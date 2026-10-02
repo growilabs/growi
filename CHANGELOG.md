@@ -1,22 +1,3253 @@
 # Changelog
 
-## [Unreleased](https://github.com/weseek/growi/compare/v4.5.2...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.4...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
 
-## [v4.5.2](https://github.com/weseek/growi/compare/v4.5.1...v4.5.2) - 2021-12-06
+## [v8.0.4](https://github.com/growilabs/compare/v8.0.3...v8.0.4) - 2026-09-14
+
+### 💎 Features
+
+* feat: Add inline comments on page body text selections (#11844) @yuki-takei
+* feat: UI for advanced search filters (#11597) @arvid-e
+
+### 🚀 Improvement
+
+* imprv(lsx): Add tag-based filtering to $lsx (#11883) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(turbo): generate vendor-styles.prebuilt files before component tests (#11882) @yuki-takei
+* fix: Preserve inline style and class on rendered headings (#11894) @yuki-takei
+* fix: Read-only users could publish/unpublish pages (#11895) @yuki-takei
+* fix(vault): Stop sending required revisionId as empty string (#11878) @yuki-takei
+
+### 🧰 Maintenance
+
+* support(i18n): Add community translation pipeline via POEditor (#11874) @yuki-takei
+
+## [v8.0.3](https://github.com/growilabs/compare/v8.0.2...v8.0.3) - 2026-09-07
+
+### 💎 Features
+
+* feat(editor): Add slash command to the Markdown editor (#11838) @Ryosei-Fukushima
+
+### 🚀 Improvement
+
+* imprv(news): Render GROWI news as Markdown (#11608) @ryotaro-nagahara
+* imprv: Refactoring for extracting shared page-access check for attachment retrieval (#11813) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Clean pages automatically using cron job (#11513) @arvid-e
+* fix(page-bulk-export): Embed attachment images in exported PDFs (RELAY mode) (#11859) @yuki-takei
+* fix: Enforce access control on revision-by-id and attachment-by-id apiv3 routes (#11810) @yuki-takei
+
+## [v8.0.2](https://github.com/growilabs/compare/v8.0.1...v8.0.2) - 2026-08-25
+
+### 💎 Features
+
+* No changes
+  
+* feat(g2g-transfer): Add a migration mode that replaces the destination and keeps its admins able to sign in (#11695) @yuki-takei
+  
+
+### 🐛 Bug Fixes
+
+* fix(file-uploader): Restore update button on FileUploadSetting for GROWI.cloud (#11771) @yuki-takei
+* fix(g2g-transfer): Extend G2G unique-conflict detection to externalaccounts/externalusergroups (#11749) @yuki-takei
+* fix: Guard array length before indexing in POST /pages/delete (#11768) @yuki-takei
+* fix: Unify not-found/forbidden responses to a uniform 404 for write-action page routes (#11762) @yuki-takei
+* fix(attachment): Enforce page-viewer permission for guest requests too (#11756) @yuki-takei
+* fix(NextLink): decide client-side routing from an explicit route list (#11747) @yuki-takei
+* fix(page-bulk-export): ERR_MODULE_NOT_FOUND on production builds (#11729) @yuki-takei
+* fix: SelectGroupModal uses list-group with checkbox rows (#11701) @yuki-takei
+* fix: Reduce SSR payload on admin/ai, admin/vault, admin/app by dropping preloadAllLang (#11697) @yuki-takei
+* fix: Report a conflict when deleting a page with a stale revisionId (#11684) @yuki-takei
+* fix: Report a conflict when renaming a page with a stale revisionId (#11680) @yuki-takei
+* fix: Links to pages with non-ASCII paths reload the whole document (#11687) @yuki-takei
+* fix: Page created at a path with a leftover redirect was not reachable at that path (#11683) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Prisma page-tag-relation model (#11691) @mizozobu
+* support: Publish vault-manager and pdf-converter images from master via changesets (#11679) @yuki-takei
+
+## [v8.0.1](https://github.com/growilabs/compare/v8.0.0...v8.0.1) - 2026-08-10
+
+### 💎 Features
+
+* feat: Audit Log fuzzy search by username (#11621) @Appleple47
+* feat: Syntax highlighting view in admin custom (#11453) @mariko-h
+
+### 🚀 Improvement
+
+* imprv(mastra): Focus the chat prompt input when the chat sidebar opens (#11527) @miya
+
+### 🐛 Bug Fixes
+
+* fix(comment): Make /comments.update respond so editing leaves edit mode (#11641) @yuki-takei
+* fix(drawio): Fix math, shapes, menu contrast and DRAWIO_URI on self-hosted instances (#11633) @yuki-takei
+* fix(g2g-transfer): Fix expiring keys, overwritten destination records and silent partial imports (#11658) @yuki-takei
+* fix(g2g-transfer): Abort G2G transfer before import when unique-constraint conflicts exist (#11643) @yuki-takei
+* fix(g2g-transfer): Prevent auth bypass and path traversal in the transfer receiver (#11631) @yuki-takei
+* fix(vault): Reject requests for objects outside the requester's view (#11604) @yuki-takei
+* fix(vault): Recover a bootstrap whose runner is gone (#11599) @yuki-takei
+* fix(vault): Shrink the clone transfer and fix the sparse-checkout recipe (#11605) @yuki-takei
+* fix(vault-manager): Prevent clone checkouts from failing due to long page names (#11603) @yuki-takei
+* fix: Replace dead Slack invite link with a single redirect page (#11626) @yuki-takei
+* fix: Restore native "Choose File" button styling outside .tw-root (#11613) @yuki-takei
+* fix: Bookmark folder authorization and bookmark display restriction (#11478) @arvid-e
+
+### 🧰 Maintenance
+
+* ci(deps-dev): bump vite from 6.4.2 to 6.4.3 (#11533) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump mermaid from 11.15.0 to 11.16.1 (#11662) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump js-yaml from 4.2.0 to 4.3.1 (#11663) @[dependabot[bot]](https://github.com/apps/dependabot)
+* chore(app): remove orphaned openai:serviceType / openai:apiKey config keys (#11652) @yuki-takei
+* support(contributors): Add Allan Wirth as a contributor (#11647) @yuki-takei
+
+## [v8.0.0](https://github.com/growilabs/compare/v7.5.7...v8.0.0) - 2026-07-27
+
+### 💎 Features
+
+* feat(ai): AI agent using Mastra (#10327) @miya
+* feat(ai): Support multiple AI providers and cross-provider model selection (#11394) @miya
+* feat(ai): Show official AI provider & model names in the UI (#11432) @miya
+* feat: GROWI Vault (#11092) @yuki-takei
+* feat: Agentic search engine for suggest-path (#11293) @tomoyuki-t-weseek
+* feat: Page Markdown endpoint (.md URL / Accept: text/markdown) with navigation footer (#11439) @yuki-takei
+* feat(activity): Capture attachment snapshots for ADD/DOWNLOAD actions (#11433) @yuki-takei
+* feat(activity-log): Activity Log with action-keyed snapshot union (incl. activities Prisma migration) (#11393) @yuki-takei
+* feat(news): Switch news delivery settings from admin page (#11091) @ryotaro-nagahara
+
+### 🚀 Improvement
+
+* imprv: Lazy-load passport strategy SDKs and ldapjs (#11480) @yuki-takei
+* imprv: Lazy-load mail transports to keep nodemailer/aws-sdk out of boot (#11479) @yuki-takei
+* imprv: Warm up Prisma connection at boot (#11481) @yuki-takei
+* imprv(activity-log): Activity Log snapshot detail viewer (formatted attachment-removal view + raw fallback) (#11440) @yuki-takei
+* imprv(activity-log): Activity Log recording gate (lazy fail-safe) — skip persisting out-of-gate updates (#11421) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Build safeRedirect target from app:siteUrl behind a reverse proxy (#11248) (#11489) @yuki-takei
+* fix(drawio): Preserve and render all pages of a multi-page diagram (#11524) @yuki-takei
+* fix(import): Derive export archive list from server state via SWR (#11511) @yuki-takei
+* fix(import): Surface import-settings build errors to the admin UI (#11520) @yuki-takei
+
+### 🧰 Maintenance
+
+* support(search): Drop Elasticsearch 7 support (#11490) @yuki-takei
+* support: Opt-in jemalloc allocator (JEMALLOC_ENABLED) to release glibc's retained native memory (#11411) @yuki-takei
+* support: Migrate to ESM (#11309) @yuki-takei
+* support: Reduce memory consumption for the GROWI server (#11208) @yuki-takei
+* ci(deps): bump body-parser from 1.20.3 to 1.20.6 (#11504) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.5.7](https://github.com/growilabs/compare/v7.5.6...v7.5.7) - 2026-07-21
+
+### 💎 Features
+
+* feat: Display comments at the share link (#11401) @mariko-h
+* feat: Filter by author, editor and group in the search results (#11368) @arvid-e
+* feat: User group member visibility (#11320) @Ryosei-Fukushima
+
+### 🚀 Improvement
+
+* imprv: Email white list (#11314) @mariko-h
+
+### 🐛 Bug Fixes
+
+* fix(plantuml): Stop deprecation warning painted onto carbon-gray diagrams (#11475) @yuki-takei
+* fix(plantuml): Stop leaking PlantUML theme YAML front matter into diagram source (#11461) @yuki-takei
+* fix(import): Harden admin data import (re-enable button on failure, await import) (#11474) @yuki-takei
+* fix: Prevent blank screen when Next.js falls back to the error page (#11423) @yuki-takei
+* fix: Prevent PageSelectModal infinite render loop (#11422) (#11428) @yuki-takei
+
+## [v7.5.6](https://github.com/growilabs/compare/v7.5.5...v7.5.6) - 2026-06-25
+
+### 💎 Features
+
+* feat: Contribution Graph on the user's profile (#10509) @arvid-e
+* feat(comment): Comment mention and add In-App-notification (#11058) @Ryosei-Fukushima
+* feat: Changes Index and Revision Diff APIs (#11353) @yuki-takei
+* feat: Add button to make all notification as read (#11352) @ryotaro-nagahara
+
+### 🚀 Improvement
+
+* imprv: Expose news body (#11317) @ryotaro-nagahara
+* imprv: Include page revert action in supported contribution actions (#11321) @arvid-e
+* imprv: Page create button interaction (#11313) @hikaru-n-cpu
+
+### 🐛 Bug Fixes
+
+* fix: Suppress modifier shortcuts in editable elements (#11340) @yuki-takei
+* fix: escape </style> breakout in renderCustomCss (#11298) @yuki-takei
+* fix: Use req.user.username in LDAP Execute Sync instead of req.user.name (#11356) @yuki-takei
+* feat(page-bulk-export): Rework bulk PDF/HTML export to render Markdown like the web (tables, math, emoji, directives) (#11288) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps): bump js-yaml from 4.1.1 to 4.2.0 (#11311) @[dependabot[bot]](https://github.com/apps/dependabot)
+* chore(deps): dedupe pnpm-lock.yaml to CI-gate release dependency churn (#11343) @yuki-takei
+* ci(deps-dev): bump vitest from 3.2.4 to 3.2.6 (#11279) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump form-data from 4.0.5 to 4.0.6 (#11335) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.5.5](https://github.com/growilabs/compare/v7.5.4...v7.5.5) - 2026-06-10
+
+### 🚀 Improvement
+
+* imprv: Enable API token header "X-GROWI-ACCESS-TOKEN" (#11244) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: disable $lsx() and attachment-refs directives on share link pages to prevent Basic auth challenge (#11271) @yuki-takei
+* fix: Prevent bulk-export cleanup race on shared attachment (#11229) @tomoyuki-t-weseek
+* fix: Remove uglifycss to preserve CSS Color Level 4 syntax (#11277) @yuki-takei
+* fix: Index rebuild fails on boot when initializing a Crowi instance takes a long time (#11247) @ryu-sato
+* fix: Page operations and v5 page migration fail for paths containing non-ASCII whitespace (e.g. U+3000) (#11236) @yuki-takei
+* fix(editor): fix Shift+Arrow selection stuck on wrapped lines by upgrading @codemirror/commands to ^6.10.3 (#11264) @yuki-takei
+* fix(editor): Preserve page grant on mobile & before grant loads (#11272) (#11276) @yuki-takei
+* fix(ui): right-align ModalHeader close content wrapped in a custom element (#11269) @yuki-takei
+* fix(attachment): deny direct access to /uploads to prevent stored XSS (#11257) @miya
+* fix(page-grant): guard against TypeError when grantedUsers is empty in calcApplicableGrantData (#11211) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Verify initial pages are created with content after installation (#11234) @Ryosei-Fukushima
+* ci(deps): bump mermaid from 11.10.0 to 11.15.0 (#11121) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump axios from 1.15.0 to 1.16.0 (#11260) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump qs from 6.14.2 to 6.15.2 (#11209) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): bump turbo from 2.1.3 to 2.9.14 (#11202) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump js-cookie from 3.0.5 to 3.0.7 (#11205) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.5.4](https://github.com/growilabs/compare/v7.5.3...v7.5.4) - 2026-05-27
+
+### 💎 Features
+
+* feat: Retrieve GROWI news (#10986) @ryotaro-nagahara
+* feat: Editor guide (#10847) @yuki-takei
+* feat(otel): Add growi_installed_at metrics (#11214) @ryotaro-nagahara
+* feat(otel): add yjs docs count and mongoose connection pool metrics (v7 backport) (#11218) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: UserPicture in order to show tooltip in production builds (#11192) @yuki-takei
+* fix: Correct parent grant value in /grant-data endpoint (#11181) @yuki-takei
+* fix: Permit GRANT_RESTRICTED child under any parent grant (#11182) @yuki-takei
+* fix(editor): Fix cursor stuck on wrapped lines by upgrading @codemirror/view to ^6.42.1 (#11153) @yuki-takei
+* fix(bookmark): Add owner authorization checks to bookmark folder api (#11178) @Ryosei-Fukushima
+* fix(bulk-export): Set completedAt on all bulk export completion paths (#11195) @tomoyuki-t-weseek
+* fix(admin): Prompt reload after toggling page bulk export setting (#11180) @tomoyuki-t-weseek
+* fix(drawio): draw.io stencil URLs for local instances (#11196) @yuki-takei
+* fix(bulk-export): Show bulk-export restart modal on duplicate-job error (#11186) @tomoyuki-t-weseek
+* fix(admin): stop infinite render loop on G2G data transfer page (#11166) @miya
+
+## [v7.5.3](https://github.com/growilabs/compare/v7.5.2...v7.5.3) - 2026-05-14
+
+### 🐛 Bug Fixes
+
+* fix: GrowiSlides throws an unhandled exception when the rendererOptions are undefined (#11110) @Ryosei-Fukushima
+* fix: Rebalance blockquote margins in wiki and page comments (#11072) @yuki-takei
+* fix(drawio): Prevent host CSS leaking into <foreignObject> (#11068) @yuki-takei
+* fix(search): resolve nested <button> DOM warning in search result list (#11065) @yuki-takei
+* fix: Page publish/unpublish IDOR bypasses page grant system (#11032) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: switch pnpm install to corepack & devcontainer node:2 (#11157) @yuki-takei
+* ci(deps): bump next from 16.2.3 to 16.2.6 (#11117) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump @opentelemetry/auto-instrumentations-node from 0.60.1 to 0.75.0 (#11112) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump @opentelemetry/sdk-node from 0.202.0 to 0.217.0 (#11114) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Figma plugin (#11069) @satof3
+* ci(deps): bump next from 16.2.1 to 16.2.3 (#10995) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump mongoose from 6.13.8 to 6.13.9 (#11083) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Add vulnerability hunters (#11071) @hikaru-n-cpu
+* support: Fix ES security settings for CI (#11048) @yuki-takei
+
+## [v7.5.2](https://github.com/growilabs/compare/v7.5.1...v7.5.2) - 2026-04-22
+
+### 🚀 Improvement
+
+* imprv: Render page tree item title as a real anchor (#11029) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(editor): Editor breaks when an ID created by useId() is passed to a  reactstrap Popover/Tooltip targets (#11039) @yuki-takei
+* fix: Request requiring login is being made on the shared link page (#11026) @miya
+* fix: Search scope children as default setting is not applied (#11027) @miya
+* fix(slack): Normalize proxyUri to undefined for custom bot without proxy mode (#11035) @yuki-takei
+* fix: Avoid setState-in-render warning in useHydrateGlobalEachAtoms (#11023) @yuki-takei
+* fix: Stabilize watch-rendering-and-rescroll test suite (#11037) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Upgrade Biome (#11040) @yuki-takei
+
+## [v7.5.1](https://github.com/growilabs/compare/v7.5.0...v7.5.1) - 2026-04-16
+
+### 💎 Features
+
+* feat(editor): Add full Emacs markdown-mode keybindings (#10980) @yuki-takei
+* feat(ui): Add Other Shortcuts link to modal footer (#10976) @tomoyuki-t-weseek
+* feat(editor): Collaborative editor awareness with rich cursors and off-screen indicators (#10981) @yuki-takei
+* feat: Define actions that result in Create vs Edit activities (#10818) @arvid-e
+* feat(editor): Add full Emacs markdown-mode keybindings (#10980) @yuki-takei
+
+### 🚀 Improvement
+
+* feat(editor): Collaborative editor awareness with rich cursors and off-screen indicators (#10981) @yuki-takei
+* feat: add dedicated share link page API and simplify GET /page (#11000) @miya
+
+### 🐛 Bug Fixes
+
+* fix: Initial page fails to generate automatically upon a new installation (#11007) @miya
+* fix(security): upgrade axios to ^1.15.0 (CVSS 10.0) (#11009) @yuki-takei
+* fix(security): Path traversal (#10998) @mariko-h
+* fix: Initial page fails to generate automatically upon a new installation (#11007) @miya
+* fix: Unify documentation URL locale logic (#10999) @tomoyuki-t-weseek
+* fix(admin): Prevent flickering for V5 Page Migration section on app settings page (#10992) @yuki-takei
+* fix(security): Path traversal (#10998) @mariko-h
+* fix(mail): TypeError when sending test email via SMTP (#10991) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Upgrade Claude Code Spec-Driven Development (SDD) to v3 (#11014) @yuki-takei
+* support: Add contributor (#10985) @satof3
+* support: Migrate logger to pino (#10958) @yuki-takei
+
+## [v7.5.0](https://github.com/growilabs/compare/v7.4.7...v7.5.0) - 2026-04-07
+
+### 💎 Features
+
+* feat(ai): Suggest path to save (#10777) @tomoyuki-t-weseek
+* feat: Audit log bulk export (#10874) @Ryosei-Fukushima
+* feat(page-create-modal): add template help link icon (#10899) @tomoyuki-t-weseek
+* feat: add tooltips to editor toolbar (#10938) @Ryosei-Fukushima
+* feat: Add growi cloud link to audit log settings (#10881) @ryota-t0401
+
+### 🚀 Improvement
+
+* imprv: Staff credit (#10839) @yuki-takei
+* imprv(lsx): Allow spaces in attribute names (#10931) @NJisEverywhere
+* imprv: pre-fill export modal with current filter values (#10944) @NJisEverywhere
+* imprv(presentation): Decouple Marp from GrowiSlides (#10840) @yuki-takei
+* imprv(ui): Implement the improved New button. (#10937) @yuyaiwahori
+
+### 🐛 Bug Fixes
+
+* fix: re-scroll to hash target after lazy-rendered content completes (#10853) @miya
+* fix: Bulk export fails due to S3 upload complete version (#10833) @ryotaro-nagahara
+* fix: Duplicate user data is appearing in the user table at /user/admin (#10940) @miya
+* fix: Deleted users are not displayed in the user list on the user management page (/admin/users) (#10934) @miya
+* fix: Resolve React warnings during page rendering (#10913) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Upgrade Next.js to v16 (#10831) @yuki-takei
+* support(yjs): Migrate collaborative editing transport from y-socket.io to y-websocket (#10889) @yuki-takei
+* support: Upgrade vite v6, vitest v3, and related packages (#10945) @yuki-takei
+* ci(deps-dev): bump vite from 6.4.1 to 6.4.2 (#10960) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Upgrade version-pinned packages and replace escape-string-regexp with RegExp.escape() (#10920) @yuki-takei
+* support: Migrate to Turbopack (#10838) @yuki-takei
+* support: Modernize Dockerfile (#10809) @yuki-takei
+* support: Reclassify deps (#10873) @yuki-takei
+* support(dev): Reduce modules loaded (#10822) @yuki-takei
+
+## [v7.4.7](https://github.com/growilabs/compare/v7.4.6...v7.4.7) - 2026-03-23
+
+### 💎 Features
+
+* feat: Prevent inline mime type sniffing vulnerabilities (#10087) @arvid-e
+
+### 🐛 Bug Fixes
+
+* fix(editor): Disable bracketMatching to prevent IME composition rendering corruption (#10900) @miya
+
+## [v7.4.6](https://github.com/growilabs/compare/v7.4.5...v7.4.6) - 2026-03-10
+
+### 🐛 Bug Fixes
+
+* fix: mobile editor page title display (#10712) @satof3
+* fix: Exclude user page data from search response when user pages are disabled (#10740) @arvid-e
+* fix(search): prevent Downshift from intercepting Home/End keys in search input (#10815) @yuki-takei
+* fix: Openai thread IDOR (#10806) @ryotaro-nagahara
+
+### 🧰 Maintenance
+
+* support(claude): Add SessionStart hook for Claude Code on the web (#10816) @yuki-takei
+
+## [v7.4.5](https://github.com/growilabs/compare/v7.4.4...v7.4.5) - 2026-02-19
+
+### 💎 Features
+
+* feat: Realtime Increment View Count Without Refreshing Pages (#10760) @ryotaro-nagahara
+
+### 🚀 Improvement
+
+* imprv: Unchanged revision (#10770) @yuki-takei
+* imprv: Close the Sidebar in drawer mode when the route changes (#10763) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Use currentPageId for share link page fetching (#10797) @yuki-takei
+* fix: Allow viewing shared pages regardless of page permissions (#10762) @ryotaro-nagahara
+* fix: Bulk export fails due to S3 upload minimal version (#10782) @ryotaro-nagahara
+* fix: Block revisions API from returning info about user pages when user pages are disabled (#10751) @arvid-e
+* fix: OpenAPI spec mismatch for GET /page endpoint response format (#10787) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+
+### 🧰 Maintenance
+
+* support: Extract `/page/info` endpoint handler into a dedicated module (#10795) @yuki-takei
+* ci(deps): bump qs from 6.14.1 to 6.14.2 (#10785) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.4.4](https://github.com/growilabs/compare/v7.4.3...v7.4.4) - 2026-01-30
+
+### 🐛 Bug Fixes
+
+* fix: Search navigation (#10749) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+* fix: User pages are displayed in page list when 'Disable user pages' is on (#10752) @miya
+* fix: Disable logo update button when no file is selected (#10587) @hikaru-n-cpu
+
+### 🧰 Maintenance
+
+* support: Setup Claude Code environment (#10746) @yuki-takei
+* support: Improve test parallelism (#10747) @yuki-takei
+* support: Typecheck by tsgo (#10717) @yuki-takei
+
+## [v7.4.3](https://github.com/growilabs/compare/v7.4.2...v7.4.3) - 2026-01-21
+
+### 💎 Features
+
+* feat: Disable user page (#10735) @miya
+* feat: New admin setting for hiding user pages (#10708) @arvid-e
+* feat: Block other user's user pages (#10725) @arvid-e
+
+### 🚀 Improvement
+
+* imprv: New sidebar tool icon appearance (#10672) @satof3
+* imprv: Admin Home (#10692) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Vim keymap insert mode exiting after single keystroke  (#10714) @miya
+* fix: Cannot create `/Sidebar` page from custom sidebar (#10690) @miya
+* fix: PageTree does not auto-scroll to target page path on initial render (#10699) @miya
+
+### 🧰 Maintenance
+
+* support: Upgrade headless-tree (#10733) @miya
+* support: Integrate Lefthook for pre-commit Biome formatting (#10694) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+* support: Stop pushing docker image to weseek repository (#10681) @miya
+* support: Migrate the rest of files to Biome from Eslint (#10683) @yuki-takei
+
+## [v7.4.2](https://github.com/growilabs/compare/v7.4.1...v7.4.2) - 2026-01-08
+
+### 🚀 Improvement
+
+* imprv: New help button (#10553) @satof3
+* imprv: PagePathNavTitle spacing and z-index layering (#10665) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Handle blank configurations for SAML settings (#10674) @yuki-takei
+* fix: Text strings inside invitation email modal are incorrect (#10679) @miya
+* fix: Scroll jumps back to current PageTreeItem when creating page from PageTree (#10671) @miya
+
+### 🧰 Maintenance
+
+* support: Update dependencies (#10685) @miya
+* support: Update dependencies (#10682) @miya
+* ci(mergify): upgrade configuration to current format (#10673) @[mergify[bot]](https://github.com/apps/mergify)
+* support: Configure biome for some client components inside app 8 (#10668) @arafubeatbox
+* support: Configure biome for some client components inside app 7 (#10667) @arafubeatbox
+* support: Configure biome for some client components in app 6 (#10636) @arafubeatbox
+* support: Configure biome for some client components in app 4 (#10634) @arafubeatbox
+* support: Configure biome for some client components in app 3 (#10633) @arafubeatbox
+* ci(deps): bump qs from 6.13.0 to 6.14.1 (#10669) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Configure biome for some client components in app 5 (#10635) @arafubeatbox
+* support: Configure biome for some client components in app 2 (#10632) @arafubeatbox
+* support: Configure biome for some client components in app 1 (#10631) @arafubeatbox
+* ci(deps): bump next from 14.2.33 to 14.2.35 (#10597) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.4.1](https://github.com/growilabs/compare/v7.4.0...v7.4.1) - 2025-12-26
+
+### 🚀 Improvement
+
+* imprv: Show page name and link for affected pages in Activity Log (#10590) @arvid-e
+
+### 🧰 Maintenance
+
+* support: Update terraform settings and the policy for OIDC GitHub (#10653) @yuki-takei
+
+## [v7.4.0](https://github.com/growilabs/compare/v7.3.9...v7.4.0) - 2025-12-24
+
+### 💎 Features
+
+* feat: PageTree Virtualization (#10581) @yuki-takei
+* feat: Can set default user role as read-only for new users (#10623) @Ryosei-Fukushima
+* feat: Can create page when executing page edit shortcut key on empty page (#10594) @miya
+
+### 🚀 Improvement
+
+* imprv: Admin sidebar mode setting (#10617) @miya
+* imprv: Empty page operation (#10604) @yuki-takei
+* imprv: Support target attribute for anchor links (#10566) @yuki-takei
+* imprv: Use EventTarget instead of EventEmitter on the client side (#10472) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Aftercare for Revisions migration script-bug (#10620) @yuki-takei
+* fix: Omit file upload restriction feature for non image files (#10602) @miya
+
+### 🧰 Maintenance
+
+* support: Use jotai for state management (#10474) @yuki-takei
+* support: Omit importers for esa.io and Qiita (#10584) @yuki-takei
+* support: Configure biome for app client services (#10600) @arafubeatbox
+* support: Configure biome for app client utils (#10601) @arafubeatbox
+* support: Configure biome for app client models/interfaces (#10599) @arafubeatbox
+* support: Configure biome for app server services 4 (#10583) @arafubeatbox
+* support: Configure biome for app server services 3 (#10578) @arafubeatbox
+* ci(mergify): upgrade configuration to current format (#10372) @[mergify[bot]](https://github.com/apps/mergify)
+* support: Configure biome for app server services 2 (#10575) @arafubeatbox
+* support: Configure biome for some app server services (#10574) @arafubeatbox
+* support: Configure biome for apiv3 js files (#10537) @arafubeatbox
+* support: Reapply biome configuration for app apiv3 routes (app-settings, page) (#10555) @arafubeatbox
+* support: Configure biome for apiv3 routes (remaining ts files) (#10536) @arafubeatbox
+* support: Configure biome for app apiv3 routes (app-settings, page) (#10532) @arafubeatbox
+* support: Configure biome for app apiv3 routes (personal-setting, security-settings, interfaces, pages, user) (#10500) @arafubeatbox
+* support: Configure biome for app server middlewares (#10507) @arafubeatbox
+
+## [v7.3.9](https://github.com/growilabs/compare/v7.3.8...v7.3.9) - 2025-12-09
+
+### 🐛 Bug Fixes
+
+* fix: Change the name of maintenance mode. (#10559) @hikaru-n-cpu
+
+### 🧰 Maintenance
+
+* support: Add new intern names to staff credits (#10556) @riona-k
+
+## [v7.3.8](https://github.com/growilabs/compare/v7.3.7...v7.3.8) - 2025-12-04
+
+### 💎 Features
+
+* feat: Enable page bulk export for GROWI.cloud (#10292) @arafubeatbox
+* feat: Users statistics table for admin (#10539) @riona-k
+
+### 🧰 Maintenance
+
+* ci(deps): bump validator from 13.15.20 to 13.15.22 (#10560) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.3.7](https://github.com/growilabs/compare/v7.3.6...v7.3.7) - 2025-11-25
+
+### 💎 Features
+
+* feat(pdf-converter): Enable puppeteer-cluster config of pdf-converter from env var (#10516) @arafubeatbox
+
+### 🐛 Bug Fixes
+
+* fix: Admin form degradation (#10540) @yuki-takei
+
+## [v7.3.6](https://github.com/growilabs/compare/v7.3.5...v7.3.6) - 2025-11-18
+
+### 🐛 Bug Fixes
+
+* fix: Printing styles (#10505) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps): bump js-yaml from 4.1.0 to 4.1.1 (#10511) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Configure biome for app routes excluding apiv3 (#10496) @arafubeatbox
+
+## [v7.3.5](https://github.com/growilabs/compare/v7.3.4...v7.3.5) - 2025-11-10
+
+### 💎 Features
+
+* feat: Activity Log on the user page for viewing recent activity (#10487) @arvid-e
+
+### 🐛 Bug Fixes
+
+* fix: PDF-converter major/minor tags not updated on release (#10476) @arafubeatbox
+
+### 🧰 Maintenance
+
+* support: Configure biome for app/src/server/models dir (#10419) @arafubeatbox
+* support: Playwright tests biome migration (#10248) @arafubeatbox
+
+## [v7.3.4](https://github.com/growilabs/compare/v7.3.3...v7.3.4) - 2025-11-04
+
+### 🚀 Improvement
+
+* imprv: Admin form text input (#10401) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Enable profile picture uploads for read only users (#10454) @miya
+* fix: CodeQL security issues: insecure randomness and unvalidated redirect (#10431) @[copilot-swe-agent[bot]](https://github.com/apps/copilot-swe-agent)
+* fix: CSRF protection by origin comparison (#10345) @yusa-bot
+
+### 🧰 Maintenance
+
+* support: Clean CSRF token storing hook (#10452) @yuki-takei
+* ci(deps): bump validator from 13.12.0 to 13.15.20 (#10445) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): bump vite from 5.4.20 to 5.4.21 (#10432) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Configure biome for OpenAI feature client dir (#10422) @arafubeatbox
+* support: Configure biome for small dirs in app/src/server (#10417) @arafubeatbox
+* support: Configure biome for OpenAI feature exluding client dir (#10377) @arafubeatbox
+* support: Configure biome for app services/stores dir (#10411) @arafubeatbox
+* support: Configure biome for app pages dir (#10410) @arafubeatbox
+* support: Configure biome for app components dir (#10382) @arafubeatbox
+* support: Biome v2.2 and use noRestrictedImports instead of eslint(no-restricted-imports) (#10408) @yuki-takei
+* support: Apply Biome and organize imports (#10406) @yuki-takei
+
+## [v7.3.3](https://github.com/growilabs/compare/v7.3.2...v7.3.3) - 2025-10-15
+
+### 💎 Features
+
+* feat(otel): Page counts metrics (#10367) @Ryosei-Fukushima
+
+### 🚀 Improvement
+
+* imprv: Improve KnowledgeAssistant chat UI UX (#10355) @satof3
+* imprv: Guest user client performance by Socket.io event optimization (#10379) @yuki-takei
+* imprv: PageTree performance by page-listing API (#10362) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Draw.io color mode (#10390) @miya
+* fix: Cannot update v4 format pages (#10378) @miya
+* fix: Bulk export cleanup and notification occasionally not working on job expire (#10366) @arafubeatbox
+
+### 🧰 Maintenance
+
+* support: Configure biome for app services dir (#10381) @arafubeatbox
+* support: Configure biome for app etc. dirs (#10380) @arafubeatbox
+* support: Configure biome for rate-limiter feature (#10376) @arafubeatbox
+* support: Configure biome for growi-plugin feature (#10309) @arafubeatbox
+* support: Service integration test biome migration (#10234) @arafubeatbox
+* support: Update axios (#10353) @arafubeatbox
+
+## [v7.3.2](https://github.com/growilabs/compare/v7.3.1...v7.3.2) - 2025-09-29
+
+### 🚀 Improvement
+
+* imprv: Elasticsearch management retrieving status (#10330) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Ensure login errors display regardless of password login configuration (#10347) @yuki-takei
+* fix: TreeItem opening logic (#10331) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Improve memory leak (#10329) @yuki-takei
+* support: Fix biome errors (#10338) @yuki-takei
+
+## [v7.3.1](https://github.com/growilabs/compare/v7.3.0...v7.3.1) - 2025-09-22
+
+### 🧰 Maintenance
+
+* support: Revert Node.js runtime version to v18/20 for memory consumption
+* ci(deps-dev): bump vite from 5.4.19 to 5.4.20 (#10294) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump next from 14.2.30 to 14.2.32 (#10312) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.3.0](https://github.com/growilabs/compare/v7.2.10...v7.3.0) - 2025-09-11
+
+### 💎 Features
+
+* feat: Eenhanced access token (#9824) @miya
+* feat: Add shortcuts when editing (#9512) @WNomunomu
+
+### 🚀 Improvement
+
+* imprv(ai): Threads history (#10098) @miya
+* imprv: New keyboard shortcut display modal (#10158) @satof3
+* imprv: Set a longer value for the export interval of OpenTelemetry metrics (#10189) @yuki-takei
+* imprv: Change pdf bulk export shared html path (#10174) @arafubeatbox
+* imprv: Adjust pagetitle spacing (#10171) @satof3
+* imprv: Add dark mode support to PlantUML rendering (#10147) @yuki-takei
+* imprv: Add dark mode support to DrawioViewer component (#10141) @yuki-takei
+* imprv: Add dark mode support to MermaidViewer component (#10139) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Auto-scroll to anchor for page view (#10181) @Naoki427
+* fix: Mermaid diagrams are not displayed when svg ids are duplicated (#10167) @miya
+* fix: Page list preview is not displayed in guest mode (#10176) @miya
+* fix: Tag <code> result in inline code blocks (#10165) @arvid-e
+* fix: Put render error message on PagePresentationModal and console (#10152) @Naoki427
+* fix: Remove appId from GROWI.cloud export path (#10213) @arafubeatbox
+* fix: remove srcdoc from whitelist (#10200) @Naoki427
+* fix: Add checking attachment file name and file size for g2g transformation (#10166) @Naoki427
+* fix: Bug causing export zip file to display twice (#10128) @arvid-e
+* fix(pdf-converter): Puppeteer not launching in pdf-converter (#10192) @arafubeatbox
+* fix(admin): Validate invalid key in qiita importer (#10170) @Naoki427
+* fix(admin): Cannot change file upload destination to "MongoDB (GridFS)" or "local" (#10118) @miya
+
+### 🧰 Maintenance
+
+* support: Remove questionnaire (#10185) @yuki-takei
+* support: Node.JS 22 (#10140, #10149) @miya
+* support: Elasticsearch v9 (#10127) @miya
+* support: Bump mermaid to v11.9.0 (#10194) @yuki-takei
+* support: Update biome to ver2 (#10142) @arafubeatbox
+* support: Configure biome for slackbot-proxy services (#10206) @arafubeatbox
+* support: Configure biome for slackbot-proxy (excluding services) (#10126) @arafubeatbox
+* support: Configure biome for pdf-converter (#10125) @arafubeatbox
+* ci(deps): bump form-data from 4.0.0 to 4.0.4 (#10177) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump myrotvorets/info-from-package-json-action from 2.0.1 to 2.0.2 (#9823) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump docker/metadata-action from 4 to 5 (#9821) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump peter-evans/dockerhub-description from 3 to 4 (#9822) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.2.10](https://github.com/weseek/growi/compare/v7.2.9...v7.2.10) - 2025-08-20
+
+### 🐛 Bug Fixes
+
+* fix: Auto-scroll to anchor for page view (for v7.2.x) (#10241) @miya
+* fix: OpenTelemetry metrics setup (#10219) @yuki-takei
+* fix: Share link copy button couldn't be pressed (#10221) @yuki-takei
+* fix: Mermaid diagrams are not displayed when svg ids are duplicated (for v7.2.x) (#10184) @miya
+
+### 🧰 Maintenance
+
+* support: Change OpenTelemetry configuration (#10218) @yuki-takei
+
+## [v7.2.9](https://github.com/growilabs/growi/compare/v7.2.8...v7.2.9) - 2025-07-01
+
+### 🚀 Improvement
+
+* imprv(ai): Assistant instructions (#10129) @yuki-takei
+* imprv: OpenTelemetry phase 2 (#10095) @yuki-takei
+* imprv: Adjust margin-top for .main at md and lg breakpoints (#10131) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Sharelink expiration date parsing when the date is cleared by the calendar UI (#10132) @yuki-takei
+* fix: Cannot change file upload destination to "MongoDB (GridFS)" or "local" for dev/7.2.x (#10119) @miya
+
+## [v7.2.8](https://github.com/growilabs/growi/compare/v7.2.7...v7.2.8) - 2025-06-26
+
+### 💎 Features
+
+* feat(ai): Send pre-message before main chat stream (#10089) @miya
+
+### 🚀 Improvement
+
+* imprv(ai): Add page content around the cursor position as context for editor assistant (#10106) @yuki-takei
+* imprv(ai): Search and Replace strategy for Editor Assistant (#10093) @yuki-takei
+* imprv(ai): Submit with Enter key (#10085) @yuki-takei
+* imprv: Make axios response convert dates to type Date (#10064) @arvid-e
+* imprv: OpenAPI Spec for GROWI API v1 (#10063) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Unhandled exception in GlobalNotificationMailService (#10076) @yuki-takei
+* fix: Prevent dropdown menu from hiding behind sidebar (#10103) @arvid-e
+* fix(ai): Message gets sent when pressing Enter to confirm text conversion (#10094) @miya
+
+### 🧰 Maintenance
+
+* support: Configure biome for core package utils and models (#10082) @arafubeatbox
+* support: Configure biome for pdf-converter-client package (#10077) @arafubeatbox
+* support: Configure biome for core package biome (excluding utils and models) (#10078) @arafubeatbox
+* support: Configure biome for pluginkit package (#10071) @arafubeatbox
+* support: Configure biome for remark-attachment-refs package (#10054) @arafubeatbox
+* support: Configure biome for presentation package (#10067) @arafubeatbox
+* ci(deps): bump next from 14.2.26 to 14.2.30 (#10068) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.2.7](https://github.com/growilabs/growi/compare/v7.2.6...v7.2.7) - 2025-06-11
+
+### 🐛 Bug Fixes
+
+* fix: Input values ​​in the admin settings form are sometimes not reflected (#10051) @yuki-takei
+* fix: Hide Google OAuth client secret field (#10049) @yuki-takei
+* fix: Prevent unnecessary API request when the user is guest (#10046) @yuki-takei
+* fix(ai): Prevent unnecessary API request when GROWI AI is disabled (#10044) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Configure biome for preset-templates package (#10058) @arafubeatbox
+* support: Configure biome for preset-themes package (#10055) @arafubeatbox
+* support: Configure biome for remark-drawio package (#10033) @arafubeatbox
+
+## [v7.2.6](https://github.com/growilabs/growi/compare/v7.2.5...v7.2.6) - 2025-06-10
+
+### 💎 Features
+
+* feat(ai): Display spinner while creating diff (#9991) @miya
+
+### 🚀 Improvement
+
+* imprv: Message card markdown header size (#10038) @miya
+* imprv: Type safe configuration for file uploading (#10032) @yuki-takei
+* imprv: EditorAssistant instruction (#10030) @miya
+* imprv: Add NonEmptyString type (#10031) @yuki-takei
+* imprv: Security settings search results redesign (#9992) @arvid-e
+* imprv: OpenAPI spec properties ref (#10023) @yuki-takei
+* imprv(ai): Make input form position sticky (#10002) @miya
+* imprv: Prevent path traversal attack in pdf converter (#9993) @arafubeatbox
+* imprv: Discard when form is submitted without Accept/Discard after showing diff (#9980) @miya
+
+### 🐛 Bug Fixes
+
+* imprv:  The delete button on the user home page is now hidden for unauthorized users. (#9915) @taikou-m
+* fix: OpenAI threads can be retrieved regardless of assistant's public permissions (#9994) @miya
+* fix: Editor assistant button is being displayed when ai functionality is not enabled (#9985) @miya
+* fix: Improve attribute handling in Lsx (#9989) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: OpenAPI operationId generation (#10009) @yuki-takei
+* support: Configure biome for remark-growi-directive (#9999) @arafubeatbox
+
+## [v7.2.5](https://github.com/growilabs/growi/compare/v7.2.4...v7.2.5) - 2025-05-28
+
+### 💎 Features
+
+* feat: Save attachment to VectorStore (#9906) @miya
+
+### 🚀 Improvement
+
+* imprv: Headers and CopyDropdown UX (#9973) @yuki-takei
+* imprv(api): Support Bearer token (#9971) @yuki-takei
+* imprv: Add orgId and appId to bulk export path (#9946) @arafubeatbox
+
+### 🐛 Bug Fixes
+
+* fix: Prevent submission during text composition in SearchTypeahead (#9977) @miya
+* fix(ai): First user message is not displayed (#9976) @miya
+* fix: Vectorstore file not rebuilt after page update (#9951) @miya
+
+### 🧰 Maintenance
+
+* ci(deps-dev): bump vite from 5.4.17 to 5.4.19 (#9911) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Prevent SSRF for slack integration (#9952) @yuki-takei
+* support: Remark lsx package biome migration (#9948) @arafubeatbox
+* support: UI package biome migration (#9945) @arafubeatbox
+* support: Migrate linter/formatter to biome for @growi/slack package (#9917) @arafubeatbox
+
+## [v7.2.4](https://github.com/growilabs/growi/compare/v7.2.3...v7.2.4) - 2025-05-15
+
+### 🐛 Bug Fixes
+
+* fix: Picture size (#9938) @yuki-takei
+
+## [v7.2.3](https://github.com/growilabs/growi/compare/v7.2.2...v7.2.3) - 2025-05-14
+
+### 💎 Features
+
+* feat(ai): Unified merge view (#9643) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv(ai): AI models and instructions (#9913) @yuki-takei
+* imprv(ai): Evaluate article headers (#9921) @yuki-takei
+* imprv(ai): Tidy up instructions (#9918) @yuki-takei
+* imprv: Disable page bulk export when file upload settings are not configured (#9900) @arafubeatbox
+* imprv: add contributors that has not been added to konami command (#9901) @Ryosei-Fukushima
+* imprv(ai): AI models and instructions (#9913) @yuki-takei
+* imprv: Hide summary mode switch in editor assistant mode (#9897) @miya
+* imprv: User picture tooltip (#9892) @yuki-takei
+* imprv: User picture tooltip (2) (#9898) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: PagePathHeader maxWidth for editor (#9930) @yuki-takei
+* fix: Pages list API (#9928) @yuki-takei
+* fix: Set OpenTelemetry resource attribute `service.instance.id` (#9902) @yuki-takei
+* fix: User picture tooltip (2) (#9898) @yuki-takei
+* fix: ConfigLoader.loadFromDB for JSON parsing error handling (#9890) @yuki-takei
+* fix: Profile image upload functionality and accepted file types (#9886) @yuki-takei
+* fix: Tooltip for UserPicture doesn't work (#9884) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Improve the official docker image size (#9874) @yuki-takei
+* support: Upgrade openai package (#9909) @yuki-takei
+* support(pdf-converter): Improve the official docker image size for pdf-converter (#9880) @yuki-takei
+* support: Improve the official docker image size (#9874) @yuki-takei
+
+## [v7.2.2](https://github.com/growilabs/growi/compare/v7.2.1...v7.2.2) - 2025-04-17
+
+### 🐛 Bug Fixes
+
+* fix: Export page API is broken (#9870) @yuki-takei
+
+## [v7.2.1](https://github.com/growilabs/growi/compare/v7.2.0...v7.2.1) - 2025-04-16
+
+### 💎 Features
+
+* feat: Page bulk export (pdf export included) (#9678) @arafubeatbox
+
+### 🚀 Improvement
+
+* imprv: Add util method to get react instance of growi via growifacade (#9775) @NaokiHigashi28
+* imprv: Adjust comment editor clickable area (#9840) @yuki-takei
+* imprv: Make user activation middleware securely (#9818) @yuki-takei
+* imprv: Prepare to upgrade React and Next.js (#9816) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: The order of multer middleware (#9772) @NaokiHigashi28
+* fix: growi pluginkit growifacade typo (#9812) @NaokiHigashi28
+* fix: Migration script to remove index for 'ns' from config collection (#9770) @yuki-takei
+* fix: Assistant remains default when made unpublished (#9763) @miya
+* fix: Fix layout when safari browse (#9744) @satof3
+* fix:  Prevent GrowiPlugin from being downloaded outside the plugin directory (#9712) @NaokiHigashi28
+* fix: The link for Telemetry of GROWI Docs (#9737) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps): bump next from 14.2.22 to 14.2.25 (#9761) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): bump vite from 5.4.16 to 5.4.17 (#9837) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): bump vite from 5.4.15 to 5.4.16 (#9830) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Upgrade Next.js (#9825) @yuki-takei
+* support: Upgrade SWR (#9814) @yuki-takei
+* ci(deps-dev): bump vite from 5.4.14 to 5.4.15 (#9781) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump dependabot/fetch-metadata from 1 to 2 (#9636) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump docker/build-push-action from 4 to 6 (#9638) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump release-drafter/release-drafter from 5 to 6 (#9637) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v7.2.0](https://github.com/growilabs/growi/compare/v7.1.9...v7.2.0) - 2025-03-11
+
+### 💎 Features
+
+* feat: GROWI AI Next Gen (#9492) @miya
+* feat: Support OpenTelemetry (#8810) @yuki-takei
+* feat: Add AuthorInfo display setting to PageSideContents (#9689) @satof3
+* feat: Expose React Insance to window via GrowiFacade (#9729) @NaokiHigashi28
+* feat: Normalize remark growi directives for v6.0.x or above (#9690) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv: Fix RecentChanges dropdown label (#9711) @satof3
+* imprv: Border color for dark mode (#9695) @satof3
+* imprv: Update shortcut key modal (#9651) @satof3
+* imprv: Suppresses unnecessary re-rendering within PageEditor (#9629) @reiji-h
+
+### 🐛 Bug Fixes
+
+* fix: Redirection after login does not work on systems with guest mode enabled (#9653) @reiji-h
+* fix: Data migration script for CSV and TSV (#9641) @miya
+* fix: Authenticate before uploading at /_api/v3/import/upload endpoint (#9647) @NaokiHigashi28
+* fix: Add XSS filter to remark-attachment-refs /refs endpoint (#9631) @NaokiHigashi28
+* fix: PageTree auto-scrolling sometimges not woking (#9544) @reiji-h
+* fix: Middlewares about installation (#9616) @yuki-takei
+* fix: Typo for bookmark API (#9613) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Upgrade runtime versions (#9655) @yuki-takei
+* support: Display brand logo when editor mode (#9632) @satof3
+* support: Upgrade CodeMirror (#9633) @yuki-takei
+* ci(deps): bump docker/login-action from 2 to 3 (#8208) @dependabot
+* ci(deps): bump google-github-actions/auth from 1 to 2 (#9557) @dependabot
+* ci(deps): bump myrotvorets/info-from-package-json-action from 2.0.1 to 2.0.2 (#9558) @dependabot
+* support: Remove legacy ConfigManager (#9624) @yuki-takei
+
+## [v7.1.9](https://github.com/growilabs/growi/compare/v7.1.8...v7.1.9) - 2025-02-03
+
+### 💎 Features
+
+* feat: Add error handling for data migration (#9582) @miya
+
+### 🚀 Improvement
+
+* imprv: Data migration script performance (#9599) @miya
+* imprv: Initialization for Passport strategies (#9353) @yuki-takei
+* imprv: Make data migration type safe (#9590) @miya
+* imprv: Printing styles (#9576) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Serializing page data for share link (#9602) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps-dev): bump vite from 5.4.6 to 5.4.12 (#9574) @dependabot
+* ci(deps): bump mongoose from 6.13.0 to 6.13.6 (#9570) @dependabot
+* ci(deps): bump katex from 0.16.11 to 0.16.21 (#9564) @dependabot
+
+## [v7.1.8](https://github.com/growilabs/growi/compare/v7.1.7...v7.1.8) - 2025-01-21
+
+### 🐛 Bug Fixes
+
+* fix: Escape page path when generating RegExp to find ancestors children (#9550) @yuki-takei
+
+## [v7.1.7](https://github.com/growilabs/growi/compare/v7.1.6...v7.1.7) - 2025-01-16
+
+### 🐛 Bug Fixes
+
+* fix: Unable to select group viewing permissions (#9541) @miya
+* fix: Fix i18n of oidc settings (#9536) @ryu-sato
+
+### 🧰 Maintenance
+
+* support: Update Swagger documentation for the PUT endpoint to update a page (#9529) @tkfm1991
+* ci(deps): bump docker/metadata-action from 4 to 5 (#9181) @dependabot
+* ci(deps): bump github/codeql-action from 2 to 3 (#9180) @dependabot
+* ci(deps): bump next from 14.2.15 to 14.2.21 (#9538) @dependabot
+* ci(deps-dev): bump @marp-team/marp-core from 3.9.0 to 3.9.1 (#9530) @dependabot
+
+## [v7.1.6](https://github.com/growilabs/growi/compare/v7.1.5...v7.1.6) - 2024-12-26
+
+### 💎 Features
+
+* feat(ai): Save file to VectorStore in HTML format   (#9462) @miya
+
+### 🐛 Bug Fixes
+
+* fix: remark-lsx pagination (#9513) @miya
+* fix: Spelling miss of external_link in i18n (#9456) @reiji-h
+* fix: Wider copy to clipboard area (#9450) @Ryosei-Fukushima
+* fix: Error when creating pages with deep hierarchy (#9487) @reiji-h
+
+### 🧰 Maintenance
+
+* ci(deps): bump next from 14.2.13 to 14.2.15 (#9501) @dependabot
+
+## [v7.1.5](https://github.com/growilabs/growi/compare/v7.1.4...v7.1.5) - 2024-12-13
+
+### 🚀 Improvement
+
+* imprv: Slim down the sidebar scrollbar (#9430) @reiji-h
+
+### 🐛 Bug Fixes
+
+* fix: Usage for stream pipeline of callback version (#9455) @reiji-h
+* fix: TypeError occurs during export (#9481) @miya
+* fix: Put `/` before the page name (#9471) @Ryosei-Fukushima
+* fix: Cannot comment when comments from rom user are allowed (#9472) @miya
+
+## [v7.1.4](https://github.com/growilabs/growi/compare/v7.1.3...v7.1.4) - 2024-11-26
+
+### 🐛 Bug Fixes
+
+* fix: Failed to export the page markdown (#9444) @miya
+
+## [v7.1.3](https://github.com/growilabs/growi/compare/v7.1.2...v7.1.3) - 2024-11-26
+
+### 💎 Features
+
+* feat(ai): Set a rate limit for vector store rebuild (#9404) @miya
+
+### 🚀 Improvement
+
+* imprv: Fonts preload settings (#9432) @yuki-takei
+* imprv: Use stream.pipeline (#9361) @reiji-h
+
+### 🐛 Bug Fixes
+
+* fix: Retrieving runtime versions (#9438) @yuki-takei
+* fix: Notification for new user creation (#9434) @yuki-takei
+* fix:  Deleted pages appear in the page tree (#9337) @reiji-h
+
+## [v7.1.2](https://github.com/growilabs/growi/compare/v7.1.1...v7.1.2) - 2024-11-18
+
+### 🚀 Improvement
+
+* imprv(ai): GROWI AI Knowledge Assistant instructions (#9407) @yuki-takei
+* imprv(ai): Knowedge Assistant model configuration by env var (#9410) @yuki-takei
+* imprv(ai): Shorten thread deletion expiredAt (#9419) @yuki-takei
+* imprv(ai): Remove unnecessary strings from markdown when creating VectorStoreFIie (#9411) @miya
+* imprv(ai): Create thead before the first post (#9414) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Fixed the message when all read (#9405) @Ryosei-Fukushima
+
+### 🧰 Maintenance
+
+* support: Import OpenAI features dynamically (#9413) @yuki-takei
+* support: Welcome back Hufflepuff badger (#9403) @satof3
+
+## [v7.1.1](https://github.com/growilabs/growi/compare/v7.1.0...v7.1.1) - 2024-11-12
+
+### 💎 Features
+
+* feat(ai): Swtch summary mode (#9377) @yuki-takei
+* feat: Return sources when generating responses (Knowledge assistant) (#9362) @miya
+* feat: Set the maximum number of minutes until the request in an environment variable (#9347) @miya
+
+### 🚀 Improvement
+
+* imprv: GitHub Alert with directive syntax (#9392) @yuki-takei
+* imprv: Sidebar button displays tooltip (#9371) @reiji-h
+* imprv: Open the link of PageTreeItem in a new tab when the user middle click (#9365) @yuki-takei
+* support: Avoid using req.t() (#9149) @shironegi39
+* imprv: Tidy up /Sandbox (#9355) @yuki-takei
+* imprv: Reduce sanitizing (#9350) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Output TextDirective and LeafDirective HTML (#9388) @yuki-takei
+* fix: NextLink isCreatablePage always returns false (#9356) @yuki-takei
+* fix: Duplicate page names alert should not occur on a single page (#9348) @reiji-h
+* fix: i18n for security settings (#9379) @yuki-takei
+* fix: Output TextDirective and LeafDirective HTML (#9388) @yuki-takei
+* fix(i18n): i18n for server side (#9372) @yuki-takei
+* fix: Duplicate page names alert should not occur on a single page (#9348) @reiji-h
+* fix: NextLink isCreatablePage always returns false (#9356) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Welcome back new Christmas theme (#9374) @satof3
+* support: Type checking (#9393) @yuki-takei
+* support: Welcome back new Christmas theme (#9374) @satof3
+* support: Omit remark-toc (#9383) @yuki-takei
+* support: Stop managing font files with Git LFS (#9351) @yuki-takei
+* support: Avoid using req.t() (#9149) @shironegi39
+* support: Improve playwright report (#9363) @yuki-takei
+* support: Avoid using req.t() (#9149) @shironegi39
+* support: Stop managing font files with Git LFS (#9351) @yuki-takei
+
+## [v7.1.0](https://github.com/growilabs/growi/compare/v7.0.23...v7.1.0) - 2024-10-31
+
+### BREAKING CHANGES
+
+* imprv: Update default value for S3_OBJECT_ACL (#9332) @yuki-takei
+
+### 💎 Features
+
+* feat: GROWI OpenAI Integration (#9246) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv: Add GitHub Markdown alerts  (#9127) @reiji-h
+* imprv: Upgrade unified and remark-growi-directive (#9048) @reiji-h
+* imprv: ROM users can manage comments (#9101) @WNomunomu
+* imprv: Update default value for S3_OBJECT_ACL (#9332) @yuki-takei
+* imprv: Sandbox (#9330) @yuki-takei
+* support: JSDoc for OpenAPI document (#9311) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Couldn't show old revision (#9296) @yuki-takei
+* fix: Replace the word ROM (#9295) @satof3
+* fix: forgot-password API (#9257) @reiji-h
+* fix: Edit button appear for the side of header (#9270) @yuki-takei
+* fix: Ensure text-only paste for mixed content from various sources (#9096) @reiji-h
+* fix: Notification count badge (#9124) @shironegi39
+* fix(ogp): Set an unknown label when the user is not found (#9232) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Migrate to pnpm from yarn v1 (#9249) @yuki-takei
+* support: Omit MongoDB 4.x compatible code (#9334) @yuki-takei
+* support: Pull LFS files with turbo (#9325) @yuki-takei
+* support: Use `pnpm deploy` instead of `turbo prune` (#9323) @yuki-takei
+* support: Maintenance API docs generation (#9302) @yuki-takei
+* support: Improve typings for PageService (#9220) @yuki-takei
+* support: Typescriptize accessTokenParser (#9320) @yuki-takei
+* support: Migrate to pnpm from yarn v1 (#9249) @yuki-takei
+* support: JSDoc for OpenAPI document (#9311) @yuki-takei
+* support: Maintenance API docs generation (#9302) @yuki-takei
+* support: Omit docs route (#9299) @yuki-takei
+
+## [v7.0.23](https://github.com/growilabs/growi/compare/v7.0.22...v7.0.23) - 2024-10-24
+
+### 🐛 Bug Fixes
+
+* fix: Couln't show old revision (#9296) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Maintenance API docs generation (#9302) @yuki-takei
+* support: Omit docs route (#9299) @yuki-takei
+
+## [v7.0.22](https://github.com/growilabs/growi/compare/v7.0.21...v7.0.22) - 2024-10-21
+
+### 🐛 Bug Fixes
+
+* fix: Edit button appear for the side of header (#9270) @yuki-takei
+* fix: Collaborative editing occurs unstable behavior (#9267) @yuki-takei
+
+## [v7.0.21](https://github.com/growilabs/growi/compare/v7.0.20...v7.0.21) - 2024-10-15
+
+### 🚀 Improvement
+
+* imprv: Update Recent Changes when a page is created, updated, or deleted (#9092) @nHigashiWeseek
+* imprv: Documentation URL for g2gtransfer (#9183) @moekumasaka
+
+### 🐛 Bug Fixes
+
+* fix: Add validators to lsx API (#9182) @WNomunomu
+* fix: Display revisions only if they are not corrupted (#9099) @WNomunomu
+* fix: Make it impossible to overwrite grants on descendant pages when 'anyone with the link' is selected. (#9125) @WNomunomu
+* fix: Forgot password API - reject requests with invalid email format (#9179) @abichan99911111
+
+### 🧰 Maintenance
+
+* support: Upgrade codemirror and yjs packages (#9218) @yuki-takei
+
+## [v7.0.20](https://github.com/growilabs/growi/compare/v7.0.19...v7.0.20) - 2024-09-25
+
+### 🚀 Improvement
+
+* imprv: The color of the dropdown list when it is activated (#9102) @WNomunomu
+* imprv: PageTitleHeader max-width (#9166) @yuki-takei
+* imprv: Documentation URL for g2gtransfer (#9157) @yuki-takei
+* imprv: Corrected wording on admin page (/admin/data-transfer) (#9106) @miya
+* imprv: Add hover-activated clipboard copy button with icon (#9095) @reiji-h
+
+### 🐛 Bug Fixes
+
+* fix: Make PageAccessoriesModal responsive (#9171) @moekumasaka
+* fix: PageControls unexpectedly move in response to opening and closing the sidebar (#9094) @WNomunomu
+* fix: Make CustomNavTab responsive (#9123) @moekumasaka
+
+### 🧰 Maintenance
+
+* ci(deps): bump rollup from 4.22.0 to 4.22.4 (#9160) @dependabot
+* ci(deps): bump google-github-actions/setup-gcloud from 1 to 2 (#9153) @dependabot
+* ci(deps): bump softprops/action-gh-release from 1 to 2 (#9152) @dependabot
+* support: Improve vitest environment (#9144) @yuki-takei
+* ci(deps): bump next from 14.1.3 to 14.2.13 (#9154) @dependabot
+* support: Upgrade @testing-library/react (#9141) @yuki-takei
+* support: Update logo image in README.md for the official docker image (#9139) @satof3
+* ci(deps-dev): bump vite from 5.2.9 to 5.2.14 (#9134) @dependabot
+* ci(deps): bump myrotvorets/info-from-package-json-action from 1.2.0 to 2.0.1 (#9129) @dependabot
+* ci(deps): bump stefanzweifel/git-auto-commit-action from 4 to 5 (#9128) @dependabot
+* ci(deps): bump nodemailer from 6.9.14 to 6.9.15 (#9075) @dependabot
+* ci(deps): bump docker/setup-buildx-action from 2 to 3 (#8207) @dependabot
+* ci(deps): bump jose from 4.11.4 to 4.15.9 (#9114) @dependabot
+* ci(deps): bump express from 4.19.2 to 4.20.0 (#9110) @dependabot
+* ci(deps): bump body-parser from 1.20.2 to 1.20.3 (#9109) @dependabot
+
+## [v7.0.19](https://github.com/growilabs/growi/compare/v7.0.18...v7.0.19) - 2024-09-12
+
+### 🐛 Bug Fixes
+
+* fix: Shared page is not displayed when skipping SSR (#9089) @miya
+* fix: The grant of pages can be changed via api even if restricted (#9087) @WNomunomu
+* fix: Updated content is not reflected on the View screen even after refreshing the page (#9086) @miya
+* fix: Removing comment doesn't work (#9083) @yuki-takei
+
+## [v7.0.18](https://github.com/growilabs/growi/compare/v7.0.17...v7.0.18) - 2024-09-09
+
+### 🚀 Improvement
+
+* imprv: Prevent looping to update a hook for TrashPageAlert (#9066) @yuki-takei
+* imprv: Display page tree in page select modal with scrollbar (#9023) @kazutoweseek
+
+### 🐛 Bug Fixes
+
+* fix: issue that material symbols icons are not displayed in ReplyComments component (#9076) @WNomunomu
+* fix: Unable to navigate to the data transfer page (#9071) @miya
+* fix: Page content does not update when switching revisions (#9072) @miya
+* fix: Supress rendering too many invisible DropdownMenu components (#9073) @yuki-takei
+* fix: Return error when grant is string for PUT /_api/v3/page (#9069) @arafubeatbox
+* fix: Scrolling may not occurs when clicking on the edit button next to the header (#9043) @reiji-h
+* fix: API v3 Page update (#9053) @maeshinshin
+* fix: Input text becomes empty when opening the ReadOnlyEditor (#9059) @miya
+* fix: Show pages with grants that are set to be visible in security settings on RecentChanges and PageTree as well (#9044) @miya
+
+### 🧰 Maintenance
+
+* support: Omit Cypress (#9065) @miya
+* ci(deps): bump unzip-stream from 0.3.1 to 0.3.2 (#9049) @dependabot
+
+## [v7.0.17](https://github.com/growilabs/growi/compare/v7.0.16...v7.0.17) - 2024-08-26
+
+### 🚀 Improvement
+
+* imprv: Serializers for User model and Attachment model (#9019) @yuki-takei
+* imprv: translation modification (#9035) @maeshinshin
+* imprv: Add UI and logic for disabled user registration (#9034) @maeshinshin
+* imprv: lang attribute in Html element (#8960) @maeshinshin
+
+### 🐛 Bug Fixes
+
+* fix: Serializer for accessing to an empty page (#9042) @yuki-takei
+* fix: Import data (#8994) @yuki-takei
+* fix: Comment operation by API (#9026) @yuki-takei
+* fix: Tests fail due to docker image and Playwright  version mismatch on CI (#9022) @miya
+* fix: Use the scrollbar to prevent the toolbar from being hidden (#8976) @maeshinshin
+* fix: Revision pageId schema type (#9008) @yuki-takei
+* fix: Revision pageId schema type (add a changeset) (#9010) @yuki-takei
+* fix: Hide WideViewMenuItem in search result (#9009) @yuki-takei
+* fix: Wrongly autofocus to PageHeader even after updating (#9011) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Dark mode support for CountBadge (#9036) @satof3
+* support: Update import lines (#9018) @yuki-takei
+* support: Typescriptize REPL launcher (#9013) @yuki-takei
+
+## [v7.0.16](https://github.com/growilabs/growi/compare/v7.0.15...v7.0.16) - 2024-07-31
+
+### 💎 Features
+
+* feat: Automatically repair corrupted data, at least for the latest revision (#9002) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv: User group link in admin page (#8855) @kazutoweseek
+* imprv: Sidebar header text size (#8986) @satof3
+* imprv: Replace possition usericon (#8991) @satof3
+
+### 🐛 Bug Fixes
+
+* fix: Undo in the comment editor (#9005) @yuki-takei
+* fix: Some OIDC authentication settings not being applied (#9000) @WNomunomu
+* fix: font-family for monospace (#9004) @yuki-takei
+* fix: Pointer cursor for the create button in the installer (#9003) @yuki-takei
+* fix: Migration script (20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js) (#8998) @miya
+* fix: Non-admin user gets 500 error when opening history modal (#9001) @miya
+* fix: Enable page creation under GRANT_RESTRICTED pages (#8996) @arafubeatbox
+
+## [v7.0.15](https://github.com/growilabs/growi/compare/v7.0.14...v7.0.15) - 2024-07-23
+
+### 🐛 Bug Fixes
+
+* fix: The $size query when aggregation to rebuild the index (#8987) @yuki-takei
+* fix: Regaining lost backward compatibility for MongoDB 4.4 (#8985) @yuki-takei
+* fix: Activate express-session middlewares for all sockets in SocketIoService (#8981) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Chage text size in sidebar (#8965) @satof3
+
+## [v7.0.14](https://github.com/growilabs/growi/compare/v7.0.13...v7.0.14) - 2024-07-19
+
+### 🐛 Bug Fixes
+
+### 💎 Features
+
+* feat: Alerts when trying to sync with latest revision when yjs data is corrupt (#8971) @miya
+
+### 🚀 Improvement
+
+* imprv: Restrict use of the editing UI from View if there is at least one user currently editing (#8966) @miya
+
+### 🐛 Bug Fixes
+
+* fix: Handle error when folding drawio blocks (#8977) @yuki-takei
+* fix: Sync the editor text with the latest revision menu (1) (#8975) @yuki-takei
+* fix: Sync the editor text with the latest revision menu (2) (#8978) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Normalize Revision.pageId (for #8954) (#8973) @miya
+
+## [v7.0.13](https://github.com/growilabs/growi/compare/v7.0.12...v7.0.13) - 2024-07-16
+
+### 💎 Features
+
+* feat: Sync latest revision body to Yjs draft (#8939) @miya
+
+### 🚀 Improvement
+
+* imprv: Better synchronizing between YDoc and the latest revision (#8959) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Revision model (#8967) @yuki-takei
+* fix: Healthcheck with checkServices=mongo (#8961) @yuki-takei
+* fix: Enable  # next to headline in view (#8826) @reiji-h
+
+### 🧰 Maintenance
+
+* ci(deps): bump nodemailer from 6.6.2 to 6.9.14 (#8928) @dependabot
+* support: Update favicon (#8957) @satof3
+
+## [v7.0.12](https://github.com/growilabs/growi/compare/v7.0.11...v7.0.12) - 2024-07-10
+
+### 🚀 Improvement
+
+* imprv: lang attribute in Html element to correctly reflect locale (#8940) @maeshinshin
+* imprv: Archive importing and exporting (#8943) @yuki-takei
+* imprv: Restrict indexing for full text search when the body length exceeds the threshold (#8937) @yuki-takei
+* imprv: Dark theme support for emoji mart (#8936) @reiji-h
+* imprv: Add env var for set Elasticsearch reindex bulk size (#8933) @yuki-takei
+* imprv: Size for skeleton for tags (#8923) @yuki-takei
+* imprv: Button opacity of TableWithEditButton and DrawioViewerWithEditButton (#8924) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Initialize sanitize option (#8946) @yuki-takei
+* fix: PageTitleHeader rename input status (#8944) @yuki-takei
+* fix: Presentation section tag (#8941) @yuki-takei
+* fix: Page history colorscheme is broken (#8938) @reiji-h
+* imprv: Rename label for bookmark item (#8925) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Refactor Yjs service (#8949) @yuki-takei
+* support: Upgrade y-mongodb-provider (#8953) @yuki-takei
+* support: Typescriptize Revision model (#8954) @yuki-takei
+* support: Typescriptize SocketIoService (#8948) @yuki-takei
+* support: Update GROWI logo type in NoLogin (#8942) @satof3
+* support: Update logo design (#8934) @satof3
+* ci(deps): bump @azure/identity from 4.0.1 to 4.3.0 (#8927) @dependabot
+* support: Upgrade vitest (#8920) @yuki-takei
+* support: Upgrade playwright (#8921) @yuki-takei
+
+## [v7.0.11](https://github.com/growilabs/growi/compare/v7.0.10...v7.0.11) - 2024-06-25
+
+### 💎 Features
+
+### 🚀 Improvement
+
+* imprv: New marker color (#8891) @satof3
+* imprv: SSR performance (#8916) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Vim keymap works correctly (#8901) @reiji-h
+* fix: Readonly editor prevents ctrl+v and paste. (#8902) @reiji-h
+* fix: Missing HTTP Response in SAML Login With ABLC Callback (#8879) @maeshinshin
+* fix: Set `z-0` to correct navbar and header overlap when the anchor is specified (#8905) @yuki-takei
+* fix: Minimum number of characters in password cannot be changed (#8896) @miya
+
+### 🧰 Maintenance
+
+* support: Replace tests with playwright (20-basic-features/20-basic-features--click-page-icons) (#8903) @miya
+* support: Relocate components dir (#8917) @yuki-takei
+* ci(deps): bump ws from 8.11.0 to 8.17.1 (#8906) @dependabot
+* support: Update module resolution settings (#8898) @yuki-takei
+* support: Decrease max SSR body length (#8895) @yuki-takei
+* support: Use typescript-transform-paths instead of tsconfig-paths (#8892) @yuki-takei
+
+## [v7.0.10](https://github.com/growilabs/growi/compare/v7.0.9...v7.0.10) - 2024-06-13
+
+### 💎 Features
+
+* imprv: Autofocus on PageTitleHeader when edigin untitled page (#8813) @WNomunomu
+* imprv: Autofocus on PageTitleHeader when creating untitled page (#8813) @WNomunomu
+
+### 🚀 Improvement
+
+* imprv: DrawioViewerScript should respect the base path in DRAWIO_URI 2 (#8889) @yuki-takei
+* imprv: Styling icon on the side of header (#8833) @reiji-h
+* imprv: DrawioViewerScript should respect the base path in DRAWIO_URI (#8878) @yuki-takei
+* imprv: Behavior when clicking on a label in the dropdown (#8857) @maeshinshin
+* imprv(plugin): Support github tag in githuburl.ts (#8868) @reiji-h
+* imprv: Display selected tree item in page select modal as active (#8802) @WNomunomu
+
+### 🐛 Bug Fixes
+
+* fix: Match width of video tag to img tag (#8836) @TatsuyaIse
+* fix: Behaviour of input during Japanese input (#8880) @miya
+* fix: Supress warning of checkbox 2 (#8871) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Watch with nodemon (#8877) @yuki-takei
+* support: Add playwright test for installer (#8874) @yuki-takei
+* support: Upgrade turbo to v2 (#8875) @yuki-takei
+
+## [v7.0.9](https://github.com/growilabs/growi/compare/v7.0.8...v7.0.9) - 2024-05-30
+
+### 🐛 Bug Fixes
+
+* fix: Supress warning of checkbox (#8865) @yuki-takei
+* fix: Editor package import/export (#8864) @yuki-takei
+
+## [v7.0.8](https://github.com/growilabs/growi/compare/v7.0.7...v7.0.8) - 2024-05-30
+
+### 💎 Features
+
+* feat: Select unrelated group inheritance on child page create (#8812) @arafubeatbox
+
+### 🚀 Improvement
+
+* imprv: Design coding of search result page (#8828) @miya
+
+### 🐛 Bug Fixes
+
+* fix: Page body sometimes appears doubled up when the editor is opened (#8858) @miya
+* fix: Brackets appearance when Nord editor theme (#8852) @satof3
+* fix: Slack notification not sent on page update (#8841) @miya
+* fix: Table icon is not displayed when hovering over the table (#8830) @WNomunomu
+
+### 🧰 Maintenance
+
+* support: Reorganize editor module exports (#8846) @yuki-takei
+
+## [v7.0.7](https://github.com/growilabs/growi/compare/v7.0.6...v7.0.7) - 2024-05-27
+
+### 🚀 Improvement
+
+* imprv: Behavior of dropdown toggle in groundglassbar (#8832) @maeshinshin
+* imprv: toastr location (#8831) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Do not insert initial value when input is empty in editor (#8773) @miya
+
+### 🧰 Maintenance
+
+* support: Apply changesets (#8840) @yuki-takei
+* support: Upgrade yjs packages (#8839) @yuki-takei
+* support: Upgrade stylelint (#8835) @yuki-takei
+
+## [v7.0.6](https://github.com/growilabs/growi/compare/v7.0.5...v7.0.6) - 2024-05-20
+
+### 🐛 Bug Fixes
+
+* fix: S3 configurations are considered invalid wrongly (#8823) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Publish @growi/core-styles package (#8819) @yuki-takei
+
+## [v7.0.5](https://github.com/growilabs/growi/compare/v7.0.4...v7.0.5) - 2024-05-20
+
+### 🚀 Improvement
+
+* imprv: Behavior of dropdown toggle for WIP in 'Page Tree' sidebar (#8796) @maeshinshin
+* imprv: Hide the page creation button for users without editing permissions (#8808) @miya
+* imprv: Add config to toggle ACL between public_read and private on PutObject when using S3 with FileUploader (#8778) @ToshihitoKon
+
+### 🐛 Bug Fixes
+
+* fix: BookmarkItem occures an error when the related page has been deleted 2 (#8818) @yuki-takei
+* fix: BookmarkItem occures an error when the related page has been deleted (#8817) @yuki-takei
+* fix: Display share page date (#8809) @TatsuyaIse
+* fix: Admin layout (#8806) @satof3
+
+### 🧰 Maintenance
+
+* support: Modify env var for S3 Object-ACL (#8805) @yuki-takei
+
+## [v7.0.4](https://github.com/growilabs/growi/compare/v7.0.3...v7.0.4) - 2024-05-13
+
+### 💎 Features
+
+* feat: Add a button to open PageCreateModal in the new page creation lead (#8774) @miya
+* feat: Show Yjs status indicator in SubNavigation (#8709) @miya
+* feat: Apply locale to defualt page title (#8600) @jam411
+
+### 🚀 Improvement
+
+* imprv: Behavior when creating first user fails (#8801) @miya
+* imprv: Add indexes for performance (#8800) @yuki-takei
+* imprv: Autosize Input for rename (#8795) @yuki-takei
+* imprv: behavior of dropdown toggle in 'Recent Changes' sidebar (#8782) @maeshinshin
+* imprv: Hide  personal drop down when guest user (#8786) @kazutoweseek
+
+### 🐛 Bug Fixes
+
+* fix: Drawio not available with GROWI slides (#8725) @reiji-h
+* fix: Auto-scroll to the active page in the page tree (#8772) @reiji-h
+
+### 🧰 Maintenance
+
+* ci(deps): bump ejs from 3.1.9 to 3.1.10 (#8784) @dependabot
+
+## [v7.0.3](https://github.com/growilabs/growi/compare/v7.0.2...v7.0.3) - 2024-05-01
+
+### 🚀 Improvement
+
+* imprv: Rename on blur (#8777) @yuki-takei
+* imprv: Re-calculate max-width for page tile on editor (#8775) @yuki-takei
+* imprv: Truncate page path title in editor (#8726) @reiji-h
+* imprv: FootstrampIcon uses material symbols (#8699) @kazutoweseek
+* imprv: behaviour when pressing enter after numerical input (ex: 2.3.4.) (#8754) @WNomunomu
+
+### 🐛 Bug Fixes
+
+* fix: An error occurred during user activation via email (#8767) @maeshinshin
+* fix: Admin customize screen (#8765) @yuki-takei
+* fix: Editor theme active line (material, nord) (#8762) @satof3
+* fix: 500 error occur when pressing the button for opening PageSelectModal (#8761) @WNomunomu
+* fix: Admin screen min-height for body (#8764) @yuki-takei
+* fix: Behaviour of table operation by enter key in editor (#8756) @WNomunomu
+* fix: EditingUserList shows user icons even when the user is not opening the editor (#8752) @miya
+* fix: Tags are not created when space key is entered (Firefox) (#8758) @miya
+* fix: Parent group selection dropdown does not work (#8759) @miya
+* fix: Codeblock overflow (#8753) @yuki-takei
+* fix:  Nord and Original-dark theme in editor (#8748) @satof3
+* fix: Material and Eclipse colors (#8749) @satof3
+* fix: Always autofocus when moving to the Editor (#8730) @reiji-h
+* fix: CopyDropdown protrudes from the screen issue (#8734) @WNomunomu
+* fix: Error on today's memo create from hotkey when memo exists (#8746) @arafubeatbox
+* fix: Editor styles (#8742) @yuki-takei
+* fix: Close the comment editor after the post (#8741) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps): bump typeorm from 0.3.0 to 0.3.20 (#8745) @dependabot
+* support: Make AwsFileUploader type safe (#8780) @yuki-takei
+* support: Update modal header design (#8766) @satof3
+* support: Improve types in IPage and IRevision (#8763) @yuki-takei
+* support: Editor mobile appearance (#8760) @satof3
+* support: Localize in app tags language en change ja ch revision (#8757) @kazutoweseek
+* support: Upgrade vite and vitest (#8743) @yuki-takei
+* support: Adjust design details (#8738) @satof3
+* ci(deps): bump typeorm from 0.2.32 to 0.3.0 (#8602) @dependabot
+* support: Upgrade date-fns (#8744) @yuki-takei
+
+## [v7.0.2](https://github.com/growilabs/growi/compare/v7.0.1...v7.0.2) - 2024-04-17
+
+### 💎 Features
+
+* feat: fr_FR locale
+
+### 🚀 Improvement
+
+* imprv: Hide title of untitled page when creating newly (#8536) @WNomunomu
+* imprv: Comment editor performance (#8731) @yuki-takei
+* imprv: Truncate page path title in view (#8707) @reiji-h
+* imprv: Show unrelated groups and disable ungrantable groups in grant select (#8695) @arafubeatbox
+* imprv: Bookmark sidebar layout (#8703) @satof3
+* imprv: Responsive layout (#8710) @yuki-takei
+* imprv: Sm size dropdown menu (#8711) @satof3
+* imprv: search results form improvements (#8705) @maeshinshin
+* imprv: WIP Page behavior (#8700) @miya
+* imprv: Disable groups not assignable to page due to parent grant (#8570) @arafubeatbox
+* imprv: Border delete in search modal (#8629) @kazutoweseek
+* imprv: Border in search modal (#8629) @kazutoweseek
+* imprv: New Comment style (#8631) @satof3
+* imprv: Hide title of untitled page when creating newly (#8536) @WNomunomu
+* imprv: Render lightbox above the sidebar (#8673) @yuki-takei
+* imprv: Add border to the page title header when editing (#8671) @yuki-takei
+* imprv: Set font-display to icon fonts (#8670) @yuki-takei
+* imprv: Enable box-shadow (#8668) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Login layout when external auth only (#8717) @satof3
+* fix: Initialize grant correctly after when page transition (#8633) @yukendev
+* fix: lsx icon layout and color (#8691) @satof3
+* fix: Tags are unintentionally created when a conversion is finalized (#8682) @miya
+* fix: Footnotes making page scrollable. (#8678) @reiji-h
+* fix: Automatic installation failure (#8685) @miya
+* fix: Page content preview not shown in duplicate alert page (#8645) @arafubeatbox
+* fix: react-toastify colors (#8672) @yuki-takei
+* fix: Add filePath to the schema of attachement for backward compatibility for v3.3 or earlier (#8679) @shield-9
+* fix: Questionnaire modal styles in dark mode (#8669) @yuki-takei
+* fix: Cannot display error when page path is duplicated (#8664) @TatsuyaIse
+
+### 🧰 Maintenance
+
+* ci(deps): bump express from 4.17.1 to 4.19.2 (#8617) @dependabot
+* support: Localize in app (#8716) @satof3
+* ci(deps): bump tar from 6.2.0 to 6.2.1 (#8712) @dependabot
+* support: Localize comment components (#8694) @satof3
+* support: Upgrade actions from v3 to v4 (2) (#8688) @yuki-takei
+* support: Upgrade actions from v3 to v4 (#8684) @yuki-takei
+* ci(deps): bump undici from 5.21.2 to 5.28.4 (#8686) @dependabot
+* ci(deps-dev): bump vite from 4.5.2 to 4.5.3 (#8675) @dependabot
+
+## [v7.0.1](https://github.com/growilabs/growi/compare/v7.0.0...v7.0.1) - 2024-04-02
+
+### 🚀 Improvement
+
+* imprv: PagePathNav and PagePathHeader styles (#8643) @yuki-takei
+* imprv: Prevent tooltip flickering (#8642) @yuki-takei
+* imprv: PersonalDropdown style (#8641) @yuki-takei
+* imprv: Support color scheme in Page History (diff2html) (#8637) @yuki-takei
+* imprv: Disable RequestedAuthnContext in SAML authentication (v7.0.x) (#8635) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Admin users badge color in /admin/users (#8655) @satof3
+* fix: Custom logo style (#8656) @satof3
+* fix: Error when creating TTL index (#8653) @miya
+* fix: Login form style is broken (#8651) @yuki-takei
+* fix: Login buttons for external auth provider does not work (#8648) @yuki-takei
+* fix: Set `d-none` when the sidebar is closed in order to prevent scrollbars from appearing (#8640) @yuki-takei
+* fix: Style for Handsontable in dark mode (#8639) @yuki-takei
+* fix: Supress PageAccessoriesModal rerendering for keeping radio button selections of PageHistory (#8638) @yuki-takei
+* fix: Uncorrect update bookmark button clicked on page control (#8608) @jam411
+* fix: Counting comments when removing the thread (#8624) @yukendev
+
+### 🧰 Maintenance
+
+* support: Add light and dark badge color (#8652) @satof3
+* support: Omit configurations for publishing to GitHub Container Registry(ghcr.io) (#8628) @yuki-takei
+
+## [v7.0.0](https://github.com/growilabs/growi/compare/v6.3.2...v7.0.0) - 2024-03-27
+
+### BREAKING CHANGES
+
+* support: Remove obsolete route for attachment on MongoDB GridFS (#8239) @yuki-takei
+* support: Omit promster (#8105) @yuki-takei
+* support: Omit HackMD (CodiMD) (#8094) @yuki-takei
+* support: Revoke well classes (#8041) @soumaeda
+
+### 💎 Features
+
+* feat: Not required latest revision when updating from Editor (#8522) @miya
+* feat: Add editing user list on page header (#8486) @jam411
+* feat: implement to add table when doing a line break in table markdown (#8461) @WNomunomu
+* feat: WIP Page (#8484) @miya
+* feat: 140020 140992 sidebar style (#8497) @yukendev
+* feat: Select parent page from PageSelectModal (#8446) @WNomunomu
+* feat: CollapsedParentsDropdown to display ancestor pathname (#8444) @miya
+* feat: Enable and fix page duplication of user unrelated pages (#8442) @arafubeatbox
+* feat: Multiple group grant for page (#8331) @arafubeatbox
+* feat: Built-in Collaborative Editor (#8176) @jam411
+* feat: Changing page title and path in edit mode (#8252) @WNomunomu
+* feat: Notification count badge (#8372) @miya
+* feat: Unread filtering for In-app notification (#8373) @miya
+* feat: Show notifications in sidebar (#8371) @miya
+* feat: Uniform behavior when creating pages from create new page button (#8297) @jam411
+* feat: New incremental search (#8238) @miya
+* feat: Allow deletion of user homepage when the user is deleted (#8224) @jam411
+* feat: LDAP/Keycloak group sync (#7857) @arafubeatbox
+* feat: Implementation of autocompletion function for emoji input (#8137) @WNomunomu
+* feat: Create page when click edit button if page is not found (#8174) @jam411
+* feat: Presentation preview and support Marp  (#8029) @reiji-h
+
+### 🚀 Improvement
+
+* imprv: New login design (#8607) @satof3
+* imprv: Multi group grant page duplicate explanation (#8507) @arafubeatbox
+* imprv: Update design for user homepage side contents (#8465) @jam411
+* imprv: Update page accessories modal design (#8466) @jam411
+* imprv: Creating/updating page APIs (#8459) @yuki-takei
+* imprv: improve PageHeader component (#8439) @WNomunomu
+* imprv: Use unzip stream instead of unzipper (#8378) @ryu-sato
+* imprv: Allow plugin that contain slashes in the branch name to be installed (#8359) @ryu-sato
+* imprv: Refactor DrawioViewer re-rendering by the resizing trigger (#8314) @yuki-takei
+* imprv: Upload handler use apiv3 post (#8279) @reiji-h
+* imprv: Apply content headers for attachment response (#8245) @yuki-takei
+* imprv: Add Marp preset template for ja_JP and zh_CN (#8179) @AikaHiyama
+* imprv: Update RichAttachments feat on shared pages (#8206) @jam411
+* imprv: Certify shared page attachment middleware (#8211) @yuki-takei
+* imprv: Able to edit tags in editor (#8167) @soumaeda
+* imprv: Responsive layout (#8200) @yuki-takei
+* imprv: Sidebar on edit (#8181) @yuki-takei
+* imprv: Sidebar mode (#8160) @yuki-takei
+* imprv: Limit the file types in editor. (#8146) @reiji-h
+* imprv: Support Ctrl+V file paste. (#8124) @reiji-h
+* imprv: i18n for marp settings (#8110) @moekumasaka
+* imprv: Download a markdown file using the page name as the file name (#8061) @soumaeda
+* imprv: i18n "Create /Sidebar page" label (#8085) @yuki-takei
+* imprv: Admin customize presentation form (#8083) @meiri-k
+* imprv: Search behavior (#8069) @yuki-takei
+* imprv: i18n resetting password mail body (#8058) @meiri-k
+* imprv: Add installed date to questionnaire answer (#7971) @TatsuyaIse
+* imprv: Export md with page name (#8005) @soumaeda
+* imprv: Show modal when you delete plugin (#7875) @soumaeda
+* imprv: Create  Japanese  ejs files (#7957) @meiri-k
+* imprv: Sidebar shows skelton with suspense (#7975) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Show both UserGroups and ExternalUserGroups for group delete modal transfer select (#8519) @arafubeatbox
+* fix: Multi group grant page becomes public when one of groups deleted (#8518) @arafubeatbox
+* fix: pages are not displayed in page tree (#8515) @WNomunomu
+* fix: Page being able to delete completely when not allowed (#8374) @arafubeatbox
+* fix: Logs are not saved when viewing the page (#8406) @miya
+* fix: Normalize duplicated root pages to valid paths when server startup (#8414) @miya
+* fix: Configured auditlog environment variables are not reflected in the administration screen (#8383) @miya
+* fix: Plugin is broken after unzipping (#8358) @ryu-sato
+* fix: Keycloak group sync config not loaded on sync execution (#8339) @arafubeatbox
+* fix: SAML callback action throws the field is undefined error when the ACL Rule string is only white space (#8322) @yuki-takei
+* fix: Update deleteCompletelyUserHomeBySystem for v4 process (#8289) @jam411
+* fix: Remove groups not related to the user from the user groups that are specified automatically when creating child pages (#8266) @arafubeatbox
+* fix: Certify shared page attachment middleware (#8255) @yuki-takei
+* fix: Show liker counts in lsx (#8194) @yuki-takei
+* fix: Marp is enabled incorrectly problem (#8100) @reiji-h
+* fix: Fixing swagger for tag update api (#8010) @miya
+* fix: Modification of links in the docs (#8004) @miya
+* fix: Type safe implementation for objects imported from ElasticsearchClient (#7862) @miya
+* fix: Consider an empty page when renaming and duplicating (v6.1.x) (#7980) @yuki-takei
+* fix: Consider an empty page when renaming and duplicating (#7979) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Upgrade Next.js v14 (#8586) @yuki-takei
+* imprv: New login design (#8607) @satof3
+* support: Node.js v20 (#8528) @miya
+* support: Upgrade react bootstrap typeahead (#8500) @jam411
+* ci(deps): bump ip from 2.0.0 to 2.0.1 (#8508) @dependabot
+* support: React Testing Library (#8393) @miya
+* ci(deps-dev): bump vite from 4.5.1 to 4.5.2 (#8392) @dependabot
+* support: Build GROWI custom icons (#8356) @yukendev
+* ci(deps-dev): bump vite from 4.5.0 to 4.5.1 (#8302) @dependabot
+* support: Remove obsolete route for attachment on MongoDB GridFS (#8239) @yuki-takei
+* support: Install material-symbols (#8182) @yuki-takei
+* ci(deps-dev): bump postcss from 8.4.26 to 8.4.31 (#8142) @dependabot
+* ci(deps): bump cypress-io/github-action from 5 to 6 (#8051) @dependabot
+* ci(deps): bump amannn/action-semantic-pull-request from 5.0.2 to 5.3.0 (#8127) @dependabot
+* ci(deps): bump aws-actions/configure-aws-credentials from 2 to 4 (#8128) @dependabot
+* support: Internationalization USER_REGISTRATION_APPROVAL_REQUEST label for v62x (#8130) @jam411
+* ci(deps): bump get-func-name from 2.0.0 to 2.0.2 (#8119) @dependabot
+* support: Omit promster (#8105) @yuki-takei
+* support: Omit HackMD (CodiMD) (#8094) @yuki-takei
+* support: Revoke well classes (#8041) @soumaeda
+* support: Upgrade to reactstrap v9 (#7984) @jam411
+* support: Update CodeMirror to v6 (#7968) @yuki-takei
+
+## [v6.3.2](https://github.com/growilabs/growi/compare/v6.3.1...v6.3.2) - 2024-03-25
+
+### 🐛 Bug Fixes
+
+* fix: Show both UserGroups and ExternalUserGroups for group delete modal transfer select (#8519) @arafubeatbox
+
+### 🧰 Maintenance
+
+* ci(deps): bump ip from 2.0.0 to 2.0.1 (#8508) @dependabot
+
+## [v6.3.1](https://github.com/growilabs/growi/compare/v6.3.0...v6.3.1) - 2024-02-01
+
+### 💎 Features
+
+* feat: Normalize duplicated root pages to valid paths when server startup (#8414) @miya
+
+### 🚀 Improvement
+
+* imprv: Use unzip stream instead of unzipper (#8378) @ryu-sato
+* imprv: Allow plugin that contain slashes in the branch name to be installed (#8359) @ryu-sato
+
+### 🐛 Bug Fixes
+
+* fix: Page being able to delete completely when not allowed (#8374) @arafubeatbox
+* fix: Logs are not saved when viewing the page (#8406) @miya
+* fix: Preventing duplication of `/user/username` pages (#8413) @WNomunomu
+* fix: Non-admin user cannot rename pages v63x (#8410) @jam411
+* fix: Duplicate root pages are created unintentionally (#8404) @miya
+* fix: Configured auditlog environment variables are not reflected in the administration screen (#8383) @miya
+* fix: plugin is broken after unzipping (#8358) @ryu-sato
+* fix: Keycloak group sync config not loaded on sync execution (#8339) @arafubeatbox
+
+### 🧰 Maintenance
+
+* support: React Testing Library (#8393) @miya
+* ci(deps-dev): bump vite from 4.5.1 to 4.5.2 (#8392) @dependabot
+
+## [v6.3.0](https://github.com/growilabs/growi/compare/v6.2.5...v6.3.0) - 2023-12-14
+
+### BREAKING CHANGES
+
+* support: Remove obsolete route for attachment on MongoDB GridFS (#8239) @yuki-takei
+
+### 💎 Features
+
+* feat: LDAP/Keycloak group sync (#7857) @arafubeatbox
+
+### 🚀 Improvement
+
+* imprv: Refactor DrawioViewer re-rendering by the resizing trigger (#8314) @yuki-takei
+* imprv: Apply content headers for attachment response (#8245) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: SAML callback action throws the field is undefined error when the ACL Rule string is only white space (#8322) @yuki-takei
+* fix: Remove groups not related to the user from the user groups that are specified automatically when creating child pages (#8266) @arafubeatbox
+* fix: Certify shared page attachment middleware (#8255) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Add test for delete-completely-user-home-by-system.ts (#8323) @jam411
+* ci(deps-dev): bump vite from 4.5.0 to 4.5.1 (#8302) @dependabot
+* support: TypeScriptize attachment codes (#8243) @yuki-takei
+* support: Remove obsolete route for attachment on MongoDB GridFS (#8239) @yuki-takei
+
+## [v6.2.5](https://github.com/growilabs/growi/compare/v6.2.4...v6.2.5) - 2023-12-14
+
+### 🐛 Bug Fixes
+
+* fix: Update deleteCompletelyUserHomeBySystem for v4 process (#8289) @jam411
+
+## [v6.2.4](https://github.com/growilabs/growi/compare/v6.2.3...v6.2.4) - 2023-11-29
+
+### 💎 Features
+
+* feat: Show create date in Attachment Data list (#8229) @sakazuki
+
+### 🚀 Improvement
+
+* imprv: Add Marp preset template for ja_JP and zh_CN (#8179) @AikaHiyama
+* imprv: Allow deletion of user homepage when the user is deleted (#8224) @jam411
+
+### 🐛 Bug Fixes
+
+* fix: Certify shared page attachment middleware (6.2.x) (#8256) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Refactor deleteCompletelyUserHomeBySystem (#8262) @jam411
+
+## [v6.2.3](https://github.com/growilabs/growi/compare/v6.2.2...v6.2.3) - 2023-11-13
+
+### 🚀 Improvement
+
+- imprv: Certify shared page attachment middleware (#8211) @yuki-takei
+- imprv: Printing styles 2 (#8203) @yuki-takei
+
+## [v6.2.2](https://github.com/growilabs/growi/compare/v6.2.1...v6.2.2) - 2023-10-30
+
+### 🚀 Improvement
+
+- imprv: Printing styles (#8195) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: Show liker counts in lsx (#8194) @yuki-takei
+
+### 🧰 Maintenance
+
+- ci(deps-dev): bump postcss from 8.4.26 to 8.4.31 (#8142) @dependabot
+- ci(deps): bump cypress-io/github-action from 5 to 6 (#8051) @dependabot
+- ci(deps): bump amannn/action-semantic-pull-request from 5.0.2 to 5.3.0 (#8127) @dependabot
+- ci(deps): bump aws-actions/configure-aws-credentials from 2 to 4 (#8128) @dependabot
+
+## [v6.2.1](https://github.com/growilabs/growi/compare/v6.2.0...v6.2.1) - 2023-10-03
+
+### BREAKING CHANGES
+
+- support: Omit promster (#8105) @yuki-takei
+
+### 🚀 Improvement
+
+- imprv: Download a markdown file using the page name as the file name (#8061) @soumaeda
+- imprv: Admin customize presentation form (#8083) @meiri-k
+- imprv: i18n for marp settings (#8110) @moekumasaka
+- imprv: i18n "Create /Sidebar page" label (#8085) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: Marp is enabled incorrectly problem (#8100) @reiji-h
+- fix: Do not work img tag if use style property 62x (#8092) @jam411
+
+### 🧰 Maintenance
+
+- support: Internationalization USER_REGISTRATION_APPROVAL_REQUEST label for v62x (#8130) @jam411
+- ci(deps): bump get-func-name from 2.0.0 to 2.0.2 (#8119) @dependabot
+- support: Omit promster (#8105) @yuki-takei
+
+## [v6.2.0](https://github.com/growilabs/growi/compare/v6.1.12...v6.2.0) - 2023-09-14
+
+### 💎 Features
+
+- feat: Presentation preview and support Marp  (#8029) @reiji-h
+
+### 🚀 Improvement
+
+- imprv: Able to customize users homepage deletion (#7921) @yuki-takei
+- imprv: Search behavior (#8069) @yuki-takei
+- imprv: Add CSP style-src for Safari and Content-Disposition of attachment (#8049) @ykanematsu
+- imprv: Correct update message (#8040) @reiji-h
+- imprv: Add installed date to questionnaire answer (#7971) @TatsuyaIse
+- imprv: Show modal when you delete plugin (#7875) @soumaeda
+- imprv: i18n resetting password mail body (#8058) @meiri-k
+- imprv: Create Japanese ejs files (#7957) @meiri-k
+- imprv: Clean up old toastr (#7949) @jam411
+- imprv: Persist the installed date in the Config collection (#7936) @TatsuyaIse
+
+### 🐛 Bug Fixes
+
+- fix: Pages can be created under a non-existent user page (#7974) @miya
+- fix: Pages can be created under a non-existent user page (During attachment upload) (#8001) @miya
+- fix: Type safe implementation for objects imported from ElasticsearchClient (#7862) @miya
+- fix: Consider an empty page when renaming and duplicating (#7979) @yuki-takei
+- fix: Remove redundant toastSuccess for pasted attachments (#8044) @jam411
+- fix: Fixing swagger for tag update api (#8010) @miya
+- fix: Modification of links in the docs (#8004) @miya
+
+### 🧰 Maintenance
+
+- support: Omit core-js v2 (#7944) @yuki-takei
+- support: Improve build settings (#7919) @yuki-takei
+- support: Url to join to the slack team (#8073) @WNomunomu
+
+## [v6.1.15](https://github.com/growilabs/growi/compare/v6.1.14...v6.1.15) - 2023-09-11
+
+### 🚀 Improvement
+
+- imprv: Add CSP style-src for Safari and Content-Disposition of attachment (for v6.1.x) (#8057) @yuki-takei
+
+## [v6.1.14](https://github.com/growilabs/growi/compare/v6.1.13...v6.1.14) - 2023-08-22
+
+### 🐛 Bug Fixes
+
+- fix: Add option to lightbox (6.1.x) (#8003) @yuki-takei
+
+## [v6.1.13](https://github.com/growilabs/growi/compare/v6.1.12...v6.1.13) - 2023-08-17
+
+### 🐛 Bug Fixes
+
+- fix: Do not work img tag if use style property (#7988) @jam411
+- fix: "Searching..." label appearing unnecessarily (#7990) @yuki-takei
+
+## [v6.1.12](https://github.com/growilabs/growi/compare/v6.1.11...v6.1.12) - 2023-08-14
+
+### 🐛 Bug Fixes
+
+- fix: Consider an empty page when renaming and duplicating (v6.1.x) (#7980) @yuki-takei
+- fix: Do not work image tag properties (#7977) @jam411
+
+## [v6.1.11](https://github.com/growilabs/growi/compare/v6.1.10...v6.1.11) - 2023-08-07
+
+### 🐛 Bug Fixes
+
+- fix: Admin page permission when the user transit with next-routing (#7908) @WNomunomu
+- fix: Transitioning to a non-existent page under "/me" results in a 500 error (#7946) @miya
+- fix: Auto-scroll search result content 2 (#7943) @yuki-takei
+
+## [v6.1.10](https://github.com/growilabs/growi/compare/v6.1.9...v6.1.10) - 2023-08-01
+
+### 🐛 Bug Fixes
+
+- fix: Unsaved comments remain in the editor when transitioning to a new page  (#7912) @miya
+- fix: SWR settings for searching (#7940) @yuki-takei
+- fix: Auto-scroll search result content (#7935) @yuki-takei
+
+## [v6.1.9](https://github.com/growilabs/growi/compare/v6.1.8...v6.1.9) - 2023-07-31
+
+### 💎 Features
+
+- feat: LightBox for enlargement of image (#7899) @WNomunomu
+
+### 🚀 Improvement
+
+- imprv: Do not use loadConfigs in skipSSR (#7929) @jam411
+- imprv: Improve default behavior of skipSSR (#7927) @jam411
+- imprv: Improved Design for Bookmarks Sidebar (#7886) @soumaeda
+
+### 🐛 Bug Fixes
+
+- fix: Page creation and update process (#7925) @yuki-takei
+- fix: Sidebar doesn't show the link to the administration panel when logged in as an Admin (#7914) @miya
+- fix: Improve page data mutation after renaming and deleting by GrowiContextualSubNavigation (#7926) @yuki-takei
+- fix: Revert dynamic import. (#7923) @TatsuyaIse
+- fix: Questionnaire wikiType (#7907) @TatsuyaIse
+
+## [v6.1.8](https://github.com/growilabs/growi/compare/v6.1.7...v6.1.8) - 2023-07-24
+
+### 💎 Features
+
+- feat: Add plugin badge to TemplateModal's list of templates (#7897) @TatsuyaIse
+
+### 🚀 Improvement
+
+- imprv: Replace isAdmin with usersAdminHooks (#7840) @WNomunomu
+- imprv: Show alert for trashed pages only when the page is not empty (#7903) @TatsuyaIse
+- imprv: Template name truncation (#7898) @TatsuyaIse
+
+### 🐛 Bug Fixes
+
+- fix: Cancel a comment will cancel all comments (#7804) @mudana-grune
+
+### 🧰 Maintenance
+
+- ci(deps-dev): bump vite from 4.3.8 to 4.4.5 (#7901) @dependabot
+- ci(deps): bump semver from 5.7.1 to 5.7.2 (#7867) @dependabot
+- ci(deps): bump mongoose from 6.11.1 to 6.11.3 (#7891) @dependabot
+- ci(deps): bump word-wrap from 1.2.3 to 1.2.4 (#7892) @dependabot
+
+## [v6.1.7](https://github.com/growilabs/growi/compare/v6.1.6...v6.1.7) - 2023-07-19
+
+### 💎 Features
+
+- feat: Authentication settings cannot be disabled if there will be no administrator user available to log in (#7761) @mudana-grune
+
+### 🚀 Improvement
+
+- imprv: Show spinner while installing and logging-in (#7823) @soumaeda
+- imprv: Routing with next link (#7880) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: Auto popup PageAccessoriesModal and show page history (#7888) @yuki-takei
+- fix: Auto-scroll does not work when accessing the page when the header string is CJK (#7882) @yuki-takei
+- fix: Avoid unnecessary next routing (#7863) @miya
+- fix: Work put back page on bookmark sidebar (#7698) @mudana-grune
+
+### 🧰 Maintenance
+
+- support: Render SearchPageBase in CSR (#7889) @yuki-takei
+
+## [v6.1.6](https://github.com/growilabs/growi/compare/v6.1.5...v6.1.6) - 2023-07-12
+
+### 🐛 Bug Fixes
+
+- fix: Revert current page mutation and add workaround for saving page (#7877) @yuki-takei
+- fix: The official docker image missed preset-templates (#7865) @yuki-takei
+- fix: SSL connection error to Elasticsearch8 using self certificate (#7818) @miya
+
+## [v6.1.5](https://github.com/growilabs/growi/compare/v6.1.4...v6.1.5) - 2023-07-10
+
+### 💎 Features
+
+- feat: Rich Attachment (#7534) @jam411
+- feat: Plugin kit (#7830) @yuki-takei
+- feat: Deciding whether to use SSR based on the volume of latestRevisionBodyLength (#7772) @miya
+
+### 🚀 Improvement
+
+- imprv: Load templates from the server 2 (#7850) @yuki-takei
+- imprv: Improve release parent group button (#7838) @WNomunomu
+- imprv: Load templates from the server (#7842) @yuki-takei
+- imprv: Able to send new passsword by email (#7758) @soumaeda
+- imprv: Convert jsx into tsx (#7832) @WNomunomu
+- imprv: After reset password footer modal design (#7790) @soumaeda
+- imprv: Update email alert (#7771) @WNomunomu
+- imprv: Can use normal browser transition in searching page (#7826) @yuki-takei
+- imprv: Show tooltip when copying password (#7800) @soumaeda
+
+### 🐛 Bug Fixes
+
+- fix(lsx): Except option (#7855) @yuki-takei
+- fix: Page body is not displayed when skipSSR (#7849) @miya
+- fix: When uploading an attachment file to a new page and pressing the update button, an error occurs (#7844) @miya
+- fix: Editing user group settings (#7827) @WNomunomu
+- fix: Handsontable not display full screen (#7784) @mudana-grune
+- fix: Brand logo fill color transition (#7828) @yuki-takei
+- fix: Email body of global notification is not displayed (#7824) @jam411
+- fix(lsx): Prefix is not uniquely determined by usage (#7815) @yuki-takei
+
+### 🧰 Maintenance
+
+- support: Dependencies specification for local packages (#7809) @yuki-takei
+
+## [v6.1.4](https://github.com/growilabs/growi/compare/v6.1.3...v6.1.4) - 2023-06-12
+
+### 💎 Features
+
+- feat(plugin): Specify repository branch name (#7783) @yuki-takei
+
+### 🚀 Improvement
+
+- imprv: Suppress unnecessary bookmark API requests (#7798) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: Bookmarks mutation for the current user (#7797) @yuki-takei
+- fix: Slack channels data for User Triggered Notification is not loaded (#7794) @yuki-takei
+- fix: The input of the editor is cleared when an attachment is added when a new page editing (#7788) @miya
+
+## [v6.1.3](https://github.com/growilabs/growi/compare/v6.1.2...v6.1.3) - 2023-06-07
+
+### 💎 Features
+
+- feat(lsx):  Load more (#7774) @yuki-takei
+
+### 🚀 Improvement
+
+- imprv: Insert template (#7764) @yuki-takei
+- imprv: Update preset templates (#7762) @yuki-takei
+- imprv: Make migration script type safe (#7702) @miya
+- imprv: Update migration script docs (#7699) @miya
+
+### 🐛 Bug Fixes
+
+- fix(lsx): Parsing num/depth options (#7769) @yuki-takei
+- fix: When uploading an attachment and creating a new page, it does not inherit the grant of the parent page (#7768) @miya
+- fix: Unable to perform bookmark operations from bookmark item control (#7750) @miya
+- fix: Bookmarks status not updated on search result (#7667) @mudana-grune
+
+### 🧰 Maintenance
+
+- support: Refactor plugin related modules (#7765) @yuki-takei
+- support: Refactor AclService (#7754) @yuki-takei
+- support: typescriptize SlackLegacyUtil (#7751) @yuki-takei
+- support: Refactor ConfigManager (#7752) @yuki-takei
+- support: Convert unit tests by Jest to Vitest (#7749) @yuki-takei
+
+## [v6.1.2](https://github.com/growilabs/growi/compare/v6.1.1...v6.1.2) - 2023-05-25
+
+### 🚀 Improvement
+
+- imprv: Unify whitelist description (#7638) @soumaeda
+- imprv: Refactoring migration script (#7694) @miya
+- imprv: Implement infinite scroll into PageTimeline (#7679) @reiji-h
+
+### 🐛 Bug Fixes
+
+- fix: Hash and search query in the relative link are omitted wrongly (#7697) @yuki-takei
+
+### 🧰 Maintenance
+
+- support: Restrict the 'populate' method in model modules (#7689) @yuki-takei
+- support: Refactor LinkEditModal (#7654) @yukendev
+- ci(deps): bump aws-actions/configure-aws-credentials from 1 to 2 (#7620) @dependabot
+- ci(deps): bump hugo19941994/delete-draft-releases from 1.0.0 to 1.0.1 (#7448) @dependabot
+
+## [v6.1.1](https://github.com/growilabs/growi/compare/v6.1.0...v6.1.1) - 2023-05-24
+
+### 🐛 Bug Fixes
+
+- fix: Bookmark folders owned by others are accessible for manipulation (#7688) @miya
+- fix: remark-attachment-refs does not work in production (#7681) @yuki-takei
+- fix: User picture of bookmark not showing inside bookmark folder (#7678) @mudana-grune
+- fix: Update name attribute of PageRenameModal.tsx (#7677) @jam411
+- fix: The user's bookmarks are displayed on unrelated user's home (#7668) @miya
+- fix: The user's bookmarks are updated by unrelated user's operation (#7670) @jam411
+
+## [v6.1.0](https://github.com/growilabs/growi/compare/v6.0.15...v6.1.0) - 2023-05-17
+
+### BREAKING CHANGES
+
+- Node.js v14 is no longer supported.
+- Elasticsearch v6 is no longer supported.
+- imprv: Omit clobber prefix (#7627) @yuki-takei
+- support: Omit textlint (#7578) @yuki-takei
+- support: Remove Blockdiag codes (#7576) @yuki-takei
+
+See the upgrading guide for v6.1.x. => [English](https://docs.growi.org/en/admin-guide/upgrading/61x.html) / [Japanese](https://docs.growi.org/ja/admin-guide/upgrading/61x.html)
+
+### 💎 Features
+
+- feat: Add read-only user feature (#7648) @jam411
+- feat: Support Mermaid (move into the feature dierctory) (#7647) @miya
+- feat: Fix APP_SITE_URL with an environment variable (#7646) @yuki-takei
+- feat: Support Mermaid (#7645) @miya
+- feat: Support Elasticsearch v8 (#7623) @miya
+- feat: Elasticsearchv8 module (#7623) @miya
+- feat: Bookmarks folder and sidebar menu (#7450) @mudana-grune
+- feat: GROWI Questionnaire (#7316) @hakumizuki
+- feat: Revive attachment-refs with remark (#7597) @arafubeatbox
+
+### 🚀 Improvement
+
+- imprv: Font size (#7663) @yuki-takei
+- imprv: Admin user can use `reset-password` without email settings (#7650) @jam411
+- imprv: Optimize fonts with next/font (#7633) @yuki-takei
+- imprv: GFM table performance 2 (#7640) @yuki-takei
+- imprv: GFM footnote styles (#7628) @yuki-takei
+- imprv: GFM table performance (#7619) @yuki-takei
+- imprv: Show unsaved warning when comment not posted (#7603) @arafubeatbox
+- imprv: Suppress UI Flickering for dropdowns (#7608) @jam411
+- imprv: Allow registering without GROWI email settings for ID/Password authentication's restricted registration (#7591) @jam411
+- imprv: Enable browsing video (for v6.1.0) (#7589) @yuki-takei
+- imprv: Show a spinner into the save button while the saving process (#7579) @yuki-takei
+- imprv: Inject PlantUML URI with config-loader (#7577) @yuki-takei
+- imprv: Loading draw.io (diagrams.net) resources (#7575) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: The environment variable for disabling link sharing (#7652) @yuki-takei
+- fix: Cursor resetting occurs after updating with the built-in editor (#7644) @yuki-takei
+- fix: Revision schema migration for v5 to v6 (#7637) @yuki-takei
+- fix: Editor not resetting when the same markdown (#7625) @arafubeatbox
+- fix: AlignRight DropdownMenu flickering (#7606) @mudana-grune
+- fix: Not display page list count badge in trash page (#7600) @yukendev
+- fix: Reverted descendant pages do not appear in search results (#7587) @miya
+- fix: Deleted descendant pages do not appear in search results (#7583) @miya
+- fix: Show lsx page list in trash page correctly (#7582) @yukendev
+- fix: Uncaught type error by `sticky-event` (#7566) @mudana-grune
+
+### 🧰 Maintenance
+
+- support: mongoose update (#7659) @jam411
+- support: Elasticsearch8 (#7592) @miya
+- support: Replaced by IAttachmentHasId (#7629) @reiji-h
+- support: Dedupe packages (#7590) @yuki-takei
+- support: Typescriptize CustomNav (#7584) @yuki-takei
+- support: Replaced by IAttachmentHasId (#7629) @reiji-h
+- support: Migrate to Turborepo (#7417) @yuki-takei
+
+## [v6.0.15](https://github.com/growilabs/growi/compare/v6.0.14...v6.0.15) - 2023-04-10
+
+### 🐛 Bug Fixes
+
+- fix: Templates are not applied when pages are created from PageTree (#7553) @miya
+- fix(drawio): Render uncompressed data when line-breaks option is set (#7555) @yuki-takei
+- fix: Is not working i18n on `/admin/export`  (#7554) @jam411
+- fix: PageTree mutiple DnD unexpected disappear and unexpected tree move if renamed path (#7542) @jam411
+- fix: Username incremental search is not working in comment (#7548) @mudana-grune
+- fix: H6 line-height (#7541) @yukendev
+
+## [v6.0.14](https://github.com/growilabs/growi/compare/v6.0.13...v6.0.14) - 2023-04-04
+
+### 🐛 Bug Fixes
+
+- fix(drawio): Set compressXml option (#7536) @yuki-takei
+- fix(drawio): Rendering uncompressed data (#7537) @yuki-takei
+
+## [v6.0.13](https://github.com/growilabs/growi/compare/v6.0.12...v6.0.13) - 2023-04-03
+
+### 🐛 Bug Fixes
+
+- fix: The "note" and "keep" commands of the GROWI bot are not functioning (#7529) @miya
+- fix: The "search" command of the GROWI bot is not functioning (#7525) @miya
+- fix: Lsx filter and except option do not work when the path includes special characters (#7523) @yuki-takei
+
+## [v6.0.12](https://github.com/growilabs/growi/compare/v6.0.11...v6.0.12) - 2023-03-30
+
+### 🐛 Bug Fixes
+
+- fix: DrawioViewer script URL (#7518) @yuki-takei
+
+## [v6.0.11](https://github.com/growilabs/growi/compare/v6.0.10...v6.0.11) - 2023-03-29
+
+### 🚀 Improvement
+
+- imprv: ToC placeholder (#7506) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: Support draw.io v21.1.0 (support both of compressed/uncompressed data) (#7515) @yuki-takei
+- fix: The same level template page is being applied to lower level pages unintentionally (#7510) @miya
+- fix: Supress `activeTab` prop type error (#7504) @jam411
+
+## [v6.0.10](https://github.com/growilabs/growi/compare/v6.0.9...v6.0.10) - 2023-03-23
+
+### 🚀 Improvement
+
+- imprv: Reverse switch for display or hidden page settings (#7483) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: CodeBlock string is be `[object Object]` if searched (#7484) @jam411
+- fix: Show handsontable edit modal color in dark theme  (#7497) @yukendev
+- fix: Error when transitioning to a user home page where creator does not exist (#7499) @miya
+- fix: Attachment links do not work correctly (#7498) @jam411
+- fix: Language selection dropdown in installer does not reflect browser language setting (#7494) @miya
+- fix:  Search results are not highlighted when searching for quoteted words (PageListItemL) (#7491) @miya
+- fix: Responses 500 status code when invalid regular expressions are inputted to lsx's execpt option (#7488) @jam411
+- fix: Page paths in search results are not displayed correctly (#7463) @miya
+
+## [v6.0.9](https://github.com/growilabs/growi/compare/v6.0.8...v6.0.9) - 2023-03-14
+
+### 💎 Features
+
+- feat: Replaced with new toast (#7466) @mudana-grune
+
+### 🚀 Improvement
+
+- imprv: Page path hierarchical link color (#7474) @yuki-takei
+- imprv: Add markdown header link (h4, h5, h6) (#7465) @miya
+- imprv: Include anyone with the link page in the deletion target (#7461) @miya
+
+### 🐛 Bug Fixes
+
+- fix: Scrolling table in preview causes editor to scroll to row 1 (workaround) (#7473) @miya
+- fix: Internal server error when input wrong tag to markdown (#7471) @jam411
+- fix: Search results are not highlighted when searching for quoteted words (#7443) @miya
+
+### 🧰 Maintenance
+
+- support: Bump Next.js to v13 (#7458) @yuki-takei
+
+## [v6.0.8](https://github.com/growilabs/growi/compare/v6.0.7...v6.0.8) - 2023-03-06
+
+### 💎 Features
+
+- feat: Compare all page revisions on PageAccessoriesModal History tab (#7414) @jam411
+
+### 🚀 Improvement
+
+- imprv: Save the correct page body when uploading the attachment (#7432) @miya
+- imprv: Determine page grant considering wiki mode when creating a new page by uploading attachments (#7428) @miya
+
+### 🐛 Bug Fixes
+
+- fix: Email is not sent to Admin user when the user is created at user registration restricted (#7454) @miya
+- fix: Error when trying to create a new page with attachments (#7424) @miya
+- fix: Unable to delete multiple pages (#7435) @miya
+- fix: PageDeleteModal warns even if you have delete permission (#7436) @miya
+- fix: Color of the close icon in modal header (#7419) @ayaka0417
+- fix: Behavior when conflicts occur when saving pages (#7425) @miya
+
+## [v6.0.7](https://github.com/growilabs/growi/compare/v6.0.6...v6.0.7) - 2023-02-21
+
+### 💎 Features
+
+- feat: Manage guest ui setting with session (#7401) @yukendev
+- feat: Manage guest sidebar mode with session (#7393) @yukendev
+
+### 🚀 Improvement
+
+- imprv: UnsavedAlertDialog and page transition when next routing (#7400) @miya
+- imprv: PasswordResetModal styles and ejs format (#7404) @jam411
+- imprv: Initialize UserUISettings (#7397) @yuki-takei
+- imprv: Presentation behavior (#7399) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: PageStatusAlert is displayed on unnecessary pages (#7413) @miya
+- fix: PageStatusAlert does not disappear after loading latest revision (#7412) @miya
+- fix: Unable to transition requested page after login (#7402) @miya
+- fix: Page body is blank when opening editor after duplicating page (#7394) @miya
+- fix: Error when pressing the conflict resolution button on PageStatusAlert (#7395) @miya
+- fix: mono-blue subnavigation color (#7398) @ayaka0417
+- imprv: Add send email to user feat to `/reset-password` endpoint v6 (#7356) @jam411
+- fix: Behavior when color schema is forced by GROWI themes (#7391) @yuki-takei
+- fix: Sidebar mode on editor doesn't work in HackMD tab (#7396) @yuki-takei
+- fix: Can't controll slack notification button in comment editor (#7389) @yukendev
+
+## [v6.0.6](https://github.com/growilabs/growi/compare/v6.0.5...v6.0.6) - 2023-02-14
+
+### 💎 Features
+
+- feat: Presentation (#7367) @yuki-takei
+- feat: Detect i18n locale from browser accept languages (#7341) @jam411
+- feat: Server Side Rendering (#7352) @yuki-takei
+
+### 🚀 Improvement
+
+- imprv: Allow iframe tag (#7368) @yuki-takei
+- imprv: User data serialization (#7355) @miya
+- imprv: Anchor link (#7354) @yuki-takei
+- imprv: classname for fluid layout (#7353) @yuki-takei
+- imprv: Disable lsx in shared page (#7333) @miya
+- imprv: Data mutation (#7336) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: Make collapse work for anchor tags (#7381) @jam411
+- fix: Revision short body is not displayed on search results page (#7373) @miya
+- fix: Error when clicking on a page you are not authorized to view on the search results page (#7343) @miya
+- fix: Omit S3 credentials from the response for /_api/v3/app-settings (#7369) @miya
+- fix: Omit S3 credentials from the response for /_api/v3/app-settings (#7369) @miya
+- fix: Keep showing page restricted alert (#7371) @yukendev
+- fix: Recent changes and Timeline (#7366) @yuki-takei
+- fix: Login screen background (#7350) @ayaka0417
+- fix: Comment form background (#7365) @ayaka0417
+- fix: Scroll into view by anchor (#7360) @yuki-takei
+- fix: Routing after creating page with shortcut (#7359) @yuki-takei
+- fix: Border-color in edit mode (#7349) @ayaka0417
+- fix: Can't controll slack notification switch in editor (#7332) @yukendev
+- fix: Show load latest revision button when update drawio or table from view (#7324) @yukendev
+- fix: Can delete own user (#7321) @miya
+- fix: Request to "/_api/v3/page/is-grant-normalized" occurs when in guest mode (#7313) @miya
+
+### 🧰 Maintenance
+
+- support: create README.md for v6 migration (#7380) @yukendev
+- support: Bump SWR to v2.0.3 (#7362) @yuki-takei
+- feat: Refactor common processes in Next Page (#7357) @yukendev
+- support: Migrate Notation for v5 to v6 (#7326) @yukendev
+- ci(deps-dev): bump sass from 1.53.0 to 1.57.1 (#7223) @dependabot
+- ci(deps): bump amannn/action-semantic-pull-request from 4.2.0 to 5.0.2 (#7338) @dependabot
+- ci(deps): bump bakunyo/git-pr-release-action from 281e1fe424fac01f3992542266805e4202a22fe0 to master (#7340) @dependabot
+- ci(deps): bump docker/build-push-action from 2 to 4 (#7339) @dependabot
+- ci(deps): bump http-cache-semantics from 4.1.0 to 4.1.1 (#7344) @dependabot
+- support: Bump SWR to v2 (#7318) @yuki-takei
+- support: Add test for View and Edit contents when saving (#7323) @yukendev
+
+## [v6.0.5](https://github.com/growilabs/growi/compare/v6.0.4...v6.0.5) - 2023-01-30
+
+### 🚀 Improvement
+
+- imprv: Override process for CommonSanitizeOptions (#7305) @miya
+
+### 🐛 Bug Fixes
+
+- fix:  Request to "/_api/v3/personal-settings"  occurs when in guest mode (#7307) @miya
+- fix: Undeleteable trash pages when clicked empty trash button bug (#7250) @jam411
+- fix: Guest users are able to move to pages that require authentication (#7300) @miya
+- fix: Modal does not close after clicking on path in DescendantsPageListModal (#7291) @miya
+- fix: GrowiContextualSubNavigation style is broken (#7304) @jam411
+- fix: Markdown in the editor reverted when save with shortcut (#7301) @yukendev
+
+## [v6.0.4](https://github.com/growilabs/growi/compare/v6.0.3...v6.0.4) - 2023-01-25
+
+### 🐛 Bug Fixes
+
+- fix: Invalid URL in markdown breaks browser (#7292) @yuki-takei
+- fix: Previous editing markdown remains after changing page (#7285) @yukendev
+
+### 🧰 Maintenance
+
+- ci(deps): bump ua-parser-js from 0.7.31 to 0.7.33 (#7293) @dependabot
+
+## [v6.0.3](https://github.com/growilabs/growi/compare/v6.0.2...v6.0.3) - 2023-01-24
+
+### 💎 Features
+
+- feat: GROWI to GROWI transfer (#6727) @hakumizuki
+- feat: Use configured xss custom whitelist (#7252) @miya
+- imprv: UI admin g2g transfer advanced options (#7261) @hakumizuki
+
+### 🚀 Improvement
+
+- imprv: Do not retrieve page data using API in shared page (#7240) @miya
+- imprv: Use CSS variables (#7093) @yuki-takei
+- imprv: Do not request /pages.getPageTag when on a shared page (#7214) @miya
+
+### 🐛 Bug Fixes
+
+- fix: Share link management button is not available (#7286) @yuki-takei
+- fix: Color for blinked section (#7287) @ayaka0417
+- fix: Error toaster appears after renaming (#7276) @miya
+- fix: Search Tag From Tag Sidebar Correctly (#7282) @yukendev
+- fix: Ignore backslash in page path (#7284) @yuki-takei
+- fix: Bug in Page Tree Selected Item Background Color (#7272) @yukendev
+- fix: Type guard comment.createdAt (#7281) @hakumizuki
+- fix: Color of login form (#7275) @ayaka0417
+- fix: Body of shared page is not displayed (#7270) @miya
+- fix: Refactor uri decoding in getServerSideProps (#7268) @yukendev
+- fix: Cannot login with LDAP unless local strategy is enabled (#7259) @miya
+- fix: Skeleton color (#7264) @ayaka0417
+- fix: Refactor axios date serializer config (#7249) @yukendev
+- fix: DeletePageModal shows an incorrect label when open (#7224) @yukendev
+- fix: Page path is not displayed in browser tab on shared page (#7243) @miya
+- fix: Lsx encode prefix twice (#7239) @yuki-takei
+- fix: Initial value of the page grant respects the parent page's one (#7232) @yukendev
+
+### 🧰 Maintenance
+
+- support: Build container images with AWS CodeBuild (#7258) @yuki-takei
+
+## [v6.0.2](https://github.com/growilabs/growi/compare/v6.0.1...v6.0.2) - 2023-01-10
+
+### 🐛 Bug Fixes
+
+- fix: Attaching page title as initial header section (#7228) @yukendev
+- fix: Update PageTree data after saving page (#7227) @yukendev
+- fix: Lsx "filter" and "except" options does not work (#7226) @yuki-takei
+- fix: Omit remark-growi-directive shortcuts (#7225) @yuki-takei
+
+### 🧰 Maintenance
+
+- ci(deps-dev): bump textlint-rule-no-doubled-joshi from 4.0.0 to 4.0.1 (#7222) @dependabot
+
+## [v6.0.1](https://github.com/growilabs/growi/compare/v6.0.0...v6.0.1) - 2023-01-07
+
+### 🚀 Improvement
+
+- imprv: Reduce frequent API calling by SWR (#7218) @yuki-takei
+- imprv: Do not use api for fetching pages when using shared pages (#7213) @miya
+
+### 🐛 Bug Fixes
+
+- fix: Custom logo not displayed on shared page (#7205) @miya
+- fix: Attach i18n User Setting and TagEditModal (#7216) @jam411
+- fix: Make PLANTUML_URI v5.x compatible (#7215) @yuki-takei
+- fix: Launch with PROMSTER_ENABLED=true failed (#7210) @yuki-takei
+- fix: Lsx performs with strange behavior (#7209) @yuki-takei
+
+### 🧰 Maintenance
+
+- support: Arm architecture (#7212) @yuki-takei
+- ci(deps): bump anothrNick/github-tag-action from 1.38.0 to 1.56.0 (#7195) @dependabot
+- ci(deps): bump google-github-actions/setup-gcloud from 0 to 1 (#7193) @dependabot
+- ci(deps): bump github/codeql-action from 1 to 2 (#7194) @dependabot
+- ci(deps): bump flat from 5.0.0 to 5.0.2 (#7200) @dependabot
+- ci(deps): bump json5 from 1.0.1 to 1.0.2 (#7201) @dependabot
+- ci(Mergify): configuration update (#7202) @yuki-takei
+- support: Uninstall swig-template (#7192) @yuki-takei
+
+## [v6.0.0](https://github.com/growilabs/growi/compare/v5.1.8...v6.0.0) - 2022-12-27
+
+### 💎 Features
+
+- feat: Apply Next.js
+- feat: New plugin (#7034) @yuki-takei
+- feat: Save prevent xss custom settings in new format (#7124) @miya
+
+### 🧰 Maintenance
+
+- support: Request scoped SWR (#6742) @yuki-takei
+- support: Build preset themes within external package (#7057) @yuki-takei
+
+## [v5.1.8](https://github.com/growilabs/growi/compare/v5.1.7...v5.1.8) - 2022-11-17
+
+### 🐛 Bug Fixes
+
+- fix: Put back page from trash (#6835) @yukendev
+- fix: Updating page content width is not working (#6914) @yukendev
+- fix: Create page at installer (#6930) @hakumizuki @yuki-takei
+
+## [v5.1.7](https://github.com/growilabs/growi/compare/v5.1.6...v5.1.7) - 2022-10-26
+
+### 🐛 Bug Fixes
+
+- fix: Page move event notification message (#6823) @hakumizuki
+
+## [v5.1.6](https://github.com/growilabs/growi/compare/v5.1.5...v5.1.6) - 2022-10-19
+
+### 🐛 Bug Fixes
+
+- fix: image not showing and exceed crop modal area (#6712) @mudana-grune
+- fix: Conflict Diff Modal Error getCurrentOptionsToSave is not a function (#6745) @kaoritokashiki
+
+## [v5.1.5](https://github.com/growilabs/growi/compare/v5.1.4...v5.1.5) - 2022-10-04
+
+### 💎 Features
+
+- feat: Add option to not use crop modal on brand logo upload (#6677) @Yohei-Shiina
+
+### 🚀 Improvement
+
+- imprv: Emoji picker performance for v5.x (#6689) @hakumizuki
+
+### 🐛 Bug Fixes
+
+- fix(auditlog): Attachment download is displayed even if the filter is unchecked (#6688) @miya
+- fix: firstName and lastName japanese translations in SAML  (#6631) @kaoritokashiki
+
+## [v5.1.4](https://github.com/growilabs/growi/compare/v5.1.3...v5.1.4) - 2022-09-12
+
+### 💎 Features
+
+- feat:  Truncate long path when recent changes is in S size (#6263) @mudana-grune
+- feat: In-app notifications when removing descendants of subscribed pages (#6192) @Shunm634-source
+- feat: Not increment ordered list number in CodeMirror (#6462) @mudana-grune
+
+### 🚀 Improvement
+
+- imprv: Added page URL to mail subject (#6554) @hakumizuki
+
+### 🐛 Bug Fixes
+
+- fix: Cannot update user group without parent (#6530) @kaoritokashiki
+- fix: Make PageTree input not draggable when editting (#6525) @hakumizuki
+- fix: Pagetree input hit enter (#6526) @hakumizuki
+- fix: Disallow retrieval of revision data that does not match the page (#6537) @miya
+
+## [v5.1.3](https://github.com/growilabs/growi/compare/v5.1.2...v5.1.3) - 2022-08-28
+
+### 💎 Features
+
+- feat(auditlog): Copy URL of the table (#6421) @miya
+
+### 🚀 Improvement
+
+- imprv(auditlog): Activity paging UI (#6444) @miya
+- imprv: Improvement behavior when click on drawio diagram. (#6486) @kaishuu0123
+
+### 🐛 Bug Fixes
+
+- fix: Label of alert when updating tags (#6478) @miya
+- fix: Uploading image using shortcut key(ctrl+v) shows toastError (#6474) @Yohei-Shiina
+- fix: Pager is not displayed (#6468) @miya
+
+### 🧰 Maintenance
+
+- support: Use vscode-stylelint (#6430) @yuki-takei
+
+## [v5.1.2](https://github.com/growilabs/growi/compare/v5.1.1...v5.1.2) - 2022-08-03
+
+### 💎 Features
+
+- feat: Make content width of each page configurable (#6107) @mudana-grune
+
+### 🚀 Improvement
+
+- imprv(auditlog): Clear and reload button (#6398) @miya
+- imprv(auditlog): Date Range Picker  (#6395) @miya
+
+### 🐛 Bug Fixes
+
+- fix: MathJax rendering (#6396) @yuki-takei
+
+### 🧰 Maintenance
+
+- support: Make Editor component Functional Component and TypeScript (#6374) @yukendev
+
+## [v5.1.1](https://github.com/growilabs/growi/compare/v5.1.0...v5.1.1) - 2022-08-01
+
+### 💎 Features
+
+- feat: Users can set users per ip from env var at API Rate Limit  (#6379) @yukendev
+- feat: Show user picture in Audit Log (#6342) @miya
+- feat: Reset search criteria button (#6327) @miya
+
+### 🚀 Improvement
+
+- imprv(auditlog): Display number of actions that can be saved (#6353) @miya
+- imprv(auditlog): Include delete-related actions in small group (#6351) @miya
+
+### 🐛 Bug Fixes
+
+- fix: Default markdown linker with relative path does not respect the current page path (v5.1.0) (#6378) @yuki-takei
+- fix: Recover page path operation (#6368) @hakumizuki
+- fix: Migration script for inserting NamedQuery (#6364) @yuki-takei
+- fix: "Error: cannnot get grant label" occured with lsx (#6348) @yukendev
+
+## [v5.1.0](https://github.com/growilabs/growi/compare/v5.0.11...v5.1.0) - 2022-07-21
+
+### 💎 Features
+
+- feat: Custom brand logo image (#5709) @mudana-grune
+- feat: Rate Limit by rate-limit-flexible (#6053) @yukendev
+- feat: Audit Log (#5915) @miya
+
+### 🚀 Improvement
+
+- imprv: Prevent XSS with React (#6274) @yuki-takei
+- imprv: Reflect tmp tag data (#6124) @kaoritokashiki
+- imprv: Update subscribe button icon on Navbar (#6213) @jam411
+- imprv: Event emittion by socket.io is triggered only when ES reindexing (#6077) @hirokei-camel
+
+### 🐛 Bug Fixes
+
+- fix: Drawio rendering (#6275) @hakumizuki
+- fix: Blink section header on init (#6249) @yuki-takei
+- fix: Error when trying login with an email that contains plus sign (#6232) @miya
+- fix: Use APIv3 for api get check_username (#6226) @kaoritokashiki
+- fix: Slack integration connection test (#6201) @yukendev
+- fix: Not found page for `/${ObjectId like string}` path (#6208) @yuki-takei
+
+### 🧰 Maintenance
+
+- support: Refactor PageInfo types (#6283) @yuki-takei
+- support: Refactor growi renderer using hooks 2 (#6237) @yuki-takei
+- support: Refactor growi renderer using hooks (#6223) @hakumizuki
+- imprv: Omit Personal Container (#6182) @kaoritokashiki
+
+## [v5.0.11](https://github.com/growilabs/growi/compare/v5.0.10...v5.0.11) - 2022-07-05
+
+### 💎 Features
+
+- feat: Integrate recount descendant count after paths fix (#6170) @Yohei-Shiina
+
+### 🚀 Improvement
+
+- imprv: Redirect when the anchor is #password (#6144) @Kami-jo
+
+### 🐛 Bug Fixes
+
+- fix: User registration page is not redirected after tmp login (#6197) @kaoritokashiki
+- fix: Empty trash doesn't work (#6168) @yukendev
+
+### 🧰 Maintenance
+
+- support: Ease rate limit temporary (#6191) @yuki-takei
+- support: Omit page history container and page revision comparer container (#6185) @yukendev
+
+## [v5.0.10](https://github.com/growilabs/growi/compare/v5.0.9...v5.0.10) - 2022-06-27
+
+### 💎 Features
+
+- feat: Sidebar default mode settings (#6111) @yukendev
+- feat: Get GCS instance that uses Application Default Credentials for v5 (#6051) @Yohei-Shiina
+- feat: Resume rename on server boot (#5862)(#6014) @Yohei-Shiina
+- feat: Show page item control menu on empty page (#6070)(#6103) @Yohei-Shiina
+
+### 🚀 Improvement
+
+- imprv: Show page control on subnavigation at existing empty page  (#5638) @Yohei-Shiina
+- imprv: Remove toc and page authors in empty page (#5661) @Yohei-Shiina
+- imprv: SWRize apiGet /tag.search (#6062) @kaoritokashiki
+
+### 🐛 Bug Fixes
+
+- fix: Scrolling preview (#6148) @yuki-takei
+- fix: Show page history comparation modal on init (#6072) @hirokei-camel
+- fix: Ensure backword compatibility for ES6 when using max_analyzed_offset (#6121) @hakumizuki
+- fix: Set max_analyzed_offset to elasticsearch querying options (#6115) @hakumizuki
+- fix: Revision err when updating tags (#6073) @kaoritokashiki
+- fix: Support 3 types of syntax for OpenID Connect Issuer Host (#6061) @mudana-grune
+
+### 🧰 Maintenance
+
+- support: Omit comment container (#6147) @yuki-takei
+- support: Upgrade typescript to ^4.6.0 (#6082) @hakumizuki
+
+## [v5.0.9](https://github.com/growilabs/growi/compare/v5.0.8...v5.0.9) - 2022-06-13
+
+### 🚀 Improvement
+
+- imprv: Render MathJax in Preview tab of comment (#6025) @yuki-takei
+- imprv: Exception handling for user authentication (#6019) @kaoritokashiki
+- imprv: Sidebar background color on light theme and add shadow on dark theme (#6012) @shukmos
+- imprv: Limit display of notification paths (#5991) @jam411
+
+### 🐛 Bug Fixes
+
+- fix: Getting page API is broken (#6023) @yuki-takei
+- fix: MathJax does not working (#6020) @yuki-takei
+
+## [v5.0.8](https://github.com/growilabs/growi/compare/v5.0.7...v5.0.8) - 2022-06-07
+
+### 🚀 Improvement
+
+- imprv: Fix subnavigation spacing (#5995) @yuki-takei
+- imprv: Set Content-Length header in response of attachment (#5972) @hiroki-hgs
+- imprv: Fix sidebar tag layout (#5984) @jam411
+- imprv: PageStatusAlert labels when data is outdated (#5961) @yuki-takei
+- imprv: Delete NotFoundAlert from not found page (#5919) @Shunm634-source
+
+### 🐛 Bug Fixes
+
+- fix: Too many footstamps icons are shown by lsx output 3 (#6000) @yuki-takei
+- fix: Adjust PageItemControl alignment (#5994) @yuki-takei
+- fix: CodeMirror placeholder color (#5993) @yuki-takei
+- fix: Chinese notation is broken on create new page modal (#5973) @jam411
+- fix: Document timestamps does not updated (#5979) @yuki-takei
+- fix: Slack channels are not automatically filled after setting up user trigger notification on v5.0.x (#5911) @kaoritokashiki
+- fix: Login required when viewing sharelink page (#5959) @yuki-takei
+- fix: Editor scroll sync by Preview scrolling does not work (#5949) @yuki-takei
+
+### 🧰 Maintenance
+
+- support: Enable garbage collection at runtime with expose-gc package (#5986) @yuki-takei
+- support: Upgrade aws-sdk to v3 (#5863) @mudana-grune
+
+## [v4.5.22](https://github.com/growilabs/growi/compare/v4.5.21...v4.5.22) - 2022-06-07
+
+### 🐛 Bug Fixes
+
+- fix: Fixed the bug of auto-filling unintended values into the Email field of the User settings (#5885) @Shunm634-source
+- fix: google-oauth2 Automatically bind external accounts does not work (#5891) @kaoritokashiki
+- fix: Slack channels are not automatically filled after setting up user trigger notification (#5976) @kaoritokashiki
+
+### 🧰 Maintenance
+
+- support: Enable garbage collection at runtime with expose-gc package (#5998) @kaoritokashiki
+
+## [v5.0.7](https://github.com/growilabs/growi/compare/v5.0.6...v5.0.7) - 2022-05-30
+
+### 💎 Features
+
+- feat: Set the min length of passwords by environment variable (#5899) @Shunm634-source
+- feat: API to find username (#5907) @miya
+
+### 🐛 Bug Fixes
+
+- fix: Page is not rendered for guest (#5930) @yuki-takei
+- fix: Server error due to the canDeleteLogic method (#5927) @hakumizuki
+- fix: Show pagename on toastr when page deleted (#5772) @hirokei-camel
+- fix: Search result screen is broken under content 100% setting (#5917) @jam411
+
+## [v5.0.6](https://github.com/growilabs/growi/compare/v5.0.5...v5.0.6) - 2022-05-27
+
+### 💎 Features
+
+- feat: Emoji - replace emojione to emojimart (#5668) @kaoritokashiki
+- feat: Show username suggestion for mention in comment (#5856) @mudana-grune
+- feat: Send in-app notification when containing username mention in comment  (#5906) @mudana-grune
+- feat: Customize menu in navbar for guest user (#5858) @yukendev
+- feat: Admin only page convert by path (#5902) @hakumizuki
+- feat: Fix grant alert (#5903) @hakumizuki
+
+### 🚀 Improvement
+
+- imprv: Automatic login after registration (#5860) @hiroki-hgs
+- imprv: Add tooltip to SubNavButtons (#5887) @miya
+- imprv: Mixin of argument-of-override-list-group-item-for-pagetree for dark theme (#5904) @shukmos
+- imprv: Move code to the appropriate place for fix browser auto-complete email wiith username (#5892) @Yohei-Shiina
+- imprv: Initial rendering when opening Custom Sidebar (#5880) @Kami-jo
+- imprv: Add contributors to staff credit (#5841) @hiroki-hgs
+
+### 🐛 Bug Fixes
+
+- fix: Can not toggle textlint function on v5.0.x (#5854) @kaoritokashiki
+- fix(google-oauth2): Automatically bind external accounts  does not work on v5.0.x (#5886) @kaoritokashiki
+
+## [v4.5.21](https://github.com/growilabs/growi/compare/v4.5.20...v4.5.21) - 2022-05-23
+
+### 🐛 Bug Fixes
+
+- fix: Can not toggle textlint function on v4.5.x (https://github.com/growilabs/growi/pull/5855) @kaoritokashiki
+- fix: Error on searching (https://github.com/growilabs/growi/pull/5873) @miya
+
+## [v5.0.5](https://github.com/growilabs/growi/compare/v5.0.4...v5.0.5) - 2022-05-16
+
+### 💎 Features
+
+- feat: Empty trash button in trash page (#5816) @yukendev
+
+### 🚀 Improvement
+
+- imprv: Count badge colors (#5835) @shukmos
+- imprv: List group background colors on PageTree (#5812) @shukmos
+- imprv: Page path auto complete function for page rename modal (#5805) @kaoritokashiki
+- imprv: Show toastr when converting is completed on Private Legacy Page (#5810) @yukendev
+- imprv: Create parent pages as needed by path that includes slash (#5809) @kaoritokashiki
+
+### 🐛 Bug Fixes
+
+- fix: Change the execution user of the official docker image to root (#5846) @yuki-takei
+- fix: Display admin link only with logged in (#5799) @hirokei-camel
+- fix: Error when renaming (#5793) @miya
+
+### 🧰 Maintenance
+
+- support: Typescriptize tag model (#5778) @kaoritokashiki
+
+## [v4.5.20](https://github.com/growilabs/growi/compare/v4.5.19...v4.5.20) - 2022-05-12
+
+### 🐛 Bug Fixes
+
+- fix: Guest user cannot access share link pages (#5819) @kaoritokashiki
+
+## [v5.0.4](https://github.com/growilabs/growi/compare/v5.0.3...v5.0.4) - 2022-04-28
+
+### 💎 Features
+
+- feat: Private legacy pages convert by path (#5787) @hakumizuki
+- feat: Generate activity when page is created (#5765) @miya
+- feat: Private legacy pages convert by path API (#5760) @hakumizuki
+- feat:  Create notification when page is reverted (#5756) @miya
+- feat: Create notification when page is duplicated (#5749) @miya
+- feat: Add count badge to Page List button and Comment button (#5740) @yukendev
+- feat: Infinite scroll for Recent Changes in Sidebar (#5647) @mudana-grune
+
+### 🚀 Improvement
+
+- imprv: Change GET method to POST for logout operation (#5751) @kaoritokashiki
+- imprv: Redesign tags (#5730) @miya
+- imprv: i18n for already_exists error in PutBackPageModal (#5747) @kaoritokashiki
+
+### 🐛 Bug Fixes
+
+- fix: Default markdown linker with relative path does not respect the current page path (#5788) @yuki-takei
+- fix: Include any public pages as applicable ancestors (#5786) @hakumizuki
+- fix: Not create unnecessary empty pages when ancestors are public (#5774) @hakumizuki
+- fix: Too many footstamps icons are shown by lsx output 2 (#5763) @yuki-takei
+- fix:  footstamp-icon size (#5759) @kaoritokashiki
+
+## [v4.5.19](https://github.com/growilabs/growi/compare/v4.5.18...v4.5.19) - 2022-04-28
+
+### 🐛 Bug Fixes
+
+- fix: Swiping to previous/next page for Mac users (4.5.x) (#5758) @hirokei-camel
+- fix: Get attachment list api without "page" parameter returns 500 response (#5726) @miya
+
+## [v5.0.3](https://github.com/growilabs/growi/compare/v5.0.2...v5.0.3) - 2022-04-21
+
+### 💎 Features
+
+- feat: Search on private legacy pages (#5723) @hakumizuki
+
+### 🚀 Improvement
+
+- imprv: Dark theme color optimization (#5737) @shukmos
+- imprv: Change the order of menu items (#5722) @miya
+
+### 🐛 Bug Fixes
+
+- fix: Get attachment list api without "page" parameter returns 500 response (#5726) @miya
+- fix: New user notification email is also sent TO: deleted_at_<epoch_time>@deleted (#5735) @yuki-takei
+- fix: Too many footstamps icons are shown by lsx output (#5727) @yuki-takei
+
+## [v5.0.2](https://github.com/growilabs/growi/compare/v5.0.1...v5.0.2) - 2022-04-15
+
+### 🐛 Bug Fixes
+
+- fix: Edit button to open built-in editor does not work when HackMD is disabled (#5719) @yuki-takei
+- fix: Share link list occures error when related page is not found (#5718) @yuki-takei
+
+## [v5.0.1](https://github.com/growilabs/growi/compare/v5.0.0...v5.0.1) - 2022-04-15
+
+### 💎 Features
+
+- feat: Input Slack member ID (#5412) @mudana-grune
+- feat: Remove child group from parent group (#5600) @miya
+
+### 🚀 Improvement
+
+- imprv: Add spinner to tag sidebar (#5700) @miya
+- imprv: Adjust pagelist and comment position (#5682) @Yohei-Shiina
+- imprv: Adjust layout for PageTree Descendant Count (#5666) @miya
+- imprv: adjust spaces in page item control and subnav btn (#5655) @Yohei-Shiina
+- imprv: Clickable area of PageListItemL (#5665) @yuki-takei
+- imprv: Add an expiration date for the link in the email (#5660) @miya
+- imprv: remove min-width from search-sort-option-btn (#5656) @kaoritokashiki
+
+### 🐛 Bug Fixes
+
+- fix: Correction of expiredAt attached to email (#5715) @miya
+- fix: Normalize parent so it does not include siblings (#5678) @hakumizuki
+- fix: Prevent auto completing email with username stored by browser in /me page (#5702) @Yohei-Shiina
+- fix: Do not include granted users if change page permission restricted (#5693) @miya
+- fix: Do not include in search results if the page grant is restricted (#5691) @miya
+- fix: Password reset gives error update password failed when submitting a new password (#5685) @kaoritokashiki
+- fix: Cannot register new users (#5683) @kaoritokashiki
+- fix: Sync change of count for both like and bookmark in search page (#5667) @Yohei-Shiina
+- imprv: Adjust layout for PageTree Descendant Count (#5666) @miya
+- fix: HackMD disabled tooltip on mobile (#5658) @yuki-takei
+- fix: One Time Token is not available (#5654) @miya
+- fix: Page items disappear when dnd (#5651) @miya
+
+### 🧰 Maintenance
+
+- ci(deps): bump anothrNick/github-tag-action from 1.36.0 to 1.38.0 (#5271) @dependabot
+- ci(deps): bump amannn/action-semantic-pull-request from 3.4.5 to 4.2.0 (#5627) @dependabot
+- ci(deps): bump actions/upload-artifact from 2 to 3 (#5686) @dependabot
+- ci(deps): bump actions/download-artifact from 2 to 3 (#5687) @dependabot
+- support: Migration for setting sparce option to slack member id (#5694) @kaoritokashiki
+- support: Update eslint-config-weseek (#5673) @yuki-takei
+
+## [v4.5.18](https://github.com/growilabs/growi/compare/v4.5.17...v4.5.18) - 2022-04-15
+
+### 🐛 Bug Fixes
+
+- fix: One Time Token is not available for v4.5.x (#5713) @miya
+- fix: Prevent auto completing email with username stored by browser in /me page for v4.5.x (#5703) @Yohei-Shiina
+- fix: Page view count stops at 15 (#5705) @miya
+
+## [v4.5.17](https://github.com/growilabs/growi/compare/v4.5.16...v4.5.17) - 2022-04-07
+
+### 🐛 Bug Fixes
+
+- fix: Elasticsearch doesn't work properly on production (#5676) @Yohei-Shiina
+
+## [v4.5.16](https://github.com/growilabs/growi/compare/v4.5.15...v4.5.16) - 2022-04-06
+
+### 💎 Features
+
+- feat: Support Elasticsearch 7 (#5613) @Yohei-Shiina
+
+### 🐛 Bug Fixes
+
+- fix: Domain whitelist is not respected (fix #5408) (#5488) @yuto-oweseek
+- fix: Add tags to pages restricted by specified groups on View mode (for v4.5.x) (#5487) @yuto-oweseek
+
+## [v5.0.0](https://github.com/growilabs/growi/compare/v4.5.15...v5.0.0) - 2022-04-01
+
+### 💎 Features
+
+- feat: Support Elasticsearch 7 (#5080) @yuki-takei
+- feat: Elasticsearch reindex on boot (#5149) @LuqmanHakim-Grune
+- feat: PageTree and re-impl SearchResult with list group (#5286) @yuki-takei
+- feat: Rename(Move) by Drag & Drop (#5292) @hakumizuki
+- feat: Maintenance mode (#5486) @hakumizuki
+- feat: Delete permission config (#5527) @hakumizuki
+
+### 🚀 Improvement
+
+- imprv: Show comments in search page result (#5645) @yuki-takei
+- imprv: Add description for user addition (#5614) @hakumizuki
+- imprv: Validate deletion settings (#5581) @hakumizuki
+
+### 🐛 Bug Fixes
+
+- fix: Swiping to previous/next page for Mac users (5.0.x) (#5491) @hakumizuki
+- fix: Guest User Access Dropdown shows wrong value (#5643) @miya
+- fix: Show full text on presentation mode (#5636) @hakumizuki
+- fix: Displaying minimum length of password (#5630) @Yohei-Shiina
+- fix: Domain whitelist is not respected (fix #5408) (#5470) @yuto-oweseek
+- fix: Add tags to pages restricted by specified groups on View mode (#5457) @yuto-oweseek
+
+### 🧰 Maintenance
+
+- ci(deps-dev): bump plantuml-encoder from 1.2.5 to 1.4.0 (#5633) @dependabot
+- ci(deps-dev): bump codemirror from 5.63.0 to 5.64.0 (#4777) @dependabot
+- ci(deps): bump nanoid from 3.1.30 to 3.2.0 (#5142) @dependabot
+- support: Upgrade openid client (#5185) @mudana-grune
+- ci(deps): bump amannn/action-semantic-pull-request from 3.4.2 to 3.4.5 (#4559) @dependabot
+- ci(deps): bump extend from 3.0.1 to 3.0.2 (#5222) @dependabot
+- ci(deps-dev): bump jquery-ui from 1.12.1 to 1.13.0 (#4548) @dependabot
+- ci(deps): bump actions/setup-node from 2 to 3 (#5437) @dependabot
+- ci(deps): bump actions/checkout from 2 to 3 (#5462) @dependabot
+- ci(deps): bump peter-evans/dockerhub-description from 2 to 3 (#5615) @dependabot
+- ci(deps): bump actions/cache from 2 to 3 (#5584) @dependabot
+- ci(deps-dev): bump reveal.js from 3.6.0 to 4.3.1 (#5603) @dependabot
+- support: Update yarn git-hosted-info v2.8.8 to v2.8.9 (#5215) @LuqmanHakim-Grune
+- support: dependabot trim-off-newlines (#5336) @mudana-grune
+- support: dependabot @npmcli/git (#5337) @mudana-grune
+- support: dependabot highlight.js (#5352) @mudana-grune
+- support: dependabot extend (#5335) @mudana-grune
+- support: dependabot ajv (#5333) @mudana-grune
+- support: dependabot dot-drop (#5204) @LuqmanHakim-Grune
+- support: update nanoid yarn.lock v3.1.30 to v3.2.0 (#5216) @LuqmanHakim-Grune
+- support: update validator version (#5562) @LuqmanHakim-Grune
+
+## [v4.5.15](https://github.com/growilabs/growi/compare/v4.5.14...v4.5.15) - 2022-02-17
+
+### 🚀 Improvement
+
+- imprv: Hide forgot password when localstrategy is disabled (#5380) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: The condition to attempt to reconnect to Elasticsearch (#5344) @yuki-takei
+- fix: Highlight-addons and drawio-viewer for view missing (#5376) @yuki-takei
+
+### 🧰 Maintenance
+
+- support:  modify docker-compose indent (#5322) @yuto-oweseek
+
+## [v4.5.14](https://github.com/growilabs/growi/compare/v4.5.13...v4.5.14) - 2022-02-10
+
+### 💎 Features
+
+- feat: OGP in public wiki (#5304) @yuto-oweseek
+
+## [v4.5.13](https://github.com/growilabs/growi/compare/v4.5.12...v4.5.13) - 2022-02-08
+
+### 🐛 Bug Fixes
+
+- fix: fix: Sidebar collapsing (#5283) @yuki-takei
+
+## [v4.5.12](https://github.com/growilabs/growi/compare/v4.5.11...v4.5.12) - 2022-02-01
+
+### 🚀 Improvement
+
+- imprv: Sidebar opening delay (for v4.5.x) (#5218) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: /_api/v3/page with pageId param occurs an 500 error (#5212) @yuki-takei
+- fix: Resolving OIDC issure host (#5220) @yuki-takei
+
+## [v4.5.11](https://github.com/growilabs/growi/compare/v4.5.10...v4.5.11) - 2022-01-26
+
+### 🐛 Bug Fixes
+
+- fix: Internal server error occured when "Restrict complete deletion of pages" option's value is "Admin and author" (#5175 ) @yuki-takei
+
+## [v4.5.10](https://github.com/growilabs/growi/compare/v4.5.9...v4.5.10) - 2022-01-26
+
+### 💎 Features
+
+- feat: Automatic installation (#5141) @yuki-takei
+
+### 🚀 Improvement
+
+- imprv: Migrate like states to swr (#5137) @miya
+
+### 🐛 Bug Fixes
+
+- fix: 86631-cannot-reset-password-in-case-that-register-limitation-is-Closed (#5155) @kaoritokashiki
+
+### 🧰 Maintenance
+
+- support: VRT with Cypress (#5030) @yuki-takei
+
+## [v4.5.9](https://github.com/growilabs/growi/compare/v4.5.8...v4.5.9) - 2022-01-21
+
+### 🚀 Improvement
+
+- imprv: 79291 make password min length 8 charactors (#5116) @kaoritokashiki
+
+### 🐛 Bug Fixes
+
+- fix: OIDC reconnection bug fix (#5104) @mudana-grune
+- fix: /_api/v3/page is broken and dump 500 error "get-page-failed TypeError: user.canDeleteCompletely is not a function" (#5103) @yuki-takei
+- fix: Default completely deletion settings label mismatched against to actual (#5102) @yuki-takei
+- fix: OIDC issuer host availability check (#5099) @mudana-grune
+
+### 🧰 Maintenance
+
+- support: Improve multistage build (#5090) @yuki-takei
+- support: Omit node-re2 (#5089) @yuki-takei
+- ci(deps-dev): bump swr from 1.0.1 to 1.1.2 (#5018) @dependabot
+
+## [v4.5.8](https://github.com/growilabs/growi/compare/v4.5.7...v4.5.8) - 2022-01-12
+
+### 💎 Features
+
+- feat: Display a list of bookmarked users (#5044) @miya
+
+### 🐛 Bug Fixes
+
+- fix: Built-in editor scroll position is reset after save (Introduced by v4.5.3) (#5074) @yuki-takei
+
+### 🧰 Maintenance
+
+- support: Bump y18n to v4.0.3 (#5071) @yuki-takei
+- support: Omit prettier-stylelint (#5070) @yuki-takei
+- support: Bump tar to 6.1.11 (#5069) @yuki-takei
+
+## [v4.5.7](https://github.com/growilabs/growi/compare/v4.5.6...v4.5.7) - 2022-01-11
+
+### 🐛 Bug Fixes
+
+- fix: Subnavigation sticking initialization (#5062) @yuki-takei
+- fix: Built-in editor was broken (#5061) @yuki-takei
+
+### 🧰 Maintenance
+
+- support: Bump re2 to 1.17.2 (#5059) @yuki-takei
+
+## [v4.5.6](https://github.com/growilabs/growi/compare/v4.5.5...v4.5.6) - 2022-01-07
+
+### 💎 Features
+
+- feat: Resolve conflict with 3-way merge like editor (#5012) @yuto-oweseek
+
+### 🚀 Improvement
+
+- imprv: Subnavigation behavior (#5047) @yuki-takei
+- imprv: Switching editor mode behavior (#5043) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- Bug: Error: The specified instance couldn't register because same id has already been registered (#5031) by #5043 @yuki-takei
+
+## [v4.5.5](https://github.com/growilabs/growi/compare/v4.5.4...v4.5.5) - 2022-01-05
+
+### 💎 Features
+
+- feat: OIDC reconnection (#5016) @mudana-grune
+- feat: In-App Notification (#4792) @kaoritokashiki
+
+### 🚀 Improvement
+
+- imprv: Improve tags functions (#5001) @yuto-oweseek
+- imprv: Migrate editor container grant to SWR (#4957) @stevenfukase
+
+### 🐛 Bug Fixes
+
+- Bug: Error: The specified instance couldn't register because same id has already been registered (#5031) by 573216c @yuki-takei
+
+### 🧰 Maintenance
+
+- fix: dependabot alert trim-newlines (#4931) @mudana-grune
+- fix: dependabot alert dot-prop (#4921) @mudana-grune
+- ci(deps-dev): bump tsconfig-paths-webpack-plugin from 3.5.1 to 3.5.2 (#4852) @dependabot
+- ci(deps): bump ua-parser-js from 0.7.17 to 0.7.31 (#4895) @dependabot
+- support: dependabot alert ssri (#4973) @mudana-grune
+
+## [v4.5.4](https://github.com/growilabs/growi/compare/v4.5.3...v4.5.4) - 2021-12-23
+
+### 💎 Features
+
+- feat: Hotkey to focus to search (#5006) @yuki-takei
+
+### 🚀 Improvement
+
+- imprv: Omit magnifier icon from global SearchTypeahead (#5005) @yuki-takei
+- imprv: Focus to input when resetting SearchTypeahead (#5003) @yuki-takei
+- imprv: Make updatedAt SWR (#4954) @kaoritokashiki
+- imprv: Make createdAt SWR (#4819) @kaoritokashiki
+- imprv: Performance optimization for large drawio diagrams (#4221) @kaishuu0123
+
+### 🐛 Bug Fixes
+
+- fix: Sidebar height is a little large (#4988) @yuki-takei
+
+### 🧰 Maintenance
+
+- imprv: Focus to input when resetting SearchTypeahead (#5003) @yuki-takei
+- support: Typescriptize search components (#4982) @yuki-takei
+- fix:  dependabot alert object-path (#4964) @mudana-grune
+- fix: dependabot alert axios (#4960) @mudana-grune
+- fix: dependabot alert elliptic (#4959) @mudana-grune
+- fix: dependabot alert acorn (#4951) @mudana-grune
+- fix: dependabot alert is-svg (#4937) @mudana-grune
+- fix: dependabot alert socket.io-parser (#4934) @mudana-grune
+- fix: dependabot alert serialize-javascript (#4910) @mudana-grune
+- fix: dependabot alert js-yaml (#4906) @mudana-grune
+- ci(deps): bump ws from 7.5.1 to 8.3.0 (#4728) @dependabot
+- support: omit growi-commons (#4938) @yuki-takei
+
+## [v4.5.3](https://github.com/growilabs/growi/compare/v4.5.2...v4.5.3) - 2021-12-17
+
+### 💎 Features
+
+- feat: user activation by email (#4862) @kaoritokashiki
+
+### 🚀 Improvement
+
+- imprv: Use SWR for isSlackEnabled (#4827) @stevenfukase
+- imprv: Disable rubber band scroll for Mac & iOS users (#4834) @hakumizuki
+- imprv: Omit atlaskit and implement sidebar only with original codes (#4598) @yuki-takei
+
+### 🐛 Bug Fixes
+
+- fix: GROWI Bot search command after transplanting search service from dev/5.0.x (#4916) @hakumizuki
+- fix: Set min-height to sidebar scroll target (#4884) @yuki-takei
+
+### 🧰 Maintenance
+
+- support: fix dependabot alert for kind-of (#4891) @LuqmanHakim-Grune
+- support: fix dependabot alert for ini (#4892) @LuqmanHakim-Grune
+- support: fix and debug mixin-deep dependabot alert (#4867) @LuqmanHakim-Grune
+- support: dependabot alert xmlhttprequest-ssl (#4878) @mudana-grune
+- support: Transplant search service from dev/5.0.x (#4869) @hakumizuki
+- support: dependabot alert set-value (#4864) @LuqmanHakim-Grune
+- ci(deps): bump aws-sdk from 2.179.0 to 2.1044.0 (#4821) @dependabot
+
+## [v4.5.2](https://github.com/growilabs/growi/compare/v4.5.1...v4.5.2) - 2021-12-06
 
 ### 🐛 Bug Fixes
 
 - fix: Added scope for unfurl (#4811) @hakumizuki
 
-## [v4.5.1](https://github.com/weseek/growi/compare/v4.5.0...v4.5.1) - 2021-12-06
+## [v4.5.1](https://github.com/growilabs/growi/compare/v4.5.0...v4.5.1) - 2021-12-06
 
 ### 🐛 Bug Fixes
 
 - fix: /admin/slack-integration page dump undefined error (#4806) @yuki-takei
 
-## [v4.5.0](https://github.com/weseek/growi/compare/v4.4.13...v4.5.0) - 2021-12-06
+## [v4.5.0](https://github.com/growilabs/growi/compare/v4.4.13...v4.5.0) - 2021-12-06
 
 ### BREAKING CHANGES
 
@@ -44,7 +3275,7 @@
 - ci(deps): bump detect-indent from 6.0.0 to 7.0.0 (#4635) @dependabot
 - ci(deps): bump passport-saml from 2.2.0 to 3.2.0 (#4431) @dependabot
 
-## [v4.4.13](https://github.com/weseek/growi/compare/v4.4.12...v4.4.13) - 2021-11-19
+## [v4.4.13](https://github.com/growilabs/growi/compare/v4.4.12...v4.4.13) - 2021-11-19
 
 ### 💎 Features
 
@@ -54,7 +3285,7 @@
 
 - fix(slackbot): Interactions from private channels not working (#4688) @stevenfukase
 
-## [v4.4.12](https://github.com/weseek/growi/compare/v4.4.11...v4.4.12) - 2021-11-15
+## [v4.4.12](https://github.com/growilabs/growi/compare/v4.4.11...v4.4.12) - 2021-11-15
 
 ### 🐛 Bug Fixes
 
@@ -64,7 +3295,7 @@
 
 - ci(deps): Downgrade passport to 0.4.0 (#4669) @mudana-grune
 
-## [v4.4.11](https://github.com/weseek/growi/compare/v4.4.10...v4.4.11) - 2021-11-12
+## [v4.4.11](https://github.com/growilabs/growi/compare/v4.4.10...v4.4.11) - 2021-11-12
 
 ### 🚀 Improvement
 
@@ -84,7 +3315,7 @@
 - ci(deps): bump axios from 0.21.1 to 0.24.0 (#4604) @dependabot
 - ci(deps): bump tar from 4.4.13 to 4.4.19 (#4601) @dependabot
 
-## [v4.4.10](https://github.com/weseek/growi/compare/v4.4.9...v4.4.10) - 2021-11-08
+## [v4.4.10](https://github.com/growilabs/growi/compare/v4.4.9...v4.4.10) - 2021-11-08
 
 ### 🚀 Improvement
 
@@ -109,7 +3340,7 @@
 - ci(deps-dev): bump jquery-ui from 1.12.1 to 1.13.0 (#4549) @dependabot
 - docs(page): Add docs to /page/info api (#4531) @Mxchaeltrxn
 
-## [v4.4.9](https://github.com/weseek/growi/compare/v4.4.8...v4.4.9) - 2021-10-18
+## [v4.4.9](https://github.com/growilabs/growi/compare/v4.4.8...v4.4.9) - 2021-10-18
 
 ### 💎 Features
 
@@ -130,7 +3361,7 @@
 
 - support: Localize Copy bug report button (#4436) @AbiFirmandhani-Grune
 
-## [v4.4.8](https://github.com/weseek/growi/compare/v4.4.7...v4.4.8) - 2021-10-08
+## [v4.4.8](https://github.com/growilabs/growi/compare/v4.4.7...v4.4.8) - 2021-10-08
 
 ### 🚀 Improvement
 
@@ -147,7 +3378,7 @@
 - fix(slackbot): Respond bad gateway error & improved help message (#4470) @hakumizuki
 - fix(slackbot): Stop auto-join to channels with middlewarer (#4424) @yuki-takei
 
-## [v4.4.7](https://github.com/weseek/growi/compare/v4.4.6...v4.4.7) - 2021-09-29
+## [v4.4.7](https://github.com/growilabs/growi/compare/v4.4.6...v4.4.7) - 2021-09-29
 
 ### 🚀 Improvement
 
@@ -173,7 +3404,7 @@
 - support: Install Git LFS when provisioning of devcontainer (#4405) @stevenfukase
 - chore: Add .dockerignore (#4396) @yuki-takei
 
-## [v4.4.6](https://github.com/weseek/growi/compare/v4.4.5...v4.4.6) - 2021-09-24
+## [v4.4.6](https://github.com/growilabs/growi/compare/v4.4.5...v4.4.6) - 2021-09-24
 
 ### 🚀 Improvement
 
@@ -184,7 +3415,7 @@
 
 - support(slackbot-proxy): Bump slackbot proxy version independentry (#4385) @yuki-takei
 
-## [v4.4.5](https://github.com/weseek/growi/compare/v4.4.4...v4.4.5) - 2021-09-23
+## [v4.4.5](https://github.com/growilabs/growi/compare/v4.4.4...v4.4.5) - 2021-09-23
 
 ### 🐛 Bug Fixes
 
@@ -197,7 +3428,7 @@
 - support: Upgrade codemirror to 5.63.0 (#4364) @yuki-takei
 - ci(deps-dev): bump codemirror from 5.48.4 to 5.58.2 (#4363) @dependabot
 
-## [v4.4.4](https://github.com/weseek/growi/compare/v4.4.3...v4.4.4) (Discontinued) - 2021-09-22
+## [v4.4.4](https://github.com/growilabs/growi/compare/v4.4.3...v4.4.4) (Discontinued) - 2021-09-22
 
 ### 💎 Features
 
@@ -224,7 +3455,7 @@
 - ci(deps): bump path-parse from 1.0.5 to 1.0.7 (#4126) @dependabot
 - ci(deps): bump tmpl from 1.0.4 to 1.0.5 (#4337) @dependabot
 
-## [v4.4.3](https://github.com/weseek/growi/compare/v4.4.2...v4.4.3) - 2021-09-17
+## [v4.4.3](https://github.com/growilabs/growi/compare/v4.4.2...v4.4.3) - 2021-09-17
 
 ### 💎 Features
 
@@ -247,7 +3478,7 @@
 - chore: Refactor for "Slack command permission for each channel" (#4295) @zahmis
 - support: Update APIv3 docs for pages (#4280) @yuki-takei
 
-## [v4.4.2](https://github.com/weseek/growi/compare/v4.4.0...v4.4.2) - 2021-09-07
+## [v4.4.2](https://github.com/growilabs/growi/compare/v4.4.0...v4.4.2) - 2021-09-07
 
 ### Changes
 
@@ -264,7 +3495,7 @@
 
 ## v4.4.1 (Missing number)
 
-## [v4.4.0](https://github.com/weseek/growi/compare/v4.3.3...v4.4.0) (Discontinued) - 2021-09-06
+## [v4.4.0](https://github.com/growilabs/growi/compare/v4.3.3...v4.4.0) (Discontinued) - 2021-09-06
 
 ### Changes
 
@@ -309,7 +3540,7 @@ Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/44x.html](http
 
 - Improvement: Welcome page markdown
 - Fix: Some recursive operation exclude descendant pages that are restricted for groups (Rename / Delete / Delete completely / Put back / Duplicate)
-- Fix: Layout is broken when editing users page ([#4128](https://github.com/weseek/growi/issues/4128))
+- Fix: Layout is broken when editing users page ([#4128](https://github.com/growilabs/growi/issues/4128))
 - Support: Upgrade libs
 
 ## v4.3.2
@@ -331,7 +3562,7 @@ Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/44x.html](http
 ### BREAKING CHANGES
 
 - GROWI manages dependencies with `lerna`: Use `npx lerna bootstrap` instead of `yarn install`
-- GROWI includes some official plugins in default: Users no longer need to install [growi-plugin-lsx](https://github.com/weseek/growi-plugin-lsx), [growi-plugin-pukiwiki-like-linker](https://github.com/weseek/growi-plugin-pukiwiki-like-linker) and [growi-plugin-attachment-refs](https://github.com/weseek/growi-plugin-attachment-refs) before build client.
+- GROWI includes some official plugins in default: Users no longer need to install [growi-plugin-lsx](https://github.com/growilabs/growi-plugin-lsx), [growi-plugin-pukiwiki-like-linker](https://github.com/growilabs/growi-plugin-pukiwiki-like-linker) and [growi-plugin-attachment-refs](https://github.com/growilabs/growi-plugin-attachment-refs) before build client.
 
 Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/43x.html](https://docs.growi.org/en/admin-guide/upgrading/43x.html)
 
@@ -865,7 +4096,7 @@ Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/37x.html](http
 ### BREAKING CHANGES
 
 - GROWI v3.6.x no longer support Node.js v8.x
-- The name of database that is storing migrations meta data has been changed. This affects **only when `MONGO_URI` has parameters**. v3.5.x or above has a bug ([#1361](https://github.com/weseek/growi/issues/1361))
+- The name of database that is storing migrations meta data has been changed. This affects **only when `MONGO_URI` has parameters**. v3.5.x or above has a bug ([#1361](https://github.com/growilabs/growi/issues/1361))
 
 Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/36x.html](https://docs.growi.org/en/admin-guide/upgrading/36x.html)
 
@@ -954,7 +4185,7 @@ Upgrading Guide: [https://docs.growi.org/en/admin-guide/upgrading/36x.html](http
 ## v3.5.13
 
 - Feature: Re-edit comments
-- Support: [growi-plugin-attachment-refs](https://github.com/weseek/growi-plugin-attachment-refs)
+- Support: [growi-plugin-attachment-refs](https://github.com/growilabs/growi-plugin-attachment-refs)
 - Support: Upgrade libs
 
 ## v3.5.12

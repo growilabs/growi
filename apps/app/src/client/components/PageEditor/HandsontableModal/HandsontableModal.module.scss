@@ -1,0 +1,46 @@
+.grw-handsontable {
+  :global(.handsontable) {
+    position: relative;
+
+    :global(.handsontableInput) {
+      max-width: 290px !important;
+    }
+
+    :global(td) {
+      word-break: break-all;
+    }
+
+    :global(th) {
+      text-align: inherit;
+    }
+  }
+
+  // expand .hot-table-container (with flexbox)
+  :global(.grw-modal-expanded) {
+    :global(.hot-table-container) {
+      flex: 1;
+    }
+  }
+
+
+  // Prevent handsontable/handsontable #2937 (Manual column resize does not work when handsontable is loaded inside Bootstrap 3.0 Modal)
+  // see https://github.com/handsontable/handsontable/issues/2937#issuecomment-287390111
+  // This issue fixing from Handsontable v 7.0.0
+  // see: https://github.com/handsontable/handsontable/issues/2937#issuecomment-480824024
+  :global(.modal.in .modal-dialog.handsontable-modal) {
+    transform: none;
+
+    :global(.data-import-button) {
+      position: relative;
+      padding-right: 35px;
+      padding-left: 10px;
+
+      :global(i::before) {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        font-size: 20px;
+      }
+    }
+  }
+}

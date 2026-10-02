@@ -1,0 +1,41 @@
+import { type JSX, useEffect, useMemo, useRef } from 'react';
+import type { Extension } from '@codemirror/state';
+import { placeholder, scrollPastEnd } from '@codemirror/view';
+import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
+
+import { GlobalCodeMirrorEditorKey } from '../../../consts/index.js';
+import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor.js';
+import { useDefaultExtensions } from '../../stores/use-default-extensions.js';
+import { useEditorSettings } from '../../stores/use-editor-settings.js';
+
+const additionalExtensions: Extension[] = [
+  [
+    // todo: i18n
+    placeholder('Please select page body'),
+    scrollPastEnd(),
+  ],
+];
+
+export const CodeMirrorEditorDiff = (): JSX.Element => {
+  const codeMirrorRef = useRef(null);
+
+  const cmProps = useMemo<ReactCodeMirrorProps>(() => {
+    return {};
+  }, []);
+
+  const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(
+    GlobalCodeMirrorEditorKey.DIFF,
+    codeMirrorRef.current,
+    cmProps,
+  );
+
+  useDefaultExtensions(codeMirrorEditor);
+  useEditorSettings(codeMirrorEditor);
+
+  // setup additional extensions
+  useEffect(() => {
+    return codeMirrorEditor?.appendExtensions?.(additionalExtensions);
+  }, [codeMirrorEditor]);
+
+  return <div ref={codeMirrorRef} />;
+};

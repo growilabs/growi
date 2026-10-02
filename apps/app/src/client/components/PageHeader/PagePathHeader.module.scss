@@ -1,0 +1,24 @@
+.page-path-header {
+  :global(input) {
+    min-width: 20px;
+    min-height: unset;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    line-height: 1.2em;
+  }
+
+  :global(.page-path-header-buttons) {
+    height: 0;
+
+    :global(.btn) {
+      width: 24px;
+      height: 24px;
+      transform: translateY(12px);
+    }
+  }
+
+  // Make Truncated elements horizontally scrollable and hide the scroll bar
+  :global(.page-path-header-input) {
+    scrollbar-width: none;
+  }
+}

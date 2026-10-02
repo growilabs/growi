@@ -1,0 +1,26 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use '@growi/ui/scss/atoms/btn-muted';
+@use './button-styles';
+
+.btn-group-bookmark {
+  :global(.btn-bookmark) {
+    @extend %btn-basis;
+  }
+  :global(.dropdown .btn-bookmark) {
+    padding-right: 1px;
+  }
+  :global(.total-counts) {
+    @extend %btn-total-counts-basis;
+
+    padding-left: 5px;
+  }
+}
+
+// == Colors
+.btn-group-bookmark {
+  /* stylelint-disable-next-line no-descending-specificity */
+  :global(.btn-bookmark) {
+    @include btn-muted.colorize(bs.$orange);
+  }
+}
+

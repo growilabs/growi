@@ -1,0 +1,47 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+
+.btn-group-switching {
+  :global(.btn) {
+    --bs-btn-border-width: 2px;
+
+    width: 60px;
+    height: 38px;
+
+    @include bs.media-breakpoint-up(sm) {
+      width: auto;
+      height: 30px;
+    }
+  }
+}
+
+
+// == Colors
+@include bs.color-mode(light) {
+  .btn-group-switching {
+    :global(.btn) {
+      $bg: var(--bs-gray-500);
+
+      --bs-btn-border-color: #{$bg};
+      --bs-btn-hover-bg: var(--bs-gray-100);
+      --bs-btn-hover-border-color: #{$bg};
+      --bs-btn-active-color: white;
+      --bs-btn-active-bg: #{$bg};
+      --bs-btn-active-border-color: #{$bg};
+    }
+  }
+}
+
+@include bs.color-mode(dark) {
+  .btn-group-switching {
+    :global(.btn) {
+      $bg: var(--bs-gray-800);
+
+      --bs-btn-border-color: #{$bg};
+      --bs-btn-hover-bg: #{rgba(bs.$gray-600, 0.1)};
+      --bs-btn-hover-border-color: #{$bg};
+      --bs-btn-active-bg: #{$bg};
+      --bs-btn-active-border-color: #{$bg};
+    }
+  }
+}

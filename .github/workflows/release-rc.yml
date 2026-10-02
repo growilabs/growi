@@ -5,64 +5,54 @@ on:
     branches:
       - rc/**
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
 jobs:
 
-  build-rc:
-
+  determine-tags:
     runs-on: ubuntu-latest
 
+    outputs:
+      TAGS: ${{ steps.meta.outputs.tags }}
+
     steps:
-    - uses: actions/checkout@v2
-      with:
-        lfs: true
+    - uses: actions/checkout@v4
 
     - name: Retrieve information from package.json
-      uses: myrotvorets/info-from-package-json-action@1.1.0
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
       id: package-json
 
-    - name: Docker meta
+    - name: Docker meta for docker.io
+      uses: docker/metadata-action@v5
       id: meta
-      uses: docker/metadata-action@v3
       with:
-        images: weseek/growi,ghcr.io/weseek/growi
+        images: docker.io/growilabs/growi
+        sep-tags: ','
         tags: |
           type=raw,value=${{ steps.package-json.outputs.packageVersion }}
           type=raw,value=${{ steps.package-json.outputs.packageVersion }}.{{sha}}
 
-    - name: Login to docker.io registry
-      run: |
-        echo ${{ secrets. DOCKER_REGISTRY_PASSWORD }} | docker login --username wsmoogle --password-stdin
+  build-image-rc:
+    uses: ./.github/workflows/reusable-app-build-image.yml
+    with:
+      image-name: growilabs/growi
+      tag-temporary: latest-rc
+    secrets:
+      AWS_ROLE_TO_ASSUME_FOR_OIDC: ${{ secrets.AWS_ROLE_TO_ASSUME_FOR_OIDC }}
 
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v1
-      with:
-        registry: ghcr.io
-        username: wsmoogle
-        password: ${{ secrets.DOCKER_REGISTRY_ON_GITHUB_PASSWORD }}
+  publish-image-rc:
+    needs: [determine-tags, build-image-rc]
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
-
-    - name: Cache Docker layers
-      uses: actions/cache@v2
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-app-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildx-app-
-
-    - name: Build and push
-      uses: docker/build-push-action@v2
-      with:
-        context: .
-        file: ./packages/app/docker/Dockerfile
-        platforms: linux/amd64
-        push: true
-        cache-from: type=local,src=/tmp/.buildx-cache
-        cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
-        tags: ${{ steps.meta.outputs.tags }}
-
-    - name: Move cache
-      run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+    uses: ./.github/workflows/reusable-app-create-manifests.yml
+    with:
+      tags: ${{ needs.determine-tags.outputs.TAGS }}
+      registry: docker.io
+      image-name: 'growilabs/growi'
+      docker-registry-username: 'growimoogle'
+      tag-temporary: latest-rc
+    secrets:
+      DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }}

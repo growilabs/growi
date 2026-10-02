@@ -1,0 +1,68 @@
+import type { JSX, ReactNode } from 'react';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+
+import GrowiLogo from '~/components/Common/GrowiLogo';
+import { useSetupAdminSocket } from '~/features/admin/states/socket-io';
+
+import { RawLayout } from './RawLayout';
+
+import styles from './Admin.module.scss';
+
+const AdminNavigation = dynamic(
+  () =>
+    import('../Admin/Common/AdminNavigation').then(
+      (mod) => mod.AdminNavigation,
+    ),
+  { ssr: false },
+);
+const PageCreateModal = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+  () => import('~/client/components/PageCreateModal'),
+  { ssr: false },
+);
+const HotkeysManager = dynamic(
+  // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+  () => import('~/client/components/Hotkeys/HotkeysManager'),
+  { ssr: false },
+);
+
+type Props = {
+  componentTitle?: string;
+  children?: ReactNode;
+};
+
+const AdminLayout = ({ children, componentTitle }: Props): JSX.Element => {
+  useSetupAdminSocket();
+
+  return (
+    <RawLayout>
+      <div className={`admin-page ${styles['admin-page']}`}>
+        <header className="py-0 container">
+          <h1 className="p-3 fs-2 d-flex align-items-center">
+            <Link href="/" className="d-block mb-1 me-2">
+              <GrowiLogo />
+            </Link>
+            {componentTitle}
+          </h1>
+        </header>
+        <div className="main">
+          <div className="container">
+            <div className="row">
+              <div className="col-lg-3">
+                <AdminNavigation />
+              </div>
+              <div className="col-lg-9 mb-5">{children}</div>
+            </div>
+          </div>
+        </div>
+
+        <PageCreateModal />
+      </div>
+
+      <HotkeysManager />
+    </RawLayout>
+  );
+};
+
+export default AdminLayout;

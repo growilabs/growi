@@ -1,0 +1,25 @@
+.flex-expand-horiz {
+  display: flex;
+  flex-direction: row;
+  flex-grow: 1;
+}
+
+.flex-expand-vert {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.flex-expand-vh-100 {
+  height: 100vh;
+
+  .flex-expand-horiz {
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  .flex-expand-vert {
+    height: 100%;
+    overflow-y: hidden;
+  }
+}

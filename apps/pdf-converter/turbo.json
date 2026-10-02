@@ -1,0 +1,27 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "gen:swagger-spec": {
+      "outputs": ["specs/**"],
+      "outputLogs": "new-only"
+    },
+    "dev:pdf-converter": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev:pdf-converter:ci": {
+      "cache": false
+    },
+    "build": {
+      "outputs": ["dist/**"],
+      "outputLogs": "new-only"
+    },
+    "version:prerelease": {
+      "cache": false
+    },
+    "version:prepatch": {
+      "cache": false
+    }
+  }
+}

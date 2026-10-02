@@ -1,0 +1,220 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!**/.terraform",
+      "!**/*.grit",
+      "!**/turbo.json",
+      "!**/.devcontainer",
+      "!**/.stylelintrc.json",
+      "!**/package.json",
+      "!.vscode",
+      "!.claude",
+      "!tsconfig.base.json",
+      "!apps/app/src/styles/prebuilt",
+      "!apps/app/src/styles/tailwind.css",
+      "!apps/app/next-env.d.ts",
+      "!apps/app/tmp",
+      "!apps/pdf-converter/specs",
+      "!apps/slackbot-proxy/src/public/bootstrap",
+      "!apps/app/src/generated",
+      "!packages/pdf-converter-client/src/index.ts",
+      "!packages/pdf-converter-client/specs",
+      "!apps/app/src/migrations",
+      "!apps/app/config/logger",
+      "!apps/app/tmp"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space"
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [
+              ["react", "react/**"],
+              ["next", "next/**"],
+              [":NODE:", ":PACKAGE:"],
+              ":BLANK_LINE:",
+              ["@/**", "^/**"],
+              ":BLANK_LINE:",
+              "~/**",
+              ":BLANK_LINE:",
+              [
+                ":PATH:",
+                "!../**/*.css",
+                "!./*.css",
+                "!../**/*.scss",
+                "!./*.scss"
+              ],
+              ":BLANK_LINE:",
+              ["../**/*.scss", "../**/*.css"],
+              ["./*.scss", "./*.css"]
+            ]
+          }
+        }
+      }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        "useThrowOnlyError": "error",
+        "noParameterAssign": "warn",
+        "noDefaultExport": "warn"
+      },
+      "suspicious": {
+        "noConsole": "error",
+        "noAlert": "error",
+        "noVar": "error",
+        "useAwait": "warn"
+      },
+      "performance": {
+        "noAwaitInLoops": "warn"
+      },
+      "correctness": {
+        "useUniqueElementIds": "warn"
+      },
+      "complexity": {
+        "useMaxParams": "warn"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single"
+    },
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "**/vite*.config.ts",
+        "vitest*.config.ts",
+        "**/declaration.d.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["bin/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["bin/data-migrations/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noVar": "off"
+          },
+          "correctness": {
+            "noInnerDeclarations": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/pdf-converter/**",
+        "apps/slackbot-proxy/**",
+        "apps/growi-vault-manager/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "useImportType": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/app/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "axios": "Please use src/utils/axios instead.",
+                  "^/config/migrate-mongo-config": "Use ^/config/migrate-mongo-config.cjs (CJS-isolated file, extension required).",
+                  "^/config/next-i18next.config": "Use ^/config/next-i18next.config.cjs (CJS-isolated file, extension required).",
+                  "^/config/i18next.config": "Use ^/config/i18next.config.cjs (CJS-isolated file, extension required)."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "apps/app/src/stores-universal/**",
+        "apps/app/src/utils/**",
+        "apps/app/src/models/**",
+        "apps/app/src/services/**",
+        "apps/app/src/pages/**",
+        "apps/app/src/server/**",
+        "apps/app/src/components/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "axios": "Please use src/utils/axios instead."
+                },
+                "patterns": [
+                  {
+                    "group": [
+                      "~/client/**",
+                      "**/client/**",
+                      "client/**",
+                      "!@prisma/client/**"
+                    ],
+                    "message": "Importing from client/ directories is restricted."
+                  },
+                  {
+                    "group": ["~/migrations/**", "**/src/migrations/**"],
+                    "message": "Importing from src/migrations/ in server code is forbidden. Migrations run independently via the migrate-mongo CLI; server code must not depend on a one-shot migration module."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/app/src/server/models/**"],
+      "plugins": ["apps/app/src/server/models/.biome/plugins/no-populate.grit"]
+    }
+  ]
+}

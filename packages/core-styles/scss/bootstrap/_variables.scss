@@ -1,0 +1,68 @@
+/* stylelint-disable scss/comment-no-empty */
+
+@use 'sass:color';
+
+// Variables
+//
+// Variables should follow the `$component-state-property-size` formula for
+// consistent naming. Ex: $nav-link-disabled-color and $modal-content-box-shadow-xs.
+
+// Color system
+$success: #4a9017 !default;
+$info: #4689aa !default;
+$warning: #c99818 !default;
+$danger: #de4d4d !default;
+$success-text-emphasis: color.mix($gray-900, $success, 30%) !default;
+$info-text-emphasis: color.mix($gray-900, $info, 30%) !default;
+$warning-text-emphasis: color.mix($gray-900, $warning, 30%) !default;
+$danger-text-emphasis: color.mix($gray-900, $danger, 30%) !default;
+$success-bg-subtle: color.mix(#fff, $success, 90%) !default;
+$info-bg-subtle: color.mix(#fff, $info, 90%) !default;
+$warning-bg-subtle: color.mix(#fff, $warning, 90%) !default;
+$danger-bg-subtle: color.mix(#fff, $danger, 90%) !default;
+$success-border-subtle: color.mix(#fff, $success, 70%) !default;
+$info-border-subtle: color.mix(#fff, $info, 70%) !default;
+$warning-border-subtle: color.mix(#fff, $warning, 70%) !default;
+$danger-border-subtle: color.mix(#fff, $danger, 70%) !default;
+
+
+// Options
+//
+// Quickly modify global styling by enabling or disabling optional features.
+
+$enable-shadows: true;
+$box-shadow-inset: inset 0 0 rgba(black, 0); // set invisible value for inset
+
+
+// Buttons
+//
+// For each of Bootstrap's buttons, define text, background, and border color.
+
+$btn-box-shadow: 0;
+$btn-active-box-shadow: 0;
+
+
+// Links
+//
+// Style anchor elements.
+
+$link-decoration: none;
+
+
+// == Typography
+//
+// ## Font, line-height, and color for body text, headings, and more.
+$font-family-sans-serif: var(--font-family-sans-serif);
+$font-family-serif: var(--font-family-serif);
+$font-family-monospace: var(--font-family-monospace);
+$font-family-base: $font-family-sans-serif;
+
+
+// == Dropdowns
+$dropdown-header-padding-y: 0 !default;
+
+// == Modals
+$modal-footer-border-width: 0;
+
+// == Custom Checkbox
+$form-check-indicator-size: 1.2rem;

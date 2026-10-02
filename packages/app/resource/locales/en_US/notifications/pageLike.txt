@@ -1,5 +1,0 @@
-{{ username }} liked the page {{ path }}.
-
-----------------------
-
-Growi: {{ appTitle }}

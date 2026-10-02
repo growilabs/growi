@@ -1,0 +1,31 @@
+& {
+  @each $color, $value in $theme-colors {
+    @if $color == 'primary' or $color == 'secondary' {
+      --#{$prefix}#{$color}: #{$value};
+    }
+  }
+
+  @each $color, $value in $theme-colors-rgb {
+    @if $color == 'primary' or $color == 'secondary' {
+      --#{$prefix}#{$color}-rgb: #{$value};
+    }
+  }
+
+  @each $color, $value in $theme-colors-text {
+    @if $color == 'primary' or $color == 'secondary' {
+      --#{$prefix}#{$color}-text-emphasis: #{$value};
+    }
+  }
+
+  @each $color, $value in $theme-colors-bg-subtle {
+    @if $color == 'primary' or $color == 'secondary' {
+      --#{$prefix}#{$color}-bg-subtle: #{$value};
+    }
+  }
+
+  @each $color, $value in $theme-colors-border-subtle {
+    @if $color == 'primary' or $color == 'secondary' {
+      --#{$prefix}#{$color}-border-subtle: #{$value};
+    }
+  }
+}

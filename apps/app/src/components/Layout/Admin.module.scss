@@ -1,0 +1,264 @@
+@use '@growi/core-styles/scss/bootstrap/init' as *;
+@use 'styles/mixins';
+
+$slack-work-space-name-card-background: #fff5ff;
+$slack-work-space-name-card-border: #efc1f6;
+
+.admin-page {
+  :global(.admin-user-menu) {
+    :global(.dropdown-menu) {
+      right: 0;
+      left: auto;
+      width: 400px;
+    }
+  }
+
+  :global(.admin-group-menu) {
+    :global(.dropdown-menu) {
+      right: 0;
+      left: auto;
+    }
+  }
+
+  :global(.admin-customize) {
+    :global(.ss-container img) {
+      padding: 0.5em;
+      background-color: $gray-300;
+    }
+
+    :global(.table-user-list) {
+      :global(.label-admin) {
+        margin-left: 1em;
+      }
+    }
+  }
+
+  :global(.admin-setting-header) {
+    margin-bottom: 20px;
+    border-bottom: 1px solid transparent;
+  }
+
+  :global(.custom-card) {
+    padding: 8px 16px;
+    :global(ul) {
+      margin-bottom: 0;
+    }
+  }
+
+  :global(.admin-security) {
+    :global(.passport-logo) {
+      height: 32px;
+      padding: 3px;
+      margin-top: -0.5em;
+      background-color: black;
+    }
+
+    :global(.auth-mechanism-configurations) {
+      min-height: 80vh;
+    }
+  }
+
+  :global(.admin-customize-sidebar-icon) {
+    :global(svg) {
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  :global(.admin-notification) {
+    :global(table .admin-notif-list) {
+      :global(td) {
+        vertical-align: middle;
+      }
+      :global(.td-abs-center) {
+        width: 1px; // to keep the cell small
+        text-align: center;
+      }
+    }
+  }
+
+  :global(.admin-importer) {
+    :global(table.table-mapping) {
+      :global(th),
+      :global(td) {
+        text-align: center;
+      }
+    }
+  }
+
+  :global(.admin-export) {
+    :global(.progress) {
+      height: 8px;
+    }
+  }
+
+  /*
+  Slack Integration
+  */
+  :global(.selecting-bot-type) {
+    :global(.supplementary-bot-name) {
+      font-size: 1rem;
+    }
+    :global(.bg-info) {
+      font-size: 0.6rem;
+    }
+    :global(.admin-bot-card) {
+      min-width: 300px;
+      max-width: 500px;
+      border-radius: 8px !important;
+      :global(.grw-botcard-title-active) {
+        color: $gray-200;
+      }
+    }
+    :global(.border-primary) {
+      border-width: 2px;
+    }
+  }
+
+  // TODO: change to utility class on Bootstrap 5
+  :global(.slack-connection-log) {
+    :global(.slack-connection-log-title) {
+      border-left: 2px solid;
+    }
+    :global(.slack-connection-log-body) {
+      border: 2px solid;
+    }
+  }
+
+  :global(.admin-slack-integration) {
+    :global(.admin-setting-header) {
+      :global(.btn-link) {
+        font-size: 1rem;
+      }
+    }
+  }
+
+  :global(.bot-integration) {
+    :global(.admin-bot-card) {
+      border-radius: 8px !important;
+    }
+    :global(.admin-border-failed) {
+      border-style: dashed;
+      border-width: 2px;
+    }
+    :global(.admin-border-success) {
+      border-width: 3px;
+    }
+
+    :global(.grw-bridge-proxy-circle) {
+      :global(.circle) {
+        inset: 0;
+        width: 100px;
+        height: 100px;
+        border: 13px solid;
+
+        @include media-breakpoint-down(lg) {
+          width: 50px;
+          height: 50px;
+          border: 8px solid;
+        }
+      }
+
+      :global(.circle-inner) {
+        transform: translate(-50%, 25%);
+      }
+      :global(.circle-inner.grw-proxy-server-name) {
+        margin-top: 55px;
+        transform: translate(-50%, -25%);
+      }
+    }
+
+    // switch layout for Bridge component
+    :global(.grw-bridge-container) {
+      // with ProxyCircle
+      &:global(.with-proxy) {
+        :global(.hr-container) {
+          margin-top: 40px;
+
+          @include media-breakpoint-up(lg) {
+            margin-top: 65px;
+          }
+        }
+      }
+    }
+
+    :global(.slack-work-space-name-card) {
+      background-color: $slack-work-space-name-card-background;
+      border: 1px solid $slack-work-space-name-card-border;
+    }
+  }
+
+  //// TODO: migrate to Bootstrap 4
+  //// omit all .btn-toggle and use Switches
+  //// https://getbootstrap.com/docs/4.2/components/forms/#switches
+
+  // Toggle Twitter Bootstrap button class when active
+  // https://jsfiddle.net/ms040m01/3/
+  // @mixin active-color($color, $bg-color, $border-color) {
+  //   color: $color;
+  //   background-color: darken($bg-color, 10%);
+  //   border-color: $border-color;
+
+  //   &:hover {
+  //     background-color: darken($bg-color, 15%);
+  //   }
+  // }
+  // .btn-group.btn-toggle {
+  //   .btn {
+  //     min-width: 60px;
+  //   }
+  //   .btn.active[data-active-class='default'] {
+  //     @include active-color($btn-default-color, $btn-default-bg, $btn-default-border);
+  //   }
+  //   .btn.active[data-active-class='primary'] {
+  //     @include active-color($btn-primary-color, $btn-primary-bg, $btn-primary-border);
+  //   }
+
+  //   // disabled btn-group styles
+  //   &.btn-group-disabled {
+  //     .btn:hover {
+  //       cursor: not-allowed;
+  //       background-color: unset;
+  //     }
+  //   }
+  // }
+
+  :global(.admin-audit-log) {
+    :global(.select-action-dropdown) {
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    :global(.date-range-picker) {
+      width: 188px;
+      height: auto;
+    }
+    :global(.jump-page-input) {
+      width: 50px;
+    }
+  }
+
+
+
+
+  :global(.settings-table) {
+
+    :global(.item-name) {
+      width: 150px;
+    }
+
+    :global(td.unused) {
+      opacity: 0.5;
+    }
+
+    &:global(.use-only-env-vars .from-env-vars) {
+      background-color: rgba($info, 0.1);
+    }
+  }
+
+
+
+
+
+}
+
+

@@ -12,21 +12,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: ${{ github.event.pull_request.base.ref }}
 
     - name: Retrieve information from package.json
-      uses: myrotvorets/info-from-package-json-action@1.1.0
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
       id: package-json
       with:
-        workingDir: packages/slackbot-proxy
+        workingDir: apps/slackbot-proxy
 
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@v3
+      uses: docker/metadata-action@v5
       with:
-        images: weseek/growi-slackbot-proxy,ghcr.io/weseek/growi-slackbot-proxy,asia.gcr.io/${{ secrets.GCP_PRJ_ID_SLACKBOT_PROXY }}/growi-slackbot-proxy
+        images: weseek/growi-slackbot-proxy,asia.gcr.io/${{ secrets.GCP_PRJ_ID_SLACKBOT_PROXY }}/growi-slackbot-proxy
         tags: |
           type=raw,value=latest
           type=raw,value=${{ steps.package-json.outputs.packageVersion }}
@@ -35,65 +35,47 @@ jobs:
       run: |
         echo ${{ secrets. DOCKER_REGISTRY_PASSWORD }} | docker login --username wsmoogle --password-stdin
 
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v1
+    - name: Authenticate to Google Cloud for GROWI.cloud
+      uses: google-github-actions/auth@v2
       with:
-        registry: ghcr.io
-        username: wsmoogle
-        password: ${{ secrets.DOCKER_REGISTRY_ON_GITHUB_PASSWORD }}
+        credentials_json: '${{ secrets.GCP_SA_KEY_SLACKBOT_PROXY }}'
 
     - name: Setup gcloud
-      uses: google-github-actions/setup-gcloud@master
-      with:
-        project_id: ${{ secrets.GCP_PRJ_ID_SLACKBOT_PROXY }}
-        service_account_key: ${{ secrets.GCP_SA_KEY_SLACKBOT_PROXY }}
-        export_default_credentials: true
+      uses: google-github-actions/setup-gcloud@v2
 
     - name: Configure docker for gcloud
       run: |
         gcloud auth configure-docker --quiet
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
-
-    - name: Cache Docker layers
-      uses: actions/cache@v2
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-slackbot-proxy-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildx-slackbot-proxy-
+      uses: docker/setup-buildx-action@v3
 
     - name: Build and push
-      uses: docker/build-push-action@v2
+      uses: docker/build-push-action@v6
       with:
         context: .
-        file: ./packages/slackbot-proxy/docker/Dockerfile
+        file: ./apps/slackbot-proxy/docker/Dockerfile
         platforms: linux/amd64
         push: true
-        cache-from: type=local,src=/tmp/.buildx-cache
-        cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
+        builder: ${{ steps.buildx.outputs.name }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
         tags: ${{ steps.meta.outputs.tags }}
 
-    - name: Move cache
-      run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
     - name: Add tag
-      uses: anothrNick/github-tag-action@1.36.0
+      uses: anothrNick/github-tag-action@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         CUSTOM_TAG: v${{ steps.package-json.outputs.packageVersion }}
         VERBOSE : true
 
     - name: Update Docker Hub Description
-      uses: peter-evans/dockerhub-description@v2
+      uses: peter-evans/dockerhub-description@v4
       with:
         username: wsmoogle
         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
         repository: weseek/growi-slackbot-proxy
-        readme-filepath: ./packages/slackbot-proxy/docker/README.md
+        readme-filepath: ./apps/slackbot-proxy/docker/README.md
 
 
   create-pr-for-next-rc:
@@ -102,32 +84,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: ${{ github.event.pull_request.base.ref }}
 
-    - uses: actions/setup-node@v2
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
       with:
-        node-version: '14'
-        cache: 'yarn'
-        cache-dependency-path: '**/yarn.lock'
+        node-version: '24'
+        cache: 'pnpm'
 
     - name: Install dependencies
       run: |
-        npx lerna bootstrap
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
 
     - name: Bump versions for next RC
       run: |
-        yarn bump-versions:slackbot-proxy
+        turbo run version:prerelease --filter=@growi/slackbot-proxy
 
     - name: Retrieve information from package.json
-      uses: myrotvorets/info-from-package-json-action@1.1.0
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
       id: package-json
       with:
-        workingDir: packages/slackbot-proxy
+        workingDir: apps/slackbot-proxy
 
     - name: Commit
-      uses: github-actions-x/commit@v2.8
+      uses: github-actions-x/commit@v2.9
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         push-branch: support/prepare-v${{ steps.package-json.outputs.packageVersion }}
@@ -140,6 +124,6 @@ jobs:
         source_branch: support/prepare-v${{ steps.package-json.outputs.packageVersion }}
         destination_branch: master
         pr_title: Prepare v${{ steps.package-json.outputs.packageVersion }}
-        pr_label: exclude from changelog
+        pr_label: flag/exclude-from-changelog,type/prepare-next-version
         pr_body: "An automated PR generated by ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
         github_token: ${{ secrets.GITHUB_TOKEN }}

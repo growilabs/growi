@@ -1,0 +1,109 @@
+import { useMemo } from 'react';
+import { bracketMatching } from '@codemirror/language';
+import type { EditorState } from '@codemirror/state';
+import type { EditorView } from '@codemirror/view';
+import { type UseCodeMirror, useCodeMirror } from '@uiw/react-codemirror';
+import deepmerge from 'ts-deepmerge';
+
+import {
+  type AppendExtensions,
+  useAppendExtensions,
+} from './utils/append-extensions.js';
+import { type Focus, useFocus } from './utils/focus.js';
+import type { FoldDrawio } from './utils/fold-drawio.js';
+import { useFoldDrawio } from './utils/fold-drawio.js';
+import type { GetDocString } from './utils/get-doc.js';
+import { type GetDoc, useGetDoc, useGetDocString } from './utils/get-doc.js';
+import { type InitDoc, useInitDoc } from './utils/init-doc.js';
+import {
+  type InsertMarkdownElements,
+  useInsertMarkdownElements,
+} from './utils/insert-markdown-elements.js';
+import { type InsertPrefix, useInsertPrefix } from './utils/insert-prefix.js';
+import { type InsertText, useInsertText } from './utils/insert-text.js';
+import { type ReplaceText, useReplaceText } from './utils/replace-text.js';
+import { type SetCaretLine, useSetCaretLine } from './utils/set-caret-line.js';
+
+type UseCodeMirrorEditorUtils = {
+  initDoc: InitDoc;
+  appendExtensions: AppendExtensions;
+  getDoc: GetDoc;
+  getDocString: GetDocString;
+  focus: Focus;
+  setCaretLine: SetCaretLine;
+  insertText: InsertText;
+  replaceText: ReplaceText;
+  insertMarkdownElements: InsertMarkdownElements;
+  insertPrefix: InsertPrefix;
+  foldDrawio: FoldDrawio;
+};
+export type UseCodeMirrorEditor = {
+  state: EditorState | undefined;
+  view: EditorView | undefined;
+} & UseCodeMirrorEditorUtils;
+
+export const useCodeMirrorEditor = (
+  props?: UseCodeMirror,
+): UseCodeMirrorEditor => {
+  const mergedProps = useMemo(
+    () =>
+      deepmerge(
+        {
+          // Reset settings of react-codemirror.
+          // Extensions are defined first will be used if they have the same priority.
+          // If extensions conflict, disable them here.
+          // And add them to defaultExtensions: Extension[] with a lower priority.
+          // ref: https://codemirror.net/examples/config/
+          // ------- Start -------
+          indentWithTab: false,
+          basicSetup: {
+            defaultKeymap: false,
+            dropCursor: false,
+            highlightActiveLine: false,
+            highlightActiveLineGutter: false,
+            // Disable default bracketMatching and re-add with afterCursor: false
+            // to prevent a rendering bug where text visually disappears after IME
+            // composition inside brackets on non-Safari browsers (e.g. Chrome).
+            // When afterCursor is true (default), bracketMatching decorates brackets
+            // ahead of the cursor immediately after composition ends, which corrupts
+            // CodeMirror's DOM reconciliation.
+            bracketMatching: false,
+          },
+          extensions: [bracketMatching({ afterCursor: false })],
+          // ------- End -------
+        },
+        props ?? {},
+      ),
+    [props],
+  );
+
+  const { state, view } = useCodeMirror(mergedProps);
+
+  const initDoc = useInitDoc(view);
+  const appendExtensions = useAppendExtensions(view);
+  const getDoc = useGetDoc(view);
+  const getDocString = useGetDocString(view);
+  const focus = useFocus(view);
+  const setCaretLine = useSetCaretLine(view);
+  const insertText = useInsertText(view);
+  const replaceText = useReplaceText(view);
+  const insertMarkdownElements = useInsertMarkdownElements(view);
+  const insertPrefix = useInsertPrefix(view);
+  const foldDrawio = useFoldDrawio(view);
+
+  return {
+    state,
+    view,
+    initDoc,
+    appendExtensions,
+    getDoc,
+    getDocString,
+    focus,
+    setCaretLine,
+    insertText,
+    replaceText,
+    insertMarkdownElements,
+    insertPrefix,
+    foldDrawio,
+  };
+};

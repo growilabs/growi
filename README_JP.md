@@ -1,13 +1,14 @@
 - [English 🇺🇸](./README.md)
-  <p align="center">
-    <a href="https://growi.org">
-      <img src="https://user-images.githubusercontent.com/1638767/38254268-d4476bbe-3793-11e8-964c-8865d690baff.png" width="240px">
-    </a>
-  </p>
-  <p align="center">
-    <a href="https://github.com/weseek/growi/releases/latest"><img src="https://img.shields.io/github/release/weseek/growi.svg"></a>
-    <a href="https://growi-slackin.weseek.co.jp/"><img src="https://growi-slackin.weseek.co.jp/badge.svg"></a>
-  </p>
+
+<p align="center">
+  <a href="https://growi.org">
+    <img src="https://github.com/user-attachments/assets/0acf1409-cea7-4f0e-841c-af5bd8be6711" width="360px">
+  </a>
+</p>
+<p align="center">
+  <a href="https://github.com/growilabs/growi/releases/latest"><img src="https://img.shields.io/github/release/growilabs/growi.svg" alt="Latest version"></a>
+  <a href="https://docs.growi.org/slack"><img src="https://img.shields.io/badge/Slack-Join%20Us-4A154B?style=flat&logo=slack&logoColor=white" alt="Slack - Join US"></a>
+</p>
 
 <p align="center">
   <a href="https://docs.growi.org">ドキュメント</a> / <a href="https://demo.growi.org">デモ</a>
@@ -15,14 +16,14 @@
 
 # GROWI
 
-[![Actions Status](https://github.com/weseek/growi/workflows/Node%20CI/badge.svg)](https://github.com/weseek/growi/actions)
-[![dependencies status](https://david-dm.org/weseek/growi.svg)](https://david-dm.org/weseek/growi)
-[![devDependencies Status](https://david-dm.org/weseek/growi/dev-status.svg)](https://david-dm.org/weseek/growi?type=dev)
-[![docker pulls](https://img.shields.io/docker/pulls/weseek/growi.svg)](https://hub.docker.com/r/weseek/growi/)
+[![docker pulls](https://img.shields.io/docker/pulls/growilabs/growi.svg)](https://hub.docker.com/r/growilabs/growi/)
+[![CodeQL](https://github.com/growilabs/growi/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/codeql-analysis.yml)
+[![Node CI for app development](https://github.com/growilabs/growi/actions/workflows/ci-app.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/ci-app.yml)
+[![Node CI for app production](https://github.com/growilabs/growi/actions/workflows/ci-app-prod.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/ci-app-prod.yml)
 
-|                                                　デモンストレーション                                                 |
-| :-------------------------------------------------------------------------------------------------------------------: |
-| ![sample image](https://user-images.githubusercontent.com/42988650/70600974-6b29cc80-1c34-11ea-94ef-33c39c6a00dc.gif) |
+## デモ
+<video src="https://private-user-images.githubusercontent.com/34241526/333079216-cec7f7d8-c3cc-4ee7-bc94-167b056d4ce2.mp4?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTY0NDk0MDQsIm5iZiI6MTcxNjQ0OTEwNCwicGF0aCI6Ii8zNDI0MTUyNi8zMzMwNzkyMTYtY2VjN2Y3ZDgtYzNjYy00ZWU3LWJjOTQtMTY3YjA1NmQ0Y2UyLm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDA1MjMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQwNTIzVDA3MjUwNFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWQ2M2IwZjc0ZGNhOWQxNWE4MGIyZTZlMzQ0ZDQ4MGZlNjEzMWE3MTQ1YmMwYzg3MmY1NWMyZWI2NzQ3NGIwMTkmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JmFjdG9yX2lkPTAma2V5X2lkPTAmcmVwb19pZD0wIn0.qLfu5120JrkdfpghXlLG8wCn0p4JNZ7W8AD3zUJTIYY"></video>
+
 
 ## 目次
 
@@ -38,15 +39,14 @@
 # 機能紹介
 
 - **主な機能**
-  - マークダウンを使用してページを階層構造で作成することが可能です。 -> 5 分間チュートリアルは[こちら](https://docs.growi.org/ja/guide/getting-started/five_minutes.html))。
-  - HackMD(CodiMd)[https://hackmd.io/] と連携することで同時多人数編集が可能です。
-    - [GROWI Docs: HackMD(CodiMD) 連携](https://docs.growi.org/ja/admin-guide/admin-cookbook/integrate-with-hackmd.html)
+  - マークダウンを使用してページを階層構造で作成することが可能です。 -> [デモサイトで GROWI を体験する](https://docs.growi.org/ja/guide/getting-started/try_growi.html)。
+  - 同時多人数編集が可能です。
   - LDAP / Active Direcotry , OAuth 認証をサポートしています。
   - SAML を用いた Single Sign On が可能です。
   - Slack / Mattermost, IFTTT と連携することが可能です。
   - [GROWI Docs: 機能紹介](https://docs.growi.org/ja/guide/features/page_layout.html)
 - **プラグイン**
-  - [npm](https://www.npmjs.com/browse/keyword/growi-plugin) または [github](https://github.com/search?q=topic%3Agrowi-plugin) から 便利なプラグインを見つけることができます。
+  - [npm](https://www.npmjs.com/browse/keyword/growi-plugin) または [GitHub](https://github.com/search?q=topic%3Agrowi-plugin) から 便利なプラグインを見つけることができます。
 - **[Docker の準備][dockerhub]**
 - **[Docker Compose の準備][docker-compose]**
   - [GROWI Docs: 複数の GROWI を起動](https://docs.growi.org/ja/admin-guide/admin-cookbook/multi-app.html)
@@ -81,28 +81,28 @@ Crowi からの移行は **[こちら](https://docs.growi.org/en/admin-guide/mig
 
 ## 依存関係
 
-- Node.js v12.x or v14.x
-- npm 6.x
-- yarn
-- MongoDB 4.x
+- Node.js v24.x
+- pnpm 10.x
+- [Turborepo](https://turbo.build/repo)
+- MongoDB v6.x or v8.x
 
 ### オプションの依存関係
 
 - Redis 3.x
-- ElasticSearch 6.x (needed when using Full-text search)
+- ElasticSearch 7.x or 8.x or 9.x (needed when using Full-text search)
   - **注意: 次のプラグインが必要です**
     - [Japanese (kuromoji) Analysis plugin](https://www.elastic.co/guide/en/elasticsearch/plugins/current/analysis-kuromoji.html)
     - [ICU Analysis Plugin](https://www.elastic.co/guide/en/elasticsearch/plugins/current/analysis-icu.html)
 
 ## コマンド詳細
 
-| コマンド          | 説明                                                    |
-| ------------------| ------------------------------------------------------- |
-| `yarn app:build`  | GROWI app クライアントをビルドします。                  |
-| `yarn app:server` | GROWI app サーバーを起動します。                        |
-| `yarn start`      | `yarn app:build` と `yarn app:server` を呼び出します。  |
+| コマンド              | 説明                                                            |
+| --------------------- | --------------------------------------------------------------- |
+| `npm run app:build`   | GROWI app クライアントをビルドします。                          |
+| `npm run app:server`  | GROWI app サーバーを起動します。                                |
+| `npm run start`       | `npm run app:build` と `npm run app:server` を呼び出します。    |
 
-詳しくは [GROWI Docs: List of npm Commands](https://docs.growi.org/ja/dev/startup-v2/launch-system.html#npm-コマンドリスト)をご覧ください。
+詳しくは [GROWI Docs: npm スクリプトリスト](https://docs.growi.org/ja/dev/startup-v5/start-development.html#npm-%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%95%E3%82%9A%E3%83%88%E3%83%AA%E3%82%B9%E3%83%88)をご覧ください。
 
 # ドキュメント
 
@@ -130,17 +130,17 @@ Issue と Pull requests の作成は英語・日本語どちらでも受け付�
 
 ## GROWI について話し合いましょう！
 
-質問や提案があれば、私たちの [Slack team](https://growi-slackin.weseek.co.jp/) にぜひご参加ください。
+質問や提案があれば、私たちの [Slack team](https://docs.growi.org/slack) にぜひご参加ください。
 いつでも、どこでも GROWI について議論しましょう！
 
 # ライセンス
 
 - The MIT License (MIT)
-- [ライセンス](https://github.com/weseek/growi/blob/master/LICENSE) と [THIRD-PARTY-NOTICES.md](https://github.com/weseek/growi/blob/master/THIRD-PARTY-NOTICES.md) をご覧ください。
+- [ライセンス](https://github.com/growilabs/growi/blob/master/LICENSE) と [THIRD-PARTY-NOTICES.md](https://github.com/growilabs/growi/blob/master/THIRD-PARTY-NOTICES.md) をご覧ください。
 
   [crowi]: https://github.com/crowi/crowi
-  [growi]: https://github.com/weseek/growi
-  [issues]: https://github.com/weseek/growi/issues
-  [pulls]: https://github.com/weseek/growi/pulls
-  [dockerhub]: https://hub.docker.com/r/weseek/growi
-  [docker-compose]: https://github.com/weseek/growi-docker-compose
+  [growi]: https://github.com/growilabs/growi
+  [issues]: https://github.com/growilabs/growi/issues
+  [pulls]: https://github.com/growilabs/growi/pulls
+  [dockerhub]: https://hub.docker.com/r/growilabs/growi
+  [docker-compose]: https://github.com/growilabs/growi-docker-compose

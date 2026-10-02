@@ -1,0 +1,9 @@
+name: Cache Clear
+
+on: workflow_dispatch
+
+jobs:
+  clear:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: snnaplab/delete-branch-cache-action@v1

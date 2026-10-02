@@ -1,0 +1,32 @@
+import type React from 'react';
+import type { JSX } from 'react';
+import Link from 'next/link';
+import type { IUserHasId } from '@growi/core';
+import { type IUser, isPopulated, type Ref } from '@growi/core';
+import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializers';
+import { pagePathUtils } from '@growi/core/dist/utils';
+
+/** A user as a Prisma row carries it: `name` may be null. */
+type UsernameUserRow = { _id: string; username: string; name: string | null };
+
+export const Username: React.FC<{
+  user?:
+    | IUserHasId
+    | Ref<IUser>
+    | IUserSerializedSecurely<IUserHasId>
+    | UsernameUserRow;
+}> = ({ user }): JSX.Element => {
+  if (user == null || !isPopulated(user)) {
+    return <i>(anyone)</i>;
+  }
+
+  const name = user.name || '(no name)';
+  const username = user.username;
+  const href = pagePathUtils.userHomepagePath(user);
+
+  return (
+    <Link href={href} prefetch={false}>
+      {name}(@{username})
+    </Link>
+  );
+};

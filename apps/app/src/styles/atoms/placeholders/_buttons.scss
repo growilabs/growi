@@ -1,0 +1,15 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+%btn-nologin {
+  transition: 0.8s ease;
+
+  --bs-btn-border-color: #{rgba(white, 0.1)};
+  --bs-btn-hover-border-color: #{rgba(white, 0.1)};
+  --bs-btn-active-border-color: #{rgba(white, 0.1)};
+}
+
+%btn-register {
+  --bs-btn-bg: #{rgba(bs.$success, 0.4)};
+  --bs-btn-hover-bg: #{rgba(bs.$success, 0.8)};
+  --bs-btn-active-bg: #{rgba(bs.$success, 0.8)};
+}

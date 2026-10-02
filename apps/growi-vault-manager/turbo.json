@@ -1,0 +1,26 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "dev:vault-manager": {
+      "dependsOn": ["@growi/core#dev", "@growi/logger#dev"],
+      "cache": false,
+      "persistent": true
+    },
+    "dev:vault-manager:ci": {
+      "dependsOn": ["@growi/core#dev", "@growi/logger#dev"],
+      "cache": false
+    },
+    "build": {
+      "dependsOn": ["@growi/core#build", "@growi/logger#build"],
+      "outputs": ["dist/**"],
+      "outputLogs": "new-only"
+    },
+    "version:prerelease": {
+      "cache": false
+    },
+    "version:prepatch": {
+      "cache": false
+    }
+  }
+}

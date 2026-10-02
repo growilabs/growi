@@ -1,0 +1,77 @@
+{
+  "name": "@growi/remark-attachment-refs",
+  "version": "1.0.0",
+  "description": "Remark plugin to add ref/refimg/refs/refsimg tags",
+  "license": "MIT",
+  "private": true,
+  "keywords": [
+    "growi",
+    "growi-plugin"
+  ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    "./dist/client": {
+      "require": "./dist/client/index.cjs",
+      "import": "./dist/client/index.js"
+    },
+    "./dist/client/*": {
+      "require": "./dist/client/*",
+      "import": "./dist/client/*"
+    },
+    "./dist/server": {
+      "types": "./dist/server/index.d.ts",
+      "require": "./dist/server/index.cjs",
+      "import": "./dist/server/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "run-p build:*",
+    "build:server": "vite build -c vite.server.config.ts",
+    "build:client": "vite build -c vite.client.config.ts",
+    "clean": "rimraf dist",
+    "dev": "run-p dev:*",
+    "dev:server": "vite build -c vite.server.config.ts --mode dev",
+    "dev:client": "vite build -c vite.client.config.ts --mode dev",
+    "watch": "run-p watch:*",
+    "watch:client": "pnpm run dev:client -w --emptyOutDir=false",
+    "watch:server": "pnpm run dev:server -w --emptyOutDir=false",
+    "lint:biome": "biome check",
+    "lint:styles": "stylelint \"src/**/*.scss\" \"src/**/*.css\"",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "run-p lint:*",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@growi/core": "workspace:^",
+    "@growi/logger": "workspace:^",
+    "@growi/remark-growi-directive": "workspace:^",
+    "@growi/ui": "workspace:^",
+    "axios": "^1.16.0",
+    "express": "^4.20.0",
+    "hast-util-select": "^6.0.2",
+    "mongoose": "^6.13.9",
+    "swr": "^2.3.2",
+    "xss": "^1.0.15"
+  },
+  "devDependencies": {
+    "@types/hast": "^3.0.4",
+    "@types/react": "^18.2.14",
+    "@types/react-dom": "^18.2.6",
+    "@types/supertest": "^6.0.2",
+    "csstype": "^3.0.2",
+    "happy-dom": "^15.7.4",
+    "hast-util-sanitize": "^5.0.1",
+    "hast-util-select": "^6.0.2",
+    "npm-run-all2": "^8.0.4",
+    "supertest": "^7.0.0",
+    "unified": "^11.0.0",
+    "unist-util-visit": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

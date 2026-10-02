@@ -1,0 +1,6 @@
+
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.collapsed-parents-dropdown-menu {
+  --bs-dropdown-zindex: #{bs.$zindex-fixed};
+}

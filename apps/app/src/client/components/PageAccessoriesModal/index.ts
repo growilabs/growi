@@ -1,0 +1,1 @@
+export { PageAccessoriesModalLazyLoaded } from './dynamic';

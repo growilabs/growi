@@ -1,0 +1,38 @@
+@use 'sass:color';
+
+:root[data-bs-theme] {
+  @import '@growi/core-styles/scss/bootstrap/init-stage-1';
+  @import '@growi/core-styles/scss/bootstrap/theming/variables';
+  @import '@growi/core-styles/scss/bootstrap/theming/utils/color-palette';
+
+  $primary: #559B44;
+  $highlight: #F2869C;
+
+  @include generate-color-palette('primary', $primary, #002000, white);
+  @include generate-color-palette('highlight', $highlight, #401702, white);
+
+  $body-color: #4C5F40;
+  $body-bg: white;
+  $body-secondary-color: rgba($body-color, .75);
+  $body-secondary-bg: $gray-200;
+  $body-tertiary-color: rgba($body-color, .5);
+  $body-tertiary-bg: $gray-100;
+  $border-color: $gray-300;
+  $link-color: $gray-800;
+
+  @import 'bootstrap/scss/variables';
+  @import 'bootstrap/scss/variables-dark';
+  @import '@growi/core-styles/scss/bootstrap/init-stage-2';
+  @import '@growi/core-styles/scss/bootstrap/theming/apply-light';
+
+  --grw-wiki-link-color-rgb: var(--grw-primary-500-rgb);
+  --grw-wiki-link-hover-color-rgb: var(--grw-primary-600-rgb);
+  --grw-sidebar-nav-btn-color: var(--grw-highlight-600);
+
+  &, body {
+    background-image: url('../images/spring/spring02.jpg');
+    background-attachment: fixed;
+    background-position: bottom;
+    background-size: cover;
+  }
+}

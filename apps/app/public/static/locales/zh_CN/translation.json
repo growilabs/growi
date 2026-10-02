@@ -1,0 +1,1154 @@
+{
+  "meta": {
+    "display_name": "简体中文"
+  },
+  "Help": "帮助",
+  "view": "View",
+  "Edit": "编辑",
+  "Delete": "删除",
+  "delete_all": "删除所有",
+  "Duplicate": "复制",
+  "PathRecovery": "路径恢复",
+  "Copy": "复制",
+  "preview": "预览",
+  "desktop": "电脑",
+  "phone": "手机",
+  "tablet": "平板",
+  "Click to copy": "点击复制",
+  "Rename": "重命名",
+  "Move/Rename": "移动/重命名",
+  "Redirected": "重定向",
+  "Unlinked": "Unlinked",
+  "unlink_redirection": "取消链接重定向",
+  "Done": "Done",
+  "Cancel": "取消",
+  "Create": "创建",
+  "Description": "描述",
+  "Admin": "管理",
+  "administrator": "管理员",
+  "Tags": "标签",
+  "Close": "Close",
+  "Shortcuts": "快捷方式",
+  "Custom Sidebar": "Custom Sidebar",
+  "eg": "e.g.",
+  "add": "添加",
+  "Undo": "撤销",
+  "account_id": "用户Id",
+  "Update": "更新",
+  "Update Page": "更新本页",
+  "Error": "误差",
+  "Warning": "警告",
+  "Sign in": "登录",
+  "Sign in with External auth": "Sign in with {{signin}}",
+  "Sign up is here": "注册",
+  "Sign in is here": "登录",
+  "Sign up": "注册",
+  "or": "或者",
+  "Sign up with Google Account": "Sign up with Google Account",
+  "Sign in with Google Account": "Sign in with Google Account",
+  "Sign up with this Google Account": "Sign up with this Google Account",
+  "Select": "请选择",
+  "Required": "必需的",
+  "Example": "例如",
+  "Taro Yamada": "John Doe",
+  "List View": "列表",
+  "Timeline View": "时间线",
+  "History": "历史",
+  "attachment_data": "Attachment Data",
+  "No_attachments_yet": "暂无附件",
+  "Presentation Mode": "演示文稿",
+  "Not available for guest": "不提供给客人",
+  "Not available in this version": "此版本中不提供",
+  "Not available for read only user": "只读用户无法使用",
+  "Not available when \"anyone with the link\" is selected": "如果选择“任何人”，则无法覆盖范围",
+  "No users have liked this yet": "还没有用户喜欢这个",
+  "No users have bookmarked yet": "还没有用户加入书签",
+  "Create Archive Page": "创建归档页",
+  "Create Sidebar Page": "创建 <strong>/Sidebar</strong> 页面",
+  "File type": "文件类型",
+  "Target page": "目标页面",
+  "Include Attachment File": "包含附件",
+  "Include Comment": "包含评论",
+  "Include Subordinated Page": "包括子页面",
+  "Include Subordinated Target Page": "包括 {{target}}",
+  "All Subordinated Page": "所有子页面",
+  "Specify Hierarchy": "指定层级",
+  "Submitted the request to create the archive": "提交创建归档请求",
+  "username": "用户名",
+  "Created": "创建",
+  "Last updated": "上次更新",
+  "Share": "分享",
+  "Markdown Link": "Markdown链接",
+  "Create/Edit Template": "创建/编辑 模板页面",
+  "Go to this version": "查看此版本",
+  "View diff": "查看差异",
+  "No diff": "无差异",
+  "Latest": "最新",
+  "User ID": "用户ID",
+  "User Settings": "用户设置",
+  "User Information": "用户信息",
+  "User Activation": "用户激活",
+  "Basic Info": "基础信息",
+  "Name": "姓名",
+  "Email": "邮箱",
+  "Language": "语言",
+  "English": "英语",
+  "Japanese": "日语",
+  "Set Profile Image": "头像",
+  "Upload Image": "上传图片",
+  "Current Image": "当前图片",
+  "Delete Image": "删除图片",
+  "Delete this image?": "删除图片?",
+  "Updated": "更新",
+  "Upload new image": "上传新图像",
+  "Connected": "Connected",
+  "Loading": "加载...",
+  "Disclose E-mail": "显示邮箱",
+  "Slack Member ID": "Slack 成员 ID",
+  "page exists": "页面已存在",
+  "Error occurred": "Error occurred",
+  "Successfully updated": "更新成功",
+  "Failed to update": "更新失败",
+  "Input page name": "Input page name",
+  "Input page name (optional)": "Input page name (optional)",
+  "Input parent page path": "Input parent page path",
+  "New Page": "新页面",
+  "Create under": "Create page under below:",
+  "V5 Page Migration": "转换为V5的兼容性",
+  "GROWI.5.0_new_schema": "GROWI.5.0 new schema",
+  "See_more_detail_on_new_schema": "更多详情请见<a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html#about-the-new-v5-compatible-format' target='_blank'> {{title}}</a> <span class='growi-custom-icons'>external_link</span> ",
+  "external_account_management": "外部账户管理",
+  "UserGroup": "用户组",
+  "Basic Settings": "基础设置",
+  "The contents entered here will be shown in the header etc": "此处输入的内容将显示在标题等中",
+  "Forbidden": "禁止访问",
+  "Public": "公共",
+  "Anyone with the link": "任何人",
+  "Specified users only": "仅指定用户",
+  "Only me": "只有我",
+  "Only inside the group": "仅组内",
+  "page_list": "Page List",
+  "comments": "Comments",
+  "Reselect the group": "重新选择组",
+  "Shareable link": "可分享链接",
+  "The whitelist of registration permission E-mail address": "注册许可电子邮件地址的白名单",
+  "Add tags for this page": "添加标签",
+  "tag_list": "标签列表",
+  "popular_tags": "流行标签",
+  "Check All tags": "检查所有标签",
+  "You have no tag, You can set tags on pages": "你没有标签，可以在页面上设置标签",
+  "Show latest": "显示最新",
+  "Load latest": "家在最新",
+  "edited this page": "edited this page.",
+  "List Drafts": "草稿",
+  "Deleted Pages": "已删除页",
+  "Disassociate": "解除关联",
+  "No bookmarks yet": "暂无书签",
+  "add_bookmark": "添加到书签",
+  "remove_bookmark": "从书签中删除",
+  "wide_view": "视野开阔",
+  "Recent Changes": "最新修改",
+  "Page Tree": "页面树",
+  "Bookmarks": "书签",
+  "In-App Notification": "通知",
+  "GROWI AI Agent": "GROWI AI Agent",
+  "original_path": "Original path",
+  "new_path": "New path",
+  "duplicated_path": "Duplicated path",
+  "Link sharing is disabled": "你不允许分享该链接",
+  "successfully_saved_the_page": "成功地保存了该页面",
+  "you_can_not_create_page_with_this_name_or_hierarchy": "您無法使用此名稱或頁面層級建立頁面",
+  "not_allowed_to_see_this_page": "你不能看到这个页面",
+  "Confirm": "确定",
+  "Successfully requested": "进程成功接受",
+  "source": "消息来源",
+  "input_validation": {
+    "target": {
+      "page_name": "页面名称",
+      "folder_name": "文件夹名称",
+      "field": "字段"
+    },
+    "message": {
+      "error_message": "有些值不正确",
+      "required": "'{{param}}' 是必需的",
+      "invalid_syntax": "{{syntax}} 的语法无效。",
+      "title_required": "标题是必需的。",
+      "field_required": "{{target}} 是必需的"
+    }
+  },
+  "not_creatable_page": {
+    "message": "无法在此路径中创建页面内容。"
+  },
+  "custom_navigation": {
+    "no_pages_under_this_page": "There are no pages under this page."
+  },
+  "author_info": {
+    "created_at": "创建日期",
+    "created_by": "创建者:",
+    "last_revision_posted_at": "最后更新日期",
+    "updated_by": "更新者:"
+  },
+  "installer": {
+    "tab": "创建账户",
+    "title": "安装",
+    "setup": "安装",
+    "create_initial_account": "创建初始用户",
+    "initial_account_will_be_administrator_automatically": "初始帐户将自动成为管理员。",
+    "unavaliable_user_id": "用户ID不可用",
+    "failed_to_install": "GROWI安装失败。请再试一次。",
+    "failed_to_login_after_install": "安装后登录失败。重定向到登录表格..."
+  },
+  "breaking_changes": {
+    "v346_using_basic_auth": "当前使用的基本身份验证在不久的将来将不再可用。从%s中删除设置"
+  },
+  "page_register": {
+    "send_email": "发电子邮件",
+    "notice": {
+      "restricted": "需要管理员批准。",
+      "restricted_defail": "一旦管理员批准您的注册，您就可以访问此wiki。"
+    },
+    "form_help": {
+      "email": "您必须有下面列出的电子邮件地址才能注册此wiki。",
+      "password": "密码长度必须至少为8个字符。",
+      "user_id": "您创建的网页的URL将包含您的用户ID。您的用户ID可以由字母、数字和一些符号组成。"
+    }
+  },
+  "page_me": {
+    "form_help": {
+      "profile_image1": "图像上传设置未完成。",
+      "profile_image2": "设置AWS或启用本地上传。"
+    }
+  },
+  "API Token Settings": "API token 设置",
+  "Current API Token": "当前 API token",
+  "Update API Token": "更新 API token",
+  "page_me_apitoken": {
+    "api_token": "API Token",
+    "notice": {
+      "apitoken_issued": "API token 未发布。",
+      "update_token1": "您可以更新以生成新的API令牌。",
+      "update_token2": "您需要更新任何现有进程中的API令牌。"
+    }
+  },
+  "Access Token Settings": "Access token 设置",
+  "page_me_access_token": {
+    "access_token": "访问令牌",
+    "expiredAt": "过期日期",
+    "description": "描述",
+    "scope": "范围",
+    "scope_read": "读取",
+    "action": "操作",
+    "create_token": "创建令牌",
+    "no_tokens_found": "未找到访问令牌",
+    "new_token": {
+      "title": "新访问令牌",
+      "copy_to_clipboard": "复制到剪贴板",
+      "message": "此令牌仅显示一次。请安全保存。"
+    },
+    "modal": {
+      "message": "确定要删除此访问令牌吗？",
+      "alert": "此操作无法撤消。",
+      "delete_token": "删除令牌"
+    },
+    "form": {
+      "title": "创建新访问令牌",
+      "expiredAt_desc": "选择此访问令牌的过期时间。",
+      "description_desc": "提供描述以帮助您稍后识别此令牌。",
+      "description_max_length": "请输入最多 {{length}} 个字符",
+      "scope_desc": "选择访问令牌的范围。"
+    },
+    "copy_to_clipboard": "复制到剪贴板"
+  },
+  "Password": "密码",
+  "Password Settings": "密码设置",
+  "personal_settings": {
+    "disassociate_external_account": "解除与外部帐户的关联",
+    "disassociate_external_account_desc": "是否确实要解除与<strong>{{providerType}}</strong>帐户<strong>{{providerType}}</strong> 的关联？",
+    "set_new_password": "设置新密码",
+    "update_password": "更新密码",
+    "current_password": "当前密码",
+    "new_password": "新密码",
+    "new_password_confirm": "重复新密码",
+    "password_is_not_set": "密码未设置"
+  },
+  "share_links": {
+    "Shere this page link to public": "Shere this page link to public",
+    "share_link_list": "Share link list",
+    "share_link_management": "Share Link Management",
+    "delete_all_share_links": "Delete all share links",
+    "expire": "Expiration",
+    "Days": "Days",
+    "Custom": "Custom",
+    "description": "description",
+    "enter_desc": "Enter description",
+    "Unlimited": "unlimited",
+    "Issue": "Issue",
+    "share_settings": "Share settings",
+    "Invalid_Number_of_Date": "You entered invalid value",
+    "link_sharing_is_disabled": "链接共享已被禁用"
+  },
+  "API Settings": "API设置",
+  "Other Settings": "其他设置",
+  "in_app_notification_settings": {
+    "in_app_notification_settings": "在应用程序通知设置",
+    "subscribe_settings": "自动订阅（接收通知）页面的设置",
+    "default_subscribe_rules": {
+      "page_create": "创建页面时订阅页面。"
+    }
+  },
+  "ui_settings": {
+    "ui_settings": "用户界面设置",
+    "side_bar_mode": {
+      "settings": "侧边栏模式设置",
+      "side_bar_mode_setting": "设置侧边栏模式",
+      "description": "您可以设置当屏幕宽度较大时，侧边栏是否始终打开。 如果屏幕宽度较小，侧边栏将始终关闭。"
+    }
+  },
+  "color_mode_settings": {
+    "light": "灯光",
+    "dark": "暗处",
+    "system": "系统",
+    "settings": "色彩模式设置",
+    "description": "选择是以浅色模式、深色模式还是系统特定的显示方式显示。<br>只能切换支持的主题。"
+  },
+  "editor_settings": {
+    "editor_settings": "编辑器设置"
+  },
+  "search_help": {
+    "title": "搜索帮助",
+    "and": {
+      "syntax help": "用空格分隔",
+      "desc": "在标题或正文中同时包含{{word1}、{{word2}的搜索页"
+    },
+    "exclude": {
+      "desc": "排除标题或正文中包含{{word}的页"
+    },
+    "phrase": {
+      "syntax help": "用双引号括起来",
+      "desc": "包含短语“{{phrase}”的搜索页"
+    },
+    "prefix": {
+      "desc": "只搜索标题以{{path}开头的页"
+    },
+    "exclude_prefix": {
+      "desc": "排除标题以{{path}开头的页"
+    },
+    "tag": {
+      "desc": "搜索带有{{tag}标记的页面"
+    },
+    "exclude_tag": {
+      "desc": "排除带有{{tag}标记的页"
+    },
+    "author": {
+      "desc": "搜索由{{author}}创建的页面"
+    },
+    "exclude_author": {
+      "desc": "排除由{{author}}创建的页面"
+    },
+    "editor": {
+      "desc": "搜索最后由{{editor}}编辑的页面"
+    },
+    "exclude_editor": {
+      "desc": "排除由{{editor}}编辑的页面"
+    },
+    "group": {
+      "desc": "搜索授予{{group}}组的页面"
+    },
+    "exclude_group": {
+      "desc": "排除授予{{group}}组的页面"
+    },
+    "quoted_value": {
+      "desc": "筛选值包含空格时，请用双引号括起来（例如组名或页面路径）"
+    }
+  },
+  "search": {
+    "search page bodies": "按[回车]键进行全文搜索"
+  },
+  "page_page": {
+    "notice": {
+      "version": "这不是当前版本。",
+      "redirected": "您将从",
+      "redirected_period": "",
+      "unlinked": "将网页重定向到此网页已被删除。",
+      "restricted": "访问此页受到限制",
+      "stale": "自上次更新以来，已超过{{count}年。",
+      "stale_plural": "自上次更新以来已过去{{count}年以上。",
+      "no_deadline": "此页面没有到期日期",
+      "not_indexed1": "此页面可能不会被全文搜索引擎索引。",
+      "not_indexed2": "页面正文超过了{{threshold}}指定的阈值。"
+    }
+  },
+  "page_edit": {
+    "input_channels": "频道名",
+    "theme": "主题",
+    "keymap": "键表",
+    "indent": "缩进",
+    "paste": {
+      "title": "粘贴行为",
+      "both": "两者",
+      "text": "仅文本",
+      "file": "仅文件"
+    },
+    "editor_config": "编辑器配置",
+    "Show active line": "显示活动行",
+    "auto_format_table": "自动格式化表格",
+    "overwrite_scopes": "{{operation}和覆盖所有子体的作用域",
+    "notice": {
+      "conflict": "无法保存您所做的更改，因为其他人正在编辑此页。请在重新加载页面后重新编辑受影响的部分。"
+    },
+    "changes_not_saved": "您所做的更改可能不会保存。你真的想继续前进吗？"
+  },
+  "page_comment": {
+    "comments": "评论",
+    "comment": "评论",
+    "preview": "预览",
+    "write": "输入",
+    "add_a_comment": "Add a comment",
+    "display_the_page_when_posting_this_comment": "Display the page when posting this comment",
+    "no_user_found": "未找到用户名",
+    "reply": "Reply",
+    "delete_comment": "Delete comment?",
+    "comment_management_is_not_allowed": "不允许操作评论。",
+    "no_comments": "暂无评论。"
+  },
+  "inline_comment": {
+    "expand": "展开",
+    "collapse": "折叠",
+    "more": "更多",
+    "expand_all_resolved": "展开所有已解决的评论",
+    "list_menu": "评论列表菜单",
+    "item_menu": "评论操作",
+    "view_at_posting": "查看发表时的页面"
+  },
+  "page_api_error": {
+    "notfound_or_forbidden": "未找到或禁止原始页。",
+    "already_exists": "具有该路径的页面已存在",
+    "outdated": "页面已被某人更新，现在已过时。",
+    "invalid_body": "请求中未包含操作对象页面的版本信息。",
+    "user_not_admin": "仅管理员用户可以删除",
+    "single_deletion_empty_pages": "空的页面不能被单一删除",
+    "complete_deletion_not_allowed_for_user": "您无权永久删除该页面"
+  },
+  "page_history": {
+    "revision_list": "修订清单",
+    "revision": "版本",
+    "comparing_source": "源头",
+    "comparing_target": "目标",
+    "comparing_revisions": "比较两者的区别",
+    "compare_latest": "比較最新版本",
+    "compare_previous": "比較以前的版本"
+  },
+  "modal_rename": {
+    "label": {
+      "Move/Rename page": "页面 移动/重命名",
+      "New page name": "新建页面名称",
+      "Failed to get subordinated pages": "Failed to get subordinated pages",
+      "Failed to get exist path": "Failed to get exist path",
+      "Current page name": "当前页面名称",
+      "Rename this page only": "仅重命名此页面",
+      "Force rename all child pages": "强制重命名所有子页面 ",
+      "Other options": "其他选项",
+      "Do not update metadata": "不更新元数据",
+      "Redirect": "重定向"
+    },
+    "help": {
+      "redirect": "Redirect to new page if someone accesses <code>%s</code>",
+      "metadata": "Remains last update user and updated date as is",
+      "recursive": "Move/Rename children of under <code>%s</code> recursively"
+    }
+  },
+  "Put Back": "Put back",
+  "Delete Completely": "Delete completely",
+  "page_has_been_reverted": "{{path}} 已还原",
+  "modal_delete": {
+    "delete_page": "Delete page",
+    "deleting_page": "Deleting page",
+    "delete_recursively": "Delete child pages recursively.",
+    "delete_completely": "Delete completely",
+    "delete_completely_restriction": "You don't have the authority to delete pages completely.",
+    "recursively": "Delete children of <code>%s</code> recursively.",
+    "completely": "Delete completely instead of putting it into trash."
+  },
+  "deleted_page": "移到了垃圾箱。",
+  "deleted_pages": "将 {{path}} 放入垃圾箱",
+  "deleted_pages_completely": "{{path}} 已被完全删除",
+  "renamed_pages": "移动/重命名 {{path}}",
+  "empty_trash": "清空垃圾",
+  "modal_empty": {
+    "empty_the_trash": "清空垃圾",
+    "empty_the_trash_button": "清空垃圾",
+    "not_deletable_notice": "由于缺乏权限，一些页面不能被删除",
+    "notice": "完全删除的页面是不可恢复的。"
+  },
+  "modal_duplicate": {
+    "label": {
+      "Duplicate page": "Duplicate page",
+      "New page name": "New page name",
+      "Failed to get subordinated pages": "Failed to get subordinated pages",
+      "Current page name": "Current page name",
+      "Recursively": "Recursively",
+      "Duplicate without exist path": "Duplicate without exist path",
+      "Same page already exists": "Same page already exists",
+      "Only duplicate user related pages": "Only duplicate pages you can access"
+    },
+    "help": {
+      "recursive": "Duplicate children of under this path recursively",
+      "only_inherit_user_related_groups": "If the page privilege is set to \"Only inside the group\", groups you do not belong to will lose access to the duplicated page"
+    }
+  },
+  "duplicated_pages": "{{fromPath}} 已重复",
+  "modal_granted_groups_inheritance_select": {
+    "select_granted_groups": "Select groups that can access page",
+    "inherit_all_granted_groups_from_parent": "Inherit all groups that can access page from parent",
+    "only_inherit_related_groups": "Only inherit groups that you belong to from parent",
+    "create_page": "Create Page"
+  },
+  "modal_putback": {
+    "label": {
+      "Put Back Page": "Put back page",
+      "recursively": "Put back recursively"
+    },
+    "help": {
+      "recursively": "Put back children of under <code>%s</code> recursively"
+    }
+  },
+  "modal_shortcuts": {
+    "global": {
+      "title": "全局快捷方式",
+      "Open/Close shortcut help": "打开/关闭快捷方式帮助",
+      "Edit Page": "编辑页面",
+      "Create Page": "创建页面",
+      "Search": "搜索",
+      "Show Contributors": "显示参与者",
+      "MirrorMode": "镜像模式",
+      "Konami Code": "Konami Code",
+      "konami_code_url": "https://en.wikipedia.org/wiki/Konami_Code"
+    },
+    "editor": {
+      "title": "编辑器快捷方式",
+      "Slash Command": "斜杠命令",
+      "Slash Command Desc": "(显示命令菜单)",
+      "Indent": "缩进",
+      "Outdent": "回退缩进",
+      "Save Page": "保存页面",
+      "Only Editor": "(仅编辑器)",
+      "Delete Line": "删除行",
+      "Search in Editor": "编辑器内搜索",
+      "Move Line": "移动行",
+      "Copy Line": "复制行",
+      "Insert Line": "插入行",
+      "Post Comment": "(发表评论)",
+      "Multiple Cursors": "多光标",
+      "Or Alt Click": "或 Alt + 点击"
+    },
+    "format": {
+      "title": "格式设置（编辑器）",
+      "Bold": "粗体",
+      "Italic": "斜体",
+      "Strikethrough": "删除线",
+      "Code Text": "代码文本",
+      "Hyperlink": "超链接"
+    },
+    "line_settings": {
+      "title": "行设置（编辑器）",
+      "Bullet List": "项目符号列表",
+      "Numbered List": "编号列表",
+      "Quote": "引用",
+      "Code Block": "代码块",
+      "Comment Out": "隐藏",
+      "Comment Out Desc": "（注释）"
+    },
+    "Other Shortcuts": "其他快捷键"
+  },
+  "modal_resolve_conflict": {
+    "conflicts_with_new_body_on_server_side": "与服务器端的新正文文本冲突。 请选择或编辑页面正文以解决冲突",
+    "file_conflicting_with_newer_remote": "此文件与较新的远程文件冲突",
+    "resolve_conflict_message": "选择页面正文",
+    "resolve_conflict": "解决冲突",
+    "resolve_and_save": "解决冲突并保存",
+    "select_revision": "选择{{revision}}",
+    "requested_revision": "发送的页面正文",
+    "latest_revision": "最新页面正文",
+    "selected_editable_revision": "选定的可编辑页面正文"
+  },
+  "ai_unavailable": {
+    "open_admin_settings_to_enable": "请在管理界面中配置 AI 设置以启用 AI 集成",
+    "to_admin_ai_settings": "前往 AI 设置管理界面",
+    "contact_admin_to_enable": "AI 集成尚未启用。请联系您的管理员。"
+  },
+  "ai_sidebar": {
+    "new_chat": "新建对话",
+    "recent_threads": "最近的项目",
+    "accuracy_notice": "请查看参考页面以确认信息是否准确。",
+    "sources": "已参考 {{count}} 个页面",
+    "error": {
+      "title": "发生错误",
+      "retry": "重试",
+      "dismiss": "关闭"
+    },
+    "incomplete": {
+      "length": "回答因达到最大长度而中途停止。",
+      "tool_calls": "因达到处理步骤上限，回答中途停止。",
+      "content_filter": "回答因内容策略而被停止。",
+      "error": "因发生错误，回答中途停止。",
+      "unknown": "回答在完成前停止。"
+    },
+    "toaster": {
+      "thread_deleted_success": "已删除会话",
+      "thread_deleted_failed": "删除会话失败"
+    }
+  },
+  "link_edit": {
+    "edit_link": "Edit Link",
+    "set_link_and_label": "Set link and label",
+    "link": "Link",
+    "placeholder_of_link_input": "Input page path or URL",
+    "label": "Label",
+    "path_format": "Path format",
+    "use_relative_path": "Use relative path",
+    "use_permanent_link": "Use permanent link",
+    "notation": "Notation",
+    "markdown": "Markdown",
+    "GROWI_original": "GROWI original",
+    "pukiwiki": "Pukiwiki",
+    "preview": "Preview",
+    "page_not_found_in_preview": "\"{{path}}\" is not a GROWI page."
+  },
+  "toaster": {
+    "file_upload_failed": "文件上传失败",
+    "initialize_successed": "Succeeded to initialize {{target}}",
+    "issue_share_link": "Succeeded to issue new share link",
+    "switch_disable_link_sharing_success": "成功更新分享链接设置",
+    "failed_to_reset_password": "Failed to reset password",
+    "save_succeeded": "已成功保存"
+  },
+  "template": {
+    "modal_label": {
+      "Select template": "选择模板",
+      "Create/Edit Template Page": "创建/编辑模板页",
+      "Create template under": "在下面创建模板页"
+    },
+    "option_label": {
+      "create/edit": "创建/编辑模板页。",
+      "select": "选择模板页面类型"
+    },
+    "children": {
+      "label": "子模板",
+      "desc": "仅应用于模板存在的同一级别页"
+    },
+    "descendants": {
+      "label": "子代模板",
+      "desc": "适用于所有分散页"
+    }
+  },
+  "sandbox": {
+    "header": "标题",
+    "header_x": "标题{{index}",
+    "block": "段落",
+    "block_detail": "写一段",
+    "empty_line": "空行",
+    "line_break": "换行符",
+    "line_break_detail": "（2空格）换行",
+    "typography": "排版",
+    "italics": "斜体",
+    "bold": "加粗",
+    "italic_bold": "斜体加粗",
+    "strikethrough": "删除线",
+    "link": "链接",
+    "code_highlight": "代码突出显示",
+    "list": "列表",
+    "unordered_list_x": "无序列表{{index}}",
+    "ordered_list_x": "有序列表{{index}}",
+    "task": "任务",
+    "task_checked": "选中的",
+    "task_unchecked": "未选中的",
+    "quote": "引用",
+    "quote1": "你可以写",
+    "quote2": "多行引用",
+    "quote_nested": "嵌套引用",
+    "table": "表格",
+    "image": "图片",
+    "alt_text": "Alt文本",
+    "insert_image": "插入图像",
+    "open_sandbox": "开放式沙箱"
+  },
+  "slack_notification": {
+    "popover_title": "Slack Notification",
+    "popover_desc": "Input channel name. You can notify multiple channels by entering a comma-separated list.",
+    "input_channels": "Input channels"
+  },
+  "search_result": {
+    "title": "搜索",
+    "result_meta": "搜索结果:",
+    "deletion_mode_btn_lavel": "选择并删除页面",
+    "cancel": "取消",
+    "delete": "删除",
+    "check_all": "全部检查",
+    "deletion_modal_header": "删除页",
+    "delete_completely": "完全删除",
+    "include_certain_path": "包含 {{pathToInclude}} 路径 ",
+    "delete_all_selected_page": "删除所有",
+    "select_all": "选择所有",
+    "delete_selected_pages": "删除选定页面",
+    "currently_not_implemented": "这是当前未实现的功能",
+    "search_again": "再次搜索",
+    "number_of_list_to_display": "显示器的数量",
+    "page_number_unit": "例",
+    "hit_number_unit": "例",
+    "filter": "筛选",
+    "search_option": "搜索选项",
+    "filter_remove": "移除",
+    "filter_clear": "清除全部",
+    "filter_author": "创建者",
+    "filter_by_author": "按创建者筛选",
+    "filter_editor": "编辑者",
+    "filter_by_editor": "按编辑者筛选",
+    "filter_tag": "标签",
+    "filter_group": "用户组",
+    "filter_group_select": "选择用户组",
+    "filter_group_none": "没有可用的用户组",
+    "sort_axis": {
+      "relationScore": "按相关性排序",
+      "createdAt": "按创建日期排序",
+      "updatedAt": "按更新日期排序"
+    }
+  },
+  "help_dropdown": {
+    "show_shortcuts": "显示快捷键",
+    "growi_cloud_help": "GROWI.cloud 帮助",
+    "growi_version": "GROWI 版本"
+  },
+  "private_legacy_pages": {
+    "title": "私人遗留页面",
+    "bulk_operation": "批量操作",
+    "convert_all_selected_pages": "全部转换为新的v5兼容格式",
+    "input_path_to_convert": "输入一个转换页面的路径",
+    "alert_title": "存在旧的v4兼容格式的私人网页。",
+    "alert_desc1": "在这一页，你可以用复选框选择页面，并通过屏幕上方的批量操作按钮批量转换为新的v5兼容格式。",
+    "nopages_title": "恭喜你。准备使用GROWI v5!",
+    "nopages_desc1": "现在你能管理的所有页面似乎都是v5兼容的格式。",
+    "detail_info": "请参见 <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html' target='_blank' class='alert-link'>升级GROWI到v5.0.x <span class='growi-custom-icons'>external_link</span></a>.的详细内容。",
+    "modal": {
+      "title": "转换为新的v5兼容格式",
+      "converting_pages": "转换页面",
+      "convert_recursively_label": "递归地转换子页面。",
+      "convert_recursively_desc": "递归地转换该路径下的页面。",
+      "button_label": "转换"
+    },
+    "toaster": {
+      "page_migration_succeeded": "已成功将所选页面转换为 v5 兼容格式。",
+      "page_migration_failed_with_paths": "将 {{paths}} 转换为 v5 兼容格式时出错",
+      "page_migration_failed": "将页面转换为 v5 兼容格式时出错。"
+    },
+    "by_path_modal": {
+      "title": "转换为新的v5兼容格式",
+      "alert": "这一操作不能被撤销，用户不能查看的页面也要进行处理。",
+      "checkbox_label": "明白了",
+      "description": "输入一个路径，该路径下的所有页面将被转换为v5兼容格式。",
+      "button_label": "转换",
+      "success": "成功地请求转换。",
+      "error": "请求转换失败。",
+      "error_grant_invalid": "页面权限不正确。请更正并重试。",
+      "error_page_not_found": "没有找到页面。",
+      "error_duplicate_pages_found": "发现多个具有相同路径名称的页面。请重新命名或删除并重试。"
+    }
+  },
+  "login": {
+    "title": "登录",
+    "sign_in_error": "登录错误",
+    "registration_successful": "注册成功。请等待管理员批准",
+    "Setup": "安装程序",
+    "enabled_ldap_has_configuration_problem": "启用了LDAP，但配置有问题。",
+    "set_env_var_for_logs": "(请设置环境变量 <code>DEBUG=crowi:service:PassportService</code> 以获得日志。)"
+  },
+  "invited": {
+    "discription_heading": "创建账户",
+    "discription": "用被邀请的电子邮件地址创建一个你的账户"
+  },
+  "page_export": {
+    "failed_to_export": "导出失败",
+    "failed_to_count_pages": "页面计数失败",
+    "export_page_markdown": "以Markdown格式导出页面",
+    "export_page_pdf": "以PDF格式导出页面",
+    "bulk_export": "导出页面及其下的所有页面",
+    "bulk_export_download_explanation": "导出完成后将发送通知。要下载导出的文件，请单击通知。",
+    "bulk_export_exec_time_warning": "如果页数较多，导出可能需要一段时间",
+    "large_bulk_export_warning": "为了节省系统资源，请避免连续导出大量页面",
+    "markdown": "Markdown",
+    "choose_export_format": "选择导出格式",
+    "bulk_export_started": "目前我们正在准备...",
+    "bulk_export_download_expired": "下载期限已过",
+    "bulk_export_job_expired": "由于导出时间太长，处理被中断",
+    "export_in_progress": "导出正在进行中",
+    "export_in_progress_explanation": "已在进行相同格式的导出。您要重新启动以导出最新的页面内容吗？",
+    "export_cancel_warning": "以下正在进行的导出将被取消",
+    "restart": "重新开始",
+    "format": "格式",
+    "started_on": "开始于",
+    "file_upload_not_configured": "未配置文件上传设置"
+  },
+  "audit_log_bulk_export": {
+    "download_expired": "下载期限已过期",
+    "job_expired": "导出过程因耗时过长被取消",
+    "no_results": "没有审计日志符合指定筛选条件"
+  },
+  "message": {
+    "successfully_connected": "连接成功！",
+    "fail_to_save_access_token": "无法保存访问令牌。请再试一次。",
+    "fail_to_fetch_access_token": "无法获取访问令牌。请重新连接。",
+    "successfully_disconnected": "成功断开连接！",
+    "strategy_has_not_been_set_up": "{{strategy}} 尚未设置",
+    "ldap_user_not_valid": "Ldap user is no valid",
+    "external_account_not_exist": "查找或创建外部账户失败",
+    "maximum_number_of_users": "注册的用户数不能超过最大值。",
+    "sign_in_failure": "登录失败。",
+    "aws_sttings_required": "使用此功能所需的AWS设置。请询问管理员。",
+    "application_already_installed": "应用程序已安装。",
+    "email_address_could_not_be_used": "此电子邮件地址无法在此 Wiki 中使用。请联系管理员。",
+    "user_id_is_not_available": "此用户ID不可用。",
+    "username_should_not_be_null": "用户名不应为空。请检查管理页面上的身份验证机制设置",
+    "email_address_is_already_registered": "此电子邮件地址已注册。",
+    "can_not_register_maximum_number_of_users": "注册的用户数不能超过最大值。",
+    "email_settings_is_not_setup": "邮箱设置未设置，请询问管理员。",
+    "email_authentication_is_not_enabled": "电子邮件验证未被激活, 请询问管理员。",
+    "failed_to_register": "注册失败。",
+    "successfully_created": "已成功创建用户{{username}。",
+    "can_not_activate_maximum_number_of_users": "无法激活超过最大用户数的用户。",
+    "failed_to_activate": "无法激活。",
+    "unable_to_use_this_user": "无法使用此用户。",
+    "complete_to_install1": "完成安装GROWI！请以管理员帐户登录。",
+    "complete_to_install2": "完成安装GROWI！请先检查此页上的每个设置。",
+    "failed_to_create_admin_user": "无法创建管理用户。{{errMessage}",
+    "successfully_send_email_auth": "我们向 {{email}} 发送了一封电子邮件。 请点击邮件中的网址并完成注册。",
+    "incorrect_token_or_expired_url": "令牌不正确或 URL 已过期。",
+    "user_already_logged_in": "当你登录的时候，你不能创建一个新的账户。",
+    "registration_closed": "你无权创建一个新的账户。",
+    "Username has invalid characters": "用户名有无效字符",
+    "Username field is required": "用户ID字段是必需的",
+    "Name field is required": "姓名字段为必填项",
+    "Email format is invalid": "电子邮件的格式是无效的",
+    "Email field is required": "电子邮件字段是必需的",
+    "Password has invalid character": "密码有无效字符",
+    "Password minimum character should be more than n characters": "密码最小字符应超过{{number}}个字符",
+    "Password field is required": "密码字段是必需的",
+    "Username or E-mail has invalid characters": "用户名或电子邮件有无效的字符",
+    "user_not_found": "未找到用户",
+    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>发生了重复用户名异常</strong></p><p class='mb-0'> 你的 {{ failedProviderForDuplicatedUsernameException }} 认证成功了，但不能创建新的用户。参见问题<a href='https://github.com/growilabs/growi/issues/193'>#193</a>.</p>"
+  },
+  "grid_edit": {
+    "create_bootstrap_4_grid": "创建Bootstrap 4网格",
+    "grid_settings": "网格设置",
+    "grid_pattern": "网格样式",
+    "division": "分割",
+    "smart_no": "手机/不分割",
+    "break_point": "按画面大小分割"
+  },
+  "validation": {
+    "aws_region": "关于地区，请输入AWS地区名，例如：ap-east-1",
+    "aws_custom_endpoint": "关于自定义端点，请指定以http(s)://开头的URL，链接末尾不需要添加“/”",
+    "failed_to_send_a_test_email": "SMTP方式测试邮件发送失败，请检查相关设定。"
+  },
+  "forgot_password": {
+    "forgot_password": "忘记密码？",
+    "send": "发送",
+    "return_to_login": "返回登录",
+    "reset_password": "重设密码",
+    "sign_in_instead": "改为登录",
+    "password_reset_request_desc": "您可以在此处重置密码",
+    "password_reset_excecution_desc": "输入新的密码",
+    "new_password": "新密码",
+    "confirm_new_password": "确认新密码",
+    "email_is_required": "电子邮件是必需的",
+    "success_to_send_email": "我发了一封电子邮件",
+    "feature_is_unavailable": "此功能不可用",
+    "incorrect_token_or_expired_url": "令牌不正确或 URL 已过期。 请通过以下链接重新发送密码重置请求",
+    "password_and_confirm_password_does_not_match": "密码和确认密码不匹配",
+    "please_enable_mailer_alert": "密码重置功能被禁用，因为电子邮件设置尚未完成。请要求管理员完成电子邮件的设置。"
+  },
+  "maintenance_mode": {
+    "maintenance_mode": "维护模式",
+    "growi_is_under_maintenance": "GROWI正在进行维护。请等待，直到它结束。",
+    "admin_page": "管理员页",
+    "login": "登录",
+    "logout": "登出"
+  },
+  "pagetree": {
+    "cannot_rename_a_title_that_contains_slash": "不能重命名包含 ’/' 的标题",
+    "you_cannot_move_this_page_now": "你现在不能移动这个页面",
+    "something_went_wrong_with_moving_page": "移动页面时出了问题",
+    "error_retrieving_the_pagetree": "检索页面树时发生错误"
+  },
+  "duplicated_page_alert": {
+    "same_page_name_exists": "页面名称「{{pageName}}」是重复的",
+    "same_page_name_exists_at_path": "在”{{path}}” 中，有不止一个名为”{{pageName}}”的页面",
+    "select_page_to_see": "请在下面选择你想去的页面。"
+  },
+  "user_group": {
+    "select_group": "选择组别",
+    "belonging_to_no_group": "无法找到你所属的团体。",
+    "manage_user_groups": "管理用户组",
+    "only_yourself": "仅限自己"
+  },
+  "fix_page_grant": {
+    "modal": {
+      "no_grant_available": "无法找到可选择的权限列表。 请先修改父页的权限，然后再试一次。",
+      "need_to_fix_grant": "为了正确使用该功能，需要修改与该页面相关的权限。 <br> 请从以下选项中选择进行更改。",
+      "grant_label": {
+        "public": "向公众提供",
+        "isForbidden": "无权查看的机构",
+        "currentPageGrantLabel": "本页的权限: ",
+        "parentPageGrantLabel": "父页的权限: ",
+        "docLink": "关于修改授权的更多信息，请参见此<a href='https://docs.growi.org/en/guide/features/authority.html#permissions-for-subordinate-pages'>此链接</a>"
+      },
+      "radio_btn": {
+        "restrected": "只有那些知道链接的人",
+        "only_me": "只对自己说",
+        "grant_group": "仅限特定群体"
+      },
+      "select_group_default_text": "选择组别",
+      "alert_message_select_group": "未选择组别",
+      "btn_label": "蜕变",
+      "title": "修改后的授权书"
+    },
+    "alert": {
+      "description": "本页的授权设置需要修改。",
+      "btn_label": "修改"
+    }
+  },
+  "tooltip": {
+    "like": "很好!",
+    "cancel_like": "取消喜欢",
+    "bookmark": "书签",
+    "cancel_bookmark": "取消书签",
+    "receive_notifications": "接收通知",
+    "stop_notification": "停止通知",
+    "footprints": "脚印",
+    "login_required": "需要登录",
+    "operation": {
+      "attention": {
+        "rename": "重命名子孙页的路径没有成功，请从三点式阅读器上打开菜单，选择 '路径恢复'。"
+      }
+    }
+  },
+  "page_operation": {
+    "paths_recovered": "成功恢复了页面路径",
+    "path_recovery_failed": "路径恢复失败"
+  },
+  "user_home_page": {
+    "bookmarks": "书签",
+    "contribution_graph": "贡献图",
+    "contribution_migration_in_progress": "正在准备您的贡献数据。请稍后刷新查看。",
+    "recently_created": "最近创建页面",
+    "recent_activity": "最近动态",
+    "unknown_action": "进行了未指明的更改",
+    "page_create": "创建了页面",
+    "page_update": "更新了页面",
+    "page_delete": "删除了页面",
+    "page_delete_completely": "彻底删除了页面",
+    "page_rename": "重命名了页面",
+    "page_revert": "还原了页面",
+    "page_like": "赞了页面",
+    "page_duplicate": "复制了页面",
+    "comment_create": "发布了评论"
+  },
+  "bookmark_folder": {
+    "bookmark_folder": "书签文件夹",
+    "bookmark": "书签",
+    "delete_modal": {
+      "modal_header_label": "删除书签文件夹",
+      "modal_body_description": "删除此书签文件夹及其内容",
+      "modal_body_alert": "已删除的文件夹及其内容无法恢复",
+      "modal_footer_button": "删除文件夹"
+    },
+    "input_placeholder": "输入文件夹名称",
+    "new_folder": "新建文件夹",
+    "delete": "删除文件夹",
+    "drop_item_here": "将项目拖放到此处",
+    "cancel_bookmark": "取消收藏此页面",
+    "move_to_root": "移动到根部",
+    "root": "root (default)"
+  },
+  "v5_page_migration": {
+    "page_tree_not_avaliable": "Page Tree 功能不可用",
+    "go_to_settings": "进入设置，启用该功能"
+  },
+  "tag_edit_modal": {
+    "edit_tags": "编辑标签",
+    "done": "完毕",
+    "tags_input": {
+      "tag_name": "标签名称"
+    }
+  },
+  "delete_attachment_modal": {
+    "confirm_delete_attachment": "你想删除一个附件吗？"
+  },
+  "rich_attachment": {
+    "attachment_not_be_found": "没有找到附件"
+  },
+  "page_select_modal": {
+    "select_page_location": "选择页面位置"
+  },
+  "wip_page": {
+    "save_as_wip": "保存为 WIP（仍在撰写中）",
+    "success_save_as_wip": "成功保存为 WIP 页面",
+    "fail_save_as_wip": "保存为 WIP 页失败",
+    "alert": "本页仍在编写中",
+    "publish_page": "发布 WIP",
+    "success_publish_page": "WIP 已停用",
+    "fail_publish_page": "无法停用 WIP"
+  },
+  "sidebar_header": {
+    "show_wip_page": "显示 WIP",
+    "compact_view": "紧凑视图"
+  },
+  "create_page": {
+    "untitled": "Untitled"
+  },
+  "sync-latest-revision-body": {
+    "menuitem": "同步编辑器文本与最新修订正文",
+    "confirm": "删除输入编辑器的草稿数据，同步最新文本。 您真的想运行它吗？",
+    "alert": "最新文本可能尚未同步。 请重新加载并再次检查。",
+    "success-toaster": "同步最新文本",
+    "skipped-toaster": "由于编辑器未激活，因此跳过同步。 请打开编辑器并重试。",
+    "error-toaster": "同步最新文本失败"
+  },
+  "toolbar": {
+    "attachments": "附件",
+    "bold": "粗体",
+    "bullet_list": "无序列表",
+    "checklist": "清单",
+    "code": "代码",
+    "diagram": "图表",
+    "editor_guide": "编辑器指南",
+    "emoji": "表情符号",
+    "heading": "标题",
+    "italic": "斜体",
+    "numbered_list": "有序列表",
+    "quote": "引用",
+    "strikethrough": "删除线",
+    "table": "表格",
+    "template": "模板",
+    "text_formatting": "文本格式"
+  },
+  "editor_guide": {
+    "title": "编辑器指南",
+    "tabs": {
+      "textstyle": "文本样式",
+      "layout": "页面布局",
+      "decoration": "装饰"
+    },
+    "textstyle": {
+      "copy_done": "已复制！",
+      "copy_failed": "复制失败",
+      "this": "这是",
+      "is": "效果",
+      "bold": "加粗",
+      "italic": "斜体",
+      "strikethrough": "删除线",
+      "inline_code": "行内代码",
+      "bold_italic": "全体加粗或斜体",
+      "emoji": "表情符号",
+      "sub_sup": "下标 / 上标",
+      "link_label": "带有标签的链接",
+      "link_docs": "GROWI 文档",
+      "link_growi": "GROWI 链接",
+      "link_sandbox": "沙盒页面在这里",
+      "all_important": "这段文字非常\n重要",
+      "sub_text": "下标",
+      "sup_text": "上标",
+      "is_text": "这是{{val}}效果"
+    },
+    "layout": {
+      "copy_done": "已复制！",
+      "header": "标题",
+      "header_text": "标题",
+      "list": "无序列表",
+      "list_text": "这是一个列表项",
+      "ordered_list": "有序列表",
+      "ordered_list_text": "这是一个编号项",
+      "checkbox": "复选框",
+      "task": "任务 ",
+      "quote": "引用",
+      "quote_text": "引用",
+      "multi_quote": "多重引用",
+      "hr": "分割线",
+      "br": "换行",
+      "br_code": "输入两个空格  即可\n换行",
+      "br_preview_1": "输入两个空格即可",
+      "br_preview_2": "换行",
+      "code_block": "代码块",
+      "code_block_text": "在此处插入代码",
+      "table": "表格",
+      "left": "左对齐",
+      "right": "右对齐",
+      "center": "居中对齐",
+      "row_text": "本列将",
+      "row_display": "显示",
+      "footnote": "脚注",
+      "footnote_label": "带有脚注的文本",
+      "footnote_desc": "注记的写法如下"
+    },
+    "decoration": {
+      "copy_done": "已复制到剪贴板！",
+      "style": "样式",
+      "alert": "提示",
+      "alert_with_custom_title": "带标签的提示",
+      "alert_with_custom_title_text": "自定义标题",
+      "alert_block": "警告框",
+      "alert_unavailable": "此样式不可用",
+      "badge": "徽章",
+      "text_color": "文本颜色",
+      "back_color": "背景颜色",
+      "placeholder": "此处显示文本内容",
+      "docs_title": "Bootstrap 5 官方文档",
+      "docs_badge": "了解更多关于徽章的信息",
+      "docs_color": "了解更多关于颜色的信息",
+      "docs_alert": "了解更多关于警告框的信息"
+    }
+  },
+  "pageMention": {
+    "placeholder": "输入消息...（输入 @ 提及页面）",
+    "hint": "输入页面名称进行搜索",
+    "searching": "搜索中...",
+    "noResults": "未找到页面",
+    "candidatesLabel": "页面候选"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "标题 1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "标题 2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "标题 3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "项目符号列表",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "编号列表",
+      "description": ""
+    },
+    "taskList": {
+      "label": "任务列表",
+      "description": ""
+    },
+    "quote": {
+      "label": "引用",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "代码块",
+      "description": ""
+    },
+    "table": {
+      "label": "表格",
+      "description": ""
+    }
+  }
+}

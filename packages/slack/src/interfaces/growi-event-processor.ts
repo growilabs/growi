@@ -1,7 +1,7 @@
-import { WebClient } from '@slack/web-api';
+import type { WebClient } from '@slack/web-api';
 
-export interface GrowiEventProcessor {
+export interface GrowiEventProcessor<EVENT> {
   shouldHandleEvent(eventType: string): boolean;
 
-  processEvent(client: WebClient, event: any): Promise<void>;
+  processEvent(client: WebClient, event: EVENT): Promise<void>;
 }

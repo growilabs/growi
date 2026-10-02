@@ -1,0 +1,14 @@
+.grw-toast-container {
+  --toastify-color-info: var(--bs-info);
+  --toastify-color-success: var(--bs-success);
+  --toastify-color-warning: var(--bs-warning);
+  --toastify-color-error: var(--bs-danger);
+  --toastify-icon-color-info: var(--toastify-color-success);
+  --toastify-icon-color-success: var(--toastify-color-success);
+  --toastify-icon-color-warning: var(--toastify-color-warning);
+  --toastify-icon-color-error: var(--toastify-color-error);
+  --toastify-color-progress-info: var(--toastify-color-success);
+  --toastify-color-progress-success: var(--toastify-color-success);
+  --toastify-color-progress-warning: var(--toastify-color-warning);
+  --toastify-color-progress-error: var(--toastify-color-error);
+}

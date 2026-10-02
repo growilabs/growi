@@ -1,0 +1,11 @@
+@use 'styles/variables' as var;
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+/*
+ * style of inline-code
+ */
+code:not([class^='language-']) {
+  padding: 2px 4px;
+  border: 1px solid;
+  border-radius: bs.$border-radius;
+}

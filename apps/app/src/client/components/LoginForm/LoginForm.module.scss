@@ -1,0 +1,97 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'styles/atoms/placeholders/buttons';
+
+.login-form {
+  //
+  // deactivated in order to fix https://redmine.weseek.co.jp/issues/143531 -- 2024.04.02 Yuki Takei
+  //
+  // // To adjust the behavior, this problem is not solved.
+  // // See https://github.com/AaronCCWong/react-card-flip/issues/56
+  // .react-card-front,
+  // .react-card-back {
+  //   height: 0% !important;
+  // }
+
+  :global(.collapse-external-auth) {
+    overflow: hidden;
+  }
+
+  :global(.link-growi-org) {
+    position: absolute;
+    bottom: 9px;
+    z-index: 3;
+  }
+
+  :global(.text-line) {
+    &::before,
+    &::after {
+      flex-grow: 1;
+      height: 1px;
+      margin:0 1em;
+      content: '';
+      background: rgba(white,0.5);
+    }
+  }
+
+
+  :global(.ldap-space) {
+    padding-right: 76px;
+  }
+
+  :global(.input-ldap) {
+    position: absolute;
+    top: 4px;
+    right: 5px;
+  }
+}
+
+
+// Button colors
+:root {
+  .login-form {
+
+    :global(.btn) {
+      @extend %btn-nologin;
+    }
+
+    :global(.btn-register) {
+      @extend %btn-register;
+    }
+
+    :global(.btn-login) {
+      --bs-btn-bg: #{rgba(#204986, 0.6)};
+      --bs-btn-hover-bg: #{rgba(#204986, 0.8)};
+      --bs-btn-active-bg: #{rgba(#204986, 0.8)};
+    }
+
+    :global(.btn-function) {
+      --bs-btn-bg: #{rgba(bs.$gray-800, 0.8)};
+      --bs-btn-hover-bg: #{rgba(bs.$gray-800, 0.5)};
+      --bs-btn-active-bg: #{rgba(bs.$gray-800, 0.5)};
+    }
+
+    :global(.btn-auth-google) {
+      --bs-btn-bg: #{rgba(#4285F4, 0.4)};
+      --bs-btn-hover-bg: #{rgba(#4285F4, 0.8)};
+      --bs-btn-active-bg: #{rgba(#4285F4, 0.8)};
+    }
+
+    :global(.btn-auth-github) {
+      --bs-btn-bg: #{rgba(#403D3E, 0.4)};
+      --bs-btn-hover-bg: #{rgba(#403D3E, 0.7)};
+      --bs-btn-active-bg: #{rgba(#403D3E, 0.7)};
+    }
+
+    :global(.btn-auth-oidc) {
+      --bs-btn-bg: #{rgba(#835B1A, 0.4)};
+      --bs-btn-hover-bg: #{rgba(#835B1A, 0.8)};
+      --bs-btn-active-bg: #{rgba(#835B1A, 0.8)};
+    }
+
+    :global(.btn-auth-saml) {
+      --bs-btn-bg: #{rgba(#138957, 0.4)};
+      --bs-btn-hover-bg: #{rgba(#138957, 0.7)};
+      --bs-btn-active-bg: #{rgba(#138957, 0.7)};
+    }
+  }
+}

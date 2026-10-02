@@ -1,0 +1,106 @@
+/* stylelint-disable selector-class-pattern */
+
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use './variables' as var;
+@import './organisms/wiki-custom-sidebar';
+
+:root {
+  --grw-codemirror-editor-content-font-family: var(--font-family-monospace);
+}
+
+// global imported
+.layout-root.editing {
+  overflow: hidden !important;
+
+  .page-wrapper{
+    height: 100vh;
+  }
+
+  // show
+  .d-edit-block {
+    display: block !important;
+  }
+
+  // hide unnecessary elements
+  .d-edit-none {
+    display: none !important;
+  }
+
+
+  /*****************
+   * Expand Editor
+   *****************/
+  .dynamic-layout-root {
+    @extend .flex-expand-vh-100;
+  }
+
+
+  &.builtin-editor {
+    /*****************
+    * Editor styles
+    *****************/
+    .page-editor-editor-container {
+      border-right: 1px solid transparent;
+
+      // add icon on cursor
+      // .markdown-link-activated {
+      //   .CodeMirror-cursor {
+      //     &::after {
+      //       position: relative;
+      //       top: -1.1em;
+      //       left: 0.3em;
+      //       display: block;
+      //       width: 1em;
+      //       height: 1em;
+      //       content: ' ';
+      //       background-repeat: no-repeat;
+      //       background-size: 1em;
+      //     }
+      //   }
+      // }
+
+      // .markdown-link-activated .CodeMirror-cursor {
+      //   &::after {
+      //     background-image: url('/images/icons/editor/link.svg');
+      //   }
+      // }
+
+    }
+
+    // .page-editor-preview-container {
+    // }
+
+    .page-editor-preview-body {
+      flex-grow: 1;
+      padding: 18px 15px 0;
+      overflow-y: scroll;
+    }
+
+    // editing /Sidebar
+    .page-editor-preview-body.preview-sidebar {
+      flex-grow: 0;
+      width: 320px;
+      margin-right: auto;
+      margin-left: auto;
+
+      .wiki {
+        @extend %grw-custom-sidebar-content;
+      }
+    }
+
+  }
+
+}
+
+// TODO: Never used this id class
+#tag-edit-button-tooltip {
+  .tooltip-inner {
+    color: black;
+    background-color: white;
+    border: 1px solid bs.$gray-300;
+  }
+
+  .tooltip-arrow {
+    border-bottom: 5px solid bs.$gray-300;
+  }
+}

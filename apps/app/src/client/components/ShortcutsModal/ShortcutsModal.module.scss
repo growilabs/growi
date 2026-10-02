@@ -1,0 +1,21 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use '@growi/core-styles/scss/helpers/modifier-keys';
+
+.shortcuts-modal {
+
+  :global(.key) {
+    /* Box Properties */
+    padding: 0 4px;
+
+    /* Text Properties */
+    background: var(--bs-tertiary-bg);
+    border: var(--bs-border-width) solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius-sm);
+  }
+
+  @include modifier-keys.modifier-key;
+
+  :global(.grw-modal-body-style) {
+    max-height: calc(100vh - 200px);
+  }
+}

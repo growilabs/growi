@@ -1,0 +1,46 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+$grw-tag-label-font-size: 12px;
+
+.grw-tag-labels {
+  :global(.grw-tag-label) {
+    font-size: $grw-tag-label-font-size;
+    font-weight: normal;
+    border-radius: bs.$border-radius;
+  }
+
+  :global(.grw-tag-simple-bar) {
+    width: 15.5rem;
+    max-height: 5rem;
+  }
+
+}
+
+// apply font-size
+.grw-tag-labels {
+  :global(.btn-edit-tags) {
+    --bs-btn-font-size: 14px;
+
+    @include bs.media-breakpoint-down(lg) {
+      --bs-btn-font-size: 16px;
+    }
+  }
+}
+
+.grw-tag-labels-skeleton {
+  width: 137px;
+  height: calc(var(--bs-body-line-height) * 1em);
+
+  @include bs.media-breakpoint-down(lg) {
+    width: 42px;
+    height: calc(var(--bs-body-line-height) * 1em + .375rem * 2);
+  }
+}
+
+.grw-tag-icon-button {
+  padding: 6px 8px;
+
+  @include bs.media-breakpoint-down(sm) {
+    box-shadow: 0 3px 6px rgba(black, 0.15);
+  }
+}

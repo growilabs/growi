@@ -1,0 +1,23 @@
+.tags-input {
+  :global(.rbt-token) {
+    :global(.rbt-token-label) {
+      // override to text-truncate
+      overflow: hidden;
+      font-size: 1rem; // adjust font-size
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}
+
+// == Colors
+.tags-input {
+  :global(.rbt-token) {
+    // override to .badge color
+    color: var(--bs-badge-color);
+  }
+
+  :global(.rbt-token-active) {
+    border-color: var(--grw-primary-400) !important;
+  }
+}

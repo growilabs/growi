@@ -1,0 +1,114 @@
+import type { IUser } from '@growi/core';
+import { isIPageNotFoundInfo, SCOPE } from '@growi/core';
+import { ErrorV3 } from '@growi/core/dist/models';
+import type { Request, RequestHandler } from 'express';
+import { query } from 'express-validator';
+import type { HydratedDocument } from 'mongoose';
+
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
+import loggerFactory from '~/utils/logger';
+
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { setup as certifySharedPageFactory } from '../../../middlewares/certify-shared-page';
+import type { ApiV3Response } from '../interfaces/apiv3-response';
+
+const logger = loggerFactory('growi:routes:apiv3:page:get-page-info');
+
+// Extend Request to include middleware-added properties
+interface RequestWithAuth extends Request {
+  user?: HydratedDocument<IUser>;
+  isSharedPage?: boolean;
+}
+
+/**
+ * @swagger
+ *
+ *    /page/info:
+ *      get:
+ *        tags: [Page]
+ *        summary: /page/info
+ *        description: Get summary informations for a page
+ *        parameters:
+ *          - name: pageId
+ *            in: query
+ *            required: true
+ *            description: page id
+ *            schema:
+ *              $ref: '#/components/schemas/ObjectId'
+ *          - name: shareLinkId
+ *            in: query
+ *            description: share link id for shared page access
+ *            schema:
+ *              $ref: '#/components/schemas/ObjectId'
+ *        responses:
+ *          200:
+ *            description: Successfully retrieved current page info.
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/PageInfoExt'
+ *          404:
+ *            description: Page is not found or forbidden.
+ *          500:
+ *            description: Internal server error.
+ */
+export const getPageInfoHandlerFactory = (crowi: Crowi): RequestHandler[] => {
+  const loginRequired = loginRequiredFactory(crowi, true);
+  const certifySharedPage = certifySharedPageFactory(crowi);
+  const { pageService, pageGrantService } = crowi;
+
+  // define validators for req.query
+  const validator = [
+    query('pageId').isMongoId().withMessage('pageId is required'),
+    query('shareLinkId').optional({ checkFalsy: true }).isMongoId(),
+  ];
+
+  return [
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE]),
+    certifySharedPage,
+    loginRequired,
+    ...validator,
+    apiV3FormValidator,
+    async (req: RequestWithAuth, res: ApiV3Response) => {
+      const { user, isSharedPage } = req;
+      const { pageId } = req.query;
+
+      // pageId is validated by express-validator as MongoId, so it's a string
+      const pageIdString = typeof pageId === 'string' ? pageId : String(pageId);
+
+      try {
+        const { meta } = await findPageAndMetaDataByViewer(
+          pageService,
+          pageGrantService,
+          {
+            pageId: pageIdString,
+            path: null,
+            user,
+            isSharedPage,
+          },
+        );
+
+        if (isIPageNotFoundInfo(meta)) {
+          // Always respond 404 regardless of forbidden vs not-found — see
+          // apps/app/.claude/rules/page-write-action-403-404.md
+          return res.apiv3Err(
+            new ErrorV3(
+              'Page is not found or forbidden',
+              'notfound_or_forbidden',
+            ),
+            404,
+          );
+        }
+
+        // Empty pages (isEmpty: true) should return page info for UI operations
+        return res.apiv3(meta);
+      } catch (err) {
+        logger.error('get-page-info', err);
+        return res.apiv3Err(err, 500);
+      }
+    },
+  ];
+};

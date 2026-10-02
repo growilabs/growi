@@ -1,0 +1,362 @@
+@use '@growi/core-styles/scss/bootstrap/utilities' as bs;
+@use '../variables' as var;
+
+.wiki {
+  @mixin add-left-border($width) {
+    &::before {
+      margin-right: 0.4em;
+      content: '';
+      border-left: $width solid;
+      border-left-color: var(--bs-border-color);
+    }
+  }
+
+  font-size: 16px;
+
+  // @extend .text-break;
+  // https://github.com/twbs/bootstrap/blob/v4.6.1/scss/utilities/_text.scss#L65-L68
+  word-break: break-word !important; // Deprecated, but avoids issues with flex containers
+  word-wrap: break-word !important; // Used instead of `overflow-wrap` for IE & Edge Legacy
+
+  a {
+    @extend .link-offset-2;
+
+    text-decoration-line: underline;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .h1,
+  .h2,
+  .h3,
+  .h4,
+  .h5,
+  .h6 {
+    margin-top: 1.6em;
+    margin-bottom: 0.8em;
+
+    scroll-margin-top: var.$grw-scroll-margin-top-in-view;
+  }
+
+  h1, .h1 {
+    padding: 0.3em 0;
+    margin-top: 2em;
+    font-size: 1.9em;
+    line-height: 1.1em;
+  }
+
+  h1 {
+    border-bottom: 2px solid var(--bs-border-color);
+  }
+
+  h2, .h2 {
+    padding-bottom: 0.3em;
+    font-size: 1.6em;
+    font-weight: bold;
+    line-height: 1.225;
+  }
+  h2 {
+    border-bottom: 1px solid var(--bs-border-color);
+  }
+
+  h3, .h3 {
+    font-size: 1.4em;
+    font-weight: bold;
+  }
+
+  h4, .h4 {
+    font-size: 1.35em;
+    font-weight: normal;
+  }
+  h4 {
+    // style
+    @include add-left-border(6px);
+  }
+
+  h5, .h5 {
+    font-size: 1.25em;
+    font-weight: normal;
+  }
+  h5 {
+    // style
+    @include add-left-border(4px);
+  }
+
+  h6, .h6 {
+    font-size: 1.2em;
+    font-weight: normal;
+  }
+  h6 {
+    // style
+    @include add-left-border(2px);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .h1,
+  .h2,
+  .h3,
+  .h4,
+  .h5,
+  .h6 {
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  p {
+    margin: 15px 0;
+    font-weight: normal;
+  }
+
+  table {
+    font-size: 0.95em;
+  }
+
+  blockquote {
+    padding: 0 20px;
+    margin: 24px 0 16px;
+    font-size: 0.9em;
+    /* stylelint-disable-next-line scss/no-global-function-names */
+    color: lighten(bs.$gray-800, 35%);
+    border-left: 0.3rem solid #ddd;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  img,video {
+    max-width: 100%;
+    margin: 5px 0;
+  }
+
+  pre {
+    position: relative; // for absolute positioned .code-highlighted-title
+  }
+
+  ul:not(.nav),
+  ol:not(.nav) {
+    padding-left: 30px;
+    margin: 20px 0;
+
+    li {
+      margin: 5px 0;
+      line-height: 1.8em;
+
+      pre {
+        line-height: bs.$line-height-base;
+      }
+    }
+
+    ul,
+    ol {
+      margin: 0;
+    }
+  }
+
+  .contains-task-list {
+    .task-list-item {
+      margin: 0 0.2em 0.25em -1.6em;
+      list-style-type: none;
+    }
+
+    .task-list-item > .contains-task-list {
+      margin-left: 30px;
+    }
+
+    // use awesome-bootstrap-checkbox
+    .task-list-item .checkbox input[type='checkbox'] {
+      // layout
+      +label {
+        padding-left: 0.3em;
+
+        &::before {
+          margin-top: 0.4em;
+        }
+      }
+
+      // styles
+      cursor: default;
+
+      +label {
+        cursor: default;
+        opacity: 1;
+
+        &::before,
+        &::after {
+          cursor: default;
+        }
+      }
+    }
+  }
+
+  // see: https://github.com/micromark/micromark-extension-gfm-footnote#css
+
+  /* Style the footnotes section. */
+  .footnotes {
+    font-size: smaller;
+    color: bs.$text-muted;
+    border-top: 1px solid bs.$border-color;
+
+    /* Hide the section label for visual users. */
+    #footnote-label {
+      display: none;
+    }
+  }
+
+  /* Place `[` and `]` around footnote references. */
+  [data-footnote-ref]::before {
+    content: '[';
+  }
+
+  [data-footnote-ref]::after {
+    content: ']';
+  }
+
+  $ratio: 0.95;
+
+  &.comment {
+    font-size: 14px;
+    line-height: 1.5em;
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      margin-top: 1.6em * $ratio;
+      margin-bottom: 0.8em * $ratio;
+    }
+
+    /* stylelint-disable no-descending-specificity */
+    h1 {
+      padding-bottom: 0.3em * $ratio;
+      margin-top: 2em * $ratio;
+      font-size: 1.8em * $ratio;
+      line-height: 1.1em * $ratio;
+    }
+
+    h2 {
+      padding-bottom: 0.5em * $ratio;
+      font-size: 1.4em * $ratio;
+      line-height: 1.225 * $ratio;
+    }
+
+    h3 {
+      font-size: 1.2em * $ratio;
+    }
+    /* stylelint-enable no-descending-specificity */
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      &:first-child {
+        margin-top: 15px;
+      }
+    }
+
+    blockquote {
+      font-size: 0.9em * $ratio;
+    }
+
+    ul:not(.nav),
+    ol:not(.nav) {
+      padding-left: 15px;
+      margin: 10px 0;
+
+      li {
+        line-height: bs.$line-height-base;
+
+        pre {
+          line-height: bs.$line-height-base;
+        }
+      }
+    }
+
+    .revision-head {
+
+      .revision-head-link,
+      .revision-head-edit-button {
+        margin-left: 0.5em * $ratio;
+        font-size: 0.6em * $ratio;
+      }
+    }
+  }
+
+  .grw-keep {
+    padding: 7%;
+    padding-bottom: 3%;
+    margin: 0 7%;
+    background-color: rgba(200, 200, 200, 20%);
+    border-radius: 10px;
+
+    .grw-keep-time {
+      float: right;
+      font-size: 0.8em;
+      font-weight: normal;
+    }
+  }
+}
+
+// mobile
+.page-mobile .wiki .revision-head {
+
+  .revision-head-link,
+  .revision-head-edit-button {
+    opacity: 0.3;
+  }
+}
+
+@include bs.media-breakpoint-down(sm) {
+  .main .wiki {
+    img {
+      max-width: 100%;
+    }
+  }
+}
+
+
+// == Colors
+.wiki {
+  a:not(.alert-link) {
+    @extend .link-underline-opacity-25;
+    @extend .link-underline-opacity-100-hover;
+
+    $color-rgb: var(--grw-wiki-link-color-rgb, var(--bs-link-color-rgb));
+
+    color: rgba($color-rgb, var(--bs-link-opacity, 1));
+    text-decoration-color: rgba($color-rgb, var(--bs-link-underline-opacity, 1));
+
+    &:hover {
+      color: rgba(
+        var(--grw-wiki-link-hover-color-rgb, var(--bs-link-hover-color-rgb)),
+        var(--bs-link-opacity, 1)
+      );
+    }
+  }
+}
+
+@include bs.color-mode(light) {
+  .wiki {
+    --bs-border-color: var(--bs-gray-300);
+  }
+}
+
+@include bs.color-mode(dark) {
+  .wiki {
+    --bs-border-color: var(--bs-gray-700);
+  }
+}

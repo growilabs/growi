@@ -1,0 +1,20 @@
+// Variables
+
+// Variables should follow the `$component-state-property-size` formula for
+// consistent naming. Ex: $nav-link-disabled-color and $modal-content-box-shadow-xs.
+
+// Color system
+
+$gray-100: #faf9f8 !default;
+$gray-200: #efeeed !default;
+$gray-300: #e6e5e3 !default;
+$gray-400: #d8d7d5 !default;
+$gray-500: #b2b0ae !default;
+$gray-600: #767371 !default;
+$gray-700: #4d4a48 !default;
+$gray-800: #403c39 !default;
+$gray-900: #26231e !default;
+
+// The contrast ratio to reach against white, to determine if color changes from "light" to "dark". Acceptable values for WCAG 2.0 are 3, 4.5 and 7.
+// See https://www.w3.org/TR/WCAG20/#visual-audio-contrast-contrast
+$min-contrast-ratio: 3 !default;

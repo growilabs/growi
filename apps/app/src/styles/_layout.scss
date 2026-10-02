@@ -1,0 +1,120 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use './variables' as var;
+
+body {
+  min-height: 100vh;
+}
+
+.dynamic-layout-root {
+  @extend .flex-expand-vert;
+}
+
+.grw-bg-image-wrapper {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+
+  img {
+    object-fit: cover;
+    object-position: bottom;
+  }
+}
+
+.grw-scrollable-modal-body {
+  max-height: calc(100vh - 330px);
+  overflow-y: scroll;
+}
+
+.page-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+// padding settings for GrowiNavbarBottom
+.page-wrapper {
+  padding-bottom: var.$grw-navbar-bottom-height;
+
+  @include bs.media-breakpoint-up(md) {
+    padding-bottom: unset;
+  }
+}
+
+.main {
+  margin-top: 1rem;
+
+  @include bs.media-breakpoint-up(md) {
+    margin-top: 2rem;
+  }
+
+  @include bs.media-breakpoint-up(lg) {
+    margin-top: 4rem;
+  }
+}
+
+// md/lg layout padding
+.ps-sidebar {
+  @include bs.media-breakpoint-between(md, xl) {
+    padding-left: var.$grw-sidebar-nav-width;
+  }
+}
+
+.wide-gutter-x-lg {
+  @include bs.media-breakpoint-up(lg) {
+    &,
+    .container,
+    .container-fluid,
+    .container-xxl,
+    .container-xl,
+    .container-lg {
+      --bs-gutter-x: 3rem;
+    }
+  }
+
+  // set to double value to allow space for .revision-head-link
+  @include bs.media-breakpoint-up(xl) {
+    &,
+    .container,
+    .container-fluid,
+    .container-xxl,
+    .container-xl,
+    .container-lg {
+      padding-left: calc(var(--bs-gutter-x) * 1);
+    }
+  }
+}
+
+// printable style
+@media print {
+  body {
+    padding: 30px;
+  }
+
+  // Avoid the issue where the footer element overlaps the main content
+  .dynamic-layout-root {
+    display: block !important;
+  }
+
+  a::after {
+    display: none !important;
+  }
+
+  .main {
+    header {
+      border-bottom: solid 1px bs.$secondary;
+      h1 {
+        font-size: 2em;
+        color: black;
+      }
+    }
+
+    .row {
+      display: block !important;
+    }
+
+    .meta {
+      margin-top: 32px;
+      color: bs.$secondary;
+      border-top: solid 1px bs.$gray-300;
+    }
+  }
+}

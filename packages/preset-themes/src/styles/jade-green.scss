@@ -1,0 +1,67 @@
+@use 'sass:color';
+
+$min-contrast-ratio: 2;
+
+:root[data-bs-theme='light'] {
+  @import '@growi/core-styles/scss/bootstrap/init-stage-1';
+  @import '@growi/core-styles/scss/bootstrap/theming/variables';
+  @import '@growi/core-styles/scss/bootstrap/theming/utils/color-palette';
+
+  $primary: #49B38A;
+  $highlight: #BBC3BF;
+
+  @include generate-color-palette('primary', $primary, black, white);
+  @include generate-color-palette('highlight', $highlight, black, white);
+
+  $body-color: $gray-800;
+  $body-bg: white;
+  $body-secondary-color: rgba($body-color, .75);
+  $body-secondary-bg: $gray-200;
+  $body-tertiary-color: rgba($body-color, .5);
+  $body-tertiary-bg: $gray-100;
+  $border-color: $gray-300;
+  $link-color: $gray-800;
+
+  @import 'bootstrap/scss/variables';
+  @import 'bootstrap/scss/variables-dark';
+  @import '@growi/core-styles/scss/bootstrap/init-stage-2';
+  @import '@growi/core-styles/scss/bootstrap/theming/apply-light';
+
+  --grw-wiki-link-color-rgb: var(--grw-primary-700-rgb);
+  --grw-wiki-link-hover-color-rgb: var(--grw-primary-800-rgb);
+
+    // change marker color
+    --grw-marker-bg: var(--grw-marker-bg-red);
+}
+
+:root[data-bs-theme='dark'] {
+  @import '@growi/core-styles/scss/bootstrap/init-stage-1';
+  @import '@growi/core-styles/scss/bootstrap/theming/variables';
+  @import '@growi/core-styles/scss/bootstrap/theming/utils/color-palette';
+
+  $primary: #49B38A;
+  $highlight: #BBC3BF;
+
+  @include generate-color-palette('primary', $primary, black, white);
+  @include generate-color-palette('highlight', $highlight, black, white);
+
+  $body-color-dark: color.mix(#BBC3BF, white, 60%);
+  $body-bg-dark: $gray-900;
+  $body-secondary-color-dark: rgba($body-color-dark, .75);
+  $body-secondary-bg-dark: $gray-800;
+  $body-tertiary-color-dark: rgba($body-color-dark, .5);
+  $body-tertiary-bg-dark: color.mix($gray-800, $gray-900, 50%);
+  $border-color-dark: $gray-700;
+  $link-color-dark: $gray-400;
+
+  @import 'bootstrap/scss/variables';
+  @import 'bootstrap/scss/variables-dark';
+  @import '@growi/core-styles/scss/bootstrap/init-stage-2';
+  @import '@growi/core-styles/scss/bootstrap/theming/apply-dark';
+
+  --grw-wiki-link-color-rgb: var(--grw-primary-500-rgb);
+  --grw-wiki-link-hover-color-rgb: var(--grw-primary-400-rgb);
+
+  // change marker color
+  --grw-marker-bg: var(--grw-marker-bg-red);
+}

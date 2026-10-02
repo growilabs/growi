@@ -1,0 +1,41 @@
+.grw-resizable-area {
+  will-change: width;
+}
+
+.grw-resizable-area:not(:global(.dragging)) {
+  transition: width 100ms cubic-bezier(0.2, 0, 0, 1) 0s;
+}
+
+
+.grw-navigation-draggable {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 100%;
+
+  :global(.grw-navigation-draggable-hitarea) {
+    position: absolute;
+    left: -4px;
+    width: 24px;
+    height: 100%;
+    padding: 0;
+    appearance: none;
+    cursor: ew-resize;
+    background: transparent;
+    border: 0;
+  }
+  :global(.grw-navigation-draggable-line) {
+    position: absolute;
+    left: -1px;
+    display: none;
+    width: 3px;
+    height: 100%;
+    background-color: rgb(76, 154, 255);
+  }
+}
+
+.grw-navigation-draggable:hover {
+  :global(.grw-navigation-draggable-line) {
+    display: block;
+  }
+}

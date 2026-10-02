@@ -18,27 +18,40 @@ jobs:
       RELEASED_VERSION: ${{ steps.package-json.outputs.packageVersion }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: ${{ github.event.pull_request.base.ref }}
 
-    - uses: actions/setup-node@v2
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
       with:
-        node-version: '14'
-        cache: 'yarn'
-        cache-dependency-path: '**/yarn.lock'
+        node-version: '24'
+        cache: 'pnpm'
 
     - name: Install dependencies
       run: |
-        npx lerna bootstrap
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
+
+    - name: Refresh vendored model catalog (pre-release ingest step)
+      working-directory: ./apps/app
+      # Ingest step: fetch models.dev and regenerate the committed catalog so the
+      # release tag bundles the freshest chat+tool model list. On fetch/schema/empty
+      # failure vendor:models exits non-zero and preserves the existing committed
+      # artifact, so the release proceeds with the last-good catalog (design Error
+      # Handling: the release can continue with the previous catalog). The subsequent
+      # build reads only the committed JSON (no fetch/commit added to the build workflow).
+      continue-on-error: true
+      run: pnpm vendor:models
 
     - name: Bump versions
       run: |
-        yarn bump-versions:patch
-        sh ./packages/app/bin/github-actions/update-readme.sh
+        turbo run version:patch --filter=@growi/app
+        sh ./apps/app/bin/github-actions/update-readme.sh
 
     - name: Retrieve information from package.json
-      uses: myrotvorets/info-from-package-json-action@1.1.0
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
       id: package-json
 
     - name: Update Changelog
@@ -48,62 +61,138 @@ jobs:
         release-notes: ${{ github.event.pull_request.body }}
 
     - name: Update README.md for docker image
-      working-directory: ./packages/app
+      working-directory: ./apps/app
       run: |
         sh ./bin/github-actions/update-readme.sh
       env:
         RELEASED_VERSION: ${{ steps.package-json.outputs.packageVersion }}
 
     - name: Commit, Tag and Push
-      uses: stefanzweifel/git-auto-commit-action@v4
+      uses: stefanzweifel/git-auto-commit-action@v5
       with:
         branch: ${{ github.event.pull_request.base.ref }}
         commit_message: Release v${{ steps.package-json.outputs.packageVersion }}
         tagging_message: v${{ steps.package-json.outputs.packageVersion }}
 
-    - uses: ncipollo/release-action@v1
+    - uses: softprops/action-gh-release@v2
       with:
         body: ${{ github.event.pull_request.body }}
-        tag: v${{ steps.package-json.outputs.packageVersion }}
-        token: ${{ secrets.GITHUB_TOKEN }}
+        tag_name: v${{ steps.package-json.outputs.packageVersion }}
+        target_commitish: ${{ github.head_ref }}
 
     - name: Delete drafts
-      uses: hugo19941994/delete-draft-releases@v1.0.0
+      uses: hugo19941994/delete-draft-releases@v1.0.1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
-  create-pr-for-next-rc:
+  determine-tags:
+    needs: create-github-release
+    runs-on: ubuntu-latest
+
+    outputs:
+      TAGS: ${{ steps.meta.outputs.tags }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Retrieve information from package.json
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
+      id: package-json
+
+    - name: Docker meta for docker.io
+      uses: docker/metadata-action@v5
+      id: meta
+      with:
+        images: docker.io/growilabs/growi
+        sep-tags: ','
+        tags: |
+          type=raw,value=latest
+          type=semver,value=${{ needs.create-github-release.outputs.RELEASED_VERSION }},pattern={{major}}
+          type=semver,value=${{ needs.create-github-release.outputs.RELEASED_VERSION }},pattern={{major}}.{{minor}}
+          type=semver,value=${{ needs.create-github-release.outputs.RELEASED_VERSION }},pattern={{major}}.{{minor}}.{{patch}}
+
+  build-app-image:
     needs: create-github-release
 
+    uses: ./.github/workflows/reusable-app-build-image.yml
+    with:
+      source-version: refs/tags/v${{ needs.create-github-release.outputs.RELEASED_VERSION }}
+      image-name: growilabs/growi
+      tag-temporary: latest
+    secrets:
+      AWS_ROLE_TO_ASSUME_FOR_OIDC: ${{ secrets.AWS_ROLE_TO_ASSUME_FOR_OIDC }}
+
+  publish-app-image:
+    needs: [determine-tags, build-app-image]
+
+    uses: ./.github/workflows/reusable-app-create-manifests.yml
+    with:
+      tags: ${{ needs.determine-tags.outputs.TAGS }}
+      registry: docker.io
+      image-name: 'growilabs/growi'
+      docker-registry-username: 'growimoogle'
+      tag-temporary: latest
+    secrets:
+      DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }}
+
+  post-publish:
+    needs: [create-github-release, publish-app-image]
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         ref: v${{ needs.create-github-release.outputs.RELEASED_VERSION }}
 
-    - uses: actions/setup-node@v2
+    - name: Update Docker Hub Description
+      uses: peter-evans/dockerhub-description@v3
       with:
-        node-version: '14'
-        cache: 'yarn'
-        cache-dependency-path: '**/yarn.lock'
+        username: growimoogle
+        password: ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }}
+        repository: growilabs/growi
+        readme-filepath: ./apps/app/docker/README.md
+
+    - name: Slack Notification
+      uses: weseek/ghaction-release-slack-notification@master
+      with:
+        channel: '#release'
+        url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        created_tag: 'v${{ needs.create-github-release.outputs.RELEASED_VERSION }}'
+
+
+  create-pr-for-next-rc:
+    needs: [create-github-release, publish-app-image]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: v${{ needs.create-github-release.outputs.RELEASED_VERSION }}
+
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+        cache: 'pnpm'
 
     - name: Install dependencies
       run: |
-        npx lerna bootstrap
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
 
     - name: Bump versions for next RC
       run: |
-        yarn bump-versions:rc
-        yarn bump-versions:slackbot-proxy
+        turbo run version:prepatch --filter=@growi/app
+        turbo run version:prepatch --filter=@growi/slackbot-proxy
 
     - name: Retrieve information from package.json
-      uses: myrotvorets/info-from-package-json-action@1.1.0
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
       id: package-json
 
     - name: Commit
-      uses: github-actions-x/commit@v2.8
+      uses: github-actions-x/commit@v2.9
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         push-branch: support/prepare-v${{ steps.package-json.outputs.packageVersion }}
@@ -114,105 +203,8 @@ jobs:
       uses: repo-sync/pull-request@v2
       with:
         source_branch: support/prepare-v${{ steps.package-json.outputs.packageVersion }}
-        destination_branch: master
+        destination_branch: ${{ github.head_ref }}
         pr_title: Prepare v${{ steps.package-json.outputs.packageVersion }}
-        pr_label: exclude from changelog
-        pr_body: "An automated PR generated by ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+        pr_label: flag/exclude-from-changelog,type/prepare-next-version
+        pr_body: "[skip ci] An automated PR generated by create-pr-for-next-rc"
         github_token: ${{ secrets.GITHUB_TOKEN }}
-
-
-  build-image:
-    needs: create-github-release
-
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        flavor: [default, nocdn]
-
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        ref: v${{ needs.create-github-release.outputs.RELEASED_VERSION }}
-        lfs: true
-
-    - name: Setup suffix
-      id: suffix
-      run: |
-        [[ ${{ matrix.flavor }} = "nocdn" ]] && suffix="-nocdn" || suffix=""
-        echo "::set-output name=SUFFIX::$suffix"
-
-    - name: Docker meta
-      id: meta
-      uses: docker/metadata-action@v3
-      with:
-        images: weseek/growi,ghcr.io/weseek/growi
-        flavor: |
-          suffix=${{ steps.suffix.outputs.SUFFIX }}
-        tags: |
-          type=raw,value=latest
-          type=semver,value=${{ needs.create-github-release.outputs.RELEASED_VERSION }},pattern={{major}}
-          type=semver,value=${{ needs.create-github-release.outputs.RELEASED_VERSION }},pattern={{major}}.{{minor}}
-          type=semver,value=${{ needs.create-github-release.outputs.RELEASED_VERSION }},pattern={{major}}.{{minor}}.{{patch}}
-
-    - name: Login to docker.io registry
-      run: |
-        echo ${{ secrets. DOCKER_REGISTRY_PASSWORD }} | docker login --username wsmoogle --password-stdin
-
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v1
-      with:
-        registry: ghcr.io
-        username: wsmoogle
-        password: ${{ secrets.DOCKER_REGISTRY_ON_GITHUB_PASSWORD }}
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
-
-    - name: Cache Docker layers
-      uses: actions/cache@v2
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-app-${{ matrix.flavor }}-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildx-app-${{ matrix.flavor }}-
-          ${{ runner.os }}-buildx-app-
-
-    - name: Build and push
-      uses: docker/build-push-action@v2
-      with:
-        context: .
-        file: ./packages/app/docker/Dockerfile
-        platforms: linux/amd64
-        push: true
-        build-args: |
-          flavor=${{ matrix.flavor }}
-        cache-from: type=local,src=/tmp/.buildx-cache
-        cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
-        tags: ${{ steps.meta.outputs.tags }}
-
-    - name: Move cache
-      run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-    - name: Update Docker Hub Description
-      uses: peter-evans/dockerhub-description@v2
-      with:
-        username: wsmoogle
-        password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
-        repository: weseek/growi
-        readme-filepath: ./packages/app/docker/README.md
-
-    - name: Slack Notification
-      uses: weseek/ghaction-release-slack-notification@master
-      with:
-        channel: '#release'
-        url: ${{ secrets.SLACK_WEBHOOK_URL }}
-        created_tag: 'v${{ needs.create-github-release.outputs.RELEASED_VERSION }}${{ steps.suffix.outputs.SUFFIX }}'
-
-    - name: Check whether workspace is clean
-      run: |
-        STATUS=`git status --porcelain`
-        if [ -z "$STATUS" ]; then exit 0; else exit 1; fi
-

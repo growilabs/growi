@@ -1,0 +1,68 @@
+name: Release Docker Images for RC (for master)
+
+on:
+  schedule:
+    # Weekdays at 24:00hrs (JST) Executed
+    - cron: '0 15 * * 1-5'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+
+  determine-tags:
+    runs-on: ubuntu-latest
+
+    outputs:
+      TAGS: ${{ steps.meta.outputs.tags }}
+      TAGS_GHCR: ${{ steps.meta-ghcr.outputs.tags }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Retrieve information from package.json
+      uses: myrotvorets/info-from-package-json-action@v2.0.2
+      id: package-json
+
+    - name: Docker meta for docker.io
+      uses: docker/metadata-action@v5
+      id: meta
+      with:
+        images: docker.io/weseek/growi
+        sep-tags: ','
+        tags: |
+          type=raw,value=${{ steps.package-json.outputs.packageVersion }}.{{sha}}
+
+    - name: Docker meta for ghcr.io
+      uses: docker/metadata-action@v5
+      id: meta-ghcr
+      with:
+        images: ghcr.io/weseek/growi
+        sep-tags: ','
+        tags: |
+          type=raw,value=${{ steps.package-json.outputs.packageVersion }}.{{sha}}
+
+
+  build-image-rc:
+    uses: ./.github/workflows/reusable-app-build-image.yml
+    with:
+      image-name: growilabs/growi
+      tag-temporary: latest-rc
+    secrets:
+      AWS_ROLE_TO_ASSUME_FOR_OIDC: ${{ secrets.AWS_ROLE_TO_ASSUME_FOR_OIDC }}
+
+
+  publish-image-rc:
+    needs: [determine-tags, build-image-rc]
+
+    uses: ./.github/workflows/reusable-app-create-manifests.yml
+    with:
+      tags: ${{ needs.determine-tags.outputs.TAGS }}
+      registry: docker.io
+      image-name: weseek/growi
+      docker-registry-username: wsmoogle
+      tag-temporary: latest-rc
+    secrets:
+      DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}

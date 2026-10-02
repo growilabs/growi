@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "paths": {
+      "~/*": ["./src/*"]
+    },
+    "types": ["vitest/globals"],
+
+    /* TODO: remove below flags for strict checking */
+    "strict": false,
+    "strictNullChecks": true,
+    "strictBindCallApply": true,
+    "noImplicitAny": false,
+    "noImplicitOverride": true
+  },
+  "include": ["src"]
+}

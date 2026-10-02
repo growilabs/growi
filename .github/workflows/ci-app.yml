@@ -1,0 +1,331 @@
+name: Node CI for app development
+
+on:
+  push:
+    branches-ignore:
+      - release/**
+      - rc/**
+      - changeset-release/**
+      - mergify/merge-queue/**
+      - tmp-mergify/merge-queue/**
+      # Throwaway measurement branches pushed by the flaky-repro workflow
+      # (empty commits); excluded explicitly rather than relying on the
+      # `paths` filter's diff behavior for new branches. See design.md
+      # "CI Exclusion" in .kiro/specs/ci-flaky-test-detection.
+      - flaky-repro/**
+    paths:
+      - .github/mergify.yml
+      - .github/workflows/ci-app.yml
+      - biome.json
+      - tsconfig.base.json
+      - turbo.json
+      - pnpm-lock.yaml
+      - package.json
+      - apps/app/**
+      - '!apps/app/docker/**'
+      - packages/**
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - .github/mergify.yml
+      - .github/workflows/ci-app.yml
+      - biome.json
+      - tsconfig.base.json
+      - turbo.json
+      - pnpm-lock.yaml
+      - package.json
+      - apps/app/**
+      - '!apps/app/docker/**'
+      - packages/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+  ci-app-lint:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Cache/Restore dist
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/.turbo
+            **/dist
+            **/node_modules/.cache/turbo
+          key: dist-ci-app-${{ runner.OS }}-node${{ matrix.node-version }}-${{ github.sha }}
+          restore-keys: |
+            dist-ci-app-${{ runner.OS }}-node${{ matrix.node-version }}-
+
+      - name: Install dependencies
+        run: |
+          pnpm add turbo --global
+          pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: |
+          turbo run lint --filter=@growi/app --filter=./packages/*
+
+      - name: Slack Notification
+        uses: weseek/ghaction-slack-notification@master
+        if: failure()
+        with:
+          type: ${{ job.status }}
+          job_name: '*Node CI for growi - lint (${{ matrix.node-version }})*'
+          channel: '#ci'
+          isCompactMode: true
+          url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+
+  ci-app-test:
+    runs-on: ubuntu-latest
+
+    # Skipped when `flag/skip-heavy-ci` is present, or when this is the i18n
+    # sync bot's translation-only pull request (see pull-translations.ts's
+    # SKIP_HEAVY_CI_LABEL and TRANSLATION_ONLY_BRANCH): its diff is always a
+    # subset of apps/app/public/static/locales/** values already validated
+    # by `pnpm run lint:i18n` before the pull request was opened (see
+    # .github/mergify.yml's i18n-sync-translation-only queue, which only
+    # requires ci-app-lint for this branch). The head-ref check exists
+    # alongside the label check because the label lands after the PR's
+    # `opened` event via a separate API call, so a run triggered by `opened`
+    # never sees it -- the head ref, unlike the label, is already final at
+    # `opened` time. (An earlier version of this condition added `labeled`
+    # to the trigger types instead; that let a mid-flight labeling event
+    # cancel an in-flight run via the concurrency group below, and Mergify's
+    # `check-failure` treats that resulting `cancelled` conclusion as a
+    # failure -- risking ejecting *any* PR from the merge queue over an
+    # unrelated label change. Reverted in favor of this race-free check.)
+    #
+    # The branch-name check alone would let any PR from this repo -- not
+    # just the sync bot's -- skip the full test/build matrix by naming its
+    # branch i18n-sync/translation-only. The head.repo.full_name check
+    # limits that to PRs whose head lives in this repository (not a fork),
+    # matching .github/mergify.yml's author restriction on the same branch
+    # name for the merge queue itself.
+    if: |
+      !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+         || ( github.event.pull_request.head.ref == 'i18n-sync/translation-only'
+              && github.event.pull_request.head.repo.full_name == github.repository ) )
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+        mongodb-version: ['6.0', '8.0']
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - &setup-node-step
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - &cache-restore-dist-step
+        name: Cache/Restore dist
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/.turbo
+            **/dist
+            **/node_modules/.cache/turbo
+          key: dist-ci-app-${{ runner.OS }}-node${{ matrix.node-version }}-${{ github.sha }}
+          restore-keys: |
+            dist-ci-app-${{ runner.OS }}-node${{ matrix.node-version }}-
+
+      - &install-dependencies-step
+        name: Install dependencies
+        run: |
+          pnpm add turbo --global
+          pnpm install --frozen-lockfile
+
+      - &start-mongodb-step
+        name: Start MongoDB (replica set)
+        uses: supercharge/mongodb-github-action@1.12.1
+        with:
+          mongodb-version: ${{ matrix.mongodb-version }}
+          mongodb-replica-set: rs0
+
+      - name: Test
+        run: |
+          turbo run test:unit test:components --filter=@growi/app --env-mode=loose
+        env:
+          MONGO_URI: mongodb://localhost:27017/growi_test?replicaSet=rs0
+
+      - name: Test (packages)
+        run: |
+          turbo run test --filter=./packages/* --env-mode=loose
+
+
+      - name: Slack Notification
+        uses: weseek/ghaction-slack-notification@master
+        if: failure()
+        with:
+          type: ${{ job.status }}
+          job_name: '*Node CI for growi - test (${{ matrix.node-version }})*'
+          channel: '#ci'
+          isCompactMode: true
+          url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+
+  ci-app-test-integration:
+    runs-on: ubuntu-latest
+
+    # See ci-app-test's comment above.
+    if: |
+      !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+         || ( github.event.pull_request.head.ref == 'i18n-sync/translation-only'
+              && github.event.pull_request.head.repo.full_name == github.repository ) )
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+        mongodb-version: ['8.0']
+        elasticsearch-version:
+          - env: 8
+            stack-version: '8.19.16'
+          - env: 9
+            stack-version: '9.3.3'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Cross-reference: .github/workflows/flaky-repro.yml copies this job's
+      # whole setup span — pnpm/action-setup, setup-node (Node version, pnpm
+      # cache), the dist cache (same key / restore-keys format), the
+      # dependency install command, and the MongoDB / Elasticsearch start and
+      # wait steps — so that a repro run uses the same toolchain as the CI
+      # failure it is reproducing. Revalidation Trigger (design.md,
+      # .kiro/specs/ci-flaky-test-detection): when any of these actions, their
+      # versions, the Node / MongoDB / Elasticsearch versions, or the dist
+      # cache key format change here (the anchors are defined in the
+      # ci-app-test job above), change flaky-repro.yml in the same commit.
+      - uses: pnpm/action-setup@v6
+
+      - *setup-node-step
+
+      - *cache-restore-dist-step
+
+      - *install-dependencies-step
+
+      - *start-mongodb-step
+
+      - name: Start Elasticsearch with plugins
+        uses: elastic/elastic-github-actions/elasticsearch@master
+        with:
+          stack-version: ${{ matrix.elasticsearch-version.stack-version }}
+          plugins: |
+            analysis-kuromoji
+            analysis-icu
+          security-enabled: false
+
+      - name: Wait for Elasticsearch to be ready
+        run: |
+          curl \
+            --no-progress-meter \
+            -X GET \
+            --retry 60 \
+            --retry-delay 1 \
+            --retry-connrefused \
+            http://localhost:9200/_cluster/health?wait_for_status=green
+
+      - name: Test
+        run: |
+          turbo run test:integ --filter=@growi/app --env-mode=loose
+        env:
+          MONGO_URI: mongodb://localhost:27017/growi_test?replicaSet=rs0
+          VITE_ELASTICSEARCH_URI: http://localhost:9200/growi
+          VITE_ELASTICSEARCH_VERSION: ${{ matrix.elasticsearch-version.env }}
+
+      - name: Slack Notification
+        uses: weseek/ghaction-slack-notification@master
+        if: failure()
+        with:
+          type: ${{ job.status }}
+          job_name: '*Node CI for growi - test-es (${{ matrix.node-version }})*'
+          channel: '#ci'
+          isCompactMode: true
+          url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+
+  ci-app-launch-dev:
+    runs-on: ubuntu-latest
+
+    # See ci-app-test's comment above.
+    if: |
+      !( contains( github.event.pull_request.labels.*.name, 'flag/skip-heavy-ci' )
+         || ( github.event.pull_request.head.ref == 'i18n-sync/translation-only'
+              && github.event.pull_request.head.repo.full_name == github.repository ) )
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+        mongodb-version: ['6.0', '8.0']
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Cache/Restore dist
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/.turbo
+            **/dist
+            **/node_modules/.cache/turbo
+          key: dist-ci-app-${{ runner.OS }}-node${{ matrix.node-version }}-${{ github.sha }}
+          restore-keys: |
+            dist-ci-app-${{ runner.OS }}-node${{ matrix.node-version }}-
+
+      - name: Install dependencies
+        run: |
+          pnpm add turbo --global
+          pnpm install --frozen-lockfile
+
+      - name: Start MongoDB (replica set)
+        uses: supercharge/mongodb-github-action@1.12.1
+        with:
+          mongodb-version: ${{ matrix.mongodb-version }}
+          mongodb-replica-set: rs0
+
+      - name: turbo run launch-dev:ci
+        working-directory: ./apps/app
+        run: |
+          cp config/ci/.env.local.for-ci .env.development.local
+          turbo run launch-dev:ci --env-mode=loose
+        env:
+          MONGO_URI: mongodb://localhost:27017/growi_dev?replicaSet=rs0
+
+      - name: Slack Notification
+        uses: weseek/ghaction-slack-notification@master
+        if: failure()
+        with:
+          type: ${{ job.status }}
+          job_name: '*Node CI for growi - launch-dev (${{ matrix.node-version }})*'
+          channel: '#ci'
+          isCompactMode: true
+          url: ${{ secrets.SLACK_WEBHOOK_URL }}

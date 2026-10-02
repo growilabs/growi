@@ -1,0 +1,15 @@
+@use 'styles/variables' as var;
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.code-highlighted-title {
+  position: absolute;
+  top: 0;
+  right: 0.5em;
+  padding: 0 4px;
+  font-style: normal;
+  font-weight: bold;
+  color: bs.$gray-900;
+  background: bs.$gray-300;
+  border-radius: bs.$border-radius;
+  opacity: 0.8;
+}

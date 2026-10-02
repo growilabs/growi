@@ -1,0 +1,96 @@
+.page-list {
+  :global(.btn-page-item-control) {
+    width: 20px;
+    height: 20px;
+    padding: 0px;
+  }
+
+  :global(.page-list-ul) {
+    padding-left: 0;
+    margin: 0;
+
+    > li {
+      list-style: none;
+
+      > a {
+        padding: 0px;
+        color: inherit;
+
+        &:hover {
+          color: inherit;
+        }
+      }
+    }
+
+    :global(.user-picture) {
+      width: 16px;
+      height: 16px;
+      vertical-align: text-bottom;
+
+      &:global(.user-picture-md) {
+        width: 20px;
+        height: 20px;
+      }
+    }
+
+    :global(.page-list-meta) {
+      font-size: 0.9em;
+      // Restore muted meta color that theme apply-colors used to set via
+      // --color-page-list-group-item-meta (gray-500) before themes were removed.
+      color: var(--bs-secondary-color);
+
+      > span {
+        margin-right: 0.3rem;
+      }
+
+      i {
+        margin-right: 2px;
+      }
+
+      :global(.material-symbols-outlined) {
+        font-size: 1.15em;
+        line-height: 1;
+        vertical-align: text-bottom;
+      }
+
+      :global(.seen-users-count) {
+        &:global(.strength-0),
+        &:global(.strength-1),
+        &:global(.strength-2) {
+          font-weight: bold;
+        }
+        &:global(.strength-3) {
+          font-weight: normal;
+        }
+        &:global(.strength-4) {
+          opacity: 0.5;
+        }
+      }
+    }
+
+    // after second level indent
+    :global(.page-list-ul) {
+      padding-left: 2rem;
+    }
+
+    // override .page-list-ul
+    &:global(.page-list-ul-flat) {
+      padding-left: 0;
+    }
+  }
+
+  // List group
+  :global(.list-group) {
+    :global(.list-group-item) {
+      min-height: 136px;
+
+      :global(.page-list-updated-at) {
+        font-size: 12px;
+      }
+
+      &:global(.list-group-item-action) {
+        border-left: solid 3px transparent;
+      }
+    }
+  }
+}

@@ -1,0 +1,423 @@
+import type { IPage, IUserHasId } from '@growi/core';
+import { allOrigin, getIdForRef, getIdStringForRef, Origin } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
+import { ErrorV3 } from '@growi/core/dist/models';
+import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import {
+  isTopPage,
+  isUserPage,
+  isUsersProtectedPages,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
+import type { Request, RequestHandler } from 'express';
+import type { ValidationChain } from 'express-validator';
+import { body } from 'express-validator';
+import type { HydratedDocument } from 'mongoose';
+import mongoose from 'mongoose';
+
+import type { revisions } from '~/generated/prisma/client';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import {
+  type IApiv3PageUpdateParams,
+  PageUpdateErrorCode,
+} from '~/interfaces/apiv3';
+import type { IOptionsForUpdate } from '~/interfaces/page';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import {
+  serializePageSecurely,
+  serializeRevisionSecurely,
+} from '~/server/models/serializers';
+import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
+import { configManager } from '~/server/service/config-manager/config-manager';
+import { preNotifyService } from '~/server/service/pre-notify';
+import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
+import { getYjsService } from '~/server/service/yjs';
+import { generalXssFilter } from '~/services/general-xss-filter';
+import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
+
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
+import type { ApiV3Response } from '../interfaces/apiv3-response';
+
+const logger = loggerFactory('growi:routes:apiv3:page:update-page');
+
+type ReqBody = IApiv3PageUpdateParams;
+
+interface UpdatePageRequest
+  extends Request<Record<string, string>, ApiV3Response, ReqBody> {
+  user: IUserHasId;
+}
+
+export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
+  const Page = mongoose.model<IPage, PageModel>('Page');
+
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+
+  // define validators for req.body
+  const validator: ValidationChain[] = [
+    body('pageId')
+      .isMongoId()
+      .exists()
+      .not()
+      .isEmpty({ ignore_whitespace: true })
+      .withMessage("'pageId' must be specified"),
+    body('revisionId')
+      .optional()
+      .exists()
+      .not()
+      .isEmpty({ ignore_whitespace: true })
+      .withMessage("'revisionId' must be specified"),
+    body('body')
+      .exists()
+      .isString()
+      .withMessage("Empty value is not allowed for 'body'"),
+    body('grant')
+      .optional()
+      .not()
+      .isString()
+      .isInt({ min: 0, max: 5 })
+      .withMessage('grant must be an integer from 1 to 5'),
+    body('userRelatedGrantUserGroupIds')
+      .optional()
+      .isArray()
+      .withMessage('userRelatedGrantUserGroupIds must be an array of group id'),
+    body('overwriteScopesOfDescendants')
+      .optional()
+      .isBoolean()
+      .withMessage('overwriteScopesOfDescendants must be boolean'),
+    body('isSlackEnabled')
+      .optional()
+      .isBoolean()
+      .withMessage('isSlackEnabled must be boolean'),
+    body('slackChannels')
+      .optional()
+      .isString()
+      .withMessage('slackChannels must be string'),
+    body('origin')
+      .optional()
+      .isIn(allOrigin)
+      .withMessage('origin must be "view" or "editor"'),
+    body('wip').optional().isBoolean().withMessage('wip must be boolean'),
+  ];
+
+  /**
+   * Emit the page-update activity.
+   *
+   * This MUST run before the response is sent (see the call site). The
+   * activity's request context (operator user / ip / endpoint / username) is
+   * held in `pendingActivityContext`, keyed by the pre-minted activity id, and
+   * `registerFailsafeFinalizer` clears that entry on the `res` 'finish'/'close'
+   * events. The ActivityService 'update' listener consumes the context
+   * synchronously (`pendingActivityContext.take`) as the first thing it does.
+   *
+   * If the emit ran after `res.apiv3()` (as it used to, from inside
+   * `postAction`), the `await shouldGenerateUpdate(...)` below would yield the
+   * event loop long enough for the response's 'finish' to clear the context
+   * first, so the listener would settle the row with `user: null` -- a "bare"
+   * activity that later surfaces as a `null` entry in a notification's
+   * `actionUsers` and crashed the notification list. Emitting before the
+   * response guarantees `take()` runs while the context is still alive.
+   * (create-page.ts is unaffected: its emit is the first statement of its
+   * postAction, with no `await` between `res.apiv3()` and the emit.)
+   */
+  async function generateUpdateActivity(
+    req: UpdatePageRequest,
+    res: ApiV3Response,
+    updatedPage: HydratedDocument<PageDocument>,
+  ) {
+    // Decide if update activity should generate
+    let shouldGenerateUpdateActivity = false;
+    try {
+      const targetPageId = getIdStringForRef(updatedPage);
+      const currentActivityId = getIdStringForRef(res.locals.activity);
+      const currentUserId = req.user ? getIdStringForRef(req.user) : undefined;
+
+      shouldGenerateUpdateActivity = await shouldGenerateUpdate({
+        currentUserId,
+        targetPageId,
+        currentActivityId,
+      });
+    } catch (err) {
+      logger.error(
+        'Failed to determine whether to generate update activity.',
+        err,
+      );
+    }
+
+    if (!shouldGenerateUpdateActivity) {
+      return;
+    }
+
+    try {
+      // persist activity
+      const creator =
+        updatedPage.creator != null
+          ? getIdForRef(updatedPage.creator)
+          : undefined;
+      const parameters = {
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+        target: updatedPage,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        contributor: req.user,
+      };
+      const activityEvent = crowi.events.activity;
+      activityEvent.emit(
+        'update',
+        res.locals.activity._id,
+        parameters,
+        { path: updatedPage.path, creator },
+        preNotifyService.generatePreNotify,
+      );
+    } catch (err) {
+      logger.error('Failed to generate update activity', err);
+    }
+  }
+
+  async function postAction(
+    req: UpdatePageRequest,
+    updatedPage: HydratedDocument<PageDocument>,
+    previousRevision: { body: string } | null,
+  ) {
+    // Reflect the updates in ydoc
+    const origin = req.body.origin;
+    if (origin === Origin.View || origin === undefined) {
+      const yjsService = getYjsService();
+      await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
+    }
+
+    // global notification
+    try {
+      await crowi.globalNotificationService.fire(
+        GlobalNotificationSettingEvent.PAGE_EDIT,
+        updatedPage,
+        req.user,
+      );
+    } catch (err) {
+      logger.error({ err }, 'Edit notification failed');
+    }
+
+    // user notification
+    const { isSlackEnabled, slackChannels } = req.body;
+    if (isSlackEnabled) {
+      try {
+        const option =
+          previousRevision != null ? { previousRevision } : undefined;
+        const results = await crowi.userNotificationService.fire(
+          updatedPage,
+          req.user,
+          slackChannels,
+          'update',
+          option,
+        );
+        for (const result of results) {
+          if (result.status === 'rejected') {
+            logger.error(
+              { err: result.reason },
+              'Create user notification failed',
+            );
+          }
+        }
+      } catch (err) {
+        logger.error({ err }, 'Create user notification failed');
+      }
+    }
+  }
+
+  const addActivity = generateAddActivityMiddleware();
+
+  return [
+    accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    excludeReadOnlyUser,
+    addActivity,
+    ...validator,
+    apiV3FormValidator,
+    async (req: UpdatePageRequest, res: ApiV3Response) => {
+      const { pageId, revisionId, body, origin, grant } = req.body;
+
+      const sanitizeRevisionId =
+        revisionId == null ? undefined : generalXssFilter.process(revisionId);
+
+      // check page existence
+      const isExist = (await Page.count({ _id: { $eq: pageId } })) > 0;
+      if (!isExist) {
+        return res.apiv3Err(
+          new ErrorV3(
+            `Page('${pageId}' is not found or forbidden`,
+            'notfound_or_forbidden',
+          ),
+          400,
+        );
+      }
+
+      // check revision
+      const currentPage = await Page.findByIdAndViewer(pageId, req.user);
+      // check page existence (for type safety)
+      if (currentPage == null) {
+        return res.apiv3Err(
+          new ErrorV3(
+            `Page('${pageId}' is not found or forbidden`,
+            'notfound_or_forbidden',
+          ),
+          400,
+        );
+      }
+
+      const currentPageRevisionId =
+        typeof currentPage.revision === 'string'
+          ? currentPage.revision
+          : currentPage.revision?._id.toString();
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
+      if (
+        disableUserPages &&
+        (isUsersTopPage(currentPage.path) || isUserPage(currentPage.path))
+      ) {
+        return res.apiv3Err('User pages are disabled');
+      }
+
+      const isGrantImmutable =
+        isTopPage(currentPage.path) || isUsersProtectedPages(currentPage.path);
+
+      if (grant != null && grant !== currentPage.grant && isGrantImmutable) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'The grant settings for the specified page cannot be modified.',
+            PageUpdateErrorCode.FORBIDDEN,
+          ),
+          403,
+        );
+      }
+
+      if (currentPage != null) {
+        // Normalize the latest revision which was borken by the migration script '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549.js' provided by v6.1.0 - v7.0.15
+        try {
+          await normalizeLatestRevisionIfBroken(pageId);
+        } catch (err) {
+          logger.error('Error occurred in normalizing the latest revision');
+        }
+      }
+
+      if (
+        currentPage != null &&
+        !(await currentPage.isUpdatable(sanitizeRevisionId, origin))
+      ) {
+        const latestRevision =
+          currentPageRevisionId != null
+            ? await prisma.revisions.findUnique({
+                where: { id: currentPageRevisionId },
+                include: { author: true },
+              })
+            : undefined;
+        const returnLatestRevision = {
+          revisionId: latestRevision?._id,
+          revisionBody: latestRevision?.body,
+          createdAt: latestRevision?.createdAt,
+          user: serializeUserSecurely(
+            latestRevision?.author as IUserHasId | undefined,
+          ),
+        };
+        return res.apiv3Err(
+          new ErrorV3(
+            'Posted param "revisionId" is outdated.',
+            PageUpdateErrorCode.CONFLICT,
+            undefined,
+            { returnLatestRevision },
+          ),
+          409,
+        );
+      }
+      let updatedPage: HydratedDocument<PageDocument>;
+      let previousRevision: revisions | null = null;
+      try {
+        const {
+          userRelatedGrantUserGroupIds,
+          overwriteScopesOfDescendants,
+          wip,
+        } = req.body;
+        const options: IOptionsForUpdate = {
+          overwriteScopesOfDescendants,
+          origin,
+          wip,
+        };
+        if (grant != null) {
+          options.grant = grant;
+          options.userRelatedGrantUserGroupIds = userRelatedGrantUserGroupIds;
+        }
+
+        // Priority 1: Use provided revisionId (for conflict detection)
+        previousRevision = null;
+        if (sanitizeRevisionId != null) {
+          try {
+            previousRevision = await prisma.revisions.findUnique({
+              where: { id: sanitizeRevisionId },
+            });
+          } catch (error) {
+            logger.error(
+              {
+                revisionId: sanitizeRevisionId,
+                pageId: currentPage._id,
+                err: error,
+              },
+              'Failed to fetch previousRevision by revisionId',
+            );
+          }
+        }
+
+        // Priority 2: Fallback to currentPage.revision (for diff detection)
+        if (previousRevision == null && currentPage.revision != null) {
+          try {
+            previousRevision = await prisma.revisions.findUnique({
+              where: { id: currentPageRevisionId },
+            });
+          } catch (error) {
+            logger.error(
+              {
+                pageId: currentPage._id,
+                revisionId: currentPageRevisionId,
+                err: error,
+              },
+              'Failed to fetch previousRevision by currentPageRevisionId',
+            );
+          }
+        }
+
+        // There are cases where "revisionId" is not required for revision updates
+        // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
+        updatedPage = await crowi.pageService.updatePage(
+          currentPage,
+          body,
+          previousRevision?.body ?? null,
+          req.user,
+          options,
+        );
+      } catch (err) {
+        logger.error({ err }, 'Error occurred while updating a page.');
+        return res.apiv3Err(err);
+      }
+
+      const result = {
+        page: serializePageSecurely(updatedPage),
+        revision: serializeRevisionSecurely(updatedPage.revision),
+      };
+
+      // Generate the update activity BEFORE sending the response so the
+      // ActivityService listener captures the request context while it is
+      // still alive (see generateUpdateActivity's doc comment). This is
+      // awaited because the synchronous context `take()` happens inside the
+      // emit, and the emit must not be preceded by `res.apiv3()`.
+      await generateUpdateActivity(req, res, updatedPage);
+
+      res.apiv3(result, 201);
+
+      postAction(req, updatedPage, previousRevision);
+    },
+  ];
+};

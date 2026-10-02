@@ -1,0 +1,1 @@
+export { PlantUmlViewer } from './PlantUmlViewer';

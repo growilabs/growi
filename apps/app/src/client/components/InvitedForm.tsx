@@ -1,0 +1,178 @@
+import React, { type JSX, useCallback, useState } from 'react';
+import { useRouter } from 'next/router';
+import { LoadingSpinner } from '@growi/ui/dist/components';
+import { useTranslation } from 'next-i18next';
+import { useForm } from 'react-hook-form';
+
+import { apiv3Post } from '~/client/util/apiv3-client';
+import { useCurrentUser } from '~/states/global';
+
+type InvitedFormProps = {
+  invitedFormUsername: string;
+  invitedFormName: string;
+};
+
+type InvitedFormValues = {
+  name: string;
+  username: string;
+  password: string;
+};
+
+export const InvitedForm = (props: InvitedFormProps): JSX.Element => {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const user = useCurrentUser();
+  const [loginErrors, setLoginErrors] = useState<Error[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const { invitedFormUsername, invitedFormName } = props;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<InvitedFormValues>({
+    defaultValues: {
+      name: invitedFormName,
+      username: invitedFormUsername,
+    },
+  });
+
+  const submitHandler = useCallback(
+    async (values: InvitedFormValues) => {
+      setIsLoading(true);
+
+      const invitedForm = {
+        name: values.name,
+        username: values.username,
+        password: values.password,
+      };
+
+      try {
+        const res = await apiv3Post('/invited', { invitedForm });
+        const { redirectTo } = res.data;
+        router.push(redirectTo ?? '/');
+      } catch (err) {
+        setLoginErrors(err);
+        setIsLoading(false);
+      }
+    },
+    [router],
+  );
+
+  const formNotification = useCallback(() => {
+    return (
+      <>
+        {loginErrors != null && loginErrors.length > 0 ? (
+          <p className="alert alert-danger">
+            {loginErrors.map((err) => {
+              return (
+                <span key={err.message}>
+                  {t(err.message)}
+                  <br />
+                </span>
+              );
+            })}
+          </p>
+        ) : (
+          <p className="alert alert-success">
+            <strong>{t('invited.discription_heading')}</strong>
+            <br></br>
+            <small>{t('invited.discription')}</small>
+          </p>
+        )}
+      </>
+    );
+  }, [loginErrors, t]);
+
+  if (user == null) {
+    return <></>;
+  }
+
+  return (
+    <div className="nologin-dialog px-3 pb-3 mx-auto">
+      {formNotification()}
+      <form onSubmit={handleSubmit(submitHandler)}>
+        {/* Email Form */}
+        <div className="input-group">
+          <span className="input-group-text">
+            <span className="material-symbols-outlined">mail</span>
+          </span>
+          <input
+            type="text"
+            className="form-control"
+            disabled
+            placeholder={t('Email')}
+            name="invitedForm[email]"
+            defaultValue={user.email}
+            required
+          />
+        </div>
+        {/* UserID Form */}
+        <div className="input-group">
+          <span className="input-group-text">
+            <span className="material-symbols-outlined">person</span>
+          </span>
+          <input
+            type="text"
+            className="form-control"
+            placeholder={t('User ID')}
+            required
+            {...register('username', { required: true })}
+          />
+        </div>
+        {/* Name Form */}
+        <div className="input-group">
+          <span className="input-group-text">
+            <span className="material-symbols-outlined">sell</span>
+          </span>
+          <input
+            type="text"
+            className="form-control"
+            placeholder={t('Name')}
+            required
+            {...register('name', { required: true })}
+          />
+        </div>
+        {/* Password Form */}
+        <div className="input-group">
+          <span className="input-group-text">
+            <span className="material-symbols-outlined">lock</span>
+          </span>
+          <input
+            type="password"
+            className="form-control"
+            placeholder={t('Password')}
+            required
+            minLength={6}
+            {...register('password', { required: true, minLength: 6 })}
+          />
+        </div>
+        {/* Create Button */}
+        <div className="input-group justify-content-center d-flex mt-4">
+          <button
+            type="submit"
+            className="btn btn-fill"
+            id="register"
+            disabled={isLoading || isSubmitting}
+          >
+            <span className="btn-label">
+              {isLoading ? (
+                <LoadingSpinner />
+              ) : (
+                <span className="material-symbols-outlined">person_add</span>
+              )}
+            </span>
+            <span className="btn-label-text">{t('Create')}</span>
+          </button>
+        </div>
+      </form>
+      <div className="input-group mt-4 d-flex justify-content-center">
+        <a href="https://growi.org" className="link-growi-org">
+          <span className="growi">GROWI</span>
+          <span className="org">.ORG</span>
+        </a>
+      </div>
+    </div>
+  );
+};

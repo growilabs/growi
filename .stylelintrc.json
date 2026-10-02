@@ -1,15 +1,25 @@
 {
   "extends": [
+    "stylelint-config-recommended-scss",
     "stylelint-config-recess-order"
   ],
   "rules": {
-    "indentation": 2,
-    "string-quotes": "single",
+    "no-duplicate-selectors": null,
+    "scss/comment-no-empty": null,
+    "scss/at-extend-no-missing-placeholder": null,
     "rule-empty-line-before": [ "always-multi-line", {
       "except": ["after-single-line-comment", "first-nested"],
       "ignore": ["after-comment", "inside-block"]
     } ],
-    "selector-combinator-space-before": "always",
-    "selector-combinator-space-after": "always"
+    "color-function-notation": "legacy",
+    "selector-pseudo-class-no-unknown": [
+      true,
+      {
+        "ignorePseudoClasses": [
+          "global",
+          "local"
+        ]
+      }
+    ]
   }
 }

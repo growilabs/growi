@@ -1,25 +1,57 @@
 {
   "files.eol": "\n",
 
-  "eslint.workingDirectories": [{ "mode": "auto" }],
-
-  // use stylelint-plus
-  // see https://qiita.com/y-w/items/bd7f11013fe34b69f0df#vs-code%E3%81%A8%E7%B5%84%E3%81%BF%E5%90%88%E3%82%8F%E3%81%9B%E3%82%8B
-  "css.validate": false,
-  "scss.validate": false,
-  "[css]": {
-    "editor.formatOnSave": true
-  },
-  "[scss]": {
-    "editor.formatOnSave": true
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome"
   },
 
-  // for vscode-eslint
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+
   "[javascript]": {
-    "editor.formatOnSave": false
+    "editor.defaultFormatter": "biomejs.biome"
   },
+
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  },
+
+  // use vscode-stylelint
+  // see https://github.com/stylelint/vscode-stylelint
+  "stylelint.validate": ["css", "less", "scss"],
+  "stylelint.ignoreDisables": true,
+  "css.validate": false,
+  "less.validate": false,
+  "scss.validate": false,
+
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true,
-    "source.fixAll.markdownlint": true
-  }
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "explicit",
+    "source.fixAll.markdownlint": "explicit",
+    "source.fixAll.stylelint": "explicit"
+  },
+
+  "editor.formatOnSave": true,
+
+  "githubPullRequests.ignoredPullRequestBranches": [
+    "master"
+  ],
+
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.autoImportFileExcludePatterns": ["node_modules/*"],
+  "typescript.validate.enable": true,
+
+  "vitest.filesWatcherInclude": "**/*",
+  "git-worktree-menu.worktreeDir": "/workspace"
+
 }

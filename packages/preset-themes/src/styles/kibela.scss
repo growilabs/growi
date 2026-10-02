@@ -1,0 +1,30 @@
+@use 'sass:color';
+
+:root[data-bs-theme] {
+  @import '@growi/core-styles/scss/bootstrap/init-stage-1';
+  @import '@growi/core-styles/scss/bootstrap/theming/variables';
+  @import '@growi/core-styles/scss/bootstrap/theming/utils/color-palette';
+
+  $primary: #3780C0;
+  $highlight: #909090;
+
+  @include generate-color-palette('primary', $primary, black, #F5F5F5, 20%, 25%);
+  @include generate-color-palette('highlight', $highlight, black, white, 20%, 25%);
+
+  $body-color: $gray-700;
+  $body-bg: white;
+  $body-secondary-color: rgba($body-color, .75);
+  $body-secondary-bg: $gray-200;
+  $body-tertiary-color: rgba($body-color, .5);
+  $body-tertiary-bg: $gray-100;
+  $border-color: $gray-300;
+  $link-color: $gray-800;
+
+  @import 'bootstrap/scss/variables';
+  @import 'bootstrap/scss/variables-dark';
+  @import '@growi/core-styles/scss/bootstrap/init-stage-2';
+  @import '@growi/core-styles/scss/bootstrap/theming/apply-light';
+
+  --grw-wiki-link-color-rgb: var(--grw-primary-400-rgb);
+  --grw-wiki-link-hover-color-rgb: var(--grw-primary-500-rgb);
+}

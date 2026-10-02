@@ -1,0 +1,94 @@
+name: Release Subpackages
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - .changeset/**
+      - .github/workflows/release-subpackages.yml
+  workflow_run:
+    workflows: ["Node CI for app development"]
+    types:
+      - completed
+    branches:
+      - master
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-subpackages-snapshot:
+
+    if: "!startsWith(github.head_ref, 'changeset-release/')"
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
+
+    - name: Retrieve changesets information
+      id: changesets-status
+      run: |
+        pnpm changeset status --output status.json
+        # Gate on the number of packages that will actually be bumped, not on the number
+        # of changeset files. A changeset that only targets an ignored package produces
+        # no release, and snapshotting it would republish the versions currently in the
+        # tree under the 'next' dist-tag.
+        echo "RELEASES_LENGTH=$(jq -r '[.releases[] | select(.type != "none")] | length' status.json)" >> $GITHUB_OUTPUT
+        rm status.json
+
+    - name: Snapshot release to npm
+      if: steps.changesets-status.outputs.RELEASES_LENGTH > 0
+      run: |
+        pnpm run release-subpackages:snapshot
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+  release-subpackages:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
+
+    - name: Create Release Pull Request or Publish to npm
+      id: changesets
+      uses: changesets/action@v1
+      with:
+        title: Release Subpackages
+        version: pnpm run version-subpackages
+        publish: pnpm run release-subpackages
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

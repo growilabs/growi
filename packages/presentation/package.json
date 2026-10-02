@@ -1,0 +1,70 @@
+{
+  "name": "@growi/presentation",
+  "version": "1.0.0",
+  "description": "A package for GROWI presentation feature",
+  "license": "MIT",
+  "private": true,
+  "keywords": [
+    "growi",
+    "growi-plugin"
+  ],
+  "module": "dist/presentation.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    "./dist/client": {
+      "import": "./dist/client/index.js"
+    },
+    "./dist/client/services/sanitize-option": {
+      "import": "./dist/client/services/sanitize-option.js"
+    },
+    "./dist/services": {
+      "import": "./dist/services/index.js"
+    },
+    "./dist/style.css": {
+      "import": "./dist/style.css"
+    }
+  },
+  "scripts": {
+    "generate:marpit-base-css": "node scripts/extract-marpit-css.ts",
+    "build": "vite build",
+    "clean": "rimraf dist",
+    "dev": "vite build --mode dev",
+    "watch": "pnpm run dev -w --emptyOutDir=false",
+    "lint:biome": "biome check",
+    "lint:styles": "stylelint --allow-empty-input \"src/**/*.scss\" \"src/**/*.css\"",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "run-p lint:*",
+    "test": "vitest run"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "@marp-team/marp-core": "^3.9.1",
+    "@marp-team/marpit": "^2.6.1",
+    "@types/mdast": "^4.0.4",
+    "@types/reveal.js": "^4.4.1",
+    "@types/unist": "^3.0.3",
+    "hast-util-sanitize": "^5.0.1",
+    "hast-util-select": "^6.0.2",
+    "mdast-util-frontmatter": "^2.0.1",
+    "mdast-util-gfm": "^3.0.0",
+    "mdast-util-to-markdown": "^2.1.0",
+    "react-markdown": "^9.0.1",
+    "remark-frontmatter": "^5.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "reveal.js": "^4.4.0",
+    "unified": "^11.0.0",
+    "unist-util-find-after": "^5.0.0",
+    "unist-util-visit": "^5.0.0"
+  },
+  "peerDependencies": {
+    "next": "^16",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

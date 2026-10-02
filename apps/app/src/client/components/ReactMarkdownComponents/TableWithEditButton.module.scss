@@ -1,0 +1,31 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+/**
+ * for table with handsontable modal button
+ */
+.editable-with-handsontable {
+  position: relative;
+
+  :global(.handsontable-modal-trigger) {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    padding: 0;
+    font-size: 16px;
+    line-height: 1;
+    vertical-align: bottom;
+    background-color: transparent;
+    border: none;
+    opacity: 0;
+
+    @include bs.media-breakpoint-down(lg) {
+      opacity: 0.5;
+    }
+  }
+}
+
+.editable-with-handsontable:hover {
+  :global(.handsontable-modal-trigger) {
+    opacity: 1;
+  }
+}

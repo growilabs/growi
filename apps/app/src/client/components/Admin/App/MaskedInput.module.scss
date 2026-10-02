@@ -1,0 +1,14 @@
+/* stylelint-disable selector-class-pattern */
+
+.MaskedInput {
+  position: relative;
+  display: flex;
+}
+
+.PasswordReveal {
+  position: absolute;
+  top: 0;
+  right: 0.5rem;
+  left: auto;
+  font-size: 1.4rem;
+}

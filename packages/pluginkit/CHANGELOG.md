@@ -1,0 +1,103 @@
+# @growi/pluginkit
+
+## 1.2.8
+
+### Patch Changes
+
+- Updated dependencies [[`211f493`](https://github.com/growilabs/growi/commit/211f49330240ecac27442790416ab20e5ea4e2ab)]:
+  - @growi/core@3.0.0
+
+## 1.2.7
+
+### Patch Changes
+
+- Updated dependencies [[`659c93d`](https://github.com/growilabs/growi/commit/659c93d31d24fe90b0edc777c2e586f9efdd0195), [`e2375eb`](https://github.com/growilabs/growi/commit/e2375ebb787062ad20f4f982d94a2768fb9a3ec1)]:
+  - @growi/core@2.5.0
+
+## 1.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`5e8f105`](https://github.com/growilabs/growi/commit/5e8f1054c01771275682dcdbcb2fc3488e1c0be3)]:
+  - @growi/core@2.4.0
+
+## 1.2.5
+
+### Patch Changes
+
+- Updated dependencies [[`4a0bf1d`](https://github.com/growilabs/growi/commit/4a0bf1dac5954f9ae7756a574970a3968a4ae8b9)]:
+  - @growi/core@2.3.2
+
+## 1.2.4
+
+### Patch Changes
+
+- Updated dependencies [[`bd28252`](https://github.com/growilabs/growi/commit/bd28252c1a6e7f76f9bdadbdc3a07690f6bc0573)]:
+  - @growi/core@2.3.1
+
+## 1.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`3c50530`](https://github.com/growilabs/growi/commit/3c50530a105d85058076f31f1800c6304850f5d5)]:
+  - @growi/core@2.3.0
+
+## 1.2.2
+
+### Patch Changes
+
+- Updated dependencies [[`ef1c8b0`](https://github.com/growilabs/growi/commit/ef1c8b0e8b605c8c84c23e7650e02bd168817ff5)]:
+  - @growi/core@2.2.0
+
+## 1.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`cbadb43`](https://github.com/growilabs/growi/commit/cbadb436f12d683de6876510a629265b921ab112), [`36699d6`](https://github.com/growilabs/growi/commit/36699d62cf656ecf777022a0ee118372fac955fc)]:
+  - @growi/core@2.1.0
+
+## 1.2.0
+
+### Minor Changes
+
+- [`2948cf7`](https://github.com/growilabs/growi/commit/2948cf75ea36c6189deae9a41bdac5e56c8b66b4) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Update dependency to use workspace version
+
+### Patch Changes
+
+- Updated dependencies [[`22fae03`](https://github.com/growilabs/growi/commit/22fae03ce3bc7a530b0d7219c300f9c13f1d65c6), [`3de6953`](https://github.com/growilabs/growi/commit/3de6953c5cf049d8bb070f8cc8c59a85b160a6df), [`3de6953`](https://github.com/growilabs/growi/commit/3de6953c5cf049d8bb070f8cc8c59a85b160a6df)]:
+  - @growi/core@2.0.0
+
+## 1.1.1
+
+### Patch Changes
+
+- [#9812](https://github.com/growilabs/growi/pull/9812) [`fdde5ad`](https://github.com/growilabs/growi/commit/fdde5ad90f8324ae5fd6b3ca127b46f1dd8453e0) Thanks [@NaokiHigashi28](https://github.com/NaokiHigashi28)! - Fix growifacade typo
+
+## 1.1.0
+
+### Minor Changes
+
+- [#9775](https://github.com/growilabs/growi/pull/9775) [`6b9781d`](https://github.com/growilabs/growi/commit/6b9781d76b7037ae1f7cb69df3fa99b3b894c83e) Thanks [@NaokiHigashi28](https://github.com/NaokiHigashi28)! - feat: Add util function to get react instance of GROWI via GrowiFacade
+
+## 1.0.1
+
+### Patch Changes
+
+- [#8898](https://github.com/growilabs/growi/pull/8898) [`7a50227`](https://github.com/growilabs/growi/commit/7a502271b35bae4b419e54a08b2b00c7b140db46) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Update tsconfig.json module setting
+
+## 1.0.0
+
+### Major Changes
+
+- [#8844](https://github.com/growilabs/growi/pull/8844) [`37d88a8`](https://github.com/growilabs/growi/commit/37d88a858c3e54d741790760fbfad4fd7a229949) Thanks [@github-actions](https://github.com/apps/github-actions)! - The first major version release
+
+### Minor Changes
+
+- [#8856](https://github.com/growilabs/growi/pull/8856) [`47ce932`](https://github.com/growilabs/growi/commit/47ce932a066b8bdd16f600f2526d6f0d10b7b763) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add vaidator for GROWI theme plugins
+
+### Patch Changes
+
+- [#8854](https://github.com/growilabs/growi/pull/8854) [`eb29dc2`](https://github.com/growilabs/growi/commit/eb29dc2cf2895739778a315cb5883e95d736f823) Thanks [@yuki-takei](https://github.com/yuki-takei)! - support: Add test for pluginkit
+
+- Updated dependencies [[`37d88a8`](https://github.com/growilabs/growi/commit/37d88a858c3e54d741790760fbfad4fd7a229949), [`47ce932`](https://github.com/growilabs/growi/commit/47ce932a066b8bdd16f600f2526d6f0d10b7b763)]:
+  - @growi/core@1.0.0

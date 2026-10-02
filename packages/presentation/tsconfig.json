@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+
+    "paths": {},
+
+    /* TODO: remove below flags for strict checking */
+    "noImplicitAny": false
+  },
+  "include": ["src"]
+}

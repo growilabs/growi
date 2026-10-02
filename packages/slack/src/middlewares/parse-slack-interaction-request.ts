@@ -1,16 +1,23 @@
-import { Response, NextFunction } from 'express';
-import { InteractionPayloadAccessor } from '../utils/interaction-payload-accessor';
+import type { NextFunction, Response } from 'express';
 
-import { RequestFromSlack } from '../interfaces/request-from-slack';
+import type { RequestFromSlack } from '../interfaces/request-from-slack.js';
+import { InteractionPayloadAccessor } from '../utils/interaction-payload-accessor.js';
 
-export const parseSlackInteractionRequest = (req: RequestFromSlack, res: Response, next: NextFunction): Record<string, any> | void => {
+export const parseSlackInteractionRequest = (
+  req: RequestFromSlack,
+  _res: Response,
+  next: NextFunction,
+): void => {
   // There is no payload in the request from slack
   if (req.body.payload == null) {
-    return next();
+    next();
+    return;
   }
 
   req.interactionPayload = JSON.parse(req.body.payload);
-  req.interactionPayloadAccessor = new InteractionPayloadAccessor(req.interactionPayload);
+  req.interactionPayloadAccessor = new InteractionPayloadAccessor(
+    req.interactionPayload,
+  );
 
-  return next();
+  next();
 };

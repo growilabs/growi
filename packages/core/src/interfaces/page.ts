@@ -1,0 +1,221 @@
+import type { Ref } from './common.js';
+import type { HasObjectId } from './has-object-id.js';
+import type {
+  HasRevisionShortbody,
+  IRevision,
+  IRevisionHasId,
+} from './revision.js';
+import type { SubscriptionStatusType } from './subscription.js';
+import type { ITag } from './tag.js';
+import type { IUser, IUserGroup, IUserGroupHasId, IUserHasId } from './user.js';
+
+export const GroupType = {
+  userGroup: 'UserGroup',
+  externalUserGroup: 'ExternalUserGroup',
+} as const;
+export type GroupType = (typeof GroupType)[keyof typeof GroupType];
+
+export type IGrantedGroup = {
+  type: GroupType;
+  item: Ref<IUserGroup>;
+};
+
+export type IPage = {
+  path: string;
+  status: string;
+  revision?: Ref<IRevision>;
+  tags: Ref<ITag>[];
+  creator?: Ref<IUser>;
+  createdAt: Date;
+  updatedAt: Date;
+  seenUsers: Ref<IUser>[];
+  parent: Ref<IPage> | null;
+  descendantCount: number;
+  isEmpty: boolean;
+  grant: PageGrant;
+  grantedUsers: Ref<IUser>[];
+  grantedGroups: IGrantedGroup[];
+  lastUpdateUser?: Ref<IUser>;
+  liker: Ref<IUser>[];
+  commentCount: number;
+  slackChannels: string;
+  deleteUser: Ref<IUser>;
+  deletedAt: Date;
+  latestRevision?: Ref<IRevision>;
+  latestRevisionBodyLength?: number;
+  expandContentWidth?: boolean;
+  wip?: boolean;
+  wipExpiredAt?: Date;
+};
+
+export type IPagePopulatedToShowRevision = Omit<
+  IPageHasId,
+  | 'lastUpdateUser'
+  | 'creator'
+  | 'deleteUser'
+  | 'grantedGroups'
+  | 'revision'
+  | 'author'
+> & {
+  lastUpdateUser?: IUserHasId;
+  creator?: IUserHasId;
+  deleteUser: IUserHasId;
+  grantedGroups: { type: GroupType; item: IUserGroupHasId }[];
+  revision?: IRevisionHasId;
+  author: IUserHasId;
+};
+
+export const PageGrant = {
+  GRANT_PUBLIC: 1,
+  GRANT_RESTRICTED: 2,
+  GRANT_SPECIFIED: 3, // DEPRECATED
+  GRANT_OWNER: 4,
+  GRANT_USER_GROUP: 5,
+} as const;
+type UnionPageGrantKeys = keyof typeof PageGrant;
+export type PageGrant = (typeof PageGrant)[UnionPageGrantKeys];
+
+export const PageStatus = {
+  STATUS_PUBLISHED: 'published',
+  STATUS_DELETED: 'deleted',
+} as const;
+export type PageStatus = (typeof PageStatus)[keyof typeof PageStatus];
+
+export type IPageHasId = IPage & HasObjectId;
+
+// Special type to represent page is an empty page or not found or forbidden status
+export type IPageNotFoundInfo = {
+  isNotFound: true;
+  isForbidden: boolean;
+};
+
+export type IPageInfo = {
+  isNotFound: boolean;
+  isV5Compatible: boolean;
+  isEmpty: boolean;
+  isMovable: boolean;
+  isDeletable: boolean;
+  isAbleToDeleteCompletely: boolean;
+  isRevertible: boolean;
+  bookmarkCount: number;
+};
+
+export type IPageInfoForEmpty = Omit<IPageInfo, 'isNotFound' | 'isEmpty'> & {
+  emptyPageId: string;
+  isNotFound: false;
+  isEmpty: true;
+  isBookmarked?: boolean;
+};
+
+export type IPageInfoForEntity = Omit<IPageInfo, 'isNotFound' | 'isEmpty'> & {
+  isNotFound: false;
+  isEmpty: false;
+  sumOfLikers: number;
+  likerIds: string[];
+  sumOfSeenUsers: number;
+  seenUserIds: string[];
+  contentAge: number;
+  descendantCount: number;
+  commentCount: number;
+  latestRevisionId: Ref<IRevision>;
+};
+
+export type IPageInfoForOperation = IPageInfoForEntity & {
+  isBookmarked?: boolean;
+  isLiked?: boolean;
+  subscriptionStatus?: SubscriptionStatusType;
+};
+
+export type IPageInfoForListing = IPageInfoForEntity & HasRevisionShortbody;
+
+export type IPageInfoExt =
+  | IPageInfo
+  | IPageInfoForEmpty
+  | IPageInfoForEntity
+  | IPageInfoForOperation
+  | IPageInfoForListing;
+
+export const isIPageNotFoundInfo = (
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
+  pageInfo: any | undefined,
+): pageInfo is IPageNotFoundInfo => {
+  return (
+    pageInfo != null &&
+    pageInfo instanceof Object &&
+    pageInfo.isNotFound === true &&
+    'isForbidden' in pageInfo
+  );
+};
+
+export const isIPageInfo = (
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
+  pageInfo: any | undefined,
+): pageInfo is IPageInfo => {
+  return (
+    pageInfo != null && pageInfo instanceof Object && 'isEmpty' in pageInfo
+  );
+};
+
+export const isIPageInfoForEmpty = (
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
+  pageInfo: any | undefined,
+): pageInfo is IPageInfoForEmpty => {
+  return isIPageInfo(pageInfo) && pageInfo.isEmpty === true;
+};
+
+export const isIPageInfoForEntity = (
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
+  pageInfo: any | undefined,
+): pageInfo is IPageInfoForEntity => {
+  return isIPageInfo(pageInfo) && pageInfo.isEmpty === false;
+};
+
+export type IPageInfoBasicForEmpty = Omit<
+  IPageInfoForEmpty,
+  'bookmarkCount' | 'isDeletable' | 'isAbleToDeleteCompletely' | 'isBookmarked'
+>;
+
+export type IPageInfoBasicForEntity = Omit<
+  IPageInfoForEntity,
+  'bookmarkCount' | 'isDeletable' | 'isAbleToDeleteCompletely'
+>;
+
+export type IPageInfoBasic = IPageInfoBasicForEmpty | IPageInfoBasicForEntity;
+
+export const isIPageInfoForOperation = (
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
+  pageInfo: any | undefined,
+): pageInfo is IPageInfoForOperation => {
+  return (
+    isIPageInfoForEntity(pageInfo) &&
+    ('isBookmarked' in pageInfo ||
+      'isLiked' in pageInfo ||
+      'subscriptionStatus' in pageInfo)
+  );
+};
+
+export const isIPageInfoForListing = (
+  // biome-ignore lint/suspicious/noExplicitAny: ignore
+  pageInfo: any | undefined,
+): pageInfo is IPageInfoForListing => {
+  return isIPageInfoForEntity(pageInfo) && 'revisionShortBody' in pageInfo;
+};
+
+export type IDataWithMeta<D = unknown, M = unknown> = {
+  data: D;
+  meta?: M;
+};
+export type IDataWithRequiredMeta<D = unknown, M = unknown> = IDataWithMeta<
+  D,
+  M
+> & { meta: M };
+
+export type IPageWithMeta<M = IPageInfoExt> = IDataWithMeta<IPageHasId, M>;
+
+export type IPageToDeleteWithMeta<T = IPageInfoForEntity | unknown> =
+  IDataWithMeta<
+    HasObjectId & (IPage | { path: string; revision: string | null }),
+    T
+  >;
+export type IPageToRenameWithMeta<T = IPageInfoForEntity | unknown> =
+  IPageToDeleteWithMeta<T>;

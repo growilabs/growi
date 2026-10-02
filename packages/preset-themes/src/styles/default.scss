@@ -1,0 +1,63 @@
+@use 'sass:color';
+
+:root[data-bs-theme='light'] {
+  @import '@growi/core-styles/scss/bootstrap/init-stage-1';
+  @import '@growi/core-styles/scss/bootstrap/theming/variables';
+  @import '@growi/core-styles/scss/bootstrap/theming/utils/color-palette';
+
+  $primary: #007eb0;
+  $highlight: #c4c2bd;
+
+  @include generate-color-palette('primary', $primary, #000010, white, 22%, 22%);
+  @include generate-color-palette('highlight', $highlight);
+
+  $body-color: $gray-800;
+  $body-bg: white;
+  $body-secondary-color: rgba($body-color, .75);
+  $body-secondary-bg: $gray-200;
+  $body-tertiary-color: rgba($body-color, .5);
+  $body-tertiary-bg: $gray-100;
+  $border-color: var(--grw-highlight-200);
+  $link-color: #434240;
+
+  @import 'bootstrap/scss/variables';
+  @import 'bootstrap/scss/variables-dark';
+  @import '@growi/core-styles/scss/bootstrap/init-stage-2';
+  @import '@growi/core-styles/scss/bootstrap/theming/apply-light';
+
+  --grw-wiki-link-color-rgb: var(--grw-highlight-700-rgb);
+  --grw-wiki-link-hover-color-rgb: var(--grw-highlight-600-rgb);
+  --grw-sidebar-nav-btn-color: var(--grw-highlight-500);
+  --grw-sidebar-nav-btn-hover-color: var(--grw-highlight-800);
+}
+
+:root[data-bs-theme='dark'] {
+  @import '@growi/core-styles/scss/bootstrap/init-stage-1';
+  @import '@growi/core-styles/scss/bootstrap/theming/variables';
+  @import '@growi/core-styles/scss/bootstrap/theming/utils/color-palette';
+
+  $primary: #007eb0;
+  $highlight: #c4c2bd;
+
+  @include generate-color-palette('primary', $primary, #000010, white, 22%, 22%);
+  @include generate-color-palette('highlight', $highlight, black, white, 22%, 22%);
+
+  $body-color-dark: $gray-300;
+  $body-bg-dark: #1c1a1a;
+  $body-secondary-color-dark: rgba($body-color-dark, .75);
+  $body-secondary-bg-dark: $gray-800;
+  $body-tertiary-color-dark: rgba($body-color-dark, .5);
+  $body-tertiary-bg-dark: color.mix($gray-800, $gray-900, 50%);
+  $border-color-dark: var(--grw-highlight-800);
+  $link-color-dark: $gray-500;
+
+  @import 'bootstrap/scss/variables';
+  @import 'bootstrap/scss/variables-dark';
+  @import '@growi/core-styles/scss/bootstrap/init-stage-2';
+  @import '@growi/core-styles/scss/bootstrap/theming/apply-dark';
+
+  --grw-wiki-link-color-rgb: var(--grw-highlight-600-rgb);
+  --grw-wiki-link-hover-color-rgb: var(--grw-highlight-400-rgb);
+  --grw-sidebar-nav-btn-color: var(--grw-highlight-700);
+  --grw-sidebar-nav-btn-hover-color: var(--grw-highlight-500);
+}

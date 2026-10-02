@@ -1,0 +1,17 @@
+// refs: https://fastbootstrap.com/docs/rotate/
+$rotate-degrees: [0, 1, 2, 3, 6, 12, 45, 90, 180];
+
+.rotate-none {
+  transform: none;
+}
+
+@each $degree in $rotate-degrees {
+  .rotate-#{$degree} {
+    transform: rotate(#{$degree}deg);
+  }
+
+  // negative rotation
+  .-rotate-#{$degree} {
+    transform: rotate(-#{$degree}deg);
+  }
+}

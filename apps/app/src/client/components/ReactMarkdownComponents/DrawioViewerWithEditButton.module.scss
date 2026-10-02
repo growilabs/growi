@@ -1,0 +1,23 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.drawio-viewer-with-edit-button {
+  position: relative;
+
+  :global(.btn-edit-drawio) {
+    position: absolute;
+    top: 11px;
+    right: 10px;
+    z-index: 14;
+    opacity: 0;
+
+    @include bs.media-breakpoint-down(lg) {
+      opacity: 0.6;
+    }
+  }
+}
+
+.drawio-viewer-with-edit-button:hover {
+  :global(.btn-edit-drawio) {
+    opacity: 1;
+  }
+}

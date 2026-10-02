@@ -1,0 +1,46 @@
+.lsx {
+  // workaround
+  // https://stackoverflow.com/a/57667536
+  :global(.lsx-blink) {
+    animation: lsx-fade-in 1s ease 0s infinite alternate;
+  }
+
+  :global(.lsx-load-more-row) {
+    opacity: .5;
+
+    :global(.start-items-label) {
+      display: none;
+    }
+    :global(.btn-load-more) {
+      border-right-style: hidden;
+      border-bottom-style: hidden;
+      border-left-style: hidden;
+      border-radius: 0;
+    }
+  }
+  :global(.lsx-load-more-row:hover) {
+    opacity: 1;
+
+    :global(.start-items-label) {
+      display: inline;
+    }
+    :global(.btn-load-more) {
+      border-style: solid;
+    }
+  }
+
+  :global(.lsx-load-more-container) {
+    max-width: 250px;
+    border-top: 1px black;
+  }
+
+}
+
+@keyframes lsx-fade-in {
+  0% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 0.9;
+  }
+}

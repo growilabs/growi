@@ -1,5 +1,0 @@
-{{ username }} created a new page under {{ path }}.
-
-----------------------
-
-Growi: {{ appTitle }}

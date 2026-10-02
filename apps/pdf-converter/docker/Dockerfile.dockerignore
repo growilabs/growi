@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/coverage
+**/Dockerfile
+**/*.dockerignore
+**/.pnpm-store
+**/.turbo
+out
+apps/**
+!apps/pdf-converter

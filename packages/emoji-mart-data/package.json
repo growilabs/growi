@@ -1,0 +1,24 @@
+{
+  "name": "@growi/emoji-mart-data",
+  "version": "1.0.0",
+  "description": "Extracted emoji-mart native lookup data for GROWI",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node bin/extract.ts",
+    "dev": "node bin/extract.ts",
+    "lint": "biome check"
+  },
+  "devDependencies": {
+    "@emoji-mart/data": "^1.2.1"
+  }
+}

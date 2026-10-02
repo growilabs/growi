@@ -1,0 +1,27 @@
+{
+  "name": "@growi/preset-templates",
+  "version": "1.0.0",
+  "description": "GROWI preset templates",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "lint": "biome check"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@growi/pluginkit": "workspace:^"
+  },
+  "growiPlugin": {
+    "schemaVersion": "4",
+    "types": [
+      "template"
+    ],
+    "locales": [
+      "en_US",
+      "ja_JP",
+      "zh_CN"
+    ]
+  }
+}

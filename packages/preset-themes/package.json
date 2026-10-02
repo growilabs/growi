@@ -1,0 +1,51 @@
+{
+  "name": "@growi/preset-themes",
+  "version": "1.0.0",
+  "description": "GROWI preset themes",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist/libs/preset-themes.umd.cjs",
+  "module": "dist/libs/preset-themes.js",
+  "types": "dist/libs/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/libs/index.d.ts",
+      "import": "./dist/libs/preset-themes.js",
+      "require": "./dist/libs/preset-themes.umd.cjs"
+    },
+    "./dist/*": "./dist/*"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "run-p build:*",
+    "build:libs": "vite -c vite.libs.config.ts build",
+    "build:themes": "vite -c vite.themes.config.ts build",
+    "clean": "rimraf dist",
+    "dev": "run-p dev:*",
+    "dev:libs": "pnpm run build:libs --mode dev",
+    "dev:themes": "pnpm run build:themes --mode dev",
+    "watch": "run-p watch:*",
+    "watch:libs": "pnpm run dev:libs -w --emptyOutDir=false",
+    "watch:themes": "pnpm run dev:themes -w --emptyOutDir=false",
+    "lint:biome": "biome check",
+    "lint:styles": "stylelint \"src/**/*.scss\"",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "run-p lint:*",
+    "preview": "vite preview"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@growi/core": "workspace:^",
+    "@growi/core-styles": "workspace:^",
+    "bootstrap": "^5.3.8",
+    "sass": "^1.55.0"
+  },
+  "peerDependencies": {
+    "@popperjs/core": "^2.11.8",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

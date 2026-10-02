@@ -1,0 +1,53 @@
+@mixin expand-modal-fullscreen($hasModalHeader: true, $hasModalFooter: true, $margin: 1rem, $css-modules: false) {
+  // full-screen modal
+  width: auto;
+  max-width: unset !important;
+  height: calc(100vh - $margin * 2);
+  margin: $margin !important;
+
+  // Use :global() for CSS Modules to keep Bootstrap class names unhashed
+  @if $css-modules {
+    :global(.modal-content) {
+      height: calc(100vh - $margin * 2);
+    }
+  } @else {
+    .modal-content {
+      height: calc(100vh - $margin * 2);
+    }
+  }
+
+  // expand .modal-body (with calculating height)
+  $modal-header: 54px;
+  $modal-footer: 46px;
+  $margin-body: 0;
+
+  @if $hasModalHeader {
+    $margin-body: $margin-body + $modal-header;
+  }
+
+  @if $hasModalFooter {
+    $margin-body: $margin-body + $modal-footer;
+  }
+
+  @if $css-modules {
+    :global(.modal-body) {
+      height: calc(100% - #{$margin-body});
+      padding: $margin;
+    }
+  } @else {
+    .modal-body {
+      height: calc(100% - #{$margin-body});
+      padding: $margin;
+    }
+  }
+}
+
+// expanded window layout
+.modal-dialog.grw-modal-expanded {
+  @include expand-modal-fullscreen(true, true);
+}
+
+// expanded window layout without modal-header & modal-footer
+.modal-dialog.grw-body-only-modal-expanded {
+  @include expand-modal-fullscreen(false, false);
+}

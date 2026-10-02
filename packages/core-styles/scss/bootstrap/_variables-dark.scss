@@ -1,0 +1,14 @@
+@use 'sass:color';
+
+$success-text-emphasis-dark: color.mix(#fff, $success, 20%) !default;
+$info-text-emphasis-dark: color.mix(#fff, $info, 20%) !default;
+$warning-text-emphasis-dark: color.mix(#fff, $warning, 20%) !default;
+$danger-text-emphasis-dark: color.mix(#fff, $danger, 20%) !default;
+$success-bg-subtle-dark: color.mix($gray-900, $success, 85%) !default;
+$info-bg-subtle-dark: color.mix($gray-900, $info, 85%) !default;
+$warning-bg-subtle-dark: color.mix($gray-900, $warning, 85%) !default;
+$danger-bg-subtle-dark: color.mix($gray-900, $danger, 85%) !default;
+$success-border-subtle-dark: color.mix($gray-900, $success, 50%) !default;
+$info-border-subtle-dark: color.mix($gray-900, $info, 50%) !default;
+$warning-border-subtle-dark: color.mix($gray-900, $warning, 50%) !default;
+$danger-border-subtle-dark: color.mix($gray-900, $danger, 50%) !default;

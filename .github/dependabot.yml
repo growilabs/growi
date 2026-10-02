@@ -2,22 +2,31 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: '/'
+    open-pull-requests-limit: 3
     schedule:
-      interval: daily
+      interval: weekly
+      day: saturday
+    labels:
+      - "type/dependencies"
     commit-message:
       prefix: ci
       include: scope
 
   - package-ecosystem: npm
     directory: '/'
+    open-pull-requests-limit: 3
     schedule:
-      interval: daily
+      interval: weekly
+      day: saturday
+    labels:
+      - "type/dependencies"
     commit-message:
       prefix: ci
       include: scope
     ignore:
-      - dependency-name: escape-string-regexp
-      - dependency-name: string-width
       - dependency-name: "@handsontable/react"
       - dependency-name: handsontable
+      - dependency-name: typeorm
+      - dependency-name: mysql2
+      - dependency-name: "@codemirror/*"
 

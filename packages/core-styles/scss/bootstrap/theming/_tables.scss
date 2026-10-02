@@ -1,0 +1,5 @@
+@each $color, $value in $table-variants {
+  @if $color == 'primary' or $color == 'secondary' {
+    @include table-variant($color, $value);
+  }
+}

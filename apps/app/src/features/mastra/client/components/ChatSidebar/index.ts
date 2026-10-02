@@ -1,0 +1,1 @@
+export { ChatSidebarLazyLoaded } from './dynamic';

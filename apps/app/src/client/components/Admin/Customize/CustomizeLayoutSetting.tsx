@@ -1,0 +1,122 @@
+import React, { type JSX, useCallback, useEffect, useState } from 'react';
+import { LoadingSpinner } from '@growi/ui/dist/components';
+import { useTranslation } from 'next-i18next';
+
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useSWRxLayoutSetting } from '~/stores/admin/customize';
+import { useNextThemes } from '~/stores-universal/use-next-themes';
+
+const useIsContainerFluid = () => {
+  const { data: layoutSetting, update: updateLayoutSetting } =
+    useSWRxLayoutSetting();
+  const [isContainerFluid, setIsContainerFluid] = useState<boolean>();
+
+  useEffect(() => {
+    setIsContainerFluid(layoutSetting?.isContainerFluid);
+  }, [layoutSetting?.isContainerFluid]);
+
+  return {
+    isContainerFluid,
+    setIsContainerFluid,
+    updateLayoutSetting,
+  };
+};
+
+const CustomizeLayoutSetting = (): JSX.Element => {
+  const { t } = useTranslation('admin');
+
+  const { resolvedTheme } = useNextThemes();
+
+  const { isContainerFluid, setIsContainerFluid, updateLayoutSetting } =
+    useIsContainerFluid();
+
+  const onClickSubmit = useCallback(async () => {
+    if (isContainerFluid == null) {
+      return;
+    }
+    try {
+      await updateLayoutSetting({ isContainerFluid });
+      toastSuccess(
+        t('toaster.update_successed', {
+          target: t('customize_settings.layout'),
+          ns: 'commons',
+        }),
+      );
+    } catch (err) {
+      toastError(err);
+    }
+  }, [isContainerFluid, updateLayoutSetting, t]);
+
+  if (isContainerFluid == null) {
+    return (
+      <div className="text-muted text-center fs-3">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  return (
+    <div className="row">
+      <div className="col-12">
+        <h2 className="admin-setting-header">
+          {t('customize_settings.layout')}
+        </h2>
+
+        <div className="d-flex justify-content-around mt-5">
+          <div className="row row-cols-2">
+            <div className="col">
+              <button
+                type="button"
+                className={`card border border-4 ${!isContainerFluid ? 'border-primary' : ''}`}
+                onClick={() => setIsContainerFluid(false)}
+                aria-pressed={!isContainerFluid}
+              >
+                {/* biome-ignore lint/performance/noImgElement: Ignore for SVG */}
+                <img
+                  className="card-img-top"
+                  src={`/images/customize-settings/default-${resolvedTheme}.svg`}
+                  alt={t('customize_settings.layout_options.default')}
+                />
+                <div className="card-body text-center">
+                  {t('customize_settings.layout_options.default')}
+                </div>
+              </button>
+            </div>
+            <div className="col">
+              <button
+                type="button"
+                className={`card border border-4 ${isContainerFluid ? 'border-primary' : ''}`}
+                onClick={() => setIsContainerFluid(true)}
+                aria-pressed={isContainerFluid}
+              >
+                {/* biome-ignore lint/performance/noImgElement: Ignore for SVG */}
+                <img
+                  className="card-img-top"
+                  src={`/images/customize-settings/fluid-${resolvedTheme}.svg`}
+                  alt={t('customize_settings.layout_options.expanded')}
+                />
+                <div className="card-body text-center">
+                  {t('customize_settings.layout_options.expanded')}
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="row my-3">
+          <div className="mx-auto">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onClickSubmit}
+            >
+              {t('commons:Update')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CustomizeLayoutSetting;

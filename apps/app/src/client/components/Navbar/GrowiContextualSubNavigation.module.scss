@@ -1,0 +1,17 @@
+@use 'styles/mixins';
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.grw-min-height-sub-navigation {
+  min-height: 46px;
+}
+
+@include mixins.at-editing() {
+  .grw-contextual-sub-navigation {
+    position: fixed;
+    right: 0;
+
+    // unset colors
+    background-color: unset;
+    backdrop-filter: unset;
+  }
+}

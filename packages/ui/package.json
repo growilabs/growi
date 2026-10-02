@@ -1,23 +1,55 @@
 {
   "name": "@growi/ui",
-  "version": "4.5.3-RC.0",
+  "version": "1.0.0",
   "description": "GROWI UI Libraries",
   "license": "MIT",
+  "private": true,
   "keywords": [
     "growi"
   ],
-  "module": "dist/esm/index.js",
+  "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "scss"
   ],
+  "exports": {
+    "./dist/components": {
+      "import": "./dist/components/index.js"
+    },
+    "./dist/interfaces": {
+      "import": "./dist/interfaces/index.js"
+    },
+    "./dist/utils": {
+      "import": "./dist/utils/index.js"
+    },
+    "./dist/style": {
+      "style": "./dist/style.css",
+      "import": "./dist/style.css"
+    },
+    "./scss/*": "./scss/*.scss"
+  },
   "scripts": {
-    "lint:js": "eslint **/*.{js,jsx,ts,tsx}",
-    "lint:styles": "stylelint src/styles/scss/**/*.scss",
-    "lint": "npm-run-all -p lint:*",
-    "test": "jest --verbose"
+    "build": "vite build",
+    "clean": "rimraf dist",
+    "dev": "vite build --mode dev",
+    "watch": "pnpm run dev -w --emptyOutDir=false",
+    "lint:biome": "biome check",
+    "lint:styles": "stylelint \"./scss/**/*\"",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "npm-run-all -p lint:*"
   },
   "dependencies": {},
   "devDependencies": {
-    "react": "^16.8.3"
+    "@growi/core": "workspace:^",
+    "@growi/core-styles": "workspace:^",
+    "@types/react": "^18.2.14",
+    "@types/react-dom": "^18.2.6",
+    "date-fns": "^3.6.0",
+    "reactstrap": "^9.2.2"
+  },
+  "peerDependencies": {
+    "next": "^16",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   }
 }

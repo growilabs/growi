@@ -1,0 +1,33 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use '@growi/ui/scss/atoms/btn-muted';
+
+.copy-clipboard-dropdown-menu {
+    min-width: 310px;
+    max-width: 375px;
+
+    @include bs.media-breakpoint-up(md) {
+      max-width: 600px;
+    }
+
+    :global(.dropdown-header) {
+      margin-bottom: 0.5em;
+      font-size: 1.1em;
+    }
+
+    // unset active styles
+    :global(.dropdown-item:active) {
+      color: unset;
+      background-color: unset;
+    }
+
+    :global(.card) {
+      font-size: 0.7em;
+      word-break: break-all;
+    }
+  }
+
+.grw-copy-dropdown {
+  :global(.btn.btn-copy) {
+    @include btn-muted.colorize(bs.$gray-500);
+  }
+}

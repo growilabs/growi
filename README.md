@@ -2,12 +2,12 @@
 
 <p align="center">
   <a href="https://growi.org">
-    <img src="https://user-images.githubusercontent.com/1638767/38254268-d4476bbe-3793-11e8-964c-8865d690baff.png" width="240px">
+    <img src="https://github.com/user-attachments/assets/0acf1409-cea7-4f0e-841c-af5bd8be6711" width="360px">
   </a>
 </p>
 <p align="center">
-  <a href="https://github.com/weseek/growi/releases/latest"><img src="https://img.shields.io/github/release/weseek/growi.svg"></a>
-  <a href="https://growi-slackin.weseek.co.jp/"><img src="https://growi-slackin.weseek.co.jp/badge.svg"></a>
+  <a href="https://github.com/growilabs/growi/releases/latest"><img src="https://img.shields.io/github/release/growilabs/growi.svg" alt="Latest version"></a>
+  <a href="https://docs.growi.org/slack"><img src="https://img.shields.io/badge/Slack-Join%20Us-4A154B?style=flat&logo=slack&logoColor=white" alt="Slack - Join US"></a>
 </p>
 
 <p align="center">
@@ -16,14 +16,14 @@
 
 # GROWI
 
-[![Actions Status](https://github.com/weseek/growi/workflows/Node%20CI/badge.svg)](https://github.com/weseek/growi/actions)
-[![dependencies status](https://david-dm.org/weseek/growi.svg)](https://david-dm.org/weseek/growi)
-[![devDependencies Status](https://david-dm.org/weseek/growi/dev-status.svg)](https://david-dm.org/weseek/growi?type=dev)
-[![docker pulls](https://img.shields.io/docker/pulls/weseek/growi.svg)](https://hub.docker.com/r/weseek/growi/)
+[![docker pulls](https://img.shields.io/docker/pulls/growilabs/growi.svg)](https://hub.docker.com/r/growilabs/growi/)
+[![CodeQL](https://github.com/growilabs/growi/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/codeql-analysis.yml)
+[![Node CI for app development](https://github.com/growilabs/growi/actions/workflows/ci-app.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/ci-app.yml)
+[![Node CI for app production](https://github.com/growilabs/growi/actions/workflows/ci-app-prod.yml/badge.svg)](https://github.com/growilabs/growi/actions/workflows/ci-app-prod.yml)
 
-|                                                     demonstration                                                     |
-| :-------------------------------------------------------------------------------------------------------------------: |
-| ![sample image](https://user-images.githubusercontent.com/42988650/70600974-6b29cc80-1c34-11ea-94ef-33c39c6a00dc.gif) |
+## Demonstration
+<video src="https://private-user-images.githubusercontent.com/34241526/333079483-fee540d7-2fa6-46d7-833e-74014c5340e3.mp4?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTY0NDk2OTEsIm5iZiI6MTcxNjQ0OTM5MSwicGF0aCI6Ii8zNDI0MTUyNi8zMzMwNzk0ODMtZmVlNTQwZDctMmZhNi00NmQ3LTgzM2UtNzQwMTRjNTM0MGUzLm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDA1MjMlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQwNTIzVDA3Mjk1MVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTBkYWFkMmYyYmIwMTI2YWE3ZmQzZTFiNWU3ZThkMDc5NDA5N2Q3YWE5ZGM1NDgwNjk0OGNjYjZmOTJkM2IzZGQmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JmFjdG9yX2lkPTAma2V5X2lkPTAmcmVwb19pZD0wIn0.FAvLseWBzE62yFA7wt26uERamvEVQdIGRVdBwk0uLhE"></video>
+
 
 ## Table Of Contents
 
@@ -39,9 +39,8 @@
 # Features
 
 - **Features**
-  - Create hierarchical pages with markdown -> [HERE](https://docs.growi.org/en/guide/getting-started/five_minutes.html) is 5 minutes tutorial
-  - Simultaneously edit with multiple people by [HackMD(CodiMD)](https://hackmd.io/) integration
-    - [GROWI Docs: HackMD(CodiMD) Integration](https://docs.growi.org/en/admin-guide/admin-cookbook/integrate-with-hackmd.html)
+  - Create hierarchical pages with markdown -> [Try GROWI on the demo site](https://docs.growi.org/en/guide/getting-started/try_growi.html)
+  - Simultaneously edit with multiple people
   - Support Authentication with LDAP / Active Directory, OAuth
   - SSO(Single Sign On) with SAML
   - Slack/Mattermost, IFTTT Integration
@@ -82,28 +81,28 @@ See [GROWI Docs: Environment Variables](https://docs.growi.org/en/admin-guide/ad
 
 ## Dependencies
 
-- Node.js v12.x or v14.x
-- npm 6.x
-- yarn
-- MongoDB 4.x
+- Node.js v24.x
+- pnpm 10.x
+- [Turborepo](https://turbo.build/repo)
+- MongoDB v6.x or v8.x
 
 ### Optional Dependencies
 
 - Redis 3.x
-- ElasticSearch 6.x (needed when using Full-text search)
+- ElasticSearch 7.x or 8.x or 9.x (needed when using Full-text search)
   - **CAUTION: Following plugins are required**
     - [Japanese (kuromoji) Analysis plugin](https://www.elastic.co/guide/en/elasticsearch/plugins/current/analysis-kuromoji.html)
     - [ICU Analysis Plugin](https://www.elastic.co/guide/en/elasticsearch/plugins/current/analysis-icu.html)
 
 ## Command details
 
-| command           | desc                                                    |
-| ------------------| ------------------------------------------------------- |
-| `yarn app:build`  | Build GROWI app client                                  |
-| `yarn app:server` | Launch GROWI app server                                 |
-| `yarn start`      | Invoke `yarn app:build` and `yarn app:server`           |
+| command               | desc                                                    |
+| --------------------- | ------------------------------------------------------- |
+| `npm run app:build`   | Build GROWI app client                                  |
+| `npm run app:server`  | Launch GROWI app server                                 |
+| `npm run start`       | Invoke `npm run app:build` and `npm run app:server`     |
 
-For more info, see [GROWI Docs: List of npm Commands](https://docs.growi.org/en/dev/startup-v2/launch-system.html#list-of-npm-commands).
+For more info, see [GROWI Docs: List of npm Scripts](https://docs.growi.org/en/dev/startup-v5/start-development.html#list-of-npm-scripts).
 
 # Documentation
 
@@ -127,22 +126,27 @@ Repository. If you would like to _implement_ a new feature, firstly please submi
   It also allows us to coordinate better, prevent duplication of work and help you to create the change so it can be successfully accepted into the project.
 - **Small Features** can be created and directly [submitted as a Pull Request][pulls].
 
+## Translations
+
+Want to help translate GROWI into your language? No GitHub account is required.
+See [Contributing to GROWI translations](./docs/i18n-community-translation.md) for how to join and submit translations.
+
 ## Language on GitHub
 
 You can write issues and PRs in English or Japanese.
 
 ## Discussion
 
-If you have questions or suggestions, you can [join our Slack team](https://growi-slackin.weseek.co.jp/) and talk about anything, anytime.
+If you have questions or suggestions, you can [join our Slack team](https://docs.growi.org/slack) and talk about anything, anytime.
 
 # License
 
 - The MIT License (MIT)
-- See [LICENSE](https://github.com/weseek/growi/blob/master/LICENSE) and [THIRD-PARTY-NOTICES.md](https://github.com/weseek/growi/blob/master/THIRD-PARTY-NOTICES.md).
+- See [LICENSE](https://github.com/growilabs/growi/blob/master/LICENSE) and [THIRD-PARTY-NOTICES.md](https://github.com/growilabs/growi/blob/master/THIRD-PARTY-NOTICES.md).
 
 [crowi]: https://github.com/crowi/crowi
-[growi]: https://github.com/weseek/growi
-[issues]: https://github.com/weseek/growi/issues
-[pulls]: https://github.com/weseek/growi/pulls
-[dockerhub]: https://hub.docker.com/r/weseek/growi
-[docker-compose]: https://github.com/weseek/growi-docker-compose
+[growi]: https://github.com/growilabs/growi
+[issues]: https://github.com/growilabs/growi/issues
+[pulls]: https://github.com/growilabs/growi/pulls
+[dockerhub]: https://hub.docker.com/r/growilabs/growi
+[docker-compose]: https://github.com/growilabs/growi-docker-compose

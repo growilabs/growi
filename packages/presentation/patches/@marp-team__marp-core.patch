@@ -1,0 +1,19 @@
+diff --git a/package.json b/package.json
+index 13f1a01c4d20efdba0b0b20b47b470de52e3cfc5..6af7689cfa8bb5bbb439f38e011f6b0dfdf15748 100644
+--- a/package.json
++++ b/package.json
+@@ -25,6 +25,14 @@
+     "type": "git",
+     "url": "https://github.com/marp-team/marp-core"
+   },
++  "browser": {
++    "mathjax-full/js/adaptors/liteAdaptor": false,
++    "mathjax-full/js/handlers/html": false,
++    "mathjax-full/js/input/tex": false,
++    "mathjax-full/js/input/tex/AllPackages": false,
++    "mathjax-full/js/mathjax": false,
++    "mathjax-full/js/output/svg": false
++  },
+   "main": "lib/marp.js",
+   "types": "types/src/marp.d.ts",
+   "files": [

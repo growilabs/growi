@@ -1,0 +1,139 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+
+    "pre:styles-commons": {
+      "dependsOn": ["@growi/ui#build"],
+      "outputs": ["src/styles/prebuilt/**"],
+      "inputs": [
+        "vite.vendor-styles-commons.ts",
+        "src/styles/**/*.scss",
+        "../../packages/core/scss/**"
+      ],
+      "outputLogs": "new-only"
+    },
+    "pre:styles-components": {
+      "dependsOn": ["^build"],
+      "outputs": ["src/**/*.vendor-styles.prebuilt.*"],
+      "inputs": [
+        "vite.vendor-styles-components.ts",
+        "src/**/*.vendor-styles.ts",
+        "package.json"
+      ],
+      "outputLogs": "new-only"
+    },
+    "pre:styles-bulk-export": {
+      "outputs": [
+        "src/features/page-bulk-export/server/service/page-bulk-export-job-cron/markdown/styles/bulk-export.generated.ts"
+      ],
+      "inputs": [
+        "bin/build-bulk-export-css.ts",
+        "src/styles/**/*.scss",
+        "../../packages/core-styles/scss/**",
+        "package.json"
+      ],
+      "outputLogs": "new-only"
+    },
+    "prisma:generate": {
+      "outputs": ["src/generated/prisma/**"],
+      "inputs": ["prisma/schema.prisma"],
+      "outputLogs": "new-only"
+    },
+    "build": {
+      "dependsOn": ["^build", "pre:styles-commons", "pre:styles-components", "pre:styles-bulk-export", "prisma:generate"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "inputs": [
+        "next.config.ts",
+        "config/**",
+        "public/**",
+        "resource/**",
+        "src/**",
+        "tsconfig*.json"
+      ],
+      "outputLogs": "new-only"
+    },
+
+    "dev:migrate": {
+      "dependsOn": ["@growi/core#dev"],
+      "outputs": ["tmp/cache/migration-status.out"],
+      "inputs": ["src/migrations/*.js"],
+      "outputLogs": "new-only"
+    },
+    "dev:pre:styles-commons": {
+      "dependsOn": ["@growi/ui#dev"],
+      "outputs": ["src/styles/prebuilt/**"],
+      "inputs": [
+        "vite.vendor-styles-commons.ts",
+        "src/styles/**/*.scss",
+        "!src/styles/prebuilt/**",
+        "../../packages/core/scss/**"
+      ],
+      "outputLogs": "new-only"
+    },
+    "dev:pre:styles-components": {
+      "dependsOn": ["^dev"],
+      "outputs": ["src/**/*.vendor-styles.prebuilt.*"],
+      "inputs": [
+        "vite.vendor-styles-components.ts",
+        "src/**/*.vendor-styles.*",
+        "!src/**/*.vendor-styles.prebuilt.*",
+        "package.json"
+      ],
+      "outputLogs": "new-only"
+    },
+    "dev": {
+      "dependsOn": ["^dev", "dev:migrate", "dev:pre:styles-commons", "dev:pre:styles-components", "pre:styles-bulk-export"],
+      "cache": false,
+      "persistent": true
+    },
+
+    "launch-dev:ci": {
+      "dependsOn": ["^dev", "dev:migrate", "dev:pre:styles-commons", "dev:pre:styles-components", "pre:styles-bulk-export"],
+      "cache": false
+    },
+
+    "lint": {
+      "dependsOn": ["^dev", "dev:pre:styles-commons", "dev:pre:styles-components", "pre:styles-bulk-export"]
+    },
+
+    "test": {
+      "dependsOn": ["^dev", "@growi/vault-manager#build", "pre:styles-bulk-export", "dev:pre:styles-components"],
+      "outputLogs": "new-only"
+    },
+    "test:unit": {
+      "dependsOn": ["^dev", "pre:styles-bulk-export"],
+      "outputLogs": "new-only"
+    },
+    "test:integ": {
+      "dependsOn": ["^dev", "pre:styles-bulk-export"],
+      "outputLogs": "new-only"
+    },
+    "test:components": {
+      "dependsOn": ["^dev", "dev:pre:styles-commons", "dev:pre:styles-components", "pre:styles-bulk-export"],
+      "outputLogs": "new-only"
+    },
+
+    "version:patch": {
+      "cache": false,
+      "dependsOn": ["//#version:patch"]
+    },
+    "version:prerelease": {
+      "cache": false,
+      "dependsOn": ["//#version:prerelease"]
+    },
+    "version:prepatch": {
+      "cache": false,
+      "dependsOn": ["//#version:prepatch"]
+    },
+    "version:preminor": {
+      "cache": false,
+      "dependsOn": ["//#version:preminor"]
+    },
+    "version:premajor": {
+      "cache": false,
+      "dependsOn": ["//#version:premajor"]
+    }
+
+  }
+}

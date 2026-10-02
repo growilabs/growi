@@ -1,0 +1,28 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'styles/mixins';
+
+
+// for react-toastify
+.grw-basic-layout {
+  :global(.Toastify .Toastify__toast-container) {
+    top: 2.5em;
+
+    @include bs.media-breakpoint-down(md) {
+      top: 6.5em;
+    }
+  }
+}
+
+.grw-basic-layout {
+  @include mixins.with-editing() {
+    :global(.Toastify .Toastify__toast-container) {
+      top: 5em;
+
+      @include bs.media-breakpoint-down(md) {
+        top: 7em;
+      }
+    }
+  }
+}
+
+

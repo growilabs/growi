@@ -1,25 +1,91 @@
 {
   "name": "@growi/core",
-  "version": "4.5.3-RC.0",
+  "version": "3.0.0",
   "description": "GROWI Core Libraries",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/growilabs/growi"
+  },
   "keywords": [
     "growi"
   ],
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
   "files": [
     "dist"
   ],
-  "scripts": {
-    "build": "run-p build:*",
-    "build:cjs": "tsc -p tsconfig.build.cjs.json && tsc-alias -p tsconfig.build.cjs.json",
-    "build:esm": "tsc -p tsconfig.build.esm.json && tsc-alias -p tsconfig.build.esm.json",
-    "lint:js": "eslint **/*.{js,ts}",
-    "lint:styles": "stylelint src/styles/scss/**/*.scss",
-    "lint": "npm-run-all -p lint:*",
-    "test": "jest --verbose"
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./dist/consts": {
+      "import": "./dist/consts/index.js",
+      "require": "./dist/consts/index.cjs"
+    },
+    "./dist/interfaces": {
+      "import": "./dist/interfaces/index.js",
+      "require": "./dist/interfaces/index.cjs"
+    },
+    "./dist/interfaces/server": {
+      "import": "./dist/interfaces/server/index.js",
+      "require": "./dist/interfaces/server/index.cjs"
+    },
+    "./dist/interfaces/vault": {
+      "types": "./dist/interfaces/vault/index.d.ts",
+      "import": "./dist/interfaces/vault/index.js",
+      "require": "./dist/interfaces/vault/index.cjs"
+    },
+    "./dist/models": {
+      "import": "./dist/models/index.js",
+      "require": "./dist/models/index.cjs"
+    },
+    "./dist/models/serializers": {
+      "import": "./dist/models/serializers/index.js",
+      "require": "./dist/models/serializers/index.cjs"
+    },
+    "./dist/remark-plugins": {
+      "import": "./dist/remark-plugins/index.js",
+      "require": "./dist/remark-plugins/index.cjs"
+    },
+    "./dist/swr": {
+      "import": "./dist/swr/index.js",
+      "require": "./dist/swr/index.cjs"
+    },
+    "./dist/utils": {
+      "import": "./dist/utils/index.js",
+      "require": "./dist/utils/index.cjs"
+    },
+    "./dist/utils/page-path-utils": {
+      "import": "./dist/utils/page-path-utils/index.js",
+      "require": "./dist/utils/page-path-utils/index.cjs"
+    },
+    "./dist/utils/*": {
+      "import": "./dist/utils/*.js",
+      "require": "./dist/utils/*.cjs"
+    }
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "scripts": {
+    "build": "vite build",
+    "clean": "rimraf dist",
+    "dev": "vite build --mode dev",
+    "watch": "pnpm run dev -w --emptyOutDir=false",
+    "lint:biome": "biome check",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "npm-run-all -p lint:*",
+    "test": "vitest run --coverage"
+  },
+  "// comments for dependencies": {},
+  "dependencies": {
+    "bson-objectid": "^2.0.4"
+  },
+  "devDependencies": {
+    "@types/express": "^4",
+    "mongoose": "^6.13.9",
+    "socket.io-client": "^4.7.5",
+    "swr": "^2.2.2"
+  }
 }

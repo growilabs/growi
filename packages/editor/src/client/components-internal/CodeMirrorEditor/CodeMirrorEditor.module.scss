@@ -1,0 +1,164 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+
+.codemirror-editor-container {
+
+  :global(.cm-editor) {
+    width: 100%;
+    height: 100%;
+
+    :global(.cm-content) {
+      font-family: var(--grw-codemirror-editor-content-font-family, monospace);
+    }
+
+    // Header highlight style
+    :global(.cm-header) {
+      text-decoration: none;
+      &:first-of-type {
+        font-style: italic;
+        opacity: 0.5;
+      }
+    }
+
+    :global(.cm-header-1) {
+      font-size: 1.9em;
+    }
+    :global(.cm-header-2) {
+      font-size: 1.6em;
+    }
+    :global(.cm-header-3) {
+      font-size: 1.4em;
+    }
+    :global(.cm-header-4) {
+      font-size: 1.35em;
+    }
+    :global(.cm-header-5) {
+      font-size: 1.25em;
+    }
+    :global(.cm-header-6) {
+      font-size: 1.2em;
+    }
+
+  }
+
+}
+
+@mixin insertMaterialSymbolAndMessage($code, $message) {
+  .overlay-icon:before {
+    margin-right: 0.2em;
+    font-size:1.4em;
+    content: $code;
+  }
+  &:after {
+    content: $message;
+  }
+}
+
+.codemirror-editor {
+
+  // overlay in .codemirror-editor
+  :global(.overlay) {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 7; // forward than .CodeMirror-vscrollbar
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  // for Dropzone
+  :global(.dropzone) {
+    position: relative; // against .overlay position: absolute
+
+    :global(.overlay.overlay-dropzone-active) {
+      background: rgba(255, 255, 255, 0.5);
+      :global(.overlay-content) {
+        padding: 0.5em;
+        font-size: 2.5em;
+        color: bs.$gray-700;
+        background: rgba(200, 200, 200, 0.5);
+      }
+    }
+
+    // uploading
+    &:global(.dropzone-uploading) {
+      :global(.overlay.overlay-dropzone-active) {
+        :global(.overlay-content) {
+          @include insertMaterialSymbolAndMessage('upload_file', 'Uploading...');
+        }
+      }
+    }
+
+    // diabled
+    &:global(.dropzone-disabled) {
+      :global(.overlay.overlay-dropzone-active) {
+        :global(.overlay-content) {
+          @include insertMaterialSymbolAndMessage('error', 'File uploading is disabled');
+        }
+      }
+    }
+
+    // accepted
+    &:global(.dropzone-accepted) {
+      :global(.overlay.overlay-dropzone-active) {
+        // style
+        color: bs.$secondary;
+        background: rgba(200, 200, 200, 0.8);
+        border: 4px dashed bs.$gray-300;
+
+        :global(.overlay-content) {
+          @include insertMaterialSymbolAndMessage('cloud_upload', 'Drop here to upload');
+        }
+      }
+    }
+
+    // file type mismatch
+    &:global(.dropzone-mismatch-picture) {
+      :global(.overlay.overlay-dropzone-active) {
+        :global(.overlay-content) {
+          @include insertMaterialSymbolAndMessage('photo', 'Only an image file is allowed');
+        }
+      }
+    }
+
+    // rejected
+    &:global(.dropzone-rejected) {
+      :global(.overlay.overlay-dropzone-active) {
+        background: rgba(200, 200, 200, 0.8);
+
+        :global(.overlay-content) {
+          @include insertMaterialSymbolAndMessage('error', 'This file is not allowed');
+        }
+
+      }
+    }
+    /* end of.dropzone */
+  }
+
+  :global(.markdown-table-activated .cm-cursor) {
+    &:after {
+      position: relative;
+      top: 0em;
+      left: 0.3em;
+      display: block;
+      width: 1em;
+      height: 1em;
+      content: ' ';
+      background-repeat: no-repeat;
+      background-size: 1em;
+    }
+  }
+
+  :global(.markdown-table-activated .cm-cursor.cm-cursor-primary) {
+    &:after {
+      font-family: var(--grw-font-family-material-symbols-outlined);
+      font-size: 1.5em;
+      content: 'table_chart';
+      opacity: 0.7;
+      transform: translateY(-1.2em)
+    }
+  }
+}

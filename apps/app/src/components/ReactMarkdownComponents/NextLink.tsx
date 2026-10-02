@@ -1,0 +1,116 @@
+import type { AnchorHTMLAttributes, JSX } from 'react';
+import type { LinkProps } from 'next/link';
+import Link from 'next/link';
+
+import { useSiteUrl } from '~/states/global';
+// isNextPageRoute's Express-exclusive path list can drift from server/routes/index.js --
+// see the next-express-route-consistency skill (apps/app/.claude/skills).
+import { isNextPageRoute } from '~/utils/is-next-page-route';
+import loggerFactory from '~/utils/logger';
+
+const logger = loggerFactory('growi:components:NextLink');
+
+const hasAnchorLink = (href: string): boolean => {
+  return href.toString().length > 0 && href[0] === '#';
+};
+
+const isExternalLink = (href: string, siteUrl: string | undefined): boolean => {
+  try {
+    const baseUrl = new URL(siteUrl ?? 'https://example.com');
+    const hrefUrl = new URL(href, baseUrl);
+    return baseUrl.host !== hrefUrl.host;
+  } catch (err) {
+    logger.debug(err);
+    return false;
+  }
+};
+
+const isRoutableByNext = (href: string) => {
+  try {
+    const url = new URL(href, 'http://example.com');
+    // URL.pathname is percent-encoded, and '%' itself is one of the characters
+    // isNextPageRoute() treats as unsafe -- so every path holding a non-ASCII
+    // character or a space would be misjudged unless it is decoded back first.
+    // Same treatment as getServerSideCommonProps().
+    const pathName = decodeURIComponent(url.pathname);
+    return isNextPageRoute(pathName);
+  } catch (err) {
+    logger.debug(err);
+    return false;
+  }
+};
+
+type Props = AnchorHTMLAttributes<HTMLAnchorElement> &
+  Omit<LinkProps, 'href'> & {
+    children: React.ReactNode;
+    id?: string;
+    href?: string;
+    className?: string;
+  };
+
+export const NextLink = (props: Props): JSX.Element => {
+  const { id, href, children, className, target, onClick, ...rest } = props;
+
+  const siteUrl = useSiteUrl();
+
+  if (href == null) {
+    // biome-ignore lint/a11y/useValidAnchor: ignore
+    return <a className={className}>{children}</a>;
+  }
+
+  // extract 'data-*' props
+  const dataAttributes = Object.fromEntries(
+    Object.entries(rest).filter(([key]) => key.startsWith('data-')),
+  );
+
+  if (isExternalLink(href, siteUrl) || target === '_blank') {
+    return (
+      <a
+        id={id}
+        href={href}
+        className={className}
+        target="_blank"
+        onClick={onClick}
+        rel="noopener noreferrer"
+        {...dataAttributes}
+      >
+        {children}
+        {target === '_blank' && (
+          <span style={{ userSelect: 'none' }}>
+            &nbsp;
+            <span className="growi-custom-icons">external_link</span>
+          </span>
+        )}
+      </a>
+    );
+  }
+
+  // when href is an anchor link or not routable by Next's page router
+  if (hasAnchorLink(href) || !isRoutableByNext(href) || target != null) {
+    return (
+      <a
+        id={id}
+        href={href}
+        className={className}
+        target={target}
+        onClick={onClick}
+        {...dataAttributes}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <Link
+      {...rest}
+      id={id}
+      href={href}
+      prefetch={false}
+      className={className}
+      onClick={onClick}
+    >
+      {children}
+    </Link>
+  );
+};

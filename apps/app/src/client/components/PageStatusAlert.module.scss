@@ -1,0 +1,36 @@
+@use 'styles/variables' as var;
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.grw-page-status-alert {
+  $margin-bottom: var.$grw-navbar-bottom-height + 10px;
+
+  box-shadow: 0 2px 4px #0000004d;
+  opacity: 0.9;
+
+  @include bs.media-breakpoint-down(sm) {
+    margin: 0 10px $margin-bottom;
+
+    :global(.grw-card-label-container) {
+      text-align: center;
+    }
+    :global(.grw-card-btn-container) {
+      text-align: center;
+    }
+  }
+
+  @include bs.media-breakpoint-up(md) {
+    width: 700px;
+    margin: 0 auto $margin-bottom;
+
+    :global(.card-body) {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    :global(.grw-card-label-container),
+    :global(.grw-card-btn-container) {
+      margin: 0;
+    }
+  }
+}

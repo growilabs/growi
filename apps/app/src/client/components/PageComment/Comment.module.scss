@@ -1,0 +1,109 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'styles/variables' as var;
+@use './comment-inheritance';
+
+.comment-styles {
+
+  :global(.page-comment) {
+    position: relative;
+    pointer-events: none;
+    scroll-margin-top: var.$grw-scroll-margin-top-in-view;
+
+    // background
+    :global(.bg-comment) {
+      @extend %bg-comment;
+    }
+
+    // user icon
+    :global(.user-picture) {
+      @extend %user-picture;
+    }
+
+    // comment section
+    :global(.page-comment-main) {
+      @extend %comment-section;
+
+      pointer-events: auto;
+
+      // delete button
+      //
+      // 2026-09-11: no longer `position: absolute` -- `.page-comment-control`
+      // now renders in the header row's own normal flex flow (see
+      // Comment.tsx's `headerEnd`), matching InlineCommentItem's own
+      // icon-button placement, so it is no longer a direct child of
+      // `.page-comment-main` and the hover-reveal selector below is a
+      // descendant selector (not `>`), matching
+      // InlineCommentItem.module.scss's own `.icon-button-container` rule.
+      :global(.page-comment-control) {
+        visibility: hidden;
+      }
+
+      &:hover :global(.page-comment-control) {
+        visibility: visible;
+      }
+
+      // Scoped to this wrapper, not `.page-comment-revision` -- that class
+      // is also on the always-visible "posted X ago" link in CommentCard.tsx.
+      .icon-button-container {
+        visibility: hidden;
+      }
+
+      &:hover .icon-button-container {
+        visibility: visible;
+      }
+    }
+
+    // comment body
+    :global(.page-comment-body) {
+      word-wrap: break-word;
+      :global(.wiki) {
+        p {
+          margin: 8px 0;
+        }
+        blockquote {
+          margin: 24px 0 8px;
+          &:first-child {
+            margin-top: 0;
+          }
+        }
+      }
+    }
+
+    // older comments
+    // &.page-comment-older {
+    // }
+
+    // newer comments
+    &:global(.page-comment-newer) {
+      opacity: 0.7;
+
+      &:hover {
+        opacity: 1;
+      }
+    }
+
+    :global(.page-comment-meta) {
+      display: flex;
+      justify-content: flex-end;
+      font-size: 0.9em;
+      color: bs.$gray-400;
+    }
+
+    :global(.page-comment-revision) {
+      @extend %page-comment-revision;
+    }
+
+  }
+
+  // TODO: Refacotr Soft-coding
+  :global(.page-comment-comment-body-skeleton) {
+    position: relative;
+    height: 66px;
+    padding: 1em;
+    margin-left: 4.5em;
+
+    @include bs.media-breakpoint-down(xs) {
+      margin-left: 3.5em;
+    }
+  }
+}

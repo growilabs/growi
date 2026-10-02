@@ -1,0 +1,84 @@
+@use '@growi/ui/scss/molecules/page_list';
+
+$grw-sidebar-content-header-height: 58px;
+$grw-sidebar-content-footer-height: 50px;
+
+.user-page-footer {
+  :global(.grw-user-page-list-m) {
+    :global(.growi-custom-icons) {
+      font-size: 1.1em;
+    }
+    :global(.list-group) {
+      :global(.list-group-item) {
+        :global(.grw-visible-on-hover) {
+          display: none;
+        }
+
+        &:hover {
+          :global(.grw-visible-on-hover) {
+            display: block;
+          }
+        }
+
+        min-height: 40px;
+        border-radius: 0;
+
+        &:global(.grw-bookmark-item-list) {
+          :global(.user-picture) {
+            width: 16px;
+            height: 16px;
+            vertical-align: text-bottom;
+
+            &:global(.user-picture-md) {
+              width: 20px;
+              height: 20px;
+            }
+          }
+          :global(svg) {
+            width: 14px;
+            height: 14px;
+          }
+          :global(.grw-foldertree-control) {
+            margin-left: 1rem;
+          }
+        }
+      }
+    }
+
+    :global(.grw-foldertree-item-container) {
+      :global(input) {
+        max-width: 25%;
+      }
+    }
+    :global(.grw-foldertree-title-anchor) {
+      width: fit-content !important;
+      margin-right: 20px;
+    }
+    :global(.new-bookmark-folder) {
+      max-height: 30px;
+    }
+    :global(.grw-expand-compress-btn) {
+      max-height: 40px;
+    }
+    :global(.grw-folder-tree-container) {
+      :global(.grw-drop-item-area) {
+        padding: 1rem;
+        :global(.grw-accept-drop-item) {
+          padding: 0.5rem;
+          border-style: dashed;
+          border-width: 0.15rem;
+        }
+      }
+    }
+  }
+}
+
+.grw-bookarks-contents-compressed {
+  max-height: calc(70vh - ($grw-sidebar-content-header-height + $grw-sidebar-content-footer-height));
+  overflow-y: scroll;
+}
+
+.grw-bookarks-contents-expanded {
+  max-height: calc(100vh - ($grw-sidebar-content-header-height + $grw-sidebar-content-footer-height));
+  overflow-y: scroll;
+}

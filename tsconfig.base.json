@@ -1,7 +1,8 @@
 {
+  "$schema": "http://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    "target": "es2019",
-    "module": "commonjs",
+    "target": "ESNext",
+    "module": "ESNext",
     "allowJs": true,
     "skipLibCheck": true,
     "importHelpers": true,
@@ -12,19 +13,14 @@
     "lib": ["dom", "dom.iterable", "esnext"],
 
     /* Strict Type-Checking Options */
-    // "strict": true,
-    "strictNullChecks": true,
-    "noImplicitAny": false,
+    "strict": true,
 
     /* Additional Checks */
     "noUnusedLocals": false,
     "noUnusedParameters": false,
 
     /* Module Resolution Options */
-    "moduleResolution": "node",
-    "typeRoots": [
-      "./node_modules/@types"
-    ],
+    "moduleResolution": "Bundler",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
 
@@ -35,13 +31,8 @@
 
     /* Experimental Options */
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
+    "emitDecoratorMetadata": true
 
-    /* default path aliases */
-    "baseUrl": ".",
-    "paths": {
-      "@growi/*": ["packages/*/src"],
-    }
   },
   "exclude": [
     "node_modules",

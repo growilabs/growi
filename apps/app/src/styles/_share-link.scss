@@ -1,0 +1,7 @@
+@use './mixins';
+
+@include mixins.share-link {
+  .d-share-link-none {
+    display: none !important;
+  }
+}

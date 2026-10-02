@@ -1,0 +1,1 @@
+export { HandsontableModalLazyLoaded } from './dynamic';

@@ -1,10 +1,13 @@
 {
-  "extends": "./tsconfig.base.json",
+  "$schema": "http://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "types": ["vitest/globals"],
+
     "paths": {
-      "~/*": ["./src/*"],
-      "@growi/*": ["../*/src"]
+      "~/*": ["./src/*"]
     }
-  }
+  },
+  "include": ["src"]
 }

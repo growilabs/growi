@@ -5,42 +5,61 @@ on:
     branches-ignore:
       - release/**
       - rc/**
-      - chore/**
       - support/prepare-v**
+    paths:
+      - .github/mergify.yml
+      - .github/workflows/ci-slackbot-proxy.yml
+      - biome.json
+      - tsconfig.base.json
+      - turbo.json
+      - pnpm-lock.yaml
+      - package.json
+      - apps/slackbot-proxy/**
+      - '!apps/slackbot-proxy/docker/**'
+      - packages/slack/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 
 jobs:
 
-  test:
+  ci-slackbot-proxy-lint:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [24.x]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
-    - uses: actions/setup-node@v2
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'yarn'
-        cache-dependency-path: '**/yarn.lock'
+        cache: 'pnpm'
 
-    - name: lerna bootstrap
-      run: |
-        npx lerna bootstrap
-    - name: Print dependencies
-      run: |
-        echo -n "node " && node -v
-        echo -n "npm " && npm -v
-        yarn list --depth=0
+    - name: Restore dist
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          **/.turbo
+          **/dist
+        key: dist-slackbot-proxy-ci-${{ runner.OS }}-node${{ matrix.node-version }}-${{ hashFiles('node_modules/.cache/turbo/*-meta.json') }}
+        restore-keys: |
+          dist-slackbot-proxy-ci-${{ runner.OS }}-node${{ matrix.node-version }}-
 
-    - name: yarn lint
+    - name: Install dependencies
       run: |
-        yarn lerna run lint --scope @growi/slack --scope @growi/slackbot-proxy
-    - name: yarn test
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
+
+    - name: Lint
       run: |
-        yarn lerna run test --scope @growi/slack --scope @growi/slackbot-proxy
+        turbo run lint --filter=@growi/slackbot-proxy --filter=@growi/slack
 
     - name: Slack Notification
       uses: weseek/ghaction-slack-notification@master
@@ -52,13 +71,21 @@ jobs:
         isCompactMode: true
         url: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+    - name: Cache dist
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          **/.turbo
+          **/dist
+        key: dist-slackbot-proxy-ci-${{ runner.OS }}-node${{ matrix.node-version }}-${{ hashFiles('node_modules/.cache/turbo/*-meta.json') }}
 
-  launch-dev:
+
+  ci-slackbot-proxy-launch-dev:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [24.x]
 
     services:
       mysql:
@@ -71,28 +98,35 @@ jobs:
           MYSQL_DATABASE: growi-slackbot-proxy
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
-    - uses: actions/setup-node@v2
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'yarn'
-        cache-dependency-path: '**/yarn.lock'
+        cache: 'pnpm'
 
-    - name: lerna bootstrap
-      run: |
-        npx lerna bootstrap
-    - name: Print dependencies
-      run: |
-        echo -n "node " && node -v
-        echo -n "npm " && npm -v
-        yarn list --depth=0
+    - name: Restore dist
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          **/.turbo
+          **/dist
+        key: dist-slackbot-proxy-ci-${{ runner.OS }}-node${{ matrix.node-version }}-${{ hashFiles('node_modules/.cache/turbo/*-meta.json') }}
+        restore-keys: |
+          dist-slackbot-proxy-ci-${{ runner.OS }}-node${{ matrix.node-version }}-
 
-    - name: yarn dev:ci
-      working-directory: ./packages/slackbot-proxy
+    - name: Install dependencies
+      run: |
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
+
+    - name: turbo run dev:ci
+      working-directory: ./apps/slackbot-proxy
       run: |
         cp config/ci/.env.local.for-ci .env.development.local
-        yarn dev:ci
+        turbo run dev:ci --env-mode=loose
       env:
         SERVER_URI: http://localhost:8080
         TYPEORM_CONNECTION: mysql
@@ -112,13 +146,24 @@ jobs:
         isCompactMode: true
         url: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+    - name: Cache dist
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          **/.turbo
+          **/dist
+        key: dist-slackbot-proxy-ci-${{ runner.OS }}-node${{ matrix.node-version }}-${{ hashFiles('node_modules/.cache/turbo/*-meta.json') }}
 
-  launch-prod:
+
+  ci-slackbot-proxy-launch-prod:
+
+    if: startsWith(github.head_ref, 'mergify/merge-queue/')
+
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [24.x]
 
     services:
       mysql:
@@ -131,42 +176,49 @@ jobs:
           MYSQL_DATABASE: growi-slackbot-proxy
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
-    - uses: actions/setup-node@v2
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'yarn'
-        cache-dependency-path: '**/yarn.lock'
+        cache: 'pnpm'
 
-    - name: Remove unnecessary packages
-      working-directory: ./packages
+    - name: Install turbo
       run: |
-        ls | egrep -v '^(slack|slackbot-proxy)$' | xargs rm -r
-    - name: lerna bootstrap
+        pnpm add turbo --global
+
+    - name: Install dependencies
       run: |
-        npx lerna bootstrap
-    - name: Print dependencies
+        pnpm install --frozen-lockfile
+
+    - name: Restore dist
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          **/.turbo
+          **/dist
+        key: dist-slackbot-proxy-prod-${{ runner.OS }}-node${{ matrix.node-version }}-${{ hashFiles('node_modules/.cache/turbo/*-meta.json') }}
+        restore-keys: |
+          dist-slackbot-proxy-prod-${{ runner.OS }}-node${{ matrix.node-version }}-
+
+    - name: Build
+      working-directory: ./apps/slackbot-proxy
       run: |
-        echo -n "node " && node -v
-        echo -n "npm " && npm -v
-        yarn list --depth=0
-    - name: lerna run build
+        turbo run build
+
+    - name: Assembling all dependencies
       run: |
-        yarn lerna run build
-    - name: lerna bootstrap --production
-      run: |
-        npx lerna bootstrap -- --production
-    - name: Print dependencies
-      run: |
-        echo -n "node " && node -v
-        echo -n "npm " && npm -v
-        yarn list --production --depth=0
-    - name: yarn start:prod:ci
-      working-directory: ./packages/slackbot-proxy
+        rm -rf out
+        pnpm deploy out --prod --legacy --filter @growi/slackbot-proxy
+        rm -rf apps/slackbot-proxy/node_modules && mv out/node_modules apps/slackbot-proxy/node_modules
+
+    - name: pnpm run start:prod:ci
+      working-directory: ./apps/slackbot-proxy
       run: |
         cp config/ci/.env.local.for-ci .env.production.local
-        yarn start:prod:ci
+        pnpm run start:prod:ci
       env:
         SERVER_URI: http://localhost:8080
         TYPEORM_CONNECTION: mysql
@@ -185,3 +237,11 @@ jobs:
         channel: '#ci'
         isCompactMode: true
         url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Cache dist
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          **/.turbo
+          **/dist
+        key: dist-slackbot-proxy-prod-${{ runner.OS }}-node${{ matrix.node-version }}-${{ hashFiles('node_modules/.cache/turbo/*-meta.json') }}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["@growi/core#build", "@growi/emoji-mart-data#build"],
+      "outputs": ["dist/**"],
+      "outputLogs": "new-only"
+    },
+    "dev": {
+      "dependsOn": ["@growi/core#dev", "@growi/emoji-mart-data#build"],
+      "outputs": ["dist/**"],
+      "outputLogs": "new-only"
+    },
+    "lint": {
+      "dependsOn": ["@growi/core#dev", "@growi/emoji-mart-data#build"]
+    },
+    "serve": {
+      "dependsOn": ["@growi/core#dev"],
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "extends": "../../.stylelintrc.json",
+  "rules": {
+    "no-invalid-position-at-import-rule": null,
+    "no-duplicate-at-import-rules": null
+  }
+}

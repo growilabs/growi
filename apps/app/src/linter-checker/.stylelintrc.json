@@ -1,0 +1,6 @@
+{
+  "extends": "../../../../.stylelintrc.json",
+  "ignoreFiles": [
+    "./test.scss"
+  ]
+}

@@ -1,0 +1,378 @@
+import type {
+  ChangeStream,
+  ChangeStreamDocument,
+  ChangeStreamOptions,
+} from 'mongodb';
+import mongoose from 'mongoose';
+
+import type { ActivityDocument } from '~/server/models/activity';
+import { configManager } from '~/server/service/config-manager';
+import loggerFactory from '~/utils/logger';
+
+import type { AuditlogEsWriter } from '../interfaces/auditlog-es-writer';
+import { AuditlogEsSyncStatus } from '../models/auditlog-es-sync-status';
+import {
+  markUnsyncedAndAdvanceToken,
+  markUnsyncedAndClearToken,
+} from '../models/auditlog-es-sync-tx';
+import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
+
+const logger = loggerFactory('growi:service:auditlog-changestream');
+
+// Fixed key shared by every instance: all GROWI processes use the one resume-token doc.
+// Each process also runs its own consumer against this key, so events are written to ES
+// redundantly across instances; ES index/delete are idempotent (keyed on activity _id) and
+// the token store is last-writer-wins, so the duplication wastes work but never corrupts state.
+const STREAM_KEY = 'auditlogs';
+
+const CHANGE_STREAM_HISTORY_LOST_CODE = 286;
+
+const isChangeStreamHistoryLost = (err: unknown): boolean => {
+  if (!(err instanceof Error)) return false;
+  if ('code' in err && err.code === CHANGE_STREAM_HISTORY_LOST_CODE)
+    return true;
+  // Message text may change between server versions; fallback for errors that lack the code.
+  if (err.message.includes('Resume of change stream was not possible'))
+    return true;
+  return false;
+};
+
+export class AuditlogChangeStreamService {
+  // Backoff: 1,2,4,8,16,30,30s. Skip a repeatedly failing batch on its 8th failure (~91s total).
+  private static readonly MAX_CONSECUTIVE_EVENT_FAILURES = 8;
+  private static readonly RESTART_BASE_DELAY_MS = 1000;
+  private static readonly RESTART_MAX_DELAY_MS = 30000;
+  private static readonly BATCH_SIZE = 100;
+  private static readonly FLUSH_IDLE_MS = 200;
+
+  private readonly esWriter: AuditlogEsWriter;
+
+  private changeStream: ChangeStream<ActivityDocument> | null = null;
+
+  private buffer: ChangeStreamDocument<ActivityDocument>[] = [];
+
+  private stopped = false;
+
+  private restarting = false;
+
+  // Same-token failures, for poison pill detection. Not used for backoff.
+  private consecutiveEventFailures = 0;
+
+  // Restarts without forward progress, for backoff. Reset when the resume token advances.
+  private consecutiveRestarts = 0;
+
+  private lastFailingToken: unknown = null;
+
+  // True when a full auditlog reindex succeeded on this boot, so ES is complete as of startup.
+  private readonly didRebuildOnBoot: boolean;
+
+  // Guards the one-time sync-state reconciliation in start() so restarts don't repeat it.
+  private initialStartHandled = false;
+
+  constructor(esWriter: AuditlogEsWriter, didRebuildOnBoot = false) {
+    this.esWriter = esWriter;
+    this.didRebuildOnBoot = didRebuildOnBoot;
+  }
+
+  async start(): Promise<void> {
+    // close() is terminal: once stopped, the service never restarts.
+    // Resetting the flag here would let an in-flight restart() reopen the stream after shutdown.
+    if (this.stopped) return;
+
+    const auditLogEnabled = configManager.getConfig('app:auditLogEnabled');
+    if (!auditLogEnabled) {
+      logger.debug(
+        'AuditlogChangeStreamService not started: auditLogEnabled is false.',
+      );
+      return;
+    }
+
+    const Activity = mongoose.model<ActivityDocument>('Activity');
+
+    if (!this.initialStartHandled) {
+      await this.reconcileInitialSyncState(Activity);
+      if (this.stopped) return;
+      this.initialStartHandled = true;
+    }
+
+    const token = await ChangeStreamResumeToken.load(STREAM_KEY);
+    if (this.stopped) return;
+
+    const options: ChangeStreamOptions =
+      token != null ? { resumeAfter: token } : {};
+
+    // Requires an open Mongo connection (Crowi awaits setupDatabase() before
+    // SearchService.create()). A sync throw here means broken boot order, not a retryable error.
+    this.changeStream = Activity.watch<ActivityDocument>([], options);
+
+    void this.processChangeStream();
+
+    logger.info('AuditlogChangeStreamService started.');
+  }
+
+  // Retry the initial start like a runtime error, so a transient failure doesn't leave sync dead.
+  async startWithRetry(): Promise<void> {
+    try {
+      await this.start();
+    } catch (err) {
+      logger.error(
+        err,
+        'AuditlogChangeStreamService failed initial start; scheduling restart.',
+      );
+      void this.restart();
+    }
+  }
+
+  // Run once on the first start to settle the sync-status flag against the stream's start position.
+  private async reconcileInitialSyncState(
+    Activity: mongoose.Model<ActivityDocument>,
+  ): Promise<void> {
+    // A boot rebuild already wrote every existing activity to ES. Drop any stale resume token so
+    // the stream resumes from the current position instead of replaying from a token that may sit
+    // past a truncated oplog — replaying would raise HistoryLost and re-flag unsynced right after a
+    // clean rebuild. ES is complete as of now, so clear the flag.
+    if (this.didRebuildOnBoot) {
+      // Accepted gap: activities inserted between the rebuild snapshot and watch() below miss ES
+      // until the next reindex-on-boot; harmless since Mongo keeps the source of truth.
+      await ChangeStreamResumeToken.clear(STREAM_KEY);
+      await AuditlogEsSyncStatus.setUnsynced(false);
+      return;
+    }
+
+    // No rebuild and no resume token: the stream starts from "now", so any auditlog written before
+    // this point is absent from ES. Flag a rebuild when such a backlog exists (skip a fresh install
+    // with no activities, which needs no signal).
+    const token = await ChangeStreamResumeToken.load(STREAM_KEY);
+    if (token == null && (await Activity.exists({})) != null) {
+      await AuditlogEsSyncStatus.setUnsynced(true);
+    }
+  }
+
+  private startNext(
+    changeStream: ChangeStream<ActivityDocument>,
+  ): Promise<ChangeStreamDocument<ActivityDocument> | null> {
+    const pending = changeStream.next();
+    // Guard against unhandled rejection when the loop breaks and abandons this next().
+    pending.catch(() => {});
+    return pending;
+  }
+
+  private async processChangeStream(): Promise<void> {
+    const changeStream = this.changeStream;
+    if (changeStream == null) return;
+
+    try {
+      // Keep exactly one in-flight next() in `pending`. flushBuffer() is awaited inline so the
+      // loop applies natural backpressure and never runs concurrently with a flush.
+      let pending = this.startNext(changeStream);
+
+      while (!changeStream.closed) {
+        // biome-ignore lint/performance/noAwaitInLoops: change-stream consumption is inherently sequential (backpressure).
+        const { idle, event } = await this.nextOrIdle(pending);
+
+        if (idle) {
+          if (!(await this.flushBuffer())) break;
+          continue;
+        }
+        if (event == null) break; // stream ended
+
+        pending = this.startNext(changeStream);
+        this.buffer.push(event);
+        if (
+          this.buffer.length >= AuditlogChangeStreamService.BATCH_SIZE &&
+          !(await this.flushBuffer())
+        ) {
+          break;
+        }
+      }
+
+      // Drain events buffered when the stream ended before a size/idle flush.
+      // A no-op after an in-loop flush failure, which already emptied the buffer.
+      await this.flushBuffer();
+    } catch (err) {
+      if (isChangeStreamHistoryLost(err)) {
+        logger.warn(
+          'Change stream history lost (oplog truncated). Clearing resume token and restarting from current position.' +
+            ' Documents written during the gap are not in Elasticsearch; run reindex to restore consistency.',
+        );
+        try {
+          await markUnsyncedAndClearToken(STREAM_KEY);
+        } catch (txErr) {
+          // If this fails the stale token remains and restart would immediately hit HistoryLost
+          // again. Stop the service instead; admin must resolve the MongoDB issue and restart.
+          logger.error(
+            txErr,
+            'Failed to clear resume token + mark unsynced after history loss. Stopping service to prevent restart loop.',
+          );
+          this.stopped = true;
+        }
+      } else if (this.stopped) {
+        logger.debug('AuditlogChangeStreamService change stream closed.');
+      } else {
+        logger.error(err, 'AuditlogChangeStreamService change stream error.');
+      }
+    }
+
+    if (!this.stopped) {
+      await this.restart();
+    }
+  }
+
+  // Resolve with the next event, or { idle: true } if no event arrives within FLUSH_IDLE_MS
+  // while the buffer is non-empty. `pending` is never abandoned, so racing it here is lossless.
+  private async nextOrIdle(
+    pending: Promise<ChangeStreamDocument<ActivityDocument> | null>,
+  ): Promise<{
+    idle: boolean;
+    event: ChangeStreamDocument<ActivityDocument> | null;
+  }> {
+    if (this.buffer.length === 0) {
+      return { idle: false, event: await pending };
+    }
+    let timer: NodeJS.Timeout | undefined;
+    const idle = new Promise<'idle'>((resolve) => {
+      timer = setTimeout(
+        () => resolve('idle'),
+        AuditlogChangeStreamService.FLUSH_IDLE_MS,
+      );
+    });
+    try {
+      const result = await Promise.race([pending, idle]);
+      return result === 'idle'
+        ? { idle: true, event: null }
+        : { idle: false, event: result };
+    } finally {
+      if (timer != null) clearTimeout(timer);
+    }
+  }
+
+  // Send the buffered events as one ES bulk and persist the resume token at the batch
+  // boundary. Returns false when the batch failed (token not advanced) and the stream must
+  // restart to replay it; true when synced, poison-pill-skipped, or empty.
+  private async flushBuffer(): Promise<boolean> {
+    if (this.buffer.length === 0) return true;
+    const batch = this.buffer;
+    this.buffer = [];
+
+    const upserts: ActivityDocument[] = [];
+    const deleteIds: mongoose.Types.ObjectId[] = [];
+    for (const event of batch) {
+      // 'update' is ignored: ES holds only snapshot.username, fixed at creation.
+      // Index a mutable field in the auditlog mapping and 'update' must be handled too.
+      if (
+        event.operationType === 'insert' &&
+        'fullDocument' in event &&
+        event.fullDocument != null
+      ) {
+        upserts.push(event.fullDocument);
+      } else if (event.operationType === 'delete') {
+        deleteIds.push(event.documentKey._id);
+      }
+    }
+    // Counter keys on the head token, not the tail: a restart resumes just after the last
+    // committed event, so the head is stable across restarts while the tail drifts with batch size.
+    const firstToken = batch[0]._id;
+    const lastToken = batch[batch.length - 1]._id;
+
+    try {
+      await this.esWriter.bulkSyncAuditlogs(upserts, deleteIds);
+      this.consecutiveEventFailures = 0;
+      this.lastFailingToken = null;
+      this.consecutiveRestarts = 0;
+    } catch (err) {
+      // ResumeToken is `unknown`; JSON.stringify compares structurally without assertions.
+      // A false mismatch only resets the counter and delays the poison-pill skip.
+      if (
+        JSON.stringify(firstToken) !== JSON.stringify(this.lastFailingToken)
+      ) {
+        this.consecutiveEventFailures = 0;
+      }
+      this.consecutiveEventFailures++;
+
+      if (
+        this.consecutiveEventFailures >=
+        AuditlogChangeStreamService.MAX_CONSECUTIVE_EVENT_FAILURES
+      ) {
+        logger.error(
+          { token: lastToken, batchSize: batch.length, err },
+          'Skipping poison pill batch after consecutive failures.',
+        );
+        // On failure, return false instead of skipping: the batch replays on restart, so a
+        // gap is never left with the flag unset.
+        try {
+          await markUnsyncedAndAdvanceToken(STREAM_KEY, lastToken);
+        } catch (txErr) {
+          logger.error(
+            txErr,
+            'Failed to mark unsynced + advance token past poison pill batch; will retry on restart.',
+          );
+          return false;
+        }
+        this.consecutiveEventFailures = 0;
+        this.lastFailingToken = null;
+        this.consecutiveRestarts = 0;
+        return true;
+      }
+
+      this.lastFailingToken = firstToken;
+      logger.error(
+        { err },
+        'AuditlogChangeStreamService batch handling failed.',
+      );
+      return false;
+    }
+
+    // Persist token at the batch boundary (not per event). Replay window: a crash before
+    // this persists replays the batch on restart; ES index/delete are idempotent, so
+    // reprocessing is safe (at-least-once).
+    try {
+      await ChangeStreamResumeToken.upsert(STREAM_KEY, lastToken);
+    } catch (tokenErr) {
+      logger.error(
+        tokenErr,
+        'Failed to persist resume token; batch will be reprocessed on restart.',
+      );
+    }
+    return true;
+  }
+
+  private async restart(): Promise<void> {
+    if (this.stopped || this.restarting) return;
+    this.restarting = true;
+    let startFailed = false;
+    try {
+      this.consecutiveRestarts++;
+      const delay = Math.min(
+        AuditlogChangeStreamService.RESTART_BASE_DELAY_MS *
+          2 ** (this.consecutiveRestarts - 1),
+        AuditlogChangeStreamService.RESTART_MAX_DELAY_MS,
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+
+      if (this.stopped) return;
+      await this.closeStream();
+      await this.start();
+    } catch (err) {
+      logger.error(err, 'AuditlogChangeStreamService failed to restart.');
+      startFailed = true;
+    } finally {
+      this.restarting = false;
+    }
+    // restarting is cleared in finally above; placing this inside catch would block on the guard
+    if (!this.stopped && startFailed) {
+      void this.restart();
+    }
+  }
+
+  async close(): Promise<void> {
+    this.stopped = true;
+    await this.closeStream();
+  }
+
+  private async closeStream(): Promise<void> {
+    if (this.changeStream != null) {
+      await this.changeStream.close();
+      this.changeStream = null;
+    }
+  }
+}

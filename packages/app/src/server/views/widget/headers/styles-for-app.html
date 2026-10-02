@@ -1,8 +1,0 @@
-{% if env === 'development' %}
-  <script src="{{ webpack_asset('styles/style-commons.js') }}"></script>
-  <script src="{{ webpack_asset('styles/style-app.js') }}"></script>
-{% else %}
-  <script src="{{ webpack_asset('styles/style-commons.js') }}"></script>
-  <link rel="stylesheet" href="{{ webpack_asset('styles/style-commons.css') }}">
-  <link rel="stylesheet" href="{{ webpack_asset('styles/style-app.css') }}">
-{% endif %}

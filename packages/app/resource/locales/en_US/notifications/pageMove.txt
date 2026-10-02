@@ -1,5 +1,0 @@
-{{ username }} renamed the page {{ oldPath }} to {{ newPath }}.
-
-----------------------
-
-Growi: {{ appTitle }}

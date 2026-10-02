@@ -1,0 +1,61 @@
+{
+  "name": "@growi/remark-lsx",
+  "version": "1.0.0",
+  "description": "Remark plugin to list pages",
+  "license": "MIT",
+  "private": true,
+  "keywords": [
+    "growi",
+    "growi-plugin"
+  ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "run-p build:*",
+    "build:client": "vite build -c vite.client.config.ts",
+    "build:server": "vite build -c vite.server.config.ts",
+    "clean": "rimraf dist",
+    "dev": "run-p dev:*",
+    "dev:client": "vite build -c vite.client.config.ts --mode dev",
+    "dev:server": "vite build -c vite.server.config.ts --mode dev",
+    "watch": "run-p watch:*",
+    "watch:client": "pnpm run dev:client -w --emptyOutDir=false",
+    "watch:server": "pnpm run dev:server -w --emptyOutDir=false",
+    "lint:biome": "biome check",
+    "lint:styles": "stylelint --allow-empty-input \"src/**/*.scss\" \"src/**/*.css\"",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "run-p lint:*",
+    "test": "vitest run --coverage"
+  },
+  "// comments for dependencies": {},
+  "dependencies": {
+    "@growi/core": "workspace:^",
+    "@growi/logger": "workspace:^",
+    "@growi/remark-growi-directive": "workspace:^",
+    "@growi/ui": "workspace:^",
+    "express": "^4.20.0",
+    "express-validator": "^6.14.0",
+    "http-errors": "^2.0.0",
+    "mongoose": "^6.13.9",
+    "swr": "^2.3.2",
+    "xss": "^1.0.15"
+  },
+  "devDependencies": {
+    "@types/express": "^4",
+    "@types/hast": "^3.0.4",
+    "axios": "^1.16.0",
+    "hast-util-sanitize": "^5.0.1",
+    "hast-util-select": "^6.0.2",
+    "is-absolute-url": "^4.0.1",
+    "jsdom": "^26.1.0",
+    "unified": "^11.0.0",
+    "unist-util-visit": "^5.0.0"
+  },
+  "peerDependencies": {
+    "next": "^16",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

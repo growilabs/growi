@@ -1,0 +1,9 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.grw-sidebar-mode-icon {
+  display: flex;
+  align-items: center;
+  width: 20px;
+  height: 20px;
+  color: bs.$secondary;
+}

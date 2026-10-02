@@ -1,0 +1,18 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'sass:map';
+
+.layoutTabContainer {
+  min-width: map.get(bs.$grid-breakpoints, 'sm');
+}
+
+.checkboxMock {
+  width: bs.$form-check-input-width;
+  height: bs.$form-check-input-width;
+}
+
+.tableContainer {
+  width: fit-content;
+  table {
+    min-width: map.get(bs.$grid-breakpoints, 'sm');
+  }
+}

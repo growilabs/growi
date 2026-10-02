@@ -1,6 +1,6 @@
 export type GrowiCommand = {
-  text: string,
-  responseUrl: string,
-  growiCommandType: string,
-  growiCommandArgs: string[],
+  text: string;
+  responseUrl: string;
+  growiCommandType: string;
+  growiCommandArgs: string[];
 };

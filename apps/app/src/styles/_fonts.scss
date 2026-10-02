@@ -1,0 +1,32 @@
+:root {
+  --font-family-sans-serif: var(--grw-font-family-lato), -apple-system, blinkmacsystemfont, 'Hiragino Kaku Gothic ProN', meiryo, sans-serif;
+  --font-family-serif: georgia, 'Times New Roman', times, serif;
+  --font-family-monospace: Menlo, Consolas, DejaVu Sans Mono, var(--grw-font-family-source-han-code-jp-subset-main), var(--grw-font-family-source-han-code-jp-subset-jis2), monospace;
+}
+
+.material-symbols-outlined {
+  display: inline-block;
+  font-family: var(--grw-font-family-material-symbols-outlined);
+  font-size: 1.5em;  /* Preferred icon size */
+  font-style: normal;
+  font-weight: normal;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  vertical-align: bottom;
+  direction: ltr;
+
+  &.fill {
+    font-variation-settings: 'FILL' 1;
+  }
+}
+
+.growi-custom-icons {
+  font-family: var(--grw-font-family-custom-icon);
+  font-size: 0.8em;
+  font-style: normal;
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+}
