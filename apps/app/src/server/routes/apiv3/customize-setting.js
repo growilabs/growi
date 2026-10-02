@@ -11,9 +11,9 @@ import { AttachmentType } from '~/server/interfaces/attachment';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { Attachment } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -1217,8 +1217,8 @@ export const setup = (crowi) => {
       }
 
       // Check if previous attachment exists and remove it
-      const attachments = await Attachment.find({
-        attachmentType: AttachmentType.BRAND_LOGO,
+      const attachments = await prisma.attachments.findMany({
+        where: { attachmentType: AttachmentType.BRAND_LOGO },
       });
       if (attachments != null) {
         await attachmentService.removeAllAttachments(attachments);
@@ -1238,8 +1238,13 @@ export const setup = (crowi) => {
           new ErrorV3(err.message, 'upload-brand-logo-failed'),
         );
       }
-      attachment.toObject({ virtuals: true });
-      return res.apiv3({ attachment });
+      return res.apiv3({
+        attachment: {
+          ...attachment,
+          creator: attachment.creatorId,
+          page: attachment.pageId,
+        },
+      });
     },
   );
 
@@ -1267,8 +1272,8 @@ export const setup = (crowi) => {
     loginRequiredStrictly,
     adminRequired,
     async (req, res) => {
-      const attachments = await Attachment.find({
-        attachmentType: AttachmentType.BRAND_LOGO,
+      const attachments = await prisma.attachments.findMany({
+        where: { attachmentType: AttachmentType.BRAND_LOGO },
       });
 
       if (attachments == null) {

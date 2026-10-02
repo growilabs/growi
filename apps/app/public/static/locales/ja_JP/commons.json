@@ -150,7 +150,7 @@
     "publish_transfer_key": "移行キーを発行する",
     "transfer_key_limit": "※ 移行キーの有効期限は発行から1時間となります。",
     "once_transfer_key_used": "※ 移行キーは一度移行に利用するとそれ以降はご利用いただけなくなります。",
-    "transfer_to_growi_cloud": "※ 詳しくは <a href='{{documentationUrl}}ja/admin-guide/management-cookbook/g2g-transfer.html'> GROWI お引越し機能</a>をご確認ください。"
+    "transfer_to_growi_cloud": "※ 詳しくは <a href='{{documentationUrl}}/ja/admin-guide/management-cookbook/g2g-transfer.html'> GROWI お引越し機能</a>をご確認ください。"
   },
   "accesstoken_scopes_desc": {
     "read": {
