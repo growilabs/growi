@@ -255,7 +255,12 @@ describe('receive route POST / — the replace procedure around the import', () 
 
     const leftovers = await fs.readdir(importsDir);
     await Promise.all(
-      leftovers.map((fileName) => fs.rm(path.join(importsDir, fileName))),
+      // `force`: the route deletes the received archive in its own `finally` *after*
+      // the response is sent, so this cleanup can race it and lstat a file that is
+      // already gone (ENOENT) — see growilabs/growi#11819.
+      leftovers.map((fileName) =>
+        fs.rm(path.join(importsDir, fileName), { force: true }),
+      ),
     );
   };
 

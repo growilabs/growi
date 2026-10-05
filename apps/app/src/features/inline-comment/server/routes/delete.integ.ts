@@ -224,6 +224,11 @@ describe('DELETE /_api/v3/inline-comments/:id', () => {
 
   it('deletes the origin comment and cascades to its replies (200)', async () => {
     const { originId, replyId } = await createOriginWithReply();
+    // A stale stored value, so only the post-write refresh can make it match.
+    await crowi.models.Page.updateOne(
+      { _id: publicPage._id },
+      { commentCount: 999 },
+    );
 
     const res = await request(app).delete(
       `/_api/v3/inline-comments/${originId}`,
@@ -243,5 +248,13 @@ describe('DELETE /_api/v3/inline-comments/:id', () => {
     });
     expect(originRow).toBeNull();
     expect(replyRow).toBeNull();
+
+    const total = await prisma.comments.count({
+      where: { pageId: String(publicPage._id) },
+    });
+    const stored = await crowi.models.Page.findById(publicPage._id).select(
+      'commentCount',
+    );
+    expect(stored?.commentCount).toBe(total);
   });
 });

@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { SYNC_TARGETS } from './sync-config';
+import { SHARED_POEDITOR_PROJECT_ID, SYNC_TARGETS } from './sync-config';
 
 // Resolve locale files relative to this spec file (apps/app/tools/i18n-sync/)
 // rather than process.cwd(), so the test is stable regardless of the
@@ -37,9 +37,13 @@ describe('SYNC_TARGETS', () => {
     }
   });
 
-  it('gives each declared namespace a non-empty POEditor project ID placeholder', () => {
+  it('declares a single non-empty shared POEditor project ID placeholder', () => {
+    expect(SHARED_POEDITOR_PROJECT_ID.length).toBeGreaterThan(0);
+  });
+
+  it('does not carry a per-namespace poeditorProjectId field on any entry', () => {
     for (const entry of SYNC_TARGETS) {
-      expect(entry.poeditorProjectId.length).toBeGreaterThan(0);
+      expect(entry).not.toHaveProperty('poeditorProjectId');
     }
   });
 });

@@ -97,10 +97,10 @@ export const InlineCommentPreviewPopover: FC<
   const currentUser = useCurrentUser();
   const isOwnComment = currentUser?._id === comment.creatorId;
 
-  // `comment.replies` arrives in the server's `createdAt: 'desc'` fetch order
-  // (newest first) -- InlineCommentService.listByPageId() never reorders for
-  // display. Reversed here to oldest-first (newest at the bottom), matching
-  // both InlineCommentReplies.tsx's own `repliesFromOldest` and a normal
+  // `comment.replies` arrives in the order GET /comments returns them
+  // (newest first), which groupInlineComments keeps as-is. Reversed here to
+  // oldest-first (newest at the bottom), matching both
+  // InlineCommentReplies.tsx's own `repliesFromOldest` and a normal
   // comment thread's reading order (2026-09-11, user report: replies were
   // rendering newest-first, oldest-last).
   const repliesFromOldest = useMemo(
@@ -332,7 +332,7 @@ export const InlineCommentPreviewPopover: FC<
             like the list view's reply toggle -- it's always shown -- so the
             whole form is wrapped, not just the send button. */}
         <NotAvailableIfReadOnlyUserNotAllowedToComment>
-          <div className="inline-comment-preview-popover-reply-form d-flex align-items-start border border-primary-subtle rounded p-2 gap-2">
+          <div className="inline-comment-preview-popover-reply-form d-flex align-items-start border border-primary-subtle rounded mt-3 p-2 gap-2">
             <UserPicture user={currentUser} className="ms-2" noLink noTooltip />
             <MentionAwareCommentInput
               editorKey={replyEditorKey}

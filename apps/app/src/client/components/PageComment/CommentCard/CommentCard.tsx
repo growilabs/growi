@@ -1,10 +1,10 @@
 import type { JSX, ReactNode } from 'react';
 import Link from 'next/link';
-import type { IUser, IUserHasId, Ref } from '@growi/core';
-import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializers';
+import type { IUser, Ref } from '@growi/core';
 import { UserPicture } from '@growi/ui/dist/components';
 
 import { Username } from '~/components/User/Username';
+import type { ICommentCreatorSummary } from '~/features/comment/interfaces';
 
 import { FormattedDistanceDate } from '../../FormattedDistanceDate';
 
@@ -14,18 +14,11 @@ export type CommentCardProps = {
   /**
    * The author, forwarded as-is to UserPicture / Username (both already fall
    * back for a missing/unpopulated creator), so CommentCard never decides to
-   * hide them itself. A normal comment passes `undefined` or an unpopulated
-   * `Ref<IUser>`; an inline comment passes an already-serialized
-   * `IUserSerializedSecurely<IUserHasId>` (or `null`), since its
-   * `listByPageId()` response already ran the row through
-   * `serializeUserSecurely` server-side.
+   * hide them itself. Both kinds of comment pass the `ICommentCreatorSummary`
+   * from the shared comment list; a normal comment passes `undefined` and an
+   * inline comment `null` when the author could not be resolved.
    */
-  creator:
-    | IUserHasId
-    | Ref<IUser>
-    | IUserSerializedSecurely<IUserHasId>
-    | null
-    | undefined;
+  creator: Ref<IUser> | ICommentCreatorSummary | null | undefined;
   /**
    * Declared as Date but actually arrives as an ISO string. Forwarded to
    * FormattedDistanceDate as-is; this component never parses or converts it.
@@ -79,12 +72,11 @@ export const CommentCard = (props: CommentCardProps): JSX.Element => {
   return (
     <div id={id} className={className}>
       <div className="page-comment-main bg-comment rounded mb-2">
-        <div className="d-flex align-items-center">
+        <div className="d-flex flex-wrap align-items-center">
           <UserPicture user={creator} size="md" className="me-2" />
           <div className="small fw-bold me-3">
             {/*
-             * Username's prop type doesn't include `null` (only `IUserHasId
-             * | Ref<IUser> | undefined`), but treats null/undefined/unpopulated
+             * Username's prop type doesn't include `null`, but treats null/undefined/unpopulated
              * identically at runtime (falls back to "(anyone)"), so normalizing
              * null to undefined here changes nothing observable.
              */}

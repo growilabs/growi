@@ -37,6 +37,7 @@ import { prisma } from '~/utils/prisma';
 
 import type { CreateInlineCommentReplyRequestBody } from '../../interfaces/dto/create-inline-comment-reply';
 import { InlineCommentService } from '../service/inline-comment-service';
+import { updatePageCommentCount } from '../update-page-comment-count';
 
 const logger = loggerFactory('growi:routes:apiv3:inline-comments:create-reply');
 
@@ -127,6 +128,7 @@ export const createInlineCommentReplyRouteHandlersFactory = (
       const service = new InlineCommentService({
         prisma,
         commentService: crowi.commentService,
+        updateCommentCount: updatePageCommentCount,
       });
 
       try {
