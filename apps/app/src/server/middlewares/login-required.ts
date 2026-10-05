@@ -24,6 +24,13 @@ type FallbackFunction = (
 ) => void;
 
 /**
+ * Whether a logged-in user may pass loginRequired. Also used by paths that
+ * cannot run the middleware itself (e.g. the Yjs WebSocket upgrade).
+ */
+export const isActiveUser = (user: Pick<IUser, 'status'>): boolean =>
+  user.status === UserStatus.STATUS_ACTIVE;
+
+/**
  * require login handler
  * @param crowi Crowi instance
  * @param isGuestAllowed whether guest user is allowed (default false)
@@ -43,7 +50,7 @@ const loginRequiredFactory = (
   ) {
     // check the user logged in
     if (req.user != null && req.user instanceof Object && '_id' in req.user) {
-      if (req.user.status === UserStatus.STATUS_ACTIVE) {
+      if (isActiveUser(req.user)) {
         // Active の人だけ先に進める
         return next();
       }
