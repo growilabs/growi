@@ -37,12 +37,13 @@ describe('comments Mongoose schema (inline comment index)', () => {
 });
 
 /**
- * `countCommentByPageId` backs the page-footer comment count badge
- * (`obsolete-page.js` `updateCommentCount`). Requirement 6.3 also applies
- * here per design.md's "アーキテクチャ選定": inline comments must not
- * inflate that count, even though this isn't a share-link disclosure path.
+ * `countCommentByPageId` backs the page comment count
+ * (`obsolete-page.js` `updateCommentCount`). Requirements 7.1-7.3: normal
+ * comments, inline comments, replies and resolved inline comments each count
+ * as one. The `find*` methods keep excluding inline rows (they feed the
+ * legacy API and share links).
  */
-describe('prisma.comments.countCommentByPageId (inline comment exclusion)', () => {
+describe('prisma.comments.countCommentByPageId (counts every comment row)', () => {
   const { ObjectId } = Types;
   const pageId = new ObjectId();
   const revisionId = new ObjectId();
@@ -87,17 +88,49 @@ describe('prisma.comments.countCommentByPageId (inline comment exclusion)', () =
       },
     });
     commentIds.push(inlineComment.id);
+
+    const inlineReply = await prisma.comments.create({
+      data: {
+        pageId: pageId.toString(),
+        creatorId: new ObjectId().toString(),
+        revisionId: revisionId.toString(),
+        comment: 'reply to inline comment',
+        commentPosition: -1,
+        isInline: true,
+        replyToId: inlineComment.id,
+      },
+    });
+    commentIds.push(inlineReply.id);
+
+    const resolvedInlineComment = await prisma.comments.create({
+      data: {
+        pageId: pageId.toString(),
+        creatorId: new ObjectId().toString(),
+        revisionId: revisionId.toString(),
+        comment: 'resolved inline comment',
+        commentPosition: -1,
+        isInline: true,
+        quote: 'other quoted text',
+        resolvedById: new ObjectId().toString(),
+        resolvedAt: new Date(),
+      },
+    });
+    commentIds.push(resolvedInlineComment.id);
   });
 
   afterAll(async () => {
+    // Replies first: the replyTo relation forbids deleting a referenced parent.
+    await prisma.comments.deleteMany({
+      where: { id: { in: commentIds }, replyToId: { not: null } },
+    });
     await prisma.comments.deleteMany({ where: { id: { in: commentIds } } });
     await prisma.revisions.deleteMany({ where: { id: revisionId.toString() } });
     await prisma.pages.deleteMany({ where: { id: pageId.toString() } });
   });
 
-  it('does not count isInline rows toward the page comment count', async () => {
+  it('counts normal, inline, reply and resolved inline comments as one each', async () => {
     const count = await prisma.comments.countCommentByPageId(pageId.toString());
-    expect(count).toBe(1);
+    expect(count).toBe(4);
   });
 
   it('excludes isInline rows from findCommentsByPageId/findCommentsByRevisionId even if a caller-supplied `where` tries to override it (the `options` param type omits `where`, but is not enforced against a plain-JS caller)', async () => {
@@ -120,8 +153,8 @@ describe('prisma.comments.countCommentByPageId (inline comment exclusion)', () =
 });
 
 /**
- * BLOCKING regression: `findCommentsByPageId` / `findCommentsByRevisionId` /
- * `countCommentByPageId` filter with `where: { isInline: { not: true } }`.
+ * BLOCKING regression: `findCommentsByPageId` / `findCommentsByRevisionId`
+ * filter with `where: { isInline: { not: true } }`.
  * Prisma's MongoDB connector does NOT match that filter (nor `NOT: {
  * isInline: true }`, nor `OR: [{ isInline: false }, { isInline: null }]`)
  * against a document where `isInline` is entirely ABSENT from the underlying
@@ -129,8 +162,7 @@ describe('prisma.comments.countCommentByPageId (inline comment exclusion)', () =
  * as `false`/some non-true value. Every comment created before the
  * inline-comment feature shipped has no `isInline` field at all, so without
  * the `20260901160138-backfill-comments-isinline` migration, every
- * pre-existing comment would vanish from the page-footer comment thread and
- * comment count badge as soon as this feature ships.
+ * pre-existing comment would vanish from the page-footer comment thread as soon as this feature ships.
  *
  * The legacy document is inserted via the RAW mongodb driver (bypassing
  * Prisma entirely), which is the only way to reproduce a document that
@@ -187,7 +219,7 @@ describe('backfill-comments-isinline migration (Mongo null-vs-absent regression)
     await prisma.pages.deleteMany({ where: { id: pageId.toString() } });
   });
 
-  it('is invisible to findCommentsByPageId/findCommentsByRevisionId/countCommentByPageId before the migration runs (RED — locks in the Mongo connector gotcha this migration exists to fix)', async () => {
+  it('is invisible to findCommentsByPageId/findCommentsByRevisionId before the migration runs, while countCommentByPageId (no isInline filter) already counts it (RED — locks in the Mongo connector gotcha this migration exists to fix)', async () => {
     const byPage = await prisma.comments.findCommentsByPageId(
       pageId.toString(),
       {},
@@ -203,10 +235,10 @@ describe('backfill-comments-isinline migration (Mongo null-vs-absent regression)
     );
 
     const count = await prisma.comments.countCommentByPageId(pageId.toString());
-    expect(count).toBe(0);
+    expect(count).toBe(1);
   });
 
-  it('becomes visible to findCommentsByPageId/findCommentsByRevisionId/countCommentByPageId after the migration runs (GREEN)', async () => {
+  it('becomes visible to findCommentsByPageId/findCommentsByRevisionId after the migration runs (GREEN)', async () => {
     await backfillIsInlineMigration.up();
 
     const byPage = await prisma.comments.findCommentsByPageId(

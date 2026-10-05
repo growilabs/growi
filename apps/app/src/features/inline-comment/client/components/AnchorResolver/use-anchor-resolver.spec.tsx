@@ -135,7 +135,7 @@ describe('useAnchorResolver', () => {
   it('resolves anchors that arrive after mount, with no further DOM settle event', async () => {
     // Reproduces the real-world gap: on a plain markdown page (no lsx/drawio/
     // mermaid widget), useContainerSettle fires exactly once, at mount,
-    // before useSWRxInlineComments(pageId) has resolved its list fetch — so
+    // before the shared comment list fetch has resolved — so
     // the hook is first rendered with `anchors: []`. Because the container
     // never settles again (no rendering element ever appears to re-arm the
     // observer), the real anchors that arrive afterward must be picked up by
@@ -304,8 +304,8 @@ describe('useAnchorResolver', () => {
   });
 
   it('does not keep recomputing when anchors is replaced by a new array with identical content', async () => {
-    // useSWRxInlineComments hands back a new array reference on every
-    // revalidation even when the comment list itself hasn't changed. If the
+    // useSWRxInlineComments derives a new array whenever the shared comment
+    // list changes, even when a revalidation returns identical content. If the
     // hook depended on that reference directly, this would recompute (and
     // produce a new Map) on every single revalidation tick, forever. Guard
     // against that: replacing `anchors` with a content-identical array must

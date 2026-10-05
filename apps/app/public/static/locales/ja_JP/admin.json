@@ -2,14 +2,7 @@
   "meta": {
     "display_name": "日本語"
   },
-  "Update": "更新",
-  "Delete": "削除",
-  "User": "ユーザー",
-  "Name": "名前",
   "Page": "ページ",
-  "Created": "作成日",
-  "Edit": "編集",
-  "Description": "説明",
   "Execute": "実行",
   "Enable": "有効化",
   "Copied!": "コピーしました！",
@@ -191,7 +184,6 @@
       "attr_based_login_control_detail": "SAMLの <code>&lt;saml:AttributeStatement&gt;</code> 要素に含まれる <code>&lt;saml:Attribute&gt;</code> 要素と、その子要素 <code>&lt;saml:AttributeValue&gt;</code> を利用してログインの可否を制御します。",
       "attr_based_login_control_rule_help": "<h5>利用可能なクエリ:</h5><ul><li>Terms</li><li>Fields</li><li>AND/NOT/OR Operator</li><li>Grouping</li></ul><h5>利用不可なクエリ:</h5><ul><li>Wildcard, Fuzzy, Proximity, Range and Boosting</li><li>+/- Operator</li><li>Field Grouping</li></ul><h5>特殊文字のエスケープ</h5>次の特殊文字はエスケープする必要があります。<code>+ - && || ! ( ) { } [ ] ^ &quot; &tilde; * ? : &#92;</code> and <code>/</code>",
       "attr_based_login_control_rule_example1": "<h5>条件式の例</h5>ルールに <code>(Department: A || Department: B) && Position: Leader</code> を指定した場合, <code>Department: A</code> または <code>Department: B</code> のどちらかに該当し、かつ <code>Position: Leader</code> を持つユーザーにログインを<strong>許可</strong>します。",
-      "attr_based_login_control_rule_exampl2": "<h5>エスケープの例</h5>ルールに URL を利用したい場合は、次のようにエスケープしてください:<br><code>http&#92;:&#92;/&#92;/schemas.example.com&#92;/ws&#92;/2005&#92;/05&#92;/identity&#92;/claims&#92;/emailaddress: &quot;myname@example.com&quot;</code>",
       "updated_saml": "Succeeded to update SAML setting"
     },
     "OAuth": {
@@ -468,6 +460,7 @@
     "file_delivery_method_relay": "内部システム中継",
     "file_delivery_method_redirect_info": "リダイレクト： GROWIサーバーを介さずに署名付きURLにリダイレクトされるため、優れたパフォーマンスを出します。",
     "file_delivery_method_relay_info": "内部システム中継： GROWIサーバーがクライアントに配信するため、完全なセキュリティーを提供します。",
+    "fixed_by_env_var": "環境変数 <code>{{envKey}}={{envVar}}</code> により固定されています。",
     "gcs_label": "GCP(GCS)",
     "aws_label": "AWS(S3)",
     "local_label": "Local",
@@ -480,7 +473,6 @@
     "azure_storage_container_name": "コンテナ名",
     "azure_note_for_the_only_env_option": "現在Azure設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください",
     "azure_note_for_the_only_env_option_cloud": "Azure の設定は GROWI.cloud の管理画面から変更できます",
-    "fixed_by_env_var": "環境変数 <code>{{envKey}}={{envVar}}</code> により固定されています。",
     "file_upload": "ファイルをアップロードするための設定を行います。ファイルアップロードの設定を完了させると、ファイルアップロード機能、プロフィール写真機能などが有効になります。",
     "test_connection": "接続テスト",
     "change_setting": "この設定を途中で変更すると、これまでにアップロードしたファイル等へのアクセスができなくなりますのでご注意下さい。",
@@ -592,9 +584,9 @@
       "inline_header": "インライン MIMEタイプ",
       "attachment_header": "添付ファイル MIMEタイプ",
       "inline_button": "インライン",
+      "attachment_button": "添付ファイル",
       "no_inline": "設定済みのインラインタイプはありません。",
       "no_attachment": "設定済みの添付ファイルタイプはありません。",
-      "attachment_button": "添付ファイル",
       "remove_button": "削除"
     }
   },

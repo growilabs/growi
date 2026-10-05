@@ -34,36 +34,61 @@ concurrency:
   # nothing.
   cancel-in-progress: false
 
-# Scopes the workflow's own GITHUB_TOKEN to what the sync job needs, and
-# nothing else (design.md Security Considerations). Note this does NOT scope
-# the approval bot's token: a personal access token / GitHub App installation
-# token carries the permissions it was minted with, which no workflow key can
-# narrow. That identity is limited to submitting approving reviews by (a) how
-# it is minted -- see docs/i18n-community-translation-setup.md -- and (b) the
+# The job's own GITHUB_TOKEN is no longer used for anything: checkout and the
+# sync CLI both use the App-minted tokens below instead. Left at read-only
+# rather than removed, so the default token stays available (e.g. to
+# actions/checkout for internal bookkeeping) without granting it any write
+# capability (design.md Security Considerations). This does NOT scope the
+# publish/approval App tokens minted below: an installation token carries the
+# permissions its App was granted, which no workflow key can narrow. The
+# approval identity is limited to submitting approving reviews by (a) the
+# approval App's own permission set (pull-requests: write only, no
+# contents: write -- see docs/i18n-community-translation-setup.md) and (b) the
 # code path in tools/i18n-sync/github-adapters.ts, where the approval token
 # reaches exactly one endpoint (POST /pulls/{n}/reviews) and no adapter that
 # holds it has any content-writing capability.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   i18n-sync-pull:
     runs-on: ubuntu-latest
 
     steps:
+      # Two separate GitHub Apps, minted fresh on every run. Long-term
+      # storage is the App private keys only -- never the installation
+      # tokens themselves, which expire in under an hour. Splitting into two
+      # Apps (rather than one) is what lets the approval step below avoid
+      # GitHub's self-approval rejection: the PR is authored by the publish
+      # App's identity, and the approving review comes from a genuinely
+      # different identity (docs/i18n-community-translation-setup.md §4.2).
+      - name: Mint publish app token
+        id: mint-publish
+        uses: actions/create-github-app-token@v3.2.0
+        with:
+          app-id: ${{ vars.I18N_SYNC_PUBLISH_APP_ID }}
+          private-key: ${{ secrets.I18N_SYNC_PUBLISH_APP_PRIVATE_KEY }}
+
+      - name: Mint approval app token
+        id: mint-approval
+        uses: actions/create-github-app-token@v3.2.0
+        with:
+          app-id: ${{ vars.I18N_SYNC_APPROVAL_APP_ID }}
+          private-key: ${{ secrets.I18N_SYNC_APPROVAL_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4
         with:
           # The credential this token leaves behind is what `git push` uses,
           # so it also decides which identity the sync branches are pushed
-          # under. A dedicated token is preferred over the workflow's own
-          # GITHUB_TOKEN because pushes made with GITHUB_TOKEN do not start
-          # further workflow runs -- the translation-only pull request would
-          # then never get the `ci-app-lint` check that .github/mergify.yml's
+          # under. This must be the publish App's token, not the workflow's
+          # own GITHUB_TOKEN: pushes made with GITHUB_TOKEN do not start
+          # further workflow runs, so the translation-only pull request would
+          # never get the `ci-app-lint` check that .github/mergify.yml's
           # queue conditions require, and would sit in the merge queue
-          # forever. The fallback keeps a manual dry run working in a fork,
-          # where nothing needs to merge.
-          token: ${{ secrets.I18N_SYNC_PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
+          # forever. Deliberately no `|| secrets.GITHUB_TOKEN` fallback: a
+          # missing private key must fail this step loudly, not degrade
+          # silently into that unmergeable state.
+          token: ${{ steps.mint-publish.outputs.token }}
 
       - uses: pnpm/action-setup@v6
 
@@ -79,12 +104,11 @@ jobs:
         working-directory: ./apps/app
         env:
           POEDITOR_API_TOKEN: ${{ secrets.POEDITOR_API_TOKEN }}
-          # Three separate secrets for three separate identities. The
-          # approval token must never be the same value as the publishing
-          # token: GitHub refuses a self-approval, and the CLI rejects the
-          # run outright if the two match.
-          I18N_SYNC_PUBLISH_TOKEN: ${{ secrets.I18N_SYNC_PUBLISH_TOKEN }}
-          I18N_SYNC_APPROVAL_TOKEN: ${{ secrets.I18N_SYNC_APPROVAL_TOKEN }}
-          # Not exposed to the process automatically, unlike GITHUB_REPOSITORY.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The CLI's own env var names stay as-is; only where their values
+          # come from has changed (minted above, not read from a fixed
+          # secret). The approval token must never equal the publish token:
+          # GitHub refuses a self-approval, and the CLI rejects the run
+          # outright if the two match -- which two distinct Apps guarantee.
+          I18N_SYNC_PUBLISH_TOKEN: ${{ steps.mint-publish.outputs.token }}
+          I18N_SYNC_APPROVAL_TOKEN: ${{ steps.mint-approval.outputs.token }}
         run: pnpm run i18n:sync:pull

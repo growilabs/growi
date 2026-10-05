@@ -1,25 +1,20 @@
 /**
  * SWR store for the inline-comment feature.
  *
- * Follows the established `useSWRx*` + `withUtils` pattern: the list hook
- * owns the SWR key, and each write helper posts/puts through
- * `apiv3Post`/`apiv3Put` and then calls the bound `mutate()` from the SAME
- * `useSWR` call, so a write always revalidates the exact list the caller is
- * looking at rather than a globally-keyed one.
- *
- * The SWR key is `['/inline-comments', pageId]` (an array key, not the bare
- * endpoint string) so that different pages never share a cache entry.
+ * The list is not fetched here: it is derived from the page's shared comment
+ * list (`useSWRxCommentList`), so the body highlights and the bottom comment
+ * thread read one cache entry and one request. Every write helper refetches
+ * that shared list; writes that change the page's comment count also refetch
+ * the page info, as ordinary comment writes do.
  */
 
+import { useCallback, useMemo } from 'react';
 import { type SWRResponseWithUtils, withUtils } from '@growi/core/dist/swr';
-import useSWR from 'swr';
+import type { KeyedMutator, SWRResponse } from 'swr';
 
-import {
-  apiv3Delete,
-  apiv3Get,
-  apiv3Post,
-  apiv3Put,
-} from '~/client/util/apiv3-client';
+import { apiv3Delete, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
+import { useSWRxCommentList } from '~/features/comment/client/stores/comment-list';
+import { useSWRMUTxPageInfo } from '~/stores/page';
 
 import type { InlineCommentWithReplies } from '../../interfaces';
 import type {
@@ -27,63 +22,56 @@ import type {
   CreateInlineCommentReplyResponseBody,
   CreateInlineCommentRequestBody,
   CreateInlineCommentResponseBody,
-  ListInlineCommentsResponseBody,
   ResolveInlineCommentResponseBody,
   UpdateInlineCommentReplyResponseBody,
   UpdateInlineCommentResponseBody,
 } from '../../interfaces/dto';
+import { groupInlineComments } from '../services/group-inline-comments';
 
 type InlineCommentListUtils = {
-  /** POST /_api/v3/inline-comments, then revalidate this page's list. */
+  /** POST /_api/v3/inline-comments, then refetch the list and page info. */
   create(
     body: CreateInlineCommentRequestBody,
   ): Promise<CreateInlineCommentResponseBody['inlineComment']>;
   /**
-   * POST /_api/v3/inline-comments/:parentId/replies, then revalidate this
-   * page's list.
+   * POST /_api/v3/inline-comments/:parentId/replies, then refetch the list
+   * and page info.
    */
   createReply(
     parentId: string,
     body: CreateInlineCommentReplyRequestBody,
   ): Promise<CreateInlineCommentReplyResponseBody['inlineCommentReply']>;
-  /**
-   * PUT /_api/v3/inline-comments/:id/resolve, then revalidate this page's
-   * list.
-   */
+  /** PUT /_api/v3/inline-comments/:id/resolve, then refetch the list. */
   resolve(
     id: string,
     resolved: boolean,
   ): Promise<ResolveInlineCommentResponseBody['inlineComment']>;
-  /** PUT /_api/v3/inline-comments/:id, then revalidate this page's list. */
+  /** PUT /_api/v3/inline-comments/:id, then refetch the list. */
   update(
     id: string,
     comment: string,
   ): Promise<UpdateInlineCommentResponseBody['inlineComment']>;
-  /**
-   * PUT /_api/v3/inline-comments/replies/:id, then revalidate this page's
-   * list.
-   */
+  /** PUT /_api/v3/inline-comments/replies/:id, then refetch the list. */
   updateReply(
     id: string,
     comment: string,
   ): Promise<UpdateInlineCommentReplyResponseBody['inlineCommentReply']>;
-  /** DELETE /_api/v3/inline-comments/:id, then revalidate this page's list. */
+  /** DELETE /_api/v3/inline-comments/:id, then refetch the list and page info. */
   remove(id: string): Promise<Record<string, never>>;
   /**
-   * DELETE /_api/v3/inline-comments/replies/:id, then revalidate this page's
-   * list.
+   * DELETE /_api/v3/inline-comments/replies/:id, then refetch the list and
+   * page info.
    */
   removeReply(id: string): Promise<Record<string, never>>;
 };
 
 /**
- * Fetches the page-scoped inline-comment list (origin comments with nested
- * replies, creation-order — sorted server-side by `listByPageId`) and
- * exposes `create`/`createReply`/`resolve` helpers that revalidate it.
+ * Returns the page's inline comments as origins with nested replies (newest
+ * first, the order the shared list arrives in) and write helpers that keep it
+ * fresh.
  *
- * Pass `null` while the page id is not yet known — SWR will not fetch, same
- * convention as the rest of the codebase's `useSWRx*` hooks (see
- * `useSWRxExternalUserGroup`).
+ * Pass `null` while the page id is not yet known, or on views that must not
+ * show inline comments (the share-link view) — nothing is fetched then.
  */
 export const useSWRxInlineComments = (
   pageId: string | null,
@@ -92,20 +80,58 @@ export const useSWRxInlineComments = (
   InlineCommentWithReplies[],
   Error
 > => {
-  const swrResponse = useSWR(
-    pageId != null ? (['/inline-comments', pageId] as const) : null,
-    ([endpoint, pageId]) =>
-      apiv3Get<ListInlineCommentsResponseBody>(endpoint, { pageId }).then(
-        (response) => response.data.inlineComments,
-      ),
+  const commentList = useSWRxCommentList(pageId);
+  const { trigger: triggerPageInfo } = useSWRMUTxPageInfo(pageId);
+
+  const { data: commentListData, mutate: mutateCommentList } = commentList;
+
+  const data = useMemo(
+    () =>
+      commentListData != null
+        ? groupInlineComments(commentListData)
+        : undefined,
+    [commentListData],
   );
+
+  // Revalidation only: the grouped list is derived, so it cannot be written
+  // back into the shared cache. No caller passes data to `mutate`.
+  const mutate: KeyedMutator<InlineCommentWithReplies[]> =
+    useCallback(async () => {
+      const refreshed = await mutateCommentList();
+      return refreshed != null ? groupInlineComments(refreshed) : undefined;
+    }, [mutateCommentList]);
+
+  // The write has already succeeded; a failed page-info refetch must not
+  // surface as a failed write.
+  const refetchListAndPageInfo = async (): Promise<void> => {
+    await Promise.all([
+      mutateCommentList(),
+      triggerPageInfo(null, { throwOnError: false }),
+    ]);
+  };
+
+  // Getters keep SWR's per-field subscription: a caller that never reads
+  // isValidating must not re-render on every revalidation.
+  const swrResponse: SWRResponse<InlineCommentWithReplies[], Error> = {
+    data,
+    get error() {
+      return commentList.error;
+    },
+    get isLoading() {
+      return commentList.isLoading;
+    },
+    get isValidating() {
+      return commentList.isValidating;
+    },
+    mutate,
+  };
 
   const create: InlineCommentListUtils['create'] = async (body) => {
     const response = await apiv3Post<CreateInlineCommentResponseBody>(
       '/inline-comments',
       body,
     );
-    await swrResponse.mutate();
+    await refetchListAndPageInfo();
     return response.data.inlineComment;
   };
 
@@ -117,7 +143,7 @@ export const useSWRxInlineComments = (
       `/inline-comments/${parentId}/replies`,
       body,
     );
-    await swrResponse.mutate();
+    await refetchListAndPageInfo();
     return response.data.inlineCommentReply;
   };
 
@@ -126,7 +152,7 @@ export const useSWRxInlineComments = (
       `/inline-comments/${id}/resolve`,
       { resolved },
     );
-    await swrResponse.mutate();
+    await mutateCommentList();
     return response.data.inlineComment;
   };
 
@@ -135,7 +161,7 @@ export const useSWRxInlineComments = (
       `/inline-comments/${id}`,
       { comment },
     );
-    await swrResponse.mutate();
+    await mutateCommentList();
     return response.data.inlineComment;
   };
 
@@ -147,19 +173,19 @@ export const useSWRxInlineComments = (
       `/inline-comments/replies/${id}`,
       { comment },
     );
-    await swrResponse.mutate();
+    await mutateCommentList();
     return response.data.inlineCommentReply;
   };
 
   const remove: InlineCommentListUtils['remove'] = async (id) => {
     const response = await apiv3Delete(`/inline-comments/${id}`);
-    await swrResponse.mutate();
+    await refetchListAndPageInfo();
     return response.data;
   };
 
   const removeReply: InlineCommentListUtils['removeReply'] = async (id) => {
     const response = await apiv3Delete(`/inline-comments/replies/${id}`);
-    await swrResponse.mutate();
+    await refetchListAndPageInfo();
     return response.data;
   };
 
