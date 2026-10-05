@@ -271,7 +271,7 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
     });
     instanciateExternalAccountService(passportServiceMock);
 
-    // Create root page and /user page for UserEvent.onActivated to work
+    // Create root page and /user page for user homepage creation to work
     rootPageId = new Types.ObjectId();
     userPageId = new Types.ObjectId();
 

@@ -33,6 +33,7 @@ import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
 import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';
 
+import { ensureUserHomepage } from '../../service/page/ensure-user-homepage';
 import { getModelSafely } from '../../util/mongoose-utils';
 import { Attachment } from '../attachment';
 import { UserStatus } from './conts';
@@ -50,9 +51,18 @@ const factory = (crowi) => {
     return userModelExists;
   }
 
-  // Activation awaits userEvent.onActivated directly: callers rely on the home
-  // page existing once activation resolves.
   const userEvent = crowi?.events.user;
+
+  // Part of activation itself, not a reaction to it: callers rely on the
+  // homepage existing once activation resolves. A failure here must not fail
+  // the activation, so it is only logged.
+  const setUpUserHomepage = async (user) => {
+    try {
+      await ensureUserHomepage(user, crowi.pageService);
+    } catch (err) {
+      logger.error({ err }, 'Failed to create user page');
+    }
+  };
 
   const userSchema = new mongoose.Schema(
     {
@@ -314,7 +324,8 @@ const factory = (crowi) => {
     this.readOnly = getConfigManager().getConfig('app:isReadOnlyForNewUser');
 
     const userData = await this.save();
-    await userEvent.onActivated(userData);
+    await setUpUserHomepage(userData);
+    userEvent.emit('activated', userData);
     return userData;
   };
 
@@ -351,7 +362,8 @@ const factory = (crowi) => {
     logger.debug('Activate User', this);
     this.status = UserStatus.STATUS_ACTIVE;
     const userData = await this.save();
-    await userEvent.onActivated(userData);
+    await setUpUserHomepage(userData);
+    userEvent.emit('activated', userData);
     return userData;
   };
 
@@ -737,7 +749,8 @@ const factory = (crowi) => {
     }
 
     if (userData.status === UserStatus.STATUS_ACTIVE) {
-      await userEvent.onActivated(userData);
+      await setUpUserHomepage(userData);
+      userEvent.emit('activated', userData);
     }
     return callback(null, userData);
   };
