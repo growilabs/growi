@@ -3914,6 +3914,18 @@ test.describe('Inline comment - a resolved comment hides its body highlight/popo
     await page.goto(resolvedPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
 
+    // `inline-comment-ready` marks SelectionCapture's idle stage, not that
+    // the saved anchor has resolved and its Range is registered under
+    // CSS.highlights -- that resolution is asynchronous on a fresh load, so
+    // clicking before it completes misses the hit test (see #11914).
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          () => CSS.highlights.get('growi-inline-comment')?.size ?? 0,
+        ),
+      )
+      .toBeGreaterThan(0);
+
     const popover = page.getByTestId('inline-comment-preview-popover');
     await clickText(page, targetSentence);
     await expect(popover).toBeVisible();
