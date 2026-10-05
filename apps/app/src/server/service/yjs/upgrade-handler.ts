@@ -9,9 +9,8 @@ import type { Duplex } from 'stream';
 import type { SessionConfig } from '~/interfaces/session-config';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
-import loginRequiredFactory from '../../middlewares/login-required';
+import { isReadOnlyUser } from '../../middlewares/exclude-read-only-user';
+import { isActiveUser } from '../../middlewares/login-required';
 import type { PageModel } from '../../models/page';
 
 const logger = loggerFactory('growi:service:yjs:upgrade-handler');
@@ -49,28 +48,6 @@ const runMiddleware = (
   });
 
 /**
- * Run an authorization middleware (loginRequired, excludeReadOnlyUser) that
- * rejects by writing an HTTP response. Its response methods are captured and
- * turned into a status code, since there is no HTTP response on an upgrade.
- * Resolves null when the middleware calls next().
- */
-const runAuthzMiddleware = (
-  middleware: ConnectMiddleware,
-  req: IncomingMessage,
-): Promise<number | null> =>
-  new Promise((resolve, reject) => {
-    const captureRes = {
-      sendStatus: (statusCode: number) => resolve(statusCode),
-      redirect: () => resolve(403),
-      apiv3Err: () => resolve(403),
-    } as unknown as ServerResponse;
-    middleware(req, captureRes, (err?: unknown) => {
-      if (err) return reject(err);
-      resolve(null);
-    });
-  });
-
-/**
  * Extracts pageId from upgrade request URL.
  * Expected format: /yjs/{pageId}
  */
@@ -102,20 +79,10 @@ export type UpgradeResult =
  * Creates an upgrade handler that authenticates WebSocket connections
  * using the existing express-session + passport mechanism.
  */
-export const createUpgradeHandler = (
-  sessionConfig: SessionConfig,
-  crowi: Crowi,
-) => {
+export const createUpgradeHandler = (sessionConfig: SessionConfig) => {
   const sessionMiddleware = expressSession(sessionConfig as any);
   const passportInit = passport.initialize();
   const passportSession = passport.session();
-
-  // Same gate as the page update API (update-page.ts). The fallback replaces
-  // the default redirect-to-login, which would also write to the session.
-  const editPermissionMiddlewares = [
-    loginRequiredFactory(crowi, false, (_req, res) => res.sendStatus(401)),
-    excludeReadOnlyUser,
-  ] as unknown as ConnectMiddleware[];
 
   return async (
     request: IncomingMessage,
@@ -140,22 +107,24 @@ export const createUpgradeHandler = (
       return { authorized: false, statusCode: 401 };
     }
 
-    // A Yjs connection can write to the document, so apply the same
-    // middlewares as the page update API, not just the view access check.
-    for (const middleware of editPermissionMiddlewares) {
-      const rejectedStatus = await runAuthzMiddleware(middleware, request);
-      if (rejectedStatus != null) {
-        const message = rejectedStatus === 401 ? 'Unauthorized' : 'Forbidden';
-        logger.warn(
-          { pageId, userId: (request as AuthenticatedRequest).user?._id },
-          `Yjs upgrade rejected: ${message}`,
-        );
-        writeErrorResponse(socket, rejectedStatus, message);
-        return { authorized: false, statusCode: rejectedStatus };
-      }
-    }
-
     const user = (request as AuthenticatedRequest).user ?? null;
+
+    // A Yjs connection can write to the document, so require the same user
+    // conditions as the page update API (loginRequiredStrictly +
+    // excludeReadOnlyUser), not just view access.
+    if (user == null) {
+      logger.warn({ pageId }, 'Yjs upgrade rejected: Unauthorized');
+      writeErrorResponse(socket, 401, 'Unauthorized');
+      return { authorized: false, statusCode: 401 };
+    }
+    if (!isActiveUser(user) || isReadOnlyUser(user)) {
+      logger.warn(
+        { pageId, userId: user._id },
+        'Yjs upgrade rejected: user is not allowed to edit',
+      );
+      writeErrorResponse(socket, 403, 'Forbidden');
+      return { authorized: false, statusCode: 403 };
+    }
 
     // Check page access
     const Page = mongoose.model<IPage, PageModel>('Page');
@@ -163,7 +132,7 @@ export const createUpgradeHandler = (
 
     if (!isAccessible) {
       logger.warn(
-        { pageId, userId: user?._id },
+        { pageId, userId: user._id },
         'Yjs upgrade rejected: page is not accessible',
       );
       writeErrorResponse(socket, 403, 'Forbidden');

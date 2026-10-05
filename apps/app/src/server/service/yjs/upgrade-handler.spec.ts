@@ -4,7 +4,6 @@ import type { Duplex } from 'node:stream';
 import type { IUserHasId } from '@growi/core';
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '../../crowi';
 import { UserStatus } from '../../models/user/conts';
 import { createUpgradeHandler } from './upgrade-handler';
 
@@ -82,7 +81,7 @@ const createUser = (overrides: Partial<IUserHasId> = {}): IUserHasId =>
   }) as unknown as IUserHasId;
 
 describe('UpgradeHandler', () => {
-  const handleUpgrade = createUpgradeHandler(sessionConfig, mock<Crowi>());
+  const handleUpgrade = createUpgradeHandler(sessionConfig);
 
   it('should authorize a valid user with page access', async () => {
     isAccessibleMock.mockResolvedValue(true);

@@ -8,7 +8,6 @@ import { docs, setPersistence, setupWSConnection } from 'y-websocket/bin/utils';
 
 import type { SessionConfig } from '~/interfaces/session-config';
 import type { SyncLatestRevisionBody } from '~/interfaces/yjs';
-import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -42,7 +41,6 @@ class YjsService implements IYjsService {
     httpServer: http.Server,
     io: Server,
     sessionConfig: SessionConfig,
-    crowi: Crowi,
   ) {
     const mdb = new MongodbPersistence(
       {
@@ -68,7 +66,7 @@ class YjsService implements IYjsService {
 
     // setup WebSocket server
     const wss = new WebSocketServer({ noServer: true });
-    const handleUpgrade = createUpgradeHandler(sessionConfig, crowi);
+    const handleUpgrade = createUpgradeHandler(sessionConfig);
 
     httpServer.on('upgrade', async (request, socket, head) => {
       const url = request.url ?? '';
@@ -196,13 +194,12 @@ export const initializeYjsService = (
   httpServer: http.Server,
   io: Server,
   sessionConfig: SessionConfig,
-  crowi: Crowi,
 ): void => {
   if (_instance != null) {
     throw new Error('YjsService is already initialized');
   }
 
-  _instance = new YjsService(httpServer, io, sessionConfig, crowi);
+  _instance = new YjsService(httpServer, io, sessionConfig);
 };
 
 export const getYjsService = (): YjsService => {

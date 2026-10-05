@@ -4,7 +4,6 @@ import { Types } from 'mongoose';
 import type { Server } from 'socket.io';
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '~/server/crowi';
 import { prisma } from '~/utils/prisma';
 
 import type { MongodbPersistence } from './extended/mongodb-persistence';
@@ -48,7 +47,7 @@ describe('YjsService', () => {
       };
 
       // initialize
-      initializeYjsService(httpServer, ioMock, sessionConfig, mock<Crowi>());
+      initializeYjsService(httpServer, ioMock, sessionConfig);
     });
 
     afterEach(async () => {
