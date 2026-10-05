@@ -693,6 +693,7 @@ class Crowi {
       httpServer,
       this.socketIoService.io,
       this.sessionConfig,
+      this,
     );
 
     await this.autoInstall();
