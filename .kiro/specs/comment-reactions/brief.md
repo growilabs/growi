@@ -38,7 +38,7 @@
 
 **採用: 正規化した専用コレクション（1ユーザー × 1コメント × 1絵文字 = 1ドキュメント）＋名前空間付きの絵文字キー**
 
-- 新しいコレクション（仮称 `commentreactions`）に `{ commentId, pageId, userId, emoji(キー), createdAt }` を保存し、`(commentId, userId, emoji)` に一意制約を張る。トグルは upsert と delete の組み合わせで冪等にする。`pageId` を持たせるのは、ページ単位でまとめて取得するためと、ページ削除時に一括で消すため。
+- 新しいコレクション（仮称 `commentreactions`）に `{ commentId, pageId, userId, emoji(キー), createdAt }` を保存し、`(commentId, userId, emoji)` に一意制約を張る。追加は upsert、解除は delete として別々の操作で受け付け、どちらも何度送っても結果が変わらない（冪等）ようにする（Constraints の「追加・解除の API の形」を参照）。`pageId` を持たせるのは、ページ単位でまとめて取得するためと、ページ削除時に一括で消すため。
 - 表示用の集計（絵文字ごとの人数、自分が付けたか、リアクションしたユーザー）は、読み取り時にページ単位でまとめて作る。通常コメントとインラインコメントは `commentId` で同じように扱えるので、モデルは1つで足りる。
 - **絵文字キーには名前空間を持たせる。** 標準絵文字は `@growi/emoji-mart-data`（本文レンダラーと同じ対応表）のショートコードで識別する。将来の Slack カスタム絵文字とキーが衝突しないよう、種別を区別する仕組み（例: 種別フィールド、または `std:+1` / `slack:<workspace>:<name>` のような接頭辞）を最初から入れる。どちらの形式にするかは設計フェーズで決める。
 - 選定理由:
@@ -71,7 +71,7 @@
 ## Boundary Candidates
 
 - **データモデルと永続化**: 新しいコレクションと Prisma モデル、一意インデックス、名前空間付き絵文字キーの型定義（`@growi/core` に置くかは設計で決める）
-- **サーバー API と認可**: リアクションのトグル（追加・解除）と、ページ単位の一括取得。`comments.get` のレスポンスに含めるか、別エンドポイントにするかは設計で決める。後から作る API は apiv3 が基本になる
+- **サーバー API と認可**: リアクションの追加・解除と、ページ単位の一括取得。`comments.get` のレスポンスに含めるか、別エンドポイントにするかは設計で決める。後から作る API は apiv3 が基本になる
 - **絵文字ピッカーの再利用**: `packages/editor` の `EmojiButton`（内部コンポーネント）から、エディタに依存しない遅延ロードのピッカー部品を切り出して公開するか、apps/app 側に新しく作るか
 - **リアクションバー UI**: チップ、人数、自分のリアクションの強調、ユーザー一覧、「＋」ボタン。`CommentCard` の slot（既存の `footer` か新しい slot）に差し込む想定
 - **連鎖削除と Activity 記録**: 削除経路への後始末の追加と、監査ログ・通知の扱い
@@ -91,6 +91,7 @@
   - `@growi/emoji-mart-data`（ショートコードからネイティブ絵文字への変換。本文レンダラーと共有）、`packages/editor` の emoji-mart 依存
   - `CommentCard` を含む `PageComment/` の共通コンポーネント群
   - Activity・監査ログの仕組み（`apps/app/src/interfaces/activity.ts`、`apps/app/.claude/rules/activity-recording.md`）
+  - GROWI 間移行・インポートの仕組み（`apps/app/src/server/service/import/`。新しいコレクションの登録先）
 - **Downstream**:
   - Slack カスタム絵文字対応（将来の別スペック。本スペックの名前空間付き絵文字キーを前提にする）
   - ページへのリアクション（将来の別スペック。モデルを共通化するかはそのときに判断する）
@@ -101,20 +102,28 @@
 - **Extends**: なし（新規スペック）。既存スペックの契約を変えない純粋な追加なので、`.claude/rules/spec-lifecycle.md` の amend spec には**当たらない**。
 - **Adjacent**:
   - [inline-comment](../inline-comment/): 同じ `comments` コレクションと `CommentCard` を共有している。インラインコメントを対象にする場合は、削除経路（origin・返信の DELETE）への連鎖削除の追加と、共有リンク経由の露出防止で関わる。
-  - [share-link-comments](../share-link-comments/): 共有リンク閲覧者はコメントを読み取り専用で見られる、という前提。リアクションも読み取り専用で見せ、トグルは禁止する。
+  - [share-link-comments](../share-link-comments/): 共有リンク閲覧者はコメントを読み取り専用で見られる、という前提。リアクションも読み取り専用で見せ、追加・解除は禁止する。
   - [comment-mention](../comment-mention/): コメントエディタの絵文字自動補完（`emojiCompletionSource`）。関心は重ならないが、絵文字のデータソースは揃える。
   - [activity-log](../activity-log/): 新しい Activity アクションを足す場合の記録方針。
 
 ## Constraints
 
 - **認可**
-  - トグルには `loginRequiredStrictly` と `excludeReadOnlyUserIfCommentNotAllowed` に加え、**対象コメントのページを閲覧できるか**の確認が要る。認証だけでは、閲覧権限の無いページのコメント ID を指定されたときにリアクションを付けられてしまう。
+  - 追加・解除には `loginRequiredStrictly` と `excludeReadOnlyUserIfCommentNotAllowed` に加え、**対象コメントのページを閲覧できるか**の確認が要る。認証だけでは、閲覧権限の無いページのコメント ID を指定されたときにリアクションを付けられてしまう。
   - ゲストと共有リンク閲覧者は読み取り専用とする。
 - **インデックス作成**: Prisma（MongoDB プロバイダ）は一意インデックスを自動では作らない。新しいコレクションの `(commentId, userId, emoji)` 一意インデックスと `pageId` インデックスを何で作るかは、`.claude/rules/model.md` の移行ルールに従って設計で決める。`bookmarks` の一意インデックスがどう作られているかを前例として確認すること。
 - **連鎖削除の経路**: 次の経路すべてでリアクションも消す必要がある。
   - `removeWithReplies`（通常コメントとその返信の削除）
   - インラインコメントの origin 削除と返信削除（対象に含める場合）
   - `apps/app/src/server/service/page/delete-completely-operation.ts`（ページの完全削除）
+- **追加・解除の API の形**: 「押すたびに反転する」トグル API にはせず、クライアントが「追加」か「解除」かを明示して送る形にする（ページの「いいね」の `PUT /_api/v3/page/likes` が `{ pageId, bool }` を受け取るのと同じ考え方）。
+  - コメントにはリアルタイム更新が無いので、画面の状態が古いまま操作されることがある。たとえば別タブで既に 👍 を付けている状態で古い画面から 👍 を押すと、反転型では本人の意図（追加）に反して解除になってしまう。
+  - 明示型なら、既に付いているものへの「追加」や、付いていないものへの「解除」は何もせずに成功扱いにでき、何度送っても結果が変わらない。
+- **GROWI 間移行（G2G）・インポートへの対応**: 新しいコレクションを足すと、移行・インポートの仕組みにも申告が要る。
+  - `apps/app/src/server/service/import/non-transferable-collections.ts` の `TRANSFERABLE_COLLECTIONS`（移行で運ぶ）と `NON_TRANSFERABLE_COLLECTIONS`（運ばない）の**どちらかに必ず登録する**。どちらにも無いコレクションは drift test（`non-transferable-collections.integ.ts`）で失敗する。
+  - どちらに入れるかは設計で決める（メンター確認事項）。同ファイルの基準では、リアクションは環境固有の運用状態ではなくコンテンツなので、`TRANSFERABLE_COLLECTIONS` が有力。
+  - 運ぶ場合は、インポート時に `commentId`・`pageId`・`userId` が移行先の ID と正しく対応するか（`construct-convert-map.ts` 周辺）を確認する。
+  - `(commentId, userId, emoji)` の一意制約を持つので、インポート時の一意制約衝突検出（`detect-unique-conflicts.ts` と、その drift test `detect-unique-conflicts.drift.spec.ts`）の対象に加える必要があるかも確認する。
 - **絵文字キー**
   - 標準絵文字は `@growi/emoji-mart-data` に存在するショートコードだけを受け付け、サーバー側で検証する（任意の文字列を保存させない）。
   - カスタム絵文字を足しても衝突しない名前空間を持たせる。
