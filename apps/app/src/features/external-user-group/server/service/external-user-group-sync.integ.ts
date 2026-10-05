@@ -15,6 +15,7 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { PageModel } from '~/server/models/page';
+import PageOperation from '~/server/models/page-operation';
 import { configManager } from '~/server/service/config-manager';
 import instanciateExternalAccountService from '~/server/service/external-account';
 import type PassportService from '~/server/service/passport';
@@ -318,6 +319,24 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
   });
 
   afterEach(async () => {
+    // pageService.create leaves its sub-operation running after it resolves;
+    // let it finish so it does not overlap the next test or outlive the DB
+    // connection.
+    await vi.waitFor(async () => {
+      expect(
+        await PageOperation.countDocuments({
+          fromPath: {
+            $in: [
+              '/user/childGroupUser',
+              '/user/parentGroupUser',
+              '/user/grandParentGroupUser',
+              '/user/previouslySyncedGroupUser',
+            ],
+          },
+        }),
+      ).toBe(0);
+    }, 5000);
+
     await ExternalUserGroup.deleteMany();
     await ExternalUserGroupRelation.deleteMany();
     await mongoose.model('User').deleteMany({

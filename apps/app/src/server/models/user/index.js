@@ -50,13 +50,9 @@ const factory = (crowi) => {
     return userModelExists;
   }
 
-  let userEvent;
-
-  // init event
-  if (crowi != null) {
-    userEvent = crowi.events.user;
-    userEvent.on('activated', userEvent.onActivated);
-  }
+  // Activation awaits userEvent.onActivated directly: callers rely on the home
+  // page existing once activation resolves.
+  const userEvent = crowi?.events.user;
 
   const userSchema = new mongoose.Schema(
     {
@@ -317,13 +313,9 @@ const factory = (crowi) => {
     );
     this.readOnly = getConfigManager().getConfig('app:isReadOnlyForNewUser');
 
-    this.save((err, userData) => {
-      userEvent.emit('activated', userData);
-      if (err) {
-        throw new Error(err);
-      }
-      return userData;
-    });
+    const userData = await this.save();
+    await userEvent.onActivated(userData);
+    return userData;
   };
 
   userSchema.methods.grantAdmin = async function () {
@@ -359,7 +351,8 @@ const factory = (crowi) => {
     logger.debug('Activate User', this);
     this.status = UserStatus.STATUS_ACTIVE;
     const userData = await this.save();
-    return userEvent.emit('activated', userData);
+    await userEvent.onActivated(userData);
+    return userData;
   };
 
   userSchema.methods.statusSuspend = async function () {
@@ -735,17 +728,18 @@ const factory = (crowi) => {
     }
     newUser.status = status || decideUserStatusOnRegistration();
 
-    newUser.save((err, userData) => {
-      if (err) {
-        logger.error('createUserByEmailAndPasswordAndStatus failed: ', err);
-        return callback(err);
-      }
+    let userData;
+    try {
+      userData = await newUser.save();
+    } catch (err) {
+      logger.error('createUserByEmailAndPasswordAndStatus failed: ', err);
+      return callback(err);
+    }
 
-      if (userData.status === UserStatus.STATUS_ACTIVE) {
-        userEvent.emit('activated', userData);
-      }
-      return callback(err, userData);
-    });
+    if (userData.status === UserStatus.STATUS_ACTIVE) {
+      await userEvent.onActivated(userData);
+    }
+    return callback(null, userData);
   };
 
   /**

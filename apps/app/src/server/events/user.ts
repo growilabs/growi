@@ -20,13 +20,15 @@ class UserEvent extends EventEmitter {
     this.crowi = crowi;
   }
 
+  // Never rejects: activation awaits this, and a failure to set up the home
+  // page must not fail the activation itself.
   async onActivated(user: IUserHasId): Promise<void> {
-    const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
-      'Page',
-    );
-    const userHomepagePath = pagePathUtils.userHomepagePath(user);
-
     try {
+      const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+        'Page',
+      );
+      const userHomepagePath = pagePathUtils.userHomepagePath(user);
+
       let page: HydratedDocument<PageDocument> | null = await Page.findByPath(
         userHomepagePath,
         true,
