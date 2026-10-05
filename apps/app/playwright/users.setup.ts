@@ -56,8 +56,11 @@ setup('provision filter test users', async ({ page, browser }) => {
   await fillLoginForm(page, 'admin', 'adminadmin');
   const adminRequest = page.request;
 
-  // Each user is provisioned independently.
-  await Promise.all(
-    FILTER_TEST_USERS.map((user) => provisionUser(browser, adminRequest, user)),
-  );
+  // Sequential: concurrent invited-user logins can land one of them back on
+  // /login, and a user left invited-but-not-activated cannot be re-provisioned
+  // by a retry (its temporary password is gone).
+  for (const user of FILTER_TEST_USERS) {
+    // biome-ignore lint/performance/noAwaitInLoops: provisioning must not overlap
+    await provisionUser(browser, adminRequest, user);
+  }
 });
