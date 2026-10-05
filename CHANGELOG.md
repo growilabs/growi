@@ -1,8 +1,14 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.5...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.6...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.6](https://github.com/growilabs/compare/v8.0.5...v8.0.6) - 2026-10-05
+
+### 🐛 Bug Fixes
+
+* fix: dedupe @types/node so .next symlinks survive pnpm deploy (v8.0.5 SSR failure) (#12010) @yuki-takei
 
 ## [v8.0.5](https://github.com/growilabs/compare/v8.0.4...v8.0.5) - 2026-10-05
 
