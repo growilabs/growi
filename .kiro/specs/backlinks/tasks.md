@@ -757,7 +757,8 @@ the restored page's status. Independent of B3/B4.
   - Done when an integration/route test shows the endpoint returns both `backlinks` and `linkTargets`
     for a readable page (with the same 400/404 behavior as before), a viewer who cannot read a target
     sees it omitted from `linkTargets` while `backlinks` is unaffected, and the hook test shows the
-    response object is returned and revalidates on page-id change
+    response object is returned and revalidates on page-id change. On forward-link failure, return 200
+    with `linkTargets: null` (backlinks still returned); a backlinks failure still returns 500
   - _Requirements: 1.1, 2.1, 6.4_
   - _Boundary: getBacklinksHandlerFactory (routes/backlinks.ts), useSWRxBacklinks, interfaces/backlink.ts_
   - _Depends: B5.4_
@@ -778,7 +779,8 @@ the restored page's status. Independent of B3/B4.
   - Reads `linkTargets` off the B5.9 hook payload. B5.9 widens the hook's return type from
     `IBacklink[]` to the whole response, so the incoming-list call site changes here too — deliberate
     churn placed in the task that is already rewriting this panel, not an unplanned break of B1.11
-  - Done when the panel flags trashed/broken outgoing links; the incoming list and empty state are unchanged
+  - Done when the panel flags trashed/broken outgoing links; the incoming list and empty state are unchanged.
+    When `linkTargets` is `null` (forward-link lookup failed), display "Couldn't check link status."
   - _Requirements: 6.4_
   - _Boundary: BacklinksPanel_
   - _Depends: B5.9, B5.5, B1.11_

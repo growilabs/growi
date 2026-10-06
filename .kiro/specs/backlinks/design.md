@@ -743,7 +743,7 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null, userGroups: Obje
 ##### API Contract
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | `/_api/v3/page/backlinks` | query: `pageId` (MongoId) | `{ backlinks: IBacklink[], linkTargets: ILinkTarget[] }` | 400, 404, 500 |
+| GET | `/_api/v3/page/backlinks` | query: `pageId` (MongoId) | `{ backlinks: IBacklink[], linkTargets: ILinkTarget[] \| null }` (`null` = forward-link lookup failed) | 400, 404, 500 (backlinks read or group lookup failed) |
 
 - Middleware: `accessTokenParser([SCOPE.READ.FEATURES.PAGE])`, `loginRequired` (guest per ACL),
   `apiV3FormValidator`; `req.user` is the viewer. Delegates to `PageLinkService.findBacklinks` and
@@ -886,7 +886,9 @@ interface ILinkTarget {
 
 interface IBacklinkResponse {
   backlinks: IBacklink[];
-  linkTargets: ILinkTarget[]; // B5.9 — trashed/broken outbound targets of the same page
+  // B5.9 — trashed/broken outbound targets of the same page.
+  // null: the forward-link lookup failed; [] : no problematic links
+  linkTargets: ILinkTarget[] | null;
 }
 ```
 
@@ -908,6 +910,9 @@ interface IBacklinkResponse {
 ### Error Categories and Responses
 - **User errors (4xx)**: invalid/missing `pageId` → 400 via validator; subject page missing or not readable → 404 (one status for both).
 - **System errors (5xx)**: DB/resolution failure → 500 with generic message; details logged only.
+  The one exception is the forward-link read: its failure is logged and answered with 200 and
+  `linkTargets: null`, so the secondary read cannot take down the backlinks list. `null` (not `[]`)
+  keeps a failed lookup distinguishable from "no problematic links".
 - **Business-logic**: an unresolved `toPath` is **not** an error — it is the `broken` state.
 
 ### Monitoring
