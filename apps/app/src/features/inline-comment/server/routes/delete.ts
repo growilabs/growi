@@ -36,6 +36,7 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { InlineCommentService } from '../service/inline-comment-service';
+import { updatePageCommentCount } from '../update-page-comment-count';
 
 const logger = loggerFactory('growi:routes:apiv3:inline-comments:delete');
 
@@ -133,6 +134,7 @@ export const deleteInlineCommentRouteHandlersFactory = (
       const service = new InlineCommentService({
         prisma,
         commentService: crowi.commentService,
+        updateCommentCount: updatePageCommentCount,
       });
 
       try {

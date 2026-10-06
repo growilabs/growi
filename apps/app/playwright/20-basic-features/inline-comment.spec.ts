@@ -118,6 +118,76 @@ const clickText = async (targetPage: Page, text: string): Promise<void> => {
   await targetPage.mouse.click(x, y);
 };
 
+/**
+ * How many client rects the saved highlight's registered `Range` currently
+ * reports. `CSS.highlights.get(...)?.size` alone stays `1` even for a `Range`
+ * whose text node no longer sits in the document (the Highlight set still
+ * holds the object), and such a `Range` paints nothing and -- being the very
+ * object `useHighlightHitTest` hit-tests -- is unhittable too. A rect count
+ * above zero is what distinguishes "this highlight covers real, laid-out text
+ * right now" from "a leftover Range is still registered".
+ */
+const highlightRectCount = (targetPage: Page): Promise<number> =>
+  targetPage.evaluate(() => {
+    const set = CSS.highlights.get('growi-inline-comment');
+    const range = set != null ? [...set][0] : undefined;
+    return range instanceof Range ? range.getClientRects().length : 0;
+  });
+
+/**
+ * Waits until the saved highlight covers laid-out, hit-testable text. Needed
+ * before hovering/clicking it after a fresh load: `inline-comment-ready` only
+ * marks SelectionCapture's idle stage, while the saved anchor is resolved and
+ * registered asynchronously after that.
+ */
+const waitForSavedHighlight = async (targetPage: Page): Promise<void> => {
+  await expect.poll(() => highlightRectCount(targetPage)).toBeGreaterThan(0);
+};
+
+/**
+ * Hovers/clicks `text` until the preview popover opens.
+ *
+ * Even once the highlight is registered, the first gesture after a fresh load
+ * can still be lost: `InlineCommentBodyInteraction` (which attaches the
+ * hit-test listeners) is a separate lazily loaded chunk from
+ * `InlineCommentHighlight` (which registers the highlight), and the hover path
+ * additionally ignores pointer moves until the `isLargerThanMd` atom flips
+ * true in its own effect. A real pointer keeps generating events, so
+ * repeating the gesture models real use; a single `page.mouse` call does not.
+ *
+ * Use this only for the FIRST popover-opening gesture after a goto/reload --
+ * never for a step whose timing or negative outcome is itself under test.
+ */
+const openPopoverFromHighlight = async (
+  targetPage: Page,
+  text: string,
+  gesture: 'hover' | 'click',
+): Promise<void> => {
+  const popover = targetPage.getByTestId('inline-comment-preview-popover');
+  await expect(async () => {
+    // A late-opening popover from the previous attempt counts. Clicking the
+    // highlight again would instead be an outside mousedown that closes it,
+    // and the repeated identical hit would then stay suppressed.
+    if (await popover.isVisible()) {
+      return;
+    }
+    const { x, y } = await centerOfText(targetPage, text);
+    if (gesture === 'hover') {
+      // Two distinct points, so every attempt dispatches a fresh pointermove
+      // even when the pointer is already resting on the text.
+      await targetPage.mouse.move(x - 2, y);
+      await targetPage.mouse.move(x, y);
+    } else {
+      await targetPage.mouse.click(x, y);
+    }
+    // Hover: the 150ms show delay plus a frame. Click: no debounce at all, so
+    // a slow appearance only means slow rendering -- give it longer.
+    await expect(popover).toBeVisible({
+      timeout: gesture === 'hover' ? 1_000 : 3_000,
+    });
+  }).toPass({ timeout: 15_000 });
+};
+
 test.describe('Inline comment', () => {
   // Serial: comment creation is a real, non-idempotent backend write and later
   // tests (reload / reply) depend on the comment created by an earlier test in
@@ -1994,16 +2064,7 @@ test.describe('Inline comment - hover/click/tap on a saved body highlight opens 
     await expect(item).toBeVisible();
     await expect(item).toContainText(commentText);
 
-    // The saved highlight (and therefore its hit-testable Range) is only
-    // registered once AnchorResolver resolves the just-created anchor -- same
-    // poll pattern used throughout this file.
-    await expect
-      .poll(async () =>
-        page.evaluate(
-          () => CSS.highlights.get('growi-inline-comment')?.size ?? 0,
-        ),
-      )
-      .toBeGreaterThan(0);
+    await waitForSavedHighlight(page);
   });
 
   test('Desktop: hovering the highlight shows the comment content, and moving away closes it (Req 2.1, 2.4, 2.5)', async ({
@@ -2013,12 +2074,12 @@ test.describe('Inline comment - hover/click/tap on a saved body highlight opens 
     // Bootstrap's `md` breakpoint (768px) -- the desktop case Req 2.1 covers.
     await page.goto(bodyPopoverPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
 
     const popover = page.getByTestId('inline-comment-preview-popover');
     await expect(popover).not.toBeVisible();
 
-    await hoverText(page, targetSentence);
-    await expect(popover).toBeVisible();
+    await openPopoverFromHighlight(page, targetSentence, 'hover');
     await expect(popover).toContainText(commentText);
 
     // Requirement 15, AC 15.5: the popover also offers an edit control for
@@ -2042,10 +2103,10 @@ test.describe('Inline comment - hover/click/tap on a saved body highlight opens 
   }, testInfo) => {
     await page.goto(bodyPopoverPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
 
     const popover = page.getByTestId('inline-comment-preview-popover');
-    await clickText(page, targetSentence);
-    await expect(popover).toBeVisible();
+    await openPopoverFromHighlight(page, targetSentence, 'click');
     await expect(popover).toContainText(commentText);
 
     // Decisive proof of "pinned": a plain hover elsewhere, which alone closes
@@ -2065,10 +2126,10 @@ test.describe('Inline comment - hover/click/tap on a saved body highlight opens 
   }, testInfo) => {
     await page.goto(bodyPopoverPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
 
     const popover = page.getByTestId('inline-comment-preview-popover');
-    await clickText(page, targetSentence);
-    await expect(popover).toBeVisible();
+    await openPopoverFromHighlight(page, targetSentence, 'click');
 
     await clickText(page, introText);
     await expect(popover).not.toBeVisible();
@@ -2079,10 +2140,10 @@ test.describe('Inline comment - hover/click/tap on a saved body highlight opens 
   }, testInfo) => {
     await page.goto(bodyPopoverPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
 
     const popover = page.getByTestId('inline-comment-preview-popover');
-    await clickText(page, targetSentence);
-    await expect(popover).toBeVisible();
+    await openPopoverFromHighlight(page, targetSentence, 'click');
 
     const replyText = 'a reply posted through the body popover';
     // 2026-09-11 その4: the popover's reply composer is `MentionAwareCommentInput`
@@ -2118,12 +2179,12 @@ test.describe('Inline comment - hover/click/tap on a saved body highlight opens 
     await page.setViewportSize({ width: 600, height: 1024 });
     await page.goto(bodyPopoverPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
 
     const popover = page.getByTestId('inline-comment-preview-popover');
     await expect(popover).not.toBeVisible();
 
-    await clickText(page, targetSentence);
-    await expect(popover).toBeVisible();
+    await openPopoverFromHighlight(page, targetSentence, 'click');
     await expect(popover).toContainText(commentText);
   });
 });
@@ -2190,16 +2251,7 @@ test.describe('Inline comment - hover-to-popover transit and popover-lock timing
     await expect(item).toBeVisible();
     await expect(item).toContainText(commentText);
 
-    // The saved highlight (and therefore its hit-testable Range) is only
-    // registered once AnchorResolver resolves the just-created anchor -- same
-    // poll pattern used throughout this file.
-    await expect
-      .poll(async () =>
-        page.evaluate(
-          () => CSS.highlights.get('growi-inline-comment')?.size ?? 0,
-        ),
-      )
-      .toBeGreaterThan(0);
+    await waitForSavedHighlight(page);
   });
 
   test('Req 15.7-15.9: moving the pointer from the highlight, through the gap, and onto the popover keeps it visible throughout, and once landed it stays open even after the pointer leaves entirely', async ({
@@ -2207,16 +2259,15 @@ test.describe('Inline comment - hover-to-popover transit and popover-lock timing
   }, testInfo) => {
     await page.goto(popoverRefinementPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
 
     const popover = page.getByTestId('inline-comment-preview-popover');
     await expect(popover).not.toBeVisible();
 
+    // Req 15.7: appears after the show delay. The helper leaves the pointer
+    // resting on the center of the text, where the transit below starts.
+    await openPopoverFromHighlight(page, targetSentence, 'hover');
     const highlightPoint = await centerOfText(page, targetSentence);
-    await page.mouse.move(highlightPoint.x, highlightPoint.y);
-
-    // Req 15.7: appears after the show delay -- the default expect timeout
-    // comfortably covers the 150ms delay, so no fixed wait is needed here.
-    await expect(popover).toBeVisible();
 
     const popoverBox = await popover.boundingBox();
     if (popoverBox == null) {
@@ -2268,10 +2319,13 @@ test.describe('Inline comment - hover-to-popover transit and popover-lock timing
   }, testInfo) => {
     await page.goto(popoverRefinementPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
 
     const popover = page.getByTestId('inline-comment-preview-popover');
     await expect(popover).not.toBeVisible();
 
+    // A single click, not `openPopoverFromHighlight`: retrying it would let a
+    // popover that only appears after the hover debounce pass the 100ms check.
     await clickText(page, targetSentence);
 
     // A short explicit timeout, well under the 150ms hover show-delay, proves
@@ -2291,10 +2345,10 @@ test.describe('Inline comment - hover-to-popover transit and popover-lock timing
   }, testInfo) => {
     await page.goto(popoverRefinementPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
 
     const popover = page.getByTestId('inline-comment-preview-popover');
-    await clickText(page, targetSentence);
-    await expect(popover).toBeVisible();
+    await openPopoverFromHighlight(page, targetSentence, 'click');
 
     await popover.getByRole('button', { name: 'Resolve' }).click();
 
@@ -2873,23 +2927,6 @@ test.describe('Inline comment - the highlight keeps tracking a body change that 
     }
   });
 
-  /**
-   * How many client rects the saved highlight's registered `Range` currently
-   * reports -- the "見た目" half of Requirement 4.1, read directly.
-   * `CSS.highlights.get(...)?.size` alone stays `1` even for a `Range` whose
-   * text node no longer sits in the document (the Highlight set still holds
-   * the object), and such a `Range` paints nothing and -- being the very
-   * object `useHighlightHitTest` hit-tests -- is unhittable too. A rect count
-   * above zero is what distinguishes "this highlight covers real, laid-out
-   * text right now" from "a leftover Range is still registered".
-   */
-  const highlightRectCount = (targetPage: Page): Promise<number> =>
-    targetPage.evaluate(() => {
-      const set = CSS.highlights.get('growi-inline-comment');
-      const range = set != null ? [...set][0] : undefined;
-      return range?.getClientRects().length ?? 0;
-    });
-
   test('Create a page and save an inline comment on the target sentence', async ({
     page,
     request,
@@ -2958,10 +2995,9 @@ test.describe('Inline comment - the highlight keeps tracking a body change that 
     // observing the delayed-loading state it is about.
     await expect(page.locator('.wiki h1')).toBeVisible();
     await expect(editButton).toHaveCount(0);
-    await expect.poll(() => highlightRectCount(page)).toBeGreaterThan(0);
+    await waitForSavedHighlight(page);
 
-    await hoverText(page, targetSentence);
-    await expect(popover).toBeVisible();
+    await openPopoverFromHighlight(page, targetSentence, 'hover');
     await expect(popover).toContainText(commentText);
 
     await hoverText(page, introText);
@@ -2995,6 +3031,10 @@ test.describe('Inline comment - the highlight keeps tracking a body change that 
     // carried over -- Requirement 4.1's "位置情報を再構築し" and the reason
     // Requirement 3.4 asks for a re-resolution opportunity at all. Captured
     // as late as possible, immediately before the change under test.
+    //
+    // The "before" half must finish inside YJS_DATA_DELAY_MS; checked here so
+    // an overrun fails as such rather than as an identity mismatch below.
+    await expect(editButton).toHaveCount(0);
     await page.evaluate(() => {
       Reflect.set(
         window,
@@ -3349,10 +3389,8 @@ test.describe('Inline comment - a heading-adjacent comment restores onto the sam
     // is searched in were counted in the same state), and it is what variant
     // A has to agree with. Requirement 2.2 is the PAIR -- "same result either
     // way" -- so neither test alone states the contract.
-    const releaseCommentList = await gateRoute(
-      page,
-      '**/_api/v3/inline-comments**',
-    );
+    // The anchors arrive through the page's shared comment list.
+    const releaseCommentList = await gateRoute(page, '**/_api/v3/comments**');
 
     await page.goto(headingAdjacentPagePath(testInfo.retry));
 
@@ -3491,10 +3529,10 @@ test.describe('Inline comment - editing an origin comment (from the list and fro
   }, testInfo) => {
     await page.goto(editFlowPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
 
     const popover = page.getByTestId('inline-comment-preview-popover');
-    await clickText(page, targetSentence);
-    await expect(popover).toBeVisible();
+    await openPopoverFromHighlight(page, targetSentence, 'click');
     await expect(popover).toContainText(
       'an origin comment edited from the list',
     );
@@ -3528,9 +3566,9 @@ test.describe('Inline comment - editing an origin comment (from the list and fro
     );
 
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
     const reopenedPopover = page.getByTestId('inline-comment-preview-popover');
-    await clickText(page, targetSentence);
-    await expect(reopenedPopover).toBeVisible();
+    await openPopoverFromHighlight(page, targetSentence, 'click');
     await expect(reopenedPopover).toContainText(
       'an origin comment edited from the popover',
     );
@@ -3837,10 +3875,10 @@ test.describe("Inline comment - a non-owner browser session sees no edit/delete 
       const page = await context.newPage();
       await page.goto(nonOwnerPagePath(testInfo.retry));
       await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+      await waitForSavedHighlight(page);
 
       const popover = page.getByTestId('inline-comment-preview-popover');
-      await clickText(page, targetSentence);
-      await expect(popover).toBeVisible();
+      await openPopoverFromHighlight(page, targetSentence, 'click');
       await expect(popover).toContainText('an origin comment owned by admin');
       await expect(
         popover.getByTestId('inline-comment-preview-popover-edit-button'),
@@ -3915,10 +3953,10 @@ test.describe('Inline comment - a resolved comment hides its body highlight/popo
   }, testInfo) => {
     await page.goto(resolvedPagePath(testInfo.retry));
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await waitForSavedHighlight(page);
 
     const popover = page.getByTestId('inline-comment-preview-popover');
-    await clickText(page, targetSentence);
-    await expect(popover).toBeVisible();
+    await openPopoverFromHighlight(page, targetSentence, 'click');
 
     await popover.getByRole('button', { name: 'Resolve' }).click();
     await expect(popover).not.toBeVisible();
@@ -4483,23 +4521,13 @@ test.describe('Inline comment - visual refresh: mockup cross-check captures', ()
     await page.goto(visualRefreshPagePath(testInfo.retry));
     await disableCssTransitions(page);
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
-
-    // The saved highlight must actually be registered before the popover can
-    // be opened at all -- it is what `useHighlightHitTest` hit-tests against.
-    await expect
-      .poll(async () =>
-        page.evaluate(
-          () => CSS.highlights.get('growi-inline-comment')?.size ?? 0,
-        ),
-      )
-      .toBeGreaterThan(0);
+    await waitForSavedHighlight(page);
 
     // A click (not a hover) pins the popover open via its `onPointerEnter`
     // promotion, which is what makes it stable enough to screenshot and
     // measure without the pointer having to stay parked on the text.
-    await clickText(page, targetSentence);
+    await openPopoverFromHighlight(page, targetSentence, 'click');
     const popover = page.getByTestId('inline-comment-preview-popover');
-    await expect(popover).toBeVisible();
     await expect(popover).toContainText(originCommentText);
     await expect(
       popover.getByTestId('inline-comment-preview-popover-reply'),
@@ -4662,6 +4690,8 @@ test.describe('Inline comment - visual refresh: mockup cross-check captures', ()
     await expect(item.getByTestId('inline-comment-status')).toHaveText(
       'Resolved',
     );
+    // Resolving collapses the item; this state captures the expanded card.
+    await item.getByTestId('inline-comment-expand-button').click();
     await card.hover();
     await expect(editButton).toBeVisible();
 
@@ -4763,17 +4793,10 @@ test.describe('Inline comment - visual refresh: mockup cross-check captures', ()
     await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
     const themeProbe = await switchToDarkMode(page);
 
-    await expect
-      .poll(async () =>
-        page.evaluate(
-          () => CSS.highlights.get('growi-inline-comment')?.size ?? 0,
-        ),
-      )
-      .toBeGreaterThan(0);
+    await waitForSavedHighlight(page);
 
-    await clickText(page, targetSentence);
+    await openPopoverFromHighlight(page, targetSentence, 'click');
     const popover = page.getByTestId('inline-comment-preview-popover');
-    await expect(popover).toBeVisible();
     await expect(popover).toContainText(originCommentText);
     await waitForPopoverToSettle(popover);
 
@@ -4921,6 +4944,8 @@ test.describe('Inline comment - visual refresh: mockup cross-check captures', ()
     await expect(item.getByTestId('inline-comment-status')).toHaveText(
       'Resolved',
     );
+    // Resolving collapses the item; this state captures the expanded card.
+    await item.getByTestId('inline-comment-expand-button').click();
     await card.hover();
     await expect(editButton).toBeVisible();
 
@@ -4943,5 +4968,387 @@ test.describe('Inline comment - visual refresh: mockup cross-check captures', ()
     await expect(item.getByTestId('inline-comment-status')).toHaveText(
       'Unresolved',
     );
+  });
+});
+
+test.describe('Inline comment - resolved comments are collapsed by default, expand one by one or all at once from the list menu, and collapse again on reload (Req 20.1, 20.2, 20.5, 21.1-21.3, 22.1, 22.4)', () => {
+  // Serial: the comments created (and resolved) by the first tests are the
+  // fixture every later test reads, same reasoning as the other suites here.
+  test.describe.configure({ mode: 'serial' });
+
+  const collapsePagePath = (retry: number) =>
+    `/inline-comment-e2e-collapse${retry}`;
+
+  // Long enough to wrap onto well over two lines at every viewport this
+  // suite uses, so the two-line clamp visibly cuts it off.
+  const longResolvedSentence = Array.from(
+    { length: 12 },
+    (_, i) => `Long resolved anchor segment number ${i + 1} keeps growing.`,
+  ).join(' ');
+  const shortResolvedSentence =
+    'This short sentence anchors the second resolved comment.';
+  const unresolvedSentence =
+    'This sentence anchors the comment that stays unresolved.';
+
+  const longResolvedBody = 'body of the first resolved comment';
+  const shortResolvedBody = 'body of the second resolved comment';
+  const unresolvedBody = 'body of the unresolved comment';
+
+  const pageBody = [
+    '# Inline comment E2E - collapse',
+    '',
+    longResolvedSentence,
+    '',
+    shortResolvedSentence,
+    '',
+    unresolvedSentence,
+    '',
+  ].join('\n');
+
+  // The en_US values of `inline_comment.list_menu` / `expand_all_resolved`.
+  const listMenuName = 'Comment list menu';
+  const expandAllName = 'Expand all resolved comments';
+
+  let createdPage: CreatedPage | undefined;
+
+  test.afterAll(async ({ request }) => {
+    if (createdPage != null) {
+      await deletePagesCompletely(request, [createdPage]);
+    }
+  });
+
+  const listItemFor = (page: Page, anchorText: string): Locator =>
+    page
+      .getByTestId('inline-comment-item')
+      .filter({ hasText: anchorText.slice(0, 40) });
+
+  const createInlineComment = async (
+    page: Page,
+    anchorText: string,
+    bodyText: string,
+  ): Promise<void> => {
+    await selectTextInPageBody(page, anchorText);
+    await page.getByTestId('selection-action-button').click();
+    const form = page.getByTestId('inline-comment-form');
+    await expect(form).toBeVisible();
+    await form.locator('.cm-content').fill(bodyText);
+    await form.getByTestId('inline-comment-submit-button').click();
+    await expect(form).not.toBeVisible();
+    await expect(listItemFor(page, anchorText)).toContainText(bodyText);
+  };
+
+  const gotoCollapsePage = async (page: Page, retry: number): Promise<void> => {
+    await page.goto(collapsePagePath(retry));
+    await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+    await expect(page.getByTestId('inline-comment-item')).toHaveCount(3);
+  };
+
+  const expectCollapsed = async (
+    item: Locator,
+    body: string,
+  ): Promise<void> => {
+    await expect(
+      item.getByTestId('inline-comment-expand-button'),
+    ).toBeVisible();
+    await expect(
+      item.getByTestId('inline-comment-collapse-button'),
+    ).toHaveCount(0);
+    await expect(item.locator('blockquote.inline-comment-quote')).toBeVisible();
+    // Collapsed shows a height-clipped rendered peek of the body.
+    await expect(
+      item.getByTestId('inline-comment-collapsed-peek'),
+    ).toContainText(body);
+  };
+
+  const expectExpanded = async (item: Locator, body: string): Promise<void> => {
+    await expect(item.getByText(body)).toBeVisible();
+    await expect(
+      item.getByTestId('inline-comment-collapse-button'),
+    ).toBeVisible();
+    await expect(item.getByTestId('inline-comment-expand-button')).toHaveCount(
+      0,
+    );
+  };
+
+  const expectUnresolvedUntouched = async (page: Page): Promise<void> => {
+    const item = listItemFor(page, unresolvedSentence);
+    await expect(item.getByText(unresolvedBody)).toBeVisible();
+    await expect(item.getByTestId('inline-comment-expand-button')).toHaveCount(
+      0,
+    );
+    await expect(
+      item.getByTestId('inline-comment-collapse-button'),
+    ).toHaveCount(0);
+  };
+
+  test('Create a page, save three inline comments, and resolve two of them: each resolved comment collapses right away', async ({
+    page,
+    request,
+  }, testInfo) => {
+    createdPage = await createPage(request, {
+      path: collapsePagePath(testInfo.retry),
+      body: pageBody,
+    });
+
+    await page.goto(createdPage.path);
+    await expect(page.locator('.wiki').first()).toContainText(
+      unresolvedSentence,
+    );
+    await expect(page.getByTestId('inline-comment-ready')).toBeAttached();
+
+    await createInlineComment(page, longResolvedSentence, longResolvedBody);
+    await createInlineComment(page, shortResolvedSentence, shortResolvedBody);
+    await createInlineComment(page, unresolvedSentence, unresolvedBody);
+
+    const resolveAndExpectCollapsed = async (
+      sentence: string,
+      body: string,
+    ): Promise<void> => {
+      const item = listItemFor(page, sentence);
+      // The resolve toggle is revealed only while the card is hovered.
+      await item.locator('.page-comment').first().hover();
+      await item.getByTestId('inline-comment-resolve-toggle-button').click();
+      // Requirement 20.1: resolving collapses the item without a reload.
+      await expectCollapsed(item, body);
+    };
+    await resolveAndExpectCollapsed(longResolvedSentence, longResolvedBody);
+    await resolveAndExpectCollapsed(shortResolvedSentence, shortResolvedBody);
+    await expectUnresolvedUntouched(page);
+  });
+
+  test('Req 20.1, 20.2, 20.5: after a reload the resolved comments are collapsed (quote and body peek visible) and the unresolved one is expanded', async ({
+    page,
+  }, testInfo) => {
+    await gotoCollapsePage(page, testInfo.retry);
+
+    await expectCollapsed(
+      listItemFor(page, longResolvedSentence),
+      longResolvedBody,
+    );
+    await expectCollapsed(
+      listItemFor(page, shortResolvedSentence),
+      shortResolvedBody,
+    );
+    await expectUnresolvedUntouched(page);
+  });
+
+  test('Req 21.1-21.3: expanding one resolved comment expands only that one, and its collapse button folds it back in the same place', async ({
+    page,
+  }, testInfo) => {
+    await gotoCollapsePage(page, testInfo.retry);
+
+    const target = listItemFor(page, shortResolvedSentence);
+    const other = listItemFor(page, longResolvedSentence);
+
+    await target.getByTestId('inline-comment-expand-button').click();
+    await expectExpanded(target, shortResolvedBody);
+    await expectCollapsed(other, longResolvedBody);
+    await expectUnresolvedUntouched(page);
+
+    await target.getByTestId('inline-comment-collapse-button').click();
+    await expectCollapsed(target, shortResolvedBody);
+    await expectCollapsed(other, longResolvedBody);
+  });
+
+  test('Req 22.1, 22.4, 20.5: the list menu expands every resolved comment and leaves the unresolved one alone; a reload collapses them again', async ({
+    page,
+  }, testInfo) => {
+    await gotoCollapsePage(page, testInfo.retry);
+
+    await page.getByRole('button', { name: listMenuName }).click();
+    await page.getByRole('menuitem', { name: expandAllName }).click();
+
+    await expectExpanded(
+      listItemFor(page, longResolvedSentence),
+      longResolvedBody,
+    );
+    await expectExpanded(
+      listItemFor(page, shortResolvedSentence),
+      shortResolvedBody,
+    );
+    await expectUnresolvedUntouched(page);
+
+    await page.reload();
+    await expect(page.getByTestId('inline-comment-item')).toHaveCount(3);
+    await expectCollapsed(
+      listItemFor(page, longResolvedSentence),
+      longResolvedBody,
+    );
+    await expectCollapsed(
+      listItemFor(page, shortResolvedSentence),
+      shortResolvedBody,
+    );
+    await expectUnresolvedUntouched(page);
+  });
+
+  test('Req 20.2: a long quote is cut off at one line while collapsed, and shows in full once expanded', async ({
+    page,
+  }, testInfo) => {
+    await gotoCollapsePage(page, testInfo.retry);
+
+    const item = listItemFor(page, longResolvedSentence);
+    const quote = item.locator('blockquote.inline-comment-quote');
+    await quote.scrollIntoViewIfNeeded();
+
+    // The clamp sits on an element inside the padded blockquote, so its box
+    // is exactly the visible text area (no padding to leak the next line into).
+    const clamp = quote.locator('.inline-comment-quote-clamped');
+    const collapsedQuoteHeight = (await quote.boundingBox())?.height ?? 0;
+
+    const clampMetrics = await clamp.evaluate((el) => {
+      const style = window.getComputedStyle(el);
+      return {
+        lineClamp: style.getPropertyValue('-webkit-line-clamp'),
+        clientHeight: el.clientHeight,
+        scrollHeight: el.scrollHeight,
+        lineHeight: Number.parseFloat(style.lineHeight),
+        verticalPadding:
+          Number.parseFloat(style.paddingTop) +
+          Number.parseFloat(style.paddingBottom),
+      };
+    });
+    expect(clampMetrics.lineClamp).toBe('1');
+    expect(clampMetrics.verticalPadding).toBe(0);
+    // Cut off: there is more text than the visible box shows ...
+    expect(clampMetrics.scrollHeight).toBeGreaterThan(
+      clampMetrics.clientHeight,
+    );
+    // ... and the visible box holds no more than one line.
+    expect(clampMetrics.clientHeight).toBeLessThanOrEqual(
+      clampMetrics.lineHeight * 1 + 1,
+    );
+
+    await item.screenshot({
+      path: testInfo.outputPath('long-quote-collapsed.png'),
+    });
+
+    await item.getByTestId('inline-comment-expand-button').click();
+    await expect(quote.locator('.inline-comment-quote-clamped')).toHaveCount(0);
+    const expandedQuoteHeight = (await quote.boundingBox())?.height ?? 0;
+    expect(expandedQuoteHeight).toBeGreaterThan(collapsedQuoteHeight);
+  });
+
+  test('Req 22.1: on a 375px-wide screen the list menu button stays inside the viewport at the right side, and its dropdown does not run off either edge', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await gotoCollapsePage(page, testInfo.retry);
+
+    const menuButton = page.getByRole('button', { name: listMenuName });
+    await menuButton.scrollIntoViewIfNeeded();
+    await expect(menuButton).toBeVisible();
+
+    const buttonBox = await menuButton.boundingBox();
+    expect(buttonBox).not.toBeNull();
+    if (buttonBox == null) return;
+    expect(buttonBox.x).toBeGreaterThanOrEqual(0);
+    expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(375);
+    expect(buttonBox.x + buttonBox.width / 2).toBeGreaterThan(375 / 2);
+
+    const expectBadgeInsideCard = async (item: Locator): Promise<void> => {
+      const badge = item.getByTestId('inline-comment-status');
+      await badge.scrollIntoViewIfNeeded();
+      const badgeBox = await badge.boundingBox();
+      const cardBox = await item.locator('.page-comment-main').boundingBox();
+      expect(badgeBox).not.toBeNull();
+      expect(cardBox).not.toBeNull();
+      if (badgeBox == null || cardBox == null) return;
+      expect(badgeBox.x + badgeBox.width).toBeLessThanOrEqual(
+        cardBox.x + cardBox.width + 0.5,
+      );
+    };
+    const collapsedResolved = listItemFor(page, shortResolvedSentence);
+    const unresolved = listItemFor(page, unresolvedSentence);
+    await expectBadgeInsideCard(collapsedResolved);
+    await expectBadgeInsideCard(unresolved);
+    await collapsedResolved.getByTestId('inline-comment-expand-button').click();
+    await expect(
+      collapsedResolved.getByTestId('inline-comment-collapse-button'),
+    ).toBeVisible();
+    await expectBadgeInsideCard(collapsedResolved);
+
+    await menuButton.click();
+    const menuItem = page.getByRole('menuitem', { name: expandAllName });
+    await expect(menuItem).toBeVisible();
+    const itemBox = await menuItem.boundingBox();
+    expect(itemBox).not.toBeNull();
+    if (itemBox == null) return;
+    expect(itemBox.x).toBeGreaterThanOrEqual(0);
+    expect(itemBox.x + itemBox.width).toBeLessThanOrEqual(375);
+
+    await page.screenshot({ path: testInfo.outputPath('narrow-375-menu.png') });
+  });
+
+  test('Req 22.1: in the dark theme the three-dot button stays legible against its surroundings and its dropdown follows the theme', async ({
+    page,
+  }, testInfo) => {
+    await gotoCollapsePage(page, testInfo.retry);
+    await page.addStyleTag({
+      content:
+        '*, *::before, *::after { transition: none !important; animation: none !important; }',
+    });
+
+    const menuButton = page.getByRole('button', { name: listMenuName });
+    await menuButton.scrollIntoViewIfNeeded();
+
+    // The icon color against the first opaque background found walking up
+    // from the button, as a WCAG contrast ratio.
+    const readContrast = (): Promise<number> =>
+      menuButton.evaluate((el) => {
+        const parse = (value: string): number[] =>
+          (value.match(/[\d.]+/g) ?? []).map(Number);
+        const luminance = ([r, g, b]: number[]): number => {
+          const [lr, lg, lb] = [r, g, b].map((c) => {
+            const v = c / 255;
+            return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+        };
+        let surface: Element | null = el.parentElement;
+        while (surface != null) {
+          const bg = parse(getComputedStyle(surface).backgroundColor);
+          if (bg.length >= 3 && (bg[3] ?? 1) > 0.99) break;
+          surface = surface.parentElement;
+        }
+        const surfaceColor = parse(
+          surface == null
+            ? 'rgb(255, 255, 255)'
+            : getComputedStyle(surface).backgroundColor,
+        );
+        const iconColor = parse(getComputedStyle(el).color);
+        const [hi, lo] = [luminance(iconColor), luminance(surfaceColor)].sort(
+          (a, b) => b - a,
+        );
+        return (hi + 0.05) / (lo + 0.05);
+      });
+    const dropdownBackground = (dropdown: Locator): Promise<string> =>
+      dropdown.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    await menuButton.click();
+    const dropdown = page
+      .getByRole('menuitem', { name: expandAllName })
+      .locator('..');
+    await expect(dropdown).toBeVisible();
+    const lightDropdownBackground = await dropdownBackground(dropdown);
+    await menuButton.click();
+    await expect(dropdown).not.toBeVisible();
+
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-bs-theme', 'dark');
+    });
+    // 3:1 is the WCAG minimum for a non-text UI component such as an icon button.
+    expect(await readContrast()).toBeGreaterThanOrEqual(3);
+
+    await menuButton.click();
+    await expect(dropdown).toBeVisible();
+    expect(await dropdownBackground(dropdown)).not.toBe(
+      lightDropdownBackground,
+    );
+
+    await page
+      .getByTestId('inline-comment-item')
+      .first()
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('dark-menu-open.png') });
   });
 });

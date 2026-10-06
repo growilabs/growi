@@ -1,73 +1,33 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { Nullable } from '@growi/core';
 import type { SWRResponse } from 'swr';
-import useSWR from 'swr';
 
-import { apiGet, apiPost } from '~/client/util/apiv1-client';
-import { useShareLinkId } from '~/states/page/hooks';
+import { apiPost } from '~/client/util/apiv1-client';
+import { useSWRxCommentList } from '~/features/comment/client/stores/comment-list';
 
 import type {
   ICommentHasIdList,
   ICommentPostArgs,
 } from '../interfaces/comment';
 
-type IResponseComment = {
-  comments: ICommentHasIdList;
-  ok: boolean;
-};
-
 type CommentOperation = {
   update(comment: string, revisionId: string, commentId: string): Promise<void>;
   post(args: ICommentPostArgs): Promise<void>;
 };
 
-/**
- * Normalize a raw shareLinkId into a non-empty trimmed string, or `undefined`
- * when it carries no share-link context. Feeding this normalized value into
- * both the SWR cache key and the request keeps them in sync: without it,
- * distinct-but-equivalent raw values (e.g. '  ' vs '   ') would produce
- * separate cache entries that all resolve to the same request.
- */
-const normalizeShareLinkId = (
-  shareLinkId: string | undefined,
-): string | undefined => {
-  const trimmed = shareLinkId?.trim();
-  return trimmed != null && trimmed.length > 0 ? trimmed : undefined;
-};
-
-/**
- * Build query params for /comments.get.
- * Keep the existing `page_id` as the single page identifier (verification and
- * fetch use the same id on the server); add `shareLinkId` only in a share-link
- * context. Never send a separate `pageId` — that would reintroduce the
- * verify/fetch identifier split.
- */
-const buildCommentGetParams = (
-  pageId: string,
-  shareLinkId: string | undefined,
-): { page_id: string; shareLinkId?: string } => {
-  if (shareLinkId != null) {
-    return { page_id: pageId, shareLinkId };
-  }
-  return { page_id: pageId };
-};
-
 export const useSWRxPageComment = (
   pageId: Nullable<string>,
 ): SWRResponse<ICommentHasIdList, Error> & CommentOperation => {
-  const shareLinkId = normalizeShareLinkId(useShareLinkId());
+  const swrResponse = useSWRxCommentList(pageId);
 
-  const shouldFetch: boolean = pageId != null;
+  const { data: commentList, mutate } = swrResponse;
 
-  const swrResponse = useSWR(
-    shouldFetch ? ['/comments.get', pageId, shareLinkId] : null,
-    ([endpoint, pageId, shareLinkId]: [string, string, string | undefined]) =>
-      apiGet(endpoint, buildCommentGetParams(pageId, shareLinkId)).then(
-        (response: IResponseComment) => response.comments,
-      ),
+  // Excluding inline rows here is also what keeps them off the share-link
+  // view and the search-result preview, which render only this list.
+  const normalComments = useMemo(
+    () => commentList?.filter((comment) => !comment.isInline),
+    [commentList],
   );
-
-  const { mutate } = swrResponse;
 
   const update = useCallback(
     async (comment: string, revisionId: string, commentId: string) => {
@@ -108,6 +68,7 @@ export const useSWRxPageComment = (
 
   return {
     ...swrResponse,
+    data: normalComments,
     update,
     post,
   };

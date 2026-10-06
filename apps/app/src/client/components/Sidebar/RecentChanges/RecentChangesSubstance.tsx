@@ -35,15 +35,22 @@ const PageItemLower = memo(({ page }: PageItemLowerProps): JSX.Element => {
     <div
       className={`${pageItemLowerClass} d-flex justify-content-between grw-recent-changes-item-lower`}
     >
-      <div className="d-flex align-items-center">
-        <div className="">
-          <span className="material-symbols-outlined p-0">footprint</span>
-          <span className="grw-list-counts ms-1">{page.seenUsers.length}</span>
-        </div>
-        <div className="ms-2">
-          <span className="material-symbols-outlined p-0">chat</span>
-          <span className="grw-list-counts ms-1">{page.commentCount}</span>
-        </div>
+      <div className="d-flex align-items-center gap-2">
+        {/* A single viewer is the author alone, so the count carries no information */}
+        {page.seenUsers.length > 1 && (
+          <div>
+            <span className="material-symbols-outlined p-0">footprint</span>
+            <span className="grw-list-counts ms-1">
+              {page.seenUsers.length}
+            </span>
+          </div>
+        )}
+        {page.commentCount > 0 && (
+          <div>
+            <span className="material-symbols-outlined p-0">chat</span>
+            <span className="grw-list-counts ms-1">{page.commentCount}</span>
+          </div>
+        )}
       </div>
       <div
         className="grw-formatted-distance-date mt-auto"
