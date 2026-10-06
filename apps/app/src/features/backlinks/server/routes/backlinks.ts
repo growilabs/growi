@@ -58,11 +58,12 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
 
       const [backlinks, linkTargets] = await Promise.all([
         crowi.pageLinkService.findBacklinks(pageObjectId, viewer, userGroups),
-        crowi.pageLinkService.findForwardLinkHealth(
-          pageObjectId,
-          viewer,
-          userGroups,
-        ),
+        crowi.pageLinkService
+          .findForwardLinkHealth(pageObjectId, viewer, userGroups)
+          .catch((err) => {
+            logger.error({ err }, 'Failed to get forward link health');
+            return null;
+          }),
       ]);
 
       return res.apiv3({ backlinks, linkTargets });
@@ -118,10 +119,13 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
  *                            example: /Sandbox/source
  *                    linkTargets:
  *                      type: array
+ *                      nullable: true
  *                      description: >
  *                        This page's outbound links whose target is trashed or broken.
  *                        Links to healthy pages, and to trashed pages the requesting
- *                        user cannot read, are omitted.
+ *                        user cannot read, are omitted. null when the lookup failed
+ *                        (backlinks are still returned); an empty array means no
+ *                        problematic links.
  *                      items:
  *                        type: object
  *                        properties:
