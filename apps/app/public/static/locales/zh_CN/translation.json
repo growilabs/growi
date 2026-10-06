@@ -421,6 +421,15 @@
     "comment_management_is_not_allowed": "不允许操作评论。",
     "no_comments": "暂无评论。"
   },
+  "inline_comment": {
+    "expand": "展开",
+    "collapse": "折叠",
+    "more": "更多",
+    "expand_all_resolved": "展开所有已解决的评论",
+    "list_menu": "评论列表菜单",
+    "item_menu": "评论操作",
+    "view_at_posting": "查看发表时的页面"
+  },
   "page_api_error": {
     "notfound_or_forbidden": "未找到或禁止原始页。",
     "already_exists": "具有该路径的页面已存在",

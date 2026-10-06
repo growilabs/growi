@@ -1,9 +1,9 @@
 import { getIdStringForRef } from '@growi/core';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { body, query, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
+import { toLegacyCommentListItem } from '~/features/comment/server/serializers/to-comment-list-item';
 import {
   SupportedAction,
   SupportedEventModel,
@@ -86,7 +86,10 @@ export const setup = (crowi, _app) => {
    *        tags: [Comments]
    *        operationId: getComments
    *        summary: /comments.get
-   *        description: Get comments of the page of the revision
+   *        deprecated: true
+   *        description: |
+   *          Deprecated. Use GET /comments (apiv3) instead, which also returns inline comments.
+   *          Get comments of the page of the revision
    *        parameters:
    *          - in: query
    *            name: page_id
@@ -166,16 +169,7 @@ export const setup = (crowi, _app) => {
 
     res.json(
       ApiResponse.success({
-        comments: comments.map((comment) => ({
-          ...comment,
-          page: comment.pageId,
-          creator:
-            comment.creator != null
-              ? serializeUserSecurely(comment.creator)
-              : comment.creatorId,
-          revision: comment.revisionId,
-          replyTo: comment.replyToId,
-        })),
+        comments: comments.map(toLegacyCommentListItem),
       }),
     );
   };
@@ -629,7 +623,12 @@ export const setup = (crowi, _app) => {
       }
 
       await prisma.comments.removeWithReplies(comment.id);
-      await Page.updateCommentCount(comment.pageId);
+      // The comment is already deleted; a failed count refresh must not turn that into an error response.
+      try {
+        await Page.updateCommentCount(comment.pageId);
+      } catch (err) {
+        logger.error('Failed to update the comment count', err);
+      }
       commentEvent.emit(CommentEvent.DELETE, comment);
     } catch (err) {
       return res.json(ApiResponse.error(err));

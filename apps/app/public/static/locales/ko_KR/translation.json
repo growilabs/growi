@@ -399,6 +399,15 @@
     "comment_management_is_not_allowed": "댓글 관리가 허용되지 않습니다.",
     "no_comments": "댓글이 없습니다."
   },
+  "inline_comment": {
+    "expand": "펼치기",
+    "collapse": "접기",
+    "more": "더보기",
+    "expand_all_resolved": "해결된 댓글 모두 펼치기",
+    "list_menu": "댓글 목록 메뉴",
+    "item_menu": "댓글 작업",
+    "view_at_posting": "작성 시점의 페이지 보기"
+  },
   "page_api_error": {
     "notfound_or_forbidden": "원본 페이지를 찾을 수 없거나 접근이 금지되었습니다.",
     "already_exists": "경로가 있는 페이지가 이미 존재합니다.",

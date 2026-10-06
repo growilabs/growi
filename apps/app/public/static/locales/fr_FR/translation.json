@@ -427,6 +427,15 @@
     "comment_management_is_not_allowed": "La gestion des commentaires n'est pas autorisée.",
     "no_comments": "Il n'y a aucun commentaire."
   },
+  "inline_comment": {
+    "expand": "Développer",
+    "collapse": "Réduire",
+    "more": "Plus",
+    "expand_all_resolved": "Développer tous les commentaires résolus",
+    "list_menu": "Menu de la liste des commentaires",
+    "item_menu": "Actions du commentaire",
+    "view_at_posting": "Voir la page au moment de la publication"
+  },
   "page_api_error": {
     "notfound_or_forbidden": "Page originale introuvable ou accès restreint.",
     "already_exists": "Une page avec ce chemin existe déjà.",

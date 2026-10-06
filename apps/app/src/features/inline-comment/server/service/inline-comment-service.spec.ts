@@ -114,7 +114,7 @@ function makeReplyRow(overrides: Partial<CommentsRow> = {}): CommentsRow {
   });
 }
 
-/** An origin (anchored) inline comment row, as `listByPageId()`'s `findMany()` reads it back (no `page` relation). */
+/** An origin (anchored) inline comment row, with no `page` relation. */
 function makeOriginRow(overrides: Partial<CommentsRow> = {}): CommentsRow {
   return makeCommentRow({
     quote: 'the quoted text',
@@ -171,7 +171,11 @@ function makeDeps(
       notify: vi.fn().mockResolvedValue(undefined),
     }),
   });
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -198,7 +202,11 @@ function makeReplyDeps(
       notify: vi.fn().mockResolvedValue(undefined),
     }),
   });
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -220,7 +228,11 @@ function makeSetResolvedDeps(
     },
   });
   const commentService = mock<PickedCommentService>({});
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -244,7 +256,11 @@ function makeUpdateDeps(
     },
   });
   const commentService = mock<PickedCommentService>({});
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -265,7 +281,11 @@ function makeDeleteCommentDeps(
     },
   });
   const commentService = mock<PickedCommentService>({});
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 /**
@@ -286,32 +306,11 @@ function makeDeleteReplyDeps(
     },
   });
   const commentService = mock<PickedCommentService>({});
-  return { prisma, commentService };
-}
-
-/**
- * Builds a fully-mocked `InlineCommentServiceDeps` for `listByPageId()`:
- * `findMany` is stubbed to answer the origin-comment query with
- * `originRows` and the replies query with `replyRows`, distinguished by
- * `where.replyToId` (`null` for origins, `{ in: [...] }` for replies) —
- * mirroring the two distinct `findMany` calls `listByPageId()` makes.
- */
-function makeListDeps(
-  originRows: CommentsRow[],
-  replyRows: CommentsRow[] = [],
-): InlineCommentServiceDeps {
-  const prisma = mock<PrismaClient>({
-    comments: {
-      findMany: vi.fn().mockImplementation(({ where }) => {
-        if (where.replyToId === null) {
-          return Promise.resolve(originRows);
-        }
-        return Promise.resolve(replyRows);
-      }),
-    },
-  });
-  const commentService = mock<PickedCommentService>({});
-  return { prisma, commentService };
+  return {
+    prisma,
+    commentService,
+    updateCommentCount: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -434,17 +433,11 @@ describe('InlineCommentService.create', () => {
   });
 
   it('挿入する data に replyToId: null を明示的に含める（省略しない）', async () => {
-    // Regression test for a real defect found while wiring the apiv3 routes
-    // (task 3.5): omitting `replyToId` here leaves the field entirely absent
-    // on the underlying MongoDB document (rather than stored as `null`), and
-    // Prisma's MongoDB connector's `where: { replyToId: null }` filter —
-    // exactly what listByPageId() uses to select origin comments — does not
-    // match a document where the field is absent. A mock can't reproduce
-    // that Mongo-connector-specific null-vs-absent distinction (this test
-    // only locks the field-presence contract so it can't silently regress
-    // again); the real regression coverage for the Mongo semantics lives in
-    // list.integ.ts's "lists only the isInline:true origin comments..." test
-    // (real DB, no mocks).
+    // Locks the field-presence contract: an omitted `replyToId` is absent from
+    // the MongoDB document, and Prisma's `where: { replyToId: null }` filter does
+    // not match an absent field. A mock can't reproduce that Mongo-connector
+    // behavior, so this only guards against dropping the explicit null.
+
     const createdRow = makeCreatedRow();
     const deps = makeDeps(createdRow);
     const service = new InlineCommentService(deps);
@@ -555,7 +548,11 @@ describe('InlineCommentService.createReply', () => {
         const commentService = mock<PickedCommentService>({
           prepareMentionNotifications: vi.fn(),
         });
-        const service = new InlineCommentService({ prisma, commentService });
+        const service = new InlineCommentService({
+          prisma,
+          commentService,
+          updateCommentCount: vi.fn().mockResolvedValue(undefined),
+        });
 
         await expect(
           service.createReply({ parentId: makeId(), comment: 'x' }, makeId()),
@@ -678,218 +675,6 @@ describe('InlineCommentService.createReply', () => {
   });
 });
 
-describe('InlineCommentService.listByPageId', () => {
-  it('起点コメントに、対応する返信をネストした配列として、双方とも作成日時順に並べて返す', async () => {
-    const pageId = makeId();
-    const now = Date.now();
-
-    // Two origin comments, newest first — the order listByPageId must
-    // preserve at the top level.
-    const originNewer = makeOriginRow({
-      pageId,
-      comment: 'origin newer',
-      createdAt: new Date(now),
-    });
-    const originOlder = makeOriginRow({
-      pageId,
-      comment: 'origin older',
-      createdAt: new Date(now - 10_000),
-    });
-
-    // Two replies to originOlder, newest first — the order listByPageId
-    // must preserve within that origin's nested `replies` array. Display
-    // order (oldest-first) is a client concern (InlineCommentReplies.tsx),
-    // not this method's — see its own doc comment above. A reply to
-    // originNewer confirms replies are matched to the correct parent, not
-    // just concatenated.
-    const replyToOlderNewer = makeReplyRow({
-      pageId,
-      comment: 'reply to older, newer',
-      replyToId: originOlder.id,
-      createdAt: new Date(now - 1_000),
-    });
-    const replyToOlderOlder = makeReplyRow({
-      pageId,
-      comment: 'reply to older, older',
-      replyToId: originOlder.id,
-      createdAt: new Date(now - 5_000),
-    });
-    const replyToNewer = makeReplyRow({
-      pageId,
-      comment: 'reply to newer',
-      replyToId: originNewer.id,
-      createdAt: new Date(now - 500),
-    });
-
-    const deps = makeListDeps(
-      [originNewer, originOlder],
-      [replyToOlderNewer, replyToOlderOlder, replyToNewer],
-    );
-    const service = new InlineCommentService(deps);
-
-    const result = await service.listByPageId(pageId);
-
-    expect(result.map((c) => c.comment)).toEqual([
-      'origin newer',
-      'origin older',
-    ]);
-    expect(
-      result
-        .find((c) => c.id === originNewer.id)
-        ?.replies.map((r) => r.comment),
-    ).toEqual(['reply to newer']);
-    expect(
-      result
-        .find((c) => c.id === originOlder.id)
-        ?.replies.map((r) => r.comment),
-    ).toEqual(['reply to older, newer', 'reply to older, older']);
-
-    // The nested-order assertions above only prove the assembly step
-    // preserves whatever order `findMany` happens to return — they say
-    // nothing about whether the service actually asked Prisma to sort by
-    // `createdAt`. Assert on the query arguments directly (requirement
-    // 2.6), the same way create()'s tests inspect `.mock.calls[0][0].data`
-    // for requirement 1.4.
-    const findManyCalls = vi.mocked(deps.prisma.comments.findMany).mock.calls;
-    const originCall = findManyCalls.find(
-      (call) => call[0]?.where?.replyToId === null,
-    );
-    const replyCall = findManyCalls.find((call) => {
-      const replyToId = call[0]?.where?.replyToId;
-      return replyToId != null && typeof replyToId === 'object';
-    });
-    expect(originCall?.[0]?.orderBy).toEqual({ createdAt: 'desc' });
-    expect(replyCall?.[0]?.orderBy).toEqual({ createdAt: 'desc' });
-  });
-
-  it('返信を持たない起点コメントは空の replies 配列を返す（undefined/null にはしない）', async () => {
-    const pageId = makeId();
-    const originRow = makeOriginRow({ pageId, comment: 'no replies here' });
-    const deps = makeListDeps([originRow], []);
-    const service = new InlineCommentService(deps);
-
-    const result = await service.listByPageId(pageId);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].replies).toEqual([]);
-  });
-
-  it('ページにインラインコメントが1件もない場合は空配列を返し、返信の取得は行わない', async () => {
-    const deps = makeListDeps([], []);
-    const service = new InlineCommentService(deps);
-
-    const result = await service.listByPageId(makeId());
-
-    expect(result).toEqual([]);
-    // Only the origin-comment query ran — no wasted second round trip when
-    // there is nothing to look up replies for.
-    expect(deps.prisma.comments.findMany).toHaveBeenCalledTimes(1);
-  });
-
-  it('投稿者が populate された行は、通常コメント一覧と同じ秘匿処理（serializeUserSecurely）を通した creator を返す（Requirement 13.5）', async () => {
-    const pageId = makeId();
-    // Fields serializeUserSecurely must strip: password, apiToken, email
-    // (email is kept only when isEmailPublished is true).
-    const creatorRow = {
-      id: makeId(),
-      username: 'alice',
-      name: 'Alice',
-      password: 'super-secret-hash',
-      apiToken: 'secret-api-token',
-      email: 'alice@example.com',
-      isEmailPublished: false,
-    };
-    const originRow = {
-      ...makeOriginRow({ pageId, comment: 'origin with creator' }),
-      creator: creatorRow,
-    } as CommentsRow & { creator: typeof creatorRow };
-    const deps = makeListDeps([originRow], []);
-    const service = new InlineCommentService(deps);
-
-    const result = await service.listByPageId(pageId);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].creator).not.toBeNull();
-    expect(result[0].creator?.username).toBe('alice');
-    // Secured fields must not leak through.
-    expect(result[0].creator).not.toHaveProperty('password');
-    expect(result[0].creator).not.toHaveProperty('apiToken');
-    expect(result[0].creator?.email).toBeUndefined();
-    // creatorId must still be present alongside the new creator field.
-    expect(result[0].creatorId).toBe(originRow.creatorId);
-  });
-
-  it('投稿者が populate されていない行は creator を null で返す', async () => {
-    const pageId = makeId();
-    const originRow = {
-      ...makeOriginRow({ pageId, comment: 'origin without creator' }),
-      creator: null,
-    } as CommentsRow & { creator: null };
-    const deps = makeListDeps([originRow], []);
-    const service = new InlineCommentService(deps);
-
-    const result = await service.listByPageId(pageId);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].creator).toBeNull();
-  });
-
-  it('返信も投稿者が populate されていれば creator を返す（起点コメントと同じ扱い）', async () => {
-    const pageId = makeId();
-    const originRow = makeOriginRow({ pageId, comment: 'origin' });
-    const creatorRow = {
-      id: makeId(),
-      username: 'bob',
-      name: 'Bob',
-      password: 'super-secret-hash',
-      apiToken: 'secret-api-token',
-      email: 'bob@example.com',
-      isEmailPublished: false,
-    };
-    const replyRow = {
-      ...makeReplyRow({
-        pageId,
-        comment: 'a reply',
-        replyToId: originRow.id,
-      }),
-      creator: creatorRow,
-    } as CommentsRow & { creator: typeof creatorRow };
-    const deps = makeListDeps([originRow], [replyRow]);
-    const service = new InlineCommentService(deps);
-
-    const result = await service.listByPageId(pageId);
-
-    const reply = result.find((c) => c.id === originRow.id)?.replies[0];
-    expect(reply?.creator).not.toBeNull();
-    expect(reply?.creator?.username).toBe('bob');
-    expect(reply?.creator).not.toHaveProperty('password');
-    expect(reply?.creator).not.toHaveProperty('apiToken');
-  });
-
-  it('アンカー必須フィールドが欠けた不正な行はスキップし、残りの正常な行だけを返す（1件の不正行で一覧全体を失敗させない）', async () => {
-    // BLOCKING 2 regression: toIInlineCommentFromListRow used to throw on a
-    // row missing an anchor field (e.g. quote: null), which propagated out
-    // of listByPageId() and made GET /inline-comments 500 for every viewer
-    // of the page — even though nothing in the query filter guarantees
-    // quote/prefix/suffix/approxOffset/anchorOriginRevisionId are non-null.
-    const pageId = makeId();
-    const wellFormed = makeOriginRow({ pageId, comment: 'well-formed origin' });
-    const malformed = makeOriginRow({
-      pageId,
-      comment: 'malformed origin (missing quote)',
-      quote: null,
-    });
-    const deps = makeListDeps([wellFormed, malformed], []);
-    const service = new InlineCommentService(deps);
-
-    const result = await service.listByPageId(pageId);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe(wellFormed.id);
-    expect(result[0].comment).toBe('well-formed origin');
-  });
-});
-
 describe('InlineCommentService.setResolved', () => {
   it('未解決の起点コメントを解決済みにすると、操作者と日時を記録し ACTION_INLINE_COMMENT_RESOLVE の Activity を発行する', async () => {
     const id = makeId();
@@ -994,7 +779,11 @@ describe('InlineCommentService.setResolved', () => {
       },
     });
     const commentService = mock<PickedCommentService>({});
-    const service = new InlineCommentService({ prisma, commentService });
+    const service = new InlineCommentService({
+      prisma,
+      commentService,
+      updateCommentCount: vi.fn().mockResolvedValue(undefined),
+    });
 
     const resolvedResult = await service.setResolved(id, true, actorId);
     expect(resolvedResult.resolvedById).toBe(actorId);
@@ -1301,5 +1090,201 @@ describe('InlineCommentService.deleteReply', () => {
       SupportedAction.ACTION_INLINE_COMMENT_REPLY_DELETE,
     );
     expect(activityParams.user).toBe(creatorId);
+  });
+});
+
+describe('InlineCommentService page comment count refresh', () => {
+  const originInput = (pageId: string) => ({
+    pageId,
+    anchorOriginRevisionId: makeId(),
+    comment: 'c',
+    anchor: { quote: 'q', prefix: '', suffix: '', approxOffset: 0 },
+  });
+
+  const rejectCount = (deps: InlineCommentServiceDeps) => {
+    vi.mocked(deps.updateCommentCount).mockRejectedValue(new Error('db down'));
+  };
+
+  it('create は成功後に、そのページの件数更新を完了まで待って呼ぶ', async () => {
+    const pageId = makeId();
+    const deps = makeDeps(makeCreatedRow({ pageId }));
+    let settled = false;
+    vi.mocked(deps.updateCommentCount).mockImplementation(async () => {
+      await Promise.resolve();
+      settled = true;
+    });
+
+    await new InlineCommentService(deps).create(originInput(pageId), makeId());
+
+    expect(deps.updateCommentCount).toHaveBeenCalledWith(pageId);
+    expect(settled).toBe(true);
+  });
+
+  it('create の入力検証で失敗したときは件数更新を呼ばない', async () => {
+    const deps = makeDeps(makeCreatedRow());
+    await expect(
+      new InlineCommentService(deps).create(
+        {
+          ...originInput(makeId()),
+          anchor: { quote: '', prefix: '', suffix: '', approxOffset: 0 },
+        },
+        makeId(),
+      ),
+    ).rejects.toThrow();
+    expect(deps.updateCommentCount).not.toHaveBeenCalled();
+  });
+
+  it('件数更新が失敗しても create は作成結果を返す', async () => {
+    const createdRow = makeCreatedRow();
+    const deps = makeDeps(createdRow);
+    rejectCount(deps);
+
+    const result = await new InlineCommentService(deps).create(
+      originInput(createdRow.pageId),
+      makeId(),
+    );
+
+    expect(result.id).toBe(createdRow.id);
+  });
+
+  it('createReply は親のページの件数更新を呼び、失敗しても返信を返す', async () => {
+    const parentRow = makeParentRow();
+    const replyRow = makeReplyRow({ pageId: parentRow.pageId });
+    const deps = makeReplyDeps(parentRow, replyRow);
+    rejectCount(deps);
+
+    const result = await new InlineCommentService(deps).createReply(
+      { parentId: parentRow.id, comment: 'r' },
+      makeId(),
+    );
+
+    expect(deps.updateCommentCount).toHaveBeenCalledWith(parentRow.pageId);
+    expect(result.id).toBe(replyRow.id);
+  });
+
+  it('deleteComment は削除後に件数更新を呼び、失敗しても削除は成功する', async () => {
+    const creatorId = makeId();
+    const targetRow = makeOriginRow({ creatorId });
+    const deps = makeDeleteCommentDeps(targetRow);
+    rejectCount(deps);
+
+    await expect(
+      new InlineCommentService(deps).deleteComment(targetRow.id, creatorId),
+    ).resolves.toBeUndefined();
+
+    expect(deps.updateCommentCount).toHaveBeenCalledWith(targetRow.pageId);
+  });
+
+  it('deleteReply は削除後に件数更新を呼び、失敗しても削除は成功する', async () => {
+    const creatorId = makeId();
+    const targetRow = makeReplyRow({ creatorId });
+    const deps = makeDeleteReplyDeps(targetRow);
+    rejectCount(deps);
+
+    await expect(
+      new InlineCommentService(deps).deleteReply(targetRow.id, creatorId),
+    ).resolves.toBeUndefined();
+
+    expect(deps.updateCommentCount).toHaveBeenCalledWith(targetRow.pageId);
+  });
+
+  describe('アクティビティの記録が失敗しても、書き込み済みのコメントの件数は更新される', () => {
+    const activityError = new Error('activity down');
+    const rejectActivity = (deps: InlineCommentServiceDeps) => {
+      vi.mocked(deps.prisma.activities.createByParameters).mockRejectedValue(
+        activityError,
+      );
+    };
+
+    it('create', async () => {
+      const pageId = makeId();
+      const deps = makeDeps(makeCreatedRow({ pageId }));
+      rejectActivity(deps);
+
+      await expect(
+        new InlineCommentService(deps).create(originInput(pageId), makeId()),
+      ).rejects.toBe(activityError);
+
+      expect(deps.updateCommentCount).toHaveBeenCalledWith(pageId);
+    });
+
+    it('createReply', async () => {
+      const parentRow = makeParentRow();
+      const replyRow = makeReplyRow({ pageId: parentRow.pageId });
+      const deps = makeReplyDeps(parentRow, replyRow);
+      rejectActivity(deps);
+
+      await expect(
+        new InlineCommentService(deps).createReply(
+          { parentId: parentRow.id, comment: 'r' },
+          makeId(),
+        ),
+      ).rejects.toBe(activityError);
+
+      expect(deps.updateCommentCount).toHaveBeenCalledWith(parentRow.pageId);
+    });
+
+    it('deleteComment', async () => {
+      const creatorId = makeId();
+      const targetRow = makeOriginRow({ creatorId });
+      const deps = makeDeleteCommentDeps(targetRow);
+      rejectActivity(deps);
+
+      await expect(
+        new InlineCommentService(deps).deleteComment(targetRow.id, creatorId),
+      ).rejects.toBe(activityError);
+
+      expect(deps.updateCommentCount).toHaveBeenCalledWith(targetRow.pageId);
+    });
+
+    it('deleteReply', async () => {
+      const creatorId = makeId();
+      const targetRow = makeReplyRow({ creatorId });
+      const deps = makeDeleteReplyDeps(targetRow);
+      rejectActivity(deps);
+
+      await expect(
+        new InlineCommentService(deps).deleteReply(targetRow.id, creatorId),
+      ).rejects.toBe(activityError);
+
+      expect(deps.updateCommentCount).toHaveBeenCalledWith(targetRow.pageId);
+    });
+  });
+
+  it('削除の前提条件に失敗したときは件数更新を呼ばない', async () => {
+    const deps = makeDeleteCommentDeps(null);
+    await expect(
+      new InlineCommentService(deps).deleteComment(makeId(), makeId()),
+    ).rejects.toThrow();
+    expect(deps.updateCommentCount).not.toHaveBeenCalled();
+  });
+
+  it('解決の切り替えと編集では件数更新を呼ばない', async () => {
+    const creatorId = makeId();
+    const origin = makeOriginRow({ creatorId });
+    const reply = makeReplyRow({ creatorId });
+
+    const resolveDeps = makeSetResolvedDeps(origin, origin);
+    await new InlineCommentService(resolveDeps).setResolved(
+      origin.id,
+      true,
+      creatorId,
+    );
+    const updateDeps = makeUpdateDeps(origin, origin);
+    await new InlineCommentService(updateDeps).updateComment(
+      origin.id,
+      'edited',
+      creatorId,
+    );
+    const replyDeps = makeUpdateDeps(reply, reply);
+    await new InlineCommentService(replyDeps).updateReply(
+      reply.id,
+      'edited',
+      creatorId,
+    );
+
+    expect(resolveDeps.updateCommentCount).not.toHaveBeenCalled();
+    expect(updateDeps.updateCommentCount).not.toHaveBeenCalled();
+    expect(replyDeps.updateCommentCount).not.toHaveBeenCalled();
   });
 });

@@ -55,7 +55,8 @@ import { getBacklinksHandlerFactory } from './backlinks';
  * Contract (design.md § Read flow; requirements 1.1, 1.7, 6.4): GET /_api/v3/page/backlinks
  * validates pageId, delegates to PageLinkService.findBacklinks and
  * PageLinkService.findForwardLinkHealth for the requesting viewer, and answers with
- * { backlinks: IBacklink[], linkTargets: ILinkTarget[] }.
+ * { backlinks: IBacklink[], linkTargets: ILinkTarget[] | null } — `null` when the
+ * forward-link read failed, so a failed lookup is distinguishable from "no problems" (`[]`).
  * Permission filtering itself is the services' contract — see page-link-service.integ.ts
  * and find-forward-link-health.integ.ts.
  */
@@ -343,17 +344,20 @@ describe('GET /page/backlinks', () => {
       expect(res.body).toHaveProperty('errors');
     });
 
-    // A partial 200 with backlinks alone would render as "no outbound problems".
-    it('answers 500, not a partial 200, when the forward-link read throws', async () => {
-      findBacklinks.mockResolvedValue([]);
+    it('answers 200 with the backlinks and linkTargets: null when the forward-link read throws', async () => {
+      const backlinks: IBacklink[] = [
+        { pageId: '507f1f77bcf86cd799439021', path: '/source-a' },
+        { pageId: '507f1f77bcf86cd799439022', path: '/source-b' },
+      ];
+
+      findBacklinks.mockResolvedValue(backlinks);
       findForwardLinkHealth.mockRejectedValue(new Error('unexpected failure'));
 
       const res = await get(buildApp(), { pageId: validPageId });
 
-      expect(res.status).toBe(500);
-      expect(res.body.errors[0]).toMatchObject({
-        code: 'failed-to-get-backlinks',
-      });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ backlinks, linkTargets: null });
+      expect(JSON.stringify(res.body)).not.toContain('unexpected failure');
     });
 
     // apiv3Err turns a raw Error into ErrorV3(err.message), and `message` is an

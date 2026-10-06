@@ -214,4 +214,113 @@ describe('SelectionPopover', () => {
 
     expect(capturedReference().getBoundingClientRect()).toEqual(ZERO_RECT);
   });
+
+  describe('with a cursorEdge', () => {
+    const LINE_RECT = buildRect({
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 16,
+      top: 20,
+      left: 10,
+      right: 110,
+      bottom: 36,
+    });
+
+    // A single-line selection whose end caret is at x=110 (the right end).
+    const buildRangeWithCarets = (): Range =>
+      ({
+        getBoundingClientRect: () => LINE_RECT,
+        getClientRects: () => [LINE_RECT],
+        cloneRange: () => {
+          let toStart = true;
+          return {
+            collapse: (start: boolean) => {
+              toStart = start;
+            },
+            getClientRects: () => [
+              buildRect({
+                left: toStart ? 10 : 110,
+                top: 20,
+                width: 0,
+                height: 16,
+                bottom: 36,
+              }),
+            ],
+          };
+        },
+      }) as unknown as Range;
+
+    it('positions above the selection, at the cursor end, when the cursor is at the end', () => {
+      render(
+        <SelectionPopover range={buildRangeWithCarets()} cursorEdge="end">
+          <button type="button">Comment</button>
+        </SelectionPopover>,
+      );
+
+      expect(capturedReference().getBoundingClientRect()).toMatchObject({
+        left: 110,
+        width: 0,
+        top: 20,
+      });
+      expect(mockCreatePopper.mock.calls[0][2]).toMatchObject({
+        placement: 'top',
+      });
+    });
+
+    it('positions at the selection start when the cursor is at the start', () => {
+      render(
+        <SelectionPopover range={buildRangeWithCarets()} cursorEdge="start">
+          <button type="button">Comment</button>
+        </SelectionPopover>,
+      );
+
+      expect(capturedReference().getBoundingClientRect()).toMatchObject({
+        left: 10,
+        width: 0,
+        top: 20,
+      });
+    });
+
+    it('still serves the last valid rect when the range later loses layout', () => {
+      let bounds = LINE_RECT;
+      const range = {
+        getBoundingClientRect: () => bounds,
+        getClientRects: () => [bounds],
+        cloneRange: () => ({
+          collapse: () => undefined,
+          getClientRects: () => [buildRect({ left: 110, top: 20, height: 16 })],
+        }),
+      } as unknown as Range;
+
+      render(
+        <SelectionPopover range={range} cursorEdge="end">
+          <button type="button">Comment</button>
+        </SelectionPopover>,
+      );
+      const reference = capturedReference();
+      const valid = reference.getBoundingClientRect();
+
+      bounds = ZERO_RECT;
+
+      expect(reference.getBoundingClientRect()).toEqual(valid);
+    });
+  });
+
+  it('keeps the default below-the-selection placement when no cursorEdge is given', () => {
+    const range = mock<Range>({
+      getBoundingClientRect: vi.fn(() => VALID_RECT),
+    });
+
+    render(
+      <SelectionPopover range={range}>
+        <button type="button">Comment</button>
+      </SelectionPopover>,
+    );
+
+    expect(mockCreatePopper.mock.calls[0][2]).toMatchObject({
+      placement: 'bottom',
+    });
+    expect(capturedReference().getBoundingClientRect()).toEqual(VALID_RECT);
+  });
 });

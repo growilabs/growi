@@ -278,6 +278,38 @@ describe('InlineCommentForm', () => {
     });
   });
 
+  describe('width (Requirement 23)', () => {
+    const renderForm = () =>
+      render(
+        <InlineCommentForm
+          pageId="page-1"
+          anchorOriginRevisionId="rev-1"
+          anchor={validAnchor}
+        />,
+      );
+
+    it('uses the former fixed width as its minimum, capped to the viewport', () => {
+      renderForm();
+
+      const form = screen.getByTestId('inline-comment-form');
+      expect(form.style.minWidth).toBe('min(24rem, calc(100vw - 2rem))');
+    });
+
+    it('may grow to a larger maximum width, still capped to the viewport', () => {
+      renderForm();
+
+      const form = screen.getByTestId('inline-comment-form');
+      expect(form.style.maxWidth).toBe('min(40rem, calc(100vw - 2rem))');
+    });
+
+    it('sizes itself to its content between the minimum and the maximum', () => {
+      renderForm();
+
+      const form = screen.getByTestId('inline-comment-form');
+      expect(form.style.width).toBe('max-content');
+    });
+  });
+
   describe('cancellation without a visible Cancel button', () => {
     it('calls onCanceled when Escape is pressed', () => {
       const onCanceled = vi.fn();

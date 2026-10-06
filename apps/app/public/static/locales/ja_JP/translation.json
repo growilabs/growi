@@ -421,6 +421,15 @@
     "comment_management_is_not_allowed": "コメントの操作が許可されていません。",
     "no_comments": "コメントはありません。"
   },
+  "inline_comment": {
+    "expand": "展開",
+    "collapse": "折りたたみ",
+    "more": "続きを表示",
+    "expand_all_resolved": "全ての解決済みのコメントを展開する",
+    "list_menu": "コメント一覧のメニュー",
+    "item_menu": "コメントの操作",
+    "view_at_posting": "投稿時のページを表示"
+  },
   "page_api_error": {
     "notfound_or_forbidden": "元のページが見つからないか、アクセス権がありません。",
     "already_exists": "そのパスを持つページは既に存在しています。",
