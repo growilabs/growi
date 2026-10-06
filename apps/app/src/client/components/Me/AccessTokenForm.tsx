@@ -1,5 +1,9 @@
 import React from 'react';
 import type { Scope } from '@growi/core/dist/interfaces';
+import { addMonths } from 'date-fns/addMonths';
+import { endOfDay } from 'date-fns/endOfDay';
+import { format as dateFnsFormat } from 'date-fns/format';
+import { parse } from 'date-fns/parse';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
@@ -24,10 +28,14 @@ export const AccessTokenForm = React.memo(
     const { submitHandler } = props;
     const { t } = useTranslation();
 
-    const defaultExpiredAt = new Date();
-    defaultExpiredAt.setMonth(defaultExpiredAt.getMonth() + 1);
-    const defaultExpiredAtStr = defaultExpiredAt.toISOString().split('T')[0];
-    const todayStr = new Date().toISOString().split('T')[0];
+    // <input type="date"> works in local dates; toISOString() gives the UTC date,
+    // which differs from the local date for part of every day.
+    const today = new Date();
+    const defaultExpiredAtStr = dateFnsFormat(
+      addMonths(today, 1),
+      'yyyy-MM-dd',
+    );
+    const todayStr = dateFnsFormat(today, 'yyyy-MM-dd');
 
     const {
       register,
@@ -43,8 +51,11 @@ export const AccessTokenForm = React.memo(
     });
 
     const onSubmit = (data: FormInputs) => {
-      const expiredAtDate = new Date(data.expiredAt);
-      expiredAtDate.setHours(23, 59, 59, 999);
+      // Parse as a local date: `new Date('yyyy-MM-dd')` is UTC midnight, which is
+      // already the previous day in time zones west of UTC.
+      const expiredAtDate = endOfDay(
+        parse(data.expiredAt, 'yyyy-MM-dd', new Date()),
+      );
       const scopes: Scope[] = data.scopes ? data.scopes : [];
 
       submitHandler({

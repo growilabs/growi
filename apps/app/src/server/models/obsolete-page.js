@@ -302,18 +302,15 @@ export const getPageSchema = (crowi) => {
     return differenceInYears(new Date(), this.updatedAt);
   };
 
-  pageSchema.statics.updateCommentCount = function (pageId) {
+  pageSchema.statics.updateCommentCount = async function (pageId) {
     validateCrowi();
-    return prisma.comments.countCommentByPageId(pageId).then((count) => {
-      this.update({ _id: pageId }, { commentCount: count }, {}, (err, data) => {
-        if (err) {
-          logger.debug('Update commentCount Error', err);
-          throw err;
-        }
-
-        return data;
-      });
-    });
+    const count = await prisma.comments.countCommentByPageId(pageId);
+    try {
+      return await this.updateOne({ _id: pageId }, { commentCount: count });
+    } catch (err) {
+      logger.debug('Update commentCount Error', err);
+      throw err;
+    }
   };
 
   pageSchema.statics.getDeletedPageName = (path) => {
