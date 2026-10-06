@@ -1,4 +1,5 @@
 import { GroupType, type IUserHasId } from '@growi/core';
+import { ConfigSource } from '@growi/core/dist/interfaces';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
@@ -8,9 +9,11 @@ import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
+import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
+import { findUserGroupIdsForViewer } from './find-user-group-ids-for-viewer';
 import { PageLinkService } from './page-link-service';
 
 // pagelinks is prisma-only, and the harness skips migrations on the in-memory MongoDB.
@@ -55,6 +58,17 @@ describe('PageLinkService.findBacklinks (integration)', () => {
             ),
         },
       }),
+    );
+
+  // As the route does: resolve the viewer's groups once, then read.
+  const readBacklinks = async (
+    toPageId: Types.ObjectId,
+    user: IUserHasId | null,
+  ) =>
+    service().findBacklinks(
+      toPageId,
+      user,
+      await findUserGroupIdsForViewer(user),
     );
 
   // --- seeding helpers ---------------------------------------------------
@@ -168,7 +182,7 @@ describe('PageLinkService.findBacklinks (integration)', () => {
     });
     await linkTo(source, target);
 
-    const backlinks = await service().findBacklinks(target._id, viewer);
+    const backlinks = await readBacklinks(target._id, viewer);
 
     expect(backlinks).toEqual([
       { pageId: source._id.toString(), path: source.path },
@@ -187,7 +201,7 @@ describe('PageLinkService.findBacklinks (integration)', () => {
     await linkTo(readable, target);
     await linkTo(restricted, target);
 
-    const asViewer = await service().findBacklinks(target._id, viewer);
+    const asViewer = await readBacklinks(target._id, viewer);
 
     // The restricted source must not leak — neither its path nor its existence.
     expect(asViewer).toEqual([
@@ -196,7 +210,7 @@ describe('PageLinkService.findBacklinks (integration)', () => {
 
     // Positive control: the owner sees it, so the omission above is the grant filter's
     // doing, not a missing row.
-    const asOwner = await service().findBacklinks(target._id, foreignUser);
+    const asOwner = await readBacklinks(target._id, foreignUser);
     expect(asOwner).toEqual(
       expect.arrayContaining([
         { pageId: restricted._id.toString(), path: restricted.path },
@@ -212,13 +226,30 @@ describe('PageLinkService.findBacklinks (integration)', () => {
     });
     await linkTo(groupSource, target);
 
-    const asViewer = await service().findBacklinks(target._id, viewer);
-    const asMember = await service().findBacklinks(target._id, foreignUser);
+    const asViewer = await readBacklinks(target._id, viewer);
+    const asMember = await readBacklinks(target._id, foreignUser);
 
     expect(asViewer).toEqual([]);
     expect(asMember).toEqual([
       { pageId: groupSource._id.toString(), path: groupSource.path },
     ]);
+  });
+
+  it('decides a group-restricted source by the group ids it is handed', async () => {
+    const unrelatedGroupId = new mongoose.Types.ObjectId();
+    const target = await createPage('/target', { grant: Page.GRANT_PUBLIC });
+    const groupSource = await createPage('/handed-group-restricted', {
+      grant: Page.GRANT_USER_GROUP,
+      grantedGroups: [{ item: unrelatedGroupId, type: GroupType.userGroup }],
+    });
+    await linkTo(groupSource, target);
+
+    // No one belongs to unrelatedGroupId in the database, so a listed source can only
+    // come from the ids the caller passed — not from a lookup of its own.
+    expect(
+      await service().findBacklinks(target._id, viewer, [unrelatedGroupId]),
+    ).toEqual([{ pageId: groupSource._id.toString(), path: groupSource.path }]);
+    expect(await service().findBacklinks(target._id, viewer, [])).toEqual([]);
   });
 
   it('omits a trashed source page', async () => {
@@ -231,7 +262,7 @@ describe('PageLinkService.findBacklinks (integration)', () => {
     await linkTo(live, target);
     await linkTo(trashed, target);
 
-    const backlinks = await service().findBacklinks(target._id, viewer);
+    const backlinks = await readBacklinks(target._id, viewer);
 
     expect(backlinks).toEqual([
       { pageId: live._id.toString(), path: live.path },
@@ -250,7 +281,7 @@ describe('PageLinkService.findBacklinks (integration)', () => {
     await linkTo(publicSource, target);
     await linkTo(ownerSource, target);
 
-    const asGuest = await service().findBacklinks(target._id, null);
+    const asGuest = await readBacklinks(target._id, null);
 
     expect(asGuest).toEqual([
       { pageId: publicSource._id.toString(), path: publicSource.path },
@@ -258,7 +289,7 @@ describe('PageLinkService.findBacklinks (integration)', () => {
 
     // Positive control: the owner sees ownerSource, so the guest's omission is the
     // grant filter's doing.
-    const asOwner = await service().findBacklinks(target._id, viewer);
+    const asOwner = await readBacklinks(target._id, viewer);
     expect(asOwner).toEqual(
       expect.arrayContaining([
         { pageId: ownerSource._id.toString(), path: ownerSource.path },
@@ -273,7 +304,7 @@ describe('PageLinkService.findBacklinks (integration)', () => {
     });
     await linkTo(source, target);
 
-    expect(await service().findBacklinks(target._id, viewer)).toHaveLength(1);
+    expect(await readBacklinks(target._id, viewer)).toHaveLength(1);
 
     // Restrict the source to a group the viewer is not in.
     await Page.updateOne(
@@ -284,7 +315,7 @@ describe('PageLinkService.findBacklinks (integration)', () => {
       },
     );
 
-    expect(await service().findBacklinks(target._id, viewer)).toEqual([]);
+    expect(await readBacklinks(target._id, viewer)).toEqual([]);
   });
 
   it('returns an empty array when the page has no backlinks (1.7)', async () => {
@@ -292,8 +323,66 @@ describe('PageLinkService.findBacklinks (integration)', () => {
       grant: Page.GRANT_PUBLIC,
     });
 
-    const backlinks = await service().findBacklinks(target._id, viewer);
+    const backlinks = await readBacklinks(target._id, viewer);
 
     expect(backlinks).toEqual([]);
+  });
+
+  describe('with security:disableUserPages', () => {
+    let disableUserPagesInDbBefore: boolean | undefined;
+
+    beforeAll(() => {
+      disableUserPagesInDbBefore = configManager.getConfig(
+        'security:disableUserPages',
+        ConfigSource.db,
+      );
+    });
+
+    afterEach(async () => {
+      await configManager.updateConfigs(
+        { 'security:disableUserPages': disableUserPagesInDbBefore },
+        { removeIfUndefined: true },
+      );
+    });
+
+    it('omits a user-page source while the setting is on, as the rest of the app hides it', async () => {
+      const target = await createPage('/target', { grant: Page.GRANT_PUBLIC });
+      const regularSource = await createPage('/regular-source', {
+        grant: Page.GRANT_PUBLIC,
+      });
+      // Public on purpose: the setting, not the grant, is what must hide it.
+      const userPageSource = await Page.create({
+        path: `/user/${viewer.username}/backlinks-source`,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: false,
+        parent: rootPage._id,
+      });
+      await linkTo(regularSource, target);
+      await linkTo(userPageSource, target);
+
+      try {
+        await configManager.updateConfig('security:disableUserPages', true);
+        expect(await readBacklinks(target._id, viewer)).toEqual([
+          { pageId: regularSource._id.toString(), path: regularSource.path },
+        ]);
+
+        // Positive control: the setting is what hides it, not a missing row.
+        await configManager.updateConfig('security:disableUserPages', false);
+        expect(await readBacklinks(target._id, viewer)).toEqual(
+          expect.arrayContaining([
+            {
+              pageId: userPageSource._id.toString(),
+              path: userPageSource.path,
+            },
+          ]),
+        );
+      } finally {
+        // Outside PREFIX, so the suite's afterEach does not clean it up.
+        await prisma.pagelinks.deleteMany({
+          where: { fromPageId: userPageSource._id.toString() },
+        });
+        await Page.deleteOne({ _id: userPageSource._id });
+      }
+    });
   });
 });

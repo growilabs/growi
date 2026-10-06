@@ -302,18 +302,15 @@ export const getPageSchema = (crowi) => {
     return differenceInYears(new Date(), this.updatedAt);
   };
 
-  pageSchema.statics.updateCommentCount = function (pageId) {
+  pageSchema.statics.updateCommentCount = async function (pageId) {
     validateCrowi();
-    return prisma.comments.countCommentByPageId(pageId).then((count) => {
-      this.update({ _id: pageId }, { commentCount: count }, {}, (err, data) => {
-        if (err) {
-          logger.debug('Update commentCount Error', err);
-          throw err;
-        }
-
-        return data;
-      });
-    });
+    const count = await prisma.comments.countCommentByPageId(pageId);
+    try {
+      return await this.updateOne({ _id: pageId }, { commentCount: count });
+    } catch (err) {
+      logger.debug('Update commentCount Error', err);
+      throw err;
+    }
   };
 
   pageSchema.statics.getDeletedPageName = (path) => {
@@ -335,22 +332,29 @@ export const getPageSchema = (crowi) => {
    * return whether the user is accessible to the page
    * @param {string} id ObjectId
    * @param {User} user
+   * @param {import('../interfaces/mongoose-utils').ObjectIdLike[] | null} [userGroups] ids of the groups `user` belongs to; looked up when omitted
+   * @param {boolean} [includeEmpty] whether an empty page counts as accessible
    */
-  pageSchema.statics.isAccessiblePageByViewer = async function (id, user) {
+  pageSchema.statics.isAccessiblePageByViewer = async function (
+    id,
+    user,
+    userGroups = null,
+    includeEmpty = false,
+  ) {
     const baseQuery = this.findOne({ _id: id }).select('path');
 
-    const userGroups =
-      user != null
+    const relatedUserGroups =
+      user != null && userGroups == null
         ? [
             ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
             ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
               user,
             )),
           ]
-        : [];
+        : userGroups;
 
-    const queryBuilder = new this.PageQueryBuilder(baseQuery);
-    queryBuilder.addConditionToFilteringByViewer(user, userGroups, true);
+    const queryBuilder = new this.PageQueryBuilder(baseQuery, includeEmpty);
+    queryBuilder.addConditionToFilteringByViewer(user, relatedUserGroups, true);
 
     const page = await queryBuilder.query.exec();
 

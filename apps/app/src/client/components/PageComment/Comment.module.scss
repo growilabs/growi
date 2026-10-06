@@ -89,6 +89,10 @@
       color: bs.$gray-400;
     }
 
+    :global(.page-comment-revision) {
+      @extend %page-comment-revision;
+    }
+
   }
 
   // TODO: Refacotr Soft-coding
@@ -100,24 +104,6 @@
 
     @include bs.media-breakpoint-down(xs) {
       margin-left: 3.5em;
-    }
-  }
-}
-
-// // Light mode color
-@include bs.color-mode(light) {
-  .comment-styles {
-    :global(.page-comment-revision) {
-      color: bs.$gray-500;
-    }
-  }
-}
-
-// // Dark mode color
-@include bs.color-mode(dark) {
-  .comment-styles {
-    :global(.page-comment-revision) {
-      color: bs.$gray-600;
     }
   }
 }

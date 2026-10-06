@@ -2,8 +2,10 @@ import type { IUser } from '@growi/core';
 import type { Query, Types } from 'mongoose';
 import mongoose from 'mongoose';
 
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { PageQueryBuilder } from '~/server/models/page';
+import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import type { IBacklink } from '../../interfaces/backlink';
@@ -19,7 +21,9 @@ type BacklinkSource = {
 };
 
 /**
- * The subset of `sourceIds` that `user` may read, as an **unexecuted** query.
+ * The subset of `sourceIds` that `user` may read, as an **unexecuted** query. That
+ * includes `security:disableUserPages` hiding user pages: the setting sits outside the
+ * grant model, so `addViewerCondition` alone would still list a public user page.
  *
  * Unexecuted so a caller can either run it or explain() it. That is what lets the B2.1
  * benchmark (page-link-read-perf.integ.ts) time this half of the read path and assert
@@ -30,6 +34,7 @@ type BacklinkSource = {
 export const buildVisibleSourcesQuery = async (
   sourceIds: Types.ObjectId[],
   user: IUser | null,
+  userGroups: ObjectIdLike[] | null,
   // Wrapped in an object rather than returned bare: a mongoose Query is itself a
   // thenable, so `await` on a Promise<Query> chains into it and resolves to the
   // executed result — which would defeat the whole point of handing back an
@@ -38,8 +43,12 @@ export const buildVisibleSourcesQuery = async (
   const Page = mongoose.model<PageDocument, PageModel>('Page');
   const builder = new PageQueryBuilder(Page.find({ _id: { $in: sourceIds } }));
 
-  await builder.addViewerCondition(user);
+  await builder.addViewerCondition(user, userGroups);
   builder.addConditionToExcludeTrashed();
+
+  if (configManager.getConfig('security:disableUserPages')) {
+    builder.addConditionToListByNotMatchPathAndChildren('/user');
+  }
 
   return { query: builder.query.select('_id path') };
 };
@@ -54,10 +63,15 @@ export const buildVisibleSourcesQuery = async (
 export const findBacklinks = async (
   toPageId: Types.ObjectId,
   user: IUser | null,
+  userGroups: ObjectIdLike[] | null,
 ): Promise<IBacklink[]> => {
   const backlinkIds = await prisma.pagelinks.findBacklinkSources(toPageId);
 
-  const { query } = await buildVisibleSourcesQuery(backlinkIds, user);
+  const { query } = await buildVisibleSourcesQuery(
+    backlinkIds,
+    user,
+    userGroups,
+  );
   const pages: BacklinkSource[] = await query.lean().exec();
 
   return pages.map((page) => ({

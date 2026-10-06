@@ -1,10 +1,18 @@
 import { useEffect } from 'react';
-import { createPopper, type VirtualElement } from '@popperjs/core';
+import {
+  createPopper,
+  type Placement,
+  type VirtualElement,
+} from '@popperjs/core';
 
 /**
  * Manages the lifecycle of a `@popperjs/core` instance: creates it once both
  * the reference (a virtual element, e.g. from `rangeToVirtualElement`) and
  * the popper DOM element are available, and destroys it on cleanup.
+ *
+ * A ResizeObserver re-runs Popper's position computation when the popper
+ * element changes size, so content that grows (a multi-line form) stays
+ * anchored on the reference side instead of spilling over it.
  *
  * Only the standard `flip` / `preventOverflow` / `offset` modifiers are used (no custom modifiers).
  *
@@ -19,6 +27,7 @@ import { createPopper, type VirtualElement } from '@popperjs/core';
 export function usePopperPosition(
   virtualElement: VirtualElement | null,
   popperElement: HTMLElement | null,
+  placement: Placement = 'bottom',
 ): void {
   useEffect(() => {
     if (virtualElement == null || popperElement == null) {
@@ -26,6 +35,7 @@ export function usePopperPosition(
     }
 
     const instance = createPopper(virtualElement, popperElement, {
+      placement,
       modifiers: [
         { name: 'flip' },
         { name: 'preventOverflow' },
@@ -33,8 +43,17 @@ export function usePopperPosition(
       ],
     });
 
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            void instance.update();
+          });
+    resizeObserver?.observe(popperElement);
+
     return () => {
+      resizeObserver?.disconnect();
       instance.destroy();
     };
-  }, [virtualElement, popperElement]);
+  }, [virtualElement, popperElement, placement]);
 }
