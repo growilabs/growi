@@ -1,10 +1,11 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import {
   type CreatedPage,
   createPage,
   deletePagesCompletely,
 } from '../utils/api';
+import { openBacklinksPanel } from './open-backlinks-panel';
 
 // B1.16 — E2E for the backlinks panel (Story B1 slice), covering Req 1.1 / 1.7 / 1.8.
 
@@ -13,23 +14,6 @@ const stamp = 'e2e-backlinks-7a2f1c';
 const targetPath = `/Sandbox/${stamp}-target`;
 const sourcePath = `/Sandbox/${stamp}-source`;
 const emptyPath = `/Sandbox/${stamp}-empty`;
-
-// Backlinks tab = page-item-control dropdown -> Backlinks entry -> PageAccessoriesModal.
-const openBacklinksPanel = async (page: Page): Promise<void> => {
-  const nav = page.getByTestId('grw-contextual-sub-nav');
-  await expect(nav).toBeVisible();
-
-  const controlButton = nav.getByTestId('open-page-item-control-btn');
-  await expect(controlButton).toBeVisible();
-  await expect(controlButton).toBeEnabled();
-  await controlButton.click();
-
-  const tabButton = page.getByTestId(
-    'open-page-accessories-modal-btn-with-backlinks-tab',
-  );
-  await expect(tabButton).toBeVisible();
-  await tabButton.click();
-};
 
 test.describe
   .serial('Backlinks panel', () => {
