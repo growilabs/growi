@@ -794,7 +794,7 @@ the restored page's status. Independent of B3/B4.
   - Extend the B1.12 subscription with delete/deleteCompletely/syncDescendantsDelete → the B5.3 handlers
   - **Pin each event's payload shape here.** `EventEmitter.on` types its listener `(...args: any[])`,
     so the shape a listener declares is unverified: `syncDescendantsDelete` carries an **array**
-    (both `server/service/page/index.ts:2309` and `:2407`) while `delete`/`deleteCompletely` carry a
+    (both `server/service/page/index.ts:2297` and `:2391`) while `delete`/`deleteCompletely` carry a
     single document, and reading the array as one document settles nothing, silently. Covered in
     `page-link-service.spec.ts` — B5.8's real delete operations would catch it only incidentally
   - Done when deleting a page through the app reconciles `PageLink` rows accordingly
