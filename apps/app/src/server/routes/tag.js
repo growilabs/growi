@@ -1,8 +1,8 @@
 import { SupportedAction } from '~/interfaces/activity';
 import { prisma } from '~/utils/prisma';
 
-import { isRevisionOfPage } from '../service/revision/is-revision-of-page';
 import ApiResponse from '../util/apiResponse';
+import { isRevisionOfPage } from '../util/is-revision-of-page';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi, _app) => {
