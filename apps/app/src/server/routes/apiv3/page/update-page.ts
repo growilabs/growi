@@ -36,6 +36,7 @@ import { isGrantImmutablePath } from '~/server/service/page/grant-immutable-path
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import { getYjsService } from '~/server/service/yjs';
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -359,6 +360,9 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
             previousRevision = await prisma.revisions.findUnique({
               where: { id: sanitizeRevisionId },
             });
+            if (!isRevisionOfPage(previousRevision, currentPage._id)) {
+              previousRevision = null;
+            }
           } catch (error) {
             logger.error(
               {
