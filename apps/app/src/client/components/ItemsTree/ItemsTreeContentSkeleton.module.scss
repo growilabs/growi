@@ -1,0 +1,13 @@
+@use 'styles/mixins';
+
+.text-skeleton-level1 {
+  @include mixins.grw-skeleton-text($font-size:16px, $line-height: 40px);
+
+  padding-left: 12px;
+}
+
+.text-skeleton-level2 {
+  @extend .text-skeleton-level1;
+
+  padding-left: 12px + 10px * 2;
+}

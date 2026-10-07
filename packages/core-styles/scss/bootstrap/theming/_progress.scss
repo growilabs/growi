@@ -1,0 +1,4 @@
+.progress,
+.progress-stacked {
+  --#{$prefix}progress-bar-bg: #{$progress-bar-bg};
+}

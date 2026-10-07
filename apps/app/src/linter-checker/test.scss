@@ -1,0 +1,26 @@
+/*
+ * VSCode の Stylelint 設定チェック方法
+ *
+ * 1. このディレクトリにある .stylelintrc.json ファイル中の `./test.scss` 行を削除し、
+ *    このファイルを VSCode 上で開き直す
+ *
+ * 2. VSCode で以下のエラーが表示されていることを確認
+ *   - color で stylelint(order/properties-order)
+ *   - ul で stylelint(selector-combinator-space-after)
+ *
+ * 3. VSCode で上書き保存
+ *
+ * 4. 以下のように整形され、全てのエラーが消えていることを確認
+ *   - color が background の上の行にくる
+ *   - ul と li の間にスペースが入る
+ *
+ */
+
+.test {
+  background: $gray-300;
+  color: $gray-900;
+
+  ul>li {
+    margin-left: 0;
+  }
+}

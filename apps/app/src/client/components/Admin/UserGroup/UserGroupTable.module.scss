@@ -1,0 +1,18 @@
+.user-group-edit-link {
+  text-decoration: underline;
+}
+
+// switch visibility of the edit icon
+.user-group-edit-link {
+    :global(.grw-edit-icon) {
+      visibility: hidden;
+    }
+
+  & {
+    &:hover {
+      :global(.grw-edit-icon) {
+        visibility: visible;
+      }
+    }
+  }
+}

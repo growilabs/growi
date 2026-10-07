@@ -1,0 +1,56 @@
+name: Auto-labeling
+
+on:
+  pull_request:
+    branches:
+      - master
+      - dev/*.*.*
+    # Only following types are handled by the action, but one can default to all as well
+    types: [opened, reopened, edited, synchronize]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+
+  # Refs: https://github.com/release-drafter/release-drafter
+  auto-labeling:
+    runs-on: ubuntu-latest
+
+    if: |
+      (!contains( github.event.pull_request.labels.*.name, 'flag/exclude-from-changelog' )
+        && !startsWith( github.head_ref, 'changeset-release/' )
+        && !startsWith( github.head_ref, 'mergify/merge-queue/' ))
+
+    steps:
+      - uses: release-drafter/release-drafter@v6
+        with:
+          disable-releaser: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  check-title:
+    runs-on: ubuntu-latest
+
+    if: |
+      (!contains( github.event.pull_request.labels.*.name, 'flag/exclude-from-changelog' )
+        && !startsWith( github.head_ref, 'changeset-release/' )
+        && !startsWith( github.head_ref, 'mergify/merge-queue/' ))
+
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        with:
+          types: |
+            feat
+            imprv
+            fix
+            support
+            chore
+            ci
+            docs
+            test
+          requireScope: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

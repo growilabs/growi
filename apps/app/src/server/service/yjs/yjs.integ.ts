@@ -1,0 +1,195 @@
+import http from 'node:http';
+import { YDocStatus } from '@growi/core/dist/consts';
+import { Types } from 'mongoose';
+import type { Server } from 'socket.io';
+import { mock } from 'vitest-mock-extended';
+
+import { prisma } from '~/utils/prisma';
+
+import type { MongodbPersistence } from './extended/mongodb-persistence';
+import type { IYjsService } from './yjs';
+import { getYjsService, initializeYjsService } from './yjs';
+
+vi.mock('y-websocket/bin/utils', () => {
+  const docs = new Map();
+  return {
+    docs,
+    setPersistence: vi.fn(),
+    setupWSConnection: vi.fn(),
+    getYDoc: vi.fn(),
+    setContentInitializor: vi.fn(),
+  };
+});
+
+vi.mock('../revision/normalize-latest-revision-if-broken', () => ({
+  normalizeLatestRevisionIfBroken: vi.fn(),
+}));
+
+const ObjectId = Types.ObjectId;
+
+const getPrivateMdbInstance = (yjsService: IYjsService): MongodbPersistence => {
+  // biome-ignore lint/complexity/useLiteralKeys: ignore
+  return yjsService['mdb'];
+};
+
+describe('YjsService', () => {
+  describe('getYDocStatus()', () => {
+    beforeAll(() => {
+      const ioMock = mock<Server>();
+      const httpServer = http.createServer();
+      const sessionConfig = {
+        rolling: true,
+        secret: 'test-secret',
+        resave: false,
+        saveUninitialized: true,
+        cookie: { maxAge: 86400000 },
+        genid: () => 'test-session-id',
+      };
+
+      // initialize
+      initializeYjsService(httpServer, ioMock, sessionConfig);
+    });
+
+    afterEach(async () => {
+      await prisma.revisions.deleteMany();
+    });
+
+    afterAll(async () => {
+      const yjsService = getYjsService();
+      const privateMdb = getPrivateMdbInstance(yjsService);
+      try {
+        await privateMdb.flushDB();
+      } catch (error) {
+        // Ignore errors that can occur due to async index creation:
+        // - 26: NamespaceNotFound (collection not yet created)
+        // - 276: IndexBuildAborted (cleanup during index creation)
+        const code = (error as { code?: number }).code;
+        if (code !== 26 && code !== 276) {
+          throw error;
+        }
+      }
+    });
+
+    it('returns ISOLATED when neither revisions nor YDocs exists', async () => {
+      // arrange
+      const yjsService = getYjsService();
+
+      const pageId = new ObjectId();
+
+      // act
+      const result = await yjsService.getYDocStatus(pageId.toString());
+
+      // assert
+      expect(result).toBe(YDocStatus.ISOLATED);
+    });
+
+    it('returns ISOLATED when no revisions exist', async () => {
+      // arrange
+      const yjsService = getYjsService();
+
+      const pageId = new ObjectId();
+
+      const privateMdb = getPrivateMdbInstance(yjsService);
+      await privateMdb.setTypedMeta(pageId.toString(), 'updatedAt', 1000);
+
+      // act
+      const result = await yjsService.getYDocStatus(pageId.toString());
+
+      // assert
+      expect(result).toBe(YDocStatus.ISOLATED);
+    });
+
+    it('returns NEW when no YDocs exist', async () => {
+      // arrange
+      const yjsService = getYjsService();
+
+      const pageId = new ObjectId();
+
+      await prisma.revisions.create({
+        data: { pageId: pageId.toString(), body: '' },
+      });
+
+      // act
+      const result = await yjsService.getYDocStatus(pageId.toString());
+
+      // assert
+      expect(result).toBe(YDocStatus.NEW);
+    });
+
+    it('returns DRAFT when the newer YDocs exist', async () => {
+      // arrange
+      const yjsService = getYjsService();
+
+      const pageId = new ObjectId();
+
+      await prisma.revisions.create({
+        data: { pageId: pageId.toString(), body: '' },
+      });
+
+      const privateMdb = getPrivateMdbInstance(yjsService);
+      await privateMdb.setTypedMeta(
+        pageId.toString(),
+        'updatedAt',
+        new Date(2034, 1, 1).getTime(),
+      );
+
+      // act
+      const result = await yjsService.getYDocStatus(pageId.toString());
+
+      // assert
+      expect(result).toBe(YDocStatus.DRAFT);
+    });
+
+    it('returns SYNCED', async () => {
+      // arrange
+      const yjsService = getYjsService();
+
+      const pageId = new ObjectId();
+
+      await prisma.revisions.create({
+        data: {
+          pageId: pageId.toString(),
+          body: '',
+          createdAt: new Date(2025, 1, 1),
+        },
+      });
+
+      const privateMdb = getPrivateMdbInstance(yjsService);
+      await privateMdb.setTypedMeta(
+        pageId.toString(),
+        'updatedAt',
+        new Date(2025, 1, 1).getTime(),
+      );
+
+      // act
+      const result = await yjsService.getYDocStatus(pageId.toString());
+
+      // assert
+      expect(result).toBe(YDocStatus.SYNCED);
+    });
+
+    it('returns OUTDATED when the latest revision is newer than meta data', async () => {
+      // arrange
+      const yjsService = getYjsService();
+
+      const pageId = new ObjectId();
+
+      await prisma.revisions.create({
+        data: { pageId: pageId.toString(), body: '' },
+      });
+
+      const privateMdb = getPrivateMdbInstance(yjsService);
+      await privateMdb.setTypedMeta(
+        pageId.toString(),
+        'updatedAt',
+        new Date(2024, 1, 1).getTime(),
+      );
+
+      // act
+      const result = await yjsService.getYDocStatus(pageId.toString());
+
+      // assert
+      expect(result).toBe(YDocStatus.OUTDATED);
+    });
+  });
+});

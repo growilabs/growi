@@ -1,0 +1,15 @@
+{
+  "ext": "js,ts,json",
+  "watch": [".", "../../packages/**/dist"],
+  "ignore": [
+    ".next",
+    "public/static",
+    "package.json",
+    "playwright",
+    "src/client",
+    "src/**/client",
+    "test",
+    "tmp",
+    "*.mongodb.js"
+  ]
+}

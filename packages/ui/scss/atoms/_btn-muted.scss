@@ -1,0 +1,20 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+@mixin colorize($color-active, $color: var(--bs-tertiary-color)) {
+  $color-active-rgb: #{bs.to-rgb($color-active)};
+
+  --bs-btn-color: #{$color};
+  --bs-btn-bg: transparent;
+
+  --bs-btn-hover-color: #{$color-active};
+  --bs-btn-hover-bg: rgba(#{$color-active-rgb}, 0.2);
+
+  --bs-btn-active-color: #{$color-active};
+  --bs-btn-active-bg: transparent;
+
+  --bs-btn-border-width: 0;
+
+  &:hover {
+    --bs-btn-active-bg: rgba(#{$color-active-rgb}, 0.2);
+  }
+}

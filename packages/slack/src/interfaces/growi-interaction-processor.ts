@@ -1,6 +1,6 @@
-import { AuthorizeResult } from '@slack/oauth';
-import { InteractionPayloadAccessor } from '../utils/interaction-payload-accessor';
+import type { AuthorizeResult } from '@slack/oauth';
 
+import type { InteractionPayloadAccessor } from '../utils/interaction-payload-accessor.js';
 
 export interface InteractionHandledResult<V> {
   result?: V;
@@ -8,10 +8,14 @@ export interface InteractionHandledResult<V> {
 }
 
 export interface GrowiInteractionProcessor<V> {
-
-  shouldHandleInteraction(interactionPayloadAccessor: InteractionPayloadAccessor): boolean;
+  shouldHandleInteraction(
+    interactionPayloadAccessor: InteractionPayloadAccessor,
+  ): boolean;
 
   processInteraction(
-    authorizeResult: AuthorizeResult, interactionPayload: any, interactionPayloadAccessor: InteractionPayloadAccessor): Promise<InteractionHandledResult<V>>;
-
+    authorizeResult: AuthorizeResult,
+    // biome-ignore lint/suspicious/noExplicitAny: ignore
+    interactionPayload: any,
+    interactionPayloadAccessor: InteractionPayloadAccessor,
+  ): Promise<InteractionHandledResult<V>>;
 }

@@ -1,0 +1,55 @@
+name: Reusable create app container image manifests workflow
+
+on:
+  workflow_call:
+    inputs:
+      tags:
+        type: string
+        required: true
+      registry:
+        type: string
+        default: 'docker.io'
+      image-name:
+        type: string
+        default: growilabs/growi
+      docker-registry-username:
+        type: string
+        default: growimoogle
+      tag-temporary:
+        type: string
+        default: latest
+    secrets:
+      DOCKER_REGISTRY_PASSWORD:
+        required: true
+
+
+
+jobs:
+
+  create-manifest:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Docker meta for extra-images
+      id: meta-extra-images
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ inputs.registry }}/${{ inputs.image-name }}
+        sep-tags: ','
+        tags: |
+          type=raw,value=${{ inputs.tag-temporary }}-amd64
+          type=raw,value=${{ inputs.tag-temporary }}-arm64
+
+    - name: Login to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.docker-registry-username }}
+        password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+
+    - name: Create and push manifest images
+      uses: Noelware/docker-manifest-action@0.4.3
+      with:
+        base-image: ${{ inputs.tags }}
+        extra-images: ${{ steps.meta-extra-images.outputs.tags }}
+        push: true

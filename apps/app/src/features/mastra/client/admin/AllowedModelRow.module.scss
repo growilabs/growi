@@ -1,0 +1,9 @@
+.grw-allowed-model-remove {
+  // Bootstrap's .btn consumes these variables, so overriding them keeps the
+  // native hover/active handling and the built-in color transition intact:
+  // quiet gray at rest, danger red on hover — the destructive intent only
+  // surfaces when the pointer commits to the control.
+  --bs-btn-color: var(--bs-secondary-color);
+  --bs-btn-hover-color: var(--bs-danger);
+  --bs-btn-active-color: var(--bs-danger);
+}

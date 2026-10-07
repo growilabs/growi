@@ -1,5 +1,0 @@
-{{ username }} edited the page {{ path }}.
-
-----------------------
-
-Growi: {{ appTitle }}

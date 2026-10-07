@@ -1,0 +1,291 @@
+{
+  "Show": "公開",
+  "View": "閲覧",
+  "Hide": "非公開",
+  "Add": "追加",
+  "Insert": "挿入",
+  "Reset": "リセット",
+  "Sign out": "ログアウト",
+  "New": "作成",
+  "Send": "送信",
+  "Clear": "クリア",
+  "Close": "閉じる",
+  "Done": "完了",
+  "Delete": "削除",
+  "Cancel": "キャンセル",
+  "Confirm": "確認",
+  "Create": "作成",
+  "Created": "作成日",
+  "Description": "説明",
+  "Edit": "編集",
+  "Email": "メールアドレス",
+  "Error occurred": "エラーが発生しました",
+  "Help": "ヘルプ",
+  "Name": "名前",
+  "Password": "パスワード",
+  "Update": "更新",
+  "UserGroup": "グループ",
+  "V5 Page Migration": "V5 互換形式 への変換",
+  "Warning": "注意",
+  "add": "追加",
+  "eg": "例:",
+  "username": "ユーザー名",
+  "meta": {
+    "display_name": "日本語"
+  },
+  "toaster": {
+    "add_succeeded": "新しい{{target}}が追加されました",
+    "delete_succeeded": "{{target}} の削除に成功しました",
+    "create_failed": "{{target}}の作成に失敗しました",
+    "create_succeeded": "新しい{{target}}が作成されました",
+    "update_failed": "{{target}}の更新に失敗しました",
+    "update_successed": "{{target}}を更新しました",
+    "remove_share_link": "共有リンクを{{count}}件削除しました",
+    "remove_share_link_success": "{{shareLinkId}}を削除しました"
+  },
+  "alert": {
+    "siteUrl_is_not_set": "'サイトURL' が設定されていません。{{link}} から設定してください。",
+    "please_enable_mailer": "メール認証を有効にするには、メール設定を完了させてください。",
+    "password_reset_please_enable_mailer": "パスワード再設定を有効にするには、メール設定を完了させてください。",
+    "email_is_already_in_use": "そのメールアドレスは既に使用されています。"
+  },
+  "headers": {
+    "app_settings": "アプリ設定"
+  },
+  "header_search_box": {
+    "label": {
+      "All pages": "全てのページ",
+      "This tree": "この階層"
+    },
+    "item_label": {
+      "All pages": "全てのページ",
+      "This tree": "この階層下の子ページのみ"
+    }
+  },
+  "search_method_menu_item": {
+    "search_in_all": "全てのページ",
+    "only_children_of_this_tree": "この階層下の子ページのみ",
+    "exact_mutch": "キーワードに完全一致した文字を含むページのみ"
+  },
+  "share_links": {
+    "Share Link": "共有用リンク",
+    "Page Path": "ページパス",
+    "expire": "有効期限",
+    "description": "概要"
+  },
+  "in_app_notification": {
+    "notification_list": "アプリ内通知一覧",
+    "see_all": "通知一覧を見る",
+    "no_notification": "通知はありません",
+    "all": "全て",
+    "unopend": "未読",
+    "mark_all_as_read": "全て既読にする",
+    "no_unread_messages": "未読はありません",
+    "only_unread": "未読のみ",
+    "news": "お知らせ",
+    "notifications": "通知",
+    "filter_all": "すべて",
+    "no_news": "ニュースはありません",
+    "view_detail": "詳細を見る"
+  },
+  "personal_dropdown": {
+    "home": "ホーム",
+    "settings": "設定",
+    "color_mode": "カラーモード",
+    "sidebar_mode": "サイドバーモード",
+    "sidebar_mode_editor": "サイドバーモード(編集時)",
+    "use_os_settings": "OS設定を利用する",
+    "feedback": "ご意見・ご要望"
+  },
+  "create_page_dropdown": {
+    "new_page": "新規ページ作成",
+    "open_page_create_modal": "新規ページ作成モーダルを表示",
+    "todays": {
+      "desc": "今日のメモを作成",
+      "memo": "メモ"
+    },
+    "template": {
+      "desc": "テンプレートページの作成/編集",
+      "children": "同一階層テンプレート",
+      "descendants": "下位層テンプレート"
+    }
+  },
+  "copy_to_clipboard": {
+    "Copy to clipboard": "クリップボードにコピー",
+    "Page path": "ページ名",
+    "Page URL": "ページURL",
+    "Permanent link": "パーマリンク",
+    "Page path and permanent link": "ページ名とパーマリンク",
+    "Markdown link": "マークダウン形式のリンク",
+    "Append params": "パラメータの追加"
+  },
+  "crop_image_modal": {
+    "image_crop": "画像の切り抜き",
+    "crop": "トリミング",
+    "save": "保存",
+    "cancel": "キャンセル"
+  },
+  "handsontable_modal": {
+    "title": "テーブル編集",
+    "data_import": "データインポート",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "done": "完了",
+    "data_import_form": {
+      "select_data_format": "データフォーマット",
+      "import_data": "インポートデータ",
+      "paste_table_data": "テーブルデータを貼り付け",
+      "parse_error": "パーザーエラー",
+      "cancel": "キャンセル",
+      "import": "インポート"
+    }
+  },
+  "not_found_page": {
+    "page_not_exist": "このページは存在しません。"
+  },
+  "g2g_data_transfer": {
+    "tab": "データ移行",
+    "data_transfer": "データ移行",
+    "transfer_data_to_this_growi": "別GROWIのデータをこのGROWIへ移行する",
+    "publish_transfer_key": "移行キーを発行する",
+    "transfer_key_limit": "※ 移行キーの有効期限は発行から1時間となります。",
+    "once_transfer_key_used": "※ 移行キーは一度移行に利用するとそれ以降はご利用いただけなくなります。",
+    "transfer_to_growi_cloud": "※ 詳しくは <a href='{{documentationUrl}}ja/admin-guide/management-cookbook/g2g-transfer.html'> GROWI お引越し機能</a>をご確認ください。"
+  },
+  "accesstoken_scopes_desc": {
+    "read": {
+      "all": "全ての閲覧権限を付与できます。",
+      "admin": {
+        "all": "管理者機能の閲覧権限を付与できます。",
+        "top": "Wiki管理トップの閲覧権限を付与できます。",
+        "app": "アプリ設定の閲覧権限を付与できます。",
+        "ai": "AI 設定の閲覧権限を付与できます。",
+        "security": "セキュリティ設定の閲覧権限を付与できます。",
+        "markdown": "マークダウン設定の閲覧権限を付与できます。",
+        "customize": "カスタマイズの閲覧権限を付与できます。",
+        "import_data": "データインポートの閲覧権限を付与できます。",
+        "export_data": "データアーカイブの閲覧権限を付与できます。",
+        "data_transfer": "データ移行の閲覧権限を付与できます。",
+        "external_notification": "外部ツールへの通知の閲覧権限を付与できます。",
+        "slack_integration": "Slack連携の閲覧権限を付与できます。",
+        "legacy_slack_integration": "Slack連携(レガシー)の閲覧権限を付与できます。",
+        "user_management": "ユーザー管理の閲覧権限を付与できます。",
+        "user_group_management": "ユーザーグループ管理の閲覧権限を付与できます。",
+        "audit_log": "監査ログの閲覧権限を付与できます。",
+        "plugin": "プラグインの閲覧権限を付与できます。",
+        "full_text_search": "全文検索管理の閲覧権限を付与できます。"
+      },
+      "user_settings": {
+        "all": "ユーザー設定の閲覧権限を付与できます。",
+        "info": "ユーザー情報の閲覧権限を付与できます。",
+        "external_account": "外部アカウントの閲覧権限を付与できます。",
+        "password": "パスワード設定の閲覧権限を付与できます。",
+        "api": {
+          "all": "API 設定の閲覧権限を付与できます。",
+          "api_token": "API トークン設定の閲覧権限を付与できます。",
+          "access_token": "アクセストークン設定の閲覧権限を付与できます。"
+        },
+        "in_app_notification": "アプリ内通知設定の閲覧権限を付与できます。",
+        "other": "その他設定の閲覧権限を付与できます。"
+      },
+      "features": {
+        "all": "機能の閲覧権限を付与できます。",
+        "ai": "AIアシスタント機能の閲覧権限を付与できます。",
+        "page": "ページ機能の閲覧権限を付与できます。",
+        "share_link": "共有リンク機能の閲覧権限を付与できます。",
+        "bookmark": "ブックマーク機能の閲覧権限を付与できます。",
+        "attachment": "添付ファイル機能の閲覧権限を付与できます。",
+        "page_bulk_export": "ページの一括エクスポート機能の閲覧権限を付与できます。",
+        "in_app_notification": "アプリ内通知機能の閲覧権限を付与できます。",
+        "user": "ユーザー情報機能の閲覧権限を付与できます。",
+        "user_group": "ユーザーグループメンバー機能の閲覧権限を付与できます。"
+      }
+    },
+    "write": {
+      "all": "全ての編集権限を付与できます。",
+      "admin": {
+        "all": "管理者機能の編集権限を付与できます。",
+        "top": "Wiki管理トップの編集権限を付与できます。",
+        "app": "アプリ設定の編集権限を付与できます。",
+        "ai": "AI 設定の編集権限を付与できます。",
+        "security": "セキュリティ設定の編集権限を付与できます。",
+        "markdown": "マークダウン設定の編集権限を付与できます。",
+        "customize": "カスタマイズの編集権限を付与できます。",
+        "import_data": "データインポートの編集権限を付与できます。",
+        "export_data": "データアーカイブの編集権限を付与できます。",
+        "data_transfer": "データ移行の編集権限を付与できます。",
+        "external_notification": "外部ツールへの通知の編集権限を付与できます。",
+        "slack_integration": "Slack連携の編集権限を付与できます。",
+        "legacy_slack_integration": "Slack連携(レガシー)の編集権限を付与できます。",
+        "user_management": "ユーザー管理の編集権限を付与できます。",
+        "user_group_management": "ユーザーグループ管理の編集権限を付与できます。",
+        "audit_log": "監査ログの編集権限を付与できます。",
+        "plugin": "プラグインの編集権限を付与できます。",
+        "full_text_search": "全文検索管理の編集権限を付与できます。"
+      },
+      "user_settings": {
+        "all": "ユーザー設定の編集権限を付与できます。",
+        "info": "ユーザー情報の編集権限を付与できます。",
+        "external_account": "外部アカウントの編集権限を付与できます。",
+        "password": "パスワード設定の編集権限を付与できます。",
+        "api": {
+          "all": "API 設定の編集権限を付与できます。",
+          "api_token": "API トークン設定の編集権限を付与できます。",
+          "access_token": "アクセストークン設定の編集権限を付与できます。"
+        },
+        "in_app_notification": "アプリ内通知設定の編集権限を付与できます。",
+        "other": "その他設定の編集権限を付与できます。"
+      },
+      "features": {
+        "all": "機能の編集権限を付与できます。",
+        "ai": "AIアシスタント機能の編集権限を付与できます。",
+        "page": "ページ機能の編集権限を付与できます。",
+        "share_link": "共有リンク機能の編集権限を付与できます。",
+        "bookmark": "ブックマーク機能の編集権限を付与できます。",
+        "attachment": "添付ファイル機能の編集権限を付与できます。",
+        "page_bulk_export": "ページの一括エクスポート機能の編集権限を付与できます。",
+        "in_app_notification": "アプリ内通知機能の編集権限を付与できます。",
+        "user": "ユーザー情報機能の編集権限を付与できます。",
+        "user_group": "ユーザーグループメンバー機能の編集権限を付与できます。"
+      }
+    }
+  },
+  "growi-vault": {
+    "reconcile": {
+      "section": {
+        "title": "リコンサイル"
+      },
+      "rejected": {
+        "invalid-target": "指定されたターゲットパスが無効です。",
+        "bootstrap-not-done": "Vault の準備が完了していません。ブートストラップの完了をお待ちいただいてから再試行してください。",
+        "page-count-exceeds-user-limit": "対象のページ数が多すぎます。範囲を絞り込むか、管理者にリコンサイルの実行を依頼してください。",
+        "page-count-exceeds-admin-limit": "対象のページ数が多すぎます。範囲を絞り込むか、VAULT_BOOTSTRAP_ON_START=force を用いた全体再ブートストラップをご検討ください。",
+        "user-concurrency-limit": "すでにリコンサイルが実行中です。完了するまでお待ちいただいてから再試行してください。",
+        "system-concurrency-limit": "システム全体のリコンサイル上限に達しています。いずれかのリコンサイルが完了するまでお待ちください。"
+      },
+      "accepted": {
+        "message": "リコンサイルを開始しました。"
+      },
+      "target-type": {
+        "legend": "ターゲットタイプ",
+        "page": "ページ（単一ページのみ）",
+        "sub-tree": "サブツリー（ページとすべての子孫）"
+      },
+      "target-path": {
+        "label": "ターゲットパス"
+      },
+      "submit": {
+        "submitting": "送信中…",
+        "start": "リコンサイルを開始"
+      },
+      "cancel": "キャンセル"
+    }
+  },
+  "username_suggestion": {
+    "active_user": "アクティブユーザー",
+    "inactive_user": "非アクティブユーザー"
+  },
+  "table_action": {
+    "edit": "編集"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "example-package-invalid-template1",
+  "version": "1.0.0",
+  "main": "index.js",
+  "growiPlugin": {
+    "schemaVersion": "4",
+    "types": [
+      "template"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "outputs": ["dist/**"],
+      "inputs": ["bin/**", "package.json"],
+      "outputLogs": "new-only"
+    },
+    "dev": {
+      "outputs": ["dist/**"],
+      "inputs": ["bin/**", "package.json"],
+      "outputLogs": "new-only"
+    }
+  }
+}

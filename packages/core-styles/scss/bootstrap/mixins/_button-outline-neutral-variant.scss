@@ -1,0 +1,59 @@
+@use 'sass:color';
+
+@mixin button-outline-neutral-variant-light(
+  $color,
+  $background: color.mix(#fff, $color, 100%),
+  $border: color.mix(#fff, $color, 70%),
+  $hover-background: color.mix(#fff, $color, 95%),
+  $hover-border: $border,
+  $hover-color: $color,
+  $active-background: color.mix(#fff, $color, 85%),
+  $active-border: $border,
+  $active-color: $color,
+  $disabled-background: $background,
+  $disabled-border: $border,
+  $disabled-color: $color
+) {
+  --#{$prefix}btn-color: #{$color};
+  --#{$prefix}btn-bg: #{$background};
+  --#{$prefix}btn-border-color: #{$border};
+  --#{$prefix}btn-hover-color: #{$hover-color};
+  --#{$prefix}btn-hover-bg: #{$hover-background};
+  --#{$prefix}btn-hover-border-color: #{$hover-border};
+  --#{$prefix}btn-active-color: #{$active-color};
+  --#{$prefix}btn-active-bg: #{$active-background};
+  --#{$prefix}btn-active-border-color: #{$active-border};
+  --#{$prefix}btn-active-shadow: #{$btn-active-box-shadow};
+  --#{$prefix}btn-disabled-color: #{$disabled-color};
+  --#{$prefix}btn-disabled-bg: #{$disabled-background};
+  --#{$prefix}btn-disabled-border-color: #{$disabled-border};
+}
+
+@mixin button-outline-neutral-variant-dark(
+  $color,
+  $background: color.mix($gray-900, $color, 100%),
+  $border: color.mix($gray-900, $color, 70%),
+  $hover-background: color.mix($gray-900, $color, 95%),
+  $hover-border: $border,
+  $hover-color: $color,
+  $active-background: color.mix($gray-900, $color, 85%),
+  $active-border: $border,
+  $active-color: $color,
+  $disabled-background: $background,
+  $disabled-border: $border,
+  $disabled-color: $color
+) {
+  --#{$prefix}btn-color: #{$color};
+  --#{$prefix}btn-bg: #{$background};
+  --#{$prefix}btn-border-color: #{$border};
+  --#{$prefix}btn-hover-color: #{$hover-color};
+  --#{$prefix}btn-hover-bg: #{$hover-background};
+  --#{$prefix}btn-hover-border-color: #{$hover-border};
+  --#{$prefix}btn-active-color: #{$active-color};
+  --#{$prefix}btn-active-bg: #{$active-background};
+  --#{$prefix}btn-active-border-color: #{$active-border};
+  --#{$prefix}btn-active-shadow: #{$btn-active-box-shadow};
+  --#{$prefix}btn-disabled-color: #{$disabled-color};
+  --#{$prefix}btn-disabled-bg: #{$disabled-background};
+  --#{$prefix}btn-disabled-border-color: #{$disabled-border};
+}

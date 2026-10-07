@@ -1,0 +1,125 @@
+@use 'sass:color';
+
+:root[data-bs-theme='light'] {
+
+  @import '@growi/core-styles/scss/bootstrap/init-stage-1';
+
+  $gray-100: #F2F0EC;
+  $gray-200: #E6E2DA;
+  $gray-300: #DAD3C7;
+  $gray-400: #CEC5B5;
+  $gray-500: #C1B6A2;
+  $gray-600: #9F9284;
+  $gray-700: #7C6D65;
+  $gray-800: #594947;
+  $gray-900: #362824;
+
+  @import '@growi/core-styles/scss/bootstrap/theming/variables';
+
+  @import '@growi/core-styles/scss/bootstrap/theming/utils/color-palette';
+
+  $primary: #aa1820;
+  $highlight: #c2ae2b;
+
+  @include generate-color-palette('primary', $primary, black, white, 25%, 20% );
+  @include generate-color-palette('highlight', $highlight, black, white, 20%, 23%);
+
+  $body-color: #20402c;
+  $body-bg: white;
+  $body-secondary-color: rgba($body-color, .75);
+  $body-secondary-bg: $gray-200;
+  $body-tertiary-color: rgba($body-color, .5);
+  $body-tertiary-bg: $gray-100;
+  $border-color: $gray-300;
+  $link-color: $gray-800;
+
+  @import 'bootstrap/scss/variables';
+  @import 'bootstrap/scss/variables-dark';
+  @import '@growi/core-styles/scss/bootstrap/init-stage-2';
+  @import '@growi/core-styles/scss/bootstrap/theming/apply-light';
+
+  --grw-wiki-link-color-rgb: var(--grw-primary-400-rgb);
+  --grw-wiki-link-hover-color-rgb: var(--grw-primary-300-rgb);
+
+
+  // change marker color
+  --grw-marker-bg: var(--grw-marker-bg-blue);
+
+  .wiki {
+    h1,
+    h2,
+    h4,
+    h5,
+    h6 {
+      --bs-border-color: var(--grw-primary-200);
+    }
+  }
+
+  .grw-site-name {
+    --bs-link-opacity: 0.8;
+    --bs-link-color-rgb: var(--grw-primary-600-rgb);
+  }
+
+  .grw-logo {
+    svg {
+      fill: var(--grw-primary-300);
+    }
+  }
+
+  &, body {
+    background-image: url('../images/christmas/christmas-light-bg.svg');
+    background-repeat: repeat-x;
+    background-attachment: fixed;
+    background-size: contain;
+  }
+}
+
+:root[data-bs-theme='dark'] {
+  @import '@growi/core-styles/scss/bootstrap/init-stage-1';
+
+  $gray-100: #F2F0EC;
+  $gray-200: #E6E2DA;
+  $gray-300: #DAD3C7;
+  $gray-400: #CEC5B5;
+  $gray-500: #C1B6A2;
+  $gray-600: #9F9284;
+  $gray-700: #7C6D65;
+  $gray-800: #594947;
+  $gray-900: #362824;
+
+  @import '@growi/core-styles/scss/bootstrap/theming/variables';
+  @import '@growi/core-styles/scss/bootstrap/theming/utils/color-palette';
+
+  $primary: #e90f0f;
+  $highlight: #1e8b2b;
+
+  @include generate-color-palette('primary', $primary, #30001B, #f7da47, 20% ,25%);
+  @include generate-color-palette('highlight', $highlight, black, white);
+
+  $body-color-dark: #f1ede1;
+  $body-bg-dark: #001b30;
+  $body-secondary-color-dark: rgba($body-color-dark, .75);
+  $body-secondary-bg-dark: $gray-800;
+  $body-tertiary-color-dark: rgba($body-color-dark, .5);
+  $body-tertiary-bg-dark: color.mix($gray-800, $gray-900, 50%);
+  $border-color-dark: $gray-700;
+  $link-color-dark: $gray-400;
+
+  @import 'bootstrap/scss/variables';
+  @import 'bootstrap/scss/variables-dark';
+  @import '@growi/core-styles/scss/bootstrap/init-stage-2';
+  @import '@growi/core-styles/scss/bootstrap/theming/apply-dark';
+
+  --grw-wiki-link-color-rgb: var(--grw-primary-400-rgb);
+  --grw-wiki-link-hover-color-rgb: var(--grw-primary-300-rgb);
+
+  // change marker color
+  --grw-marker-bg: var(--grw-marker-bg-cyan);
+
+    &, body {
+    background-image: url('../images/christmas/christmas-dark-bg.svg');
+    background-repeat: repeat-x;
+    background-attachment: fixed;
+    background-size: contain;
+  }
+}

@@ -1,0 +1,26 @@
+@use '@growi/core-styles/scss/variables/growi-official-colors';
+
+// == Colors
+.grw-logo {
+  // set transition for fill
+  :global(svg), :global(svg *) {
+    transition: fill 0.8s ease-out;
+  }
+
+  fill: var(--grw-app-title-color, var(--bs-tertiary-color));
+}
+
+.grw-logo {
+  & {
+    &:hover {
+      :global(.group1) {
+        fill: growi-official-colors.$growi-green;
+      }
+
+      :global(.group2) {
+        fill: growi-official-colors.$growi-blue;
+      }
+    }
+  }
+}
+

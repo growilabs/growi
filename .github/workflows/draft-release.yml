@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - master
+      - dev/*.*.*
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 
 jobs:
 
@@ -16,16 +23,16 @@ jobs:
       RELEASE_DRAFT_BODY: ${{ steps.release-drafter.outputs.body }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Retrieve information from package.json
-        uses: myrotvorets/info-from-package-json-action@1.1.0
+        uses: myrotvorets/info-from-package-json-action@v2.0.2
         id: package-json
 
-      # Drafts your next Release notes as Pull Requests are merged into "master"
-      - uses: release-drafter/release-drafter@v5
+      - uses: release-drafter/release-drafter@v6
         id: release-drafter
         with:
+          config-name: release-drafter.yml
           name: v${{ steps.package-json.outputs.packageVersion }}
           tag: v${{ steps.package-json.outputs.packageVersion }}
           version: ${{ steps.package-json.outputs.packageVersion }}
@@ -40,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -48,14 +55,23 @@ jobs:
         id: release-version
         run: |
           RELEASE_VERSION=`npx semver -i patch ${{ needs.update-release-draft.outputs.CURRENT_VERSION }}`
-          echo ::set-output name=RELEASE_VERSION::$RELEASE_VERSION
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get base branch
+        id: base-branch
+        run: |
+          GITHUB_REF_NAME=${{ github.ref_name }}
+          WILDCARD_VERSION=${GITHUB_REF_NAME#dev/}
+          # set "release/current" or "release/X.X.x" to BASE_BRANCH
+          BASE_BRANCH=release/${{ github.ref_name == 'master' && 'current' || '$WILDCARD_VERSION' }}
+          echo "BASE_BRANCH=$BASE_BRANCH" >> $GITHUB_OUTPUT
 
       - name: Create/Update Pull Request
         uses: bakunyo/git-pr-release-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GIT_PR_RELEASE_BRANCH_PRODUCTION: release/current
-          GIT_PR_RELEASE_BRANCH_STAGING: master
+          GIT_PR_RELEASE_BRANCH_PRODUCTION: ${{ steps.base-branch.outputs.BASE_BRANCH }}
+          GIT_PR_RELEASE_BRANCH_STAGING: ${{ github.ref_name }}
           GIT_PR_RELEASE_TEMPLATE: .github/git-pr-release-template.erb
           GIT_PR_RELEASE_TITLE: Release v${{ steps.release-version.outputs.RELEASE_VERSION }}
           GIT_PR_RELEASE_BODY: ${{ needs.update-release-draft.outputs.RELEASE_DRAFT_BODY }}

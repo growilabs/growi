@@ -1,0 +1,53 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+
+    "clean": {
+      "dependsOn": ["@growi/slack#clean"],
+      "cache": false
+    },
+
+    "build": {
+      "dependsOn": ["@growi/slack#build"],
+      "outputs": ["dist/**"],
+      "outputLogs": "new-only"
+    },
+
+    "dev": {
+      "dependsOn": ["@growi/slack#dev"],
+      "cache": false,
+      "persistent": true
+    },
+    "dev:ci": {
+      "dependsOn": ["@growi/slack#dev"],
+      "cache": false
+    },
+
+    "lint": {
+      "dependsOn": ["@growi/slack#dev"]
+    },
+
+    "test": {
+      "dependsOn": ["@growi/slack#dev"],
+      "outputLogs": "new-only"
+    },
+
+    "version:patch": {
+      "cache": false
+    },
+    "version:prerelease": {
+      "cache": false
+    },
+    "version:prepatch": {
+      "cache": false
+    },
+    "version:preminor": {
+      "cache": false
+    },
+    "version:premajor": {
+      "cache": false
+    }
+
+  }
+}

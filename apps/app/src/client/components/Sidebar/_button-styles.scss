@@ -1,0 +1,34 @@
+@use 'styles/variables' as var;
+@use './variables' as sidebarVar;
+
+
+%btn-basis {
+  --bs-btn-padding-x: 0;
+  --bs-btn-padding-y: 0;
+
+  width: var.$grw-sidebar-nav-width;
+  height: sidebarVar.$grw-sidebar-button-height;
+  line-height: 1em;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none !important;
+}
+
+%btn-primary-color-vars {
+  --bs-btn-bg: transparent;
+  --bs-btn-active-bg: transparent;
+  --bs-btn-hover-color: var(
+    --grw-sidebar-nav-btn-hover-color,
+    var(
+      --grw-sidebar-nav-btn-color,
+      var(--bs-btn-color)
+    ),
+  );
+  --bs-btn-active-color: var(
+    --grw-sidebar-nav-btn-active-color,
+    var(
+      --grw-sidebar-nav-btn-color,
+      var(--bs-btn-color)
+    ),
+  );
+}

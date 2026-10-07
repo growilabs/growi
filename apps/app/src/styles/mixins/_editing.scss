@@ -1,0 +1,32 @@
+/**
+ * USAGE:
+ * @include at-editing() {
+ *   .component-class {
+ *     visibility: hidden;
+ *   }
+ * }
+ *
+ * outputs: .layout-root.editing .component-class_LOCAL_ID { visibility: hidden; }
+ */
+@mixin at-editing() {
+  @at-root :global(.layout-root.editing) #{&} {
+    @content;
+  }
+}
+
+/**
+ * USAGE:
+ * .component-class {
+ *   @include with-editing() {
+ *     visibility: hidden;
+ *   }
+ * }
+ *
+ * outputs: .component-class_LOCAL_ID.layout-root.editing { visibility: hidden; }
+ */
+
+@mixin with-editing() {
+  &:global(.layout-root.editing) {
+    @content;
+  }
+}

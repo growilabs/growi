@@ -1,0 +1,17 @@
+.linkedit-preview {
+  .page-editor-preview-body {
+    max-height: 70vh;
+    padding-top: 0;
+    margin: 0 -10px;
+    .wiki {
+      overflow-y: scroll;
+      font-size: 0.5rem;
+    }
+  }
+}
+
+// page preview button
+.btn-page-preview svg {
+  width: 18px;
+  height: 18px;
+}

@@ -1,0 +1,5 @@
+@mixin code-inline-color($color-inline-code,$bgcolor-inline-code, $bordercolor-inline-code) {
+  color: $color-inline-code;
+  background-color: $bgcolor-inline-code;
+  border-color: $bordercolor-inline-code;
+}

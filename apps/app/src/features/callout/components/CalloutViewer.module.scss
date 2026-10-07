@@ -1,0 +1,78 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+// == Colors
+.callout-viewer {
+  --callout-accent-note: var(--bs-info);
+  --callout-accent-tip: var(--bs-success);
+  --callout-accent-important: var(--bs-primary);
+  --callout-accent-warning: var(--bs-warning);
+  --callout-accent-caution: var(--bs-danger);
+}
+
+.callout-viewer{
+
+  :global(.callout) {
+    padding: 0.5rem 1rem;
+    margin: 1rem 0rem;
+    color: inherit;
+  }
+
+  :global(.callout-indicator) {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    line-height: 1;
+  }
+
+  :global(.callout-hint) {
+    display: inline-block;
+    margin-right: 0.3rem;
+    vertical-align: text-bottom;
+    fill: currentColor;
+  }
+
+  :global(.callout-note) {
+    :global(.callout-indicator) {
+      color: var(--callout-accent-note);
+    }
+    border-left: .25em solid var(--callout-accent-note);
+  }
+
+  :global(.callout-tip) {
+    :global(.callout-indicator) {
+      color: var(--callout-accent-tip);
+    }
+    border-left: .25em solid var(--callout-accent-tip);
+  }
+
+  :global(.callout-warning) {
+    :global(.callout-indicator) {
+      color: var(--callout-accent-warning);
+    }
+    border-left:.25em solid var(--callout-accent-warning);
+  }
+
+  :global(.callout-caution) {
+    :global(.callout-indicator) {
+      color: var(--callout-accent-caution);
+    }
+    border-left:.25em solid var(--callout-accent-caution);
+  }
+
+  :global(.callout-important) {
+    :global(.callout-indicator) {
+      color: var(--callout-accent-important);
+    }
+    border-left:.25em solid var(--callout-accent-important);
+  }
+
+  :global(.callout-content:first-child),
+  :global(.callout-content:only-child) {
+    margin-block-start: 0;
+  }
+
+  :global(.callout-content:last-child),
+  :global(.callout-content:only-child) {
+    margin-block-end: 0;
+  }
+}

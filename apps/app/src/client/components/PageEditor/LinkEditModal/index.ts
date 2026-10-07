@@ -1,0 +1,1 @@
+export { LinkEditModalLazyLoaded } from './dynamic';

@@ -1,0 +1,1007 @@
+import nextPkg from 'next';
+import http from 'node:http';
+import path from 'node:path';
+import { createTerminus } from '@godaddy/terminus';
+import { createHttpLoggerMiddleware } from '@growi/logger';
+import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
+import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
+import type { Express } from 'express';
+import expressFactory from 'express';
+import expressSession from 'express-session';
+import mongoose from 'mongoose';
+import uidSafe from 'uid-safe';
+
+import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
+import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
+import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
+import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server';
+import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
+import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
+import { initializeVaultFeature } from '~/features/growi-vault/server';
+import { isAiReady as resolveIsAiReady } from '~/features/mastra/server/services/is-ai-configured';
+import { modelConfigSync } from '~/features/mastra/server/services/model-config-sync';
+import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
+import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
+import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
+import type { SessionConfig } from '~/interfaces/session-config';
+import { startCron as startAccessTokenCron } from '~/server/service/access-token';
+import { projectRoot } from '~/server/util/project-dir-utils';
+import { getGrowiVersion } from '~/utils/growi-version';
+import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
+import { connectPrismaAtBoot } from '~/utils/prisma-connect';
+
+import ActivityEvent from '../events/activity';
+import AdminEvent from '../events/admin';
+import BookmarkEvent from '../events/bookmark';
+import PageEvent from '../events/page';
+import TagEvent from '../events/tag';
+import UserEvent from '../events/user';
+import type { AccessTokenParser } from '../middlewares/access-token-parser';
+import { accessTokenParser } from '../middlewares/access-token-parser';
+import httpErrorHandler from '../middlewares/http-error-handler';
+import loginRequiredFactory from '../middlewares/login-required';
+import type { AclService } from '../service/acl';
+import { aclService as aclServiceSingletonInstance } from '../service/acl';
+import ActivityService from '../service/activity';
+import AppService from '../service/app';
+import { AttachmentService } from '../service/attachment';
+import CommentService from '../service/comment';
+import { configManager as configManagerSingletonInstance } from '../service/config-manager';
+import type { ConfigManager } from '../service/config-manager/config-manager';
+import instanciateExportService from '../service/export';
+import instanciateExternalAccountService from '../service/external-account';
+import { type FileUploader, getUploader } from '../service/file-uploader';
+import {
+  G2GTransferPusherService,
+  G2GTransferReceiverService,
+} from '../service/g2g-transfer';
+import { GrowiBridgeService } from '../service/growi-bridge';
+import { initializeImportService } from '../service/import';
+import { InAppNotificationService } from '../service/in-app-notification';
+import { InstallerService } from '../service/installer';
+import { normalizeData } from '../service/normalize-data';
+import PageService from '../service/page';
+import PageGrantService from '../service/page-grant';
+import type { IPageOperationService } from '../service/page-operation';
+import instanciatePageOperationService from '../service/page-operation';
+import PassportService from '../service/passport';
+import SearchService from '../service/search';
+import { SlackIntegrationService } from '../service/slack-integration';
+import { SocketIoService } from '../service/socket-io';
+import SyncPageStatusService from '../service/system-events/sync-page-status';
+import UserGroupService from '../service/user-group';
+import { UserNotificationService } from '../service/user-notification';
+import { initializeYjsService } from '../service/yjs';
+import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
+import { setup as setupExpressInit } from './express-init';
+import type { ModelsMapDependentOnCrowi } from './setup-models';
+import { setupModelsDependentOnCrowi } from './setup-models';
+
+const logger = loggerFactory('growi:crowi');
+
+// next's CJS entry self-patches `module.exports` to the createServer function,
+// so the runtime default import IS callable; the shipped d.ts (`export default`
+// in a CJS package) makes NodeNext type it as the module namespace instead.
+// Narrow the binding back to the callable declared as its `default`.
+const next = nextPkg as unknown as typeof import('next').default;
+
+const sep = path.sep;
+
+type PageEventType = any;
+type ActivityEventType = any;
+type BookmarkEventType = any;
+type TagEventType = any;
+type AdminEventType = any;
+type GlobalNotificationServiceType = any;
+type S2sMessagingServiceType = any;
+type MailServiceType = any;
+type FileUploaderSwitchServiceType = any;
+type InAppNotificationServiceType = any;
+type ActivityServiceType = any;
+type CommentServiceType = any;
+type SyncPageStatusServiceType = any;
+type CrowiDevType = any;
+
+interface CrowiEvents {
+  user: UserEvent;
+  page: PageEventType;
+  activity: ActivityEventType;
+  bookmark: BookmarkEventType;
+  tag: TagEventType;
+  admin: AdminEventType;
+}
+
+class Crowi {
+  /**
+   * For retrieving other packages
+   */
+  accessTokenParser: AccessTokenParser;
+
+  loginRequiredFactory: typeof loginRequiredFactory;
+
+  nextApp!: ReturnType<typeof next>;
+
+  configManager!: ConfigManager;
+
+  attachmentService!: AttachmentService;
+
+  aclService!: AclService;
+
+  appService!: AppService;
+
+  fileUploadService!: FileUploader;
+
+  growiInfoService!: import('../service/growi-info').GrowiInfoService;
+
+  growiBridgeService!: GrowiBridgeService;
+
+  pageService!: import('../service/page/page-service').IPageService;
+
+  pageGrantService!: PageGrantService;
+
+  pageOperationService!: IPageOperationService;
+
+  customizeService!: import('../service/customize').CustomizeService;
+
+  passportService!: PassportService;
+
+  searchService!: SearchService;
+
+  auditlogChangeStreamService: AuditlogChangeStreamService | null = null;
+
+  slackIntegrationService!: SlackIntegrationService;
+
+  socketIoService!: SocketIoService;
+
+  userNotificationService!: UserNotificationService;
+
+  userGroupService!: UserGroupService;
+
+  ldapUserGroupSyncService!: LdapUserGroupSyncService;
+
+  keycloakUserGroupSyncService!: KeycloakUserGroupSyncService;
+
+  globalNotificationService!: GlobalNotificationServiceType;
+
+  sessionConfig!: SessionConfig;
+
+  version: string;
+
+  publicDir: string;
+
+  resourceDir: string;
+
+  localeDir: string;
+
+  viewsDir: string;
+
+  tmpDir: string;
+
+  cacheDir: string;
+
+  express!: Express;
+
+  config: Record<string, unknown>;
+
+  s2sMessagingService: S2sMessagingServiceType | null;
+
+  g2gTransferPusherService: G2GTransferPusherService | null;
+
+  g2gTransferReceiverService: G2GTransferReceiverService | null;
+
+  mailService: MailServiceType | null;
+
+  fileUploaderSwitchService!: FileUploaderSwitchServiceType;
+
+  pluginService: unknown | null;
+
+  syncPageStatusService: SyncPageStatusServiceType | null;
+
+  inAppNotificationService: InAppNotificationServiceType | null;
+
+  activityService: ActivityServiceType | null;
+
+  commentService: CommentServiceType | null;
+
+  tokens: unknown | null;
+
+  models: ModelsMapDependentOnCrowi;
+
+  env: NodeJS.ProcessEnv;
+
+  node_env: string;
+
+  port: string | number;
+
+  events: CrowiEvents;
+
+  slack?: unknown;
+
+  slackLegacy?: unknown;
+
+  crowiDev?: CrowiDevType;
+
+  constructor() {
+    this.version = getGrowiVersion();
+
+    this.publicDir = path.join(projectRoot, 'public') + sep;
+    this.resourceDir = path.join(projectRoot, 'resource') + sep;
+    this.localeDir = path.join(this.resourceDir, 'locales') + sep;
+    this.viewsDir = path.resolve(import.meta.dirname, '../views') + sep;
+    this.tmpDir = path.join(projectRoot, 'tmp') + sep;
+    this.cacheDir = path.join(this.tmpDir, 'cache');
+
+    this.accessTokenParser = accessTokenParser;
+    this.loginRequiredFactory = loginRequiredFactory;
+
+    this.config = {};
+    this.s2sMessagingService = null;
+    this.g2gTransferPusherService = null;
+    this.g2gTransferReceiverService = null;
+    this.mailService = null;
+    this.pluginService = null;
+    this.syncPageStatusService = null;
+    this.inAppNotificationService = null;
+    this.activityService = null;
+    this.commentService = null;
+
+    this.tokens = null;
+
+    this.models = {};
+
+    this.env = process.env;
+    this.node_env = this.env.NODE_ENV || 'development';
+
+    this.port = this.env.PORT || 3000;
+
+    this.events = {
+      user: new UserEvent(this),
+      page: new PageEvent(this),
+      activity: new ActivityEvent(this),
+      bookmark: new BookmarkEvent(this),
+      tag: new TagEvent(this),
+      admin: new AdminEvent(this),
+    };
+  }
+
+  async init(): Promise<void> {
+    await this.setupDatabase();
+    // Warm up the Prisma connection right after mongoose connects, so a
+    // Prisma connection problem aborts boot the same way a mongoose failure
+    // does, and the native query engine's memory cost is paid at boot time
+    // instead of being invisible until the first request (see prisma-connect.ts).
+    await connectPrismaAtBoot();
+    this.models = await setupModelsDependentOnCrowi(this);
+    await this.setupConfigManager();
+    await this.setupSessionConfig();
+
+    // setup messaging services
+    await this.setupS2sMessagingService();
+    await this.setupSocketIoService();
+
+    // customizeService depends on AppService
+    // passportService depends on appService
+    // export and import depends on setUpGrowiBridge
+    await Promise.all([this.setUpApp(), this.setUpGrowiBridge()]);
+
+    await Promise.all([
+      this.setupGrowiInfoService(),
+      this.setupPassport(),
+      this.setupSearcher(),
+      this.setupMailer(),
+      this.setupSlackIntegrationService(),
+      this.setupG2GTransferService(),
+      this.setUpFileUpload(),
+      this.setUpFileUploaderSwitchService(),
+      this.setupAttachmentService(),
+      this.setUpAcl(),
+      this.setupUserGroupService(),
+      this.setupExport(),
+      this.setupImport(),
+      this.setupGrowiPluginService(),
+      this.setupPageService(),
+      this.setupInAppNotificationService(),
+      this.setupActivityService(),
+      this.setupCommentService(),
+      this.setupSyncPageStatusService(),
+      this.setUpCustomize(), // depends on pluginService
+    ]);
+
+    await Promise.all([
+      // globalNotification depends on slack and mailer
+      this.setUpGlobalNotification(),
+      this.setUpUserNotification(),
+      // depends on passport service
+      this.setupExternalAccountService(),
+      this.setupExternalUserGroupSyncService(),
+      // depends on pageService and activityService
+      this.setupVaultFeature(),
+    ]);
+
+    await this.setupCron();
+
+    await normalizeData();
+  }
+
+  /**
+   * Execute functions that should be run after the express server is ready.
+   */
+  async asyncAfterExpressServerReady(): Promise<void> {
+    if (this.pageOperationService != null) {
+      await this.pageOperationService.afterExpressServerReady();
+    }
+
+    // One-shot model-catalog refresh (no-op unless AI is enabled AND
+    // ai:modelCatalogRefreshOnStartup is true). Fire-and-forget inside — a
+    // failure only logs and the bundled/last-good catalog stays in effect.
+    const { triggerModelCatalogRefreshOnStartupIfEnabled } = await import(
+      '~/features/mastra/server/services/model-catalog-refresh-jobs'
+    );
+    triggerModelCatalogRefreshOnStartupIfEnabled();
+  }
+
+  isPageId(pageId: unknown): boolean {
+    if (!pageId) {
+      return false;
+    }
+
+    if (typeof pageId === 'string' && pageId.match(/^[\da-f]{24}$/)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // AI usability verdict (enabled && configured) for callers that cannot reach
+  // the module-level config singleton safely — notably getServerSideProps, which
+  // runs in the Next/Turbopack SSR realm where a directly-imported configManager
+  // is a separate, never-loaded instance ("Config is not loaded"). Exposing the
+  // verdict here makes it execute in this (Express) realm, where the singleton is
+  // bootstrapped and loaded, so SSR code only needs the crowi reference it already
+  // has. Mirrors the verdict the mastra route guard uses, keeping UI and API
+  // aligned (Req 7.4).
+  isAiReady(): boolean {
+    return resolveIsAiReady();
+  }
+
+  setConfig(config: Record<string, unknown>): void {
+    this.config = config;
+  }
+
+  getConfig(): Record<string, unknown> {
+    return this.config;
+  }
+
+  getEnv(): NodeJS.ProcessEnv {
+    return this.env;
+  }
+
+  async setupDatabase(): Promise<typeof mongoose> {
+    mongoose.Promise = global.Promise;
+
+    // mongoUri = mongodb://user:password@host/dbname
+    const mongoUri = getMongoUri();
+
+    return await mongoose.connect(mongoUri, mongoOptions);
+  }
+
+  async setupSessionConfig(): Promise<void> {
+    const sessionMaxAge =
+      this.configManager.getConfig('security:sessionMaxAge') || 2592000000; // default: 30days
+    const redisUrl =
+      this.env.REDISTOGO_URL ||
+      this.env.REDIS_URI ||
+      this.env.REDIS_URL ||
+      null;
+    const uid = uidSafe.sync;
+
+    // generate pre-defined uid for healthcheck
+    const healthcheckUid = uid(24);
+
+    const sessionConfig: SessionConfig = {
+      rolling: true,
+      secret: this.env.SECRET_TOKEN || 'this is default session secret',
+      resave: false,
+      saveUninitialized: true,
+      cookie: {
+        maxAge: sessionMaxAge,
+      },
+      genid(req) {
+        // return pre-defined uid when healthcheck
+        if (req.path === '/_api/v3/healthcheck') {
+          return healthcheckUid;
+        }
+        return uid(24);
+      },
+    };
+
+    if (this.env.SESSION_NAME) {
+      sessionConfig.name = this.env.SESSION_NAME;
+    }
+
+    // use Redis for session store
+    // (loaded lazily: the redis stack is only needed when a Redis URL is configured)
+    if (redisUrl) {
+      const { createClient } = await import('redis');
+      const redisClient = createClient({ url: redisUrl });
+      const { default: connectRedis } = await import('connect-redis');
+      const RedisStore = connectRedis(expressSession);
+      sessionConfig.store = new RedisStore({ client: redisClient });
+    }
+    // use MongoDB for session store
+    else {
+      const { default: MongoStore } = await import('connect-mongo');
+      sessionConfig.store = MongoStore.create({
+        client: mongoose.connection.getClient(),
+      });
+    }
+
+    this.sessionConfig = sessionConfig;
+  }
+
+  async setupConfigManager(): Promise<void> {
+    this.configManager = configManagerSingletonInstance;
+    return await this.configManager.loadConfigs();
+  }
+
+  async setupS2sMessagingService(): Promise<void> {
+    const { setup: setupS2sMessaging } = await import(
+      '../service/s2s-messaging'
+    );
+    const s2sMessagingService = await setupS2sMessaging(this);
+    if (s2sMessagingService != null) {
+      s2sMessagingService.subscribe(false);
+      this.configManager.setS2sMessagingService(s2sMessagingService);
+      // add as a message handler
+      s2sMessagingService.addMessageHandler(this.configManager);
+      // discard the memoized Mastra model on remote AI settings updates
+      s2sMessagingService.addMessageHandler(modelConfigSync);
+
+      this.s2sMessagingService = s2sMessagingService;
+    }
+  }
+
+  setupSocketIoService(): void {
+    this.socketIoService = new SocketIoService(this);
+  }
+
+  async setupCron(): Promise<void> {
+    instanciatePageBulkExportJobCronService(this);
+    checkPageBulkExportJobInProgressCronService.startCron();
+
+    instanciatePageBulkExportJobCleanUpCronService(this);
+    // Dynamic import to get the initialized singleton instance
+    const { pageBulkExportJobCleanUpCronService } = await import(
+      '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron'
+    );
+    if (pageBulkExportJobCleanUpCronService == null) {
+      throw new Error('pageBulkExportJobCleanUpCronService is not initialized');
+    }
+    pageBulkExportJobCleanUpCronService.startCron();
+
+    instantiateAuditLogBulkExportJobCronService(this);
+    checkAuditLogExportJobInProgressCronService.startCron();
+
+    instantiateAuditLogBulkExportJobCleanUpCronService(this);
+    const { auditLogBulkExportJobCleanUpCronService } = await import(
+      '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron'
+    );
+    if (auditLogBulkExportJobCleanUpCronService == null) {
+      throw new Error(
+        'auditLogBulkExportJobCleanUpCronService is not initialized',
+      );
+    }
+    auditLogBulkExportJobCleanUpCronService.startCron();
+
+    startAccessTokenCron();
+
+    // News feed sync cron
+    const { NewsCronService } = await import(
+      '~/features/news/server/services/news-cron-service'
+    );
+    new NewsCronService().startCron();
+
+    // Expired WIP page cleanup (the schedule defaults to daily and can be disabled
+    // with an empty app:wipPageCleanupCronSchedule)
+    const { startWipPageCleanupCronIfEnabled } = await import(
+      '~/server/service/page/wip-page-cleanup-cron'
+    );
+    startWipPageCleanupCronIfEnabled(this);
+
+    // Periodic model-catalog refresh (no-op unless AI is enabled; the schedule
+    // defaults to daily and can be disabled with an empty ai:modelCatalogRefreshCronSchedule)
+    const { startModelCatalogRefreshCronIfEnabled } = await import(
+      '~/features/mastra/server/services/model-catalog-refresh-jobs'
+    );
+    startModelCatalogRefreshCronIfEnabled();
+  }
+
+  getSlack(): unknown {
+    return this.slack;
+  }
+
+  getSlackLegacy(): unknown {
+    return this.slackLegacy;
+  }
+
+  async setupPassport(): Promise<void> {
+    logger.debug('Passport is enabled');
+
+    // initialize service
+    if (this.passportService == null) {
+      this.passportService = new PassportService(this);
+    }
+    this.passportService.setupSerializer();
+    // setup strategies
+    try {
+      await this.passportService.setupStrategyById('local');
+      await this.passportService.setupStrategyById('ldap');
+      await this.passportService.setupStrategyById('saml');
+      await this.passportService.setupStrategyById('oidc');
+      await this.passportService.setupStrategyById('google');
+      await this.passportService.setupStrategyById('github');
+    } catch (err) {
+      logger.error(err);
+    }
+
+    // add as a message handler
+    if (this.s2sMessagingService != null) {
+      this.s2sMessagingService.addMessageHandler(this.passportService);
+    }
+  }
+
+  async setupSearcher(): Promise<void> {
+    this.searchService = await SearchService.create(this);
+
+    if (this.searchService.isConfigured) {
+      // Auditlog rebuild-on-boot is orchestrated here (not in the delegator) so that server-core
+      // stays free of the auditlog-es-sync feature. Whether the rebuild actually succeeded is then
+      // handed to the change-stream service, which reconciles the sync-status flag and resume token
+      // on its first start (a feature concern that belongs in that layer).
+      let didRebuildOnBoot = false;
+      if (
+        this.configManager.getConfig('app:elasticsearchAuditlogReindexOnBoot')
+      ) {
+        // No cross-instance guard (like the page-index reindexOnBoot): concurrent rebuilds race
+        // on the ES alias swap, so enable on a single instance.
+        try {
+          await this.searchService.rebuildAuditlogIndex();
+          didRebuildOnBoot = true;
+        } catch (err) {
+          logger.error('Rebuild auditlog index on boot failed', err);
+        }
+      }
+
+      this.auditlogChangeStreamService = new AuditlogChangeStreamService(
+        this.searchService.fullTextSearchDelegator,
+        didRebuildOnBoot,
+      );
+      void this.auditlogChangeStreamService.startWithRetry();
+    }
+  }
+
+  async setupMailer(): Promise<void> {
+    // intentionally lazy: service/mail participates in a require cycle with
+    // this hub module; loading it at import time would surface the cycle
+    const { default: MailService } = await import('~/server/service/mail');
+    this.mailService = new MailService(this);
+    // initialize() is async because it lazy-loads the configured transport
+    // (smtp/ses/oauth2) via dynamic import(), so it can no longer run inside
+    // the constructor; await it explicitly before the mailer is used.
+    await this.mailService.initialize();
+
+    // add as a message handler
+    if (this.s2sMessagingService != null) {
+      this.s2sMessagingService.addMessageHandler(this.mailService);
+    }
+  }
+
+  async autoInstall(): Promise<void> {
+    const isInstalled = this.configManager.getConfig('app:installed');
+    const username = this.configManager.getConfig('autoInstall:adminUsername');
+
+    if (isInstalled || username == null) {
+      return;
+    }
+
+    logger.info('Start automatic installation');
+
+    const firstAdminUserToSave = {
+      username,
+      name: this.configManager.getConfig('autoInstall:adminName') ?? username,
+      email: this.configManager.getConfig('autoInstall:adminEmail') ?? '',
+      password: this.configManager.getConfig('autoInstall:adminPassword') ?? '',
+      admin: true,
+    };
+    const globalLang = this.configManager.getConfig('autoInstall:globalLang');
+    const allowGuestMode = this.configManager.getConfig(
+      'autoInstall:allowGuestMode',
+    );
+    const serverDateStr = this.configManager.getConfig(
+      'autoInstall:serverDate',
+    );
+    const serverDate =
+      serverDateStr != null ? new Date(serverDateStr) : undefined;
+
+    const installerService = new InstallerService(this);
+
+    try {
+      await installerService.install(
+        firstAdminUserToSave,
+        globalLang ?? 'en_US',
+        {
+          allowGuestMode,
+          serverDate,
+        },
+      );
+    } catch (err) {
+      logger.warn('Automatic installation failed.', err);
+    }
+  }
+
+  getTokens(): unknown {
+    return this.tokens;
+  }
+
+  async start(): Promise<http.Server> {
+    const dev = process.env.NODE_ENV !== 'production';
+
+    await this.init();
+    await this.buildServer();
+
+    // setup Next.js
+    // Save the dev TS runner's .ts extension hook (tsx registers one for CJS
+    // interop) before Next.js prepare() destroys it.
+    // Next.js's next.config.ts transpiler registers/deregisters its own require hooks,
+    // and deregisterHook() deletes require.extensions['.ts'] instead of restoring the previous hook.
+    // `typeof require` guards the CJS-only API: under the ESM build `require` is
+    // undefined and no .ts hook exists, so there is nothing to restore.
+    const cjsRequire = typeof require === 'function' ? require : undefined;
+    const savedTsHook = cjsRequire?.extensions['.ts'];
+    this.nextApp = next({ dev });
+    await this.nextApp.prepare();
+    // Restore the runner's .ts hook if Next.js removed it
+    if (cjsRequire && savedTsHook && !cjsRequire.extensions['.ts']) {
+      cjsRequire.extensions['.ts'] = savedTsHook;
+    }
+
+    // setup CrowiDev (loaded lazily: development runtime only)
+    if (dev) {
+      const { default: CrowiDev } = await import('./dev');
+      this.crowiDev = new CrowiDev(this);
+      this.crowiDev.init();
+    }
+
+    const { express } = this;
+
+    const app =
+      this.node_env === 'development'
+        ? this.crowiDev!.setupServer(express)
+        : express;
+
+    const httpServer = http.createServer(app);
+
+    // setup terminus
+    this.setupTerminus(httpServer);
+
+    // attach to socket.io
+    this.socketIoService.attachServer(httpServer);
+
+    // Initialization YjsService
+    initializeYjsService(
+      httpServer,
+      this.socketIoService.io,
+      this.sessionConfig,
+    );
+
+    await this.autoInstall();
+
+    // listen
+    const serverListening = httpServer.listen(this.port, () => {
+      logger.info(
+        `[${this.node_env}] Express server is listening on port ${this.port}`,
+      );
+      if (this.node_env === 'development') {
+        this.crowiDev!.setupExpressAfterListening(express);
+      }
+    });
+
+    // setup Express Routes
+    this.setupRoutesForPlugins();
+    await this.setupRoutesAtLast();
+
+    // setup Global Error Handlers
+    this.setupGlobalErrorHandlers();
+
+    // Execute this asynchronously after the express server is ready so it does not block the ongoing process
+    this.asyncAfterExpressServerReady();
+
+    return serverListening;
+  }
+
+  async buildServer(): Promise<void> {
+    const env = this.node_env;
+    const express: Express = expressFactory();
+
+    setupExpressInit(this, express);
+
+    // HTTP request logging via @growi/logger (encapsulates pino-http)
+    const httpLogger = await createHttpLoggerMiddleware({
+      // suppress logging for Next.js static files in development mode
+      ...(env !== 'production' && {
+        autoLogging: {
+          ignore: (req) => req.url?.startsWith('/_next/static/') ?? false,
+        },
+      }),
+    });
+    express.use(httpLogger);
+
+    this.express = express;
+  }
+
+  setupTerminus(server: http.Server): void {
+    createTerminus(server, {
+      signals: ['SIGINT', 'SIGTERM'],
+      onSignal: async () => {
+        logger.info('Server is starting cleanup');
+
+        await this.auditlogChangeStreamService?.close();
+        await mongoose.disconnect();
+        return;
+      },
+      // biome-ignore lint/suspicious/useAwait: onShutdown should be async
+      onShutdown: async () => {
+        logger.info('Cleanup finished, server is shutting down');
+      },
+    });
+  }
+
+  setupRoutesForPlugins(): void {
+    lsxRoutes(this, this.express, {
+      resolveTagPageIds: (tagNames) =>
+        prisma.pagetagrelations.findPageIdsWithAllTags(tagNames),
+    });
+    attachmentRoutes(this, this.express);
+  }
+
+  /**
+   * setup Express Routes
+   * !! this must be at last because it includes '/*' route !!
+   */
+  async setupRoutesAtLast(): Promise<void> {
+    type RoutesSetup = (crowi: Crowi, app: Express) => void;
+    const { setup: setupRoutes }: { setup: RoutesSetup } = await import(
+      '../routes'
+    );
+    setupRoutes(this, this.express);
+  }
+
+  /**
+   * setup global error handlers
+   * !! this must be after the Routes setup !!
+   */
+  setupGlobalErrorHandlers(): void {
+    this.express.use(httpErrorHandler);
+  }
+
+  /**
+   * setup GlobalNotificationService
+   */
+  async setUpGlobalNotification(): Promise<void> {
+    const { GlobalNotificationService } = await import(
+      '../service/global-notification'
+    );
+    if (this.globalNotificationService == null) {
+      this.globalNotificationService = new GlobalNotificationService(this);
+    }
+  }
+
+  /**
+   * setup UserNotificationService
+   */
+  setUpUserNotification(): void {
+    if (this.userNotificationService == null) {
+      this.userNotificationService = new UserNotificationService(this);
+    }
+  }
+
+  /**
+   * setup AclService
+   */
+  setUpAcl(): void {
+    this.aclService = aclServiceSingletonInstance;
+  }
+
+  /**
+   * setup CustomizeService
+   */
+  async setUpCustomize(): Promise<void> {
+    const { CustomizeService } = await import('../service/customize');
+    if (this.customizeService == null) {
+      this.customizeService = new CustomizeService(this);
+      this.customizeService.initCustomCss();
+      this.customizeService.initCustomTitle();
+      this.customizeService.initGrowiTheme();
+
+      // add as a message handler
+      if (this.s2sMessagingService != null) {
+        this.s2sMessagingService.addMessageHandler(this.customizeService);
+      }
+    }
+  }
+
+  /**
+   * setup AppService
+   */
+  setUpApp(): void {
+    if (this.appService == null) {
+      this.appService = new AppService(this);
+
+      // add as a message handler
+      const isInstalled = this.configManager.getConfig('app:installed');
+      if (this.s2sMessagingService != null && !isInstalled) {
+        this.s2sMessagingService.addMessageHandler(this.appService);
+      }
+    }
+  }
+
+  /**
+   * setup FileUploadService
+   */
+  async setUpFileUpload(isForceUpdate = false): Promise<void> {
+    if (this.fileUploadService == null || isForceUpdate) {
+      this.fileUploadService = await getUploader(this);
+    }
+  }
+
+  /**
+   * setup FileUploaderSwitchService
+   */
+  async setUpFileUploaderSwitchService(): Promise<void> {
+    const { default: FileUploaderSwitchService } = await import(
+      '../service/file-uploader-switch'
+    );
+    this.fileUploaderSwitchService = new FileUploaderSwitchService(this);
+    // add as a message handler
+    if (this.s2sMessagingService != null) {
+      this.s2sMessagingService.addMessageHandler(
+        this.fileUploaderSwitchService,
+      );
+    }
+  }
+
+  async setupGrowiInfoService(): Promise<void> {
+    const { growiInfoService } = await import('../service/growi-info');
+    this.growiInfoService = growiInfoService;
+  }
+
+  /**
+   * setup AttachmentService
+   */
+  setupAttachmentService(): void {
+    if (this.attachmentService == null) {
+      this.attachmentService = new AttachmentService(this);
+    }
+  }
+
+  async setupUserGroupService(): Promise<void> {
+    if (this.userGroupService == null) {
+      this.userGroupService = new UserGroupService(this);
+      return await this.userGroupService.init();
+    }
+  }
+
+  setUpGrowiBridge(): void {
+    if (this.growiBridgeService == null) {
+      this.growiBridgeService = new GrowiBridgeService(this);
+    }
+  }
+
+  setupExport(): void {
+    instanciateExportService(this);
+  }
+
+  setupImport(): void {
+    initializeImportService(this);
+  }
+
+  async setupGrowiPluginService(): Promise<void> {
+    const growiPluginService = await import(
+      '~/features/growi-plugin/server/services'
+    ).then((mod) => mod.growiPluginService);
+
+    // download plugin repositories, if document exists but there is no repository
+    // TODO: Cannot download unless connected to the Internet at setup.
+    await growiPluginService.downloadNotExistPluginRepositories();
+  }
+
+  setupPageService(): void {
+    if (this.pageGrantService == null) {
+      this.pageGrantService = new PageGrantService(this);
+    }
+    // initialize after pageGrantService since pageService uses pageGrantService in constructor
+    if (this.pageService == null) {
+      this.pageService = new PageService(this);
+    }
+    this.pageOperationService = instanciatePageOperationService(this);
+  }
+
+  setupInAppNotificationService(): void {
+    if (this.inAppNotificationService == null) {
+      this.inAppNotificationService = new InAppNotificationService(this);
+    }
+  }
+
+  async setupActivityService(): Promise<void> {
+    if (this.activityService == null) {
+      this.activityService = new ActivityService(this);
+      await this.activityService.createTtlIndex();
+    }
+  }
+
+  setupCommentService(): void {
+    if (this.commentService == null) {
+      this.commentService = new CommentService(this);
+    }
+  }
+
+  setupSyncPageStatusService(): void {
+    if (this.syncPageStatusService == null) {
+      this.syncPageStatusService = new SyncPageStatusService(
+        this,
+        this.s2sMessagingService,
+        this.socketIoService,
+      );
+
+      // add as a message handler
+      if (this.s2sMessagingService != null) {
+        this.s2sMessagingService.addMessageHandler(this.syncPageStatusService);
+      }
+    }
+  }
+
+  setupSlackIntegrationService(): void {
+    if (this.slackIntegrationService == null) {
+      this.slackIntegrationService = new SlackIntegrationService(this);
+    }
+
+    // add as a message handler
+    if (this.s2sMessagingService != null) {
+      this.s2sMessagingService.addMessageHandler(this.slackIntegrationService);
+    }
+  }
+
+  setupG2GTransferService(): void {
+    if (this.g2gTransferPusherService == null) {
+      this.g2gTransferPusherService = new G2GTransferPusherService(this);
+    }
+    if (this.g2gTransferReceiverService == null) {
+      this.g2gTransferReceiverService = new G2GTransferReceiverService(this);
+    }
+  }
+
+  // execute after setupPassport
+  setupExternalAccountService(): void {
+    instanciateExternalAccountService(this.passportService);
+  }
+
+  // execute after setupPassport, s2sMessagingService, socketIoService
+  setupExternalUserGroupSyncService(): void {
+    this.ldapUserGroupSyncService = new LdapUserGroupSyncService(
+      this.passportService,
+      this.s2sMessagingService,
+      this.socketIoService,
+    );
+    this.keycloakUserGroupSyncService = new KeycloakUserGroupSyncService(
+      this.s2sMessagingService,
+      this.socketIoService,
+    );
+  }
+
+  async setupVaultFeature(): Promise<void> {
+    await initializeVaultFeature(this);
+  }
+}
+
+export default Crowi;

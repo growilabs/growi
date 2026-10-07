@@ -2,8 +2,10 @@
 
 # dependencies
 node_modules
+node_modules.*
 /.pnp
 .pnp.js
+.pnpm-store
 
 # testing
 coverage
@@ -26,7 +28,33 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# typescript
+*.tsbuildinfo
+
+# Terraform
+**/.terraform/*
+*.tfstate.*
+/aws/
+
 # IDE, dev #
 .idea
+**/.claude/settings.local.json
 *.orig
 *.code-workspace
+*.timestamp-*.mjs
+
+# UTCP configuration file
+.utcp_config.json
+
+# turborepo
+.turbo
+
+# pnpm deploy target dir
+out
+
+.devcontainer/compose.extend.yml
+
+# Memory profiling artifacts (heap snapshots are large and may contain sensitive data)
+*.heapsnapshot
+/tmp/memory-profiler/
+/tmp/memory-leak-investigation/

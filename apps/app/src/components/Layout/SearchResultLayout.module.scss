@@ -1,0 +1,45 @@
+@use 'styles/variables' as var;
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.on-search {
+  :global(.page-wrapper) {
+    height: 100vh;
+  }
+
+  :global(.search-control-include-options) {
+    :global(.card-body) {
+      padding: 5px 10px;
+    }
+  }
+  :global(.search-result-list) {
+
+    :global(.search-result-keyword) {
+      font-size: 17.5px;
+      font-weight: bold;
+    }
+    :global(.search-result-select-group) {
+      > :global(select) {
+        max-width: 8rem;
+      }
+    }
+
+    // list group
+    :global(.page-list) {
+      // not show top label in search result list
+      :global(.page-list-meta) {
+        :global(.top-label) {
+          display: none;
+        }
+      }
+    }
+  }
+
+  :global(.search-result-content) {
+    :global(.search-result-content-body-container) {
+      :global(.wiki) {
+        margin-top: 2em;
+        font-size: 14px;
+      }
+    }
+  }
+}

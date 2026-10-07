@@ -1,0 +1,70 @@
+@import '@growi/core-styles/scss/helpers/flex-expand';
+@import '@growi/core-styles/scss/helpers/rotate';
+@import 'mixins';
+
+// atoms
+@import 'atoms/custom_control';
+@import 'atoms/code';
+@import 'atoms/mention';
+@import 'atoms/tag';
+@import 'atoms/tooltip';
+
+// molecules
+@import 'molecules/toastr';
+@import 'molecules/list-group-item';
+
+// @import 'molecules/duplicated-paths-table.scss';
+
+// organisms
+@import 'organisms/wiki';
+
+// // growi component
+@import 'editor';
+@import 'fonts';
+@import 'installer';
+@import 'layout';
+@import 'mirror_mode';
+@import 'modal';
+@import 'share-link';
+@import 'marker';
+
+/*
+ * for Guest User Mode
+ */
+// TODO: reactify and replace with `grw-not-available-for-guest`
+.dropdown-toggle.dropdown-toggle-disabled {
+  cursor: not-allowed;
+}
+
+// TODO: reactify and replace with `grw-not-available-for-guest`
+.edit-button.edit-button-disabled {
+  cursor: not-allowed;
+}
+
+.grw-not-available-for-guest {
+  cursor: not-allowed !important;
+}
+
+/*
+ * Helper Classes
+ */
+
+.mw-0 {
+  min-width: 0;
+}
+
+.flex-basis-0 {
+  flex-basis: 0;
+}
+
+.grw-page-control-dropdown-item {
+  display: flex !important;
+  align-items: center;
+
+  .grw-page-control-dropdown-icon {
+    display: flex;
+    justify-content: center;
+    width: 25px;
+  }
+
+}

@@ -1,0 +1,25 @@
+@mixin modifier-key {
+  :global(.cmd-key.mac) {
+    &::after {
+      content: '⌘';
+    }
+  }
+
+  :global(.cmd-key.win) {
+    &::after {
+      content: 'Ctrl';
+    }
+  }
+
+  :global(.alt-key.mac) {
+    &::after {
+      content: '⌥';
+    }
+  }
+
+  :global(.alt-key.win) {
+    &::after {
+      content: 'Alt';
+    }
+  }
+}

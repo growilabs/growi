@@ -1,0 +1,1173 @@
+{
+  "meta": {
+    "display_name": "English"
+  },
+  "Help": "Help",
+  "view": "View",
+  "Edit": "Edit",
+  "Delete": "Delete",
+  "delete_all": "Delete all",
+  "Duplicate": "Duplicate",
+  "PathRecovery": "Path recovery",
+  "Copy": "Copy",
+  "preview": "Preview",
+  "desktop": "Desktop",
+  "phone": "Smartphone",
+  "tablet": "Tablet",
+  "Click to copy": "Click to copy",
+  "Rename": "Rename",
+  "Move/Rename": "Move/Rename",
+  "Redirected": "Redirected",
+  "Unlinked": "Unlinked",
+  "unlink_redirection": "Unlink redirection",
+  "Done": "Done",
+  "Cancel": "Cancel",
+  "Create": "Create",
+  "Description": "Description",
+  "Admin": "Admin",
+  "administrator": "Admin",
+  "Tag": "Tag",
+  "Tags": "Tags",
+  "Close": "Close",
+  "Shortcuts": "Shortcuts",
+  "Custom Sidebar": "Custom Sidebar",
+  "eg": "e.g.",
+  "add": "Add",
+  "Undo": "Undo",
+  "Article": "Article",
+  "Page Path": "Page path",
+  "Category": "Category",
+  "User": "User",
+  "account_id": "Account Id",
+  "Update": "Update",
+  "Update Page": "Update Page",
+  "Error": "Error",
+  "Warning": "Warning",
+  "Sign in": "Sign in",
+  "Sign in with External auth": "Sign in with {{signin}}",
+  "Sign up is here": "Sign up",
+  "Sign in is here": "Sign in",
+  "Sign up": "Sign up",
+  "or": "or",
+  "Sign up with Google Account": "Sign up with Google Account",
+  "Sign in with Google Account": "Sign in with Google Account",
+  "Sign up with this Google Account": "Sign up with this Google Account",
+  "Select": "Select",
+  "Required": "Required",
+  "Example": "Example",
+  "Taro Yamada": "John Doe",
+  "List View": "List",
+  "Timeline View": "Timeline",
+  "History": "History",
+  "attachment_data": "Attachment Data",
+  "No_attachments_yet": "No attachments yet.",
+  "Presentation Mode": "Presentation",
+  "Not available for guest": "Not available for guest",
+  "Not available in this version": "Not available in this version",
+  "Not available for read only user": "Not available for read only user",
+  "Not available when \"anyone with the link\" is selected": "If \"anyone with the link\" is selected, the scope cannot be overridden.",
+  "No users have liked this yet": "No users have liked this yet",
+  "No users have liked this yet.": "No users have liked this yet.",
+  "No users have bookmarked yet": "No users have bookmarked yet",
+  "Create Archive Page": "Create Archive Page",
+  "Create Sidebar Page": "Create <strong>/Sidebar</strong> Page",
+  "File type": "File type",
+  "Target page": "Target page",
+  "Include Attachment File": "Include Attachment File",
+  "Include Comment": "Include Comment",
+  "Include Subordinated Page": "Include Subordinated Page",
+  "Include Subordinated Target Page": "include {{target}}",
+  "All Subordinated Page": "All Subordinated Page",
+  "Specify Hierarchy": "Specify Hierarchy",
+  "Submitted the request to create the archive": "Submitted the request to create the archive",
+  "username": "Username",
+  "Created": "Created",
+  "Last updated": "Updated",
+  "Share": "Share",
+  "Markdown Link": "Markdown Link",
+  "Create/Edit Template": "Create/Edit template page",
+  "Go to this version": "View this version",
+  "View diff": "View diff",
+  "No diff": "No diff",
+  "Latest": "Latest",
+  "User ID": "User ID",
+  "User Settings": "User Settings",
+  "User Information": "User information",
+  "User Activation": "User Activation",
+  "Basic Info": "Basic info",
+  "Name": "Name",
+  "Email": "Email",
+  "Language": "Language",
+  "English": "English",
+  "Japanese": "Japanese",
+  "Set Profile Image": "Set profile image",
+  "Upload Image": "Upload image",
+  "Current Image": "Current image",
+  "Delete Image": "Delete Image",
+  "Delete this image?": "Delete this image?",
+  "Updated": "Updated",
+  "Upload new image": "Upload new image",
+  "Connected": "Connected",
+  "Loading": "Loading...",
+  "Disclose E-mail": "Disclose E-mail",
+  "Slack Member ID": "Slack Member ID",
+  "page exists": "this page already exists",
+  "Error occurred": "Error occurred",
+  "Successfully updated": "Successfully updated",
+  "Failed to update": "Failed to update",
+  "Input page name": "Input page name",
+  "Input page name (optional)": "Input page name (optional)",
+  "Input parent page path": "Input parent page path",
+  "New Page": "New page",
+  "Create under": "Create page under below:",
+  "V5 Page Migration": "Convert To V5 Compatibility",
+  "GROWI.5.0_new_schema": "GROWI.5.0 new schema",
+  "See_more_detail_on_new_schema": "See more detail on <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html#about-the-new-v5-compatible-format' target='_blank'>{{title}}</a> <span class='growi-custom-icons'>external_link</span> ",
+  "external_account_management": "External Account Management",
+  "UserGroup": "UserGroup",
+  "Basic Settings": "Basic Settings",
+  "The contents entered here will be shown in the header etc": "The contents entered here will be shown in the header etc",
+  "Forbidden": "Forbidden",
+  "Public": "Public",
+  "Anyone with the link": "Anyone with the link",
+  "Specified users only": "Specified users only",
+  "Only me": "Only me",
+  "Only inside the group": "Only inside the group",
+  "page_list": "Page List",
+  "comments": "Comments",
+  "Reselect the group": "Reselect the group",
+  "Shareable link": "Shareable link",
+  "The whitelist of registration permission E-mail address": "The whitelist of registration permission E-mail address",
+  "Add tags for this page": "Add tags for this page",
+  "tag_list": "Tag list",
+  "popular_tags": "Popular tags",
+  "Check All tags": "check all tags",
+  "You have no tag, You can set tags on pages": "You have no tag, You can set tags on pages",
+  "Show latest": "Show latest",
+  "Load latest": "Load latest",
+  "edited this page": "edited this page.",
+  "List Drafts": "Drafts",
+  "Deleted Pages": "Deleted Pages",
+  "Disassociate": "Disassociate",
+  "No bookmarks yet": "No bookmarks yet",
+  "add_bookmark": "Add to Bookmarks",
+  "remove_bookmark": "Remove from Bookmarks",
+  "wide_view": "Wide View",
+  "Recent Changes": "Recent Changes",
+  "Page Tree": "Page Tree",
+  "Bookmarks": "Bookmarks",
+  "In-App Notification": "Notifications",
+  "GROWI AI Agent": "GROWI AI Agent",
+  "original_path": "Original path",
+  "new_path": "New path",
+  "duplicated_path": "Duplicated path",
+  "Link sharing is disabled": "Link sharing is disabled",
+  "successfully_saved_the_page": "Successfully saved the page",
+  "you_can_not_create_page_with_this_name_or_hierarchy": "You can not create page with this name or page hierarchy",
+  "not_allowed_to_see_this_page": "You cannot see this page",
+  "Confirm": "Confirm",
+  "Successfully requested": "Successfully requested.",
+  "source": "Source",
+  "input_validation": {
+    "target": {
+      "page_name": "Page name",
+      "folder_name": "Folder name",
+      "field": "field"
+    },
+    "message": {
+      "error_message": "Some values ​​are incorrect",
+      "required": "'{{param}}' is required",
+      "invalid_syntax": "The syntax of {{syntax}} is invalid.",
+      "title_required": "Title is required.",
+      "field_required": "{{target}} is required"
+    }
+  },
+  "not_creatable_page": {
+    "message": "Page contents cannot be created in this path."
+  },
+  "custom_navigation": {
+    "no_pages_under_this_page": "There are no pages under this page."
+  },
+  "author_info": {
+    "created_at": "Created at",
+    "created_by": "Created by",
+    "last_revision_posted_at": "Last revision posted at",
+    "updated_by": "Updated by"
+  },
+  "installer": {
+    "tab": "Create account",
+    "title": "Installer",
+    "setup": "Setup",
+    "create_initial_account": "Create an initial account",
+    "initial_account_will_be_administrator_automatically": "The initial account will be administrator automatically.",
+    "unavaliable_user_id": "This 'User ID' is unavailable.",
+    "failed_to_install": "Failed to install GROWI. Please try again.",
+    "failed_to_login_after_install": "Failed to login after installation. Redirecting to the login form ..."
+  },
+  "breaking_changes": {
+    "v346_using_basic_auth": "Basic Authentication currently in use will <strong>no longer be available</strong> in the near future. Remove settings from %s"
+  },
+  "page_register": {
+    "send_email": "Send email",
+    "notice": {
+      "restricted": "Admin approval required.",
+      "restricted_defail": "Once the admin approves your sign up, you'll be able to access this wiki."
+    },
+    "form_help": {
+      "email": "You must have email address which listed below to sign up to this wiki.",
+      "password": "Your password must be at least {{target}} characters long.",
+      "user_id": "The URL of pages you create will contain your User ID. Your User ID can consist of letters, numbers, and some symbols."
+    }
+  },
+  "page_me": {
+    "form_help": {
+      "profile_image1": "Image upload settings not completed.",
+      "profile_image2": "Set up AWS or enable local uploads."
+    }
+  },
+  "API Token Settings": "API token settings",
+  "Current API Token": "Current API token",
+  "Update API Token": "Update API token",
+  "page_me_apitoken": {
+    "api_token": "API Token",
+    "notice": {
+      "apitoken_issued": "API token is not issued.",
+      "update_token1": "You can update to generate a new API token.",
+      "update_token2": "You will need to update the API token in any existing processes."
+    },
+    "form_help": {}
+  },
+  "Access Token Settings": "Access token settings",
+  "page_me_access_token": {
+    "access_token": "Access token",
+    "expiredAt": "Expiration date",
+    "description": "Description",
+    "scope": "Scope",
+    "scope_read": "Read",
+    "action": "Action",
+    "create_token": "Create Token",
+    "no_tokens_found": "No access tokens found",
+    "new_token": {
+      "title": "New access token",
+      "copy_to_clipboard": "Copy to clipboard",
+      "message": "This token will only be displayed once. Please save it securely."
+    },
+    "modal": {
+      "message": "Are you sure you want to delete this access token?",
+      "alert": "This action cannot be undone.",
+      "delete_token": "Delete Token"
+    },
+    "form": {
+      "title": "Create New Access Token",
+      "expiredAt_desc": "Select when this access token should expire.",
+      "description_desc": "Provide a description to help you identify this token later",
+      "description_max_length": "Description must be less than {{length}} characters",
+      "scope_desc": "Select the scope of the access token."
+    },
+    "copy_to_clipboard": "Copy to clipboard"
+  },
+  "Password": "Password",
+  "Password Settings": "Password settings",
+  "personal_settings": {
+    "disassociate_external_account": "Disassociate External Account",
+    "disassociate_external_account_desc": "Are you sure to disassociate the <strong>{{providerType}}</strong> account <strong>{{accountId}}</strong>?",
+    "set_new_password": "Set new Password",
+    "update_password": "Update password",
+    "current_password": "Current password",
+    "new_password": "New password",
+    "new_password_confirm": "Re-enter new password",
+    "password_is_not_set": "Password is not set"
+  },
+  "share_links": {
+    "Shere this page link to public": "Shere this page link to public",
+    "share_link_list": "Share link list",
+    "share_link_management": "Share Link Management",
+    "delete_all_share_links": "Delete all share links",
+    "expire": "Expiration",
+    "Days": "Days",
+    "Custom": "Custom",
+    "description": "Description",
+    "enter_desc": "Enter description",
+    "Unlimited": "unlimited",
+    "Issue": "Issue",
+    "share_settings": "Share settings",
+    "Invalid_Number_of_Date": "You entered invalid value",
+    "link_sharing_is_disabled": "Link sharing is disabled"
+  },
+  "API Settings": "API settings",
+  "Other Settings": "Other Settings",
+  "in_app_notification_settings": {
+    "in_app_notification_settings": "In-App Notification Settings",
+    "subscribe_settings": "Settings to automatically subscribe (Receive notifications) to pages",
+    "default_subscribe_rules": {
+      "page_create": "Subscribe to the page when you create it."
+    }
+  },
+  "ui_settings": {
+    "ui_settings": "UI Settings",
+    "side_bar_mode": {
+      "settings": "Sidebar mode settings",
+      "side_bar_mode_setting": "Set the sidebar mode",
+      "description": "You can set whether or not the sidebar will always be open when the screen width is large. If the screen width is small, the sidebar will always be closed."
+    }
+  },
+  "color_mode_settings": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "settings": "Color mode settings",
+    "description": "Select whether to display in light mode, dark mode, or a system-specific display.<br>Only supported themes can be switched."
+  },
+  "editor_settings": {
+    "editor_settings": "Editor Settings"
+  },
+  "search_help": {
+    "title": "Searching Help",
+    "and": {
+      "syntax help": "divide with space",
+      "desc": "Search pages that include both {{word1}}, {{word2}} in the title or body"
+    },
+    "exclude": {
+      "desc": "Exclude pages that include {{word}} in the title or body"
+    },
+    "phrase": {
+      "syntax help": "surround with double quotes",
+      "desc": "Search pages that include the phrase \"{{phrase}}\""
+    },
+    "prefix": {
+      "desc": "Search only the pages that the title start with {{path}}"
+    },
+    "exclude_prefix": {
+      "desc": "Exclude the pages that the title start with {{path}}"
+    },
+    "tag": {
+      "desc": "Search for pages with {{tag}} tag"
+    },
+    "exclude_tag": {
+      "desc": "Exclude pages with {{tag}} tag"
+    },
+    "author": {
+      "desc": "Search for pages created by {{author}}"
+    },
+    "exclude_author": {
+      "desc": "Exclude pages created by {{author}}"
+    },
+    "editor": {
+      "desc": "Search for pages last edited by {{editor}}"
+    },
+    "exclude_editor": {
+      "desc": "Exclude pages edited by {{editor}}"
+    },
+    "group": {
+      "desc": "Search for pages granted to group {{group}}"
+    },
+    "exclude_group": {
+      "desc": "Exclude pages granted to group {{group}}"
+    },
+    "quoted_value": {
+      "desc": "Wrap any filter value in double quotes when it contains a space (e.g. a group name or page path)"
+    }
+  },
+  "search": {
+    "search page bodies": "Hit [Enter] key to full-text search"
+  },
+  "page_page": {
+    "notice": {
+      "version": "This is not the current version.",
+      "redirected": "You are redirected from",
+      "redirected_period": ".",
+      "unlinked": "Redirect pages to this page have been deleted.",
+      "restricted": "Access to this page is restricted",
+      "stale": "More than {{count}} year has passed since last update.",
+      "stale_plural": "More than {{count}} years has passed since last update.",
+      "expiration": "This share link will expire at <strong>{{expiredAt}}</strong>.",
+      "no_deadline": "This page has no expiration date",
+      "not_indexed1": "This page may not be indexed by Full-Text search engines.",
+      "not_indexed2": "Page body exceeds the threshold specified by {{threshold}}."
+    }
+  },
+  "page_edit": {
+    "input_channels": "Slack channel name...",
+    "theme": "Theme",
+    "keymap": "Keymap",
+    "indent": "Indent",
+    "paste": {
+      "title": "Paste behavior",
+      "both": "Both",
+      "text": "Text only",
+      "file": "File only"
+    },
+    "editor_config": "Editor Config",
+    "Show active line": "Show active line",
+    "auto_format_table": "Auto format table",
+    "overwrite_scopes": "{{operation}} and Overwrite scopes of all descendants",
+    "notice": {
+      "conflict": "Couldn't save the changes you made because someone else was editing this page. Please re-edit the affected section after reloading the page."
+    },
+    "changes_not_saved": "Changes you made may not be saved. Are you sure you want to move?"
+  },
+  "page_comment": {
+    "comments": "Commments",
+    "comment": "Commment",
+    "preview": "Preview",
+    "write": "Write",
+    "add_a_comment": "Add a comment",
+    "display_the_page_when_posting_this_comment": "Display the page when posting this comment",
+    "no_user_found": "No user found",
+    "reply": "Reply",
+    "delete_comment": "Delete comment?",
+    "comment_management_is_not_allowed": "Comment management is not allowed.",
+    "no_comments": "There are no comments yet."
+  },
+  "inline_comment": {
+    "start_comment": "Comment",
+    "resolved": "Resolved",
+    "unresolved": "Unresolved",
+    "resolve": "Resolve",
+    "reopen": "Reopen",
+    "range_not_found": "The commented text could not be found on this page. It may have been edited or removed.",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "more": "More",
+    "expand_all_resolved": "Expand all resolved comments",
+    "list_menu": "Comment list menu",
+    "item_menu": "Comment actions",
+    "view_at_posting": "View page at posting"
+  },
+  "page_api_error": {
+    "notfound_or_forbidden": "Original page is not found or forbidden.",
+    "already_exists": "Page with the path already exists.",
+    "outdated": "Page is updated someone and now outdated.",
+    "invalid_body": "The request does not tell which version of the page it applies to.",
+    "user_not_admin": "Only admin user can delete",
+    "single_deletion_empty_pages": "Empty pages cannot be single deleted",
+    "complete_deletion_not_allowed_for_user": "You are not allowed to delete this page completely"
+  },
+  "page_history": {
+    "revision_list": "Revision list",
+    "revision": "version",
+    "comparing_source": "Source",
+    "comparing_target": "Target",
+    "comparing_revisions": "Comparing the difference",
+    "compare_latest": "Compare latest revision",
+    "compare_previous": "Compare previous revision"
+  },
+  "modal_rename": {
+    "label": {
+      "Move/Rename page": "Move/Rename page",
+      "New page name": "New page name",
+      "Failed to get subordinated pages": "Failed to get subordinated pages",
+      "Failed to get exist path": "Failed to get exist path",
+      "Current page name": "Current page name",
+      "Rename this page only": "Rename this page only",
+      "Force rename all child pages": "Force rename all pages",
+      "Other options": "Other options",
+      "Do not update metadata": "Do not update metadata",
+      "Redirect": "Redirect"
+    },
+    "help": {
+      "redirect": "Redirect to new page if someone accesses under this path",
+      "metadata": "Last update user and updated date will remain the same",
+      "recursive": "Move/Rename children of under this path recursively"
+    }
+  },
+  "Put Back": "Put back",
+  "Delete Completely": "Delete completely",
+  "page_has_been_reverted": "{{path}} has been reverted",
+  "modal_delete": {
+    "delete_page": "Delete page",
+    "deleting_page": "Deleting page",
+    "delete_recursively": "Delete child pages recursively.",
+    "delete_completely": "Delete completely",
+    "delete_completely_restriction": "You don't have the authority to delete pages completely.",
+    "recursively": "Delete pages under this path recursively.",
+    "completely": "Delete completely instead of putting it into trash."
+  },
+  "deleted_page": "Moved to the trash",
+  "deleted_pages": "{{path}} has been deleted",
+  "deleted_pages_completely": "{{path}} has been deleted completely",
+  "renamed_pages": "{{path}} has been renamed",
+  "empty_trash": "The trash has been emptied",
+  "modal_empty": {
+    "empty_the_trash": "Empty The Trash",
+    "empty_the_trash_button": "Empty The Trash",
+    "not_deletable_notice": "Some pages cannot be removed due to lack of permission.",
+    "notice": "The pages deleted completely are unrecoverable."
+  },
+  "modal_duplicate": {
+    "label": {
+      "Duplicate page": "Duplicate page",
+      "New page name": "New page name",
+      "Failed to get subordinated pages": "Failed to get subordinated pages",
+      "Current page name": "Current page name",
+      "Recursively": "Recursively",
+      "Duplicate without exist path": "Duplicate without exist path",
+      "Same page already exists": "Same page already exists",
+      "Only duplicate user related pages": "Only duplicate pages you can access"
+    },
+    "help": {
+      "recursive": "Duplicate children of under this path recursively",
+      "only_inherit_user_related_groups": "If the page privilege is set to \"Only inside the group\", groups you do not belong to will lose access to the duplicated page"
+    }
+  },
+  "duplicated_pages": "{{fromPath}} has been duplicated",
+  "modal_granted_groups_inheritance_select": {
+    "select_granted_groups": "Select groups that can access page",
+    "inherit_all_granted_groups_from_parent": "Inherit all groups that can access page from parent",
+    "only_inherit_related_groups": "Only inherit groups that you belong to from parent",
+    "create_page": "Create Page"
+  },
+  "modal_putback": {
+    "label": {
+      "Put Back Page": "Put back page",
+      "recursively": "Put back recursively"
+    },
+    "help": {
+      "recursively": "Put back page under this path recursively"
+    }
+  },
+  "modal_shortcuts": {
+    "global": {
+      "title": "Global shortcuts",
+      "Open/Close shortcut help": "Open/Close Shortcut Help",
+      "Edit Page": "Edit Page",
+      "Create Page": "Create Page",
+      "Search": "Search",
+      "Show Contributors": "Show Contributors",
+      "MirrorMode": "Mirror Mode",
+      "Konami Code": "Konami Code",
+      "konami_code_url": "https://en.wikipedia.org/wiki/Konami_Code"
+    },
+    "editor": {
+      "title": "Editor shortcuts",
+      "Slash Command": "Slash Command",
+      "Slash Command Desc": "(Show the command menu)",
+      "Indent": "Indent",
+      "Outdent": "Outdent",
+      "Save Page": "Save Page",
+      "Only Editor": "(Editor Only)",
+      "Delete Line": "Delete Line",
+      "Search in Editor": "Search in Editor",
+      "Move Line": "Move Line",
+      "Copy Line": "Copy Line",
+      "Insert Line": "Insert Line",
+      "Post Comment": "(Post Comment)",
+      "Multiple Cursors": "Multiple Cursors",
+      "Or Alt Click": "or Alt + Click"
+    },
+    "format": {
+      "title": "Format Settings (Editor)",
+      "Bold": "Bold",
+      "Italic": "Italic",
+      "Strikethrough": "Strikethrough",
+      "Code Text": "Code Text",
+      "Hyperlink": "Hyperlink"
+    },
+    "line_settings": {
+      "title": "Line Settings (Editor)",
+      "Bullet List": "Bullet List",
+      "Numbered List": "Numbered List",
+      "Quote": "Quote",
+      "Code Block": "Code Block",
+      "Comment Out": "Comment Out",
+      "Comment Out Desc": "(Hide)"
+    },
+    "Other Shortcuts": "Other Shortcuts"
+  },
+  "modal_resolve_conflict": {
+    "conflicts_with_new_body_on_server_side": "Conflict with new body on server side. Please select or edit the page body to resolve the conflict.",
+    "file_conflicting_with_newer_remote": "This file is conflicting with newer remote file",
+    "resolve_conflict_message": "Please select page body",
+    "resolve_conflict": "Resolve Conflict",
+    "resolve_and_save": "Resolve and save",
+    "select_revision": "Select {{revision}}",
+    "requested_revision": "mine",
+    "latest_revision": "theirs",
+    "selected_editable_revision": "Selected Page Body (Editable)"
+  },
+  "ai_unavailable": {
+    "open_admin_settings_to_enable": "Configure AI settings on the admin page to enable AI integration",
+    "to_admin_ai_settings": "Open AI Settings",
+    "contact_admin_to_enable": "AI integration is not enabled. Please contact your administrator."
+  },
+  "ai_sidebar": {
+    "new_chat": "New Chat",
+    "recent_threads": "Recent Items",
+    "accuracy_notice": "Check the referenced pages to verify the information.",
+    "sources": "{{count}} pages referenced",
+    "sources_one": "{{count}} page referenced",
+    "sources_other": "{{count}} pages referenced",
+    "error": {
+      "title": "An error occurred",
+      "retry": "Retry",
+      "dismiss": "Dismiss"
+    },
+    "incomplete": {
+      "length": "The response stopped because it reached the maximum length.",
+      "tool_calls": "The response stopped after reaching the processing-step limit.",
+      "content_filter": "The response was stopped by the content policy.",
+      "error": "The response stopped because an error occurred.",
+      "unknown": "The response stopped before completing."
+    },
+    "toaster": {
+      "thread_deleted_success": "Thread deleted",
+      "thread_deleted_failed": "Failed to delete thread"
+    }
+  },
+  "link_edit": {
+    "edit_link": "Edit Link",
+    "set_link_and_label": "Set link and label",
+    "link": "Link",
+    "placeholder_of_link_input": "Input page path or URL",
+    "label": "Label",
+    "path_format": "Path format",
+    "use_relative_path": "Use relative path",
+    "use_permanent_link": "Use permanent link",
+    "notation": "Notation",
+    "markdown": "Markdown",
+    "GROWI_original": "GROWI original",
+    "pukiwiki": "Pukiwiki",
+    "preview": "Preview",
+    "page_not_found_in_preview": "\"{{path}}\" is not a GROWI page."
+  },
+  "toaster": {
+    "file_upload_failed": "File upload failed.",
+    "initialize_successed": "Succeeded to initialize {{target}}",
+    "remove_share_link_success": "Succeeded to remove {{shareLinkId}}",
+    "issue_share_link": "Succeeded to issue new share link",
+    "remove_share_link": "Succeeded to remove {{count}} share links",
+    "switch_disable_link_sharing_success": "Succeeded to update share link setting",
+    "failed_to_reset_password": "Failed to reset password",
+    "save_succeeded": "Saved successfully"
+  },
+  "template": {
+    "modal_label": {
+      "Select template": "Select template",
+      "Create/Edit Template Page": "Create/Edit template page",
+      "Create template under": "Create template page under this page"
+    },
+    "option_label": {
+      "create/edit": "Create/Edit template page..",
+      "select": "Select template page type"
+    },
+    "children": {
+      "label": "Template for children",
+      "desc": "Applies only to the same level pages which the template exists"
+    },
+    "descendants": {
+      "label": "Template for descendants",
+      "desc": "Applies to all decendant pages"
+    }
+  },
+  "sandbox": {
+    "header": "Header",
+    "header_x": "Header {{index}}",
+    "block": "Paragraph",
+    "block_detail": "makes a paragraph",
+    "empty_line": "Empty Line",
+    "line_break": "Line Break",
+    "line_break_detail": "(2 spaces) make a line break",
+    "typography": "Typography",
+    "italics": "Italics",
+    "bold": "Bold",
+    "italic_bold": "Italic Bold",
+    "strikethrough": "strikethrough",
+    "link": "Link",
+    "code_highlight": "Code Highlight",
+    "list": "List",
+    "unordered_list_x": "Unordered List {{index}}",
+    "ordered_list_x": "Ordered List {{index}}",
+    "task": "Task",
+    "task_checked": "Checked",
+    "task_unchecked": "Unchecked",
+    "quote": "Quote",
+    "quote1": "You can write",
+    "quote2": "multi-line quotations",
+    "quote_nested": "Nested Quote",
+    "table": "Table",
+    "image": "Image",
+    "alt_text": "Alt Text",
+    "insert_image": "inserts an image",
+    "open_sandbox": "Open Sandbox"
+  },
+  "slack_notification": {
+    "popover_title": "Slack Notification",
+    "popover_desc": "Input channel name. You can notify multiple channels by entering a comma-separated list.",
+    "input_channels": "Input channels"
+  },
+  "search_result": {
+    "title": "Search",
+    "result_meta": "Search results for:",
+    "deletion_mode_btn_lavel": "Select and delete page",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "check_all": "Check all",
+    "deletion_modal_header": "Delete page",
+    "delete_completely": "Delete completely",
+    "include_certain_path": "Include {{pathToInclude}} path ",
+    "delete_all_selected_page": "Delete All",
+    "select_all": "Select all",
+    "delete_selected_pages": "Delete selected pages",
+    "currently_not_implemented": "This is not currently implemented",
+    "search_again": "Search again",
+    "number_of_list_to_display": "Display",
+    "page_number_unit": "pages",
+    "hit_number_unit": "hit",
+    "filter": "Filters",
+    "search_option": "Search Options",
+    "filter_remove": "Remove",
+    "filter_clear": "Clear all",
+    "filter_author": "Author",
+    "filter_by_author": "Filter by author",
+    "filter_editor": "Editor",
+    "filter_by_editor": "Filter by editor",
+    "filter_tag": "Tag",
+    "filter_group": "Group",
+    "filter_group_select": "Select groups",
+    "filter_group_none": "No groups available",
+    "sort_axis": {
+      "relationScore": "Sort by relevance",
+      "createdAt": "Creation date",
+      "updatedAt": "Last update date"
+    }
+  },
+  "help_dropdown": {
+    "show_shortcuts": "Show shortcuts",
+    "growi_cloud_help": "GROWI.cloud Help",
+    "growi_version": "GROWI version"
+  },
+  "private_legacy_pages": {
+    "title": "Private Legacy Pages",
+    "bulk_operation": "Bulk operation",
+    "convert_all_selected_pages": "Convert all to new v5 compatible format",
+    "input_path_to_convert": "Input a path to convert pages",
+    "alert_title": "Old v4 compatible format private pages exist.",
+    "alert_desc1": "On this page, you can select pages with the checkbox and batch convert to the new v5 compatible format from the \"Bulk operation\" button at the top of the screen.",
+    "nopages_title": "Congratulations. Ready to use GROWI v5!",
+    "nopages_desc1": "Now all the pages you can manage seem to be in v5 compatible format.",
+    "detail_info": "See the detail information from <a href='https://docs.growi.org/en/admin-guide/upgrading/50x.html' target='_blank' class='alert-link'>Upgrading GROWI to v5.0.x <span class='growi-custom-icons'>external_link</span></a>.",
+    "modal": {
+      "title": "Convert to new v5 compatible format",
+      "converting_pages": "Converting pages",
+      "convert_recursively_label": "Convert child pages recursively.",
+      "convert_recursively_desc": "Convert pages under this path recursively.",
+      "button_label": "Convert"
+    },
+    "toaster": {
+      "page_migration_succeeded": "Conversion of selected page to v5 has been successfully completed.",
+      "page_migration_failed_with_paths": "Conversion of {{paths}} to v5 has been failed.",
+      "page_migration_failed": "Conversion of page to v5 has been failed."
+    },
+    "by_path_modal": {
+      "title": "Convert to new v5 compatible format",
+      "alert": "This operation cannot be undone, and pages that the user cannot view are also subject to processing.",
+      "checkbox_label": "Understood",
+      "description": "Enter a path and all pages under that path will be converted to v5 compatible format.",
+      "button_label": "Convert",
+      "success": "Successfully requested conversion.",
+      "error": "Failed to request conversion.",
+      "error_grant_invalid": "Page permissions are incorrect. Please correct it and try again.",
+      "error_page_not_found": "Page not found.",
+      "error_duplicate_pages_found": "Multiple pages with the same path name were found. Please rename or delete and try again."
+    }
+  },
+  "login": {
+    "title": "Login",
+    "sign_in_error": "Login error",
+    "registration_successful": "Registration successful. Please wait for administrator approval.",
+    "Setup": "Setup",
+    "enabled_ldap_has_configuration_problem": "LDAP is enabled but the configuration has something wrong.",
+    "set_env_var_for_logs": "(Please set the environment variables <code>DEBUG=crowi:service:PassportService</code> to get the logs)"
+  },
+  "invited": {
+    "title": "Invited",
+    "discription_heading": "Create Account",
+    "discription": "Create an your account with the invited email address"
+  },
+  "page_export": {
+    "failed_to_export": "Failed to export",
+    "failed_to_count_pages": "Failed to count pages",
+    "export_page_markdown": "Export page as Markdown",
+    "export_page_pdf": "Export page as PDF",
+    "bulk_export": "Export page and all child pages",
+    "bulk_export_download_explanation": "A notification will be sent when the export is complete. To download the exported file, click the notification.",
+    "bulk_export_exec_time_warning": "If the number of pages is large, it may take a while to export",
+    "large_bulk_export_warning": "To conserve system resources, please refrain from exporting a large number of pages consecutively",
+    "markdown": "Markdown",
+    "choose_export_format": "Select export format",
+    "bulk_export_started": "Please wait a moment...",
+    "bulk_export_download_expired": "Download period has expired",
+    "bulk_export_job_expired": "Export process was canceled because it took too long",
+    "export_in_progress": "Export in progress",
+    "export_in_progress_explanation": "Export with the same format is already in progress. Would you like to restart to export the latest page contents?",
+    "export_cancel_warning": "The following export in progress will be canceled",
+    "restart": "Restart",
+    "format": "Format",
+    "started_on": "Started on",
+    "file_upload_not_configured": "File upload settings are not configured"
+  },
+  "audit_log_bulk_export": {
+    "download_expired": "Download period has expired",
+    "job_expired": "Export process was canceled because it took too long",
+    "no_results": "No audit logs matched the specified filters"
+  },
+  "message": {
+    "successfully_connected": "Successfully Connected!",
+    "fail_to_save_access_token": "Failed to save access_token. Please try again.",
+    "fail_to_fetch_access_token": "Failed to fetch access_token. Please do connect again.",
+    "successfully_disconnected": "Successfully Disconnected!",
+    "strategy_has_not_been_set_up": "{{strategy}} has not been set up",
+    "ldap_user_not_valid": "Ldap user is no valid",
+    "external_account_not_exist": "Failed to find or create External account",
+    "maximum_number_of_users": "Can not register more than the maximum number of users.",
+    "sign_in_failure": "Sign in failure.",
+    "aws_sttings_required": "AWS settings required to use this function. Please ask the administrator.",
+    "application_already_installed": "Application already installed.",
+    "email_address_could_not_be_used": "This email address cannot be used on this wiki. Please contact your administrator.",
+    "user_id_is_not_available": "This User ID is not available.",
+    "username_should_not_be_null": "Username should not be null. Please check Authentication Mechanism Settings on admin page",
+    "email_address_is_already_registered": "This email address is already registered.",
+    "can_not_register_maximum_number_of_users": "Can not register more than the maximum number of users.",
+    "email_settings_is_not_setup": "E-mail settings is not set up. Please ask the administrator.",
+    "email_authentication_is_not_enabled": "Email authentication is not enabled. Please ask the administrator.",
+    "failed_to_register": "Failed to register.",
+    "successfully_created": "The user {{username}} is successfully created.",
+    "can_not_activate_maximum_number_of_users": "Can not activate more than the maximum number of users.",
+    "failed_to_activate": "Failed to activate.",
+    "unable_to_use_this_user": "Unable to use this user.",
+    "complete_to_install1": "Complete to Install GROWI ! Please login as admin account.",
+    "complete_to_install2": "Complete to Install GROWI ! Please check each settings on this page first.",
+    "failed_to_create_admin_user": "Failed to create admin user. {{errMessage}}",
+    "successfully_send_email_auth": "We sent an email to {{email}}. Please click the URL in the email and complete the registration.",
+    "incorrect_token_or_expired_url": "The token is incorrect or the URL has expired.",
+    "user_already_logged_in": "You cannot create a new account when you are logged in.",
+    "registration_closed": "You are not authorized to create a new account.",
+    "Username has invalid characters": "Username has invalid characters.",
+    "Username field is required": "User ID field is required.",
+    "Name field is required": "Name field is required.",
+    "Email format is invalid": "Email format is invalid.",
+    "Email field is required": "Email field is required.",
+    "Password has invalid character": "Password has invalid character.",
+    "Password minimum character should be more than n characters": "Password minimum character should be more than {{number}} characters.",
+    "Password field is required": "Password field is required.",
+    "Username or E-mail has invalid characters": "Username or E-mail has invalid characters.",
+    "user_not_found": "User not found.",
+    "provider_duplicated_username_exception": "<p><strong><span class='material-symbols-outlined me-1'>cancel</span>DuplicatedUsernameException occured</strong></p><p class='mb-0'> Your {{ failedProviderForDuplicatedUsernameException }} authentication was succeeded, but a new user could not be created. See the issue <a href='https://github.com/growilabs/growi/issues/193'>#193</a>.</p>"
+  },
+  "grid_edit": {
+    "create_bootstrap_4_grid": "Create Bootstrap 4 Grid",
+    "grid_settings": "Grid Settings",
+    "grid_pattern": "Grid Pattern",
+    "division": "Divisions",
+    "smart_no": "Smartphone / No Break",
+    "break_point": "Break point by display size"
+  },
+  "validation": {
+    "aws_region": "For the region, enter the AWS region name. ex):us-east-1",
+    "aws_custom_endpoint": "For the custom endpoint, specify the URL that starts with http(s)://. Also, the trailing slash is not required.",
+    "failed_to_send_a_test_email": "Failed to send a test email using SMTP. Please check your settings."
+  },
+  "forgot_password": {
+    "forgot_password": "Forgot Password?",
+    "send": "Send",
+    "return_to_login": "Return to login",
+    "reset_password": "Reset Password",
+    "sign_in_instead": "Sign in instead",
+    "password_reset_request_desc": "You can reset your password here.",
+    "password_reset_excecution_desc": "Enter a new password",
+    "new_password": "New Password",
+    "confirm_new_password": "Confirm the new password",
+    "email_is_required": "Email is required",
+    "success_to_send_email": "Success to send email",
+    "feature_is_unavailable": "This feature is unavailable.",
+    "incorrect_token_or_expired_url": "The token is incorrect or the URL has expired. Please resend a password reset request via the link below.",
+    "password_and_confirm_password_does_not_match": "Password and confirm password does not match",
+    "please_enable_mailer_alert": "The password reset feature is disabled because email setup has not been completed. Please ask administrator to complete the email setup."
+  },
+  "maintenance_mode": {
+    "maintenance_mode": "Maintenance Mode",
+    "growi_is_under_maintenance": "GROWI is under maintenance. Please wait until it ends.",
+    "admin_page": "Admin Page",
+    "login": "Login",
+    "logout": "Logout"
+  },
+  "pagetree": {
+    "cannot_rename_a_title_that_contains_slash": "Cannot rename a title that contains '/'",
+    "you_cannot_move_this_page_now": "You cannot move this page now",
+    "something_went_wrong_with_moving_page": "Something went wrong with moving page",
+    "error_retrieving_the_pagetree": "Error occurred while retrieving the PageTree"
+  },
+  "duplicated_page_alert": {
+    "same_page_name_exists": "Same page name exits as「{{pageName}}」",
+    "same_page_name_exists_at_path": "Same page name as {{pageName}} exists at {{path}} ",
+    "select_page_to_see": "Select a page to see"
+  },
+  "user_group": {
+    "select_group": "Select group",
+    "belonging_to_no_group": "Could not find the groups you belong to.",
+    "manage_user_groups": "Manage user groups",
+    "only_yourself": "Only you"
+  },
+  "fix_page_grant": {
+    "modal": {
+      "no_grant_available": "The list of selectable permissions could not be found. Please modify the permissions on the parent page first and try again.",
+      "need_to_fix_grant": "The permissions associated with this page must be modified in order to use the functionality correctly. <br> Please select from the options below to make the change.",
+      "grant_label": {
+        "public": "Public",
+        "isForbidden": "Authority not allowed to view",
+        "currentPageGrantLabel": "Authorization for this page: ",
+        "parentPageGrantLabel": "Authority of parent page: ",
+        "docLink": "For more information on modifying permissions, please refer to <a href='https://docs.growi.org/en/guide/features/authority.html#permissions-for-subordinate-pages'>こちらのリンク</a>"
+      },
+      "radio_btn": {
+        "restrected": "Only those who know the link",
+        "only_me": "only to oneself",
+        "grant_group": "Only specific groups"
+      },
+      "select_group_default_text": "Select Group",
+      "alert_message_select_group": "No group selected",
+      "btn_label": "Conversion",
+      "title": "Modify authority"
+    },
+    "alert": {
+      "description": "You need to modify the permission settings for this page.",
+      "btn_label": "Revision"
+    }
+  },
+  "tooltip": {
+    "like": "Like!",
+    "cancel_like": "Cancel Like",
+    "bookmark": "Bookmark",
+    "cancel_bookmark": "Cancel Bookmark",
+    "receive_notifications": "Receive Notifications",
+    "stop_notification": "Stop Notification",
+    "footprints": "Footprints",
+    "login_required": "Login required",
+    "operation": {
+      "attention": {
+        "rename": "Renaming paths of descendant pages was not successful, please open the menu from the 3-point reader and select 'Path recovery'"
+      }
+    }
+  },
+  "page_operation": {
+    "paths_recovered": "Paths recovered successfully",
+    "path_recovery_failed": "Path recovery failed"
+  },
+  "user_home_page": {
+    "bookmarks": "Bookmarks",
+    "contribution_graph": "Contribution Graph",
+    "contribution_migration_in_progress": "Preparing your contribution data. Refresh in a moment to see it.",
+    "recently_created": "Recently Created",
+    "recent_activity": "Recent Activity",
+    "unknown_action": "made an unspecified change",
+    "page_create": "created a page",
+    "page_update": "updated a page",
+    "page_delete": "deleted a page",
+    "page_delete_completely": "deleted a page",
+    "page_rename": "renamed a page",
+    "page_revert": "reverted a page",
+    "page_like": "liked a page",
+    "page_duplicate": "duplicated a page",
+    "comment_create": "posted a comment"
+  },
+  "bookmark_folder": {
+    "bookmark_folder": "bookmark folder",
+    "bookmark": "bookmark",
+    "delete_modal": {
+      "modal_header_label": "Delete Bookmark Folder",
+      "modal_body_description": "Delete this bookmark folder and its contents",
+      "modal_body_alert": "Deleted folder and its contents cannot be recovered",
+      "modal_footer_button": "Delete Folder"
+    },
+    "input_placeholder": "Input folder name",
+    "new_folder": "New Folder",
+    "delete": "Delete Folder",
+    "drop_item_here": "Drag and drop item here",
+    "cancel_bookmark": "Un-bookmark this page",
+    "move_to_root": "Move to the root",
+    "root": "root (default)"
+  },
+  "v5_page_migration": {
+    "page_tree_not_avaliable": "Page tree feature is not available yet.",
+    "go_to_settings": "Go to settings to enable the feature"
+  },
+  "tag_edit_modal": {
+    "edit_tags": "Edit Tags",
+    "done": "Done",
+    "tags_input": {
+      "tag_name": "tag name"
+    }
+  },
+  "delete_attachment_modal": {
+    "confirm_delete_attachment": "Delete attachment?"
+  },
+  "rich_attachment": {
+    "attachment_not_be_found": "The attachment could not be found"
+  },
+  "page_select_modal": {
+    "select_page_location": "Select page location"
+  },
+  "wip_page": {
+    "save_as_wip": "Save as WIP (still being written)",
+    "success_save_as_wip": "Successfully saved as a WIP page",
+    "fail_save_as_wip": "Failed to save as a WIP page",
+    "alert": "This page is still being written",
+    "publish_page": "Publish page",
+    "success_publish_page": "Page has been published",
+    "fail_publish_page": "Failed to publish the Page"
+  },
+  "sidebar_header": {
+    "show_wip_page": "Show WIP",
+    "compact_view": "Compact View"
+  },
+  "create_page": {
+    "untitled": "Untitled"
+  },
+  "sync-latest-revision-body": {
+    "menuitem": "Sync the editor text with the latest revision body",
+    "confirm": "Delete the draft data being entered into the editor and synchronize the latest text. Are you sure you want to run it?",
+    "alert": "The latest text may not have been synchronized. Please reload and check again.",
+    "success-toaster": "Latest text synchronized",
+    "skipped-toaster": "Skipped synchronizing since the editor is not activated. Please open the editor and try again.",
+    "error-toaster": "Synchronization of the latest text failed"
+  },
+  "toolbar": {
+    "attachments": "Attachments",
+    "bold": "Bold",
+    "bullet_list": "Bullet List",
+    "checklist": "Checklist",
+    "code": "Code",
+    "diagram": "Diagram",
+    "editor_guide": "Editor Guide",
+    "emoji": "Emoji",
+    "heading": "Heading",
+    "italic": "Italic",
+    "numbered_list": "Numbered List",
+    "quote": "Quote",
+    "strikethrough": "Strikethrough",
+    "table": "Table",
+    "template": "Template",
+    "text_formatting": "Text Formatting"
+  },
+  "editor_guide": {
+    "title": "Editor Guide",
+    "tabs": {
+      "textstyle": "Text Style",
+      "layout": "Layout",
+      "decoration": "Decoration"
+    },
+    "textstyle": {
+      "copy_done": "Copied!",
+      "copy_failed": "Failed to copy",
+      "this": "This is",
+      "is": "",
+      "bold": "bold",
+      "italic": "italic",
+      "strikethrough": "strikethrough",
+      "inline_code": "inline code",
+      "bold_italic": "Bold or italic all",
+      "emoji": "Emoji",
+      "sub_sup": "Subscript / Superscript",
+      "link_label": "Link with label",
+      "link_docs": "GROWI Documentation",
+      "link_growi": "GROWI Link",
+      "link_sandbox": "Sandbox page is here",
+      "all_important": "This text is all\nimportant",
+      "sub_text": "subscript",
+      "sup_text": "superscript",
+      "is_text": "This is {{val}}"
+    },
+    "layout": {
+      "copy_done": "Copied!",
+      "header": "Headers",
+      "header_text": "Heading",
+      "list": "Unordered List",
+      "list_text": "This is a list item",
+      "ordered_list": "Ordered List",
+      "ordered_list_text": "This is a numbered item",
+      "checkbox": "Checkboxes",
+      "task": "Task ",
+      "quote": "Blockquotes",
+      "quote_text": "Quote",
+      "multi_quote": "Nested Quote",
+      "hr": "Horizontal Rule",
+      "br": "Line Break",
+      "br_code": "Add two spaces  to break\nthe line",
+      "br_preview_1": "Add two spaces to",
+      "br_preview_2": "break the line",
+      "code_block": "Code Blocks",
+      "code_block_text": "Insert code here",
+      "table": "Tables",
+      "left": "Align Left",
+      "right": "Align Right",
+      "center": "Align Center",
+      "row_text": "This column is",
+      "row_display": "aligned",
+      "footnote": "Footnotes",
+      "footnote_label": "Footnote text",
+      "footnote_desc": "Write the note content like this"
+    },
+    "decoration": {
+      "copy_done": "Copied to clipboard!",
+      "style": "Style",
+      "alert": "Alert",
+      "alert_with_custom_title": "Alert with label",
+      "alert_with_custom_title_text": "Custom Title",
+      "alert_block": "Alert Block",
+      "alert_unavailable": "Unavailable in this style",
+      "badge": "Badge",
+      "text_color": "Text Color",
+      "back_color": "Background Color",
+      "placeholder": "Sample text goes here",
+      "docs_title": "Bootstrap 5 Official Documentation",
+      "docs_badge": "Learn more about Badges",
+      "docs_color": "Learn more about Colors",
+      "docs_alert": "Learn more about Alert Blocks"
+    }
+  },
+  "pageMention": {
+    "placeholder": "Type a message... (@ to mention a page)",
+    "hint": "Type a page name to search",
+    "searching": "Searching...",
+    "noResults": "No pages found",
+    "candidatesLabel": "Page candidates"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "Heading 1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "Heading 2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "Heading 3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "Bulleted list",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "Numbered list",
+      "description": ""
+    },
+    "taskList": {
+      "label": "Task list",
+      "description": ""
+    },
+    "quote": {
+      "label": "Quote",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "Code block",
+      "description": ""
+    },
+    "table": {
+      "label": "Table",
+      "description": ""
+    }
+  }
+}

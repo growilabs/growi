@@ -1,0 +1,52 @@
+{
+  "name": "@growi/remark-drawio",
+  "version": "1.0.0",
+  "description": "Remark plugin to draw diagrams with draw.io (diagrams.net)",
+  "license": "MIT",
+  "private": true,
+  "keywords": [
+    "unified",
+    "remark",
+    "remark-plugin",
+    "plugin",
+    "mdast",
+    "markdown"
+  ],
+  "type": "module",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
+  "scripts": {
+    "build": "vite build",
+    "clean": "rimraf dist",
+    "dev": "vite build --mode dev",
+    "watch": "pnpm run dev -w --emptyOutDir=false",
+    "lint:biome": "biome check",
+    "lint:styles": "stylelint --allow-empty-input \"src/**/*.scss\" \"src/**/*.css\"",
+    "test": "vitest run",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "run-p lint:*"
+  },
+  "dependencies": {
+    "@growi/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/hast": "^3.0.4",
+    "@types/mdast": "^4.0.4",
+    "@types/react": "^18.2.14",
+    "@types/react-dom": "^18.2.6",
+    "hast-util-sanitize": "^5.0.1",
+    "pako": "^2.1.0",
+    "throttle-debounce": "^5.0.0",
+    "unified": "^11.0.0",
+    "unist-util-visit": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

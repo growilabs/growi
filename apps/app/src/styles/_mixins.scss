@@ -1,0 +1,21 @@
+@import './mixins/editing';
+@import './mixins/fluid-layout';
+@import './mixins/share-link';
+
+@mixin apply-navigation-transition() {
+  transition-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+  transition-duration: 300ms;
+}
+
+@mixin grw-skeleton-text($font-size, $line-height) {
+  height: $line-height;
+  padding: (($line-height - $font-size) * 0.5) 0;
+}
+
+@mixin grw-skeleton-h3 {
+  @include grw-skeleton-text(21px, 30px);
+}
+
+@mixin grw-skeleton-h5 {
+  @include grw-skeleton-text(16px, 18px);
+}

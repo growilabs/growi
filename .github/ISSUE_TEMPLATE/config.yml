@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Question or Suggestions
-    url: https://growi-slackin.weseek.co.jp/
-    about: If you have questions or suggestions, you can join our Slack team and talk about anything, anytime.
+  - name: User request or Suggestions
+    url: https://github.com/growilabs/growi/discussions
+    about: If you have feature requests or suggestions, you can create a new discussion and consider it with the community.
+  - name: Questions
+    url: https://docs.growi.org/slack
+    about: If you have questions, you can join our Slack team and talk about anything, anytime.

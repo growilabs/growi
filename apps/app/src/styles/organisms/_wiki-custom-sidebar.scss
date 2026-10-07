@@ -1,0 +1,46 @@
+%grw-custom-sidebar-content {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin-top: 1em;
+    margin-bottom: 0.4em;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  h1 {
+    padding-top: 0.2em;
+    font-size: 1.4em;
+    line-height: 1em;
+  }
+  h2 {
+    padding-top: 0.2em;
+    font-size: 1.2em;
+    line-height: 1em;
+  }
+  h3 {
+    font-size: 1.1em;
+  }
+  h4 {
+    font-size: 1.05em;
+  }
+  h5 {
+    font-size: 1.03em;
+  }
+
+  ul,
+  ol {
+    padding-left: 20px;
+    margin: 10px 0;
+  }
+
+  .lsx.page-list > .page-list-ul {
+    padding-left: 0;
+    margin: 0;
+  }
+}

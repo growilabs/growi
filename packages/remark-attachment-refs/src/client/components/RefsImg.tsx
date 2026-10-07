@@ -1,0 +1,126 @@
+import React, { type JSX, useMemo } from 'react';
+
+import { useSWRxRefs } from '../stores/refs.js';
+import { AttachmentList } from './AttachmentList.js';
+import { AttachmentRefsDisabled } from './AttachmentRefsDisabled.js';
+import { RefsContext } from './util/refs-context.js';
+
+export type Props = {
+  pagePath: string;
+  prefix?: string;
+  depth?: string;
+  regexp?: string;
+  width?: string;
+  height?: string;
+  maxWidth?: string;
+  maxHeight?: string;
+  display?: string;
+  grid?: string;
+  gridGap?: string;
+  noCarousel?: string;
+
+  isImmutable?: boolean;
+  isSharedPage?: boolean;
+};
+
+export const RefsImgSubstance = React.memo(
+  ({
+    pagePath,
+    prefix,
+    depth,
+    regexp,
+    width,
+    height,
+    maxWidth,
+    maxHeight,
+    display,
+    grid,
+    gridGap,
+    noCarousel,
+
+    isImmutable,
+  }: Props): JSX.Element => {
+    const refsContext = useMemo(() => {
+      const options = {
+        pagePath,
+        prefix,
+        depth,
+        regexp,
+        width,
+        height,
+        maxWidth,
+        maxHeight,
+        display,
+        grid,
+        gridGap,
+        noCarousel,
+      };
+      return new RefsContext('refsimg', pagePath, options);
+    }, [
+      pagePath,
+      prefix,
+      depth,
+      regexp,
+      width,
+      height,
+      maxWidth,
+      maxHeight,
+      display,
+      grid,
+      gridGap,
+      noCarousel,
+    ]);
+
+    const {
+      data,
+      error: axiosError,
+      isLoading,
+    } = useSWRxRefs(
+      pagePath,
+      prefix,
+      {
+        depth,
+        regexp,
+        width,
+        height,
+        maxWidth,
+        maxHeight,
+        display,
+        grid,
+        gridGap,
+        noCarousel,
+      },
+      isImmutable,
+    );
+    const attachments = data != null ? data : [];
+
+    const error =
+      axiosError != null
+        ? new Error(axiosError.response?.data ?? axiosError.message)
+        : undefined;
+
+    return (
+      <AttachmentList
+        refsContext={refsContext}
+        isLoading={isLoading}
+        error={error}
+        attachments={attachments}
+      />
+    );
+  },
+);
+
+export const RefsImg = React.memo((props: Props): JSX.Element => {
+  if (props.isSharedPage) {
+    return <AttachmentRefsDisabled name="refsimg" />;
+  }
+  return <RefsImgSubstance {...props} />;
+});
+
+export const RefsImgImmutable = React.memo(
+  (props: Omit<Props, 'isImmutable'>): JSX.Element => {
+    return <RefsImg {...props} isImmutable />;
+  },
+);
+
+RefsImg.displayName = 'RefsImg';

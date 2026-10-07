@@ -1,0 +1,29 @@
+{
+  "name": "example-package-invalid-theme2",
+  "version": "1.0.0",
+  "main": "index.js",
+  "growiPlugin": {
+    "schemaVersion": "4",
+    "types": ["theme"],
+    "themes": [
+      {
+        "name": "theme2-1",
+        "manifestKey": "src/styles/style.scss",
+        "schemeType": "light",
+        "lightBg": "#ff0000",
+        "darkBg": "#0000ff",
+        "lightSidebar": "#ffff00",
+        "darkSidebar": "#ff8800",
+        "lightIcon": "#ff0000",
+        "darkIcon": "#000000",
+        "createBtn": "#00ff00"
+      },
+      {
+        "name": "theme2-2",
+        "manifestKey": "src/styles/style.scss",
+        "schemeType": "light",
+        "// missing some attributes": ""
+      }
+    ]
+  }
+}

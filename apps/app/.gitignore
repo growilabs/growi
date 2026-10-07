@@ -1,0 +1,29 @@
+# next.js
+/.next/
+/out/
+next-env.d.ts
+next.config.js
+
+# test
+.reg
+
+# dist
+/build/
+/dist/
+/transpiled/
+/config/**/*.js
+/config/**/*.d.ts
+/public/static/fonts
+/public/static/js
+/public/static/styles
+/public/uploads
+/src/styles/prebuilt
+/src/**/*.vendor-styles.prebuilt.*
+/src/**/bulk-export.generated.ts
+/tmp/
+
+# cache
+/.swc/
+
+# prisma
+/src/generated/prisma

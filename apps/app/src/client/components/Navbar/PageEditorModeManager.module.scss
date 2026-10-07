@@ -1,0 +1,71 @@
+// @mixin page-editor-mode-manager($textColor, $borderColor, $bgColorHoverAndActive, $bgColor: white) {
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'styles/mixins';
+
+.grw-page-editor-mode-manager {
+  :global(.btn) {
+    --bs-btn-font-size: 13px;
+    --bs-btn-border-width: 2px;
+
+    width: 90px;
+    height: 38px;
+
+    @include bs.media-breakpoint-up(md) {
+      width: 70px;
+      height: 30px;
+    }
+  }
+}
+
+.grw-page-editor-mode-manager-skeleton {
+  width: 90px;
+  height: 38px;
+
+  @include bs.media-breakpoint-up(md) {
+    width: 179px;
+    height: 30px;
+  }
+}
+
+// == Colors
+@include bs.color-mode(light) {
+  .grw-page-editor-mode-manager {
+    :global(.btn) {
+      $color: var(--grw-page-editor-mode-manager-btn-color, var(--grw-primary-700));
+      $bg: var(--grw-page-editor-mode-manager-btn-bg, var(--grw-primary-100));
+      $bg-rgb: var(--grw-page-editor-mode-manager-btn-bg-rgb, var(--grw-primary-100-rgb));
+
+      --bs-btn-color: #{$color};
+      --bs-btn-border-color: #{$bg};
+      --bs-btn-hover-color: #{$color};
+      --bs-btn-hover-bg: rgba(#{$bg-rgb}, 0.5);
+      --bs-btn-hover-border-color: #{$bg};
+      --bs-btn-active-color: #{$color};
+      --bs-btn-active-bg: #{$bg};
+      --bs-btn-active-border-color: #{$bg};
+      --bs-btn-disabled-color: $color;
+      --bs-btn-disabled-border-color: #{$bg};
+    }
+  }
+}
+
+@include bs.color-mode(dark) {
+  .grw-page-editor-mode-manager {
+    :global(.btn) {
+      $color: var(--grw-page-editor-mode-manager-btn-color, var(--grw-primary-300));
+      $bg: var(--grw-page-editor-mode-manager-btn-bg, var(--grw-primary-800));
+      $bg-rgb: var(--grw-page-editor-mode-manager-btn-bg-rgb, var(--grw-primary-800-rgb));
+
+      --bs-btn-color: #{$color};
+      --bs-btn-border-color: #{$bg};
+      --bs-btn-hover-color: #{$color};
+      --bs-btn-hover-bg: rgba(#{$bg-rgb}, 0.5);
+      --bs-btn-hover-border-color: #{$bg};
+      --bs-btn-active-color: #{$color};
+      --bs-btn-active-bg: #{$bg};
+      --bs-btn-active-border-color: #{$bg};
+      --bs-btn-disabled-color: $color;
+      --bs-btn-disabled-border-color: #{$bg};
+    }
+  }
+}

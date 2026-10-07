@@ -1,0 +1,74 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+  "name": "GROWI-Dev",
+  "dockerComposeFile": ["../compose.yml", "../compose.extend.yml"],
+  "service": "app",
+  "workspaceFolder": "/workspace/growi",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "24",
+      "pnpmVersion": "11.1.1"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/rapidsai/devcontainers/features/gitlab-cli:26.6.0": {}
+  },
+
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [],
+
+  "initializeCommand": "/bin/bash .devcontainer/scripts/init-home.sh",
+  // Use 'postCreateCommand' to run commands after the container is created.
+  "postCreateCommand": "/bin/bash ./.devcontainer/app/postCreateCommand.sh",
+
+  // Expose tool install dirs (pnpm global, uv/claude) to every shell spawned by VS Code
+  // (integrated terminal, lifecycle commands, and extension shells such as Claude Code)
+  // without relying on ~/.bashrc, which non-interactive shells don't source.
+  "remoteEnv": {
+    "PNPM_HOME": "/home/vscode/.local/share/pnpm",
+    "PATH": "/home/vscode/.local/share/pnpm/bin:/home/vscode/.local/bin:${containerEnv:PATH}"
+  },
+
+  // Configure tool-specific properties.
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // AI
+        "anthropic.claude-code",
+        // linter
+        "biomejs.biome",
+        "editorconfig.editorconfig",
+        "shinnn.stylelint",
+        "stylelint.vscode-stylelint",
+        // markdown
+        "bierner.markdown-mermaid",
+        // TypeScript (Native Preview)
+        "typescriptteam.native-preview",
+        // Test
+        "vitest.explorer",
+        "ms-playwright.playwright",
+        // git/github
+        "codeinklingon.git-worktree-menu",
+        "github.vscode-pull-request-github",
+        "mhutchie.git-graph",
+        "eamodio.gitlens",
+        "cschleiden.vscode-github-actions",
+        // DB
+        "cweijan.vscode-database-client2",
+        "mongodb.mongodb-vscode",
+        // Debug
+        "msjsdiag.debugger-for-chrome",
+        "firefox-devtools.vscode-firefox-debug",
+        // prisma
+        "Prisma.prisma@6.19.0"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    },
+  },
+
+  // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+  // "remoteUser": "root"
+}

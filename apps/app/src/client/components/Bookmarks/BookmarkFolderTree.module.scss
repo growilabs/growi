@@ -1,0 +1,84 @@
+$grw-foldertree-item-padding-left: 15px;
+$grw-bookmark-item-padding-left: 35px;
+
+.grw-folder-tree-container {
+  :global(.grw-foldertree-item-container), :global(.grw-drop-item-area) {
+    & :global(.grw-accept-drop-item) {
+      border-style: dashed !important;
+      border-width: 0.15rem !important;
+    }
+  }
+
+  :global(.grw-drop-item-area) {
+    padding: 1rem;
+    & :global(.grw-accept-drop-item) {
+      padding: 0.7rem;
+    }
+  }
+  :global(.grw-drag-drop-container > .grw-drop-item-area) {
+    margin: 1rem;
+    border-style: dashed !important;
+    border-width: 0.15rem !important;
+  }
+}
+
+.grw-foldertree {
+
+  :global(.list-group-item) {
+    :global(.grw-visible-on-hover) {
+      display: none;
+    }
+
+    &:hover {
+      :global(.grw-visible-on-hover) {
+        display: block;
+      }
+      :global(.page-list-meta) {
+        display: none;
+      }
+    }
+
+    :global(.grw-foldertree-triangle-btn) {
+      border: 0;
+      transition: all 0.2s ease-out;
+      transform: rotate(0deg);
+
+      &:global(.grw-foldertree-open) {
+        transform: rotate(90deg);
+      }
+    }
+
+    :global(.grw-foldertree-title-anchor) {
+      width: 100%;
+      overflow: hidden;
+      font-size: 14px;
+      text-decoration: none;
+    }
+  }
+
+  :global(.grw-foldertree-item-container) {
+    :global(.grw-triangle-container) {
+      height:30px;
+    }
+
+    :global(.grw-bookmark-item-list){
+      min-width: 30px;
+      height: 50px;
+
+      :global(.user-picture) {
+        width: 16px;
+        height: 16px;
+        vertical-align: text-bottom;
+
+        &:global(.user-picture-md) {
+          width: 20px;
+          height: 20px;
+        }
+      }
+
+      :global(.grw-foldertree-control){
+        margin-left: auto;
+      }
+    }
+  }
+}

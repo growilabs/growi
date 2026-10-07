@@ -1,0 +1,28 @@
+{
+  "name": "@growi/core-styles",
+  "version": "1.1.0",
+  "description": "GROWI Core Style Files",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "growi"
+  ],
+  "files": [
+    "scss"
+  ],
+  "exports": {
+    "./scss/*": "./scss/*.scss"
+  },
+  "scripts": {
+    "lint:styles": "stylelint \"./scss/**/*\"",
+    "lint": "npm-run-all -p lint:*"
+  },
+  "dependencies": {},
+  "// comments for defDependencies": {},
+  "devDependencies": {
+    "bootstrap": "^5.3.8"
+  },
+  "peerDependencies": {
+    "@popperjs/core": "^2.11.8"
+  }
+}

@@ -2,7 +2,7 @@ name: List Unhealthy Branches
 
 on:
   schedule:
-    - cron: '0 6 * * wed'
+    - cron: '0 3 * * fri'
 
 jobs:
   list:
@@ -10,23 +10,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - uses: actions/setup-node@v2-beta
+    - uses: actions/setup-node@v6
       with:
-        node-version: '14'
+        node-version: '24'
 
     - name: List branches
       id: list-branches
       run: |
         export SLACK_ATTACHMENTS_ILLEGAL=`node bin/github-actions/list-branches --illegal`
         export SLACK_ATTACHMENTS_INACTIVE=`node bin/github-actions/list-branches --inactive`
-        echo ::set-output name=SLACK_ATTACHMENTS_ILLEGAL::$SLACK_ATTACHMENTS_ILLEGAL
-        echo ::set-output name=SLACK_ATTACHMENTS_INACTIVE::$SLACK_ATTACHMENTS_INACTIVE
-        echo ::set-output name=SLACK_ATTACHMENTS_LENGTH_ILLEGAL::$(echo $SLACK_ATTACHMENTS_ILLEGAL | jq '. | length')
-        echo ::set-output name=SLACK_ATTACHMENTS_LENGTH_INACTIVE::$(echo $SLACK_ATTACHMENTS_INACTIVE | jq '. | length')
+        echo "SLACK_ATTACHMENTS_ILLEGAL=$SLACK_ATTACHMENTS_ILLEGAL" >> $GITHUB_OUTPUT
+        echo "SLACK_ATTACHMENTS_INACTIVE=$SLACK_ATTACHMENTS_INACTIVE" >> $GITHUB_OUTPUT
+        echo "SLACK_ATTACHMENTS_LENGTH_ILLEGAL=$(echo $SLACK_ATTACHMENTS_ILLEGAL | jq '. | length')" >> $GITHUB_OUTPUT
+        echo "SLACK_ATTACHMENTS_LENGTH_INACTIVE=$(echo $SLACK_ATTACHMENTS_INACTIVE | jq '. | length')" >> $GITHUB_OUTPUT
 
     - name: Slack Notification for illegal named branches
       if: steps.list-branches.outputs.SLACK_ATTACHMENTS_LENGTH_ILLEGAL > 0

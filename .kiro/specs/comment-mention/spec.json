@@ -1,0 +1,24 @@
+{
+  "feature_name": "comment-mention",
+  "created_at": "2026-04-03T00:00:00.000Z",
+  "updated_at": "2026-06-09T00:00:00.000Z",
+  "language": "en",
+  "phase": "tasks-generated",
+  "cleaned_up_at": "2026-05-27T00:00:00.000Z",
+  "handoff_note": "Requirements 1-3 are implemented and merged. Requirement 4 (autocomplete facility/source separation) requirements, design, and tasks are complete and auto-approved (2026-06-05). Design validated empirically (config-merge confirmed; AC 6 test must use a synchronous stub sublanguage, NOT async codeLanguages: languages). Review correction (2026-06-09): AC 4.5 reworded — the old 'remove the shared facility and both features die' claim was false under config-merge (emoji also calls autocompletion(), so the facility stays installed); the real guarantee is AC 4.2 (mention works without emoji). Design traceability and the AC 4.2/4.4 test notes (EditorState-backed context for emoji; fake-timers for the debounced mention source) were updated to match. Ready for implementation: tasks 4.1 (production refactor + export emojiCompletionSource) then 4.2 (regression tests). Run /kiro-impl comment-mention.",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

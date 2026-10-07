@@ -1,6 +1,0 @@
-{% if !getConfig('crowi', 'app:siteUrl') %}
-<div class="alert alert-danger d-edit-none mb-0 px-4 py-2">
-  <i class="icon-exclamation"></i>
-  {{ t("security_setting.alert_siteUrl_is_not_set", { link: t('App Settings')}) }} &gt;&gt; <a href="/admin/app">{{t('App Settings')}}<i class="icon-login"></i></a>
-</div>
-{% endif %}

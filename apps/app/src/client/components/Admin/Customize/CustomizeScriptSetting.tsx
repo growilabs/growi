@@ -1,0 +1,132 @@
+import React, { type JSX, useCallback, useEffect } from 'react';
+import { useTranslation } from 'next-i18next';
+import { Controller, useForm } from 'react-hook-form';
+import PrismAsyncLight from 'react-syntax-highlighter/dist/esm/prism-async-light';
+import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark';
+import { Card, CardBody } from 'reactstrap';
+
+import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import { AdminCodeEditor } from '../Common/AdminCodeEditor';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
+
+type Props = {
+  adminCustomizeContainer: AdminCustomizeContainer;
+};
+
+const CustomizeScriptSetting = (props: Props): JSX.Element => {
+  const { adminCustomizeContainer } = props;
+  const { t } = useTranslation();
+
+  const { control, handleSubmit, reset } = useForm();
+
+  // Sync form with container state
+  useEffect(() => {
+    reset({
+      customizeScript:
+        adminCustomizeContainer.state.currentCustomizeScript || '',
+    });
+  }, [adminCustomizeContainer.state.currentCustomizeScript, reset]);
+
+  const onSubmit = useCallback(
+    async (data) => {
+      try {
+        // Update container state before API call
+        await adminCustomizeContainer.changeCustomizeScript(
+          data.customizeScript,
+        );
+        await adminCustomizeContainer.updateCustomizeScript();
+        toastSuccess(
+          t('toaster.update_successed', {
+            target: t('admin:customize_settings.custom_script'),
+            ns: 'commons',
+          }),
+        );
+      } catch (err) {
+        toastError(err);
+      }
+    },
+    [t, adminCustomizeContainer],
+  );
+
+  return (
+    <React.Fragment>
+      <div className="row">
+        <div className="col-12">
+          <h2 className="admin-setting-header">
+            {t('admin:customize_settings.custom_script')}
+          </h2>
+          <Card className="card custom-card bg-body-tertiary mb-3">
+            <CardBody className="px-0 py-2">
+              {t('admin:customize_settings.write_java')}
+              <br />
+              {t('admin:customize_settings.reflect_change')}
+            </CardBody>
+          </Card>
+
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <div>
+              <Controller
+                name="customizeScript"
+                control={control}
+                render={({ field }) => (
+                  <AdminCodeEditor
+                    language="javascript"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    aria-label={t('admin:customize_settings.custom_script')}
+                  />
+                )}
+              />
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-link text-muted p-0"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseExampleScript"
+              aria-expanded="false"
+              aria-controls="collapseExampleScript"
+            >
+              <span
+                className="material-symbols-outlined me-1"
+                aria-hidden="true"
+              >
+                navigate_next
+              </span>
+              Example for Google Tag Manager
+            </button>
+            <div className="collapse" id="collapseExampleScript">
+              <PrismAsyncLight style={oneDark} language="javascript">
+                {`(function(w,d,s,l,i){
+w[l]=w[l]||[];
+w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});
+var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),
+  dl=l!='dataLayer'?'&l='+l:'';
+j.async=true;
+j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-XXXXXX');`}
+              </PrismAsyncLight>
+            </div>
+
+            <AdminUpdateButtonRow
+              type="submit"
+              disabled={adminCustomizeContainer.state.retrieveError != null}
+            />
+          </form>
+        </div>
+      </div>
+    </React.Fragment>
+  );
+};
+
+const CustomizeScriptSettingWrapper = withUnstatedContainers(
+  CustomizeScriptSetting,
+  [AdminCustomizeContainer],
+);
+
+export default CustomizeScriptSettingWrapper;

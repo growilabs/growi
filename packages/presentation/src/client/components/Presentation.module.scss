@@ -1,0 +1,39 @@
+.grw-presentation {
+  // workaround from https://github.com/css-modules/css-modules/issues/295#issuecomment-952885628
+  &:global(.reveal) {
+    :global(.slides) {
+      text-align: unset;
+
+      :global(section) {
+        position: absolute;
+        width: 100%;
+      }
+    }
+    :global(.controls) {
+      bottom: 24px;
+      color: var(--bs-body-color);
+    }
+    :global(.progress) {
+      color: var(--bs-primary);
+    }
+  }
+
+}
+
+// adjust marp default theme
+:root[data-bs-theme='light'] {
+  .grw-presentation {
+    &:global(.reveal-viewport) {
+      background-color: #fff;
+    }
+  }
+}
+
+:root[data-bs-theme='dark'] {
+  // stylelint-disable-next-line no-descending-specificity -- false positive: different theme context from 'light' variant above
+  .grw-presentation {
+    &:global(.reveal-viewport) {
+      background-color: #0d1117;
+    }
+  }
+}

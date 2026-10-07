@@ -1,0 +1,24 @@
+version: 0.2
+
+env:
+  variables:
+    DOCKER_BUILDKIT: 1
+    IMAGE_TAG: ''
+  secrets-manager:
+    DOCKER_REGISTRY_PASSWORD: growi/official-image-builder:DOCKER_REGISTRY_PASSWORD
+
+phases:
+  pre_build:
+    commands:
+      # login to docker.io
+      - echo ${DOCKER_REGISTRY_PASSWORD} | docker login --username growimoogle --password-stdin
+      # login to dhi.io (DHI uses Docker Hub credentials)
+      - echo ${DOCKER_REGISTRY_PASSWORD} | docker login dhi.io --username growimoogle --password-stdin
+  build:
+    commands:
+      - docker build -t ${IMAGE_TAG} -f ./apps/app/docker/Dockerfile .
+
+  post_build:
+    commands:
+      - docker push $IMAGE_TAG
+

@@ -1,0 +1,10 @@
+@use 'styles/atoms/placeholders/buttons';
+
+:root {
+  .installer-form {
+    :global(.btn-register) {
+      @extend %btn-nologin;
+      @extend %btn-register;
+    }
+  }
+}

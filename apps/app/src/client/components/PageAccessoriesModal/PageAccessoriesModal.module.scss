@@ -1,0 +1,22 @@
+.grw-page-accessories-modal {
+  :global(.modal-header) {
+    :global(button.btn-close) {
+      margin: auto 0 auto auto;
+    }
+  }
+
+  :global(.modal-body) {
+    padding: 25px 30px;
+  }
+
+  :global(.grw-tab-content-style-md-down) {
+    padding-top: 25px;
+  }
+
+  :global(.grw-modal-body-style) {
+    max-height: calc(100vh - 100px);
+  }
+  :global(ul.pagination) {
+    margin-bottom: 0;
+  }
+}

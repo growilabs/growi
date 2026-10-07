@@ -1,29 +1,50 @@
 {
-    // IntelliSense を使用して利用可能な属性を学べます。
-    // 既存の属性の説明をホバーして表示します。
-    // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
       {
         "type": "node",
+        "request": "launch",
+        "name": "Debug: Current File",
+        "skipFiles": [
+          "<node_internals>/**"
+        ],
+        "console": "integratedTerminal",
+        "cwd": "${fileDirname}",
+        "runtimeExecutable": "node",
+        "runtimeArgs": [
+          "-r", "@swc-node/register",
+          "${file}"
+        ]
+      },
+      {
+        "type": "node",
         "request": "attach",
         "name": "Debug: Attach Debugger to Server",
-        "port": 9229
+        "port": 9229,
+        "cwd": "${workspaceFolder}/apps/app",
+        "sourceMapPathOverrides": {
+          "webpack://@growi/app/*": "${workspaceFolder}/apps/app/*"
+        }
       },
       {
         "type": "node",
         "request": "launch",
         "name": "Debug: Server",
-        "cwd": "${workspaceFolder}/packages/app",
-        "runtimeExecutable": "npm",
+        "cwd": "${workspaceFolder}/apps/app",
+        "runtimeExecutable": "pnpm",
         "runtimeArgs": [
           "run",
-          "dev:server"
+          "dev"
         ],
-        "port": 9229,
+        "skipFiles": [
+          "<node_internals>/**"
+        ],
         "restart": true,
         "console": "integratedTerminal",
-        "internalConsoleOptions": "neverOpen"
+        "internalConsoleOptions": "neverOpen",
+        "sourceMapPathOverrides": {
+          "webpack://@growi/app/*": "${workspaceFolder}/apps/app/*"
+        }
       },
       {
         "type": "chrome",
@@ -31,9 +52,9 @@
         "name": "Debug: Chrome",
         "sourceMaps": true,
         "sourceMapPathOverrides": {
-          "webpack:///*": "${workspaceFolder}/packages/app/*"
+          "webpack://_N_E/*": "${workspaceFolder}/apps/app/*"
         },
-        "webRoot": "${workspaceFolder}/packages/app/public",
+        "webRoot": "${workspaceFolder}/apps/app/public",
         "url": "http://localhost:3000"
       },
       {
@@ -41,36 +62,32 @@
         "request": "launch",
         "name": "Debug: Firefox",
         "reAttach": true,
+        "webRoot": "${workspaceFolder}/apps/app/public",
         "url": "http://localhost:3000",
-        "webRoot": "${workspaceFolder}/packages/app/public",
         "pathMappings": [
           {
-            "url": "webpack:///core",
+            "url": "webpack://_n_e/src",
+            "path": "${workspaceFolder}/apps/app/src"
+          },
+          {
+            "url": "webpack://_n_e/core",
             "path": "${workspaceFolder}/packages/core"
           },
           {
-            "url": "webpack:///plugin-attachment-refs",
-            "path": "${workspaceFolder}/packages/plugin-attachment-refs"
+            "url": "webpack://_n_e/remark-lsx",
+            "path": "${workspaceFolder}/packages/remark-lsx"
           },
           {
-            "url": "webpack:///plugin-pukiwiki-like-linker",
-            "path": "${workspaceFolder}/packages/plugin-pukiwiki-like-linker"
+            "url": "webpack://_n_e/slack",
+            "path": "${workspaceFolder}/apps/app/slack"
           },
           {
-            "url": "webpack:///plugin-lsx",
-            "path": "${workspaceFolder}/packages/plugin-lsx"
-          },
-          {
-            "url": "webpack:///ui",
+            "url": "webpack://_n_e/ui",
             "path": "${workspaceFolder}/packages/ui"
           },
           {
-            "url": "webpack:///src",
-            "path": "${workspaceFolder}/packages/app/src"
-          },
-          {
             "url": "http://localhost:3000",
-            "path": "${workspaceFolder}/packages/app/public"
+            "path": "${workspaceFolder}/apps/app/public"
           }
         ]
       }

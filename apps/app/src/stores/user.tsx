@@ -1,0 +1,94 @@
+import type { IUserHasId } from '@growi/core';
+import type { SWRResponse } from 'swr';
+import useSWR from 'swr';
+import useSWRImmutable from 'swr/immutable';
+
+import { apiv3Get } from '~/client/util/apiv3-client';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
+import type {
+  IResRelatedGroupsMembers,
+  RelatedGroupsMembers,
+} from '~/interfaces/user-group-member';
+import { useIsGuestUser } from '~/states/context';
+import { checkAndUpdateImageUrlCached } from '~/stores/middlewares/user';
+
+export const useSWRxUsersList = (
+  userIds: string[],
+): SWRResponse<IUserHasId[], Error> => {
+  const isGuestUser = useIsGuestUser();
+  const distinctUserIds =
+    userIds.length > 0 ? Array.from(new Set(userIds)).sort() : [];
+
+  const shouldFetch = !isGuestUser && distinctUserIds.length > 0;
+
+  return useSWR(
+    shouldFetch ? ['/users/list', distinctUserIds] : null,
+    ([endpoint, userIds]) =>
+      apiv3Get(endpoint, { userIds: userIds.join(',') }).then((response) => {
+        return response.data.users;
+      }),
+    {
+      use: [checkAndUpdateImageUrlCached],
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+    },
+  );
+};
+
+// No `totalCount`: this hook does not request `isIncludeTotalCount`, so the
+// route omits it.
+type UsernamesResponse = {
+  activeUser?: { usernames: string[] };
+  inactiveUser?: { usernames: string[] };
+};
+
+/**
+ * Username suggestions from the registered-user list. `/users/usernames` is
+ * strictly login-required, so callers must not render a suggestion input for
+ * guests (see SearchFilterPanel).
+ */
+export const useSWRxUsernames = (
+  q: string,
+  limit = 5,
+): SWRResponse<UsernamesResponse, Error> => {
+  const trimmedQ = q.trim();
+  return useSWRImmutable(
+    trimmedQ !== '' ? ['/users/usernames', trimmedQ, limit] : null,
+    ([endpoint, q, limit]) =>
+      apiv3Get(endpoint, {
+        q,
+        limit,
+        // The route JSON.parses this param, so it must be sent as a JSON string.
+        options: JSON.stringify({
+          isIncludeActiveUser: true,
+          isIncludeInactiveUser: false,
+        }),
+      }).then((response) => response.data),
+  );
+};
+
+type RelatedGroupsResponse = {
+  relatedGroups: PopulatedGrantedGroup[];
+};
+
+export const useSWRxUserRelatedGroups = (): SWRResponse<
+  RelatedGroupsResponse,
+  Error
+> => {
+  return useSWRImmutable<RelatedGroupsResponse>(
+    ['/user/related-groups'],
+    ([endpoint]) => apiv3Get(endpoint).then((response) => response.data),
+  );
+};
+
+export const useSWRxRelatedGroupsMembers = (
+  shouldFetch: boolean,
+): SWRResponse<RelatedGroupsMembers, Error> => {
+  return useSWRImmutable<RelatedGroupsMembers>(
+    shouldFetch ? ['/user/related-groups/members'] : null,
+    ([endpoint]) =>
+      apiv3Get<IResRelatedGroupsMembers>(endpoint).then(
+        (response) => response.data.membersByGroupId,
+      ),
+  );
+};

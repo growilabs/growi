@@ -1,0 +1,8 @@
+.ea-table {
+  :global(thead th) {
+    vertical-align: top;
+  }
+  :global(td) {
+    vertical-align: middle;
+  }
+}

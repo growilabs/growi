@@ -1,0 +1,58 @@
+.revision-head {
+  :global(a) {
+    text-decoration: none;
+  }
+
+  :global(.revision-head-link) {
+    left: -1em;
+    width: 1em;
+    user-select: none;
+    opacity: 0;
+  }
+  :global(.revision-head-edit-button){
+    margin-left: 0.5em;
+    font-size: 16px;
+    user-select: none;
+    opacity: 0;
+    :global(.material-symbols-outlined){
+      vertical-align: middle;
+    }
+  }
+}
+
+.revision-head:hover {
+  :global(.revision-head-link), :global(.revision-head-edit-button) {
+    opacity: 0.5;
+  }
+  :global(.revision-head-link:hover) {
+    opacity: 1;
+  }
+  :global(.revision-head-edit-button:hover) {
+    opacity: 1;
+  }
+}
+
+// blink
+@keyframes fadeout {
+  100% {
+    opacity: 0;
+  }
+}
+
+.blink {
+  position: relative;
+  z-index: 1;
+
+  &::after {
+    position: absolute;
+    top: 15%;
+    left: 0;
+    z-index: -1;
+    width: 100%;
+    height: 70%;
+    content: '';
+    background-color: var(--bs-highlight-bg);
+    border-radius: 2px;
+    animation: fadeout 1s ease-in 1.5s forwards;
+  }
+}

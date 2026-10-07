@@ -1,0 +1,34 @@
+{
+  "name": "@growi/pluginkit",
+  "version": "1.2.8",
+  "description": "Plugin kit for GROWI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/growilabs/growi"
+  },
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "clean": "rimraf dist",
+    "dev": "vite build --mode dev",
+    "watch": "pnpm run dev -w --emptyOutDir=false",
+    "lint:biome": "biome check",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "npm-run-all -p lint:*",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@growi/core": "workspace:^",
+    "extensible-custom-error": "^0.0.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.14"
+  }
+}

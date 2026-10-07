@@ -1,0 +1,9 @@
+.attachment-delete-modal {
+  :global(.attachment-delete-image) {
+    text-align: center;
+
+    :global(img) {
+      max-width: 100%;
+    }
+  }
+}

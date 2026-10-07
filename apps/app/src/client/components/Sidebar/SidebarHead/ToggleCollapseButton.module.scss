@@ -1,0 +1,71 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'styles/variables' as var;
+@use 'styles/mixins';
+@use '../button-styles';
+
+.btn-toggle-collapse {
+  @extend %btn-basis;
+
+  $height: var.$grw-sidebar-nav-width; // declare $height with the same value as the sidebar nav width
+
+  height: $height;
+}
+
+// icon
+.btn-toggle-collapse {
+  :global(.material-symbols-outlined) {
+    transition: transform 0.25s;
+
+    // rotation
+    &:global(.rotate180) {
+      transform: rotate(180deg);
+    }
+  }
+}
+
+// Hide when editing
+@include mixins.at-editing() {
+  .btn-toggle-collapse {
+    visibility: hidden;
+  }
+}
+
+
+// == Colors
+.btn-toggle-collapse {
+  & {
+    &:global(.btn.btn-primary) {
+      @extend %btn-primary-color-vars;
+
+      --bs-btn-hover-color: color-mix(in srgb, var(
+        --grw-sidebar-nav-btn-hover-color,
+        var(
+          --grw-sidebar-nav-btn-color,
+          var(--bs-btn-color)
+        )) 90%,
+        transparent);
+    }
+  }
+}
+
+@include bs.color-mode(light) {
+  .btn-toggle-collapse {
+    & {
+      &:global(.btn.btn-primary) {
+        --bs-btn-color: color-mix(in srgb, var(--grw-sidebar-nav-btn-color, var(--bs-gray-500)) 50%, transparent);
+        --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-300));
+      }
+    }
+  }
+}
+
+@include bs.color-mode(dark) {
+  .btn-toggle-collapse {
+    & {
+      &:global(.btn.btn-primary) {
+        --bs-btn-color: color-mix(in srgb, var(--grw-sidebar-nav-btn-color, var(--bs-gray-600)) 50%, transparent);
+        --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-700));
+      }
+    }
+  }
+}

@@ -9,15 +9,18 @@ please bring it to our attention through any of the ways detailed here :
 The attached notices are provided for information only.
 
 For any licenses that require disclosure of source, sources are available at  
-https://github.com/weseek/growi.
+https://github.com/growilabs/growi.
 
 
 1. Apache License, Version 2.0 Derivative Works
-2. crowi/crowi (https://github.com/crowi/crowi)
-3. Microsoft/vscode (https://github.com/Microsoft/vscode)
-4. stephenhutchings/typicons.font (https://github.com/stephenhutchings/typicons.font)
-5. EmojiOne Version 3 (https://github.com/joypixels/emojione/tree/v3.1.1)
-6. Kuromoji.js (https://github.com/takuyaa/kuromoji.js)
+1. crowi/crowi (https://github.com/crowi/crowi)
+1. Microsoft/vscode (https://github.com/Microsoft/vscode)
+1. Kuromoji.js (https://github.com/takuyaa/kuromoji.js)
+1. Lato (https://fonts.google.com/specimen/Lato)
+1. Press Start 2P (https://fonts.google.com/specimen/Press+Start+2P)
+1. stephenhutchings/typicons.font (https://github.com/stephenhutchings/typicons.font)
+1. Source Han Code JP (https://github.com/adobe-fonts/source-han-code-jp)
+
 
 
 License Notice for Apache License, Version 2.0 Derivative Works
@@ -91,6 +94,36 @@ SOFTWARE.
 ```
 
 
+License Notice for Kuromoji.js
+------------------------
+
+https://github.com/takuyaa/kuromoji.js/blob/master/LICENSE-2.0.txt
+
+```
+author: "Takuya Asano <takuya.a@gmail.com>"
+```
+
+
+License Notice for Lato
+---------------------
+
+https://scripts.sil.org/cms/scripts/page.php?site_id=nrsi&id=OFL
+
+```
+Designed by Łukasz Dziedzic 
+```
+
+
+License Notice for Press Start 2P
+------------------------------
+
+http://scripts.sil.org/OFL
+
+```
+Designed by CodeMan38
+```
+
+
 License Notice for Typicons
 ------------------------
 
@@ -101,21 +134,11 @@ Copyright (c) 2018 Stephen Hutchings
 ```
 
 
-License Notice for EmojiOne
-------------------------
+License Notice for Source Han Code JP
+----------------------------------
 
-https://creativecommons.org/licenses/by/4.0/
-
-```
-author: "EmojiOne <ryan@emojione.com> (http://emojione.com)"
-```
-
-
-License Notice for Kuromoji.js
-------------------------
-
-https://github.com/takuyaa/kuromoji.js/blob/master/LICENSE-2.0.txt
+http://scripts.sil.org/OFL
 
 ```
-author: "Takuya Asano <takuya.a@gmail.com>"
+Copyright (c) 2014-2020 Adobe Systems Incorporated
 ```

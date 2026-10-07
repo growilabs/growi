@@ -1,0 +1,22 @@
+// All-caps `RGBA()` function used because of this Sass bug: https://github.com/sass/node-sass/issues/2251
+@each $color, $value in $theme-colors {
+  @if $color == 'light' {
+    .text-bg-#{$color} {
+      color: $gray-500 if($enable-important-utilities, !important, null);
+      background-color: var(--bs-light) if($enable-important-utilities, !important, null);
+      border: 1px solid var(--bs-light-border-subtle) if($enable-important-utilities, !important, null);
+    }
+  } @else if $color == 'dark' {
+    .text-bg-#{$color} {
+      color: $gray-600 if($enable-important-utilities, !important, null);
+      background-color: var(--bs-dark);
+      border: 1px solid var(--bs-dark-border-subtle);
+    }
+  } @else {
+    .text-bg-#{$color} {
+      color: var(--#{$prefix}#{$color}) if($enable-important-utilities, !important, null);
+      background-color: var(--#{$prefix}#{$color}-bg-subtle) if($enable-important-utilities, !important, null);
+      border: 1px solid var(--#{$prefix}#{$color}-border-subtle) if($enable-important-utilities, !important, null);
+    }
+  }
+}

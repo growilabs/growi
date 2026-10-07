@@ -1,0 +1,17 @@
+@import '../mixins/button-outline-variant';
+
+.btn-primary {
+  @include button-variant($primary, $primary);
+}
+
+.btn-secondary {
+  @include button-variant($secondary, $secondary);
+}
+
+.btn-outline-primary {
+  @include button-outline-variant-light($primary);
+}
+
+.btn-outline-secondary {
+  @include button-outline-variant-light($secondary);
+}

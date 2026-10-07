@@ -1,0 +1,21 @@
+/* stylelint-disable selector-class-pattern */
+
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+// Table
+@include bs.color-mode(dark) {
+  .handsontable:not(.htMenu) .handsontable.ht_master {
+    td {
+      color: var(--bs-gray-800);
+    }
+  }
+}
+
+// Context Menu
+@include bs.color-mode(dark) {
+  .handsontable.htMenu .handsontable.ht_master {
+    td:not(.htDisabled) {
+      color: var(--bs-gray-800);
+    }
+  }
+}

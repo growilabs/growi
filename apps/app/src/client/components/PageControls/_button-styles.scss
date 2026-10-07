@@ -1,0 +1,17 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+%btn-basis {
+  --bs-btn-padding-x: 6px;
+  --bs-btn-padding-y: 6px;
+  --bs-btn-line-height: 1em;
+  --bs-btn-border-width: 0;
+  --bs-btn-box-shadow: none;
+}
+
+%btn-total-counts-basis {
+  --bs-btn-font-size: 13px;
+}
+
+%text-total-counts-basis {
+  font-size: 13px;
+}

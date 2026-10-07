@@ -1,0 +1,67 @@
+@use 'styles/mixins' as *;
+
+.grw-recent-changes-resize-button {
+  line-height: normal;
+  transform: translateY(-2px);
+}
+
+.list-group-item {
+  font-size: 12px;
+
+  :global(h6) {
+    font-size: 14px;
+  }
+
+  :global(.grw-recent-changes-skeleton-small) {
+    @include grw-skeleton-text($font-size: 14px, $line-height: 16px);
+
+    max-width: 120px;
+  }
+
+  :global(.grw-recent-changes-skeleton-h5) {
+    @include grw-skeleton-h5;
+
+    max-width: 120px;
+  }
+
+  :global(.grw-recent-changes-skeleton-date) {
+    @include grw-skeleton-text($font-size: 10px, $line-height: 12px);
+
+    width: 80px;
+  }
+
+  // For truncate-text
+  :global(.flex-grow-1) {
+    min-width: 0;
+  }
+
+  :global(.truncate-text) {
+    max-width: fit-content;
+  }
+}
+
+.grw-recent-changes-item-lower {
+  font-size: 12px;
+
+  :global(.material-symbols-outlined) {
+    font-size: 14px;
+  }
+  :global(.grw-formatted-distance-date) {
+    font-size: 10px;
+  }
+}
+
+// == Colors
+.grw-former-link a {
+  --bs-link-opacity: 0.5;
+
+  & {
+    &:hover {
+      --bs-link-opacity: 1;
+    }
+  }
+}
+
+.grw-recent-changes-item-lower {
+  color: var(--bs-gray-500);
+}

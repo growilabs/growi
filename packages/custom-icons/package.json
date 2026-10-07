@@ -1,0 +1,15 @@
+{
+  "name": "@growi/custom-icons",
+  "version": "1.0.0",
+  "description": "Custom icons builder project for GROWI",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "svgtofont --sources ./svg --output ./dist",
+    "dev": "svgtofont --sources ./svg --output ./dist"
+  },
+  "devDependencies": {
+    "svgtofont": "^4.1.1"
+  }
+}

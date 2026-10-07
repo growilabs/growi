@@ -1,0 +1,83 @@
+import React, { type JSX } from 'react';
+import { type IUserHasId, USER_STATUS } from '@growi/core';
+import { useTranslation } from 'next-i18next';
+
+import { scrollToElement } from '~/client/util/smooth-scroll';
+
+import {
+  BOOKMARKS_LIST_ID,
+  RECENT_ACTIVITY_LIST_ID,
+  RECENTLY_CREATED_LIST_ID,
+} from './UsersHomepageFooter.consts';
+
+const BookMarkLinkButton = React.memo(() => {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      className="btn btn-sm btn-outline-neutral-secondary rounded-pill d-flex align-items-center w-100 px-3"
+      onClick={() => scrollToElement(BOOKMARKS_LIST_ID, { offset: -120 })}
+    >
+      <span className="material-symbols-outlined p-0 me-2">bookmark</span>
+      <span>{t('user_home_page.bookmarks')}</span>
+    </button>
+  );
+});
+
+BookMarkLinkButton.displayName = 'BookMarkLinkButton';
+
+const RecentlyCreatedLinkButton = React.memo(() => {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      className="btn btn-sm btn-outline-neutral-secondary rounded-pill d-flex align-items-center w-100 px-3"
+      onClick={() =>
+        scrollToElement(RECENTLY_CREATED_LIST_ID, { offset: -120 })
+      }
+    >
+      <span className="growi-custom-icons mx-2 ">recently_created</span>
+      <span>{t('user_home_page.recently_created')}</span>
+    </button>
+  );
+});
+
+RecentlyCreatedLinkButton.displayName = 'RecentlyCreatedLinkButton';
+
+const RecentActivityLinkButton = React.memo(() => {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      className="btn btn-sm btn-outline-neutral-secondary rounded-pill d-flex align-items-center w-100 px-3"
+      onClick={() => scrollToElement(RECENT_ACTIVITY_LIST_ID, { offset: -120 })}
+    >
+      <span className="material-symbols-outlined mx-1">update</span>
+      <span>{t('user_home_page.recent_activity')}</span>
+    </button>
+  );
+});
+
+RecentActivityLinkButton.displayName = 'RecentActivityLinkButton';
+
+export type ContentLinkButtonsProps = {
+  author?: IUserHasId;
+};
+
+export const ContentLinkButtons = (
+  props: ContentLinkButtonsProps,
+): JSX.Element => {
+  const { author } = props;
+
+  if (author == null || author.status === USER_STATUS.DELETED) {
+    return <></>;
+  }
+
+  return (
+    <div className="d-grid gap-2">
+      <BookMarkLinkButton />
+      <RecentlyCreatedLinkButton />
+      <RecentActivityLinkButton />
+    </div>
+  );
+};

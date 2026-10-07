@@ -1,35 +1,41 @@
+prerelease: true
+
+# Filter previous releases to consider target_commitish
+include-pre-releases: true
+filter-by-commitish: true
+
 categories:
   - title: 'BREAKING CHANGES'
     labels:
-      - 'breaking'
+      - 'type/breaking'
   - title: '💎 Features'
     labels:
-      - 'feature'
+      - 'type/feature'
   - title: '🚀 Improvement'
     labels:
-      - 'improvement'
+      - 'type/improvement'
   - title: '🐛 Bug Fixes'
     labels:
-      - 'bug'
+      - 'type/bug'
   - title: '🧰 Maintenance'
     labels:
-      - 'support'
-      - 'dependencies'
+      - 'type/support'
+      - 'type/dependencies'
 category-template: '### $TITLE'
 change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
 autolabeler:
-  - label: 'feature'
+  - label: 'type/feature'
     branch:
       - '/^feat\/.+/'
-  - label: 'improvement'
+  - label: 'type/improvement'
     branch:
       - '/^imprv\/.+/'
-  - label: 'bug'
+  - label: 'type/bug'
     branch:
       - '/^fix\/.+/'
     title:
       - '/^fix/i'
-  - label: 'support'
+  - label: 'type/support'
     branch:
       - '/^support\/.+/'
     title:
@@ -39,13 +45,13 @@ autolabeler:
       - '/^docs/i'
       - '/^test/i'
 include-labels:
-  - breaking
-  - feature
-  - improvement
-  - bug
-  - support
-  - dependencies
+  - type/breaking
+  - type/feature
+  - type/improvement
+  - type/bug
+  - type/support
+  - type/dependencies
 exclude-labels:
-  - 'exclude from changelog'
+  - 'flag/exclude-from-changelog'
 template: |
   $CHANGES

@@ -1,0 +1,1 @@
+export { EmptyTrashModalLazyLoaded } from './dynamic';

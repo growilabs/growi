@@ -1,0 +1,12 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use '@growi/ui/scss/atoms/btn-muted';
+@use './button-styles';
+
+.btn-search {
+  @extend %btn-basis;
+}
+
+// == Colors
+.btn-search {
+  @include btn-muted.colorize(bs.$success);
+}

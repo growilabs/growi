@@ -1,0 +1,17 @@
+// button layout
+.admin-navigation {
+  & {
+    & > :global(a + a) {
+      margin-top: 2px;
+    }
+  }
+}
+
+// sticky settings
+.admin-navigation {
+  & {
+    &:global(.sticky-top) {
+      top: 30px;
+    }
+  }
+}

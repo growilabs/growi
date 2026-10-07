@@ -1,0 +1,29 @@
+@keyframes attachement-refs-fade-in {
+  0% {opacity: .2}
+  100% {opacity: .9}
+}
+
+.attachment-refs {
+  :global(.attachement-refs-blink) {
+    animation: attachement-refs-fade-in 1s ease 0s infinite alternate;
+  }
+
+  :global(li.attachment) {
+    list-style: none;
+  }
+
+  :global(.attachment-userpicture) {
+    line-height: 1.7em;
+    vertical-align: bottom;
+  }
+
+  :global(.page-meta) {
+    font-size: 0.95em;
+  }
+
+  :global(.attachment-filetype) {
+    padding: 1px 5px;
+    margin: 0 0 0 4px;
+    font-weight: normal;
+  }
+}

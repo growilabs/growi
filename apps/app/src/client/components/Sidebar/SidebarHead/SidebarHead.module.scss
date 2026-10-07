@@ -1,0 +1,27 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+
+// == Colors
+@include bs.color-mode(light) {
+  .grw-sidebar-head {
+    background-color: var(
+      --grw-sidebar-head-bg,
+      var(
+        --grw-sidebar-nav-bg,
+        var(--grw-highlight-100)
+      )
+    );
+  }
+}
+
+@include bs.color-mode(dark) {
+  .grw-sidebar-head {
+    background-color: var(
+      --grw-sidebar-head-bg,
+      var(
+        --grw-sidebar-nav-bg,
+        var(--grw-highlight-800)
+      )
+    );
+  }
+}

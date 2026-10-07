@@ -1,0 +1,897 @@
+import type { IPage, IPageHasId, IUser } from '@growi/core';
+import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import mongoose from 'mongoose';
+import { FilterXSS } from 'xss';
+
+import { CommentEvent, commentEvent } from '~/features/comment/server';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
+import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
+import {
+  FILTER_FIELDS,
+  SEARCH_FILTER_PREFIXES,
+} from '~/features/search/utils/filter-fields';
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+} from '~/interfaces/activity';
+import { SearchDelegatorName } from '~/interfaces/named-query';
+import type {
+  IFormattedSearchResult,
+  IPageWithSearchMeta,
+  ISearchResult,
+} from '~/interfaces/search';
+import {
+  USER_FIELDS_EXCEPT_CONFIDENTIAL,
+  UserStatus,
+} from '~/server/models/user/conts';
+import UserGroup from '~/server/models/user-group';
+import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
+
+import type Crowi from '../crowi';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils';
+import type {
+  ParsedQuery,
+  QueryTerms,
+  ResolvedFilterData,
+  SearchableData,
+  SearchDelegator,
+  SearchQueryParser,
+  SearchResolver,
+} from '../interfaces/search';
+import NamedQuery from '../models/named-query';
+import type { PageModel } from '../models/page';
+import { SearchError } from '../models/vo/search-error';
+import { hasIntersection } from '../util/compare-objectId';
+import { configManager } from './config-manager';
+import ElasticsearchDelegator from './search-delegator/elasticsearch';
+import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
+
+const logger = loggerFactory('growi:service:search');
+
+const nonNullable = <T>(value: T): value is NonNullable<T> => value != null;
+
+// options for filtering xss
+// Do not change the property key name to 'whitelist" because it depends on the 'xss' library
+const filterXssOptions = {
+  whiteList: {
+    em: ['class'],
+  },
+};
+
+const filterXss = new FilterXSS(filterXssOptions);
+
+// The shared UI operators plus the server-only `prefix:` path filter.
+const FILTER_PREFIXES = ['prefix:', ...SEARCH_FILTER_PREFIXES] as const;
+
+// New-filter operators (author/editor/group) typed with no value (e.g. `author:`,
+// `-group:`) are ignored rather than captured as full-text match terms. `tag:` is
+// excluded because prefix:/tag: keep their legacy behavior. Filtered by field name
+// so a prefix-string rename in the shared vocabulary propagates automatically.
+const VALUELESS_IGNORED_PREFIXES: readonly string[] = FILTER_FIELDS.filter(
+  ([field]) => field !== 'tags',
+).map(([, prefix]) => prefix);
+
+// https://regex101.com/r/pN9XfK/2
+const NEGATIVE_TERM_REGEXP = new RegExp(
+  `^-(${FILTER_PREFIXES.join('|')})?(.+)$`,
+);
+// https://regex101.com/r/3qw9FQ/2
+const POSITIVE_TERM_REGEXP = new RegExp(
+  `^(${FILTER_PREFIXES.join('|')})?(.+)$`,
+);
+
+const normalizeQueryString = (_queryString: string): string => {
+  const queryString = _queryString.trim().replace(/\s+/g, ' ');
+
+  return queryString;
+};
+
+const normalizeNQName = (nqName: string): string => {
+  return nqName.trim();
+};
+
+const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
+  const Page = mongoose.model<IPage, PageModel>('Page');
+
+  const builder = new Page.PageQueryBuilder(
+    Page.find({ _id: { $in: pageIds } }),
+    false,
+  );
+
+  builder.addConditionToPagenate(undefined, undefined); // offset and limit are unnesessary
+
+  builder.populateDataToList(USER_FIELDS_EXCEPT_CONFIDENTIAL); // populate lastUpdateUser
+  builder.query = builder.query.populate({
+    path: 'creator',
+    select: USER_FIELDS_EXCEPT_CONFIDENTIAL,
+  });
+
+  const pages = await builder.query.clone().exec('find');
+  const totalCount = await builder.query.exec('count');
+
+  return {
+    pages,
+    totalCount,
+  };
+};
+
+class SearchService implements SearchQueryParser, SearchResolver {
+  protected constructor() {}
+
+  crowi: Crowi;
+
+  isErrorOccuredOnHealthcheck: boolean | null;
+
+  isErrorOccuredOnSearching: boolean | null;
+
+  fullTextSearchDelegator: ElasticsearchDelegator;
+
+  nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
+
+  static async create(crowi: Crowi) {
+    const instance = new SearchService();
+
+    instance.crowi = crowi;
+
+    instance.isErrorOccuredOnHealthcheck = null;
+    instance.isErrorOccuredOnSearching = null;
+
+    try {
+      const tmpFullTextSearchDelegator =
+        instance.generateFullTextSearchDelegator();
+      if (tmpFullTextSearchDelegator == null) {
+        throw new Error('Failed to initialize search delegator');
+      }
+      instance.fullTextSearchDelegator = tmpFullTextSearchDelegator;
+      instance.nqDelegators = instance.generateNQDelegators(
+        instance.fullTextSearchDelegator,
+      );
+      logger.info('Succeeded to initialize search delegators');
+    } catch (err) {
+      logger.error(err);
+    }
+
+    if (instance.isConfigured) {
+      await instance.fullTextSearchDelegator.init();
+      instance.registerUpdateEvent();
+    }
+    return instance;
+  }
+
+  get isConfigured() {
+    return this.fullTextSearchDelegator != null;
+  }
+
+  get isReachable() {
+    return (
+      this.isConfigured &&
+      !this.isErrorOccuredOnHealthcheck &&
+      !this.isErrorOccuredOnSearching
+    );
+  }
+
+  get isElasticsearchEnabled() {
+    const uri = configManager.getConfig('app:elasticsearchUri');
+    return uri != null && uri.length > 0;
+  }
+
+  generateFullTextSearchDelegator() {
+    logger.info('Initializing search delegator');
+
+    if (this.isElasticsearchEnabled) {
+      logger.info('Elasticsearch is enabled');
+      return new ElasticsearchDelegator(this.crowi.socketIoService);
+    }
+
+    logger.info(
+      'No elasticsearch URI is specified so that full text search is disabled.',
+    );
+  }
+
+  generateNQDelegators(defaultDelegator: ElasticsearchDelegator): {
+    [key in SearchDelegatorName]: SearchDelegator;
+  } {
+    return {
+      [SearchDelegatorName.DEFAULT]: defaultDelegator,
+      [SearchDelegatorName.PRIVATE_LEGACY_PAGES]:
+        new PrivateLegacyPagesDelegator() as unknown as SearchDelegator,
+    };
+  }
+
+  registerUpdateEvent() {
+    const pageEvent = this.crowi.events.page;
+    pageEvent.on(
+      'create',
+      this.fullTextSearchDelegator.syncPageUpdated.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    pageEvent.on(
+      'update',
+      this.fullTextSearchDelegator.syncPageUpdated.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    pageEvent.on('delete', (targetPage, deletedPage, user) => {
+      this.fullTextSearchDelegator.syncPageDeleted.bind(
+        this.fullTextSearchDelegator,
+      )(targetPage, user);
+      this.fullTextSearchDelegator.syncPageUpdated.bind(
+        this.fullTextSearchDelegator,
+      )(deletedPage, user);
+    });
+    pageEvent.on('revert', (targetPage, revertedPage, user) => {
+      this.fullTextSearchDelegator.syncPageDeleted.bind(
+        this.fullTextSearchDelegator,
+      )(targetPage, user);
+      this.fullTextSearchDelegator.syncPageUpdated.bind(
+        this.fullTextSearchDelegator,
+      )(revertedPage, user);
+    });
+    pageEvent.on(
+      'deleteCompletely',
+      this.fullTextSearchDelegator.syncPageDeleted.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    pageEvent.on(
+      'syncDescendantsDelete',
+      this.fullTextSearchDelegator.syncDescendantsPagesDeleted.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    pageEvent.on(
+      'updateMany',
+      this.fullTextSearchDelegator.syncPagesUpdated.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    pageEvent.on(
+      'syncDescendantsUpdate',
+      this.fullTextSearchDelegator.syncDescendantsPagesUpdated.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    pageEvent.on(
+      'addSeenUsers',
+      this.fullTextSearchDelegator.syncPageUpdated.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    pageEvent.on('rename', () => {
+      this.fullTextSearchDelegator.syncPageDeleted.bind(
+        this.fullTextSearchDelegator,
+      );
+      this.fullTextSearchDelegator.syncPageUpdated.bind(
+        this.fullTextSearchDelegator,
+      );
+    });
+
+    const bookmarkEvent = this.crowi.events.bookmark;
+    bookmarkEvent.on(
+      'create',
+      this.fullTextSearchDelegator.syncBookmarkChanged.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    bookmarkEvent.on(
+      'delete',
+      this.fullTextSearchDelegator.syncBookmarkChanged.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+
+    const tagEvent = this.crowi.events.tag;
+    tagEvent.on(
+      'update',
+      this.fullTextSearchDelegator.syncTagChanged.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+
+    commentEvent.on(
+      CommentEvent.CREATE,
+      this.fullTextSearchDelegator.syncCommentChanged.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    commentEvent.on(
+      CommentEvent.UPDATE,
+      this.fullTextSearchDelegator.syncCommentChanged.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    commentEvent.on(
+      CommentEvent.DELETE,
+      this.fullTextSearchDelegator.syncCommentChanged.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+  }
+
+  resetErrorStatus() {
+    this.isErrorOccuredOnHealthcheck = false;
+    this.isErrorOccuredOnSearching = false;
+  }
+
+  async reconnectClient() {
+    logger.info('Try to reconnect...');
+    this.fullTextSearchDelegator.initClient();
+
+    await this.getInfoForHealth();
+
+    logger.info('Reconnecting succeeded.');
+    this.resetErrorStatus();
+  }
+
+  async getInfo() {
+    try {
+      return await this.fullTextSearchDelegator.getInfo();
+    } catch (err) {
+      logger.error(err);
+      throw err;
+    }
+  }
+
+  async getInfoForHealth() {
+    try {
+      const result = await this.fullTextSearchDelegator.getInfoForHealth();
+
+      this.isErrorOccuredOnHealthcheck = false;
+      return result;
+    } catch (err) {
+      logger.error(err);
+
+      // switch error flag, `isErrorOccuredOnHealthcheck` to be `false`
+      this.isErrorOccuredOnHealthcheck = true;
+      throw err;
+    }
+  }
+
+  async getInfoForAdmin() {
+    return this.fullTextSearchDelegator.getInfoForAdmin();
+  }
+
+  async getAuditlogInfoForAdmin() {
+    return this.fullTextSearchDelegator.getAuditlogInfoForAdmin();
+  }
+
+  async normalizeIndices() {
+    return this.fullTextSearchDelegator.normalizeIndices();
+  }
+
+  async normalizeAuditlogIndices() {
+    return this.fullTextSearchDelegator.normalizeAuditlogIndices();
+  }
+
+  async rebuildIndex(shouldEmitProgress = false) {
+    return this.fullTextSearchDelegator.rebuildIndex({ shouldEmitProgress });
+  }
+
+  async rebuildAuditlogIndex(
+    option: { shouldEmitProgress: boolean } = { shouldEmitProgress: false },
+  ) {
+    return this.fullTextSearchDelegator.rebuildAuditlogIndex(option);
+  }
+
+  private async searchAuditlogUsernames(
+    q: string,
+    limit: number,
+  ): Promise<string[]> {
+    if (this.isReachable) {
+      try {
+        return await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
+          'username',
+          q,
+          limit,
+        );
+      } catch (err) {
+        logger.error(
+          'Failed to search auditlog suggestions on Elasticsearch. Falling back to MongoDB.',
+          err,
+        );
+      }
+    }
+    return prisma.activities.findSnapshotUsernamesByUsernameRegex(q, {
+      offset: 0,
+      limit,
+    });
+  }
+
+  async searchAuditlogSuggestions(
+    fields: AuditlogSuggestionField[],
+    q: string,
+    limit: number,
+  ): Promise<AuditlogSuggestionsResponse> {
+    if (q === '') return {};
+
+    const response: AuditlogSuggestionsResponse = {};
+
+    if (fields.includes('username')) {
+      const usernames = await this.searchAuditlogUsernames(q, limit);
+
+      const User = mongoose.model<IUser>('User');
+      const users =
+        usernames.length === 0
+          ? []
+          : await User.find({ username: { $in: usernames } })
+              .select('username status')
+              .lean();
+
+      const activeUsernames = new Set(
+        users
+          .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+          .map((u) => u.username),
+      );
+
+      // A username with no live User match (e.g. deleted -- statusDelete()
+      // renames the User doc's username to `deleted_at_*`) must still be
+      // searchable in the audit trail, so anything not proven active is
+      // treated as inactive rather than silently dropped.
+      response.username = {
+        activeUsernames: usernames.filter((u) => activeUsernames.has(u)),
+        inactiveUsernames: usernames.filter((u) => !activeUsernames.has(u)),
+      };
+    }
+
+    return response;
+  }
+
+  async parseSearchQuery(
+    _queryString: string,
+    nqName: string | null,
+  ): Promise<ParsedQuery> {
+    const disableUserPages = configManager.getConfig(
+      'security:disableUserPages',
+    );
+    const queryString = normalizeQueryString(_queryString);
+    const terms = this.parseQueryString(queryString);
+
+    let parsedQuery: ParsedQuery = { queryString, terms };
+
+    if (nqName != null) {
+      const nq = await NamedQuery.findOne({ name: normalizeNQName(nqName) });
+
+      if (nq != null) {
+        const { aliasOf, delegatorName } = nq;
+
+        if (aliasOf != null) {
+          parsedQuery = {
+            queryString: normalizeQueryString(aliasOf),
+            terms: this.parseQueryString(aliasOf),
+          };
+        } else {
+          parsedQuery = { queryString, terms, delegatorName };
+        }
+      } else {
+        logger.debug(
+          `Delegated to full-text search since a named query document did not found. (nqName="${nqName}")`,
+        );
+      }
+    }
+
+    if (disableUserPages) {
+      excludeUserPagesFromQuery(parsedQuery.terms);
+    }
+
+    return parsedQuery;
+  }
+
+  async resolve(
+    parsedQuery: ParsedQuery,
+  ): Promise<[SearchDelegator, SearchableData]> {
+    const {
+      queryString,
+      terms,
+      delegatorName = SearchDelegatorName.DEFAULT,
+    } = parsedQuery;
+    const nqDeledator = this.nqDelegators[delegatorName];
+
+    const data = {
+      queryString,
+      terms,
+    };
+    return [nqDeledator, data];
+  }
+
+  /**
+   * Throws SearchError if data is corrupted.
+   * @param {SearchableData} data
+   * @param {SearchDelegator} delegator
+   * @throws {SearchError} SearchError
+   */
+  private validateSearchableData(
+    delegator: SearchDelegator,
+    data: SearchableData,
+  ): void {
+    const { terms } = data;
+
+    if (delegator.isTermsNormalized(terms)) {
+      return;
+    }
+
+    const unavailableTermsKeys = delegator.validateTerms(terms);
+
+    throw new SearchError(
+      'The query string includes unavailable terms.',
+      unavailableTermsKeys,
+    );
+  }
+
+  async searchKeyword(
+    keyword: string,
+    nqName: string | null,
+    user,
+    userGroups: ObjectIdLike[] | null,
+    searchOpts,
+  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
+    let parsedQuery: ParsedQuery;
+    // parse
+    try {
+      parsedQuery = await this.parseSearchQuery(keyword, nqName);
+    } catch (err) {
+      logger.error('Error occurred while parseSearchQuery', err);
+      throw err;
+    }
+
+    let delegator: SearchDelegator;
+    let data: SearchableData;
+    // resolve
+    try {
+      [delegator, data] = await this.resolve(parsedQuery);
+    } catch (err) {
+      logger.error('Error occurred while resolving search delegator', err);
+      throw err;
+    }
+
+    this.validateSearchableData(delegator, data);
+
+    data.resolvedFilterData = await this.resolveFilterData(
+      data.terms,
+      userGroups,
+    );
+
+    return [
+      await delegator.search(data, user, userGroups, searchOpts),
+      delegator.name ?? null,
+    ];
+  }
+
+  async resolveFilterData(
+    terms: Partial<QueryTerms>,
+    userGroups: ObjectIdLike[] | null,
+  ): Promise<ResolvedFilterData> {
+    const groupTerms = terms.group ?? [];
+    const notGroupTerms = terms.not_group ?? [];
+
+    // Early-return (no MongoDB query) for guests or when no group operator was typed.
+    if (
+      userGroups == null ||
+      userGroups.length < 1 ||
+      (groupTerms.length === 0 && notGroupTerms.length === 0)
+    ) {
+      const emptyFilterData: ResolvedFilterData = {
+        groupIds: [],
+        notGroupIds: [],
+      };
+      return emptyFilterData;
+    }
+
+    const [internal, external] = await Promise.all([
+      UserGroup.find({ _id: { $in: userGroups } })
+        .select('_id name')
+        .exec(),
+      ExternalUserGroup.find({ _id: { $in: userGroups } })
+        .select('_id name')
+        .exec(),
+    ]);
+    const myGroups = [...internal, ...external];
+    const namesToIds = new Map<string, string[]>();
+
+    // Save all the user's group names and their ids
+    for (const group of myGroups) {
+      const id = group.id;
+      namesToIds.set(group.name, [...(namesToIds.get(group.name) ?? []), id]);
+    }
+
+    const resolve = (names: string[] = []) =>
+      names.flatMap((name) => namesToIds.get(name) ?? []);
+
+    const resolvedFilterData: ResolvedFilterData = {
+      groupIds: resolve(groupTerms),
+      notGroupIds: resolve(notGroupTerms),
+    };
+
+    return resolvedFilterData;
+  }
+
+  parseQueryString(_queryString: string): QueryTerms {
+    let queryString = _queryString;
+
+    // terms
+    const matchWords: string[] = [];
+    const notMatchWords: string[] = [];
+    const phraseWords: string[] = [];
+    const notPhraseWords: string[] = [];
+    const prefixPaths: string[] = [];
+    const notPrefixPaths: string[] = [];
+    const tags: string[] = [];
+    const notTags: string[] = [];
+    const authors: string[] = [];
+    const notAuthors: string[] = [];
+    const editors: string[] = [];
+    const notEditors: string[] = [];
+    const groups: string[] = [];
+    const notGroups: string[] = [];
+
+    // First: Parse quoted filter values (e.g. `group:"My Group"`, `-editor:"Jane Doe"`).
+    // This must run before the phrase pass below, otherwise the phrase regex would strip
+    // the `"..."` part into a full-text phrase and leave a bare, valueless operator behind.
+    // The quotes let a filter value contain spaces despite the later space-based tokenizing.
+    const positiveBuckets: Record<string, string[]> = {
+      'prefix:': prefixPaths,
+      'tag:': tags,
+      'author:': authors,
+      'editor:': editors,
+      'group:': groups,
+    };
+    const negativeBuckets: Record<string, string[]> = {
+      'prefix:': notPrefixPaths,
+      'tag:': notTags,
+      'author:': notAuthors,
+      'editor:': notEditors,
+      'group:': notGroups,
+    };
+    const quotedFilterRegExp = new RegExp(
+      `(-?)(${FILTER_PREFIXES.join('|')})"([^"]+)"`,
+      'g',
+    );
+    queryString = queryString.replace(
+      quotedFilterRegExp,
+      (_match, negation, prefix, value) => {
+        const buckets = negation === '-' ? negativeBuckets : positiveBuckets;
+        buckets[prefix].push(value);
+        return '';
+      },
+    );
+
+    // Second: Parse phrase keywords
+    const phraseRegExp = new RegExp(/(-?"[^"]+")/g);
+    const phrases = queryString.match(phraseRegExp);
+
+    if (phrases !== null) {
+      queryString = queryString.replace(phraseRegExp, '');
+
+      phrases.forEach((phrase) => {
+        phrase.trim();
+        if (phrase.match(/^-/)) {
+          notPhraseWords.push(phrase.replace(/^-/, ''));
+        } else {
+          phraseWords.push(phrase);
+        }
+      });
+    }
+
+    // Any unpaired quotes are removed
+    queryString = queryString.replace(/"/g, '');
+
+    // Third: Parse other keywords (include minus keywords)
+    queryString.split(' ').forEach((word) => {
+      if (word === '') {
+        return;
+      }
+
+      // Ignore a bare new-filter operator with no value (positive or negated) so it
+      // does not leak into full-text match terms
+      const wordWithoutNegation = word.startsWith('-') ? word.slice(1) : word;
+      if (VALUELESS_IGNORED_PREFIXES.includes(wordWithoutNegation)) {
+        return;
+      }
+
+      const matchNegative = word.match(NEGATIVE_TERM_REGEXP);
+      const matchPositive = word.match(POSITIVE_TERM_REGEXP);
+
+      if (matchNegative != null) {
+        if (matchNegative[1] === 'prefix:') {
+          notPrefixPaths.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'tag:') {
+          notTags.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'author:') {
+          notAuthors.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'editor:') {
+          notEditors.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'group:') {
+          notGroups.push(matchNegative[2]);
+        } else {
+          notMatchWords.push(matchNegative[2]);
+        }
+      } else if (matchPositive != null) {
+        if (matchPositive[1] === 'prefix:') {
+          prefixPaths.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'tag:') {
+          tags.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'author:') {
+          authors.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'editor:') {
+          editors.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'group:') {
+          groups.push(matchPositive[2]);
+        } else {
+          matchWords.push(matchPositive[2]);
+        }
+      }
+    });
+
+    const terms = {
+      match: matchWords,
+      not_match: notMatchWords,
+      phrase: phraseWords,
+      not_phrase: notPhraseWords,
+      prefix: prefixPaths,
+      not_prefix: notPrefixPaths,
+      tag: tags,
+      not_tag: notTags,
+      author: authors,
+      not_author: notAuthors,
+      editor: editors,
+      not_editor: notEditors,
+      group: groups,
+      not_group: notGroups,
+    };
+
+    return terms;
+  }
+
+  // TODO: optimize the way to check isFormattable e.g. check data schema of searchResult
+  // So far, it determines by delegatorName passed by searchService.searchKeyword
+  checkIsFormattable(
+    searchResult,
+    delegatorName: SearchDelegatorName | null,
+  ): boolean {
+    return delegatorName === SearchDelegatorName.DEFAULT;
+  }
+
+  /**
+   * formatting result
+   */
+  async formatSearchResult(
+    searchResult: ISearchResult<any>,
+    delegatorName: SearchDelegatorName | null,
+    user,
+    userGroups,
+  ): Promise<IFormattedSearchResult> {
+    if (!this.checkIsFormattable(searchResult, delegatorName)) {
+      const data: IPageWithSearchMeta[] = searchResult.data.map((page) => {
+        return {
+          data: page as IPageHasId,
+        };
+      });
+
+      return {
+        data,
+        meta: searchResult.meta,
+      };
+    }
+
+    /*
+     * Format ElasticSearch result
+     */
+    const User = mongoose.model('User') as any; // Cast to any to access static properties
+    const result = {} as IFormattedSearchResult;
+
+    // get page data
+    const pageIds: string[] = searchResult.data.map((page) => {
+      return page._id;
+    });
+
+    const findPageResult = await findPageListByIds(pageIds, this.crowi);
+
+    // set meta data
+    result.meta = searchResult.meta;
+
+    // set search result page data
+    const pages: (IPageWithSearchMeta | null)[] = searchResult.data.map(
+      (data) => {
+        const pageData = findPageResult.pages.find((pageData) => {
+          return pageData.id === data._id;
+        });
+
+        if (pageData == null) {
+          return null;
+        }
+
+        // add tags and seenUserCount to pageData
+        pageData._doc.tags = data._source.tag_names;
+        pageData._doc.seenUserCount =
+          (pageData.seenUsers && pageData.seenUsers.length) || 0;
+
+        // serialize lastUpdateUser
+        if (
+          pageData.lastUpdateUser != null &&
+          pageData.lastUpdateUser instanceof User
+        ) {
+          pageData.lastUpdateUser = serializeUserSecurely(
+            pageData.lastUpdateUser,
+          );
+        }
+
+        // increment elasticSearchResult
+        let elasticSearchResult:
+          | { snippet: string | null; highlightedPath: string | null }
+          | undefined;
+        const highlightData = data._highlight;
+        if (highlightData != null) {
+          const snippet = this.canShowSnippet(pageData, user, userGroups)
+            ? highlightData.body ||
+              highlightData['body.en'] ||
+              highlightData['body.ja'] ||
+              highlightData.comments ||
+              highlightData['comments.en'] ||
+              highlightData['comments.ja']
+            : null;
+          const pathMatch =
+            highlightData['path.en'] || highlightData['path.ja'];
+
+          elasticSearchResult = {
+            snippet:
+              snippet != null && typeof snippet[0] === 'string'
+                ? filterXss.process(snippet)
+                : null,
+            highlightedPath:
+              pathMatch != null && typeof pathMatch[0] === 'string'
+                ? filterXss.process(pathMatch)
+                : null,
+          };
+        }
+
+        // serialize creator
+        if (pageData.creator != null && pageData.creator instanceof User) {
+          pageData.creator = serializeUserSecurely(pageData.creator);
+        }
+
+        // generate pageMeta data
+        const pageMeta = {
+          bookmarkCount: data._source.bookmark_count || 0,
+          elasticSearchResult,
+        };
+
+        return { data: pageData, meta: pageMeta };
+      },
+    );
+
+    result.data = pages.filter(nonNullable);
+    return result;
+  }
+
+  canShowSnippet(pageData, user, userGroups): boolean {
+    const Page = mongoose.model('Page') as unknown as PageModel;
+
+    const testGrant = pageData.grant;
+    const testGrantedUser = pageData.grantedUsers?.[0];
+    const testGrantedGroups = pageData.grantedGroups;
+
+    if (testGrant === Page.GRANT_RESTRICTED) {
+      return false;
+    }
+
+    if (testGrant === Page.GRANT_OWNER) {
+      if (user == null) return false;
+
+      return user._id.toString() === testGrantedUser.toString();
+    }
+
+    if (testGrant === Page.GRANT_USER_GROUP) {
+      if (userGroups == null) return false;
+
+      return hasIntersection(
+        userGroups.map((id) => id.toString()),
+        testGrantedGroups,
+      );
+    }
+
+    return true;
+  }
+}
+
+export default SearchService;

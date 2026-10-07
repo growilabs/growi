@@ -1,7 +1,0 @@
-{% if env === 'development' %}
-  <script src="{{ webpack_asset('js/dev.js') }}" async></script>
-  <!-- Browsersync -->
-  <script id="__bs_script__">//<![CDATA[
-    document.write("<script async src='http://HOST:3001/browser-sync/browser-sync-client.js?v=2.23.6'><\/script>".replace("HOST", location.hostname));
-  //]]></script>
-{% endif %}

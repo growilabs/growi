@@ -1,0 +1,21 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+// == Colors
+@include bs.color-mode(light) {
+  .grw-tag.badge {
+    --bs-badge-color: var(--bs-gray-600);
+
+    background-color: var(--bs-gray-100);
+    border: 1px solid var(--bs-gray-300);
+  }
+}
+
+@include bs.color-mode(dark) {
+  .grw-tag.badge {
+    --bs-badge-color: var(--bs-gray-500);
+
+    background-color: var(--bs-gray-800);
+    border: 1px solid var(--bs-gray-600);
+  }
+}
+

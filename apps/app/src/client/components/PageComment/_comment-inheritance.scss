@@ -1,0 +1,61 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+%comment-section {
+  position: relative;
+  padding: 1em;
+
+  // speech balloon
+  &::before {
+    position: absolute;
+    top: 1.5em;
+    left: -1em;
+    display: block;
+    width: 0;
+    content: '';
+    border: 1em solid transparent;
+    border-left-width: 0;
+
+    @include bs.media-breakpoint-down(xs) {
+      top: 1em;
+    }
+  }
+}
+
+// `UserPicture`'s own size scale has no 30px step (lg 48 / md 24 / sm 18 / xs 14), so the size is
+// set from here; nested inside this block so it outranks the
+// `%user-picture` extend above on specificity rather than on source order.
+%user-picture {
+  width: 30px;
+  height: 30px;
+}
+
+$codemirror-default-height: 300px;
+
+// // Light mode color
+@include bs.color-mode(light) {
+  %bg-comment {
+    background-color: rgba( bs.$gray-200, 0.5 );
+    backdrop-filter: blur(10px);
+    border: 1px solid bs.$gray-200;
+  }
+
+  // Date link (`CommentCard`) and history icon (`CommentRevisionLink`) —
+  // both carry `.page-comment-revision`. Kept here so normal and inline
+  // comment modules extend the same value (see research.md on CommentCard).
+  %page-comment-revision {
+    color: bs.$gray-500;
+  }
+}
+
+// // Dark mode color
+@include bs.color-mode(dark) {
+  %bg-comment {
+    background-color: rgba( bs.$gray-800, 0.3 );
+    backdrop-filter: blur(10px);
+    border: 1px solid bs.$gray-700;
+  }
+
+  %page-comment-revision {
+    color: bs.$gray-600;
+  }
+}

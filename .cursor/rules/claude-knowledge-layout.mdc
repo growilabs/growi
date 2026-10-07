@@ -1,0 +1,39 @@
+---
+description: How Cursor Agent should use this repo's Claude Code knowledge (AGENTS.md, .claude, skills) without duplicating it
+alwaysApply: true
+---
+
+# Single source of truth: `.claude/` + `AGENTS.md`
+
+This repository is maintained for Claude Code. Cursor Agent must consume the same
+files — never maintain a parallel copy of instructions, skills, or rules.
+
+## Already native to Cursor
+
+| Artifact | Behavior |
+|---|---|
+| `AGENTS.md` (root + nested) | Auto-loaded by Cursor |
+| `CLAUDE.md` (points at `AGENTS.md` + Kiro workflow) | Treat as entrypoint / workflow overlay |
+| `.claude/skills/**/SKILL.md` | Offered as Agent Skills — read and follow when relevant |
+| `apps/app/.claude/skills/**/SKILL.md` | Same, when working under `apps/app/` |
+
+## Bridged via `sessionStart` hook (not `@` includes)
+
+Claude Code auto-injects `.claude/rules/`. Cursor does **not**.
+
+Cursor docs claim `@filename` inside `.mdc` rules attaches file contents, but that
+mechanism does not work yet. Copying rule bodies into `.cursor/rules/` would be
+dual management — do not do that.
+
+Instead, `.cursor/hooks.json` runs `sessionStart` →
+`.cursor/hooks/inject-claude-rules.mjs`, which reads the canonical markdown under
+`.claude/rules/` and `apps/app/.claude/rules/` and returns them as
+`additional_context`. **Edit only the `.claude/` sources.**
+
+## When to load more
+
+- Skills: if there is even a small chance a listed skill applies, read its `SKILL.md` first
+- Package docs: `apps/*/CLAUDE.md` / `AGENTS.md` when touching that package
+- Specs / steering: `.kiro/specs/`, `.kiro/steering/` per `CLAUDE.md`
+- Slash-style workflows in `.claude/commands/` and kiro skills: follow the matching
+  skill under `.claude/skills/` rather than inventing a Cursor-only procedure

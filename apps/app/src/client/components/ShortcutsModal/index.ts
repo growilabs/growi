@@ -1,0 +1,1 @@
+export { ShortcutsModalLazyLoaded } from './dynamic';

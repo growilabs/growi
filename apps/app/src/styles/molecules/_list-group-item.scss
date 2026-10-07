@@ -1,0 +1,28 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.list-group-item.active {
+  --bs-list-group-active-color: var(--bs-list-group-color);
+}
+
+@include bs.color-mode(light) {
+  .list-group-item-action {
+    --bs-list-group-action-hover-bg: var(--grw-primary-100);
+    --bs-list-group-action-active-bg: var(--grw-primary-200);
+  }
+
+  .list-group-item {
+    --bs-list-group-active-bg: var(--grw-primary-100);
+  }
+}
+
+@include bs.color-mode(dark) {
+  .list-group-item-action {
+    --bs-list-group-action-hover-bg: var(--grw-primary-800);
+    --bs-list-group-action-active-bg: var(--grw-primary-700);
+  }
+
+  .list-group-item {
+    --bs-list-group-active-bg: var(--grw-primary-800);
+  }
+
+}

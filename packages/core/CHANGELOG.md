@@ -1,0 +1,136 @@
+# @growi/core
+
+## 3.0.0
+
+### Major Changes
+
+- [#11513](https://github.com/growilabs/growi/pull/11513) [`211f493`](https://github.com/growilabs/growi/commit/211f49330240ecac27442790416ab20e5ea4e2ab) Thanks [@arvid-e](https://github.com/arvid-e)! - Rename `IPage.ttlTimestamp` to `IPage.wipExpiredAt` and change its meaning
+
+  WIP page expiry is no longer enforced by a MongoDB TTL index (which deleted pages without running application code, leaving `descendantCount` inflated and empty placeholder pages orphaned). It is now application-driven, so the stored value changed meaning as well as name:
+
+  - old `ttlTimestamp` — the instant the page was made WIP; the TTL index supplied the duration via `expireAfterSeconds`.
+  - new `wipExpiredAt` — the absolute instant the page expires, computed up front.
+
+  BREAKING: consumers reading or writing `IPage.ttlTimestamp` must switch to `wipExpiredAt` and must not treat it as "when the page became WIP". A GROWI-side migration converts existing stored values.
+
+## 2.5.0
+
+### Minor Changes
+
+- [#11267](https://github.com/growilabs/growi/pull/11267) [`659c93d`](https://github.com/growilabs/growi/commit/659c93d31d24fe90b0edc777c2e586f9efdd0195) Thanks [@miya](https://github.com/miya)! - Rename and prune AI-related access token scopes
+
+  - Renamed the user-feature scope `features:ai_assistant` → `features:ai` (read/write). The constants `SCOPE.READ/WRITE.FEATURES.AI_ASSISTANT` are now `SCOPE.READ/WRITE.FEATURES.AI`, and the scope strings are `read:features:ai` / `write:features:ai`.
+  - Removed the now-unused admin scope `admin:ai_integration` (read/write); the admin AI integration screen has been removed.
+
+  BREAKING: access tokens previously granted `read|write:features:ai_assistant` no longer match the renamed scope and will lose access to AI endpoints until re-granted (or remapped via migration). Tokens carrying `read|write:admin:ai_integration` retain a now-meaningless scope string.
+
+- [#11092](https://github.com/growilabs/growi/pull/11092) [`e2375eb`](https://github.com/growilabs/growi/commit/e2375ebb787062ad20f4f982d94a2768fb9a3ec1) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add interfaces for growi-vault
+
+## 2.4.0
+
+### Minor Changes
+
+- [#11320](https://github.com/growilabs/growi/pull/11320) [`5e8f105`](https://github.com/growilabs/growi/commit/5e8f1054c01771275682dcdbcb2fc3488e1c0be3) Thanks [@Ryosei-Fukushima](https://github.com/Ryosei-Fukushima)! - Add `features:user` and `features:user_group` access-token scopes (read/write). These separate "reading other users'/groups' directory information" from the self-oriented `user_settings:info` scope, which previously over-granted such reads.
+
+## 2.3.2
+
+### Patch Changes
+
+- [#11317](https://github.com/growilabs/growi/pull/11317) [`4a0bf1d`](https://github.com/growilabs/growi/commit/4a0bf1dac5954f9ae7756a574970a3968a4ae8b9) Thanks [@ryotaro-nagahara](https://github.com/ryotaro-nagahara)! - Reserve the `/_news` path (in-app news feed page) in `isCreatablePage` so it cannot be created as a wiki page.
+
+## 2.3.1
+
+### Patch Changes
+
+- [#11236](https://github.com/growilabs/growi/pull/11236) [`bd28252`](https://github.com/growilabs/growi/commit/bd28252c1a6e7f76f9bdadbdc3a07690f6bc0573) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Fix page operations and v5 page migration failing for page paths that contain non-ASCII whitespace (e.g. U+3000 IDEOGRAPHIC SPACE)
+
+  Node.js 24's `RegExp.escape()` escapes non-ASCII whitespace (code points >= U+0100, such as U+3000) into `\uXXXX` form, which MongoDB's PCRE2 engine does not support (error 51091). Added `escapeStringForMongoRegex()`, which escapes only regex metacharacters and passes other characters through literally, and used it wherever the resulting pattern is sent to MongoDB.
+
+## 2.3.0
+
+### Minor Changes
+
+- [#10853](https://github.com/growilabs/growi/pull/10853) [`3c50530`](https://github.com/growilabs/growi/commit/3c50530a105d85058076f31f1800c6304850f5d5) Thanks [@miya](https://github.com/miya)! - Add const for content rendering
+
+## 2.2.0
+
+### Minor Changes
+
+- [`ef1c8b0`](https://github.com/growilabs/growi/commit/ef1c8b0e8b605c8c84c23e7650e02bd168817ff5) Thanks [@yuki-takei](https://github.com/yuki-takei)! - add YJS_WEBSOCKET_BASE_PATH
+
+## 2.1.0
+
+### Minor Changes
+
+- [#10717](https://github.com/growilabs/growi/pull/10717) [`cbadb43`](https://github.com/growilabs/growi/commit/cbadb436f12d683de6876510a629265b921ab112) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add AccessTokenParser type
+
+- [#10717](https://github.com/growilabs/growi/pull/10717) [`36699d6`](https://github.com/growilabs/growi/commit/36699d62cf656ecf777022a0ee118372fac955fc) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Explicitly define scope grouping
+
+## 2.0.0
+
+### Major Changes
+
+- [#10474](https://github.com/growilabs/growi/pull/10474) [`3de6953`](https://github.com/growilabs/growi/commit/3de6953c5cf049d8bb070f8cc8c59a85b160a6df) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Remove global socket management and useSWRStatic
+
+- [#10474](https://github.com/growilabs/growi/pull/10474) [`3de6953`](https://github.com/growilabs/growi/commit/3de6953c5cf049d8bb070f8cc8c59a85b160a6df) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Update IPage interfaces family
+
+### Minor Changes
+
+- [#10472](https://github.com/growilabs/growi/pull/10472) [`22fae03`](https://github.com/growilabs/growi/commit/22fae03ce3bc7a530b0d7219c300f9c13f1d65c6) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add global EventTarget instance provider
+
+## 1.6.0
+
+### Minor Changes
+
+- [#10189](https://github.com/growilabs/growi/pull/10189) [`e6bd8c8`](https://github.com/growilabs/growi/commit/e6bd8c8ca0b50be85e27ca0ca5f40ad0400fc5ea) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Update IGrowiInfo type
+
+- [#10185](https://github.com/growilabs/growi/pull/10185) [`8d28e19`](https://github.com/growilabs/growi/commit/8d28e1990cf90a8957594a27b400af86728fb69a) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Updated the interface to accommodate the removal of the questionnaire feature.
+
+## 1.5.0
+
+### Minor Changes
+
+- [#9729](https://github.com/growilabs/growi/pull/9729) [`29ce07f`](https://github.com/growilabs/growi/commit/29ce07f562cdef44550adc32d92c5456226c4669) Thanks [@NaokiHigashi28](https://github.com/NaokiHigashi28)! - Expose React instance to window via GrowiFacade
+
+## 1.4.0
+
+### Minor Changes
+
+- [#9542](https://github.com/growilabs/growi/pull/9542) [`708c45a`](https://github.com/growilabs/growi/commit/708c45ab76ee7a3d3861033d1f82714f2f07e4ec) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Update GrowiInfo interface
+
+## 1.3.1
+
+### Patch Changes
+
+- [#9550](https://github.com/growilabs/growi/pull/9550) [`acd3787`](https://github.com/growilabs/growi/commit/acd3787fc4b8c8630ba9fa5a06d837639da8d10a) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Fix generateChildrenRegExp method
+
+## 1.3.0
+
+### Minor Changes
+
+- [#9042](https://github.com/growilabs/growi/pull/9042) [`8f9189d`](https://github.com/growilabs/growi/commit/8f9189d4fcf031c1344072f88b7d9febeb02ce1d) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add isIPageInfo type guard
+
+## 1.2.0
+
+### Minor Changes
+
+- [#9019](https://github.com/growilabs/growi/pull/9019) [`60097ac`](https://github.com/growilabs/growi/commit/60097ac686928cca76715a83a10b506576889108) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Transplant and re-implement serializers for User and Attachment
+
+## 1.1.0
+
+### Minor Changes
+
+- [#9010](https://github.com/growilabs/growi/pull/9010) [`c2d4766`](https://github.com/growilabs/growi/commit/c2d476677574dfb9cd3fb9e18cc8073b30dad842) Thanks [@yuki-takei](https://github.com/yuki-takei)! - - `Ref<T>` is modified - includes ObjectId
+  - `isPopulated()` is updated
+  - `getIdForRef()` is updated
+  - `getIdStringForRef()` is newly added
+
+## 1.0.0
+
+### Major Changes
+
+- [#8844](https://github.com/growilabs/growi/pull/8844) [`37d88a8`](https://github.com/growilabs/growi/commit/37d88a858c3e54d741790760fbfad4fd7a229949) Thanks [@github-actions](https://github.com/apps/github-actions)! - The first major version release
+
+### Minor Changes
+
+- [#8856](https://github.com/growilabs/growi/pull/8856) [`47ce932`](https://github.com/growilabs/growi/commit/47ce932a066b8bdd16f600f2526d6f0d10b7b763) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add vaidator for GROWI theme plugins

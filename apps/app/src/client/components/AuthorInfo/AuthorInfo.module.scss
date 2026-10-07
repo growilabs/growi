@@ -1,0 +1,23 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+$author-font-size: 12px;
+$date-font-size: 12px;
+
+.grw-author-info {
+  font-size: $author-font-size;
+
+  :global(.text-date) {
+    font-size: $date-font-size;
+  }
+
+  :global(.user-picture) {
+    width: 22px;
+    height: 22px;
+    border: 1px solid bs.$gray-300;
+
+    &:global(.user-picture-xs) {
+      width: 14px;
+      height: 14px;
+    }
+  }
+}

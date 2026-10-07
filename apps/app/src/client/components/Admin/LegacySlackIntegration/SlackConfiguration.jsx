@@ -1,0 +1,273 @@
+import React, { useCallback, useEffect } from 'react';
+import { useTranslation } from 'next-i18next';
+import PropTypes from 'prop-types';
+import { useForm } from 'react-hook-form';
+
+import AdminSlackIntegrationLegacyContainer from '~/client/services/AdminSlackIntegrationLegacyContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import loggerFactory from '~/utils/logger';
+
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
+
+const logger = loggerFactory('growi:slackAppConfiguration');
+
+const SlackConfiguration = (props) => {
+  const { t, adminSlackIntegrationLegacyContainer } = props;
+  const { webhookUrl, slackToken, retrieveError } =
+    adminSlackIntegrationLegacyContainer.state;
+
+  const { register, handleSubmit, reset } = useForm();
+
+  // Sync form with container state
+  useEffect(() => {
+    reset({
+      webhookUrl,
+      slackToken,
+    });
+  }, [reset, webhookUrl, slackToken]);
+
+  const onClickSubmit = useCallback(
+    async (data) => {
+      try {
+        await adminSlackIntegrationLegacyContainer.changeWebhookUrl(
+          data.webhookUrl ?? '',
+        );
+        await adminSlackIntegrationLegacyContainer.changeSlackToken(
+          data.slackToken ?? '',
+        );
+        await adminSlackIntegrationLegacyContainer.updateSlackAppConfiguration();
+        toastSuccess(t('admin:notification_settings.updated_slackApp'));
+      } catch (err) {
+        toastError(err);
+        logger.error(err);
+      }
+    },
+    [adminSlackIntegrationLegacyContainer, t],
+  );
+
+  return (
+    <form onSubmit={handleSubmit(onClickSubmit)}>
+      <React.Fragment>
+        <div className="row my-3">
+          <div className="col-6 text-start">
+            <div className="dropdown">
+              <button
+                className="btn btn-secondary dropdown-toggle"
+                type="button"
+                id="dropdownMenuButton"
+                data-bs-toggle="dropdown"
+                aria-haspopup="true"
+                aria-expanded="true"
+              >
+                {`Slack ${adminSlackIntegrationLegacyContainer.state.selectSlackOption}`}
+              </button>
+              <div
+                className="dropdown-menu"
+                role="menu"
+                aria-labelledby="dropdownMenuButton"
+              >
+                <button
+                  className="dropdown-item"
+                  type="button"
+                  onClick={() =>
+                    adminSlackIntegrationLegacyContainer.switchSlackOption(
+                      'Incoming Webhooks',
+                    )
+                  }
+                >
+                  Slack Incoming Webhooks
+                </button>
+                <button
+                  className="dropdown-item"
+                  type="button"
+                  onClick={() =>
+                    adminSlackIntegrationLegacyContainer.switchSlackOption(
+                      'App',
+                    )
+                  }
+                >
+                  Slack App
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {adminSlackIntegrationLegacyContainer.state.selectSlackOption ===
+        'Incoming Webhooks' ? (
+          <React.Fragment>
+            <h2 className="border-bottom mb-5">
+              {t('admin:notification_settings.slack_incoming_configuration')}
+            </h2>
+
+            <div className="row mb-3">
+              <label
+                className="form-label col-md-3 text-start text-md-end"
+                htmlFor="webhookUrl"
+              >
+                Webhook URL
+              </label>
+              <div className="col-md-6">
+                <input
+                  id="webhookUrl"
+                  className="form-control"
+                  type="text"
+                  {...register('webhookUrl')}
+                />
+              </div>
+            </div>
+
+            <div className="row mb-3">
+              <div className="offset-md-3 col-md-6 text-start">
+                <div className="form-check form-check-success">
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    id="cbPrioritizeIWH"
+                    checked={
+                      adminSlackIntegrationLegacyContainer.state
+                        .isIncomingWebhookPrioritized || false
+                    }
+                    onChange={() => {
+                      adminSlackIntegrationLegacyContainer.switchIsIncomingWebhookPrioritized();
+                    }}
+                  />
+                  <label
+                    className="form-label form-check-label"
+                    htmlFor="cbPrioritizeIWH"
+                  >
+                    {t('admin:notification_settings.prioritize_webhook')}
+                  </label>
+                </div>
+                <p className="form-text text-muted">
+                  {t('admin:notification_settings.prioritize_webhook_desc')}
+                </p>
+              </div>
+            </div>
+          </React.Fragment>
+        ) : (
+          <React.Fragment>
+            <h2 className="border-bottom mb-3">
+              {t('admin:notification_settings.slack_app_configuration')}
+            </h2>
+
+            <div className="card custom-card bg-danger-subtle">
+              <span className="text-danger">
+                <span className="material-symbols-outlined">error</span>NOT
+                RECOMMENDED
+              </span>
+              <br />
+              <span
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+                dangerouslySetInnerHTML={{
+                  __html: t(
+                    'admin:notification_settings.slack_app_configuration_desc',
+                  ),
+                }}
+              />
+              <br />
+              <button
+                type="button"
+                className="btn btn-link p-0"
+                data-bs-toggle="tab"
+                data-bs-target="#slack-incoming-webhooks"
+                onClick={() =>
+                  adminSlackIntegrationLegacyContainer.switchSlackOption(
+                    'Incoming Webhooks',
+                  )
+                }
+              >
+                {t('admin:notification_settings.use_instead')}
+              </button>
+            </div>
+
+            <div className="row mb-5 mt-4">
+              <label
+                className="form-label col-md-3 text-start text-md-end"
+                htmlFor="slackToken"
+              >
+                OAuth access token
+              </label>
+              <div className="col-md-6">
+                <input
+                  id="slackToken"
+                  className="form-control"
+                  type="text"
+                  {...register('slackToken')}
+                />
+              </div>
+            </div>
+          </React.Fragment>
+        )}
+
+        <AdminUpdateButtonRow
+          disabled={retrieveError != null}
+          onClick={handleSubmit(onClickSubmit)}
+        />
+
+        <hr />
+
+        <h3>
+          <span className="material-symbols-outlined" aria-hidden="true">
+            help
+          </span>{' '}
+          <a href="#collapseHelpForIwh" data-bs-toggle="collapse">
+            {t('admin:notification_settings.how_to.header')}
+          </a>
+        </h3>
+
+        <ol
+          id="collapseHelpForIwh"
+          className="collapse card custom-card bg-body-tertiary"
+        >
+          <li className="ms-3">
+            {t('admin:notification_settings.how_to.workspace')}
+            <ol>
+              <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+                dangerouslySetInnerHTML={{
+                  __html: t(
+                    'admin:notification_settings.how_to.workspace_desc1',
+                  ),
+                }}
+              />
+              <li>{t('admin:notification_settings.how_to.workspace_desc2')}</li>
+              <li>{t('admin:notification_settings.how_to.workspace_desc3')}</li>
+            </ol>
+          </li>
+          <li className="ms-3">
+            {t('admin:notification_settings.how_to.at_growi')}
+            <ol>
+              <li
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: translation contains HTML markup
+                dangerouslySetInnerHTML={{
+                  __html: t('admin:notification_settings.how_to.at_growi_desc'),
+                }}
+              />
+            </ol>
+          </li>
+        </ol>
+      </React.Fragment>
+    </form>
+  );
+};
+
+SlackConfiguration.propTypes = {
+  t: PropTypes.func.isRequired, // i18next
+  adminSlackIntegrationLegacyContainer: PropTypes.instanceOf(
+    AdminSlackIntegrationLegacyContainer,
+  ).isRequired,
+};
+
+const SlackConfigurationWrapperFc = (props) => {
+  const { t } = useTranslation('admin');
+
+  return <SlackConfiguration t={t} {...props} />;
+};
+
+const SlackConfigurationWrapper = withUnstatedContainers(
+  SlackConfigurationWrapperFc,
+  [AdminSlackIntegrationLegacyContainer],
+);
+
+export default SlackConfigurationWrapper;

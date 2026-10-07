@@ -1,0 +1,99 @@
+import type { NextFunction, Request, Response } from 'express';
+import createError from 'http-errors';
+
+import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
+import loggerFactory from '~/utils/logger';
+
+import type Crowi from '../crowi';
+import type { IPasswordResetOrder } from '../models/password-reset-order';
+
+const logger = loggerFactory('growi:routes:forgot-password');
+
+export const checkForgotPasswordEnabledMiddlewareFactory = (
+  crowi: Crowi,
+  forApi = false,
+) => {
+  // Named function so the route-middleware snapshot tool can identify this
+  // handler in the apiv3 auth chain.
+  return function checkForgotPasswordEnabled(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): void {
+    const isPasswordResetEnabled = crowi.configManager.getConfig(
+      'security:passport-local:isPasswordResetEnabled',
+    );
+    const isLocalStrategySetup =
+      (crowi.passportService.isLocalStrategySetup as boolean) ?? false;
+
+    const isEnabled = isLocalStrategySetup && isPasswordResetEnabled;
+
+    if (!isEnabled) {
+      const message =
+        'Forgot-password function is unavailable because neither LocalStrategy and LdapStrategy is not setup.';
+      logger.error(message);
+
+      const statusCode = forApi ? 405 : 404;
+      next(
+        createError(statusCode, message, {
+          code: forgotPasswordErrorCode.PASSWORD_RESET_IS_UNAVAILABLE,
+        }),
+      );
+      return;
+    }
+
+    next();
+  };
+};
+
+type CrowiReq = Request & {
+  crowi: Crowi;
+};
+
+export const renderForgotPassword = (crowi: Crowi) => {
+  return (req: CrowiReq, res: Response, next: NextFunction): void => {
+    const { nextApp } = crowi;
+    req.crowi = crowi;
+    nextApp.render(req, res, '/forgot-password');
+    return;
+  };
+};
+
+export const renderResetPassword = (crowi: Crowi) => {
+  return (
+    req: CrowiReq & { passwordResetOrder: IPasswordResetOrder },
+    res: Response,
+    next: NextFunction,
+  ): void => {
+    const { nextApp } = crowi;
+    req.crowi = crowi;
+    nextApp.render(req, res, '/reset-password', {
+      email: req.passwordResetOrder.email,
+    });
+    return;
+  };
+};
+
+// middleware to handle error
+export const handleErrorsMiddleware = (crowi: Crowi) => {
+  return (
+    error: Error & { code: string; statusCode: number },
+    req: CrowiReq,
+    res: Response,
+    next: NextFunction,
+  ): void => {
+    if (error != null) {
+      const { nextApp } = crowi;
+
+      req.crowi = crowi;
+      res.status(error.statusCode);
+
+      nextApp.render(req, res, '/forgot-password-errors', {
+        errorCode: error.code,
+      });
+      return;
+    }
+
+    next();
+  };
+};

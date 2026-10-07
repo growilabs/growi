@@ -1,0 +1,39 @@
+import glob from 'glob';
+import { nodeExternals } from 'rollup-plugin-node-externals';
+import { defineConfig } from 'vite';
+import dts from 'vite-plugin-dts';
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [
+    dts({
+      copyDtsFiles: true,
+    }),
+    {
+      ...nodeExternals({
+        devDeps: true,
+        builtinsPrefix: 'ignore',
+      }),
+      enforce: 'pre',
+    },
+  ],
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+    lib: {
+      entry: glob.sync('src/**/*.ts', {
+        cwd: __dirname,
+        absolute: true,
+        ignore: '**/*.spec.ts',
+      }),
+      name: 'core-libs',
+      formats: ['es', 'cjs'],
+    },
+    rollupOptions: {
+      output: {
+        preserveModules: true,
+        preserveModulesRoot: 'src',
+      },
+    },
+  },
+});

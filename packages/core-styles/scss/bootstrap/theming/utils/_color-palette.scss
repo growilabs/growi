@@ -1,0 +1,32 @@
+@use 'sass:color';
+
+@mixin generate-color-palette($color-id, $color-value, $shade-color: black, $tint-color: white, $shade-color-ratio: 20%, $tint-color-ratio: 20%, $prefix: 'grw-') {
+  $color-900: color.mix($shade-color, $color-value, $shade-color-ratio * 4);
+  $color-800: color.mix($shade-color, $color-value, $shade-color-ratio * 3);
+  $color-700: color.mix($shade-color, $color-value, $shade-color-ratio * 2);
+  $color-600: color.mix($shade-color, $color-value, $shade-color-ratio);
+  $color-500: $color-value;
+  $color-400: color.mix($tint-color, $color-value, $tint-color-ratio);
+  $color-300: color.mix($tint-color, $color-value, $tint-color-ratio * 2);
+  $color-200: color.mix($tint-color, $color-value, $tint-color-ratio * 3);
+  $color-100: color.mix($tint-color, $color-value, $tint-color-ratio * 4);
+
+  --#{$prefix}#{$color-id}-900: #{$color-900};
+  --#{$prefix}#{$color-id}-800: #{$color-800};
+  --#{$prefix}#{$color-id}-700: #{$color-700};
+  --#{$prefix}#{$color-id}-600: #{$color-600};
+  --#{$prefix}#{$color-id}-500: #{$color-500};
+  --#{$prefix}#{$color-id}-400: #{$color-400};
+  --#{$prefix}#{$color-id}-300: #{$color-300};
+  --#{$prefix}#{$color-id}-200: #{$color-200};
+  --#{$prefix}#{$color-id}-100: #{$color-100};
+  --#{$prefix}#{$color-id}-900-rgb: #{to-rgb($color-900)};
+  --#{$prefix}#{$color-id}-800-rgb: #{to-rgb($color-800)};
+  --#{$prefix}#{$color-id}-700-rgb: #{to-rgb($color-700)};
+  --#{$prefix}#{$color-id}-600-rgb: #{to-rgb($color-600)};
+  --#{$prefix}#{$color-id}-500-rgb: #{to-rgb($color-500)};
+  --#{$prefix}#{$color-id}-400-rgb: #{to-rgb($color-400)};
+  --#{$prefix}#{$color-id}-300-rgb: #{to-rgb($color-300)};
+  --#{$prefix}#{$color-id}-200-rgb: #{to-rgb($color-200)};
+  --#{$prefix}#{$color-id}-100-rgb: #{to-rgb($color-100)};
+}
