@@ -120,4 +120,13 @@ describe('Page#initLatestRevisionField with a revision id taken from a request',
 
     expect(shown.revision?.body).toBe('attacker body');
   });
+
+  it('keeps showing the latest revision when the requested revision id is not an ObjectId', async () => {
+    const user = await findOrCreateUser('initRevMalformedUser');
+    const page = await createPage('/init-rev-malformed', 'latest body', user);
+
+    const shown = await showRevision(page._id.toString(), user, 'abc');
+
+    expect(shown.revision?.body).toBe('latest body');
+  });
 });

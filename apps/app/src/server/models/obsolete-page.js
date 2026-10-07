@@ -6,6 +6,7 @@ import {
   pathUtils,
   templateChecker,
 } from '@growi/core/dist/utils';
+import { isValidObjectId } from '@growi/core/dist/utils/objectid-utils';
 import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
@@ -256,7 +257,8 @@ export const getPageSchema = (crowi) => {
   // revisionId comes from a request: show it only when it belongs to this page, otherwise keep the latest revision.
   pageSchema.methods.initLatestRevisionField = async function (revisionId) {
     this.latestRevision = this.revision;
-    if (revisionId == null) {
+    // Prisma throws on an id that is not an ObjectId, which would turn a mistyped URL into a 500.
+    if (!isValidObjectId(revisionId?.toString())) {
       return;
     }
 
