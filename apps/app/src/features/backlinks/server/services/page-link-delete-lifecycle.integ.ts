@@ -232,8 +232,10 @@ describe('Backlinks B5.8 (delete-family lifecycle integration)', {
       activityParameters,
     );
     // Guard: without this, an empty report after the restore could just mean the
-    // trash never took effect.
-    expect(await readHealth(source._id)).toHaveLength(1);
+    // trash never took effect. Pinned to `trashed`, since any entry would satisfy a count.
+    expect(await readHealth(source._id)).toEqual([
+      expect.objectContaining({ targetState: 'trashed' }),
+    ]);
 
     await crowi.pageService.revertDeletedPage(
       trashedTarget,
