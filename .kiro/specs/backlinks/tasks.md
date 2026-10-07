@@ -804,7 +804,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: crowi setup, PageLinkService_
   - _Depends: B5.3, B1.12_
 
-- [ ] B5.8 Integration + E2E tests (delete/broken states)
+- [x] B5.8 Integration + E2E tests (delete/broken states)
   - Integration: deleted page is no longer an active source; trash → trashed; permanent delete →
     broken; restore → normal. E2E: an editor viewing a page that links to a trashed/deleted target
     sees the trashed/broken indicator for outgoing links
