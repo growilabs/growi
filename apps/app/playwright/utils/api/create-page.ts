@@ -157,7 +157,9 @@ export const trashPages = async (
     pages.map((p) => [p.pageId, p.revisionId]),
   );
   const res = await request.post('/_api/v3/pages/delete', {
-    data: { pageIdToRevisionIdMap, isCompletely: false, isRecursively: true },
+    // isCompletely must be omitted (not false) to mean "move to trash": the
+    // validator only accepts true.
+    data: { pageIdToRevisionIdMap, isRecursively: true },
   });
   expect(
     res.ok(),
