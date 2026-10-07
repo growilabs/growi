@@ -5,6 +5,7 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import PageOperation from '~/server/models/page-operation';
 import { prisma } from '~/utils/prisma';
 
 import { ensurePageLinkIndexes } from '../models/page-link-indexes';
@@ -23,13 +24,15 @@ beforeAll(async () => {
  * (requirements 3.3, 6.1, 6.2, 6.3). A hand-written status or path update emits no
  * event, so it could never catch a broken subscription or a wrong event payload.
  *
- * Only non-recursive operations are used: the recursive ones run a detached
- * sub-operation that outlives the spec.
+ * Recursive operations run a detached sub-operation that outlives the call, so the one
+ * recursive spec waits for its PageOperation to clear before it asserts or ends.
  */
-// Longer than the 15s waitFor windows below, so a regression fails with the assertion message
-// instead of a bare test timeout.
+const WAIT_OPTIONS = { timeout: 15_000, interval: 100 };
+
+// Twice the waitFor window, so a regression fails with the assertion message instead of
+// a bare test timeout.
 describe('Backlinks B5.8 (delete-family lifecycle integration)', {
-  timeout: 30_000,
+  timeout: WAIT_OPTIONS.timeout * 2,
 }, () => {
   const PREFIX = '/backlinks-b58-delete-lifecycle-test';
   // Sentinel ip so cleanup deletes only this suite's activity rows.
@@ -49,13 +52,16 @@ describe('Backlinks B5.8 (delete-family lifecycle integration)', {
 
   // --- helpers -----------------------------------------------------------
 
-  const createPage = (path: string): Promise<HydratedDocument<PageDocument>> =>
+  const createPage = (
+    path: string,
+    parent?: Types.ObjectId,
+  ): Promise<HydratedDocument<PageDocument>> =>
     Page.create({
       path: `${PREFIX}${path}`,
       grant: Page.GRANT_PUBLIC,
       grantedUsers: null,
       isEmpty: false,
-      parent: rootPage._id,
+      parent: parent ?? rootPage._id,
     });
 
   const readBacklinks = async (toPageId: Types.ObjectId) =>
@@ -85,21 +91,30 @@ describe('Backlinks B5.8 (delete-family lifecycle integration)', {
     fromPage: Types.ObjectId,
     count: number,
   ): Promise<void> =>
-    vi.waitFor(
-      async () => {
-        expect(
-          await prisma.pagelinks.count({
-            where: { fromPageId: fromPage.toString() },
-          }),
-        ).toBe(count);
-      },
-      { timeout: 15000, interval: 100 },
-    );
+    vi.waitFor(async () => {
+      expect(
+        await prisma.pagelinks.count({
+          where: { fromPageId: fromPage.toString() },
+        }),
+      ).toBe(count);
+    }, WAIT_OPTIONS);
+
+  // `removeLinksForPages` clears this cache; the derived "broken" report alone cannot show
+  // that a delete event reached the reconcile, since a missing page already reads as broken.
+  const waitForInboundCacheCleared = (
+    fromPage: Types.ObjectId,
+  ): Promise<void> =>
+    vi.waitFor(async () => {
+      expect((await outboundRow(fromPage))?.toPageId).toBeNull();
+    }, WAIT_OPTIONS);
 
   // Create a target, then a source linking to it, and wait until the link row exists.
   // The target comes first so the link resolves to it instead of being recorded broken.
-  const createLinkedPair = async () => {
-    const target = await createPage('/target');
+  const createLinkedPair = async (
+    targetPath = '/target',
+    targetParent?: Types.ObjectId,
+  ) => {
+    const target = await createPage(targetPath, targetParent);
     const source = await createPage('/source');
 
     const revision = await prisma.revisions.create({
@@ -116,6 +131,13 @@ describe('Backlinks B5.8 (delete-family lifecycle integration)', {
 
     return { source, target };
   };
+
+  // A recursive delete does not await its sub-operation; wait until it deletes its
+  // PageOperation, or it outlives the spec and hits the worker's disconnect.
+  const waitForOperationSettled = (fromPath: string): Promise<void> =>
+    vi.waitFor(async () => {
+      expect(await PageOperation.findOne({ fromPath })).toBeNull();
+    }, WAIT_OPTIONS);
 
   // --- lifecycle ---------------------------------------------------------
 
@@ -160,6 +182,9 @@ describe('Backlinks B5.8 (delete-family lifecycle integration)', {
       },
     });
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
+    // A PageOperation left by a failed recursive spec would lock its path and make every
+    // later create there fail with "Cannot process create".
+    await PageOperation.deleteMany({ fromPath: seededPaths });
   });
 
   afterAll(async () => {
@@ -206,14 +231,7 @@ describe('Backlinks B5.8 (delete-family lifecycle integration)', {
       activityParameters,
     );
 
-    // The read below derives "broken" from the missing page alone, so it cannot show
-    // that the deleteCompletely event reached the reconcile. The cleared id cache can.
-    await vi.waitFor(
-      async () => {
-        expect((await outboundRow(source._id))?.toPageId).toBeNull();
-      },
-      { timeout: 15000, interval: 100 },
-    );
+    await waitForInboundCacheCleared(source._id);
 
     expect(await readHealth(source._id)).toEqual([
       { pageId: null, path: target.path, targetState: 'broken' },
@@ -274,5 +292,34 @@ describe('Backlinks B5.8 (delete-family lifecycle integration)', {
     // read alone would also come back empty from the missing source page.
     await waitForOutboundCount(source._id, 0);
     expect(await readBacklinks(target._id)).toEqual([]);
+  });
+
+  it('marks the link broken when its target is permanently deleted along with an ancestor (6.2)', async () => {
+    const ancestor = await createPage('/ancestor');
+    // Only a descendant of the deleted page: the ancestor's own deleteCompletely event
+    // carries no link to this target, so only syncDescendantsDelete can break the row.
+    const { source, target } = await createLinkedPair(
+      '/ancestor/target',
+      ancestor._id,
+    );
+    const before = await outboundRow(source._id);
+    expect(before?.toPageId).toBe(target._id.toString());
+
+    await crowi.pageService.deleteCompletely(
+      ancestor,
+      viewer,
+      {},
+      true,
+      false,
+      activityParameters,
+    );
+    await waitForOperationSettled(ancestor.path);
+
+    // syncDescendantsDelete hands the reconcile an array, unlike the single-page events,
+    // so a handler reading it as one document would silently settle nothing.
+    await waitForInboundCacheCleared(source._id);
+    expect(await readHealth(source._id)).toEqual([
+      { pageId: null, path: target.path, targetState: 'broken' },
+    ]);
   });
 });
