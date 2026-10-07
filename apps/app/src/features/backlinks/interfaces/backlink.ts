@@ -5,6 +5,9 @@ export interface IBacklink {
 
 export interface IBacklinkResponse {
   backlinks: IBacklink[];
+  // null: the forward-link lookup failed (backlinks are still returned)
+  // []: the lookup succeeded and there are no problematic links
+  linkTargets: ILinkTarget[] | null;
 }
 
 export interface ILinkTarget {

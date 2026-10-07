@@ -11,11 +11,8 @@ export const BacklinksPanel = (): JSX.Element => {
   const { t } = useTranslation();
   const pageId = useCurrentPageId();
 
-  const {
-    data: backlinks,
-    error,
-    isLoading,
-  } = useSWRxBacklinks(pageId ?? null);
+  const { data, error, isLoading } = useSWRxBacklinks(pageId ?? null);
+  const backlinks = data?.backlinks;
 
   if (error != null) {
     return (

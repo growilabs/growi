@@ -736,7 +736,7 @@ the restored page's status. Independent of B3/B4.
   - _Boundary: find-forward-link-health.ts, PageLinkService, interfaces/backlink.ts_
   - _Depends: B5.1, B1.7_
 
-- [ ] B5.9 Expose forward-link health over the API and the client hook
+- [x] B5.9 Expose forward-link health over the API and the client hook
   - **Closes the gap between B5.4 (server read) and B5.6 (panel).** B5.4 produces `ILinkTarget[]` and
     B5.6 renders it, but nothing carried it across the wire: the B1 endpoint returns
     `{ backlinks }` only and `useSWRxBacklinks` resolves to `IBacklink[]`. Without this task B5.6 has
@@ -744,8 +744,9 @@ the restored page's status. Independent of B3/B4.
   - **Extend the existing `GET /_api/v3/page/backlinks`, do not add a second route.** Same `pageId`,
     same viewer, same 404 semantics, and the panel renders both sections together — a separate route
     would cost a second round trip per panel open, a second hook, and a second registration in
-    `apiv3/index.js`, with no independent cacheability. Add `linkTargets: ILinkTarget[]` to
-    `IBacklinkResponse` and have the handler call `findBacklinks` and `findForwardLinkHealth`
+    `apiv3/index.js`, with no independent cacheability. Add `linkTargets: ILinkTarget[] | null` to
+    `IBacklinkResponse` (`null` when the forward-link lookup fails, `[]` when the page has no outgoing
+    links) and have the handler call `findBacklinks` and `findForwardLinkHealth`
     concurrently (`Promise.all`) so the added field costs no extra latency
   - Widen `useSWRxBacklinks` to return `IBacklinkResponse` instead of `IBacklink[]` (keep the
     existing key and plain `useSWR` — grants change under a stable key, so it must stay revalidating).
@@ -757,7 +758,8 @@ the restored page's status. Independent of B3/B4.
   - Done when an integration/route test shows the endpoint returns both `backlinks` and `linkTargets`
     for a readable page (with the same 400/404 behavior as before), a viewer who cannot read a target
     sees it omitted from `linkTargets` while `backlinks` is unaffected, and the hook test shows the
-    response object is returned and revalidates on page-id change
+    response object is returned and revalidates on page-id change. On forward-link failure, return 200
+    with `linkTargets: null` (backlinks still returned); a backlinks failure still returns 500
   - _Requirements: 1.1, 2.1, 6.4_
   - _Boundary: getBacklinksHandlerFactory (routes/backlinks.ts), useSWRxBacklinks, interfaces/backlink.ts_
   - _Depends: B5.4_
@@ -778,7 +780,8 @@ the restored page's status. Independent of B3/B4.
   - Reads `linkTargets` off the B5.9 hook payload. B5.9 widens the hook's return type from
     `IBacklink[]` to the whole response, so the incoming-list call site changes here too — deliberate
     churn placed in the task that is already rewriting this panel, not an unplanned break of B1.11
-  - Done when the panel flags trashed/broken outgoing links; the incoming list and empty state are unchanged
+  - Done when the panel flags trashed/broken outgoing links; the incoming list and empty state are unchanged.
+    When `linkTargets` is `null` (forward-link lookup failed), display "Couldn't check link status."
   - _Requirements: 6.4_
   - _Boundary: BacklinksPanel_
   - _Depends: B5.9, B5.5, B1.11_

@@ -56,12 +56,17 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
         );
       }
 
-      const backlinks = await crowi.pageLinkService.findBacklinks(
-        pageObjectId,
-        viewer,
-        userGroups,
-      );
-      return res.apiv3({ backlinks });
+      const [backlinks, linkTargets] = await Promise.all([
+        crowi.pageLinkService.findBacklinks(pageObjectId, viewer, userGroups),
+        crowi.pageLinkService
+          .findForwardLinkHealth(pageObjectId, viewer, userGroups)
+          .catch((err) => {
+            logger.error({ err }, 'Failed to get forward link health');
+            return null;
+          }),
+      ]);
+
+      return res.apiv3({ backlinks, linkTargets });
     } catch (err) {
       logger.error({ err }, 'Failed to get backlinks');
       // Deliberately not forwarding `err`: apiv3Err serializes an Error's own
@@ -82,7 +87,8 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
  *        tags: [Page]
  *        summary: /page/backlinks
  *        description: >
- *          Get the pages that link to the given page. Sources the requesting user
+ *          Get the pages that link to the given page, and the given page's outbound
+ *          links whose target is trashed or broken. Sources the requesting user
  *          cannot read, and sources in the trash, are omitted.
  *        parameters:
  *          - name: pageId
@@ -111,6 +117,31 @@ const getBacklinksHandler = (crowi: Crowi): RequestHandler => {
  *                            type: string
  *                            description: current path of the linking page
  *                            example: /Sandbox/source
+ *                    linkTargets:
+ *                      type: array
+ *                      nullable: true
+ *                      description: >
+ *                        This page's outbound links whose target is trashed or broken.
+ *                        Links to healthy pages, and to trashed pages the requesting
+ *                        user cannot read, are omitted. null when the lookup failed
+ *                        (backlinks are still returned); an empty array means no
+ *                        problematic links.
+ *                      items:
+ *                        type: object
+ *                        properties:
+ *                          pageId:
+ *                            type: string
+ *                            nullable: true
+ *                            description: id of the trashed target page; null when broken
+ *                          path:
+ *                            type: string
+ *                            description: >
+ *                              current path of a trashed target, or the link's own path
+ *                              when broken
+ *                            example: /trash/Sandbox/target
+ *                          targetState:
+ *                            type: string
+ *                            enum: [trashed, broken]
  *          400:
  *            description: pageId is missing or is not a MongoDB ID.
  *          404:
