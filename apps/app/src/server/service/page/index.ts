@@ -87,6 +87,7 @@ import { getYjsService } from '../yjs';
 import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { deleteCompletelyOperation as deleteCompletelyOperationImpl } from './delete-completely-operation';
 import { onSeen } from './events/seen';
+import { isGrantImmutablePath } from './grant-immutable-path';
 import type { IPageService } from './page-service';
 import { shouldUseV4Process } from './should-use-v4-process';
 
@@ -4899,6 +4900,10 @@ class PageService implements IPageService {
       grantUserGroupIds,
     };
 
+    if (isUsersTopPage(path) && grant !== PageGrant.GRANT_PUBLIC) {
+      throw Error('The grant of the users top page must be public.');
+    }
+
     const isGrantRestricted = grant === PageGrant.GRANT_RESTRICTED;
 
     // Validate
@@ -5045,7 +5050,7 @@ class PageService implements IPageService {
 
     let grant = options.grant;
     // force public
-    if (isTopPage(pathSanitized)) {
+    if (isTopPage(pathSanitized) || isUsersTopPage(pathSanitized)) {
       grant = PageGrant.GRANT_PUBLIC;
     }
 
@@ -5331,6 +5336,16 @@ class PageService implements IPageService {
     const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
       'Page',
     );
+
+    if (
+      options.grant != null &&
+      options.grant !== pageData.grant &&
+      isGrantImmutablePath(pageData.path)
+    ) {
+      throw Error(
+        'The grant settings for the specified page cannot be modified.',
+      );
+    }
 
     const wasOnTree = pageData.parent != null || isTopPage(pageData.path);
     const isV5Compatible = configManager.getConfig('app:isV5Compatible');
