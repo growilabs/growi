@@ -13,8 +13,8 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
-import { isRevisionOfPage } from '../service/revision/is-revision-of-page';
 import ApiResponse from '../util/apiResponse';
+import { isRevisionOfPage } from '../util/is-revision-of-page';
 
 /**
  * @swagger

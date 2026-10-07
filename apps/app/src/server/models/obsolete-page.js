@@ -17,7 +17,7 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { configManager as _configManager } from '../service/config-manager';
-import { isRevisionOfPage } from '../service/revision/is-revision-of-page';
+import { isRevisionOfPage } from '../util/is-revision-of-page';
 import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
 import UserGroup from './user-group';
 import UserGroupRelation from './user-group-relation';

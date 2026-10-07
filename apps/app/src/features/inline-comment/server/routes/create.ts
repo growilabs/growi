@@ -31,7 +31,7 @@ import { excludeReadOnlyUserIfCommentNotAllowed } from '~/server/middlewares/exc
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
-import { isRevisionOfPage } from '~/server/service/revision/is-revision-of-page';
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
