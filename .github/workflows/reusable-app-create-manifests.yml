@@ -48,7 +48,7 @@ jobs:
         password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
 
     - name: Create and push manifest images
-      uses: Noelware/docker-manifest-action@0.4.3
+      uses: Noelware/docker-manifest-action@1.0.0
       with:
         base-image: ${{ inputs.tags }}
         extra-images: ${{ steps.meta-extra-images.outputs.tags }}
