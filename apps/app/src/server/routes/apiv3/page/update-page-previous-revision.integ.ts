@@ -79,7 +79,6 @@ describe('update-page — previous revision lookup', () => {
     vi.spyOn(Page, 'findByIdAndViewer').mockResolvedValue(currentPage as any);
     const updatePageSpy = vi
       .spyOn(crowi.pageService, 'updatePage')
-      // biome-ignore lint/suspicious/noExplicitAny: minimal stub for the page update
       .mockResolvedValue({
         _id: pageId,
         path: currentPage.path,
