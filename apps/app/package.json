@@ -231,7 +231,7 @@
     "js-tiktoken": "^1.0.15",
     "js-yaml": "^4.3.2",
     "jsonrepair": "^3.12.0",
-    "katex": "^0.16.21",
+    "katex": "^0.18.2",
     "ldapjs": "^3.0.2",
     "lucene-query-parser": "^1.2.0",
     "lucide-react": "^0.546.0",
