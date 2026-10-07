@@ -188,7 +188,7 @@
     "cm6-theme-basic-light": "^0.2.0",
     "cmdk": "^1.1.1",
     "codemirror": "^6.0.1",
-    "compression": "^1.7.4",
+    "compression": "^1.8.2",
     "connect-flash": "~0.1.1",
     "connect-mongo": "^4.6.0",
     "connect-redis": "^4.0.4",
