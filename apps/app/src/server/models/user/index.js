@@ -32,10 +32,10 @@ export function getAclService() {
 import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
 import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { ensureUserHomepage } from '../../service/page/ensure-user-homepage';
 import { getModelSafely } from '../../util/mongoose-utils';
-import { Attachment } from '../attachment';
 import { UserStatus } from './conts';
 import {
   buildUsernamePrefixRange,
@@ -292,7 +292,9 @@ const factory = (crowi) => {
       return this.image;
     }
     if (this.imageAttachment != null && this.imageAttachment._id != null) {
-      const imageAttachment = await Attachment.findById(this.imageAttachment);
+      const imageAttachment = await prisma.attachments.findUnique({
+        where: { id: this.imageAttachment._id.toString() },
+      });
       return imageAttachment.filePathProxied;
     }
     return '/images/icons/user.svg';

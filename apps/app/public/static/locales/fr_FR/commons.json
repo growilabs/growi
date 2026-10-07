@@ -150,7 +150,7 @@
     "publish_transfer_key": "Publier la clé de transfert",
     "transfer_key_limit": "Les clés de transfert sont valides durant une heure.",
     "once_transfer_key_used": "Les clés de transfert sont à usage unique.",
-    "transfer_to_growi_cloud": "Pour plus de détails, veuillez cliquer <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>ici.</a>"
+    "transfer_to_growi_cloud": "Pour plus de détails, veuillez cliquer <a href='{{documentationUrl}}/en/admin-guide/management-cookbook/g2g-transfer.html'>ici.</a>"
   },
   "accesstoken_scopes_desc": {
     "read": {

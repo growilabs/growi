@@ -27,7 +27,10 @@ import {
   type RespondOptions,
   ResponseMode,
 } from '~/server/interfaces/attachment';
-import type { IAttachmentDocument } from '~/server/models/attachment';
+import type {
+  AttachmentDraft,
+  AttachmentWithComputed,
+} from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../../config-manager';
@@ -131,7 +134,7 @@ const S3Factory = (): S3Client => {
   return client;
 };
 
-const getFilePathOnStorage = (attachment: IAttachmentDocument) => {
+const getFilePathOnStorage = (attachment: AttachmentDraft) => {
   if (attachment.filePath != null) {
     // DEPRECATED: remains for backward compatibility for v3.3.x or below
     return attachment.filePath;
@@ -140,7 +143,7 @@ const getFilePathOnStorage = (attachment: IAttachmentDocument) => {
   let dirName: string;
   if (attachment.attachmentType === AttachmentType.PAGE_BULK_EXPORT) {
     dirName = FilePathOnStoragePrefix.pageBulkExport;
-  } else if (attachment.page != null) {
+  } else if (attachment.pageId != null) {
     dirName = FilePathOnStoragePrefix.attachment;
   } else {
     dirName = FilePathOnStoragePrefix.user;
@@ -176,7 +179,7 @@ class AwsFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
+  override async deleteFile(attachment: AttachmentWithComputed): Promise<void> {
     const filePath = getFilePathOnStorage(attachment);
     return this.deleteFileByFilePath(filePath);
   }
@@ -185,7 +188,7 @@ class AwsFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override async deleteFiles(
-    attachments: IAttachmentDocument[],
+    attachments: AttachmentWithComputed[],
   ): Promise<void> {
     if (!this.getIsUploadable()) {
       throw new Error('AWS is not configured.');
@@ -240,7 +243,7 @@ class AwsFileUploader extends AbstractFileUploader {
    */
   override async uploadAttachment(
     readable: Readable,
-    attachment: IAttachmentDocument,
+    attachment: AttachmentDraft,
   ): Promise<void> {
     if (!this.getIsUploadable()) {
       throw new Error('AWS is not configured.');
@@ -312,7 +315,7 @@ class AwsFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override async findDeliveryFile(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
   ): Promise<NodeJS.ReadableStream> {
     if (!this.getIsReadable()) {
       throw new Error('AWS is not configured.');
@@ -360,7 +363,7 @@ class AwsFileUploader extends AbstractFileUploader {
    * @inheritDoc
    */
   override async generateTemporaryUrl(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
     opts?: RespondOptions,
   ): Promise<TemporaryUrl> {
     if (!this.getIsUploadable()) {

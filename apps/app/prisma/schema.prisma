@@ -96,6 +96,7 @@ model activities {
 
 model attachments {
   id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  v                     Int       @default(0) @map("__v")
   pageId                String?   @map("page") @db.ObjectId
   creatorId             String?   @map("creator") @db.ObjectId
   filePath              String?
@@ -107,10 +108,9 @@ model attachments {
   temporaryUrlExpiredAt DateTime?
   attachmentType        String
   createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
 
   creator              users?  @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  page                 pages?  @relation(fields: [pageId], references: [id])
+  page                 pages?  @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   userImageAttachments users[] @relation("UserImageAttachment")
 
   @@index([pageId], map: "page_1")
