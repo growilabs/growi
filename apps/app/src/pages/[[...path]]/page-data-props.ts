@@ -240,7 +240,7 @@ export async function getPageDataForInitial(
     }
 
     // Handle existing page with valid meta that is not IPageNotFoundInfo
-    page.initLatestRevisionField(revisionId);
+    await page.initLatestRevisionField(revisionId);
     const ssrMaxRevisionBodyLength = configManager.getConfig(
       'app:ssrMaxRevisionBodyLength',
     );
