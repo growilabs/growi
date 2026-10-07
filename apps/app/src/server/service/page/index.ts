@@ -78,7 +78,6 @@ import { serializePageSecurely } from '../../models/serializers/page-serializer'
 import Subscription from '../../models/subscription';
 import UserGroupRelation from '../../models/user-group-relation';
 import { V5ConversionError } from '../../models/vo/v5-conversion-error';
-import { divideByType } from '../../util/granted-group';
 import type { ActivityActor } from '../attachment/attachment-removal-snapshot';
 import { configManager } from '../config-manager';
 import type { IPageGrantService } from '../page-grant';
@@ -5358,22 +5357,25 @@ class PageService implements IPageService {
       parent: { $ne: null },
     });
 
-    const isChangingScope =
+    const userRelatedGroups =
+      await this.pageGrantService.getUserRelatedGroups(user);
+    const isGrantSpecified =
       options.grant != null || options.userRelatedGrantUserGroupIds != null;
-    if (isChangingScope) {
-      await this.pageGrantService.validateGrantedGroupsAssignableByUser(
-        user,
+    if (isGrantSpecified) {
+      this.pageGrantService.validateGrantedGroupsAssignableByUserSyncronously(
+        userRelatedGroups,
         grant,
         grantUserGroupIds,
       );
     }
 
-    const isGrantChangeable = await this.pageGrantService.validateGrantChange(
-      user,
-      pageData.grantedGroups,
-      grant,
-      grantUserGroupIds,
-    );
+    const isGrantChangeable =
+      this.pageGrantService.validateGrantChangeSyncronously(
+        userRelatedGroups,
+        pageData.grantedGroups,
+        grant,
+        grantUserGroupIds,
+      );
     if (!isGrantChangeable) {
       throw Error(
         'The selected grant or grantedGroup is not assignable to this page.',

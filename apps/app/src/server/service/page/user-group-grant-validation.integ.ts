@@ -94,7 +94,7 @@ describe('PageService user group grant validation', () => {
         grant: PageGrant.GRANT_USER_GROUP,
         grantUserGroupIds: [],
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/must not be empty/);
 
     expect(await Page.exists({ path })).toBeNull();
   });
@@ -109,7 +109,7 @@ describe('PageService user group grant validation', () => {
           { item: foreignGroupId, type: GroupType.userGroup },
         ],
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/does not belong to any of the granted groups/);
 
     expect(await Page.exists({ path })).toBeNull();
   });
@@ -127,6 +127,24 @@ describe('PageService user group grant validation', () => {
     expect(page.grantedGroups).toHaveLength(2);
   });
 
+  it('rejects inheriting the parent groups when the user belongs to none of them', async () => {
+    const parentPath = `${PREFIX}/foreign-parent`;
+    const publicParent = await Page.findOne({ path: PREFIX });
+    await Page.create({
+      path: parentPath,
+      grant: Page.GRANT_USER_GROUP,
+      grantedGroups: [{ item: foreignGroupId, type: GroupType.userGroup }],
+      parent: publicParent?._id,
+    });
+    const childPath = `${parentPath}/child`;
+
+    await expect(createWithoutSubOperation(childPath, {})).rejects.toThrow(
+      /does not belong to any of the granted groups/,
+    );
+
+    expect(await Page.exists({ path: childPath })).toBeNull();
+  });
+
   describe('updatePage', () => {
     it('rejects changing a public page to a group the user does not belong to', async () => {
       const path = `${PREFIX}/update-foreign-group`;
@@ -139,7 +157,7 @@ describe('PageService user group grant validation', () => {
             { item: foreignGroupId, type: GroupType.userGroup },
           ],
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/does not belong to any of the granted groups/);
 
       const reloaded = await Page.findById(created._id);
       expect(reloaded?.grant).toBe(PageGrant.GRANT_PUBLIC);

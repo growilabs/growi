@@ -136,6 +136,11 @@ export interface IPageGrantService {
     grant: PageGrant | undefined,
     grantedGroups: IGrantedGroup[] | undefined,
   ) => Promise<void>;
+  validateGrantedGroupsAssignableByUserSyncronously: (
+    userRelatedGroups: PopulatedGrantedGroup[],
+    grant: PageGrant | undefined,
+    grantedGroups: IGrantedGroup[] | undefined,
+  ) => void;
   validateGrantChangeSyncronously: (
     userRelatedGroups: PopulatedGrantedGroup[],
     previousGrantedGroups: IGrantedGroup[],
@@ -408,12 +413,30 @@ class PageGrantService implements IPageGrantService {
     if (grant !== PageGrant.GRANT_USER_GROUP) {
       return;
     }
+    const userRelatedGroups = await this.getUserRelatedGroups(user);
+    this.validateGrantedGroupsAssignableByUserSyncronously(
+      userRelatedGroups,
+      grant,
+      grantedGroups,
+    );
+  }
+
+  /**
+   * Use when userRelatedGroups is already at hand, to avoid fetching it from DB again.
+   */
+  validateGrantedGroupsAssignableByUserSyncronously(
+    userRelatedGroups: PopulatedGrantedGroup[],
+    grant: PageGrant | undefined,
+    grantedGroups: IGrantedGroup[] | undefined,
+  ): void {
+    if (grant !== PageGrant.GRANT_USER_GROUP) {
+      return;
+    }
 
     if (grantedGroups == null || grantedGroups.length === 0) {
       throw Error('grantedGroups must not be empty for GRANT_USER_GROUP');
     }
 
-    const userRelatedGroups = await this.getUserRelatedGroups(user);
     const isUserInAnyGrantedGroup = hasIntersection(
       grantedGroups.map((g) => getIdForRef(g.item)),
       userRelatedGroups.map((g) => g.item._id),
