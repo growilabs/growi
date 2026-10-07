@@ -12,7 +12,10 @@ import {
 import { useTranslation } from 'next-i18next';
 
 import type { ForceHideMenuItems } from '~/client/components/Common/Dropdown/PageItemControl';
-import { PageListItemL } from '~/client/components/PageList/PageListItemL';
+import {
+  PageListItemL,
+  type TruncatedAncestorPathRenderer,
+} from '~/client/components/PageList/PageListItemL';
 import type {
   ISelectable,
   ISelectableAll,
@@ -26,6 +29,14 @@ import {
   useSWRxPageInfoForList,
 } from '~/stores/page-listing';
 import { mutateSearching } from '~/stores/search';
+
+import { SearchResultAncestorPath } from '../SearchResultAncestorPath';
+
+// Module-level so every render passes the same reference to PageListItemL.
+const renderSearchResultAncestorPath: TruncatedAncestorPathRenderer = (
+  path,
+  highlightedPath,
+) => <SearchResultAncestorPath path={path} highlightedPath={highlightedPath} />;
 
 type Props = {
   pages: IPageWithSearchMeta[];
@@ -173,6 +184,7 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
             page={page}
             isEnableActions={!isGuestUser}
             isReadOnlyUser={!!isReadOnlyUser}
+            renderTruncatedAncestorPath={renderSearchResultAncestorPath}
             isSelected={page.data._id === selectedPageId}
             forceHideMenuItems={forceHideMenuItems}
             onClickItem={clickItemHandler}
