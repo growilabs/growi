@@ -35,6 +35,7 @@ import {
 import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
 import { configManager } from '~/server/service/config-manager/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
+import { isRevisionOfPage } from '~/server/service/revision/is-revision-of-page';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import { getYjsService } from '~/server/service/yjs';
 import { generalXssFilter } from '~/services/general-xss-filter';
@@ -359,6 +360,9 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
             previousRevision = await prisma.revisions.findUnique({
               where: { id: sanitizeRevisionId },
             });
+            if (!isRevisionOfPage(previousRevision, currentPage._id)) {
+              previousRevision = null;
+            }
           } catch (error) {
             logger.error(
               {

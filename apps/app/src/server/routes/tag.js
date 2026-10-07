@@ -1,6 +1,7 @@
 import { SupportedAction } from '~/interfaces/activity';
 import { prisma } from '~/utils/prisma';
 
+import { isRevisionOfPage } from '../service/revision/is-revision-of-page';
 import ApiResponse from '../util/apiResponse';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
@@ -136,6 +137,11 @@ export const setup = (crowi, _app) => {
       const previousRevision = await prisma.revisions.findUnique({
         where: { id: revisionId },
       });
+      if (!isRevisionOfPage(previousRevision, page._id)) {
+        return res.json(
+          ApiResponse.error('The revision does not belong to this page.'),
+        );
+      }
       result.savedPage = await crowi.pageService.updatePage(
         page,
         previousRevision.body,
