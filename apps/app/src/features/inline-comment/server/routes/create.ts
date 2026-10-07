@@ -31,6 +31,7 @@ import { excludeReadOnlyUserIfCommentNotAllowed } from '~/server/middlewares/exc
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
+import { isRevisionOfPage } from '~/server/service/revision/is-revision-of-page';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -106,6 +107,21 @@ export const createInlineCommentRouteHandlersFactory = (
             'notfound_or_forbidden',
           ),
           404,
+        );
+      }
+
+      // A revision of another page must not be linked; an unknown id is harmless anchor metadata.
+      const anchorRevision = await prisma.revisions.findUnique({
+        where: { id: anchorOriginRevisionId },
+        select: { pageId: true },
+      });
+      if (anchorRevision != null && !isRevisionOfPage(anchorRevision, pageId)) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'The revision does not belong to this page.',
+            'inline-comment-create-failed',
+          ),
+          400,
         );
       }
 

@@ -13,6 +13,7 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
+import { isRevisionOfPage } from '../service/revision/is-revision-of-page';
 import ApiResponse from '../util/apiResponse';
 
 /**
@@ -62,6 +63,16 @@ import ApiResponse from '../util/apiResponse';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi, _app) => {
+  // A revision id from a request says nothing about which page it belongs to.
+  const isRevisionOfPageId = async (revisionId, pageId) =>
+    isRevisionOfPage(
+      await prisma.revisions.findUnique({
+        where: { id: revisionId },
+        select: { pageId: true },
+      }),
+      pageId,
+    );
+
   const logger = loggerFactory('growi:routes:comment');
   const { Page } = crowi.models;
 
@@ -153,8 +164,12 @@ export const setup = (crowi, _app) => {
       // revision_id can point to a revision belonging to a different page.
       // In a share context the access bypass is scoped to the verified
       // page_id, so we must NOT honor revision_id there; fetch strictly by
-      // page_id. Non-shared (authenticated) access keeps the revision_id path.
-      if (revisionId && !isSharedPage) {
+      // page_id. Non-shared access honors revision_id only when it belongs to page_id.
+      if (
+        revisionId &&
+        !isSharedPage &&
+        (await isRevisionOfPageId(revisionId, pageId))
+      ) {
         comments = await prisma.comments.findCommentsByRevisionId(revisionId, {
           include: { creator: true },
         });
@@ -313,6 +328,11 @@ export const setup = (crowi, _app) => {
 
     let createdComment;
     try {
+      if (!(await isRevisionOfPageId(revisionId, pageId))) {
+        return res.json(
+          ApiResponse.error('The revision does not belong to this page.'),
+        );
+      }
       createdComment = await prisma.comments.add(
         pageId,
         req.user._id,
@@ -511,6 +531,10 @@ export const setup = (crowi, _app) => {
       }
       if (req.user._id.toString() !== comment.creatorId.toString()) {
         throw new Error('Current user is not operatable to this comment.');
+      }
+
+      if (!(await isRevisionOfPageId(revisionId, pageId))) {
+        throw new Error('The revision does not belong to this page.');
       }
 
       updatedComment = await prisma.comments.update({
