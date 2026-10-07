@@ -54,6 +54,7 @@ import { getPageByShareLinkHandlerFactory } from './get-page-by-share-link';
 import { getPageInfoHandlerFactory } from './get-page-info';
 import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count';
 import { getYjsDataHandlerFactory } from './get-yjs-data';
+import { grantBodyValidator } from './grant-body-validator';
 import { publishPageHandlersFactory } from './publish-page';
 import { respondWithSinglePage } from './respond-with-single-page';
 import { syncLatestRevisionBodyToYjsDraftHandlerFactory } from './sync-latest-revision-body-to-yjs-draft';
@@ -114,7 +115,7 @@ export const setup = (crowi: Crowi): Router => {
     ],
     updateGrant: [
       param('pageId').isMongoId().withMessage('pageId is required'),
-      body('grant').isInt().withMessage('grant is required'),
+      grantBodyValidator({ required: true }),
       body('grantedGroups')
         .optional()
         .isArray()
