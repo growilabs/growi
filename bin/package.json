@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.11"
   },
   "dependencies": {
     "ws": "^8.17.1"
