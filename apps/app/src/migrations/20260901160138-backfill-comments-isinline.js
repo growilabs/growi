@@ -7,14 +7,14 @@ const logger = loggerFactory('growi:migrate:backfill-comments-isinline');
  * Backfill `isInline: false` onto every `comments` document that predates
  * the inline-comment feature.
  *
- * WHY: `findCommentsByPageId` / `findCommentsByRevisionId` /
- * `countCommentByPageId` filter with `where: { isInline: { not: true } }` to
- * keep inline comments out of the page-footer thread/count. Prisma's MongoDB
+ * WHY: `findCommentsByPageId` / `findCommentsByRevisionId` filter with
+ * `where: { isInline: { not: true } }` to
+ * keep inline comments out of the page-footer thread. Prisma's MongoDB
  * connector does NOT match `{ not: true }` against a document where
  * `isInline` is entirely absent — only where it's explicitly stored as a
  * non-true value. Every pre-existing comment has no `isInline` field at all,
- * so without this backfill it becomes invisible from the comment thread and
- * count badge as soon as this feature ships (the same Mongo null-vs-absent
+ * so without this backfill it becomes invisible from the comment thread
+ * as soon as this feature ships (the same Mongo null-vs-absent
  * gotcha already fixed once for `InlineCommentService.create()`'s
  * `replyToId: null` write).
  *

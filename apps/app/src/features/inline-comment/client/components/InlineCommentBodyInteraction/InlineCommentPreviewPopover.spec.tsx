@@ -399,9 +399,9 @@ describe('InlineCommentPreviewPopover', () => {
     ).toHaveLength(2);
   });
 
-  // 2026-09-11: `replies` arrives in the server's `createdAt: 'desc'` fetch
-  // order (newest first) -- InlineCommentService.listByPageId() never
-  // reorders for display, display order is this component's own concern.
+  // `replies` arrives in the order GET /comments returns them (newest first)
+  // and the server never reorders for display, so display order is this
+  // component's own concern.
   // Mirrors InlineCommentReplies.tsx's own `repliesFromOldest` reversal (user
   // report: replies were rendering newest-first, oldest-last).
   it('renders replies oldest-first even though the `replies` prop arrives newest-first (Req 2.1)', () => {

@@ -297,7 +297,7 @@ describe('PageComment — one list holding both kinds of comment', () => {
   });
 
   it('orders normal and inline comments by posting date, not by insertion or kind', () => {
-    // `/comments.get` answers newest-first.
+    // `useSWRxPageComment` answers newest-first, as the list API does.
     commentStore.data = [
       normalComment('normal-late', '2024-01-03T00:00:00.000Z'),
       normalComment('normal-early', '2024-01-01T00:00:00.000Z'),

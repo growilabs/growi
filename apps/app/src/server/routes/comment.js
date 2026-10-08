@@ -1,9 +1,9 @@
 import { getIdStringForRef } from '@growi/core';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { body, query, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
+import { toLegacyCommentListItem } from '~/features/comment/server/serializers/to-comment-list-item';
 import {
   SupportedAction,
   SupportedEventModel,
@@ -14,6 +14,7 @@ import { prisma } from '~/utils/prisma';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
 import ApiResponse from '../util/apiResponse';
+import { isRevisionOfPage } from '../util/is-revision-of-page';
 
 /**
  * @swagger
@@ -62,6 +63,16 @@ import ApiResponse from '../util/apiResponse';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi, _app) => {
+  // A revision id from a request says nothing about which page it belongs to.
+  const isRevisionOfPageId = async (revisionId, pageId) =>
+    isRevisionOfPage(
+      await prisma.revisions.findUnique({
+        where: { id: revisionId },
+        select: { pageId: true },
+      }),
+      pageId,
+    );
+
   const logger = loggerFactory('growi:routes:comment');
   const { Page } = crowi.models;
 
@@ -86,7 +97,10 @@ export const setup = (crowi, _app) => {
    *        tags: [Comments]
    *        operationId: getComments
    *        summary: /comments.get
-   *        description: Get comments of the page of the revision
+   *        deprecated: true
+   *        description: |
+   *          Deprecated. Use GET /comments (apiv3) instead, which also returns inline comments.
+   *          Get comments of the page of the revision
    *        parameters:
    *          - in: query
    *            name: page_id
@@ -150,8 +164,12 @@ export const setup = (crowi, _app) => {
       // revision_id can point to a revision belonging to a different page.
       // In a share context the access bypass is scoped to the verified
       // page_id, so we must NOT honor revision_id there; fetch strictly by
-      // page_id. Non-shared (authenticated) access keeps the revision_id path.
-      if (revisionId && !isSharedPage) {
+      // page_id. Non-shared access honors revision_id only when it belongs to page_id.
+      if (
+        revisionId &&
+        !isSharedPage &&
+        (await isRevisionOfPageId(revisionId, pageId))
+      ) {
         comments = await prisma.comments.findCommentsByRevisionId(revisionId, {
           include: { creator: true },
         });
@@ -166,16 +184,7 @@ export const setup = (crowi, _app) => {
 
     res.json(
       ApiResponse.success({
-        comments: comments.map((comment) => ({
-          ...comment,
-          page: comment.pageId,
-          creator:
-            comment.creator != null
-              ? serializeUserSecurely(comment.creator)
-              : comment.creatorId,
-          revision: comment.revisionId,
-          replyTo: comment.replyToId,
-        })),
+        comments: comments.map(toLegacyCommentListItem),
       }),
     );
   };
@@ -319,6 +328,11 @@ export const setup = (crowi, _app) => {
 
     let createdComment;
     try {
+      if (!(await isRevisionOfPageId(revisionId, pageId))) {
+        return res.json(
+          ApiResponse.error('The revision does not belong to this page.'),
+        );
+      }
       createdComment = await prisma.comments.add(
         pageId,
         req.user._id,
@@ -519,6 +533,10 @@ export const setup = (crowi, _app) => {
         throw new Error('Current user is not operatable to this comment.');
       }
 
+      if (!(await isRevisionOfPageId(revisionId, pageId))) {
+        throw new Error('The revision does not belong to this page.');
+      }
+
       updatedComment = await prisma.comments.update({
         where: {
           id: commentId,
@@ -629,7 +647,12 @@ export const setup = (crowi, _app) => {
       }
 
       await prisma.comments.removeWithReplies(comment.id);
-      await Page.updateCommentCount(comment.pageId);
+      // The comment is already deleted; a failed count refresh must not turn that into an error response.
+      try {
+        await Page.updateCommentCount(comment.pageId);
+      } catch (err) {
+        logger.error('Failed to update the comment count', err);
+      }
       commentEvent.emit(CommentEvent.DELETE, comment);
     } catch (err) {
       return res.json(ApiResponse.error(err));

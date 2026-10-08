@@ -202,6 +202,28 @@ describe('POST /_api/v3/inline-comments', () => {
     expect(row?.isInline).toBe(true);
   });
 
+  it('updates the stored page commentCount to the total after creating (requirement 7.4)', async () => {
+    // A stale stored value, so only the post-write refresh can make it match.
+    await crowi.models.Page.updateOne(
+      { _id: publicPage._id },
+      { commentCount: 999 },
+    );
+
+    const res = await request(app)
+      .post('/_api/v3/inline-comments')
+      .send(validBody());
+
+    expect(res.status).toBe(201);
+
+    const total = await prisma.comments.count({
+      where: { pageId: String(publicPage._id) },
+    });
+    const stored = await crowi.models.Page.findById(publicPage._id).select(
+      'commentCount',
+    );
+    expect(stored?.commentCount).toBe(total);
+  });
+
   it('notifies a user mentioned by @username in the comment body (requirement 3.2)', async () => {
     const res = await request(app)
       .post('/_api/v3/inline-comments')
@@ -272,6 +294,35 @@ describe('POST /_api/v3/inline-comments', () => {
         false,
       );
     }
+  });
+
+  it('returns 400 and stores nothing when anchorOriginRevisionId is a revision of another page', async () => {
+    const otherPageId = new Types.ObjectId().toString();
+    const otherRevision = await prisma.revisions.create({
+      data: {
+        id: String(new Types.ObjectId()),
+        pageId: otherPageId,
+        body: 'other page body',
+        format: 'markdown',
+        authorId: String(owner._id),
+      },
+    });
+    const before = await prisma.comments.count({
+      where: { anchorOriginRevisionId: otherRevision.id },
+    });
+
+    const res = await request(app)
+      .post('/_api/v3/inline-comments')
+      .send({ ...validBody(), anchorOriginRevisionId: otherRevision.id });
+
+    expect(res.status).toBe(400);
+    expect(
+      await prisma.comments.count({
+        where: { anchorOriginRevisionId: otherRevision.id },
+      }),
+    ).toBe(before);
+
+    await prisma.revisions.deleteMany({ where: { id: otherRevision.id } });
   });
 
   it('returns 400 when anchor.quote is empty (service precondition)', async () => {

@@ -31,11 +31,13 @@ import { excludeReadOnlyUserIfCommentNotAllowed } from '~/server/middlewares/exc
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import type { CreateInlineCommentRequestBody } from '../../interfaces/dto/create-inline-comment';
 import { InlineCommentService } from '../service/inline-comment-service';
+import { updatePageCommentCount } from '../update-page-comment-count';
 
 const logger = loggerFactory('growi:routes:apiv3:inline-comments:create');
 
@@ -108,9 +110,25 @@ export const createInlineCommentRouteHandlersFactory = (
         );
       }
 
+      // A revision of another page must not be linked; an unknown id is harmless anchor metadata.
+      const anchorRevision = await prisma.revisions.findUnique({
+        where: { id: anchorOriginRevisionId },
+        select: { pageId: true },
+      });
+      if (anchorRevision != null && !isRevisionOfPage(anchorRevision, pageId)) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'The revision does not belong to this page.',
+            'inline-comment-create-failed',
+          ),
+          400,
+        );
+      }
+
       const service = new InlineCommentService({
         prisma,
         commentService: crowi.commentService,
+        updateCommentCount: updatePageCommentCount,
       });
 
       try {

@@ -6,6 +6,7 @@ import {
   pathUtils,
   templateChecker,
 } from '@growi/core/dist/utils';
+import { isValidObjectId } from '@growi/core/dist/utils/objectid-utils';
 import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
@@ -17,6 +18,7 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { configManager as _configManager } from '../service/config-manager';
+import { isRevisionOfPage } from '../util/is-revision-of-page';
 import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
 import UserGroup from './user-group';
 import UserGroupRelation from './user-group-relation';
@@ -252,9 +254,19 @@ export const getPageSchema = (crowi) => {
     return this.save();
   };
 
-  pageSchema.methods.initLatestRevisionField = function (revisionId) {
+  // revisionId comes from a request: show it only when it belongs to this page, otherwise keep the latest revision.
+  pageSchema.methods.initLatestRevisionField = async function (revisionId) {
     this.latestRevision = this.revision;
-    if (revisionId != null) {
+    // Prisma throws on an id that is not an ObjectId, which would turn a mistyped URL into a 500.
+    if (!isValidObjectId(revisionId?.toString())) {
+      return;
+    }
+
+    const revision = await prisma.revisions.findUnique({
+      where: { id: revisionId.toString() },
+      select: { pageId: true },
+    });
+    if (isRevisionOfPage(revision, this._id)) {
       this.revision = revisionId;
     }
   };
@@ -302,18 +314,15 @@ export const getPageSchema = (crowi) => {
     return differenceInYears(new Date(), this.updatedAt);
   };
 
-  pageSchema.statics.updateCommentCount = function (pageId) {
+  pageSchema.statics.updateCommentCount = async function (pageId) {
     validateCrowi();
-    return prisma.comments.countCommentByPageId(pageId).then((count) => {
-      this.update({ _id: pageId }, { commentCount: count }, {}, (err, data) => {
-        if (err) {
-          logger.debug('Update commentCount Error', err);
-          throw err;
-        }
-
-        return data;
-      });
-    });
+    const count = await prisma.comments.countCommentByPageId(pageId);
+    try {
+      return await this.updateOne({ _id: pageId }, { commentCount: count });
+    } catch (err) {
+      logger.debug('Update commentCount Error', err);
+      throw err;
+    }
   };
 
   pageSchema.statics.getDeletedPageName = (path) => {

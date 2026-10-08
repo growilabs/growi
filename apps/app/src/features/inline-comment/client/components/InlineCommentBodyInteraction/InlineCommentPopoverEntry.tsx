@@ -21,8 +21,6 @@
  * reply thread whenever the origin comment was edited.
  */
 import { type JSX, type ReactNode, useState } from 'react';
-import type { IUserHasId } from '@growi/core';
-import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializers';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'react-i18next';
 
@@ -31,6 +29,7 @@ import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/componen
 import { DeleteConfirmAlert } from '~/client/components/PageComment/DeleteConfirmAlert';
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
 import { Username } from '~/components/User/Username';
+import type { ICommentCreatorSummary } from '~/features/comment/interfaces';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 
 import { MentionPickerButton } from '../InlineCommentForm/MentionPickerButton';
@@ -42,7 +41,7 @@ import styles from './InlineCommentPreviewPopover.module.scss';
 type InlineCommentPopoverEntryProps = {
   id: string;
   /** `null` when the creator relation could not be resolved, as both comment DTOs allow. */
-  creator: IUserSerializedSecurely<IUserHasId> | null;
+  creator: ICommentCreatorSummary | null;
   /**
    * Declared as Date by the DTO but actually arrives as an ISO string over
    * the wire. Forwarded to `FormattedDistanceDate` as-is, exactly as
