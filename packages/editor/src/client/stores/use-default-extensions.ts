@@ -45,10 +45,10 @@ const markdownHighlighting = HighlightStyle.define([
 ]);
 
 const completionMenuTheme = EditorView.baseTheme({
-  '.cm-tooltip-autocomplete .cm-completionLabel': {
+  '&light .cm-tooltip-autocomplete .cm-completionLabel': {
     color: 'var(--bs-gray-800)',
   },
-  '.cm-tooltip-autocomplete .cm-completionDetail': {
+  '&light .cm-tooltip-autocomplete .cm-completionDetail': {
     color: 'var(--bs-gray-600)',
   },
 });

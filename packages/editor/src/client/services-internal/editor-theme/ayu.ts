@@ -1,16 +1,21 @@
 // Ref: https://github.com/vadimdemedes/thememirror/blob/94a6475a9113ec03d880fcb817aadcc5a16e82e4/source/themes/ayu-light.ts
 
+import type { Extension } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
 import { tags as t } from '@lezer/highlight';
 import { createTheme } from '@uiw/codemirror-themes';
 
+const foreground = '#5c6166';
+const selection = '#036dd626';
+
 // Author: Konstantin Pschera
-export const ayu = createTheme({
+const ayuTheme = createTheme({
   theme: 'light',
   settings: {
     background: '#fcfcfc',
-    foreground: '#5c6166',
+    foreground,
     caret: '#ffaa33',
-    selection: '#036dd626',
+    selection,
     gutterBackground: '#fcfcfc',
     gutterForeground: '#8a919966',
     lineHighlight: '#8a91991a',
@@ -78,3 +83,14 @@ export const ayu = createTheme({
     },
   ],
 });
+
+// createTheme cannot style the completion tooltip, so define the selected item colors here.
+// Without this, CodeMirror's default (blue background) is used, which is hard to read with dark text.
+const completionTheme = EditorView.theme({
+  '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    backgroundColor: selection,
+    color: foreground,
+  },
+});
+
+export const ayu: Extension = [ayuTheme, completionTheme];
