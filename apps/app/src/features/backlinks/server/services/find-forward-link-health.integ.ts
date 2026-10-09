@@ -202,6 +202,57 @@ describe('findForwardLinkHealth (integration)', () => {
     ]);
   });
 
+  it('reports a row whose target page was permanently deleted as broken, even though the row still holds its id', async () => {
+    const source = await createPage('/source');
+    const deleted = await createPage('/permanently-deleted');
+    await linkTo(source, deleted);
+    // A permanent delete whose cleanup ran before this row was written leaves the id behind.
+    await Page.deleteOne({ _id: deleted._id });
+
+    const result = await health(source, viewer);
+
+    expect(result).toEqual([
+      { pageId: null, path: deleted.path, targetState: 'broken' },
+    ]);
+  });
+
+  it('still omits an existing target the viewer cannot read when a deleted one is reported', async () => {
+    const source = await createPage('/source');
+    const restricted = await createPage('/restricted', {
+      grantedTo: foreignUser,
+    });
+    const deleted = await createPage('/permanently-deleted');
+    await linkTo(source, restricted);
+    await linkTo(source, deleted);
+    await Page.deleteOne({ _id: deleted._id });
+
+    const result = await health(source, viewer);
+
+    // Only the deleted page is reported; the unreadable one must not leak as broken.
+    expect(result).toEqual([
+      { pageId: null, path: deleted.path, targetState: 'broken' },
+    ]);
+  });
+
+  it('reports a deleted target once per spelling the body used, each with its own text', async () => {
+    const source = await createPage('/source');
+    const deleted = await createPage('/permanently-deleted');
+    const permalink = `/${deleted._id.toString()}`;
+    await linkTo(source, deleted);
+    await addRow(source, permalink, deleted);
+    await Page.deleteOne({ _id: deleted._id });
+
+    const result = await health(source, viewer);
+
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(
+      expect.arrayContaining([
+        { pageId: null, path: deleted.path, targetState: 'broken' },
+        { pageId: null, path: permalink, targetState: 'broken' },
+      ]),
+    );
+  });
+
   it('omits a trashed target the viewer cannot read, rather than reporting it as broken (2.1)', async () => {
     const source = await createPage('/source');
     const restricted = await createPage('/restricted', {

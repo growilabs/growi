@@ -1,13 +1,27 @@
 import { performance } from 'node:perf_hooks';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { getIdForRef } from '@growi/core';
-import mongoose from 'mongoose';
+import mongoose, { type Types } from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { BULK_REINDEX_SIZE } from '~/server/service/page/consts';
+import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { extractInternalLinkPaths } from './extract-internal-link-paths';
-import { reResolveByToPath, syncOutboundLinks } from './page-link-sync';
+import {
+  reconcileDeletedPages,
+  reResolveByToPath,
+  syncOutboundLinks,
+} from './page-link-sync';
 import { resolveToPageIds } from './target-page-resolution';
+
+const logger = loggerFactory(
+  'growi:features:backlinks:page-link-service-handlers',
+);
+
+const MAX_RETRY_ATTEMPTS = 5;
+const RETRY_BACKOFF_MS = 5000;
 
 // The only caller reads the page with a projection and never populates, so the revision is always
 // a ref here.
@@ -74,4 +88,48 @@ export const handlePageUpsertById = async (
   if (page.status === Page.STATUS_DELETED) return 0;
 
   return handlePageUpsert(page, siteUrl);
+};
+
+/**
+ * Try to reconcile deleted pages, retries MAX_RETRY_ATTEMPS times if it fails.
+ */
+const tryReconcileDeletedPages = async (
+  chunk: Types.ObjectId[],
+  tryCount: number,
+  err?: unknown,
+): Promise<void> => {
+  if (tryCount < 1) {
+    logger.error(
+      { err, pageIds: chunk },
+      `backlinks delete reconcile failed after ${MAX_RETRY_ATTEMPTS} attempts, needs to be cleaned up by backfill job`,
+    );
+    return;
+  }
+
+  try {
+    await reconcileDeletedPages(chunk);
+  } catch (err) {
+    if (tryCount > 1) {
+      await sleep(RETRY_BACKOFF_MS, undefined, { ref: false });
+    }
+    await tryReconcileDeletedPages(chunk, tryCount - 1, err);
+  }
+};
+
+/**
+ * Reconciles deleted pages in chunks of `BULK_REINDEX_SIZE`, the batch size `removeLinksForPages`
+ * requires. Group deletion hands `syncDescendantsDelete` every affected page at once, so a
+ * payload is not bounded on its own. A failed chunk is retried and logged after failing after allowed attempts.
+ *
+ * @param pageIds - Page IDs of pages that have been deleted.
+ */
+export const handlePagesDelete = async (
+  pageIds: Types.ObjectId[],
+): Promise<void> => {
+  for (let i = 0; i < pageIds.length; i += BULK_REINDEX_SIZE) {
+    const chunk = pageIds.slice(i, i + BULK_REINDEX_SIZE);
+
+    // biome-ignore lint/performance/noAwaitInLoops: one bounded command at a time is the point
+    await tryReconcileDeletedPages(chunk, MAX_RETRY_ATTEMPTS);
+  }
 };
