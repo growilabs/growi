@@ -4,9 +4,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import {
-  isTopPage,
   isUserPage,
-  isUsersProtectedPages,
   isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import type { Request, RequestHandler } from 'express';
@@ -34,9 +32,11 @@ import {
 } from '~/server/models/serializers';
 import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
 import { configManager } from '~/server/service/config-manager/config-manager';
+import { isGrantImmutablePath } from '~/server/service/page/grant-immutable-path';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import { getYjsService } from '~/server/service/yjs';
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -283,10 +283,11 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         return res.apiv3Err('User pages are disabled');
       }
 
-      const isGrantImmutable =
-        isTopPage(currentPage.path) || isUsersProtectedPages(currentPage.path);
-
-      if (grant != null && grant !== currentPage.grant && isGrantImmutable) {
+      if (
+        grant != null &&
+        grant !== currentPage.grant &&
+        isGrantImmutablePath(currentPage.path)
+      ) {
         return res.apiv3Err(
           new ErrorV3(
             'The grant settings for the specified page cannot be modified.',
@@ -359,6 +360,9 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
             previousRevision = await prisma.revisions.findUnique({
               where: { id: sanitizeRevisionId },
             });
+            if (!isRevisionOfPage(previousRevision, currentPage._id)) {
+              previousRevision = null;
+            }
           } catch (error) {
             logger.error(
               {
