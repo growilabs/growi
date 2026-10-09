@@ -751,8 +751,9 @@ the restored page's status. Independent of B3/B4.
   - **Extend the existing `GET /_api/v3/page/backlinks`, do not add a second route.** Same `pageId`,
     same viewer, same 404 semantics, and the panel renders both sections together — a separate route
     would cost a second round trip per panel open, a second hook, and a second registration in
-    `apiv3/index.js`, with no independent cacheability. Add `linkTargets: ILinkTarget[]` to
-    `IBacklinkResponse` and have the handler call `findBacklinks` and `findForwardLinkHealth`
+    `apiv3/index.js`, with no independent cacheability. Add `linkTargets: ILinkTarget[] | null` to
+    `IBacklinkResponse` (`null` when the forward-link lookup fails, `[]` when the page has no outgoing
+    links) and have the handler call `findBacklinks` and `findForwardLinkHealth`
     concurrently (`Promise.all`) so the added field costs no extra latency
   - Widen `useSWRxBacklinks` to return `IBacklinkResponse` instead of `IBacklink[]` (keep the
     existing key and plain `useSWR` — grants change under a stable key, so it must stay revalidating).

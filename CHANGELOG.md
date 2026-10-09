@@ -1,8 +1,28 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.6...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.7...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.7](https://github.com/growilabs/compare/v8.0.6...v8.0.7) - 2026-10-07
+
+### 🚀 Improvement
+
+* imprv: Use isRevisionOfPage for the existing revision/page checks (#12054) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(page): Reject empty or non-member user groups when creating or updating group-restricted pages (#12050) @yuki-takei
+* fix(page): Keep /user and the top page public even when changed through the grant API (#12051) @yuki-takei
+* fix(app): Ensure the user home page exists when user creation/activation completes (#12017) @yuki-takei
+
+### 🧰 Maintenance
+
+* support(ci): push slackbot-proxy release image to Artifact Registry (#12033) @yuki-takei
+* ci(slackbot-proxy): use Workload Identity Federation for Google Cloud auth (#12039) @yuki-takei
+* ci(deps): Bump @opentelemetry/instrumentation-mongoose from 0.63.0 to 0.67.0 (#12038) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump compression from 1.7.4 to 1.8.2 (#12037) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump katex from 0.16.47 to 0.18.2 (#12036) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v8.0.6](https://github.com/growilabs/compare/v8.0.5...v8.0.6) - 2026-10-05
 

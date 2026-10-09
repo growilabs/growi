@@ -44,6 +44,7 @@ import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and
 import type { IPageGrantService } from '~/server/service/page-grant';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -54,6 +55,7 @@ import { getPageByShareLinkHandlerFactory } from './get-page-by-share-link';
 import { getPageInfoHandlerFactory } from './get-page-info';
 import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count';
 import { getYjsDataHandlerFactory } from './get-yjs-data';
+import { grantBodyValidator } from './grant-body-validator';
 import { publishPageHandlersFactory } from './publish-page';
 import { respondWithSinglePage } from './respond-with-single-page';
 import { syncLatestRevisionBodyToYjsDraftHandlerFactory } from './sync-latest-revision-body-to-yjs-draft';
@@ -114,7 +116,7 @@ export const setup = (crowi: Crowi): Router => {
     ],
     updateGrant: [
       param('pageId').isMongoId().withMessage('pageId is required'),
-      body('grant').isInt().withMessage('grant is required'),
+      grantBodyValidator({ required: true }),
       body('grantedGroups')
         .optional()
         .isArray()
@@ -952,7 +954,7 @@ export const setup = (crowi: Crowi): Router => {
         pagePath = page.path;
 
         // Error if pageId and revison's pageIds do not match
-        if (page._id.toString() !== revision.pageId) {
+        if (!isRevisionOfPage(revision, page._id)) {
           return res.apiv3Err(
             new ErrorV3("Haven't the right to see the page."),
             403,
