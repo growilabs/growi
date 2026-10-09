@@ -32,24 +32,22 @@ describe('PageRedirect', () => {
     });
   };
 
-  // Counts the aggregations a call sends to MongoDB, read from the server's own
-  // profiler: a spy on the Prisma delegate cannot see calls made inside an extension.
-  const runCountingAggregations = async <T>(
-    run: () => Promise<T>,
-  ): Promise<{ result: T; aggregations: number }> => {
-    const profile = () =>
-      mongoose.connection
-        .collection('system.profile')
-        .countDocuments({ 'command.aggregate': 'pageredirects' });
-
-    await mongoose.connection.db?.command({ profile: 2 });
-    try {
-      const before = await profile();
-      const result = await run();
-      return { result, aggregations: (await profile()) - before };
-    } finally {
-      await mongoose.connection.db?.command({ profile: 0 });
-    }
+  // A spy on the delegate cannot see calls made inside a model extension, but a
+  // `query` extension on a client of the test's own sees every aggregation it sends,
+  // and shares no state with other tests the way a database-wide profiler would.
+  const withAggregationCount = () => {
+    let aggregations = 0;
+    const client = prisma.$extends({
+      query: {
+        pageredirects: {
+          aggregateRaw({ args, query }) {
+            aggregations += 1;
+            return query(args);
+          },
+        },
+      },
+    });
+    return { client, aggregations: () => aggregations };
   };
 
   // Duplicate fromPaths can only be staged below the Prisma client, with the
@@ -430,17 +428,16 @@ describe('PageRedirect', () => {
       });
 
       // when:
-      const { result: endpointsByFromPath, aggregations } =
-        await runCountingAggregations(() =>
-          prisma.pageredirects.retrievePageRedirectEndpointsBatch([
-            '/first',
-            ...fillerFromPaths,
-            '/last',
-          ]),
-        );
+      const { client, aggregations } = withAggregationCount();
+      const endpointsByFromPath =
+        await client.pageredirects.retrievePageRedirectEndpointsBatch([
+          '/first',
+          ...fillerFromPaths,
+          '/last',
+        ]);
 
       // then:
-      expect(aggregations).toBeGreaterThan(1);
+      expect(aggregations()).toBeGreaterThan(1);
       expect(endpointsByFromPath.get('/first')?.end.toPath).toEqual('/end');
       expect(endpointsByFromPath.get('/last')?.end.toPath).toEqual('/end');
       expect(endpointsByFromPath.get('/filler0')?.end.toPath).toEqual(
@@ -462,15 +459,14 @@ describe('PageRedirect', () => {
       );
 
       // when:
-      const { result: endpointsByFromPath, aggregations } =
-        await runCountingAggregations(() =>
-          prisma.pageredirects.retrievePageRedirectEndpointsBatch(
-            repeatedFromPaths,
-          ),
+      const { client, aggregations } = withAggregationCount();
+      const endpointsByFromPath =
+        await client.pageredirects.retrievePageRedirectEndpointsBatch(
+          repeatedFromPaths,
         );
 
       // then:
-      expect(aggregations).toEqual(1);
+      expect(aggregations()).toEqual(1);
       expect(endpointsByFromPath.size).toEqual(1);
       expect(endpointsByFromPath.get('/path1')?.end.toPath).toEqual('/path2');
     });
