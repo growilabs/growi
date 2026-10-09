@@ -65,6 +65,106 @@ type RawInsertCommandResult = {
 };
 const MONGO_DUPLICATE_KEY_ERROR_CODE = 11000;
 
+type PageRedirectsContext = typeof prisma.pageredirects;
+
+/**
+ * Resolves the endpoint of each requested `fromPath`'s redirect chain.
+ *
+ * @param maxDepth - Optional cap on how many hops of a chain to walk. `$graphLookup`
+ *                   is memory-bound (100MB, with no spill to disk), so a caller on a
+ *                   hot path can trade reach for a guaranteed bound. Omit it to walk
+ *                   each chain to its real end — page view resolves an old URL
+ *                   through this, where a cap would turn a page that was renamed
+ *                   many times into a not-found for that URL.
+ */
+const retrieveEndpointsBatch = async (
+  context: PageRedirectsContext,
+  fromPaths: string[],
+  maxDepth?: number,
+): Promise<Map<string, IPageRedirectEndpoints>> => {
+  if (fromPaths.length === 0) {
+    return new Map();
+  }
+
+  const aggResult = (await context.aggregateRaw({
+    pipeline: [
+      { $match: { fromPath: { $in: fromPaths } } },
+      {
+        $graphLookup: {
+          from: 'pageredirects',
+          startWith: '$toPath',
+          connectFromField: 'toPath',
+          connectToField: 'fromPath',
+          as: CHAINS_FIELD_NAME,
+          depthField: DEPTH_FIELD_NAME,
+          ...(maxDepth != null ? { maxDepth } : {}),
+        },
+      },
+    ],
+  })) as unknown as RawPageRedirectWithDepthChains[];
+
+  const endpointsByFromPath = new Map<string, IPageRedirectEndpoints>();
+
+  for (const redirectWithChains of aggResult) {
+    const start = {
+      fromPath: redirectWithChains.fromPath,
+      toPath: redirectWithChains.toPath,
+    };
+
+    // `fromPath` is unique-indexed, but MongoDB refuses to build a unique index
+    // over a collection that already holds duplicates and the app boots anyway,
+    // so duplicates are reachable. Take the first match instead of letting
+    // aggregation order — which is not guaranteed — pick the winner.
+    if (endpointsByFromPath.has(start.fromPath)) {
+      logger.warn(
+        `Although two or more PageRedirect documents starts from '${start.fromPath}' exists, The first one is used.`,
+      );
+      continue;
+    }
+
+    // sort chains in desc, without reordering the aggregation result itself
+    const sortedChains = [...redirectWithChains[CHAINS_FIELD_NAME]].sort(
+      (a, b) =>
+        toDepthNumber(b[DEPTH_FIELD_NAME]) - toDepthNumber(a[DEPTH_FIELD_NAME]),
+    );
+
+    const end = sortedChains.length === 0 ? start : sortedChains[0];
+
+    endpointsByFromPath.set(start.fromPath, { start, end });
+  }
+
+  return endpointsByFromPath;
+};
+
+/**
+ * One reverse walk: every redirect whose chain reaches `toPath`, at any depth.
+ *
+ * The mirror of `retrieveEndpointsBatch` — that walks forward from a path to
+ * where its chain ends, this walks back from a path to everything that reaches
+ * it. Shared so the two callers below cannot drift, each projecting what it
+ * needs from the same documents.
+ */
+const aggregateRedirectsReaching = async (
+  context: PageRedirectsContext,
+  toPath: string,
+  maxDepth?: number,
+): Promise<RawPageRedirectWithChains[]> =>
+  (await context.aggregateRaw({
+    pipeline: [
+      { $match: { toPath } },
+      {
+        $graphLookup: {
+          from: 'pageredirects',
+          startWith: '$fromPath',
+          connectFromField: 'fromPath',
+          connectToField: 'toPath',
+          as: CHAINS_FIELD_NAME,
+          ...(maxDepth != null ? { maxDepth } : {}),
+        },
+      },
+    ],
+  })) as unknown as RawPageRedirectWithChains[];
+
 export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
     result: {
@@ -92,49 +192,50 @@ export const extension = Prisma.defineExtension((client) => {
         ): Promise<IPageRedirectEndpoints | null> {
           const context =
             Prisma.getExtensionContext<typeof prisma.pageredirects>(this);
+          const endpoints = await retrieveEndpointsBatch(context, [fromPath]);
+          return endpoints.get(fromPath) ?? null;
+        },
 
-          const aggResult = (await context.aggregateRaw({
-            pipeline: [
-              { $match: { fromPath } },
-              {
-                $graphLookup: {
-                  from: 'pageredirects',
-                  startWith: '$toPath',
-                  connectFromField: 'toPath',
-                  connectToField: 'fromPath',
-                  as: CHAINS_FIELD_NAME,
-                  depthField: DEPTH_FIELD_NAME,
-                },
-              },
-            ],
-          })) as unknown as RawPageRedirectWithDepthChains[];
+        retrievePageRedirectEndpointsBatch(
+          fromPaths: string[],
+          maxDepth?: number,
+        ): Promise<Map<string, IPageRedirectEndpoints>> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.pageredirects>(this);
+          return retrieveEndpointsBatch(context, fromPaths, maxDepth);
+        },
 
-          if (aggResult.length === 0) {
-            return null;
-          }
-
-          if (aggResult.length > 1) {
-            logger.warn(
-              `Although two or more PageRedirect documents starts from '${fromPath}' exists, The first one is used.`,
-            );
-          }
-
-          const redirectWithChains = aggResult[0];
-
-          // sort chains in desc
-          const sortedChains = [...redirectWithChains[CHAINS_FIELD_NAME]].sort(
-            (a, b) =>
-              toDepthNumber(b[DEPTH_FIELD_NAME]) -
-              toDepthNumber(a[DEPTH_FIELD_NAME]),
+        /**
+         * Resolves every `fromPath` whose redirect chain reaches `toPath`.
+         *
+         * The result is **candidates only** — a longer chain can carry a candidate past
+         * `toPath`, so only the forward walk can say where one actually resolves.
+         *
+         * @param maxDepth - As on `retrievePageRedirectEndpointsBatch`: a cap the caller
+         *                   chooses, omitted to walk every chain to its real start.
+         */
+        async retrieveFromPathsRedirectingTo(
+          toPath: string,
+          maxDepth?: number,
+        ): Promise<string[]> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.pageredirects>(this);
+          const aggResult = await aggregateRedirectsReaching(
+            context,
+            toPath,
+            maxDepth,
           );
 
-          const start = {
-            fromPath: redirectWithChains.fromPath,
-            toPath: redirectWithChains.toPath,
-          };
-          const end = sortedChains.length === 0 ? start : sortedChains[0];
-
-          return { start, end };
+          return [
+            ...new Set(
+              aggResult.flatMap((redirectWithChains) => [
+                redirectWithChains.fromPath,
+                ...redirectWithChains[CHAINS_FIELD_NAME].map(
+                  (doc) => doc.fromPath,
+                ),
+              ]),
+            ),
+          ];
         },
 
         deleteByFromPath(fromPath: string): Promise<{ count: number }> {
@@ -147,25 +248,15 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.pageredirects>(this);
 
-          const aggResult = (await context.aggregateRaw({
-            pipeline: [
-              { $match: { toPath } },
-              {
-                $graphLookup: {
-                  from: 'pageredirects',
-                  startWith: '$fromPath',
-                  connectFromField: 'fromPath',
-                  connectToField: 'toPath',
-                  as: CHAINS_FIELD_NAME,
-                },
-              },
-            ],
-          })) as unknown as RawPageRedirectWithChains[];
+          const aggResult = await aggregateRedirectsReaching(context, toPath);
 
           if (aggResult.length === 0) {
             return;
           }
 
+          // By `_id`, not `fromPath`: where the unique index build failed, two documents
+          // can share a `fromPath` while pointing at different targets, and only the one
+          // this walk reached should go.
           const idsToRemove = aggResult.flatMap((redirectWithChains) => {
             return [
               redirectWithChains._id.$oid,

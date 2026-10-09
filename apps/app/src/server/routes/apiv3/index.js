@@ -3,6 +3,7 @@ import express from 'express';
 
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
+import { getBacklinksHandlerFactory } from '~/features/backlinks/server/routes/backlinks';
 import { listCommentsRouteHandlersFactory } from '~/features/comment/server/routes/list';
 import { setup as setupExternalUserGroup } from '~/features/external-user-group/server/routes/apiv3/external-user-group';
 import { setup as setupExternalUserGroupRelation } from '~/features/external-user-group/server/routes/apiv3/external-user-group-relation';
@@ -200,7 +201,12 @@ export const setup = (crowi, app) => {
 
   router.use('/search', setupSearch(crowi));
 
-  router.use('/page', setupPage(crowi));
+  {
+    const pageRouter = setupPage(crowi);
+    pageRouter.get('/backlinks', getBacklinksHandlerFactory(crowi));
+    router.use('/page', pageRouter);
+  }
+
   router.use('/pages', setupPages(crowi));
   {
     const revisionsRouter = setupRevisions(crowi);
