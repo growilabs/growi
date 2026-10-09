@@ -18,12 +18,15 @@ class NotificationDeleteModal extends React.PureComponent {
         </ModalHeader>
         <ModalBody>
           <p>
-            {t('notification_settings.delete_notification_pattern_desc1', {
-              path: notificationForConfiguration.triggerPath,
-            })}
+            {t(
+              'admin:notification_settings.delete_notification_pattern_desc1',
+              {
+                path: notificationForConfiguration.triggerPath,
+              },
+            )}
           </p>
           <p className="text-danger">
-            {t('notification_settings.delete_notification_pattern_desc2')}
+            {t('admin:notification_settings.delete_notification_pattern_desc2')}
           </p>
         </ModalBody>
         <ModalFooter>

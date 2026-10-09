@@ -66,7 +66,9 @@ describe('FileUploadSetting', () => {
 
     render(<FileUploadSetting />);
 
-    expect(screen.getByRole('button', { name: 'Update' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'commons:Update' }),
+    ).toBeInTheDocument();
   });
 
   it('still renders the update button on GROWI.cloud, so cloud-editable fields (e.g. relay mode) can be saved', () => {
@@ -75,6 +77,8 @@ describe('FileUploadSetting', () => {
 
     render(<FileUploadSetting />);
 
-    expect(screen.getByRole('button', { name: 'Update' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'commons:Update' }),
+    ).toBeInTheDocument();
   });
 });

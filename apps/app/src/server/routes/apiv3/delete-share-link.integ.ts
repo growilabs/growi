@@ -22,8 +22,8 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
-import ShareLink from '~/server/models/share-link';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
+import { prisma } from '~/utils/prisma';
 
 type AuthenticatedRequest = Request & {
   user?: HydratedDocument<IUserHasId>;
@@ -134,31 +134,39 @@ describe('DELETE /share-links/:id', () => {
   });
 
   it('returns 404 and does not delete the share link when the related page no longer exists', async () => {
-    const shareLink = await ShareLink.create({
-      relatedPage: new mongoose.Types.ObjectId(),
+    const shareLink = await prisma.sharelinks.create({
+      data: {
+        relatedPageId: new mongoose.Types.ObjectId().toString(),
+      },
     });
 
     const response = await request(app).delete(`/${shareLink._id}`);
 
     expect(response.status).toBe(404);
-    const stillExists = await ShareLink.findById(shareLink._id);
+    const stillExists = await prisma.sharelinks.findUnique({
+      where: { id: shareLink._id },
+    });
     expect(stillExists).not.toBeNull();
 
-    await ShareLink.deleteOne({ _id: shareLink._id });
+    await prisma.sharelinks.delete({ where: { id: shareLink._id } });
   });
 
   it('returns 404 (same status) and does not delete the share link when the requester may not read the related page', async () => {
-    const shareLink = await ShareLink.create({
-      relatedPage: forbiddenPage._id,
+    const shareLink = await prisma.sharelinks.create({
+      data: {
+        relatedPageId: forbiddenPage._id.toString(),
+      },
     });
 
     const response = await request(app).delete(`/${shareLink._id}`);
 
     expect(response.status).toBe(404);
-    const stillExists = await ShareLink.findById(shareLink._id);
+    const stillExists = await prisma.sharelinks.findUnique({
+      where: { id: shareLink._id },
+    });
     expect(stillExists).not.toBeNull();
 
-    await ShareLink.deleteOne({ _id: shareLink._id });
+    await prisma.sharelinks.delete({ where: { id: shareLink._id } });
   });
 
   it('deletes the share link when an admin makes the request, even if the related page no longer exists', async () => {
@@ -180,14 +188,18 @@ describe('DELETE /share-links/:id', () => {
     const adminApp = buildApp(adminUser);
     adminApp.use('/', setup(crowi));
 
-    const shareLink = await ShareLink.create({
-      relatedPage: new mongoose.Types.ObjectId(),
+    const shareLink = await prisma.sharelinks.create({
+      data: {
+        relatedPageId: new mongoose.Types.ObjectId().toString(),
+      },
     });
 
     const response = await request(adminApp).delete(`/${shareLink._id}`);
 
     expect(response.status).toBe(200);
-    const stillExists = await ShareLink.findById(shareLink._id);
+    const stillExists = await prisma.sharelinks.findUnique({
+      where: { id: shareLink._id },
+    });
     expect(stillExists).toBeNull();
   });
 });

@@ -24,7 +24,7 @@ const AdminAppPage: NextPageWithLayout<Props> = () => (
 );
 
 AdminAppPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('plugins.plugins'),
+  title: (_p, t) => t('admin:plugins.plugins'),
   containerFactories: [
     async () => {
       const AdminAppContainer =

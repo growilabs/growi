@@ -23,7 +23,8 @@ const AdminLegacySlackIntegrationPage: NextPageWithLayout<Props> = () => (
 );
 
 AdminLegacySlackIntegrationPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('slack_integration_legacy.slack_integration_legacy'),
+  title: (_p, t) =>
+    t('admin:slack_integration_legacy.slack_integration_legacy'),
   containerFactories: [
     async () => {
       const AdminSlackIntegrationLegacyContainer =

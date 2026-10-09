@@ -1,0 +1,411 @@
+/**
+ * A single inline comment in the comment list. In its read-only display, the
+ * box, header row, and body container all come from the shared
+ * `CommentCard`, so an inline comment sits in exactly the same box as a
+ * normal comment; only the parts that genuinely differ are supplied through
+ * its slots (the resolved badge/toggle via `headerEnd`, the anchored quote
+ * via `beforeBody`).
+ *
+ * While editing, `CommentCard` is not kept mounted underneath the editor --
+ * it is replaced entirely by the bare `CommentEditor`, matching
+ * `Comment.tsx`'s own re-edit exactly (user request: keeping the
+ * box/header/quote/badge visible around a second, nested editor UI read as
+ * redundant, not as an intentionally-kept feature). This means
+ * the badge, resolve toggle, and quote are all hidden for the duration of an
+ * edit, same as a normal comment's revision link and header disappear during
+ * its own edit.
+ *
+ * `RevisionRenderer` receives `additionalClassName="comment"`, matching
+ * `Comment.tsx`; without it, `Comment.module.scss`'s paragraph/blockquote
+ * spacing (scoped to `.wiki.comment`) never reaches an inline comment.
+ *
+ * Edit/delete: shown only to the comment's own creator (`comment.creatorId
+ * === currentUser?._id` — `creator` is not used for this check since a
+ * write route's response carries no populated `creator`, and the popover
+ * cannot rely on one either). The buttons themselves, and the read-only-user
+ * gating around them, come from the shared `CommentEditDeleteButtons` --
+ * the same component `CommentControl.tsx` uses for a normal comment.
+ * Deleting opens the `DeleteConfirmAlert` shown in place, the same
+ * confirmation a normal comment uses.
+ *
+ * A collapsed resolved comment renders `CollapsedInlineCommentItem` instead;
+ * the quote and the status badge are shared parts, so the two displays
+ * cannot drift apart.
+ *
+ * On viewports narrower than `md`, edit/delete/resolve/history collapse into
+ * a three-dot menu (Requirement 24) — hover-reveal is useless on touch, and
+ * the pill row wraps. Collapse and the status badge stay outside the menu.
+ */
+import { type FC, type JSX, useState } from 'react';
+import { useRouter } from 'next/router';
+import * as pathUtils from '@growi/core/dist/utils/path-utils';
+import { useTranslation } from 'react-i18next';
+import urljoin from 'url-join';
+
+import {
+  NotAvailableIfReadOnlyUserNotAllowedToComment,
+  useIsCommentActionBlockedForReadOnlyUser,
+} from '~/client/components/NotAvailableForReadOnlyUser';
+import { CommentCard } from '~/client/components/PageComment/CommentCard';
+import { CommentEditDeleteButtons } from '~/client/components/PageComment/CommentEditDeleteButtons';
+import { CommentEditor } from '~/client/components/PageComment/CommentEditor';
+import { CommentRevisionLink } from '~/client/components/PageComment/CommentRevisionLink';
+import { DeleteConfirmAlert } from '~/client/components/PageComment/DeleteConfirmAlert';
+import RevisionRenderer from '~/components/PageView/RevisionRenderer';
+import type { RendererOptions } from '~/interfaces/renderer-options';
+import { useCurrentUser } from '~/states/global';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
+
+import type { InlineCommentWithReplies } from '../../../interfaces';
+import {
+  InlineCommentListMenu,
+  type InlineCommentListMenuItem,
+} from '../InlineCommentListMenu/InlineCommentListMenu';
+import { CollapsedInlineCommentItem } from './CollapsedInlineCommentItem';
+import { InlineCommentQuote } from './InlineCommentQuote';
+import { InlineCommentReplies } from './InlineCommentReplies';
+import { InlineCommentStatusBadge } from './InlineCommentStatusBadge';
+
+import styles from './InlineCommentItem.module.scss';
+
+type InlineCommentItemProps = {
+  comment: InlineCommentWithReplies;
+  pagePath: string;
+  /**
+   * Undefined while the caller's renderer options are still loading — the
+   * body then falls back to plain text rather than blocking the whole list
+   * on the renderer-options fetch.
+   */
+  rendererOptions: RendererOptions | undefined;
+  resolve: (id: string, resolved: boolean) => Promise<unknown>;
+  createReply: (parentId: string, comment: string) => Promise<unknown>;
+  /** Persists an edited origin-comment body. */
+  update: (id: string, comment: string) => Promise<unknown>;
+  /** Deletes the origin comment, along with its replies. */
+  remove: (id: string) => Promise<unknown>;
+  /** Persists an edited reply body, forwarded to `InlineCommentReplies`. */
+  updateReply: (id: string, comment: string) => Promise<unknown>;
+  /** Deletes a single reply, forwarded to `InlineCommentReplies`. */
+  removeReply: (id: string) => Promise<unknown>;
+  /**
+   * Scrolls the page body to the highlighted range this comment anchors to.
+   * Wired to the anchored quote below; the boolean re-anchor-failure result
+   * is handled entirely inside `scrollToRange` itself.
+   */
+  scrollToRange: (commentId: string) => boolean;
+  /** Owned by the list; only ever true for a resolved comment. */
+  collapsed: boolean;
+  onExpand: () => void;
+  onCollapse: () => void;
+};
+
+export const InlineCommentItem: FC<InlineCommentItemProps> = (
+  props,
+): JSX.Element => {
+  const {
+    comment,
+    pagePath,
+    rendererOptions,
+    resolve,
+    createReply,
+    update,
+    remove,
+    updateReply,
+    removeReply,
+    scrollToRange,
+    collapsed,
+    onExpand,
+    onCollapse,
+  } = props;
+  const { t } = useTranslation();
+  const router = useRouter();
+  const currentUser = useCurrentUser();
+  const [isLargerThanMd] = useDeviceLargerThanMd();
+  const isCommentActionBlocked = useIsCommentActionBlockedForReadOnlyUser();
+
+  const [resolveError, setResolveError] = useState<string>();
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>();
+
+  const isResolved = comment.resolvedAt != null;
+  const isOwnComment = currentUser?._id === comment.creatorId;
+
+  // Branching after the hooks keeps this component mounted while collapsed,
+  // so its local state survives a collapse/expand round trip.
+  if (collapsed) {
+    return (
+      <CollapsedInlineCommentItem
+        comment={comment}
+        rendererOptions={rendererOptions}
+        onExpand={onExpand}
+        onQuoteClick={() => scrollToRange(comment.id)}
+      />
+    );
+  }
+
+  // `opacity-75` is what makes a resolved comment recede, mirroring the
+  // mockup's `.ic-item[data-resolved="true"] { opacity: .8 }`. Besides the
+  // badge's wording/color and the toggle's wording, that fade is the only
+  // thing the resolved state changes — the layout stays identical.
+  const resolvedRootClassName = isResolved
+    ? 'inline-comment-item-resolved opacity-75'
+    : undefined;
+
+  const handleResolveToggle = async (): Promise<void> => {
+    try {
+      await resolve(comment.id, !isResolved);
+      setResolveError(undefined);
+    } catch (err) {
+      setResolveError(
+        err instanceof Error
+          ? err.message
+          : 'An unknown error occurred when updating the resolved status',
+      );
+    }
+  };
+
+  const handleQuoteClick = (): void => {
+    scrollToRange(comment.id);
+  };
+
+  const handleEditCancel = (): void => {
+    setIsEditing(false);
+  };
+
+  const handleDeleteConfirm = async (): Promise<void> => {
+    try {
+      await remove(comment.id);
+      setDeleteError(undefined);
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error
+          ? err.message
+          : 'An unknown error occurred when deleting the comment',
+      );
+    } finally {
+      setIsDeleteConfirmOpen(false);
+    }
+  };
+
+  const { returnPathForURL } = pathUtils;
+  const revisionHref = urljoin(
+    returnPathForURL(pagePath, comment.pageId),
+    `?revisionId=${comment.anchorOriginRevisionId}`,
+  );
+
+  const narrowMenuItems: InlineCommentListMenuItem[] = [];
+  if (isOwnComment) {
+    narrowMenuItems.push(
+      {
+        id: 'edit',
+        labelKey: 'Edit',
+        icon: 'edit',
+        disabled: isCommentActionBlocked,
+        onSelect: () => setIsEditing(true),
+      },
+      {
+        id: 'delete',
+        labelKey: 'Delete',
+        icon: 'delete',
+        disabled: isCommentActionBlocked,
+        onSelect: () => setIsDeleteConfirmOpen(true),
+      },
+    );
+  }
+  narrowMenuItems.push(
+    {
+      id: 'resolve',
+      labelKey: isResolved ? 'inline_comment.reopen' : 'inline_comment.resolve',
+      icon: isResolved ? 'undo' : 'check_circle',
+      disabled: isCommentActionBlocked,
+      onSelect: () => {
+        void handleResolveToggle();
+      },
+    },
+    {
+      id: 'view-at-posting',
+      labelKey: 'inline_comment.view_at_posting',
+      icon: 'history',
+      disabled: false,
+      onSelect: () => {
+        void router.push(revisionHref);
+      },
+    },
+  );
+
+  const collapseButton =
+    isResolved && !isDeleteConfirmOpen ? (
+      <button
+        type="button"
+        data-testid="inline-comment-collapse-button"
+        className="btn btn-sm btn-link text-secondary text-decoration-none p-0 d-inline-flex align-items-center lh-1"
+        aria-label={t('inline_comment.collapse')}
+        onClick={onCollapse}
+      >
+        <span className="material-symbols-outlined" aria-hidden="true">
+          expand_less
+        </span>
+      </button>
+    ) : null;
+
+  const statusBadge = <InlineCommentStatusBadge isResolved={isResolved} />;
+
+  const desktopHeaderEnd = (
+    <>
+      {/* Same position as a normal comment's own history link:
+          right after the date, not part of the `ms-auto` group
+          below. */}
+      <span className={`ms-2 ${styles['icon-button-container']}`}>
+        <CommentRevisionLink
+          id={comment.id}
+          pagePath={pagePath}
+          pageId={comment.pageId}
+          revisionId={comment.anchorOriginRevisionId}
+        />
+      </span>
+      {/* Order left-to-right: edit/delete, resolve/reopen, collapse (resolved
+          only), status badge. Edit/delete and resolve share
+          `.icon-button-container` (hover-revealed). The badge stays outside
+          and always visible. */}
+      <span className="ms-auto d-flex align-items-center gap-2">
+        {isOwnComment && !isDeleteConfirmOpen && (
+          <span
+            className={`d-flex align-items-center gap-1 ${styles['icon-button-container']}`}
+          >
+            <CommentEditDeleteButtons
+              testIdPrefix="inline-comment"
+              onClickEditBtn={() => setIsEditing(true)}
+              onClickDeleteBtn={() => setIsDeleteConfirmOpen(true)}
+            />
+          </span>
+        )}
+        {/* Neither the resolve toggle nor the collapse button while the
+            delete confirm is open: resolving collapses the item, and
+            the still-set confirm would reappear on the next expand. */}
+        {!isDeleteConfirmOpen && (
+          <span className={styles['icon-button-container']}>
+            <NotAvailableIfReadOnlyUserNotAllowedToComment>
+              <button
+                type="button"
+                data-testid="inline-comment-resolve-toggle-button"
+                className="btn btn-sm btn-outline-secondary rounded-pill"
+                onClick={handleResolveToggle}
+              >
+                {isResolved
+                  ? t('inline_comment.reopen')
+                  : t('inline_comment.resolve')}
+              </button>
+            </NotAvailableIfReadOnlyUserNotAllowedToComment>
+          </span>
+        )}
+        {collapseButton}
+        {statusBadge}
+      </span>
+    </>
+  );
+
+  const narrowHeaderEnd = (
+    <span className="ms-auto d-flex align-items-center gap-2">
+      {!isDeleteConfirmOpen && (
+        <InlineCommentListMenu
+          items={narrowMenuItems}
+          ariaLabelKey="inline_comment.item_menu"
+          toggleTestId="inline-comment-item-menu-toggle"
+        />
+      )}
+      {collapseButton}
+      {statusBadge}
+    </span>
+  );
+
+  return (
+    <div
+      data-testid="inline-comment-item"
+      data-resolved={isResolved}
+      className={`inline-comment-item mb-3 ${styles['inline-comment-item-styles']}`}
+    >
+      {isEditing ? (
+        // Matches `Comment.tsx`'s own re-edit -- the whole `CommentCard`
+        // (box, header, quote, badge, resolve toggle)
+        // is replaced by the bare `CommentEditor` while editing, not kept
+        // mounted underneath it. `onSubmit` overrides `CommentEditor`'s
+        // default post/update path to route through this comment's own
+        // `update`, the same override technique `InlineCommentReplies.tsx`'s
+        // reply composer already uses for `createReply`.
+        <CommentEditor
+          pageId={comment.pageId}
+          currentCommentId={comment.id}
+          commentBody={comment.comment}
+          revisionId={comment.anchorOriginRevisionId}
+          onCanceled={handleEditCancel}
+          onCommented={() => setIsEditing(false)}
+          onSubmit={(text) => update(comment.id, text)}
+        />
+      ) : (
+        <CommentCard
+          id={comment.id}
+          creator={comment.creator}
+          createdAt={comment.createdAt}
+          rootClassName={resolvedRootClassName}
+          headerEnd={isLargerThanMd ? desktopHeaderEnd : narrowHeaderEnd}
+          beforeBody={
+            <InlineCommentQuote
+              quote={comment.anchor.quote}
+              onClick={handleQuoteClick}
+            />
+          }
+          footer={
+            <>
+              {resolveError != null && (
+                <span
+                  className="text-danger d-block"
+                  data-testid="inline-comment-resolve-error"
+                >
+                  {resolveError}
+                </span>
+              )}
+              {deleteError != null && (
+                <span
+                  className="text-danger d-block"
+                  data-testid="inline-comment-delete-error"
+                >
+                  {deleteError}
+                </span>
+              )}
+              {isDeleteConfirmOpen && (
+                <DeleteConfirmAlert
+                  testIdPrefix="inline-comment"
+                  onCancel={() => setIsDeleteConfirmOpen(false)}
+                  onConfirm={handleDeleteConfirm}
+                />
+              )}
+            </>
+          }
+        >
+          {rendererOptions != null ? (
+            <RevisionRenderer
+              rendererOptions={rendererOptions}
+              markdown={comment.comment}
+              additionalClassName="comment"
+            />
+          ) : (
+            <span>{comment.comment}</span>
+          )}
+        </CommentCard>
+      )}
+
+      <InlineCommentReplies
+        parentId={comment.id}
+        pagePath={pagePath}
+        pageId={comment.pageId}
+        revisionId={comment.anchorOriginRevisionId}
+        replies={comment.replies}
+        rendererOptions={rendererOptions}
+        onSubmitReply={createReply}
+        updateReply={updateReply}
+        removeReply={removeReply}
+      />
+    </div>
+  );
+};

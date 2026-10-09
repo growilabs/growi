@@ -534,7 +534,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               htmlFor="oidcAttrMapUserName"
               className="text-start text-md-end col-md-3 col-form-label"
             >
-              {t('username')}
+              {t('commons:username')}
             </label>
             <div className="col-md-6">
               <input
@@ -558,7 +558,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               htmlFor="oidcAttrMapName"
               className="text-start text-md-end col-md-3 col-form-label"
             >
-              {t('Name')}
+              {t('commons:Name')}
             </label>
             <div className="col-md-6">
               <input
@@ -582,7 +582,7 @@ const OidcSecurityManagementContents = (props: Props) => {
               htmlFor="oidcAttrMapEmail"
               className="text-start text-md-end col-md-3 col-form-label"
             >
-              {t('Email')}
+              {t('commons:Email')}
             </label>
             <div className="col-md-6">
               <input
@@ -595,7 +595,7 @@ const OidcSecurityManagementContents = (props: Props) => {
                   // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted translation markup
                   dangerouslySetInnerHTML={{
                     __html: t('security_settings.OAuth.OIDC.mapping_detail', {
-                      target: t('Email'),
+                      target: t('commons:Email'),
                     }),
                   }}
                 />
@@ -733,7 +733,7 @@ const OidcSecurityManagementContents = (props: Props) => {
                   adminOidcSecurityContainer.state.retrieveError != null
                 }
               >
-                {t('Update')}
+                {t('commons:Update')}
               </button>
             </div>
           </div>

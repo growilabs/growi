@@ -1,6 +1,6 @@
 {
   "_source": "https://models.dev/api.json (MIT)",
-  "_generatedAt": "2026-08-25T14:10:09.998Z",
+  "_generatedAt": "2026-10-07T15:40:51.745Z",
   "models": {
     "openai": [
       {
@@ -128,6 +128,30 @@
         "name": "GPT-5.6 Terra"
       },
       {
+        "id": "gpt-6-astra",
+        "name": "GPT-6 Astra"
+      },
+      {
+        "id": "gpt-6-luna",
+        "name": "GPT-6 Luna"
+      },
+      {
+        "id": "gpt-6-sol",
+        "name": "GPT-6 Sol"
+      },
+      {
+        "id": "gpt-6.1-sol",
+        "name": "GPT-6.1 Sol"
+      },
+      {
+        "id": "gpt-daybreak-blue-latest",
+        "name": "Daybreak Blue"
+      },
+      {
+        "id": "gpt-daybreak-red-latest",
+        "name": "Daybreak Red"
+      },
+      {
         "id": "gpt-realtime-2.1",
         "name": "GPT-Realtime-2.1"
       },
@@ -162,6 +186,10 @@
         "name": "Claude Fable 5"
       },
       {
+        "id": "claude-fable-5-1",
+        "name": "Claude Fable 5.1"
+      },
+      {
         "id": "claude-haiku-4-5",
         "name": "Claude Haiku 4.5 (latest)"
       },
@@ -194,6 +222,10 @@
         "name": "Claude Opus 5"
       },
       {
+        "id": "claude-opus-5-5",
+        "name": "Claude Opus 5.5"
+      },
+      {
         "id": "claude-sonnet-4-5",
         "name": "Claude Sonnet 4.5 (latest)"
       },
@@ -208,6 +240,10 @@
       {
         "id": "claude-sonnet-5",
         "name": "Claude Sonnet 5"
+      },
+      {
+        "id": "claude-sonnet-5-5",
+        "name": "Claude Sonnet 5.5"
       }
     ],
     "google": [
@@ -280,16 +316,16 @@
         "name": "Gemini 3.7 Flash"
       },
       {
+        "id": "gemini-3.8-flash",
+        "name": "Gemini 3.8 Flash"
+      },
+      {
         "id": "gemini-flash-latest",
         "name": "Gemini Flash Latest"
       },
       {
         "id": "gemini-flash-lite-latest",
         "name": "Gemini Flash-Lite Latest"
-      },
-      {
-        "id": "gemini-robotics-er-1.6-preview",
-        "name": "Gemini Robotics-ER 1.6 Preview"
       },
       {
         "id": "gemma-4-26b-a4b-it",

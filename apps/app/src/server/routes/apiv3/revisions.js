@@ -10,6 +10,7 @@ import {
   getAppliedAtForRevisionFilter,
   normalizeLatestRevisionIfBroken,
 } from '~/server/service/revision/normalize-latest-revision-if-broken';
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -271,6 +272,21 @@ export const setup = (crowi) => {
           where: { id: revisionId },
           include: { author: true },
         });
+
+        // The pageId access check above only proves the caller may view the
+        // page identified by the query param — it says nothing about the
+        // revision fetched by the path param. Without this check, a caller
+        // could pair an accessible page's pageId with an arbitrary
+        // revisionId to read another page's revision.
+        if (!isRevisionOfPage(revision, pageId)) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Current user is not accessible to this page.',
+              'forbidden-page',
+            ),
+            403,
+          );
+        }
 
         if (revision.author != null) {
           revision.author = serializeUserSecurely(revision.author);

@@ -84,7 +84,7 @@ const LikeButtons: FC<LikeButtonsProps> = (props: LikeButtonsProps) => {
             {props.likers?.length ? (
               <UserPictureList users={props.likers} />
             ) : (
-              t('No users have liked this yet.')
+              t('No users have liked this yet')
             )}
           </div>
         </PopoverBody>

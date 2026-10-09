@@ -35,7 +35,7 @@ const AdminUserGroupPage: NextPageWithLayout<Props> = (props: Props) => {
 };
 
 AdminUserGroupPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('user_group_management.user_group_management'),
+  title: (_p, t) => t('admin:user_group_management.user_group_management'),
 });
 
 export const getServerSideProps: GetServerSideProps<Props> = async (

@@ -1,22 +1,14 @@
-import type { Document, Model } from 'mongoose';
-import mongoose, { Schema } from 'mongoose';
+import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import type { IShareLink } from '~/interfaces/share-link';
+import { Prisma } from '~/generated/prisma/client';
 
 import { getOrCreateModel } from '../util/mongoose-utils';
 
-export interface ShareLinkDocument extends IShareLink, Document {
-  isExpired: () => boolean;
-}
-
-export type ShareLinkModel = Model<ShareLinkDocument>;
-
-/*
- * define schema
- */
-const schema = new Schema<ShareLinkDocument, ShareLinkModel>(
+// TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
+// Until then, use mongoose to automatically create collections and indexes when connected.
+const schema = new Schema(
   {
     relatedPage: {
       type: Schema.Types.ObjectId,
@@ -34,14 +26,38 @@ const schema = new Schema<ShareLinkDocument, ShareLinkModel>(
 schema.plugin(mongoosePaginate);
 schema.plugin(uniqueValidator);
 
-schema.methods.isExpired = function () {
-  if (this.expiredAt == null) {
-    return false;
-  }
-  return this.expiredAt.getTime() < new Date().getTime();
-};
+getOrCreateModel('ShareLink', schema);
 
-export default getOrCreateModel<ShareLinkDocument, ShareLinkModel>(
-  'ShareLink',
-  schema,
-);
+export const extension = Prisma.defineExtension((client) => {
+  return client.$extends({
+    result: {
+      sharelinks: {
+        // for backward compatibility with mongoose
+        _id: {
+          needs: { id: true },
+          compute(model) {
+            return model.id;
+          },
+        },
+        // for backward compatibility with mongoose
+        __v: {
+          needs: { v: true },
+          compute(model) {
+            return model.v;
+          },
+        },
+        isExpired: {
+          needs: { expiredAt: true },
+          compute(model) {
+            return () => {
+              if (model.expiredAt == null) {
+                return false;
+              }
+              return model.expiredAt.getTime() < Date.now();
+            };
+          },
+        },
+      },
+    },
+  });
+});

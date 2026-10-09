@@ -103,9 +103,9 @@ export const ItemsTree: FC<Props> = (props: Props) => {
       const result = await onDrop(...args);
       if (!result.success) {
         if (result.errorType === 'operation_blocked') {
-          toastWarning(t('page_tree.move_blocked'));
+          toastWarning(t('pagetree.you_cannot_move_this_page_now'));
         } else {
-          toastError(t('page_tree.move_failed'));
+          toastError(t('pagetree.something_went_wrong_with_moving_page'));
         }
       }
     },

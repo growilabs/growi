@@ -45,7 +45,7 @@ const XssForm = (props) => {
         await adminMarkDownContainer.updateXssSetting();
         toastSuccess(
           t('toaster.update_successed', {
-            target: t('markdown_settings.xss_header'),
+            target: t('admin:markdown_settings.xss_header'),
             ns: 'commons',
           }),
         );
@@ -83,11 +83,11 @@ const XssForm = (props) => {
                 htmlFor="xssOption1"
               >
                 <p className="fw-bold">
-                  {t('markdown_settings.xss_options.recommended_setting')}
+                  {t('admin:markdown_settings.xss_options.recommended_setting')}
                 </p>
                 <div className="mt-4">
                   <div className="d-flex justify-content-between">
-                    {t('markdown_settings.xss_options.tag_names')}
+                    {t('admin:markdown_settings.xss_options.tag_names')}
                   </div>
                   <textarea
                     className="form-control xss-list"
@@ -100,7 +100,7 @@ const XssForm = (props) => {
                 </div>
                 <div className="mt-4">
                   <div className="d-flex justify-content-between">
-                    {t('markdown_settings.xss_options.tag_attributes')}
+                    {t('admin:markdown_settings.xss_options.tag_attributes')}
                   </div>
                   <textarea
                     className="form-control xss-list"
@@ -134,7 +134,7 @@ const XssForm = (props) => {
                 htmlFor="xssOption2"
               >
                 <p className="fw-bold">
-                  {t('markdown_settings.xss_options.custom_whitelist')}
+                  {t('admin:markdown_settings.xss_options.custom_whitelist')}
                 </p>
                 <WhitelistInput
                   adminMarkDownContainer={adminMarkDownContainer}
@@ -170,7 +170,9 @@ const XssForm = (props) => {
                   className="form-label form-check-label w-100"
                   htmlFor="XssEnable"
                 >
-                  {t('markdown_settings.xss_options.enable_xss_prevention')}
+                  {t(
+                    'admin:markdown_settings.xss_options.enable_xss_prevention',
+                  )}
                 </label>
               </div>
             </div>

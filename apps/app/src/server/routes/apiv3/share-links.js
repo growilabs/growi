@@ -10,8 +10,8 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import ShareLink from '~/server/models/share-link';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory('growi:routes:apiv3:share-links');
 
@@ -164,9 +164,18 @@ export const setup = (crowi) => {
       }
 
       try {
-        const shareLinksResult = await ShareLink.find({
-          relatedPage: { $eq: relatedPage },
-        }).populate({ path: 'relatedPage', select: 'path' });
+        const shareLinksResult = await prisma.sharelinks.findMany({
+          where: { relatedPageId: relatedPage },
+          include: {
+            relatedPage: {
+              select: {
+                id: true,
+                _id: true,
+                path: true,
+              },
+            },
+          },
+        });
         return res.apiv3({ shareLinksResult });
       } catch (err) {
         const msg = 'Error occurred in get share link';
@@ -245,17 +254,25 @@ export const setup = (crowi) => {
       }
 
       try {
-        const postedShareLink = await ShareLink.create({
-          relatedPage,
-          expiredAt,
-          description,
+        const postedShareLink = await prisma.sharelinks.create({
+          data: {
+            relatedPageId: relatedPage,
+            expiredAt,
+            description,
+          },
         });
 
         activityEvent.emit('update', res.locals.activity._id, {
           action: SupportedAction.ACTION_SHARE_LINK_CREATE,
         });
 
-        return res.apiv3(postedShareLink, 201);
+        return res.apiv3(
+          {
+            ...postedShareLink,
+            relatedPage: postedShareLink.relatedPageId,
+          },
+          201,
+        );
       } catch (err) {
         const msg = 'Error occured in post share link';
         logger.error('Error', err);
@@ -315,15 +332,19 @@ export const setup = (crowi) => {
       }
 
       try {
-        const deletedShareLink = await ShareLink.deleteMany({
-          relatedPage: { $eq: relatedPage },
+        const deletedShareLink = await prisma.sharelinks.deleteMany({
+          where: { relatedPageId: relatedPage },
         });
 
         activityEvent.emit('update', res.locals.activity._id, {
           action: SupportedAction.ACTION_SHARE_LINK_DELETE_BY_PAGE,
         });
 
-        return res.apiv3(deletedShareLink);
+        return res.apiv3({
+          // for mongoose compatibility, return acknowledged and deletedCount
+          acknowledged: true,
+          deletedCount: deletedShareLink.count,
+        });
       } catch (err) {
         const msg = 'Error occured in delete share link';
         logger.error('Error', err);
@@ -361,8 +382,8 @@ export const setup = (crowi) => {
     addActivity,
     async (req, res) => {
       try {
-        const deletedShareLink = await ShareLink.deleteMany({});
-        const { deletedCount } = deletedShareLink;
+        const deletedShareLink = await prisma.sharelinks.deleteMany({});
+        const deletedCount = deletedShareLink.count;
 
         activityEvent.emit('update', res.locals.activity._id, {
           action: SupportedAction.ACTION_SHARE_LINK_ALL_DELETE,
@@ -414,7 +435,9 @@ export const setup = (crowi) => {
       const { user } = req;
 
       try {
-        const shareLinkToDelete = await ShareLink.findOne({ _id: id });
+        const shareLinkToDelete = await prisma.sharelinks.findUnique({
+          where: { id },
+        });
 
         // A nonexistent share-link id must answer the same way as an
         // existing one whose related page cannot be resolved below —
@@ -434,7 +457,7 @@ export const setup = (crowi) => {
         // check permission
         if (!user.isAdmin) {
           const page = await Page.findByIdAndViewer(
-            shareLinkToDelete.relatedPage,
+            shareLinkToDelete.relatedPageId,
             user,
           );
           // Deny whenever the related page cannot be resolved for this viewer
@@ -456,13 +479,18 @@ export const setup = (crowi) => {
         }
 
         // remove
-        await shareLinkToDelete.remove();
+        await prisma.sharelinks.delete({ where: { id } });
 
         activityEvent.emit('update', res.locals.activity._id, {
           action: SupportedAction.ACTION_SHARE_LINK_DELETE,
         });
 
-        return res.apiv3({ deletedShareLink: shareLinkToDelete });
+        return res.apiv3({
+          deletedShareLink: {
+            ...shareLinkToDelete,
+            relatedPage: shareLinkToDelete.relatedPageId,
+          },
+        });
       } catch (err) {
         const msg = 'Error occurred in delete share link';
         logger.error('Error', err);

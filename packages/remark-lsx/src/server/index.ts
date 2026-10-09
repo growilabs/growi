@@ -50,7 +50,13 @@ const paramValidator = (req: Request, res: Response, next: NextFunction) => {
   res.status(400).json({ errors: errs.map((err) => err.message) });
 };
 
-const middleware = (crowi: any, app: any): void => {
+const middleware = (
+  crowi: any,
+  app: any,
+  deps: { resolveTagPageIds: (tagNames: string[]) => Promise<string[]> },
+): void => {
+  const { resolveTagPageIds } = deps;
+
   const loginRequired = crowi.loginRequiredFactory(
     crowi,
     true,
@@ -68,7 +74,7 @@ const middleware = (crowi: any, app: any): void => {
     loginRequired,
     lsxValidator,
     paramValidator,
-    listPages({ getExcludedPaths }),
+    listPages({ getExcludedPaths, resolveTagPageIds }),
   );
 };
 

@@ -1,8 +1,10 @@
+import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
 import { createChatIntegrationRouter } from '~/features/chat-integration/server';
+import { listCommentsRouteHandlersFactory } from '~/features/comment/server/routes/list';
 import { setup as setupExternalUserGroup } from '~/features/external-user-group/server/routes/apiv3/external-user-group';
 import { setup as setupExternalUserGroupRelation } from '~/features/external-user-group/server/routes/apiv3/external-user-group-relation';
 import { setup as growiPlugin } from '~/features/growi-plugin/server/routes/apiv3/admin';
@@ -10,6 +12,13 @@ import {
   createVaultAdminRouterWithDeps,
   createVaultPageRouterWithDeps,
 } from '~/features/growi-vault/server';
+import { createInlineCommentRouteHandlersFactory } from '~/features/inline-comment/server/routes/create';
+import { createInlineCommentReplyRouteHandlersFactory } from '~/features/inline-comment/server/routes/create-reply';
+import { deleteInlineCommentRouteHandlersFactory } from '~/features/inline-comment/server/routes/delete';
+import { deleteInlineCommentReplyRouteHandlersFactory } from '~/features/inline-comment/server/routes/delete-reply';
+import { resolveInlineCommentRouteHandlersFactory } from '~/features/inline-comment/server/routes/resolve';
+import { updateInlineCommentRouteHandlersFactory } from '~/features/inline-comment/server/routes/update';
+import { updateInlineCommentReplyRouteHandlersFactory } from '~/features/inline-comment/server/routes/update-reply';
 import { factory as mastraRouteFactory } from '~/features/mastra/server/routes';
 import { factory as adminAiSettingsRouteFactory } from '~/features/mastra/server/routes/admin-ai-settings';
 import newsRoute from '~/features/news/server/routes/news';
@@ -203,6 +212,52 @@ export const setup = (crowi, app) => {
 
   // vault user API (POST /page/reconcile) — loginRequired only, no adminRequired
   router.use('/vault', createVaultPageRouterWithDeps(crowi));
+
+  {
+    // certifySharedPage is intentionally never applied to any of these routes.
+    const inlineCommentsRouter = express.Router();
+    inlineCommentsRouter.post(
+      '/',
+      createInlineCommentRouteHandlersFactory(crowi),
+    );
+    inlineCommentsRouter.post(
+      '/:id/replies',
+      createInlineCommentReplyRouteHandlersFactory(crowi),
+    );
+    inlineCommentsRouter.put(
+      '/:id/resolve',
+      resolveInlineCommentRouteHandlersFactory(crowi),
+    );
+    inlineCommentsRouter.put(
+      '/:id',
+      updateInlineCommentRouteHandlersFactory(crowi),
+    );
+    inlineCommentsRouter.put(
+      '/replies/:id',
+      updateInlineCommentReplyRouteHandlersFactory(crowi),
+    );
+    inlineCommentsRouter.delete(
+      '/:id',
+      deleteInlineCommentRouteHandlersFactory(crowi),
+    );
+    inlineCommentsRouter.delete(
+      '/replies/:id',
+      deleteInlineCommentReplyRouteHandlersFactory(crowi),
+    );
+    router.use('/inline-comments', inlineCommentsRouter);
+    // apiv3 has no catch-all, so an unmatched GET would be delegated to the
+    // Next.js pages (302 to /login or an HTML 200) instead of a JSON error.
+    router.get('/inline-comments', (req, res) =>
+      res.apiv3Err(new ErrorV3('Not found', 'not_found'), 404),
+    );
+  }
+
+  {
+    // Read-only: only GET is registered on /comments.
+    const commentsRouter = express.Router();
+    commentsRouter.get('/', listCommentsRouteHandlersFactory(crowi));
+    router.use('/comments', commentsRouter);
+  }
 
   router.use('/page-listing', pageListing(crowi));
 

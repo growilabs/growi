@@ -173,15 +173,26 @@ model comments {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  creator  users?     @relation(fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  revision revisions? @relation(fields: [revisionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  replyTo  comments?  @relation("CommentToReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  replies  comments[] @relation("CommentToReply")
+  isInline               Boolean   @default(false)
+  quote                  String?
+  prefix                 String?
+  suffix                 String?
+  approxOffset           Int?
+  anchorOriginRevisionId String?   @db.ObjectId
+  resolvedById           String?   @db.ObjectId
+  resolvedAt             DateTime?
+
+  page       pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  creator    users?     @relation("CommentCreator", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revision   revisions? @relation(fields: [revisionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replyTo    comments?  @relation("CommentToReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies    comments[] @relation("CommentToReply")
+  resolvedBy users?     @relation("InlineCommentResolver", fields: [resolvedById], references: [id])
 
   @@index([pageId], map: "page_1")
   @@index([creatorId], map: "creator_1")
   @@index([revisionId], map: "revision_1")
+  @@index([pageId, isInline])
 }
 
 model configs {
@@ -360,8 +371,9 @@ model pageoperations {
 
 model pageredirects {
   id       String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  fromPath Json?  @unique(map: "fromPath_1")
+  v        Int    @default(0) @map("__v")
+  fromPath String @unique(map: "fromPath_1")
+  toPath   String
 }
 
 model pages {
@@ -387,9 +399,9 @@ model pages {
   revisionId               String?   @map("revision") @db.ObjectId
   seenUsers                String[]
   status                   String    @default("published")
-  ttlTimestamp             DateTime?
   updatedAt                DateTime  @default(now())
   wip                      Boolean?
+  wipExpiredAt             DateTime?
 
   creator          users?             @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   lastUpdateUser   users?             @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -401,6 +413,7 @@ model pages {
   attachments      attachments[]
   bookmarks        bookmarks[]
   pagetagrelations pagetagrelations[]
+  sharelinks       sharelinks[]
 
   @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")
@@ -409,7 +422,11 @@ model pages {
   @@index([creatorId], map: "creator_1")
   @@index([createdAt], map: "createdAt_1")
   @@index([updatedAt], map: "updatedAt_1")
-  @@index([ttlTimestamp], map: "ttlTimestamp_1")
+  // The mongoose schema declares this index as sparse; Prisma cannot express that,
+  // so once `prisma db push` takes over index creation (see .claude/rules/model.md)
+  // the sparse option has to be re-applied out of band. It must never regain
+  // expireAfterSeconds — see server/models/no-ttl-index-on-page.spec.ts.
+  @@index([wipExpiredAt], map: "wipExpiredAt_1")
 }
 
 model pagetagrelations {
@@ -472,11 +489,16 @@ model sessions {
 }
 
 model sharelinks {
-  id          String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  relatedPage Json?
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  v             Int       @default(0) @map("__v")
+  relatedPageId String    @map("relatedPage") @db.ObjectId
+  expiredAt     DateTime?
+  description   String?
+  createdAt     DateTime  @default(now())
 
-  @@index([relatedPage], map: "relatedPage_1")
+  relatedPage pages @relation(fields: [relatedPageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([relatedPageId], map: "relatedPage_1")
 }
 
 model slackappintegrations {
@@ -579,17 +601,18 @@ model users {
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
-  activities         activities[]
-  comments           comments[]
-  revisions          revisions[]
-  createdPages       pages[]            @relation("CreatedPages")
-  deletedPages       pages[]            @relation("DeletedPages")
-  lastUpdatedPages   pages[]            @relation("LastUpdatedPages")
-  imageAttachment    attachments?       @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
-  createdAttachments attachments[]      @relation("CreatedAttachments")
-  externalaccounts   externalaccounts[]
-  bookmarks          bookmarks[]
-  bookmarkfolders    bookmarkfolders[]
+  activities             activities[]
+  comments               comments[]         @relation("CommentCreator")
+  resolvedInlineComments comments[]         @relation("InlineCommentResolver")
+  revisions              revisions[]
+  createdPages           pages[]            @relation("CreatedPages")
+  deletedPages           pages[]            @relation("DeletedPages")
+  lastUpdatedPages       pages[]            @relation("LastUpdatedPages")
+  imageAttachment        attachments?       @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
+  createdAttachments     attachments[]      @relation("CreatedAttachments")
+  externalaccounts       externalaccounts[]
+  bookmarks              bookmarks[]
+  bookmarkfolders        bookmarkfolders[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")

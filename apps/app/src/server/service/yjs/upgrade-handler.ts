@@ -10,6 +10,10 @@ import type { SessionConfig } from '~/interfaces/session-config';
 import loggerFactory from '~/utils/logger';
 
 import type { PageModel } from '../../models/page';
+import {
+  isActiveUserStatus,
+  isReadOnlyUser,
+} from '../../models/user/predicates';
 
 const logger = loggerFactory('growi:service:yjs:upgrade-handler');
 
@@ -107,22 +111,34 @@ export const createUpgradeHandler = (sessionConfig: SessionConfig) => {
 
     const user = (request as AuthenticatedRequest).user ?? null;
 
+    // A Yjs connection can write to the document, so require the same user
+    // conditions as the page update API (loginRequiredStrictly +
+    // excludeReadOnlyUser), not just view access.
+    if (user == null) {
+      logger.warn({ pageId }, 'Yjs upgrade rejected: Unauthorized');
+      writeErrorResponse(socket, 401, 'Unauthorized');
+      return { authorized: false, statusCode: 401 };
+    }
+    if (!isActiveUserStatus(user.status) || isReadOnlyUser(user)) {
+      logger.warn(
+        { pageId, userId: user._id },
+        'Yjs upgrade rejected: user is not allowed to edit',
+      );
+      writeErrorResponse(socket, 403, 'Forbidden');
+      return { authorized: false, statusCode: 403 };
+    }
+
     // Check page access
     const Page = mongoose.model<IPage, PageModel>('Page');
     const isAccessible = await Page.isAccessiblePageByViewer(pageId, user);
 
     if (!isAccessible) {
-      const statusCode = user == null ? 401 : 403;
-      const message = user == null ? 'Unauthorized' : 'Forbidden';
       logger.warn(
-        {
-          pageId,
-          userId: user?._id,
-        },
-        `Yjs upgrade rejected: ${message}`,
+        { pageId, userId: user._id },
+        'Yjs upgrade rejected: page is not accessible',
       );
-      writeErrorResponse(socket, statusCode, message);
-      return { authorized: false, statusCode };
+      writeErrorResponse(socket, 403, 'Forbidden');
+      return { authorized: false, statusCode: 403 };
     }
 
     return {

@@ -3,6 +3,18 @@ import { expect, test } from '@playwright/test';
 test.describe('Sticky features', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+
+    // react-stickynode measures the wrapper's initial offset at mount time.
+    // Scrolling immediately after goto() races that measurement against
+    // client-side hydration and any post-load data fetches that affect
+    // layout (e.g. sidebar width), which intermittently leaves the very
+    // first scroll event checked against a stale/not-yet-computed trigger
+    // point. Waiting for the network to settle and the wrapper to actually
+    // be visible before scrolling lets that initial measurement complete
+    // first. See growilabs/growi#11780, #11797, #11798 (and sibling issues
+    // in this file) for the flaky occurrences this addresses.
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.sticky-outer-wrapper').first()).toBeVisible();
   });
 
   test('Subnavigation displays changes on scroll down and up', async ({

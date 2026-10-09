@@ -7,7 +7,6 @@ import type { MockInstance } from 'vitest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
-import type { ShareLinkModel } from '~/server/models/share-link';
 import { prisma } from '~/utils/prisma';
 
 const { ObjectId } = Types;
@@ -42,7 +41,6 @@ describe('/comments.get share-link authorization (integration)', () => {
   // typed `any`, so there is no usable type to spy on here.
   // biome-ignore lint/suspicious/noExplicitAny: no usable type for Page (see above)
   let Page: any;
-  let ShareLink: ShareLinkModel;
   let certifySharedPage: RequestHandler;
 
   // Controllable request user, read by the injector middleware at request time.
@@ -56,14 +54,13 @@ describe('/comments.get share-link authorization (integration)', () => {
   const revBId = new ObjectId();
   let commentAId: string;
   let commentBId: string;
+  let inlineCommentAId: string;
   let shareLinkAId: Types.ObjectId;
   let expiredShareLinkId: Types.ObjectId;
 
   beforeAll(async () => {
     crowi = await getInstance();
     Page = crowi.models.Page;
-
-    ShareLink = (await import('~/server/models/share-link')).default;
 
     // api.remove reads the comment with `include: { page: true }` (a required
     // relation), so the referenced pages must actually exist: Prisma throws on a
@@ -110,14 +107,35 @@ describe('/comments.get share-link authorization (integration)', () => {
     commentAId = commentA.id;
     commentBId = commentB.id;
 
-    // Share links related to page A: one valid, one expired.
-    const shareLinkA = await ShareLink.create({ relatedPage: pageAId });
-    const expiredShareLink = await ShareLink.create({
-      relatedPage: pageAId,
-      expiredAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    // An inline comment on page A, seeded alongside the normal comment above.
+    // `prisma.comments.add` never writes `isInline`, so this is created
+    // directly through `prisma.comments.create` (task 1.3: the read paths
+    // exercised below must exclude this row unconditionally).
+    const inlineCommentA = await prisma.comments.create({
+      data: {
+        pageId: pageAId.toString(),
+        creatorId: new ObjectId().toString(),
+        revisionId: revAId.toString(),
+        comment: 'inline comment on page A',
+        commentPosition: -1,
+        isInline: true,
+        quote: 'quoted text',
+      },
     });
-    shareLinkAId = shareLinkA._id;
-    expiredShareLinkId = expiredShareLink._id;
+    inlineCommentAId = inlineCommentA.id;
+
+    // Share links related to page A: one valid, one expired.
+    const shareLinkA = await prisma.sharelinks.create({
+      data: { relatedPageId: pageAId.toString() },
+    });
+    const expiredShareLink = await prisma.sharelinks.create({
+      data: {
+        relatedPageId: pageAId.toString(),
+        expiredAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      },
+    });
+    shareLinkAId = new ObjectId(shareLinkA.id);
+    expiredShareLinkId = new ObjectId(expiredShareLink.id);
 
     const apiV1FormValidator = (
       await import('~/server/middlewares/apiv1-form-validator')
@@ -199,15 +217,27 @@ describe('/comments.get share-link authorization (integration)', () => {
   });
 
   afterAll(async () => {
+    // comments also has a required relation to revisions (onDelete: NoAction),
+    // so it must be deleted first and alone. revisions/sharelinks then have no
+    // relation to each other -- only to pages -- so they can run concurrently.
+    // pages must be deleted last, and separately, or Prisma throws P2014 for
+    // deleting a page while a dependent still refers to it (see the same
+    // reasoning in delete-completely-operation.ts).
     await prisma.comments.deleteMany({
-      where: { id: { in: [commentAId, commentBId] } },
+      where: { id: { in: [commentAId, commentBId, inlineCommentAId] } },
     });
-    await prisma.revisions.deleteMany({ where: { id: revAId.toString() } });
+    await Promise.all([
+      prisma.revisions.deleteMany({ where: { id: revAId.toString() } }),
+      prisma.sharelinks.deleteMany({
+        where: {
+          id: {
+            in: [shareLinkAId.toString(), expiredShareLinkId.toString()],
+          },
+        },
+      }),
+    ]);
     await prisma.pages.deleteMany({
       where: { id: { in: [pageAId.toString(), pageBId.toString()] } },
-    });
-    await ShareLink.deleteMany({
-      _id: { $in: [shareLinkAId, expiredShareLinkId] },
     });
   });
 
@@ -381,7 +411,21 @@ describe('/comments.get share-link authorization (integration)', () => {
       expect(res.body.comments[0]._id).toBe(commentAId.toString());
     });
 
-    it('still honors revision_id outside a share context', async () => {
+    it('honors revision_id outside a share context when the revision belongs to the page', async () => {
+      currentUser = { _id: new ObjectId() };
+      accessSpy.mockResolvedValue(true);
+
+      const res = await request(app)
+        .get('/comments.get')
+        .query({ page_id: pageAId.toString(), revision_id: revAId.toString() });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.comments).toHaveLength(1);
+      expect(res.body.comments[0]._id).toBe(commentAId.toString());
+    });
+
+    it('does not return another page comments when revision_id belongs to a different page', async () => {
       currentUser = { _id: new ObjectId() };
       accessSpy.mockResolvedValue(true);
 
@@ -391,9 +435,8 @@ describe('/comments.get share-link authorization (integration)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.ok).toBe(true);
-      // non-shared revision_id path is preserved -> resolves page B's comment
       expect(res.body.comments).toHaveLength(1);
-      expect(res.body.comments[0]._id).toBe(commentBId.toString());
+      expect(res.body.comments[0]._id).toBe(commentAId.toString());
     });
 
     it('denies an authenticated viewer who cannot access the page', async () => {
@@ -416,6 +459,47 @@ describe('/comments.get share-link authorization (integration)', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.comments).toBeUndefined();
+    });
+  });
+
+  /**
+   * Requirements 6.1 / 6.3: `/comments.get` must never return an
+   * `isInline: true` row, in either the shared-link context or the normal
+   * (non-shared) context. Page A carries both a normal comment
+   * (`commentAId`) and an inline comment (`inlineCommentAId`) seeded above;
+   * every assertion below checks the response contains only the normal one.
+   */
+  describe('GET /comments.get — inline comments are excluded (6.1, 6.3)', () => {
+    it('excludes isInline rows in the share-link context', async () => {
+      const res = await request(app).get('/comments.get').query({
+        page_id: pageAId.toString(),
+        shareLinkId: shareLinkAId.toString(),
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      const ids = res.body.comments.map(
+        (comment: { _id: string }) => comment._id,
+      );
+      expect(ids).toContain(commentAId.toString());
+      expect(ids).not.toContain(inlineCommentAId.toString());
+    });
+
+    it('excludes isInline rows in the normal (non-shared) context', async () => {
+      currentUser = { _id: new ObjectId() };
+      accessSpy.mockResolvedValue(true);
+
+      const res = await request(app)
+        .get('/comments.get')
+        .query({ page_id: pageAId.toString() });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      const ids = res.body.comments.map(
+        (comment: { _id: string }) => comment._id,
+      );
+      expect(ids).toContain(commentAId.toString());
+      expect(ids).not.toContain(inlineCommentAId.toString());
     });
   });
 
@@ -603,6 +687,123 @@ describe('/comments.get share-link authorization (integration)', () => {
         where: { id: editableCommentId },
       });
       expect(stored?.comment).toBe('edited body');
+    });
+  });
+
+  describe('POST /comments.remove — authorized creator', () => {
+    const creatorId = new ObjectId();
+    let removableCommentId: string;
+
+    beforeEach(async () => {
+      const seeded = await prisma.comments.add(
+        pageAId.toString(),
+        creatorId.toString(),
+        revAId.toString(),
+        'comment to remove',
+        -1,
+      );
+      removableCommentId = seeded.id;
+
+      currentUser = { _id: creatorId };
+      accessSpy.mockResolvedValue(true);
+    });
+
+    afterEach(async () => {
+      await prisma.comments.deleteMany({ where: { id: removableCommentId } });
+    });
+
+    it('responds with success and deletes the comment', async () => {
+      const res = await request(app)
+        .post('/comments.remove')
+        .send({ comment_id: removableCommentId });
+
+      expect(res.body.ok).toBe(true);
+      expect(
+        await prisma.comments.findUnique({ where: { id: removableCommentId } }),
+      ).toBeNull();
+    });
+
+    it('still responds with success when the comment count refresh fails', async () => {
+      vi.spyOn(Page, 'updateCommentCount').mockRejectedValue(
+        new Error('count refresh failed'),
+      );
+
+      const res = await request(app)
+        .post('/comments.remove')
+        .send({ comment_id: removableCommentId });
+
+      expect(res.body.ok).toBe(true);
+      expect(
+        await prisma.comments.findUnique({ where: { id: removableCommentId } }),
+      ).toBeNull();
+    });
+  });
+
+  describe('GET /comments.get — creator output is the full sanitized user row (5.1, 5.4)', () => {
+    const workerId = process.env.VITEST_WORKER_ID ?? '1';
+    const pageCId = new ObjectId();
+    const lastLoginAt = new Date('2021-02-03T04:05:06.000Z');
+    let authorId: string;
+    let commentCId: string;
+
+    beforeAll(async () => {
+      await prisma.pages.create({
+        data: { id: pageCId.toString(), path: '/comment-integ-c', v: 0 },
+      });
+      const author = await prisma.users.create({
+        data: {
+          username: `comment-integ-author-${workerId}`,
+          name: 'Comment Author',
+          email: `comment-integ-author-${workerId}@example.com`,
+          isEmailPublished: false,
+          password: 'hashed-password',
+          googleId: 'legacy-google-id',
+          slackMemberId: `legacy-slack-member-id-${workerId}`,
+          lastLoginAt,
+          admin: true,
+          status: 2,
+        },
+      });
+      authorId = author.id;
+      commentCId = (
+        await prisma.comments.add(
+          pageCId.toString(),
+          authorId,
+          revAId.toString(),
+          'comment on page C',
+          -1,
+        )
+      ).id;
+    });
+
+    afterAll(async () => {
+      await prisma.comments.deleteMany({ where: { id: commentCId } });
+      await prisma.users.deleteMany({ where: { id: authorId } });
+      await prisma.pages.deleteMany({ where: { id: pageCId.toString() } });
+    });
+
+    it('keeps every non-credential creator column, unlike the v3 list', async () => {
+      currentUser = { _id: new ObjectId() };
+      accessSpy.mockResolvedValue(true);
+
+      const res = await request(app)
+        .get('/comments.get')
+        .query({ page_id: pageCId.toString() });
+
+      expect(res.status).toBe(200);
+      const [comment] = res.body.comments;
+      expect(comment.creator).toMatchObject({
+        _id: authorId,
+        username: `comment-integ-author-${workerId}`,
+        googleId: 'legacy-google-id',
+        slackMemberId: `legacy-slack-member-id-${workerId}`,
+        lastLoginAt: lastLoginAt.toISOString(),
+        admin: true,
+        status: 2,
+      });
+      expect(comment.creator).not.toHaveProperty('password');
+      expect(comment.creator).not.toHaveProperty('apiToken');
+      expect(comment.creator).not.toHaveProperty('email');
     });
   });
 });

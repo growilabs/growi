@@ -5,15 +5,12 @@ import type { MockInstance } from 'vitest';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import { prisma } from '~/utils/prisma';
-
-import type { ShareLinkModel } from '../../models/share-link';
 
 let rootPage: PageDocument;
 let dummyUser1: HydratedDocument<IUser>;
@@ -62,7 +59,6 @@ describe('PageService', () => {
   let crowi: Crowi;
   let Page: PageModel;
   let User: Model<IUser>;
-  let ShareLink: ShareLinkModel;
   let generalXssFilterProcessSpy: MockInstance;
 
   beforeAll(async () => {
@@ -71,7 +67,6 @@ describe('PageService', () => {
 
     User = mongoose.model('User');
     Page = mongoose.model('Page') as PageModel;
-    ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
 
     // Create test users if they don't exist
     const existingUser1 = await User.findOne({ username: 'someone1' });

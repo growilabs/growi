@@ -84,6 +84,7 @@ export const CONFIG_KEYS = [
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
   'app:wipPageExpirationSeconds',
+  'app:wipPageCleanupCronSchedule',
   'app:isReadOnlyForNewUser',
   'app:vaultEnabled',
   'app:vaultManagerEndpoint',
@@ -567,6 +568,13 @@ export const CONFIG_DEFINITIONS = {
   'app:wipPageExpirationSeconds': defineConfig<number>({
     envVarName: 'WIP_PAGE_EXPIRATION_SECONDS',
     defaultValue: 172800,
+  }),
+  // Sweep that deletes expired WIP pages. An empty value disables it, which an
+  // operator needs when the sweep is too heavy for their wiki or must be run
+  // out-of-band; the pages then simply keep their (unenforced) expiry.
+  'app:wipPageCleanupCronSchedule': defineConfig<string>({
+    envVarName: 'WIP_PAGE_CLEANUP_CRON_SCHEDULE',
+    defaultValue: '0 3 * * *',
   }),
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',

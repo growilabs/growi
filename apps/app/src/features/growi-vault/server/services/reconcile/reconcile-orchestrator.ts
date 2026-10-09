@@ -240,6 +240,14 @@ export function createReconcileOrchestrator(
           return;
         }
 
+        // Skip pages without a revision (e.g. auto-generated intermediate
+        // path pages) — VaultInstruction.payload.entries[].revisionId is a
+        // required field, so there is nothing valid to send, and there is no
+        // content to sync anyway. Mirrors the same guard in bootstrap-runner.ts.
+        if (page.revision == null) {
+          continue;
+        }
+
         // Compute namespaces for this page
         const { current: namespaces } =
           vaultNamespaceMapper.computePageNamespaces(page as never);
@@ -247,7 +255,7 @@ export function createReconcileOrchestrator(
         const entry: BulkUpsertEntry = {
           pageId: page._id.toString(),
           pagePath: page.path ?? '',
-          revisionId: page.revision?.toString() ?? '',
+          revisionId: page.revision.toString(),
         };
 
         // Accumulate in per-namespace buffers

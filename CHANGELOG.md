@@ -1,8 +1,97 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.2...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.7...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.7](https://github.com/growilabs/compare/v8.0.6...v8.0.7) - 2026-10-07
+
+### 🚀 Improvement
+
+* imprv: Use isRevisionOfPage for the existing revision/page checks (#12054) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(page): Reject empty or non-member user groups when creating or updating group-restricted pages (#12050) @yuki-takei
+* fix(page): Keep /user and the top page public even when changed through the grant API (#12051) @yuki-takei
+* fix(app): Ensure the user home page exists when user creation/activation completes (#12017) @yuki-takei
+
+### 🧰 Maintenance
+
+* support(ci): push slackbot-proxy release image to Artifact Registry (#12033) @yuki-takei
+* ci(slackbot-proxy): use Workload Identity Federation for Google Cloud auth (#12039) @yuki-takei
+* ci(deps): Bump @opentelemetry/instrumentation-mongoose from 0.63.0 to 0.67.0 (#12038) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump compression from 1.7.4 to 1.8.2 (#12037) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump katex from 0.16.47 to 0.18.2 (#12036) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v8.0.6](https://github.com/growilabs/compare/v8.0.5...v8.0.6) - 2026-10-05
+
+### 🐛 Bug Fixes
+
+* fix: dedupe @types/node so .next symlinks survive pnpm deploy (v8.0.5 SSR failure) (#12010) @yuki-takei
+
+## [v8.0.5](https://github.com/growilabs/compare/v8.0.4...v8.0.5) - 2026-10-05
+
+### 🚀 Improvement
+
+* imprv(comment): Add GET /_api/v3/comments (#12000) @yuki-takei
+* imprv(inline-comment): Move the creation UI to the cursor edge and collapse resolved comments by default (#11989) @yuki-takei
+* imprv(sidebar): Hide single-viewer count and zero comment count in history (#11995) @yuki-takei
+* imprv(ui): comment button, lsx list wrap, and footer author avatar (#11940) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(slacbot-proxy): Fix slackbot-proxy failures on Slack Enterprise Grid installs (#11904) @ryota-t0401
+* fix: Show access token expiration date (#11984) @ryota-t0401
+* fix(growi-vault): Propagate recursive page delete to vault_instructions (#11978) @yuki-takei
+
+### 🧰 Maintenance
+
+* chore(i18n): apply translation-only updates from POEditor (#11943) @[growi-i18n-pr-publisher[bot]](https://github.com/apps/growi-i18n-pr-publisher)
+* chore(i18n): review structural updates from POEditor (#11935) @[growi-i18n-pr-publisher[bot]](https://github.com/apps/growi-i18n-pr-publisher)
+* support(i18n): Mint i18n sync tokens from two GitHub Apps at runtime, no stored PATs (#11920) @yuki-takei
+* ci(deps): bump next from 16.2.6 to 16.3.3 (#11888) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump js-yaml from 4.3.1 to 4.3.2 (#11887) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump qs from 6.15.2 to 6.16.0 (#11854) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v8.0.4](https://github.com/growilabs/compare/v8.0.3...v8.0.4) - 2026-09-14
+
+### 💎 Features
+
+* feat: Add inline comments on page body text selections (#11844) @yuki-takei
+* feat: UI for advanced search filters (#11597) @arvid-e
+
+### 🚀 Improvement
+
+* imprv(lsx): Add tag-based filtering to $lsx (#11883) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(turbo): generate vendor-styles.prebuilt files before component tests (#11882) @yuki-takei
+* fix: Preserve inline style and class on rendered headings (#11894) @yuki-takei
+* fix: Read-only users could publish/unpublish pages (#11895) @yuki-takei
+* fix(vault): Stop sending required revisionId as empty string (#11878) @yuki-takei
+
+### 🧰 Maintenance
+
+* support(i18n): Add community translation pipeline via POEditor (#11874) @yuki-takei
+
+## [v8.0.3](https://github.com/growilabs/compare/v8.0.2...v8.0.3) - 2026-09-07
+
+### 💎 Features
+
+* feat(editor): Add slash command to the Markdown editor (#11838) @Ryosei-Fukushima
+
+### 🚀 Improvement
+
+* imprv(news): Render GROWI news as Markdown (#11608) @ryotaro-nagahara
+* imprv: Refactoring for extracting shared page-access check for attachment retrieval (#11813) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: Clean pages automatically using cron job (#11513) @arvid-e
+* fix(page-bulk-export): Embed attachment images in exported PDFs (RELAY mode) (#11859) @yuki-takei
+* fix: Enforce access control on revision-by-id and attachment-by-id apiv3 routes (#11810) @yuki-takei
 
 ## [v8.0.2](https://github.com/growilabs/compare/v8.0.1...v8.0.2) - 2026-08-25
 

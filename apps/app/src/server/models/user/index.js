@@ -1,9 +1,6 @@
 import crypto from 'node:crypto';
 import { omitInsecureAttributes } from '@growi/core/dist/models/serializers';
-import {
-  escapeStringForMongoRegex,
-  pagePathUtils,
-} from '@growi/core/dist/utils';
+import { pagePathUtils } from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
@@ -36,9 +33,14 @@ import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
 import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';
 
+import { ensureUserHomepage } from '../../service/page/ensure-user-homepage';
 import { getModelSafely } from '../../util/mongoose-utils';
 import { Attachment } from '../attachment';
 import { UserStatus } from './conts';
+import {
+  buildUsernamePrefixRange,
+  USERNAME_CI_COLLATION,
+} from './username-prefix-range';
 
 const logger = loggerFactory('growi:models:user');
 
@@ -49,13 +51,18 @@ const factory = (crowi) => {
     return userModelExists;
   }
 
-  let userEvent;
+  const userEvent = crowi?.events.user;
 
-  // init event
-  if (crowi != null) {
-    userEvent = crowi.events.user;
-    userEvent.on('activated', userEvent.onActivated);
-  }
+  // Part of activation itself, not a reaction to it: callers rely on the
+  // homepage existing once activation resolves. A failure here must not fail
+  // the activation, so it is only logged.
+  const setUpUserHomepage = async (user) => {
+    try {
+      await ensureUserHomepage(user, crowi.pageService);
+    } catch (err) {
+      logger.error({ err }, 'Failed to create user page');
+    }
+  };
 
   const userSchema = new mongoose.Schema(
     {
@@ -109,6 +116,14 @@ const factory = (crowi) => {
   );
   userSchema.plugin(mongoosePaginate);
   userSchema.plugin(uniqueValidator);
+
+  // Bounds the username typeahead's collated prefix range. Additional to the
+  // unique `username` index, which stays case-sensitive; `status` is included so
+  // inactive accounts are filtered from the index keys, not fetched first.
+  userSchema.index(
+    { username: 1, status: 1 },
+    { name: 'username_ci', collation: USERNAME_CI_COLLATION },
+  );
 
   function validateCrowi() {
     if (crowi == null) {
@@ -308,13 +323,10 @@ const factory = (crowi) => {
     );
     this.readOnly = getConfigManager().getConfig('app:isReadOnlyForNewUser');
 
-    this.save((err, userData) => {
-      userEvent.emit('activated', userData);
-      if (err) {
-        throw new Error(err);
-      }
-      return userData;
-    });
+    const userData = await this.save();
+    await setUpUserHomepage(userData);
+    userEvent.emit('activated', userData);
+    return userData;
   };
 
   userSchema.methods.grantAdmin = async function () {
@@ -350,7 +362,9 @@ const factory = (crowi) => {
     logger.debug('Activate User', this);
     this.status = UserStatus.STATUS_ACTIVE;
     const userData = await this.save();
-    return userEvent.emit('activated', userData);
+    await setUpUserHomepage(userData);
+    userEvent.emit('activated', userData);
+    return userData;
   };
 
   userSchema.methods.statusSuspend = async function () {
@@ -726,17 +740,19 @@ const factory = (crowi) => {
     }
     newUser.status = status || decideUserStatusOnRegistration();
 
-    newUser.save((err, userData) => {
-      if (err) {
-        logger.error('createUserByEmailAndPasswordAndStatus failed: ', err);
-        return callback(err);
-      }
+    let userData;
+    try {
+      userData = await newUser.save();
+    } catch (err) {
+      logger.error('createUserByEmailAndPasswordAndStatus failed: ', err);
+      return callback(err);
+    }
 
-      if (userData.status === UserStatus.STATUS_ACTIVE) {
-        userEvent.emit('activated', userData);
-      }
-      return callback(err, userData);
-    });
+    if (userData.status === UserStatus.STATUS_ACTIVE) {
+      await setUpUserHomepage(userData);
+      userEvent.emit('activated', userData);
+    }
+    return callback(null, userData);
   };
 
   /**
@@ -840,7 +856,15 @@ const factory = (crowi) => {
     return users;
   };
 
-  userSchema.statics.findUserByUsernameRegexWithTotalCount = async function (
+  /**
+   * Matches from the start of the username only — the previous `$regex` matched
+   * anywhere but could not be index-bounded (see username-prefix-range.ts).
+   * Every query needs USERNAME_CI_COLLATION: without it the results are the same
+   * but `username_ci` is unusable, and the cost is a full index walk.
+   *
+   * `totalCount` is opt-in: `limit` lets the page stop early, a count cannot.
+   */
+  userSchema.statics.findUserByUsernamePrefix = async function (
     username,
     status,
     option,
@@ -850,18 +874,32 @@ const factory = (crowi) => {
     const offset = opt.offset || 0;
     const limit = opt.limit || 10;
 
+    const prefixRange = buildUsernamePrefixRange(username);
     const conditions = {
-      username: {
-        $regex: escapeStringForMongoRegex(username),
-        $options: 'i',
-      },
+      // A null range means an empty keyword: every username qualifies, which is
+      // this lookup's pre-existing contract.
+      ...(prefixRange != null ? { username: prefixRange } : {}),
       status: { $in: status },
     };
 
-    const { docs: users, totalDocs: totalCount } = await this.paginate(
-      conditions,
-      { sort: sortOpt, offset, limit },
-    );
+    // Only `username` is ever read from these documents by the callers.
+    const usersQuery = this.find(conditions)
+      .collation(USERNAME_CI_COLLATION)
+      .sort(sortOpt)
+      .skip(offset)
+      .limit(limit)
+      .select('username')
+      .lean();
+
+    if (!opt.withTotalCount) {
+      return { users: await usersQuery };
+    }
+
+    const [users, totalCount] = await Promise.all([
+      usersQuery,
+      // Same collation, or the count disagrees with the page it accompanies.
+      this.countDocuments(conditions).collation(USERNAME_CI_COLLATION),
+    ]);
 
     return { users, totalCount };
   };

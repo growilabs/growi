@@ -100,7 +100,7 @@ describe('RefreshCatalogButton', () => {
       <RefreshCatalogButton invalidateAllProviders={invalidateAllProviders} />,
     );
     await user.click(getRefreshButton());
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'commons:Cancel' }));
 
     // Assert
     expect(mockedApiv3Post).not.toHaveBeenCalled();

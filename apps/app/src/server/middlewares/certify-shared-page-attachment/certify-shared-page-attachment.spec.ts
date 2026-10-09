@@ -1,7 +1,7 @@
 import type { Response } from 'express';
 import { mock } from 'vitest-mock-extended';
 
-import type { ShareLinkDocument } from '~/server/models/share-link';
+import type { sharelinks } from '~/generated/prisma/client';
 
 import {
   certifySharedPageAttachmentMiddleware,
@@ -127,7 +127,7 @@ describe('certifySharedPageAttachmentMiddleware', () => {
       const validReferer = vi.fn();
       mocks.validateRefererMock.mockImplementation(() => validReferer);
 
-      const shareLinkMock = mock<ShareLinkDocument>();
+      const shareLinkMock = mock<sharelinks>();
       mocks.retrieveValidShareLinkByRefererMock.mockResolvedValue(
         shareLinkMock,
       );
@@ -163,7 +163,7 @@ describe('certifySharedPageAttachmentMiddleware', () => {
     const validReferer = vi.fn();
     mocks.validateRefererMock.mockImplementation(() => validReferer);
 
-    const shareLinkMock = mock<ShareLinkDocument>();
+    const shareLinkMock = mock<sharelinks>();
     mocks.retrieveValidShareLinkByRefererMock.mockResolvedValue(shareLinkMock);
 
     mocks.validateAttachmentMock.mockResolvedValue(true);

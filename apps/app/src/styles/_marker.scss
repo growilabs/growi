@@ -17,3 +17,15 @@
   --grw-marker-bg-cyan: #008888;
   --grw-marker-bg-green: #007000;
 }
+
+:root {
+  // Default to the search keyword marker color as-is.
+  // Themes can override this property to use a different color from the search marker.
+  --grw-inline-comment-marker-bg: var(--grw-marker-bg, var(--grw-marker-bg-yellow));
+
+  // Highlight color for the pending (in-creation: selecting/composing) range.
+  // Falls back to a different marker color family than the saved-highlight
+  // token above so the two are distinguishable by default; themes can
+  // override this independently of --grw-inline-comment-marker-bg.
+  --grw-inline-comment-marker-bg-pending: var(--grw-inline-comment-marker-bg-pending-override, var(--grw-marker-bg-blue));
+}

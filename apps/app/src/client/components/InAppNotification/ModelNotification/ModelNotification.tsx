@@ -5,7 +5,7 @@ import { PagePathLabel } from '@growi/ui/dist/components';
 
 import type { IInAppNotification } from '~/interfaces/in-app-notification';
 
-import FormattedDistanceDate from '../../FormattedDistanceDate';
+import { FormattedDistanceDate } from '../../FormattedDistanceDate';
 
 import styles from './ModelNotification.module.scss';
 

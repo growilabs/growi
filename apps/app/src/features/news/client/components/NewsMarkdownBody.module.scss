@@ -1,0 +1,36 @@
+// Minimal, theme-aware styling for the news Markdown body. The renderer does
+// not use the Wiki `.wiki` class (that would pull in the whole Wiki style
+// surface), so the few elements that need visible structure are styled here,
+// scoped to this container. Uses Bootstrap CSS variables so it follows the
+// active theme (light/dark).
+
+.news-markdown-body {
+  // GFM tables: without borders they read as plain lines of text.
+  table {
+    width: auto;
+    max-width: 100%;
+    margin-block: 0.5rem;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--bs-border-color);
+  }
+
+  th {
+    font-weight: 600;
+    background-color: var(--bs-tertiary-bg);
+  }
+
+  // Links should look like links (color + underline), not body text.
+  a {
+    color: var(--bs-link-color);
+    text-decoration: underline;
+
+    &:hover {
+      color: var(--bs-link-hover-color);
+    }
+  }
+}

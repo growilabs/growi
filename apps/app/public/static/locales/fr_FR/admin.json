@@ -2,6 +2,12 @@
   "meta": {
     "display_name": "Français"
   },
+  "Page": "Page",
+  "Execute": "Exécuter",
+  "Enable": "Activer",
+  "Copied!": "Copié !",
+  "ExternalUserGroup": "Groupe utilisateur externe",
+  "something_went_wrong": "Une erreur est survenue. Veuillez réessayer.",
   "last_login": "Dernière connexion",
   "wiki_management_homepage": "Système",
   "public": "Public",
@@ -48,8 +54,6 @@
     "other_options": "Autres options",
     "deletion_explanation": "Restreindre les utilisateurs pouvant mettre à la corbeille une page.",
     "complete_deletion_explanation": "Restreindre les utilisateurs pouvant supprimer définitivement une page.",
-    "recursive_deletion_explain": "Restreindre les utilisateurs pouvant récursivement supprimer une page.",
-    "recursive_complete_deletion_explain": "Restreindre les utilisateurs pouvant récursivement supprimer complètement une page.",
     "is_all_group_membership_required_for_page_complete_deletion": "L'utilisateur doit faire partie de tout les groupes ayant l'accès à la page",
     "is_all_group_membership_required_for_page_complete_deletion_explanation": "Effectif lorsque les paramètres de page sont \"Seulement groupes spécifiés\".",
     "inherit": "Hériter",
@@ -312,6 +316,28 @@
     "rebuild_progress_completed": "Terminé",
     "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement."
   },
+  "audit_log_index_management": {
+    "audit_log_index_management": "Gestion de l'index des journaux d'audit",
+    "settings_explanation": "Vous pouvez normaliser ou reconstruire l'index des journaux d'audit sur la page suivante",
+    "index_management_link": "Aller à {{destination}}",
+    "docs_url": {
+      "top": "https://docs.growi.org/en/admin-guide/management-cookbook/setup-search-system.html"
+    },
+    "normalize": "Normaliser",
+    "normalize_button": "Normaliser l'index des journaux d'audit",
+    "normalize_success": "L'index des journaux d'audit a été normalisé.",
+    "normalize_description": "Répare les index des journaux d'audit corrompus.",
+    "rebuild": "Reconstruire",
+    "rebuild_button": "Reconstruire l'index des journaux d'audit",
+    "rebuild_requested": "La reconstruction de l'index des journaux d'audit a été demandée.",
+    "rebuild_description_1": "Supprime et reconstruit tous les index des journaux d'audit.",
+    "rebuild_description_2": "Cette opération peut prendre un certain temps.",
+    "unsynced_events_warning": "Certains événements du journal d'audit n'ont pas pu être synchronisés avec Elasticsearch. Reconstruisez pour restaurer la cohérence.",
+    "rebuild_progress_processing": "En cours..",
+    "rebuild_progress_completed": "Terminé",
+    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement.",
+    "reconnect": "Reconnexion"
+  },
   "mailer_setup_required": "La <a href='/admin/app'>configuration du SMTP</a> est requise.",
   "admin_top": {
     "management_wiki": "Configuration du wiki",
@@ -342,6 +368,16 @@
     "header_upgrading_progress": "Progression de la conversion",
     "migration_succeeded": "Conversion réussie! Le mode maintenance peut être désactivée et GROWI utilisé.",
     "migration_failed": "Conversion échouée. Lire la documentation GROWI pour des informations supplémentaires."
+  },
+  "page_tree_repair": {
+    "page_tree_repair": "Réparation de l'arborescence des pages",
+    "repair_desc": "Supprime les pages vides orphelines et recalcule le nombre de pages descendantes de chaque page. À utiliser si l'arborescence affiche des dossiers vides sans aucun contenu, ou si le nombre de pages enfants ne correspond pas au nombre réel de pages. Cette opération est nécessaire sur les instances mises à niveau depuis une version qui supprimait les pages WIP via un index TTL MongoDB.",
+    "repair_note": "Note: le mode maintenance doit être activé. Cette opération parcourt toutes les pages et peut donc prendre du temps sur un wiki volumineux. La progression est écrite dans le journal du serveur.",
+    "repair_page_tree": "Réparer l'arborescence des pages",
+    "modal_repair_warning": "Ce processus parcourt et met à jour toutes les pages, ce qui peut prendre beaucoup de temps. Il est fortement recommandé que les administrateurs demandent aux utilisateurs de ne pas créer, modifier ou supprimer de pages pendant la réparation.",
+    "start_repair": "Démarrer la réparation de l'arborescence",
+    "successfully_started": "Réparation de l'arborescence des pages démarrée.",
+    "repair_in_progress": "La réparation de l'arborescence des pages est en cours en arrière-plan. Consulter le journal du serveur pour le résultat."
   },
   "news_delivery": {
     "section_title": "Diffusion des actualités",
@@ -946,28 +982,6 @@
       "force_update_parents_label": "Forcer l'ajout d'utilisateurs manquants",
       "force_update_parents_description": "Ajoute les utilisateurs manquants au groupe ancêtre si ils existent lors d'un changement de groupe parent."
     }
-  },
-  "audit_log_index_management": {
-    "audit_log_index_management": "Gestion de l'index des journaux d'audit",
-    "settings_explanation": "Vous pouvez normaliser ou reconstruire l'index des journaux d'audit sur la page suivante",
-    "index_management_link": "Aller à {{destination}}",
-    "docs_url": {
-      "top": "https://docs.growi.org/en/admin-guide/management-cookbook/setup-search-system.html"
-    },
-    "normalize": "Normaliser",
-    "normalize_button": "Normaliser l'index des journaux d'audit",
-    "normalize_success": "L'index des journaux d'audit a été normalisé.",
-    "normalize_description": "Répare les index des journaux d'audit corrompus.",
-    "rebuild": "Reconstruire",
-    "rebuild_button": "Reconstruire l'index des journaux d'audit",
-    "rebuild_requested": "La reconstruction de l'index des journaux d'audit a été demandée.",
-    "rebuild_description_1": "Supprime et reconstruit tous les index des journaux d'audit.",
-    "rebuild_description_2": "Cette opération peut prendre un certain temps.",
-    "unsynced_events_warning": "Certains événements du journal d'audit n'ont pas pu être synchronisés avec Elasticsearch. Reconstruisez pour restaurer la cohérence.",
-    "rebuild_progress_processing": "En cours..",
-    "rebuild_progress_completed": "Terminé",
-    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement.",
-    "reconnect": "Reconnexion"
   },
   "audit_log_management": {
     "audit_log": "Audit",

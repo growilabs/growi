@@ -600,7 +600,7 @@ describe('AllowedModelsField', () => {
           name: 'ai_settings.remove_model_confirm',
         }),
       ).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      await user.click(screen.getByRole('button', { name: 'commons:Cancel' }));
 
       // Assert: nothing was removed.
       expect(findProbeRow('openai', 'gpt-4o')).toBeDefined();

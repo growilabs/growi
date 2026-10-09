@@ -1,3 +1,7 @@
+// Search-behavior suite: stubs out react-bootstrap-typeahead to inspect the
+// props AsyncTypeahead receives. Token rendering needs the REAL component, so it
+// is tested in TagsInput.rendering.spec.tsx — the two mock factories are
+// incompatible, and merging the files would disable the #11734 guard below.
 import type { FC } from 'react';
 import { act, render } from '@testing-library/react';
 

@@ -20,7 +20,8 @@ type ReplycommentsProps = {
   replyList: ICommentHasIdList;
   pageId: string;
   pagePath: string;
-  deleteBtnClicked: (comment: ICommentHasId) => void;
+  /** Forwarded to each reply's own `Comment` — see `CommentProps`. */
+  onDeleteConfirmed: (comment: ICommentHasId) => Promise<void>;
   onComment: () => void;
 };
 
@@ -34,7 +35,7 @@ export const ReplyComments = (props: ReplycommentsProps): JSX.Element => {
     replyList,
     pageId,
     pagePath,
-    deleteBtnClicked,
+    onDeleteConfirmed,
     onComment,
   } = props;
 
@@ -57,7 +58,7 @@ export const ReplyComments = (props: ReplycommentsProps): JSX.Element => {
           isReadOnly={isReadOnly}
           pageId={pageId}
           pagePath={pagePath}
-          deleteBtnClicked={deleteBtnClicked}
+          onDeleteConfirmed={onDeleteConfirmed}
           onComment={onComment}
         />
       </div>

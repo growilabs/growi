@@ -78,7 +78,7 @@ export const ShareLink = (): JSX.Element => {
           onClick={toggleShareLinkFormHandler}
           data-testid="btn-sharelink-toggleform"
         >
-          {isOpenShareLinkForm ? t('Close') : t('New')}
+          {isOpenShareLinkForm ? t('Close') : t('commons:New')}
         </button>
         {isOpenShareLinkForm && (
           <ShareLinkForm onCloseForm={toggleShareLinkFormHandler} />

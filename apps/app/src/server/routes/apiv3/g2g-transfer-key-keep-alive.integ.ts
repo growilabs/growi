@@ -103,6 +103,19 @@ describe('receive route — transfer key keep-alive', () => {
     return new Date(transferKeyDoc.expireAt).getTime();
   };
 
+  const waitForExpireAtAfter = (
+    key: string,
+    previous: number,
+  ): Promise<number> =>
+    vi.waitFor(
+      async () => {
+        const current = await readExpireAt(key);
+        expect(current).toBeGreaterThan(previous);
+        return current;
+      },
+      { timeout: 10_000, interval: KEEP_ALIVE_INTERVAL_MS / 2 },
+    );
+
   const postArchive = (): request.Test =>
     request(app)
       .post(`${G2G_TRANSFER_ROUTE_PREFIX}/`)
@@ -295,13 +308,20 @@ describe('receive route — transfer key keep-alive', () => {
         { transferKeyKeepAliveIntervalMs: KEEP_ALIVE_INTERVAL_MS },
       );
 
-      // Whether the export succeeds is beside the point; its duration is the arrangement.
+      // Whether the export succeeds is beside the point; how long it runs is the
+      // arrangement. The test holds it open until it has seen the reminders it is looking
+      // for: each reminder is a round trip to the destination plus a read and a write
+      // there, so a fixed export duration can leave a loaded runner no time to land any.
       // Failing it ends startTransfer right after the stretch under test.
       if (exportService == null) {
         throw new Error('Expected the export service to be instantiated');
       }
+      let releaseExport: () => void = () => {};
+      const exportBlocked = new Promise<void>((resolve) => {
+        releaseExport = resolve;
+      });
       vi.spyOn(exportService, 'export').mockImplementation(async () => {
-        await delay(KEEP_ALIVE_INTERVAL_MS * 6);
+        await exportBlocked;
         throw new Error('export failed on purpose');
       });
 
@@ -319,18 +339,15 @@ describe('receive route — transfer key keep-alive', () => {
           // The deliberately failed export.
         });
 
-      await delay(KEEP_ALIVE_INTERVAL_MS * 2);
-      const earlyInExport = await readExpireAt(tk.key);
-      await delay(KEEP_ALIVE_INTERVAL_MS * 3);
-      const laterInExport = await readExpireAt(tk.key);
-
-      await transferring;
-
       // Without this, nothing reaches the destination between the growi-info call and the
       // archive itself, so a long export runs the key out before the archive is handed
-      // over at all — and then not one byte of the transfer has arrived.
-      expect(earlyInExport).toBeGreaterThan(before);
-      expect(laterInExport).toBeGreaterThan(earlyInExport);
+      // over at all — and then not one byte of the transfer has arrived. Two advances,
+      // because a single one would also pass for a reminder that fires only once.
+      const earlyInExport = await waitForExpireAtAfter(tk.key, before);
+      await waitForExpireAtAfter(tk.key, earlyInExport);
+
+      releaseExport();
+      await transferring;
 
       // Everything after the export is itself a request to the destination, so the
       // reminder has to stop; left running it would hold the key open indefinitely.
@@ -340,6 +357,6 @@ describe('receive route — transfer key keep-alive', () => {
       const afterExport = await readExpireAt(tk.key);
       await delay(KEEP_ALIVE_INTERVAL_MS * 4);
       expect(await readExpireAt(tk.key)).toBe(afterExport);
-    });
+    }, 30_000);
   });
 });

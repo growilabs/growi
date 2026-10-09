@@ -241,7 +241,7 @@ export const UserGroupDeleteModal: FC<Props> = (props: Props) => {
             disabled={!validateForm()}
           >
             <span className="material-symbols-outlined">delete_forever</span>{' '}
-            {t('Delete')}
+            {t('commons:Delete')}
           </button>
         </form>
         {actionName === PageActionOnGroupDelete.publicize && (

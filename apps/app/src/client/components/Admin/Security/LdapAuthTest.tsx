@@ -92,7 +92,7 @@ export const LdapAuthTest = (props: LdapAuthTestProps): JSX.Element => {
       )}
       <div className="row mt-3">
         <label htmlFor="username" className="col-3 col-form-label text-end">
-          {t('username')}
+          {t('commons:username')}
         </label>
         <div className="col-6">
           <input
@@ -108,7 +108,7 @@ export const LdapAuthTest = (props: LdapAuthTestProps): JSX.Element => {
       </div>
       <div className="row mt-3">
         <label htmlFor="password" className="col-3 col-form-label text-end">
-          {t('Password')}
+          {t('commons:Password')}
         </label>
         <div className="col-6">
           <input
