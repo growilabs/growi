@@ -577,7 +577,7 @@ B3/B5.
   - _Requirements: 1.9, 5.1, 5.2, 5.4_
   - _Depends: B4.3, B1.12_
 
-- [ ] B4.5 Bound how many chains one redirect lookup walks
+- [x] B4.5 Bound how many chains one redirect lookup walks
   - Deliberately deferred out of B4.1 (judged out of that PR's scope), and independent of
     B4.2–B4.4 — pick it up at any point after B4.1.
   - B4.1 capped the *depth* of a chain (`maxDepth: 50` from the save path) but nothing caps the
