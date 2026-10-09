@@ -74,6 +74,59 @@ services:
           print(`FCV upgraded: $${result.featureCompatibilityVersion.version} -> $${target}`);
         }
 
+  # Used by apps/chat-integration-proxy (chat-integration-proxy spec, task 1.2).
+  # Holds both the app's own tables (Prisma, default `public` schema) and the
+  # Chat SDK state adapter's tables (`@chat-adapter/state-pg`, `chat_sdk` schema).
+  #
+  # **Opt-in via `profiles`, not started by a plain `docker compose up`.** Every
+  # devcontainer in this repo (`app`, `pdf-converter`) shares this one
+  # compose.yml, and most sessions never touch chat-integration-proxy -- unlike
+  # `mongo`/`elasticsearch`, which every app in this repo actually depends on.
+  # Start it only when needed, from the docker host:
+  #   docker compose --profile chat-integration-proxy up -d postgres postgres-init
+  postgres:
+    image: postgres:18.6
+    profiles: ["chat-integration-proxy"]
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=chat_integration_proxy
+      - POSTGRES_PASSWORD=chat_integration_proxy_dev
+      - POSTGRES_DB=chat_integration_proxy
+    ports:
+      - 5432
+    volumes:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chat_integration_proxy -d chat_integration_proxy"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Creates the `chat_sdk` schema up front.
+  # `@chat-adapter/state-pg` auto-creates its own tables on connect() but has no
+  # concept of a target schema (see its README/dist/index.d.ts: `createPostgresState()`
+  # only takes `url` / `client` / `keyPrefix` / `logger`). Schema separation from the
+  # app's own (default `public`-schema) tables is achieved by pointing the state
+  # adapter's connection URL at this database with `?options=-c search_path=chat_sdk`
+  # (see apps/chat-integration-proxy/.env.development). That only works once the
+  # schema already exists, so it is created here, the same way `mongo-init` prepares
+  # baseline state for `mongo` before the app connects.
+  postgres-init:
+    image: postgres:18.6
+    profiles: ["chat-integration-proxy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    environment:
+      - PGPASSWORD=chat_integration_proxy_dev
+    entrypoint:
+      - psql
+      - --host=postgres
+      - --username=chat_integration_proxy
+      - --dbname=chat_integration_proxy
+      - --command=CREATE SCHEMA IF NOT EXISTS chat_sdk;
+
   # This container requires '../../growi-docker-compose' repository
   #   cloned from https://github.com/growilabs/growi-docker-compose.git
   elasticsearch:

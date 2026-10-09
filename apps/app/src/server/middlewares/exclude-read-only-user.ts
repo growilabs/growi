@@ -1,20 +1,13 @@
-import type { IUser } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Response } from 'express';
 import type { Request } from 'express-validator/src/base.js';
 
 import loggerFactory from '~/utils/logger';
 
+import { isReadOnlyUser } from '../models/user/predicates';
 import { configManager } from '../service/config-manager';
 
 const logger = loggerFactory('growi:middleware:exclude-read-only-user');
-
-/**
- * Whether a user is rejected by excludeReadOnlyUser. Also used by paths that
- * cannot run the middleware itself (e.g. the Yjs WebSocket upgrade).
- */
-export const isReadOnlyUser = (user: Pick<IUser, 'readOnly'>): boolean =>
-  user.readOnly;
 
 export const excludeReadOnlyUser = (
   req: Request,
@@ -57,7 +50,7 @@ export const excludeReadOnlyUserIfCommentNotAllowed = (
     return;
   }
 
-  if (user.readOnly && !isRomUserAllowedToComment) {
+  if (isReadOnlyUser(user) && !isRomUserAllowedToComment) {
     const message = 'This user is read only user and comment is not allowed';
     logger.warn(message);
 

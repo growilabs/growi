@@ -17,6 +17,8 @@ import {
   UncontrolledButtonDropdown,
 } from 'reactstrap';
 
+import { ChatIntegrationDestinationSelect } from '~/features/chat-integration/client/notification';
+import type { IApiv3ChatIntegrationDestinationInput } from '~/interfaces/apiv3/page';
 import {
   useCurrentPageData,
   useCurrentPagePath,
@@ -48,6 +50,8 @@ const logger = loggerFactory('growi:SavePageControls');
 const SavePageButton = (props: {
   slackChannels: string;
   isSlackEnabled?: boolean;
+  /** Gen 2's per-save destinations; independent of Gen 1's fields above. */
+  chatIntegrationDestinations: IApiv3ChatIntegrationDestinationInput[];
   isDeviceLargerThanMd?: boolean;
 }) => {
   const { t } = useTranslation();
@@ -56,7 +60,12 @@ const SavePageButton = (props: {
     useState<boolean>(false);
   const [selectedGrant] = useSelectedGrant();
 
-  const { slackChannels, isSlackEnabled = false, isDeviceLargerThanMd } = props;
+  const {
+    slackChannels,
+    isSlackEnabled = false,
+    chatIntegrationDestinations,
+    isDeviceLargerThanMd,
+  } = props;
 
   const isWaitingSaveProcessing = _isWaitingSaveProcessing === true; // ignore undefined
 
@@ -68,10 +77,11 @@ const SavePageButton = (props: {
           wip: false,
           slackChannels,
           isSlackEnabled,
+          chatIntegrationDestinations,
         },
       }),
     );
-  }, [isSlackEnabled, slackChannels]);
+  }, [chatIntegrationDestinations, isSlackEnabled, slackChannels]);
 
   const saveAndOverwriteScopesOfDescendants = useCallback(() => {
     // save
@@ -82,10 +92,11 @@ const SavePageButton = (props: {
           overwriteScopesOfDescendants: true,
           slackChannels,
           isSlackEnabled,
+          chatIntegrationDestinations,
         },
       }),
     );
-  }, [isSlackEnabled, slackChannels]);
+  }, [chatIntegrationDestinations, isSlackEnabled, slackChannels]);
 
   const saveAndMakeWip = useCallback(() => {
     // save
@@ -95,10 +106,11 @@ const SavePageButton = (props: {
           wip: true,
           slackChannels,
           isSlackEnabled,
+          chatIntegrationDestinations,
         },
       }),
     );
-  }, [isSlackEnabled, slackChannels]);
+  }, [chatIntegrationDestinations, isSlackEnabled, slackChannels]);
 
   const labelSubmitButton = t('Update');
   const labelOverwriteScopes = t('page_edit.overwrite_scopes', {
@@ -217,6 +229,11 @@ export const SavePageControls = (): JSX.Element | null => {
   const [isDeviceLargerThanMd] = useDeviceLargerThanMd();
 
   const [slackChannels, setSlackChannels] = useState<string>('');
+  // Gen 2's chosen destinations for this save. Kept apart from Gen 1's
+  // `slackChannels` above on purpose: the two generations are configured
+  // independently and both may fire (Requirements 12.1-12.3).
+  const [chatIntegrationDestinations, setChatIntegrationDestinations] =
+    useState<IApiv3ChatIntegrationDestinationInput[]>([]);
   const [isSavePageControlsModalShown, setIsSavePageControlsModalShown] =
     useState<boolean>(false);
 
@@ -238,6 +255,13 @@ export const SavePageControls = (): JSX.Element | null => {
   const slackChannelsChangedHandler = useCallback((slackChannels: string) => {
     setSlackChannels(slackChannels);
   }, []);
+
+  const chatIntegrationDestinationsChangedHandler = useCallback(
+    (destinations: readonly IApiv3ChatIntegrationDestinationInput[]) => {
+      setChatIntegrationDestinations([...destinations]);
+    },
+    [],
+  );
 
   if (isEditable == null || isAclEnabled == null) {
     return null;
@@ -269,6 +293,18 @@ export const SavePageControls = (): JSX.Element | null => {
             </div>
           )}
 
+          {/*
+            A sibling of Gen 1's SlackNotification above, NOT a replacement:
+            it renders nothing unless a Gen 2 workspace is paired, and it is
+            not gated on Gen 1's `isSlackConfigured`.
+          */}
+          <div className="me-2">
+            <ChatIntegrationDestinationSelect
+              destinations={chatIntegrationDestinations}
+              onChange={chatIntegrationDestinationsChangedHandler}
+            />
+          </div>
+
           {isAclEnabled && (
             <div className="me-2">
               <GrantSelector disabled={isGrantSelectorDisabledPage} />
@@ -278,6 +314,7 @@ export const SavePageControls = (): JSX.Element | null => {
           <SavePageButton
             isSlackEnabled={isSlackEnabled}
             slackChannels={slackChannels}
+            chatIntegrationDestinations={chatIntegrationDestinations}
             isDeviceLargerThanMd
           />
         </>
@@ -286,6 +323,7 @@ export const SavePageControls = (): JSX.Element | null => {
           <SavePageButton
             isSlackEnabled={isSlackEnabled}
             slackChannels={slackChannels}
+            chatIntegrationDestinations={chatIntegrationDestinations}
           />
           <button
             type="button"
@@ -320,6 +358,12 @@ export const SavePageControls = (): JSX.Element | null => {
                   />
                 </>
               )}
+
+              <ChatIntegrationDestinationSelect
+                destinations={chatIntegrationDestinations}
+                onChange={chatIntegrationDestinationsChangedHandler}
+              />
+
               <div className="d-flex">
                 <button
                   type="button"

@@ -14,6 +14,8 @@ import qs from 'qs';
 
 import { resolveFromRoot } from '~/server/util/project-dir-utils';
 
+import { CHAT_INTEGRATION_PEER_PREFIX } from '../../features/chat-integration/server/consts';
+import { isChatIntegrationPeerPath } from '../../features/chat-integration/server/is-peer-path';
 import {
   PLUGIN_EXPRESS_STATIC_DIR,
   PLUGIN_STORING_PATH,
@@ -113,6 +115,19 @@ export const setup = (crowi, app) => {
 
   app.use(methodOverride());
 
+  // The chat-integration proxy signs the exact bytes it sends (content-digest),
+  // so verification needs the body unparsed. This must be registered before the
+  // app-wide JSON parsing below: once that has read the stream, only the parsed
+  // value is left. express.raw() puts a Buffer in req.body and sets req._body,
+  // which makes the app-wide parsers below skip the request -- no other route is
+  // affected. Scoped to /peer only: the admin-screen endpoints share the
+  // chat-integration base path and must keep the parsed body their validators
+  // rely on. The 10mb limit covers a single page's content.
+  app.use(
+    CHAT_INTEGRATION_PEER_PREFIX,
+    express.raw({ type: 'application/json', limit: '10mb' }),
+  );
+
   app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(cookieParser());
@@ -121,8 +136,8 @@ export const setup = (crowi, app) => {
   const sessionMiddleware = expressSession(crowi.sessionConfig);
   app.use((req, res, next) => {
     // test whether the route is listed in avoidSessionRoutes
-    for (const regex of avoidSessionRoutes) {
-      if (regex.test(req.path)) {
+    for (const matchesAvoidSessionRoute of avoidSessionRoutes) {
+      if (matchesAvoidSessionRoute(req.path)) {
         return next();
       }
     }
@@ -132,11 +147,18 @@ export const setup = (crowi, app) => {
 
   // csurf should be initialized after express-session
   // default methods + PUT. See: https://expressjs.com/en/resources/middleware/csurf.html#ignoremethods
-  app.use(
-    csrf({
-      ignoreMethods: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'POST', 'DELETE'],
-      cookie: false,
-    }),
+  // Skipped for the proxy-facing sub-tree, which has no session: with
+  // `cookie: false` csurf keeps its secret in the session and fails the
+  // request outright ("misconfigured csrf") when there is none -- before it
+  // ever looks at `ignoreMethods`.
+  const csrfProtection = csrf({
+    ignoreMethods: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'POST', 'DELETE'],
+    cookie: false,
+  });
+  app.use((req, res, next) =>
+    isChatIntegrationPeerPath(req.path)
+      ? next()
+      : csrfProtection(req, res, next),
   );
 
   app.use('/_api', CertifyOrigin);
@@ -144,10 +166,30 @@ export const setup = (crowi, app) => {
   // passport
   logger.debug('initialize Passport');
   app.use(passport.initialize());
-  app.use(passport.session());
+  // Also skipped for the proxy-facing sub-tree for the same reason: the
+  // session strategy fails the request when `req.session` is absent. Those
+  // requests carry no login state anyway -- the acting user is resolved from
+  // the signature-verified payload.
+  const passportSession = passport.session();
+  app.use((req, res, next) =>
+    isChatIntegrationPeerPath(req.path)
+      ? next()
+      : passportSession(req, res, next),
+  );
 
   app.use(flash());
-  app.use(mongoSanitize());
+
+  // The app-wide mongo-sanitize walk treats a Buffer as a plain object, so for
+  // a raw-body request it enumerates one key per byte and runs the key test on
+  // every one of them (measured: 133 ms per MiB, over a second at this
+  // endpoint's 10mb limit). A Buffer cannot carry a MongoDB operator in the
+  // first place, so the walk has nothing to find there; the feature validates
+  // the parsed value itself. The registration is unconditional, so the only
+  // way to exempt a path is to wrap it.
+  const sanitizer = mongoSanitize();
+  app.use((req, res, next) =>
+    isChatIntegrationPeerPath(req.path) ? next() : sanitizer(req, res, next),
+  );
 
   app.use(registerSafeRedirect);
   app.use(injectCurrentuserToLocalvars);
