@@ -78,7 +78,6 @@ import { serializePageSecurely } from '../../models/serializers/page-serializer'
 import Subscription from '../../models/subscription';
 import UserGroupRelation from '../../models/user-group-relation';
 import { V5ConversionError } from '../../models/vo/v5-conversion-error';
-import { divideByType } from '../../util/granted-group';
 import type { ActivityActor } from '../attachment/attachment-removal-snapshot';
 import { configManager } from '../config-manager';
 import type { IPageGrantService } from '../page-grant';
@@ -87,6 +86,7 @@ import { getYjsService } from '../yjs';
 import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { deleteCompletelyOperation as deleteCompletelyOperationImpl } from './delete-completely-operation';
 import { onSeen } from './events/seen';
+import { isGrantImmutablePath } from './grant-immutable-path';
 import type { IPageService } from './page-service';
 import { shouldUseV4Process } from './should-use-v4-process';
 
@@ -4730,36 +4730,6 @@ class PageService implements IPageService {
     pageDocument.status = Page.STATUS_PUBLISHED;
   }
 
-  private async validateAppliedScope(
-    user,
-    grant,
-    grantUserGroupIds: IGrantedGroup[],
-  ) {
-    if (grant === PageGrant.GRANT_USER_GROUP && grantUserGroupIds == null) {
-      throw new Error('grantUserGroupIds is not specified');
-    }
-
-    if (grant === PageGrant.GRANT_USER_GROUP) {
-      const {
-        grantedUserGroups: grantedUserGroupIds,
-        grantedExternalUserGroups: grantedExternalUserGroupIds,
-      } = divideByType(grantUserGroupIds);
-      const count =
-        (await UserGroupRelation.countByGroupIdsAndUser(
-          grantedUserGroupIds,
-          user,
-        )) +
-        (await ExternalUserGroupRelation.countByGroupIdsAndUser(
-          grantedExternalUserGroupIds,
-          user,
-        ));
-
-      if (count === 0) {
-        throw new Error('no relations were exist for group and user.');
-      }
-    }
-  }
-
   private async canProcessCreate(
     path: string,
     grantData: {
@@ -4797,6 +4767,12 @@ class PageService implements IPageService {
       if (user == null) {
         throw Error('user is required to validate grant');
       }
+
+      await this.pageGrantService.validateGrantedGroupsAssignableByUser(
+        user,
+        grant,
+        grantUserGroupIds,
+      );
 
       let isGrantNormalized = false;
       try {
@@ -4898,6 +4874,10 @@ class PageService implements IPageService {
       grantUserIds,
       grantUserGroupIds,
     };
+
+    if (isUsersTopPage(path) && grant !== PageGrant.GRANT_PUBLIC) {
+      throw Error('The grant of the users top page must be public.');
+    }
 
     const isGrantRestricted = grant === PageGrant.GRANT_RESTRICTED;
 
@@ -5045,7 +5025,7 @@ class PageService implements IPageService {
 
     let grant = options.grant;
     // force public
-    if (isTopPage(pathSanitized)) {
+    if (isTopPage(pathSanitized) || isUsersTopPage(pathSanitized)) {
       grant = PageGrant.GRANT_PUBLIC;
     }
 
@@ -5063,7 +5043,11 @@ class PageService implements IPageService {
     if (expandContentWidth != null) {
       page.expandContentWidth = expandContentWidth;
     }
-    await this.validateAppliedScope(user, grant, grantUserGroupIds);
+    await this.pageGrantService.validateGrantedGroupsAssignableByUser(
+      user,
+      grant,
+      grantUserGroupIds,
+    );
     page.applyScope(user, grant, grantUserGroupIds);
 
     let savedPage = await page.save();
@@ -5332,6 +5316,16 @@ class PageService implements IPageService {
       'Page',
     );
 
+    if (
+      options.grant != null &&
+      options.grant !== pageData.grant &&
+      isGrantImmutablePath(pageData.path)
+    ) {
+      throw Error(
+        'The grant settings for the specified page cannot be modified.',
+      );
+    }
+
     const wasOnTree = pageData.parent != null || isTopPage(pageData.path);
     const isV5Compatible = configManager.getConfig('app:isV5Compatible');
 
@@ -5378,12 +5372,25 @@ class PageService implements IPageService {
       parent: { $ne: null },
     });
 
-    const isGrantChangeable = await this.pageGrantService.validateGrantChange(
-      user,
-      pageData.grantedGroups,
-      grant,
-      grantUserGroupIds,
-    );
+    const userRelatedGroups =
+      await this.pageGrantService.getUserRelatedGroups(user);
+    const isGrantSpecified =
+      options.grant != null || options.userRelatedGrantUserGroupIds != null;
+    if (isGrantSpecified) {
+      this.pageGrantService.validateGrantedGroupsAssignableByUserSyncronously(
+        userRelatedGroups,
+        grant,
+        grantUserGroupIds,
+      );
+    }
+
+    const isGrantChangeable =
+      this.pageGrantService.validateGrantChangeSyncronously(
+        userRelatedGroups,
+        pageData.grantedGroups,
+        grant,
+        grantUserGroupIds,
+      );
     if (!isGrantChangeable) {
       throw Error(
         'The selected grant or grantedGroup is not assignable to this page.',
@@ -5559,7 +5566,11 @@ class PageService implements IPageService {
       grantUserGroupIds,
     );
 
-    await this.validateAppliedScope(user, grant, grantUserGroupIds);
+    await this.pageGrantService.validateGrantedGroupsAssignableByUser(
+      user,
+      grant,
+      grantUserGroupIds,
+    );
     pageData.applyScope(user, grant, grantUserGroupIds);
 
     // update existing page

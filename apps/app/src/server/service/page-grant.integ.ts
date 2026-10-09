@@ -994,6 +994,117 @@ describe('PageGrantService', () => {
     });
   });
 
+  describe('Test validateGrantedGroupsAssignableByUser method', () => {
+    // user2 belongs to groupParent and externalGroupParent, but not to groupChild or differentTreeGroup
+    it('Should not check anything unless the grant is GRANT_USER_GROUP', async () => {
+      await expect(
+        pageGrantService.validateGrantedGroupsAssignableByUser(
+          user2,
+          Page.GRANT_PUBLIC,
+          [],
+        ),
+      ).resolves.toBeUndefined();
+    });
+
+    it('Should reject GRANT_USER_GROUP without a group list', async () => {
+      await expect(
+        pageGrantService.validateGrantedGroupsAssignableByUser(
+          user2,
+          Page.GRANT_USER_GROUP,
+          undefined,
+        ),
+      ).rejects.toThrow(/must not be empty/);
+    });
+
+    it('Should reject GRANT_USER_GROUP with an empty group list', async () => {
+      await expect(
+        pageGrantService.validateGrantedGroupsAssignableByUser(
+          user2,
+          Page.GRANT_USER_GROUP,
+          [],
+        ),
+      ).rejects.toThrow(/must not be empty/);
+    });
+
+    it('Should accept a group the user belongs to', async () => {
+      await expect(
+        pageGrantService.validateGrantedGroupsAssignableByUser(
+          user2,
+          Page.GRANT_USER_GROUP,
+          [{ item: groupParent._id, type: GroupType.userGroup }],
+        ),
+      ).resolves.toBeUndefined();
+    });
+
+    it('Should accept an external group the user belongs to', async () => {
+      await expect(
+        pageGrantService.validateGrantedGroupsAssignableByUser(
+          user2,
+          Page.GRANT_USER_GROUP,
+          [
+            {
+              item: externalGroupParent._id,
+              type: GroupType.externalUserGroup,
+            },
+          ],
+        ),
+      ).resolves.toBeUndefined();
+    });
+
+    it('Should accept a list that includes groups the user does not belong to as long as one of them is joined', async () => {
+      await expect(
+        pageGrantService.validateGrantedGroupsAssignableByUser(
+          user2,
+          Page.GRANT_USER_GROUP,
+          [
+            { item: groupChild._id, type: GroupType.userGroup },
+            { item: groupParent._id, type: GroupType.userGroup },
+          ],
+        ),
+      ).resolves.toBeUndefined();
+    });
+
+    it('Should reject a list that has no group the user belongs to', async () => {
+      await expect(
+        pageGrantService.validateGrantedGroupsAssignableByUser(
+          user2,
+          Page.GRANT_USER_GROUP,
+          [
+            { item: groupChild._id, type: GroupType.userGroup },
+            { item: differentTreeGroup._id, type: GroupType.userGroup },
+          ],
+        ),
+      ).rejects.toThrow(/does not belong to any of the granted groups/);
+    });
+
+    it('Should give the same verdicts from the synchronous variant when userRelatedGroups is passed in', async () => {
+      const userRelatedGroups =
+        await pageGrantService.getUserRelatedGroups(user2);
+
+      expect(() =>
+        pageGrantService.validateGrantedGroupsAssignableByUserSyncronously(
+          userRelatedGroups,
+          Page.GRANT_USER_GROUP,
+          [{ item: groupParent._id, type: GroupType.userGroup }],
+        ),
+      ).not.toThrow();
+      expect(() =>
+        pageGrantService.validateGrantedGroupsAssignableByUserSyncronously(
+          userRelatedGroups,
+          Page.GRANT_USER_GROUP,
+          [{ item: groupChild._id, type: GroupType.userGroup }],
+        ),
+      ).toThrow(/does not belong to any of the granted groups/);
+      expect(() =>
+        pageGrantService.validateGrantedGroupsAssignableByUserSyncronously(
+          userRelatedGroups,
+          Page.GRANT_USER_GROUP,
+          [],
+        ),
+      ).toThrow(/must not be empty/);
+    });
+  });
+
   describe('Test for calcApplicableGrantData', () => {
     it('Only Public is Applicable in case of top page', async () => {
       const result = await pageGrantService.calcApplicableGrantData(
