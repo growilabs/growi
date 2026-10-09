@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 
 import { prisma } from '~/utils/prisma';
 
+import { FROM_PATHS_CHUNK_SIZE } from './page-redirect';
+
 const mocks = vi.hoisted(() => ({
   logger: {
     debug: vi.fn(),
@@ -28,6 +30,26 @@ describe('PageRedirect', () => {
         toPath: `/p${i + 1}`,
       })),
     });
+  };
+
+  // Counts the aggregations a call sends to MongoDB, read from the server's own
+  // profiler: a spy on the Prisma delegate cannot see calls made inside an extension.
+  const runCountingAggregations = async <T>(
+    run: () => Promise<T>,
+  ): Promise<{ result: T; aggregations: number }> => {
+    const profile = () =>
+      mongoose.connection
+        .collection('system.profile')
+        .countDocuments({ 'command.aggregate': 'pageredirects' });
+
+    await mongoose.connection.db?.command({ profile: 2 });
+    try {
+      const before = await profile();
+      const result = await run();
+      return { result, aggregations: (await profile()) - before };
+    } finally {
+      await mongoose.connection.db?.command({ profile: 0 });
+    }
   };
 
   // Duplicate fromPaths can only be staged below the Prisma client, with the
@@ -384,6 +406,73 @@ describe('PageRedirect', () => {
       // then:
       expect(endpointsByFromPath.size).toEqual(1);
       expect(endpointsByFromPath.has('/never-existed')).toBe(false);
+    });
+
+    test('shoud resolve every fromPath of a set larger than one chunk', async () => {
+      // setup:
+      // /first and /last converge on /shared -> /end, and are far enough apart
+      // in the input to start in different chunks
+      const fillerCount = FROM_PATHS_CHUNK_SIZE + 1;
+      const fillerFromPaths = Array.from(
+        { length: fillerCount },
+        (_, i) => `/filler${i}`,
+      );
+      await prisma.pageredirects.createMany({
+        data: [
+          { fromPath: '/first', toPath: '/shared' },
+          { fromPath: '/last', toPath: '/shared' },
+          { fromPath: '/shared', toPath: '/end' },
+          ...fillerFromPaths.map((fromPath, i) => ({
+            fromPath,
+            toPath: `/filler-target${i}`,
+          })),
+        ],
+      });
+
+      // when:
+      const { result: endpointsByFromPath, aggregations } =
+        await runCountingAggregations(() =>
+          prisma.pageredirects.retrievePageRedirectEndpointsBatch([
+            '/first',
+            ...fillerFromPaths,
+            '/last',
+          ]),
+        );
+
+      // then:
+      expect(aggregations).toBeGreaterThan(1);
+      expect(endpointsByFromPath.get('/first')?.end.toPath).toEqual('/end');
+      expect(endpointsByFromPath.get('/last')?.end.toPath).toEqual('/end');
+      expect(endpointsByFromPath.get('/filler0')?.end.toPath).toEqual(
+        '/filler-target0',
+      );
+      expect(
+        endpointsByFromPath.get(`/filler${fillerCount - 1}`)?.end.toPath,
+      ).toEqual(`/filler-target${fillerCount - 1}`);
+    });
+
+    test('shoud not spend extra aggregations on a fromPath requested repeatedly', async () => {
+      // setup:
+      await prisma.pageredirects.createMany({
+        data: [{ fromPath: '/path1', toPath: '/path2' }],
+      });
+      const repeatedFromPaths = Array.from(
+        { length: FROM_PATHS_CHUNK_SIZE + 1 },
+        () => '/path1',
+      );
+
+      // when:
+      const { result: endpointsByFromPath, aggregations } =
+        await runCountingAggregations(() =>
+          prisma.pageredirects.retrievePageRedirectEndpointsBatch(
+            repeatedFromPaths,
+          ),
+        );
+
+      // then:
+      expect(aggregations).toEqual(1);
+      expect(endpointsByFromPath.size).toEqual(1);
+      expect(endpointsByFromPath.get('/path1')?.end.toPath).toEqual('/path2');
     });
 
     test('shoud stop following a chain at the depth cap it is given', async () => {
