@@ -1,12 +1,16 @@
 import { ErrorV3 } from '@growi/core/dist/models';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type { SWRResponse } from 'swr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { IErrorV3 } from '~/interfaces/errors/v3-error';
 import { useCurrentPageId } from '~/states/page';
 
-import type { IBacklink, IBacklinkResponse } from '../../interfaces/backlink';
+import type {
+  IBacklink,
+  IBacklinkResponse,
+  ILinkTarget,
+} from '../../interfaces/backlink';
 import { useSWRxBacklinks } from '../stores/backlinks';
 import { BacklinksPanel } from './BacklinksPanel';
 
@@ -32,10 +36,18 @@ const mockBacklinks = (
   );
 };
 
-const responseOf = (backlinks: IBacklink[]): IBacklinkResponse => ({
+const responseOf = (
+  backlinks: IBacklink[],
+  linkTargets: ILinkTarget[] = [],
+): IBacklinkResponse => ({
   backlinks,
-  linkTargets: [],
+  linkTargets,
 });
+
+const TRASHED_AND_BROKEN: ILinkTarget[] = [
+  { pageId: 'p-t', path: '/trash/best', targetState: 'trashed' },
+  { pageId: null, path: '/parent/gone', targetState: 'broken' },
+];
 
 describe('BacklinksPanel', () => {
   beforeEach(() => {
@@ -119,5 +131,69 @@ describe('BacklinksPanel', () => {
     // Assert
     expect(screen.getByTestId('backlinks-empty')).toBeInTheDocument();
     expect(screen.queryByTestId('backlinks-loading')).not.toBeInTheDocument();
+  });
+
+  describe('outgoing links needing attention', () => {
+    it('lists trashed and broken outgoing links with their badges', () => {
+      // Arrange
+      mockBacklinks({
+        data: responseOf([{ pageId: 'p-a', path: '/foo' }], TRASHED_AND_BROKEN),
+        isLoading: false,
+      });
+
+      // Act
+      render(<BacklinksPanel />);
+
+      // Assert: the section holds exactly the two outgoing rows, each flagged
+      const section = within(screen.getByTestId('backlinks-link-targets'));
+      expect(
+        section.getByText('backlinks.outgoing_needing_attention'),
+      ).toBeInTheDocument();
+      expect(section.getAllByRole('listitem')).toHaveLength(2);
+      expect(
+        section.getByText('backlinks.target_state.trashed'),
+      ).toBeInTheDocument();
+      expect(
+        section.getByText('backlinks.target_state.broken'),
+      ).toBeInTheDocument();
+
+      // Assert: the incoming list is unchanged
+      const incoming = within(screen.getByTestId('backlinks-list'));
+      expect(incoming.getAllByRole('listitem')).toHaveLength(1);
+      expect(incoming.getByText('foo')).toBeInTheDocument();
+    });
+
+    it('shows no outgoing section when no outgoing link needs attention', () => {
+      // Arrange
+      mockBacklinks({
+        data: responseOf([{ pageId: 'p-a', path: '/foo' }]),
+        isLoading: false,
+      });
+
+      // Act
+      render(<BacklinksPanel />);
+
+      // Assert
+      expect(screen.getByTestId('backlinks-list')).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('backlinks-link-targets'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the outgoing section alongside the empty state when nothing links here', () => {
+      // Arrange
+      mockBacklinks({
+        data: responseOf([], TRASHED_AND_BROKEN),
+        isLoading: false,
+      });
+
+      // Act
+      render(<BacklinksPanel />);
+
+      // Assert
+      expect(screen.getByTestId('backlinks-empty')).toBeInTheDocument();
+      const section = within(screen.getByTestId('backlinks-link-targets'));
+      expect(section.getAllByRole('listitem')).toHaveLength(2);
+    });
   });
 });
