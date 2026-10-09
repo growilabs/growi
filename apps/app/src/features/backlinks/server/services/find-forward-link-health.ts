@@ -126,6 +126,40 @@ const findBrokenTargets = async (
 };
 
 /**
+ * Rows whose cached target id matches no page at all — left behind when a recording raced
+ * a permanent delete (the delete cleanup had already run), or when a delete was missed.
+ *
+ * Existence is checked WITHOUT the viewer condition, so a page the viewer cannot read still
+ * counts as present and stays omitted (see `findTrashedTargets`); only an id that no page
+ * holds is reported. Like `findBrokenTargets`, the path is the row's own `toPath`.
+ */
+const findDanglingTargets = async (
+  rows: OutboundRow[],
+): Promise<ILinkTarget[]> => {
+  const rowsWithTarget = rows.flatMap((row) =>
+    row.toPageId != null
+      ? [{ toPath: row.toPath, toPageId: row.toPageId }]
+      : [],
+  );
+  if (rowsWithTarget.length === 0) {
+    return [];
+  }
+
+  const Page = mongoose.model<PageDocument, PageModel>('Page');
+  const existingPages = await Page.find({
+    _id: { $in: rowsWithTarget.map((row) => new Types.ObjectId(row.toPageId)) },
+  })
+    .select('_id')
+    .lean()
+    .exec();
+  const existingIds = new Set(existingPages.map((page) => page._id.toString()));
+
+  return rowsWithTarget
+    .filter((row) => !existingIds.has(row.toPageId))
+    .map((row) => ({ pageId: null, path: row.toPath, targetState: 'broken' }));
+};
+
+/**
  * `fromPageId`'s outbound links whose target needs the editor's attention — `trashed`
  * or `broken` — among the targets `user` may read.
  *
@@ -139,10 +173,11 @@ export const findForwardLinkHealth = async (
 ): Promise<ILinkTarget[]> => {
   const rows = await findOutboundRows(fromPageId);
 
-  const [trashed, broken] = await Promise.all([
+  const [trashed, broken, dangling] = await Promise.all([
     findTrashedTargets(rows, user, userGroups),
     findBrokenTargets(fromPageId, rows),
+    findDanglingTargets(rows),
   ]);
 
-  return [...trashed, ...broken];
+  return [...trashed, ...broken, ...dangling];
 };

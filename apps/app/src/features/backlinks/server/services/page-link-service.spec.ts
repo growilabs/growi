@@ -1,4 +1,5 @@
 import EventEmitter from 'node:events';
+import type { IUserHasId } from '@growi/core';
 import { Types } from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
@@ -8,14 +9,20 @@ import type { PageDocument } from '~/server/models/page';
 
 import { PageLinkService } from './page-link-service';
 
-// handlePageUpsertById has its own coverage (page-link-service-handlers.integ.ts); mock it so this
-// test isolates the queue contract — which pages are extracted, how often, and how many per tick.
+// Both handlers have their own coverage (page-link-service-handlers.integ.ts, page-link-sync.spec.ts);
+// mock them so this test isolates what the subscription itself owns — which pages each event
+// settles, and which of them are extracted, how often, and how many per tick.
 const mocks = vi.hoisted(() => ({
   handlePageUpsertById: vi.fn(),
+  // The listener attaches .catch(), so this must resolve rather than return undefined. Set once
+  // here because the workspace's `clearMocks` is mockClear (calls only); a switch to mockReset
+  // would drop it, and every delete case would throw from inside the listener.
+  handlePagesDelete: vi.fn().mockResolvedValue(undefined),
   loggerError: vi.fn(),
 }));
 vi.mock('./page-link-service-handlers', () => ({
   handlePageUpsertById: mocks.handlePageUpsertById,
+  handlePagesDelete: mocks.handlePagesDelete,
 }));
 vi.mock('~/utils/logger', () => ({
   default: () => ({
@@ -81,16 +88,20 @@ describe('PageLinkService (live extraction queue)', () => {
     vi.useRealTimers();
   });
 
+  const pageDoc = (pageId: Types.ObjectId): PageDocument => {
+    const page = mock<PageDocument>({ path: '/from' });
+    // Assign the ObjectId directly: mock<T>() would deep-mock it into a proxy, so toString()
+    // would no longer yield the id the queue keys on.
+    page._id = pageId;
+    return page;
+  };
+
   const save = (
     event: 'create' | 'update',
     pageId: Types.ObjectId,
     emitter: EventEmitter = pageEvent,
   ): void => {
-    const page = mock<PageDocument>({ path: '/from' });
-    // Assign the ObjectId directly: mock<T>() would deep-mock it into a proxy, so toString()
-    // would no longer yield the id the queue keys on.
-    page._id = pageId;
-    emitter.emit(event, page);
+    emitter.emit(event, pageDoc(pageId));
   };
 
   const upsertedIds = (): string[] =>
@@ -223,6 +234,89 @@ describe('PageLinkService (live extraction queue)', () => {
     expect(mocks.handlePageUpsertById).toHaveBeenLastCalledWith(
       next.toString(),
       siteUrl,
+    );
+  });
+
+  /*
+   * B5.7 — the delete-family subscription. `EventEmitter.on` types its listener as
+   * `(...args: any[])`, so the payload shape a listener declares is an unverified claim: reading an
+   * array as a single document yields no ids, and settles and reports nothing. These cases pin the
+   * shapes `server/service/page/index.ts` actually emits.
+   */
+  describe('delete-family events', () => {
+    const user = mock<IUserHasId>();
+
+    const deleteEvents = [
+      {
+        // (page, deletedPage, user) — arg 0 is the pre-delete document, same _id as the trashed one.
+        event: 'delete',
+        carriedPages: 1,
+        emit: (pages: PageDocument[]): void => {
+          pageEvent.emit(
+            'delete',
+            pages[0],
+            pageDoc(new Types.ObjectId()),
+            user,
+          );
+        },
+      },
+      {
+        // (page, user); the system path (delete-page-completely-by-system.ts) omits the user.
+        event: 'deleteCompletely',
+        carriedPages: 1,
+        emit: (pages: PageDocument[]): void => {
+          pageEvent.emit('deleteCompletely', pages[0], user);
+        },
+      },
+      {
+        // (pages, user) — an array, from the soft-delete and the permanent-delete descendant paths alike.
+        event: 'syncDescendantsDelete',
+        carriedPages: 2,
+        emit: (pages: PageDocument[]): void => {
+          pageEvent.emit('syncDescendantsDelete', pages, user);
+        },
+      },
+    ];
+
+    /** Every id handed to handlePagesDelete, across all calls, as hex. */
+    const reconciledIds = (): string[] =>
+      mocks.handlePagesDelete.mock.calls.flatMap(([ids]) =>
+        ids.map((id: Types.ObjectId) => id.toString()),
+      );
+
+    const carriedIds = (count: number): Types.ObjectId[] =>
+      Array.from({ length: count }, () => new Types.ObjectId());
+
+    const eachDeleteEvent = it.each(deleteEvents);
+
+    eachDeleteEvent(
+      'reconciles every page a $event event carries',
+      ({ emit, carriedPages }) => {
+        const pageIds = carriedIds(carriedPages);
+
+        emit(pageIds.map(pageDoc));
+
+        expect(reconciledIds()).toEqual(
+          pageIds.map((pageId) => pageId.toString()),
+        );
+      },
+    );
+
+    eachDeleteEvent(
+      'abandons the pending upsert of every page a $event event carries',
+      async ({ emit, carriedPages }) => {
+        const deleted = carriedIds(carriedPages);
+        // A page the event does not carry: without it, a drain that ran empty would pass too.
+        const kept = new Types.ObjectId();
+        for (const pageId of [...deleted, kept]) {
+          save('update', pageId);
+        }
+
+        emit(deleted.map(pageDoc));
+        await vi.advanceTimersByTimeAsync(DRAIN_INTERVAL_MS);
+
+        expect(upsertedIds()).toEqual([kept.toString()]);
+      },
     );
   });
 });

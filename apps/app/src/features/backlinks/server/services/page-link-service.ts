@@ -9,6 +9,7 @@ import loggerFactory from '~/utils/logger';
 import type { IBacklink, ILinkTarget } from '../../interfaces/backlink';
 import { findBacklinks } from './find-backlinks';
 import { findForwardLinkHealth } from './find-forward-link-health';
+import { handlePagesDelete } from './page-link-service-handlers';
 import { PageLinkUpsertQueue } from './page-link-upsert-queue';
 import { resolveUpsertQueuePacing } from './upsert-queue-pacing';
 
@@ -54,6 +55,14 @@ export class PageLinkService {
     const pageEvent = this.crowi.events.page;
     pageEvent.on('create', (page: PageDocument) => this.onUpsert(page));
     pageEvent.on('update', (page: PageDocument) => this.onUpsert(page));
+    pageEvent.on('revert', (page: PageDocument) => this.onUpsert(page));
+    pageEvent.on('delete', (page: PageDocument) => this.onDelete([page]));
+    pageEvent.on('deleteCompletely', (page: PageDocument) =>
+      this.onDelete([page]),
+    );
+    pageEvent.on('syncDescendantsDelete', (pages: PageDocument[]) =>
+      this.onDelete(pages),
+    );
   }
 
   private onUpsert(page: PageDocument): void {
@@ -67,6 +76,13 @@ export class PageLinkService {
     } catch (err) {
       logger.error({ err, pageId: page._id }, 'backlinks sync failed');
     }
+  }
+
+  private onDelete(pages: PageDocument[]): void {
+    const ids = pages.map((page) => page._id).filter((id) => id != null);
+    this.upsertQueue.abandon(ids.map((id) => id.toString()));
+
+    handlePagesDelete(ids);
   }
 
   findBacklinks(
