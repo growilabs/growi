@@ -1132,6 +1132,7 @@
     "PAGE_SUBSCRIBE": "ページをサブスクライブ",
     "PAGE_UNSUBSCRIBE": "ページをアンサブスクライブ",
     "PAGE_EXPORT": "マークダウン形式でページをエクスポート",
+    "PAGE_AI_SUMMARIZE": "AIによるページの要約",
     "TAG_UPDATE": "タグの更新",
     "IN_APP_NOTIFICATION_ALL_STATUSES_OPEN": "アプリ内通知を全て既読",
     "COMMENT_CREATE": "コメントの作成",

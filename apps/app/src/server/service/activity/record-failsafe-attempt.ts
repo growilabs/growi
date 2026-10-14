@@ -10,8 +10,10 @@ const logger = loggerFactory('growi:service:activity:record-failsafe-attempt');
 /**
  * Create exactly one ACTION_UNSETTLED "attempt was made" row for a request
  * that ended in failure or interruption before record-eligibility could be
- * determined (called only by registerFailsafeFinalizer, after it has
- * already decided the request failed/aborted).
+ * determined. Called by registerFailsafeFinalizer once it has decided the
+ * request failed/aborted, and by a streaming route whose failure arrives
+ * inside a 200 response the finalizer cannot see (e.g.
+ * features/mastra/server/routes/summarize-message.ts).
  *
  * No pre-read: the pre-minted `activityId` is the row's primary key, so if
  * settle already created the real-action row for this id, `create` fails

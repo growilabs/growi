@@ -1132,6 +1132,7 @@
     "PAGE_SUBSCRIBE": "订阅页面",
     "PAGE_UNSUBSCRIBE": "退订页面",
     "PAGE_EXPORT": "导出页面",
+    "PAGE_AI_SUMMARIZE": "使用 AI 总结页面",
     "TAG_UPDATE": "更新标签",
     "IN_APP_NOTIFICATION_ALL_STATUSES_OPEN": "读取所有应用内通知",
     "COMMENT_CREATE": "创建评论",

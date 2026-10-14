@@ -6,7 +6,7 @@
  * (a) stepped full-coverage reading procedure via limitedGetPageContentTool
  * (b) explicit "partial content" disclosure when limit_exceeded is received
  * (c) output format: one lead sentence + 3-5 bullet points
- * (d) respond in the user's input language
+ * (d) respond in the requested locale's language, else the page's language
  *
  * This file is intentionally independent from growi-agent.ts's instructions
  * and shares nothing with it.
@@ -41,4 +41,4 @@ Write the summary as exactly:
 
 ## Step 4 — Response language
 
-Always respond in the SAME LANGUAGE as the user's input.`;
+Write the summary in the language of the locale specified in the request. If no locale is specified, write it in the same language as the page content.`;

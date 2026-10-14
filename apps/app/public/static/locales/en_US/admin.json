@@ -1143,6 +1143,7 @@
     "PAGE_SUBSCRIBE": "Subscribe page",
     "PAGE_UNSUBSCRIBE": "Unsubscribe page",
     "PAGE_EXPORT": "Export page",
+    "PAGE_AI_SUMMARIZE": "Summarize page with AI",
     "TAG_UPDATE": "Update tags",
     "IN_APP_NOTIFICATION_ALL_STATUSES_OPEN": "Read all In-App notifications",
     "COMMENT_CREATE": "Create comment",

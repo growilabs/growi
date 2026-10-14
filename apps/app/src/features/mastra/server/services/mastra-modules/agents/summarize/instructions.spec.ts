@@ -63,8 +63,14 @@ describe('SUMMARIZE_INSTRUCTIONS', () => {
     expect(SUMMARIZE_INSTRUCTIONS).toMatch(/bullet/i);
   });
 
-  it('instructs to respond in the user’s input language', () => {
-    expect(SUMMARIZE_INSTRUCTIONS).toMatch(/same language/i);
+  it('instructs to respond in the requested locale’s language, falling back to the page’s language', () => {
+    expect(SUMMARIZE_INSTRUCTIONS).toMatch(
+      /language of the locale specified in the request/i,
+    );
+    expect(SUMMARIZE_INSTRUCTIONS).toMatch(
+      /no locale is specified[\s\S]{0,60}same language as the page content/i,
+    );
+    expect(SUMMARIZE_INSTRUCTIONS).not.toMatch(/same language as the user/i);
   });
 
   it('instructs that totalLines is never a stop condition by itself (not merely mentioning the word)', () => {

@@ -1130,6 +1130,7 @@
     "PAGE_SUBSCRIBE": "S'abonner",
     "PAGE_UNSUBSCRIBE": "Se désabonner",
     "PAGE_EXPORT": "Exporter",
+    "PAGE_AI_SUMMARIZE": "Résumer la page avec l'IA",
     "TAG_UPDATE": "Modifier les tags",
     "IN_APP_NOTIFICATION_ALL_STATUSES_OPEN": "Marquer toutes les notifications comme lues",
     "COMMENT_CREATE": "Ajouter un commentaire",
