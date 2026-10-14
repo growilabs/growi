@@ -1,6 +1,7 @@
 import { Schema } from 'mongoose';
 
 import { Prisma } from '~/generated/prisma/client';
+import { chunk } from '~/utils/array-utils';
 import loggerFactory from '~/utils/logger';
 import type { prisma } from '~/utils/prisma';
 
@@ -68,6 +69,14 @@ const MONGO_DUPLICATE_KEY_ERROR_CODE = 11000;
 type PageRedirectsContext = typeof prisma.pageredirects;
 
 /**
+ * How many `fromPath`s one `$graphLookup` aggregation starts from. Each start
+ * document holds its own chain array in the stage's memory (100MB, no spill to
+ * disk), so the number of starts bounds the stage the way `maxDepth` bounds a
+ * chain. `retrieveEndpointsBatch` applies it, so callers never size their input.
+ */
+export const FROM_PATHS_CHUNK_SIZE = 500;
+
+/**
  * Resolves the endpoint of each requested `fromPath`'s redirect chain.
  *
  * @param maxDepth - Optional cap on how many hops of a chain to walk. `$graphLookup`
@@ -82,10 +91,31 @@ const retrieveEndpointsBatch = async (
   fromPaths: string[],
   maxDepth?: number,
 ): Promise<Map<string, IPageRedirectEndpoints>> => {
-  if (fromPaths.length === 0) {
-    return new Map();
+  const endpointsByFromPath = new Map<string, IPageRedirectEndpoints>();
+
+  // Deduplicated so one path never lands in two chunks.
+  const chunkedPaths = chunk([...new Set(fromPaths)], FROM_PATHS_CHUNK_SIZE);
+
+  for (const fromPathsChunk of chunkedPaths) {
+    // biome-ignore lint/performance/noAwaitInLoops: Allow for memory consumption control
+    const chunkEndpoints = await retrieveEndpointsOfChunk(
+      context,
+      fromPathsChunk,
+      maxDepth,
+    );
+    for (const [fromPath, endpoints] of chunkEndpoints) {
+      endpointsByFromPath.set(fromPath, endpoints);
+    }
   }
 
+  return endpointsByFromPath;
+};
+
+const retrieveEndpointsOfChunk = async (
+  context: PageRedirectsContext,
+  fromPaths: string[],
+  maxDepth?: number,
+): Promise<Map<string, IPageRedirectEndpoints>> => {
   const aggResult = (await context.aggregateRaw({
     pipeline: [
       { $match: { fromPath: { $in: fromPaths } } },
