@@ -273,10 +273,12 @@
   and the Elasticsearch reindex (streams, GC per batch, admin Socket.IO progress).
 - **Selected Approach**:
   1. migrate-mongo creates **only the indexes** (fast, safe to block on at boot).
-  2. The heavy backfill is an **online `CronService` job** modeled on page-bulk-export: chunk per
-     tick (cadence × chunk = duty cycle = the throttle), resumable via a progress-marker document,
-     run-once + multi-instance-safe via an **atomic Mongo claim** (`findOneAndUpdate`), progress
-     over the admin Socket.IO channel.
+  2. The heavy backfill is an **online `CronService` job** modeled on page-bulk-export: a
+     time-budgeted chunk per tick (the duty cycle over measured extraction time is the throttle),
+     resumable via a progress-marker document (last `_id`, saved after the chunk's writes),
+     run-once + multi-instance-safe via an **atomic Mongo claim** (`findOneAndUpdate`) with a
+     renewed lease for crash recovery, an in-process overlap flag, progress over the admin
+     Socket.IO channel.
   3. Resolution during backfill uses an **in-memory `{path → _id}` map** built from one projection
      query (hash lookups, not per-link DB round-trips); redirect-following skipped (stragglers
      self-heal on next edit/read).
@@ -285,6 +287,44 @@
   full plugin chain. Central estimate ~5 ms/page. Full-speed totals (also = blocking-downtime if
   it ran at boot): ~1 min/10k, ~10 min/100k, ~50 min/500k, ~1.7 h/1M. Online throttled =
   full-speed ÷ duty cycle (e.g. 25% ⇒ ×4); ×~4 again if pages average ~15 KB.
+- **Scale assumption (customer data)**: largest wiki 45k pages, most under 3k, a few at 8k–20k.
+  Estimated at 25% duty (unmeasured): ~1.5 min for 3k pages, 4–8 min for 8k–20k, ~18 min for 45k
+  (~70 min if pages average 15 KB). This covers only the customers we can see; self-hosted
+  installs may be larger, which is why the job stays online and throttled rather than assuming
+  small wikis.
+- **Scheduler facts that shape the throttle** (node-cron 3.0.3 source): the callback is not
+  awaited and there is no no-overlap option, so ticks can overlap on a slow write; a tick due
+  while the previous is running is dropped (`recoverMissedExecutions: false`) and the next starts
+  immediately; polling is once per second. Hence the overlap flag, and a time budget instead of
+  `cadence × chunk size`.
+- **Duty cycle vs. stall length**: the duty cycle is the average share of wall time the job is
+  active; only its synchronous parsing blocks the event loop. What live requests feel is the longest
+  uninterrupted block, so the loop yields after a slice limit. Success is judged on event-loop
+  delay max/p99 (`perf_hooks.monitorEventLoopDelay`), not on the duty number.
+- **Considered and deferred — MongoDB `$regex` prefilter**: skip parsing pages whose current
+  revision cannot contain a link. Deferred because (1) the benefit is unmeasured (27% pass rate on
+  59 short dev pages says little); (2) the regex is a second definition of "a link", and a miss
+  means permanently missing backlinks, silently — a dev regex missed reference-style links,
+  `<https://…>` autolinks and possibly bare URLs (unverified against the extractor); (3) it must
+  target only each page's *current* revision (a naive all-revisions query matched 2× as many);
+  (4) DB read load is similar to the plain scan, which reads every body anyway. If added: one
+  source of link forms or a drift test against the extractor, and a deliberately broad regex.
+- **Other options ruled out**: *lazy per target* — not exact (relative links, wiki-links,
+  renames) and depends on Elasticsearch; *lazy on view of the source page* — cannot work, rows live
+  under the source page; *lazy start (first backlinks panel open)* — cheap and can be added later
+  without changing the job; *admin trigger* — already deferred above.
+- **Open questions (settle in B3.2)**: write ordering between the live listener and the backfill on
+  the same page (can a stale backfill read overwrite fresher rows?); whether the backfill's pacing
+  reuses the listener's measured-time mechanism as-is; whether to cap the body size parsed, since
+  the budget and slice checks run between pages and cannot bound one large page (~1.1 s at
+  333 KiB). Options considered: skip-and-record (a gap that is visible but still missing until the
+  page's next save), truncate (loses the links after the cutoff, silently — rejected), parse
+  off-thread (the real fix, deferred with `worker_threads`).
+- **Pacing alternative (settle in B3.2)**: a cron tick with a time budget (as designed) versus a
+  self-paced loop that works for a slice and sleeps for a multiple of it. The sleep-based form
+  gives an exact duty and short, evenly spaced bursts, and sidesteps node-cron's 1 s cadence floor
+  and dropped ticks; it costs the reuse of the `CronService` scaffolding and requires moving the
+  marker save, write and lease renewal off the tick boundary. Neither shape bounds one large page.
 - **Trade-offs**: backlinks are incomplete for pre-existing pages until the job finishes
   (acceptable per 4.2 — completeness only required *after* completion; new edits index instantly).
   In-process means the parse still shares the one JS thread; the duty cycle bounds but cannot
@@ -355,10 +395,11 @@
   explicit non-trashed status filter to the backlink-source query; verify during implementation.
 - **Backfill on very large wikis** — Mitigation: online throttled `CronService` job (not a
   boot-blocking migration); in-memory `{path→_id}` resolution; cursor + `createBatchStream` +
-  idempotent `bulkWrite` upserts; resumable progress marker; atomic Mongo claim for
-  multi-instance. See the backfill decision above.
-- **Backfill CPU contention with live traffic** (single JS thread) — Mitigation: duty-cycle
-  throttle via cron cadence; conservative default; admin-tunable. Full elimination needs
+  idempotent `bulkWrite` upserts; resumable progress marker; atomic Mongo claim with a renewed
+  lease for multi-instance and crash recovery. See the backfill decision above.
+- **Backfill CPU contention with live traffic** (single JS thread) — Mitigation: per-tick time
+  budget (duty cycle) plus a bounded continuous block (yield between pages); conservative default;
+  admin-tunable. Full elimination needs
   `worker_threads` (deferred, no infra).
 - **Redirect record accumulation** — Mitigation: none required for correctness (`$graphLookup`
   handles depth); note for future cleanup.

@@ -799,8 +799,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 > **Why the backfill is an online job, not a boot-time migration.** GROWI runs migrate-mongo
 > migrations *synchronously at boot, before the app serves traffic* (`docker-entrypoint.ts:247`).
 > A data migration that parses every page body would therefore make the wiki **offline for the
-> full backfill duration** — minutes on small wikis, but tens of minutes to hours on large-plan
-> instances. So the heavy data part runs **online** as a throttled background job after boot.
+> full backfill duration** — minutes on the wikis we know of (largest 45k pages, most under 3k),
+> longer on very large self-hosted instances. So the heavy data part runs **online** as a throttled background job after boot.
 > Nothing schema-related blocks boot either: the index migration that provisions the three
 > `pagelinks` indexes (unique `fromPage_1_toPath_1`, `toPage_1`, `toPath_1`) builds them on a new,
 > empty collection, which is effectively instant. Backlinks are simply incomplete
@@ -818,15 +818,63 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 **Responsibilities & Constraints**
 - Extends `CronService` (node-cron) and follows the **page-bulk-export job** precedent: each tick
   processes a bounded **chunk** of pages, persists progress, then idles until the next tick.
-- **Throttle = cron cadence × chunk size** (the duty cycle). Because the job shares the single JS
-  thread, the cadence is the only lever bounding CPU contention with live traffic; default
-  conservative (≈10–25% duty), operator-tunable.
-- **Resumable**: a `PageLinkBackfillJob` document stores a progress marker (e.g. last processed
-  `_id`/path) so a restart continues rather than restarting (4.3).
+- **Throttle = a duty cycle over measured time, not a page count.** Because the job shares the
+  single JS thread, bounding the time it holds the thread is the only lever on contention with live
+  traffic. Each tick has a **time budget** (≈250 ms of extraction work; default ≈10–25% duty,
+  operator-tunable) and stops taking pages once it is spent, as the save-time listener does (B2.2).
+  A page-denominated chunk is not a throttle: extraction cost spans ~700× across bodies, and
+  node-cron polls at a 1 s minimum cadence and drops a tick that falls due while the previous one is
+  still running (`recoverMissedExecutions: false`), so a chunk that outlasts the interval leaves
+  almost no idle time.
+- **Bounded continuous blocking.** The duty cycle fixes the average, not the stall length. The
+  extraction loop is synchronous and has no natural `await` once bodies are read per batch, so it
+  **yields to the event loop (`setImmediate`) whenever the time since its last yield exceeds a
+  slice limit** (tens of ms), then continues with the next page. Nothing is skipped; the check is
+  made between pages, so the worst stall is the slice limit plus the slowest single page.
+  The test is event-loop delay (max / p99), not duty cycle.
+- **Single-page overshoot (open — settle in B3.2)**: neither the tick budget nor the slice limit can
+  interrupt a parse, so one large body overshoots both (measured on the B2.2 pipeline: ~88 ms at
+  32.6 KiB, ~1.1 s at 333 KiB — a single stall longer than the whole 250 ms budget, and near-100%
+  duty for that stretch because node-cron drops the tick that falls due meanwhile). Only a
+  **body-size cap** checked before parsing bounds a single page's stall. Whether to cap, at what
+  size (to be chosen from the performance run), and how skipped pages are recorded (log plus a
+  count on the job document, so the gap is visible rather than silent) is undecided. The
+  save-time listener has the same single-page exposure, so whether the cap is shared with it is
+  part of that decision. Off-thread parsing is the alternative and stays deferred.
+- **Alternative pacing — sleep proportional to work (open — settle in B3.2)**: instead of a cron
+  tick that spends a budget and then idles until the next tick, the job works for a slice (≈50 ms)
+  and then `await`s a timer of a multiple of the work (≈150 ms for 25% duty). One mechanism then
+  replaces both the tick budget and the zero-length yield: the duty is exact by construction, the
+  load is spread as short bursts instead of one burst per second, and the cron cadence is needed
+  only to start the job. It also removes the dropped-tick behavior and the 1 s cron floor. Costs:
+  it departs from the `CronService` / page-bulk-export pattern this design otherwise reuses (a
+  custom timer loop); the per-chunk work (page-link writes, progress marker, lease renewal) must
+  move from "per tick" to a per-N-pages or per-interval step, trading more DB writes against more
+  pages redone after a crash; and it still cannot bound a single large page, so the body-size cap
+  above applies either way. The overlap flag is needed in both shapes if anything can start a
+  second loop.
+- **No overlapping ticks.** node-cron 3.0.3 does not await the tick callback and has no
+  no-overlap option, so a tick awaiting a slow DB write can overlap the next one on the same
+  progress marker. An **in-process `isRunning` flag**, reset in `finally`, makes an overlapping tick
+  return immediately.
+- **Resumable**: a `PageLinkBackfillJob` document stores a progress marker — the **last `_id`
+  processed, walking pages in `_id` order** — so a restart continues rather than restarting (4.3).
+  The marker is saved **after** the chunk's page-link writes: delivery is at-least-once, a crash
+  redoes at most one chunk, and the idempotent upsert on `{fromPage,toPath}` makes that safe. Saving
+  it before the writes would silently skip the chunk after a crash.
 - **Run-once + multi-instance safe**: the job document carries an **atomic claim**
   (`findOneAndUpdate`) so only one instance in a multi-container deployment runs it, and it stops
   permanently once complete. (GROWI has no distributed lock; this Mongo claim is the minimal
-  hardening over the bulk-export pattern, which has a known race window.)
+  hardening over the bulk-export pattern, which has a known race window.) The claim is **per job**
+  (one control document), not per chunk or per page, and it does not replace the in-process
+  overlap flag.
+- **Crash recovery via a lease**: a claim held by a dead owner would otherwise block the job
+  forever. The claim carries `leaseExpiresAt`, **renewed on every chunk**, and the claim filter also
+  matches a document whose lease has expired, so another instance takes over and resumes from the
+  progress marker.
+- **Write ordering vs. the live listener (open — settle in B3.2)**: the backfill reads a page body
+  and writes its rows later; the save-time listener may rewrite the same page's rows in between.
+  Whether a stale backfill write can overwrite fresher rows is not established by this design.
 - **In-memory resolution**: loads `{path → _id}` for all pages once (one lightweight projection
   query) and resolves extracted links by hash lookup — **never** the live `resolveToPageIds` per page.
   Redirect-following is skipped during backfill. For a **permalink** `toPath` (`isPermalink`),
@@ -840,7 +888,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 - Trigger: **auto-started from `crowi` setup after boot** (throttled). Skips immediately if the job
   document is marked complete. (Admin-triggered start deferred — see Delivery decision below.)
 - Input per chunk: a cursor page-batch (`Page.find(...).cursor({ batch_size })` +
-  `createBatchStream`); body via `Revision.findById(page.revision).body`.
+  `createBatchStream`) in `_id` order, starting after the progress marker; body via
+  `Revision.findById(page.revision).body`. The chunk ends when the tick's time budget is spent.
 - Per page: `extractInternalLinkPaths(body, page.path, siteUrl)` → resolve each path via the in-memory
   map (or, for a permalink path, via the id-existence set) → batched upserts. **`pagelinks` is a
   Prisma-only collection with no mongoose model, so there is no `Model.bulkWrite`**: the chunk write
@@ -1058,9 +1107,10 @@ interface IBacklinkResponse {
   - Trade-off: the index trails the save by up to (tick interval × queue depth) — acceptable, since
     the listener is already fire-and-forget and eventually consistent.
 - **Backfill** is the only bulk-CPU operation. It runs online but on the single JS thread, so its
-  cron cadence/chunk size (duty cycle) bounds latency impact on live traffic; the in-memory
-  `{path→_id}` map keeps it CPU-bound (parsing), not round-trip-bound. Measured ~5 ms/page;
-  full-speed ~10 min/100k pages, ~50 min/500k, scaled by duty cycle and page size.
+  per-tick time budget (duty cycle) and its bounded continuous block bound latency impact on live
+  traffic; the in-memory `{path→_id}` map keeps link resolution CPU-bound, not round-trip-bound.
+  Measured ~5 ms/page; full-speed ~10 min/100k pages, ~50 min/500k, scaled by duty cycle and page
+  size. Body reads remain one DB read per page unless B3.2 batches them.
 
 ## Migration Strategy
 
@@ -1099,6 +1149,7 @@ graph TB
   wiki is online throughout the backfill; pre-existing backlinks fill in progressively.
 - **Estimated backfill wall-clock** (≈5 ms/page CPU; in-memory resolution): ~10 min/100k pages at
   full speed, scaled up by the inverse duty cycle (e.g. ~40 min/100k at 25% duty) and by average
-  page size. See `research.md` for the benchmark and the scale/duty-cycle table.
+  page size. For the known customer sizes (largest 45k pages, most under 3k) this is minutes, not
+  hours; see `research.md` for the benchmark, the scale table and the unmeasured caveats.
 - Rollback: stop the cron and drop the `PageLink` collection (indexes go with it). Recovery from a
   crash = resume from the progress marker; idempotent upserts make partial progress safe.

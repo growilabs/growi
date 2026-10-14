@@ -454,9 +454,12 @@ new code is the in-memory `{path→_id}` map, the `bulkWrite` upsert sink, and t
 admin-triggered start was deferred as a one-line future change. Independent of B4/B5.
 
 - [ ] B3.1 Add the backfill job state model
-  - Add a single-document model tracking backfill status, a progress marker (resume point), and an
-    atomic-claim field so only one instance runs the job and it stops once complete
-  - Done when a unit test shows the claim succeeds once and is rejected for a second concurrent claimant
+  - Add a single-document model tracking backfill status, a progress marker (the last `_id`
+    processed, in `_id` order), and an atomic-claim field with `leaseExpiresAt` so only one instance
+    runs the job, it stops once complete, and a claim held by a dead owner can be taken over once
+    its lease expires
+  - Done when a unit test shows the claim succeeds once, is rejected for a second concurrent
+    claimant while the lease is live, and succeeds for a new claimant after the lease expires
   - _Requirements: 4.3_
   - _Boundary: PageLinkBackfillJob_
   - _Depends: B1.2_
@@ -466,11 +469,20 @@ admin-triggered start was deferred as a one-line future change. Independent of B
     in-memory path→id map (one projection query) for resolution instead of per-link lookups, extract
     links via the B1 extractor (passing the configured site URL), resolve permalink targets via an
     id-existence check against the known page ids (not the path map), and bulk-upsert rows; persist
-    the progress marker after each chunk and resume from it on restart
-  - Throttle via cron cadence × chunk size; skip immediately once the job document is complete
+    the progress marker **after** each chunk's writes and resume from it on restart
+  - Throttle by a per-tick time budget (≈250 ms of extraction), not a page count; yield to the event
+    loop between pages once a slice limit is exceeded; renew the lease on every chunk; guard
+    against overlapping ticks with an in-process `isRunning` flag reset in `finally`; skip
+    immediately once the job document is complete
+  - Settle four open questions and record them in design.md: write ordering against the live
+    listener on the same page (can a stale backfill write overwrite fresher rows?), whether the
+    pacing reuses the B2.2 listener's mechanism as-is, whether to cap the body size parsed (at
+    what size, and how skipped pages are recorded) since one large page overshoots the budget,
+    and whether to keep the cron-tick time budget or use the sleep-proportional-to-work loop
+    described in design.md as the alternative
   - Done when running the job over a seeded dataset (including pages linked by permalink and by
     same-wiki absolute URL) populates rows equivalent to the live path, a re-run/resume adds no
-    duplicates, and progress is emitted on the admin channel
+    duplicates, no tick overlaps a still-running one, and progress is emitted on the admin channel
   - _Requirements: 4.1, 4.2, 4.3_
   - _Boundary: PageLinkBackfillCron_
   - _Depends: B3.1, B1.3, B1.2_
@@ -488,7 +500,15 @@ admin-triggered start was deferred as a one-line future change. Independent of B
 - [ ] B3.4 Backfill tests
   - Verify backfill output matches the live path; running twice or resuming after an interrupted chunk
     produces no duplicates; the atomic claim prevents two instances/ticks double-processing
+  - Correctness cases: kill mid-run and resume (no missing or duplicate rows); two instances (only
+    one works); owner stopped and lease expires (another takes over); artificially slow write
+    (ticks do not overlap); backfilled rows equal the live path's for the same pages (4.2)
   - Done when these pass against a seeded dataset
+  - Performance run (not part of CI): seed ~45–50k pages in a separate database (e.g. `growi_perf`)
+    with `insertMany`, so the live listener creates no `PageLink` rows, using a realistic spread of
+    body sizes and link densities. Measure total duration, throughput, tick duration distribution,
+    event-loop delay (`perf_hooks.monitorEventLoopDelay`) and live-request p50/p99 with and without
+    the job. Agree the success numbers before running
   - _Requirements: 4.1, 4.2, 4.3_
   - _Depends: B3.2_
 
