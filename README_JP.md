@@ -82,7 +82,7 @@ Crowi からの移行は **[こちら](https://docs.growi.org/en/admin-guide/mig
 ## 依存関係
 
 - Node.js v24.x
-- pnpm 10.x
+- pnpm 11.x（正確なバージョンは[package.json](./package.json)の`packageManager`を参照）
 - [Turborepo](https://turbo.build/repo)
 - MongoDB v6.x or v8.x
 
