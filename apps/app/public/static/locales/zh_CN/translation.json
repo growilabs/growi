@@ -1,4 +1,14 @@
 {
+  "backlinks": {
+    "failed_to_fetch": "获取反向链接失败。",
+    "no_backlinks": "尚无反向链接。",
+    "outgoing_needing_attention": "需要注意的出站链接",
+    "panel": "反向链接",
+    "target_state": {
+      "broken": "失效链接",
+      "trashed": "在垃圾箱中"
+    }
+  },
   "meta": {
     "display_name": "简体中文"
   },

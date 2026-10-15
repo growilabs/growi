@@ -1,4 +1,14 @@
 {
+  "backlinks": {
+    "failed_to_fetch": "Échec de la récupération des rétroliens.",
+    "no_backlinks": "Il n'y a pas encore de rétroliens.",
+    "outgoing_needing_attention": "Liens sortants nécessitant votre attention",
+    "panel": "Rétroliens",
+    "target_state": {
+      "broken": "Lien rompu",
+      "trashed": "Dans la corbeille"
+    }
+  },
   "meta": {
     "display_name": "Français"
   },

@@ -139,3 +139,53 @@ export const deletePagesCompletely = async (
     ),
   );
 };
+
+/**
+ * Move pages to the trash (soft delete) via POST /_api/v3/pages/delete.
+ *
+ * Like completely deleting, the operation is async, so wait until each page is
+ * visible at its `/trash` path before returning. Returns the pages as they now
+ * stand (under `/trash`), for later teardown by `deletePagesCompletely`.
+ */
+export const trashPages = async (
+  request: APIRequestContext,
+  pages: CreatedPage[],
+): Promise<CreatedPage[]> => {
+  if (pages.length === 0) return [];
+
+  const pageIdToRevisionIdMap = Object.fromEntries(
+    pages.map((p) => [p.pageId, p.revisionId]),
+  );
+  const res = await request.post('/_api/v3/pages/delete', {
+    // isCompletely must be omitted (not false) to mean "move to trash": the
+    // validator only accepts true.
+    data: { pageIdToRevisionIdMap, isRecursively: true },
+  });
+  expect(
+    res.ok(),
+    `trashPages failed: ${res.status()} ${await res.text()}`,
+  ).toBe(true);
+
+  await Promise.all(
+    pages.map((p) =>
+      expect
+        .poll(
+          async () => {
+            const existRes = await request.get('/_api/v3/page/exist', {
+              params: { path: `/trash${p.path}` },
+            });
+            if (!existRes.ok()) return false;
+            const { isExist } = await existRes.json();
+            return isExist;
+          },
+          {
+            message: `page not in trash yet: ${p.path}`,
+            timeout: 15_000,
+          },
+        )
+        .toBe(true),
+    ),
+  );
+
+  return pages.map((p) => ({ ...p, path: `/trash${p.path}` }));
+};

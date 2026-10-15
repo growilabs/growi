@@ -1,0 +1,380 @@
+import { SCOPE } from '@growi/core';
+import type { NextFunction, Request, Response } from 'express';
+import express from 'express';
+import request from 'supertest';
+import { mock } from 'vitest-mock-extended';
+
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type Crowi from '~/server/crowi';
+
+import type { IBacklink, ILinkTarget } from '../../interfaces/backlink';
+import type { PageLinkService } from '../services/page-link-service';
+
+type Viewer = NonNullable<CrowiRequest['user']>;
+
+// The auth middlewares are replaced with passthroughs so the request-handling tests below
+// exercise this endpoint rather than the shared auth stack (which has its own specs).
+// They stay spies because the factory's other job — which auth the chain demands —
+// is only observable through the arguments it hands them (see 'authorization wiring').
+const mocks = vi.hoisted(() => {
+  const passthrough = (_req: Request, _res: Response, next: NextFunction) =>
+    next();
+  return {
+    accessTokenParser: vi.fn(() => passthrough),
+    loginRequiredFactory: vi.fn(() => passthrough),
+    isPageReadableByViewer: vi.fn(),
+    findUserGroupIdsForViewer: vi.fn(),
+  };
+});
+
+vi.mock('~/server/middlewares/access-token-parser', () => ({
+  accessTokenParser: mocks.accessTokenParser,
+}));
+
+vi.mock('~/server/middlewares/login-required', () => ({
+  default: mocks.loginRequiredFactory,
+}));
+
+// The grant check itself is Page.isAccessiblePageByViewer's contract; what this endpoint
+// owns is refusing to answer for a page the viewer cannot read.
+vi.mock('../services/is-page-readable-by-viewer', () => ({
+  isPageReadableByViewer: mocks.isPageReadableByViewer,
+}));
+
+// The group lookup is its own module's contract (find-user-group-ids-for-viewer.integ.ts);
+// what this endpoint owns is resolving it once and sharing it between both reads.
+vi.mock('../services/find-user-group-ids-for-viewer', () => ({
+  findUserGroupIdsForViewer: mocks.findUserGroupIdsForViewer,
+}));
+
+// Imported after the middleware mocks so the route picks up the passthroughs.
+import { getBacklinksHandlerFactory } from './backlinks';
+
+/*
+ * B1.13 / B5.9 — the read endpoint is reachable over HTTP.
+ * Contract (design.md § Read flow; requirements 1.1, 1.7, 6.4): GET /_api/v3/page/backlinks
+ * validates pageId, delegates to PageLinkService.findBacklinks and
+ * PageLinkService.findForwardLinkHealth for the requesting viewer, and answers with
+ * { backlinks: IBacklink[], linkTargets: ILinkTarget[] | null } — `null` when the
+ * forward-link read failed, so a failed lookup is distinguishable from "no problems" (`[]`).
+ * Permission filtering itself is the services' contract — see page-link-service.integ.ts
+ * and find-forward-link-health.integ.ts.
+ */
+describe('GET /page/backlinks', () => {
+  const validPageId = '507f1f77bcf86cd799439011';
+
+  const findBacklinks = vi.fn<PageLinkService['findBacklinks']>();
+  const findForwardLinkHealth =
+    vi.fn<PageLinkService['findForwardLinkHealth']>();
+
+  beforeAll(async () => {
+    // Install the real res.apiv3 / res.apiv3Err helpers (as server/routes/apiv3/index.js does)
+    // so the asserted status codes and error shape are the production ones, not a test stand-in.
+    // WHY the cast: response.js is an untyped CommonJS module (`module.exports = fn`),
+    // so TypeScript sees no default export even though the ESM interop provides one.
+    const responseModule = (await import(
+      '~/server/routes/apiv3/response'
+    )) as unknown as { default: (e: typeof express) => void };
+    responseModule.default(express);
+  });
+
+  const buildApp = (viewer?: Viewer) => {
+    const crowi = mock<Crowi>({
+      pageLinkService: { findBacklinks, findForwardLinkHealth },
+    });
+
+    const app = express();
+
+    // A guest request leaves req.user undefined.
+    app.use((req: CrowiRequest, _res, next) => {
+      req.user = viewer;
+      next();
+    });
+
+    // Mirrors the registration in server/routes/apiv3/index.js
+    const pageRouter = express.Router();
+    pageRouter.get('/backlinks', getBacklinksHandlerFactory(crowi));
+    app.use('/page', pageRouter);
+
+    return app;
+  };
+
+  const get = (app: express.Application, query?: Record<string, string>) =>
+    request(app)
+      .get('/page/backlinks')
+      .query(query ?? {});
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isPageReadableByViewer.mockResolvedValue(true);
+    mocks.findUserGroupIdsForViewer.mockResolvedValue(null);
+    findForwardLinkHealth.mockResolvedValue([]);
+  });
+
+  describe('success', () => {
+    it('answers 200 with the backlinks and link targets returned by the services', async () => {
+      const backlinks: IBacklink[] = [
+        { pageId: '507f1f77bcf86cd799439021', path: '/source-a' },
+        { pageId: '507f1f77bcf86cd799439022', path: '/source-b' },
+      ];
+      const linkTargets: ILinkTarget[] = [
+        {
+          pageId: '507f1f77bcf86cd799439041',
+          path: '/trash/target-a',
+          targetState: 'trashed',
+        },
+        { pageId: null, path: '/missing', targetState: 'broken' },
+      ];
+      findBacklinks.mockResolvedValue(backlinks);
+      findForwardLinkHealth.mockResolvedValue(linkTargets);
+
+      const res = await get(buildApp(), { pageId: validPageId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ backlinks, linkTargets });
+    });
+
+    it('answers 200 with empty lists when the page has no backlinks and no outbound links needing attention (1.7)', async () => {
+      findBacklinks.mockResolvedValue([]);
+      findForwardLinkHealth.mockResolvedValue([]);
+
+      const res = await get(buildApp(), { pageId: validPageId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ backlinks: [], linkTargets: [] });
+    });
+
+    // One pageId serves both reads: it is the link target for backlinks and the link
+    // source for forward-link health.
+    it('asks both services about the page the client named', async () => {
+      findBacklinks.mockResolvedValue([]);
+
+      await get(buildApp(), { pageId: validPageId });
+
+      const [toPageId] = findBacklinks.mock.calls[0];
+      const [fromPageId] = findForwardLinkHealth.mock.calls[0];
+      expect(String(toPageId)).toBe(validPageId);
+      expect(String(fromPageId)).toBe(validPageId);
+    });
+
+    it('asks both services on behalf of the authenticated viewer', async () => {
+      findBacklinks.mockResolvedValue([]);
+      const viewer = mock<Viewer>();
+
+      await get(buildApp(viewer), { pageId: validPageId });
+
+      const [, backlinksUser] = findBacklinks.mock.calls[0];
+      const [, forwardLinkUser] = findForwardLinkHealth.mock.calls[0];
+      expect(backlinksUser).toBe(viewer);
+      expect(forwardLinkUser).toBe(viewer);
+    });
+
+    it('substitutes no viewer identity for an unauthenticated request', async () => {
+      findBacklinks.mockResolvedValue([]);
+
+      await get(buildApp(), { pageId: validPageId });
+
+      // `?? null` because null and undefined are the same "no viewer" to the grant filter;
+      // what must not happen is a guest being served as some user.
+      const [, backlinksUser] = findBacklinks.mock.calls[0];
+      const [, forwardLinkUser] = findForwardLinkHealth.mock.calls[0];
+      expect(backlinksUser ?? null).toBeNull();
+      expect(forwardLinkUser ?? null).toBeNull();
+    });
+  });
+
+  describe('page readability', () => {
+    it('answers 404 without querying the service when the viewer cannot read the page', async () => {
+      mocks.isPageReadableByViewer.mockResolvedValue(false);
+
+      const res = await get(buildApp(mock<Viewer>()), { pageId: validPageId });
+
+      expect(res.status).toBe(404);
+      expect(res.body.errors[0]).toMatchObject({
+        code: 'notfound_or_forbidden',
+      });
+      expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
+    });
+
+    // linkTargets echoes link paths written in the page's body, so answering with it
+    // for an unreadable page would disclose that page's content.
+    it("does not disclose the page's outbound link paths when the viewer cannot read the page", async () => {
+      mocks.isPageReadableByViewer.mockResolvedValue(false);
+      findBacklinks.mockResolvedValue([]);
+      findForwardLinkHealth.mockResolvedValue([
+        {
+          pageId: null,
+          path: '/hr/salary-review-draft',
+          targetState: 'broken',
+        },
+      ]);
+
+      const res = await get(buildApp(mock<Viewer>()), { pageId: validPageId });
+
+      expect(res.status).toBe(404);
+      expect(JSON.stringify(res.body)).not.toContain('/hr/salary-review-draft');
+    });
+
+    it('checks readability of the page the client named, for the requesting viewer', async () => {
+      findBacklinks.mockResolvedValue([]);
+      const viewer = mock<Viewer>();
+
+      await get(buildApp(viewer), { pageId: validPageId });
+
+      const [pageId, user] = mocks.isPageReadableByViewer.mock.calls[0];
+      expect(String(pageId)).toBe(validPageId);
+      expect(user).toBe(viewer);
+    });
+
+    it('checks readability as a guest for an unauthenticated request', async () => {
+      findBacklinks.mockResolvedValue([]);
+
+      await get(buildApp(), { pageId: validPageId });
+
+      const [, user] = mocks.isPageReadableByViewer.mock.calls[0];
+      expect(user ?? null).toBeNull();
+    });
+  });
+
+  describe('viewer groups', () => {
+    it("looks the viewer's groups up once and hands the same ids to both reads", async () => {
+      const groupIds = ['507f1f77bcf86cd799439031', '507f1f77bcf86cd799439032'];
+      mocks.findUserGroupIdsForViewer.mockResolvedValue(groupIds);
+      findBacklinks.mockResolvedValue([]);
+      const viewer = mock<Viewer>();
+
+      await get(buildApp(viewer), { pageId: validPageId });
+
+      expect(mocks.findUserGroupIdsForViewer).toHaveBeenCalledTimes(1);
+      const [lookedUpFor] = mocks.findUserGroupIdsForViewer.mock.calls[0];
+      expect(lookedUpFor).toBe(viewer);
+
+      const [, , groupsForReadability] =
+        mocks.isPageReadableByViewer.mock.calls[0];
+      const [, , groupsForBacklinks] = findBacklinks.mock.calls[0];
+      const [, , groupsForForwardLinks] = findForwardLinkHealth.mock.calls[0];
+      expect(groupsForReadability).toBe(groupIds);
+      expect(groupsForBacklinks).toBe(groupIds);
+      expect(groupsForForwardLinks).toBe(groupIds);
+    });
+
+    it('answers 500 without querying the service when the group lookup fails', async () => {
+      mocks.findUserGroupIdsForViewer.mockRejectedValue(new Error('db down'));
+
+      const res = await get(buildApp(mock<Viewer>()), { pageId: validPageId });
+
+      expect(res.status).toBe(500);
+      expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('validation', () => {
+    it('answers 400 without querying the service when pageId is missing', async () => {
+      const res = await get(buildApp());
+
+      expect(res.status).toBe(400);
+      expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 without querying the service when pageId is empty', async () => {
+      const res = await get(buildApp(), { pageId: '' });
+
+      expect(res.status).toBe(400);
+      expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 without querying the service when pageId is not a Mongo ID', async () => {
+      const res = await get(buildApp(), { pageId: 'not-an-object-id' });
+
+      expect(res.status).toBe(400);
+      expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
+    });
+
+    // A repeated query param arrives as an array, and isMongoId() validates its members
+    // rather than rejecting it — so this is the one input that reaches the handler's
+    // typeof check. Without it the array would reach the ObjectId constructor and 500.
+    it('answers 400 without querying the service when pageId is repeated', async () => {
+      const res = await request(buildApp()).get(
+        `/page/backlinks?pageId=${validPageId}&pageId=${validPageId}`,
+      );
+
+      expect(res.status).toBe(400);
+      expect(findBacklinks).not.toHaveBeenCalled();
+      expect(findForwardLinkHealth).not.toHaveBeenCalled();
+    });
+  });
+
+  /*
+   * Which auth the endpoint demands is decided when the chain is assembled, so it is
+   * observable only in what the factory asks of the auth middlewares. Asserted here
+   * because a silently widened token scope, or guests being locked out of a public wiki,
+   * would otherwise pass every test above.
+   */
+  describe('authorization wiring', () => {
+    it('demands an access token scoped to reading pages', () => {
+      buildApp();
+
+      expect(mocks.accessTokenParser).toHaveBeenCalledWith([
+        SCOPE.READ.FEATURES.PAGE,
+      ]);
+    });
+
+    it('admits guests, so backlinks stay readable on a public wiki', () => {
+      buildApp();
+
+      expect(mocks.loginRequiredFactory).toHaveBeenCalledWith(
+        expect.anything(),
+        true,
+      );
+    });
+  });
+
+  describe('error handling', () => {
+    it('answers 500 when the backlinks read throws', async () => {
+      findBacklinks.mockRejectedValue(new Error('unexpected failure'));
+
+      const res = await get(buildApp(), { pageId: validPageId });
+
+      expect(res.status).toBe(500);
+      expect(res.body).toHaveProperty('errors');
+    });
+
+    it('answers 200 with the backlinks and linkTargets: null when the forward-link read throws', async () => {
+      const backlinks: IBacklink[] = [
+        { pageId: '507f1f77bcf86cd799439021', path: '/source-a' },
+        { pageId: '507f1f77bcf86cd799439022', path: '/source-b' },
+      ];
+
+      findBacklinks.mockResolvedValue(backlinks);
+      findForwardLinkHealth.mockRejectedValue(new Error('unexpected failure'));
+
+      const res = await get(buildApp(), { pageId: validPageId });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ backlinks, linkTargets: null });
+      expect(JSON.stringify(res.body)).not.toContain('unexpected failure');
+    });
+
+    // apiv3Err turns a raw Error into ErrorV3(err.message), and `message` is an
+    // enumerable own property — so forwarding the caught error would put driver
+    // and query internals in the response body.
+    it('does not leak the internal error message to the client', async () => {
+      findBacklinks.mockRejectedValue(
+        new Error('E11000 duplicate key error collection: growi.pagelinks'),
+      );
+
+      const res = await get(buildApp(), { pageId: validPageId });
+
+      expect(JSON.stringify(res.body)).not.toContain('E11000');
+      expect(res.body.errors[0]).toMatchObject({
+        message: 'Failed to get backlinks',
+        code: 'failed-to-get-backlinks',
+      });
+    });
+  });
+});
