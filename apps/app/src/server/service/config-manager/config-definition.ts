@@ -360,6 +360,7 @@ export const CONFIG_KEYS = [
   'env:useOnlyEnvVars:app:fileUploadType',
   'env:useOnlyEnvVars:security:passport-local',
   'env:useOnlyEnvVars:security:passport-saml',
+  'env:useOnlyEnvVars:aws',
   'env:useOnlyEnvVars:gcs',
   'env:useOnlyEnvVars:azure',
   'env:useOnlyEnvVars:ai',
@@ -1022,19 +1023,24 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
   }),
   'aws:s3Bucket': defineConfig<NonBlankString>({
+    envVarName: 'S3_BUCKET',
     defaultValue: toNonBlankString('growi'),
   }),
   'aws:s3Region': defineConfig<NonBlankString>({
+    envVarName: 'S3_REGION',
     defaultValue: toNonBlankString('ap-northeast-1'),
   }),
   'aws:s3AccessKeyId': defineConfig<NonBlankString | undefined>({
+    envVarName: 'S3_ACCESS_KEY_ID',
     defaultValue: undefined,
   }),
   'aws:s3SecretAccessKey': defineConfig<NonBlankString | undefined>({
+    envVarName: 'S3_SECRET_ACCESS_KEY',
     defaultValue: undefined,
     isSecret: true,
   }),
   'aws:s3CustomEndpoint': defineConfig<NonBlankString | undefined>({
+    envVarName: 'S3_CUSTOM_ENDPOINT',
     defaultValue: undefined,
   }),
 
@@ -1535,6 +1541,10 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'SAML_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
   }),
+  'env:useOnlyEnvVars:aws': defineConfig<boolean>({
+    envVarName: 'AWS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+    defaultValue: false,
+  }),
   'env:useOnlyEnvVars:gcs': defineConfig<boolean>({
     envVarName: 'GCS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
@@ -1628,19 +1638,26 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
     ],
   },
   {
-    // gcs:referenceFileWithRelayMode is included alongside the
-    // credential/bucket keys: for a GROWI.cloud hosted-GCS tenant, the
-    // file-delivery method is infra-managed the same as the bucket itself,
-    // so it must not be overridable from the admin UI either.
-    // TODO: azure:referenceFileWithRelayMode has the same requirement but is
-    // not yet in the azure group below — see the GCS fix this comment
-    // shipped with.
+    controlKey: 'env:useOnlyEnvVars:aws',
+    targetKeys: [
+      'aws:s3Bucket',
+      'aws:s3Region',
+      'aws:s3AccessKeyId',
+      'aws:s3SecretAccessKey',
+      'aws:s3CustomEndpoint',
+      'aws:referenceFileWithRelayMode',
+      'aws:lifetimeSecForTemporaryUrl',
+      'aws:s3ObjectCannedACL',
+    ],
+  },
+  {
     controlKey: 'env:useOnlyEnvVars:gcs',
     targetKeys: [
       'gcs:apiKeyJsonPath',
       'gcs:bucket',
       'gcs:uploadNamespace',
       'gcs:referenceFileWithRelayMode',
+      'gcs:lifetimeSecForTemporaryUrl',
     ],
   },
   {
@@ -1651,6 +1668,8 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
       'azure:clientSecret',
       'azure:storageAccountName',
       'azure:storageContainerName',
+      'azure:referenceFileWithRelayMode',
+      'azure:lifetimeSecForTemporaryUrl',
     ],
   },
   {

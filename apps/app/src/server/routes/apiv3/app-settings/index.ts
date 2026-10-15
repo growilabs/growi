@@ -43,6 +43,9 @@ const router = express.Router();
  *        description: AppSettingParams
  *        type: object
  *        properties:
+ *          awsUseOnlyEnvVars:
+ *            type: boolean
+ *            example: false
  *          azureReferenceFileWithRelayMode:
  *            type: boolean
  *            example: false
@@ -464,6 +467,7 @@ export const setup = (crowi: Crowi): Router => {
           'env:useOnlyEnvVars:app:fileUploadType',
         ),
 
+        awsUseOnlyEnvVars: configManager.getConfig('env:useOnlyEnvVars:aws'),
         s3Region: configManager.getConfig('aws:s3Region'),
         s3CustomEndpoint: configManager.getConfig('aws:s3CustomEndpoint'),
         s3Bucket: configManager.getConfig('aws:s3Bucket'),

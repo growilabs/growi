@@ -77,6 +77,8 @@ See [GROWI Docs: Admin Guide](https://docs.growi.org/en/admin-guide/) ([en](http
 
 See [GROWI Docs: Environment Variables](https://docs.growi.org/en/admin-guide/admin-cookbook/env-vars.html) ([en](https://docs.growi.org/en/admin-guide/admin-cookbook/env-vars.html)/[ja](https://docs.growi.org/ja/admin-guide/admin-cookbook/env-vars.html)).
 
+See [environment-only storage settings](docs/storage-env-only.md) for configuring AWS S3, GCS, and Azure from environment variables.
+
 # Development
 
 ## Dependencies
