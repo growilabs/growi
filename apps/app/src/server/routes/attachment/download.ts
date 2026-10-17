@@ -1,4 +1,4 @@
-import { getIdStringForRef, type IUserHasId } from '@growi/core';
+import type { IUserHasId } from '@growi/core';
 import type { Router } from 'express';
 import express from 'express';
 
@@ -13,7 +13,7 @@ import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
-import type { IAttachmentDocument } from '../../models/attachment';
+import type { AttachmentWithComputed } from '../../models/attachment';
 import type { GetRequest, GetResponse } from './get';
 import { getActionFactory, retrieveAttachmentFromIdParam } from './get';
 
@@ -47,7 +47,7 @@ type DownloadRequest = GetRequest & { user?: IUserHasId };
  */
 const recordDownloadActivity = async (
   crowi: Crowi,
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
   actor: DownloadActor,
 ): Promise<void> => {
   // String() keeps this line throw-free even in impossible edge states
@@ -62,14 +62,9 @@ const recordDownloadActivity = async (
     const snapshot = await buildAttachmentDownloadSnapshot(
       {
         _id: attachmentId,
-        originalName: attachment.originalName,
+        originalName: attachment.originalName ?? undefined,
         fileSize: attachment.fileSize,
-        // page ref (ObjectId) -> id string; the builder maps it to pageId
-        // and resolves pagePath from it
-        page:
-          attachment.page != null
-            ? getIdStringForRef(attachment.page)
-            : undefined,
+        page: attachment.pageId ?? undefined,
       },
       actor,
     );
