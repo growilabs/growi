@@ -1,3 +1,4 @@
+import { toNativeChannelId } from '@growi/chat';
 import { mockDeep } from 'vitest-mock-extended';
 
 import type { PrismaClient } from '../prisma-client.js';
@@ -7,7 +8,7 @@ const TARGET_A = {
   relationId: 'relation-1',
   requestId: 'req-1',
   platform: 'slack',
-  channelId: 'C0001',
+  channelId: toNativeChannelId('C0001'),
   status: 'posted',
   detail: null,
   processedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -16,7 +17,7 @@ const TARGET_A = {
 
 const TARGET_B = {
   ...TARGET_A,
-  channelId: 'C0002',
+  channelId: toNativeChannelId('C0002'),
   status: 'bot-not-in-channel',
   detail: 'bot is not a member of C0002',
 };
@@ -36,6 +37,23 @@ describe('processedNotificationRepository.findAllForRequest (Requirement 10.7)',
     expect(prisma.processedNotificationTarget.findMany).toHaveBeenCalledWith({
       where: { relationId: 'relation-1', requestId: 'req-1' },
     });
+  });
+});
+
+describe('processedNotificationRepository.findAllForRequest -- a row GROWI could not have named', () => {
+  it("leaves out a row whose id is not a service's own channel id", async () => {
+    // Every destination GROWI names is such an id, so no destination of the
+    // request can match this row; leaving it out changes no answer.
+    const prisma = mockDeep<PrismaClient>();
+    prisma.processedNotificationTarget.findMany.mockResolvedValue([
+      TARGET_A,
+      { ...TARGET_B, channelId: 'slack:C0002' },
+    ]);
+    const repository = createProcessedNotificationRepository(prisma);
+
+    await expect(
+      repository.findAllForRequest('relation-1', 'req-1'),
+    ).resolves.toEqual([TARGET_A]);
   });
 });
 

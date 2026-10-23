@@ -24,9 +24,11 @@ import type {
   PlatformName,
   SettingsPushRequest,
 } from '@growi/chat';
-import { OP_NAMES } from '@growi/chat';
+import { OP_NAMES, toNativeChannelId } from '@growi/chat';
 import { type DeepMockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
+import { nativeChannelIdOf } from '../capabilities/index.js';
+import { testSdkChannelId } from '../capabilities/test-channels.js';
 import type { PrismaClient } from '../db/index.js';
 import type { SecretCipher } from '../types/index.js';
 import { createInboundFlow, type InboundFlowPlatform } from './inbound-flow.js';
@@ -61,11 +63,28 @@ const installationRow = (channelsSyncedAt: Date | null) => ({
   channelsSyncedAt,
 });
 
-const channelRow = (channelId: string, platform: PlatformName = PLATFORM) => ({
+/**
+ * A saved inventory row for the channel the service shows as `nativeId`,
+ * stored the way the lister stores it: in the Chat SDK's encoding.
+ */
+/** An `installation_channel` row as the database holds it. */
+interface ChannelRow {
+  readonly installationId: string;
+  readonly platform: string;
+  readonly channelId: string;
+  readonly channelName: string;
+  readonly isPrivate: boolean;
+  readonly refreshedAt: Date;
+}
+
+const channelRow = (
+  nativeId: string,
+  platform: PlatformName = PLATFORM,
+): ChannelRow => ({
   installationId: INSTALLATION_ID,
   platform,
-  channelId,
-  channelName: channelId.toLowerCase(),
+  channelId: testSdkChannelId(platform, nativeId),
+  channelName: nativeId.toLowerCase(),
   isPrivate: false,
   refreshedAt: new Date('2026-05-31T00:00:00.000Z'),
 });
@@ -77,7 +96,10 @@ const notificationOf = (
   relationId: RELATION_ID,
   op: OP_NAMES.notification,
   requestId,
-  targets: channelIds.map((channelId) => ({ platform: PLATFORM, channelId })),
+  targets: channelIds.map((channelId) => ({
+    platform: PLATFORM,
+    channelId: toNativeChannelId(channelId),
+  })),
   markdown: '[Sandbox](https://wiki.example.com/Sandbox) が更新されました',
   containsRestrictedPage: false,
 });
@@ -100,7 +122,7 @@ interface ProcessedRow {
  * tell "skipped because already posted" from "posted again".
  */
 const createPrisma = (
-  channels: ReadonlyArray<ReturnType<typeof channelRow>>,
+  channels: ReadonlyArray<ChannelRow>,
   channelsSyncedAt: Date | null = new Date('2026-05-31T00:00:00.000Z'),
 ): DeepMockProxy<PrismaClient> => {
   const prisma = mockDeep<PrismaClient>();
@@ -113,15 +135,7 @@ const createPrisma = (
   // documents: the delegates' generated generic query types may not be named
   // outside `db/` (architecture guard 3), so the implementations are written
   // against the narrow shape the repository actually sends.
-  prisma.installationChannel.findUnique.mockImplementation(((args: {
-    where: { installationId_channelId: { channelId: string } };
-  }) =>
-    Promise.resolve(
-      channels.find(
-        (row) =>
-          row.channelId === args.where.installationId_channelId.channelId,
-      ) ?? null,
-    )) as never);
+  prisma.installationChannel.findMany.mockResolvedValue([...channels]);
 
   let processed: ReadonlyArray<ProcessedRow> = [];
   prisma.processedNotificationTarget.findMany.mockImplementation(((args: {
@@ -308,6 +322,101 @@ describe('notification -- which destinations may be posted to (Requirement 2.1, 
   });
 });
 
+describe('notification -- a destination named by the id the chat service shows', () => {
+  // GROWI names a destination the way the chat service shows it (`C1`), which
+  // is how the inventory was served to it; the saved inventory and every post
+  // use the Chat SDK's own encoding (`slack:C1`, `discord:<guild>:<channel>`).
+  it('posts to the inventory channel that id names, and answers by the id GROWI sent', async () => {
+    const prisma = createPrisma([channelRow('C1')]);
+    const platform = postingPlatform();
+
+    const result = await flowOver(prisma, platform).notify(
+      notificationOf(['C1']),
+    );
+
+    expect(platform.post).toHaveBeenCalledWith(
+      {
+        platform: PLATFORM,
+        channelId: 'slack:C1',
+        channelName: 'c1',
+        isPrivate: false,
+      },
+      expect.anything(),
+    );
+    expect(result.outcomes).toEqual([
+      { platform: PLATFORM, channelId: 'C1', status: 'posted' },
+    ]);
+  });
+
+  it('finds a Discord channel under the guild the inventory recorded it in', async () => {
+    const prisma = createPrisma([channelRow('111', 'discord')]);
+    const platform = postingPlatform();
+
+    const result = await flowOver(prisma, platform).notify({
+      ...notificationOf([]),
+      targets: [{ platform: 'discord', channelId: toNativeChannelId('111') }],
+    });
+
+    expect(platform.post.mock.calls[0]?.[0].channelId).toBe(
+      testSdkChannelId('discord', '111'),
+    );
+    expect(result.outcomes).toEqual([
+      { platform: 'discord', channelId: '111', status: 'posted' },
+    ]);
+  });
+
+  it('answers a Teams channel from the inventory as a platform error, without posting', async () => {
+    // A listed Teams channel is held by its Graph id, which lacks the
+    // `serviceUrl` the Teams adapter needs to post.
+    const prisma = createPrisma([
+      {
+        ...channelRow('unused'),
+        platform: 'teams',
+        channelId: '19:abc@thread.tacv2',
+      },
+    ]);
+    const platform = postingPlatform();
+
+    const result = await flowOver(prisma, platform).notify({
+      ...notificationOf([]),
+      targets: [
+        {
+          platform: 'teams',
+          channelId: toNativeChannelId('19:abc@thread.tacv2'),
+        },
+      ],
+    });
+
+    expect(platform.post).not.toHaveBeenCalled();
+    expect(result.outcomes).toEqual([
+      {
+        platform: 'teams',
+        channelId: '19:abc@thread.tacv2',
+        status: 'platform-error',
+        detail: expect.any(String),
+      },
+    ]);
+  });
+
+  it('refuses an id that names no channel of the saved inventory', async () => {
+    const prisma = createPrisma([channelRow('C1')]);
+    const platform = postingPlatform();
+
+    const result = await flowOver(prisma, platform).notify(
+      notificationOf(['C2']),
+    );
+
+    expect(platform.post).not.toHaveBeenCalled();
+    expect(result.outcomes).toEqual([
+      {
+        platform: PLATFORM,
+        channelId: 'C2',
+        status: 'channel-not-in-installation',
+      },
+    ]);
+  });
+});
+
 describe('notification -- retrying one that partly failed (Requirement 10.7)', () => {
   it('posts again only where it failed, and still answers for every destination', async () => {
     // The acceptance criterion of this task. Two separate assertions on
@@ -322,7 +431,7 @@ describe('notification -- retrying one that partly failed (Requirement 10.7)', (
     const platform = mock<InboundFlowPlatform>();
     platform.post.mockImplementation((target) =>
       Promise.resolve(
-        target.channelId === 'C-b'
+        nativeChannelIdOf(target) === 'C-b'
           ? { ok: false, reason: 'platform-error', detail: 'rate limited' }
           : { ok: true, messageId: `M-${target.channelId}` },
       ),
@@ -344,7 +453,7 @@ describe('notification -- retrying one that partly failed (Requirement 10.7)', (
     const second = await flow.notify(request);
 
     expect(platform.post).toHaveBeenCalledTimes(1);
-    expect(platform.post.mock.calls[0][0].channelId).toBe('C-b');
+    expect(nativeChannelIdOf(platform.post.mock.calls[0][0])).toBe('C-b');
     expect(second.outcomes).toEqual([
       { platform: PLATFORM, channelId: 'C-a', status: 'posted' },
       { platform: PLATFORM, channelId: 'C-b', status: 'posted' },
@@ -376,7 +485,7 @@ describe("notification -- the proxy's own deadline", () => {
   const hangingOn = (hangingChannelIds: ReadonlyArray<string>) => {
     const platform = mock<InboundFlowPlatform>();
     platform.post.mockImplementation((channel) =>
-      hangingChannelIds.includes(channel.channelId)
+      hangingChannelIds.includes(nativeChannelIdOf(channel))
         ? // Never settles: the chat service accepted the call and went quiet.
           new Promise(() => {})
         : Promise.resolve({ ok: true, messageId: `M-${channel.channelId}` }),
@@ -476,7 +585,7 @@ describe("notification -- the proxy's own deadline", () => {
     const platform = mock<InboundFlowPlatform>();
     platform.post.mockImplementation((channel) =>
       Promise.resolve(
-        channel.channelId === 'C-b'
+        nativeChannelIdOf(channel) === 'C-b'
           ? { ok: false, reason: 'platform-error', detail: 'rate limited' }
           : { ok: true, messageId: 'M-a' },
       ),
@@ -501,14 +610,22 @@ describe("notification -- the proxy's own deadline", () => {
 describe('settings-push (Requirement 11.4)', () => {
   const pushOf = (
     version: number,
-    allowedChannels: ReadonlyArray<string> | 'all' | 'none',
+    allowed: ReadonlyArray<string> | 'all' | 'none',
   ): SettingsPushRequest => ({
     relationId: RELATION_ID,
     op: OP_NAMES.settingsPush,
     version,
     settings: {
       relationId: RELATION_ID,
-      channelPermissions: [{ commandName: 'search', allowedChannels }],
+      channelPermissions: [
+        {
+          commandName: 'search',
+          allowedChannels:
+            typeof allowed === 'string'
+              ? allowed
+              : allowed.map((channelId) => toNativeChannelId(channelId)),
+        },
+      ],
     },
   });
 

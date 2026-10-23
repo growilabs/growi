@@ -1,3 +1,4 @@
+import { toNativeChannelId } from '@growi/chat';
 import { mockDeep } from 'vitest-mock-extended';
 
 import type { PrismaClient } from '../prisma-client.js';
@@ -18,6 +19,24 @@ describe('channelPermissionRepository.find', () => {
     await expect(repository.find('relation-1', 'search')).resolves.toEqual([
       'C0001',
       'C0002',
+    ]);
+  });
+
+  it("leaves out a stored entry that is not a service's own channel id, so it permits nothing", async () => {
+    // Every comparison is against the id the chat service shows; an adapter
+    // encoding such as `slack:C0002` can match no channel.
+    const prisma = mockDeep<PrismaClient>();
+    prisma.channelPermission.findUnique.mockResolvedValue({
+      id: 'perm-1',
+      relationId: 'relation-1',
+      commandName: 'search',
+      channels: ['C0001', 'slack:C0002'],
+      allowAll: false,
+    });
+    const repository = createChannelPermissionRepository(prisma);
+
+    await expect(repository.find('relation-1', 'search')).resolves.toEqual([
+      'C0001',
     ]);
   });
 
@@ -42,7 +61,9 @@ describe('channelPermissionRepository.upsert', () => {
     });
     const repository = createChannelPermissionRepository(prisma);
 
-    await repository.upsert('relation-1', 'search', ['C0001']);
+    await repository.upsert('relation-1', 'search', [
+      toNativeChannelId('C0001'),
+    ]);
 
     expect(prisma.channelPermission.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -124,7 +145,7 @@ describe("channelPermissionRepository and RelationSettings' 'all'", () => {
     });
     const repository = createChannelPermissionRepository(prisma);
 
-    await repository.upsert('relation-1', 'search', ['C1']);
+    await repository.upsert('relation-1', 'search', [toNativeChannelId('C1')]);
 
     expect(prisma.channelPermission.upsert).toHaveBeenCalledWith(
       expect.objectContaining({

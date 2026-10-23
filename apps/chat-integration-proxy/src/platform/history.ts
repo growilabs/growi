@@ -9,7 +9,7 @@
 //     walks the replies under one message, while `fetchChannelMessages`
 //     (Slack's own comment: 「channel-level messages (conversations.history,
 //     not thread replies)」) walks the conversation. `fetchHistory` takes a
-//     `ChannelRef`, so it is the latter.
+//     `SdkChannelRef`, so it is the latter.
 //  2. **No service can be asked for a time range**, only for a page and a
 //     direction (`FetchOptions` carries `limit` / `cursor` / `direction` and
 //     nothing else). So the range is applied here: pages are walked from the
@@ -21,15 +21,14 @@
 //     The recognition of *which* failure it is comes from `outbound.ts`, so
 //     there is one answer for the whole layer rather than a second copy here
 //     that can drift.
-import type { ChannelRef } from '@growi/chat';
 import type { Adapter, FetchResult, Message } from 'chat';
 
 import type {
   HistoryMessage,
   HistoryOutcome,
+  SdkChannelRef,
   TimeRange,
 } from '../types/index.js';
-import { sdkChannelIdOf } from './channel-id.js';
 import { toChatAccountRef } from './event-mapping.js';
 import { channelAccessFailure } from './outbound.js';
 
@@ -68,7 +67,7 @@ const REMEDIES: Readonly<
 };
 
 const toHistoryMessage = (
-  target: ChannelRef,
+  target: SdkChannelRef,
   message: Message,
 ): HistoryMessage => ({
   postedAt: message.metadata.dateSent.toISOString(),
@@ -150,7 +149,7 @@ const collectInRange = async (
  */
 export const fetchHistory = async (
   context: HistoryContext,
-  target: ChannelRef,
+  target: SdkChannelRef,
   range: TimeRange,
 ): Promise<HistoryOutcome> => {
   const readChannel = context.adapter.fetchChannelMessages;
@@ -166,7 +165,7 @@ export const fetchHistory = async (
   try {
     const collected = await collectInRange(
       (cursor) =>
-        readChannel.call(context.adapter, sdkChannelIdOf(target), {
+        readChannel.call(context.adapter, target.channelId, {
           limit: PAGE_SIZE,
           direction: 'backward',
           ...(cursor == null ? {} : { cursor }),

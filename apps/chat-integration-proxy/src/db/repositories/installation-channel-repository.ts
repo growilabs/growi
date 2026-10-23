@@ -14,9 +14,19 @@
 // alone), so there is no `deleteByRelation` -- there is no relation column to
 // delete by in the first place.
 
+import { parseInventoryChannelKey } from '../../capabilities/index.js';
+import type {
+  InventoryChannel,
+  InventoryChannelId,
+} from '../../types/index.js';
 import type { DbClient } from '../prisma-client.js';
 
-export interface InstallationChannelRecord {
+export type InstallationChannelRecord = InventoryChannel & {
+  readonly installationId: string;
+  readonly refreshedAt: Date;
+};
+
+interface InstallationChannelRow {
   readonly installationId: string;
   readonly platform: string;
   readonly channelId: string;
@@ -36,7 +46,7 @@ export interface InstallationChannelRepository {
    */
   find(
     installationId: string,
-    channelId: string,
+    channelId: InventoryChannelId,
   ): Promise<InstallationChannelRecord | null>;
   /**
    * The whole saved inventory of one installation, in the order the database
@@ -70,16 +80,26 @@ export interface InstallationChannelRepository {
   deleteByInstallation(installationId: string): Promise<number>;
 }
 
+/**
+ * `null` for a row whose id is not in the form its service's inventory holds:
+ * such a row can name no channel this proxy compares against or posts to, so
+ * it is left out rather than failing every read of the installation. The
+ * refresh never deletes, so it stays until the installation is removed.
+ */
 const toRecord = (
-  row: InstallationChannelRecord,
-): InstallationChannelRecord => ({
-  installationId: row.installationId,
-  platform: row.platform,
-  channelId: row.channelId,
-  channelName: row.channelName,
-  isPrivate: row.isPrivate,
-  refreshedAt: row.refreshedAt,
-});
+  row: InstallationChannelRow,
+): InstallationChannelRecord | null => {
+  const key = parseInventoryChannelKey(row.platform, row.channelId);
+  return key === undefined
+    ? null
+    : {
+        ...key,
+        installationId: row.installationId,
+        channelName: row.channelName,
+        isPrivate: row.isPrivate,
+        refreshedAt: row.refreshedAt,
+      };
+};
 
 export const createInstallationChannelRepository = (
   db: DbClient,
@@ -106,7 +126,7 @@ export const createInstallationChannelRepository = (
     const rows = await db.installationChannel.findMany({
       where: { installationId },
     });
-    return rows.map(toRecord);
+    return rows.flatMap((row) => toRecord(row) ?? []);
   },
 
   find: async (installationId, channelId) => {

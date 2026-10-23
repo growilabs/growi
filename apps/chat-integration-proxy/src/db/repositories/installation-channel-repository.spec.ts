@@ -4,13 +4,19 @@
 // round trip through PostgreSQL is `storage-round-trip.integ.ts`'s job.
 import { mockDeep } from 'vitest-mock-extended';
 
+import { testSdkChannelId } from '../../capabilities/test-channels.js';
 import type { PrismaClient } from '../prisma-client.js';
-import { createInstallationChannelRepository } from './installation-channel-repository.js';
+import {
+  createInstallationChannelRepository,
+  type InstallationChannelRecord,
+} from './installation-channel-repository.js';
 
-const CHANNEL = {
+const CHANNEL_ID = testSdkChannelId('slack', 'C0001');
+
+const CHANNEL: InstallationChannelRecord = {
   installationId: 'installation-1',
   platform: 'slack',
-  channelId: 'C0001',
+  channelId: CHANNEL_ID,
   channelName: 'general',
   isPrivate: false,
   refreshedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -29,7 +35,7 @@ describe('installationChannelRepository.upsert', () => {
         where: {
           installationId_channelId: {
             installationId: 'installation-1',
-            channelId: 'C0001',
+            channelId: CHANNEL_ID,
           },
         },
       }),
@@ -43,9 +49,22 @@ describe('installationChannelRepository.find (Requirement 2.5)', () => {
     prisma.installationChannel.findUnique.mockResolvedValue(CHANNEL);
     const repository = createInstallationChannelRepository(prisma);
 
-    await expect(repository.find('installation-1', 'C0001')).resolves.toEqual(
-      CHANNEL,
-    );
+    await expect(
+      repository.find('installation-1', CHANNEL_ID),
+    ).resolves.toEqual(CHANNEL);
+  });
+
+  it("answers null for a saved row whose id is not in the form its service's inventory holds", async () => {
+    const prisma = mockDeep<PrismaClient>();
+    prisma.installationChannel.findUnique.mockResolvedValue({
+      ...CHANNEL,
+      channelId: 'C0001',
+    });
+    const repository = createInstallationChannelRepository(prisma);
+
+    await expect(
+      repository.find('installation-1', CHANNEL_ID),
+    ).resolves.toBeNull();
   });
 
   it('answers null for a channel not in the saved inventory', async () => {
@@ -54,7 +73,7 @@ describe('installationChannelRepository.find (Requirement 2.5)', () => {
     const repository = createInstallationChannelRepository(prisma);
 
     await expect(
-      repository.find('installation-1', 'C-unknown'),
+      repository.find('installation-1', testSdkChannelId('slack', 'C-unknown')),
     ).resolves.toBeNull();
   });
 });
@@ -111,6 +130,22 @@ describe('installationChannelRepository.listByInstallation (Requirements 2.2, 11
   it('answers the saved rows', async () => {
     const prisma = mockDeep<PrismaClient>();
     prisma.installationChannel.findMany.mockResolvedValue([CHANNEL]);
+    const repository = createInstallationChannelRepository(prisma);
+
+    await expect(
+      repository.listByInstallation('installation-1'),
+    ).resolves.toEqual([CHANNEL]);
+  });
+
+  it("leaves out a saved row whose id is not in the form its service's inventory holds", async () => {
+    // A Slack row holding the bare `C0002` names no channel an event carries
+    // or a post can address, so it must not reach the inventory GROWI is shown.
+    const prisma = mockDeep<PrismaClient>();
+    prisma.installationChannel.findMany.mockResolvedValue([
+      CHANNEL,
+      { ...CHANNEL, channelId: 'C0002' },
+      { ...CHANNEL, platform: 'unknown-service' },
+    ]);
     const repository = createInstallationChannelRepository(prisma);
 
     await expect(

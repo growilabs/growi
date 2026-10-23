@@ -17,6 +17,7 @@ export {
   linkPostedOn,
   mentionOn,
   modalSubmitOn,
+  sdkChannelIdOn,
 } from './chat-events.js';
 export type {
   CapturedModal,

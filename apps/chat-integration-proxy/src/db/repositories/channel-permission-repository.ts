@@ -13,6 +13,8 @@
 // row for it must not be created later. This repository does not enforce
 // that -- it is a caller-side invariant for whichever layer calls `upsert`
 // with a `commandName`.
+import { type NativeChannelId, parseNativeChannelId } from '@growi/chat';
+
 import type { DbClient } from '../prisma-client.js';
 
 /**
@@ -27,7 +29,7 @@ import type { DbClient } from '../prisma-client.js';
  * identical verdict from `judge()`, so a second spelling of it would be two
  * representations of one state.
  */
-export type PermittedChannels = ReadonlyArray<string> | 'all';
+export type PermittedChannels = ReadonlyArray<NativeChannelId> | 'all';
 
 export interface ChannelPermissionRepository {
   /**
@@ -67,7 +69,11 @@ export const createChannelPermissionRepository = (
     if (row == null) {
       return null;
     }
-    return row.allowAll ? 'all' : row.channels;
+    // An entry that is not a service's own id can match no channel, since
+    // every comparison is between such ids; it is dropped, which denies.
+    return row.allowAll
+      ? 'all'
+      : row.channels.flatMap((channel) => parseNativeChannelId(channel) ?? []);
   },
 
   upsert: async (relationId, commandName, channels) => {

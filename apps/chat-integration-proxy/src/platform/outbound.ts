@@ -20,12 +20,7 @@
 //     `capabilities/` and consulted through `levelOf` / `supports`.
 
 import type { SlackThreadId } from '@chat-adapter/slack';
-import type {
-  ChannelRef,
-  ChatAccountRef,
-  MessageRef,
-  PlatformName,
-} from '@growi/chat';
+import type { ChatAccountRef, PlatformName } from '@growi/chat';
 import {
   Actions,
   type Adapter,
@@ -41,8 +36,13 @@ import {
 import type { MattermostThreadId } from 'chat-adapter-mattermost';
 
 import { supports } from '../capabilities/index.js';
-import type { OutboundMessage, PostOutcome } from '../types/index.js';
-import { type SdkChannelId, sdkChannelIdOf } from './channel-id.js';
+import type {
+  OutboundMessage,
+  PostOutcome,
+  SdkChannelId,
+  SdkChannelRef,
+  SdkMessageRef,
+} from '../types/index.js';
 import { encodeActionId } from './event-mapping.js';
 
 /**
@@ -200,7 +200,7 @@ export const toPostable = (
 };
 
 // --------------------------------------------------------------------------
-// Addressing: a ChannelRef / MessageRef -> the adapter's own thread id
+// Addressing: an SdkChannelRef / SdkMessageRef -> the adapter's own thread id
 // --------------------------------------------------------------------------
 
 /**
@@ -209,7 +209,7 @@ export const toPostable = (
  *
  * This is the inverse of `Adapter.channelIdFromThreadId`, which the SDK offers
  * in one direction only -- and the direction this module needs, because
- * `MessageRef` carries a `ChannelRef` and a message id but no thread id, while
+ * `SdkMessageRef` carries a channel and a message id but no thread id, while
  * `editMessage` / `postMessage` are addressed by thread id.
  *
  * Declared as a table for the same reason `ADAPTER_FACTORIES` (`adapter-set.ts`)
@@ -451,7 +451,7 @@ const attempt = async (
 };
 
 /**
- * The SDK's channel handle for a `ChannelRef`.
+ * The SDK's channel handle for an `SdkChannelRef`.
  *
  * `post` and `postEphemeral` go through this rather than calling the adapter
  * directly, because `ChannelImpl` already owns two behaviors this module would
@@ -464,12 +464,12 @@ const attempt = async (
  */
 const channelHandleOf = (
   context: OutboundContext,
-  target: ChannelRef,
+  target: SdkChannelRef,
 ): ChannelImpl =>
   new ChannelImpl({
     adapter: context.adapter,
     stateAdapter: context.state,
-    id: sdkChannelIdOf(target),
+    id: target.channelId,
     // `isDM` is deliberately left at its default. `ChannelRef.isPrivate` is not
     // the same question: `event-mapping.ts` sets it for a private channel as
     // well as for a direct message, so passing it here would tell the SDK that
@@ -489,7 +489,7 @@ const channelHandleOf = (
  */
 export const post = async (
   context: OutboundContext,
-  target: ChannelRef,
+  target: SdkChannelRef,
   message: OutboundMessage,
 ): Promise<PostOutcome> =>
   attempt(() =>
@@ -501,7 +501,7 @@ export const post = async (
 /** Posts something only `user` can see in `target`. */
 export const postEphemeral = async (
   context: OutboundContext,
-  target: ChannelRef,
+  target: SdkChannelRef,
   user: ChatAccountRef,
   message: OutboundMessage,
 ): Promise<PostOutcome> =>
@@ -539,7 +539,7 @@ export const postEphemeral = async (
  */
 export const attachPreview = async (
   context: OutboundContext,
-  target: MessageRef,
+  target: SdkMessageRef,
   preview: OutboundMessage,
 ): Promise<PostOutcome> =>
   attempt(() =>
@@ -547,7 +547,7 @@ export const attachPreview = async (
       channelThreadId(
         context.adapter,
         target.channel.platform,
-        sdkChannelIdOf(target.channel),
+        target.channel.channelId,
         target.messageId,
       ),
       toPostable(preview, target.channel.platform, context.botName),
@@ -567,7 +567,7 @@ export const attachPreview = async (
  */
 export const replace = async (
   context: OutboundContext,
-  message: MessageRef,
+  message: SdkMessageRef,
   replacement: OutboundMessage,
 ): Promise<PostOutcome> =>
   attempt(() =>
@@ -575,7 +575,7 @@ export const replace = async (
       channelThreadId(
         context.adapter,
         message.channel.platform,
-        sdkChannelIdOf(message.channel),
+        message.channel.channelId,
         null,
       ),
       message.messageId,

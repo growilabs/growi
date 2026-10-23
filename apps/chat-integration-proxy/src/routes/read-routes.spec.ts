@@ -130,8 +130,16 @@ const CHANNEL_ROWS = [
   channelRow({
     installationId: 'installation-slack',
     platform: 'slack',
-    channelId: 'C-s1',
+    channelId: 'slack:C-s1',
     channelName: 's-general',
+  }),
+  // A row in the service's own form cannot be the Chat SDK's encoding of any
+  // Slack channel, so it names nothing this proxy could post to.
+  channelRow({
+    installationId: 'installation-slack',
+    platform: 'slack',
+    channelId: 'C-s0',
+    channelName: 's-unaddressable',
   }),
 ];
 
@@ -554,6 +562,29 @@ describe('POST /chat-integration/channels', () => {
         where: { installationId: 'installation-b' },
       }),
     );
+  });
+
+  it('names each channel by the id the chat service shows, which is what an administrator types', async () => {
+    const harness = createHarness();
+
+    const response = await harness.app.request(
+      signedRequest({
+        path: CHANNELS_PATH,
+        op: OP_NAMES.channels,
+        relationId: RELATION_SLACK.relationId,
+      }),
+    );
+
+    expect(await response.json()).toStrictEqual({
+      channels: [
+        {
+          platform: 'slack',
+          channelId: 'C-s1',
+          channelName: 's-general',
+          isPrivate: false,
+        },
+      ],
+    });
   });
 
   it('answers an empty inventory rather than everything when nothing is saved', async () => {

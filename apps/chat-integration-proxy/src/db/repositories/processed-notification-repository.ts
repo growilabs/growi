@@ -10,13 +10,16 @@
 // touching the others' rows -- which is why there is no bulk
 // clear-and-rewrite function here, only `findAllForRequest` (read every
 // destination's status) and `upsertTarget` (write exactly one).
+import { type NativeChannelId, parseNativeChannelId } from '@growi/chat';
+
 import type { DbClient } from '../prisma-client.js';
 
+/** Keyed by the destination exactly as GROWI named it. */
 export interface ProcessedNotificationTargetRecord {
   readonly relationId: string;
   readonly requestId: string;
   readonly platform: string;
-  readonly channelId: string;
+  readonly channelId: NativeChannelId;
   readonly status: string;
   readonly detail: string | null;
   readonly processedAt: Date;
@@ -52,18 +55,32 @@ export interface ProcessedNotificationRepository {
   deleteByRelation(relationId: string): Promise<number>;
 }
 
+type ProcessedNotificationTargetRow = Omit<
+  ProcessedNotificationTargetRecord,
+  'channelId'
+> & { readonly channelId: string };
+
+/**
+ * `null` for a row whose id is not one GROWI could have sent: no destination
+ * of a request matches it, so leaving it out changes no answer.
+ */
 const toRecord = (
-  row: ProcessedNotificationTargetRecord,
-): ProcessedNotificationTargetRecord => ({
-  relationId: row.relationId,
-  requestId: row.requestId,
-  platform: row.platform,
-  channelId: row.channelId,
-  status: row.status,
-  detail: row.detail,
-  processedAt: row.processedAt,
-  expiresAt: row.expiresAt,
-});
+  row: ProcessedNotificationTargetRow,
+): ProcessedNotificationTargetRecord | null => {
+  const channelId = parseNativeChannelId(row.channelId);
+  return channelId === undefined
+    ? null
+    : {
+        relationId: row.relationId,
+        requestId: row.requestId,
+        platform: row.platform,
+        channelId,
+        status: row.status,
+        detail: row.detail,
+        processedAt: row.processedAt,
+        expiresAt: row.expiresAt,
+      };
+};
 
 export const createProcessedNotificationRepository = (
   db: DbClient,
@@ -72,7 +89,7 @@ export const createProcessedNotificationRepository = (
     const rows = await db.processedNotificationTarget.findMany({
       where: { relationId, requestId },
     });
-    return rows.map(toRecord);
+    return rows.flatMap((row) => toRecord(row) ?? []);
   },
 
   upsertTarget: async (target) => {

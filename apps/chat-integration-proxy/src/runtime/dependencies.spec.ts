@@ -1,6 +1,7 @@
 import { type DeepMockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
 import { REQUIRES_INBOUND_REACHABILITY } from '../capabilities/index.js';
+import { testSdkChannel } from '../capabilities/test-channels.js';
 import type { PrismaClient } from '../db/index.js';
 import type { ConnectionManager, PlatformFacade } from '../platform/index.js';
 import type {
@@ -61,12 +62,7 @@ describe('createDeferredEventSink', () => {
   const event: PlatformEvent = {
     kind: 'mention',
     platform: 'slack',
-    channel: {
-      platform: 'slack',
-      channelId: 'C1',
-      channelName: 'general',
-      isPrivate: false,
-    },
+    channel: testSdkChannel('slack'),
     actor: { platform: 'slack', accountId: 'U1', displayName: 'someone' },
     text: 'hello',
     interaction: null,
@@ -147,20 +143,10 @@ describe('createProxyDependencies', () => {
       .handle({
         kind: 'link-posted',
         platform: 'slack',
-        channel: {
-          platform: 'slack',
-          channelId: 'C1',
-          channelName: 'general',
-          isPrivate: false,
-        },
+        channel: testSdkChannel('slack'),
         actor: { platform: 'slack', accountId: 'U1', displayName: 'someone' },
         messageRef: {
-          channel: {
-            platform: 'slack',
-            channelId: 'C1',
-            channelName: 'general',
-            isPrivate: false,
-          },
+          channel: testSdkChannel('slack'),
           messageId: 'M1',
         },
         urls: ['https://growi.internal/page'],
@@ -406,12 +392,7 @@ describe('the periodic work createProxyDependencies composes', () => {
  *    proxy's own configuration rather than the operator's permissions
  */
 describe('a register command typed in chat (Requirement 9.1)', () => {
-  const channel = {
-    platform: 'slack' as const,
-    channelId: 'C1',
-    channelName: 'general',
-    isPrivate: false,
-  };
+  const channel = testSdkChannel('slack');
   const actor = {
     platform: 'slack' as const,
     accountId: 'U1',
@@ -432,7 +413,7 @@ describe('a register command typed in chat (Requirement 9.1)', () => {
     db.installationChannel.findUnique.mockResolvedValue({
       installationId: 'inst-1',
       platform: 'slack',
-      channelId: 'C1',
+      channelId: 'slack:C1',
       channelName: 'general',
       isPrivate: false,
       refreshedAt: new Date('2026-09-01T00:00:00.000Z'),

@@ -12,18 +12,21 @@
 import { createDiscordAdapter } from '@chat-adapter/discord';
 import { createSlackAdapter } from '@chat-adapter/slack';
 import { createTeamsAdapter } from '@chat-adapter/teams';
-import type {
-  ChannelRef,
-  ChatAccountRef,
-  MessageRef,
-  PlatformName,
-} from '@growi/chat';
+import type { ChatAccountRef, PlatformName } from '@growi/chat';
 import type { Adapter, CardElement, StateAdapter } from 'chat';
 import { createMattermostAdapter } from 'chat-adapter-mattermost';
 import { mock } from 'vitest-mock-extended';
 
-import type { OutboundMessage } from '../types/index.js';
-import { type SdkChannelId, sdkChannelIdFromAdapter } from './channel-id.js';
+import {
+  sdkChannelIdFromAdapter,
+  toSdkChannelId,
+} from '../capabilities/index.js';
+import type {
+  OutboundMessage,
+  SdkChannelId,
+  SdkChannelRef,
+  SdkMessageRef,
+} from '../types/index.js';
 import { decodeActionId } from './event-mapping.js';
 import {
   attachPreview,
@@ -57,9 +60,12 @@ const slackPlatformError = (error: string) =>
 const adapterError = (name: string, adapter: string, message: string) =>
   Object.assign(new Error(message), { name, adapter });
 
-const channelOf = (platform: PlatformName, channelId: string): ChannelRef => ({
+const channelOf = (
+  platform: PlatformName,
+  channelId: string,
+): SdkChannelRef => ({
   platform,
-  channelId,
+  channelId: toSdkChannelId(platform, channelId),
   channelName: 'general',
   isPrivate: false,
 });
@@ -584,7 +590,7 @@ describe('replace', () => {
     // the message was edited rather than re-posted.
     const postSpy = vi.spyOn(adapter, 'postMessage');
 
-    const target: MessageRef = {
+    const target: SdkMessageRef = {
       channel: channelOf('slack', realChannelIds.slack),
       messageId: 'posted-1',
     };
@@ -630,7 +636,7 @@ describe('attachPreview', () => {
       threadId: 'slack:C123:ts',
     });
 
-    const target: MessageRef = {
+    const target: SdkMessageRef = {
       channel: channelOf('slack', realChannelIds.slack),
       messageId: '1700000000.000100',
     };

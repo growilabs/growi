@@ -6,16 +6,16 @@
 // tell the user what to do (Requirement 5.4). The Chat SDK's own paging is
 // third-party code and is not re-tested; what *is* tested is that this module
 // keeps asking for older pages until the range is covered and then stops.
-import type { ChannelRef } from '@growi/chat';
 import { type Adapter, Message } from 'chat';
 import { mock } from 'vitest-mock-extended';
 
-import type { TimeRange } from '../types/index.js';
+import { toSdkChannelId } from '../capabilities/index.js';
+import type { SdkChannelRef, TimeRange } from '../types/index.js';
 import { fetchHistory, type HistoryContext } from './history.js';
 
-const CHANNEL: ChannelRef = {
+const CHANNEL: SdkChannelRef = {
   platform: 'slack',
-  channelId: 'slack:C123',
+  channelId: toSdkChannelId('slack', 'slack:C123'),
   channelName: 'general',
   isPrivate: false,
 };

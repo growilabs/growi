@@ -17,13 +17,7 @@
 // its instances with the REAL facade and leave this one out of the way. The
 // cluster passes overrides through per instance so both are possible.
 
-import type {
-  ChannelInventory,
-  ChannelRef,
-  ChatAccountRef,
-  MessageRef,
-  PlatformName,
-} from '@growi/chat';
+import type { ChatAccountRef, PlatformName } from '@growi/chat';
 
 import type {
   ConnectionManager,
@@ -33,6 +27,7 @@ import type {
 } from '../platform/index.js';
 import type {
   AdminActorRoles,
+  ChannelListing,
   DistributedLock,
   HistoryOutcome,
   InteractionRef,
@@ -42,6 +37,8 @@ import type {
   PlatformEvent,
   PlatformEventSink,
   PostOutcome,
+  SdkChannelRef,
+  SdkMessageRef,
   TimeRange,
 } from '../types/index.js';
 
@@ -50,7 +47,7 @@ export type CapturedPostKind = 'post' | 'ephemeral' | 'replace' | 'preview';
 
 export interface CapturedPost {
   readonly kind: CapturedPostKind;
-  readonly channel: ChannelRef;
+  readonly channel: SdkChannelRef;
   /** Set only on an ephemeral message: who alone was meant to see it. */
   readonly user?: ChatAccountRef;
   /** Set on a replacement or a preview: which message it attached to. */
@@ -76,9 +73,9 @@ export interface CapturedModal {
 export interface FakeChatScript {
   readonly post?: (post: CapturedPost) => PostOutcome;
   readonly openModal?: (modal: CapturedModal) => boolean;
-  readonly listChannels?: (installationId: string) => ChannelInventory;
+  readonly listChannels?: (installationId: string) => ChannelListing;
   readonly fetchHistory?: (
-    channel: ChannelRef,
+    channel: SdkChannelRef,
     range: TimeRange,
   ) => HistoryOutcome;
   readonly webhook?: (
@@ -96,7 +93,7 @@ export interface FakeChatScript {
    */
   readonly observeActorRoles?: (
     installationId: string,
-    channel: ChannelRef,
+    channel: SdkChannelRef,
     actor: ChatAccountRef,
   ) => AdminActorRoles | null;
 }
@@ -197,7 +194,7 @@ export const createFakeChatService = (
     postEphemeral: async (channel, user, message) =>
       capture({ kind: 'ephemeral', channel, user, message }),
 
-    replace: async (message: MessageRef, replacement) =>
+    replace: async (message: SdkMessageRef, replacement) =>
       capture({
         kind: 'replace',
         channel: message.channel,
@@ -205,7 +202,7 @@ export const createFakeChatService = (
         message: replacement,
       }),
 
-    attachPreview: async (target: MessageRef, preview) =>
+    attachPreview: async (target: SdkMessageRef, preview) =>
       capture({
         kind: 'preview',
         channel: target.channel,

@@ -16,6 +16,7 @@
 import type { KeyOperationResult, PlatformName } from '@growi/chat';
 import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
+import { testSdkChannel } from '../capabilities/test-channels.js';
 import type { AdminActorRoles } from '../command/index.js';
 import type { PrismaClient } from '../db/index.js';
 import { PairingOrderLimitError } from '../relation/index.js';
@@ -29,12 +30,7 @@ import {
 const PLATFORM: PlatformName = 'slack';
 const INSTALLATION_ID = 'installation-1';
 
-const channel = {
-  platform: PLATFORM,
-  channelId: 'C1',
-  channelName: 'general',
-  isPrivate: false,
-};
+const channel = testSdkChannel(PLATFORM);
 const actor = { platform: PLATFORM, accountId: 'U1', displayName: 'Taro' };
 
 const ADMIN: AdminActorRoles = { grantedFields: ['is_admin'] };

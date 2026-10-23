@@ -10,24 +10,36 @@
 //     `channel-not-in-installation`.
 //  2. **What each service's channel listing produces.** Asserted through an
 //     injected `fetch` against the shape each service's real API returns, so
-//     the mapping into `ChannelInventory` (name, privacy, which channel kinds
+//     the mapping into inventory rows (id, name, privacy, which channel kinds
 //     count at all) is checked rather than the SDK helper that carries it.
 import { createDiscordAdapter } from '@chat-adapter/discord';
 import { createSlackAdapter } from '@chat-adapter/slack';
-import type { ChannelInventory, PlatformName } from '@growi/chat';
+import { createTeamsAdapter } from '@chat-adapter/teams';
+import type { PlatformName } from '@growi/chat';
 import { createMattermostAdapter } from 'chat-adapter-mattermost';
 import { mock } from 'vitest-mock-extended';
 
+import {
+  inventoryChannelIdOfEvent,
+  nativeChannelIdOf,
+  resolveNotificationTarget,
+  sdkChannelIdFromAdapter,
+  toProtocolInventory,
+  toSdkChannelId,
+  toTeamsGraphChannelId,
+} from '../capabilities/index.js';
+import { testSdkChannelId } from '../capabilities/test-channels.js';
 import type {
   InstallationChannelRecord,
   InstallationChannelRepository,
   InstallationRepository,
 } from '../db/index.js';
 import type {
+  ChannelListing,
   InstallationCredentials,
+  InventoryChannel,
   PlatformAppConfig,
 } from '../types/index.js';
-import { sdkChannelIdFromAdapter } from './channel-id.js';
 import {
   CHANNEL_LISTERS,
   type ChannelLister,
@@ -45,12 +57,15 @@ const INSTALLATION_ID = 'inst-1';
 const NOW = new Date('2026-09-03T10:00:00.000Z');
 
 const channelOf = (
-  channelId: string,
-  overrides: Partial<ChannelInventory['channels'][number]> = {},
-) => ({
-  platform: 'slack' as PlatformName,
-  channelId,
-  channelName: channelId.replace('C', 'ch-'),
+  nativeId: string,
+  overrides: {
+    readonly channelName?: string;
+    readonly isPrivate?: boolean;
+  } = {},
+): InventoryChannel => ({
+  platform: 'slack',
+  channelId: testSdkChannelId('slack', nativeId),
+  channelName: nativeId.replace('C', 'ch-'),
   isPrivate: false,
   ...overrides,
 });
@@ -62,7 +77,7 @@ interface RefreshHarness {
 }
 
 const refreshHarness = (
-  listChannelsImpl: (installationId: string) => Promise<ChannelInventory>,
+  listChannelsImpl: (installationId: string) => Promise<ChannelListing>,
 ): RefreshHarness => {
   const upserted: InstallationChannelRecord[] = [];
   const synced: Array<{ installationId: string; syncedAt: Date }> = [];
@@ -107,7 +122,7 @@ describe('refreshChannelInventory', () => {
       {
         installationId: INSTALLATION_ID,
         platform: 'slack',
-        channelId: 'C1',
+        channelId: 'slack:C1',
         channelName: 'ch-1',
         isPrivate: false,
         refreshedAt: NOW,
@@ -115,7 +130,7 @@ describe('refreshChannelInventory', () => {
       {
         installationId: INSTALLATION_ID,
         platform: 'slack',
-        channelId: 'C2',
+        channelId: 'slack:C2',
         channelName: 'secret',
         isPrivate: true,
         refreshedAt: NOW,
@@ -194,9 +209,9 @@ describe('listChannels', () => {
         called.push(platform);
         return Promise.resolve([
           {
-            platform,
-            channelId: sdkChannelIdFromAdapter('X'),
-            channelName: 'x',
+            platform: 'mattermost',
+            channelId: toSdkChannelId('mattermost', 'X'),
+            channelName: `listed for ${platform}`,
             isPrivate: false,
           },
         ]);
@@ -211,16 +226,9 @@ describe('listChannels', () => {
     const inventory = await listChannels('discord', CONTEXT, listers);
 
     expect(called).toEqual(['discord']);
-    expect(inventory).toEqual({
-      channels: [
-        {
-          platform: 'discord',
-          channelId: 'X',
-          channelName: 'x',
-          isPrivate: false,
-        },
-      ],
-    });
+    expect(inventory.channels.map((channel) => channel.channelName)).toEqual([
+      'listed for discord',
+    ]);
   });
 
   it('declares a lister for every service', () => {
@@ -894,5 +902,210 @@ describe('a listed channel has the id an event in that channel carries', () => {
     );
 
     expect(listed?.channelId).toBe(eventChannelId);
+  });
+});
+
+// --------------------------------------------------------------------------
+// GROWI sees the id the service shows, and names back the channel events use
+// --------------------------------------------------------------------------
+
+// An administrator picks a channel from the inventory GROWI was served, or
+// types the id the chat service shows; GROWI then names that channel in a
+// permission and in a notification. Both directions are taken from the real
+// adapter and the real lister here, for the reason the block above gives.
+describe('a listed channel, served to GROWI and named back by it, is the channel an event in it carries', () => {
+  it('slack', async () => {
+    const adapter = createSlackAdapter({
+      mode: 'socket',
+      appToken: 'xapp-unused',
+      signingSecret: 'unused',
+    });
+    const eventChannelId = sdkChannelIdFromAdapter(
+      adapter.channelIdFromThreadId(
+        adapter.encodeThreadId({
+          channel: 'C1',
+          threadTs: '1700000000.000100',
+        }),
+      ),
+    );
+    const { stub } = fetchStub([
+      {
+        ok: true,
+        channels: [{ id: 'C1', name: 'general', is_private: false }],
+        response_metadata: { next_cursor: '' },
+      },
+    ]);
+    const listed = await CHANNEL_LISTERS.slack(
+      contextOf({
+        credentials: { slack: { botToken: 'xoxb-1' } },
+        fetch: stub,
+      }),
+    );
+
+    const served = toProtocolInventory(listed);
+    const named = served.channels[0]?.channelId;
+
+    expect(named).toBe('C1');
+    expect(
+      nativeChannelIdOf({ platform: 'slack', channelId: eventChannelId }),
+    ).toBe(named);
+    expect(
+      resolveNotificationTarget(listed, {
+        platform: 'slack',
+        channelId: named,
+      }),
+    ).toEqual({
+      kind: 'found',
+      channel: {
+        platform: 'slack',
+        channelId: eventChannelId,
+        channelName: 'general',
+        isPrivate: false,
+      },
+    });
+  });
+
+  it('discord', async () => {
+    const adapter = createDiscordAdapter({
+      applicationId: 'app-1',
+      publicKey: '0'.repeat(64),
+      botToken: 'bot-1',
+    });
+    const eventChannelId = sdkChannelIdFromAdapter(
+      adapter.channelIdFromThreadId(
+        adapter.encodeThreadId({
+          guildId: 'G1',
+          channelId: '1',
+          threadId: '9',
+        }),
+      ),
+    );
+    const { stub } = fetchStub([[{ id: '1', name: 'general', type: 0 }]]);
+    const listed = await CHANNEL_LISTERS.discord(
+      contextOf({
+        workspaceId: 'G1',
+        appConfig: {
+          stateConnectionString: 'postgres://unused',
+          discord: {
+            applicationId: 'app-1',
+            publicKey: 'pk',
+            clientSecret: 'cs',
+            botToken: 'bot-1',
+          },
+        },
+        fetch: stub,
+      }),
+    );
+
+    const served = toProtocolInventory(listed);
+    const named = served.channels[0]?.channelId;
+
+    expect(named).toBe('1');
+    expect(
+      nativeChannelIdOf({ platform: 'discord', channelId: eventChannelId }),
+    ).toBe(named);
+    expect(
+      resolveNotificationTarget(listed, {
+        platform: 'discord',
+        channelId: named,
+      }),
+    ).toMatchObject({ kind: 'found', channel: { channelId: eventChannelId } });
+  });
+
+  it('teams: the id GROWI is served is the id an event in that channel shows, though it cannot be posted to', () => {
+    // The Teams adapter's channel id also carries the conversation's
+    // `serviceUrl`, which no listing has, so a listed Teams channel can be
+    // matched against but not addressed.
+    const adapter = createTeamsAdapter({
+      appId: 'teams-app',
+      appPassword: 'teams-secret',
+    });
+    const eventChannelId = sdkChannelIdFromAdapter(
+      adapter.channelIdFromThreadId(
+        adapter.encodeThreadId({
+          conversationId: '19:abc@thread.tacv2;messageid=1700000000000',
+          serviceUrl: 'https://smba.trafficmanager.net/teams/',
+        }),
+      ),
+    );
+    const listed = [
+      {
+        platform: 'teams' as const,
+        channelId: toTeamsGraphChannelId('19:abc@thread.tacv2'),
+        channelName: 'General',
+        isPrivate: false,
+      },
+    ];
+
+    const named = toProtocolInventory(listed).channels[0]?.channelId;
+
+    expect(named).toBe('19:abc@thread.tacv2');
+    expect(
+      nativeChannelIdOf({ platform: 'teams', channelId: eventChannelId }),
+    ).toBe(named);
+    expect(
+      resolveNotificationTarget(listed, {
+        platform: 'teams',
+        channelId: named,
+      }),
+    ).toEqual({ kind: 'unaddressable' });
+  });
+
+  it('mattermost', () => {
+    const adapter = createMattermostAdapter({
+      baseUrl: 'https://mm.example.com',
+      botToken: 'mm-1',
+    });
+    const eventChannelId = sdkChannelIdFromAdapter(
+      adapter.channelIdFromThreadId(
+        adapter.encodeThreadId({ channelId: 'ch-1', rootPostId: 'post-1' }),
+      ),
+    );
+
+    expect(
+      nativeChannelIdOf({ platform: 'mattermost', channelId: eventChannelId }),
+    ).toBe('ch-1');
+  });
+});
+
+// A slash command names its channel by `Channel.id`, which the Discord adapter
+// builds with `encodeThreadId` -- so inside a thread it carries the thread as a
+// fourth segment, unlike the `Thread.channelId` of a message there.
+describe('a Discord slash command typed inside a thread', () => {
+  it('is named to GROWI, and found in the inventory, as the channel the thread belongs to', async () => {
+    const adapter = createDiscordAdapter({
+      applicationId: 'app-1',
+      publicKey: '0'.repeat(64),
+      botToken: 'bot-1',
+    });
+    const slashChannelId = sdkChannelIdFromAdapter(
+      adapter.encodeThreadId({ guildId: 'G1', channelId: '1', threadId: '9' }),
+    );
+    const { stub } = fetchStub([[{ id: '1', name: 'general', type: 0 }]]);
+    const [listed] = await CHANNEL_LISTERS.discord(
+      contextOf({
+        workspaceId: 'G1',
+        appConfig: {
+          stateConnectionString: 'postgres://unused',
+          discord: {
+            applicationId: 'app-1',
+            publicKey: 'pk',
+            clientSecret: 'cs',
+            botToken: 'bot-1',
+          },
+        },
+        fetch: stub,
+      }),
+    );
+
+    expect(
+      nativeChannelIdOf({ platform: 'discord', channelId: slashChannelId }),
+    ).toBe('1');
+    expect(
+      inventoryChannelIdOfEvent({
+        platform: 'discord',
+        channelId: slashChannelId,
+      }),
+    ).toBe(listed?.channelId);
   });
 });

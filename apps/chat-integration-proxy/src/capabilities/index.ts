@@ -5,6 +5,19 @@
 
 export type { AdminCheckMethod } from './admin-check.js';
 export { ADMIN_CHECK_TABLE } from './admin-check.js';
+export {
+  inventoryChannelIdOfEvent,
+  inventoryChannelIdOfListed,
+  nativeChannelIdOf,
+  parseInventoryChannelKey,
+  parseSdkChannelId,
+  resolveNotificationTarget,
+  sdkChannelIdFromAdapter,
+  toProtocolChannelRef,
+  toProtocolInventory,
+  toSdkChannelId,
+  toTeamsGraphChannelId,
+} from './channel-id.js';
 // `CapabilityLevel` is NOT re-exported here -- it is owned by `@growi/chat`
 // (this app's proxy-specific `platform-capabilities.ts` imports it from
 // there rather than redeclaring it). Consumers should import it directly

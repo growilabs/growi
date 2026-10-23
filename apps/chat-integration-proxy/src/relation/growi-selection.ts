@@ -19,16 +19,17 @@
 // This file only decides WHICH GROWIs; `search_weight` -- how their answers
 // are then merged -- belongs to `SearchFusion`, not here.
 
-import type { ChannelRef, CommandName, RelationSettings } from '@growi/chat';
+import type { CommandName, RelationSettings } from '@growi/chat';
 import { judge } from '@growi/chat';
 
+import { toProtocolChannelRef } from '../capabilities/index.js';
 import {
   createChannelPermissionRepository,
   createRelationRepository,
   type DbClient,
   type PermittedChannels,
 } from '../db/index.js';
-import type { Relation } from '../types/index.js';
+import type { Relation, SdkChannelRef } from '../types/index.js';
 import { growiBasePathOf } from './growi-uri-resolver.js';
 
 /** One GROWI that was left out, with the reason the user needs to be told (Req 11.3). */
@@ -82,13 +83,13 @@ export type SelectionRequest =
   | {
       readonly targeting: 'exactly-one' | 'all-permitted';
       readonly installationId: string;
-      readonly channel: ChannelRef;
+      readonly channel: SdkChannelRef;
       readonly commandName: CommandName;
     }
   | {
       readonly targeting: 'url-match';
       readonly installationId: string;
-      readonly channel: ChannelRef;
+      readonly channel: SdkChannelRef;
       readonly commandName: CommandName;
       /** The text posted in the channel. Not required to be a URL at all. */
       readonly url: string;
@@ -224,12 +225,15 @@ export const createGrowiSelector = (deps: GrowiSelectorDeps): GrowiSelector => {
   const relations = createRelationRepository(deps.db);
   const permissions = createChannelPermissionRepository(deps.db);
 
-  const judgeEach = async (
+  const judgeEach = (
     candidates: ReadonlyArray<Relation>,
     commandName: CommandName,
-    channel: ChannelRef,
-  ): Promise<ReadonlyArray<Judged>> =>
-    Promise.all(
+    channel: SdkChannelRef,
+  ): Promise<ReadonlyArray<Judged>> => {
+    // The stored permissions list channels as GROWI names them, so the event's
+    // channel is named the same way before it is compared.
+    const protocolChannel = toProtocolChannelRef(channel);
+    return Promise.all(
       candidates.map(async (relation) => {
         const channels = await permissions.find(
           relation.relationId,
@@ -238,7 +242,7 @@ export const createGrowiSelector = (deps: GrowiSelectorDeps): GrowiSelector => {
         const verdict = judge(
           settingsFor(relation.relationId, commandName, channels),
           commandName,
-          channel,
+          protocolChannel,
         );
         return {
           relation,
@@ -253,6 +257,7 @@ export const createGrowiSelector = (deps: GrowiSelectorDeps): GrowiSelector => {
         };
       }),
     );
+  };
 
   return {
     select: async (request: SelectionRequest): Promise<SelectionOutcome> => {

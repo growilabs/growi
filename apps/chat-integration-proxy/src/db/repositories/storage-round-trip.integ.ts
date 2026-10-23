@@ -13,9 +13,15 @@
 // test rather than application code. The default mirrors `.env.development`, so
 // this runs for a developer who has not sourced that file.
 import { generateKeyPairSync, randomUUID, sign, verify } from 'node:crypto';
+import { toNativeChannelId } from '@growi/chat';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import type { InstallationCredentials, Invocation } from '../../types/index.js';
+import { testSdkChannelId } from '../../capabilities/test-channels.js';
+import type {
+  InstallationCredentials,
+  Invocation,
+  SdkChannelId,
+} from '../../types/index.js';
 import { createPrismaClient, type PrismaClient } from '../prisma-client.js';
 import { createChannelPermissionRepository } from './channel-permission-repository.js';
 import { createInstallationChannelRepository } from './installation-channel-repository.js';
@@ -396,7 +402,7 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
     const { prisma, installationId } = await context();
     const installations = createInstallationRepository(prisma, testCipher);
     const installationChannels = createInstallationChannelRepository(prisma);
-    const channelId = `C-${randomUUID()}`;
+    const channelId = testSdkChannelId('slack', `C-${randomUUID()}`);
 
     // Before any refresh: no channel row, and channelsSyncedAt starts null
     // from installations.save() above (never overwritten by re-saving).
@@ -436,6 +442,39 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
     );
   });
 
+  it("leaves a stored row that is not in its service's inventory form out of what is read back", async () => {
+    const { prisma, installationId } = await context();
+    const installationChannels = createInstallationChannelRepository(prisma);
+    const listed = testSdkChannelId('slack', `C-${randomUUID()}`);
+    const bare = `C-${randomUUID()}`;
+    const refreshedAt = new Date();
+    await installationChannels.upsert({
+      installationId,
+      platform: 'slack',
+      channelId: listed,
+      channelName: 'listed',
+      isPrivate: false,
+      refreshedAt,
+    });
+    // Written past the repository: nothing this proxy produces stores a bare
+    // Slack id, but the column itself does not refuse one.
+    await prisma.installationChannel.create({
+      data: {
+        installationId,
+        platform: 'slack',
+        channelId: bare,
+        channelName: 'bare',
+        isPrivate: false,
+        refreshedAt,
+      },
+    });
+
+    const read = await installationChannels.listByInstallation(installationId);
+
+    expect(read.map((row) => row.channelId)).toContain(listed);
+    expect(read.map((row) => row.channelId)).not.toContain(bare);
+  });
+
   it('reads back the permitted channels for one (relation, command), keeping "no row" apart from an empty list', async () => {
     const { prisma, installationId } = await context();
     const relations = createRelationRepository(prisma);
@@ -454,8 +493,8 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
     ).resolves.toBeNull();
 
     await channelPermissions.upsert(relation.relationId, 'search', [
-      'C0001',
-      'C0002',
+      toNativeChannelId('C0001'),
+      toNativeChannelId('C0002'),
     ]);
     await expect(
       channelPermissions.find(relation.relationId, 'search'),
@@ -473,7 +512,7 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
     const { prisma } = await context();
     const pendingCollections = createPendingCollectionRepository(prisma);
     const correlationId = `corr-${randomUUID()}`;
-    const channelId = `C-${randomUUID()}`;
+    const channelId = testSdkChannelId('slack', `C-${randomUUID()}`);
     const invocation: Invocation = {
       platform: 'slack',
       channel: {
@@ -523,7 +562,9 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
     const pendingCollections = createPendingCollectionRepository(prisma);
     const expiredId = `corr-${randomUUID()}`;
     const freshId = `corr-${randomUUID()}`;
-    const invocationFor = (channelId: string): Invocation => ({
+    const expiredChannel = testSdkChannelId('slack', `C-${randomUUID()}`);
+    const freshChannel = testSdkChannelId('slack', `C-${randomUUID()}`);
+    const invocationFor = (channelId: SdkChannelId): Invocation => ({
       platform: 'slack',
       channel: {
         platform: 'slack',
@@ -541,10 +582,10 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       correlationId: expiredId,
       relationId: null,
       platform: 'slack',
-      channelId: `C-${randomUUID()}`,
+      channelId: expiredChannel,
       actorAccountId: 'U0002',
       commandName: 'search',
-      invocation: invocationFor(`C-${randomUUID()}`),
+      invocation: invocationFor(expiredChannel),
       collected: {},
       offeredOptions: {},
       expiresAt: new Date(Date.now() - 1_000),
@@ -553,10 +594,10 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       correlationId: freshId,
       relationId: null,
       platform: 'slack',
-      channelId: `C-${randomUUID()}`,
+      channelId: freshChannel,
       actorAccountId: 'U0002',
       commandName: 'search',
-      invocation: invocationFor(`C-${randomUUID()}`),
+      invocation: invocationFor(freshChannel),
       collected: {},
       offeredOptions: {},
       expiresAt: new Date(Date.now() + 600_000),
@@ -595,7 +636,7 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       relationId: relation.relationId,
       requestId,
       platform: 'slack',
-      channelId: 'C0001',
+      channelId: toNativeChannelId('C0001'),
       status: 'posted',
       detail: null,
       processedAt: new Date(),
@@ -605,7 +646,7 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       relationId: relation.relationId,
       requestId,
       platform: 'slack',
-      channelId: 'C0002',
+      channelId: toNativeChannelId('C0002'),
       status: 'bot-not-in-channel',
       detail: 'bot is not a member of C0002',
       processedAt: new Date(),
@@ -629,7 +670,7 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       relationId: relation.relationId,
       requestId,
       platform: 'slack',
-      channelId: 'C0002',
+      channelId: toNativeChannelId('C0002'),
       status: 'posted',
       detail: null,
       processedAt: new Date(),

@@ -30,8 +30,6 @@
 //    They are structurally `SendKeyRegistration` / `SendKeyRevocation`, which
 //    is why `KeyDeliveryOutcome`'s field is named `response`; an adapter here
 //    would be a second declaration of the same shape, free to drift.
-import type { ChannelRef } from '@growi/chat';
-
 import {
   type AdminCommandIntent,
   type AdminDelivery,
@@ -51,6 +49,7 @@ import type {
   Invocation,
   OutboundMessage,
   Relation,
+  SdkChannelRef,
 } from '../types/index.js';
 
 /**
@@ -85,7 +84,7 @@ export interface AdminFlowDeps {
   readonly growiClient: Pick<GrowiClient, 'registerKey' | 'revokeKey'>;
   /** See `CommandFlowDeps.resolveInstallationId`: the same gap, filled once. */
   readonly resolveInstallationId: (
-    channel: ChannelRef,
+    channel: SdkChannelRef,
   ) => Promise<string | null>;
   readonly observeActorRoles: ObserveActorRoles;
 }

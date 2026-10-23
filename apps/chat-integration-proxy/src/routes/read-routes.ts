@@ -50,7 +50,10 @@ import { OP_NAMES, parseOpEnvelope } from '@growi/chat';
 import type { Hono } from 'hono';
 
 import type { ConnectionUnit } from '../capabilities/index.js';
-import { buildCapabilityReport } from '../capabilities/index.js';
+import {
+  buildCapabilityReport,
+  toProtocolInventory,
+} from '../capabilities/index.js';
 import type {
   InstallationChannelRepository,
   InstallationRepository,
@@ -201,18 +204,10 @@ export const registerReadRoutes = (
     );
 
     const rows = await deps.channels.listByInstallation(installationId);
-    // `refreshedAt` and `installationId` are dropped: the wire type carries
-    // neither, and the row's own `platform` is kept because one installation
-    // is on exactly one service and the admin screen picks destinations by
+    // The row's own `platform` is kept because one installation is on exactly
+    // one service and the admin screen picks destinations by
     // `(platform, channelId)`.
-    const inventory: ChannelInventory = {
-      channels: rows.map((row) => ({
-        platform: row.platform as PlatformName,
-        channelId: row.channelId,
-        channelName: row.channelName,
-        isPrivate: row.isPrivate,
-      })),
-    };
+    const inventory: ChannelInventory = toProtocolInventory(rows);
     return c.json(inventory);
   });
 };

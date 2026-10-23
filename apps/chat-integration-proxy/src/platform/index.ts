@@ -12,18 +12,13 @@
 // `AdapterPostableMessage`), `history.ts`'s `HistoryContext`,
 // `event-handlers.ts`'s `HandlerHost`, and `event-mapping.ts` in full.
 // `index.spec.ts` asserts the export list rather than trusting this comment.
-import type {
-  ChannelInventory,
-  ChannelRef,
-  ChatAccountRef,
-  MessageRef,
-  PlatformName,
-} from '@growi/chat';
+import type { ChatAccountRef, PlatformName } from '@growi/chat';
 import { type Adapter, Chat, type StateAdapter } from 'chat';
 
 import { CONNECTION_UNIT_TABLE } from '../capabilities/index.js';
 import type {
   AdminActorRoles,
+  ChannelListing,
   DistributedLock,
   HistoryOutcome,
   InteractionRef,
@@ -32,6 +27,8 @@ import type {
   PlatformAppConfig,
   PlatformEventSink,
   PostOutcome,
+  SdkChannelRef,
+  SdkMessageRef,
   TimeRange,
 } from '../types/index.js';
 import {
@@ -73,9 +70,9 @@ import { webhookOptionsFor } from './webhook-options.js';
  * invariant: 「platform 層の出入口に Chat SDK の型を含めない」).
  */
 export interface PlatformFacade {
-  post(target: ChannelRef, message: OutboundMessage): Promise<PostOutcome>;
+  post(target: SdkChannelRef, message: OutboundMessage): Promise<PostOutcome>;
   postEphemeral(
-    target: ChannelRef,
+    target: SdkChannelRef,
     user: ChatAccountRef,
     message: OutboundMessage,
   ): Promise<PostOutcome>;
@@ -90,15 +87,18 @@ export interface PlatformFacade {
     correlationId: string,
   ): Promise<boolean>;
   /** One installation's channels. Called on a schedule, not per notification. */
-  listChannels(installationId: string): Promise<ChannelInventory>;
+  listChannels(installationId: string): Promise<ChannelListing>;
   attachPreview(
-    target: MessageRef,
+    target: SdkMessageRef,
     preview: OutboundMessage,
   ): Promise<PostOutcome>;
-  fetchHistory(target: ChannelRef, range: TimeRange): Promise<HistoryOutcome>;
+  fetchHistory(
+    target: SdkChannelRef,
+    range: TimeRange,
+  ): Promise<HistoryOutcome>;
   /** Replaces an already-posted message, for answers that outlive the deadline. */
   replace(
-    message: MessageRef,
+    message: SdkMessageRef,
     replacement: OutboundMessage,
   ): Promise<PostOutcome>;
   /** The way in for a service that dials this proxy rather than the reverse. */
@@ -122,7 +122,7 @@ export interface PlatformFacade {
    */
   observeActorRoles(
     installationId: string,
-    channel: ChannelRef,
+    channel: SdkChannelRef,
     actor: ChatAccountRef,
   ): Promise<AdminActorRoles | null>;
   connections(): ConnectionManager;
@@ -334,8 +334,8 @@ export const createPlatformFacade = async (
 
   /**
    * The adapter to address a service through. A per-installation service has
-   * one adapter per open connection, and a `ChannelRef` names no installation,
-   * so it can only be answered while exactly one is open -- see
+   * one adapter per open connection, and an `SdkChannelRef` names no
+   * installation, so it can only be answered while exactly one is open -- see
    * `unaddressable`.
    */
   const adapterFor = (platform: PlatformName): Adapter | null => {

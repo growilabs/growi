@@ -24,9 +24,14 @@ import {
   createPublicKey,
   randomUUID,
 } from 'node:crypto';
-import type { ChannelRef, ChatAccountRef, PlatformName } from '@growi/chat';
+import type { ChatAccountRef, PlatformName } from '@growi/chat';
 import { COMMAND_NAMES } from '@growi/chat';
 
+import {
+  inventoryChannelIdOfEvent,
+  nativeChannelIdOf,
+  parseInventoryChannelKey,
+} from '../capabilities/index.js';
 import {
   createChannelPermissionRepository,
   createInstallationChannelRepository,
@@ -36,7 +41,8 @@ import {
   type PrismaClient,
 } from '../db/index.js';
 import { createRelationKeyService } from '../relation/index.js';
-import { actorOn, channelOn } from './chat-events.js';
+import type { SdkChannelRef } from '../types/index.js';
+import { actorOn, channelOn, sdkChannelIdOn } from './chat-events.js';
 import type { FakeGrowi } from './fake-growi.js';
 
 /** A cipher that leaves values readable: what it protects is not under test. */
@@ -47,7 +53,7 @@ export const passthroughCipher = {
 
 export interface Workspace {
   readonly installationId: string;
-  readonly channel: ChannelRef;
+  readonly channel: SdkChannelRef;
   readonly actor: ChatAccountRef;
 }
 
@@ -55,7 +61,7 @@ export interface Workspace {
  * Adds one channel to a workspace's saved inventory.
  *
  * The row is NOT optional dressing: `resolveInstallationId`
- * (`runtime/dependencies.ts`) turns a `ChannelRef` into an installation by
+ * (`runtime/dependencies.ts`) turns an `SdkChannelRef` into an installation by
  * looking the channel up here, and `InboundFlow.notify` judges every
  * notification destination against these same rows.
  *
@@ -69,12 +75,22 @@ export const addChannel = async (
   db: PrismaClient,
   installationId: string,
   platform: PlatformName,
-): Promise<ChannelRef> => {
-  const channel = channelOn(platform, { channelId: `chan-${randomUUID()}` });
-  await createInstallationChannelRepository(db).upsert({
-    installationId,
+): Promise<SdkChannelRef> => {
+  const channel = channelOn(platform, {
+    channelId: sdkChannelIdOn(platform, `chan-${randomUUID()}`),
+  });
+  // Stored the way the lister stores it, which for Teams is not the id the
+  // event carries.
+  const key = parseInventoryChannelKey(
     platform,
-    channelId: channel.channelId,
+    inventoryChannelIdOfEvent(channel),
+  );
+  if (key === undefined) {
+    throw new Error(`no inventory row can hold ${channel.channelId}`);
+  }
+  await createInstallationChannelRepository(db).upsert({
+    ...key,
+    installationId,
     channelName: channel.channelName,
     isPrivate: channel.isPrivate,
     refreshedAt: new Date(),
@@ -184,7 +200,8 @@ export const trustGrowiSignature = (
   });
 
 /**
- * Lets this channel run a WRITE command against that GROWI.
+ * Lets this channel run a WRITE command against that GROWI, listing it the
+ * way an administrator does: by the id the chat service shows.
  *
  * `judge` denies a write command that has no stored row (`no-settings`) and
  * allows a read one, so a read command left without a row is not an omission
@@ -195,10 +212,10 @@ export const trustGrowiSignature = (
 export const permitWrite = (
   db: PrismaClient,
   relationId: string,
-  channelId: string,
+  channel: SdkChannelRef,
 ): Promise<void> =>
   createChannelPermissionRepository(db).upsert(
     relationId,
     COMMAND_NAMES.createPage,
-    [channelId],
+    [nativeChannelIdOf(channel)],
   );

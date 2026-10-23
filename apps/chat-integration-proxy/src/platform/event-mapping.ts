@@ -30,9 +30,13 @@ import type {
   Thread,
 } from 'chat';
 
-import type { InteractionRef, PlatformEvent } from '../types/index.js';
+import { sdkChannelIdFromAdapter } from '../capabilities/index.js';
+import type {
+  InteractionRef,
+  PlatformEvent,
+  SdkChannelId,
+} from '../types/index.js';
 import { ADAPTER_FACTORIES } from './adapter-set.js';
-import { type SdkChannelId, sdkChannelIdFromAdapter } from './channel-id.js';
 
 /**
  * The Chat SDK types an adapter's `name` as a plain `string` -- it is the
@@ -52,7 +56,7 @@ const toPlatformName = (adapterName: string): PlatformName | null =>
     : null;
 
 /**
- * `ChannelRef` needs the four values below; where they come from differs per
+ * `SdkChannelRef` needs the four values below; where they come from differs per
  * event (a `Thread` for a message, a `Channel` for a slash command), so the
  * source is destructured by the caller and only the construction lives here.
  *
@@ -106,7 +110,7 @@ export const toChatAccountRef = (platform: PlatformName, author: Author) => ({
  * *state* parameter lands on `unknown`), while `ModalSubmitEvent.relatedThread`
  * is `Thread<Record<string, unknown>, TRawMessage>`. The two are not mutually
  * assignable, and neither the state nor the raw-message type has anything to do
- * with building a `ChannelRef`.
+ * with building an `SdkChannelRef`.
  */
 interface ChannelSource {
   readonly id: string;
@@ -133,7 +137,7 @@ const channelRefOfChannel = (platform: PlatformName, channel: ChannelSource) =>
 const channelRefOfThread = (platform: PlatformName, thread: ThreadSource) =>
   toChannelRef(platform, {
     // The thread's own id is the thread, not the channel; `channelId` is the
-    // conversation it lives in, which is what a `ChannelRef` names.
+    // conversation it lives in, which is what an `SdkChannelRef` names.
     channelId: sdkChannelIdFromAdapter(thread.channelId),
     channelName: thread.channel.name,
     isDM: thread.isDM,
@@ -289,7 +293,7 @@ export const fromAction = (
   if (decoded == null) return null;
 
   // `null` for a view-based press (a home-tab button): there is no
-  // conversation to answer in, so there is no `ChannelRef` to build.
+  // conversation to answer in, so there is no `SdkChannelRef` to build.
   const thread = event.thread;
   if (thread == null) return null;
 

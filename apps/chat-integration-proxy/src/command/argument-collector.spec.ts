@@ -2,6 +2,10 @@ import { COMMAND_NAMES, type PlatformName } from '@growi/chat';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
+import {
+  testSdkChannel,
+  testSdkChannelId,
+} from '../capabilities/test-channels.js';
 import type {
   NewPendingCollection,
   PendingCollectionRecord,
@@ -84,12 +88,7 @@ const createFakeRepository = (): PendingCollectionRepository & {
   };
 };
 
-const channelOf = (platform: PlatformName) => ({
-  platform,
-  channelId: 'C1',
-  channelName: 'general',
-  isPrivate: false,
-});
+const channelOf = (platform: PlatformName) => testSdkChannel(platform);
 
 const actorOf = (platform: PlatformName) => ({
   platform,
@@ -295,7 +294,7 @@ describe('ArgumentCollector.start', () => {
       correlationId: 'older',
       relationId: null,
       platform: 'mattermost',
-      channelId: 'C1',
+      channelId: testSdkChannelId('mattermost', 'C1'),
       actorAccountId: 'U1',
       commandName: COMMAND_NAMES.search,
       invocation: invocationOf('mattermost', COMMAND_NAMES.search),
@@ -319,7 +318,7 @@ describe('ArgumentCollector.start', () => {
       correlationId: 'older',
       relationId: null,
       platform: 'mattermost',
-      channelId: 'C1',
+      channelId: testSdkChannelId('mattermost', 'C1'),
       actorAccountId: 'U1',
       commandName: COMMAND_NAMES.search,
       invocation: invocationOf('mattermost', COMMAND_NAMES.search),
@@ -338,7 +337,7 @@ describe('ArgumentCollector.start', () => {
     expect(platform.postEphemeral).toHaveBeenCalledTimes(1);
     const [channel, actor, message] = vi.mocked(platform.postEphemeral).mock
       .calls[0];
-    expect(channel.channelId).toBe('C1');
+    expect(channel.channelId).toBe(testSdkChannelId('mattermost', 'C1'));
     expect(actor.accountId).toBe('U1');
     expect(message.kind === 'markdown' && message.markdown).toContain(
       COMMAND_NAMES.search,
@@ -350,7 +349,7 @@ describe('ArgumentCollector.start', () => {
       correlationId: 'older',
       relationId: null,
       platform: 'mattermost',
-      channelId: 'C1',
+      channelId: testSdkChannelId('mattermost', 'C1'),
       actorAccountId: 'U1',
       commandName: COMMAND_NAMES.search,
       invocation: invocationOf('mattermost', COMMAND_NAMES.search),
@@ -442,7 +441,7 @@ describe('ArgumentCollector.resume', () => {
       correlationId: 'corr-x',
       relationId: null,
       platform: 'slack',
-      channelId: 'C1',
+      channelId: testSdkChannelId('slack', 'C1'),
       actorAccountId: 'U1',
       commandName: COMMAND_NAMES.search,
       invocation: invocationOf('slack', COMMAND_NAMES.search),

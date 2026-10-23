@@ -48,9 +48,10 @@ export type OutboundMessage =
  * decoration: `bot-not-in-channel` is the one a user can act on, and it
  * carries the `remedy` to show them.
  *
- * `messageId` is the platform's own id for the posted message, not a
- * `MessageRef` -- the caller builds a `MessageRef` from it (its own
- * `ChannelRef` plus this id) when it later wants to `replace()` that message.
+ * `messageId` is the platform's own id for the posted message, not an
+ * `SdkMessageRef` -- the caller builds an `SdkMessageRef` from it (its own
+ * `SdkChannelRef` plus this id) when it later wants to `replace()` that
+ * message.
  */
 export type PostOutcome =
   | { readonly ok: true; readonly messageId: string }

@@ -1,4 +1,8 @@
-import type { CommandRequest, CommandResponse } from '@growi/chat';
+import {
+  type CommandRequest,
+  type CommandResponse,
+  toNativeChannelId,
+} from '@growi/chat';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ExcludedGrowi } from '../relation/index.js';
@@ -29,7 +33,7 @@ const searchRequestFor = (target: Relation): CommandRequest => ({
   actor: { platform: 'slack', accountId: 'U1', displayName: 'User One' },
   channel: {
     platform: 'slack',
-    channelId: 'C1',
+    channelId: toNativeChannelId('C1'),
     channelName: 'general',
     isPrivate: false,
   },

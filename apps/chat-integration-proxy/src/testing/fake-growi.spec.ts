@@ -19,7 +19,12 @@ import {
   verify as nodeVerify,
 } from 'node:crypto';
 import type { CommandRequest, OwnershipChallenge } from '@growi/chat';
-import { OP_NAMES, parseChallengeResponse, RESPONSE_KINDS } from '@growi/chat';
+import {
+  OP_NAMES,
+  parseChallengeResponse,
+  RESPONSE_KINDS,
+  toNativeChannelId,
+} from '@growi/chat';
 import type { KeyRef, VerifyFailure } from '@growi/chat/server';
 import { pairingChallengePayload } from '@growi/chat/server';
 import { type ServerType, serve } from '@hono/node-server';
@@ -50,7 +55,7 @@ const commandRequest = (): CommandRequest => ({
   actor: { platform: 'slack', accountId: 'U1', displayName: 'Ada' },
   channel: {
     platform: 'slack',
-    channelId: 'C1',
+    channelId: toNativeChannelId('C1'),
     channelName: 'general',
     isPrivate: false,
   },

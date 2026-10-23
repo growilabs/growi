@@ -1,12 +1,17 @@
 import { COMMAND_NAMES, type PlatformName } from '@growi/chat';
 import { mock } from 'vitest-mock-extended';
 
+import { testSdkChannel } from '../capabilities/test-channels.js';
 import {
   ADMIN_COMMAND_WORDS,
   type ArgumentCollector,
   LINK_COMMAND_WORD,
 } from '../command/index.js';
-import type { Invocation, PlatformEvent } from '../types/index.js';
+import type {
+  Invocation,
+  PlatformEvent,
+  PlatformEventSink,
+} from '../types/index.js';
 import {
   type CommandFlow,
   createEventSink,
@@ -15,12 +20,7 @@ import {
 
 const PLATFORM: PlatformName = 'slack';
 
-const channel = {
-  platform: PLATFORM,
-  channelId: 'C1',
-  channelName: 'general',
-  isPrivate: false,
-};
+const channel = testSdkChannel(PLATFORM);
 const actor = {
   platform: PLATFORM,
   accountId: 'U1',
@@ -304,5 +304,100 @@ describe('what each resume outcome leads to', () => {
     expect(flow.previewLinks).not.toHaveBeenCalled();
     expect(flow.runChosenGrowi).not.toHaveBeenCalled();
     expect(flow.reportExpired).not.toHaveBeenCalled();
+  });
+});
+
+describe('PlatformEvent', () => {
+  it('constructs every declared kind, and excludes `reply`', () => {
+    const channel = testSdkChannel('discord');
+    const actor = {
+      platform: 'discord',
+      accountId: 'U1',
+      displayName: 'Alice',
+    } as const;
+
+    const events: readonly PlatformEvent[] = [
+      {
+        kind: 'mention',
+        platform: 'discord',
+        channel,
+        actor,
+        text: 'hi',
+        interaction: null,
+      },
+      {
+        kind: 'slash-command',
+        platform: 'discord',
+        channel,
+        actor,
+        command: 'search',
+        text: 'growi',
+        interaction: { token: 't1' },
+      },
+      {
+        kind: 'modal-submit',
+        platform: 'discord',
+        channel,
+        actor,
+        correlationId: 'corr1',
+        values: { path: '/foo' },
+      },
+      {
+        kind: 'action',
+        platform: 'discord',
+        channel,
+        actor,
+        correlationId: 'corr1',
+        actionId: 'select-growi',
+        value: 'rel_1',
+        interaction: { token: 't1' },
+      },
+      {
+        kind: 'link-posted',
+        platform: 'discord',
+        channel,
+        actor,
+        messageRef: { channel, messageId: 'M1' },
+        urls: ['https://growi.example.com/foo'],
+      },
+    ];
+
+    expect(events.map((event) => event.kind)).toEqual([
+      'mention',
+      'slash-command',
+      'modal-submit',
+      'action',
+      'link-posted',
+    ]);
+    // `reply` was deliberately removed from PlatformEvent (design.md:
+    // "plainReply に依存しないと決めた...`PlatformEvent` の型からも外す").
+    // This is a compile-time-only check (no runtime assertion possible: at
+    // runtime the type system's erasure means there's nothing to observe)
+    // -- the `@ts-expect-error` below is what fails the build if `'reply'`
+    // is ever re-added to `PlatformEvent['kind']`.
+    // @ts-expect-error -- `'reply'` is not a member of `PlatformEvent['kind']`.
+    const rejectedKind: PlatformEvent['kind'] = 'reply';
+    expect(events.every((event) => event.kind !== rejectedKind)).toBe(true);
+  });
+
+  it('declares the sink a mapped event is handed to, taking any of the five kinds', async () => {
+    const handled: PlatformEvent[] = [];
+    const sink: PlatformEventSink = {
+      handle: (event) => {
+        handled.push(event);
+        return Promise.resolve();
+      },
+    };
+
+    await sink.handle({
+      kind: 'mention',
+      platform: 'discord',
+      channel: testSdkChannel('discord'),
+      actor: { platform: 'discord', accountId: 'U1', displayName: 'Alice' },
+      text: 'hi',
+      interaction: null,
+    });
+
+    expect(handled.map((event) => event.kind)).toEqual(['mention']);
   });
 });

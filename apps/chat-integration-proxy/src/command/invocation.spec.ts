@@ -14,17 +14,17 @@
 // correctly marks `none` (see task 12.2 for the paired capability-table fix).
 // Making the two paths actually converge -- e.g. by stripping a leading `/`
 // from `command` before use -- is left to a future task.
-import type { ChannelRef, ChatAccountRef } from '@growi/chat';
+import type { ChatAccountRef } from '@growi/chat';
 
-import type { InteractionRef } from '../types/index.js';
+import { testSdkChannel } from '../capabilities/test-channels.js';
+import type {
+  InteractionRef,
+  Invocation,
+  SdkChannelRef,
+} from '../types/index.js';
 import { CommandInvocation } from './invocation.js';
 
-const channel: ChannelRef = {
-  platform: 'slack',
-  channelId: 'C0001',
-  channelName: 'general',
-  isPrivate: false,
-};
+const channel: SdkChannelRef = testSdkChannel('slack');
 
 const actor: ChatAccountRef = {
   platform: 'slack',
@@ -132,5 +132,36 @@ describe('CommandInvocation.normalize', () => {
     expect(result.interaction).toBe(trigger);
     expect(result.commandName).toBe('/add-growi');
     expect(result.argsText).toBe('');
+  });
+});
+
+describe('Invocation', () => {
+  it('normalizes a mention and a slash-command into the same shape', () => {
+    const actor = {
+      platform: 'slack',
+      accountId: 'U1',
+      displayName: 'Alice',
+    } as const;
+    const channel = testSdkChannel('slack');
+
+    const fromMention: Invocation = {
+      platform: 'slack',
+      channel,
+      actor,
+      commandName: 'search',
+      argsText: 'growi setup',
+      interaction: null,
+    };
+    const fromSlashCommand: Invocation = {
+      platform: 'slack',
+      channel,
+      actor,
+      commandName: 'search',
+      argsText: 'growi setup',
+      interaction: { token: 'trigger-abc' },
+    };
+
+    expect(fromMention.commandName).toBe(fromSlashCommand.commandName);
+    expect(fromMention.argsText).toBe(fromSlashCommand.argsText);
   });
 });

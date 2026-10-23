@@ -19,6 +19,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { ADMIN_CHECK_TABLE } from '../capabilities/index.js';
+import {
+  testSdkChannel,
+  testSdkChannelId,
+} from '../capabilities/test-channels.js';
 import type {
   InstallationCredentials,
   PlatformAppConfig,
@@ -30,12 +34,7 @@ import {
   ROLE_READERS,
 } from './actor-roles.js';
 
-const channel = {
-  platform: 'slack' as const,
-  channelId: 'C1',
-  channelName: 'general',
-  isPrivate: false,
-};
+const channel = testSdkChannel('slack');
 const actor = {
   platform: 'slack' as const,
   accountId: 'U1',
@@ -160,7 +159,7 @@ describe('ROLE_READERS: Discord', () => {
     contextOf({
       workspaceId: guildId,
       appConfig: discordAppConfig,
-      channel: { ...channel, platform: 'discord' },
+      channel: testSdkChannel('discord'),
       actor: { ...actor, platform: 'discord' },
       fetch: fetchOf(routes),
     });
@@ -252,7 +251,9 @@ describe('ROLE_READERS: Mattermost', () => {
   ): ActorRoleContext =>
     contextOf({
       credentials: mattermostCredentials,
-      channel: { ...channel, platform: 'mattermost', channelId: 'mm-channel' },
+      channel: testSdkChannel('mattermost', {
+        channelId: testSdkChannelId('mattermost', 'mm-channel'),
+      }),
       actor: { ...actor, platform: 'mattermost', accountId: 'mm-user' },
       fetch: fetchOf(routes),
     });
@@ -337,7 +338,7 @@ describe('ROLE_READERS: Teams', () => {
     await expect(
       ROLE_READERS.teams(
         contextOf({
-          channel: { ...channel, platform: 'teams' },
+          channel: testSdkChannel('teams'),
           actor: { ...actor, platform: 'teams' },
           fetch: fetchOf({}),
         }),

@@ -35,13 +35,14 @@
 // `read_other_users_teams`). Same caveat `channels.ts` carries for its own
 // Mattermost pagination.
 import { assertSlackOk, callSlackApi } from '@chat-adapter/slack/api';
-import type { ChannelRef, ChatAccountRef, PlatformName } from '@growi/chat';
+import type { ChatAccountRef, PlatformName } from '@growi/chat';
 
-import { ADMIN_CHECK_TABLE } from '../capabilities/index.js';
+import { ADMIN_CHECK_TABLE, nativeChannelIdOf } from '../capabilities/index.js';
 import type {
   AdminActorRoles,
   InstallationCredentials,
   PlatformAppConfig,
+  SdkChannelRef,
 } from '../types/index.js';
 
 /**
@@ -60,7 +61,7 @@ export interface ActorRoleContext {
   readonly credentials: InstallationCredentials;
   readonly appConfig: PlatformAppConfig;
   /** The channel the command was typed in. */
-  readonly channel: ChannelRef;
+  readonly channel: SdkChannelRef;
   /** The person who typed it. */
   readonly actor: ChatAccountRef;
   readonly fetch: typeof fetch;
@@ -269,7 +270,7 @@ const readMattermostRoles: ActorRoleReader = async (context) => {
   // is nothing further to ask.
   const channel = asRecord(
     await get(
-      `/api/v4/channels/${encodeURIComponent(context.channel.channelId)}`,
+      `/api/v4/channels/${encodeURIComponent(nativeChannelIdOf(context.channel))}`,
     ),
   );
   const teamId = typeof channel.team_id === 'string' ? channel.team_id : '';

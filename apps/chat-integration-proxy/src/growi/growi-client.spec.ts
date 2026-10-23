@@ -40,7 +40,7 @@ import type {
   KeyRevocationRequest,
   PublicKeyRegistration,
 } from '@growi/chat';
-import { OP_ENDPOINTS, OP_NAMES } from '@growi/chat';
+import { OP_ENDPOINTS, OP_NAMES, toNativeChannelId } from '@growi/chat';
 import { type KeyRef, verify } from '@growi/chat/server';
 import { mock } from 'vitest-mock-extended';
 
@@ -126,7 +126,7 @@ const commandRequest: CommandRequest = {
   actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
   channel: {
     platform: 'slack',
-    channelId: 'C1',
+    channelId: toNativeChannelId('C1'),
     channelName: 'general',
     isPrivate: false,
   },

@@ -19,13 +19,14 @@
 // - `argsText`: whatever free text followed the command name, still
 //   unparsed -- `ArgumentCollector` is what turns it into per-`FieldSpec`
 //   values.
-import type { ChannelRef, ChatAccountRef, PlatformName } from '@growi/chat';
+import type { ChatAccountRef, PlatformName } from '@growi/chat';
 
+import type { SdkChannelRef } from './channel.js';
 import type { InteractionRef } from './index.js';
 
 export interface Invocation {
   readonly platform: PlatformName;
-  readonly channel: ChannelRef;
+  readonly channel: SdkChannelRef;
   readonly actor: ChatAccountRef;
   readonly commandName: string;
   readonly argsText: string;

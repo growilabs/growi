@@ -38,33 +38,19 @@
 // context so all four are exercisable without a live service.
 import { assertSlackOk, callSlackApi } from '@chat-adapter/slack/api';
 import { callTeamsGraphApi } from '@chat-adapter/teams/graph';
-import type { ChannelInventory, PlatformName } from '@growi/chat';
+import type { PlatformName } from '@growi/chat';
 
+import { inventoryChannelIdOfListed } from '../capabilities/index.js';
 import type {
   InstallationChannelRepository,
   InstallationRepository,
 } from '../db/index.js';
 import type {
+  ChannelListing,
   InstallationCredentials,
+  InventoryChannel,
   PlatformAppConfig,
 } from '../types/index.js';
-import {
-  INVENTORY_CHANNEL_IDS,
-  type SdkChannelId,
-  type TeamsGraphChannelId,
-} from './channel-id.js';
-
-/**
- * One row of the answer. Named because every lister below builds these. Its
- * id is typed so that a lister cannot hand back a bare service id, which an
- * event in the same channel would never match (see `channel-id.ts`).
- */
-type InventoryChannel = Omit<
-  ChannelInventory['channels'][number],
-  'channelId'
-> & {
-  readonly channelId: SdkChannelId | TeamsGraphChannelId;
-};
 
 /**
  * What a lister needs besides the service it serves.
@@ -149,10 +135,12 @@ const toSlackChannel = (
   raw: SlackChannel,
   workspaceId: string,
 ): InventoryChannel | null => {
-  if (typeof raw.id !== 'string' || raw.id === '') return null;
+  if (typeof raw.id !== 'string') return null;
+  const channelId = inventoryChannelIdOfListed('slack', raw.id, workspaceId);
+  if (channelId === undefined) return null;
   return {
     platform: 'slack',
-    channelId: INVENTORY_CHANNEL_IDS.slack(raw.id, workspaceId),
+    channelId,
     channelName: typeof raw.name === 'string' ? raw.name : raw.id,
     isPrivate: raw.is_private === true,
   };
@@ -294,7 +282,9 @@ const listDiscordChannels: ChannelLister = async (context) => {
   const raws = Array.isArray(body) ? (body as DiscordChannel[]) : [];
 
   return raws.flatMap((raw) => {
-    if (typeof raw.id !== 'string' || raw.id === '') return [];
+    if (typeof raw.id !== 'string') return [];
+    const channelId = inventoryChannelIdOfListed('discord', raw.id, guildId);
+    if (channelId === undefined) return [];
     if (
       typeof raw.type !== 'number' ||
       !DISCORD_POSTABLE_CHANNEL_TYPES.has(raw.type)
@@ -304,7 +294,7 @@ const listDiscordChannels: ChannelLister = async (context) => {
     return [
       {
         platform: 'discord' as const,
-        channelId: INVENTORY_CHANNEL_IDS.discord(raw.id, guildId),
+        channelId,
         channelName: typeof raw.name === 'string' ? raw.name : raw.id,
         isPrivate: isDiscordChannelPrivate(raw, guildId),
       },
@@ -479,12 +469,15 @@ const listMattermostChannels: ChannelLister = async (context) => {
           ? raw.display_name
           : null;
       const urlName = typeof raw.name === 'string' ? raw.name : raw.id;
+      const channelId = inventoryChannelIdOfListed(
+        'mattermost',
+        raw.id,
+        context.workspaceId,
+      );
+      if (channelId === undefined) continue;
       collected.push({
         platform: 'mattermost',
-        channelId: INVENTORY_CHANNEL_IDS.mattermost(
-          raw.id,
-          context.workspaceId,
-        ),
+        channelId,
         channelName: displayName ?? urlName,
         isPrivate: raw.type === MATTERMOST_PRIVATE_TYPE,
       });
@@ -582,10 +575,16 @@ const listTeamsChannels: ChannelLister = async (context) => {
       options,
     );
     for (const raw of channels) {
-      if (typeof raw.id !== 'string' || raw.id === '') continue;
+      if (typeof raw.id !== 'string') continue;
+      const channelId = inventoryChannelIdOfListed(
+        'teams',
+        raw.id,
+        context.workspaceId,
+      );
+      if (channelId === undefined) continue;
       collected.push({
         platform: 'teams',
-        channelId: INVENTORY_CHANNEL_IDS.teams(raw.id, context.workspaceId),
+        channelId,
         channelName:
           typeof raw.displayName === 'string' && raw.displayName !== ''
             ? raw.displayName
@@ -635,7 +634,7 @@ export const listChannels = async (
   platform: PlatformName,
   context: ChannelListerContext,
   listers: Readonly<Record<PlatformName, ChannelLister>>,
-): Promise<ChannelInventory> => ({
+): Promise<ChannelListing> => ({
   channels: await listers[platform](context),
 });
 
@@ -646,7 +645,7 @@ export interface ChannelRefreshDeps {
    * assembled here because resolving an installation id to its platform and
    * credentials is `platform/index.ts`'s job (task 3.8).
    */
-  readonly listChannels: (installationId: string) => Promise<ChannelInventory>;
+  readonly listChannels: (installationId: string) => Promise<ChannelListing>;
   readonly channels: InstallationChannelRepository;
   readonly installations: InstallationRepository;
   /** Injected so the stored timestamps are assertable. */
@@ -685,14 +684,7 @@ export const refreshChannelInventory = async (
     // layer offers a single-row upsert on purpose (no bulk replace exists,
     // because nothing here deletes).
     // biome-ignore lint/performance/noAwaitInLoops: one upsert per channel
-    await deps.channels.upsert({
-      installationId,
-      platform: channel.platform,
-      channelId: channel.channelId,
-      channelName: channel.channelName,
-      isPrivate: channel.isPrivate,
-      refreshedAt,
-    });
+    await deps.channels.upsert({ ...channel, installationId, refreshedAt });
   }
 
   await deps.installations.markChannelsSynced(installationId, refreshedAt);

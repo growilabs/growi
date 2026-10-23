@@ -71,6 +71,16 @@ export interface FieldSpec {
 }
 
 export type { AdminActorRoles } from './actor-roles.js';
+export type {
+  ChannelListing,
+  InventoryChannel,
+  InventoryChannelId,
+  InventoryChannelOf,
+  SdkChannelId,
+  SdkChannelRef,
+  SdkMessageRef,
+  TeamsGraphChannelId,
+} from './channel.js';
 export type { ClosedNetworkConfig } from './closed-network-config.js';
 export type { DistributedLock } from './distributed-lock.js';
 export type { Invocation } from './invocation.js';

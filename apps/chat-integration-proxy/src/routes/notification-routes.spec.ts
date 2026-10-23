@@ -33,6 +33,8 @@ import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 import { type DeepMockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
+import { nativeChannelIdOf } from '../capabilities/index.js';
+import { testSdkChannelId } from '../capabilities/test-channels.js';
 import type { PrismaClient } from '../db/index.js';
 import {
   createInboundFlow,
@@ -89,11 +91,15 @@ interface ProcessedRow {
   expiresAt: Date;
 }
 
-const channelRow = (channelId: string) => ({
+/**
+ * A saved inventory row for the channel the service shows as `nativeId`,
+ * stored the way the lister stores it: in the Chat SDK's encoding.
+ */
+const channelRow = (nativeId: string) => ({
   installationId: INSTALLATION_ID,
   platform: PLATFORM,
-  channelId,
-  channelName: channelId.toLowerCase(),
+  channelId: testSdkChannelId(PLATFORM, nativeId),
+  channelName: nativeId.toLowerCase(),
   isPrivate: false,
   refreshedAt: new Date('2026-05-31T00:00:00.000Z'),
 });
@@ -125,15 +131,7 @@ const createPrisma = (
     channelsSyncedAt: new Date('2026-05-31T00:00:00.000Z'),
   });
 
-  prisma.installationChannel.findUnique.mockImplementation(((args: {
-    where: { installationId_channelId: { channelId: string } };
-  }) =>
-    Promise.resolve(
-      channels.find(
-        (row) =>
-          row.channelId === args.where.installationId_channelId.channelId,
-      ) ?? null,
-    )) as never);
+  prisma.installationChannel.findMany.mockResolvedValue([...channels]);
 
   let processed: ReadonlyArray<ProcessedRow> = [];
   prisma.processedNotificationTarget.findMany.mockImplementation(((args: {
@@ -351,7 +349,7 @@ describe('POST /chat-integration/notification', () => {
     ]);
     harness.platform.post.mockImplementation((channel) =>
       Promise.resolve(
-        channel.channelId === 'C-b'
+        nativeChannelIdOf(channel) === 'C-b'
           ? { ok: false, reason: 'platform-error', detail: 'rate limited' }
           : { ok: true, messageId: `M-${channel.channelId}` },
       ),
@@ -375,7 +373,9 @@ describe('POST /chat-integration/notification', () => {
     // succeeded" and "answered only for what it tried this time" are separate
     // faults, and one assertion lets either hide behind the other.
     expect(harness.platform.post).toHaveBeenCalledTimes(1);
-    expect(harness.platform.post.mock.calls[0]?.[0].channelId).toBe('C-b');
+    expect(nativeChannelIdOf(harness.platform.post.mock.calls[0]?.[0])).toBe(
+      'C-b',
+    );
     expect(await second.json()).toEqual({
       outcomes: [
         { platform: PLATFORM, channelId: 'C-a', status: 'posted' },

@@ -15,11 +15,18 @@
 // not as a branch in the builders: adding a fifth service is one entry, and no
 // caller changes.
 
-import type { ChannelRef, ChatAccountRef, PlatformName } from '@growi/chat';
+import type { ChatAccountRef, PlatformName } from '@growi/chat';
 
-import type { InteractionRef, PlatformEvent } from '../types/index.js';
+import { testSdkChannelId } from '../capabilities/test-channels.js';
+import type {
+  InteractionRef,
+  PlatformEvent,
+  SdkChannelId,
+  SdkChannelRef,
+} from '../types/index.js';
 
 interface ServiceFixture {
+  /** The channel's id as the service shows it. */
   readonly channelId: string;
   readonly channelName: string;
   readonly accountId: string;
@@ -65,14 +72,23 @@ const SERVICE_FIXTURES: Readonly<Record<PlatformName, ServiceFixture>> = {
   },
 };
 
+/**
+ * The id an event in the channel `nativeId` (by default this service's
+ * fixture channel) carries.
+ */
+export const sdkChannelIdOn = (
+  platform: PlatformName,
+  nativeId: string = SERVICE_FIXTURES[platform].channelId,
+): SdkChannelId => testSdkChannelId(platform, nativeId);
+
 export const channelOn = (
   platform: PlatformName,
-  overrides: Partial<Omit<ChannelRef, 'platform'>> = {},
-): ChannelRef => {
+  overrides: Partial<Omit<SdkChannelRef, 'platform'>> = {},
+): SdkChannelRef => {
   const fixture = SERVICE_FIXTURES[platform];
   return {
     platform,
-    channelId: fixture.channelId,
+    channelId: sdkChannelIdOn(platform),
     channelName: fixture.channelName,
     isPrivate: false,
     ...overrides,
@@ -99,7 +115,7 @@ export const interactionOn = (platform: PlatformName): InteractionRef | null =>
     : null;
 
 interface EventOverrides {
-  readonly channel?: ChannelRef;
+  readonly channel?: SdkChannelRef;
   readonly actor?: ChatAccountRef;
   readonly interaction?: InteractionRef | null;
 }

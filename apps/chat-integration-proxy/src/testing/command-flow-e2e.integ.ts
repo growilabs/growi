@@ -231,8 +231,8 @@ describe('a command run end to end', () => {
       growiB,
       'GROWI B',
     );
-    await permitWrite(db, relationA, workspace.channel.channelId);
-    await permitWrite(db, relationB, workspace.channel.channelId);
+    await permitWrite(db, relationA, workspace.channel);
+    await permitWrite(db, relationB, workspace.channel);
 
     const chat = createFakeChatService();
     await startOneProxy(chat);
@@ -344,8 +344,8 @@ describe('a command run end to end', () => {
       growiB,
       'GROWI B',
     );
-    await permitWrite(db, relationA, workspace.channel.channelId);
-    await permitWrite(db, relationB, workspace.channel.channelId);
+    await permitWrite(db, relationA, workspace.channel);
+    await permitWrite(db, relationB, workspace.channel);
 
     const chat = createFakeChatService();
     await startOneProxy(chat);
@@ -514,7 +514,7 @@ describe('a command run end to end', () => {
       growi,
       'GROWI A',
     );
-    await permitWrite(db, relationId, workspace.channel.channelId);
+    await permitWrite(db, relationId, workspace.channel);
 
     const chat = createFakeChatService();
     const listener = await startOneProxy(chat);

@@ -40,6 +40,7 @@ import { randomUUID } from 'node:crypto';
 import { OP_NAMES } from '@growi/chat';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { nativeChannelIdOf } from '../capabilities/index.js';
 import { createPrismaClient, type PrismaClient } from '../db/index.js';
 import type { ProxyConfig } from '../runtime/index.js';
 import type { OutboundMessage, PostOutcome } from '../types/index.js';
@@ -201,8 +202,11 @@ describe('a notification from GROWI, end to end', () => {
       body: {
         requestId: `req-${randomUUID()}`,
         targets: [
-          { platform: 'slack', channelId: workspace.channel.channelId },
-          { platform: 'slack', channelId: second.channelId },
+          {
+            platform: 'slack',
+            channelId: nativeChannelIdOf(workspace.channel),
+          },
+          { platform: 'slack', channelId: nativeChannelIdOf(second) },
         ],
         markdown: NOTIFICATION_MARKDOWN,
         containsRestrictedPage: false,
@@ -217,10 +221,14 @@ describe('a notification from GROWI, end to end', () => {
       outcomes: [
         {
           platform: 'slack',
-          channelId: workspace.channel.channelId,
+          channelId: nativeChannelIdOf(workspace.channel),
           status: 'posted',
         },
-        { platform: 'slack', channelId: second.channelId, status: 'posted' },
+        {
+          platform: 'slack',
+          channelId: nativeChannelIdOf(second),
+          status: 'posted',
+        },
       ],
     });
 
@@ -286,8 +294,11 @@ describe('a notification from GROWI, end to end', () => {
       body: {
         requestId,
         targets: [
-          { platform: 'slack', channelId: workspace.channel.channelId },
-          { platform: 'slack', channelId: second.channelId },
+          {
+            platform: 'slack',
+            channelId: nativeChannelIdOf(workspace.channel),
+          },
+          { platform: 'slack', channelId: nativeChannelIdOf(second) },
         ],
         markdown: NOTIFICATION_MARKDOWN,
         containsRestrictedPage: false,
@@ -304,12 +315,12 @@ describe('a notification from GROWI, end to end', () => {
       outcomes: [
         {
           platform: 'slack',
-          channelId: workspace.channel.channelId,
+          channelId: nativeChannelIdOf(workspace.channel),
           status: 'posted',
         },
         {
           platform: 'slack',
-          channelId: second.channelId,
+          channelId: nativeChannelIdOf(second),
           status: 'bot-not-in-channel',
           remedy: INVITE_THE_BOT,
         },
@@ -339,10 +350,14 @@ describe('a notification from GROWI, end to end', () => {
       outcomes: [
         {
           platform: 'slack',
-          channelId: workspace.channel.channelId,
+          channelId: nativeChannelIdOf(workspace.channel),
           status: 'posted',
         },
-        { platform: 'slack', channelId: second.channelId, status: 'posted' },
+        {
+          platform: 'slack',
+          channelId: nativeChannelIdOf(second),
+          status: 'posted',
+        },
       ],
     });
   });
@@ -424,7 +439,7 @@ describe('the account-linking flow, end to end', () => {
     // Without this the write is stopped by channel permission (`no-settings`)
     // and never reaches GROWI, so the refusal under test would never be asked
     // for.
-    await permitWrite(db, relationId, workspace.channel.channelId);
+    await permitWrite(db, relationId, workspace.channel);
 
     await startOneProxy(chat);
     await runWriteCommand(chat, workspace);
@@ -470,7 +485,7 @@ describe('the account-linking flow, end to end', () => {
       growi,
       GROWI_LABEL,
     );
-    await permitWrite(db, relationId, workspace.channel.channelId);
+    await permitWrite(db, relationId, workspace.channel);
 
     await startOneProxy(chat);
 

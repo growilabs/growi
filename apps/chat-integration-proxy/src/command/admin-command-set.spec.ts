@@ -2,6 +2,7 @@ import { COMMAND_NAMES, type PlatformName } from '@growi/chat';
 import { describe, expect, it } from 'vitest';
 
 import { ADMIN_CHECK_TABLE } from '../capabilities/index.js';
+import { testSdkChannel } from '../capabilities/test-channels.js';
 import type { Invocation } from '../types/index.js';
 import {
   ADMIN_COMMAND_WORDS,
@@ -17,12 +18,7 @@ const invocationOf = (
   platform: PlatformName = 'slack',
 ): Invocation => ({
   platform,
-  channel: {
-    platform,
-    channelId: 'C1',
-    channelName: 'general',
-    isPrivate: false,
-  },
+  channel: testSdkChannel(platform),
   actor: { platform, accountId: 'U1', displayName: 'Operator' },
   commandName,
   argsText,

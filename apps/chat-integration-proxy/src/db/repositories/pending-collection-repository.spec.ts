@@ -1,5 +1,6 @@
 import { mockDeep } from 'vitest-mock-extended';
 
+import { testSdkChannelId } from '../../capabilities/test-channels.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 import type { Invocation } from '../../types/index.js';
 import type { PrismaClient } from '../prisma-client.js';
@@ -8,11 +9,13 @@ import {
   type NewPendingCollection,
 } from './pending-collection-repository.js';
 
+const CHANNEL_ID = testSdkChannelId('slack', 'C0001');
+
 const INVOCATION: Invocation = {
   platform: 'slack',
   channel: {
     platform: 'slack',
-    channelId: 'C0001',
+    channelId: CHANNEL_ID,
     channelName: 'general',
     isPrivate: false,
   },
@@ -27,7 +30,7 @@ const NEW_COLLECTION: NewPendingCollection = {
   correlationId: 'corr-1',
   relationId: null,
   platform: 'slack',
-  channelId: 'C0001',
+  channelId: CHANNEL_ID,
   actorAccountId: 'U0001',
   commandName: 'create-page',
   invocation: INVOCATION,
@@ -85,6 +88,35 @@ describe('pendingCollectionRepository.findByCorrelationId', () => {
     );
   });
 
+  it('answers null for a row naming no channel this proxy can address', async () => {
+    const prisma = mockDeep<PrismaClient>();
+    prisma.pendingCollection.findUnique.mockResolvedValue({
+      ...dbRow(),
+      channelId: 'C0001',
+    });
+    const repository = createPendingCollectionRepository(prisma);
+
+    await expect(repository.findByCorrelationId('corr-1')).resolves.toBeNull();
+  });
+
+  it('answers null when the stored invocation names another channel than the row', async () => {
+    const prisma = mockDeep<PrismaClient>();
+    prisma.pendingCollection.findUnique.mockResolvedValue(
+      dbRow({
+        invocation: {
+          ...INVOCATION,
+          channel: {
+            ...INVOCATION.channel,
+            channelId: testSdkChannelId('slack', 'C0002'),
+          },
+        },
+      }),
+    );
+    const repository = createPendingCollectionRepository(prisma);
+
+    await expect(repository.findByCorrelationId('corr-1')).resolves.toBeNull();
+  });
+
   it('answers null for an unknown correlationId', async () => {
     const prisma = mockDeep<PrismaClient>();
     prisma.pendingCollection.findUnique.mockResolvedValue(null);
@@ -103,10 +135,14 @@ describe('pendingCollectionRepository.findInFlight (Requirement 11.5)', () => {
     const repository = createPendingCollectionRepository(prisma);
 
     await expect(
-      repository.findInFlight('slack', 'C0001', 'U0001'),
+      repository.findInFlight('slack', CHANNEL_ID, 'U0001'),
     ).resolves.toEqual(NEW_COLLECTION);
     expect(prisma.pendingCollection.findFirst).toHaveBeenCalledWith({
-      where: { platform: 'slack', channelId: 'C0001', actorAccountId: 'U0001' },
+      where: {
+        platform: 'slack',
+        channelId: CHANNEL_ID,
+        actorAccountId: 'U0001',
+      },
     });
   });
 });

@@ -31,7 +31,6 @@
 // reach `relation/` and `growi/`. Keeping the routing in this one entrance is
 // what makes it impossible for a word to be answered twice, or by neither.
 import type {
-  ChannelRef,
   CommandName,
   CommandRequest,
   CommandResponse,
@@ -39,6 +38,7 @@ import type {
 } from '@growi/chat';
 import { COMMAND_NAMES, OP_NAMES } from '@growi/chat';
 
+import { toProtocolChannelRef } from '../capabilities/index.js';
 import {
   ADMIN_COMMAND_WORDS,
   type ArgumentCollector,
@@ -67,6 +67,7 @@ import type {
   OutboundMessage,
   PlatformEvent,
   Relation,
+  SdkChannelRef,
 } from '../types/index.js';
 import type { AdminFlow } from './admin-flow.js';
 import type { CommandFlow, LinkPostedEvent } from './event-sink.js';
@@ -106,7 +107,7 @@ export interface CommandFlowDeps {
    * being guessed at here.
    */
   readonly resolveInstallationId: (
-    channel: ChannelRef,
+    channel: SdkChannelRef,
   ) => Promise<string | null>;
   /**
    * Where an operator word goes. Injected rather than built here so this flow
@@ -409,7 +410,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     relationId: relation.relationId,
     requestId: newRequestId(),
     actor: invocation.actor,
-    channel: invocation.channel,
+    channel: toProtocolChannelRef(invocation.channel),
   });
 
   /**
@@ -470,7 +471,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
    */
   const permittedFor = async (
     installationId: string,
-    channel: ChannelRef,
+    channel: SdkChannelRef,
     commandName: CommandName,
   ): Promise<ReadonlySet<string>> => {
     const outcome = await selector.select({
@@ -1039,7 +1040,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
           relationId: relation.relationId,
           requestId: newRequestId(),
           actor: event.actor,
-          channel: event.channel,
+          channel: toProtocolChannelRef(event.channel),
           kind: COMMAND_NAMES.linkPreview,
           pageUrl: url,
         });

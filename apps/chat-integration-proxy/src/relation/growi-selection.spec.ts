@@ -15,20 +15,24 @@
 // database, the same way `relation-key-service.spec.ts` does: the selector
 // builds its repositories from the `DbClient` it is handed, so mocking the
 // delegates exercises the real repository code paths too.
-import type { ChannelRef } from '@growi/chat';
 import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
+import {
+  testSdkChannel,
+  testSdkChannelId,
+} from '../capabilities/test-channels.js';
 import type { PrismaClient } from '../db/index.js';
 import { createGrowiSelector } from './growi-selection.js';
 
 const INSTALLATION = 'installation-1';
 
-const CHANNEL: ChannelRef = {
-  platform: 'slack',
-  channelId: 'C-general',
-  channelName: 'general',
-  isPrivate: false,
-};
+/** The channel as an administrator types it into a permission. */
+const TYPED_CHANNEL_ID = 'C-general';
+
+/** The same channel as an event in it names it. */
+const CHANNEL = testSdkChannel('slack', {
+  channelId: testSdkChannelId('slack', TYPED_CHANNEL_ID),
+});
 
 const relationRow = (
   id: string,
@@ -100,8 +104,8 @@ describe('exactly-one targeting (Requirements 8.2 / 8.3)', () => {
       relationRow('rel-c', 'https://charlie.example.com/', 'Charlie'),
     ]);
     withPermissions(prisma, {
-      'rel-a': [CHANNEL.channelId],
-      'rel-b': [CHANNEL.channelId],
+      'rel-a': [TYPED_CHANNEL_ID],
+      'rel-b': [TYPED_CHANNEL_ID],
       'rel-c': ['C-other'],
     });
 
@@ -134,7 +138,7 @@ describe('exactly-one targeting (Requirements 8.2 / 8.3)', () => {
     const prisma = mockDeep<PrismaClient>();
     prisma.relation.findMany.mockResolvedValue([ALPHA, BRAVO]);
     withPermissions(prisma, {
-      'rel-a': [CHANNEL.channelId],
+      'rel-a': [TYPED_CHANNEL_ID],
       'rel-b': ['C-other'],
     });
 
@@ -167,8 +171,8 @@ describe('exactly-one targeting (Requirements 8.2 / 8.3)', () => {
     const prisma = mockDeep<PrismaClient>();
     prisma.relation.findMany.mockResolvedValue([second, first]);
     withPermissions(prisma, {
-      'rel-x': [CHANNEL.channelId],
-      'rel-y': [CHANNEL.channelId],
+      'rel-x': [TYPED_CHANNEL_ID],
+      'rel-y': [TYPED_CHANNEL_ID],
     });
 
     const outcome = await selectorOver(prisma).select({
@@ -191,8 +195,8 @@ describe('all-permitted targeting (Requirement 8.4)', () => {
     const prisma = mockDeep<PrismaClient>();
     prisma.relation.findMany.mockResolvedValue([BRAVO, ALPHA]);
     withPermissions(prisma, {
-      'rel-a': [CHANNEL.channelId],
-      'rel-b': [CHANNEL.channelId],
+      'rel-a': [TYPED_CHANNEL_ID],
+      'rel-b': [TYPED_CHANNEL_ID],
     });
 
     const outcome = await selectorOver(prisma).select({
@@ -221,7 +225,7 @@ describe('all-permitted targeting (Requirement 8.4)', () => {
     // `rel-b`'s row that omits this channel is `not-permitted-in-channel` --
     // two different things to tell the user, never rolled into one.
     withPermissions(prisma, {
-      'rel-a': [CHANNEL.channelId],
+      'rel-a': [TYPED_CHANNEL_ID],
       'rel-b': ['C-other'],
     });
 
@@ -428,8 +432,8 @@ describe('url-match targeting (Requirement 6.4)', () => {
     const prisma = mockDeep<PrismaClient>();
     prisma.relation.findMany.mockResolvedValue([ALPHA, BRAVO]);
     withPermissions(prisma, {
-      'rel-a': [CHANNEL.channelId],
-      'rel-b': [CHANNEL.channelId],
+      'rel-a': [TYPED_CHANNEL_ID],
+      'rel-b': [TYPED_CHANNEL_ID],
     });
 
     const outcome = await byUrl(prisma, 'https://bravo.example.com/Sandbox');
@@ -446,8 +450,8 @@ describe('url-match targeting (Requirement 6.4)', () => {
     const prisma = mockDeep<PrismaClient>();
     prisma.relation.findMany.mockResolvedValue([ALPHA, BRAVO]);
     withPermissions(prisma, {
-      'rel-a': [CHANNEL.channelId],
-      'rel-b': [CHANNEL.channelId],
+      'rel-a': [TYPED_CHANNEL_ID],
+      'rel-b': [TYPED_CHANNEL_ID],
     });
 
     const outcome = await byUrl(
@@ -470,7 +474,7 @@ describe('url-match targeting (Requirement 6.4)', () => {
   it('says nothing when the posted text is not a URL at all (6.4)', async () => {
     const prisma = mockDeep<PrismaClient>();
     prisma.relation.findMany.mockResolvedValue([ALPHA]);
-    withPermissions(prisma, { 'rel-a': [CHANNEL.channelId] });
+    withPermissions(prisma, { 'rel-a': [TYPED_CHANNEL_ID] });
 
     const outcome = await byUrl(prisma, 'not a url');
 
@@ -482,7 +486,7 @@ describe('url-match targeting (Requirement 6.4)', () => {
     prisma.relation.findMany.mockResolvedValue([
       relationRow('rel-p', 'https://example.com/growi/', 'Prefixed'),
     ]);
-    withPermissions(prisma, { 'rel-p': [CHANNEL.channelId] });
+    withPermissions(prisma, { 'rel-p': [TYPED_CHANNEL_ID] });
 
     expect(
       (await byUrl(prisma, 'https://example.com/growi/Sandbox')).kind,
@@ -510,8 +514,8 @@ describe('url-match targeting (Requirement 6.4)', () => {
       relationRow('rel-deep', 'https://example.com/team/', 'Team'),
     ]);
     withPermissions(prisma, {
-      'rel-root': [CHANNEL.channelId],
-      'rel-deep': [CHANNEL.channelId],
+      'rel-root': [TYPED_CHANNEL_ID],
+      'rel-deep': [TYPED_CHANNEL_ID],
     });
 
     const outcome = await byUrl(prisma, 'https://example.com/team/Sandbox');
@@ -528,7 +532,7 @@ describe('url-match targeting (Requirement 6.4)', () => {
     prisma.relation.findMany.mockResolvedValue([
       relationRow('rel-a', 'https://alpha.example.com', 'Alpha'),
     ]);
-    withPermissions(prisma, { 'rel-a': [CHANNEL.channelId] });
+    withPermissions(prisma, { 'rel-a': [TYPED_CHANNEL_ID] });
 
     expect(
       (await byUrl(prisma, 'https://alpha.example.com:443/Sandbox')).kind,
@@ -574,6 +578,30 @@ describe("a row that permits every channel ('all')", () => {
       targeting: 'exactly-one',
       installationId: INSTALLATION,
       channel: CHANNEL,
+      commandName: 'create-page',
+    });
+
+    expect(outcome).toEqual({
+      kind: 'execute',
+      targets: [expect.objectContaining({ relationId: 'rel-a' })],
+      excluded: [],
+    });
+  });
+});
+
+describe('a channel the administrator typed, against the channel an event names', () => {
+  it('permits a command typed in the channel an administrator listed by its own id', async () => {
+    // The administrator types the id Slack shows (`C1`); an event in that
+    // channel names it the way the Chat SDK encodes it (`slack:C1`).
+    const prisma = mockDeep<PrismaClient>();
+    prisma.relation.findMany.mockResolvedValue([ALPHA]);
+    withPermissions(prisma, { 'rel-a': ['C1'] });
+
+    const outcome = await selectorOver(prisma).select({
+      targeting: 'exactly-one',
+      installationId: INSTALLATION,
+      // An event in that channel names it `slack:C1`.
+      channel: testSdkChannel('slack'),
       commandName: 'create-page',
     });
 

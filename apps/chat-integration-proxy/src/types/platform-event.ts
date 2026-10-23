@@ -5,13 +5,9 @@
 // where a Chat SDK event gets turned into a `PlatformEvent` -- "SDK 型は
 // ここで止まる" (design.md's File Structure Plan) -- so nothing past that
 // point, including this file, may import the SDK.
-import type {
-  ChannelRef,
-  ChatAccountRef,
-  MessageRef,
-  PlatformName,
-} from '@growi/chat';
+import type { ChatAccountRef, PlatformName } from '@growi/chat';
 
+import type { SdkChannelRef, SdkMessageRef } from './channel.js';
 import type { InteractionRef } from './index.js';
 
 /**
@@ -24,7 +20,7 @@ export type PlatformEvent =
   | {
       readonly kind: 'mention';
       readonly platform: PlatformName;
-      readonly channel: ChannelRef;
+      readonly channel: SdkChannelRef;
       readonly actor: ChatAccountRef;
       readonly text: string;
       readonly interaction: InteractionRef | null;
@@ -32,7 +28,7 @@ export type PlatformEvent =
   | {
       readonly kind: 'slash-command';
       readonly platform: PlatformName;
-      readonly channel: ChannelRef;
+      readonly channel: SdkChannelRef;
       readonly actor: ChatAccountRef;
       readonly command: string;
       readonly text: string;
@@ -49,7 +45,7 @@ export type PlatformEvent =
   | {
       readonly kind: 'modal-submit';
       readonly platform: PlatformName;
-      readonly channel: ChannelRef;
+      readonly channel: SdkChannelRef;
       readonly actor: ChatAccountRef;
       readonly correlationId: string;
       readonly values: Readonly<Record<string, string>>;
@@ -57,7 +53,7 @@ export type PlatformEvent =
   | {
       readonly kind: 'action';
       readonly platform: PlatformName;
-      readonly channel: ChannelRef;
+      readonly channel: SdkChannelRef;
       readonly actor: ChatAccountRef;
       readonly correlationId: string;
       readonly actionId: string;
@@ -68,9 +64,9 @@ export type PlatformEvent =
   | {
       readonly kind: 'link-posted';
       readonly platform: PlatformName;
-      readonly channel: ChannelRef;
+      readonly channel: SdkChannelRef;
       readonly actor: ChatAccountRef;
-      readonly messageRef: MessageRef;
+      readonly messageRef: SdkMessageRef;
       readonly urls: ReadonlyArray<string>;
     };
 

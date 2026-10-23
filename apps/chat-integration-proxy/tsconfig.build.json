@@ -9,6 +9,7 @@
     "**/*.spec.ts",
     "**/*.integ.ts",
     "src/db/repositories/test-cipher.ts",
+    "src/capabilities/test-channels.ts",
     "src/testing"
   ]
 }

@@ -11,10 +11,11 @@
 // parameters with real defaults, so the wiring itself is provable without
 // either.
 
-import type { ChannelRef, PlatformName } from '@growi/chat';
+import type { PlatformName } from '@growi/chat';
 
 import {
   CONNECTION_UNIT_TABLE,
+  inventoryChannelIdOfEvent,
   REQUIRES_INBOUND_REACHABILITY,
 } from '../capabilities/index.js';
 import { createArgumentCollector } from '../command/index.js';
@@ -60,6 +61,7 @@ import type {
   Invocation,
   PlatformEvent,
   PlatformEventSink,
+  SdkChannelRef,
 } from '../types/index.js';
 import type { ProxyConfig } from './config.js';
 import {
@@ -259,20 +261,18 @@ export const createProxyDependencies = async (
 
   /**
    * The gap `CommandFlowDeps` and `AdminFlowDeps` both leave open, filled once
-   * and handed to both ("the same gap, filled once"). A `ChannelRef` names the
-   * service and the channel but no installation, so the saved channel
-   * inventory is what turns one into the other.
+   * and handed to both ("the same gap, filled once"). An `SdkChannelRef`
+   * names the service and the channel but no installation, so the saved
+   * channel inventory is what turns one into the other.
    */
   const resolveInstallationId = async (
-    channel: ChannelRef,
+    channel: SdkChannelRef,
   ): Promise<string | null> => {
     const candidates = await installations.listByPlatform(channel.platform);
+    const channelId = inventoryChannelIdOfEvent(channel);
     for (const candidate of candidates) {
       // biome-ignore lint/performance/noAwaitInLoops: stops at the first match, exactly as `locateInstallation` does in platform/index.ts
-      const found = await channels.find(
-        candidate.installationId,
-        channel.channelId,
-      );
+      const found = await channels.find(candidate.installationId, channelId);
       if (found != null) return candidate.installationId;
     }
     return null;

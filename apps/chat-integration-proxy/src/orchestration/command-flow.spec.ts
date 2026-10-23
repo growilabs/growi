@@ -8,6 +8,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
+import { testSdkChannel } from '../capabilities/test-channels.js';
 import {
   type ArgumentCollector,
   LINK_COMMAND_WORD,
@@ -27,12 +28,7 @@ import type { LinkPostedEvent } from './event-sink.js';
 const PLATFORM: PlatformName = 'slack';
 const INSTALLATION_ID = 'inst-1';
 
-const channel = {
-  platform: PLATFORM,
-  channelId: 'C1',
-  channelName: 'general',
-  isPrivate: false,
-};
+const channel = testSdkChannel(PLATFORM);
 const actor = { platform: PLATFORM, accountId: 'U1', displayName: 'Taro' };
 
 const relationOf = (
@@ -217,7 +213,7 @@ describe('the five commands, end to end', () => {
       relationId: GROWI_A.relationId,
       op: OP_NAMES.command,
       actor,
-      channel,
+      channel: { ...channel, channelId: 'C1' },
     });
     // Requirement 10.4: duplicate-execution detection is keyed on this, so
     // two targets must not share one id.
@@ -425,6 +421,34 @@ describe('the five commands, end to end', () => {
     expect(harness.postedMessages()[0]).toEqual({
       kind: 'markdown',
       markdown: expect.stringContaining('https://rel-a.example.com/memo'),
+    });
+  });
+
+  it('names the channel to GROWI by the id the chat service shows, not by the Chat SDK encoding an event carries', async () => {
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'execute',
+      targets: [GROWI_A],
+      excluded: [],
+    });
+    vi.mocked(harness.collector.start).mockResolvedValue({
+      status: 'collected',
+      values: { path: '/memo/today', body: 'hello' },
+    });
+    vi.mocked(harness.growiClient.sendCommand).mockResolvedValue({
+      ok: true,
+      response: { kind: 'created', pageUrl: 'https://rel-a.example.com/memo' },
+    });
+
+    // `channel` is named the way an event carries it: `slack:C1`.
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.createPage));
+
+    expect(
+      vi.mocked(harness.growiClient.sendCommand).mock.calls[0]?.[1].channel,
+    ).toEqual({
+      platform: 'slack',
+      channelId: 'C1',
+      channelName: 'general',
+      isPrivate: false,
     });
   });
 

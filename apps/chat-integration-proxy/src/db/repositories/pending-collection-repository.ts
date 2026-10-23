@@ -15,8 +15,9 @@
 // options a `GrowiSelector` choice offered), not something a storage
 // primitive needs to interpret to persist and return it unchanged.
 
+import { parseSdkChannelId } from '../../capabilities/index.js';
 import type { Prisma } from '../../generated/prisma/client.js';
-import type { Invocation } from '../../types/index.js';
+import type { Invocation, SdkChannelId } from '../../types/index.js';
 import type { DbClient } from '../prisma-client.js';
 
 export interface PendingCollectionRecord {
@@ -24,7 +25,7 @@ export interface PendingCollectionRecord {
   /** `null` while the GROWI destination is still being chosen. */
   readonly relationId: string | null;
   readonly platform: string;
-  readonly channelId: string;
+  readonly channelId: SdkChannelId;
   readonly actorAccountId: string;
   readonly commandName: string;
   readonly invocation: Invocation;
@@ -60,7 +61,7 @@ export interface PendingCollectionRepository {
    */
   findInFlight(
     platform: string,
-    channelId: string,
+    channelId: SdkChannelId,
     actorAccountId: string,
   ): Promise<PendingCollectionRecord | null>;
   update(correlationId: string, update: PendingCollectionUpdate): Promise<void>;
@@ -100,20 +101,34 @@ interface PendingCollectionRow {
   readonly expiresAt: Date;
 }
 
-const toRecord = (row: PendingCollectionRow): PendingCollectionRecord => ({
-  correlationId: row.correlationId,
-  relationId: row.relationId,
-  platform: row.platform,
-  channelId: row.channelId,
-  actorAccountId: row.actorAccountId,
-  commandName: row.commandName,
+/**
+ * `null` for a row whose channel id is not in its service's Chat SDK form, or
+ * whose stored invocation names a different channel than the row: either way
+ * there is no channel to resume the collection in.
+ */
+const toRecord = (
+  row: PendingCollectionRow,
+): PendingCollectionRecord | null => {
+  const channelId = parseSdkChannelId(row.platform, row.channelId);
   // The JSON column round-trips whatever was written; the caller that wrote
-  // it is the one that knows it was an `Invocation`.
-  invocation: row.invocation as Invocation,
-  collected: row.collected,
-  offeredOptions: row.offeredOptions,
-  expiresAt: row.expiresAt,
-});
+  // it is the one that knows it was an `Invocation`. Its channel id is
+  // trusted only because it equals the column validated above.
+  const invocation = row.invocation as Invocation;
+  return channelId === undefined || invocation.channel?.channelId !== channelId
+    ? null
+    : {
+        correlationId: row.correlationId,
+        relationId: row.relationId,
+        platform: row.platform,
+        channelId,
+        actorAccountId: row.actorAccountId,
+        commandName: row.commandName,
+        invocation,
+        collected: row.collected,
+        offeredOptions: row.offeredOptions,
+        expiresAt: row.expiresAt,
+      };
+};
 
 export const createPendingCollectionRepository = (
   db: DbClient,
@@ -128,7 +143,13 @@ export const createPendingCollectionRepository = (
         offeredOptions: collection.offeredOptions as Prisma.InputJsonValue,
       },
     });
-    return toRecord(row);
+    const record = toRecord(row);
+    if (record == null) {
+      throw new TypeError(
+        `pending collection ${row.correlationId} names no ${row.platform} channel this proxy can address: ${row.channelId}`,
+      );
+    }
+    return record;
   },
 
   findByCorrelationId: async (correlationId) => {
