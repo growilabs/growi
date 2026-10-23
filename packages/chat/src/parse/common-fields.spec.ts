@@ -70,6 +70,13 @@ describe('parseChannelRef', () => {
     expect(parseChannelRef({ ...valid, isPrivate: 'false' })).toBeUndefined();
   });
 
+  it('accepts an empty channelName, which a chat event may not carry', () => {
+    expect(parseChannelRef({ ...valid, channelName: '' })).toEqual({
+      ...valid,
+      channelName: '',
+    });
+  });
+
   it('rejects an oversized channelName', () => {
     expect(
       parseChannelRef({ ...valid, channelName: 'x'.repeat(500) }),

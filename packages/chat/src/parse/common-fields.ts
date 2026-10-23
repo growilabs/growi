@@ -78,7 +78,14 @@ export const parseChannelRef = (v: unknown): ChannelRef | undefined => {
 
   const platform = oneOf(v.platform, PLATFORM_NAMES);
   const channelId = str(v.channelId, CHANNEL_ID_MAX);
-  const channelName = str(v.channelName, CHANNEL_NAME_MAX);
+  // Checked by hand rather than via `str` (which rejects '' unconditionally):
+  // a chat event may arrive without its channel's name, and the name is
+  // display-only -- nothing matches on it.
+  const channelName =
+    typeof v.channelName === 'string' &&
+    v.channelName.length <= CHANNEL_NAME_MAX
+      ? v.channelName
+      : undefined;
   const isPrivate = v.isPrivate;
 
   if (
