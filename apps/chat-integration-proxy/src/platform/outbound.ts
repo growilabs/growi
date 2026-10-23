@@ -42,6 +42,7 @@ import type { MattermostThreadId } from 'chat-adapter-mattermost';
 
 import { supports } from '../capabilities/index.js';
 import type { OutboundMessage, PostOutcome } from '../types/index.js';
+import { type SdkChannelId, sdkChannelIdOf } from './channel-id.js';
 import { encodeActionId } from './event-mapping.js';
 
 /**
@@ -236,7 +237,7 @@ export const toPostable = (
  */
 type ChannelAddressing = (
   adapter: Adapter,
-  channelId: string,
+  channelId: SdkChannelId,
   rootMessageId: string | null,
 ) => string;
 
@@ -265,7 +266,7 @@ const CHANNEL_ADDRESSING: Readonly<Record<PlatformName, ChannelAddressing>> = {
 export const channelThreadId = (
   adapter: Adapter,
   platform: PlatformName,
-  channelId: string,
+  channelId: SdkChannelId,
   rootMessageId: string | null,
 ): string => CHANNEL_ADDRESSING[platform](adapter, channelId, rootMessageId);
 
@@ -468,7 +469,7 @@ const channelHandleOf = (
   new ChannelImpl({
     adapter: context.adapter,
     stateAdapter: context.state,
-    id: target.channelId,
+    id: sdkChannelIdOf(target),
     // `isDM` is deliberately left at its default. `ChannelRef.isPrivate` is not
     // the same question: `event-mapping.ts` sets it for a private channel as
     // well as for a direct message, so passing it here would tell the SDK that
@@ -546,7 +547,7 @@ export const attachPreview = async (
       channelThreadId(
         context.adapter,
         target.channel.platform,
-        target.channel.channelId,
+        sdkChannelIdOf(target.channel),
         target.messageId,
       ),
       toPostable(preview, target.channel.platform, context.botName),
@@ -574,7 +575,7 @@ export const replace = async (
       channelThreadId(
         context.adapter,
         message.channel.platform,
-        message.channel.channelId,
+        sdkChannelIdOf(message.channel),
         null,
       ),
       message.messageId,

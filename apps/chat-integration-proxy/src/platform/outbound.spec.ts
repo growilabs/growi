@@ -23,6 +23,7 @@ import { createMattermostAdapter } from 'chat-adapter-mattermost';
 import { mock } from 'vitest-mock-extended';
 
 import type { OutboundMessage } from '../types/index.js';
+import { type SdkChannelId, sdkChannelIdFromAdapter } from './channel-id.js';
 import { decodeActionId } from './event-mapping.js';
 import {
   attachPreview,
@@ -129,27 +130,34 @@ const realAdapters: Readonly<Record<PlatformName, Adapter>> = {
  * A channel id in exactly the form the rest of the app sees it: `event-mapping.ts`
  * reads `Thread.channelId`, which the SDK derives with `channelIdFromThreadId`.
  */
-const realChannelIds: Readonly<Record<PlatformName, string>> = {
-  slack: realAdapters.slack.channelIdFromThreadId(
+const realChannelIdOf = (adapter: Adapter, threadId: string) =>
+  sdkChannelIdFromAdapter(adapter.channelIdFromThreadId(threadId));
+
+const realChannelIds: Readonly<Record<PlatformName, SdkChannelId>> = {
+  slack: realChannelIdOf(
+    realAdapters.slack,
     realAdapters.slack.encodeThreadId({
       channel: 'C123',
       threadTs: '1700000000.000100',
     }),
   ),
-  discord: realAdapters.discord.channelIdFromThreadId(
+  discord: realChannelIdOf(
+    realAdapters.discord,
     realAdapters.discord.encodeThreadId({
       guildId: 'G1',
       channelId: 'C1',
       threadId: 'T1',
     }),
   ),
-  teams: realAdapters.teams.channelIdFromThreadId(
+  teams: realChannelIdOf(
+    realAdapters.teams,
     realAdapters.teams.encodeThreadId({
       conversationId: '19:abc@thread.tacv2',
       serviceUrl: 'https://smba.example.com/',
     }),
   ),
-  mattermost: realAdapters.mattermost.channelIdFromThreadId(
+  mattermost: realChannelIdOf(
+    realAdapters.mattermost,
     realAdapters.mattermost.encodeThreadId({
       channelId: 'mmchan1',
       rootPostId: 'root1',

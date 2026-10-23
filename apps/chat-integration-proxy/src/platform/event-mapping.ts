@@ -32,6 +32,7 @@ import type {
 
 import type { InteractionRef, PlatformEvent } from '../types/index.js';
 import { ADAPTER_FACTORIES } from './adapter-set.js';
+import { type SdkChannelId, sdkChannelIdFromAdapter } from './channel-id.js';
 
 /**
  * The Chat SDK types an adapter's `name` as a plain `string` -- it is the
@@ -70,7 +71,7 @@ const toPlatformName = (adapterName: string): PlatformName | null =>
 const toChannelRef = (
   platform: PlatformName,
   source: {
-    readonly channelId: string;
+    readonly channelId: SdkChannelId;
     readonly channelName: string | null;
     readonly isDM: boolean;
     readonly channelVisibility: ChannelVisibility;
@@ -123,7 +124,7 @@ interface ThreadSource {
 
 const channelRefOfChannel = (platform: PlatformName, channel: ChannelSource) =>
   toChannelRef(platform, {
-    channelId: channel.id,
+    channelId: sdkChannelIdFromAdapter(channel.id),
     channelName: channel.name,
     isDM: channel.isDM,
     channelVisibility: channel.channelVisibility,
@@ -133,7 +134,7 @@ const channelRefOfThread = (platform: PlatformName, thread: ThreadSource) =>
   toChannelRef(platform, {
     // The thread's own id is the thread, not the channel; `channelId` is the
     // conversation it lives in, which is what a `ChannelRef` names.
-    channelId: thread.channelId,
+    channelId: sdkChannelIdFromAdapter(thread.channelId),
     channelName: thread.channel.name,
     isDM: thread.isDM,
     channelVisibility: thread.channelVisibility,

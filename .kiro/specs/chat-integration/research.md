@@ -447,6 +447,33 @@ createSlackAdapter({
 - **Trade-offs**: 運用者が `allowList` に書いた宛先については、条件が 3 つとも外れる。明示した宛先に限るので受け入れる。
 - **Follow-up**: 判定を毎回掛けるのは `chat-integration-proxy` の `relation/growi-uri-resolver.ts`。
 
+### 決定 14: チャンネルの id は Chat SDK のアダプタが付ける形（`slack:C…`）にそろえる
+
+- **Context**: proxy の中で、同じチャンネルが 2 通りの id で扱われていた。イベントから作る
+  `ChannelRef.channelId` は Chat SDK の `Thread.channelId`（`adapter.channelIdFromThreadId` が作る
+  `slack:C…` や `discord:<guild>:<channel>`）で、チャンネル一覧はサービスの API が返す id（`C…`）だった。
+  一覧は、コマンドを打ったチャンネルがどの installation のものかの判定、チャンネルごとの許可、
+  通知先の確認のすべての照合に使われるので、どれも一致しなかった。
+- **Alternatives Considered**:
+  1. proxy の中はサービスの id にそろえ、イベントを受けたときと送るときに変換する
+  2. **チャンネル一覧のほうを Chat SDK の形で作る**
+- **Selected Approach**: 2
+- **Rationale**:
+  - 1 は送る側に材料が無い。Discord の id にはサーバー（guild）が入るが、送る時点の `ChannelRef` には
+    installation が載っていない。送るたびに installation を引き直すか、すべての送信に workspace を
+    持たせる必要がある。
+  - 返信・差し替え・履歴の読み取りは、すでに Chat SDK の形を前提に書かれていて、食い違っていたのは
+    一覧だけだった。一覧を作る時点では installation の `workspace_id`（Discord ではサーバー）が手元にある。
+  - Teams はどちらの向きでも合わせられない。Chat SDK の Teams の id には会話の `serviceUrl` が入り、
+    これは届いた activity にしか載っていない。一覧（Microsoft Graph）からは作れない。
+- **Trade-offs**: GROWI に保存されるチャンネルの id（許可するチャンネル、通知先）が Chat SDK の形になり、
+  保存データが外部ライブラリの id の作り方に結びつく。protocol は `channelId` を中身の意味を持たない
+  文字列として扱っているので、リリース前の今は受け入れる。Chat SDK が id の形を変えたら、保存済みの id の
+  移し替えが要る。
+- **Follow-up**: 変換は `platform/channel-id.ts` の `INVENTORY_CHANNEL_IDS` の 1 か所だけにある。一覧の行と
+  イベントの id が一致することは、`channels.spec.ts` が本物のアダプタを使って確かめる。Teams の一覧の id が
+  イベントと合わない点は未解決のまま残っている。
+
 ## Risks & Mitigations
 
 | リスク | 緩和 |

@@ -29,6 +29,7 @@ import type {
   HistoryOutcome,
   TimeRange,
 } from '../types/index.js';
+import { sdkChannelIdOf } from './channel-id.js';
 import { toChatAccountRef } from './event-mapping.js';
 import { channelAccessFailure } from './outbound.js';
 
@@ -165,7 +166,7 @@ export const fetchHistory = async (
   try {
     const collected = await collectInRange(
       (cursor) =>
-        readChannel.call(context.adapter, target.channelId, {
+        readChannel.call(context.adapter, sdkChannelIdOf(target), {
           limit: PAGE_SIZE,
           direction: 'backward',
           ...(cursor == null ? {} : { cursor }),

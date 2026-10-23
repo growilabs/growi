@@ -48,9 +48,23 @@ import type {
   InstallationCredentials,
   PlatformAppConfig,
 } from '../types/index.js';
+import {
+  INVENTORY_CHANNEL_IDS,
+  type SdkChannelId,
+  type TeamsGraphChannelId,
+} from './channel-id.js';
 
-/** One row of the answer. Named because every lister below builds these. */
-type InventoryChannel = ChannelInventory['channels'][number];
+/**
+ * One row of the answer. Named because every lister below builds these. Its
+ * id is typed so that a lister cannot hand back a bare service id, which an
+ * event in the same channel would never match (see `channel-id.ts`).
+ */
+type InventoryChannel = Omit<
+  ChannelInventory['channels'][number],
+  'channelId'
+> & {
+  readonly channelId: SdkChannelId | TeamsGraphChannelId;
+};
 
 /**
  * What a lister needs besides the service it serves.
@@ -131,11 +145,14 @@ interface SlackChannel {
   readonly is_private?: unknown;
 }
 
-const toSlackChannel = (raw: SlackChannel): InventoryChannel | null => {
+const toSlackChannel = (
+  raw: SlackChannel,
+  workspaceId: string,
+): InventoryChannel | null => {
   if (typeof raw.id !== 'string' || raw.id === '') return null;
   return {
     platform: 'slack',
-    channelId: raw.id,
+    channelId: INVENTORY_CHANNEL_IDS.slack(raw.id, workspaceId),
     channelName: typeof raw.name === 'string' ? raw.name : raw.id,
     isPrivate: raw.is_private === true,
   };
@@ -176,7 +193,7 @@ const listSlackChannels: ChannelLister = async (context) => {
       ? (response.channels as SlackChannel[])
       : [];
     for (const raw of channels) {
-      const channel = toSlackChannel(raw);
+      const channel = toSlackChannel(raw, context.workspaceId);
       if (channel != null) collected.push(channel);
     }
 
@@ -287,7 +304,7 @@ const listDiscordChannels: ChannelLister = async (context) => {
     return [
       {
         platform: 'discord' as const,
-        channelId: raw.id,
+        channelId: INVENTORY_CHANNEL_IDS.discord(raw.id, guildId),
         channelName: typeof raw.name === 'string' ? raw.name : raw.id,
         isPrivate: isDiscordChannelPrivate(raw, guildId),
       },
@@ -464,7 +481,10 @@ const listMattermostChannels: ChannelLister = async (context) => {
       const urlName = typeof raw.name === 'string' ? raw.name : raw.id;
       collected.push({
         platform: 'mattermost',
-        channelId: raw.id,
+        channelId: INVENTORY_CHANNEL_IDS.mattermost(
+          raw.id,
+          context.workspaceId,
+        ),
         channelName: displayName ?? urlName,
         isPrivate: raw.type === MATTERMOST_PRIVATE_TYPE,
       });
@@ -565,7 +585,7 @@ const listTeamsChannels: ChannelLister = async (context) => {
       if (typeof raw.id !== 'string' || raw.id === '') continue;
       collected.push({
         platform: 'teams',
-        channelId: raw.id,
+        channelId: INVENTORY_CHANNEL_IDS.teams(raw.id, context.workspaceId),
         channelName:
           typeof raw.displayName === 'string' && raw.displayName !== ''
             ? raw.displayName

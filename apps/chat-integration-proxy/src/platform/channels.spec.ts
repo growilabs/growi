@@ -12,7 +12,10 @@
 //     injected `fetch` against the shape each service's real API returns, so
 //     the mapping into `ChannelInventory` (name, privacy, which channel kinds
 //     count at all) is checked rather than the SDK helper that carries it.
+import { createDiscordAdapter } from '@chat-adapter/discord';
+import { createSlackAdapter } from '@chat-adapter/slack';
 import type { ChannelInventory, PlatformName } from '@growi/chat';
+import { createMattermostAdapter } from 'chat-adapter-mattermost';
 import { mock } from 'vitest-mock-extended';
 
 import type {
@@ -24,6 +27,7 @@ import type {
   InstallationCredentials,
   PlatformAppConfig,
 } from '../types/index.js';
+import { sdkChannelIdFromAdapter } from './channel-id.js';
 import {
   CHANNEL_LISTERS,
   type ChannelLister,
@@ -189,7 +193,12 @@ describe('listChannels', () => {
       () => {
         called.push(platform);
         return Promise.resolve([
-          { platform, channelId: 'X', channelName: 'x', isPrivate: false },
+          {
+            platform,
+            channelId: sdkChannelIdFromAdapter('X'),
+            channelName: 'x',
+            isPrivate: false,
+          },
         ]);
       };
     const listers: Readonly<Record<PlatformName, ChannelLister>> = {
@@ -291,19 +300,19 @@ describe('CHANNEL_LISTERS.slack', () => {
     expect(channels).toEqual([
       {
         platform: 'slack',
-        channelId: 'C1',
+        channelId: 'slack:C1',
         channelName: 'general',
         isPrivate: false,
       },
       {
         platform: 'slack',
-        channelId: 'C2',
+        channelId: 'slack:C2',
         channelName: 'secret',
         isPrivate: true,
       },
       {
         platform: 'slack',
-        channelId: 'C3',
+        channelId: 'slack:C3',
         channelName: 'random',
         isPrivate: false,
       },
@@ -408,19 +417,19 @@ describe('CHANNEL_LISTERS.discord', () => {
     expect(channels).toEqual([
       {
         platform: 'discord',
-        channelId: '1',
+        channelId: 'discord:G1:1',
         channelName: 'general',
         isPrivate: false,
       },
       {
         platform: 'discord',
-        channelId: '2',
+        channelId: 'discord:G1:2',
         channelName: 'announce',
         isPrivate: false,
       },
       {
         platform: 'discord',
-        channelId: '4',
+        channelId: 'discord:G1:4',
         channelName: 'staff',
         isPrivate: true,
       },
@@ -789,5 +798,101 @@ describe('CHANNEL_LISTERS.teams', () => {
     await expect(
       CHANNEL_LISTERS.teams(contextOf({ appConfig })),
     ).rejects.toThrow(/credential/i);
+  });
+});
+
+// --------------------------------------------------------------------------
+// A listed channel is the channel an event in it names
+// --------------------------------------------------------------------------
+
+// The inventory is what a command's channel, a channel permission and a
+// notification target are all matched against, so a listed channel's id must
+// equal the `ChannelRef.channelId` an event in that same channel carries. The
+// event side is taken from the real adapter -- `Thread.channelId` is
+// `adapter.channelIdFromThreadId(threadId)` -- rather than written by hand,
+// because a hand-written id is exactly how both sides came to agree in tests
+// while disagreeing in production.
+describe('a listed channel has the id an event in that channel carries', () => {
+  it('slack', async () => {
+    const adapter = createSlackAdapter({
+      mode: 'socket',
+      appToken: 'xapp-unused',
+      signingSecret: 'unused',
+    });
+    const eventChannelId = adapter.channelIdFromThreadId(
+      adapter.encodeThreadId({ channel: 'C1', threadTs: '1700000000.000100' }),
+    );
+    const { stub } = fetchStub([
+      {
+        ok: true,
+        channels: [{ id: 'C1', name: 'general', is_private: false }],
+        response_metadata: { next_cursor: '' },
+      },
+    ]);
+
+    const [listed] = await CHANNEL_LISTERS.slack(
+      contextOf({
+        credentials: { slack: { botToken: 'xoxb-1' } },
+        fetch: stub,
+      }),
+    );
+
+    expect(listed?.channelId).toBe(eventChannelId);
+  });
+
+  it('discord', async () => {
+    const adapter = createDiscordAdapter({
+      applicationId: 'app-1',
+      publicKey: '0'.repeat(64),
+      botToken: 'bot-1',
+    });
+    const eventChannelId = adapter.channelIdFromThreadId(
+      adapter.encodeThreadId({ guildId: 'G1', channelId: '1', threadId: '9' }),
+    );
+    const { stub } = fetchStub([[{ id: '1', name: 'general', type: 0 }]]);
+
+    const [listed] = await CHANNEL_LISTERS.discord(
+      contextOf({
+        workspaceId: 'G1',
+        appConfig: {
+          stateConnectionString: 'postgres://unused',
+          discord: {
+            applicationId: 'app-1',
+            publicKey: 'pk',
+            clientSecret: 'cs',
+            botToken: 'bot-1',
+          },
+        },
+        fetch: stub,
+      }),
+    );
+
+    expect(listed?.channelId).toBe(eventChannelId);
+  });
+
+  it('mattermost', async () => {
+    const adapter = createMattermostAdapter({
+      baseUrl: 'https://mm.example.com',
+      botToken: 'mm-1',
+    });
+    const eventChannelId = adapter.channelIdFromThreadId(
+      adapter.encodeThreadId({ channelId: 'ch-1', rootPostId: 'post-1' }),
+    );
+    const { stub } = fetchStub([
+      [{ id: 'team-1' }],
+      [{ id: 'ch-1', name: 'town-square', display_name: 'Town', type: 'O' }],
+      [],
+    ]);
+
+    const [listed] = await CHANNEL_LISTERS.mattermost(
+      contextOf({
+        credentials: {
+          mattermost: { baseUrl: 'https://mm.example.com', botToken: 'mm-1' },
+        },
+        fetch: stub,
+      }),
+    );
+
+    expect(listed?.channelId).toBe(eventChannelId);
   });
 });
