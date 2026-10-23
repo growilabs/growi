@@ -473,7 +473,7 @@ createSlackAdapter({
     境目の変換からしか得られない。契約の検査は `slack:` などで始まる値を断るので、型の外から入ってきた値も実行時に止まる。
 - **Trade-offs**: 境目の変換を 1 か所に保つ必要がある。Teams はチャンネル一覧（Microsoft Graph）の id から Chat SDK の形を
   作れないので、Teams の通知先は宛先にできないものとして扱う。
-- **Follow-up**: 契約側は `packages/chat`（`parse/channel-id.ts`）、proxy 側は `platform/channel-id.ts` が境目を持つ。
+- **Follow-up**: 契約側は `packages/chat`（`parse/channel-id.ts`）、proxy 側は `capabilities/channel-id.ts` が境目を持つ（`db/` の読み出しも同じ検査を使うので、層の順で `db/` より左に置く）。
   一覧の行とイベントの id が一致することと、契約の id が往復して元の Chat SDK の形に戻ることは、本物のアダプタを使う
   テストで確かめる。Teams の扱いは未解決のまま残っている。
 
