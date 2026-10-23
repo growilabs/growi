@@ -448,7 +448,7 @@ export interface FieldSpec {
 | 入り口 | 流れ |
 |---|---|
 | **利用者が自分から**（`link`） | `GrowiClient` が `AccountLinkStartRequest` を送る → `link-issued` なら `linkUrl` を**本人にだけ見えるメッセージ**で出す。`already-linked` / `taken-by-another-user` はそのまま伝える（要件 7.4） |
-| **書き込みを断られて**（要件 7.6） | GROWI が `CommandResponse` の `account-link-required`（`growiLabel` と `linkUrl` を持つ）を返す → 同じく**本人にだけ見えるメッセージ**で出す |
+| **操作を断られて**（要件 7.6） | GROWI が `CommandResponse` の `account-link-required`（`growiLabel` と `linkUrl` を持つ）を返す → 同じく**本人にだけ見えるメッセージ**で出す。書き込みに限らず、ゲストに閲覧を許さない GROWI は未紐付けの利用者の `search` / `help` にもこれを返す。全ての GROWI に送るコマンドでは、その GROWI を結果の注記に「紐付けが必要」として名指しし、「応答が無かった」には含めない。GROWI が `error` で断ったときも、その理由を注記に出す |
 
 **どちらも投稿の経路は 1 本にする**（`orchestration/command-flow.ts`）。
 `linkUrl` は一度きりで短時間に失効するので、**チャンネルに平文で出さない。**

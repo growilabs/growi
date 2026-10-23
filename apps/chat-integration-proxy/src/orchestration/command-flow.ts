@@ -146,6 +146,82 @@ const accountLinkNotice = (
     `GROWI「${growiLabel}」との紐付けが必要です。次のリンクを開き、その GROWI にログインした状態で紐付けを承認してください（1 回だけ使えます。短時間で失効します）: ${linkUrl}`,
   );
 
+/**
+ * How a GROWI may answer a command asked of every GROWI without giving what
+ * was asked: by asking the user to link their account first (a GROWI that lets
+ * no guest read answers an unlinked searcher this way, Requirement 7.6), or by
+ * refusing with a reason. Each needs its own handling, so neither is folded
+ * into "did not answer".
+ */
+type DeclinedAnswer =
+  | {
+      readonly kind: 'account-link-required';
+      readonly growiLabel: string;
+      readonly linkUrl: string;
+    }
+  | { readonly kind: 'refused'; readonly message: string };
+
+/** One GROWI's answer to a command asked of every GROWI. */
+type FanOutAnswer<T> =
+  | { readonly kind: 'answered'; readonly value: T }
+  | DeclinedAnswer;
+
+interface DeclinedEntry {
+  readonly relationId: string;
+  readonly growiLabel: string;
+  readonly answer: DeclinedAnswer;
+}
+
+/** `null` when the response is not a way of declining. */
+const declinedAnswerOf = (response: CommandResponse): DeclinedAnswer | null => {
+  switch (response.kind) {
+    case 'account-link-required':
+      return {
+        kind: 'account-link-required',
+        growiLabel: response.growiLabel,
+        linkUrl: response.linkUrl,
+      };
+    case 'error':
+      return { kind: 'refused', message: response.message };
+    default:
+      return null;
+  }
+};
+
+const splitAnswers = <T>(
+  responded: FanOutOutcome<FanOutAnswer<T>>['responded'],
+): {
+  readonly answered: FanOutOutcome<T>['responded'];
+  readonly declined: ReadonlyArray<DeclinedEntry>;
+} => ({
+  answered: responded.flatMap(({ relationId, growiLabel, value }) =>
+    value.kind === 'answered'
+      ? [{ relationId, growiLabel, value: value.value }]
+      : [],
+  ),
+  declined: responded.flatMap(({ relationId, growiLabel, value }) =>
+    value.kind === 'answered'
+      ? []
+      : [{ relationId, growiLabel, answer: value }],
+  ),
+});
+
+const declinedNote = (declined: ReadonlyArray<DeclinedEntry>): string | null =>
+  declined.length === 0
+    ? null
+    : `結果に含まれていない GROWI: ${declined
+        .map(({ growiLabel, answer }) => {
+          switch (answer.kind) {
+            case 'account-link-required':
+              return `${growiLabel}（アカウントの紐付けが必要です。手順はあなたにだけ送りました）`;
+            case 'refused':
+              return `${growiLabel}（${answer.message}）`;
+            default:
+              return answer satisfies never;
+          }
+        })
+        .join('、')}`;
+
 const notRespondedNote = (
   notResponded: FanOutOutcome<unknown>['notResponded'],
 ): string | null =>
@@ -183,8 +259,15 @@ const excludedNote = (
   return notes.length === 0 ? null : notes.join('\n');
 };
 
-const footerOf = (outcome: FanOutOutcome<unknown>): string | undefined =>
-  [notRespondedNote(outcome.notResponded), excludedNote(outcome.excluded)]
+const footerOf = (
+  outcome: FanOutOutcome<unknown>,
+  declined: ReadonlyArray<DeclinedEntry>,
+): string | undefined =>
+  [
+    declinedNote(declined),
+    notRespondedNote(outcome.notResponded),
+    excludedNote(outcome.excluded),
+  ]
     .filter((note) => note != null)
     .join('\n') || undefined;
 
@@ -303,6 +386,22 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     message: OutboundMessage,
   ): Promise<void> => {
     await platform.postEphemeral(invocation.channel, invocation.actor, message);
+  };
+
+  const announceAccountLinks = async (
+    invocation: Invocation,
+    declined: ReadonlyArray<DeclinedEntry>,
+  ): Promise<void> => {
+    await Promise.all(
+      declined.map(({ answer }) =>
+        answer.kind === 'account-link-required'
+          ? tell(
+              invocation,
+              accountLinkNotice(answer.growiLabel, answer.linkUrl),
+            )
+          : undefined,
+      ),
+    );
   };
 
   const envelopeFor = (invocation: Invocation, relation: Relation) => ({
@@ -582,7 +681,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     );
 
     const outcome = await fanOutCollector.fanOut<
-      ReadonlyArray<SearchResultItem>
+      FanOutAnswer<ReadonlyArray<SearchResultItem>>
     >({
       targets,
       excluded,
@@ -594,15 +693,19 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
         limit: searchLimit,
       }),
       extract: (response) => {
+        const declined = declinedAnswerOf(response);
+        if (declined != null) return declined;
         if (response.kind !== COMMAND_NAMES.search) {
           throw new Error(`not a search answer: ${response.kind}`);
         }
-        return response.items;
+        return { kind: 'answered', value: response.items };
       },
     });
+    const { answered, declined } = splitAnswers(outcome.responded);
+    await announceAccountLinks(invocation, declined);
 
     const fused = fuseResults(
-      outcome.responded.map((entry) => ({
+      answered.map((entry) => ({
         relationId: entry.relationId,
         growiLabel: entry.growiLabel,
         // Requirement 3.8: the operator's own weight for that GROWI.
@@ -614,7 +717,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
       { limit: searchLimit },
     );
 
-    const footer = footerOf(outcome);
+    const footer = footerOf(outcome, declined);
     await deliver(
       invocation,
       placeholder,
@@ -650,7 +753,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     );
 
     const outcome = await fanOutCollector.fanOut<
-      Extract<CommandResponse, { kind: 'help' }>['commands']
+      FanOutAnswer<Extract<CommandResponse, { kind: 'help' }>['commands']>
     >({
       targets,
       excluded,
@@ -659,21 +762,23 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
         kind: COMMAND_NAMES.help,
       }),
       extract: (response) => {
+        const declined = declinedAnswerOf(response);
+        if (declined != null) return declined;
         if (response.kind !== COMMAND_NAMES.help) {
           throw new Error(`not a help answer: ${response.kind}`);
         }
-        return response.commands;
+        return { kind: 'answered', value: response.commands };
       },
     });
+    const { answered, declined } = splitAnswers(outcome.responded);
+    await announceAccountLinks(invocation, declined);
 
     // Requirement 14.4: a command this channel may not run is left out. The
     // judgement is asked of `GrowiSelector`, once per command name the GROWIs
     // actually named -- not per (GROWI x command), and not re-derived here.
     const named = [
       ...new Set(
-        outcome.responded.flatMap((entry) =>
-          entry.value.map((command) => command.name),
-        ),
+        answered.flatMap((entry) => entry.value.map((command) => command.name)),
       ),
     ];
     const permitted = new Map(
@@ -690,7 +795,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
 
     // Requirement 14.3: one row per (GROWI, command), each labelled with the
     // GROWI it describes -- what a GROWI offers differs by version.
-    const rows = outcome.responded.flatMap((entry) =>
+    const rows = answered.flatMap((entry) =>
       entry.value
         .filter((command) => permitted.get(command.name)?.has(entry.relationId))
         .map((command) => ({
@@ -699,7 +804,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
         })),
     );
 
-    const footer = footerOf(outcome);
+    const footer = footerOf(outcome, declined);
     await deliver(
       invocation,
       placeholder,

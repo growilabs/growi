@@ -579,6 +579,93 @@ describe('the five commands, end to end', () => {
   });
 });
 
+describe('a GROWI that declines a command asked of every GROWI', () => {
+  let harness: Harness;
+
+  const linkRequired: CommandResponse = {
+    kind: 'account-link-required',
+    growiLabel: GROWI_A.growiLabel,
+    linkUrl: 'https://rel-a.example.com/link/xyz',
+  };
+
+  beforeEach(() => {
+    harness = createHarness();
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'execute',
+      targets: [GROWI_A, GROWI_B],
+      excluded: [],
+    });
+    vi.mocked(harness.collector.start).mockResolvedValue({
+      status: 'collected',
+      values: { keyword: 'onboarding' },
+    });
+  });
+
+  it('search: sends the account link to the asker alone, and says why that GROWI is missing from the results', async () => {
+    // A GROWI that does not let guests read answers an unlinked searcher
+    // with an account link (Requirement 7.6) instead of results.
+    vi.mocked(harness.growiClient.sendCommand).mockImplementation((uri) =>
+      Promise.resolve({
+        ok: true,
+        response: uri.includes('rel-a') ? linkRequired : searchResponse('Beta'),
+      }),
+    );
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search));
+
+    const notice = harness.ephemeralMessages().at(-1);
+    if (notice?.kind !== 'markdown') throw new Error('expected markdown');
+    expect(notice.markdown).toContain('https://rel-a.example.com/link/xyz');
+    expect(harness.postedMessages()).not.toContainEqual(notice);
+
+    const [, message] = vi.mocked(harness.platform.replace).mock.calls[0] ?? [];
+    if (message?.kind !== 'list') throw new Error('expected a list');
+    expect(message.rows.map((row) => row.sourceLabel)).toEqual(['GROWI B']);
+    expect(message.footer).toContain('GROWI A');
+    expect(message.footer).toContain('紐付け');
+    expect(message.footer).not.toContain('エラー');
+  });
+
+  it('search: names the reason a GROWI gave for refusing', async () => {
+    vi.mocked(harness.growiClient.sendCommand).mockImplementation((uri) =>
+      Promise.resolve({
+        ok: true,
+        response: uri.includes('rel-a')
+          ? {
+              kind: 'error',
+              code: 'invalid',
+              message: 'Search is not available right now.',
+            }
+          : searchResponse('Beta'),
+      }),
+    );
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search));
+
+    const [, message] = vi.mocked(harness.platform.replace).mock.calls[0] ?? [];
+    if (message?.kind !== 'list') throw new Error('expected a list');
+    expect(message.footer).toContain('GROWI A');
+    expect(message.footer).toContain('Search is not available right now.');
+  });
+
+  it('help: sends the account link to the asker alone', async () => {
+    vi.mocked(harness.growiClient.sendCommand).mockResolvedValue({
+      ok: true,
+      response: linkRequired,
+    });
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.help));
+
+    const notice = harness.ephemeralMessages().at(-1);
+    if (notice?.kind !== 'markdown') throw new Error('expected markdown');
+    expect(notice.markdown).toContain('https://rel-a.example.com/link/xyz');
+    const [, message] = vi.mocked(harness.platform.replace).mock.calls[0] ?? [];
+    if (message?.kind !== 'markdown') throw new Error('expected markdown');
+    expect(message.markdown).toContain('紐付け');
+    expect(message.markdown).not.toContain('エラー');
+  });
+});
+
 describe('the one path an account-link notice is posted through', () => {
   it('renders a refused write and a typed `link` identically', async () => {
     // Requirement 7.6 and design.md's 「どちらも投稿の経路は 1 本にする」. Two
