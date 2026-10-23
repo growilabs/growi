@@ -58,7 +58,7 @@
   - _Boundary: locales_
   - _Depends: 1.1_
 
-- [ ] 4.2 (P) 移行状況の取得 hook とセクションのコンポーネントを実装する
+- [x] 4.2 (P) 移行状況の取得 hook とセクションのコンポーネントを実装する
   - 管理画面の既存の SWR hook に倣い、移行状況を取得する hook を作る。削除が成功したら再取得できるようにする
   - セクションには、4 区分の件数表（「旧形式のみ」は ACTIVE の内訳付き、「両形式」は削除対象であることを示す）と、危険な操作のボタンを置く。ボタンは、取得中、取得エラー、削除対象 0 件のときに無効にする。取得エラーのときはエラーメッセージを出す
   - 確認には既存の確認モーダルを手を加えずに使い、対象件数、取り消せないこと、ダウングレード時の影響の警告、再アップグレード準備スクリプトを先に実行することの注意を出す。キャンセルしたら何もしない
@@ -87,3 +87,4 @@
 ## Implementation Notes
 - `lint:typecheck` が `@growi/core/dist/...` の export 不足（例: `isInsecureUserAttribute`）で落ちるときは、`@growi/core` の dist が古い。`turbo run build --filter @growi/core` で作り直す（1.1 で発生）
 - 開発サーバーで管理者 API を確かめるときは、dev DB の `accesstokens` に一時的なトークン（必要なスコープ付き、description で識別、短い有効期限）を入れて `Authorization: Bearer` で呼び、終わったら削除する。dev DB の users の `password` は 8 人が旧形式のみ（未移行）で、両形式のユーザーはいない（3.3 で確認）
+- RTL のコンポーネント spec が `Cannot find module 'react'`（`@testing-library/react` から）で落ちるのは、hoist 領域（`node_modules/.pnpm/node_modules`）に react がないため。この作業と無関係な既存 spec でも同じ症状が出る。根本対処は `rm -rf node_modules && pnpm install`。それまでは `NODE_PATH=/workspace/growi/apps/app/node_modules pnpm vitest run ...` で回避する（4.2 で発生）
