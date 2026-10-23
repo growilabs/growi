@@ -83,8 +83,11 @@
   - apps/app の lint とテスト一式を実行する
   - 完了の状態: 上の確認がすべて通り、lint とテストがすべて成功する
   - _Requirements: 1.4, 2.3, 2.8, 4.3, 4.5, 5.1_
+  - _Pending: 画面での目視確認だけが残っている（devcontainer にブラウザがない）。確認済みなのは、API と配信バンドルのレベルでの通し確認（件数・削除・旧パスワードでのログイン・監査ログ・サーバーログ）、lint 一式、テスト一式。画面で見ていないのは、表・確認ダイアログの文言・成功トースト・件数の再表示・監査ログ画面の行_
 
 ## Implementation Notes
 - `lint:typecheck` が `@growi/core/dist/...` の export 不足（例: `isInsecureUserAttribute`）で落ちるときは、`@growi/core` の dist が古い。`turbo run build --filter @growi/core` で作り直す（1.1 で発生）
 - 開発サーバーで管理者 API を確かめるときは、dev DB の `accesstokens` に一時的なトークン（必要なスコープ付き、description で識別、短い有効期限）を入れて `Authorization: Bearer` で呼び、終わったら削除する。dev DB の users の `password` は 8 人が旧形式のみ（未移行）で、両形式のユーザーはいない（3.3 で確認）
 - RTL のコンポーネント spec が `Cannot find module 'react'`（`@testing-library/react` から）で落ちるのは、hoist 領域（`node_modules/.pnpm/node_modules`）に react がないため。この作業と無関係な既存 spec でも同じ症状が出る。根本対処は `rm -rf node_modules && pnpm install`。それまでは `NODE_PATH=/workspace/growi/apps/app/node_modules pnpm vitest run ...` で回避する（4.2 で発生）
+- nodemon の再起動で、app-commands スキルの手順どおりに `kill <pid>` すると、"app crashed - waiting for file changes" で止まることがある。`touch apps/app/src/server/app.ts` で再起動できる（5.2 で発生）
+- 全テストの実行で落ちるのは、この作業と無関係な 4 ファイル。growi-vault の integ 2 件は vault-manager の dist が未ビルドのため、contribution-graph の 2 件は負荷による MongoMemoryServer の起動タイムアウトで、単体で再実行すると通る（5.2 で確認）
