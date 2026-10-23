@@ -4,12 +4,9 @@ import mongoose from 'mongoose';
 import loggerFactory from '~/utils/logger';
 
 import {
-  activeUserFilter,
-  bothFilter,
-  legacyOnlyFilter,
-  nonActiveUserFilter,
-  scopeFilter,
-} from '../models/user/password-hash-format-filters';
+  countPasswordHashFormats,
+  unsetLegacyPasswordOfMigratedUsers,
+} from '../service/legacy-password-cleanup';
 import {
   exitAfterLogFlush,
   isEntryPoint,
@@ -60,8 +57,10 @@ export interface PasswordHashCleanupResult {
  * Steps:
  *  1. Count `legacyOnly` users (`password` set, `passwordHash` unset), split by
  *     whether they are ACTIVE.
- *  2. If any ACTIVE one exists, ABORT without writing (Req 3.4) — cleaning up now
- *     would leave those users unable to authenticate after a downgrade.
+ *  2. If any ACTIVE one exists, ABORT without writing (Req 3.4). Why the CLI
+ *     aborts while the admin screen does not: see research.md's Decision
+ *     "CLI では中止し、画面では中止しない理由"
+ *     (.kiro/specs/legacy-password-hash-cleanup/).
  *  3. Otherwise `$unset` the legacy `password` field from every `both` user
  *     (both fields present), keeping the scrypt `passwordHash` (Req 3.3).
  *
@@ -93,12 +92,9 @@ export async function runPasswordHashCleanup(
   // `baseFilter` defaults to `{}` (whole collection) so `main()` and production
   // behavior are unchanged; a caller (integ test) may pass a scope to narrow the
   // count/write to a marker-seeded subset of the shared `users` collection.
-  const legacyOnly = await usersCollection.countDocuments(
-    scopeFilter(baseFilter, legacyOnlyFilter, activeUserFilter),
-  );
-  const legacyOnlyNonActive = await usersCollection.countDocuments(
-    scopeFilter(baseFilter, legacyOnlyFilter, nonActiveUserFilter),
-  );
+  const counts = await countPasswordHashFormats(usersCollection, baseFilter);
+  const legacyOnly = counts.legacyOnly.active;
+  const legacyOnlyNonActive = counts.legacyOnly.nonActive;
 
   if (legacyOnly > 0) {
     // Abort WITHOUT modifying the DB (Req 3.4).
@@ -116,22 +112,20 @@ export async function runPasswordHashCleanup(
 
   // NOT status-scoped on purpose: a suspended/invited user's retired legacy hash
   // should be cleaned up too (see NOTE 2 above).
-  const updateResult = await usersCollection.updateMany(
-    scopeFilter(baseFilter, bothFilter),
-    {
-      $unset: { password: '' },
-    },
+  const { unset } = await unsetLegacyPasswordOfMigratedUsers(
+    usersCollection,
+    baseFilter,
   );
 
   logger.info(
-    `Password-hash cleanup complete: removed the legacy password field from ${updateResult.modifiedCount} fully-migrated user(s).`,
+    `Password-hash cleanup complete: removed the legacy password field from ${unset} fully-migrated user(s).`,
   );
 
   return {
     aborted: false,
     legacyOnly: 0,
     legacyOnlyNonActive,
-    unset: updateResult.modifiedCount,
+    unset,
   };
 }
 
