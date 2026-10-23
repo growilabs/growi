@@ -1,13 +1,13 @@
 # Implementation Plan
 
-- [ ] 1. 基盤: 共有の型と監査ログ action
+- [x] 1. 基盤: 共有の型と監査ログ action
 - [x] 1.1 移行状況と削除結果の型、および削除操作の監査ログ action を定義する
   - 4 区分の件数（「旧形式のみ」は ACTIVE とそれ以外の内訳を持つ）、件数取得のレスポンス、削除件数のレスポンスを、クライアントとサーバーで共有できる型として定義する。サーバー専用のモジュールには依存させない
   - 旧形式パスワード削除の監査ログ action を追加する。他の管理者操作と同じく、記録範囲が最大のグループ（LARGE）にだけ登録する
   - 完了の状態: 型チェックが通り、新しい action が LARGE グループにだけ含まれている。監査ログ画面の action の絞り込みは `ADMIN_` で始まる名前で分類されるので、追加の登録は要らない
   - _Requirements: 4.3, 4.4_
 
-- [ ] 2. コア: 件数の集計と旧形式パスワードの除去
+- [x] 2. コア: 件数の集計と旧形式パスワードの除去
 - [x] 2.1 形式ごとの件数の集計と、移行済みユーザーからの旧形式パスワードの除去を、共有サービスとして実装する
   - 既存の形式分類フィルタだけを使って 4 区分を数え、「旧形式のみ」は ACTIVE とそれ以外に分けて数える。空文字や null のパスワードは「未設定」として扱う
   - 除去は、両形式を持つユーザー全員を対象にし、ステータスでは絞らない。中止の判定はしない。新形式のハッシュには触れない
@@ -21,7 +21,7 @@
   - 完了の状態: 既存の cleanup スクリプトの integ テストが、テストを変更せずにそのまま通る。差分にログ文言（`logger.*` の文字列）の変更が含まれていない。ログ文言を検証するテストは新しく足さない
   - _Requirements: 5.1, 5.2_
 
-- [ ] 3. サーバー API
+- [x] 3. サーバー API
 - [x] 3.1 移行状況を取得する管理者用エンドポイントを実装する
   - セキュリティ設定の参照と同じ権限（ログイン必須、管理者のみ、セキュリティ設定の参照スコープ）をかける
   - users コレクションは、リクエストごとに handler の中で取得する。route モジュールのトップレベルに副作用を置かない（route-guard lint に従う）
@@ -48,7 +48,7 @@
   - 完了の状態: 型チェック、biome、route-guard、import-convention、OpenAPI（`lint:openapi:apiv3`）の lint が通る。開発サーバーで、管理者として `GET /_api/v3/security-setting/password-hash-status` を呼ぶと 200 と件数が返り、管理者以外では 302 が返る
   - _Requirements: 4.1_
 
-- [ ] 4. 管理画面
+- [x] 4. 管理画面
 - [x] 4.1 (P) 移行状況セクションの文言を 5 ロケールに追加し、揃っているかを確かめる spec を書く
   - 監査ログ画面に出す、旧形式パスワード削除の action のラベルを 5 ロケールに追加する（翻訳ファイルの編集はこのタスクにまとめる）
   - 見出し、説明、件数の区分名、ACTIVE の内訳、ボタン、確認ダイアログの本文と警告、成功・エラーメッセージを、5 ロケールすべての管理画面用の翻訳に追加する
@@ -90,4 +90,4 @@
 - 開発サーバーで管理者 API を確かめるときは、dev DB の `accesstokens` に一時的なトークン（必要なスコープ付き、description で識別、短い有効期限）を入れて `Authorization: Bearer` で呼び、終わったら削除する。dev DB の users の `password` は 8 人が旧形式のみ（未移行）で、両形式のユーザーはいない（3.3 で確認）
 - RTL のコンポーネント spec が `Cannot find module 'react'`（`@testing-library/react` から）で落ちるのは、hoist 領域（`node_modules/.pnpm/node_modules`）に react がないため。この作業と無関係な既存 spec でも同じ症状が出る。根本対処は `rm -rf node_modules && pnpm install`。それまでは `NODE_PATH=/workspace/growi/apps/app/node_modules pnpm vitest run ...` で回避する（4.2 で発生）
 - nodemon の再起動で、app-commands スキルの手順どおりに `kill <pid>` すると、"app crashed - waiting for file changes" で止まることがある。`touch apps/app/src/server/app.ts` で再起動できる（5.2 で発生）
-- 全テストの実行で落ちるのは、この作業と無関係な 4 ファイル。growi-vault の integ 2 件は vault-manager の dist が未ビルドのため、contribution-graph の 2 件は負荷による MongoMemoryServer の起動タイムアウトで、単体で再実行すると通る（5.2 で確認）
+- 全テストの実行で落ちる 4 ファイルは、この作業の不具合ではない。どれも変更した `~/interfaces/activity` を import しているが、変更は定数を 1 つ足しただけである。growi-vault の integ 2 件は vault-manager の dist が未ビルドのため、contribution-graph の 2 件は負荷による MongoMemoryServer の起動タイムアウトで、単体で再実行すると通る（5.2 で確認）
