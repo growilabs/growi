@@ -8,12 +8,12 @@ import type {
   NotificationResult,
 } from '../contract/notification.js';
 import { OP_NAMES } from '../endpoints/op-names.js';
+import { parseNativeChannelId } from './channel-id.js';
 import { PLATFORM_NAMES } from './common-fields.js';
 import { arr, isRecord, oneOf, str } from './shape.js';
 
 const RELATION_ID_MAX = 128;
 const REQUEST_ID_MAX = 128;
-const CHANNEL_ID_MAX = 200;
 /** A fan-out to a large but bounded number of channels in one request. */
 const TARGETS_MAX = 500;
 /** A notification body -- generous for a rendered markdown message. */
@@ -29,7 +29,7 @@ const parseTarget = (v: unknown): NotificationTarget | undefined => {
   }
 
   const platform = oneOf(v.platform, PLATFORM_NAMES);
-  const channelId = str(v.channelId, CHANNEL_ID_MAX);
+  const channelId = parseNativeChannelId(v.channelId);
 
   if (platform === undefined || channelId === undefined) {
     return undefined;
@@ -104,7 +104,7 @@ const parseOutcome = (v: unknown): NotificationOutcome | undefined => {
   }
 
   const platform = oneOf(v.platform, PLATFORM_NAMES);
-  const channelId = str(v.channelId, CHANNEL_ID_MAX);
+  const channelId = parseNativeChannelId(v.channelId);
   const status = oneOf(v.status, OUTCOME_STATUS_VALUES);
 
   if (

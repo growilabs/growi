@@ -20,6 +20,7 @@ export type {
   ChannelRef,
   ChatAccountRef,
   MessageRef,
+  NativeChannelId,
   PlatformName,
 } from './common.js';
 export type {

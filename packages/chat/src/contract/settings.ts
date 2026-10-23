@@ -6,7 +6,7 @@
 
 import type { CommandName } from '../commands/command-names.js';
 import type { OP_NAMES, RequestEnvelope } from '../endpoints/op-names.js';
-import type { PlatformName } from './common.js';
+import type { NativeChannelId, PlatformName } from './common.js';
 
 /**
  * Meaning of `allowedChannels`:
@@ -24,7 +24,7 @@ export interface RelationSettings {
    */
   readonly channelPermissions: ReadonlyArray<{
     readonly commandName: CommandName;
-    readonly allowedChannels: ReadonlyArray<string> | 'all' | 'none';
+    readonly allowedChannels: ReadonlyArray<NativeChannelId> | 'all' | 'none';
   }>;
 }
 
@@ -87,7 +87,7 @@ export interface SettingsPullResponse {
 export interface ChannelInventory {
   readonly channels: ReadonlyArray<{
     readonly platform: PlatformName;
-    readonly channelId: string;
+    readonly channelId: NativeChannelId;
     readonly channelName: string;
     readonly isPrivate: boolean;
   }>;

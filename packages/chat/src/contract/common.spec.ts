@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { toNativeChannelId } from '../parse/channel-id.js';
 import type {
   ChannelRef,
   ChatAccountRef,
@@ -45,7 +46,7 @@ describe('common contract types', () => {
   it('constructs a ChannelRef keyed by channelId, with channelName kept separate for display only', () => {
     const channel: ChannelRef = {
       platform: 'slack',
-      channelId: 'C67890',
+      channelId: toNativeChannelId('C67890'),
       channelName: 'general',
       isPrivate: false,
     };
@@ -56,7 +57,7 @@ describe('common contract types', () => {
   it('constructs a MessageRef that references a channel and carries a platform-native message id', () => {
     const channel: ChannelRef = {
       platform: 'discord',
-      channelId: 'D001',
+      channelId: toNativeChannelId('D001'),
       channelName: 'random',
       isPrivate: true,
     };

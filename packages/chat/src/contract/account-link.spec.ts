@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { COMMAND_NAMES } from '../commands/command-names.js';
 import { OP_NAMES } from '../endpoints/op-names.js';
+import { toNativeChannelId } from '../parse/channel-id.js';
 import type {
   AccountLinkStartRequest,
   AccountLinkStartResponse,
@@ -43,7 +44,7 @@ describe('AccountLinkStartRequest', () => {
       actor: { platform: 'slack', accountId: 'U123', displayName: 'Alice' },
       channel: {
         platform: 'slack',
-        channelId: 'C1',
+        channelId: toNativeChannelId('C1'),
         channelName: 'general',
         isPrivate: false,
       },

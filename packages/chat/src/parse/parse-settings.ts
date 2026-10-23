@@ -13,11 +13,11 @@ import type {
   SettingsPushRequest,
 } from '../contract/settings.js';
 import { OP_NAMES } from '../endpoints/op-names.js';
+import { parseNativeChannelId } from './channel-id.js';
 import { parseChatAccountRef } from './common-fields.js';
 import { arr, isRecord, oneOf, str } from './shape.js';
 
 const RELATION_ID_MAX = 128;
-const CHANNEL_ID_MAX = 200;
 /** Bounded well above `COMMAND_NAMES`'s current size (5), for future growth. */
 const CHANNEL_PERMISSIONS_MAX = 50;
 /** A single command's allow-list of channels. */
@@ -36,7 +36,7 @@ const parseAllowedChannels = (
   if (v === 'all' || v === 'none') {
     return v;
   }
-  return arr(v, ALLOWED_CHANNELS_MAX, (item) => str(item, CHANNEL_ID_MAX));
+  return arr(v, ALLOWED_CHANNELS_MAX, parseNativeChannelId);
 };
 
 const parseChannelPermissionRow = (

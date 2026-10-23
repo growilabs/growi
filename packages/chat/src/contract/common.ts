@@ -18,6 +18,19 @@ export interface ChatAccountRef {
   readonly displayName: string;
 }
 
+declare const nativeChannelIdBrand: unique symbol;
+
+/**
+ * A channel id exactly as the chat service itself shows it (`C0CBFQ5558V` on
+ * Slack) -- what an administrator types and what every field of this protocol
+ * carries. Never a chat adapter's own encoding (`slack:C0CBFQ5558V`), which
+ * belongs inside the proxy. Obtained only from `parseNativeChannelId` /
+ * `toNativeChannelId`, which refuse that encoding.
+ */
+export type NativeChannelId = string & {
+  readonly [nativeChannelIdBrand]: true;
+};
+
 export interface ChannelRef {
   readonly platform: PlatformName;
   /**
@@ -25,7 +38,7 @@ export interface ChannelRef {
    * display-only and may be renamed on the chat platform, so it must never
    * be used for matching/authorization decisions (Requirement 11.3).
    */
-  readonly channelId: string;
+  readonly channelId: NativeChannelId;
   readonly channelName: string;
   readonly isPrivate: boolean;
 }

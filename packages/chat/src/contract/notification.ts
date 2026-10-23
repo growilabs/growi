@@ -4,7 +4,7 @@
 // per-target outcomes rather than a single discriminated response.
 
 import type { OP_NAMES, RequestEnvelope } from '../endpoints/op-names.js';
-import type { PlatformName } from './common.js';
+import type { NativeChannelId, PlatformName } from './common.js';
 
 /** GROWI → proxy. Notification body travels as a markdown string (Decision 3). */
 export interface NotificationRequest extends RequestEnvelope {
@@ -16,7 +16,7 @@ export interface NotificationRequest extends RequestEnvelope {
    */
   readonly targets: ReadonlyArray<{
     readonly platform: PlatformName;
-    readonly channelId: string;
+    readonly channelId: NativeChannelId;
   }>;
   readonly markdown: string;
   /** Requirement 2.3: GROWI makes this judgement, not the proxy. */
@@ -40,7 +40,7 @@ export interface NotificationResult {
    */
   readonly outcomes: ReadonlyArray<{
     readonly platform: PlatformName;
-    readonly channelId: string;
+    readonly channelId: NativeChannelId;
     /**
      * `inventory-not-ready` means "proxy hasn't fetched the channel list
      * yet", NOT "no such channel" -- conflating it with

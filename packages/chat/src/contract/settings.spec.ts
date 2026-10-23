@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { OP_NAMES } from '../endpoints/op-names.js';
+import { toNativeChannelId } from '../parse/channel-id.js';
 import type {
   CapabilityLevel,
   CapabilityReport,
@@ -25,14 +26,17 @@ describe('RelationSettings', () => {
       relationId: 'rel-1',
       channelPermissions: [
         { commandName: 'search', allowedChannels: 'all' },
-        { commandName: 'create-page', allowedChannels: ['C1', 'C2'] },
+        {
+          commandName: 'create-page',
+          allowedChannels: [toNativeChannelId('C1'), toNativeChannelId('C2')],
+        },
         { commandName: 'keep', allowedChannels: 'none' },
       ],
     };
     expect(settings.channelPermissions).toHaveLength(3);
     expect(settings.channelPermissions[1]).toEqual({
       commandName: 'create-page',
-      allowedChannels: ['C1', 'C2'],
+      allowedChannels: [toNativeChannelId('C1'), toNativeChannelId('C2')],
     });
     // `scope` (broadcast vs single) is deliberately absent from each row --
     // that knowledge lives only in COMMAND_TRAITS.targeting, structurally
@@ -47,7 +51,10 @@ describe('RelationSettings', () => {
     const settings: RelationSettings = {
       relationId: 'rel-1',
       channelPermissions: [
-        { commandName: 'search', allowedChannels: ['C-general'] },
+        {
+          commandName: 'search',
+          allowedChannels: [toNativeChannelId('C-general')],
+        },
       ],
     };
     expect(settings.channelPermissions[0].allowedChannels).toEqual([
@@ -127,7 +134,7 @@ describe('ChannelInventory', () => {
       channels: [
         {
           platform: 'slack',
-          channelId: 'C1',
+          channelId: toNativeChannelId('C1'),
           channelName: 'general',
           isPrivate: false,
         },

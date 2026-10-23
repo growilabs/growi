@@ -43,6 +43,7 @@ export type {
   KeyRegistrationRequest,
   KeyRevocationRequest,
   MessageRef,
+  NativeChannelId,
   NotificationRequest,
   NotificationResult,
   OwnershipChallenge,
@@ -78,6 +79,7 @@ export {
   parseKeyOperationResult,
   parseKeyRegistration,
   parseKeyRevocation,
+  parseNativeChannelId,
   parseNotificationRequest,
   parseNotificationResult,
   parseOpEnvelope,
@@ -86,6 +88,7 @@ export {
   parsePairingSubmission,
   parseSettingsPullResponse,
   parseSettingsPush,
+  toNativeChannelId,
 } from './parse/index.js';
 export type { BroadcastTarget, PermissionVerdict } from './permission/index.js';
 export { filterBroadcastTargets, judge } from './permission/index.js';

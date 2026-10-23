@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { OP_NAMES } from '../endpoints/op-names.js';
+import { toNativeChannelId } from '../parse/channel-id.js';
 import type {
   NotificationRequest,
   NotificationResult,
@@ -19,14 +20,17 @@ describe('NotificationRequest', () => {
       op: OP_NAMES.notification,
       requestId: 'req-1',
       targets: [
-        { platform: 'slack', channelId: 'C1' },
-        { platform: 'slack', channelId: 'C2' },
+        { platform: 'slack', channelId: toNativeChannelId('C1') },
+        { platform: 'slack', channelId: toNativeChannelId('C2') },
       ],
       markdown: '**/team/notes** was updated by Alice',
       containsRestrictedPage: false,
     };
     expect(request.targets).toHaveLength(2);
-    expect(request.targets[0]).toEqual({ platform: 'slack', channelId: 'C1' });
+    expect(request.targets[0]).toEqual({
+      platform: 'slack',
+      channelId: toNativeChannelId('C1'),
+    });
     expect(request.containsRestrictedPage).toBe(false);
   });
 
@@ -35,7 +39,7 @@ describe('NotificationRequest', () => {
       relationId: 'rel-1',
       op: OP_NAMES.notification,
       requestId: 'req-2',
-      targets: [{ platform: 'slack', channelId: 'C1' }],
+      targets: [{ platform: 'slack', channelId: toNativeChannelId('C1') }],
       markdown: 'A restricted page was updated',
       containsRestrictedPage: true,
     };
@@ -50,27 +54,39 @@ describe('NotificationResult', () => {
   it('represents a notification where some targets failed and others succeeded, with distinct reasons (Requirement 2.4)', () => {
     const result: NotificationResult = {
       outcomes: [
-        { platform: 'slack', channelId: 'C1', status: 'posted' },
         {
           platform: 'slack',
-          channelId: 'C2',
+          channelId: toNativeChannelId('C1'),
+          status: 'posted',
+        },
+        {
+          platform: 'slack',
+          channelId: toNativeChannelId('C2'),
           status: 'bot-not-in-channel',
           remedy: 'Invite the bot to this channel',
         },
         {
           platform: 'slack',
-          channelId: 'C3',
+          channelId: toNativeChannelId('C3'),
           status: 'channel-not-in-installation',
           detail: 'Channel does not belong to this workspace installation',
         },
-        { platform: 'slack', channelId: 'C4', status: 'inventory-not-ready' },
         {
           platform: 'slack',
-          channelId: 'C5',
+          channelId: toNativeChannelId('C4'),
+          status: 'inventory-not-ready',
+        },
+        {
+          platform: 'slack',
+          channelId: toNativeChannelId('C5'),
           status: 'platform-error',
           detail: 'Slack API 500',
         },
-        { platform: 'slack', channelId: 'C6', status: 'timeout' },
+        {
+          platform: 'slack',
+          channelId: toNativeChannelId('C6'),
+          status: 'timeout',
+        },
       ],
     };
 
@@ -90,12 +106,12 @@ describe('NotificationResult', () => {
     // channel truly isn't part of the workspace" (reconfigure).
     const notReady: NotificationResult['outcomes'][number] = {
       platform: 'slack',
-      channelId: 'C1',
+      channelId: toNativeChannelId('C1'),
       status: 'inventory-not-ready',
     };
     const notInInstallation: NotificationResult['outcomes'][number] = {
       platform: 'slack',
-      channelId: 'C2',
+      channelId: toNativeChannelId('C2'),
       status: 'channel-not-in-installation',
     };
     expect(notReady.status).not.toBe(notInInstallation.status);
@@ -107,8 +123,16 @@ describe('NotificationResult', () => {
     // GROWI writes the result back into its outbox row.
     const retryResult: NotificationResult = {
       outcomes: [
-        { platform: 'slack', channelId: 'C1', status: 'posted' }, // succeeded on the first try
-        { platform: 'slack', channelId: 'C2', status: 'timeout' }, // retried this time
+        {
+          platform: 'slack',
+          channelId: toNativeChannelId('C1'),
+          status: 'posted',
+        }, // succeeded on the first try
+        {
+          platform: 'slack',
+          channelId: toNativeChannelId('C2'),
+          status: 'timeout',
+        }, // retried this time
       ],
     };
     expect(retryResult.outcomes.map((o) => o.channelId)).toEqual(['C1', 'C2']);
@@ -125,7 +149,7 @@ describe('NotificationResult', () => {
         outcomes: [
           {
             platform: 'slack',
-            channelId: 'C1',
+            channelId: toNativeChannelId('C1'),
             // @ts-expect-error -- 'unknown-reason' is not a declared status
             status: 'unknown-reason',
           },

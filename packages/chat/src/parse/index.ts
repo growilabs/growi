@@ -14,6 +14,7 @@
 //   level and a sub-object checker consumed only by `parseSettingsPush` and
 //   `parseSettingsPullResponse` (both exported below), the same "shared
 //   internal, not a standalone checker" role as `common-fields.ts`.
+export { parseNativeChannelId, toNativeChannelId } from './channel-id.js';
 export { parseCommandRequest, parseCommandResponse } from './parse-command.js';
 export { parseOpEnvelope } from './parse-envelope.js';
 export { parseKeyRegistration, parseKeyRevocation } from './parse-keys.js';

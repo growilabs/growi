@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { CommandEnvelope } from '../contract/command.js';
 import type { NotificationRequest } from '../contract/notification.js';
 import { OP_NAMES } from '../endpoints/op-names.js';
+import { toNativeChannelId } from '../parse/channel-id.js';
 import { acceptEnvelope } from './accept-envelope.js';
 import type { KeyRef } from './key-identity.js';
 
@@ -24,7 +25,7 @@ const commandBody = (
   },
   channel: {
     platform: 'slack',
-    channelId: 'C123',
+    channelId: toNativeChannelId('C123'),
     channelName: 'general',
     isPrivate: false,
   },
@@ -37,7 +38,7 @@ const notificationBody = (
   relationId: verified.relationId,
   op: OP_NAMES.notification,
   requestId: 'req-2',
-  targets: [{ platform: 'slack', channelId: 'C123' }],
+  targets: [{ platform: 'slack', channelId: toNativeChannelId('C123') }],
   markdown: 'hello',
   containsRestrictedPage: false,
   ...overrides,

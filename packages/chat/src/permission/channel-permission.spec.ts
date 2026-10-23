@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { COMMAND_NAMES } from '../commands/command-names.js';
 import type { ChannelRef } from '../contract/common.js';
 import type { RelationSettings } from '../contract/settings.js';
+import { toNativeChannelId } from '../parse/channel-id.js';
 import { filterBroadcastTargets, judge } from './channel-permission.js';
 
 const channel = (channelId: string, channelName = 'general'): ChannelRef => ({
   platform: 'slack',
-  channelId,
+  channelId: toNativeChannelId(channelId),
   channelName,
   isPrivate: false,
 });
@@ -85,7 +86,7 @@ describe('judge', () => {
         channelPermissions: [
           {
             commandName: COMMAND_NAMES.createPage,
-            allowedChannels: ['C1', 'C2'],
+            allowedChannels: [toNativeChannelId('C1'), toNativeChannelId('C2')],
           },
         ],
       };
@@ -110,7 +111,7 @@ describe('judge', () => {
         channelPermissions: [
           {
             commandName: COMMAND_NAMES.createPage,
-            allowedChannels: ['C1'],
+            allowedChannels: [toNativeChannelId('C1')],
           },
         ],
       };
@@ -130,7 +131,7 @@ describe('judge', () => {
         channelPermissions: [
           {
             commandName: COMMAND_NAMES.createPage,
-            allowedChannels: ['C1'],
+            allowedChannels: [toNativeChannelId('C1')],
           },
         ],
       };
@@ -157,7 +158,10 @@ describe('filterBroadcastTargets', () => {
         settings: {
           relationId: 'r-allowed',
           channelPermissions: [
-            { commandName: COMMAND_NAMES.createPage, allowedChannels: ['C1'] },
+            {
+              commandName: COMMAND_NAMES.createPage,
+              allowedChannels: [toNativeChannelId('C1')],
+            },
           ],
         } satisfies RelationSettings,
       },
@@ -171,7 +175,7 @@ describe('filterBroadcastTargets', () => {
           channelPermissions: [
             {
               commandName: COMMAND_NAMES.createPage,
-              allowedChannels: ['OTHER'],
+              allowedChannels: [toNativeChannelId('OTHER')],
             },
           ],
         } satisfies RelationSettings,

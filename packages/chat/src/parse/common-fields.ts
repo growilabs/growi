@@ -7,11 +7,7 @@
 // points. Sibling files under `parse/` import this one directly, the same
 // way they import `./shape.js`.
 
-import type {
-  ChannelRef,
-  ChatAccountRef,
-  PlatformName,
-} from '../contract/common.js';
+import type { ChannelRef, ChatAccountRef } from '../contract/common.js';
 import type { PublicKeyRegistration } from '../contract/pairing.js';
 // Deliberately importing these two leaf files directly, NOT
 // `../signature/index.js`. Both files have zero imports of their own (no
@@ -23,22 +19,11 @@ import type { PublicKeyRegistration } from '../contract/pairing.js';
 // to catch.
 import { isValidKeyIdShape } from '../signature/key-identity.js';
 import { isValidPublicKeyMaterial } from '../signature/key-material.js';
+import { parseNativeChannelId } from './channel-id.js';
+import { PLATFORM_NAMES } from './platform-names.js';
 import { isRecord, oneOf, str } from './shape.js';
 
-/**
- * `contract/common.ts` declares `PlatformName` as a plain string-literal
- * union, not a `COMMAND_NAMES`/`OP_NAMES`-style const object, so there is no
- * existing runtime array to reuse here. Keep this list in sync with that
- * union by hand -- there are only 4 platforms and adding one is rare enough
- * that a compile-time-enforced link (like `Object.values(COMMAND_NAMES)`)
- * isn't worth the indirection.
- */
-export const PLATFORM_NAMES: ReadonlyArray<PlatformName> = [
-  'slack',
-  'discord',
-  'teams',
-  'mattermost',
-];
+export { PLATFORM_NAMES } from './platform-names.js';
 
 // Defensive upper bounds (Requirement 10.1 / task 6.1's rationale): a
 // signature only proves the body wasn't altered in transit, never that its
@@ -48,7 +33,6 @@ export const PLATFORM_NAMES: ReadonlyArray<PlatformName> = [
 // business rule.
 const ACCOUNT_ID_MAX = 200;
 const DISPLAY_NAME_MAX = 200;
-const CHANNEL_ID_MAX = 200;
 const CHANNEL_NAME_MAX = 200;
 
 export const parseChatAccountRef = (v: unknown): ChatAccountRef | undefined => {
@@ -77,7 +61,7 @@ export const parseChannelRef = (v: unknown): ChannelRef | undefined => {
   }
 
   const platform = oneOf(v.platform, PLATFORM_NAMES);
-  const channelId = str(v.channelId, CHANNEL_ID_MAX);
+  const channelId = parseNativeChannelId(v.channelId);
   // Checked by hand rather than via `str` (which rejects '' unconditionally):
   // a chat event may arrive without its channel's name, and the name is
   // display-only -- nothing matches on it.

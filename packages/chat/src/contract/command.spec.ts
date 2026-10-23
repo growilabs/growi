@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { COMMAND_NAMES } from '../commands/command-names.js';
 import { OP_NAMES } from '../endpoints/op-names.js';
+import { toNativeChannelId } from '../parse/channel-id.js';
 import type {
   CommandEnvelope,
   CommandRequest,
@@ -28,7 +29,7 @@ describe('CommandEnvelope', () => {
       actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
       channel: {
         platform: 'slack',
-        channelId: 'C1',
+        channelId: toNativeChannelId('C1'),
         channelName: 'general',
         isPrivate: false,
       },
@@ -48,7 +49,7 @@ describe('CommandRequest', () => {
       actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
       channel: {
         platform: 'slack',
-        channelId: 'C1',
+        channelId: toNativeChannelId('C1'),
         channelName: 'general',
         isPrivate: false,
       },
@@ -67,7 +68,7 @@ describe('CommandRequest', () => {
       actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
       channel: {
         platform: 'slack',
-        channelId: 'C1',
+        channelId: toNativeChannelId('C1'),
         channelName: 'general',
         isPrivate: false,
       },
@@ -91,7 +92,7 @@ describe('CommandRequest', () => {
       actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
       channel: {
         platform: 'slack',
-        channelId: 'C1',
+        channelId: toNativeChannelId('C1'),
         channelName: 'general',
         isPrivate: false,
       },
@@ -110,7 +111,7 @@ describe('CommandRequest', () => {
       actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
       channel: {
         platform: 'slack',
-        channelId: 'C1',
+        channelId: toNativeChannelId('C1'),
         channelName: 'general',
         isPrivate: false,
       },
@@ -128,7 +129,7 @@ describe('CommandRequest', () => {
       actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
       channel: {
         platform: 'slack',
-        channelId: 'C1',
+        channelId: toNativeChannelId('C1'),
         channelName: 'general',
         isPrivate: false,
       },
@@ -152,7 +153,7 @@ describe('CommandRequest', () => {
         actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
         channel: {
           platform: 'slack',
-          channelId: 'C1',
+          channelId: toNativeChannelId('C1'),
           channelName: 'general',
           isPrivate: false,
         },
