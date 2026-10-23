@@ -49,7 +49,7 @@
   - _Requirements: 4.1_
 
 - [ ] 4. 管理画面
-- [ ] 4.1 (P) 移行状況セクションの文言を 5 ロケールに追加し、揃っているかを確かめる spec を書く
+- [x] 4.1 (P) 移行状況セクションの文言を 5 ロケールに追加し、揃っているかを確かめる spec を書く
   - 監査ログ画面に出す、旧形式パスワード削除の action のラベルを 5 ロケールに追加する（翻訳ファイルの編集はこのタスクにまとめる）
   - 見出し、説明、件数の区分名、ACTIVE の内訳、ボタン、確認ダイアログの本文と警告、成功・エラーメッセージを、5 ロケールすべての管理画面用の翻訳に追加する
   - growi-vault の i18n spec に倣い、追加したキーと監査ログの action ラベルが、5 ロケールすべてに空でない文字列として存在することを確かめる spec を書く
@@ -86,3 +86,4 @@
 
 ## Implementation Notes
 - `lint:typecheck` が `@growi/core/dist/...` の export 不足（例: `isInsecureUserAttribute`）で落ちるときは、`@growi/core` の dist が古い。`turbo run build --filter @growi/core` で作り直す（1.1 で発生）
+- 開発サーバーで管理者 API を確かめるときは、dev DB の `accesstokens` に一時的なトークン（必要なスコープ付き、description で識別、短い有効期限）を入れて `Authorization: Bearer` で呼び、終わったら削除する。dev DB の users の `password` は 8 人が旧形式のみ（未移行）で、両形式のユーザーはいない（3.3 で確認）

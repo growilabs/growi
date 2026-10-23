@@ -13,6 +13,29 @@
   "days": "days",
   "security_settings": {
     "security_settings": "Security Settings",
+    "legacy_password_cleanup": {
+      "title": "Password hash migration status",
+      "description": "Remove the legacy SHA-256 passwords of users who already have a password in the new format. This reduces the amount of weakly hashed data kept in the database.",
+      "count_label": {
+        "upgraded_only": "New format only",
+        "both": "Both formats (migrated, deletion target)",
+        "legacy_only": "Legacy format only (not migrated)",
+        "legacy_only_active": "Legacy format only: ACTIVE",
+        "legacy_only_non_active": "Legacy format only: not ACTIVE",
+        "no_password": "No password set"
+      },
+      "both_is_target_hint": "Users with both formats are the target of the deletion. Only their legacy password is removed.",
+      "delete_button": "Delete legacy passwords",
+      "confirm": {
+        "title": "Delete legacy passwords",
+        "warning": "The legacy passwords of {{count}} user(s) will be deleted. This action cannot be undone.",
+        "downgrade_warning": "After deletion, if you downgrade to a version that does not support the new password format, these users will not be able to log in. ACTIVE users can recover by resetting their password; non-ACTIVE users must be handled individually by an administrator. If you have just returned from a downgrade and have not yet run the re-upgrade preparation script, run it first. Deleting before that leaves users unable to log in with their current password.",
+        "submit": "Delete"
+      },
+      "success": "Deleted the legacy passwords of {{count}} user(s)",
+      "delete_error": "Failed to delete legacy passwords. Some may have been deleted; the counts have been refreshed.",
+      "fetch_error": "Failed to fetch the password hash migration status"
+    },
     "scope_of_page_disclosure": "Scope of page disclosure",
     "set_point": "Set point",
     "Guest Users Access": "Guest users access",
@@ -1092,6 +1115,7 @@
     "ADMIN_MAINTENANCEMODE_ENABLED": "Enable Maintenance Mode",
     "ADMIN_MAINTENANCEMODE_DISABLED": "Disabled Maintenance Mode",
     "ADMIN_SECURITY_SETTINGS_UPDATE": "Update Security Settings",
+    "ADMIN_LEGACY_PASSWORD_DELETE": "Delete legacy passwords",
     "ADMIN_PERMIT_SHARE_LINK": "Enable Share Link",
     "ADMIN_REJECT_SHARE_LINK": "Disable Share Link",
     "ADMIN_AUTH_ID_PASS_ENABLED": "Enable ID/Password auth",

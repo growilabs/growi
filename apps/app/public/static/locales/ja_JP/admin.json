@@ -22,6 +22,29 @@
   "days": "日",
   "security_settings": {
     "security_settings": "セキュリティ設定",
+    "legacy_password_cleanup": {
+      "title": "パスワードハッシュの移行状況",
+      "description": "新形式のパスワードを既に持っているユーザーについて、旧形式（SHA-256）のパスワードを削除します。脆弱なハッシュがデータベースに残り続けることを防ぎます。",
+      "count_label": {
+        "upgraded_only": "新形式のみ",
+        "both": "両形式（移行済み・削除対象）",
+        "legacy_only": "旧形式のみ（未移行）",
+        "legacy_only_active": "旧形式のみ: ACTIVE",
+        "legacy_only_non_active": "旧形式のみ: ACTIVE 以外",
+        "no_password": "パスワード未設定"
+      },
+      "both_is_target_hint": "両形式を持つユーザーが削除対象です。旧形式のパスワードのみが削除されます。",
+      "delete_button": "旧形式パスワードを削除",
+      "confirm": {
+        "title": "旧形式パスワードの削除",
+        "warning": "{{count}} 人のユーザーの旧形式パスワードを削除します。この操作は取り消せません。",
+        "downgrade_warning": "削除後に、新形式のパスワードに対応していないバージョンへダウングレードすると、これらのユーザーはログインできなくなります。ACTIVE のユーザーはパスワードのリセットで復旧できますが、ACTIVE 以外のユーザーは管理者による個別の対応が必要です。ダウングレードから戻った直後で、再アップグレード準備スクリプトをまだ実行していない場合は、先にそのスクリプトを実行してください。実行前に削除すると、ユーザーは現在のパスワードでログインできなくなります。",
+        "submit": "削除する"
+      },
+      "success": "{{count}} 人のユーザーの旧形式パスワードを削除しました",
+      "delete_error": "旧形式パスワードの削除に失敗しました。一部が削除されている可能性があるため、件数を再取得しました。",
+      "fetch_error": "パスワードハッシュの移行状況の取得に失敗しました"
+    },
     "scope_of_page_disclosure": "ページの公開範囲",
     "set_point": "設定値",
     "Guest Users Access": "ゲストユーザーのアクセス",
@@ -1091,6 +1114,7 @@
     "ADMIN_MAINTENANCEMODE_ENABLED": "メンテナンスモードの開始",
     "ADMIN_MAINTENANCEMODE_DISABLED": "メンテナンスモードの終了",
     "ADMIN_SECURITY_SETTINGS_UPDATE": "セキュリティ設定の更新",
+    "ADMIN_LEGACY_PASSWORD_DELETE": "旧形式パスワードの削除",
     "ADMIN_PERMIT_SHARE_LINK": "共有リンクの有効化",
     "ADMIN_REJECT_SHARE_LINK": "共有リンクの無効化",
     "ADMIN_AUTH_ID_PASS_ENABLED": "ID/Password 認証を有効",

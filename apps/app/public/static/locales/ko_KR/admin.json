@@ -13,6 +13,29 @@
   "days": "일",
   "security_settings": {
     "security_settings": "보안 설정",
+    "legacy_password_cleanup": {
+      "title": "비밀번호 해시 마이그레이션 현황",
+      "description": "이미 새 형식의 비밀번호를 가진 사용자의 이전 형식(SHA-256) 비밀번호를 삭제합니다. 취약한 해시가 데이터베이스에 계속 남는 것을 방지합니다.",
+      "count_label": {
+        "upgraded_only": "새 형식만",
+        "both": "두 형식 모두 (이전 완료, 삭제 대상)",
+        "legacy_only": "이전 형식만 (미마이그레이션)",
+        "legacy_only_active": "이전 형식만: ACTIVE",
+        "legacy_only_non_active": "이전 형식만: ACTIVE 아님",
+        "no_password": "비밀번호 미설정"
+      },
+      "both_is_target_hint": "두 형식을 모두 가진 사용자가 삭제 대상입니다. 이전 형식의 비밀번호만 삭제됩니다.",
+      "delete_button": "이전 형식 비밀번호 삭제",
+      "confirm": {
+        "title": "이전 형식 비밀번호 삭제",
+        "warning": "{{count}}명의 사용자의 이전 형식 비밀번호가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+        "downgrade_warning": "삭제 후 새 비밀번호 형식을 지원하지 않는 버전으로 다운그레이드하면 이 사용자들은 로그인할 수 없게 됩니다. ACTIVE 사용자는 비밀번호 재설정으로 복구할 수 있지만, ACTIVE가 아닌 사용자는 관리자가 개별적으로 처리해야 합니다. 다운그레이드에서 막 돌아왔고 재업그레이드 준비 스크립트를 아직 실행하지 않았다면 먼저 실행하세요. 그 전에 삭제하면 사용자가 현재 비밀번호로 로그인할 수 없게 됩니다.",
+        "submit": "삭제"
+      },
+      "success": "{{count}}명의 사용자의 이전 형식 비밀번호를 삭제했습니다",
+      "delete_error": "이전 형식 비밀번호 삭제에 실패했습니다. 일부가 삭제되었을 수 있으므로 건수를 다시 가져왔습니다.",
+      "fetch_error": "비밀번호 해시 마이그레이션 현황을 가져오지 못했습니다"
+    },
     "scope_of_page_disclosure": "페이지 공개 범위",
     "set_point": "설정 지점",
     "Guest Users Access": "게스트 사용자 접근",
@@ -1082,6 +1105,7 @@
     "ADMIN_MAINTENANCEMODE_ENABLED": "유지 보수 모드 활성화",
     "ADMIN_MAINTENANCEMODE_DISABLED": "유지 보수 모드 비활성화",
     "ADMIN_SECURITY_SETTINGS_UPDATE": "보안 설정 업데이트",
+    "ADMIN_LEGACY_PASSWORD_DELETE": "이전 형식 비밀번호 삭제",
     "ADMIN_PERMIT_SHARE_LINK": "공유 링크 활성화",
     "ADMIN_REJECT_SHARE_LINK": "공유 링크 비활성화",
     "ADMIN_AUTH_ID_PASS_ENABLED": "ID/비밀번호 인증 활성화",

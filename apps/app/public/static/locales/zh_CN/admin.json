@@ -22,6 +22,29 @@
   "days": "天",
   "security_settings": {
     "security_settings": "安全设置",
+    "legacy_password_cleanup": {
+      "title": "密码哈希迁移状态",
+      "description": "为已拥有新格式密码的用户删除旧格式（SHA-256）密码，避免数据库中继续保留安全性较弱的哈希。",
+      "count_label": {
+        "upgraded_only": "仅新格式",
+        "both": "两种格式（已迁移，删除对象）",
+        "legacy_only": "仅旧格式（未迁移）",
+        "legacy_only_active": "仅旧格式：ACTIVE",
+        "legacy_only_non_active": "仅旧格式：非 ACTIVE",
+        "no_password": "未设置密码"
+      },
+      "both_is_target_hint": "同时拥有两种格式的用户是删除对象，只会删除其旧格式密码。",
+      "delete_button": "删除旧格式密码",
+      "confirm": {
+        "title": "删除旧格式密码",
+        "warning": "将删除 {{count}} 位用户的旧格式密码。此操作无法撤销。",
+        "downgrade_warning": "删除后，如果降级到不支持新密码格式的版本，这些用户将无法登录。ACTIVE 用户可以通过重置密码恢复，非 ACTIVE 用户需要管理员单独处理。如果您刚从降级中恢复，且尚未运行重新升级准备脚本，请先运行该脚本。在此之前删除会导致用户无法使用当前密码登录。",
+        "submit": "删除"
+      },
+      "success": "已删除 {{count}} 位用户的旧格式密码",
+      "delete_error": "删除旧格式密码失败。部分密码可能已被删除，已重新获取数量。",
+      "fetch_error": "获取密码哈希迁移状态失败"
+    },
     "scope_of_page_disclosure": "页面公开范围",
     "set_point": "设定值",
     "always_displayed": "始终显示",
@@ -1091,6 +1114,7 @@
     "ADMIN_MAINTENANCEMODE_ENABLED": "启用维护模式",
     "ADMIN_MAINTENANCEMODE_DISABLED": "禁用维护模式",
     "ADMIN_SECURITY_SETTINGS_UPDATE": "更新安全设置",
+    "ADMIN_LEGACY_PASSWORD_DELETE": "删除旧格式密码",
     "ADMIN_PERMIT_SHARE_LINK": "启用分享链接",
     "ADMIN_REJECT_SHARE_LINK": "禁用分享链接",
     "ADMIN_AUTH_ID_PASS_ENABLED": "启用 ID/密码验证",

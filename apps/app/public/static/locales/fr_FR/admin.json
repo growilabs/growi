@@ -13,6 +13,29 @@
   "days": "jours",
   "security_settings": {
     "security_settings": "Sécurité",
+    "legacy_password_cleanup": {
+      "title": "État de la migration des hachages de mots de passe",
+      "description": "Supprime les mots de passe au format hérité (SHA-256) des utilisateurs qui possèdent déjà un mot de passe au nouveau format. Cela évite de conserver dans la base de données des hachages peu sûrs.",
+      "count_label": {
+        "upgraded_only": "Nouveau format uniquement",
+        "both": "Les deux formats (migrés, cible de la suppression)",
+        "legacy_only": "Format hérité uniquement (non migré)",
+        "legacy_only_active": "Format hérité uniquement : ACTIVE",
+        "legacy_only_non_active": "Format hérité uniquement : non ACTIVE",
+        "no_password": "Mot de passe non défini"
+      },
+      "both_is_target_hint": "Les utilisateurs ayant les deux formats sont la cible de la suppression. Seul leur mot de passe au format hérité est supprimé.",
+      "delete_button": "Supprimer les mots de passe hérités",
+      "confirm": {
+        "title": "Supprimer les mots de passe hérités",
+        "warning": "Les mots de passe hérités de {{count}} utilisateur(s) seront supprimés. Cette action est irréversible.",
+        "downgrade_warning": "Après la suppression, si vous revenez à une version qui ne prend pas en charge le nouveau format de mot de passe, ces utilisateurs ne pourront plus se connecter. Les utilisateurs ACTIVE peuvent récupérer leur accès en réinitialisant leur mot de passe ; les utilisateurs non ACTIVE doivent être traités individuellement par un administrateur. Si vous venez de revenir d'un retour à une version antérieure et n'avez pas encore exécuté le script de préparation à la remise à niveau, exécutez-le d'abord. Supprimer avant cela empêche les utilisateurs de se connecter avec leur mot de passe actuel.",
+        "submit": "Supprimer"
+      },
+      "success": "Les mots de passe hérités de {{count}} utilisateur(s) ont été supprimés",
+      "delete_error": "Échec de la suppression des mots de passe hérités. Certains ont pu être supprimés ; les compteurs ont été actualisés.",
+      "fetch_error": "Échec de la récupération de l'état de la migration des hachages de mots de passe"
+    },
     "scope_of_page_disclosure": "Confidentialité de la page",
     "set_point": "Valeur",
     "Guest Users Access": "Accès public",
@@ -1081,6 +1104,7 @@
     "ADMIN_MAINTENANCEMODE_ENABLED": "Activer mode maintenance",
     "ADMIN_MAINTENANCEMODE_DISABLED": "Désactiver mode maintenance",
     "ADMIN_SECURITY_SETTINGS_UPDATE": "Mettre à jour les paramètres de sécurité",
+    "ADMIN_LEGACY_PASSWORD_DELETE": "Supprimer les mots de passe hérités",
     "ADMIN_PERMIT_SHARE_LINK": "Activer liens de partage",
     "ADMIN_REJECT_SHARE_LINK": "Désactiver liens de partage",
     "ADMIN_AUTH_ID_PASS_ENABLED": "Activer authentification ID/Password",
