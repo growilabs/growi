@@ -58,6 +58,12 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - **今の設計との違い**: 「ページの状態」だけでなく「今それを見ている人が誰か」をその場で判定する必要があり、しかもチャット側のボタン操作を GROWI 側へ伝え返す往復が要る。今の `link-preview` は一往復で完結する設計だが、これは成り立たない
   - **想定される影響範囲**: `chat-integration-proxy`（各プラットフォームの ephemeral message・ボタン操作の扱いはサービスごとに異なる）、`chat-integration-protocol`（ボタン操作を GROWI へ伝え返す新しいやり取りが要る可能性）、`chat-integration-app`（その場での権限再判定）——3 sub-spec すべてにまたがる可能性が高く、要件6.6〜6.8のような amend では収まらない
   - **次にやること**: `/kiro-discovery` から着手し、新規 spec として brief を起こす
+- **要件7（アカウントの紐付け）の承認画面の作り直し**: 実機試験（2026-10-23、Slack）で、`/me/chat-integration/account-link/:token` の承認画面について次のフィードバックが出た。優先度は低いが、いずれ直す。
+  - **体裁**: 見た目にもっと気を配る。サイドバーは要らないので、`BasicLayout` ではなく承認のためだけの簡素なレイアウトにする
+  - **誤った承認を防ぐ**: 「どの GROWI（名前）に」「GROWI のどのログイン中ユーザーとして」「どのチャットサービス・workspace の、どのアカウントを」結び付けるのかを整理して見せる。Slack などの他製品の OAuth 承認画面を参考にする
+  - **今の実装との差**: 画面は `AccountLinkApproval.tsx` で、文言が英語の直書き（i18n 未対応）。出せる情報は `platform`・`accountId`（Slack なら `U…` の ID のみ）・`workspaceName`・`relationLabel`・`growiUsername`。チャットアカウントの表示名は `chat_account_link_orders` に保存していないので、表示名を出すなら注文を作るとき（`account-link-start` の `actor.displayName`）に保存する必要がある
+  - **想定される影響範囲**: `chat-integration-app` が中心（画面・レイアウト・注文の保存項目）。表示名を保存するだけなら protocol の契約は変わらない
+  - **次にやること**: 規模が小さければ `chat-integration-app` の amend spec、そうでなければ `/kiro-discovery` から着手する
 
 ## Scope
 
