@@ -982,6 +982,7 @@ bot が招待されていない公開チャンネルは、本当は `bot-not-in-
 | 取り直し | **proxy が installation ごとに、自分の周期で**（既定 10 分）`PlatformFacade.listChannels()` を呼び、`installation_channel` に保存する |
 | **最初の 1 回** | **`InstallationStore.save()` が成功した直後に 1 回取り直す。** これが無いと、`installation_channel` が空のまま最初の周期を待つことになり、**紐付けた直後の 10 分間、通知がすべて断られる** |
 | 判定 | 通知が来たら**保存した一覧だけを見る**。無いチャンネルは `channel-not-in-installation` |
+| **id の形** | 一覧の行は Chat SDK の形（`slack:C…`。イベントの `Thread.channelId` と同じ）で保存する。宛先は GROWI からサービスが表示するままの形（`NativeChannelId`）で届くので、その installation の行のうち、サービスが表示する形に直すと宛先と一致する行を探し、見つかった行の id で投稿する。この引き当てが宛先の検査を兼ねる。Teams の行は Chat SDK の形にできないので、宛先にできないものとして扱う（umbrella research.md 決定 14） |
 | **一度も取れていない installation** | `installation.channels_synced_at` が `NULL` の状態と、非 `NULL`（取り直しは完了したが結果が空だった）状態を**区別する**。前者は `channel-not-in-installation` ではなく **`inventory-not-ready`** を返す。前者で「そのチャンネルは無い」と答えると、**運用者に間違った直し方（チャンネルを作り直す・bot を入れ直す）を案内してしまう** |
 | 取り直しの失敗 | **最後に取れた一覧をそのまま使い続ける**（新しい一覧が取れるまで判定は変わらない） |
 | 誰が回すか | `sweeper` と同じく**分散ロックで 1 台だけ**が取り直す。保存先は PostgreSQL なので、**ロックを持たない台も読める** |

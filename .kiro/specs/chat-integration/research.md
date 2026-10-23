@@ -447,32 +447,35 @@ createSlackAdapter({
 - **Trade-offs**: 運用者が `allowList` に書いた宛先については、条件が 3 つとも外れる。明示した宛先に限るので受け入れる。
 - **Follow-up**: 判定を毎回掛けるのは `chat-integration-proxy` の `relation/growi-uri-resolver.ts`。
 
-### 決定 14: チャンネルの id は Chat SDK のアダプタが付ける形（`slack:C…`）にそろえる
+### 決定 14: チャンネル id は、契約の上ではサービスが表示するままの形、proxy の中では Chat SDK の形にし、2 つを型で分ける
 
-- **Context**: proxy の中で、同じチャンネルが 2 通りの id で扱われていた。イベントから作る
-  `ChannelRef.channelId` は Chat SDK の `Thread.channelId`（`adapter.channelIdFromThreadId` が作る
-  `slack:C…` や `discord:<guild>:<channel>`）で、チャンネル一覧はサービスの API が返す id（`C…`）だった。
-  一覧は、コマンドを打ったチャンネルがどの installation のものかの判定、チャンネルごとの許可、
-  通知先の確認のすべての照合に使われるので、どれも一致しなかった。
+- **Context**: 同じチャンネルの id に 2 つの形がある。チャットサービス自身が表示する id（Slack の `C0CBFQ5558V`）と、
+  Chat SDK のアダプタが付ける形（`adapter.channelIdFromThreadId` が作る `slack:C…`、`discord:<guild>:<channel>`。
+  Mattermost は表示するままと同じ。Teams は会話の `serviceUrl` を含む形）。管理者がチャンネル権限の画面に入力するのは前者で、
+  GROWI はその値と照合する。一方、proxy が受けるイベントと、送信・差し替え・履歴の読み取りは後者で動く。
+  2 つを文字列のまま比べると、許可したチャンネルでもコマンドが断られる。
 - **Alternatives Considered**:
-  1. proxy の中はサービスの id にそろえ、イベントを受けたときと送るときに変換する
-  2. **チャンネル一覧のほうを Chat SDK の形で作る**
-- **Selected Approach**: 2
+  1. すべてをサービスが表示する形にそろえ、proxy は送るたびに Chat SDK の形へ戻す
+  2. すべてを Chat SDK の形にそろえ、GROWI にもその形で保存する
+  3. **契約（GROWI ⇄ proxy）の上はサービスが表示する形、proxy の中は Chat SDK の形にし、境目で変換する。2 つの形を別々の型にする**
+- **Selected Approach**: 3
 - **Rationale**:
-  - 1 は送る側に材料が無い。Discord の id にはサーバー（guild）が入るが、送る時点の `ChannelRef` には
-    installation が載っていない。送るたびに installation を引き直すか、すべての送信に workspace を
-    持たせる必要がある。
-  - 返信・差し替え・履歴の読み取りは、すでに Chat SDK の形を前提に書かれていて、食い違っていたのは
-    一覧だけだった。一覧を作る時点では installation の `workspace_id`（Discord ではサーバー）が手元にある。
-  - Teams はどちらの向きでも合わせられない。Chat SDK の Teams の id には会話の `serviceUrl` が入り、
-    これは届いた activity にしか載っていない。一覧（Microsoft Graph）からは作れない。
-- **Trade-offs**: GROWI に保存されるチャンネルの id（許可するチャンネル、通知先）が Chat SDK の形になり、
-  保存データが外部ライブラリの id の作り方に結びつく。protocol は `channelId` を中身の意味を持たない
-  文字列として扱っているので、リリース前の今は受け入れる。Chat SDK が id の形を変えたら、保存済みの id の
-  移し替えが要る。
-- **Follow-up**: 変換は `platform/channel-id.ts` の `INVENTORY_CHANNEL_IDS` の 1 か所だけにある。一覧の行と
-  イベントの id が一致することは、`channels.spec.ts` が本物のアダプタを使って確かめる。Teams の一覧の id が
-  イベントと合わない点は未解決のまま残っている。
+  - 2 は、管理者が入力する値と食い違う。`slack:` を付けることを管理者は知りようがなく、GROWI が Chat SDK の id の作り方に
+    依存することにもなる（決定 3 に反する）。
+  - 1 は、送る側に材料が無い。Discord の id にはサーバー（guild）が入り、Teams の id には `serviceUrl` が入るが、
+    返信の時点ではどちらも手元に無い。チャンネル一覧から引き直す形にすると、一覧にまだ載っていないチャンネル（作ったばかりの
+    チャンネル、DM）で返信できなくなる。
+  - 3 では、Chat SDK の形からサービスが表示する形への変換は材料が要らない。逆向きが要るのは GROWI から届く通知先だけで、
+    GROWI からの依頼には必ず関係（つまり installation）が付いているので、その installation のチャンネル一覧の行から引ける。
+    宛先がその installation のチャンネルかの確認も、同じ引き当てで済む。
+  - 型を分けるのは、2 つの形が同じ `string` だと取り違えがコンパイルを通るからである。契約の id は `@growi/chat` の
+    `NativeChannelId`、proxy の中の id は `SdkChannelId` で、どちらもただの文字列からは作れず、検査する作成関数か
+    境目の変換からしか得られない。契約の検査は `slack:` などで始まる値を断るので、型の外から入ってきた値も実行時に止まる。
+- **Trade-offs**: 境目の変換を 1 か所に保つ必要がある。Teams はチャンネル一覧（Microsoft Graph）の id から Chat SDK の形を
+  作れないので、Teams の通知先は宛先にできないものとして扱う。
+- **Follow-up**: 契約側は `packages/chat`（`parse/channel-id.ts`）、proxy 側は `platform/channel-id.ts` が境目を持つ。
+  一覧の行とイベントの id が一致することと、契約の id が往復して元の Chat SDK の形に戻ることは、本物のアダプタを使う
+  テストで確かめる。Teams の扱いは未解決のまま残っている。
 
 ## Risks & Mitigations
 

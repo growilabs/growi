@@ -178,10 +178,19 @@ export interface ChatAccountRef {
   readonly displayName: string;
 }
 
+/**
+ * チャットサービス自身が表示するままのチャンネル id（Slack なら `C0CBFQ5558V`）。
+ * 管理者が入力する値であり、この契約のすべての欄はこの形で運ぶ。
+ * Chat SDK のアダプタの形（`slack:C0CBFQ5558V`）は proxy の中だけのもので、ここには入らない。
+ * `parseNativeChannelId` / `toNativeChannelId` からしか得られない
+ */
+export type NativeChannelId = string & { readonly [nativeChannelIdBrand]: true };
+
 export interface ChannelRef {
   readonly platform: PlatformName;
   /** **照合はこれだけで行う。** `channelName` は表示用で、変更されうるので判定に使わない */
-  readonly channelId: string;
+  readonly channelId: NativeChannelId;
+  /** 空文字もありうる（チャットのイベントがチャンネル名を運ばないことがある）。表示にしか使わない */
   readonly channelName: string;
   readonly isPrivate: boolean;
 }
@@ -195,6 +204,11 @@ export interface MessageRef {
 > **チャンネルの照合は `channelId` だけで行う。** 名前は変更できるので、名前で照合すると
 > チャンネル名を変えるだけで権限をすり抜けられる。`RelationSettings.allowedChannels` と
 > `NotificationRequest.targets[].channel` に入るのも `channelId` である（要件 11.3）。
+>
+> **チャンネル id は型で 1 つの形に固定する。** `channelId` を運ぶ欄（`ChannelRef`、通知の宛先と結果、
+> チャンネル権限の一覧、`ChannelInventory`）はすべて `NativeChannelId` で、ただの文字列からは作れない。
+> 検査（`parse*`）は `slack:` `discord:` `teams:` `mattermost:` で始まる値を断る。管理者が入力した
+> `C…` と、proxy が送る id が別の形になって一致しなくなるのを、型と実行時の両方で防ぐため。
 
 ### コマンド名の語彙
 
