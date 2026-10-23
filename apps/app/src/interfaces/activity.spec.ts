@@ -8,6 +8,10 @@ import type {
   ISnapshot,
 } from './activity';
 import {
+  AllEssentialActions,
+  AllLargeGroupActions,
+  AllMediumGroupActions,
+  AllSmallGroupActions,
   AllSupportedActions,
   isAttachmentAddActivity,
   isAttachmentDownloadActivity,
@@ -452,5 +456,21 @@ describe('ISnapshot union', () => {
     expectTypeOf<AttachmentRemoveSnapshot['fileSize']>().toEqualTypeOf<
       number | undefined
     >();
+  });
+});
+
+describe('SupportedAction - legacy password deletion audit action', () => {
+  it('exposes ADMIN_LEGACY_PASSWORD_DELETE as a supported action', () => {
+    expect(SupportedAction.ACTION_ADMIN_LEGACY_PASSWORD_DELETE).toBe(
+      'ADMIN_LEGACY_PASSWORD_DELETE',
+    );
+    expect(AllSupportedActions).toContain('ADMIN_LEGACY_PASSWORD_DELETE');
+  });
+
+  it('is recorded only under the Large audit-log group, like other admin settings updates', () => {
+    expect(AllLargeGroupActions).toContain('ADMIN_LEGACY_PASSWORD_DELETE');
+    expect(AllMediumGroupActions).not.toContain('ADMIN_LEGACY_PASSWORD_DELETE');
+    expect(AllSmallGroupActions).not.toContain('ADMIN_LEGACY_PASSWORD_DELETE');
+    expect(AllEssentialActions).not.toContain('ADMIN_LEGACY_PASSWORD_DELETE');
   });
 });
