@@ -21,6 +21,9 @@ import {
   createInstallationBot,
   LOCK_KEY_NAMESPACE,
 } from './bot-factory.js';
+import type { InstallationProvider } from './installation-provider.js';
+
+const CONTEXT = { installations: mock<InstallationProvider>() };
 
 const APP_CONFIG: PlatformAppConfig = {
   slack: {
@@ -181,7 +184,7 @@ describe('createDistributedLock', () => {
 
 describe('createAppBot', () => {
   it('assembles one bot holding an adapter for every service the app config configures', async () => {
-    const appBot = createAppBot(APP_CONFIG);
+    const appBot = createAppBot(APP_CONFIG, CONTEXT);
 
     expect([...appBot.platforms].sort()).toEqual(
       ['discord', 'slack', 'teams'].sort(),
@@ -192,7 +195,7 @@ describe('createAppBot', () => {
   it('assembles a bot for a single-service deployment without demanding the other services', async () => {
     const { discord, teams, ...slackOnly } = APP_CONFIG;
 
-    const appBot = createAppBot(slackOnly);
+    const appBot = createAppBot(slackOnly, CONTEXT);
 
     expect(appBot.platforms).toEqual(['slack']);
     await appBot.state.disconnect();
@@ -202,7 +205,7 @@ describe('createAppBot', () => {
     // One state adapter, therefore one lock namespace: `runtime/sweeper.ts`
     // and `ConnectionManager` must contend with each other and with the other
     // proxies, not with separate private tables.
-    const appBot = createAppBot(APP_CONFIG);
+    const appBot = createAppBot(APP_CONFIG, CONTEXT);
     appBot.state.acquireLock = vi.fn().mockResolvedValue(null);
 
     await expect(appBot.locks.acquire('app:slack', 30_000)).resolves.toBe(
@@ -229,7 +232,7 @@ describe('createInstallationBot', () => {
   };
 
   it('assembles a mattermost bot from one installation own connection target', async () => {
-    const appBot = createAppBot(APP_CONFIG);
+    const appBot = createAppBot(APP_CONFIG, CONTEXT);
 
     const bot = createInstallationBot('mattermost', credentials, appBot.state);
 
@@ -238,7 +241,7 @@ describe('createInstallationBot', () => {
   });
 
   it('assembles nothing when that installation carries no credentials for the service', async () => {
-    const appBot = createAppBot(APP_CONFIG);
+    const appBot = createAppBot(APP_CONFIG, CONTEXT);
 
     expect(createInstallationBot('mattermost', {}, appBot.state)).toBeNull();
     await appBot.state.disconnect();

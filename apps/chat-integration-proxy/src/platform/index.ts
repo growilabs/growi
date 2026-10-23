@@ -223,7 +223,9 @@ export const createPlatformFacade = async (
   const modals = createModalTriggerRegistry();
   const handlerDeps = { sink, modals };
 
-  const appAdapters = createAppAdapters(appConfig, ADAPTER_FACTORIES);
+  const appAdapters = createAppAdapters(appConfig, ADAPTER_FACTORIES, {
+    installations,
+  });
   // Walked over the declared services rather than over the built map's own
   // keys: `Object.entries` widens them to `string`, and narrowing them back
   // would assert something the walk gives for free.

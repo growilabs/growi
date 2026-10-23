@@ -24,6 +24,17 @@ import type {
   InstallationCredentials,
   PlatformAppConfig,
 } from '../types/index.js';
+import type { InstallationProvider } from './installation-provider.js';
+import { createSlackInstallationLookup } from './slack-installation-lookup.js';
+
+/**
+ * What an app-credentialed adapter may need beyond the app config: a service
+ * that serves many workspaces over one app-wide connection (Slack) resolves
+ * each workspace's bot from this proxy's installations.
+ */
+export interface AppAdapterContext {
+  readonly installations: InstallationProvider;
+}
 
 /**
  * Where one service reads the credentials it needs to be constructed at all
@@ -45,7 +56,10 @@ export type AdapterFactory =
   | {
       readonly credentialSource: 'app';
       /** `null` when this deployment does not configure the service at all. */
-      readonly create: (appConfig: PlatformAppConfig) => Adapter | null;
+      readonly create: (
+        appConfig: PlatformAppConfig,
+        context: AppAdapterContext,
+      ) => Adapter | null;
     }
   | {
       readonly credentialSource: 'installation';
@@ -64,7 +78,7 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
   {
     slack: {
       credentialSource: 'app',
-      create: (appConfig) => {
+      create: (appConfig, context) => {
         const slack = appConfig.slack;
         if (slack == null) return null;
         return createSlackAdapter({
@@ -88,10 +102,11 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           // own callback instead (`routes/install-routes.ts`), which is what
           // those two values in `PlatformAppConfig` are for. Multi-workspace
           // socket mode still works: events arrive on the one app-level socket
-          // and the per-workspace token is resolved by `team_id` -- wiring the
-          // adapter's `installationProvider` hook to `installation` is task
-          // 3.2's job.
+          // and each workspace's bot is resolved through `installationProvider`.
           // No `botToken` either: it is a single-workspace field.
+          installationProvider: createSlackInstallationLookup({
+            installations: context.installations,
+          }),
         });
       },
     },
@@ -153,11 +168,12 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
 export const createAppAdapters = (
   appConfig: PlatformAppConfig,
   factories: Readonly<Record<PlatformName, AdapterFactory>>,
+  context: AppAdapterContext,
 ): Readonly<Partial<Record<PlatformName, Adapter>>> =>
   Object.fromEntries(
     Object.entries(factories).flatMap(([platform, factory]) => {
       if (factory.credentialSource !== 'app') return [];
-      const adapter = factory.create(appConfig);
+      const adapter = factory.create(appConfig, context);
       return adapter == null ? [] : [[platform, adapter] as const];
     }),
   );

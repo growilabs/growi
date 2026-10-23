@@ -15,13 +15,14 @@ import type {
   InstallationCredentials,
   PlatformAppConfig,
 } from '../types/index.js';
-import type { AdapterFactory } from './adapter-set.js';
+import type { AdapterFactory, AppAdapterContext } from './adapter-set.js';
 import {
   ADAPTER_FACTORIES,
   createAppAdapters,
   createChatState,
   createInstallationAdapter,
 } from './adapter-set.js';
+import type { InstallationProvider } from './installation-provider.js';
 
 const FULL_APP_CONFIG: PlatformAppConfig = {
   slack: {
@@ -38,6 +39,10 @@ const FULL_APP_CONFIG: PlatformAppConfig = {
   },
   teams: { clientId: 'teams-client-id', clientSecret: 'teams-client-secret' },
   stateConnectionString: 'postgres://user:pw@postgres:5432/chat_sdk',
+};
+
+const CONTEXT: AppAdapterContext = {
+  installations: mock<InstallationProvider>(),
 };
 
 describe('ADAPTER_FACTORIES (the declared registry)', () => {
@@ -76,7 +81,11 @@ describe('ADAPTER_FACTORIES (the declared registry)', () => {
 
 describe('createAppAdapters', () => {
   it('builds an adapter for every service the app config carries credentials for', () => {
-    const adapters = createAppAdapters(FULL_APP_CONFIG, ADAPTER_FACTORIES);
+    const adapters = createAppAdapters(
+      FULL_APP_CONFIG,
+      ADAPTER_FACTORIES,
+      CONTEXT,
+    );
 
     expect(Object.keys(adapters).sort()).toEqual(
       ['discord', 'slack', 'teams'].sort(),
@@ -89,13 +98,17 @@ describe('createAppAdapters', () => {
     // filtering, not the capability table.
     const { discord, teams, ...slackOnly } = FULL_APP_CONFIG;
 
-    const adapters = createAppAdapters(slackOnly, ADAPTER_FACTORIES);
+    const adapters = createAppAdapters(slackOnly, ADAPTER_FACTORIES, CONTEXT);
 
     expect(Object.keys(adapters)).toEqual(['slack']);
   });
 
   it('never builds an app-wide adapter for mattermost, whose connection target is per installation', () => {
-    const adapters = createAppAdapters(FULL_APP_CONFIG, ADAPTER_FACTORIES);
+    const adapters = createAppAdapters(
+      FULL_APP_CONFIG,
+      ADAPTER_FACTORIES,
+      CONTEXT,
+    );
 
     expect(adapters.mattermost).toBeUndefined();
   });
@@ -113,7 +126,7 @@ describe('createAppAdapters', () => {
       mattermost: { credentialSource: 'installation', create: () => null },
     };
 
-    const adapters = createAppAdapters(FULL_APP_CONFIG, factories);
+    const adapters = createAppAdapters(FULL_APP_CONFIG, factories, CONTEXT);
 
     expect(adapters).toEqual({ discord: substitute });
   });

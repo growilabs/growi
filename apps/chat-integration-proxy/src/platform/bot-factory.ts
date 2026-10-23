@@ -18,6 +18,7 @@ import type {
 } from '../types/index.js';
 import {
   ADAPTER_FACTORIES,
+  type AppAdapterContext,
   createAppAdapters,
   createChatState,
   createInstallationAdapter,
@@ -136,9 +137,12 @@ export interface AppBot {
  * return `Chat` and expose its adapters, or be removed, is an open decision
  * for whoever next changes this file.
  */
-export const createAppBot = (appConfig: PlatformAppConfig): AppBot => {
+export const createAppBot = (
+  appConfig: PlatformAppConfig,
+  context: AppAdapterContext,
+): AppBot => {
   const state = createChatState(appConfig);
-  const adapters = createAppAdapters(appConfig, ADAPTER_FACTORIES);
+  const adapters = createAppAdapters(appConfig, ADAPTER_FACTORIES, context);
 
   return {
     bot: new Chat({ adapters, state, userName: BOT_USER_NAME }),
