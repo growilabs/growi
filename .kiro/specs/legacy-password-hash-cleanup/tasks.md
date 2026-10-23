@@ -43,7 +43,7 @@
   - _Requirements: 2.1, 2.3, 2.4, 2.6, 2.7, 4.1, 4.2, 4.3, 4.5_
   - _Depends: 3.1_
 
-- [ ] 3.3 2 つのエンドポイントをセキュリティ設定のルーターに登録する
+- [x] 3.3 2 つのエンドポイントをセキュリティ設定のルーターに登録する
   - 既存のセキュリティ設定ルーターに、移行状況の取得と削除の 2 つを登録する
   - 完了の状態: 型チェック、biome、route-guard、import-convention、OpenAPI（`lint:openapi:apiv3`）の lint が通る。開発サーバーで、管理者として `GET /_api/v3/security-setting/password-hash-status` を呼ぶと 200 と件数が返り、管理者以外では 302 が返る
   - _Requirements: 4.1_

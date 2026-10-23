@@ -23,6 +23,8 @@ import {
 } from '~/utils/page-delete-config';
 
 import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin';
+import { deleteLegacyPasswordsHandlersFactory } from './delete-legacy-passwords';
+import { getPasswordHashStatusHandlersFactory } from './password-hash-status';
 import { handleSamlUpdate, samlAuthValidator } from './saml';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting');
@@ -1772,6 +1774,16 @@ export const setup = (crowi) => {
         return res.apiv3Err(new ErrorV3(msg, 'update-githubOAuth-failed'));
       }
     },
+  );
+
+  router.get(
+    '/password-hash-status',
+    ...getPasswordHashStatusHandlersFactory(crowi),
+  );
+
+  router.delete(
+    '/legacy-passwords',
+    ...deleteLegacyPasswordsHandlersFactory(crowi),
   );
 
   return router;
