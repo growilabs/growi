@@ -49,15 +49,23 @@ vi.mock('../../service/audit-log-bulk-export', async () => {
   };
 });
 
-function buildCrowi(): Crowi {
+type TestUser = { _id: string; admin: boolean };
+
+const adminUser: TestUser = { _id: '6561a1a1a1a1a1a1a1a1a1a1', admin: true };
+const nonAdminUser: TestUser = {
+  _id: '6561b2b2b2b2b2b2b2b2b2b2',
+  admin: false,
+};
+
+function buildCrowi(user: TestUser): Crowi {
   const accessTokenParser =
     () =>
     (
-      req: Request & { user?: { _id: string } },
+      req: Request & { user?: TestUser },
       _res: Response,
       next: NextFunction,
     ) => {
-      req.user = { _id: '6561a1a1a1a1a1a1a1a1a1a1' };
+      req.user = user;
       next();
     };
 
@@ -90,11 +98,11 @@ function withApiV3Helpers(app: express.Express) {
   });
 }
 
-function buildApp() {
+function buildApp(user: TestUser = adminUser) {
   const app = express();
   app.use(express.json());
   withApiV3Helpers(app);
-  const crowi = buildCrowi();
+  const crowi = buildCrowi(user);
   const router = factory(crowi);
   app.use('/_api/v3/audit-log-bulk-export', router);
   return app;
@@ -135,6 +143,17 @@ describe('POST /_api/v3/audit-log-bulk-export', () => {
     expect(format).toBe('json');
     expect(userId).toBeDefined();
     expect(restartJob).toBe(false);
+  });
+
+  it('rejects a non-admin user without creating an export job', async () => {
+    const app = buildApp(nonAdminUser);
+    const res = await request(app)
+      .post('/_api/v3/audit-log-bulk-export')
+      .send({ filters: {} });
+
+    expect(res.status).not.toBe(201);
+    expect(res.body?.jobId).toBeUndefined();
+    expect(createOrReset).not.toHaveBeenCalled();
   });
 
   it('returns 409 with proper error code when DuplicateAuditLogBulkExportJobError is thrown', async () => {
