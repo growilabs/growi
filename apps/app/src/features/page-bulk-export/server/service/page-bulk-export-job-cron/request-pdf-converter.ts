@@ -73,7 +73,7 @@ export async function requestPdfConverter(
     );
 
     if (res.data.status === PdfCtrlSyncJobStatus202Status.PDF_EXPORT_DONE) {
-      return prisma.pagebulkexportjobs.update({
+      return await prisma.pagebulkexportjobs.update({
         where: { id: pageBulkExportJob.id },
         data: { status: PageBulkExportJobStatus.uploading },
       });

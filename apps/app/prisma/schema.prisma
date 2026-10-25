@@ -341,8 +341,10 @@ model pagebulkexportjobs {
   id                       String    @id @default(auto()) @map("_id") @db.ObjectId
   v                        Int       @default(0) @map("__v")
   userId                   String    @map("user") @db.ObjectId
-  // optional: pages are left orphaned (not deleted) on page complete-deletion
-  // (see deleteCompletelyOperation), so the referenced page may not exist
+  // optional: page complete-deletion (see deleteCompletelyOperation) does not
+  // touch jobs, so a job can keep pointing at a page that no longer exists.
+  // The relation below is NoAction on purpose; see the P2014 note in
+  // delete-completely-operation.ts.
   pageId                   String?   @map("page") @db.ObjectId
   lastExportedPagePath     String?
   format                   String
