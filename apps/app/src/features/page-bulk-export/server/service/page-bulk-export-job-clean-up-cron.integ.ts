@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
+import { AttachmentService } from '~/server/service/attachment';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
@@ -25,12 +26,15 @@ vi.mock('./page-bulk-export-job-cron', () => {
 const newObjectIdString = () => new mongoose.Types.ObjectId().toString();
 
 describe('PageBulkExportJobCleanUpCronService', () => {
-  const removeAttachmentMock = vi.fn(() => Promise.resolve());
+  // Only the file store is faked; removeAttachment itself runs for real so the
+  // Prisma-side attachment deletion is exercised through the cleanup flow.
+  const deleteFileMock = vi.fn(() => Promise.resolve());
   const crowi = mock<Crowi>({
-    attachmentService: {
-      removeAttachment: removeAttachmentMock,
-    },
+    fileUploadService: { deleteFile: deleteFileMock },
   });
+  const attachmentService = new AttachmentService(crowi);
+  crowi.attachmentService = attachmentService;
+  const removeAttachmentMock = vi.spyOn(attachmentService, 'removeAttachment');
   const userId = newObjectIdString();
 
   beforeAll(async () => {
@@ -40,7 +44,9 @@ describe('PageBulkExportJobCleanUpCronService', () => {
 
   beforeEach(async () => {
     await prisma.pagebulkexportjobs.deleteMany();
+    await prisma.attachments.deleteMany();
     removeAttachmentMock.mockClear();
+    deleteFileMock.mockClear();
   });
 
   describe('deleteExpiredExportJobs', () => {
@@ -167,6 +173,82 @@ describe('PageBulkExportJobCleanUpCronService', () => {
       expect(jobs.map((job) => job.id).sort()).toStrictEqual(
         [jobId1, jobId3, jobId4].sort(),
       );
+    });
+
+    describe('with a stored attachment', () => {
+      beforeEach(async () => {
+        // the enclosing describe seeds jobs this scenario must not see
+        await prisma.pagebulkexportjobs.deleteMany();
+      });
+
+      test('should remove the attachment, then delete the job that referenced it', async () => {
+        // arrange
+        const attachment = await prisma.attachments.create({
+          data: {
+            fileFormat: 'application/zip',
+            fileName: 'export.zip',
+            originalName: 'export.zip',
+            attachmentType: 'BULK_EXPORT',
+            fileSize: 1,
+          },
+        });
+        await prisma.pagebulkexportjobs.create({
+          data: {
+            userId,
+            pageId: newObjectIdString(),
+            format: PageBulkExportFormat.md,
+            status: PageBulkExportJobStatus.completed,
+            completedAt: new Date(Date.now() - 86400 * 1000 - 1),
+            attachmentId: attachment.id,
+          },
+        });
+
+        // act
+        await pageBulkExportJobCleanUpCronService?.deleteDownloadExpiredExportJobs();
+
+        // assert
+        expect(deleteFileMock).toHaveBeenCalledTimes(1);
+        expect(
+          await prisma.attachments.findUnique({ where: { id: attachment.id } }),
+        ).toBeNull();
+        expect(await prisma.pagebulkexportjobs.findMany()).toHaveLength(0);
+      });
+
+      test('should keep the job for retry when the file store fails, leaving the attachment row intact', async () => {
+        // arrange
+        const attachment = await prisma.attachments.create({
+          data: {
+            fileFormat: 'application/zip',
+            fileName: 'export.zip',
+            originalName: 'export.zip',
+            attachmentType: 'BULK_EXPORT',
+            fileSize: 1,
+          },
+        });
+        const job = await prisma.pagebulkexportjobs.create({
+          data: {
+            userId,
+            pageId: newObjectIdString(),
+            format: PageBulkExportFormat.md,
+            status: PageBulkExportJobStatus.completed,
+            completedAt: new Date(Date.now() - 86400 * 1000 - 1),
+            attachmentId: attachment.id,
+          },
+        });
+        deleteFileMock.mockRejectedValueOnce(new Error('file store down'));
+
+        // act
+        await pageBulkExportJobCleanUpCronService?.deleteDownloadExpiredExportJobs();
+
+        // assert: both rows survive so the next cron execution can retry
+        const remainingJob = await prisma.pagebulkexportjobs.findUnique({
+          where: { id: job.id },
+        });
+        expect(remainingJob?.attachmentId).toBe(attachment.id);
+        expect(
+          await prisma.attachments.findUnique({ where: { id: attachment.id } }),
+        ).not.toBeNull();
+      });
     });
   });
 
@@ -313,62 +395,6 @@ describe('PageBulkExportJobCleanUpCronService', () => {
       expect(removeAttachmentMock).toHaveBeenCalledTimes(1);
       expect(removeAttachmentMock).toHaveBeenCalledWith(zombieAttachmentId);
       expect(await prisma.pagebulkexportjobs.findMany()).toHaveLength(0);
-    });
-
-    test('should keep the job record for retry when removeAttachment fails', async () => {
-      // arrange
-      const jobId = newObjectIdString();
-      await prisma.pagebulkexportjobs.create({
-        data: {
-          id: jobId,
-          userId,
-          pageId: newObjectIdString(),
-          format: PageBulkExportFormat.md,
-          status: PageBulkExportJobStatus.completed,
-          completedAt: new Date(Date.now() - 86400 * 1000 - 1),
-          attachmentId: sharedAttachmentId,
-        },
-      });
-      removeAttachmentMock.mockRejectedValueOnce(new Error('file store down'));
-
-      // act
-      await pageBulkExportJobCleanUpCronService?.deleteDownloadExpiredExportJobs();
-
-      // assert: the job survives so the next cron execution retries the removal
-      const remaining = await prisma.pagebulkexportjobs.findMany();
-      expect(remaining.map((job) => job.id)).toEqual([jobId]);
-    });
-
-    test('should allow deleting an attachment that an export job references', async () => {
-      // arrange: a real attachment row referenced by a job
-      const attachment = await prisma.attachments.create({
-        data: {
-          fileFormat: 'application/zip',
-          fileName: 'export.zip',
-          originalName: 'export.zip',
-          attachmentType: 'BULK_EXPORT',
-          fileSize: 1,
-        },
-      });
-      const job = await prisma.pagebulkexportjobs.create({
-        data: {
-          userId,
-          pageId: newObjectIdString(),
-          format: PageBulkExportFormat.md,
-          status: PageBulkExportJobStatus.completed,
-          completedAt: new Date(),
-          attachmentId: attachment.id,
-        },
-      });
-
-      // act
-      await prisma.attachments.delete({ where: { id: attachment.id } });
-
-      // assert: the job row survives with its reference cleared
-      const after = await prisma.pagebulkexportjobs.findUnique({
-        where: { id: job.id },
-      });
-      expect(after?.attachmentId).toBeNull();
     });
   });
 
