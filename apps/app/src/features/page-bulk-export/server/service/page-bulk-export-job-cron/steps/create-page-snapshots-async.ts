@@ -8,6 +8,7 @@ import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/
 import type { pagebulkexportjobs } from '~/generated/prisma/client';
 import { SupportedAction } from '~/interfaces/activity';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
@@ -18,8 +19,19 @@ async function reuseDuplicateExportIfExists(
   this: IPageBulkExportJobCronService,
   pageBulkExportJob: pagebulkexportjobs,
 ) {
+  // Skip jobs whose attachment is gone or whose download has expired: the
+  // clean-up cron removes the attachment of expired jobs, so reusing one would
+  // complete this job with an attachment that is about to disappear.
+  const downloadExpirationSeconds = configManager.getConfig(
+    'app:bulkExportDownloadExpirationSeconds',
+  );
+  const downloadExpirationThreshold = new Date(
+    Date.now() - downloadExpirationSeconds * 1000,
+  );
   const duplicateExportJob = await prisma.pagebulkexportjobs.findFirst({
     where: {
+      attachmentId: { not: null },
+      completedAt: { gte: downloadExpirationThreshold },
       userId: pageBulkExportJob.userId,
       pageId: pageBulkExportJob.pageId,
       format: pageBulkExportJob.format,

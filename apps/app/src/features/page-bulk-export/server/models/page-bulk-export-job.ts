@@ -20,7 +20,8 @@ const pageBulkExportJobSchema = new Schema({
     required: true,
   },
   completedAt: { type: Date },
-  attachment: { type: Schema.Types.ObjectId, ref: 'Attachment' },
+  // indexed because Prisma's SetNull emulation filters jobs by attachment on every attachment delete
+  attachment: { type: Schema.Types.ObjectId, ref: 'Attachment', index: true },
   status: {
     type: String,
     enum: Object.values(PageBulkExportJobStatus),
