@@ -446,11 +446,13 @@ export const setup = (crowi) => {
    *                      items:
    *                        $ref: '#/components/schemas/ThemesMetadata'
    */
+  // Intentionally not adminRequired: RevisionDiff (page history) reads this for
+  // non-admin viewers too, and the response holds nothing secret — the current
+  // theme is already exposed to every page via its stylesheet and forcedColorScheme.
   router.get(
     '/theme',
     accessTokenParser([SCOPE.READ.ADMIN.CUSTOMIZE]),
     loginRequiredStrictly,
-    adminRequired,
     async (req, res) => {
       try {
         const currentTheme = await configManager.getConfig('customize:theme');

@@ -3,6 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { mockDeep } from 'vitest-mock-extended';
 
+import { GrowiPlugin } from '~/features/growi-plugin/server/models';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
@@ -63,13 +64,18 @@ describe('customize-setting routes for a non-admin user', () => {
     vi.clearAllMocks();
   });
 
-  it('does not expose GET /theme', async () => {
+  it('serves GET /theme so that page history can resolve the diff color scheme', async () => {
+    vi.mocked(configManager.getConfig).mockReturnValue('default');
+    vi.mocked(GrowiPlugin.findEnabledPluginsByType).mockResolvedValue([]);
     const app = buildApp(nonAdminUser);
 
     const res = await request(app).get('/customize-setting/theme');
 
-    expect(res.status).toBe(302);
-    expect(configManager.getConfig).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      currentTheme: 'default',
+      pluginThemesMetadatas: [],
+    });
   });
 
   it('does not replace the brand logo via POST /upload-brand-logo', async () => {
