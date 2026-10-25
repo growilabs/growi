@@ -5,6 +5,7 @@ import {
   extractAllScope,
   extractScopes,
   hasAllScope,
+  includesAdminScope,
   isValidScope,
 } from './scope-utils';
 
@@ -93,6 +94,33 @@ describe('scope-utils', () => {
         s.endsWith('access_token'),
       );
       expect(accessTokenScopes).toHaveLength(2); // Only READ and WRITE, no duplicates
+    });
+  });
+
+  describe('includesAdminScope', () => {
+    it.each([
+      ['a specific admin scope', [SCOPE.WRITE.ADMIN.AUDIT_LOG]],
+      ['a read-only admin scope', [SCOPE.READ.ADMIN.APP]],
+      ['the admin wildcard', [SCOPE.READ.ADMIN.ALL]],
+      ['the read wildcard', [SCOPE.READ.ALL]],
+      ['the write wildcard', [SCOPE.WRITE.ALL]],
+      [
+        'an admin scope mixed with user scopes',
+        [SCOPE.READ.FEATURES.PAGE, SCOPE.WRITE.ADMIN.USER_MANAGEMENT],
+      ],
+    ])('should return true for %s', (_, scopes) => {
+      expect(includesAdminScope(scopes)).toBe(true);
+    });
+
+    it.each([
+      ['no scopes', []],
+      [
+        'user scopes only',
+        [SCOPE.READ.FEATURES.PAGE, SCOPE.WRITE.USER_SETTINGS.API.ALL],
+      ],
+      ['the features wildcard', [SCOPE.WRITE.FEATURES.ALL]],
+    ])('should return false for %s', (_, scopes) => {
+      expect(includesAdminScope(scopes)).toBe(false);
     });
   });
 });
