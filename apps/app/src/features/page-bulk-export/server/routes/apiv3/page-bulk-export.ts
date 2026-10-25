@@ -9,7 +9,10 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import { PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE } from '../../../interfaces/page-bulk-export';
+import {
+  PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE,
+  PageBulkExportFormat,
+} from '../../../interfaces/page-bulk-export';
 import {
   DuplicateBulkExportJobError,
   pageBulkExportService,
@@ -30,7 +33,7 @@ export const setup = (crowi: Crowi): Router => {
   const validators = {
     pageBulkExport: [
       body('path').exists({ checkFalsy: true }).isString(),
-      body('format').exists({ checkFalsy: true }).isString(),
+      body('format').isIn(Object.values(PageBulkExportFormat)),
       body('restartJob').isBoolean().optional(),
     ],
   };
