@@ -450,6 +450,7 @@ export const setup = (crowi) => {
     '/theme',
     accessTokenParser([SCOPE.READ.ADMIN.CUSTOMIZE]),
     loginRequiredStrictly,
+    adminRequired,
     async (req, res) => {
       try {
         const currentTheme = await configManager.getConfig('customize:theme');
@@ -1192,6 +1193,7 @@ export const setup = (crowi) => {
     uploads.single('file'),
     accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]),
     loginRequiredStrictly,
+    adminRequired,
     uploads.single('file'),
     validator.logo,
     apiV3FormValidator,
