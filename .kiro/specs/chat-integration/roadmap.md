@@ -50,6 +50,16 @@ Gen 1 には手を入れず、GROWI 本体で両方を同時に有効にでき�
 **依存の向き**: `protocol` ← `proxy` / `app`。protocol は他の 2 つを知らない。
 proxy と app は互いを知らず、protocol の契約だけで話す。
 
+## 進行中の amend spec
+
+完了済みの sub-spec の契約を変える spec。どれも、変更を対象の spec に書き戻して自分を削除することが最後のタスクになる（`.claude/rules/spec-lifecycle.md`）。上から順に進める。
+
+| 順 | spec | 中身 | 対象 | 前提 |
+|---|---|---|---|---|
+| 1 | [chat-integration-search-private](../chat-integration-search-private/) | `search` の結果を、チャンネルの全員ではなく本人にだけ見せる（出荷済みのコードの漏れを直す） | umbrella（要件 3）、proxy | なし |
+| 2 | （spec 無しで直す） | DM やチャンネル一覧にまだ無い場所でのコマンドで、installation を特定できない不具合（下の「既知の不具合」） | proxy | なし |
+| 3 | [chat-integration-agent](../chat-integration-agent/) | コマンドを `search`・`create-page`・`agent` に再編する。`keep` を `agent` に吸収し、答えをあとから届ける口を足す | umbrella、protocol、proxy、app | 1、2 |
+
 ## Backlog（将来の拡張候補・未着手）
 
 まだ spec 化していない、次に検討したい拡張のアイデア。discovery から着手する際は、このリストの該当行を消して spec ディレクトリへのリンクに差し替えること。
@@ -88,18 +98,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
     3. チャット連携が 1 つも無いテナントでは問い合わせを飛ばす（「連携があるか」の確認結果は一定時間覚えておく）
   - **想定される影響範囲**: `chat-integration-app`（`notification-outbox.ts`・`notification-dispatcher.ts`・`notification-dispatch-cron.ts`・`pairing/sweep-unpaired-relations.ts`）。protocol と proxy は変わらない
   - **次にやること**: `chat-integration-app` の amend spec。設計の「通知を 2 段に分ける」節に、すぐ送る経路と間隔の決め方を足す
-- **ユーザー向けコマンドを `search`・`create-page`・`agent` に再編する検討**: 実機試験の途中（2026-10-26）で、機能の在り方を見直した。
-  - **方針（決定）**: AI に手伝ってもらう書き込み・検索は、**AI から GROWI MCP を使う形（利用者ごとの認証）を本筋にする**。特定の AI 製品には寄せない（Slack に組み込まれた AI アプリなど、どの AI からでもよい）
-  - **候補（決定）**: チャットのコマンドは `search`・`create-page`・`agent` の 3 つにする。`agent`（例: `@GROWI agent "～～を探して"`）は依頼を GROWI の AI Agent に渡す。編集や要約を伴う依頼は `agent` に任せ、単純な作成と検索は AI なしで速く済ませる
-    - **`keep` は `agent` に吸収する（決定）**: proxy が今ある会話の読み取りで会話を取り、`agent` に添えて渡し、要約してページにしてもらう。会話はそのまま貼るより要約して残すほうが役に立つ場面が多い。引き換えに、AI を使わない GROWI では会話の取り込みができなくなる
-    - **`agent` だけにしない理由**: GROWI AI は管理者が有効にし（`isAiEnabled`）言語モデルを設定して（`isAiConfigured`）初めて使える任意の機能なので、`agent` だけでは AI を使わない GROWI でコマンドが 1 つも無くなる。複数の GROWI をまとめて検索できるのは proxy だけで（要件3、各 GROWI の agent は自分の wiki しか見えない）、読み取りと書き込みが別のコマンドでないとチャンネル単位の権限で「検索は許すが書き込みは許さない」を表せない。`search` は Slack の時間制限内に安く同じ結果を返せる
-    - **`agent` で閉域の GROWI でも AI を使える**: 依頼は proxy 経由で GROWI に届き、AI の処理は GROWI の中で行う。紐付け（要件7）をそのまま使うので、誰の依頼かが履歴と監査記録に残る
-  - **チャンネル単位の権限（要件11）は残す**: `agent` は書き込みもしうるので、管理者がチャンネルごとに使わせるかを決められる必要がある
-  - **決める必要がある論点: 答えを誰が見るか**: `search` と `agent` は依頼した本人の閲覧権限で調べるので、答えをチャンネルに出すと、見る権限の無い参加者（社外の人が入るチャンネルなら社外の人）に漏れる。本人にだけ見える形で返すか、チャンネルに出してよい条件を決める。`search` と `agent` でまとめて 1 回決める
-  - **設計上の注意**: `search`・`create-page` の処理と `agent` の道具は、GROWI の同じ処理を呼び、2 通りの実装を持たない。GROWI の AI Agent の道具は今のところ読み取りだけ（`full-text-search-tool`・`get-page-content-tool`）なので、作成・編集を任せるには書き込みの道具を足す必要がある
-  - **AI では代わりにならず、残すもの**: 通知（要件2）、URL の展開（要件6）、proxy と GROWI の紐付け（要件9・10）
-  - **採らない案**: チャット内の AI bot に `@GROWI create-page` などのコマンドを打たせ、MCP の代わりに使う形。書き込みが bot の名義になり、AI に頼んだ人が履歴と監査記録に残らない（要件7 の目的と食い違う）。本人にだけ見えるメッセージは bot に届かず、応答も人向けの書式で AI が読む仕様になっていない。Slack 側の AI と GROWI 側の AI を連携させるなら、どの人の依頼かを渡す仕組みを別に設計する必要がある
-  - **次にやること**: `/kiro-discovery` から着手する（要件の変更は 3 sub-spec すべてにまたがる）
+- **ユーザー向けコマンドを `search`・`create-page`・`agent` に再編する** → discovery 済み（2026-10-26）。上の「進行中の amend spec」の [chat-integration-search-private](../chat-integration-search-private/) と [chat-integration-agent](../chat-integration-agent/) に移した
 - **既知の不具合（未修正、2026-10-26 時点）**: 実機試験と独立レビューで見つかり、まだ直していないもの。
   - **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
   - **Discord のスレッド内で打ったスラッシュコマンドの追加入力が結び付かない**: 入力待ちを 4 区切りの `Channel.id`（`discord:<guild>:<parent>:<thread>`）で保存する一方、スレッドでの返答のイベントは 3 区切りの `Thread.channelId` を持つ
