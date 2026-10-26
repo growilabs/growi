@@ -31,7 +31,7 @@
 
 ### This Spec Owns
 - 共有サービス `legacy-password-cleanup`: 形式ごとの件数の集計と、移行済みユーザーからの旧形式パスワードの除去
-- セキュリティ設定 API の 2 エンドポイント: 移行状況の取得と旧形式パスワードの削除。レスポンスの型も含む
+- セキュリティ設定 API の 3 エンドポイント: 移行状況の取得、催促が必要なユーザーの一覧の取得、旧形式パスワードの削除。レスポンスの型も含む
 - 監査ログの action `ADMIN_LEGACY_PASSWORD_DELETE` と、5 ロケール分のラベル
 - 管理画面のセクション `LegacyPasswordCleanupSetting` と、その SWR hook
 - `runPasswordHashCleanup` の内部を共有サービス呼び出しに置き換えること（外から見た挙動は変えない）
@@ -79,17 +79,29 @@ graph LR
     Section[LegacyPasswordCleanupSetting]
     Hook[useSWRxPasswordHashStatus]
     Modal[ConfirmModal]
+    Table[PasswordHashCountTable]
+    List[UnmigratedUserList]
+    ListHook[useSWRInfinitePasswordHashUnmigratedUsers]
   end
   subgraph Server
     GetH[getPasswordHashStatusHandlers]
     DelH[deleteLegacyPasswordsHandlers]
+    ListH[getPasswordHashUnmigratedUsersHandlers]
     Svc[legacy-password-cleanup service]
+    ListSvc[password-hash-unmigrated-users service]
     Script[password-hash-cleanup script]
     Filters[password-hash-format-filters]
   end
   Types[interfaces password-hash-status]
   Section --> Hook
   Section --> Modal
+  Section --> Table
+  Section --> List
+  List --> ListHook
+  ListHook --> ListH
+  ListH --> ListSvc
+  ListSvc --> Filters
+  ListSvc --> ExtAcc[(externalaccounts read only)]
   Hook --> GetH
   Section --> DelH
   GetH --> Svc
@@ -104,7 +116,7 @@ graph LR
 - **Selected pattern**: 共有サービスを切り出し、入口を 2 つ（CLI と HTTP）用意する。中止判定は入口側の方針として、スクリプトだけが持つ。
 - **New components rationale**:
   - 共有サービス: 5.2 の「同じ基準」をコードとして 1 か所に置くため
-  - 2 つの handler ファイル: 1778 行の JS を大きくしないため
+  - 3 つの handler ファイル: 1778 行の JS を大きくしないため
   - 型ファイル: クライアントとサーバーの境界をまたいで型を共有するため
 - **Steering compliance**:
   - 中核の処理を返り値のある関数にし、入口は薄く保つ（Pure Function Extraction）
@@ -115,7 +127,7 @@ graph LR
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | Frontend | React + reactstrap、`swr`（既存） | セクション、確認モーダル、件数の取得と再取得 | 新しい依存はない |
-| Backend | Express apiv3（既存） | 2 エンドポイント、権限、監査ログ | 新しい依存はない |
+| Backend | Express apiv3（既存） | 3 エンドポイント、権限、監査ログ | 新しい依存はない |
 | Data | MongoDB `users` コレクション（mongodb driver の `Collection` 経由。既存スクリプトと同じ） | `countDocuments` と `updateMany($unset)` | スキーマとインデックスは変えない |
 
 ## File Structure Plan
@@ -137,12 +149,13 @@ apps/app/src/
 │       ├── password-hash-unmigrated-users.ts # GET handler factory（一覧）
 │       ├── password-hash-unmigrated-users.integ.ts
 │       ├── delete-legacy-passwords-activity.integ.ts  # activity の確定で実行者が残るかの drift テスト
-│       └── legacy-password-cleanup.integ.ts  # 2 つの handler の supertest
+│       └── legacy-password-cleanup.integ.ts  # 件数と削除の handler の supertest
 ├── stores/admin/
 │   ├── password-hash-status.ts              # useSWRxPasswordHashStatus
 │   └── password-hash-unmigrated-users.ts    # useSWRInfinitePasswordHashUnmigratedUsers
 └── client/components/Admin/Security/
-    ├── LegacyPasswordCleanupSetting.tsx      # セクション（件数表、削除ボタン、確認モーダル、一覧の配置、非表示の判定）
+    ├── LegacyPasswordCleanupSetting.tsx      # セクション（削除ボタン、確認モーダル、一覧の配置、非表示の判定）
+    ├── PasswordHashCountTable.tsx            # 件数表（表示だけ。旧形式のみの合計 sumLegacyOnly もここ）
     ├── UnmigratedUserList.tsx                # 催促が必要なユーザーの一覧（枠の中のスクロールで読み足し）
     ├── UnmigratedUserList.spec.tsx
     ├── LegacyPasswordCleanupSetting.spec.tsx
@@ -181,7 +194,7 @@ sequenceDiagram
   S->>API: revalidate GET password-hash-status
 ```
 
-- **ボタンを無効にする条件**: 件数の取得中、取得に失敗したとき、`both === 0` のとき（1.5, 2.5）。
+- **ボタンを無効にする条件**: 件数の取得中、取得に失敗したとき、`both === 0` のとき（1.5, 2.5）。押したあとの件数の取り直しの間と、削除を確定してから件数の再取得が終わるまでの間（2.9）。
 - **サーバー側では中止判定をしない**: 対象が 0 件でも正常に応答し、`unsetCount: 0` を返す（2.3, 2.6）。
 
 ## Requirements Traceability
@@ -362,7 +375,7 @@ export const useSWRxPasswordHashStatus: () => SWRResponse<PasswordHashFormatCoun
   - `supplymentaryMessage`: ダウングレード時の影響（ACTIVE ユーザーはパスワードリセットで復旧でき、それ以外は個別に対応が必要）。加えて、ダウングレードから戻した直後で再アップグレード準備スクリプトを実行していない場合は、先に実行すること（実行前に削除すると、現在のパスワードでログインできないユーザーが出る）
   - `confirmButtonTitle`: 削除
   - `onCancel`: モーダルを閉じるだけ
-  - `ConfirmModal` には手を加えない。実行ボタンは既存どおり `btn-outline-primary` のままで、処理中も無効化しない。二重に実行されても、サーバー側の削除が冪等なので実害はない（2 回目は `unsetCount: 0`）。
+  - `ConfirmModal` には手を加えない。実行ボタンは既存どおり `btn-outline-primary` のままで、処理中もモーダルのボタン自体は無効化しない。二重実行は、セクションの削除ボタンを処理中に無効にすることで防ぐ（2.9。末尾の「レビューを受けた修正」を参照）。
 - 確定したら `apiv3Delete('/security-setting/legacy-passwords')` を呼ぶ。成功したら `toastSuccess`（件数を含む）を出して `mutate()` する。失敗したら `toastError` を出し、途中まで削除されている可能性があるので、こちらも `mutate()` で件数を取り直す（2.4, 2.7）。
 - `ConfirmModal` は `onConfirm` でモーダルを閉じないので、セクション側で開閉の状態を持ち、確定したときに閉じる。
 - hook は、レスポンスに `counts` がない場合（302 のリダイレクトで HTML が返った場合など）をエラーとして扱う（1.5）。
