@@ -4,12 +4,13 @@
 // `orchestration/` and `routes/` may see of `command/` is exported from here;
 // nothing else in this directory is part of its contract.
 //
-// The whole public surface of all four modules is re-exported, and that is
+// The whole public surface of all five modules is re-exported, and that is
 // deliberate rather than lazy: orchestration is the only external caller, and
 // it needs each of them -- `normalize` to turn an event into an `Invocation`,
 // `COMMAND_TRAITS` to look up what that command collects and how its target is
-// chosen, the admin words to route an operator's command, and
-// `ArgumentCollector` to collect and resume. What is NOT here is what stayed
+// chosen, the admin words to route an operator's command,
+// `ArgumentCollector` to collect and resume, and `PrivateReplier` to answer
+// the requester alone. What is NOT here is what stayed
 // unexported in each module (its internal helpers, e.g. the argument-line
 // parser and the `pending_collection` state shape), which is where this
 // layer's implementation detail actually lives.
@@ -51,3 +52,11 @@ export {
 } from './command-set.js';
 export type { CommandStartEvent } from './invocation.js';
 export { CommandInvocation, stripAddressToken } from './invocation.js';
+export type {
+  PrivateReplier,
+  PrivateReplierDeps,
+  PrivateReplyOrigin,
+  PrivateReplyOutcome,
+  UndeliverableFact,
+} from './private-reply.js';
+export { createPrivateReplier } from './private-reply.js';
