@@ -139,6 +139,21 @@ umbrella の判断は [../change-proposal/research.md](../change-proposal/resear
 - **Rationale**: 無効にしたあとも、反映済みの Change Proposal と取り消しは残る（core 要件 5.13）。印と詳細ページは、それをたどる手段として残す必要がある。一方、一度も使っていない wiki の Recent Changes に入口を出すと、意味の無いリンクになる。
 - **Trade-offs**: 無効にしたあとは、一覧へは通知・印・URL からしか行けない。
 
+### Decision: 本人向けの操作は、入口ごとの宣言の表から引く
+- **Context**: 要件 13。umbrella の決定 7。AI チャットの入口は、詳細ページに「後続 Change Proposal を作る」と、操作ごとの「AI に見直してもらう」を出したい。Vault・MCP の入口は、今は同じことができない。
+- **Alternatives Considered**:
+  1. 詳細ページが入口の種類を見て、AI チャットのときだけボタンを出す。viewer が AI チャットの振る舞いを知ることになり、入口が増えるたびに viewer を直す。
+  2. 既存の本人向けの内容の表（`REQUESTER_ONLY_SECTIONS`）の行を、内容と操作の両方を持つ形に変える。ai-agent がすでに合わせている形（`{ proposalId }`）が変わる。
+  3. 本人向けの操作だけの表（`REQUESTER_ACTION_SLOTS`）を別に作り、Change Proposal 全体の部品と操作ごとの部品を入口ごとに宣言させる（採用）。
+- **Selected Approach**: 3。部品には、詳細ページが表示している core の応答（`ChangeProposalView` と、操作ごとの部品には `OperationView` も）を渡す。どの操作にボタンを出すかは部品が決める。表に行が無い入口では、viewer が反映されなかった操作の一覧だけを出す。
+- **Rationale**: 本人向けの内容の表と同じ形（入口をキーにした宣言の表と、遅れて読み込む部品）で、詳細ページは入口で分岐しない。部品に応答をそのまま渡すと、部品が同じ Change Proposal を取り直さずに済み、取り消しのあとに詳細ページが取り直した値もそのまま渡る。
+- **Trade-offs**: 部品の props が core の応答の型に依存する。core の応答の形が変わったときは、Revalidation Triggers に従って ai-agent の部品も確かめ直す。
+
+### Decision: 完了と達成度は依頼した人にだけ表示する
+- **Context**: 要件 11。core は段階と達成度を依頼した人にだけ返す（core の research.md の「段階と達成度は依頼した人にだけ返す」）。
+- **Selected Approach**: core の `requesterState` があるときだけ表示する。完了なら達成度の割合（切り捨て）を添え、分母が 0 なら「完了」だけにする。破棄は「残りを反映せずに閉じた」と表示する。
+- **Rationale**: 割合を四捨五入すると、1 つだけ反映されなかった案が「100%」に見えることがあるので、切り捨てる。破棄は、依頼した人が残りを反映しないと決めたことなので、失敗のように見えない言葉にする。
+
 ## Risks & Mitigations
 - 印の問い合わせが Recent Changes の表示を遅くする — 一覧の行を先に表示し、印は別の問い合わせとして後から付ける。結合テストで、印の API が遅い・失敗する場合にも行が表示されることを確かめる。
 - 通知の snapshot が読めず、通知の一覧全体が表示されなくなる — snapshot を読む関数は例外を投げず、読めなければ null を返す。単体テストで、壊れた値・知らない action・欠けた項目を確かめる。

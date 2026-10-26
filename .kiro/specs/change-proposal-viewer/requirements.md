@@ -34,6 +34,10 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 - **今の版**: ページの最新のリビジョン。古い版を表示している間も、ページの最新のリビジョンを指す。
 - **頼む通知**: 依頼した人以外のユーザーが、依頼した人に「この Change Proposal を戻してほしい」と知らせるアプリ内通知。一言を添えられる。
 - **まとめた通知**: `change-proposal-core` が、反映または取り消しが終わったときに、Change Proposal ごとに 1 件だけ作るアプリ内通知。中身は受け取る人が閲覧できるページの分だけで作られている。
+- **段階・完了・達成度・後続・見直し・元の Change Proposal**: `change-proposal-core` の要件の「本要件で使う言い方」と同じ。段階と達成度は、core が依頼した人にだけ返す。
+- **つながり**: ある Change Proposal と、それを元にした後続・見直しの Change Proposal との関係。core が見る人ごとに絞って返す。
+- **反映されなかった操作**: 状態が「古い」「失敗」「飛ばした」の操作のうち、依頼した人が飛ばすことを選んだ操作を除いたもの（core の画面の共通の部品が決める）。
+- **本人向けの操作**: 入口の spec が、依頼した人のために詳細ページに置く操作（AI チャットでは「後続 Change Proposal を作る」「AI に見直してもらう」）。Change Proposal 全体に置くものと、操作ごとに置くものがある。
 
 ## Boundary Context
 
@@ -43,11 +47,14 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
   - 詳細ページの「戻せるものを全部戻す」ボタンと、その結果の表示
   - 頼む通知の送信と、その通知の表示
   - まとめた通知の表示
+  - 依頼した人への完了と達成度の表示、つながりの表示、反映されなかった操作の一覧、入口の spec が宣言した本人向けの操作の置き場所
   - 新しく足す文言の 5 言語（英語・日本語・中国語・フランス語・韓国語）の翻訳
 - **Out of scope**:
   - 戻せるかどうかの判定、取り消しの実行、見る人ごとの絞り込みの判定、まとめた通知の中身を作ること（`change-proposal-core`）
   - 操作の種類・操作の状態・全体の状態・理由・戻せない理由を表す言葉とその 5 言語の翻訳、差分の表示の設定と見た目（`change-proposal-core` が画面の共通の部品として用意し、本 spec はそれを使う）
   - チャット画面での Change Proposal の表示・承認・作り直し、AI が書いた要約と会話の保存（`change-proposal-ai-agent`）
+  - 後続・見直しを頼む操作の中身（入口の spec。AI チャットでは `change-proposal-ai-agent`）。Vault・MCP の入口の本人向けの操作（将来）
+  - 段階・達成度・つながりを決めること（`change-proposal-core`）
   - 承認待ちの Change Proposal の承認・飛ばす・破棄の操作（詳細ページには置かない）
   - Recent Changes を Change Proposal 単位でまとめ直すこと
   - 承認待ちの Change Proposal を本人以外に見せること
@@ -195,4 +202,35 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 2. If ログインしていない人、または共有リンクでページを見ている人がページ履歴・Recent Changes・ページを表示した場合, then the Change Proposal Viewer shall 印を表示せず、印のための問い合わせもしない。
 3. Where 見る人が読み取り専用ユーザーである場合, the Change Proposal Viewer shall 詳細ページ・一覧・印は表示し、取り消しと頼む通知の操作は表示しない。
 4. The Change Proposal Viewer shall 新しく足す文言を、GROWI が対応する 5 言語（英語・日本語・中国語・フランス語・韓国語）すべてで表示する。
-5. The Change Proposal Viewer shall 入口の種類（AI チャット・Vault・MCP・取り消し）によって、詳細ページ・一覧・印・通知の振る舞いを変えない（本人向けの内容の有無を除く）。
+5. The Change Proposal Viewer shall 入口の種類（AI チャット・Vault・MCP・取り消し）によって、詳細ページ・一覧・印・通知の振る舞いを変えない。ただし、本人向けの内容（1.7）と本人向けの操作（13.1）の有無は、入口の spec の宣言によって変わる。
+
+### Requirement 11: 完了と達成度の表示
+
+**Objective:** 依頼した人として、自分の Change Proposal が終わったかどうかと、頼んだ変更のうちどれだけが反映されたかを、詳細ページと一覧で知りたい。残りをどうするか決めるため。
+
+#### Acceptance Criteria
+1. Where 見る人が依頼した人で、Change Proposal の段階が完了である場合, the Change Proposal Viewer shall 詳細ページと一覧の項目に「完了（達成度 N%）」を表示する。N は core が返した達成度の割合を切り捨てた整数にする。
+2. If 達成度の分母が 0 の場合（すべての操作を依頼した人が飛ばした場合）、または core が達成度を返さない場合（取り消しの Change Proposal）, then the Change Proposal Viewer shall 割合を出さずに「完了」だけを表示する。
+3. Where 見る人が依頼した人で、段階が破棄・期限切れ・取り下げのいずれかである場合, the Change Proposal Viewer shall その段階を言葉で表示する。破棄は「残りを反映せずに閉じた」と表示する。
+4. If 見る人が依頼した人でない場合, then the Change Proposal Viewer shall 段階と達成度を表示しない。
+5. The Change Proposal Viewer shall 状態が「古い」の操作を、core の画面の共通の部品の言葉（「見送り（ページが先に変わっていた）」）で表示し、対応が要る誤りの見た目では表示しない。
+
+### Requirement 12: つながりの表示
+
+**Objective:** 詳細ページを見るユーザーとして、ある変更が、どの Change Proposal から続いたものか、その後どの Change Proposal で作り直されたり見直されたりしたかをたどりたい。
+
+#### Acceptance Criteria
+1. When core が操作に後続・見直しの Change Proposal を返した場合, the Change Proposal Viewer shall その操作の表示に「後続: #ID」「見直し: #ID」を、それぞれの詳細ページへのリンクとして表示する。
+2. When core が詳細ページの Change Proposal に元の Change Proposal を返した場合, the Change Proposal Viewer shall 詳細ページの見出しに「元: #ID」を、元の詳細ページへのリンクとして表示する。
+3. The Change Proposal Viewer shall core が返したつながりだけを表示し、自分ではつながりを探さない。
+4. The Change Proposal Viewer shall #ID に、core の画面の共通の部品が決める Change Proposal の短い ID を使う。
+
+### Requirement 13: 本人向けの操作と、反映されなかった操作の一覧
+
+**Objective:** 依頼した人として、詳細ページで、反映されなかった操作を確かめ、入口が用意している方法（AI チャットでは後続や見直しの依頼）で続きを頼みたい。viewer は入口ごとの振る舞いを持たずに、それを表示したい。
+
+#### Acceptance Criteria
+1. Where 見る人が依頼した人で、入口の spec がその入口の本人向けの操作（Change Proposal 全体に置くもの、操作ごとに置くもの）を宣言している場合, the Change Proposal Viewer shall 詳細ページの決まった場所に、宣言された部品を表示する。
+2. The Change Proposal Viewer shall 詳細ページで入口の種類によって分岐せず、入口から部品を引く宣言の表だけを使う。
+3. Where 見る人が依頼した人で、反映されなかった操作がある場合, the Change Proposal Viewer shall 入口の種類にかかわらず、その操作のパスと状態の一覧を詳細ページに表示する。
+4. If 見る人が依頼した人でない場合, then the Change Proposal Viewer shall 本人向けの操作の部品を読み込まず、反映されなかった操作の一覧も表示しない。

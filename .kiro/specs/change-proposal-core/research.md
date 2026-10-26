@@ -75,12 +75,12 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 
 ### 機能の置き場所と前例
 - **Findings**:
-  - Mongoose のモデル・apiv3 の route・サービスを持つ機能の前例は `features/growi-vault/server/` と `features/page-bulk-export/server/`。索引付きのモデルの前例は `vault-reconcile-log.ts`。
+  - apiv3 の route とサービスを持つ機能の前例は `features/growi-vault/server/` と `features/page-bulk-export/server/`。新しいコレクションを Prisma だけで読み書きする前例は `features/mastra/server/models/refreshed-model-catalog.ts`（索引が無いので Mongoose の schema を持たない）。Mongoose の schema で索引を作り、読み書きを Prisma の拡張で行う前例は `server/models/page-redirect.ts` と `server/models/revision.ts`。
   - 期限切れの処理の前例は `wip-page-cleanup-cron.ts`（`CronService` を継承、設定キーで実行の間隔を決める、複数台の間でずらすための待ち、保守モードでは動かない）と `delete-expired-wip-page-by-system.ts`（`findOneAndUpdate` で 1 台だけが取る）。WIP ページは TTL 索引をやめてこの形にした。TTL 索引は、アプリの処理を通さずに消すので、記録には使わない。
   - 管理者の設定画面の前例は `pages/admin/ai.page.tsx` と `features/mastra/client/admin/`。管理画面は `commons` と `admin` の名前空間しか読み込まない。
   - 依頼した人ごとの 1 日の件数を数える仕組みは無い。近い前例は contribution-graph の、サーバーの日付の 0 時で区切る数え方。
   - access token の scope を足すには `@growi/core` の変更と翻訳が要る。
-- **Implications**: 新しい機能は `apps/app/src/features/change-proposal/` に置く。Change Proposal のモデルは Mongoose で宣言し、Prisma には足さない（索引が要り、前例もそうしている）。scope は既存の `features.page`（利用者の API）と `admin.app`（管理者の API）を使い、新しい scope は足さない。
+- **Implications**: 新しい機能は `apps/app/src/features/change-proposal/` に置く。Change Proposal のコレクションは Prisma で読み書きし、コレクションと索引の作成だけを Mongoose の schema に任せる（Design Decisions の「新しいコレクションは Prisma で読み書きし、索引は Mongoose の schema で作る」）。scope は既存の `features.page`（利用者の API）と `admin.app`（管理者の API）を使い、新しい scope は足さない。
 
 ## Architecture Pattern Evaluation
 
@@ -177,19 +177,78 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Context**: 要件 11。viewer の画面と ai-agent のチャット画面は、どちらも操作の種類・状態・理由を言葉にし、本文の差分を表示する。
 - **Selected Approach**: 値から翻訳キーを引く表、`translation` の名前空間の `change_proposal.*` のキー（5 言語）、diff2html の設定と CSS を、core の `client/shared/` に置く。ページ履歴の差分（`RevisionDiff`）も同じ部品を使う。画面ごとの文言は、それぞれの spec が `change_proposal_viewer.*` と `change_proposal_chat.*` に置く。まとめた通知の文言は viewer の `commons` に置く。
 - **Rationale**: 値の型を持つのは core なので、値が増えたときに表と翻訳を同じ spec の中で直せる。2 つの画面が別々に表を持つと、同じ値の言葉が食い違う。表を `satisfies Record<…>` で宣言すると、値を足して表に足し忘れたときに型の検査で止まる。
-- **Trade-offs**: キーの全体を表から引くので、翻訳キーの検査（i18next-cli）にはキーが使われていないように見える。`i18next.config.ts` の `preservePatterns` に 5 つの接頭辞のワイルドカードを足して、使われていないと報告されないようにする。`change_proposal.` で始まる静的な呼び出しを作らないので、ワイルドカードで隠れるキーは無い。
+- **Trade-offs**: キーの全体を表から引くので、翻訳キーの検査（i18next-cli）にはキーが使われていないように見える。`i18next.config.ts` の `preservePatterns` に 表の接頭辞（8 つ）のワイルドカードを足して、使われていないと報告されないようにする。`change_proposal.` で始まる静的な呼び出しを作らないので、ワイルドカードで隠れるキーは無い。
+
+### Decision: 新しいコレクションは Prisma で読み書きし、索引は Mongoose の schema で作る
+- **Context**: GROWI は Mongoose のモデルを Prisma の拡張（`Prisma.defineExtension`）へ順に移している（`.claude/rules/model.md`）。新しいコレクション `changeproposals` を Mongoose で読み書きすると、あとで移す対象を 1 つ増やすことになる。一方で、このコレクションには疎な索引（値を持つ文書だけが入る索引）が要り、Change Proposal の状態の変化は「今の状態がこうなら書く」という条件付きの更新に頼る。
+- **確かめた事実**（apps/app が使う Prisma は 6.19.2。prisma-engines の 6.19.2 の tag のコードを読んだ。動かしてはいない）:
+  1. 条件を付けた `updateMany` と `update` は、MongoDB の 1 つのコマンドにはならない。クエリエンジンは、まず条件に合う文書の `_id` を読み、次に `{ _id: { $in: 読んだ _id } }` だけを条件にして書く（`write.rs` の `update_records`）。2 回目のコマンドには元の条件が入らない。
+  2. ただし、`updateMany` と `update` は、クエリエンジンが MongoDB の transaction の中で実行する（`update.rs` の `flag_transactional`、`execute_operation.rs`）。読んでから書くまでの間に、別の処理が同じ文書を書き換えると、MongoDB は書き込みの衝突（WriteConflict）を返す。クエリエンジンは、その transaction を最初からやり直す（間を 5 ミリ秒空け、合計でおよそ 12 秒まで）。やり直しでは条件を読み直すので、もう条件に合わない文書は書かれず、返る件数は 0 になる。このため、条件付きの `updateMany` は「条件に合えば書く」を 1 回の処理として扱える。結果の件数が 1 なら自分が書いた、0 なら書いていない、と判断できる。
+  3. 埋め込みの配列（composite type の list。文書の中に持つ配列）への `updateMany` は、`$map` と `$cond` を使う 1 つの更新になる。配列の要素ごとに、書くときに条件を確かめて書き換える（`into_expression.rs`）。`operations` の中の、`key` と `status` が合う 1 つの要素だけを書き換える更新は、Prisma の通常の書き方で表せる。
+  4. 任意の項目について、Prisma は「値が null」と「項目そのものが無い」を区別する。更新では `unset: true` で項目を消せ、条件では `isSet` で項目があるかを確かめられる（apps/app の生成された型に `unset?: boolean` と `isSet?: boolean` がある）。
+  5. Prisma の schema は、疎な索引・TTL 索引・`partialFilterExpression` を表せない。また今の GROWI は `prisma db push` を使っていないので、`schema.prisma` の `@@index` は何も作らない（`.claude/skills/mongoose-to-prisma/SKILL.md`）。
+  6. アプリ内通知のモデルは、`target` を `refPath: 'targetModel'` で読み込む（`server/models/in-app-notification.ts`）。通知の一覧の API は `target` を読み込むので、`targetModel` に書く `ChangeProposal` という名前の Mongoose のモデルが登録されていないと、一覧の読み込みが失敗する。
+  7. apps/app の `utils/prisma.ts` は、すべての model の `update` と `updateMany` の `data` に `v: { increment: 1 }` を足す。`v`（`@map("__v")`）を持たない model では、この更新が失敗する。
+- **Alternatives Considered**:
+  1. Mongoose で読み書きする。移す対象が増える。
+  2. Prisma で読み書きし、索引は migrate-mongo の migration で作る（`20260619120000-add-unique-key-index-to-auditlog-es-sync-collections.js` の前例）。事実 6 のとおり、通知のために `ChangeProposal` の Mongoose のモデルの登録がどのみち要る。
+  3. Prisma で読み書きし、コレクションと索引の作成だけを、索引の項目だけを持つ Mongoose の schema に任せる（採用）。
+- **Selected Approach**: `features/change-proposal/server/models/change-proposal.ts` に、索引の項目だけを持つ Mongoose の schema（`getOrCreateModel('ChangeProposal', schema)` で登録し、export しない）と、Prisma の拡張を置く（`page-redirect.ts` と同じ形）。`schema.prisma` に `changeproposals` の model を足し、読み書きはすべて拡張の関数を通す。拡張は `utils/prisma.ts` の `createPrisma()` に登録する。この登録で、起動時にこのファイルが読み込まれ、Mongoose が接続のときに索引を作る。
+- **Rationale**: 事実 2・3 から、前の設計が `findOneAndUpdate` に頼っていた操作（lease の取得と延長、操作の状態の変化、期限切れと取り下げ）は、すべて条件付きの `updateMany` と件数の確認で同じ結果を保てる。生の MongoDB のコマンド（`$runCommandRaw`）が要る操作は無い。疎な索引は Mongoose の schema が作る。Mongoose の schema は事実 6 のためにも要る。
+- **Trade-offs**:
+  - 条件付きの更新が 1 回の処理として扱えるのは、クエリエンジンの作り（読んでから書く処理を transaction の中で行い、衝突したらやり直す）による。Prisma の文書に書かれた約束ではない。そこで、同じ条件付きの更新を 2 つ同時に走らせて、件数 1 が 1 つだけ返ることを結合テストで確かめる（tasks.md の 1.4・4.5・5.4）。Prisma の版を上げたときは、この結合テストで確かめ直す。結合テストで同時に 2 つが成功した場合は、その操作だけを `$runCommandRaw` の `update` コマンド（条件を `q` に入れ、`n` で件数を見る）に置き換える。
+  - 1 回の条件付きの更新は、読み・書き・transaction の確定の 3 回の往復になる。書き込みの衝突が続くと、クエリエンジンはおよそ 12 秒でやり直しをやめ、`P2034`（transaction の衝突）の誤りを返す。呼び出し側は、これを「取れなかった（件数 0）」と同じに扱う。
+  - transaction を使うので、MongoDB が replica set で動いている必要がある。GROWI は Prisma のためにすでに replica set を前提にしている。
+  - Prisma の model は `v` を持つので、Prisma の更新のたびに `__v` が 1 増える（`model.md`）。`__v` の値に頼る処理は作らない。
+- **Follow-up**: `schema.prisma` の `@@index` には、Mongoose の schema が作る索引と同じ項目・同じ名前（`map`）を書き、疎な索引にはそのことを注記する（`pages.wipExpiredAt` の前例）。将来 `prisma db push` が索引の作成を受け持つときに、疎の指定を付け直すためである。
+
+### Decision: リビジョンの印の型は `@growi/core` に置く
+- **Context**: 上書き防止の確認と書き込みの共通の処理（`server/service/page-save/`）は、人の保存の route も使うので、`features/change-proposal` に依存しない。一方で、その入力と `pageService.updatePage` / `create` の options は、リビジョンに書く印を受け取る。
+- **Selected Approach**: `@growi/core` の `interfaces/revision.ts` に、`IRevision` と並べて `IRevisionProposalMark = { proposalId: string; proposalOperationKey: string }` を置く。`IRevision` の 2 つの任意の項目と同じ名前にする。`page-save`・`pageService`・`prepareRevision` はこの型だけを受け取る。Change Proposal の側の `ProposalMark`（`proposalId` と `operationKey`。取り消しの操作が戻す相手と、API の応答で使う）は今のまま持ち、反映のときに純関数 `toRevisionProposalMark` で `IRevisionProposalMark` に変える。
+- **Rationale**: 依存の向き（`page-save` は `features/change-proposal` を import しない）を守ったまま、リビジョンの項目名と同じ名前の型を、下の層が受け取れる。
+- **Trade-offs**: 似た 2 つの型（`ProposalMark` と `IRevisionProposalMark`）がある。変換を 1 つの純関数に限り、単体テストで項目の対応を確かめる。
+
+### Decision: 完了は、待ちの状態を変えた書き込みのすぐあとの条件付きの更新で決める
+- **Context**: 要件 2.9。「最後の『待ち』の状態を変えた更新で、同時に段階を完了にする」という書き方は、core の設計の契約に由来する。umbrella の決定 7 が求めるのは、「待ち」が 1 つも残らなくなったら自動で完了にすることだけで、同じ更新で行うことまでは求めていない。
+- **確かめた事実**: Prisma の更新は `data` を条件で切り替えられない。「この操作が最後の待ちなら、段階も `settled` にする」を 1 つの `updateMany` で書くには、条件の違う 2 つの更新（ほかに待ちが無い場合の更新と、ある場合の更新）を順に試し、どちらも当たらなければやり直す、という繰り返しが要る。
+- **Alternatives Considered**:
+  1. 上の 2 つの更新を順に試す。正しく書けるが、操作の結果を書くすべての関数に、やり直しの繰り返しが入る。
+  2. 待ちの状態を変えた書き込みのすぐあとに、`lifecycle: 'open'` で「待ち」が 1 つも無いことを条件にした更新（`settleIfNoPending`）を、同じ処理が呼ぶ（採用）。
+- **Selected Approach**: 2。反映の 1 回の実行の終わりと、飛ばす処理のあとで呼ぶ。2 つの書き込みの間で止まった場合は、保守用の cron が `open` で「待ち」の無い文書を探して完了にする。期限切れと取り下げは「待ち」があることを条件にする。
+- **Rationale**: 条件付きの更新なので何度呼んでも結果は同じで、反映と飛ばす処理が最後の 2 つの待ちの状態を同時に変えても、あとに呼んだほうが必ず完了にする。関数ごとのやり直しの繰り返しが要らない。
+- **Trade-offs**: 2 つの書き込みの間は、段階が `open` のまま「待ち」が無い。この間に起きることは、完了の表示が遅れることだけである（design の Open Questions / Risks）。
+
+### Decision: 段階と達成度は依頼した人にだけ返す
+- **Context**: 要件 12。依頼した人以外には、反映に関わった操作（反映済み・取り消し済み・取り消しを断られた）だけを返している。
+- **Selected Approach**: 段階と達成度を `requesterState` にまとめ、依頼した人への応答にだけ入れる。全体の状態（`ProposalStatus`）は今までどおり操作の状態から決め、`settled` を全体の状態の値には足さない。
+- **Rationale**: 依頼した人以外に段階を返すと、反映済みの操作しか見えないのに段階が承認待ちのままであることから、見えない「待ち」の操作があると分かる。達成度も、依頼した人以外にはいつも 100% になり、分母から見えない操作の数が分かる。
+- **Trade-offs**: 依頼した人以外の画面には「完了」が出ない。他の人にとって意味があるのは反映された内容なので、全体の状態の表示で足りる。
+
+### Decision: 後続と見直しは `basedOn` で元に結び付け、元の操作は書き換えない
+- **Context**: 要件 13・14。umbrella の決定 7。
+- **Selected Approach**: 後続・見直しの Change Proposal の側に `basedOn`（元の ID・関係・元の操作の `key`）を持ち、元の側は書き換えない。元から後続・見直しへは `basedOn.proposalId` の疎な索引で引く。作れるのは元の依頼した人だけで、元が取り消しの Change Proposal のときは作れない。
+- **Rationale**: 元の操作の状態（取り消し済みかどうかなど）は、取り消しの仕組みだけが決める。見直しの反映で元の操作を「取り消し済み」にすると、機械的に戻せたかのように見え、取り消しの判定（戻せる条件）の意味が崩れる。つながりを片側だけに持てば、元の文書を書き換える同時実行の問題が起きない。
+- **Trade-offs**: 元の Change Proposal を開くたびに、つながりを読む問い合わせが 1 回増える。読む件数に上限を設ける。
+- **元の操作として認める状態**: 後続は「古い」「失敗」「飛ばした」。「待ち」は元の Change Proposal でまだ承認できるので、後続にすると同じ変更が 2 か所で承認できてしまう。見直しは「反映済み」「取り消しを断られた」（今も内容がページに残っている操作）。「取り消し済み」は、内容がすでに戻っているので見直す意味が無い。
+
+### Decision: 見直しは自動反映しない
+- **Context**: 要件 13.4。
+- **Selected Approach**: `selectAutoApplyTargets` に関係を渡し、見直しなら方針にかかわらず空を返す。
+- **Rationale**: 見直しは、ほかの人がその後に加えた編集をふまえて内容を作り直すものなので、元の案より人の編集とぶつかる見込みが高い。依頼した人が差分を確かめてから反映する。
 
 ## Risks & Mitigations
 - 人の保存の route に手が入る — 既存の `update-page.integ.ts` / `create-page.integ.ts` とページの結合テストを変更なしで通すことを、切り出しのタスクの完了条件にする。
 - 複数台のサーバーで、別のプロセスにつながっている編集者を見落とす — 分かっている制約として design に書き、umbrella の未決の論点に残す。
 - 移動の裏の処理と次の操作がぶつかる — 移動は最後に 1 つだけ。編集・作成の後は、重なる `PageOperation` が消えるのを決まった時間だけ待ち、それでも残れば「待ち」のままにする。
 - `revisions` に索引を足すと、大きな collection では起動時の索引作成に時間がかかる — 疎な索引（値を持つリビジョンだけが入る）にする。起動にかかる時間を結合テストの環境で確かめる。
+- 条件付きの更新が 1 回の処理として扱えることは、Prisma のクエリエンジンの作りに頼っている — 同時に 2 つ走らせる結合テストで確かめ、Prisma の版を上げたときに確かめ直す。成り立たなければ、その操作だけを `$runCommandRaw` に置き換える（Design Decisions の「新しいコレクションは Prisma で読み書きし、索引は Mongoose の schema で作る」）。
 - 1 件の Change Proposal が MongoDB の 1 文書の上限（16MB）を超える — 本文の合計の上限を定数で持ち、作成の時点で断る（要件 1.16）。
 
 ## References
 - `apps/app/.claude/skills/learned/page-save-origin-semantics/SKILL.md` — `origin` と上書き防止の確認の関係
 - `apps/app/.claude/rules/activity-recording.md` — activity の記録の順序
 - `apps/app/.claude/rules/page-write-action-403-404.md` — 見えないページへの応答をそろえる規則
-- `.claude/rules/model.md` — 索引は Mongoose 側で宣言する
+- `.claude/rules/model.md` と `.claude/skills/mongoose-to-prisma/SKILL.md` — 読み書きは Prisma の拡張、コレクションと索引の作成は Mongoose の schema
+- prisma-engines 6.19.2 の `query-engine/connectors/mongodb-query-connector/src/root_queries/write.rs`（`update_records`）、`query-engine/core/src/query_graph_builder/write/update.rs`、`query-engine/core/src/executor/execute_operation.rs`、`mongodb-query-connector/src/root_queries/update/into_expression.rs` — 条件付きの更新の実行のしかた
 - `.kiro/specs/collaborative-editor/design.md` — 共同編集の文書の状態
 - `.kiro/specs/revision-diff-api/design.md` — 見る人ごとの絞り込みの前例

@@ -37,7 +37,10 @@ GROWI AI Agent は、検索と読み取りの結果をもとに答えること�
 - **閲覧範囲が狭い**: ある読んだページについて、書き込み先のページを閲覧できるのに、その読んだページは閲覧できないユーザーがいる（またはいるかどうか確かめられない）こと。
 - **保留中の案**: 本人の確認が要るため、まだ Change Proposal にしていない案。本人が確かめて Change Proposal にするか、やめるまで残る。
 - **AI の記録**: 書き込みの道具が Change Proposal を作るときに残す、AI が書いた要約・会話へのリンク・AI が読んだページの一覧。本人にだけ見せる。
-- **古い操作**: core が「元のリビジョンから変わっていたため書き込まなかった」とした編集の操作。
+- **古い操作**: core が「元のリビジョンから変わっていたため書き込まなかった」とした編集の操作。画面では「見送り（ページが先に変わっていた）」と表す。
+- **完了・達成度・後続 Change Proposal・見直しの Change Proposal・元の Change Proposal・元の操作**: core の requirements.md の「本要件で使う言い方」と同じ。
+- **反映されなかった操作**: 状態が「古い」「失敗」「飛ばした」の操作のうち、本人が飛ばすことを選んだ操作を除いたもの。後続 Change Proposal で作り直す対象になる。
+- **後続・見直しの依頼**: 本人が画面のボタンで、元の Change Proposal と元の操作を選び、AI に後続または見直しの Change Proposal を作るよう頼むこと。依頼は本人のメッセージとして会話に送られ、元の Change Proposal と元の操作は、メッセージとは別に、その実行の値としてサーバーへ送られる。
 
 ## Boundary Context
 
@@ -49,10 +52,11 @@ GROWI AI Agent は、検索と読み取りの結果をもとに答えること�
   - チャット画面での表示・承認・飛ばす・破棄・取り消し・作り直し
   - AI の記録の保存と、本人だけが取得できる API
   - 反映済みの Change Proposal の詳細ページ（`change-proposal-viewer`）で、AI の記録を本人に見せる部品と、その部品を viewer の本人向けの場所に登録すること
+  - 後続 Change Proposal と見直しの Change Proposal を AI に作らせる流れ（チャット画面のボタン、viewer の詳細ページの本人向けの操作の場所に登録する部品、AI への指示）
   - AI への指示文（いつ書き込みの道具を使うか、どう出すか）
   - 新しく足す画面の文言（5 言語）
 - **Out of scope**:
-  - Change Proposal の保存・状態・反映・取り消しの実行・戻せるかの判定・管理者の設定・通知の中身（`change-proposal-core`）
+  - Change Proposal の保存・状態・反映・取り消しの実行・戻せるかの判定・管理者の設定・通知の中身（`change-proposal-core`）。後続・見直しのつながりの保存と検査、完了の判定と達成度の計算、見直しを自動反映しない扱いも core が持つ
   - 反映済みの Change Proposal の詳細ページ・一覧・ページ履歴や Recent Changes の印・まとめた通知の表示（`change-proposal-viewer`）。ただし詳細ページで AI の記録を表示するための API と、表示する部品は本 spec が提供する（部品を置く場所は viewer が用意する）
   - ページを直接書き換える道具。削除・閲覧範囲の変更・公開と非公開の切り替えの道具
   - 大きな整理を計画として先に出させる機能、AI が自分から始める作業
@@ -63,6 +67,7 @@ GROWI AI Agent は、検索と読み取りの結果をもとに答えること�
   - 既存の読み取りの道具（全文検索とページの本文の読み取り）の入力と出力の形は変えない。
   - 操作の種類・状態・理由の表示の言葉と、差分の表示の設定と見た目は、core が画面向けに共通で用意したものを使う。本 spec の文言はチャット画面に固有のものだけにする。
   - 新規作成の置き場所の候補は、既存の suggest-path の機能が出す。
+  - viewer は、詳細ページに入口ごとの本人向けの操作の場所を用意し、本 spec はそこに後続・見直しの依頼のボタンの部品を登録する。viewer は入口の種類で分岐しない。
 
 ## Requirements
 
@@ -176,6 +181,8 @@ GROWI AI Agent は、検索と読み取りの結果をもとに答えること�
 5. When 本人が過去の会話を開き直した場合, the AI Proposal Feature shall その会話で作られた案を表す表示を、今の状態で再び出す。
 6. The AI Proposal Feature shall 保留中の案を表す表示に、AI の提案である操作の印と、閲覧範囲が狭いページの名前の一覧を示す。
 7. The AI Proposal Feature shall 案を表す表示に、AI が書いた案の要約を示す。
+8. When Change Proposal が完了した場合, the AI Proposal Feature shall Change Proposal を表す表示に「完了」と、core が本人に返した達成度を示す。
+9. The AI Proposal Feature shall Change Proposal を表す表示に、core が返したつながり（その操作を元にした後続・見直しの Change Proposal と、元の Change Proposal）を、それぞれの詳細ページへのリンクとして示す。
 
 ### Requirement 9: チャット画面での承認・取り消し・作り直し
 
@@ -188,9 +195,11 @@ GROWI AI Agent は、検索と読み取りの結果をもとに答えること�
 4. When 本人が反映済みの操作、または反映済みの Change Proposal 全体の取り消しを選んだ場合, the AI Proposal Feature shall core に取り消しを求め、操作ごとの結果（取り消し済み・断られた理由・飛ばした理由）を示す。
 5. The AI Proposal Feature shall 取り消しのボタンを、core がその時点で戻せると判定した操作にだけ出し、戻せない操作には core が返した理由を示す。
 6. If 編集中の人がいたため操作が承認待ちに戻った場合, then the AI Proposal Feature shall その理由を示し、本人がもう一度承認できるようにする。
-7. When 本人が古い操作の「AI で作り直す」を選んだ場合, the AI Proposal Feature shall その操作の対象のページのパスを含む作り直しの依頼を、本人のメッセージとして同じ会話に送る。
+7. When 本人が古い操作の「AI で作り直す」を選んだ場合, the AI Proposal Feature shall その操作だけを元の操作とする後続の依頼（Requirement 13.2）を、その操作の対象のページのパスを含めて、本人のメッセージとして同じ会話に送る。
 8. If core が承認・飛ばす・破棄・取り消しを断った場合, then the AI Proposal Feature shall 断られた理由を表示し、表示を core の今の状態に合わせる。
 9. While 承認・飛ばす・破棄・取り消しの求めを core が処理している間, the AI Proposal Feature shall 同じ案への別の操作のボタンを押せないようにする。
+10. The AI Proposal Feature shall 破棄のボタンを「残りを反映せずに閉じる」という言葉で示し、古い操作を、対応が要る誤りではなく見送った操作として示す。
+11. While Change Proposal が完了している間, the AI Proposal Feature shall 承認・飛ばす・破棄のボタンを出さない。
 
 ### Requirement 10: AI の記録
 
@@ -222,5 +231,35 @@ GROWI AI Agent は、検索と読み取りの結果をもとに答えること�
 1. The AI Proposal Feature shall 新しく足すチャット画面の文言を、GROWI が対応する 5 言語（英語・日本語・中国語・フランス語・韓国語）すべてで表示する。
 2. The AI Proposal Feature shall 既存の検索と読み取りの道具の入力と出力の形、および、チャット画面の参照したページの一覧の表示を変えない。
 3. When 書き込み機能が管理者によって無効にされている場合, the AI Proposal Feature shall チャットの応答とチャット画面の表示を、書き込みの道具を足す前と同じにする。ただし、過去に作られた案を表す表示は、今の状態で出す。
-</content>
-</invoke>
+
+### Requirement 13: 後続 Change Proposal を作る
+
+**Objective:** 依頼した人として、反映されなかった操作を、今のページの本文に合わせて AI に作り直してもらいたい。新しい案が元の案から続いていることを、後からたどれるようにしたい。
+
+#### Acceptance Criteria
+1. Where 本人の Change Proposal（入口が AI チャット）に反映されなかった操作がある場合, the AI Proposal Feature shall Change Proposal を表す表示に「後続 Change Proposal を作る」を出す。
+2. When 本人が「後続 Change Proposal を作る」を選んだ場合, the AI Proposal Feature shall 反映されなかった操作の対象のページのパスを含む依頼を、本人のメッセージとして、その Change Proposal を作った会話に送り、その実行で作る Change Proposal に、元の Change Proposal・元の操作・関係「後続」を付けて core に渡す。
+3. While 後続の依頼の実行の間, the AI Proposal Feature shall 対象のページの今の本文を読み直してから、反映されなかった操作だけを作り直すよう AI に指示する。
+4. The AI Proposal Feature shall 元の Change Proposal と元の操作を、本人が画面で選んだものだけから決め、AI の道具の入力・AI が書いた文・道具が返した内容からは決めない。
+5. If core が元の Change Proposal または元の操作を受け付けなかった場合, then the AI Proposal Feature shall 断られた理由を AI に返し、その案を保存しない。
+6. When 後続・見直しの依頼の実行で作った案が保留中の案になった場合, the AI Proposal Feature shall 本人が保留中の案を進めて作る Change Proposal にも、同じ元の Change Proposal・元の操作・関係を付ける。
+
+### Requirement 14: AI に見直してもらう
+
+**Objective:** 依頼した人として、反映された変更を、その後に他の人が加えた編集を残したまま、AI に考え直してもらいたい。取り消しが断られて元に戻せない変更にも、手で 1 ページずつ直さずに対応するため。
+
+#### Acceptance Criteria
+1. Where 本人の Change Proposal（入口が AI チャット）に、反映済みまたは取り消しを断られた操作がある場合, the AI Proposal Feature shall その操作に「AI に見直してもらう」を出す。取り消しを断られた操作では、断られた理由の近くに出す。
+2. When 本人が「AI に見直してもらう」を選んだ場合, the AI Proposal Feature shall その操作の対象のページのパスを含む見直しの依頼を、本人のメッセージとして、その Change Proposal を作った会話に送り、その実行で作る Change Proposal に、元の Change Proposal・元の操作・関係「見直し」を付けて core に渡す。
+3. While 見直しの依頼の実行の間, the AI Proposal Feature shall 取り消しのように元の本文へ戻すのではなく、対象のページの今の本文を読み直し、その後に人が加えた編集を残したまま内容を考え直す案を、できるだけ短い置き換えの指示で出すよう AI に指示する。
+4. The AI Proposal Feature shall 見直しの Change Proposal を、自動反映の方針にかかわらず、本人が差分を確かめて承認するまで反映されないものとして示し、操作ごとの承認のボタンを出す。
+
+### Requirement 15: viewer の詳細ページからの後続・見直しの依頼
+
+**Objective:** 依頼した人として、反映済みの Change Proposal を詳細ページで見ているときにも、チャットを探さずに後続や見直しを AI に頼みたい。
+
+#### Acceptance Criteria
+1. When 依頼した人が、入口が AI チャットの Change Proposal の詳細ページ（`change-proposal-viewer`）を開いた場合, the AI Proposal Feature shall viewer が用意した本人向けの操作の場所に、13.1 と同じ条件で「後続 Change Proposal を作る」を、14.1 と同じ条件で操作ごとの「AI に見直してもらう」を出す。
+2. When 本人が詳細ページでそれらを選んだ場合, the AI Proposal Feature shall チャット画面を、その Change Proposal を作った会話で開き、13.2・14.2 と同じ依頼を送る。会話が削除されている場合と、AI の記録が無い場合は、新しい会話を開いて送る。
+3. If AI の機能が無効でチャット画面を使えない場合, then the AI Proposal Feature shall 詳細ページにこれらのボタンを出さない。
+4. The AI Proposal Feature shall 詳細ページのこれらのボタンを、依頼した人以外に出さない。

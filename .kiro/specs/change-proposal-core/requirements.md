@@ -37,8 +37,14 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
 - **取り消し**: 反映した操作を元に戻すこと。種類が「取り消し」の Change Proposal を作り、同じ反映の仕組みで適用する。新規作成を戻すときは、作ったページをごみ箱へ移す。その取り消しをさらに戻すときは、ページをごみ箱から元のパスへ戻す。この 2 つの操作は、取り消しの Change Proposal だけが持つ。
 - **見る人**: API を呼んで Change Proposal を取得するユーザー。依頼した人の場合も、他のユーザーの場合もある。
 - **閲覧できるページ**: 見る人が、その時点の閲覧範囲の設定に従って見られるページ。GROWI では、閲覧できるページは編集もできる。
-- **見る人に返す操作**: 依頼した人には、閲覧できるページに対する操作と、まだページが無い新規作成の操作。依頼した人以外の見る人には、閲覧できるページ（リンクを知る人だけが見られるページを除く）に対する操作のうち、状態が「反映済み」「取り消し済み」「取り消しを断られた」のものだけ。依頼した人以外には、「待ち」「失敗」「古い」「飛ばした」の操作を返さない。Change Proposal が承認待ちかどうか、破棄・期限切れ・取り下げになったかどうかは、この決まりに関係しない。
+- **見る人に返す操作**: 依頼した人には、閲覧できるページに対する操作と、まだページが無い新規作成の操作。依頼した人以外の見る人には、閲覧できるページ（リンクを知る人だけが見られるページを除く）に対する操作のうち、状態が「反映済み」「取り消し済み」「取り消しを断られた」のものだけ。依頼した人以外には、「待ち」「失敗」「古い」「飛ばした」の操作を返さない。Change Proposal の段階（承認待ち・完了・破棄・期限切れ・取り下げ）は、この決まりに関係しない。
 - **編集中の人がいるページ**: そのページの共同編集の画面に誰かが接続しているページ、または共同編集の文書に、まだページへ保存されていない入力が残っているページ。
+- **段階**: Change Proposal 全体が、まだ動いているか、終わったかを表す値。「承認待ち」「完了」「破棄」「期限切れ」「取り下げ」の 5 つ。操作の状態とは別に持つ。
+- **完了**: 「待ち」の操作が 1 つも残っていない段階。反映・飛ばす・承認による反映の処理で、最後の「待ち」の操作の状態が決まったときに、自動でこの段階になる。
+- **達成度**: 依頼した人が反映しないことを選んだ操作を除いた操作のうち、一度でも反映された操作（状態が「反映済み」「取り消し済み」「取り消しを断られた」）の割合。依頼した人にだけ返す。
+- **元の Change Proposal**: 後続または見直しの Change Proposal が作られるもとになった Change Proposal。その中で、後続・見直しが指す操作を **元の操作** と呼ぶ。
+- **後続の Change Proposal**: 元の Change Proposal で反映されなかった操作（「古い」「失敗」「飛ばした」）を、今のページに対してもう一度試すために作る Change Proposal。画面では「後続 Change Proposal」と呼ぶ。
+- **見直しの Change Proposal**: 元の Change Proposal で反映された内容を、その後に人が加えた編集をふまえて考え直すために作る Change Proposal。取り消しとは違い、元の操作をそのまま戻すのではなく、新しい内容を作る。
 
 操作ごとの状態は次の 7 つとする。
 
@@ -65,6 +71,8 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
   - 管理者の設定画面（5 言語の文言を含む）
   - Change Proposal を作り、取得し、承認し、取り消す API。見る人に返す操作の分だけを返すこと
   - 兄弟の spec の画面で共通に使う部品: 操作の種類・操作の状態・全体の状態・理由・戻せない理由の表示名（5 言語）と、本文の差分を表示するときの diff2html の設定と見た目
+  - 段階「完了」への自動の移り変わりと、依頼した人にだけ返す段階と達成度
+  - 後続・見直しの Change Proposal と元の Change Proposal のつながりの保存と検査、つながりを見る人ごとに絞って返すこと。段階・つながりの関係・達成度の表示名（5 言語）
 - **Out of scope**:
   - AI に Change Proposal を作らせる道具、置き換えの指示から本文を組み立てる処理、内容が大きく消える操作の拒否、チャット画面（`change-proposal-ai-agent`）
   - 反映済みの Change Proposal の詳細ページ・一覧画面、ページ履歴・Recent Changes・ページの見出しの印、取り消しボタン、「本人に戻すよう頼む」通知、まとめたアプリ内通知の画面での表示と文言（`change-proposal-viewer`）
@@ -73,6 +81,8 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
   - 差分の塊ごとの承認、元のリビジョンが変わった案の自動の合わせ込み
   - ページの削除・閲覧範囲の変更・公開と非公開の切り替えを操作として受け付けること
   - 「待ち」「失敗」「古い」「飛ばした」の操作を、依頼した人以外に見せること
+  - 後続・見直しの Change Proposal の中身（どの操作をどう作り直すか）を作ること。入口が作る（AI チャットでは `change-proposal-ai-agent`）
+  - 後続・見直しを作るボタンなどの画面（`change-proposal-ai-agent` と `change-proposal-viewer`）
 - **Adjacent expectations**:
   - 入口（`change-proposal-ai-agent` など）は、変更後の本文全体を作ってから Change Proposal を作る。本 spec は受け取った本文をそのまま使い、本文の中身を評価しない。
   - 入口の違い（AI チャット・Vault・MCP）によって、反映・承認・取り消しの振る舞いを変えない。
@@ -117,6 +127,9 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
 6. When 操作が反映された場合, the Change Proposal System shall その操作に、反映した日時と、反映で作られたページとリビジョンを記録する。
 7. When 操作が「失敗」「古い」「取り消しを断られた」になった場合, the Change Proposal System shall その操作に、理由を表す決まった値を記録する。
 8. The Change Proposal System shall 反映済みの操作を含む Change Proposal を削除しない。
+9. When 段階が承認待ちの Change Proposal で、反映・飛ばす・承認による反映の処理の結果、「待ち」の操作が 1 つも残らなくなった場合, the Change Proposal System shall その Change Proposal の段階を自動で完了にする。作成の直後の自動反映ですべての操作の状態が決まった Change Proposal と、取り消しの Change Proposal も同じように完了にする。
+10. If 完了した Change Proposal の承認・飛ばす・破棄を求められた場合, then the Change Proposal System shall それを受け付けず、反映できない状態であることを返す。完了した Change Proposal の反映済みの操作の取り消しと、完了した Change Proposal を元にした後続・見直しの作成は受け付ける。
+11. The Change Proposal System shall 完了した Change Proposal を、期限切れと取り下げの対象にしない。
 
 ### Requirement 3: 反映
 
@@ -251,3 +264,39 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
 1. The Change Proposal System shall 操作の種類・操作の状態・全体の状態・理由・戻せない理由のそれぞれについて、値ごとの表示名を、GROWI が対応する 5 言語すべてで用意する。
 2. The Change Proposal System shall 1 の表示名を、値から表示名の翻訳キーを引く表として、兄弟の spec の画面から import できる形で提供する。値の型に含まれるすべての値に表示名があることを、型の検査で確かめられるようにする。
 3. The Change Proposal System shall Change Proposal の本文の差分を、ページ履歴の差分と同じ diff2html の設定と見た目で表示するための部品を、兄弟の spec の画面から import できる形で提供し、ページ履歴の差分もそれを使う。ページ履歴の差分の見た目は変えない。
+4. The Change Proposal System shall 段階・つながりの関係（後続・見直し・元）の表示名と、達成度を表す文言を、11.1 と同じく 5 言語で用意し、11.2 と同じ形で兄弟の spec の画面から使えるようにする。
+5. The Change Proposal System shall 状態「古い」の表示名を、対応が要る誤りではなく、ページが先に変わっていたために見送ったことが分かる言葉（日本語では「見送り（ページが先に変わっていた）」）にする。段階「破棄」と全体の状態「破棄」の表示名は、残りの操作を反映せずに閉じたことが分かる言葉（日本語では「残りを反映せずに閉じた」）にする。
+
+### Requirement 12: 完了と達成度
+
+**Objective:** 依頼した人として、自分の Change Proposal が終わったかどうかと、頼んだ変更のうちどれだけが反映されたかを知りたい。残りをどうするかを決めるため。
+
+#### Acceptance Criteria
+1. When 依頼した人が自分の Change Proposal を取得した場合（1 件の取得と一覧のどちらでも）, the Change Proposal System shall その Change Proposal の段階と達成度を返す。
+2. The Change Proposal System shall 達成度を、一度でも反映された操作の数と、全体の操作の数から依頼した人が反映しないことを選んだ操作の数を引いた数、の 2 つの数として返す。
+3. The Change Proposal System shall 取り消しの Change Proposal には、達成度を返さない。
+4. The Change Proposal System shall 段階と達成度を、依頼した人以外の見る人への応答に含めない。
+
+### Requirement 13: 後続と見直しの Change Proposal
+
+**Objective:** 入口を作る開発者として、反映されなかった操作をもう一度試す Change Proposal と、反映された内容を考え直す Change Proposal を、元の Change Proposal に結び付けて作りたい。依頼した人が、どの Change Proposal から続いたものかをたどれるようにするため。
+
+#### Acceptance Criteria
+1. Where 入口が作成の求めに、元の Change Proposal の ID・関係（後続または見直し）・元の操作の一覧を指定した場合, the Change Proposal System shall それを Change Proposal とともに保存する。入口の種類にかかわらず保存する。
+2. If 指定された元の Change Proposal が存在しない場合、作成を求めた依頼した人が元の Change Proposal の依頼した人でない場合、または元の Change Proposal が取り消しの Change Proposal である場合, then the Change Proposal System shall その Change Proposal を保存せず、どの場合も同じ「元の Change Proposal を使えない」結果を返す。
+3. If 元の操作が 1 つも指定されていない場合、指定された元の操作が元の Change Proposal に無い場合、または元の操作の状態が関係に合わない場合, then the Change Proposal System shall その Change Proposal を保存せず、合わない操作を示す結果を返す。関係に合う状態は、後続では「古い」「失敗」「飛ばした」、見直しでは「反映済み」「取り消しを断られた」とする。
+4. Where 関係が見直しである場合, the Change Proposal System shall 自動反映の方針にかかわらず、作成の直後にどの操作も反映せず、すべてを依頼した人の承認待ちにする。
+5. The Change Proposal System shall 後続・見直しの Change Proposal を作ったときも反映したときも、元の操作の状態を変えない。
+6. The Change Proposal System shall 元の操作を「取り消し済み」にするのを、取り消しの Change Proposal の反映（Requirement 5）だけにする。見直しの Change Proposal の反映では「取り消し済み」にしない。
+7. Where 関係が後続である場合, the Change Proposal System shall 自動反映と承認を、通常の Change Proposal と同じに扱う。
+
+### Requirement 14: つながりの取得と、見る人ごとの絞り込み
+
+**Objective:** 反映後の画面とチャット画面を作る開発者として、ある Change Proposal から、その後続・見直しの Change Proposal と、元の Change Proposal へたどれる情報がほしい。ただし、見る人が閲覧できないページの存在は、つながりからも分からないようにしたい。
+
+#### Acceptance Criteria
+1. When 見る人が Change Proposal を 1 件取得した場合, the Change Proposal System shall 返す操作ごとに、その操作を元の操作として指す後続・見直しの Change Proposal の ID と関係を返す。
+2. When 見る人が後続・見直しの Change Proposal を 1 件取得した場合, the Change Proposal System shall 元の Change Proposal の ID と関係と、元の操作のうち見る人に返す操作の key を返す。
+3. If 依頼した人以外の見る人がつながった先の Change Proposal を取得すると「見つからない」になる場合, then the Change Proposal System shall そのつながりを返さない。
+4. The Change Proposal System shall 依頼した人以外の見る人に、見る人に返さない元の操作の key と、その数を返さない。
+5. If 依頼した人以外の見る人に返す元の操作の key が 1 つも無い場合, then the Change Proposal System shall 元の Change Proposal へのつながりを返さない。

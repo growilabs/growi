@@ -56,14 +56,15 @@ GROWI の AI 機能は、今は検索と、読んだページをもとにした�
   - `change-proposal-core` は「何を、どう反映し、どう取り消すか」を持ち、入口（AI チャット・Vault・MCP）を知らない。入口を増やしても core を変えずに済む。
   - `change-proposal-ai-agent` は入口の1つで、AI に何を任せてよいか（書き込み先の制限、閲覧範囲の確認、変更の出させ方）を持つ。
   - `change-proposal-viewer` は反映した後の見せ方と、画面からの取り消しを持つ。入口に関係なく同じ画面を使う。
-  - `change-proposal-ai-agent` と `change-proposal-viewer` は、どちらも core に依存し、並行して進められる。例外は、ai-agent が詳細ページに部品を登録する1つのタスクで、viewer の置き場所ができてから行う。
+  - `change-proposal-ai-agent` と `change-proposal-viewer` は、どちらも core に依存し、並行して進められる。例外は、ai-agent が詳細ページに部品を登録する 2 つのタスク（AI の記録と、後続・見直しのボタン）で、viewer の置き場所ができてから行う。
 - **Shared seams to watch**:
   - core の反映の API ↔ ai-agent の自動反映・承認: 承認の単位（ページ単位）と、自動反映しなかった操作が承認待ちとして残る扱いを、両方の spec で同じにする。
   - core の取り消しの条件 ↔ viewer の取り消しボタン: 戻せるかどうかの判定は core が持ち、viewer はその結果を表示するだけにする。
   - 見る人ごとの絞り込み: 通知の中身は core、画面は viewer が作る。どちらも同じ判定（見る人が閲覧できるページか）を使う。
   - `proposalId` の記録: core がリビジョンにだけ書き（ページには書かない）、viewer がページ履歴と Recent Changes の印に使う。
   - 表示用の共通部品: 操作の種類・状態・理由の文言の表と、差分表示の設定は core が `features/change-proposal/client/shared/` に持ち、ai-agent と viewer はそれを使う。値を決めているのが core だから。
-  - 本人にだけ見せる部分: viewer が詳細ページに入口ごとの置き場所を用意し、ai-agent が AI の要約と会話を出す部品をそこに登録する。ai-agent のこの1つのタスクだけが viewer に依存する。
+  - 本人にだけ見せる部分: viewer が詳細ページに入口ごとの置き場所（本人向けの内容と、本人向けの操作の 2 つ）を用意し、ai-agent が AI の要約と会話を出す部品と、後続・見直しを頼むボタンの部品をそこに登録する。ai-agent のこの 2 つのタスクだけが viewer に依存する。
+  - 完了・達成度・後続と見直しのつながり（`basedOn`）: 段階の移り変わり、達成度の数え方、つながりの保存と検査、見る人ごとの絞り込みは core が持つ。後続・見直しの中身と、それを頼むボタンは入口（ai-agent）が持つ。viewer は core が返したものを表示するだけにする（research.md の決定 7）。
 - **Cross-spec touchpoints**（複数の spec が触るもの）:
   - `@growi/core` の変更: core がリビジョンの型に項目を足し、ai-agent が置き換えを当てる純関数 `applyStringEdits` を足す。どちらも changeset が要る。
   - 既存の `ai-agentic-search` の確かめ直し: ai-agent が `growi-agent.ts` と `post-message.ts` を書き換えるので、`ai-agentic-search` の Revalidation Triggers（`RequestContext` の新しいキー、指示文の構成の変更）に当たる。
@@ -72,7 +73,7 @@ GROWI の AI 機能は、今は検索と、読んだページをもとにした�
 ## Specs (dependency order)
 
 - [x] change-proposal-core -- Change Proposal のデータ・状態・サーバー側の反映と取り消し・管理者の設定・通知のまとめ。Dependencies: none
-- [x] change-proposal-ai-agent -- GROWI AI Agent から Change Proposal を作る道具、書き込みの守り、チャット画面での承認。Dependencies: change-proposal-core（詳細ページへの部品の登録の1タスクだけ change-proposal-viewer にも依存）
+- [x] change-proposal-ai-agent -- GROWI AI Agent から Change Proposal を作る道具、書き込みの守り、チャット画面での承認。Dependencies: change-proposal-core（詳細ページへの部品の登録の 2 タスクだけ change-proposal-viewer にも依存）
 - [x] change-proposal-viewer -- 反映済みの Change Proposal の詳細ページ、ページ履歴と Recent Changes の印、画面からの取り消し。Dependencies: change-proposal-core
 
 ## Future (brief はまだ作らない)
