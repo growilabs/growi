@@ -12,6 +12,8 @@
 // variants below are exactly design.md's declared shape.
 import type { ChatAccountRef } from '@growi/chat';
 
+import type { SdkChannelRef } from './channel.js';
+
 export type OutboundMessage =
   | { readonly kind: 'markdown'; readonly markdown: string }
   | {
@@ -89,3 +91,29 @@ export interface HistoryMessage {
   readonly author: ChatAccountRef;
   readonly text: string;
 }
+
+/**
+ * `PostOutcome` is unchanged so `post` / `replace` / `attachPreview` callers
+ * never handle a case that cannot happen for them; only the ephemeral
+ * operation can answer `unsupported`.
+ */
+export type EphemeralPostOutcome =
+  | PostOutcome
+  /** The adapter has no native ephemeral message. Nothing was posted. */
+  | { readonly ok: false; readonly reason: 'unsupported' };
+
+/** `PlatformFacade.postDirect()`'s result: the DM channel it posted into. */
+export type DirectPostOutcome =
+  | {
+      readonly ok: true;
+      readonly messageId: string;
+      readonly channel: SdkChannelRef;
+    }
+  | { readonly ok: false; readonly detail: string };
+
+export type ReactionOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly detail: string };
+
+/** Chat SDK's shared emoji names this app uses. */
+export type ReactionName = 'eyes' | 'email';

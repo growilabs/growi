@@ -2,17 +2,23 @@ import { describe, expect, it } from 'vitest';
 
 import type {
   AdminActorRoles,
+  DirectPostOutcome,
   DistributedLock,
+  EphemeralPostOutcome,
   FieldSpec,
   HistoryMessage,
   HistoryOutcome,
   InstallationCredentials,
   InteractionRef,
+  Invocation,
   ModalForm,
   OutboundMessage,
   PlatformAppConfig,
   PostOutcome,
+  ReactionName,
+  ReactionOutcome,
   Relation,
+  SdkChannelRef,
   TimeRange,
 } from './index.js';
 
@@ -211,5 +217,57 @@ describe('PlatformAppConfig / InstallationCredentials', () => {
     // `InstallationCredentials` never carries an always-on-connection value
     // -- enforced structurally: neither interface declares the other's
     // connection-opening fields (e.g. no `appToken` here).
+  });
+});
+
+describe('private-reply outcome types', () => {
+  it('lets only the ephemeral outcome answer unsupported, keeping PostOutcome unchanged', () => {
+    const unsupported: EphemeralPostOutcome = {
+      ok: false,
+      reason: 'unsupported',
+    };
+    const posted: EphemeralPostOutcome = { ok: true, messageId: 'm1' };
+    // @ts-expect-error PostOutcome must not gain the unsupported arm.
+    const notAPostOutcome: PostOutcome = unsupported;
+
+    expect([unsupported, posted, notAPostOutcome]).toHaveLength(3);
+  });
+
+  it('carries the DM channel on a successful direct post', () => {
+    const channel: SdkChannelRef = {
+      platform: 'slack',
+      channelId: 'slack:D1' as SdkChannelRef['channelId'],
+      channelName: 'dm',
+      isPrivate: true,
+    };
+    const ok: DirectPostOutcome = { ok: true, messageId: 'm1', channel };
+    const failed: DirectPostOutcome = { ok: false, detail: 'im:write missing' };
+    const reacted: ReactionOutcome = { ok: true };
+    const reactionFailed: ReactionOutcome = { ok: false, detail: 'nope' };
+    const names: ReactionName[] = ['eyes', 'email'];
+
+    expect([ok, failed, reacted, reactionFailed, names]).toHaveLength(5);
+  });
+});
+
+describe('Invocation.sourceMessageId', () => {
+  it('is optional so a stored row without it still type-checks', () => {
+    const base: Invocation = {
+      platform: 'slack',
+      channel: {
+        platform: 'slack',
+        channelId: 'slack:C1' as SdkChannelRef['channelId'],
+        channelName: 'general',
+        isPrivate: false,
+      },
+      actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
+      commandName: 'search',
+      argsText: '',
+      interaction: null,
+    };
+    const withId: Invocation = { ...base, sourceMessageId: '1700.1' };
+    const withNull: Invocation = { ...base, sourceMessageId: null };
+
+    expect([base, withId, withNull]).toHaveLength(3);
   });
 });

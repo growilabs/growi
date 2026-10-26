@@ -85,10 +85,14 @@ export type { ClosedNetworkConfig } from './closed-network-config.js';
 export type { DistributedLock } from './distributed-lock.js';
 export type { Invocation } from './invocation.js';
 export type {
+  DirectPostOutcome,
+  EphemeralPostOutcome,
   HistoryMessage,
   HistoryOutcome,
   OutboundMessage,
   PostOutcome,
+  ReactionName,
+  ReactionOutcome,
 } from './outbound-message.js';
 export type {
   InstallationCredentials,

@@ -31,4 +31,6 @@ export interface Invocation {
   readonly commandName: string;
   readonly argsText: string;
   readonly interaction: InteractionRef | null;
+  /** Optional so `pending_collection` rows saved before it existed still type-check. */
+  readonly sourceMessageId?: string | null;
 }
