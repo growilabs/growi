@@ -681,11 +681,16 @@ export const refreshChannelInventory = async (
 
   for (const channel of inventory.channels) {
     // Sequential: one installation's channel count is small, and the storage
-    // layer offers a single-row upsert on purpose (no bulk replace exists,
-    // because nothing here deletes).
+    // layer offers a single-row upsert on purpose.
     // biome-ignore lint/performance/noAwaitInLoops: one upsert per channel
     await deps.channels.upsert({ ...channel, installationId, refreshedAt });
   }
+  // Only after a complete listing: a channel deleted on the service would
+  // otherwise stay offered to GROWI and pass the destination check forever.
+  await deps.channels.deleteAllExcept(
+    installationId,
+    inventory.channels.map((channel) => channel.channelId),
+  );
 
   await deps.installations.markChannelsSynced(installationId, refreshedAt);
 };

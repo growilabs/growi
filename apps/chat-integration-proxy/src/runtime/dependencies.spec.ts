@@ -382,6 +382,7 @@ describe('the periodic work createProxyDependencies composes', () => {
 describe('the bot being added to a channel', () => {
   it('refreshes that installation through the same refresh the sweeper and the install path use', async () => {
     const db = mockDeep<PrismaClient>();
+    db.installationChannel.deleteMany.mockResolvedValue({ count: 0 });
     const facade = facadeMock();
     vi.mocked(facade.listChannels).mockResolvedValue({
       channels: [

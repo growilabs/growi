@@ -67,6 +67,15 @@ export interface InstallationChannelRepository {
    */
   existsAny(installationId: string): Promise<boolean>;
   /**
+   * Deletes the installation's rows for every channel NOT in `kept` -- what a
+   * complete refresh calls with the channels it just listed, so a channel
+   * deleted on the service stops being offered and accepted as a destination.
+   */
+  deleteAllExcept(
+    installationId: string,
+    kept: ReadonlyArray<InventoryChannelId>,
+  ): Promise<number>;
+  /**
    * Deletes the whole saved inventory of an installation. Called only when the
    * installation itself is removed (`InstallationStore.remove()`), where
    * `installation_channel` -> `installation` being `Restrict` means the
@@ -83,8 +92,8 @@ export interface InstallationChannelRepository {
 /**
  * `null` for a row whose id is not in the form its service's inventory holds:
  * such a row can name no channel this proxy compares against or posts to, so
- * it is left out rather than failing every read of the installation. The
- * refresh never deletes, so it stays until the installation is removed.
+ * it is left out rather than failing every read of the installation, and the
+ * next complete refresh deletes it.
  */
 const toRecord = (
   row: InstallationChannelRow,
@@ -142,6 +151,13 @@ export const createInstallationChannelRepository = (
       select: { installationId: true },
     });
     return row != null;
+  },
+
+  deleteAllExcept: async (installationId, kept) => {
+    const result = await db.installationChannel.deleteMany({
+      where: { installationId, channelId: { notIn: [...kept] } },
+    });
+    return result.count;
   },
 
   deleteByInstallation: async (installationId) => {
