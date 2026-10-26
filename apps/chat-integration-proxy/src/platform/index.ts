@@ -20,6 +20,7 @@ import type {
   AdminActorRoles,
   ChannelListing,
   DistributedLock,
+  EphemeralPostOutcome,
   HistoryOutcome,
   InteractionRef,
   ModalForm,
@@ -88,7 +89,7 @@ export interface PlatformFacade {
     user: ChatAccountRef,
     message: OutboundMessage,
     scope?: { readonly installationId: string },
-  ): Promise<PostOutcome>;
+  ): Promise<EphemeralPostOutcome>;
   /**
    * Opens a modal; the submission arrives later as a `modal-submit` event.
    * Answers whether it opened, so a caller can fall back to asking in the

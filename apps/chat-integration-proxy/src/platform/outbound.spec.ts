@@ -14,7 +14,10 @@ import { createSlackAdapter } from '@chat-adapter/slack';
 import { createTeamsAdapter } from '@chat-adapter/teams';
 import type { ChatAccountRef, PlatformName } from '@growi/chat';
 import type { Adapter, CardElement, StateAdapter } from 'chat';
-import { createMattermostAdapter } from 'chat-adapter-mattermost';
+import {
+  createMattermostAdapter,
+  type MattermostPost,
+} from 'chat-adapter-mattermost';
 import { mock } from 'vitest-mock-extended';
 
 import { toSdkChannelId } from '../capabilities/index.js';
@@ -107,26 +110,32 @@ const CHOICE: OutboundMessage = {
   ],
 };
 
+// Kept at their concrete types so a test can spy on a method `Adapter` marks
+// optional (`postEphemeral`, `openDM`).
+const slackAdapter = createSlackAdapter({
+  mode: 'socket',
+  appToken: 'xapp-1',
+  signingSecret: 's',
+});
+const discordAdapter = createDiscordAdapter({
+  applicationId: 'app-id',
+  publicKey: '0'.repeat(64),
+  botToken: 'bot-token',
+});
+const mattermostAdapter = createMattermostAdapter({
+  baseUrl: 'https://mattermost.example.com',
+  botToken: 'mm-token',
+});
+
 /** The four real adapters, constructible without any I/O (see adapter-set.spec.ts). */
 const realAdapters: Readonly<Record<PlatformName, Adapter>> = {
-  slack: createSlackAdapter({
-    mode: 'socket',
-    appToken: 'xapp-1',
-    signingSecret: 's',
-  }),
-  discord: createDiscordAdapter({
-    applicationId: 'app-id',
-    publicKey: '0'.repeat(64),
-    botToken: 'bot-token',
-  }),
+  slack: slackAdapter,
+  discord: discordAdapter,
   teams: createTeamsAdapter({
     appId: 'teams-app',
     appPassword: 'teams-secret',
   }),
-  mattermost: createMattermostAdapter({
-    baseUrl: 'https://mattermost.example.com',
-    botToken: 'mm-token',
-  }),
+  mattermost: mattermostAdapter,
 };
 
 /**
@@ -507,15 +516,15 @@ describe('classifyOutboundFailure', () => {
 });
 
 describe('postEphemeral', () => {
-  const user: ChatAccountRef = {
-    platform: 'slack',
+  const userOn = (platform: PlatformName): ChatAccountRef => ({
+    platform,
     accountId: 'U1',
     displayName: 'Someone',
-  };
+  });
 
-  it('sends a message only that user can see, natively where the service offers it', async () => {
-    const adapter = adapterMock();
-    adapter.postEphemeral.mockResolvedValue({
+  it('sends a message only that user can see, addressed at the channel it was given', async () => {
+    const adapter = slackAdapter;
+    const send = vi.spyOn(adapter, 'postEphemeral').mockResolvedValue({
       id: 'eph-1',
       raw: {},
       threadId: 'slack:C123:',
@@ -524,44 +533,98 @@ describe('postEphemeral', () => {
 
     const outcome = await postEphemeral(
       contextOf(adapter),
-      channelOf('slack', 'slack:C123'),
-      user,
+      channelOf('slack', realChannelIds.slack),
+      userOn('slack'),
       MARKDOWN,
     );
 
     expect(outcome).toEqual({ ok: true, messageId: 'eph-1' });
-    expect(adapter.postEphemeral).toHaveBeenCalledWith(
-      'slack:C123',
-      'U1',
-      expect.anything(),
+    expect(send).toHaveBeenCalledTimes(1);
+    const [threadId, userId] = send.mock.calls[0] ?? [];
+    expect(userId).toBe('U1');
+    expect(adapter.channelIdFromThreadId(String(threadId))).toBe(
+      realChannelIds.slack,
     );
+
+    send.mockRestore();
   });
 
-  it('falls back to a direct message on a service whose adapter has no native ephemeral', async () => {
-    // Discord's adapter implements no `postEphemeral`; the SDK's documented
-    // fallback is a DM, which still satisfies "only that user sees it".
-    const adapter = adapterMock();
-    const openDM = adapter.openDM;
-    Object.defineProperty(adapter, 'postEphemeral', {
-      value: undefined,
-      configurable: true,
-    });
-    openDM.mockResolvedValue('discord:G1:DM1');
-    adapter.postMessage.mockResolvedValue({
-      id: 'dm-1',
-      raw: {},
-      threadId: 'discord:G1:DM1',
+  it('hands Mattermost a thread id for the channel, not the bare channel id it cannot decode', async () => {
+    const adapter = mattermostAdapter;
+    const send = vi.spyOn(adapter, 'postEphemeral').mockResolvedValue({
+      id: 'eph-mm',
+      raw: mock<MattermostPost>(),
+      threadId: 'unused',
+      usedFallback: false,
     });
 
     const outcome = await postEphemeral(
       contextOf(adapter),
-      channelOf('discord', 'discord:G1:C1'),
-      { ...user, platform: 'discord' },
+      channelOf('mattermost', realChannelIds.mattermost),
+      userOn('mattermost'),
       MARKDOWN,
     );
 
-    expect(outcome).toEqual({ ok: true, messageId: 'dm-1' });
-    expect(openDM).toHaveBeenCalledWith('U1');
+    expect(outcome).toEqual({ ok: true, messageId: 'eph-mm' });
+    const [threadId] = send.mock.calls[0] ?? [];
+    expect(adapter.decodeThreadId(String(threadId))).toMatchObject({
+      channelId: 'mmchan1',
+    });
+
+    send.mockRestore();
+  });
+
+  it('answers unsupported on a service with no native ephemeral, sending nothing and opening no direct message', async () => {
+    const adapter = discordAdapter;
+    expect('postEphemeral' in adapter).toBe(false);
+    const postSpy = vi
+      .spyOn(adapter, 'postMessage')
+      .mockRejectedValue(new Error('must not post'));
+    const openDM = vi
+      .spyOn(adapter, 'openDM')
+      .mockRejectedValue(new Error('must not open a DM'));
+
+    const outcome = await postEphemeral(
+      contextOf(adapter),
+      channelOf('discord', realChannelIds.discord),
+      userOn('discord'),
+      MARKDOWN,
+    );
+
+    expect(outcome).toEqual({ ok: false, reason: 'unsupported' });
+    expect(postSpy).not.toHaveBeenCalled();
+    expect(openDM).not.toHaveBeenCalled();
+
+    postSpy.mockRestore();
+    openDM.mockRestore();
+  });
+
+  it('tells the user to invite the bot when the service refuses the channel, instead of throwing', async () => {
+    const adapter = mattermostAdapter;
+    const send = vi
+      .spyOn(adapter, 'postEphemeral')
+      .mockRejectedValue(
+        adapterError(
+          'PermissionError',
+          'mattermost',
+          'Permission denied: cannot post in mattermost',
+        ),
+      );
+
+    const outcome = await postEphemeral(
+      contextOf(adapter),
+      channelOf('mattermost', realChannelIds.mattermost),
+      userOn('mattermost'),
+      MARKDOWN,
+    );
+
+    expect(outcome).toEqual({
+      ok: false,
+      reason: 'bot-not-in-channel',
+      remedy: expect.any(String),
+    });
+
+    send.mockRestore();
   });
 
   it('reports a failure as a PostOutcome instead of throwing', async () => {
@@ -570,8 +633,8 @@ describe('postEphemeral', () => {
 
     const outcome = await postEphemeral(
       contextOf(adapter),
-      channelOf('slack', 'slack:C123'),
-      user,
+      channelOf('teams', realChannelIds.teams),
+      userOn('teams'),
       MARKDOWN,
     );
 

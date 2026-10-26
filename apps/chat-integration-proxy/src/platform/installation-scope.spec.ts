@@ -22,7 +22,7 @@ import type {
 import { ADAPTER_FACTORIES } from './adapter-set.js';
 import type { InstallationProvider } from './installation-provider.js';
 import { installationRunner } from './installation-scope.js';
-import { post } from './outbound.js';
+import { type OutboundContext, post, postEphemeral } from './outbound.js';
 
 interface ReceivedCall {
   readonly path: string;
@@ -149,23 +149,21 @@ describe('a Slack post made outside any incoming event', () => {
     await new Promise<void>((resolve) => fake.server.close(() => resolve()));
   });
 
+  const contextAs = (installationId: string | null): OutboundContext => ({
+    adapter,
+    state: mock<StateAdapter>(),
+    botName: 'growi',
+    run:
+      installationId == null
+        ? undefined
+        : (installationRunner('slack', adapter, installationId, {
+            installations: INSTALLATIONS,
+            factories: ADAPTER_FACTORIES,
+          }) ?? undefined),
+  });
+
   const postAs = (installationId: string | null, channel: SdkChannelRef) =>
-    post(
-      {
-        adapter,
-        state: mock<StateAdapter>(),
-        botName: 'growi',
-        run:
-          installationId == null
-            ? undefined
-            : (installationRunner('slack', adapter, installationId, {
-                installations: INSTALLATIONS,
-                factories: ADAPTER_FACTORIES,
-              }) ?? undefined),
-      },
-      channel,
-      NOTIFICATION,
-    );
+    post(contextAs(installationId), channel, NOTIFICATION);
 
   it('has no bot to speak as unless told which installation it is for', async () => {
     // What the rest of this block guards against: without this the tests
@@ -189,6 +187,24 @@ describe('a Slack post made outside any incoming event', () => {
         path: '/api/chat.postMessage',
         authorization: 'Bearer xoxb-installation-x',
         channel: 'C0000000X',
+      },
+    ]);
+  });
+
+  it("reaches chat.postEphemeral, for only that user, with that installation's own bot token", async () => {
+    const outcome = await postEphemeral(
+      contextAs('installation-y'),
+      slackChannel('C0000000Y'),
+      { platform: 'slack', accountId: 'U0000000Y', displayName: 'Someone' },
+      NOTIFICATION,
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(fake.calls).toEqual([
+      {
+        path: '/api/chat.postEphemeral',
+        authorization: 'Bearer xoxb-installation-y',
+        channel: 'C0000000Y',
       },
     ]);
   });

@@ -30,6 +30,7 @@ import type {
 } from '../db/index.js';
 import type { PlatformFacade } from '../platform/index.js';
 import type {
+  EphemeralPostOutcome,
   FieldSpec,
   Invocation,
   OutboundMessage,
@@ -250,6 +251,26 @@ const discardNoticeFor = (commandName: string): OutboundMessage => ({
   markdown: `前の \`${commandName}\` コマンドの入力は取り消しました。`,
 });
 
+const CANNOT_ASK =
+  'このチャットサービスでは、値を聞き返す手段がないため、このコマンドを実行できません。';
+
+/**
+ * Why a question could not be shown. `unsupported` reads like the capability
+ * pre-check because, for now, a question has nowhere else to go.
+ */
+const whyNotAsked = (
+  posted: Extract<EphemeralPostOutcome, { ok: false }>,
+): string => {
+  switch (posted.reason) {
+    case 'bot-not-in-channel':
+      return posted.remedy;
+    case 'unsupported':
+      return CANNOT_ASK;
+    default:
+      return posted.detail;
+  }
+};
+
 /** The wording of one follow-up question, built from the same `FieldSpec`. */
 const questionFor = (field: FieldSpec): OutboundMessage => ({
   kind: 'markdown',
@@ -304,11 +325,7 @@ export const createArgumentCollector = (
     field: FieldSpec,
   ): Promise<StartOutcome> => {
     if (!supports('ephemeralMessage', invocation.platform)) {
-      return {
-        status: 'unavailable',
-        reason:
-          'このチャットサービスでは、値を聞き返す手段がないため、このコマンドを実行できません。',
-      };
+      return { status: 'unavailable', reason: CANNOT_ASK };
     }
 
     const posted = await platform.postEphemeral(
@@ -317,13 +334,7 @@ export const createArgumentCollector = (
       questionFor(field),
     );
     if (!posted.ok) {
-      return {
-        status: 'unavailable',
-        reason:
-          posted.reason === 'bot-not-in-channel'
-            ? posted.remedy
-            : posted.detail,
-      };
+      return { status: 'unavailable', reason: whyNotAsked(posted) };
     }
 
     await pendingCollections.update(correlationId, {
@@ -575,13 +586,7 @@ export const createArgumentCollector = (
         // would block this user's next command in the channel until it
         // expired.
         await pendingCollections.remove(correlationId);
-        return {
-          status: 'unavailable',
-          reason:
-            posted.reason === 'bot-not-in-channel'
-              ? posted.remedy
-              : posted.detail,
-        };
+        return { status: 'unavailable', reason: whyNotAsked(posted) };
       }
       return { status: 'pending', correlationId };
     },

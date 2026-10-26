@@ -309,6 +309,24 @@ describe('ArgumentCollector.start', () => {
     expect(repository.rows.size).toBe(0);
   });
 
+  it('reports unavailable, keeping no row, where the service has no message only this user would see', async () => {
+    vi.mocked(platform.postEphemeral).mockResolvedValue({
+      ok: false,
+      reason: 'unsupported',
+    });
+
+    const outcome = await collector().start(
+      invocationOf('mattermost', COMMAND_NAMES.createPage, ''),
+      CREATE_PAGE_FIELDS,
+    );
+
+    expect(outcome).toEqual({
+      status: 'unavailable',
+      reason: expect.stringMatching(/\S/),
+    });
+    expect(repository.rows.size).toBe(0);
+  });
+
   it('discards the collection already in flight for the same channel and user, whatever wrote it', async () => {
     repository.rows.set('older', {
       correlationId: 'older',
@@ -824,6 +842,25 @@ describe('ArgumentCollector.startGrowiChoice / resuming a GROWI choice', () => {
     expect(outcome).toEqual({
       status: 'unavailable',
       reason: 'invite the bot',
+    });
+    expect(repository.rows.size).toBe(0);
+  });
+
+  it('drops the row when the service has no message only this user would see', async () => {
+    vi.mocked(platform.postEphemeral).mockResolvedValue({
+      ok: false,
+      reason: 'unsupported',
+    });
+
+    const outcome = await collector().startGrowiChoice(
+      invocationOf('slack', COMMAND_NAMES.createPage),
+      {},
+      OPTIONS,
+    );
+
+    expect(outcome).toEqual({
+      status: 'unavailable',
+      reason: expect.stringMatching(/\S/),
     });
     expect(repository.rows.size).toBe(0);
   });

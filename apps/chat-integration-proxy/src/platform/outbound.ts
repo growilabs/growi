@@ -37,6 +37,7 @@ import type { MattermostThreadId } from 'chat-adapter-mattermost';
 
 import { supports } from '../capabilities/index.js';
 import type {
+  EphemeralPostOutcome,
   OutboundMessage,
   PostOutcome,
   SdkChannelId,
@@ -460,14 +461,9 @@ const attempt = async (
 /**
  * The SDK's channel handle for an `SdkChannelRef`.
  *
- * `post` and `postEphemeral` go through this rather than calling the adapter
- * directly, because `ChannelImpl` already owns two behaviors this module would
- * otherwise have to restate: falling back to `postMessage` when an adapter
- * implements no `postChannelMessage`, and falling back to a direct message when
- * an adapter implements no native ephemeral (Discord's does not, even though
- * design.md's capability table records `ephemeralMessage` as `full` for it).
- * `replace` and `attachPreview` have no `ChannelImpl` equivalent and address the
- * adapter directly.
+ * `post` goes through this rather than calling the adapter directly, because
+ * `ChannelImpl` already falls back to `postMessage` when an adapter implements
+ * no `postChannelMessage`. The other operations address the adapter directly.
  */
 const channelHandleOf = (
   context: OutboundContext,
@@ -505,29 +501,34 @@ export const post = async (
     ),
   );
 
-/** Posts something only `user` can see in `target`. */
+/**
+ * Posts something only `user` can see in `target`, or answers `unsupported`
+ * where the adapter has no native ephemeral (Discord) -- never a direct message
+ * in its place, which would reach the user without saying where it came from.
+ *
+ * Addressed at the adapter directly, like `replace`: `ChannelImpl` would hand
+ * the adapter the channel id as it is, and Mattermost's adapter accepts only a
+ * thread id.
+ */
 export const postEphemeral = async (
   context: OutboundContext,
   target: SdkChannelRef,
   user: ChatAccountRef,
   message: OutboundMessage,
-): Promise<PostOutcome> =>
-  attempt(context, async () => {
-    const sent = await channelHandleOf(context, target).postEphemeral(
+): Promise<EphemeralPostOutcome> => {
+  const { adapter } = context;
+  const native = adapter.postEphemeral;
+  if (native == null) return { ok: false, reason: 'unsupported' };
+
+  return await attempt(context, () =>
+    native.call(
+      adapter,
+      channelThreadId(adapter, target.platform, target.channelId, null),
       user.accountId,
       toPostable(message, target.platform, context.botName),
-      // The point of an ephemeral message is that only this one person sees it;
-      // a direct message keeps that true where the platform offers nothing
-      // native, whereas refusing would drop the message entirely.
-      { fallbackToDM: true },
-    );
-    if (sent == null) {
-      throw new Error(
-        `${target.platform} can post neither an ephemeral message nor a direct message`,
-      );
-    }
-    return sent;
-  });
+    ),
+  );
+};
 
 /**
  * Posts a preview of what a link points at, next to the message that carried

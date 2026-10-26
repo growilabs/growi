@@ -495,8 +495,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
    * placeholder goes out first and the answer replaces it.
    *
    * When the placeholder could not be posted at all, the answer is shown to
-   * the person who asked instead of being dropped -- `postEphemeral` falls
-   * back to a direct message, which is the one route left when the bot cannot
+   * the person who asked instead, as the one route left when the bot cannot
    * write in the channel.
    */
   const deliver = async (
