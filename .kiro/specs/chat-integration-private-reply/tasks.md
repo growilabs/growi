@@ -44,7 +44,7 @@
   - _Requirements: 2.3, 3.3_
   - _Boundary: event-mapping, platform-event types, testing chat-events_
 
-- [ ] 2.4 本物のアダプタで、DM・リアクション・本文の形を確かめる結合テストを作る
+- [x] 2.4 本物のアダプタで、DM・リアクション・本文の形を確かめる結合テストを作る
   - 4 サービスの本物のアダプタを使い、送信先の HTTP だけを置き換える
   - Discord で本人だけのメッセージが「無い」になり、Chat SDK の自動の DM を通らない
   - Mattermost に proxy のチャンネル id を渡すと、本人だけのメッセージの API への要求が実際に出る。そのうえで API が 403 を返すと、DM の API に送られる
@@ -173,3 +173,8 @@
 
 - 2.2: Teams アダプタの別名表には email が無く、そのまま送られて拒否される可能性が高い。2.4 で Teams のリアクション（email）と、Mattermost・Teams で同じリアクションを 2 回付けたときの動きを実測し、必要なら Teams 向けの名前を足す。
 - 2.2: DM のチャンネルは `directMessageChannelRef`（event-mapping.ts、barrel 非公開）で作る。2.3 は同じファイルを触るので、この関数を壊さない。
+- 2.4: 4 サービスとも、postDirect が返す DM のチャンネル id と DM のイベントのチャンネル id が一致した（design の見直しは不要）。試験は `src/platform/private-reply-adapters.integ.ts`（platform 層の外は Chat SDK を import できないため。7.2 で design の File Structure Plan を直す）。
+- 2.4: DM で bot に呼びかけたときの本文の先頭は、Slack が `@<bot の user id> 本文`、Discord が `<@<application id>> 本文`、Teams が `@<アプリの表示名> 本文`、Mattermost が「打たれたまま」。呼びかけの語は固定の名前ではなく、各サービスが返す bot 自身の名前や id と比べて判定する（3.1）。呼びかけが無い DM は 4 サービスとも本文がそのまま届く。
+- 2.4: Mattermost で本人だけのメッセージが 403（`create_post_ephemeral` 権限なし）になると、`classifyOutboundFailure` が `bot-not-in-channel`（bot を招待して）と分類する。原因が違うので案内が誤っている。3.2 の運用者向け報告に誤った理由が載る。試験が現状の分類を固定しているので、直すとその試験が落ちて気づける。
+- 2.4: 本番の proxy は Discord の Gateway を一度も開かない（`startGatewayListener` の呼び出しが src に無い）。Discord では DM もチャンネルの mention も proxy に届かず、要件 2.3（DM での答え）も Discord では働かない。umbrella の design.md 195 行目（Discord は Gateway で受ける）と食い違う、この spec より前からの不整合。
+- 2.4: Teams の `email` リアクションは別名表に無くそのまま送られる。受け付けられるかは実機でしか分からない（6.2 の Teams の説明に未確認と書く）。2 回目の同じリアクションが成功になることは Slack だけアダプタのコードで確かめた。Discord・Mattermost・Teams は仮定した応答の上での確認。
