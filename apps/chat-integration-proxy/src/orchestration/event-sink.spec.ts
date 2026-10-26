@@ -118,7 +118,10 @@ describe('every PlatformEvent kind reaches its declared destination', () => {
 
     await sink.handle(mentionEvent(`@growi ${COMMAND_NAMES.search} foo`));
 
-    expect(flow.startCommand).toHaveBeenCalledWith(anInvocation);
+    expect(flow.startCommand).toHaveBeenCalledWith({
+      ...anInvocation,
+      sourceMessageId: 'M0001',
+    });
     expect(collector.resume).not.toHaveBeenCalled();
     expect(flow.previewLinks).not.toHaveBeenCalled();
   });
@@ -128,7 +131,10 @@ describe('every PlatformEvent kind reaches its declared destination', () => {
 
     await sink.handle(slashEvent(COMMAND_NAMES.search, 'foo'));
 
-    expect(flow.startCommand).toHaveBeenCalledWith(anInvocation);
+    expect(flow.startCommand).toHaveBeenCalledWith({
+      ...anInvocation,
+      sourceMessageId: null,
+    });
     expect(collector.resume).not.toHaveBeenCalled();
   });
 

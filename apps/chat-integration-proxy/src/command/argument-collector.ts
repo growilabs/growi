@@ -611,7 +611,9 @@ export const createArgumentCollector = (
           return answerChoiceByPosition(
             loaded.record,
             loaded.state,
-            stripAddressToken(event.text),
+            stripAddressToken(event.text, {
+              inDirectMessage: event.inDirectMessage,
+            }),
           );
         }
         if (loaded.state.awaiting == null) return { status: 'not-mine' };
@@ -620,7 +622,11 @@ export const createArgumentCollector = (
           inFlight.correlationId,
           loaded.record.invocation,
           loaded.state,
-          { [loaded.state.awaiting]: stripAddressToken(event.text) },
+          {
+            [loaded.state.awaiting]: stripAddressToken(event.text, {
+              inDirectMessage: event.inDirectMessage,
+            }),
+          },
         );
       }
 

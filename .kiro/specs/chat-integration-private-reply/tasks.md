@@ -57,7 +57,7 @@
   - _Requirements: 1.2, 1.3, 1.4, 1.5, 2.3_
 
 - [ ] 3. command 層: 本人宛ての返事の判断と、聞き返し
-- [ ] 3.1 DM で打たれた文の先頭の語を、呼びかけとして落とさない
+- [x] 3.1 DM で打たれた文の先頭の語を、呼びかけとして落とさない
   - コマンドの解釈と聞き返しへの答えの取り出しで、DM の中では先頭の語を残す。DM でも先頭が bot への呼びかけ（2.4 で確かめた形）なら落とす
   - 依頼のメッセージの id を依頼の情報に写す（slash command では無し）
   - 完了の状態: 単体テストで、DM の「search foo」はコマンド名 search として読まれ、DM での答え「foo bar」が欠けずに取り出され、チャンネルの mention の扱いは変わらないことが確かめられる
@@ -174,7 +174,7 @@
 - 2.2: Teams アダプタの別名表には email が無く、そのまま送られて拒否される可能性が高い。2.4 で Teams のリアクション（email）と、Mattermost・Teams で同じリアクションを 2 回付けたときの動きを実測し、必要なら Teams 向けの名前を足す。
 - 2.2: DM のチャンネルは `directMessageChannelRef`（event-mapping.ts、barrel 非公開）で作る。2.3 は同じファイルを触るので、この関数を壊さない。
 - 2.4: 4 サービスとも、postDirect が返す DM のチャンネル id と DM のイベントのチャンネル id が一致した（design の見直しは不要）。試験は `src/platform/private-reply-adapters.integ.ts`（platform 層の外は Chat SDK を import できないため。7.2 で design の File Structure Plan を直す）。
-- 2.4: DM で bot に呼びかけたときの本文の先頭は、Slack が `@<bot の user id> 本文`、Discord が `<@<application id>> 本文`、Teams が `@<アプリの表示名> 本文`、Mattermost が「打たれたまま」。呼びかけの語は固定の名前ではなく、各サービスが返す bot 自身の名前や id と比べて判定する（3.1）。呼びかけが無い DM は 4 サービスとも本文がそのまま届く。
+- 2.4: DM で bot に呼びかけたときの本文の先頭は、Slack が `@<bot の user id> 本文`、Discord が `<@<application id>> 本文`、Teams が `@<アプリの表示名> 本文`、Mattermost が「打たれたまま」。呼びかけの語は固定の名前にせず、3.1 は形（`@語` か `<@…>`）で判定する。command 層には bot 自身の名前や id が届かず、design の署名もそれを受け取らないため。DM の答えが `@誰か` で始まると、その語が落ちる。呼びかけが無い DM は 4 サービスとも本文がそのまま届く。
 - 2.4: Mattermost で本人だけのメッセージが 403（`create_post_ephemeral` 権限なし）になると、`classifyOutboundFailure` が `bot-not-in-channel`（bot を招待して）と分類する。原因が違うので案内が誤っている。3.2 の運用者向け報告に誤った理由が載る。試験が現状の分類を固定しているので、直すとその試験が落ちて気づける。
 - 2.4: 本番の proxy は Discord の Gateway を一度も開かない（`startGatewayListener` の呼び出しが src に無い）。Discord では DM もチャンネルの mention も proxy に届かず、要件 2.3（DM での答え）も Discord では働かない。umbrella の design.md 195 行目（Discord は Gateway で受ける）と食い違う、この spec より前からの不整合。
 - 2.4: Teams の `email` リアクションは別名表に無くそのまま送られる。受け付けられるかは実機でしか分からない（6.2 の Teams の説明に未確認と書く）。2 回目の同じリアクションが成功になることは Slack だけアダプタのコードで確かめた。Discord・Mattermost・Teams は仮定した応答の上での確認。

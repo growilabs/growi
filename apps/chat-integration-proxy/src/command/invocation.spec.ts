@@ -72,6 +72,7 @@ describe('CommandInvocation.normalize', () => {
       commandName: 'search',
       argsText: 'foo',
       interaction: null,
+      sourceMessageId: 'M0001',
     });
     // The honest current result: `/growi` (the whole slash command, `/`
     // included) becomes the commandName verbatim, and none of the general or
@@ -86,6 +87,7 @@ describe('CommandInvocation.normalize', () => {
       commandName: '/growi',
       argsText: 'search foo',
       interaction: null,
+      sourceMessageId: null,
     });
     expect(fromMention).not.toEqual(fromSlashCommand);
   });
@@ -169,5 +171,62 @@ describe('Invocation', () => {
 
     expect(fromMention.commandName).toBe(fromSlashCommand.commandName);
     expect(fromMention.argsText).toBe(fromSlashCommand.argsText);
+  });
+
+  describe('in a direct message', () => {
+    const dm = (text: string) =>
+      CommandInvocation.normalize({
+        kind: 'mention',
+        platform: 'slack',
+        channel,
+        actor,
+        text,
+        inDirectMessage: true,
+        messageId: 'M0002',
+        interaction: null,
+      });
+
+    it('reads an unaddressed first word as the command name', () => {
+      const result = dm('search foo');
+
+      expect(result.commandName).toBe('search');
+      expect(result.argsText).toBe('foo');
+      expect(result.sourceMessageId).toBe('M0002');
+    });
+
+    // Accepted tradeoff of recognizing an address by shape: the command layer
+    // cannot tell a mention of another person from the bot's own address.
+    it('drops a leading @-word that is not the bot, as the shape rule cannot tell them apart', () => {
+      const result = dm('@alice please review');
+
+      expect(result.commandName).toBe('please');
+      expect(result.argsText).toBe('review');
+    });
+
+    it.each([
+      ['Slack', '@U0BOT search foo'],
+      ['Discord', '<@123456789> search foo'],
+      ['Teams', '@growi search foo'],
+    ])('still drops a leading bot address (%s form)', (_service, text) => {
+      const result = dm(text);
+
+      expect(result.commandName).toBe('search');
+      expect(result.argsText).toBe('foo');
+    });
+  });
+
+  it('still drops the first word of a channel mention even when it is not address-shaped', () => {
+    const result = CommandInvocation.normalize({
+      kind: 'mention',
+      platform: 'slack',
+      channel,
+      actor,
+      text: 'growi search foo',
+      inDirectMessage: false,
+      messageId: 'M0003',
+      interaction: null,
+    });
+
+    expect(result.commandName).toBe('search');
   });
 });

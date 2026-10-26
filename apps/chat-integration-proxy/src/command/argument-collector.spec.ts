@@ -133,13 +133,14 @@ const invocationOf = (
 const mentionAnswer = (
   platform: PlatformName,
   text: string,
+  options: { readonly inDirectMessage: boolean } = { inDirectMessage: false },
 ): PlatformEvent => ({
   kind: 'mention',
   platform,
   channel: channelOf(platform),
   actor: actorOf(platform),
   text: `@growi ${text}`,
-  inDirectMessage: false,
+  inDirectMessage: options.inDirectMessage,
   messageId: 'M0001',
   interaction: null,
 });
@@ -538,6 +539,51 @@ describe('ArgumentCollector.resume', () => {
     expect(outcome).toEqual({
       status: 'collected',
       values: { path: '/memo/today', body: 'first line\nsecond line' },
+      invocation,
+    });
+  });
+
+  it('keeps the first word of an answer typed in a direct message', async () => {
+    const invocation = invocationOf(
+      'mattermost',
+      COMMAND_NAMES.createPage,
+      '/memo/today',
+    );
+    await collectorAt(NOW).start(invocation, CREATE_PAGE_FIELDS);
+
+    const outcome = await collectorAt(NOW).resume({
+      kind: 'mention',
+      platform: 'mattermost',
+      channel: channelOf('mattermost'),
+      actor: actorOf('mattermost'),
+      text: 'foo bar',
+      inDirectMessage: true,
+      messageId: 'M0001',
+      interaction: null,
+    });
+
+    expect(outcome).toEqual({
+      status: 'collected',
+      values: { path: '/memo/today', body: 'foo bar' },
+      invocation,
+    });
+  });
+
+  it('still drops a bot address at the start of an answer typed in a direct message', async () => {
+    const invocation = invocationOf(
+      'mattermost',
+      COMMAND_NAMES.createPage,
+      '/memo/today',
+    );
+    await collectorAt(NOW).start(invocation, CREATE_PAGE_FIELDS);
+
+    const outcome = await collectorAt(NOW).resume(
+      mentionAnswer('mattermost', 'foo bar', { inDirectMessage: true }),
+    );
+
+    expect(outcome).toEqual({
+      status: 'collected',
+      values: { path: '/memo/today', body: 'foo bar' },
       invocation,
     });
   });

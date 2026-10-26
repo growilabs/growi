@@ -900,7 +900,8 @@ describe('Mattermost, with two installations open', () => {
 
   // `growi` is installation B's username from /users/me in this stand-in. The
   // adapter never rewrites a post's text, so the leading name is whatever the
-  // user typed; 3.1 has to compare it with the name the service reports.
+  // user typed; 3.1 decides by shape (`@word` / `<@...>`) because the command
+  // layer has no bot identity to compare it with.
   it("leaves a DM that addresses the bot as typed: @<the bot account's username from /users/me> in front", async () => {
     serverB.push(mattermostDirectPost(`@${BOT_USER_NAME} search foo`));
 
