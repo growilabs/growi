@@ -27,6 +27,9 @@
 //      inside `db/` a caller reaches, because from guard 1's point of view every file under
 //      `db/` is equally "the db layer". This guard is narrower than guard 1 and independent of
 //      it, the same way guard 3 is independent of guard 1 for `generated/`.
+//   5. private-reply single path — outside `src/platform/**`, only `command/private-reply.ts`
+//      may call `postEphemeral(` / `postDirect(`. Imports cannot express this: the facade
+//      reaches callers as an injected object, so no import ever names these methods.
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
@@ -486,5 +489,115 @@ describe('db barrel import origin', () => {
 
     expect(specifier.endsWith('.js')).toBe(true);
     expect(dbInternalImportsOf(fixturePath)).toEqual([]);
+  });
+});
+
+describe('private reply single path', () => {
+  /**
+   * A call to either method that delivers to one person only. `platform/` defines and wires
+   * them, and `PrivateReplier` is the single caller that decides which one to use, so any
+   * other production call site is a second route for a private reply that bypasses its
+   * fallback and failure reporting.
+   */
+  const PRIVATE_POST_CALL = /\b(?:postEphemeral|postDirect)\s*\(/;
+  const PLATFORM_DIR = `platform${sep}`;
+  const PRIVATE_REPLIER = join('command', 'private-reply.ts');
+
+  // Harness fakes and tests exercise the facade directly on purpose; the invariant protects
+  // production code paths only. `testing/` fakes implement the methods rather than route replies.
+  const isProductionSource = (relativePath: string): boolean =>
+    !relativePath.endsWith('.spec.ts') &&
+    !relativePath.endsWith('.integ.ts') &&
+    relativePath.split(sep)[0] !== TESTING_DIR;
+
+  // Doc comments name these methods with parentheses (`postDirect()`), which is not a call.
+  // String literals are matched first and kept, so a `//` in a URL or a `/*` in a glob is not
+  // mistaken for a comment start that would hide a real call.
+  const STRING_OR_COMMENT =
+    /('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`)|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g;
+  const withoutComments = (source: string): string =>
+    source.replace(
+      STRING_OR_COMMENT,
+      (_match, literal?: string) => literal ?? '',
+    );
+
+  const privatePostCallers = (
+    files: readonly { readonly path: string; readonly source: string }[],
+  ): string[] =>
+    files
+      .filter(
+        ({ path }) =>
+          isProductionSource(path) &&
+          !path.startsWith(PLATFORM_DIR) &&
+          path !== PRIVATE_REPLIER,
+      )
+      .filter(({ source }) => PRIVATE_POST_CALL.test(withoutComments(source)))
+      .map(({ path }) => `src/${path.split(sep).join('/')}`);
+
+  it('is called outside src/platform/** only from command/private-reply.ts', () => {
+    const files = SOURCE_FILES.map((file) => ({
+      path: relative(SRC_DIR, file),
+      source: readFileSync(file, 'utf8'),
+    }));
+
+    expect(privatePostCallers(files)).toEqual([]);
+  });
+
+  it('sees the one legitimate caller, so the scan above is not vacuous', () => {
+    const source = readFileSync(join(SRC_DIR, PRIVATE_REPLIER), 'utf8');
+
+    expect(PRIVATE_POST_CALL.test(withoutComments(source))).toBe(true);
+  });
+
+  it('flags a production file that calls postEphemeral or postDirect', () => {
+    const orchestration = join('orchestration', 'admin-flow.ts');
+
+    expect(
+      privatePostCallers([
+        {
+          path: orchestration,
+          source: 'await platform.postEphemeral(channel, actor, message);',
+        },
+        {
+          path: join('routes', 'x.ts'),
+          source: 'await facade.postDirect (near, user, message);',
+        },
+      ]),
+    ).toEqual(['src/orchestration/admin-flow.ts', 'src/routes/x.ts']);
+  });
+
+  it('still flags a call that follows a string containing // or /*', () => {
+    expect(
+      privatePostCallers([
+        {
+          path: join('runtime', 'a.ts'),
+          source: "const u = 'https://x'; await p.postEphemeral(a);",
+        },
+        {
+          path: join('routes', 'b.ts'),
+          source:
+            "const g = 'src/*';\nawait p.postDirect(near, u, m);\nconst e = '*/';\n",
+        },
+      ]),
+    ).toEqual(['src/runtime/a.ts', 'src/routes/b.ts']);
+  });
+
+  it('does not flag platform/, the replier, tests, the harness, or a mention in a comment', () => {
+    const call = 'await facade.postEphemeral(channel, user, message);';
+
+    expect(
+      privatePostCallers([
+        { path: join('platform', 'facade.ts'), source: call },
+        { path: PRIVATE_REPLIER, source: call },
+        { path: join('orchestration', 'a.spec.ts'), source: call },
+        { path: join('testing', 'b.integ.ts'), source: call },
+        { path: join('testing', 'fake.ts'), source: call },
+        {
+          path: join('types', 'c.ts'),
+          source:
+            '/** `PlatformFacade.postDirect()` result */\n// postEphemeral(x)\n',
+        },
+      ]),
+    ).toEqual([]);
   });
 });
