@@ -73,6 +73,8 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 - **管理画面と通知の見た目の改善**: 実機試験（2026-10-26、Slack）で次の点に気付いた。動作は正しいが、見た目と使い勝手を直す。
   - **管理画面（`/admin/chat-integration`）**: Connected workspaces の「What this service can do」の表示が冗長。Notification destinations と Channel permissions を、それぞれ見出しのあるセクションに分けて見やすくする（画面は `AdminChatIntegration.tsx` など。文言は英語の直書きで i18n 未対応）
   - **ページの編集画面**: 「Chat notification channels」が縦に長く、編集画面のレイアウトを崩している（要件2.2 の保存時の通知先の選択）
+  - **チャット側で紐付けを解除したあとの管理画面**: `@GROWI unregister` は proxy 側の関係と鍵だけを消し、GROWI には知らせない。管理画面は接続の状態・できること・チャンネル一覧を読めないことを赤字で示すので状況は分かるが、右上のバッジは緑の「active」のまま（GROWI 側の関係の記録による表示のため）
+  - **`help` の一覧の書き方**: コマンドの使い方が `/growi search [keyword]` のようなスラッシュコマンドの形で出るが、スラッシュコマンドは未対応（`chat-integration-proxy` のタスク 12.4）で、実際には `@GROWI search …` と打つ必要がある
   - **Slack への通知の文面**: メッセージの書式が洗練されていない。ページ名・変更の種類・変更した人・リンクを読みやすく並べる。Slack の Block Kit など、サービスごとの表現を使うかも含めて検討する
   - **想定される影響範囲**: 管理画面と編集画面は `chat-integration-app`。通知の文面は GROWI が組み立てる markdown（`chat-integration-app`）と、proxy がサービスごとに描く部分（`chat-integration-proxy` の `outbound.ts`）の両方にまたがりうる
   - **次にやること**: 小さければ `chat-integration-app` の amend spec にまとめる。上の「コマンドの再編」に着手するなら、それと合わせて見直す
