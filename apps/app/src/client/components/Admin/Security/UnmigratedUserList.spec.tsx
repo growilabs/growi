@@ -1,7 +1,14 @@
 // @vitest-environment happy-dom
 
 import type { ReactNode } from 'react';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 // biome-ignore lint/style/noRestrictedImports: import only types
 import type { AxiosResponse } from 'axios';
 import { SWRConfig } from 'swr';
@@ -95,8 +102,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// SWR's automatic error retry fires on a randomized multi-second backoff; it is
+// turned off so a test only sees the requests the user's actions trigger.
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+  <SWRConfig
+    value={{
+      provider: () => new Map(),
+      dedupingInterval: 0,
+      shouldRetryOnError: false,
+    }}
+  >
     {children}
   </SWRConfig>
 );
@@ -250,6 +265,71 @@ describe('UnmigratedUserList', () => {
     });
   });
 
+  describe('when loading a later page fails', () => {
+    const page1 = Array.from({ length: 20 }, (_, i) =>
+      userOf({ username: `first-${i}` }),
+    );
+
+    const failSecondPage = async () => {
+      vi.mocked(apiv3Get)
+        .mockResolvedValueOnce(
+          mockResponse(responseOf(page1, { totalCount: 21, page: 1 })),
+        )
+        .mockRejectedValueOnce(new Error('boom'));
+      renderList();
+      await screen.findByRole('row', { name: /first-19/ });
+      await scrollToEnd();
+      await screen.findByText(`${PREFIX}.load_more_error`);
+    };
+
+    it('keeps the loaded rows and shows the load-more error with a retry button', async () => {
+      await failSecondPage();
+
+      expect(screen.getByRole('row', { name: /first-0/ })).toBeTruthy();
+      expect(screen.getByRole('row', { name: /first-19/ })).toBeTruthy();
+      expect(
+        screen.getByRole('button', { name: `${PREFIX}.retry` }),
+      ).toBeTruthy();
+      expect(screen.queryByText(`${PREFIX}.fetch_error`)).toBeNull();
+    });
+
+    it('does not keep loading more while the error is shown', async () => {
+      await failSecondPage();
+      expect(apiv3Get).toHaveBeenCalledTimes(2);
+
+      await scrollToEnd();
+
+      expect(apiv3Get).toHaveBeenCalledTimes(2);
+      expect(screen.getByText(`${PREFIX}.load_more_error`)).toBeTruthy();
+    });
+
+    it('requests the failed page again on retry and appends its rows', async () => {
+      await failSecondPage();
+      vi.mocked(apiv3Get).mockResolvedValueOnce(
+        mockResponse(
+          responseOf([userOf({ username: 'second-0' })], {
+            totalCount: 21,
+            page: 2,
+          }),
+        ),
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: `${PREFIX}.retry` }));
+
+      expect(await screen.findByRole('row', { name: /second-0/ })).toBeTruthy();
+      expect(screen.getByRole('row', { name: /first-0/ })).toBeTruthy();
+      expect(screen.queryByText(`${PREFIX}.load_more_error`)).toBeNull();
+      expect(
+        screen.queryByRole('button', { name: `${PREFIX}.retry` }),
+      ).toBeNull();
+      expect(apiv3Get).toHaveBeenCalledTimes(3);
+      expect(apiv3Get).toHaveBeenLastCalledWith(ENDPOINT, {
+        page: 2,
+        limit: 20,
+      });
+    });
+  });
+
   describe('empty and error states', () => {
     it('shows the empty message and no table when there is nobody to nudge', async () => {
       vi.mocked(apiv3Get).mockResolvedValue(mockResponse(responseOf([])));
@@ -265,6 +345,7 @@ describe('UnmigratedUserList', () => {
 
       expect(await screen.findByText(`${PREFIX}.fetch_error`)).toBeTruthy();
       expect(screen.queryByRole('table')).toBeNull();
+      expect(screen.queryByText(`${PREFIX}.load_more_error`)).toBeNull();
     });
 
     it('shows the error message when the response has no users', async () => {
