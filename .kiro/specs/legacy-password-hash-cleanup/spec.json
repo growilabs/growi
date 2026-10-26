@@ -1,7 +1,7 @@
 {
   "feature_name": "legacy-password-hash-cleanup",
   "created_at": "2026-10-21T05:16:34Z",
-  "updated_at": "2026-10-23T07:29:04Z",
+  "updated_at": "2026-10-26T08:00:54Z",
   "language": "ja",
   "phase": "tasks-generated",
   "approvals": {
