@@ -7,19 +7,22 @@ import type {
   PasswordHashStatusResponse,
 } from '~/interfaces/password-hash-status';
 
+const STATUS_ENDPOINT = '/security-setting/password-hash-status';
+
+export const fetchPasswordHashStatus =
+  async (): Promise<PasswordHashFormatCounts> => {
+    const { data } =
+      await apiv3Get<PasswordHashStatusResponse>(STATUS_ENDPOINT);
+    // A redirect (e.g. to /login) can yield an HTML body with HTTP 200.
+    if (data?.counts == null) {
+      throw new Error('Password hash status response has no counts');
+    }
+    return data.counts;
+  };
+
 export const useSWRxPasswordHashStatus = (): SWRResponse<
   PasswordHashFormatCounts,
   Error
 > => {
-  return useSWRImmutable(
-    '/security-setting/password-hash-status',
-    async (endpoint) => {
-      const { data } = await apiv3Get<PasswordHashStatusResponse>(endpoint);
-      // A redirect (e.g. to /login) can yield an HTML body with HTTP 200.
-      if (data?.counts == null) {
-        throw new Error('Password hash status response has no counts');
-      }
-      return data.counts;
-    },
-  );
+  return useSWRImmutable(STATUS_ENDPOINT, fetchPasswordHashStatus);
 };

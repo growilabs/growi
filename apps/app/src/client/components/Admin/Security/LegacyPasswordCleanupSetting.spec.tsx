@@ -234,6 +234,109 @@ describe('LegacyPasswordCleanupSetting', () => {
       ).toBeTruthy();
     });
 
+    it('shows the latest target count refetched on click', async () => {
+      let statusFetches = 0;
+      mockStatus(() => {
+        statusFetches += 1;
+        return { counts: countsOf({ both: statusFetches === 1 ? 3 : 43 }) };
+      });
+      renderSection();
+      await screen.findByText(`${PREFIX}.count_label.both`);
+
+      await userEvent.click(deleteButton());
+
+      expect(
+        await screen.findByText(
+          new RegExp(`${PREFIX}.confirm.warning \\[43\\]`),
+        ),
+      ).toBeTruthy();
+    });
+
+    it('does not open when the refetched target count is zero', async () => {
+      let statusFetches = 0;
+      mockStatus(() => {
+        statusFetches += 1;
+        return { counts: countsOf({ both: statusFetches === 1 ? 3 : 0 }) };
+      });
+      renderSection();
+      await screen.findByText(`${PREFIX}.count_label.both`);
+
+      await userEvent.click(deleteButton());
+
+      // The refetched zero disables the button; the modal must stay closed.
+      await waitFor(() =>
+        expect(deleteButton().hasAttribute('disabled')).toBe(true),
+      );
+      expect(screen.queryByText(`${PREFIX}.confirm.title`)).toBeNull();
+    });
+
+    it('does not open and reports an error when the refetch on click fails', async () => {
+      let statusFetches = 0;
+      vi.mocked(apiv3Get).mockImplementation((endpoint: string) => {
+        if (endpoint !== STATUS_ENDPOINT) {
+          return Promise.resolve(
+            mock<AxiosResponse>({ data: emptyUnmigratedUsers }),
+          );
+        }
+        statusFetches += 1;
+        return statusFetches === 1
+          ? Promise.resolve(
+              mock<AxiosResponse>({ data: { counts: countsOf() } }),
+            )
+          : Promise.reject(new Error('boom'));
+      });
+      renderSection();
+      await screen.findByText(`${PREFIX}.count_label.both`);
+
+      await userEvent.click(deleteButton());
+
+      await waitFor(() =>
+        expect(toastError).toHaveBeenCalledWith(`${PREFIX}.fetch_error`),
+      );
+      expect(screen.queryByText(`${PREFIX}.confirm.title`)).toBeNull();
+      await waitFor(() =>
+        expect(deleteButton().hasAttribute('disabled')).toBe(false),
+      );
+    });
+
+    it('opens only after the refetch on click has finished', async () => {
+      let statusFetches = 0;
+      let resolveRefetch: (res: AxiosResponse) => void = () => {};
+      vi.mocked(apiv3Get).mockImplementation((endpoint: string) => {
+        if (endpoint !== STATUS_ENDPOINT) {
+          return Promise.resolve(
+            mock<AxiosResponse>({ data: emptyUnmigratedUsers }),
+          );
+        }
+        statusFetches += 1;
+        return statusFetches === 1
+          ? Promise.resolve(
+              mock<AxiosResponse>({ data: { counts: countsOf() } }),
+            )
+          : new Promise<AxiosResponse>((resolve) => {
+              resolveRefetch = resolve;
+            });
+      });
+      renderSection();
+      await screen.findByText(`${PREFIX}.count_label.both`);
+
+      await userEvent.click(deleteButton());
+
+      await waitFor(() => expect(statusFetches).toBe(2));
+      expect(screen.queryByText(`${PREFIX}.confirm.title`)).toBeNull();
+      expect(deleteButton().hasAttribute('disabled')).toBe(true);
+
+      resolveRefetch(
+        mock<AxiosResponse>({ data: { counts: countsOf({ both: 8 }) } }),
+      );
+
+      expect(
+        await screen.findByText(
+          new RegExp(`${PREFIX}.confirm.warning \\[8\\]`),
+        ),
+      ).toBeTruthy();
+    });
+
     it('does nothing when cancelled', async () => {
       mockStatus({ counts: countsOf() });
       renderSection();
@@ -247,6 +350,7 @@ describe('LegacyPasswordCleanupSetting', () => {
         expect(screen.queryByText(`${PREFIX}.confirm.title`)).toBeNull(),
       );
       expect(apiv3Delete).not.toHaveBeenCalled();
+      expect(deleteButton().hasAttribute('disabled')).toBe(false);
     });
   });
 
@@ -308,6 +412,32 @@ describe('LegacyPasswordCleanupSetting', () => {
       );
       await waitFor(() =>
         expect(screen.queryByText(`${PREFIX}.title`)).toBeNull(),
+      );
+    });
+
+    it('disables the delete button until the deletion finishes', async () => {
+      mockStatus({ counts: countsOf() });
+      let resolveDelete: (res: AxiosResponse) => void = () => {};
+      vi.mocked(apiv3Delete).mockReturnValue(
+        new Promise<AxiosResponse>((resolve) => {
+          resolveDelete = resolve;
+        }),
+      );
+      renderSection();
+
+      await confirmDeletion();
+
+      await waitFor(() =>
+        expect(deleteButton().hasAttribute('disabled')).toBe(true),
+      );
+
+      resolveDelete(mock<AxiosResponse>({ data: { unsetCount: 3 } }));
+
+      await waitFor(() =>
+        expect(toastSuccess).toHaveBeenCalledWith(`${PREFIX}.success [3]`),
+      );
+      await waitFor(() =>
+        expect(deleteButton().hasAttribute('disabled')).toBe(false),
       );
     });
 
