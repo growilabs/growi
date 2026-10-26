@@ -28,26 +28,26 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 1,
   },
-  '/installer': {
+  '/_api/v3/installer': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 1,
   },
-  '/login': {
+  '/_api/v3/login': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 100,
   },
-  '/invited': {
+  '/_api/v3/invited': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_2,
   },
-  '/register': {
+  '/_api/v3/register': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 20,
   },
-  '/user-activation/register': {
+  '/_api/v3/user-activation/register': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 20,
@@ -97,7 +97,15 @@ export const defaultConfigWithRegExp: IApiRateLimitEndpointMap = {
     method: 'ALL',
     maxRequests: MAX_REQUESTS_TIER_1,
   },
+  '/_api/v3/forgot-password(?:/.*)?': {
+    method: 'ALL',
+    maxRequests: MAX_REQUESTS_TIER_1,
+  },
   '/user-activation/.*': {
+    method: 'GET',
+    maxRequests: MAX_REQUESTS_TIER_1,
+  },
+  '/_api/v3/user-activation/.*': {
     method: 'GET',
     maxRequests: MAX_REQUESTS_TIER_1,
   },
