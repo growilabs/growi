@@ -78,7 +78,7 @@
 - **Alternatives Considered**: 上の表の A・C。各呼び出し元で個別に DM へ切り替える案（散らばりが残る）。
 - **Selected Approach**: B。`CommandFlowPlatform`・`AdminFlowPlatform`・`ArgumentCollectorPlatform` は `postEphemeral` を持たず、代わりに `PrivateReplier` を受け取る。書き忘れは型の検査で止まる。加えて `architecture.spec.ts` が「`src/platform/**` の外で `postEphemeral(`・`postDirect(` を呼ぶのは `command/private-reply.ts` だけ」を確かめる（facade は注入されるオブジェクトなので、import の検査ではこれを表せない）。
 - **Rationale**: 守りを型と試験に任せ、レビューの注意力に頼らない。
-- **Trade-offs**: 呼ぶ側の依存が 1 つ増える。呼ぶ側の型には `post`・`replace` が残るので、「本人宛てにすべき返事を誤ってチャンネルに出す」ことは型では止まらない。`search` の結果がまさにこの道でチャンネルに出ていたので、`command-flow.spec.ts` と `testing/command-flow-e2e.integ.ts` が「`search` は `post`・`replace` を呼ばず、結果は本人宛ての返事 1 通で届く」を確かめる。
+- **Trade-offs**: 呼ぶ側の依存が 1 つ増える。呼ぶ側の型には `post`・`replace` が残るので、「本人宛てにすべき返事を誤ってチャンネルに出す」ことは型では止まらない。検索の結果はこの道でチャンネルに出うるので、`command-flow.spec.ts` と `testing/command-flow-e2e.integ.ts` が「`search` は `post`・`replace` を呼ばず、結果は本人宛ての返事 1 通で届く」を確かめる。
 
 ### 決定 P2: DM への切り替えは Chat SDK に任せず proxy が行い、本人だけのメッセージは `ChannelImpl` を通さずアダプタを直接呼ぶ
 
@@ -150,28 +150,28 @@
 
 ## Synthesis
 
-- **Generalization**: 「本人に届ける」は、検索の結果・聞き返し・エラー・登録コードに共通する 1 つの問題として扱う。インターフェースは「何の依頼への、どの installation としての返事か」を受け取る形にした。あとから（イベントの処理の外で）届ける返事も、installation を名指しすれば token の問題は解ける。ただし「スレッドの中で本人だけに見せる」ためのスレッドの根元は持たないので、それが要る機能（`chat-integration-agent`）が `PrivateReplyOrigin` に足す（design.md の Revalidation Triggers）
+- **Generalization**: 「本人に届ける」は、検索の結果・聞き返し・エラー・登録コードに共通する 1 つの問題として扱う。インターフェースは「何の依頼への、どの installation としての返事か」を受け取る形である。あとから（イベントの処理の外で）届ける返事も、installation を名指しすれば token の問題は解ける。ただし「スレッドの中で本人だけに見せる」ためのスレッドの根元は持たないので、それが要る機能（`chat-integration-agent`）が `PrivateReplyOrigin` に足す（design.md の Revalidation Triggers）
 - **Build vs. Adopt**: Chat SDK の `fallbackToDM` を採らない理由は決定 P2。リアクションと DM はアダプタの既存の機能を使う
-- **Simplification**: 権限の有無を覚える仕組み、DM の既読の確認、届いたかの追跡は足さない。能力表は `directMessage` を 1 行足すだけにした
+- **Simplification**: 権限の有無を覚える仕組み、DM の既読の確認、届いたかの追跡は足さない。能力表に足すのは `directMessage` の 1 行だけである
 
 ## Risks & Mitigations
 
-- Slack の既存の導入は `im:write` を持たない — 導入し直すまで、DM に切り替えられず内容を含まない知らせだけになる。導入ドキュメントに「導入し直す」を書いた
-- Mattermost で権限が無い運用者は、毎回 1 回分の失敗する呼び出しを払う — 導入ドキュメント（`docs/setup-mattermost.md`）で、権限を与えるか DM で受け取るかを選べることを示した
+- Slack の既存の導入は `im:write` を持たない — 導入し直すまで、DM に切り替えられず内容を含まない知らせだけになる。導入ドキュメントに「導入し直す」と書いてある
+- Mattermost で権限が無い運用者は、毎回 1 回分の失敗する呼び出しを払う — 導入ドキュメント（`docs/setup-mattermost.md`）で、権限を与えるか DM で受け取るかを選べることが書いてある
 - Mattermost の本人だけのメッセージの id の形の問題が再発する — 本物のアダプタに proxy の id を渡し、`/posts/ephemeral` への要求が実際に出ることを結合試験で確かめる（HTTP の 403 を真似るだけの試験では、要求の前の例外を見逃す）
-- Slack の Messages タブの設定が無い導入では、DM の聞き返しに答えられない — マニフェストと導入ドキュメントに含めた
-- DM で打たれた本文の先頭の扱いが、本物の本文の形と食い違う — 4 サービスの本文を本物のアダプタの試験で確かめ、試験の中に事実として残した
+- Slack の Messages タブの設定が無い導入では、DM の聞き返しに答えられない — マニフェストと導入ドキュメントに含まれている
+- DM で打たれた本文の先頭の扱いが、本物の本文の形と食い違う — 4 サービスの本文を本物のアダプタの試験で確かめており、その形が試験の中に事実として書いてある
 
 ## 既知の問題（未解決）
 
 1. **Mattermost の 403 が「bot がチャンネルにいない」と分類される。** `/posts/ephemeral` が権限不足（`create_post_ephemeral` が無い）で 403 を返すと、`classifyOutboundFailure`（`platform/outbound.ts`）は `bot-not-in-channel`（「bot を招待して」）と分類する。アダプタが投げる `PermissionError` は応答の本文を持たないので、権限不足とチャンネル不参加を見分けられない。利用者への影響は無い（決定 P3 によりどちらでも DM に進む）が、DM も届かなかったときの運用者向けの報告（`reportUndeliverable`）に誤った理由が載る。今の分類は `platform/private-reply-adapters.integ.ts` の Mattermost の試験（「reaches /posts/ephemeral with the proxy's bare channel id …」）が固定しているので、分類を直すとその試験が落ちて気づける。`docs/setup-mattermost.md` にも既知の不整合として書いてある
-2. **Discord の Gateway を開いていないので、Discord の DM と mention が proxy に届かない。** `src/` のどこからもアダプタの `startGatewayListener` を呼んでいない。そのため Discord では、本人宛ての返事を DM で送ることはできるが、利用者がその DM に書いた答え（要件 1.16）もチャンネルでの mention も proxy に届かない。umbrella の design.md の「Discord は Gateway で受ける」という記述と食い違う。本人宛ての返事の仕組みより前からある不整合で、別の対応で直す（umbrella の roadmap の既知の不具合）。`docs/setup-discord.md` にも書いてある
+2. **Discord の Gateway を開いていないので、Discord の DM と mention が proxy に届かない。** `src/` のどこからもアダプタの `startGatewayListener` を呼んでいない。そのため Discord では、本人宛ての返事を DM で送ることはできるが、利用者がその DM に書いた答え（要件 1.16）もチャンネルでの mention も proxy に届かない。umbrella の design.md の「Discord は Gateway で受ける」という記述と食い違う。以前からある不整合で、別の対応で直す（umbrella の roadmap の既知の不具合）。`docs/setup-discord.md` にも書いてある
 3. **DM の先頭の `@誰か` が落ちる。** 決定 P8 の規則は形で判定するので、DM での答えが `@誰か` で始まると、その語が呼びかけとして落ちる。command 層は bot 自身の名前や id を知らないので、今の作りでは避けられない。直すなら、platform 層が「呼びかけの語を外した本文」を渡す形に変える
 4. **Teams と、2 回目のリアクションは一部が未確認。** Teams の `email` リアクションはアダプタの対応表に無く、Teams が受け付けるかは実機で確かめていない（受け付けなければ短い文の知らせに落ちる。決定 P4）。同じリアクションの 2 回付けが成功になることは、Slack だけアダプタのコードで確かめた。Discord・Mattermost・Teams は仮定した応答の上での確認である。Teams で、利用者が 1 対 1 の会話で bot に答えるのにアプリを `personal` の範囲でも入れる必要があるかも未確認（`docs/setup-teams.md`）
 5. **依頼のメッセージが無い依頼では、DM に届くたびにその場に短い文が出る。** slash command から始まった依頼は依頼のメッセージの id（`sourceMessageId`）を持たない（`sourceMessageId` が無い古い保存済みの行から再開した依頼も同じ）ので、リアクションを付けられない。DM に届くたびに「返事を DM で送りました」という内容を含まない文がその場に出る。うるさいが、返事の内容は漏れない
 6. **Mattermost で installation が複数あるとき、DM の中で届いたイベントの「入力の期限切れ」の知らせは installation を引けない。** `reportExpired`（`orchestration/command-flow.ts`）はイベントのチャンネル（DM）を宛先にし、`installationId` を `null` で渡す。DM はチャンネル一覧に載らないので `resolveInstallationId` が引けず、`scope` 無しの呼び出しは宛先の接続を決められずに失敗する（その場合は運用者への報告だけが残る）
 7. **DM に落ちる経路は Slack の実機では起こせない**（上の Research Log）。結合試験と単体試験で守る
-8. **（本機能の外）`src/testing/instance-ownership-e2e.integ.ts` の「runs the periodic sweep on one instance at a time」は、この開発環境では 5 秒の上限で時々失敗する。** 本人宛ての返事の変更を入れる前のコミットでも同じように失敗した
+8. **（本機能の外）`src/testing/instance-ownership-e2e.integ.ts` の「runs the periodic sweep on one instance at a time」は、この開発環境では 5 秒の上限で時々失敗する。** この機能の無いコミットでも同じように失敗する
 
 ## References
 

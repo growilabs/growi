@@ -27,7 +27,7 @@
 - 4 サービスとのやり取り（Chat SDK 経由）と、**常時接続の生涯**
 - 関係管理（1 workspace 対 N GROWI）、ペアリングの proxy 側、鍵の保管（PostgreSQL）
 - コマンドの解釈、引数の収集、GROWI の選択、検索の待ち合わせと統合
-- 本人宛ての返事の届け方（本人にだけ見えるメッセージ → 本人への DM → 内容を含まない知らせ。要件 1.6〜1.16・3.10〜3.14）
+- 本人宛ての返事の届け方（本人にだけ見えるメッセージ → 本人への DM → 内容を含まない知らせ。要件 1.6〜1.19・3.10〜3.14。能力表の届き方の行と導入ドキュメントの説明を含む）
 - proxy 側の PostgreSQL スキーマ
 - 閉域向け推奨構成のドキュメント
 
@@ -131,7 +131,7 @@ types → capabilities → db → platform → command → relation → growi �
 `CapabilityLevel` は `full` / `degraded` / `none` / `unverified` の 4 値。
 表の ○ が `full`、△ が `degraded`、× が `none`、要確認が `unverified`。
 `supports()` が `true` を返すのは **`full` のときだけ**。
-- `degraded`（Mattermost の `card` と `ephemeralMessage`）— `false`。呼ぶ側は代わりの手段（markdown で投稿）を選ぶ。
+- `degraded`（Mattermost の `card` と `ephemeralMessage`）— `false`。代わりの手段は表の右端の列のとおり（`card` は markdown で投稿、`ephemeralMessage` は本人への DM。後者は `supports()` を見ず、呼んだ結果で切り替える）。
   `levelOf()` で `degraded` を見分けられるので、「使えるが劣る」ことを利用者に示したい場所だけがそれを使う
 
 > **`ephemeralMessage` と `directMessage` の行は、運用者への説明（要件 1.17）のためにある。** 本人宛ての返事の届け方は
@@ -325,7 +325,7 @@ Chat SDK は DM のメッセージを mention として届けるので、DM で�
 apps/chat-integration-proxy/
 ├── prisma/
 │   ├── schema.prisma
-│   └── migrations/            # pending_collection の answer_channel_id と索引も migration で足す
+│   └── migrations/            # pending_collection の answer_channel_id と索引の migration を含む
 ├── src/
 │   ├── types/
 │   │   ├── index.ts               # InteractionRef / TimeRange / ModalForm / FieldSpec
@@ -920,7 +920,7 @@ flowchart TD
 export interface PrivateReplyOrigin {
   readonly channel: SdkChannelRef;
   readonly actor: ChatAccountRef;
-  /** The message that carried the request; `null` when there is none (slash command). */
+  /** The message that carried the request; `null` when there is none (modal, slash command). */
   readonly sourceMessageId: string | null;
   /** What was asked, as the DM header shows it, e.g. `search foo`. Never the reply itself. */
   readonly requestSummary: string;
@@ -1436,7 +1436,7 @@ Chat SDK の state（購読・分散ロック・重複排除）は `@chat-adapte
 
 1. Slack: mention → ボタン → modal → ページ作成 → リンクが投稿される（4.1–4.3・8.2）
 2. Mattermost: mention → 番号つき一覧 → `@growi 1` で選択 → 引数と聞き返しでページ作成（1.2・8.2）
-3. Discord: mention による検索が 2 台の GROWI の結果を出典つきで返す（3.1–3.3）
+3. Discord: mention による検索が 2 台の GROWI の結果を出典つきで返す（3.1–3.3）。結果は本人への DM で届く（Discord には本人にだけ見えるメッセージが無い）。ただし proxy は今 Discord の Gateway を開かないので mention が届かず、この試験は今は行えない（proxy の research.md の既知の問題 2）
 4. **Teams**: mention → modal → ページ作成。**外部から接続を受ける唯一のサービス**で、
    slash command は使えず modal は使えるという他と違う組み合わせを持つため確かめる価値が最も高い（1.1・1.2・13.3）
 5. **通知**（要件 2）: GROWI がページを保存 → 通知が指定のチャンネルへ届く →
