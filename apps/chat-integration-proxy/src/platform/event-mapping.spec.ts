@@ -55,7 +55,7 @@ const author = (overrides: Partial<Author> = {}): Author => ({
 });
 
 const slackChannel = (name: string | null = 'general'): Channel =>
-  mock<Channel>({ id: 'C0001', name });
+  mock<Channel>({ id: 'slack:C0001', name });
 
 const slackThread = (
   overrides: {
@@ -67,7 +67,7 @@ const slackThread = (
 ): Thread =>
   mock<Thread>({
     adapter: mock({ name: 'slack' }),
-    channelId: overrides.channelId ?? 'C0001',
+    channelId: overrides.channelId ?? 'slack:C0001',
     isDM: overrides.isDM ?? false,
     channelVisibility: overrides.channelVisibility ?? 'workspace',
     channel: slackChannel(
@@ -132,7 +132,7 @@ describe('fromMessage', () => {
       platform: 'slack',
       channel: {
         platform: 'slack',
-        channelId: 'C0001',
+        channelId: 'slack:C0001',
         channelName: 'general',
         isPrivate: false,
       },
@@ -175,7 +175,7 @@ describe('fromMessage', () => {
       platform: 'slack',
       channel: {
         platform: 'slack',
-        channelId: 'C0001',
+        channelId: 'slack:C0001',
         channelName: 'general',
         isPrivate: false,
       },
@@ -187,7 +187,7 @@ describe('fromMessage', () => {
       messageRef: {
         channel: {
           platform: 'slack',
-          channelId: 'C0001',
+          channelId: 'slack:C0001',
           channelName: 'general',
           isPrivate: false,
         },
@@ -231,8 +231,15 @@ describe('fromMessage', () => {
     // matched by id, never by name, so a missing name must not drop the event.
     const event = fromMessage(slackThread({ channelName: null }), message());
 
-    expect(event?.channel.channelId).toBe('C0001');
+    expect(event?.channel.channelId).toBe('slack:C0001');
     expect(event?.channel.channelName).toBe('');
+  });
+
+  it('drops an event whose channel id is not in the adapter encoding it came from', () => {
+    // Nothing downstream that converts the id can then throw on it.
+    expect(
+      fromMessage(slackThread({ channelId: 'C0001' }), message()),
+    ).toBeNull();
   });
 
   it('falls back to the handle when the platform reports no display name', () => {
@@ -247,7 +254,7 @@ describe('fromMessage', () => {
   it('produces nothing for an adapter this proxy does not serve', () => {
     const foreign = mock<Thread>({
       adapter: mock({ name: 'whatsapp' }),
-      channelId: 'C0001',
+      channelId: 'slack:C0001',
       isDM: false,
       channelVisibility: 'workspace',
       channel: slackChannel(),
@@ -292,7 +299,7 @@ describe('fromSlashCommand', () => {
     mock<SlashCommandEvent>({
       adapter: mock({ name: 'slack' }),
       channel: mock<Channel>({
-        id: 'C0001',
+        id: 'slack:C0001',
         name: 'general',
         isDM: false,
         channelVisibility: 'workspace',
@@ -312,7 +319,7 @@ describe('fromSlashCommand', () => {
       platform: 'slack',
       channel: {
         platform: 'slack',
-        channelId: 'C0001',
+        channelId: 'slack:C0001',
         channelName: 'general',
         isPrivate: false,
       },
@@ -427,7 +434,7 @@ describe('fromAction', () => {
       platform: 'slack',
       channel: {
         platform: 'slack',
-        channelId: 'C0001',
+        channelId: 'slack:C0001',
         channelName: 'general',
         isPrivate: false,
       },
@@ -511,7 +518,7 @@ describe('fromModalSubmit', () => {
       platform: 'slack',
       channel: {
         platform: 'slack',
-        channelId: 'C0001',
+        channelId: 'slack:C0001',
         channelName: 'general',
         isPrivate: false,
       },
@@ -538,7 +545,7 @@ describe('fromModalSubmit', () => {
       modalSubmitEvent({
         relatedThread: undefined,
         relatedChannel: mock<Channel>({
-          id: 'C0002',
+          id: 'slack:C0002',
           name: 'random',
           isDM: false,
           channelVisibility: 'private',
@@ -548,7 +555,7 @@ describe('fromModalSubmit', () => {
 
     expect(event?.channel).toEqual({
       platform: 'slack',
-      channelId: 'C0002',
+      channelId: 'slack:C0002',
       channelName: 'random',
       isPrivate: true,
     });

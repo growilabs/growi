@@ -5,14 +5,15 @@
 
 export type { AdminCheckMethod } from './admin-check.js';
 export { ADMIN_CHECK_TABLE } from './admin-check.js';
+export type { InventoryIndex } from './channel-id.js';
 export {
+  indexInventory,
   inventoryChannelIdOfEvent,
   inventoryChannelIdOfListed,
   nativeChannelIdOf,
   parseInventoryChannelKey,
   parseSdkChannelId,
   resolveNotificationTarget,
-  sdkChannelIdFromAdapter,
   toProtocolChannelRef,
   toProtocolInventory,
   toSdkChannelId,

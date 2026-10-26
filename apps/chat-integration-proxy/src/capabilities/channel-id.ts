@@ -115,13 +115,6 @@ export const toSdkChannelId = (
 };
 
 /**
- * An id the Chat SDK itself just produced (`Thread.channelId`, `Channel.id`),
- * taken as it is: the adapter is the authority on its own encoding.
- */
-export const sdkChannelIdFromAdapter = (channelId: string): SdkChannelId =>
-  channelId as SdkChannelId;
-
-/**
  * The chat service's own id of a channel this proxy addresses. Throws when the
  * id is not in `platform`'s encoding, so a mismatch surfaces where the id is
  * about to leave the proxy rather than as a refusal inside GROWI.
@@ -295,6 +288,29 @@ export const toProtocolInventory = (
 // A notification target GROWI names
 // ---------------------------------------------------------------------------
 
+/**
+ * An inventory keyed by service, then by the id GROWI names a channel with.
+ * Keyed by service as well because two services may share a channel id, and a
+ * row from the wrong one must not stand in for the other.
+ */
+export type InventoryIndex = ReadonlyMap<
+  PlatformName,
+  ReadonlyMap<NativeChannelId, InventoryChannel>
+>;
+
+/** Built once per request, so each target is one lookup rather than a scan. */
+export const indexInventory = (
+  inventory: ReadonlyArray<InventoryChannel>,
+): InventoryIndex => {
+  const index = new Map<PlatformName, Map<NativeChannelId, InventoryChannel>>();
+  for (const channel of inventory) {
+    const byId = index.get(channel.platform) ?? new Map();
+    byId.set(nativeIdOfInventory(channel), channel);
+    index.set(channel.platform, byId);
+  }
+  return index;
+};
+
 export type NotificationTargetResolution =
   | { readonly kind: 'found'; readonly channel: SdkChannelRef }
   | { readonly kind: 'inventory-not-ready' }
@@ -309,7 +325,7 @@ export type NotificationTargetResolution =
  * rather than converted.
  */
 export const resolveNotificationTarget = (
-  inventory: ReadonlyArray<InventoryChannel> | null,
+  inventory: InventoryIndex | null,
   target: {
     readonly platform: PlatformName;
     readonly channelId: NativeChannelId;
@@ -318,13 +334,7 @@ export const resolveNotificationTarget = (
   if (inventory == null) {
     return { kind: 'inventory-not-ready' };
   }
-  // The service is compared as well as the id: two services may share a
-  // channel id, and a row from the wrong one must not stand in for this one.
-  const row = inventory.find(
-    (channel) =>
-      channel.platform === target.platform &&
-      nativeIdOfInventory(channel) === target.channelId,
-  );
+  const row = inventory.get(target.platform)?.get(target.channelId);
   if (row == null) {
     return { kind: 'not-in-installation' };
   }

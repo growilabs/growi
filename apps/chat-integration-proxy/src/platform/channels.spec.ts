@@ -20,10 +20,10 @@ import { createMattermostAdapter } from 'chat-adapter-mattermost';
 import { mock } from 'vitest-mock-extended';
 
 import {
+  indexInventory,
   inventoryChannelIdOfEvent,
   nativeChannelIdOf,
   resolveNotificationTarget,
-  sdkChannelIdFromAdapter,
   toProtocolInventory,
   toSdkChannelId,
   toTeamsGraphChannelId,
@@ -920,7 +920,8 @@ describe('a listed channel, served to GROWI and named back by it, is the channel
       appToken: 'xapp-unused',
       signingSecret: 'unused',
     });
-    const eventChannelId = sdkChannelIdFromAdapter(
+    const eventChannelId = toSdkChannelId(
+      'slack',
       adapter.channelIdFromThreadId(
         adapter.encodeThreadId({
           channel: 'C1',
@@ -950,7 +951,7 @@ describe('a listed channel, served to GROWI and named back by it, is the channel
       nativeChannelIdOf({ platform: 'slack', channelId: eventChannelId }),
     ).toBe(named);
     expect(
-      resolveNotificationTarget(listed, {
+      resolveNotificationTarget(indexInventory(listed), {
         platform: 'slack',
         channelId: named,
       }),
@@ -971,7 +972,8 @@ describe('a listed channel, served to GROWI and named back by it, is the channel
       publicKey: '0'.repeat(64),
       botToken: 'bot-1',
     });
-    const eventChannelId = sdkChannelIdFromAdapter(
+    const eventChannelId = toSdkChannelId(
+      'discord',
       adapter.channelIdFromThreadId(
         adapter.encodeThreadId({
           guildId: 'G1',
@@ -1005,7 +1007,7 @@ describe('a listed channel, served to GROWI and named back by it, is the channel
       nativeChannelIdOf({ platform: 'discord', channelId: eventChannelId }),
     ).toBe(named);
     expect(
-      resolveNotificationTarget(listed, {
+      resolveNotificationTarget(indexInventory(listed), {
         platform: 'discord',
         channelId: named,
       }),
@@ -1020,7 +1022,8 @@ describe('a listed channel, served to GROWI and named back by it, is the channel
       appId: 'teams-app',
       appPassword: 'teams-secret',
     });
-    const eventChannelId = sdkChannelIdFromAdapter(
+    const eventChannelId = toSdkChannelId(
+      'teams',
       adapter.channelIdFromThreadId(
         adapter.encodeThreadId({
           conversationId: '19:abc@thread.tacv2;messageid=1700000000000',
@@ -1044,7 +1047,7 @@ describe('a listed channel, served to GROWI and named back by it, is the channel
       nativeChannelIdOf({ platform: 'teams', channelId: eventChannelId }),
     ).toBe(named);
     expect(
-      resolveNotificationTarget(listed, {
+      resolveNotificationTarget(indexInventory(listed), {
         platform: 'teams',
         channelId: named,
       }),
@@ -1056,7 +1059,8 @@ describe('a listed channel, served to GROWI and named back by it, is the channel
       baseUrl: 'https://mm.example.com',
       botToken: 'mm-1',
     });
-    const eventChannelId = sdkChannelIdFromAdapter(
+    const eventChannelId = toSdkChannelId(
+      'mattermost',
       adapter.channelIdFromThreadId(
         adapter.encodeThreadId({ channelId: 'ch-1', rootPostId: 'post-1' }),
       ),
@@ -1078,7 +1082,8 @@ describe('a Discord slash command typed inside a thread', () => {
       publicKey: '0'.repeat(64),
       botToken: 'bot-1',
     });
-    const slashChannelId = sdkChannelIdFromAdapter(
+    const slashChannelId = toSdkChannelId(
+      'discord',
       adapter.encodeThreadId({ guildId: 'G1', channelId: '1', threadId: '9' }),
     );
     const { stub } = fetchStub([[{ id: '1', name: 'general', type: 0 }]]);

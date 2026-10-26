@@ -34,10 +34,10 @@ const author = (overrides: Partial<Author> = {}): Author => ({
 const thread = (): Thread =>
   mock<Thread>({
     adapter: mock({ name: 'slack' }),
-    channelId: 'C0001',
+    channelId: 'slack:C0001',
     isDM: false,
     channelVisibility: 'workspace',
-    channel: mock<Channel>({ id: 'C0001', name: 'general' }),
+    channel: mock<Channel>({ id: 'slack:C0001', name: 'general' }),
   });
 
 const message = (overrides: Partial<Message> = {}): Message =>
@@ -193,7 +193,7 @@ describe('modal handles', () => {
     await registered.slashCommand?.(
       mock<SlashCommandEvent>({
         adapter: mock({ name: 'slack' }),
-        channel: mock<Channel>({ id: 'C0001', name: 'general' }),
+        channel: mock<Channel>({ id: 'slack:C0001', name: 'general' }),
         user: author(),
         command: '/growi',
         text: 'search foo',
@@ -267,7 +267,7 @@ describe('modal submissions', () => {
         adapter: mock({ name: 'slack' }),
         user: author(),
         privateMetadata: 'corr-1',
-        relatedChannel: mock<Channel>({ id: 'C0001', name: 'general' }),
+        relatedChannel: mock<Channel>({ id: 'slack:C0001', name: 'general' }),
         // Absent, not stubbed: a submission from a modal opened over a
         // channel carries no thread, and an auto-stubbed one would be taken
         // as a real conversation.

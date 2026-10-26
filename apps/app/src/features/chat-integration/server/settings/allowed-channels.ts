@@ -21,11 +21,11 @@ import type {
   IChatChannelPermission,
 } from './models/chat-channel-permission';
 
-/** The wire form: what the proxy sends and receives. */
 const logger = loggerFactory(
   'growi:features:chat-integration:settings:allowed-channels',
 );
 
+/** The wire form: what the proxy sends and receives. */
 export type WireAllowedChannels =
   RelationSettings['channelPermissions'][number]['allowedChannels'];
 

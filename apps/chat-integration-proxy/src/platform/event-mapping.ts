@@ -30,11 +30,11 @@ import type {
   Thread,
 } from 'chat';
 
-import { sdkChannelIdFromAdapter } from '../capabilities/index.js';
+import { parseSdkChannelId } from '../capabilities/index.js';
 import type {
   InteractionRef,
   PlatformEvent,
-  SdkChannelId,
+  SdkChannelRef,
 } from '../types/index.js';
 import { ADAPTER_FACTORIES } from './adapter-set.js';
 
@@ -75,17 +75,23 @@ const toPlatformName = (adapterName: string): PlatformName | null =>
 const toChannelRef = (
   platform: PlatformName,
   source: {
-    readonly channelId: SdkChannelId;
+    readonly channelId: string;
     readonly channelName: string | null;
     readonly isDM: boolean;
     readonly channelVisibility: ChannelVisibility;
   },
-) => ({
-  platform,
-  channelId: source.channelId,
-  channelName: source.channelName ?? '',
-  isPrivate: source.isDM || source.channelVisibility === 'private',
-});
+): SdkChannelRef | null => {
+  // Checked here, where the id enters, so nothing downstream that converts it
+  // can throw on an id this proxy cannot read; such an event is dropped.
+  const channelId = parseSdkChannelId(platform, source.channelId);
+  if (channelId === undefined) return null;
+  return {
+    platform,
+    channelId,
+    channelName: source.channelName ?? '',
+    isPrivate: source.isDM || source.channelVisibility === 'private',
+  };
+};
 
 /**
  * `fullName` is what the platform shows; the handle is the fallback when it is
@@ -128,7 +134,7 @@ interface ThreadSource {
 
 const channelRefOfChannel = (platform: PlatformName, channel: ChannelSource) =>
   toChannelRef(platform, {
-    channelId: sdkChannelIdFromAdapter(channel.id),
+    channelId: channel.id,
     channelName: channel.name,
     isDM: channel.isDM,
     channelVisibility: channel.channelVisibility,
@@ -138,7 +144,7 @@ const channelRefOfThread = (platform: PlatformName, thread: ThreadSource) =>
   toChannelRef(platform, {
     // The thread's own id is the thread, not the channel; `channelId` is the
     // conversation it lives in, which is what an `SdkChannelRef` names.
-    channelId: sdkChannelIdFromAdapter(thread.channelId),
+    channelId: thread.channelId,
     channelName: thread.channel.name,
     isDM: thread.isDM,
     channelVisibility: thread.channelVisibility,
@@ -212,6 +218,7 @@ export const fromMessage = (
   if (platform == null) return null;
 
   const channel = channelRefOfThread(platform, thread);
+  if (channel == null) return null;
   const actor = toChatAccountRef(platform, message.author);
 
   // Strictly `true`: `Message.isMention` is `boolean | undefined`, and the SDK
@@ -270,10 +277,13 @@ export const fromSlashCommand = (
   const platform = toPlatformName(event.adapter.name);
   if (platform == null) return null;
 
+  const channel = channelRefOfChannel(platform, event.channel);
+  if (channel == null) return null;
+
   return {
     kind: 'slash-command',
     platform,
-    channel: channelRefOfChannel(platform, event.channel),
+    channel: channel,
     actor: toChatAccountRef(platform, event.user),
     command: event.command,
     text: event.text,
@@ -297,10 +307,13 @@ export const fromAction = (
   const thread = event.thread;
   if (thread == null) return null;
 
+  const channel = channelRefOfThread(platform, thread);
+  if (channel == null) return null;
+
   return {
     kind: 'action',
     platform,
-    channel: channelRefOfThread(platform, thread),
+    channel: channel,
     actor: toChatAccountRef(platform, event.user),
     correlationId: decoded.correlationId,
     actionId: decoded.actionId,
