@@ -97,7 +97,7 @@ function makeService(tmpDir: string): IPageBulkExportJobCronService {
  * lastExportedPagePath defaults to null (no prior export).
  */
 function makeJob(
-  format: PageBulkExportFormat,
+  format: string,
   lastExportedPagePath: string | null = null,
 ): pagebulkexportjobs {
   return mock<pagebulkexportjobs>({
@@ -347,6 +347,28 @@ describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
       findSpy.mockRestore();
+    }
+  });
+});
+
+describe('export-pages-to-fs-async: unsupported format', () => {
+  it.each([
+    '/../../../escape',
+    'docx',
+    '',
+  ])('refuses to start exporting a job whose format is %j', async (format) => {
+    const tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'bulk-export-bad-format-'),
+    );
+    const svc = makeService(tmpDir);
+
+    try {
+      await expect(
+        getPageWritable.call(svc, makeJob(format)),
+      ).rejects.toThrow();
+      expect(fs.readdirSync(tmpDir)).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 });

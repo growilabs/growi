@@ -390,6 +390,8 @@ model pagebulkexportjobs {
   // job so that a failed removal leaves the job row for the next cron to retry.
   // NoAction would make Prisma reject deleting an attachment a job still references.
   attachment attachments? @relation(fields: [attachmentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([attachmentId], map: "attachment_1")
 }
 
 model pagebulkexportpagesnapshots {
