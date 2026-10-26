@@ -71,6 +71,7 @@ const validator = [
       return true;
     })
     .withMessage('Invalid scope')
+    .bail()
     .custom((scopes: Scope[], { req }) => {
       if (req.user?.admin !== true && includesAdminScope(scopes)) {
         throw new Error('Admin scopes are only available to administrators');

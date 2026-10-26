@@ -88,6 +88,26 @@ describe('POST /personal-setting/generate-access-token', () => {
     expect(generateToken).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['an unknown wildcard scope', ['read:foo:bar:*']],
+    ['a non-array scopes value', 'write:admin:*'],
+  ])('responds to %s with validator messages only, not internal errors', async (_, scopes) => {
+    const res = await postScopes(nonAdminUser, scopes as Scope[]);
+
+    expect(res.status).toBe(400);
+    const messages = res.body.errors.map(
+      (err: { message: string }) => err.message,
+    );
+    expect(
+      messages.every((message: string) =>
+        ['scopes: scope must be an array', 'scopes: Invalid scope'].includes(
+          message,
+        ),
+      ),
+    ).toBe(true);
+    expect(generateToken).not.toHaveBeenCalled();
+  });
+
   it('issues a token with user scopes to a non-admin user', async () => {
     const res = await postScopes(nonAdminUser, [SCOPE.READ.FEATURES.PAGE]);
 
