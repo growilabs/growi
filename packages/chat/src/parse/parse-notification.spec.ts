@@ -144,6 +144,21 @@ describe('parseNotificationResult', () => {
     expect(parseNotificationResult(validResult)).toEqual(validResult);
   });
 
+  it('reads back its own answer after a store that writes an undefined field as null', () => {
+    // GROWI keeps the parsed result in MongoDB and parses it again before a
+    // retry; BSON stores a present-but-undefined field as null.
+    const parsed = parseNotificationResult({
+      outcomes: [{ ...outcome, status: 'platform-error', detail: 'boom' }],
+    });
+    const stored: unknown = JSON.parse(
+      JSON.stringify(parsed, (_key, value) =>
+        value === undefined ? null : value,
+      ),
+    );
+
+    expect(parseNotificationResult(stored)).toStrictEqual(parsed);
+  });
+
   it('accepts an empty outcomes array', () => {
     expect(parseNotificationResult({ outcomes: [] })).toEqual({
       outcomes: [],

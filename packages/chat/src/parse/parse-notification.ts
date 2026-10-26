@@ -131,7 +131,15 @@ const parseOutcome = (v: unknown): NotificationOutcome | undefined => {
     }
   }
 
-  return { platform, channelId, status, remedy, detail };
+  // An absent field is left out, not set to undefined: a stored copy would
+  // turn it into null, which this same function refuses on the way back.
+  return {
+    platform,
+    channelId,
+    status,
+    ...(remedy === undefined ? {} : { remedy }),
+    ...(detail === undefined ? {} : { detail }),
+  };
 };
 
 export const parseNotificationResult = (

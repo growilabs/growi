@@ -470,6 +470,12 @@ describe('parseCommandResponse', () => {
       expect(parseCommandResponse(base)).toEqual(base);
     });
 
+    it('leaves an absent optional field out rather than present as undefined', () => {
+      // A stored copy turns a present-but-undefined field into null, which
+      // this same parser then refuses.
+      expect(parseCommandResponse(base)).toStrictEqual(base);
+    });
+
     it('accepts a valid link-preview response with all optional fields', () => {
       const withOptionals = {
         ...base,

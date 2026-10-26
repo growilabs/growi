@@ -341,7 +341,16 @@ export const parseCommandResponse = (
         }
       }
 
-      return { kind, path, restricted, excerpt, updatedAt, commentCount };
+      // Absent fields are left out, not set to undefined (see
+      // `parse-notification.ts`'s outcome for why).
+      return {
+        kind,
+        path,
+        restricted,
+        ...(excerpt === undefined ? {} : { excerpt }),
+        ...(updatedAt === undefined ? {} : { updatedAt }),
+        ...(commentCount === undefined ? {} : { commentCount }),
+      };
     }
     case RESPONSE_KINDS.help: {
       const commands = arr(raw.commands, COMMANDS_MAX, parseHelpCommandEntry);
