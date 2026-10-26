@@ -23,6 +23,7 @@ const INVOCATION: Invocation = {
   commandName: 'create-page',
   argsText: '',
   interaction: null,
+  sourceMessageId: null,
 };
 
 /** What a caller passes to `create()` -- typed the way the repository's own interface declares it. */
@@ -50,6 +51,7 @@ const dbRow = (overrides: Partial<typeof NEW_COLLECTION> = {}) => {
   return {
     ...merged,
     relationId: merged.relationId ?? null,
+    answerChannelId: null,
     invocation: merged.invocation as unknown as Prisma.JsonValue,
     collected: merged.collected as Prisma.JsonValue,
     offeredOptions: merged.offeredOptions as Prisma.JsonValue,

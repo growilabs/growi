@@ -58,12 +58,26 @@ export interface PendingCollectionRepository {
    * actorAccountId)`, if any -- matches the table's index. Whether a new
    * command discards it (and tells the user it discarded something) is
    * `ArgumentCollector.start`'s decision, not this repository's.
+   *
+   * Also matches a row whose answers were routed to `channelId` by
+   * `routeAnswersVia`; a row asked in `channelId` itself wins over one only
+   * routed there.
    */
   findInFlight(
     platform: string,
     channelId: SdkChannelId,
     actorAccountId: string,
   ): Promise<PendingCollectionRecord | null>;
+  /**
+   * Records that answers to this collection may arrive in `answerChannelId`
+   * (a DM). Clears the same route from any other row of the same platform and
+   * actor, so one DM answers at most one collection: the newest question
+   * wins. Rejects when no row has `correlationId`.
+   */
+  routeAnswersVia(
+    correlationId: string,
+    answerChannelId: SdkChannelId,
+  ): Promise<void>;
   update(correlationId: string, update: PendingCollectionUpdate): Promise<void>;
   /** Used once a collection completes or is explicitly discarded. */
   remove(correlationId: string): Promise<void>;
@@ -113,8 +127,13 @@ const toRecord = (
   // The JSON column round-trips whatever was written; the caller that wrote
   // it is the one that knows it was an `Invocation`. Its channel id is
   // trusted only because it equals the column validated above.
-  const invocation = row.invocation as Invocation;
-  return channelId === undefined || invocation.channel?.channelId !== channelId
+  const stored = row.invocation as Invocation;
+  // Rows saved before `sourceMessageId` existed lack the key altogether.
+  const invocation: Invocation = {
+    ...stored,
+    sourceMessageId: stored.sourceMessageId ?? null,
+  };
+  return channelId === undefined || stored.channel?.channelId !== channelId
     ? null
     : {
         correlationId: row.correlationId,
@@ -160,10 +179,41 @@ export const createPendingCollectionRepository = (
   },
 
   findInFlight: async (platform, channelId, actorAccountId) => {
-    const row = await db.pendingCollection.findFirst({
-      where: { platform, channelId, actorAccountId },
-    });
+    const row =
+      (await db.pendingCollection.findFirst({
+        where: { platform, channelId, actorAccountId },
+      })) ??
+      (await db.pendingCollection.findFirst({
+        where: { platform, answerChannelId: channelId, actorAccountId },
+        orderBy: { expiresAt: 'desc' },
+      }));
     return row == null ? null : toRecord(row);
+  },
+
+  routeAnswersVia: async (correlationId, answerChannelId) => {
+    // One statement, so clearing the old route and writing the new one are
+    // atomic without this repository opening a transaction (see DbClient).
+    const updated = await db.$queryRaw<{ correlation_id: string }[]>`
+      UPDATE "pending_collection" AS p
+      SET "answer_channel_id" = CASE
+        WHEN p."correlation_id" = ${correlationId} THEN ${answerChannelId}
+        ELSE NULL
+      END
+      FROM "pending_collection" AS target
+      WHERE target."correlation_id" = ${correlationId}
+        AND (
+          p."correlation_id" = target."correlation_id"
+          OR (
+            p."platform" = target."platform"
+            AND p."actor_account_id" = target."actor_account_id"
+            AND p."answer_channel_id" = ${answerChannelId}
+          )
+        )
+      RETURNING p."correlation_id"
+    `;
+    if (!updated.some((row) => row.correlation_id === correlationId)) {
+      throw new Error(`pending collection ${correlationId} does not exist`);
+    }
   },
 
   update: async (correlationId, update) => {

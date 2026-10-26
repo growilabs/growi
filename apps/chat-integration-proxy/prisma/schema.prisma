@@ -226,20 +226,24 @@ model ChannelPermission {
 // A command invocation waiting for more input (a modal submission, a
 // follow-up answer, or a choice of which GROWI to act on).
 model PendingCollection {
-  correlationId  String   @id @map("correlation_id")
+  correlationId   String   @id @map("correlation_id")
   // Empty while the GROWI destination is still being chosen.
-  relationId     String?  @map("relation_id") @db.Uuid
-  platform       String
-  channelId      String   @map("channel_id")
-  actorAccountId String   @map("actor_account_id")
-  commandName    String   @map("command_name")
-  invocation     Json
-  collected      Json
-  offeredOptions Json     @map("offered_options")
-  expiresAt      DateTime @map("expires_at") @db.Timestamptz(3)
+  relationId      String?  @map("relation_id") @db.Uuid
+  platform        String
+  channelId       String   @map("channel_id")
+  actorAccountId  String   @map("actor_account_id")
+  commandName     String   @map("command_name")
+  invocation      Json
+  collected       Json
+  offeredOptions  Json     @map("offered_options")
+  expiresAt       DateTime @map("expires_at") @db.Timestamptz(3)
+  // The DM the question was delivered to, when it went there instead of the
+  // original channel; answers are accepted there too.
+  answerChannelId String?  @map("answer_channel_id")
 
   relation Relation? @relation(fields: [relationId], references: [id], onDelete: Restrict)
 
   @@index([platform, channelId, actorAccountId])
+  @@index([platform, answerChannelId, actorAccountId])
   @@map("pending_collection")
 }

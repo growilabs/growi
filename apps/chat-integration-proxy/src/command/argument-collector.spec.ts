@@ -30,6 +30,7 @@ const createFakeRepository = (): PendingCollectionRepository & {
   readonly rows: Map<string, PendingCollectionRecord>;
 } => {
   const rows = new Map<string, PendingCollectionRecord>();
+  const answerRoutes = new Map<string, string>();
   return {
     rows,
     create: (collection: NewPendingCollection) => {
@@ -42,15 +43,34 @@ const createFakeRepository = (): PendingCollectionRepository & {
     },
     findByCorrelationId: (correlationId) =>
       Promise.resolve(rows.get(correlationId) ?? null),
-    findInFlight: (platform, channelId, actorAccountId) =>
-      Promise.resolve(
-        [...rows.values()].find(
-          (row) =>
-            row.platform === platform &&
-            row.channelId === channelId &&
-            row.actorAccountId === actorAccountId,
-        ) ?? null,
-      ),
+    findInFlight: (platform, channelId, actorAccountId) => {
+      const own = [...rows.values()].filter(
+        (row) =>
+          row.platform === platform && row.actorAccountId === actorAccountId,
+      );
+      return Promise.resolve(
+        own.find((row) => row.channelId === channelId) ??
+          own.find(
+            (row) => answerRoutes.get(row.correlationId) === channelId,
+          ) ??
+          null,
+      );
+    },
+    routeAnswersVia: (correlationId, answerChannelId) => {
+      const target = rows.get(correlationId);
+      if (target == null) throw new Error(`no such row: ${correlationId}`);
+      for (const row of rows.values()) {
+        if (
+          row.platform === target.platform &&
+          row.actorAccountId === target.actorAccountId &&
+          answerRoutes.get(row.correlationId) === answerChannelId
+        ) {
+          answerRoutes.delete(row.correlationId);
+        }
+      }
+      answerRoutes.set(correlationId, answerChannelId);
+      return Promise.resolve();
+    },
     update: (correlationId, update) => {
       const row = rows.get(correlationId);
       if (row == null) throw new Error(`no such row: ${correlationId}`);

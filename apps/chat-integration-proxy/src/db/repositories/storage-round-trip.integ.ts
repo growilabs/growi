@@ -525,6 +525,7 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       commandName: 'create-page',
       argsText: '',
       interaction: null,
+      sourceMessageId: null,
     };
 
     const created = await pendingCollections.create({
@@ -753,4 +754,218 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       ),
     ).resolves.toBe(false);
   });
+});
+
+describe('answers to a question delivered by DM, through real PostgreSQL (Requirement 2.3)', () => {
+  // Rows here have no relation, so the file-level `afterAll` (which cleans up
+  // by relation) never reaches them; each test removes its own.
+  const withPendingRows = async (
+    test: (helpers: {
+      prisma: PrismaClient;
+      pendingCollections: ReturnType<typeof createPendingCollectionRepository>;
+      createRow: (
+        channelId: SdkChannelId,
+        actorAccountId: string,
+      ) => Promise<string>;
+    }) => Promise<void>,
+  ): Promise<void> => {
+    const { prisma } = await context();
+    const pendingCollections = createPendingCollectionRepository(prisma);
+    const correlationIds: string[] = [];
+    const createRow = async (
+      channelId: SdkChannelId,
+      actorAccountId: string,
+    ): Promise<string> => {
+      const correlationId = `corr-${randomUUID()}`;
+      correlationIds.push(correlationId);
+      await pendingCollections.create({
+        correlationId,
+        relationId: null,
+        platform: 'slack',
+        channelId,
+        actorAccountId,
+        commandName: 'create-page',
+        invocation: {
+          platform: 'slack',
+          channel: {
+            platform: 'slack',
+            channelId,
+            channelName: 'general',
+            isPrivate: false,
+          },
+          actor: {
+            platform: 'slack',
+            accountId: actorAccountId,
+            displayName: 'Alice',
+          },
+          commandName: 'create-page',
+          argsText: '',
+          interaction: null,
+          sourceMessageId: `m-${randomUUID()}`,
+        },
+        collected: {},
+        offeredOptions: {},
+        expiresAt: new Date(Date.now() + 600_000),
+      });
+      return correlationId;
+    };
+    try {
+      await test({ prisma, pendingCollections, createRow });
+    } finally {
+      await prisma.pendingCollection.deleteMany({
+        where: { correlationId: { in: correlationIds } },
+      });
+    }
+  };
+
+  const newChannel = (prefix: string): SdkChannelId =>
+    testSdkChannelId('slack', `${prefix}-${randomUUID()}`);
+
+  it('finds a collection by the DM it was routed through, as well as by its own channel', () =>
+    withPendingRows(async ({ pendingCollections, createRow }) => {
+      const actor = `U-${randomUUID()}`;
+      const channel = newChannel('C');
+      const dm = newChannel('D');
+      const correlationId = await createRow(channel, actor);
+
+      await expect(
+        pendingCollections.findInFlight('slack', dm, actor),
+      ).resolves.toBeNull();
+
+      await pendingCollections.routeAnswersVia(correlationId, dm);
+
+      const viaDm = await pendingCollections.findInFlight('slack', dm, actor);
+      expect(viaDm?.correlationId).toBe(correlationId);
+      // Answering in the DM still resumes in the original channel.
+      expect(viaDm?.channelId).toBe(channel);
+      const viaChannel = await pendingCollections.findInFlight(
+        'slack',
+        channel,
+        actor,
+      );
+      expect(viaChannel?.correlationId).toBe(correlationId);
+    }));
+
+  it('hands the DM to the newest question, leaving the older one answerable in its own channel', () =>
+    withPendingRows(async ({ prisma, pendingCollections, createRow }) => {
+      const actor = `U-${randomUUID()}`;
+      const dm = newChannel('D');
+      const olderChannel = newChannel('C');
+      const older = await createRow(olderChannel, actor);
+      const newer = await createRow(newChannel('C'), actor);
+
+      await pendingCollections.routeAnswersVia(older, dm);
+      await pendingCollections.routeAnswersVia(newer, dm);
+
+      const viaDm = await pendingCollections.findInFlight('slack', dm, actor);
+      expect(viaDm?.correlationId).toBe(newer);
+      // Read around the repository: the lookup alone cannot tell a cleared
+      // route from one that merely lost a tie.
+      await expect(
+        prisma.pendingCollection.findUnique({
+          where: { correlationId: older },
+          select: { answerChannelId: true },
+        }),
+      ).resolves.toEqual({ answerChannelId: null });
+      const viaOlderChannel = await pendingCollections.findInFlight(
+        'slack',
+        olderChannel,
+        actor,
+      );
+      expect(viaOlderChannel?.correlationId).toBe(older);
+    }));
+
+  it("leaves another person's route through the same DM id alone", () =>
+    withPendingRows(async ({ pendingCollections, createRow }) => {
+      const alice = `U-${randomUUID()}`;
+      const bob = `U-${randomUUID()}`;
+      const dm = newChannel('D');
+      const bobs = await createRow(newChannel('C'), bob);
+      const alices = await createRow(newChannel('C'), alice);
+
+      await pendingCollections.routeAnswersVia(bobs, dm);
+      await pendingCollections.routeAnswersVia(alices, dm);
+
+      const forBob = await pendingCollections.findInFlight('slack', dm, bob);
+      expect(forBob?.correlationId).toBe(bobs);
+      const forAlice = await pendingCollections.findInFlight(
+        'slack',
+        dm,
+        alice,
+      );
+      expect(forAlice?.correlationId).toBe(alices);
+    }));
+
+  it('prefers the collection asked in a channel over one only routed to it', () =>
+    withPendingRows(async ({ pendingCollections, createRow }) => {
+      const actor = `U-${randomUUID()}`;
+      const channel = newChannel('C');
+      const routed = await createRow(newChannel('C'), actor);
+      await pendingCollections.routeAnswersVia(routed, channel);
+      const askedHere = await createRow(channel, actor);
+
+      const found = await pendingCollections.findInFlight(
+        'slack',
+        channel,
+        actor,
+      );
+      expect(found?.correlationId).toBe(askedHere);
+    }));
+
+  it('refuses to route a collection that does not exist', () =>
+    withPendingRows(async ({ pendingCollections }) => {
+      await expect(
+        pendingCollections.routeAnswersVia(
+          `corr-${randomUUID()}`,
+          newChannel('D'),
+        ),
+      ).rejects.toThrow();
+    }));
+
+  it('reads a row saved before the request message id existed, with that id as null', () =>
+    withPendingRows(async ({ prisma, pendingCollections, createRow }) => {
+      const channel = newChannel('C');
+      // Created through the repository only so the row is cleaned up; its
+      // stored invocation is then replaced with one lacking the key entirely.
+      const correlationId = await createRow(channel, `U-${randomUUID()}`);
+      await prisma.pendingCollection.update({
+        where: { correlationId },
+        data: {
+          invocation: {
+            platform: 'slack',
+            channel: {
+              platform: 'slack',
+              channelId: channel,
+              channelName: 'general',
+              isPrivate: false,
+            },
+            actor: {
+              platform: 'slack',
+              accountId: 'U0001',
+              displayName: 'Alice',
+            },
+            commandName: 'create-page',
+            argsText: '',
+            interaction: null,
+          },
+        },
+      });
+
+      const record =
+        await pendingCollections.findByCorrelationId(correlationId);
+      expect(record?.invocation.sourceMessageId).toBeNull();
+      expect(record?.invocation.commandName).toBe('create-page');
+    }));
+
+  it('reads back the request message id that was saved', () =>
+    withPendingRows(async ({ pendingCollections, createRow }) => {
+      const correlationId = await createRow(
+        newChannel('C'),
+        `U-${randomUUID()}`,
+      );
+
+      const record =
+        await pendingCollections.findByCorrelationId(correlationId);
+      expect(record?.invocation.sourceMessageId).toMatch(/^m-/);
+    }));
 });
