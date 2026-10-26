@@ -15,7 +15,7 @@ import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-sn
 import type { IPageBulkExportJobCronService } from '..';
 import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
 
-async function reuseDuplicateExportIfExists(
+export async function reuseDuplicateExportIfExists(
   this: IPageBulkExportJobCronService,
   pageBulkExportJob: pagebulkexportjobs,
 ) {
@@ -46,6 +46,7 @@ async function reuseDuplicateExportIfExists(
       data: {
         attachmentId: duplicateExportJob.attachmentId,
         status: PageBulkExportJobStatus.completed,
+        completedAt: new Date(),
       },
     });
 
