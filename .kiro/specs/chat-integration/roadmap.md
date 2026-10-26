@@ -9,7 +9,7 @@
 Gen 1 には手を入れず、GROWI 本体で両方を同時に有効にできる形で併存させる。
 
 前提・確定済みの決定（決定 1〜10）・調査の記録は、本ディレクトリの `brief.md` と `research.md` にある。
-要件（14 件・受け入れ条件 85 件）は本 umbrella の `requirements.md` が持ち、**sub-spec は要件 ID を参照する。番号は振り直さない。**
+要件（14 件・受け入れ条件 107 件）は本 umbrella の `requirements.md` が持ち、**sub-spec は要件 ID を参照する。番号は振り直さない。**
 
 ## 分割の経緯
 
@@ -56,9 +56,8 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 | 順 | spec | 中身 | 対象 | 前提 |
 |---|---|---|---|---|
-| 1 | [chat-integration-private-reply](../chat-integration-private-reply/) | 本人にだけ答えを届ける仕組み（使えなければ DM、チャンネルには戻さない）を作り、`search` の結果と、今ある本人宛ての返事をそこに通す（`search` の漏れと、Mattermost で届かない疑いを直す） | umbrella（要件 1・3）、proxy | なし |
-| 2 | （spec 無しで直す） | DM やチャンネル一覧にまだ無い場所でのコマンドで、installation を特定できない不具合（下の「既知の不具合」） | proxy | なし |
-| 3 | [chat-integration-agent](../chat-integration-agent/) | コマンドを `search`・`create-page`・`agent` に再編する。`keep` を `agent` に吸収し、答えをあとから届ける口を足す | umbrella、protocol、proxy、app | 1、2 |
+| 1 | （spec 無しで直す） | DM やチャンネル一覧にまだ無い場所でのコマンドで、installation を特定できない不具合（下の「既知の不具合」） | proxy | なし |
+| 2 | [chat-integration-agent](../chat-integration-agent/) | コマンドを `search`・`create-page`・`agent` に再編する。`keep` を `agent` に吸収し、答えをあとから届ける口を足す | umbrella、protocol、proxy、app | 1 |
 
 ## Backlog（将来の拡張候補・未着手）
 
@@ -98,13 +97,14 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
     3. チャット連携が 1 つも無いテナントでは問い合わせを飛ばす（「連携があるか」の確認結果は一定時間覚えておく）
   - **想定される影響範囲**: `chat-integration-app`（`notification-outbox.ts`・`notification-dispatcher.ts`・`notification-dispatch-cron.ts`・`pairing/sweep-unpaired-relations.ts`）。protocol と proxy は変わらない
   - **次にやること**: `chat-integration-app` の amend spec。設計の「通知を 2 段に分ける」節に、すぐ送る経路と間隔の決め方を足す
-- **ユーザー向けコマンドを `search`・`create-page`・`agent` に再編する** → discovery 済み（2026-10-26）。上の「進行中の amend spec」の [chat-integration-private-reply](../chat-integration-private-reply/) と [chat-integration-agent](../chat-integration-agent/) に移した
+- **ユーザー向けコマンドを `search`・`create-page`・`agent` に再編する** → discovery 済み（2026-10-26）。答えを本人にだけ届ける仕組みは実装済み（[chat-integration-proxy の design.md](../chat-integration-proxy/design.md)「PrivateReplier — 本人宛ての返事の届け方」）。残りは上の「進行中の amend spec」の [chat-integration-agent](../chat-integration-agent/) に移した
 - **既知の不具合（未修正、2026-10-26 時点）**: 実機試験と独立レビューで見つかり、まだ直していないもの。
   - **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
   - **Discord のスレッド内で打ったスラッシュコマンドの追加入力が結び付かない**: 入力待ちを 4 区切りの `Channel.id`（`discord:<guild>:<parent>:<thread>`）で保存する一方、スレッドでの返答のイベントは 3 区切りの `Thread.channelId` を持つ
   - **DM や一覧にまだ載っていないチャンネルでのコマンドに、的外れな案内が返る**: installation の特定をチャンネル一覧に頼るため、「workspace がまだ登録されていません」と返る（bot が招待された直後は一覧をすぐ取り直すようにしたので、招待後の待ちは無くなった。DM と、bot の招待を伴わずに増えたチャンネルでは残る）
-  - **（疑い・実機未確認）Mattermost で本人にだけ見えるメッセージを出せない**: Mattermost の `POST /api/v4/posts/ephemeral` はシステム管理者の権限（`create_post_ephemeral`）を求め、コミュニティ製のアダプタはこの API を直接呼んで DM に切り替えない。登録コード・紐付けの案内・エラーなど、本人にだけ返すもの（`tell`）がすべて届かないおそれがある。詳しくは [chat-integration-agent の brief](../chat-integration-agent/brief.md) の「実現性の確認の結果」5
-  - **official proxy では Slack の会話の取り込みが事実上使えない**: Slack Marketplace の外で配布するアプリは、2025-05-29 以降、`conversations.history` が 1 分に 1 回・1 回 15 件までに制限される（組織が自分で作るアプリは対象外）。GROWI が運営する 1 つのアプリを多くの workspace に導入する形では、`keep`（要件 5）がこの制限を受ける。同じ brief の 3
+  - **Discord の Gateway を開いていないので、Discord の DM と mention が proxy に届かない**: `src/` のどこからもアダプタの `startGatewayListener` を呼んでいない。本人宛ての返事を DM で送ることはできるが、その DM での答え（要件 1.16）もチャンネルでの mention も届かない。umbrella の design.md の「Discord は Gateway で受ける」と食い違う。別の対応で直す。詳しくは [chat-integration-proxy の research.md](../chat-integration-proxy/research.md) の「既知の問題」2
+  - **Mattermost で、本人にだけ見えるメッセージの権限不足（403）が「bot がチャンネルにいない」と記録される**: `classifyOutboundFailure` が 403 を `bot-not-in-channel` と分類する（アダプタの例外が応答の本文を持たず、見分けられない）。利用者には DM で届くので影響は無いが、DM も届かなかったときの運用者向けの報告の理由が誤る。同じ research.md の「既知の問題」1
+  - **official proxy では Slack の会話の取り込みが事実上使えない**: Slack Marketplace の外で配布するアプリは、2025-05-29 以降、`conversations.history` が 1 分に 1 回・1 回 15 件までに制限される（組織が自分で作るアプリは対象外）。GROWI が運営する 1 つのアプリを多くの workspace に導入する形では、`keep`（要件 5）がこの制限を受ける。詳しくは [chat-integration-agent の brief](../chat-integration-agent/brief.md) の「実現性の確認の結果」3
 
 ## Scope
 

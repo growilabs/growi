@@ -46,7 +46,7 @@
    - チャンネル単位の権限（要件 11）は残す。`agent` は書き込みもしうるので、管理者がチャンネルごとに使わせるかを決められる必要がある。
    - 通知（要件 2）、URL の展開（要件 6）、proxy と GROWI の紐付け（要件 9・10）は、AI では代わりにならないので今のまま残す。
 2. **`keep` は `agent` に吸収する。** proxy が会話を読み、`agent` への依頼に添えて渡し、GROWI の AI が要約してページにする。引き換えに、AI を使わない GROWI では会話の取り込みができなくなる。
-3. **答えは本人にだけ見せる。** 共有したいときは、本人がページの URL を貼り、要件 6 の規則に任せる（`chat-integration-private-reply` が作る、本人にだけ届ける仕組みを使う）。
+3. **答えは本人にだけ見せる。** 共有したいときは、本人がページの URL を貼り、要件 6 の規則に任せる（proxy の本人にだけ届ける仕組みを使う。`chat-integration-proxy` の design.md「PrivateReplier — 本人宛ての返事の届け方」）。
 4. **答える場所**: チャンネルで頼まれたら、そのスレッドの中で本人にだけ見える形で答え、「AI アプリの画面で続ける」案内を添える。続けてやり取りするなら Slack の AI アプリの画面で行う。Discord は本人にだけ見せる手段が無いので DM。Teams と Mattermost はスレッドの中で本人にだけ見せ、できなければ DM にする（下の「実現性の確認の結果」の 2・5・8）。
 5. **答えはあとから届ける。** GROWI はすぐ「受け付けた」と返し、答えができたら新しい口で proxy へ送る。通知と同じ向きと署名なので、閉域の構成でも新しい通信経路は要らない。少しずつの書き出しは、GROWI から proxy へ途中経過を流す仕組みが要るので、今回はやらない。
 6. **GROWI の AI Agent に書き込みの道具は足さない。** 会話の要約は AI に作らせ（`agent.generate` の形）、ページの作成は `create-page` と同じ書き込みの処理（`performWriteCommand`）で行う。`search`・`create-page` と `agent` で、GROWI の処理を 2 通り持たない。
@@ -71,7 +71,7 @@
   - 答えの少しずつの書き出し（途中経過を流す仕組み）
   - GROWI の MCP サーバ（このリポジトリには無い。チャット側の AI からの経路は別の話）
   - スラッシュコマンド（`chat-integration-proxy` のタスク 12.4）
-  - 本人にだけ届ける仕組みそのものと、`search` の公開範囲の修正（`chat-integration-private-reply` が扱う）
+  - 本人にだけ届ける仕組みそのものと、`search` の公開範囲（実装済み。`chat-integration-proxy` の design.md「PrivateReplier — 本人宛ての返事の届け方」）
 
 ## Boundary Candidates
 
@@ -90,7 +90,7 @@
 ## Upstream / Downstream
 
 - **Upstream**:
-  - `chat-integration-private-reply`（本人にだけ届ける部品。`agent` はその上に、イベントの処理の外からあとで届ける部分を足す）
+  - proxy の `PrivateReplier`（本人にだけ届ける部品。実装済み。`chat-integration-proxy` の design.md「PrivateReplier — 本人宛ての返事の届け方」）。`agent` はその上に、イベントの処理の外からあとで届ける部分と、スレッドの中で本人にだけ見せるためのスレッドの根元を足す
   - DM やチャンネル一覧にまだ無い場所でのコマンドで installation を特定できない不具合の修正（spec 無しで直す。AI アプリの画面は中身が DM なので、この修正が前提）
   - GROWI の AI Agent（`features/mastra`、実装済み）と、利用者ごとの会話の記録
 - **Downstream**:
@@ -100,7 +100,7 @@
 ## Existing Spec Touchpoints
 
 - **Extends**: `chat-integration`（要件 1・5・11・14、Out of scope、新しい要件 15）、`chat-integration-protocol`、`chat-integration-proxy`、`chat-integration-app`
-- **Adjacent**: `chat-integration-private-reply`（本人にだけ届ける部品）、`ai-agentic-search`・`ai-chat-page-mention` など `features/mastra` の spec（AI Agent を使う側として触れるだけで、変えない）
+- **Adjacent**: proxy の `PrivateReplier`（本人にだけ届ける部品。`chat-integration-proxy` の design.md「PrivateReplier — 本人宛ての返事の届け方」）、`ai-agentic-search`・`ai-chat-page-mention` など `features/mastra` の spec（AI Agent を使う側として触れるだけで、変えない）
 
 ## 実現性の確認の結果（2026-10-26）
 
@@ -116,7 +116,7 @@
 3. **Slack Marketplace の外で配布するアプリは、会話の履歴の読み取りが厳しく制限される。** 2025-05-29 以降に作られたアプリ（と新しい導入）は、`conversations.history` が 1 分に 1 回・1 回 15 件までになる。組織が自分で作ったアプリ（社内用）は対象外（https://docs.slack.dev/changelog/2025/05/29/rate-limit-changes-for-non-marketplace-apps ）。
    - 運用者が自分で Slack アプリを作る custom proxy なら影響は無い。GROWI が運営する 1 つのアプリを多くの workspace に導入する official proxy では、チャンネルの議論の要約は事実上できない。今の `keep`（要件 5）も同じ制限を受ける。
 4. **（未確認・法務の確認が要る）Slack API の利用規約が、データの保存を制限している。** 組織の外に配布するアプリは、API で得たデータを使い・保存するのに、導入する組織から明示の許可を得る必要があり、使い方は最小限にする（https://slack.com/terms-of-service/api ）。会話の要約を GROWI のページとして残すことが、これに当たるかは確かめていない。今の `keep` も同じ論点を持つ。
-5. **Mattermost で本人にだけ見えるメッセージを出すには、システム管理者の権限が要る。** `POST /api/v4/posts/ephemeral` は `create_post_ephemeral` の権限を求め、これは今のところシステム管理者にしか無い。コミュニティ製のアダプタ（`chat-adapter-mattermost@1.1.3`）はこの API を直接呼び、DM に切り替えない。普通の bot ではエラーになる（`chat-integration-private-reply` が扱う。今の `tell` にも効く）。
+5. **Mattermost で本人にだけ見えるメッセージを出すには、システム管理者の権限が要る。** `POST /api/v4/posts/ephemeral` は `create_post_ephemeral` の権限を求め、これは今のところシステム管理者にしか無い。コミュニティ製のアダプタ（`chat-adapter-mattermost@1.1.3`）はこの API を直接呼び、DM に切り替えない。普通の bot ではエラーになる。proxy は、本人にだけ見えるメッセージが失敗したら本人への DM で届ける（`chat-integration-proxy` の design.md「PrivateReplier — 本人宛ての返事の届け方」）。
 6. **リンクからチャンネルの横の画面を開く方法は無い。** 文書にある深いリンク（`slack://app?...&tab=messages`、`https://slack.com/app_redirect?...`）は、アプリの Messages タブを開く（https://docs.slack.dev/interactivity/deep-linking ）。案内は「右上の Add agent から GROWI を開く」という文と、`app_redirect` のリンクにする。リンクから来た利用者はチャンネルを見ていないので、どのチャンネルの依頼だったかは proxy 側で覚えておく必要がある（推測、未確認）。
 7. **利用者が見ているものが、いつもチャンネルとは限らない。** `app_context_changed` の中身は関連の強い順の一覧で、canvas や list のこともあり、空のこともある。画面が見えている間だけ届く。bot が参加していないチャンネルは読めない。
 8. **Teams（未確認）**: 本人にだけ見えるメッセージ（targeted message）がスレッドの中に出るかは確かめていない。Microsoft の文書は、targeted message は返信に対応しないとしている（https://learn.microsoft.com/en-us/microsoftteams/platform/agents-in-teams/targeted-messages ）。Teams には、Slack の横の画面にあたるものがアダプタに無い。

@@ -54,14 +54,17 @@
   | ボタン等の操作 | ○ | ○ | ○ | **×**（ライフサイクル未完） |
   | Card | ○ | ○ | ○ | △（プレーンテキスト代替） |
   | メッセージ投稿・編集・削除 | ○ | ○ | ○ | ○ |
-  | その場限りのメッセージ | ○ | ○ | ○ | ○ |
+  | 本人にだけ見えるメッセージ | ○ | **×** | ○ | **△**（システム管理者の権限が要る） |
+  | 本人への DM | ○ | ○ | ○ | ○ |
   | 履歴の取得（`fetchMessages`） | ○ | ○ | ○ | ○ |
   | 外部からの接続が要るか | 不要 | 不要 | **必要** | 不要 |
 
   - slash command は SDK が Slack / Discord / Telegram のみと明記。
   - modal は「Currently supported on Slack and Teams」と明記。
   - `fetchMessages(threadId, options)` は `Adapter` インタフェースの**必須メソッド**（`dist/types-*.d.ts`）。任意メソッドの `fetchChannelMessages` があればそちらが使われる。
-- **Implications**: 4 サービス共通の入口は **mention だけ**。設計決定 4（コマンド起動を mention に寄せる）と設計決定 5（引数収集の切り替え）へ。
+  - **本人にだけ見えるメッセージ**: Discord のアダプタは `postEphemeral` を持たない。Discord 自体にも、メンションへの返事を本人にだけ見せる手段が無い（EPHEMERAL のフラグは interaction への応答にだけ使える。https://docs.discord.com/developers/resources/message ）。Mattermost の `POST /api/v4/posts/ephemeral` は `create_post_ephemeral` の権限を求め、これは今のところシステム管理者にしか無い（https://raw.githubusercontent.com/mattermost/mattermost/master/api/v4/source/posts.yaml ）。普通の bot では 403 になる。
+  - **本人への DM**: 4 つのアダプタとも `openDM` を持つ。Slack は `im:write` の権限が要る。Teams は、利用者が一度 bot に呼びかけていないと DM を開けない。
+- **Implications**: 4 サービス共通の入口は **mention だけ**。設計決定 4（コマンド起動を mention に寄せる）と設計決定 5（引数収集の切り替え）へ。本人に宛てた返事は、本人にだけ見えるメッセージを出せる場所ではそれを使い、出せなければ全サービスで使える本人への DM で届ける（要件 1.6〜1.13。届け方の判断と根拠は `chat-integration-proxy` の design.md「PrivateReplier — 本人宛ての返事の届け方」と research.md）。
 
 ### 4. 未決 7-a — Discord に外部からの穴は要るか
 
@@ -284,13 +287,13 @@ createSlackAdapter({
   2. Mattermost アダプタを fork して slash command を実装する → 保守を丸ごと引き受けることになる（未決 M が確定的な作業に変わる）
   3. mention を主経路にする
 - **Selected Approach**: 3。`@growi search foo` の形を 4 サービス共通の入口とし、Slack と Discord では `/growi search foo` も同じ処理へ流す。両者を 1 つの内部表現へ正規化する。
-- **Rationale**: 4 サービスすべてが mention の受信に対応している唯一の入口。コマンド解釈の経路が 1 本になり、分岐が減る。**Mattermost アダプタに必要な機能が「投稿・mention・その場限りのメッセージ」だけになり、いずれも対応済み（○）なので fork が不要になる。**
+- **Rationale**: 4 サービスすべてが mention の受信に対応している唯一の入口。コマンド解釈の経路が 1 本になり、分岐が減る。**Mattermost アダプタに必要な機能が「投稿・mention・本人への DM」だけになり、いずれも対応済み（○）なので fork が不要になる。** 本人にだけ見えるメッセージはシステム管理者の権限が要る（△）が、出せなければ本人への DM で届けるので、無くても機能は欠けない。
 - **Trade-offs**: slash command のような入力補完が既定では効かない。対応サービスでは slash command も登録するので、そこでは従来どおり。
 
 ### 決定 5: 引数の収集はプラットフォームの能力に応じて切り替える
 
 - **Context**: modal は Slack と Teams でしか出せない（研究ログ 3）。要件 4.1（パスと本文の入力）、5.1（取り込む範囲の指定）、8.2（GROWI の選択）が該当する。
-- **Selected Approach**: 「必要な情報を集める」を 1 つの仕組みに抽象化し、能力表を見て手段を選ぶ。modal が使えるなら modal、使えないならコマンド行の引数を読み、足りない分をその場限りのメッセージで聞き返す。
+- **Selected Approach**: 「必要な情報を集める」を 1 つの仕組みに抽象化し、能力表を見て手段を選ぶ。modal が使えるなら modal、使えないならコマンド行の引数を読み、足りない分を本人に宛てた返事（本人にだけ見えるメッセージ、出せなければ本人への DM）で聞き返す。DM で聞き返したときは、DM での答えも元の依頼の引数として受け付ける（要件 1.16）。
 - **Rationale**: 3 つの要件が「利用者から必要な値を集める」という同じ問題の変種。1 か所にまとめれば、対応サービスが増えたときも能力表への 1 行追加で済む。
 - **Trade-offs**: modal が使えないサービスでは往復が増える。
 - **Follow-up**: 能力表は**データとして 1 か所に宣言し、各所で `if (platform === 'mattermost')` と書かない**（`.claude/rules/coding-style.md` の「モード名で分岐しない」）。
@@ -482,7 +485,7 @@ createSlackAdapter({
 | リスク | 緩和 |
 |---|---|
 | Chat SDK のリリース頻度が高く、`protected` 拡張面が「安定と見なされていない」 | バージョン完全固定（決定 1）+ 触れてよい層を 1 つに限定（決定 2）+ 能力表の突き合わせを Revalidation Trigger にする |
-| `chat-adapter-mattermost` が有志作（メンテナ 1 名・4 リリース） | 決定 4 により必要な機能が「投稿・mention・その場限りのメッセージ」だけになり、いずれも対応済み。**fork は現時点で不要**。必要になったら `protected` 拡張面での subclass が先の手段 |
+| `chat-adapter-mattermost` が有志作（メンテナ 1 名・4 リリース） | 決定 4 により必要な機能が「投稿・mention・本人への DM」だけになり、いずれも対応済み。本人にだけ見えるメッセージはシステム管理者の権限が要るが、無ければ本人への DM で届ける。**fork は現時点で不要**。必要になったら `protected` 拡張面での subclass が先の手段 |
 | `structured-headers` に型定義が無い | 薄い型付きラッパを 1 つ書き、そこだけが未型付き API に触れる |
 | 自前で書く RFC 9421 の署名対象文字列に取りこぼしがある | 署名対象を 1 か所に定数として宣言し、RFC 9421 のテストベクタと、対象を 1 つずつ削った改ざん検知テストで担保する |
 | **`op` の突き合わせを実装が忘れる・取り違える** | 忘れても間違えても正常系は動くので、実装でも受け入れ確認でも気づけない。**別の口へ宛てた署名付きリクエストが通らないこと**を 12 の口すべてで確かめる試験で固定する（決定 11） |

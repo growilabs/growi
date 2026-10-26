@@ -1,7 +1,7 @@
 # Technical Design — chat-integration（umbrella）
 
 > **本書は全体像と分担だけを持つ。** 部品の設計は 3 つの sub-spec にある。
-> 要件は本ディレクトリの `requirements.md`（14 件・受け入れ条件 85 件）。設計判断の根拠は `research.md`（決定 1〜10）。
+> 要件は本ディレクトリの `requirements.md`（14 件・受け入れ条件 107 件）。設計判断の根拠は `research.md`（決定 1〜10）。
 > 分割の経緯と方針は `roadmap.md`。
 
 ## Sub-spec の分担
@@ -22,12 +22,12 @@
 
 | 要件 | 受け入れ条件 | 主に担当する sub-spec |
 |---|---|---|
-| 1. 複数のチャットサービスへの対応と、サービスごとの機能差 | 1.1–1.5 | `app` / `proxy` |
+| 1. 複数のチャットサービスへの対応と、サービスごとの機能差 | 1.1–1.19 | `app` / `proxy` |
 | 2. GROWI からチャットへの通知 | 2.1–2.6 | `app` / `proxy` |
-| 3. 複数の GROWI をまたぐ検索 | 3.1–3.9 | `app` / `protocol` / `proxy` |
+| 3. 複数の GROWI をまたぐ検索 | 3.1–3.14 | `app` / `protocol` / `proxy` |
 | 4. チャットからのページ作成 | 4.1–4.6 | `app` / `proxy` |
 | 5. チャットの会話の取り込み | 5.1–5.6 | `app` / `proxy` |
-| 6. GROWI の URL の展開 | 6.1–6.5 | `app` / `proxy` |
+| 6. GROWI の URL の展開 | 6.1–6.8 | `app` / `proxy` |
 | 7. チャットの利用者と GROWI ユーザーの紐付け | 7.1–7.8 | `app` / `protocol` |
 | 8. 1 つの workspace に複数の GROWI が紐づくときの振る舞い | 8.1–8.6 | `proxy` |
 | 9. chat-integration proxy と GROWI の紐付け | 9.1–9.7 | `protocol` / `proxy` |
@@ -179,9 +179,11 @@ graph TB
 | `slashCommand` | ○ | ○ | × | × | mention で起動する（決定 4） |
 | `mention` | ○ | ○ | ○ | ○ | — （全サービス対応） |
 | `plainReply`（呼びかけ無しの返信を bot が受け取れるか） | 要確認 | 要確認 | 要確認 | 要確認 | **呼びかけ付きの返信にする**（下記） |
-| `modal` | ○ | × | ○ | × | コマンド行の引数 + その場限りのメッセージで聞き返す（決定 5） |
+| `modal` | ○ | × | ○ | × | コマンド行の引数 + 本人に宛てた返事（本人にだけ見えるメッセージ、出せなければ本人への DM）で聞き返す（決定 5） |
 | `interactiveActions` | ○ | ○ | ○ | × | 番号つきの一覧を出して返信で選ばせる |
 | `card` | ○ | ○ | ○ | △ | markdown で投稿する |
+| `ephemeralMessage`（本人にだけ見えるメッセージ） | ○ | × | ○ | △ | 本人への DM で届ける（下記） |
+| `directMessage`（本人への DM） | ○ | ○ | ○ | ○ | — （全サービス対応） |
 | `linkPreview` | ○ | × | × | × | 要件 6.5 に従い「使えない」と運用者に示す |
 | `fetchMessages` | ○ | ○ | ○ | ○ | — （全サービス対応） |
 | `requiresInboundReachability` | × | × | **○** | × | 要件 13.3 の接続元制限の対象 |
@@ -193,6 +195,8 @@ graph TB
 > `plainReply` が使えると確認できたサービスでは、呼びかけ無しの返信も受け付けてよい。
 
 > この表は**デプロイ先に依存しない**。proxy は常駐プロセスなので、Slack は Socket Mode、Discord は Gateway、Mattermost は WebSocket で受けられ、mention はどのサービスでも届く（決定 10）。
+
+> **本人に宛てた返事は、本人にだけ見えるメッセージ → 本人への DM の順で届ける**（要件 1.6〜1.13）。Discord にはメンションへの返事を本人にだけ見せる手段が無い（×）。Mattermost は bot にシステム管理者の権限（`create_post_ephemeral`）があるときだけ出せる（△）。どちらでも、出せなければ本人への DM で届け、返事の内容をチャンネルの全員に見える形にはしない。届け方の設計は `chat-integration-proxy` の design.md「PrivateReplier — 本人宛ての返事の届け方」。
 
 > `linkPreview`（投稿されたリンクを bot に通知する仕組み）は Slack の `link_shared` に相当するものが他の 3 サービスに無い。要件 6.5 はこの場合に「使えないことを運用者に示す」ことを求めており、代わりの手段は用意しない。
 
