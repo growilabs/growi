@@ -214,6 +214,7 @@ describe('GET /password-hash-unmigrated-users', () => {
     ['limit=101'],
     ['limit=abc'],
     ['page=abc'],
+    ['page=100001'],
   ])('rejects an invalid query %s with 400', async (query) => {
     currentUser = adminUser;
 

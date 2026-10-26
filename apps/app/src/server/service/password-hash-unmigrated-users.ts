@@ -10,8 +10,6 @@ import {
   scopeFilter,
 } from '../models/user/password-hash-format-filters';
 
-const NO_SCOPE: Filter<Document> = {};
-
 // Scope and exclusion rules: design.md "催促が必要なユーザーの一覧", research.md last section.
 export const listUnmigratedUsersToNudge = async (
   users: Collection,
@@ -22,7 +20,7 @@ export const listUnmigratedUsersToNudge = async (
     readonly baseFilter?: Filter<Document>;
   },
 ): Promise<PasswordHashUnmigratedUsersResponse> => {
-  const { page, limit, baseFilter = NO_SCOPE } = options;
+  const { page, limit, baseFilter = {} } = options;
 
   const linkedUserIds = await externalAccounts.distinct('user');
   const filter = scopeFilter(baseFilter, legacyOnlyFilter, {

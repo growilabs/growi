@@ -22,6 +22,8 @@ const logger = loggerFactory(
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+// Caps the skip offset so a huge page is a 400, not a 500 (design.md review fixes).
+const MAX_PAGE = 100000;
 
 const parseIntOrDefault = (value: unknown, defaultValue: number): number =>
   value == null ? defaultValue : Number.parseInt(String(value), 10);
@@ -43,6 +45,7 @@ const parseIntOrDefault = (value: unknown, defaultValue: number): number =>
  *            schema:
  *              type: integer
  *              minimum: 1
+ *              maximum: 100000
  *              default: 1
  *          - name: limit
  *            in: query
@@ -94,7 +97,7 @@ export const getPasswordHashUnmigratedUsersHandlersFactory = (
     accessTokenParser([SCOPE.READ.ADMIN.SECURITY]),
     loginRequiredStrictly,
     adminRequired,
-    query('page').optional().isInt({ min: 1 }),
+    query('page').optional().isInt({ min: 1, max: MAX_PAGE }),
     query('limit').optional().isInt({ min: 1, max: MAX_LIMIT }),
     apiV3FormValidator,
     async (req: Request, res: ApiV3Response) => {
