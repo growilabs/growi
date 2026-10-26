@@ -695,8 +695,8 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     { targets, excluded }: FanOutTargets,
     keyword: string,
   ): Promise<void> => {
-    const placeholder = await platform.post(
-      invocation.channel,
+    await privateReplier.acknowledge(
+      origin,
       markdown(`「${keyword}」を検索しています…`),
     );
 
@@ -738,10 +738,8 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     );
 
     const footer = footerOf(outcome, declined);
-    await deliver(
-      invocation,
+    await tell(
       origin,
-      placeholder,
       fused.length === 0
         ? // Requirement 3.5: say that nothing came back, and who was silent.
           markdown(

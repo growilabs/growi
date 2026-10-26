@@ -108,6 +108,7 @@ const createHarness = (): Harness => {
 
   const privateReplier = mock<PrivateReplier>();
   privateReplier.reply.mockResolvedValue({ kind: 'in-place' });
+  privateReplier.acknowledge.mockResolvedValue();
 
   const flow = createCommandFlow({
     platform,
@@ -171,7 +172,7 @@ describe('the five commands, end to end', () => {
     harness = createHarness();
   });
 
-  it('search: asks every permitted GROWI, then replaces the placeholder with one merged list', async () => {
+  it('search: asks every permitted GROWI, then sends one merged list to the asker alone', async () => {
     vi.mocked(harness.selector.select).mockResolvedValue({
       kind: 'execute',
       targets: [GROWI_A, GROWI_B],
@@ -192,13 +193,25 @@ describe('the five commands, end to end', () => {
 
     await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search));
 
-    // Posted first, replaced once the answers are in: a `MessageRef` does not
-    // exist before the first post.
-    expect(harness.platform.post).toHaveBeenCalledTimes(1);
-    const [replaced, message] =
-      vi.mocked(harness.platform.replace).mock.calls[0] ?? [];
-    expect(replaced).toEqual({ channel, messageId: 'M100' });
-    expect(message).toMatchObject({ kind: 'list' });
+    // Requirement 3.1 / 3.2: nothing is posted to or replaced in the channel,
+    // and the acknowledgement is the one that never carries content.
+    expect(harness.platform.post).not.toHaveBeenCalled();
+    expect(harness.platform.replace).not.toHaveBeenCalled();
+    expect(harness.privateReplier.acknowledge).toHaveBeenCalledTimes(1);
+    const [ackOrigin, fallback] =
+      harness.privateReplier.acknowledge.mock.calls[0] ?? [];
+    expect(ackOrigin?.installationId).toBe(INSTALLATION_ID);
+    expect(fallback).toEqual({
+      kind: 'markdown',
+      markdown: '「onboarding」を検索しています…',
+    });
+    // Requirement 3.3: results and notes arrive in exactly one private reply.
+    expect(harness.privateReplier.reply).toHaveBeenCalledTimes(1);
+    const message = harness.ephemeralMessages()[0];
+    expect(message).toMatchObject({
+      kind: 'list',
+      title: '「onboarding」の検索結果',
+    });
     if (message?.kind !== 'list') throw new Error('expected a list');
     expect(message.rows.map((row) => row.sourceLabel)).toEqual([
       'GROWI A',
@@ -244,9 +257,14 @@ describe('the five commands, end to end', () => {
 
     await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search));
 
-    const [, message] = vi.mocked(harness.platform.replace).mock.calls[0] ?? [];
+    expect(harness.platform.replace).not.toHaveBeenCalled();
+    expect(harness.privateReplier.reply).toHaveBeenCalledTimes(1);
+    const message = harness.ephemeralMessages()[0];
     expect(message?.kind).toBe('markdown');
     if (message?.kind !== 'markdown') throw new Error('expected markdown');
+    expect(message.markdown).toContain(
+      '「onboarding」の結果は得られませんでした。',
+    );
     expect(message.markdown).toContain('GROWI A');
     // A GROWI that answered with a failure is reported as an error, not as a
     // deadline that ran out: the two tell the reader different things about
@@ -285,7 +303,7 @@ describe('the five commands, end to end', () => {
 
     await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search));
 
-    const [, message] = vi.mocked(harness.platform.replace).mock.calls[0] ?? [];
+    const message = harness.ephemeralMessages().at(-1);
     if (message?.kind !== 'list') throw new Error('expected a list');
     const lines = (message.footer ?? '').split('\n');
     const barredLine = lines.find((line) => line.includes('許可されていない'));
@@ -305,12 +323,9 @@ describe('the five commands, end to end', () => {
     expect(unconfiguredLine).not.toContain('GROWI C');
   });
 
-  it('search: shows the answer to the asker when the placeholder itself could not be posted', async () => {
-    // The placeholder is what the answer would have replaced, so when it never
-    // went out there is no message to replace. The answer is shown to the
-    // person who asked instead of being dropped -- doing the work and then
-    // throwing the result away is the one outcome this branch exists to rule
-    // out.
+  it('search: never posts to the channel even when the bot cannot write there', async () => {
+    // The acknowledgement's own fallback is PrivateReplier's job; the flow
+    // must not depend on the channel being writable at all.
     vi.mocked(harness.platform.post).mockResolvedValue({
       ok: false,
       reason: 'bot-not-in-channel',
@@ -332,9 +347,8 @@ describe('the five commands, end to end', () => {
 
     await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search));
 
-    // Nothing to replace: there is no `MessageRef` for a post that failed.
+    expect(harness.platform.post).not.toHaveBeenCalled();
     expect(harness.platform.replace).not.toHaveBeenCalled();
-    // The merged answer itself reached the asker -- not merely "some message".
     const shown = harness.ephemeralMessages().at(-1);
     if (shown?.kind !== 'list') throw new Error('expected the merged list');
     expect(shown.rows[0]?.sourceLabel).toBe('GROWI A');
@@ -682,13 +696,16 @@ describe('a GROWI that declines a command asked of every GROWI', () => {
 
     await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search));
 
-    const notice = harness.ephemeralMessages().at(-1);
+    // The link notice and the results are two separate private replies.
+    expect(harness.privateReplier.reply).toHaveBeenCalledTimes(2);
+    const notice = harness.ephemeralMessages()[0];
     if (notice?.kind !== 'markdown') throw new Error('expected markdown');
     expect(notice.markdown).toContain('https://rel-a.example.com/link/xyz');
     expect(harness.postedMessages()).not.toContainEqual(notice);
 
-    const [, message] = vi.mocked(harness.platform.replace).mock.calls[0] ?? [];
+    const message = harness.ephemeralMessages().at(-1);
     if (message?.kind !== 'list') throw new Error('expected a list');
+    expect(harness.platform.replace).not.toHaveBeenCalled();
     expect(message.rows.map((row) => row.sourceLabel)).toEqual(['GROWI B']);
     expect(message.footer).toContain('GROWI A');
     expect(message.footer).toContain('紐付け');
@@ -711,7 +728,7 @@ describe('a GROWI that declines a command asked of every GROWI', () => {
 
     await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search));
 
-    const [, message] = vi.mocked(harness.platform.replace).mock.calls[0] ?? [];
+    const message = harness.ephemeralMessages().at(-1);
     if (message?.kind !== 'list') throw new Error('expected a list');
     expect(message.footer).toContain('GROWI A');
     expect(message.footer).toContain('Search is not available right now.');
