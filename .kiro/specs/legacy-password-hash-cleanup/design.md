@@ -48,7 +48,7 @@
 ### Allowed Dependencies
 - `server/models/user/password-hash-format-filters.ts`（分類フィルタ）と `server/models/user/conts.ts`（UserStatus）
 - `externalaccounts` コレクション（読み取りだけ。`user` フィールドで外部アカウントと連携しているユーザーを判定する）
-- クライアント: `client/components/PaginationWrapper`（一覧のページ送り）
+- クライアント: `client/components/InfiniteScroll` と `swr/infinite`（一覧の読み足し）
 - 既存のミドルウェア: `accessTokenParser`、`loginRequiredStrictly`、`adminRequired`、`generateAddActivityMiddleware`、`crowi.events.activity`
 - クライアント: `apiv3-client`、`toastr`、`Admin/App/ConfirmModal`、`swr`
 - 依存の向きは次のとおりとし、逆向きの import は禁止する。
@@ -219,7 +219,7 @@ sequenceDiagram
 | 7.3 | 外部アカウントと連携しているユーザーを含めない | Unmigrated service | `externalaccounts.user` で除外 | — |
 | 7.4 | ユーザー名・メール・最終ログインを表示 | API の型, UnmigratedUserList | `PasswordHashUnmigratedUser` | 表示 |
 | 7.5 | 最終ログインの新しい順、未ログインは最後 | Unmigrated service | `sort({ lastLoginAt: -1, _id: 1 })` | — |
-| 7.6 | ページに分ける | GET handler, hook, UnmigratedUserList | `page` / `limit`、`PaginationWrapper` | 表示 |
+| 7.6 | スクロールで続きを読み込む | GET handler, hook, UnmigratedUserList | `page` / `limit`、`useSWRInfinite`、`InfiniteScroll` | 表示 |
 | 7.7 | 0 人のときはいないことを表示 | UnmigratedUserList | `totalCount === 0` | 表示 |
 | 7.8 | 取得失敗時はエラーを表示し、他に影響させない | GET handler, UnmigratedUserList | `ErrorV3`、hook の `error` | 表示 |
 | 8.1 | 旧形式が残っていなければ非表示 | Section | `both + legacyOnly === 0` | 表示 |
@@ -241,7 +241,7 @@ sequenceDiagram
 | password-hash-unmigrated-users | server/service | 催促が必要なユーザーの一覧 | 7.1–7.5 | format filters (P0), externalaccounts (P0) | Service |
 | getPasswordHashUnmigratedUsersHandlers | server/routes | 一覧の取得 API | 4.1, 4.2, 4.4, 7.6, 7.8 | Unmigrated service (P0), adminRequired (P0) | API |
 | useSWRxPasswordHashUnmigratedUsers | stores/admin | 一覧の取得 | 7.6, 7.8 | apiv3Get (P0) | State |
-| UnmigratedUserList | client UI | 一覧の表とページ送り | 7.4, 7.6–7.8, 6.1 | Hook (P0), PaginationWrapper (P1) | — |
+| UnmigratedUserList | client UI | 一覧の表と、スクロールでの読み足し | 7.4, 7.6–7.8, 6.1 | Hook (P0), InfiniteScroll (P1) | — |
 
 ### interfaces
 
@@ -407,14 +407,16 @@ export function listUnmigratedUsersToNudge(
 
 #### useSWRxPasswordHashUnmigratedUsers（`stores/admin/password-hash-unmigrated-users.ts`）
 ```typescript
-export const useSWRxPasswordHashUnmigratedUsers: (page: number) => SWRResponse<PasswordHashUnmigratedUsersResponse, Error>;
+export const useSWRInfinitePasswordHashUnmigratedUsers: () => SWRInfiniteResponse<PasswordHashUnmigratedUsersResponse, Error>;
 ```
-- キーは `['/security-setting/password-hash-unmigrated-users', page]`。レスポンスに `users` がない場合はエラーとして扱う。削除しても未移行ユーザーは変わらないので、削除後の再取得はしない。
+- `stores/in-app-notification.ts` の `useSWRInfinite` に倣う。`pageIndex` から `page = pageIndex + 1` を作り、キーは `['/security-setting/password-hash-unmigrated-users', page]`。前のページまでで `totalCount` に達していたら `null` を返して、それ以上読まない。1 回に読む件数は 20 件。
+- レスポンスに `users` がない場合はエラーとして扱う。削除しても未移行ユーザーは変わらないので、削除後の再取得はしない。
+- サーバーの `limit` の上限（100）はそのまま残す。画面からは使わない値で、API を直接呼ばれたときに 1 回で返す量を抑えるための歯止めである。
 
 #### UnmigratedUserList（`client/components/Admin/Security/UnmigratedUserList.tsx`）
-- 見出し（催促が必要なユーザー）と説明（外部アカウントと連携しているユーザーは含めない）、ユーザー名・メール・最終ログインの表、`PaginationWrapper`（`pagingLimit` は 20）。最終ログインがない行は「ログインしたことがない」と表示する（7.4–7.6）。
+- 見出し（催促が必要なユーザー）と説明（外部アカウントと連携しているユーザーは含めない）、ユーザー名・メール・最終ログインの表。最終ログインがない行は「ログインしたことがない」と表示する（7.4）。
+- 表は高さを決めた枠（`overflow-y: auto`）に入れ、`InfiniteScroll` で包む。枠の末尾までスクロールすると次の 20 件を読み足し、`totalCount` に達したら止める（7.6）。設定画面では一覧の下にも別の設定が続くので、画面全体のスクロールで読み足すと、下の設定へ進むたびに一覧が伸びてしまう。そのため枠の中で読み足す。`IntersectionObserver` は祖先のスクロール枠による切り取りも考えて交差を判定するので、枠の末尾が見えたときだけ読み足しが起きる。
 - `totalCount === 0` のときは表の代わりに「催促が必要なユーザーはいません」を表示する（7.7）。取得に失敗したときは表の代わりにエラーメッセージを出す（7.8）。
-- ページ番号は自分の state で持つ。
 
 ### セクションの非表示（Requirement 8）
 - `LegacyPasswordCleanupSetting` は、件数の取得中は何も描画しない（8.3）。取得に失敗したときは、セクションを表示してエラーを出す（8.4）。
@@ -466,7 +468,7 @@ export const useSWRxPasswordHashUnmigratedUsers: (page: number) => SWRResponse<P
   - サービスが失敗したら、500 とエラーコードが返ること。500 の指定を消すとテストが落ちること（7.8）
 - **Component（`UnmigratedUserList.spec.tsx`、RTL）**
   - ユーザー名・メール・最終ログインが表示され、ログインしたことがない人にはその表示が出ること（7.4）
-  - ページを切り替えると、次のページを取得すること（7.6）
+  - 末尾の読み込み位置が見えると次のページを取得して行が追加され、`totalCount` に達したらそれ以上取得しないこと（7.6。`IntersectionObserver` をテスト用に差し替えて交差を起こす）
   - 0 人のときと取得失敗のときに、それぞれのメッセージが出ること（7.7, 7.8）
 - **Component（`LegacyPasswordCleanupSetting.spec.tsx` に追加）**
   - 両形式と旧形式のみがどちらも 0 人なら、セクションが描画されないこと。どちらかが 1 人以上なら描画されること（8.1）
