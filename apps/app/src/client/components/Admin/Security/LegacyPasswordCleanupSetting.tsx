@@ -54,7 +54,7 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element | null => {
   }
 
   return (
-    <>
+    <div className="mb-5">
       <h2 className="border-bottom mb-4">{t(`${I18N_PREFIX}.title`)}</h2>
       <p className="mb-3">{t(`${I18N_PREFIX}.description`)}</p>
 
@@ -132,6 +132,6 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element | null => {
         onConfirm={onConfirm}
         onCancel={() => setIsModalOpen(false)}
       />
-    </>
+    </div>
   );
 };

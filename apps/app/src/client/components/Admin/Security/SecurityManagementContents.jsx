@@ -84,10 +84,8 @@ const SecurityManagementContents = () => {
         <ShareLinkSetting />
       </div>
 
-      {/* Legacy password hash migration status and cleanup */}
-      <div className="mb-5">
-        <LegacyPasswordCleanupSetting />
-      </div>
+      {/* Legacy password hash migration status and cleanup; renders nothing once no legacy password remains */}
+      <LegacyPasswordCleanupSetting />
 
       {/* XSS configuration link */}
       <div className="mb-5">
