@@ -30,6 +30,7 @@ import type {
   ChannelListing,
   DirectPostOutcome,
   DistributedLock,
+  EphemeralPostOutcome,
   HistoryOutcome,
   InteractionRef,
   ModalForm,
@@ -87,6 +88,14 @@ export interface CapturedModal {
  */
 export interface FakeChatScript {
   readonly post?: (post: CapturedPost) => PostOutcome;
+  /**
+   * Unscripted (or answering `undefined`), an ephemeral message is answered
+   * like a post. An `unsupported` answer is not recorded in `posts()`: the
+   * real facade returns it before anything is sent.
+   */
+  readonly postEphemeral?: (
+    post: CapturedPost,
+  ) => EphemeralPostOutcome | undefined;
   readonly postDirect?: (post: CapturedPost) => DirectPostOutcome;
   readonly addReaction?: (reaction: CapturedReaction) => ReactionOutcome;
   readonly openModal?: (modal: CapturedModal) => boolean;
@@ -141,7 +150,10 @@ export interface FakeChatService {
    * assertion about `posts()`. This tells the two apart.
    */
   readonly deliver: (event: PlatformEvent) => Promise<DeliveryOutcome>;
-  /** Channel posts, ephemeral messages and direct messages, in order sent. */
+  /**
+   * Channel posts, ephemeral messages and direct messages, in order sent --
+   * including ones answered with a failure, except an `unsupported` ephemeral.
+   */
   readonly posts: () => ReadonlyArray<CapturedPost>;
   readonly reactions: () => ReadonlyArray<CapturedReaction>;
   readonly modals: () => ReadonlyArray<CapturedModal>;
@@ -219,8 +231,22 @@ export const createFakeChatService = (
     post: async (channel, message) =>
       capture({ kind: 'post', channel, message }),
 
-    postEphemeral: async (channel, user, message) =>
-      capture({ kind: 'ephemeral', channel, user, message }),
+    postEphemeral: (channel, user, message) => {
+      const ephemeral: CapturedPost = {
+        kind: 'ephemeral',
+        channel,
+        user,
+        message,
+      };
+      const scripted = script.postEphemeral?.(ephemeral);
+      if (scripted == null) return Promise.resolve(capture(ephemeral));
+      if (!scripted.ok && scripted.reason === 'unsupported') {
+        return Promise.resolve(scripted);
+      }
+      posts.push(ephemeral);
+      nextMessageId += 1;
+      return Promise.resolve(scripted);
+    },
 
     postDirect: (_near, user, message) => {
       const direct: CapturedPost = {

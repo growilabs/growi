@@ -37,7 +37,7 @@
 // can prove -- and what actually matters to a user on Mattermost -- is that
 // the position they typed selects the GROWI that was offered in that position.
 
-import { COMMAND_NAMES, OP_NAMES } from '@growi/chat';
+import { COMMAND_NAMES, OP_NAMES, type PlatformName } from '@growi/chat';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { levelOf } from '../capabilities/index.js';
@@ -58,6 +58,13 @@ import {
   permitWrite,
 } from './paired-workspace.js';
 import { type ProxyCluster, startProxyCluster } from './proxy-cluster.js';
+
+const PLATFORMS: ReadonlyArray<PlatformName> = [
+  'slack',
+  'discord',
+  'teams',
+  'mattermost',
+];
 
 const DATABASE_URL =
   process.env.DATABASE_URL ??
@@ -179,17 +186,6 @@ const lastChoice = (
     .at(-1);
   if (choice == null) throw new Error('the proxy asked for no GROWI choice');
   return choice;
-};
-
-const lastList = (
-  chat: FakeChatService,
-): Extract<OutboundMessage, { kind: 'list' }> => {
-  const list = chat
-    .posts()
-    .flatMap((post) => (post.message.kind === 'list' ? [post.message] : []))
-    .at(-1);
-  if (list == null) throw new Error('the proxy posted no list');
-  return list;
 };
 
 const markdownOf = (post: CapturedPost): string =>
@@ -405,7 +401,14 @@ describe('a command run end to end', () => {
     expect(markdownOf(lastPost(chat))).toContain('http://growi-b.test/e2e/mm');
   });
 
-  it('answers a Discord search with both GROWIs’ results, each row saying which GROWI it came from', async () => {
+  it.each(
+    PLATFORMS,
+  )('answers a %s search privately with every GROWI’s results, each row saying which GROWI it came from', async (platform) => {
+    // A reply for one person is sent in place where the service can, and by
+    // DM where it cannot (Requirement 4.1); the table says which.
+    expect(levelOf('directMessage', platform)).toBe('full');
+    const inPlace = levelOf('ephemeralMessage', platform) !== 'none';
+
     const growiA = await startFakeGrowi({
       responders: {
         [OP_NAMES.command]: findsOnePage(
@@ -422,49 +425,78 @@ describe('a command run end to end', () => {
         ),
       },
     });
-    closers.push(growiA.close, growiB.close);
+    // Gives the answer a note, so the note's destination is checked too.
+    const growiC = await startFakeGrowi({
+      responders: {
+        [OP_NAMES.command]: () => ({ status: 500, body: {} }),
+      },
+    });
+    closers.push(growiA.close, growiB.close, growiC.close);
 
     const db = openDb();
-    const workspace = await openWorkspace(db, 'discord');
+    const workspace = await openWorkspace(db, platform);
     await pairGrowi(db, workspace.installationId, growiA, 'GROWI A');
     await pairGrowi(db, workspace.installationId, growiB, 'GROWI B');
+    await pairGrowi(db, workspace.installationId, growiC, 'GROWI C');
     // No `channel_permission` row on purpose -- `search` reads, and a read
     // command with no stored settings is permitted (`judge`'s default).
 
-    const chat = createFakeChatService();
+    // The fake answers an ephemeral message the way the real facade does on a
+    // service with none: `unsupported`, with nothing sent.
+    const chat = createFakeChatService({
+      postEphemeral: (post) =>
+        levelOf('ephemeralMessage', post.channel.platform) === 'none'
+          ? { ok: false, reason: 'unsupported' }
+          : undefined,
+    });
     await startOneProxy(chat);
 
     // The whole command fits on one line, so nothing is asked and the search
-    // goes out at once (Requirement 3.1).
+    // goes out at once.
+    const requestMessageId = `${platform}-search-request`;
     const outcome = await chat.deliver(
-      mentionOn('discord', {
+      mentionOn(platform, {
         text: '@growi search minutes',
         channel: workspace.channel,
         actor: workspace.actor,
+        messageId: requestMessageId,
       }),
     );
     expect(outcome).toEqual({ handled: true });
 
-    expect(growiA.received().map((request) => request.body)).toEqual([
-      expect.objectContaining({
-        kind: COMMAND_NAMES.search,
-        keyword: 'minutes',
-      }),
-    ]);
-    expect(growiA.refusals()).toEqual([]);
-    expect(growiB.received().map((request) => request.body)).toEqual([
-      expect.objectContaining({
-        kind: COMMAND_NAMES.search,
-        keyword: 'minutes',
-      }),
-    ]);
-    expect(growiB.refusals()).toEqual([]);
+    for (const growi of [growiA, growiB]) {
+      expect(growi.received().map((request) => request.body)).toEqual([
+        expect.objectContaining({
+          kind: COMMAND_NAMES.search,
+          keyword: 'minutes',
+        }),
+      ]);
+      expect(growi.refusals()).toEqual([]);
+    }
 
-    // One list, carrying both GROWIs (Requirement 3.2), every row attributed
-    // to the GROWI it came from (Requirement 3.3). The ORDER the two are
+    // Requirement 3.1: nothing about the search reaches the channel for
+    // everyone -- no post, and no replaced post.
+    expect(
+      chat
+        .posts()
+        .filter((post) => post.kind === 'post' || post.kind === 'replace'),
+    ).toEqual([]);
+
+    // Requirement 3.2: one reply carries the results and the note, to the
+    // requester alone.
+    const [reply, ...more] = chat.posts();
+    expect(more).toEqual([]);
+    if (reply == null) throw new Error('the proxy sent no reply at all');
+    expect(reply.kind).toBe(inPlace ? 'ephemeral' : 'direct');
+    expect(reply.user?.accountId).toBe(workspace.actor.accountId);
+    if (reply.message.kind !== 'list') {
+      throw new Error(`expected a list, got ${reply.message.kind}`);
+    }
+    const list = reply.message;
+
+    // Every row attributed to the GROWI it came from. The ORDER the two are
     // interleaved in belongs to `growi/search-fusion.ts` and is asserted by
     // its own spec, so it is read as a set here.
-    const list = lastList(chat);
     expect(
       list.rows.map((row) => ({
         sourceLabel: row.sourceLabel,
@@ -481,10 +513,32 @@ describe('a command run end to end', () => {
       ]),
     );
     expect(list.rows).toHaveLength(2);
+    expect(list.footer).toBe('応答がありませんでした: GROWI C（エラー）');
 
-    // The answer replaces the 「検索しています…」 placeholder rather than
-    // being posted underneath it.
-    expect(lastPost(chat).kind).toBe('replace');
+    const requestMessage = {
+      channel: workspace.channel,
+      messageId: requestMessageId,
+    };
+    if (inPlace) {
+      // Requirement 3.3: the request was acknowledged with a reaction only.
+      expect(list.title).toBe('「minutes」の検索結果');
+      expect(chat.reactions()).toEqual([
+        { target: requestMessage, reaction: 'eyes' },
+      ]);
+      return;
+    }
+
+    // By DM: in a conversation of its own, headed with where and what was
+    // asked (the place name is the channel's saved inventory name), and an
+    // envelope on the request says where the reply went.
+    expect(reply.channel.channelId).not.toBe(workspace.channel.channelId);
+    expect(list.title).toBe(
+      `${workspace.channel.channelName} での「search minutes」への返事です — 「minutes」の検索結果`,
+    );
+    expect(chat.reactions()).toEqual([
+      { target: requestMessage, reaction: 'eyes' },
+      { target: requestMessage, reaction: 'email' },
+    ]);
   });
 
   it('runs the whole flow on Teams -- an input field, and the one inbound route this proxy opens', async () => {

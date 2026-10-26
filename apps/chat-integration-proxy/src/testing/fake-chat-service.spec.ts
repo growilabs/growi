@@ -168,6 +168,54 @@ describe('capturing what the proxy sends back', () => {
     ]);
   });
 
+  it('answers an ephemeral message as unsupported when scripted to, and records nothing sent', async () => {
+    const chat = createFakeChatService({
+      postEphemeral: () => ({ ok: false, reason: 'unsupported' }),
+    });
+    const facade = await chat.createFacade(
+      { stateConnectionString: 'unused' },
+      { list: () => Promise.resolve([]), resolve: () => Promise.resolve(null) },
+      { handle: async () => {} },
+    );
+
+    const outcome = await facade.postEphemeral(
+      channelOn('discord'),
+      actorOn('discord'),
+      { kind: 'markdown', markdown: 'only you' },
+    );
+
+    expect(outcome).toEqual({ ok: false, reason: 'unsupported' });
+    expect(chat.posts()).toEqual([]);
+  });
+
+  it('answers an ephemeral message with a scripted failure and still records the attempt', async () => {
+    const chat = createFakeChatService({
+      postEphemeral: () => ({
+        ok: false,
+        reason: 'platform-error',
+        detail: 'forbidden',
+      }),
+    });
+    const facade = await chat.createFacade(
+      { stateConnectionString: 'unused' },
+      { list: () => Promise.resolve([]), resolve: () => Promise.resolve(null) },
+      { handle: async () => {} },
+    );
+
+    const outcome = await facade.postEphemeral(
+      channelOn('mattermost'),
+      actorOn('mattermost'),
+      { kind: 'markdown', markdown: 'only you' },
+    );
+
+    expect(outcome).toEqual({
+      ok: false,
+      reason: 'platform-error',
+      detail: 'forbidden',
+    });
+    expect(chat.posts().map((post) => post.kind)).toEqual(['ephemeral']);
+  });
+
   it('answers a post with the failure it was scripted to fail with', async () => {
     const chat = createFakeChatService({
       post: () => ({
