@@ -158,7 +158,7 @@ describe('PrivateReplier.reply -- every failure combination', () => {
 
     const outcome = await replier.reply(origin, message);
 
-    // 1.1 / 3.4: nothing public ever carries the reply.
+    // Requirement 1.6 / 3.13: nothing public ever carries the reply.
     expect(allPostedText(platform)).not.toContain(SECRET);
     for (const [, posted] of platform.post.mock.calls) {
       expect([DIRECT_NOTICE, UNDELIVERABLE_NOTICE]).toContain(
@@ -171,7 +171,7 @@ describe('PrivateReplier.reply -- every failure combination', () => {
     );
 
     if (ephemeral === 'ok') {
-      // 1.2
+      // Requirement 1.7
       expect(outcome).toEqual({ kind: 'in-place' });
       expect(platform.postEphemeral).toHaveBeenCalledWith(
         origin.channel,
@@ -186,7 +186,7 @@ describe('PrivateReplier.reply -- every failure combination', () => {
       return;
     }
 
-    // 1.3 / 1.4: any failure, whatever its reason, falls back to a DM.
+    // Requirement 1.8 / 1.9: any failure, whatever its reason, falls back to a DM.
     expect(platform.postDirect).toHaveBeenCalledTimes(1);
     const [near, user, directBody] = platform.postDirect.mock.calls[0];
     expect(near).toEqual(origin.channel);
@@ -196,7 +196,7 @@ describe('PrivateReplier.reply -- every failure combination', () => {
     if (dm === 'ok') {
       expect(outcome).toEqual({ kind: 'direct', directChannel: DM_CHANNEL });
       expect(reports).toEqual([]);
-      // 1.5
+      // Requirement 1.10
       if (hasMessage) {
         expect(platform.addReaction).toHaveBeenCalledWith(
           { channel: origin.channel, messageId: 'm-1' },
@@ -218,7 +218,7 @@ describe('PrivateReplier.reply -- every failure combination', () => {
       return;
     }
 
-    // 1.6 / 1.7: neither route worked.
+    // Requirement 1.11 / 1.12: neither route worked.
     expect(outcome).toEqual({ kind: 'undeliverable' });
     expect(platform.addReaction).not.toHaveBeenCalled();
     expect(platform.post).toHaveBeenCalledTimes(1);
@@ -241,7 +241,7 @@ describe('PrivateReplier.reply -- every failure combination', () => {
   });
 });
 
-/** 1.8 / 2.2: header first, the original reply otherwise untouched. */
+/** Requirement 1.13 / 1.15: header first, the original reply otherwise untouched. */
 const expectHeaderedBody = (
   body: OutboundMessage,
   original: OutboundMessage,

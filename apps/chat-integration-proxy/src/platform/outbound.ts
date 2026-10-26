@@ -424,10 +424,11 @@ export const channelAccessFailure = (
  * operation below shares one answer rather than each inventing its own.
  *
  * `PostOutcome` has a single actionable arm, so only `not-in-channel` reaches
- * it. A missing permission becomes `platform-error` with its detail: the
- * remedy this layer knows how to word ("invite the bot") would be the wrong
- * instruction for it, and inventing an outcome that carries the right one
- * belongs to a change of `PostOutcome`, not to a guess here.
+ * it. A missing permission becomes `platform-error` with its detail where the
+ * adapter reports it distinctly (Teams' `PermissionError`), but Mattermost
+ * answers 403 both for a channel the bot has not joined and for a missing
+ * permission such as `create_post_ephemeral`, so the latter is classified
+ * `bot-not-in-channel` too (proxy research.md 既知の問題 1).
  */
 export const classifyOutboundFailure = (
   error: unknown,
@@ -499,9 +500,9 @@ const channelHandleOf = (
 /**
  * Posts to a channel. On success the returned `messageId` is what a caller
  * pairs with its own `ChannelRef` to build the `MessageRef` that `replace()`
- * takes -- design.md's 「まず『検索しています』を投稿し、その
- * `PostOutcome.messageId` から `MessageRef` を作り、結果が揃ったら `replace()`
- * で差し替える」.
+ * takes -- the help flow posts 「使えるコマンドを調べています…」 and replaces it
+ * once the list is ready (design.md's 「PrivateReplier」 section scopes
+ * post-and-replace to help; search replies go through `PrivateReplier`).
  */
 export const post = async (
   context: OutboundContext,
@@ -581,7 +582,7 @@ export const attachPreview = async (
  * (`chat.update`, `PATCH /channels/.../messages/...`, `updateActivity`,
  * `PUT /posts/...`), so the message keeps its position and its permalink.
  *
- * This is the path design.md routes search through, because Slack allows 3
+ * This is the path design.md routes help through, because Slack allows 3
  * seconds for an event and Discord 3 seconds for a first response: the
  * acknowledgement goes out immediately and this replaces it once results are
  * ready.

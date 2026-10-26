@@ -2,11 +2,11 @@
 // only the chat services' HTTP (and, for Mattermost, its WebSocket) replaced by
 // local stand-ins: where a private message, a DM and a reaction actually go,
 // whether the DM a bot opens is the channel a later DM event names, and what
-// the start of a DM's text looks like (the input to task 3.1's rule).
+// the start of a DM's text looks like (the input to the rule of 決定 P8 in the proxy research.md).
 //
-// In `platform/` rather than `testing/` (design.md's File Structure Plan names
-// `testing/`): `architecture.spec.ts` lets only `platform/` import the Chat SDK,
-// and pointing an adapter at a stand-in needs its constructor.
+// This file lives in `platform/` because `architecture.spec.ts` lets only
+// `platform/` import the Chat SDK, and pointing an adapter at a stand-in needs
+// its constructor.
 //
 // Each stand-in answers what the service is known or, where marked, assumed to
 // answer. A case whose outcome rests on an assumed answer rather than on
@@ -900,7 +900,7 @@ describe('Mattermost, with two installations open', () => {
 
   // `growi` is installation B's username from /users/me in this stand-in. The
   // adapter never rewrites a post's text, so the leading name is whatever the
-  // user typed; 3.1 decides by shape (`@word` / `<@...>`) because the command
+  // user typed; the rule (決定 P8) decides by shape (`@word` / `<@...>`) because the command
   // layer has no bot identity to compare it with.
   it("leaves a DM that addresses the bot as typed: @<the bot account's username from /users/me> in front", async () => {
     serverB.push(mattermostDirectPost(`@${BOT_USER_NAME} search foo`));

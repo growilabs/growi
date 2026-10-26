@@ -756,7 +756,7 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
   });
 });
 
-describe('answers to a question delivered by DM, through real PostgreSQL (Requirement 2.3)', () => {
+describe('answers to a question delivered by DM, through real PostgreSQL (Requirement 1.16)', () => {
   // Rows here have no relation, so the file-level `afterAll` (which cleans up
   // by relation) never reaches them; each test removes its own.
   const withPendingRows = async (

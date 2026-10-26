@@ -49,7 +49,7 @@ export interface PrivateReplier {
   ): Promise<void>;
 }
 
-/** What the operator sees. Carries no reply content (Requirement 1.7). */
+/** What the operator sees. Carries no reply content (Requirement 1.12). */
 export interface UndeliverableFact {
   readonly platform: PlatformName;
   readonly channelId: string;
@@ -115,7 +115,7 @@ const undeliverableNoticeOf = (actor: ChatAccountRef): OutboundMessage => ({
 
 /**
  * Puts the header in front of the reply and changes nothing else
- * (Requirement 2.2). A list's title is the only slot ahead of its rows, and
+ * (Requirement 1.15). A list's title is the only slot ahead of its rows, and
  * it is rendered bold on one line, so the header joins it without a newline.
  */
 const withHeader = (
@@ -133,7 +133,7 @@ const withHeader = (
 };
 
 // The reason, never the remedy: the remedy is advice for a user and may not
-// match the actual cause (tasks.md Implementation Notes, 2.4).
+// match the actual cause (proxy research.md 既知の問題 1).
 const ephemeralFailureOf = (
   outcome: Extract<EphemeralPostOutcome, { ok: false }>,
 ): string =>

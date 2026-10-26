@@ -405,7 +405,7 @@ describe('a command run end to end', () => {
     PLATFORMS,
   )('answers a %s search privately with every GROWI’s results, each row saying which GROWI it came from', async (platform) => {
     // A reply for one person is sent in place where the service can, and by
-    // DM where it cannot (Requirement 4.1); the table says which.
+    // DM where it cannot (Requirement 1.17); the table says which.
     expect(levelOf('directMessage', platform)).toBe('full');
     const inPlace = levelOf('ephemeralMessage', platform) !== 'none';
 
@@ -474,7 +474,7 @@ describe('a command run end to end', () => {
       expect(growi.refusals()).toEqual([]);
     }
 
-    // Requirement 3.1: nothing about the search reaches the channel for
+    // Requirement 3.10: nothing about the search reaches the channel for
     // everyone -- no post, and no replaced post.
     expect(
       chat
@@ -482,7 +482,7 @@ describe('a command run end to end', () => {
         .filter((post) => post.kind === 'post' || post.kind === 'replace'),
     ).toEqual([]);
 
-    // Requirement 3.2: one reply carries the results and the note, to the
+    // Requirement 3.11: one reply carries the results and the note, to the
     // requester alone.
     const [reply, ...more] = chat.posts();
     expect(more).toEqual([]);
@@ -520,7 +520,7 @@ describe('a command run end to end', () => {
       messageId: requestMessageId,
     };
     if (inPlace) {
-      // Requirement 3.3: the request was acknowledged with a reaction only.
+      // Requirement 3.12: the request was acknowledged with a reaction only.
       expect(list.title).toBe('「minutes」の検索結果');
       expect(chat.reactions()).toEqual([
         { target: requestMessage, reaction: 'eyes' },

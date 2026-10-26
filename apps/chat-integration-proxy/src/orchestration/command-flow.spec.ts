@@ -193,7 +193,7 @@ describe('the five commands, end to end', () => {
 
     await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search));
 
-    // Requirement 3.1 / 3.2: nothing is posted to or replaced in the channel,
+    // Requirement 3.10 / 3.13: nothing is posted to or replaced in the channel,
     // and the acknowledgement is the one that never carries content.
     expect(harness.platform.post).not.toHaveBeenCalled();
     expect(harness.platform.replace).not.toHaveBeenCalled();
@@ -205,7 +205,7 @@ describe('the five commands, end to end', () => {
       kind: 'markdown',
       markdown: '「onboarding」を検索しています…',
     });
-    // Requirement 3.3: results and notes arrive in exactly one private reply.
+    // Requirement 3.11: results and notes arrive in exactly one private reply.
     expect(harness.privateReplier.reply).toHaveBeenCalledTimes(1);
     const message = harness.ephemeralMessages()[0];
     expect(message).toMatchObject({
@@ -412,7 +412,7 @@ describe('the five commands, end to end', () => {
     // The installation is looked up once for the whole invocation: the
     // selection carries it on to the steps that follow.
     expect(harness.resolveInstallationId).toHaveBeenCalledTimes(1);
-    // Requirement 5.1: help stays in the channel.
+    // Help stays in the channel: no private reply.
     expect(harness.privateReplier.reply).not.toHaveBeenCalled();
   });
 
@@ -479,7 +479,7 @@ describe('the five commands, end to end', () => {
       kind: 'markdown',
       markdown: expect.stringContaining('https://rel-a.example.com/memo'),
     });
-    // Requirement 5.1: the new page is announced to the channel.
+    // The page-create success stays in the channel: no private reply.
     expect(harness.privateReplier.reply).not.toHaveBeenCalled();
   });
 
