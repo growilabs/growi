@@ -29,7 +29,7 @@
       "confirm": {
         "title": "Supprimer les mots de passe hérités",
         "warning": "Les mots de passe hérités de {{count}} utilisateur(s) seront supprimés. Cette action est irréversible.",
-        "downgrade_warning": "Après la suppression, si vous revenez à une version qui ne prend pas en charge le nouveau format de mot de passe, ces utilisateurs ne pourront plus se connecter. Les utilisateurs ACTIVE peuvent récupérer leur accès en réinitialisant leur mot de passe ; les utilisateurs non ACTIVE doivent être traités individuellement par un administrateur. Si vous venez de revenir d'un retour à une version antérieure et n'avez pas encore exécuté le script de préparation à la remise à niveau, exécutez-le d'abord. Supprimer avant cela empêche les utilisateurs de se connecter avec leur mot de passe actuel.",
+        "downgrade_warning": "Si vous revenez à une version antérieure, les utilisateurs dont l'ancien mot de passe a été supprimé ne pourront pas se connecter sur cette version. Les utilisateurs actifs peuvent récupérer l'accès en réinitialisant leur mot de passe ; les autres (suspendus, invités, etc.) doivent être traités individuellement par un administrateur. Si vous venez de revenir d'une version antérieure, exécutez d'abord le script de préparation à la remise à niveau. Si vous supprimez avant de l'exécuter, les utilisateurs qui ont changé leur mot de passe pendant l'utilisation de la version antérieure ne pourront pas se connecter avec leur nouveau mot de passe.",
         "submit": "Supprimer"
       },
       "success": "Les mots de passe hérités de {{count}} utilisateur(s) ont été supprimés",

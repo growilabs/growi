@@ -29,7 +29,7 @@
       "confirm": {
         "title": "Delete legacy passwords",
         "warning": "The legacy passwords of {{count}} user(s) will be deleted. This action cannot be undone.",
-        "downgrade_warning": "After deletion, if you downgrade to a version that does not support the new password format, these users will not be able to log in. ACTIVE users can recover by resetting their password; non-ACTIVE users must be handled individually by an administrator. If you have just returned from a downgrade and have not yet run the re-upgrade preparation script, run it first. Deleting before that leaves users unable to log in with their current password.",
+        "downgrade_warning": "If you downgrade to an older version, the users whose legacy password was deleted will not be able to log in on that version. Active users can recover by resetting their password; other users (suspended, invited, etc.) must be handled individually by an administrator. If you have just returned from an older version, run the re-upgrade preparation script first. If you delete before running it, users who changed their password while the older version was in use will not be able to log in with their new password.",
         "submit": "Delete"
       },
       "success": "Deleted the legacy passwords of {{count}} user(s)",
