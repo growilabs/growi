@@ -9,6 +9,7 @@ import {
 import mongoose from 'mongoose';
 
 import {
+  isPageBulkExportFormat,
   PageBulkExportFormat,
   PageBulkExportJobStatus,
 } from '~/features/page-bulk-export/interfaces/page-bulk-export';
@@ -62,6 +63,14 @@ export async function getPageWritable(
   this: IPageBulkExportJobCronService,
   pageBulkExportJob: pagebulkexportjobs,
 ): Promise<Writable> {
+  // `format` becomes a file extension in the output path, so a value written
+  // to the DB by any route other than the validated API must not reach it.
+  if (!isPageBulkExportFormat(pageBulkExportJob.format)) {
+    throw new Error(
+      `Unsupported page bulk export format: ${pageBulkExportJob.format}`,
+    );
+  }
+
   const isHtmlPath = pageBulkExportJob.format === PageBulkExportFormat.pdf;
   const format =
     pageBulkExportJob.format === PageBulkExportFormat.pdf

@@ -33,7 +33,7 @@ export const setup = (crowi: Crowi): Router => {
   const validators = {
     pageBulkExport: [
       body('path').exists({ checkFalsy: true }).isString(),
-      body('format').isIn(Object.values(PageBulkExportFormat)),
+      body('format').isString().isIn(Object.values(PageBulkExportFormat)),
       body('restartJob').isBoolean().optional(),
     ],
   };
