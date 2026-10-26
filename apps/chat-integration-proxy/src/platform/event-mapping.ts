@@ -151,6 +151,23 @@ const channelRefOfThread = (platform: PlatformName, thread: ThreadSource) =>
   });
 
 /**
+ * The channel of a 1:1 conversation the bot opened itself, built the way
+ * `channelRefOfThread` builds the channel of an incoming DM event -- so a reply
+ * typed into that conversation later names this same `SdkChannelRef`. `null`
+ * when the id is not one this proxy can read, as for an incoming event.
+ */
+export const directMessageChannelRef = (
+  platform: PlatformName,
+  channelId: string,
+): SdkChannelRef | null =>
+  toChannelRef(platform, {
+    channelId,
+    channelName: null,
+    isDM: true,
+    channelVisibility: 'private',
+  });
+
+/**
  * A button carries two slots the platform gives back on a press (`actionId`
  * and `value`), but `PlatformEvent`'s `action` needs three values -- the
  * `correlationId` that `ArgumentCollector.resume` looks the in-flight

@@ -1,6 +1,7 @@
-// design.md's File Structure Plan for this file: the four outbound operations
-// on `PlatformFacade` -- post, post-so-only-one-person-sees-it, attach a
-// preview to an existing message, and replace a message already posted.
+// design.md's File Structure Plan for this file: the outbound operations on
+// `PlatformFacade` -- post, post-so-only-one-person-sees-it, post into a
+// direct message, react to a message, attach a preview to an existing message,
+// and replace a message already posted.
 //
 // This is also the one place a proxy-owned `OutboundMessage` becomes a Chat SDK
 // Card (design.md: 「Card への変換は `platform/outbound.ts` の中だけで行う」).
@@ -31,20 +32,25 @@ import {
   CardText,
   ChannelImpl,
   Divider,
+  emoji,
   type StateAdapter,
+  type WellKnownEmoji,
 } from 'chat';
 import type { MattermostThreadId } from 'chat-adapter-mattermost';
 
 import { supports } from '../capabilities/index.js';
 import type {
+  DirectPostOutcome,
   EphemeralPostOutcome,
   OutboundMessage,
   PostOutcome,
+  ReactionName,
+  ReactionOutcome,
   SdkChannelId,
   SdkChannelRef,
   SdkMessageRef,
 } from '../types/index.js';
-import { encodeActionId } from './event-mapping.js';
+import { directMessageChannelRef, encodeActionId } from './event-mapping.js';
 import type { ScopedRun } from './installation-scope.js';
 
 /**
@@ -441,17 +447,24 @@ export const classifyOutboundFailure = (
   };
 };
 
+/** Runs `work` as the installation the context is bound to, if any. */
+const runScoped = <T>(
+  context: OutboundContext,
+  work: () => Promise<T>,
+): Promise<T> => (context.run == null ? work() : context.run(work));
+
 /**
- * The single place the "never throw" postcondition is honoured. Every operation
- * below is `attempt(...)` around one SDK call, so no operation can grow a path
- * that escapes it -- including failing to bind the installation it runs as.
+ * Where the "never throw" postcondition is honoured for every operation that
+ * answers a `PostOutcome`. Each is `attempt(...)` around one SDK call, so none
+ * can grow a path that escapes it -- including failing to bind the
+ * installation it runs as.
  */
 const attempt = async (
   context: OutboundContext,
   send: () => Promise<{ readonly id: string }>,
 ): Promise<PostOutcome> => {
   try {
-    const sent = await (context.run == null ? send() : context.run(send));
+    const sent = await runScoped(context, send);
     return { ok: true, messageId: sent.id };
   } catch (error) {
     return classifyOutboundFailure(error);
@@ -480,7 +493,7 @@ const channelHandleOf = (
   });
 
 // --------------------------------------------------------------------------
-// The four operations
+// Posting into a channel
 // --------------------------------------------------------------------------
 
 /**
@@ -590,3 +603,112 @@ export const replace = async (
       toPostable(replacement, message.channel.platform, context.botName),
     ),
   );
+
+// --------------------------------------------------------------------------
+// Direct messages and reactions
+// --------------------------------------------------------------------------
+
+const messageOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+/**
+ * Opens (or reuses) the 1:1 conversation with `user` on the adapter that
+ * serves `near`, and posts `message` there.
+ *
+ * Opening and posting run inside one `run`: on a service connected per
+ * workspace (Slack) opening the conversation needs the installation's token
+ * just as much as posting does.
+ *
+ * The DM's `SdkChannelRef` is built before posting, so a conversation whose id
+ * this proxy could not read back is reported as not delivered rather than
+ * delivered into a channel no later reply could be matched against.
+ */
+export const postDirect = async (
+  context: OutboundContext,
+  near: SdkChannelRef,
+  user: ChatAccountRef,
+  message: OutboundMessage,
+): Promise<DirectPostOutcome> => {
+  const { adapter } = context;
+  const openDM = adapter.openDM;
+  if (openDM == null) {
+    return {
+      ok: false,
+      detail: `${near.platform} adapter cannot open a direct message`,
+    };
+  }
+
+  try {
+    return await runScoped(context, async () => {
+      const threadId = await openDM.call(adapter, user.accountId);
+      const channel = directMessageChannelRef(
+        near.platform,
+        adapter.channelIdFromThreadId(threadId),
+      );
+      if (channel == null) {
+        return {
+          ok: false,
+          detail: `unreadable ${near.platform} direct message thread: ${threadId}`,
+        } as const;
+      }
+      const sent = await adapter.postMessage(
+        threadId,
+        toPostable(message, near.platform, context.botName),
+      );
+      return { ok: true, messageId: sent.id, channel } as const;
+    });
+  } catch (error) {
+    return { ok: false, detail: messageOf(error) };
+  }
+};
+
+/**
+ * How each service says the bot's reaction is already on the message. Kept as
+ * rows, like `FAILURE_ROWS`, so a service found to answer this way is one
+ * entry. Discord's `PUT .../@me` succeeds on a repeat; Slack is the one
+ * service known to refuse it.
+ */
+const ALREADY_REACTED_ROWS: ReadonlyArray<
+  (error: Error & Record<string, unknown>) => boolean
+> = [(error) => slackApiErrorName(error) === 'already_reacted'];
+
+const isAlreadyReacted = (error: unknown): boolean =>
+  error instanceof Error &&
+  ALREADY_REACTED_ROWS.some((matches) =>
+    matches(error as Error & Record<string, unknown>),
+  );
+
+const REACTION_EMOJI = {
+  eyes: 'eyes',
+  email: 'email',
+} as const satisfies Record<ReactionName, WellKnownEmoji>;
+
+/**
+ * Reacts to `target` with the SDK's shared emoji, which each adapter resolves
+ * to its own service's name for it.
+ */
+export const addReaction = async (
+  context: OutboundContext,
+  target: SdkMessageRef,
+  reaction: ReactionName,
+): Promise<ReactionOutcome> => {
+  const { adapter } = context;
+  try {
+    await runScoped(context, () =>
+      adapter.addReaction(
+        channelThreadId(
+          adapter,
+          target.channel.platform,
+          target.channel.channelId,
+          null,
+        ),
+        target.messageId,
+        emoji[REACTION_EMOJI[reaction]],
+      ),
+    );
+    return { ok: true };
+  } catch (error) {
+    if (isAlreadyReacted(error)) return { ok: true };
+    return { ok: false, detail: messageOf(error) };
+  }
+};

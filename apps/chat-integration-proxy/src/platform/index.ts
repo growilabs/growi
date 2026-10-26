@@ -19,6 +19,7 @@ import { CONNECTION_UNIT_TABLE } from '../capabilities/index.js';
 import type {
   AdminActorRoles,
   ChannelListing,
+  DirectPostOutcome,
   DistributedLock,
   EphemeralPostOutcome,
   HistoryOutcome,
@@ -28,6 +29,8 @@ import type {
   PlatformAppConfig,
   PlatformEventSink,
   PostOutcome,
+  ReactionName,
+  ReactionOutcome,
   SdkChannelRef,
   SdkMessageRef,
   TimeRange,
@@ -55,7 +58,9 @@ import { fetchHistory as fetchHistoryOf } from './history.js';
 import type { InstallationProvider } from './installation-provider.js';
 import { installationRunner } from './installation-scope.js';
 import {
+  addReaction as addReactionOf,
   attachPreview as attachPreviewOf,
+  postDirect as postDirectOf,
   postEphemeral as postEphemeralOf,
   post as postOf,
   replace as replaceOf,
@@ -90,6 +95,24 @@ export interface PlatformFacade {
     message: OutboundMessage,
     scope?: { readonly installationId: string },
   ): Promise<EphemeralPostOutcome>;
+  /**
+   * Opens (or reuses) the 1:1 conversation with `user` and posts there.
+   * `near` is the channel the request came from: like `postEphemeral`'s
+   * `target`, it picks the service and (with `scope`) the connection the
+   * conversation is opened through.
+   */
+  postDirect(
+    near: SdkChannelRef,
+    user: ChatAccountRef,
+    message: OutboundMessage,
+    scope?: { readonly installationId: string },
+  ): Promise<DirectPostOutcome>;
+  /** Answers success when the same reaction is already on the message. */
+  addReaction(
+    target: SdkMessageRef,
+    reaction: ReactionName,
+    scope?: { readonly installationId: string },
+  ): Promise<ReactionOutcome>;
   /**
    * Opens a modal; the submission arrives later as a `modal-submit` event.
    * Answers whether it opened, so a caller can fall back to asking in the
@@ -457,6 +480,22 @@ export const createPlatformFacade = async (
       const context = outboundContext(target.platform, scope);
       if (context == null) return notAddressable(target.platform);
       return await postEphemeralOf(context, target, user, message);
+    },
+
+    async postDirect(near, user, message, scope) {
+      const context = outboundContext(near.platform, scope);
+      if (context == null) {
+        return { ok: false, detail: unaddressable(near.platform) };
+      }
+      return await postDirectOf(context, near, user, message);
+    },
+
+    async addReaction(target, reaction, scope) {
+      const context = outboundContext(target.channel.platform, scope);
+      if (context == null) {
+        return { ok: false, detail: unaddressable(target.channel.platform) };
+      }
+      return await addReactionOf(context, target, reaction);
     },
 
     openModal(trigger, form, correlationId) {

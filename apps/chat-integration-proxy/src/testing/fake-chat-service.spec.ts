@@ -11,7 +11,7 @@ import type { PlatformName } from '@growi/chat';
 import { describe, expect, it } from 'vitest';
 
 import type { PlatformEvent } from '../types/index.js';
-import { channelOn, mentionOn, modalSubmitOn } from './chat-events.js';
+import { actorOn, channelOn, mentionOn, modalSubmitOn } from './chat-events.js';
 import { createFakeChatService } from './fake-chat-service.js';
 
 const PLATFORMS: ReadonlyArray<PlatformName> = [
@@ -193,5 +193,74 @@ describe('capturing what the proxy sends back', () => {
       reason: 'bot-not-in-channel',
       remedy: 'invite the bot',
     });
+  });
+});
+
+describe('capturing direct messages and reactions', () => {
+  const message = { kind: 'markdown' as const, markdown: 'only you' };
+
+  it('records a direct message apart from channel posts and answers with a DM channel', async () => {
+    const { chat, facade } = await attached();
+    const near = channelOn('slack');
+    const user = actorOn('slack');
+
+    const outcome = await facade.postDirect(near, user, message);
+
+    if (!outcome.ok) throw new Error(`expected a DM, got ${outcome.detail}`);
+    expect(outcome.channel).toMatchObject({
+      platform: 'slack',
+      isPrivate: true,
+    });
+    expect(outcome.channel.channelId).not.toBe(near.channelId);
+    expect(chat.posts()).toEqual([
+      { kind: 'direct', channel: outcome.channel, user, message },
+    ]);
+  });
+
+  it('answers a direct message with the failure it was scripted to fail with', async () => {
+    const chat = createFakeChatService({
+      postDirect: () => ({ ok: false, detail: 'missing_scope' }),
+    });
+    const facade = await chat.createFacade(
+      { stateConnectionString: 'unused' },
+      { list: () => Promise.resolve([]), resolve: () => Promise.resolve(null) },
+      { handle: async () => {} },
+    );
+
+    const outcome = await facade.postDirect(
+      channelOn('discord'),
+      actorOn('discord'),
+      message,
+    );
+
+    expect(outcome).toEqual({ ok: false, detail: 'missing_scope' });
+  });
+
+  it('records each reaction with the message it was put on', async () => {
+    const { chat, facade } = await attached();
+    const target = { channel: channelOn('teams'), messageId: 'm-1' };
+
+    const outcome = await facade.addReaction(target, 'eyes');
+
+    expect(outcome).toEqual({ ok: true });
+    expect(chat.reactions()).toEqual([{ target, reaction: 'eyes' }]);
+  });
+
+  it('answers a reaction with the failure it was scripted to fail with', async () => {
+    const chat = createFakeChatService({
+      addReaction: () => ({ ok: false, detail: 'message_not_found' }),
+    });
+    const facade = await chat.createFacade(
+      { stateConnectionString: 'unused' },
+      { list: () => Promise.resolve([]), resolve: () => Promise.resolve(null) },
+      { handle: async () => {} },
+    );
+
+    const outcome = await facade.addReaction(
+      { channel: channelOn('mattermost'), messageId: 'm-1' },
+      'email',
+    );
+
+    expect(outcome).toEqual({ ok: false, detail: 'message_not_found' });
   });
 });

@@ -23,6 +23,7 @@ export type {
   CapturedModal,
   CapturedPost,
   CapturedPostKind,
+  CapturedReaction,
   DeliveryOutcome,
   FakeChatScript,
   FakeChatService,

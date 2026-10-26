@@ -28,6 +28,7 @@ import type {
 import type {
   AdminActorRoles,
   ChannelListing,
+  DirectPostOutcome,
   DistributedLock,
   HistoryOutcome,
   InteractionRef,
@@ -37,22 +38,36 @@ import type {
   PlatformEvent,
   PlatformEventSink,
   PostOutcome,
+  ReactionName,
+  ReactionOutcome,
   SdkChannelRef,
   SdkMessageRef,
   TimeRange,
 } from '../types/index.js';
+import { sdkChannelIdOn } from './chat-events.js';
 
 /** How the proxy tried to reach a chat user. */
-export type CapturedPostKind = 'post' | 'ephemeral' | 'replace' | 'preview';
+export type CapturedPostKind =
+  | 'post'
+  | 'ephemeral'
+  | 'direct'
+  | 'replace'
+  | 'preview';
 
 export interface CapturedPost {
   readonly kind: CapturedPostKind;
+  /** On a direct message, the 1:1 conversation it was posted into. */
   readonly channel: SdkChannelRef;
-  /** Set only on an ephemeral message: who alone was meant to see it. */
+  /** Set only on an ephemeral or direct message: who alone was meant to see it. */
   readonly user?: ChatAccountRef;
   /** Set on a replacement or a preview: which message it attached to. */
   readonly messageId?: string;
   readonly message: OutboundMessage;
+}
+
+export interface CapturedReaction {
+  readonly target: SdkMessageRef;
+  readonly reaction: ReactionName;
 }
 
 /** Whether the proxy handled a delivered event, and what went wrong if not. */
@@ -72,6 +87,8 @@ export interface CapturedModal {
  */
 export interface FakeChatScript {
   readonly post?: (post: CapturedPost) => PostOutcome;
+  readonly postDirect?: (post: CapturedPost) => DirectPostOutcome;
+  readonly addReaction?: (reaction: CapturedReaction) => ReactionOutcome;
   readonly openModal?: (modal: CapturedModal) => boolean;
   readonly listChannels?: (installationId: string) => ChannelListing;
   readonly fetchHistory?: (
@@ -124,7 +141,9 @@ export interface FakeChatService {
    * assertion about `posts()`. This tells the two apart.
    */
   readonly deliver: (event: PlatformEvent) => Promise<DeliveryOutcome>;
+  /** Channel posts, ephemeral messages and direct messages, in order sent. */
   readonly posts: () => ReadonlyArray<CapturedPost>;
+  readonly reactions: () => ReadonlyArray<CapturedReaction>;
   readonly modals: () => ReadonlyArray<CapturedModal>;
   /** Everything `webhookHandler` was asked to serve, by service. */
   readonly webhookCalls: () => ReadonlyArray<PlatformName>;
@@ -132,6 +151,14 @@ export interface FakeChatService {
 }
 
 const posted = (messageId: string): PostOutcome => ({ ok: true, messageId });
+
+/** The 1:1 conversation with `user`: one per person, never the channel asked from. */
+const directChannelOf = (user: ChatAccountRef): SdkChannelRef => ({
+  platform: user.platform,
+  channelId: sdkChannelIdOn(user.platform, `dm-${user.accountId}`),
+  channelName: '',
+  isPrivate: true,
+});
 
 /** A lock nobody else holds. See this file's header for why that is deliberate. */
 const uncontendedLock = (): DistributedLock => {
@@ -163,6 +190,7 @@ export const createFakeChatService = (
   script: FakeChatScript = {},
 ): FakeChatService => {
   const posts: CapturedPost[] = [];
+  const reactions: CapturedReaction[] = [];
   const modals: CapturedModal[] = [];
   const webhookCalls: PlatformName[] = [];
   let sink: PlatformEventSink | null = null;
@@ -193,6 +221,30 @@ export const createFakeChatService = (
 
     postEphemeral: async (channel, user, message) =>
       capture({ kind: 'ephemeral', channel, user, message }),
+
+    postDirect: (_near, user, message) => {
+      const direct: CapturedPost = {
+        kind: 'direct',
+        channel: directChannelOf(user),
+        user,
+        message,
+      };
+      posts.push(direct);
+      nextMessageId += 1;
+      return Promise.resolve(
+        script.postDirect?.(direct) ?? {
+          ok: true,
+          messageId: `message-${nextMessageId}`,
+          channel: direct.channel,
+        },
+      );
+    },
+
+    addReaction: (target, reaction) => {
+      const captured: CapturedReaction = { target, reaction };
+      reactions.push(captured);
+      return Promise.resolve(script.addReaction?.(captured) ?? { ok: true });
+    },
 
     replace: async (message: SdkMessageRef, replacement) =>
       capture({
@@ -259,6 +311,7 @@ export const createFakeChatService = (
     },
 
     posts: () => [...posts],
+    reactions: () => [...reactions],
     modals: () => [...modals],
     webhookCalls: () => [...webhookCalls],
     shutdownCount: () => shutdowns,

@@ -29,12 +29,14 @@ import type {
 } from '../types/index.js';
 import { decodeActionId } from './event-mapping.js';
 import {
+  addReaction,
   attachPreview,
   channelAccessFailure,
   channelThreadId,
   classifyOutboundFailure,
   type OutboundContext,
   post,
+  postDirect,
   postEphemeral,
   replace,
   toPostable,
@@ -642,6 +644,262 @@ describe('postEphemeral', () => {
       ok: false,
       reason: 'platform-error',
       detail: 'boom',
+    });
+  });
+});
+
+describe('postDirect', () => {
+  const userOn = (platform: PlatformName): ChatAccountRef => ({
+    platform,
+    accountId: 'U1',
+    displayName: 'Someone',
+  });
+
+  /** What each real adapter's own `openDM` answers with for a 1:1 conversation. */
+  const dmThreadIds: Readonly<Record<PlatformName, string>> = {
+    slack: slackAdapter.encodeThreadId({ channel: 'D0DM00001', threadTs: '' }),
+    discord: discordAdapter.encodeThreadId({
+      guildId: '@me',
+      channelId: '700000000000000001',
+    }),
+    teams: realAdapters.teams.encodeThreadId({
+      conversationId: 'a:1dm-conversation',
+      serviceUrl: 'https://smba.example.com/',
+      conversationType: 'personal',
+    }),
+    mattermost: mattermostAdapter.encodeThreadId({ channelId: 'mmdm00001' }),
+  };
+
+  /**
+   * A mock whose addressing is the real adapter's, so the returned channel is
+   * checked against the encoding the rest of the app reads events in.
+   */
+  const dmCapableAdapter = (platform: PlatformName) => {
+    const adapter = adapterMock();
+    const real = realAdapters[platform];
+    adapter.channelIdFromThreadId.mockImplementation((threadId) =>
+      real.channelIdFromThreadId(threadId),
+    );
+    adapter.openDM.mockResolvedValue(dmThreadIds[platform]);
+    adapter.postMessage.mockResolvedValue({
+      id: 'dm-message-1',
+      raw: {},
+      threadId: dmThreadIds[platform],
+    });
+    return adapter;
+  };
+
+  it.each(
+    PLATFORMS,
+  )('opens the 1:1 conversation on %s, posts there, and answers with the DM channel', async (platform) => {
+    const adapter = dmCapableAdapter(platform);
+
+    const outcome = await postDirect(
+      contextOf(adapter),
+      channelOf(platform, realChannelIds[platform]),
+      userOn(platform),
+      MARKDOWN,
+    );
+
+    expect(adapter.openDM).toHaveBeenCalledWith('U1');
+    expect(adapter.postMessage).toHaveBeenCalledWith(dmThreadIds[platform], {
+      markdown: 'hello **world**',
+    });
+    expect(outcome).toEqual({
+      ok: true,
+      messageId: 'dm-message-1',
+      channel: {
+        platform,
+        channelId: toSdkChannelId(
+          platform,
+          realAdapters[platform].channelIdFromThreadId(dmThreadIds[platform]),
+        ),
+        channelName: '',
+        isPrivate: true,
+      },
+    });
+  });
+
+  it('opens the conversation and posts inside the installation it was scoped to', async () => {
+    const adapter = dmCapableAdapter('slack');
+    let bound = false;
+    const seenBound: boolean[] = [];
+    adapter.openDM.mockImplementation(() => {
+      seenBound.push(bound);
+      return Promise.resolve(dmThreadIds.slack);
+    });
+    adapter.postMessage.mockImplementation(() => {
+      seenBound.push(bound);
+      return Promise.resolve({
+        id: 'dm-message-1',
+        raw: {},
+        threadId: dmThreadIds.slack,
+      });
+    });
+    const run = async <T>(work: () => Promise<T>): Promise<T> => {
+      bound = true;
+      try {
+        return await work();
+      } finally {
+        bound = false;
+      }
+    };
+
+    const outcome = await postDirect(
+      { ...contextOf(adapter), run },
+      channelOf('slack', realChannelIds.slack),
+      userOn('slack'),
+      MARKDOWN,
+    );
+
+    expect(outcome.ok).toBe(true);
+    expect(seenBound).toEqual([true, true]);
+  });
+
+  it('answers why when the conversation cannot be opened, posting nothing and not throwing', async () => {
+    const adapter = dmCapableAdapter('slack');
+    adapter.openDM.mockRejectedValue(slackPlatformError('missing_scope'));
+
+    const outcome = await postDirect(
+      contextOf(adapter),
+      channelOf('slack', realChannelIds.slack),
+      userOn('slack'),
+      MARKDOWN,
+    );
+
+    expect(outcome).toEqual({
+      ok: false,
+      detail: expect.stringContaining('missing_scope'),
+    });
+    expect(adapter.postMessage).not.toHaveBeenCalled();
+  });
+
+  it('answers why when the post into the opened conversation fails', async () => {
+    const adapter = dmCapableAdapter('teams');
+    adapter.postMessage.mockRejectedValue(new Error('blocked by the user'));
+
+    const outcome = await postDirect(
+      contextOf(adapter),
+      channelOf('teams', realChannelIds.teams),
+      userOn('teams'),
+      MARKDOWN,
+    );
+
+    expect(outcome).toEqual({ ok: false, detail: 'blocked by the user' });
+  });
+
+  it('answers a failure on an adapter that cannot open a direct message', async () => {
+    const adapter: Adapter = { ...dmCapableAdapter('slack') };
+    delete (adapter as { openDM?: unknown }).openDM;
+
+    const outcome = await postDirect(
+      contextOf(adapter),
+      channelOf('slack', realChannelIds.slack),
+      userOn('slack'),
+      MARKDOWN,
+    );
+
+    expect(outcome).toEqual({ ok: false, detail: expect.any(String) });
+  });
+
+  it('posts nothing when the opened conversation is not a channel id this proxy can read', async () => {
+    const adapter = dmCapableAdapter('slack');
+    adapter.channelIdFromThreadId.mockReturnValue('not-a-slack-channel');
+
+    const outcome = await postDirect(
+      contextOf(adapter),
+      channelOf('slack', realChannelIds.slack),
+      userOn('slack'),
+      MARKDOWN,
+    );
+
+    expect(outcome).toEqual({ ok: false, detail: expect.any(String) });
+    expect(adapter.postMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('addReaction', () => {
+  const messageOn = (platform: PlatformName): SdkMessageRef => ({
+    channel: channelOf(platform, realChannelIds[platform]),
+    messageId: 'M1',
+  });
+
+  it.each(
+    PLATFORMS,
+  )('reacts to the message on %s, addressed at its channel', async (platform) => {
+    const adapter = adapterMock();
+    const real = realAdapters[platform];
+    adapter.channelIdFromThreadId.mockImplementation((threadId) =>
+      real.channelIdFromThreadId(threadId),
+    );
+    adapter.encodeThreadId.mockImplementation((data) =>
+      real.encodeThreadId(data),
+    );
+    adapter.decodeThreadId.mockImplementation((threadId) =>
+      real.decodeThreadId(threadId),
+    );
+    adapter.addReaction.mockResolvedValue(undefined);
+
+    const outcome = await addReaction(
+      contextOf(adapter),
+      messageOn(platform),
+      'eyes',
+    );
+
+    expect(outcome).toEqual({ ok: true });
+    const [threadId, messageId] = adapter.addReaction.mock.calls[0] ?? [];
+    expect(messageId).toBe('M1');
+    expect(real.channelIdFromThreadId(String(threadId))).toBe(
+      realChannelIds[platform],
+    );
+  });
+
+  it.each([
+    ['eyes', 'eyes'],
+    ['email', 'email'],
+  ] as const)('hands Slack the %s reaction by its Slack name', async (reaction, slackName) => {
+    const reactionsAdd = vi
+      .spyOn(slackAdapter, 'addReaction')
+      .mockResolvedValue(undefined);
+
+    await addReaction(contextOf(slackAdapter), messageOn('slack'), reaction);
+
+    const [, , emoji] = reactionsAdd.mock.calls[0] ?? [];
+    expect(String(emoji)).toContain(slackName);
+
+    reactionsAdd.mockRestore();
+  });
+
+  it('treats a reaction that is already there as success', async () => {
+    const adapter = adapterMock();
+    adapter.addReaction.mockRejectedValue(
+      slackPlatformError('already_reacted'),
+    );
+
+    const outcome = await addReaction(
+      contextOf(adapter),
+      messageOn('discord'),
+      'email',
+    );
+
+    expect(outcome).toEqual({ ok: true });
+  });
+
+  it('answers why any other failure happened, instead of throwing', async () => {
+    const adapter = adapterMock();
+    adapter.addReaction.mockRejectedValue(
+      slackPlatformError('message_not_found'),
+    );
+
+    const outcome = await addReaction(
+      contextOf(adapter),
+      messageOn('discord'),
+      'email',
+    );
+
+    expect(outcome).toEqual({
+      ok: false,
+      detail: expect.stringContaining('message_not_found'),
     });
   });
 });

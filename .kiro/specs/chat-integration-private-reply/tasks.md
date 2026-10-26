@@ -28,7 +28,7 @@
   - 完了の状態: 単体テストで、Discord 相当のアダプタでは何も送らず「無い」が返ること、Mattermost 相当のアダプタにスレッドの形の id が渡ること、scope を渡せばその installation の接続が使われることが確かめられ、型の検査が通る
   - _Requirements: 1.2, 1.3_
 
-- [ ] 2.2 本人への DM と、依頼のメッセージへのリアクションの仕組みを足す
+- [x] 2.2 本人への DM と、依頼のメッセージへのリアクションの仕組みを足す
   - 依頼が来たチャンネルからサービスと接続（scope があればその installation）を選び、本人との 1 対 1 の会話を開いて投稿する。送れたら DM のチャンネルを返す
   - 依頼のメッセージにリアクションを付ける。同じリアクションが既に付いている（Slack の already_reacted など）ときは成功として返す
   - どちらも例外を投げない。本人だけのメッセージ・DM・リアクションの 3 つを、platform 層の入口から使えるようにする
@@ -168,3 +168,8 @@
   - `.kiro/specs/chat-integration-private-reply/` を削除する
   - 完了の状態: `grep -r chat-integration-private-reply .kiro .claude` が 0 件で、本 spec のディレクトリが無い
   - _Requirements: 1.1_
+
+## Implementation Notes
+
+- 2.2: Teams アダプタの別名表には email が無く、そのまま送られて拒否される可能性が高い。2.4 で Teams のリアクション（email）と、Mattermost・Teams で同じリアクションを 2 回付けたときの動きを実測し、必要なら Teams 向けの名前を足す。
+- 2.2: DM のチャンネルは `directMessageChannelRef`（event-mapping.ts、barrel 非公開）で作る。2.3 は同じファイルを触るので、この関数を壊さない。
