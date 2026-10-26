@@ -8,6 +8,7 @@ import type { ChatAccountRef, PlatformName } from '@growi/chat';
 import type { PlatformFacade } from '../platform/index.js';
 import type {
   EphemeralPostOutcome,
+  Invocation,
   OutboundMessage,
   ReactionName,
   SdkChannelRef,
@@ -67,6 +68,33 @@ export interface PrivateReplierDeps {
   ) => Promise<string | null>;
   readonly reportUndeliverable: (fact: UndeliverableFact) => void;
 }
+
+const REQUEST_SUMMARY_LIMIT = 80;
+
+/**
+ * The origin of a reply to `invocation`. Only the first line of the
+ * arguments is kept, so a page body typed after a `create-page` path never
+ * reaches the DM header.
+ */
+export const privateReplyOriginOf = (
+  invocation: Invocation,
+  installationId: string | null,
+): PrivateReplyOrigin => {
+  const [firstLine = ''] = `${invocation.commandName} ${invocation.argsText}`
+    .trim()
+    .split('\n');
+  const line = firstLine.trimEnd();
+  return {
+    channel: invocation.channel,
+    actor: invocation.actor,
+    sourceMessageId: invocation.sourceMessageId ?? null,
+    requestSummary:
+      line.length > REQUEST_SUMMARY_LIMIT
+        ? `${line.slice(0, REQUEST_SUMMARY_LIMIT)}…`
+        : line,
+    installationId,
+  };
+};
 
 type Scope = { readonly installationId: string } | undefined;
 

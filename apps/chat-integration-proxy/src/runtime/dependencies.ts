@@ -289,7 +289,6 @@ export const createProxyDependencies = async (
     return null;
   };
 
-  // Not handed to any flow yet; each flow takes it when its own task lands.
   const privateReplier = createPrivateReplier({
     platform: facade,
     describePlace: (channel) =>
@@ -338,6 +337,7 @@ export const createProxyDependencies = async (
   const collector = createArgumentCollector({
     pendingCollections,
     platform: facade,
+    privateReplier,
   });
 
   const adminFlow = createAdminFlow({

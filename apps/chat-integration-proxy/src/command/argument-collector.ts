@@ -14,7 +14,8 @@
 //   1. the command line itself (`Invocation.argsText`),
 //   2. a modal, when `supports(platform, 'modal')` AND the invocation carries
 //      a still-usable trigger,
-//   3. follow-up questions posted as ephemeral messages.
+//   3. follow-up questions sent through `PrivateReplier`, so they reach the
+//      user in place or by DM, and an answer is accepted in either place.
 //
 // Path 1 is not an optimization for the platforms that lack modals: it is what
 // the capability table's 「無いときの代わり」 column declares as the substitute
@@ -30,13 +31,13 @@ import type {
 } from '../db/index.js';
 import type { PlatformFacade } from '../platform/index.js';
 import type {
-  EphemeralPostOutcome,
   FieldSpec,
   Invocation,
   OutboundMessage,
   PlatformEvent,
 } from '../types/index.js';
 import { stripAddressToken } from './invocation.js';
+import { type PrivateReplier, privateReplyOriginOf } from './private-reply.js';
 
 export type StartOutcome =
   | {
@@ -97,19 +98,16 @@ export interface ArgumentCollector {
 }
 
 /**
- * The two facade methods this component uses. Narrowed with `Pick` rather
- * than taking the whole `PlatformFacade` so a caller can see, from the type
- * alone, that collecting arguments never posts to a channel, opens a
- * connection, or reads history.
+ * The one facade method this component uses directly. Everything it says to
+ * the user goes through `PrivateReplier`, so from the type alone a caller can
+ * see that collecting arguments never posts to a channel by itself.
  */
-export type ArgumentCollectorPlatform = Pick<
-  PlatformFacade,
-  'openModal' | 'postEphemeral'
->;
+export type ArgumentCollectorPlatform = Pick<PlatformFacade, 'openModal'>;
 
 export interface ArgumentCollectorDeps {
   readonly pendingCollections: PendingCollectionRepository;
   readonly platform: ArgumentCollectorPlatform;
+  readonly privateReplier: PrivateReplier;
   /** Injected so a test can fix the clock; production passes nothing. */
   readonly now?: () => Date;
   readonly newCorrelationId?: () => string;
@@ -252,24 +250,10 @@ const discardNoticeFor = (commandName: string): OutboundMessage => ({
 });
 
 const CANNOT_ASK =
-  'このチャットサービスでは、値を聞き返す手段がないため、このコマンドを実行できません。';
+  '値を聞き返すメッセージを届けられなかったため、このコマンドを実行できません。';
 
-/**
- * Why a question could not be shown. `unsupported` reads like the capability
- * pre-check because, for now, a question has nowhere else to go.
- */
-const whyNotAsked = (
-  posted: Extract<EphemeralPostOutcome, { ok: false }>,
-): string => {
-  switch (posted.reason) {
-    case 'bot-not-in-channel':
-      return posted.remedy;
-    case 'unsupported':
-      return CANNOT_ASK;
-    default:
-      return posted.detail;
-  }
-};
+const CANNOT_OFFER_CHOICE =
+  '対象の GROWI を選んでもらうメッセージを届けられなかったため、このコマンドを実行できません。';
 
 /** The wording of one follow-up question, built from the same `FieldSpec`. */
 const questionFor = (field: FieldSpec): OutboundMessage => ({
@@ -306,36 +290,49 @@ export const createArgumentCollector = (
   const {
     pendingCollections,
     platform,
+    privateReplier,
     now = () => new Date(),
     newCorrelationId = () => crypto.randomUUID(),
     ttlMs = PENDING_COLLECTION_TTL_MS,
   } = deps;
 
   /**
-   * Posts the next question and records what it asked for. Answers whether it
-   * could be asked at all: an ephemeral message is the only way this component
-   * has of reaching the user (design.md's capability table notes 「聞き返し」
-   * rests on `ephemeralMessage`), so a service that cannot post one -- or a
-   * channel the bot is not in -- means the values cannot be collected.
+   * Sends a question that belongs to the row `correlationId`. Answers whether
+   * it reached the user; when it went to a DM, that DM becomes a place the
+   * answer is accepted from.
    */
+  const askPrivately = async (
+    invocation: Invocation,
+    correlationId: string,
+    message: OutboundMessage,
+  ): Promise<boolean> => {
+    const outcome = await privateReplier.reply(
+      privateReplyOriginOf(invocation, null),
+      message,
+    );
+    if (outcome.kind === 'undeliverable') return false;
+    if (outcome.kind === 'direct') {
+      await pendingCollections.routeAnswersVia(
+        correlationId,
+        outcome.directChannel.channelId,
+      );
+    }
+    return true;
+  };
+
+  /** Asks the next question and records what it asked for. */
   const ask = async (
     invocation: Invocation,
     correlationId: string,
     state: CollectionState,
     field: FieldSpec,
   ): Promise<StartOutcome> => {
-    if (!supports('ephemeralMessage', invocation.platform)) {
-      return { status: 'unavailable', reason: CANNOT_ASK };
-    }
-
-    const posted = await platform.postEphemeral(
-      invocation.channel,
-      invocation.actor,
+    const asked = await askPrivately(
+      invocation,
+      correlationId,
       questionFor(field),
     );
-    if (!posted.ok) {
-      return { status: 'unavailable', reason: whyNotAsked(posted) };
-    }
+    if (!asked) return { status: 'unavailable', reason: CANNOT_ASK };
 
     await pendingCollections.update(correlationId, {
       collected: { ...state, awaiting: field.name },
@@ -474,9 +471,11 @@ export const createArgumentCollector = (
         : undefined;
     if (picked != null) return chosen(record, state, picked.relationId);
 
-    await platform.postEphemeral(
-      record.invocation.channel,
-      record.invocation.actor,
+    // Undeliverable or not, the row stays: the user just reached us, and the
+    // original question may still be answered.
+    await askPrivately(
+      record.invocation,
+      record.correlationId,
       growiChoiceMessage(record.commandName, record.correlationId, offered),
     );
     return { status: 'pending' };
@@ -520,20 +519,20 @@ export const createArgumentCollector = (
       // either way, and finding that out is exactly what the invariant is
       // for. Its own failure is not reported -- there is no channel left to
       // report it through, and the outcome of the command the user actually
-      // typed must not be replaced by it. For the same reason this is the one
-      // post that does not consult the capability table first (`ask` does):
-      // there is no alternative way of saying this and nothing to decide
-      // between, so asking the table could only turn one ignored failure into
-      // another.
+      // typed must not be replaced by it.
       const inFlight = await pendingCollections.findInFlight(
         invocation.platform,
         invocation.channel.channelId,
         invocation.actor.accountId,
       );
-      if (inFlight != null) {
-        await platform.postEphemeral(
-          invocation.channel,
-          invocation.actor,
+      // A row only routed here (its question went to this DM) belongs to
+      // another channel and stays answerable there, so it is not superseded.
+      if (
+        inFlight != null &&
+        inFlight.channelId === invocation.channel.channelId
+      ) {
+        await privateReplier.reply(
+          privateReplyOriginOf(invocation, null),
           discardNoticeFor(inFlight.commandName),
         );
         await pendingCollections.remove(inFlight.correlationId);
@@ -550,13 +549,6 @@ export const createArgumentCollector = (
       // No in-flight row is discarded here, unlike `start`: this is the SAME
       // command continuing (its values have just been collected), not a new
       // one superseding an old one.
-      if (!supports('ephemeralMessage', invocation.platform)) {
-        return {
-          status: 'unavailable',
-          reason:
-            'このチャットサービスでは、対象の GROWI を選んでもらう手段がないため、このコマンドを実行できません。',
-        };
-      }
 
       const correlationId = newCorrelationId();
       // Written BEFORE the question is asked, for the same reason
@@ -576,17 +568,17 @@ export const createArgumentCollector = (
         expiresAt: new Date(now().getTime() + ttlMs),
       });
 
-      const posted = await platform.postEphemeral(
-        invocation.channel,
-        invocation.actor,
+      const asked = await askPrivately(
+        invocation,
+        correlationId,
         growiChoiceMessage(invocation.commandName, correlationId, options),
       );
-      if (!posted.ok) {
+      if (!asked) {
         // Nothing can answer a question that was never shown, and the row
         // would block this user's next command in the channel until it
         // expired.
         await pendingCollections.remove(correlationId);
-        return { status: 'unavailable', reason: whyNotAsked(posted) };
+        return { status: 'unavailable', reason: CANNOT_OFFER_CHOICE };
       }
       return { status: 'pending', correlationId };
     },
@@ -596,7 +588,8 @@ export const createArgumentCollector = (
       // from `PlatformEvent` (design.md: 「`plainReply` に依存しない」), so the
       // user answers by addressing the bot again. Which collection it answers
       // is decided by (channel, user), the same key the one-in-flight rule
-      // uses -- an answer carries no correlation id of its own.
+      // uses -- an answer carries no correlation id of its own. The channel may
+      // also be the DM a question was delivered to (`routeAnswersVia`).
       if (event.kind === 'mention') {
         const inFlight = await pendingCollections.findInFlight(
           event.platform,

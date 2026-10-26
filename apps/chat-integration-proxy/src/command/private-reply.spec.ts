@@ -13,6 +13,7 @@ import {
   createPrivateReplier,
   type PrivateReplierDeps,
   type PrivateReplyOrigin,
+  privateReplyOriginOf,
   type UndeliverableFact,
 } from './private-reply.js';
 
@@ -467,5 +468,56 @@ describe('PrivateReplier.acknowledge', () => {
       sourceMessageId == null ? 0 : 1,
     );
     expect(platform.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('privateReplyOriginOf', () => {
+  const invocationWith = (commandName: string, argsText: string) => ({
+    platform: 'slack' as const,
+    channel: testSdkChannel('slack'),
+    actor: { platform: 'slack' as const, accountId: 'U1', displayName: 'Taro' },
+    commandName,
+    argsText,
+    interaction: null,
+  });
+
+  it('addresses the requester where they asked, labelled by the command and its arguments', () => {
+    const invocation = {
+      ...invocationWith('search', 'how to deploy'),
+      sourceMessageId: 'M1',
+    };
+
+    expect(privateReplyOriginOf(invocation, 'inst-1')).toEqual({
+      channel: invocation.channel,
+      actor: invocation.actor,
+      sourceMessageId: 'M1',
+      requestSummary: 'search how to deploy',
+      installationId: 'inst-1',
+    });
+  });
+
+  it('labels a request with no arguments by its command alone, and reads a missing message id as none', () => {
+    const origin = privateReplyOriginOf(invocationWith('help', ''), null);
+
+    expect(origin.requestSummary).toBe('help');
+    expect(origin.sourceMessageId).toBeNull();
+  });
+
+  it('keeps only the first line, so a page body typed after it never reaches the label', () => {
+    const origin = privateReplyOriginOf(
+      invocationWith('create-page', '/memo first line\nsecond line'),
+      null,
+    );
+
+    expect(origin.requestSummary).toBe('create-page /memo first line');
+  });
+
+  it('cuts a long label to 80 characters and marks the cut', () => {
+    const origin = privateReplyOriginOf(
+      invocationWith('search', 'x'.repeat(200)),
+      null,
+    );
+
+    expect(origin.requestSummary).toBe(`search ${'x'.repeat(73)}…`);
   });
 });

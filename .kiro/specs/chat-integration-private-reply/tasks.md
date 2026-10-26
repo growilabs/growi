@@ -83,7 +83,7 @@
   - 完了の状態: 場所の名前の引き当ての単体テストで、保存済みのチャンネル一覧から名前が引け、一覧に無いチャンネルでは名前が無いと返ることが確かめられ、型の検査が通る
   - _Requirements: 1.7, 1.8_
 
-- [ ] 3.4 引数の聞き返しを本人宛ての返事の部品で出し、DM での答えを受け付ける
+- [x] 3.4 引数の聞き返しを本人宛ての返事の部品で出し、DM での答えを受け付ける
   - 値の聞き返し・答えの検証の失敗・GROWI の選択・前の入力を取り消した知らせの 4 か所を、本人宛ての返事の部品で出す（2.1 の一時的な対応はここで消える）
   - 「本人だけのメッセージが使えないサービスでは聞き返せない」という事前の断りをやめ、部品が「届けられなかった」を返したときだけ聞き返せないで終える
   - 聞き返しが DM に届いたら、その DM を答えを受け付けるチャンネルとして記録する。答えは元のチャンネルでも DM でも受け付け、DM の文は先頭の語を残して読む
@@ -178,3 +178,6 @@
 - 2.4: Mattermost で本人だけのメッセージが 403（`create_post_ephemeral` 権限なし）になると、`classifyOutboundFailure` が `bot-not-in-channel`（bot を招待して）と分類する。原因が違うので案内が誤っている。3.2 の運用者向け報告に誤った理由が載る。試験が現状の分類を固定しているので、直すとその試験が落ちて気づける。
 - 2.4: 本番の proxy は Discord の Gateway を一度も開かない（`startGatewayListener` の呼び出しが src に無い）。Discord では DM もチャンネルの mention も proxy に届かず、要件 2.3（DM での答え）も Discord では働かない。umbrella の design.md 195 行目（Discord は Gateway で受ける）と食い違う、この spec より前からの不整合。
 - 2.4: Teams の `email` リアクションは別名表に無くそのまま送られる。受け付けられるかは実機でしか分からない（6.2 の Teams の説明に未確認と書く）。2 回目の同じリアクションが成功になることは Slack だけアダプタのコードで確かめた。Discord・Mattermost・Teams は仮定した応答の上での確認。
+- 3.4: 4.1 で `collector.start` と `startGrowiChoice` が `unavailable` を返しても、CommandFlow は `tell` しない（PrivateReplier が内容を含まない知らせと運用者への報告を済ませているため、`tell` すると知らせも報告も 2 回になる）。同じタスクで `StartOutcome` の `reason` と `CANNOT_ASK`・`CANNOT_OFFER_CHOICE` を消す。
+- 3.4: 依頼の宛先情報の作り方（`${commandName} ${argsText}` の 1 行目を 80 文字で切って「…」）は `command/private-reply.ts` の `privateReplyOriginOf` にある。4.1・4.3 は自前の `originOf` を書かず、これを使う。
+- 3.4: `src/testing/instance-ownership-e2e.integ.ts` の「runs the periodic sweep on one instance at a time」は 5 秒の上限すれすれで、レビューの worktree では変更前の HEAD でも失敗した（この spec の変更とは無関係）。

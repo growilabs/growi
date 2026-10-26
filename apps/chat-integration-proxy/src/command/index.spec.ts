@@ -19,6 +19,7 @@ describe('command/ public entry point', () => {
         'SEARCH_DEFAULT_LIMIT',
         'createArgumentCollector',
         'createPrivateReplier',
+        'privateReplyOriginOf',
         'isWorkspaceAdmin',
         'parseAdminCommand',
         'stripAddressToken',

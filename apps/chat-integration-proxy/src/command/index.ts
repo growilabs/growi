@@ -59,4 +59,7 @@ export type {
   PrivateReplyOutcome,
   UndeliverableFact,
 } from './private-reply.js';
-export { createPrivateReplier } from './private-reply.js';
+export {
+  createPrivateReplier,
+  privateReplyOriginOf,
+} from './private-reply.js';

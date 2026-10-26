@@ -19,6 +19,13 @@ import {
   type ResumeOutcome,
 } from './argument-collector.js';
 import { COMMAND_TRAITS } from './command-set.js';
+import type { PrivateReplier } from './private-reply.js';
+
+const inPlaceReplier = (): PrivateReplier => {
+  const replier = mock<PrivateReplier>();
+  vi.mocked(replier.reply).mockResolvedValue({ kind: 'in-place' });
+  return replier;
+};
 
 /**
  * A real in-memory `PendingCollectionRepository` rather than a mock: every
@@ -166,21 +173,20 @@ const NOW = new Date('2026-09-01T00:00:00.000Z');
 describe('ArgumentCollector.start', () => {
   let repository: ReturnType<typeof createFakeRepository>;
   let platform: ArgumentCollectorPlatform;
+  let privateReplier: PrivateReplier;
 
   beforeEach(() => {
     repository = createFakeRepository();
     platform = mock<ArgumentCollectorPlatform>();
     vi.mocked(platform.openModal).mockResolvedValue(true);
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: true,
-      messageId: 'M1',
-    });
+    privateReplier = inPlaceReplier();
   });
 
   const collector = () =>
     createArgumentCollector({
       pendingCollections: repository,
       platform,
+      privateReplier,
       now: () => NOW,
       newCorrelationId: () => 'corr-1',
     });
@@ -201,7 +207,7 @@ describe('ArgumentCollector.start', () => {
       values: { path: '/memo/today', body: 'body text' },
     });
     expect(platform.openModal).not.toHaveBeenCalled();
-    expect(platform.postEphemeral).not.toHaveBeenCalled();
+    expect(privateReplier.reply).not.toHaveBeenCalled();
     expect(repository.rows.size).toBe(0);
   });
 
@@ -213,7 +219,7 @@ describe('ArgumentCollector.start', () => {
 
     expect(outcome).toEqual({ status: 'collected', values: {} });
     expect(platform.openModal).not.toHaveBeenCalled();
-    expect(platform.postEphemeral).not.toHaveBeenCalled();
+    expect(privateReplier.reply).not.toHaveBeenCalled();
     expect(repository.rows.size).toBe(0);
   });
 
@@ -241,7 +247,7 @@ describe('ArgumentCollector.start', () => {
       { title: COMMAND_NAMES.createPage, fields: CREATE_PAGE_FIELDS },
       'corr-1',
     );
-    expect(platform.postEphemeral).not.toHaveBeenCalled();
+    expect(privateReplier.reply).not.toHaveBeenCalled();
     expect(repository.rows.get('corr-1')?.commandName).toBe(
       COMMAND_NAMES.createPage,
     );
@@ -255,7 +261,7 @@ describe('ArgumentCollector.start', () => {
 
     expect(outcome).toEqual({ status: 'pending', correlationId: 'corr-1' });
     expect(platform.openModal).not.toHaveBeenCalled();
-    expect(platform.postEphemeral).toHaveBeenCalledTimes(1);
+    expect(privateReplier.reply).toHaveBeenCalledTimes(1);
   });
 
   it('reads the capability table, not the platform name: a service the table marks as having no modal is asked, trigger or not', async () => {
@@ -266,7 +272,7 @@ describe('ArgumentCollector.start', () => {
 
     expect(outcome).toEqual({ status: 'pending', correlationId: 'corr-1' });
     expect(platform.openModal).not.toHaveBeenCalled();
-    expect(platform.postEphemeral).toHaveBeenCalledTimes(1);
+    expect(privateReplier.reply).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to asking when the modal could not be opened', async () => {
@@ -278,7 +284,7 @@ describe('ArgumentCollector.start', () => {
     );
 
     expect(outcome).toEqual({ status: 'pending', correlationId: 'corr-1' });
-    expect(platform.postEphemeral).toHaveBeenCalledTimes(1);
+    expect(privateReplier.reply).toHaveBeenCalledTimes(1);
   });
 
   it('asks only for what the command line did not already fill, on a platform without modals', async () => {
@@ -289,33 +295,13 @@ describe('ArgumentCollector.start', () => {
 
     expect(outcome).toEqual({ status: 'pending', correlationId: 'corr-1' });
     expect(platform.openModal).not.toHaveBeenCalled();
-    const [, , message] = vi.mocked(platform.postEphemeral).mock.calls[0];
+    const [, message] = vi.mocked(privateReplier.reply).mock.calls[0];
     expect(message.kind === 'markdown' && message.markdown).toContain('Body');
   });
 
-  it('reports unavailable and keeps no half-finished row when the question could not be posted', async () => {
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: false,
-      reason: 'bot-not-in-channel',
-      remedy: 'invite the bot',
-    });
-
-    const outcome = await collector().start(
-      invocationOf('mattermost', COMMAND_NAMES.createPage, ''),
-      CREATE_PAGE_FIELDS,
-    );
-
-    expect(outcome).toEqual({
-      status: 'unavailable',
-      reason: 'invite the bot',
-    });
-    expect(repository.rows.size).toBe(0);
-  });
-
-  it('reports unavailable, keeping no row, where the service has no message only this user would see', async () => {
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: false,
-      reason: 'unsupported',
+  it('reports unavailable and keeps no half-finished row when the question could not be delivered at all', async () => {
+    vi.mocked(privateReplier.reply).mockResolvedValue({
+      kind: 'undeliverable',
     });
 
     const outcome = await collector().start(
@@ -328,6 +314,210 @@ describe('ArgumentCollector.start', () => {
       reason: expect.stringMatching(/\S/),
     });
     expect(repository.rows.size).toBe(0);
+  });
+
+  it('asks on a service that has no message only this user would see, rather than refusing up front', async () => {
+    const outcome = await collector().start(
+      invocationOf('discord', COMMAND_NAMES.createPage, ''),
+      CREATE_PAGE_FIELDS,
+    );
+
+    expect(outcome).toEqual({ status: 'pending', correlationId: 'corr-1' });
+    expect(privateReplier.reply).toHaveBeenCalledTimes(1);
+  });
+
+  it('addresses the question to the requester and labels it with the request', async () => {
+    await collector().start(
+      {
+        ...invocationOf('mattermost', COMMAND_NAMES.createPage, '/memo/today'),
+        sourceMessageId: 'M-request',
+      },
+      CREATE_PAGE_FIELDS,
+    );
+
+    const [origin] = vi.mocked(privateReplier.reply).mock.calls[0];
+    expect(origin).toEqual({
+      channel: channelOf('mattermost'),
+      actor: actorOf('mattermost'),
+      sourceMessageId: 'M-request',
+      requestSummary: `${COMMAND_NAMES.createPage} /memo/today`,
+      installationId: null,
+    });
+  });
+
+  it('accepts no answer from a direct message when the question was shown in place', async () => {
+    await collector().start(
+      invocationOf('mattermost', COMMAND_NAMES.createPage, '/memo/today'),
+      CREATE_PAGE_FIELDS,
+    );
+
+    const outcome = await collector().resume({
+      kind: 'mention',
+      platform: 'mattermost',
+      channel: testSdkChannel('mattermost', {
+        channelId: testSdkChannelId('mattermost', 'D1'),
+        isPrivate: true,
+      }),
+      actor: actorOf('mattermost'),
+      text: 'foo bar',
+      inDirectMessage: true,
+      messageId: 'M-dm',
+      interaction: null,
+    });
+
+    expect(outcome).toEqual({ status: 'not-mine' });
+    expect(repository.rows.size).toBe(1);
+  });
+
+  it('keeps a request asked elsewhere when a new command starts in the direct message its question went to', async () => {
+    const dm = testSdkChannel('mattermost', {
+      channelId: testSdkChannelId('mattermost', 'D1'),
+      isPrivate: true,
+    });
+    vi.mocked(privateReplier.reply).mockResolvedValue({
+      kind: 'direct',
+      directChannel: dm,
+    });
+    const original = invocationOf(
+      'mattermost',
+      COMMAND_NAMES.createPage,
+      '/memo/today',
+    );
+    await collector().start(original, CREATE_PAGE_FIELDS);
+    vi.mocked(privateReplier.reply).mockClear();
+
+    const started = await collector().start(
+      {
+        ...invocationOf('mattermost', COMMAND_NAMES.search, 'deploy'),
+        channel: dm,
+      },
+      SEARCH_FIELDS,
+    );
+
+    expect(started).toEqual({
+      status: 'collected',
+      values: { keyword: 'deploy' },
+    });
+    expect(privateReplier.reply).not.toHaveBeenCalled();
+    const answered = await collector().resume(
+      mentionAnswer('mattermost', 'foo bar'),
+    );
+    expect(answered).toEqual({
+      status: 'collected',
+      values: { path: '/memo/today', body: 'foo bar' },
+      invocation: original,
+    });
+  });
+
+  it('accepts the answer in the direct message the question was delivered to', async () => {
+    const dm = testSdkChannel('mattermost', {
+      channelId: testSdkChannelId('mattermost', 'D1'),
+      isPrivate: true,
+    });
+    vi.mocked(privateReplier.reply).mockResolvedValue({
+      kind: 'direct',
+      directChannel: dm,
+    });
+    const invocation = invocationOf(
+      'mattermost',
+      COMMAND_NAMES.createPage,
+      '/memo/today',
+    );
+    const routeAnswersVia = vi.spyOn(repository, 'routeAnswersVia');
+    await collector().start(invocation, CREATE_PAGE_FIELDS);
+    expect(routeAnswersVia).toHaveBeenCalledWith('corr-1', dm.channelId);
+
+    const outcome = await collector().resume({
+      kind: 'mention',
+      platform: 'mattermost',
+      channel: dm,
+      actor: actorOf('mattermost'),
+      text: 'foo bar',
+      inDirectMessage: true,
+      messageId: 'M-dm',
+      interaction: null,
+    });
+
+    // The request carries on in the channel it was made in, not in the DM.
+    expect(outcome).toEqual({
+      status: 'collected',
+      values: { path: '/memo/today', body: 'foo bar' },
+      invocation,
+    });
+    expect(repository.rows.size).toBe(0);
+  });
+
+  it('still accepts the answer in the original channel after asking by direct message', async () => {
+    vi.mocked(privateReplier.reply).mockResolvedValue({
+      kind: 'direct',
+      directChannel: testSdkChannel('mattermost', {
+        channelId: testSdkChannelId('mattermost', 'D1'),
+      }),
+    });
+    const invocation = invocationOf(
+      'mattermost',
+      COMMAND_NAMES.createPage,
+      '/memo/today',
+    );
+    await collector().start(invocation, CREATE_PAGE_FIELDS);
+
+    const outcome = await collector().resume(
+      mentionAnswer('mattermost', 'foo bar'),
+    );
+
+    expect(outcome).toEqual({
+      status: 'collected',
+      values: { path: '/memo/today', body: 'foo bar' },
+      invocation,
+    });
+  });
+
+  it('gives a direct-message answer to the newer of two questions delivered to the same DM', async () => {
+    const dm = testSdkChannel('mattermost', {
+      channelId: testSdkChannelId('mattermost', 'D1'),
+      isPrivate: true,
+    });
+    vi.mocked(privateReplier.reply).mockResolvedValue({
+      kind: 'direct',
+      directChannel: dm,
+    });
+    let n = 0;
+    const numbered = createArgumentCollector({
+      pendingCollections: repository,
+      platform,
+      privateReplier,
+      now: () => NOW,
+      newCorrelationId: () => `corr-${++n}`,
+    });
+    const inChannel = (channelName: string, commandName: string) => ({
+      ...invocationOf('mattermost', commandName, '/memo/today'),
+      channel: testSdkChannel('mattermost', {
+        channelId: testSdkChannelId('mattermost', channelName),
+      }),
+    });
+    const older = inChannel('C1', COMMAND_NAMES.createPage);
+    const newer = inChannel('C2', COMMAND_NAMES.createPage);
+    await numbered.start(older, CREATE_PAGE_FIELDS);
+    await numbered.start(newer, CREATE_PAGE_FIELDS);
+
+    const outcome = await numbered.resume({
+      kind: 'mention',
+      platform: 'mattermost',
+      channel: dm,
+      actor: actorOf('mattermost'),
+      text: 'foo bar',
+      inDirectMessage: true,
+      messageId: 'M-dm',
+      interaction: null,
+    });
+
+    expect(outcome).toEqual({
+      status: 'collected',
+      values: { path: '/memo/today', body: 'foo bar' },
+      invocation: newer,
+    });
+    // The older request is still answerable where it was made.
+    expect([...repository.rows.keys()]).toEqual(['corr-1']);
   });
 
   it('discards the collection already in flight for the same channel and user, whatever wrote it', async () => {
@@ -375,11 +565,10 @@ describe('ArgumentCollector.start', () => {
 
     // The command line was complete, so the only reason to post anything at
     // all is the discard -- design.md's 「破棄したことを利用者に示す」.
-    expect(platform.postEphemeral).toHaveBeenCalledTimes(1);
-    const [channel, actor, message] = vi.mocked(platform.postEphemeral).mock
-      .calls[0];
-    expect(channel.channelId).toBe(testSdkChannelId('mattermost', 'C1'));
-    expect(actor.accountId).toBe('U1');
+    expect(privateReplier.reply).toHaveBeenCalledTimes(1);
+    const [origin, message] = vi.mocked(privateReplier.reply).mock.calls[0];
+    expect(origin.channel.channelId).toBe(testSdkChannelId('mattermost', 'C1'));
+    expect(origin.actor.accountId).toBe('U1');
     expect(message.kind === 'markdown' && message.markdown).toContain(
       COMMAND_NAMES.search,
     );
@@ -398,10 +587,8 @@ describe('ArgumentCollector.start', () => {
       offeredOptions: [],
       expiresAt: new Date(NOW.getTime() + 60_000),
     });
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: false,
-      reason: 'bot-not-in-channel',
-      remedy: 'invite the bot',
+    vi.mocked(privateReplier.reply).mockResolvedValue({
+      kind: 'undeliverable',
     });
 
     const outcome = await collector().start(
@@ -412,15 +599,15 @@ describe('ArgumentCollector.start', () => {
     // Losing the earlier input silently is the worse half of this failure:
     // the attempt to say so must be made before the new command gives up.
     const notice = vi
-      .mocked(platform.postEphemeral)
-      .mock.calls.map(([, , message]) =>
+      .mocked(privateReplier.reply)
+      .mock.calls.map(([, message]) =>
         message.kind === 'markdown' ? message.markdown : '',
       )
       .find((markdown) => markdown.includes(COMMAND_NAMES.search));
     expect(notice).toBeDefined();
     expect(outcome).toEqual({
       status: 'unavailable',
-      reason: 'invite the bot',
+      reason: expect.stringMatching(/\S/),
     });
     expect(repository.rows.size).toBe(0);
   });
@@ -430,6 +617,7 @@ describe('ArgumentCollector.start', () => {
     const twice = createArgumentCollector({
       pendingCollections: repository,
       platform,
+      privateReplier,
       now: () => NOW,
       newCorrelationId: () => `corr-${++n}`,
     });
@@ -450,21 +638,20 @@ describe('ArgumentCollector.start', () => {
 describe('ArgumentCollector.resume', () => {
   let repository: ReturnType<typeof createFakeRepository>;
   let platform: ArgumentCollectorPlatform;
+  let privateReplier: PrivateReplier;
 
   beforeEach(() => {
     repository = createFakeRepository();
     platform = mock<ArgumentCollectorPlatform>();
     vi.mocked(platform.openModal).mockResolvedValue(true);
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: true,
-      messageId: 'M1',
-    });
+    privateReplier = inPlaceReplier();
   });
 
   const collectorAt = (now: Date) =>
     createArgumentCollector({
       pendingCollections: repository,
       platform,
+      privateReplier,
       now: () => now,
       newCorrelationId: () => 'corr-1',
     });
@@ -593,10 +780,8 @@ describe('ArgumentCollector.resume', () => {
       invocationOf('mattermost', COMMAND_NAMES.createPage, ''),
       CREATE_PAGE_FIELDS,
     );
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: false,
-      reason: 'bot-not-in-channel',
-      remedy: 'invite the bot',
+    vi.mocked(privateReplier.reply).mockResolvedValue({
+      kind: 'undeliverable',
     });
 
     const outcome = await collectorAt(NOW).resume(
@@ -620,7 +805,7 @@ describe('ArgumentCollector.resume', () => {
     );
 
     expect(outcome).toEqual({ status: 'pending' });
-    expect(platform.postEphemeral).toHaveBeenCalledTimes(2);
+    expect(privateReplier.reply).toHaveBeenCalledTimes(2);
     expect(repository.rows.size).toBe(1);
   });
 });
@@ -635,13 +820,11 @@ describe('ArgumentCollector: the same field declaration collects on every servic
     const repository = createFakeRepository();
     const platform = mock<ArgumentCollectorPlatform>();
     vi.mocked(platform.openModal).mockResolvedValue(true);
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: true,
-      messageId: 'M1',
-    });
+    const privateReplier = inPlaceReplier();
     const deps = {
       pendingCollections: repository,
       platform,
+      privateReplier,
       now: () => NOW,
       newCorrelationId: () => 'corr-1',
     };
@@ -710,13 +893,11 @@ describe('ArgumentCollector.sweepExpired', () => {
     const repository = createFakeRepository();
     const platform = mock<ArgumentCollectorPlatform>();
     vi.mocked(platform.openModal).mockResolvedValue(true);
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: true,
-      messageId: 'M1',
-    });
+    const privateReplier = inPlaceReplier();
     const collector = createArgumentCollector({
       pendingCollections: repository,
       platform,
+      privateReplier,
       now: () => NOW,
       newCorrelationId: () => 'corr-1',
     });
@@ -746,6 +927,7 @@ describe('the field declaration this component is driven by', () => {
 describe('ArgumentCollector.startGrowiChoice / resuming a GROWI choice', () => {
   let repository: ReturnType<typeof createFakeRepository>;
   let platform: ArgumentCollectorPlatform;
+  let privateReplier: PrivateReplier;
 
   const OPTIONS = [
     { relationId: 'rel-a', growiLabel: 'GROWI A' },
@@ -755,16 +937,14 @@ describe('ArgumentCollector.startGrowiChoice / resuming a GROWI choice', () => {
   beforeEach(() => {
     repository = createFakeRepository();
     platform = mock<ArgumentCollectorPlatform>();
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: true,
-      messageId: 'M1',
-    });
+    privateReplier = inPlaceReplier();
   });
 
   const collector = () =>
     createArgumentCollector({
       pendingCollections: repository,
       platform,
+      privateReplier,
       now: () => NOW,
       newCorrelationId: () => 'corr-choice',
     });
@@ -797,7 +977,7 @@ describe('ArgumentCollector.startGrowiChoice / resuming a GROWI choice', () => {
       status: 'pending',
       correlationId: 'corr-choice',
     });
-    const [, , message] = vi.mocked(platform.postEphemeral).mock.calls[0] ?? [];
+    const [, message] = vi.mocked(privateReplier.reply).mock.calls[0] ?? [];
     expect(message).toMatchObject({
       kind: 'choice',
       correlationId: 'corr-choice',
@@ -865,39 +1045,18 @@ describe('ArgumentCollector.startGrowiChoice / resuming a GROWI choice', () => {
       {},
       OPTIONS,
     );
-    vi.mocked(platform.postEphemeral).mockClear();
+    vi.mocked(privateReplier.reply).mockClear();
 
     const resumed = await collector().resume(mentionAnswer('mattermost', '9'));
 
     expect(resumed).toEqual({ status: 'pending' });
     expect(repository.rows.size).toBe(1);
-    expect(platform.postEphemeral).toHaveBeenCalledTimes(1);
+    expect(privateReplier.reply).toHaveBeenCalledTimes(1);
   });
 
-  it('drops the row when the choice could not be shown at all', async () => {
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: false,
-      reason: 'bot-not-in-channel',
-      remedy: 'invite the bot',
-    });
-
-    const outcome = await collector().startGrowiChoice(
-      invocationOf('slack', COMMAND_NAMES.createPage),
-      {},
-      OPTIONS,
-    );
-
-    expect(outcome).toEqual({
-      status: 'unavailable',
-      reason: 'invite the bot',
-    });
-    expect(repository.rows.size).toBe(0);
-  });
-
-  it('drops the row when the service has no message only this user would see', async () => {
-    vi.mocked(platform.postEphemeral).mockResolvedValue({
-      ok: false,
-      reason: 'unsupported',
+  it('drops the row when the choice could not be delivered at all', async () => {
+    vi.mocked(privateReplier.reply).mockResolvedValue({
+      kind: 'undeliverable',
     });
 
     const outcome = await collector().startGrowiChoice(
@@ -911,6 +1070,50 @@ describe('ArgumentCollector.startGrowiChoice / resuming a GROWI choice', () => {
       reason: expect.stringMatching(/\S/),
     });
     expect(repository.rows.size).toBe(0);
+  });
+
+  it('offers the choice on a service that has no message only this user would see', async () => {
+    const outcome = await collector().startGrowiChoice(
+      invocationOf('discord', COMMAND_NAMES.createPage),
+      {},
+      OPTIONS,
+    );
+
+    expect(outcome).toEqual({
+      status: 'pending',
+      correlationId: 'corr-choice',
+    });
+  });
+
+  it('accepts the numbered answer in the direct message the choice was delivered to', async () => {
+    const dm = testSdkChannel('mattermost', {
+      channelId: testSdkChannelId('mattermost', 'D1'),
+      isPrivate: true,
+    });
+    vi.mocked(privateReplier.reply).mockResolvedValue({
+      kind: 'direct',
+      directChannel: dm,
+    });
+    const invocation = invocationOf('mattermost', COMMAND_NAMES.createPage);
+    await collector().startGrowiChoice(invocation, { path: '/memo' }, OPTIONS);
+
+    const resumed = await collector().resume({
+      kind: 'mention',
+      platform: 'mattermost',
+      channel: dm,
+      actor: actorOf('mattermost'),
+      text: '2',
+      inDirectMessage: true,
+      messageId: 'M-dm',
+      interaction: null,
+    });
+
+    expect(resumed).toEqual({
+      status: 'growi-chosen',
+      invocation,
+      values: { path: '/memo' },
+      relationId: 'rel-b',
+    });
   });
 
   it('leaves an ordinary field collection unaffected by the choice shape', async () => {
