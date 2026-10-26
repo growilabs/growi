@@ -834,6 +834,8 @@ describe('dead ends the user is told about', () => {
       channel,
       actor,
       text: '@growi /memo',
+      inDirectMessage: false,
+      messageId: 'M0001',
       interaction: null,
     });
 

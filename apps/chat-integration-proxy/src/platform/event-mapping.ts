@@ -249,6 +249,8 @@ export const fromMessage = (
       channel,
       actor,
       text: message.text,
+      inDirectMessage: thread.isDM,
+      messageId: message.id,
       // A message notification never carries a modal handle (design.md:
       // 「mention の通知には付いてこない」).
       interaction: null,

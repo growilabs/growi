@@ -142,6 +142,8 @@ describe('fromMessage', () => {
         displayName: 'Alice Example',
       },
       text: '@growi search foo',
+      inDirectMessage: false,
+      messageId: 'M0001',
       // A message event never carries a modal trigger (design.md: 「mention の
       // 通知には付いてこない」).
       interaction: null,
@@ -226,6 +228,25 @@ describe('fromMessage', () => {
     expect(open?.channel.isPrivate).toBe(false);
   });
 
+  it('reports whether the mention was made inside a direct message, and carries the message id either way', () => {
+    const inDm = fromMessage(
+      slackThread({ isDM: true }),
+      message({ id: 'M0002' }),
+    );
+    const inChannel = fromMessage(slackThread(), message({ id: 'M0003' }));
+
+    expect(inDm).toMatchObject({
+      kind: 'mention',
+      inDirectMessage: true,
+      messageId: 'M0002',
+    });
+    expect(inChannel).toMatchObject({
+      kind: 'mention',
+      inDirectMessage: false,
+      messageId: 'M0003',
+    });
+  });
+
   it('still resolves the channel when the platform has not supplied a channel name yet', () => {
     // `Channel.name` is null until metadata has been fetched. The channel is
     // matched by id, never by name, so a missing name must not drop the event.
@@ -279,6 +300,8 @@ describe('fromMessage', () => {
       'channel',
       'actor',
       'text',
+      'inDirectMessage',
+      'messageId',
       'interaction',
     ]);
     expectNoSdkValueLeaked(linkPosted, [

@@ -23,6 +23,14 @@ export type PlatformEvent =
       readonly channel: SdkChannelRef;
       readonly actor: ChatAccountRef;
       readonly text: string;
+      /**
+       * Whether the mention was made inside a 1:1 conversation with the bot,
+       * as opposed to a channel. Carried separately from `channel.isPrivate`,
+       * which is also true for a private channel.
+       */
+      readonly inDirectMessage: boolean;
+      /** The id of the requesting message itself, for acting on it later. */
+      readonly messageId: string;
       readonly interaction: InteractionRef | null;
     }
   | {

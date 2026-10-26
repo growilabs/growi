@@ -120,15 +120,23 @@ interface EventOverrides {
   readonly interaction?: InteractionRef | null;
 }
 
+interface MentionOverrides extends EventOverrides {
+  readonly text: string;
+  readonly inDirectMessage?: boolean;
+  readonly messageId?: string;
+}
+
 export const mentionOn = (
   platform: PlatformName,
-  options: EventOverrides & { readonly text: string },
+  options: MentionOverrides,
 ): PlatformEvent => ({
   kind: 'mention',
   platform,
   channel: options.channel ?? channelOn(platform),
   actor: options.actor ?? actorOn(platform),
   text: options.text,
+  inDirectMessage: options.inDirectMessage ?? false,
+  messageId: options.messageId ?? `${platform}-message-1`,
   interaction:
     options.interaction === undefined
       ? interactionOn(platform)

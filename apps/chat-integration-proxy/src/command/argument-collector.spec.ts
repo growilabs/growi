@@ -139,6 +139,8 @@ const mentionAnswer = (
   channel: channelOf(platform),
   actor: actorOf(platform),
   text: `@growi ${text}`,
+  inDirectMessage: false,
+  messageId: 'M0001',
   interaction: null,
 });
 

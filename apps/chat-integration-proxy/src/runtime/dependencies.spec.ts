@@ -68,6 +68,8 @@ describe('createDeferredEventSink', () => {
     channel: testSdkChannel('slack'),
     actor: { platform: 'slack', accountId: 'U1', displayName: 'someone' },
     text: 'hello',
+    inDirectMessage: false,
+    messageId: 'M0001',
     interaction: null,
   };
 
@@ -502,6 +504,8 @@ describe('a register command typed in chat (Requirement 9.1)', () => {
       channel,
       actor,
       text: '@growi register',
+      inDirectMessage: false,
+      messageId: 'M0001',
       interaction: null,
     });
 

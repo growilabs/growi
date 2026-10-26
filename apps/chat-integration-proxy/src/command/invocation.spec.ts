@@ -42,6 +42,8 @@ describe('CommandInvocation.normalize', () => {
       channel,
       actor,
       text: '@growi search foo',
+      inDirectMessage: false,
+      messageId: 'M0001',
       interaction: null,
     });
 
@@ -95,6 +97,8 @@ describe('CommandInvocation.normalize', () => {
       channel,
       actor,
       text: '@growi keep https://growi.example.com/page',
+      inDirectMessage: false,
+      messageId: 'M0001',
       interaction: null,
     });
 
@@ -109,6 +113,8 @@ describe('CommandInvocation.normalize', () => {
       channel,
       actor,
       text: '@growi',
+      inDirectMessage: false,
+      messageId: 'M0001',
       interaction: null,
     });
 

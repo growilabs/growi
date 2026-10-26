@@ -33,6 +33,8 @@ const mentionEvent = (text: string): PlatformEvent => ({
   channel,
   actor,
   text,
+  inDirectMessage: false,
+  messageId: 'M0001',
   interaction: null,
 });
 
@@ -323,6 +325,8 @@ describe('PlatformEvent', () => {
         channel,
         actor,
         text: 'hi',
+        inDirectMessage: false,
+        messageId: 'M0001',
         interaction: null,
       },
       {
@@ -395,6 +399,8 @@ describe('PlatformEvent', () => {
       channel: testSdkChannel('discord'),
       actor: { platform: 'discord', accountId: 'U1', displayName: 'Alice' },
       text: 'hi',
+      inDirectMessage: false,
+      messageId: 'M0001',
       interaction: null,
     });
 
