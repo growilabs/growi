@@ -54,7 +54,9 @@
         },
         "never_logged_in": "从未登录",
         "empty": "没有需要提示迁移的用户",
-        "fetch_error": "获取需要提示迁移的用户列表失败"
+        "fetch_error": "获取需要提示迁移的用户列表失败",
+        "load_more_error": "加载更多用户失败",
+        "retry": "重试"
       }
     },
     "scope_of_page_disclosure": "页面公开范围",

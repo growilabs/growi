@@ -45,7 +45,9 @@
         },
         "never_logged_in": "로그인 기록 없음",
         "empty": "마이그레이션을 유도해야 하는 사용자가 없습니다",
-        "fetch_error": "마이그레이션을 유도할 사용자 목록을 가져오지 못했습니다"
+        "fetch_error": "마이그레이션을 유도할 사용자 목록을 가져오지 못했습니다",
+        "load_more_error": "사용자를 더 불러오지 못했습니다",
+        "retry": "다시 시도"
       }
     },
     "scope_of_page_disclosure": "페이지 공개 범위",

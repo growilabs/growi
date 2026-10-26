@@ -13,8 +13,9 @@
 
 import { EventEmitter } from 'node:events';
 import type { IUserHasId } from '@growi/core';
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import { Types } from 'mongoose';
+import { mock } from 'vitest-mock-extended';
 
 import { getInstance } from '^/test/setup/crowi';
 
@@ -109,13 +110,16 @@ describe('delete-legacy-passwords — emits the delete activity before the respo
       apiv3Err: vi.fn(),
     } as unknown as ApiV3Response;
 
-    const req = {
+    const req = mock<Request & { user?: IUserHasId }>({
       method: 'DELETE',
       ip: TEST_IP,
       originalUrl: TEST_ENDPOINT,
-      user: testUser,
-      // biome-ignore lint/suspicious/noExplicitAny: minimal Express request shape
-    } as any;
+      // Not the mongoose User document: wrapping it in vitest-mock-extended's proxy breaks its getters
+      user: mock<IUserHasId>({
+        _id: testUserId.toHexString(),
+        username: TEST_USERNAME,
+      }),
+    });
 
     const addActivity = generateAddActivityMiddleware();
     addActivity(req, res, () => {});

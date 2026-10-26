@@ -45,7 +45,9 @@
         },
         "never_logged_in": "Never logged in",
         "empty": "No users need to be nudged",
-        "fetch_error": "Failed to fetch the list of users to nudge"
+        "fetch_error": "Failed to fetch the list of users to nudge",
+        "load_more_error": "Failed to load more users",
+        "retry": "Retry"
       }
     },
     "scope_of_page_disclosure": "Scope of page disclosure",
