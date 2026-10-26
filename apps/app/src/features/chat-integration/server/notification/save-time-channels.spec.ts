@@ -2,7 +2,7 @@
 // a notification destination from? Every case is stated as "what does the
 // caller get back", so the query shape underneath can change freely.
 
-import type { ChannelInventory } from '@growi/chat';
+import { type ChannelInventory, toNativeChannelId } from '@growi/chat';
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import {
   afterAll,
@@ -30,7 +30,7 @@ vi.mock('../proxy-client', async (importOriginal) => {
 
 const channel = (channelId: string, channelName: string) => ({
   platform: 'slack' as const,
-  channelId,
+  channelId: toNativeChannelId(channelId),
   channelName,
   isPrivate: false,
 });

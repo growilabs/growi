@@ -20,7 +20,12 @@
 // Requires a real MongoDB (wired by vitest.workspace.mts integ setup) with
 // Prisma bound to the same per-worker database (test/setup/prisma.ts).
 
-import type { ChannelRef, ChatAccountRef, CommandRequest } from '@growi/chat';
+import {
+  type ChannelRef,
+  type ChatAccountRef,
+  type CommandRequest,
+  toNativeChannelId,
+} from '@growi/chat';
 import type { IUserHasId } from '@growi/core';
 import mongoose, { Types } from 'mongoose';
 
@@ -58,7 +63,7 @@ vi.mock('~/server/service/activity/index', async (importOriginal) => {
 const RELATION_ID = 'relation-write-1';
 const CHANNEL: ChannelRef = {
   platform: 'slack',
-  channelId: 'C0WRITE',
+  channelId: toNativeChannelId('C0WRITE'),
   channelName: 'write-channel',
   isPrivate: false,
 };

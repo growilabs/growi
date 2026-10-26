@@ -18,7 +18,11 @@
 // on this side of it (the transaction, the version, the stored rows) runs
 // against a real MongoDB replica set.
 
-import type { CommandRequest } from '@growi/chat';
+import {
+  type CommandRequest,
+  type NativeChannelId,
+  toNativeChannelId,
+} from '@growi/chat';
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import {
   afterAll,
@@ -189,14 +193,14 @@ describe('saveRelationSettings', () => {
   describe("a changed setting takes effect on the command endpoint's next execution", () => {
     const CHANNEL = {
       platform: 'slack',
-      channelId: 'C0GENERAL',
+      channelId: toNativeChannelId('C0GENERAL'),
       channelName: 'general',
       isPrivate: false,
     } as const;
 
     const helpRequest = (
       requestId: string,
-      channelId: string = CHANNEL.channelId,
+      channelId: NativeChannelId = CHANNEL.channelId,
     ): CommandRequest => ({
       relationId: RELATION_ID,
       op: 'command',
@@ -210,7 +214,7 @@ describe('saveRelationSettings', () => {
       kind: 'help',
     });
 
-    const runHelp = (requestId: string, channelId?: string) =>
+    const runHelp = (requestId: string, channelId?: NativeChannelId) =>
       createCommandEndpoint(mock<Crowi>()).handle(
         helpRequest(requestId, channelId),
       );
@@ -237,21 +241,57 @@ describe('saveRelationSettings', () => {
       expect((await runHelp('req-after-listed')).kind).toBe('help');
     });
 
+    it('judges a command from the service-native channel id as permitted once an administrator listed that id', async () => {
+      const nativeId = toNativeChannelId('C0CBFQ5558V');
+      await saveRelationSettings(RELATION_ID, [
+        { commandName: 'help', allowedChannels: [nativeId] },
+      ]);
+
+      expect((await runHelp('req-native-id', nativeId)).kind).toBe('help');
+    });
+
+    it('does not let a stored adapter-encoded id widen or break the judgment of the other stored ids', async () => {
+      await ChatChannelPermission.create({
+        relationId: RELATION_ID,
+        commandName: 'help',
+        channelScope: 'listed',
+        allowedChannels: ['slack:C0LEGACY', 'C0CBFQ5558V'],
+      });
+
+      expect(
+        (await runHelp('req-stored-ok', toNativeChannelId('C0CBFQ5558V'))).kind,
+      ).toBe('help');
+      expect(
+        (await runHelp('req-stored-legacy', toNativeChannelId('C0LEGACY')))
+          .kind,
+      ).toBe('error');
+    });
+
     it("allows the command from a channel nobody listed after 'all' is saved", async () => {
       await saveRelationSettings(RELATION_ID, [
         { commandName: 'help', allowedChannels: [CHANNEL.channelId] },
       ]);
 
-      expect((await runHelp('req-other-channel', 'C0NEVER-LISTED')).kind).toBe(
-        'error',
-      );
+      expect(
+        (
+          await runHelp(
+            'req-other-channel',
+            toNativeChannelId('C0NEVER-LISTED'),
+          )
+        ).kind,
+      ).toBe('error');
 
       await saveRelationSettings(RELATION_ID, [
         { commandName: 'help', allowedChannels: 'all' },
       ]);
 
       expect(
-        (await runHelp('req-other-channel-all', 'C0NEVER-LISTED')).kind,
+        (
+          await runHelp(
+            'req-other-channel-all',
+            toNativeChannelId('C0NEVER-LISTED'),
+          )
+        ).kind,
       ).toBe('help');
     });
   });
@@ -266,6 +306,10 @@ describe('saveRelationSettings', () => {
       [
         'an allowedChannels value that is neither a list nor all/none',
         [{ commandName: 'search', allowedChannels: 'everything' }],
+      ],
+      [
+        "a channel id in a chat adapter's own encoding",
+        [{ commandName: 'search', allowedChannels: ['C0001', 'slack:C1'] }],
       ],
       [
         'a channel id that is not a string',

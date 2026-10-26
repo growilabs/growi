@@ -26,6 +26,8 @@
 import {
   COMMAND_NAMES,
   type CommandName,
+  type NativeChannelId,
+  parseNativeChannelId,
   type RelationSettings,
 } from '@growi/chat';
 
@@ -43,7 +45,6 @@ const logger = loggerFactory(
 
 /** Same bound the protocol's own `parseSettingsPush` applies to one command's list. */
 const ALLOWED_CHANNELS_MAX = 1000;
-const CHANNEL_ID_MAX_LENGTH = 200;
 
 export type SaveRelationSettingsOutcome =
   | {
@@ -96,20 +97,38 @@ const isTransientWriteConflict = (error: unknown): boolean => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value != null && !Array.isArray(value);
 
+type ParsedAllowedChannels =
+  | {
+      readonly ok: true;
+      readonly allowedChannels: RelationSettings['channelPermissions'][number]['allowedChannels'];
+    }
+  | { readonly ok: false; readonly detail: string };
+
 const parseAllowedChannels = (
+  commandName: string,
   value: unknown,
-): RelationSettings['channelPermissions'][number]['allowedChannels'] | null => {
+): ParsedAllowedChannels => {
   if (value === 'all' || value === 'none') {
-    return value;
+    return { ok: true, allowedChannels: value };
   }
   if (!Array.isArray(value) || value.length > ALLOWED_CHANNELS_MAX) {
-    return null;
+    return {
+      ok: false,
+      detail: `invalid allowedChannels for '${commandName}': must be 'all', 'none', or a list of channel ids`,
+    };
   }
-  const isChannelId = (item: unknown): item is string =>
-    typeof item === 'string' &&
-    item.length > 0 &&
-    item.length <= CHANNEL_ID_MAX_LENGTH;
-  return value.every(isChannelId) ? [...value] : null;
+  const ids: NativeChannelId[] = [];
+  for (const item of value) {
+    const id = parseNativeChannelId(item);
+    if (id === undefined) {
+      return {
+        ok: false,
+        detail: `invalid channel id for '${commandName}': ${JSON.stringify(item)} must be the chat service's own channel id (for Slack, like C0123ABCDEF), not one prefixed with a platform name`,
+      };
+    }
+    ids.push(id);
+  }
+  return { ok: true, allowedChannels: ids };
 };
 
 type ParsedChannelPermissions =
@@ -153,16 +172,16 @@ const parseChannelPermissions = (raw: unknown): ParsedChannelPermissions => {
         detail: `duplicate commandName: ${commandName}`,
       };
     }
-    const allowedChannels = parseAllowedChannels(row.allowedChannels);
-    if (allowedChannels == null) {
-      return {
-        ok: false,
-        detail: `invalid allowedChannels for '${commandName}': must be 'all', 'none', or a list of channel ids`,
-      };
+    const allowed = parseAllowedChannels(commandName, row.allowedChannels);
+    if (!allowed.ok) {
+      return allowed;
     }
 
     seen.add(commandName as CommandName);
-    parsed.push({ commandName: commandName as CommandName, allowedChannels });
+    parsed.push({
+      commandName: commandName as CommandName,
+      allowedChannels: allowed.allowedChannels,
+    });
   }
 
   return { ok: true, channelPermissions: parsed };

@@ -3,7 +3,7 @@
 // an OLD name carries the current one -- otherwise Requirement 12.4's
 // overlap warning is decided by a name the chat service abandoned.
 
-import type { ChannelInventory } from '@growi/chat';
+import { type ChannelInventory, toNativeChannelId } from '@growi/chat';
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import {
   afterAll,
@@ -41,7 +41,7 @@ const inventory = (
 
 const channel = (channelId: string, channelName: string) => ({
   platform: 'slack' as const,
-  channelId,
+  channelId: toNativeChannelId(channelId),
   channelName,
   isPrivate: false,
 });

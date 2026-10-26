@@ -8,7 +8,13 @@
 // matching the other. Requirement 11.1's whole point is that both sides of
 // the integration agree on what a channel permission says.
 
-import type { RelationSettings } from '@growi/chat';
+import {
+  type NativeChannelId,
+  parseNativeChannelId,
+  type RelationSettings,
+} from '@growi/chat';
+
+import loggerFactory from '~/utils/logger';
 
 import type {
   ChatChannelPermissionScope,
@@ -16,6 +22,10 @@ import type {
 } from './models/chat-channel-permission';
 
 /** The wire form: what the proxy sends and receives. */
+const logger = loggerFactory(
+  'growi:features:chat-integration:settings:allowed-channels',
+);
+
 export type WireAllowedChannels =
   RelationSettings['channelPermissions'][number]['allowedChannels'];
 
@@ -45,5 +55,18 @@ export const toWireAllowedChannels = (stored: {
   if (stored.channelScope === 'all' || stored.channelScope === 'none') {
     return stored.channelScope;
   }
-  return [...(stored.allowedChannels ?? [])];
+  const ids: NativeChannelId[] = [];
+  for (const storedId of stored.allowedChannels ?? []) {
+    const id = parseNativeChannelId(storedId);
+    if (id === undefined) {
+      // Dropping an entry only narrows where the command is allowed, so a row
+      // saved before the protocol refused adapter-encoded ids fails closed.
+      logger.warn(
+        `Ignoring a stored channel id that is not a chat service's own id: ${storedId}`,
+      );
+      continue;
+    }
+    ids.push(id);
+  }
+  return ids;
 };

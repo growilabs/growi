@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { OP_ENDPOINTS, OP_NAMES } from '@growi/chat';
+import { OP_ENDPOINTS, OP_NAMES, toNativeChannelId } from '@growi/chat';
 import { verify } from '@growi/chat/server';
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import urljoin from 'url-join';
@@ -125,7 +125,7 @@ describe('proxy-client', () => {
 
       const outcome = await notify(relationId, {
         requestId: 'req-1',
-        targets: [{ platform: 'slack', channelId: 'C1' }],
+        targets: [{ platform: 'slack', channelId: toNativeChannelId('C1') }],
         markdown: 'hello',
         containsRestrictedPage: false,
       });
@@ -305,7 +305,9 @@ describe('proxy-client', () => {
         () =>
           notify('relation-verify-notify', {
             requestId: 'req-1',
-            targets: [{ platform: 'slack', channelId: 'C1' }],
+            targets: [
+              { platform: 'slack', channelId: toNativeChannelId('C1') },
+            ],
             markdown: 'hi',
             containsRestrictedPage: false,
           }),
@@ -370,13 +372,13 @@ describe('proxy-client', () => {
       // Missing `status` on the one outcome -- not a valid NotificationResult.
       vi.mocked(axios.post).mockResolvedValueOnce(
         jsonResponse(200, {
-          outcomes: [{ platform: 'slack', channelId: 'C1' }],
+          outcomes: [{ platform: 'slack', channelId: toNativeChannelId('C1') }],
         }),
       );
 
       const outcome = await notify(relationId, {
         requestId: 'req-1',
-        targets: [{ platform: 'slack', channelId: 'C1' }],
+        targets: [{ platform: 'slack', channelId: toNativeChannelId('C1') }],
         markdown: 'hello',
         containsRestrictedPage: false,
       });

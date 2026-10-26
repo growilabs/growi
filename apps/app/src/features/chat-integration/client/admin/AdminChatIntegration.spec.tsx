@@ -341,6 +341,27 @@ describe('AdminChatIntegration', () => {
       expect(mocks.toastSuccess).toHaveBeenCalled();
     });
 
+    it('refuses to submit a channel id in a chat adapter encoding, and says which entry is wrong', async () => {
+      stubApi({ relations: [ACTIVE_RELATION] });
+      const user = userEvent.setup();
+
+      renderScreen();
+
+      await screen.findByTestId('grw-chat-integration-permissions-form');
+      await user.selectOptions(scopeSelectFor('search'), 'listed');
+      await user.type(
+        screen.getByLabelText(/channel ids for search/i),
+        'C0009, slack:C1',
+      );
+      await user.click(
+        screen.getByRole('button', { name: /save channel permissions/i }),
+      );
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('slack:C1');
+      expect(mocks.apiv3Post).not.toHaveBeenCalled();
+      expect(mocks.toastSuccess).not.toHaveBeenCalled();
+    });
+
     it('reports a save whose push failed as saved, and says the proxy will fetch it', async () => {
       stubApi({ relations: [ACTIVE_RELATION] });
       mocks.apiv3Post.mockResolvedValue({

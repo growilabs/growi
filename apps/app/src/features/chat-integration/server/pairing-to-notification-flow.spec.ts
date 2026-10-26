@@ -43,10 +43,12 @@ import type {
   ChannelInventory,
   ChatAccountRef,
   CommandRequest,
+  NativeChannelId,
   NotificationResult,
   PairingResult,
   PairingSubmission,
 } from '@growi/chat';
+import { toNativeChannelId } from '@growi/chat';
 import { pairingChallengePayload } from '@growi/chat/server';
 import { PageGrant } from '@growi/core';
 import type { IUser } from '@growi/core/dist/interfaces';
@@ -119,14 +121,14 @@ const CHALLENGE_PATH = '/peer/pairing/challenge';
 /** The channel the command comes from and the settings are saved for. */
 const COMMAND_CHANNEL = {
   platform: PLATFORM,
-  channelId: 'C-COMMANDS',
+  channelId: toNativeChannelId('C-COMMANDS'),
   channelName: 'commands',
   isPrivate: false,
 } as const;
 
 /** Two notification destinations: one the proxy accepts, one it refuses. */
-const CHANNEL_OK = 'C-DELIVERS';
-const CHANNEL_FAILING = 'C-REFUSES';
+const CHANNEL_OK = toNativeChannelId('C-DELIVERS');
+const CHANNEL_FAILING = toNativeChannelId('C-REFUSES');
 
 const INVENTORY: ChannelInventory = {
   channels: [
@@ -273,7 +275,7 @@ const COMMANDER: ChatAccountRef = {
 
 const helpRequest = (
   relationId: string,
-  channelId: string,
+  channelId: NativeChannelId,
 ): CommandRequest => ({
   relationId,
   op: 'command',

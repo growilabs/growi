@@ -8,6 +8,7 @@
 // property that holds for every wire value is exactly what
 // `settingsPullHandler` promises the proxy ("returns them verbatim").
 
+import { toNativeChannelId } from '@growi/chat';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -20,7 +21,10 @@ describe('allowedChannels storage translation', () => {
   const everyWireValue: ReadonlyArray<[string, WireAllowedChannels]> = [
     ['allowed in every channel', 'all'],
     ['allowed in no channel', 'none'],
-    ['allowed in the listed channels', ['C0001', 'C0002']],
+    [
+      'allowed in the listed channels',
+      [toNativeChannelId('C0001'), toNativeChannelId('C0002')],
+    ],
     // Distinct from 'none' on the wire even though `judge()` denies both:
     // an operator who cleared the list has not said "never allow this".
     ['an empty explicit list', []],
@@ -53,5 +57,23 @@ describe('allowedChannels storage translation', () => {
         allowedChannels: ['C0009'],
       }),
     ).toEqual(['C0009']);
+  });
+
+  it('reads the stored service-native id back as the id an administrator typed', () => {
+    expect(
+      toWireAllowedChannels({
+        channelScope: 'listed',
+        allowedChannels: ['C0CBFQ5558V'],
+      }),
+    ).toEqual([toNativeChannelId('C0CBFQ5558V')]);
+  });
+
+  it('leaves out a stored id in a chat adapter encoding instead of passing it on the protocol', () => {
+    expect(
+      toWireAllowedChannels({
+        channelScope: 'listed',
+        allowedChannels: ['slack:C0LEGACY', 'C0CBFQ5558V'],
+      }),
+    ).toEqual([toNativeChannelId('C0CBFQ5558V')]);
   });
 });

@@ -24,7 +24,12 @@
 //
 // Requirements: 4.3, 4.4, 7.3, 7.6.
 
-import type { ChannelRef, ChatAccountRef, CommandRequest } from '@growi/chat';
+import {
+  type ChannelRef,
+  type ChatAccountRef,
+  type CommandRequest,
+  toNativeChannelId,
+} from '@growi/chat';
 import type { IUserHasId } from '@growi/core';
 import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
@@ -56,7 +61,7 @@ import {
 const RELATION_ID = 'relation-10-3-e2e';
 const CHANNEL: ChannelRef = {
   platform: 'slack',
-  channelId: 'C0LINKAUDIT',
+  channelId: toNativeChannelId('C0LINKAUDIT'),
   channelName: 'link-audit-channel',
   isPrivate: false,
 };

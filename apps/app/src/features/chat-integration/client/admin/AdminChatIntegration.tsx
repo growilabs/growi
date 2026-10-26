@@ -36,6 +36,8 @@ import {
   COMMAND_NAMES,
   type CommandName,
   type ConnectionStatusView,
+  type NativeChannelId,
+  parseNativeChannelId,
   type RelationSettings,
 } from '@growi/chat';
 import useSWR from 'swr';
@@ -241,22 +243,58 @@ const splitChannelIds = (raw: string): string[] =>
     .map((id) => id.trim())
     .filter((id) => id.length > 0);
 
+type ParsedChannelIds =
+  | { readonly ok: true; readonly ids: NativeChannelId[] }
+  | { readonly ok: false; readonly message: string };
+
+const parseChannelIds = (
+  commandName: CommandName,
+  raw: string,
+): ParsedChannelIds => {
+  const ids: NativeChannelId[] = [];
+  for (const entry of splitChannelIds(raw)) {
+    const id = parseNativeChannelId(entry);
+    if (id === undefined) {
+      return {
+        ok: false,
+        message: `"${entry}" for ${commandName} is not a channel id. Enter the chat service's own id (for Slack, like C0123ABCDEF), without a platform prefix such as "slack:".`,
+      };
+    }
+    ids.push(id);
+  }
+  return { ok: true, ids };
+};
+
+type ParsedForm =
+  | {
+      readonly ok: true;
+      readonly channelPermissions: RelationSettings['channelPermissions'];
+    }
+  | { readonly ok: false; readonly message: string };
+
 const toChannelPermissions = (
   form: Record<CommandName, CommandFormState>,
-): RelationSettings['channelPermissions'] =>
-  ALL_COMMAND_NAMES.flatMap((commandName) => {
+): ParsedForm => {
+  const channelPermissions: Array<
+    RelationSettings['channelPermissions'][number]
+  > = [];
+  for (const commandName of ALL_COMMAND_NAMES) {
     const { scope, channelIds } = form[commandName];
     if (scope === 'unset') {
-      return [];
+      continue;
     }
-    return [
-      {
-        commandName,
-        allowedChannels:
-          scope === 'listed' ? splitChannelIds(channelIds) : scope,
-      },
-    ];
-  });
+    if (scope !== 'listed') {
+      channelPermissions.push({ commandName, allowedChannels: scope });
+      continue;
+    }
+    const parsed = parseChannelIds(commandName, channelIds);
+    if (!parsed.ok) {
+      return parsed;
+    }
+    channelPermissions.push({ commandName, allowedChannels: parsed.ids });
+  }
+  return { ok: true, channelPermissions };
+};
 
 const describeSaveOutcome = (outcome: SaveSettingsOutcome): string =>
   outcome.push.ok
@@ -289,6 +327,7 @@ const ChannelPermissionsForm = ({
     toFormState(initialPermissions),
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [inputError, setInputError] = useState<string | null>(null);
 
   const handleScopeChange = useCallback(
     (commandName: CommandName) => (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -315,11 +354,17 @@ const ChannelPermissionsForm = ({
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+      const parsed = toChannelPermissions(form);
+      if (!parsed.ok) {
+        setInputError(parsed.message);
+        return;
+      }
+      setInputError(null);
       setIsSaving(true);
       try {
         const res = await apiv3Post<SaveSettingsOutcome>(
           `/chat-integration/admin/relations/${relationId}/settings`,
-          { channelPermissions: toChannelPermissions(form) },
+          { channelPermissions: parsed.channelPermissions },
         );
         toastSuccess(describeSaveOutcome(res.data));
         onSaved();
@@ -380,6 +425,11 @@ const ChannelPermissionsForm = ({
           </div>
         </div>
       ))}
+      {inputError != null && (
+        <div className="alert alert-danger" role="alert">
+          {inputError}
+        </div>
+      )}
       <button type="submit" className="btn btn-primary" disabled={isSaving}>
         {isSaving ? 'Saving…' : 'Save channel permissions'}
       </button>

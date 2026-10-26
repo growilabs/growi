@@ -31,7 +31,11 @@
 //     overlap (Requirement 12.4), decided by the name the chat service
 //     reports at fetch time rather than the one stored earlier
 
-import type { CapabilityReport, ConnectionStatusView } from '@growi/chat';
+import {
+  type CapabilityReport,
+  type ConnectionStatusView,
+  toNativeChannelId,
+} from '@growi/chat';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
@@ -543,6 +547,7 @@ describe('admin-router', () => {
             platform: 'slack',
             isPrivate: false,
             ...channel,
+            channelId: toNativeChannelId(channel.channelId),
           })),
         },
       });

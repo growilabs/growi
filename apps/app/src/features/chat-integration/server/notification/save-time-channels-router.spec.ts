@@ -6,6 +6,7 @@
 // Uses the REAL `loginRequiredFactory`, same convention as
 // `manage-account-links-router.spec.ts`.
 
+import { toNativeChannelId } from '@growi/chat';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
@@ -118,7 +119,7 @@ describe('save-time-channels-router', () => {
         channels: [
           {
             platform: 'slack',
-            channelId: 'C0001',
+            channelId: toNativeChannelId('C0001'),
             channelName: 'general',
             isPrivate: false,
           },

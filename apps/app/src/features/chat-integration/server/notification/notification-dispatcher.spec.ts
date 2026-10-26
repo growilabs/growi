@@ -7,7 +7,7 @@
 // for -- claiming a row exclusively, remembering which targets already
 // succeeded, backing off, and giving up -- IS the state of those rows.
 
-import type { NotificationResult } from '@growi/chat';
+import { type NotificationResult, toNativeChannelId } from '@growi/chat';
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 
 import {
@@ -54,7 +54,7 @@ const outcomesFor = (
 ): NotificationResult => ({
   outcomes: entries.map(([target, status]) => ({
     platform: target.platform,
-    channelId: target.channelId,
+    channelId: toNativeChannelId(target.channelId),
     status,
   })),
 });
@@ -374,7 +374,7 @@ describe('notificationDispatcher.drain', () => {
           outcomes: [
             {
               platform: TARGET_A.platform,
-              channelId: TARGET_A.channelId,
+              channelId: toNativeChannelId(TARGET_A.channelId),
               status: 'bot-not-in-channel',
               remedy: 'invite the bot to the channel',
             },

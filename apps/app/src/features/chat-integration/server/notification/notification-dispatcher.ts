@@ -31,16 +31,13 @@
 //    (fresh nonce and `created`/`expires`), which is why this module calls
 //    `notify` rather than holding on to anything from the previous attempt.
 
-import type { NotificationResult } from '@growi/chat';
-import { parseNotificationResult } from '@growi/chat';
+import type { NotificationRequest, NotificationResult } from '@growi/chat';
+import { parseNativeChannelId, parseNotificationResult } from '@growi/chat';
 
 import loggerFactory from '~/utils/logger';
 
 import { notify } from '../proxy-client';
-import type {
-  ChatNotificationOutboxDocument,
-  ChatNotificationOutboxTarget,
-} from './models/chat-notification-outbox';
+import type { ChatNotificationOutboxDocument } from './models/chat-notification-outbox';
 import { ChatNotificationOutbox } from './models/chat-notification-outbox';
 
 const logger = loggerFactory(
@@ -260,12 +257,23 @@ const deliverClaimedRow = async (
   const postedKeys = new Set(
     recorded.filter((o) => o.status === 'posted').map(targetKey),
   );
-  const pendingTargets: ChatNotificationOutboxTarget[] = row.targets
-    .filter((target) => !postedKeys.has(targetKey(target)))
-    .map((target) => ({
-      platform: target.platform,
-      channelId: target.channelId,
-    }));
+  const pendingTargets: ReadonlyArray<NotificationRequest['targets'][number]> =
+    row.targets.flatMap((target) => {
+      if (postedKeys.has(targetKey(target))) {
+        return [];
+      }
+      const channelId = parseNativeChannelId(target.channelId);
+      if (channelId === undefined) {
+        // The proxy would refuse the whole request for one such id; a row
+        // queued before ids were checked must not block its valid targets.
+        logger.warn(
+          { relationId: row.relationId, requestId: row.requestId },
+          `Skipping an outbox target whose channel id is not a chat service's own id: ${target.channelId}`,
+        );
+        return [];
+      }
+      return [{ platform: target.platform, channelId }];
+    });
 
   if (pendingTargets.length === 0) {
     await settleAsSent(row, { outcomes: [...recorded] });

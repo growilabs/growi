@@ -75,7 +75,7 @@ export const refreshDestinationChannelNames = async (
     return 0;
   }
 
-  const currentNameById = new Map(
+  const currentNameById = new Map<string, string>(
     channels.map((channel) => [channel.channelId, channel.channelName]),
   );
 

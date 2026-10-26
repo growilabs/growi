@@ -4,7 +4,12 @@
 // before the search runs, and a repeated `(relationId, requestId)` replays
 // the stored response instead of recomputing it.
 
-import type { ChannelRef, ChatAccountRef, CommandRequest } from '@growi/chat';
+import {
+  type ChannelRef,
+  type ChatAccountRef,
+  type CommandRequest,
+  toNativeChannelId,
+} from '@growi/chat';
 import { GroupType, PageGrant } from '@growi/core';
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
@@ -48,7 +53,7 @@ const ACTOR: ChatAccountRef = {
 };
 const CHANNEL: ChannelRef = {
   platform: 'slack',
-  channelId: 'C0GENERAL',
+  channelId: toNativeChannelId('C0GENERAL'),
   channelName: 'general',
   isPrivate: false,
 };

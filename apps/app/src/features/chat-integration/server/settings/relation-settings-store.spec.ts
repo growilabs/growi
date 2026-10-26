@@ -18,7 +18,7 @@
 //     forms ('all' / 'none' / a list) -- `settingsPullHandler` hands this
 //     straight to the proxy
 
-import type { RelationSettings } from '@growi/chat';
+import { type RelationSettings, toNativeChannelId } from '@growi/chat';
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -79,7 +79,7 @@ describe('relation-settings-store', () => {
 
   it('bumps settingsVersion by exactly 1 and stores the rows', async () => {
     const result = await writeRelationSettings(RELATION_ID, [
-      { commandName: 'search', allowedChannels: ['C0001'] },
+      { commandName: 'search', allowedChannels: [toNativeChannelId('C0001')] },
       { commandName: 'create-page', allowedChannels: 'all' },
     ]);
 
@@ -90,7 +90,10 @@ describe('relation-settings-store', () => {
     expect(read?.version).toBe(INITIAL_VERSION + 1);
     expect(read?.settings.channelPermissions).toEqual(
       expect.arrayContaining([
-        { commandName: 'search', allowedChannels: ['C0001'] },
+        {
+          commandName: 'search',
+          allowedChannels: [toNativeChannelId('C0001')],
+        },
         { commandName: 'create-page', allowedChannels: 'all' },
       ]),
     );
@@ -106,17 +109,17 @@ describe('relation-settings-store', () => {
 
   it("replaces the relation's rows wholesale, leaving no row from an earlier save", async () => {
     await writeRelationSettings(RELATION_ID, [
-      { commandName: 'search', allowedChannels: ['C0001'] },
+      { commandName: 'search', allowedChannels: [toNativeChannelId('C0001')] },
       { commandName: 'keep', allowedChannels: 'all' },
     ]);
 
     await writeRelationSettings(RELATION_ID, [
-      { commandName: 'search', allowedChannels: ['C0002'] },
+      { commandName: 'search', allowedChannels: [toNativeChannelId('C0002')] },
     ]);
 
     const read = await readRelationSettings(RELATION_ID);
     expect(read?.settings.channelPermissions).toEqual([
-      { commandName: 'search', allowedChannels: ['C0002'] },
+      { commandName: 'search', allowedChannels: [toNativeChannelId('C0002')] },
     ]);
   });
 
@@ -125,7 +128,7 @@ describe('relation-settings-store', () => {
       relationId: 'some-other-relation',
       commandName: 'search',
       channelScope: 'listed',
-      allowedChannels: ['C9999'],
+      allowedChannels: [toNativeChannelId('C9999')],
     });
 
     await writeRelationSettings(RELATION_ID, [
@@ -141,7 +144,7 @@ describe('relation-settings-store', () => {
 
   it('commits neither the version bump nor the rows when a row write fails', async () => {
     await writeRelationSettings(RELATION_ID, [
-      { commandName: 'search', allowedChannels: ['C0001'] },
+      { commandName: 'search', allowedChannels: [toNativeChannelId('C0001')] },
     ]);
     const versionBeforeFailure = await currentVersion();
 
@@ -149,8 +152,8 @@ describe('relation-settings-store', () => {
     // unique index, so the row write fails mid-transaction. Whatever the
     // cause, the guarantee is the same: no half-written save.
     const duplicated = [
-      { commandName: 'keep', allowedChannels: ['C0002'] },
-      { commandName: 'keep', allowedChannels: ['C0003'] },
+      { commandName: 'keep', allowedChannels: [toNativeChannelId('C0002')] },
+      { commandName: 'keep', allowedChannels: [toNativeChannelId('C0003')] },
     ] as unknown as RelationSettings['channelPermissions'];
 
     await expect(
@@ -160,7 +163,7 @@ describe('relation-settings-store', () => {
     expect(await currentVersion()).toBe(versionBeforeFailure);
     const read = await readRelationSettings(RELATION_ID);
     expect(read?.settings.channelPermissions).toEqual([
-      { commandName: 'search', allowedChannels: ['C0001'] },
+      { commandName: 'search', allowedChannels: [toNativeChannelId('C0001')] },
     ]);
   });
 
