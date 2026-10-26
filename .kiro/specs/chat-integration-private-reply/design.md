@@ -32,6 +32,7 @@
 |---|---|---|
 | `chat-integration`（umbrella）requirements.md | 要件 1（本人に届ける手段の違いと代わりの手段）・要件 3（検索の結果を本人にだけ届ける）の末尾に受け入れ条件を足す | 本 spec の requirements.md「書き戻し先（予定）」の表 |
 | `chat-integration-proxy` design.md | プラットフォーム能力表（`ephemeralMessage` の Discord を `none`、Mattermost を `degraded` に。`directMessage` の行を足す）。検索の「いったん投稿して差し替える」段取り。引数の聞き返しが `ephemeralMessage` に寄りかかる記述。`pending_collection` の列。`PlatformFacade` の操作 | proxy design.md の能力表・検索の段取り・引数の収集・データモデル・`PlatformFacade` の節 |
+| `chat-integration`（umbrella）design.md・research.md | umbrella の能力表の `modal` の行の「その場限りのメッセージで聞き返す」と、research.md の決定 5 の同じ記述を、「本人宛ての返事（本人だけのメッセージ、出せなければ本人への DM）で聞き返す」に直す | umbrella design.md の能力表、research.md の決定 5 |
 | `chat-integration-proxy` の Revalidation Triggers | 変えない。能力表を変えるので、既存の「Chat SDK を更新したとき — 能力表を必ず突き合わせる」が本 spec の行にも効く | — |
 
 `chat-integration-protocol` と `chat-integration-app` の契約は変わらない。能力の報告（`CapabilityReport`）の `capability` はただの文字列なので、`directMessage` を足しても protocol は変わらない。GROWI の管理画面は能力の名前をそのまま表示するので、`directMessage` の行が名前のまま加わる。
@@ -73,7 +74,7 @@
 
 ### Existing Architecture Analysis
 
-- 本人宛ての返事は、`platform.postEphemeral` を直接呼ぶ 5 か所に散っている（`command-flow.ts` の `tell`・`reportExpired`、`admin-flow.ts` の `say`、`argument-collector.ts` の 2 か所）
+- 本人宛ての返事は、`platform.postEphemeral` を直接呼ぶ 6 か所に散っている（`command-flow.ts` の `tell`・`reportExpired`、`admin-flow.ts` の `say`、`argument-collector.ts` の 3 か所: 値の聞き返し・答えの検証の失敗・GROWI の選択）
 - `outbound.ts` の `postEphemeral` は Chat SDK の `fallbackToDM: true` に頼るが、これはアダプタに機能が無いとき（Discord）にしか働かない。Mattermost で権限が無いときのエラーや、Slack で本人がチャンネルにいないときのエラーは、そのまま `PostOutcome` の失敗になり、返事は落ちる
 - 本人だけのメッセージは、チャンネルの直下に出る（`ChannelImpl` をチャンネルの id で作るので、Slack では `thread_ts` が付かない）。Slack の「返事の無いスレッドでは表示されない」制約は効かない
 - `search` は、チャンネルに「検索しています…」を出して、結果で差し替える
@@ -138,7 +139,7 @@ apps/chat-integration-proxy/
 - `src/orchestration/admin-flow.ts` — `say` の本人宛て（`delivery: 'ephemeral'`）を `PrivateReplier` に。`AdminFlowPlatform` から `postEphemeral` を外す
 - `src/capabilities/platform-capabilities.ts` — `ephemeralMessage` の Discord を `none`、Mattermost を `degraded`。`directMessage` の行（4 サービスとも `full`）と、`ephemeralMessage` の代わりの手段の文を足す
 - `src/runtime/dependencies.ts` — `PrivateReplier` を組み立てる（facade、場所の名前の引き当て、`reportOperationalFailure`）
-- `src/architecture.spec.ts` — `postEphemeral`・`postDirect` を呼んでよいのは `command/private-reply.ts` だけ、を確かめる
+- `src/architecture.spec.ts` — `platform/` の外で `postEphemeral`・`postDirect` を呼んでよいのは `command/private-reply.ts` だけ、を確かめる（`platform/` はこれらを定義し、中で呼ぶので除く）
 - `src/testing/command-flow-e2e.integ.ts` — 能力表の値の確認と、検索の結果がチャンネルに出ないことの確認を直す
 - `docs/setup-slack.md`・`docs/manual-e2e-slack.md` — `im:write`。導入済みの workspace は導入し直すこと。実機試験の表（検索の結果は本人だけ、DM に落ちる場合）
 - `docs/setup-mattermost.md` — 本人だけのメッセージにはシステム管理者の権限が要ること、与えなければ DM で届くこと
@@ -371,16 +372,20 @@ export interface PlatformFacade {
   /** Only `user` can see it. Never falls back to a direct message. */
   postEphemeral(target: SdkChannelRef, user: ChatAccountRef, message: OutboundMessage,
     scope?: { readonly installationId: string }): Promise<PostOutcome>;
-  /** Opens (or reuses) the 1:1 conversation with `user` and posts there. */
-  postDirect(user: ChatAccountRef, message: OutboundMessage,
+  /**
+   * Opens (or reuses) the 1:1 conversation with `user` and posts there. `near` is the
+   * channel the request came from: it picks the service and, like `postEphemeral`'s
+   * `target`, the adapter (and through `scope`, the installation) to open the DM with.
+   */
+  postDirect(near: SdkChannelRef, user: ChatAccountRef, message: OutboundMessage,
     scope?: { readonly installationId: string }): Promise<DirectPostOutcome>;
   addReaction(target: SdkMessageRef, reaction: ReactionName): Promise<PostOutcome>;
 }
 ```
 
 - `postEphemeral`: `ChannelImpl.postEphemeral(..., { fallbackToDM: false })`。`null`（アダプタに機能が無い）なら `unsupported`。例外は今どおり `classifyOutboundFailure` で分類する
-- `postDirect`: アダプタの `openDM(user.accountId)` → `postMessage`。返す `channel` は DM のスレッド id から作った `SdkChannelRef`（既存の `channelRefOfThread` と同じ作り方）。Slack は `im:write` が無いと `openDM` が失敗する
-- `addReaction`: アダプタの `addReaction(threadId, messageId, emoji)`。スレッド id は `channelThreadId` で作る
+- `postDirect`: `near` から `postEphemeral` と同じ方法でアダプタを選び（`outboundContext(near.platform, scope)`）、`openDM(user.accountId)` → `postMessage`。installation ごとに接続を持つサービス（Mattermost）でも、本人だけのメッセージと同じ接続で DM を開く。返す `channel` は DM のスレッド id から作った `SdkChannelRef`（既存の `channelRefOfThread` と同じ作り方）。Slack は `im:write` が無いと `openDM` が失敗する
+- `addReaction`: アダプタの `addReaction(threadId, messageId, emoji)`。スレッド id は `channelThreadId` で作る。**同じリアクションが既に付いている**（Slack の `already_reacted` など）ときは成功として返す。1 つの依頼から本人宛ての返事が何通も DM に届く（GROWI ごとの紐付けの案内と結果、複数の聞き返し）ので、2 通目以降で短い文の知らせに落ちないようにする
 - 3 つとも例外を投げない（`attempt` で包む）
 
 #### event-mapping の変更
@@ -415,7 +420,7 @@ export interface PendingCollectionRepository {
 
 #### CommandFlow の変更
 
-- `tell(invocation, message)` → `privateReplier.reply(originOf(invocation), message)`。`originOf` は `requestSummary` を `${commandName} ${argsText}`（空なら `commandName`）で作る
+- `tell(invocation, message)` → `privateReplier.reply(originOf(invocation), message)`。`originOf` は `requestSummary` を `${commandName} ${argsText}` の 1 行目（空なら `commandName`）で作り、80 文字で切って「…」を付ける。`create-page` の引数はページの本文を含みうるので、DM の見出しに本文を丸ごと載せない
 - `runSearch`: 仮の投稿（`platform.post` の「検索しています…」）をやめ、`privateReplier.acknowledge(origin, markdown('「…」を検索しています…'))` を呼ぶ。結果か「結果は得られませんでした」と注記は `privateReplier.reply` で 1 通にまとめて届ける。`fuseResults`・`footerOf` は変えない（要件 3.5）
 - `deliver`（ヘルプの差し替え）の「仮の投稿に失敗したとき」の経路は `privateReplier.reply` にする。ヘルプ自体はチャンネルに出すまま（要件 5.1）
 - `reportExpired(event)` → `privateReplier.reply`（DM の中で届いたイベントなら、DM の中で本人だけのメッセージか DM になる）。イベントは invocation を持たないので、`requestSummary` は「入力の続き」、`sourceMessageId` は mention の `messageId` にする
@@ -465,7 +470,7 @@ export interface PendingCollectionRepository {
 - 返事の内容が `post`（全員に見える投稿）に一度も渡らない（1.1、3.4）
 - 本人だけのメッセージが成功すれば DM を送らない（1.2）。未対応・失敗なら DM を送る（1.3、1.4）
 - DM の本文が「見出し + 元の返事そのまま」で、見出しに場所の名前と依頼が入る。場所の名前が引けないときは「元のチャンネル」（1.8、2.2）
-- DM が届いたら `email` のリアクション、付けられなければ内容を含まない短い文（1.5）
+- DM が届いたら `email` のリアクション、付けられなければ内容を含まない短い文（1.5）。同じ依頼から 2 通目が DM に届いても、短い文は出ない（リアクションは既に付いている）
 - 両方失敗したら、内容を含まない知らせと運用者への報告。報告に返事の内容が入らない（1.6、1.7）
 - `acknowledge` はリアクションを付け、付けられなければ `fallback` を `reply` で届ける（3.3）
 
@@ -476,13 +481,16 @@ export interface PendingCollectionRepository {
 - `command-flow.spec.ts`: `search` が `platform.post` を一度も呼ばず、結果と注記を `PrivateReplier.reply` の 1 通で届ける。並べ方と注記の文は変わらない（3.1、3.2、3.5）。ヘルプは今どおり `platform.post`（5.1）
 - `admin-flow.spec.ts`: `delivery: 'ephemeral'` は `PrivateReplier`、`'channel'` は `platform.post`（2.1、5.1）
 - `platform-capabilities.spec.ts`: 新しい行と値（4.1）
-- `architecture.spec.ts`: `postEphemeral(`・`postDirect(` を呼ぶのは `command/private-reply.ts` だけ（1.1）
+- `architecture.spec.ts`: `platform/` の外で `postEphemeral(`・`postDirect(` を呼ぶのは `command/private-reply.ts` だけ（1.1）
 
 ### Integration Tests
 
 - `pending-collection-repository` の結合テスト（既存の `storage-round-trip.integ.ts` に足す）: `routeAnswersVia` が古い行の経路を外す。`findInFlight` が元のチャンネルと `answer_channel_id` の両方で見つけ、元のチャンネルを優先する。`sourceMessageId` の無い行を読める（2.3）
 - `testing/private-reply-adapters.integ.ts`（本物のアダプタ、送信先の HTTP はスタブ）:
   - Discord で `postEphemeral` が `unsupported` になり、Chat SDK の自動の DM を通らない（見出しが必ず付く）
+  - **4 サービスそれぞれで、`postDirect` が返す DM のチャンネル id と、利用者がその DM に書いたときのイベントの `channel.channelId` が一致する**（要件 2.3 はこの一致に頼る。Discord は guild の部分が `@me`、Teams は会話の id に付く部分があるので、実物で確かめる。`parseSdkChannelId` が DM の id を受け付けることも確かめる）
+  - 同じリアクションを 2 回付けても `addReaction` が成功を返す（Slack の `already_reacted`）
+  - Teams で bot がリアクションを付けられるか。付けられなければ短い文の知らせに落ちる
   - Mattermost の `/posts/ephemeral` が 403 を返したら DM（`/channels/direct`）に送る
   - 各サービスの DM のイベントで `inDirectMessage` が `true` になり、本文の先頭に呼びかけがどう表れるか（決定 6 の確認）
 - `testing/command-flow-e2e.integ.ts`: 検索の結果がチャンネルへの投稿に含まれない。能力表の値の確認を新しい値に合わせる

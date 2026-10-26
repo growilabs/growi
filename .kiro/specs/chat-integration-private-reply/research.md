@@ -16,10 +16,10 @@
 - **Context**: 要件 1・2 が「どこを通る返事を直すか」を決めるため。
 - **Sources Consulted**: `src/orchestration/command-flow.ts`（`tell`・`deliver`・`runSearch`・`reportExpired`）、`src/orchestration/admin-flow.ts`（`say`）、`src/command/argument-collector.ts`（`ask`・選択肢の聞き返し）、`src/platform/outbound.ts`（`postEphemeral`）
 - **Findings**:
-  - 本人宛ての返事は、`platform.postEphemeral` を直接呼ぶ 5 か所に散っている（`tell`、`reportExpired`、`admin-flow` の `say`、`argument-collector` の 2 か所）
+  - 本人宛ての返事は、`platform.postEphemeral` を直接呼ぶ 6 か所に散っている（`tell`、`reportExpired`、`admin-flow` の `say`、`argument-collector` の 3 か所）
   - `argument-collector` は、聞き返す前に `supports('ephemeralMessage', platform)` を見て、使えなければ「聞き返す手段が無い」と断る
   - `search` は「いったん投稿して差し替える」で、仮の投稿と結果をチャンネルに出す
-- **Implications**: 届け方の判断を 1 か所に集め、5 か所すべてをそこへ寄せる。`supports('ephemeralMessage')` による断りは、DM という代わりがあるので不要になる
+- **Implications**: 届け方の判断を 1 か所に集め、6 か所すべてをそこへ寄せる。`supports('ephemeralMessage')` による断りは、DM という代わりがあるので不要になる
 
 ### サービスごとの本人だけのメッセージと DM
 
@@ -64,7 +64,7 @@
 
 ### 決定 1: 届け方の判断を `command/private-reply.ts` の 1 か所に集め、呼ぶ側の型から `postEphemeral` を外す
 
-- **Context**: 要件 1.1 は「チャンネルの全員に見える形にしない」という保証である。判断が 5 か所に散ったままだと、1 か所の書き忘れで崩れる。
+- **Context**: 要件 1.1 は「チャンネルの全員に見える形にしない」という保証である。判断が 6 か所に散ったままだと、1 か所の書き忘れで崩れる。
 - **Alternatives Considered**: 上の表の A・C。各呼び出し元で個別に DM へ切り替える案（散らばりが残る）。
 - **Selected Approach**: B。`CommandFlowPlatform`・`AdminFlowPlatform`・`ArgumentCollectorPlatform` から `postEphemeral` を外し、代わりに `PrivateReplier` を受け取らせる。書き忘れはコンパイルで止まる。加えて `architecture.spec.ts` で「`postEphemeral`・`postDirect` を呼ぶのは `command/private-reply.ts` だけ」を確かめる。
 - **Rationale**: 守りを型と試験に任せ、レビューの注意力に頼らない。
