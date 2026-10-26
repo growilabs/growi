@@ -126,8 +126,8 @@
   - 完了の状態: 上の確認と lint・テストが通る。5.2 の画面での目視確認に、一覧と非表示の確認項目を加える
   - _Requirements: 7.1, 7.3, 8.1_
 
-- [ ] 7. 一覧を無限スクロールにする
-- [ ] 7.1 一覧のページ送りをやめ、枠の中のスクロールで続きを読み込むようにする
+- [x] 7. 一覧を無限スクロールにする
+- [x] 7.1 一覧のページ送りをやめ、枠の中のスクロールで続きを読み込むようにする
   - 一覧の取得 hook を、既存の無限スクロールの書き方（`useSWRInfinite`）に変える。1 回に読む件数は 20 件のままとし、総数に達したらそれ以上読まない
   - 一覧のコンポーネントからページ送りを外し、高さを決めた枠の中に表を置いて、既存の `InfiniteScroll` で包む。枠の末尾までスクロールしたら次の 20 件を読み足す。0 人・取得失敗の表示は変えない
   - サーバーの API（page と limit、limit の上限 100）には手を入れない
@@ -140,3 +140,4 @@
 - RTL のコンポーネント spec が `Cannot find module 'react'`（`@testing-library/react` から）で落ちるのは、hoist 領域（`node_modules/.pnpm/node_modules`）に react がないため。この作業と無関係な既存 spec でも同じ症状が出る。根本対処は `rm -rf node_modules && pnpm install`。それまでは `NODE_PATH=/workspace/growi/apps/app/node_modules pnpm vitest run ...` で回避する（4.2 で発生）
 - nodemon の再起動で、app-commands スキルの手順どおりに `kill <pid>` すると、"app crashed - waiting for file changes" で止まることがある。`touch apps/app/src/server/app.ts` で再起動できる（5.2 で発生）
 - 全テストの実行で落ちる 4 ファイルは、この作業の不具合ではない。どれも変更した `~/interfaces/activity` を import しているが、変更は定数を 1 つ足しただけである。growi-vault の integ 2 件は vault-manager の dist が未ビルドのため、contribution-graph の 2 件は負荷による MongoMemoryServer の起動タイムアウトで、単体で再実行すると通る（5.2 で確認）
+- `useSWRInfinite` と `InfiniteScroll` で一覧を作るときは、終端の判定を 1 つの純粋関数にまとめ、`getKey` とコンポーネントの `isReachingEnd` の両方で、最後に読んだページの値を渡して使う。2 か所で別々に判定すると、読み進めている間に総数が減ったときに食い違い、`setSize` が繰り返し呼ばれてタブが固まる（7.1 のレビューで再現）

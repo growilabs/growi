@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 
 import type { ReactNode } from 'react';
-import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 // biome-ignore lint/style/noRestrictedImports: import only types
 import type { AxiosResponse } from 'axios';
 import { SWRConfig } from 'swr';
@@ -50,6 +49,51 @@ const responseOf = (
 });
 
 const mockResponse = (data: unknown) => mock<AxiosResponse>({ data });
+
+// happy-dom never reports intersections, so the list's InfiniteScroll gets an
+// observer double whose callback the test fires to simulate scrolling to the
+// end of the scroll box.
+const observerCallbacks: IntersectionObserverCallback[] = [];
+
+class IntersectionObserverDouble implements IntersectionObserver {
+  readonly root = null;
+  readonly rootMargin = '';
+  readonly thresholds: readonly number[] = [];
+
+  constructor(callback: IntersectionObserverCallback) {
+    observerCallbacks.push(callback);
+  }
+
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+}
+
+const scrollToEnd = () =>
+  act(() => {
+    const entry = mock<IntersectionObserverEntry>({ isIntersecting: true });
+    // Snapshot first: constructing the observer argument registers a callback.
+    const callbacks = [...observerCallbacks];
+    const observer = new IntersectionObserverDouble(() => {});
+    for (const callback of callbacks) {
+      callback([entry], observer);
+    }
+  });
+
+beforeEach(() => {
+  // A test that stops before consuming every mockResolvedValueOnce would
+  // otherwise leak the leftover pages into the next test.
+  vi.mocked(apiv3Get).mockReset();
+  observerCallbacks.length = 0;
+  vi.stubGlobal('IntersectionObserver', IntersectionObserverDouble);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
@@ -100,11 +144,12 @@ describe('UnmigratedUserList', () => {
     });
   });
 
-  describe('pagination', () => {
-    it('requests the next page and shows its rows when page 2 is clicked', async () => {
-      const page1 = Array.from({ length: 20 }, (_, i) =>
-        userOf({ username: `first-${i}` }),
-      );
+  describe('infinite scroll', () => {
+    const page1 = Array.from({ length: 20 }, (_, i) =>
+      userOf({ username: `first-${i}` }),
+    );
+
+    const mockTwoPages = () => {
       vi.mocked(apiv3Get)
         .mockResolvedValueOnce(
           mockResponse(responseOf(page1, { totalCount: 21, page: 1 })),
@@ -117,26 +162,91 @@ describe('UnmigratedUserList', () => {
             }),
           ),
         );
-      renderList();
-      await screen.findByRole('row', { name: /first-0/ });
+    };
 
-      await userEvent.click(screen.getByText('2'));
+    it('shows the first 20 rows and requests only the first page', async () => {
+      mockTwoPages();
+      renderList();
+
+      expect(await screen.findByRole('row', { name: /first-19/ })).toBeTruthy();
+      // 20 body rows plus the header row
+      expect(screen.getAllByRole('row')).toHaveLength(21);
+      expect(apiv3Get).toHaveBeenCalledTimes(1);
+      expect(apiv3Get).toHaveBeenCalledWith(ENDPOINT, { page: 1, limit: 20 });
+    });
+
+    it('requests the next page and appends its rows when the end of the list is reached', async () => {
+      mockTwoPages();
+      renderList();
+      await screen.findByRole('row', { name: /first-19/ });
+
+      await scrollToEnd();
 
       expect(await screen.findByRole('row', { name: /second-0/ })).toBeTruthy();
-      expect(apiv3Get).toHaveBeenCalledWith(
+      expect(screen.getByRole('row', { name: /first-0/ })).toBeTruthy();
+      expect(apiv3Get).toHaveBeenCalledWith(ENDPOINT, { page: 2, limit: 20 });
+    });
+
+    it('does not request another page once every user is listed', async () => {
+      mockTwoPages();
+      renderList();
+      await screen.findByRole('row', { name: /first-19/ });
+      await scrollToEnd();
+      await screen.findByRole('row', { name: /second-0/ });
+
+      await scrollToEnd();
+
+      await waitFor(() => expect(apiv3Get).toHaveBeenCalledTimes(2));
+      expect(apiv3Get).not.toHaveBeenCalledWith(
         ENDPOINT,
-        expect.objectContaining({ page: 2 }),
+        expect.objectContaining({ page: 3 }),
       );
     });
 
-    it('shows no pagination when everything fits on one page', async () => {
+    it('stops loading when a later page reports a smaller total than the first', {
+      timeout: 3000,
+    }, async () => {
+      // A user migrates mid-scroll: page 1 still says 21, page 2 says 20.
+      vi.mocked(apiv3Get)
+        .mockResolvedValueOnce(
+          mockResponse(responseOf(page1, { totalCount: 21, page: 1 })),
+        )
+        .mockResolvedValueOnce(
+          mockResponse(responseOf([], { totalCount: 20, page: 2 })),
+        );
+      renderList();
+      await screen.findByRole('row', { name: /first-19/ });
+
+      await scrollToEnd();
+      await waitFor(() => expect(apiv3Get).toHaveBeenCalledTimes(2));
+      await scrollToEnd();
+
+      expect(apiv3Get).toHaveBeenCalledTimes(2);
+      expect(screen.getAllByRole('row')).toHaveLength(21);
+    });
+
+    it('does not request a second page when the first page holds exactly every user', async () => {
+      vi.mocked(apiv3Get).mockResolvedValue(
+        mockResponse(responseOf(page1, { totalCount: 20, page: 1 })),
+      );
+      renderList();
+      await screen.findByRole('row', { name: /first-19/ });
+
+      await scrollToEnd();
+
+      expect(apiv3Get).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not request a second page when everything fits on the first', async () => {
       vi.mocked(apiv3Get).mockResolvedValue(
         mockResponse(responseOf([userOf({ username: 'dave' })])),
       );
       renderList();
       await screen.findByRole('row', { name: /dave/ });
 
-      expect(screen.queryByRole('navigation')).toBeNull();
+      await scrollToEnd();
+
+      expect(apiv3Get).toHaveBeenCalledTimes(1);
     });
   });
 

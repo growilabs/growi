@@ -140,10 +140,10 @@ apps/app/src/
 │       └── legacy-password-cleanup.integ.ts  # 2 つの handler の supertest
 ├── stores/admin/
 │   ├── password-hash-status.ts              # useSWRxPasswordHashStatus
-│   └── password-hash-unmigrated-users.ts    # useSWRxPasswordHashUnmigratedUsers
+│   └── password-hash-unmigrated-users.ts    # useSWRInfinitePasswordHashUnmigratedUsers
 └── client/components/Admin/Security/
     ├── LegacyPasswordCleanupSetting.tsx      # セクション（件数表、削除ボタン、確認モーダル、一覧の配置、非表示の判定）
-    ├── UnmigratedUserList.tsx                # 催促が必要なユーザーの一覧（ページ送り付き）
+    ├── UnmigratedUserList.tsx                # 催促が必要なユーザーの一覧（枠の中のスクロールで読み足し）
     ├── UnmigratedUserList.spec.tsx
     ├── LegacyPasswordCleanupSetting.spec.tsx
     └── LegacyPasswordCleanupSetting.i18n.spec.ts  # 5 ロケールのキーが揃っているかの検査
@@ -240,7 +240,7 @@ sequenceDiagram
 | LegacyPasswordCleanupSetting | client UI | 件数表、削除ボタン、確認、一覧の配置、非表示の判定 | 1.x, 2.4, 2.5, 2.7, 3.x, 6.1, 8.x | Hook (P0), ConfirmModal (P1) | — |
 | password-hash-unmigrated-users | server/service | 催促が必要なユーザーの一覧 | 7.1–7.5 | format filters (P0), externalaccounts (P0) | Service |
 | getPasswordHashUnmigratedUsersHandlers | server/routes | 一覧の取得 API | 4.1, 4.2, 4.4, 7.6, 7.8 | Unmigrated service (P0), adminRequired (P0) | API |
-| useSWRxPasswordHashUnmigratedUsers | stores/admin | 一覧の取得 | 7.6, 7.8 | apiv3Get (P0) | State |
+| useSWRInfinitePasswordHashUnmigratedUsers | stores/admin | 一覧の取得 | 7.6, 7.8 | apiv3Get (P0) | State |
 | UnmigratedUserList | client UI | 一覧の表と、スクロールでの読み足し | 7.4, 7.6–7.8, 6.1 | Hook (P0), InfiniteScroll (P1) | — |
 
 ### interfaces
@@ -405,12 +405,13 @@ export function listUnmigratedUsersToNudge(
 | GET | `/_api/v3/security-setting/password-hash-unmigrated-users?page=1&limit=20` | `accessTokenParser([SCOPE.READ.ADMIN.SECURITY])`, `loginRequiredStrictly`, `adminRequired`, `query('page').optional().isInt({ min: 1 })`, `query('limit').optional().isInt({ min: 1, max: 100 })`, `apiV3FormValidator` | `PasswordHashUnmigratedUsersResponse` | 管理者以外は 302、不正な page/limit は 400、取得失敗は 500 `password-hash-unmigrated-users-fetch-failed` |
 - `page` の既定値は 1、`limit` の既定値は 20。コレクションは handler の中でリクエストごとに `mongoose.connection.collection('users')` と `('externalaccounts')` から取る（route-guard）。500 は明示して渡す。GET なので activity は記録しない。
 
-#### useSWRxPasswordHashUnmigratedUsers（`stores/admin/password-hash-unmigrated-users.ts`）
+#### useSWRInfinitePasswordHashUnmigratedUsers（`stores/admin/password-hash-unmigrated-users.ts`）
 ```typescript
 export const useSWRInfinitePasswordHashUnmigratedUsers: () => SWRInfiniteResponse<PasswordHashUnmigratedUsersResponse, Error>;
 ```
 - `stores/in-app-notification.ts` の `useSWRInfinite` に倣う。`pageIndex` から `page = pageIndex + 1` を作り、キーは `['/security-setting/password-hash-unmigrated-users', page]`。前のページまでで `totalCount` に達していたら `null` を返して、それ以上読まない。1 回に読む件数は 20 件。
 - レスポンスに `users` がない場合はエラーとして扱う。削除しても未移行ユーザーは変わらないので、削除後の再取得はしない。
+- 最後のページかどうかの判定（`page * limit >= totalCount`）は、hook の中の 1 つの純粋関数にまとめ、`getKey` とコンポーネントの `isReachingEnd` の両方でそれを使う。判定には最後に読んだページの値を使う。読み進めている間にユーザーが移行して総数が減ると、1 ページ目の総数は古くなる。それを使うと、`getKey` は止まっているのにコンポーネントは続きがあると判断し、`InfiniteScroll` が読み足しを繰り返し続けてしまう（7.1 のレビューで再現した）。
 - サーバーの `limit` の上限（100）はそのまま残す。画面からは使わない値で、API を直接呼ばれたときに 1 回で返す量を抑えるための歯止めである。
 
 #### UnmigratedUserList（`client/components/Admin/Security/UnmigratedUserList.tsx`）
