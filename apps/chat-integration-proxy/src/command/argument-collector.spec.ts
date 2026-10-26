@@ -311,7 +311,6 @@ describe('ArgumentCollector.start', () => {
 
     expect(outcome).toEqual({
       status: 'unavailable',
-      reason: expect.stringMatching(/\S/),
     });
     expect(repository.rows.size).toBe(0);
   });
@@ -607,7 +606,6 @@ describe('ArgumentCollector.start', () => {
     expect(notice).toBeDefined();
     expect(outcome).toEqual({
       status: 'unavailable',
-      reason: expect.stringMatching(/\S/),
     });
     expect(repository.rows.size).toBe(0);
   });
@@ -1067,7 +1065,6 @@ describe('ArgumentCollector.startGrowiChoice / resuming a GROWI choice', () => {
 
     expect(outcome).toEqual({
       status: 'unavailable',
-      reason: expect.stringMatching(/\S/),
     });
     expect(repository.rows.size).toBe(0);
   });

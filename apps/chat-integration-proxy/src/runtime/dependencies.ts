@@ -358,6 +358,7 @@ export const createProxyDependencies = async (
     fanOutCollector: createFanOutCollector({ growiClient }),
     resolveInstallationId,
     adminFlow,
+    privateReplier,
   });
 
   // The knot is tied here, before anything is served or connected.

@@ -15,8 +15,9 @@
 //    `accountLinkNotice` is reached both by a write GROWI refused
 //    (`CommandResponse` の `account-link-required`, Requirement 7.6) and by a
 //    user typing `link` (`AccountLinkStartResponse` の `link-issued`).
-//    design.md: 「どちらも投稿の経路は 1 本にする」. Both are ephemeral: the
-//    link is one-time and short-lived, so it must not sit in a channel.
+//    design.md: 「どちらも投稿の経路は 1 本にする」. Both go to the requester
+//    alone: the link is one-time and short-lived, so it must not sit in a
+//    channel.
 //  - **`keep` never reaches GROWI when the range holds nothing** (Requirement
 //    5.5). `fetchHistory` answering with no messages ends the command here.
 //  - **Nothing branches on a command name literal.** Which fields to collect,
@@ -47,6 +48,9 @@ import {
   type GrowiChoiceOption,
   LINK_COMMAND_WORD,
   LINK_TRAIT,
+  type PrivateReplier,
+  type PrivateReplyOrigin,
+  privateReplyOriginOf,
   SEARCH_DEFAULT_LIMIT,
 } from '../command/index.js';
 import {
@@ -74,14 +78,15 @@ import type { CommandFlow, LinkPostedEvent } from './event-sink.js';
 import { parseTimeRange, TIME_RANGE_USAGE } from './time-range.js';
 
 /**
- * The five facade operations a user command uses. Narrowed with `Pick` for
- * the same reason `ArgumentCollectorPlatform` is: a reader can see from the
- * type alone that running a command opens no connection and lists no
- * channels.
+ * The facade operations a user command uses. Narrowed with `Pick` for the
+ * same reason `ArgumentCollectorPlatform` is: a reader can see from the type
+ * alone that running a command opens no connection and lists no channels,
+ * and that a reply meant for one person can only go out through
+ * `privateReplier`.
  */
 export type CommandFlowPlatform = Pick<
   PlatformFacade,
-  'post' | 'postEphemeral' | 'replace' | 'attachPreview' | 'fetchHistory'
+  'post' | 'replace' | 'attachPreview' | 'fetchHistory'
 >;
 
 export interface CommandFlowDeps {
@@ -116,6 +121,7 @@ export interface CommandFlowDeps {
    * `RelationKeyService`, `GrowiClient`) do not become this flow's.
    */
   readonly adminFlow: AdminFlow;
+  readonly privateReplier: PrivateReplier;
   /** Requirement 10.4 keys duplicate-execution detection on this. */
   readonly newRequestId?: () => string;
   readonly searchLimit?: number;
@@ -365,6 +371,12 @@ const toKeepMessages = (messages: ReadonlyArray<HistoryMessage>) =>
     markdown: message.text,
   }));
 
+/** Who a fan-out command is sent to, and who was left out of it. */
+interface FanOutTargets {
+  readonly targets: ReadonlyArray<Relation>;
+  readonly excluded: ReadonlyArray<ExcludedGrowi>;
+}
+
 // ---------------------------------------------------------------------------
 // The flow
 // ---------------------------------------------------------------------------
@@ -378,28 +390,26 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     fanOutCollector,
     resolveInstallationId,
     adminFlow,
+    privateReplier,
     newRequestId = () => crypto.randomUUID(),
     searchLimit = SEARCH_DEFAULT_LIMIT,
   } = deps;
 
   const tell = async (
-    invocation: Pick<Invocation, 'channel' | 'actor'>,
+    origin: PrivateReplyOrigin,
     message: OutboundMessage,
   ): Promise<void> => {
-    await platform.postEphemeral(invocation.channel, invocation.actor, message);
+    await privateReplier.reply(origin, message);
   };
 
   const announceAccountLinks = async (
-    invocation: Invocation,
+    origin: PrivateReplyOrigin,
     declined: ReadonlyArray<DeclinedEntry>,
   ): Promise<void> => {
     await Promise.all(
       declined.map(({ answer }) =>
         answer.kind === 'account-link-required'
-          ? tell(
-              invocation,
-              accountLinkNotice(answer.growiLabel, answer.linkUrl),
-            )
+          ? tell(origin, accountLinkNotice(answer.growiLabel, answer.linkUrl))
           : undefined,
       ),
     );
@@ -428,7 +438,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     const installationId = await resolveInstallationId(invocation.channel);
     if (installationId == null) {
       await tell(
-        invocation,
+        privateReplyOriginOf(invocation, null),
         markdown(
           'このチャットの workspace がまだ登録されていません。運用者に設定を依頼してください。',
         ),
@@ -494,17 +504,18 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
    * before the first post, and the chat services allow ~3 seconds, so the
    * placeholder goes out first and the answer replaces it.
    *
-   * When the placeholder could not be posted at all, the answer is shown to
+   * When the placeholder could not be posted at all, the answer is sent to
    * the person who asked instead, as the one route left when the bot cannot
    * write in the channel.
    */
   const deliver = async (
     invocation: Invocation,
+    origin: PrivateReplyOrigin,
     placeholder: Awaited<ReturnType<CommandFlowPlatform['post']>>,
     message: OutboundMessage,
   ): Promise<void> => {
     if (!placeholder.ok) {
-      await tell(invocation, message);
+      await tell(origin, message);
       return;
     }
     await platform.replace(
@@ -523,6 +534,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
    */
   const buildSingleRequest = async (
     invocation: Invocation,
+    origin: PrivateReplyOrigin,
     relation: Relation,
     values: Readonly<Record<string, string>>,
   ): Promise<CommandRequest | null> => {
@@ -538,7 +550,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
 
     const range = parseTimeRange(values.range ?? '');
     if (range == null) {
-      await tell(invocation, markdown(TIME_RANGE_USAGE));
+      await tell(origin, markdown(TIME_RANGE_USAGE));
       return null;
     }
 
@@ -546,13 +558,13 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     if (!history.ok) {
       // Requirement 5.4 / 5.6: the reason AND what to do about it, both of
       // which `HistoryOutcome` already carries.
-      await tell(invocation, markdown(history.remedy));
+      await tell(origin, markdown(history.remedy));
       return null;
     }
     if (history.messages.length === 0) {
       // Requirement 5.5: no page, and GROWI is not called at all.
       await tell(
-        invocation,
+        origin,
         markdown(
           '指定された範囲に発言が 1 件もありませんでした。ページは作成していません。',
         ),
@@ -570,6 +582,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
 
   const showResponse = async (
     invocation: Invocation,
+    origin: PrivateReplyOrigin,
     relation: Relation,
     response: CommandResponse,
   ): Promise<void> => {
@@ -587,13 +600,13 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
       case 'account-link-required':
         // Requirement 7.6, through the same one function `link` uses.
         await tell(
-          invocation,
+          origin,
           accountLinkNotice(response.growiLabel, response.linkUrl),
         );
         return;
       case 'error':
         await tell(
-          invocation,
+          origin,
           markdown(
             `GROWI「${relation.growiLabel}」で実行できませんでした: ${response.message}`,
           ),
@@ -604,7 +617,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
         // `link-preview` through `previewLinks`; arriving here means GROWI
         // answered a different question than the one asked.
         await tell(
-          invocation,
+          origin,
           markdown(
             `GROWI「${relation.growiLabel}」から想定外の応答が返りました。`,
           ),
@@ -614,25 +627,32 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
 
   const runSingle = async (
     invocation: Invocation,
+    origin: PrivateReplyOrigin,
     relation: Relation,
     values: Readonly<Record<string, string>>,
   ): Promise<void> => {
-    const request = await buildSingleRequest(invocation, relation, values);
+    const request = await buildSingleRequest(
+      invocation,
+      origin,
+      relation,
+      values,
+    );
     if (request == null) return;
 
     const sent = await growiClient.sendCommand(relation.growiUri, request);
     if (!sent.ok) {
       await tell(
-        invocation,
+        origin,
         markdown(`GROWI「${relation.growiLabel}」に届きませんでした。`),
       );
       return;
     }
-    await showResponse(invocation, relation, sent.response);
+    await showResponse(invocation, origin, relation, sent.response);
   };
 
   const runAccountLink = async (
     invocation: Invocation,
+    origin: PrivateReplyOrigin,
     relation: Relation,
   ): Promise<void> => {
     const started = await growiClient.startAccountLink(relation.growiUri, {
@@ -642,7 +662,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     });
     if (!started.ok) {
       await tell(
-        invocation,
+        origin,
         markdown(`GROWI「${relation.growiLabel}」に届きませんでした。`),
       );
       return;
@@ -651,13 +671,13 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     const response = started.response;
     if (response.status === 'link-issued') {
       await tell(
-        invocation,
+        origin,
         accountLinkNotice(relation.growiLabel, response.linkUrl),
       );
       return;
     }
     await tell(
-      invocation,
+      origin,
       markdown(
         response.status === 'already-linked'
           ? `GROWI「${relation.growiLabel}」には既に ${response.growiUserName} として紐付いています。`
@@ -671,8 +691,8 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
 
   const runSearch = async (
     invocation: Invocation,
-    targets: ReadonlyArray<Relation>,
-    excluded: ReadonlyArray<ExcludedGrowi>,
+    origin: PrivateReplyOrigin,
+    { targets, excluded }: FanOutTargets,
     keyword: string,
   ): Promise<void> => {
     const placeholder = await platform.post(
@@ -702,7 +722,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
       },
     });
     const { answered, declined } = splitAnswers(outcome.responded);
-    await announceAccountLinks(invocation, declined);
+    await announceAccountLinks(origin, declined);
 
     const fused = fuseResults(
       answered.map((entry) => ({
@@ -720,6 +740,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     const footer = footerOf(outcome, declined);
     await deliver(
       invocation,
+      origin,
       placeholder,
       fused.length === 0
         ? // Requirement 3.5: say that nothing came back, and who was silent.
@@ -743,9 +764,9 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
 
   const runHelp = async (
     invocation: Invocation,
+    origin: PrivateReplyOrigin,
     installationId: string,
-    targets: ReadonlyArray<Relation>,
-    excluded: ReadonlyArray<ExcludedGrowi>,
+    { targets, excluded }: FanOutTargets,
   ): Promise<void> => {
     const placeholder = await platform.post(
       invocation.channel,
@@ -771,7 +792,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
       },
     });
     const { answered, declined } = splitAnswers(outcome.responded);
-    await announceAccountLinks(invocation, declined);
+    await announceAccountLinks(origin, declined);
 
     // Requirement 14.4: a command this channel may not run is left out. The
     // judgement is asked of `GrowiSelector`, once per command name the GROWIs
@@ -807,6 +828,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     const footer = footerOf(outcome, declined);
     await deliver(
       invocation,
+      origin,
       placeholder,
       rows.length === 0
         ? markdown(
@@ -838,21 +860,27 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
       work;
     const [first] = targets;
     if (first == null) return;
+    const origin = privateReplyOriginOf(invocation, installationId);
 
     if (trait.sends === 'account-link-start') {
-      await runAccountLink(invocation, first);
+      await runAccountLink(invocation, origin, first);
       return;
     }
     if (trait.targeting === 'exactly-one') {
-      await runSingle(invocation, first, values);
+      await runSingle(invocation, origin, first, values);
       return;
     }
     if (invocation.commandName === COMMAND_NAMES.search) {
-      await runSearch(invocation, targets, excluded, values.keyword ?? '');
+      await runSearch(
+        invocation,
+        origin,
+        { targets, excluded },
+        values.keyword ?? '',
+      );
       return;
     }
     if (invocation.commandName === COMMAND_NAMES.help) {
-      await runHelp(invocation, installationId, targets, excluded);
+      await runHelp(invocation, origin, installationId, { targets, excluded });
     }
   };
 
@@ -875,19 +903,20 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     const { outcome, installationId } = selected;
     if (outcome.kind === 'silent') return;
     if (outcome.kind === 'explain') {
-      await tell(invocation, explanation(invocation.commandName, outcome));
+      await tell(
+        privateReplyOriginOf(invocation, installationId),
+        explanation(invocation.commandName, outcome),
+      );
       return;
     }
     if (outcome.kind === 'choose') {
-      // Requirement 8.2.
-      const asked = await collector.startGrowiChoice(
+      // Requirement 8.2. An `unavailable` answer needs nothing more from
+      // here: the replier has already told the user and the operator.
+      await collector.startGrowiChoice(
         invocation,
         values,
         asChoiceOptions(outcome.options),
       );
-      if (asked.status === 'unavailable') {
-        await tell(invocation, markdown(asked.reason));
-      }
       return;
     }
     await runOn({
@@ -925,7 +954,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
         // The platform's own UI already told the user they were addressing
         // this bot, so an unrecognised word owes them an answer.
         await tell(
-          invocation,
+          privateReplyOriginOf(invocation, null),
           markdown(
             `\`${word}\` というコマンドはありません。\`help\` で、このチャンネルで使えるコマンドを確認できます。`,
           ),
@@ -936,22 +965,22 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
       // Step 1 and 2: may this channel run it, and against which GROWIs.
       const selected = await selectFor(invocation, trait);
       if (selected == null) return;
-      const { outcome } = selected;
+      const { outcome, installationId } = selected;
       if (outcome.kind === 'silent') return;
       if (outcome.kind === 'explain') {
         // Nothing is asked of the user for a command that cannot run.
-        await tell(invocation, explanation(word, outcome));
+        await tell(
+          privateReplyOriginOf(invocation, installationId),
+          explanation(word, outcome),
+        );
         return;
       }
 
       // Step 3: the values. Already-complete command lines finish here with
-      // no round trip at all.
+      // no round trip at all. `pending` waits for the answer; on
+      // `unavailable` the replier has already told the user and the operator.
       const started = await collector.start(invocation, trait.fields);
-      if (started.status === 'unavailable') {
-        await tell(invocation, markdown(started.reason));
-        return;
-      }
-      if (started.status === 'pending') return;
+      if (started.status !== 'collected') return;
 
       // Steps 4 and 5, with the selection this call already made -- asking
       // for it again would double the permission reads and leave a window
@@ -974,9 +1003,10 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
       const selected = await selectFor(invocation, trait);
       if (selected == null) return;
       const { outcome, installationId } = selected;
+      const origin = privateReplyOriginOf(invocation, installationId);
       if (outcome.kind === 'silent') return;
       if (outcome.kind === 'explain') {
-        await tell(invocation, explanation(invocation.commandName, outcome));
+        await tell(origin, explanation(invocation.commandName, outcome));
         return;
       }
 
@@ -990,7 +1020,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
       );
       if (chosen == null) {
         await tell(
-          invocation,
+          origin,
           markdown(
             '選ばれた GROWI は、このチャンネルからは実行できなくなりました。もう一度コマンドを打ち直してください。',
           ),
@@ -1026,7 +1056,16 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
         // message of any kind.
         if (outcome.kind === 'silent') continue;
         if (outcome.kind === 'explain') {
-          await tell(event, explanation(COMMAND_NAMES.linkPreview, outcome));
+          await tell(
+            {
+              channel: event.channel,
+              actor: event.actor,
+              sourceMessageId: event.messageRef.messageId,
+              requestSummary: 'リンクの展開',
+              installationId,
+            },
+            explanation(COMMAND_NAMES.linkPreview, outcome),
+          );
           continue;
         }
         // `url-match` never answers `choose`: a URL matches one GROWI.
@@ -1056,9 +1095,15 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     },
 
     reportExpired: async (event: PlatformEvent) => {
-      await platform.postEphemeral(
-        event.channel,
-        event.actor,
+      // An event carries no invocation, so the summary names what expired.
+      await tell(
+        {
+          channel: event.channel,
+          actor: event.actor,
+          sourceMessageId: event.kind === 'mention' ? event.messageId : null,
+          requestSummary: '入力の続き',
+          installationId: null,
+        },
         markdown(
           '入力の有効期限が切れました。お手数ですが、もう一度コマンドを打ち直してください。',
         ),

@@ -12,6 +12,8 @@ import { testSdkChannel } from '../capabilities/test-channels.js';
 import {
   type ArgumentCollector,
   LINK_COMMAND_WORD,
+  type PrivateReplier,
+  type PrivateReplyOrigin,
   SEARCH_DEFAULT_LIMIT,
 } from '../command/index.js';
 import { createFanOutCollector, type GrowiClient } from '../growi/index.js';
@@ -65,17 +67,15 @@ interface Harness {
   readonly growiClient: GrowiClient;
   readonly resolveInstallationId: CommandFlowDeps['resolveInstallationId'];
   readonly adminFlow: MockProxy<AdminFlow>;
+  readonly privateReplier: MockProxy<PrivateReplier>;
   readonly ephemeralMessages: () => ReadonlyArray<OutboundMessage>;
+  readonly privateOrigins: () => ReadonlyArray<PrivateReplyOrigin>;
   readonly postedMessages: () => ReadonlyArray<OutboundMessage>;
 }
 
 const createHarness = (): Harness => {
   const platform = mock<CommandFlowPlatform>();
   vi.mocked(platform.post).mockResolvedValue({ ok: true, messageId: 'M100' });
-  vi.mocked(platform.postEphemeral).mockResolvedValue({
-    ok: true,
-    messageId: 'M101',
-  });
   vi.mocked(platform.replace).mockResolvedValue({
     ok: true,
     messageId: 'M100',
@@ -106,6 +106,9 @@ const createHarness = (): Harness => {
   const adminFlow = mock<AdminFlow>();
   adminFlow.run.mockResolvedValue();
 
+  const privateReplier = mock<PrivateReplier>();
+  privateReplier.reply.mockResolvedValue({ kind: 'in-place' });
+
   const flow = createCommandFlow({
     platform,
     selector,
@@ -116,6 +119,7 @@ const createHarness = (): Harness => {
     fanOutCollector: createFanOutCollector({ growiClient }),
     resolveInstallationId,
     adminFlow,
+    privateReplier,
     newRequestId: (() => {
       // Requirement 10.4 keys duplicate-execution detection on this value, so
       // the fixture has to make two targets' ids actually differ.
@@ -135,8 +139,11 @@ const createHarness = (): Harness => {
     growiClient,
     resolveInstallationId,
     adminFlow,
+    privateReplier,
     ephemeralMessages: () =>
-      vi.mocked(platform.postEphemeral).mock.calls.map((call) => call[2]),
+      privateReplier.reply.mock.calls.map((call) => call[1]),
+    privateOrigins: () =>
+      privateReplier.reply.mock.calls.map((call) => call[0]),
     postedMessages: () =>
       vi.mocked(platform.post).mock.calls.map((call) => call[1]),
   };
@@ -391,6 +398,42 @@ describe('the five commands, end to end', () => {
     // The installation is looked up once for the whole invocation: the
     // selection carries it on to the steps that follow.
     expect(harness.resolveInstallationId).toHaveBeenCalledTimes(1);
+    // Requirement 5.1: help stays in the channel.
+    expect(harness.privateReplier.reply).not.toHaveBeenCalled();
+  });
+
+  it('help: shows the answer to the asker alone when the placeholder could not be posted', async () => {
+    vi.mocked(harness.platform.post).mockResolvedValue({
+      ok: false,
+      reason: 'bot-not-in-channel',
+      remedy: 'invite the bot to this channel',
+    });
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'execute',
+      targets: [GROWI_A],
+      excluded: [],
+    });
+    vi.mocked(harness.growiClient.sendCommand).mockResolvedValue({
+      ok: true,
+      response: {
+        kind: 'help',
+        commands: [
+          {
+            name: COMMAND_NAMES.search,
+            usage: 'search <word>',
+            description: 'searches',
+          },
+        ],
+      },
+    });
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.help));
+
+    expect(harness.platform.replace).not.toHaveBeenCalled();
+    const [origin, shown] = harness.privateReplier.reply.mock.calls[0] ?? [];
+    expect(origin?.installationId).toBe(INSTALLATION_ID);
+    if (shown?.kind !== 'list') throw new Error('expected the help list');
+    expect(shown.rows[0]?.markdown).toContain('search <word>');
   });
 
   it('create-page: sends to the single permitted GROWI and posts the new page', async () => {
@@ -422,6 +465,8 @@ describe('the five commands, end to end', () => {
       kind: 'markdown',
       markdown: expect.stringContaining('https://rel-a.example.com/memo'),
     });
+    // Requirement 5.1: the new page is announced to the channel.
+    expect(harness.privateReplier.reply).not.toHaveBeenCalled();
   });
 
   it('names the channel to GROWI by the id the chat service shows, not by the Chat SDK encoding an event carries', async () => {
@@ -736,6 +781,8 @@ describe('the one path an account-link notice is posted through', () => {
       GROWI_A.relationId,
     );
 
+    expect(refused.ephemeralMessages()).toHaveLength(1);
+    expect(typed.ephemeralMessages()).toHaveLength(1);
     expect(refused.ephemeralMessages().at(-1)).toEqual(
       typed.ephemeralMessages().at(-1),
     );
@@ -881,7 +928,7 @@ describe('dead ends the user is told about', () => {
     await harness.flow.startCommand(invocation);
 
     expect(harness.adminFlow.run).toHaveBeenCalledWith(invocation);
-    expect(harness.platform.postEphemeral).not.toHaveBeenCalled();
+    expect(harness.privateReplier.reply).not.toHaveBeenCalled();
     expect(harness.platform.post).not.toHaveBeenCalled();
     expect(harness.selector.select).not.toHaveBeenCalled();
   });
@@ -896,6 +943,171 @@ describe('dead ends the user is told about', () => {
     await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search, 'foo'));
 
     expect(harness.adminFlow.run).not.toHaveBeenCalled();
+  });
+});
+
+describe('where a private reply says it came from', () => {
+  let harness: Harness;
+
+  beforeEach(() => {
+    harness = createHarness();
+  });
+
+  it('labels the reply with the command and the first line of its arguments, cut at 80 characters', async () => {
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'explain',
+      reason: 'not-permitted',
+      excluded: [],
+    });
+    const path = `/${'a'.repeat(100)}`;
+
+    await harness.flow.startCommand(
+      invocationOf(COMMAND_NAMES.createPage, `${path}\nthe secret page body`),
+    );
+
+    const [origin] = harness.privateOrigins();
+    expect(origin?.requestSummary).toBe(
+      `${`${COMMAND_NAMES.createPage} ${path}`.slice(0, 80)}…`,
+    );
+    expect(origin?.requestSummary).not.toContain('secret');
+  });
+
+  it('carries the installation the selection already looked up', async () => {
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'explain',
+      reason: 'not-linked',
+      excluded: [],
+    });
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search, 'foo'));
+
+    expect(harness.privateOrigins()).toEqual([
+      {
+        channel,
+        actor,
+        sourceMessageId: null,
+        requestSummary: `${COMMAND_NAMES.search} foo`,
+        installationId: INSTALLATION_ID,
+      },
+    ]);
+  });
+
+  it('carries the installation into replies sent while the command runs', async () => {
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'execute',
+      targets: [GROWI_A],
+      excluded: [],
+    });
+    vi.mocked(harness.collector.start).mockResolvedValue({
+      status: 'collected',
+      values: { path: '/memo', body: 'x' },
+    });
+    vi.mocked(harness.growiClient.sendCommand).mockResolvedValue({
+      ok: false,
+      reason: 'unreachable',
+    });
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.createPage));
+
+    expect(harness.privateOrigins()).toHaveLength(1);
+    expect(harness.privateOrigins()[0]?.installationId).toBe(INSTALLATION_ID);
+  });
+
+  it('leaves the installation unknown when the workspace is not registered', async () => {
+    vi.mocked(harness.resolveInstallationId).mockResolvedValue(null);
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search, 'foo'));
+
+    expect(harness.privateOrigins()).toHaveLength(1);
+    expect(harness.privateOrigins()[0]?.installationId).toBeNull();
+  });
+
+  it('leaves the installation unknown for a word it does not know', async () => {
+    await harness.flow.startCommand(invocationOf('frobnicate'));
+
+    expect(harness.privateOrigins()[0]?.installationId).toBeNull();
+  });
+
+  it('names the message that carried the request', async () => {
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'explain',
+      reason: 'not-linked',
+      excluded: [],
+    });
+
+    await harness.flow.startCommand({
+      ...invocationOf(COMMAND_NAMES.search, 'foo'),
+      sourceMessageId: 'M7',
+    });
+
+    expect(harness.privateOrigins()[0]?.sourceMessageId).toBe('M7');
+  });
+
+  it('labels an expired input as the continuation of an input, on the message that carried it', async () => {
+    await harness.flow.reportExpired({
+      kind: 'mention',
+      platform: PLATFORM,
+      channel,
+      actor,
+      text: '@growi /memo',
+      inDirectMessage: true,
+      messageId: 'M0001',
+      interaction: null,
+    });
+
+    expect(harness.privateOrigins()).toEqual([
+      {
+        channel,
+        actor,
+        sourceMessageId: 'M0001',
+        requestSummary: '入力の続き',
+        installationId: null,
+      },
+    ]);
+  });
+});
+
+describe('a question that could not be delivered', () => {
+  let harness: Harness;
+
+  beforeEach(() => {
+    harness = createHarness();
+  });
+
+  // The replier has already sent a content-free notice and told the operator,
+  // so the flow adds nothing.
+  it('says nothing more when the values could not be asked for', async () => {
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'execute',
+      targets: [GROWI_A],
+      excluded: [],
+    });
+    vi.mocked(harness.collector.start).mockResolvedValue({
+      status: 'unavailable',
+    });
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.createPage));
+
+    expect(harness.privateReplier.reply).not.toHaveBeenCalled();
+    expect(harness.platform.post).not.toHaveBeenCalled();
+    expect(harness.growiClient.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('says nothing more when the GROWI choice could not be offered', async () => {
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'choose',
+      options: [GROWI_A, GROWI_B],
+      excluded: [],
+    });
+    vi.mocked(harness.collector.startGrowiChoice).mockResolvedValue({
+      status: 'unavailable',
+    });
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.createPage));
+
+    expect(harness.privateReplier.reply).not.toHaveBeenCalled();
+    expect(harness.platform.post).not.toHaveBeenCalled();
+    expect(harness.growiClient.sendCommand).not.toHaveBeenCalled();
   });
 });
 
@@ -938,6 +1150,7 @@ describe('previewLinks', () => {
     expect(target).toEqual(linkEvent.messageRef);
     if (preview?.kind !== 'markdown') throw new Error('expected markdown');
     expect(preview.markdown).toContain('/Sandbox');
+    expect(harness.privateReplier.reply).not.toHaveBeenCalled();
   });
 
   it('summarises the same link once, however often the message repeats it', async () => {
@@ -969,6 +1182,33 @@ describe('previewLinks', () => {
 
     expect(harness.platform.attachPreview).not.toHaveBeenCalled();
     expect(harness.platform.post).not.toHaveBeenCalled();
-    expect(harness.platform.postEphemeral).not.toHaveBeenCalled();
+    expect(harness.privateReplier.reply).not.toHaveBeenCalled();
+  });
+
+  it('explains to the poster alone, naming the link expansion and the message that carried the link', async () => {
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'explain',
+      reason: 'not-permitted',
+      excluded: [
+        {
+          relationId: GROWI_A.relationId,
+          growiLabel: GROWI_A.growiLabel,
+          reason: 'not-permitted-in-channel',
+        },
+      ],
+    });
+
+    await harness.flow.previewLinks(linkEvent);
+
+    expect(harness.platform.post).not.toHaveBeenCalled();
+    expect(harness.privateOrigins()).toEqual([
+      {
+        channel,
+        actor,
+        sourceMessageId: 'M9',
+        requestSummary: 'リンクの展開',
+        installationId: INSTALLATION_ID,
+      },
+    ]);
   });
 });

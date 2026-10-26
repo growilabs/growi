@@ -45,7 +45,8 @@ export type StartOutcome =
       readonly values: Readonly<Record<string, string>>;
     }
   | { readonly status: 'pending'; readonly correlationId: string }
-  | { readonly status: 'unavailable'; readonly reason: string };
+  /** The user and the operator have already been told, by `PrivateReplier`. */
+  | { readonly status: 'unavailable' };
 
 export type ResumeOutcome =
   | {
@@ -249,12 +250,6 @@ const discardNoticeFor = (commandName: string): OutboundMessage => ({
   markdown: `前の \`${commandName}\` コマンドの入力は取り消しました。`,
 });
 
-const CANNOT_ASK =
-  '値を聞き返すメッセージを届けられなかったため、このコマンドを実行できません。';
-
-const CANNOT_OFFER_CHOICE =
-  '対象の GROWI を選んでもらうメッセージを届けられなかったため、このコマンドを実行できません。';
-
 /** The wording of one follow-up question, built from the same `FieldSpec`. */
 const questionFor = (field: FieldSpec): OutboundMessage => ({
   kind: 'markdown',
@@ -332,7 +327,7 @@ export const createArgumentCollector = (
       correlationId,
       questionFor(field),
     );
-    if (!asked) return { status: 'unavailable', reason: CANNOT_ASK };
+    if (!asked) return { status: 'unavailable' };
 
     await pendingCollections.update(correlationId, {
       collected: { ...state, awaiting: field.name },
@@ -578,7 +573,7 @@ export const createArgumentCollector = (
         // would block this user's next command in the channel until it
         // expired.
         await pendingCollections.remove(correlationId);
-        return { status: 'unavailable', reason: CANNOT_OFFER_CHOICE };
+        return { status: 'unavailable' };
       }
       return { status: 'pending', correlationId };
     },
