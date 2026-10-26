@@ -56,7 +56,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 | 順 | spec | 中身 | 対象 | 前提 |
 |---|---|---|---|---|
-| 1 | [chat-integration-search-private](../chat-integration-search-private/) | `search` の結果を、チャンネルの全員ではなく本人にだけ見せる（出荷済みのコードの漏れを直す） | umbrella（要件 3）、proxy | なし |
+| 1 | [chat-integration-private-reply](../chat-integration-private-reply/) | 本人にだけ答えを届ける仕組み（使えなければ DM、チャンネルには戻さない）を作り、`search` の結果と、今ある本人宛ての返事をそこに通す（`search` の漏れと、Mattermost で届かない疑いを直す） | umbrella（要件 1・3）、proxy | なし |
 | 2 | （spec 無しで直す） | DM やチャンネル一覧にまだ無い場所でのコマンドで、installation を特定できない不具合（下の「既知の不具合」） | proxy | なし |
 | 3 | [chat-integration-agent](../chat-integration-agent/) | コマンドを `search`・`create-page`・`agent` に再編する。`keep` を `agent` に吸収し、答えをあとから届ける口を足す | umbrella、protocol、proxy、app | 1、2 |
 
@@ -98,7 +98,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
     3. チャット連携が 1 つも無いテナントでは問い合わせを飛ばす（「連携があるか」の確認結果は一定時間覚えておく）
   - **想定される影響範囲**: `chat-integration-app`（`notification-outbox.ts`・`notification-dispatcher.ts`・`notification-dispatch-cron.ts`・`pairing/sweep-unpaired-relations.ts`）。protocol と proxy は変わらない
   - **次にやること**: `chat-integration-app` の amend spec。設計の「通知を 2 段に分ける」節に、すぐ送る経路と間隔の決め方を足す
-- **ユーザー向けコマンドを `search`・`create-page`・`agent` に再編する** → discovery 済み（2026-10-26）。上の「進行中の amend spec」の [chat-integration-search-private](../chat-integration-search-private/) と [chat-integration-agent](../chat-integration-agent/) に移した
+- **ユーザー向けコマンドを `search`・`create-page`・`agent` に再編する** → discovery 済み（2026-10-26）。上の「進行中の amend spec」の [chat-integration-private-reply](../chat-integration-private-reply/) と [chat-integration-agent](../chat-integration-agent/) に移した
 - **既知の不具合（未修正、2026-10-26 時点）**: 実機試験と独立レビューで見つかり、まだ直していないもの。
   - **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
   - **Discord のスレッド内で打ったスラッシュコマンドの追加入力が結び付かない**: 入力待ちを 4 区切りの `Channel.id`（`discord:<guild>:<parent>:<thread>`）で保存する一方、スレッドでの返答のイベントは 3 区切りの `Thread.channelId` を持つ
