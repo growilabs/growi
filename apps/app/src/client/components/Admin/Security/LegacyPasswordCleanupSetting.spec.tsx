@@ -460,5 +460,20 @@ describe('LegacyPasswordCleanupSetting', () => {
         ),
       );
     });
+
+    it('treats a response without unsetCount as a failure', async () => {
+      mockStatus({ counts: countsOf() });
+      vi.mocked(apiv3Delete).mockResolvedValue(
+        mock<AxiosResponse>({ data: '<html></html>' }),
+      );
+      renderSection();
+
+      await confirmDeletion();
+
+      await waitFor(() =>
+        expect(toastError).toHaveBeenCalledWith(`${PREFIX}.delete_error`),
+      );
+      expect(toastSuccess).not.toHaveBeenCalled();
+    });
   });
 });

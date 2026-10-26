@@ -62,6 +62,10 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element | null => {
       const { data } = await apiv3Delete<DeleteLegacyPasswordsResponse>(
         '/security-setting/legacy-passwords',
       );
+      // A redirect can yield an HTML body with HTTP 200, as the status hook guards against.
+      if (typeof data?.unsetCount !== 'number') {
+        throw new Error('Delete response has no unsetCount');
+      }
       toastSuccess(t(`${I18N_PREFIX}.success`, { count: data.unsetCount }));
     } catch (_err) {
       toastError(t(`${I18N_PREFIX}.delete_error`));
