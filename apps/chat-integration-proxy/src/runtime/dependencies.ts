@@ -343,6 +343,7 @@ export const createProxyDependencies = async (
   const adminFlow = createAdminFlow({
     db,
     platform: facade,
+    privateReplier,
     pairing: pairingService,
     keyService,
     growiClient,

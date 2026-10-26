@@ -7,7 +7,8 @@
 //
 //  1. **The registration code never reaches the channel.** `issue-pairing-code`
 //     pins `delivery: 'ephemeral'` in its own type, and the assertion here is
-//     that `post` is not called at all -- not merely that `postEphemeral` was.
+//     that `post` is not called at all -- the answer goes through the
+//     `PrivateReplier`, which is the only way a reply reaches one person.
 //  2. **Nothing is carried out before the actor's roles have been judged.**
 //     A denied or unobservable actor must leave every service untouched.
 //  3. **`rotate-key` composes `RelationKeyService` with `GrowiClient`.** The
@@ -17,7 +18,7 @@ import type { KeyOperationResult, PlatformName } from '@growi/chat';
 import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
 import { testSdkChannel } from '../capabilities/test-channels.js';
-import type { AdminActorRoles } from '../command/index.js';
+import type { AdminActorRoles, PrivateReplier } from '../command/index.js';
 import type { PrismaClient } from '../db/index.js';
 import { PairingOrderLimitError } from '../relation/index.js';
 import type { Invocation, OutboundMessage } from '../types/index.js';
@@ -59,6 +60,7 @@ interface Harness {
   readonly flow: ReturnType<typeof createAdminFlow>;
   readonly prisma: ReturnType<typeof mockDeep<PrismaClient>>;
   readonly platform: MockProxy<AdminFlowPlatform>;
+  readonly privateReplier: MockProxy<PrivateReplier>;
   readonly pairing: MockProxy<AdminFlowDeps['pairing']>;
   readonly keyService: MockProxy<AdminFlowDeps['keyService']>;
   readonly growiClient: MockProxy<AdminFlowDeps['growiClient']>;
@@ -79,7 +81,8 @@ const createHarness = (
 
   const platform = mock<AdminFlowPlatform>();
   platform.post.mockResolvedValue({ ok: true, messageId: 'M1' });
-  platform.postEphemeral.mockResolvedValue({ ok: true, messageId: 'M2' });
+  const privateReplier = mock<PrivateReplier>();
+  privateReplier.reply.mockResolvedValue({ kind: 'in-place' });
 
   const pairing = mock<AdminFlowDeps['pairing']>();
   pairing.issueCode.mockResolvedValue({
@@ -98,6 +101,7 @@ const createHarness = (
   const flow = createAdminFlow({
     db: prisma,
     platform,
+    privateReplier,
     pairing,
     keyService,
     growiClient,
@@ -106,13 +110,14 @@ const createHarness = (
   });
 
   const ephemeral = () =>
-    platform.postEphemeral.mock.calls.map((call) => call[2]);
+    privateReplier.reply.mock.calls.map((call) => call[1]);
   const posted = () => platform.post.mock.calls.map((call) => call[1]);
 
   return {
     flow,
     prisma,
     platform,
+    privateReplier,
     pairing,
     keyService,
     growiClient,
@@ -190,6 +195,77 @@ describe('register (Requirement 9.1)', () => {
     expect(harness.platform.post).not.toHaveBeenCalled();
     expect(harness.ephemeral()).toHaveLength(1);
     expect(harness.saidText()).not.toContain('CODE-XYZ');
+  });
+
+  it('hands the code to the PrivateReplier with the installation it resolved', async () => {
+    const harness = createHarness();
+
+    await harness.flow.run(invocationOf('register'));
+
+    expect(harness.privateReplier.reply).toHaveBeenCalledWith(
+      {
+        channel,
+        actor,
+        sourceMessageId: null,
+        requestSummary: 'register',
+        installationId: INSTALLATION_ID,
+      },
+      expect.objectContaining({
+        kind: 'markdown',
+        markdown: expect.stringContaining('CODE-XYZ'),
+      }),
+    );
+  });
+
+  it('refuses privately, with no installation known yet, when the workspace is not registered', async () => {
+    const harness = createHarness();
+    const flow = createAdminFlow({
+      db: mockDeep<PrismaClient>(),
+      platform: harness.platform,
+      privateReplier: harness.privateReplier,
+      pairing: harness.pairing,
+      keyService: harness.keyService,
+      growiClient: harness.growiClient,
+      resolveInstallationId: () => Promise.resolve(null),
+      observeActorRoles: () => Promise.resolve(ADMIN),
+    });
+
+    await flow.run(invocationOf('register'));
+
+    expect(harness.privateReplier.reply).toHaveBeenCalledWith(
+      expect.objectContaining({ installationId: null }),
+      expect.objectContaining({ kind: 'markdown' }),
+    );
+    expect(harness.pairing.issueCode).not.toHaveBeenCalled();
+    expect(harness.platform.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('where each answer is shown', () => {
+  it.each([
+    ['unregister', ''],
+    ['weight', 'growi-a 5'],
+    ['rotate-key', ''],
+  ])('posts the answer of %s to the channel and never to the PrivateReplier', async (word, args) => {
+    const harness = createHarness();
+
+    await harness.flow.run(invocationOf(word, args));
+
+    expect(harness.platform.post).toHaveBeenCalledTimes(1);
+    expect(harness.platform.post).toHaveBeenCalledWith(
+      channel,
+      expect.objectContaining({ kind: 'markdown' }),
+    );
+    expect(harness.privateReplier.reply).not.toHaveBeenCalled();
+  });
+
+  it('answers a refusal of the actor to the actor alone, not in the channel', async () => {
+    const harness = createHarness(NOT_ADMIN);
+
+    await harness.flow.run(invocationOf('unregister'));
+
+    expect(harness.platform.post).not.toHaveBeenCalled();
+    expect(harness.privateReplier.reply).toHaveBeenCalledTimes(1);
   });
 });
 

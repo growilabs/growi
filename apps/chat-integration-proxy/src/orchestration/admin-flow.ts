@@ -21,7 +21,9 @@
 //    the operation. That is what makes 「登録コードは本人にだけ見えるメッセージ
 //    で返す」 structural: `issue-pairing-code` pins the literal `'ephemeral'`
 //    in its type, so a branch posting it to the channel cannot be written
-//    without contradicting the type it read.
+//    without contradicting the type it read. An answer meant for one person
+//    goes through `PrivateReplier`, the only component that decides how such
+//    a reply reaches them; this flow can post to the channel and nothing else.
 //  - **The two halves of a rotation stay apart.** `rotate-key` runs steps 1-3
 //    (`rotate`); `rotate-key status` runs step 4 (`revokeOldIfAllDelivered`),
 //    which design.md's AdminCommandSet table assigns to it by name. Calling
@@ -33,7 +35,9 @@
 import {
   type AdminCommandIntent,
   type AdminDelivery,
+  type PrivateReplier,
   parseAdminCommand,
+  privateReplyOriginOf,
 } from '../command/index.js';
 import { createRelationRepository, type DbClient } from '../db/index.js';
 import type { GrowiClient } from '../growi/index.js';
@@ -53,12 +57,13 @@ import type {
 } from '../types/index.js';
 
 /**
- * The two facade operations an operator command uses. Narrowed with `Pick`
- * for the same reason `CommandFlowPlatform` is: a reader can see from the
- * type alone that running an operator command opens no connection, lists no
- * channels and reads no history.
+ * The one facade operation an operator command uses directly. Narrowed with
+ * `Pick` for the same reason `CommandFlowPlatform` is: a reader can see from
+ * the type alone that running an operator command opens no connection, lists
+ * no channels, reads no history and cannot address one person except through
+ * `PrivateReplier`.
  */
-export type AdminFlowPlatform = Pick<PlatformFacade, 'post' | 'postEphemeral'>;
+export type AdminFlowPlatform = Pick<PlatformFacade, 'post'>;
 
 /**
  * The actor's roles on the chat service, as the caller observed them, or
@@ -76,6 +81,7 @@ export type ObserveActorRoles = (
 export interface AdminFlowDeps {
   readonly db: DbClient;
   readonly platform: AdminFlowPlatform;
+  readonly privateReplier: PrivateReplier;
   readonly pairing: Pick<PairingService, 'issueCode' | 'unpair'>;
   readonly keyService: Pick<
     RelationKeyService,
@@ -161,6 +167,7 @@ const statusLine = (status: RotationStatus): string => {
 export const createAdminFlow = (deps: AdminFlowDeps): AdminFlow => {
   const {
     platform,
+    privateReplier,
     pairing,
     keyService,
     growiClient,
@@ -176,9 +183,15 @@ export const createAdminFlow = (deps: AdminFlowDeps): AdminFlow => {
    * line, a missing installation -- goes to the person who typed it and
    * nowhere else: those say nothing the channel needs, and the refusals name
    * roles.
+   *
+   * `installationId` is `null` until the channel's workspace has been
+   * resolved; the replier then resolves it itself. No operator command takes
+   * a secret as input (the pairing code is output only), so the request
+   * summary the DM header shows cannot leak one.
    */
   const say = async (
     invocation: Invocation,
+    installationId: string | null,
     text: string,
     delivery: AdminDelivery = 'ephemeral',
   ): Promise<void> => {
@@ -186,9 +199,8 @@ export const createAdminFlow = (deps: AdminFlowDeps): AdminFlow => {
       await platform.post(invocation.channel, markdown(text));
       return;
     }
-    await platform.postEphemeral(
-      invocation.channel,
-      invocation.actor,
+    await privateReplier.reply(
+      privateReplyOriginOf(invocation, installationId),
       markdown(text),
     );
   };
@@ -333,6 +345,7 @@ export const createAdminFlow = (deps: AdminFlowDeps): AdminFlow => {
       if (roles == null) {
         await say(
           invocation,
+          null,
           'この操作を実行してよいかを判定できませんでした（チャットサービスから権限を読み取れません）。proxy の運用者に連絡してください。',
         );
         return;
@@ -349,12 +362,13 @@ export const createAdminFlow = (deps: AdminFlowDeps): AdminFlow => {
       if (outcome.kind === 'denied') {
         await say(
           invocation,
+          null,
           `\`${outcome.word}\` を実行できるのは workspace の管理者だけです（${outcome.requiredAnyOf.join(' または ')}）。`,
         );
         return;
       }
       if (outcome.kind === 'invalid') {
-        await say(invocation, outcome.detail);
+        await say(invocation, null, outcome.detail);
         return;
       }
 
@@ -362,6 +376,7 @@ export const createAdminFlow = (deps: AdminFlowDeps): AdminFlow => {
       if (installationId == null) {
         await say(
           invocation,
+          null,
           'このチャンネルを受け持つ workspace の登録が見つかりませんでした。proxy の運用者に連絡してください。',
         );
         return;
@@ -369,6 +384,7 @@ export const createAdminFlow = (deps: AdminFlowDeps): AdminFlow => {
 
       await say(
         invocation,
+        installationId,
         await carryOut(invocation, outcome.intent, installationId),
         outcome.intent.delivery,
       );
