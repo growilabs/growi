@@ -1,39 +1,57 @@
 import { createHash } from 'node:crypto';
 import { pipeline, Writable } from 'node:stream';
 import type { IPage } from '@growi/core';
-import { getIdForRef, getIdStringForRef } from '@growi/core';
+import { getIdStringForRef } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export';
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
 import { SupportedAction } from '~/interfaces/activity';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
-import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
-import PageBulkExportJob from '../../../models/page-bulk-export-job';
 import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
 import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
 
 async function reuseDuplicateExportIfExists(
   this: IPageBulkExportJobCronService,
-  pageBulkExportJob: PageBulkExportJobDocument,
+  pageBulkExportJob: pagebulkexportjobs,
 ) {
-  const duplicateExportJob = await PageBulkExportJob.findOne({
-    user: pageBulkExportJob.user,
-    page: pageBulkExportJob.page,
-    format: pageBulkExportJob.format,
-    status: PageBulkExportJobStatus.completed,
-    revisionListHash: pageBulkExportJob.revisionListHash,
+  // Skip jobs whose attachment is gone or whose download has expired: the
+  // clean-up cron removes the attachment of expired jobs, so reusing one would
+  // complete this job with an attachment that is about to disappear.
+  const downloadExpirationSeconds = configManager.getConfig(
+    'app:bulkExportDownloadExpirationSeconds',
+  );
+  const downloadExpirationThreshold = new Date(
+    Date.now() - downloadExpirationSeconds * 1000,
+  );
+  const duplicateExportJob = await prisma.pagebulkexportjobs.findFirst({
+    where: {
+      attachmentId: { not: null },
+      completedAt: { gte: downloadExpirationThreshold },
+      userId: pageBulkExportJob.userId,
+      pageId: pageBulkExportJob.pageId,
+      format: pageBulkExportJob.format,
+      status: PageBulkExportJobStatus.completed,
+      revisionListHash: pageBulkExportJob.revisionListHash,
+    },
   });
   if (duplicateExportJob != null) {
     // if an upload with the exact same contents exists, re-use the same attachment of that upload
-    pageBulkExportJob.attachment = duplicateExportJob.attachment;
-    pageBulkExportJob.status = PageBulkExportJobStatus.completed;
-    await pageBulkExportJob.save();
+    const updated = await prisma.pagebulkexportjobs.update({
+      where: { id: pageBulkExportJob.id },
+      data: {
+        attachmentId: duplicateExportJob.attachmentId,
+        status: PageBulkExportJobStatus.completed,
+      },
+    });
 
     await this.notifyExportResultAndCleanUp(
       SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED,
-      pageBulkExportJob,
+      updated,
     );
   }
 }
@@ -45,14 +63,16 @@ async function reuseDuplicateExportIfExists(
 export async function createPageSnapshotsAsync(
   this: IPageBulkExportJobCronService,
   user,
-  pageBulkExportJob: PageBulkExportJobDocument,
+  pageBulkExportJob: pagebulkexportjobs,
 ): Promise<void> {
   const Page = mongoose.model<IPage, PageModel>('Page');
 
   // if the process of creating snapshots was interrupted, delete the snapshots and create from the start
-  await PageBulkExportPageSnapshot.deleteMany({ pageBulkExportJob });
+  await PageBulkExportPageSnapshot.deleteMany({
+    pageBulkExportJob: pageBulkExportJob.id,
+  });
 
-  const basePage = await Page.findById(getIdForRef(pageBulkExportJob.page));
+  const basePage = await Page.findById(pageBulkExportJob.pageId);
   if (basePage == null) {
     throw new Error('Base page not found');
   }
@@ -77,7 +97,7 @@ export async function createPageSnapshotsAsync(
           revisionListHash.update(getIdStringForRef(page.revision));
         }
         await PageBulkExportPageSnapshot.create({
-          pageBulkExportJob,
+          pageBulkExportJob: pageBulkExportJob.id,
           path: page.path,
           revision: page.revision,
         });
@@ -89,11 +109,15 @@ export async function createPageSnapshotsAsync(
     },
     final: async (callback) => {
       try {
-        pageBulkExportJob.revisionListHash = revisionListHash.digest('hex');
-        pageBulkExportJob.status = PageBulkExportJobStatus.exporting;
-        await pageBulkExportJob.save();
+        const updated = await prisma.pagebulkexportjobs.update({
+          where: { id: pageBulkExportJob.id },
+          data: {
+            revisionListHash: revisionListHash.digest('hex'),
+            status: PageBulkExportJobStatus.exporting,
+          },
+        });
 
-        await reuseDuplicateExportIfExists.bind(this)(pageBulkExportJob);
+        await reuseDuplicateExportIfExists.bind(this)(updated);
       } catch (err) {
         callback(err);
         return;
@@ -103,7 +127,7 @@ export async function createPageSnapshotsAsync(
   });
 
   this.setStreamsInExecution(
-    pageBulkExportJob._id,
+    pageBulkExportJob.id,
     pagesReadable,
     pageSnapshotsWritable,
   );
