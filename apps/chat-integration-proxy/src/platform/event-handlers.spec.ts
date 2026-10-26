@@ -155,13 +155,40 @@ describe('messages', () => {
     ]);
   });
 
-  it('watches for links by pattern', () => {
-    const { registered } = setUp();
+  it('reaches the link handler even when the text shows only a link label', async () => {
+    // Slack sends a long URL as `<url|label>`, and the SDK builds
+    // `Message.text` from the label (`localhost/…`); the URL is only in
+    // `Message.links`, so the text cannot be what decides.
+    const { handled, registered } = setUp();
+    const shown = 'localhost/…';
 
-    expect(registered.messagePattern?.test('see https://example.com')).toBe(
-      true,
+    expect(registered.messagePattern?.test(shown)).toBe(true);
+    await registered.message?.(
+      thread(),
+      message({
+        isMention: false,
+        text: shown,
+        links: [{ url: 'http://localhost:3000/6adf11e2de5add813a048114' }],
+      }),
     );
-    expect(registered.messagePattern?.test('no link here')).toBe(false);
+
+    expect(handled).toMatchObject([
+      {
+        kind: 'link-posted',
+        urls: ['http://localhost:3000/6adf11e2de5add813a048114'],
+      },
+    ]);
+  });
+
+  it('dispatches nothing for an unaddressed message that carries no link', async () => {
+    const { handled, registered } = setUp();
+
+    await registered.message?.(
+      thread(),
+      message({ isMention: false, text: 'no link here', links: [] }),
+    );
+
+    expect(handled).toEqual([]);
   });
 
   it('does not dispatch an addressed message a second time from the link handler', async () => {

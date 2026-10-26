@@ -53,13 +53,13 @@ export interface EventHandlerDeps {
 }
 
 /**
- * What makes an unaddressed message worth looking at at all. Only Slack fills
- * `Message.links` in, so this is in practice the Slack link-preview path
- * (Requirement 6.1) -- but the pattern, not the service name, is what decides,
- * for the same reason `event-mapping.ts` does not consult the capability table
- * here.
+ * Every unaddressed message reaches the link handler. The SDK tests this
+ * pattern against `Message.text`, which Slack builds from a link's display
+ * label (a long URL arrives as `<url|localhost/…>`), so the text cannot tell
+ * whether a message carries a link. `Message.links` can, and `event-mapping.ts`
+ * maps a message without links to nothing.
  */
-const LINK_PATTERN = /https?:\/\//;
+const ANY_MESSAGE = /[\s\S]*/;
 
 const dispatch = async (
   deps: EventHandlerDeps,
@@ -94,7 +94,7 @@ export const registerEventHandlers = (
 ): void => {
   host.onNewMention((thread, message) => handleMessage(deps, thread, message));
 
-  host.onNewMessage(LINK_PATTERN, async (thread, message) => {
+  host.onNewMessage(ANY_MESSAGE, async (thread, message) => {
     // The SDK routes an addressed message to the mention handler and stops, so
     // this normally sees only unaddressed ones. Guarded anyway: were both to
     // run, the same command would be answered twice.
