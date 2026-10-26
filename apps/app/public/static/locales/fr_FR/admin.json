@@ -34,7 +34,19 @@
       },
       "success": "Les mots de passe hérités de {{count}} utilisateur(s) ont été supprimés",
       "delete_error": "Échec de la suppression des mots de passe hérités. Certains ont pu être supprimés ; les compteurs ont été actualisés.",
-      "fetch_error": "Échec de la récupération de l'état de la migration des hachages de mots de passe"
+      "fetch_error": "Échec de la récupération de l'état de la migration des hachages de mots de passe",
+      "unmigrated_list": {
+        "title": "Utilisateurs à inciter à migrer",
+        "description": "Ces utilisateurs n'ont encore qu'un mot de passe au format hérité. Ils seront migrés automatiquement lors de leur prochaine connexion avec leur mot de passe. Les utilisateurs liés à une authentification externe (LDAP, OAuth, SAML, etc.) ne sont pas listés, car la connexion via ces méthodes ne migre pas le mot de passe.",
+        "column": {
+          "username": "Nom d'utilisateur",
+          "email": "Adresse courriel",
+          "last_login": "Dernière connexion"
+        },
+        "never_logged_in": "Jamais connecté",
+        "empty": "Aucun utilisateur n'a besoin d'être incité à migrer.",
+        "fetch_error": "Échec de la récupération de la liste des utilisateurs à inciter à migrer"
+      }
     },
     "scope_of_page_disclosure": "Confidentialité de la page",
     "set_point": "Valeur",

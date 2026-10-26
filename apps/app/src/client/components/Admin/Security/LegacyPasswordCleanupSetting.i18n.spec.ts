@@ -24,6 +24,14 @@ const REQUIRED_KEYS = [
   `${SECTION}.success`,
   `${SECTION}.delete_error`,
   `${SECTION}.fetch_error`,
+  `${SECTION}.unmigrated_list.title`,
+  `${SECTION}.unmigrated_list.description`,
+  `${SECTION}.unmigrated_list.column.username`,
+  `${SECTION}.unmigrated_list.column.email`,
+  `${SECTION}.unmigrated_list.column.last_login`,
+  `${SECTION}.unmigrated_list.never_logged_in`,
+  `${SECTION}.unmigrated_list.empty`,
+  `${SECTION}.unmigrated_list.fetch_error`,
   'audit_log_action.ADMIN_LEGACY_PASSWORD_DELETE',
 ];
 
