@@ -201,10 +201,12 @@ sequenceDiagram
 | 2.6 | 対象が 0 人でも正常に応答する | Service, DELETE handler | `unsetCount: 0` | 削除 |
 | 2.7 | エラー時はエラーを表示し、成功は表示しない | Section, DELETE handler | `ErrorV3` | 削除 |
 | 2.8 | 現行バージョンでのログインは変わらない | （既存の検証）Service が `passwordHash` に触れないこと | — | — |
+| 2.9 | 削除の実行中は操作を無効にする | Section | 実行中の state | 削除 |
 | 3.1 | 実行前に確認ダイアログを出す | Section | `ConfirmModal` | 削除 |
 | 3.2 | 件数と、取り消せないことを表示 | Section | `warningMessage` | 削除 |
 | 3.3 | ダウングレード時の影響を警告 | Section | `supplymentaryMessage` | 削除 |
 | 3.4 | キャンセルしたら何もしない | Section | `onCancel` | 削除 |
+| 3.5 | 最新の件数を確認ダイアログに出す | Section | 開くときの `mutate()` | 削除 |
 | 4.1 | 管理者だけに許可 | GET/DELETE handler | `adminRequired`、SCOPE | — |
 | 4.2 | 管理者以外は拒否し、データを返さない | GET/DELETE handler | `adminRequired` | — |
 | 4.3 | 監査ログが有効で記録対象のときに記録 | DELETE handler, activity.ts | `ADMIN_LEGACY_PASSWORD_DELETE`（`LargeActionGroup`） | 削除 |
@@ -221,7 +223,8 @@ sequenceDiagram
 | 7.5 | 最終ログインの新しい順、未ログインは最後 | Unmigrated service | `sort({ lastLoginAt: -1, _id: 1 })` | — |
 | 7.6 | スクロールで続きを読み込む | GET handler, hook, UnmigratedUserList | `page` / `limit`、`useSWRInfinite`、`InfiniteScroll` | 表示 |
 | 7.7 | 0 人のときはいないことを表示 | UnmigratedUserList | `totalCount === 0` | 表示 |
-| 7.8 | 取得失敗時はエラーを表示し、他に影響させない | GET handler, UnmigratedUserList | `ErrorV3`、hook の `error` | 表示 |
+| 7.8 | 最初の読み込みの失敗時はエラーを表示し、他に影響させない | GET handler, UnmigratedUserList | `ErrorV3`、hook の `error` | 表示 |
+| 7.9 | 続きの読み込みの失敗時は行を残し、末尾にエラーと再試行を出す | UnmigratedUserList | `error` と読み込み済みの `data`、`setSize` での再試行 | 表示 |
 | 8.1 | 旧形式が残っていなければ非表示 | Section | `both + legacyOnly === 0` | 表示 |
 | 8.2 | 削除で 0 人になったら、成功を知らせて非表示 | Section | 成功トースト → `mutate()` | 削除 |
 | 8.3 | 取得中は表示しない | Section | `isLoading` | 表示 |
@@ -481,3 +484,13 @@ export const useSWRInfinitePasswordHashUnmigratedUsers: () => SWRInfiniteRespons
 - 権限: 既存のセキュリティ設定と同じ `adminRequired` と SCOPE（`READ/WRITE.ADMIN.SECURITY`）を使う。アクセストークンで呼ぶ場合も、同じスコープが必要。
 - 情報を漏らさない: 件数の API は件数だけを返す。一覧の API はユーザー名・メール・最終ログインだけを返し、パスワード系のフィールドは読み出さない。メールアドレスを返すのは、管理者だけが見られる既存の「ユーザー管理」画面と同じ範囲である。
 - 取り消せないこと: 確認モーダルで明示する。実行者と件数は、監査ログの設定にかかわらずサーバーログで追える。監査ログが有効で LARGE の環境では、監査ログにも実行者が残る。
+
+## レビュー（code-review high）を受けた修正（2026-10-26）
+- **件数の集計を 1 回の走査にする（7）**: `countPasswordHashFormats` は、`$match: baseFilter` のあとに `$facet` を置き、区分ごとに既存のフィルタで `$match` して `$count` する集計 1 回で数える。区分の定義には既存のフィルタをそのまま使い、集計式（`$cond`）に書き直さない（5.3: 判定の定義を 1 か所に保つ）。戻り値の型と CLI の挙動は変えない。
+- **一覧 API の `page` に上限を付ける（5）**: `query('page').optional().isInt({ min: 1, max: 100000 })`。巨大な値は 500 ではなく 400 になる。
+- **`NO_SCOPE` の重複をなくす（9）**: 既定の `baseFilter` は引数の既定値 `{}` で書き、定数は持たない。
+- **確認ダイアログの件数を最新にする（4 → 3.5）**: 削除ボタンを押したら、件数の `mutate()` を待ってから確認ダイアログを開き、最新の `both` を表示する。最新の件数が 0 なら、ダイアログを開かない。
+- **削除の実行中はボタンを無効にする（3 → 2.9）**: 実行中の state を持ち、確定から削除後の件数の再取得までの間、削除ボタンを無効にする。
+- **続きの読み込みの失敗で行を消さない（2 → 7.9）**: 最初のページで失敗したときだけ一覧の代わりにエラーを出す。2 ページ目以降で失敗したときは、読み込み済みの行を残したまま末尾にエラーと再試行のボタンを出し、ボタンで `setSize` を呼び直す。エラーの間は `InfiniteScroll` の自動の読み足しを止める（終端の判定とは別に、エラー中は読み足さない）。
+- **セクションを分割する（8）**: 件数表を `PasswordHashCountTable`（同じディレクトリ、表示だけのコンポーネント）に切り出し、旧形式のみの合計は 1 か所で計算する。
+- **drift テストの `req` を型安全にする（10）**: `req` は `mock<Request>()` で作る。`res` は `finish` を同期で発火させる本物の振る舞いが要るので、今の書き方のまま残す。
