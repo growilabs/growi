@@ -19,6 +19,10 @@ features:
   bot_user:
     display_name: GROWI
     always_online: true
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
 
 oauth_config:
   scopes:
@@ -31,6 +35,7 @@ oauth_config:
       - groups:read
       - im:history
       - im:read
+      - im:write
       - mpim:history
       - mpim:read
       - reactions:read
@@ -61,9 +66,26 @@ WebSocket 経由で届くため、Slack 側に公開の URL を教える必要�
 **この proxy は、bot が参加しているチャンネルで bot をメンションして呼びかける形
 （`@growi search foo` のように）でのみコマンドを受け付ける。** マニフェストの
 `event_subscriptions.bot_events` に含めた `app_mention` がその呼びかけを Socket
-Mode 経由で proxy に届ける。**Slack の DM に書いてもコマンドは起動しない** —
-Slack は DM での発言を `app_mention` としては配信しないため（Slack 公式ドキュメント
-「app_mention イベント」も、DM の発言はこのイベントで届かないと明記している）。
+Mode 経由で proxy に届ける。**Slack の DM で打ったコマンドは起動しない。** DM で
+`search foo` のように打っても、この proxy は DM がどの workspace のものかを特定できないため、
+「このチャットの workspace がまだ登録されていません」と返す（workspace を特定する手がかりが
+bot の参加しているチャンネルの一覧で、DM はそこに入らないため）。一方、**bot からの DM で
+聞き返された質問への答えは DM で受け付ける。** 検索などの返事が DM に届いたとき
+（返事を出す前に本人がそのチャンネルを抜けた、本人だけに見えるメッセージを出せない、など）や、
+コマンドの引数を聞き返されたときは、利用者がその DM に答えを書けば元の依頼が進む。
+そのために、マニフェストに次の 2 つを入れてある。
+
+- `im:write`（bot スコープ）— bot が利用者との DM を開くために要る。無い導入では、
+  返事は DM に落ちず、チャンネルに「DM を送れませんでした」という内容を含まない知らせだけが出る
+  （返事の内容がチャンネルに出ることはない）。
+- `features.app_home` の `messages_tab_enabled: true` と
+  `messages_tab_read_only_enabled: false` — App Home の Messages タブを有効にし、利用者が
+  bot との DM に書き込めるようにする。これが無いと、DM に届いた聞き返しに答えを書けない。
+
+**すでに導入済みの workspace は、スコープと App Home の設定を足したあとで、アプリを導入し直す
+（手順2の「Add to Slack」をもう一度行う）必要がある。** `im:write` は導入し直すまで効かない。
+導入し直すまでは、本人だけに見えるメッセージが出せない場面で DM に落ちず、内容を含まない知らせになる。
+
 マニフェストに含めた `message.channels` / `message.groups` / `message.im` /
 `message.mpim` の購読は、コマンドの起動のためではなく、投稿された URL を検知して
 プレビューを付ける機能（要件6）のためのものなので、この理由で外さないこと。

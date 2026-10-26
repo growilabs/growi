@@ -135,7 +135,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 4.1, 5.1_
 
 - [ ] 6. 運用者向けの説明
-- [ ] 6.1 (P) Slack の導入の説明と実機試験の手順を直す
+- [x] 6.1 (P) Slack の導入の説明と実機試験の手順を直す
   - マニフェストに DM を開く権限（im:write）と、利用者が bot との DM に書き込める設定（App Home の Messages タブ）を足す。導入済みの workspace は導入し直す必要があることを書く
   - 「Slack の DM に書いてもコマンドは起動しない」を、DM での聞き返しへの答えは受け付け、DM で打ったコマンドは「workspace が登録されていない」と返る、という今の振る舞いに書き換える
   - 実機試験の表に、検索の結果が本人にだけ見えること、DM に落ちる場合（封筒のリアクション）、DM の聞き返しに DM で答えて元の依頼が進むこと、im:write の無い導入では内容を含まない知らせになることを足す
@@ -143,7 +143,7 @@
   - _Requirements: 4.2_
   - _Boundary: docs Slack_
 
-- [ ] 6.2 (P) Mattermost・Discord・Teams の導入の説明を直す
+- [x] 6.2 (P) Mattermost・Discord・Teams の導入の説明を直す
   - Mattermost: 本人だけのメッセージには bot にシステム管理者の権限が要り、与えなければ DM で届くことと、どちらを選ぶかの判断材料
   - Discord: 本人宛ての返事は DM で届くこと、リアクションと DM に要る bot の権限
   - Teams: 本人だけのメッセージは 24 時間で消えること、DM には利用者が一度 bot に呼びかけている必要があること、1 対 1 の会話で答えるのに personal の範囲が要るかは未確認であること
@@ -181,3 +181,4 @@
 - 3.4: 4.1 で `collector.start` と `startGrowiChoice` が `unavailable` を返しても、CommandFlow は `tell` しない（PrivateReplier が内容を含まない知らせと運用者への報告を済ませているため、`tell` すると知らせも報告も 2 回になる）。同じタスクで `StartOutcome` の `reason` と `CANNOT_ASK`・`CANNOT_OFFER_CHOICE` を消す。
 - 3.4: 依頼の宛先情報の作り方（`${commandName} ${argsText}` の 1 行目を 80 文字で切って「…」）は `command/private-reply.ts` の `privateReplyOriginOf` にある。4.1・4.3 は自前の `originOf` を書かず、これを使う。
 - 3.4: `src/testing/instance-ownership-e2e.integ.ts` の「runs the periodic sweep on one instance at a time」は 5 秒の上限すれすれで、レビューの worktree では変更前の HEAD でも失敗した（この spec の変更とは無関係）。
+- 6.1: design.md の実機試験の節（523 行目付近）は「bot がいないチャンネルで呼びかける」と「聞き返しを DM に落とす」を実機で起こせる前提で書いているが、Slack ではどちらも起こせない（bot がいないチャンネルの mention はイベントが届かない。聞き返しは依頼の直後、本人がチャンネルにいる間に出る）。7.x で書き戻すときにこの前提を移さず、DM に落ちる経路は結合試験が守ると書く。

@@ -41,13 +41,20 @@ umbrella spec の `roadmap.md` の「既知の不具合」）。普通の worksp
 ```json
 {
   "display_information": { "name": "GROWI (local test)" },
-  "features": { "bot_user": { "display_name": "GROWI", "always_online": true } },
+  "features": {
+    "bot_user": { "display_name": "GROWI", "always_online": true },
+    "app_home": {
+      "home_tab_enabled": false,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    }
+  },
   "oauth_config": {
     "redirect_urls": ["http://localhost:8080/install/slack/callback"],
     "scopes": {
       "bot": [
         "app_mentions:read", "channels:history", "channels:read", "chat:write",
-        "groups:history", "groups:read", "im:history", "im:read",
+        "groups:history", "groups:read", "im:history", "im:read", "im:write",
         "mpim:history", "mpim:read", "reactions:read", "reactions:write", "users:read"
       ]
     }
@@ -160,7 +167,7 @@ https://<workspace>.slack.com/oauth/v2/authorize?client_id=<Client ID>&scope=<�
 | 2 | GROWI の `/admin/chat-integration` でコードを入力（Proxy URI `http://localhost:8080`、GROWI URI `http://localhost:3000`） | ペアリングが成立する |
 | 3 | `@GROWI help` | 使えるコマンドの一覧（使い方が `/growi …` の形で出るのは既知の食い違い） |
 | 4 | `@GROWI link` → 届いた URL を開いて承認 | アカウントが紐づく。紐付け前の `search` は紐付けの案内が本人に届く |
-| 5 | `@GROWI search <語>` | 結果の一覧、または「結果は得られませんでした」 |
+| 5 | `@GROWI search <語>` | 結果の一覧、または「結果は得られませんでした」。結果は呼びかけた本人にだけ見える。別のアカウントで同じチャンネルを見ても結果は見えない |
 | 6 | 管理画面で `create-page` を「Only these channels」にして `#growi-test` の ID を入力 → `@GROWI create-page /chat-test/hello こんにちは` | ページが作られ、作成者は紐付けた GROWI ユーザー |
 | 7 | 管理画面で通知先に `#growi-test` を設定 → 対象のページを更新 | 1 分以内に通知が届く（送信は 1 分ごとの定期処理） |
 | 8 | GROWI のページの URL をメンションなしで貼る | プレビューが付く。ログインしていない人の閲覧を許さない GROWI では「存在しないか、全員には見えない」（設計どおり） |
@@ -178,3 +185,12 @@ https://<workspace>.slack.com/oauth/v2/authorize?client_id=<Client ID>&scope=<�
   書くと、GROWI が返した内容をそのまま見られる。
 - **データ**: proxy は `manual_e2e` スキーマの `installation`・`installation_channel`・`relation` など、
   GROWI は MongoDB の `chat_*` コレクション（通知の送信待ちは `chat_notification_outbox`）。
+
+**DM に落ちる場合は、手では確実に起こせないので、この表には入れていない。** Slack では bot がいない
+チャンネルの呼びかけはそもそも proxy に届かず、本人だけに見えるメッセージも bot の投稿として直接出る。
+DM に落ちるのは、依頼のあとで本人がそのチャンネルを抜けるといった、返事を出す直前の競合に限られる。
+次の振る舞いは結合テスト・単体テストで確かめている。
+
+- 返事が DM に届くこと、先頭に「<場所> での「<依頼>」への返事です」の見出しが付くこと、元のメッセージに封筒（email）のリアクションが付くこと、`im:write` が無いなどで DM も送れないときに内容を含まない「DM を送れませんでした…」の知らせだけが出ること — `src/command/private-reply.spec.ts`（本人だけのメッセージ・DM・知らせの成否の全組み合わせ）
+- DM に届いた聞き返しに DM で答えると元の依頼が進むこと — `src/command/argument-collector.spec.ts`
+- Slack で DM を開いたときのチャンネル id と、DM に打った本文が同じ形になること、同じリアクションの 2 回付け — `src/platform/private-reply-adapters.integ.ts`
