@@ -26,7 +26,7 @@
 - **GROWI の AI Agent**（`apps/app/src/features/mastra/`）: Mastra で作られた `growiAgent`。道具は読み取りの 2 つだけ（`full-text-search-tool`・`get-page-content-tool`）で、どちらも依頼した利用者の閲覧権限で動く。管理者が AI を有効にし（`isAiEnabled`）言語モデルを設定して（`isAiConfigured`）初めて使える。会話の記録は利用者ごとに Mastra のスレッドとして残る。ブラウザからは `POST /_api/v3/mastra/message` で呼び、答えは少しずつ流れてくる。サーバ側から呼ぶための公開された関数は無い（`suggest-path` の `agent.generate` が、サーバ側から呼ぶ前例）。時間の上限は無く、最大 10 手まで回る。
 - **chat-integration のコマンド**: `search`（全 GROWI）、`create-page`・`keep`（1 つの GROWI。書き込み）、`help`、`link`。`keep` は proxy が会話の履歴を読み、GROWI が原文のままページにする（要件 5）。
 - **時間の制約**: proxy から GROWI への署名付きの依頼は 10 秒で打ち切られる。GROWI があとからコマンドの答えを送る口は無い。AI Agent の答えは 10 秒に収まらないのが普通と見込む。
-- **Chat SDK 4.38.1 の Slack アダプタ**は、Slack の AI アプリの画面に対応している（`assistant_thread_started`、「考えています…」の表示 `setAssistantStatus`、依頼の例の表示 `setSuggestedPrompts`、DM のスレッドでの少しずつの書き出し `chatStream`、利用者が見ているチャンネルの通知 `assistant_thread_context_changed`）。
+- **Chat SDK 4.38.1 の Slack アダプタ**は、Slack の AI アプリの画面に対応している（「考えています…」の表示 `setAssistantStatus`、依頼の例の表示 `setSuggestedPrompts`、DM のスレッドでの少しずつの書き出し `chatStream`、利用者が見ているものの通知 `onAppContextChanged`）。ただし proxy は今、この対応を有効にする `agentView` を渡していない（`platform/adapter-set.ts`）。Slack 側の現行の仕組み（agent_view）との関係は、下の「実現性の確認の結果」を見ること。
 
 ## Desired Outcome
 
@@ -47,7 +47,7 @@
    - 通知（要件 2）、URL の展開（要件 6）、proxy と GROWI の紐付け（要件 9・10）は、AI では代わりにならないので今のまま残す。
 2. **`keep` は `agent` に吸収する。** proxy が会話を読み、`agent` への依頼に添えて渡し、GROWI の AI が要約してページにする。引き換えに、AI を使わない GROWI では会話の取り込みができなくなる。
 3. **答えは本人にだけ見せる。** 共有したいときは、本人がページの URL を貼り、要件 6 の規則に任せる（`chat-integration-search-private` と同じ規則）。
-4. **答える場所**: チャンネルで頼まれたら、そのスレッドの中で本人にだけ見える形で答え、「AI アプリの画面で続ける」案内を添える。続けてやり取りするなら Slack の AI アプリの画面で行う。Discord は本人にだけ見せる手段が無いので DM。Teams と Mattermost はスレッドの中で本人にだけ見せる（できない場合の扱いは実現性の確認の結果で決める）。
+4. **答える場所**: チャンネルで頼まれたら、そのスレッドの中で本人にだけ見える形で答え、「AI アプリの画面で続ける」案内を添える。続けてやり取りするなら Slack の AI アプリの画面で行う。Discord は本人にだけ見せる手段が無いので DM。Teams と Mattermost はスレッドの中で本人にだけ見せ、できなければ DM にする（下の「実現性の確認の結果」の 2・5・8）。
 5. **答えはあとから届ける。** GROWI はすぐ「受け付けた」と返し、答えができたら新しい口で proxy へ送る。通知と同じ向きと署名なので、閉域の構成でも新しい通信経路は要らない。少しずつの書き出しは、GROWI から proxy へ途中経過を流す仕組みが要るので、今回はやらない。
 6. **GROWI の AI Agent に書き込みの道具は足さない。** 会話の要約は AI に作らせ（`agent.generate` の形）、ページの作成は `create-page` と同じ書き込みの処理（`performWriteCommand`）で行う。`search`・`create-page` と `agent` で、GROWI の処理を 2 通り持たない。
 
@@ -102,6 +102,27 @@
 - **Extends**: `chat-integration`（要件 1・5・11・14、Out of scope、新しい要件 15）、`chat-integration-protocol`、`chat-integration-proxy`、`chat-integration-app`
 - **Adjacent**: `chat-integration-search-private`（同じ規則）、`ai-agentic-search`・`ai-chat-page-mention` など `features/mastra` の spec（AI Agent を使う側として触れるだけで、変えない）
 
+## 実現性の確認の結果（2026-10-26）
+
+サブエージェントが、公式ドキュメントとインストール済みのアダプタのコードで確かめた。出典は各項目に書く。「未確認」とした項目は、requirements か design の段階で実機か文書で確かめる。
+
+1. **Slack の AI アプリの画面は、新しい仕組み（agent_view）で作る。** Slack は 2026-06-30 に、新しく作るアプリは「Agent messaging experience」（agent_view）しか使えないとした。古い仕組み（assistant_view）は将来なくなる（https://docs.slack.dev/changelog/2026/06/30/agent-messages-tab/ 、https://docs.slack.dev/ai/migrating-to-agent-messaging ）。agent_view でも、チャンネルの横の画面は残る。変わる点は次のとおり。
+   - 利用者が画面を開いたことは `app_home_opened`（`tab` が `messages`）で知る。利用者が見ているものは `app_context_changed` で受け取り、`assistant:write` の権限が要る。
+   - マニフェストに `features.agent_view`、`assistant:write`、イベント `app_home_opened`・`app_context_changed`・`agent_session_stopped` を足す。proxy はアダプタに `agentView: true` を渡す。
+   - アダプタ 4.38.1 は `agent_session_stopped`（利用者が止めるボタンを押した）を扱わない。`setStatus`・`setTitle` は廃止予定で、互換の仕組みで当面は動く。
+2. **Slack では、返事の無いメッセージのスレッドに、本人にだけ見えるメッセージを出せないことがある。** `chat.postEphemeral` の文書に「スレッドの中の ephemeral は、スレッドが既にある場合にだけ表示される」とある（https://docs.slack.dev/reference/methods/chat.postEphemeral ）。届くことの保証も無く、再読み込みで消え、あとから書き換えられない。
+   - 実機試験（`register` の登録コード、`link` の URL）では、メンションへの本人だけの返事は届いている。スレッドの中に出たのか、チャンネルに出たのかは確かめていない。
+   - 対策の候補: 先にスレッドへ全員に見える「受け付けました」を返してスレッドを作り、そのあとで本人だけの答えを出す。答えが消えても困らないよう、同じ答えを AI アプリの画面（DM）にも残し、続きはそこで行う。どちらにするかは design で決める。
+3. **Slack Marketplace の外で配布するアプリは、会話の履歴の読み取りが厳しく制限される。** 2025-05-29 以降に作られたアプリ（と新しい導入）は、`conversations.history` が 1 分に 1 回・1 回 15 件までになる。組織が自分で作ったアプリ（社内用）は対象外（https://docs.slack.dev/changelog/2025/05/29/rate-limit-changes-for-non-marketplace-apps ）。
+   - 運用者が自分で Slack アプリを作る custom proxy なら影響は無い。GROWI が運営する 1 つのアプリを多くの workspace に導入する official proxy では、チャンネルの議論の要約は事実上できない。今の `keep`（要件 5）も同じ制限を受ける。
+4. **（未確認・法務の確認が要る）Slack API の利用規約が、データの保存を制限している。** 組織の外に配布するアプリは、API で得たデータを使い・保存するのに、導入する組織から明示の許可を得る必要があり、使い方は最小限にする（https://slack.com/terms-of-service/api ）。会話の要約を GROWI のページとして残すことが、これに当たるかは確かめていない。今の `keep` も同じ論点を持つ。
+5. **Mattermost で本人にだけ見えるメッセージを出すには、システム管理者の権限が要る。** `POST /api/v4/posts/ephemeral` は `create_post_ephemeral` の権限を求め、これは今のところシステム管理者にしか無い。コミュニティ製のアダプタ（`chat-adapter-mattermost@1.1.3`）はこの API を直接呼び、DM に切り替えない。普通の bot ではエラーになる（`chat-integration-search-private` と、今の `tell` にも効く）。
+6. **リンクからチャンネルの横の画面を開く方法は無い。** 文書にある深いリンク（`slack://app?...&tab=messages`、`https://slack.com/app_redirect?...`）は、アプリの Messages タブを開く（https://docs.slack.dev/interactivity/deep-linking ）。案内は「右上の Add agent から GROWI を開く」という文と、`app_redirect` のリンクにする。リンクから来た利用者はチャンネルを見ていないので、どのチャンネルの依頼だったかは proxy 側で覚えておく必要がある（推測、未確認）。
+7. **利用者が見ているものが、いつもチャンネルとは限らない。** `app_context_changed` の中身は関連の強い順の一覧で、canvas や list のこともあり、空のこともある。画面が見えている間だけ届く。bot が参加していないチャンネルは読めない。
+8. **Teams（未確認）**: 本人にだけ見えるメッセージ（targeted message）がスレッドの中に出るかは確かめていない。Microsoft の文書は、targeted message は返信に対応しないとしている（https://learn.microsoft.com/en-us/microsoftteams/platform/agents-in-teams/targeted-messages ）。Teams には、Slack の横の画面にあたるものがアダプタに無い。
+9. **あとから届ける答えの投稿**: Slack のアダプタは、イベントの処理の外では bot トークンを持たない。今の `bindInstallation`（通知の投稿で使っている）の中で投稿する必要がある。少しずつの書き出しは、DM（AI アプリの画面を含む）でなら追加の情報なしで使える。チャンネルのスレッドでは使えず、投稿して書き換える形になる。アダプタは、1 つの workspace で書き出しが使えないと分かると、全 workspace で書き出しを止める。
+10. **（未確認）Slack のプラン**: ヘルプセンターは「全プランで使える」とし、開発者向けの案内は「AI の機能の一部は有料プランが要る」とする。どの機能が当たるかは書かれていない。無料の workspace で試す。
+
 ## Constraints
 
 - 要件 ID を振り直さない。要件 5 を置き換えるときも番号は残す。置き換え方（受け入れ条件を書き換えるか、廃止と明記するか）は requirements の段階で決める。
@@ -118,3 +139,5 @@
 - bot がチャンネルに参加していないと会話を読めないとき（今の要件 5.4 と同じ扱いにする見込み）。
 - AI の利用量を、利用者ごと・GROWI ごとに制限するか。
 - 要件 5 を廃止すると、AI を使わない GROWI で会話の取り込みが無くなる。これを受け入れることの最終確認。
+- official proxy（GROWI が運営する 1 つの Slack アプリ）で、会話の要約を提供するか。Marketplace の外では履歴の読み取りが 1 分に 1 回・15 件までになる（実現性の確認の 3）。Marketplace への掲載は umbrella の Out of scope（公式アプリ審査）なので、custom proxy だけの機能とするかを決める。
+- Slack の本人だけの答えが届かない・消える場合の扱い（実現性の確認の 2）。

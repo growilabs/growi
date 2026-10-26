@@ -103,6 +103,8 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
   - **Discord のスレッド内で打ったスラッシュコマンドの追加入力が結び付かない**: 入力待ちを 4 区切りの `Channel.id`（`discord:<guild>:<parent>:<thread>`）で保存する一方、スレッドでの返答のイベントは 3 区切りの `Thread.channelId` を持つ
   - **DM や一覧にまだ載っていないチャンネルでのコマンドに、的外れな案内が返る**: installation の特定をチャンネル一覧に頼るため、「workspace がまだ登録されていません」と返る（bot が招待された直後は一覧をすぐ取り直すようにしたので、招待後の待ちは無くなった。DM と、bot の招待を伴わずに増えたチャンネルでは残る）
+  - **（疑い・実機未確認）Mattermost で本人にだけ見えるメッセージを出せない**: Mattermost の `POST /api/v4/posts/ephemeral` はシステム管理者の権限（`create_post_ephemeral`）を求め、コミュニティ製のアダプタはこの API を直接呼んで DM に切り替えない。登録コード・紐付けの案内・エラーなど、本人にだけ返すもの（`tell`）がすべて届かないおそれがある。詳しくは [chat-integration-agent の brief](../chat-integration-agent/brief.md) の「実現性の確認の結果」5
+  - **official proxy では Slack の会話の取り込みが事実上使えない**: Slack Marketplace の外で配布するアプリは、2025-05-29 以降、`conversations.history` が 1 分に 1 回・1 回 15 件までに制限される（組織が自分で作るアプリは対象外）。GROWI が運営する 1 つのアプリを多くの workspace に導入する形では、`keep`（要件 5）がこの制限を受ける。同じ brief の 3
 
 ## Scope
 
