@@ -25,6 +25,7 @@ import {
 import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin';
 import { deleteLegacyPasswordsHandlersFactory } from './delete-legacy-passwords';
 import { getPasswordHashStatusHandlersFactory } from './password-hash-status';
+import { getPasswordHashUnmigratedUsersHandlersFactory } from './password-hash-unmigrated-users';
 import { handleSamlUpdate, samlAuthValidator } from './saml';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting');
@@ -1779,6 +1780,11 @@ export const setup = (crowi) => {
   router.get(
     '/password-hash-status',
     ...getPasswordHashStatusHandlersFactory(crowi),
+  );
+
+  router.get(
+    '/password-hash-unmigrated-users',
+    ...getPasswordHashUnmigratedUsersHandlersFactory(crowi),
   );
 
   router.delete(
