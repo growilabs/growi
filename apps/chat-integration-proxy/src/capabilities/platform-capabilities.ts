@@ -31,6 +31,7 @@ import type {
  */
 export type CapabilityName =
   | 'ephemeralMessage'
+  | 'directMessage'
   | 'slashCommand'
   | 'mention'
   | 'modal'
@@ -50,7 +51,16 @@ type CapabilityRow = Readonly<Record<PlatformName, CapabilityLevel>>;
  */
 export const CAPABILITY_TABLE: Readonly<Record<CapabilityName, CapabilityRow>> =
   {
+    // Mattermost is `degraded` because posting in place for one person needs
+    // the bot to hold the system-admin permission; the wire shape has no
+    // per-cell note, so that condition lives only here.
     ephemeralMessage: {
+      slack: 'full',
+      discord: 'none',
+      teams: 'full',
+      mattermost: 'degraded',
+    },
+    directMessage: {
       slack: 'full',
       discord: 'full',
       teams: 'full',
@@ -135,6 +145,8 @@ export const CAPABILITY_TABLE: Readonly<Record<CapabilityName, CapabilityRow>> =
 export const CAPABILITY_SUBSTITUTE: Readonly<
   Partial<Record<CapabilityName, string>>
 > = {
+  // 本人への DM で届ける
+  ephemeralMessage: 'Send it to that person as a direct message instead.',
   // mention で起動する（決定 4）
   slashCommand: 'Invoke the command by mentioning the bot instead.',
   // コマンド行の引数 + 聞き返し（決定 5）

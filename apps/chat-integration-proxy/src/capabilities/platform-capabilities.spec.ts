@@ -48,8 +48,8 @@ describe('CAPABILITY_TABLE completeness', () => {
 
 describe('supports()', () => {
   it('returns true only when the level is full', () => {
-    expect(supports('ephemeralMessage', 'slack')).toBe(true);
-    expect(levelOf('ephemeralMessage', 'slack')).toBe('full');
+    expect(supports('directMessage', 'slack')).toBe(true);
+    expect(levelOf('directMessage', 'slack')).toBe('full');
   });
 
   it('returns false for a degraded capability (Mattermost card)', () => {
@@ -88,6 +88,16 @@ describe('design.md-declared capability values (spot checks)', () => {
     expect(levelOf('linkPreview', 'teams')).toBe('none');
     expect(levelOf('linkPreview', 'mattermost')).toBe('none');
     expect(levelOf('fetchMessages', 'teams')).toBe('full');
+  });
+
+  it('declares how a message reaches one person alone: ephemeral per service, DM everywhere', () => {
+    expect(levelOf('ephemeralMessage', 'slack')).toBe('full');
+    expect(levelOf('ephemeralMessage', 'discord')).toBe('none');
+    expect(levelOf('ephemeralMessage', 'teams')).toBe('full');
+    expect(levelOf('ephemeralMessage', 'mattermost')).toBe('degraded');
+    for (const platform of ALL_PLATFORMS) {
+      expect(levelOf('directMessage', platform)).toBe('full');
+    }
   });
 });
 
@@ -186,7 +196,16 @@ describe('buildCapabilityReport() (Requirement 1.3)', () => {
     expect(substituteOf('slack', 'plainReply')).toEqual(expect.any(String));
     // `—` in design.md's column: nothing to fall back to even where the
     // capability is missing.
+    // ephemeralMessage falls back to a DM where it is missing or degraded;
+    // directMessage has no fallback (`—`).
+    expect(substituteOf('discord', 'ephemeralMessage')).toBe(
+      'Send it to that person as a direct message instead.',
+    );
+    expect(substituteOf('mattermost', 'ephemeralMessage')).toBe(
+      'Send it to that person as a direct message instead.',
+    );
     expect(substituteOf('slack', 'ephemeralMessage')).toBeNull();
+    expect(substituteOf('discord', 'directMessage')).toBeNull();
   });
 
   it("reports slashCommand as none for every service, Requirement 1.3's stated value (task 12.2)", () => {
