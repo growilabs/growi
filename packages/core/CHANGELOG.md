@@ -1,5 +1,11 @@
 # @growi/core
 
+## 3.1.1
+
+### Patch Changes
+
+- [#11893](https://github.com/growilabs/growi/pull/11893) [`7d3c061`](https://github.com/growilabs/growi/commit/7d3c06199d8267bcf651b167b3bfbcdc6752d02d) Thanks [@Ryosei-Fukushima](https://github.com/Ryosei-Fukushima)! - Add callout variant constants (`AllCallout` / `Callout`) to `@growi/core` as the single source of truth, shared by the callout renderer and the editor slash commands.
+
 ## 3.1.0
 
 ### Minor Changes

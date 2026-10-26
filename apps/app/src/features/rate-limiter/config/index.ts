@@ -23,6 +23,11 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     maxRequests: 60,
     usersPerIpProspection: 1,
   },
+  '/_api/v3/ai-usage': {
+    method: 'GET',
+    maxRequests: MAX_REQUESTS_TIER_1,
+    usersPerIpProspection: 1,
+  },
   '/installer': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,

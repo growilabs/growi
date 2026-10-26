@@ -9,7 +9,6 @@ import type { Express } from 'express';
 import expressFactory from 'express';
 import expressSession from 'express-session';
 import mongoose from 'mongoose';
-import uidSafe from 'uid-safe';
 
 import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
@@ -76,6 +75,7 @@ import { UserNotificationService } from '../service/user-notification';
 import { initializeYjsService } from '../service/yjs';
 import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
 import { setup as setupExpressInit } from './express-init';
+import { createSessionIdGenerator, FIXED_SESSION_ID_PATHS } from './session-id';
 import type { ModelsMapDependentOnCrowi } from './setup-models';
 import { setupModelsDependentOnCrowi } from './setup-models';
 
@@ -335,12 +335,20 @@ class Crowi {
    * Execute functions that should be run after the express server is ready.
    */
   async asyncAfterExpressServerReady(): Promise<void> {
+    // Fire-and-forget so a slow or failed check never delays the steps below.
+    import('~/features/ai-usage/server')
+      .then(({ warnIfUsageBaseModelInvalid }) => warnIfUsageBaseModelInvalid())
+      .catch((err) => {
+        logger.warn('Failed to validate ai:usageBaseModel at startup', err);
+      });
+
     if (this.pageOperationService != null) {
       await this.pageOperationService.afterExpressServerReady();
     }
 
-    // One-shot model-catalog refresh (no-op unless AI is enabled AND
-    // ai:modelCatalogRefreshOnStartup is true). Fire-and-forget inside — a
+    // One-shot model-catalog refresh (no-op unless the refresh is allowed: AI
+    // enabled or disabled for catalog_stale, and ai:modelCatalogRefreshOnStartup
+    // is true). Fire-and-forget inside — a
     // failure only logs and the bundled/last-good catalog stays in effect.
     const { triggerModelCatalogRefreshOnStartupIfEnabled } = await import(
       '~/features/mastra/server/services/model-catalog-refresh-jobs'
@@ -401,11 +409,6 @@ class Crowi {
       this.env.REDIS_URI ||
       this.env.REDIS_URL ||
       null;
-    const uid = uidSafe.sync;
-
-    // generate pre-defined uid for healthcheck
-    const healthcheckUid = uid(24);
-
     const sessionConfig: SessionConfig = {
       rolling: true,
       secret: this.env.SECRET_TOKEN || 'this is default session secret',
@@ -414,13 +417,7 @@ class Crowi {
       cookie: {
         maxAge: sessionMaxAge,
       },
-      genid(req) {
-        // return pre-defined uid when healthcheck
-        if (req.path === '/_api/v3/healthcheck') {
-          return healthcheckUid;
-        }
-        return uid(24);
-      },
+      genid: createSessionIdGenerator(FIXED_SESSION_ID_PATHS),
     };
 
     if (this.env.SESSION_NAME) {
@@ -516,7 +513,7 @@ class Crowi {
     );
     startWipPageCleanupCronIfEnabled(this);
 
-    // Periodic model-catalog refresh (no-op unless AI is enabled; the schedule
+    // Periodic model-catalog refresh (no-op unless the refresh is allowed; the schedule
     // defaults to daily and can be disabled with an empty ai:modelCatalogRefreshCronSchedule)
     const { startModelCatalogRefreshCronIfEnabled } = await import(
       '~/features/mastra/server/services/model-catalog-refresh-jobs'

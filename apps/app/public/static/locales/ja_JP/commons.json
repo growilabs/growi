@@ -9,14 +9,14 @@
   "New": "作成",
   "Send": "送信",
   "Clear": "クリア",
-  "Close": "閉じる",
-  "Done": "完了",
   "Delete": "削除",
   "Cancel": "キャンセル",
+  "Close": "閉じる",
   "Confirm": "確認",
   "Create": "作成",
   "Created": "作成日",
   "Description": "説明",
+  "Done": "完了",
   "Edit": "編集",
   "Email": "メールアドレス",
   "Error occurred": "エラーが発生しました",
@@ -35,13 +35,13 @@
   },
   "toaster": {
     "add_succeeded": "新しい{{target}}が追加されました",
-    "delete_succeeded": "{{target}} の削除に成功しました",
     "create_failed": "{{target}}の作成に失敗しました",
     "create_succeeded": "新しい{{target}}が作成されました",
-    "update_failed": "{{target}}の更新に失敗しました",
-    "update_successed": "{{target}}を更新しました",
+    "delete_succeeded": "{{target}} の削除に成功しました",
     "remove_share_link": "共有リンクを{{count}}件削除しました",
-    "remove_share_link_success": "{{shareLinkId}}を削除しました"
+    "remove_share_link_success": "{{shareLinkId}}を削除しました",
+    "update_failed": "{{target}}の更新に失敗しました",
+    "update_successed": "{{target}}を更新しました"
   },
   "alert": {
     "siteUrl_is_not_set": "'サイトURL' が設定されていません。{{link}} から設定してください。",
@@ -150,7 +150,7 @@
     "publish_transfer_key": "移行キーを発行する",
     "transfer_key_limit": "※ 移行キーの有効期限は発行から1時間となります。",
     "once_transfer_key_used": "※ 移行キーは一度移行に利用するとそれ以降はご利用いただけなくなります。",
-    "transfer_to_growi_cloud": "※ 詳しくは <a href='{{documentationUrl}}/ja/admin-guide/management-cookbook/g2g-transfer.html'> GROWI お引越し機能</a>をご確認ください。"
+    "transfer_to_growi_cloud": "※ 詳しくは <a href='{{documentationUrl}}ja/admin-guide/management-cookbook/g2g-transfer.html'> GROWI お引越し機能</a>をご確認ください。"
   },
   "accesstoken_scopes_desc": {
     "read": {

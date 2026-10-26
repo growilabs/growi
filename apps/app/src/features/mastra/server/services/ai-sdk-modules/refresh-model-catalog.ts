@@ -33,8 +33,9 @@ export interface RefreshModelCatalogResult {
  * app instances.
  *
  * This is the ONLY runtime path that performs external communication, and it
- * runs solely when explicitly triggered (admin request, opt-in startup
- * refresh, or opt-in cron — Req 9.6). Any failure (network, HTTP status,
+ * runs solely when triggered (admin request, startup refresh, or the periodic
+ * cron), the automatic triggers being gated by isCatalogRefreshAllowed in
+ * model-catalog-refresh-jobs (Req 9.6). Any failure (network, HTTP status,
  * schema drift, empty provider) throws BEFORE anything is persisted, so the
  * last-good catalog (a previous refresh, or the bundled asset) stays in effect
  * (Req 9.4).

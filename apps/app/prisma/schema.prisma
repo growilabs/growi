@@ -94,6 +94,30 @@ model activities {
   @@index([createdAt], map: "createdAt_1")
 }
 
+model aiusagelogs {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  v                Int      @default(0) @map("__v")
+  userId           String   @db.ObjectId
+  feature          String
+  provider         String
+  modelId          String
+  callCount        Int
+  inputTokens      Int
+  outputTokens     Int
+  // Nullable fields are always written (as null when absent), never omitted:
+  // the usage aggregation counts a null weightedUnits as "unknown".
+  reasoningTokens  Int?
+  cacheReadTokens  Int?
+  cacheWriteTokens Int?
+  estimatedCostUsd Float?
+  weightedUnits    Float?
+  baseModelKey     String?
+  createdAt        DateTime @default(now())
+
+  // TTL (expireAfterSeconds: 90 days) is created by the Mongoose schema.
+  @@index([createdAt], map: "createdAt_1")
+}
+
 model attachments {
   id                    String    @id @default(auto()) @map("_id") @db.ObjectId
   v                     Int       @default(0) @map("__v")
