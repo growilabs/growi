@@ -18,7 +18,10 @@ import {
   inventoryChannelIdOfEvent,
   REQUIRES_INBOUND_REACHABILITY,
 } from '../capabilities/index.js';
-import { createArgumentCollector } from '../command/index.js';
+import {
+  createArgumentCollector,
+  createPrivateReplier,
+} from '../command/index.js';
 import {
   createChannelPermissionRepository,
   createInstallationChannelRepository,
@@ -64,6 +67,7 @@ import type {
   SdkChannelRef,
 } from '../types/index.js';
 import type { ProxyConfig } from './config.js';
+import { describePlace } from './describe-place.js';
 import {
   ensureMattermostInstallations,
   type MattermostInstallationFailure,
@@ -284,6 +288,18 @@ export const createProxyDependencies = async (
     }
     return null;
   };
+
+  // Not handed to any flow yet; each flow takes it when its own task lands.
+  const privateReplier = createPrivateReplier({
+    platform: facade,
+    describePlace: (channel) =>
+      describePlace({ installations, channels }, channel),
+    resolveInstallationId,
+    reportUndeliverable: (fact) =>
+      reporters.reportOperationalFailure(
+        `a private reply could not be delivered in ${fact.platform} channel ${fact.channelId}: the ephemeral message failed (${fact.ephemeralFailure}) and the direct message failed (${fact.directFailure})`,
+      ),
+  });
 
   /**
    * `AdminFlowDeps.observeActorRoles` -- the gap task 7.3 left open, filled the
