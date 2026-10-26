@@ -1,7 +1,10 @@
 import { type DeepMockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
 import { REQUIRES_INBOUND_REACHABILITY } from '../capabilities/index.js';
-import { testSdkChannel } from '../capabilities/test-channels.js';
+import {
+  testSdkChannel,
+  testSdkChannelId,
+} from '../capabilities/test-channels.js';
 import type { PrismaClient } from '../db/index.js';
 import type { ConnectionManager, PlatformFacade } from '../platform/index.js';
 import type {
@@ -127,7 +130,9 @@ describe('createProxyDependencies', () => {
       reporters: { reportOperationalFailure },
     });
 
-    expect(createFacade.mock.calls[0]?.[3]).toBe(reportOperationalFailure);
+    expect(createFacade.mock.calls[0]?.[3]?.reportOperationalFailure).toBe(
+      reportOperationalFailure,
+    );
   });
 
   it('gives the facade a sink that is already wired, so an event arriving on the first connection is handled', async () => {
@@ -371,6 +376,53 @@ describe('the periodic work createProxyDependencies composes', () => {
     // the walk is over the declared services, not over one hard-coded name.
     expect(new Set(ids)).toEqual(new Set(['inst-1', 'inst-2']));
     expect(ids).toHaveLength(8);
+  });
+});
+
+describe('the bot being added to a channel', () => {
+  it('refreshes that installation through the same refresh the sweeper and the install path use', async () => {
+    const db = mockDeep<PrismaClient>();
+    const facade = facadeMock();
+    vi.mocked(facade.listChannels).mockResolvedValue({
+      channels: [
+        {
+          platform: 'slack',
+          channelId: testSdkChannelId('slack', 'C9'),
+          channelName: 'just-invited',
+          isPrivate: true,
+        },
+      ],
+    });
+    let refreshChannels: ((installationId: string) => Promise<void>) | null =
+      null;
+
+    await createProxyDependencies(config(), {
+      createDb: () => db,
+      createFacade: (_appConfig, _installations, _sink, callbacks) => {
+        refreshChannels = callbacks?.refreshChannels ?? null;
+        return Promise.resolve(facade);
+      },
+    });
+    if (refreshChannels == null) {
+      throw new Error('the facade was given no way to refresh an inventory');
+    }
+
+    await (refreshChannels as (installationId: string) => Promise<void>)(
+      'inst-1',
+    );
+
+    expect(facade.listChannels).toHaveBeenCalledWith('inst-1');
+    expect(db.installationChannel.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          installationId: 'inst-1',
+          channelId: testSdkChannelId('slack', 'C9'),
+        }),
+      }),
+    );
+    expect(db.installation.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'inst-1' } }),
+    );
   });
 });
 

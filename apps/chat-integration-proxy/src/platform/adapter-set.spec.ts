@@ -7,6 +7,9 @@
 // `if (platform === 'slack')`. The Chat SDK's own adapter behavior is not
 // re-tested here -- it is third-party code.
 
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createSlackAdapter, type SlackAdapter } from '@chat-adapter/slack';
 import type { PlatformName } from '@growi/chat';
 import type { Adapter } from 'chat';
 import { mock } from 'vitest-mock-extended';
@@ -179,5 +182,103 @@ describe('createChatState', () => {
       FULL_APP_CONFIG.stateConnectionString,
     );
     await state.disconnect();
+  });
+});
+
+describe("Slack's workspace of the event being handled", () => {
+  // Driven through the REAL adapter against a local stand-in for Slack's Web
+  // API: what is under test is that the adapter's own per-event client (the
+  // token `withBotToken` binds here, as an incoming event does in production)
+  // is what gets asked, and how its answer maps onto `installation.workspace_id`.
+  let server: Server;
+  let apiUrl: string;
+  const answers = new Map<string, Record<string, unknown>>();
+  const askedWith: Array<string | undefined> = [];
+
+  beforeEach(async () => {
+    answers.clear();
+    askedWith.length = 0;
+    server = createServer((request, response) => {
+      const authorization = request.headers.authorization;
+      askedWith.push(authorization);
+      request.resume();
+      request.on('end', () => {
+        const token = authorization?.replace(/^Bearer /, '') ?? '';
+        response.setHeader('content-type', 'application/json');
+        response.end(
+          JSON.stringify(
+            request.url?.endsWith('/auth.test')
+              ? (answers.get(token) ?? { ok: false, error: 'invalid_auth' })
+              : { ok: false, error: 'unknown_method' },
+          ),
+        );
+      });
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, '127.0.0.1', resolve),
+    );
+    apiUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/`;
+  });
+
+  afterEach(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  const slackAdapter = (): SlackAdapter =>
+    createSlackAdapter({
+      mode: 'socket',
+      appToken: 'xapp-1-test',
+      signingSecret: 'signing-secret',
+      installationProvider: { getInstallation: async () => null },
+      apiUrl,
+    });
+
+  const workspaceOfEventAs = (botToken: string): Promise<string> => {
+    const factory = ADAPTER_FACTORIES.slack;
+    if (
+      factory.credentialSource !== 'app' ||
+      factory.workspaceOfEvent == null
+    ) {
+      throw new Error(
+        'Slack declares no way to read the workspace of an event',
+      );
+    }
+    const read = factory.workspaceOfEvent;
+    const adapter = slackAdapter();
+    return adapter.withBotToken(botToken, () => read(adapter));
+  };
+
+  it('answers the team for a workspace install, asked with the bot token of the event', async () => {
+    answers.set('xoxb-team', {
+      ok: true,
+      team_id: 'T2',
+      user_id: 'UBOT',
+      is_enterprise_install: false,
+    });
+
+    await expect(workspaceOfEventAs('xoxb-team')).resolves.toBe('T2');
+    expect(askedWith).toEqual(['Bearer xoxb-team']);
+  });
+
+  it('answers the enterprise for an org-wide install, the key the OAuth callback stores it under', async () => {
+    answers.set('xoxb-org', {
+      ok: true,
+      team_id: 'T9',
+      enterprise_id: 'E1',
+      user_id: 'UBOT',
+      is_enterprise_install: true,
+    });
+
+    await expect(workspaceOfEventAs('xoxb-org')).resolves.toBe('E1');
+  });
+
+  it('fails rather than guessing when Slack refuses the token', async () => {
+    await expect(workspaceOfEventAs('xoxb-revoked')).rejects.toThrow();
+  });
+
+  it('fails rather than guessing when Slack names no workspace', async () => {
+    answers.set('xoxb-odd', { ok: true, user_id: 'UBOT' });
+
+    await expect(workspaceOfEventAs('xoxb-odd')).rejects.toThrow();
   });
 });

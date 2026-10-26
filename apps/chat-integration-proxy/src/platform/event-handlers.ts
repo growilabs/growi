@@ -9,6 +9,8 @@
 // host rather than something index.ts spells out twice.
 import type {
   ActionEvent,
+  Adapter,
+  MemberJoinedChannelEvent,
   Message,
   ModalSubmitEvent,
   SlashCommandEvent,
@@ -44,12 +46,21 @@ export interface HandlerHost {
     handler: (event: ModalSubmitEvent) => Promise<void>,
   ): void;
   onSlashCommand(handler: (event: SlashCommandEvent) => Promise<void>): void;
+  onMemberJoinedChannel(
+    handler: (event: MemberJoinedChannelEvent) => Promise<void>,
+  ): void;
 }
 
 export interface EventHandlerDeps {
   readonly sink: PlatformEventSink;
   /** Holds each in-flight event's own way of opening a modal (`prompt.ts`). */
   readonly modals: ModalTriggerRegistry;
+  /**
+   * The bot itself was added to a channel, on the adapter serving that event
+   * (`bot-joined-channel.ts`). Not a `PlatformEvent`: no user is asking
+   * anything, so it has no business in the sink's routing.
+   */
+  readonly onBotJoinedChannel?: (adapter: Adapter) => Promise<void>;
 }
 
 /**
@@ -133,4 +144,13 @@ export const registerEventHandlers = (
   host.onModalSubmit(MODAL_CALLBACK_ID, (event) =>
     dispatch(deps, fromModalSubmit(event)),
   );
+
+  // Anyone joining fires this; only the bot's own join changes what it can
+  // see. `botUserId` is read from the adapter rather than the event because
+  // an adapter serving many workspaces holds a different bot per workspace.
+  host.onMemberJoinedChannel(async (event) => {
+    const botUserId = event.adapter.botUserId;
+    if (botUserId == null || event.userId !== botUserId) return;
+    await deps.onBotJoinedChannel?.(event.adapter);
+  });
 };

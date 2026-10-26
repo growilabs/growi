@@ -75,6 +75,14 @@ export type AdapterFactory =
         },
         work: () => Promise<T>,
       ) => Promise<T>;
+      /**
+       * The reverse of `bindInstallation`, for an event that does not name
+       * its workspace (the bot being added to a channel): which workspace --
+       * the key `installation.workspace_id` is stored under -- `adapter` is
+       * speaking for while it handles the current event. Called only inside
+       * that event's handling. Throws when the service cannot say.
+       */
+      readonly workspaceOfEvent?: (adapter: Adapter) => Promise<string>;
     }
   | {
       readonly credentialSource: 'installation';
@@ -142,6 +150,24 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
         return adapter.withBotToken(botToken, work, {
           installationId: workspaceId,
         });
+      },
+      // `member_joined_channel` carries no team or enterprise id, but the
+      // adapter has already bound that workspace's bot token for the event,
+      // and `auth.test` answers whose token it is. Read the same way
+      // `oauth-callback.ts` stores `workspace_id`.
+      workspaceOfEvent: async (adapter) => {
+        if (!(adapter instanceof SlackAdapter)) {
+          throw new TypeError('a Slack lookup was handed a non-Slack adapter');
+        }
+        const answer = await adapter.webClient.auth.test();
+        const workspaceId =
+          answer.is_enterprise_install === true
+            ? answer.enterprise_id
+            : answer.team_id;
+        if (workspaceId == null || workspaceId === '') {
+          throw new Error('Slack auth.test named no workspace');
+        }
+        return workspaceId;
       },
     },
     discord: {

@@ -208,14 +208,21 @@ export const createProxyDependencies = async (
     config.platformApp,
     createInstallationProvider(installations),
     deferred.sink,
-    reporters.reportOperationalFailure,
+    {
+      reportOperationalFailure: reporters.reportOperationalFailure,
+      // A forward reference, the same knot as the sink's: `refreshChannels`
+      // lists through this facade. It only runs once a connection delivers an
+      // event, and `server.ts` opens connections after this function returns.
+      refreshChannels: (installationId) => refreshChannels(installationId),
+    },
   );
 
   /**
-   * Re-takes one installation's channel inventory. Shared by the two callers
-   * design.md names: `InstallationStore.save()`'s 「最初の 1 回」, and the
-   * periodic run below -- one closure, so the two cannot drift into refreshing
-   * by different rules.
+   * Re-takes one installation's channel inventory. Shared by every caller --
+   * design.md's two, `InstallationStore.save()`'s 「最初の 1 回」 and the
+   * periodic run below, plus the bot being added to a channel (the facade
+   * above) -- one closure, so they cannot drift into refreshing by different
+   * rules.
    */
   const refreshChannels = (installationId: string): Promise<void> =>
     refreshChannelInventory(

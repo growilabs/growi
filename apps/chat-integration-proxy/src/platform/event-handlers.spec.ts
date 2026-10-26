@@ -7,8 +7,10 @@
 // handle is minted from the event that can actually open one.
 import type {
   ActionEvent,
+  Adapter,
   Author,
   Channel,
+  MemberJoinedChannelEvent,
   Message,
   ModalSubmitEvent,
   SlashCommandEvent,
@@ -59,6 +61,7 @@ interface Registered {
   modalCallbackId?: string;
   modalSubmit?: (event: ModalSubmitEvent) => Promise<void>;
   slashCommand?: (event: SlashCommandEvent) => Promise<void>;
+  memberJoined?: (event: MemberJoinedChannelEvent) => Promise<void>;
 }
 
 const fakeHost = (): { host: HandlerHost; registered: Registered } => {
@@ -83,12 +86,16 @@ const fakeHost = (): { host: HandlerHost; registered: Registered } => {
       onSlashCommand(handler) {
         registered.slashCommand = handler;
       },
+      onMemberJoinedChannel(handler) {
+        registered.memberJoined = handler;
+      },
     },
   };
 };
 
 const setUp = () => {
   const handled: PlatformEvent[] = [];
+  const botJoinedThrough: Adapter[] = [];
   const { host, registered } = fakeHost();
   const modals = createModalTriggerRegistry();
 
@@ -100,9 +107,13 @@ const setUp = () => {
       },
     },
     modals,
+    onBotJoinedChannel: (adapter) => {
+      botJoinedThrough.push(adapter);
+      return Promise.resolve();
+    },
   });
 
-  return { handled, registered, modals };
+  return { handled, botJoinedThrough, registered, modals };
 };
 
 describe('messages', () => {
@@ -310,5 +321,41 @@ describe('modal submissions', () => {
         values: { path: '/memo' },
       },
     ]);
+  });
+});
+
+describe('someone joining a channel', () => {
+  const joined = (
+    userId: string,
+    adapter: Adapter,
+  ): MemberJoinedChannelEvent => ({
+    userId,
+    // The SDK form, `slack:<channel>:` with an empty thread part.
+    channelId: 'slack:C0009:',
+    inviterId: 'U0001',
+    adapter,
+  });
+
+  it('reports the bot itself being added, with the adapter that is serving the event', async () => {
+    const { botJoinedThrough, handled, registered } = setUp();
+    const adapter = mock<Adapter>({ name: 'slack', botUserId: 'UBOT' });
+
+    await registered.memberJoined?.(joined('UBOT', adapter));
+
+    expect(botJoinedThrough).toHaveLength(1);
+    expect(botJoinedThrough[0]).toBe(adapter);
+    // Not a conversation: nothing reaches the command side.
+    expect(handled).toEqual([]);
+  });
+
+  it('ignores a person joining', async () => {
+    const { botJoinedThrough, registered } = setUp();
+    expect(registered.memberJoined).toBeDefined();
+
+    await registered.memberJoined?.(
+      joined('U0002', mock<Adapter>({ name: 'slack', botUserId: 'UBOT' })),
+    );
+
+    expect(botJoinedThrough).toEqual([]);
   });
 });

@@ -42,6 +42,7 @@ import {
   createInstallationAdapter,
 } from './adapter-set.js';
 import { BOT_USER_NAME, createDistributedLock } from './bot-factory.js';
+import { refreshOnBotJoin } from './bot-joined-channel.js';
 import { CHANNEL_LISTERS, listChannels as listChannelsOf } from './channels.js';
 import {
   type ConnectionManager,
@@ -202,6 +203,14 @@ const createPlatformBot = (
   deps: {
     readonly sink: PlatformEventSink;
     readonly modals: ModalTriggerRegistry;
+    readonly installations: InstallationProvider;
+    readonly refreshChannels?: (installationId: string) => Promise<void>;
+    readonly reportOperationalFailure: (
+      message: string,
+      error?: unknown,
+    ) => void;
+    /** Set for a connection opened for this one installation. */
+    readonly installationId?: string;
   },
 ): PlatformBot => {
   const chat = new Chat({
@@ -209,7 +218,23 @@ const createPlatformBot = (
     state,
     userName: BOT_USER_NAME,
   });
-  registerEventHandlers(chat, deps);
+  const { refreshChannels, installationId } = deps;
+  registerEventHandlers(chat, {
+    sink: deps.sink,
+    modals: deps.modals,
+    ...(refreshChannels == null
+      ? {}
+      : {
+          onBotJoinedChannel: refreshOnBotJoin({
+            platform,
+            ...(installationId == null ? {} : { installationId }),
+            factories: ADAPTER_FACTORIES,
+            installations: deps.installations,
+            refreshChannels,
+            reportOperationalFailure: deps.reportOperationalFailure,
+          }),
+        }),
+  });
   return { platform, adapter, chat };
 };
 
@@ -217,15 +242,30 @@ export const createPlatformFacade = async (
   appConfig: PlatformAppConfig,
   installations: InstallationProvider,
   sink: PlatformEventSink,
-  /**
-   * Where a fact the operator has to see is reported, on a path that has
-   * already answered its caller -- the same shape `InstallationStoreDeps`
-   * takes for a failed channel refresh. Optional so a caller that reports
-   * nothing still gets a working facade; `runtime/dependencies.ts` passes its
-   * own reporter.
-   */
-  reportOperationalFailure?: (message: string, error?: unknown) => void,
+  /** What this layer calls back into. Each is optional; see each one. */
+  callbacks: {
+    /**
+     * Where a fact the operator has to see is reported, on a path that has
+     * already answered its caller -- the same shape `InstallationStoreDeps`
+     * takes for a failed channel refresh. Optional so a caller that reports
+     * nothing still gets a working facade; `runtime/dependencies.ts` passes
+     * its own reporter.
+     */
+    readonly reportOperationalFailure?: (
+      message: string,
+      error?: unknown,
+    ) => void;
+    /**
+     * Re-takes one installation's channel inventory -- the closure
+     * `InstallationStore.save()` and the sweeper are given. Run when the bot
+     * itself is added to a channel, so a command typed there right after
+     * resolves without waiting for the periodic refresh. Without it a join
+     * changes nothing until that refresh.
+     */
+    readonly refreshChannels?: (installationId: string) => Promise<void>;
+  } = {},
 ): Promise<PlatformFacade> => {
+  const { reportOperationalFailure, refreshChannels } = callbacks;
   // `PostgresStateAdapter` does not connect lazily -- every one of its methods
   // throws until `connect()` has resolved -- which is why this function is
   // asynchronous (design.md).
@@ -234,7 +274,14 @@ export const createPlatformFacade = async (
 
   const locks = createDistributedLock(state);
   const modals = createModalTriggerRegistry();
-  const handlerDeps = { sink, modals };
+  const handlerDeps = {
+    sink,
+    modals,
+    installations,
+    ...(refreshChannels == null ? {} : { refreshChannels }),
+    reportOperationalFailure: (message: string, error?: unknown) =>
+      reportOperationalFailure?.(message, error),
+  };
 
   const appAdapters = createAppAdapters(appConfig, ADAPTER_FACTORIES, {
     installations,
@@ -317,7 +364,10 @@ export const createPlatformFacade = async (
     );
     if (adapter == null) throw new Error(unaddressable(unit.platform));
 
-    const bot = createPlatformBot(unit.platform, adapter, state, handlerDeps);
+    const bot = createPlatformBot(unit.platform, adapter, state, {
+      ...handlerDeps,
+      installationId: unit.installationId,
+    });
     await adapter.initialize(bot.chat);
     installationBots.set(unit.installationId, bot);
   };
