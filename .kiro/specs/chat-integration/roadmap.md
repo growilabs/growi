@@ -64,6 +64,12 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - **今の実装との差**: 画面は `AccountLinkApproval.tsx` で、文言が英語の直書き（i18n 未対応）。出せる情報は `platform`・`accountId`（Slack なら `U…` の ID のみ）・`workspaceName`・`relationLabel`・`growiUsername`。チャットアカウントの表示名は `chat_account_link_orders` に保存していないので、表示名を出すなら注文を作るとき（`account-link-start` の `actor.displayName`）に保存する必要がある
   - **想定される影響範囲**: `chat-integration-app` が中心（画面・レイアウト・注文の保存項目）。表示名を保存するだけなら protocol の契約は変わらない
   - **次にやること**: 規模が小さければ `chat-integration-app` の amend spec、そうでなければ `/kiro-discovery` から着手する
+- **管理画面と通知の見た目の改善**: 実機試験（2026-10-26、Slack）で次の点に気付いた。動作は正しいが、見た目と使い勝手を直す。
+  - **管理画面（`/admin/chat-integration`）**: Connected workspaces の「What this service can do」の表示が冗長。Notification destinations と Channel permissions を、それぞれ見出しのあるセクションに分けて見やすくする（画面は `AdminChatIntegration.tsx` など。文言は英語の直書きで i18n 未対応）
+  - **ページの編集画面**: 「Chat notification channels」が縦に長く、編集画面のレイアウトを崩している（要件2.2 の保存時の通知先の選択）
+  - **Slack への通知の文面**: メッセージの書式が洗練されていない。ページ名・変更の種類・変更した人・リンクを読みやすく並べる。Slack の Block Kit など、サービスごとの表現を使うかも含めて検討する
+  - **想定される影響範囲**: 管理画面と編集画面は `chat-integration-app`。通知の文面は GROWI が組み立てる markdown（`chat-integration-app`）と、proxy がサービスごとに描く部分（`chat-integration-proxy` の `outbound.ts`）の両方にまたがりうる
+  - **次にやること**: 小さければ `chat-integration-app` の amend spec にまとめる。上の「コマンドの再編」に着手するなら、それと合わせて見直す
 - **ユーザー向けコマンドを `search`・`create-page`・`agent` に再編する検討**: 実機試験の途中（2026-10-26）で、機能の在り方を見直した。
   - **方針（決定）**: AI に手伝ってもらう書き込み・検索は、**AI から GROWI MCP を使う形（利用者ごとの認証）を本筋にする**。特定の AI 製品には寄せない（Slack に組み込まれた AI アプリなど、どの AI からでもよい）
   - **候補（決定）**: チャットのコマンドは `search`・`create-page`・`agent` の 3 つにする。`agent`（例: `@GROWI agent "～～を探して"`）は依頼を GROWI の AI Agent に渡す。編集や要約を伴う依頼は `agent` に任せ、単純な作成と検索は AI なしで速く済ませる
