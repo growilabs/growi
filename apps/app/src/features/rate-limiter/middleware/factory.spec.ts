@@ -143,21 +143,14 @@ describe('middlewareFactory', () => {
     ['/_api/v3/login', '/_api/v3//login', 'POST'],
     ['/_api/v3/login', '/_API/v3//LOGIN//', 'POST'],
     ['/_api/v3/invited', '/_api/v3/invited//', 'POST'],
-    [
-      '/_api/v3/forgot-password',
-      '/_api/v3//forgot-password//',
-      'PUT',
-    ],
-  ])(
-    'uses the same per-IP bucket and limit for %s and %s',
-    async (canonicalPath, variantPath, method) => {
-      const canonical = await consumeCallsFor(canonicalPath, method);
-      const variant = await consumeCallsFor(variantPath, method);
+    ['/_api/v3/forgot-password', '/_api/v3//forgot-password//', 'PUT'],
+  ])('uses the same per-IP bucket and limit for %s and %s', async (canonicalPath, variantPath, method) => {
+    const canonical = await consumeCallsFor(canonicalPath, method);
+    const variant = await consumeCallsFor(variantPath, method);
 
-      expect(variant[0]?.key).toBe(canonical[0]?.key);
-      expect(variant[0]?.config?.maxRequests).toBe(
-        canonical[0]?.config?.maxRequests,
-      );
-    },
-  );
+    expect(variant[0]?.key).toBe(canonical[0]?.key);
+    expect(variant[0]?.config?.maxRequests).toBe(
+      canonical[0]?.config?.maxRequests,
+    );
+  });
 });
