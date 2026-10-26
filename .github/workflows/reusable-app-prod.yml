@@ -209,8 +209,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (!inputs.skip-e2e-test && startsWith(github.head_ref, 'mergify/merge-queue/'))
 
-    # Playwright does not support chromium on ubuntu26.04 yet; keep both Playwright jobs on the same image
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
@@ -246,7 +245,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (!inputs.skip-e2e-test && startsWith(github.head_ref, 'mergify/merge-queue/'))
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     # Playwright spawns `pnpm run server` inside the extracted prod dir via
     # GROWI_WEBSERVER_COMMAND. That dir lacks pnpm-workspace.yaml and packages/*,
