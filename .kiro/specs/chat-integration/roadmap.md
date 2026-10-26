@@ -64,6 +64,18 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - **今の実装との差**: 画面は `AccountLinkApproval.tsx` で、文言が英語の直書き（i18n 未対応）。出せる情報は `platform`・`accountId`（Slack なら `U…` の ID のみ）・`workspaceName`・`relationLabel`・`growiUsername`。チャットアカウントの表示名は `chat_account_link_orders` に保存していないので、表示名を出すなら注文を作るとき（`account-link-start` の `actor.displayName`）に保存する必要がある
   - **想定される影響範囲**: `chat-integration-app` が中心（画面・レイアウト・注文の保存項目）。表示名を保存するだけなら protocol の契約は変わらない
   - **次にやること**: 規模が小さければ `chat-integration-app` の amend spec、そうでなければ `/kiro-discovery` から着手する
+- **`search`・`create-page`・`keep`（要件3・4・5）を削り、chat-integration を簡素にする検討**: 実機試験の途中（2026-10-26）で、機能の在り方を見直した。
+  - **方針（決定）**: AI に手伝ってもらう書き込み・検索は、**AI から GROWI MCP を使う形（利用者ごとの認証）を本筋にする**。特定の AI 製品には寄せない（Slack に組み込まれた AI アプリなど、どの AI からでもよい）。会話の取り込みも、そのまま貼るより AI が要約して残すほうが役に立つ場面が多い
+  - **削れる余地があるもの**: `search`・`create-page`・`keep` は AI + GROWI MCP で代わりが利く。削れば、コマンドの解釈・引数の収集・複数 GROWI の検索結果の統合・会話の読み取りなど、proxy と app の多くを簡素にできる
+  - **AI では代わりにならず、残すもの**: 通知（要件2。GROWI から誰にも頼まれずに送る）、URL の展開（要件6。メンションなしで決まった判定をする）、それを支える proxy と GROWI の紐付け（要件9・10）とチャンネル単位の権限（要件11）
+  - **削る前に確かめること**: 閉域で使う GROWI（要件13。クラウドの AI からは GROWI MCP に届かない）や、AI を使えない・使わない組織（自前運用の Mattermost、AI 事業者へのデータ送信を禁じる組織など）の利用者が、この 3 コマンドをどれだけ必要とするか
+  - **採らない案**: チャット内の AI bot に `@GROWI create-page` などのコマンドを打たせ、MCP の代わりに使う形。書き込みが bot の名義になり、AI に頼んだ人が履歴と監査記録に残らない（要件7 の目的と食い違う）。本人にだけ見えるメッセージは bot に届かず、応答も人向けの書式で AI が読む仕様になっていない
+  - **次にやること**: 上の確認を経て、削るなら `/kiro-discovery` から着手する（要件の削除は 3 sub-spec すべてにまたがる）
+- **既知の不具合（未修正、2026-10-26 時点）**: 実機試験と独立レビューで見つかり、まだ直していないもの。
+  - **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
+  - **メンションへの返事ではない Slack への投稿で、bot トークンを渡す仕組みがない疑い**: 通知のように、イベントの処理の外から投稿するときの経路。実機ではまだ確かめていない
+  - **Discord のスレッド内で打ったスラッシュコマンドの追加入力が結び付かない**: 入力待ちを 4 区切りの `Channel.id`（`discord:<guild>:<parent>:<thread>`）で保存する一方、スレッドでの返答のイベントは 3 区切りの `Thread.channelId` を持つ
+  - **DM や一覧にまだ載っていないチャンネルでのコマンドに、的外れな案内が返る**: installation の特定をチャンネル一覧に頼るため、「workspace がまだ登録されていません」と返る
 
 ## Scope
 
