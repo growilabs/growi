@@ -26,8 +26,8 @@ import {
   PageBulkExportFormat,
   PageBulkExportJobStatus,
 } from '~/features/page-bulk-export/interfaces/page-bulk-export';
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
 
-import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
 import type { PageBulkExportPageSnapshotDocument } from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
 import * as RendererModule from '../markdown';
@@ -43,6 +43,18 @@ import {
 // ---------------------------------------------------------------------------
 vi.mock('../../../models/page-bulk-export-page-snapshot', () => {
   return { default: { find: vi.fn() } };
+});
+
+// The job's progress writes (lastExportedPagePath / status) go through prisma.
+// Stub the client so this unit test needs no database.
+vi.mock('~/utils/prisma', () => {
+  return {
+    prisma: {
+      pagebulkexportjobs: {
+        update: vi.fn(() => Promise.resolve({})),
+      },
+    },
+  };
 });
 
 // ---------------------------------------------------------------------------
@@ -81,20 +93,19 @@ function makeService(tmpDir: string): IPageBulkExportJobCronService {
 }
 
 /**
- * Build a minimal PageBulkExportJobDocument mock for the given format.
- * lastExportedPagePath defaults to undefined (no prior export).
+ * Build a minimal page bulk export job for the given format.
+ * lastExportedPagePath defaults to null (no prior export).
  */
 function makeJob(
   format: PageBulkExportFormat,
-  lastExportedPagePath?: string,
-): PageBulkExportJobDocument {
-  const job = mock<PageBulkExportJobDocument>({
+  lastExportedPagePath: string | null = null,
+): pagebulkexportjobs {
+  return mock<pagebulkexportjobs>({
+    id: '000000000000000000000001',
     format,
     lastExportedPagePath,
     status: PageBulkExportJobStatus.exporting,
   });
-  job.save.mockResolvedValue(job);
-  return job;
 }
 
 /**
@@ -298,7 +309,7 @@ describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3
       expect(findSpy).toHaveBeenCalledOnce();
       const [queryArg] = findSpy.mock.calls[0];
       expect(queryArg).toMatchObject({
-        pageBulkExportJob: job,
+        pageBulkExportJob: job.id,
         path: { $gt: lastPath },
       });
     } finally {
@@ -316,7 +327,7 @@ describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3
       .spyOn(PageBulkExportPageSnapshot, 'find')
       .mockImplementation(makeCursorChain());
 
-    const job = makeJob(PageBulkExportFormat.pdf); // lastExportedPagePath = undefined
+    const job = makeJob(PageBulkExportFormat.pdf); // lastExportedPagePath = null
 
     const tmpDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'bulk-export-resume-full-'),
@@ -332,7 +343,7 @@ describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3
       // Observable: find() was called with only the job filter (no path $gt)
       expect(findSpy).toHaveBeenCalledOnce();
       const [queryArg] = findSpy.mock.calls[0];
-      expect(queryArg).toEqual({ pageBulkExportJob: job });
+      expect(queryArg).toEqual({ pageBulkExportJob: job.id });
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
       findSpy.mockRestore();
