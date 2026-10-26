@@ -44,6 +44,7 @@ import type {
   SdkMessageRef,
 } from '../types/index.js';
 import { encodeActionId } from './event-mapping.js';
+import type { ScopedRun } from './installation-scope.js';
 
 /**
  * What an outbound call needs besides its arguments. Passed in rather than
@@ -68,6 +69,11 @@ export interface OutboundContext {
    * that name.
    */
   readonly botName: string;
+  /**
+   * What every SDK call of the operation runs inside. Absent when the adapter
+   * already knows whose bot speaks -- see `installation-scope.ts`.
+   */
+  readonly run?: ScopedRun;
 }
 
 /**
@@ -437,13 +443,14 @@ export const classifyOutboundFailure = (
 /**
  * The single place the "never throw" postcondition is honoured. Every operation
  * below is `attempt(...)` around one SDK call, so no operation can grow a path
- * that escapes it.
+ * that escapes it -- including failing to bind the installation it runs as.
  */
 const attempt = async (
+  context: OutboundContext,
   send: () => Promise<{ readonly id: string }>,
 ): Promise<PostOutcome> => {
   try {
-    const sent = await send();
+    const sent = await (context.run == null ? send() : context.run(send));
     return { ok: true, messageId: sent.id };
   } catch (error) {
     return classifyOutboundFailure(error);
@@ -492,7 +499,7 @@ export const post = async (
   target: SdkChannelRef,
   message: OutboundMessage,
 ): Promise<PostOutcome> =>
-  attempt(() =>
+  attempt(context, () =>
     channelHandleOf(context, target).post(
       toPostable(message, target.platform, context.botName),
     ),
@@ -505,7 +512,7 @@ export const postEphemeral = async (
   user: ChatAccountRef,
   message: OutboundMessage,
 ): Promise<PostOutcome> =>
-  attempt(async () => {
+  attempt(context, async () => {
     const sent = await channelHandleOf(context, target).postEphemeral(
       user.accountId,
       toPostable(message, target.platform, context.botName),
@@ -542,7 +549,7 @@ export const attachPreview = async (
   target: SdkMessageRef,
   preview: OutboundMessage,
 ): Promise<PostOutcome> =>
-  attempt(() =>
+  attempt(context, () =>
     context.adapter.postMessage(
       channelThreadId(
         context.adapter,
@@ -570,7 +577,7 @@ export const replace = async (
   message: SdkMessageRef,
   replacement: OutboundMessage,
 ): Promise<PostOutcome> =>
-  attempt(() =>
+  attempt(context, () =>
     context.adapter.editMessage(
       channelThreadId(
         context.adapter,

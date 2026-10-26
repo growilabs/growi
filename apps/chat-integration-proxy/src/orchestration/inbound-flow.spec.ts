@@ -212,6 +212,19 @@ describe('notification -- which destinations may be posted to (Requirement 2.1, 
     ]);
   });
 
+  it('posts as the relation s own installation, since no incoming event says whose bot speaks', async () => {
+    const prisma = createPrisma([channelRow('C1')]);
+    const platform = postingPlatform();
+
+    await flowOver(prisma, platform).notify(notificationOf(['C1']));
+
+    expect(platform.post).toHaveBeenCalledWith(
+      expect.objectContaining({ channelId: 'slack:C1' }),
+      expect.anything(),
+      { installationId: INSTALLATION_ID },
+    );
+  });
+
   it('refuses a channel that is not in this installation s saved inventory, without asking the chat service', async () => {
     // This is the one thing standing between a compromised GROWI and every
     // other channel of the workspace, so the refusal must happen BEFORE the
@@ -341,6 +354,7 @@ describe('notification -- a destination named by the id the chat service shows',
         channelName: 'c1',
         isPrivate: false,
       },
+      expect.anything(),
       expect.anything(),
     );
     expect(result.outcomes).toEqual([

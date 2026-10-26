@@ -51,6 +51,7 @@ import {
 import { registerEventHandlers } from './event-handlers.js';
 import { fetchHistory as fetchHistoryOf } from './history.js';
 import type { InstallationProvider } from './installation-provider.js';
+import { installationRunner } from './installation-scope.js';
 import {
   attachPreview as attachPreviewOf,
   postEphemeral as postEphemeralOf,
@@ -70,11 +71,22 @@ import { webhookOptionsFor } from './webhook-options.js';
  * invariant: 「platform 層の出入口に Chat SDK の型を含めない」).
  */
 export interface PlatformFacade {
-  post(target: SdkChannelRef, message: OutboundMessage): Promise<PostOutcome>;
+  /**
+   * `scope` names the installation this proxy speaks for. Needed when no
+   * incoming event is being handled -- a GROWI notification -- because a
+   * service serving many workspaces over one connection otherwise learns that
+   * only from the event. Inside an event's handling it can be left out.
+   */
+  post(
+    target: SdkChannelRef,
+    message: OutboundMessage,
+    scope?: { readonly installationId: string },
+  ): Promise<PostOutcome>;
   postEphemeral(
     target: SdkChannelRef,
     user: ChatAccountRef,
     message: OutboundMessage,
+    scope?: { readonly installationId: string },
   ): Promise<PostOutcome>;
   /**
    * Opens a modal; the submission arrives later as a `modal-submit` event.
@@ -100,6 +112,7 @@ export interface PlatformFacade {
   replace(
     message: SdkMessageRef,
     replacement: OutboundMessage,
+    scope?: { readonly installationId: string },
   ): Promise<PostOutcome>;
   /** The way in for a service that dials this proxy rather than the reverse. */
   webhookHandler(
@@ -334,13 +347,20 @@ export const createPlatformFacade = async (
 
   /**
    * The adapter to address a service through. A per-installation service has
-   * one adapter per open connection, and an `SdkChannelRef` names no
-   * installation, so it can only be answered while exactly one is open -- see
-   * `unaddressable`.
+   * one adapter per open connection: the installation named, when one is, and
+   * otherwise -- an `SdkChannelRef` names no installation -- the only one
+   * open, if exactly one is (see `unaddressable`).
    */
-  const adapterFor = (platform: PlatformName): Adapter | null => {
+  const adapterFor = (
+    platform: PlatformName,
+    installationId?: string,
+  ): Adapter | null => {
     if (ADAPTER_FACTORIES[platform].credentialSource === 'app') {
       return appBots.get(platform)?.adapter ?? null;
+    }
+    if (installationId != null) {
+      const bot = installationBots.get(installationId);
+      return bot?.platform === platform ? bot.adapter : null;
     }
     const open = [...installationBots.values()].filter(
       (bot) => bot.platform === platform,
@@ -348,9 +368,25 @@ export const createPlatformFacade = async (
     return open.length === 1 ? (open[0]?.adapter ?? null) : null;
   };
 
-  const outboundContext = (platform: PlatformName) => {
-    const adapter = adapterFor(platform);
-    return adapter == null ? null : { adapter, state, botName: BOT_USER_NAME };
+  const outboundContext = (
+    platform: PlatformName,
+    scope?: { readonly installationId: string },
+  ) => {
+    const adapter = adapterFor(platform, scope?.installationId);
+    if (adapter == null) return null;
+    const run =
+      scope == null
+        ? null
+        : installationRunner(platform, adapter, scope.installationId, {
+            installations,
+            factories: ADAPTER_FACTORIES,
+          });
+    return {
+      adapter,
+      state,
+      botName: BOT_USER_NAME,
+      ...(run == null ? {} : { run }),
+    };
   };
 
   const notAddressable = (platform: PlatformName): PostOutcome => ({
@@ -360,14 +396,14 @@ export const createPlatformFacade = async (
   });
 
   return {
-    async post(target, message) {
-      const context = outboundContext(target.platform);
+    async post(target, message, scope) {
+      const context = outboundContext(target.platform, scope);
       if (context == null) return notAddressable(target.platform);
       return await postOf(context, target, message);
     },
 
-    async postEphemeral(target, user, message) {
-      const context = outboundContext(target.platform);
+    async postEphemeral(target, user, message, scope) {
+      const context = outboundContext(target.platform, scope);
       if (context == null) return notAddressable(target.platform);
       return await postEphemeralOf(context, target, user, message);
     },
@@ -420,8 +456,8 @@ export const createPlatformFacade = async (
       return await fetchHistoryOf({ adapter }, target, range);
     },
 
-    async replace(message, replacement) {
-      const context = outboundContext(message.channel.platform);
+    async replace(message, replacement, scope) {
+      const context = outboundContext(message.channel.platform, scope);
       if (context == null) return notAddressable(message.channel.platform);
       return await replaceOf(context, message, replacement);
     },

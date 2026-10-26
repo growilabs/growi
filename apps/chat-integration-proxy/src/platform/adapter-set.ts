@@ -10,7 +10,7 @@
 // internals. `bot-factory.ts` composes what this file builds; nothing outside
 // `platform/` imports either.
 import { createDiscordAdapter } from '@chat-adapter/discord';
-import { createSlackAdapter } from '@chat-adapter/slack';
+import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
 import {
   createPostgresState,
   type PostgresStateAdapter,
@@ -60,6 +60,21 @@ export type AdapterFactory =
         appConfig: PlatformAppConfig,
         context: AppAdapterContext,
       ) => Adapter | null;
+      /**
+       * Present when one adapter speaks for many workspaces and learns whose
+       * bot to speak as only from the incoming event. Outside an event --
+       * a notification from GROWI -- it has to be told, and this is how:
+       * `work` runs as `installation`'s bot. Throws when the installation
+       * carries nothing to speak with.
+       */
+      readonly bindInstallation?: <T>(
+        adapter: Adapter,
+        installation: {
+          readonly workspaceId: string;
+          readonly credentials: InstallationCredentials;
+        },
+        work: () => Promise<T>,
+      ) => Promise<T>;
     }
   | {
       readonly credentialSource: 'installation';
@@ -107,6 +122,25 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           installationProvider: createSlackInstallationLookup({
             installations: context.installations,
           }),
+        });
+      },
+      // The adapter reads the token from its request context, which only an
+      // incoming event fills in; `withBotToken` fills it for `work`. The
+      // workspace id is passed as the adapter's own `installationId` -- the
+      // team (or enterprise) id its event contexts carry -- so per-workspace
+      // caches stay keyed the same way on both paths.
+      bindInstallation: (adapter, { workspaceId, credentials }, work) => {
+        const botToken = credentials.slack?.botToken;
+        if (botToken == null) {
+          throw new Error(
+            `Slack workspace ${workspaceId} has no bot token on record`,
+          );
+        }
+        if (!(adapter instanceof SlackAdapter)) {
+          throw new TypeError('a Slack binding was handed a non-Slack adapter');
+        }
+        return adapter.withBotToken(botToken, work, {
+          installationId: workspaceId,
         });
       },
     },
