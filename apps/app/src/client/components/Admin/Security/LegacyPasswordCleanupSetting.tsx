@@ -8,10 +8,11 @@ import type { DeleteLegacyPasswordsResponse } from '~/interfaces/password-hash-s
 import { useSWRxPasswordHashStatus } from '~/stores/admin/password-hash-status';
 
 import { ConfirmModal } from '../App/ConfirmModal';
+import { UnmigratedUserList } from './UnmigratedUserList';
 
 const I18N_PREFIX = 'security_settings.legacy_password_cleanup';
 
-export const LegacyPasswordCleanupSetting = (): JSX.Element => {
+export const LegacyPasswordCleanupSetting = (): JSX.Element | null => {
   const { t } = useTranslation('admin');
   const {
     data: counts,
@@ -38,6 +39,19 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element => {
     // Refetch on failure too: the deletion may have partially applied.
     await mutate();
   }, [mutate, t]);
+
+  // Nothing to show while loading, and nothing left to clean up once no
+  // legacy password remains. Hooks above must stay before these early returns.
+  if (error == null && counts == null) {
+    return null;
+  }
+  if (
+    counts != null &&
+    counts.both === 0 &&
+    counts.legacyOnly.active + counts.legacyOnly.nonActive === 0
+  ) {
+    return null;
+  }
 
   return (
     <>
@@ -104,6 +118,8 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element => {
       >
         {t(`${I18N_PREFIX}.delete_button`)}
       </button>
+
+      <UnmigratedUserList />
 
       <ConfirmModal
         isModalOpen={isModalOpen}

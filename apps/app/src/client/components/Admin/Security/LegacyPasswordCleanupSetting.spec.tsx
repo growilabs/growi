@@ -54,8 +54,36 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 const renderSection = () =>
   render(<LegacyPasswordCleanupSetting />, { wrapper: Wrapper });
 
-const mockStatus = (data: unknown) => {
-  vi.mocked(apiv3Get).mockResolvedValue(mock<AxiosResponse>({ data }));
+const STATUS_ENDPOINT = '/security-setting/password-hash-status';
+
+const emptyUnmigratedUsers = {
+  users: [],
+  totalCount: 0,
+  page: 1,
+  limit: 20,
+};
+
+// apiv3Get is shared by the status hook and the unmigrated-user list, so the
+// mock is routed by endpoint. `getData` is evaluated per call so that a test
+// can change what a refetch returns.
+const mockStatus = (getData: unknown | (() => unknown)) => {
+  vi.mocked(apiv3Get).mockImplementation((endpoint: string) => {
+    const data =
+      endpoint === STATUS_ENDPOINT
+        ? typeof getData === 'function'
+          ? getData()
+          : getData
+        : emptyUnmigratedUsers;
+    return Promise.resolve(mock<AxiosResponse>({ data }));
+  });
+};
+
+const failStatus = () => {
+  vi.mocked(apiv3Get).mockImplementation((endpoint: string) =>
+    endpoint === STATUS_ENDPOINT
+      ? Promise.reject(new Error('boom'))
+      : Promise.resolve(mock<AxiosResponse>({ data: emptyUnmigratedUsers })),
+  );
 };
 
 const deleteButton = () =>
@@ -112,15 +140,8 @@ describe('LegacyPasswordCleanupSetting', () => {
       expect(deleteButton().hasAttribute('disabled')).toBe(true);
     });
 
-    it('is disabled while the status is loading', () => {
-      vi.mocked(apiv3Get).mockReturnValue(new Promise(() => {}));
-      renderSection();
-
-      expect(deleteButton().hasAttribute('disabled')).toBe(true);
-    });
-
     it('is disabled and shows an error message when the fetch fails', async () => {
-      vi.mocked(apiv3Get).mockRejectedValue(new Error('boom'));
+      failStatus();
       renderSection();
 
       expect(await screen.findByText(`${PREFIX}.fetch_error`)).toBeTruthy();
@@ -133,6 +154,66 @@ describe('LegacyPasswordCleanupSetting', () => {
 
       expect(await screen.findByText(`${PREFIX}.fetch_error`)).toBeTruthy();
       expect(deleteButton().hasAttribute('disabled')).toBe(true);
+    });
+  });
+
+  describe('section visibility', () => {
+    const heading = () => screen.queryByText(`${PREFIX}.title`);
+    const zeroLegacy = { active: 0, nonActive: 0 };
+
+    it('renders nothing while the status is loading', () => {
+      vi.mocked(apiv3Get).mockReturnValue(new Promise(() => {}));
+      const { container } = renderSection();
+
+      expect(container.textContent).toBe('');
+    });
+
+    it('is hidden when no user has a legacy password', async () => {
+      mockStatus({
+        counts: countsOf({ both: 0, legacyOnly: zeroLegacy }),
+      });
+      const { container } = renderSection();
+
+      await waitFor(() =>
+        expect(vi.mocked(apiv3Get)).toHaveBeenCalledWith(STATUS_ENDPOINT),
+      );
+      await waitFor(() => expect(container.textContent).toBe(''));
+      expect(heading()).toBeNull();
+    });
+
+    it('is shown when only users with both formats remain', async () => {
+      mockStatus({
+        counts: countsOf({ both: 4, legacyOnly: zeroLegacy }),
+      });
+      renderSection();
+
+      expect(await screen.findByText(`${PREFIX}.title`)).toBeTruthy();
+    });
+
+    it('is shown when only legacy-only users remain', async () => {
+      mockStatus({
+        counts: countsOf({ both: 0, legacyOnly: { active: 0, nonActive: 2 } }),
+      });
+      renderSection();
+
+      expect(await screen.findByText(`${PREFIX}.title`)).toBeTruthy();
+    });
+
+    it('is shown with the error message when the fetch fails', async () => {
+      failStatus();
+      renderSection();
+
+      expect(await screen.findByText(`${PREFIX}.title`)).toBeTruthy();
+      expect(screen.getByText(`${PREFIX}.fetch_error`)).toBeTruthy();
+    });
+
+    it('includes the unmigrated user list', async () => {
+      mockStatus({ counts: countsOf() });
+      renderSection();
+
+      expect(
+        await screen.findByText(`${PREFIX}.unmigrated_list.title`),
+      ).toBeTruthy();
     });
   });
 
@@ -202,6 +283,31 @@ describe('LegacyPasswordCleanupSetting', () => {
         expect(vi.mocked(apiv3Get).mock.calls.length).toBeGreaterThan(
           fetchesBefore,
         ),
+      );
+    });
+
+    it('reports success and then hides the section once nothing legacy remains', async () => {
+      let counts = countsOf({ legacyOnly: { active: 0, nonActive: 0 } });
+      mockStatus(() => ({ counts }));
+      vi.mocked(apiv3Delete).mockImplementation(() => {
+        counts = countsOf({
+          both: 0,
+          upgradedOnly: 14,
+          legacyOnly: { active: 0, nonActive: 0 },
+        });
+        return Promise.resolve(
+          mock<AxiosResponse>({ data: { unsetCount: 3 } }),
+        );
+      });
+      renderSection();
+
+      await confirmDeletion();
+
+      await waitFor(() =>
+        expect(toastSuccess).toHaveBeenCalledWith(`${PREFIX}.success [3]`),
+      );
+      await waitFor(() =>
+        expect(screen.queryByText(`${PREFIX}.title`)).toBeNull(),
       );
     });
 
