@@ -102,7 +102,6 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - **次にやること**: `/kiro-discovery` から着手する（要件の変更は 3 sub-spec すべてにまたがる）
 - **既知の不具合（未修正、2026-10-26 時点）**: 実機試験と独立レビューで見つかり、まだ直していないもの。
   - **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
-  - **メンションへの返事ではない Slack への投稿で、bot トークンを渡す仕組みがない疑い**: 通知のように、イベントの処理の外から投稿するときの経路。実機ではまだ確かめていない
   - **Discord のスレッド内で打ったスラッシュコマンドの追加入力が結び付かない**: 入力待ちを 4 区切りの `Channel.id`（`discord:<guild>:<parent>:<thread>`）で保存する一方、スレッドでの返答のイベントは 3 区切りの `Thread.channelId` を持つ
   - **DM や一覧にまだ載っていないチャンネルでのコマンドに、的外れな案内が返る**: installation の特定をチャンネル一覧に頼るため、「workspace がまだ登録されていません」と返る（bot が招待された直後は一覧をすぐ取り直すようにしたので、招待後の待ちは無くなった。DM と、bot の招待を伴わずに増えたチャンネルでは残る）
 
