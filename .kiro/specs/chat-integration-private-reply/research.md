@@ -6,7 +6,7 @@
 - **Discovery Scope**: Extension（既存の proxy の送信の層・コマンドの流れ・引数の収集に手を入れる）。light discovery に加え、Slack・Mattermost・Teams・Discord の公式文書を確かめた（`chat-integration-agent` の brief の「実現性の確認の結果」と共有）
 - **Key Findings**:
   1. **今の本人宛ての返事は、チャンネルの直下に出ている。** `platform/outbound.ts` は `ChannelImpl` をチャンネルの id で作り、Slack のアダプタはスレッドの部分が無い id には `thread_ts` を付けない。そのため、Slack の「返事の無いスレッドでは表示されない」制約は、本 spec の範囲では効かない
-  2. **DM への切り替えは、アダプタに本人だけのメッセージの機能が無いとき（Discord）にしか働かない。** Chat SDK の `ChannelImpl.postEphemeral` は、アダプタが `postEphemeral` を持てばそれを呼び、失敗しても DM に切り替えない。Mattermost のアダプタは `/posts/ephemeral` を直接呼ぶので、システム管理者の権限が無い bot ではエラーになり、返事が落ちる
+  2. **DM への切り替えは、アダプタに本人だけのメッセージの機能が無いとき（Discord）にしか働かない。** Chat SDK の `ChannelImpl.postEphemeral` は、アダプタが `postEphemeral` を持てばそれを呼び、失敗しても DM に切り替えない。**Mattermost では、権限より前にチャンネル id の形で必ず失敗している。** `ChannelImpl` は proxy のチャンネル id（Mattermost は素の id）をそのままアダプタに渡し、Mattermost のアダプタの `decodeThreadId` は `mattermost:<base64>` の形以外で例外を投げる。そのため `/posts/ephemeral` は一度も呼ばれていない。この形の問題を直したあとで、システム管理者の権限（`create_post_ephemeral`）の要否が効いてくる（設計の確認で Opus のレビューが指摘し、アダプタのコードで確かめた）
   3. **DM で聞き返しても、今は DM での答えを受け取れない。** Chat SDK は DM のメッセージを mention として届ける（`chat/dist/index.js` で `isDM` のとき `isMention = true`）が、`argument-collector.ts` は答えを (チャンネル, 本人) で探すので、DM のチャンネルでは見つからない。さらに `stripAddressToken` が先頭の語を必ず落とすので、DM で打った答えの最初の語が消える。Discord では今も聞き返しが DM に出ているので、これは出荷済みの不具合でもある
 
 ## Research Log
@@ -16,10 +16,10 @@
 - **Context**: 要件 1・2 が「どこを通る返事を直すか」を決めるため。
 - **Sources Consulted**: `src/orchestration/command-flow.ts`（`tell`・`deliver`・`runSearch`・`reportExpired`）、`src/orchestration/admin-flow.ts`（`say`）、`src/command/argument-collector.ts`（`ask`・選択肢の聞き返し）、`src/platform/outbound.ts`（`postEphemeral`）
 - **Findings**:
-  - 本人宛ての返事は、`platform.postEphemeral` を直接呼ぶ 6 か所に散っている（`tell`、`reportExpired`、`admin-flow` の `say`、`argument-collector` の 3 か所）
+  - 本人宛ての返事は、`platform.postEphemeral` を直接呼ぶ 7 か所に散っている（`tell`（`previewLinks` からの呼び出しを含む）、`reportExpired`、`admin-flow` の `say`、`argument-collector` の 4 か所）
   - `argument-collector` は、聞き返す前に `supports('ephemeralMessage', platform)` を見て、使えなければ「聞き返す手段が無い」と断る
   - `search` は「いったん投稿して差し替える」で、仮の投稿と結果をチャンネルに出す
-- **Implications**: 届け方の判断を 1 か所に集め、6 か所すべてをそこへ寄せる。`supports('ephemeralMessage')` による断りは、DM という代わりがあるので不要になる
+- **Implications**: 届け方の判断を 1 か所に集め、7 か所すべてをそこへ寄せる。`supports('ephemeralMessage')` による断りは、DM という代わりがあるので不要になる
 
 ### サービスごとの本人だけのメッセージと DM
 
@@ -29,8 +29,10 @@
   - **Slack**: `chat.postEphemeral`。利用者か bot がチャンネルにいないと失敗する。届く保証は無く、再読み込みで消える（https://docs.slack.dev/reference/methods/chat.postEphemeral ）。DM は `conversations.open` で開き、**`im:write` の権限が要る**。今のマニフェスト（`docs/setup-slack.md`）には無い
   - **Discord**: アダプタに `postEphemeral` が無い。メンションへの返事を本人だけに見せる手段は Discord 自体に無い（EPHEMERAL のフラグは interaction の応答だけ）。DM は `openDM`。Gateway の intents に `DirectMessages` が入っており（アダプタの `GatewayIntentBits.DirectMessages`）、DM のメッセージは proxy に届く
   - **Teams**: アダプタは targeted message を送る。DM は 1 対 1 の会話を作る。テナントの id が要るが、一度メンションした利用者なら保存済み
-  - **Mattermost**: `/posts/ephemeral` は `create_post_ephemeral`（システム管理者だけ）を要する（https://raw.githubusercontent.com/mattermost/mattermost/master/api/v4/source/posts.yaml ）。DM は `/channels/direct`
-  - **リアクション**: 4 つのアダプタすべてが `addReaction` を持つ。Chat SDK の共通の絵文字名に `eyes`・`email` がある。Slack は `reactions:write`（マニフェストに有る）が要る。Teams で bot がリアクションを付けられるかは実物で確かめていない
+  - **Mattermost**: アダプタの `postEphemeral` はスレッドの id（`mattermost:<base64>`）を受け取る。素のチャンネル id では `decodeThreadId` が例外を投げる（`chat-adapter-mattermost@1.1.3` の `dist/index.js`）。`/posts/ephemeral` は `create_post_ephemeral`（システム管理者だけ）を要する（https://raw.githubusercontent.com/mattermost/mattermost/master/api/v4/source/posts.yaml ）。DM は `/channels/direct`
+  - **リアクション**: 4 つのアダプタすべてが `addReaction` を持つ。Chat SDK の共通の絵文字名に `eyes`・`email` がある。Slack は `reactions:write`（マニフェストに有る）が要る。Teams のアダプタは独自の別名の表を持ち、`eyes` は直せるが `email` は直せない。Teams で bot がリアクションを付けられるか自体も、実物で確かめていない
+- **利用者が DM に書けるか**: DM を「開く」こと（Slack の `im:write`）と、利用者が bot との DM に「書き込める」ことは別の設定で決まる。Slack は App Home の Messages タブの設定（マニフェストの `features.app_home.messages_tab_enabled` と `messages_tab_read_only_enabled`）。今のマニフェストにはこの節が無い。Teams は、利用者が 1 対 1 の会話で bot に答えるのに、アプリを personal の範囲でも入れる必要があるかもしれない（未確認）
+- **installation の指定**: 本人宛ての返事の呼び出しは、どれも installation を渡していない。Slack はイベントの処理の中ならイベントから token を選ぶので困らないが、Mattermost は installation ごとに接続を持つので、2 つ以上開いていると宛先のアダプタを決められない（`platform/index.ts` の `adapterFor`）。あとで届ける返事（`agent`）では、Slack でも installation を名指ししないと token が無い
 - **Implications**: 本人だけのメッセージ → 失敗・未対応なら DM、の 2 段にする。DM の可否はアダプタに頼らず proxy 側で決める（Discord で Chat SDK 任せにすると、DM に見出しを付けられない）
 
 ### 引数の聞き返しと DM
@@ -64,7 +66,7 @@
 
 ### 決定 1: 届け方の判断を `command/private-reply.ts` の 1 か所に集め、呼ぶ側の型から `postEphemeral` を外す
 
-- **Context**: 要件 1.1 は「チャンネルの全員に見える形にしない」という保証である。判断が 6 か所に散ったままだと、1 か所の書き忘れで崩れる。
+- **Context**: 要件 1.1 は「チャンネルの全員に見える形にしない」という保証である。判断が 7 か所に散ったままだと、1 か所の書き忘れで崩れる。
 - **Alternatives Considered**: 上の表の A・C。各呼び出し元で個別に DM へ切り替える案（散らばりが残る）。
 - **Selected Approach**: B。`CommandFlowPlatform`・`AdminFlowPlatform`・`ArgumentCollectorPlatform` から `postEphemeral` を外し、代わりに `PrivateReplier` を受け取らせる。書き忘れはコンパイルで止まる。加えて `architecture.spec.ts` で「`postEphemeral`・`postDirect` を呼ぶのは `command/private-reply.ts` だけ」を確かめる。
 - **Rationale**: 守りを型と試験に任せ、レビューの注意力に頼らない。
@@ -73,7 +75,7 @@
 ### 決定 2: DM への切り替えは Chat SDK に任せず、proxy が自分で行う
 
 - **Context**: Chat SDK の `fallbackToDM` は、アダプタに本人だけのメッセージの機能が無いときだけ働く。失敗したとき（Mattermost の権限、Slack で本人がチャンネルにいない）には働かない。また SDK が DM に送ると、どの依頼への返事かの見出し（要件 1.8）を付けられない。
-- **Selected Approach**: `outbound.ts` の `postEphemeral` は `fallbackToDM: false` で呼び、アダプタに機能が無ければ `unsupported` を返す。DM は新しい `postDirect` で送る。
+- **Selected Approach**: `outbound.ts` の `postEphemeral` は `ChannelImpl` を通さず、アダプタの `postEphemeral` を `channelThreadId` で作ったスレッドの id で直接呼ぶ（Mattermost の id の形の問題も同時に直る）。アダプタに機能が無ければ `unsupported` を返す。DM は新しい `postDirect` で送る。結果の型は、`PostOutcome` を広げず、本人だけのメッセージとリアクションにそれぞれ専用の型を用意する（`post`・`replace` の呼び出し側に、起こりえない場合を扱わせない）。
 - **Trade-offs**: Mattermost で権限が無い間は、毎回いったん失敗してから DM に送る。1 回分の無駄な API 呼び出しは許容する（権限の有無を覚えておく仕組みは足さない。簡素さを優先）。
 
 ### 決定 3: 「DM に届いた」「受け付けた」の知らせは、依頼のメッセージへのリアクションにする
@@ -82,7 +84,7 @@
 - **Alternatives Considered**: 本人だけの「検索しています…」を出して、結果は別のメッセージで届ける（Discord では DM が 2 通になる）。チャンネルに短い文を出す（Discord では毎回チャンネルに文が残る）。
 - **Selected Approach**: 受け付けたら依頼のメッセージに `eyes`、DM に届けたら `email` を付ける。リアクションを付けられないとき（依頼にメッセージが無い、サービスが拒んだ）は、受け付けの知らせは本人宛ての返事として「検索しています…」を出し、DM の知らせは内容を含まない短い文をその場に出す。
 - **Rationale**: リアクションは内容を含まず、チャンネルに文を増やさない。
-- **Trade-offs**: リアクションは誰からも見える（何かを頼んだことは分かる）。頼んだこと自体は、メンションが全員に見えている時点で既に見えている。
+- **Trade-offs**: リアクションは誰からも見える（何かを頼んだことは分かる）。頼んだこと自体は、メンションが全員に見えている時点で既に見えている。Teams（`email` を直せない）と、Discord の既存のスレッドの中での依頼（リアクションの宛先が親のチャンネルになる）では、リアクションが付かず短い文の知らせになる。どちらも内容は出ないので受け入れる。同じリアクションが既に付いているとき（1 つの依頼から DM に何通も届く）は成功として扱い、2 通目以降で短い文に落ちないようにする。
 
 ### 決定 4: DM の見出しに使う場所の名前は、保存済みのチャンネル一覧から引く
 
@@ -102,9 +104,20 @@
 - **Selected Approach**: `event-mapping.ts` が mention に `inDirectMessage`（スレッドが DM か）を付ける。`CommandInvocation.normalize` と `stripAddressToken` は、DM では先頭の語を落とさない。ただし DM でも先頭が bot への呼びかけなら落とす。各サービスの本物の本文で呼びかけがどう表れるかは、本物のアダプタを使う試験で確かめる。
 - **Trade-offs**: DM で `search foo` と打てばコマンドとして読まれるが、DM での installation の特定は別の不具合（roadmap の 2）なので、本 spec では「workspace が登録されていない」と返るまでが範囲。
 
+### 決定 7: 返事の宛先の情報に installation を持たせる
+
+- **Context**: Mattermost は installation ごとに接続を持ち、2 つ以上開いていると、installation を名指ししない呼び出しは宛先を決められない。あとで届ける返事（`agent`）では、Slack でも installation を名指ししないと bot の token が無い（設計の確認で Opus のレビューが指摘）。
+- **Selected Approach**: `PrivateReplyOrigin.installationId: string | null` を足す。`command-flow` は `selectFor` で引いた値を渡す。分からない呼び出し元（`argument-collector`、「workspace が登録されていない」の返事）は `null` を渡し、`PrivateReplier` が依頼のチャンネルから既存の `resolveInstallationId` で引く。引いた installation を 4 つの platform 呼び出しすべてに同じ `scope` として渡す。
+- **Trade-offs**: `null` のときにチャンネル一覧を 1 回引く。引けなければ今と同じく `scope` 無しで呼ぶ。
+
+### 決定 8: 利用者が DM に書けるようにする設定を、導入の手順に含める
+
+- **Context**: 要件 2.3（DM での答えを受け付ける）は、利用者が bot との DM に書き込めることが前提。Slack の App Home の Messages タブの設定は今のマニフェストに無い。
+- **Selected Approach**: マニフェストに `features.app_home.messages_tab_enabled: true` と `messages_tab_read_only_enabled: false` を足す。`setup-slack.md` の「DM に書いてもコマンドは起動しない」を書き換える。Teams の personal の範囲の要否は実機で確かめて導入ドキュメントに書く。
+
 ## Synthesis
 
-- **Generalization**: 「本人に届ける」は、検索の結果・聞き返し・エラー・登録コード・後の `agent` の答えに共通する 1 つの問題として扱う。インターフェースは「何の依頼への返事か」を受け取る形にし、`agent` があとで届ける場合にも同じ形で使えるようにする（あとで届ける実装は足さない）
+- **Generalization**: 「本人に届ける」は、検索の結果・聞き返し・エラー・登録コード・後の `agent` の答えに共通する 1 つの問題として扱う。インターフェースは「何の依頼への、どの installation としての返事か」を受け取る形にする。`agent` があとで届ける場合は、installation を名指しすれば token の問題は解ける。ただし「スレッドの中で本人だけに見せる」ためのスレッドの根元は持たないので、`agent` 側で足すことになる（本 spec の Revalidation Triggers に当たる）
 - **Build vs. Adopt**: Chat SDK の `fallbackToDM` を採らない理由は決定 2。リアクションと DM はアダプタの既存の機能を使う
 - **Simplification**: 権限の有無を覚える仕組み、DM の既読確認、届いたかの追跡は足さない。能力表の行は `directMessage` を 1 行足すだけにする
 
@@ -113,6 +126,8 @@
 - Slack の既存の導入は `im:write` を持たない — 導入し直すまで、Slack では本人だけのメッセージが失敗したとき DM に切り替えられず、内容を含まない知らせだけになる。導入ドキュメントと実機試験の手順に「導入し直す」を書く
 - Teams で bot がリアクションを付けられない場合 — 決定 3 の代わりの手段（本人宛ての「検索しています…」、内容を含まない短い文）に落ちる
 - Mattermost で権限が無い運用者は、毎回 1 回分の失敗する呼び出しを払う — 導入ドキュメントで、権限を与えるか DM で受け取るかを選べることを示す
+- Mattermost の本人だけのメッセージの id の形の問題が再発する — 本物のアダプタに proxy の id を渡し、`/posts/ephemeral` への要求が実際に出ることを結合テストで確かめる（HTTP の 403 を真似るだけの試験では、要求の前の例外を見逃す）
+- Slack の Messages タブの設定が無い導入では、DM の聞き返しに答えられない — マニフェストと導入ドキュメントに含め、実機試験で確かめる
 - DM で打たれた本文の先頭の扱い（決定 6）が、本物の本文の形と食い違う — 本物のアダプタを使う試験で 4 サービスの本文を確かめる
 
 ## References
