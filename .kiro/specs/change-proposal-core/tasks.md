@@ -18,7 +18,7 @@
   - 設定を型付きの値として読む処理と、管理者の API から書く処理を作る。読むたびに設定の仕組みから取り、他のサーバーでの変更も次の読み込みで使われる
   - 設定キーの宣言の既存のテストに新しいキーを足し、決まっている初期値（書き込み機能は無効、操作ごとの有効化は有効、自動反映は「しない」、ページごとの通知は出さない）がテストで確かめられている
   - _Requirements: 1.9, 8.1, 8.2, 8.3, 8.4, 8.9_
-- [ ] 1.3 リビジョンに、作った Change Proposal の印の項目を足す
+- [x] 1.3 リビジョンに、作った Change Proposal の印の項目を足す
   - `@growi/core` の `interfaces/revision.ts` に、リビジョンの印の型 `IRevisionProposalMark`（`proposalId` と `proposalOperationKey`）を足し、リビジョンの型（`IRevision`）に同じ名前の任意の 2 項目を足して、changeset を作る。ページの型（`IPage`）は変えない。apps/app は `@growi/core` を `dist` から読むので、apps/app の型の検査と結合テストの前に `@growi/core` を build し直す
   - Prisma の schema のリビジョンに同じ項目と、同じ名前の `@@index`（疎であることの注記つき）を足し、Prisma の client を生成し直す。Mongoose のリビジョンの schema にも項目と、値を持つ文書だけが入る疎な索引 `{ proposalId: 1, proposalOperationKey: 1 }` を宣言する（索引は Mongoose の schema が作る規則に従う）。ページの schema には項目を足さない
   - リビジョンを作るための入力を組み立てる処理が、任意の印（`IRevisionProposalMark`）を受け取ってリビジョンに入れる

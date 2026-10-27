@@ -1,7 +1,7 @@
 import * as domain from '.';
 
 describe('change-proposal domain barrel', () => {
-  it('exports the functions of the 12 judgement files', () => {
+  it('exports the functions of the judgement files', () => {
     expect(Object.keys(domain).sort()).toEqual(
       [
         'buildProposalLinks',
@@ -15,6 +15,7 @@ describe('change-proposal domain barrel', () => {
         'selectAutoApplyTargets',
         'selectVisibleOperations',
         'shouldSendPerPageNotifications',
+        'toRevisionProposalMark',
         'validateBasedOn',
         'validateProposalInput',
       ].sort(),

@@ -516,6 +516,8 @@ model revisions {
   format        String   @default("markdown")
   origin        String?
   pageId        String   @db.ObjectId
+  proposalId           String?  @db.ObjectId
+  proposalOperationKey String?
 
   author   users?     @relation(fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -523,6 +525,9 @@ model revisions {
 
   @@index([pageId], map: "pageId_1")
   @@index([authorId, createdAt(sort: Desc)], map: "author_1_createdAt_-1")
+  // The mongoose schema declares this index as sparse; Prisma cannot express that,
+  // so it has to be re-applied out of band once Prisma takes over index creation.
+  @@index([proposalId, proposalOperationKey], map: "proposalId_1_proposalOperationKey_1")
 }
 
 model rlflx {

@@ -8,5 +8,6 @@ export * from './plan-apply-order';
 export * from './select-auto-apply-targets';
 export * from './select-visible-operations';
 export * from './should-send-per-page-notifications';
+export * from './to-revision-proposal-mark';
 export * from './validate-based-on';
 export * from './validate-proposal-input';
