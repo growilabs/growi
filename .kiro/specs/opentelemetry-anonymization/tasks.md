@@ -35,7 +35,7 @@
   - _Requirements: 5.2, 7.1, 7.2_
   - _Boundary: PathPattern_
 
-- [ ] 2.3 (P) 指定した名前のクエリパラメータの値だけを置き換える部品を作り直す
+- [x] 2.3 (P) 指定した名前のクエリパラメータの値だけを置き換える部品を作り直す
   - クエリを `&` で区切り、名前（デコード後、末尾の `[]` を除く）が対象の区切りの値だけを置き換え、ほかの区切りは元の文字列のまま残す
   - 値が JSON 配列なら従来どおり `["[ANONYMIZED]"]` にする。同じ名前の繰り返し（`path=a&path=b`）はそれぞれ置き換える
   - 既存の handler が使っている間は既存の関数を壊さない。新しい関数は別名で追加し、handler を消すタスク（4.1）で古い関数を消して新しい関数をその名前にする
@@ -126,3 +126,4 @@
 - コミット: pre-commit hook は `pnpm biome` を呼び同じ問題で固まる。`node_modules/.bin/biome check` を手で通してから `git commit --no-verify` を使う。
 - 1.3: ルート列挙の起動ヘルパーは `apps/app/test/setup/growi-routes.ts`（`listGrowiRoutes()`）。4.3 はこれを import して使う。`src/` に置くとサーバーの build に入るため `test/setup/` に置いた。integration テストは `cd apps/app && env -u MONGO_URI ../../node_modules/.bin/vitest run --project=app-integration <パターン>` で回す。
 - 2.2: `matchPathPattern` / `redactPathParams` は素の `:name` だけを扱う（`:id([0-9a-f]{24})` のような正規表現付きは非対応）。3.2 のパス規則のパターンは素の `:name` で宣言する。末尾 `/` 1 つは許容して照合する（`/share/abc/` も匿名化される）。
+- 2.3: 新しい関数は `anonymizeSearchParams(search, paramNames)`（`?` なしのクエリを受け取る）。4.1 で古い `anonymizeQueryParams` を消し、この関数を `anonymizeQueryParams` に改名する。
