@@ -1,12 +1,11 @@
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { body } from 'express-validator';
-import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { PathAlreadyExistsError } from '../models/errors';
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
-import PageTagRelation from '../models/page-tag-relation';
 import UpdatePost from '../models/update-post';
 import ApiResponse from '../util/apiResponse';
 
@@ -22,8 +21,6 @@ export const setup = (crowi, _app) => {
 
   /** @type {import('../models/page').PageModel} */
   const { Page } = crowi.models;
-
-  const PageRedirect = mongoose.model('PageRedirect');
 
   const globalNotificationService = crowi.globalNotificationService;
 
@@ -144,7 +141,9 @@ export const setup = (crowi, _app) => {
   api.getPageTag = async (req, res) => {
     const result = {};
     try {
-      result.tags = await PageTagRelation.listTagNamesByPage(req.query.pageId);
+      result.tags = await prisma.pagetagrelations.listTagNamesByPage(
+        req.query.pageId,
+      );
     } catch (err) {
       return res.json(ApiResponse.error(err));
     }
@@ -305,7 +304,7 @@ export const setup = (crowi, _app) => {
    *               revision_id:
    *                 type: string
    *                 format: ObjectId
-   *                 description: Revision ID for conflict detection
+   *                 description: Revision ID for conflict detection. Required to soft delete a non-empty page — omitting it is rejected with 'invalid_body', and a value that is not the page's latest revision is rejected with 'outdated'. Not consulted when completely is true, or for an empty page.
    *                 example: "507f1f77bcf86cd799439012"
    *               completely:
    *                 type: boolean
@@ -327,6 +326,7 @@ export const setup = (crowi, _app) => {
    *               summary: Recursive soft delete
    *               value:
    *                 page_id: "507f1f77bcf86cd799439011"
+   *                 revision_id: "507f1f77bcf86cd799439012"
    *                 recursively: true
    *             completeDelete:
    *               summary: Complete deletion
@@ -437,7 +437,19 @@ export const setup = (crowi, _app) => {
           );
         }
 
-        if (!page.isEmpty && !page.isUpdatable(previousRevision)) {
+        // A missing revision_id is answered on its own rather than through
+        // isUpdatable, which cannot tell it apart from a stale one and would report
+        // that someone else had updated the page. Same split as
+        // apiv3 PUT /pages/rename, which pairs this code with its own conflict check.
+        if (!page.isEmpty && previousRevision == null) {
+          return res.json(
+            ApiResponse.error('revision_id must be a mongoId', 'invalid_body'),
+          );
+        }
+
+        // isUpdatable is async: without the await the negation is always false and
+        // this conflict check never fires
+        if (!page.isEmpty && !(await page.isUpdatable(previousRevision))) {
           return res.json(
             ApiResponse.error(
               "Someone could update this page, so couldn't delete.",
@@ -701,7 +713,7 @@ export const setup = (crowi, _app) => {
     const path = req.body.path;
 
     try {
-      await PageRedirect.removePageRedirectsByToPath(path);
+      await prisma.pageredirects.removePageRedirectsByToPath(path);
       logger.debug('Redirect Page deleted', path);
     } catch (err) {
       logger.error('Error occured while get setting', err);

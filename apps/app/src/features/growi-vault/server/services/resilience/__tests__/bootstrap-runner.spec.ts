@@ -416,6 +416,52 @@ describe('BootstrapRunner', () => {
   });
 
   // -------------------------------------------------------------------------
+  // (c-2) force wipe must invalidate the persisted resume cursor immediately
+  //
+  // A force wipe re-seeds the vault from the first page, so a cursor left over
+  // from an earlier run is not a valid resume point. If the wipe run dies
+  // before it streams its first page, that stale cursor would survive and the
+  // next resume would skip every page below it — leaving those pages missing
+  // from the freshly wiped repository while the completeness check still
+  // passes.
+  // -------------------------------------------------------------------------
+
+  describe('(c-2) force wipe invalidates the persisted cursor', () => {
+    it('has cleared the persisted cursor by the time the run is acknowledged as running', async () => {
+      const pages = [makePageDoc(FAKE_ID_B, '/page-b')];
+      const { state, runner } = createTestRunner(
+        { bootstrapState: 'done', bootstrapCursor: FAKE_ID_A },
+        pages,
+      );
+
+      // onRunning fires right after the state transition is committed and
+      // before any page is streamed — the exact window a crash would freeze.
+      let cursorWhenRunning: unknown = 'never-captured';
+      await runner.bootstrap({
+        triggerSource: 'env-force',
+        onRunning: () => {
+          cursorWhenRunning = state.bootstrapCursor;
+        },
+      });
+
+      expect(cursorWhenRunning).toBeNull();
+    });
+
+    it('does not carry a previous cursor into the page query of the wipe run', async () => {
+      const pages = [makePageDoc(FAKE_ID_B, '/page-b')];
+      const { mockPage, runner } = createTestRunner(
+        { bootstrapState: 'done', bootstrapCursor: FAKE_ID_A },
+        pages,
+      );
+
+      await runner.bootstrap({ triggerSource: 'env-force' });
+
+      // The stream query must be unfiltered: a wipe re-seeds from page one.
+      expect(mockPage.find).toHaveBeenCalledWith({});
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // (d) env=true + failed → resume (no reset-all)
   // -------------------------------------------------------------------------
 
@@ -849,6 +895,105 @@ describe('BootstrapRunner', () => {
       const status = await runner.getStatus();
 
       expect(status.forceWarningActive).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getStatus — runner liveness
+  //
+  // Contract: isStaleRunner answers "the state says a bootstrap is in flight,
+  // but is anyone still working on it?". Callers (the admin UI) use it to
+  // decide whether a re-bootstrap may be started, so it must be false while a
+  // real run is progressing and true once the owning process has gone away.
+  // The staleness threshold belongs to the server (heartbeatStaleMs = 120s in
+  // this fixture); callers must not have to re-derive it.
+  // -------------------------------------------------------------------------
+
+  describe('getStatus() — runner liveness (isStaleRunner)', () => {
+    it('is false while a running bootstrap keeps its heartbeat within the threshold', async () => {
+      const { runner } = createTestRunner({
+        bootstrapState: 'running',
+        bootstrapHeartbeatAt: new Date(Date.now() - 119_000),
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(false);
+    });
+
+    it('is true once a running bootstrap heartbeat is older than the threshold', async () => {
+      const { runner } = createTestRunner({
+        bootstrapState: 'running',
+        bootstrapHeartbeatAt: new Date(Date.now() - 121_000),
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(true);
+    });
+
+    it('is true for a verifying bootstrap whose heartbeat has expired', async () => {
+      // The heartbeat keeps ticking through the completeness check, so an
+      // expired heartbeat in 'verifying' means the owning process is gone.
+      const { runner } = createTestRunner({
+        bootstrapState: 'verifying',
+        bootstrapHeartbeatAt: new Date(Date.now() - 600_000),
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(true);
+    });
+
+    it('is true for a running bootstrap that never wrote a heartbeat', async () => {
+      const { runner } = createTestRunner({
+        bootstrapState: 'running',
+        bootstrapHeartbeatAt: null,
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(true);
+    });
+
+    it.each([
+      'done',
+      'failed',
+      'escalated',
+      'pending',
+    ] as const)('is false for the settled state %s even when the heartbeat is ancient', async (settledState) => {
+      const { runner } = createTestRunner({
+        bootstrapState: settledState,
+        bootstrapHeartbeatAt: new Date(Date.now() - 86_400_000),
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(false);
+    });
+
+    it('exposes the raw heartbeat timestamp so operators can see how old it is', async () => {
+      const heartbeatAt = new Date('2026-06-16T13:10:30.008Z');
+      const { runner } = createTestRunner({
+        bootstrapState: 'running',
+        bootstrapHeartbeatAt: heartbeatAt,
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.heartbeatAt).toEqual(heartbeatAt);
+    });
+
+    it('is false when no state document exists yet', async () => {
+      const { mockVaultSyncState, runner } = createTestRunner();
+      mockVaultSyncState.findOne.mockReturnValue({
+        lean: () => Promise.resolve(null),
+      });
+
+      const status = await runner.getStatus();
+
+      expect(status.bootstrap.isStaleRunner).toBe(false);
+      expect(status.bootstrap.heartbeatAt).toBeNull();
     });
   });
 

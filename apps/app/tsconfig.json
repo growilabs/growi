@@ -6,10 +6,11 @@
     "resolveJsonModule": true,
     "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
 
-    // Suffix patterns (esm-migration task 3.6): Turbopack does not apply
-    // TypeScript's `.js` -> `.ts` extension substitution, so the
-    // `.js`-suffixed alias specifiers required by the NodeNext server build
-    // are mapped back to their extensionless form, which every pipeline
+    // Suffix patterns: Turbopack does not apply TypeScript's `.js` -> `.ts`
+    // extension substitution, so the few remaining `.js`-suffixed alias
+    // specifiers (see .claude/rules/import-convention.md — source normally
+    // carries no extension) are mapped back to their extensionless form,
+    // which every pipeline
     // (Turbopack, tsgo, vite-tsconfig-paths) resolves with normal extension
     // searching. Keep the targets extensionless: typescript-go panics on
     // suffix patterns with extensioned targets.
@@ -29,7 +30,7 @@
 
     // Enforce erasable-only TS (no enum / parameter properties / namespaces) so
     // the server runs under Node's native type stripping with no
-    // --experimental-transform-types (esm-migration task 3.7.c). tsgo --noEmit
+    // --experimental-transform-types. tsgo --noEmit
     // (CI lint) fails if a non-erasable construct is reintroduced.
     "erasableSyntaxOnly": true,
 

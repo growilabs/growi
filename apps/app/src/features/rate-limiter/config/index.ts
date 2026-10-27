@@ -23,33 +23,31 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
     maxRequests: 60,
     usersPerIpProspection: 1,
   },
-  '/installer': {
+  '/_api/v3/ai-usage': {
+    method: 'GET',
+    maxRequests: MAX_REQUESTS_TIER_1,
+    usersPerIpProspection: 1,
+  },
+  '/_api/v3/installer': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 1,
   },
-  // Keys are matched as an exact `configWithoutRegExp[req.path]` lookup
-  // (middleware/factory.ts), so they must be the FULLY-MOUNTED path. The legacy
-  // `POST /login` route is gone and the live one is on apiV3AuthRouter, mounted at
-  // '/_api/v3' (server/routes/index.js) — so the bare '/login' key matched nothing
-  // and login ran at the permissive default (500 x 5 = 2500 req/min/IP). That only
-  // became load-bearing when verification became scrypt (~128MiB, ~100ms on a libuv
-  // thread per attempt).
   '/_api/v3/login': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 100,
   },
-  '/invited': {
+  '/_api/v3/invited': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_2,
   },
-  '/register': {
+  '/_api/v3/register': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 20,
   },
-  '/user-activation/register': {
+  '/_api/v3/user-activation/register': {
     method: 'POST',
     maxRequests: MAX_REQUESTS_TIER_1,
     usersPerIpProspection: 20,
@@ -62,6 +60,22 @@ export const defaultConfig: IApiRateLimitEndpointMap = {
   '/_api/check_username': {
     method: 'GET',
     maxRequests: MAX_REQUESTS_TIER_3,
+  },
+  // Username suggestions, called on every keystroke burst in the search page's
+  // author/editor fields. Each request walks index entries proportional to the
+  // number of non-matching usernames it passes, so the global default of 500/min
+  // is far more headroom than a typeahead needs: the input debounces for 400ms
+  // and each keyword is fetched once and cached client-side, which puts real
+  // sustained typing well inside this tier.
+  // Unlike most entries here, every logged-in user hits this one, so the per-IP
+  // allowance (maxRequests x usersPerIpProspection) has to assume a shared egress
+  // IP: at the default of 5 a corporate NAT would share 500/min across everyone
+  // behind it and start returning 429s to legitimate typing. Raised so the
+  // per-user limit above stays the one that does the work.
+  '/_api/v3/users/usernames': {
+    method: 'GET',
+    maxRequests: MAX_REQUESTS_TIER_4,
+    usersPerIpProspection: 20,
   },
 };
 
@@ -83,7 +97,15 @@ export const defaultConfigWithRegExp: IApiRateLimitEndpointMap = {
     method: 'ALL',
     maxRequests: MAX_REQUESTS_TIER_1,
   },
+  '/_api/v3/forgot-password(?:/.*)?': {
+    method: 'ALL',
+    maxRequests: MAX_REQUESTS_TIER_1,
+  },
   '/user-activation/.*': {
+    method: 'GET',
+    maxRequests: MAX_REQUESTS_TIER_1,
+  },
+  '/_api/v3/user-activation/.*': {
     method: 'GET',
     maxRequests: MAX_REQUESTS_TIER_1,
   },

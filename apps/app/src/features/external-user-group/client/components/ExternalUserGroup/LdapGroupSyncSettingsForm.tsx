@@ -239,7 +239,7 @@ export const LdapGroupSyncSettingsForm: FC = () => {
             htmlFor="ldapGroupNameAttribute"
             className="text-left text-md-end col-md-3 col-form-label"
           >
-            {t('Name')}
+            {t('commons:Name')}
           </label>
           <div className="col-md-9">
             <input
@@ -266,7 +266,7 @@ export const LdapGroupSyncSettingsForm: FC = () => {
             htmlFor="ldapGroupDescriptionAttribute"
             className="text-left text-md-end col-md-3 col-form-label"
           >
-            {t('Description')}
+            {t('commons:Description')}
           </label>
           <div className="col-md-9">
             <input
@@ -293,7 +293,7 @@ export const LdapGroupSyncSettingsForm: FC = () => {
         <div className="row my-3">
           <div className="offset-3 col-5">
             <button type="submit" className="btn btn-primary">
-              {t('Update')}
+              {t('commons:Update')}
             </button>
           </div>
         </div>

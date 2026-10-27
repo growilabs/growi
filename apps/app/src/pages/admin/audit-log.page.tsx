@@ -51,7 +51,7 @@ const AdminAuditLogPage: NextPageWithLayout<Props> = (props: Props) => {
 
 // No extra containers required presently; values injected directly via props + existing universal stores inside component children
 AdminAuditLogPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('audit_log_management.audit_log'),
+  title: (_p, t) => t('admin:audit_log_management.audit_log'),
 });
 
 // Extend common SSR to inject audit log specific server configs

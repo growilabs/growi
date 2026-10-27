@@ -86,7 +86,7 @@ const SecuritySettingComponent: React.FC<Props> = ({
     return (
       <div>
         <p>
-          {t('Error occurred')} :{' '}
+          {t('commons:Error occurred')} :{' '}
           {adminGeneralSecurityContainer.state.retrieveError}
         </p>
       </div>
@@ -103,29 +103,23 @@ const SecuritySettingComponent: React.FC<Props> = ({
         <div className="vstack gap-3">
           <PageListDisplaySettings
             adminGeneralSecurityContainer={adminGeneralSecurityContainer}
-            t={t}
           />
           <PageAccessRightsSettings
             adminGeneralSecurityContainer={adminGeneralSecurityContainer}
-            t={t}
           />
           <PageDeleteRightsSettings
             adminGeneralSecurityContainer={adminGeneralSecurityContainer}
-            t={t}
           />
           <UserHomepageDeletionSettings
             adminGeneralSecurityContainer={adminGeneralSecurityContainer}
-            t={t}
           />
           <UserPageVisibilitySettings
             adminGeneralSecurityContainer={adminGeneralSecurityContainer}
-            t={t}
           />
           <CommentManageRightsSettings
             adminGeneralSecurityContainer={adminGeneralSecurityContainer}
-            t={t}
           />
-          <SessionMaxAgeSettings register={register} t={t} />
+          <SessionMaxAgeSettings register={register} />
 
           <div className="text-center text-md-start offset-md-3 col-md-5">
             <button
@@ -135,7 +129,7 @@ const SecuritySettingComponent: React.FC<Props> = ({
                 adminGeneralSecurityContainer.state.retrieveError != null
               }
             >
-              {t('Update')}
+              {t('commons:Update')}
             </button>
           </div>
         </div>

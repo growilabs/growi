@@ -1,5 +1,5 @@
 /**
- * Tests for the verify-dist-resolution tool (C5, esm-import-convention task 3).
+ * Tests for the verify-dist-resolution tool.
  *
  * The tool statically checks that every relative import specifier in every .js
  * file under dist points to a file that actually exists. This recovers the

@@ -1,5 +1,3 @@
-import type { IPage, Ref } from '@growi/core';
-import { getIdForRef } from '@growi/core';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
@@ -11,16 +9,10 @@ import { createBatchStream } from '~/server/util/batch-stream';
 import loggerFactory from '~/utils/logger';
 
 import { BULK_REINDEX_SIZE } from './consts';
+import { deletePageCompletelyBySystem } from './delete-page-completely-by-system';
 import type { IPageService } from './page-service';
-import { shouldUseV4Process } from './should-use-v4-process';
 
 const logger = loggerFactory('growi:services:page');
-
-type IPageUnderV5 = Omit<IPage, 'parent'> & { parent: Ref<IPage> };
-
-const _shouldUseV5Process = (page: IPage): page is IPageUnderV5 => {
-  return !shouldUseV4Process(page);
-};
 
 /**
  * @description This function is intended to be used exclusively for forcibly deleting the user homepage by the system.
@@ -51,41 +43,9 @@ export const deleteCompletelyUserHomeBySystem = async (
     throw new Error(msg);
   }
 
-  const shouldUseV5Process = _shouldUseV5Process(userHomepage);
-
-  const ids = [userHomepage._id];
-  const paths = [userHomepage.path];
+  await deletePageCompletelyBySystem(userHomepage, pageService);
 
   try {
-    if (shouldUseV5Process) {
-      // Ensure consistency of ancestors
-      const inc = userHomepage.isEmpty
-        ? -userHomepage.descendantCount
-        : -(userHomepage.descendantCount + 1);
-      await pageService.updateDescendantCountOfAncestors(
-        getIdForRef(userHomepage.parent),
-        inc,
-        true,
-      );
-    }
-
-    // Delete the user's homepage
-    // actor=null: this is a system operation with no operator, so no
-    // cascade attachment-removal activity is recorded for it.
-    await pageService.deleteCompletelyOperation(ids, paths, null);
-
-    if (shouldUseV5Process) {
-      // Remove leaf empty pages
-      await Page.removeLeafEmptyPagesRecursively(
-        getIdForRef(userHomepage.parent),
-      );
-    }
-
-    if (!userHomepage.isEmpty) {
-      // Emit an event for the search service
-      pageService.getEventEmitter().emit('deleteCompletely', userHomepage);
-    }
-
     const { PageQueryBuilder } = Page;
 
     // Find descendant pages with system deletion condition

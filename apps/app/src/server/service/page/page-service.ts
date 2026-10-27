@@ -8,7 +8,7 @@ import type {
   IUserHasId,
   PageGrant,
 } from '@growi/core/dist/interfaces';
-import type { HydratedDocument, Types } from 'mongoose';
+import type { Cursor, HydratedDocument, Types } from 'mongoose';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import type { SupportedActionType } from '~/interfaces/activity';
@@ -110,6 +110,10 @@ export interface IPageService {
     revisionBody?: string,
   ): Promise<CurrentPageYjsData>;
   updateDescendantCountOfPagesWithPaths(paths: string[]): Promise<void>;
+  recountAndUpdateDescendantCountOfPages(
+    pageCursor: Cursor<unknown>,
+    batchSize: number,
+  ): Promise<void>;
   revertRecursivelyMainOperation(
     page,
     user,
@@ -204,8 +208,6 @@ export interface IPageService {
   canDeleteUserHomepageByConfig(): boolean;
 
   isUsersHomepageOwnerAbsent(path: string): Promise<boolean>;
-
-  createTtlIndex(): Promise<void>;
 
   // Normalize parent operations
   getParentAndFillAncestorsByUser(

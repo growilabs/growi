@@ -1,10 +1,11 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
-import type { ColorScheme, IUserHasId } from '@growi/core';
+import type { ColorScheme, IAttachmentHasId, IUserHasId } from '@growi/core';
 import mongoose from 'mongoose';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import {
   detectNextjsRoutingType,
@@ -166,11 +167,30 @@ export const getServerSideCommonEachProps = async (
   let currentUser: IUserHasId | undefined;
   if (user != null) {
     const User = mongoose.model<IUserHasId>('User');
-    const userData = await User.findById(user.id).populate({
-      path: 'imageAttachment',
-      select: 'filePathProxied',
-    });
-    currentUser = userData?.toObject();
+    const userData = (await User.findById(user.id))?.toObject();
+    if (userData != null) {
+      // TODO: replace with a single prisma query (include imageAttachment)
+      // once the User model is migrated to prisma.
+      const imageAttachment =
+        userData.imageAttachment != null
+          ? await prisma.attachments.findUnique({
+              where: { id: userData.imageAttachment.toString() },
+              select: { _id: true, filePathProxied: true },
+            })
+          : null;
+      currentUser = {
+        ...userData,
+        // Copy into a plain object: a prisma row is not plain data for SSR props.
+        // A partial projection, the same shape the former populate({ select }) produced
+        imageAttachment:
+          imageAttachment == null
+            ? undefined
+            : ({
+                _id: imageAttachment._id,
+                filePathProxied: imageAttachment.filePathProxied,
+              } as IAttachmentHasId),
+      };
+    }
   }
 
   // Redirect destination for page transition by next/link

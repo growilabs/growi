@@ -3,7 +3,7 @@
  * bulk-export Markdown → HTML pipeline.
  *
  * This module is the single source of truth used by:
- *  - EsmPluginLoader (task 3.x) — which plugins to dynamicImport and in what order
+ *  - EsmPluginLoader (task 3.x) — which plugins to load and in what order
  *  - RendererParityGuard (task 6.1) — drift test comparing this set against
  *    generateCommonOptions / generateSSRViewOptions from the web renderer
  *
@@ -15,8 +15,8 @@
  *   → rehype plugins (raw, slug, sanitize, katex, add-class, stringify)
  *
  * Entries are loaded by EsmPluginLoader generically: npm plugins by bare
- * specifier, reused local plugins (emoji, echo-directive, xsv-to-table, add-class)
- * by relative path + named export.
+ * `import(name)`, reused local plugins (emoji, echo-directive, xsv-to-table,
+ * add-class) via an explicit `load` thunk + named export.
  */
 
 /** A declared plugin entry: how to load it, its pipeline options, and its
@@ -24,16 +24,19 @@
 export interface PluginDeclaration {
   /**
    * Canonical name — the npm package name for npm plugins (also used as the
-   * import specifier), or the short name the web renderer / parity test use for
-   * a reused local plugin (e.g. "add-class").
+   * default import target via `import(name)`), or the short name the web
+   * renderer / parity test use for a reused local plugin (e.g. "add-class").
    */
   readonly name: string;
   /**
-   * Module to import when it differs from `name` — e.g. a relative path (from
-   * the markdown/ dir) to a reused local GROWI plugin. Defaults to `name`,
-   * treated as a bare npm specifier.
+   * Dynamic-import thunk to use when the module differs from a bare
+   * `import(name)` — e.g. a reused local GROWI plugin. Must wrap a real
+   * `import('~/...')` (a literal specifier, not a runtime-built path) so the
+   * production build's `add-js-extensions` / `verify-dist-resolution` tooling
+   * can rewrite and verify it (see `.claude/rules/import-convention.md`).
+   * Defaults to `() => import(name)`.
    */
-  readonly specifier?: string;
+  readonly load?: () => Promise<Record<string, unknown>>;
   /** Named export to use as the plugin. Defaults to "default". */
   readonly exportName?: string;
   /**
@@ -52,7 +55,7 @@ export interface PluginDeclaration {
  *   rehype-sanitize, rehype-katex, rehype-stringify
  *
  * Note: remark-parse is the implicit unified base processor entry point;
- * it is listed first for completeness and traceability but is not dynamicImport-ed
+ * it is listed first for completeness and traceability but is not dynamically imported
  * as a separate plugin (it is part of unified itself via remark()).
  */
 export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
@@ -61,10 +64,10 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
   // Reused GROWI web plugin: emoji converts `:smile:` shortcodes to native emoji
   // glyphs (req 1.7). Placed right after gfm and BEFORE remark-directive so that
   // `:smile:` is consumed as an emoji, not parsed as a text directive (mirrors the
-  // web renderer order). React/DOM-free mdast transform; loaded by relative path.
+  // web renderer order). React/DOM-free mdast transform; loaded via a dynamic import() thunk.
   {
     name: 'emoji',
-    specifier: '../../../../../../services/renderer/remark-plugins/emoji.ts',
+    load: () => import('~/services/renderer/remark-plugins/emoji'),
     exportName: 'remarkPlugin',
     options: undefined,
   },
@@ -74,11 +77,10 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
   // Reused GROWI web plugin: echo-directive degrades text/leaf directives to readable
   // text (`<span>`/`<div>` showing the directive name), without leaking the `{...}`
   // attribute syntax (req 3.1a). Container directives are callout's domain (not adopted)
-  // and degrade to a plain text-preserving block. React/DOM-free; loaded by relative path.
+  // and degrade to a plain text-preserving block. React/DOM-free; loaded via a dynamic import() thunk.
   {
     name: 'echo-directive',
-    specifier:
-      '../../../../../../services/renderer/remark-plugins/echo-directive.ts',
+    load: () => import('~/services/renderer/remark-plugins/echo-directive'),
     exportName: 'remarkPlugin',
     options: undefined,
   },
@@ -87,11 +89,10 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
   // Reused GROWI web plugin: xsv-to-table converts csv/csv-h/tsv/tsv-h fenced code
   // blocks to GFM tables (req 1.8). Placed after math (mirrors the web view order
   // `push(math, xsvToTable)`) and before remark-rehype so the produced <table> later
-  // receives `table table-bordered` from add-class. React/DOM-free; loaded by relative path.
+  // receives `table table-bordered` from add-class. React/DOM-free; loaded via a dynamic import() thunk.
   {
     name: 'xsv-to-table',
-    specifier:
-      '../../../../../../services/renderer/remark-plugins/xsv-to-table.ts',
+    load: () => import('~/services/renderer/remark-plugins/xsv-to-table'),
     exportName: 'remarkPlugin',
     options: undefined,
   },
@@ -108,13 +109,12 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
   { name: 'rehype-katex', options: undefined },
   // Reused GROWI web plugin: add-class adds `table table-bordered` so the design
   // system's .table/.table-bordered borders apply (mirrors generateCommonOptions).
-  // Loaded via dynamicImport from a relative path; its only runtime dependency
+  // Loaded via a dynamic import() thunk; its only runtime dependency
   // (hast-util-select) is ESM. Placed after sanitize (trusted, static class
   // values), before stringify.
   {
     name: 'add-class',
-    specifier:
-      '../../../../../../services/renderer/rehype-plugins/add-class.ts',
+    load: () => import('~/services/renderer/rehype-plugins/add-class'),
     exportName: 'rehypePlugin',
     options: { table: 'table table-bordered' },
   },
@@ -129,7 +129,7 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
  * generateSSRViewOptions) that this pipeline consciously omits. NOTE (改訂 5):
  * exclusion is NOT because "local .ts plugins can't be loaded" — that earlier claim
  * (research.md I2) was disproven by add-class and corrected; any React/DOM-free AST
- * transform loads fine via the same relative-path dynamicImport pattern. The real
+ * transform loads fine via the same dynamic import() pattern. The real
  * reasons, by group:
  *  - Degrades WORSE without callout (research.md I7):
  *      github-admonitions — converts `> [!NOTE]` to a `:::note` container directive,

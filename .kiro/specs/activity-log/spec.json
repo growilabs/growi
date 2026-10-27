@@ -1,9 +1,9 @@
 {
   "feature_name": "activity-log",
   "created_at": "2026-07-07T09:58:07Z",
-  "updated_at": "2026-07-08T12:30:00Z",
+  "updated_at": "2026-08-06T00:00:00Z",
   "language": "ja",
-  "phase": "tasks-approved",
+  "phase": "implementation-complete",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -18,5 +18,6 @@
       "approved": true
     }
   },
-  "ready_for_implementation": true
+  "ready_for_implementation": true,
+  "increment_note": "Implemented and merged (PR #11421). All sub-tasks are done; the unchecked entries in tasks.md are parent headers, not pending work. The recording gate lives in server/service/activity/ (recordFailsafeAttempt / registerFailsafeFinalizer). Cleanup of pre-existing rows was out of scope from the start. This spec remains the flagship of the activity log family and keeps the family-wide concern map (brief.md)."
 }

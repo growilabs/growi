@@ -1,8 +1,8 @@
 /**
- * WebSocket authorization matrix capture (task 0.3.2).
+ * WebSocket authorization matrix capture.
  *
- * The structural route-middleware snapshot (0.3) and the apiv3 black-box
- * matrix (0.3.1) both operate on Express's internal router stack. Neither
+ * The structural route-middleware snapshot and the apiv3 black-box
+ * matrix both operate on Express's internal router stack. Neither
  * observes the WebSocket upgrade gates — `service/yjs/upgrade-handler.ts`
  * (HTTP `upgrade` listener, not an Express middleware) and the socket.io
  * namespace middleware chain inside `service/socket-io/socket-io.ts`.
@@ -11,8 +11,8 @@
  * live HTTP listener, performing a genuine express-session login, and
  * opening raw `ws` / `socket.io-client` connections with the resulting
  * cookie. The observed statuses (4xx rejections, 101 accept + Yjs sync)
- * are written to `.kiro/specs/esm-migration/ws-authz-baseline.json` so
- * Phase 3.8.d can diff post-migration runs against it.
+ * are written to `tools/authz-matrix/baselines/ws-authz.json` so a
+ * re-capture after a refactor can be diffed against it.
  *
  * Three yjs cases, three socket.io cases:
  *
@@ -23,18 +23,18 @@
  *   socketio/`no-session`         — connect with no cookie → loginRequired rejects
  *   socketio/`session-nonadmin-admin-ns` —
  *           cookie of a non-admin user connecting to the `/admin` namespace
- *           → adminRequired rejects. Note: the task spec asks for
- *           "session + unviewable" as the 2nd case, but socket.io has NO
+ *           → adminRequired rejects. Note: the natural 2nd case would be
+ *           "session + unviewable", but socket.io has NO
  *           per-page ACL at connect time (the only namespace-level gate
  *           besides loginRequired is adminRequired on `/admin`), so we
  *           substitute the nearest real gate and document it here.
  *   socketio/`session-viewable`   — cookie on default `/` namespace → connect ok
  *
- * Output shape is flat and sorted-key-friendly so diffs in Phase 3.8.d
- * are unambiguous per field. Determinism is verified by two consecutive
- * passes (only the `capturedAt` / `git` / `node` metadata fields differ).
+ * Output shape is flat and sorted-key-friendly so diffs are unambiguous
+ * per field. Determinism is verified by two consecutive passes (only the
+ * `capturedAt` / `git` / `node` metadata fields differ).
  *
- * Requirements covered: 2.6, 6.5
+ * See the "Authorization Regression Check" section of the app-commands skill.
  */
 
 import { execSync } from 'node:child_process';
@@ -50,7 +50,7 @@ import {
   type WsSeededFixtures,
 } from './authz-matrix/ws-fixtures';
 
-const DEFAULT_OUTPUT = '.kiro/specs/esm-migration/ws-authz-baseline.json';
+const DEFAULT_OUTPUT = 'tools/authz-matrix/baselines/ws-authz.json';
 
 type YjsCaseResult = {
   readonly status: number;

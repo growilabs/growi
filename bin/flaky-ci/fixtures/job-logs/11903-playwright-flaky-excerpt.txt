@@ -1,0 +1,5 @@
+::error file=apps/app/playwright/20-basic-features/inline-comment.spec.ts,title=[chromium] › playwright/20-basic-features/inline-comment.spec.ts:4758:3 › Inline comment - visual refresh: mockup cross-check captures › Capture popover states 5 (normal) and 6 (edit mode) in DARK mode (Req 4.4),line=4776,col=27::  1) [chromium] › playwright/20-basic-features/inline-comment.spec.ts ...
+Error: expect(locator).toBeVisible() failed
+playwright/output/20-basic-features-inline-c-c6bf4--mode-in-DARK-mode-Req-4-4--chromium/test-failed-1.png
+  1 flaky
+  106 passed (5.7m)

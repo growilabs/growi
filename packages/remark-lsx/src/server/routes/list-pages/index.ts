@@ -6,14 +6,17 @@ import type { Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
 
 import type {
+  LsxApiOptions,
   LsxApiParams,
   LsxApiResponseData,
 } from '../../../interfaces/api.js';
 import { addDepthCondition } from './add-depth-condition.js';
 import { addNumCondition } from './add-num-condition.js';
 import { addSortCondition } from './add-sort-condition.js';
+import { addTagCondition } from './add-tag-condition.js';
 import { generateBaseQuery, type PageQuery } from './generate-base-query.js';
 import { getToppageViewersCount } from './get-toppage-viewers-count.js';
+import { parseTagNames } from './parse-tag-names.js';
 
 const logger = loggerFactory('growi:remark-lsx:routes:list-pages');
 
@@ -75,8 +78,10 @@ interface IListPagesRequest
 
 export const listPages = ({
   getExcludedPaths,
+  resolveTagPageIds,
 }: {
   getExcludedPaths: () => string[];
+  resolveTagPageIds: (tagNames: string[]) => Promise<string[]>;
 }) => {
   return async (req: IListPagesRequest, res: Response): Promise<Response> => {
     const params: LsxApiParams = {
@@ -127,6 +132,15 @@ export const listPages = ({
       }
       if (options?.except != null) {
         query = addExceptCondition(query, pagePath, options.except);
+      }
+      // tag
+      if (options?.tag != null) {
+        // when option string is 'tag=', the option value is true (same convention as filter/except)
+        const tagNames = parseTagNames(
+          options.tag as LsxApiOptions['tag'] | true,
+        );
+        const pageIds = await resolveTagPageIds(tagNames);
+        query = addTagCondition(query, pageIds);
       }
 
       // get total num before adding num/sort conditions

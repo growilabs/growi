@@ -57,7 +57,10 @@ describe('listPages', () => {
       createError(400, 'pagePath is required'),
     );
 
-    const handler = listPages({ getExcludedPaths: () => [] });
+    const handler = listPages({
+      getExcludedPaths: () => [],
+      resolveTagPageIds: vi.fn(),
+    });
     await handler(reqMock, resMock);
 
     expect(resMock.status).toHaveBeenCalledWith(400);
@@ -100,7 +103,10 @@ describe('listPages', () => {
       resMock.status.calledWith(200).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages({ getExcludedPaths: () => [] });
+      const handler = listPages({
+        getExcludedPaths: () => [],
+        resolveTagPageIds: vi.fn(),
+      });
       await handler(reqMock, resMock);
 
       // then
@@ -134,7 +140,10 @@ describe('listPages', () => {
       resMock.status.calledWith(500).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages({ getExcludedPaths: () => [] });
+      const handler = listPages({
+        getExcludedPaths: () => [],
+        resolveTagPageIds: vi.fn(),
+      });
       await handler(reqMock, resMock);
 
       // then
@@ -164,7 +173,10 @@ describe('listPages', () => {
       resMock.status.calledWith(400).mockReturnValue(resStatusMock);
 
       // when
-      const handler = listPages({ getExcludedPaths: () => [] });
+      const handler = listPages({
+        getExcludedPaths: () => [],
+        resolveTagPageIds: vi.fn(),
+      });
       await handler(reqMock, resMock);
 
       // then
@@ -174,6 +186,136 @@ describe('listPages', () => {
       expect(mocks.addSortConditionMock).not.toHaveBeenCalledOnce(); // does not called
       expect(resMock.status).toHaveBeenCalledOnce();
       expect(resStatusMock.send).toHaveBeenCalledWith('error for test');
+    });
+  });
+
+  describe('with tag option', () => {
+    const pagePath = '/Sandbox';
+    const builderMock = mock<PageQueryBuilder>();
+    const queryMock = mock<PageQuery>();
+    builderMock.query = queryMock;
+
+    const resolveTagPageIdsMock = vi.fn();
+
+    beforeEach(() => {
+      mocks.generateBaseQueryMock.mockResolvedValue(builderMock);
+      mocks.getToppageViewersCountMock.mockResolvedValue(0);
+      resolveTagPageIdsMock.mockReset();
+
+      queryMock.and.mockReturnValue(queryMock);
+
+      const queryClonedMock = mock<PageQuery>();
+      queryMock.clone.mockReturnValue(queryClonedMock);
+      queryClonedMock.count.mockResolvedValue(0);
+      queryMock.exec.mockResolvedValue([]);
+
+      mocks.addNumConditionMock.mockReturnValue(queryMock);
+      mocks.addSortConditionMock.mockReturnValue(queryMock);
+    });
+
+    it('resolves tag names and scopes the query to the resolved page ids when tag option is given', async () => {
+      // setup
+      const reqMock = mock<IListPagesRequest>();
+      reqMock.query = { pagePath, options: { tag: 'foo, bar' } };
+
+      const resolvedPageIds = ['page1', 'page2'];
+      resolveTagPageIdsMock.mockResolvedValue(resolvedPageIds);
+
+      const pageMock = mock<IPageHasId>();
+      queryMock.exec.mockResolvedValue([pageMock]);
+
+      const resMock = mock<Response>();
+      resMock.status.mockReturnValue(mock<Response>());
+
+      // when
+      const handler = listPages({
+        getExcludedPaths: () => [],
+        resolveTagPageIds: resolveTagPageIdsMock,
+      });
+      await handler(reqMock, resMock);
+
+      // then
+      expect(resolveTagPageIdsMock).toHaveBeenCalledWith(['foo', 'bar']);
+      expect(queryMock.and).toHaveBeenCalledWith([
+        { _id: { $in: resolvedPageIds } },
+      ]);
+    });
+
+    it('does not call resolveTagPageIds and behaves as before when tag option is not given (Req 2.2)', async () => {
+      // setup
+      const reqMock = mock<IListPagesRequest>();
+      reqMock.query = { pagePath };
+
+      const resMock = mock<Response>();
+      resMock.status.mockReturnValue(mock<Response>());
+
+      // when
+      const handler = listPages({
+        getExcludedPaths: () => [],
+        resolveTagPageIds: resolveTagPageIdsMock,
+      });
+      await handler(reqMock, resMock);
+
+      // then
+      expect(resolveTagPageIdsMock).not.toHaveBeenCalled();
+      expect(queryMock.and).not.toHaveBeenCalledWith([
+        { _id: { $in: expect.anything() } },
+      ]);
+    });
+
+    it('applies both the tag condition and an existing option (filter) as AND conditions (Req 2.3)', async () => {
+      // setup
+      const reqMock = mock<IListPagesRequest>();
+      reqMock.query = {
+        pagePath,
+        options: { tag: 'foo', filter: 'child' },
+      };
+
+      const resolvedPageIds = ['page1'];
+      resolveTagPageIdsMock.mockResolvedValue(resolvedPageIds);
+
+      const resMock = mock<Response>();
+      resMock.status.mockReturnValue(mock<Response>());
+
+      // when
+      const handler = listPages({
+        getExcludedPaths: () => [],
+        resolveTagPageIds: resolveTagPageIdsMock,
+      });
+      await handler(reqMock, resMock);
+
+      // then
+      const expectedFilterRegex = new RegExp(
+        `^${escapeStringForMongoRegex('/Sandbox/')}.*${escapeStringForMongoRegex('child')}`,
+      );
+      expect(queryMock.and).toHaveBeenCalledWith({ path: expectedFilterRegex });
+      expect(queryMock.and).toHaveBeenCalledWith([
+        { _id: { $in: resolvedPageIds } },
+      ]);
+    });
+
+    it('responds 400 when tag option is given without a value, without calling resolveTagPageIds (Req 1.6 propagation)', async () => {
+      // setup
+      const reqMock = mock<IListPagesRequest>();
+      reqMock.query = { pagePath, options: { tag: true as unknown as string } };
+
+      const resMock = mock<Response>();
+      const resStatusMock = mock<Response>();
+      resMock.status.mockReturnValue(resStatusMock);
+
+      // when
+      const handler = listPages({
+        getExcludedPaths: () => [],
+        resolveTagPageIds: resolveTagPageIdsMock,
+      });
+      await handler(reqMock, resMock);
+
+      // then
+      expect(resolveTagPageIdsMock).not.toHaveBeenCalled();
+      expect(resMock.status).toHaveBeenCalledWith(400);
+      expect(resStatusMock.send).toHaveBeenCalledWith(
+        'tag option requires at least one tag name.',
+      );
     });
   });
 
@@ -297,7 +439,10 @@ describe('when excludedPaths is handled', () => {
     resMock.status.mockReturnValue(mock<Response>());
 
     // getExcludedPaths returns empty array
-    const handler = listPages({ getExcludedPaths: () => [] });
+    const handler = listPages({
+      getExcludedPaths: () => [],
+      resolveTagPageIds: vi.fn(),
+    });
     await handler(reqMock, resMock);
 
     // query.and should NOT be called with a $not regex for paths
@@ -319,7 +464,10 @@ describe('when excludedPaths is handled', () => {
 
     // getExcludedPaths returns paths to exclude
     const excludedPaths = ['/user', '/tmp'];
-    const handler = listPages({ getExcludedPaths: () => excludedPaths });
+    const handler = listPages({
+      getExcludedPaths: () => excludedPaths,
+      resolveTagPageIds: vi.fn(),
+    });
     await handler(reqMock, resMock);
 
     // check if the logic generates the correct regex: ^\/(user|tmp)(\/|$)

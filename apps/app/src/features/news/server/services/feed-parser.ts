@@ -14,6 +14,10 @@ const FeedItemSchema = z.object({
   emoji: z.string().optional(),
   title: z.record(z.string(), z.string()),
   body: z.record(z.string(), z.string()).optional(),
+  // z.string() (not z.literal('markdown')): the parser skips whole items on
+  // validation failure, so an unknown future value must survive ingest and
+  // degrade to plain text at render, not drop the news item.
+  bodyFormat: z.string().optional(),
   url: z.string().regex(HTTP_URL_PATTERN).optional(),
   publishedAt: z.string().min(1),
   conditions: z

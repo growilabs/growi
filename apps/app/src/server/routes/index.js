@@ -3,6 +3,8 @@ import express from 'express';
 import multer from 'multer';
 import autoReap from 'multer-autoreap';
 
+import { DRAWIO_ASSET_PROXY_PATH } from '~/features/drawio/consts';
+import { drawioAssetsRouterFactory } from '~/features/drawio/server';
 import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server';
 import { createPageMarkdownHandlers } from '~/features/page-markdown/server';
 import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
@@ -198,6 +200,12 @@ export const setup = (crowi, app) => {
 
   // brand logo
   app.use('/attachment', attachment.getBrandLogoRouterFactory(crowi));
+
+  // draw.io's own stencil/shape libraries, served from GROWI's origin because the viewer
+  // reads them with XMLHttpRequest and a self-hosted draw.io sends no CORS header.
+  // Unauthenticated on purpose — readers of shared pages need it too, and it exposes no
+  // GROWI data. See features/drawio/server/routes/drawio-assets.ts.
+  app.use(DRAWIO_ASSET_PROXY_PATH, drawioAssetsRouterFactory());
 
   /*
    * Routes below are unavailable when maintenance mode

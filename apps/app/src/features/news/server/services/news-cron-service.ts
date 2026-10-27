@@ -1,8 +1,10 @@
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
+import { randomSleep } from '~/server/util/random-sleep';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
+import { FEED_URL } from '../../consts';
 import type { INewsItemInput } from '../../interfaces/news-item';
 import { type FeedItem, parseFeedJson } from './feed-parser';
 import { NewsService } from './news-service';
@@ -21,14 +23,6 @@ const FETCH_TIMEOUT_MS = 10_000;
  * an external endpoint (broken or compromised) can push into our process memory.
  */
 const MAX_RESPONSE_SIZE_BYTES = 5 * 1024 * 1024;
-
-/**
- * Vendor-controlled news feed URL. Hardcoded so a fresh deployment delivers
- * news without any infrastructure-side env injection. Users (incl. admins)
- * cannot change this; opt-out is performed via the `news:isDeliveryEnabled`
- * config flag managed in the admin UI.
- */
-const FEED_URL = 'https://growilabs.github.io/growi-news-feed/feed.json';
 
 /**
  * Check if the item matches the current GROWI version
@@ -50,14 +44,6 @@ const matchesGrowiVersion = (
       return false;
     }
   });
-};
-
-/**
- * Sleep for a random duration between 0 and maxMs
- */
-const randomSleep = (maxMs: number): Promise<void> => {
-  const ms = Math.floor(Math.random() * maxMs);
-  return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
 export class NewsCronService extends CronService {
@@ -117,6 +103,7 @@ export class NewsCronService extends CronService {
       id: item.id,
       title: item.title,
       body: item.body,
+      bodyFormat: item.bodyFormat,
       emoji: item.emoji,
       url: item.url,
       publishedAt: item.publishedAt,

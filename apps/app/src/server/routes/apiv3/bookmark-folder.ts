@@ -1,9 +1,17 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import { objectIdUtils } from '@growi/core/dist/utils';
+import {
+  isUserPage,
+  isUsersTopPage,
+} from '@growi/core/dist/utils/page-path-utils';
 import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
+// Page is not migrated to Prisma yet; its viewer/grant filter is a mongoose static.
+import mongoose from 'mongoose';
 
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
@@ -15,7 +23,10 @@ import {
   BookmarkFolderNotFoundError,
   InvalidParentBookmarkFolderError,
 } from '~/server/models/errors';
+import type { PageModel } from '~/server/models/page';
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -142,6 +153,11 @@ const validator = {
   ],
 };
 
+// Prisma throws a validation error (500) on a malformed ObjectId string, so ids
+// are rejected up front to keep the endpoint's 400 contract.
+const isValidObjectString = (v: unknown): v is string =>
+  typeof v === 'string' && objectIdUtils.isValidObjectId(v);
+
 export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
@@ -218,6 +234,9 @@ export const setup = (crowi: Crowi): Router => {
         });
       } catch (err) {
         logger.error(err);
+        if (err instanceof BookmarkFolderForbiddenError) {
+          return res.apiv3Err('forbidden', 403);
+        }
         if (err instanceof InvalidParentBookmarkFolderError) {
           return res.apiv3Err(
             new ErrorV3(err.message, 'failed_to_create_bookmark_folder'),
@@ -266,6 +285,34 @@ export const setup = (crowi: Crowi): Router => {
     loginRequiredStrictly,
     async (req: CrowiRequest, res: ApiV3Response) => {
       const { userId } = req.params;
+      const Page = mongoose.model<InstanceType<PageModel>, PageModel>('Page');
+
+      const hideRestrictedByOwner = configManager.getConfig(
+        'security:list-policy:hideRestrictedByOwner',
+      );
+      const hideRestrictedByGroup = configManager.getConfig(
+        'security:list-policy:hideRestrictedByGroup',
+      );
+      const disableUserPages = configManager.getConfig(
+        'security:disableUserPages',
+      );
+      // "Anyone with the link" pages are never listed elsewhere, so a bookmark may
+      // be the owner's only way back: keep them on the owner's own list, hide from others.
+      const isOwnList = req.user?._id.toString() === userId;
+
+      // Resolve the viewer's groups once here; addViewerCondition would otherwise
+      // re-resolve them on every per-folder findByIdsAndViewer call below.
+      const userGroups =
+        req.user != null
+          ? [
+              ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(
+                req.user,
+              )),
+              ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+                req.user,
+              )),
+            ]
+          : null;
 
       const getBookmarkFolders = async (
         userId: string,
@@ -303,23 +350,56 @@ export const setup = (crowi: Crowi): Router => {
               .map((id) => bookmarkMap.get(id))
               .filter((b) => b != null);
           }
-          const bookmarks = populatedBookmarks.map((bookmark) => {
-            const serializedBookmark = serializeBookmarkSecurely(bookmark);
-            return {
-              ...serializedBookmark,
-              user: serializedBookmark.userId,
-              page:
-                serializedBookmark.page == null
-                  ? null
-                  : {
-                      ...serializedBookmark.page,
-                      creator: serializedBookmark.page.creatorId,
-                      deleteUser: serializedBookmark.page.deleteUserId,
-                      parent: serializedBookmark.page.parentId,
-                      revision: serializedBookmark.page.revisionId,
-                    },
-            };
-          });
+
+          const bookmarkedPageIds = populatedBookmarks
+            .map((bookmark) => bookmark.pageId)
+            .filter((id): id is string => id != null);
+
+          const viewablePages = await Page.findByIdsAndViewer(
+            bookmarkedPageIds,
+            req.user,
+            userGroups,
+            false,
+            isOwnList,
+            !hideRestrictedByOwner,
+            !hideRestrictedByGroup,
+          );
+          // When user pages are disabled, exclude them from the listing as
+          // page-listing does, so bookmarked user pages don't leak into the list.
+          const viewableIdSet = new Set(
+            viewablePages
+              .filter(
+                (page) =>
+                  !disableUserPages ||
+                  (!isUserPage(page.path) && !isUsersTopPage(page.path)),
+              )
+              .map((page) => page._id.toString()),
+          );
+
+          // Drop bookmarks the viewer cannot access, and orphaned ones (null page):
+          // they carry no path/title and the client renders them as nothing anyway.
+          const bookmarks = populatedBookmarks
+            .filter(
+              (bookmark) =>
+                bookmark.pageId != null && viewableIdSet.has(bookmark.pageId),
+            )
+            .map((bookmark) => {
+              const serializedBookmark = serializeBookmarkSecurely(bookmark);
+              return {
+                ...serializedBookmark,
+                user: serializedBookmark.userId,
+                page:
+                  serializedBookmark.page == null
+                    ? null
+                    : {
+                        ...serializedBookmark.page,
+                        creator: serializedBookmark.page.creatorId,
+                        deleteUser: serializedBookmark.page.deleteUserId,
+                        parent: serializedBookmark.page.parentId,
+                        revision: serializedBookmark.page.revisionId,
+                      },
+              };
+            });
           return {
             _id: folder.id,
             name: folder.name,
@@ -461,9 +541,61 @@ export const setup = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
     loginRequiredStrictly,
     validator.bookmarkFolder,
+    apiV3FormValidator,
     async (req: CrowiRequest, res: ApiV3Response) => {
+      // loginRequiredStrictly guarantees req.user at runtime; guard narrows the type
+      if (req.user == null) {
+        return res.apiv3Err(
+          new ErrorV3('param "user" must be set.', 'forbidden'),
+          403,
+        );
+      }
+      const userId = req.user._id.toString();
       const { bookmarkFolderId, name, parent, childFolder } = req.body;
       try {
+        if (!isValidObjectString(bookmarkFolderId)) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'bookmarkFolderId must be a valid object id',
+              'invalid_bookmark_folder_id',
+            ),
+            400,
+          );
+        }
+
+        const folder = await prisma.bookmarkfolders.findUnique({
+          where: { id: bookmarkFolderId },
+        });
+        if (folder == null) {
+          return res.apiv3Err('bookmark_folder_not_found', 404);
+        }
+
+        if (folder.ownerId !== userId) {
+          return res.apiv3Err('forbidden', 403);
+        }
+
+        if (parent != null) {
+          if (!isValidObjectString(parent)) {
+            return res.apiv3Err(
+              new ErrorV3(
+                'parent must be a valid object id',
+                'invalid_parent_bookmark_folder_id',
+              ),
+              400,
+            );
+          }
+          const parentFolder = await prisma.bookmarkfolders.findUnique({
+            where: { id: parent },
+          });
+          if (parentFolder == null) {
+            return res.apiv3Err('bookmark_folder_not_found', 404);
+          }
+          // A user must not move a folder under another user's folder
+          if (parentFolder.ownerId !== userId) {
+            return res.apiv3Err('forbidden', 403);
+          }
+        }
+
         const bookmarkFolder =
           await prisma.bookmarkfolders.updateBookmarkFolder(
             bookmarkFolderId,
@@ -540,6 +672,28 @@ export const setup = (crowi: Crowi): Router => {
       const { pageId, folderId } = req.body;
 
       try {
+        if (folderId != null) {
+          if (!isValidObjectString(folderId)) {
+            return res.apiv3Err(
+              new ErrorV3(
+                'folderId must be a valid object id',
+                'invalid_folder_id',
+              ),
+              400,
+            );
+          }
+          const folder = await prisma.bookmarkfolders.findUnique({
+            where: { id: folderId },
+          });
+          if (folder == null) {
+            return res.apiv3Err('bookmark_folder_not_found', 404);
+          }
+          // A user must not add a bookmark under another user's folder
+          if (folder.ownerId !== userId) {
+            return res.apiv3Err('forbidden', 403);
+          }
+        }
+
         const bookmarkFolder =
           await prisma.bookmarkfolders.insertOrUpdateBookmarkedPage(
             pageId,

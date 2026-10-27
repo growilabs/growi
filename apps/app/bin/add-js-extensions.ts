@@ -1,5 +1,5 @@
 /**
- * Post-build tool: add-js-extensions (C1, esm-import-convention task 2.2).
+ * Post-build tool: add-js-extensions.
  *
  * Rewrites extensionless relative import specifiers in emitted .js files so that
  * Node native ESM can resolve them. Called from postbuild-server.ts after

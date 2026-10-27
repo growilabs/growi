@@ -60,3 +60,15 @@ export interface PageMentionInputProps {
   onChange: (value: string) => void; // returns the flatten result on each doc change
   placeholder?: string;
 }
+
+/**
+ * Imperative handle exposed by `PageMentionInput`.
+ *
+ * The editable element is CodeMirror's contentDOM, created and owned inside the
+ * component, so a host that wants to hand the caret over (e.g. right after the
+ * chat sidebar opens) cannot reach it through a plain DOM ref.
+ */
+export interface PageMentionInputHandle {
+  /** Move the caret into the editor. No-op before the view is mounted. */
+  focus(): void;
+}

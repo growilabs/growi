@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * succeeded. This tests the observable contract (a specifier resolves and the
  * program runs) rather than the internal string matching.
  *
- * Regression guard for esm-import-convention: the codemod collapses
+ * Regression guard for the no-extension import convention, which collapses
  * `./index.js` -> bare `.` (and `../x/index.js` -> `..`), which Node's native
  * ESM loader rejects with ERR_UNSUPPORTED_DIR_IMPORT. The resolver must map
  * those bare directory specifiers to the directory's index source, mirroring

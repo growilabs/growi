@@ -4,7 +4,9 @@
  * Performance and idempotency integration tests for ReconcileOrchestrator.
  *
  * Tests:
- *   1. Accept gate latency — assert < 200ms (p99 approximated by single measurement)
+ *   1. Accept gate — submit returns while the reconcile it scheduled is still in
+ *      flight (see the test for why this is asserted relatively rather than as a
+ *      wall-clock budget)
  *   2. Instruction count bounded — each page produces exactly 1 instruction when
  *      it has a unique namespace (the makeNamespaceMapper stub gives each page its
  *      own namespace, so no mid-stream chunk flush occurs; all buffers flush at
@@ -28,6 +30,7 @@ import { VaultInstruction } from '~/features/growi-vault/server/models/vault-ins
 import { VaultReconcileLog } from '~/features/growi-vault/server/models/vault-reconcile-log';
 import { createConcurrencyController } from '~/features/growi-vault/server/services/reconcile/reconcile-concurrency-controller';
 import { createHistoryStore } from '~/features/growi-vault/server/services/reconcile/reconcile-history-store';
+import type { ReconcileOrchestrator } from '~/features/growi-vault/server/services/reconcile/reconcile-orchestrator';
 import { createReconcileOrchestrator } from '~/features/growi-vault/server/services/reconcile/reconcile-orchestrator';
 import { createVaultReconcileService } from '~/features/growi-vault/server/services/reconcile/reconcile-service';
 import { resolveTarget } from '~/features/growi-vault/server/services/reconcile/reconcile-target-resolver';
@@ -145,6 +148,46 @@ function waitForReconcileStatus(
   });
 }
 
+/**
+ * Wait until no reconcile is still in flight.
+ *
+ * `afterEach` empties vault_instructions and vault_reconcile_log, but a reconcile
+ * that is still running goes on writing into them afterwards, and that late row is
+ * counted by the next test. The per-test `waitForReconcileStatus` calls do not
+ * prevent this: they sit at the end of the test body, so any assertion that fails
+ * before them skips the wait entirely. That is exactly how this file used to fail
+ * in pairs — a failed assertion in the accept-gate test turned the following test's
+ * "expected 25" into "expected 26". Draining here instead makes the cleanup
+ * independent of whether the test passed.
+ */
+function waitForNoActiveReconciles(timeoutMs = 30000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      VaultReconcileLog.countDocuments({
+        status: { $in: ['pending', 'running'] },
+      })
+        .then((count: number) => {
+          if (count === 0) {
+            resolve();
+            return;
+          }
+          if (Date.now() >= deadline) {
+            reject(
+              new Error(
+                `Timeout waiting for ${count} in-flight reconcile(s) to settle`,
+              ),
+            );
+            return;
+          }
+          setTimeout(tick, 50);
+        })
+        .catch(reject);
+    };
+    tick();
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -165,6 +208,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  await waitForNoActiveReconciles();
   await mongoose.connection.collection('vault_reconcile_log').deleteMany({});
   await mongoose.connection.collection('vault_instructions').deleteMany({});
   await mongoose.connection.collection('pages').deleteMany({
@@ -176,12 +220,53 @@ afterEach(async () => {
 // Shared service factory
 // ---------------------------------------------------------------------------
 
+/** The real orchestrator, wired the same way `buildService` wires it by default. */
+function buildOrchestrator(opts: {
+  chunkSize?: number;
+  createActivity?: (data: { action: string }) => Promise<void>;
+}): ReconcileOrchestrator {
+  return createReconcileOrchestrator({
+    pageModel: Page,
+    vaultInstruction: VaultInstruction,
+    vaultNamespaceMapper: makeNamespaceMapper(),
+    vaultReconcileLog: VaultReconcileLog,
+    createActivity: opts.createActivity as Parameters<
+      typeof createReconcileOrchestrator
+    >[0]['createActivity'],
+    chunkSize: opts.chunkSize ?? 10,
+  });
+}
+
+/**
+ * Wraps a real orchestrator so `run()` waits on a gate the caller opens, which
+ * holds a reconcile in flight for as long as the test needs.
+ */
+function makeBlockableOrchestrator(real: ReconcileOrchestrator): {
+  orchestrator: ReconcileOrchestrator;
+  release: () => void;
+} {
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return {
+    orchestrator: {
+      run: async (runOpts) => {
+        await gate;
+        await real.run(runOpts);
+      },
+    },
+    release,
+  };
+}
+
 function buildService(opts: {
   chunkSize?: number;
   // biome-ignore lint/suspicious/noExplicitAny: test stub
   configManager?: any;
   // biome-ignore lint/suspicious/noExplicitAny: test stub
   concurrencyController?: any;
+  orchestrator?: ReconcileOrchestrator;
   createActivity?: (data: { action: string }) => Promise<void>;
 }) {
   const historyStore = createHistoryStore({
@@ -194,16 +279,7 @@ function buildService(opts: {
       maxConcurrentSystem: 10,
       adminBypassCapacityLimit: true,
     });
-  const orchestrator = createReconcileOrchestrator({
-    pageModel: Page,
-    vaultInstruction: VaultInstruction,
-    vaultNamespaceMapper: makeNamespaceMapper(),
-    vaultReconcileLog: VaultReconcileLog,
-    createActivity: opts.createActivity as Parameters<
-      typeof createReconcileOrchestrator
-    >[0]['createActivity'],
-    chunkSize: opts.chunkSize ?? 10,
-  });
+  const orchestrator = opts.orchestrator ?? buildOrchestrator(opts);
   return createVaultReconcileService({
     pageModel: Page,
     targetResolver: realTargetResolver,
@@ -220,11 +296,26 @@ function buildService(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1: Accept gate latency < 200ms
+// Test 1: Accept gate does not block on the reconcile
 // ---------------------------------------------------------------------------
 
-describe('Accept gate latency', () => {
-  it('accept gate resolves within 200ms for a normal request', async () => {
+describe('Accept gate', () => {
+  /**
+   * What is being guarded: the gate stays a cheap synchronous path (要件 6.2 —
+   * one findOne, no collection scan) and hands the work to the background
+   * orchestrator instead of awaiting it.
+   *
+   * The reconcile is held at a gate the test opens only after `submit()` has
+   * resolved, so whether `submit()` awaits it does not depend on which of two
+   * concurrent operations happens to finish first. A wall-clock budget would
+   * fail on runner noise alone, and comparing against the real reconcile's
+   * finishing time is still a race. An accept gate that awaited the reconcile
+   * never resolves here, and the test fails on its timeout.
+   *
+   * 要件 6.10's "accept gate p99 ≤ 200ms" is a production SLO. A single sample in
+   * CI cannot measure a p99, so this test does not attempt to.
+   */
+  it('resolves while the reconcile it scheduled is still in flight', async () => {
     await Page.insertMany([
       {
         path: '/overhead-latency',
@@ -234,30 +325,37 @@ describe('Accept gate latency', () => {
       },
     ]);
 
-    const service = buildService({});
+    const { orchestrator, release } = makeBlockableOrchestrator(
+      buildOrchestrator({}),
+    );
+    const service = buildService({ orchestrator });
 
-    const start = Date.now();
-    const result = await service.submit({
-      targetType: 'sub-tree',
-      targetPath: '/overhead-latency',
-      triggeredBy: {
-        userId: new mongoose.Types.ObjectId().toString(),
-        isAdmin: true,
-      },
-    });
-    const elapsed = Date.now() - start;
+    try {
+      const result = await service.submit({
+        targetType: 'sub-tree',
+        targetPath: '/overhead-latency',
+        triggeredBy: {
+          userId: new mongoose.Types.ObjectId().toString(),
+          isAdmin: true,
+        },
+      });
 
-    expect(result.status).toBe('accepted');
-    expect(elapsed).toBeLessThan(200);
+      expect(result.status).toBe('accepted');
+      const { reconcileId } = result as {
+        status: 'accepted';
+        reconcileId: string;
+        descendantCount: number;
+      };
 
-    // Wait for background reconcile to reach a terminal state before afterEach
-    // clears vault_instructions, so it doesn't bleed into the next test.
-    const { reconcileId } = result as {
-      status: 'accepted';
-      reconcileId: string;
-      descendantCount: number;
-    };
-    await waitForReconcileStatus(reconcileId, ['completed', 'failed']);
+      const log = await VaultReconcileLog.findOne({ reconcileId }).lean();
+      expect(['pending', 'running']).toContain(
+        (log as Record<string, unknown> | null)?.status,
+      );
+    } finally {
+      // Opened on every exit so afterEach's drain is not left waiting on a
+      // reconcile this test still holds; the drain also waits for it to finish.
+      release();
+    }
   });
 });
 

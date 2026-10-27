@@ -21,7 +21,7 @@ const AdminDataImportPage: NextPageWithLayout<Props> = () => (
 );
 
 AdminDataImportPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('importer_management.import_data'),
+  title: (_p, t) => t('admin:importer_management.import_data'),
   containerFactories: [
     async () => {
       const AdminImportContainer =

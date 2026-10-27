@@ -65,7 +65,7 @@ export const PageEditorModeManager = (props: Props): JSX.Element => {
     try {
       await startEditing(path);
     } catch (err) {
-      toastError(t('toaster.create_failed', { target: path }));
+      toastError(t('commons:toaster.create_failed', { target: path }));
     }
   }, [startEditing, path, t]);
 

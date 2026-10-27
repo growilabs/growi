@@ -1,5 +1,10 @@
-import { MongoMemoryServer } from 'mongodb-memory-server-core';
+import type { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
+
+import {
+  connectSelfContainedMongo,
+  disconnectSelfContainedMongo,
+} from '^/test/setup/mongo/self-contained-connection';
 
 import type { IContribution } from '../../interfaces/contribution';
 import Contribution from '../models/contribution-model';
@@ -8,12 +13,12 @@ import { addContribution, getContributions } from './contribution-service';
 describe('addContribution', () => {
   const userId = new mongoose.Types.ObjectId().toString();
 
-  let mongod: MongoMemoryServer;
+  let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
-    await mongoose.connect(uri);
+    ({ mongod } = await connectSelfContainedMongo(
+      'growi_test_unit_contribution_service',
+    ));
   });
 
   beforeEach(async () => {
@@ -21,9 +26,7 @@ describe('addContribution', () => {
   });
 
   afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongod.stop();
+    await disconnectSelfContainedMongo(mongod);
   });
 
   it('should create a new contribution record if it does not exist (upsert)', async () => {
@@ -70,12 +73,12 @@ describe('addContribution', () => {
 describe('getContributions', () => {
   const userId = new mongoose.Types.ObjectId().toString();
 
-  let mongod: MongoMemoryServer;
+  let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
-    await mongoose.connect(uri);
+    ({ mongod } = await connectSelfContainedMongo(
+      'growi_test_unit_contribution_service',
+    ));
   });
 
   beforeEach(async () => {
@@ -83,9 +86,7 @@ describe('getContributions', () => {
   });
 
   afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongod.stop();
+    await disconnectSelfContainedMongo(mongod);
   });
 
   it('should return one year of contributions if they exist in the database', async () => {

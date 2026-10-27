@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Readable, Writable } from 'node:stream';
 import type { IUser } from '@growi/core';
-import { getIdForRef, isPopulated } from '@growi/core';
 import mongoose from 'mongoose';
 
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
@@ -13,14 +13,13 @@ import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import {
   PageBulkExportFormat,
   PageBulkExportJobInProgressStatus,
   PageBulkExportJobStatus,
 } from '../../../interfaces/page-bulk-export';
-import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job';
-import PageBulkExportJob from '../../models/page-bulk-export-job';
 import PageBulkExportPageSnapshot from '../../models/page-bulk-export-page-snapshot';
 import {
   BulkExportJobExpiredError,
@@ -43,16 +42,13 @@ export interface IPageBulkExportJobCronService {
     ...streams: (Readable | Writable)[]
   ): void;
   removeStreamInExecution(jobId: ObjectIdLike): void;
-  handleError(
-    err: Error | null,
-    pageBulkExportJob: PageBulkExportJobDocument,
-  ): void;
+  handleError(err: Error | null, pageBulkExportJob: pagebulkexportjobs): void;
   notifyExportResultAndCleanUp(
     action: SupportedActionType,
-    pageBulkExportJob: PageBulkExportJobDocument,
+    pageBulkExportJob: pagebulkexportjobs,
   ): Promise<void>;
   getTmpOutputDir(
-    pageBulkExportJob: PageBulkExportJobDocument,
+    pageBulkExportJob: pagebulkexportjobs,
     isHtmlPath?: boolean,
   ): string;
 }
@@ -101,13 +97,14 @@ class PageBulkExportJobCronService
   }
 
   override async executeJob(): Promise<void> {
-    const pageBulkExportJobsInProgress = await PageBulkExportJob.find({
-      $or: Object.values(PageBulkExportJobInProgressStatus).map((status) => ({
-        status,
-      })),
-    })
-      .sort({ createdAt: 1 })
-      .limit(this.parallelExecLimit);
+    const pageBulkExportJobsInProgress =
+      await prisma.pagebulkexportjobs.findMany({
+        where: {
+          status: { in: Object.values(PageBulkExportJobInProgressStatus) },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: this.parallelExecLimit,
+      });
 
     pageBulkExportJobsInProgress.forEach((pageBulkExportJob) => {
       this.proceedBulkExportJob(pageBulkExportJob);
@@ -124,10 +121,10 @@ class PageBulkExportJobCronService
    * @param isHtmlPath whether the tmp output path is for html files
    */
   getTmpOutputDir(
-    pageBulkExportJob: PageBulkExportJobDocument,
+    pageBulkExportJob: pagebulkexportjobs,
     isHtmlPath = false,
   ): string {
-    const jobId = pageBulkExportJob._id.toString();
+    const jobId = pageBulkExportJob.id;
     return isHtmlPath
       ? path.join(this.tmpOutputRootDir, 'html', jobId)
       : path.join(this.tmpOutputRootDir, jobId);
@@ -164,53 +161,54 @@ class PageBulkExportJobCronService
    * Proceed the page bulk export job if the next step is executable
    * @param pageBulkExportJob PageBulkExportJob in progress
    */
-  async proceedBulkExportJob(pageBulkExportJob: PageBulkExportJobDocument) {
+  async proceedBulkExportJob(pageBulkExportJob: pagebulkexportjobs) {
+    let job = pageBulkExportJob;
     try {
-      if (pageBulkExportJob.restartFlag) {
-        await this.cleanUpExportJobResources(pageBulkExportJob);
-        pageBulkExportJob.restartFlag = false;
-        pageBulkExportJob.status = PageBulkExportJobStatus.initializing;
-        pageBulkExportJob.statusOnPreviousCronExec = undefined;
-        await pageBulkExportJob.save();
+      if (job.restartFlag) {
+        await this.cleanUpExportJobResources(job);
+        job = await prisma.pagebulkexportjobs.update({
+          where: { id: job.id },
+          data: {
+            restartFlag: false,
+            status: PageBulkExportJobStatus.initializing,
+            statusOnPreviousCronExec: null,
+          },
+        });
       }
 
       if (
-        pageBulkExportJob.status === PageBulkExportJobStatus.exporting &&
-        pageBulkExportJob.format === PageBulkExportFormat.pdf
+        job.status === PageBulkExportJobStatus.exporting &&
+        job.format === PageBulkExportFormat.pdf
       ) {
-        await requestPdfConverter(pageBulkExportJob);
+        job = await requestPdfConverter(job);
       }
 
       // return if job is still the same status as the previous cron exec
-      if (
-        pageBulkExportJob.status === pageBulkExportJob.statusOnPreviousCronExec
-      ) {
+      if (job.status === job.statusOnPreviousCronExec) {
         return;
       }
 
       const User = mongoose.model<IUser>('User');
-      const user = await User.findById(getIdForRef(pageBulkExportJob.user));
+      const user = await User.findById(job.userId);
 
       // update statusOnPreviousCronExec before starting processes that updates status
-      pageBulkExportJob.statusOnPreviousCronExec = pageBulkExportJob.status;
-      await pageBulkExportJob.save();
+      job = await prisma.pagebulkexportjobs.update({
+        where: { id: job.id },
+        data: { statusOnPreviousCronExec: job.status },
+      });
 
-      if (pageBulkExportJob.status === PageBulkExportJobStatus.initializing) {
-        await createPageSnapshotsAsync.bind(this)(user, pageBulkExportJob);
-      } else if (
-        pageBulkExportJob.status === PageBulkExportJobStatus.exporting
-      ) {
-        await exportPagesToFsAsync.bind(this)(pageBulkExportJob);
-      } else if (
-        pageBulkExportJob.status === PageBulkExportJobStatus.uploading
-      ) {
-        compressAndUpload.bind(this)(user, pageBulkExportJob);
+      if (job.status === PageBulkExportJobStatus.initializing) {
+        await createPageSnapshotsAsync.bind(this)(user, job);
+      } else if (job.status === PageBulkExportJobStatus.exporting) {
+        await exportPagesToFsAsync.bind(this)(job);
+      } else if (job.status === PageBulkExportJobStatus.uploading) {
+        compressAndUpload.bind(this)(user, job);
       }
     } catch (err) {
       logger.error(err);
       await this.notifyExportResultAndCleanUp(
         SupportedAction.ACTION_PAGE_BULK_EXPORT_FAILED,
-        pageBulkExportJob,
+        job,
       );
     }
   }
@@ -220,10 +218,7 @@ class PageBulkExportJobCronService
    * @param err error
    * @param pageBulkExportJob PageBulkExportJob executed in the pipeline
    */
-  async handleError(
-    err: Error | null,
-    pageBulkExportJob: PageBulkExportJobDocument,
-  ) {
+  async handleError(err: Error | null, pageBulkExportJob: pagebulkexportjobs) {
     if (err == null) return;
 
     if (err instanceof BulkExportJobExpiredError) {
@@ -248,30 +243,35 @@ class PageBulkExportJobCronService
    */
   async notifyExportResultAndCleanUp(
     action: SupportedActionType,
-    pageBulkExportJob: PageBulkExportJobDocument,
+    pageBulkExportJob: pagebulkexportjobs,
   ): Promise<void> {
-    pageBulkExportJob.status =
-      action === SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED
-        ? PageBulkExportJobStatus.completed
-        : PageBulkExportJobStatus.failed;
+    const isCompleted =
+      action === SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED;
 
-    // Guarantee completedAt is set for every completion path (including the
-    // duplicate-reuse path in createPageSnapshotsAsync, which marks the job as
-    // completed without setting completedAt). Without this, the download-expiration
-    // cleanup query `{ completedAt: { $lt } }` never matches such jobs (MongoDB
-    // type bracketing excludes null), so they accumulate forever.
-    if (action === SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED) {
-      pageBulkExportJob.completedAt ??= new Date();
-    }
-
+    let job = pageBulkExportJob;
     try {
-      await pageBulkExportJob.save();
-      await this.notifyExportResult(pageBulkExportJob, action);
+      job = await prisma.pagebulkexportjobs.update({
+        where: { id: pageBulkExportJob.id },
+        data: {
+          status: isCompleted
+            ? PageBulkExportJobStatus.completed
+            : PageBulkExportJobStatus.failed,
+          // Guarantee completedAt is set for every completion path (including the
+          // duplicate-reuse path in createPageSnapshotsAsync, which marks the job as
+          // completed without setting completedAt). Without this, the download-expiration
+          // cleanup query `{ completedAt: { lt } }` never matches such jobs (MongoDB
+          // type bracketing excludes null), so they accumulate forever.
+          ...(isCompleted && pageBulkExportJob.completedAt == null
+            ? { completedAt: new Date() }
+            : {}),
+        },
+      });
+      await this.notifyExportResult(job, action);
     } catch (err) {
       logger.error(err);
     }
     // execute independently of notif process resolve/reject
-    await this.cleanUpExportJobResources(pageBulkExportJob);
+    await this.cleanUpExportJobResources(job);
   }
 
   /**
@@ -279,12 +279,8 @@ class PageBulkExportJobCronService
    * - delete page snapshots
    * - remove the temporal output directory
    */
-  async cleanUpExportJobResources(
-    pageBulkExportJob: PageBulkExportJobDocument,
-  ) {
-    const streamsInExecution = this.getStreamsInExecution(
-      pageBulkExportJob._id,
-    );
+  async cleanUpExportJobResources(pageBulkExportJob: pagebulkexportjobs) {
+    const streamsInExecution = this.getStreamsInExecution(pageBulkExportJob.id);
     if (streamsInExecution != null && streamsInExecution.length > 0) {
       // Wait for all streams to be destroyed before proceeding with cleanup
       await Promise.allSettled(
@@ -299,11 +295,13 @@ class PageBulkExportJobCronService
         }),
       );
 
-      this.removeStreamInExecution(pageBulkExportJob._id);
+      this.removeStreamInExecution(pageBulkExportJob.id);
     }
 
     const promises = [
-      PageBulkExportPageSnapshot.deleteMany({ pageBulkExportJob }),
+      PageBulkExportPageSnapshot.deleteMany({
+        pageBulkExportJob: pageBulkExportJob.id,
+      }),
       fs.promises.rm(this.getTmpOutputDir(pageBulkExportJob), {
         recursive: true,
         force: true,
@@ -327,18 +325,16 @@ class PageBulkExportJobCronService
   }
 
   private async notifyExportResult(
-    pageBulkExportJob: PageBulkExportJobDocument,
+    pageBulkExportJob: pagebulkexportjobs,
     action: SupportedActionType,
   ) {
     const activity = await this.crowi.activityService.createActivity({
       action,
       targetModel: SupportedTargetModel.MODEL_PAGE_BULK_EXPORT_JOB,
       target: pageBulkExportJob,
-      user: pageBulkExportJob.user,
+      user: pageBulkExportJob.userId,
       snapshot: {
-        username: isPopulated(pageBulkExportJob.user)
-          ? pageBulkExportJob.user.username
-          : '',
+        username: '',
       },
     });
     if (activity == null) {
@@ -346,7 +342,7 @@ class PageBulkExportJobCronService
     }
     // createActivity's result never has `user` populated (only `userId`) --
     // reference the acting user we already have on hand instead.
-    const getAdditionalTargetUsers = async () => [pageBulkExportJob.user];
+    const getAdditionalTargetUsers = async () => [pageBulkExportJob.userId];
     const preNotify = preNotifyService.generatePreNotify(
       activity,
       getAdditionalTargetUsers,

@@ -1,9 +1,11 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 
+import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
+import auditLogEnabledRequired from '~/server/middlewares/audit-log-enabled-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
@@ -296,6 +298,179 @@ export const setup = (crowi) => {
 
             activityEvent.emit('update', res.locals.activity._id, {
               action: SupportedAction.ACTION_ADMIN_SEARCH_INDICES_REBUILD,
+            });
+
+            return res
+              .status(200)
+              .send({ message: 'Operation is successfully requested.' });
+          default:
+            throw new Error(`Unimplemented operation: ${operation}`);
+        }
+      } catch (err) {
+        return res.apiv3Err(err, 503);
+      }
+    },
+  );
+
+  /**
+   * @swagger
+   *
+   *  /search/auditlog-indices:
+   *    get:
+   *      tags: [FullTextSearch Management]
+   *      summary: Get auditlog indices status
+   *      responses:
+   *        200:
+   *          description: Status of auditlog indices
+   *          content:
+   *            application/json:
+   *              schema:
+   *                properties:
+   *                  info:
+   *                    type: object
+   *                    description: Status of auditlog indices
+   *                  auditlogHasUnsyncedEvents:
+   *                    type: boolean
+   *                    description: Whether auditlog events failed to sync to Elasticsearch (rebuild needed)
+   */
+  router.get(
+    '/auditlog-indices',
+    noCache(),
+    accessTokenParser([SCOPE.READ.ADMIN.FULL_TEXT_SEARCH], {
+      acceptLegacy: true,
+    }),
+    loginRequired,
+    adminRequired,
+    auditLogEnabledRequired,
+    async (req, res) => {
+      const { searchService } = crowi;
+
+      if (!searchService.isConfigured) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not configured',
+            'search-service-unconfigured',
+          ),
+          503,
+        );
+      }
+      if (!searchService.isReachable) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not reachable',
+            'search-service-unreachable',
+          ),
+          503,
+        );
+      }
+
+      try {
+        const [info, auditlogHasUnsyncedEvents] = await Promise.all([
+          searchService.getAuditlogInfoForAdmin(),
+          AuditlogEsSyncStatus.isUnsynced(),
+        ]);
+        return res.status(200).send({ info, auditlogHasUnsyncedEvents });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(err, 503);
+      }
+    },
+  );
+
+  const validatorForPutAuditlogIndices = [
+    body('operation').isString().isIn(['rebuild', 'normalize']),
+  ];
+
+  /**
+   * @swagger
+   *
+   *  /search/auditlog-indices:
+   *    put:
+   *      tags: [FullTextSearch Management]
+   *      summary: /search/auditlog-indices
+   *      description: Operate auditlog indices
+   *      requestBody:
+   *        required: true
+   *        content:
+   *          application/json:
+   *            schema:
+   *              properties:
+   *                operation:
+   *                  type: string
+   *                  description: Operation type against to auditlog indices >
+   *                    * `normalize` - Normalize auditlog indices
+   *                    * `rebuild` - Rebuild auditlog indices
+   *                  enum: [normalize, rebuild]
+   *      responses:
+   *        200:
+   *          description: Return 200
+   *          content:
+   *            application/json:
+   *              schema:
+   *                properties:
+   *                  message:
+   *                    type: string
+   *                    description: Operation is successfully processed, or requested
+   */
+  router.put(
+    '/auditlog-indices',
+    accessTokenParser([SCOPE.WRITE.ADMIN.FULL_TEXT_SEARCH], {
+      acceptLegacy: true,
+    }),
+    loginRequired,
+    adminRequired,
+    auditLogEnabledRequired,
+    addActivity,
+    validatorForPutAuditlogIndices,
+    apiV3FormValidator,
+    async (req, res) => {
+      const operation = req.body.operation;
+
+      const { searchService } = crowi;
+
+      if (!searchService.isConfigured) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not configured',
+            'search-service-unconfigured',
+          ),
+        );
+      }
+      if (!searchService.isReachable) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not reachable',
+            'search-service-unreachable',
+          ),
+        );
+      }
+
+      try {
+        switch (operation) {
+          case 'normalize':
+            // wait the processing is terminated
+            await searchService.normalizeAuditlogIndices();
+
+            activityEvent.emit('update', res.locals.activity._id, {
+              action:
+                SupportedAction.ACTION_ADMIN_SEARCH_AUDITLOG_INDICES_NORMALIZE,
+            });
+
+            return res
+              .status(200)
+              .send({ message: 'Operation is successfully processed.' });
+          case 'rebuild':
+            // NOT wait the processing is terminated; rebuildAuditlogIndex
+            // handles completion (unsynced flag, FinishAddAuditlog) itself.
+            searchService
+              .rebuildAuditlogIndex({ shouldEmitProgress: true })
+              .catch((err) => {
+                logger.error('Rebuild auditlog index failed', err);
+              });
+
+            activityEvent.emit('update', res.locals.activity._id, {
+              action:
+                SupportedAction.ACTION_ADMIN_SEARCH_AUDITLOG_INDICES_REBUILD,
             });
 
             return res

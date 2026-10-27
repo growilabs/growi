@@ -16,10 +16,33 @@ import {
   isAttachmentAddActivity,
   isAttachmentDownloadActivity,
   isAttachmentRemoveActivity,
+  isAuditlogSuggestionField,
   MODEL_ATTACHMENT,
   SupportedAction,
   SupportedTargetModel,
 } from './activity';
+
+describe('isAuditlogSuggestionField()', () => {
+  it('should return true for "username"', () => {
+    expect(isAuditlogSuggestionField('username')).toBe(true);
+  });
+
+  it('should return false for an unrecognized string', () => {
+    expect(isAuditlogSuggestionField('foo')).toBe(false);
+  });
+
+  it('should return false for empty string', () => {
+    expect(isAuditlogSuggestionField('')).toBe(false);
+  });
+
+  it('should return false for null', () => {
+    expect(isAuditlogSuggestionField(null)).toBe(false);
+  });
+
+  it('should return false for undefined', () => {
+    expect(isAuditlogSuggestionField(undefined)).toBe(false);
+  });
+});
 
 describe('SupportedAction - GROWI Vault resilience constants', () => {
   it('exports ACTION_VAULT_RESILIENCE_BOOTSTRAP_STARTED', () => {
@@ -130,6 +153,39 @@ describe('SupportedAction - admin AI setting update action', () => {
 
   it('includes the AI setting update action in AllSupportedActions', () => {
     expect(AllSupportedActions).toContain('ADMIN_AI_SETTING_UPDATE');
+  });
+});
+
+describe('SupportedAction - inline comment constants', () => {
+  it('exports ACTION_INLINE_COMMENT_CREATE with the expected value', () => {
+    expect(SupportedAction.ACTION_INLINE_COMMENT_CREATE).toBe(
+      'INLINE_COMMENT_CREATE',
+    );
+  });
+
+  it('exports ACTION_INLINE_COMMENT_REPLY with the expected value', () => {
+    expect(SupportedAction.ACTION_INLINE_COMMENT_REPLY).toBe(
+      'INLINE_COMMENT_REPLY',
+    );
+  });
+
+  it('exports ACTION_INLINE_COMMENT_RESOLVE with the expected value', () => {
+    expect(SupportedAction.ACTION_INLINE_COMMENT_RESOLVE).toBe(
+      'INLINE_COMMENT_RESOLVE',
+    );
+  });
+
+  it('exports ACTION_INLINE_COMMENT_UNRESOLVE with the expected value', () => {
+    expect(SupportedAction.ACTION_INLINE_COMMENT_UNRESOLVE).toBe(
+      'INLINE_COMMENT_UNRESOLVE',
+    );
+  });
+
+  it('includes all four inline comment actions in AllSupportedActions', () => {
+    expect(AllSupportedActions).toContain('INLINE_COMMENT_CREATE');
+    expect(AllSupportedActions).toContain('INLINE_COMMENT_REPLY');
+    expect(AllSupportedActions).toContain('INLINE_COMMENT_RESOLVE');
+    expect(AllSupportedActions).toContain('INLINE_COMMENT_UNRESOLVE');
   });
 });
 

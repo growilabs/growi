@@ -29,7 +29,7 @@ const ForbiddenPage = React.memo((props: Props): JSX.Element => {
             </span>
             {props.isLinkSharingDisabled
               ? t('share_links.link_sharing_is_disabled')
-              : t('Browsing of this page is restricted')}
+              : t('page_page.notice.restricted')}
           </p>
         </div>
       </div>
