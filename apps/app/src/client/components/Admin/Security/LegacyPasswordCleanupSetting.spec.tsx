@@ -1,7 +1,13 @@
 // @vitest-environment happy-dom
 
 import type { ReactNode } from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // biome-ignore lint/style/noRestrictedImports: import only types
 import type { AxiosResponse } from 'axios';
@@ -154,6 +160,43 @@ describe('LegacyPasswordCleanupSetting', () => {
 
       expect(await screen.findByText(`${PREFIX}.fetch_error`)).toBeTruthy();
       expect(deleteButton().hasAttribute('disabled')).toBe(true);
+    });
+
+    it('fetches the counts again on retry and then enables the button', async () => {
+      failStatus();
+      renderSection();
+      await screen.findByText(`${PREFIX}.fetch_error`);
+
+      mockStatus({ counts: countsOf() });
+      await userEvent.click(
+        screen.getByRole('button', { name: `${PREFIX}.retry` }),
+      );
+
+      expect(
+        await screen.findByText(`${PREFIX}.count_label.both`),
+      ).toBeTruthy();
+      expect(screen.queryByText(`${PREFIX}.fetch_error`)).toBeNull();
+      expect(deleteButton().hasAttribute('disabled')).toBe(false);
+    });
+
+    it('refetches the counts when the section is mounted again', async () => {
+      let counts = countsOf();
+      mockStatus(() => ({ counts }));
+      // Same Wrapper, so the SWR cache survives the remount.
+      const { rerender } = render(
+        <LegacyPasswordCleanupSetting key="first" />,
+        {
+          wrapper: Wrapper,
+        },
+      );
+      await screen.findByText(`${PREFIX}.count_label.both`);
+
+      counts = countsOf({ both: 0 });
+      rerender(<LegacyPasswordCleanupSetting key="second" />);
+
+      await waitFor(() =>
+        expect(deleteButton().hasAttribute('disabled')).toBe(true),
+      );
     });
   });
 
@@ -413,6 +456,30 @@ describe('LegacyPasswordCleanupSetting', () => {
       await waitFor(() =>
         expect(screen.queryByText(`${PREFIX}.title`)).toBeNull(),
       );
+    });
+
+    it('sends a single delete request when the confirm button is clicked twice', async () => {
+      mockStatus({ counts: countsOf() });
+      vi.mocked(apiv3Delete).mockResolvedValue(
+        mock<AxiosResponse>({ data: { unsetCount: 3 } }),
+      );
+      renderSection();
+      await screen.findByText(`${PREFIX}.count_label.both`);
+      await userEvent.click(deleteButton());
+      const submit = await screen.findByRole('button', {
+        name: `${PREFIX}.confirm.submit`,
+      });
+
+      // The modal fades out after the first click, leaving the button
+      // clickable for a moment.
+      fireEvent.click(submit);
+      fireEvent.click(submit);
+
+      await waitFor(() =>
+        expect(toastSuccess).toHaveBeenCalledWith(`${PREFIX}.success [3]`),
+      );
+      expect(apiv3Delete).toHaveBeenCalledTimes(1);
+      expect(toastSuccess).toHaveBeenCalledTimes(1);
     });
 
     it('disables the delete button until the deletion finishes', async () => {

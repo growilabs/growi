@@ -33,7 +33,7 @@ const REQUIRED_KEYS = [
   `${SECTION}.unmigrated_list.empty`,
   `${SECTION}.unmigrated_list.fetch_error`,
   `${SECTION}.unmigrated_list.load_more_error`,
-  `${SECTION}.unmigrated_list.retry`,
+  `${SECTION}.retry`,
   'audit_log_action.ADMIN_LEGACY_PASSWORD_DELETE',
 ];
 

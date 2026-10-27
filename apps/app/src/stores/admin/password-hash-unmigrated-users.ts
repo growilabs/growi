@@ -42,6 +42,8 @@ export const useSWRInfinitePasswordHashUnmigratedUsers =
         }
         return data;
       },
-      { revalidateFirstPage: false },
+      // revalidateOnMount refetches the loaded pages when the list mounts
+      // again, so users who migrated meanwhile drop out of a cached list.
+      { revalidateFirstPage: false, revalidateOnMount: true },
     );
   };

@@ -44,6 +44,7 @@
       "success": "已删除 {{count}} 位用户的旧格式密码",
       "delete_error": "删除旧格式密码失败。部分密码可能已被删除。",
       "fetch_error": "获取密码哈希迁移状态失败",
+      "retry": "重试",
       "unmigrated_list": {
         "title": "需要提示迁移的用户",
         "description": "这些用户目前仅有旧格式密码，使用密码登录一次后将自动完成迁移。与 LDAP、OAuth、SAML 等外部认证关联的用户不会列出，因为通过外部认证登录不会迁移密码。",
@@ -55,8 +56,7 @@
         "never_logged_in": "从未登录",
         "empty": "没有需要提示迁移的用户",
         "fetch_error": "获取需要提示迁移的用户列表失败",
-        "load_more_error": "加载更多用户失败",
-        "retry": "重试"
+        "load_more_error": "加载更多用户失败"
       }
     },
     "scope_of_page_disclosure": "页面公开范围",

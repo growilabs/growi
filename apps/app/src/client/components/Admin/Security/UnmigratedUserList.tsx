@@ -9,6 +9,8 @@ import {
   useSWRInfinitePasswordHashUnmigratedUsers,
 } from '~/stores/admin/password-hash-unmigrated-users';
 
+import { ErrorWithRetry } from './ErrorWithRetry';
+
 const I18N_PREFIX = 'security_settings.legacy_password_cleanup.unmigrated_list';
 
 // The list sits above other settings, so it loads more inside its own
@@ -44,33 +46,6 @@ const UserTable = ({ users }: UserTableProps): JSX.Element => {
         ))}
       </tbody>
     </table>
-  );
-};
-
-type ErrorWithRetryProps = {
-  message: string;
-  isRetrying: boolean;
-  onRetry: () => void;
-};
-
-const ErrorWithRetry = ({
-  message,
-  isRetrying,
-  onRetry,
-}: ErrorWithRetryProps): JSX.Element => {
-  const { t } = useTranslation('admin');
-  return (
-    <div className="d-flex align-items-center gap-2 mt-2">
-      <span className="text-danger">{message}</span>
-      <button
-        type="button"
-        className="btn btn-sm btn-outline-secondary"
-        disabled={isRetrying}
-        onClick={onRetry}
-      >
-        {t(`${I18N_PREFIX}.retry`)}
-      </button>
-    </div>
   );
 };
 

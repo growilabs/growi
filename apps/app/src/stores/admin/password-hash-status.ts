@@ -24,5 +24,9 @@ export const useSWRxPasswordHashStatus = (): SWRResponse<
   PasswordHashFormatCounts,
   Error
 > => {
-  return useSWRImmutable(STATUS_ENDPOINT, fetchPasswordHashStatus);
+  // Refetch whenever the section mounts again (e.g. after client-side
+  // navigation) so the counts are not left at a stale cached value.
+  return useSWRImmutable(STATUS_ENDPOINT, fetchPasswordHashStatus, {
+    revalidateOnMount: true,
+  });
 };

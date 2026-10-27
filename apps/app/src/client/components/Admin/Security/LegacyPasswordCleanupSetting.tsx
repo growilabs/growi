@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import { apiv3Delete } from '~/client/util/apiv3-client';
@@ -9,13 +9,19 @@ import {
   fetchPasswordHashStatus,
   useSWRxPasswordHashStatus,
 } from '~/stores/admin/password-hash-status';
+import loggerFactory from '~/utils/logger';
 
 import { ConfirmModal } from '../App/ConfirmModal';
+import { ErrorWithRetry } from './ErrorWithRetry';
 import {
   PasswordHashCountTable,
   sumLegacyOnly,
 } from './PasswordHashCountTable';
 import { UnmigratedUserList } from './UnmigratedUserList';
+
+const logger = loggerFactory(
+  'growi:client:admin:security:LegacyPasswordCleanupSetting',
+);
 
 const I18N_PREFIX = 'security_settings.legacy_password_cleanup';
 
@@ -25,12 +31,16 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element | null => {
     data: counts,
     error,
     isLoading,
+    isValidating,
     mutate,
   } = useSWRxPasswordHashStatus();
   const [isModalOpen, setIsModalOpen] = useState(false);
   // True while the pre-open refetch or the deletion and its refetch run, so a
   // repeated click can neither open the modal twice nor start a second delete.
   const [isBusy, setIsBusy] = useState(false);
+  // The modal keeps its confirm button clickable while it fades out; a ref
+  // rejects a second confirm without depending on when the busy state renders.
+  const isDeletingRef = useRef(false);
 
   const hasFetchError = error != null;
   const isDeleteDisabled =
@@ -48,7 +58,8 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element | null => {
       if (fresh != null && fresh.both > 0) {
         setIsModalOpen(true);
       }
-    } catch (_err) {
+    } catch (err) {
+      logger.error('Failed to refetch the password hash status', err);
       toastError(t(`${I18N_PREFIX}.fetch_error`));
     } finally {
       setIsBusy(false);
@@ -56,6 +67,10 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element | null => {
   }, [mutate, t]);
 
   const onConfirm = useCallback(async () => {
+    if (isDeletingRef.current) {
+      return;
+    }
+    isDeletingRef.current = true;
     setIsModalOpen(false);
     setIsBusy(true);
     try {
@@ -67,13 +82,15 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element | null => {
         throw new Error('Delete response has no unsetCount');
       }
       toastSuccess(t(`${I18N_PREFIX}.success`, { count: data.unsetCount }));
-    } catch (_err) {
+    } catch (err) {
+      logger.error('Failed to delete legacy passwords', err);
       toastError(t(`${I18N_PREFIX}.delete_error`));
     }
     try {
       // Refetch on failure too: the deletion may have partially applied.
       await mutate();
     } finally {
+      isDeletingRef.current = false;
       setIsBusy(false);
     }
   }, [mutate, t]);
@@ -93,7 +110,13 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element | null => {
       <p className="mb-3">{t(`${I18N_PREFIX}.description`)}</p>
 
       {hasFetchError ? (
-        <p className="text-danger">{t(`${I18N_PREFIX}.fetch_error`)}</p>
+        <div className="mb-3">
+          <ErrorWithRetry
+            message={t(`${I18N_PREFIX}.fetch_error`)}
+            isRetrying={isValidating}
+            onRetry={() => mutate()}
+          />
+        </div>
       ) : (
         counts != null && (
           <>

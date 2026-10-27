@@ -33,6 +33,7 @@ vi.mock('~/client/util/apiv3-client', () => ({
 }));
 
 const PREFIX = 'security_settings.legacy_password_cleanup.unmigrated_list';
+const RETRY_LABEL = 'security_settings.legacy_password_cleanup.retry';
 const ENDPOINT = '/security-setting/password-hash-unmigrated-users';
 
 const userOf = (
@@ -287,9 +288,7 @@ describe('UnmigratedUserList', () => {
 
       expect(screen.getByRole('row', { name: /first-0/ })).toBeTruthy();
       expect(screen.getByRole('row', { name: /first-19/ })).toBeTruthy();
-      expect(
-        screen.getByRole('button', { name: `${PREFIX}.retry` }),
-      ).toBeTruthy();
+      expect(screen.getByRole('button', { name: RETRY_LABEL })).toBeTruthy();
       expect(screen.queryByText(`${PREFIX}.fetch_error`)).toBeNull();
     });
 
@@ -314,14 +313,12 @@ describe('UnmigratedUserList', () => {
         ),
       );
 
-      fireEvent.click(screen.getByRole('button', { name: `${PREFIX}.retry` }));
+      fireEvent.click(screen.getByRole('button', { name: RETRY_LABEL }));
 
       expect(await screen.findByRole('row', { name: /second-0/ })).toBeTruthy();
       expect(screen.getByRole('row', { name: /first-0/ })).toBeTruthy();
       expect(screen.queryByText(`${PREFIX}.load_more_error`)).toBeNull();
-      expect(
-        screen.queryByRole('button', { name: `${PREFIX}.retry` }),
-      ).toBeNull();
+      expect(screen.queryByRole('button', { name: RETRY_LABEL })).toBeNull();
       expect(apiv3Get).toHaveBeenCalledTimes(3);
       expect(apiv3Get).toHaveBeenLastCalledWith(ENDPOINT, {
         page: 2,
@@ -344,9 +341,7 @@ describe('UnmigratedUserList', () => {
       renderList();
 
       expect(await screen.findByText(`${PREFIX}.fetch_error`)).toBeTruthy();
-      expect(
-        screen.getByRole('button', { name: `${PREFIX}.retry` }),
-      ).toBeTruthy();
+      expect(screen.getByRole('button', { name: RETRY_LABEL })).toBeTruthy();
       expect(screen.queryByRole('table')).toBeNull();
       expect(screen.queryByText(`${PREFIX}.load_more_error`)).toBeNull();
     });
@@ -360,13 +355,11 @@ describe('UnmigratedUserList', () => {
       renderList();
       await screen.findByText(`${PREFIX}.fetch_error`);
 
-      fireEvent.click(screen.getByRole('button', { name: `${PREFIX}.retry` }));
+      fireEvent.click(screen.getByRole('button', { name: RETRY_LABEL }));
 
       expect(await screen.findByRole('row', { name: /erin/ })).toBeTruthy();
       expect(screen.queryByText(`${PREFIX}.fetch_error`)).toBeNull();
-      expect(
-        screen.queryByRole('button', { name: `${PREFIX}.retry` }),
-      ).toBeNull();
+      expect(screen.queryByRole('button', { name: RETRY_LABEL })).toBeNull();
       expect(apiv3Get).toHaveBeenCalledTimes(2);
       expect(apiv3Get).toHaveBeenLastCalledWith(ENDPOINT, {
         page: 1,
@@ -380,6 +373,35 @@ describe('UnmigratedUserList', () => {
 
       expect(await screen.findByText(`${PREFIX}.fetch_error`)).toBeTruthy();
       expect(screen.queryByRole('table')).toBeNull();
+    });
+  });
+  describe('when mounted again', () => {
+    it('refetches the cached list and drops users who migrated meanwhile', async () => {
+      vi.mocked(apiv3Get)
+        .mockResolvedValueOnce(
+          mockResponse(
+            responseOf([
+              userOf({ username: 'alice' }),
+              userOf({ username: 'bob' }),
+            ]),
+          ),
+        )
+        .mockResolvedValueOnce(
+          mockResponse(responseOf([userOf({ username: 'bob' })])),
+        );
+      // Same Wrapper, so the SWR cache survives the remount.
+      const { rerender } = render(<UnmigratedUserList key="first" />, {
+        wrapper: Wrapper,
+      });
+      await screen.findByRole('row', { name: /alice/ });
+
+      rerender(<UnmigratedUserList key="second" />);
+
+      await waitFor(() =>
+        expect(screen.queryByRole('row', { name: /alice/ })).toBeNull(),
+      );
+      expect(screen.getByRole('row', { name: /bob/ })).toBeTruthy();
+      expect(apiv3Get).toHaveBeenCalledTimes(2);
     });
   });
 });

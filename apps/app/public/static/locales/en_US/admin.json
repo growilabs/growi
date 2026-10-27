@@ -35,6 +35,7 @@
       "success": "Deleted the legacy passwords of {{count}} user(s)",
       "delete_error": "Failed to delete legacy passwords. Some may have been deleted.",
       "fetch_error": "Failed to fetch the password hash migration status",
+      "retry": "Retry",
       "unmigrated_list": {
         "title": "Users to nudge toward migration",
         "description": "These users still have only a legacy-format password. They are migrated automatically the next time they log in with their password. Users linked to an external authentication (LDAP, OAuth, SAML, etc.) are not listed, because logging in through those does not migrate the password.",
@@ -46,8 +47,7 @@
         "never_logged_in": "Never logged in",
         "empty": "No users need to be nudged",
         "fetch_error": "Failed to fetch the list of users to nudge",
-        "load_more_error": "Failed to load more users",
-        "retry": "Retry"
+        "load_more_error": "Failed to load more users"
       }
     },
     "scope_of_page_disclosure": "Scope of page disclosure",
