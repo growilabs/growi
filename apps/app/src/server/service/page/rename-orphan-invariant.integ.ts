@@ -106,14 +106,26 @@ describe('a failed rename must not orphan the page (#9755)', () => {
 
   // Fails the write that moves the page to `newPath`, the last step of the rename.
   // `applied: true` lets the server apply it first, as a lost acknowledgement would.
+  // `onFault` runs just before an unapplied write fails, to record the tree at that moment.
   const renameWithFailingFinalWrite = async (
     page: PageDocument,
     newPath: string,
-    { applied }: { applied: boolean },
+    { applied, onFault }: { applied: boolean; onFault?: () => Promise<void> },
   ) => {
     const originalFindByIdAndUpdate = Page.findByIdAndUpdate;
     const fault = new Error('simulated failure of the final write');
     let faultFired = false;
+    const failingBeforeWrite = (
+      query: ReturnType<typeof Page.findByIdAndUpdate>,
+    ) => {
+      const failing = query.error(fault);
+      const exec = failing.exec.bind(failing);
+      failing.exec = async (...execArgs: Parameters<typeof exec>) => {
+        await onFault?.();
+        return exec(...execArgs);
+      };
+      return failing;
+    };
     const spy = vi
       .spyOn(Page, 'findByIdAndUpdate')
       .mockImplementation(function (this: PageModel, ...args) {
@@ -127,7 +139,7 @@ describe('a failed rename must not orphan the page (#9755)', () => {
               faultFired = true;
               throw fault;
             })
-          : query.error(fault);
+          : failingBeforeWrite(query);
       });
     try {
       const err = await rename(page, newPath);
@@ -217,23 +229,57 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     expect(await findPathsOffTree()).toEqual([]);
   });
 
-  it('puts the page back under its old parent when renaming to a new location fails', async () => {
+  it('restores the tree unchanged, new empty ancestors included, when renaming to a new location fails', async () => {
     await create(base, 'base body');
     await create(`${base}/ex-parent`, 'body');
     await create(`${base}/new-parent`, 'body');
     const target = await create(`${base}/ex-parent/target`, 'body');
+    const before = await snapshotTree();
+
+    let emptyAncestorsAtFault: string[] = [];
+    const { err, fault } = await renameWithFailingFinalWrite(
+      target,
+      `${base}/new-parent/not-yet-existing/deeper/moved`,
+      {
+        applied: false,
+        onFault: async () => {
+          const empties = await Page.find({
+            path: new RegExp(`^${base}/new-parent/`),
+            isEmpty: true,
+          });
+          emptyAncestorsAtFault = empties.map((p) => p.path).sort();
+        },
+      },
+    );
+
+    expect(err).toBe(fault);
+    // the fault must hit after the new ancestors were created, or nothing is left to clean up
+    expect(emptyAncestorsAtFault).toEqual([
+      `${base}/new-parent/not-yet-existing`,
+      `${base}/new-parent/not-yet-existing/deeper`,
+    ]);
+    expect(await snapshotTree()).toEqual(before);
+  });
+
+  it('keeps an existing empty ancestor that still has other children when renaming to a new location fails', async () => {
+    await create(base, 'base body');
+    await create(`${base}/ex-parent`, 'body');
+    // creating a page under a missing path leaves an empty page at `${base}/holder`
+    await create(`${base}/holder/other-child`, 'body');
+    const target = await create(`${base}/ex-parent/target`, 'body');
+    const before = await snapshotTree();
+    expect(before).toContainEqual(
+      expect.objectContaining({ path: `${base}/holder`, isEmpty: true }),
+    );
 
     const { err, fault } = await renameWithFailingFinalWrite(
       target,
-      `${base}/new-parent/not-yet-existing/moved`,
+      `${base}/holder/not-yet-existing/moved`,
       { applied: false },
     );
 
     expect(err).toBe(fault);
-    expect(await findPathAndParentPath(target._id)).toEqual({
-      path: `${base}/ex-parent/target`,
-      parentPath: `${base}/ex-parent`,
-    });
+    expect(await snapshotTree()).toEqual(before);
   });
 
   it('restores the tree unchanged when renaming a page to under itself fails', async () => {
