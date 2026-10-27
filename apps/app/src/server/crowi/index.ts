@@ -9,11 +9,11 @@ import type { Express } from 'express';
 import expressFactory from 'express';
 import expressSession from 'express-session';
 import mongoose from 'mongoose';
-import uidSafe from 'uid-safe';
 
 import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
+import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { initializeVaultFeature } from '~/features/growi-vault/server';
@@ -27,6 +27,8 @@ import { startCron as startAccessTokenCron } from '~/server/service/access-token
 import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
+import type { PrismaClient } from '~/utils/prisma';
+import * as prismaUtils from '~/utils/prisma';
 import { connectPrismaAtBoot } from '~/utils/prisma-connect';
 
 import ActivityEvent from '../events/activity';
@@ -73,6 +75,7 @@ import { UserNotificationService } from '../service/user-notification';
 import { initializeYjsService } from '../service/yjs';
 import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
 import { setup as setupExpressInit } from './express-init';
+import { createSessionIdGenerator, FIXED_SESSION_ID_PATHS } from './session-id';
 import type { ModelsMapDependentOnCrowi } from './setup-models';
 import { setupModelsDependentOnCrowi } from './setup-models';
 
@@ -118,6 +121,12 @@ class Crowi {
 
   loginRequiredFactory: typeof loginRequiredFactory;
 
+  // Read lazily: a module-scope `import { prisma }` would resolve before
+  // test/setup/prisma.ts has MONGO_URI and cache a broken client.
+  get prisma(): PrismaClient {
+    return prismaUtils.prisma;
+  }
+
   nextApp!: ReturnType<typeof next>;
 
   configManager!: ConfigManager;
@@ -145,6 +154,8 @@ class Crowi {
   passportService!: PassportService;
 
   searchService!: SearchService;
+
+  auditlogChangeStreamService: AuditlogChangeStreamService | null = null;
 
   slackIntegrationService!: SlackIntegrationService;
 
@@ -324,12 +335,20 @@ class Crowi {
    * Execute functions that should be run after the express server is ready.
    */
   async asyncAfterExpressServerReady(): Promise<void> {
+    // Fire-and-forget so a slow or failed check never delays the steps below.
+    import('~/features/ai-usage/server')
+      .then(({ warnIfUsageBaseModelInvalid }) => warnIfUsageBaseModelInvalid())
+      .catch((err) => {
+        logger.warn('Failed to validate ai:usageBaseModel at startup', err);
+      });
+
     if (this.pageOperationService != null) {
       await this.pageOperationService.afterExpressServerReady();
     }
 
-    // One-shot model-catalog refresh (no-op unless AI is enabled AND
-    // ai:modelCatalogRefreshOnStartup is true). Fire-and-forget inside — a
+    // One-shot model-catalog refresh (no-op unless the refresh is allowed: AI
+    // enabled or disabled for catalog_stale, and ai:modelCatalogRefreshOnStartup
+    // is true). Fire-and-forget inside — a
     // failure only logs and the bundled/last-good catalog stays in effect.
     const { triggerModelCatalogRefreshOnStartupIfEnabled } = await import(
       '~/features/mastra/server/services/model-catalog-refresh-jobs'
@@ -390,11 +409,6 @@ class Crowi {
       this.env.REDIS_URI ||
       this.env.REDIS_URL ||
       null;
-    const uid = uidSafe.sync;
-
-    // generate pre-defined uid for healthcheck
-    const healthcheckUid = uid(24);
-
     const sessionConfig: SessionConfig = {
       rolling: true,
       secret: this.env.SECRET_TOKEN || 'this is default session secret',
@@ -403,13 +417,7 @@ class Crowi {
       cookie: {
         maxAge: sessionMaxAge,
       },
-      genid(req) {
-        // return pre-defined uid when healthcheck
-        if (req.path === '/_api/v3/healthcheck') {
-          return healthcheckUid;
-        }
-        return uid(24);
-      },
+      genid: createSessionIdGenerator(FIXED_SESSION_ID_PATHS),
     };
 
     if (this.env.SESSION_NAME) {
@@ -498,7 +506,14 @@ class Crowi {
     );
     new NewsCronService().startCron();
 
-    // Periodic model-catalog refresh (no-op unless AI is enabled; the schedule
+    // Expired WIP page cleanup (the schedule defaults to daily and can be disabled
+    // with an empty app:wipPageCleanupCronSchedule)
+    const { startWipPageCleanupCronIfEnabled } = await import(
+      '~/server/service/page/wip-page-cleanup-cron'
+    );
+    startWipPageCleanupCronIfEnabled(this);
+
+    // Periodic model-catalog refresh (no-op unless the refresh is allowed; the schedule
     // defaults to daily and can be disabled with an empty ai:modelCatalogRefreshCronSchedule)
     const { startModelCatalogRefreshCronIfEnabled } = await import(
       '~/features/mastra/server/services/model-catalog-refresh-jobs'
@@ -542,6 +557,32 @@ class Crowi {
 
   async setupSearcher(): Promise<void> {
     this.searchService = await SearchService.create(this);
+
+    if (this.searchService.isConfigured) {
+      // Auditlog rebuild-on-boot is orchestrated here (not in the delegator) so that server-core
+      // stays free of the auditlog-es-sync feature. Whether the rebuild actually succeeded is then
+      // handed to the change-stream service, which reconciles the sync-status flag and resume token
+      // on its first start (a feature concern that belongs in that layer).
+      let didRebuildOnBoot = false;
+      if (
+        this.configManager.getConfig('app:elasticsearchAuditlogReindexOnBoot')
+      ) {
+        // No cross-instance guard (like the page-index reindexOnBoot): concurrent rebuilds race
+        // on the ES alias swap, so enable on a single instance.
+        try {
+          await this.searchService.rebuildAuditlogIndex();
+          didRebuildOnBoot = true;
+        } catch (err) {
+          logger.error('Rebuild auditlog index on boot failed', err);
+        }
+      }
+
+      this.auditlogChangeStreamService = new AuditlogChangeStreamService(
+        this.searchService.fullTextSearchDelegator,
+        didRebuildOnBoot,
+      );
+      void this.auditlogChangeStreamService.startWithRetry();
+    }
   }
 
   async setupMailer(): Promise<void> {
@@ -709,6 +750,7 @@ class Crowi {
       onSignal: async () => {
         logger.info('Server is starting cleanup');
 
+        await this.auditlogChangeStreamService?.close();
         await mongoose.disconnect();
         return;
       },
@@ -720,7 +762,10 @@ class Crowi {
   }
 
   setupRoutesForPlugins(): void {
-    lsxRoutes(this, this.express);
+    lsxRoutes(this, this.express, {
+      resolveTagPageIds: (tagNames) =>
+        this.prisma.pagetagrelations.findPageIdsWithAllTags(tagNames),
+    });
     attachmentRoutes(this, this.express);
   }
 
@@ -875,14 +920,13 @@ class Crowi {
     await growiPluginService.downloadNotExistPluginRepositories();
   }
 
-  async setupPageService(): Promise<void> {
+  setupPageService(): void {
     if (this.pageGrantService == null) {
       this.pageGrantService = new PageGrantService(this);
     }
     // initialize after pageGrantService since pageService uses pageGrantService in constructor
     if (this.pageService == null) {
       this.pageService = new PageService(this);
-      await this.pageService.createTtlIndex();
     }
     this.pageOperationService = instanciatePageOperationService(this);
   }

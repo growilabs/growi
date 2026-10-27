@@ -19,6 +19,7 @@
 
 - [x] 1.4 起動時 migration 処理（2 段階分離 + stale running 正規化）
   - WHY: `$setOnInsert` 単体では既存 doc に新フィールドが入らず、追加フィルタ + upsert は E11000 を招くため fresh install 用 upsert と既存 doc 用 no-upsert を分離する。`running` + null instanceId は stale 扱いに正規化（migration 前の crash 残骸を安全側で回収）
+  - NOTE: 正規化の条件は 7.2 で置き換え済み。instanceId は bootstrap の開始時に書かれるためプロセスが落ちても残り、この条件では復旧させたい doc をちょうど対象外にしていた（要件 7 / 追補 A 参照）
   - _Depends: 1.1_
   - _Requirements: 1.11, 3.3_
   - _Boundary: resilience layer init（features/growi-vault/server/index.ts の migration block、bootstrap 起動分岐より前）_
@@ -138,3 +139,24 @@
   - _Depends: 6.1_
   - _Requirements: 1.6, 1.8, 2.3, 3.1, 3.3, 3.6, 5.6, 6.1, 6.2_
   - _Boundary: resilience-flow integration (stale / abort / force)_
+
+## Phase 7: 追補（要件 7 — PR #11599）
+
+- [ ] 7. 実行が途絶えた bootstrap の復旧と、全 wipe 時の cursor 無効化
+
+- [x] 7.1 全 wipe の開始時に、DB に保存された bootstrapCursor を消す
+  - WHY: メモリ上の `resumeCursor` だけで cursor を無視する作りでは、最初のページを処理する前に落ちると前回の cursor が残る。残った cursor から resume すると、それより古いページを 1 件も処理しないまま completeness check を満たし、中身が欠けた vault が `done` になる
+  - _Requirements: 7.9, 7.10_
+  - _Boundary: bootstrap-runner（executeBootstrap の forceWipe 分岐）_
+
+- [x] 7.2 プロセスが動いているかの判断を 1 つの純関数にまとめ、起動時の正規化と getStatus の双方から使う
+  - WHY: 判断の材料は `bootstrapHeartbeatAt` の新しさだけとする（instanceId は bootstrap の開始時に書かれるためプロセスが落ちても残り、復旧させたい doc をちょうど対象外にしてしまう）。定義が 2 か所に分かれて食い違わないよう 1 つの関数に置き、barrel（外部への唯一の入口）から export する
+  - _Depends: 7.1_
+  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.8_
+  - _Boundary: resilience/runner-liveness.ts（新規）、resilience/index.ts barrel、features/growi-vault/server/index.ts の migration step 3_
+
+- [x] 7.3 判断の結果を status API に載せ、admin UI の再構築操作をそれに従わせる
+  - WHY: 「古い」と判断する時間はサーバの設定値なので、判断はサーバ側で行い結論だけを渡す。実行が途絶えているときは再構築を押せるようにし、状態が `running` と表示されたままデータを消す操作が有効になる理由を文章で示す
+  - _Depends: 7.2_
+  - _Requirements: 7.5, 7.6, 7.7_
+  - _Boundary: bootstrap-runner getStatus、vault-admin route GET /status、VaultAdminSettings UI、admin.json（en_US / ja_JP）_

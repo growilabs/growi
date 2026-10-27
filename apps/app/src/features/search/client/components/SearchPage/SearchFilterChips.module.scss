@@ -1,0 +1,51 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.filter-chips {
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.chip {
+  font-weight: normal;
+}
+
+// The label prefix ("Author:", "Tag:", …) is secondary to the value, so mute it
+// slightly rather than introduce a second color that would clash with the tint.
+.chip-label {
+  margin-right: 0.25rem;
+  opacity: 0.7;
+}
+
+// A flex item defaults to min-width:auto and refuses to shrink below its content,
+// so `text-truncate` never engages without this — a long value would overflow the
+// chip instead of ellipsizing.
+.chip-value {
+  min-width: 0;
+}
+
+.chip-remove {
+  line-height: 1;
+}
+
+// Match the primary-tinted tokens the typeahead renders (see
+// SearchFilterPanel.module.scss) so chips read as the same visual family.
+@include bs.color-mode(light) {
+  .chip {
+    color: var(--grw-primary-500);
+    background-color: var(--grw-primary-100);
+  }
+
+  .chip-remove {
+    color: var(--grw-primary-500);
+  }
+}
+
+@include bs.color-mode(dark) {
+  .chip {
+    color: var(--grw-primary-200);
+    background-color: var(--grw-primary-800);
+  }
+
+  .chip-remove {
+    color: var(--grw-primary-200);
+  }
+}

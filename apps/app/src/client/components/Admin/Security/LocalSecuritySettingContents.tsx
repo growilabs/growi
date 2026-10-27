@@ -74,7 +74,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
       {adminLocalSecurityContainer.state.retrieveError != null && (
         <div className="alert alert-danger">
           <p>
-            {t('Error occurred')} :{' '}
+            {t('commons:Error occurred')} :{' '}
             {adminLocalSecurityContainer.state.retrieveError}
           </p>
         </div>
@@ -333,7 +333,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
                   adminLocalSecurityContainer.state.retrieveError != null
                 }
               >
-                {t('Update')}
+                {t('commons:Update')}
               </button>
             </div>
           </div>

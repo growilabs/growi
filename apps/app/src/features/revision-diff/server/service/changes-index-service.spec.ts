@@ -10,7 +10,7 @@ import {
 } from './changes-index-service';
 
 // Helper to create a fresh ObjectId
-const makeId = () => new Types.ObjectId();
+const makeId = () => new Types.ObjectId().toString();
 
 describe('buildRuns', () => {
   it('連続する自分の編集を1つの run にまとめる', () => {
@@ -53,10 +53,10 @@ describe('buildRuns', () => {
     const runs = buildRuns(revisions, userId);
 
     expect(runs).toHaveLength(1);
-    expect(runs[0].fromRevisionId?.toString()).toBe(before.toString());
-    expect(runs[0].toRevisionId.toString()).toBe(rev3.toString());
-    expect(runs[0].pageId.toString()).toBe(pageId.toString());
-    expect(runs[0].authorId.toString()).toBe(userId.toString());
+    expect(runs[0].fromRevisionId).toBe(before);
+    expect(runs[0].toRevisionId).toBe(rev3);
+    expect(runs[0].pageId).toBe(pageId);
+    expect(runs[0].authorId).toBe(userId);
     expect(runs[0].latestUpdatedAt).toEqual(new Date('2024-01-01T03:00:00Z'));
   });
 
@@ -96,11 +96,11 @@ describe('buildRuns', () => {
 
     // First run: only rev1, baseline is null (page creation)
     expect(runs[0].fromRevisionId).toBeNull();
-    expect(runs[0].toRevisionId.toString()).toBe(rev1.toString());
+    expect(runs[0].toRevisionId).toBe(rev1);
 
     // Second run: rev2, baseline is otherRev (the intervening revision)
-    expect(runs[1].fromRevisionId?.toString()).toBe(otherRev.toString());
-    expect(runs[1].toRevisionId.toString()).toBe(rev2.toString());
+    expect(runs[1].fromRevisionId).toBe(otherRev);
+    expect(runs[1].toRevisionId).toBe(rev2);
   });
 
   it('新規作成（直前版なし）のとき fromRevisionId が null', () => {
@@ -123,9 +123,9 @@ describe('buildRuns', () => {
 
     expect(runs).toHaveLength(1);
     expect(runs[0].fromRevisionId).toBeNull();
-    expect(runs[0].toRevisionId.toString()).toBe(rev1.toString());
-    expect(runs[0].pageId.toString()).toBe(pageId.toString());
-    expect(runs[0].authorId.toString()).toBe(userId.toString());
+    expect(runs[0].toRevisionId).toBe(rev1);
+    expect(runs[0].pageId).toBe(pageId);
+    expect(runs[0].authorId).toBe(userId);
     expect(runs[0].latestUpdatedAt).toEqual(new Date('2024-01-01T01:00:00Z'));
   });
 
@@ -172,16 +172,16 @@ describe('buildRuns', () => {
     // Total: 2 runs
     expect(runs).toHaveLength(2);
 
-    const runB = runs.find((r) => r.pageId.toString() === pageB.toString());
-    const runA = runs.find((r) => r.pageId.toString() === pageA.toString());
+    const runB = runs.find((r) => r.pageId === pageB);
+    const runA = runs.find((r) => r.pageId === pageA);
 
     expect(runB).toBeDefined();
     expect(runB!.fromRevisionId).toBeNull();
-    expect(runB!.toRevisionId.toString()).toBe(revB1.toString());
+    expect(runB!.toRevisionId).toBe(revB1);
 
     expect(runA).toBeDefined();
     expect(runA!.fromRevisionId).toBeNull();
-    expect(runA!.toRevisionId.toString()).toBe(revA2.toString());
+    expect(runA!.toRevisionId).toBe(revA2);
   });
 
   it('入力が空配列のとき run も空', () => {
@@ -196,12 +196,12 @@ describe('buildRuns', () => {
 // ---------------------------------------------------------------------------
 
 /** テスト用に Run を作るヘルパー */
-function makeRun(toRevId: Types.ObjectId, createdAt: Date): Run {
+function makeRun(toRevId: string, createdAt: Date): Run {
   return {
-    pageId: new Types.ObjectId(),
+    pageId: makeId(),
     fromRevisionId: null,
     toRevisionId: toRevId,
-    authorId: new Types.ObjectId(),
+    authorId: makeId(),
     latestUpdatedAt: createdAt,
   };
 }
@@ -209,8 +209,8 @@ function makeRun(toRevId: Types.ObjectId, createdAt: Date): Run {
 describe('paginateRuns', () => {
   it('limit 内に収まる結果は next=null を返す', () => {
     const runs = [
-      makeRun(new Types.ObjectId(), new Date('2024-01-01')),
-      makeRun(new Types.ObjectId(), new Date('2024-01-02')),
+      makeRun(makeId(), new Date('2024-01-01')),
+      makeRun(makeId(), new Date('2024-01-02')),
     ];
     const result = paginateRuns(runs, 5);
     expect(result.emittedRuns).toHaveLength(2);
@@ -219,7 +219,7 @@ describe('paginateRuns', () => {
 
   it('limit 超過時は limit 件だけ emit し next cursor を返す', () => {
     const runs = Array.from({ length: 5 }, (_, i) =>
-      makeRun(new Types.ObjectId(), new Date(`2024-01-0${i + 1}`)),
+      makeRun(makeId(), new Date(`2024-01-0${i + 1}`)),
     );
     const result = paginateRuns(runs, 3);
     expect(result.emittedRuns).toHaveLength(3);
@@ -227,7 +227,7 @@ describe('paginateRuns', () => {
   });
 
   it('cursor 継続で前ページの重複・取りこぼしがない', () => {
-    const revIds = Array.from({ length: 6 }, () => new Types.ObjectId());
+    const revIds = Array.from({ length: 6 }, () => makeId());
     const dates = Array.from(
       { length: 6 },
       (_, i) => new Date(`2024-01-0${i + 1}`),
@@ -245,14 +245,14 @@ describe('paginateRuns', () => {
     expect(page2.nextCursor).toBeNull();
 
     // 重複なし
-    const page1Ids = page1.emittedRuns.map((r) => r.toRevisionId.toString());
-    const page2Ids = page2.emittedRuns.map((r) => r.toRevisionId.toString());
+    const page1Ids = page1.emittedRuns.map((r) => r.toRevisionId);
+    const page2Ids = page2.emittedRuns.map((r) => r.toRevisionId);
     expect(page1Ids.filter((id) => page2Ids.includes(id))).toHaveLength(0);
 
     // 6 件全てカバー、取りこぼしなし
     expect([...page1Ids, ...page2Ids]).toHaveLength(6);
     // 元の runs 全 ID が含まれる
-    const allRunIds = runs.map((r) => r.toRevisionId.toString());
+    const allRunIds = runs.map((r) => r.toRevisionId);
     expect([...page1Ids, ...page2Ids].sort()).toEqual(allRunIds.sort());
   });
 
@@ -265,9 +265,9 @@ describe('paginateRuns', () => {
   it('emit 済み runs は時系列昇順になっている', () => {
     // 意図的に逆順で渡す（呼び出し元は昇順ソート済みが前提だが、順序の検証）
     const sorted = [
-      makeRun(new Types.ObjectId(), new Date('2024-01-01')),
-      makeRun(new Types.ObjectId(), new Date('2024-01-02')),
-      makeRun(new Types.ObjectId(), new Date('2024-01-03')),
+      makeRun(makeId(), new Date('2024-01-01')),
+      makeRun(makeId(), new Date('2024-01-02')),
+      makeRun(makeId(), new Date('2024-01-03')),
     ];
     const result = paginateRuns(sorted, 10);
     for (let i = 1; i < result.emittedRuns.length; i++) {
@@ -278,7 +278,7 @@ describe('paginateRuns', () => {
   });
 
   it('cursor がちょうど最終 run を指すとき次ページは空で next=null', () => {
-    const revId = new Types.ObjectId();
+    const revId = makeId();
     const date = new Date('2024-01-01');
     const runs = [makeRun(revId, date)];
 
@@ -288,12 +288,12 @@ describe('paginateRuns', () => {
     expect(page1.nextCursor).toBeNull();
   });
 
-  it('cursor 直後の run から始まり、cursor と同時刻で _id が大きい run も含める', () => {
+  it('cursor 直後の run から始まり、cursor と同時刻で _id が大きい run 도含める', () => {
     // 同一 createdAt の run が複数ある場合、toRevisionId (_id) の文字列比較で順序付け
     const date = new Date('2024-01-01');
     // ObjectId の toString() は 24 桁 hex: 辞書順で大小が決まる
     // 明示的に小さい/大きい ID を作るのは困難なので、複数生成して Sort で確認
-    const revIds = Array.from({ length: 4 }, () => new Types.ObjectId());
+    const revIds = Array.from({ length: 4 }, () => makeId());
     // latestUpdatedAt が全て同じ date のケース
     const runs = revIds.map((id) => makeRun(id, date));
 
@@ -302,7 +302,7 @@ describe('paginateRuns', () => {
       const timeDiff =
         a.latestUpdatedAt.getTime() - b.latestUpdatedAt.getTime();
       if (timeDiff !== 0) return timeDiff;
-      return a.toRevisionId.toString() < b.toRevisionId.toString() ? -1 : 1;
+      return a.toRevisionId < b.toRevisionId ? -1 : 1;
     });
 
     // Page 1: 2 件
@@ -316,19 +316,17 @@ describe('paginateRuns', () => {
     expect(page2.nextCursor).toBeNull();
 
     // 全 4 件が重複なくカバーされる
-    const allIds = [...page1.emittedRuns, ...page2.emittedRuns].map((r) =>
-      r.toRevisionId.toString(),
+    const allIds = [...page1.emittedRuns, ...page2.emittedRuns].map(
+      (r) => r.toRevisionId,
     );
-    expect(allIds.sort()).toEqual(
-      sorted.map((r) => r.toRevisionId.toString()).sort(),
-    );
+    expect(allIds.sort()).toEqual(sorted.map((r) => r.toRevisionId).sort());
   });
 
   it('sorts unsorted input into keyset order so no run is dropped across pages', () => {
     // Runs supplied in NON-keyset order (as buildRuns may return them, in page-first-touch
     // order): X has the later latest-edit (05:00) yet appears first; Y is earlier (03:00).
-    const xId = new Types.ObjectId();
-    const yId = new Types.ObjectId();
+    const xId = makeId();
+    const yId = makeId();
     const unsorted = [
       makeRun(xId, new Date('2024-01-01T05:00:00Z')),
       makeRun(yId, new Date('2024-01-01T03:00:00Z')),
@@ -338,13 +336,13 @@ describe('paginateRuns', () => {
     // the array — otherwise the cursor would jump to 05:00 and drop Y on the next page.
     const page1 = paginateRuns(unsorted, 1);
     expect(page1.emittedRuns).toHaveLength(1);
-    expect(page1.emittedRuns[0].toRevisionId.toString()).toBe(yId.toString());
+    expect(page1.emittedRuns[0].toRevisionId).toBe(yId);
     expect(page1.nextCursor).not.toBeNull();
 
     // Page 2 continues from the cursor and yields X@05:00 — nothing dropped.
     const page2 = paginateRuns(unsorted, 1, page1.nextCursor as CursorKey);
     expect(page2.emittedRuns).toHaveLength(1);
-    expect(page2.emittedRuns[0].toRevisionId.toString()).toBe(xId.toString());
+    expect(page2.emittedRuns[0].toRevisionId).toBe(xId);
     expect(page2.nextCursor).toBeNull();
   });
 });
@@ -354,22 +352,18 @@ describe('paginateRuns', () => {
 // ---------------------------------------------------------------------------
 
 /** テスト用に Run を作るヘルパー（pageId を指定可能） */
-function makeRunForPage(pageId: Types.ObjectId): Run {
+function makeRunForPage(pageId: string): Run {
   return {
     pageId,
-    fromRevisionId: new Types.ObjectId(),
-    toRevisionId: new Types.ObjectId(),
-    authorId: new Types.ObjectId(),
+    fromRevisionId: makeId(),
+    toRevisionId: makeId(),
+    authorId: makeId(),
     latestUpdatedAt: new Date('2024-01-01T00:00:00Z'),
   };
 }
 
 /** テスト用に PageInfo を作るヘルパー */
-function makePageInfo(
-  id: Types.ObjectId,
-  status: string,
-  path: string,
-): PageInfo {
+function makePageInfo(id: string, status: string, path: string): PageInfo {
   return { _id: id, status, path };
 }
 
@@ -377,15 +371,15 @@ describe('applyAccessFlags', () => {
   it('accessible ページは accessible:true, deleted:false, path 付きで返す', () => {
     const pageId = makeId();
     const runs = [makeRunForPage(pageId)];
-    const accessiblePageIds = new Set([pageId.toString()]);
+    const accessiblePageIds = new Set([pageId]);
     const pageInfoMap = new Map([
-      [pageId.toString(), makePageInfo(pageId, 'published', '/path/to/page')],
+      [pageId, makePageInfo(pageId, 'published', '/path/to/page')],
     ]);
 
     const result = applyAccessFlags(runs, accessiblePageIds, pageInfoMap);
 
     expect(result).toHaveLength(1);
-    expect(result[0].pageId).toBe(pageId.toString());
+    expect(result[0].pageId).toBe(pageId);
     expect(result[0].accessible).toBe(true);
     expect(result[0].deleted).toBe(false);
     expect(result[0].path).toBe('/path/to/page');
@@ -397,13 +391,13 @@ describe('applyAccessFlags', () => {
     // accessiblePageIds には含まれない
     const accessiblePageIds = new Set<string>();
     const pageInfoMap = new Map([
-      [pageId.toString(), makePageInfo(pageId, 'deleted', '/trash/page')],
+      [pageId, makePageInfo(pageId, 'deleted', '/trash/page')],
     ]);
 
     const result = applyAccessFlags(runs, accessiblePageIds, pageInfoMap);
 
     expect(result).toHaveLength(1);
-    expect(result[0].pageId).toBe(pageId.toString());
+    expect(result[0].pageId).toBe(pageId);
     expect(result[0].accessible).toBe(false);
     expect(result[0].deleted).toBe(true);
     expect(result[0].path).toBeNull();
@@ -415,13 +409,13 @@ describe('applyAccessFlags', () => {
     // accessiblePageIds には含まれない
     const accessiblePageIds = new Set<string>();
     const pageInfoMap = new Map([
-      [pageId.toString(), makePageInfo(pageId, 'published', '/private/page')],
+      [pageId, makePageInfo(pageId, 'published', '/private/page')],
     ]);
 
     const result = applyAccessFlags(runs, accessiblePageIds, pageInfoMap);
 
     expect(result).toHaveLength(1);
-    expect(result[0].pageId).toBe(pageId.toString());
+    expect(result[0].pageId).toBe(pageId);
     expect(result[0].accessible).toBe(false);
     expect(result[0].deleted).toBe(false);
     expect(result[0].path).toBeNull();
@@ -452,20 +446,11 @@ describe('applyAccessFlags', () => {
       makeRunForPage(absentId),
     ];
 
-    const accessiblePageIds = new Set([accessibleId.toString()]);
+    const accessiblePageIds = new Set([accessibleId]);
     const pageInfoMap = new Map([
-      [
-        accessibleId.toString(),
-        makePageInfo(accessibleId, 'published', '/accessible'),
-      ],
-      [
-        deletedId.toString(),
-        makePageInfo(deletedId, 'deleted', '/trash/deleted'),
-      ],
-      [
-        inaccessibleId.toString(),
-        makePageInfo(inaccessibleId, 'published', '/private'),
-      ],
+      [accessibleId, makePageInfo(accessibleId, 'published', '/accessible')],
+      [deletedId, makePageInfo(deletedId, 'deleted', '/trash/deleted')],
+      [inaccessibleId, makePageInfo(inaccessibleId, 'published', '/private')],
       // absentId は pageInfoMap に無い
     ]);
 
@@ -474,25 +459,21 @@ describe('applyAccessFlags', () => {
     // 不在 (absentId) は除外 → 3件のみ
     expect(result).toHaveLength(3);
 
-    const accessibleEntry = result.find(
-      (e) => e.pageId === accessibleId.toString(),
-    );
+    const accessibleEntry = result.find((e) => e.pageId === accessibleId);
     expect(accessibleEntry).toBeDefined();
     if (accessibleEntry == null) return;
     expect(accessibleEntry.accessible).toBe(true);
     expect(accessibleEntry.deleted).toBe(false);
     expect(accessibleEntry.path).toBe('/accessible');
 
-    const deletedEntry = result.find((e) => e.pageId === deletedId.toString());
+    const deletedEntry = result.find((e) => e.pageId === deletedId);
     expect(deletedEntry).toBeDefined();
     if (deletedEntry == null) return;
     expect(deletedEntry.accessible).toBe(false);
     expect(deletedEntry.deleted).toBe(true);
     expect(deletedEntry.path).toBeNull();
 
-    const inaccessibleEntry = result.find(
-      (e) => e.pageId === inaccessibleId.toString(),
-    );
+    const inaccessibleEntry = result.find((e) => e.pageId === inaccessibleId);
     expect(inaccessibleEntry).toBeDefined();
     if (inaccessibleEntry == null) return;
     expect(inaccessibleEntry.accessible).toBe(false);
@@ -501,9 +482,9 @@ describe('applyAccessFlags', () => {
   });
 
   it('accessible かつ deleted なページ（ゴミ箱で GRANT_PUBLIC 等）は deleted:true, path:null で返す', () => {
-    const pageId = new Types.ObjectId();
-    const revId = new Types.ObjectId();
-    const authorId = new Types.ObjectId();
+    const pageId = makeId();
+    const revId = makeId();
+    const authorId = makeId();
     const runs: Run[] = [
       {
         pageId,
@@ -514,12 +495,9 @@ describe('applyAccessFlags', () => {
       },
     ];
     // findByIdsAndViewer returns this page (GRANT_PUBLIC deleted page — still accessible by grant)
-    const accessiblePageIds = new Set([pageId.toString()]);
+    const accessiblePageIds = new Set([pageId]);
     const pageInfoMap = new Map<string, PageInfo>([
-      [
-        pageId.toString(),
-        { _id: pageId, status: 'deleted', path: '/trash/my-page' },
-      ],
+      [pageId, { _id: pageId, status: 'deleted', path: '/trash/my-page' }],
     ]);
 
     const result = applyAccessFlags(runs, accessiblePageIds, pageInfoMap);

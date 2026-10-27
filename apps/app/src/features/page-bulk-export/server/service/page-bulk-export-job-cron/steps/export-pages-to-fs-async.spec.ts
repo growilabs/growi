@@ -26,8 +26,8 @@ import {
   PageBulkExportFormat,
   PageBulkExportJobStatus,
 } from '~/features/page-bulk-export/interfaces/page-bulk-export';
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
 
-import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
 import type { PageBulkExportPageSnapshotDocument } from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
 import * as RendererModule from '../markdown';
@@ -45,6 +45,39 @@ vi.mock('../../../models/page-bulk-export-page-snapshot', () => {
   return { default: { find: vi.fn() } };
 });
 
+// The job's progress writes (lastExportedPagePath / status) go through prisma.
+// Stub the client so this unit test needs no database.
+vi.mock('~/utils/prisma', () => {
+  return {
+    prisma: {
+      pagebulkexportjobs: {
+        update: vi.fn(() => Promise.resolve({})),
+      },
+    },
+  };
+});
+
+// ---------------------------------------------------------------------------
+// getPageWritable resolves the exporting user once per job via
+// `mongoose.model('User')` (User isn't registered in this unit-test process).
+// None of the fixtures below embed an attachment image, so the returned user
+// is never read.
+// ---------------------------------------------------------------------------
+vi.mock('mongoose', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('mongoose')>();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      model: (name: string, ...rest: unknown[]) =>
+        name === 'User'
+          ? { findById: vi.fn().mockResolvedValue(undefined) }
+          : // biome-ignore lint/suspicious/noExplicitAny: forwarding to the real mongoose.model overload set
+            (actual.default.model as any)(name, ...rest),
+    },
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -60,20 +93,19 @@ function makeService(tmpDir: string): IPageBulkExportJobCronService {
 }
 
 /**
- * Build a minimal PageBulkExportJobDocument mock for the given format.
- * lastExportedPagePath defaults to undefined (no prior export).
+ * Build a minimal page bulk export job for the given format.
+ * lastExportedPagePath defaults to null (no prior export).
  */
 function makeJob(
-  format: PageBulkExportFormat,
-  lastExportedPagePath?: string,
-): PageBulkExportJobDocument {
-  const job = mock<PageBulkExportJobDocument>({
+  format: string,
+  lastExportedPagePath: string | null = null,
+): pagebulkexportjobs {
+  return mock<pagebulkexportjobs>({
+    id: '000000000000000000000001',
     format,
     lastExportedPagePath,
     status: PageBulkExportJobStatus.exporting,
   });
-  job.save.mockResolvedValue(job);
-  return job;
 }
 
 /**
@@ -277,7 +309,7 @@ describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3
       expect(findSpy).toHaveBeenCalledOnce();
       const [queryArg] = findSpy.mock.calls[0];
       expect(queryArg).toMatchObject({
-        pageBulkExportJob: job,
+        pageBulkExportJob: job.id,
         path: { $gt: lastPath },
       });
     } finally {
@@ -295,7 +327,7 @@ describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3
       .spyOn(PageBulkExportPageSnapshot, 'find')
       .mockImplementation(makeCursorChain());
 
-    const job = makeJob(PageBulkExportFormat.pdf); // lastExportedPagePath = undefined
+    const job = makeJob(PageBulkExportFormat.pdf); // lastExportedPagePath = null
 
     const tmpDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'bulk-export-resume-full-'),
@@ -311,10 +343,32 @@ describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3
       // Observable: find() was called with only the job filter (no path $gt)
       expect(findSpy).toHaveBeenCalledOnce();
       const [queryArg] = findSpy.mock.calls[0];
-      expect(queryArg).toEqual({ pageBulkExportJob: job });
+      expect(queryArg).toEqual({ pageBulkExportJob: job.id });
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
       findSpy.mockRestore();
+    }
+  });
+});
+
+describe('export-pages-to-fs-async: unsupported format', () => {
+  it.each([
+    '/../../../escape',
+    'docx',
+    '',
+  ])('refuses to start exporting a job whose format is %j', async (format) => {
+    const tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'bulk-export-bad-format-'),
+    );
+    const svc = makeService(tmpDir);
+
+    try {
+      await expect(
+        getPageWritable.call(svc, makeJob(format)),
+      ).rejects.toThrow();
+      expect(fs.readdirSync(tmpDir)).toEqual([]);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 });

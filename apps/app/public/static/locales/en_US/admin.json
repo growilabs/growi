@@ -2,6 +2,12 @@
   "meta": {
     "display_name": "English"
   },
+  "Page": "Page",
+  "Execute": "Execute",
+  "Enable": "Enable",
+  "Copied!": "Copied!",
+  "ExternalUserGroup": "External User Group",
+  "something_went_wrong": "Something went wrong. Please try again.",
   "last_login": "Last login",
   "wiki_management_homepage": "Wiki Management Homepage",
   "public": "Public",
@@ -35,6 +41,7 @@
     "insert_single": "Please insert one entry per line.",
     "whitelist_invalid_format": "Invalid format. Use @example.com for exact domain, @*.example.com for subdomains, or user@example.com for exact address.",
     "page_list_and_search_results": "Page list / Search results",
+    "page_list_and_search_results_desc": "These settings only affect users without access to a page. Users who can view a page (e.g. members of a group it is restricted to via \"Only inside the group\") always see it in listings and search, even when set to \"Always hidden\".",
     "page_listing_1": "Page listing/searching<br>restricted by 'Only me'",
     "page_listing_1_desc": "Show pages that are restricted by 'Only me' option when listing/searching",
     "page_listing_2": "Page listing/searching<br>restricted by User group",
@@ -283,9 +290,9 @@
     "toggle_notification": "Updated setting of {{path}}",
     "not_found_global_notification_triggerid": "Not found the global notification id"
   },
-  "full_text_search_management": {
-    "full_text_search_management": "Full Text Search Management",
-    "elasticsearch_management": "Elasticsearch management",
+  "elasticsearch_management": "Elasticsearch management",
+  "page_data_index_management": {
+    "page_data_management": "Page Data Management",
     "connection_status": "Connection status",
     "connection_status_label_unconfigured": "UNCONFIGURED",
     "connection_status_label_connected": "CONNECTED",
@@ -299,12 +306,39 @@
     "reconnect_button": "Try to reconnect",
     "reconnect_description": "Click the button to try to reconnect to Elasticsearch.",
     "normalize": "Normalize",
-    "normalize_button": "Normalize indices",
-    "normalize_description": "Click the button to repair broken indices.",
+    "normalize_button": "Normalize page data index",
+    "normalize_description": "Click the button to repair the broken page data index.",
+    "normalize_success": "Page data index normalized successfully.",
     "rebuild": "Rebuild",
-    "rebuild_button": "Rebuild index",
+    "rebuild_button": "Rebuild page data index",
+    "rebuild_requested": "Page data index rebuild has been requested.",
     "rebuild_description_1": "Click the button to rebuild index and add all page datas.",
-    "rebuild_description_2": "This may take a while."
+    "rebuild_description_2": "This may take a while.",
+    "rebuild_progress_processing": "Processing..",
+    "rebuild_progress_completed": "Completed",
+    "rebuild_normalization_timeout": "Rebuild completed but normalization timed out. Please normalize manually."
+  },
+  "audit_log_index_management": {
+    "audit_log_index_management": "Audit Log Index Management",
+    "settings_explanation": "Normalize or rebuild the audit log's index on the following page",
+    "index_management_link": "Go to {{destination}}",
+    "docs_url": {
+      "top": "https://docs.growi.org/en/admin-guide/management-cookbook/setup-search-system.html"
+    },
+    "normalize": "Normalize",
+    "normalize_button": "Normalize audit log index",
+    "normalize_success": "Audit log index normalized successfully.",
+    "normalize_description": "Repairs broken audit log indices.",
+    "rebuild": "Rebuild",
+    "rebuild_button": "Rebuild audit log index",
+    "rebuild_requested": "Audit log index rebuild has been requested.",
+    "rebuild_description_1": "Deletes and rebuilds all audit log indices.",
+    "rebuild_description_2": "This may take a while.",
+    "unsynced_events_warning": "Some audit log events failed to sync to Elasticsearch. Rebuild to restore consistency.",
+    "rebuild_progress_processing": "Processing..",
+    "rebuild_progress_completed": "Completed",
+    "rebuild_normalization_timeout": "Rebuild completed but normalization timed out. Please normalize manually.",
+    "reconnect": "Reconnect"
   },
   "mailer_setup_required": "<a href='/admin/app'>Email settings</a> are required to send.",
   "admin_top": {
@@ -336,6 +370,16 @@
     "header_upgrading_progress": "Upgrade Progress",
     "migration_succeeded": "Your upgrade has been successfully completed! Exit maintenance mode and GROWI can be used.",
     "migration_failed": "Upgrade failed. Please refer to the GROWI docs for information on what to do in the event of failure."
+  },
+  "page_tree_repair": {
+    "page_tree_repair": "Page Tree Repair",
+    "repair_desc": "Removes orphaned empty pages and recalculates the descendant count of every page. Use this if the page tree shows empty folders that contain nothing, or child counts that do not match the actual number of pages. This is needed on instances upgraded from a version that expired WIP pages with a MongoDB TTL index.",
+    "repair_note": "Note: Maintenance mode must be enabled. This scans every page, so it may take a long time on a large wiki. Progress is written to the server log.",
+    "repair_page_tree": "Repair page tree",
+    "modal_repair_warning": "This process scans and updates every page and may take a long time. It is highly recommended that administrators tell users not to create, modify, or delete pages during the repair.",
+    "start_repair": "Start repairing the page tree",
+    "successfully_started": "Succeeded to start the page tree repair",
+    "repair_in_progress": "The page tree repair is running in the background. See the server log for the result."
   },
   "news_delivery": {
     "section_title": "News delivery",
@@ -607,7 +651,7 @@
     "custom_title_detail_placeholder2": "<code>&#123;&#123;pagename&#125;&#125;</code> - The page name of the current page.",
     "custom_title_detail_placeholder3": "<code>&#123;&#123;pagepath&#125;&#125;</code> - The page path of the current page.",
     "custom_noscript": "Custom Noscript",
-    "custom_noscript_detail": "You can customize Noscript code that applies all pages. Your custom Noscript will be inserted into the <code>&lt;noscript&gt;</code> tag that is located as the first element of body.<br>Relaod page to see changes.",
+    "custom_noscript_detail": "You can customize Noscript code that applies all pages. Your custom Noscript will be inserted into the <code>&lt;noscript&gt;</code> tag that is located as the first element of body.<br>You need to reload the page to reflect the change.",
     "custom_css": "Custom CSS",
     "write_css": "You can write CSS that is applied to whole system.",
     "ctrl_space": "Ctrl+Space to autocomplete",
@@ -987,7 +1031,43 @@
     "transfer_data_to_another_growi": "Transfer data from this GROWI to another GROWI",
     "advanced_options": "Advanced options",
     "start_transfer": "Start transfer",
-    "paste_transfer_key": "Paste transter key here"
+    "paste_transfer_key": "Paste transter key here",
+    "transfer_method": {
+      "heading": "Transfer method",
+      "migration": "Migration (replace all data on the destination)",
+      "merge": "Add to existing data (the destination's existing data is kept)"
+    },
+    "confirm_modal": {
+      "title": "Confirm transfer",
+      "description": "The destination GROWI currently holds the following data. Starting this transfer will delete all of it and replace it with data from this GROWI:",
+      "counts": {
+        "users": "Users",
+        "user_groups": "User groups",
+        "pages": "Pages"
+      },
+      "warnings_heading": "Before you continue:",
+      "warnings": {
+        "password_seed_mismatch": "The source and destination GROWI have different password seeds. Migrated users will not be able to log in with their existing password.",
+        "no_loginable_admin": "The destination GROWI has no administrator who can currently log in. After the transfer, nobody may be able to log in.",
+        "sessions_not_invalidatable": "The destination GROWI's session store cannot invalidate individual sessions. Sessions established before the transfer will remain valid.",
+        "local_auth_disabled_at_source": "This GROWI has local (ID/Password) authentication disabled. Even a rescued destination administrator will not be able to log in with a password."
+      }
+    },
+    "blockers": {
+      "version_mismatch": "This transfer cannot proceed: the source and destination GROWI are running different versions.",
+      "user_upper_limit": "This transfer cannot proceed: the number of active users on the source GROWI exceeds the destination GROWI's user limit.",
+      "file_upload_not_configured": "This transfer cannot proceed: file upload is not configured on the source or destination GROWI.",
+      "destination_storage_not_writable": "This transfer cannot proceed: the destination GROWI's storage is not writable.",
+      "file_upload_total_limit": "This transfer cannot proceed: the total size of the source GROWI's attachments exceeds the destination GROWI's file upload limit."
+    },
+    "rescue_outcome": {
+      "heading": "The migration replaced every user on the destination. The following administrator accounts were kept so someone can still sign in:",
+      "renamed_from": "renamed from",
+      "email_removed": "Its email address was removed because it conflicted with an incoming user.",
+      "slack_member_id_removed": "Its Slack member ID was removed because it conflicted with an incoming user.",
+      "id_reassigned": "It was assigned a new internal identifier because the original one conflicted with an incoming user; any login session from before the transfer was lost."
+    },
+    "failed_collections_heading": "The destination GROWI could not import the following collections:"
   },
   "plugins": {
     "plugins": "Plugins",
@@ -1174,7 +1254,20 @@
   "g2g": {
     "transfer_success": "Completed GROWI to GROWI transfer successfully",
     "error_generate_growi_archive": "Failed to generate GROWI archive file",
-    "error_send_growi_archive": "Failed to send GROWI archive file to the destination GROWI"
+    "error_send_growi_archive": "Failed to send GROWI archive file to the destination GROWI",
+    "error_data_conflict": "Transfer aborted: some of the transferred data conflicts with users or user groups that already exist on the destination GROWI, so nothing was imported. Resolve the conflicting accounts or groups before retrying, or transfer into a destination GROWI that has not yet completed its initial setup.",
+    "error_upload_attachment": "Failed to transfer attachments",
+    "error_import_in_progress": "Transfer aborted: another data import is already running on the destination GROWI. Wait for it to finish, then retry the transfer.",
+    "error_partial_import": "Transfer incomplete: the destination GROWI did not finish the transfer cleanly (it may have failed to import a collection, rescue an administrator, or finish its post-import cleanup), so it may hold a partly transferred database. If the destination was put into maintenance mode for this transfer, it stays closed to ordinary users until you switch it off from Admin > App Settings on the destination GROWI. Fix the cause and run the transfer again.",
+    "error_protected_collection": "Transfer aborted: the destination GROWI refused the request because it named collections that a transfer must not carry, so nothing was imported. The transfer screen never selects those collections, so check that both GROWIs are running the same version, then report the collection names shown below.",
+    "error_mixed_import_methods": "Transfer aborted: the destination GROWI refused the request because its import-method assignment mixed replacing some collections with appending to others, so nothing was imported. The transfer screen no longer builds such a request, so check that both GROWIs are running the same version, then retry the transfer.",
+    "error_invalid_transfer_key": "Transfer aborted: the destination GROWI rejected the transfer key as missing, expired, or invalid. Publish a new transfer key on the destination GROWI and retry.",
+    "error_parse_failed": "Transfer aborted: the destination GROWI could not parse the transfer request. Check that both GROWIs are running the same version, then retry the transfer.",
+    "error_validation_failed": "Transfer aborted: the destination GROWI could not validate the uploaded GROWI archive file. It may be corrupted; try generating and sending the archive again.",
+    "error_version_incompatible": "Transfer aborted: the source and destination GROWI are running different versions, so nothing was imported. Upgrade the destination GROWI to match the source, then retry the transfer.",
+    "error_import_settings_invalid": "Transfer aborted: the destination GROWI could not build valid import settings for the requested collections. See GROWI docs about details.",
+    "error_conflict_detection_failed": "Transfer aborted: the destination GROWI could not determine whether the transfer data conflicts with its existing data, so it refused to import rather than guess. Retry the transfer; if this keeps happening, check the destination GROWI's logs.",
+    "error_mongo_collection_import_failure": "Transfer incomplete: the destination GROWI failed to write one or more collections to MongoDB for a reason other than a data conflict. Check the destination GROWI's logs for details."
   },
   "external_user_group": {
     "management": "External Group Management",
@@ -1280,7 +1373,8 @@
         "confirm-question": "Are you sure you want to proceed?",
         "confirm-button": "Confirm",
         "cancel-button": "Cancel",
-        "started-toast": "Rebuild started. The Vault will return 503 until the data is rebuilt."
+        "started-toast": "Rebuild started. The Vault will return 503 until the data is rebuilt.",
+        "abandoned-run-notice": "The status says a rebuild is in progress, but no progress has been reported since {{heartbeatAt}} — the process that was running it is gone. Rebuild Vault stays available so you can start a new run."
       },
       "bootstrap-status": {
         "state": "Status",
@@ -1337,5 +1431,13 @@
         "description": "Manually reconcile data inconsistencies between MongoDB pages and Vault git trees without performing a full initialization."
       }
     }
+  },
+  "maintenance_mode_notice": {
+    "title": "GROWI will stay in maintenance mode",
+    "body_this_growi": "Importing the configs collection replaces every setting of this GROWI with the ones in the archive, so this GROWI is put into maintenance mode and left there. Ordinary users cannot reach it until you switch it off.",
+    "body_destination": "Importing the configs collection replaces every setting of the destination GROWI with the ones from this GROWI, so the destination is put into maintenance mode and left there. Ordinary users cannot reach the destination until you switch it off. Attachments are transferred after the collections, so the destination is incomplete until the whole transfer has finished.",
+    "turn_it_off": "Switch maintenance mode off from Admin > App Settings on the GROWI that was closed, once you have checked the result.",
+    "cancel": "Cancel",
+    "proceed": "Understood, proceed"
   }
 }

@@ -28,7 +28,6 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
@@ -36,10 +35,12 @@ import {
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { grantBodyValidator } from './grant-body-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:page:create-page');
 
@@ -143,10 +144,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       .optional()
       .isString()
       .withMessage('body must be string or undefined'),
-    body('grant')
-      .optional()
-      .isInt({ min: 0, max: 5 })
-      .withMessage('grant must be integer from 1 to 5'),
+    grantBodyValidator({ required: false }),
     body('onlyInheritUserRelatedGrantedGroups')
       .optional()
       .isBoolean()
@@ -207,9 +205,9 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     pageTags: string[];
   }) {
     const tagEvent = crowi.events.tag;
-    await PageTagRelation.updatePageTags(createdPage.id, pageTags);
+    await prisma.pagetagrelations.updatePageTags(createdPage.id, pageTags);
     tagEvent.emit('update', createdPage, pageTags);
-    return PageTagRelation.listTagNamesByPage(createdPage.id);
+    return prisma.pagetagrelations.listTagNamesByPage(createdPage.id);
   }
 
   /**

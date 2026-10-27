@@ -1,7 +1,10 @@
+import ObjectId from 'bson-objectid';
+
 import type { IUser } from '../../interfaces/user.js';
 import {
   omitInsecureAttributes,
   serializeUserSecurely,
+  toLegacyUserShape,
 } from './user-serializer.js';
 
 describe('user-serializer', () => {
@@ -61,6 +64,32 @@ describe('user-serializer', () => {
       // Type-level assertion: this object must typecheck against IUser
       const user = buildUser({ passwordHash: 'scrypt$...' });
       expect(user.passwordHash).toBe('scrypt$...');
+    });
+  });
+});
+
+describe('toLegacyUserShape', () => {
+  it('sets imageAttachment to imageAttachmentId', () => {
+    const user = {
+      id: new ObjectId().toString(),
+      imageAttachmentId: new ObjectId().toString(),
+    };
+
+    expect(toLegacyUserShape(user)).toEqual({
+      ...user,
+      imageAttachment: user.imageAttachmentId,
+    });
+  });
+
+  it('keeps imageAttachment null when the user has no image', () => {
+    const user = {
+      id: new ObjectId().toString(),
+      imageAttachmentId: null,
+    };
+
+    expect(toLegacyUserShape(user)).toEqual({
+      ...user,
+      imageAttachment: null,
     });
   });
 });

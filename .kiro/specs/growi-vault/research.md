@@ -139,6 +139,7 @@
 - **Rationale**: GROWI の ACL モデル（public + group ≤数十 + user-private）が namespace 数を小さく保てるため namespace ベース設計と相性が良い。git binary に pack format / delta / protocol を委譲することで実装リスクを最小化
 - **Trade-offs**: container image に git binary 同梱（`apk add git`）、disk persistence 必要
 - **Follow-up**: 「常に packed」運用の周期 `git repack` ジョブ設計
+- **Follow-up（2026-07-28 実測で判明）**: namespace は **読み取りの遮断を提供しない**。`GIT_NAMESPACE` が絞るのは ref の広告範囲のみで、object の保管領域は namespace 間で共有される。git が広告外の要求に対して行う到達性確認は commit を前提としており、ファイルの中身（blob）とディレクトリの一覧（tree）は namespace を越えて取得できた（`gitnamespaces(7)` も「namespace は読み取りのアクセス制御には有効ではない」と明記）。したがって本 Decision の「namespace で per-user 可視範囲を表現する」は **ref の可視範囲の表現**までが有効で、読み取りの遮断は vault-manager 側の検査で別途担保する必要がある。実測・対応方針は `.kiro/specs/growi-vault-manager/research.md`、実装は同 spec の要件 5.6–5.8
 
 ### Decision 4: per-user view ref は namespace tree merge による合成
 
@@ -239,6 +240,7 @@
 | パスエンコーディング規則の breaking change | v1 確定後 immutable、変更時は revalidation trigger として明示 |
 | isomorphic-git のメジャーバージョンアップ | object I/O のみに利用するため API 影響範囲は限定的、integration test で保護 |
 | shared secret 漏洩 | env only、rotation 手順を文書化 |
+| namespace は読み取りの遮断を提供しない（object 保管領域が共有のため、ID を知っていれば他 namespace のファイルの中身・ディレクトリ一覧が取得できた。2026-07-28 実測） | vault-manager が upload-pack 起動前に要求 object のビュー ref からの到達性を検査（growi-vault-manager 要件 5.6–5.8。Decision 3 の Follow-up 参照） |
 | change stream resume token 期限切れ | 起動時 drain で `processedAt: null` を全件処理する保険 |
 
 ---

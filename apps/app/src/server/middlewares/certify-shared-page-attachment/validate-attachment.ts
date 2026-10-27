@@ -1,6 +1,6 @@
-import { getIdForRef, type IAttachment } from '@growi/core';
+import type { IAttachment } from '@growi/core';
 
-import type { ShareLinkDocument } from '~/server/models/share-link';
+import type { sharelinks } from '~/generated/prisma/client';
 import { getModelSafely } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
@@ -10,7 +10,7 @@ const logger = loggerFactory(
 
 export const validateAttachment = async (
   fileId: string,
-  shareLink: ShareLinkDocument,
+  shareLink: sharelinks,
 ): Promise<boolean> => {
   const Attachment = getModelSafely<IAttachment>('Attachment');
   if (Attachment == null) {
@@ -20,10 +20,9 @@ export const validateAttachment = async (
     return false;
   }
 
-  const relatedPageId = getIdForRef(shareLink.relatedPage);
   const result = await Attachment.exists({
     _id: fileId,
-    page: relatedPageId,
+    page: shareLink.relatedPageId,
   });
 
   return result != null;

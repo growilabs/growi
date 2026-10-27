@@ -8,8 +8,8 @@
  * This hook only does *resolution* — it teaches Node's loader the project's
  * path aliases and the `.js`->`.ts` source mapping — so there is no per-module
  * transform cost beyond Node's own (the constant ESM-loader-hook round-trip
- * that made tsx ~2x slower on GROWI's large import fan-out; see
- * .kiro/specs/esm-migration/research.md "dev runner").
+ * that made tsx ~2x slower on GROWI's large import fan-out; rationale is
+ * recorded in .kiro/steering/tech.md "Module System").
  *
  * Registered synchronously via `module.registerHooks` (no worker-thread round
  * trip). Used by the dev / migrate / repl scripts:
@@ -25,8 +25,8 @@
  * Other bare specifiers (packages) and anything already resolvable fall
  * through to the default.
  *
- * The bare `.` / `..` (and `./dir`) directory forms are produced by the
- * esm-import-convention codemod (which collapses `./index.js` -> `.`). Node's
+ * The bare `.` / `..` (and `./dir`) directory forms come from the repo's
+ * no-extension import convention (`./index.js` collapses to `.`). Node's
  * native ESM loader rejects directory imports (ERR_UNSUPPORTED_DIR_IMPORT), so
  * this hook must resolve them to the directory's index source — mirroring the
  * production-side `bin/add-js-extensions.ts`, which appends `/index.js` to the

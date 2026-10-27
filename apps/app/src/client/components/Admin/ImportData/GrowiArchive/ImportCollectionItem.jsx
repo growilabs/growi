@@ -28,6 +28,13 @@ export const MODE_RESTRICTED_COLLECTION = {
   pages: ['upsert', 'flushAndInsert'],
 };
 
+/**
+ * All modes this component knows how to render, in the order they are offered when
+ * nothing narrows the choice. The single source callers fall back to instead of
+ * restating `Object.keys(MODE_ATTR_MAP)` themselves.
+ */
+export const ALL_IMPORT_MODES = Object.keys(MODE_ATTR_MAP);
+
 export default class ImportCollectionItem extends React.Component {
   constructor(props) {
     super(props);
@@ -116,11 +123,15 @@ export default class ImportCollectionItem extends React.Component {
   }
 
   renderModeSelector() {
-    const { collectionName, option, isImporting } = this.props;
+    const { collectionName, option, isImporting, allowedModes } = this.props;
     const currentMode = option?.mode || 'insert';
     const attrMap = MODE_ATTR_MAP[currentMode];
+    // `allowedModes` is optional so the manual zip import screen (ImportForm.jsx),
+    // which never passes it, keeps exactly today's behavior. Only the G2G screen
+    // (G2GDataTransferExportForm.tsx) passes it, to narrow the choices it offers.
     const modes =
-      MODE_RESTRICTED_COLLECTION[collectionName] || Object.keys(MODE_ATTR_MAP);
+      allowedModes ??
+      (MODE_RESTRICTED_COLLECTION[collectionName] || ALL_IMPORT_MODES);
 
     return (
       <span className="d-inline-flex align-items-center">
@@ -279,6 +290,14 @@ ImportCollectionItem.propTypes = {
   errorsCount: PropTypes.number,
 
   isConfigButtonAvailable: PropTypes.bool,
+
+  /**
+   * The import methods this instance may offer, in place of the component's own
+   * default (`MODE_RESTRICTED_COLLECTION[collectionName]`, or every mode). Omit to
+   * keep today's behavior -- ImportForm.jsx (the manual zip import screen) never
+   * passes this, so it is unaffected by callers that do.
+   */
+  allowedModes: PropTypes.arrayOf(PropTypes.string),
 
   onChange: PropTypes.func,
   onOptionChange: PropTypes.func,

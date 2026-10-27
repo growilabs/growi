@@ -8,6 +8,7 @@ import {
   type PageModel,
   PageQueryBuilder,
 } from '~/server/models/page';
+import { prisma } from '~/utils/prisma';
 
 import { aggregatePipelineToIndex } from './aggregate-to-index';
 
@@ -61,16 +62,24 @@ describe('aggregatePipelineToIndex() lastUpdateUser join', () => {
     // A revision is required: the pipeline $unwinds revision without
     // preserveNullAndEmptyArrays, so a page with no revision is dropped.
     // Revision.pageId is required, so revisions are created after the pages.
-    const Revision = mongoose.model('Revision');
-    const [revWith, revWithout] = await Revision.create([
-      { pageId: pageWith._id, body: 'with editor', format: 'markdown' },
-      { pageId: pageWithout._id, body: 'without editor', format: 'markdown' },
+    const [revWith, revWithout] = await Promise.all([
+      prisma.revisions.create({
+        data: {
+          pageId: pageWith._id.toString(),
+          body: 'with editor',
+          format: 'markdown',
+        },
+      }),
+      prisma.revisions.create({
+        data: {
+          pageId: pageWithout._id.toString(),
+          body: 'without editor',
+          format: 'markdown',
+        },
+      }),
     ]);
-    await Page.updateOne({ _id: pageWith._id }, { revision: revWith._id });
-    await Page.updateOne(
-      { _id: pageWithout._id },
-      { revision: revWithout._id },
-    );
+    await Page.updateOne({ _id: pageWith._id }, { revision: revWith.id });
+    await Page.updateOne({ _id: pageWithout._id }, { revision: revWithout.id });
   });
 
   afterAll(async () => {

@@ -13,6 +13,15 @@
   :root :not(.tw-root, .tw-root *) {
     all: revert-layer;
   }
+
+  /* ::file-selector-button is a separate generated box, not matched by the
+   * host-element selector above, so preflight's unlayered border/background
+   * reset on it (input[type=file]'s native "Choose File" button) survives
+   * outside .tw-root and renders as an invisible, borderless control. Revert
+   * it explicitly for the same set of elements. */
+  :root :not(.tw-root, .tw-root *)::file-selector-button {
+    all: revert-layer;
+  }
 }
 
 /* Explicitly scan only AI Elements source files. */

@@ -9,6 +9,7 @@ import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-op
 import { ImportOptionForPages } from '~/models/admin/import-option-for-pages';
 import { ImportOptionForRevisions } from '~/models/admin/import-option-for-revisions';
 
+import { MaintenanceModeNoticeModal } from '../../MaintenanceModeNoticeModal';
 import ErrorViewer from './ErrorViewer';
 import ImportCollectionConfigurationModal from './ImportCollectionConfigurationModal';
 import ImportCollectionItem, {
@@ -52,6 +53,8 @@ class ImportForm extends React.Component {
 
       isConfigurationModalOpen: false,
       collectionNameForConfiguration: null,
+
+      isMaintenanceModeNoticeOpen: false,
 
       isErrorsViewerOpen: false,
       collectionNameForErrorsViewer: null,
@@ -328,6 +331,7 @@ class ImportForm extends React.Component {
 
   async import() {
     const { fileName, onPostImport, t } = this.props;
+    this.setState({ isMaintenanceModeNoticeOpen: false });
     const { selectedCollections, optionsMap } = this.state;
 
     // init progress data
@@ -574,7 +578,7 @@ class ImportForm extends React.Component {
           <button
             type="button"
             className="btn btn-primary mx-1"
-            onClick={this.import}
+            onClick={() => this.setState({ isMaintenanceModeNoticeOpen: true })}
             disabled={!canImport || isImporting}
           >
             {t('admin:importer_management.import')}
@@ -583,6 +587,11 @@ class ImportForm extends React.Component {
 
         {this.renderConfigurationModal()}
         {this.renderErrorsViewer()}
+        <MaintenanceModeNoticeModal
+          isOpen={this.state.isMaintenanceModeNoticeOpen}
+          onClose={() => this.setState({ isMaintenanceModeNoticeOpen: false })}
+          onConfirm={this.import}
+        />
       </>
     );
   }

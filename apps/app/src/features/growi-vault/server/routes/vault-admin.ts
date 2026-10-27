@@ -127,6 +127,12 @@ export const createVaultAdminRouter = (
           startedAt: bootstrapStatus.startedAt,
           completedAt: bootstrapStatus.completedAt,
           lastError: bootstrapStatus.lastError,
+          heartbeatAt: bootstrapStatus.heartbeatAt,
+          // Whether an in-flight state still has a live runner. The admin UI
+          // gates its re-bootstrap control on this, so the verdict is computed
+          // server-side (the staleness threshold is server config, not
+          // something a client should re-derive from heartbeatAt).
+          isStaleRunner: bootstrapStatus.isStaleRunner,
           storageStats,
         },
       });

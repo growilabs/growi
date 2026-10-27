@@ -21,6 +21,12 @@ import {
   useSWRxSearch,
 } from '~/stores/search';
 
+import {
+  buildSearchQuery,
+  createEmptyFilterState,
+  normalizeKeyword,
+  parseSearchQuery,
+} from '../../utils/search-query';
 import { OperateAllControl } from './OperateAllControl';
 import SearchControl from './SearchControl';
 import type { IReturnSelectedPageIds } from './SearchPageBase';
@@ -33,6 +39,10 @@ import styles from './SearchPage.module.scss';
 
 // TODO: replace with "customize:showPageLimitationS"
 const INITIAL_PAGIONG_SIZE = 20;
+
+// The search runs off the raw `?q=` (which already carries the operators), so the
+// structured filters are always empty here. Shared to keep the SWR key stable.
+const EMPTY_FILTER_STATE = createEmptyFilterState();
 
 /**
  * SearchResultListHead
@@ -106,7 +116,11 @@ export const SearchPage = (): JSX.Element => {
   const { t } = useTranslation();
   const showPageLimitationL = useAtomValue(showPageLimitationLAtom);
 
+  // The URL `?q=` is the single source of truth (free text + inline operators).
+  // Parse it to hydrate the keyword box and the filter chips/panel;
+  // searchInvokedHandler does the reverse.
   const keyword = useSearchKeyword();
+  const parsedQuery = useMemo(() => parseSearchQuery(keyword), [keyword]);
   const setSearchKeyword = useSetSearchKeyword();
 
   const disableUserPages = useAtomValue(disableUserPagesAtom);
@@ -128,8 +142,9 @@ export const SearchPage = (): JSX.Element => {
     (ISelectableAll & IReturnSelectedPageIds) | null
   >(null);
 
-  const { data, conditions, mutate } = useSWRxSearch(keyword ?? '', null, {
+  const { data, conditions, mutate } = useSWRxSearch(keyword, null, {
     ...configurationsByControl,
+    filters: EMPTY_FILTER_STATE,
     offset,
     limit,
   });
@@ -137,13 +152,25 @@ export const SearchPage = (): JSX.Element => {
   const searchInvokedHandler = useCallback(
     (newKeyword: string, newConfigurations: Partial<ISearchConfigurations>) => {
       setOffset(0);
-      setConfigurationsByControl(newConfigurations);
+      // Filters travel via the URL (`?q=`), not this filters config — the SWR call always
+      // sources them from the parsed query, so we don't retain them here.
+      const { filters: _filters, ...configWithoutFilters } = newConfigurations;
+      setConfigurationsByControl(configWithoutFilters);
 
-      setSearchKeyword(newKeyword);
+      // Serialize free text + filters into `?q=`. A new keyword pushes (a fresh
+      // search in history); a filter/sort-only change replaces (no history spam).
+      const q = buildSearchQuery(
+        newKeyword,
+        newConfigurations.filters ?? createEmptyFilterState(),
+      );
+      // Normalize both sides so an internal-whitespace-only difference is not
+      // misread as a new keyword.
+      const isNewKeyword = normalizeKeyword(newKeyword) !== parsedQuery.keyword;
+      setSearchKeyword(q, { replace: !isNewKeyword });
 
       mutate();
     },
-    [mutate, setSearchKeyword],
+    [mutate, setSearchKeyword, parsedQuery.keyword],
   );
 
   const selectAllCheckboxChangedHandler = useCallback((isChecked: boolean) => {
@@ -205,10 +232,12 @@ export const SearchPage = (): JSX.Element => {
 
   const initialSearchConditions: Partial<ISearchConditions> = useMemo(() => {
     return {
-      keyword,
+      // Box shows free text only; the panel/chips hydrate from the parsed filters.
+      keyword: parsedQuery.keyword,
+      filters: parsedQuery.filters,
       limit: INITIAL_PAGIONG_SIZE,
     };
-  }, [keyword]);
+  }, [parsedQuery]);
 
   // for bulk deletion
   const deleteAllButtonClickedHandler = usePageDeleteModalForBulkDeletion(
@@ -345,7 +374,7 @@ export const SearchPage = (): JSX.Element => {
       className={styles['search-page']}
       ref={searchPageBaseRef}
       pages={data?.data}
-      searchingKeyword={keyword}
+      searchingKeyword={parsedQuery.keyword}
       onSelectedPagesByCheckboxesChanged={
         selectedPagesByCheckboxesChangedHandler
       }

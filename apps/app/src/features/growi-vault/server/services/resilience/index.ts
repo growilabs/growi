@@ -35,6 +35,13 @@ export type {
   RetryStatus,
   VaultResilienceLayer,
 } from './bootstrap-runner';
+/**
+ * The runner-liveness rule is part of the public surface because the startup
+ * normalization (features/growi-vault/server/index.ts) has to apply the *same*
+ * definition of "abandoned run" that getStatus reports. Sharing the predicate
+ * keeps those two from drifting apart.
+ */
+export { isStaleBootstrapRunner } from './runner-liveness';
 
 // ---------------------------------------------------------------------------
 // Factory dependency interface

@@ -21,17 +21,15 @@ export const GroupMembersLabel = ({
   const onlySelf = members.every((m) => m.username === currentUsername);
   if (onlySelf) {
     return (
-      <small className="ms-2 text-muted">{t('user_group.only_yourself')}</small>
+      <small className="d-block text-muted">
+        {t('user_group.only_yourself')}
+      </small>
     );
   }
   const label = members.map((m) => m.name || m.username).join(', ');
   return (
     <>
-      <small
-        ref={labelRef}
-        className="ms-2 text-muted text-truncate"
-        style={{ minWidth: 0 }}
-      >
+      <small ref={labelRef} className="d-block text-muted text-truncate">
         {label}
       </small>
       <UncontrolledTooltip target={labelRef}>{label}</UncontrolledTooltip>

@@ -32,6 +32,7 @@ export type FileUploadFormValues = {
 export type FileUploadSettingsData = FileUploadFormValues & {
   isFixedFileUploadByEnvVar: boolean;
   envFileUploadType?: string;
+  awsUseOnlyEnvVars: boolean;
   // GCS env vars
   gcsUseOnlyEnvVars: boolean;
   envGcsApiKeyJsonPath?: string;

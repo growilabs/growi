@@ -1,5 +1,5 @@
 /**
- * Tests for normalize-import-convention codemod (C2, esm-import-convention task 4.1).
+ * Tests for the normalize-import-convention codemod.
  *
  * Transforms apps/app/src import specifiers to the canonical "no-extension" convention.
  * The transform removes extensions ONLY — it preserves each specifier's authored

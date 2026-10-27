@@ -1,7 +1,13 @@
-import type { GetServerSideProps } from 'next';
+import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
+import { useHydrateAtoms } from 'jotai/utils';
+
+import { langDisplayNamesAtom } from '~/states/server-configurations';
 
 import type { NextPageWithLayout } from '../_app.page';
+import type { LangDisplayNames } from '../common-props/lang-display-names';
+import { getLangDisplayNames } from '../common-props/lang-display-names';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
 import type { AdminCommonProps } from './_shared';
 import {
   createAdminPageLayout,
@@ -14,11 +20,19 @@ const AppSettingsPageContents = dynamic(
   { ssr: false },
 );
 
-type Props = AdminCommonProps;
+type PageProps = {
+  langDisplayNames: LangDisplayNames;
+};
 
-const AdminAppPage: NextPageWithLayout<Props> = () => (
-  <AppSettingsPageContents />
-);
+type Props = AdminCommonProps & PageProps;
+
+const AdminAppPage: NextPageWithLayout<Props> = (props: Props) => {
+  useHydrateAtoms([[langDisplayNamesAtom, props.langDisplayNames]], {
+    dangerouslyForceHydrate: true,
+  });
+
+  return <AppSettingsPageContents />;
+};
 
 AdminAppPage.getLayout = createAdminPageLayout<Props>({
   title: (_p, t) => t('headers.app_settings', { ns: 'commons' }),
@@ -32,8 +46,16 @@ AdminAppPage.getLayout = createAdminPageLayout<Props>({
   ],
 });
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
-  return getServerSideAdminCommonProps(context, { preloadAllLang: true });
+export const getServerSideProps: GetServerSideProps<Props> = async (
+  context: GetServerSidePropsContext,
+) => {
+  const commonResult = await getServerSideAdminCommonProps(context);
+
+  const langDisplayNamesFragment = {
+    props: { langDisplayNames: getLangDisplayNames() },
+  } satisfies { props: PageProps };
+
+  return mergeGetServerSidePropsResults(commonResult, langDisplayNamesFragment);
 };
 
 export default AdminAppPage;

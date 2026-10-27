@@ -32,10 +32,15 @@ export const SocketEventName = {
   PageMigrationSuccess: 'PageMigrationSuccess',
   PageMigrationError: 'PageMigrationError',
 
-  // Elasticsearch
+  // Elasticsearch - page rebuild
   AddPageProgress: 'addPageProgress',
   FinishAddPage: 'finishAddPage',
   RebuildingFailed: 'rebuildingFailed',
+
+  // Elasticsearch - auditlog rebuild
+  AddAuditlogProgress: 'addAuditlogProgress',
+  FinishAddAuditlog: 'finishAddAuditlog',
+  AuditlogRebuildingFailed: 'auditlogRebuildingFailed',
 
   // External user group sync
   externalUserGroup: generateGroupSyncEvents(),

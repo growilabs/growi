@@ -139,7 +139,7 @@ export const BasicInfoSettings = (): JSX.Element => {
               className="form-label form-check-label mb-0"
               htmlFor="radioEmailShow"
             >
-              {t('Show')}
+              {t('commons:Show')}
             </label>
           </div>
           <div className="form-check form-check-inline">
@@ -157,7 +157,7 @@ export const BasicInfoSettings = (): JSX.Element => {
               className="form-label form-check-label mb-0"
               htmlFor="radioEmailHide"
             >
-              {t('Hide')}
+              {t('commons:Hide')}
             </label>
           </div>
         </div>

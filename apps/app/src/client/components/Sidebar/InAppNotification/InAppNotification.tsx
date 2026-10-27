@@ -58,7 +58,11 @@ export const InAppNotification = (): JSX.Element => {
       />
 
       <Suspense fallback={<ItemsTreeContentSkeleton />}>
-        <InAppNotificationContent activeFilter={activeFilter} merged={merged} />
+        <InAppNotificationContent
+          activeFilter={activeFilter}
+          merged={merged}
+          isUnopendNotificationsVisible={isUnopendNotificationsVisible}
+        />
       </Suspense>
     </div>
   );

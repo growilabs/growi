@@ -1,2 +1,2 @@
 export { PageMentionInput } from './PageMentionInput';
-export type { PageMentionInputProps } from './types';
+export type { PageMentionInputHandle, PageMentionInputProps } from './types';

@@ -27,7 +27,7 @@ AdminVaultPage.getLayout = createAdminPageLayout<Props>({
 });
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-  return getServerSideAdminCommonProps(context, { preloadAllLang: true });
+  return getServerSideAdminCommonProps(context);
 };
 
 export default AdminVaultPage;

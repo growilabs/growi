@@ -1,1 +1,0 @@
-export type Marker = 'marker';

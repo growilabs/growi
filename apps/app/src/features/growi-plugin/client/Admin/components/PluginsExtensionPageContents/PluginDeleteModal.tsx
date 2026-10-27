@@ -71,7 +71,7 @@ const PluginDeleteModalSubstance = ({
       <ModalFooter>
         <Button color="danger" onClick={onClickDeleteButtonHandler}>
           <span className="material-symbols-outlined">delete_forever</span>
-          {t('Delete')}
+          {t('commons:Delete')}
         </Button>
       </ModalFooter>
     </div>

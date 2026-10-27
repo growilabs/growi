@@ -22,7 +22,7 @@ const AdminGlobalNotificationNewPage: NextPageWithLayout<Props> = () => (
 );
 
 AdminGlobalNotificationNewPage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('external_notification.external_notification'),
+  title: (_p, t) => t('admin:external_notification.external_notification'),
   containerFactories: [
     async () => {
       const AdminNotificationContainer =

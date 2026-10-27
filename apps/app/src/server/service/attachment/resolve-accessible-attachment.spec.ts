@@ -1,0 +1,130 @@
+import type { IUser } from '@growi/core';
+import type { HydratedDocument } from 'mongoose';
+import mongoose from 'mongoose';
+import { mock } from 'vitest-mock-extended';
+
+import { prisma } from '~/utils/prisma';
+
+import type { PageModel } from './resolve-accessible-attachment';
+import { resolveAccessibleAttachment } from './resolve-accessible-attachment';
+
+type FindUniqueResult = Awaited<
+  ReturnType<typeof prisma.attachments.findUnique>
+>;
+
+describe('resolveAccessibleAttachment', () => {
+  const pageId = '000000000000000000000001';
+  const attachmentId = '0000000000000000000000a1';
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const buildAttachment = (hasPage: boolean): FindUniqueResult =>
+    mock<NonNullable<FindUniqueResult>>({
+      id: attachmentId,
+      pageId: hasPage ? pageId : null,
+    });
+
+  const mockIsAccessiblePageByViewer = (isAccessible: boolean) => {
+    const isAccessiblePageByViewer = vi.fn().mockResolvedValue(isAccessible);
+    const pageModel = mock<PageModel>({ isAccessiblePageByViewer });
+    // `mongoose.model` is overloaded; its last signature's generic return type
+    // resolves to `unknown` without a call-site instantiation, so a cast is
+    // still needed here to bridge that gap. The mock value itself is checked
+    // against the real `PageModel` contract via `mock<PageModel>()` above.
+    vi.spyOn(mongoose, 'model').mockReturnValue(
+      pageModel as ReturnType<typeof mongoose.model>,
+    );
+    return isAccessiblePageByViewer;
+  };
+
+  it('reports not_found when no attachment exists for the id', async () => {
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(null);
+
+    const result = await resolveAccessibleAttachment(
+      '0000000000000000000000ff',
+      undefined,
+      false,
+    );
+
+    expect(result).toEqual({ errorCode: 'not_found' });
+  });
+
+  it('reports forbidden when the viewer cannot access the owning page', async () => {
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+      buildAttachment(true),
+    );
+    const isAccessiblePageByViewer = mockIsAccessiblePageByViewer(false);
+    const user = mock<HydratedDocument<IUser>>();
+
+    const result = await resolveAccessibleAttachment(attachmentId, user, false);
+
+    expect(isAccessiblePageByViewer).toHaveBeenCalledWith(pageId, user);
+    expect(result).toEqual({ errorCode: 'forbidden' });
+  });
+
+  it('returns the attachment when the viewer can access the owning page', async () => {
+    const attachment = buildAttachment(true);
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
+    mockIsAccessiblePageByViewer(true);
+
+    const result = await resolveAccessibleAttachment(
+      attachmentId,
+      mock<HydratedDocument<IUser>>(),
+      false,
+    );
+
+    expect(result).toEqual({ attachment });
+  });
+
+  it('skips the viewer check for an attachment with no owning page', async () => {
+    const attachment = buildAttachment(false);
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
+    const modelSpy = vi.spyOn(mongoose, 'model');
+
+    const result = await resolveAccessibleAttachment(
+      attachmentId,
+      undefined,
+      false,
+    );
+
+    expect(modelSpy).not.toHaveBeenCalled();
+    expect(result).toEqual({ attachment });
+  });
+
+  it('skips the viewer check when the request is via a certified share link', async () => {
+    const attachment = buildAttachment(true);
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
+    const isAccessiblePageByViewer = mockIsAccessiblePageByViewer(false);
+
+    const result = await resolveAccessibleAttachment(
+      attachmentId,
+      undefined,
+      true,
+    );
+
+    expect(isAccessiblePageByViewer).not.toHaveBeenCalled();
+    expect(result).toEqual({ attachment });
+  });
+
+  it('passes `include: { creator: true }` to findUnique when creator is requested', async () => {
+    const attachment = buildAttachment(false);
+    const findUniqueSpy = vi
+      .spyOn(prisma.attachments, 'findUnique')
+      .mockResolvedValue(attachment);
+
+    const result = await resolveAccessibleAttachment(
+      attachmentId,
+      undefined,
+      false,
+      { creator: true },
+    );
+
+    expect(findUniqueSpy).toHaveBeenCalledWith({
+      where: { id: attachmentId },
+      include: { creator: true },
+    });
+    expect(result).toEqual({ attachment });
+  });
+});

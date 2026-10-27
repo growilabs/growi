@@ -226,6 +226,13 @@ export const setup = (crowi: Crowi): Router => {
         return res.apiv3Err('User id is not found or forbidden', 400);
       }
 
+      // Bookmarks are Prisma-backed, but the viewer/grant filter below still
+      // lives on the (not yet migrated) mongoose Page model.
+      const Page: PageModel = mongoose.model<
+        HydratedDocument<PageDocument>,
+        PageModel
+      >('Page');
+
       try {
         const userFolders = await prisma.bookmarkfolders.findMany({
           where: { ownerId: userId },
@@ -248,21 +255,51 @@ export const setup = (crowi: Crowi): Router => {
           },
         });
 
+        const bookmarkedPageIds = userRootBookmarks
+          .map((b) => b.pageId)
+          .filter((id): id is string => id != null);
+
+        // "Anyone with the link" pages are never listed anywhere, so the bookmark is
+        // often the owner's only path back to them: keep them visible on the owner's
+        // own list, but hide them from other users' bookmark listings.
+        const isOwnList = req.user?._id.toString() === userId;
+
+        const hideRestrictedByOwner = configManager.getConfig(
+          'security:list-policy:hideRestrictedByOwner',
+        );
+        const hideRestrictedByGroup = configManager.getConfig(
+          'security:list-policy:hideRestrictedByGroup',
+        );
+
+        const viewablePages = await Page.findByIdsAndViewer(
+          bookmarkedPageIds,
+          req.user,
+          null,
+          false,
+          isOwnList,
+          !hideRestrictedByOwner,
+          !hideRestrictedByGroup,
+        );
+        const viewablePageIds = new Set(
+          viewablePages.map((p) => p._id.toString()),
+        );
+
         const disabledUserPage = configManager.getConfig(
           'security:disableUserPages',
         );
 
-        const filteredBookmarks = disabledUserPage
-          ? userRootBookmarks.filter(
-              (bookmark) =>
-                bookmark.page != null &&
-                !isUserPage(bookmark.page.path) &&
-                !isUsersTopPage(bookmark.page.path),
-            )
-          : userRootBookmarks;
+        // Drop bookmarks the viewer cannot access, and orphaned ones (null page):
+        // they carry no path/title and the client renders them as nothing anyway.
+        const viewableBookmarks = userRootBookmarks.filter(({ page }) => {
+          if (page == null || !viewablePageIds.has(page.id)) return false;
+          return !(
+            disabledUserPage &&
+            (isUserPage(page.path) || isUsersTopPage(page.path))
+          );
+        });
 
         // serialize Bookmark
-        const serializedUserRootBookmarks = filteredBookmarks.map((bookmark) =>
+        const serializedUserRootBookmarks = viewableBookmarks.map((bookmark) =>
           serializeBookmarkSecurely(bookmark),
         );
 

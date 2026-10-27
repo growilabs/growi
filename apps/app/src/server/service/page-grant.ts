@@ -131,6 +131,16 @@ export interface IPageGrantService {
     grant?: PageGrant,
     grantedGroupIds?: IGrantedGroup[],
   ) => Promise<boolean>;
+  validateGrantedGroupsAssignableByUser: (
+    user: IUserHasId | HydratedDocument<IUser>,
+    grant: PageGrant | undefined,
+    grantedGroups: IGrantedGroup[] | undefined,
+  ) => Promise<void>;
+  validateGrantedGroupsAssignableByUserSyncronously: (
+    userRelatedGroups: PopulatedGrantedGroup[],
+    grant: PageGrant | undefined,
+    grantedGroups: IGrantedGroup[] | undefined,
+  ) => void;
   validateGrantChangeSyncronously: (
     userRelatedGroups: PopulatedGrantedGroup[],
     previousGrantedGroups: IGrantedGroup[],
@@ -387,6 +397,53 @@ class PageGrantService implements IPageGrantService {
       grant,
       grantedGroups,
     );
+  }
+
+  /**
+   * Throws unless the user may assign the given group scope to a page.
+   * GRANT_USER_GROUP needs a non-empty group list that includes at least one group the user belongs to;
+   * the list may also hold groups the user is not in, as inherited from a parent page.
+   * Hierarchy consistency is a separate concern, see isGrantNormalized.
+   */
+  async validateGrantedGroupsAssignableByUser(
+    user: IUserHasId | HydratedDocument<IUser>,
+    grant: PageGrant | undefined,
+    grantedGroups: IGrantedGroup[] | undefined,
+  ): Promise<void> {
+    if (grant !== PageGrant.GRANT_USER_GROUP) {
+      return;
+    }
+    const userRelatedGroups = await this.getUserRelatedGroups(user);
+    this.validateGrantedGroupsAssignableByUserSyncronously(
+      userRelatedGroups,
+      grant,
+      grantedGroups,
+    );
+  }
+
+  /**
+   * Use when userRelatedGroups is already at hand, to avoid fetching it from DB again.
+   */
+  validateGrantedGroupsAssignableByUserSyncronously(
+    userRelatedGroups: PopulatedGrantedGroup[],
+    grant: PageGrant | undefined,
+    grantedGroups: IGrantedGroup[] | undefined,
+  ): void {
+    if (grant !== PageGrant.GRANT_USER_GROUP) {
+      return;
+    }
+
+    if (grantedGroups == null || grantedGroups.length === 0) {
+      throw Error('grantedGroups must not be empty for GRANT_USER_GROUP');
+    }
+
+    const isUserInAnyGrantedGroup = hasIntersection(
+      grantedGroups.map((g) => getIdForRef(g.item)),
+      userRelatedGroups.map((g) => g.item._id),
+    );
+    if (!isUserInAnyGrantedGroup) {
+      throw Error('The user does not belong to any of the granted groups');
+    }
   }
 
   /**

@@ -38,7 +38,7 @@ export const emojiAutocompletionSettings = [
           const emoji = nativeLookup[emojiName]?.skins[0].native ?? '';
 
           const element = document.createElement('span');
-          element.innerHTML = emoji;
+          element.textContent = emoji;
           return element;
         },
         position: 20,

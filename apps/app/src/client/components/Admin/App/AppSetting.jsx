@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect } from 'react';
-import { i18n, useTranslation } from 'next-i18next';
+import { useAtomValue } from 'jotai';
+import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import { useForm } from 'react-hook-form';
 
@@ -7,6 +8,7 @@ import nextI18nConfig from '^/config/next-i18next.config.mjs';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { langDisplayNamesAtom } from '~/states/server-configurations';
 import loggerFactory from '~/utils/logger';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
@@ -19,6 +21,7 @@ const logger = loggerFactory('growi:appSettings');
 const AppSetting = (props) => {
   const { adminAppContainer } = props;
   const { t } = useTranslation(['admin', 'commons']);
+  const langDisplayNames = useAtomValue(langDisplayNamesAtom);
 
   const { register, handleSubmit, reset } = useForm();
 
@@ -128,11 +131,6 @@ const AppSetting = (props) => {
         </span>
         <div className="col-md-6 py-2">
           {i18nConfig.locales.map((locale) => {
-            if (i18n == null) {
-              return null;
-            }
-            const fixedT = i18n.getFixedT(locale, 'admin');
-
             return (
               <div key={locale} className="form-check form-check-inline">
                 <input
@@ -146,7 +144,7 @@ const AppSetting = (props) => {
                   className="form-label form-check-label"
                   htmlFor={`radioLang${locale}`}
                 >
-                  {fixedT('meta.display_name')}
+                  {langDisplayNames[locale] ?? locale}
                 </label>
               </div>
             );

@@ -18,6 +18,9 @@ vi.mock('mongoose', () => ({
       plugin() {
         return this;
       }
+      index() {
+        return this;
+      }
       methods: Record<string, unknown> = {};
       statics: Record<string, unknown> = {};
       virtual() {
@@ -46,7 +49,12 @@ vi.mock('~/utils/logger', () => ({
 vi.mock('../../util/mongoose-utils', () => ({
   getModelSafely: vi.fn(() => null),
 }));
-vi.mock('../attachment', () => ({ Attachment: { findById: vi.fn() } }));
+// The real prisma client (~/utils/prisma) pulls in every model's own
+// mongoose schema transitively; mock the boundary instead of trying to keep
+// the mongoose mock above in sync with every model's needs.
+vi.mock('~/utils/prisma', () => ({
+  prisma: { attachments: { findUnique: vi.fn() } },
+}));
 
 // Provide mock singletons for the lazy-loaded services
 const mockConfigManager = { getConfig: vi.fn() };

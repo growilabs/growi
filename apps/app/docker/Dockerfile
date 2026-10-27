@@ -82,6 +82,10 @@ RUN turbo run build --filter @growi/app
 # Produce artifacts
 RUN bash apps/app/bin/assemble-prod.sh
 
+# This pruned install can resolve peers differently from the full workspace that CI checks,
+# so verify here too that the Turbopack-baked symlinks survived `pnpm deploy --prod`.
+RUN bash apps/app/bin/check-next-symlinks.sh
+
 # Point a fixed-name symlink at the Prisma query engine for THIS image's target
 # architecture. The release stage references it via a static PRISMA_QUERY_ENGINE_LIBRARY,
 # which @prisma/client returns verbatim — WITHOUT an existence check and skipping its
@@ -110,7 +114,16 @@ RUN set -eu; \
   ln -sfn "libquery_engine-${target}.so.node" "$dir/libquery_engine-active.so.node"
 
 # Stage artifacts into a clean directory for COPY --from
+#
+# apps/app/tmp/* is gitignored except for .keep placeholders (cache/,
+# downloads/, googlecache/, imports/, plugins/, uploads/), and `turbo prune
+# --docker` drops gitignored paths from its output entirely — even the
+# tracked .keep files — so apps/app/tmp does not exist in this stage's
+# source tree. Recreate the runtime-required subdirectories explicitly
+# instead of relying on `cp -a apps/app/tmp` to produce them.
 RUN mkdir -p /tmp/release/apps/app && \
+  mkdir -p apps/app/tmp/cache apps/app/tmp/downloads apps/app/tmp/googlecache \
+           apps/app/tmp/imports apps/app/tmp/plugins apps/app/tmp/uploads && \
   cp package.json /tmp/release/ && \
   cp -a node_modules /tmp/release/ && \
   cp -a apps/app/.next apps/app/config apps/app/dist apps/app/public \
