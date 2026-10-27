@@ -37,6 +37,7 @@ import loggerFactory from '../../utils/logger';
 import type Crowi from '../crowi';
 import { collectAncestorPaths } from '../util/collect-ancestor-paths';
 import { getOrCreateModel } from '../util/mongoose-utils';
+import { RevisionConflictError } from './errors';
 import {
   extractToAncestorsPaths,
   getPageSchema,
@@ -1086,8 +1087,19 @@ export async function pushRevision(
   pageData: HydratedDocument<PageDocument>,
   newRevisionData,
   user,
+  options?: { readonly expectedRevisionId?: ObjectIdLike },
 ) {
   const newRevision = await prisma.revisions.create({ data: newRevisionData });
+
+  const expectedRevisionId = options?.expectedRevisionId;
+  if (expectedRevisionId != null) {
+    return writeRevisionIfUnchanged(
+      pageData,
+      newRevision,
+      user,
+      expectedRevisionId,
+    );
+  }
 
   pageData.revision = newRevision._id;
   pageData.latestRevisionBodyLength = newRevision.body.length;
@@ -1102,6 +1114,39 @@ export async function pushRevision(
   // `revisions` collection that Prisma writes to.
   // biome-ignore lint/plugin: allow populate for backward compatibility
   return savedPage.populate<HydratedDocument<PageDocument>>('revision');
+}
+
+// Check and write in one atomic update so no other save can slip in between.
+async function writeRevisionIfUnchanged(
+  pageData: HydratedDocument<PageDocument>,
+  newRevision: { readonly id: string; readonly body: string },
+  user,
+  expectedRevisionId: ObjectIdLike,
+): Promise<HydratedDocument<PageDocument>> {
+  const Page = pageData.$model<Model<PageDocument>>('Page');
+  const updatedPage = await Page.findOneAndUpdate(
+    { _id: pageData._id, revision: expectedRevisionId },
+    {
+      $set: {
+        revision: newRevision.id,
+        latestRevisionBodyLength: newRevision.body.length,
+        lastUpdateUser: user?._id ?? user,
+        updatedAt: new Date(),
+      },
+    },
+    { new: true },
+  );
+
+  if (updatedPage == null) {
+    await prisma.revisions.delete({ where: { id: newRevision.id } });
+    throw new RevisionConflictError(
+      pageData._id.toString(),
+      expectedRevisionId.toString(),
+    );
+  }
+
+  // biome-ignore lint/plugin: allow populate for backward compatibility
+  return updatedPage.populate<HydratedDocument<PageDocument>>('revision');
 }
 
 /**

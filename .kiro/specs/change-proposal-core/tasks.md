@@ -56,7 +56,7 @@
   - 最新のリビジョンの `origin` が `editor` か `view` のとき、`origin: editor` の保存が確認を飛ばして通ること
   - 切り出しの前のコードでこれらのテストが成功していることを確かめている（以後の変更で動きが変わらないことの基準にする）
   - _Requirements: 3.11, 10.1_
-- [ ] 2.2 ページの書き込みを「期待するリビジョンのままなら書く」にできるようにする
+- [x] 2.2 ページの書き込みを「期待するリビジョンのままなら書く」にできるようにする
   - リビジョンを積む処理に、任意の「期待するリビジョンの ID」を足す。渡されたときは、ページの今のリビジョンがその ID であることを条件に 1 回の更新で書く
   - 一致しなかったときは、作ったリビジョンを消し、リビジョンの衝突を表す例外を投げる。渡されなかったときの動きは今と同じ
   - 一致しない場合にページが変わらず、作ったリビジョンが残らないことを結合テストで確かめている
@@ -312,3 +312,4 @@
 - 1.4: `modelLabel`（100 文字まで）は model では確かめない。どのタスクにも検査の担当が書かれていないので、3.1（validateProposalInput）か 5.1 で、入力の検査として 100 文字を超えたら断るようにする
 - 1.4: `changeproposals` は G2G 転送で移せる側（`TRANSFERABLE_COLLECTIONS`）に入れた（design の Modified Files には未記載）。model の拡張の関数の引数の形は `change-proposal-types.ts` を正とする（`skipPendingOperations` の `'all-pending'`、`recordOperationOutcome` が `skipped` と待ちに戻す `pending` も受ける、など）。本文を読まない一覧系は `ChangeProposalSummary` / `LinkedProposalRecord` を返す
 - 2.1: 2.4 の共通処理は `crowi.pageService.updatePage` を呼ぶ形を守る（update-page-conflict-check.integ.ts がそれを spy している）
+- 2.2: `pushRevision` に `expectedRevisionId` を渡す呼び出しは、その直前にページを `save()` 済みにすること（条件付きの書き込みは 4 項目しか書かない）。`revisions.delete` が失敗すると RevisionConflictError でなく Prisma の例外になる点は、2.4 の呼び出し側で扱いを決める
