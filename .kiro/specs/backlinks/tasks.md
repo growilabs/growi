@@ -449,26 +449,29 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
 
 **Nature:** Online, throttled, resumable, two-phase (recent pages first) job, started by a
 `CronService` poll and run as a self-paced loop (rest proportional to work, per page), that
-populates rows for pages that existed before the feature. It auto-starts on-prem; on GROWI.cloud
-it waits for an infra-set `startRequested` flag on its job document (see the start rule in
-design.md's Delivery decision). Reuses the page-bulk-export scaffolding (`CronService` base,
+populates rows for pages that existed before the feature. It is off by default
+(`BACKLINKS_BACKFILL_AUTO_START`); when on, each app starts at its own `startAt`, derived from a
+uniform start window so a fleet spreads out with no per-app setup (see design.md's Delivery
+decision). Reuses the page-bulk-export scaffolding (`CronService` base,
 `createBatchStream`, cursor→resume skeleton) and the B1 extractor; the new code is the in-memory
 `{path→_id}` map, the per-page upsert sink, the paced loop, and the atomic claim. An
 admin-triggered start was deferred as a one-line future change. Independent of B4/B5.
 
 - [ ] B3.1 Add the backfill job state model
-  - Add a single-document model tracking backfill `status` (`idle` / `running` / `paused` /
-    `complete` / `failed`), the current phase (`recent` / `older`), the `recentCutoff` computed once
+  - Add a single-document model tracking backfill `status` (`idle` / `running` / `complete` /
+    `failed`; plus `paused` only if a pause field is adopted), the current phase (`recent` / `older`), the `recentCutoff` computed once
     at the first claim, a progress marker (the last `_id` processed in the current phase, in `_id`
     order, reset when the phase advances), processed counts per phase, `completedAt`, `lastError`,
-    an infra-owned `startRequested` flag, and an atomic-claim field with `leaseExpiresAt` so only
+    `firstBootAt` and `startAt`, and an atomic-claim field with `leaseExpiresAt` so only
     one instance runs the job, it stops once complete, and a claim held by a dead owner can be
     taken over once its lease expires
-  - Create the document idle at boot with an upsert that uses `$setOnInsert`, so an existing
-    `startRequested: true` is never reset; the app never writes `startRequested` afterwards
+  - Create the document idle at boot with an upsert that uses `$setOnInsert`, setting `firstBootAt`
+    and `startAt = firstBootAt + hash(app:growiAppIdForCloud) mod startWindow` (a pure function;
+    offset 0 when the window is unset or the id is absent), so a restart never moves the slot
   - Done when a unit test shows the claim succeeds once, is rejected for a second concurrent
     claimant while the lease is live, and succeeds for a new claimant after the lease expires, and
-    a second boot leaves an existing `startRequested: true` and the progress fields untouched
+    a second boot leaves an existing `startAt` and the progress fields untouched; the offset function
+    is deterministic, stays within the window, and spreads a sample of ids roughly evenly
   - _Requirements: 4.3_
   - _Boundary: PageLinkBackfillJob_
   - _Depends: B1.2_
@@ -482,44 +485,50 @@ admin-triggered start was deferred as a one-line future change. Independent of B
   - Run two phases in order: pages with `updatedAt >= recentCutoff` at the recent duty (default
     25%), then the remaining pages at the older duty (default 10%); complete only when the second
     finishes. Window and both duties are config-driven (design.md's Delivery decision)
-  - Pace by resting `restRatio × extractionMs` after each page, with the charged work capped as in
-    the live drain; extract the drain's rest computation into one pure function both call. The rest
+  - Pace by resting `restRatio × pageCycleMs` after each page, where the page cycle is the body read,
+    parse and writes (not the parse alone), with the charged work capped as in the live drain;
+    extract the drain's rest computation into one pure function both call. Enforce a minimum
+    interval between pages from `backlinks:backfillMaxPagesPerSecond`, so the per-app DB operation
+    rate is bounded whatever the parse time. The rest
     is the yield, so there is no tick budget or slice limit. Checkpoint every N pages or T seconds:
-    save the marker and counts, renew the lease, re-check the start rule. Guard against a second
+    save the marker and counts, renew the lease. Guard against a second
     loop with an in-process `isRunning` flag reset in `finally`; skip immediately once the job
     document is complete
-  - When the start rule stops allowing the run, release the claim, keep the marker and set
-    `status: paused`, so a cleared flag pauses the job and a set flag resumes it from the marker.
-    Record `lastError` and set `status: failed` when the loop fails
+  - Record `lastError` and set `status: failed` when the loop fails; the tick retries a failed job
+    (retry policy settled below with the failing-page policy)
+  - Add a way to skip old pages, for admins who need only recent ones: `backlinks:backfillMaxAgeDays`
+    and `backlinks:backfillMaxPages` (newest N by `updatedAt`, cutoff read from the `updatedAt`
+    index and stored once with `recentCutoff`), both unset by default. Settle how the panel and the
+    job `status` show a partial index (Requirement 4 holds for the pages in scope)
   - Settle the remaining open questions and record them in design.md: write ordering against the
     live listener on the same page (can a stale backfill write overwrite fresher rows?), whether to
     cap the body size parsed (at what size, and how skipped pages are recorded) since one large page
-    stalls the thread for its whole parse, the checkpoint cadence and lease length (the lease must
-    outlast the checkpoint interval plus the longest single rest), and the policy for a page whose
-    write keeps failing. The pacing shape is decided: the per-page proportional rest
+    stalls the thread for its whole parse, the default for `backfillMaxPagesPerSecond`, whether an
+    infra-owned `pauseRequested` field is needed as a no-restart brake, the checkpoint cadence and
+    lease length (the lease must outlast the checkpoint interval plus the longest single rest), and
+    the policy for a page whose write keeps failing. The pacing shape is decided: the per-page proportional rest
   - Done when running the job over a seeded dataset (including pages linked by permalink and by
     same-wiki absolute URL) populates rows equivalent to the live path, a re-run/resume adds no
     duplicates, no second loop starts while one is running, and progress is emitted on the admin
-    channel
-  - _Requirements: 4.1, 4.2, 4.3_
+    channel; the page-rate floor is never exceeded on a seeded set of tiny pages, and with the age
+    or page-count limit set only the in-scope pages are processed
+  - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _Boundary: PageLinkBackfillCron_
   - _Depends: B3.1, B1.3, B1.2_
 
 - [ ] B3.3 Register the backfill job and gate its start
   - Register the backfill cron poll in server setup; when the start rule allows, an idle tick starts
     the paced loop (B3.2). Stop the poll permanently once the job document is marked complete
-  - Implement the start rule as a pure function of `backlinks:backfillAutoStart`,
-    `app:growiCloudUri` and the job document's `startRequested` (explicit env value wins; otherwise
-    a set URI means the job waits for the flag). The tick reads the job document directly from the
-    database, not through `configManager`; the idle interval is chosen here (1 to 5 minutes), and
-    the running loop re-checks the rule at each checkpoint.
-    `complete` unschedules the tick and is not re-scheduled at boot; `failed` keeps the tick so a
-    re-set flag resumes from the marker
+  - Implement the start rule as a pure function of `backlinks:backfillAutoStart` (default `false`),
+    the job document's `startAt` and the current time. The tick reads the job document directly
+    from the database, not through `configManager`; the idle interval is chosen here (1 to 5
+    minutes). `complete` unschedules the tick and is not re-scheduled at boot; `failed` keeps the
+    tick so the job is retried from the marker
   - Note: edits the same server-setup file as B1.12 — sequence after it to avoid a merge
-  - Done when a five-row truth-table test covers the start rule, setting `startRequested` on an
-    idle cloud-configured app starts it within one idle interval with no restart, and,
-    after boot with the rule allowing it, the job claims and runs both phases to completion on a
-    fresh dataset and marks itself complete so it does not re-run
+  - Done when a truth-table test covers the start rule (off, waiting for `startAt`, past `startAt`),
+    an app with the flag on and `startAt` in the past starts within one idle interval, and the job
+    claims and runs both phases to completion on a fresh dataset and marks itself complete so it
+    does not re-run
   - _Requirements: 4.1_
   - _Boundary: crowi setup, PageLinkBackfillCron_
   - _Depends: B3.2, B1.12_
@@ -535,8 +544,12 @@ admin-triggered start was deferred as a one-line future change. Independent of B
     with `insertMany`, so the live listener creates no `PageLink` rows, using a realistic spread of
     body sizes and link densities. Measure total duration, throughput, tick duration distribution,
     event-loop delay (`perf_hooks.monitorEventLoopDelay`) and live-request p50/p99 with and without
-    the job. Agree the success numbers before running
-  - _Requirements: 4.1, 4.2, 4.3_
+    the job. Also measure the database side per app, which decides how many apps may run at once:
+    operations per second, bytes written, oplog growth and replication delay, with many small
+    pages as well as typical ones, at the default duty and with the page-rate floor. From the
+    per-app duration across a realistic page-count spread, size the start window and the number
+    of apps that may overlap. Agree the success numbers before running
+  - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _Depends: B3.2_
 
 - [ ] B3.5 Index the descendants of a recursive duplicate

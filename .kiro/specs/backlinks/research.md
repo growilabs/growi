@@ -309,7 +309,8 @@
   links on a 1,200-link fixture, but it differs from the renderer where GFM splits cells
   (`[a | b](/x)`, `|` in a link destination) and gives up a single source of link forms.
 - **Scale assumption (customer data)**: largest wiki 45k pages, most under 3k, a few at 8k–20k.
-  Estimated at 25% duty (unmeasured): ~1.5 min for 3k pages, 4–8 min for 8k–20k, ~18 min for 45k
+  Estimated at 25% duty, charging parse time only (unmeasured; the page-cycle charge and the
+  page-rate floor lengthen it): ~1.5 min for 3k pages, 4–8 min for 8k–20k, ~18 min for 45k
   (~70 min if pages average 15 KB). This covers only the customers we can see; self-hosted
   installs may be larger, which is why the job stays online and throttled rather than assuming
   small wikis.
@@ -363,32 +364,42 @@
   (acceptable per 4.2 — completeness only required *after* completion; new edits index instantly).
   In-process means the parse still shares the one JS thread; the duty cycle bounds but cannot
   remove that contention — only `worker_threads` could, which GROWI lacks (deferred).
-- **Delivery decision (resolved)**: throttled, two-phase (recent pages at 25% duty, then older at
-  10%); auto-started on-prem, and on GROWI.cloud started by infra through a flag in the job
-  document. Admin-triggered start deferred (a one-line wiring change to add later, reusing the
-  identical job). The start rule and duty settings are in design.md's Delivery decision; the
-  reasoning behind them is here:
+- **Delivery decision (proposed — pending infra agreement)**: throttled, two-phase (recent pages at
+  25% duty, then older at 10%); off by default; on GROWI.cloud each app starts itself at a `startAt`
+  derived from one uniform start window. Admin-triggered start deferred (a one-line wiring change
+  to add later, reusing the identical job). The start rule and settings are in design.md's Delivery
+  decision; the reasoning behind them is here:
+  - *Off by default*: an upgrade has never run a heavy job, and admins do not expect one, so the
+    default is `false` and on-prem opts in. The cost is that an on-prem admin who never sets it gets
+    no backfill, which is why the admin-triggered start is worth revisiting.
   - *Unconditional auto-start was rejected for cloud*: apps share one MongoDB, a duty cycle bounds
-    per-instance load only, so a fleet starting together has no aggregate cap. Waves bound it.
-  - *Operator-controlled start vs an admin setting*: an admin button would let cloud customers
-    start backfills at arbitrary times, outside infra's waves. For on-prem there is no shared
-    database, so auto-start is safe and needs no action, which avoids the "customers never notice
-    an opt-in" problem.
-  - *Cloud detection by `app:growiCloudUri`, with an explicit override*: a dedicated variable alone
-    fails open (a forgotten variable starts the backfill on shared Mongo), while gating on the URI
-    fails closed. The false-positive cost is an on-prem install not auto-starting until the flag
-    or the env override is set, a delay and not an outage. Not verified outside the repo: whether infra sets `GROWI_CLOUD_URI` on every cloud
-    app, which the gate relies on — confirm with the infra team.
+    per-instance load only, so a fleet starting together has no aggregate cap.
+  - *An admin button was rejected for cloud*: it would let customers start backfills at arbitrary
+    times, outside the start window.
   - *Two phases by `updatedAt`, with a stored cutoff*: skipping old pages entirely would break full
     coverage (4.1), so they run second at a lower duty. The cutoff is stored on the job so the sets
     do not shift across restarts.
-  - *Cloud start mechanism: a flag in the job document (resolved)*. Waves must be decoupled from
-    both the release and from restarts: release stages are sized for release risk, nothing makes a
-    release wait for a backfill to finish, and an app restart may be visible to customers (migrations
-    run at boot and sockets drop). The job document is read directly each tick, so infra can start,
-    pause and resume one app at a time with no restart and no release involvement. This matches
-    how GROWI.cloud infra already ran the v8 `revisions` index pre-creation (see the precedent
-    below).
+  - *Cloud start mechanism: a uniform start window (proposed)*. The constraint from the infra
+    review is that GROWI.cloud infra must not do repeated work: one-time setup at release (the same
+    env values everywhere) is fine, starting a few apps at a time and checking load between batches
+    is not. A start flag in the job document needed exactly that repeated work, so it was dropped.
+    Instead every app gets the same `BACKLINKS_BACKFILL_START_WINDOW_HOURS` and derives its own
+    offset from a hash of its app id, anchored to its own first boot of this version (stored, so a
+    restart does not move it). With about 295 active apps, average concurrency is
+    `apps × average duration ÷ window`: ~2 for a 30-minute average over 72 h, ~8 for 2 h, ~0.9 and
+    ~3.5 over 7 days; random clumping puts the peak above that average. This **spreads starts but
+    does not cap concurrency**, and it says nothing about how long each app runs, so the window is
+    sized from the measured duration (B3.4). A shared lease would give a real cap and needs a store
+    every tenant can reach, which is unconfirmed.
+  - *Per-app load is not bounded by the duty alone*: the rest was set from parse time only, so the
+    body read and the writes were free. By the reviewer's estimate (not measured), a 5 ms page at
+    25% duty rests ~15 ms (~40 pages/s per app) and a 1.3 ms note runs 100+ pages/s, so lowering
+    the duty barely lowers the database load for small pages. Hence the charge covers the whole
+    page cycle, a page-rate floor bounds the operation rate directly, and B3.4 measures the
+    database side (operations/s, writes, oplog, replication delay) that the event-loop and
+    live-request numbers do not show.
+  - *Scope limits*: admins who consider the last year, or the last 10,000 pages, enough can bound
+    the backfill with config values. Coverage is then partial by choice, so the panel must say so.
   - *Precedent — v8 `revisions` index pre-creation* (internal wiki page, Redmine 186296): to avoid
     all apps building `{ author: 1, createdAt: -1 }` at once through `autoIndex` at v8 boot, infra
     pre-created it per app from an `operation-mongo` pod with the admin credential (databases named
@@ -401,44 +412,38 @@
     all had the index afterwards. That pace does not predict the backfill's: a `createIndex` took
     seconds to about two minutes per app (the largest, 14 GB of revisions, 109 s), while the
     backfill runs for much longer under its duty cycle, and its per-app time is not measured yet.
-    The backfill wave procedure reuses this shape with one difference: `createIndex` returns when
-    it finishes, but setting `startRequested` returns at once, so the wave script must poll
-    `status` / `completedAt` / `lastError` and stop on `failed` before moving to the next app or
-    batch. Starting apps in parallel also needs a per-cluster concurrency cap, which the
-    sequential index script never had; it is chosen from B3.2's measured per-app load and
-    Grafana, not from this precedent. A sample check after the waves (the `complete` status plus a
-    spot check of rows) mirrors the verification the index run used.
-  - *Considered, not adopted for the cloud start*: an env var per wave (needs a restart per wave);
-    tying waves to staged releases (couples release timing to backfill duration, which nothing
-    enforces); a hashed per-app start offset (spreads starts but neither avoids overlap nor caps
-    load, because an app does not know the others' durations); a scheduled absolute start time in
-    an env var (a deterministic slot plan, but the schedule is fixed until the next restart and
-    cannot react to cluster load); a control-plane permission endpoint (the only option with a real
-    concurrency cap and no per-app action, but infra would have to build and run it). *Fallback if
-    infra cannot write to tenant databases*: an authenticated start/status HTTP endpoint on the
-    app, protected by a per-app secret from the deploy config — same job-document contract, a
-    different way to set the flag; it needs real auth and audit recording.
+    The precedent supports the facts it records (database naming, active-app count, the plan
+    groups) but not the control: a person watching Grafana between batches is the repeated manual
+    work the backfill must avoid, and `createIndex` (one call, database-side only) is not a
+    safety argument for a job that parses markdown in the app and may issue tens of thousands to
+    hundreds of thousands of reads and writes (estimated) over minutes to hours.
+  - *Considered, not adopted for the cloud start*: a start flag in the job document set by infra
+    (manual wave control); an env var per app or per wave (per-app values to maintain, a restart per
+    wave); relying on the release cadence as the wave (concurrent backfills would be
+    `5 × (duration ÷ 20 min)` and nothing bounds the duration); fixed 1-hour slots by app index
+    (fleet-sized total time, and a slow backfill overlaps the next slot); tying waves to staged
+    releases; a scheduled absolute start time; a control-plane permission endpoint or a shared lease
+    (the only options with a real concurrency cap, but infra would have to build them or tenants
+    share state, so they stay candidates, not the baseline).
   - *Also considered, not adopted*: lazy backfill on page view (cannot work for backlinks, which
-    come from other pages' bodies); a cross-tenant lock in shared state; an infra-run external
+    come from other pages' bodies); an infra-run external
     script that parses pages (the parse needs the app's extractor). Candidates to add later:
     reading bodies with `secondaryPreferred` (backfill tolerates stale reads, not verified against
     the cluster) and backing off when chunk latency rises.
   - *Infra answers (2026-10-21)*: the GROWI.cloud release job updates at most 5 apps every 20
     minutes (15 an hour, 360 a day); restarting an app is not treated as an outage, though strictly
     it is one; querying a tenant database directly depends on the operation, and infra wants to be
-    consulted before it is run. Consequences: (1) auto-starting on update was rejected again —
+    consulted before it is run. Consequences: (1) auto-starting on update was rejected —
     concurrent backfills would be `5 × (backfill duration ÷ 20 min)`, and nothing bounds the
-    duration, so slowing the release would only guess at it and would couple release timing to the
-    backfill. (2) The release goes out at the normal cadence (about 295 active apps finish in under
-    a day) and the waves run afterwards, so the waves, not the release, set the pace. (3) Setting
-    `startRequested` is a direct tenant-database write, so the procedure and the field-level `$set`
-    contract go to infra for agreement before the first wave; the HTTP start/status endpoint above
-    is the fallback if they decline.
-  - *Still to confirm with the infra team*: that `GROWI_CLOUD_URI` is set on every cloud app; that
-    they are comfortable setting and reading one field on each app's job document directly, and
-    how they will watch progress across apps; the cluster headroom and which apps share which
-    cluster. The backfill load they would be
-    shown is estimated, not measured — B3.2's performance run replaces the estimates.
+    duration. (2) The release goes out at the normal cadence (about 295 active apps finish in
+    under a day), so each app's own first boot is the anchor of its start window, not a release
+    timestamp. (3) The design no longer needs infra to write to tenant databases.
+  - *Still to confirm with the infra team*: that they will set the same env values (auto-start
+    and the start window) on every cloud app once at release; that `app:growiAppIdForCloud` is set at
+    boot on every cloud app; whether a shared store for a lease is available; how they will watch
+    progress across apps; the cluster headroom and which apps share which cluster. The backfill
+    load they would be shown is estimated, not measured — B3.4's performance run replaces the
+    estimates.
   Implementation reuses the page-bulk-export scaffolding:
   `CronService` base, `createBatchStream`, the cursor→resume(progress marker)→`pipeline` skeleton, and
   the watchdog start/stop logic; the new code is link extraction/resolution, the in-memory `{path→_id}`

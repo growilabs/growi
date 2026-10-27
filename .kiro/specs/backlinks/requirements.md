@@ -120,6 +120,7 @@ order of delivery is tracked separately in the implementation backlog.
 1. Where pages existed before the Backlinks feature was enabled, the Backlinks feature shall provide a one-time process that makes the links within those pages discoverable as backlinks.
 2. When the one-time process completes, the Backlinks feature shall present backlinks from pre-existing pages equivalently to backlinks created after enablement.
 3. If the one-time process is run more than once, then the Backlinks feature shall not produce duplicate backlinks.
+4. Where an administrator limits the one-time process to recent pages (by age or by page count), the Backlinks feature shall make backlinks from the pages within that limit equivalent to backlinks created after enablement, and shall indicate that backlinks from older pages are not included.
 
 ### Requirement 5: Link integrity when a page is renamed or moved
 **Objective:** As an editor, I want links to a page to survive its rename or move, so that references are not silently broken.
