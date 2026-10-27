@@ -1085,7 +1085,8 @@
     "ShareLink": "シェアリンク",
     "Search": "検索",
     "User": "ユーザー",
-    "Admin": "管理者ユーザー"
+    "Admin": "管理者ユーザー",
+    "ChangeProposal": "Change Proposal"
   },
   "audit_log_action": {
     "USER_REGISTRATION_SUCCESS": "ユーザー作成",
@@ -1152,6 +1153,10 @@
     "ADMIN_APP_SETTING_UPDATE": "アプリ設定の更新",
     "ADMIN_AI_SETTING_UPDATE": "AI設定の更新",
     "ADMIN_AI_MODEL_CATALOG_REFRESH": "モデルカタログの更新",
+    "CHANGE_PROPOSAL_CREATE": "Change Proposal の作成",
+    "CHANGE_PROPOSAL_APPLY": "Change Proposal の反映",
+    "CHANGE_PROPOSAL_REVERT": "Change Proposal の取り消し",
+    "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "Change Proposal 設定の更新",
     "ADMIN_SITE_URL_UPDATE": "サイトURL設定の更新",
     "ADMIN_MAIL_SMTP_UPDATE": "メール設定（SMTP）の更新",
     "ADMIN_MAIL_SES_UPDATE": "メール設定（SES）の更新",
