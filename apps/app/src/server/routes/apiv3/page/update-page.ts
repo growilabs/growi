@@ -1,5 +1,5 @@
 import type { IPage, IUserHasId } from '@growi/core';
-import { allOrigin, getIdForRef, getIdStringForRef, Origin } from '@growi/core';
+import { allOrigin } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
@@ -14,7 +14,6 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type { revisions } from '~/generated/prisma/client';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import {
   type IApiv3PageUpdateParams,
   PageUpdateErrorCode,
@@ -23,22 +22,20 @@ import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
-import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
 import { configManager } from '~/server/service/config-manager/config-manager';
 import { isGrantImmutablePath } from '~/server/service/page/grant-immutable-path';
 import {
+  emitPageUpdateActivity,
+  runAfterHumanUpdate,
   type UpdatePageBodyHumanOptions,
   updatePageBody,
 } from '~/server/service/page-save';
-import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
-import { getYjsService } from '~/server/service/yjs';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -108,79 +105,6 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     body('wip').optional().isBoolean().withMessage('wip must be boolean'),
   ];
 
-  /**
-   * Emit the page-update activity.
-   *
-   * This MUST run before the response is sent (see the call site). The
-   * activity's request context (operator user / ip / endpoint / username) is
-   * held in `pendingActivityContext`, keyed by the pre-minted activity id, and
-   * `registerFailsafeFinalizer` clears that entry on the `res` 'finish'/'close'
-   * events. The ActivityService 'update' listener consumes the context
-   * synchronously (`pendingActivityContext.take`) as the first thing it does.
-   *
-   * If the emit ran after `res.apiv3()` (as it used to, from inside
-   * `postAction`), the `await shouldGenerateUpdate(...)` below would yield the
-   * event loop long enough for the response's 'finish' to clear the context
-   * first, so the listener would settle the row with `user: null` -- a "bare"
-   * activity that later surfaces as a `null` entry in a notification's
-   * `actionUsers` and crashed the notification list. Emitting before the
-   * response guarantees `take()` runs while the context is still alive.
-   * (create-page.ts is unaffected: its emit is the first statement of its
-   * postAction, with no `await` between `res.apiv3()` and the emit.)
-   */
-  async function generateUpdateActivity(
-    req: UpdatePageRequest,
-    res: ApiV3Response,
-    updatedPage: HydratedDocument<PageDocument>,
-  ) {
-    // Decide if update activity should generate
-    let shouldGenerateUpdateActivity = false;
-    try {
-      const targetPageId = getIdStringForRef(updatedPage);
-      const currentActivityId = getIdStringForRef(res.locals.activity);
-      const currentUserId = req.user ? getIdStringForRef(req.user) : undefined;
-
-      shouldGenerateUpdateActivity = await shouldGenerateUpdate({
-        currentUserId,
-        targetPageId,
-        currentActivityId,
-      });
-    } catch (err) {
-      logger.error(
-        'Failed to determine whether to generate update activity.',
-        err,
-      );
-    }
-
-    if (!shouldGenerateUpdateActivity) {
-      return;
-    }
-
-    try {
-      // persist activity
-      const creator =
-        updatedPage.creator != null
-          ? getIdForRef(updatedPage.creator)
-          : undefined;
-      const parameters = {
-        targetModel: SupportedTargetModel.MODEL_PAGE,
-        target: updatedPage,
-        action: SupportedAction.ACTION_PAGE_UPDATE,
-        contributor: req.user,
-      };
-      const activityEvent = crowi.events.activity;
-      activityEvent.emit(
-        'update',
-        res.locals.activity._id,
-        parameters,
-        { path: updatedPage.path, creator },
-        preNotifyService.generatePreNotify,
-      );
-    } catch (err) {
-      logger.error('Failed to generate update activity', err);
-    }
-  }
-
   async function respondConflict(
     res: ApiV3Response,
     latestRevisionId: string | undefined,
@@ -209,56 +133,6 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       ),
       409,
     );
-  }
-
-  async function postAction(
-    req: UpdatePageRequest,
-    updatedPage: HydratedDocument<PageDocument>,
-    previousRevision: { body: string } | null,
-  ) {
-    // Reflect the updates in ydoc
-    const origin = req.body.origin;
-    if (origin === Origin.View || origin === undefined) {
-      const yjsService = getYjsService();
-      await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
-    }
-
-    // global notification
-    try {
-      await crowi.globalNotificationService.fire(
-        GlobalNotificationSettingEvent.PAGE_EDIT,
-        updatedPage,
-        req.user,
-      );
-    } catch (err) {
-      logger.error({ err }, 'Edit notification failed');
-    }
-
-    // user notification
-    const { isSlackEnabled, slackChannels } = req.body;
-    if (isSlackEnabled) {
-      try {
-        const option =
-          previousRevision != null ? { previousRevision } : undefined;
-        const results = await crowi.userNotificationService.fire(
-          updatedPage,
-          req.user,
-          slackChannels,
-          'update',
-          option,
-        );
-        for (const result of results) {
-          if (result.status === 'rejected') {
-            logger.error(
-              { err: result.reason },
-              'Create user notification failed',
-            );
-          }
-        }
-      } catch (err) {
-        logger.error({ err }, 'Create user notification failed');
-      }
-    }
   }
 
   const addActivity = generateAddActivityMiddleware();
@@ -378,16 +252,27 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         revision: serializeRevisionSecurely(updatedPage.revision),
       };
 
-      // Generate the update activity BEFORE sending the response so the
-      // ActivityService listener captures the request context while it is
-      // still alive (see generateUpdateActivity's doc comment). This is
-      // awaited because the synchronous context `take()` happens inside the
-      // emit, and the emit must not be preceded by `res.apiv3()`.
-      await generateUpdateActivity(req, res, updatedPage);
+      // emit before res.apiv3() — see rules/activity-recording.md
+      const activityId = res.locals.activity?._id;
+      if (activityId != null) {
+        await emitPageUpdateActivity(crowi, {
+          activityId,
+          page: updatedPage,
+          user: req.user,
+        });
+      }
 
       res.apiv3(result, 201);
 
-      postAction(req, updatedPage, previousRevision);
+      runAfterHumanUpdate(crowi, {
+        pageId,
+        page: updatedPage,
+        user: req.user,
+        origin,
+        previousRevision,
+        isSlackEnabled: req.body.isSlackEnabled,
+        slackChannels: req.body.slackChannels,
+      });
     },
   ];
 };

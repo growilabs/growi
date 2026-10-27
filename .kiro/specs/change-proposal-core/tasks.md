@@ -75,7 +75,7 @@
   - 既存のページの更新の結合テスト（更新・前のリビジョン・共同編集の文書の同期）を変更せずに通し、2.1 のテストも通っている
   - _Requirements: 3.3, 3.4, 6.3, 6.4, 10.1, 10.2_
   - _Depends: 2.1, 2.2, 2.3_
-- [ ] 2.5 人の保存のあとの処理（通知・共同編集の文書の同期）を、route から共通の場所へ移す
+- [x] 2.5 人の保存のあとの処理（通知・共同編集の文書の同期）を、route から共通の場所へ移す
   - 更新の route と作成の route の、応答のあとの処理（グローバル通知、Slack 通知、購読の作成、`origin` が `view` か空のときの共同編集の文書の置き換え）を、順序と条件を変えずに移す
   - グローバル通知の送信（失敗をログに残すだけの扱いを含む）を `page-notifications.ts` の `firePageGlobalNotification` に、更新の route の `generateUpdateActivity` の中身（`shouldGenerateUpdate` の判断と `PAGE_UPDATE` の emit）を `emitPageUpdateActivity` に移す。route は自分の activity の ID を渡して、今と同じ位置（応答の前）で呼ぶ。反映の handler（4.2・4.3）もこの 2 つを使う
   - 既存の作成と更新の結合テストを変更せずに通している。書き込み機能が無効でも有効でも、人の保存の通知の数が変わらないことを確かめている
@@ -316,3 +316,4 @@
 - 2.3: アプリ内通知の抑止は子を含む delete / restore には未配線（design 上、trash と restore は子を持たないページのみ）。renamePage の options の型は未付与なので、4.x の handler では `IOptionsForInAppNotificationSuppression` を使う。`updatePage` は条件付き pushRevision の前に `save()` でページを書くため、衝突時にも閲覧範囲等の `save()` 分は戻らない（反映では閲覧範囲を渡さないので無害。2.4 で人の保存を共通化するときに考慮）
 - 2.4: 保存の前後で閲覧範囲が「リンクを知っている人だけ」かどうかが変わる人の保存は、`expectedRevisionId` なしで 1 回だけ書く（`movesBetweenTreeAndRestricted`。条件付きにすると負けて書き直したとき子の付け替えが飛ばされ同じパスにページが 2 つできる）。この保存は反映と同時に起きると反映を確認なしで上書きしうるので、2.6 の同時実行テストか要件 3.16 の例外として記録する
 - 2.4: `revisions.delete` 失敗時は例外をそのまま投げる（`RevisionConflictError` に変えない）ので、4.x の「同じ印のリビジョンがあれば反映済み」の確認は、残った印付きリビジョンに引っかからない対策が要る。`normalizeLatestRevisionIfBroken` は route に残っていて反映のモードでは呼ばれない。負けたあとの再確認で 409 になっても閲覧範囲・WIP の `save()` 分は残る
+- 2.5: `emitPageUpdateActivity` は emit したときだけ true を返す（4.x の handler は false なら pendingActivityContext を消す）。page-save の 4 関数は express に依存せず 4.2/4.3 から直接呼べる
