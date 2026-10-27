@@ -178,6 +178,29 @@
   - 完了の状態: 一覧の spec で、最初の失敗のあと再試行で表示されることを確かめる。セクションの spec と i18n spec が通る
   - _Requirements: 7.8, 2.7, 6.1_
 
+- [x] 10. 3 回目のレビュー（code-review high）の指摘への対応
+- [x] 10.1 サーバー: activity の emit の失敗で、削除の成功を 500 にしない
+  - unset とサーバーログの出力だけを 500 を返す try に入れ、emit は別の try に入れる。emit が失敗したらエラーをサーバーログに出し、削除件数を 200 で返す
+  - 完了の状態: routes の integ テストで、emit が例外を投げても 200 と削除件数が返り、エラーがログに出ることを確かめる。これまでのテストと drift テストが通る
+  - _Requirements: 2.10, 4.3_
+  - _Boundary: delete-legacy-passwords route_
+
+- [x] 10.2 画面: 確定の連打を弾き、件数の取得失敗に再試行を出し、catch でエラーを記録する
+  - `onConfirm` の先頭で、実行中なら何もしない（ref で判定する）
+  - 再試行の表示を `ErrorWithRetry` として切り出し、件数の取得失敗にも出す。文言のキーを `legacy_password_cleanup.retry` に移す（5 ロケール、i18n spec）
+  - 件数の取り直しと削除の catch で `logger.error` を呼ぶ
+  - 完了の状態: セクションの spec で次を確かめる。確定を 2 回続けて押しても削除の要求は 1 回だけ。件数の取得に失敗したあと、再試行で件数が表示され削除ボタンが押せるようになる。一覧の spec と i18n spec が通る
+  - _Requirements: 2.9, 1.6, 6.1_
+
+- [x] 10.3 hook: 画面に戻ったら件数と一覧を取り直す
+  - 件数の hook と一覧の hook に `revalidateOnMount: true` を渡す
+  - 完了の状態: 同じ SWR のキャッシュのまま、セクション（または一覧）をアンマウントしてマウントし直すと、件数と一覧を取り直し、新しい値が表示されることを spec で確かめる
+  - _Requirements: 1.7, 7.10_
+
+- [x] 10.4 lint とテスト一式を実行し、回帰がないことを確かめる
+  - 完了の状態: apps/app の lint と、この機能のテストが通る
+  - _Requirements: 5.1_
+
 ## Implementation Notes
 - `lint:typecheck` が `@growi/core/dist/...` の export 不足（例: `isInsecureUserAttribute`）で落ちるときは、`@growi/core` の dist が古い。`turbo run build --filter @growi/core` で作り直す（1.1 で発生）
 - 開発サーバーで管理者 API を確かめるときは、dev DB の `accesstokens` に一時的なトークン（必要なスコープ付き、description で識別、短い有効期限）を入れて `Authorization: Bearer` で呼び、終わったら削除する。dev DB のパスワード形式の内訳は、ログインによる移行で変わる（3.3 の時点では旧形式のみ 8 人・両形式 0 人、6.6 の時点では旧形式のみ 6 人・両形式 2 人）。確認の前に必ず数え直す
@@ -186,3 +209,4 @@
 - 全テストの実行で落ちる 4 ファイルは、この作業の不具合ではない。どれも変更した `~/interfaces/activity` を import しているが、変更は定数を 1 つ足しただけである。growi-vault の integ 2 件は vault-manager の dist が未ビルドのため、contribution-graph の 2 件は負荷による MongoMemoryServer の起動タイムアウトで、単体で再実行すると通る（5.2 で確認）
 - `useSWRInfinite` と `InfiniteScroll` で一覧を作るときは、終端の判定を 1 つの純粋関数にまとめ、`getKey` とコンポーネントの `isReachingEnd` の両方で、最後に読んだページの値を渡して使う。2 か所で別々に判定すると、読み進めている間に総数が減ったときに食い違い、`setSize` が繰り返し呼ばれてタブが固まる（7.1 のレビューで再現）
 - 一覧の続きの読み込みが失敗している間に止めるのは、`InfiniteScroll` の自動の読み足しだけ。SWR の既定の自動再試行（指数バックオフ）とフォーカス時の再取得は、本番では有効のまま残している。再試行ボタン（9.2 で最初のページの失敗にも追加）を押さなくても、一時的な失敗なら自動で回復させるため。エラー表示がちらつかず、`setSize` のループも起きないことは 8.3 のレビューで確認した（spec では `shouldRetryOnError: false` で止めている）
+- SWR の `revalidateOnMount` は、明示的に `false` を渡すと最初の取得もしなくなる（未指定とは違う）。マウント時の再取得の効き目を確かめる mutation では、`false` に変えるのではなく、オプションを外す（10.3 で確認）
