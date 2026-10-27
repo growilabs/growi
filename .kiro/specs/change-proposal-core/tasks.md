@@ -93,7 +93,7 @@
   - _Requirements: 3.5, 5.7_
 
 - [ ] 3. 判断の純関数（グループ 1 の 1.1 だけに依存し、1.2 以降を待たない）
-- [ ] 3.1 (P) 入力の検査と、全体の状態を決める純関数を作る
+- [x] 3.1 (P) 入力の検査と、全体の状態を決める純関数を作る
   - 作成の入力の検査: 操作が無い、知らない種類、移動が 2 つ以上、操作数の上限、本文の合計の大きさ（8 MiB）、無効にされた種類、ページのパスとして使えない形、を理由の値つきで断る
   - 全体の状態: design の 6 つの規則を上から当てはめる。段階が完了で反映に関わった操作が無いときは「反映していない」にし、全体の状態の値に無い値を返さない
   - 達成度: 一度でも反映された操作の数と、本人が飛ばした操作を除いた数を返す。取り消しの Change Proposal には返さない
@@ -318,3 +318,4 @@
 - 2.4: `revisions.delete` 失敗時は例外をそのまま投げる（`RevisionConflictError` に変えない）ので、4.x の「同じ印のリビジョンがあれば反映済み」の確認は、残った印付きリビジョンに引っかからない対策が要る。`normalizeLatestRevisionIfBroken` は route に残っていて反映のモードでは呼ばれない。負けたあとの再確認で 409 になっても閲覧範囲・WIP の `save()` 分は残る
 - 2.5: `emitPageUpdateActivity` は emit したときだけ true を返す（4.x の handler は false なら pendingActivityContext を消す）。page-save の 4 関数は express に依存せず 4.2/4.3 から直接呼べる
 - 2.7: `deleteRedirectsFromPathTree(fromPath)` は Prisma の startsWith が MongoDB で正規表現の記号をエスケープしないため raw の delete コマンド + `escapeStringForMongoRegex` で書いてある。`getConnectionCount(pageId)` はこのプロセスの接続数だけ（複数サーバー構成では他サーバーの接続を数えない。design OQ-6）
+- 3.1: `modelLabel` の 100 文字検査は 5.1（createProposal の入口）で行う（validateProposalInput の引数に modelLabel は無く、断る理由の型にも無いため）。5.x の入口では本文が文字列であることと、入口の種類が作成で受けられるもの（CreatableEntry）であることも確かめる
