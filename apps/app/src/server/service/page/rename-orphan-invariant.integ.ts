@@ -199,6 +199,11 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     const trashed = await Page.findById(victim._id);
     expect(trashed?.parent).toBeNull();
     expect(trashed?.status).toBe('deleted');
+    const findEmptyTrashPaths = async () =>
+      (await Page.find({ path: /^\/trash/, isEmpty: true }))
+        .map((p) => p.path)
+        .sort();
+    const emptyTrashPathsBefore = await findEmptyTrashPaths();
 
     const err = await rename(target, `${trashed?.path}/moved`);
 
@@ -211,6 +216,10 @@ describe('a failed rename must not orphan the page (#9755)', () => {
       parentPath,
       `rename failed with "${err?.message}" and left "${path}" off the tree`,
     ).toBe(pathlib.dirname(path ?? ''));
+    if (err != null) {
+      // a failed rename also takes back the empty ancestors it created above the trashed page
+      expect(await findEmptyTrashPaths()).toEqual(emptyTrashPathsBefore);
+    }
   });
 
   it('completes the rename, children included, when the final write commits but its acknowledgement is lost', async () => {
@@ -622,6 +631,37 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     expect(await snapshotTree()).toEqual(before);
   });
 
+  it('fails without a warning and leaves the tree unchanged when detaching the page fails before it applies', async () => {
+    await create(base, 'base body');
+    await create(`${base}/ex-parent`, 'body');
+    await create(`${base}/new-parent`, 'body');
+    const target = await create(`${base}/ex-parent/target`, 'body');
+    const before = await snapshotTree();
+
+    const fault = new Error('simulated failure of the detach');
+    const takeOffSpy = vi
+      .spyOn(Page, 'takeOffFromTree')
+      .mockRejectedValueOnce(fault);
+    const warnSpy = vi.spyOn(loggerFactory('growi:services:page'), 'warn');
+    let err: Error | null;
+    // read before mockRestore, which discards the recorded calls
+    let warnings: string[] = [];
+    try {
+      err = await rename(target, `${base}/new-parent/moved`);
+      warnings = warnSpy.mock.calls.map(([message]) => String(message));
+    } finally {
+      takeOffSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+
+    expect(err).toBe(fault);
+    expect(await snapshotTree()).toEqual(before);
+    // nothing was detached, so nothing suggests that another writer moved the page
+    expect(
+      warnings.filter((w) => w.includes(`${base}/ex-parent/target`)),
+    ).toEqual([]);
+  });
+
   it('points the log at the new path, not at an off-tree page, when only removing the new ancestors fails', async () => {
     await create(base, 'base body');
     await create(`${base}/ex-parent`, 'body');
@@ -677,17 +717,17 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     await create(`${base}/ex-parent`, 'body');
     await create(`${base}/new-parent`, 'body');
     const target = await create(`${base}/ex-parent/target`, 'body');
-    await create(`${base}/ex-parent/target/child`, 'body');
+    const child = await create(`${base}/ex-parent/target/child`, 'body');
     const newPath = `${base}/new-parent/moved`;
 
-    // the connection stays down: every write after the lost acknowledgement fails too
+    // the connection stays down: the write that undoes the rename fails too
     const connectionFault = new Error('simulated connection loss');
+    const originalUpdateOne = Page.updateOne;
     const updateOneSpy = vi
       .spyOn(Page, 'updateOne')
-      .mockRejectedValue(connectionFault);
-    const findByIdSpy = vi
-      .spyOn(Page, 'findById')
-      .mockRejectedValue(connectionFault);
+      .mockImplementation(function (this: PageModel, ...args) {
+        return originalUpdateOne.apply(this, args).error(connectionFault);
+      });
     const errorSpy = vi.spyOn(loggerFactory('growi:services:page'), 'error');
     let result: Awaited<ReturnType<typeof renameWithFailingFinalWrite>>;
     // read before mockRestore, which discards the recorded calls
@@ -701,15 +741,18 @@ describe('a failed rename must not orphan the page (#9755)', () => {
         .join('\n');
     } finally {
       updateOneSpy.mockRestore();
-      findByIdSpy.mockRestore();
       errorSpy.mockRestore();
     }
 
     // otherwise the final write never committed and the warning below would not apply
     expect(result.faultFired).toBe(true);
     expect(result.err).toBe(result.fault);
-    // the page did move; only the log can tell an operator its children stayed behind
+    // the page did move but its child stayed behind; only the log can tell an operator
     expect((await Page.findById(target._id))?.path).toBe(newPath);
+    expect(await findPathAndParentPath(child._id)).toEqual({
+      path: `${base}/ex-parent/target/child`,
+      parentPath: newPath,
+    });
     expect(logged).toContain(newPath);
   });
 });

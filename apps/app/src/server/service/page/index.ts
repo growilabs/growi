@@ -1020,6 +1020,14 @@ class PageService implements IPageService {
         if (currentPage?.path === newPagePath) {
           return currentPage;
         }
+        // The detach itself failed without applying, so there is nothing to undo
+        const isUntouched =
+          currentPage?.path === page.path &&
+          getIdStringForRef(currentPage.parent ?? '') ===
+            getIdStringForRef(exParentId ?? '');
+        if (isUntouched) {
+          return null;
+        }
         logger.warn(
           `Skipped reattaching "${page.path}" to its original parent after a failed rename: ` +
             'the page is no longer detached at its original path.',
@@ -1059,8 +1067,10 @@ class PageService implements IPageService {
 
   /**
    * Remove the childless empty ancestors of `path`, nearest first, up to the first
-   * ancestor that is kept. Walks by path rather than by `parent` since a failed
-   * getParentAndFillAncestorsByUser can leave the ancestors it created unlinked.
+   * empty ancestor that still has children. Walks by path rather than by `parent`
+   * since a failed getParentAndFillAncestorsByUser can leave the ancestors it created
+   * unlinked, and goes on past a path without an empty page since an off-tree page
+   * there (e.g. a trashed one) does not hold up the empty pages above it.
    */
   private async removeChildlessEmptyAncestors(path: string): Promise<void> {
     const Page = mongoose.model<IPage, PageModel>('Page');
@@ -1070,7 +1080,10 @@ class PageService implements IPageService {
         path: ancestorPath,
         isEmpty: true,
       });
-      if (emptyPage == null || (await Page.exists({ parent: emptyPage._id }))) {
+      if (emptyPage == null) {
+        continue;
+      }
+      if (await Page.exists({ parent: emptyPage._id })) {
         return;
       }
       await Page.deleteOne({ _id: emptyPage._id, isEmpty: true });
