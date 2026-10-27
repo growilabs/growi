@@ -199,7 +199,7 @@
   - _Depends: 3.6, 4.1, 4.5_
 
 - [ ] 5. Change Proposal のサービス
-- [ ] 5.1 Change Proposal の作成と、作成直後の自動反映を作る
+- [x] 5.1 Change Proposal の作成と、作成直後の自動反映を作る
   - ゲスト・読み取り専用ユーザーを断る。入力の検査、1 日の件数（サーバーの日付の 0 時から、取り消しを除く）、書き込み機能と操作の種類の有効化、対象のページを依頼した人が閲覧できること、元のリビジョンが対象のページのものであることを確かめる。閲覧できない場合と存在しない場合は同じ結果を返す
   - 承認待ちの期限の設定に値があるときだけ、作成日時にその秒数を足した日時を期限として保存する。値が無いときは期限を保存しない
   - 作成の関数は任意の `perPageNotifications` を受け取り、渡されたときはその値、無いときは真をページごとの通知の指定として保存する（後続・見直しも同じ）
@@ -336,3 +336,5 @@
 - 4.6: 残る穴（人の判断で足すかを決める）: 結果の記録のあと `markOriginalOperation` の前にプロセスが止まると、元の操作は「反映済み」のまま残り直す処理が無い（5.4 の保守用の cron の再開が拾う設計かは 5.4 で確かめる）。確認の時点で YjsService が未初期化だと `failed: write-error` になるので、5.4 の cron の起動順に注意。`canOperate` の引数は pageService と同じ形（edit だけは `updatePage` が呼ばないので `(false, 今のパス, null)` と決めた）。失敗で記録された操作も `approvedAt` が残る（1.4 の動き。失敗した操作は二度と選ばれない）
 - 日本語の確認（ユーザー依頼）: 日本語・全角スペース（U+3000）・全角かっこ・正規表現の特殊文字・絵文字・CRLF を使うテストを、入力の検査・5 種類の handler・ProposalApplier・通知の snapshot・ChangeProposal model・diff2html に足し、本物の不具合は無いことを確かめた（`escapeStringForMongoRegex` を `RegExp.escape` に変える・本文のバイト数を `.length` にする書き換えでテストが落ちる）。`isCreatablePage` は `+ ^ $ \` を含むパスを断る。版の本文の CRLF は読み出し時に LF へ変わる（既存の挙動。検査関数は変換前のバイト数で数えるので上限は厳しめ）。`latestRevisionBodyLength` は UTF-16 の単位の長さでバイト数ではない
 - 5.1: `modelLabel` の 100 文字の検査は `Array.from(label).length`（コードポイントの数）で数え、超えたら切り詰めずに断る（`.length` は絵文字を 2 と数え、バイト数は日本語が 33 文字前後で上限に達し、`Intl.Segmenter` は ICU の版で結果が変わり保存サイズに上限が付かない。サーバーとブラウザで数え方が一致し、保存サイズが最大 400 バイトに収まる）。画面側の `maxlength` は UTF-16 の単位で数えるのでサーバーより厳しくなるだけで緩くはならない
+- 5.1: server の barrel（`features/change-proposal/server/index.ts`、5.1 で新規作成）は `createChangeProposalService(crowi, deps?)` を export する。`createProposal` は返るオブジェクトのメソッドで、承認（5.2）・取り消し（5.3）・取得（6.1）が同じオブジェクトにメソッドを足す。design の File Structure と change-proposal-ai-agent の `ProposeChangesContext`（design 705 行目）は crowi もサービスの実体も持たずに `createProposal({...})` を呼ぶ前提なので、route の factory で `createChangeProposalService(crowi)` を作って mastra の requestContext 等で道具に渡す配線が要る（どの spec にもこの受け渡しを書いたタスクが無い。ai-agent 側の Revalidation Trigger に当たる。6.3 / 8 で決める）
+- 5.1: `input-rejected` の `rejection` は `CreateInputRejection`（domain の `InputRejection` に `invalid-entry`、`model-label-too-long`（`max: 100`）、`invalid-operation`（`index`）を足したもの）。ai-agent の誤りの対応表は code をそのまま detail に入れるので壊れないが、design の ServiceError の節と ai-agent への引き継ぎに書き足す。作成時に move の `fromPath` が今のパスと違えば `target-unavailable`（design に無い。反映時の move handler と同じ判断）。1 日の上限は「数えてから保存」なので同時の作成で少し超えうる。承認の書き込みで例外なら `apply: null`、反映で例外なら `{type:'in-progress'}`（承認は保存済みなので 5.4 の cron が拾う）。`MODEL_LABEL_MAX_CODE_POINTS` は barrel から export（使う側は ai-agent の予定）
