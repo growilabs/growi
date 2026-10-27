@@ -44,7 +44,7 @@
   - _Boundary: AnonymizeQueryParams_
 
 - [ ] 3. 規則と実行関数
-- [ ] 3.1 規則を受け取って URL を匿名化する実行関数を作る
+- [x] 3.1 規則を受け取って URL を匿名化する実行関数を作る
   - URL をパスとクエリに分け、パスには最初に当てはまった規則を 1 つだけ、クエリには共通パラメータ名の置換を適用し、最後につなぐ
   - 画面内遷移用データ URL の規則では、中のパスを同じ規則の一覧に通して外側を付け直す
   - 何も変わらなければ「変化なし」を返す。想定外の例外では固定の `/[ANONYMIZATION_FAILED]` を返して警告を記録する
@@ -127,3 +127,4 @@
 - 1.3: ルート列挙の起動ヘルパーは `apps/app/test/setup/growi-routes.ts`（`listGrowiRoutes()`）。4.3 はこれを import して使う。`src/` に置くとサーバーの build に入るため `test/setup/` に置いた。integration テストは `cd apps/app && env -u MONGO_URI ../../node_modules/.bin/vitest run --project=app-integration <パターン>` で回す。
 - 2.2: `matchPathPattern` / `redactPathParams` は素の `:name` だけを扱う（`:id([0-9a-f]{24})` のような正規表現付きは非対応）。3.2 のパス規則のパターンは素の `:name` で宣言する。末尾 `/` 1 つは許容して照合する（`/share/abc/` も匿名化される）。
 - 2.3: 新しい関数は `anonymizeSearchParams(search, paramNames)`（`?` なしのクエリを受け取る）。4.1 で古い `anonymizeQueryParams` を消し、この関数を `anonymizeQueryParams` に改名する。
+- 3.1: `unwrap-next-data` の `/_next/data/<buildId>/[<locale>/]…json` の解析と locale 判定（`AllLang`）は実行関数 `anonymize-url.ts` の中にある。3.2 の規則は「データ URL であること」の判定だけを宣言する。`hashPagePath` は例外を握りつぶさず、実行関数の catch が `/[ANONYMIZATION_FAILED]` を返す。

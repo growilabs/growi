@@ -6,11 +6,6 @@ import {
   isUserPage,
   isUsersHomepage,
 } from '@growi/core/dist/utils/page-path-utils';
-import { diag } from '@opentelemetry/api';
-
-const logger = diag.createComponentLogger({
-  namespace: 'growi:anonymization:hash-page-path',
-});
 
 function hashString(str: string): string {
   return createHash('sha256').update(str).digest('hex').substring(0, 16);
@@ -48,47 +43,42 @@ export const isPageRoute = (decodedPath: string): boolean => {
  * leading/trailing slashes are preserved.
  */
 export const hashPagePath = (decodedPath: string): string => {
-  try {
-    if (isPermalink(decodedPath)) {
-      return decodedPath;
-    }
-
-    if (isUserPage(decodedPath)) {
-      const username = getUsernameByPath(decodedPath);
-
-      if (isUsersHomepage(decodedPath) && username) {
-        return `/user/[USERNAME_HASHED:${hashString(username)}]`;
-      }
-
-      if (username) {
-        const hashedUsername = hashString(username);
-        const remainingPath = decodedPath.replace(`/user/${username}`, '');
-
-        if (remainingPath) {
-          const cleanRemainingPath = remainingPath.replace(/^\/+|\/+$/g, '');
-          const hashedRemainingPath = hashString(cleanRemainingPath);
-          const leadingSlash = remainingPath.startsWith('/') ? '/' : '';
-          const trailingSlash =
-            remainingPath.endsWith('/') && remainingPath.length > 1 ? '/' : '';
-
-          return `/user/[USERNAME_HASHED:${hashedUsername}]${leadingSlash}[HASHED:${hashedRemainingPath}]${trailingSlash}`;
-        }
-      }
-    }
-
-    const cleanPath = decodedPath.replace(/^\/+|\/+$/g, '');
-
-    if (!cleanPath) {
-      return decodedPath;
-    }
-
-    const leadingSlash = decodedPath.startsWith('/') ? '/' : '';
-    const trailingSlash =
-      decodedPath.endsWith('/') && decodedPath.length > 1 ? '/' : '';
-
-    return `${leadingSlash}[HASHED:${hashString(cleanPath)}]${trailingSlash}`;
-  } catch (error) {
-    logger.warn(`Failed to hash page path: ${error}`);
+  if (isPermalink(decodedPath)) {
     return decodedPath;
   }
+
+  if (isUserPage(decodedPath)) {
+    const username = getUsernameByPath(decodedPath);
+
+    if (isUsersHomepage(decodedPath) && username) {
+      return `/user/[USERNAME_HASHED:${hashString(username)}]`;
+    }
+
+    if (username) {
+      const hashedUsername = hashString(username);
+      const remainingPath = decodedPath.replace(`/user/${username}`, '');
+
+      if (remainingPath) {
+        const cleanRemainingPath = remainingPath.replace(/^\/+|\/+$/g, '');
+        const hashedRemainingPath = hashString(cleanRemainingPath);
+        const leadingSlash = remainingPath.startsWith('/') ? '/' : '';
+        const trailingSlash =
+          remainingPath.endsWith('/') && remainingPath.length > 1 ? '/' : '';
+
+        return `/user/[USERNAME_HASHED:${hashedUsername}]${leadingSlash}[HASHED:${hashedRemainingPath}]${trailingSlash}`;
+      }
+    }
+  }
+
+  const cleanPath = decodedPath.replace(/^\/+|\/+$/g, '');
+
+  if (!cleanPath) {
+    return decodedPath;
+  }
+
+  const leadingSlash = decodedPath.startsWith('/') ? '/' : '';
+  const trailingSlash =
+    decodedPath.endsWith('/') && decodedPath.length > 1 ? '/' : '';
+
+  return `${leadingSlash}[HASHED:${hashString(cleanPath)}]${trailingSlash}`;
 };
