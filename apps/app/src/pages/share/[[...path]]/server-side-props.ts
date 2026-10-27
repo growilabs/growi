@@ -19,7 +19,7 @@ import {
 import { addActivity } from '../../utils/activity';
 import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
 import { getPageDataForInitial } from './page-data-props';
-import type { Stage2InitialProps } from './types';
+import type { Stage2EachProps, Stage2InitialProps } from './types';
 
 const basisProps = {
   props: {
@@ -92,6 +92,32 @@ export async function getServerSidePropsForInitial(
   if (!isValidGeneralPageInitialProps(mergedProps)) {
     throw new Error('Invalid merged props structure');
   }
+
+  // Persist activity
+  addActivity(context, getActivityAction(mergedProps));
+
+  return mergedResult;
+}
+
+export async function getServerSidePropsForSameRoute(
+  context: GetServerSidePropsContext,
+): Promise<GetServerSidePropsResult<Stage2EachProps>> {
+  // Unlike [[...path]], the page cannot be fetched client-side from the URL alone:
+  // the share link itself is resolved only on the server.
+  const [i18nPropsResult, pageDataResult] = await Promise.all([
+    getServerSideI18nProps(context, ['translation']),
+    getPageDataForInitial(context),
+  ]);
+
+  const mergedResult: GetServerSidePropsResult<Stage2EachProps> =
+    mergeGetServerSidePropsResults(pageDataResult, i18nPropsResult);
+
+  // Check for early return (redirect/notFound)
+  if ('redirect' in mergedResult || 'notFound' in mergedResult) {
+    return mergedResult;
+  }
+
+  const mergedProps = await mergedResult.props;
 
   // Persist activity
   addActivity(context, getActivityAction(mergedProps));
