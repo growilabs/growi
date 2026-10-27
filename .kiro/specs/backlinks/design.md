@@ -966,10 +966,15 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     for a 30-minute average over 72 h, ~8 for 2 h), with random clumping above that. It is **not a
     cap**: a few large wikis can overlap. The window is sized from the measured per-app duration
     (B3.4), not guessed.
-  - **Hard cap (open, not in the baseline)**: a lease in a store every app can reach, held while a
-    backfill runs, would bound concurrent apps to K whatever the durations. It needs shared state
-    across tenants, which may not exist (each tenant has its own database), so its feasibility is
-    confirmed with infra first.
+  - **No hard cap by design.** A cross-app lease would bound concurrent apps whatever the
+    durations, but it needs shared state across tenants (each has its own database) or a service
+    infra would have to build, which is more work than the one-time setup allows. It is not
+    planned; it is revisited only if B3.4 shows the window cannot be sized safely.
+  - **Fallback if the fixed limits are not enough: latency backoff in the app.** The loop already
+    times each page's database round trips; when they rise above a baseline it lengthens its rest,
+    and shortens it again as they recover. It uses only the tenant's own connection, so it needs
+    no new permissions and no infra work. It is a weaker signal than replication lag (which needs
+    admin access) and is added only if B3.4's measurements call for it.
 - **Per-app load bound.** The duty cycle alone does not bound DB access, because the rest was set
   from parse time only and the body read and page-link writes were not counted. Three limits apply
   to a page cycle:

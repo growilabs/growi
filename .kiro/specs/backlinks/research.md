@@ -389,8 +389,8 @@
     `apps × average duration ÷ window`: ~2 for a 30-minute average over 72 h, ~8 for 2 h, ~0.9 and
     ~3.5 over 7 days; random clumping puts the peak above that average. This **spreads starts but
     does not cap concurrency**, and it says nothing about how long each app runs, so the window is
-    sized from the measured duration (B3.4). A shared lease would give a real cap and needs a store
-    every tenant can reach, which is unconfirmed.
+    sized from the measured duration (B3.4). A shared lease would give a real cap, but it needs shared
+    state across tenants or a service infra would build, so it is not planned.
   - *Per-app load is not bounded by the duty alone*: the rest was set from parse time only, so the
     body read and the writes were free. By the reviewer's estimate (not measured), a 5 ms page at
     25% duty rests ~15 ms (~40 pages/s per app) and a 1.3 ms note runs 100+ pages/s, so lowering
@@ -424,12 +424,15 @@
     (fleet-sized total time, and a slow backfill overlaps the next slot); tying waves to staged
     releases; a scheduled absolute start time; a control-plane permission endpoint or a shared lease
     (the only options with a real concurrency cap, but infra would have to build them or tenants
-    share state, so they stay candidates, not the baseline).
+    would share state, which is more infra work than the one-time setup allows; revisit only if
+    B3.4 shows the window cannot be sized safely).
   - *Also considered, not adopted*: lazy backfill on page view (cannot work for backlinks, which
     come from other pages' bodies); an infra-run external
-    script that parses pages (the parse needs the app's extractor). Candidates to add later:
-    reading bodies with `secondaryPreferred` (backfill tolerates stale reads, not verified against
-    the cluster) and backing off when chunk latency rises.
+    script that parses pages (the parse needs the app's extractor). The planned fallback if B3.4
+    shows the fixed limits are not enough is backing off when the page's own database round trips
+    slow down (design.md); it needs no permissions or infra work. A candidate to add later: reading
+    bodies with `secondaryPreferred` (backfill tolerates stale reads, not verified against the
+    cluster).
   - *Infra answers (2026-10-21)*: the GROWI.cloud release job updates at most 5 apps every 20
     minutes (15 an hour, 360 a day); restarting an app is not treated as an outage, though strictly
     it is one; querying a tenant database directly depends on the operation, and infra wants to be
@@ -440,8 +443,7 @@
     timestamp. (3) The design no longer needs infra to write to tenant databases.
   - *Still to confirm with the infra team*: that they will set the same env values (auto-start
     and the start window) on every cloud app once at release; that `app:growiAppIdForCloud` is set at
-    boot on every cloud app; whether a shared store for a lease is available; how they will watch
-    progress across apps; the cluster headroom and which apps share which cluster. The backfill
+    boot on every cloud app; how they will watch progress across apps; the cluster headroom and which apps share which cluster. The backfill
     load they would be shown is estimated, not measured — B3.4's performance run replaces the
     estimates.
   Implementation reuses the page-bulk-export scaffolding:

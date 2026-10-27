@@ -548,7 +548,8 @@ admin-triggered start was deferred as a one-line future change. Independent of B
     operations per second, bytes written, oplog growth and replication delay, with many small
     pages as well as typical ones, at the default duty and with the page-rate floor. From the
     per-app duration across a realistic page-count spread, size the start window and the number
-    of apps that may overlap. Agree the success numbers before running
+    of apps that may overlap, and decide whether the fixed limits suffice or the app needs to back
+    off when its own database round trips slow down (design.md's fallback). Agree the success numbers before running
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _Depends: B3.2_
 
