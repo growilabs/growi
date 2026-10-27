@@ -419,6 +419,21 @@
     "comment_management_is_not_allowed": "Comment management is not allowed.",
     "no_comments": "There are no comments yet."
   },
+  "inline_comment": {
+    "start_comment": "Comment",
+    "resolved": "Resolved",
+    "unresolved": "Unresolved",
+    "resolve": "Resolve",
+    "reopen": "Reopen",
+    "range_not_found": "The commented text could not be found on this page. It may have been edited or removed.",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "more": "More",
+    "expand_all_resolved": "Expand all resolved comments",
+    "list_menu": "Comment list menu",
+    "item_menu": "Comment actions",
+    "view_at_posting": "View page at posting"
+  },
   "page_api_error": {
     "notfound_or_forbidden": "Original page is not found or forbidden.",
     "already_exists": "Page with the path already exists.",
@@ -698,6 +713,18 @@
     "number_of_list_to_display": "Display",
     "page_number_unit": "pages",
     "hit_number_unit": "hit",
+    "filter": "Filters",
+    "search_option": "Search Options",
+    "filter_remove": "Remove",
+    "filter_clear": "Clear all",
+    "filter_author": "Author",
+    "filter_by_author": "Filter by author",
+    "filter_editor": "Editor",
+    "filter_by_editor": "Filter by editor",
+    "filter_tag": "Tag",
+    "filter_group": "Group",
+    "filter_group_select": "Select groups",
+    "filter_group_none": "No groups available",
     "sort_axis": {
       "relationScore": "Sort by relevance",
       "createdAt": "Creation date",
@@ -1141,6 +1168,48 @@
     "table": {
       "label": "Table",
       "description": ""
+    },
+    "plantuml": {
+      "label": "PlantUML",
+      "description": ""
+    },
+    "lsx": {
+      "label": "Dynamic list (lsx)",
+      "description": ""
+    },
+    "drawio": {
+      "label": "Diagram (drawio)",
+      "description": ""
+    },
+    "link": {
+      "label": "Link",
+      "description": ""
+    },
+    "tableBuilder": {
+      "label": "Table builder",
+      "description": ""
+    },
+    "callout": {
+      "note": {
+        "label": "Callout (Note)",
+        "description": ""
+      },
+      "tip": {
+        "label": "Callout (Tip)",
+        "description": ""
+      },
+      "important": {
+        "label": "Callout (Important)",
+        "description": ""
+      },
+      "warning": {
+        "label": "Callout (Warning)",
+        "description": ""
+      },
+      "caution": {
+        "label": "Callout (Caution)",
+        "description": ""
+      }
     }
   }
 }

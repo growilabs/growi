@@ -1,5 +1,16 @@
 {
   "extends": "./tsconfig.json",
+  // "exclude" replaces the base list rather than merging with it, so the base
+  // entries are restated here. Tests are kept out of the build only: the
+  // typecheck uses tsconfig.json and must still cover them.
+  "exclude": [
+    "node_modules",
+    "config",
+    "dist",
+    "src/public/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "dist",

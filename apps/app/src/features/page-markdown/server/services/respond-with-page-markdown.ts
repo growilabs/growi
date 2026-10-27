@@ -147,7 +147,7 @@ async function buildOkResolution(
 ): Promise<MarkdownResolution> {
   // Populate body + updater. Empty container pages have no revision; populate
   // leaves it null rather than throwing, so this is safe for empty pages too.
-  page.initLatestRevisionField();
+  await page.initLatestRevisionField();
   const populated = await page.populateDataToShowRevision(false);
 
   const pageId = String(populated._id);

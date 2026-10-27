@@ -1,5 +1,7 @@
 # Brief: i18n-community-translation
 
+> これは discovery 時点(2026-09-08)の記録である。現在の正しい設計・決定は `design.md` / `requirements.md` / `research.md` を参照し、本文と食い違う場合はそちらを優先する。
+
 ## Problem
 
 GROWI は 5 言語（en_US / ja_JP / zh_CN / fr_FR / ko_KR）を提供しているが、コミュニティのユーザーが翻訳に貢献する導線が無い。現状で貢献するには、GitHub のアカウントを持ち、リポジトリを fork し、`apps/app/public/static/locales/<lang>/<ns>.json` の正しい位置に手で JSON を書き、PR を出す必要がある。翻訳したいだけの wiki 利用者にはハードルが高すぎる。

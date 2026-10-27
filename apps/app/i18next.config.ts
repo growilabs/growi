@@ -113,6 +113,17 @@ export default defineConfig({
       // AccessTokenScopeList.tsx:92 — the segment is a scope id with ':'
       // rewritten to '.' at runtime.
       'commons:accesstoken_scopes_desc.*',
+      // UsernameTypeahead.tsx:178 — `t(CATEGORY_LABEL_KEYS[category])`, where
+      // CATEGORY_LABEL_KEYS (UsernameTypeahead.tsx:34) maps a category to a
+      // whole namespace-prefixed key string. Unlike the entries above, it is
+      // not just a trailing segment that is runtime-built but the entire key,
+      // so static analysis sees no key at the call site at all.
+      // Enumerated, not `commons:username_suggestion.*`: the value set is
+      // exactly the two `Categories` values (UsernameTypeahead.tsx:22-25), a
+      // closed map `satisfies Record<CategoryType, string>` that cannot grow
+      // without this call site being touched.
+      'commons:username_suggestion.active_user',
+      'commons:username_suggestion.inactive_user',
       // slash-command-definitions.ts — the command set lives in
       // packages/editor (outside `extract.input`, which only scans apps/app's
       // own `src/**`) and every key is read back through

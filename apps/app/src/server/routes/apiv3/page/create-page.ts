@@ -40,6 +40,7 @@ import { prisma } from '~/utils/prisma';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { grantBodyValidator } from './grant-body-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:page:create-page');
 
@@ -143,10 +144,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       .optional()
       .isString()
       .withMessage('body must be string or undefined'),
-    body('grant')
-      .optional()
-      .isInt({ min: 0, max: 5 })
-      .withMessage('grant must be integer from 1 to 5'),
+    grantBodyValidator({ required: false }),
     body('onlyInheritUserRelatedGrantedGroups')
       .optional()
       .isBoolean()

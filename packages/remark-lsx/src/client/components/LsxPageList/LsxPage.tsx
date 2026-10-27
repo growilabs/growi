@@ -60,11 +60,11 @@ export const LsxPage = React.memo((props: Props): JSX.Element => {
   const iconElement: JSX.Element = useMemo(() => {
     const isExists = pageId != null;
     return isExists ? (
-      <span className="material-symbols-outlined fs-5 me-1" aria-hidden="true">
+      <span className="material-symbols-outlined fs-5" aria-hidden="true">
         description
       </span>
     ) : (
-      <span className="material-symbols-outlined fs-5 me-1" aria-hidden="true">
+      <span className="material-symbols-outlined fs-5" aria-hidden="true">
         draft
       </span>
     );
@@ -118,9 +118,14 @@ export const LsxPage = React.memo((props: Props): JSX.Element => {
 
   return (
     <li className={`page-list-li ${styles['page-list-li']} my-2`}>
-      <div className="d-flex align-items-center">
-        {iconElement} {pagePathElement}
-        <span className="ms-2">{pageListMetaElement}</span>
+      <div className="d-flex align-items-start gap-1">
+        <span className="flex-shrink-0 lh-1">{iconElement}</span>
+        <span className="flex-grow-1 text-break">
+          {pagePathElement}
+          {pageListMetaElement != null && (
+            <span className="ms-2">{pageListMetaElement}</span>
+          )}
+        </span>
       </div>
       {childrenElements}
     </li>

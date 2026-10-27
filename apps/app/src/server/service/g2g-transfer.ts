@@ -10,6 +10,7 @@ import mongoose, { Types as MongooseTypes } from 'mongoose';
 import { basename } from 'pathe';
 
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
+import type { Prisma } from '~/generated/prisma/client';
 import {
   type AdminRescueOutcome,
   G2G_PROGRESS_STATUS,
@@ -23,15 +24,14 @@ import { ImportMode } from '~/models/admin/import-mode';
 import TransferKeyModel from '~/server/models/transfer-key';
 import { getImportService, type ImportSettings } from '~/server/service/import';
 import type { ImportResult } from '~/server/service/import/import';
-import { createBatchStream } from '~/server/util/batch-stream';
 import axios from '~/utils/axios';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 import { TransferKey } from '~/utils/vo/transfer-key';
 
 import type Crowi from '../crowi';
 import { AccessToken, type IAccessToken } from '../models/access-token';
-import { Attachment } from '../models/attachment';
 import UserGroup from '../models/user-group';
 import {
   G2G_CONFLICT_DETECTION_FAILED_ERROR_CODE,
@@ -981,21 +981,37 @@ export class G2GTransferPusherService implements Pusher {
      * | c.png | 1024 |
      * | d.png | 2048 |
      */
-    const filter =
+    const where: Prisma.attachmentsWhereInput =
       filesFromSrcGROWI.length > 0
         ? {
-            $and: filesFromSrcGROWI.map(({ name, size }) => ({
-              $or: [
-                { fileName: { $ne: basename(name) } },
-                { fileSize: { $ne: size } },
+            AND: filesFromSrcGROWI.map(({ name, size }) => ({
+              OR: [
+                { fileName: { not: basename(name) } },
+                { fileSize: { not: size } },
               ],
             })),
           }
         : {};
-    const attachmentsCursor = await Attachment.find(filter).cursor();
-    const batchStream = createBatchStream(BATCH_SIZE);
 
-    for await (const attachmentBatch of attachmentsCursor.pipe(batchStream)) {
+    // Keyset-paginated batches (bounded to BATCH_SIZE in memory at a time),
+    // replacing Mongoose's native find().cursor() streaming: Prisma has no
+    // equivalent DB-level cursor for MongoDB. Mirrors exportActivityCursor's
+    // `id: { gt: lastId }` resume pattern.
+    let lastId: string | undefined;
+    while (true) {
+      const resolvedWhere: Prisma.attachmentsWhereInput =
+        lastId != null ? { ...where, id: { gt: lastId } } : where;
+
+      const attachmentBatch = await prisma.attachments.findMany({
+        where: resolvedWhere,
+        orderBy: { id: 'asc' },
+        take: BATCH_SIZE,
+      });
+      if (attachmentBatch.length === 0) {
+        break;
+      }
+      lastId = attachmentBatch[attachmentBatch.length - 1].id;
+
       for await (const attachment of attachmentBatch) {
         logger.debug(`processing attachment: ${attachment}`);
         let fileStream: NodeJS.ReadableStream;

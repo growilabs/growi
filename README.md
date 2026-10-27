@@ -77,12 +77,14 @@ See [GROWI Docs: Admin Guide](https://docs.growi.org/en/admin-guide/) ([en](http
 
 See [GROWI Docs: Environment Variables](https://docs.growi.org/en/admin-guide/admin-cookbook/env-vars.html) ([en](https://docs.growi.org/en/admin-guide/admin-cookbook/env-vars.html)/[ja](https://docs.growi.org/ja/admin-guide/admin-cookbook/env-vars.html)).
 
+See [environment-only storage settings](docs/storage-env-only.md) for configuring AWS S3, GCS, and Azure from environment variables.
+
 # Development
 
 ## Dependencies
 
 - Node.js v24.x
-- pnpm 10.x
+- pnpm 11.x (see the `packageManager` field in [package.json](./package.json) for the exact version)
 - [Turborepo](https://turbo.build/repo)
 - MongoDB v6.x or v8.x
 
@@ -125,6 +127,11 @@ Repository. If you would like to _implement_ a new feature, firstly please submi
 - For a **Major Feature**, firstly open an issue and outline your proposal so it can be discussed.  
   It also allows us to coordinate better, prevent duplication of work and help you to create the change so it can be successfully accepted into the project.
 - **Small Features** can be created and directly [submitted as a Pull Request][pulls].
+
+## Translations
+
+Want to help translate GROWI into your language? No GitHub account is required.
+See [Contributing to GROWI translations](./docs/i18n-community-translation.md) for how to join and submit translations.
 
 ## Language on GitHub
 

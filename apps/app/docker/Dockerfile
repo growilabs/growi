@@ -82,6 +82,10 @@ RUN turbo run build --filter @growi/app
 # Produce artifacts
 RUN bash apps/app/bin/assemble-prod.sh
 
+# This pruned install can resolve peers differently from the full workspace that CI checks,
+# so verify here too that the Turbopack-baked symlinks survived `pnpm deploy --prod`.
+RUN bash apps/app/bin/check-next-symlinks.sh
+
 # Point a fixed-name symlink at the Prisma query engine for THIS image's target
 # architecture. The release stage references it via a static PRISMA_QUERY_ENGINE_LIBRARY,
 # which @prisma/client returns verbatim — WITHOUT an existence check and skipping its

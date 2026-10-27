@@ -27,13 +27,22 @@ export const NotAvailableForReadOnlyUser: React.FC<{
 };
 NotAvailableForReadOnlyUser.displayName = 'NotAvailableForReadOnlyUser';
 
+/**
+ * Same gate as `NotAvailableIfReadOnlyUserNotAllowedToComment`, for call
+ * sites that need a boolean (e.g. disabling a dropdown item) rather than a
+ * wrapping disable overlay.
+ */
+export const useIsCommentActionBlockedForReadOnlyUser = (): boolean => {
+  const isReadOnlyUser = useIsReadOnlyUser();
+  const isRomUserAllowedToComment = useAtomValue(isRomUserAllowedToCommentAtom);
+  return !!isReadOnlyUser && !isRomUserAllowedToComment;
+};
+
 export const NotAvailableIfReadOnlyUserNotAllowedToComment: React.FC<{
   children: JSX.Element;
 }> = ({ children }) => {
   const { t } = useTranslation();
-  const isReadOnlyUser = useIsReadOnlyUser();
-  const isRomUserAllowedToComment = useAtomValue(isRomUserAllowedToCommentAtom);
-  const isDisabled = !!isReadOnlyUser && !isRomUserAllowedToComment;
+  const isDisabled = useIsCommentActionBlockedForReadOnlyUser();
   const title = t('page_comment.comment_management_is_not_allowed');
   return (
     <NotAvailable

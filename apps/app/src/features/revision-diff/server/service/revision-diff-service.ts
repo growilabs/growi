@@ -12,6 +12,7 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose, { Types } from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import { prisma } from '~/utils/prisma';
 
 import type {
@@ -88,7 +89,7 @@ export function computeDiffForPair(
 
   // Step 2: validate toRevision — must exist and belong to the specified pageId.
   const toRevision = revisionMap.get(toRevisionId);
-  if (toRevision == null || toRevision.pageId !== pageId) {
+  if (!isRevisionOfPage(toRevision, pageId)) {
     return { status: 'invalid', pageId, toRevisionId };
   }
 
@@ -96,7 +97,7 @@ export function computeDiffForPair(
   let fromBody = '';
   if (fromRevisionId !== null) {
     const fromRevision = revisionMap.get(fromRevisionId);
-    if (fromRevision == null || fromRevision.pageId !== pageId) {
+    if (!isRevisionOfPage(fromRevision, pageId)) {
       return { status: 'invalid', pageId, toRevisionId };
     }
     fromBody = fromRevision.body;

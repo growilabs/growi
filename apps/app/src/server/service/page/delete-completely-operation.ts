@@ -6,8 +6,6 @@ import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageModel } from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
 
-import { Attachment } from '../../models/attachment';
-import PageRedirect from '../../models/page-redirect';
 import {
   type ActivityActor,
   recordCascadeAttachmentRemovals,
@@ -45,7 +43,12 @@ export const deleteCompletelyOperation = async (
   const Page = mongoose.model<IPage, PageModel>('Page');
 
   const { attachmentService } = crowi;
-  const attachments = await Attachment.find({ page: { $in: pageIds } });
+
+  const pageIdStrings = pageIds.map((pageId) => pageId.toString());
+
+  const attachments = await prisma.attachments.findMany({
+    where: { pageId: { in: pageIdStrings } },
+  });
 
   if (actor != null) {
     await recordCascadeAttachmentRemovals(
@@ -55,12 +58,6 @@ export const deleteCompletelyOperation = async (
       actor,
     );
   }
-
-  // prisma's `comments.pageId` (String @db.ObjectId) filter expects hex strings,
-  // whereas the mongoose `$in` queries below accept ObjectIdLike as-is. Normalize
-  // to strings for the prisma side only (same ObjectId-stringify convention as
-  // cascade-attachment-removal-inputs); no-op for ids already in string form.
-  const pageIdStrings = pageIds.map((pageId) => pageId.toString());
 
   // Delete reply comments first, then top-level comments, to avoid foreign key constraint violations.
   await prisma.$transaction([
@@ -92,6 +89,12 @@ export const deleteCompletelyOperation = async (
   // reliably reproducible when the two run concurrently, never when run
   // sequentially). At that point, move pagetagrelations/revisions
   // deletion ahead of the pages delete.
+  //
+  // `pagebulkexportjobs.page` is an optional `onDelete: NoAction` relation too,
+  // but it is deliberately not deleted here: jobs may outlive their page. After
+  // the move to `prisma.pages.deleteMany`, a page still referenced by a job
+  // would be rejected with P2014, so decide then whether to delete those jobs
+  // or switch the relation to SetNull.
   await Promise.all([
     prisma.pagetagrelations.deleteMany({
       where: { relatedPageId: { in: pageIdStrings } },
@@ -104,8 +107,10 @@ export const deleteCompletelyOperation = async (
 
   await Promise.all([
     Page.deleteMany({ _id: { $in: pageIds } }),
-    PageRedirect.deleteMany({
-      $or: [{ fromPath: { $in: pagePaths } }, { toPath: { $in: pagePaths } }],
+    prisma.pageredirects.deleteMany({
+      where: {
+        OR: [{ fromPath: { in: pagePaths } }, { toPath: { in: pagePaths } }],
+      },
     }),
     attachmentService.removeAllAttachments(attachments),
 

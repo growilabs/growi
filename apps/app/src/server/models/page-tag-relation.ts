@@ -215,6 +215,47 @@ export const extension = Prisma.defineExtension((client) => {
           );
         },
 
+        /**
+         * Returns the ids of the pages that have *every* one of the given tag
+         * names (AND). Tag names are matched exactly. Returns an empty array
+         * when any of the given names is not a known tag, or when no page has
+         * all of them.
+         */
+        async findPageIdsWithAllTags(tagNames: string[]): Promise<string[]> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.pagetagrelations>(this);
+
+          const tags = await tagsModel.findMany({
+            where: { name: { in: tagNames } },
+            select: { id: true },
+          });
+
+          // A name that resolves to no tag makes the AND condition
+          // unsatisfiable, so there is nothing left to query.
+          if (tags.length < new Set(tagNames).size) {
+            return [];
+          }
+
+          const tagIds = tags.map((tag) => tag.id);
+
+          const relations = await context.findMany({
+            where: { relatedTagId: { in: tagIds } },
+            select: { relatedPageId: true, relatedTagId: true },
+          });
+
+          const pageIdToTagIds = new Map<string, Set<string>>();
+          relations.forEach((relation) => {
+            const tagIdsOfPage =
+              pageIdToTagIds.get(relation.relatedPageId) ?? new Set<string>();
+            tagIdsOfPage.add(relation.relatedTagId);
+            pageIdToTagIds.set(relation.relatedPageId, tagIdsOfPage);
+          });
+
+          return Array.from(pageIdToTagIds.entries())
+            .filter(([, tagIdsOfPage]) => tagIdsOfPage.size === tagIds.length)
+            .map(([pageId]) => pageId);
+        },
+
         async updatePageTags(pageId: Types.ObjectId | string, tags: string[]) {
           if (pageId == null || tags == null) {
             throw new Error("args 'pageId' and 'tags' are required.");

@@ -4,24 +4,24 @@ import {
   pdfCtrlSyncJobStatus,
 } from '@growi/pdf-converter-client';
 
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 import { PageBulkExportJobStatus } from '../../../interfaces/page-bulk-export';
-import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job';
 import PageBulkExportPageSnapshot from '../../models/page-bulk-export-page-snapshot';
 import { BulkExportJobExpiredError } from './errors';
 
 /**
  * Request PDF converter and start pdf convert for the pageBulkExportJob,
  * or sync pdf convert status if already started.
+ *
+ * @returns the job, re-read when this call advanced it to the uploading status
  */
 export async function requestPdfConverter(
-  pageBulkExportJob: PageBulkExportJobDocument,
-): Promise<void> {
+  pageBulkExportJob: pagebulkexportjobs,
+): Promise<pagebulkexportjobs> {
   const jobCreatedAt = pageBulkExportJob.createdAt;
-  if (jobCreatedAt == null) {
-    throw new Error('createdAt is not set');
-  }
 
   const isGrowiCloud = configManager.getConfig('app:growiCloudUri') != null;
   const appId = configManager.getConfig('app:growiAppIdForCloud');
@@ -39,7 +39,9 @@ export async function requestPdfConverter(
     PdfCtrlSyncJobStatusBodyStatus.HTML_EXPORT_IN_PROGRESS;
 
   const lastExportPagePath = (
-    await PageBulkExportPageSnapshot.findOne({ pageBulkExportJob }).sort({
+    await PageBulkExportPageSnapshot.findOne({
+      pageBulkExportJob: pageBulkExportJob.id,
+    }).sort({
       path: -1,
     })
   )?.path;
@@ -63,7 +65,7 @@ export async function requestPdfConverter(
     const res = await pdfCtrlSyncJobStatus(
       {
         appId,
-        jobId: pageBulkExportJob._id.toString(),
+        jobId: pageBulkExportJob.id,
         expirationDate: bulkExportJobExpirationDate.toISOString(),
         status: pdfConvertStatus,
       },
@@ -71,9 +73,12 @@ export async function requestPdfConverter(
     );
 
     if (res.data.status === PdfCtrlSyncJobStatus202Status.PDF_EXPORT_DONE) {
-      pageBulkExportJob.status = PageBulkExportJobStatus.uploading;
-      await pageBulkExportJob.save();
-    } else if (res.data.status === PdfCtrlSyncJobStatus202Status.FAILED) {
+      return await prisma.pagebulkexportjobs.update({
+        where: { id: pageBulkExportJob.id },
+        data: { status: PageBulkExportJobStatus.uploading },
+      });
+    }
+    if (res.data.status === PdfCtrlSyncJobStatus202Status.FAILED) {
       throw new Error('PDF export failed');
     }
   } catch (err) {
@@ -83,4 +88,6 @@ export async function requestPdfConverter(
       throw err;
     }
   }
+
+  return pageBulkExportJob;
 }

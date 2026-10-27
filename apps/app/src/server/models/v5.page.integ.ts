@@ -24,7 +24,6 @@ import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 
 import type { IPageService } from '../service/page';
-import type { IPageRedirect, PageRedirectModel } from './page-redirect';
 
 describe('Page', () => {
   let crowi: Crowi;
@@ -32,7 +31,6 @@ describe('Page', () => {
 
   let Page: PageModel;
   let User: Model<IUser>;
-  let PageRedirect: PageRedirectModel;
   let PageOperation: PageOperationModel;
 
   let rootPage: PageDocument;
@@ -555,9 +553,6 @@ describe('Page', () => {
     vi.restoreAllMocks();
     User = mongoose.model('User');
     Page = mongoose.model('Page') as PageModel;
-    PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
-      'PageRedirect',
-    );
     PageOperation = mongoose.model<IPageOperation, PageOperationModel>(
       'PageOperation',
     );

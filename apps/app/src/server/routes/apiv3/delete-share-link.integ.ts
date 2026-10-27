@@ -170,19 +170,10 @@ describe('DELETE /share-links/:id', () => {
   });
 
   it('deletes the share link when an admin makes the request, even if the related page no longer exists', async () => {
-    // The route's admin bypass reads `user.isAdmin` off req.user — but
-    // `IUserHasId`/the User schema have no such field (the real field is
-    // `admin`, e.g. server/models/user/index.js). So `user.isAdmin` is always
-    // undefined for a real user, and this branch is unreachable in
-    // production today; that mismatch is a separate, pre-existing bug and
-    // out of scope here. This test exercises the branch as the code is
-    // literally written, via a fresh object (never mutating the shared
-    // `requester` fixture the other cases use).
     const adminUser = {
       ...requester.toObject(),
-      isAdmin: true,
-      // biome-ignore lint/suspicious/noExplicitAny: `isAdmin` isn't a real field on IUserHasId — see comment above
-    } as any as HydratedDocument<IUserHasId>;
+      admin: true,
+    } as HydratedDocument<IUserHasId>;
 
     const { setup } = await import('./share-links');
     const adminApp = buildApp(adminUser);

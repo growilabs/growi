@@ -1,7 +1,6 @@
 {
   "Show": "Afficher",
   "View": "Lecture",
-  "Edit": "Écriture",
   "Hide": "Cacher",
   "Add": "Ajouter",
   "Insert": "Insérer",
@@ -18,6 +17,7 @@
   "Created": "Crée le",
   "Description": "Description",
   "Done": "Terminer",
+  "Edit": "Écriture",
   "Email": "Adresse courriel",
   "Error occurred": "Une erreur est survenue",
   "Help": "Aide",
@@ -249,6 +249,10 @@
         "user_group": "Accorde la permission de modifier les fonctionnalités de membres de groupe d'utilisateurs."
       }
     }
+  },
+  "username_suggestion": {
+    "active_user": "Utilisateurs actifs",
+    "inactive_user": "Utilisateurs inactifs"
   },
   "table_action": {
     "edit": "Modifier"

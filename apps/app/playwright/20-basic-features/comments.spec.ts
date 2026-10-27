@@ -102,8 +102,8 @@ test.describe('Comment', () => {
 
   //   await page.getByTestId('page-comment-button').click();
   //   await page.getByTestId('comment-delete-button').first().click({ force: true });
-  //   await expect(page.getByTestId('page-comment-delete-modal')).toBeVisible();
-  //   await page.getByTestId('delete-comment-button').click();
+  //   await expect(page.getByTestId('comment-delete-confirm')).toBeVisible();
+  //   await page.getByTestId('comment-delete-confirm-button').click();
 
   //   await expect(page.getByTestId('page-comment-button').locator('.grw-count-badge')).toHaveText('0');
   // });

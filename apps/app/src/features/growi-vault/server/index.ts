@@ -484,14 +484,32 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       },
     );
 
-    // syncDescendantsDelete fires after bulk descendant deletion.
-    // The individual delete events are sufficient for vault_instructions;
-    // this bulk event does not map to a distinct instruction type.
-    pageEvent.on('syncDescendantsDelete', (_pages: unknown, _user: unknown) => {
-      logger.debug(
-        'vault-dispatcher: received syncDescendantsDelete (no-op for vault)',
-      );
-    });
+    // syncDescendantsDelete fires after a recursive delete's bulk descendant
+    // removal (deleteDescendants()). Unlike the single-page delete path, GROWI
+    // core never emits an individual 'delete' event per descendant here — this
+    // bulk event is the only signal, so each descendant must be dispatched
+    // individually or its removal is silently dropped from vault_instructions.
+    pageEvent.on(
+      'syncDescendantsDelete',
+      (
+        pages:
+          | Array<IPage & { _id: { toString(): string } }>
+          | null
+          | undefined,
+        _user: unknown,
+      ) => {
+        if (!Array.isArray(pages) || pages.length === 0) return;
+
+        for (const page of pages) {
+          dispatcher.onPageChanged({ type: 'delete', page }).catch((err) => {
+            logger.warn(
+              { err },
+              'vault-dispatcher: error handling syncDescendantsDelete entry',
+            );
+          });
+        }
+      },
+    );
 
     // 'descendantsGrantChanged' fires after updateChildPagesGrant has applied
     // a bulk grant change to descendant pages. Without this signal, GROWI's
