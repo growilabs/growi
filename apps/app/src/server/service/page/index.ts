@@ -84,6 +84,7 @@ import { configManager } from '../config-manager';
 import type { IPageGrantService } from '../page-grant';
 import { preNotifyService } from '../pre-notify';
 import { getYjsService } from '../yjs';
+import { collectEmptyAncestorPaths } from './collect-empty-ancestor-paths';
 import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { deleteCompletelyOperation as deleteCompletelyOperationImpl } from './delete-completely-operation';
 import { onSeen } from './events/seen';
@@ -732,17 +733,22 @@ class PageService implements IPageService {
     await Page.takeOffFromTree(page._id);
 
     let newParent: PageDocument | undefined;
-    let insertedEmptyPageIds: PageDocument['_id'][] = [];
+    let emptyPagesToInsert: { _id: PageDocument['_id']; path: string }[] = [];
     let renamedPage: PageDocument | null = null;
     try {
       // 2. Find new parent
       // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
       if (this.isRenamingToUnderTarget(page.path, newPagePathSanitized)) {
-        ({ newParent, insertedPageIds: insertedEmptyPageIds } =
-          await this.getParentAndforceCreateEmptyTree(
-            page,
-            newPagePathSanitized,
-          ));
+        // Ids are fixed before the insert so the rollback can delete a partial insert.
+        emptyPagesToInsert = collectEmptyAncestorPaths(
+          page.path,
+          newPagePathSanitized,
+        ).map((path) => ({ _id: new mongoose.Types.ObjectId(), path }));
+        newParent = await this.getParentAndforceCreateEmptyTree(
+          page,
+          newPagePathSanitized,
+          emptyPagesToInsert,
+        );
       } else {
         newParent = await this.getParentAndFillAncestorsByUser(
           user,
@@ -781,11 +787,10 @@ class PageService implements IPageService {
               'the page is no longer detached at its original path.',
           );
         } else {
-          // Drop the empty pages step 2 inserted: one sits at the page's own path
-          // and would duplicate it. Only after a matched rollback, since if step 3
-          // committed they are the page's new ancestors.
+          // Only after a matched rollback: if step 3 committed, these are the page's
+          // new ancestors. Ids that were never inserted match nothing.
           await Page.deleteMany({
-            _id: { $in: insertedEmptyPageIds },
+            _id: { $in: emptyPagesToInsert.map((p) => p._id) },
             isEmpty: true,
           });
         }
@@ -793,7 +798,8 @@ class PageService implements IPageService {
         // Propagate the original error, not this one
         logger.error(
           `Failed to roll back the failed rename of "${page.path}". ` +
-            'The page may be off-tree or duplicated by an empty page until it is normalized.',
+            'The page may be off-tree or duplicated by an empty page until it is normalized. ' +
+            `Empty page ids that may remain: ${emptyPagesToInsert.map((p) => p._id).join(', ')}`,
           rollbackErr,
         );
       }
@@ -1001,39 +1007,29 @@ class PageService implements IPageService {
     return new RegExp(`^${pathToTest}`, 'i').test(pathToBeTested);
   }
 
-  private async getParentAndforceCreateEmptyTree(originalPage, toPath: string) {
+  private async getParentAndforceCreateEmptyTree(
+    originalPage,
+    toPath: string,
+    emptyPagesToInsert: { _id: PageDocument['_id']; path: string }[],
+  ) {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
-    const fromPath = originalPage.path;
     const newParentPath = pathlib.dirname(toPath);
 
-    // local util
-    const collectAncestorPathsUntilFromPath = (
-      path: string,
-      paths: string[] = [],
-    ): string[] => {
-      if (path === fromPath) return paths;
-
-      const parentPath = pathlib.dirname(path);
-      paths.push(parentPath);
-      return collectAncestorPathsUntilFromPath(parentPath, paths);
-    };
-
-    const pathsToInsert = collectAncestorPathsUntilFromPath(toPath);
     const originalParent = await Page.findById(originalPage.parent);
     if (originalParent == null) {
       throw Error('Original parent not found');
     }
     const insertedPages = await Page.insertMany(
-      pathsToInsert.map((path) => {
+      emptyPagesToInsert.map(({ _id, path }) => {
         return {
+          _id,
           path,
           isEmpty: true,
         };
       }),
     );
 
-    const insertedPageIds = insertedPages.map((p) => p._id);
     const pages = [...insertedPages, originalParent];
 
     const ancestorsMap = new Map<string, PageDocument & { _id: any }>(
@@ -1059,25 +1055,9 @@ class PageService implements IPageService {
 
       return op;
     });
-    try {
-      await Page.bulkWrite(operations);
-    } catch (err) {
-      try {
-        await Page.deleteMany({ _id: { $in: insertedPageIds } });
-      } catch (cleanupErr) {
-        // Propagate the original error, not this one. The caller never receives
-        // these ids when we throw, so log them to allow manual removal.
-        logger.error(
-          'Failed to delete the empty pages inserted before the failed bulkWrite. ' +
-            `Orphaned empty page ids: ${insertedPageIds.join(', ')}`,
-          cleanupErr,
-        );
-      }
-      throw err;
-    }
+    await Page.bulkWrite(operations);
 
-    const newParent = ancestorsMap.get(newParentPath);
-    return { newParent, insertedPageIds };
+    return ancestorsMap.get(newParentPath);
   }
 
   private async renamePageV4(page, newPagePath, user, options) {
