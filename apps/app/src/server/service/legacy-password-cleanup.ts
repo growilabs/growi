@@ -36,7 +36,12 @@ export const countPasswordHashFormats = async (
     ]),
   );
   const [result = {}] = await users
-    .aggregate<FacetResult>([{ $match: baseFilter }, { $facet: facetStages }])
+    .aggregate<FacetResult>([
+      { $match: baseFilter },
+      // $facet buffers every matched document; keep only the fields FACETS reads.
+      { $project: { password: 1, passwordHash: 1, status: 1 } },
+      { $facet: facetStages },
+    ])
     .toArray();
   // $count emits no document for an empty bucket, so a missing entry means 0.
   const countOf = (name: keyof typeof FACETS): number =>

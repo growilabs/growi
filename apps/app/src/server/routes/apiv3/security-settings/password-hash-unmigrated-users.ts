@@ -25,8 +25,13 @@ const MAX_LIMIT = 100;
 // Caps the skip offset so a huge page is a 400, not a 500 (design.md review fixes).
 const MAX_PAGE = 100000;
 
-const parseIntOrDefault = (value: unknown, defaultValue: number): number =>
-  value == null ? defaultValue : Number.parseInt(String(value), 10);
+// Shaped by the validators below: `.toInt()` has already converted each value.
+type ReqQuery = {
+  page?: number;
+  limit?: number;
+};
+
+type Req = Request<Record<string, string>, ApiV3Response, undefined, ReqQuery>;
 
 /**
  * @swagger
@@ -97,12 +102,26 @@ export const getPasswordHashUnmigratedUsersHandlersFactory = (
     accessTokenParser([SCOPE.READ.ADMIN.SECURITY]),
     loginRequiredStrictly,
     adminRequired,
-    query('page').optional().isInt({ min: 1, max: MAX_PAGE }),
-    query('limit').optional().isInt({ min: 1, max: MAX_LIMIT }),
+    // A repeated parameter arrives as an array, and isInt / toInt act on each
+    // element, so reject arrays explicitly before the range check.
+    query('page')
+      .optional()
+      .not()
+      .isArray()
+      .withMessage('page must be given once')
+      .isInt({ min: 1, max: MAX_PAGE })
+      .toInt(),
+    query('limit')
+      .optional()
+      .not()
+      .isArray()
+      .withMessage('limit must be given once')
+      .isInt({ min: 1, max: MAX_LIMIT })
+      .toInt(),
     apiV3FormValidator,
-    async (req: Request, res: ApiV3Response) => {
-      const page = parseIntOrDefault(req.query.page, DEFAULT_PAGE);
-      const limit = parseIntOrDefault(req.query.limit, DEFAULT_LIMIT);
+    async (req: Req, res: ApiV3Response) => {
+      const page = req.query.page ?? DEFAULT_PAGE;
+      const limit = req.query.limit ?? DEFAULT_LIMIT;
       try {
         const users = mongoose.connection.collection('users');
         const externalAccounts =
