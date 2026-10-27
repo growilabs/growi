@@ -11,6 +11,7 @@ import { isMailerSetupAtom } from '~/states/server-configurations';
 import { isValidWhitelistEntry } from '~/utils/email-whitelist';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
+import { PasswordHashMigration } from './PasswordHashMigration';
 
 type Props = {
   adminGeneralSecurityContainer: AdminGeneralSecurityContainer;
@@ -339,6 +340,8 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
           </div>
         </form>
       )}
+
+      <PasswordHashMigration />
     </>
   );
 };

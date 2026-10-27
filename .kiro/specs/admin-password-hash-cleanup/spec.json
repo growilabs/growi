@@ -1,0 +1,22 @@
+{
+  "feature_name": "admin-password-hash-cleanup",
+  "created_at": "2026-10-13T09:13:45.158Z",
+  "updated_at": "2026-10-14T11:56:26.967Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}
