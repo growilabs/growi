@@ -725,25 +725,34 @@ class PageService implements IPageService {
       }
     }
 
-    // 1. Take target off from tree
-    // No session makes this atomic with steps 2-3: if they throw, the catch below
-    // must reattach the page or it is stranded off the tree.
-    // See https://github.com/growilabs/growi/issues/9755
     const exParentId = page.parent;
-    await Page.takeOffFromTree(page._id);
+    // Computed before step 1, so a destination that cannot be computed (e.g. one
+    // under the page only by case) fails with nothing on the tree to undo. The ids
+    // are fixed before the insert so the rollback can delete a partial insert.
+    const isRenamingToUnderTarget = this.isRenamingToUnderTarget(
+      page.path,
+      newPagePathSanitized,
+    );
+    const emptyPagesToInsert = isRenamingToUnderTarget
+      ? collectEmptyAncestorPaths(page.path, newPagePathSanitized).map(
+          (path) => ({ _id: new mongoose.Types.ObjectId(), path }),
+        )
+      : [];
 
     let newParent: PageDocument | undefined;
-    let emptyPagesToInsert: { _id: PageDocument['_id']; path: string }[] = [];
     let renamedPage: PageDocument | null = null;
+    let hasDetachReturned = false;
+    // No session makes steps 1-3 atomic: if any of them throws, the catch below
+    // must reattach the page or it is stranded off the tree.
+    // See https://github.com/growilabs/growi/issues/9755
     try {
+      // 1. Take target off from tree
+      await Page.takeOffFromTree(page._id);
+      hasDetachReturned = true;
+
       // 2. Find new parent
       // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
-      if (this.isRenamingToUnderTarget(page.path, newPagePathSanitized)) {
-        // Ids are fixed before the insert so the rollback can delete a partial insert.
-        emptyPagesToInsert = collectEmptyAncestorPaths(
-          page.path,
-          newPagePathSanitized,
-        ).map((path) => ({ _id: new mongoose.Types.ObjectId(), path }));
+      if (isRenamingToUnderTarget) {
         newParent = await this.getParentAndforceCreateEmptyTree(
           page,
           newPagePathSanitized,
@@ -773,8 +782,8 @@ class PageService implements IPageService {
       const committedPage = await this.rollbackFailedRename({
         page,
         exParentId,
+        hasDetachReturned,
         newPagePath: newPagePathSanitized,
-        newParentId: newParent?._id,
         emptyPageIds: emptyPagesToInsert.map((p) => p._id),
       });
       if (committedPage == null) {
@@ -986,22 +995,23 @@ class PageService implements IPageService {
   /**
    * Undo steps 1-2 of a failed rename, but only while the page is still in the state
    * step 1 left it in. The driver can report an error for a write the server applied
-   * (lost ack, writeConcernError), so the failure itself does not prove that step 3
-   * did not commit.
+   * (lost ack, writeConcernError), so the failure itself proves neither that step 1
+   * did not commit nor that step 3 did not.
    *
    * @returns the page if step 3 turned out to be committed, otherwise null
    */
   private async rollbackFailedRename({
     page,
     exParentId,
+    hasDetachReturned,
     newPagePath,
-    newParentId,
     emptyPageIds,
   }: {
     page: PageDocument;
     exParentId: PageDocument['parent'];
+    // false when step 1 threw, even if its write was applied
+    hasDetachReturned: boolean;
     newPagePath: string;
-    newParentId: PageDocument['_id'] | undefined;
     emptyPageIds: PageDocument['_id'][];
   }): Promise<PageDocument | null> {
     const Page = mongoose.model<IPage, PageModel>('Page');
@@ -1013,35 +1023,76 @@ class PageService implements IPageService {
         { _id: page._id, parent: null, path: page.path },
         { $set: { parent: exParentId } },
       );
-      if (matchedCount > 0) {
-        // Only after a matched rollback: if step 3 committed, these are the page's
-        // new ancestors. Ids that were never inserted match nothing.
-        await Page.deleteMany({ _id: { $in: emptyPageIds }, isEmpty: true });
-        // Step 2 may also have created empty ancestors for the new path, whose ids are unknown here
-        if (newParentId != null) {
-          await Page.removeLeafEmptyPagesRecursively(newParentId);
+      if (matchedCount === 0) {
+        // Step 1 threw and the page is not detached at its original path, so its write
+        // most likely never applied; either way there is nothing to undo
+        if (!hasDetachReturned) {
+          return null;
         }
+        const currentPage = await Page.findById(page._id);
+        if (currentPage?.path === newPagePath) {
+          return currentPage;
+        }
+        logger.warn(
+          `Skipped reattaching "${page.path}" to its original parent after a failed rename: ` +
+            'the page is no longer detached at its original path.',
+        );
         return null;
       }
-
-      const currentPage = await Page.findById(page._id);
-      if (currentPage?.path === newPagePath) {
-        return currentPage;
-      }
-      logger.warn(
-        `Skipped reattaching "${page.path}" to its original parent after a failed rename: ` +
-          'the page is no longer detached at its original path.',
-      );
     } catch (rollbackErr) {
       // The caller propagates the original error, not this one
       logger.error(
-        `Failed to roll back the failed rename of "${page.path}". ` +
-          'The page may be off-tree or duplicated by an empty page until it is normalized. ' +
-          `Empty page ids that may remain: ${emptyPageIds.join(', ')}`,
+        `Failed to roll back the failed rename of "${page.path}" to "${newPagePath}". ` +
+          'Until it is normalized, the page may be off-tree at its original path, ' +
+          'or at the new path with its descendants left at the original path.',
         rollbackErr,
+      );
+      return null;
+    }
+
+    // Only after a matched rollback: if step 3 committed, these are the page's new ancestors
+    try {
+      if (emptyPageIds.length > 0) {
+        // Ids that were never inserted match nothing
+        await Page.deleteMany({ _id: { $in: emptyPageIds }, isEmpty: true });
+      } else {
+        await this.removeChildlessEmptyAncestors(newPagePath);
+      }
+    } catch (cleanupErr) {
+      logger.error(
+        `Reattached "${page.path}" after its failed rename, but failed to remove the empty pages created for "${newPagePath}". ` +
+          (emptyPageIds.length > 0
+            ? `Empty page ids that may remain: ${emptyPageIds.join(', ')}`
+            : `Empty pages may remain among the ancestors of "${newPagePath}".`),
+        cleanupErr,
       );
     }
     return null;
+  }
+
+  /**
+   * Remove the childless empty ancestors of `path`, nearest first, up to the first
+   * empty ancestor that still has children. Walks by path rather than by `parent`
+   * since a failed getParentAndFillAncestorsByUser can leave the ancestors it created
+   * unlinked, and goes on past a path without an empty page since an off-tree page
+   * there (e.g. a trashed one) does not hold up the empty pages above it.
+   */
+  private async removeChildlessEmptyAncestors(path: string): Promise<void> {
+    const Page = mongoose.model<IPage, PageModel>('Page');
+
+    for (const ancestorPath of collectAncestorPaths(path)) {
+      const emptyPage = await Page.findOne({
+        path: ancestorPath,
+        isEmpty: true,
+      });
+      if (emptyPage == null) {
+        continue;
+      }
+      if (await Page.exists({ parent: emptyPage._id })) {
+        return;
+      }
+      await Page.deleteOne({ _id: emptyPage._id, isEmpty: true });
+    }
   }
 
   private isRenamingToUnderTarget(fromPath: string, toPath: string): boolean {

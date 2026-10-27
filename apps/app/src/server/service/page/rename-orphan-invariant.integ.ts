@@ -11,6 +11,7 @@ import { getInstance } from '^/test/setup/crowi';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 describe('a failed rename must not orphan the page (#9755)', () => {
   let crowi: Crowi;
@@ -110,7 +111,15 @@ describe('a failed rename must not orphan the page (#9755)', () => {
   const renameWithFailingFinalWrite = async (
     page: PageDocument,
     newPath: string,
-    { applied, onFault }: { applied: boolean; onFault?: () => Promise<void> },
+    {
+      applied,
+      onFault,
+      options,
+    }: {
+      applied: boolean;
+      onFault?: () => Promise<void>;
+      options?: Record<string, unknown>;
+    },
   ) => {
     const originalFindByIdAndUpdate = Page.findByIdAndUpdate;
     const fault = new Error('simulated failure of the final write');
@@ -142,7 +151,7 @@ describe('a failed rename must not orphan the page (#9755)', () => {
           : failingBeforeWrite(query);
       });
     try {
-      const err = await rename(page, newPath);
+      const err = await rename(page, newPath, options);
       return { err, fault, faultFired };
     } finally {
       spy.mockRestore();
@@ -173,6 +182,9 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     await Page.deleteMany({
       path: { $in: [new RegExp(`^${base}`), new RegExp(`^/trash${base}`)] },
     });
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: base } },
+    });
   });
 
   it('leaves the page on the tree after renaming it under a trashed page, whether or not the rename succeeds', async () => {
@@ -187,6 +199,11 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     const trashed = await Page.findById(victim._id);
     expect(trashed?.parent).toBeNull();
     expect(trashed?.status).toBe('deleted');
+    const findEmptyTrashPaths = async () =>
+      (await Page.find({ path: /^\/trash/, isEmpty: true }))
+        .map((p) => p.path)
+        .sort();
+    const emptyTrashPathsBefore = await findEmptyTrashPaths();
 
     const err = await rename(target, `${trashed?.path}/moved`);
 
@@ -199,20 +216,42 @@ describe('a failed rename must not orphan the page (#9755)', () => {
       parentPath,
       `rename failed with "${err?.message}" and left "${path}" off the tree`,
     ).toBe(pathlib.dirname(path ?? ''));
+    if (err != null) {
+      // a failed rename also takes back the empty ancestors it created above the trashed page
+      expect(await findEmptyTrashPaths()).toEqual(emptyTrashPathsBefore);
+    }
   });
 
   it('completes the rename, children included, when the final write commits but its acknowledgement is lost', async () => {
     await create(base, 'base body');
-    await create(`${base}/ex-parent`, 'body');
-    await create(`${base}/new-parent`, 'body');
-    const target = await create(`${base}/ex-parent/target`, 'body');
-    const child = await create(`${base}/ex-parent/target/child`, 'body');
-    const newPath = `${base}/new-parent/moved`;
+    const createTree = async (root: string) => {
+      await create(root, 'body');
+      await create(`${root}/ex-parent`, 'body');
+      await create(`${root}/new-parent`, 'body');
+      const target = await create(`${root}/ex-parent/target`, 'body');
+      const child = await create(`${root}/ex-parent/target/child`, 'body');
+      return { target, child };
+    };
+    const descendantCountsUnder = async (root: string) =>
+      (
+        await Page.find({ path: new RegExp(`^${root}/`) }).sort({ path: 1 })
+      ).map((p) => [p.path.slice(root.length), p.descendantCount]);
+    const options = { createRedirectPage: true };
 
+    // a rename that succeeds outright, to compare against
+    const control = `${base}/control`;
+    const controlTree = await createTree(control);
+    expect(
+      await rename(controlTree.target, `${control}/new-parent/moved`, options),
+    ).toBeNull();
+
+    const subject = `${base}/subject`;
+    const { target, child } = await createTree(subject);
+    const newPath = `${subject}/new-parent/moved`;
     const { err, faultFired } = await renameWithFailingFinalWrite(
       target,
       newPath,
-      { applied: true },
+      { applied: true, options },
     );
 
     // otherwise the fault never fired and the assertions below prove nothing
@@ -220,13 +259,22 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     expect(err).toBeNull();
     expect(await findPathAndParentPath(target._id)).toEqual({
       path: newPath,
-      parentPath: `${base}/new-parent`,
+      parentPath: `${subject}/new-parent`,
     });
     expect(await findPathAndParentPath(child._id)).toEqual({
       path: `${newPath}/child`,
       parentPath: newPath,
     });
     expect(await findPathsOffTree()).toEqual([]);
+    // the rest of the rename ran as it does when nothing fails
+    expect(
+      await prisma.pageredirects.findFirst({
+        where: { fromPath: `${subject}/ex-parent/target` },
+      }),
+    ).toEqual(expect.objectContaining({ toPath: newPath }));
+    expect(await descendantCountsUnder(subject)).toEqual(
+      await descendantCountsUnder(control),
+    );
   });
 
   it('restores the tree unchanged, new empty ancestors included, when renaming to a new location fails', async () => {
@@ -368,12 +416,27 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     expect(await snapshotTree()).toEqual(before);
   });
 
-  it('fails and restores the tree unchanged when the destination is under the page only by case', async () => {
+  it('fails without touching the tree when the destination is under the page only by case', async () => {
     await create(base, 'base body');
     const target = await create(`${base}/Target`, 'body');
     const before = await snapshotTree();
 
-    const err = await rename(target, `${base}/target/moved`);
+    // no rollback can succeed (this fails the rollback's write), so the tree only
+    // stays as it was if nothing was written
+    const originalUpdateOne = Page.updateOne;
+    const updateOneSpy = vi
+      .spyOn(Page, 'updateOne')
+      .mockImplementation(function (this: PageModel, ...args) {
+        return originalUpdateOne
+          .apply(this, args)
+          .error(new Error('simulated failure of the rollback'));
+      });
+    let err: Error | null;
+    try {
+      err = await rename(target, `${base}/target/moved`);
+    } finally {
+      updateOneSpy.mockRestore();
+    }
 
     expect(err).not.toBeNull();
     expect(await snapshotTree()).toEqual(before);
@@ -485,9 +548,10 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     expect(warnings).toContainEqual(expect.stringContaining(`${base}/target`));
   });
 
-  it('completes the rename to under itself when the final write commits but its acknowledgement is lost', async () => {
+  it('completes the rename to under itself, children included, when the final write commits but its acknowledgement is lost', async () => {
     await create(base, 'base body');
     const target = await create(`${base}/target`, 'body');
+    const child = await create(`${base}/target/child`, 'body');
     const newPath = `${base}/target/not-yet-existing/moved`;
 
     const { err, faultFired } = await renameWithFailingFinalWrite(
@@ -502,6 +566,256 @@ describe('a failed rename must not orphan the page (#9755)', () => {
       path: newPath,
       parentPath: `${base}/target/not-yet-existing`,
     });
+    expect(await findPathAndParentPath(child._id)).toEqual({
+      path: `${newPath}/child`,
+      parentPath: newPath,
+    });
     expect(await findPathsOffTree()).toEqual([]);
+  });
+
+  it('restores the tree unchanged when creating the new ancestors fails before they are linked', async () => {
+    await create(base, 'base body');
+    await create(`${base}/ex-parent`, 'body');
+    await create(`${base}/new-parent`, 'body');
+    const target = await create(`${base}/ex-parent/target`, 'body');
+    const before = await snapshotTree();
+
+    const fault = new Error('simulated failure after creating the ancestors');
+    const realCreateEmptyPagesByPaths = Page.createEmptyPagesByPaths.bind(Page);
+    let emptyAncestorsAtFault: { path: string; parent: string | null }[] = [];
+    const spy = vi
+      .spyOn(Page, 'createEmptyPagesByPaths')
+      .mockImplementationOnce(async (...args) => {
+        await realCreateEmptyPagesByPaths(...args);
+        const empties = await Page.find({
+          path: new RegExp(`^${base}/new-parent/`),
+          isEmpty: true,
+        }).sort({ path: 1 });
+        emptyAncestorsAtFault = empties.map((p) => ({
+          path: p.path,
+          parent: p.parent?.toString() ?? null,
+        }));
+        throw fault;
+      });
+    let err: Error | null;
+    try {
+      err = await rename(
+        target,
+        `${base}/new-parent/not-yet-existing/deeper/moved`,
+      );
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(err).toBe(fault);
+    // the fault must hit after the ancestors were created and before they were linked
+    expect(emptyAncestorsAtFault).toEqual([
+      { path: `${base}/new-parent/not-yet-existing`, parent: null },
+      { path: `${base}/new-parent/not-yet-existing/deeper`, parent: null },
+    ]);
+    expect(await snapshotTree()).toEqual(before);
+  });
+
+  it('removes the new empty ancestors above an off-tree page on the way when the rename fails', async () => {
+    await create(base, 'base body');
+    await create(`${base}/ex-parent`, 'body');
+    const target = await create(`${base}/ex-parent/target`, 'body');
+    // an off-tree page with no page above it, as a page left unmigrated is
+    const offTree = await create(`${base}/missing/off-tree`, 'body');
+    await Page.deleteOne({ path: `${base}/missing`, isEmpty: true });
+    await Page.updateOne({ _id: offTree._id }, { $set: { parent: null } });
+    const before = await snapshotTree();
+
+    const fault = new Error('simulated failure after creating the ancestors');
+    const realCreateEmptyPagesByPaths = Page.createEmptyPagesByPaths.bind(Page);
+    let emptyAncestorsAtFault: string[] = [];
+    const spy = vi
+      .spyOn(Page, 'createEmptyPagesByPaths')
+      .mockImplementationOnce(async (...args) => {
+        await realCreateEmptyPagesByPaths(...args);
+        const empties = await Page.find({
+          path: new RegExp(`^${base}/missing`),
+          isEmpty: true,
+        });
+        emptyAncestorsAtFault = empties.map((p) => p.path).sort();
+        throw fault;
+      });
+    let err: Error | null;
+    try {
+      err = await rename(
+        target,
+        `${base}/missing/off-tree/not-yet-existing/moved`,
+      );
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(err).toBe(fault);
+    // empty pages were created both below and above the off-tree page
+    expect(emptyAncestorsAtFault).toEqual([
+      `${base}/missing`,
+      `${base}/missing/off-tree/not-yet-existing`,
+    ]);
+    expect(await snapshotTree()).toEqual(before);
+  });
+
+  it('restores the tree unchanged when detaching the page reports an error after it was applied', async () => {
+    await create(base, 'base body');
+    await create(`${base}/ex-parent`, 'body');
+    await create(`${base}/new-parent`, 'body');
+    const target = await create(`${base}/ex-parent/target`, 'body');
+    const before = await snapshotTree();
+
+    const fault = new Error('simulated lost acknowledgement of the detach');
+    const realTakeOffFromTree = Page.takeOffFromTree.bind(Page);
+    let detachedAtFault = false;
+    const spy = vi
+      .spyOn(Page, 'takeOffFromTree')
+      .mockImplementationOnce(async (...args) => {
+        await realTakeOffFromTree(...args);
+        detachedAtFault = (await Page.findById(target._id))?.parent == null;
+        throw fault;
+      });
+    let err: Error | null;
+    try {
+      err = await rename(target, `${base}/new-parent/moved`);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(err).toBe(fault);
+    // otherwise the detach never applied and there was nothing to restore
+    expect(detachedAtFault).toBe(true);
+    expect(await snapshotTree()).toEqual(before);
+  });
+
+  it('fails without a warning and leaves the tree unchanged when detaching the page fails before it applies', async () => {
+    await create(base, 'base body');
+    await create(`${base}/ex-parent`, 'body');
+    await create(`${base}/new-parent`, 'body');
+    const target = await create(`${base}/ex-parent/target`, 'body');
+    const before = await snapshotTree();
+
+    const fault = new Error('simulated failure of the detach');
+    const takeOffSpy = vi
+      .spyOn(Page, 'takeOffFromTree')
+      .mockRejectedValueOnce(fault);
+    const warnSpy = vi.spyOn(loggerFactory('growi:services:page'), 'warn');
+    let err: Error | null;
+    // read before mockRestore, which discards the recorded calls
+    let warnings: string[] = [];
+    try {
+      err = await rename(target, `${base}/new-parent/moved`);
+      warnings = warnSpy.mock.calls.map(([message]) => String(message));
+    } finally {
+      takeOffSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+
+    expect(err).toBe(fault);
+    expect(await snapshotTree()).toEqual(before);
+    // nothing was detached, so nothing suggests that another writer moved the page
+    expect(
+      warnings.filter((w) => w.includes(`${base}/ex-parent/target`)),
+    ).toEqual([]);
+  });
+
+  it('points the log at the new path, not at an off-tree page, when only removing the new ancestors fails', async () => {
+    await create(base, 'base body');
+    await create(`${base}/ex-parent`, 'body');
+    await create(`${base}/new-parent`, 'body');
+    const target = await create(`${base}/ex-parent/target`, 'body');
+    const newPath = `${base}/new-parent/not-yet-existing/moved`;
+
+    const cleanupFault = new Error(
+      'simulated failure while removing the new ancestors',
+    );
+    let failedDeletes = 0;
+    const failDelete = () => {
+      failedDeletes += 1;
+      throw cleanupFault;
+    };
+    const deleteManySpy = vi
+      .spyOn(Page, 'deleteMany')
+      .mockImplementation(failDelete);
+    const deleteOneSpy = vi
+      .spyOn(Page, 'deleteOne')
+      .mockImplementation(failDelete);
+    const errorSpy = vi.spyOn(loggerFactory('growi:services:page'), 'error');
+    let result: Awaited<ReturnType<typeof renameWithFailingFinalWrite>>;
+    // read before mockRestore, which discards the recorded calls
+    let logged = '';
+    try {
+      result = await renameWithFailingFinalWrite(target, newPath, {
+        applied: false,
+      });
+      logged = errorSpy.mock.calls
+        .map((args) => args.map(String).join(' '))
+        .join('\n');
+    } finally {
+      deleteManySpy.mockRestore();
+      deleteOneSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+
+    // otherwise the cleanup never failed and the assertions below prove nothing
+    expect(failedDeletes).toBeGreaterThan(0);
+    expect(result.err).toBe(result.fault);
+    expect(await findPathAndParentPath(target._id)).toEqual({
+      path: `${base}/ex-parent/target`,
+      parentPath: `${base}/ex-parent`,
+    });
+    // the page is back on the tree; what may remain are the empty pages on the way to newPath
+    expect(logged).toContain(
+      `Reattached "${base}/ex-parent/target" after its failed rename`,
+    );
+    expect(logged).toContain(newPath);
+  });
+
+  it('warns that the page may have moved without its children when undoing the failed rename also fails', async () => {
+    await create(base, 'base body');
+    await create(`${base}/ex-parent`, 'body');
+    await create(`${base}/new-parent`, 'body');
+    const target = await create(`${base}/ex-parent/target`, 'body');
+    const child = await create(`${base}/ex-parent/target/child`, 'body');
+    const newPath = `${base}/new-parent/moved`;
+
+    // the connection stays down: the write that undoes the rename fails too
+    const connectionFault = new Error('simulated connection loss');
+    const originalUpdateOne = Page.updateOne;
+    const updateOneSpy = vi
+      .spyOn(Page, 'updateOne')
+      .mockImplementation(function (this: PageModel, ...args) {
+        return originalUpdateOne.apply(this, args).error(connectionFault);
+      });
+    const errorSpy = vi.spyOn(loggerFactory('growi:services:page'), 'error');
+    let result: Awaited<ReturnType<typeof renameWithFailingFinalWrite>>;
+    // read before mockRestore, which discards the recorded calls
+    let logged = '';
+    try {
+      result = await renameWithFailingFinalWrite(target, newPath, {
+        applied: true,
+      });
+      logged = errorSpy.mock.calls
+        .map((args) => args.map(String).join(' '))
+        .join('\n');
+    } finally {
+      updateOneSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+
+    // otherwise the final write never committed and the warning below would not apply
+    expect(result.faultFired).toBe(true);
+    expect(result.err).toBe(result.fault);
+    // the page did move but its child stayed behind; only the log can tell an operator
+    expect((await Page.findById(target._id))?.path).toBe(newPath);
+    expect(await findPathAndParentPath(child._id)).toEqual({
+      path: `${base}/ex-parent/target/child`,
+      parentPath: newPath,
+    });
+    expect(logged).toContain(
+      `at the new path with its descendants left at the original path`,
+    );
+    expect(logged).toContain(newPath);
   });
 });
