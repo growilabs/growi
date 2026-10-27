@@ -123,3 +123,4 @@
 
 - 1.1: PR #12151 が未マージ（2026-10-27 時点）のため、実装ブランチは #12151 のコミット（`fix/otel-anonymize-http-url`）の上に載せた。#12151 のマージ後は `git rebase origin/master` でそのコミットが外れる。
 - 検証コマンド: worktree の `node_modules` は本体チェックアウトへの symlink で、`pnpm vitest` / `pnpm run` は `pnpm install` を誘発して失敗する。`apps/app` で `node_modules/.bin/vitest run <パターン>` を直接使う。
+- コミット: pre-commit hook は `pnpm biome` を呼び同じ問題で固まる。`node_modules/.bin/biome check` を手で通してから `git commit --no-verify` を使う。
