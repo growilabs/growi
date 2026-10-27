@@ -75,6 +75,7 @@
 - `revision-diff` の `POST /revisions/diff` の 1 回あたりの組の上限と応答の形
 - `REQUESTER_ONLY_SECTIONS` の部品が受け取る値（`{ proposalId: string }`）と、表の鍵（入口の種類）。`change-proposal-ai-agent` の `AiRecordSection` が同じ値を受け取って `'ai-chat'` の行に登録されているので、変えるときは ai-agent の部品も合わせて直す
 - 頼む通知の snapshot の形と、action の名前
+- core の `requesterState.perPageNotifications`（ページごとの通知の指定 `value` と管理者の設定 `isEnabledBySettings`）の形と、依頼した人にだけ返す扱い
 - core の `requesterState`（段階と達成度）・`OperationView.linkedProposals`・`ChangeProposalView.basedOn` の形と、依頼した人以外に返す条件、`selectRemainingOperations` の決め方、段階とつながりの言葉の表の名前
 - `REQUESTER_ACTION_SLOTS` の部品が受け取る値（`ProposalActionSlotProps` / `OperationActionSlotProps`）と、表の鍵（入口の種類）。`change-proposal-ai-agent` の `ProposalFollowUpAction` / `OperationReworkAction` が同じ値を受け取って `'ai-chat'` の行に登録されているので、変えるときは ai-agent の部品も合わせて直す
 
@@ -193,6 +194,7 @@ apps/app/src/features/change-proposal/
             ├── RequesterActionSlot.tsx               # Loads the entry's proposal-level / operation-level action component, requester only
             ├── requester-action-slots.ts             # Declared table: entry -> { proposal?, operation? } lazy components; 'ai-chat' row added by change-proposal-ai-agent
             ├── ProposalProgressLabel.tsx             # Requester only: 完了（達成度 N%） or the lifecycle label
+            ├── PerPageNotificationsLabel.tsx         # Requester only, admin switch on: the proposal's per-page notification switch (read-only)
             ├── ProposalLinkChips.tsx                 # 後続: #id / 見直し: #id / 元: #id links
             ├── ChangeProposalNotification.tsx        # useChangeProposalModelNotification hook
             ├── detail/
@@ -356,6 +358,7 @@ sequenceDiagram
 | 10.5 | 入口で振る舞いを変えない（本人向けの内容と操作の有無を除く） | 全部品、requester-only-sections、requester-action-slots | — | — |
 | 11.1–11.4 | 完了と達成度、段階の言葉、本人だけ | ProposalProgressLabel、ProposalSummaryHeader、ChangeProposalSummaryItem | core の `requesterState`、`toAchievementPercent`、`ACHIEVEMENT_LABEL_KEY`、`PROPOSAL_LIFECYCLE_LABEL_KEYS` | — |
 | 11.5 | 「古い」を見送りとして出す | OperationItem、RemainingOperationsList | core の `OPERATION_STATUS_LABEL_KEYS` | — |
+| 11.6, 11.7 | ページごとの通知の指定の表示（本人だけ、管理者の設定が有効なときだけ、変える操作は置かない） | PerPageNotificationsLabel、ProposalSummaryHeader | core の `requesterState.perPageNotifications`、`change_proposal_viewer.per_page_notifications.*` | — |
 | 12.1–12.4 | つながりの表示 | ProposalLinkChips、OperationItem、ProposalSummaryHeader | core の `linkedProposals`・`basedOn`、`PROPOSAL_LINK_LABEL_KEYS`、`formatProposalShortId` | — |
 | 13.1, 13.2 | 本人向けの操作の置き場所 | RequesterActionSlot、requester-action-slots | `REQUESTER_ACTION_SLOTS`、`ProposalActionSlotProps`、`OperationActionSlotProps` | — |
 | 13.3 | 反映されなかった操作の一覧 | RemainingOperationsList | core の `selectRemainingOperations` | — |
@@ -372,7 +375,7 @@ sequenceDiagram
 | ChangeProposalDetail と子の部品 | client/viewer/components/detail | 詳細ページ | 1.*, 2.*, 3.*, 4.1, 4.3, 10.3 | Proposal Data Hooks (P0)、core の `client/shared/` (P0) | — |
 | RequesterOnlySection | client/viewer/components | 本人向けの内容の場所 | 1.7, 1.8, 10.5 | 入口の spec の部品 (P2) | State |
 | RequesterActionSlot | client/viewer/components | 本人向けの操作の場所 | 10.5, 13.1, 13.2, 13.4 | 入口の spec の部品 (P2) | State |
-| ProposalProgressLabel / ProposalLinkChips / RemainingOperationsList | client/viewer/components | 完了と達成度、つながり、反映されなかった操作 | 11.*, 12.*, 13.3, 13.4 | core の `client/shared/` (P0) | — |
+| ProposalProgressLabel / PerPageNotificationsLabel / ProposalLinkChips / RemainingOperationsList | client/viewer/components | 完了と達成度、ページごとの通知の指定、つながり、反映されなかった操作 | 11.*, 12.*, 13.3, 13.4 | core の `client/shared/` (P0) | — |
 | ChangeProposalLists | client/viewer/components/list | 2 つの一覧 | 8.* | Proposal Data Hooks (P0) | — |
 | ChangeProposalNotification | client/viewer/components | 通知の表示の hook | 9.* | ModelNotification (P0) | — |
 | Pages | pages/me/change-proposals | URL と SSR の props | 1.9, 8.7 | BasicLayout (P0) | — |
@@ -494,7 +497,7 @@ function sendRevertRequest(proposalId: string, message: string): Promise<RevertR
 
 #### ChangeProposalDetail と子の部品（summary）
 - `ChangeProposalDetail({ proposalId })`: `useSWRxChangeProposal` の結果が `not-found` なら、理由を区別しない「見つからない」表示にする（要件 1.3）。取得の失敗は別のエラー表示にする（存在の有無と関係が無い通信の失敗のため）。
-- `ProposalSummaryHeader`: 依頼した人、入口（`ENTRY_LABEL_KEYS`）、モデル名、作成日時、反映日時（core の `lastAppliedAt` をそのまま。依頼した人以外には、core が見える操作だけから決めた値が入っている）、全体の状態（core の表から引く）、`ProposalProgressLabel`、`basedOn` の `ProposalLinkChips`、本人向けの操作の場所（`RequesterActionSlot`）。入口が `revert` なら `revertOf` へのリンク。件数は出さない（要件 1.4）。
+- `ProposalSummaryHeader`: 依頼した人、入口（`ENTRY_LABEL_KEYS`）、モデル名、作成日時、反映日時（core の `lastAppliedAt` をそのまま。依頼した人以外には、core が見える操作だけから決めた値が入っている）、全体の状態（core の表から引く）、`ProposalProgressLabel`、`PerPageNotificationsLabel`、`basedOn` の `ProposalLinkChips`、本人向けの操作の場所（`RequesterActionSlot`）。入口が `revert` なら `revertOf` へのリンク。件数は出さない（要件 1.4）。
 - `OperationItem`: 種類、パス（`page.path`、新規作成は `path`、移動は `fromPath` → `toPath`）、状態と理由、戻せるかどうか（`revertability`。種類・状態・理由・戻せない理由の言葉は core の `client/shared/` の表から引く）、取り消し済みなら `revertedByProposalId` へのリンク、`linkedProposals` の `ProposalLinkChips`、本人向けの操作の場所（`RequesterActionSlot` に `operation` を渡す）、差分の開閉。`index` は表示しない（要件 2.10）。操作は応答の順に並べる。
 - `RevertAllButton`: `selectRevertibleOperations` の結果が 1 つ以上で、ゲストでも読み取り専用でもないときだけ出す。押すと対象のパスを並べた確認の modal を出し、確定で `revertOperations` を呼ぶ。送信中は押せない。結果を `RevertResultList` に表示し、`refreshAfterRevert` を呼ぶ。
 - `RevertResultList`: `RevertResult.operations` の 1 つずつを、`key` で確認の modal に並べた操作のパスと結び付け、`outcome` ごとに「取り消した」（`reverted`）、断られた理由（`revert-refused`。`reason` を core の戻せない理由の表で訳す）、見送った理由（`skipped`。`reason` の `page-being-edited` を core の理由の表で訳す）を出す。件数は出さない。
@@ -548,6 +551,7 @@ const REQUESTER_ACTION_SLOTS: Readonly<Partial<Record<CreatableEntry, RequesterA
 
 #### ProposalProgressLabel / ProposalLinkChips / RemainingOperationsList（summary）
 - `ProposalProgressLabel({ view })`: `view.requesterState` が無ければ何も出さない（依頼した人以外。要件 11.4）。段階が `settled` なら、`achievement` があり `toAchievementPercent` が数を返すときは `ACHIEVEMENT_LABEL_KEY`（「完了（達成度 N%）」）、`achievement` が無い（取り消しの Change Proposal）か null のときは段階の言葉（「完了」）を出す（要件 11.1・11.2）。`discarded`・`expired`・`withdrawn` なら段階の言葉を出す（破棄は core の言葉で「残りを反映せずに閉じた」。要件 11.3）。`open` なら何も出さない（全体の状態の表示で足りる）。詳細ページの見出しと一覧の項目の両方で使う。
+- `PerPageNotificationsLabel({ view })`: `view.requesterState` が無い（依頼した人以外）か、`requesterState.perPageNotifications.isEnabledBySettings` が偽なら何も出さない。真なら、`value` に応じて「ページごとの通知: 出す」か「出さない」を、詳細ページの見出し（`ProposalSummaryHeader`）に文字だけで出す。段階にかかわらず出す。管理者の設定の値は表示した時点のもので、過去の反映で実際に通知を出したかの記録ではない。切り替えのボタンは置かない。指定を変えるのは、承認を行う入口の画面（AI チャットでは `change-proposal-ai-agent` の `ProposalCard`）である。詳細ページに承認の操作を置かない判断（OQ-V3）と同じく、反映の前に決めることは承認と同じ画面にまとめる（要件 11.6・11.7）。一覧の項目には出さない。
 - `ProposalLinkChips`: 操作の `linkedProposals` を「後続: #ID」「見直し: #ID」、Change Proposal の `basedOn` を「元: #ID」として、`buildProposalHref` へのリンクで出す。言葉は core の `PROPOSAL_LINK_LABEL_KEYS`、#ID は `formatProposalShortId`。core が返さなかったつながりは出さない（要件 12.1–12.4）。
 - `RemainingOperationsList({ view })`: 依頼した人にだけ、core の `selectRemainingOperations(view.operations)` が返す操作のパスと状態（理由つき）を、詳細ページの操作の並びの前に「反映されなかった操作」として並べる。0 件なら何も出さない。入口の種類にかかわらず出す（Vault・MCP では、これが続きを考えるための唯一の表示になる。要件 13.3）。
 - 「古い」の操作は、core の言葉（「見送り（ページが先に変わっていた）」）で出し、誤りの色や印を使わない（要件 11.5）。
@@ -678,11 +682,13 @@ viewer は新しいコレクションを作らない。core の型を使い、�
 - `commons.json`: `in_app_notification.change_proposal.*`（3 つの通知の言葉、「ほかのページもあります」）。管理画面は `commons` と `admin` だけを読み込むので、通知の文言は `commons` に置く（要件 9.8）
 - `admin.json`: `audit_log_action.CHANGE_PROPOSAL_REVERT_REQUEST`
 - 5 言語すべてに同じキーを足す。件数を差し込むキー（`{{count}}`）は作らない。達成度の割合（core の `ACHIEVEMENT_LABEL_KEY` の `{{percent}}`）は、依頼した人にだけ返る値なので、この決まりに当たらない。
-- 段階・つながり・達成度の言葉は core の `change_proposal.*` を使い、viewer は足さない。viewer が足すのは「反映されなかった操作」の見出しだけである:
+- 段階・つながり・達成度の言葉は core の `change_proposal.*` を使い、viewer は足さない。viewer が足すのは「反映されなかった操作」の見出しと、ページごとの通知の指定の表示の 2 つである（チャット画面の `change_proposal_chat.*` のキーは使わない）:
 
 | キー | en_US | ja_JP | zh_CN | fr_FR | ko_KR |
 |---|---|---|---|---|---|
 | `change_proposal_viewer.remaining_operations.title` | Changes that were not applied | 反映されなかった操作 | 未反映的操作 | Modifications non appliquées | 반영되지 않은 작업 |
+| `change_proposal_viewer.per_page_notifications.enabled` | Per-page notifications: sent | ページごとの通知: 出す | 逐页通知：发送 | Notifications par page : envoyées | 페이지별 알림: 보냄 |
+| `change_proposal_viewer.per_page_notifications.disabled` | Per-page notifications: not sent | ページごとの通知: 出さない | 逐页通知：不发送 | Notifications par page : non envoyées | 페이지별 알림: 보내지 않음 |
 
 ## Error Handling
 
@@ -714,6 +720,7 @@ viewer は新しいコレクションを作らない。core の型を使い、�
 
 ### Component Tests
 - `ProposalProgressLabel`: 依頼した人で完了なら「完了（達成度 N%）」が出て割合が切り捨てになること、分母が 0 のときと取り消しの Change Proposal（達成度が無い）では「完了」だけになること、破棄・期限切れ・取り下げで段階の言葉が出ること、`requesterState` が無い（依頼した人以外）ときに何も出ないこと。詳細ページと一覧の項目の両方で確かめる（要件 11.1–11.4）。
+- `PerPageNotificationsLabel`: 依頼した人で管理者の設定が有効なときだけ、指定の値に応じた言葉が出ること、管理者の設定が無効のときと `requesterState` が無いときに何も出ないこと、切り替えのボタンが無いこと（要件 11.6・11.7）。
 - `ProposalLinkChips`: 後続・見直し・元のリンクの言葉と行き先、core が返さないつながりが出ないこと（要件 12.1–12.4）。
 - `RequesterActionSlot` と `RemainingOperationsList`: 依頼した人で表に行がある入口だけ部品が読み込まれ、見出しと操作ごとの場所に表示されること。依頼した人以外では読み込みが起きないこと。表に行が無い入口（Vault・MCP を表す仮の値）でも、反映されなかった操作の一覧が出ること。「古い」が見送りの言葉で出て誤りの見た目にならないこと（要件 10.5・11.5・13.1–13.4）。
 - `OperationItem`: 状態ごとの表示、取り消し済みのリンク、本人以外に並び順の番号が出ないこと、まだ反映していない操作に差分の開閉が出ないこと、移動の 2 つのパス（要件 2.1・2.4・2.6・2.7・2.9・2.10・2.12）。
@@ -766,7 +773,7 @@ viewer が前提にしている core の決まりを挙げる。どれも core �
 |---|---|---|
 | OQ-V1 | 本人向けの内容（AI が書いた要約と会話）を出す部品の受け取る値と置き場所 | 決定。置き場所は viewer の `requester-only-sections.ts` の `REQUESTER_ONLY_SECTIONS`、部品が受け取る値は `{ proposalId: string }`。viewer は `'ai-chat'` の行を持たない表を出し、`change-proposal-ai-agent` が `AiRecordSection` を作って `'ai-chat'` の行に登録する（ai-agent のこのタスクは viewer のタスク 5.6 のあとで行う）。受け取る値を変えるときは Revalidation Triggers に従う |
 | OQ-V2 | 頼む通知の一言の長さ（500 文字）と、同じ人が送れる間隔（24 時間） | 定数として持つ。運用で変える必要が出たら設定キーにする |
-| OQ-V3 | 依頼した人が、詳細ページから承認待ちの操作を承認できるようにするか | 本 spec では承認の操作を置かず、状態だけを表示する。Vault や MCP の入口が来たときに、承認の画面をどこに置くかと一緒に決める |
+| OQ-V3 | 依頼した人が、詳細ページから承認待ちの操作を承認できるようにするか | 本 spec では承認の操作とページごとの通知の指定を変える操作を置かず、状態と指定の値だけを表示する。Vault や MCP の入口が来たときに、承認の画面をどこに置くかと一緒に決める |
 | OQ-V4 | 書き込み機能を無効にしたあと、Recent Changes の一覧へのリンクも消してよいか | 消す（research.md の判断）。印・通知・URL からは行ける |
 
 その他のリスク:

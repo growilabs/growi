@@ -45,6 +45,8 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
 - **元の Change Proposal**: 後続または見直しの Change Proposal が作られるもとになった Change Proposal。その中で、後続・見直しが指す操作を **元の操作** と呼ぶ。
 - **後続の Change Proposal**: 元の Change Proposal で反映されなかった操作（「古い」「失敗」「飛ばした」）を、今のページに対してもう一度試すために作る Change Proposal。画面では「後続 Change Proposal」と呼ぶ。
 - **見直しの Change Proposal**: 元の Change Proposal で反映された内容を、その後に人が加えた編集をふまえて考え直すために作る Change Proposal。取り消しとは違い、元の操作をそのまま戻すのではなく、新しい内容を作る。
+- **ページごとの通知**: 人が画面から同じ操作（編集・新規作成・移動・ごみ箱へ移す・ごみ箱から戻す）をしたときに、ページ 1 つごとに出る通知。そのページを購読している人へのアプリ内通知と、管理者が設定したグローバル通知（Slack・メール）の 2 つを指す。人が保存のたびに Slack のチャンネルを選んで送る通知は含めない。
+- **ページごとの通知の指定**: Change Proposal ごとに持つ「ページごとの通知を出すか」の値。依頼した人が決める。
 
 操作ごとの状態は次の 7 つとする。
 
@@ -67,7 +69,7 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
   - 依頼した人によるページ単位の承認と、管理者の設定による自動反映
   - 取り消しと、戻してよい条件の判定。移動を戻すときに逆向きのリダイレクトを消すこと
   - リビジョンへの、作った Change Proposal の記録（新規作成で作ったページは、その最初のリビジョンの記録で表す）
-  - ページごとの通知を止め、Change Proposal ごとに 1 つのアプリ内通知にまとめること。activity への記録
+  - Change Proposal ごとに 1 つのアプリ内通知にまとめること。ページごとの通知を出すかを、管理者の設定とページごとの通知の指定で決めること。activity への記録
   - 管理者の設定画面（5 言語の文言を含む）
   - Change Proposal を作り、取得し、承認し、取り消す API。見る人に返す操作の分だけを返すこと
   - 兄弟の spec の画面で共通に使う部品: 操作の種類・操作の状態・全体の状態・理由・戻せない理由の表示名（5 言語）と、本文の差分を表示するときの diff2html の設定と見た目
@@ -113,6 +115,7 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
 14. The Change Proposal System shall 入口の種類が「取り消し」の Change Proposal を、入口からの作成の求めでは受け付けず、取り消しの求め（Requirement 5）によってだけ作る。
 15. Where 入口が、表示用のモデル名を指定した場合, the Change Proposal System shall それを Change Proposal とともに保存する。
 16. If 作成を求められた Change Proposal の本文の合計の大きさが、1 件の Change Proposal として保存できる大きさを超える場合, then the Change Proposal System shall その Change Proposal を保存せず、大きすぎることを返す。
+17. When 入口が Change Proposal の作成を求めた場合, the Change Proposal System shall 入口が指定したページごとの通知の指定を、Change Proposal とともに保存する。入口が指定しなかったときは「出す」として保存する。後続・見直しの Change Proposal も同じ扱いにする。
 
 ### Requirement 2: 状態の移り変わりと期限切れ
 
@@ -204,10 +207,10 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
 
 ### Requirement 7: 通知と activity
 
-**Objective:** wiki を使う他のユーザーとして、まとめて書き換えられたときに、ページごとの大量の通知ではなく、1 つのまとまった通知で知りたい。そのとき、自分が閲覧できないページのことは知らされたくない。
+**Objective:** wiki を使う他のユーザーとして、まとめて書き換えられたときに、ページごとの大量の通知ではなく、1 つのまとまった通知で知りたい。そのとき、自分が閲覧できないページのことは知らされたくない。管理者としては、必要なら人の保存と同じページごとの通知も出せるようにしたい。依頼した人としては、大きな Change Proposal ではページごとの通知を止められるようにしたい。
 
 #### Acceptance Criteria
-1. While Change Proposal の操作を反映している間, the Change Proposal System shall ページごとに出るアプリ内通知・Slack 通知・メール通知を出さない。
+1. If 操作を反映するときに、管理者がページごとの通知を有効にしていない場合、または Change Proposal のページごとの通知の指定が「出さない」である場合, then the Change Proposal System shall その操作の反映では、ページごとの通知（購読している人へのアプリ内通知と、グローバル通知）を出さない。
 2. When Change Proposal の反映が終わり、1 つ以上の操作が反映済みになった場合, the Change Proposal System shall その Change Proposal について 1 つのアプリ内通知を、反映済みの操作のページが人の保存で更新された場合にアプリ内通知を受け取るはずだったユーザー（依頼した人を除く）に送る。
 3. The Change Proposal System shall まとめたアプリ内通知の中身を、受け取るユーザーが閲覧できるページの分だけで作り、閲覧できないページのパス・タイトル・件数を含めない。
 4. If 通知を受け取るはずのユーザーが、反映済みの操作のページを 1 つも閲覧できない場合, then the Change Proposal System shall そのユーザーにはその Change Proposal の通知を送らない。
@@ -216,6 +219,16 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
 7. When Change Proposal を作成した場合, the Change Proposal System shall 監査ログの設定で記録の対象になっているときに、それを新しい種類の activity として、依頼した人を操作者として記録する。
 8. When 取り消しの Change Proposal の反映が終わり、1 つ以上の操作が反映済みになった場合, the Change Proposal System shall ごみ箱へ移したページとごみ箱から戻したページも通知の対象のページに含め、元の Change Proposal の依頼した人にも（取り消した人と同じでなければ）まとめたアプリ内通知を送る。中身は 7.3・7.4 と同じく、受け取る人が閲覧できるページの分だけで作る。
 9. When 入口が、利用者の request を受けた処理の中で Change Proposal を作った場合, the Change Proposal System shall 作成の activity をその request の activity として記録し、作成のための activity を別に残さない。
+10. When 操作を反映するときに、管理者がページごとの通知を有効にしていて、かつ Change Proposal のページごとの通知の指定が「出す」である場合, the Change Proposal System shall その操作について、人が画面から同じ操作をしたときと同じページごとの通知を出す。アプリ内通知の受け取る人は人の操作と同じ決め方で決め、グローバル通知は人の操作と同じく、ページの閲覧範囲によって送るかどうかを決める。
+11. The Change Proposal System shall 人が保存のたびに Slack のチャンネルを選んで送る通知を、反映では出さない。
+12. The Change Proposal System shall まとめたアプリ内通知（7.2・7.8）を、管理者の設定とページごとの通知の指定にかかわらず送る。
+13. The Change Proposal System shall ページごとの通知を出すかを、操作ごとに、その操作を書き込む時点の管理者の設定とページごとの通知の指定で決める。作成の直後に自動で反映する操作には、作成のときに保存した指定を使う。
+14. When 依頼した人が、段階が承認待ちの自分の Change Proposal について、ページごとの通知の指定の変更を求めた場合, the Change Proposal System shall 指定を変え、変えたあとに反映する操作にだけ使う。すでに反映した操作について出した通知、出さなかった通知は変えない。
+15. If 依頼した人以外のユーザーが、ページごとの通知の指定の変更を求めた場合, then the Change Proposal System shall 変えずに、Change Proposal が存在しない場合と同じ応答を返す。
+16. If 段階が承認待ちでない Change Proposal について、ページごとの通知の指定の変更を求められた場合, then the Change Proposal System shall 変えずに、変えられない状態であることを返す。
+17. When 取り消しの Change Proposal を作る場合, the Change Proposal System shall 元の Change Proposal のページごとの通知の指定を引き継いで保存する。
+18. When 依頼した人が自分の Change Proposal を取得した場合（1 件の取得と一覧のどちらでも）, the Change Proposal System shall ページごとの通知の指定と、管理者がページごとの通知を有効にしているかどうかを返す。依頼した人以外の見る人への応答には、どちらも含めない。
+19. If 読み取り専用ユーザーが、ページごとの通知の指定の変更を求めた場合, then the Change Proposal System shall それを受け付けない。
 
 ### Requirement 8: 管理者の設定
 
@@ -230,6 +243,8 @@ GROWI には、AI や外部の仕組みが複数のページをまとめて書�
 6. The Change Proposal System shall これらの設定を、管理者の設定画面から確かめ、変更できるようにする。
 7. The Change Proposal System shall 管理者の設定画面の文言と、監査ログに表示する新しい activity の名前を、GROWI が対応する 5 言語（英語・日本語・中国語・フランス語・韓国語）すべてで表示する。
 8. If 管理者でないユーザーが設定の変更を求めた場合, then the Change Proposal System shall 変更しない。
+9. The Change Proposal System shall 反映でページごとの通知を出すかどうかを管理者が設定できるようにし、初期値を「出さない」にする。
+10. The Change Proposal System shall 1 件の Change Proposal あたりの操作数の上限の初期値を 50 にし、依頼した人ごとの 1 日あたりの件数の上限の初期値を「上限なし」にする。1 日あたりの件数は、管理者が上限の数を設定したときだけ確かめる（1.8）。
 
 ### Requirement 9: Change Proposal の取得と、見る人ごとの絞り込み
 

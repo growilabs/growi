@@ -16,6 +16,7 @@
 - 管理者の方針による自動反映と、依頼した人によるページ単位の承認（要件 4）
 - 取り消し用の Change Proposal による取り消しと、戻してよい条件の判定（要件 5）
 - リビジョンへの印、まとめたアプリ内通知、新しい activity（要件 6・7）
+- 反映でページごとの通知を出すかを、管理者の設定と Change Proposal ごとの指定で決め、出すときは人の操作と同じ通知を出す（要件 7.1・7.10–7.19・8.9）
 - 管理者の設定と画面（要件 8）、見る人ごとに絞った API（要件 9）、人の保存を変えないこと（要件 10）
 - 兄弟の spec の画面が使う共通の部品（表示名の表と、diff2html の設定と見た目）（要件 11）
 - 「待ち」の操作が無くなった Change Proposal を自動で完了にし、依頼した人にだけ段階と達成度を返す（要件 2.9–2.11・12）
@@ -41,6 +42,8 @@
 - 戻してよいかの判定（見る人ごと、その時点のページの状態で）
 - リビジョンの `proposalId` / `proposalOperationKey` の書き込み（ページには項目を足さない）
 - まとめたアプリ内通知のデータ（受け取る人ごとの中身）と、新しい activity の action
+- 反映でページごとの通知を出すかの判断（管理者の設定 `changeProposal:perPageNotificationsEnabled` と、Change Proposal ごとの指定 `perPageNotifications`）と、出すときの呼び出し。指定を依頼した人が変える API
+- 人の保存と反映が共通に使う、ページごとの通知の処理（`server/service/page-save/page-notifications.ts`。グローバル通知の送信と、編集の `PAGE_UPDATE` の activity の記録）
 - 管理者の設定キー、設定の API、設定画面
 - Change Proposal の取得・一覧・承認・飛ばす・破棄・取り消し・リビジョンの印の取得の REST API と、その応答の形
 - 兄弟の spec の画面で共通に使う client の部品（`features/change-proposal/client/shared/`）: 操作の種類・操作の状態・全体の状態・理由・戻せない理由・段階・つながりの関係の表示名の表と達成度の文言、`translation` の名前空間の `change_proposal.*` の翻訳キー（5 言語）、`i18next.config.ts` の `preservePatterns`、達成度の割合と残りの操作を決める純関数、diff2html の設定と CSS、詳細ページの URL を作る `buildProposalHref`。ページ履歴の差分（`RevisionDiff`）もこれを使う
@@ -58,6 +61,7 @@
 ### Allowed Dependencies
 - `apps/app/src/server/service/page/`（`pageService.updatePage` / `create` / `renamePage` / `deletePage` / `revertDeletedPage`）と `pageOperationService.canOperate`
 - `apps/app/src/server/models/`（`Page`・`Revision`・`PageRedirect`・`Subscription`・`InAppNotification`・`User`）
+- `crowi.globalNotificationService`（`page-save/page-notifications.ts` の `firePageGlobalNotification` から呼ぶ）と、`server/service/activity/` の `shouldGenerateUpdate`（`emitPageUpdateActivity` から呼ぶ）
 - `apps/app/prisma/schema.prisma` と `apps/app/src/utils/prisma.ts`（`createPrisma()` に Change Proposal の拡張を登録する）
 - `apps/app/src/server/service/yjs/` の `IYjsService`
 - `apps/app/src/server/service/activity/`（`beginActivity` / `pendingActivityContext`）と `activityService.createActivity`
@@ -83,12 +87,15 @@
 - 依頼した人にだけ返す `requesterState`（段階と達成度）の形と、達成度の数え方（分子と分母に入る状態、取り消しの Change Proposal には返さないこと）
 - `basedOn` の形、関係の値（`BasedOnRelation`）、関係ごとに元の操作として認める状態（`BASED_ON_ELIGIBLE_STATUSES`）、`createProposal` が返す `based-on-unavailable` / `based-on-operation-not-eligible`、見直しを自動反映しない扱い
 - つながり（`OperationView.linkedProposals` と `ChangeProposalView.basedOn`）を依頼した人以外に返す条件
+- ページごとの通知: `createProposal` の任意の `perPageNotifications`、依頼した人にだけ返す `requesterState.perPageNotifications` の形、指定を変える API（`PUT /change-proposals/:id/per-page-notifications`）、出すかの決め方（管理者の設定と Change Proposal ごとの指定の両方が真のときだけ）、取り消しの Change Proposal が元の指定を引き継ぐこと
+- 操作数の上限と 1 日の件数の上限の初期値（50 と「上限なし」）を変えるとき（ai-agent の書き込みの道具が 1 回に受ける操作の数 `MAX_OPERATIONS_PER_CALL` との大小が変わるため）
 
 ## Architecture
 
 ### Existing Architecture Analysis
 - ページの更新は route（`routes/apiv3/page/update-page.ts`）が、上書き防止の確認（`isUpdatable`）・書き込み（`pageService.updatePage`）・activity・通知・共同編集の文書の置き換えを順に呼ぶ。書き込みのときに最新のリビジョンを条件にしていない。
 - 作成・更新の通知は route から、移動・ごみ箱への移動のアプリ内通知は `pageService` の中から出る。全文検索・GROWI Vault・画面の更新は `crowi.events.page` を受けて動く。
+- 人の操作のページごとの通知の出どころは次のとおりである。グローバル通知（`globalNotificationService.fire`）は、どれも route が送る（編集 `PAGE_EDIT` は `update-page.ts`、新規作成 `PAGE_CREATE` は `create-page.ts`、移動 `PAGE_MOVE` は `apiv3/pages/index.js`、ごみ箱へ移す `PAGE_DELETE` は `routes/page.js`。ごみ箱から戻すにはグローバル通知が無い）。`fire` は中で、ページの閲覧範囲から送るかどうかを決める（`isSendNotification`。リンクを知る人だけ・特定のユーザーだけのページには送らず、本人だけ・グループのページは管理者の設定に従う）。購読している人へのアプリ内通知は、編集では route の `generateUpdateActivity` が `PAGE_UPDATE` の activity を `preNotify` つきで知らせることで作られ（同じ人の 5 分以内の更新では `shouldGenerateUpdate` が作らない）、移動・ごみ箱へ移す・ごみ箱から戻すでは `pageService` の中で作られる。新規作成ではアプリ内通知は出ない。
 - 共同編集の接続数は、プロセスごとのメモリにだけある。
 
 ### Architecture Pattern & Boundary Map
@@ -169,7 +176,8 @@ apps/app/src/features/change-proposal/
 │   │   ├── validate-based-on.ts           # base exists / same requester / not a revert proposal / eligible op keys
 │   │   ├── compute-achievement.ts         # applied-at-least-once / attempted, requester view only
 │   │   ├── build-proposal-links.ts        # per-operation back-links from derived proposals, filtered per viewer
-│   │   └── to-revision-proposal-mark.ts   # ProposalMark -> IRevisionProposalMark (@growi/core)
+│   │   ├── to-revision-proposal-mark.ts   # ProposalMark -> IRevisionProposalMark (@growi/core)
+│   │   └── should-send-per-page-notifications.ts # admin switch AND the proposal's own switch
 │   ├── services/
 │   │   ├── settings.ts             # Reads/writes the change-proposal config keys
 │   │   ├── editing-presence.ts     # "Is someone editing this page" check via IYjsService
@@ -197,6 +205,7 @@ apps/app/src/features/change-proposal/
 │       ├── discard.ts
 │       ├── revert.ts
 │       ├── revision-marks.ts
+│       ├── set-per-page-notifications.ts
 │       └── admin/
 │           ├── index.ts            # Admin router factory mounted at /change-proposal-settings
 │           ├── get-settings.ts
@@ -221,7 +230,8 @@ apps/app/src/features/change-proposal/
 apps/app/src/server/service/page-save/
 ├── index.ts                        # Barrel
 ├── update-page-body.ts             # Conflict check + conditional write shared by human save and apply
-└── human-save-effects.ts           # Post-save notifications/yjs sync moved out of update-page/create-page routes
+├── human-save-effects.ts           # Post-save notifications/yjs sync moved out of update-page/create-page routes
+└── page-notifications.ts           # Per-page notifications shared by human saves and Change Proposal apply (global notification, PAGE_UPDATE in-app activity)
 
 apps/app/src/pages/admin/change-proposal.page.tsx   # Admin page (same shape as admin/ai.page.tsx)
 ```
@@ -238,16 +248,17 @@ apps/app/src/pages/admin/change-proposal.page.tsx   # Admin page (same shape as 
 - `apps/app/src/server/service/page/index.ts` / `page-service.ts` — `updatePage` と `create` が `proposalMark` と `expectedRevisionId` を下へ渡す。`renamePage` と `deletePage` の options に `isInAppNotificationSuppressed?` を足し、真のときは `activityEvent.emit('updated', …)` を出さない（activity の記録は今のまま）。`revertDeletedPage` の options にも同じ指定を足す。子のページを含めない戻し方では今 `activityEvent.emit('update', activityId, parameters, page, preNotifyService.generatePreNotify)` を出しているので、指定が真のときは 4 番目と 5 番目の引数を渡さずに `emit` する（activity は今のまま記録し、アプリ内通知は作らない）
 - `apps/app/src/server/models/page-redirect.ts` — `deleteRedirectsFromPathTree(fromPath)`（`fromPath` 自身と、その下のパスを起点とするリダイレクトを消す）を Prisma の拡張に足す。ごみ箱から戻す操作は、既存の `deleteByFromPath` を使う
 - `apps/app/src/server/service/yjs/yjs.ts` — `IYjsService` に `getConnectionCount(pageId): number` を足す（このプロセスの `docs.get(pageId)?.conns.size ?? 0`）
-- `apps/app/src/server/routes/apiv3/page/update-page.ts` — 確認と書き込みを `updatePageBody` に、`postAction` を `human-save-effects` に移す。middleware の順と activity の emit の位置は変えない
+- `apps/app/src/server/routes/apiv3/page/update-page.ts` — 確認と書き込みを `updatePageBody` に、`postAction` を `human-save-effects` に移す。`generateUpdateActivity` の中身（`shouldGenerateUpdate` の判断と `PAGE_UPDATE` の emit）を `page-notifications.ts` の `emitPageUpdateActivity` に移し、route は自分の activity の ID を渡して同じ位置で呼ぶ。middleware の順と activity の emit の位置は変えない
 - `apps/app/src/server/routes/apiv3/page/create-page.ts` — `postAction` を `human-save-effects` に移す
+- `human-save-effects.ts` のグローバル通知の送信は `page-notifications.ts` の `firePageGlobalNotification` を呼ぶ形にする（失敗をログに残すだけの扱いと、送る順序は変えない）
 - `apps/app/src/interfaces/activity.ts` — action `CHANGE_PROPOSAL_CREATE` / `CHANGE_PROPOSAL_APPLY` / `CHANGE_PROPOSAL_REVERT` / `ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE`、target model `ChangeProposal`、監査ログの分類（`SupportedActionCategory.CHANGE_PROPOSAL = 'ChangeProposal'`）を足す。分類の正規表現は `^CHANGE_PROPOSAL_` を直接書く（分類名を大文字にするだけの既存の書き方では `CHANGEPROPOSAL` になり、action の名前と合わないため）。`APPLY` と `REVERT` は `EssentialActionGroup` に入れる
 - `apps/app/src/client/components/Admin/AuditLog/SelectActionDropdown.tsx`（分類を表示している部品）— 新しい分類を足す
 - `apps/app/src/server/service/in-app-notification.ts` — 通知の一覧で、`targetModel` が `ChangeProposal` の通知の `target` を `_id` だけにして返す（一覧の取得は `target` を中身ごと読み込んで返すため。そのままだと受け取る人に Change Proposal の全部の操作が渡り、受け取る人ごとに絞った snapshot の意味が無くなる）
-- `apps/app/src/server/service/config-manager/config-definition.ts` — 設定キー（Data Models の「設定キー」）
+- `apps/app/src/server/service/config-manager/config-definition.ts` — 設定キー（Data Models の「設定キー」）。ページごとの通知の管理者の設定 `changeProposal:perPageNotificationsEnabled` を含む
 - `apps/app/src/server/routes/apiv3/index.js` — `router.use('/change-proposals', …)` と `routerForAdmin.use('/change-proposal-settings', …)`
 - `apps/app/src/server/crowi/index.ts` — `setupCron` で保守用の cron を起動する。書き込み機能の有効・無効にかかわらず起動し（無効のときに承認待ちを取り下げるため）、実行の間隔の設定が空のときだけ起動しない
 - `apps/app/src/components/Admin/Common/AdminNavigation.tsx` — 管理メニューに 1 項目を足す
-- `apps/app/public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/admin.json` — 設定画面の文言と `audit_log_action.CHANGE_PROPOSAL_*` / `ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE`
+- `apps/app/public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/admin.json` — 設定画面の文言（ページごとの通知の設定を含む。Client の Admin Settings Screen の表）と `audit_log_action.CHANGE_PROPOSAL_*` / `ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE`
 - `apps/app/public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/translation.json` — `client/shared/` の表が指す `change_proposal.operation_type.*` / `operation_status.*` / `proposal_status.*` / `reason.*` / `revert_refusal_reason.*` / `lifecycle.*` / `link.*` / `achievement.*`
 - `apps/app/i18next.config.ts` — `extract.preservePatterns` に上の 8 つの接頭辞のワイルドカード（`change_proposal.operation_type.*` など）を足す。キーの全体を表から引く呼び方なので、静的な解析ではどのキーも使われていないように見えるためである。`change_proposal.` で始まる静的な `t('…')` の呼び出しは作らないので、ワイルドカードで隠れるキーは無い
 - `apps/app/src/client/components/PageHistory/RevisionDiff.tsx` — diff2html の設定（`outputFormat: 'side-by-side'`、`drawFileList: false`、テーマから決めた `colorScheme`）と色の決め方を `client/shared/diff2html-options.ts` から取り、CSS は `client/shared/diff2html.vendor-styles.prebuilt` を読み込む。表示は変えない
@@ -291,6 +302,7 @@ sequenceDiagram
 - 各操作の前に、同じ Change Proposal の印（`proposalId` と操作の `key`）を持つリビジョンがすでにあるかを探す（新規作成では、見つかったリビジョンの `pageId` が作ったページである）。あれば書かずに「反映済み」として記録する。
 - 編集中の人がいるとき、または重なる `PageOperation` が決まった時間を過ぎても残るときは、その操作を「待ち」に戻し、`approvedAt` を消す（もう一度の承認が要る。要件 3.5・4.8）。
 - すでに反映した操作は、後の操作が失敗しても戻さない（要件 3.13）。
+- 各操作の前に、ページごとの通知を出すかを決める。管理者の設定と、その時点で保存されている Change Proposal の指定を読み直し、両方が真のときだけ handler に「出す」を渡す（要件 7.1・7.10・7.13）。
 
 ### 操作の状態の移り変わり
 
@@ -367,6 +379,7 @@ stateDiagram-v2
 | 1.11, 1.12 | 閲覧できない対象、元のリビジョンの所属 | ChangeProposalService | `createProposal` | — |
 | 1.14 | 入口の種類「取り消し」は作成で受けない | validateProposalInput | `CreatableEntry` 型 | — |
 | 1.15 | モデル名 | ChangeProposal Model | `modelLabel` | — |
+| 1.17 | ページごとの通知の指定の保存（指定が無ければ「出す」） | ChangeProposalService、ChangeProposal Model | `createProposal` の `perPageNotifications` | — |
 | 2.1, 2.2 | 操作の状態と全体の状態 | deriveProposalStatus | `deriveProposalStatus` | 状態の移り変わり |
 | 2.3, 2.4 | 飛ばす、破棄 | ChangeProposalService | `skip` / `discard` | — |
 | 2.5 | 期限切れ | ChangeProposalService、MaintenanceCron | `expireDueProposals` | — |
@@ -403,7 +416,12 @@ stateDiagram-v2
 | 6.3, 6.4 | 人の保存に印を付けない、`origin` を空に | PageSave Core | — | — |
 | 6.5 | 消えない記録 | ChangeProposal Model | — | — |
 | 6.6 | 既存のリビジョンの応答から他の操作が分からない | Revision の schema（`key` だけを持つ） | `proposalOperationKey` | — |
-| 7.1 | ページごとの通知を止める | Operation Handlers、pageService の options | `isInAppNotificationSuppressed` | — |
+| 7.1, 7.10, 7.11 | ページごとの通知を出すか、出すときは人の操作と同じ通知、保存ごとの Slack 通知は出さない | ProposalApplier、Operation Handlers、page-notifications、pageService の options | `shouldSendPerPageNotifications`、`OperationContext.perPageNotifications`、`isInAppNotificationSuppressed`、`firePageGlobalNotification`、`emitPageUpdateActivity` | 反映の流れ |
+| 7.12 | まとめた通知は指定にかかわらず送る | ProposalNotifier | `notifyApplied` | 反映の流れ |
+| 7.13 | 操作ごとに、書き込む時点の値で決める | ProposalApplier、ChangeProposal Model | `readPerPageNotifications` | 反映の流れ |
+| 7.14–7.16, 7.19 | 指定の変更（依頼した人だけ、承認待ちのときだけ、読み取り専用ユーザーは受け付けない） | ChangeProposalService、ChangeProposal Model、ChangeProposal Routes | `setPerPageNotifications`、`PUT /change-proposals/:id/per-page-notifications` | — |
+| 7.17 | 取り消しは元の指定を引き継ぐ | ChangeProposalService | `revert` | 取り消しの流れ |
+| 7.18 | 指定と管理者の設定を依頼した人にだけ返す | ProposalQueryService | `RequesterProposalState.perPageNotifications` | — |
 | 7.2–7.4 | まとめた通知、見えるページだけ | ProposalNotifier | `notifyApplied` | 反映の流れ |
 | 7.8 | 取り消しの通知（元の依頼した人、ごみ箱の操作のページ） | ProposalNotifier | `notifyApplied` | 取り消しの流れ |
 | 7.5, 7.7 | activity | ProposalActivity | `recordProposalActivity` | — |
@@ -412,6 +430,8 @@ stateDiagram-v2
 | 8.1–8.4 | 設定 | Settings、config-definition | 設定キー | — |
 | 8.5 | 無効にしたら取り下げ | ChangeProposalService、Admin Routes、MaintenanceCron | `withdrawAllPending` | — |
 | 8.6–8.8 | 設定画面、5 言語、管理者だけ | Admin UI、Admin Routes | Admin API | — |
+| 8.9 | ページごとの通知の管理者の設定（初期値は出さない） | Settings、config-definition、Admin UI、Admin Routes | `changeProposal:perPageNotificationsEnabled` | — |
+| 8.10 | 上限の初期値（操作数 50、1 日の件数は上限なし） | Settings、config-definition、validateProposalInput、ChangeProposalService | `changeProposal:maxOperationsPerProposal`、`changeProposal:maxProposalsPerUserPerDay` | — |
 | 9.1–9.5 | 取得と絞り込み | ProposalQueryService、selectVisibleOperations | `GET /change-proposals/:id` | — |
 | 9.6, 9.7 | 一覧 | ProposalQueryService、selectVisibleOperations | `GET /change-proposals/mine`・`/applied` | — |
 | 9.8 | リビジョンの印の取得 | ProposalQueryService、selectVisibleOperations | `POST /change-proposals/revision-marks` | — |
@@ -437,21 +457,21 @@ stateDiagram-v2
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
-| Domain Pure Functions | domain | 状態・順序・承認・戻せるか・見えるか・達成度・つながりの判断 | 1.5–1.7, 1.13, 1.14, 1.16, 2.1, 2.2, 3.2, 4.1–4.5, 5.2–5.8, 5.12, 5.15, 5.16, 9.1–9.5, 9.7, 9.8, 12.2, 12.3, 13.2–13.4, 13.7, 14.1–14.4 | なし | Service |
-| ChangeProposal Model | data | 新しいコレクションの読み書き（Prisma の拡張）と、索引を作る Mongoose の schema | 1.1–1.4, 1.15, 2.6–2.9, 2.11, 6.5, 13.1, 14.1 | Prisma (P0)、Mongoose（コレクションと索引の作成だけ）(P0) | Service, State |
-| Settings | services | 設定キーの読み書き | 1.9, 8.1–8.4 | configManager (P0) | Service |
+| Domain Pure Functions | domain | 状態・順序・承認・戻せるか・見えるか・達成度・つながり・ページごとの通知の判断 | 1.5–1.7, 1.13, 1.14, 1.16, 2.1, 2.2, 3.2, 4.1–4.5, 5.2–5.8, 5.12, 5.15, 5.16, 7.1, 7.10, 9.1–9.5, 9.7, 9.8, 12.2, 12.3, 13.2–13.4, 13.7, 14.1–14.4 | なし | Service |
+| ChangeProposal Model | data | 新しいコレクションの読み書き（Prisma の拡張）と、索引を作る Mongoose の schema | 1.1–1.4, 1.15, 1.17, 2.6–2.9, 2.11, 6.5, 7.13, 7.14, 13.1, 14.1 | Prisma (P0)、Mongoose（コレクションと索引の作成だけ）(P0) | Service, State |
+| Settings | services | 設定キーの読み書き | 1.9, 8.1–8.4, 8.9, 8.10 | configManager (P0) | Service |
 | EditingPresence | services | 編集中の人がいるかの確認 | 3.5, 5.11 | IYjsService (P0) | Service |
 | PageSave Core | server/service/page-save | 確認と条件付きの書き込み（人の保存と共通） | 3.3, 3.4, 3.11, 3.12, 3.16, 6.1, 6.3, 6.4, 10.1–10.3 | pageService (P0)、Page model (P0) | Service |
-| Operation Handlers | services | 操作の種類ごとの書き込み | 3.6–3.10, 3.17, 5.7, 5.15, 5.16, 6.2, 7.1 | PageSave Core (P0)、pageService (P0) | Service |
-| ProposalApplier | services | 反映の実行 | 2.6, 2.7, 2.9, 3.1–3.17, 4.8, 5.9, 5.11, 13.5, 13.6 | Handlers (P0)、Presence (P0)、Model (P0) | Service, State |
-| ProposalNotifier | services | まとめたアプリ内通知 | 7.2–7.4, 7.8 | InAppNotification (P0)、Subscription (P1) | Service, Event |
+| Operation Handlers | services | 操作の種類ごとの書き込みと、ページごとの通知 | 3.6–3.10, 3.17, 5.7, 5.15, 5.16, 6.2, 7.1, 7.10, 7.11 | PageSave Core (P0)、pageService (P0)、page-notifications (P1) | Service |
+| ProposalApplier | services | 反映の実行 | 2.6, 2.7, 2.9, 3.1–3.17, 4.8, 5.9, 5.11, 7.1, 7.13, 13.5, 13.6 | Handlers (P0)、Presence (P0)、Model (P0) | Service, State |
+| ProposalNotifier | services | まとめたアプリ内通知 | 7.2–7.4, 7.8, 7.12 | InAppNotification (P0)、Subscription (P1) | Service, Event |
 | ProposalActivity | services | activity の記録 | 7.5, 7.7, 7.9 | activity service (P0) | Service |
-| ChangeProposalService | services | 作成・承認・飛ばす・破棄・取り消し・期限切れ・取り下げ | 1.*, 2.3–2.5, 2.9, 2.10, 4.*, 5.1–5.13, 8.5, 13.1–13.7 | Applier (P0)、Model (P0)、Settings (P0) | Service |
-| ProposalQueryService | services | 見る人ごとに絞った取得 | 5.14, 9.1–9.8, 9.10, 12.1, 12.4, 14.1–14.4 | Model (P0)、Page model (P0) | Service |
+| ChangeProposalService | services | 作成・承認・飛ばす・破棄・取り消し・期限切れ・取り下げ・ページごとの通知の指定の変更 | 1.*, 2.3–2.5, 2.9, 2.10, 4.*, 5.1–5.13, 7.14–7.17, 8.5, 8.10, 13.1–13.7 | Applier (P0)、Model (P0)、Settings (P0) | Service |
+| ProposalQueryService | services | 見る人ごとに絞った取得 | 5.14, 7.18, 9.1–9.8, 9.10, 12.1, 12.4, 14.1–14.4 | Model (P0)、Page model (P0) | Service |
 | MaintenanceCron | services | 期限切れ・取り下げ・再開・完了の書き込みの前で止まった Change Proposal の完了 | 2.5, 2.9, 2.11, 3.14, 8.5 | CronService (P0) | Batch |
-| ChangeProposal Routes | routes | 利用者の REST API | 4.4–4.7, 5.1–5.4, 9.*  | Service (P0)、Query (P0) | API |
-| Admin Settings Routes | routes | 管理者の設定の API | 8.1–8.6, 8.8 | Settings (P0)、Service (P1) | API |
-| Admin Settings Screen | client | 管理者の設定画面 | 8.6, 8.7 | Admin Routes (P0) | — |
+| ChangeProposal Routes | routes | 利用者の REST API | 4.4–4.7, 5.1–5.4, 7.14–7.16, 7.19, 9.*  | Service (P0)、Query (P0) | API |
+| Admin Settings Routes | routes | 管理者の設定の API | 8.1–8.6, 8.8, 8.9 | Settings (P0)、Service (P1) | API |
+| Admin Settings Screen | client | 管理者の設定画面 | 8.6, 8.7, 8.9 | Admin Routes (P0) | — |
 | Client Shared | client | 兄弟の spec の画面と `RevisionDiff` が使う表示名の表と diff2html の部品 | 11.1–11.5 | interfaces (P0)、diff2html (P0) | — |
 
 ### Domain（純関数）
@@ -461,7 +481,7 @@ stateDiagram-v2
 | Field | Detail |
 |-------|--------|
 | Intent | DB を読まない判断をすべて純関数にし、サービスはそれに入力を渡すだけにする |
-| Requirements | 1.5–1.7, 1.13, 1.14, 1.16, 2.1, 2.2, 3.2, 4.1–4.5, 5.2–5.8, 5.12, 5.15, 5.16, 9.1–9.5, 9.7, 9.8, 12.2, 12.3, 13.2–13.4, 13.7, 14.1–14.4 |
+| Requirements | 1.5–1.7, 1.13, 1.14, 1.16, 2.1, 2.2, 3.2, 4.1–4.5, 5.2–5.8, 5.12, 5.15, 5.16, 7.1, 7.10, 9.1–9.5, 9.7, 9.8, 12.2, 12.3, 13.2–13.4, 13.7, 14.1–14.4 |
 
 **Responsibilities & Constraints**
 - どの関数も DB・設定・時刻を直接読まない。必要な値は引数で受け取る。
@@ -568,6 +588,12 @@ function buildProposalLinks(
   returnedOperationKeys: readonly string[],      // keys of the base operations this viewer receives
   linked: readonly LinkedProposalFacts[],
 ): ReadonlyMap<string, readonly ProposalLinkView[]>; // base operation key -> links, newest first
+
+// should-send-per-page-notifications.ts — the only place that combines the two switches
+function shouldSendPerPageNotifications(
+  isEnabledBySettings: boolean,   // changeProposal:perPageNotificationsEnabled, read before each operation
+  proposalValue: boolean,         // ChangeProposalDocument.perPageNotifications, read before each operation
+): boolean;                         // true only when both are true
 ```
 - `deriveProposalStatus` の決め方（上から順に当てはめる）:
   1. `lifecycle` が `open` で、「待ち」の操作が 1 つ以上ある → `pending`
@@ -600,6 +626,7 @@ function buildProposalLinks(
   4. それ以外 → 重なった `key` を 1 つにまとめた `basedOn` を返す
 - `BASED_ON_ELIGIBLE_STATUSES`（`interfaces/change-proposal.ts` の表）: `follow-up` は `stale`・`failed`・`skipped`（理由を問わない）、`rework` は `applied`・`revert-refused`。`pending` は元の Change Proposal でまだ承認できるので後続にしない。`reverted` はすでに戻した内容なので見直さない。兄弟の spec の画面も、ボタンを出すかの判断にこの表を使う。
 - `computeAchievement` の規則: `entry` が `revert` なら返さない（取り消しの操作の「古い」「失敗」は、元の操作の「取り消しを断られた」として表すため。要件 12.3）。それ以外は、`applied` を「状態が `applied`・`reverted`・`revert-refused`（`APPLIED_AT_LEAST_ONCE_STATUSES`）の操作の数」、`attempted` を「全体の操作の数から、状態が `skipped` で理由が `skipped-by-requester` の操作の数を引いた数」にする（要件 12.2）。`attempted` が 0 のときも 0 のまま返し、割合にするのは画面の側（`toAchievementPercent`）である。
+- `shouldSendPerPageNotifications` の規則: 管理者の設定と Change Proposal の指定の両方が真のときだけ真を返す。取り消しの Change Proposal も同じ規則で決める（取り消しは書き込み機能の設定を確かめないが、ページごとの通知の設定は確かめる）。2 つの値を組み合わせる場所をこの関数 1 つにし、handler と applier は結果の真偽だけを扱う（要件 7.1・7.10）。
 - `buildProposalLinks` の規則: `returnedOperationKeys` に入る `key` にだけ、つながりを付ける（見る人に返さない元の操作には付けない）。`isVisibleToViewer` が偽のつながりは付けない（要件 14.3）。同じ Change Proposal が同じ操作を 2 回指すことは無い（`validateBasedOn` が `key` をまとめるため）。
 
 ### Data
@@ -609,7 +636,7 @@ function buildProposalLinks(
 | Field | Detail |
 |-------|--------|
 | Intent | Change Proposal を 1 文書として保存する。操作は文書の中の配列に持つ。読み書きはすべて Prisma の拡張の関数を通す |
-| Requirements | 1.1–1.4, 1.15, 2.6–2.9, 2.11, 6.5, 13.1, 14.1 |
+| Requirements | 1.1–1.4, 1.15, 1.17, 2.6–2.9, 2.11, 6.5, 7.13, 7.14, 13.1, 14.1 |
 
 **Responsibilities & Constraints**
 - 読み書きは、`server/models/change-proposal.ts` の Prisma の拡張の関数（`prisma.changeproposals.<関数>`、下の表）だけで行う。サービスは Prisma の `findMany` や `updateMany` を直接呼ばない。Mongoose のモデルでは読み書きしない。
@@ -628,7 +655,9 @@ function buildProposalLinks(
 
 | 関数 | 使う場面 | Prisma の呼び方と条件 | 偽のとき |
 |---|---|---|---|
-| `createProposal` | 作成 | `create`。操作の `key` は UUID を振り、`index` は 0 から振る。`basedOn` が渡されたときは、`validateBasedOn` が返した値をそのまま書く | — |
+| `createProposal` | 作成 | `create`。操作の `key` は UUID を振り、`index` は 0 から振る。`basedOn` が渡されたときは、`validateBasedOn` が返した値をそのまま書く。`perPageNotifications` は呼び出し側が決めた値を必ず書く（指定が無いときの「出す」と、取り消しの引き継ぎは ChangeProposalService が決める） | — |
+| `setPerPageNotifications(id, requesterId, value)` | ページごとの通知の指定の変更 | where: `id`・`requester`・`lifecycle: 'open'`。data: `perPageNotifications: value` | 読み直して `not-found` か `not-open` を返す（`markApproved` と同じ） |
+| `readPerPageNotifications(id)` | 反映で、各操作の前に指定を読み直す | `findUnique`（`select: { perPageNotifications: true }`。本文を読まない） | — |
 | `findProposal` | 反映・取り消し・取得の読み込み | `findUnique`（`id`） | — |
 | `claimApplyLease(id, token, now)` | 反映の権利を取る | where: `id`、かつ `applyLease` が無い（`isSet: false` または null）か `applyLease.expiresAt < now`。data: `applyLease: { set: { token, expiresAt: now + APPLY_LEASE_MS } }` | 取れなかった（`in-progress` を返す） |
 | `extendApplyLease(id, token, now)` | 操作を 1 つ反映するたび | where: `id` と `applyLease.token = token`。data: `applyLease.expiresAt` を延ばす | lease を失ったので、その実行を止める |
@@ -665,7 +694,7 @@ function buildProposalLinks(
 | Field | Detail |
 |-------|--------|
 | Intent | 設定キーを読み、型付きの値として返す。管理者の API から書く |
-| Requirements | 1.9, 8.1–8.4 |
+| Requirements | 1.9, 8.1–8.4, 8.9, 8.10 |
 
 **Contracts**: Service [x]
 
@@ -675,15 +704,17 @@ type ChangeProposalSettings = {
   readonly isEnabled: boolean;
   readonly enabledOperationTypes: ReadonlySet<CreatableOperationType>;
   readonly autoApplyPolicy: AutoApplyPolicy;
-  readonly maxOperationsPerProposal: number | null;   // null: no limit until OQ-2 is decided
-  readonly maxProposalsPerUserPerDay: number | null;  // null: no limit until OQ-2 is decided
+  readonly maxOperationsPerProposal: number | null;   // default 50; null: not checked (only when an admin clears it)
+  readonly maxProposalsPerUserPerDay: number | null;  // default null: no limit; checked only when an admin sets a number
   readonly pendingExpirationSeconds: number | null;   // null: never expires until OQ-1 is decided
+  readonly perPageNotificationsEnabled: boolean;      // default false: apply sends no per-page notifications
 };
 function readChangeProposalSettings(): ChangeProposalSettings;
 function updateChangeProposalSettings(input: ChangeProposalSettingsUpdate): Promise<void>; // configManager.updateConfigs
 ```
 - 読むたびに `configManager` から取る（他のサーバーで変更されても、次の読み込みで反映される）。
 - `readChangeProposalSettings` は機能の server の barrel から export する。兄弟の spec（viewer の画面の共通の値、ai-agent の道具を渡すかの判断）は、設定キーを直接読まず、この関数を使う。
+- ブラウザの画面は `readChangeProposalSettings` を呼べず、管理者の設定の API は管理者だけが使える。そのため、ページごとの通知の管理者の設定は、依頼した人への取得の応答（`requesterState.perPageNotifications.isEnabledBySettings`）に入れて返す。兄弟の spec の画面は、この値で指定の表示を出すかを決める（要件 7.18）。
 
 #### EditingPresence
 
@@ -754,7 +785,22 @@ function updatePageBody(deps: { readonly pageService: IPageService }, input: Upd
 // human-save-effects.ts — moved verbatim from the routes' postAction
 function runAfterHumanUpdate(crowi: Crowi, args: HumanUpdateEffectArgs): Promise<void>;
 function runAfterHumanCreate(crowi: Crowi, args: HumanCreateEffectArgs): Promise<void>;
+
+// page-notifications.ts — per-page notifications shared by human saves and Change Proposal apply
+function firePageGlobalNotification(
+  crowi: Crowi,
+  event: GlobalNotificationSettingEvent, // PAGE_EDIT / PAGE_CREATE / PAGE_MOVE / PAGE_DELETE
+  page: PageDocument,
+  user: IUserHasId,
+  vars?: GlobalNotificationEventVars,    // { oldPath } for PAGE_MOVE
+): Promise<void>;                         // logs and swallows errors, like the routes do today
+function emitPageUpdateActivity(
+  crowi: Crowi,
+  args: { readonly activityId: string; readonly page: HydratedDocument<PageDocument>; readonly user: IUserHasId },
+): Promise<boolean>;                      // false when shouldGenerateUpdate skipped it (same user within 5 minutes)
 ```
+- `page-notifications.ts` は、人の保存の route に今ある処理を動きを変えずに移したものである。`firePageGlobalNotification` は `globalNotificationService.fire` を呼び、失敗をログに残すだけにする（ページの閲覧範囲による送る・送らないの判定は `fire` の中のまま）。`emitPageUpdateActivity` は、`update-page.ts` の `generateUpdateActivity` の中身（`shouldGenerateUpdate` の判断と、`PAGE_UPDATE` の activity を対象のページと `preNotify` つきで知らせる `emit`）である。route は今までどおり自分の activity の ID を渡す。
+- 人が保存のたびに Slack のチャンネルを選んで送る通知（`userNotificationService`）と、共同編集の文書の置き換えは `human-save-effects.ts` に残し、反映からは呼ばない（要件 7.11）。
 - Preconditions: `mode: 'proposal'` では `origin` を渡さない（反映のリビジョンの `origin` は空、要件 6.4）。
 - Postconditions: `updated` のとき、最新のリビジョンは今回作ったもので、`mode: 'proposal'` ならそのリビジョンが `proposalId` と `proposalOperationKey` を持つ。
 - Invariants: `mode: 'human'` では、リビジョンに Change Proposal の印を付けない（要件 6.3）。
@@ -769,12 +815,24 @@ function runAfterHumanCreate(crowi: Crowi, args: HumanCreateEffectArgs): Promise
 | Field | Detail |
 |-------|--------|
 | Intent | 1 つの操作を、既存のページのサービスを通して書き込む |
-| Requirements | 3.6–3.10, 3.17, 5.7, 5.15, 5.16, 6.2, 7.1 |
+| Requirements | 3.6–3.10, 3.17, 5.7, 5.15, 5.16, 6.2, 7.1, 7.10, 7.11 |
 
 **Responsibilities & Constraints**
 - 種類をキーにした表（`OPERATION_HANDLERS`）で持ち、実行する側は種類で分岐しない。
 - 書き込みはすべて `pageService` か PageSave Core を通す。全文検索・GROWI Vault・画面の更新は、`pageService` の中から出る `crowi.events.page` でそのまま動く（要件 3.17）。
-- route の通知の処理（グローバル通知、Slack 通知、購読の作成、共同編集の文書の置き換え）は呼ばない。移動・ごみ箱・ごみ箱から戻すでは `isInAppNotificationSuppressed: true` を渡す（要件 7.1）。
+- route の応答のあとの処理（`runAfterHumanUpdate` / `runAfterHumanCreate`。保存ごとに選んだ Slack のチャンネルへの通知、購読の作成、共同編集の文書の置き換え）は呼ばない（要件 7.11）。
+- ページごとの通知は、`OperationContext.perPageNotifications`（`shouldSendPerPageNotifications` の結果。ProposalApplier が操作ごとに決める）だけで出すかを決める。handler は設定も Change Proposal の指定も読まない。偽のときは、どの種類でもページごとの通知を出さない（要件 7.1）。真のときは、人が同じ操作をしたときと同じ通知を、次の表のとおりに出す（要件 7.10）。移動・ごみ箱へ移す・ごみ箱から戻すのアプリ内通知は、`pageService` の呼び出しの指定で `execute` の中で出る。それ以外（表の `sendPerPageNotifications` の列）は、ProposalApplier が操作の結果を記録したあとで呼ぶ `sendPerPageNotifications` が出す。
+
+| 操作の種類 | 購読している人へのアプリ内通知 | グローバル通知（`sendPerPageNotifications`） |
+|---|---|---|
+| edit | `sendPerPageNotifications` の中で、`beginActivity` で依頼した人を操作者とする activity の ID を作り、`emitPageUpdateActivity` を呼ぶ（人の保存と同じく、同じ人の 5 分以内の更新では作らない。作らなかったときは `pendingActivityContext.clear` で文脈を消す） | `firePageGlobalNotification(PAGE_EDIT)` |
+| create | 出さない（人の作成でも出ない） | `firePageGlobalNotification(PAGE_CREATE)` |
+| move | `renamePage` に `isInAppNotificationSuppressed: false` を渡す | `firePageGlobalNotification(PAGE_MOVE, { oldPath: fromPath })` |
+| trash | `deletePage` に `isInAppNotificationSuppressed: false` を渡す | `firePageGlobalNotification(PAGE_DELETE)` |
+| restore | `revertDeletedPage` に `isInAppNotificationSuppressed: false` を渡す | 出さない（人がごみ箱から戻してもグローバル通知は無い） |
+
+- `sendPerPageNotifications` は、ProposalApplier が `recordOperationOutcome` で「反映済み」を記録できたあとで、`perPageNotifications` が真のときだけ呼ぶ。グローバル通知はメールと Slack の送信を待つので、送るのが遅くても、書けた結果の記録が遅れないようにするためである。`findExistingResult` が前の実行の書き込みを見つけた操作では呼ばない（前の実行が通知を送る前に止まった場合、その操作のページごとの通知は出ないままになる）。送るのに失敗してもログに残すだけで、操作の結果は変えない。ページの閲覧範囲による送る・送らないの判定は `globalNotificationService.fire` の中の既存の判定のままにする。
+- 編集で作る `PAGE_UPDATE` の activity は、人の保存と同じく監査ログにも残る。反映の activity（`CHANGE_PROPOSAL_APPLY`）とは別の行になる。
 - 作者は依頼した人（`requester` の `IUserHasId`）にする（要件 3.10）。
 
 **Contracts**: Service [x]
@@ -786,6 +844,7 @@ type OperationContext = {
   readonly operationKey: string;
   readonly requester: IUserHasId;
   readonly activityParameters: { readonly ip?: string; readonly endpoint?: string };
+  readonly perPageNotifications: boolean;   // result of shouldSendPerPageNotifications for this operation
 };
 type OperationOutcome =
   | { readonly status: 'applied'; readonly resultPageId: string; readonly resultRevisionId: string | null }
@@ -795,18 +854,20 @@ interface OperationHandler<T extends OperationRecord> {
   // Detects a write already done by an interrupted run (same proposal mark, or the page already at the target path)
   findExistingResult(op: T, ctx: OperationContext): Promise<OperationOutcome | null>;
   execute(op: T, ctx: OperationContext): Promise<OperationOutcome>;
+  // Called by ProposalApplier after the applied outcome is recorded, only when ctx.perPageNotifications is true; never throws
+  sendPerPageNotifications(op: T, outcome: Extract<OperationOutcome, { status: 'applied' }>, ctx: OperationContext): Promise<void>;
 }
 ```
 - **edit**: `Page.findByIdAndViewer(pageId, requester)` で取れなければ `failed: target-unavailable`。取れたら `updatePageBody({ mode: 'proposal', expectedRevisionId: baseRevisionId, proposalMark: toRevisionProposalMark({ proposalId, operationKey }), … })`。`conflict` なら `stale`。
 - **create**: 近い祖先のページを依頼した人が閲覧できなければ `failed: target-unavailable`。パスが使われていれば（`Page.exists({ path, isEmpty: false })`）`failed: path-occupied`。`pageService.create(path, body, requester, { proposalMark: toRevisionProposalMark({ proposalId, operationKey }) })` を、`grant` を渡さずに呼ぶ（閲覧範囲は祖先から引き継がれる。要件 3.9）。印は最初のリビジョンにだけ書き、ページには書かない（要件 6.2）。閲覧範囲を依頼した人に割り当てられずに断られたときは `failed: grant-not-assignable`。WIP は指定しない（OQ-4）。
-- **move**: 移動元のページを依頼した人が閲覧できなければ `failed: target-unavailable`。移動先が使われていれば `failed: path-occupied`。`pageService.renamePage(page, toPath, requester, { isRecursively: page.descendantCount > 0, createRedirectPage: true, updateMetadata: true, isInAppNotificationSuppressed: true }, activityParameters)`。取り消しの移動（`removeRedirectsFrom` を持つ）では `createRedirectPage: false` にし、移動のあとで `deleteRedirectsFromPathTree(removeRedirectsFrom)` を呼ぶ（要件 5.7）。
-- **trash**（取り消しだけ。新規作成の取り消しと、ごみ箱から戻した操作の取り消しに使う）: ページの最新のリビジョンが `expectedRevisionId` でない、または子のページがあれば `failed`（理由は `judgeRevertability` と同じ値）。`pageService.deletePage(page, requester, { isInAppNotificationSuppressed: true }, false, activityParameters)`。
-- **restore**（取り消しだけ。ごみ箱へ移した操作の取り消しに使う。要件 5.15）: ページを依頼した人が閲覧できなければ `failed: target-unavailable`。ページのパスが `/trash` で始まらなければ `failed: not-in-trash`。最新のリビジョンが `expectedRevisionId` でなければ `failed: edited-after-apply`。`pageService.revertDeletedPage(page, requester, { isInAppNotificationSuppressed: true }, false, activityParameters)` を呼び、`PathAlreadyExistsError` なら `failed: original-path-occupied`。戻したあとで、ごみ箱へ移したときに作られた「元のパス → ごみ箱のパス」のリダイレクトを `deleteByFromPath(toPath)` で消す（コードを読んだ範囲では、子のページを含めない `revertDeletedPage` はこのリダイレクトを消しておらず、ページを開くときはリダイレクトがページより先に調べられる。動かしては確かめていないので、タスク 4.3 の結合テストで確かめる）。子のページを持たないページだけが対象なので、`isRecursively` は常に偽にする。
+- **move**: 移動元のページを依頼した人が閲覧できなければ `failed: target-unavailable`。移動先が使われていれば `failed: path-occupied`。`pageService.renamePage(page, toPath, requester, { isRecursively: page.descendantCount > 0, createRedirectPage: true, updateMetadata: true, isInAppNotificationSuppressed: !perPageNotifications }, activityParameters)`。取り消しの移動（`removeRedirectsFrom` を持つ）では `createRedirectPage: false` にし、移動のあとで `deleteRedirectsFromPathTree(removeRedirectsFrom)` を呼ぶ（要件 5.7）。
+- **trash**（取り消しだけ。新規作成の取り消しと、ごみ箱から戻した操作の取り消しに使う）: ページの最新のリビジョンが `expectedRevisionId` でない、または子のページがあれば `failed`（理由は `judgeRevertability` と同じ値）。`pageService.deletePage(page, requester, { isInAppNotificationSuppressed: !perPageNotifications }, false, activityParameters)`。
+- **restore**（取り消しだけ。ごみ箱へ移した操作の取り消しに使う。要件 5.15）: ページを依頼した人が閲覧できなければ `failed: target-unavailable`。ページのパスが `/trash` で始まらなければ `failed: not-in-trash`。最新のリビジョンが `expectedRevisionId` でなければ `failed: edited-after-apply`。`pageService.revertDeletedPage(page, requester, { isInAppNotificationSuppressed: !perPageNotifications }, false, activityParameters)` を呼び、`PathAlreadyExistsError` なら `failed: original-path-occupied`。戻したあとで、ごみ箱へ移したときに作られた「元のパス → ごみ箱のパス」のリダイレクトを `deleteByFromPath(toPath)` で消す（コードを読んだ範囲では、子のページを含めない `revertDeletedPage` はこのリダイレクトを消しておらず、ページを開くときはリダイレクトがページより先に調べられる。動かしては確かめていないので、タスク 4.3 の結合テストで確かめる）。子のページを持たないページだけが対象なので、`isRecursively` は常に偽にする。
 - `findExistingResult`: edit と create は、同じ `proposalId` と `proposalOperationKey` を持つリビジョンを探す。create は、見つかったリビジョンの `pageId` を作ったページとする。move は、ページのパスがすでに移動先なら反映済みとみなす。trash は、ページがすでにごみ箱にあれば反映済みとみなす。restore は、ページが `toPath` にあり、ごみ箱に無ければ反映済みとみなす。
 
 **Implementation Notes**
 - Integration: `renamePage`・`deletePage`・`revertDeletedPage` は、通知を止めても activity（`PAGE_RENAME`・`PAGE_DELETE`・`PAGE_REVERT` など）を今のまま記録する。
-- Validation: 結合テストで「反映のあとに `InAppNotification` が増えていない」「グローバル通知の送信が呼ばれていない」を確かめる。
+- Validation: 結合テストで、`perPageNotifications` が偽のときは、どの種類でも反映のあとに `InAppNotification` が増えず、グローバル通知の送信が呼ばれないことを確かめる。真のときは、上の表のとおりに購読している人へのアプリ内通知が作られ、グローバル通知が送られること、閲覧範囲が「リンクを知る人だけ」のページにはグローバル通知が送られないこと（`isSendNotification` の既存の判定）、保存ごとの Slack のチャンネルへの通知が送られないことを確かめる。
 - Risks: 子のページの移動は裏で続き、反映の処理は待たない（今の移動と同じ）。`pageService.create` はページを保存してからリビジョンを書くので、その間で処理が止まると、印の付いたリビジョンの無いページが残る。もう一度反映したときは印が見つからず、パスが使われているので `failed: path-occupied` になる。二度書くことは無いが、その操作は「失敗」として残る。
 
 #### ProposalApplier
@@ -814,7 +875,7 @@ interface OperationHandler<T extends OperationRecord> {
 | Field | Detail |
 |-------|--------|
 | Intent | 承認された「待ち」の操作を、決めた順に 1 つずつ反映し、結果を記録する |
-| Requirements | 2.6, 2.7, 2.9, 3.1–3.17, 4.8, 5.9, 5.11, 13.5, 13.6 |
+| Requirements | 2.6, 2.7, 2.9, 3.1–3.17, 4.8, 5.9, 5.11, 7.1, 7.13, 13.5, 13.6 |
 
 **Responsibilities & Constraints**
 - lease を取れたときだけ反映する。取れなければ、何もせずに `{ type: 'in-progress' }` を返す（承認は記録済みなので、反映中の処理が最後に読み直して反映するか、保守用の cron が反映する）。
@@ -825,11 +886,13 @@ interface OperationHandler<T extends OperationRecord> {
   3. `findExistingResult` で、前の実行の書き込みが無いか（あれば、その結果を記録して次へ）
   4. `checkEditingPresence` で編集中でないか（編集中なら、通常の操作は `pending` に戻して `approvedAt` を消し、理由 `page-being-edited` を記録。取り消しの操作は `skipped: page-being-edited`）
   5. `pageOperationService.canOperate` で重なる処理が無いか。あれば定数 `PAGE_OPERATION_WAIT_MS`（30 秒）まで間隔を空けて確かめ直し、それでも残れば、通常の操作は 4 と同じく `pending` に戻す（理由 `page-operation-in-progress`）。取り消しの操作は `failed: page-operation-in-progress` にし、元の操作を「取り消しを断られた」（理由 `page-operation-in-progress`）にする
+- 確認をすべて通った操作を書き込む直前に、ページごとの通知を出すかを決める。`readChangeProposalSettings().perPageNotificationsEnabled` と、`readPerPageNotifications(id)` で読み直した Change Proposal の指定を `shouldSendPerPageNotifications` に渡し、結果を `OperationContext.perPageNotifications` に入れる。実行の始めに読んだ値を使い回さないので、反映の途中で依頼した人が指定を変えても、そのあとに書く操作には新しい値が使われる。作成の直後の自動反映では、作成のときに保存した値がそのまま読まれる（要件 7.13）。取り消しの Change Proposal でも、書き込み機能の設定は確かめないが、この判断は同じように行う。
 - lease は ChangeProposal Model の `claimApplyLease` / `extendApplyLease` / `releaseApplyLease` で扱う。
 - 操作の結果は、その場で `recordOperationOutcome` で文書に書く（`status`、`reason`、`appliedAt`、`resultPageId`、`resultRevisionId`）。この書き込みは lease の `token` と「その操作がまだ待ち」を条件にするので、偽が返ったら、その実行を止める。前に反映した操作は戻さない（要件 3.13）。
 - 取り消しの Change Proposal では、操作の結果に応じて、元の Change Proposal の操作を `markOriginalOperation` で更新する（`reverted` と `revertedByProposalId`、または `revert-refused` と、「取り消しの流れ」の表で決めた理由）。
 - 元の Change Proposal の操作を `markOriginalOperation` で書き換えるのは、取り消しの Change Proposal（`entry: 'revert'`）のときだけである。後続・見直しの Change Proposal を反映しても、元の操作には何も書かない（要件 13.5・13.6）。
 - 1 回の実行で試す操作をすべて試し終えたら、lease を手放す前に `settleIfNoPending` を呼ぶ（要件 2.9）。lease を失って途中で止めた実行は呼ばない（続きを反映する処理が呼ぶ）。
+- `execute` が「反映済み」を返し、`recordOperationOutcome` で記録できたあとで、`perPageNotifications` が真なら、その handler の `sendPerPageNotifications` を呼んでから次の操作へ進む（要件 7.10）。
 - 1 つ以上が反映済みになったら、lease を手放したあとで ProposalActivity と ProposalNotifier を呼ぶ。
 
 **Contracts**: Service [x] / State [x]
@@ -848,12 +911,13 @@ interface ProposalApplier {
 | Field | Detail |
 |-------|--------|
 | Intent | 反映が終わったときに、Change Proposal ごとに 1 つのアプリ内通知を、受け取る人ごとの中身で作る |
-| Requirements | 7.2–7.4, 7.8 |
+| Requirements | 7.2–7.4, 7.8, 7.12 |
 
 **Responsibilities & Constraints**
 - 対象のページ: 反映済みの編集と移動の操作のページ。取り消しの Change Proposal では、ごみ箱へ移す操作（`trash`）とごみ箱から戻す操作（`restore`）のページも含める（人がごみ箱へ移す・戻すときも、そのページを購読している人にアプリ内通知が出るため。要件 7.8）。人の保存で新規作成をしてもアプリ内通知は出ないので、新規作成のページは対象にしない。
 - 受け取る人: 対象のページを購読している人（`Subscription.getSubscription`）の和集合。取り消しの Change Proposal では、元の Change Proposal（`revertOf`）の依頼した人も加える。そこから、この Change Proposal の依頼した人（取り消しでは取り消した人）を除き、有効なユーザーだけに絞る。
 - 受け取る人ごとに、対象のページ ID を `Page.findByIdsAndViewer(pageIds, user, null, false, false)` で確かめ（リンクを知る人だけが見られるページは含めない）、閲覧できるページの分だけで snapshot を作る。1 つも無ければその人には作らない（要件 7.4）。元の Change Proposal の依頼した人にも、同じ絞り込みを行う。
+- ページごとの通知の管理者の設定と Change Proposal の指定は見ない。ページごとの通知を出した反映でも、まとめた通知は同じように作る（要件 7.12）。そのため、両方を有効にすると、購読している人は同じ変更についてページごとの通知とまとめた通知の両方を受け取る。
 - `InAppNotification.insertMany` で、1 人に 1 件ずつ入れる（`upsertByActivity` は全員に同じ中身を使うので使わない）。入れたあとで、既存のアプリ内通知のサービスと同じ Socket.IO の知らせを受け取る人に送る。
 
 **Contracts**: Service [x] / Event [x]
@@ -904,12 +968,13 @@ function recordProposalActivity(args: {
 | Field | Detail |
 |-------|--------|
 | Intent | 入口と route が Change Proposal を扱うときに呼ぶ、ただ 1 つのサービス |
-| Requirements | 1.*, 2.3–2.5, 2.9, 2.10, 4.*, 5.1–5.13, 8.5, 13.1–13.7 |
+| Requirements | 1.*, 2.3–2.5, 2.9, 2.10, 4.*, 5.1–5.13, 7.14–7.17, 8.5, 8.10, 13.1–13.7 |
 
 **Responsibilities & Constraints**
-- 作成: 依頼した人がゲスト・読み取り専用でないこと、`validateProposalInput`、1 日の件数（依頼した人が、サーバーの日付の 0 時から作った、入口の種類が `revert` でない Change Proposal の数）、対象のページを依頼した人が閲覧できること（`findByIdAndViewer`、人の保存と同じ判定）、元のリビジョンが対象のページのものであること、`basedOn` があれば `validateBasedOn`（「後続と見直しの作成の流れ」）、を確かめてから保存する。閲覧できない場合と存在しない場合は同じ `target-unavailable` を返す（要件 1.11）。保存のあとで `selectAutoApplyTargets`（`basedOn` の関係を渡す。見直しなら空）の操作に `approvedAt` を付け、`apply` を呼ぶ。
+- 作成: 依頼した人がゲスト・読み取り専用でないこと、`validateProposalInput`、1 日の件数（依頼した人が、サーバーの日付の 0 時から作った、入口の種類が `revert` でない Change Proposal の数）、対象のページを依頼した人が閲覧できること（`findByIdAndViewer`、人の保存と同じ判定）、元のリビジョンが対象のページのものであること、`basedOn` があれば `validateBasedOn`（「後続と見直しの作成の流れ」）、を確かめてから保存する。閲覧できない場合と存在しない場合は同じ `target-unavailable` を返す（要件 1.11）。保存のあとで `selectAutoApplyTargets`（`basedOn` の関係を渡す。見直しなら空）の操作に `approvedAt` を付け、`apply` を呼ぶ。ページごとの通知の指定は、入口が `perPageNotifications` を渡せばその値、渡さなければ `true` で保存する。後続・見直しも同じ（要件 1.17）。操作数の上限は設定の値（初期値 50）で `validateProposalInput` が確かめ、1 日の件数は設定に数があるときだけ確かめる（初期値は値が無く、確かめない。要件 8.10）。
+- ページごとの通知の指定の変更: 依頼した人でなければ `not-found`、`lifecycle` が `open` でなければ `not-open` を返す（承認と同じ。要件 7.14–7.16）。`setPerPageNotifications` で書き、すでに反映した操作には何もしない。管理者の設定が無効のときも値は保存する（画面は、管理者の設定が有効なときだけ切り替えを出す）。
 - 承認・飛ばす・破棄: 依頼した人でなければ `not-found` を返す（要件 4.6）。`lifecycle` が `open` でなければ（完了を含む）`not-open` を返す（要件 4.7・2.10）。承認は `expandApprovalTargets` で同じページへの「待ち」の操作に広げる。飛ばすは、書いたあとで `settleIfNoPending` を呼ぶ（要件 2.9）。破棄は「待ち」が 1 つ以上あることを条件にし、「待ち」が無い Change Proposal（完了の書き込みの前で止まったもの）では `settleIfNoPending` を呼んで完了にしてから `not-open` を返す。
-- 取り消し: 「取り消しの流れ」のとおり。取り消しの Change Proposal の操作は `approvedAt` に作成の日時を入れて保存し（取り消しを求めた人が承認したものとして扱う）、保存のあとで `apply` を呼ぶ。書き込み機能の設定と件数の上限を確かめない（要件 5.13）。読み取り専用・ゲストは受け付けない。元の Change Proposal の段階は見ないので、完了した Change Proposal も取り消せる（要件 2.10）。
+- 取り消し: 「取り消しの流れ」のとおり。取り消しの Change Proposal のページごとの通知の指定は、元の Change Proposal の値をそのまま保存する（取り消した人が元の依頼した人と違っても同じ。要件 7.17）。取り消しの Change Proposal の操作は `approvedAt` に作成の日時を入れて保存し（取り消しを求めた人が承認したものとして扱う）、保存のあとで `apply` を呼ぶ。書き込み機能の設定と件数の上限を確かめない（要件 5.13）。読み取り専用・ゲストは受け付けない。元の Change Proposal の段階は見ないので、完了した Change Proposal も取り消せる（要件 2.10）。
 - 期限切れと取り下げ: `lifecycle: open` で lease を持っていない Change Proposal の ID を、決まった件数ずつ読み（`findIdsDueForExpiry` / `findIdsOpenForWithdraw`）、1 件ずつ `closeIfStillOpen` で `lifecycle` を `expired` / `withdrawn` にし、「待ち」の操作を `skipped`（理由 `expired` / `withdrawn`）にする。`closeIfStillOpen` は読んだときと同じ条件を where に入れるので、真が返った文書だけを、この処理が閉じた件数に数える。1 回の処理の中では、一度試した ID をもう一度試さない。取り消しの Change Proposal は取り下げの対象にしない。「待ち」の操作が無い Change Proposal は、どちらの対象にもしない（要件 2.11）。
 
 **Dependencies**
@@ -942,7 +1007,9 @@ interface ChangeProposalService {
     readonly request?: { readonly ip?: string; readonly endpoint?: string };
     readonly trigger?: ApplyTrigger;              // request: settle the caller route's activity as CHANGE_PROPOSAL_CREATE
     readonly basedOn?: BasedOn;                   // follow-up / rework of one of the requester's own proposals
+    readonly perPageNotifications?: boolean;      // the proposal's own per-page notification switch; default true
   }): Promise<ServiceResult<{ readonly proposalId: string; readonly apply: ApplyResult | null }>>;
+  setPerPageNotifications(proposalId: string, user: IUserHasId, value: boolean): Promise<ServiceResult<void>>; // requester only, open only
   approve(proposalId: string, user: IUserHasId, targets: readonly string[] | 'all', trigger: ApplyTrigger): Promise<ServiceResult<ApplyResult>>; // operation keys
   skip(proposalId: string, user: IUserHasId, keys: readonly string[]): Promise<ServiceResult<void>>;
   discard(proposalId: string, user: IUserHasId): Promise<ServiceResult<void>>;
@@ -961,13 +1028,14 @@ interface ChangeProposalService {
 | Field | Detail |
 |-------|--------|
 | Intent | 見る人が見てよい分だけを、決まった形で返す |
-| Requirements | 5.14, 9.1–9.8, 9.10, 12.1, 12.4, 14.1–14.4 |
+| Requirements | 5.14, 7.18, 9.1–9.8, 9.10, 12.1, 12.4, 14.1–14.4 |
 
 **Responsibilities & Constraints**
 - 1 件の取得: 操作のページ ID をまとめて `Page.findByIdsAndViewer(ids, viewer, null, false, true)` で確かめ、その結果のうち `grant` が `GRANT_RESTRICTED` のものを `anyoneWithLinkPageIds` にする。`selectVisibleOperations` に通す。依頼した人でなく、残った操作が 1 つも無ければ `not-found` を返す（要件 9.2・9.3）。`lifecycle` は見せるかどうかの判断に使わない。承認待ちの Change Proposal でも、反映済みの操作があれば、依頼した人以外にはその操作だけを返す。
 - 依頼した人以外への `lastAppliedAt` は、残った操作の `appliedAt` の最も新しいものにする。文書に保存した `lastAppliedAt` は、見えない操作の反映の日時を含むことがあるので、そのまま返さない（要件 9.10）。依頼した人には保存した値を返す。
 - 反映済みの操作ごとに、その時点のページの状態を 1 回の問い合わせでまとめて取り、`judgeRevertability` の結果を付ける（要件 5.14）。依頼した人以外には、その人が取り消せる操作の判定だけを付ける。
 - 依頼した人にだけ、`requesterState`（段階 `lifecycle` と、`computeAchievement` で数えた達成度）を付ける。依頼した人以外には付けない。依頼した人以外に見える操作は反映に関わった操作だけなので、段階（承認待ちか完了か）と達成度の分母から、見えない「待ち」の操作があるかどうかや数が分かってしまうためである（要件 12.1・12.4）。
+- `requesterState` には、ページごとの通知の指定（文書の `perPageNotifications`）と、取得した時点の管理者の設定（`readChangeProposalSettings().perPageNotificationsEnabled`）も入れる。設定は 1 回の要求で 1 回だけ読む。依頼した人以外には付けない（要件 7.18）。
 - 後続・見直しへのつながり: 1 件の取得では、`findLinkedProposals(proposalId)` で、この Change Proposal を元にした後続・見直しを読む。依頼した人以外には、読んだ Change Proposal の操作のページ ID も、最初の 1 回の `findByIdsAndViewer` にまとめて確かめ、Change Proposal ごとに `selectVisibleOperations`（`isRequester` は偽）に通して、残る操作が 1 つ以上あるものだけを見える（`isVisibleToViewer`）とする。依頼した人には、すべて見える（後続・見直しの依頼した人は、元の Change Proposal の依頼した人と同じであるため）。そのうえで `buildProposalLinks` で、返す操作ごとの `linkedProposals` を作る（要件 14.1・14.3）。
 - 元の Change Proposal へのつながり: 1 件の取得で、Change Proposal が `basedOn` を持つときは、元の Change Proposal を `findProposal` で読み、依頼した人以外には元の操作のページを同じ問い合わせにまとめて確かめる。元の Change Proposal が `selectVisibleOperations` で 1 つも残らなければ `basedOn` を返さない。残るときは、`operationKeys` を、元の Change Proposal で見る人に返す操作の `key` だけに絞る。絞った結果の一覧が空なら、`basedOn` のキーごと返さない（後続の元の操作が、見る人に返す操作に 1 つも含まれない場合がこれに当たる。要件 14.2–14.5）。返す `basedOn` の `operationKeys` は、いつも 1 件以上である。依頼した人には、保存した値をそのまま返す。
 - 一覧（自分の一覧と反映済みの一覧）の要約には、つながりを付けない（文書ごとに元とつながった先を読むと、一覧の問い合わせが増えるため）。`requesterState` は、依頼した人の文書にだけ付ける（反映済みの一覧では、`isRequester` が真の文書だけ）。
@@ -1020,8 +1088,10 @@ interface ProposalQueryService {
 | POST | `/change-proposals/:id/discard` | — | `{}` | 404、409 `not_open` |
 | POST | `/change-proposals/:id/revert` | `{ operationKeys?: string[] }`（無ければ見えるもの全部） | `{ result: RevertResult }` | 404 `notfound` |
 | POST | `/change-proposals/revision-marks` | `{ revisionIds: string[] }`（100 まで） | `{ marks: RevisionMarkView[] }` | 400 |
+| PUT | `/change-proposals/:id/per-page-notifications` | `{ enabled: boolean }` | `{}` | 404 `notfound`、409 `not_open`、400 |
 
 - 見えない・存在しない・依頼した人でない、はすべて同じ 404 `notfound` にする（`page-write-action-403-404.md`、要件 9.3・4.6）。
+- ページごとの通知の指定を変える route は、書く API の middleware の順（飛ばすと同じ。読み取り専用ユーザーを `excludeReadOnlyUser` で断る。要件 7.19）で作り、`setPerPageNotifications` の `not-found` を 404 `notfound`、`not-open` を 409 `not_open` にする（要件 7.14–7.16）。
 - 承認・取り消しの route は、handler の中でサービスを待ってから activity を記録し、そのあとで応答を返す（`ApplyTrigger` は `{ kind: 'request', activityId: res.locals.activity._id }`）。
 - OpenAPI の JSDoc を各 route に書き、`generate-spec-apiv3.sh` の対象に足す。
 
@@ -1038,6 +1108,7 @@ interface ProposalQueryService {
 
 - PUT で `isEnabled` が真から偽に変わったら、`withdrawAllPending` を呼んでから応答する（要件 8.5）。activity `ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE` を応答の前に記録する。
 - 環境変数で固定されている値は、GET の応答で分かるようにし、画面では変更できない表示にする（既存の設定画面と同じ扱い）。
+- `ChangeProposalSettingsUpdate` と `ChangeProposalSettingsView` に `perPageNotificationsEnabled`（boolean）を含める。操作数の上限は 1 以上の整数か空（確かめない）、1 日の件数の上限は 1 以上の整数か空（上限なし）を受け付ける（要件 8.9・8.10）。
 
 ### Client
 
@@ -1045,6 +1116,13 @@ interface ProposalQueryService {
 - `pages/admin/change-proposal.page.tsx` は `pages/admin/ai.page.tsx` と同じ形（`dynamic` で `features/change-proposal/client/admin` の `ChangeProposalSettings` を読み込み、`getServerSideAdminCommonProps` を使う）。
 - 文言は `useTranslation('admin')` と `admin.json` の `change_proposal_settings.*` だけを使う（管理画面は `commons` と `admin` だけを読み込む）。5 言語すべてに同じキーを足す（要件 8.7）。
 - `AdminNavigation.tsx` に 1 項目を足す（表示の分岐・リンク・狭い画面の一覧の 3 か所）。
+- ページごとの通知の設定は、1 つの切り替えと説明文で出す。説明文では、有効にすると人の保存と同じページごとの通知（購読している人へのアプリ内通知と、グローバル通知）が出ること、依頼した人が Change Proposal ごとに止められること、まとめた通知は設定にかかわらず出ることを伝える（要件 8.9）。1 日の件数の上限の入力欄は、空のとき「上限なし」と表示する。文言（5 言語）:
+
+| キー | en_US | ja_JP | zh_CN | fr_FR | ko_KR |
+|---|---|---|---|---|---|
+| `change_proposal_settings.per_page_notifications_enabled` | Send per-page notifications when applying | 反映のときにページごとの通知を出す | 反映时发送逐页通知 | Envoyer des notifications par page lors de l'application | 반영할 때 페이지별 알림 보내기 |
+| `change_proposal_settings.per_page_notifications_enabled_desc` | When on, applying a Change Proposal sends the same per-page notifications as a manual save (in-app notifications to page subscribers and global notifications). The requester can turn them off for each Change Proposal. The combined notification is always sent. | 有効にすると、Change Proposal の反映で、人が保存したときと同じページごとの通知（ページを購読している人へのアプリ内通知と、グローバル通知）を出します。依頼した人は Change Proposal ごとに止められます。まとめた通知は設定にかかわらず出ます。 | 启用后，反映 Change Proposal 时会发送与手动保存相同的逐页通知（发给页面订阅者的应用内通知和全局通知）。请求者可以针对每个 Change Proposal 关闭。汇总通知始终会发送。 | Si activé, l'application d'un Change Proposal envoie les mêmes notifications par page qu'un enregistrement manuel (notifications dans l'application aux abonnés de la page et notifications globales). Le demandeur peut les désactiver pour chaque Change Proposal. La notification groupée est toujours envoyée. | 켜면 Change Proposal을 반영할 때 직접 저장한 경우와 같은 페이지별 알림(페이지 구독자에게 보내는 앱 내 알림과 전역 알림)을 보냅니다. 요청한 사람은 Change Proposal마다 끌 수 있습니다. 묶음 알림은 설정과 관계없이 항상 보냅니다. |
+| `change_proposal_settings.max_proposals_per_user_per_day_unlimited` | No limit | 上限なし | 无限制 | Aucune limite | 제한 없음 |
 
 #### Client Shared（`features/change-proposal/client/shared/`）
 
@@ -1204,6 +1282,7 @@ type ChangeProposalDocument = {
   readonly lastAppliedAt?: Date;
   readonly applyLease?: { readonly token: string; readonly expiresAt: Date } | null;
   readonly expiresAt?: Date;                       // createdAt + pendingExpirationSeconds at creation; absent when no expiry is configured
+  readonly perPageNotifications: boolean;          // the requester's per-page notification switch; default true, revert proposals copy the original's value
   readonly createdAt: Date;
   readonly updatedAt: Date;
 };
@@ -1278,6 +1357,7 @@ model changeproposals {
   lastAppliedAt  DateTime?
   applyLease     ChangeproposalsApplyLease?
   expiresAt      DateTime?
+  perPageNotifications Boolean            @default(true)
   createdAt      DateTime                   @default(now())
   updatedAt      DateTime                   @updatedAt
 
@@ -1292,6 +1372,7 @@ model changeproposals {
 }
 ```
 
+- `perPageNotifications` は索引に使わないので、索引だけを持つ Mongoose の schema には足さない。
 - `requester` などは他のコレクションへの `@relation` を持たない（ID だけを持つ。`include` で読み込む使い方をしない）。model の名前はコレクション名と同じなので `@@map` は書かない（既存の model と同じ）。
 
 **`revisions`（既存、項目を足す）**
@@ -1309,12 +1390,15 @@ model changeproposals {
 | `changeProposal:isCreateEnabled` | boolean | `true` | `CHANGE_PROPOSAL_IS_CREATE_ENABLED` | あり |
 | `changeProposal:isMoveEnabled` | boolean | `true` | `CHANGE_PROPOSAL_IS_MOVE_ENABLED` | あり |
 | `changeProposal:autoApplyPolicy` | `AutoApplyPolicy` | `'none'` | `CHANGE_PROPOSAL_AUTO_APPLY_POLICY` | あり |
-| `changeProposal:maxOperationsPerProposal` | number | 未決（OQ-2） | `CHANGE_PROPOSAL_MAX_OPERATIONS_PER_PROPOSAL` | あり |
-| `changeProposal:maxProposalsPerUserPerDay` | number | 未決（OQ-2） | `CHANGE_PROPOSAL_MAX_PROPOSALS_PER_USER_PER_DAY` | あり |
+| `changeProposal:maxOperationsPerProposal` | number | `50` | `CHANGE_PROPOSAL_MAX_OPERATIONS_PER_PROPOSAL` | あり |
+| `changeProposal:maxProposalsPerUserPerDay` | number | `null`（上限なし） | `CHANGE_PROPOSAL_MAX_PROPOSALS_PER_USER_PER_DAY` | あり |
 | `changeProposal:pendingExpirationSeconds` | number | 未決（OQ-1） | `CHANGE_PROPOSAL_PENDING_EXPIRATION_SECONDS` | なし |
 | `changeProposal:maintenanceCronSchedule` | string | `'*/10 * * * *'` | `CHANGE_PROPOSAL_MAINTENANCE_CRON_SCHEDULE` | なし |
+| `changeProposal:perPageNotificationsEnabled` | boolean | `false` | `CHANGE_PROPOSAL_PER_PAGE_NOTIFICATIONS_ENABLED` | あり |
 
-- 初期値が未決の 3 つのキーは、決まるまで初期値を `null`（値が無い）として宣言する。値が無い間は、その上限を確かめず、期限切れにもしない。決まった値を入れるまでを実装の完了の条件に含める（tasks.md の 8.1）。
+- 操作数の上限の初期値は 50 である。管理者は数を変えられ、空にすると確かめない。1 日の件数の上限の初期値は `null`（値が無い）で、これは「上限なし」を意図した初期値である。管理者が数を入れたときだけ確かめる（要件 8.10）。
+- 承認待ちの期限は、初期値が未決（OQ-1）なので、決まるまで初期値を `null` として宣言する。値が無い間は期限切れにしない。決まった値を入れるまでを実装の完了の条件に含める（tasks.md の 8.1）。
+- ページごとの通知の初期値は `false` である。初期の状態では、反映でページごとの通知を出さない（要件 8.9）。
 - 操作ごとの有効化の初期値は有効にする。全体の書き込み機能が初期値で無効なので、管理者が有効にしたときに 3 つとも使える状態から始まる。
 
 ### Data Contracts & Integration
@@ -1344,6 +1428,11 @@ type ProposalLinkView = { readonly proposalId: string; readonly relation: BasedO
 type RequesterProposalState = {
   readonly lifecycle: ProposalLifecycle;
   readonly achievement?: ProposalAchievement;                       // absent for revert proposals
+  readonly perPageNotifications: PerPageNotificationsView;
+};
+type PerPageNotificationsView = {
+  readonly value: boolean;                // the proposal's own switch (perPageNotifications)
+  readonly isEnabledBySettings: boolean;  // changeProposal:perPageNotificationsEnabled when this response was built
 };
 type ChangeProposalView = {
   readonly id: string;
@@ -1384,7 +1473,7 @@ type RevertResult = {
 ```
 - `ApplyTrigger`・`ApplyResult`・`RevertResult` は `interfaces/api.ts` に宣言し、`interfaces` の barrel から export する。兄弟の spec はこの名前をそのまま使う。`ApplyResult` と `RevertResult` は、操作を `index` ではなく `key` で指す。
 - 応答に、見えない操作の件数・全体の操作数・「ほかにある」を示す値を入れない（要件 9.4）。`requesterState` は依頼した人への応答にだけ入れる（要件 12.4）。依頼した人以外への応答では、つながりは見る人が開ける Change Proposal の分だけ、`basedOn.operationKeys` は見る人に返す元の操作の分だけにする。絞った結果が空のときは `basedOn` を返さない（要件 14.3–14.5）。
-- `BasedOn`・`BasedOnRelation`・`BASED_ON_ELIGIBLE_STATUSES`・`ProposalAchievement`・`RequesterProposalState`・`ProposalLinkView` は `interfaces` の barrel から export する。兄弟の spec はこの名前をそのまま使う。
+- `BasedOn`・`BasedOnRelation`・`BASED_ON_ELIGIBLE_STATUSES`・`ProposalAchievement`・`RequesterProposalState`・`PerPageNotificationsView`・`ProposalLinkView` は `interfaces` の barrel から export する。兄弟の spec はこの名前をそのまま使う。
 - 操作の `index`（0 から振った並び順）は、依頼した人への応答にだけ入れる。依頼した人以外への応答に `index` を入れると、番号が飛んでいることから「間に見えない操作がある」と分かってしまうためである。
 - 操作を指定するときは、どの API でも `key` を使う。`key` は、作成のときに操作ごとに振る乱数の ID（UUID）で、並び順の情報を持たない。取り消しの操作が戻す相手（`revertTarget`）と、リビジョンの印（`proposalOperationKey`）も `key` で持つ。
 - リビジョンを返す既存の API（`/pages/recent`、`/revisions/list`、ページを取得したときに読み込まれるリビジョン）は、リビジョンの文書をそのまま返すので、応答に `proposalId` と `proposalOperationKey` が入る。リビジョンには `key` だけを書き、並び順の番号を書かないので、それを見ても、同じ Change Proposal の他の操作の数・並び順・あるかどうかは分からない（要件 6.6）。並び順の番号をリビジョンに書くと、番号が飛んでいることから見えない操作があると分かってしまう。
@@ -1438,6 +1527,7 @@ type ChangeProposalNotificationSnapshot = {
 - `judgeRevertability` と `buildRevertOperations`: 操作の種類ごと（編集・新規作成・移動・ごみ箱・ごみ箱から戻す）の理由の値と、取り消しの取り消しで作る操作の種類（要件 5.5–5.8・5.12・5.15・5.16）。
 - `selectVisibleOperations`: 依頼した人とそれ以外、操作の 7 つの状態、リンクを知る人だけが見られるページ。依頼した人以外には「待ち」「失敗」「古い」「飛ばした」が返らないこと（要件 5.2–5.4・9.2・9.5）。
 - `toRevisionProposalMark`: `operationKey` が `proposalOperationKey` になり、ほかの項目が入らないこと（要件 6.1・6.6）。
+- `shouldSendPerPageNotifications`: 4 つの組み合わせのうち、両方が真のときだけ真になること（要件 7.1・7.10）。
 - `toChangeProposalDocument`: 5 つの操作の種類それぞれで、Prisma の行から `OperationRecord` の正しい種類になること。`basedOn` と段階 `settled` が読めること。種類に必要な項目が欠けた行と、知らない状態・段階・関係の値で例外になること。
 
 ### Integration Tests
@@ -1445,7 +1535,9 @@ type ChangeProposalNotificationSnapshot = {
 - 反映の流れ: 編集・新規作成・移動を含む Change Proposal を反映し、リビジョンの印（新規作成では最初のリビジョン）、ページに印の項目が無いこと、作者、閲覧範囲（親と同じ）、`origin` が空、を確かめる（要件 3.9・3.10・6.1・6.2・6.4）。
 - 二度書かない: 反映の途中で処理を止めたことにして（lease を期限切れにする）、もう一度反映しても同じ操作のリビジョンが 1 つだけであること。同時に 2 回 `apply` しても同じ（要件 3.14・3.15）。
 - 編集中の人: 接続数が 1 以上、または `draft` のとき「待ち」に残り `approvedAt` が消えること（要件 3.5・4.8）。
-- 通知: 反映でページごとのアプリ内通知・グローバル通知が出ないこと。まとめた通知が受け取る人ごとに、閲覧できるページだけで 1 件ずつ作られ、何も閲覧できない人には作られないこと。取り消しでは、元の依頼した人にも届き、ごみ箱へ移した・戻したページも中身に入ること（要件 7.1–7.4・7.8）。
+- 通知: 管理者の設定が無効（初期値）のとき、反映でページごとのアプリ内通知・グローバル通知が出ないこと。まとめた通知が受け取る人ごとに、閲覧できるページだけで 1 件ずつ作られ、何も閲覧できない人には作られないこと。取り消しでは、元の依頼した人にも届き、ごみ箱へ移した・戻したページも中身に入ること（要件 7.1–7.4・7.8）。
+- ページごとの通知: 管理者の設定が有効で Change Proposal の指定が「出す」のとき、編集・移動・ごみ箱へ移す・ごみ箱から戻すのページの購読している人にアプリ内通知が作られ、編集・新規作成・移動・ごみ箱へ移すでグローバル通知が送られること。閲覧範囲が「リンクを知る人だけ」のページにはグローバル通知が送られないこと。保存ごとの Slack のチャンネルへの通知が送られないこと。まとめた通知も同じように作られること。管理者の設定が有効で指定が「出さない」のときは、ページごとの通知が出ないこと。承認待ちの Change Proposal で一部を反映したあとに指定を変えると、そのあとに反映した操作にだけ新しい値が使われること。取り消しの Change Proposal が元の指定を引き継ぐこと。依頼した人以外と、承認待ちでない Change Proposal への指定の変更が、それぞれ 404 と 409 になること（要件 7.10–7.17）。
+- 取得: `requesterState.perPageNotifications` が依頼した人にだけ返り、指定と管理者の設定の値が入ること（要件 7.18）。
 - 取り消し: 取り消しの Change Proposal の操作が `approvedAt` つきで保存され、`apply` が承認の手順なしにそれを反映し、反映が終わると `settleIfNoPending` で段階が `settled` になること。編集・新規作成・移動それぞれの戻せる場合と断られる場合、他の人による一部の取り消し、取り消しの取り消し、ごみ箱へ移した操作の取り消し（ごみ箱から戻す）と、その条件を満たさない場合（要件 5.*）。
 - API: 見えない Change Proposal・依頼した人でない承認・存在しない ID がすべて同じ 404 であること、応答に見えない操作の件数が出ないこと。承認待ちの Change Proposal でも、反映済みの操作があれば依頼した人以外にはその操作だけが返り、`lastAppliedAt` が見える操作の日時になること（要件 9.1–9.5・9.10・4.6）。
 - 既存のリビジョンの応答: `/pages/recent`・`/revisions/list`・ページの取得で読み込まれるリビジョンに、`proposalId` と `proposalOperationKey` 以外の印の項目（並び順の番号など）が入らないこと（要件 6.6）。
@@ -1458,13 +1550,13 @@ type ChangeProposalNotificationSnapshot = {
 ### Drift / Guard Tests
 - `no-eager-ai-imports.spec.ts` の対象に `features/change-proposal/server` の入口を含めても通ること（AI の SDK を読み込まない）。
 - `revisions` と `pages` に TTL 索引が無いこと（既存の `no-ttl-index-on-page.spec.ts` を通す）。
-- `config-definition.spec.ts` に新しい設定キーを足す。
+- `config-definition.spec.ts` に新しい設定キーを足し、操作数の上限の初期値が 50、1 日の件数の上限の初期値が `null`、ページごとの通知の初期値が `false` であることを確かめる（要件 8.9・8.10）。
 - 新しい翻訳キーが 5 言語すべてにあること（`new-key-locale-coverage.spec.ts` と `lint:i18n`。baseline は引き上げない）。`client/shared/` の表のキーは `label-keys.spec.ts` でも確かめる。
 - `RevisionDiff` の diff2html の設定を移したあとも、同じ入力から同じ HTML ができること（`diff2html-options.spec.ts`）。
 
 ### Performance
 - 反映済みの一覧: 見る人が閲覧できるものが少ない場合でも、1 回の要求で読む文書が `APPLIED_LIST_SCAN_LIMIT` を超えないこと。
-- 操作数の上限いっぱいの Change Proposal を反映したときの所要時間を測り、承認の API の応答の時間として許せるかを確かめる。
+- 操作数の上限の初期値（50）いっぱいの Change Proposal を反映したときの所要時間を、ページごとの通知を出さない場合と出す場合の両方で測り、承認の API の応答の時間として許せるかを確かめる。
 
 ## Security Considerations
 - 見えないページの存在を示さない: 取得・一覧・通知・エラーのすべてで、見る人が閲覧できるページの分だけを使う。存在しない場合と見えない場合の応答をそろえる（umbrella の Constraints、`page-write-action-403-404.md`）。
@@ -1476,20 +1568,21 @@ type ChangeProposalNotificationSnapshot = {
 - 操作の指定は、並び順の情報を持たない `key` で受ける。取り消しでは、存在しない `key` と、見えない操作の `key` を、どちらも同じように対象から外し、応答でも区別しない（要件 5.4）。リビジョンの印も `key` だけを持つ（要件 6.6）。
 - 依頼した人以外には、閲覧できるページに対する反映済み・取り消し済み・取り消しを断られたの操作だけを返す。承認待ち・失敗・古い・飛ばしたの操作は、そのページを閲覧できても返さない（要件 9.2）。`lastAppliedAt` と全体の状態も、返す操作だけから決める（要件 9.10）。
 - 対策せずに受け入れる危険: 反映済みの一覧は、文書に保存した `lastAppliedAt` の順に読む。そのため、見えない操作があとから反映された Change Proposal は、表示する `lastAppliedAt`（見える操作の日時）よりも新しい位置に並ぶことがある。並び順の食い違いから分かるのは「見えない何かが、より新しく反映された」ことだけで、ページのパス・件数・中身は分からない。見る人ごとに並べ直すには、見る人ごとの反映の日時を別に保存して索引を作る必要がある。分かることが上のとおり少ないので、その仕組みは作らない。
+- ページごとの通知を出すときは、人が同じ操作をしたときと同じ受け取る人の決め方と、同じ閲覧範囲の判定（グローバル通知の `isSendNotification`）をそのまま使う。人の保存で届く人以外には届かないので、見えないページについて新しく分かることは増えない。
 - ログに本文を書かない。
 - アプリ内通知の一覧の API は、通知の対象を中身ごと読み込んで返す。Change Proposal を対象にした通知では `target` を `_id` だけにし、受け取る人が見られるのは、その人のために作った snapshot だけにする。監査ログの一覧は対象の中身を返さないので、変更は要らない。
 
 ## Open Questions / Risks
 
-umbrella の roadmap の「未決の論点」は、brief でも決まっていないので未決のまま残す。
+umbrella の roadmap の「未決の論点」のうち、上限の初期値（OQ-2）は決まった。ほかは brief でも決まっていないので未決のまま残す。ページごとの通知の扱い（OQ-5）は本 spec の設計で出た論点で、これも決まった（umbrella の research.md の決定 8）。
 
 | ID | 論点 | 本 design での扱い |
 |---|---|---|
 | OQ-1 | 承認待ちの Change Proposal の期限（何日で期限切れにするか）と、破棄・期限切れの案の本文をいつ消すか | 期限は設定キー `changeProposal:pendingExpirationSeconds` で持つが、初期値は未決。本文を消す処理は作らず、決まるまでは残す |
-| OQ-2 | 1 回の実行で扱うページ数と操作数の上限の初期値 | 設定キーとして持つが、初期値は未決 |
+| OQ-2 | 1 回の実行で扱うページ数と操作数の上限の初期値 | 決定。1 件あたりの操作数の上限は 50、依頼した人ごとの 1 日の件数の上限は「上限なし」（`null`）を初期値にし、どちらも管理者が変えられる（要件 8.10） |
 | OQ-3 | 自動反映の「自分が作ったページだけ」の「作った」の定義（作成者か、最後の更新者か） | 判定を `isOwnPageForAutoApply` 1 つにまとめる。決まるまでは作成者で判定する仮の実装にする |
 | OQ-4 | AI が新しく作るページを WIP にするかどうか | 作成の操作は WIP の指定を持たない。決まったら、作成の操作に指定を足す |
-| OQ-5 | 管理者が設定したグローバル通知（Slack・メール）を、反映した Change Proposal でも出すか | brief に従い、反映中はページごとのグローバル通知を止める。Change Proposal ごとにまとめたグローバル通知は作らない。このままだと管理者は AI などによる変更をグローバル通知で知ることができない |
+| OQ-5 | 管理者が設定したグローバル通知（Slack・メール）を、反映した Change Proposal でも出すか | 決定。管理者の設定 `changeProposal:perPageNotificationsEnabled`（初期値は出さない）と、Change Proposal ごとの指定（初期値は出す。依頼した人が承認待ちの間に変えられる）の両方が真のときだけ、人の操作と同じページごとの通知（購読している人へのアプリ内通知とグローバル通知）を出す。まとめたアプリ内通知はいつも出す（要件 7.1・7.10–7.19・8.9） |
 | OQ-6 | 複数台のサーバーで動かしている場合に、編集中の人がいるかどうかを確かめる方法 | 今の数え方（このプロセスの接続数）と `draft` の確認だけを行い、分かっている制約として書く |
 
 その他のリスク:
