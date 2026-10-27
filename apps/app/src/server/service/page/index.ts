@@ -725,15 +725,14 @@ class PageService implements IPageService {
       }
     }
 
-    // No session makes steps 1-3 atomic: if any of them throws, the catch below
-    // must reattach the page or it is stranded off the tree.
-    // See https://github.com/growilabs/growi/issues/9755
     const exParentId = page.parent;
+    // Computed before the first write, so a destination that cannot be computed
+    // (e.g. one under the page only by case) fails with nothing to undo. The ids are
+    // fixed before the insert so the rollback can delete a partial insert.
     const isRenamingToUnderTarget = this.isRenamingToUnderTarget(
       page.path,
       newPagePathSanitized,
     );
-    // Ids are fixed before the insert so the rollback can delete a partial insert.
     const emptyPagesToInsert = isRenamingToUnderTarget
       ? collectEmptyAncestorPaths(page.path, newPagePathSanitized).map(
           (path) => ({ _id: new mongoose.Types.ObjectId(), path }),
@@ -742,11 +741,14 @@ class PageService implements IPageService {
 
     let newParent: PageDocument | undefined;
     let renamedPage: PageDocument | null = null;
-    let isDetached = false;
+    let hasDetachReturned = false;
+    // No session makes steps 1-3 atomic: if any of them throws, the catch below
+    // must reattach the page or it is stranded off the tree.
+    // See https://github.com/growilabs/growi/issues/9755
     try {
       // 1. Take target off from tree
       await Page.takeOffFromTree(page._id);
-      isDetached = true;
+      hasDetachReturned = true;
 
       // 2. Find new parent
       // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
@@ -780,7 +782,7 @@ class PageService implements IPageService {
       const committedPage = await this.rollbackFailedRename({
         page,
         exParentId,
-        isDetached,
+        hasDetachReturned,
         newPagePath: newPagePathSanitized,
         emptyPageIds: emptyPagesToInsert.map((p) => p._id),
       });
@@ -1001,14 +1003,14 @@ class PageService implements IPageService {
   private async rollbackFailedRename({
     page,
     exParentId,
-    isDetached,
+    hasDetachReturned,
     newPagePath,
     emptyPageIds,
   }: {
     page: PageDocument;
     exParentId: PageDocument['parent'];
-    // false when step 1 itself threw, whether or not its write applied
-    isDetached: boolean;
+    // false when step 1 threw, even if its write was applied
+    hasDetachReturned: boolean;
     newPagePath: string;
     emptyPageIds: PageDocument['_id'][];
   }): Promise<PageDocument | null> {
@@ -1022,8 +1024,8 @@ class PageService implements IPageService {
         { $set: { parent: exParentId } },
       );
       if (matchedCount === 0) {
-        // An unapplied step 1 left nothing to undo
-        if (!isDetached) {
+        // Step 1 threw without its write being applied, so there is nothing to undo
+        if (!hasDetachReturned) {
           return null;
         }
         const currentPage = await Page.findById(page._id);

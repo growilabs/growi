@@ -416,12 +416,26 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     expect(await snapshotTree()).toEqual(before);
   });
 
-  it('fails and restores the tree unchanged when the destination is under the page only by case', async () => {
+  it('fails without touching the tree when the destination is under the page only by case', async () => {
     await create(base, 'base body');
     const target = await create(`${base}/Target`, 'body');
     const before = await snapshotTree();
 
-    const err = await rename(target, `${base}/target/moved`);
+    // no rollback can succeed, so the tree only stays as it was if nothing was written
+    const originalUpdateOne = Page.updateOne;
+    const updateOneSpy = vi
+      .spyOn(Page, 'updateOne')
+      .mockImplementation(function (this: PageModel, ...args) {
+        return originalUpdateOne
+          .apply(this, args)
+          .error(new Error('simulated failure of the rollback'));
+      });
+    let err: Error | null;
+    try {
+      err = await rename(target, `${base}/target/moved`);
+    } finally {
+      updateOneSpy.mockRestore();
+    }
 
     expect(err).not.toBeNull();
     expect(await snapshotTree()).toEqual(before);
@@ -751,8 +765,10 @@ describe('a failed rename must not orphan the page (#9755)', () => {
       parentPath: `${base}/ex-parent`,
     });
     // the page is back on the tree; what may remain are the empty pages on the way to newPath
+    expect(logged).toContain(
+      `Reattached "${base}/ex-parent/target" after its failed rename`,
+    );
     expect(logged).toContain(newPath);
-    expect(logged).not.toContain('off-tree');
   });
 
   it('warns that the page may have moved without its children when undoing the failed rename also fails', async () => {
@@ -796,6 +812,9 @@ describe('a failed rename must not orphan the page (#9755)', () => {
       path: `${base}/ex-parent/target/child`,
       parentPath: newPath,
     });
+    expect(logged).toContain(
+      `at the new path with its descendants left at the original path`,
+    );
     expect(logged).toContain(newPath);
   });
 });
