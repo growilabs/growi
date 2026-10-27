@@ -770,40 +770,20 @@ class PageService implements IPageService {
         { new: true },
       );
     } catch (err) {
-      // Undo steps 1-2, but only while the page is still in the state it left behind.
-      // The driver can report an error for a write the server applied (lost ack,
-      // writeConcernError), so neither `renamedPage` nor a flag proves that step 3
-      // did not commit.
-      try {
-        // `path` alone catches a committed step 3; `parent: null` guards against a
-        // writer that bypasses the PageOperation lock
-        const { matchedCount } = await Page.updateOne(
-          { _id: page._id, parent: null, path: page.path },
-          { $set: { parent: exParentId } },
-        );
-        if (matchedCount === 0) {
-          logger.warn(
-            `Skipped reattaching "${page.path}" to its original parent after a failed rename: ` +
-              'the page is no longer detached at its original path.',
-          );
-        } else {
-          // Only after a matched rollback: if step 3 committed, these are the page's
-          // new ancestors. Ids that were never inserted match nothing.
-          await Page.deleteMany({
-            _id: { $in: emptyPagesToInsert.map((p) => p._id) },
-            isEmpty: true,
-          });
-        }
-      } catch (rollbackErr) {
-        // Propagate the original error, not this one
-        logger.error(
-          `Failed to roll back the failed rename of "${page.path}". ` +
-            'The page may be off-tree or duplicated by an empty page until it is normalized. ' +
-            `Empty page ids that may remain: ${emptyPagesToInsert.map((p) => p._id).join(', ')}`,
-          rollbackErr,
-        );
+      const committedPage = await this.rollbackFailedRename({
+        page,
+        exParentId,
+        newPagePath: newPagePathSanitized,
+        emptyPageIds: emptyPagesToInsert.map((p) => p._id),
+      });
+      if (committedPage == null) {
+        throw err;
       }
-      throw err;
+      logger.warn(
+        `The write that renamed "${page.path}" reported an error but was applied; continuing the rename.`,
+        err,
+      );
+      renamedPage = committedPage;
     }
 
     // 5.increase parent's descendantCount.
@@ -998,6 +978,61 @@ class PageService implements IPageService {
         toPath,
       );
     await this.updateDescendantCountOfPagesWithPaths(ancestorsPaths);
+  }
+
+  /**
+   * Undo steps 1-2 of a failed rename, but only while the page is still in the state
+   * step 1 left it in. The driver can report an error for a write the server applied
+   * (lost ack, writeConcernError), so the failure itself does not prove that step 3
+   * did not commit.
+   *
+   * @returns the page if step 3 turned out to be committed, otherwise null
+   */
+  private async rollbackFailedRename({
+    page,
+    exParentId,
+    newPagePath,
+    emptyPageIds,
+  }: {
+    page: PageDocument;
+    exParentId: PageDocument['parent'];
+    newPagePath: string;
+    emptyPageIds: PageDocument['_id'][];
+  }): Promise<PageDocument | null> {
+    const Page = mongoose.model<IPage, PageModel>('Page');
+
+    try {
+      // `path` alone catches a committed step 3; `parent: null` guards against a
+      // writer that bypasses the PageOperation lock
+      const { matchedCount } = await Page.updateOne(
+        { _id: page._id, parent: null, path: page.path },
+        { $set: { parent: exParentId } },
+      );
+      if (matchedCount > 0) {
+        // Only after a matched rollback: if step 3 committed, these are the page's
+        // new ancestors. Ids that were never inserted match nothing.
+        await Page.deleteMany({ _id: { $in: emptyPageIds }, isEmpty: true });
+        return null;
+      }
+
+      const currentPage = await Page.findById(page._id);
+      if (currentPage?.path === newPagePath) {
+        return currentPage;
+      }
+      logger.warn(
+        `Skipped reattaching "${page.path}" to its original parent after a failed rename: ` +
+          'the page is no longer detached at its original path.',
+      );
+    } catch (rollbackErr) {
+      // The caller propagates the original error, not this one
+      logger.error(
+        `Failed to roll back the failed rename of "${page.path}". ` +
+          'The page may be off-tree or duplicated by an empty page until it is normalized. ' +
+          `Empty page ids that may remain: ${emptyPageIds.join(', ')}`,
+        rollbackErr,
+      );
+    }
+    return null;
   }
 
   private isRenamingToUnderTarget(fromPath: string, toPath: string): boolean {
