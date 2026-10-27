@@ -63,7 +63,7 @@
   - 完了時: 規則と共通パラメータ名を 1 つにまとめた宣言が公開され、実行関数に渡して代表的な URL（ページ表示・データ URL・共有リンク・API のページパス・拡張子の無い `/images/<ページ>`）が期待どおりに匿名化される
   - _Requirements: 2.4, 2.5, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 7.1, 7.2, 7.3_
 
-- [ ] 3.3 一覧表の各行に対応する例を宣言する
+- [x] 3.3 一覧表の各行に対応する例を宣言する
   - requirements.md「匿名化対象一覧」の全行（Q01、P01〜P13、N01〜N07、S01〜S04、U01〜U07、A01〜A09、K01〜K05、F01〜F02）について、同じ ID の例を 1 つ以上宣言する。各例は、URL・当てはまる規則・期待する `http.target`（変化なしを含む）を持つ
   - 例の型（design.md の `CoverageExample`）をここで定義する
   - API とページ表示のルートを持つ例には、Express のルートの型（例: `/_api/v3/page/exist`、`/share/:linkId`）と、GET 以外ならその HTTP メソッドを持たせる。正規表現付きで登録されたルートは、登録どおりの文字列にする（例: `/_api/v3/revisions/:id([0-9a-fA-F]{24})`）
@@ -129,3 +129,4 @@
 - 2.3: 新しい関数は `anonymizeSearchParams(search, paramNames)`（`?` なしのクエリを受け取る）。4.1 で古い `anonymizeQueryParams` を消し、この関数を `anonymizeQueryParams` に改名する。
 - 3.1: `unwrap-next-data` の `/_next/data/<buildId>/[<locale>/]…json` の解析と locale 判定（`AllLang`）は実行関数 `anonymize-url.ts` の中にある。3.2 の規則は「データ URL であること」の判定だけを宣言する。`hashPagePath` は例外を握りつぶさず、実行関数の catch が `/[ANONYMIZATION_FAILED]` を返す。
 - 3.2: 規則の宣言は `rules/index.ts` の `ANONYMIZATION_RULES`。`static-files` の `/vault.git` は design の表どおり前方一致（`/vault.gitpage` も静的ファイル扱いになる）。直すなら `=== '/vault.git'` か `startsWith('/vault.git/')`（レビューの任意提案）。
+- 3.3: 例の宣言は `rules/coverage-examples.ts` の `COVERAGE_EXAMPLES`（`route` は Express の登録どおりの文字列。照合は末尾 `/` を取り除いて比べるが `/` 自体は残す。`/*` と `/*/$` も登録されている）。ルートを持たない例は静的配信の URL だけ。`route` には、その URL を実際に処理する最初のルートを書く（全部を受ける `/*` は具体的なルートが無い場合だけ）。
