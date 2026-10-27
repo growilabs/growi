@@ -73,8 +73,8 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 | 3 | proxy の不具合の一括修正 | Discord の Gateway、Enterprise Grid のチャンネル一覧、installation の特定、Mattermost の 403 | spec を作らず直接直す。各項目にテストを付ける | proxy |
 | 4 | app の見え方（`agent` と重ならない部分） | 承認画面、ページの編集画面、紐付け解除後のバッジ | amend spec `chat-integration-app-ui`（名前は仮） | app |
 | 5 | URL の展開の方針 | 公開範囲が「公開」のページは題名だけ出す | amend spec `chat-integration-link-preview`（名前は仮） | app（protocol と proxy にも及びうる） |
-| 6 | 通知の定期処理 | 定期処理の間隔、連携が無いテナントの問い合わせを飛ばす | amend spec `chat-integration-notification-load`（名前は仮） | app |
-| 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作る。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。`brief.md` だけがあり、要件・設計・タスクの承認がこれから | umbrella、protocol、proxy、app |
+| 6 | 通知の定期処理の負荷 | 連携が無いテナントの問い合わせを飛ばす、解除済みの連携の掃除を 1 日 1 回にする | amend spec `chat-integration-notification-load`（名前は仮） | app |
+| 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作り、それと同時に定期処理の間隔を延ばす。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。`brief.md` だけがあり、要件・設計・タスクの承認がこれから | umbrella、protocol、proxy、app |
 | 8 | 管理画面の作り直し | 管理画面のうち、チャンネルの権限と「できること」の表 | amend spec `chat-integration-admin-ui`（名前は仮） | app |
 | 9 | コマンドの表示の締め | スラッシュコマンドの実機確認、`help` の一覧の書き方、Discord のスレッドでの追加入力 | proxy の残タスク 12.4 | proxy |
 | 10 | URL の展開の確認フロー | 共有してよいかを本人に尋ねてから展開する | `/kiro-discovery` から着手する。`agent` の「本人にだけ届ける」しくみの上に作るので、`agent` の後 | 3 spec すべて |
@@ -139,8 +139,9 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - **遅れ**: 保存から届くまで 0〜60 秒（平均 30 秒ほど）
   - **負荷**: 定期処理は、チャット連携を使っているかに関係なく、すべてのインスタンスで起動時に始まる（`crowi/index.ts`）。1 分ごとに MongoDB へ 2 回問い合わせる（送信待ちの行を取る `findOneAndUpdate` と、保持期間を過ぎた連携を探す `findOne`）。1 回は索引の効く小さな問い合わせだが、**使っていないテナントも常に払う**ので、テナント数に比例して共有の MongoDB にかかり続ける
   - **ここで直す改善案**: 次の 2 つ。
-    1. 定期処理は送り直しと止まった送信の回収だけを担うので、間隔を延ばす（例: 5 分）。保持期間を過ぎた連携の削除は 1 日 1 回で足りる
+    1. 保持期間を過ぎた連携の削除は 1 日 1 回で足りる（別の定期処理にする）
     2. チャット連携が 1 つも無いテナントでは問い合わせを飛ばす（「連携があるか」の確認結果は一定時間覚えておく）
+  - **定期処理の間隔の延長は順 7 で、「書き込んだ直後に送る」と同時にやる**: 今は定期処理がすべての通知の最初の送信も担うので、先に間隔を 5 分に延ばすと、ふつうの通知が最大 5 分遅れ、1 分あたりに送れる行数も 50 から 10 に減る。書いてすぐ送る経路ができてから、定期処理を送り直しと止まった送信の回収だけにして延ばす。
   - **「書き込んだ直後に送る」は順 7 で作る**: 送り方が 2 通りにならないよう、`agent` が作る「答えをあとから送る口」と同じ経路にする（[chat-integration-agent の brief](../chat-integration-agent/brief.md) の Downstream）
   - **想定される影響範囲**: `chat-integration-app`（`notification-outbox.ts`・`notification-dispatcher.ts`・`notification-dispatch-cron.ts`・`pairing/sweep-unpaired-relations.ts`）。protocol と proxy は変わらない
 
