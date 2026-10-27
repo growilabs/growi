@@ -421,7 +421,8 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     const target = await create(`${base}/Target`, 'body');
     const before = await snapshotTree();
 
-    // no rollback can succeed, so the tree only stays as it was if nothing was written
+    // no rollback can succeed (this fails the rollback's write), so the tree only
+    // stays as it was if nothing was written
     const originalUpdateOne = Page.updateOne;
     const updateOneSpy = vi
       .spyOn(Page, 'updateOne')

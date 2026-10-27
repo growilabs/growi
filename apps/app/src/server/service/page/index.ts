@@ -726,9 +726,9 @@ class PageService implements IPageService {
     }
 
     const exParentId = page.parent;
-    // Computed before the first write, so a destination that cannot be computed
-    // (e.g. one under the page only by case) fails with nothing to undo. The ids are
-    // fixed before the insert so the rollback can delete a partial insert.
+    // Computed before step 1, so a destination that cannot be computed (e.g. one
+    // under the page only by case) fails with nothing on the tree to undo. The ids
+    // are fixed before the insert so the rollback can delete a partial insert.
     const isRenamingToUnderTarget = this.isRenamingToUnderTarget(
       page.path,
       newPagePathSanitized,
@@ -1024,7 +1024,8 @@ class PageService implements IPageService {
         { $set: { parent: exParentId } },
       );
       if (matchedCount === 0) {
-        // Step 1 threw without its write being applied, so there is nothing to undo
+        // Step 1 threw and the page is not detached at its original path, so its write
+        // most likely never applied; either way there is nothing to undo
         if (!hasDetachReturned) {
           return null;
         }
