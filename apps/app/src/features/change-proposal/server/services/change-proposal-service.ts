@@ -38,6 +38,7 @@ import {
   createProposalApplier,
   type ProposalApplier,
 } from './proposal-applier';
+import type { AppliedListScan } from './proposal-list-query';
 import { createProposalQuery, type ProposalQuery } from './proposal-query';
 import {
   createRequesterActions,
@@ -68,6 +69,7 @@ export type ChangeProposalServiceDeps = {
   readonly applier?: ProposalApplier;
   readonly now?: () => Date;
   readonly maintenanceBatchSize?: number;
+  readonly appliedListScan?: AppliedListScan;
 };
 
 const fail = (error: ServiceError): { ok: false; error: ServiceError } => ({
@@ -239,7 +241,7 @@ export const createChangeProposalService = (
   return {
     ...createRequesterActions({ applier, now }),
     ...createRevertAction({ applier, now }),
-    ...createProposalQuery(),
+    ...createProposalQuery({ appliedListScan: deps.appliedListScan }),
     ...createMaintenanceActions({
       applier,
       now,

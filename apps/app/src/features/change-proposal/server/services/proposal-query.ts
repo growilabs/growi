@@ -1,5 +1,4 @@
 import type { IUserHasId } from '@growi/core';
-import mongoose from 'mongoose';
 
 import { prisma } from '~/utils/prisma';
 
@@ -7,20 +6,14 @@ import type {
   BasedOn,
   ChangeProposalDocument,
   ChangeProposalView,
-  OperationRecord,
   OperationStatus,
-  RequesterProposalState,
 } from '../../interfaces';
 import {
   buildProposalLinks,
-  computeAchievement,
-  deriveProposalStatus,
   judgeRevertability,
   type LinkedProposalFacts,
   selectVisibleOperations,
   targetPageIdOf,
-  type VisibilityContext,
-  type VisibilityOperationFacts,
 } from '../domain';
 import type { LinkedProposalRecord } from '../models/change-proposal-types';
 import type { ServiceResult } from './change-proposal-service-types';
@@ -30,14 +23,34 @@ import {
   type ViewablePages,
 } from './current-page-facts';
 import { isRequesterAllowed } from './pre-write-checks';
+import {
+  type AppliedListScan,
+  createProposalListQuery,
+  type ProposalListQuery,
+} from './proposal-list-query';
+import {
+  contextFor,
+  pageIdsOf,
+  readRequesters,
+  toProposalHeaderView,
+} from './proposal-view-parts';
+import {
+  createRevisionMarksQuery,
+  type RevisionMarksQuery,
+} from './revision-marks-query';
 import { readChangeProposalSettings } from './settings';
 import { toOperationView } from './to-operation-view';
 
-export type ProposalQuery = {
-  getForViewer(
-    proposalId: string,
-    viewer: IUserHasId,
-  ): Promise<ServiceResult<ChangeProposalView>>;
+export type ProposalQuery = ProposalListQuery &
+  RevisionMarksQuery & {
+    getForViewer(
+      proposalId: string,
+      viewer: IUserHasId,
+    ): Promise<ServiceResult<ChangeProposalView>>;
+  };
+
+export type ProposalQueryDeps = {
+  readonly appliedListScan?: AppliedListScan;
 };
 
 const NOT_FOUND = { ok: false, error: { code: 'not-found' } } as const;
@@ -46,37 +59,6 @@ const REVERTIBILITY_STATUSES: ReadonlySet<OperationStatus> = new Set([
   'applied',
   'revert-refused',
 ]);
-
-const userModel = () => mongoose.model<IUserHasId>('User');
-
-const pageIdsOf = (operations: readonly VisibilityOperationFacts[]): string[] =>
-  operations.flatMap((op) => {
-    const pageId = targetPageIdOf(op);
-    return pageId == null ? [] : [pageId];
-  });
-
-const contextFor = (
-  requesterId: string,
-  viewerId: string,
-  viewable: ViewablePages,
-): VisibilityContext => ({
-  isRequester: requesterId === viewerId,
-  viewablePageIds: viewable.viewablePageIds,
-  anyoneWithLinkPageIds: viewable.anyoneWithLinkPageIds,
-});
-
-// The newest appliedAt among the returned operations; the stored value may come
-// from an operation the viewer must not learn about (requirement 9.10).
-const newestAppliedAt = (
-  operations: readonly OperationRecord[],
-): Date | undefined =>
-  operations.reduce<Date | undefined>(
-    (newest, op) =>
-      op.appliedAt != null && (newest == null || op.appliedAt > newest)
-        ? op.appliedAt
-        : newest,
-    undefined,
-  );
 
 const toLinkedFacts = (
   linked: readonly LinkedProposalRecord[],
@@ -117,41 +99,16 @@ const narrowBasedOn = (
   return operationKeys.length === 0 ? undefined : { ...basedOn, operationKeys };
 };
 
-const requesterStateOf = (
-  proposal: ChangeProposalDocument,
-  visible: readonly OperationRecord[],
-): RequesterProposalState => {
-  const achievement = computeAchievement(proposal.entry, visible);
-  return {
-    lifecycle: proposal.lifecycle,
-    ...(achievement == null ? {} : { achievement }),
-    perPageNotifications: {
-      value: proposal.perPageNotifications,
-      isEnabledBySettings:
-        readChangeProposalSettings().perPageNotificationsEnabled,
-    },
-  };
-};
-
-const readRequester = async (
-  requesterId: string,
-): Promise<ChangeProposalView['requester']> => {
-  const user = await userModel()
-    .findById(requesterId, { username: 1, name: 1 })
-    .lean();
-  return {
-    id: requesterId,
-    username: user?.username ?? '',
-    name: user?.name ?? '',
-  };
-};
-
 /**
  * Builds what one viewer may see of a proposal. Every page involved — the
  * proposal's, its follow-ups' and reworks', and its base's — is checked in a
  * single findByIdsAndViewer call, read the same way as a revert reads it.
  */
-export const createProposalQuery = (): ProposalQuery => ({
+export const createProposalQuery = (
+  deps: ProposalQueryDeps = {},
+): ProposalQuery => ({
+  ...createProposalListQuery(deps.appliedListScan),
+  ...createRevisionMarksQuery(),
   async getForViewer(proposalId, viewer) {
     const proposal = await prisma.changeproposals.findProposal(proposalId);
     if (proposal == null) {
@@ -190,11 +147,11 @@ export const createProposalQuery = (): ProposalQuery => ({
     const revertCandidates = isRequesterAllowed(viewer)
       ? visible.filter((op) => REVERTIBILITY_STATUSES.has(op.status))
       : [];
-    const [factsOf, requester] = await Promise.all([
+    const [factsOf, requesterOf] = await Promise.all([
       revertCandidates.length === 0
         ? null
         : loadCurrentPageFacts(revertCandidates, viewable.pages),
-      readRequester(proposal.requester),
+      readRequesters([proposal.requester]),
     ]);
     const candidateKeys = new Set(revertCandidates.map((op) => op.key));
     const links = buildProposalLinks(
@@ -226,9 +183,6 @@ export const createProposalQuery = (): ProposalQuery => ({
       });
     });
 
-    const lastAppliedAt = isRequester
-      ? proposal.lastAppliedAt
-      : newestAppliedAt(visible);
     const basedOn =
       proposal.basedOn == null || isRequester
         ? proposal.basedOn
@@ -237,23 +191,16 @@ export const createProposalQuery = (): ProposalQuery => ({
     return {
       ok: true,
       value: {
-        id: proposal._id,
-        requester,
-        entry: proposal.entry,
-        ...(proposal.modelLabel == null
-          ? {}
-          : { modelLabel: proposal.modelLabel }),
-        createdAt: proposal.createdAt.toISOString(),
-        ...(lastAppliedAt == null
-          ? {}
-          : { lastAppliedAt: lastAppliedAt.toISOString() }),
-        status: deriveProposalStatus(proposal.lifecycle, visible),
-        isRequester,
-        ...(proposal.revertOf == null ? {} : { revertOf: proposal.revertOf }),
+        ...toProposalHeaderView({
+          id: proposal._id,
+          proposal,
+          visible,
+          isRequester,
+          requester: requesterOf(proposal.requester),
+          isPerPageNotificationsEnabled:
+            readChangeProposalSettings().perPageNotificationsEnabled,
+        }),
         ...(basedOn == null ? {} : { basedOn }),
-        ...(isRequester
-          ? { requesterState: requesterStateOf(proposal, visible) }
-          : {}),
         operations,
       },
     };
