@@ -37,6 +37,55 @@ const validator = [
     .withMessage('revisionIds must hold revision ids'),
 ];
 
+/**
+ * @swagger
+ *
+ *    /change-proposals/revision-marks:
+ *      post:
+ *        tags: [ChangeProposals]
+ *        summary: Find the change proposals that created the given revisions
+ *        description: >
+ *          Returns a mark only for revisions whose operation the caller may see. A read
+ *          sent as POST because the id list can be long. Requires the
+ *          `read:features:page` scope.
+ *        requestBody:
+ *          required: true
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                required:
+ *                  - revisionIds
+ *                properties:
+ *                  revisionIds:
+ *                    type: array
+ *                    maxItems: 100
+ *                    items:
+ *                      type: string
+ *        responses:
+ *          200:
+ *            description: The marks
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  properties:
+ *                    marks:
+ *                      type: array
+ *                      items:
+ *                        type: object
+ *                        properties:
+ *                          revisionId:
+ *                            type: string
+ *                          proposalId:
+ *                            type: string
+ *                          isRevert:
+ *                            type: boolean
+ *          400:
+ *            description: Invalid revision id list
+ *          403:
+ *            description: Not authenticated or insufficient scope
+ */
 // A read despite POST (the id list can be long): no addActivity, read scope.
 export const revisionMarksRouteHandlersFactory = (
   crowi: Crowi,

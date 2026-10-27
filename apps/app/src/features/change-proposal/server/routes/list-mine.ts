@@ -36,6 +36,48 @@ const validator = [
   limitValidator(),
 ];
 
+/**
+ * @swagger
+ *
+ *    /change-proposals/mine:
+ *      get:
+ *        tags: [ChangeProposals]
+ *        summary: List the caller's own change proposals, newest first
+ *        description: Requires the `read:features:page` scope.
+ *        parameters:
+ *          - name: page
+ *            in: query
+ *            schema:
+ *              type: integer
+ *              minimum: 1
+ *              maximum: 10000
+ *              default: 1
+ *          - name: limit
+ *            in: query
+ *            schema:
+ *              type: integer
+ *              minimum: 1
+ *              maximum: 50
+ *              default: 20
+ *        responses:
+ *          200:
+ *            description: One page of summaries
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  properties:
+ *                    items:
+ *                      type: array
+ *                      items:
+ *                        type: object
+ *                    hasNext:
+ *                      type: boolean
+ *          400:
+ *            description: Invalid page or limit
+ *          403:
+ *            description: Not authenticated or insufficient scope
+ */
 export const listMineRouteHandlersFactory = (
   crowi: Crowi,
   getService: GetChangeProposalService,

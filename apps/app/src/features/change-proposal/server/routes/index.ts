@@ -6,10 +6,15 @@ import {
   type ChangeProposalService,
   createChangeProposalService,
 } from '../services/change-proposal-service';
+import { approveRouteHandlersFactory } from './approve';
+import { discardRouteHandlersFactory } from './discard';
 import { getProposalRouteHandlersFactory } from './get-proposal';
 import { listAppliedRouteHandlersFactory } from './list-applied';
 import { listMineRouteHandlersFactory } from './list-mine';
+import { revertRouteHandlersFactory } from './revert';
 import { revisionMarksRouteHandlersFactory } from './revision-marks';
+import { setPerPageNotificationsRouteHandlersFactory } from './set-per-page-notifications';
+import { skipRouteHandlersFactory } from './skip';
 
 export type ChangeProposalRouterDeps = {
   // Tests inject a service built with their own applier.
@@ -38,6 +43,14 @@ export const createChangeProposalRouter = (
   router.post(
     '/revision-marks',
     revisionMarksRouteHandlersFactory(crowi, getService),
+  );
+  router.post('/:id/approve', approveRouteHandlersFactory(crowi, getService));
+  router.post('/:id/skip', skipRouteHandlersFactory(crowi, getService));
+  router.post('/:id/discard', discardRouteHandlersFactory(crowi, getService));
+  router.post('/:id/revert', revertRouteHandlersFactory(crowi, getService));
+  router.put(
+    '/:id/per-page-notifications',
+    setPerPageNotificationsRouteHandlersFactory(crowi, getService),
   );
   router.get('/:id', getProposalRouteHandlersFactory(crowi, getService));
   return router;

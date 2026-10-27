@@ -36,6 +36,49 @@ const validator = [
   limitValidator(),
 ];
 
+/**
+ * @swagger
+ *
+ *    /change-proposals/applied:
+ *      get:
+ *        tags: [ChangeProposals]
+ *        summary: List applied change proposals the caller may see, most recently applied first
+ *        description: >
+ *          Lists proposals with at least one applied, reverted or revert-refused operation
+ *          on a page the caller may view. No total count is returned; continue with
+ *          nextCursor. Requires the `read:features:page` scope.
+ *        parameters:
+ *          - name: cursor
+ *            in: query
+ *            schema:
+ *              type: string
+ *          - name: limit
+ *            in: query
+ *            schema:
+ *              type: integer
+ *              minimum: 1
+ *              maximum: 50
+ *              default: 20
+ *        responses:
+ *          200:
+ *            description: Summaries and the cursor to continue from
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  properties:
+ *                    items:
+ *                      type: array
+ *                      items:
+ *                        type: object
+ *                    nextCursor:
+ *                      type: string
+ *                      nullable: true
+ *          400:
+ *            description: Invalid cursor or limit
+ *          403:
+ *            description: Not authenticated or insufficient scope
+ */
 export const listAppliedRouteHandlersFactory = (
   crowi: Crowi,
   getService: GetChangeProposalService,

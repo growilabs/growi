@@ -78,6 +78,7 @@ module.exports = {
         'Attachment',
         'Bookmarks',
         'BookmarkFolders',
+        'ChangeProposals',
         'Page',
         'Pages',
         'PageListing',

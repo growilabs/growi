@@ -23,6 +23,39 @@ type Req = AuthenticatedRequest<Record<string, string>, unknown, unknown>;
 export const proposalNotFound = (): ErrorV3 =>
   new ErrorV3('Change proposal is not found', 'notfound');
 
+/**
+ * @swagger
+ *
+ *    /change-proposals/{id}:
+ *      get:
+ *        tags: [ChangeProposals]
+ *        summary: Get a change proposal as the caller may see it
+ *        description: >
+ *          Returns only the operations on pages the caller may view; a viewer other than
+ *          the requester gets no proposed bodies, no requester state and no pending
+ *          operations. A missing, malformed or entirely invisible proposal gets one
+ *          identical 404. Requires the `read:features:page` scope.
+ *        parameters:
+ *          - name: id
+ *            in: path
+ *            required: true
+ *            schema:
+ *              type: string
+ *        responses:
+ *          200:
+ *            description: The proposal
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  type: object
+ *                  properties:
+ *                    proposal:
+ *                      type: object
+ *          403:
+ *            description: Not authenticated or insufficient scope
+ *          404:
+ *            description: Not found (code notfound)
+ */
 export const getProposalRouteHandlersFactory = (
   crowi: Crowi,
   getService: GetChangeProposalService,
