@@ -304,6 +304,23 @@ markitdown は読み込み時点でファイル種別判定用の機械学習モ
 - 実物は 6 件で、実物の DOCX は無い。大きなファイルはすべて生成したもの
 - 品質は文字の一致で見ており、表の構造や読み順の正しさは目で少し確かめただけ
 - 計測は開発コンテナ 1 台で行った。本番のコンテナでの値ではない
+- 遅い側の処理時間 (p95) とコンテナ image の大きさは測っていない
+
+### 6.7 外部の比較記事 (2026-10-27 時点)
+
+自分たちで計測した記事・日本語文書を扱った記事は見つからなかった。6.3 / 6.4 の実測のほうが本用途に近い。
+
+| 記事 | 内容 | 注意点 |
+|---|---|---|
+| [anydoc vs MarkItDown (file2markdown.ai, 2026-08-05)](https://www.file2markdown.ai/blog/anydoc-vs-markitdown) | anydoc は「正しく変換するか、はっきり失敗する」、markitdown は崩れた結果でも返す。一般的な Office 文書の本番処理は anydoc、形式の幅重視は markitdown、PDF 中心なら PDF 専用エンジン | 競合サービスの運営元 (OverXceed Ltd) による記事。数値の計測なし |
+| [firecrawl anydoc review (Wavect, 2026-08-10、09-02 更新)](https://wavect.io/blog/firecrawl-anydoc-review/) | Firecrawl のベンチマークを批判 (評価文書が非公開、LLM 採点で人間との一致が未確認、初回起動・p95・コンテナの大きさを測っていない)。自社文書での試験導入を推奨し、受理率・p50/p95・障害率を見るべきとする | 数値は Firecrawl の公表値で、独自計測なし |
+| [anydoc の bench/README](https://github.com/firecrawl/anydoc/blob/main/bench/README.md) | 比較相手は markitdown / pandoc / docling / unstructured / mammoth / LibreOffice。品質は構造要素の数と、Claude による 1 組ずつの判定 (表示順を入れ替えて 2 回) | PDF は対象外。anydoc と markitdown はプロセス起動時間を含まず、pandoc と LibreOffice は含む |
+| [MarkItDown 調査 (yage.ai, 2026-04-12)](https://yage.ai/share/markitdown-survey-en-20260412.html) | OpenDataLoader Benchmark (PDF 変換 12 エンジン) で markitdown は下から 2 番目。総合 0.589 (Docling 0.882)、表の再現 0.273、見出しの階層 0.000、読み順 0.844 | AI 生成の記事。anydoc は比較対象外 |
+
+本 spec への示唆:
+
+- PDF を markitdown に頼らず pdfminer で 1 ページずつ抽出する現在の設計は、外部の評価 (markitdown の PDF は表と見出しが弱い) とも合う。検索用の文字取り出しが目的なので表の構造は問わないが、表の多い PDF の品質を上げる場合は Docling が候補になる
+- anydoc は変換できない部分があると全体をエラーにする (暗号化・壊れたファイル・画像だけのページを含む PDF)。採用する場合は、indexing spec の Req 2.4 (失敗時はメタデータのみの文書を登録) への対応づけを決める
 
 採否は未決 (2026-10-27 時点)。
 
