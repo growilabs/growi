@@ -113,6 +113,7 @@ describe('a failed rename must not orphan the page (#9755)', () => {
   ) => {
     const originalFindByIdAndUpdate = Page.findByIdAndUpdate;
     const fault = new Error('simulated failure of the final write');
+    let faultFired = false;
     const spy = vi
       .spyOn(Page, 'findByIdAndUpdate')
       .mockImplementation(function (this: PageModel, ...args) {
@@ -123,13 +124,14 @@ describe('a failed rename must not orphan the page (#9755)', () => {
         // `transform` throws after the write ran, `error` rejects before it runs.
         return applied
           ? query.transform(() => {
+              faultFired = true;
               throw fault;
             })
           : query.error(fault);
       });
     try {
       const err = await rename(page, newPath);
-      return { err, fault };
+      return { err, fault, faultFired };
     } finally {
       spy.mockRestore();
     }
@@ -187,22 +189,30 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     ).toBe(pathlib.dirname(path ?? ''));
   });
 
-  it('keeps the new parent when the final write commits but its acknowledgement is lost', async () => {
+  it('completes the rename, children included, when the final write commits but its acknowledgement is lost', async () => {
     await create(base, 'base body');
     await create(`${base}/ex-parent`, 'body');
     await create(`${base}/new-parent`, 'body');
     const target = await create(`${base}/ex-parent/target`, 'body');
+    const child = await create(`${base}/ex-parent/target/child`, 'body');
     const newPath = `${base}/new-parent/moved`;
 
-    const { err, fault } = await renameWithFailingFinalWrite(target, newPath, {
-      applied: true,
-    });
+    const { err, faultFired } = await renameWithFailingFinalWrite(
+      target,
+      newPath,
+      { applied: true },
+    );
 
-    // otherwise the fault never fired and the assertion below proves nothing
-    expect(err).toBe(fault);
+    // otherwise the fault never fired and the assertions below prove nothing
+    expect(faultFired).toBe(true);
+    expect(err).toBeNull();
     expect(await findPathAndParentPath(target._id)).toEqual({
       path: newPath,
       parentPath: `${base}/new-parent`,
+    });
+    expect(await findPathAndParentPath(child._id)).toEqual({
+      path: `${newPath}/child`,
+      parentPath: newPath,
     });
     expect(await findPathsOffTree()).toEqual([]);
   });
@@ -429,16 +439,19 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     expect(warnings).toContainEqual(expect.stringContaining(`${base}/target`));
   });
 
-  it('keeps the new ancestors when renaming to under itself commits but its acknowledgement is lost', async () => {
+  it('completes the rename to under itself when the final write commits but its acknowledgement is lost', async () => {
     await create(base, 'base body');
     const target = await create(`${base}/target`, 'body');
     const newPath = `${base}/target/not-yet-existing/moved`;
 
-    const { err, fault } = await renameWithFailingFinalWrite(target, newPath, {
-      applied: true,
-    });
+    const { err, faultFired } = await renameWithFailingFinalWrite(
+      target,
+      newPath,
+      { applied: true },
+    );
 
-    expect(err).toBe(fault);
+    expect(faultFired).toBe(true);
+    expect(err).toBeNull();
     expect(await findPathAndParentPath(target._id)).toEqual({
       path: newPath,
       parentPath: `${base}/target/not-yet-existing`,
