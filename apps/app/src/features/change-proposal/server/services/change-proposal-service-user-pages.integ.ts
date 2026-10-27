@@ -138,8 +138,12 @@ describe('Change Proposals and the protection of user pages', () => {
       where: { pageId: { in: leftovers.map((p) => p._id.toString()) } },
     });
     await Page().deleteMany({ _id: { $in: leftovers.map((p) => p._id) } });
-    await prisma.pageredirects.deleteRedirectsFromPathTree(PREFIX);
-    await prisma.pageredirects.deleteRedirectsFromPathTree(OWNER_HOME);
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: PREFIX } },
+    });
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: OWNER_HOME } },
+    });
     await prisma.changeproposals.deleteMany({
       where: { requester: users.requester._id.toString() },
     });

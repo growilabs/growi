@@ -29,15 +29,17 @@ const appliedMove = (op: MoveOperation): AppliedOutcome => ({
 
 // Only a revert move carries removeRedirectsFrom: the redirects the original
 // move left at the path the page returns to would otherwise hide the page.
+// That move went from removeRedirectsFrom to this op's fromPath.
 const removeRedirectsLeftByOriginalMove = async (
   op: MoveOperation,
 ): Promise<void> => {
   if (op.removeRedirectsFrom == null) {
     return;
   }
-  await prisma.pageredirects.deleteRedirectsFromPathTree(
-    op.removeRedirectsFrom,
-  );
+  await prisma.pageredirects.deleteRedirectsCreatedByMove({
+    fromPath: op.removeRedirectsFrom,
+    toPath: op.fromPath,
+  });
 };
 
 export const createMoveHandler = (

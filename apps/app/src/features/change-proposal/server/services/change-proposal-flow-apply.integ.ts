@@ -246,7 +246,9 @@ describe('change proposal flow: create, approve page by page and apply', () => {
     await InAppNotification.deleteMany({ target: { $in: ids } });
     await prisma.activities.deleteMany({ where: { target: { in: ids } } });
     await prisma.changeproposals.deleteMany({ where: { id: { in: ids } } });
-    await prisma.pageredirects.deleteRedirectsFromPathTree(PREFIX);
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: PREFIX } },
+    });
     await mongoose
       .model('UserGroupRelation')
       .deleteMany({ relatedGroup: groupId });

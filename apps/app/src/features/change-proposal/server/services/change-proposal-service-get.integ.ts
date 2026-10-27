@@ -119,7 +119,9 @@ describe('ChangeProposalService.getForViewer', () => {
       where: { pageId: { in: trashed.map((p) => p._id.toString()) } },
     });
     await Page().deleteMany({ _id: { $in: trashed.map((p) => p._id) } });
-    await prisma.pageredirects.deleteRedirectsFromPathTree(PREFIX);
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: PREFIX } },
+    });
     await prisma.changeproposals.deleteMany({
       where: { requester: users.requester._id.toString() },
     });

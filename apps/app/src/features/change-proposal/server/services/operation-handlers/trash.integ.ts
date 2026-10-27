@@ -229,7 +229,9 @@ describe('trash operation handler', () => {
     await prisma.revisions.deleteMany({
       where: { pageId: { in: pageIds.map((id) => id.toString()) } },
     });
-    await prisma.pageredirects.deleteRedirectsFromPathTree(PREFIX);
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: PREFIX } },
+    });
     await InAppNotification.deleteMany({ target: { $in: pageIds } });
     await Subscription.deleteMany({ target: { $in: pageIds } });
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });

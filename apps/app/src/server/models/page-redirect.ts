@@ -64,11 +64,6 @@ function toDepthNumber(value: RawLong): number {
 type RawInsertCommandResult = {
   writeErrors?: { index: number; code: number; errmsg: string }[];
 };
-// shape of the MongoDB `delete` command response
-type RawDeleteCommandResult = {
-  n: number;
-  writeErrors?: { index: number; code: number; errmsg: string }[];
-};
 const MONGO_DUPLICATE_KEY_ERROR_CODE = 11000;
 
 export const extension = Prisma.defineExtension((client) => {
@@ -149,38 +144,50 @@ export const extension = Prisma.defineExtension((client) => {
           return context.deleteMany({ where: { fromPath } });
         },
 
-        // The path itself plus everything under it; '/ab' is not under '/a'.
-        // Prisma's `startsWith` does not escape regex metacharacters on MongoDB,
-        // so the delete command is issued raw with an escaped $regex.
-        async deleteRedirectsFromPathTree(
-          fromPath: string,
-        ): Promise<{ count: number }> {
-          const base = fromPath.replace(/\/+$/, '');
-          const result = (await client.$runCommandRaw({
-            delete: 'pageredirects',
-            deletes: [
-              {
-                q: {
-                  $or: [
-                    { fromPath },
-                    {
-                      fromPath: {
-                        $regex: `^${escapeStringForMongoRegex(base)}/`,
-                      },
-                    },
-                  ],
+        // A move from `fromPath` to `toPath` leaves `fromPath + suffix ->
+        // toPath + suffix` for each moved page (suffix '' or '/...'); other
+        // redirects under `fromPath`, such as an earlier move of a former
+        // child, are not this move's to remove. Prisma's `startsWith` does not
+        // escape regex metacharacters on MongoDB, so candidates are read raw.
+        async deleteRedirectsCreatedByMove({
+          fromPath,
+          toPath,
+        }: IPageRedirect): Promise<{ count: number }> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.pageredirects>(this);
+          const fromBase = fromPath.replace(/\/+$/, '');
+          const candidates = (await context.findRaw({
+            filter: {
+              $or: [
+                { fromPath },
+                {
+                  fromPath: {
+                    $regex: `^${escapeStringForMongoRegex(fromBase)}/`,
+                  },
                 },
-                limit: 0,
-              },
-            ],
-          })) as unknown as RawDeleteCommandResult;
+              ],
+            },
+            options: { projection: { _id: 0, fromPath: 1, toPath: 1 } },
+          })) as unknown as IPageRedirect[];
 
-          if (result.writeErrors != null && result.writeErrors.length > 0) {
-            throw new Error(
-              `Failed to delete PageRedirect documents: ${result.writeErrors[0].errmsg}`,
-            );
+          // Same prefix replacement as renamePage, so a destination with a
+          // trailing slash yields dest//child just as the move wrote it.
+          const created = candidates.filter(
+            (redirect) =>
+              redirect.toPath ===
+              `${toPath}${redirect.fromPath.slice(fromPath.length)}`,
+          );
+          if (created.length === 0) {
+            return { count: 0 };
           }
-          return { count: result.n };
+          return context.deleteMany({
+            where: {
+              OR: created.map((redirect) => ({
+                fromPath: redirect.fromPath,
+                toPath: redirect.toPath,
+              })),
+            },
+          });
         },
 
         async removePageRedirectsByToPath(toPath: string): Promise<void> {

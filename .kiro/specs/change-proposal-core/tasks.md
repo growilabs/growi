@@ -87,9 +87,9 @@
   - エディタどうしの保存が同時に起きても、今までどおり両方が通ること（負けた側が書き直しで通ること）を確かめている
   - _Requirements: 3.16, 10.1_
 - [x] 2.7 リダイレクトをまとめて消す処理と、共同編集の接続数を返す処理を足す
-  - 指定したパスと、その下のパスを起点とするリダイレクトを消す処理を、リダイレクトの Prisma の拡張に足す
+  - 移動元 → 移動先の移動で作られる形（移動元+suffix → 移動先+suffix）のリダイレクトだけを消す処理を、リダイレクトの Prisma の拡張に足す
   - 共同編集のサービスに、そのページのこのプロセスでの接続数を返す処理を足す
-  - それぞれの結合テストで、指定外のパスのリダイレクトが残ること、接続している間は 1 以上・切断後は 0 になることを確かめている
+  - それぞれの結合テストで、指定外のパスのリダイレクトと、移動元の下でも移動先の同じ位置を指していないリダイレクトが残ること、接続している間は 1 以上・切断後は 0 になることを確かめている
   - _Requirements: 3.5, 5.7_
 
 - [ ] 3. 判断の純関数（グループ 1 の 1.1 だけに依存し、1.2 以降を待たない）
@@ -167,7 +167,7 @@
   - `perPageNotifications` が真のときは、`sendPerPageNotifications` の中で、移動では `firePageGlobalNotification(PAGE_MOVE, { oldPath })`、ごみ箱へ移すでは `firePageGlobalNotification(PAGE_DELETE)` を呼ぶ。ごみ箱から戻すにはグローバル通知が無いので呼ばない
   - `perPageNotifications` が偽のとき、移動・ごみ箱へ移す・ごみ箱から戻すでアプリ内通知とグローバル通知が出ないこと、真のとき、3 つとも購読している人へのアプリ内通知が出て、移動とごみ箱へ移すでグローバル通知が出ることを結合テストで確かめている（グローバル通知が route から出ていて、ページのサービスの中からは出ていないことを先に確かめる）
   - ごみ箱から戻したあと、元のパスがページそのものを表示し、元のパスを起点とするリダイレクトが残っていないこと、元のパスに空でないページがあるときは書き込まずに失敗になることを結合テストで確かめている
-  - 子のページを持つページの移動と取り消しの移動のあと、元のパスがページそのものを表示し、元のパスとその下を起点とするリダイレクトが残っていないことを結合テストで確かめている（brief の「移動を戻したときのリダイレクトの残り方」）
+  - 子のページを持つページの移動と取り消しの移動のあと、元のパスがページそのものを表示し、元の移動が作ったリダイレクトが残っておらず、ほかの移動で作られたリダイレクトは残っていることを結合テストで確かめている（brief の「移動を戻したときのリダイレクトの残り方」）
   - _Requirements: 3.6, 3.8, 3.10, 5.6, 5.7, 5.15, 5.16, 7.1, 7.10_
 - [x] 4.4 反映の activity と、まとめたアプリ内通知を作る
   - activity: route から呼ばれたときは route が作った activity に、応答の前に記録する。裏で動くときは自分で文脈を作って記録し、失敗したら文脈を消す
@@ -318,14 +318,14 @@
 - 2.4: 保存の前後で閲覧範囲が「リンクを知っている人だけ」かどうかが変わる人の保存は、`expectedRevisionId` なしで 1 回だけ書く（`movesBetweenTreeAndRestricted`。条件付きにすると負けて書き直したとき子の付け替えが飛ばされ同じパスにページが 2 つできる）。この保存は反映と同時に起きると反映を確認なしで上書きしうるので、2.6 の同時実行テストか要件 3.16 の例外として記録する
 - 2.4: `revisions.delete` 失敗時は例外をそのまま投げる（`RevisionConflictError` に変えない）ので、4.x の「同じ印のリビジョンがあれば反映済み」の確認は、残った印付きリビジョンに引っかからない対策が要る。`normalizeLatestRevisionIfBroken` は route に残っていて反映のモードでは呼ばれない。負けたあとの再確認で 409 になっても閲覧範囲・WIP の `save()` 分は残る
 - 2.5: `emitPageUpdateActivity` は emit したときだけ true を返す（4.x の handler は false なら pendingActivityContext を消す）。page-save の 4 関数は express に依存せず 4.2/4.3 から直接呼べる
-- 2.7: `deleteRedirectsFromPathTree(fromPath)` は Prisma の startsWith が MongoDB で正規表現の記号をエスケープしないため raw の delete コマンド + `escapeStringForMongoRegex` で書いてある。`getConnectionCount(pageId)` はこのプロセスの接続数だけ（複数サーバー構成では他サーバーの接続を数えない。design OQ-6）
+- 2.7（I-5 で書き換え）: `deleteRedirectsCreatedByMove({ fromPath, toPath })` は、エスケープした `$regex` を使う `findRaw` で移動元の下の候補を読み（Prisma の startsWith は MongoDB で正規表現の記号をエスケープしないため）、JS で `redirect.toPath === toPath + redirect.fromPath.slice(fromPath.length)`（`renamePage` と同じ組み立て。移動先の末尾に `/` があれば `移動先//child`）の組だけに絞り、`{fromPath, toPath}` の完全一致の OR で消す。`getConnectionCount(pageId)` はこのプロセスの接続数だけ（複数サーバー構成では他サーバーの接続を数えない。design OQ-6）
 - 3.1: `modelLabel` の 100 文字検査は 5.1（createProposal の入口）で行う（validateProposalInput の引数に modelLabel は無く、断る理由の型にも無いため）。5.x の入口では本文が文字列であることと、入口の種類が作成で受けられるもの（CreatableEntry）であることも確かめる
 - 3.3: `CurrentPageFacts.isPathOccupied` は「空のページは使われていない」前提（`Page.exists({ path, isEmpty: false })` と同じ基準）で 4.x / 5.x が作る。移動元のパス（move の取り消し）も同じ基準。`page-operation-in-progress` と `apply-failed` は judgeRevertability でなく取り消しの反映結果から決める。`buildRevertOperations` は必要な値が欠けると例外を投げる
 - 3.4: `selectVisibleOperations` は絞った一覧だけを返す。件数や全体の状態（deriveProposalStatus）に見えない操作を混ぜない・ごみ箱のページを viewablePageIds に入れる扱いは、呼ぶ側（5.x ProposalQueryService）が `findByIdsAndViewer(..., true)` の引数で決める
 - 4.1: `checkEditingPresence(yjsService, pageId)` は `services/editing-presence.ts`（barrel 未作成。4.4 以降は直接 import するか barrel に足す）。接続数はこのプロセス分のみ
 - 4.2: handler の契約は `operation-handlers/types.ts` が正（`OperationOutcome` は applied / stale / failed、skipped は ProposalApplier の値）。handler は予期しない例外を投げるので、4.5 の ProposalApplier が操作ごとに捕まえて `failed: write-error` を記録する。`createOperationHandlers(crowi)` は今 edit と create だけ登録しており、4.3 で移動・ごみ箱へ移す・ごみ箱から戻すを足したら `OperationHandlerTable` を全項目必須の型にして `getOperationHandler` の実行時例外を型で消す
 - 4.2: edit の `findExistingResult` は「印付きリビジョンがある」だけでは反映済みとしない（ページがその印付きリビジョンを指している、またはページが元のリビジョンより先へ進み、印付きリビジョンの直前が元のリビジョン、のときだけ）。残る誤判定: 印付きリビジョンを作った直後に止まり、次の実行までに人が編集した場合は本文が反映されていなくても反映済みと見える（データから区別できない）。edit は書き込み前に `normalizeLatestRevisionIfBroken` を呼ぶ（ページにリビジョンが結びついていないときだけ pageId を直す。CAS と衝突しない）
-- 4.3: move / restore の `findExistingResult` は読むだけではなく、途中で止まった書き込みの後始末（残ったリダイレクトの削除。何度やっても同じ結果）も済ませる。4.5 では編集中の人の確認（checkEditingPresence）や重なる処理の確認より先に呼ばれる点に注意し、取り消せるかを表示するだけの読む経路から呼ばない
+- 4.3: move / restore の `findExistingResult` は読むだけではなく、途中で止まった書き込みの後始末（元の移動が作ったリダイレクトだけの削除。execute と同じ条件。何度やっても同じ結果）も済ませる。4.5 では編集中の人の確認（checkEditingPresence）や重なる処理の確認より先に呼ばれる点に注意し、取り消せるかを表示するだけの読む経路から呼ばない
 - 4.3: trash の子のページの判定は `Page.exists({ parent })`（空のページも数える）。5.x で `CurrentPageFacts.hasChildren` を作るときは同じ条件にして、取り消せるかの表示と実際の反映で判断が食い違わないようにする。`resultRevisionId` は move / trash / restore では null
 - 4.3: 【解決済み: remediation 1 で「当てる」と決定。下の最終検証の記録を参照】trash / restore のハンドラーは閲覧できるかだけを確かめ、人の削除 route が使う `pageService.canDelete`（管理者設定 `pageDeletionAuthority`、トップページ・ユーザーのホームの保護）は当てていない（design・要件 5.3/5.6 に条件が無いため）。新規作成の取り消し（trash）で、ほかの人が作ったページを削除権限なしに消せる経路になりうる
 - 4.4: `recordProposalActivity` は design と違い `crowi` を引数に取り `{ activityId }` を返す（裏で動くときの activity の ID は関数の中の `beginActivity` で作られ、`notifyApplied` の `activities` に渡すため）。route から呼ぶ（request）場合、操作者は route の `addActivity` が保存した「リクエストを送った人」になる（引数の operator は使われない）ので、承認・取り消しできるのは本人だけという前提を 4.5 / 5.x でも崩さない
@@ -366,3 +366,4 @@
 - 残る既知の差（記録のみ）: `judgeRevertability` はユーザーページの規則を知らないので、管理者がユーザーページを無効にしたあと、`/user` に触れる編集・移動の取り消しが画面では「戻せる」と出ても、反映すると `revert-refused: target-unavailable` になる（断る側に寄った差。要件 5.14 との小さなずれ）。ごみ箱へ移す・戻す操作は人の `pages.remove` / `revertRemove` と同じく `disableUserPages` を確かめない。AI には、ユーザーページの保護で断った場合も `target-unavailable`（ページが無いか閲覧できない）と同じ値で伝わる
 - 最終検証の remediation 2: 2 回目の最終検証が NO-GO（C-1・C-2 は閉じ、新たに I-2 が要件 7.5 違反として critical）。(I-2) `proposal-applier.ts` の `apply()` は、実行の途中で DB の例外が出ても、その回で反映済みになった操作が 1 件以上あれば、lease を手放したあとで `reportAppliedBeforeFailure`（APPLY / REVERT の activity と、まとめた通知を 1 回ずつ。失敗してもログに残すだけ）を呼び、元の例外をそのまま投げ直す（呼び出し側は `in-progress` として扱う）。`proposal-applier-report.integ.ts` で確認。(G-1) `isMovableSourcePath(path)` = `isMovablePage(path) && !isTrashPage(path)`（domain の公開関数）を、move の移動元に、作成時（`check-create-targets.ts` → `target-unavailable` と操作の番号）と反映時（`move.ts` の `execute`、`findUserPageWriteRefusal` と `renamePage` の前 → `failed: target-unavailable`）に当てた。`/`・`/user`・ユーザーのホーム・ごみ箱の中は動かせない。ごみ箱の除外は人の画面（ごみ箱のページに操作メニューが出ない）に合わせたもので、除かないと `renamePage` がごみ箱のページを `revertDeletedPage` を通さずに外へ動かしていた。(I-3) 4.6 の記述「`canOperate` の引数は pageService と同じ形」は move については誤りだった。`renamePage` は子の有無にかかわらず `canOperate(true, 移動元, 移動先)` なので、事前確認も `(true, from, to)` に揃え、一時的な重なりは `write-error` ではなく `pending / page-operation-in-progress` になる。create `(false, null, path)`・restore `(false, ごみ箱のパス, 元のパス)` は実際の呼び出しと一致、edit は `updatePage` が呼ばない。move の移動元が `/user` のとき反映時に `disableUserPages` で断られるテストも足した
 - 最終検証で残した IMPORTANT / 既知（記録のみ・人が決める）: (I-1) 反映の途中で「飛ばす」が入ると、その実行は止まり（結果の記録が 0 件のとき lease を失ったのと同じに扱う）、残りは保守用の cron が最大 10 分後に反映して完了させる。さらに反映がページを書いた直後に割り込むと「書いたのに『飛ばした』と記録」されうる（design 688 行目が受け入れた重なり。推奨: 書き込み済みなら「反映済み」を優先して記録する）。実行の途中で `recordOperationOutcome` が結果を保存した直後に例外になると、その操作は報告されない（ごく狭い場面）。lease の解放が失敗すると元の例外が置き換わる（元の `finally` と同じ）。ページ単位の activity に ip / endpoint が入らない。移動の取り消しが関係の無いリダイレクトまで消す（I-5）。`change-proposal.integ.ts` は 1005 行で上限を超える。人の route の `pages.filter(async …)`（`service/page/index.ts:481`。基点のコミットにもある既存の不具合で、`POST /pages/delete` の削除権限の判定が効いていない可能性。公開の issue や PR にする前に非公開で実際に動かして確かめる。Change Proposal は `canDelete` を直接呼ぶのでこの関数を通らない）
+- 最終検証の remediation 3（I-5。3 回目の最終検証で critical）: 移動の取り消しが `deleteRedirectsFromPathTree`（移動元とその下を起点とするリダイレクトを行き先を見ずに全部消す）で、人が前に作った `/A/old → /X` など無関係な既存のリダイレクトまで元に戻せない形で消していた（人の操作は消さない。要件 5.7 は移動が作ったものだけ）ので、この関数を削除し `deleteRedirectsCreatedByMove` に置き換えた（move handler の `execute` と `findExistingResult` の後始末の両方）。移動が実際に作る形（移動元+suffix → 移動先+suffix）だけを消す。残る制限: 反映の前から人が手で作った、まったく同じ形のリダイレクトは区別できず消える（保存されているデータから判断できる最も狭い条件）。design.md L249・L409・L865・L1520 と research.md を直した

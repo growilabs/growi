@@ -77,55 +77,100 @@ describe('PageRedirect', () => {
     });
   });
 
-  describe('.deleteRedirectsFromPathTree', () => {
-    test('deletes redirects starting at the path and below it, and keeps the rest', async () => {
+  describe('.deleteRedirectsCreatedByMove', () => {
+    const fromPaths = async (): Promise<string[]> =>
+      (await prisma.pageredirects.findMany({ select: { fromPath: true } }))
+        .map((r) => r.fromPath)
+        .sort();
+
+    test('deletes only redirects mapping the moved tree onto the same place under the destination', async () => {
       await prisma.pageredirects.createMany({
         data: [
           { fromPath: '/a', toPath: '/b' },
           { fromPath: '/a/child', toPath: '/b/child' },
           { fromPath: '/a/child/grand', toPath: '/b/child/grand' },
-          { fromPath: '/ab', toPath: '/other' },
-          { fromPath: '/x/a', toPath: '/a' },
-          { fromPath: '/z', toPath: '/a' },
+          { fromPath: '/a/old', toPath: '/x' },
+          { fromPath: '/a/legacy', toPath: '/b/other' },
+          { fromPath: '/a/sub', toPath: '/b' },
+          { fromPath: '/ab', toPath: '/bb' },
+          { fromPath: '/ab/child', toPath: '/b/child' },
+          { fromPath: '/x/a', toPath: '/b' },
         ],
       });
 
-      const result =
-        await prisma.pageredirects.deleteRedirectsFromPathTree('/a');
+      const result = await prisma.pageredirects.deleteRedirectsCreatedByMove({
+        fromPath: '/a',
+        toPath: '/b',
+      });
 
       expect(result.count).toBe(3);
-      const remaining = await prisma.pageredirects.findMany({
-        select: { fromPath: true },
-      });
-      expect(remaining.map((r) => r.fromPath).sort()).toEqual([
+      expect(await fromPaths()).toEqual([
+        '/a/legacy',
+        '/a/old',
+        '/a/sub',
         '/ab',
+        '/ab/child',
         '/x/a',
-        '/z',
       ]);
     });
 
-    test('treats regex metacharacters and non-ASCII whitespace in the path literally', async () => {
-      const path = '/a.b (1)\u3000x';
+    test('keeps a redirect from the source path itself that points elsewhere', async () => {
       await prisma.pageredirects.createMany({
         data: [
-          { fromPath: path, toPath: '/t1' },
-          { fromPath: `${path}/child`, toPath: '/t2' },
-          { fromPath: '/aXb (1)\u3000x', toPath: '/t3' },
-          { fromPath: '/aXb (1)\u3000x/child', toPath: '/t4' },
+          { fromPath: '/a', toPath: '/elsewhere' },
+          { fromPath: '/a/child', toPath: '/b/child' },
         ],
       });
 
-      const result =
-        await prisma.pageredirects.deleteRedirectsFromPathTree(path);
+      const result = await prisma.pageredirects.deleteRedirectsCreatedByMove({
+        fromPath: '/a',
+        toPath: '/b',
+      });
+
+      expect(result.count).toBe(1);
+      expect(await fromPaths()).toEqual(['/a']);
+    });
+
+    test('pairs a destination with a trailing slash the way a rename builds child targets', async () => {
+      await prisma.pageredirects.createMany({
+        data: [
+          { fromPath: '/a', toPath: '/b/' },
+          { fromPath: '/a/child', toPath: '/b//child' },
+          { fromPath: '/a/other', toPath: '/b/other' },
+        ],
+      });
+
+      const result = await prisma.pageredirects.deleteRedirectsCreatedByMove({
+        fromPath: '/a',
+        toPath: '/b/',
+      });
 
       expect(result.count).toBe(2);
-      const remaining = await prisma.pageredirects.findMany({
-        select: { fromPath: true },
+      expect(await fromPaths()).toEqual(['/a/other']);
+    });
+
+    test('treats regex metacharacters and non-ASCII whitespace in both paths literally', async () => {
+      const from = '/a.b (1)　x';
+      const to = '/移動先 [仮]　y';
+      await prisma.pageredirects.createMany({
+        data: [
+          { fromPath: from, toPath: to },
+          { fromPath: `${from}/子`, toPath: `${to}/子` },
+          { fromPath: '/aXb (1)　x', toPath: to },
+          { fromPath: '/aXb (1)　x/子', toPath: `${to}/子` },
+          { fromPath: `${from}/別`, toPath: '/移動先 X　y/別' },
+        ],
       });
-      expect(remaining.map((r) => r.fromPath).sort()).toEqual([
-        '/aXb (1)\u3000x',
-        '/aXb (1)\u3000x/child',
-      ]);
+
+      const result = await prisma.pageredirects.deleteRedirectsCreatedByMove({
+        fromPath: from,
+        toPath: to,
+      });
+
+      expect(result.count).toBe(2);
+      expect(await fromPaths()).toEqual(
+        [`${from}/別`, '/aXb (1)　x', '/aXb (1)　x/子'].sort(),
+      );
     });
 
     test('deletes nothing when no redirect matches', async () => {
@@ -133,8 +178,10 @@ describe('PageRedirect', () => {
         data: [{ fromPath: '/keep', toPath: '/t' }],
       });
 
-      const result =
-        await prisma.pageredirects.deleteRedirectsFromPathTree('/none');
+      const result = await prisma.pageredirects.deleteRedirectsCreatedByMove({
+        fromPath: '/none',
+        toPath: '/t',
+      });
 
       expect(result.count).toBe(0);
       expect(await prisma.pageredirects.count()).toBe(1);

@@ -242,7 +242,9 @@ describe('move operation handler', () => {
     await prisma.revisions.deleteMany({
       where: { pageId: { in: pageIds.map((id) => id.toString()) } },
     });
-    await prisma.pageredirects.deleteRedirectsFromPathTree(PREFIX);
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: PREFIX } },
+    });
     await InAppNotification.deleteMany({ target: { $in: pageIds } });
     await Subscription.deleteMany({ target: { $in: pageIds } });
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
@@ -416,6 +418,153 @@ describe('move operation handler', () => {
         reason: 'moved-after-apply',
       });
       expect((await findPage(page._id)).path).toBe(page.path);
+    });
+  });
+
+  describe('revert move with redirects the original move did not create', () => {
+    const handler = () => createMoveHandler(crowi);
+
+    // A human move of a former child, a stray record, one into the destination
+    // under another name, and one from a look-alike sibling tree.
+    const setUpForeignRedirects = async (
+      originalPath: string,
+      movedPath: string,
+    ): Promise<Array<[string, string]>> => {
+      const old = await createPage(`${originalPath}/old`);
+      const humanDestination = `${PREFIX}/human-moved-${seq}`;
+      await crowi.pageService.renamePage(
+        old,
+        humanDestination,
+        other,
+        {
+          isRecursively: false,
+          createRedirectPage: true,
+          updateMetadata: true,
+        },
+        { ip: TEST_IP, endpoint: TEST_ENDPOINT },
+      );
+      await waitForPageOperationsToFinish();
+      const recorded: Array<[string, string]> = [
+        [`${originalPath}/legacy`, `${PREFIX}/zzz-${seq}`],
+        [`${originalPath}/stale`, `${movedPath}/another-name`],
+        [`${originalPath}-other/x`, `${movedPath}/x`],
+      ];
+      await prisma.pageredirects.createMany({
+        data: recorded.map(([fromPath, toPath]) => ({ fromPath, toPath })),
+      });
+      return [[`${originalPath}/old`, humanDestination], ...recorded];
+    };
+
+    const redirectPairs = async (fromPaths: readonly string[]) =>
+      (
+        await prisma.pageredirects.findMany({
+          where: { fromPath: { in: [...fromPaths] } },
+          select: { fromPath: true, toPath: true },
+        })
+      )
+        .map((r): [string, string] => [r.fromPath, r.toPath])
+        .sort();
+
+    const moveForward = async (
+      parentId: mongoose.Types.ObjectId,
+      movedPath: string,
+    ): Promise<void> => {
+      const forward = moveOp(await findPage(parentId), movedPath);
+      expectApplied(
+        await handler().execute(forward, contextFor(forward, false)),
+      );
+      await waitForPageOperationsToFinish();
+    };
+
+    it('removes only the redirects the original move created and keeps every other redirect under the original path', async () => {
+      const parent = await createPage(nextPath());
+      const originalPath = parent.path;
+      const movedPath = `${originalPath}-moved`;
+      await createPage(`${originalPath}/child`);
+      const foreign = await setUpForeignRedirects(originalPath, movedPath);
+      await moveForward(parent._id, movedPath);
+      const createdByMove = [originalPath, `${originalPath}/child`];
+      expect(await redirectPairs(createdByMove)).toHaveLength(2);
+
+      const revert = moveOp(
+        await findPage(parent._id),
+        originalPath,
+        originalPath,
+      );
+      expectApplied(await handler().execute(revert, contextFor(revert, false)));
+      await waitForPageOperationsToFinish();
+
+      expect(await redirectPairs(createdByMove)).toEqual([]);
+      expect(await redirectPairs(foreign.map(([from]) => from))).toEqual(
+        [...foreign].sort(),
+      );
+    });
+
+    it('removes the redirects a move to a destination with a trailing slash created, and keeps the others', async () => {
+      const parent = await createPage(nextPath());
+      const originalPath = parent.path;
+      const movedPath = `${originalPath}-tsmoved/`;
+      await createPage(`${originalPath}/child`);
+      const foreign = await setUpForeignRedirects(originalPath, movedPath);
+      const forward = moveOp(await findPage(parent._id), movedPath);
+      expectApplied(
+        await handler().execute(forward, contextFor(forward, false)),
+      );
+      await waitForPageOperationsToFinish();
+      const createdByMove = [originalPath, `${originalPath}/child`];
+      expect(await redirectPairs(createdByMove)).toEqual([
+        [originalPath, movedPath],
+        [`${originalPath}/child`, `${movedPath}/child`],
+      ]);
+
+      const revert: MoveOperation = {
+        ...moveOp(await findPage(parent._id), originalPath, originalPath),
+        fromPath: forward.toPath,
+      };
+      expectApplied(await handler().execute(revert, contextFor(revert, false)));
+      await waitForPageOperationsToFinish();
+
+      expect(await redirectPairs(createdByMove)).toEqual([]);
+      expect(await redirectPairs(foreign.map(([from]) => from))).toEqual(
+        [...foreign].sort(),
+      );
+    });
+
+    it('keeps the same redirects when findExistingResult finishes a revert that stopped right after moving the page', async () => {
+      const parent = await createPage(nextPath());
+      const originalPath = parent.path;
+      const movedPath = `${originalPath}-moved`;
+      const foreign = await setUpForeignRedirects(originalPath, movedPath);
+      await moveForward(parent._id, movedPath);
+      const revert = moveOp(
+        await findPage(parent._id),
+        originalPath,
+        originalPath,
+      );
+      await crowi.pageService.renamePage(
+        await findPage(parent._id),
+        originalPath,
+        requester,
+        { createRedirectPage: false, updateMetadata: true },
+        { ip: TEST_IP, endpoint: TEST_ENDPOINT },
+      );
+      await waitForPageOperationsToFinish();
+
+      const outcome = await handler().findExistingResult(
+        revert,
+        contextFor(revert, false),
+      );
+
+      expect(outcome).toEqual({
+        status: 'applied',
+        resultPageId: parent._id.toString(),
+        resultRevisionId: null,
+      });
+
+      expect(await redirectPairs([originalPath])).toEqual([]);
+      expect(await redirectPairs(foreign.map(([from]) => from))).toEqual(
+        [...foreign].sort(),
+      );
     });
   });
 

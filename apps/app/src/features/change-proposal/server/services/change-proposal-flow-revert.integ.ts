@@ -150,7 +150,9 @@ describe('change proposal flow: apply, revert everything, then revert the revert
       where: { pageId: { in: trashed.map((p) => p._id.toString()) } },
     });
     await Page().deleteMany({ _id: { $in: trashed.map((p) => p._id) } });
-    await prisma.pageredirects.deleteRedirectsFromPathTree(PREFIX);
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: PREFIX } },
+    });
     await configManager.updateConfigs(
       { 'changeProposal:autoApplyPolicy': undefined },
       { removeIfUndefined: true },
