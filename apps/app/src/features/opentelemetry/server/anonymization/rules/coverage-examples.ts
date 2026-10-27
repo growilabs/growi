@@ -24,8 +24,8 @@ export const COVERAGE_EXAMPLES: readonly CoverageExample[] = [
   {
     id: 'Q01',
     ruleIds: ['sensitive-query-params'],
-    url: `/_api/v3/page/exist-paths?fromPath=%2Fa&toPath=%2Fb&q=x&nq=y&path=%2Fc&searchText=s&searchWord=w&username=u&shareLinkId=l&searchFilter=f&limit=5`,
-    expectedTarget: `/_api/v3/page/exist-paths?fromPath=${MASK}&toPath=${MASK}&q=${MASK}&nq=${MASK}&path=${MASK}&searchText=${MASK}&searchWord=${MASK}&username=${MASK}&shareLinkId=${MASK}&searchFilter=${MASK}&limit=5`,
+    url: `/_api/v3/page/exist-paths?fromPath=%2Fa&toPath=%2Fb&q=x&nq=y&path=%2Fc&searchText=s&searchWord=w&username=u&shareLinkId=l&searchFilter=f&access_token=t&limit=5`,
+    expectedTarget: `/_api/v3/page/exist-paths?fromPath=${MASK}&toPath=${MASK}&q=${MASK}&nq=${MASK}&path=${MASK}&searchText=${MASK}&searchWord=${MASK}&username=${MASK}&shareLinkId=${MASK}&searchFilter=${MASK}&access_token=${MASK}&limit=5`,
     route: '/_api/v3/page/exist-paths',
   },
   {
@@ -85,6 +85,13 @@ export const COVERAGE_EXAMPLES: readonly CoverageExample[] = [
     ruleIds: ['page-view'],
     url: '/docs/v1.2/notes',
     expectedTarget: '/[HASHED:615bc4591de8da7b]',
+    route: '/*',
+  },
+  {
+    id: 'P04',
+    ruleIds: ['page-view'],
+    url: '/vault.gitignore-guide',
+    expectedTarget: '/[HASHED:6f7e7d7591a99e57]',
     route: '/*',
   },
   {
@@ -436,6 +443,14 @@ export const COVERAGE_EXAMPLES: readonly CoverageExample[] = [
     route: '/_api/v3/page/page-paths-with-descendant-count',
   },
   {
+    // The form the browser client actually sends (qs arrayFormat: indices)
+    id: 'A05',
+    ruleIds: ['sensitive-query-params'],
+    url: '/_api/v3/page/page-paths-with-descendant-count?paths%5B0%5D=%2Fa&paths%5B1%5D=%2Fb',
+    expectedTarget: `/_api/v3/page/page-paths-with-descendant-count?paths%5B0%5D=${MASK}&paths%5B1%5D=${MASK}`,
+    route: '/_api/v3/page/page-paths-with-descendant-count',
+  },
+  {
     id: 'A06',
     ruleIds: ['sensitive-query-params'],
     url: '/_api/v3/page-listing/children?path=%2Fwiki',
@@ -542,6 +557,20 @@ export const COVERAGE_EXAMPLES: readonly CoverageExample[] = [
     expectedTarget: '/_api/v3/share-links/[ANONYMIZED]',
     route: '/_api/v3/share-links/:id',
     method: 'DELETE',
+  },
+  {
+    id: 'K06',
+    ruleIds: ['sensitive-query-params'],
+    url: '/_api/v3/page?path=%2Ffoo&access_token=SecretPAT',
+    expectedTarget: `/_api/v3/page?path=${MASK}&access_token=${MASK}`,
+    route: '/_api/v3/page',
+  },
+  {
+    id: 'K06',
+    ruleIds: ['page-markdown', 'sensitive-query-params'],
+    url: '/wiki/project/documentation.md?access_token=SecretPAT',
+    expectedTarget: `/${H_WIKI_DOC}.md?access_token=${MASK}`,
+    route: '/*',
   },
 
   // Static files

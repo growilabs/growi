@@ -188,7 +188,7 @@ sequenceDiagram
 | 6.4 | API のページパス | SensitiveQueryParams | `SENSITIVE_QUERY_PARAMS` | — |
 | 6.5 | `.md` | PathRules（page-markdown） | `PathAction` | — |
 | 6.6 | パーマリンク・トップ・`/user`・静的ファイル | PathRules（static-files, kept-pages） | `PathAction` | — |
-| 7.1–7.3 | 秘密の値 | PathRules（secret-path-segments, next-data）, SensitiveQueryParams | `PathAction` | — |
+| 7.1–7.4 | 秘密の値 | PathRules（secret-path-segments, next-data）, SensitiveQueryParams | `PathAction` | — |
 | 8.1, 8.2 | 複数の扱いに当てはまる URL | AnonymizeUrl（パスとクエリの分離） | `anonymizeUrl` | System Flows |
 | 9.1, 9.2 | 置換形式と既存ハッシュ値の維持 | HashPagePath, AnonymizeQueryParams, CoverageExamples（回帰の固定値） | `hashPagePath`, `anonymizeQueryParams` | — |
 
@@ -294,7 +294,7 @@ export type AnonymizationRules = {
 | Rule ID | 当てはまるパス | 動作 |
 |---|---|---|
 | `next-data` | `/_next/data/<buildId>/...json` | `<buildId>` の後の区切りが `AllLang` のいずれかなら locale として残し、その後ろ（`.json` を除く）を中のパスとして同じ規則の一覧に通し、外側を付け直す。中のパスの `RequestPath` は、**デコード前**の外側のパスから切り出した文字列を `raw` とし、`decoded = decodePathname(raw)` とする（デコード済みの文字列から切り出さない）。中のパスが空（トップページ）なら変えない |
-| `static-files` | `/_next/`、`/_drawio-assets/`、`/uploads/`、`/vault.git` で始まる。`/favicon.ico`・`/favicon.svg`。`/static/`・`/images/` で始まり、最後の区切りが静的ファイルの拡張子（`png`・`jpg`・`jpeg`・`gif`・`svg`・`ico`・`webp`・`css`・`js`・`mjs`・`map`・`json`・`woff`・`woff2`・`ttf`・`otf`・`eot`）で終わる | 変えない（それ以外の `/static/`・`/images/` は、静的ファイルが無ければページ表示になるため、この規則に当てはめず `page-view` に任せる。`/images/v1.2` のような `.` を含むページ名もハッシュ化される） |
+| `static-files` | `/_next/`、`/_drawio-assets/`、`/uploads/`、`/vault.git/` で始まる。`/vault.git`・`/favicon.ico`・`/favicon.svg`（`/vault.git` は Express の `app.use` のマウント先で、それ自身とその下だけを受けるため、`/vault.gitignore` のようなページ名は含めない）。`/static/`・`/images/` で始まり、最後の区切りが静的ファイルの拡張子（`png`・`jpg`・`jpeg`・`gif`・`svg`・`ico`・`webp`・`css`・`js`・`mjs`・`map`・`json`・`woff`・`woff2`・`ttf`・`otf`・`eot`）で終わる | 変えない（それ以外の `/static/`・`/images/` は、静的ファイルが無ければページ表示になるため、この規則に当てはめず `page-view` に任せる。`/images/v1.2` のような `.` を含むページ名もハッシュ化される） |
 | `secret-path-segments` | `/share/:linkId`、`/forgot-password/:token`、`/user-activation/:token` | 該当の区切りを `[ANONYMIZED]` にする |
 | `api-path-segments` | `/_api/v3/share-links/:id`、`/_api/v3/user-groups/:id/users/:username` | `id`（共有リンク）・`username` の区切りを `[ANONYMIZED]` にする。ユーザーグループの `:id` は ObjectId なので残す |
 | `kept-pages` | `/`、`/user`、パーマリンク（`/<24 桁の 16 進数>`）、パーマリンクの `.md` | 変えない |
@@ -303,7 +303,7 @@ export type AnonymizationRules = {
 | `page-view` | ユーザーページ（`isUserPage`）、またはページとして扱えるパス（`isPageRoute`） | `hash-page-path`（ユーザーページはユーザー名と配下を別々に、それ以外はパス全体をハッシュ化） |
 | （どれにも当てはまらない） | `/_api/...`、`/admin`、`/me`、`/login` などのシステムページ | 変えない |
 
-全 URL 共通で匿名化するクエリパラメータ（`SENSITIVE_QUERY_PARAMS`）: `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`。
+全 URL 共通で匿名化するクエリパラメータ（`SENSITIVE_QUERY_PARAMS`）: `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token`。
 
 - `isPageRoute` は既存の判定（`@growi/core` の `isCreatablePage` を、ページ名に使えない 1 文字の禁止文字を置き換えてから呼ぶ）を引き継ぐ。`.` による除外は行わない。
 - `secret-path-segments`・`api-path-segments` は、**デコード前**のパスを `/` で区切ってから型と照合し、置き換える（区切りの中の `%2F` を区切りとみなさないため。外部認証のユーザー名には文字の制約が無い）。それ以外の規則の判定とハッシュ化はデコード後のパスで行う。
@@ -352,7 +352,7 @@ export const anonymizeQueryParams: (search: string, paramNames: readonly string[
 ```
 
 - 既存の `anonymizeQueryParams(target, paramNames)` は handler が使っている間は残し、新しい関数は別名で追加する。handler を削除する時点で古い関数を消し、新しい関数をこの名前にする。
-- `search` は `?` を含まないクエリ文字列。`&` で区切り、名前（デコード後、末尾の `[]` を除く）が `paramNames` に含まれる区切りの値だけを `%5BANONYMIZED%5D`（値が JSON 配列なら `%5B%22%5BANONYMIZED%5D%22%5D`）に置き換える。ほかの区切りは元の文字列のまま。
+- `search` は `?` を含まないクエリ文字列。`&` で区切り、名前（デコード後の、最初の `[` より前の部分。`name[]`・`name[0]`・`name[a][0]` はどれも `name` として比べる）が `paramNames` に含まれる区切りの値だけを `%5BANONYMIZED%5D`（値が JSON 配列なら `%5B%22%5BANONYMIZED%5D%22%5D`）に置き換える。ほかの区切りは元の文字列のまま。
 
 #### ExpressRouteWalker（`src/test-utils/express-route-walker.ts`）
 
@@ -381,7 +381,7 @@ export const listRegisteredRoutes: (app: { _router: unknown }) => readonly Regis
   - すべてのパスの規則と `sensitive-query-params` が、少なくとも 1 つの例から参照されていること（3.2）。
 - **ルート照合テスト（`coverage-routes.integ.ts`）**: `route` を持つすべての例について、その `(method, route)` が登録済みのルートに等しさで含まれること（3.3）。実装前に、架空のルートを例に加えて失敗することを確かめ、元に戻す。
 - **実行関数の単体テスト（`anonymize-url.spec.ts`）**: 小さな規則の fixture で、規則の順序（最初に当てはまったものだけ）、パスとクエリの独立（8.1、8.2）、変化なしで `null`（1.5）、データ URL の中のパスへの再適用、例外時の固定値。
-- **ユーティリティの単体テスト**: `hash-page-path`（変更前のハッシュ値の固定、ユーザーページ、壊れたエンコード）、`path-pattern`、`anonymize-query-params`（同じ名前の繰り返し、`name[]`、JSON 配列、ほかの区切りが変わらないこと）。
+- **ユーティリティの単体テスト**: `hash-page-path`（変更前のハッシュ値の固定、ユーザーページ、壊れたエンコード）、`path-pattern`、`anonymize-query-params`（同じ名前の繰り返し、`name[]`・`name[0]`（エンコードされた `name%5B0%5D` を含む）、JSON 配列、ほかの区切りが変わらないこと）。
 - **変更前との比較（実装のタスク内、コミットしない）**: 変更前の handler と新しい規則に 70 件以上の URL を流し、「変更前に匿名化されていて変更後に平文」が 0 件、ASCII のページパスのハッシュ値が同じであることを確かめ、結果を PR に記載する。
 
 ## Security Considerations

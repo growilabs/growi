@@ -13,9 +13,15 @@ const STATIC_PREFIXES: readonly string[] = [
   '/_next/',
   '/_drawio-assets/',
   '/uploads/',
+  '/vault.git/',
+];
+// /vault.git is listed here as well as under STATIC_PREFIXES because app.use matches
+// only the mount path itself and paths below it, not page names such as /vault.gitignore
+const STATIC_FILES: readonly string[] = [
+  '/favicon.ico',
+  '/favicon.svg',
   '/vault.git',
 ];
-const STATIC_FILES: readonly string[] = ['/favicon.ico', '/favicon.svg'];
 // Only these directories may also hold page names, so they need the extension check
 const STATIC_DIRS_WITH_PAGE_FALLBACK: readonly string[] = [
   '/static/',

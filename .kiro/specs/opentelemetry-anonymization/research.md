@@ -7,7 +7,7 @@
 - **Key Findings**:
   - 既存の 4 handler は URL 文字列の部分一致で対象を選んでおり、3 つの URL が実在するルートと一致していなかった。また複数 handler が当てはまると最後の結果が前の結果を上書きしていた（途中に `_search` を含む URL でキーワードが平文に戻る）。
   - Next.js の画面内遷移は `/_next/data/<buildId>/<locale>/<ページパス>.json?<元のクエリ>&path=<区切り1>&path=<区切り2>…` を要求する。ページパスはパスとクエリの両方に入る。
-  - トークンを URL に含むのはページ表示のルート（`/forgot-password/:token`、`/user-activation/:token`）だけで、apiv3 はトークンをリクエストボディで受け取る。
+  - パスにトークンを含むのはページ表示のルート（`/forgot-password/:token`、`/user-activation/:token`）だけ。ただしアクセストークン・API トークンは、ヘッダ・リクエストボディのほかにクエリ `access_token` でも受け付けるため、どの URL のクエリにも入り得る。
 
 ## Research Log
 
@@ -35,13 +35,13 @@
 
 - **Context**: 既存の page access handler は `.` を含むパスをすべて静的ファイルとみなして除外しており、`.` を含むページ名が漏れていた。
 - **Sources Consulted**: `server/crowi/express-init.js:102-112`、`apps/app/public/`（`favicon.ico`、`favicon.svg`、`images/`、`static/`）、`server/routes/index.js:95,208`。
-- **Findings**: 静的ファイルの配信元は `/_next/`（`/_next/data/` を除く）、`/static/`、`/images/`、`/favicon.ico`、`/favicon.svg`、`/_drawio-assets/`、`/uploads/`（常に 403）、`/vault.git` に限られる。ルート直下に `robots.txt` などは無い。
+- **Findings**: 静的ファイルの配信元は `/_next/`（`/_next/data/` を除く）、`/static/`、`/images/`、`/favicon.ico`、`/favicon.svg`、`/_drawio-assets/`、`/uploads/`（常に 403）、`/vault.git`（`app.use('/vault.git', …)` なので `/vault.git` 自身とその下だけ。`/vault.gitignore` のようなページ名は含まない）に限られる。ルート直下に `robots.txt` などは無い。
 - **Implications**: `.` による除外をやめ、上記の配信元だけを「そのまま残す」とする。将来ルート直下に静的ファイルが増えた場合は、ページパスとしてハッシュ化される（プライバシ上の害は無く、ファイル名が読めなくなるだけ）。
 
 ### 秘密の値が入る場所
 
 - **Sources Consulted**: `server/routes/index.js:376-405`、`server/routes/apiv3/forgot-password.js`、`user-activation.ts`、`invited.ts`、`share-links.ts`、`page/get-page-by-share-link.ts`、`page/get-page-info.ts`、`features/comment/server/routes/list.ts`、`middlewares/certify-shared-page.js`。
-- **Findings**: URL に入るのは `/share/:linkId`、`/forgot-password/:token`、`/user-activation/:token`、`DELETE /_api/v3/share-links/:id`、クエリ `shareLinkId`（`/_api/v3/page/shared`、`/page/info`、`/comments`、apiv1 の `certifySharedPage` 配下）。apiv3 のトークンはすべてリクエストボディ。共有ページの添付ファイルは Referer ヘッダで共有リンク ID を渡す（URL 属性ではないので範囲外）。
+- **Findings**: URL に入るのは `/share/:linkId`、`/forgot-password/:token`、`/user-activation/:token`、`DELETE /_api/v3/share-links/:id`、クエリ `shareLinkId`（`/_api/v3/page/shared`、`/page/info`、`/comments`、apiv1 の `certifySharedPage` 配下）。アクセストークン・API トークンを読む処理（`middlewares/access-token-parser/extract-access-token.ts`、`middlewares/certify-origin.ts`、`features/growi-vault/server/middlewares/vault-pat-auth.ts`）は、Authorization・`X-GROWI-ACCESS-TOKEN` ヘッダとリクエストボディのほかに `req.query.access_token` も読む。このため API、添付ファイル・ダウンロード、`<ページパス>.md` などの URL に `?access_token=<トークン>` が付き得る（クエリ `access_token` として共通の名前の一覧に加える）。共有ページの添付ファイルは Referer ヘッダで共有リンク ID を渡す（URL 属性ではないので範囲外）。
 - **Implications**: 共有リンク ID は ObjectId で、作成時刻からある程度推測できる。ハッシュにすると総当たりで元の値を割り出せるため、値によらない固定の文字列（`[ANONYMIZED]`）に置き換える。
 
 ### ユーザー名に使える文字
@@ -90,7 +90,7 @@
 ### Decision: クエリパラメータは名前で匿名化する
 
 - **Context**: エンドポイントごとにパラメータを並べると、新しいエンドポイントのたびに規則の追加が要る。GROWI では `path`・`q` などの名前が多くのエンドポイントで同じ意味に使われている。
-- **Selected Approach**: `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter` を、どの URL に付いていても `[ANONYMIZED]` に置き換える。
+- **Selected Approach**: `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token` を、どの URL に付いていても `[ANONYMIZED]` に置き換える。
 - **Rationale**: 新しいエンドポイントが既存の名前を使う限り、規則の追加なしで匿名化される。途中に `_search` を含むページ URL の `q` のような、どの規則も想定していない組み合わせも匿名化される。
 - **Trade-offs**: 利用者データでない `q` や `path` も匿名化される（トレースの読みやすさが少し落ちるだけで、害は無い）。新しい名前のパラメータは名前を足すまで漏れる（Revalidation Triggers に記載）。要件 2.5 を「パス部分を書き換えない」に改めた。
 - **Follow-up**: 一覧表の各 API 行は、この名前の一覧が実際にそのエンドポイントを覆っていることを示す例として残す。
@@ -98,8 +98,8 @@
 ### Decision: 置き換えたパラメータ以外のクエリを再エンコードしない
 
 - **Context**: 既存の `anonymizeQueryParams` は `URLSearchParams` でクエリ全体を組み立て直しており、同じ名前のパラメータが 1 つにまとまり、ほかのパラメータも再エンコードされていた（`tags[]` が `tags%5B%5D` になる、空白が `+` になる）。
-- **Selected Approach**: クエリを `&` で区切り、対象の名前（`name` または `name[]`）の値だけを `%5BANONYMIZED%5D` に置き換える。ほかの区切りは元の文字列のまま残す。値が JSON 配列なら従来どおり `%5B%22%5BANONYMIZED%5D%22%5D`（`["[ANONYMIZED]"]`）にする。
-- **Rationale**: 置き換え後の値の形（`[ANONYMIZED]`）は変えずに、無関係な部分を変えない。
+- **Selected Approach**: クエリを `&` で区切り、名前（デコード後の、最初の `[` より前の部分）が対象の区切りの値だけを `%5BANONYMIZED%5D` に置き換える。ほかの区切りは元の文字列のまま残す。値が JSON 配列なら従来どおり `%5B%22%5BANONYMIZED%5D%22%5D`（`["[ANONYMIZED]"]`）にする。
+- **Rationale**: 置き換え後の値の形（`[ANONYMIZED]`）は変えずに、無関係な部分を変えない。名前を最初の `[` より前の部分で比べるのは、GROWI のブラウザ側の axios が qs の既定（`arrayFormat: 'indices'`）で配列を `paths%5B0%5D=...&paths%5B1%5D=...`（`paths[0]`、`paths[1]`）として送るため。末尾の `[]` を除くだけではこの形が平文で残る。
 - **Trade-offs**: 変更前に API の URL で再エンコードされていたほかのパラメータは、元の形のまま記録されるようになる（値の匿名化には影響しない）。
 
 ### Decision: 秘密の値はハッシュにしない

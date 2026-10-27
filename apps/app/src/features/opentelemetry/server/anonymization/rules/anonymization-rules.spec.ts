@@ -154,20 +154,43 @@ describe('ANONYMIZATION_RULES', () => {
     ])('hashes %s as a page', (url) => {
       expect(run(url)).toMatch(/^\/\[HASHED:[a-f0-9]{16}\]$/);
     });
+
+    it.each([
+      '/vault.git-notes',
+      '/vault.gitignore-guide',
+    ])('hashes %s as a page even though it starts with /vault.git', (url) => {
+      expect(run(url)).toMatch(/^\/\[HASHED:[a-f0-9]{16}\]$/);
+    });
+
+    it('keeps /vault.git itself', () => {
+      expect(run('/vault.git')).toBeNull();
+    });
+  });
+
+  describe('access tokens in the query (Q01, K06)', () => {
+    it.each`
+      url                                                        | expected
+      ${'/_api/v3/page?path=%2Ffoo&access_token=SecretPAT'}      | ${'/_api/v3/page?path=%5BANONYMIZED%5D&access_token=%5BANONYMIZED%5D'}
+      ${`/attachment/${OID}?access_token=SecretPAT`}             | ${`/attachment/${OID}?access_token=%5BANONYMIZED%5D`}
+      ${'/wiki/project/documentation.md?access_token=SecretPAT'} | ${'/[HASHED:22ca1a8b9f281349].md?access_token=%5BANONYMIZED%5D'}
+    `('redacts the token in $url', ({ url, expected }) => {
+      expect(run(url)).toBe(expected);
+    });
   });
 
   describe('sensitive query parameters (Q01, S, U, A, K04)', () => {
     it.each`
-      url                                                              | expected
-      ${'/_api/search?q=a&nq=b&limit=10'}                              | ${'/_api/search?q=%5BANONYMIZED%5D&nq=%5BANONYMIZED%5D&limit=10'}
-      ${'/_api/v3/users?searchText=jo'}                                | ${'/_api/v3/users?searchText=%5BANONYMIZED%5D'}
-      ${'/_api/v3/check-username?username=jo'}                         | ${'/_api/v3/check-username?username=%5BANONYMIZED%5D'}
-      ${'/_api/v3/activity?searchFilter=%7B%7D'}                       | ${'/_api/v3/activity?searchFilter=%5BANONYMIZED%5D'}
-      ${`/_api/v3/user-groups/${OID}/unrelated-users?searchWord=jo`}   | ${`/_api/v3/user-groups/${OID}/unrelated-users?searchWord=%5BANONYMIZED%5D`}
-      ${'/_api/v3/page?path=%2Fa%2Fb&pageId=x'}                        | ${'/_api/v3/page?path=%5BANONYMIZED%5D&pageId=x'}
-      ${'/_api/v3/page/exist-paths?fromPath=%2Fa&toPath=%2Fb'}         | ${'/_api/v3/page/exist-paths?fromPath=%5BANONYMIZED%5D&toPath=%5BANONYMIZED%5D'}
-      ${'/_api/v3/page/page-paths-with-descendant-count?paths[]=%2Fa'} | ${'/_api/v3/page/page-paths-with-descendant-count?paths[]=%5BANONYMIZED%5D'}
-      ${'/_api/v3/page/shared?shareLinkId=abc&pageId=x'}               | ${'/_api/v3/page/shared?shareLinkId=%5BANONYMIZED%5D&pageId=x'}
+      url                                                                                     | expected
+      ${'/_api/search?q=a&nq=b&limit=10'}                                                     | ${'/_api/search?q=%5BANONYMIZED%5D&nq=%5BANONYMIZED%5D&limit=10'}
+      ${'/_api/v3/users?searchText=jo'}                                                       | ${'/_api/v3/users?searchText=%5BANONYMIZED%5D'}
+      ${'/_api/v3/check-username?username=jo'}                                                | ${'/_api/v3/check-username?username=%5BANONYMIZED%5D'}
+      ${'/_api/v3/activity?searchFilter=%7B%7D'}                                              | ${'/_api/v3/activity?searchFilter=%5BANONYMIZED%5D'}
+      ${`/_api/v3/user-groups/${OID}/unrelated-users?searchWord=jo`}                          | ${`/_api/v3/user-groups/${OID}/unrelated-users?searchWord=%5BANONYMIZED%5D`}
+      ${'/_api/v3/page?path=%2Fa%2Fb&pageId=x'}                                               | ${'/_api/v3/page?path=%5BANONYMIZED%5D&pageId=x'}
+      ${'/_api/v3/page/exist-paths?fromPath=%2Fa&toPath=%2Fb'}                                | ${'/_api/v3/page/exist-paths?fromPath=%5BANONYMIZED%5D&toPath=%5BANONYMIZED%5D'}
+      ${'/_api/v3/page/page-paths-with-descendant-count?paths[]=%2Fa'}                        | ${'/_api/v3/page/page-paths-with-descendant-count?paths[]=%5BANONYMIZED%5D'}
+      ${'/_api/v3/page/page-paths-with-descendant-count?paths%5B0%5D=%2Fa&paths%5B1%5D=%2Fb'} | ${'/_api/v3/page/page-paths-with-descendant-count?paths%5B0%5D=%5BANONYMIZED%5D&paths%5B1%5D=%5BANONYMIZED%5D'}
+      ${'/_api/v3/page/shared?shareLinkId=abc&pageId=x'}                                      | ${'/_api/v3/page/shared?shareLinkId=%5BANONYMIZED%5D&pageId=x'}
     `('redacts $url', ({ url, expected }) => {
       expect(run(url)).toBe(expected);
     });

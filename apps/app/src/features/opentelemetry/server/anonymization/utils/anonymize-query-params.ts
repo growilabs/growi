@@ -54,7 +54,10 @@ export const anonymizeQueryParams = (
     }
     const eq = pair.indexOf('=');
     const rawName = eq === -1 ? pair : pair.slice(0, eq);
-    const name = decodeQueryComponent(rawName).replace(/\[\]$/, '');
+    const decodedName = decodeQueryComponent(rawName);
+    // qs serializes arrays and objects as name[], name[0] or name[a][0]
+    const bracket = decodedName.indexOf('[');
+    const name = bracket === -1 ? decodedName : decodedName.slice(0, bracket);
     if (!targets.has(name)) {
       return pair;
     }

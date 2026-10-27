@@ -11,4 +11,5 @@ export const SENSITIVE_QUERY_PARAMS: readonly string[] = [
   'username',
   'shareLinkId',
   'searchFilter',
+  'access_token',
 ];

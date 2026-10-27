@@ -110,6 +110,7 @@
 1. When 共有リンクのページ表示、その画面内遷移用のデータ URL、または共有リンク ID を含む API リクエストを受け取ったとき, the GROWI server shall 共有リンク ID を、値によらない固定の文字列に置き換える。
 2. When パスワード再設定またはユーザー有効化のトークンを含むリクエストを受け取ったとき, the GROWI server shall トークンを、値によらない固定の文字列に置き換える。
 3. The GROWI server shall 秘密の値を、元の値から計算したハッシュに置き換えない。ハッシュ値から元の値を総当たりで割り出せないようにするため。
+4. When クエリパラメータ `access_token`（アクセストークン・API トークン）を含むリクエストを受け取ったとき, the GROWI server shall URL のパスによらず、その値を値によらない固定の文字列に置き換える。
 
 ### Requirement 8: 複数の扱いに当てはまる URL
 
@@ -137,7 +138,7 @@
 
 | ID | パラメータ名 | 扱い | 規則 | 置換後の形 |
 |---|---|---|---|---|
-| `Q01` | `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`（`name[]` 形式を含む） | 匿名化する | `sensitive-query-params` | 値を `[ANONYMIZED]`（JSON 配列なら `["[ANONYMIZED]"]`） |
+| `Q01` | `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token`（名前は最初の `[` より前の部分で比べるので、`name[]`・`name[0]`・`name[a][0]` の形も含む） | 匿名化する | `sensitive-query-params` | 値を `[ANONYMIZED]`（JSON 配列なら `["[ANONYMIZED]"]`） |
 
 ### ページ表示
 
@@ -193,7 +194,7 @@
 | `A02` | `GET /_api/v3/page/exist?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
 | `A03` | `GET /_api/v3/page/exist-paths?fromPath=&toPath=` | ページパス（`fromPath`・`toPath`） | 匿名化する | `sensitive-query-params` | `fromPath=[ANONYMIZED]&toPath=[ANONYMIZED]` |
 | `A04` | `GET /_api/v3/page/non-user-related-groups-granted?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
-| `A05` | `GET /_api/v3/page/page-paths-with-descendant-count?paths[]=` | ページパス（`paths[]`） | 匿名化する | `sensitive-query-params` | `paths[]=[ANONYMIZED]` |
+| `A05` | `GET /_api/v3/page/page-paths-with-descendant-count?paths[0]=&paths[1]=`（ブラウザが送る形。`paths[]=` も同じ） | ページパス（`paths[0]` など） | 匿名化する | `sensitive-query-params` | `paths[0]=[ANONYMIZED]&paths[1]=[ANONYMIZED]` |
 | `A06` | `GET /_api/v3/page-listing/children?path=`、`/info?path=`、`/item?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
 | `A07` | `GET /_api/v3/pages/list?path=`、`/subordinated-list?path=` | ページパス（`path`） | 匿名化する。`limit` などは残す | `sensitive-query-params` | `path=[ANONYMIZED]` |
 | `A08` | `GET /_api/pages.updatePost?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
@@ -208,12 +209,13 @@
 | `K03` | `GET /user-activation/<トークン>` | ユーザー有効化トークン（パス） | 匿名化する | `secret-path-segments` | `/user-activation/[ANONYMIZED]` |
 | `K04` | `GET /_api/v3/page/shared?shareLinkId=&pageId=`、`/_api/v3/page/info?shareLinkId=`、`/_api/v3/comments?shareLinkId=` | 共有リンク ID（`shareLinkId`） | 匿名化する。`pageId` は残す | `sensitive-query-params` | `shareLinkId=[ANONYMIZED]` |
 | `K05` | `DELETE /_api/v3/share-links/<共有リンク ID>` | 共有リンク ID（パス） | 匿名化する | `api-path-segments` | `/_api/v3/share-links/[ANONYMIZED]` |
+| `K06` | `?access_token=` を付けた URL（API、添付ファイル・ダウンロード、`<ページパス>.md` など。アクセストークンを読む処理はクエリの `access_token` も受け付ける） | アクセストークン・API トークン（`access_token`） | 匿名化する。ほかの部分はそれぞれの行の扱いに従う | `sensitive-query-params` | `access_token=[ANONYMIZED]` |
 
 ### 静的ファイル
 
 | ID | URL の形 | データの種類と場所 | 扱い | 規則 | 置換後の形 |
 |---|---|---|---|---|---|
-| `F01` | `/_next/static/...`、`/_drawio-assets/...`、`/uploads/...`、`/vault.git/...`、`/favicon.ico`、`/favicon.svg`、最後の区切りが静的ファイルの拡張子（`png`・`jpg`・`jpeg`・`gif`・`svg`・`ico`・`webp`・`css`・`js`・`mjs`・`map`・`json`・`woff`・`woff2`・`ttf`・`otf`・`eot`）で終わる `/static/...`・`/images/...` | なし | 意図的にそのまま残す（利用者データを含まない） | `static-files` | 変更なし |
+| `F01` | `/_next/static/...`、`/_drawio-assets/...`、`/uploads/...`、`/vault.git`・`/vault.git/...`（`/vault.gitignore` のように `/vault.git` で始まるだけのページ名は含まない）、`/favicon.ico`、`/favicon.svg`、最後の区切りが静的ファイルの拡張子（`png`・`jpg`・`jpeg`・`gif`・`svg`・`ico`・`webp`・`css`・`js`・`mjs`・`map`・`json`・`woff`・`woff2`・`ttf`・`otf`・`eot`）で終わる `/static/...`・`/images/...` | なし | 意図的にそのまま残す（利用者データを含まない） | `static-files` | 変更なし |
 | `F02` | F01 に当てはまらない `/static/<ページパス>`・`/images/<ページパス>`（`/images/v1.2` のように `.` を含むページ名を含む） | ページパス（パス） | 匿名化する（静的ファイルが無ければページ表示になるため） | `page-view` | `/[HASHED:...]` |
 
 ### 未対応（既知の残課題）
