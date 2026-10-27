@@ -1378,10 +1378,8 @@ export class G2GTransferReceiverService implements Receiver {
   private async countLoginableAdmins(): Promise<number> {
     const User = mongoose.model<IUser, any>('User');
 
-    const admins: readonly Pick<
-      IUserHasId,
-      'status' | 'password' | 'passwordHash'
-    >[] = await User.findAdmins();
+    const admins: readonly Pick<IUserHasId, 'status' | 'password'>[] =
+      await User.findAdmins();
 
     return admins.filter(isLoginable).length;
   }

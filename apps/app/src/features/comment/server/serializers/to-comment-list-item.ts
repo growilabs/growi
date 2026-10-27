@@ -1,8 +1,3 @@
-import {
-  type InsecureUserAttribute,
-  isInsecureUserAttribute,
-} from '@growi/core/dist/models/serializers';
-
 import type { Prisma } from '~/generated/prisma/client';
 import type { PrismaClient } from '~/utils/prisma';
 
@@ -20,9 +15,10 @@ export type CommentListRow = Prisma.Result<
 type CreatorRow = NonNullable<CommentListRow['creator']>;
 
 /** A user row without credentials; `email` only when the user publishes it. */
-type LegacyCommentCreator = Omit<CreatorRow, InsecureUserAttribute> & {
-  email?: string | null;
-};
+type LegacyCommentCreator = Omit<
+  CreatorRow,
+  'password' | 'apiToken' | 'email'
+> & { email?: string | null };
 
 type CommentListItemWith<TCreator> = Omit<ICommentListItem, 'creator'> & {
   creator: TCreator | string | null;
@@ -41,14 +37,10 @@ const toCreatorSummary = ({
 });
 
 // serializeUserSecurely() is typed for the mongoose-era IUser, which a Prisma
-// user row does not satisfy (nullable `name`); this applies the same omission,
-// driven by @growi/core's shared list so a credential column added to users
-// (e.g. passwordHash) is dropped here too.
+// user row does not satisfy (nullable `name`); this applies the same omission.
 const toLegacyCreator = (user: CreatorRow): LegacyCommentCreator => {
-  const secure = Object.fromEntries(
-    Object.entries(user).filter(([key]) => !isInsecureUserAttribute(key)),
-  ) as Omit<CreatorRow, InsecureUserAttribute>;
-  return user.isEmailPublished ? { ...secure, email: user.email } : secure;
+  const { password, apiToken, email, ...rest } = user;
+  return user.isEmailPublished ? { ...rest, email } : rest;
 };
 
 const createCommentListItemMapper =

@@ -585,13 +585,6 @@ describe('GET /external-accounts/', () => {
   let mockFindAllWithPagination: Awaited<
     ReturnType<typeof stubFindAllWithPagination>
   >;
-  // The paginate extension's return type drops the `include: { user: true }`
-  // rows the route serializes, so a fixture shaped like the runtime result is
-  // cast once here.
-  const resolvePage = (page: object) =>
-    mockFindAllWithPagination.mockResolvedValue(
-      page as Parameters<typeof mockFindAllWithPagination.mockResolvedValue>[0],
-    );
 
   beforeEach(async () => {
     // The route is behind loginRequiredStrictly + adminRequired.
@@ -607,7 +600,7 @@ describe('GET /external-accounts/', () => {
 
   it('should not leak secure user attributes in the nested user objects', async () => {
     // Fixture mirrors Prisma's `include: { user: true }`: full user rows.
-    resolvePage({
+    mockFindAllWithPagination.mockResolvedValue({
       docs: [
         {
           _id: 'ea1',
@@ -657,7 +650,7 @@ describe('GET /external-accounts/', () => {
   });
 
   it('should expose email only when isEmailPublished is true', async () => {
-    resolvePage({
+    mockFindAllWithPagination.mockResolvedValue({
       docs: [
         {
           _id: 'ea2',

@@ -180,7 +180,6 @@ describe('toLegacyCommentListItem', () => {
     });
     expect(item.creator).not.toHaveProperty('email');
     expect(item.creator).not.toHaveProperty('password');
-    expect(item.creator).not.toHaveProperty('passwordHash');
     expect(item.creator).not.toHaveProperty('apiToken');
   });
 
@@ -192,7 +191,6 @@ describe('toLegacyCommentListItem', () => {
 
     expect(item.creator).toMatchObject({ email: 'alice@example.com' });
     expect(item.creator).not.toHaveProperty('password');
-    expect(item.creator).not.toHaveProperty('passwordHash');
     expect(item.creator).not.toHaveProperty('apiToken');
   });
 

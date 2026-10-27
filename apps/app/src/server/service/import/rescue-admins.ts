@@ -78,13 +78,9 @@ const hasValue = (value: unknown): value is string =>
  * plain `IUserHasId` can use the same rule.
  */
 export const isLoginable = (
-  user: Pick<IUserHasId, 'status' | 'password' | 'passwordHash'>,
+  user: Pick<IUserHasId, 'status' | 'password'>,
 ): boolean =>
-  user.status === UserStatus.STATUS_ACTIVE &&
-  // A migrated user may hold only the scrypt `passwordHash` once the legacy
-  // `password` is cleaned up; either one is a local credential (same rule as
-  // the user model's isPasswordSet).
-  (hasValue(user.password) || hasValue(user.passwordHash));
+  user.status === UserStatus.STATUS_ACTIVE && hasValue(user.password);
 
 const isRemovedOnCollision = (
   field: UserUniqueField,
