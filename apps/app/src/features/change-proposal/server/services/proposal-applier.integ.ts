@@ -12,7 +12,6 @@ import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import { createOperationHandlers } from './operation-handlers';
-import { createProposalApplier } from './proposal-applier';
 import {
   createApplierTestKit,
   type HandlerOverrides,
@@ -38,6 +37,7 @@ describe('ProposalApplier.apply', () => {
     aggregatedNotifications,
     snapshotPagesOf,
     buildHandlers,
+    newApplier,
     setUp,
     resetPerPageNotificationsSetting,
     tearDown,
@@ -124,7 +124,7 @@ describe('ProposalApplier.apply', () => {
     const [moveKey, editKey, createKey] = proposal.operations.map(
       (op) => op.key,
     );
-    const applier = createProposalApplier(crowi, {
+    const applier = newApplier({
       handlers: observedHandlers().table,
     });
 
@@ -186,7 +186,7 @@ describe('ProposalApplier.apply', () => {
     const proposal = await storeProposal([editInput(page)], {
       approve: false,
     });
-    const applier = createProposalApplier(crowi);
+    const applier = newApplier();
 
     const result = await applier.apply(proposal._id, { kind: 'background' });
 
@@ -211,10 +211,9 @@ describe('ProposalApplier.apply', () => {
     });
     const { table, sendPerPageNotifications } = observedHandlers();
 
-    await createProposalApplier(crowi, { handlers: table }).apply(
-      proposal._id,
-      { kind: 'background' },
-    );
+    await newApplier({ handlers: table }).apply(proposal._id, {
+      kind: 'background',
+    });
 
     expect(sendPerPageNotifications).toHaveBeenCalledTimes(1);
     expect(sendPerPageNotifications).toHaveBeenCalledWith(
@@ -241,7 +240,7 @@ describe('ProposalApplier.apply', () => {
       },
     });
 
-    const result = await createProposalApplier(crowi, {
+    const result = await newApplier({
       handlers: table,
     }).apply(proposal._id, { kind: 'background' });
 
@@ -279,7 +278,7 @@ describe('ProposalApplier.apply', () => {
     );
     await waitForPageOperationsToFinish();
 
-    const result = await createProposalApplier(crowi).apply(proposal._id, {
+    const result = await newApplier().apply(proposal._id, {
       kind: 'background',
     });
 
@@ -334,7 +333,7 @@ describe('ProposalApplier.apply', () => {
       },
     });
 
-    const result = await createProposalApplier(crowi, {
+    const result = await newApplier({
       handlers: table,
     }).apply(proposal._id, { kind: 'background' });
 
@@ -361,7 +360,7 @@ describe('ProposalApplier.apply', () => {
     );
     const [firstKey, secondKey] = proposal.operations.map((op) => op.key);
     const requesterId = users.requester._id.toString();
-    const applier = createProposalApplier(crowi);
+    const applier = newApplier();
 
     await prisma.changeproposals.markApproved(
       proposal._id,
@@ -402,7 +401,7 @@ describe('ProposalApplier.apply', () => {
       createdAt: new Date(),
     });
 
-    await createProposalApplier(crowi).apply(proposal._id, {
+    await newApplier().apply(proposal._id, {
       kind: 'request',
       activityId,
     });
@@ -434,7 +433,7 @@ describe('ProposalApplier.apply', () => {
       { entry: 'revert', revertOf: original._id },
     );
 
-    const result = await createProposalApplier(crowi).apply(revert._id, {
+    const result = await newApplier().apply(revert._id, {
       kind: 'background',
     });
 
@@ -450,7 +449,7 @@ describe('ProposalApplier.apply', () => {
   it('leaves the base proposal operations untouched when a follow-up proposal is applied', async () => {
     const page = await createPage('base');
     const base = await storeProposal([editInput(page)]);
-    const applier = createProposalApplier(crowi);
+    const applier = newApplier();
     await applier.apply(base._id, { kind: 'background' });
     const baseBefore = await reload(base._id);
     const followUp = await storeProposal(
@@ -476,7 +475,7 @@ describe('ProposalApplier.apply', () => {
       requester: new mongoose.Types.ObjectId().toString(),
     });
 
-    const result = await createProposalApplier(crowi).apply(proposal._id, {
+    const result = await newApplier().apply(proposal._id, {
       kind: 'background',
     });
 

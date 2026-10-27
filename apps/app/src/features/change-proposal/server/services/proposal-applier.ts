@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
+import { getYjsService } from '~/server/service/yjs';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -13,9 +14,11 @@ import type {
   ApplyTrigger,
   ChangeProposalDocument,
   OperationRecord,
+  WaitingReason,
 } from '../../interfaces';
 import { planApplyOrder, shouldSendPerPageNotifications } from '../domain';
 import type { RecordedOutcome } from '../models/change-proposal-types';
+import type { EditingPresenceSource } from './editing-presence';
 import {
   createOperationHandlers,
   type OperationContext,
@@ -23,12 +26,20 @@ import {
   type OperationHandlerTable,
   type OperationOutcome,
 } from './operation-handlers';
+import {
+  checkWritesEnabled,
+  DEFAULT_PAGE_OPERATION_WAIT,
+  findPageBlocker,
+  isRequesterAllowed,
+  type PageOperationWait,
+} from './pre-write-checks';
 import { recordProposalActivity } from './proposal-activity';
 import {
   createProposalNotifier,
   type ProposalNotifier,
 } from './proposal-notifier';
 import { readChangeProposalSettings } from './settings';
+import { toOriginalOperationChange } from './to-original-operation-change';
 
 const logger = loggerFactory(
   'growi:features:change-proposal:services:proposal-applier',
@@ -51,6 +62,9 @@ export type ProposalApplierDeps = {
   readonly handlers?: OperationHandlerTable;
   readonly notifier?: ProposalNotifier;
   readonly now?: () => Date;
+  // Resolved at check time by default: the YjsService is initialized after the services.
+  readonly presenceSource?: EditingPresenceSource;
+  readonly pageOperationWait?: PageOperationWait;
 };
 
 type OperationResult = Extract<
@@ -74,12 +88,32 @@ type RunState = {
 type RunContext = {
   readonly proposalId: string;
   readonly token: string;
+  readonly isRevert: boolean;
+  readonly requesterId: string | null;
   readonly requester: IUserHasId | null;
   readonly request: ApplyRequestParameters;
 };
 
-const findRequester = (requesterId: string): Promise<IUserHasId | null> =>
-  mongoose.model<IUserHasId>('User').findById(requesterId).exec();
+const findRequester = (
+  requesterId: string | null,
+): Promise<IUserHasId | null> =>
+  requesterId == null
+    ? Promise.resolve(null)
+    : mongoose.model<IUserHasId>('User').findById(requesterId).exec();
+
+// A revert never goes back to waiting: it is skipped (the original stays applied)
+// or failed (the original is refused), so it can simply be requested again.
+const toBlockedOutcome = (
+  reason: WaitingReason,
+  isRevert: boolean,
+): RecordedOutcome => {
+  if (!isRevert) {
+    return { status: 'pending', reason };
+  }
+  return reason === 'page-being-edited'
+    ? { status: 'skipped', reason }
+    : { status: 'failed', reason };
+};
 
 const selectTargets = (
   proposal: ChangeProposalDocument,
@@ -116,21 +150,37 @@ const decidePerPageNotifications = async (
       true,
   );
 
+// Either why the operation must not be written now, or the requester to write as.
+type WriteGate =
+  | { readonly blocked: RecordedOutcome }
+  | { readonly requester: IUserHasId };
+
+// findExistingResult comes first (design 反映の流れ): it may finish an interrupted
+// write's cleanup, and a write that already happened is recorded as applied even if
+// the settings, the requester or the page state changed since.
 const writeOperation = async <T extends OperationRecord>(
   handler: OperationHandler<T>,
   op: T,
-  baseContext: OperationContext,
+  run: Pick<RunContext, 'proposalId' | 'request'>,
+  checkBeforeWrite: () => Promise<WriteGate>,
 ): Promise<AttemptOutcome> => {
-  const existing = await handler.findExistingResult(op, baseContext);
+  const existing = await handler.findExistingResult(op, {
+    proposalId: run.proposalId,
+  });
   if (existing != null) {
     return { outcome: existing };
   }
+  const gate = await checkBeforeWrite();
+  if ('blocked' in gate) {
+    return { outcome: gate.blocked };
+  }
 
   const ctx: OperationContext = {
-    ...baseContext,
-    perPageNotifications: await decidePerPageNotifications(
-      baseContext.proposalId,
-    ),
+    proposalId: run.proposalId,
+    operationKey: op.key,
+    requester: gate.requester,
+    activityParameters: run.request,
+    perPageNotifications: await decidePerPageNotifications(run.proposalId),
   };
   const outcome: OperationOutcome = await handler.execute(op, ctx);
   if (outcome.status !== 'applied' || !ctx.perPageNotifications) {
@@ -149,34 +199,90 @@ export const createProposalApplier = (
   const handlers = deps.handlers ?? createOperationHandlers(crowi);
   const notifier = deps.notifier ?? createProposalNotifier(crowi);
   const now = deps.now ?? (() => new Date());
+  const pageOperationWait =
+    deps.pageOperationWait ?? DEFAULT_PAGE_OPERATION_WAIT;
+
+  // Design order: settings (not for reverts), requester, editing presence, overlap.
+  const checkBeforeWrite = async (
+    op: OperationRecord,
+    run: RunContext,
+  ): Promise<WriteGate> => {
+    if (!run.isRevert) {
+      const disabled = checkWritesEnabled(op, readChangeProposalSettings());
+      if (disabled != null) {
+        return { blocked: { status: 'failed', reason: disabled } };
+      }
+    }
+    // Read per operation: the requester may be suspended or made read-only mid-run.
+    const requester = await findRequester(run.requesterId);
+    if (!isRequesterAllowed(requester)) {
+      return { blocked: { status: 'failed', reason: 'requester-not-allowed' } };
+    }
+    const blocker = await findPageBlocker(op, {
+      presenceSource: deps.presenceSource ?? getYjsService(),
+      canOperate: (...scope) => crowi.pageOperationService.canOperate(...scope),
+      wait: pageOperationWait,
+    });
+    return blocker == null
+      ? { requester }
+      : { blocked: toBlockedOutcome(blocker, run.isRevert) };
+  };
 
   const attempt = async (
     op: OperationRecord,
     run: RunContext,
   ): Promise<AttemptOutcome> => {
-    if (run.requester == null) {
-      return {
-        outcome: { status: 'failed', reason: 'requester-not-allowed' },
-      };
-    }
-    const baseContext: OperationContext = {
-      proposalId: run.proposalId,
-      operationKey: op.key,
-      requester: run.requester,
-      activityParameters: run.request,
-      perPageNotifications: false,
-    };
     try {
       // The table is total, so the handler matches op.type; TypeScript cannot
       // correlate the two through the union, hence the widened signature.
       const handler = handlers[op.type] as OperationHandler<OperationRecord>;
-      return await writeOperation(handler, op, baseContext);
+      return await writeOperation(handler, op, run, () =>
+        checkBeforeWrite(op, run),
+      );
     } catch (err) {
       logger.error(
         { err, proposalId: run.proposalId, operationKey: op.key },
         'Operation handler threw while applying a change proposal',
       );
       return { outcome: { status: 'failed', reason: 'write-error' } };
+    }
+  };
+
+  // Only a revert writes to the original proposal (requirements 13.5, 13.6).
+  const markOriginalOperation = async (
+    op: OperationRecord,
+    outcome: RecordedOutcome,
+    run: RunContext,
+  ): Promise<void> => {
+    if (!run.isRevert || op.revertTarget == null) {
+      return;
+    }
+    const change = toOriginalOperationChange(outcome, run.proposalId, now());
+    if (change == null) {
+      return;
+    }
+    const logContext = {
+      proposalId: run.proposalId,
+      revertTarget: op.revertTarget,
+    };
+    try {
+      const marked = await prisma.changeproposals.markOriginalOperation(
+        op.revertTarget.proposalId,
+        op.revertTarget.operationKey,
+        change,
+      );
+      if (!marked) {
+        logger.warn(
+          logContext,
+          'The original operation was no longer revertible; its state was left as is',
+        );
+      }
+    } catch (err) {
+      // The revert outcome is already recorded; a failed mark must not stop the run.
+      logger.error(
+        { ...logContext, err },
+        'Failed to write the revert result onto the original operation',
+      );
     }
   };
 
@@ -198,6 +304,7 @@ export const createProposalApplier = (
     if (!recorded) {
       return false;
     }
+    await markOriginalOperation(op, outcome, run);
     state.results.push({
       key: op.key,
       status: outcome.status,
@@ -289,11 +396,13 @@ export const createProposalApplier = (
       let run: RunContext | null = null;
       try {
         const proposal = await prisma.changeproposals.findProposal(proposalId);
+        const requesterId = proposal?.requester ?? null;
         run = {
           proposalId,
           token,
-          requester:
-            proposal == null ? null : await findRequester(proposal.requester),
+          isRevert: proposal?.entry === 'revert',
+          requesterId,
+          requester: await findRequester(requesterId),
           request,
         };
         await applyApproved(run, state);

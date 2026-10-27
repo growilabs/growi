@@ -10,6 +10,7 @@ import type { OperationHandlerTable } from './types';
 
 export type {
   AppliedOutcome,
+  ExistingResultContext,
   OperationContext,
   OperationHandler,
   OperationHandlerTable,

@@ -5,7 +5,6 @@ import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import { createOperationHandlers } from './operation-handlers';
-import { createProposalApplier } from './proposal-applier';
 import {
   createApplierTestKit,
   type HandlerOverrides,
@@ -15,6 +14,8 @@ const TEST_IP = '10.0.0.147';
 const TEST_ENDPOINT = '/_api/v3/cp-proposal-applier-lease-integ';
 const REPEAT = 20;
 const CONCURRENT_CALLS = 10;
+// 20 sequential rounds of real writes outgrow the default 5 s test timeout.
+const RACE_TIMEOUT_MS = 60_000;
 const AN_HOUR_MS = 60 * 60 * 1000;
 
 describe('ProposalApplier.apply lease handling', () => {
@@ -31,6 +32,7 @@ describe('ProposalApplier.apply lease handling', () => {
     markedRevisions,
     aggregatedNotifications,
     buildHandlers,
+    newApplier,
     setUp,
     resetPerPageNotificationsSetting,
     tearDown,
@@ -89,7 +91,7 @@ describe('ProposalApplier.apply lease handling', () => {
       new Date(),
     );
 
-    const result = await createProposalApplier(crowi).apply(proposal._id, {
+    const result = await newApplier().apply(proposal._id, {
       kind: 'background',
     });
 
@@ -102,35 +104,39 @@ describe('ProposalApplier.apply lease handling', () => {
     ).toEqual([]);
   });
 
-  it(`writes each operation once when ${CONCURRENT_CALLS} applies race (${REPEAT} rounds)`, async () => {
-    for (let round = 0; round < REPEAT; round += 1) {
-      // biome-ignore lint/performance/noAwaitInLoops: rounds are sequential by design
-      const page = await createPage(`race-${round}`);
-      await subscribe(page);
-      const proposal = await storeProposal([editInput(page)]);
-      const key = proposal.operations[0].key;
-      const applier = createProposalApplier(crowi);
+  it(
+    `writes each operation once when ${CONCURRENT_CALLS} applies race (${REPEAT} rounds)`,
+    async () => {
+      for (let round = 0; round < REPEAT; round += 1) {
+        // biome-ignore lint/performance/noAwaitInLoops: rounds are sequential by design
+        const page = await createPage(`race-${round}`);
+        await subscribe(page);
+        const proposal = await storeProposal([editInput(page)]);
+        const key = proposal.operations[0].key;
+        const applier = newApplier();
 
-      const results = await Promise.all(
-        Array.from({ length: CONCURRENT_CALLS }, () =>
-          applier.apply(proposal._id, { kind: 'background' }),
-        ),
-      );
+        const results = await Promise.all(
+          Array.from({ length: CONCURRENT_CALLS }, () =>
+            applier.apply(proposal._id, { kind: 'background' }),
+          ),
+        );
 
-      const appliedReports = results.flatMap((r) =>
-        r.type === 'done' ? r.results : [],
-      );
-      expect(appliedReports).toEqual([{ key, status: 'applied' }]);
-      expect(results.filter((r) => r.type === 'done').length).toBeGreaterThan(
-        0,
-      );
-      expect(await markedRevisions(proposal._id, key)).toHaveLength(1);
-      const after = await reload(proposal._id);
-      expect(after.operations[0].status).toBe('applied');
-      expect(after.lifecycle).toBe('settled');
-      expect(await aggregatedNotifications(proposal._id)).toHaveLength(1);
-    }
-  });
+        const appliedReports = results.flatMap((r) =>
+          r.type === 'done' ? r.results : [],
+        );
+        expect(appliedReports).toEqual([{ key, status: 'applied' }]);
+        expect(results.filter((r) => r.type === 'done').length).toBeGreaterThan(
+          0,
+        );
+        expect(await markedRevisions(proposal._id, key)).toHaveLength(1);
+        const after = await reload(proposal._id);
+        expect(after.operations[0].status).toBe('applied');
+        expect(after.lifecycle).toBe('settled');
+        expect(await aggregatedNotifications(proposal._id)).toHaveLength(1);
+      }
+    },
+    RACE_TIMEOUT_MS,
+  );
 
   it('resumes after an interrupted run without writing again or re-sending per-page notifications', async () => {
     await configManager.updateConfigs({
@@ -161,7 +167,7 @@ describe('ProposalApplier.apply lease handling', () => {
       perPageNotifications: false,
     });
 
-    const result = await createProposalApplier(crowi, {
+    const result = await newApplier({
       handlers: table,
     }).apply(proposal._id, { kind: 'background' }, request);
 
@@ -199,7 +205,7 @@ describe('ProposalApplier.apply lease handling', () => {
       },
     });
 
-    const result = await createProposalApplier(crowi, {
+    const result = await newApplier({
       handlers: table,
     }).apply(proposal._id, { kind: 'background' });
 
@@ -234,7 +240,7 @@ describe('ProposalApplier.apply lease handling', () => {
       },
     });
 
-    const result = await createProposalApplier(crowi, {
+    const result = await newApplier({
       handlers: table,
     }).apply(proposal._id, { kind: 'background' });
 
@@ -262,7 +268,7 @@ describe('ProposalApplier.apply lease handling', () => {
     });
 
     await expect(
-      createProposalApplier(crowi, { handlers: table }).apply(proposal._id, {
+      newApplier({ handlers: table }).apply(proposal._id, {
         kind: 'background',
       }),
     ).rejects.toThrow('notification blew up');

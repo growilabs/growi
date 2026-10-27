@@ -18,7 +18,7 @@ import { prisma } from '~/utils/prisma';
 import { toRevisionProposalMark } from '../../domain';
 import { pageModel } from './page-model';
 import type {
-  OperationContext,
+  ExistingResultContext,
   OperationHandler,
   OperationOutcome,
   OperationRecordOf,
@@ -37,7 +37,7 @@ type EditOperation = OperationRecordOf<'edit'>;
 // before it is the base (the page moved from base to it, then was edited on).
 const findAdoptedMarkedRevisionId = async (
   op: EditOperation,
-  ctx: OperationContext,
+  ctx: ExistingResultContext,
 ): Promise<string | null> => {
   const marked = await prisma.revisions.findMany({
     where: {

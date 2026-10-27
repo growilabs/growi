@@ -1,5 +1,6 @@
 import type { IUserHasId } from '@growi/core';
 import { getIdStringForRef, SubscriptionStatusType } from '@growi/core';
+import { YDocStatus } from '@growi/core/dist/consts';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
@@ -22,11 +23,17 @@ import type {
   OperationRecord,
 } from '../../interfaces';
 import type { CreateOperationInput } from '../models/change-proposal-types';
+import type { EditingPresenceSource } from './editing-presence';
 import {
   createOperationHandlers,
   type OperationHandler,
   type OperationHandlerTable,
 } from './operation-handlers';
+import {
+  createProposalApplier,
+  type ProposalApplier,
+  type ProposalApplierDeps,
+} from './proposal-applier';
 
 // Shared fixtures for the ProposalApplier integration tests. Kept free of vitest
 // and the test setup so it type-checks wherever the server program includes it.
@@ -67,6 +74,12 @@ export const createApplierTestKit = (args: {
     mongoose.model<IPageOperation, PageOperationModel>('PageOperation');
   const users = {} as Record<UserRole, HydratedDocument<IUserHasId>>;
   const proposalIds: string[] = [];
+  // Pages a test marks as open in an editor; the integration Crowi has no YjsService.
+  const editingPageIds = new Set<string>();
+  const presenceSource: EditingPresenceSource = {
+    getConnectionCount: (pageId) => (editingPageIds.has(pageId) ? 1 : 0),
+    getYDocStatus: async () => YDocStatus.SYNCED,
+  };
   let seq = 0;
 
   const nextPath = (label: string): string => {
@@ -214,8 +227,14 @@ export const createApplierTestKit = (args: {
     return { table, real };
   };
 
+  const newApplier = (deps: ProposalApplierDeps = {}): ProposalApplier =>
+    createProposalApplier(getCrowi(), { presenceSource, ...deps });
+
   const setUp = async (): Promise<void> => {
-    await configManager.updateConfigs({ 'app:isV5Compatible': true });
+    await configManager.updateConfigs({
+      'app:isV5Compatible': true,
+      'app:changeProposalEnabled': true,
+    });
     if ((await Page().findOne({ path: '/' })) == null) {
       await Page().create({ path: '/', grant: Page().GRANT_PUBLIC });
     }
@@ -256,7 +275,10 @@ export const createApplierTestKit = (args: {
       username: { $in: Object.values(usernames) },
     });
     await configManager.updateConfigs(
-      { 'app:isV5Compatible': undefined },
+      {
+        'app:isV5Compatible': undefined,
+        'app:changeProposalEnabled': undefined,
+      },
       { removeIfUndefined: true },
     );
   };
@@ -276,6 +298,8 @@ export const createApplierTestKit = (args: {
     aggregatedNotifications,
     snapshotPagesOf,
     buildHandlers,
+    editingPageIds,
+    newApplier,
     setUp,
     resetPerPageNotificationsSetting,
     tearDown,

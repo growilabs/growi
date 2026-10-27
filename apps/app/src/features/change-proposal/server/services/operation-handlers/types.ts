@@ -19,6 +19,9 @@ export type OperationContext = {
   readonly perPageNotifications: boolean;
 };
 
+// findExistingResult runs before the requester is checked, so it gets no requester.
+export type ExistingResultContext = Pick<OperationContext, 'proposalId'>;
+
 export type AppliedOutcome = {
   readonly status: 'applied';
   readonly resultPageId: string;
@@ -42,7 +45,7 @@ export interface OperationHandler<T extends OperationRecord> {
   // write's idempotent cleanup (e.g. leftover redirects), so it is not read-only.
   findExistingResult(
     op: T,
-    ctx: OperationContext,
+    ctx: ExistingResultContext,
   ): Promise<OperationOutcome | null>;
   execute(op: T, ctx: OperationContext): Promise<OperationOutcome>;
   // Called only after the applied outcome is recorded and ctx.perPageNotifications is true; never throws.

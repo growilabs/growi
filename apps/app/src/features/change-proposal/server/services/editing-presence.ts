@@ -2,6 +2,11 @@ import { YDocStatus } from '@growi/core/dist/consts';
 
 import type { IYjsService } from '~/server/service/yjs';
 
+export type EditingPresenceSource = Pick<
+  IYjsService,
+  'getConnectionCount' | 'getYDocStatus'
+>;
+
 export type EditingPresenceResult =
   | { readonly isBeingEdited: false }
   | {
@@ -13,7 +18,7 @@ export type EditingPresenceResult =
 // this process. With several server processes, an editor connected to another
 // process is invisible here; only the unsaved-draft check can still catch them.
 export const checkEditingPresence = async (
-  yjsService: IYjsService,
+  yjsService: EditingPresenceSource,
   pageId: string,
 ): Promise<EditingPresenceResult> => {
   if (yjsService.getConnectionCount(pageId) > 0) {

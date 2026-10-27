@@ -880,10 +880,10 @@ interface OperationHandler<T extends OperationRecord> {
 **Responsibilities & Constraints**
 - lease を取れたときだけ反映する。取れなければ、何もせずに `{ type: 'in-progress' }` を返す（承認は記録済みなので、反映中の処理が最後に読み直して反映するか、保守用の cron が反映する）。
 - 対象は「`status` が `pending` で `approvedAt` がある操作」。順序は `planApplyOrder` で決める。1 周したあとに対象を読み直し、この実行でまだ試していない対象があれば続ける。
-- 各操作の前の確認（順に）:
-  1. 取り消しの Change Proposal でなければ、書き込み機能と操作の種類が有効か（だめなら `failed: feature-disabled` / `operation-type-disabled`）
-  2. 依頼した人が、まだ有効なユーザーで、読み取り専用でないか（だめなら `failed: requester-not-allowed`）
-  3. `findExistingResult` で、前の実行の書き込みが無いか（あれば、その結果を記録して次へ）
+- 各操作の前の確認（順に）:（1 で前の実行の書き込みが見つかれば、2 以降の確認は行わず、その結果を記録する。中断した実行がすでに書いた操作を、あとで機能が無効になった・依頼した人が無効になったことで「失敗」と記録しないため。反映の流れの図と同じ順）
+  1. `findExistingResult` で、前の実行の書き込みが無いか（あれば、その結果を記録して次へ）
+  2. 取り消しの Change Proposal でなければ、書き込み機能と操作の種類が有効か（だめなら `failed: feature-disabled` / `operation-type-disabled`）
+  3. 依頼した人が、まだ有効なユーザーで、読み取り専用でないか（だめなら `failed: requester-not-allowed`）
   4. `checkEditingPresence` で編集中でないか（編集中なら、通常の操作は `pending` に戻して `approvedAt` を消し、理由 `page-being-edited` を記録。取り消しの操作は `skipped: page-being-edited`）
   5. `pageOperationService.canOperate` で重なる処理が無いか。あれば定数 `PAGE_OPERATION_WAIT_MS`（30 秒）まで間隔を空けて確かめ直し、それでも残れば、通常の操作は 4 と同じく `pending` に戻す（理由 `page-operation-in-progress`）。取り消しの操作は `failed: page-operation-in-progress` にし、元の操作を「取り消しを断られた」（理由 `page-operation-in-progress`）にする
 - 確認をすべて通った操作を書き込む直前に、ページごとの通知を出すかを決める。`readChangeProposalSettings().perPageNotificationsEnabled` と、`readPerPageNotifications(id)` で読み直した Change Proposal の指定を `shouldSendPerPageNotifications` に渡し、結果を `OperationContext.perPageNotifications` に入れる。実行の始めに読んだ値を使い回さないので、反映の途中で依頼した人が指定を変えても、そのあとに書く操作には新しい値が使われる。作成の直後の自動反映では、作成のときに保存した値がそのまま読まれる（要件 7.13）。取り消しの Change Proposal でも、書き込み機能の設定は確かめないが、この判断は同じように行う。

@@ -187,7 +187,7 @@
   - 同じ Change Proposal を同時に 2 回反映しても、途中で止めた（lease を期限切れにした）あとでもう一度反映しても、同じ操作のリビジョンが 1 つだけで、その操作の状態が「反映済み」であること、反映で触れたページの一覧と最後に反映した日時が記録されていること、通知が 1 回だけ作られること、最後の操作を反映した実行のあとで段階が完了になり、「待ち」が残る実行のあとでは承認待ちのままであること、取り消しの Change Proposal も反映が終わると完了になること、後続・見直しを反映しても元の操作の状態が変わらないこと、ページごとの通知を出す設定のとき、前の実行の書き込みを見つけて記録した操作ではページごとの通知を出さないことを結合テストで確かめている
   - _Requirements: 2.6, 2.7, 2.9, 3.1, 3.2, 3.13, 3.14, 3.15, 7.10, 13.5, 13.6_
   - _Depends: 3.2, 4.2, 4.3, 4.4_
-- [ ] 4.6 反映の前の確認と、取り消しの結果を元の操作に書く処理を作る
+- [x] 4.6 反映の前の確認と、取り消しの結果を元の操作に書く処理を作る
   - 各操作の前に、設定（取り消しの Change Proposal では確かめない）、依頼した人がまだ有効で読み取り専用でないこと、編集中の人、重なるページの処理（決めた時間まで間を空けて確かめ直す）を、この順に確かめる
   - 確認を通った操作を書き込む直前に、ページごとの通知の管理者の設定と、`readPerPageNotifications` で読み直した Change Proposal の指定を `shouldSendPerPageNotifications`（3.6）に渡し、結果を操作の文脈の `perPageNotifications` に入れる。取り消しの Change Proposal でも同じように決める
   - 編集中や重なる処理が残るときは、通常の操作は「待ち」に戻して承認を消し、理由を記録する。取り消しの操作は「飛ばした」にする
@@ -332,3 +332,5 @@
 - 4.4: 通知一覧 API は `targetModel` が ChangeProposal の通知の `target` を読み込まず `{ _id }` だけ返す（`in-app-notification.ts` の `getLatestNotificationsByUser` と route の `hideChangeProposalTargets`）。他の種類の `target` は今までどおり読み込まれることがテストで守られている
 - 4.5: `proposal-applier.ts` の 1 操作の流れは「前の確認（空き）→ `findExistingResult` → 後の確認（空き）→ ページごとの通知を出すかの決定（`decidePerPageNotifications`。4.5 で実装済み）→ `execute`」。4.6 は判断を作り直さず、編集中（`checkEditingPresence`）と重なる処理（`canOperate`）の確認を `findExistingResult` と `decidePerPageNotifications` の間に差し込み、設定・依頼した人の有効性の確認（今は依頼した人が見つからないとき `failed: requester-not-allowed` だけ）を広げ、`markOriginalOperation` を足す
 - 4.5: `apply(proposalId, trigger, request?)` の 3 番目の引数（ip と endpoint）は 5.1 の作成直後の反映が使う。不正な ID や存在しない文書は `in-progress` を返す（`ApplyResult` は `done | in-progress` のみ）ので、5.x の呼び出し側が先に存在を確かめる。実行の途中で lease を失うと、記録できた結果だけの `done` を返し settle は呼ばない。`createProposalApplier(crowi, deps?)` で handlers / notifier / now を差し替えられる。テストの準備処理は `proposal-applier.test-kit.ts`（`.integ.ts` で終わらないのでサーバーのビルド対象に入るが、vitest や `^/test/setup` は import していない。`routes/apiv3/page/test-utils/` に前例あり）
+- 4.6: 1 操作の流れは `findExistingResult`（前の実行の書き込みが見つかれば、その結果をそのまま記録して以降の確認はしない。design の番号付きリストも図に合わせて直した）→ `checkBeforeWrite`（設定 [取り消しの Change Proposal では確かめない] → 依頼した人 → 編集中・重なる処理）→ `decidePerPageNotifications` → `execute`。`findExistingResult` の第 2 引数は `ExistingResultContext = Pick<OperationContext, 'proposalId'>` に狭めてあり、依頼した人が無効でも呼べる
+- 4.6: 残る穴（人の判断で足すかを決める）: 結果の記録のあと `markOriginalOperation` の前にプロセスが止まると、元の操作は「反映済み」のまま残り直す処理が無い（5.4 の保守用の cron の再開が拾う設計かは 5.4 で確かめる）。確認の時点で YjsService が未初期化だと `failed: write-error` になるので、5.4 の cron の起動順に注意。`canOperate` の引数は pageService と同じ形（edit だけは `updatePage` が呼ばないので `(false, 今のパス, null)` と決めた）。失敗で記録された操作も `approvedAt` が残る（1.4 の動き。失敗した操作は二度と選ばれない）
