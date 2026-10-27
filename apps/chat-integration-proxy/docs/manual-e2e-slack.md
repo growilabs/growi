@@ -12,7 +12,7 @@ Slack Developer Program のサンドボックスは使わない。サンドボ�
 そこで作ったアプリは組織（`E…`）の所属になる。さらにサンドボックスのアプリは配布を有効にできないので、
 配下の workspace（`T…`）への OAuth 導入が理由の出ないエラーになる。組織全体への導入
 （`org_deploy_enabled: true`）なら入るが、その形には未修正の不具合がある（チャンネル一覧が取れない。
-umbrella spec の `roadmap.md` の「既知の不具合」）。普通の workspace への導入を試すなら、
+umbrella spec の `roadmap.md` の「リリース前に直すもの」の 3）。普通の workspace への導入を試すなら、
 無料の workspace が要る。
 
 試験用のチャンネルは、**導入の前に**作っておく（例: 公開チャンネル `#growi-test`）。

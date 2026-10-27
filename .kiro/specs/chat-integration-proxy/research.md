@@ -47,7 +47,7 @@
 - **Findings**:
   - `resume` は mention を (platform, チャンネル, 本人) で探す。DM での答えはチャンネルが違うので、そのままでは見つからない
   - `toRecord` は、保存した invocation のチャンネルと行のチャンネルが一致しない行を捨てる。答えを受け付けるチャンネルを別の列で持てば、この検査と衝突しない
-  - 答えを受け付けたあとの処理は、保存した invocation（元のチャンネル）で installation を引く。DM のチャンネルで installation を引く箇所は無いので、「DM で installation を特定できない」不具合（umbrella の roadmap の既知の不具合）に依存しない
+  - 答えを受け付けたあとの処理は、保存した invocation（元のチャンネル）で installation を引く。DM のチャンネルで installation を引く箇所は無いので、「DM で installation を特定できない」不具合（umbrella の roadmap「リリース前に直すもの」の 3）に依存しない
   - DM かどうかは、推測ではなく対応付けの段階（`event-mapping.ts`。スレッドが DM かを知っている）で印を付けられる
 - **Implications**: 決定 P6・P8
 
@@ -128,7 +128,7 @@
 - **Context**: Key Findings 3。DM の本文には呼びかけが無いことが多い。
 - **Selected Approach**: `event-mapping.ts` が mention に `inDirectMessage`（スレッドが DM か）を付ける。`CommandInvocation.normalize` と `stripAddressToken` は、チャンネルでは先頭の語をいつも落とす。DM では、先頭の語が `@語` か `<@…>` の形のときだけ落とす（`invocation.ts` の `BOT_ADDRESS_SHAPE`）。
 - **Rationale**: 本物のアダプタで確かめた呼びかけの形（上の「本物のアダプタで確かめたこと」）は、4 サービスともこの 2 つの形に収まる。command 層には bot 自身の名前や id が届かないので、名前で突き合わせることはできない。
-- **Trade-offs**: DM の答えが `@誰か` で始まると、その語が落ちる（下の「既知の問題」3）。DM で `search foo` と打てばコマンドとして読まれるが、DM での installation の特定は別の不具合（umbrella の roadmap の既知の不具合）なので、「workspace がまだ登録されていません」と返る。
+- **Trade-offs**: DM の答えが `@誰か` で始まると、その語が落ちる（下の「既知の問題」3）。DM で `search foo` と打てばコマンドとして読まれるが、DM での installation の特定は別の不具合（umbrella の roadmap「リリース前に直すもの」の 3）なので、「workspace がまだ登録されていません」と返る。
 
 ### 決定 P9: 返事の宛先の情報に installation を持たせ、4 つの platform 呼び出しすべてに同じ値を渡す
 
@@ -165,7 +165,7 @@
 ## 既知の問題（未解決）
 
 1. **Mattermost の 403 が「bot がチャンネルにいない」と分類される。** `/posts/ephemeral` が権限不足（`create_post_ephemeral` が無い）で 403 を返すと、`classifyOutboundFailure`（`platform/outbound.ts`）は `bot-not-in-channel`（「bot を招待して」）と分類する。アダプタが投げる `PermissionError` は応答の本文を持たないので、権限不足とチャンネル不参加を見分けられない。利用者への影響は無い（決定 P3 によりどちらでも DM に進む）が、DM も届かなかったときの運用者向けの報告（`reportUndeliverable`）に誤った理由が載る。今の分類は `platform/private-reply-adapters.integ.ts` の Mattermost の試験（「reaches /posts/ephemeral with the proxy's bare channel id …」）が固定しているので、分類を直すとその試験が落ちて気づける。`docs/setup-mattermost.md` にも既知の不整合として書いてある
-2. **Discord の Gateway を開いていないので、Discord の DM と mention が proxy に届かない。** `src/` のどこからもアダプタの `startGatewayListener` を呼んでいない。そのため Discord では、本人宛ての返事を DM で送ることはできるが、利用者がその DM に書いた答え（要件 1.16）もチャンネルでの mention も proxy に届かない。umbrella の design.md の「Discord は Gateway で受ける」という記述と食い違う。以前からある不整合で、別の対応で直す（umbrella の roadmap の既知の不具合）。`docs/setup-discord.md` にも書いてある
+2. **Discord の Gateway を開いていないので、Discord の DM と mention が proxy に届かない。** `src/` のどこからもアダプタの `startGatewayListener` を呼んでいない。そのため Discord では、本人宛ての返事を DM で送ることはできるが、利用者がその DM に書いた答え（要件 1.16）もチャンネルでの mention も proxy に届かない。umbrella の design.md の「Discord は Gateway で受ける」という記述と食い違う。以前からある不整合で、別の対応で直す（umbrella の roadmap「リリース前に直すもの」の 3）。`docs/setup-discord.md` にも書いてある
 3. **DM の先頭の `@誰か` が落ちる。** 決定 P8 の規則は形で判定するので、DM での答えが `@誰か` で始まると、その語が呼びかけとして落ちる。command 層は bot 自身の名前や id を知らないので、今の作りでは避けられない。直すなら、platform 層が「呼びかけの語を外した本文」を渡す形に変える
 4. **Teams と、2 回目のリアクションは一部が未確認。** Teams の `email` リアクションはアダプタの対応表に無く、Teams が受け付けるかは実機で確かめていない（受け付けなければ短い文の知らせに落ちる。決定 P4）。同じリアクションの 2 回付けが成功になることは、Slack だけアダプタのコードで確かめた。Discord・Mattermost・Teams は仮定した応答の上での確認である。Teams で、利用者が 1 対 1 の会話で bot に答えるのにアプリを `personal` の範囲でも入れる必要があるかも未確認（`docs/setup-teams.md`）
 5. **依頼のメッセージが無い依頼では、DM に届くたびにその場に短い文が出る。** slash command から始まった依頼は依頼のメッセージの id（`sourceMessageId`）を持たない（`sourceMessageId` が無い古い保存済みの行から再開した依頼も同じ）ので、リアクションを付けられない。DM に届くたびに「返事を DM で送りました」という内容を含まない文がその場に出る。うるさいが、返事の内容は漏れない
