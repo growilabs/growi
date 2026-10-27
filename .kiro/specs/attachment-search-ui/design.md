@@ -42,8 +42,8 @@
 
 - apiv3 エンドポイントの実装 (`POST /_api/v3/attachments/:id/reextract` / admin 系 / `PUT /_api/v3/search/indices` の `includeAttachments` 受理) は上流 spec
 - Config キーの定義・永続化 (`app:attachmentFullTextSearch:*`) は上流 spec
-- ES 連携 / ES インデックス mapping / AttachmentService ハンドラ登録 / pageEvent 権限追従 / 検索クエリの multi-index 集約サーバ実装は上流 spec
-- Socket.io 送信側実装 (`AddAttachmentProgress` / `FinishAddAttachment`) は上流 spec (受信側リスナのみ本 spec)
+- ES 連携 / ES インデックス mapping / AttachmentService ハンドラ登録 / 検索時の権限判定 / 検索演算子の振り分け / 検索クエリの multi-index 集約サーバ実装は上流 spec
+- Socket.io 送信側実装 (`AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed`) は上流 spec (受信側リスナのみ本 spec)
 - 抽出サービス本体、Docker 配布、k8s manifest
 - 添付ビューア本体、既存検索レイアウト全体の変更
 
@@ -51,9 +51,10 @@
 
 - 上流 `attachment-search-indexing` spec が提供する:
   - `IPageWithSearchMeta.attachmentHits?: IAttachmentHit[]` 応答型 (optional フィールド)
-  - apiv3 エンドポイント: `POST /_api/v3/attachments/:id/reextract` / `GET /_api/v3/admin/attachment-search/failures` / `GET|PUT /_api/v3/admin/attachment-search/config` / `PUT /_api/v3/search/indices` (includeAttachments 受理)
+  - apiv3 エンドポイント: `POST /_api/v3/attachments/:id/reextract` / `GET /_api/v3/admin/attachment-search/failures` / `GET|PUT /_api/v3/admin/attachment-search/config` / `PUT /_api/v3/search/indices` (includeAttachments 受理。作り直しの完了を待たずに 200 を返し、実行中なら 409 `rebuild_in_progress`)
+  - 既存キーワード検索 API: `GET /_api/search` (apiv1) の optional クエリ `facet` / `resolve`。`facet` を付けないと従来どおりの応答になるため、本 spec の検索 UI は機能有効時に `facet` を必ず明示して送る
   - Config キー: `app:attachmentFullTextSearch:extractorUri` / `extractorToken` / `timeoutMs` / `maxFileSizeBytes` の 4 キー (読み書き API 経由)。`extractorToken` は write-only (GET 応答では `hasExtractorToken: boolean` のみ)。旧 `enabled` / `maxConcurrency` キーは上流で削除済み
-  - Socket.io イベント: `AddAttachmentProgress` / `FinishAddAttachment`
+  - Socket.io イベント: `AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed`
   - SSR prop `searchConfig.isAttachmentFullTextSearchEnabled: boolean` (基本レイアウトの `SearchConfigurationProps.searchConfig` 経由で全ページに hydrate 済み、admin 権限なしでも参照可能な機能有効フラグ)。値は上流で「ES 有効 AND `extractorUri` 設定済み AND `extractorToken` 設定済み」の**算出値**として導出される (shape 自体は `boolean` のまま不変)
 - 既存 `SearchPage` / `SearchResultList` / `SearchResultContent` / `PageAttachmentList` / `ElasticsearchManagement`
 - 既存 Jotai + SWR パターン、`useSWRxAttachments()`、`@growi/ui` の `Attachment` 行アクション props
@@ -95,7 +96,7 @@ GROWI apps/app は Next.js 16 Pages Router + Express モノリス。クライア
 ```mermaid
 graph TB
     subgraph ExternalServerAPIs [Upstream: attachment-search-indexing spec]
-        SearchAPI[/_api/v3/search .../]
+        SearchAPI[/GET /_api/search ?facet=.../]
         ReextractAPI[/POST /_api/v3/attachments/:id/reextract/]
         AdminConfigAPI[/_api/v3/admin/attachment-search/config/]
         AdminFailuresAPI[/_api/v3/admin/attachment-search/failures/]
@@ -221,7 +222,7 @@ apps/app/src/features/search-attachments/client/
 - `apps/app/src/features/search/client/components/SearchPage/SearchResultList.tsx` — Page カードレンダリング関数内で `page.attachmentHits?.length > 0` のとき `AttachmentSubEntry` をレンダリング
 - `apps/app/src/features/search/client/components/SearchPage/SearchResultContent.tsx` — 選択ページに `attachmentHits` がある場合、プレビュー最上部に `AttachmentHitCard` をレンダリング
 - `apps/app/src/client/components/PageAttachment/PageAttachmentList.tsx` — `Attachment` コンポーネントに `ReextractButton` を行アクションとして追加 (既存 `onAttachmentDeleteClicked` と同パターン)
-- `apps/app/src/client/components/Admin/ElasticsearchManagement/ElasticsearchManagement.tsx` — `RebuildWithAttachmentsCheckbox` を rebuild ボタン近傍に配置し、PUT payload に `includeAttachments` フラグを注入。`AttachmentSearchSettings` と `AttachmentExtractionFailures` セクションを追加。`AddAttachmentProgress` / `FinishAddAttachment` の Socket.io listener を追加
+- `apps/app/src/client/components/Admin/ElasticsearchManagement/ElasticsearchManagement.tsx` — `RebuildWithAttachmentsCheckbox` を rebuild ボタン近傍に配置し、PUT payload に `includeAttachments` フラグを注入。`AttachmentSearchSettings` と `AttachmentExtractionFailures` セクションを追加。`AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed` の Socket.io listener を追加。PUT の 409 `rebuild_in_progress` を受けたら「作り直しが進行中」と表示する
 - `apps/app/src/states/server-configurations/` — 既存 server configurations atom 群 (`isSearchServiceConfiguredAtom` 等と同ディレクトリ) に `is-attachment-full-text-search-enabled-atom.ts` を新規追加。本 spec は feature module の `stores/` 配下には機能ゲート atom を置かず、server configurations の既存規約に揃える (hydrate 層との依存方向を states/ 一方向に保つため)
 - `apps/app/src/pages/basic-layout-page/hydrate.ts` — 既存 `searchConfig` hydrate 処理に `isAttachmentFullTextSearchEnabled` の hydrate を追加 (既存 server configuration atom 群と同じ経路)
 
@@ -252,7 +253,7 @@ sequenceDiagram
     SearchPage->>FacetTabs: render with activeFacet
     FacetTabs->>FacetAtom: read activeFacet (default 'all')
     SearchPage->>SearchSWR: query with facet=all|pages|attachments
-    SearchSWR->>SearchAPI: GET /search?q=&facet=
+    SearchSWR->>SearchAPI: GET /_api/search?q=&facet= (機能有効時は facet を必ず明示)
     SearchAPI-->>SearchSWR: IPageWithSearchMeta[] (with optional attachmentHits[])
     SearchSWR-->>ResultList: pages
     loop per page
@@ -317,11 +318,27 @@ sequenceDiagram
     Admin->>CB: check / uncheck
     Admin->>ESMgmt: click Rebuild
     ESMgmt->>API: PUT { operation: 'rebuild', includeAttachments: true }
-    API-->>ESMgmt: 200
-    Sock-->>Progress: AddPageProgress events (existing)
-    Sock-->>Progress: AddAttachmentProgress events (new)
-    Sock-->>ESMgmt: FinishAddAttachment (new)
+    alt 作り直しが既に進行中
+        API-->>ESMgmt: 409 rebuild_in_progress
+        ESMgmt->>Admin: 「作り直しが進行中です」を表示 (新たな作り直しは始まらない)
+    else 受理
+        API-->>ESMgmt: 200 (作り直しの完了を待たずに返る)
+        ESMgmt->>ESMgmt: 進行中表示に切り替え、Rebuild ボタンを押せない状態にする
+        Sock-->>Progress: AddPageProgress events (existing)
+        Sock-->>Progress: AddAttachmentProgress events (new)
+        alt 成功
+            Sock-->>ESMgmt: FinishAddAttachment (new)
+            ESMgmt->>Admin: 完了を表示し、Rebuild ボタンを押せる状態に戻す
+        else 失敗
+            Sock-->>ESMgmt: AttachmentRebuildingFailed (new)
+            ESMgmt->>Admin: 失敗を表示し、Rebuild ボタンを押せる状態に戻す
+        end
+    end
 ```
+
+Key decisions:
+- PUT の 200 は「作り直しを受け付けた」ことだけを意味する。完了・失敗の判断は Socket.io イベントだけで行い、PUT の応答を完了とみなさない
+- 添付を含む作り直しの進行中表示は `FinishAddAttachment` か `AttachmentRebuildingFailed` を受けるまで続ける (Page 側の `FinishAddPage` では解除しない。Page の作り直しの後に添付の作り直しが続くため)
 
 ## Requirements Traceability
 
@@ -354,6 +371,8 @@ sequenceDiagram
 | 6.1 | チェックボックス追加 | RebuildWithAttachmentsCheckbox | — | Flow 3 |
 | 6.2 | 進捗表示 | ElasticsearchManagement Socket.io listener | — | Flow 3 |
 | 6.3 | 機能無効時隠蔽 | RebuildWithAttachmentsCheckbox + ElasticsearchManagement による `use-attachment-search-config` 経由の gate (admin 画面内の判定は config SWR を真実の源とする) | — | — |
+| 6.4 | 作り直しの失敗表示 | ElasticsearchManagement の `AttachmentRebuildingFailed` listener | — | Flow 3 |
+| 6.5 | 二重起動時の表示 | ElasticsearchManagement (PUT の 409 `rebuild_in_progress` 処理) | `PUT /_api/v3/search/indices` | Flow 3 |
 | 7.1 | 失敗ログ表示 | AttachmentExtractionFailures | `use-attachment-extraction-failures` | — |
 | 7.2 | 機能無効時非表示 | AttachmentExtractionFailures + `use-attachment-search-config` (`config.isAttachmentFullTextSearchEnabled`; admin 画面内の判定は config SWR を真実の源とする) | — | — |
 | 7.3 | 取得失敗時のエラー表示 | AttachmentExtractionFailures error state | — | — |
@@ -784,6 +803,7 @@ export const isAttachmentFullTextSearchEnabledAtom = atom<boolean>(false);
 - **設定 validation エラー**: フォームフィールド近傍にインライン表示。保存ボタン disable
 - **機能無効時**: すべての追加 UI は `null` を返し、既存画面の表示は導入前と完全一致
 - **admin API 取得失敗**: 画面全体は閉塞させず、セクション内にエラー表示。他の admin 機能に影響させない
+- **添付を含む作り直し**: PUT の 409 `rebuild_in_progress` は「作り直しが進行中」と表示する (エラー扱いの toast にはしない)。`AttachmentRebuildingFailed` を受けたら失敗を表示し、Rebuild ボタンを押せる状態に戻す
 
 ### Error Categories
 
@@ -816,6 +836,7 @@ export const isAttachmentFullTextSearchEnabledAtom = atom<boolean>(false);
 - 検索クエリ → 添付ヒット持ちページの左ペイン表示 + サブエントリクリック → 右ペイン添付ヒットカード表示
 - ファセット「添付ファイル」選択 → 本文ヒットのみのページが消え、添付ヒットのみが残る
 - 添付モーダルで再抽出ボタン → 成功 toast 表示 → 一覧が最新化
+- 管理画面で「添付も対象にする」を ON にして Rebuild → PUT が即 200 → 進行中表示 → `FinishAddAttachment` で完了表示に戻る。`AttachmentRebuildingFailed` を受けた場合は失敗表示になり Rebuild ボタンが再び押せる。進行中に別タブから Rebuild すると 409 で「作り直しが進行中」と表示される
 - 管理画面で `extractorUri` を空から非空に設定 **かつ** `extractorToken` を設定して保存 → ガイダンス表示 → **同画面内で即座に** rebuild チェックボックス / 失敗ログパネルが表示される (`use-attachment-search-config` の `mutate()` による SWR reactivity)。`extractorUri` を空文字にクリア or `extractorToken` を削除して保存すると soft-disable となり、同画面内で即座に追加 UI が非表示になる。非 admin ユーザの既存タブへの反映は次回フルロード時 (SSR hydrate 経由)
 - extractorUri に `http://169.254.169.254/...` (クラウドメタデータ endpoint) を入力して保存ボタンを押すと 400 `invalid_extractor_uri` で reject され、inline エラー + toast が表示されること。`http://localhost/...` や `http://markitdown.default.svc.cluster.local/...` は正常に受理されること
 - extractorToken 入力欄: 既存設定時は空欄プレースホルダに "設定済み (値は表示されません)" が出る。空欄のまま他フィールドを保存しても既存 token は維持される。明示的な「token 削除」ボタンで `null` を送り、`hasExtractorToken: false` に遷移すると即座に `isAttachmentFullTextSearchEnabled` が false 側の UI に切替わる

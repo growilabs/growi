@@ -45,7 +45,8 @@ UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペ�
   - 上流 spec が `POST /_api/v3/attachments/:id/reextract`、admin 系 apiv3 (`config` / `failures`)、`PUT /_api/v3/search/indices` の `includeAttachments` フラグを提供する
   - 上流 spec が Config キー `app:attachmentFullTextSearch:*` (`extractorUri` / `timeoutMs` / `maxFileSizeBytes` の 3 キーのみ。旧 `enabled` / `maxConcurrency` は削除済み) の読み書き API を提供する
   - 上流 spec が SSR prop `searchConfig.isAttachmentFullTextSearchEnabled: boolean` を「ES 有効 AND `extractorUri` 設定済み」の算出値として供給する (shape は `boolean` で不変)
-  - 上流 spec が Socket.io `AddAttachmentProgress` / `FinishAddAttachment` イベントを発行する
+  - 上流 spec が Socket.io `AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed` イベントを発行する
+  - 上流 spec の `PUT /_api/v3/search/indices` (`includeAttachments=true`) は作り直しの完了を待たずに応答し、実行中の再要求には 409 `rebuild_in_progress` を返す
   - 既存 SearchPage / SearchResultList / SearchResultContent / PageAttachmentList / ElasticsearchManagement が拡張可能な構造を維持している
   - 既存 Jotai + SWR パターン、既存 i18n パイプライン、Turbopack + Next.js Pages Router 構成、`@growi/ui` の `Attachment` 行アクション props 拡張点
 
@@ -124,6 +125,8 @@ UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペ�
 1. The 管理画面の既存 rebuildIndex UI shall 「添付も対象にする」チェックボックスを追加し、機能が有効な場合はデフォルト ON の状態で表示する <!-- derived from umbrella R10.1 -->
 2. While 一括再インデックスが実行中, the 管理画面 shall Socket.io イベントに基づき処理済み件数と総件数を管理者が視認可能な形で表示する <!-- derived from umbrella R10.3 -->
 3. Where 機能が無効化されている (URI 未設定または空である場合を含む、SSR prop `isAttachmentFullTextSearchEnabled` が false の状態), the 管理画面 shall 「添付も対象にする」チェックボックスを非表示または無効化する <!-- derived from umbrella R10.5 -->
+4. When 添付を含む一括再インデックスの失敗通知 (`AttachmentRebuildingFailed`) を受け取る, the 管理画面 shall 失敗したことを管理者に表示し、再度作り直しを実行できる状態に戻す
+5. If 添付を含む一括再インデックスの実行中に作り直しを要求して 409 `rebuild_in_progress` が返る, the 管理画面 shall 作り直しが進行中であることを表示し、新たな作り直しを始めない
 
 ### Requirement 7: 管理画面の抽出失敗可視化 UI
 <!-- derived from umbrella R12.2, R12.3 -->
