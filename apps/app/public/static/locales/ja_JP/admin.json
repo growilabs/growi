@@ -2,15 +2,12 @@
   "meta": {
     "display_name": "日本語"
   },
-  "Update": "更新",
-  "Delete": "削除",
-  "User": "ユーザー",
-  "Name": "名前",
   "Page": "ページ",
-  "Created": "作成日",
-  "Edit": "編集",
-  "Description": "説明",
   "Execute": "実行",
+  "Enable": "有効化",
+  "Copied!": "コピーしました！",
+  "ExternalUserGroup": "外部グループ",
+  "something_went_wrong": "問題が発生しました。もう一度お試しください。",
   "last_login": "最終ログイン",
   "wiki_management_homepage": "Wiki管理トップ",
   "public": "「公開」のページ",
@@ -34,11 +31,17 @@
     "The whitelist of registration permission E-mail address": "登録許可メールアドレスの<br>ホワイトリスト",
     "users_without_account": "アカウントを持たないユーザーはアクセス不可",
     "example": "例",
-    "restrict_emails": "登録可能なメールアドレスを制限することができます。",
-    "for_example": "例えば、",
-    "in_this_case": "と記載することで、そのドメインのメールアドレスを持っている人のみ登録可能になります。",
-    "insert_single": "1行に1メールアドレス入力してください。",
+    "restrict_emails": "ドメイン完全一致またはメールアドレス完全一致で登録を制限できます。",
+    "whitelist_domain_desc": "ドメイン完全一致（そのドメインのみを許可）は",
+    "whitelist_domain_suffix": "のように入力します（例: @growi.org のみ許可、サブドメインは含まない）。",
+    "whitelist_subdomain_desc": "サブドメインも含めて許可する場合は",
+    "whitelist_subdomain_suffix": "のように入力します（例: sub.growi.org 等のサブドメインを許可）。",
+    "whitelist_exact_desc": "特定のアドレスのみ許可する場合は",
+    "whitelist_exact_suffix": "のように完全なメールアドレスを入力します。",
+    "insert_single": "1行に1エントリ入力してください。",
+    "whitelist_invalid_format": "無効なフォーマットです。ドメイン完全一致は @example.com 、サブドメイン許可は @*.example.com 、アドレス完全一致は user@example.com の形式で入力してください。",
     "page_list_and_search_results": "ページリスト・検索結果",
+    "page_list_and_search_results_desc": "これらの設定はページへのアクセス権がないユーザーにのみ影響します。閲覧できるユーザー（例: 「特定グループのみ」で許可されたグループのメンバー）には「表示しない」でも常にリストや検索に表示されます。",
     "page_listing_1": "ページのリスト表示と検索<br>'自分のみ'に閲覧制限しているページ",
     "page_listing_1_desc": "ページのリスト表示や検索結果において、'自分のみ'に閲覧制限をしているページをアクセス権のないユーザーにも表示します。",
     "page_listing_2": "ページのリスト表示と検索<br>特定グループに閲覧制限しているページ",
@@ -181,7 +184,6 @@
       "attr_based_login_control_detail": "SAMLの <code>&lt;saml:AttributeStatement&gt;</code> 要素に含まれる <code>&lt;saml:Attribute&gt;</code> 要素と、その子要素 <code>&lt;saml:AttributeValue&gt;</code> を利用してログインの可否を制御します。",
       "attr_based_login_control_rule_help": "<h5>利用可能なクエリ:</h5><ul><li>Terms</li><li>Fields</li><li>AND/NOT/OR Operator</li><li>Grouping</li></ul><h5>利用不可なクエリ:</h5><ul><li>Wildcard, Fuzzy, Proximity, Range and Boosting</li><li>+/- Operator</li><li>Field Grouping</li></ul><h5>特殊文字のエスケープ</h5>次の特殊文字はエスケープする必要があります。<code>+ - && || ! ( ) { } [ ] ^ &quot; &tilde; * ? : &#92;</code> and <code>/</code>",
       "attr_based_login_control_rule_example1": "<h5>条件式の例</h5>ルールに <code>(Department: A || Department: B) && Position: Leader</code> を指定した場合, <code>Department: A</code> または <code>Department: B</code> のどちらかに該当し、かつ <code>Position: Leader</code> を持つユーザーにログインを<strong>許可</strong>します。",
-      "attr_based_login_control_rule_exampl2": "<h5>エスケープの例</h5>ルールに URL を利用したい場合は、次のようにエスケープしてください:<br><code>http&#92;:&#92;/&#92;/schemas.example.com&#92;/ws&#92;/2005&#92;/05&#92;/identity&#92;/claims&#92;/emailaddress: &quot;myname@example.com&quot;</code>",
       "updated_saml": "Succeeded to update SAML setting"
     },
     "OAuth": {
@@ -287,9 +289,9 @@
     "toggle_notification": "{{path}}の通知設定を変更しました",
     "not_found_global_notification_triggerid": "アクセス先の通知設定は見つかりませんでした"
   },
-  "full_text_search_management": {
-    "full_text_search_management": "全文検索管理",
-    "elasticsearch_management": "Elasticsearch 管理",
+  "elasticsearch_management": "Elasticsearch 管理",
+  "page_data_index_management": {
+    "page_data_management": "ページデータ管理",
     "connection_status": "接続の状態",
     "connection_status_label_unconfigured": "設定されていません",
     "connection_status_label_connected": "接続されています",
@@ -303,12 +305,39 @@
     "reconnect_button": "再接続の試行",
     "reconnect_description": "Elasticsearch への再接続を試みます。",
     "normalize": "正規化",
-    "normalize_button": "インデックスの正規化",
-    "normalize_description": "破損したインデックスを修復します。",
+    "normalize_button": "ページデータのインデックスの正規化",
+    "normalize_description": "破損したページデータのインデックスを修復します。",
+    "normalize_success": "ページデータのインデックスを正規化しました。",
     "rebuild": "リビルド",
-    "rebuild_button": "インデックスのリビルド",
+    "rebuild_button": "ページデータのインデックスのリビルド",
+    "rebuild_requested": "ページデータのインデックスのリビルドをリクエストしました。",
     "rebuild_description_1": "全てのページのインデックスを削除し、作り直します。",
-    "rebuild_description_2": "この作業には数秒かかります。"
+    "rebuild_description_2": "この作業には数秒かかります。",
+    "rebuild_progress_processing": "処理中..",
+    "rebuild_progress_completed": "完了",
+    "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。"
+  },
+  "audit_log_index_management": {
+    "audit_log_index_management": "監査ログのインデックス管理",
+    "settings_explanation": "監査ログのインデックスの正規化・リビルドは、以下のページで行えます",
+    "index_management_link": "{{destination}}ページに移動",
+    "docs_url": {
+      "top": "https://docs.growi.org/ja/admin-guide/management-cookbook/setup-search-system.html"
+    },
+    "normalize": "正規化",
+    "normalize_button": "監査ログのインデックスの正規化",
+    "normalize_success": "監査ログのインデックスを正規化しました。",
+    "normalize_description": "破損した監査ログのインデックスを修復します。",
+    "rebuild": "リビルド",
+    "rebuild_button": "監査ログのインデックスのリビルド",
+    "rebuild_requested": "監査ログのインデックスのリビルドをリクエストしました。",
+    "rebuild_description_1": "全ての監査ログのインデックスを削除し、作り直します。",
+    "rebuild_description_2": "この作業には数秒かかります。",
+    "unsynced_events_warning": "Elasticsearch に同期できなかった監査ログがあります。リビルドして整合性を回復してください。",
+    "rebuild_progress_processing": "処理中..",
+    "rebuild_progress_completed": "完了",
+    "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。",
+    "reconnect": "再接続"
   },
   "mailer_setup_required": "送信するには <a href='/admin/app'>メールの設定</a> が必要です。",
   "admin_top": {
@@ -340,6 +369,23 @@
     "header_upgrading_progress": "アップグレード進行度",
     "migration_succeeded": "アップグレードが正常に完了しました！メンテナンスモードを終了して、GROWI を使用することができます。",
     "migration_failed": "アップグレードが失敗しました。失敗した場合の対処法は GROWI docs を参照してください。"
+  },
+  "page_tree_repair": {
+    "page_tree_repair": "ページツリーの修復",
+    "repair_desc": "不要になった空ページを削除し、全ページの子孫ページ数を再計算します。ページツリーに中身のない空のフォルダが表示される場合や、子ページ数が実際の数と一致しない場合に実行してください。MongoDB の TTL インデックスで WIP ページを削除していたバージョンからアップグレードしたインスタンスで必要になります。",
+    "repair_note": "注意: メンテナンスモードを有効にする必要があります。全ページを走査するため、規模の大きい Wiki では時間がかかることがあります。進捗はサーバーログに出力されます。",
+    "repair_page_tree": "ページツリーを修復する",
+    "modal_repair_warning": "この処理は全ページを走査・更新するため、長時間かかることがあります。修復中はユーザーにページの作成・編集・削除を行わないよう周知することを強く推奨します。",
+    "start_repair": "ページツリーの修復を開始する",
+    "successfully_started": "ページツリーの修復を開始しました",
+    "repair_in_progress": "ページツリーの修復をバックグラウンドで実行しています。結果はサーバーログを確認してください。"
+  },
+  "news_delivery": {
+    "section_title": "ニュース配信",
+    "label": "ニュース配信",
+    "enable": "ニュース配信を有効にする",
+    "description": "外部フィードからニュースを取得してローカルにキャッシュする cron ジョブの動作を制御します。無効にしてもキャッシュ済みのニュースは引き続き表示されます。",
+    "update_succeeded": "ニュース配信設定を更新しました"
   },
   "maintenance_mode": {
     "maintenance_mode": "メンテナンスモード",
@@ -378,6 +424,10 @@
     "page_bulk_export_explanation": "すべてのユーザーが、ページメニューから選択したページとその配下ページをまとめてエクスポートできる機能を有効化します。エクスポートされたデータは保存期間経過後に自動的に削除されます。",
     "page_bulk_export_warning": "ページ一括エクスポート機能は全ユーザーが利用可能です。システムリソースの維持のため、必要最小限の利用にご協力をお願いいたします。管理者の方は、この旨をユーザーの皆様にご周知ください。",
     "page_bulk_export_storage_period": "保存期間",
+    "page_bulk_export_reload_title": "ページの再読み込み",
+    "page_bulk_export_reload_prompt": "設定を反映するにはページの再読み込みが必要です。今すぐ再読み込みしますか？",
+    "page_bulk_export_reload_dismiss": "今はしない",
+    "reload_page": "再読み込み",
     "update": "更新",
     "mail_settings": "メールの設定",
     "mailer_is_not_set_up": "メール設定がセットアップされていません。",
@@ -410,6 +460,7 @@
     "file_delivery_method_relay": "内部システム中継",
     "file_delivery_method_redirect_info": "リダイレクト： GROWIサーバーを介さずに署名付きURLにリダイレクトされるため、優れたパフォーマンスを出します。",
     "file_delivery_method_relay_info": "内部システム中継： GROWIサーバーがクライアントに配信するため、完全なセキュリティーを提供します。",
+    "fixed_by_env_var": "環境変数 <code>{{envKey}}={{envVar}}</code> により固定されています。",
     "gcs_label": "GCP(GCS)",
     "aws_label": "AWS(S3)",
     "local_label": "Local",
@@ -422,7 +473,6 @@
     "azure_storage_container_name": "コンテナ名",
     "azure_note_for_the_only_env_option": "現在Azure設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください",
     "azure_note_for_the_only_env_option_cloud": "Azure の設定は GROWI.cloud の管理画面から変更できます",
-    "fixed_by_env_var": "環境変数 <code>{{envKey}}={{envVar}}</code> により固定されています。",
     "file_upload": "ファイルをアップロードするための設定を行います。ファイルアップロードの設定を完了させると、ファイルアップロード機能、プロフィール写真機能などが有効になります。",
     "test_connection": "接続テスト",
     "change_setting": "この設定を途中で変更すると、これまでにアップロードしたファイル等へのアクセスができなくなりますのでご注意下さい。",
@@ -437,6 +487,65 @@
     "use_env_var_if_empty": "データベース側の値が空の場合、環境変数 <code>{{variable}}</code> の値を利用します",
     "note_for_the_only_env_option": "現在GCS設定は環境変数の値によって制限されています<br>この設定を変更する場合は環境変数 <code>{{env}}</code> の値をfalseに変更もしくは削除してください",
     "note_for_the_only_env_option_cloud": "GCS の設定は GROWI.cloud の管理画面から変更できます"
+  },
+  "ai_settings": {
+    "ai_settings": "AI 設定",
+    "ai_enabled_label": "AI 機能を有効にする",
+    "providers_section_title": "プロバイダー",
+    "provider_enabled_label": "このプロバイダーを有効にする",
+    "provider_status_available": "利用可能",
+    "provider_status_disabled": "無効",
+    "provider_status_misconfigured": "設定が未完了",
+    "provider_warning_missing_api_key": "このプロバイダーは有効になっていますが API キーが設定されていないため、モデルはユーザーに提供されません。",
+    "provider_warning_missing_azure_endpoint": "このプロバイダーは有効になっていますが、エンドポイント（リソース名またはベース URL）が設定されていないため、モデルはユーザーに提供されません。",
+    "api_key_label": "API キー",
+    "api_key_help": "AI プロバイダーの認証に使用する API キーです。",
+    "api_key_set_placeholder": "（設定済み）",
+    "models_section_title": "Models",
+    "models_section_desc": "登録したモデルから 1 つをデフォルトとして選びます。デフォルトは、チャットで最初に選択されているモデルです。",
+    "default_model_label": "デフォルトモデル",
+    "default_model_help": "チャットでユーザーに最初に選択されているモデルです。すべてのプロバイダーに登録されたモデルから選べます。",
+    "default_model_placeholder": "デフォルトモデルを選択してください",
+    "default_model_no_models": "登録されているモデルがありません",
+    "model_label": "モデル名",
+    "model_placeholder": "モデルを選択してください",
+    "model_duplicate_error": "このモデル ID はこのプロバイダーにすでに登録されています",
+    "refresh_model_catalog": "モデルカタログを更新",
+    "refresh_model_catalog_confirmation": "モデルカタログの更新では、最新のモデル一覧を取得するために外部サービス（models.dev）への通信が発生します。続行しますか？",
+    "refresh_model_catalog_confirm": "更新する",
+    "refresh_model_catalog_success": "モデルカタログを更新しました。",
+    "refresh_model_catalog_failed": "モデルカタログの更新に失敗しました。以前のカタログが引き続き使用されます。",
+    "refresh_model_catalog_label": "モデルカタログ",
+    "refresh_model_catalog_scope": "チャットのモデル選択に表示される候補一覧の元データです。最新のモデルを反映するには更新してください。",
+    "set_as_default": "デフォルトにする",
+    "default_badge": "デフォルト",
+    "add_model": "モデルを追加",
+    "azure_add_deployment": "デプロイメントを追加",
+    "remove_model": "削除",
+    "remove_model_confirmation": "モデル「{{modelName}}」を一覧から削除します。よろしいですか？",
+    "remove_model_confirm": "削除する",
+    "provider_options_label": "プロバイダーオプション (JSON)",
+    "provider_options_doc_link": "書き方",
+    "provider_options_invalid_json": "JSON の形式が正しくありません",
+    "provider_options_invalid_json_save_blocked": "プロバイダーオプション（JSON）が正しくないモデルがあります。保存する前に修正してください。",
+    "provider_options_error_at_line": "（{{line}} 行目）",
+    "env_only_mode_notice": "AI 設定は環境変数で固定されているため、この画面からは編集できません。",
+    "unconfigured_warning": "AI は有効になっていますが設定が完了していないため、設定を完了するまで動作しません。",
+    "save": "更新",
+    "save_success": "AI 設定を更新しました。",
+    "azure_section_title": "Azure OpenAI 設定",
+    "azure_resource_name_label": "Azure リソース名",
+    "azure_base_url_label": "Azure ベース URL",
+    "azure_api_version_label": "Azure API バージョン",
+    "azure_use_entra_id_label": "Microsoft Entra ID を使用する",
+    "azure_entra_id_api_key_note": "Microsoft Entra ID を有効にした場合、API キーは使用されません。",
+    "azure_entra_id_credential_note": "資格情報は Azure 環境から自動的に解決されます。",
+    "azure_entra_id_managed_identity_note": "GROWI を Azure 上（VM / App Service / Container Apps / AKS）でマネージド ID またはワークロード ID を有効にして動かしている場合、ここでの追加設定は不要です。",
+    "azure_entra_id_env_note": "それ以外の環境では、GROWI サーバに次の環境変数を設定してください。",
+    "azure_resource_name_help": "標準エンドポイント https://<リソース名>.openai.azure.com を組み立てます。通常（グローバル）の Azure クラウドではこちらを使用します。ベース URL も設定した場合はベース URL が優先されます。",
+    "azure_base_url_help": "ソブリンクラウド（例: Azure Government）、API Management ゲートウェイ、プロキシ経由の場合に、リソース名の代わりに使用します。両方設定した場合はこちらが優先されます。",
+    "azure_api_version_help": "任意。空欄の場合はデフォルトが使用されます。特定のデプロイメントが特定の API バージョンを要求する場合のみ設定してください。",
+    "azure_model_deployment_label": "デプロイメント名"
   },
   "markdown_settings": {
     "markdown_settings": "マークダウン設定",
@@ -475,9 +584,9 @@
       "inline_header": "インライン MIMEタイプ",
       "attachment_header": "添付ファイル MIMEタイプ",
       "inline_button": "インライン",
+      "attachment_button": "添付ファイル",
       "no_inline": "設定済みのインラインタイプはありません。",
       "no_attachment": "設定済みの添付ファイルタイプはありません。",
-      "attachment_button": "添付ファイル",
       "remove_button": "削除"
     }
   },
@@ -775,6 +884,8 @@
       "send_temporary_password": "招待メールを送っていない場合、この画面で仮パスワードをコピーし、招待者へ連絡してください。",
       "send_email": "ユーザーテーブルのドロップダウンから招待メールの送信または再送信を行うこともできます。",
       "existing_email": "以下のEmailはすでに存在しています。",
+      "whitelist_violation": "以下のメールアドレスはホワイトリストに含まれていません：",
+      "reason_email_not_in_whitelist": "ホワイトリストに含まれていません",
       "issue": "発行"
     },
     "user_table": {
@@ -909,7 +1020,43 @@
     "transfer_data_to_another_growi": "このGROWIのデータを別GROWIへ移行する",
     "advanced_options": "詳細オプション",
     "start_transfer": "移行を開始する",
-    "paste_transfer_key": "移行キーをここにペースト"
+    "paste_transfer_key": "移行キーをここにペースト",
+    "transfer_method": {
+      "heading": "移行方法",
+      "migration": "移行(移行先の全データを置き換える)",
+      "merge": "既存データに追加(移行先の既存データは保持される)"
+    },
+    "confirm_modal": {
+      "title": "移行内容の確認",
+      "description": "移行先のGROWIには現在以下のデータがあります。この移行を開始すると、これらはすべて削除され、このGROWIのデータに置き換わります:",
+      "counts": {
+        "users": "ユーザー",
+        "user_groups": "ユーザーグループ",
+        "pages": "ページ"
+      },
+      "warnings_heading": "続行する前に:",
+      "warnings": {
+        "password_seed_mismatch": "移行元と移行先のGROWIでパスワードシードが異なります。移行されたユーザーは既存のパスワードでログインできなくなります。",
+        "no_loginable_admin": "移行先のGROWIには現在ログイン可能な管理者がいません。移行後、誰もログインできなくなる可能性があります。",
+        "sessions_not_invalidatable": "移行先のGROWIのセッションストアは個々のセッションを無効化できません。移行前に確立されたセッションはそのまま有効な状態が続きます。",
+        "local_auth_disabled_at_source": "このGROWIではローカル(ID/パスワード)認証が無効になっています。救済された移行先の管理者であっても、パスワードでログインすることはできません。"
+      }
+    },
+    "blockers": {
+      "version_mismatch": "この移行は実行できません: 移行元と移行先のGROWIのバージョンが異なります。",
+      "user_upper_limit": "この移行は実行できません: 移行元のアクティブユーザー数が、移行先GROWIのユーザー数上限を超えています。",
+      "file_upload_not_configured": "この移行は実行できません: 移行元または移行先のGROWIでファイルアップロードが設定されていません。",
+      "destination_storage_not_writable": "この移行は実行できません: 移行先GROWIのストレージに書き込めません。",
+      "file_upload_total_limit": "この移行は実行できません: 移行元GROWIの添付ファイルの合計サイズが、移行先GROWIのファイルアップロード上限を超えています。"
+    },
+    "rescue_outcome": {
+      "heading": "この移行により、移行先のすべてのユーザーが置き換えられました。誰かがログインできるよう、以下の管理者アカウントは保持されました:",
+      "renamed_from": "変更前の名前",
+      "email_removed": "移行してきたユーザーとメールアドレスが競合したため、メールアドレスは削除されました。",
+      "slack_member_id_removed": "移行してきたユーザーとSlackメンバーIDが競合したため、Slackメンバー IDは削除されました。",
+      "id_reassigned": "元の内部識別子が移行してきたユーザーと競合したため、新しい内部識別子が割り当てられました。移行前に確立されたログインセッションは失われました。"
+    },
+    "failed_collections_heading": "移行先が以下のコレクションを取り込めませんでした:"
   },
   "plugins": {
     "plugins": "プラグイン",
@@ -1003,6 +1150,8 @@
     "SEARCH_PAGE": "ページの検索",
     "SEARCH_PAGE_VIEW": "ページ閲覧（検索結果ページ）",
     "ADMIN_APP_SETTING_UPDATE": "アプリ設定の更新",
+    "ADMIN_AI_SETTING_UPDATE": "AI設定の更新",
+    "ADMIN_AI_MODEL_CATALOG_REFRESH": "モデルカタログの更新",
     "ADMIN_SITE_URL_UPDATE": "サイトURL設定の更新",
     "ADMIN_MAIL_SMTP_UPDATE": "メール設定（SMTP）の更新",
     "ADMIN_MAIL_SES_UPDATE": "メール設定（SES）の更新",
@@ -1094,7 +1243,20 @@
   "g2g": {
     "transfer_success": "G2G移行が完了しました",
     "error_generate_growi_archive": "GROWI アーカイブファイルの作成に失敗しました",
-    "error_send_growi_archive": "GROWI アーカイブファイルの送信に失敗しました"
+    "error_send_growi_archive": "GROWI アーカイブファイルの送信に失敗しました",
+    "error_data_conflict": "移行が中止されました: 移行対象のデータの一部が、移行先にすでに存在するユーザーまたはユーザーグループと衝突したため、何もインポートされませんでした。競合しているアカウントやグループを解消してから再試行するか、初期セットアップが完了していない移行先へ移行してください。",
+    "error_upload_attachment": "添付ファイルの移行に失敗しました",
+    "error_import_in_progress": "移行が中止されました: 移行先で別のデータのインポートがすでに実行中です。完了を待ってから移行を再試行してください。",
+    "error_partial_import": "移行が完全には終わりませんでした: 移行先のGROWIがコレクションのインポート・管理者の救済・インポート後の後処理のいずれかに失敗した可能性があり、そのためデータベースが一部だけ移行された状態のままになっているかもしれません。この移行のために移行先がメンテナンスモードになっていた場合、移行先のGROWIの管理 > アプリ設定でメンテナンスモードを解除するまで、一般ユーザーはアクセスできません。原因を解決してから、もう一度移行を実行してください。",
+    "error_protected_collection": "移行が中止されました: 移行してはならないコレクションが指定されていたため、移行先が要求を拒否し、何もインポートされませんでした。移行画面ではそれらのコレクションを選択できないため、移行元と移行先のGROWIが同じバージョンで動作しているか確認したうえで、下に表示されたコレクション名を報告してください。",
+    "error_mixed_import_methods": "移行が中止されました: 移行先のGROWIが、一部のコレクションを置き換え・別のコレクションを追加するという異なるインポート方法が混在したリクエストを拒否したため、何もインポートされませんでした。移行画面はそのようなリクエストを作成しないため、移行元と移行先のGROWIが同じバージョンで動作しているか確認してから、もう一度移行を実行してください。",
+    "error_invalid_transfer_key": "移行が中止されました: 移行先が移行キーを未指定・期限切れ・不正のいずれかとして拒否しました。移行先で新しい移行キーを発行し、再試行してください。",
+    "error_parse_failed": "移行が中止されました: 移行先が移行のリクエストを解析できませんでした。移行元と移行先のGROWIが同じバージョンで動作しているか確認したうえで、移行を再試行してください。",
+    "error_validation_failed": "移行が中止されました: 移行先がアップロードされたGROWIアーカイブファイルを検証できませんでした。ファイルが壊れている可能性があるため、アーカイブの生成と送信をやり直してください。",
+    "error_version_incompatible": "移行が中止されました: 移行元と移行先のGROWIのバージョンが異なるため、何もインポートされませんでした。移行先のGROWIを移行元と同じバージョンにアップグレードしてから、移行を再試行してください。",
+    "error_import_settings_invalid": "移行が中止されました: 移行先が要求されたコレクションのインポート設定を正しく組み立てられませんでした。詳細はGROWIのドキュメントを参照してください。",
+    "error_conflict_detection_failed": "移行が中止されました: 移行先が移行データと既存データの衝突の有無を判定できず、推測でインポートを進めることを拒否しました。移行を再試行してください。繰り返し発生する場合は、移行先のGROWIのログを確認してください。",
+    "error_mongo_collection_import_failure": "移行が完全には終わりませんでした: データの衝突以外の理由で、移行先が1つ以上のコレクションをMongoDBへ書き込めませんでした。詳細は移行先のGROWIのログを確認してください。"
   },
   "external_user_group": {
     "management": "外部グループ管理",
@@ -1165,9 +1327,106 @@
   "forbidden_page": {
     "do_not_have_admin_permission": "管理者権限のないユーザーでは管理画面にはアクセスできません"
   },
-  "ai_integration": {
-    "ai_integration": "AI 連携",
-    "disable_mode_explanation": "現在、AI 連携は無効になっています。有効にする場合は環境変数 <code>AI_ENABLED</code> の他、必要な環境変数を設定してください。<br><br>詳細は<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}ja/guide/features/ai-knowledge-assistant.html>ドキュメント</a>を参照してください。",
-    "ai_search_management": "AI 検索管理"
+  "admin_navigation": {
+    "section_users": "ユーザー",
+    "section_data": "データ",
+    "section_external_notifications": "外部通知連携"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "警告:",
+        "message_html": "直近の初期化処理は <code>VAULT_BOOTSTRAP_ON_START=force</code> により起動されました。この環境変数を <code>force</code> のままサーバーを再起動すると、Vault のすべてのデータが再度初期化されます。環境変数を <code>true</code> または <code>false</code> に変更してください。"
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "機能ステータス",
+        "enabled": "有効",
+        "disabled": "無効",
+        "description_html": "<code>VAULT_ENABLED</code> 環境変数で制御されています。有効/無効を切り替えるには、環境変数を変更しサーバーを再起動してください。"
+      },
+      "clone-url": {
+        "label": "クローン URL",
+        "description": "このコマンドをターミナルで実行すると、Vault リポジトリをクローンできます。",
+        "copy-button": "コマンドをコピー",
+        "copied-tooltip": "コピーしました！",
+        "copy-failed": "クローンコマンドのコピーに失敗しました。",
+        "no-site-url_html": "サイト URL が未設定のため、コマンドを表示できません。<a href=\"/admin/app\">アプリ設定</a> から設定してください。"
+      },
+      "kill-switch": {
+        "heading": "初期化",
+        "button": "Vault を初期化",
+        "description_html": "Git リポジトリ内のすべてのデータを破棄し、MongoDB 内のデータを元に Git データを再構築します。初期化中はすべての <code>git clone</code> / <code>fetch</code> リクエストが 503 で拒否されます。この操作は監査ログに <code>vault.wipe</code> として記録されます。",
+        "confirm-title": "Vault 初期化の確認",
+        "confirm-message_html": "この操作を実行すると、<strong>現在の Git リポジトリ内のすべてのデータが失われます</strong>。",
+        "confirm-question": "本当に続行してよろしいですか？",
+        "confirm-button": "確認",
+        "cancel-button": "キャンセル",
+        "started-toast": "初期化を開始しました。データの再構築が完了するまで Vault は 503 を返します。",
+        "abandoned-run-notice": "ステータスは再構築中となっていますが、{{heartbeatAt}} 以降まったく進捗が報告されていません。実行していたプロセスが失われた状態です。やり直せるよう「Vault を初期化」は実行可能にしています。"
+      },
+      "bootstrap-status": {
+        "state": "ステータス",
+        "processed-total": "処理済み / 推定総数",
+        "started-at": "開始日時",
+        "completed-at": "完了日時",
+        "last-error": "直近のエラー",
+        "progress-label": "{{processed}} / {{total}} ページ"
+      },
+      "completion-reliability": {
+        "heading": "信頼性ステータス",
+        "check-result": "最終チェック結果",
+        "last-completed-at": "最終完了日時",
+        "processed-estimated": "処理済み / 推定",
+        "trigger-source": "トリガー元",
+        "last-error": "直近のエラー"
+      },
+      "auto-retry-status": {
+        "heading": "自動リトライ状況",
+        "escalated-warning_html": "初期化処理に置ける自動リトライが失敗し、<strong>escalated</strong> 状態になっています。手動での対応が必要です。",
+        "attempt-no": "試行回数",
+        "next-attempt-at": "次回試行日時",
+        "last-error": "直近のエラー",
+        "abort-button": "自動リトライを中止",
+        "aborting": "中止中…",
+        "aborted-toast": "自動リトライを中止しました。"
+      },
+      "drift-activity": {
+        "heading": "データ不整合検知ステータス",
+        "last-sweep-at": "最終スイープ日時",
+        "last-watermark": "最終ウォーターマーク",
+        "detected-since-boot": "サーバー起動時からの検出件数",
+        "repairs-emitted-since-boot": "サーバー起動時からの修復発行件数",
+        "last-error": "最後に検出されたエラー",
+        "out-of-scope_html": "<strong>注意（対象外）:</strong> パス変更（rename / hard delete）に伴うデータ不整合および権限解除による不整合は、現在の実装では検知できません。これらは将来の <code>growi-vault-ha</code> サポートが必要です。"
+      },
+      "storage-observability": {
+        "fetch-failed": "ストレージ統計の取得に失敗しました。vault-manager に接続できない可能性があります。",
+        "namespace-count": "ネームスペース数",
+        "total-commit-count": "総コミット数",
+        "loose-object-count": "Loose オブジェクト数",
+        "repo-size": "リポジトリサイズ",
+        "last-squash": "最終 squash 日時",
+        "last-gc": "最終 GC 日時"
+      },
+      "audit-log": {
+        "heading": "監査ログ",
+        "button": "VAULT_* の監査ログを表示",
+        "description": "Vault 関連のアクション（VAULT_*）でフィルタリングした管理者監査ログを開きます。"
+      },
+      "reconcile-admin": {
+        "heading": "修復管理",
+        "trigger-button": "修復を実行",
+        "description": "データ初期化を行わずに、MongoDB のページと Vault の git ツリー間のデータ不整合の手動修復を試みます。"
+      }
+    }
+  },
+  "maintenance_mode_notice": {
+    "title": "GROWIはメンテナンスモードのままになります",
+    "body_this_growi": "configsコレクションをインポートすると、このGROWIのすべての設定がアーカイブの内容で置き換えられるため、このGROWIはメンテナンスモードになり、そのままの状態になります。解除するまで、一般利用者はアクセスできません。",
+    "body_destination": "configsコレクションをインポートすると、移行先GROWIのすべての設定がこのGROWIの内容で置き換えられるため、移行先はメンテナンスモードになり、そのままの状態になります。解除するまで、一般利用者は移行先にアクセスできません。添付ファイルはコレクションの後に移行されるため、移行全体が完了するまで移行先は不完全な状態です。",
+    "turn_it_off": "結果を確認したら、閉じられた側のGROWIの管理 > アプリ設定からメンテナンスモードを解除してください。",
+    "cancel": "キャンセル",
+    "proceed": "理解した上で続行する"
   }
 }

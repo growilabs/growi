@@ -1,6 +1,30 @@
-import KeycloakAdminClient from '@keycloak/keycloak-admin-client';
-import type GroupRepresentation from '@keycloak/keycloak-admin-client/lib/defs/groupRepresentation';
-import type UserRepresentation from '@keycloak/keycloak-admin-client/lib/defs/userRepresentation';
+import KeycloakAdminClientPkg from '@keycloak/keycloak-admin-client';
+
+type KeycloakAdminClientCtor =
+  typeof import('@keycloak/keycloak-admin-client').default;
+
+// @keycloak/keycloak-admin-client v18 is transpiled CJS (`exports.__esModule`
+// + `exports.default = KcAdminClient`). The default-import binding differs by
+// resolution mode AND must hold at runtime under both: NodeNext (server build
+// / tsx) binds the module namespace (class lives under `.default`), while the
+// bundler interop (vitest's esbuild, next build) honours `__esModule` and
+// binds the class itself. Unwrapping unconditionally with `.default` breaks
+// the bundler path (`undefined` -> "not a constructor"), so disambiguate at
+// runtime: if the binding is already callable it IS the constructor.
+const pkg = KeycloakAdminClientPkg as unknown as
+  | KeycloakAdminClientCtor
+  | { default: KeycloakAdminClientCtor };
+const KeycloakAdminClient: KeycloakAdminClientCtor =
+  typeof pkg === 'function' ? pkg : pkg.default;
+type KeycloakAdminClient = import('@keycloak/keycloak-admin-client').default;
+
+// The defs are CJS-format declarations (`export default interface ...`);
+// NodeNext types a default import of them as the module namespace, so pull
+// the interfaces out via type-level import() instead.
+type GroupRepresentation =
+  import('@keycloak/keycloak-admin-client/lib/defs/groupRepresentation.js').default;
+type UserRepresentation =
+  import('@keycloak/keycloak-admin-client/lib/defs/userRepresentation.js').default;
 
 import { configManager } from '~/server/service/config-manager';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';

@@ -1,7 +1,9 @@
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
+import { MAX_MODEL_KEY_LENGTH } from '~/features/mastra/interfaces/model-key';
 import { AllSidebarContentsType } from '~/interfaces/ui';
 import loggerFactory from '~/utils/logger';
 
@@ -12,18 +14,31 @@ const logger = loggerFactory('growi:routes:apiv3:user-ui-settings');
 
 const router = express.Router();
 
-module.exports = () => {
-  const validatorForPut = [
-    body('settings')
-      .exists()
-      .withMessage("The body param 'settings' is required"),
-    body('settings.currentSidebarContents')
-      .optional()
-      .isIn(AllSidebarContentsType),
-    body('settings.currentProductNavWidth').optional().isNumeric(),
-    body('settings.preferCollapsedModeByUser').optional().isBoolean(),
-  ];
+// Exported at module scope (not inlined in setup) so the formal validation contract
+// can be unit-tested directly via .run(req) + validationResult, mirroring the
+// mastra put-ai-settings convention (updateAiSettingsValidators).
+export const validatorForPutUserUISettings = [
+  body('settings')
+    .exists()
+    .withMessage("The body param 'settings' is required"),
+  body('settings.currentSidebarContents')
+    .optional()
+    .isIn(AllSidebarContentsType),
+  body('settings.currentProductNavWidth').optional().isNumeric(),
+  body('settings.preferCollapsedModeByUser').optional().isBoolean(),
+  // Defensive length cap: the stored selection is never trusted (get-models rounds it
+  // against the allow-list), so the only risk of an unbounded value is document bloat
+  // in UserUISettings. Real modelKeys are far shorter (MAX_MODEL_KEY_LENGTH).
+  body('settings.aiChatSelectedModelKey')
+    .optional()
+    .isString()
+    .isLength({ max: MAX_MODEL_KEY_LENGTH }),
+  // Format only: the usable range depends on the viewport, so the client
+  // clamps the value (see the ai-chat-sidebar-resize spec's research.md).
+  body('settings.aiChatSidebarWidth').optional().isInt({ min: 1 }).toInt(),
+];
 
+export const setup = (): Router => {
   /**
    * @swagger
    *
@@ -50,6 +65,10 @@ module.exports = () => {
    *                     type: number
    *                   preferCollapsedModeByUser:
    *                     type: boolean
+   *                   aiChatSelectedModelKey:
+   *                     type: string
+   *                   aiChatSidebarWidth:
+   *                     type: number
    *     responses:
    *       200:
    *         description: The user's UI settings
@@ -68,10 +87,14 @@ module.exports = () => {
    *                   type: string
    *                 preferCollapsedModeByUser:
    *                   type: boolean
+   *                 aiChatSelectedModelKey:
+   *                   type: string
+   *                 aiChatSidebarWidth:
+   *                   type: number
    */
   router.put(
     '/',
-    validatorForPut,
+    validatorForPutUserUISettings,
     apiV3FormValidator,
     async (req: any, res: any) => {
       const { user } = req;
@@ -82,6 +105,8 @@ module.exports = () => {
         currentSidebarContents: settings.currentSidebarContents,
         currentProductNavWidth: settings.currentProductNavWidth,
         preferCollapsedModeByUser: settings.preferCollapsedModeByUser,
+        aiChatSelectedModelKey: settings.aiChatSelectedModelKey,
+        aiChatSidebarWidth: settings.aiChatSidebarWidth,
       };
 
       if (user == null) {

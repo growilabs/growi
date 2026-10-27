@@ -1,10 +1,13 @@
 import { ConfigSource, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import pathUtils from '@growi/core/dist/utils/path-utils';
+import * as pathUtils from '@growi/core/dist/utils/path-utils';
+import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
-import * as nextI18nConfig from '^/config/next-i18next.config';
+// next-i18next.config.mjs has a single `export default` config object; `i18n` is
+// a property of it, not a named export. Use a default import and read `.i18n`.
+import nextI18nConfig from '^/config/next-i18next.config.mjs';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
@@ -14,12 +17,16 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
-import { createSMTPClient } from '~/server/service/mail/smtp';
+import {
+  isRepairPageTreeRunning,
+  repairPageTree,
+} from '~/server/service/page/repair-page-tree';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { setup as setupFileUploadSetting } from './file-upload-setting';
 
 const logger = loggerFactory('growi:routes:apiv3:app-settings');
 
@@ -36,6 +43,9 @@ const router = express.Router();
  *        description: AppSettingParams
  *        type: object
  *        properties:
+ *          awsUseOnlyEnvVars:
+ *            type: boolean
+ *            example: false
  *          azureReferenceFileWithRelayMode:
  *            type: boolean
  *            example: false
@@ -318,7 +328,7 @@ const router = express.Router();
  *            type: boolean
  *            description: is enable internal stream system for azure file request
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
@@ -392,6 +402,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: /app-settings
    *        description: get app setting params
    *        responses:
@@ -456,6 +467,7 @@ module.exports = (crowi: Crowi) => {
           'env:useOnlyEnvVars:app:fileUploadType',
         ),
 
+        awsUseOnlyEnvVars: configManager.getConfig('env:useOnlyEnvVars:aws'),
         s3Region: configManager.getConfig('aws:s3Region'),
         s3CustomEndpoint: configManager.getConfig('aws:s3CustomEndpoint'),
         s3Bucket: configManager.getConfig('aws:s3Bucket'),
@@ -725,6 +737,10 @@ module.exports = (crowi: Crowi) => {
       throw Error('fromAddress is not setup');
     }
 
+    // Lazy: nodemailer must not load at server boot merely because this
+    // admin route module is statically registered (~/server/routes/apiv3/index.js
+    // -> app-settings/index.ts); only load it when a test email is actually sent.
+    const { createSMTPClient } = await import('~/server/service/mail/smtp');
     const smtpClient = createSMTPClient(configManager);
     if (smtpClient == null) {
       throw Error(
@@ -1034,7 +1050,7 @@ module.exports = (crowi: Crowi) => {
     },
   );
 
-  router.use('/file-upload-setting', require('./file-upload-setting')(crowi));
+  router.use('/file-upload-setting', setupFileUploadSetting(crowi));
 
   router.put(
     '/page-bulk-export-settings',
@@ -1081,12 +1097,85 @@ module.exports = (crowi: Crowi) => {
   /**
    * @swagger
    *
+   *    /app-settings/repair-page-tree:
+   *      post:
+   *        tags: [AppSettings]
+   *        security:
+   *          - bearer: []
+   *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
+   *        summary: AccessToken supported.
+   *        description: >
+   *          Removes orphaned empty pages and recomputes descendantCount for every
+   *          page. Runs in the background; progress is written to the server log.
+   *        responses:
+   *          200:
+   *            description: Page tree repair has been started
+   *            content:
+   *              application/json:
+   *                schema:
+   *                  type: object
+   *                  properties:
+   *                    isStarted:
+   *                      type: boolean
+   *                      example: true
+   */
+  router.post(
+    '/repair-page-tree',
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    (_req: CrowiRequest, res: ApiV3Response) => {
+      const isMaintenanceMode = crowi.appService.isMaintenanceMode();
+      if (!isMaintenanceMode) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'GROWI is not maintenance mode. To repair the page tree, please activate the maintenance mode first.',
+            'not_maintenance_mode',
+          ),
+        );
+      }
+
+      // The admin UI disables its button after starting, but that state is
+      // per-browser and resets on reload — reject here so a reloaded page cannot
+      // stack a second collection-wide scan on top of the running one.
+      if (isRepairPageTreeRunning()) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'Page tree repair is already running. Please wait for it to finish; progress is written to the server log.',
+            'repair_already_running',
+          ),
+        );
+      }
+
+      // Walks the whole page collection, so it cannot complete within a request.
+      // Kicked off in the background like v5-schema-migration above; the caller
+      // learns the outcome from the server log, not from this response.
+      repairPageTree(crowi.pageService).catch((err) => {
+        logger.error('Failed to repair the page tree', err);
+      });
+
+      // emit before the response is sent — see rules/activity-recording.md
+      const parameters = {
+        action: SupportedAction.ACTION_ADMIN_PAGE_TREE_REPAIR,
+      };
+      activityEvent.emit('update', res.locals.activity._id, parameters);
+
+      return res.apiv3({ isStarted: true });
+    },
+  );
+
+  /**
+   * @swagger
+   *
    *    /app-settings/v5-schema-migration:
    *      post:
    *        tags: [AppSettings]
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: AccessToken supported.
    *        description: Update V5SchemaMigration
    *        responses:
@@ -1145,6 +1234,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: AccessToken supported.
    *        description: Update MaintenanceMode
    *        requestBody:

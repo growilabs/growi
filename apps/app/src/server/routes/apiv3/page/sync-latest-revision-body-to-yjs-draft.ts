@@ -14,6 +14,7 @@ import { getYjsService } from '~/server/service/yjs';
 import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory(
@@ -49,6 +50,7 @@ export const syncLatestRevisionBodyToYjsDraftHandlerFactory = (
   return [
     accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }),
     loginRequiredStrictly,
+    excludeReadOnlyUser,
     ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {

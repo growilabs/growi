@@ -71,7 +71,8 @@ export const FixPageGrantAlert = (): JSX.Element => {
   if (
     pageId == null ||
     !hasParent ||
-    !dataIsGrantNormalized?.isGrantNormalized
+    dataIsGrantNormalized?.isGrantNormalized == null ||
+    dataIsGrantNormalized.isGrantNormalized
   ) {
     // biome-ignore lint/complexity/noUselessFragments: ignore
     return <></>;

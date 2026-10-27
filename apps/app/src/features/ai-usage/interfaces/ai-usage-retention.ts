@@ -1,0 +1,1 @@
+export const AI_USAGE_RETENTION_DAYS = 90;

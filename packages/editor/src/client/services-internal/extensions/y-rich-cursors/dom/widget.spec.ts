@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { RichCaretWidget } from './widget';
+import { RichCaretWidget } from './widget.js';
 
 /**
  * Unit tests for RichCaretWidget.

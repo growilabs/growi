@@ -3,7 +3,7 @@ import { acceptChunk, getChunks } from '@codemirror/merge';
 import type { ViewUpdate } from '@codemirror/view';
 import { EditorView } from '@codemirror/view';
 
-import type { UseCodeMirrorEditor } from '..';
+import type { UseCodeMirrorEditor } from '../index.js';
 
 export const acceptAllChunks = (view: EditorView): void => {
   // Get all chunks from the editor state

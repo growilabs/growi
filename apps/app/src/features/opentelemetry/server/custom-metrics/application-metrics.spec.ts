@@ -74,6 +74,7 @@ describe('addApplicationMetrics', () => {
       wikiType: 'open',
       additionalInfo: {
         activeExternalAccountTypes: ['google', 'github'],
+        attachmentType: 'aws',
       },
     };
 
@@ -102,6 +103,7 @@ describe('addApplicationMetrics', () => {
         site_url_hashed: undefined,
         wiki_type: 'open',
         external_auth_types: 'google,github',
+        attachment_type: 'aws',
       });
     });
 
@@ -131,6 +133,7 @@ describe('addApplicationMetrics', () => {
         site_url_hashed: expectedHash,
         wiki_type: 'open',
         external_auth_types: 'google,github',
+        attachment_type: 'aws',
       });
     });
 
@@ -145,6 +148,7 @@ describe('addApplicationMetrics', () => {
         ...mockGrowiInfo,
         additionalInfo: {
           activeExternalAccountTypes: [],
+          attachmentType: 'aws',
         },
       };
       mockGrowiInfoService.getGrowiInfo.mockResolvedValue(growiInfoWithoutAuth);
@@ -159,6 +163,7 @@ describe('addApplicationMetrics', () => {
         site_url_hashed: undefined,
         wiki_type: 'open',
         external_auth_types: '',
+        attachment_type: 'aws',
       });
     });
 
@@ -212,6 +217,7 @@ describe('addApplicationMetrics', () => {
         site_url_hashed: undefined,
         wiki_type: 'open',
         external_auth_types: '',
+        attachment_type: '',
       });
     });
   });

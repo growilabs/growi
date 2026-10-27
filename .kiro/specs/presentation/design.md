@@ -185,6 +185,8 @@ type SlidesProps = {
 - Render slide content via ReactMarkdown with section extraction
 - Apply Marp container CSS from pre-extracted constants (no runtime Marp dependency)
 - Use `MARP_CONTAINER_CLASS_NAME` from shared constants module
+- Treat the incoming `rendererOptions` as a read-only shared reference (see Risks & Mitigations); derive a new options object via `useMemo` and never mutate the input
+- Guard for `rendererOptions == null` (and missing `remarkPlugins` / `components`) with an early return; the `?` on `PresentationOptions.rendererOptions` is intentional and reflects SWR loading state
 
 **Dependencies**
 - Inbound: Slides — rendering delegation (P0)
@@ -281,4 +283,37 @@ export const presentationMarpit: Marp;
 - Integration: Added as `"pre:build:src"` script in `package.json`; runs before `vite build`
 - Validation: Script exits with error if CSS extraction produces empty output
 - Risks: Marp options must stay synchronized with `growi-marpit.ts`
+
+## Risks & Mitigations
+
+### `rendererOptions` undefined during SWR loading
+
+Callers in `apps/app` obtain `rendererOptions` from `usePresentationViewOptions()`, which is an SWR hook. During the loading window the value is `undefined`. `PresentationOptions.rendererOptions` is therefore declared optional, and `GrowiSlides` performs an early-return null guard.
+
+Defense is layered across four points; removing any single layer has historically caused regressions (PR #11110 / Redmine #183154):
+
+| Layer | Where | Purpose |
+|---|---|---|
+| Type signature | `consts/index.ts` — `rendererOptions?: ReactMarkdownOptions` | Force callers to acknowledge the loading state at compile time |
+| Caller guard | `apps/app` `SlideRenderer.tsx`, `PagePresentationModal.tsx` — no `as ReactMarkdownOptions` casts, must propagate `undefined` honestly | Prevent the loading `undefined` from masquerading as a value |
+| Component guard | `GrowiSlides.tsx` — early return when `rendererOptions == null` | Last line of defense for inline `slide: true` route, which has no caller-side `<RendererErrorMessage />` |
+| E2E | `apps/app/playwright/20-basic-features/presentation.spec.ts` — reload step | Exercises the SWR loading path that unit tests with mocked modules cannot reach |
+
+**Do not remove the optional `?`, the null guard, or add an `as` cast on grounds of "the type is required" — the optionality is intentional and reflects runtime reality.**
+
+### `rendererOptions` is a shared SWR cache reference
+
+The same `rendererOptions` object is returned by SWR to both `SlideRenderer` and `PagePresentationModal`. `GrowiSlides` must **not** mutate it; doing so leaks state across components and causes pushed remark plugins to accumulate across re-renders (incompatible with React StrictMode and concurrent rendering).
+
+Derive a new options object with `useMemo`, spreading `remarkPlugins` and `components` into fresh arrays/objects before adding `extractSections.remarkPlugin` and the section component. Keep the memo dependency list aligned with all derived inputs (`rendererOptions`, `isDarkMode`, `disableSeparationByHeader`, `presentation`).
+
+### Revalidation Triggers
+
+Re-run validation if any of the following change:
+
+- `PresentationOptions.rendererOptions` type (especially making it required again)
+- `usePresentationViewOptions` loading semantics
+- Null guards in `GrowiSlides`, `SlideRenderer`, or `PagePresentationModal`
+- Any `as ReactMarkdownOptions` cast added in `@growi/presentation` callers
+- Marp library major upgrade (regenerate `marpit-base-css.vendor-styles.prebuilt.ts`)
 

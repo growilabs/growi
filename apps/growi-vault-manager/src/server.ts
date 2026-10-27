@@ -1,0 +1,48 @@
+import type { PlatformApplication } from '@tsed/common';
+import { Configuration, Inject } from '@tsed/di';
+import express from 'express';
+import '@tsed/swagger';
+import '@tsed/terminus';
+
+import '@tsed/platform-express';
+
+import { ComposeViewController } from './controllers/compose-view-controller.js';
+import { GitProxyController } from './controllers/git-proxy-controller.js';
+import { HealthController } from './controllers/health-controller.js';
+import { MaintenanceController } from './controllers/maintenance-controller.js';
+import { StorageStatsController } from './controllers/storage-stats-controller.js';
+
+// Default port per requirement 10.1
+const PORT = Number(process.env.PORT || 3001);
+
+@Configuration({
+  port: PORT,
+  acceptMimes: ['application/json'],
+  mount: {
+    '/': [
+      ComposeViewController,
+      GitProxyController,
+      HealthController,
+      MaintenanceController,
+      StorageStatsController,
+    ],
+  },
+  middlewares: [
+    'json-parser',
+    express.json({ limit: '10mb' }),
+    express.urlencoded({ extended: true, limit: '10mb' }),
+  ],
+  swagger: [
+    {
+      path: '/v3/docs',
+      specVersion: '3.0.1',
+    },
+  ],
+  terminus: {
+    signals: ['SIGINT', 'SIGTERM'],
+  },
+})
+export class Server {
+  @Inject()
+  app: PlatformApplication | undefined;
+}

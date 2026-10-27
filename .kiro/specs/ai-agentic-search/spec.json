@@ -1,0 +1,23 @@
+{
+  "feature_name": "ai-agentic-search",
+  "created_at": "2026-05-15T00:00:00Z",
+  "updated_at": "2026-08-05T11:51:06.000Z",
+  "language": "ja",
+  "phase": "implementation-complete",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "cleaned_up_at": "2026-08-05T11:51:06.000Z"
+}

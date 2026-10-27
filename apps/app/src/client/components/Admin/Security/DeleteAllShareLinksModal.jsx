@@ -24,10 +24,10 @@ const DeleteAllShareLinksModal = React.memo((props) => {
       <ModalHeader tag="h4" toggle={closeButtonHandler} className="text-danger">
         <span>
           <span className="material-symbols-outlined">delete_forever</span>
-          {t('security_settings.delete_all_share_links')}
+          {t('admin:security_settings.delete_all_share_links')}
         </span>
       </ModalHeader>
-      <ModalBody>{t('security_settings.share_link_notice')}</ModalBody>
+      <ModalBody>{t('admin:security_settings.share_link_notice')}</ModalBody>
       <ModalFooter>
         <Button onClick={closeButtonHandler}>{t('Cancel')}</Button>
         <Button color="danger" onClick={deleteAllLinkHandler}>

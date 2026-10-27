@@ -1,10 +1,10 @@
-import { isValidObjectId } from '../objectid-utils';
-import { addTrailingSlash } from '../path-utils';
-import { isTopPage as _isTopPage } from './is-top-page';
+import { isValidObjectId } from '../objectid-utils.js';
+import { addTrailingSlash } from '../path-utils.js';
+import { isTopPage as _isTopPage } from './is-top-page.js';
 
 export const isTopPage = _isTopPage;
 
-export * from './generate-children-regexp';
+export * from './generate-children-regexp.js';
 
 /**
  * Whether path is the top page of users
@@ -111,7 +111,7 @@ const restrictedPatternsToCreate: Array<RegExp> = [
   /^(\.\.)$/, // see: https://github.com/growilabs/growi/issues/3582
   /(\/\.\.)\/?/, // see: https://github.com/growilabs/growi/issues/3582
   /\\/, // see: https://github.com/growilabs/growi/issues/7241
-  /^\/(_search|_private-legacy-pages)(\/.*|$)/,
+  /^\/(_search|_private-legacy-pages|_news)(\/.*|$)/,
   /^\/(installer|register|login|logout|admin|me|files|trash|paste|comments|tags|share|attachment)(\/.*|$)/,
   /^\/user(?:\/[^/]+)?$/, // https://regex101.com/r/9Eh2S1/1
   /^(\/.+){130,}$/, // avoid deep layer path. see: https://regex101.com/r/L0kzOD/1
@@ -311,4 +311,4 @@ export const isGlobPatternPath = (path: string): boolean => {
   return globPattern.test(path);
 };
 
-export * from './is-top-page';
+export * from './is-top-page.js';

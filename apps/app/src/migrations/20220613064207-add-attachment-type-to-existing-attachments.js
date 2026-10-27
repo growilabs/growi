@@ -1,45 +1,37 @@
-import mongoose from 'mongoose';
-
 import { AttachmentType } from '~/server/interfaces/attachment';
-import { Attachment } from '~/server/models/attachment';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory(
   'growi:migrate:add-attachment-type-to-existing-attachments',
 );
 
-module.exports = {
-  async up(db) {
-    logger.info('Apply migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
+export async function up() {
+  logger.info('Apply migration');
 
-    // Add attachmentType for wiki page
-    // Filter pages where "attachmentType" doesn't exist and "page" is not null
-    const operationsForWikiPage = {
-      updateMany: {
-        filter: { page: { $ne: null }, attachmentType: { $exists: false } },
-        update: { $set: { attachmentType: AttachmentType.WIKI_PAGE } },
+  // Add attachmentType for wiki page
+  // Filter pages where "attachmentType" doesn't exist and "page" is not null
+  await prisma.$runCommandRaw({
+    update: 'attachments',
+    updates: [
+      // Wiki page attachments: "page" is set, "attachmentType" doesn't exist
+      {
+        q: { page: { $ne: null }, attachmentType: { $exists: false } },
+        u: { $set: { attachmentType: AttachmentType.WIKI_PAGE } },
+        multi: true,
       },
-    };
-
-    // Add attachmentType for profile image
-    // Filter pages where "attachmentType" doesn't exist and "page" is null
-    const operationsForProfileImage = {
-      updateMany: {
-        filter: { page: { $eq: null }, attachmentType: { $exists: false } },
-        update: { $set: { attachmentType: AttachmentType.PROFILE_IMAGE } },
+      // Profile image attachments: "page" is null, "attachmentType" doesn't exist
+      {
+        q: { page: { $eq: null }, attachmentType: { $exists: false } },
+        u: { $set: { attachmentType: AttachmentType.PROFILE_IMAGE } },
+        multi: true,
       },
-    };
-    await Attachment.bulkWrite([
-      operationsForWikiPage,
-      operationsForProfileImage,
-    ]);
+    ],
+  });
 
-    logger.info('Migration has successfully applied');
-  },
+  logger.info('Migration has successfully applied');
+}
 
-  async down(db) {
-    // No rollback
-  },
-};
+export async function down() {
+  // No rollback
+}

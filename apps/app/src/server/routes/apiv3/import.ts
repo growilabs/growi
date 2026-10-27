@@ -3,25 +3,30 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { Router } from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
-import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+// The same code both import entry points answer a busy import with; the receive route's
+// caller matches on the exact string, so it is declared once.
+import { G2G_IMPORT_IN_PROGRESS_ERROR_CODE } from '~/server/models/vo/g2g-transfer-error';
+import { pendingActivityContext } from '~/server/service/activity/index';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
-import { generateOverwriteParams } from '~/server/service/import/overwrite-params';
 import type { ZipFileStat } from '~/server/service/interfaces/export';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+import { executeImport } from './import-executor';
+import { buildImportSettingsMap } from './import-settings-builder';
+import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:import');
 
-const path = require('path');
-
-const express = require('express');
-const multer = require('multer');
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
 
 const router = express.Router();
 
@@ -177,6 +182,7 @@ export default function route(crowi: Crowi): Router {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /import/status
    *      description: Get properties of stored zip files for import
    *      responses:
@@ -194,7 +200,7 @@ export default function route(crowi: Crowi): Router {
     accessTokenParser([SCOPE.READ.ADMIN.IMPORT_DATA], { acceptLegacy: true }),
     loginRequired,
     adminRequired,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       try {
         const status = await importService.getStatus();
         return res.apiv3(status);
@@ -213,6 +219,7 @@ export default function route(crowi: Crowi): Router {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /import
    *      description: import a collection from a zipped json
    *      requestBody:
@@ -247,9 +254,18 @@ export default function route(crowi: Crowi): Router {
     loginRequired,
     adminRequired,
     addActivity,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       // TODO: add express validator
       const { fileName, collections, options } = req.body;
+
+      // loginRequired + adminRequired guarantee req.user at runtime; guard narrows the type
+      const { user } = req;
+      if (user == null) {
+        return res.apiv3Err(
+          new ErrorV3('param "user" must be set.', 'forbidden'),
+          403,
+        );
+      }
 
       // pages collection can only be imported by upsert if isV5Compatible is true
       const isV5Compatible =
@@ -280,88 +296,129 @@ export default function route(crowi: Crowi): Router {
 
       const zipFile = importService.getFile(fileName);
 
-      // return response first
-      res.apiv3();
+      // Capture the activity context BEFORE responding. The import runs after
+      // this response and registerFailsafeFinalizer clears this request's
+      // pending context on the response's 'finish' event, so the post-import
+      // activity emit would otherwise settle with user=null (see PR #11510 and
+      // ExecuteImportArgs.activityContext).
+      //
+      // Optional on purpose: `add-activity` catches its own failures and calls `next()`
+      // without setting `res.locals.activity`, so reading `._id` outright can throw. That
+      // read used to sit between the claim below and the `try` that releases it, where a
+      // throw — which Express 4 does not catch for an async handler — would have left the
+      // claim held for the life of the process and every later import, admin and G2G
+      // alike, refused with a 409. Losing the audit row is the lesser harm; losing the
+      // import is not.
+      const activityId: string | undefined = res.locals.activity?._id;
+      const activityContext =
+        activityId != null
+          ? pendingActivityContext.take(activityId)
+          : undefined;
 
-      /*
-       * unzip, parse
-       */
-      let meta: object;
-      let fileStatsToImport: {
-        fileName: string;
-        collectionName: string;
-        size: number;
-      }[];
+      // Claimed before the response, because everything below runs after it has been sent:
+      // without the claim, a second import could start writing while this one is still
+      // reading the same directory.
+      //
+      // The maintenance-mode check above is no substitute. It only asks whether the wiki
+      // is closed to ordinary users, which says nothing about whether an import is already
+      // under way — and being closed is the normal state around one, since importing
+      // `configs` leaves maintenance mode on afterwards. So that gate waves a second zip
+      // straight through into the middle of the first import, or of a G2G transfer writing
+      // to the same place.
+      //
+      // Claimed last, immediately before the `try`: everything above can still leave
+      // without reaching the `finally` that releases it, and nothing may be added in
+      // between.
+      const importJob = importService.acquireImportJob();
+      if (importJob == null) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'Another import is already running on this GROWI.',
+            G2G_IMPORT_IN_PROGRESS_ERROR_CODE,
+          ),
+          409,
+        );
+      }
+
+      // `try/finally` rather than a response event: this route answers before it starts
+      // working, so releasing on the response would hand the job away while the import is
+      // still running. The response is sent inside the `try` so that nothing at all sits
+      // between the claim and the `finally` that returns it.
       try {
-        // unzip
-        await importService.unzip(zipFile);
+        // return response first
+        res.apiv3();
 
-        const parseZipResult = await growiBridgeService.parseZipFile(zipFile);
-        if (parseZipResult == null) {
-          throw new Error('parseZipFile returns null');
+        /*
+         * unzip, parse
+         */
+        let meta: object;
+        let fileStatsToImport: {
+          fileName: string;
+          collectionName: string;
+          size: number;
+        }[];
+        try {
+          // unzip
+          await importService.unzip(zipFile);
+
+          const parseZipResult = await growiBridgeService.parseZipFile(zipFile);
+          if (parseZipResult == null) {
+            throw new Error('parseZipFile returns null');
+          }
+
+          meta = parseZipResult.meta;
+
+          // filter innerFileStats
+          fileStatsToImport = parseZipResult.innerFileStats.filter(
+            ({ collectionName }) => {
+              return collections.includes(collectionName);
+            },
+          );
+        } catch (err) {
+          logger.error(err);
+          adminEvent.emit('onErrorForImport', { message: err.message });
+          return;
         }
 
-        meta = parseZipResult.meta;
+        /*
+         * validate with meta.json
+         */
+        try {
+          importService.validate(meta);
+        } catch (err) {
+          logger.error(err);
+          adminEvent.emit('onErrorForImport', { message: err.message });
+          return;
+        }
 
-        // filter innerFileStats
-        fileStatsToImport = parseZipResult.innerFileStats.filter(
-          ({ collectionName }) => {
-            return collections.includes(collectionName);
-          },
-        );
-      } catch (err) {
-        logger.error(err);
-        adminEvent.emit('onErrorForImport', { message: err.message });
-        return;
-      }
+        // generate maps of ImportSettings to import
+        let importSettingsMap: Map<string, ImportSettings>;
+        try {
+          importSettingsMap = buildImportSettingsMap(
+            fileStatsToImport,
+            options,
+            user._id.toString(),
+          );
+        } catch (err) {
+          logger.error(err);
+          adminEvent.emit('onErrorForImport', { message: err.message });
+          return;
+        }
 
-      /*
-       * validate with meta.json
-       */
-      try {
-        importService.validate(meta);
-      } catch (err) {
-        logger.error(err);
-        adminEvent.emit('onErrorForImport', { message: err.message });
-        return;
-      }
-
-      // generate maps of ImportSettings to import
-      // Use the Map for a potential fix for the code scanning alert no. 895: Prototype-polluting assignment
-      const importSettingsMap = new Map<string, ImportSettings>();
-      fileStatsToImport.forEach(({ fileName, collectionName }) => {
-        // instanciate GrowiArchiveImportOption
-        const option: GrowiArchiveImportOption = options.find(
-          (opt) => opt.collectionName === collectionName,
-        );
-
-        // generate options
-        const importSettings = {
-          mode: option.mode,
-          jsonFileName: fileName,
-          overwriteParams: generateOverwriteParams(
-            collectionName,
-            req.user._id,
-            option,
-          ),
-        } satisfies ImportSettings;
-
-        importSettingsMap.set(collectionName, importSettings);
-      });
-
-      /*
-       * import
-       */
-      try {
-        importService.import(collections, importSettingsMap);
-
-        const parameters = {
-          action: SupportedAction.ACTION_ADMIN_GROWI_DATA_IMPORTED,
-        };
-        activityEvent.emit('update', res.locals.activity._id, parameters);
-      } catch (err) {
-        logger.error(err);
-        adminEvent.emit('onErrorForImport', { message: err.message });
+        /*
+         * import
+         */
+        await executeImport({
+          importService,
+          adminEvent,
+          activityEvent,
+          activityId,
+          activityContext,
+          collections,
+          importSettingsMap,
+        });
+      } finally {
+        importJob.release();
       }
     },
   );
@@ -375,6 +432,7 @@ export default function route(crowi: Crowi): Router {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /import/upload
    *      description: upload a zip file
    *      requestBody:
@@ -401,8 +459,12 @@ export default function route(crowi: Crowi): Router {
     adminRequired,
     uploads.single('file'),
     addActivity,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       const { file } = req;
+      // uploads.single('file') populates req.file; guard narrows the type
+      if (file == null) {
+        return res.apiv3Err(new ErrorV3('File error.', 'file_not_found'), 400);
+      }
       const zipFile = importService.getFile(file.filename);
       let data: ZipFileStat | null;
 
@@ -441,6 +503,7 @@ export default function route(crowi: Crowi): Router {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /import/all
    *      description: Delete all zip files
    *      responses:
@@ -452,7 +515,7 @@ export default function route(crowi: Crowi): Router {
     accessTokenParser([SCOPE.WRITE.ADMIN.IMPORT_DATA], { acceptLegacy: true }),
     loginRequired,
     adminRequired,
-    async (req, res) => {
+    async (req: CrowiRequest, res: ApiV3Response) => {
       try {
         importService.deleteAllZipFiles();
 

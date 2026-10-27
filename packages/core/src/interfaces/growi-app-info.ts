@@ -1,6 +1,9 @@
 import type * as os from 'node:os';
 
-import type { GrowiDeploymentType, GrowiServiceType } from '../consts/system';
+import type {
+  GrowiDeploymentType,
+  GrowiServiceType,
+} from '../consts/system.js';
 
 export const GrowiWikiType = { open: 'open', closed: 'closed' } as const;
 type GrowiWikiType = (typeof GrowiWikiType)[keyof typeof GrowiWikiType];

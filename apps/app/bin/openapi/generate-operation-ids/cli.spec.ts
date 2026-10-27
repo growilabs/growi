@@ -77,7 +77,10 @@ describe('cli', () => {
     });
   });
 
-  it('handles generateOperationIds error correctly', async () => {
+  // The caller is a shell script whose only signal is this process's exit code.
+  // Swallowing the rejection here made the script report success while the spec
+  // it published had no operationId at all (#11634).
+  it('propagates a generateOperationIds failure instead of completing normally', async () => {
     // Mock generateOperationIds to throw error
     const error = new Error('Test error');
     vi.mocked(generateOperationIds).mockRejectedValue(error);
@@ -87,11 +90,7 @@ describe('cli', () => {
 
     // Import the module that contains the main function
     const cliModule = await import('./cli');
-    await cliModule.main();
-
-    // Verify error was logged
-    // biome-ignore lint/suspicious/noConsole: This is a test file
-    expect(console.error).toHaveBeenCalledWith(error);
+    await expect(cliModule.main()).rejects.toThrow('Test error');
 
     // Verify writeFileSync was not called
     expect(writeFileSync).not.toHaveBeenCalled();

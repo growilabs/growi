@@ -21,14 +21,30 @@ describe('getApplicationResourceAttributes', () => {
     vi.clearAllMocks();
   });
 
-  it('should return complete application resource attributes when growi info is available', async () => {
+  it('should return only service and deployment type attributes when growi info is available', async () => {
+    const mockGrowiInfo = {
+      type: 'app',
+      deploymentType: 'standalone',
+    };
+
+    mockGrowiInfoService.getGrowiInfo.mockResolvedValue(mockGrowiInfo);
+
+    const result = await getApplicationResourceAttributes();
+
+    expect(result).toEqual({
+      'growi.service.type': 'app',
+      'growi.deployment.type': 'standalone',
+    });
+    expect(result).not.toHaveProperty('growi.attachment.type');
+    expect(mockGrowiInfoService.getGrowiInfo).toHaveBeenCalledWith({});
+  });
+
+  it('should not include growi.attachment.type even when additionalInfo is present', async () => {
     const mockGrowiInfo = {
       type: 'app',
       deploymentType: 'standalone',
       additionalInfo: {
         attachmentType: 'local',
-        installedAt: new Date('2023-01-01T00:00:00.000Z'),
-        installedAtByOldestUser: new Date('2023-01-01T00:00:00.000Z'),
       },
     };
 
@@ -36,35 +52,10 @@ describe('getApplicationResourceAttributes', () => {
 
     const result = await getApplicationResourceAttributes();
 
+    expect(result).not.toHaveProperty('growi.attachment.type');
     expect(result).toEqual({
       'growi.service.type': 'app',
       'growi.deployment.type': 'standalone',
-      'growi.attachment.type': 'local',
-      'growi.installedAt': '2023-01-01T00:00:00.000Z',
-      'growi.installedAt.by_oldest_user': '2023-01-01T00:00:00.000Z',
-    });
-    expect(mockGrowiInfoService.getGrowiInfo).toHaveBeenCalledWith({
-      includeInstalledInfo: true,
-    });
-  });
-
-  it('should handle missing additionalInfo gracefully', async () => {
-    const mockGrowiInfo = {
-      type: 'app',
-      deploymentType: 'standalone',
-      additionalInfo: undefined,
-    };
-
-    mockGrowiInfoService.getGrowiInfo.mockResolvedValue(mockGrowiInfo);
-
-    const result = await getApplicationResourceAttributes();
-
-    expect(result).toEqual({
-      'growi.service.type': 'app',
-      'growi.deployment.type': 'standalone',
-      'growi.attachment.type': undefined,
-      'growi.installedAt': undefined,
-      'growi.installedAt.by_oldest_user': undefined,
     });
   });
 
@@ -76,28 +67,5 @@ describe('getApplicationResourceAttributes', () => {
     const result = await getApplicationResourceAttributes();
 
     expect(result).toEqual({});
-  });
-
-  it('should handle partial additionalInfo data', async () => {
-    const mockGrowiInfo = {
-      type: 'app',
-      deploymentType: 'docker',
-      additionalInfo: {
-        attachmentType: 'gridfs',
-        // Missing installedAt and installedAtByOldestUser
-      },
-    };
-
-    mockGrowiInfoService.getGrowiInfo.mockResolvedValue(mockGrowiInfo);
-
-    const result = await getApplicationResourceAttributes();
-
-    expect(result).toEqual({
-      'growi.service.type': 'app',
-      'growi.deployment.type': 'docker',
-      'growi.attachment.type': 'gridfs',
-      'growi.installedAt': undefined,
-      'growi.installedAt.by_oldest_user': undefined,
-    });
   });
 });

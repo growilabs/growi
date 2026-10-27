@@ -15,6 +15,16 @@ export const PageBulkExportFormat = {
 export type PageBulkExportFormat =
   (typeof PageBulkExportFormat)[keyof typeof PageBulkExportFormat];
 
+export const isPageBulkExportFormat = (
+  value: unknown,
+): value is PageBulkExportFormat =>
+  Object.values<unknown>(PageBulkExportFormat).includes(value);
+
+// Error code shared between the API route and the client to detect a
+// duplicate bulk export job in progress. Keep this as the single source of truth.
+export const PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE =
+  'page_export.duplicate_bulk_export_job_error';
+
 export const PageBulkExportJobInProgressStatus = {
   initializing: 'initializing', // preparing for export
   exporting: 'exporting', // exporting to fs

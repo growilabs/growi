@@ -2,8 +2,8 @@ import type { HydratedDocument } from 'mongoose';
 import { Types } from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
-import { getIdForRef, isPopulated } from './common';
-import type { IPage, IPageHasId } from './page';
+import { getIdForRef, isPopulated } from './common.js';
+import type { IPage, IPageHasId } from './page.js';
 
 describe('isPopulated', () => {
   it('should return true when the argument implements HasObjectId', () => {

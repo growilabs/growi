@@ -1,7 +1,7 @@
 import { Prec } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 
-import type { KeymapFactory } from './types';
+import type { KeymapFactory } from './types.js';
 
 export const defaultKeymap: KeymapFactory = async () => {
   const { defaultKeymap: cmDefaultKeymap } = await import(

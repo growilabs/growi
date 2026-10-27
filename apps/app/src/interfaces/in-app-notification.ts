@@ -1,11 +1,13 @@
-import type { IUser } from '@growi/core';
+import type { HasObjectId, IUser } from '@growi/core';
 
 import type { SupportedActionType, SupportedTargetModelType } from './activity';
 
-export enum InAppNotificationStatuses {
-  STATUS_UNOPENED = 'UNOPENED',
-  STATUS_OPENED = 'OPENED',
-}
+export const InAppNotificationStatuses = {
+  STATUS_UNOPENED: 'UNOPENED',
+  STATUS_OPENED: 'OPENED',
+} as const;
+export type InAppNotificationStatuses =
+  (typeof InAppNotificationStatuses)[keyof typeof InAppNotificationStatuses];
 
 export interface IInAppNotification<T = unknown> {
   user: IUser;
@@ -18,6 +20,9 @@ export interface IInAppNotification<T = unknown> {
   snapshot: string;
   parsedSnapshot?: any;
 }
+
+export type IInAppNotificationHasId<T = unknown> = IInAppNotification<T> &
+  HasObjectId;
 
 /*
  * Note:
@@ -42,13 +47,18 @@ export interface PaginateResult<T> {
  * In App Notification Settings
  */
 
-export enum subscribeRuleNames {
-  PAGE_CREATE = 'PAGE_CREATE',
-}
+export const subscribeRuleNames = {
+  PAGE_CREATE: 'PAGE_CREATE',
+} as const;
+export type subscribeRuleNames =
+  (typeof subscribeRuleNames)[keyof typeof subscribeRuleNames];
 
-export enum SubscribeRuleDescriptions {
-  PAGE_CREATE = 'in_app_notification_settings.default_subscribe_rules.page_create',
-}
+export const SubscribeRuleDescriptions = {
+  PAGE_CREATE:
+    'in_app_notification_settings.default_subscribe_rules.page_create',
+} as const;
+export type SubscribeRuleDescriptions =
+  (typeof SubscribeRuleDescriptions)[keyof typeof SubscribeRuleDescriptions];
 
 export interface ISubscribeRule {
   name: subscribeRuleNames;

@@ -14,9 +14,9 @@ import assert from 'assert';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import type { BookmarkedPage } from '~/interfaces/bookmark-info';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type { IPageGrantService } from '~/server/service/page-grant';
+import { prisma } from '~/utils/prisma';
 
 import Subscription from '../../models/subscription';
 import type { IPageService } from './page-service';
@@ -130,12 +130,8 @@ export async function findPageAndMetaDataByViewer(
     };
   }
 
-  const Bookmark = mongoose.model<
-    BookmarkedPage,
-    { countDocuments; findByPageIdAndUserId }
-  >('Bookmark');
-  const bookmarkCount: number = await Bookmark.countDocuments({
-    page: { $eq: pageId },
+  const bookmarkCount: number = await prisma.bookmarks.count({
+    where: { pageId: page._id.toString() },
   });
 
   const pageInfo = {
@@ -187,7 +183,8 @@ export async function findPageAndMetaDataByViewer(
 
   const isBookmarked: boolean = isGuestUser
     ? false
-    : (await Bookmark.findByPageIdAndUserId(pageId, user._id)) != null;
+    : (await prisma.bookmarks.findByPageIdAndUserId(page._id, user._id)) !=
+      null;
 
   if (pageInfo.isEmpty) {
     return {

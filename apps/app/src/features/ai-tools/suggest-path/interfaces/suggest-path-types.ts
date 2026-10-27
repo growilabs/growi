@@ -52,6 +52,9 @@ export type SearchResultItem = {
 };
 
 export type SearchService = {
+  // Availability signal (configured AND healthy) used by the engine
+  // selection; mirrors the getter on the real SearchService instance.
+  readonly isReachable: boolean;
   searchKeyword(
     keyword: string,
     nqName: string | null,

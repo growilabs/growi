@@ -1,9 +1,7 @@
-import type { IRevisionHasId } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
-import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
-import Activity from '~/server/models/activity';
+import { prisma } from '~/utils/prisma';
 
 type GenerateUpdatePayload = {
   currentUserId: string | undefined;
@@ -22,20 +20,24 @@ export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
   }
 
   // Get most recent update or create activity on the page
-  const lastContentActivity = await Activity.findOne({
-    target: targetPageId,
-    action: {
-      $in: [
-        SupportedAction.ACTION_PAGE_CREATE,
-        SupportedAction.ACTION_PAGE_UPDATE,
-      ],
+  const lastContentActivity = await prisma.activities.findFirst({
+    where: {
+      target: targetPageId,
+      action: {
+        in: [
+          SupportedAction.ACTION_PAGE_CREATE,
+          SupportedAction.ACTION_PAGE_UPDATE,
+        ],
+      },
+      id: { not: currentActivityId },
     },
-    _id: { $ne: currentActivityId },
-  }).sort({ createdAt: -1 });
+    orderBy: { createdAt: 'desc' },
+  });
 
   const isLastActivityByMe =
     lastContentActivity != null &&
-    getIdStringForRef(lastContentActivity?.user) === currentUserId;
+    lastContentActivity.userId != null &&
+    getIdStringForRef(lastContentActivity.userId) === currentUserId;
   const lastActivityTime = lastContentActivity?.createdAt?.getTime?.() ?? 0;
   const timeSinceLastActivityMs = Date.now() - lastActivityTime;
 
@@ -46,9 +48,8 @@ export const shouldGenerateUpdate = async (payload: GenerateUpdatePayload) => {
   } else if (timeSinceLastActivityMs < SUPPRESION_UPDATE_WINDOW_MS) {
     shouldGenerateUpdateActivity = false;
   } else {
-    const Revision = mongoose.model<IRevisionHasId>('Revision');
-    const revisionCount = await Revision.countDocuments({
-      pageId: targetPageId,
+    const revisionCount = await prisma.revisions.count({
+      where: { pageId: targetPageId },
     });
 
     shouldGenerateUpdateActivity =

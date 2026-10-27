@@ -56,7 +56,9 @@ const AssociateModalSubstance = (
       mutatePersonalExternalAccounts();
 
       closeModalHandler();
-      toastSuccess(t('security_settings.updated_general_security_setting'));
+      toastSuccess(
+        t('admin:security_settings.updated_general_security_setting'),
+      );
     } catch (err) {
       toastError(err);
     }

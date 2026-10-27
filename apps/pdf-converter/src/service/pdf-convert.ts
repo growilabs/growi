@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { pipeline as pipelinePromise } from 'node:stream/promises';
+import { pathToFileURL } from 'node:url';
 import { OnInit } from '@tsed/common';
 import { Service } from '@tsed/di';
 import { Logger } from '@tsed/logger';
@@ -9,7 +10,6 @@ import type { PuppeteerNodeLaunchOptions } from 'puppeteer';
 import { Cluster } from 'puppeteer-cluster';
 
 interface PageInfo {
-  htmlString: string;
   htmlFilePath: string;
 }
 
@@ -183,16 +183,20 @@ class PdfConvertService implements OnInit {
       'html',
       jobId,
     );
+    // Only *.html files are pages to convert. The job dir also contains the
+    // shared stylesheet (_bulk-export.css) which every page links to; it must
+    // be excluded from both conversion and the completion count below (the
+    // "length === 0" check that flips the job to PDF_EXPORT_DONE).
     const htmlFileEntries = fs
       .readdirSync(jobHtmlDir, { recursive: true, withFileTypes: true })
-      .filter((entry) => entry.isFile());
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.html'));
     let index = 0;
 
     const jobList = this.jobList;
 
     return new Readable({
       objectMode: true,
-      async read() {
+      read() {
         if (index >= htmlFileEntries.length) {
           if (
             jobList[jobId].status === JobStatus.HTML_EXPORT_DONE &&
@@ -206,9 +210,11 @@ class PdfConvertService implements OnInit {
 
         const entry = htmlFileEntries[index];
         const htmlFilePath = path.join(entry.parentPath, entry.name);
-        const htmlString = await fs.promises.readFile(htmlFilePath, 'utf-8');
 
-        this.push({ htmlString, htmlFilePath });
+        // The HTML is rendered by navigating Puppeteer to the file directly
+        // (see initPuppeteerCluster), so the file content is not read here —
+        // navigation resolves the page's relative <link> to the shared CSS.
+        this.push({ htmlFilePath });
 
         index += 1;
       },
@@ -242,7 +248,7 @@ class PdfConvertService implements OnInit {
         const fileOutputParentPath = this.getParentPath(fileOutputPath);
 
         try {
-          const pdfBody = await this.convertHtmlToPdf(pageInfo.htmlString);
+          const pdfBody = await this.convertHtmlToPdf(pageInfo.htmlFilePath);
           await fs.promises.mkdir(fileOutputParentPath, { recursive: true });
           await fs.promises.writeFile(fileOutputPath, pdfBody);
 
@@ -260,13 +266,13 @@ class PdfConvertService implements OnInit {
 
   /**
    * Convert html to pdf. Retry up to convertRetryLimit if failed.
-   * @param htmlString html to convert to pdf
+   * @param htmlFilePath absolute path of the html file to convert to pdf
    * @returns converted pdf
    */
-  private async convertHtmlToPdf(htmlString: string): Promise<Buffer> {
+  private async convertHtmlToPdf(htmlFilePath: string): Promise<Buffer> {
     const executeConvert = async (retries: number): Promise<Buffer> => {
       try {
-        return this.puppeteerCluster?.execute(htmlString);
+        return this.puppeteerCluster?.execute(htmlFilePath);
       } catch (err) {
         if (retries > 0) {
           this.logger.error(
@@ -293,8 +299,14 @@ class PdfConvertService implements OnInit {
     const config = this.getPuppeteerClusterConfig();
     this.puppeteerCluster = await Cluster.launch(config);
 
-    await this.puppeteerCluster.task(async ({ page, data: htmlString }) => {
-      await page.setContent(htmlString, { waitUntil: 'domcontentloaded' });
+    await this.puppeteerCluster.task(async ({ page, data: htmlFilePath }) => {
+      // Navigate to the file (not setContent) so the page's relative
+      // <link rel="stylesheet" href="…/_bulk-export.css"> resolves against the
+      // file's location on disk. waitUntil 'load' ensures the stylesheet has
+      // loaded before the PDF is rendered. The HTML is already sanitized by the
+      // bulk-export renderer, so loading it as a local file is safe.
+      // pathToFileURL handles spaces/Unicode in page paths correctly.
+      await page.goto(pathToFileURL(htmlFilePath).href, { waitUntil: 'load' });
       await page.addStyleTag({
         content: `
           body {

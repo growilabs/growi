@@ -3,7 +3,6 @@ import { pipeline } from 'node:stream/promises';
 import mongoose from 'mongoose';
 
 import getPageModel from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
 import { createBatchStream } from '~/server/util/batch-stream';
 import {
   getModelSafely,
@@ -11,6 +10,7 @@ import {
   mongoOptions,
 } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory(
   'growi:migrate:revision-path-to-page-id-schema-migration--fixed-8998',
@@ -19,98 +19,97 @@ const logger = loggerFactory(
 const LIMIT = 300;
 
 /**
- * @see https://dev.growi.org/69301054963f68dfcf2b7111
+ * Connect only when disconnected. Under the migrate-mongo CLI nothing has opened
+ * a mongoose connection yet, so this connects as before; when a caller already
+ * holds one (the integration test, which is bound to a per-worker database whose
+ * name getMongoUri() does not know), re-connecting would throw
+ * "Can't call `openUri()` on an active connection with different connection strings".
+ * see: https://mongoosejs.com/docs/api/connection.html#connection_Connection-readyState
  */
-module.exports = {
-  // path => pageId
-  async up(db, client) {
+async function connectIfDisconnected() {
+  if (mongoose.connection.readyState === 0) {
     await mongoose.connect(getMongoUri(), mongoOptions);
-    const Page = getModelSafely('Page') || getPageModel();
+  }
+}
 
-    const pagesStream = await Page.find(
-      { revision: { $ne: null } },
-      { _id: 1, path: 1 },
-    ).cursor({ batch_size: LIMIT });
-    const batchStrem = createBatchStream(LIMIT);
+export async function up(db, client) {
+  await connectIfDisconnected();
+  const Page = getModelSafely('Page') || getPageModel();
 
-    const migratePagesStream = new Writable({
-      objectMode: true,
-      async write(pages, _encoding, callback) {
-        const updateManyOperations = pages.map((page) => {
-          return {
-            updateMany: {
-              filter: {
-                $and: [{ path: page.path }, { pageId: { $exists: false } }],
-              },
-              update: [
-                {
-                  $unset: ['path'],
-                },
-                {
-                  $set: { pageId: page._id },
-                },
-              ],
-            },
-          };
-        });
+  const pagesStream = await Page.find(
+    { revision: { $ne: null } },
+    { _id: 1, path: 1 },
+  ).cursor({ batch_size: LIMIT });
+  const batchStrem = createBatchStream(LIMIT);
 
-        await Revision.bulkWrite(updateManyOperations, { strict: false });
+  const migratePagesStream = new Writable({
+    objectMode: true,
+    async write(pages, _encoding, callback) {
+      const updates = pages.map((page) => ({
+        q: {
+          $and: [{ path: page.path }, { pageId: { $exists: false } }],
+        },
+        u: [
+          { $unset: ['path'] },
+          { $set: { pageId: { $oid: page._id.toString() } } },
+        ],
+        multi: true,
+      }));
 
-        callback();
-      },
-      final(callback) {
-        callback();
-      },
-    });
+      await prisma.$runCommandRaw({
+        update: 'revisions',
+        updates,
+      });
 
-    await pipeline(pagesStream, batchStrem, migratePagesStream);
+      callback();
+    },
+    final(callback) {
+      callback();
+    },
+  });
 
-    logger.info('Migration has successfully applied');
-  },
+  await pipeline(pagesStream, batchStrem, migratePagesStream);
 
-  // pageId => path
-  async down(db, client) {
-    await mongoose.connect(getMongoUri(), mongoOptions);
-    const Page = getModelSafely('Page') || getPageModel();
+  logger.info('Migration has successfully applied');
+}
 
-    const pagesStream = await Page.find(
-      { revision: { $ne: null } },
-      { _id: 1, path: 1 },
-    ).cursor({ batch_size: LIMIT });
-    const batchStrem = createBatchStream(LIMIT);
+export async function down(db, client) {
+  await connectIfDisconnected();
+  const Page = getModelSafely('Page') || getPageModel();
 
-    const migratePagesStream = new Writable({
-      objectMode: true,
-      async write(pages, _encoding, callback) {
-        const updateManyOperations = pages.map((page) => {
-          return {
-            updateMany: {
-              filter: {
-                $and: [{ pageId: page._id }, { path: { $exists: false } }],
-              },
-              update: [
-                {
-                  $unset: ['pageId'],
-                },
-                {
-                  $set: { path: page.path },
-                },
-              ],
-            },
-          };
-        });
+  const pagesStream = await Page.find(
+    { revision: { $ne: null } },
+    { _id: 1, path: 1 },
+  ).cursor({ batch_size: LIMIT });
+  const batchStrem = createBatchStream(LIMIT);
 
-        await Revision.bulkWrite(updateManyOperations, { strict: false });
+  const migratePagesStream = new Writable({
+    objectMode: true,
+    async write(pages, _encoding, callback) {
+      const updates = pages.map((page) => ({
+        q: {
+          $and: [
+            { pageId: { $oid: page._id.toString() } },
+            { path: { $exists: false } },
+          ],
+        },
+        u: [{ $unset: ['pageId'] }, { $set: { path: page.path } }],
+        multi: true,
+      }));
 
-        callback();
-      },
-      final(callback) {
-        callback();
-      },
-    });
+      await prisma.$runCommandRaw({
+        update: 'revisions',
+        updates,
+      });
 
-    await pipeline(pagesStream, batchStrem, migratePagesStream);
+      callback();
+    },
+    final(callback) {
+      callback();
+    },
+  });
 
-    logger.info('Migration down has successfully applied');
-  },
-};
+  await pipeline(pagesStream, batchStrem, migratePagesStream);
+
+  logger.info('Migration down has successfully applied');
+}

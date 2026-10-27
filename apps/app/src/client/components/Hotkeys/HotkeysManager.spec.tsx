@@ -97,4 +97,26 @@ describe('HotkeysManager', () => {
 
     document.body.removeChild(input);
   });
+
+  it('does NOT trigger modifier-key shortcut when target is an editable element', () => {
+    render(<HotkeysManager />);
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    act(() => {
+      const event = new KeyboardEvent('keydown', {
+        key: '/',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      Object.defineProperty(event, 'getModifierState', {
+        value: (mod: string) => mod === 'Control',
+      });
+      input.dispatchEvent(event);
+    });
+    expect(ShowShortcutsModal).not.toHaveBeenCalled();
+
+    document.body.removeChild(input);
+  });
 });

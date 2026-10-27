@@ -1,6 +1,6 @@
 import { minimatch } from 'minimatch';
 
-import type { LoggerConfig } from './types';
+import type { LoggerConfig } from './types.js';
 
 /**
  * Resolve the log level for a namespace.

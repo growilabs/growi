@@ -1,12 +1,10 @@
-import type { IPage, IRevisionHasId, IUserHasId } from '@growi/core';
+import type { IPage, IUserHasId } from '@growi/core';
 import { allOrigin, getIdForRef, getIdStringForRef, Origin } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import {
-  isTopPage,
   isUserPage,
-  isUsersProtectedPages,
   isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 import type { Request, RequestHandler } from 'express';
@@ -15,7 +13,7 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { isAiEnabled } from '~/features/openai/server/services';
+import type { revisions } from '~/generated/prisma/client';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import {
   type IApiv3PageUpdateParams,
@@ -34,11 +32,14 @@ import {
 } from '~/server/models/serializers';
 import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
 import { configManager } from '~/server/service/config-manager/config-manager';
+import { isGrantImmutablePath } from '~/server/service/page/grant-immutable-path';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import { getYjsService } from '~/server/service/yjs';
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
@@ -55,7 +56,6 @@ interface UpdatePageRequest
 
 export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const Page = mongoose.model<IPage, PageModel>('Page');
-  const Revision = mongoose.model<IRevisionHasId>('Revision');
 
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
@@ -106,19 +106,31 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     body('wip').optional().isBoolean().withMessage('wip must be boolean'),
   ];
 
-  async function postAction(
+  /**
+   * Emit the page-update activity.
+   *
+   * This MUST run before the response is sent (see the call site). The
+   * activity's request context (operator user / ip / endpoint / username) is
+   * held in `pendingActivityContext`, keyed by the pre-minted activity id, and
+   * `registerFailsafeFinalizer` clears that entry on the `res` 'finish'/'close'
+   * events. The ActivityService 'update' listener consumes the context
+   * synchronously (`pendingActivityContext.take`) as the first thing it does.
+   *
+   * If the emit ran after `res.apiv3()` (as it used to, from inside
+   * `postAction`), the `await shouldGenerateUpdate(...)` below would yield the
+   * event loop long enough for the response's 'finish' to clear the context
+   * first, so the listener would settle the row with `user: null` -- a "bare"
+   * activity that later surfaces as a `null` entry in a notification's
+   * `actionUsers` and crashed the notification list. Emitting before the
+   * response guarantees `take()` runs while the context is still alive.
+   * (create-page.ts is unaffected: its emit is the first statement of its
+   * postAction, with no `await` between `res.apiv3()` and the emit.)
+   */
+  async function generateUpdateActivity(
     req: UpdatePageRequest,
     res: ApiV3Response,
     updatedPage: HydratedDocument<PageDocument>,
-    previousRevision: IRevisionHasId | null,
   ) {
-    // Reflect the updates in ydoc
-    const origin = req.body.origin;
-    if (origin === Origin.View || origin === undefined) {
-      const yjsService = getYjsService();
-      await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
-    }
-
     // Decide if update activity should generate
     let shouldGenerateUpdateActivity = false;
     try {
@@ -138,29 +150,45 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       );
     }
 
-    if (shouldGenerateUpdateActivity) {
-      try {
-        // persist activity
-        const creator =
-          updatedPage.creator != null
-            ? getIdForRef(updatedPage.creator)
-            : undefined;
-        const parameters = {
-          targetModel: SupportedTargetModel.MODEL_PAGE,
-          target: updatedPage,
-          action: SupportedAction.ACTION_PAGE_UPDATE,
-        };
-        const activityEvent = crowi.events.activity;
-        activityEvent.emit(
-          'update',
-          res.locals.activity._id,
-          parameters,
-          { path: updatedPage.path, creator },
-          preNotifyService.generatePreNotify,
-        );
-      } catch (err) {
-        logger.error('Failed to generate update activity', err);
-      }
+    if (!shouldGenerateUpdateActivity) {
+      return;
+    }
+
+    try {
+      // persist activity
+      const creator =
+        updatedPage.creator != null
+          ? getIdForRef(updatedPage.creator)
+          : undefined;
+      const parameters = {
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+        target: updatedPage,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        contributor: req.user,
+      };
+      const activityEvent = crowi.events.activity;
+      activityEvent.emit(
+        'update',
+        res.locals.activity._id,
+        parameters,
+        { path: updatedPage.path, creator },
+        preNotifyService.generatePreNotify,
+      );
+    } catch (err) {
+      logger.error('Failed to generate update activity', err);
+    }
+  }
+
+  async function postAction(
+    req: UpdatePageRequest,
+    updatedPage: HydratedDocument<PageDocument>,
+    previousRevision: { body: string } | null,
+  ) {
+    // Reflect the updates in ydoc
+    const origin = req.body.origin;
+    if (origin === Origin.View || origin === undefined) {
+      const yjsService = getYjsService();
+      await yjsService.syncWithTheLatestRevisionForce(req.body.pageId);
     }
 
     // global notification
@@ -197,19 +225,6 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         }
       } catch (err) {
         logger.error({ err }, 'Create user notification failed');
-      }
-    }
-
-    // Rebuild vector store file
-    if (isAiEnabled()) {
-      const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
-      );
-      try {
-        const openaiService = getOpenaiService();
-        await openaiService?.updateVectorStoreFileOnPageUpdate(updatedPage);
-      } catch (err) {
-        logger.error({ err }, 'Rebuild vector store failed');
       }
     }
   }
@@ -254,6 +269,10 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         );
       }
 
+      const currentPageRevisionId =
+        typeof currentPage.revision === 'string'
+          ? currentPage.revision
+          : currentPage.revision?._id.toString();
       const disableUserPages = configManager.getConfig(
         'security:disableUserPages',
       );
@@ -264,10 +283,11 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         return res.apiv3Err('User pages are disabled');
       }
 
-      const isGrantImmutable =
-        isTopPage(currentPage.path) || isUsersProtectedPages(currentPage.path);
-
-      if (grant != null && grant !== currentPage.grant && isGrantImmutable) {
+      if (
+        grant != null &&
+        grant !== currentPage.grant &&
+        isGrantImmutablePath(currentPage.path)
+      ) {
         return res.apiv3Err(
           new ErrorV3(
             'The grant settings for the specified page cannot be modified.',
@@ -290,14 +310,20 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         currentPage != null &&
         !(await currentPage.isUpdatable(sanitizeRevisionId, origin))
       ) {
-        const latestRevision = await Revision.findById(
-          currentPage.revision,
-        ).populate('author');
+        const latestRevision =
+          currentPageRevisionId != null
+            ? await prisma.revisions.findUnique({
+                where: { id: currentPageRevisionId },
+                include: { author: true },
+              })
+            : undefined;
         const returnLatestRevision = {
-          revisionId: latestRevision?._id.toString(),
+          revisionId: latestRevision?._id,
           revisionBody: latestRevision?.body,
           createdAt: latestRevision?.createdAt,
-          user: serializeUserSecurely(latestRevision?.author),
+          user: serializeUserSecurely(
+            latestRevision?.author as IUserHasId | undefined,
+          ),
         };
         return res.apiv3Err(
           new ErrorV3(
@@ -310,7 +336,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         );
       }
       let updatedPage: HydratedDocument<PageDocument>;
-      let previousRevision: IRevisionHasId | null;
+      let previousRevision: revisions | null = null;
       try {
         const {
           userRelatedGrantUserGroupIds,
@@ -331,7 +357,12 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         previousRevision = null;
         if (sanitizeRevisionId != null) {
           try {
-            previousRevision = await Revision.findById(sanitizeRevisionId);
+            previousRevision = await prisma.revisions.findUnique({
+              where: { id: sanitizeRevisionId },
+            });
+            if (!isRevisionOfPage(previousRevision, currentPage._id)) {
+              previousRevision = null;
+            }
           } catch (error) {
             logger.error(
               {
@@ -347,15 +378,17 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         // Priority 2: Fallback to currentPage.revision (for diff detection)
         if (previousRevision == null && currentPage.revision != null) {
           try {
-            previousRevision = await Revision.findById(currentPage.revision);
+            previousRevision = await prisma.revisions.findUnique({
+              where: { id: currentPageRevisionId },
+            });
           } catch (error) {
             logger.error(
               {
                 pageId: currentPage._id,
-                revisionId: currentPage.revision,
+                revisionId: currentPageRevisionId,
                 err: error,
               },
-              'Failed to fetch previousRevision by currentPage.revision',
+              'Failed to fetch previousRevision by currentPageRevisionId',
             );
           }
         }
@@ -379,9 +412,16 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         revision: serializeRevisionSecurely(updatedPage.revision),
       };
 
+      // Generate the update activity BEFORE sending the response so the
+      // ActivityService listener captures the request context while it is
+      // still alive (see generateUpdateActivity's doc comment). This is
+      // awaited because the synchronous context `take()` happens inside the
+      // emit, and the emit must not be preceded by `res.apiv3()`.
+      await generateUpdateActivity(req, res, updatedPage);
+
       res.apiv3(result, 201);
 
-      postAction(req, res, updatedPage, previousRevision);
+      postAction(req, updatedPage, previousRevision);
     },
   ];
 };

@@ -20,6 +20,9 @@ export type AggregatedPage = Pick<
     username: string;
     email: string;
   };
+  lastUpdateUser?: {
+    username: string;
+  };
 } & {
   tagNames: string[];
   revisionBodyEmbedded?: number[];
@@ -28,7 +31,6 @@ export type AggregatedPage = Pick<
 export type BulkWriteCommand = {
   index: {
     _index: string;
-    _type: '_doc' | undefined;
     _id: string;
   };
 };
@@ -46,6 +48,7 @@ export type BulkWriteBody = {
   body: string;
   body_embedded?: number[];
   username?: string;
+  last_update_username?: string;
   comments?: string[];
   comment_count: number;
   bookmark_count: number;

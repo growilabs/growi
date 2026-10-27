@@ -1,3 +1,4 @@
+import type { Lang } from '@growi/core';
 import { atom, useAtomValue } from 'jotai';
 
 import type { SupportedActionType } from '~/interfaces/activity';
@@ -7,11 +8,6 @@ import type { RendererConfig } from '~/interfaces/services/renderer';
  * Atom for AI feature enabled status
  */
 export const aiEnabledAtom = atom<boolean>(false);
-
-/**
- * Atom for limit learnable page count per assistant
- */
-export const limitLearnablePageCountPerAssistantAtom = atom<number>(0);
 
 /**
  * Atom for users homepage deletion enabled status
@@ -167,6 +163,13 @@ export const activityExpirationSecondsAtom = atom<number>(0);
  * Audit Log Available Actions atom
  */
 export const auditLogAvailableActionsAtom = atom<SupportedActionType[]>([]);
+
+/**
+ * Atom for the display name of each language, keyed by Lang.
+ * Hydrated from server-computed data instead of preloading every i18n
+ * namespace for every language into the client bundle.
+ */
+export const langDisplayNamesAtom = atom<Partial<Record<Lang, string>>>({});
 
 /**
  * Atom for renderer config

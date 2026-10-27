@@ -6,7 +6,6 @@ import {
   PresetThemesMetadatas,
 } from '@growi/preset-themes';
 import path from 'path';
-import uglifycss from 'uglifycss';
 
 import { growiPluginService } from '~/features/growi-plugin/server/services';
 import loggerFactory from '~/utils/logger';
@@ -94,8 +93,7 @@ export class CustomizeService implements S2sMessageHandlable {
   initCustomCss() {
     const rawCss = configManager.getConfig('customize:css') || '';
 
-    // uglify and store
-    this.customCss = uglifycss.processString(rawCss);
+    this.customCss = rawCss;
 
     this.lastLoadedAt = new Date();
   }
@@ -142,7 +140,8 @@ export class CustomizeService implements S2sMessageHandlable {
     else {
       // import preset-themes manifest
       const presetThemesManifest = await import(
-        path.join('@growi/preset-themes', manifestPath)
+        path.join('@growi/preset-themes', manifestPath),
+        { with: { type: 'json' } }
       ).then((imported) => imported.default);
 
       const themeMetadata = PresetThemesMetadatas.find((p) => p.name === theme);

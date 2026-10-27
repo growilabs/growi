@@ -2,13 +2,14 @@ import { type JSX, memo, useCallback, useRef } from 'react';
 import type { AcceptedUploadFileType } from '@growi/core';
 import SimpleBar from 'simplebar-react';
 
-import type { GlobalCodeMirrorEditorKey } from '../../../../consts';
-import { AttachmentsDropup } from './AttachmentsDropup';
-import { DiagramButton } from './DiagramButton';
-import { EmojiButton } from './EmojiButton';
-import { TableButton } from './TableButton';
-import { TemplateButton } from './TemplateButton';
-import { TextFormatTools } from './TextFormatTools';
+import type { GlobalCodeMirrorEditorKey } from '../../../../consts/index.js';
+import { AttachmentsDropup } from './AttachmentsDropup.js';
+import { DiagramButton } from './DiagramButton.js';
+import { EditorGuideButton } from './EditorGuideButton.js';
+import { EmojiButton } from './EmojiButton.js';
+import { TableButton } from './TableButton.js';
+import { TemplateButton } from './TemplateButton.js';
+import { TextFormatTools } from './TextFormatTools.js';
 
 import styles from './Toolbar.module.scss';
 
@@ -55,6 +56,7 @@ export const Toolbar = memo((props: Props): JSX.Element => {
               <TableButton editorKey={editorKey} />
               <DiagramButton editorKey={editorKey} />
               <TemplateButton editorKey={editorKey} />
+              <EditorGuideButton />
             </div>
           </SimpleBar>
         </div>

@@ -6,4 +6,5 @@
 **/.pnpm-store
 **/.turbo
 out
-apps/app
+apps/**
+!apps/slackbot-proxy

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { appendTextToEditorUntilContains } from '../utils/AppendTextToEditorUntilContains';
+import { appendTextToEditorUntilContains } from '../utils/append-text-to-editor-until-contains';
 
 test('has title', async ({ page }) => {
   await page.goto('/Sandbox');

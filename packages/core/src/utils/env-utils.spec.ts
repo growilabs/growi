@@ -1,4 +1,4 @@
-import { toBoolean } from './env-utils';
+import { toBoolean } from './env-utils.js';
 
 describe('env-utils', () => {
   describe('.toBoolean', () => {

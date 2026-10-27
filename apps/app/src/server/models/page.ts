@@ -4,6 +4,7 @@ import type {
   IUserHasId,
 } from '@growi/core/dist/interfaces';
 import { getIdForRef, isPopulated } from '@growi/core/dist/interfaces';
+import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import { hasSlash, isTopPage } from '@growi/core/dist/utils/page-path-utils';
 import {
   addTrailingSlash,
@@ -30,6 +31,7 @@ import type {
   IPagePathWithDescendantCount,
 } from '~/interfaces/page';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import { prisma } from '~/utils/prisma';
 
 import loggerFactory from '../../utils/logger';
 import type Crowi from '../crowi';
@@ -66,6 +68,12 @@ export interface PageDocument extends IPage, Document<Types.ObjectId> {
   populateDataToShowRevision(
     shouldExcludeBody?: boolean,
   ): Promise<IPagePopulatedToShowRevision & PageDocument>;
+  publish(): void;
+  unpublish(): void;
+  // Declared explicitly despite the index signature above: omitting
+  // wipExpirationSeconds would otherwise compile and store `new Date(NaN)`,
+  // surfacing only as a save-time CastError.
+  makeWip(disableTtl: boolean, wipExpirationSeconds: number): void;
 }
 
 type TargetAndAncestorsResult = {
@@ -129,6 +137,8 @@ export interface PageModel extends Model<PageDocument> {
     userGroups?,
     includeEmpty?: boolean,
     includeAnyoneWithTheLink?: boolean,
+    showPagesRestrictedByOwner?: boolean,
+    showPagesRestrictedByGroup?: boolean,
   ): Promise<HydratedDocument<PageDocument>[]>;
   findByPath(
     path: string,
@@ -257,7 +267,7 @@ const schema = new Schema<PageDocument, PageModel>(
     commentCount: { type: Number, default: 0 },
     expandContentWidth: { type: Boolean },
     wip: { type: Boolean },
-    ttlTimestamp: { type: Date },
+    wipExpiredAt: { type: Date },
     updatedAt: { type: Date, default: Date.now }, // Do not use timetamps for updatedAt because it breaks 'updateMetadata: false' option
     deleteUser: { type: Schema.Types.ObjectId, ref: 'User' },
     deletedAt: { type: Date },
@@ -271,6 +281,13 @@ const schema = new Schema<PageDocument, PageModel>(
 // indexes
 schema.index({ createdAt: 1 });
 schema.index({ updatedAt: 1 });
+// sparse: only WIP pages awaiting expiry carry this field, so the index stays
+// proportional to them rather than to the whole collection. Safe for the only
+// query that uses it (`wipExpiredAt: { $lte: <Date> }`): a missing or null value
+// never satisfies a Date range comparison, so nothing the index omits is a hit.
+// Keep in sync with the createIndex options in the wipExpiredAt migration —
+// mismatched options on the same index name fail with IndexOptionsConflict.
+schema.index({ wipExpiredAt: 1 }, { sparse: true });
 // apply plugins
 schema.plugin(mongoosePaginate);
 schema.plugin(uniqueValidator);
@@ -347,7 +364,7 @@ export class PageQueryBuilder {
     const pathNormalized = normalizePath(path);
     const pathWithTrailingSlash = addTrailingSlash(path);
 
-    const startsPattern = RegExp.escape(pathWithTrailingSlash);
+    const startsPattern = escapeStringForMongoRegex(pathWithTrailingSlash);
 
     this.query = this.query.and({
       $or: [
@@ -372,7 +389,7 @@ export class PageQueryBuilder {
 
     const pathWithTrailingSlash = addTrailingSlash(path);
 
-    const startsPattern = RegExp.escape(pathWithTrailingSlash);
+    const startsPattern = escapeStringForMongoRegex(pathWithTrailingSlash);
 
     this.query = this.query.and({ path: new RegExp(`^${startsPattern}`) });
 
@@ -408,7 +425,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const startsPattern = RegExp.escape(path);
+    const startsPattern = escapeStringForMongoRegex(path);
 
     this.query = this.query.and({ path: new RegExp(`^${startsPattern}`) });
 
@@ -423,7 +440,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const startsPattern = RegExp.escape(str);
+    const startsPattern = escapeStringForMongoRegex(str);
 
     this.query = this.query.and({
       path: new RegExp(`^(?!${startsPattern}).*$`),
@@ -439,7 +456,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const startsPattern = RegExp.escape(path);
+    const startsPattern = escapeStringForMongoRegex(path);
 
     this.query = this.query.and({
       path: { $not: new RegExp(`^${startsPattern}(/|$)`) },
@@ -454,7 +471,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const match = RegExp.escape(str);
+    const match = escapeStringForMongoRegex(str);
 
     this.query = this.query.and({ path: new RegExp(`^(?=.*${match}).*$`) });
 
@@ -467,7 +484,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const match = RegExp.escape(str);
+    const match = escapeStringForMongoRegex(str);
 
     this.query = this.query.and({ path: new RegExp(`^(?!.*${match}).*$`) });
 
@@ -810,6 +827,8 @@ schema.statics.findByIdsAndViewer = async function (
   userGroups?,
   includeEmpty?: boolean,
   includeAnyoneWithTheLink?: boolean,
+  showPagesRestrictedByOwner?: boolean,
+  showPagesRestrictedByGroup?: boolean,
 ): Promise<PageDocument[]> {
   const baseQuery = this.find({ _id: { $in: pageIds } });
   const queryBuilder = new PageQueryBuilder(baseQuery, includeEmpty);
@@ -818,6 +837,8 @@ schema.statics.findByIdsAndViewer = async function (
     user,
     userGroups,
     includeAnyoneWithTheLink,
+    showPagesRestrictedByOwner,
+    showPagesRestrictedByGroup,
   );
 
   return queryBuilder.query.exec();
@@ -1061,15 +1082,26 @@ schema.statics.findParentByPath = async function (
 /*
  * Utils from obsolete-page.js
  */
-export async function pushRevision(pageData, newRevision, user) {
-  await newRevision.save();
+export async function pushRevision(
+  pageData: HydratedDocument<PageDocument>,
+  newRevisionData,
+  user,
+) {
+  const newRevision = await prisma.revisions.create({ data: newRevisionData });
 
-  pageData.revision = newRevision;
+  pageData.revision = newRevision._id;
   pageData.latestRevisionBodyLength = newRevision.body.length;
   pageData.lastUpdateUser = user?._id ?? user;
-  pageData.updatedAt = Date.now();
+  pageData.updatedAt = new Date();
 
-  return pageData.save();
+  const savedPage = await pageData.save();
+  // Setting `revision` to a bare id (above) leaves the path unpopulated.
+  // The old Mongoose flow assigned a hydrated Revision document here instead,
+  // which Mongoose treats as already-populated; recreate that by populating
+  // for real -- the 'Revision' mongoose model still queries the same
+  // `revisions` collection that Prisma writes to.
+  // biome-ignore lint/plugin: allow populate for backward compatibility
+  return savedPage.populate<HydratedDocument<PageDocument>>('revision');
 }
 
 /**
@@ -1462,19 +1494,22 @@ schema.methods.calculateAndUpdateLatestRevisionBodyLength = async function (
 
 schema.methods.publish = function () {
   this.wip = undefined;
-  this.ttlTimestamp = undefined;
+  this.wipExpiredAt = undefined;
 };
 
 schema.methods.unpublish = function () {
   this.wip = true;
-  this.ttlTimestamp = undefined;
+  this.wipExpiredAt = undefined;
 };
 
-schema.methods.makeWip = function (disableTtl: boolean) {
+schema.methods.makeWip = function (
+  disableTtl: boolean,
+  wipExpirationSeconds: number,
+) {
   this.wip = true;
 
   if (!disableTtl) {
-    this.ttlTimestamp = new Date();
+    this.wipExpiredAt = new Date(Date.now() + wipExpirationSeconds * 1000);
   }
 };
 

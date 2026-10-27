@@ -56,3 +56,8 @@ out
 
 # docker env files (secrets — never commit)
 infra/docker/.env
+
+# Memory profiling artifacts (heap snapshots are large and may contain sensitive data)
+*.heapsnapshot
+/tmp/memory-profiler/
+/tmp/memory-leak-investigation/

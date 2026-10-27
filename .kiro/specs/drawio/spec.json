@@ -1,0 +1,29 @@
+{
+  "feature_name": "drawio",
+  "created_at": "2026-08-04T13:06:31Z",
+  "updated_at": "2026-08-05T00:00:00Z",
+  "language": "ja",
+  "phase": "implementation-complete",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "validation": {
+    "decision": "GO",
+    "validated_at": "2026-08-04T20:40:00Z",
+    "remediation_rounds": 2
+  },
+  "cleaned_up_at": "2026-08-05T00:00:00Z",
+  "increment_note": "Living maintenance spec for the draw.io integration: it is the starting point for spec changes, not a record of a past implementation. Requirements 1-8 are the behaviour contract (change them, then follow with the implementation -- procedure in design.md). Requirements 9-11 are what the spec itself must satisfy. Restructured 2026-08-05 on user feedback: dropped what is more reliably read from the code (signatures, file tree, traceability table, per-test coverage enumeration) and kept the facts that took real research plus the reasons behind unusual choices. PRs #11633 / #11524 are referenced, not the subject."
+}

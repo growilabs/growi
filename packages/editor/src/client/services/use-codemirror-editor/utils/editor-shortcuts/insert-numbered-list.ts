@@ -1,7 +1,7 @@
 import type { EditorView, KeyBinding } from '@codemirror/view';
 
-import { useInsertPrefix } from '../insert-prefix';
-import { generateAddMarkdownSymbolCommand } from './generate-add-markdown-symbol-command';
+import { useInsertPrefix } from '../insert-prefix.js';
+import { generateAddMarkdownSymbolCommand } from './generate-add-markdown-symbol-command.js';
 
 export const useInsertNumberedKeyBinding = (view?: EditorView): KeyBinding => {
   const insertPrefix = useInsertPrefix(view);

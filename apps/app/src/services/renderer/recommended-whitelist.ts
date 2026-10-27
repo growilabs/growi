@@ -37,6 +37,9 @@ relaxedSchemaAttributes.ul = excludeRestrictedClassAttributes(
 relaxedSchemaAttributes.li = excludeRestrictedClassAttributes(
   relaxedSchemaAttributes.li,
 );
+relaxedSchemaAttributes.h2 = excludeRestrictedClassAttributes(
+  relaxedSchemaAttributes.h2,
+);
 
 /**
  * reference: https://meta.stackexchange.com/questions/1777/what-html-tags-are-allowed-on-stack-exchange-sites,

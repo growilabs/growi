@@ -1,0 +1,24 @@
+{
+  "feature_name": "growi-vault-manager",
+  "created_at": "2026-05-07T00:00:00.000Z",
+  "updated_at": "2026-07-29T09:00:00.000Z",
+  "language": "ja",
+  "phase": "implementation-complete",
+  "cleaned_up_at": "2026-07-28T18:54:00.000Z",
+  "revision_note": "2026-07-29: #11595（clone の転送量を絞る手段が README 通りに動かない）の残件を解決。git の絞り込み指定のうち sparse:oid だけが除外をサーバ側で適用して 1 リクエストで完結し、要件 5.6–5.8 の検査を無変更で通ることを実測で確認（20,000 ページのビューで 23.2% 削減、要求は commit 1 件・本文 252 バイト）。uploadpack.allowFilter を有効化し、公開する sparse-checkout パターン集合を refs/vault/sparse-filters/<name> から参照させ、公開していない指定は upload-pack 起動前に拒否する（要件 5.9–5.11、Phase 21）。allowFilter は指定の種類ごとに分けられないため、拒否しないと blob:none が「clone だけ成功して checkout が空のまま失敗する」状態になる（実測）。allowReachableSHA1InWant は据え置き（有効化は Revalidation Trigger）。あわせて #11604 の spec 整頓で参照先が切れていた「追補 A」8 箇所を修正。 / 2026-07-28: 実装後の調査で要件 5.4 の前提（uploadpack.allowAnySHA1InWant=false でビュー外 OID を取得できない）が commit にしか当てはまらないと実測判明。ファイルの中身（blob）とディレクトリの一覧（tree）はビューを越えて取得できた（git 2.49.0）。gitnamespaces(7) が namespace は読み取りのアクセス制御に使えないと明記しており git の設定では解決できないため、GitProxyController が upload-pack 起動前に要求 object のビュー ref からの到達性を検査する層を追加（要件 5.6–5.8、PR #11604）。cc-sdd の流儀に合わせ、調査結果・3 案比較・性能実測・実装知見は新設した research.md に、検査の位置と内容および既知の制約は design.md に、受け入れ基準は requirements.md に分離。承認済みの受け入れ基準 5.4 は据え置き。umbrella spec（growi-vault）側は Decision 3 に Follow-up 1 項と Risks に 1 行のみ追記。前回の revision_note（2026-06-05 の integ 並行実行 timeout の調査と per-worker 分離による解決）は解決済みのため要約: integ テストは setupFile で worker ごとに独立 DB / 独立 bare repo / 独立 port の vault-manager を in-process 起動する方式に変更済み。",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

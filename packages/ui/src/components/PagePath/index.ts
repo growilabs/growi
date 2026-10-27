@@ -1,2 +1,2 @@
-export * from './PageListMeta';
-export * from './PagePathLabel';
+export * from './PageListMeta.js';
+export * from './PagePathLabel.js';

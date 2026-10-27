@@ -1,5 +1,6 @@
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { SupportedAction } from '~/interfaces/activity';
+import type { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
   ISearchResult,
@@ -9,6 +10,8 @@ import loggerFactory from '~/utils/logger';
 import type Crowi from '../crowi';
 import UserGroupRelation from '../models/user-group-relation';
 import { isSearchError } from '../models/vo/search-error';
+import ApiPaginate from '../util/apiPaginate';
+import ApiResponse from '../util/apiResponse';
 
 const logger = loggerFactory('growi:routes:search');
 
@@ -40,10 +43,7 @@ const logger = loggerFactory('growi:routes:search');
  *           meta:
  *             $ref: '#/components/schemas/ElasticsearchResultMeta'
  */
-module.exports = (crowi: Crowi, app) => {
-  const ApiResponse = require('../util/apiResponse');
-  const ApiPaginate = require('../util/apiPaginate');
-
+export const setup = (crowi: Crowi, app) => {
   const actions: any = {};
   const api: any = {};
 
@@ -121,7 +121,6 @@ module.exports = (crowi: Crowi, app) => {
       type = null,
       sort = null,
       order = null,
-      vector = null,
     } = req.query;
     let paginateOpts: { limit: number; offset: number };
 
@@ -155,12 +154,10 @@ module.exports = (crowi: Crowi, app) => {
       type,
       sort,
       order,
-      vector,
     };
 
     let searchResult: ISearchResult<unknown>;
-    // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-    let delegatorName;
+    let delegatorName: SearchDelegatorName | null;
     try {
       const query = decodeURIComponent(q);
       const nqName = nq ?? decodeURIComponent(nq);

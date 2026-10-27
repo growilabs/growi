@@ -81,13 +81,21 @@ const PageSelectModalSubstance: FC = () => {
         {t('page_select_modal.select_page_location')}
       </ModalHeader>
       <ModalBody className="p-0">
-        <Suspense fallback={<ItemsTreeContentSkeleton />}>
-          {/* 133px = 63px(ModalHeader) + 70px(ModalFooter) */}
-          <div
-            ref={scrollerRefCallback}
-            className="p-3"
-            style={{ maxHeight: 'calc(85vh - 133px)', overflowY: 'auto' }}
-          >
+        {/* 133px = 63px(ModalHeader) + 70px(ModalFooter) */}
+        {/*
+          The scroller div MUST stay OUTSIDE <Suspense>. It owns the callback ref
+          that sets `scrollerElem`; if it were inside the boundary, ItemsTree
+          suspending would hide the primary content and detach this ref (call it
+          with null), resetting `scrollerElem`. That unmounts ItemsTree, the
+          content reveals, the ref re-attaches, ItemsTree suspends again — an
+          unbounded render loop ("Maximum update depth exceeded"). See #11422.
+        */}
+        <div
+          ref={scrollerRefCallback}
+          className="p-3"
+          style={{ maxHeight: 'calc(85vh - 133px)', overflowY: 'auto' }}
+        >
+          <Suspense fallback={<ItemsTreeContentSkeleton />}>
             {scrollerElem && (
               <ItemsTree
                 CustomTreeItem={TreeItemForModal}
@@ -99,8 +107,8 @@ const PageSelectModalSubstance: FC = () => {
                 scrollerElem={scrollerElem}
               />
             )}
-          </div>
-        </Suspense>
+          </Suspense>
+        </div>
       </ModalBody>
       <ModalFooter className="border-top d-flex flex-column">
         {isHierarchicalSelectionMode && (

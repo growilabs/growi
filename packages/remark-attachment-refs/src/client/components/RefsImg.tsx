@@ -1,8 +1,9 @@
 import React, { type JSX, useMemo } from 'react';
 
-import { useSWRxRefs } from '../stores/refs';
-import { AttachmentList } from './AttachmentList';
-import { RefsContext } from './util/refs-context';
+import { useSWRxRefs } from '../stores/refs.js';
+import { AttachmentList } from './AttachmentList.js';
+import { AttachmentRefsDisabled } from './AttachmentRefsDisabled.js';
+import { RefsContext } from './util/refs-context.js';
 
 export type Props = {
   pagePath: string;
@@ -19,6 +20,7 @@ export type Props = {
   noCarousel?: string;
 
   isImmutable?: boolean;
+  isSharedPage?: boolean;
 };
 
 export const RefsImgSubstance = React.memo(
@@ -109,12 +111,15 @@ export const RefsImgSubstance = React.memo(
 );
 
 export const RefsImg = React.memo((props: Props): JSX.Element => {
+  if (props.isSharedPage) {
+    return <AttachmentRefsDisabled name="refsimg" />;
+  }
   return <RefsImgSubstance {...props} />;
 });
 
 export const RefsImgImmutable = React.memo(
   (props: Omit<Props, 'isImmutable'>): JSX.Element => {
-    return <RefsImgSubstance {...props} isImmutable />;
+    return <RefsImg {...props} isImmutable />;
   },
 );
 

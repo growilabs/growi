@@ -1,13 +1,13 @@
 import type { Logger } from 'pino';
 import pino from 'pino';
 
-import { parseEnvLevels } from './env-var-parser';
-import { resolveLevel } from './level-resolver';
+import { parseEnvLevels } from './env-var-parser.js';
+import { resolveLevel } from './level-resolver.js';
 import {
   createBrowserOptions,
   createNodeTransportOptions,
-} from './transport-factory';
-import type { LoggerConfig, LoggerFactoryOptions } from './types';
+} from './transport-factory.js';
+import type { LoggerConfig, LoggerFactoryOptions } from './types.js';
 
 const isBrowser =
   typeof window !== 'undefined' && typeof window.document !== 'undefined';

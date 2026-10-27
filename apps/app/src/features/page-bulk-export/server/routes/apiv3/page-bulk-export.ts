@@ -10,6 +10,10 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import {
+  PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE,
+  PageBulkExportFormat,
+} from '../../../interfaces/page-bulk-export';
+import {
   DuplicateBulkExportJobError,
   pageBulkExportService,
 } from '../../service/page-bulk-export';
@@ -22,14 +26,14 @@ interface AuthorizedRequest extends Request {
   user?: any;
 }
 
-module.exports = (crowi: Crowi): Router => {
+export const setup = (crowi: Crowi): Router => {
   const accessTokenParser = crowi.accessTokenParser;
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   const validators = {
     pageBulkExport: [
       body('path').exists({ checkFalsy: true }).isString(),
-      body('format').exists({ checkFalsy: true }).isString(),
+      body('format').isString().isIn(Object.values(PageBulkExportFormat)),
       body('restartJob').isBoolean().optional(),
     ],
   };
@@ -61,7 +65,7 @@ module.exports = (crowi: Crowi): Router => {
           return res.apiv3Err(
             new ErrorV3(
               'Duplicate bulk export job is in progress',
-              'page_export.duplicate_bulk_export_job_error',
+              PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE,
               undefined,
               { duplicateJob: { createdAt: err.duplicateJob.createdAt } },
             ),

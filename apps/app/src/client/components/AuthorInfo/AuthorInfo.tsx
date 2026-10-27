@@ -50,20 +50,33 @@ export const AuthorInfo = (props: AuthorInfoProps): JSX.Element => {
       : t('author_info.last_revision_posted_at');
   const userLabel = user != null ? <UserLabel user={user} /> : <i>Unknown</i>;
 
+  const footerByline = (
+    <span className="d-inline-flex align-items-center gap-1">
+      by
+      {/* lh-1: UserPicture's root <span> keeps a line-box strut that drops the circle */}
+      <span className="d-inline-flex lh-1">
+        <UserPicture user={user} size="sm" className="border" />
+      </span>
+      {userLabel}
+    </span>
+  );
+
   if (locate === 'footer') {
     try {
       return (
-        <p>
-          {infoLabelForFooter} {format(new Date(date), formatType)} by{' '}
-          <UserPicture user={user} size="sm" /> {userLabel}
+        <p className="d-flex flex-wrap align-items-center gap-1 mb-1">
+          <span>
+            {infoLabelForFooter} {format(new Date(date), formatType)}
+          </span>
+          {footerByline}
         </p>
       );
     } catch (err) {
       if (err instanceof RangeError) {
         return (
-          <p>
-            {nullinfoLabelForFooter} <UserPicture user={user} size="sm" />{' '}
-            {userLabel}
+          <p className="d-flex flex-wrap align-items-center gap-1 mb-1">
+            <span>{nullinfoLabelForFooter}</span>
+            {footerByline}
           </p>
         );
       }

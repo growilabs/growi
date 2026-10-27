@@ -2,6 +2,12 @@
   "meta": {
     "display_name": "Français"
   },
+  "Page": "Page",
+  "Execute": "Exécuter",
+  "Enable": "Activer",
+  "Copied!": "Copié !",
+  "ExternalUserGroup": "Groupe utilisateur externe",
+  "something_went_wrong": "Une erreur est survenue. Veuillez réessayer.",
   "last_login": "Dernière connexion",
   "wiki_management_homepage": "Système",
   "public": "Public",
@@ -25,11 +31,17 @@
     "The whitelist of registration permission E-mail address": "Autoriser l'inscription à ces adresses courriel",
     "users_without_account": "Inaccessible aux utilisateurs sans compte",
     "example": "Exemple",
-    "restrict_emails": "L'inscription par courriel peut-être restreinte par domaine (démarrant par @). ",
-    "for_example": " Par exemple, pour restreindre l'inscription aux utilisateurs dans le domaine growi.org, ajouter ",
-    "in_this_case": "; dans ce cas particulier, seul les utilisateurs du domaine growi.org peuvent s'inscrire.",
-    "insert_single": "Insérer une adresse courriel par ligne",
+    "restrict_emails": "Vous pouvez restreindre l'inscription par domaine exact ou par adresse exacte.",
+    "whitelist_domain_desc": " Pour autoriser uniquement les adresses d'un domaine exact, écrire ",
+    "whitelist_domain_suffix": " (seules les adresses de ce domaine exact seront autorisées, sans les sous-domaines).",
+    "whitelist_subdomain_desc": " Pour autoriser aussi les sous-domaines, écrire ",
+    "whitelist_subdomain_suffix": " (toute adresse d'un sous-domaine sera autorisée).",
+    "whitelist_exact_desc": " Pour autoriser une adresse précise, écrire l'adresse complète comme ",
+    "whitelist_exact_suffix": ".",
+    "insert_single": "Insérer une entrée par ligne.",
+    "whitelist_invalid_format": "Format invalide. Utilisez @example.com pour un domaine exact, @*.example.com pour les sous-domaines, ou user@example.com pour une adresse exacte.",
     "page_list_and_search_results": "Affichage des pages",
+    "page_list_and_search_results_desc": "Ces paramètres n'affectent que les utilisateurs sans accès à une page. Les utilisateurs pouvant voir une page (par ex. les membres d'un groupe auquel elle est restreinte via « Utilisateurs du groupe ») la voient toujours dans les listes et la recherche, même en cas de réglage sur « Toujours caché ».",
     "page_listing_1": "Liste et recherche de pages<br>restreint à 'Seulement moi'",
     "page_listing_1_desc": "Voir les pages restreintes à 'Seulement moi' lors de la recherche",
     "page_listing_2": "Liste et recherche de pages<br>restreint au groupe utilisateur",
@@ -42,8 +54,6 @@
     "other_options": "Autres options",
     "deletion_explanation": "Restreindre les utilisateurs pouvant mettre à la corbeille une page.",
     "complete_deletion_explanation": "Restreindre les utilisateurs pouvant supprimer définitivement une page.",
-    "recursive_deletion_explain": "Restreindre les utilisateurs pouvant récursivement supprimer une page.",
-    "recursive_complete_deletion_explain": "Restreindre les utilisateurs pouvant récursivement supprimer complètement une page.",
     "is_all_group_membership_required_for_page_complete_deletion": "L'utilisateur doit faire partie de tout les groupes ayant l'accès à la page",
     "is_all_group_membership_required_for_page_complete_deletion_explanation": "Effectif lorsque les paramètres de page sont \"Seulement groupes spécifiés\".",
     "inherit": "Hériter",
@@ -278,9 +288,9 @@
     "toggle_notification": "Paramètres mis à jour pour {{path}}",
     "not_found_global_notification_triggerid": "ID global de notification introuvable"
   },
-  "full_text_search_management": {
-    "full_text_search_management": "Moteur de recherche",
-    "elasticsearch_management": "Configuration Elasticsearch",
+  "elasticsearch_management": "Configuration Elasticsearch",
+  "page_data_index_management": {
+    "page_data_management": "Gestion des données de page",
     "connection_status": "Statut",
     "connection_status_label_unconfigured": "UNCONFIGURED",
     "connection_status_label_connected": "CONNECTED",
@@ -294,12 +304,39 @@
     "reconnect_button": "Reconnecter",
     "reconnect_description": "Faire un essai de connexion vers Elasticsearch.",
     "normalize": "Normaliser",
-    "normalize_button": "Normaliser les indices",
-    "normalize_description": "Réparer les indices cassés.",
+    "normalize_button": "Normaliser l'index des données de page",
+    "normalize_description": "Réparer l'index de données de page endommagé.",
+    "normalize_success": "L'index des données de page a été normalisé.",
     "rebuild": "Reconstruire",
-    "rebuild_button": "Reconstruire",
+    "rebuild_button": "Reconstruire l'index des données de page",
+    "rebuild_requested": "La reconstruction de l'index des données de page a été demandée.",
     "rebuild_description_1": "Reconstruire l'index et les données de pages",
-    "rebuild_description_2": "Cela peut prendre un certain temps."
+    "rebuild_description_2": "Cela peut prendre un certain temps.",
+    "rebuild_progress_processing": "En cours..",
+    "rebuild_progress_completed": "Terminé",
+    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement."
+  },
+  "audit_log_index_management": {
+    "audit_log_index_management": "Gestion de l'index des journaux d'audit",
+    "settings_explanation": "Vous pouvez normaliser ou reconstruire l'index des journaux d'audit sur la page suivante",
+    "index_management_link": "Aller à {{destination}}",
+    "docs_url": {
+      "top": "https://docs.growi.org/en/admin-guide/management-cookbook/setup-search-system.html"
+    },
+    "normalize": "Normaliser",
+    "normalize_button": "Normaliser l'index des journaux d'audit",
+    "normalize_success": "L'index des journaux d'audit a été normalisé.",
+    "normalize_description": "Répare les index des journaux d'audit corrompus.",
+    "rebuild": "Reconstruire",
+    "rebuild_button": "Reconstruire l'index des journaux d'audit",
+    "rebuild_requested": "La reconstruction de l'index des journaux d'audit a été demandée.",
+    "rebuild_description_1": "Supprime et reconstruit tous les index des journaux d'audit.",
+    "rebuild_description_2": "Cette opération peut prendre un certain temps.",
+    "unsynced_events_warning": "Certains événements du journal d'audit n'ont pas pu être synchronisés avec Elasticsearch. Reconstruisez pour restaurer la cohérence.",
+    "rebuild_progress_processing": "En cours..",
+    "rebuild_progress_completed": "Terminé",
+    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement.",
+    "reconnect": "Reconnexion"
   },
   "mailer_setup_required": "La <a href='/admin/app'>configuration du SMTP</a> est requise.",
   "admin_top": {
@@ -331,6 +368,23 @@
     "header_upgrading_progress": "Progression de la conversion",
     "migration_succeeded": "Conversion réussie! Le mode maintenance peut être désactivée et GROWI utilisé.",
     "migration_failed": "Conversion échouée. Lire la documentation GROWI pour des informations supplémentaires."
+  },
+  "page_tree_repair": {
+    "page_tree_repair": "Réparation de l'arborescence des pages",
+    "repair_desc": "Supprime les pages vides orphelines et recalcule le nombre de pages descendantes de chaque page. À utiliser si l'arborescence affiche des dossiers vides sans aucun contenu, ou si le nombre de pages enfants ne correspond pas au nombre réel de pages. Cette opération est nécessaire sur les instances mises à niveau depuis une version qui supprimait les pages WIP via un index TTL MongoDB.",
+    "repair_note": "Note: le mode maintenance doit être activé. Cette opération parcourt toutes les pages et peut donc prendre du temps sur un wiki volumineux. La progression est écrite dans le journal du serveur.",
+    "repair_page_tree": "Réparer l'arborescence des pages",
+    "modal_repair_warning": "Ce processus parcourt et met à jour toutes les pages, ce qui peut prendre beaucoup de temps. Il est fortement recommandé que les administrateurs demandent aux utilisateurs de ne pas créer, modifier ou supprimer de pages pendant la réparation.",
+    "start_repair": "Démarrer la réparation de l'arborescence",
+    "successfully_started": "Réparation de l'arborescence des pages démarrée.",
+    "repair_in_progress": "La réparation de l'arborescence des pages est en cours en arrière-plan. Consulter le journal du serveur pour le résultat."
+  },
+  "news_delivery": {
+    "section_title": "Diffusion des actualités",
+    "label": "Diffusion des actualités",
+    "enable": "Activer la diffusion des actualités",
+    "description": "Contrôle si la tâche cron récupère le flux d'actualités et met à jour le cache local. Les actualités déjà en cache restent visibles lorsque la diffusion est désactivée.",
+    "update_succeeded": "Paramètre de diffusion des actualités mis à jour"
   },
   "maintenance_mode": {
     "maintenance_mode": "Mode maintenance",
@@ -369,6 +423,10 @@
     "page_bulk_export_explanation": "Active une fonctionnalité qui permet à tous les utilisateurs d'exporter simultanément toutes les pages sélectionnées dans le menu des pages et leurs pages subordonnées. Les données exportées seront automatiquement supprimées une fois la période de conservation écoulée.",
     "page_bulk_export_warning": "La fonctionnalité d’exportation de pages en masse est disponible pour tous les utilisateurs. Afin de maintenir les ressources du système, nous demandons votre coopération pour utiliser le montant minimum nécessaire. Si vous êtes administrateur, veuillez en informer tous les utilisateurs.",
     "page_bulk_export_storage_period": "Date limite de téléchargement",
+    "page_bulk_export_reload_title": "Recharger la page",
+    "page_bulk_export_reload_prompt": "Un rechargement de la page est nécessaire pour appliquer le changement de paramètre. Recharger maintenant ?",
+    "page_bulk_export_reload_dismiss": "Pas maintenant",
+    "reload_page": "Recharger",
     "update": "Sauvegarder",
     "mail_settings": "SMTP",
     "mailer_is_not_set_up": "Paramètres d'envoi de courriels non configurés.",
@@ -428,6 +486,65 @@
     "use_env_var_if_empty": "Si la valeur dans la base de données est vide, la valeur de variable d'environnement <code>{{variable}}</code> est utilisé.",
     "note_for_the_only_env_option": "Les paramètres sont définis par des variables d'environnement.<br>Pour modifier ce paramètre, supprimer la variable d'environnement <code>{{env}}</code> .",
     "note_for_the_only_env_option_cloud": "Les paramètres GCS peuvent être modifiés depuis le panneau d'administration GROWI.cloud."
+  },
+  "ai_settings": {
+    "ai_settings": "Paramètres IA",
+    "ai_enabled_label": "Activer les fonctionnalités IA",
+    "providers_section_title": "Fournisseurs",
+    "provider_enabled_label": "Activer ce fournisseur",
+    "provider_status_available": "Disponible",
+    "provider_status_disabled": "Désactivé",
+    "provider_status_misconfigured": "Configuration incomplète",
+    "provider_warning_missing_api_key": "Ce fournisseur est activé mais sa clé API n'est pas définie ; ses modèles ne sont donc pas proposés aux utilisateurs.",
+    "provider_warning_missing_azure_endpoint": "Ce fournisseur est activé mais son point de terminaison (nom de ressource ou URL de base) n'est pas défini ; ses modèles ne sont donc pas proposés aux utilisateurs.",
+    "api_key_label": "Clé API",
+    "api_key_help": "La clé API utilisée pour s'authentifier auprès du fournisseur d'IA.",
+    "api_key_set_placeholder": "(configurée)",
+    "models_section_title": "Models",
+    "models_section_desc": "Choisissez l'un de vos modèles enregistrés comme modèle par défaut. Le modèle par défaut est celui sélectionné au départ pour les utilisateurs dans la conversation.",
+    "default_model_label": "Modèle par défaut",
+    "default_model_help": "Le modèle sélectionné au départ pour les utilisateurs dans la conversation. Choisissez parmi n'importe quel modèle enregistré, tous fournisseurs confondus.",
+    "default_model_placeholder": "Sélectionnez un modèle par défaut",
+    "default_model_no_models": "Aucun modèle n'est enregistré",
+    "model_label": "Nom du modèle",
+    "model_placeholder": "Sélectionnez un modèle",
+    "model_duplicate_error": "Cet identifiant de modèle est déjà enregistré pour ce fournisseur",
+    "refresh_model_catalog": "Actualiser le catalogue de modèles",
+    "refresh_model_catalog_confirmation": "L'actualisation du catalogue de modèles envoie une requête au service externe (models.dev) pour récupérer la liste des modèles la plus récente. Voulez-vous continuer ?",
+    "refresh_model_catalog_confirm": "Actualiser",
+    "refresh_model_catalog_success": "Le catalogue de modèles a été actualisé.",
+    "refresh_model_catalog_failed": "Échec de l'actualisation du catalogue de modèles. Le catalogue précédent reste en vigueur.",
+    "refresh_model_catalog_label": "Catalogue de modèles",
+    "refresh_model_catalog_scope": "Les données source de la liste de modèles affichée dans le sélecteur de modèle du chat. Actualisez pour refléter les modèles récemment publiés.",
+    "set_as_default": "Définir par défaut",
+    "default_badge": "Par défaut",
+    "add_model": "Ajouter un modèle",
+    "azure_add_deployment": "Ajouter un déploiement",
+    "remove_model": "Supprimer",
+    "remove_model_confirmation": "Voulez-vous vraiment supprimer « {{modelName}} » de la liste ?",
+    "remove_model_confirm": "Supprimer le modèle",
+    "provider_options_label": "Options du fournisseur (JSON)",
+    "provider_options_doc_link": "Comment écrire",
+    "provider_options_invalid_json": "JSON non valide",
+    "provider_options_invalid_json_save_blocked": "Un modèle a des options de fournisseur (JSON) non valides. Veuillez les corriger avant d'enregistrer.",
+    "provider_options_error_at_line": "(ligne {{line}})",
+    "env_only_mode_notice": "Les paramètres IA sont fixés par des variables d'environnement et ne peuvent pas être modifiés ici.",
+    "unconfigured_warning": "L'IA est activée mais n'est pas entièrement configurée ; elle ne fonctionnera pas tant que les paramètres ne seront pas complétés.",
+    "save": "Mettre à jour",
+    "save_success": "Paramètres IA mis à jour avec succès.",
+    "azure_section_title": "Paramètres Azure OpenAI",
+    "azure_resource_name_label": "Nom de la ressource Azure",
+    "azure_base_url_label": "URL de base Azure",
+    "azure_api_version_label": "Version de l'API Azure",
+    "azure_use_entra_id_label": "Utiliser Microsoft Entra ID",
+    "azure_entra_id_api_key_note": "Lorsque Microsoft Entra ID est activé, la clé API n'est pas utilisée.",
+    "azure_entra_id_credential_note": "Les informations d'identification sont résolues automatiquement à partir de l'environnement Azure :",
+    "azure_entra_id_managed_identity_note": "Si GROWI s'exécute sur Azure (VM, App Service, Container Apps ou AKS) avec une identité managée ou de charge de travail, aucune information d'identification n'est nécessaire ici.",
+    "azure_entra_id_env_note": "Sinon, définissez ces variables d'environnement sur le serveur GROWI :",
+    "azure_resource_name_help": "Construit le point de terminaison standard https://<nom-de-ressource>.openai.azure.com. À utiliser pour le cloud Azure standard (global). Si l'URL de base est également définie, elle est prioritaire.",
+    "azure_base_url_help": "À utiliser à la place du nom de ressource pour les clouds souverains (par ex. Azure Government), les passerelles API Management ou les proxys. Prioritaire sur le nom de ressource si les deux sont définis.",
+    "azure_api_version_help": "Facultatif. Laissez vide pour utiliser la valeur par défaut. À définir uniquement si un déploiement spécifique nécessite une version d'API particulière.",
+    "azure_model_deployment_label": "Nom du déploiement"
   },
   "markdown_settings": {
     "markdown_settings": "Markdown",
@@ -766,6 +883,8 @@
       "send_temporary_password": "Si un courriel d'invitation n'est pas envoyé, copiez le mot de passe temporaire",
       "send_email": "Le courriel d'invitation peut aussi être envoyé depuis la table utilisateur",
       "existing_email": "Des comptes avec les adresses courriel suivantes sont déjà existants",
+      "whitelist_violation": "Les adresses courriel suivantes ne sont pas autorisées par la liste blanche :",
+      "reason_email_not_in_whitelist": "Non incluse dans la liste blanche",
       "issue": "Créer"
     },
     "user_table": {
@@ -899,7 +1018,43 @@
     "transfer_data_to_another_growi": "Transférer les données de ce GROWI vers un autre GROWI",
     "advanced_options": "Paramètres avancés",
     "start_transfer": "Démarrer transfert",
-    "paste_transfer_key": "Copier clé de transfert ici"
+    "paste_transfer_key": "Copier clé de transfert ici",
+    "transfer_method": {
+      "heading": "Méthode de transfert",
+      "migration": "Migration (remplacer toutes les données de la destination)",
+      "merge": "Ajouter aux données existantes (les données existantes de la destination sont conservées)"
+    },
+    "confirm_modal": {
+      "title": "Confirmer le transfert",
+      "description": "Le GROWI de destination contient actuellement les données suivantes. Démarrer ce transfert supprimera toutes ces données et les remplacera par les données de ce GROWI :",
+      "counts": {
+        "users": "Utilisateurs",
+        "user_groups": "Groupes d'utilisateurs",
+        "pages": "Pages"
+      },
+      "warnings_heading": "Avant de continuer :",
+      "warnings": {
+        "password_seed_mismatch": "Le GROWI source et le GROWI de destination ont des graines de mot de passe (password seed) différentes. Les utilisateurs migrés ne pourront pas se connecter avec leur mot de passe existant.",
+        "no_loginable_admin": "Le GROWI de destination n'a actuellement aucun administrateur pouvant se connecter. Après le transfert, il se peut que personne ne puisse se connecter.",
+        "sessions_not_invalidatable": "Le magasin de sessions du GROWI de destination ne peut pas invalider les sessions individuellement. Les sessions établies avant le transfert resteront valides.",
+        "local_auth_disabled_at_source": "Ce GROWI a désactivé l'authentification locale (identifiant/mot de passe). Même un administrateur de destination sauvegardé ne pourra pas se connecter avec un mot de passe."
+      }
+    },
+    "blockers": {
+      "version_mismatch": "Ce transfert ne peut pas continuer : le GROWI source et le GROWI de destination utilisent des versions différentes.",
+      "user_upper_limit": "Ce transfert ne peut pas continuer : le nombre d'utilisateurs actifs sur le GROWI source dépasse la limite d'utilisateurs du GROWI de destination.",
+      "file_upload_not_configured": "Ce transfert ne peut pas continuer : le téléversement de fichiers n'est pas configuré sur le GROWI source ou de destination.",
+      "destination_storage_not_writable": "Ce transfert ne peut pas continuer : le stockage du GROWI de destination n'est pas accessible en écriture.",
+      "file_upload_total_limit": "Ce transfert ne peut pas continuer : la taille totale des pièces jointes du GROWI source dépasse la limite de téléversement du GROWI de destination."
+    },
+    "rescue_outcome": {
+      "heading": "Le transfert a remplacé tous les utilisateurs de la destination. Les comptes administrateur suivants ont été conservés afin qu'une personne puisse encore se connecter :",
+      "renamed_from": "renommé depuis",
+      "email_removed": "Son adresse e-mail a été supprimée car elle entrait en conflit avec un utilisateur entrant.",
+      "slack_member_id_removed": "Son identifiant de membre Slack a été supprimé car il entrait en conflit avec un utilisateur entrant.",
+      "id_reassigned": "Un nouvel identifiant interne lui a été attribué car l'identifiant d'origine entrait en conflit avec un utilisateur entrant ; toute session de connexion antérieure au transfert a été perdue."
+    },
+    "failed_collections_heading": "Le GROWI de destination n'a pas pu importer les collections suivantes :"
   },
   "plugins": {
     "plugins": "Plugins",
@@ -993,6 +1148,8 @@
     "SEARCH_PAGE": "Rechercher une page",
     "SEARCH_PAGE_VIEW": "Résultats de recherche",
     "ADMIN_APP_SETTING_UPDATE": "Modifier les paramètres d'application",
+    "ADMIN_AI_SETTING_UPDATE": "Modifier les paramètres d'IA",
+    "ADMIN_AI_MODEL_CATALOG_REFRESH": "Actualiser le catalogue de modèles",
     "ADMIN_SITE_URL_UPDATE": "Modifier les paramètres d'URL",
     "ADMIN_MAIL_SMTP_UPDATE": "Modifier les paramètres d'e-mail",
     "ADMIN_MAIL_SES_UPDATE": "Modifier les paramètres d'e-mail (SES)",
@@ -1084,7 +1241,20 @@
   "g2g": {
     "transfer_success": "Transfert de GROWI vers GROWI complété!",
     "error_generate_growi_archive": "Échec de la création du fichier d'archive GROWI",
-    "error_send_growi_archive": "Échec de l'envoi du fichier d'archive GROWI vers l'autre GROWI"
+    "error_send_growi_archive": "Échec de l'envoi du fichier d'archive GROWI vers l'autre GROWI",
+    "error_data_conflict": "Transfert interrompu : certaines données transférées entrent en conflit avec des utilisateurs ou groupes d'utilisateurs déjà présents sur le GROWI de destination, rien n'a donc été importé. Résolvez les comptes ou groupes en conflit avant de réessayer, ou transférez vers un GROWI de destination dont la configuration initiale n'est pas encore terminée.",
+    "error_upload_attachment": "Échec du transfert des pièces jointes",
+    "error_import_in_progress": "Transfert interrompu : une autre importation de données est déjà en cours sur le GROWI de destination. Attendez qu'elle se termine, puis réessayez le transfert.",
+    "error_partial_import": "Transfert incomplet : le GROWI de destination n'a pas terminé le transfert proprement (l'importation d'une collection, le sauvetage d'un administrateur ou le nettoyage après importation a peut-être échoué), il se peut donc que sa base de données ne soit que partiellement transférée. Si la destination a été mise en mode maintenance pour ce transfert, elle reste inaccessible aux utilisateurs ordinaires jusqu'à ce que vous le désactiviez depuis Administration > Paramètres de l'application sur le GROWI de destination. Corrigez la cause puis relancez le transfert.",
+    "error_protected_collection": "Transfert interrompu : le GROWI de destination a refusé la requête car elle mentionnait des collections qu'un transfert ne doit pas transporter, rien n'a donc été importé. L'écran de transfert ne sélectionne jamais ces collections ; vérifiez que les deux GROWI utilisent la même version, puis signalez les noms de collections affichés ci-dessous.",
+    "error_mixed_import_methods": "Transfert annulé : le GROWI de destination a refusé la requête car son assignation de méthode d'import mélangeait le remplacement de certaines collections avec l'ajout à d'autres, donc rien n'a été importé. L'écran de transfert ne construit plus ce type de requête ; vérifiez que les deux GROWI utilisent la même version, puis relancez le transfert.",
+    "error_invalid_transfer_key": "Transfert interrompu : le GROWI de destination a rejeté la clé de transfert car elle est absente, expirée ou invalide. Publiez une nouvelle clé de transfert sur le GROWI de destination puis réessayez.",
+    "error_parse_failed": "Transfert interrompu : le GROWI de destination n'a pas pu analyser la requête de transfert. Vérifiez que les deux GROWI utilisent la même version, puis réessayez le transfert.",
+    "error_validation_failed": "Transfert interrompu : le GROWI de destination n'a pas pu valider le fichier d'archive GROWI envoyé. Il est peut-être corrompu ; essayez de régénérer et de renvoyer l'archive.",
+    "error_version_incompatible": "Transfert interrompu : le GROWI source et le GROWI de destination utilisent des versions différentes, rien n'a donc été importé. Mettez à jour le GROWI de destination pour qu'il corresponde à la source, puis réessayez le transfert.",
+    "error_import_settings_invalid": "Transfert interrompu : le GROWI de destination n'a pas pu construire des paramètres d'importation valides pour les collections demandées. Consultez la documentation GROWI pour plus de détails.",
+    "error_conflict_detection_failed": "Transfert interrompu : le GROWI de destination n'a pas pu déterminer si les données du transfert entraient en conflit avec ses données existantes, et a refusé d'importer plutôt que de deviner. Réessayez le transfert ; si cela persiste, vérifiez les journaux du GROWI de destination.",
+    "error_mongo_collection_import_failure": "Transfert incomplet : le GROWI de destination n'a pas réussi à écrire une ou plusieurs collections dans MongoDB pour une raison autre qu'un conflit de données. Consultez les journaux du GROWI de destination pour plus de détails."
   },
   "external_user_group": {
     "management": "Gestion des groupes externes",
@@ -1155,9 +1325,105 @@
   "forbidden_page": {
     "do_not_have_admin_permission": "Seul les administrateurs peuvent accéder à cette page."
   },
-  "ai_integration": {
-    "ai_integration": "Intégration de l'IA",
-    "disable_mode_explanation": "Actuellement, l'intégration AI est désactivée. Pour l'activer, configurez la variable d'environnement <code>AI_ENABLED</code> ainsi que les autres variables nécessaires.<br><br>Pour plus de détails, veuillez consulter la <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>documentation</a>.",
-    "ai_search_management": "Gestion de la recherche par l'IA"
+  "admin_navigation": {
+    "section_users": "Utilisateurs",
+    "section_data": "Données",
+    "section_external_notifications": "Notifications externes"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "Avertissement :",
+        "message_html": "La dernière initialisation a été déclenchée par <code>VAULT_BOOTSTRAP_ON_START=force</code>. Redémarrer le serveur avec cette variable d'environnement toujours définie sur <code>force</code> réinitialisera à nouveau toutes les données du Vault. Veuillez modifier la variable d'environnement en <code>true</code> ou <code>false</code>."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "Statut de la fonctionnalité",
+        "enabled": "Activé",
+        "disabled": "Désactivé",
+        "description_html": "Contrôlé par la variable d'environnement <code>VAULT_ENABLED</code>. Pour basculer activé/désactivé, modifiez la variable d'environnement et redémarrez le serveur."
+      },
+      "clone-url": {
+        "label": "URL de clone",
+        "description": "Exécutez cette commande dans votre terminal pour cloner le dépôt du Vault.",
+        "copy-button": "Copier la commande",
+        "copied-tooltip": "Copié !",
+        "copy-failed": "Échec de la copie de la commande de clone.",
+        "no-site-url_html": "L'URL du site n'est pas configurée, la commande ne peut pas être affichée. Définissez-la dans les <a href=\"/admin/app\">Paramètres de l'application</a>."
+      },
+      "kill-switch": {
+        "heading": "Reconstruction",
+        "button": "Reconstruire le Vault",
+        "description_html": "Détruit toutes les données des dépôts Git et reconstruit les données Git à partir de MongoDB. Pendant la reconstruction, toutes les requêtes <code>git clone</code> / <code>fetch</code> sont rejetées avec 503. L'opération est enregistrée dans le journal d'audit comme <code>vault.wipe</code>.",
+        "confirm-title": "Confirmer la reconstruction du Vault",
+        "confirm-message_html": "L'exécution de cette action va <strong>perdre toutes les données des dépôts Git actuels</strong>.",
+        "confirm-question": "Êtes-vous sûr de vouloir continuer ?",
+        "confirm-button": "Confirmer",
+        "cancel-button": "Annuler",
+        "started-toast": "Reconstruction démarrée. Le Vault renverra 503 jusqu'à la fin de la reconstruction des données."
+      },
+      "bootstrap-status": {
+        "state": "Statut",
+        "processed-total": "Traité / Total estimé",
+        "started-at": "Démarré le",
+        "completed-at": "Terminé le",
+        "last-error": "Dernière erreur",
+        "progress-label": "{{processed}} sur {{total}} pages"
+      },
+      "completion-reliability": {
+        "heading": "Statut de fiabilité",
+        "check-result": "Dernier résultat de vérification",
+        "last-completed-at": "Dernière complétion",
+        "processed-estimated": "Traité / Estimé",
+        "trigger-source": "Source du déclencheur",
+        "last-error": "Dernière erreur"
+      },
+      "auto-retry-status": {
+        "heading": "Statut du réessai automatique",
+        "escalated-warning_html": "Le réessai automatique pendant l'initialisation a échoué, et l'état a atteint <strong>escalated</strong>. Une intervention manuelle est requise.",
+        "attempt-no": "N° de tentative",
+        "next-attempt-at": "Prochaine tentative",
+        "last-error": "Dernière erreur",
+        "abort-button": "Annuler le réessai automatique",
+        "aborting": "Annulation…",
+        "aborted-toast": "Réessai automatique annulé."
+      },
+      "drift-activity": {
+        "heading": "Statut de détection des incohérences de données",
+        "last-sweep-at": "Dernier balayage",
+        "last-watermark": "Dernière marque de filigrane",
+        "detected-since-boot": "Détectés depuis le démarrage du serveur",
+        "repairs-emitted-since-boot": "Réparations émises depuis le démarrage du serveur",
+        "last-error": "Dernière erreur détectée",
+        "out-of-scope_html": "<strong>Remarque (hors périmètre) :</strong> Les incohérences de données causées par des changements de chemin (renommage / suppression définitive) et la révocation de droits ne sont pas détectées dans l'implémentation actuelle. Elles nécessiteront un support futur de <code>growi-vault-ha</code>."
+      },
+      "storage-observability": {
+        "fetch-failed": "Échec de récupération des statistiques de stockage. vault-manager peut être injoignable.",
+        "namespace-count": "Nombre de namespaces",
+        "total-commit-count": "Nombre total de commits",
+        "loose-object-count": "Nombre d'objets vrac",
+        "repo-size": "Taille du dépôt",
+        "last-squash": "Dernier squash",
+        "last-gc": "Dernier GC"
+      },
+      "audit-log": {
+        "heading": "Journal d'audit",
+        "button": "Voir les entrées du journal VAULT_*",
+        "description": "Ouvre le journal d'audit administrateur filtré sur les actions liées au Vault (VAULT_*)."
+      },
+      "reconcile-admin": {
+        "heading": "Réconcilier",
+        "trigger-button": "Lancer la réconciliation",
+        "description": "Réconcilie manuellement les incohérences de données entre les pages MongoDB et les arbres git du Vault sans effectuer une initialisation complète."
+      }
+    }
+  },
+  "maintenance_mode_notice": {
+    "title": "GROWI restera en mode maintenance",
+    "body_this_growi": "L'importation de la collection configs remplace tous les paramètres de ce GROWI par ceux de l'archive ; ce GROWI est donc placé en mode maintenance et y reste. Les utilisateurs ordinaires ne peuvent pas y accéder tant que vous ne le désactivez pas.",
+    "body_destination": "L'importation de la collection configs remplace tous les paramètres du GROWI de destination par ceux de ce GROWI ; la destination est donc placée en mode maintenance et y reste. Les utilisateurs ordinaires ne peuvent pas accéder à la destination tant que vous ne le désactivez pas. Les pièces jointes sont transférées après les collections, la destination reste donc incomplète tant que l'ensemble du transfert n'est pas terminé.",
+    "turn_it_off": "Désactivez le mode maintenance depuis Administration > Paramètres de l'application sur le GROWI qui a été fermé, une fois le résultat vérifié.",
+    "cancel": "Annuler",
+    "proceed": "Compris, continuer"
   }
 }

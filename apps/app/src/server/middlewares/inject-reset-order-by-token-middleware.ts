@@ -13,12 +13,14 @@ export type ReqWithPasswordResetOrder = Request & {
   passwordResetOrder: IPasswordResetOrder;
 };
 
+// Named function expression so the route-middleware snapshot tool can
+// identify this handler in the apiv3 auth chain.
 // biome-ignore lint/style/noDefaultExport: ignore
-export default async (
+export default async function injectResetOrderByTokenMiddleware(
   req: ReqWithPasswordResetOrder,
   _res: Response,
   next: NextFunction,
-): Promise<void> => {
+): Promise<void> {
   const token: string = req.params.token || req.body.token;
 
   if (token == null) {
@@ -52,4 +54,4 @@ export default async (
   req.passwordResetOrder = passwordResetOrder;
 
   return next();
-};
+}

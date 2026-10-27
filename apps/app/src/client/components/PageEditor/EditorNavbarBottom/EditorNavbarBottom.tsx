@@ -1,11 +1,7 @@
 import type { JSX } from 'react';
 import dynamic from 'next/dynamic';
-import { useAtomValue } from 'jotai';
 
-import { aiEnabledAtom } from '~/states/server-configurations';
 import { useDrawerOpened } from '~/states/ui/sidebar';
-
-import { EditorAssistantToggleButton } from './EditorAssistantToggleButton';
 
 import styles from './EditorNavbarBottom.module.scss';
 
@@ -21,7 +17,6 @@ const OptionsSelector = dynamic(
 );
 
 export const EditorNavbarBottom = (): JSX.Element => {
-  const isAiEnabled = useAtomValue(aiEnabledAtom);
   const [, setIsDrawerOpened] = useDrawerOpened();
 
   return (
@@ -38,7 +33,6 @@ export const EditorNavbarBottom = (): JSX.Element => {
         </button>
         <form className="me-auto d-flex gap-2">
           <OptionsSelector />
-          {isAiEnabled && <EditorAssistantToggleButton />}
         </form>
         <form>
           <SavePageControls />

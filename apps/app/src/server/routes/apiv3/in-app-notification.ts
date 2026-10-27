@@ -1,5 +1,6 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import type { Router } from 'express';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
@@ -86,7 +87,7 @@ const router = express.Router();
  *           items:
  *             $ref: '#/components/schemas/User'
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
 
@@ -105,6 +106,7 @@ module.exports = (crowi: Crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/list
    *      description: Get the list of in-app notifications
    *      parameters:
@@ -133,7 +135,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.get(
     '/list',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.READ.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
@@ -170,10 +172,15 @@ module.exports = (crowi: Crowi) => {
       const getActionUsersFromActivities = (activities) =>
         activities
           .map(({ user }) => user)
+          // activity.user can be null: an activity settled without its
+          // request context (bare activity, mostly from editor saves), or a
+          // reference to a since-removed user. Exclude those so the API never
+          // returns null entries in actionUsers.
+          .filter((user) => user != null)
           .filter((user, i, self) => self.indexOf(user) === i);
 
-      const serializedDocs: Array<IInAppNotification> =
-        paginationResult.docs.map((doc) => {
+      const docObjs: Array<IInAppNotification> = paginationResult.docs.map(
+        (doc) => {
           if (doc.user != null && doc.user instanceof User) {
             doc.user = serializeUserSecurely(doc.user);
           }
@@ -187,7 +194,10 @@ module.exports = (crowi: Crowi) => {
 
           docObj.actionUsers = serializedActionUsers;
           return docObj;
-        });
+        },
+      );
+      const serializedDocs =
+        await inAppNotificationService.populateTargetAttachments(docObjs);
 
       const serializedPaginationResult = {
         ...paginationResult,
@@ -207,6 +217,7 @@ module.exports = (crowi: Crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/status
    *      description: Get the status of in-app notifications
    *      responses:
@@ -222,7 +233,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.get(
     '/status',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.READ.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
@@ -250,6 +261,7 @@ module.exports = (crowi: Crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/open
    *      description: Open the in-app notification
    *      requestBody:
@@ -272,7 +284,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.post(
     '/open',
-    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.WRITE.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
@@ -301,6 +313,7 @@ module.exports = (crowi: Crowi) => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /in-app-notification/all-statuses-open
    *      description: Open all in-app notifications
    *      responses:
@@ -309,7 +322,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.put(
     '/all-statuses-open',
-    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.WRITE.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,

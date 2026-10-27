@@ -5,7 +5,12 @@ import {
   type IGrantedGroup,
   PageGrant,
 } from '@growi/core';
-import { pagePathUtils, pageUtils, pathUtils } from '@growi/core/dist/utils';
+import {
+  escapeStringForMongoRegex,
+  pagePathUtils,
+  pageUtils,
+  pathUtils,
+} from '@growi/core/dist/utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
 import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
@@ -126,6 +131,16 @@ export interface IPageGrantService {
     grant?: PageGrant,
     grantedGroupIds?: IGrantedGroup[],
   ) => Promise<boolean>;
+  validateGrantedGroupsAssignableByUser: (
+    user: IUserHasId | HydratedDocument<IUser>,
+    grant: PageGrant | undefined,
+    grantedGroups: IGrantedGroup[] | undefined,
+  ) => Promise<void>;
+  validateGrantedGroupsAssignableByUserSyncronously: (
+    userRelatedGroups: PopulatedGrantedGroup[],
+    grant: PageGrant | undefined,
+    grantedGroups: IGrantedGroup[] | undefined,
+  ) => void;
   validateGrantChangeSyncronously: (
     userRelatedGroups: PopulatedGrantedGroup[],
     previousGrantedGroups: IGrantedGroup[],
@@ -198,6 +213,12 @@ class PageGrantService implements IPageGrantService {
     this.validateComparableTarget(target);
 
     const Page = mongoose.model<IPage, PageModel>('Page');
+
+    // GRANT_RESTRICTED pages are link-only and orthogonal to the page tree hierarchy.
+    // They are intentionally permitted under any parent grant.
+    if (target.grant === Page.GRANT_RESTRICTED) {
+      return true;
+    }
 
     /*
      * ancestor side
@@ -376,6 +397,53 @@ class PageGrantService implements IPageGrantService {
       grant,
       grantedGroups,
     );
+  }
+
+  /**
+   * Throws unless the user may assign the given group scope to a page.
+   * GRANT_USER_GROUP needs a non-empty group list that includes at least one group the user belongs to;
+   * the list may also hold groups the user is not in, as inherited from a parent page.
+   * Hierarchy consistency is a separate concern, see isGrantNormalized.
+   */
+  async validateGrantedGroupsAssignableByUser(
+    user: IUserHasId | HydratedDocument<IUser>,
+    grant: PageGrant | undefined,
+    grantedGroups: IGrantedGroup[] | undefined,
+  ): Promise<void> {
+    if (grant !== PageGrant.GRANT_USER_GROUP) {
+      return;
+    }
+    const userRelatedGroups = await this.getUserRelatedGroups(user);
+    this.validateGrantedGroupsAssignableByUserSyncronously(
+      userRelatedGroups,
+      grant,
+      grantedGroups,
+    );
+  }
+
+  /**
+   * Use when userRelatedGroups is already at hand, to avoid fetching it from DB again.
+   */
+  validateGrantedGroupsAssignableByUserSyncronously(
+    userRelatedGroups: PopulatedGrantedGroup[],
+    grant: PageGrant | undefined,
+    grantedGroups: IGrantedGroup[] | undefined,
+  ): void {
+    if (grant !== PageGrant.GRANT_USER_GROUP) {
+      return;
+    }
+
+    if (grantedGroups == null || grantedGroups.length === 0) {
+      throw Error('grantedGroups must not be empty for GRANT_USER_GROUP');
+    }
+
+    const isUserInAnyGrantedGroup = hasIntersection(
+      grantedGroups.map((g) => getIdForRef(g.item)),
+      userRelatedGroups.map((g) => g.item._id),
+    );
+    if (!isUserInAnyGrantedGroup) {
+      throw Error('The user does not belong to any of the granted groups');
+    }
   }
 
   /**
@@ -589,7 +657,10 @@ class PageGrantService implements IPageGrantService {
     };
 
     const commonCondition = {
-      path: new RegExp(`^${RegExp.escape(addTrailingSlash(targetPath))}`, 'i'),
+      path: new RegExp(
+        `^${escapeStringForMongoRegex(addTrailingSlash(targetPath))}`,
+        'i',
+      ),
       isEmpty: false,
     };
 
@@ -844,11 +915,13 @@ class PageGrantService implements IPageGrantService {
         applicableGroups: userRelatedGroups,
       };
     } else if (grant === PageGrant.GRANT_OWNER) {
-      const grantedUser = grantedUsers[0];
+      const grantedUser = grantedUsers?.[0];
 
-      const isUserApplicable = grantedUser.toString() === user._id.toString();
-
-      if (isUserApplicable) {
+      // grantedUsers may be empty due to data inconsistency; guard against TypeError
+      if (
+        grantedUser != null &&
+        grantedUser.toString() === user._id.toString()
+      ) {
         data[PageGrant.GRANT_OWNER] = null;
       }
     } else if (grant === PageGrant.GRANT_USER_GROUP) {

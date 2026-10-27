@@ -1,6 +1,6 @@
 import { Prec } from '@codemirror/state';
 
-import type { KeymapFactory } from './types';
+import type { KeymapFactory } from './types.js';
 
 let initialized = false;
 

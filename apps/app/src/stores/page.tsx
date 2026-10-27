@@ -17,7 +17,7 @@ import useSWRImmutable from 'swr/immutable';
 import useSWRInfinite, { type SWRInfiniteResponse } from 'swr/infinite';
 import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
-import type { ErrorV3 } from '^/../../packages/core/dist/models';
+import type { ErrorV3 } from '^/../../packages/core/dist/models/index.js';
 
 import { apiGet } from '~/client/util/apiv1-client';
 import { apiv3Get } from '~/client/util/apiv3-client';
@@ -70,14 +70,12 @@ export const useSWRxTagsInfo = (
 ): SWRResponse<IPageTagsInfo | null, Error> => {
   const shareLinkId = useShareLinkId();
 
-  const endpoint = `/pages.getPageTag?pageId=${pageId}`;
+  const endpoint = '/pages.getPageTag';
 
   return useSWR(
     shareLinkId == null && pageId != null ? [endpoint, pageId] : null,
     ([endpoint, pageId]) =>
-      apiGet<IPageTagsInfo>(endpoint, { pageId })
-        .then((result) => result)
-        .catch(getPageApiErrorHandler),
+      apiGet<IPageTagsInfo>(endpoint, { pageId }).catch(getPageApiErrorHandler),
     {
       ...config,
       revalidateOnFocus: false,

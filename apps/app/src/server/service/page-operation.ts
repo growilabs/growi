@@ -236,7 +236,11 @@ class PageOperationService implements IPageOperationService {
   autoUpdateExpiryDate(operationId: ObjectIdLike): NodeJS.Timeout {
     // https://github.com/Microsoft/TypeScript/issues/30128#issuecomment-651877225
     const timerObj = global.setInterval(async () => {
-      await PageOperation.extendExpiryDate(operationId);
+      try {
+        await PageOperation.extendExpiryDate(operationId);
+      } catch (err) {
+        logger.error({ err, operationId }, 'extendExpiryDate failed');
+      }
     }, AUTO_UPDATE_INTERVAL_SEC * 1000);
     return timerObj;
   }

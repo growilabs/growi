@@ -5,7 +5,6 @@ import type {
   IPage,
   IPageInfoExt,
   IPageNotFoundInfo,
-  IRevision,
 } from '@growi/core';
 import {
   AllSubscriptionStatusType,
@@ -38,7 +37,6 @@ import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
 import Subscription from '~/server/models/subscription';
 import { configManager } from '~/server/service/config-manager';
 import { exportService } from '~/server/service/export';
@@ -46,7 +44,9 @@ import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and
 import type { IPageGrantService } from '~/server/service/page-grant';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 import { checkPageExistenceHandlersFactory } from './check-page-existence';
@@ -55,6 +55,7 @@ import { getPageByShareLinkHandlerFactory } from './get-page-by-share-link';
 import { getPageInfoHandlerFactory } from './get-page-info';
 import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count';
 import { getYjsDataHandlerFactory } from './get-yjs-data';
+import { grantBodyValidator } from './grant-body-validator';
 import { publishPageHandlersFactory } from './publish-page';
 import { respondWithSinglePage } from './respond-with-single-page';
 import { syncLatestRevisionBodyToYjsDraftHandlerFactory } from './sync-latest-revision-body-to-yjs-draft';
@@ -63,8 +64,9 @@ import { updatePageHandlersFactory } from './update-page';
 
 const logger = loggerFactory('growi:routes:apiv3:page');
 
-const express = require('express');
-const { body, query, param } = require('express-validator');
+import type { Router } from 'express';
+import express from 'express';
+import { body, param, query } from 'express-validator';
 
 const router = express.Router();
 
@@ -86,7 +88,7 @@ const router = express.Router();
  *            description: boolean for like status
  *
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
@@ -114,7 +116,7 @@ module.exports = (crowi: Crowi) => {
     ],
     updateGrant: [
       param('pageId').isMongoId().withMessage('pageId is required'),
-      body('grant').isInt().withMessage('grant is required'),
+      grantBodyValidator({ required: true }),
       body('grantedGroups')
         .optional()
         .isArray()
@@ -606,7 +608,7 @@ module.exports = (crowi: Crowi) => {
       const parentPageGroupGrantData =
         await pageGrantService.getPageGroupGrantData(parentPage, req.user);
       const parentPageGrant: IPageGrantData = {
-        grant,
+        grant: parentPage.grant,
         groupGrantData: parentPageGroupGrantData,
       };
 
@@ -899,7 +901,7 @@ module.exports = (crowi: Crowi) => {
       const format: 'md' | 'pdf' = req.query.format ?? 'md';
       const revisionId: string | undefined = req.query.revisionId;
 
-      let revision: HydratedDocument<IRevision> | null;
+      let revision: Awaited<ReturnType<typeof prisma.revisions.findUnique>>;
       let pagePath: string;
 
       const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
@@ -912,15 +914,15 @@ module.exports = (crowi: Crowi) => {
         page = await Page.findByIdAndViewer(pageId, req.user);
 
         if (page == null) {
-          const isPageExist = (await Page.count({ _id: pageId })) > 0;
-          if (isPageExist) {
-            // This page exists but req.user has not read permission
-            return res.apiv3Err(
-              new ErrorV3(`Haven't the right to see the page ${pageId}.`),
-              403,
-            );
-          }
-          return res.apiv3Err(new ErrorV3(`Page ${pageId} is not exist.`), 404);
+          // Always respond 404 regardless of forbidden vs not-found — see
+          // apps/app/.claude/rules/page-write-action-403-404.md
+          return res.apiv3Err(
+            new ErrorV3(
+              `Page '${pageId}' is not found or forbidden`,
+              'notfound_or_forbidden',
+            ),
+            404,
+          );
         }
       } catch (err) {
         logger.error('Failed to get page data', err);
@@ -942,8 +944,9 @@ module.exports = (crowi: Crowi) => {
           throw new Error('revisionId is not specified');
         }
 
-        const revisionIdForFind = new mongoose.Types.ObjectId(targetId);
-        revision = await Revision.findById(revisionIdForFind);
+        revision = await prisma.revisions.findUnique({
+          where: { id: targetId.toString() },
+        });
         if (revision == null) {
           throw new Error('Revision is not found');
         }
@@ -951,7 +954,7 @@ module.exports = (crowi: Crowi) => {
         pagePath = page.path;
 
         // Error if pageId and revison's pageIds do not match
-        if (page._id.toString() !== revision.pageId.toString()) {
+        if (!isRevisionOfPage(revision, page._id)) {
           return res.apiv3Err(
             new ErrorV3("Haven't the right to see the page."),
             403,

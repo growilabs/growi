@@ -1,12 +1,20 @@
-import type { HasObjectId, IPage, IUser } from '@growi/core';
+import type { HasObjectId, IPage, IPageHasId, IUser } from '@growi/core';
 import { SubscriptionStatusType } from '@growi/core';
+import { toLegacyAttachmentShape } from '@growi/core/dist/models/serializers';
 import { subDays } from 'date-fns/subDays';
 import type { FilterQuery, Types, UpdateQuery } from 'mongoose';
 
 import type { IAuditLogBulkExportJob } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
-import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
-import { AllEssentialActions } from '~/interfaces/activity';
-import type { PaginateResult } from '~/interfaces/in-app-notification';
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
+import {
+  AllEssentialActions,
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity';
+import type {
+  IInAppNotification,
+  PaginateResult,
+} from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import type { ActivityDocument } from '~/server/models/activity';
 import type { InAppNotificationDocument } from '~/server/models/in-app-notification';
@@ -14,6 +22,7 @@ import { InAppNotification } from '~/server/models/in-app-notification';
 import InAppNotificationSettings from '~/server/models/in-app-notification-settings';
 import Subscription from '~/server/models/subscription';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
 import { generateSnapshot } from './in-app-notification/in-app-notification-utils';
@@ -23,6 +32,14 @@ import { getRoomNameWithId, RoomPrefix } from './socket-io/helper';
 const { STATUS_UNOPENED, STATUS_OPENED } = InAppNotificationStatuses;
 
 const logger = loggerFactory('growi:service:inAppNotification');
+
+const hasAttachmentRef = (
+  target: unknown,
+): target is { attachment: NonNullable<unknown> } =>
+  target != null &&
+  typeof target === 'object' &&
+  'attachment' in target &&
+  target.attachment != null;
 
 export class InAppNotificationService {
   crowi!: Crowi;
@@ -49,7 +66,7 @@ export class InAppNotificationService {
       'updated',
       async (
         activity: ActivityDocument,
-        target: IUser | IPage | IPageBulkExportJob | IAuditLogBulkExportJob,
+        target: IUser | IPage | pagebulkexportjobs | IAuditLogBulkExportJob,
         preNotify: PreNotify,
       ) => {
         try {
@@ -146,10 +163,11 @@ export class InAppNotificationService {
           offset,
           populate: [
             { path: 'user' },
-            {
-              path: 'target',
-              populate: [{ path: 'attachment', strictPopulate: false }],
-            },
+            // target.attachment is populated via prisma by
+            // populateTargetAttachments after toObject(): mongoose casts a
+            // prisma row assigned to a ref path back to an ObjectId, dropping
+            // `downloadPathProxied`.
+            { path: 'target' },
             { path: 'activities', populate: { path: 'user' } },
           ],
         },
@@ -160,6 +178,47 @@ export class InAppNotificationService {
       logger.error('Error', err);
       throw new Error(err);
     }
+  };
+
+  // TODO: populate target.attachment in the notification query itself once
+  // InAppNotification is migrated to prisma. Read through prisma so it carries
+  // the computed `downloadPathProxied`.
+  populateTargetAttachments = async <T extends IInAppNotification>(
+    notifications: T[],
+  ): Promise<T[]> => {
+    const attachmentIds = [
+      ...new Set<string>(
+        notifications
+          .map(({ target }) => target)
+          .filter(hasAttachmentRef)
+          .map(({ attachment }) => String(attachment)),
+      ),
+    ];
+    if (attachmentIds.length === 0) {
+      return notifications;
+    }
+
+    const attachments = await prisma.attachments.findMany({
+      where: { id: { in: attachmentIds } },
+    });
+    const attachmentsById = new Map(
+      attachments.map((attachment) => [attachment.id, attachment]),
+    );
+
+    return notifications.map((notification) => {
+      const { target } = notification;
+      if (!hasAttachmentRef(target)) {
+        return notification;
+      }
+      const attachment = attachmentsById.get(String(target.attachment));
+      return {
+        ...notification,
+        target: {
+          ...target,
+          attachment: attachment ? toLegacyAttachmentShape(attachment) : null,
+        },
+      };
+    });
   };
 
   open = async (
@@ -199,6 +258,52 @@ export class InAppNotificationService {
     }
   };
 
+  // Mention notifications are generated directly without a dedicated Activity document.
+  // Rationale:
+  //   - A mention is a sub-event of ACTION_COMMENT_CREATE; creating a separate Activity
+  //     would split one comment post into two activities.
+  //   - Going through the upsertByActivity flow would apply the 7-day dedup window,
+  //     which is not desired for mentions (every mention must notify).
+  // Note: notification.action (COMMENT_MENTION) intentionally differs from the
+  // referenced activity.action (COMMENT_CREATE). See PR #11022 for discussion
+  insertMentionNotifications = async (
+    mentionedUserIds: Types.ObjectId[],
+    actionUserId: Types.ObjectId,
+    activityId: Types.ObjectId,
+    page: IPageHasId,
+  ): Promise<void> => {
+    const filteredUserIds = mentionedUserIds.filter(
+      (userId) => userId.toString() !== actionUserId.toString(),
+    );
+
+    if (filteredUserIds.length === 0) {
+      return;
+    }
+
+    const now = new Date();
+    const snapshot = await generateSnapshot(
+      SupportedTargetModel.MODEL_PAGE,
+      page,
+    );
+
+    const documents = filteredUserIds.map((userId) => ({
+      user: userId,
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+      target: page._id,
+      action: SupportedAction.ACTION_COMMENT_MENTION,
+      status: STATUS_UNOPENED,
+      createdAt: now,
+      snapshot,
+      activities: [activityId],
+    }));
+
+    await InAppNotification.insertMany(documents, { ordered: false });
+    logger.info(
+      `insertMentionNotifications: inserted ${filteredUserIds.length} notifications`,
+    );
+    await this.emitSocketIo(filteredUserIds);
+  };
+
   createSubscription = async (
     userId: Types.ObjectId,
     pageId: Types.ObjectId,
@@ -225,7 +330,7 @@ export class InAppNotificationService {
 
   createInAppNotification = async function (
     activity: ActivityDocument,
-    target: IUser | IPage | IPageBulkExportJob | IAuditLogBulkExportJob,
+    target: IUser | IPage | pagebulkexportjobs | IAuditLogBulkExportJob,
     preNotify: PreNotify,
   ): Promise<void> {
     const shouldNotification =

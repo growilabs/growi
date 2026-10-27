@@ -1,10 +1,11 @@
 import {
+  type CSSProperties,
   forwardRef,
   type JSX,
   memo,
   type ReactNode,
   useCallback,
-  useRef,
+  useState,
 } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
@@ -24,6 +25,17 @@ const UncontrolledTooltip = dynamic<UncontrolledTooltipProps>(
 
 const DEFAULT_IMAGE = '/images/icons/user.svg';
 
+/**
+ * A user as a Prisma row carries it: `name` and `imageUrlCached` may be null.
+ */
+type UserPictureUserRow = {
+  username?: string;
+  name?: string | null;
+  imageUrlCached?: string | null;
+};
+
+type UserPictureUser = Partial<IUser> | UserPictureUserRow | Ref<IUser>;
+
 type UserPictureSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 type BaseUserPictureRootProps = {
@@ -33,7 +45,12 @@ type BaseUserPictureRootProps = {
   className?: string;
 };
 
-type UserPictureRootWithoutLinkProps = BaseUserPictureRootProps;
+type UserPictureRootWithoutLinkProps = BaseUserPictureRootProps & {
+  onClick?: () => void;
+  rootClassName?: string;
+  rootStyle?: CSSProperties;
+  testId?: string;
+};
 
 type UserPictureRootWithLinkProps = BaseUserPictureRootProps & {
   username: string;
@@ -43,8 +60,37 @@ const UserPictureRootWithoutLink = forwardRef<
   HTMLSpanElement,
   UserPictureRootWithoutLinkProps
 >((props, ref) => {
+  const { onClick, rootClassName, rootStyle, testId } = props;
+  const interactive = onClick != null;
+  const resolvedStyle: CSSProperties | undefined = interactive
+    ? { cursor: 'pointer', ...rootStyle }
+    : rootStyle;
+  if (interactive) {
+    return (
+      // biome-ignore lint/a11y/useSemanticElements: UserPicture is used in varied layout contexts where a native button would break styling
+      <span
+        ref={ref}
+        className={rootClassName ?? props.className}
+        style={resolvedStyle}
+        data-testid={testId}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') onClick();
+        }}
+        role="button"
+        tabIndex={0}
+      >
+        {props.children}
+      </span>
+    );
+  }
   return (
-    <span ref={ref} className={props.className}>
+    <span
+      ref={ref}
+      className={rootClassName ?? props.className}
+      style={resolvedStyle}
+      data-testid={testId}
+    >
       {props.children}
     </span>
   );
@@ -86,7 +132,7 @@ const UserPictureRootWithLink = forwardRef<
  * type guard to determine whether the specified object is IUser
  */
 const hasUsername = (
-  obj: Partial<IUser> | Ref<IUser> | null | undefined,
+  obj: UserPictureUser | null | undefined,
 ): obj is { username: string } => {
   return obj != null && typeof obj !== 'string' && 'username' in obj;
 };
@@ -95,7 +141,7 @@ const hasUsername = (
  * Type guard to determine whether tooltip should be shown
  */
 const hasName = (
-  obj: Partial<IUser> | Ref<IUser> | null | undefined,
+  obj: UserPictureUser | null | undefined,
 ): obj is { name: string } => {
   return obj != null && typeof obj === 'object' && 'name' in obj;
 };
@@ -104,17 +150,21 @@ const hasName = (
  * type guard to determine whether the specified object is IUser
  */
 const hasProfileImage = (
-  obj: Partial<IUser> | Ref<IUser> | null | undefined,
+  obj: UserPictureUser | null | undefined,
 ): obj is { imageUrlCached: string } => {
   return obj != null && typeof obj === 'object' && 'imageUrlCached' in obj;
 };
 
 type Props = {
-  user?: Partial<IUser> | Ref<IUser> | null;
+  user?: UserPictureUser | null;
   size?: UserPictureSize;
   noLink?: boolean;
   noTooltip?: boolean;
   className?: string;
+  onClick?: () => void;
+  rootClassName?: string;
+  rootStyle?: CSSProperties;
+  testId?: string;
 };
 
 export const UserPicture = memo((userProps: Props): JSX.Element => {
@@ -124,6 +174,10 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
     noLink,
     noTooltip,
     className: additionalClassName,
+    onClick,
+    rootClassName,
+    rootStyle,
+    testId,
   } = userProps;
 
   // Extract user information
@@ -145,9 +199,14 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
     .filter(Boolean)
     .join(' ');
 
-  // ref is always called unconditionally to satisfy React hooks rules.
-  // Passed to the root element so UncontrolledTooltip can target it.
-  const rootRef = useRef<HTMLSpanElement>(null);
+  // Callback ref into state so the tooltip mounts AFTER the host span is in
+  // the DOM. reactstrap's UncontrolledTooltip resolves `target.current` once
+  // in componentDidMount; when the tooltip is a child of the target span,
+  // React's bottom-up commit order leaves the parent ref unset at that
+  // moment, so the tooltip permanently fails to attach listeners. The race
+  // is masked in dev by next/dynamic's slower resolution but fires in
+  // production builds.
+  const [rootEl, setRootEl] = useState<HTMLSpanElement | null>(null);
 
   const tooltipClassName = `${moduleTooltipClass} user-picture-tooltip-${size ?? 'md'}`;
 
@@ -157,10 +216,10 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
   const children = (
     <>
       {imgElement}
-      {showTooltip && (
+      {rootEl != null && showTooltip && (
         <UncontrolledTooltip
           placement="bottom"
-          target={rootRef}
+          target={rootEl}
           popperClassName={tooltipClassName}
           delay={0}
           fade={false}
@@ -180,9 +239,13 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
   if (username == null || noLink) {
     return (
       <UserPictureRootWithoutLink
-        ref={rootRef}
+        ref={setRootEl}
         displayName={displayName}
         size={size}
+        onClick={onClick}
+        rootClassName={rootClassName}
+        rootStyle={rootStyle}
+        testId={testId}
       >
         {children}
       </UserPictureRootWithoutLink>
@@ -191,7 +254,7 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
 
   return (
     <UserPictureRootWithLink
-      ref={rootRef}
+      ref={setRootEl}
       displayName={displayName}
       size={size}
       username={username}

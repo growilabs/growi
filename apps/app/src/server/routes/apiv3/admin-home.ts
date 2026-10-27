@@ -1,4 +1,6 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
+import type { Router } from 'express';
+import express from 'express';
 
 import type { IResAdminHome } from '~/interfaces/res/admin/admin-home';
 import type Crowi from '~/server/crowi';
@@ -8,7 +10,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
 
-const express = require('express');
+import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const router = express.Router();
 
@@ -63,7 +65,7 @@ const router = express.Router();
  *            type: object
  *            description: installed plugins
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
 
@@ -92,7 +94,7 @@ module.exports = (crowi: Crowi) => {
     accessTokenParser([SCOPE.READ.ADMIN.TOP]),
     loginRequiredStrictly,
     adminRequired,
-    async (_req, res) => {
+    async (_req, res: ApiV3Response) => {
       const { getRuntimeVersions } = await import(
         '~/server/util/runtime-versions'
       );

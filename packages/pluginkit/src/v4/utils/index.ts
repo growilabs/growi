@@ -1,1 +1,1 @@
-export * from './template';
+export * from './template.js';

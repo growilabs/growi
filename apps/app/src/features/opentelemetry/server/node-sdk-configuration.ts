@@ -1,6 +1,9 @@
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
+import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express';
+import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
+import { MongoDBInstrumentation } from '@opentelemetry/instrumentation-mongodb';
+import { MongooseInstrumentation } from '@opentelemetry/instrumentation-mongoose';
 import type { Resource } from '@opentelemetry/resources';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
@@ -36,10 +39,9 @@ export const generateNodeSDKConfiguration = (opts?: Option): Configuration => {
       [ATTR_SERVICE_VERSION]: version,
     });
 
-    // Data anonymization configuration
-    const httpInstrumentationConfig = opts?.enableAnonymization
-      ? httpInstrumentationConfigForAnonymize
-      : {};
+    const httpConfig = opts?.enableAnonymization
+      ? { ...httpInstrumentationConfigForAnonymize }
+      : undefined;
 
     configuration = {
       resource,
@@ -49,21 +51,10 @@ export const generateNodeSDKConfiguration = (opts?: Option): Configuration => {
         exportIntervalMillis: 300000, // 5 minute
       }),
       instrumentations: [
-        getNodeAutoInstrumentations({
-          '@opentelemetry/instrumentation-pino': {
-            enabled: false,
-          },
-          // disable fs instrumentation since this generates very large amount of traces
-          // see: https://opentelemetry.io/docs/languages/js/libraries/#registration
-          '@opentelemetry/instrumentation-fs': {
-            enabled: false,
-          },
-          // HTTP instrumentation with anonymization
-          '@opentelemetry/instrumentation-http': {
-            enabled: true,
-            ...httpInstrumentationConfig,
-          },
-        }),
+        new HttpInstrumentation(httpConfig),
+        new ExpressInstrumentation(),
+        new MongoDBInstrumentation(),
+        new MongooseInstrumentation(),
       ],
     };
   }

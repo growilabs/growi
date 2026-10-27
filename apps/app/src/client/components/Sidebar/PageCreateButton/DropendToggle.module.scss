@@ -1,18 +1,57 @@
 @use 'styles/variables' as var;
 @use '../button-styles';
 
+// svg and icon animate independently; the hitarea div is intentionally excluded
+// from these keyframes so its position is never shifted by the slide animation
+@keyframes svg-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes svg-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+@keyframes icon-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px) translateY(-50%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(-50%);
+  }
+}
+
+@keyframes icon-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0) translateY(-50%);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-12px) translateY(-50%);
+  }
+}
+
 .btn-toggle {
   @extend %btn-basis;
 
   left: 14px;
   padding: 0;
-
-  :global(.icon) {
-    top: 50%;
-    right: 0;
-    font-size: 22px;
-    transform: translateY(-50%);
-  }
 }
 
 // no caret
@@ -26,10 +65,49 @@
   }
 }
 
-// hitarea
+// hitarea — at its natural position, unaffected by slide animation
 .btn-toggle {
   :global(.hitarea) {
     inset: 0 -14px 0 0;
+  }
+}
+
+// visual defaults — hidden until first hover
+.btn-toggle {
+  :global(svg) {
+    opacity: 0;
+    fill: var(--grw-primary-600);
+    transform: translateX(-12px);
+  }
+
+  :global(.icon) {
+    top: 50%;
+    right: 0;
+    font-size: 22px;
+    opacity: 0;
+    transform: translateX(-12px) translateY(-50%);
+  }
+}
+
+// slide in
+.btn-toggle.is-visible {
+  :global(svg) {
+    animation: svg-slide-in 0.3s ease forwards;
+  }
+
+  :global(.icon) {
+    animation: icon-slide-in 0.3s ease forwards;
+  }
+}
+
+// slide out (guarded by has-visible to prevent firing on initial mount)
+.btn-toggle.has-visible:not(.is-visible) {
+  :global(svg) {
+    animation: svg-slide-out 0.3s ease forwards;
+  }
+
+  :global(.icon) {
+    animation: icon-slide-out 0.3s ease forwards;
   }
 }
 
@@ -38,21 +116,28 @@
   background-color: transparent !important;
 }
 
-.btn-toggle {
+.btn-toggle:active,
+.btn-toggle.is-active {
   :global(svg) {
     fill: var(--grw-primary-400);
   }
 }
 
-.btn-toggle:hover {
-  :global(svg) {
-    fill: var(--grw-primary-400);
+@media (prefers-reduced-motion: reduce) {
+  .btn-toggle :global(svg),
+  .btn-toggle :global(.icon),
+  .btn-toggle.has-visible:not(.is-visible) :global(svg),
+  .btn-toggle.has-visible:not(.is-visible) :global(.icon) {
+    animation: none;
+  }
+
+  .btn-toggle.is-visible :global(svg) {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .btn-toggle.is-visible :global(.icon) {
+    opacity: 1;
+    transform: translateX(0) translateY(-50%);
   }
 }
-
-.btn-toggle:active {
-  :global(svg) {
-    fill: var(--grw-primary-600);
-  }
-}
-

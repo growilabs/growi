@@ -1,1 +1,1 @@
-module.exports = [/^\/api-docs\//];
+export default [/^\/api-docs\//];

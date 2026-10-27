@@ -1,4 +1,4 @@
-import { OptionParser } from './option-parser';
+import { OptionParser } from './option-parser.js';
 
 describe('option-parser', () => {
   test.concurrent.each`

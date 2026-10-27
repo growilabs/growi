@@ -42,3 +42,13 @@ You can update the client library by one of the following ways:
 - Execute `cd ${growi_root_path}/packages/pdf-converter-client && pnpm gen:client-code`
 - Start GROWI app
     - Inside GROWI devcontainer (not PDF-Converter devcontainer), execute `cd ${growi_root_path}/apps/app && turbo dev`
+
+# Releasing the docker image
+
+The image is released through changesets, the same flow `@growi/core` and `@growi/pluginkit` use — there is no release branch and no RC version marker.
+
+1. In the PR that changes `apps/pdf-converter/**`, run `npx changeset` and give `@growi/pdf-converter` a `patch` / `minor` / `major` bump.
+2. Merging that PR makes changesets open or update a **Release Subpackages** PR against `master`, which bumps `package.json` and writes `CHANGELOG.md`.
+3. Merging the Release Subpackages PR publishes the image. `.github/workflows/release-pdf-converter.yml` watches pushes to `master` that touch `apps/pdf-converter/package.json`, publishes when the version is a stable one with no `pdf-converter/v<version>` tag yet, and creates that tag afterwards.
+
+Because the gate is "stable version, not tagged yet", a push that edits `package.json` without releasing does nothing, and the same version can never be published twice.

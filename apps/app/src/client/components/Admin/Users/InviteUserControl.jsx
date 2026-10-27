@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 import AdminUsersContainer from '~/client/services/AdminUsersContainer';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
-import UserInviteModal from './UserInviteModal';
+import { UserInviteModal } from './UserInviteModal';
 
 class InviteUserControl extends React.Component {
   render() {

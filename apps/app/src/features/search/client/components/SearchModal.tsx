@@ -1,4 +1,4 @@
-import { type JSX, useCallback, useEffect, useMemo, useState } from 'react';
+import { type JSX, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Downshift, {
   type DownshiftState,
@@ -11,7 +11,6 @@ import { useCurrentPagePath } from '~/states/page';
 import { useSetSearchKeyword } from '~/states/search';
 import { isSearchScopeChildrenAsDefaultAtom } from '~/states/server-configurations';
 
-import { isIncludeAiMenthion, removeAiMenthion } from '../../utils/ai';
 import type { DownshiftItem } from '../interfaces/downshift';
 import {
   useSearchModalActions,
@@ -30,7 +29,6 @@ const SearchModalSubstance = (props: Props): JSX.Element => {
   const { onSearch } = props;
 
   const [searchInput, setSearchInput] = useState('');
-  const [isMenthionedToAi, setMenthionedToAi] = useState(false);
 
   const searchModalData = useSearchModalStatus();
   const { close: closeSearchModal } = useSearchModalActions();
@@ -83,29 +81,6 @@ const SearchModalSubstance = (props: Props): JSX.Element => {
     }
   }, [searchModalData?.isOpened, searchModalData?.searchKeyword]);
 
-  useEffect(() => {
-    setMenthionedToAi(isIncludeAiMenthion(searchInput));
-  }, [searchInput]);
-
-  // Memoize AI mention removal to prevent recalculation on every render
-  const searchInputWithoutAi = useMemo(
-    () => removeAiMenthion(searchInput),
-    [searchInput],
-  );
-
-  // Memoize icon selection to prevent recalculation
-  const searchIcon = useMemo(
-    () => (isMenthionedToAi ? 'psychology' : 'search'),
-    [isMenthionedToAi],
-  );
-
-  // Memoize icon class to prevent string concatenation on every render
-  const iconClassName = useMemo(
-    () =>
-      `material-symbols-outlined fs-4 me-3 ${isMenthionedToAi ? 'text-primary' : ''}`,
-    [isMenthionedToAi],
-  );
-
   return (
     <ModalBody className="pb-2">
       <Downshift
@@ -122,7 +97,9 @@ const SearchModalSubstance = (props: Props): JSX.Element => {
         }) => (
           <div {...getRootProps({}, { suppressRefError: true })}>
             <div className="text-muted d-flex justify-content-center align-items-center p-1">
-              <span className={iconClassName}>{searchIcon}</span>
+              <span className="material-symbols-outlined fs-4 me-3">
+                search
+              </span>
               <SearchForm
                 searchKeyword={searchInput}
                 onChange={changeSearchTextHandler}
@@ -144,12 +121,12 @@ const SearchModalSubstance = (props: Props): JSX.Element => {
               <div className="border-top mt-2 mb-2" />
               <SearchMethodMenuItem
                 activeIndex={highlightedIndex}
-                searchKeyword={searchInputWithoutAi}
+                searchKeyword={searchInput}
                 getItemProps={getItemProps}
               />
               <SearchResultMenuItem
                 activeIndex={highlightedIndex}
-                searchKeyword={searchInputWithoutAi}
+                searchKeyword={searchInput}
                 getItemProps={getItemProps}
               />
               <div className="border-top mt-2 mb-2" />

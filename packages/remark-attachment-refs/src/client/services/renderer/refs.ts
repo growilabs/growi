@@ -150,6 +150,7 @@ const resolvePath = (pagePath: string, basePath: string) => {
 
 type RefRehypePluginParams = {
   pagePath?: string;
+  isSharedPage?: boolean;
 };
 
 export const rehypePlugin: Plugin<[RefRehypePluginParams]> = (options = {}) => {
@@ -170,7 +171,15 @@ export const rehypePlugin: Plugin<[RefRehypePluginParams]> = (options = {}) => {
 
     for (const refElem of elements) {
       if (refElem.properties == null) {
-        continue;
+        // Initialize properties if null to avoid errors down the line
+        refElem.properties = {};
+      }
+
+      // Inject isSharedPage from the renderer config unless the element already
+      // declares it, so the directive can disable itself on a share link page.
+      const isSharedPage = refElem.properties.isSharedPage;
+      if (isSharedPage == null || typeof isSharedPage !== 'boolean') {
+        refElem.properties.isSharedPage = options.isSharedPage;
       }
 
       const prefix = refElem.properties.prefix;
@@ -199,13 +208,17 @@ export const rehypePlugin: Plugin<[RefRehypePluginParams]> = (options = {}) => {
   };
 };
 
+// Attributes injected by the renderer (not authored in markdown) that must
+// survive sanitization for every ref directive.
+const COMMON_ATTRIBUTES = ['isSharedPage'];
+
 export const sanitizeOption: SanitizeOption = {
   tagNames: ['ref', 'refimg', 'refs', 'refsimg', 'gallery'],
   attributes: {
-    ref: REF_SUPPORTED_ATTRIBUTES,
-    refimg: REF_IMG_SUPPORTED_ATTRIBUTES,
-    refs: REFS_SUPPORTED_ATTRIBUTES,
-    refsimg: REFS_IMG_SUPPORTED_ATTRIBUTES,
-    gallery: REFS_IMG_SUPPORTED_ATTRIBUTES,
+    ref: [...REF_SUPPORTED_ATTRIBUTES, ...COMMON_ATTRIBUTES],
+    refimg: [...REF_IMG_SUPPORTED_ATTRIBUTES, ...COMMON_ATTRIBUTES],
+    refs: [...REFS_SUPPORTED_ATTRIBUTES, ...COMMON_ATTRIBUTES],
+    refsimg: [...REFS_IMG_SUPPORTED_ATTRIBUTES, ...COMMON_ATTRIBUTES],
+    gallery: [...REFS_IMG_SUPPORTED_ATTRIBUTES, ...COMMON_ATTRIBUTES],
   },
 };

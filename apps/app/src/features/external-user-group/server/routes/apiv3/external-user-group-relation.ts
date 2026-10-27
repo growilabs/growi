@@ -1,6 +1,8 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, Router } from 'express';
+import express from 'express';
+import { query } from 'express-validator';
 
 import type { IExternalUserGroupRelationHasId } from '~/features/external-user-group/interfaces/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
@@ -14,11 +16,9 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:routes:apiv3:user-group-relation');
 
-const express = require('express');
-const { query } = require('express-validator');
 const router = express.Router();
 
-module.exports = (crowi: Crowi): Router => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
 

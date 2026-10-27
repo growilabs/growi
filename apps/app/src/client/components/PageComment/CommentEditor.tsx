@@ -9,6 +9,11 @@ import {
 import dynamic from 'next/dynamic';
 import { GlobalCodeMirrorEditorKey, useSetResolvedTheme } from '@growi/editor';
 import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/CodeMirrorEditorComment';
+import {
+  createMentionCompletionExtension,
+  type FetchUsersFn,
+  mentionDecorationSettings,
+} from '@growi/editor/dist/client/services';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
@@ -16,6 +21,7 @@ import { useTranslation } from 'next-i18next';
 import { TabContent, TabPane } from 'reactstrap';
 
 import { uploadAttachments } from '~/client/services/upload-attachments';
+import { apiv3Get } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
 import { useCurrentUser } from '~/states/global';
 import { useCurrentPagePath } from '~/states/page';
@@ -68,6 +74,14 @@ type CommentEditorProps = {
   commentBody?: string;
   onCanceled?: () => void;
   onCommented?: () => void;
+  /**
+   * Overrides how the typed text is persisted. When provided, this is
+   * called instead of the default `useSWRxPageComment` post/update path —
+   * used by inline-comment replies, which persist through a different
+   * endpoint (`InlineCommentService.createReply`) while reusing this same
+   * editor UI as-is.
+   */
+  onSubmit?: (commentText: string) => Promise<unknown>;
 };
 
 export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
@@ -79,6 +93,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     commentBody,
     onCanceled,
     onCommented,
+    onSubmit,
   } = props;
 
   const currentUser = useCurrentUser();
@@ -157,7 +172,9 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     const commentBodyToPost = codeMirrorEditor?.getDocString() ?? '';
 
     try {
-      if (currentCommentId != null) {
+      if (onSubmit != null) {
+        await onSubmit(commentBodyToPost);
+      } else if (currentCommentId != null) {
         // update current comment
         await updateComment(commentBodyToPost, revisionId, currentCommentId);
       } else {
@@ -198,6 +215,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     isSlackEnabled,
     slackChannels,
     postComment,
+    onSubmit,
   ]);
 
   // the upload event handler
@@ -230,6 +248,38 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     }),
     [editorKey, markDirty],
   );
+
+  const fetchUsers = useCallback<FetchUsersFn>(async (query: string) => {
+    try {
+      const res = await apiv3Get<{
+        paginateResult: { docs: { username: string; name: string }[] };
+      }>('/users/', {
+        searchText: query,
+        sort: 'username',
+        sortOrder: 'asc',
+        page: 1,
+      });
+      return (res.data.paginateResult?.docs ?? []).map((user) => ({
+        username: user.username,
+        name: user.name,
+      }));
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const mentionExtension = useMemo(
+    () => createMentionCompletionExtension(fetchUsers),
+    [fetchUsers],
+  );
+
+  useEffect(() => {
+    return codeMirrorEditor?.appendExtensions?.([mentionDecorationSettings]);
+  }, [codeMirrorEditor]);
+
+  useEffect(() => {
+    return codeMirrorEditor?.appendExtensions?.(mentionExtension);
+  }, [codeMirrorEditor, mentionExtension]);
 
   // initialize CodeMirrorEditor
   useEffect(() => {
@@ -310,7 +360,7 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
         </TabContent>
       </div>
 
-      <div className="comment-submit px-4 pb-3 mb-2">
+      <div className="comment-submit px-4 pb-3">
         <div className="d-flex">
           <span className="flex-grow-1" />
           <span className="d-none d-sm-inline">
@@ -366,7 +416,7 @@ export const CommentEditorPre = (props: CommentEditorProps): JSX.Element => {
           <NotAvailableIfReadOnlyUserNotAllowedToComment>
             <button
               type="button"
-              className="btn btn-outline-primary w-100 text-start py-3"
+              className="btn btn-outline-primary w-100 text-start py-3 d-flex align-items-center"
               onClick={() => setIsReadyToUse(true)}
               data-testid="open-comment-editor-button"
             >

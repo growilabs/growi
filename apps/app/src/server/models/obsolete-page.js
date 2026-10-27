@@ -1,29 +1,34 @@
+import nodePath from 'node:path';
 import { GroupType, Origin } from '@growi/core';
 import {
+  escapeStringForMongoRegex,
   pagePathUtils,
   pathUtils,
   templateChecker,
 } from '@growi/core/dist/utils';
+import { isValidObjectId } from '@growi/core/dist/utils/objectid-utils';
 import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
+import urljoin from 'url-join';
 
-import { Comment } from '~/features/comment/server/models/comment';
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import { configManager } from '../service/config-manager';
+import { configManager as _configManager } from '../service/config-manager';
+import { isRevisionOfPage } from '../util/is-revision-of-page';
 import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
 import UserGroup from './user-group';
 import UserGroupRelation from './user-group-relation';
 
+/** @returns {import('../service/config-manager').IConfigManagerForApp} */
+function getConfigManager() {
+  return _configManager;
+}
+
 const logger = loggerFactory('growi:models:page');
-
-const nodePath = require('path');
-
-const mongoose = require('mongoose');
-const urljoin = require('url-join');
 
 const { isTopPage, isTrashPage } = pagePathUtils;
 const { checkTemplatePath } = templateChecker;
@@ -145,17 +150,10 @@ export const getPageSchema = (crowi) => {
   };
 
   pageSchema.methods.findRelatedTagsById = async function () {
-    const PageTagRelation = mongoose.model('PageTagRelation');
-    // biome-ignore lint/plugin: allow populate for backward compatibility
-    const relations = await PageTagRelation.find({
-      relatedPage: this._id,
-    }).populate('relatedTag');
-    return relations.map((relation) => {
-      return relation.relatedTag.name;
-    });
+    return prisma.pagetagrelations.listTagNamesByPage(this._id.toString());
   };
 
-  pageSchema.methods.isUpdatable = async function (previousRevision, origin) {
+  pageSchema.methods.isUpdatable = async function (previousRevisionId, origin) {
     // biome-ignore lint/plugin: allow populate for backward compatibility
     const populatedPageDataWithRevisionOrigin = await this.populate(
       'revision',
@@ -171,10 +169,11 @@ export const getPageSchema = (crowi) => {
       return true;
     }
 
-    const revision = this.latestRevision || this.revision._id;
+    const revisionId =
+      this.latestRevision?._id.toString() || this.revision._id.toString();
     // comparing ObjectId with string
     // biome-ignore lint/suspicious/noDoubleEquals: ignore
-    if (revision != previousRevision) {
+    if (revisionId != previousRevisionId) {
       return false;
     }
     return true;
@@ -255,9 +254,19 @@ export const getPageSchema = (crowi) => {
     return this.save();
   };
 
-  pageSchema.methods.initLatestRevisionField = function (revisionId) {
+  // revisionId comes from a request: show it only when it belongs to this page, otherwise keep the latest revision.
+  pageSchema.methods.initLatestRevisionField = async function (revisionId) {
     this.latestRevision = this.revision;
-    if (revisionId != null) {
+    // Prisma throws on an id that is not an ObjectId, which would turn a mistyped URL into a 500.
+    if (!isValidObjectId(revisionId?.toString())) {
+      return;
+    }
+
+    const revision = await prisma.revisions.findUnique({
+      where: { id: revisionId.toString() },
+      select: { pageId: true },
+    });
+    if (isRevisionOfPage(revision, this._id)) {
       this.revision = revisionId;
     }
   };
@@ -305,18 +314,15 @@ export const getPageSchema = (crowi) => {
     return differenceInYears(new Date(), this.updatedAt);
   };
 
-  pageSchema.statics.updateCommentCount = function (pageId) {
+  pageSchema.statics.updateCommentCount = async function (pageId) {
     validateCrowi();
-    return Comment.countCommentByPageId(pageId).then((count) => {
-      this.update({ _id: pageId }, { commentCount: count }, {}, (err, data) => {
-        if (err) {
-          logger.debug('Update commentCount Error', err);
-          throw err;
-        }
-
-        return data;
-      });
-    });
+    const count = await prisma.comments.countCommentByPageId(pageId);
+    try {
+      return await this.updateOne({ _id: pageId }, { commentCount: count });
+    } catch (err) {
+      logger.debug('Update commentCount Error', err);
+      throw err;
+    }
   };
 
   pageSchema.statics.getDeletedPageName = (path) => {
@@ -361,7 +367,7 @@ export const getPageSchema = (crowi) => {
       return false;
     }
 
-    const disabledUserPages = configManager.getConfig(
+    const disabledUserPages = getConfigManager().getConfig(
       'security:disableUserPages',
     );
 
@@ -591,10 +597,10 @@ export const getPageSchema = (crowi) => {
     validateCrowi();
 
     // determine User condition
-    const hidePagesRestrictedByOwner = configManager.getConfig(
+    const hidePagesRestrictedByOwner = getConfigManager().getConfig(
       'security:list-policy:hideRestrictedByOwner',
     );
-    const hidePagesRestrictedByGroup = configManager.getConfig(
+    const hidePagesRestrictedByGroup = getConfigManager().getConfig(
       'security:list-policy:hideRestrictedByGroup',
     );
 
@@ -687,7 +693,7 @@ export const getPageSchema = (crowi) => {
     const regexpList = pathList.map((path) => {
       const pathWithTrailingSlash = pathUtils.addTrailingSlash(path);
       return new RegExp(
-        `^${RegExp.escape(pathWithTrailingSlash)}_{1,2}template$`,
+        `^${escapeStringForMongoRegex(pathWithTrailingSlash)}_{1,2}template$`,
       );
     });
 

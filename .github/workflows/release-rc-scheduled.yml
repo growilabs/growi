@@ -46,7 +46,7 @@ jobs:
 
 
   build-image-rc:
-    uses: growilabs/growi/.github/workflows/reusable-app-build-image.yml@master
+    uses: ./.github/workflows/reusable-app-build-image.yml
     with:
       image-name: growilabs/growi
       tag-temporary: latest-rc
@@ -57,7 +57,7 @@ jobs:
   publish-image-rc:
     needs: [determine-tags, build-image-rc]
 
-    uses: growilabs/growi/.github/workflows/reusable-app-create-manifests.yml@master
+    uses: ./.github/workflows/reusable-app-create-manifests.yml
     with:
       tags: ${{ needs.determine-tags.outputs.TAGS }}
       registry: docker.io

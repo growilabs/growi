@@ -1,4 +1,4 @@
-import { isCreatablePage } from './index';
+import { isCreatablePage } from './index.js';
 
 describe('isCreatablePage', () => {
   describe('should return true for valid page paths', () => {
@@ -53,6 +53,8 @@ describe('isCreatablePage', () => {
       '/user/john', // User homepage
       '/_api',
       '/_search',
+      '/_news', // In-app news feed page
+      '/_news/sub', // Sub-paths under the news feed
       '/admin',
       '/login',
       '/hoge/file.md', // .md files

@@ -1,5 +1,69 @@
 # @growi/core
 
+## 3.1.1
+
+### Patch Changes
+
+- [#11893](https://github.com/growilabs/growi/pull/11893) [`7d3c061`](https://github.com/growilabs/growi/commit/7d3c06199d8267bcf651b167b3bfbcdc6752d02d) Thanks [@Ryosei-Fukushima](https://github.com/Ryosei-Fukushima)! - Add callout variant constants (`AllCallout` / `Callout`) to `@growi/core` as the single source of truth, shared by the callout renderer and the editor slash commands.
+
+## 3.1.0
+
+### Minor Changes
+
+- [#11961](https://github.com/growilabs/growi/pull/11961) [`e50350f`](https://github.com/growilabs/growi/commit/e50350fc349e14ff6f8984d753676e62bac73920) Thanks [@mizozobu](https://github.com/mizozobu)! - Add `toLegacyAttachmentShape` and `toLegacyUserShape` to `@growi/core/dist/models/serializers`. They restore the Mongoose-era field names on Prisma rows.
+
+## 3.0.1
+
+### Patch Changes
+
+- [#12081](https://github.com/growilabs/growi/pull/12081) [`fd3a693`](https://github.com/growilabs/growi/commit/fd3a69339f65a4062fab8852b02e8a5c7110f751) Thanks [@yotatameguchi-boop](https://github.com/yotatameguchi-boop)! - Fix deep equality incorrectly treating objects with different own keys as equal when their values are undefined or inherited.
+
+## 3.0.0
+
+### Major Changes
+
+- [#11513](https://github.com/growilabs/growi/pull/11513) [`211f493`](https://github.com/growilabs/growi/commit/211f49330240ecac27442790416ab20e5ea4e2ab) Thanks [@arvid-e](https://github.com/arvid-e)! - Rename `IPage.ttlTimestamp` to `IPage.wipExpiredAt` and change its meaning
+
+  WIP page expiry is no longer enforced by a MongoDB TTL index (which deleted pages without running application code, leaving `descendantCount` inflated and empty placeholder pages orphaned). It is now application-driven, so the stored value changed meaning as well as name:
+
+  - old `ttlTimestamp` — the instant the page was made WIP; the TTL index supplied the duration via `expireAfterSeconds`.
+  - new `wipExpiredAt` — the absolute instant the page expires, computed up front.
+
+  BREAKING: consumers reading or writing `IPage.ttlTimestamp` must switch to `wipExpiredAt` and must not treat it as "when the page became WIP". A GROWI-side migration converts existing stored values.
+
+## 2.5.0
+
+### Minor Changes
+
+- [#11267](https://github.com/growilabs/growi/pull/11267) [`659c93d`](https://github.com/growilabs/growi/commit/659c93d31d24fe90b0edc777c2e586f9efdd0195) Thanks [@miya](https://github.com/miya)! - Rename and prune AI-related access token scopes
+
+  - Renamed the user-feature scope `features:ai_assistant` → `features:ai` (read/write). The constants `SCOPE.READ/WRITE.FEATURES.AI_ASSISTANT` are now `SCOPE.READ/WRITE.FEATURES.AI`, and the scope strings are `read:features:ai` / `write:features:ai`.
+  - Removed the now-unused admin scope `admin:ai_integration` (read/write); the admin AI integration screen has been removed.
+
+  BREAKING: access tokens previously granted `read|write:features:ai_assistant` no longer match the renamed scope and will lose access to AI endpoints until re-granted (or remapped via migration). Tokens carrying `read|write:admin:ai_integration` retain a now-meaningless scope string.
+
+- [#11092](https://github.com/growilabs/growi/pull/11092) [`e2375eb`](https://github.com/growilabs/growi/commit/e2375ebb787062ad20f4f982d94a2768fb9a3ec1) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add interfaces for growi-vault
+
+## 2.4.0
+
+### Minor Changes
+
+- [#11320](https://github.com/growilabs/growi/pull/11320) [`5e8f105`](https://github.com/growilabs/growi/commit/5e8f1054c01771275682dcdbcb2fc3488e1c0be3) Thanks [@Ryosei-Fukushima](https://github.com/Ryosei-Fukushima)! - Add `features:user` and `features:user_group` access-token scopes (read/write). These separate "reading other users'/groups' directory information" from the self-oriented `user_settings:info` scope, which previously over-granted such reads.
+
+## 2.3.2
+
+### Patch Changes
+
+- [#11317](https://github.com/growilabs/growi/pull/11317) [`4a0bf1d`](https://github.com/growilabs/growi/commit/4a0bf1dac5954f9ae7756a574970a3968a4ae8b9) Thanks [@ryotaro-nagahara](https://github.com/ryotaro-nagahara)! - Reserve the `/_news` path (in-app news feed page) in `isCreatablePage` so it cannot be created as a wiki page.
+
+## 2.3.1
+
+### Patch Changes
+
+- [#11236](https://github.com/growilabs/growi/pull/11236) [`bd28252`](https://github.com/growilabs/growi/commit/bd28252c1a6e7f76f9bdadbdc3a07690f6bc0573) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Fix page operations and v5 page migration failing for page paths that contain non-ASCII whitespace (e.g. U+3000 IDEOGRAPHIC SPACE)
+
+  Node.js 24's `RegExp.escape()` escapes non-ASCII whitespace (code points >= U+0100, such as U+3000) into `\uXXXX` form, which MongoDB's PCRE2 engine does not support (error 51091). Added `escapeStringForMongoRegex()`, which escapes only regex metacharacters and passes other characters through literally, and used it wherever the resulting pattern is sent to MongoDB.
+
 ## 2.3.0
 
 ### Minor Changes

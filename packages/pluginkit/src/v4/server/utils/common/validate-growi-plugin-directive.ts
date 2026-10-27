@@ -3,8 +3,8 @@ import type { GrowiPluginType } from '@growi/core';
 import {
   type GrowiPluginValidationData,
   GrowiPluginValidationError,
-} from '../../../../model';
-import { importPackageJson } from './import-package-json';
+} from '../../../../model/index.js';
+import { importPackageJson } from './import-package-json.js';
 
 export const validateGrowiDirective = (
   projectDirRoot: string,

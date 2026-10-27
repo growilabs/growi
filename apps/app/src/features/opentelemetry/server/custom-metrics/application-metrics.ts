@@ -55,6 +55,7 @@ export function addApplicationMetrics(): void {
           external_auth_types:
             growiInfo.additionalInfo?.activeExternalAccountTypes?.join(',') ||
             '',
+          attachment_type: growiInfo.additionalInfo?.attachmentType ?? '',
         });
       } catch (error) {
         loggerDiag.error('Failed to collect application config metrics', {

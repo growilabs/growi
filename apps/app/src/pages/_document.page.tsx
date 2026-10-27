@@ -10,6 +10,7 @@ import type { CrowiRequest } from '~/interfaces/crowi-request';
 import loggerFactory from '~/utils/logger';
 
 import { getLocaleAtServerSide } from './utils/locale';
+import { sanitizeCustomCss } from './utils/sanitize-css';
 
 const _logger = loggerFactory('growi:page:_document');
 
@@ -104,8 +105,12 @@ class GrowiDocument extends Document<GrowiDocumentInitialProps> {
     if (customCss == null || customCss.length === 0) {
       return <></>;
     }
-    // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
-    return <style dangerouslySetInnerHTML={{ __html: customCss }} />;
+    return (
+      <style
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
+        dangerouslySetInnerHTML={{ __html: sanitizeCustomCss(customCss) }}
+      />
+    );
   }
 
   renderCustomNoscript(customNoscript: string | undefined): JSX.Element {

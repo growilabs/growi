@@ -20,32 +20,30 @@ async function dropIndexIfExists(db, collectionName, indexName) {
   }
 }
 
-module.exports = {
-  async up(db) {
-    logger.info('Apply migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
+export async function up(db) {
+  logger.info('Apply migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    // remove unnecessary data
-    // see: https://redmine.weseek.co.jp/issues/163527
-    await db.collection('configs').deleteMany({
-      ns: 'crowi',
-      key: {
-        $in: [
-          'notification:owner-page:isEnabled',
-          'notification:group-page:isEnabled',
-        ],
-      },
-    });
+  // remove unnecessary data
+  // see: https://redmine.weseek.co.jp/issues/163527
+  await db.collection('configs').deleteMany({
+    ns: 'crowi',
+    key: {
+      $in: [
+        'notification:owner-page:isEnabled',
+        'notification:group-page:isEnabled',
+      ],
+    },
+  });
 
-    // drop index
-    await dropIndexIfExists(db, 'configs', 'ns_1_key_1');
+  // drop index
+  await dropIndexIfExists(db, 'configs', 'ns_1_key_1');
 
-    // create index
-    const collection = await db.collection('configs');
-    await collection.createIndex({ key: 1 }, { unique: true });
-  },
+  // create index
+  const collection = await db.collection('configs');
+  await collection.createIndex({ key: 1 }, { unique: true });
+}
 
-  async down() {
-    // No rollback
-  },
-};
+export async function down() {
+  // No rollback
+}

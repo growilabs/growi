@@ -1,22 +1,27 @@
+import type { estypes as estypes9 } from '@elastic/elasticsearch9';
 import { getIdStringForRef, type IPage } from '@growi/core';
-import gc from 'expose-gc/function';
+import gc from 'expose-gc/function.js';
 import mongoose from 'mongoose';
 import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
+import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
+import type { AuditlogSuggestionField } from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import { SocketEventName } from '~/interfaces/websocket';
-import PageTagRelation from '~/server/models/page-tag-relation';
+import type { ActivityDocument } from '~/server/models/activity';
 import type { SocketIoService } from '~/server/service/socket-io';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type {
   ESQueryTerms,
   ESTermsKey,
   QueryTerms,
+  ResolvedFilterData,
   SearchableData,
   SearchDelegator,
   UnavailableTermsKey,
@@ -24,7 +29,11 @@ import type {
 import type { PageModel } from '../../models/page';
 import { createBatchStream } from '../../util/batch-stream';
 import { configManager } from '../config-manager';
-import type { UpdateOrInsertPagesOpts } from '../interfaces/search';
+import type {
+  AddAllPagesOption,
+  RebuildIndexOption,
+  UpdateOrInsertPagesOpts,
+} from '../interfaces/search';
 import { aggregatePipelineToIndex } from './aggregate-to-index';
 import type {
   AggregatedPage,
@@ -34,11 +43,9 @@ import type {
 } from './bulk-write';
 import {
   type ElasticsearchClientDelegator,
-  type ES7SearchQuery,
   type ES8SearchQuery,
   type ES9SearchQuery,
   getClient,
-  isES7ClientDelegator,
   isES8ClientDelegator,
   isES9ClientDelegator,
   type SearchQuery,
@@ -71,6 +78,12 @@ const AVAILABLE_KEYS = [
   'not_prefix',
   'tag',
   'not_tag',
+  'author',
+  'not_author',
+  'editor',
+  'not_editor',
+  'group',
+  'not_group',
 ];
 
 type Data = any;
@@ -78,16 +91,13 @@ type Data = any;
 class ElasticsearchDelegator
   implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
 {
-  name!: SearchDelegatorName.DEFAULT;
+  name!: typeof SearchDelegatorName.DEFAULT;
 
   private socketIoService!: SocketIoService;
 
-  // TODO: https://redmine.weseek.co.jp/issues/168446
-  private isElasticsearchV7: boolean;
-
   private isElasticsearchReindexOnBoot: boolean;
 
-  private elasticsearchVersion: 7 | 8 | 9;
+  private elasticsearchVersion: 8 | 9;
 
   private client: ElasticsearchClientDelegator;
 
@@ -97,6 +107,9 @@ class ElasticsearchDelegator
 
   private userModel?: typeof mongoose.Model;
 
+  private readonly auditlogIndexName = 'auditlogs';
+  private readonly auditlogAliasName = 'auditlogs-alias';
+
   constructor(socketIoService: SocketIoService) {
     this.name = SearchDelegatorName.DEFAULT;
     this.socketIoService = socketIoService;
@@ -105,17 +118,11 @@ class ElasticsearchDelegator
       'app:elasticsearchVersion',
     );
 
-    if (
-      elasticsearchVersion !== 7 &&
-      elasticsearchVersion !== 8 &&
-      elasticsearchVersion !== 9
-    ) {
+    if (elasticsearchVersion !== 8 && elasticsearchVersion !== 9) {
       throw new Error(
         "Unsupported Elasticsearch version. Please specify a valid number to 'ELASTICSEARCH_VERSION'",
       );
     }
-
-    this.isElasticsearchV7 = elasticsearchVersion === 7;
 
     this.elasticsearchVersion = elasticsearchVersion;
 
@@ -171,10 +178,6 @@ class ElasticsearchDelegator
     this.indexName = indexName;
   }
 
-  getType(): '_doc' | undefined {
-    return this.isElasticsearchV7 ? '_doc' : undefined;
-  }
-
   /**
    * return information object to connect to ES
    * @return {object} { host, auth, indexName}
@@ -209,14 +212,21 @@ class ElasticsearchDelegator
   async init(): Promise<void> {
     await this.initClient();
     const normalizeIndices = await this.normalizeIndices();
+    try {
+      await this.normalizeAuditlogIndices();
+    } catch (err) {
+      logger.error('Failed to normalize auditlog indices', err);
+    }
     if (this.isElasticsearchReindexOnBoot) {
       try {
-        await this.rebuildIndex();
+        await this.rebuildIndex({ shouldEmitProgress: false });
       } catch (err) {
         logger.error('Rebuild index on boot failed', err);
       }
-      return;
     }
+    // Auditlog rebuild-on-boot is orchestrated by Crowi (setupSearcher): it must also
+    // clear the ES sync-status flag afterwards, which is a feature concern the delegator
+    // must not reach into.
     return normalizeIndices;
   }
 
@@ -263,7 +273,11 @@ class ElasticsearchDelegator
    *
    * @see https://www.elastic.co/guide/en/elasticsearch/reference/6.6/cluster-health.html
    */
-  async getInfoForHealth() {
+  async getInfoForHealth(): Promise<{
+    esClusterHealth: Awaited<
+      ReturnType<ElasticsearchClientDelegator['cluster']['health']>
+    >;
+  }> {
     const esClusterHealth = await this.client.cluster.health();
     return { esClusterHealth };
   }
@@ -271,33 +285,35 @@ class ElasticsearchDelegator
   /**
    * Return information for Admin Full Text Search Management page
    */
-  async getInfoForAdmin() {
-    const { client, indexName, aliasName } = this;
+  private async getIndexInfoForAdmin(
+    indexName: string,
+    aliasName: string,
+  ): Promise<{
+    indices:
+      | Awaited<
+          ReturnType<ElasticsearchClientDelegator['indices']['stats']>
+        >['indices']
+      | never[];
+    aliases:
+      | Awaited<ReturnType<ElasticsearchClientDelegator['indices']['getAlias']>>
+      | never[];
+    isNormalized: boolean;
+  }> {
+    const { client } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
 
-    // check existence
     const isExistsMainIndex = await client.indices.exists({ index: indexName });
     const isExistsTmpIndex = await client.indices.exists({
       index: tmpIndexName,
     });
 
-    // create indices name list
     const existingIndices: string[] = [];
-    if (isExistsMainIndex) {
-      existingIndices.push(indexName);
-    }
-    if (isExistsTmpIndex) {
-      existingIndices.push(tmpIndexName);
-    }
+    if (isExistsMainIndex) existingIndices.push(indexName);
+    if (isExistsTmpIndex) existingIndices.push(tmpIndexName);
 
-    // results when there is no indices
     if (existingIndices.length === 0) {
-      return {
-        indices: [],
-        aliases: [],
-        isNormalized: false,
-      };
+      return { indices: [], aliases: [], isNormalized: false };
     }
 
     const indicesStats = await client.indices.stats({
@@ -310,12 +326,12 @@ class ElasticsearchDelegator
 
     const isMainIndexHasAlias =
       isExistsMainIndex &&
-      aliases[indexName].aliases != null &&
-      aliases[indexName].aliases[aliasName] != null;
+      aliases[indexName]?.aliases != null &&
+      aliases[indexName]?.aliases[aliasName] != null;
     const isTmpIndexHasAlias =
       isExistsTmpIndex &&
-      aliases[tmpIndexName].aliases != null &&
-      aliases[tmpIndexName].aliases[aliasName] != null;
+      aliases[tmpIndexName]?.aliases != null &&
+      aliases[tmpIndexName]?.aliases[aliasName] != null;
 
     const isNormalized =
       isExistsMainIndex &&
@@ -323,23 +339,41 @@ class ElasticsearchDelegator
       !isExistsTmpIndex &&
       !isTmpIndexHasAlias;
 
-    return {
-      indices,
-      aliases,
-      isNormalized,
-    };
+    return { indices, aliases, isNormalized };
+  }
+
+  async getInfoForAdmin() {
+    return this.getIndexInfoForAdmin(this.indexName, this.aliasName);
+  }
+
+  async getAuditlogInfoForAdmin() {
+    return this.getIndexInfoForAdmin(
+      this.auditlogIndexName,
+      this.auditlogAliasName,
+    );
   }
 
   /**
    * rebuild index
    */
-  async rebuildIndex(): Promise<void> {
+  async rebuildIndex(
+    option: RebuildIndexOption = { shouldEmitProgress: false },
+  ): Promise<void> {
     const { client, indexName, aliasName } = this;
+    const { shouldEmitProgress } = option;
 
     const tmpIndexName = `${indexName}-tmp`;
 
+    let result: { totalCount: number; count: number } | undefined;
+
     try {
       // reindex to tmp index
+      const isExistsTmpIndex = await client.indices.exists({
+        index: tmpIndexName,
+      });
+      if (isExistsTmpIndex) {
+        await client.indices.delete({ index: tmpIndexName });
+      }
       await this.createIndex(tmpIndexName);
       await client.reindex(indexName, tmpIndexName);
 
@@ -356,27 +390,133 @@ class ElasticsearchDelegator
         index: indexName,
       });
       await this.createIndex(indexName);
-      await this.addAllPages();
+      result = await this.addAllPages({ shouldEmitProgress });
     } catch (error) {
-      logger.error("An error occured while 'rebuildIndex'.", error);
-      logger.error('error.meta.body', error?.meta?.body);
+      logger.error({ err: error }, "An error occured while 'rebuildIndex'.");
+      logger.error({ body: error?.meta?.body }, 'error.meta.body');
 
-      const socket = this.socketIoService.getAdminSocket();
-      socket.emit(SocketEventName.RebuildingFailed, { error: error.message });
+      if (shouldEmitProgress) {
+        const socket = this.socketIoService.getAdminSocket();
+        socket.emit(SocketEventName.RebuildingFailed, { error: error.message });
+      }
 
       throw error;
     } finally {
+      // Swallow its error so a normalization failure cannot mask the error
+      // rethrown above, nor prevent FinishAddPage from being emitted below
+      // on the success path (mirrors rebuildAuditlogIndex).
       logger.info('Normalize indices.');
-      await this.normalizeIndices();
+      try {
+        await this.normalizeIndices();
+      } catch (normalizeErr) {
+        logger.error('Failed to normalize indices', normalizeErr);
+      }
+    }
+
+    // Emitted only after normalizeIndices() above has resolved (or failed
+    // without masking success), so the client's isNormalized poll (triggered
+    // by this event) doesn't race normalization.
+    if (shouldEmitProgress) {
+      const socket = this.socketIoService.getAdminSocket();
+      socket?.emit(SocketEventName.FinishAddPage, result);
     }
   }
 
-  async normalizeIndices(): Promise<void> {
-    const { client, indexName, aliasName } = this;
-
+  async rebuildAuditlogIndex({
+    shouldEmitProgress = false,
+  }: {
+    shouldEmitProgress?: boolean;
+  } = {}): Promise<{ totalCount: number; count: number }> {
+    const {
+      client,
+      auditlogIndexName: indexName,
+      auditlogAliasName: aliasName,
+    } = this;
     const tmpIndexName = `${indexName}-tmp`;
 
-    // remove tmp index
+    let totalCount = 0;
+    let count = 0;
+    const socket = shouldEmitProgress
+      ? this.socketIoService.getAdminSocket()
+      : null;
+
+    try {
+      // Drop any leftover tmp index, then reindex the live index into a fresh tmp.
+      // reindex is fire-and-forget (wait_for_completion:false), so tmp is a best-effort
+      // copy for read availability; the authoritative repopulation is addAllAuditlogs.
+      const isExistsTmpIndex = await client.indices.exists({
+        index: tmpIndexName,
+      });
+      if (isExistsTmpIndex) {
+        await client.indices.delete({ index: tmpIndexName });
+      }
+      await this.createAuditlogIndex(tmpIndexName);
+      await client.reindex(indexName, tmpIndexName);
+
+      // update alias
+      await client.indices.updateAliases({
+        actions: [
+          { add: { alias: aliasName, index: tmpIndexName } },
+          { remove: { alias: aliasName, index: indexName } },
+        ],
+      });
+
+      // flush index
+      await client.indices.delete({ index: indexName });
+      await this.createAuditlogIndex(indexName);
+      ({ totalCount, count } = await this.addAllAuditlogs({
+        shouldEmitProgress,
+      }));
+
+      // Swap the alias back atomically so it never resolves to nothing mid-rebuild;
+      // the now-unaliased tmp is dropped by normalizeAuditlogIndices in the finally.
+      await client.indices.updateAliases({
+        actions: [
+          { add: { alias: aliasName, index: indexName } },
+          { remove: { alias: aliasName, index: tmpIndexName } },
+        ],
+      });
+    } catch (error) {
+      logger.error(
+        { err: error, body: error?.meta?.body },
+        "An error occurred while 'rebuildAuditlogIndex'.",
+      );
+      if (socket != null) {
+        socket.emit(SocketEventName.AuditlogRebuildingFailed, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      throw error;
+    } finally {
+      // Runs on both paths (cleanup after success, recovery after failure). Swallow its
+      // error so a normalization failure cannot mask the error rethrown above.
+      try {
+        await this.normalizeAuditlogIndices();
+      } catch (normalizeErr) {
+        logger.error('Failed to normalize auditlog indices', normalizeErr);
+      }
+    }
+
+    try {
+      await AuditlogEsSyncStatus.setUnsynced(false);
+    } catch (err) {
+      logger.error('Failed to clear auditlog unsynced flag after rebuild', err);
+      // Non-critical: the ES rebuild itself succeeded, so still notify the client
+      // below rather than leaving it stuck in a processing state.
+    }
+    socket?.emit(SocketEventName.FinishAddAuditlog, { totalCount, count });
+
+    return { totalCount, count };
+  }
+
+  private async normalizeIndexSet(
+    indexName: string,
+    aliasName: string,
+    createFn: () => Promise<unknown>,
+  ): Promise<void> {
+    const { client } = this;
+    const tmpIndexName = `${indexName}-tmp`;
+
     const isExistsTmpIndex = await client.indices.exists({
       index: tmpIndexName,
     });
@@ -384,37 +524,121 @@ class ElasticsearchDelegator
       await client.indices.delete({ index: tmpIndexName });
     }
 
-    // create index
     const isExistsIndex = await client.indices.exists({ index: indexName });
     if (!isExistsIndex) {
-      await this.createIndex(indexName);
+      await createFn();
     }
 
-    // create alias
+    // re-attaches alias if a failed rebuild left it detached
     const isExistsAlias = await client.indices.existsAlias({
       name: aliasName,
       index: indexName,
     });
     if (!isExistsAlias) {
-      await client.indices.putAlias({
-        name: aliasName,
-        index: indexName,
-      });
+      await client.indices.putAlias({ name: aliasName, index: indexName });
     }
   }
 
-  async createIndex(index: string) {
-    // TODO: https://redmine.weseek.co.jp/issues/168446
-    if (isES7ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es7');
-      return this.client.indices.create({
-        index,
-        body: {
-          ...mappings,
-        },
-      });
-    }
+  async normalizeIndices(): Promise<void> {
+    await this.normalizeIndexSet(this.indexName, this.aliasName, () =>
+      this.createIndex(this.indexName),
+    );
+  }
 
+  async normalizeAuditlogIndices(): Promise<void> {
+    await this.normalizeIndexSet(
+      this.auditlogIndexName,
+      this.auditlogAliasName,
+      () => this.createAuditlogIndex(this.auditlogIndexName),
+    );
+  }
+
+  async addAllAuditlogs(
+    option: { shouldEmitProgress?: boolean } = {},
+  ): Promise<{ totalCount: number; count: number }> {
+    const { shouldEmitProgress = false } = option;
+    const Activity = mongoose.model('Activity');
+    const bulkWrite = this.client.bulk.bind(this.client);
+    const prepareBodyForAuditlog = this.prepareBodyForAuditlog.bind(this);
+
+    const bulkSize: number = configManager.getConfig(
+      'app:elasticsearchReindexBulkSize',
+    );
+
+    const socket = shouldEmitProgress
+      ? this.socketIoService.getAdminSocket()
+      : undefined;
+    const totalCount = shouldEmitProgress ? await Activity.countDocuments() : 0;
+
+    const readStream = Activity.find()
+      .select('snapshot.username')
+      .lean()
+      .cursor();
+    const batchStream = createBatchStream(bulkSize);
+
+    // Counts activities read, not documents indexed — some are skipped by
+    // prepareBodyForAuditlog, which would leave count short of totalCount.
+    let count = 0;
+    const writeStream = new Writable({
+      objectMode: true,
+      async write(batch, _encoding, callback) {
+        count += batch.length;
+
+        const body = batch.flatMap((activity) =>
+          prepareBodyForAuditlog(activity),
+        );
+
+        if (body.length === 0) {
+          socket?.emit(SocketEventName.AddAuditlogProgress, {
+            totalCount,
+            count,
+          });
+          callback();
+          return;
+        }
+
+        try {
+          const bulkResponse = await bulkWrite({ body });
+
+          if (bulkResponse.errors) {
+            const errMsg = 'addAllAuditlogs bulk indexing had errors';
+            logger.error(errMsg);
+            callback(new Error(errMsg));
+            return;
+          }
+
+          logger.info(
+            `Adding auditlogs progressing: (count=${count}, took=${bulkResponse.took}ms)`,
+          );
+
+          socket?.emit(SocketEventName.AddAuditlogProgress, {
+            totalCount,
+            count,
+          });
+        } catch (err) {
+          logger.error('Adding auditlogs bulk indexing failed.', err);
+          callback(err);
+          return;
+        }
+
+        callback();
+      },
+      final(callback) {
+        logger.info(`Adding auditlogs has completed: (totalCount=${count})`);
+        callback();
+      },
+    });
+
+    await pipeline(readStream, batchStream, writeStream);
+    return { totalCount, count };
+  }
+
+  async createIndex(
+    index: string,
+  ): Promise<
+    | Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
+    | undefined
+  > {
     if (isES8ClientDelegator(this.client)) {
       const { mappings } = await import('./mappings/mappings-es8');
       return this.client.indices.create({
@@ -424,16 +648,30 @@ class ElasticsearchDelegator
     }
 
     if (isES9ClientDelegator(this.client)) {
-      const { mappings } =
-        process.env.CI == null
-          ? await import('./mappings/mappings-es9')
-          : await import('./mappings/mappings-es9-for-ci');
-
+      const { mappings } = await import('./mappings/mappings-es9');
       return this.client.indices.create({
         index,
         ...mappings,
       });
     }
+  }
+
+  async createAuditlogIndex(
+    index: string,
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
+  > {
+    if (isES8ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-auditlog-es8');
+      return this.client.indices.create({ index, ...mappings });
+    }
+    if (isES9ClientDelegator(this.client)) {
+      const { mappings } = await import('./mappings/mappings-auditlog-es9');
+      return this.client.indices.create({ index, ...mappings });
+    }
+    throw new Error(
+      `Unsupported Elasticsearch version: ${this.elasticsearchVersion}`,
+    );
   }
 
   /**
@@ -462,7 +700,6 @@ class ElasticsearchDelegator
     const command = {
       index: {
         _index: this.indexName,
-        _type: this.getType(),
         _id: page._id.toString(),
       },
     };
@@ -472,6 +709,7 @@ class ElasticsearchDelegator
       body: page.revision.body,
       body_embedded: page.revisionBodyEmbedded,
       username: page.creator?.username,
+      last_update_username: page.lastUpdateUser?.username,
       comments: page.commentsCount > 0 ? page.comments : undefined,
       comment_count: page.commentsCount,
       bookmark_count: page.bookmarksCount,
@@ -486,6 +724,19 @@ class ElasticsearchDelegator
     return [command, document];
   }
 
+  private prepareBodyForAuditlog(
+    activity: Pick<ActivityDocument, '_id' | 'snapshot'>,
+  ): [] | [{ index: { _index: string; _id: string } }, { username: string }] {
+    const username = activity.snapshot?.username;
+    if (username == null || username === '') return [];
+    return [
+      {
+        index: { _index: this.auditlogIndexName, _id: activity._id.toString() },
+      },
+      { username },
+    ];
+  }
+
   prepareBodyForDelete(body, page): void {
     if (!Array.isArray(body)) {
       throw new Error('Body must be an array.');
@@ -494,7 +745,6 @@ class ElasticsearchDelegator
     const command = {
       delete: {
         _index: this.indexName,
-        _type: this.getType(),
         _id: page._id.toString(),
       },
     };
@@ -502,10 +752,13 @@ class ElasticsearchDelegator
     body.push(command);
   }
 
-  addAllPages() {
+  // FinishAddPage is emitted by rebuildIndex (this method's only caller), not
+  // here — don't call this with shouldEmitProgress:true from elsewhere.
+  addAllPages(option: AddAllPagesOption = { shouldEmitProgress: false }) {
+    const { shouldEmitProgress } = option;
     const Page = this.getPageModel();
     return this.updateOrInsertPages(() => Page.find(), {
-      shouldEmitProgress: true,
+      shouldEmitProgress,
       invokeGarbageCollection: true,
     });
   }
@@ -528,10 +781,12 @@ class ElasticsearchDelegator
    */
   async updateOrInsertPages(
     queryFactory,
-    option: UpdateOrInsertPagesOpts = {},
-  ): Promise<void> {
-    const { shouldEmitProgress = false, invokeGarbageCollection = false } =
-      option;
+    option: UpdateOrInsertPagesOpts = {
+      shouldEmitProgress: false,
+      invokeGarbageCollection: false,
+    },
+  ): Promise<{ totalCount: number; count: number }> {
+    const { shouldEmitProgress, invokeGarbageCollection } = option;
 
     const Page = this.getPageModel();
     const { PageQueryBuilder } = Page;
@@ -565,10 +820,10 @@ class ElasticsearchDelegator
     const appendTagNamesStream = new Transform({
       objectMode: true,
       async transform(chunk, encoding, callback) {
-        const pageIds = chunk.map((doc) => doc._id);
+        const pageIds = chunk.map((doc) => doc._id.toString());
 
         const idToTagNamesMap =
-          await PageTagRelation.getIdToTagNamesMap(pageIds);
+          await prisma.pagetagrelations.getIdToTagNamesMap(pageIds);
         const idsHavingTagNames = Object.keys(idToTagNamesMap);
 
         // append tagNames
@@ -629,18 +884,87 @@ class ElasticsearchDelegator
       },
       final(callback) {
         logger.info(`Adding pages has completed: (totalCount=${totalCount})`);
-
-        if (shouldEmitProgress) {
-          socket?.emit(SocketEventName.FinishAddPage, { totalCount, count });
-        }
         callback();
       },
     });
 
-    return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
+    await pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
+    return { totalCount, count };
   }
 
-  deletePages(pages) {
+  async searchAuditlogByFuzzyWildcard(
+    field: AuditlogSuggestionField,
+    q: string,
+    limit: number,
+  ): Promise<string[]> {
+    const escaped = q.replace(/([*?\\])/g, '\\$1');
+    const query = {
+      bool: {
+        should: [
+          {
+            wildcard: {
+              [field]: { value: `${escaped}*`, case_insensitive: true },
+            },
+          },
+          { fuzzy: { [field]: { value: escaped, fuzziness: 'AUTO' } } },
+        ],
+      },
+    };
+
+    if (
+      isES8ClientDelegator(this.client) ||
+      isES9ClientDelegator(this.client)
+    ) {
+      const result = await this.client.search({
+        index: this.auditlogAliasName,
+        size: 0,
+        query,
+        aggs: { unique_values: { terms: { field, size: limit } } },
+      });
+      const agg = result.aggregations?.unique_values as
+        | estypes9.AggregationsStringTermsAggregate
+        | undefined;
+      const rawBuckets = agg?.buckets;
+      const buckets = Array.isArray(rawBuckets)
+        ? (rawBuckets as estypes9.AggregationsStringTermsBucket[])
+        : [];
+      return buckets.map((b) => String(b.key));
+    }
+
+    return [];
+  }
+
+  async bulkSyncAuditlogs(
+    upserts: ActivityDocument[],
+    deleteIds: mongoose.Types.ObjectId[],
+  ): Promise<void> {
+    const body = [
+      ...upserts.flatMap((activity) => this.prepareBodyForAuditlog(activity)),
+      ...deleteIds.map((id) => ({
+        delete: { _index: this.auditlogIndexName, _id: id.toString() },
+      })),
+    ];
+    if (body.length === 0) return;
+
+    const bulkResponse = await this.client.bulk({ body });
+    if (bulkResponse.errors) {
+      const failedItems = (bulkResponse.items ?? []).filter(
+        (i) => i.index?.error || i.delete?.error,
+      );
+      // errors flag is set but no per-item error matched our filter — surface the raw
+      // items so the anomaly is debuggable instead of throwing an empty "0 failed items".
+      const summary =
+        failedItems.length > 0
+          ? `${failedItems.length} failed items`
+          : 'errors flag set but no per-item error';
+      const detail = failedItems.length > 0 ? failedItems : bulkResponse.items;
+      throw new Error(
+        `bulkSyncAuditlogs: ${summary}: ${JSON.stringify(detail?.slice(0, 3))}`,
+      );
+    }
+  }
+
+  deletePages(pages): ReturnType<ElasticsearchClientDelegator['bulk']> {
     const body = [];
     pages.forEach((page) => {
       this.prepareBodyForDelete(body, page);
@@ -667,20 +991,9 @@ class ElasticsearchDelegator
       logger.debug({ query }, 'query');
 
       const validateQueryResponse = await (async () => {
-        if (isES7ClientDelegator(this.client)) {
-          const es7SearchQuery = query as ES7SearchQuery;
-          return this.client.indices.validateQuery({
-            explain: true,
-            index: es7SearchQuery.index,
-            body: {
-              query: es7SearchQuery.body?.query,
-            },
-          });
-        }
-
         if (isES8ClientDelegator(this.client)) {
           const es8SearchQuery = query as ES8SearchQuery;
-          return this.client.indices.validateQuery({
+          return await this.client.indices.validateQuery({
             explain: true,
             index: es8SearchQuery.index,
             query: es8SearchQuery.body.query,
@@ -689,7 +1002,7 @@ class ElasticsearchDelegator
 
         if (isES9ClientDelegator(this.client)) {
           const es9SearchQuery = query as ES9SearchQuery;
-          return this.client.indices.validateQuery({
+          return await this.client.indices.validateQuery({
             explain: true,
             index: es9SearchQuery.index,
             query: es9SearchQuery.body.query,
@@ -704,17 +1017,13 @@ class ElasticsearchDelegator
     }
 
     const searchResponse = await (async () => {
-      if (isES7ClientDelegator(this.client)) {
-        return this.client.search(query as ES7SearchQuery);
-      }
-
       if (isES8ClientDelegator(this.client)) {
-        return this.client.search(query as ES8SearchQuery);
+        return await this.client.search(query as ES8SearchQuery);
       }
 
       if (isES9ClientDelegator(this.client)) {
         const { body, ...rest } = query as ES9SearchQuery;
-        return this.client.search({
+        return await this.client.search({
           ...rest,
           // Elimination of the body property since ES9
           // https://raw.githubusercontent.com/elastic/elasticsearch-js/2f6200eb397df0e54d23848d769a93614ee1fb45/docs/release-notes/breaking-changes.md
@@ -739,10 +1048,13 @@ class ElasticsearchDelegator
         took: searchResponse.took,
         hitsCount: searchResponse.hits.hits.length,
       },
-      data: searchResponse.hits.hits.map((elm) => {
+      // The ES client types mark _id and _score as optional, but every document
+      // hit from these queries carries an _id; _score is null only when results
+      // are sorted by a field instead of relevance.
+      data: searchResponse.hits.hits.map((elm): ISearchResultData => {
         return {
-          _id: elm._id,
-          _score: elm._score,
+          _id: elm._id ?? '',
+          _score: elm._score ?? 0,
           _source: elm._source,
           _highlight: elm.highlight,
         };
@@ -954,13 +1266,69 @@ class ElasticsearchDelegator
       });
       query.body.query.bool.filter.push({ bool: { must_not: queries } });
     }
+
+    if (parsedKeywords.author.length > 0) {
+      const queries = parsedKeywords.author.map((author) => {
+        return { term: { username: author } };
+      });
+      query.body.query.bool.filter.push({ bool: { should: queries } });
+    }
+
+    if (parsedKeywords.not_author.length > 0) {
+      const queries = parsedKeywords.not_author.map((author) => {
+        return { term: { username: author } };
+      });
+      query.body.query.bool.filter.push({ bool: { must_not: queries } });
+    }
+
+    if (parsedKeywords.editor.length > 0) {
+      const queries = parsedKeywords.editor.map((editor) => {
+        return { term: { last_update_username: editor } };
+      });
+      query.body.query.bool.filter.push({ bool: { should: queries } });
+    }
+
+    if (parsedKeywords.not_editor.length > 0) {
+      const queries = parsedKeywords.not_editor.map((editor) => {
+        return { term: { last_update_username: editor } };
+      });
+      query.body.query.bool.filter.push({ bool: { must_not: queries } });
+    }
   }
 
-  async filterPagesByViewer(
+  appendCriteriaForGroupFilter(
     query: SearchQuery,
-    user,
-    userGroups,
-  ): Promise<void> {
+    parsedKeywords: ESQueryTerms,
+    resolvedFilterData?: ResolvedFilterData,
+  ): void {
+    if (resolvedFilterData == null) return;
+    const { groupIds, notGroupIds } = resolvedFilterData;
+
+    // biome-ignore lint/style/noParameterAssign: ignore
+    query = this.initializeBoolQuery(query);
+    if (
+      query.body?.query?.bool?.filter == null ||
+      !Array.isArray(query.body.query.bool.filter) ||
+      !Array.isArray(query.body.query.bool.must_not)
+    ) {
+      throw new Error('query.body.query.bool is not initialized');
+    }
+
+    // Gate on whether the user typed group:, NOT on whether resolution produced ids.
+    if (parsedKeywords.group.length > 0) {
+      query.body.query.bool.filter.push({
+        terms: { granted_groups: groupIds },
+      });
+    }
+
+    if (parsedKeywords.not_group.length > 0) {
+      query.body.query.bool.must_not.push({
+        terms: { granted_groups: notGroupIds },
+      });
+    }
+  }
+
+  filterPagesByViewer(query: SearchQuery, user, userGroups): void {
     const showPagesRestrictedByOwner = !configManager.getConfig(
       'security:list-policy:hideRestrictedByOwner',
     );
@@ -1096,7 +1464,8 @@ class ElasticsearchDelegator
     const query = this.createSearchQuery();
 
     this.appendCriteriaForQueryString(query, terms);
-    await this.filterPagesByViewer(query, user, userGroups);
+    this.appendCriteriaForGroupFilter(query, terms, data.resolvedFilterData);
+    this.filterPagesByViewer(query, user, userGroups);
     await this.appendFunctionScore(query, queryString);
 
     this.appendResultSize(query, from, size);
@@ -1105,7 +1474,7 @@ class ElasticsearchDelegator
 
     this.appendHighlight(query);
 
-    return this.searchKeyword(query);
+    return await this.searchKeyword(query);
   }
 
   isTermsNormalized(terms: Partial<QueryTerms>): terms is ESQueryTerms {
@@ -1129,7 +1498,7 @@ class ElasticsearchDelegator
 
   async syncPageUpdated(page, user) {
     logger.debug('SearchClient.syncPageUpdated', page.path);
-    return this.updateOrInsertPageById(page._id);
+    return await this.updateOrInsertPageById(page._id);
   }
 
   // remove pages whitch should nod Indexed
@@ -1147,10 +1516,15 @@ class ElasticsearchDelegator
   }
 
   async syncDescendantsPagesUpdated(parentPage, user) {
-    return this.updateOrInsertDescendantsPagesById(parentPage, user);
+    return await this.updateOrInsertDescendantsPagesById(parentPage, user);
   }
 
-  async syncDescendantsPagesDeleted(pages, user) {
+  async syncDescendantsPagesDeleted(
+    pages,
+    user,
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined
+  > {
     for (let i = 0; i < pages.length; i++) {
       logger.debug('SearchClient.syncDescendantsPagesDeleted', pages[i].path);
     }
@@ -1162,7 +1536,12 @@ class ElasticsearchDelegator
     }
   }
 
-  async syncPageDeleted(page, user) {
+  async syncPageDeleted(
+    page,
+    user,
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined
+  > {
     logger.debug('SearchClient.syncPageDeleted', page.path);
 
     try {
@@ -1175,19 +1554,19 @@ class ElasticsearchDelegator
   async syncBookmarkChanged(pageId) {
     logger.debug('SearchClient.syncBookmarkChanged', pageId);
 
-    return this.updateOrInsertPageById(pageId);
+    return await this.updateOrInsertPageById(pageId);
   }
 
   async syncCommentChanged(comment) {
     logger.debug('SearchClient.syncCommentChanged', comment);
 
-    return this.updateOrInsertPageById(comment.page);
+    return await this.updateOrInsertPageById(comment.pageId);
   }
 
   async syncTagChanged(page) {
     logger.debug('SearchClient.syncTagChanged', page.path);
 
-    return this.updateOrInsertPageById(page._id);
+    return await this.updateOrInsertPageById(page._id);
   }
 }
 

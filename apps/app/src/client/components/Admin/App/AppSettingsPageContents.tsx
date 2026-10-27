@@ -3,6 +3,7 @@ import { useTranslation } from 'next-i18next';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { toastError } from '~/client/util/toastr';
+import { NewsDeliverySetting } from '~/features/news/client/components/admin/NewsDeliverySetting';
 import { useIsMaintenanceMode } from '~/states/global';
 import { useSWRxAppSettings } from '~/stores/admin/app-settings';
 import { toArrayIfNot } from '~/utils/array-utils';
@@ -14,6 +15,7 @@ import FileUploadSetting from './FileUploadSetting';
 import MailSetting from './MailSetting';
 import { MaintenanceMode } from './MaintenanceMode';
 import PageBulkExportSettings from './PageBulkExportSettings';
+import PageTreeRepair from './PageTreeRepair';
 import SiteUrlSetting from './SiteUrlSetting';
 import V5PageMigration from './V5PageMigration';
 
@@ -81,7 +83,7 @@ const AppSettingsPageContents = (props: Props) => {
               className="admin-setting-header"
               data-testid="v5-page-migration"
             >
-              {t('V5 Page Migration')}
+              {t('commons:V5 Page Migration')}
             </h2>
             <V5PageMigration />
           </div>
@@ -133,12 +135,33 @@ const AppSettingsPageContents = (props: Props) => {
         </div>
       </div>
 
+      <div className="row mt-5">
+        <div className="col-lg-12">
+          <h2 className="admin-setting-header" id="news-delivery">
+            {t('admin:news_delivery.section_title', {
+              defaultValue: 'News delivery',
+            })}
+          </h2>
+          <NewsDeliverySetting />
+        </div>
+      </div>
+
       <div className="row">
         <div className="col-lg-12">
           <h2 className="admin-setting-header" id="maintenance-mode">
             {t('admin:maintenance_mode.maintenance_mode')}
           </h2>
           <MaintenanceMode />
+        </div>
+      </div>
+
+      {/* Placed after MaintenanceMode: the repair requires it to be enabled. */}
+      <div className="row">
+        <div className="col-lg-12">
+          <h2 className="admin-setting-header" id="page-tree-repair">
+            {t('admin:page_tree_repair.page_tree_repair')}
+          </h2>
+          <PageTreeRepair />
         </div>
       </div>
     </div>

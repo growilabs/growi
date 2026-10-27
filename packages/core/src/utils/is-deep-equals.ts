@@ -38,6 +38,10 @@ export const isDeepEquals = <T extends object>(
 
   // Compare all properties
   return typedKeys1.every((key) => {
+    if (!Object.hasOwn(obj2, key)) {
+      return false;
+    }
+
     const val1 = obj1[key];
     const val2 = obj2[key];
 

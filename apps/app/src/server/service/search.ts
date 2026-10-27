@@ -4,15 +4,20 @@ import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
-import {
-  isIncludeAiMenthion,
-  removeAiMenthion,
-} from '~/features/search/utils/ai';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
+import {
+  FILTER_FIELDS,
+  SEARCH_FILTER_PREFIXES,
+} from '~/features/search/utils/filter-fields';
 import type {
   AttachmentSearchResultAggregator,
   IPrimarySearchResult,
 } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+} from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
@@ -20,14 +25,20 @@ import type {
   ISearchResult,
   ISearchResultData,
 } from '~/interfaces/search';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import {
+  USER_FIELDS_EXCEPT_CONFIDENTIAL,
+  UserStatus,
+} from '~/server/models/user/conts';
+import UserGroup from '~/server/models/user-group';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import type {
   ParsedQuery,
   QueryTerms,
+  ResolvedFilterData,
   SearchableData,
   SearchDelegator,
   SearchQueryParser,
@@ -55,9 +66,28 @@ const filterXssOptions = {
 
 const filterXss = new FilterXSS(filterXssOptions);
 
+// The shared UI operators plus the server-only `prefix:` path filter.
+const FILTER_PREFIXES = ['prefix:', ...SEARCH_FILTER_PREFIXES] as const;
+
+// New-filter operators (author/editor/group) typed with no value (e.g. `author:`,
+// `-group:`) are ignored rather than captured as full-text match terms. `tag:` is
+// excluded because prefix:/tag: keep their legacy behavior. Filtered by field name
+// so a prefix-string rename in the shared vocabulary propagates automatically.
+const VALUELESS_IGNORED_PREFIXES: readonly string[] = FILTER_FIELDS.filter(
+  ([field]) => field !== 'tags',
+).map(([, prefix]) => prefix);
+
+// https://regex101.com/r/pN9XfK/2
+const NEGATIVE_TERM_REGEXP = new RegExp(
+  `^-(${FILTER_PREFIXES.join('|')})?(.+)$`,
+);
+// https://regex101.com/r/3qw9FQ/2
+const POSITIVE_TERM_REGEXP = new RegExp(
+  `^(${FILTER_PREFIXES.join('|')})?(.+)$`,
+);
+
 const normalizeQueryString = (_queryString: string): string => {
-  let queryString = _queryString.trim();
-  queryString = removeAiMenthion(queryString).replace(/\s+/g, ' ');
+  const queryString = _queryString.trim().replace(/\s+/g, ' ');
 
   return queryString;
 };
@@ -92,39 +122,49 @@ const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
 };
 
 class SearchService implements SearchQueryParser, SearchResolver {
+  protected constructor() {}
+
   crowi: Crowi;
 
   isErrorOccuredOnHealthcheck: boolean | null;
 
   isErrorOccuredOnSearching: boolean | null;
 
-  fullTextSearchDelegator: any & ElasticsearchDelegator;
+  fullTextSearchDelegator: ElasticsearchDelegator;
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
 
   private attachmentSearchResultAggregator: AttachmentSearchResultAggregator | null =
     null;
 
-  constructor(crowi: Crowi) {
-    this.crowi = crowi;
+  static async create(crowi: Crowi) {
+    const instance = new SearchService();
 
-    this.isErrorOccuredOnHealthcheck = null;
-    this.isErrorOccuredOnSearching = null;
+    instance.crowi = crowi;
+
+    instance.isErrorOccuredOnHealthcheck = null;
+    instance.isErrorOccuredOnSearching = null;
 
     try {
-      this.fullTextSearchDelegator = this.generateFullTextSearchDelegator();
-      this.nqDelegators = this.generateNQDelegators(
-        this.fullTextSearchDelegator,
+      const tmpFullTextSearchDelegator =
+        instance.generateFullTextSearchDelegator();
+      if (tmpFullTextSearchDelegator == null) {
+        throw new Error('Failed to initialize search delegator');
+      }
+      instance.fullTextSearchDelegator = tmpFullTextSearchDelegator;
+      instance.nqDelegators = instance.generateNQDelegators(
+        instance.fullTextSearchDelegator,
       );
       logger.info('Succeeded to initialize search delegators');
     } catch (err) {
       logger.error(err);
     }
 
-    if (this.isConfigured) {
-      this.fullTextSearchDelegator.init();
-      this.registerUpdateEvent();
+    if (instance.isConfigured) {
+      await instance.fullTextSearchDelegator.init();
+      instance.registerUpdateEvent();
     }
+    return instance;
   }
 
   get isConfigured() {
@@ -287,14 +327,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
     logger.info('Try to reconnect...');
     this.fullTextSearchDelegator.initClient();
 
-    try {
-      await this.getInfoForHealth();
+    await this.getInfoForHealth();
 
-      logger.info('Reconnecting succeeded.');
-      this.resetErrorStatus();
-    } catch (err) {
-      throw err;
-    }
+    logger.info('Reconnecting succeeded.');
+    this.resetErrorStatus();
   }
 
   async getInfo() {
@@ -325,12 +361,89 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.getInfoForAdmin();
   }
 
+  async getAuditlogInfoForAdmin() {
+    return this.fullTextSearchDelegator.getAuditlogInfoForAdmin();
+  }
+
   async normalizeIndices() {
     return this.fullTextSearchDelegator.normalizeIndices();
   }
 
-  async rebuildIndex() {
-    return this.fullTextSearchDelegator.rebuildIndex();
+  async normalizeAuditlogIndices() {
+    return this.fullTextSearchDelegator.normalizeAuditlogIndices();
+  }
+
+  async rebuildIndex(shouldEmitProgress = false) {
+    return this.fullTextSearchDelegator.rebuildIndex({ shouldEmitProgress });
+  }
+
+  async rebuildAuditlogIndex(
+    option: { shouldEmitProgress: boolean } = { shouldEmitProgress: false },
+  ) {
+    return this.fullTextSearchDelegator.rebuildAuditlogIndex(option);
+  }
+
+  private async searchAuditlogUsernames(
+    q: string,
+    limit: number,
+  ): Promise<string[]> {
+    if (this.isReachable) {
+      try {
+        return await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
+          'username',
+          q,
+          limit,
+        );
+      } catch (err) {
+        logger.error(
+          'Failed to search auditlog suggestions on Elasticsearch. Falling back to MongoDB.',
+          err,
+        );
+      }
+    }
+    return prisma.activities.findSnapshotUsernamesByUsernameRegex(q, {
+      offset: 0,
+      limit,
+    });
+  }
+
+  async searchAuditlogSuggestions(
+    fields: AuditlogSuggestionField[],
+    q: string,
+    limit: number,
+  ): Promise<AuditlogSuggestionsResponse> {
+    if (q === '') return {};
+
+    const response: AuditlogSuggestionsResponse = {};
+
+    if (fields.includes('username')) {
+      const usernames = await this.searchAuditlogUsernames(q, limit);
+
+      const User = mongoose.model<IUser>('User');
+      const users =
+        usernames.length === 0
+          ? []
+          : await User.find({ username: { $in: usernames } })
+              .select('username status')
+              .lean();
+
+      const activeUsernames = new Set(
+        users
+          .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+          .map((u) => u.username),
+      );
+
+      // A username with no live User match (e.g. deleted -- statusDelete()
+      // renames the User doc's username to `deleted_at_*`) must still be
+      // searchable in the audit trail, so anything not proven active is
+      // treated as inactive rather than silently dropped.
+      response.username = {
+        activeUsernames: usernames.filter((u) => activeUsernames.has(u)),
+        inactiveUsernames: usernames.filter((u) => !activeUsernames.has(u)),
+      };
+    }
+
+    return response;
   }
 
   async parseSearchQuery(
@@ -418,9 +531,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
     keyword: string,
     nqName: string | null,
     user,
-    userGroups,
+    userGroups: ObjectIdLike[] | null,
     searchOpts,
-  ): Promise<[ISearchResult<unknown>, string | null]> {
+  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
     let parsedQuery: ParsedQuery;
     // parse
     try {
@@ -428,10 +541,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
     } catch (err) {
       logger.error('Error occurred while parseSearchQuery', err);
       throw err;
-    }
-
-    if (isIncludeAiMenthion(keyword)) {
-      searchOpts.vector = true;
     }
 
     let delegator: SearchDelegator;
@@ -444,8 +553,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
       throw err;
     }
 
-    // throws
     this.validateSearchableData(delegator, data);
+
+    data.resolvedFilterData = await this.resolveFilterData(
+      data.terms,
+      userGroups,
+    );
 
     return [
       await delegator.search(data, user, userGroups, searchOpts),
@@ -515,6 +628,54 @@ class SearchService implements SearchQueryParser, SearchResolver {
     };
   }
 
+  async resolveFilterData(
+    terms: Partial<QueryTerms>,
+    userGroups: ObjectIdLike[] | null,
+  ): Promise<ResolvedFilterData> {
+    const groupTerms = terms.group ?? [];
+    const notGroupTerms = terms.not_group ?? [];
+
+    // Early-return (no MongoDB query) for guests or when no group operator was typed.
+    if (
+      userGroups == null ||
+      userGroups.length < 1 ||
+      (groupTerms.length === 0 && notGroupTerms.length === 0)
+    ) {
+      const emptyFilterData: ResolvedFilterData = {
+        groupIds: [],
+        notGroupIds: [],
+      };
+      return emptyFilterData;
+    }
+
+    const [internal, external] = await Promise.all([
+      UserGroup.find({ _id: { $in: userGroups } })
+        .select('_id name')
+        .exec(),
+      ExternalUserGroup.find({ _id: { $in: userGroups } })
+        .select('_id name')
+        .exec(),
+    ]);
+    const myGroups = [...internal, ...external];
+    const namesToIds = new Map<string, string[]>();
+
+    // Save all the user's group names and their ids
+    for (const group of myGroups) {
+      const id = group.id;
+      namesToIds.set(group.name, [...(namesToIds.get(group.name) ?? []), id]);
+    }
+
+    const resolve = (names: string[] = []) =>
+      names.flatMap((name) => namesToIds.get(name) ?? []);
+
+    const resolvedFilterData: ResolvedFilterData = {
+      groupIds: resolve(groupTerms),
+      notGroupIds: resolve(notGroupTerms),
+    };
+
+    return resolvedFilterData;
+  }
+
   parseQueryString(_queryString: string): QueryTerms {
     let queryString = _queryString;
 
@@ -527,8 +688,45 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const notPrefixPaths: string[] = [];
     const tags: string[] = [];
     const notTags: string[] = [];
+    const authors: string[] = [];
+    const notAuthors: string[] = [];
+    const editors: string[] = [];
+    const notEditors: string[] = [];
+    const groups: string[] = [];
+    const notGroups: string[] = [];
 
-    // First: Parse phrase keywords
+    // First: Parse quoted filter values (e.g. `group:"My Group"`, `-editor:"Jane Doe"`).
+    // This must run before the phrase pass below, otherwise the phrase regex would strip
+    // the `"..."` part into a full-text phrase and leave a bare, valueless operator behind.
+    // The quotes let a filter value contain spaces despite the later space-based tokenizing.
+    const positiveBuckets: Record<string, string[]> = {
+      'prefix:': prefixPaths,
+      'tag:': tags,
+      'author:': authors,
+      'editor:': editors,
+      'group:': groups,
+    };
+    const negativeBuckets: Record<string, string[]> = {
+      'prefix:': notPrefixPaths,
+      'tag:': notTags,
+      'author:': notAuthors,
+      'editor:': notEditors,
+      'group:': notGroups,
+    };
+    const quotedFilterRegExp = new RegExp(
+      `(-?)(${FILTER_PREFIXES.join('|')})"([^"]+)"`,
+      'g',
+    );
+    queryString = queryString.replace(
+      quotedFilterRegExp,
+      (_match, negation, prefix, value) => {
+        const buckets = negation === '-' ? negativeBuckets : positiveBuckets;
+        buckets[prefix].push(value);
+        return '';
+      },
+    );
+
+    // Second: Parse phrase keywords
     const phraseRegExp = new RegExp(/(-?"[^"]+")/g);
     const phrases = queryString.match(phraseRegExp);
 
@@ -545,22 +743,36 @@ class SearchService implements SearchQueryParser, SearchResolver {
       });
     }
 
-    // Second: Parse other keywords (include minus keywords)
+    // Any unpaired quotes are removed
+    queryString = queryString.replace(/"/g, '');
+
+    // Third: Parse other keywords (include minus keywords)
     queryString.split(' ').forEach((word) => {
       if (word === '') {
         return;
       }
 
-      // https://regex101.com/r/pN9XfK/1
-      const matchNegative = word.match(/^-(prefix:|tag:)?(.+)$/);
-      // https://regex101.com/r/3qw9FQ/1
-      const matchPositive = word.match(/^(prefix:|tag:)?(.+)$/);
+      // Ignore a bare new-filter operator with no value (positive or negated) so it
+      // does not leak into full-text match terms
+      const wordWithoutNegation = word.startsWith('-') ? word.slice(1) : word;
+      if (VALUELESS_IGNORED_PREFIXES.includes(wordWithoutNegation)) {
+        return;
+      }
+
+      const matchNegative = word.match(NEGATIVE_TERM_REGEXP);
+      const matchPositive = word.match(POSITIVE_TERM_REGEXP);
 
       if (matchNegative != null) {
         if (matchNegative[1] === 'prefix:') {
           notPrefixPaths.push(matchNegative[2]);
         } else if (matchNegative[1] === 'tag:') {
           notTags.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'author:') {
+          notAuthors.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'editor:') {
+          notEditors.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'group:') {
+          notGroups.push(matchNegative[2]);
         } else {
           notMatchWords.push(matchNegative[2]);
         }
@@ -569,6 +781,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
           prefixPaths.push(matchPositive[2]);
         } else if (matchPositive[1] === 'tag:') {
           tags.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'author:') {
+          authors.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'editor:') {
+          editors.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'group:') {
+          groups.push(matchPositive[2]);
         } else {
           matchWords.push(matchPositive[2]);
         }
@@ -584,6 +802,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
       not_prefix: notPrefixPaths,
       tag: tags,
       not_tag: notTags,
+      author: authors,
+      not_author: notAuthors,
+      editor: editors,
+      not_editor: notEditors,
+      group: groups,
+      not_group: notGroups,
     };
 
     return terms;
@@ -593,7 +817,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   // So far, it determines by delegatorName passed by searchService.searchKeyword
   checkIsFormattable(
     searchResult,
-    delegatorName: SearchDelegatorName,
+    delegatorName: SearchDelegatorName | null,
   ): boolean {
     return delegatorName === SearchDelegatorName.DEFAULT;
   }
@@ -603,7 +827,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
    */
   async formatSearchResult(
     searchResult: ISearchResult<any>,
-    delegatorName: SearchDelegatorName,
+    delegatorName: SearchDelegatorName | null,
     user,
     userGroups,
   ): Promise<IFormattedSearchResult> {

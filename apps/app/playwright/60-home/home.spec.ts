@@ -1,32 +1,43 @@
 /** biome-ignore-all lint/performance/noAwaitInLoops: Allow in tests */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
+/**
+ * Opens PersonalDropdown and clicks one of its items, re-opening the menu
+ * whenever it is found closed. While the page is still settling right after a
+ * load, the menu can close on its own shortly after opening, so the item click
+ * is retried together with the open -- a user would simply open the menu
+ * again. The toggle is clicked only while the item is hidden, because clicking
+ * it on an open menu would close it.
+ */
+const clickPersonalDropdownItem = async (
+  page: Page,
+  itemTestId: string,
+): Promise<void> => {
+  const toggle = page.getByTestId('personal-dropdown-button');
+  const item = page.getByTestId(itemTestId);
+  await expect(async () => {
+    if (!(await item.isVisible())) {
+      await toggle.click();
+    }
+    await item.click({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
+};
 
 test('Visit User home', async ({ page }) => {
   await page.goto('dummy');
 
-  // Open PersonalDropdown
-  await page.getByTestId('personal-dropdown-button').click();
-  await expect(
-    page.getByTestId('grw-personal-dropdown-menu-user-home'),
-  ).toBeVisible();
-
-  // Click UserHomeMenu
-  await page.getByTestId('grw-personal-dropdown-menu-user-home').click();
+  await clickPersonalDropdownItem(page, 'grw-personal-dropdown-menu-user-home');
   await expect(page.getByTestId('grw-users-info')).toBeVisible();
 });
 
 test('Vist User settings', async ({ page }) => {
   await page.goto('dummy');
 
-  // Open PersonalDropdown
-  await page.getByTestId('personal-dropdown-button').click();
-  await expect(
-    page.getByTestId('grw-personal-dropdown-menu-user-home'),
-  ).toBeVisible();
-
-  // Click UserSettingsMenu
-  page.getByTestId('grw-personal-dropdown-menu-user-settings').click();
+  await clickPersonalDropdownItem(
+    page,
+    'grw-personal-dropdown-menu-user-settings',
+  );
   await expect(page.getByTestId('grw-user-settings')).toBeVisible();
 });
 

@@ -55,7 +55,6 @@ export interface IAuditLogBulkExportJobCronService {
   ): Promise<void>;
 }
 
-import type { ActivityDocument } from '~/server/models/activity';
 import { preNotifyService } from '~/server/service/pre-notify';
 
 import { compressAndUpload } from './steps/compress-and-upload';
@@ -217,9 +216,12 @@ class AuditLogBulkExportJobCronService
           : '',
       },
     });
-    const getAdditionalTargetUsers = async (activity: ActivityDocument) => [
-      activity.user,
-    ];
+    if (activity == null) {
+      return;
+    }
+    // createActivity's result never has `user` populated (only `userId`) --
+    // reference the acting user we already have on hand instead.
+    const getAdditionalTargetUsers = async () => [auditLogBulkExportJob.user];
     const preNotify = preNotifyService.generatePreNotify(
       activity,
       getAdditionalTargetUsers,

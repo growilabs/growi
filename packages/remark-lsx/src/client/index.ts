@@ -1,2 +1,2 @@
-export * from './components';
-export * from './services/renderer';
+export * from './components/index.js';
+export * from './services/renderer/index.js';

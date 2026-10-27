@@ -1,6 +1,9 @@
 import type { EditorView } from '@codemirror/view';
 
-import { insertLinePrefix, toggleMarkdownSymbol } from '../../markdown-utils';
+import {
+  insertLinePrefix,
+  toggleMarkdownSymbol,
+} from '../../markdown-utils/index.js';
 
 /**
  * Register Emacs markdown-mode structural editing commands and keybindings.

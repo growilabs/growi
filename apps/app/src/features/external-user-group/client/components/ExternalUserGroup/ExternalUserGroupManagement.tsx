@@ -200,7 +200,7 @@ export const ExternalGroupManagement: FC = () => {
 
       <UserGroupModal
         userGroup={selectedExternalUserGroup}
-        buttonLabel={t('Update')}
+        buttonLabel={t('commons:Update')}
         onClickSubmit={updateExternalUserGroup}
         isShow={isUpdateModalShown}
         onHide={hideUpdateModal}

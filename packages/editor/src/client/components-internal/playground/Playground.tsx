@@ -8,13 +8,13 @@ import type {
   EditorTheme,
   KeyMapMode,
   PasteMode,
-} from '../../../consts';
-import { GlobalCodeMirrorEditorKey } from '../../../consts';
-import { CodeMirrorEditorMain } from '../../components/CodeMirrorEditorMain';
-import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor';
-import { PlaygroundController } from './PlaygroundController';
-import { Preview } from './Preview';
-import { useSetupPlaygroundSocket } from './states/socket';
+} from '../../../consts/index.js';
+import { GlobalCodeMirrorEditorKey } from '../../../consts/index.js';
+import { CodeMirrorEditorMain } from '../../components/CodeMirrorEditorMain.js';
+import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor.js';
+import { PlaygroundController } from './PlaygroundController.js';
+import { Preview } from './Preview.js';
+import { useSetupPlaygroundSocket } from './states/socket.js';
 
 export const Playground = (): JSX.Element => {
   const [markdownToPreview, setMarkdownToPreview] = useState('');

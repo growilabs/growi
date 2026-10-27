@@ -7,14 +7,13 @@ import { generateLastUpdateMrkdwn } from '@growi/slack/dist/utils/generate-last-
 import loggerFactory from '~/utils/logger';
 
 import { growiInfoService } from '../growi-info';
+import BaseSlackCommandHandler from './slack-command-handler';
 
 const logger = loggerFactory('growi:service:SlackCommandHandler:search');
 
 const PAGINGLIMIT = 7;
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
-  const BaseSlackCommandHandler = require('./slack-command-handler');
+export const setup = (crowi) => {
   const handler = new BaseSlackCommandHandler(crowi);
 
   function getKeywords(growiCommandArgs) {

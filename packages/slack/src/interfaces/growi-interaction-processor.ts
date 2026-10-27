@@ -1,6 +1,6 @@
 import type { AuthorizeResult } from '@slack/oauth';
 
-import type { InteractionPayloadAccessor } from '../utils/interaction-payload-accessor';
+import type { InteractionPayloadAccessor } from '../utils/interaction-payload-accessor.js';
 
 export interface InteractionHandledResult<V> {
   result?: V;

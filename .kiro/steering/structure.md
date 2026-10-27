@@ -1,6 +1,6 @@
 # Project Structure
 
-See: `.claude/skills/monorepo-overview/SKILL.md` (auto-loaded by Claude Code)
+The monorepo layout (apps/packages, `@growi/core` role, build order, Changeset workflow) is in `.claude/rules/project-structure.md` (always loaded). This file records cc-sdd-specific structural notes.
 
 ## cc-sdd Specific Notes
 
@@ -14,11 +14,11 @@ For apps/app-specific examples and build tooling details, see `apps/app/.claude/
 
 ### The positioning of @growi/core.
 
-See: `.claude/skills/monorepo-overview/SKILL.md` — "@growi/core — Domain & Utilities Hub" section
+See: `.claude/rules/project-structure.md` — "@growi/core — Shared Domain Hub" section (always loaded).
 
 ### `services/` — Polyglot Microservices
 
 In addition to `apps/` and `packages/`, the monorepo has a `services/` directory for polyglot (non-Node) microservices. These live **outside the pnpm workspace** and each has its own toolchain and `CLAUDE.md`.
 
 ---
-_Updated: 2026-05-07. Added `services/` directory note._
+_Updated: 2026-06-16. Repointed broken monorepo-overview SKILL.md references to `.claude/rules/project-structure.md` (the skill no longer exists). Prior: 2026-05-07 added `services/` directory note._

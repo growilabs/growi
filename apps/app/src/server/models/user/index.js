@@ -5,16 +5,42 @@ import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import { i18n } from '^/config/next-i18next.config';
+// next-i18next.config.mjs has a single `export default` whose value is the config
+// object; `i18n` is a property of that object, not a named export. Use a default
+// import and read `.i18n` from it.
+import nextI18nextConfig from '^/config/next-i18next.config.mjs';
 
+import { aclService as _aclService } from '../../service/acl';
+// Getter wrappers for service singletons: callers use getConfigManager() /
+// getAclService() so that this module's import of service singletons can be
+// intercepted by tests (vi.mock) without changing the call-site API.
+// The singletons are module-level bindings (ESM live-binding); accesses happen
+// only inside functions, never at module-top, so circular-dep evaluation order
+// is safe.
+import { configManager as _configManager } from '../../service/config-manager';
+
+/** @returns {import('../../service/config-manager').IConfigManagerForApp} */
+export function getConfigManager() {
+  return _configManager;
+}
+
+/** @returns {import('../../service/acl').AclService} */
+export function getAclService() {
+  return _aclService;
+}
+
+import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
 import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import { aclService } from '../../service/acl';
-import { configManager } from '../../service/config-manager';
+import { ensureUserHomepage } from '../../service/page/ensure-user-homepage';
 import { getModelSafely } from '../../util/mongoose-utils';
-import { Attachment } from '../attachment';
 import { UserStatus } from './conts';
+import {
+  buildUsernamePrefixRange,
+  USERNAME_CI_COLLATION,
+} from './username-prefix-range';
 
 const logger = loggerFactory('growi:models:user');
 
@@ -25,13 +51,18 @@ const factory = (crowi) => {
     return userModelExists;
   }
 
-  let userEvent;
+  const userEvent = crowi?.events.user;
 
-  // init event
-  if (crowi != null) {
-    userEvent = crowi.events.user;
-    userEvent.on('activated', userEvent.onActivated);
-  }
+  // Part of activation itself, not a reaction to it: callers rely on the
+  // homepage existing once activation resolves. A failure here must not fail
+  // the activation, so it is only logged.
+  const setUpUserHomepage = async (user) => {
+    try {
+      await ensureUserHomepage(user, crowi.pageService);
+    } catch (err) {
+      logger.error({ err }, 'Failed to create user page');
+    }
+  };
 
   const userSchema = new mongoose.Schema(
     {
@@ -59,7 +90,7 @@ const factory = (crowi) => {
       apiToken: { type: String, index: true },
       lang: {
         type: String,
-        enum: i18n.locales,
+        enum: nextI18nextConfig.i18n.locales,
         default: 'en_US',
       },
       status: {
@@ -69,6 +100,7 @@ const factory = (crowi) => {
         index: true,
       },
       lastLoginAt: { type: Date, index: true },
+      contributionsMigratedAt: { type: Date },
       admin: { type: Boolean, default: 0, index: true },
       readOnly: { type: Boolean, default: 0 },
       isInvitationEmailSended: { type: Boolean, default: false },
@@ -85,6 +117,14 @@ const factory = (crowi) => {
   userSchema.plugin(mongoosePaginate);
   userSchema.plugin(uniqueValidator);
 
+  // Bounds the username typeahead's collated prefix range. Additional to the
+  // unique `username` index, which stays case-sensitive; `status` is included so
+  // inactive accounts are filtered from the index keys, not fetched first.
+  userSchema.index(
+    { username: 1, status: 1 },
+    { name: 'username_ci', collation: USERNAME_CI_COLLATION },
+  );
+
   function validateCrowi() {
     if (crowi == null) {
       throw new Error(
@@ -96,20 +136,20 @@ const factory = (crowi) => {
   function decideUserStatusOnRegistration() {
     validateCrowi();
 
-    const isInstalled = configManager.getConfig('app:installed');
+    const isInstalled = getConfigManager().getConfig('app:installed');
     if (!isInstalled) {
       return UserStatus.STATUS_ACTIVE; // is this ok?
     }
 
     // status decided depends on registrationMode
-    const registrationMode = configManager.getConfig(
+    const registrationMode = getConfigManager().getConfig(
       'security:registrationMode',
     );
     switch (registrationMode) {
-      case aclService.labels.SECURITY_REGISTRATION_MODE_OPEN:
+      case getAclService().labels.SECURITY_REGISTRATION_MODE_OPEN:
         return UserStatus.STATUS_ACTIVE;
-      case aclService.labels.SECURITY_REGISTRATION_MODE_RESTRICTED:
-      case aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED: // 一応
+      case getAclService().labels.SECURITY_REGISTRATION_MODE_RESTRICTED:
+      case getAclService().labels.SECURITY_REGISTRATION_MODE_CLOSED: // 一応
         return UserStatus.STATUS_REGISTERED;
       default:
         return UserStatus.STATUS_ACTIVE; // どっちにすんのがいいんだろうな
@@ -252,7 +292,9 @@ const factory = (crowi) => {
       return this.image;
     }
     if (this.imageAttachment != null && this.imageAttachment._id != null) {
-      const imageAttachment = await Attachment.findById(this.imageAttachment);
+      const imageAttachment = await prisma.attachments.findUnique({
+        where: { id: this.imageAttachment._id.toString() },
+      });
       return imageAttachment.filePathProxied;
     }
     return '/images/icons/user.svg';
@@ -278,18 +320,15 @@ const factory = (crowi) => {
     this.name = name;
     this.username = username;
     this.status = UserStatus.STATUS_ACTIVE;
-    this.isEmailPublished = configManager.getConfig(
+    this.isEmailPublished = getConfigManager().getConfig(
       'customize:isEmailPublishedForNewUser',
     );
-    this.readOnly = configManager.getConfig('app:isReadOnlyForNewUser');
+    this.readOnly = getConfigManager().getConfig('app:isReadOnlyForNewUser');
 
-    this.save((err, userData) => {
-      userEvent.emit('activated', userData);
-      if (err) {
-        throw new Error(err);
-      }
-      return userData;
-    });
+    const userData = await this.save();
+    await setUpUserHomepage(userData);
+    userEvent.emit('activated', userData);
+    return userData;
   };
 
   userSchema.methods.grantAdmin = async function () {
@@ -325,7 +364,9 @@ const factory = (crowi) => {
     logger.debug('Activate User', this);
     this.status = UserStatus.STATUS_ACTIVE;
     const userData = await this.save();
-    return userEvent.emit('activated', userData);
+    await setUpUserHomepage(userData);
+    userEvent.emit('activated', userData);
+    return userData;
   };
 
   userSchema.methods.statusSuspend = async function () {
@@ -374,19 +415,18 @@ const factory = (crowi) => {
     return userStatus;
   };
 
-  userSchema.statics.isEmailValid = (email, callback) => {
+  userSchema.statics.isEmailValid = (email) => {
     validateCrowi();
 
-    const whitelist = configManager.getConfig('security:registrationWhitelist');
+    const whitelist = getConfigManager().getConfig(
+      'security:registrationWhitelist',
+    );
 
-    if (Array.isArray(whitelist) && whitelist.length > 0) {
-      return whitelist.some((allowedEmail) => {
-        const re = new RegExp(`${allowedEmail}$`);
-        return re.test(email);
-      });
+    if (!Array.isArray(whitelist) || whitelist.length === 0) {
+      return true;
     }
 
-    return true;
+    return whitelist.some((entry) => isEmailMatchedByEntry(email, entry));
   };
 
   userSchema.statics.findUsers = function (options, callback) {
@@ -491,7 +531,9 @@ const factory = (crowi) => {
   };
 
   userSchema.statics.isUserCountExceedsUpperLimit = async function () {
-    const userUpperLimit = configManager.getConfig('security:userUpperLimit');
+    const userUpperLimit = getConfigManager().getConfig(
+      'security:userUpperLimit',
+    );
 
     const activeUsers = await this.countActiveUsers();
     if (userUpperLimit <= activeUsers) {
@@ -591,12 +633,12 @@ const factory = (crowi) => {
     newUser.setPassword(password);
     newUser.status = UserStatus.STATUS_INVITED;
 
-    const globalLang = configManager.getConfig('app:globalLang');
+    const globalLang = getConfigManager().getConfig('app:globalLang');
     if (globalLang != null) {
       newUser.lang = globalLang;
     }
 
-    newUser.readOnly = configManager.getConfig('app:isReadOnlyForNewUser');
+    newUser.readOnly = getConfigManager().getConfig('app:isReadOnlyForNewUser');
 
     try {
       const newUserData = await newUser.save();
@@ -684,13 +726,13 @@ const factory = (crowi) => {
     }
 
     // Default email show/hide is up to the administrator
-    newUser.isEmailPublished = configManager.getConfig(
+    newUser.isEmailPublished = getConfigManager().getConfig(
       'customize:isEmailPublishedForNewUser',
     );
 
-    newUser.readOnly = configManager.getConfig('app:isReadOnlyForNewUser');
+    newUser.readOnly = getConfigManager().getConfig('app:isReadOnlyForNewUser');
 
-    const globalLang = configManager.getConfig('app:globalLang');
+    const globalLang = getConfigManager().getConfig('app:globalLang');
     if (globalLang != null) {
       newUser.lang = globalLang;
     }
@@ -700,17 +742,19 @@ const factory = (crowi) => {
     }
     newUser.status = status || decideUserStatusOnRegistration();
 
-    newUser.save((err, userData) => {
-      if (err) {
-        logger.error('createUserByEmailAndPasswordAndStatus failed: ', err);
-        return callback(err);
-      }
+    let userData;
+    try {
+      userData = await newUser.save();
+    } catch (err) {
+      logger.error('createUserByEmailAndPasswordAndStatus failed: ', err);
+      return callback(err);
+    }
 
-      if (userData.status === UserStatus.STATUS_ACTIVE) {
-        userEvent.emit('activated', userData);
-      }
-      return callback(err, userData);
-    });
+    if (userData.status === UserStatus.STATUS_ACTIVE) {
+      await setUpUserHomepage(userData);
+      userEvent.emit('activated', userData);
+    }
+    return callback(null, userData);
   };
 
   /**
@@ -814,7 +858,15 @@ const factory = (crowi) => {
     return users;
   };
 
-  userSchema.statics.findUserByUsernameRegexWithTotalCount = async function (
+  /**
+   * Matches from the start of the username only — the previous `$regex` matched
+   * anywhere but could not be index-bounded (see username-prefix-range.ts).
+   * Every query needs USERNAME_CI_COLLATION: without it the results are the same
+   * but `username_ci` is unusable, and the cost is a full index walk.
+   *
+   * `totalCount` is opt-in: `limit` lets the page stop early, a count cannot.
+   */
+  userSchema.statics.findUserByUsernamePrefix = async function (
     username,
     status,
     option,
@@ -824,18 +876,32 @@ const factory = (crowi) => {
     const offset = opt.offset || 0;
     const limit = opt.limit || 10;
 
+    const prefixRange = buildUsernamePrefixRange(username);
     const conditions = {
-      username: { $regex: username, $options: 'i' },
+      // A null range means an empty keyword: every username qualifies, which is
+      // this lookup's pre-existing contract.
+      ...(prefixRange != null ? { username: prefixRange } : {}),
       status: { $in: status },
     };
 
-    const users = await this.find(conditions)
+    // Only `username` is ever read from these documents by the callers.
+    const usersQuery = this.find(conditions)
+      .collation(USERNAME_CI_COLLATION)
       .sort(sortOpt)
       .skip(offset)
-      .limit(limit);
+      .limit(limit)
+      .select('username')
+      .lean();
 
-    const totalCount = (await this.find(conditions).distinct('username'))
-      .length;
+    if (!opt.withTotalCount) {
+      return { users: await usersQuery };
+    }
+
+    const [users, totalCount] = await Promise.all([
+      usersQuery,
+      // Same collation, or the count disagrees with the page it accompanies.
+      this.countDocuments(conditions).collation(USERNAME_CI_COLLATION),
+    ]);
 
     return { users, totalCount };
   };

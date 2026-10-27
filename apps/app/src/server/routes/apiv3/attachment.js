@@ -1,30 +1,49 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import {
+  serializeUserSecurely,
+  toLegacyAttachmentShape,
+} from '@growi/core/dist/models/serializers';
 import express from 'express';
 import multer from 'multer';
 import autoReap from 'multer-autoreap';
 
-import { SupportedAction } from '~/interfaces/activity';
+import { MODEL_ATTACHMENT, SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { Attachment } from '~/server/models/attachment';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
+import { buildAttachmentSnapshot } from '~/server/service/attachment/attachment-snapshot';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
 import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
+import { resolveAccessibleAttachment } from '../../service/attachment/resolve-accessible-attachment';
 
 const logger = loggerFactory('growi:routes:apiv3:attachment');
 
 const router = express.Router();
-const { query, param, body } = require('express-validator');
+
+// Keep `creator: null` (deleted user) as null, as the Mongoose-era response did;
+// serializeAttachmentSecurely would drop the key.
+const serializeWithNullableCreator = (attachment) => {
+  const legacy = toLegacyAttachmentShape(attachment);
+  return {
+    ...legacy,
+    creator:
+      legacy.creator != null
+        ? serializeUserSecurely(legacy.creator)
+        : legacy.creator,
+  };
+};
+
+import { body, param, query } from 'express-validator';
 
 /**
  * @swagger
@@ -133,11 +152,14 @@ const { query, param, body } = require('express-validator');
  *            description: temporary URL cached
  *            example: "https://example.com/attachment/5e0734e072560e001761fa67"
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
-  const { Page, User } = crowi.models;
+  const { Page } = crowi.models;
   const { attachmentService } = crowi;
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -240,22 +262,16 @@ module.exports = (crowi) => {
 
         // directly get paging-size from db. not to delivery from client side.
 
-        const paginateResult = await Attachment.paginate(
-          { page: pageId },
-          {
-            limit,
-            offset,
-            populate: 'creator',
-          },
-        );
-
-        paginateResult.docs.forEach((doc) => {
-          if (doc.creator != null && doc.creator instanceof User) {
-            doc.creator = serializeUserSecurely(doc.creator);
-          }
+        const paginateResult = await prisma.attachments.paginate({
+          where: { pageId },
+          limit,
+          offset,
+          include: { creator: true },
         });
 
-        return res.apiv3({ paginateResult });
+        const docs = paginateResult.docs.map(serializeWithNullableCreator);
+
+        return res.apiv3({ paginateResult: { ...paginateResult, docs } });
       } catch (err) {
         logger.error('Attachment not found', err);
         return res.apiv3Err(err, 500);
@@ -375,9 +391,11 @@ module.exports = (crowi) => {
     }),
     loginRequiredStrictly,
     excludeReadOnlyUser,
+    // addActivity before the validators: validation failures are audited as
+    // ACTION_UNSETTLED (see apps/app/.claude/rules/activity-recording.md).
+    addActivity,
     validator.retrieveAddAttachment,
     apiV3FormValidator,
-    addActivity,
     // Removed autoReap middleware to use file data in asynchronous processes. Instead, implemented file deletion after asynchronous processes complete
     async (req, res) => {
       const pageId = req.body.page_id;
@@ -411,11 +429,27 @@ module.exports = (crowi) => {
         const result = {
           page: serializePageSecurely(page),
           revision: serializeRevisionSecurely(page.revision),
-          attachment: attachment.toObject({ virtuals: true }),
+          attachment: toLegacyAttachmentShape(attachment),
         };
+
+        // The page is already loaded in this route; pass page.path directly
+        // instead of re-fetching it (requirement 6.1, no extra page lookup).
+        const snapshot = buildAttachmentSnapshot(
+          {
+            _id: attachment._id,
+            originalName: attachment.originalName,
+            fileSize: attachment.fileSize,
+            pageId: attachment.pageId,
+          },
+          page.path,
+          req.user.username,
+        );
 
         activityEvent.emit('update', res.locals.activity._id, {
           action: SupportedAction.ACTION_ATTACHMENT_ADD,
+          target: attachment._id,
+          targetModel: MODEL_ATTACHMENT,
+          snapshot,
         });
 
         res.apiv3(result);
@@ -461,21 +495,25 @@ module.exports = (crowi) => {
     async (req, res) => {
       try {
         const attachmentId = req.params.id;
+        const { isSharedPage } = req;
 
-        const attachment = await Attachment.findById(attachmentId)
-          .populate('creator')
-          .exec();
+        const result = await resolveAccessibleAttachment(
+          attachmentId,
+          req.user,
+          isSharedPage ?? false,
+          { creator: true },
+        );
 
-        if (attachment == null) {
+        if ('errorCode' in result) {
           const message = 'Attachment not found';
           return res.apiv3Err(message, 404);
         }
 
-        if (attachment.creator != null && attachment.creator instanceof User) {
-          attachment.creator = serializeUserSecurely(attachment.creator);
-        }
+        const { attachment } = result;
 
-        return res.apiv3({ attachment });
+        const serializedAttachment = serializeWithNullableCreator(attachment);
+
+        return res.apiv3({ attachment: serializedAttachment });
       } catch (err) {
         logger.error('Attachment retrieval failed', err);
         return res.apiv3Err(err, 500);

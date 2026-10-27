@@ -19,8 +19,8 @@ import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password'
 
 const logger = loggerFactory('growi:routes:apiv3:forgotPassword');
 
-const express = require('express');
-const { body } = require('express-validator');
+import express from 'express';
+import { body } from 'express-validator';
 
 /**
  * @swagger
@@ -44,8 +44,11 @@ const { body } = require('express-validator');
 
 const router = express.Router();
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const { appService, mailService } = crowi;
   const { User } = crowi.models;
 
@@ -148,9 +151,13 @@ module.exports = (crowi) => {
   router.post(
     '/',
     checkPassportStrategyMiddleware,
+    // addActivity before the validators so anonymous abuse / DoS / enumeration
+    // attempts against this public endpoint are recorded as ACTION_UNSETTLED
+    // (user is null by design; the ip/endpoint trace is the point). See
+    // apps/app/.claude/rules/activity-recording.md.
+    addActivity,
     validator.email,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { email } = req.body;
       const locale = configManager.getConfig('app:globalLang');
@@ -234,10 +241,14 @@ module.exports = (crowi) => {
   router.put(
     '/',
     checkPassportStrategyMiddleware,
+    // addActivity before the token/validators so anonymous abuse (invalid-token
+    // or malformed reset attempts against this public endpoint) is recorded as
+    // ACTION_UNSETTLED (user is null by design). See
+    // apps/app/.claude/rules/activity-recording.md.
+    addActivity,
     injectResetOrderByTokenMiddleware,
     validator.password,
     apiV3FormValidator,
-    addActivity,
     async (req, res) => {
       const { passwordResetOrder } = req;
       const { email } = passwordResetOrder;

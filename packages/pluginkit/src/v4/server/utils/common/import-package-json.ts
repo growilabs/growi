@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import type { GrowiPluginPackageData } from '../../../../model';
+import type { GrowiPluginPackageData } from '../../../../model/index.js';
 
 export const importPackageJson = (
   projectDirRoot: string,

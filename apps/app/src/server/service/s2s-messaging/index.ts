@@ -44,7 +44,7 @@ const envToModuleMappings = {
 class S2sMessagingServiceFactory {
   delegator!: S2sMessagingService;
 
-  initializeDelegator(crowi: Crowi) {
+  async initializeDelegator(crowi: Crowi) {
     const type = crowi.configManager.getConfig('s2sMessagingPubsub:serverType');
 
     if (type == null) {
@@ -56,17 +56,21 @@ class S2sMessagingServiceFactory {
 
     const moduleFileName = envToModuleMappings[type];
 
-    const modulePath = `./${moduleFileName}`;
-    this.delegator = require(modulePath)(crowi);
+    // Explicit `.js`: template-literal dynamic import — NodeNext's runtime ESM
+    // resolver needs the extension (extensionless -> ERR_MODULE_NOT_FOUND).
+    const modulePath = `./${moduleFileName}.js`;
+    const mod = await import(modulePath);
+    const factory = mod.default ?? mod.setup ?? mod;
+    this.delegator = factory(crowi);
 
     if (this.delegator == null) {
       logger.warn('Failed to initialize config pub/sub delegator.');
     }
   }
 
-  getDelegator(crowi: Crowi) {
+  async getDelegator(crowi: Crowi) {
     if (this.delegator == null) {
-      this.initializeDelegator(crowi);
+      await this.initializeDelegator(crowi);
     }
     return this.delegator;
   }
@@ -74,6 +78,6 @@ class S2sMessagingServiceFactory {
 
 const factory = new S2sMessagingServiceFactory();
 
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi) => {
   return factory.getDelegator(crowi);
 };

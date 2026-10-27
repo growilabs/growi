@@ -86,4 +86,71 @@ describe('ConfigLoader', () => {
       });
     });
   });
+
+  // ai:providers / ai:providerApiKeys are object-typed configs (defaultValue:
+  // null — typeof null is 'object') that also have env vars, so the loader must
+  // JSON.parse their env strings into objects. This is the contract for
+  // "configuring multiple providers via environment variables only" (R5.1).
+  describe('loadFromEnv (object-typed key from a JSON env var)', () => {
+    const ENV_VARS = ['AI_PROVIDERS', 'AI_PROVIDER_API_KEYS'] as const;
+    const originals = new Map(ENV_VARS.map((env) => [env, process.env[env]]));
+
+    afterEach(() => {
+      for (const env of ENV_VARS) {
+        const original = originals.get(env);
+        if (original === undefined) {
+          delete process.env[env];
+        } else {
+          process.env[env] = original;
+        }
+      }
+    });
+
+    it('parses a JSON AI_PROVIDERS string into an object', async () => {
+      process.env.AI_PROVIDERS =
+        '{"openai":{"enabled":true},"azure-openai":{"enabled":true,"azureOpenaiSettings":{"resourceName":"my-res","useEntraId":true}}}';
+
+      const config: RawConfigData<ConfigKey, ConfigValues> =
+        await configLoader.loadFromEnv();
+
+      expect(config['ai:providers'].value).toEqual({
+        openai: { enabled: true },
+        'azure-openai': {
+          enabled: true,
+          azureOpenaiSettings: { resourceName: 'my-res', useEntraId: true },
+        },
+      });
+    });
+
+    it('parses a JSON AI_PROVIDER_API_KEYS string into an object', async () => {
+      process.env.AI_PROVIDER_API_KEYS =
+        '{"openai":"sk-test","anthropic":"ant-test"}';
+
+      const config: RawConfigData<ConfigKey, ConfigValues> =
+        await configLoader.loadFromEnv();
+
+      expect(config['ai:providerApiKeys'].value).toEqual({
+        openai: 'sk-test',
+        anthropic: 'ant-test',
+      });
+    });
+
+    it('falls back to null on malformed JSON (fail-soft, no boot crash)', async () => {
+      process.env.AI_PROVIDERS = '{not valid json';
+
+      const config: RawConfigData<ConfigKey, ConfigValues> =
+        await configLoader.loadFromEnv();
+
+      expect(config['ai:providers'].value).toBeNull();
+    });
+
+    it('uses the null default when the env var is unset (= AI not configured)', async () => {
+      delete process.env.AI_PROVIDERS;
+
+      const config: RawConfigData<ConfigKey, ConfigValues> =
+        await configLoader.loadFromEnv();
+
+      expect(config['ai:providers'].value).toBeNull();
+    });
+  });
 });

@@ -361,7 +361,7 @@ export const registerAction = (crowi: Crowi) => {
     const registrationMode = configManager.getConfig(
       'security:registrationMode',
     );
-    const isEmailValid = await User.isEmailValid(email);
+    const isEmailValid = User.isEmailValid(email);
 
     if (registrationMode === RegistrationMode.CLOSED) {
       return res.apiv3Err(['message.registration_closed'], 400);

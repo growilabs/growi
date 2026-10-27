@@ -3,7 +3,7 @@ import { EditorSelection, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { describe, expect, it } from 'vitest';
 
-import { toggleMarkdownSymbol } from './toggle-markdown-symbol';
+import { toggleMarkdownSymbol } from './toggle-markdown-symbol.js';
 
 const createView = (doc: string, anchor: number, head?: number): EditorView => {
   const state = EditorState.create({

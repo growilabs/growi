@@ -4,8 +4,8 @@ import type { NextFunction, Request, Response } from 'express';
 import { query, validationResult } from 'express-validator';
 import { FilterXSS } from 'xss';
 
-import type { LsxApiOptions } from '../interfaces/api';
-import { listPages } from './routes/list-pages';
+import type { LsxApiOptions } from '../interfaces/api.js';
+import { listPages } from './routes/list-pages/index.js';
 
 const loginRequiredFallback = (_req: Request, res: Response) => {
   return res.status(403).send('login required');
@@ -50,7 +50,13 @@ const paramValidator = (req: Request, res: Response, next: NextFunction) => {
   res.status(400).json({ errors: errs.map((err) => err.message) });
 };
 
-const middleware = (crowi: any, app: any): void => {
+const middleware = (
+  crowi: any,
+  app: any,
+  deps: { resolveTagPageIds: (tagNames: string[]) => Promise<string[]> },
+): void => {
+  const { resolveTagPageIds } = deps;
+
   const loginRequired = crowi.loginRequiredFactory(
     crowi,
     true,
@@ -68,7 +74,7 @@ const middleware = (crowi: any, app: any): void => {
     loginRequired,
     lsxValidator,
     paramValidator,
-    listPages({ getExcludedPaths }),
+    listPages({ getExcludedPaths, resolveTagPageIds }),
   );
 };
 

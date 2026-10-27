@@ -2,17 +2,19 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
 
-import { i18n } from '^/config/next-i18next.config';
+// next-i18next.config.mjs has a single `export default` config object; `i18n` is
+// a property of it, not a named export. Use a default import and read `.i18n`.
+import nextI18nextConfig from '^/config/next-i18next.config.mjs';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import EditorSettings from '../../../models/editor-settings';
-import ExternalAccount from '../../../models/external-account';
 import InAppNotificationSettings from '../../../models/in-app-notification-settings';
 import { deleteAccessTokenHandlersFactory } from './delete-access-token';
 import { deleteAllAccessTokensHandlersFactory } from './delete-all-access-tokens';
@@ -21,8 +23,8 @@ import { getAccessTokenHandlerFactory } from './get-access-tokens';
 
 const logger = loggerFactory('growi:routes:apiv3:personal-setting');
 
-const express = require('express');
-const passport = require('passport');
+import express from 'express';
+import passport from 'passport';
 
 const router = express.Router();
 
@@ -72,8 +74,11 @@ const router = express.Router();
  *          accountId:
  *            type: string
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
@@ -95,7 +100,7 @@ module.exports = (crowi) => {
             throw new Error('email is not included in whitelist');
           return true;
         }),
-      body('lang').isString().isIn(i18n.locales),
+      body('lang').isString().isIn(nextI18nextConfig.i18n.locales),
       body('isEmailPublished').isBoolean(),
       body('slackMemberId').optional().isString(),
     ],
@@ -377,7 +382,11 @@ module.exports = (crowi) => {
       const userData = req.user;
 
       try {
-        const externalAccounts = await ExternalAccount.find({ user: userData });
+        const externalAccounts = await prisma.externalaccounts.findMany({
+          where: {
+            userId: userData._id.toString(),
+          },
+        });
         return res.apiv3({ externalAccounts });
       } catch (err) {
         logger.error(err);
@@ -641,7 +650,7 @@ module.exports = (crowi) => {
 
       try {
         await passport.authenticate('ldapauth');
-        const associateUser = await ExternalAccount.associate(
+        const associateUser = await prisma.externalaccounts.associate(
           'ldap',
           username,
           user,
@@ -697,15 +706,23 @@ module.exports = (crowi) => {
       const { providerType, accountId } = body;
 
       try {
-        const count = await ExternalAccount.count({ user });
+        const count = await prisma.externalaccounts.count({
+          where: {
+            userId: user._id.toString(),
+          },
+        });
         // make sure password set or this user has two or more ExternalAccounts
         if (user.password == null && count <= 1) {
           return res.apiv3Err('disassociate-ldap-account-failed');
         }
-        const disassociateUser = await ExternalAccount.findOneAndRemove({
-          providerType: { $eq: providerType },
-          accountId: { $eq: accountId },
-          user,
+        const disassociateUser = await prisma.externalaccounts.delete({
+          where: {
+            providerType_accountId: {
+              providerType,
+              accountId,
+            },
+            userId: user.id,
+          },
         });
 
         const parameters = {

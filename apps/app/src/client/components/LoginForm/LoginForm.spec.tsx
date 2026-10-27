@@ -42,7 +42,6 @@ vi.mock('../CompleteUserRegistration', () => ({
 const defaultProps = {
   isEmailAuthenticationEnabled: false,
   registrationMode: 'Open' as const,
-  registrationWhitelist: [],
   isPasswordResetEnabled: true,
   isLocalStrategySetup: true,
   isLdapStrategySetup: false,
