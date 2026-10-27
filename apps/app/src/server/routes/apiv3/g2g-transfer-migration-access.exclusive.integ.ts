@@ -204,8 +204,8 @@ const TOKEN_SCOPES: Scope[] = [SCOPE.READ.FEATURES.PAGE];
  * the document being cast at each call site.
  */
 interface UserAuthMethods {
-  setPassword: (password: string) => void;
-  isPasswordValid: (password: string) => boolean;
+  setPassword: (password: string) => Promise<unknown>;
+  isPasswordValid: (password: string) => Promise<{ isValid: boolean }>;
 }
 
 type UserModelWithAuth = Model<IUser, unknown, UserAuthMethods>;
@@ -352,7 +352,7 @@ describe('receive route POST / — a migration transfer replaces the destination
     });
     // The schema's own hashing, so the assertion afterwards is about the password rather
     // than about a hash this file happened to compute the same way twice.
-    admin.setPassword(DEST_ADMIN_PASSWORD);
+    await admin.setPassword(DEST_ADMIN_PASSWORD);
     await admin.save();
 
     await User.create({
@@ -585,12 +585,15 @@ describe('receive route POST / — a migration transfer replaces the destination
       username: response.body.rescue.rescued[0].rescuedUsername,
     });
     expect(rescuedAdmin).not.toBeNull();
-    expect(rescuedAdmin?.isPasswordValid(DEST_ADMIN_PASSWORD)).toBe(true);
+    expect(
+      (await rescuedAdmin?.isPasswordValid(DEST_ADMIN_PASSWORD))?.isValid,
+    ).toBe(true);
     // The credential really is being checked, rather than every password being accepted
     // by an account that ended up with no hash at all.
-    expect(rescuedAdmin?.isPasswordValid(`${DEST_ADMIN_PASSWORD}-wrong`)).toBe(
-      false,
-    );
+    expect(
+      (await rescuedAdmin?.isPasswordValid(`${DEST_ADMIN_PASSWORD}-wrong`))
+        ?.isValid,
+    ).toBe(false);
     // Signing in is only worth anything if the account still has its powers and is in a
     // state `loginRequired` lets through (requirement 4.1).
     expect(rescuedAdmin?.admin).toBe(true);
