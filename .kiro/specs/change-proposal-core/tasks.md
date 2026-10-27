@@ -61,7 +61,7 @@
   - 一致しなかったときは、作ったリビジョンを消し、リビジョンの衝突を表す例外を投げる。渡されなかったときの動きは今と同じ
   - 一致しない場合にページが変わらず、作ったリビジョンが残らないことを結合テストで確かめている
   - _Requirements: 3.3, 3.4_
-- [ ] 2.3 ページのサービスに、印・期待するリビジョン・通知を止める指定を通す
+- [x] 2.3 ページのサービスに、印・期待するリビジョン・通知を止める指定を通す
   - 更新の options に印（`@growi/core` の `IRevisionProposalMark`）と期待するリビジョンを足し、リビジョンを積む処理まで渡す。ページのサービスの型は `features/change-proposal` を import しない
   - 作成の options に同じ型の印を足し、最初のリビジョンにだけ印を書く（ページには書かない）
   - 移動・ごみ箱への移動・ごみ箱から戻す（`revertDeletedPage`）の options に「アプリ内通知を出さない」指定を足す。指定したときは、アプリ内通知のための知らせを出さず（`revertDeletedPage` では `emit` に対象のページと通知の準備の関数を渡さない）、activity の記録は今のまま行う
@@ -313,3 +313,4 @@
 - 1.4: `changeproposals` は G2G 転送で移せる側（`TRANSFERABLE_COLLECTIONS`）に入れた（design の Modified Files には未記載）。model の拡張の関数の引数の形は `change-proposal-types.ts` を正とする（`skipPendingOperations` の `'all-pending'`、`recordOperationOutcome` が `skipped` と待ちに戻す `pending` も受ける、など）。本文を読まない一覧系は `ChangeProposalSummary` / `LinkedProposalRecord` を返す
 - 2.1: 2.4 の共通処理は `crowi.pageService.updatePage` を呼ぶ形を守る（update-page-conflict-check.integ.ts がそれを spy している）
 - 2.2: `pushRevision` に `expectedRevisionId` を渡す呼び出しは、その直前にページを `save()` 済みにすること（条件付きの書き込みは 4 項目しか書かない）。`revisions.delete` が失敗すると RevisionConflictError でなく Prisma の例外になる点は、2.4 の呼び出し側で扱いを決める
+- 2.3: アプリ内通知の抑止は子を含む delete / restore には未配線（design 上、trash と restore は子を持たないページのみ）。renamePage の options の型は未付与なので、4.x の handler では `IOptionsForInAppNotificationSuppression` を使う。`updatePage` は条件付き pushRevision の前に `save()` でページを書くため、衝突時にも閲覧範囲等の `save()` 分は戻らない（反映では閲覧範囲を渡さないので無害。2.4 で人の保存を共通化するときに考慮）
