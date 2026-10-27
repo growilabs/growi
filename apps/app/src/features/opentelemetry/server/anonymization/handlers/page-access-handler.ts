@@ -85,6 +85,33 @@ function anonymizeUrlPath(urlPath: string): string {
 }
 
 /**
+ * Decode a percent-encoded URL pathname so that differently-encoded forms of
+ * the same page (e.g. %E6 / %e6) are judged and hashed identically
+ * @returns The decoded pathname, or the pathname as-is if it is malformed
+ */
+function decodePathname(pathname: string): string {
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
+// Mirrors the single-character restrictions in @growi/core's restrictedPatternsToCreate
+const CHARS_RESTRICTED_IN_PAGE_NAME = /[\^$*+#<>%?\\]/g;
+
+/**
+ * Whether the decoded path is a page route that must be anonymized.
+ * Characters forbidden in page names only limit what can be created; a request
+ * containing them still targets a page route and must not leak its path.
+ */
+function isPageRoute(decodedPath: string): boolean {
+  return isCreatablePage(
+    decodedPath.replace(CHARS_RESTRICTED_IN_PAGE_NAME, '_'),
+  );
+}
+
+/**
  * Page access anonymization module for non-API requests
  */
 export const pageAccessModule: AnonymizationModule = {
@@ -122,7 +149,7 @@ export const pageAccessModule: AnonymizationModule = {
 
       // Use GROWI's isCreatablePage logic to determine if this is a valid page path
       // This excludes API endpoints, system paths, etc.
-      return isCreatablePage(path);
+      return isPageRoute(decodePathname(path));
     } catch {
       // If URL parsing fails, don't handle it
       return false;
@@ -138,7 +165,7 @@ export const pageAccessModule: AnonymizationModule = {
   ): Record<string, string> | null {
     try {
       const parsedUrl = new URL(url, 'http://localhost');
-      const originalPath = parsedUrl.pathname;
+      const originalPath = decodePathname(parsedUrl.pathname);
 
       // Anonymize the URL path
       const anonymizedPath = anonymizeUrlPath(originalPath);
