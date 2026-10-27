@@ -1,23 +1,23 @@
 {
   "feature_name": "attachment-search-text-extractor",
   "created_at": "2026-04-17T16:30:00.000Z",
-  "updated_at": "2026-04-21T11:00:00.000Z",
+  "updated_at": "2026-10-27T15:47:17.414Z",
   "language": "ja",
-  "phase": "tasks-generated",
+  "phase": "requirements-generated",
   "derived_from": "attachment-search",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "design": {
-      "generated": true,
-      "approved": true
+      "generated": false,
+      "approved": false
     },
     "tasks": {
-      "generated": true,
-      "approved": true
+      "generated": false,
+      "approved": false
     }
   },
-  "ready_for_implementation": true
+  "ready_for_implementation": false
 }

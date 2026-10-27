@@ -10,36 +10,37 @@ GROWI monorepo には添付ファイル (PDF / Office / テキスト系) から�
 
 - GROWI monorepo には Python コードが存在せず、抽出ライブラリも未採用
 - 既存マイクロサービス `apps/pdf-converter` は HTML → PDF 専用 (Puppeteer ベース) で、テキスト抽出には転用できない
-- microsoft/markitdown (Python、MIT、v0.1.x) が PDF / Office / テキスト系を Markdown に変換する公式ライブラリとして利用可能
-- Microsoft 公式の REST API 実装は存在せず、要件を完全に満たすサードパーティ pre-built image も不在 (詳細は [../attachment-search/research-docker-image.md](../attachment-search/research-docker-image.md))
+- Office 系を Markdown に変換するライブラリと、PDF からページ単位でテキストを取り出すライブラリが PyPI から利用可能 (選定の経緯は [research.md](./research.md) §6)
+- 要件を満たす既製の抽出 REST API の image は存在しない (詳細は [../attachment-search/research-docker-image.md](../attachment-search/research-docker-image.md))
 
 ### 達成したい姿
 
 - 添付ファイルのバイト列を HTTP multipart で受け取り、ページ / スライド / シート単位に分割した Markdown テキストを JSON で返す独立マイクロサービスが存在する
 - サービスはステートレスで、k8s Deployment + HPA の共有サービス方式で運用でき、OSS docker-compose でも同梱できる
-- 外部バイナリ・ネットワーク egress を要求せず、pure Python のみで完結する
-- 悪意ある大容量 / ハングを起こす添付に対するリソース保護 (最大サイズ / タイムアウト / 同時実行上限) が組み込まれている
-- Image サイズは 250〜400MB に収まる
+- 外部バイナリ・ネットワーク egress を要求せず、PyPI から取得できる Python パッケージ (ネイティブ拡張を含む wheel を含む) のみで完結する
+- 悪意ある大容量 / 細工された / ハングを起こす添付に対するリソース保護 (最大サイズ / タイムアウト / 同時実行上限 / 展開量などの上限) が組み込まれている
+- 日本語の添付を検索で見つけられる形のテキストを返す (抽出時に入る語の途中の空白・改行を残さない)
+- Image サイズは 400MB 以下に収まる
 - FastAPI の OpenAPI spec を下流 spec (`attachment-search-indexing`) の TS クライアント生成入力として export できる
 
 ### アプローチ
 
-`services/attachment-text-extractor/` に Python 3.12 + FastAPI + Uvicorn の独立サービスを新設する。`services/` は本プロジェクトで新設されるトップレベルディレクトリで、**pnpm workspace / turbo pipeline の対象外** (`pnpm-workspace.yaml` / `turbo.json` は変更しない)。抽出エンジンは microsoft/markitdown `>=0.1.5` を extras `[pdf,docx,xlsx,pptx,outlook]` のみで採用し、`[all]` は絶対に使用しない (OCR / 音声 / YouTube / Azure DI を引き込むため)。`MarkItDown(enable_plugins=False)` + `llm_client=None` で LLM / OCR を明示的にオフ。位置情報は PPTX はスライド単位、XLSX はシート単位、PDF はページ単位 (markitdown PR #1263 未マージなら `pdfminer.six` 直接呼び出しでフォールバック)、その他形式は単一要素で扱う。Dockerfile は `python:3.12-slim-bookworm` + `uv` multi-stage、非 root (uid 10001) 実行、セキュリティハードニング (read-only rootfs / capabilities drop / egress 遮断 / tmpfs `/tmp`) に対応する。
+`services/attachment-text-extractor/` に Python 3.12 + FastAPI + Uvicorn の独立サービスを新設する。`services/` は本プロジェクトで新設されるトップレベルディレクトリで、**pnpm workspace / turbo pipeline の対象外** (`pnpm-workspace.yaml` / `turbo.json` は変更しない)。抽出エンジンは research.md §6.11 の決定 (Office 系は firecrawl/anydoc、PPTX はスライドごとに分けてから anydoc、PDF は pypdfium2、テキスト系はサービス自身で処理) に従い、詳細は design で定める。位置情報は PPTX はスライド単位、XLSX はシート単位、PDF はページ単位、その他形式は単一要素で扱う。Dockerfile は `python:3.12-slim-bookworm` + `uv` multi-stage、非 root (uid 10001) 実行、セキュリティハードニング (read-only rootfs / capabilities drop / egress 遮断 / tmpfs `/tmp`) に対応する。
 
 ### スコープ
 
-- **In**: `services/attachment-text-extractor/` ディレクトリ全体 (Dockerfile / pyproject.toml / uv.lock / src / tests / scripts / AGENTS.md / README.md) / FastAPI app (`POST /extract` multipart、`GET /healthz`、`GET /readyz`、`GET /openapi.json`) / 形式別 extractor と MIME whitelist / リソース保護 middleware / Pydantic schemas / `pdfminer.six` フォールバック / Dockerfile / OpenAPI export script / docker-compose エントリ / k8s manifest 例 / Python 用 CI job / サービス単体テスト
-- **Out**: GROWI 側統合 (AttachmentService ハンドラ登録、ES インデックス化、TS クライアントの consumer 実装、検索結果 UI、管理画面、抽出失敗ログの Mongo 永続化等) は下流 spec の責務。画像 OCR / 音声動画文字起こし / YouTube / Azure DI / ZIP 再帰展開 / Docling 等は本 spec のスコープ外
+- **In**: `services/attachment-text-extractor/` ディレクトリ全体 (Dockerfile / pyproject.toml / uv.lock / src / tests / scripts / AGENTS.md / README.md) / FastAPI app (`POST /extract` multipart、`GET /healthz`、`GET /readyz`、`GET /openapi.json`) / 形式別 extractor と MIME whitelist / リソース保護 / 日本語テキストの正規化 / Pydantic schemas / Dockerfile / OpenAPI export script / docker-compose エントリ / k8s manifest 例 / Python 用 CI job / サービス単体テスト
+- **Out**: GROWI 側統合 (AttachmentService ハンドラ登録、ES インデックス化、TS クライアントの consumer 実装、検索結果 UI、管理画面、抽出失敗ログの Mongo 永続化等) は下流 spec の責務。画像 OCR / 音声動画文字起こし / YouTube / Azure DI / ZIP 再帰展開 / Docling 等の高精度抽出 / Outlook MSG は本 spec のスコープ外
 
 ### 制約
 
 - **ランタイム / 言語**: Python 3.12+ を新規導入。GROWI monorepo の 3 言語目 (Node / Java / Python)
-- **ライセンス**: markitdown は MIT、依存も MIT / Apache-2.0 互換のみ採用 (GPL / AGPL 系は禁止)
-- **Image size 目標**: 250〜400MB
-- **メモリ目標**: 1 worker idle ~120MB、処理中 ~500MB peak。k8s resources は requests 256Mi / limits 1Gi 推奨
+- **ライセンス**: 依存は MIT / Apache-2.0 / BSD 互換のみ採用 (GPL / AGPL 系は禁止)
+- **Image size 目標**: 400MB 以下
+- **メモリ**: 1 件の変換の最大メモリは入力によって大きく変わる (6MB の XLSX で約 620MB)。コンテナのメモリ上限は、形式別のサイズ上限と同時実行数から design で定める
 - **セキュリティ**: 外部ネットワーク egress 遮断下で正常動作すること
 - **互換性**: API 契約 (`ExtractResponse.pages[]` 構造) は破壊的変更を避ける。変更時は下流 spec (`attachment-search-indexing`) の再検証を要する
-- **upstream 依存リスク**: markitdown PR #1263 が未マージの場合、PDF ページ分割はフォールバック実装で吸収する
+- **upstream 依存リスク**: anydoc は 0.x 系で公開から日が浅い。版を固定し、出力の契約テストで更新時の変化を検知する
 
 詳細は [brief.md](./brief.md) を参照。
 
@@ -55,10 +56,11 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
 
 - **In scope (feature responsibility)**:
   - `services/attachment-text-extractor/` 配下の FastAPI アプリケーション実装
-  - PDF / DOCX / XLSX / PPTX / HTML / CSV / TSV / JSON / XML / YAML / プレーンテキスト / RTF / EPub / Jupyter Notebook / Outlook MSG に対応する形式別 extractor
+  - PDF / DOCX / XLSX / PPTX / HTML / CSV / TSV / JSON / XML / YAML / プレーンテキスト / RTF / EPub / Jupyter Notebook / 旧形式 Office (DOC / XLS / PPT) / OpenDocument (ODT / ODS / ODP) に対応する形式別 extractor
   - 位置情報付き `pages[]` 構造の返却 (PDF = ページ / PPTX = スライド / XLSX = シート、その他は単一要素)
-  - リソース保護 (最大ファイルサイズ / タイムアウト / 同時実行上限 semaphore)
-  - 外部 egress 遮断下での動作と pure Python 依存
+  - 返却テキストの正規化 (改行コードの統一、日本語の語の途中に入った空白・改行の除去)
+  - リソース保護 (最大ファイルサイズ / タイムアウト / 同時実行上限 / 細工ファイルの上限) と、1 件の異常終了を他のリクエストに波及させない隔離
+  - 外部 egress 遮断下での動作と、外部バイナリを要しない Python 依存
   - Pydantic schemas (`ExtractResponse` / `PageInfo` / `ErrorResponse` / `ErrorCode`) と API 契約
   - Dockerfile (uv multi-stage、非 root、セキュリティハードニング対応)
   - k8s manifest 例 (Deployment + Service + HPA + NetworkPolicy + securityContext)
@@ -70,11 +72,10 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
   - apps/app 側の統合実装 (AttachmentService ハンドラ登録、抽出結果の ES 取り込み、失敗ログ Mongo 永続化、検索クエリの multi-index 集約、admin API、検索結果 UI、添付ファイル一覧モーダル、管理画面拡張)
   - `packages/attachment-text-extractor-client` の生成 / 配布パイプライン (OpenAPI spec の export のみ本 spec が行い、orval 設定と生成成果物の消費は下流 spec)
   - 画像 OCR / 音声動画文字起こし / YouTube 取り込み / Azure Document Intelligence / ZIP 再帰展開 / Docling 等の高精度抽出
-  - markitdown `<0.1.5` への対応
+  - Outlook MSG
   - Elasticsearch / MongoDB への直接アクセス (サービスはステートレス、DB 依存ゼロ)
 - **Adjacent expectations (this feature relies on these)**:
-  - microsoft/markitdown `>=0.1.5` が PyPI から取得可能である
-  - `pdfminer.six` が PyPI から取得可能である (フォールバック用)
+  - 採用する抽出ライブラリ (research.md §6.11) が、対象プラットフォーム (linux x64 / arm64) 向けの wheel として PyPI から取得可能である
   - Docker / Kubernetes のランタイム (cgroups / seccomp / NetworkPolicy 対応 CNI) が前提
   - 下流 spec (`attachment-search-indexing`) は本 spec が export する OpenAPI spec を入力として orval で TS クライアントを生成し、HTTP multipart で `POST /extract` を呼ぶ
 
@@ -92,9 +93,13 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
 2. When PPTX ファイルが抽出サービスに渡される, the 抽出サービス shall スライド単位で `pages` 配列を返却し、各要素の `pageNumber` に 1 始まりの序数を、`label` にスライド番号表示文字列を設定する <!-- derived from umbrella R1.2 -->
 3. When XLSX ファイルが抽出サービスに渡される, the 抽出サービス shall シート単位で `pages` 配列を返却し、各要素の `pageNumber` に 1 始まりの序数を、`label` にシート名を設定する <!-- derived from umbrella R1.3 -->
 4. When PDF ファイルが抽出サービスに渡される, the 抽出サービス shall ページ単位で `pages` 配列を返却し、各要素の `pageNumber` にページ番号を、`label` にページ番号表示文字列を設定する <!-- derived from umbrella R1.4 -->
-5. When DOCX / HTML / CSV / TSV / JSON / XML / YAML / プレーンテキスト (`.txt`, `.log`, `.md`) / RTF / EPub / Jupyter Notebook / Outlook MSG のいずれかが抽出サービスに渡される, the 抽出サービス shall 単一要素の `pages` 配列を返却し、`pageNumber` と `label` を null とする <!-- derived from umbrella R1.5 -->
+5. When DOCX / HTML / CSV / TSV / JSON / XML / YAML / プレーンテキスト (`.txt`, `.log`, `.md`) / RTF / EPub / Jupyter Notebook のいずれかが抽出サービスに渡される, the 抽出サービス shall 単一要素の `pages` 配列を返却し、`pageNumber` と `label` を null とする <!-- derived from umbrella R1.5 -->
 6. If サポート対象外の形式が抽出サービスに渡される, the 抽出サービス shall 抽出を行わず、サポート対象外を示すエラーコードを返却する <!-- derived from umbrella R1.6 -->
 7. The 抽出サービス shall 運用環境で外部バイナリおよびネットワーク egress を要求せずに動作する <!-- derived from umbrella R1.7 -->
+8. When 旧形式 Office (DOC / XLS / PPT) または OpenDocument (ODT / ODS / ODP) のファイルが抽出サービスに渡される, the 抽出サービス shall 単一要素の `pages` 配列を返却し、`pageNumber` と `label` を null とする
+9. The 抽出サービス shall 返却する各 `content` の改行コードを LF に揃え、抽出処理によって日本語の文字 (ひらがな・カタカナ・漢字) の間に入った 1 文字分の空白または改行を取り除く
+10. If 暗号化またはパスワード保護されたファイルが抽出サービスに渡される, the 抽出サービス shall 抽出を行わず、暗号化を示すエラーコードを返却する
+11. If 構造が壊れていて意味のあるテキストを取り出せないファイルが抽出サービスに渡される, the 抽出サービス shall 抽出失敗を示すエラーコードを返却する
 
 ### Requirement 2: 抽出処理のリソース保護と隔離
 
@@ -108,6 +113,9 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
 2. If 抽出処理が設定されたタイムアウトを超える, the 抽出サービス shall 当該リクエストを打ち切り、タイムアウトを示すエラーコードを返却する <!-- derived from umbrella R2.2 -->
 3. While 抽出サービスが設定された同時リクエスト上限に達している, the 抽出サービス shall 以降のリクエストを受理せず、サービスビジーを示すエラーコードを返却する <!-- derived from umbrella R2.3 -->
 4. The 抽出サービス Pod / コンテナ shall 外部ネットワーク egress が遮断された状態で正常動作する <!-- derived from umbrella R2.6 -->
+5. When 抽出処理がタイムアウトにより打ち切られる, the 抽出サービス shall 当該抽出処理の実行そのものを停止し、その処理が使っていた同時実行の枠とメモリを解放する (応答だけ返して処理を継続させない)
+6. If 展開後のサイズ、XML の入れ子の深さ、要素数などが設定された上限を超えるファイルが渡される, the 抽出サービス shall 抽出を打ち切り、上限超過を示すエラーコードを返却する
+7. If 1 件の抽出処理が異常終了する (ライブラリ内部の想定外エラーやプロセスの異常終了を含む), the 抽出サービス shall そのリクエストにエラーコードを返却し、他のリクエストの処理を継続する
 
 ### Requirement 3: デプロイメントとセキュリティハードニング
 
