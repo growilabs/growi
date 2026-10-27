@@ -1,9 +1,7 @@
 import { getIdStringForRef } from '@growi/core';
-import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/consts';
-import type { PageDocument, PageModel } from '~/server/models/page';
 import {
   beginActivity,
   pendingActivityContext,
@@ -18,6 +16,7 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { toRevisionProposalMark } from '../../domain';
+import { pageModel } from './page-model';
 import type {
   OperationContext,
   OperationHandler,
@@ -30,9 +29,6 @@ const logger = loggerFactory(
 );
 
 type EditOperation = OperationRecordOf<'edit'>;
-
-const pageModel = (): PageModel =>
-  mongoose.model<PageDocument, PageModel>('Page');
 
 // A marked revision can exist without ever having been the page's revision:
 // pushRevision creates it before the conditional page update, and a lost update

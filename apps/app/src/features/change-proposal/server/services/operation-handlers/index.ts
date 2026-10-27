@@ -3,6 +3,9 @@ import type Crowi from '~/server/crowi';
 import type { OperationType } from '../../../interfaces';
 import { createCreateHandler } from './create';
 import { createEditHandler } from './edit';
+import { createMoveHandler } from './move';
+import { createRestoreHandler } from './restore';
+import { createTrashHandler } from './trash';
 import type { OperationHandlerTable } from './types';
 
 export type {
@@ -19,15 +22,12 @@ export const createOperationHandlers = (
 ): OperationHandlerTable => ({
   edit: createEditHandler(crowi),
   create: createCreateHandler(crowi),
+  move: createMoveHandler(crowi),
+  trash: createTrashHandler(crowi),
+  restore: createRestoreHandler(crowi),
 });
 
 export const getOperationHandler = <K extends OperationType>(
   table: OperationHandlerTable,
   type: K,
-): NonNullable<OperationHandlerTable[K]> => {
-  const handler = table[type];
-  if (handler == null) {
-    throw new Error(`No operation handler is registered for '${type}'`);
-  }
-  return handler;
-};
+): OperationHandlerTable[K] => table[type];

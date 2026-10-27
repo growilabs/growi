@@ -38,7 +38,8 @@ export type OperationRecordOf<K extends OperationType> = Extract<
 // An unexpected exception from findExistingResult or execute is not mapped here;
 // ProposalApplier records it as `failed: write-error` (design "Error Strategy").
 export interface OperationHandler<T extends OperationRecord> {
-  // Detects a write already done by an interrupted run.
+  // Detects a write already done by an interrupted run. It may also finish that
+  // write's idempotent cleanup (e.g. leftover redirects), so it is not read-only.
   findExistingResult(
     op: T,
     ctx: OperationContext,
@@ -53,5 +54,5 @@ export interface OperationHandler<T extends OperationRecord> {
 }
 
 export type OperationHandlerTable = {
-  readonly [K in OperationType]?: OperationHandler<OperationRecordOf<K>>;
+  readonly [K in OperationType]: OperationHandler<OperationRecordOf<K>>;
 };

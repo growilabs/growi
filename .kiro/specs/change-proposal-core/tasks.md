@@ -158,7 +158,7 @@
   - ページごとの通知: 操作の書き込みの決まった形に、結果を記録したあとで呼ばれる `sendPerPageNotifications` を足す（4.5 が呼ぶ）。操作の文脈の `perPageNotifications` だけで決め、設定は読まない。真のとき、編集は `sendPerPageNotifications` の中で `beginActivity` で依頼した人を操作者とする activity の ID を作って `emitPageUpdateActivity` を呼び（作らなかったときは文脈を消す）、`firePageGlobalNotification(PAGE_EDIT)` を呼ぶ。新規作成は `sendPerPageNotifications` の中で `firePageGlobalNotification(PAGE_CREATE)` だけを呼ぶ（2.5 の処理）。送るのに失敗しても操作の結果は変えない。保存ごとの Slack のチャンネルへの通知は呼ばない
   - 結合テストで次を確かめている: 作者が依頼した人であること、閲覧範囲が親と同じであること、リビジョンの `origin` が空で印を持つこと、新規作成では最初のリビジョンが印を持ち、ページには印の項目が無いこと、`perPageNotifications` が偽のときにページごとのアプリ内通知とグローバル通知が出ないこと、真のときに編集では購読している人へのアプリ内通知とグローバル通知が、新規作成ではグローバル通知だけが出て、閲覧範囲が「リンクを知る人だけ」のページにはグローバル通知が出ないこと、どちらでも保存ごとの Slack のチャンネルへの通知が出ないこと、ページの作成・更新の event（`crowi.events.page`）が出ること、反映のあとに共同編集の文書を開くと反映後の本文になること
   - _Requirements: 3.3, 3.4, 3.6, 3.8, 3.9, 3.10, 3.12, 3.17, 6.1, 6.2, 6.4, 7.1, 7.10, 7.11_
-- [ ] 4.3 移動・ごみ箱へ移す・ごみ箱から戻すの操作の書き込みを作る
+- [x] 4.3 移動・ごみ箱へ移す・ごみ箱から戻すの操作の書き込みを作る
   - 4.2 で作った表に、移動・ごみ箱へ移す・ごみ箱から戻すを登録する（表と決まった形は変えない）
   - 移動: 移動元を依頼した人が閲覧できなければ失敗。移動先が使われていれば失敗。操作の文脈の `perPageNotifications` が偽ならアプリ内通知を止める指定を付け、リダイレクトを作る指定で移動する。取り消しの移動では、リダイレクトを作らず、移動のあとで元のパスとその下を起点とするリダイレクトを消す
   - ごみ箱へ移す（取り消しだけ）: 最新のリビジョンが期待どおりで子のページが無いときだけ、ごみ箱へ移す（`perPageNotifications` が偽ならアプリ内通知を止める）
@@ -324,3 +324,6 @@
 - 4.1: `checkEditingPresence(yjsService, pageId)` は `services/editing-presence.ts`（barrel 未作成。4.4 以降は直接 import するか barrel に足す）。接続数はこのプロセス分のみ
 - 4.2: handler の契約は `operation-handlers/types.ts` が正（`OperationOutcome` は applied / stale / failed、skipped は ProposalApplier の値）。handler は予期しない例外を投げるので、4.5 の ProposalApplier が操作ごとに捕まえて `failed: write-error` を記録する。`createOperationHandlers(crowi)` は今 edit と create だけ登録しており、4.3 で移動・ごみ箱へ移す・ごみ箱から戻すを足したら `OperationHandlerTable` を全項目必須の型にして `getOperationHandler` の実行時例外を型で消す
 - 4.2: edit の `findExistingResult` は「印付きリビジョンがある」だけでは反映済みとしない（ページがその印付きリビジョンを指している、またはページが元のリビジョンより先へ進み、印付きリビジョンの直前が元のリビジョン、のときだけ）。残る誤判定: 印付きリビジョンを作った直後に止まり、次の実行までに人が編集した場合は本文が反映されていなくても反映済みと見える（データから区別できない）。edit は書き込み前に `normalizeLatestRevisionIfBroken` を呼ぶ（ページにリビジョンが結びついていないときだけ pageId を直す。CAS と衝突しない）
+- 4.3: move / restore の `findExistingResult` は読むだけではなく、途中で止まった書き込みの後始末（残ったリダイレクトの削除。何度やっても同じ結果）も済ませる。4.5 では編集中の人の確認（checkEditingPresence）や重なる処理の確認より先に呼ばれる点に注意し、取り消せるかを表示するだけの読む経路から呼ばない
+- 4.3: trash の子のページの判定は `Page.exists({ parent })`（空のページも数える）。5.x で `CurrentPageFacts.hasChildren` を作るときは同じ条件にして、取り消せるかの表示と実際の反映で判断が食い違わないようにする。`resultRevisionId` は move / trash / restore では null
+- 4.3: 【要確認・人の判断】trash / restore のハンドラーは閲覧できるかだけを確かめ、人の削除 route が使う `pageService.canDelete`（管理者設定 `pageDeletionAuthority`、トップページ・ユーザーのホームの保護）は当てていない（design・要件 5.3/5.6 に条件が無いため）。新規作成の取り消し（trash）で、ほかの人が作ったページを削除権限なしに消せる経路になりうる

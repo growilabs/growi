@@ -1,15 +1,14 @@
 import { getIdStringForRef } from '@growi/core';
-import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/consts';
-import type { PageDocument, PageModel } from '~/server/models/page';
 import { firePageGlobalNotification } from '~/server/service/page-save';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { toRevisionProposalMark } from '../../domain';
 import { classifyCreateError } from './classify-create-error';
+import { isPathOccupied, pageModel } from './page-model';
 import type {
   OperationHandler,
   OperationOutcome,
@@ -21,13 +20,6 @@ const logger = loggerFactory(
 );
 
 type CreateOperation = OperationRecordOf<'create'>;
-
-const pageModel = (): PageModel =>
-  mongoose.model<PageDocument, PageModel>('Page');
-
-// An empty page only holds the tree together, so it does not occupy the path.
-const isPathOccupied = async (path: string): Promise<boolean> =>
-  (await pageModel().exists({ path, isEmpty: false })) != null;
 
 export const createCreateHandler = (
   crowi: Crowi,

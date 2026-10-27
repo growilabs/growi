@@ -3,9 +3,9 @@ export type CreateErrorKind =
   | 'not-processable'
   | 'unknown';
 
-// pageService.create reports these only as plain Error messages. create.integ.ts
-// classifies the errors the real pageService.create throws, so a reworded
-// message fails that test instead of being misread.
+// pageService.create and renamePage report these only as plain Error messages.
+// create.integ.ts and move.integ.ts drive the real refusals through this
+// classification, so a reworded message fails those tests instead of being misread.
 const GRANT_REFUSAL_PATTERNS: readonly RegExp[] = [
   /is not assignable to this page/,
   /does not belong to any of the granted groups/,
