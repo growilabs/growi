@@ -8,8 +8,27 @@ export type LinkedProposalFacts = {
 };
 
 export const buildProposalLinks = (
-  _returnedOperationKeys: readonly string[],
-  _linked: readonly LinkedProposalFacts[],
+  returnedOperationKeys: readonly string[],
+  linked: readonly LinkedProposalFacts[],
 ): ReadonlyMap<string, readonly ProposalLinkView[]> => {
-  throw new Error('Not implemented');
+  const returned = new Set(returnedOperationKeys);
+  const links = new Map<string, ProposalLinkView[]>();
+
+  for (const fact of linked) {
+    if (!fact.isVisibleToViewer) {
+      continue;
+    }
+    const view: ProposalLinkView = {
+      proposalId: fact.proposalId,
+      relation: fact.relation,
+    };
+    for (const key of fact.operationKeys) {
+      if (!returned.has(key)) {
+        continue;
+      }
+      links.set(key, [...(links.get(key) ?? []), view]);
+    }
+  }
+
+  return links;
 };
