@@ -412,3 +412,54 @@ describe('config-definition multi-provider ai keys', () => {
     });
   });
 });
+
+describe('config-definition change-proposal keys', () => {
+  const cases = [
+    ['app:changeProposalEnabled', 'CHANGE_PROPOSAL_ENABLED', false],
+    ['changeProposal:isEditEnabled', 'CHANGE_PROPOSAL_IS_EDIT_ENABLED', true],
+    [
+      'changeProposal:isCreateEnabled',
+      'CHANGE_PROPOSAL_IS_CREATE_ENABLED',
+      true,
+    ],
+    ['changeProposal:isMoveEnabled', 'CHANGE_PROPOSAL_IS_MOVE_ENABLED', true],
+    [
+      'changeProposal:autoApplyPolicy',
+      'CHANGE_PROPOSAL_AUTO_APPLY_POLICY',
+      'none',
+    ],
+    [
+      'changeProposal:maxOperationsPerProposal',
+      'CHANGE_PROPOSAL_MAX_OPERATIONS_PER_PROPOSAL',
+      null,
+    ],
+    [
+      'changeProposal:maxProposalsPerUserPerDay',
+      'CHANGE_PROPOSAL_MAX_PROPOSALS_PER_USER_PER_DAY',
+      null,
+    ],
+    [
+      'changeProposal:pendingExpirationSeconds',
+      'CHANGE_PROPOSAL_PENDING_EXPIRATION_SECONDS',
+      null,
+    ],
+    [
+      'changeProposal:maintenanceCronSchedule',
+      'CHANGE_PROPOSAL_MAINTENANCE_CRON_SCHEDULE',
+      '*/10 * * * *',
+    ],
+    [
+      'changeProposal:perPageNotificationsEnabled',
+      'CHANGE_PROPOSAL_PER_PAGE_NOTIFICATIONS_ENABLED',
+      false,
+    ],
+  ] as const;
+
+  it.each(
+    cases,
+  )('declares %s with its env var and default', (key, envVarName, defaultValue) => {
+    expect(CONFIG_KEYS).toContain(key);
+    expect(CONFIG_DEFINITIONS[key].envVarName).toBe(envVarName);
+    expect(CONFIG_DEFINITIONS[key].defaultValue).toBe(defaultValue);
+  });
+});

@@ -6,6 +6,7 @@ import type {
 } from '@growi/core/dist/interfaces';
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
 
+import type { AutoApplyPolicy } from '~/features/change-proposal/interfaces';
 import type {
   AllowedModel,
   ModelProviderOptions,
@@ -380,6 +381,18 @@ export const CONFIG_KEYS = [
 
   // Access Token Settings
   'accessToken:deletionCronExpression',
+
+  // Change Proposal Settings
+  'app:changeProposalEnabled',
+  'changeProposal:isEditEnabled',
+  'changeProposal:isCreateEnabled',
+  'changeProposal:isMoveEnabled',
+  'changeProposal:autoApplyPolicy',
+  'changeProposal:maxOperationsPerProposal',
+  'changeProposal:maxProposalsPerUserPerDay',
+  'changeProposal:pendingExpirationSeconds',
+  'changeProposal:maintenanceCronSchedule',
+  'changeProposal:perPageNotificationsEnabled',
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
@@ -1614,6 +1627,50 @@ export const CONFIG_DEFINITIONS = {
   'accessToken:deletionCronExpression': defineConfig<string>({
     envVarName: 'ACCESS_TOKEN_DELETION_CRON_EXPRESSION',
     defaultValue: '0 15 * * *',
+  }),
+
+  // Change Proposal Settings
+  // The nullable numbers carry no default yet: null means the limit is not
+  // checked / the proposal never expires.
+  'app:changeProposalEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_ENABLED',
+    defaultValue: false,
+  }),
+  'changeProposal:isEditEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_IS_EDIT_ENABLED',
+    defaultValue: true,
+  }),
+  'changeProposal:isCreateEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_IS_CREATE_ENABLED',
+    defaultValue: true,
+  }),
+  'changeProposal:isMoveEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_IS_MOVE_ENABLED',
+    defaultValue: true,
+  }),
+  'changeProposal:autoApplyPolicy': defineConfig<AutoApplyPolicy>({
+    envVarName: 'CHANGE_PROPOSAL_AUTO_APPLY_POLICY',
+    defaultValue: 'none',
+  }),
+  'changeProposal:maxOperationsPerProposal': defineConfig<number | null>({
+    envVarName: 'CHANGE_PROPOSAL_MAX_OPERATIONS_PER_PROPOSAL',
+    defaultValue: null,
+  }),
+  'changeProposal:maxProposalsPerUserPerDay': defineConfig<number | null>({
+    envVarName: 'CHANGE_PROPOSAL_MAX_PROPOSALS_PER_USER_PER_DAY',
+    defaultValue: null,
+  }),
+  'changeProposal:pendingExpirationSeconds': defineConfig<number | null>({
+    envVarName: 'CHANGE_PROPOSAL_PENDING_EXPIRATION_SECONDS',
+    defaultValue: null,
+  }),
+  'changeProposal:maintenanceCronSchedule': defineConfig<string>({
+    envVarName: 'CHANGE_PROPOSAL_MAINTENANCE_CRON_SCHEDULE',
+    defaultValue: '*/10 * * * *',
+  }),
+  'changeProposal:perPageNotificationsEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_PER_PAGE_NOTIFICATIONS_ENABLED',
+    defaultValue: false,
   }),
 } as const;
 
