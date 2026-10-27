@@ -1,7 +1,7 @@
 {
-  "feature_name": "otel-anonymization-coverage",
+  "feature_name": "opentelemetry-anonymization",
   "created_at": "2026-10-27T13:48:05.000Z",
-  "updated_at": "2026-10-27T14:42:25.000Z",
+  "updated_at": "2026-10-27T14:55:38.000Z",
   "language": "ja",
   "phase": "requirements-generated",
   "approvals": {
