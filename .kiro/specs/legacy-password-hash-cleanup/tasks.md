@@ -201,6 +201,17 @@
   - 完了の状態: apps/app の lint と、この機能のテストが通る
   - _Requirements: 5.1_
 
+- [x] 11. 4 回目のレビュー（code-review high）の指摘への対応
+- [x] 11.1 一覧: 再試行で読み込み済みのページをすべて取り直し、エラーの文言を 1 つにする
+  - 再試行を `mutate()` に変える。行を残したまま出すエラーの文言を `unmigrated_list.fetch_error` にし、`unmigrated_list.load_more_error` を 5 ロケールと i18n spec から消す
+  - 完了の状態: 一覧の spec で次を確かめる。マウントし直したときの取り直しに失敗したら、行を残したままエラーと再試行が出て、再試行で取り直した一覧に置き換わる。続きの読み込みの失敗と最初の読み込みの失敗も、これまでどおり再試行で回復する
+  - _Requirements: 7.8, 7.9, 7.11, 6.1_
+
+- [x] 11.2 セクション: 削除の流れを `useLegacyPasswordDelete` に切り出す
+  - 確認ダイアログの開閉、実行中の状態、件数の取り直し、削除、トーストとログを hook に移す。件数の `mutate` は引数で受け取る。コンポーネントの関数を 50 行未満にする
+  - 完了の状態: セクションの spec を変えずに通す。lint とこの機能のテストが通る
+  - _Requirements: 2.9, 3.5_
+
 ## Implementation Notes
 - `lint:typecheck` が `@growi/core/dist/...` の export 不足（例: `isInsecureUserAttribute`）で落ちるときは、`@growi/core` の dist が古い。`turbo run build --filter @growi/core` で作り直す（1.1 で発生）
 - 開発サーバーで管理者 API を確かめるときは、dev DB の `accesstokens` に一時的なトークン（必要なスコープ付き、description で識別、短い有効期限）を入れて `Authorization: Bearer` で呼び、終わったら削除する。dev DB のパスワード形式の内訳は、ログインによる移行で変わる（3.3 の時点では旧形式のみ 8 人・両形式 0 人、6.6 の時点では旧形式のみ 6 人・両形式 2 人）。確認の前に必ず数え直す
