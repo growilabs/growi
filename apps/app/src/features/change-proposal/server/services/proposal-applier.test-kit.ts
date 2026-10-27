@@ -51,6 +51,7 @@ export type StoreProposalOptions = {
   readonly revertOf?: string;
   readonly basedOn?: ChangeProposalDocument['basedOn'];
   readonly perPageNotifications?: boolean;
+  readonly expiresAt?: Date;
 };
 
 const PAGE_OPERATION_WAIT_MS = 5000;
@@ -160,6 +161,7 @@ export const createApplierTestKit = (args: {
       revertOf: options.revertOf,
       basedOn: options.basedOn,
       perPageNotifications: options.perPageNotifications ?? false,
+      expiresAt: options.expiresAt,
       operations: operations.map((op) => ({ ...op, approvedAt })),
     });
     proposalIds.push(created._id);

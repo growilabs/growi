@@ -15,6 +15,7 @@ import type {
 import {
   closableWhere,
   hasPendingOperation,
+  idNotIn,
   interruptedApplyWhere,
   leaseFreeAt,
   PENDING,
@@ -465,11 +466,15 @@ export const extension = Prisma.defineExtension((client) => {
           );
         },
 
-        async findIdsDueForExpiry(now: Date, limit: number): Promise<string[]> {
+        async findIdsDueForExpiry(
+          now: Date,
+          limit: number,
+          excludeIds: readonly string[] = [],
+        ): Promise<string[]> {
           const context =
             Prisma.getExtensionContext<typeof prisma.changeproposals>(this);
           const rows = await context.findMany({
-            where: closableWhere('expired', now),
+            where: { ...closableWhere('expired', now), ...idNotIn(excludeIds) },
             select: { id: true },
             take: limit,
           });
@@ -479,11 +484,15 @@ export const extension = Prisma.defineExtension((client) => {
         async findIdsOpenForWithdraw(
           now: Date,
           limit: number,
+          excludeIds: readonly string[] = [],
         ): Promise<string[]> {
           const context =
             Prisma.getExtensionContext<typeof prisma.changeproposals>(this);
           const rows = await context.findMany({
-            where: closableWhere('withdrawn', now),
+            where: {
+              ...closableWhere('withdrawn', now),
+              ...idNotIn(excludeIds),
+            },
             select: { id: true },
             take: limit,
           });
@@ -493,11 +502,12 @@ export const extension = Prisma.defineExtension((client) => {
         async findIdsWithInterruptedApply(
           now: Date,
           limit: number,
+          excludeIds: readonly string[] = [],
         ): Promise<string[]> {
           const context =
             Prisma.getExtensionContext<typeof prisma.changeproposals>(this);
           const rows = await context.findMany({
-            where: interruptedApplyWhere(now),
+            where: { ...interruptedApplyWhere(now), ...idNotIn(excludeIds) },
             select: { id: true },
             take: limit,
           });
@@ -515,11 +525,14 @@ export const extension = Prisma.defineExtension((client) => {
           );
         },
 
-        async findIdsOpenWithoutPending(limit: number): Promise<string[]> {
+        async findIdsOpenWithoutPending(
+          limit: number,
+          excludeIds: readonly string[] = [],
+        ): Promise<string[]> {
           const context =
             Prisma.getExtensionContext<typeof prisma.changeproposals>(this);
           const rows = await context.findMany({
-            where: settleableWhere,
+            where: { ...settleableWhere, ...idNotIn(excludeIds) },
             select: { id: true },
             take: limit,
           });

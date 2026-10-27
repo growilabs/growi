@@ -11,6 +11,7 @@ export type {
   ServiceError,
   ServiceResult,
 } from './services/change-proposal-service-types';
+export { startChangeProposalMaintenanceCronIfEnabled } from './services/maintenance-cron';
 export type { CreateInputRejection } from './services/normalize-create-input';
 export { MODEL_LABEL_MAX_CODE_POINTS } from './services/normalize-create-input';
 export type { ChangeProposalSettings } from './services/settings';

@@ -106,6 +106,13 @@ export const interruptedApplyWhere = (
   AND: [leaseFreeAt(now)],
 });
 
+// Lets a maintenance run skip the ids it already tried; those may keep matching
+// and would otherwise fill every batch.
+export const idNotIn = (
+  excludeIds: readonly string[],
+): Prisma.changeproposalsWhereInput =>
+  excludeIds.length === 0 ? {} : { id: { notIn: [...excludeIds] } };
+
 export const withoutUndefined = <T extends Record<string, unknown>>(
   value: T,
 ): T =>

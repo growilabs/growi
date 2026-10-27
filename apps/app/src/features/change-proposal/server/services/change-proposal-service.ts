@@ -25,6 +25,10 @@ import type {
 } from './change-proposal-service-types';
 import { checkCreateTargets } from './check-create-targets';
 import {
+  createMaintenanceActions,
+  type MaintenanceActions,
+} from './maintenance-actions';
+import {
   type NormalizedCreateInput,
   normalizeCreateInput,
 } from './normalize-create-input';
@@ -51,7 +55,8 @@ const logger = loggerFactory(
 const BASED_ON_RELATIONS: readonly string[] = ['follow-up', 'rework'];
 
 export type ChangeProposalService = RequesterActions &
-  RevertAction & {
+  RevertAction &
+  MaintenanceActions & {
     createProposal(
       input: CreateProposalRequest,
     ): Promise<ServiceResult<CreateProposalResult>>;
@@ -60,6 +65,7 @@ export type ChangeProposalService = RequesterActions &
 export type ChangeProposalServiceDeps = {
   readonly applier?: ProposalApplier;
   readonly now?: () => Date;
+  readonly maintenanceBatchSize?: number;
 };
 
 const fail = (error: ServiceError): { ok: false; error: ServiceError } => ({
@@ -231,6 +237,11 @@ export const createChangeProposalService = (
   return {
     ...createRequesterActions({ applier, now }),
     ...createRevertAction({ applier, now }),
+    ...createMaintenanceActions({
+      applier,
+      now,
+      batchSize: deps.maintenanceBatchSize,
+    }),
     async createProposal(input) {
       const settings = readChangeProposalSettings();
       const createdAt = now();
