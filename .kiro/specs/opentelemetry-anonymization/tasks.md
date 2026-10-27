@@ -72,7 +72,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 9.2_
 
 - [ ] 4. 組み込みと網羅テスト
-- [ ] 4.1 hook を新しい実行関数に切り替え、既存の handler を廃止する
+- [x] 4.1 hook を新しい実行関数に切り替え、既存の handler を廃止する
   - hook はリクエストの URL を実行関数と規則の宣言に渡し、結果があれば `http.target` と、URL 属性の組み立て（#12151）の結果を返す
   - 4 つの handler、その spec、module のインターフェース、古いクエリパラメータの置換関数を削除する
   - hook のテストを、handler 前提の部分を除いて新しい構成に合わせる
@@ -130,3 +130,4 @@
 - 3.1: `unwrap-next-data` の `/_next/data/<buildId>/[<locale>/]…json` の解析と locale 判定（`AllLang`）は実行関数 `anonymize-url.ts` の中にある。3.2 の規則は「データ URL であること」の判定だけを宣言する。`hashPagePath` は例外を握りつぶさず、実行関数の catch が `/[ANONYMIZATION_FAILED]` を返す。
 - 3.2: 規則の宣言は `rules/index.ts` の `ANONYMIZATION_RULES`。`static-files` の `/vault.git` は design の表どおり前方一致（`/vault.gitpage` も静的ファイル扱いになる）。直すなら `=== '/vault.git'` か `startsWith('/vault.git/')`（レビューの任意提案）。
 - 3.3: 例の宣言は `rules/coverage-examples.ts` の `COVERAGE_EXAMPLES`（`route` は Express の登録どおりの文字列。照合は末尾 `/` を取り除いて比べるが `/` 自体は残す。`/*` と `/*/$` も登録されている）。ルートを持たない例は静的配信の URL だけ。`route` には、その URL を実際に処理する最初のルートを書く（全部を受ける `/*` は具体的なルートが無い場合だけ）。
+- 4.1: handler 4 本・module のインターフェース・古い `anonymizeQueryParams` を削除し、`anonymizeSearchParams` を `anonymizeQueryParams` に改名済み。`/_api/v3/page/check-page-existence?path=` など個別 URL の専用テストは消えたが、共通パラメータ名の規則で処理される。ルート単位の網羅は 4.2・4.3 が受け持つ。

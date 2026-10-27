@@ -7,7 +7,7 @@ import type {
   PathRule,
   RequestPath,
 } from './rules/types';
-import { anonymizeSearchParams } from './utils/anonymize-query-params';
+import { anonymizeQueryParams } from './utils/anonymize-query-params';
 import { decodePathname, hashPagePath } from './utils/hash-page-path';
 import { redactPathParams } from './utils/path-pattern';
 
@@ -151,7 +151,7 @@ export const anonymizeUrl = (
     const anonymizedSearch =
       search == null
         ? null
-        : anonymizeSearchParams(search, rules.sensitiveQueryParams);
+        : anonymizeQueryParams(search, rules.sensitiveQueryParams);
 
     const searchChanged = search != null && anonymizedSearch !== search;
     if (anonymizedPath == null && !searchChanged) {
