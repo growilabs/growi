@@ -1,5 +1,6 @@
 import type { IncomingMessage } from 'node:http';
 import { describe, expect, it } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 import { pageAccessModule } from './page-access-handler';
 
@@ -18,6 +19,9 @@ describe('pageAccessModule', () => {
       ${'Users homepage'}                      | ${'/user/john'}                | ${true}
       ${'Users page'}                          | ${'/user/john/projects'}       | ${true}
       ${'page path with non-ASCII characters'} | ${'/Sandbox/日本語ページ'}     | ${true}
+      ${'percent-encoded non-ASCII page path'} | ${'/Sandbox/%E6%97%A5'}        | ${true}
+      ${'page path decoding to a "?"'}         | ${'/Sandbox/a%3Fb'}            | ${true}
+      ${'API endpoint decoding to a "?"'}      | ${'/_api%3Fv3'}                | ${false}
       ${'page path'}                           | ${'/path/to/page'}             | ${true}
       ${'ObjectId path'}                       | ${'/58a4569921a8424d00a1aa0e'} | ${false}
     `('should return $expected for $description', ({ url, expected }) => {
@@ -28,17 +32,26 @@ describe('pageAccessModule', () => {
 
   describe('handle', () => {
     describe('URL path anonymization', () => {
-      it('should anonymize a page path with non-ASCII characters', () => {
-        const mockRequest = {} as IncomingMessage;
-        const url = '/Sandbox/日本語ページ';
+      it('should hash a non-ASCII page path the same whether it is encoded or not', () => {
+        const mockRequest = mock<IncomingMessage>();
+        const rawResult = pageAccessModule.handle(
+          mockRequest,
+          '/Sandbox/日本語',
+        );
+        const upperCaseResult = pageAccessModule.handle(
+          mockRequest,
+          '/Sandbox/%E6%97%A5%E6%9C%AC%E8%AA%9E',
+        );
+        const lowerCaseResult = pageAccessModule.handle(
+          mockRequest,
+          '/Sandbox/%e6%97%a5%e6%9c%ac%e8%aa%9e',
+        );
 
-        expect(pageAccessModule.canHandle(url)).toBe(true);
-
-        const result = pageAccessModule.handle(mockRequest, url);
-        const anonymizedTarget = result?.['http.target'];
-
-        expect(anonymizedTarget).toMatch(/^\/\[HASHED:[a-f0-9]{16}\]$/);
-        expect(anonymizedTarget).not.toContain('日本語');
+        expect(rawResult?.['http.target']).toMatch(
+          /^\/\[HASHED:[a-f0-9]{16}\]$/,
+        );
+        expect(upperCaseResult).toEqual(rawResult);
+        expect(lowerCaseResult).toEqual(rawResult);
       });
 
       it.each`
@@ -50,7 +63,7 @@ describe('pageAccessModule', () => {
         // Ensure canHandle returns true before calling handle
         expect(pageAccessModule.canHandle(url)).toBe(true);
 
-        const mockRequest = {} as IncomingMessage;
+        const mockRequest = mock<IncomingMessage>();
         const result = pageAccessModule.handle(mockRequest, url);
 
         expect(result).toEqual({
@@ -60,7 +73,7 @@ describe('pageAccessModule', () => {
     });
 
     it('should preserve query parameters', () => {
-      const mockRequest = {} as IncomingMessage;
+      const mockRequest = mock<IncomingMessage>();
       const url = '/user/john?tab=projects&sort=date';
 
       // Ensure canHandle returns true before calling handle
@@ -75,7 +88,7 @@ describe('pageAccessModule', () => {
     });
 
     it('should handle complex query parameters', () => {
-      const mockRequest = {} as IncomingMessage;
+      const mockRequest = mock<IncomingMessage>();
       const url = '/wiki/page?search=test&tags[]=tag1&tags[]=tag2&limit=10';
 
       // Ensure canHandle returns true before calling handle
