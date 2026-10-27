@@ -135,7 +135,7 @@
   - _Boundary: Domain Pure Functions_
   - _Depends: 1.1_
 
-- [ ] 3.6 (P) ページごとの通知を出すかの判断の純関数を作る
+- [x] 3.6 (P) ページごとの通知を出すかの判断の純関数を作る
   - 管理者の設定と Change Proposal の指定の 2 つの真偽を受け取り、両方が真のときだけ真を返す `shouldSendPerPageNotifications` を作る
   - 4 つの組み合わせを単体テストで確かめている
   - 1.1 で作った仮のファイルの中身を書く。barrel は書き換えない
