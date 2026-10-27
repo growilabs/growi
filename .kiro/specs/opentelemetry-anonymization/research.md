@@ -123,6 +123,24 @@
 - **Selected Approach**: `tools/snapshot-route-middleware.ts` の `walkStack` / `extractMountPrefix` を `src/test-utils/express-route-walker.ts` に移し、ツールとテストの両方から使う。
 - **Rationale**: 3 つ目の walker を作らない。
 
+### Decision: テストではテスト用の Crowi にすべてのルートを登録して列挙する（タスク 1.3）
+
+- **Context**: 照合テスト（要件 3.3）は、integration テストの中で GROWI の登録済みのルートを列挙できる必要がある。候補は (1) ツールと同じフル起動（`new Crowi()` → `init()` → `buildServer()` → `setupRoutesForPlugins()` → `setupRoutesAtLast()`）、(2) apiv3 ルーターだけの組み立て。
+- **確かめたこと**:
+  - (1) のツールと同じ手順は、integration テストの中で動き、226 件のルートを列挙できた（apiv1 の `GET /_api/search`、ページ表示の `GET /share/:linkId` を含む）。ただし `GET /_api/v3/page/exist` は含まれなかった。`app:installed` の既定値が偽で、`server/routes/apiv3/index.js` はこの値が偽だと `/page` などのルーターを登録する前に処理を返すため。これはツールにも同じく当てはまり、どの方法でも `app:installed` を真にする必要がある。
+  - `init()` をそのまま呼ぶ方法は、次の理由でテストには向かない。
+    - `init()` の中の `setupDatabase()` は `process.env.MONGO_URI` で mongoose をつなぎ直す。テストの setup がすでにワーカーごとの DB（`growi_test_<id>`）につないでいるため、別の DB 名を指す URI だと mongoose が `Can't call openUri() on an active connection with different connection strings` を投げることを実測した。CI では `MONGO_URI` がワーカーごとの名前に置き換わらない元の DB を指したままなので（`test/setup/prisma.ts` の説明）、CI では起動に失敗する。
+    - `setupCron()` が cron を起動し、`normalizeData()` が DB に書き込む。
+    - `setUpCustomize()` がテーマの manifest（`packages/preset-themes/dist`）を読み込み、それが無い環境では未処理の Promise の失敗となり、テストがすべて通っても vitest が失敗を返す。
+- **Selected Approach**: 既存の integration テスト用の Crowi（`test/setup/crowi.ts` の `getInstance()`）に、ルートの登録時に参照されるサービス（export、import、growi bridge、g2g transfer）を足し、ツールと同じ `buildServer()` → Next.js の request handler の代役 → `setupRoutesForPlugins()` → `setupRoutesAtLast()` を呼ぶ。`app:installed` は、ルートを登録している間だけ `configManager.getConfig` がこのキーに真を返すようにする（DB には書かない。ほかのテストファイルと DB を共有しているため）。この手順は `apps/app/test/setup/growi-routes.ts` の `listGrowiRoutes()` にまとめ、タスク 4.3 の照合テストもこれを使う。
+- **Rationale**: 本番と同じ `routes/index.js` の登録処理を通すので、apiv1・ページ表示・プラグイン（`/_api/lsx`、添付ファイル）・apiv3 のすべてのルートを列挙できる。apiv3 だけの組み立て（2）より範囲が広く、`init()` の副作用（DB のつなぎ直し、cron、テーマ）も持ち込まない。
+- **列挙できる範囲**: `routes/index.js` と `routes/apiv3/index.js` の登録処理の中で、登録の有無を設定値で切り替えているのは `app:installed` だけ（この 2 ファイルの `getConfig` 呼び出しを確認）。ほかの設定で登録されないルートは見つかっていない。
+- **インストーラーのルートは列挙されない**: `app:installed` を真にして登録するため、`/_api/v3/installer` の下は `allreadyInstalledMiddleware` が付き、インストーラー用のルートは含まれない（一覧表に対応する URL は無い）。
+- **Trade-offs**:
+  - apiv3 のルーターはモジュールの中で 1 度だけ作られるため、同じテストファイルの中で 2 回登録すると、すべての apiv3 ルートが 2 重に登録される。`listGrowiRoutes()` は結果を使い回す。
+  - ルートの登録時に新しいサービスを参照するルートが加わると、`listGrowiRoutes()` が `... has not been initialized` などで失敗する。そのときは、足りないサービスの `setupX()` を `growi-routes.ts` に足す。
+  - ヘルパーは `src/` ではなく `test/setup/` に置く。サーバーの build（`tsconfig.build.server.json`）は `src/` 配下の spec 以外のファイルをすべてコンパイルするため、`src/test-utils/` に置くと `vitest` と `test/setup/crowi.ts` が build の対象に入ってしまう。
+
 ## Synthesis Outcomes
 
 - **Generalization**: 画面内遷移用データ URL は「ページ表示の URL を包んだもの」として、同じパスの規則を中のパスに当てる。直接表示とデータ URL の規則を二重に持たない。

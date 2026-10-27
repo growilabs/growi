@@ -14,7 +14,7 @@
   - 完了時: 単体テストが通り、ツールの型チェックが通る。ツールの出力形式は変わらない
   - _Requirements: 3.3_
 
-- [ ] 1.3 テスト環境で GROWI のルートを列挙できる起動方法を確かめる
+- [x] 1.3 テスト環境で GROWI のルートを列挙できる起動方法を確かめる
   - まずアプリ全体を起動する手順（ツールと同じ手順）を integration テストの中で試し、だめなら apiv3 ルーターだけを組み立てる方法に切り替える（`app:installed` を真にする必要がある）
   - どちらを採用したか、なぜかを research.md に追記する
   - 完了時: integration テストの中で登録済みのルートを列挙でき、既知のルート（`GET /_api/v3/page/exist`、`GET /_api/search`、`GET /share/:linkId`）が含まれることを確かめるテストが通る。apiv1 やページ表示のルートを列挙できない方法を採った場合は、その範囲を research.md に書く
@@ -124,3 +124,4 @@
 - 1.1: PR #12151 が未マージ（2026-10-27 時点）のため、実装ブランチは #12151 のコミット（`fix/otel-anonymize-http-url`）の上に載せた。#12151 のマージ後は `git rebase origin/master` でそのコミットが外れる。
 - 検証コマンド: worktree の `node_modules` は本体チェックアウトへの symlink で、`pnpm vitest` / `pnpm run` は `pnpm install` を誘発して失敗する。`apps/app` で `node_modules/.bin/vitest run <パターン>` を直接使う。
 - コミット: pre-commit hook は `pnpm biome` を呼び同じ問題で固まる。`node_modules/.bin/biome check` を手で通してから `git commit --no-verify` を使う。
+- 1.3: ルート列挙の起動ヘルパーは `apps/app/test/setup/growi-routes.ts`（`listGrowiRoutes()`）。4.3 はこれを import して使う。`src/` に置くとサーバーの build に入るため `test/setup/` に置いた。integration テストは `cd apps/app && env -u MONGO_URI ../../node_modules/.bin/vitest run --project=app-integration <パターン>` で回す。
