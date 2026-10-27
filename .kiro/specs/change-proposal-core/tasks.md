@@ -169,7 +169,7 @@
   - ごみ箱から戻したあと、元のパスがページそのものを表示し、元のパスを起点とするリダイレクトが残っていないこと、元のパスに空でないページがあるときは書き込まずに失敗になることを結合テストで確かめている
   - 子のページを持つページの移動と取り消しの移動のあと、元のパスがページそのものを表示し、元のパスとその下を起点とするリダイレクトが残っていないことを結合テストで確かめている（brief の「移動を戻したときのリダイレクトの残り方」）
   - _Requirements: 3.6, 3.8, 3.10, 5.6, 5.7, 5.15, 5.16, 7.1, 7.10_
-- [ ] 4.4 反映の activity と、まとめたアプリ内通知を作る
+- [x] 4.4 反映の activity と、まとめたアプリ内通知を作る
   - activity: route から呼ばれたときは route が作った activity に、応答の前に記録する。裏で動くときは自分で文脈を作って記録し、失敗したら文脈を消す
   - 通知: 反映済みの編集と移動のページ（取り消しの Change Proposal では、ごみ箱へ移した・ごみ箱から戻したページも）を購読している人と、取り消しの Change Proposal では元の Change Proposal の依頼した人を受け取る人にし、そこから依頼した人（取り消しでは取り消した人）を除く。受け取る人ごとに閲覧できるページ（リンクを知る人だけが見られるページを除く）だけで中身を作って 1 件ずつ入れ、Socket.IO で知らせる。1 つも閲覧できない人には作らない。作るのに失敗したらログに残すだけにする
   - アプリ内通知の一覧の API が、Change Proposal を対象にした通知の `target` を `_id` だけにして返すようにする
@@ -327,3 +327,6 @@
 - 4.3: move / restore の `findExistingResult` は読むだけではなく、途中で止まった書き込みの後始末（残ったリダイレクトの削除。何度やっても同じ結果）も済ませる。4.5 では編集中の人の確認（checkEditingPresence）や重なる処理の確認より先に呼ばれる点に注意し、取り消せるかを表示するだけの読む経路から呼ばない
 - 4.3: trash の子のページの判定は `Page.exists({ parent })`（空のページも数える）。5.x で `CurrentPageFacts.hasChildren` を作るときは同じ条件にして、取り消せるかの表示と実際の反映で判断が食い違わないようにする。`resultRevisionId` は move / trash / restore では null
 - 4.3: 【要確認・人の判断】trash / restore のハンドラーは閲覧できるかだけを確かめ、人の削除 route が使う `pageService.canDelete`（管理者設定 `pageDeletionAuthority`、トップページ・ユーザーのホームの保護）は当てていない（design・要件 5.3/5.6 に条件が無いため）。新規作成の取り消し（trash）で、ほかの人が作ったページを削除権限なしに消せる経路になりうる
+- 4.4: `recordProposalActivity` は design と違い `crowi` を引数に取り `{ activityId }` を返す（裏で動くときの activity の ID は関数の中の `beginActivity` で作られ、`notifyApplied` の `activities` に渡すため）。route から呼ぶ（request）場合、操作者は route の `addActivity` が保存した「リクエストを送った人」になる（引数の operator は使われない）ので、承認・取り消しできるのは本人だけという前提を 4.5 / 5.x でも崩さない
+- 4.4: `notifyApplied` は渡された文書の中で反映済みの操作をすべて対象にする。4.5 の ProposalApplier は「この実行で反映済みと記録した操作だけを残した文書」を渡し、承認を 2 回に分けても通知が 1 回ずつで前回のページを再通知しないことを 4.5 のテストで確かめる。受け取る人ごとの `findByIdsAndViewer` は同時実行数に上限が無い（多数の購読者がいる場合の改善余地）
+- 4.4: 通知一覧 API は `targetModel` が ChangeProposal の通知の `target` を読み込まず `{ _id }` だけ返す（`in-app-notification.ts` の `getLatestNotificationsByUser` と route の `hideChangeProposalTargets`）。他の種類の `target` は今までどおり読み込まれることがテストで守られている

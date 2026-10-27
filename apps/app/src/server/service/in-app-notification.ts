@@ -163,14 +163,22 @@ export class InAppNotificationService {
           offset,
           populate: [
             { path: 'user' },
-            // target.attachment is populated via prisma by
-            // populateTargetAttachments after toObject(): mongoose casts a
-            // prisma row assigned to a ref path back to an ObjectId, dropping
-            // `downloadPathProxied`.
-            { path: 'target' },
             { path: 'activities', populate: { path: 'user' } },
           ],
         },
+      );
+      // target.attachment is populated via prisma by
+      // populateTargetAttachments after toObject(): mongoose casts a
+      // prisma row assigned to a ref path back to an ObjectId, dropping
+      // `downloadPathProxied`.
+      // A change proposal is never loaded: it holds every operation (paths and
+      // bodies), while a recipient may only see its own snapshot.
+      await InAppNotification.populate(
+        paginationResult.docs.filter(
+          (doc) =>
+            doc.targetModel !== SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
+        ),
+        { path: 'target' },
       );
 
       return paginationResult;
@@ -220,6 +228,15 @@ export class InAppNotificationService {
       };
     });
   };
+
+  hideChangeProposalTargets = <T extends IInAppNotification>(
+    notifications: T[],
+  ): T[] =>
+    notifications.map((notification) =>
+      notification.targetModel === SupportedTargetModel.MODEL_CHANGE_PROPOSAL
+        ? { ...notification, target: { _id: notification.target } }
+        : notification,
+    );
 
   open = async (
     user: IUser & HasObjectId,

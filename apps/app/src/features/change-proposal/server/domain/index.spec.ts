@@ -13,6 +13,7 @@ describe('change-proposal domain barrel', () => {
         'judgeRevertability',
         'planApplyOrder',
         'selectAutoApplyTargets',
+        'selectNotifiedPageIds',
         'selectVisibleOperations',
         'shouldSendPerPageNotifications',
         'toRevisionProposalMark',

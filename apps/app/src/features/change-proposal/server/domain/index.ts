@@ -6,6 +6,7 @@ export * from './expand-approval-targets';
 export * from './judge-revertability';
 export * from './plan-apply-order';
 export * from './select-auto-apply-targets';
+export * from './select-notified-page-ids';
 export * from './select-visible-operations';
 export * from './should-send-per-page-notifications';
 export * from './to-revision-proposal-mark';
