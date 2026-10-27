@@ -339,13 +339,39 @@ describe('UnmigratedUserList', () => {
       expect(screen.queryByRole('table')).toBeNull();
     });
 
-    it('shows the error message and no table when the fetch fails', async () => {
+    it('shows the error message with a retry button and no table when the fetch fails', async () => {
       vi.mocked(apiv3Get).mockRejectedValue(new Error('boom'));
       renderList();
 
       expect(await screen.findByText(`${PREFIX}.fetch_error`)).toBeTruthy();
+      expect(
+        screen.getByRole('button', { name: `${PREFIX}.retry` }),
+      ).toBeTruthy();
       expect(screen.queryByRole('table')).toBeNull();
       expect(screen.queryByText(`${PREFIX}.load_more_error`)).toBeNull();
+    });
+
+    it('requests the first page again on retry and shows its rows', async () => {
+      vi.mocked(apiv3Get)
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValueOnce(
+          mockResponse(responseOf([userOf({ username: 'erin' })])),
+        );
+      renderList();
+      await screen.findByText(`${PREFIX}.fetch_error`);
+
+      fireEvent.click(screen.getByRole('button', { name: `${PREFIX}.retry` }));
+
+      expect(await screen.findByRole('row', { name: /erin/ })).toBeTruthy();
+      expect(screen.queryByText(`${PREFIX}.fetch_error`)).toBeNull();
+      expect(
+        screen.queryByRole('button', { name: `${PREFIX}.retry` }),
+      ).toBeNull();
+      expect(apiv3Get).toHaveBeenCalledTimes(2);
+      expect(apiv3Get).toHaveBeenLastCalledWith(ENDPOINT, {
+        page: 1,
+        limit: 20,
+      });
     });
 
     it('shows the error message when the response has no users', async () => {

@@ -33,7 +33,7 @@
         "submit": "Delete"
       },
       "success": "Deleted the legacy passwords of {{count}} user(s)",
-      "delete_error": "Failed to delete legacy passwords. Some may have been deleted; the counts have been refreshed.",
+      "delete_error": "Failed to delete legacy passwords. Some may have been deleted.",
       "fetch_error": "Failed to fetch the password hash migration status",
       "unmigrated_list": {
         "title": "Users to nudge toward migration",

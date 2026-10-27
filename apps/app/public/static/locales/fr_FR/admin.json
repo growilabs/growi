@@ -33,7 +33,7 @@
         "submit": "Supprimer"
       },
       "success": "Les mots de passe hérités de {{count}} utilisateur(s) ont été supprimés",
-      "delete_error": "Échec de la suppression des mots de passe hérités. Certains ont pu être supprimés ; les compteurs ont été actualisés.",
+      "delete_error": "Échec de la suppression des mots de passe hérités. Certains ont pu être supprimés.",
       "fetch_error": "Échec de la récupération de l'état de la migration des hachages de mots de passe",
       "unmigrated_list": {
         "title": "Utilisateurs à inciter à migrer",

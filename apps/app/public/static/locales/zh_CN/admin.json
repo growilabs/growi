@@ -42,7 +42,7 @@
         "submit": "删除"
       },
       "success": "已删除 {{count}} 位用户的旧格式密码",
-      "delete_error": "删除旧格式密码失败。部分密码可能已被删除，已重新获取数量。",
+      "delete_error": "删除旧格式密码失败。部分密码可能已被删除。",
       "fetch_error": "获取密码哈希迁移状态失败",
       "unmigrated_list": {
         "title": "需要提示迁移的用户",

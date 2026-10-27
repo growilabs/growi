@@ -95,12 +95,14 @@ export const LegacyPasswordCleanupSetting = (): JSX.Element | null => {
       {hasFetchError ? (
         <p className="text-danger">{t(`${I18N_PREFIX}.fetch_error`)}</p>
       ) : (
-        counts != null && <PasswordHashCountTable counts={counts} />
-      )}
-      {!hasFetchError && counts != null && (
-        <p className="form-text text-muted">
-          {t(`${I18N_PREFIX}.both_is_target_hint`)}
-        </p>
+        counts != null && (
+          <>
+            <PasswordHashCountTable counts={counts} />
+            <p className="form-text text-muted">
+              {t(`${I18N_PREFIX}.both_is_target_hint`)}
+            </p>
+          </>
+        )
       )}
 
       <button
