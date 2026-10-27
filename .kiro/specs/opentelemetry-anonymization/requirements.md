@@ -51,11 +51,11 @@
 
 #### Acceptance Criteria
 
-1. The opentelemetry-anonymization spec shall 利用者データまたは秘密の値をパスかクエリに含む URL の形を、一覧表に 1 行ずつ記載する。各行には、URL の形、利用者データまたは秘密の値が入る場所（パスの位置またはクエリパラメータ名）、扱い（匿名化する／意図的にそのまま残す／未対応）、置換後の形を記載する。
+1. The opentelemetry-anonymization spec shall 利用者データまたは秘密の値をパスかクエリに含む URL の形を、一覧表に 1 行ずつ記載する。各行には、行 ID、URL の形、利用者データまたは秘密の値が入る場所（パスの位置またはクエリパラメータ名）、扱い（匿名化する／意図的にそのまま残す／未対応）、置換後の形を記載する。どの URL に付いていても匿名化するクエリパラメータは、その名前の一覧を 1 行として記載する。
 2. The opentelemetry-anonymization spec shall 「意図的にそのまま残す」とした行に、残してよい理由を記載する。
 3. The opentelemetry-anonymization spec shall 「未対応」とした行に、未対応である理由と、塞がないことによる影響を記載する。
 4. The GROWI server shall 一覧表で「匿名化する」とした各行について、その行の URL の形に当てはまるリクエストの URL 属性に、利用者データと秘密の値を平文で残さない。
-5. The GROWI server shall 一覧表で「意図的にそのまま残す」とした各行について、その行の URL の形に当てはまるリクエストの URL 属性を書き換えない。
+5. The GROWI server shall 一覧表で「意図的にそのまま残す」とした各行について、その行の URL の形に当てはまるリクエストの URL 属性のパス部分を書き換えない（どの URL に付いていても匿名化するクエリパラメータは除く）。
 
 ### Requirement 3: 一覧表と実際の挙動・ルートとのずれの検出
 
@@ -131,6 +131,89 @@
 
 ## 匿名化対象一覧
 
-<!-- The table is filled in during the design phase from the 2026-10-27 survey, then kept in sync with the code and the hook-level tests (Requirement 3). -->
+各行の ID は、コード側の例（coverage examples）の ID と一致させる（要件 3.2）。「規則」はコード側の規則の ID。`<id>` は 24 桁の 16 進数（ObjectId）、`<BID>` は Next.js の buildId、`<locale>` は `AllLang` のいずれか。置換後の `[ANONYMIZED]` はクエリ中では `%5BANONYMIZED%5D` とパーセントエンコードされる。
 
-設計フェーズで、2026-10-27 の調査結果をもとに行を確定する。列は「URL の形」「データの種類と場所」「扱い」「置換後の形」「理由（そのまま残す・未対応の場合）」とする。
+### どの URL に付いていても匿名化するクエリパラメータ
+
+| ID | パラメータ名 | 扱い | 規則 | 置換後の形 |
+|---|---|---|---|---|
+| `Q01` | `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`（`name[]` 形式を含む） | 匿名化する | `sensitive-query-params` | 値を `[ANONYMIZED]`（JSON 配列なら `["[ANONYMIZED]"]`） |
+
+### ページ表示
+
+| ID | URL の形 | データの種類と場所 | 扱い | 規則 | 置換後の形 |
+|---|---|---|---|---|---|
+| `P01` | `/<ページパス>`（非 ASCII を含む） | ページパス（パス） | 匿名化する | `page-view` | `/[HASHED:...]` |
+| `P02` | `/<ページパス>`（ASCII のみ。変更前と同じ値） | ページパス（パス） | 匿名化する | `page-view` | `/[HASHED:...]` |
+| `P03` | `/<ページパス>?<クエリ>` | ページパス（パス） | 匿名化する。Q01 以外のクエリは残す | `page-view` | `/[HASHED:...]?<クエリ>` |
+| `P04` | `/<. を含むページパス>` | ページパス（パス） | 匿名化する | `page-view` | `/[HASHED:...]` |
+| `P05` | `/user/<ユーザー名>` | ユーザー名（パス） | 匿名化する | `page-view` | `/user/[USERNAME_HASHED:...]` |
+| `P06` | `/user/<ユーザー名>/<配下>`（ユーザー名に `.` を含む場合を含む） | ユーザー名・ページパス（パス） | 匿名化する | `page-view` | `/user/[USERNAME_HASHED:...]/[HASHED:...]` |
+| `P07` | `/trash/<ページパス>` | ページパス（パス） | 匿名化する | `trash-page` | `/trash/[HASHED:...]` |
+| `P08` | `/<ページパス>.md` | ページパス（パス） | 匿名化する | `page-markdown` | `/[HASHED:...].md`（ハッシュは P01 と同じ値） |
+| `P09` | `/<途中に _search を含むページパス>?q=<キーワード>` | ページパス（パス）・キーワード（`q`） | 匿名化する | `page-view`、`sensitive-query-params` | `/[HASHED:...]?q=[ANONYMIZED]` |
+| `P10` | `/`、`/user` | なし | 意図的にそのまま残す（利用者データを含まない） | `kept-pages` | 変更なし |
+| `P11` | `/<id>`、`/<id>.md`（パーマリンク） | ページ ID（パス） | 意図的にそのまま残す（ObjectId は利用者データでなく、閲覧には権限が要る） | `kept-pages` | 変更なし |
+| `P12` | `/admin/...`、`/me`、`/login`、`/_search`（キーワードなし）などのシステムページ | なし | 意図的にそのまま残す（利用者データを含まない） | （規則なし） | 変更なし |
+
+### 画面内遷移用のデータ URL
+
+| ID | URL の形 | データの種類と場所 | 扱い | 規則 | 置換後の形 |
+|---|---|---|---|---|---|
+| `N01` | `/_next/data/<BID>/<locale>/<ページパス>.json?path=<区切り>&...` | ページパス（パスとクエリ） | 匿名化する | `next-data`、`sensitive-query-params` | `/_next/data/<BID>/<locale>/[HASHED:...].json?path=[ANONYMIZED]&...`（ハッシュは P01 と同じ値） |
+| `N02` | `/_next/data/<BID>/<locale>/user/<ユーザー名>.json?path=...` | ユーザー名（パスとクエリ） | 匿名化する | `next-data`、`sensitive-query-params` | `/_next/data/<BID>/<locale>/user/[USERNAME_HASHED:...].json?path=[ANONYMIZED]&...` |
+| `N03` | `/_next/data/<BID>/<locale>/trash/<ページパス>.json?path=...` | ページパス（パスとクエリ） | 匿名化する | `next-data`、`sensitive-query-params` | `/_next/data/<BID>/<locale>/trash/[HASHED:...].json?path=[ANONYMIZED]&...` |
+| `N04` | `/_next/data/<BID>/<locale>/_search.json?q=<キーワード>` | キーワード（`q`） | 匿名化する | `next-data`、`sensitive-query-params` | `/_next/data/<BID>/<locale>/_search.json?q=[ANONYMIZED]` |
+| `N05` | `/_next/data/<BID>/<locale>/_private-legacy-pages.json?q=<キーワード>` | キーワード（`q`） | 匿名化する | `next-data`、`sensitive-query-params` | `.../_private-legacy-pages.json?q=[ANONYMIZED]` |
+| `N06` | `/_next/data/<BID>/<locale>/share/<共有リンク ID>.json?path=<共有リンク ID>` | 共有リンク ID（パスとクエリ） | 匿名化する | `next-data`、`sensitive-query-params` | `/_next/data/<BID>/<locale>/share/[ANONYMIZED].json?path=[ANONYMIZED]` |
+| `N07` | `/_next/data/<BID>/<locale>.json`（トップページ） | なし | 意図的にそのまま残す | `next-data` | 変更なし |
+
+### 検索・タグ・ユーザー名
+
+| ID | URL の形 | データの種類と場所 | 扱い | 規則 | 置換後の形 |
+|---|---|---|---|---|---|
+| `S01` | `GET /_search?q=` | キーワード（`q`） | 匿名化する | `sensitive-query-params` | `q=[ANONYMIZED]` |
+| `S02` | `GET /_api/search?q=&nq=` | キーワード・名前付き検索の名前（`q`・`nq`） | 匿名化する。`limit` などは残す | `sensitive-query-params` | `q=[ANONYMIZED]&nq=[ANONYMIZED]` |
+| `S03` | `GET /_private-legacy-pages?q=` | キーワード（`q`） | 匿名化する | `sensitive-query-params` | `q=[ANONYMIZED]` |
+| `S04` | `GET /_api/tags.search?q=` | 入力途中のタグ名（`q`） | 匿名化する | `sensitive-query-params` | `q=[ANONYMIZED]` |
+| `U01` | `GET /_api/v3/users?searchText=` | ユーザー名の断片（`searchText`） | 匿名化する | `sensitive-query-params` | `searchText=[ANONYMIZED]` |
+| `U02` | `GET /_api/v3/users/usernames?q=` | ユーザー名の断片（`q`） | 匿名化する | `sensitive-query-params` | `q=[ANONYMIZED]` |
+| `U03` | `GET /_api/v3/check-username?username=` | ユーザー名（`username`） | 匿名化する | `sensitive-query-params` | `username=[ANONYMIZED]` |
+| `U04` | `GET /_api/v3/activity/suggestions?field=username&q=` | ユーザー名の断片（`q`） | 匿名化する | `sensitive-query-params` | `q=[ANONYMIZED]` |
+| `U05` | `GET /_api/v3/activity?searchFilter=` | ユーザー名を含む JSON（`searchFilter`） | 匿名化する | `sensitive-query-params` | `searchFilter=[ANONYMIZED]` |
+| `U06` | `GET /_api/v3/user-groups/<id>/unrelated-users?searchWord=` | ユーザー名の断片（`searchWord`） | 匿名化する | `sensitive-query-params` | `searchWord=[ANONYMIZED]` |
+| `U07` | `POST/DELETE /_api/v3/user-groups/<id>/users/<ユーザー名>` | ユーザー名（パス） | 匿名化する。グループの `<id>` は残す | `api-path-segments` | `/_api/v3/user-groups/<id>/users/[ANONYMIZED]` |
+
+### ページパスを受け取る API
+
+| ID | URL の形 | データの種類と場所 | 扱い | 規則 | 置換後の形 |
+|---|---|---|---|---|---|
+| `A01` | `GET /_api/v3/page?path=` | ページパス（`path`） | 匿名化する。`pageId`・`revisionId` は残す | `sensitive-query-params` | `path=[ANONYMIZED]` |
+| `A02` | `GET /_api/v3/page/exist?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
+| `A03` | `GET /_api/v3/page/exist-paths?fromPath=&toPath=` | ページパス（`fromPath`・`toPath`） | 匿名化する | `sensitive-query-params` | `fromPath=[ANONYMIZED]&toPath=[ANONYMIZED]` |
+| `A04` | `GET /_api/v3/page/non-user-related-groups-granted?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
+| `A05` | `GET /_api/v3/page/page-paths-with-descendant-count?paths[]=` | ページパス（`paths[]`） | 匿名化する | `sensitive-query-params` | `paths[]=[ANONYMIZED]` |
+| `A06` | `GET /_api/v3/page-listing/children?path=`、`/info?path=`、`/item?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
+| `A07` | `GET /_api/v3/pages/list?path=`、`/subordinated-list?path=` | ページパス（`path`） | 匿名化する。`limit` などは残す | `sensitive-query-params` | `path=[ANONYMIZED]` |
+| `A08` | `GET /_api/pages.updatePost?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
+| `A09` | `/_api/v3/page/info?pageId=`、`/attachment/<id>`、`/download/<id>` など ID だけを含む URL | ページ・添付ファイルの ID | 意図的にそのまま残す（ObjectId は利用者データでなく、閲覧には権限が要る） | （規則なし） | 変更なし |
+
+### 秘密の値
+
+| ID | URL の形 | データの種類と場所 | 扱い | 規則 | 置換後の形 |
+|---|---|---|---|---|---|
+| `K01` | `GET /share/<共有リンク ID>` | 共有リンク ID（パス） | 匿名化する | `secret-path-segments` | `/share/[ANONYMIZED]` |
+| `K02` | `GET /forgot-password/<トークン>` | パスワード再設定トークン（パス） | 匿名化する | `secret-path-segments` | `/forgot-password/[ANONYMIZED]` |
+| `K03` | `GET /user-activation/<トークン>` | ユーザー有効化トークン（パス） | 匿名化する | `secret-path-segments` | `/user-activation/[ANONYMIZED]` |
+| `K04` | `GET /_api/v3/page/shared?shareLinkId=&pageId=`、`/_api/v3/page/info?shareLinkId=`、`/_api/v3/comments?shareLinkId=` | 共有リンク ID（`shareLinkId`） | 匿名化する。`pageId` は残す | `sensitive-query-params` | `shareLinkId=[ANONYMIZED]` |
+| `K05` | `DELETE /_api/v3/share-links/<共有リンク ID>` | 共有リンク ID（パス） | 匿名化する | `api-path-segments` | `/_api/v3/share-links/[ANONYMIZED]` |
+
+### 静的ファイル
+
+| ID | URL の形 | データの種類と場所 | 扱い | 規則 | 置換後の形 |
+|---|---|---|---|---|---|
+| `F01` | `/_next/static/...`、`/static/...`、`/images/...`、`/_drawio-assets/...`、`/favicon.ico`、`/favicon.svg` | なし | 意図的にそのまま残す（利用者データを含まない） | `static-files` | 変更なし |
+
+### 未対応（既知の残課題）
+
+なし。範囲外の経路（リクエストボディ、ヘッダ、GROWI から外へ出るリクエスト、HTTP 以外の instrumentation）は Boundary Context を参照。新しい名前のクエリパラメータで利用者データを受け取るエンドポイントが追加された場合、Q01 に名前を足すまで匿名化されない（design.md の Revalidation Triggers）。

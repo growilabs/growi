@@ -1,16 +1,16 @@
 {
   "feature_name": "opentelemetry-anonymization",
   "created_at": "2026-10-27T13:48:05.000Z",
-  "updated_at": "2026-10-27T15:02:14.000Z",
+  "updated_at": "2026-10-27T15:20:58.000Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {
