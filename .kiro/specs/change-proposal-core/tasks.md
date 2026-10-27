@@ -144,7 +144,7 @@
   - _Depends: 1.1_
 
 - [ ] 4. 反映の実行
-- [ ] 4.1 編集中の人がいるかを確かめる処理を作る
+- [x] 4.1 編集中の人がいるかを確かめる処理を作る
   - このプロセスでの接続数が 1 以上、または共同編集の文書に未保存の入力（`draft`）があれば、編集中とする
   - 接続数はこのプロセスの分しか見えないことを、処理の説明として残す（design の分かっている制約）
   - 接続中・`draft`・どちらでもない、の 3 つの場合を結合テストで確かめている
@@ -321,3 +321,4 @@
 - 3.1: `modelLabel` の 100 文字検査は 5.1（createProposal の入口）で行う（validateProposalInput の引数に modelLabel は無く、断る理由の型にも無いため）。5.x の入口では本文が文字列であることと、入口の種類が作成で受けられるもの（CreatableEntry）であることも確かめる
 - 3.3: `CurrentPageFacts.isPathOccupied` は「空のページは使われていない」前提（`Page.exists({ path, isEmpty: false })` と同じ基準）で 4.x / 5.x が作る。移動元のパス（move の取り消し）も同じ基準。`page-operation-in-progress` と `apply-failed` は judgeRevertability でなく取り消しの反映結果から決める。`buildRevertOperations` は必要な値が欠けると例外を投げる
 - 3.4: `selectVisibleOperations` は絞った一覧だけを返す。件数や全体の状態（deriveProposalStatus）に見えない操作を混ぜない・ごみ箱のページを viewablePageIds に入れる扱いは、呼ぶ側（5.x ProposalQueryService）が `findByIdsAndViewer(..., true)` の引数で決める
+- 4.1: `checkEditingPresence(yjsService, pageId)` は `services/editing-presence.ts`（barrel 未作成。4.4 以降は直接 import するか barrel に足す）。接続数はこのプロセス分のみ
