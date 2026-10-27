@@ -29,7 +29,7 @@
   - _Requirements: 5.3, 6.1, 9.1, 9.2_
   - _Boundary: HashPagePath_
 
-- [ ] 2.2 (P) `:name` 形式のルートの型と URL パスを照合し、指定した区切りを置き換える部品を作る
+- [x] 2.2 (P) `:name` 形式のルートの型と URL パスを照合し、指定した区切りを置き換える部品を作る
   - `:name` は空でない 1 区切りに一致し、区切りの数が違えば一致しない
   - 完了時: 一致・不一致・指定した区切りだけが `[ANONYMIZED]` になること・指定しない区切り（例: ユーザーグループの ID）が残ることのテストが通る
   - _Requirements: 5.2, 7.1, 7.2_
@@ -125,3 +125,4 @@
 - 検証コマンド: worktree の `node_modules` は本体チェックアウトへの symlink で、`pnpm vitest` / `pnpm run` は `pnpm install` を誘発して失敗する。`apps/app` で `node_modules/.bin/vitest run <パターン>` を直接使う。
 - コミット: pre-commit hook は `pnpm biome` を呼び同じ問題で固まる。`node_modules/.bin/biome check` を手で通してから `git commit --no-verify` を使う。
 - 1.3: ルート列挙の起動ヘルパーは `apps/app/test/setup/growi-routes.ts`（`listGrowiRoutes()`）。4.3 はこれを import して使う。`src/` に置くとサーバーの build に入るため `test/setup/` に置いた。integration テストは `cd apps/app && env -u MONGO_URI ../../node_modules/.bin/vitest run --project=app-integration <パターン>` で回す。
+- 2.2: `matchPathPattern` / `redactPathParams` は素の `:name` だけを扱う（`:id([0-9a-f]{24})` のような正規表現付きは非対応）。3.2 のパス規則のパターンは素の `:name` で宣言する。末尾 `/` 1 つは許容して照合する（`/share/abc/` も匿名化される）。
