@@ -5,7 +5,7 @@
 > **設定の初期値について**: 操作数の上限（50）と 1 日の件数の上限（上限なし）の初期値は決まっている（design の OQ-2）。承認待ちの期限（design の OQ-1）の初期値だけが未決である。初期値を入れるのはタスク 8.1 で、グループ 1〜7 はこれらの値を待たずに進められる（テストでは値を明示して使う）。上限の初期値は人に確かめずに入れる。期限は、8.1 を始める前に決まった値を人に確かめ、決まっていなければ期限の初期値を入れる部分だけを止める。
 
 - [ ] 1. 土台: 型・データ・設定・action の宣言
-- [ ] 1.1 Change Proposal の型と決まった値を宣言し、純関数の barrel を用意する
+- [x] 1.1 Change Proposal の型と決まった値を宣言し、純関数の barrel を用意する
   - 入口の種類、操作の種類（作成で受ける 3 種類と、取り消しだけの「ごみ箱へ移す」「ごみ箱から戻す」）、Change Proposal の段階（open / 完了 / 破棄 / 期限切れ / 取り下げ）、後続・見直しのつながり（`BasedOn` と関係の値）、関係ごとに元の操作として認める状態の表（`BASED_ON_ELIGIBLE_STATUSES`）と一度でも反映された状態の一覧（`APPLIED_AT_LEAST_ONCE_STATUSES`）、達成度（`ProposalAchievement`）、操作の 7 つの状態、全体の状態、理由の値（待ち・失敗・古い・飛ばした・取り消しを断られたの各理由）、戻せるかの判定結果、印（Change Proposal の ID と操作の `key`）を、design の Logical Data Model のとおりに型で宣言する。本文の合計の上限 `MAX_TOTAL_BODY_BYTES`（8 MiB）を `interfaces/change-proposal.ts` に宣言する
   - REST の応答の形（操作の表示、Change Proposal の表示と要約、リビジョンの印、依頼した人にだけ返す `requesterState`（ページごとの通知の指定と管理者の設定 `PerPageNotificationsView` を含む）、操作ごとのつながり `linkedProposals`）と、`ApplyTrigger` / `ApplyResult` / `RevertResult`（design の Data Contracts のとおり。操作は `key` で指す）を `interfaces/api.ts` に、まとめた通知の snapshot の形、設定の形を宣言する
   - `interfaces/index.ts` を barrel にし、上の型と `MAX_TOTAL_BODY_BYTES` をすべて export する（兄弟の spec は `features/change-proposal/interfaces` から import する）
