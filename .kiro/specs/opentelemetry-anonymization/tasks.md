@@ -55,7 +55,7 @@
   - _Requirements: 1.5, 2.4, 2.5, 8.1, 8.2_
   - _Depends: 2.1, 2.2, 2.3_
 
-- [ ] 3.2 パスの規則と共通パラメータ名を宣言する
+- [x] 3.2 パスの規則と共通パラメータ名を宣言する
   - design.md の表のとおり、8 つのパスの規則（データ URL・静的ファイル・秘密の値の区切り・API の区切り・残すページ・`.md`・ゴミ箱・ページ表示）をこの順で宣言する
   - データ URL の locale は `AllLang` で判定する
   - 共通で匿名化するパラメータ名（`q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`）を宣言する
@@ -128,3 +128,4 @@
 - 2.2: `matchPathPattern` / `redactPathParams` は素の `:name` だけを扱う（`:id([0-9a-f]{24})` のような正規表現付きは非対応）。3.2 のパス規則のパターンは素の `:name` で宣言する。末尾 `/` 1 つは許容して照合する（`/share/abc/` も匿名化される）。
 - 2.3: 新しい関数は `anonymizeSearchParams(search, paramNames)`（`?` なしのクエリを受け取る）。4.1 で古い `anonymizeQueryParams` を消し、この関数を `anonymizeQueryParams` に改名する。
 - 3.1: `unwrap-next-data` の `/_next/data/<buildId>/[<locale>/]…json` の解析と locale 判定（`AllLang`）は実行関数 `anonymize-url.ts` の中にある。3.2 の規則は「データ URL であること」の判定だけを宣言する。`hashPagePath` は例外を握りつぶさず、実行関数の catch が `/[ANONYMIZATION_FAILED]` を返す。
+- 3.2: 規則の宣言は `rules/index.ts` の `ANONYMIZATION_RULES`。`static-files` の `/vault.git` は design の表どおり前方一致（`/vault.gitpage` も静的ファイル扱いになる）。直すなら `=== '/vault.git'` か `startsWith('/vault.git/')`（レビューの任意提案）。
