@@ -26,7 +26,7 @@
   - 印を渡さずに作ったリビジョンには項目が無く、渡したときは値が保存されることを結合テストで確かめている。既存の「ページに TTL 索引が無い」テストも通る
   - _Requirements: 6.1, 6.2, 6.3, 6.6_
   - _Depends: 1.1_
-- [ ] 1.4 Change Proposal のコレクションを Prisma で読み書きし、索引を Mongoose の schema で作る
+- [x] 1.4 Change Proposal のコレクションを Prisma で読み書きし、索引を Mongoose の schema で作る
   - `schema.prisma` に、design の Physical Data Model の `changeproposals` の model と 4 つの composite type（操作、取り消しの相手、後続・見直しの元、lease）を足し、Prisma の client を生成し直す。依頼した人、入口の種類、表示用のモデル名（100 文字まで）、取り消しの元、後続・見直しの元（`basedOn`）、ページごとの通知の指定（`perPageNotifications`。初期値は真）、段階、操作の配列（操作ごとに並び順の番号と乱数の key）、反映で触れたページの一覧、最後に反映した日時、反映の権利（lease）、期限、作成日時と更新日時、`v`（`__v`）を持つ。6 つの索引（`basedOn.proposalId` を含む）を、Mongoose と同じ項目と名前の `@@index` で書き、疎な索引には注記を付ける
   - `features/change-proposal/server/models/change-proposal.ts` に、索引に使う項目だけを持つ Mongoose の schema を置き、6 つの索引（4 つは疎）を宣言して `ChangeProposal` の名前で登録する（export しない）。TTL 索引は持たない
   - 同じファイルに Prisma の拡張を作り、design の ChangeProposal Model の表の関数（完了にする `settleIfNoPending`、完了の書き込みが止まった文書を探す `findIdsOpenWithoutPending`、つながりを読む `findLinkedProposals`、ページごとの通知の指定を変える `setPerPageNotifications` と読む `readPerPageNotifications` を含む）を、表のとおりの条件付きの `updateMany` と件数の確認で書く。期限切れと取り下げの更新と候補の検索は「待ち」があることを条件にする。composite type の list の条件 `some` / `none` が、生成された型で使えることを確かめる。`_id` と `__v` の互換の項目も宣言する。Prisma の行を `OperationRecord` の union に変える純関数 `toChangeProposalDocument` を作る。拡張を `utils/prisma.ts` の `createPrisma()` に登録する
@@ -309,3 +309,5 @@
 ## Implementation Notes
 
 - 1.2: config-manager の `DB値 ?? 初期値` のため、上限の初期値を入れる 8.1 で「空にする」の保存方法（0 を保存）を変える必要がある（8.1 に記載済み）
+- 1.4: `modelLabel`（100 文字まで）は model では確かめない。どのタスクにも検査の担当が書かれていないので、3.1（validateProposalInput）か 5.1 で、入力の検査として 100 文字を超えたら断るようにする
+- 1.4: `changeproposals` は G2G 転送で移せる側（`TRANSFERABLE_COLLECTIONS`）に入れた（design の Modified Files には未記載）。model の拡張の関数の引数の形は `change-proposal-types.ts` を正とする（`skipPendingOperations` の `'all-pending'`、`recordOperationOutcome` が `skipped` と待ちに戻す `pending` も受ける、など）。本文を読まない一覧系は `ChangeProposalSummary` / `LinkedProposalRecord` を返す

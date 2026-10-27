@@ -39,6 +39,46 @@ type ActivitiesSnapshot {
   fileSize     Int?
 }
 
+type ChangeproposalsOperationsRevertTarget {
+  proposalId   String @db.ObjectId
+  operationKey String
+}
+
+// One shape for every operation type; toChangeProposalDocument maps it onto the OperationRecord union
+type ChangeproposalsOperations {
+  index                Int
+  key                  String
+  type                 String
+  status               String
+  reason               String?
+  pageId               String?                                @db.ObjectId
+  baseRevisionId       String?                                @db.ObjectId
+  expectedRevisionId   String?                                @db.ObjectId
+  body                 String?
+  path                 String?
+  fromPath             String?
+  toPath               String?
+  removeRedirectsFrom  String?
+  approvedAt           DateTime?
+  appliedAt            DateTime?
+  resultPageId         String?                                @db.ObjectId
+  resultRevisionId     String?                                @db.ObjectId
+  revertTarget         ChangeproposalsOperationsRevertTarget?
+  revertedByProposalId String?                                @db.ObjectId
+  revertedAt           DateTime?
+}
+
+type ChangeproposalsBasedOn {
+  proposalId    String   @db.ObjectId
+  relation      String
+  operationKeys String[]
+}
+
+type ChangeproposalsApplyLease {
+  token     String
+  expiresAt DateTime
+}
+
 type PageoperationsExPage {
   /// Field referred in an index, but found no data to define the type.
   id   Json? @map("_id")
@@ -178,6 +218,34 @@ model auditlog_es_sync_status {
   id                String  @id @default(auto()) @map("_id") @db.ObjectId
   key               String  @unique
   hasUnsyncedEvents Boolean @default(false)
+}
+
+model changeproposals {
+  id                   String                      @id @default(auto()) @map("_id") @db.ObjectId
+  v                    Int                         @default(0) @map("__v")
+  requester            String                      @db.ObjectId
+  entry                String
+  modelLabel           String?
+  revertOf             String?                     @db.ObjectId
+  basedOn              ChangeproposalsBasedOn?
+  lifecycle            String
+  operations           ChangeproposalsOperations[]
+  appliedPageIds       String[]                    @db.ObjectId
+  lastAppliedAt        DateTime?
+  applyLease           ChangeproposalsApplyLease?
+  expiresAt            DateTime?
+  perPageNotifications Boolean                     @default(true)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+
+  @@index([requester, createdAt(sort: Desc)], map: "requester_1_createdAt_-1")
+  @@index([lifecycle, expiresAt], map: "lifecycle_1_expiresAt_1")
+  // The next four are sparse in the mongoose schema; Prisma cannot express that,
+  // so the sparse option must be re-applied once `prisma db push` owns index creation.
+  @@index([applyLease.expiresAt], map: "applyLease.expiresAt_1")
+  @@index([lastAppliedAt(sort: Desc)], map: "lastAppliedAt_-1")
+  @@index([revertOf], map: "revertOf_1")
+  @@index([basedOn.proposalId], map: "basedOn.proposalId_1")
 }
 
 model changestream_resume_tokens {
