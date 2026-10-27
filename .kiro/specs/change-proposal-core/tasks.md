@@ -150,7 +150,7 @@
   - 接続中・`draft`・どちらでもない、の 3 つの場合を結合テストで確かめている
   - _Requirements: 3.5, 5.11_
   - _Depends: 2.7_
-- [ ] 4.2 操作の書き込みの決まった形と、編集と新規作成の書き込みを作る
+- [x] 4.2 操作の書き込みの決まった形と、編集と新規作成の書き込みを作る
   - 操作の書き込みの決まった形（前の実行の書き込みを探す処理と、書き込む処理）と、操作の種類をキーにした表を作り、編集と新規作成を登録する
   - 編集: 依頼した人が閲覧できなければ失敗（対象が使えない）。共通の処理の反映の方法で書き、衝突なら「古い」。リビジョンに書く印は、編集と新規作成のどちらでも `toRevisionProposalMark`（1.3）で作る
   - 新規作成: 近い祖先を依頼した人が閲覧できなければ失敗。パスが使われていれば失敗。閲覧範囲を指定せずに作り、祖先から引き継がせる。閲覧範囲を割り当てられずに断られたら失敗。WIP は指定しない
@@ -322,3 +322,5 @@
 - 3.3: `CurrentPageFacts.isPathOccupied` は「空のページは使われていない」前提（`Page.exists({ path, isEmpty: false })` と同じ基準）で 4.x / 5.x が作る。移動元のパス（move の取り消し）も同じ基準。`page-operation-in-progress` と `apply-failed` は judgeRevertability でなく取り消しの反映結果から決める。`buildRevertOperations` は必要な値が欠けると例外を投げる
 - 3.4: `selectVisibleOperations` は絞った一覧だけを返す。件数や全体の状態（deriveProposalStatus）に見えない操作を混ぜない・ごみ箱のページを viewablePageIds に入れる扱いは、呼ぶ側（5.x ProposalQueryService）が `findByIdsAndViewer(..., true)` の引数で決める
 - 4.1: `checkEditingPresence(yjsService, pageId)` は `services/editing-presence.ts`（barrel 未作成。4.4 以降は直接 import するか barrel に足す）。接続数はこのプロセス分のみ
+- 4.2: handler の契約は `operation-handlers/types.ts` が正（`OperationOutcome` は applied / stale / failed、skipped は ProposalApplier の値）。handler は予期しない例外を投げるので、4.5 の ProposalApplier が操作ごとに捕まえて `failed: write-error` を記録する。`createOperationHandlers(crowi)` は今 edit と create だけ登録しており、4.3 で移動・ごみ箱へ移す・ごみ箱から戻すを足したら `OperationHandlerTable` を全項目必須の型にして `getOperationHandler` の実行時例外を型で消す
+- 4.2: edit の `findExistingResult` は「印付きリビジョンがある」だけでは反映済みとしない（ページがその印付きリビジョンを指している、またはページが元のリビジョンより先へ進み、印付きリビジョンの直前が元のリビジョン、のときだけ）。残る誤判定: 印付きリビジョンを作った直後に止まり、次の実行までに人が編集した場合は本文が反映されていなくても反映済みと見える（データから区別できない）。edit は書き込み前に `normalizeLatestRevisionIfBroken` を呼ぶ（ページにリビジョンが結びついていないときだけ pageId を直す。CAS と衝突しない）
