@@ -13,7 +13,7 @@ _Derived from: `.kiro/specs/attachment-search/research.md` (umbrella)_
 - 先行事例: OpenAI Vector Store 連携 ([apps/app/src/features/openai/server/services/openai.ts](apps/app/src/features/openai/server/services/openai.ts)) が同パターンで既に同居している
 - `addAttachHandler` / `addDetachHandler` の shape:
   ```typescript
-  type AttachHandler = (pageId: string | null, attachment: IAttachmentDocument, file: Express.Multer.File) => Promise<void>;
+  type AttachHandler = (pageId: string | null, attachment: AttachmentWithComputed, file: Express.Multer.File) => Promise<void>;
   type DetachHandler = (attachmentId: string) => Promise<void>;
   ```
 
@@ -141,6 +141,52 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
 ### 残留リスク
 
 - 権限変更直後の検索では ES refresh interval (デフォルト 1s) 分だけ旧権限が見える可能性がある → GROWI 既存 Page index と同水準の near-real-time 制約として受容
+
+## 8. master の変化に合わせた設計の見直し (2026-10)
+
+2026-05 に止まっていたブランチへ master を取り込んだところ、設計の前提になっていた既存コードがいくつか変わっていた。以下はその確認結果と判断。
+
+### 8.1 Elasticsearch 7 対応の終了
+
+- 観察: master は ES8/ES9 だけをサポートするようになった (`refactor(search): drop Elasticsearch 7 support`)。ES7 の client delegator、mapping、`isES7ClientDelegator` が削除されている
+- 判断: 添付 index も ES8/ES9 だけを対象にする。`attachments-mappings-es7.ts` と、ES7 の応答形 (`result.body`) や bulk 引数 (`body`) を扱う分岐を持たない
+
+### 8.2 Attachment モデルの Prisma 移行
+
+- 観察: Attachment は `prisma.attachments` (Prisma 拡張) で読み書きされるようになり、Mongoose の `Attachment` / `IAttachmentDocument` は export されない。`AttachHandler` の引数は `AttachmentWithComputed`。id は 24 桁の 16 進文字列で、ObjectId を文字列化した値と同じ形
+- 判断: indexer / reindex batch / 抽出サービス / 管理 API は `prisma.attachments` を使う。ES 文書 ID (`${attachmentId}_${pageNumber ?? 0}`) と `attachmentId` keyword の値は以前と同じ文字列になるため、既存の添付 index を作り直す必要はない
+- 一括走査: Mongoose の stream cursor の代わりに `findMany` の id 順ページング (`take` + `cursor`) を使う
+
+### 8.3 抽出失敗ログを Prisma-only のモデルにする
+
+- 観察: `.claude/rules/model.md` は「移行が終わるまで collection と index の作成は Mongoose が受け持つ」としている。一方、master で新しく作られた監査ログ同期のコレクション (`auditlog_es_sync_status` / `changestream_resume_tokens`) は Mongoose schema を持たない Prisma-only のモデルで、必要な index は migrate-mongo の migration (`20260619120000-add-unique-key-index-to-auditlog-es-sync-collections.js`) で作っている
+- 判断: `extractionfailurelogs` も新規コレクションなので、監査ログ同期と同じく Prisma-only にし、TTL index と通常 index は migration で作る。model.md の規則は「既存の Mongoose モデルを移行している間」の取り決めであり、新しいコレクションに Mongoose schema を足すと、後で消す対象を自分から増やすことになる
+- G2G 転送: 監査ログ同期のコレクションと同じく、環境固有の運用記録なので `non-transferable-collections.ts` に加える
+
+### 8.4 検索演算子 (search-filters) への対応
+
+- 観察: master に `author:` / `editor:` / `group:` と各否定形が入った (`search-filters` spec)。`prefix:` / `tag:` を含むこれらの演算子は、`parseSearchQuery()` が `QueryTerms` に分解し、`appendCriteriaForQueryString()` / `appendCriteriaForGroupFilter()` が page_index のクエリに積む。以前の設計は演算子を一切考慮しておらず、(a) `facet=attachments` では演算子が効かず、(b) 演算子のトークンがそのまま添付本文の検索語になっていた
+- 判断 (ユーザー判断 2026-10-27): 添付ヒットにも **親ページの条件として** 演算子を効かせる。`QueryTerms` を本文語 4 キーとそれ以外に分け、本文語だけを添付本文に当て、それ以外は親ページ側の page_index 検索で既存の部品を使って当てる
+- 付随する変更: `facet=attachments` の権限判定を、page_index の mget + app 側での権限判定から、`ids` + viewer filter + 絞り込み条件を持つ page_index の search 1 回に置き換える。mget は filter を持てないため演算子を当てられない。また app 側で権限を判定し直すと「既存と同じ権限モデルを ES 側で適用する」(Req 4.3) から外れる。search に置き換えると、権限と絞り込みの両方を既存ロジックのまま ES 側で適用できる
+- 不採用案: 演算子を添付では無視する案。実装は簡単だが、`author:jim` を付けても他人のページの添付が出るため、ユーザーから見て検索結果が矛盾する
+
+### 8.5 同期方式: 通知関数 (attach/detach handler) を維持する
+
+- 観察: 監査ログ同期 (`features/auditlog-es-sync`) は MongoDB の change stream と、どこまで受け取ったかの記録 (resume token)、同期漏れフラグ、起動時の作り直し設定を持つ
+- 判断 (ユーザー判断 2026-10-27): 添付は通知関数による同期を続ける。理由:
+  - 添付の作成・削除は `AttachmentService` の 1 か所でしか起きないため、通知関数で漏れが出ない。監査ログは書き込み元が多数あり、change stream で 1 か所に集める必要があった
+  - 添付の同期は「外部の抽出サービスを呼ぶ重い処理」であり、change stream で受け取っても結局は待ち行列が必要になる。失敗は ExtractionFailureLog に残し、個別の再抽出と一括の作り直しで回収する現行の作りで足りる
+  - ページ削除に伴う一括削除 (`removeAllAttachments()`) は detach handler を呼ばないが、これは orphan sweeper と検索時の権限判定で既に扱っている
+- 再検討の条件: 添付の作成・削除が `AttachmentService` 以外から行われるようになった場合 (Revalidation Triggers に記載)
+
+### 8.6 作り直し API: ページと一緒に、ただし応答は待たせない
+
+- 観察: 以前の設計と実装は `PUT /search/indices` に `includeAttachments` を付け、Page と添付の作り直しが終わるまで HTTP 応答を返さなかった。添付の作り直しは添付ごとに抽出サービスを呼ぶため、添付が多いと HTTP がタイムアウトする。監査ログは専用 API (`/search/auditlog-indices`) で作り直しを非同期に進め、完了を Socket.io で通知している
+- 判断 (ユーザー判断 2026-10-27): 添付はページに属するので、ページの作り直しと同じ要求 (`PUT /search/indices` + `includeAttachments`) のまま扱う。ただし作り直しは裏で進め、即応答する。完了・失敗は `FinishAddAttachment` / `AttachmentRebuildingFailed` で通知する (失敗イベント名は監査ログの `AuditlogRebuildingFailed` に揃えた)
+- 付随する変更:
+  - 実行中フラグの上げ下ろしを API route から `AttachmentReindexBatch.startRebuild()` の内部へ移した。応答後に処理が続く形では、route の try/finally で後始末する以前の設計が成り立たないため
+  - Page 側の作り直しは関数として受け取り、batch から `SearchService` への依存を作らない
+  - alias swap は Page と添付で別々に行う。以前の設計は両 index の同時 swap を描いていたが、Page 側は既存の `rebuildIndex()` の中で swap が完結しており、同時にするには既存コードを分解する必要がある。2 つの swap の間も、添付ヒットの権限は検索時に page_index から引くため漏洩は起きない
 
 ## 参照
 

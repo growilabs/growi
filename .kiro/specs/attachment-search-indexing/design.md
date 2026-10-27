@@ -34,12 +34,12 @@
 
 - `packages/markitdown-client` の orval 生成パイプラインと `openapi.json` drift 検知の CI 入口
 - 抽出クライアントラッパ (`AttachmentTextExtractorService`) による失敗正規化と到達不可フォールバック
-- 添付専用 ES インデックス `attachments` の mapping (ES 7/8/9) とライフサイクル (create / alias swap / bulk)。**添付 ES 文書に権限フィールドは保持しない** (`grant` / `granted_users` / `granted_groups` / `creator` を含まない)
+- 添付専用 ES インデックス `attachments` の mapping (ES 8/9) とライフサイクル (create / alias swap / bulk)。**添付 ES 文書に権限フィールドは保持しない** (`grant` / `granted_users` / `granted_groups` / `creator` を含まない)
 - `AttachmentSearchIndexer` による attach / detach / reextract / bulk の単一パイプライン
-- **優先 slot 駆動検索 + secondary enrichment 設計**: primary ページングは優先 slot (`pages` or `attachments`) 単独で発行し、permission 判定を常にページサイズ bounded に保つ。`facet=attachments` primary では親 Page を mget で取得して viewer filter、`facet=all` secondary では primary の pageId 配列に `terms` で絞った attachments_index 検索 (`SearchResultAggregator` が全体を統合)
-- `AttachmentReindexBatch` による tmp index streaming 再インデックスと Socket.io 進捗イベント発行 (UI 描画は対象外)、および `AttachmentOrphanSweeper` の統合呼び出し (rebuildIndex 時に親 Page が不在の添付 doc を cleanup)
-- `ExtractionFailureLogService` による MongoDB 永続化と集計 API
-- `SearchService` extended による multi-index msearch / pageId 集約 / query-time permission lookup
+- **優先 slot 駆動検索 + secondary enrichment 設計**: primary ページングは優先 slot (`pages` or `attachments`) 単独で発行し、permission 判定を常にページサイズ bounded に保つ。`facet=attachments` primary では親 Page を「pageId 指定 + viewer filter + 検索演算子の絞り込み条件」付きの page_index 検索 1 回で判定、`facet=all` secondary では primary の pageId 配列に `terms` で絞った attachments_index 検索 (`SearchResultAggregator` が全体を統合)
+- `AttachmentReindexBatch` による、HTTP 応答を待たせない tmp index streaming 再インデックスと Socket.io 進捗・完了・失敗イベント発行 (UI 描画は対象外)、および `AttachmentOrphanSweeper` の統合呼び出し (rebuildIndex 時に親 Page が不在の添付 doc を cleanup)
+- `ExtractionFailureLogService` による MongoDB 永続化と集計 API (Prisma モデル `extractionfailurelogs`。TTL index は migrate-mongo の migration で作成)
+- `SearchService` extended による multi-index msearch / pageId 集約 / query-time permission lookup / 検索演算子の振り分け (本文語は添付本文へ、絞り込み条件は親ページへ)
 - `IPageWithSearchMeta` への optional `attachmentHits[]` 追加 (サーバ応答契約)
 - apiv3 エンドポイント群 (reextract / admin config / admin failures / search indices 拡張)
 - Config キー群 (`app:attachmentFullTextSearch:extractorUri` / `:extractorToken` / `:timeoutMs` / `:maxFileSizeBytes` の 4 キー) の定義と永続化。`extractorToken` は encrypted storage (`app:openaiApiKey` と同パターン)、`enabled` は算出値に移行して Config からは削除、`maxConcurrency` は抽出サービス側の env var 専用とし Config からは削除
@@ -72,14 +72,17 @@
 ### Revalidation Triggers
 
 - **上流 API 契約の変更** (`attachment-search-markitdown-extractor` spec): `POST /extract` の request/response schema、エラーコード enum、HTTP ステータス対応の変更 → `packages/markitdown-client` 再生成、`AttachmentTextExtractorService` の正規化ロジック再確認、drift 検知 CI の再評価
-- **ES 添付 mapping のフィールド追加/削除**: 既存添付インデックスの再構築必要性判定、ES 7/8/9 mapping 変種の同期。特に権限フィールドを **再導入する変更は Option D の設計前提を覆す** ため、本 spec の本質的再検討が必要
+- **ES 添付 mapping のフィールド追加/削除**: 既存添付インデックスの再構築必要性判定、ES 8/9 mapping 変種の同期。特に権限フィールドを **再導入する変更は Option D の設計前提を覆す** ため、本 spec の本質的再検討が必要
 - **`IPageWithSearchMeta.attachmentHits[]` / `IAttachmentHit` の形状変更**: 下流 `attachment-search-ui` spec に破壊的変更を強いるため、spec 再調整が必須
 - **apiv3 エンドポイント契約** (reextract / admin config / admin failures / search indices 拡張) の request/response 変更: 下流 spec の SWR hook 再調整が必須
 - **`filterPagesByViewer` の権限モデル本体の変更**: 本 spec は既存 Page 検索と同一の viewer フィルタを page_index に適用することで添付権限を解決しているため、page 側の権限モデル変更は添付検索の権限判定にも波及する
 - **page_index の viewer フィルタクエリ構造の変更**: `buildAccessiblePageIdLookupQuery` は既存 Page 検索の filter 生成を流用するため、その内部構造変更は lookup クエリにも影響する
 - **Config キー名の変更**: 既存環境の設定マイグレーション必要
 - **`extractorUri` クリアによる soft-disable 挙動**: `extractorUri` を admin UI で空文字 / null にすると `isAttachmentFullTextSearchEnabled` (算出値) が `false` に遷移する。この「URI による soft-disable」挙動の意味論変更 (例: 空文字扱いの揺れ、trim の有無) は下流 `attachment-search-ui` spec の機能ゲート挙動に影響するため、変更時は下流 spec に通知が必要
-- **Socket.io 進捗イベント名** (`AddAttachmentProgress` 等) の変更: 下流 UI spec の購読変更
+- **Socket.io 進捗イベント名** (`AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed`) の変更: 下流 UI spec の購読変更
+- **`PUT /search/indices` の応答タイミング**: `includeAttachments=true` の作り直しは即応答し、完了・失敗は Socket.io でのみ通知する。同期応答に戻す変更、または 409 `rebuild_in_progress` の扱いの変更は、下流 UI spec の管理画面の進行表示を再確認する必要がある
+- **`QueryTerms` へのキー追加・検索演算子の意味変更**: `splitQueryTerms()` は本文語 4 キー以外をすべて親ページの絞り込み条件として扱う。本文語のキーが増える (例: 新しいフレーズ記法) 場合は `AttachmentKeywordTerms` の更新が必要
+- **`AttachHandler` / `DetachHandler` の型 (`AttachmentWithComputed`) や、添付の作成・削除経路の変更**: 添付の作成・削除が `AttachmentService` 以外の経路で起きるようになると、通知関数による同期では漏れが出る
 - **`SearchConfigurationProps.searchConfig` の shape 変更** (フィールド追加/削除/rename): 下流 `attachment-search-ui` spec は SSR hydration 経路 (`basic-layout-page/hydrate.ts` での atom 書き込み、下流が追加する Jotai atom / SWR fallback の初期値配線) を再確認する必要がある
 
 ## Architecture
@@ -87,7 +90,10 @@
 ### Existing Architecture Analysis
 
 - apps/app は Next.js Pages Router + Express モノリス。`server/service/*` が既存責務の中心
-- ES 連携は `ElasticsearchDelegator` に集約され、ES 7/8/9 の互換レイヤが version-specific mapping で提供されている
+- ES 連携は `ElasticsearchDelegator` に集約され、ES 8/9 の互換レイヤが version-specific mapping で提供されている
+- `SearchService` は `SearchService.create(crowi)` で非同期に生成される。検索演算子 (`prefix:` / `tag:` / `author:` / `editor:` / `group:` と各否定形) は `parseSearchQuery()` で `QueryTerms` に分解され、`group:` / `-group:` は `resolveFilterData()` でグループ ID に解決されてから `appendCriteriaForQueryString()` / `appendCriteriaForGroupFilter()` で ES クエリに積まれる
+- Attachment は Prisma 拡張 (`prisma.attachments`) で読み書きされる。`AttachHandler` は `AttachmentWithComputed` を受け取る。`AttachmentService.removeAllAttachments()` (ページ削除に伴う一括削除) は detach handler を呼ばない
+- Page 以外の ES index の前例として監査ログ用 index (`features/auditlog-es-sync`) がある。こちらは MongoDB の change stream で同期し、作り直しは専用 API で非同期に実行する。添付が同期方式を揃えない理由は research.md に記録
 - `AttachmentService` はハンドラ登録型拡張点を提供し、OpenAI Vector Store 連携が既に同パターンで同居 (fire-and-forget、例外握りつぶし)
 - `registerUpdateEvent()` は `pageEvent` の `updateMany` / `syncDescendantsUpdate` を購読し Page index を同期
 - Config は `ConfigManager` + MongoDB `Config` model で永続化、`config-definition.ts` に型定義を並べる
@@ -150,9 +156,9 @@ graph TB
     Extractor --> Client
     Client -->|HTTP multipart| FastAPI
 
-    SearchService -->|primary: 優先 slot 駆動<br/>facet=all は pages viewer-filtered、facet=attachments は attachments + mget permission| ESDelegator
+    SearchService -->|primary: 優先 slot 駆動<br/>facet=all は pages viewer-filtered、facet=attachments は attachments + ids 指定の page 検索で権限と絞り込み| ESDelegator
     SearchService -->|secondary: primary の pageId に<br/>terms 絞り + content match| ESDelegator
-    ESDelegator -->|search / mget / bulk| ES
+    ESDelegator -->|search / bulk| ES
     FailureLog --> Mongo
 ```
 
@@ -172,11 +178,11 @@ graph TB
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Server runtime | Node 22 / Express / pino | indexer / 権限 sync / reindex batch / apiv3 | 既存スタック踏襲 |
+| Server runtime | Node 24 / Express / pino | indexer / 権限 sync / reindex batch / apiv3 | 既存スタック踏襲 |
 | HTTP client | axios (orval 生成) | 抽出サービス呼び出し | server 専用依存 |
 | Client package | `packages/markitdown-client` (orval 生成) | 上流 OpenAPI → TS クライアント | `pdf-converter-client` 同パターン |
-| Data — search | Elasticsearch 7/8/9 (既存) | 添付専用 index `attachments` | 既存 Page index とは別 index |
-| Data — log | MongoDB (既存) | `extractionFailureLogs` collection | TTL index 90 日 |
+| Data — search | Elasticsearch 8/9 (既存) | 添付専用 index `attachments` | 既存 Page index とは別 index |
+| Data — log | MongoDB + Prisma (既存) | `extractionfailurelogs` collection (Prisma モデル) | TTL index 90 日は migrate-mongo の migration で作成 |
 | Messaging | Socket.io (既存) | 一括再インデックス進捗 | 添付向けイベント名を追加 |
 
 ## File Structure Plan
@@ -196,14 +202,14 @@ apps/app/src/features/search-attachments/
 │   │   ├── attachment-search-result-aggregator.ts # 優先 slot 駆動 primary + secondary enrichment、permission 判定は page サイズ bounded
 │   │   └── extraction-failure-log-service.ts      # Mongo CRUD / 集計
 │   ├── models/
-│   │   └── extraction-failure-log.ts              # Mongoose schema (TTL)
+│   │   └── extraction-failure-log.ts              # prisma.extractionfailurelogs の操作と reasonCode 型
 │   ├── mappings/
-│   │   ├── attachments-mappings-es7.ts
 │   │   ├── attachments-mappings-es8.ts
 │   │   └── attachments-mappings-es9.ts
 │   ├── queries/
 │   │   ├── build-attachment-search-query.ts       # attachments_index content match body builder (primary/secondary 両方で利用)
 │   │   ├── build-attachments-by-page-ids-query.ts # secondary 用: terms: { pageId: primaryIds } + content match body builder
+│   │   ├── split-query-terms.ts                   # QueryTerms → { AttachmentKeywordTerms, PageFilterTerms } (pure function)
 │   │   └── build-snippet-segments.ts              # ES highlighter の <em> タグ入り文字列を ISnippetSegment[] にパース (XSS 防御 DTO 変換、pure function)
 │   ├── routes/apiv3/
 │   │   ├── attachment-reextract.ts                # POST /attachments/:id/reextract
@@ -238,7 +244,11 @@ packages/markitdown-client/
 - [apps/app/src/server/service/search-delegator/elasticsearch.ts](apps/app/src/server/service/search-delegator/elasticsearch.ts) — `attachment-search-delegator-extension` との合成 (既存 Page 系メソッドは不変)
 - [apps/app/src/server/service/config-manager/config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) — `app:attachmentFullTextSearch:*` 4 キー追加 (`extractorUri` / **`extractorToken` (encrypted storage、write-only)** / `timeoutMs` / `maxFileSizeBytes`)。各キーの env var 名: `GROWI_MARKITDOWN_EXTRACTOR_URI` / `GROWI_MARKITDOWN_SERVICE_TOKEN` / `GROWI_MARKITDOWN_TIMEOUT_MS` / `GROWI_MARKITDOWN_MAX_FILE_SIZE_BYTES`。`enabled` / `maxConcurrency` は Config キーとしては提供せず、前者は算出値、後者は抽出サービス側の env var 専用。加えて `ENV_ONLY_GROUPS` に `env:useOnlyEnvVars:app:attachmentFullTextSearch` エントリを追加し、control env var `MARKITDOWN_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS=true` で 4 キー全てを env-only 強制できるようにする (マルチテナント向け詳細は下記「ENV_ONLY_GROUPS エントリ」参照)
 - [apps/app/src/interfaces/search.ts](apps/app/src/interfaces/search.ts) — `IPageWithSearchMeta.attachmentHits?: IAttachmentHit[]` (optional) を追加
-- [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js) — `PUT /search/indices` に `includeAttachments` フラグを受理
+- [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js) — `PUT /search/indices` に `includeAttachments` フラグを受理。true のときは `AttachmentReindexBatch.startRebuild()` を呼んで即応答し、実行中なら 409 `rebuild_in_progress`
+- [apps/app/src/interfaces/websocket.ts](apps/app/src/interfaces/websocket.ts) — `AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed` を追加
+- [apps/app/prisma/schema.prisma](apps/app/prisma/schema.prisma) — `extractionfailurelogs` model を追加
+- `apps/app/src/migrations/<timestamp>-add-indexes-to-extractionfailurelogs.js` (新規) — `occurredAt` の 90 日 TTL index と `attachmentId` / `retentionGroupHash` の index を作成
+- [apps/app/src/server/service/import/non-transferable-collections.ts](apps/app/src/server/service/import/non-transferable-collections.ts) — `extractionfailurelogs` を G2G 転送の対象外に追加
 - [apps/app/src/pages/basic-layout-page/get-server-side-props/search-configurations.ts](apps/app/src/pages/basic-layout-page/get-server-side-props/search-configurations.ts) — `getServerSideSearchConfigurationProps` を拡張し、`searchService.isConfigured` と `ConfigManager.getConfig('app:attachmentFullTextSearch:extractorUri')` から算出した `searchConfig.isAttachmentFullTextSearchEnabled` を SSR props に含める (既存フィールドは非破壊)
 - [apps/app/src/pages/basic-layout-page/types.ts](apps/app/src/pages/basic-layout-page/types.ts) — `SearchConfigurationProps.searchConfig` 型に `isAttachmentFullTextSearchEnabled: boolean` フィールドを追加 (既存 `isSearchServiceConfigured` / `isSearchServiceReachable` / `isSearchScopeChildrenAsDefault` は据え置き)
 
@@ -317,7 +327,7 @@ sequenceDiagram
         Del->>ES: page_index search
     else facet=all (優先 slot = pages)
         alt from == 0 (1 ページ目)
-            Svc->>Del: _msearch (page_index viewer filter 付き + attachments_index content-only)
+            Svc->>Del: _msearch (既存 Page 検索クエリ = 演算子・viewer filter 込み + attachments_index 本文語のみ)
             Del->>ES: parallel search
             ES-->>Del: { pages: top N, attachments: top N }
             Svc->>Svc: pages を primary として確定、attachments は「pageId が primary 20 件に一致するもののみ」を primary に埋め込み (解釈 A)、不一致分は破棄
@@ -327,11 +337,12 @@ sequenceDiagram
             Note over Svc: attachments_index は叩かない (二次結果で補完)
         end
     else facet=attachments (優先 slot = attachments)
-        Svc->>Del: attachments_index search (content match、権限フィルタなし、over-fetch size = requested * k, k=1.5)
+        Svc->>Del: attachments_index search (本文語のみの content match、権限フィルタなし、over-fetch size = requested * k, k=1.5)
         Del->>ES: attachments_index search
         ES-->>Del: attachment hits
-        Svc->>Del: mget page_index for unique pageIds (bounded to size × k 件、≤ 30-40)
-        Svc->>Svc: parent page の viewer permission で filter、残りを primary 確定
+        Svc->>Del: searchAccessiblePages(unique pageIds ≤ size × k 件, 絞り込み条件, viewer)
+        Del->>ES: page_index search (ids + viewer filter + 演算子の絞り込み条件)
+        Svc->>Svc: 返ってきた pageId に属する添付ヒットだけを残して primary 確定
         Note over Svc: drop 発生で requested size 未達なら primaryResultIncomplete: true をメタに含める
     end
 
@@ -344,7 +355,7 @@ sequenceDiagram
 
 **Key decisions**:
 - 優先 slot のみがページングカーソル (`search_after` 推奨、`from+size` も過渡期は許容) を保持。非優先 slot はページ 1 のみ補助取得、ページ 2 以降は完全に二次結果に委ねる
-- permission lookup は **常にページサイズ bounded** (`facet=attachments` の場合 size × k ≤ 40 件程度の mget のみ)。`missingPageIds` terms クエリ爆発は構造的に発生しない
+- permission lookup は **常にページサイズ bounded** (`facet=attachments` の場合 size × k ≤ 40 件程度を ids に持つ page_index 検索 1 回のみ)。`missingPageIds` terms クエリ爆発は構造的に発生しない
 - `facet=all` の 1 ページ目で取得した非優先 slot の 20 件のうち、優先 slot の 20 件と pageId が一致しない分は破棄 (解釈 A)。漏れた添付ヒットは facet=`attachments` 切替で捕捉する UX を UI spec 側で誘導 (Slot B 優先モード案内)
 - `facet=attachments` で permission filter drop により primary 件数が requested size 未達になる場合、レスポンスに `primaryResultIncomplete: true` と `nextCursor` を含め、UI は「検索結果が不足しています。追加読み込み」ボタンで手動で次ページ取得を促す (auto retry は行わない)
 
@@ -369,7 +380,7 @@ sequenceDiagram
         ES-->>Del: attachment hits (bounded by primaryIds.length)
         Svc->>Svc: pageId ごとに group、IPageWithSearchMeta.attachmentHits[] に埋め込み
     else facet=attachments (優先=attachments、secondary=pages meta)
-        Note over Svc: primary で mget 済みの Page メタを渡す (二次不要)
+        Note over Svc: primary で取得済みの Page メタを渡す (二次不要)
     end
 
     Svc-->>Api: ISecondarySearchResult
@@ -390,9 +401,20 @@ sequenceDiagram
 
 **rebuild window 中のページング整合性は非保証** (`Migration Strategy § rebuild window 中のユーザー検索・ページングの整合性` 参照)。alias swap をまたぐ連続リクエストで重複/欠落/順序不整合が発生しうるが、管理者操作であり UI 側の進行通知で UX を degrade する方針。
 
+#### 2.4 検索演算子の扱い
+
+検索演算子 (`prefix:` / `tag:` / `author:` / `editor:` / `group:` と各否定形) は **親ページに対する条件**であり、添付本文に当てる語ではない。`SearchService.searchByFacet()` がクエリを 1 回だけ解析し (`parseSearchQuery()` → `resolve()` → `resolveFilterData()`)、`splitQueryTerms()` で次の 2 つに分けて aggregator に渡す (詳細は Components の AttachmentSearchResultAggregator)。
+
+| 分けた結果 | 中身 | 当てる先 |
+|---|---|---|
+| 本文語 (`AttachmentKeywordTerms`) | `match` / `not_match` / `phrase` / `not_phrase` | attachments_index の `content` / `originalName` |
+| 絞り込み条件 (`PageFilterTerms` + `resolvedFilterData`) | 上記以外の全キー | page_index (facet=`all` は既存 Page 検索クエリ、facet=`attachments` は `searchAccessiblePages`) |
+
+これにより、どの facet でも「添付ヒットの親ページ」は「同じクエリで通常のページ検索をしたときに返りうるページ」と一致する (Req 4.5)。権限判定と同じ page_index 検索の中で絞り込むため、追加の問い合わせは発生しない。
+
 ### 3. 親ページ権限変更 → 検索時に自動反映 (コード不要)
 
-**Option D 採用により、添付 ES 文書への partial update は発生しない**。親 Page の権限変更は既存 page_index の同期経路で反映され、次回検索実行時に Flow 2 の primary (facet=`all` では pages viewer-filter / facet=`attachments` では mget permission 判定) および secondary (primaryIds が既に viewer 許諾済) が最新の page_index を参照することで、添付ヒットの可視性も自動的に更新される。sync drift による snippet 漏洩は構造的に発生しない (権限情報を添付側に snapshot していないため)。
+**Option D 採用により、添付 ES 文書への partial update は発生しない**。親 Page の権限変更は既存 page_index の同期経路で反映され、次回検索実行時に Flow 2 の primary (facet=`all` では pages viewer-filter / facet=`attachments` では ids 指定の page_index 検索による判定) および secondary (primaryIds が既に viewer 許諾済) が最新の page_index を参照することで、添付ヒットの可視性も自動的に更新される。sync drift による snippet 漏洩は構造的に発生しない (権限情報を添付側に snapshot していないため)。
 
 ### 4. 個別再抽出 (UI → API → Indexer)
 
@@ -412,45 +434,56 @@ sequenceDiagram
 sequenceDiagram
     participant Admin as Admin UI (downstream)
     participant Api as apiv3 search/indices
-    participant Del as ESDelegator
     participant Batch as AttachmentReindexBatch
+    participant Svc as SearchService
+    participant Del as ESDelegator extended
     participant Idx as AttachmentSearchIndexer
     participant Att as AttachmentService
     participant Sock as Socket.io
     participant Ext as TextExtractor
 
     Admin->>Api: PUT /search/indices rebuild includeAttachments=true
-    Api->>Batch: begin() — rebuild lifecycle 開始 (isRebuilding=true, tmpIndexName=attachments-tmp)
-    Api->>Del: create tmp pages + attachments indices (existing tmp を drop → create)
-    Del->>Sock: AddPageProgress (existing)
-    Del->>Batch: addAllAttachments(tmpIndex, progressCb)
-    Batch->>Ext: extract per attachment (cursor)
-    Batch->>Del: bulk upsert to tmp attachments
+    Api->>Batch: startRebuild(() => searchService.rebuildIndex())
+    alt 既に実行中
+        Batch-->>Api: throw RebuildInProgressError (同期)
+        Api-->>Admin: 409 rebuild_in_progress
+    else 未実行
+        Batch->>Batch: isRebuilding=true, tmpIndexName=attachments-tmp (同期)
+        Batch-->>Api: return (await しない)
+        Api-->>Admin: 200 (作り直しは裏で継続)
+        Batch->>Svc: rebuildPageIndex() — 既存 rebuildIndex (Page 側の tmp 作成と alias swap を含む)
+        Svc->>Sock: AddPageProgress / FinishAddPage (既存)
+        Batch->>Del: drop attachments-tmp → create attachments-tmp
+        Batch->>Ext: extract per attachment (prisma.attachments を id 順にページング)
+        Batch->>Del: bulk upsert to attachments-tmp
+        Batch->>Sock: AddAttachmentProgress
 
-    par rebuild window 中の real-time event (並行発生しうる)
-        Att->>Idx: onAttach / onDetach (新規アップロード / 削除)
-        Idx->>Batch: isRebuilding? / getTmpIndexName()
-        Idx->>Del: dual-write: live attachments + attachments-tmp 両方に upsert/delete
+        par rebuild window 中の real-time event (並行発生しうる)
+            Att->>Idx: onAttach / onDetach (新規アップロード / 削除)
+            Idx->>Batch: isRebuilding? / getTmpIndexName()
+            Idx->>Del: dual-write: live attachments + attachments-tmp 両方に upsert/delete
+        end
+
+        Batch->>Batch: AttachmentOrphanSweeper.sweep(attachments-tmp)
+        Batch->>Del: attachments alias swap (attachments-tmp → attachments)
+        Batch->>Sock: FinishAddAttachment
+        Note over Batch: 例外時は AttachmentRebuildingFailed を emit。finally で isRebuilding=false
     end
-
-    Batch->>Sock: AddAttachmentProgress (new)
-    Note over Batch: orphan sweep: 親 Page が不在の添付 doc を tmp attachments から除外
-    Batch->>Batch: AttachmentOrphanSweeper.sweep(tmpAttachmentsIndex)
-    Del->>Del: atomic alias swap (both indices)
-    Api->>Batch: end() — rebuild lifecycle 終了 (isRebuilding=false)
-    Del->>Sock: FinishAddPage + FinishAddAttachment
 ```
 
 Key decisions:
-- Page と Attachment の再構築は直列 (Page 完了後に Attachment 開始、性能検証後に並列化を enhancement 判断)
+- **HTTP 応答は作り直しの完了を待たない** (Req 6.5)。添付の作り直しは添付ごとに抽出サービスを呼ぶため数分〜数時間かかりうる。API route は `startRebuild()` を呼んで即 200 を返し、完了・失敗は Socket.io (`FinishAddAttachment` / `AttachmentRebuildingFailed`) で通知する。監査ログの作り直し (`PUT /search/auditlog-indices`) と同じ非同期の流儀
+- **二重起動の判定は同期で行う** (Req 6.6)。`startRebuild()` は await する前に実行中フラグを確認して立てるため、API route は 409 を同じリクエストの中で返せる
+- **ページと添付は同じ要求で作り直す**。添付はページに属するため、`includeAttachments=true` のときは Page/Comment の作り直しに続けて添付を作り直す。直列実行 (Page 完了後に Attachment 開始)
+- **alias swap は index ごとに行う**。Page 側は既存 `rebuildIndex()` の中で swap し、添付側は bulk と orphan sweep の完了後に `attachments` alias を swap する。2 つの swap の間は「Page は新 index、添付は旧 index」の状態になるが、添付ヒットの権限は検索時に page_index から引くため (Flow 2)、漏洩は起きない
+- includeAttachments=false の場合は従来どおり Page/Comment のみを fire-and-forget で作り直し、既存 `attachments` alias は据え置き
 - 個別失敗はスキップして FailureLog に残し batch 継続
-- includeAttachments=false の場合は従来どおり Page/Comment のみ処理し既存 `attachments` alias は据え置き
-- 中断時は alias swap 未実行のまま旧 index 維持、tmp index は orphan として残存 (次回実行の先頭で drop)。`Batch.end()` を常に finally 節で呼び、例外経路でも `isRebuilding=false` に戻す (rebuild lifecycle の leak 防止)
-- **rebuild window 中の dual-write (新規)**: `AttachmentSearchIndexer.onAttach/onDetach` が `AttachmentReindexBatch.isRebuilding()` を参照し、true の間は live alias (`attachments`) と tmp index (`attachments-tmp`) の**両方**に書き込む。これにより alias swap 後に新規アップロードが消失しない。既存 Page 側 [elasticsearch.ts:277,384](apps/app/src/server/service/search-delegator/elasticsearch.ts#L277) と同パターン
+- 中断時は alias swap 未実行のまま旧 index 維持、tmp index は orphan として残存 (次回実行の先頭で drop)。実行中フラグは `startRebuild()` 内部の finally で必ず下ろす (呼び出し側に後始末を任せない)
+- **rebuild window 中の dual-write**: `AttachmentSearchIndexer.onAttach/onDetach` が `AttachmentReindexBatch.isRebuilding()` を参照し、true の間は live alias (`attachments`) と tmp index (`attachments-tmp`) の**両方**に書き込む。これにより alias swap 後に新規アップロードが消失しない。既存 Page 側 `rebuildIndex()` の tmp index への並行書き込みと同パターン
 - **dual-write の冪等性**: tmp index への書き込みは、bulk upsert が後から同 `_id` で上書きする可能性があるが、doc ID が `${attachmentId}_${pageNumber ?? 0}` で決定的なため順序に依存しない。bulk 側が後勝ちでも real-time 側が後勝ちでも最終状態は同一
 - **dual-write 失敗時**: tmp 側 write の失敗は live 側の成功を阻害しない (pino 記録して continue)。alias swap 後は live が単一 source になり自動的に整合
-- **orphan sweeper**: real-time cascade (pageEvent 購読による即時削除) は採用しない。rebuildIndex 時に `AttachmentOrphanSweeper` が MongoDB Page collection と照合して親 Page 不在の添付 doc を eventual に cleanup する。query-time permission 判定により、sweeper 実行までの間も snippet 漏洩は発生しない (`facet=attachments` primary の mget で親 Page 不在 → 該当添付ヒットを drop、`facet=all` secondary の terms クエリは primaryIds = viewer 許諾済ページに限定されるため孤児添付は含まれない)
-- **sweep タイミング**: sweep は tmp への bulk 完了後、alias swap**前**に実行する (従来どおり)。rebuild window 中の real-time `onAttach` で追加された doc は `AttachmentService` 自身が Attachment モデルを作成する前提なので、MongoDB の Page collection に親 Page が存在する限り orphan にはならない。rebuild window 中の親 Page 削除は real-time cascade しない設計のため、次回 rebuild で eventual cleanup される (query-time permission により漏洩は防止される)
+- **orphan sweeper**: real-time cascade (pageEvent 購読による即時削除) は採用しない。`AttachmentService.removeAllAttachments()` (ページ削除に伴う一括削除) は detach handler を呼ばないため、ページ削除で残った添付 doc もここで回収する。`AttachmentOrphanSweeper` が MongoDB Page collection と照合して親 Page 不在の添付 doc を eventual に cleanup する。query-time permission 判定により、sweeper 実行までの間も snippet 漏洩は発生しない (`facet=attachments` primary の ids 検索で親 Page 不在 → 該当添付ヒットを drop、`facet=all` secondary の terms クエリは primaryIds = viewer 許諾済ページに限定されるため孤児添付は含まれない)
+- **sweep タイミング**: sweep は tmp への bulk 完了後、alias swap**前**に実行する。rebuild window 中の real-time `onAttach` で追加された doc は `AttachmentService` 自身が Attachment を作成する前提なので、MongoDB の Page collection に親 Page が存在する限り orphan にはならない。rebuild window 中の親 Page 削除は real-time cascade しない設計のため、次回 rebuild で eventual cleanup される (query-time permission により漏洩は防止される)
 
 ## Requirements Traceability
 
@@ -466,13 +499,15 @@ Key decisions:
 | 2.4 | 失敗時メタデータのみ登録 | AttachmentSearchIndexer fallback | — | Flow 1 |
 | 2.5 | 文書フィールド定義 (権限フィールドを**持たない**) | ES attachments mapping (grant/granted_users/granted_groups/creator なし) | Logical Data Model | — |
 | 3.1 | 添付削除連動 | AttachmentSearchIndexer.onDetach | `addDetachHandler` | — |
-| 3.2 | 親ページ削除連動 (eventual cleanup) | AttachmentOrphanSweeper (rebuildIndex 時) + query-time permission (primary mget / secondary の primaryIds 制限) による即時的ヒット除外 | queries/build-attachments-by-page-ids-query, mgetPagesForPermissionBody | Flow 5 / Flow 2 (優先 slot 駆動) |
-| 3.3 | 権限変更連動 (query-time) | query-time permission (primary の viewer filter / mget permission 判定、secondary の primaryIds 制限) — **添付 ES 文書は更新しない** | mgetPagesForPermissionBody | Flow 2 (優先 slot 駆動) / Flow 3 (コード不要) |
+| 3.2 | 親ページ削除連動 (eventual cleanup) | AttachmentOrphanSweeper (rebuildIndex 時) + query-time permission (primary の ids 指定 page 検索 / secondary の primaryIds 制限) による即時的ヒット除外 | queries/build-attachments-by-page-ids-query, searchAccessiblePages | Flow 5 / Flow 2 (優先 slot 駆動) |
+| 3.3 | 権限変更連動 (query-time) | query-time permission (primary の viewer filter / ids 指定 page 検索、secondary の primaryIds 制限) — **添付 ES 文書は更新しない** | searchAccessiblePages | Flow 2 (優先 slot 駆動) / Flow 3 (コード不要) |
 | 3.4 | 削除/orphan sweep 失敗ログ | pino + FailureLogService | — | — |
-| 4.1 | viewer フィルタ (query-time) | build-attachment-search-query (content-only) + build-attachments-by-page-ids-query (secondary) + mgetPagesForPermissionBody (primary permission 判定) + AttachmentSearchResultAggregator (優先 slot 駆動 + enrichment) | — | Flow 2 |
+| 4.1 | viewer フィルタ (query-time) | build-attachment-search-query (content-only) + build-attachments-by-page-ids-query (secondary) + searchAccessiblePages (primary permission 判定) + AttachmentSearchResultAggregator (優先 slot 駆動 + enrichment) | — | Flow 2 |
 | 4.2 | 権限変更後反映 (query-time) | query-time permission lookup (page_index 参照) | — | Flow 2 (優先 slot 駆動) |
 | 4.3 | Page と同一権限モデル | 既存 `filterPagesByViewer` を page_index への lookup にそのまま適用 | — | Flow 2 (優先 slot 駆動) |
-| 4.4 | 孤児添付除外 (query-time) | primary 側 mget permission 判定 (親 Page 不在なら drop) + secondary 側 primaryIds 制限 (viewer 許諾済ページのみ) + orphan sweeper (eventual cleanup) | mgetPagesForPermissionBody, build-attachments-by-page-ids-query | Flow 2 (優先 slot 駆動) / Flow 5 |
+| 4.4 | 孤児添付除外 (query-time) | primary 側 ids 指定 page 検索 (親 Page 不在なら drop) + secondary 側 primaryIds 制限 (viewer 許諾済ページのみ) + orphan sweeper (eventual cleanup) | searchAccessiblePages, build-attachments-by-page-ids-query | Flow 2 (優先 slot 駆動) / Flow 5 |
+| 4.5 | 検索演算子を添付ヒットに適用 | splitQueryTerms + searchAccessiblePages (既存の appendCriteriaForQueryString / appendCriteriaForGroupFilter / filterPagesByViewer を流用) + facet=all は既存 Page 検索クエリそのもの | `AttachmentSearchInput`, `PageFilterTerms` | Flow 2 |
+| 4.6 | 演算子トークンを本文語に使わない | splitQueryTerms + searchAttachmentsBody / searchAttachmentsByPageIdsBody が `AttachmentKeywordTerms` だけを受け取る | `AttachmentKeywordTerms` | Flow 2 |
 | 5.1 | URI 設定による有効化 (算出値) | ConfigManager + config-definition (`extractorUri` 等 3 キー) + SearchConfigurationProps 拡張 (SSR、算出値を公開) | `searchConfig.isAttachmentFullTextSearchEnabled` (算出) | — |
 | 5.2 | 設定値永続化 + admin API | apiv3 admin config | `GET/PUT /admin/attachment-search/config` (`extractorUri` / `timeoutMs` / `maxFileSizeBytes`) | — |
 | 5.3 | 再インデックス必要性フラグ | admin config response flag | — | — |
@@ -482,13 +517,15 @@ Key decisions:
 | 6.2 | 個別失敗時スキップ | AttachmentReindexBatch try/catch | — | Flow 5 |
 | 6.3 | 進捗 Socket.io | Socket.io `AddAttachmentProgress` / `FinishAddAttachment` | — | Flow 5 |
 | 6.4 | 中断時 alias 不変 | AttachmentReindexBatch alias swap last | — | Flow 5 |
+| 6.5 | 作り直しを待たずに応答 + 完了・失敗通知 | AttachmentReindexBatch.startRebuild + Socket.io `FinishAddAttachment` / `AttachmentRebuildingFailed` | `PUT /search/indices` | Flow 5 |
+| 6.6 | 二重起動は 409 | AttachmentReindexBatch.startRebuild (同期で RebuildInProgressError) | `PUT /search/indices` 409 `rebuild_in_progress` | Flow 5 |
 | 7.1 | 再抽出エンドポイント | AttachmentSearchIndexer.reindex | `POST /attachments/:id/reextract` | Flow 4 |
 | 7.2 | 権限ガード | apiv3 middleware (admin OR page editor) | — | — |
 | 7.3 | 無効時 503 | require-search-attachments-enabled middleware | — | — |
 | 7.4 | Outcome レスポンス | apiv3 response shape | `{ outcome: ExtractionOutcome }` | — |
 | 8.1 | 失敗ログ pino | AttachmentSearchIndexer + FailureLogService | — | — |
 | 8.2 | 監視メトリクス | OpenTelemetry 既存パイプライン | — | — |
-| 8.3 | Mongo 永続化 + TTL | ExtractionFailureLog Mongoose schema | — | — |
+| 8.3 | Mongo 永続化 + TTL | `extractionfailurelogs` Prisma モデル + TTL index migration | — | — |
 | 8.4 | 失敗取得 API | apiv3 admin failures | `GET /admin/attachment-search/failures` | — |
 | 9.1 | 無効時完全互換 | isFeatureEnabled gate 全経路 | — | — |
 | 9.2 | Page index 非劣化 | 添付は別 index、Page mapping 不変 | — | — |
@@ -505,14 +542,14 @@ Key decisions:
 | AttachmentTextExtractorService | Server | クライアント wrapper + 失敗正規化 + 到達不可 fallback | 1.1, 1.2, 1.3, 1.4, 2.1 | MarkitdownClient (P0), FileUploader (P0) | Service |
 | AttachmentSearchIndexer | Server | attach/detach/reextract/bulk の単一窓口、rebuild window 中は live + tmp への dual-write | 2.1–2.5, 3.1, 3.4, 7.1 | TextExtractor (P0), ESDelegator extension (P0), AttachmentReindexBatch (P0, lifecycle 参照), FailureLogService (P1) | Service, Event |
 | AttachmentOrphanSweeper | Server | rebuildIndex 内で親 Page 不在の添付 doc を eventual cleanup | 3.2, 4.4 | Page model (P0), ESDelegator extension (P0) | Batch |
-| AttachmentReindexBatch | Server | 一括再インデックス streaming + progress + orphan sweeper 統合 + rebuild lifecycle (`begin/end/isRebuilding/getTmpIndexName`) 公開 | 6.1, 6.2, 6.3, 6.4 | TextExtractor (P0), ESDelegator extension (P0), AttachmentOrphanSweeper (P0), Socket.io (P1) | Batch |
+| AttachmentReindexBatch | Server | ページと添付の一括再インデックスを裏で実行 (`startRebuild`) + progress + orphan sweeper 統合 + 実行中状態 (`isRebuilding/getTmpIndexName`) 公開 | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6 | TextExtractor (P0), ESDelegator extension (P0), AttachmentOrphanSweeper (P0), Socket.io (P1) | Batch |
 | ElasticsearchDelegator extension | Server | 添付 index mapping / bulk / msearch 構築 (権限フィールドなし) | 2.2, 2.5, 3.1, 4.1, 6.1, 9.2 | 既存 ESDelegator (P0), ES client (P0) | Service |
 | ExtractionFailureLogService | Server | 失敗の Mongo 永続化 + 集計 | 3.4, 8.1, 8.3, 8.4 | ExtractionFailureLog model (P0) | Service |
-| AttachmentSearchResultAggregator | Server | 優先 slot 駆動 primary + secondary enrichment、permission 判定は page サイズ bounded | 3.3, 4.1, 4.2, 4.3, 4.4, 9.1, 9.3 | ESDelegator extension (P0), buildAttachmentsByPageIdsQuery (P0) | Service |
+| AttachmentSearchResultAggregator | Server | 優先 slot 駆動 primary + secondary enrichment、permission 判定は page サイズ bounded、検索演算子の振り分け | 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 9.1, 9.3 | ESDelegator extension (P0), buildAttachmentsByPageIdsQuery (P0) | Service |
 | apiv3: attachment-reextract | Server | `POST /attachments/:id/reextract` | 7.1, 7.2, 7.3, 7.4 | AttachmentSearchIndexer (P0) | API |
 | apiv3: search-attachments | Server | `GET /search/attachments` (secondary enrichment) | 4.1, 9.1, 9.3 | AttachmentSearchResultAggregator (P0) | API |
 | apiv3: attachment-search-admin | Server | failures / config 取得更新 | 5.1, 5.2, 5.3, 8.4 | ConfigManager (P0), FailureLogService (P0) | API |
-| apiv3: search indices extended | Server | `includeAttachments` フラグ受理 | 6.1 | AttachmentReindexBatch (P0) | API |
+| apiv3: search indices extended | Server | `includeAttachments` フラグ受理、作り直しを裏で起動して即応答 | 6.1, 6.5, 6.6 | AttachmentReindexBatch (P0) | API |
 | Response type (`IPageWithSearchMeta`) | Interface | optional `attachmentHits[]` 追加 | 9.3, 9.4 | 既存 interfaces/search.ts (P0) | Contract |
 | SearchConfigurationProps 拡張 | SSR props / Interface | 非 admin 一般ユーザ向けに機能有効フラグを SSR 経路で公開 | 5.1, 5.4 | ConfigManager (P0), 既存 basic-layout-page SSR (P0) | Contract, SSR |
 
@@ -578,7 +615,7 @@ export interface AttachmentTextExtractorService {
 
 ```typescript
 export interface AttachmentSearchIndexer {
-  onAttach(pageId: string | null, attachment: IAttachmentDocument, file: Express.Multer.File): Promise<void>;
+  onAttach(pageId: string | null, attachment: AttachmentWithComputed, file: Express.Multer.File): Promise<void>;
   onDetach(attachmentId: string): Promise<void>;
   reindex(attachmentId: string): Promise<{ ok: boolean; outcome: ExtractionOutcome }>;
   // Note: onPageDeleted is NOT part of this contract under Option D.
@@ -620,55 +657,74 @@ export interface AttachmentOrphanSweeper {
 
 | Field | Detail |
 |-------|--------|
-| Intent | 一括再インデックスの streaming 処理 + Socket.io progress |
-| Requirements | 6.1, 6.2, 6.3, 6.4 |
+| Intent | ページと添付の一括再インデックスを裏で実行 (HTTP 応答を待たせない) + Socket.io progress + 実行中状態の公開 |
+| Requirements | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6 |
 
 **Contracts**: **Batch [x]**
 
 ```typescript
-export interface AttachmentReindexBatch {
-  // rebuild の実処理
-  addAllAttachments(targetIndex: string, progress: ProgressCallback): Promise<void>;
+export class RebuildInProgressError extends Error {}
 
-  // rebuild lifecycle (AttachmentSearchIndexer.onAttach/onDetach の dual-write 判定用)
-  begin(tmpIndexName: string): void;            // rebuildIndex 開始時に API route から呼ぶ、in-memory state を true に
-  end(): void;                                  // rebuildIndex 完了 / 中断の finally で必ず呼ぶ、state を false に
+export interface AttachmentReindexBatch {
+  // Starts the page rebuild followed by the attachment rebuild and returns
+  // without awaiting them. Throws RebuildInProgressError synchronously when a
+  // rebuild is already running, so the caller can answer 409 in the same request.
+  startRebuild(rebuildPageIndex: () => Promise<void>): void;
+
+  // dual-write 判定用 (AttachmentSearchIndexer.onAttach/onDetach から同期参照)
   isRebuilding(): boolean;                      // in-memory boolean 参照 (同期、ロック不要)
   getTmpIndexName(): string | null;             // isRebuilding=true のとき 'attachments-tmp'、それ以外 null
 }
 ```
 
-- Trigger: `PUT /_api/v3/search/indices { operation: 'rebuild', includeAttachments: true }` から `rebuildIndex()` 内で呼び出し
-- Input: MongoDB 上の全 attachment を cursor で走査、バイトは FileUploader から逐次取得
-- Output: **固定 tmp index `attachments-tmp`** に bulk upsert、最終 alias swap (Page と同時 atomic)
-- Idempotency の実現方法: **既存 Page 側 `rebuildIndex()` と完全に同じ流儀**。開始時に `client.indices.delete({ index: 'attachments-tmp', ignore_unavailable: true })` で既存 tmp をドロップ → `createAttachmentIndex('attachments-tmp')` で再作成 → streaming upsert → alias swap。timestamp/version 付きの命名は使わない (累積なし)
-- tmp index 命名規約: `${indexName}-tmp` 形式。本 spec では `indexName = 'attachments'` なので tmp は **`attachments-tmp`** 固定。既存 Page 側の `${pageIndexName}-tmp` と同じパターン ([参考](apps/app/src/server/service/search-delegator/elasticsearch.ts#L277))
-- Progress: Socket.io `AddAttachmentProgress` / `FinishAddAttachment` / `RebuildingFailed` (既存と同経路)
-- 失敗時: 個別失敗は FailureLog に残しスキップ、batch は継続。中断時は alias swap 未実行のまま旧 index 維持、`attachments-tmp` は残置されるが次回実行の先頭で drop されるため**累積しない**
-- **Lifecycle 管理 (新規)**: rebuild API route が `begin()` → `rebuildIndex()` 本体 → `end()` の順に呼ぶ。`end()` は **例外経路でも finally 節で必ず呼ぶ** ことで `isRebuilding=true` の leak を防止 (leak するとすべての attach/detach が無駄に tmp へ書き続ける)。プロセス再起動で in-memory state が失われる場合は `isRebuilding=false` に初期化されるため leak にはならない (rebuild 自体は中断として扱われ、次回手動で再開)
-- 並行実行: admin 操作として同時 rebuild は想定しない (既存 Page 側と同じ前提を継承)。`begin()` が既に true のとき再呼び出しは 409 conflict
+- Trigger: `PUT /_api/v3/search/indices { operation: 'rebuild', includeAttachments: true }` の API route が `startRebuild(() => searchService.rebuildIndex())` を呼ぶ。Page 側の作り直しは引数で受け取り、batch 自身は `SearchService` を参照しない
+- 処理順 (裏で実行): `rebuildPageIndex()` → `attachments-tmp` を drop → create → MongoDB 上の全 attachment を `prisma.attachments.findMany` の id 順ページング (`take` + `cursor`) で走査し、バイトを FileUploader から逐次取得して抽出 → bulk upsert → `AttachmentOrphanSweeper.sweep('attachments-tmp')` → `attachments` alias swap → `FinishAddAttachment`
+- tmp index 命名規約: `${indexName}-tmp` 形式。本 spec では `indexName = 'attachments'` なので tmp は **`attachments-tmp`** 固定。既存 Page 側の `${pageIndexName}-tmp` と同じパターン。timestamp/version 付きの命名は使わない (累積なし)
+- Progress: Socket.io `AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed`。Page 側は既存の `AddPageProgress` / `FinishAddPage` / `RebuildingFailed` をそのまま使う
+- 失敗時: 個別失敗は FailureLog に残しスキップ、batch は継続。作り直し全体が例外で止まった場合は `AttachmentRebuildingFailed` を emit し、alias swap 未実行のまま旧 index を維持する。`attachments-tmp` は残置されるが次回実行の先頭で drop されるため**累積しない**
+- **実行中フラグの管理**: `startRebuild()` が同期でフラグを立て、裏の処理の finally で必ず下ろす。フラグの上げ下ろしを batch の内部に閉じ込めることで、呼び出し側の後始末漏れによる `isRebuilding=true` の残留 (残るとすべての attach/detach が無駄に tmp へ書き続ける) を構造的に防ぐ。プロセス再起動で in-memory state は `false` に初期化される (作り直しは中断扱い、次回手動で再実行)
+- 並行実行: 実行中に `startRebuild()` が呼ばれたら `RebuildInProgressError` を同期で throw し、API route は 409 `rebuild_in_progress` を返す
 
 ### ElasticsearchDelegator extension
 
 | Field | Detail |
 |-------|--------|
-| Intent | 既存 delegator に添付 index 操作を合成 (権限フィールドは扱わない) |
-| Requirements | 2.2, 2.5, 3.1, 4.1, 4.4, 6.1, 9.2 |
+| Intent | 既存 delegator に添付 index 操作と、添付ヒットの親ページ判定用の page_index 検索を合成 (添付 index は権限フィールドを扱わない) |
+| Requirements | 2.2, 2.5, 3.1, 4.1, 4.3, 4.4, 4.5, 6.1, 9.2 |
 
 **Contracts**: **Service [x]** / **Batch [x]**
 
 ```typescript
+// Free-text part of QueryTerms: the only terms matched against attachment content.
+export type AttachmentKeywordTerms = Pick<QueryTerms, 'match' | 'not_match' | 'phrase' | 'not_phrase'>;
+
+// Operator part of QueryTerms: applied to the parent page, never to attachment content.
+// group/not_group are resolved to ids by SearchService.resolveFilterData() beforehand.
+export type PageFilterTerms = Omit<QueryTerms, keyof AttachmentKeywordTerms>;
+
+export interface AccessiblePage {
+  pageId: string;
+  path: string;
+  title: string;
+  updatedAt: string;
+}
+
 export interface AttachmentIndexOperations {
   createAttachmentIndex(indexName?: string): Promise<void>;                                           // default 'attachments'、rebuild 時は 'attachments-tmp' 指定
+  swapAttachmentAlias(fromTmpIndex: string): Promise<void>;                                           // 'attachments' alias を tmp 側の実 index に付け替える
   // rebuild window 中 dual-write 対応のため targetIndexes を受け取る
   syncAttachmentIndexed(attachmentId: string, pageId: string, docs: AttachmentEsDoc[], targetIndexes: string[]): Promise<void>;
   syncAttachmentRemoved(attachmentId: string, targetIndexes: string[]): Promise<void>;
   // Note: grant propagation API (syncPageAttachmentsGrantUpdated) is intentionally absent.
   // Under Option D, permission is resolved at query time by looking up page_index.
-  searchAttachmentsBody(query: string, options: SearchOptions): Record<string, unknown>;              // content-only, no permission filter (primary/secondary 両方で利用)
-  searchAttachmentsByPageIdsBody(query: string, pageIds: string[]): Record<string, unknown>;          // terms: { pageId } + content match (secondary 用、permission 再チェック不要)
-  mgetPagesForPermissionBody(pageIds: string[]): Record<string, unknown>;                             // page_index mget, _source_includes: 権限判定に必要な最小フィールドのみ
-  addAllAttachments(targetIndex: string, progress: (processed: number, total: number) => void): Promise<void>;
+  searchAttachmentsBody(keywords: AttachmentKeywordTerms, options: SearchOptions): Record<string, unknown>;       // content-only, no permission filter (primary/secondary 両方で利用)
+  searchAttachmentsByPageIdsBody(keywords: AttachmentKeywordTerms, pageIds: string[]): Record<string, unknown>;  // terms: { pageId } + content match (secondary 用)
+  searchAccessiblePages(
+    pageIds: string[],
+    filter: { terms: PageFilterTerms; resolvedFilterData: ResolvedFilterData },
+    viewer: IUser | null,
+    userGroups: ObjectIdLike[] | null,
+  ): Promise<AccessiblePage[]>;                                                                       // page_index を ids + viewer filter + 絞り込み条件で検索
 }
 ```
 
@@ -677,10 +733,11 @@ export interface AttachmentIndexOperations {
 - rebuild window 中: `AttachmentSearchIndexer` が `reindexBatch.getTmpIndexName()` から `'attachments-tmp'` を得て `syncAttachmentIndexed/Removed(…, ['attachments', 'attachments-tmp'])` と呼ぶ
 - `targetIndexes` は 1 回の bulk で書ききる (individual ES `_bulk` 内の action で複数 index 指定)。2 回別 API コールにはしない
 
-- ES 7/8/9 mapping 変種を version-aware に選択 (**権限フィールドは mapping に含めない**)
-- `searchAttachmentsBody` は attachments_index 向け content match body を返す pure builder。primary (facet=attachments / facet=all の 1 ページ目) と secondary の共通基底
+- ES 8/9 mapping 変種を version-aware に選択 (**権限フィールドは mapping に含めない**)
+- `searchAttachmentsBody` は attachments_index 向け content match body を返す pure builder。受け取るのは `AttachmentKeywordTerms` だけなので、`author:jim` のような演算子トークンが添付本文の検索語に混ざることは型の上で起きない (Req 4.6)。primary (facet=attachments / facet=all の 1 ページ目) と secondary の共通基底
 - `searchAttachmentsByPageIdsBody` は secondary enrichment 用。`terms: { pageId: primaryIds }` + content match を組み立てる。`pageIds.length ≤ ページサイズ` を caller 側で保証する前提
-- `mgetPagesForPermissionBody` は `facet=attachments` の primary で viewer permission 判定のために page_index を batch 取得する pure builder。`_source_includes: ['_id','grant','grantedUsers','grantedGroups','creator','path','title','updatedAt']` で Page body を帯同しない
+- `searchAccessiblePages` は「添付ヒットの親ページのうち、viewer が読めて、かつ検索演算子の条件を満たすもの」を page_index から 1 回の search で取り出す。既存 Page 検索と同じ部品を同じ順で使う: `createSearchQuery()` → `appendCriteriaForQueryString(query, { ...emptyKeywordTerms, ...terms })` (本文語は空にして絞り込み条件だけを積む) → `appendCriteriaForGroupFilter(query, terms, resolvedFilterData)` → `filterPagesByViewer(query, viewer, userGroups)` → `ids: pageIds` の filter を追加。権限判定と絞り込みを ES 側で既存ロジックのまま適用するため、添付側に権限判定や演算子解釈の独自実装を持たない (Req 4.3 / 4.5)。`_source` は `path` / `title` / `updatedAt` に限定し Page body を帯同しない
+- 対象 `pageIds` は常にページサイズ × k (k=1.5) 以下なので、`ids` filter の要素数が ES の上限に触れることはない
 
 ### ExtractionFailureLogService
 
@@ -703,19 +760,28 @@ export interface ExtractionFailureLogService {
 
 | Field | Detail |
 |-------|--------|
-| Intent | **優先 slot 駆動の primary 取得 + 非優先 slot の secondary enrichment** の 2 段階モデル。Page/Attachment のスコア尺度を混在させず、ページングを単一 slot に帰属させ、permission lookup を常にページサイズ bounded にする |
-| Requirements | 3.3, 4.1, 4.2, 4.3, 4.4, 9.1, 9.3 |
+| Intent | **優先 slot 駆動の primary 取得 + 非優先 slot の secondary enrichment** の 2 段階モデル。Page/Attachment のスコア尺度を混在させず、ページングを単一 slot に帰属させ、permission lookup を常にページサイズ bounded にする。検索演算子は本文語と絞り込み条件に振り分けて適用する |
+| Requirements | 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 9.1, 9.3 |
 
 **Contracts**: **Service [x]**
 
 ```typescript
+// Built once by SearchService.searchByFacet() from the raw query string:
+// parseSearchQuery() → resolve() → resolveFilterData(). The aggregator never re-parses.
+export interface AttachmentSearchInput {
+  queryString: string;                    // normalized query string (page-side function score)
+  terms: QueryTerms;
+  resolvedFilterData: ResolvedFilterData; // group:/not_group: resolved to ids
+  viewer: IUser | null;
+  userGroups: ObjectIdLike[] | null;
+}
+
 export interface AttachmentSearchResultAggregator {
   // 一次結果 (優先 slot 駆動、ページング可能)
   searchPrimary(
-    query: string,
-    viewer: IUser,
+    input: AttachmentSearchInput,
     options: {
-      facet: 'all' | 'pages' | 'attachments';
+      facet: 'all' | 'attachments';   // 'pages' は SearchService が既存経路で処理し aggregator を呼ばない
       from: number;
       size: number;
       resolve?: 'primary' | 'full';  // 'full' のとき同一呼び出し内で二次結果も同期解決
@@ -724,10 +790,9 @@ export interface AttachmentSearchResultAggregator {
 
   // 二次結果 (primary の pageId 配列に紐づく非優先 slot 情報を enrichment)
   resolveSecondary(
-    query: string,
-    viewer: IUser,
+    input: AttachmentSearchInput,
     options: {
-      facet: 'all' | 'attachments';  // 'pages' は secondary なし
+      facet: 'all' | 'attachments';
       primaryIds: string[];          // primary の pageId、常に ≤ ページサイズ
     },
   ): Promise<ISecondarySearchResult>;
@@ -740,7 +805,7 @@ interface IPrimarySearchResult {
   meta: {
     total: number | null;                   // null で track_total_hits=false
     nextCursor?: string;                    // search_after カーソル
-    primaryResultIncomplete?: boolean;      // facet=attachments で permission drop により size 未達
+    primaryResultIncomplete?: boolean;      // facet=attachments で権限・絞り込みによる drop により size 未達
   };
   // resolve=full のときのみ含まれる
   secondary?: ISecondarySearchResult;
@@ -761,14 +826,21 @@ interface ISecondarySearchResult {
 
 | facet | primary の動作 | secondary の動作 |
 |---|---|---|
-| `pages` | 既存 Page 検索経路のみ (attachments_index を触らない) | 呼ばない |
-| `all` | pages を優先、from==0 のみ attachments_index を同時取得し primary 20 件と pageId が一致するものを解釈 A で埋め込み | primary の 20 pageId に `terms` で絞った attachments_index 検索 |
-| `attachments` | attachments_index を優先検索、unique pageIds (≤ size × k 件) を `mget` で permission 判定 → filter | primary の parent page メタは mget 済みのため通常 no-op |
+| `pages` | 既存 Page 検索経路のみ (attachments_index を触らない、aggregator を呼ばない) | 呼ばない |
+| `all` | pages を優先 (既存 Page 検索と同じクエリ = 演算子込み)。from==0 のみ attachments_index を本文語だけで同時取得し、primary 20 件と pageId が一致するものを解釈 A で埋め込み | primary の 20 pageId に `terms` で絞った attachments_index 検索 (本文語のみ) |
+| `attachments` | attachments_index を本文語だけで優先検索 → unique pageIds (≤ size × k 件) を `searchAccessiblePages` に渡し、viewer filter と演算子の絞り込み条件を満たすページに属するヒットだけを残す | primary の parent page メタは取得済みのため通常 no-op |
+
+**検索演算子の振り分け** (Req 4.5 / 4.6):
+- `QueryTerms` を `AttachmentKeywordTerms` (`match` / `not_match` / `phrase` / `not_phrase`) と `PageFilterTerms` (それ以外の全キー) に分ける pure function `splitQueryTerms()` を置く。`PageFilterTerms` を「`AttachmentKeywordTerms` 以外すべて」と定義するため、今後 `QueryTerms` に演算子が増えても自動的に親ページ側に入る (本文語に紛れ込まない)
+- 添付本文には `AttachmentKeywordTerms` だけを当てる。親ページには `PageFilterTerms` + `resolvedFilterData` を viewer filter と一緒に当てる
+- `facet=all` の primary は既存 Page 検索そのものなので演算子は最初から効いており、添付ヒットは primary の pageId に限定されるため追加処理は要らない
+- 本文語が空 (例: `author:jim` だけのクエリ) のときは、添付 index には問い合わせない。`facet=attachments` は空 items を返し、`facet=all` は添付ヒットを付けない
+- 検索クエリが named query (`nq:`) により DEFAULT 以外の delegator に解決された場合は、facet の指定にかかわらず `pages` として扱い aggregator を呼ばない (添付 index は DEFAULT の全文検索 delegator にだけ存在するため)
 
 **permission lookup のコスト保証**:
 - `facet=all` の secondary は `terms: { pageId: primaryIds }` で常に ≤ 20 件 → terms 爆発なし
-- `facet=attachments` の primary での viewer filter は unique pageIds ≤ size × k (k=1.5) = 30 件程度の mget のみ
-- いずれも `_source_includes: ['_id','grant','grantedUsers','grantedGroups','creator']` で Page body を帯同しない
+- `facet=attachments` の primary での判定は unique pageIds ≤ size × k (k=1.5) = 30 件程度を `ids` filter に持つ page_index 検索 1 回のみ
+- いずれも `_source` を `path` / `title` / `updatedAt` に限定し Page body を帯同しない
 
 **safety net (R9 AC 9.1 互換性)**:
 - primary の総処理時間が設定閾値 (例: 800ms) を超過したら `facet=all` は facet=pages と同等の結果に degrade、`facet=attachments` は空 items + `primaryResultIncomplete: true` を返す
@@ -791,7 +863,7 @@ interface ISecondarySearchResult {
 
 **`GET /_api/v3/search/attachments` の制約**:
 - `pageIds` は **必須**、要素数の上限はページサイズ (default 20、admin 設定で可変) と一致。超過は 400
-- viewer は session から取得。`pageIds` に対し **permission 再チェックしない** (primary 検索経路で既に viewer filter を通過済み前提)。ただし **pageId 単位で当該ページが現在も存在し viewer が参照可能か** を軽量 mget で検証し、消失/権限失効ページは enrichment 対象から除外 (primary 発行から secondary 発行までの時間差対策)
+- viewer は session から取得。`pageIds` に対し **permission 再チェックしない** (primary 検索経路で既に viewer filter を通過済み前提)。ただし **pageId 単位で当該ページが現在も存在し viewer が参照可能か** を `searchAccessiblePages` (ids + viewer filter) で検証し、消失/権限失効ページは enrichment 対象から除外 (primary 発行から secondary 発行までの時間差対策)
 - 添付検索が無効の場合は 503 feature_disabled (UI が secondary を呼ばない運用が正だが、保険)
 
 `AttachmentSearchConfig` / `AttachmentSearchConfigUpdate` DTO shape (ともに `enabled` / `maxConcurrency` は含まない):
@@ -903,7 +975,7 @@ async function computeRequiresReindex(): Promise<boolean> {
   if (!isAttachmentFullTextSearchEnabled) return false;
 
   // 2. MongoDB 上の全添付数 (indexed collection 前提、軽量)
-  const mongoCount = await Attachment.countDocuments();
+  const mongoCount = await prisma.attachments.count();
   if (mongoCount === 0) return false;
 
   // 3. ES attachments index 上のユニーク添付数 (1 添付 = N docs のため cardinality agg が必須)
@@ -924,11 +996,11 @@ async function computeRequiresReindex(): Promise<boolean> {
 
 **前提となる Interpretation A (現 design 維持)**:
 - 本 spec は supported format / unsupported format / 抽出失敗の全ケースで attachment ES doc (content は空 or 抽出テキスト) を作成する (Req 2.4 / 2.5)
-- したがって `Attachment.countDocuments()` (全添付) を filter なしで比較してよい
+- したがって `prisma.attachments.count()` (全添付) を filter なしで比較してよい
 - 全形式で `originalName` はファイル名検索対象としてインデックス化される (mapping が `text + keyword`)
 
 **性能と TTL キャッシュ**:
-- `Attachment.countDocuments()`: indexed、数 ms
+- `prisma.attachments.count()`: 数 ms
 - ES `cardinality` aggregation: `attachmentId` が keyword field のため高速、典型 <50ms
 - admin config GET を連打されないよう、`AttachmentSearchConfigService` 内に **30 秒 TTL の in-memory キャッシュ** を置く (admin 画面の SWR default revalidate と相性が良く、rebuild 完了直後の反映も 30 秒以内に期待できる)
 - `save()` (PUT config) 成功時はキャッシュを即 invalidate して次回 GET で再計算
@@ -946,7 +1018,7 @@ async function computeRequiresReindex(): Promise<boolean> {
 | real-time で ES 書き込み自体が失敗 | N+1 | N | true (transient) | FailureLog 記録、次回 bulk rebuild で解消、一時 false positive は許容 |
 | URI クリア後 (soft-disable 中) | — | — | false | 早期 return。既存 ES docs は残存するが UI ガイダンスは不要 |
 | rebuild window 中 (alias swap 前) に新規アップロード | N+1 | N+1 | false | dual-write により live + tmp 両方に書かれるため swap 後も count 一致 (Flow 5 `rebuild window 中の dual-write` 参照) |
-| PUT | /_api/v3/search/indices | `{ operation: 'rebuild', includeAttachments?: boolean }` | 既存 response + attachment 統計 | 既存 + 503 feature_disabled |
+| PUT | /_api/v3/search/indices | `{ operation: 'rebuild', includeAttachments?: boolean }` | 既存 response (作り直しの完了を待たずに 200) | 既存 + 409 rebuild_in_progress + 503 feature_disabled |
 
 権限:
 - `reextract`: `accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT])` + `loginRequiredStrictly` + (admin OR page editor)
@@ -1043,8 +1115,8 @@ export interface SearchConfigurationProps {
 ```
 Document ID: `${attachmentId}_${pageNumber ?? 0}`
 Primary fields:
-  attachmentId: keyword            # ObjectId
-  pageId: keyword                  # 親ページ ObjectId (permission は query-time に page_index から lookup)
+  attachmentId: keyword            # Attachment の id (24 桁の 16 進文字列)
+  pageId: keyword                  # 親ページの id (permission は query-time に page_index から lookup)
   pageNumber: integer (nullable)   # 1始まり、位置概念なしは null
   label: keyword (nullable)        # 表示用ラベル
   fileName: keyword
@@ -1065,24 +1137,32 @@ Primary fields:
 - `attachments` 実インデックス + `attachments` エイリアス (既存 Page 側 `${indexName}` と同じ命名)
 - **起動時 alias 衝突チェック**: `initializeSearchIndex` で `attachments` alias の既存を確認。alias が本 spec 所有の実 index 以外 (外部運用で作成された index や deprecated version) を指している場合、起動ログに WARN を出して human intervention を促す (`initialize` は続行しない)。OSS デプロイで既存 `attachments` index / alias 名が別用途で使われていた場合の silent upsert 破壊を防止
 - rebuildIndex 時は**固定名 `attachments-tmp`** を使って atomic alias swap (Page 側 `${pageIndexName}-tmp` と同じパターン)。開始時に drop → create で冪等化し、tmp index は累積しない
-- ES 7/8/9 それぞれの mapping は `mappings/attachments-mappings-esN.ts` で differ
+- ES 8/9 それぞれの mapping は `mappings/attachments-mappings-esN.ts` で differ
 
-### Logical Data Model — MongoDB `extractionFailureLogs`
+### Logical Data Model — MongoDB `extractionfailurelogs` (Prisma モデル)
 
+Mongoose schema は持たず、`apps/app/prisma/schema.prisma` の model として定義する (監査ログ同期の `auditlog_es_sync_status` / `changestream_resume_tokens` と同じ Prisma-only の扱い)。
+
+```prisma
+model extractionfailurelogs {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  attachmentId       String   @db.ObjectId
+  pageId             String?  @db.ObjectId
+  fileName           String
+  fileFormat         String
+  fileSize           Int
+  reasonCode         String   // 'unsupportedFormat' | 'fileTooLarge' | 'extractionTimeout' | 'serviceBusy' | 'serviceUnreachable' | 'extractionFailed'
+  message            String?
+  occurredAt         DateTime @db.Date
+  retentionGroupHash String   // 重複抑制 (attachmentId + reasonCode ローリング)
+}
 ```
-_id: ObjectId
-attachmentId: ObjectId ref Attachment
-pageId: ObjectId ref Page
-fileName: string
-fileFormat: string
-fileSize: number
-reasonCode: enum('unsupportedFormat'|'fileTooLarge'|'extractionTimeout'|'serviceBusy'|'serviceUnreachable'|'extractionFailed')
-message: string?
-occurredAt: Date
-retentionGroupHash: string    # 重複抑制 (attachmentId + reasonCode ローリング)
-```
 
-TTL index: `occurredAt` に 90 日 TTL。
+Index (Prisma-only のコレクションは `prisma db push` を deploy で使わないため、migrate-mongo の migration で作成する):
+- `occurredAt` に 90 日 TTL (`expireAfterSeconds: 7776000`)
+- `attachmentId`、`retentionGroupHash` に通常 index
+
+運用上の扱い: `extractionfailurelogs` は抽出サービスとの間で起きた失敗の運用記録であり、移行先の環境では意味を持たないため、G2G 転送の対象外コレクション (`non-transferable-collections.ts`) に加える。
 
 ### Data Contracts
 
@@ -1118,11 +1198,11 @@ interface IAttachmentHit {
 - **System Errors (5xx)**: 抽出サービス到達不可 / ES エラーは apps/app 側で握りつぶし、「検索対象外」として保存を継続 (Req 1)
 - **Extraction-specific errors**: 上流が返す `unsupported_format` / `file_too_large` / `extraction_timeout` / `service_busy` / `extraction_failed` を `AttachmentTextExtractorService` で `ExtractionOutcome` に統一正規化
 - **到達不可**: ネットワーク層 throw を catch して `serviceUnreachable` に畳み込む
-- **Permission 判定失敗**: `facet=attachments` primary の mget または secondary の viewer 再検証 mget が失敗した場合、Aggregator は該当添付ヒットを全て除外する fail-close 経路に合流 (漏洩防止優先)。facet=`all` primary では pages viewer filter が有効なので別経路で degrade
-- **Permission 判定の partial failure 処理 (fail-close 徹底)**: mget が部分的に成功 (一部 pageId は 200、他は 404 / errors 配列にエラー) したケースでは、**成功分のみを許可判定に使い、エラー/欠損分は一律除外**する。`found:false` は「存在せず」として除外、`errors` 配列は「権限不明」として同じく除外。**「一部成功で全件許可」や「エラーを無視して成功分のみ通す」のような fail-open ブランチは絶対に実装しない**。この挙動は integ test で以下の 3 ケースを明示的に verify: (a) 全件 200 (b) 一部 404 (c) `errors` 配列に含まれる pageId あり
+- **Permission 判定失敗**: `facet=attachments` primary または secondary の viewer 再検証で `searchAccessiblePages` が失敗した場合、Aggregator は該当添付ヒットを全て除外する fail-close 経路に合流 (漏洩防止優先)。facet=`all` primary では pages viewer filter が有効なので別経路で degrade
+- **Permission 判定は「返ってきたものだけ許可」(fail-close 徹底)**: `searchAccessiblePages` の応答に含まれた pageId だけを許可し、含まれない pageId (存在しない・権限が無い・絞り込み条件を満たさない) は理由を区別せず一律除外する。shard の一部失敗 (`_shards.failed > 0`) を含む応答は判定に使わず、全件除外する。**「応答に無い pageId を許可する」fail-open ブランチは絶対に実装しない**
 - **Orphan sweeper 失敗**: `AttachmentOrphanSweeper` の失敗は `rebuildIndex` 全体の成功を阻害しない。pino に構造化ログを記録し、alias swap は続行 (query-time permission 判定によりユーザ可視性は守られるため、cleanup 遅延は許容)
 - **rebuild window 中の dual-write 失敗**: tmp index 側の write 失敗は live 側の成功を阻害しない (pino 記録のみ、real-time event は成功扱い)。tmp 側だけに書き漏れが発生した場合、alias swap 後に当該添付が検索で出ないが、次回の rebuild で救済。ユーザーが遭遇する期間は短く、可視性に致命的な影響はないと判断
-- **rebuild lifecycle leak**: `AttachmentReindexBatch.end()` 呼び出し漏れによる `isRebuilding=true` の leak を防ぐため、API route で try/finally 必須。万が一 leak してもプロセス再起動で state は reset される (in-memory boolean のため永続化なし)
+- **作り直し全体の失敗**: `startRebuild()` の裏の処理が例外で止まった場合は `AttachmentRebuildingFailed` を emit し、alias swap は行わない。実行中フラグは `startRebuild()` 内部の finally で必ず下ろす。プロセス再起動時も in-memory boolean のため `false` から始まる
 
 ### Monitoring
 
@@ -1143,12 +1223,15 @@ interface IAttachmentHit {
 - `AttachmentSearchIndexer.onAttach` の有効化ゲート: 無効時に抽出呼び出しが一切発生しないこと (extractorToken 未設定時も無効扱いになる 4 条件の AND を全 path で verify)
 - `build-attachment-search-query` の純粋性: 権限フィルタを含まず content マッチのみが組み立つこと
 - `build-attachments-by-page-ids-query`: `terms: { pageId: [...] }` + content match が正しく組み立つこと。`pageIds.length > ページサイズ` のとき assert で弾くこと
-- `mgetPagesForPermissionBody`: `_source_includes` が権限判定用フィールドに限定されること (Page body 非帯同の保証)
+- `splitQueryTerms`: `author:jim -tag:draft 議事録 "週次 報告"` を分けると、本文語側は `match: ['議事録']` / `phrase: ['"週次 報告"']` だけになり、`author` / `not_tag` は絞り込み条件側にだけ入ること。`QueryTerms` の全キーがどちらか一方にだけ入ること
+- `searchAccessiblePages`: 生成される page_index クエリに `ids` filter・viewer filter・演算子の絞り込み条件が含まれ、本文語の match 句は含まれないこと。`_source` が `path` / `title` / `updatedAt` に限定されること (Page body 非帯同の保証)
 - `AttachmentSearchResultAggregator.searchPrimary`:
   - facet=`pages` で attachments_index / secondary いずれも発火しないこと
   - facet=`all` かつ from==0 で attachments_index を同時取得し、pageId が primary 20 件に一致するヒットのみ埋め込むこと (解釈 A: 不一致ヒットは破棄)
   - facet=`all` かつ from>0 で attachments_index を叩かないこと
-  - facet=`attachments` で primary 内 mget permission filter により drop が発生した場合 `primaryResultIncomplete: true` を返すこと
+  - facet=`attachments` で `searchAccessiblePages` による権限・絞り込みの drop が発生した場合 `primaryResultIncomplete: true` を返すこと
+  - facet=`attachments` / `all` で、添付 index に送る本文クエリに演算子トークン (`author:jim` 等) が含まれないこと。本文語が空のクエリでは添付 index に問い合わせないこと
+  - named query (`nq:`) で DEFAULT 以外の delegator に解決されたクエリは facet 指定にかかわらず pages 経路になること
   - primary レイテンシ閾値超過時に facet=`all` は facet=`pages` 相当に degrade、facet=`attachments` は空 items + incomplete フラグを返す safety net
 - `AttachmentSearchResultAggregator.resolveSecondary`:
   - `primaryIds.length > ページサイズ` で 400 相当のエラーを返す
@@ -1158,10 +1241,11 @@ interface IAttachmentHit {
   - `reindexBatch.isRebuilding()` が false のとき `syncAttachmentIndexed/Removed` の `targetIndexes` が `['attachments']` のみ
   - `reindexBatch.isRebuilding()` が true のとき `['attachments', 'attachments-tmp']` 両方が渡ること
   - tmp 側 write 失敗時も live 側は成功扱いで return、pino に warn log が出ること
-- `AttachmentReindexBatch` lifecycle:
-  - `begin('attachments-tmp')` 後に `isRebuilding() === true` / `getTmpIndexName() === 'attachments-tmp'`
-  - `end()` 後に `isRebuilding() === false` / `getTmpIndexName() === null`
-  - `begin()` が既に true で再呼び出しされた場合 conflict error を throw
+- `AttachmentReindexBatch.startRebuild`:
+  - 呼び出しが裏の処理の完了を待たずに返り、返った直後から `isRebuilding() === true` / `getTmpIndexName() === 'attachments-tmp'` であること
+  - 裏の処理の完了後は `isRebuilding() === false` / `getTmpIndexName() === null` に戻り、`FinishAddAttachment` が emit されること
+  - 渡した `rebuildPageIndex` が reject した場合も実行中フラグが下り、`AttachmentRebuildingFailed` が emit され、alias swap が行われないこと
+  - 実行中に再度呼ぶと `RebuildInProgressError` を同期で throw すること
 - `build-snippet-segments` (ES highlighter parse):
   - `<em>...</em>` で囲まれた部分が `{text, highlighted: true}`、それ以外が `{text, highlighted: false}` になること
   - `<script>alert(1)</script>` / `<img src=x onerror=...>` を含む input が全て `{text, highlighted: false}` の単一 segment になり、tag はエスケープされずそのまま text に保持される (UI 層の React text node で escape される前提)
@@ -1170,10 +1254,10 @@ interface IAttachmentHit {
   - 1 回目 503 → 2 回目 200 で success を返す
   - 1 回目 503 → 2 回目も 503 で `serviceBusy` を返し、FailureLog 記録が 1 件
   - exponential backoff + jitter の base delay が設定値通りであること
-- Permission mget partial failure (fail-close 徹底):
-  - mget response で一部が `found:false` のとき、該当 pageId が accessible 扱いにならない
-  - mget response の `errors` 配列にエラーがある pageId も accessible 扱いにならない
-  - 完全成功のみ accessible に追加される
+- Permission 判定の fail-close:
+  - `searchAccessiblePages` の応答に含まれない pageId の添付ヒットが結果に残らないこと
+  - `_shards.failed > 0` の応答では添付ヒットが全件除外されること
+  - `searchAccessiblePages` が throw した場合に添付ヒットが全件除外されること
 - reextract current grant 再チェック:
   - session は editor 権限、しかし Page current grant では viewer 以下 (demote 済み) の状態で reextract 呼び出し → 403 forbidden
   - session / Page current grant ともに editor → 200 + `ExtractionOutcome` 返却
@@ -1184,13 +1268,15 @@ interface IAttachmentHit {
 
 - 添付アップロード → attach handler → `attachments` index に bulk upsert された文書数が抽出 pages 数と一致。**ES 文書に grant 系フィールドが含まれないこと**
 - 添付削除 → detach handler → 該当添付 ID の文書が全削除される
-- 親ページ権限変更 → **添付 ES 文書は更新されない**が、次回検索で viewer が閲覧不可になったページの添付ヒットが結果から除外される (facet=`all` secondary の primaryIds 制限 / facet=`attachments` primary の mget permission filter の E2E 検証)
-- 親ページ削除 → **real-time cascade は発生しない**が、次回検索で当該添付ヒットが primary の mget permission filter により除外される。rebuildIndex 実行後に orphan sweeper によりドキュメントが実削除される
-- `GET /search/attachments?q=...&pageIds=...` (secondary endpoint) → primaryIds で指定された pageId の添付ヒットのみ返り、viewer 許諾済ページ前提のため permission 再チェックは行わない。pageIds.length 超過で 400。消失/権限失効ページは軽量 mget で検出して除外
-- `PUT /search/indices { includeAttachments: true }` → tmp 両 index 生成 → orphan sweeper 実行 → alias swap 成功
+- 親ページ権限変更 → **添付 ES 文書は更新されない**が、次回検索で viewer が閲覧不可になったページの添付ヒットが結果から除外される (facet=`all` secondary の primaryIds 制限 / facet=`attachments` primary の ids 指定 page 検索の E2E 検証)
+- 親ページ削除 → **real-time cascade は発生しない**が、次回検索で当該添付ヒットが primary の ids 指定 page 検索により除外される。rebuildIndex 実行後に orphan sweeper によりドキュメントが実削除される
+- `GET /search/attachments?q=...&pageIds=...` (secondary endpoint) → primaryIds で指定された pageId の添付ヒットのみ返り、viewer 許諾済ページ前提のため permission 再チェックは行わない。pageIds.length 超過で 400。消失/権限失効ページは ids 指定の page 検索で検出して除外
+- 検索演算子の適用: 2 人のユーザがそれぞれ作成したページに同じ語を含む添付を置き、`author:<一方> <語>` を facet=`attachments` / `all` で検索すると、一方のページの添付だけが返ること。`-tag:` / `prefix:` / `group:` でも同様に親ページの条件で絞られること
+- `PUT /search/indices { includeAttachments: true }` → 作り直しの完了前に 200 が返る → 裏で Page の作り直し → `attachments-tmp` 生成 → orphan sweeper 実行 → `attachments` alias swap → `FinishAddAttachment` を受信
+- 作り直しの実行中に 2 回目の `PUT /search/indices { includeAttachments: true }` → 409 `rebuild_in_progress`
 - **rebuild window 中の dual-write**: rebuild 実行中に別テスト runner から `AttachmentService.attach()` / `detach()` を発火させ、live alias と `attachments-tmp` の両方に doc が存在することを assert。alias swap 後も live alias から当該添付が検索 hit することを E2E 検証
 - **rebuild window 中の dual-write 失敗耐性**: tmp index を中途で delete して bulk がエラーになる状況を stub で作り、live 側の書き込みが成功し続け、real-time event の成功戻り値が返ることを assert
-- **rebuild lifecycle leak 耐性**: `Batch.begin()` 後に `rebuildIndex()` が例外 throw しても、API route の finally 節で `Batch.end()` が呼ばれ `isRebuilding=false` に戻ること
+- **作り直し失敗時の後始末**: Page 側の `rebuildIndex()` が例外を throw したとき、`AttachmentRebuildingFailed` を受信し、`isRebuilding=false` に戻り、`attachments` alias は旧 index を指したままであること
 - `POST /attachments/:id/reextract` → ES 文書が更新される / 権限なしで 403 / 機能無効で 503
 - 機能無効化 → 添付 handler が一切抽出呼び出しを行わない
 - `GET /admin/attachment-search/failures` → 記録済みエントリが返る
@@ -1233,10 +1319,10 @@ interface IAttachmentHit {
 - **戦略 1 — ページング負荷を単一 slot に集約**: 優先 slot のみが `search_after` / `from+size` ページングを保持。非優先 slot は 1 ページ目のみ補助取得 or 全く呼ばない。ページ 2 以降の ES 負荷は既存 Page 検索と同じ
 - **戦略 2 — permission lookup は常にページサイズ bounded**:
   - `facet=all` の secondary: `terms: { pageId: primaryIds }` は常に ≤ ページサイズ (default 20)
-  - `facet=attachments` の primary: unique pageIds ≤ size × k (k=1.5) = 30 件程度の `mget` のみ
+  - `facet=attachments` の primary: unique pageIds ≤ size × k (k=1.5) = 30 件程度を `ids` に持つ page_index 検索 1 回のみ
   - いずれも `max_terms_count` / `max_clause_count` に抵触する余地なし。terms 爆発リスクが**構造的に消滅**
-- **戦略 3 — Page メタ batch 化**: `mget` は `_source_includes: ['_id','grant','grantedUsers','grantedGroups','creator','path','title','updatedAt']` で Page body を帯同しない。N+1 禁止
-- **戦略 4 — ファセット別クエリスキップ**: `facet=pages` で attachments_index と secondary はともに発火しない、`facet=attachments` で page_index 本文クエリはスキップ (permission 判定のための mget のみ)
+- **戦略 3 — Page メタ batch 化**: `searchAccessiblePages` は 1 回の search で全 pageId を判定し、`_source` を `path` / `title` / `updatedAt` に限定して Page body を帯同しない。権限判定は ES 側の filter で行うため、権限フィールドを app 側に持ち帰らない。N+1 禁止
+- **戦略 4 — ファセット別クエリスキップ**: `facet=pages` で attachments_index と secondary はともに発火しない、`facet=attachments` で page_index 本文クエリはスキップ (権限と絞り込みの判定のための ids 指定検索のみ)
 - **戦略 5 — size 上限と early-terminate**: デフォルト size=20、`terminate_after` / `track_total_hits=false` を既存水準で適用
 - **戦略 6 — progressive enhancement**: 通常 UX は `resolve=primary` (default) で 1 次描画を最速化し、secondary は別リクエストで非同期に取得・enrichment。初期描画 p95 は Page 検索単体と同等を維持
 - **劣化時 fallback (safety net)**:
@@ -1260,7 +1346,7 @@ flowchart LR
     B -.->|new install| F
 ```
 
-- Phase 1: コード deploy (`extractorUri` 未設定 default)。算出値 `isAttachmentFullTextSearchEnabled` が `false` のため既存挙動と完全互換
+- Phase 1: コード deploy (`extractorUri` 未設定 default)。起動時の migrate-mongo で `extractionfailurelogs` の index を作成。算出値 `isAttachmentFullTextSearchEnabled` が `false` のため既存挙動と完全互換
 - Phase 2: admin API で `extractorUri` を設定 (= 機能有効化)。以降の新規アップロードは自動インデックス
 - Phase 3: 既存添付を取り込む admin は rebuildIndex を実行
 - ロールバック (soft-disable): admin UI で `extractorUri` を空文字 / null にクリア → 算出値 `isAttachmentFullTextSearchEnabled` が `false` に遷移し検索経路は旧挙動。`attachments` index は残置されるが参照されない
@@ -1285,7 +1371,7 @@ flowchart LR
 
 1. ~~**OpenAPI drift 検知 CI の具体コマンド**: `pnpm turbo` + orval + 上流 `/openapi.json` エクスポートの pipeline 配線。実装時に確定~~ **[Resolved]** `openapi.json` と orval 生成物の両方を commit、Python CI で export 後の `git diff --exit-code openapi.json`、Node CI で orval 後の `git diff --exit-code src/` の 2 段 drift 検知を採用 (上記 File Structure Plan OpenAPI パイプラインセクション)
 2. ~~**権限イベント網羅性**: `updateMany` / `syncDescendantsUpdate` で全権限変更経路を捕捉できているか、`pageEvent` 全リスナの整合性を実装時に確認~~ **[Resolved: Option D 採用により自動解決]** 添付側は権限を保持せず query-time に page_index を参照するため、pageEvent 購読の網羅性は添付検索の正しさには影響しない (page_index 側の同期が既に妥当であれば自動的に添付検索にも反映される)
-3. **優先 slot 駆動検索の実測性能**: kuromoji + ngram analyzer を添付 index に適用した際の p95、`facet=attachments` primary の mget permission 判定レイテンシ分布、safety net 閾値 (primary 800ms / secondary 500ms) の妥当な値
+3. **優先 slot 駆動検索の実測性能**: kuromoji + ngram analyzer を添付 index に適用した際の p95、`facet=attachments` primary の ids 指定 page 検索のレイテンシ分布、safety net 閾値 (primary 800ms / secondary 500ms) の妥当な値
 4. ~~**permission lookup の scale 監視 (新規 Risk)**: 1 クエリで 10k 件超の missing pageIds が発生するケース (巨大テナント × 添付ヒット多数のファセット検索) の ES 側性能。terms filter サイズの上限設定、page_index `max_terms_count` への抵触、および必要なら size chunking 戦略を実装時に検証~~ **[Resolved: 優先 slot 駆動モデル採用により構造的に消滅]** permission lookup 対象は常にページサイズ (default 20) bounded になり、terms 爆発リスクが構造的に発生しない
 8. **secondary resolution の UX 案内**: `facet=all` で添付のみヒットがページ外に漏れる場合、UI で「添付優先モードに切替えて再検索」を誘導する文言と IA を `attachment-search-ui` spec 側で具体化。`facet=attachments` で `primaryResultIncomplete: true` 時の「追加読み込み」ボタン文言も同様に UI spec 側で確定
 5. **Socket.io イベント名の衝突回避**: `AddAttachmentProgress` / `FinishAddAttachment` の既存 namespace との衝突を init 時に検証

@@ -16,13 +16,14 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 
 ### あるべき姿 (本 spec のスコープ)
 
-- 添付専用 Elasticsearch インデックス `attachments` (ES 7/8/9 対応 mapping) が存在。**権限情報 (grant / granted_users / granted_groups / creator) は保持しない**
+- 添付専用 Elasticsearch インデックス `attachments` (ES 8/9 対応 mapping) が存在。**権限情報 (grant / granted_users / granted_groups / creator) は保持しない**
 - 添付アップロード時に自動で抽出サービスを呼び出し、結果を ES にインデックスする (1 添付 = N 文書)
 - 添付削除は即時 ES に反映される。親ページ削除・権限変更は **query-time permission lookup** により検索時に整合が取れる (添付 ES 文書の更新は不要)
-- 既存添付を一括でインデックス化する admin 操作を提供 (`rebuildIndex` 拡張)。親 Page が不在の添付 doc は orphan sweeper が cleanup する
+- 既存添付を一括でインデックス化する admin 操作を提供 (`rebuildIndex` 拡張)。作り直しは HTTP 応答を待たせずに裏で進め、完了・失敗は Socket.io で通知する。親 Page が不在の添付 doc は orphan sweeper が cleanup する
 - 個別添付を再抽出する apiv3 エンドポイントを提供
 - 抽出失敗が MongoDB に永続化され admin が参照可能
 - 検索クエリが Page index と Attachment index を multi-index で評価し、**添付のみヒットのページについては page_index を viewer filter 付きで lookup して権限判定**、親ページ単位に集約した応答型を返す
+- 検索演算子 (`prefix:` / `tag:` / `author:` / `editor:` / `group:` と各否定形) は親ページの絞り込み条件として添付ヒットにも適用され、演算子のトークンは添付本文の検索語として使われない
 - 抽出サービス到達不可時も apps/app の添付保存と既存検索は継続動作
 - 機能無効時は既存検索 API の挙動が機能導入前と完全一致 (非互換ゼロ)
 - **核心メリット**: 権限情報を添付側に snapshot しない query-time permission lookup 方式 (Option D) の採用により、sync drift 起因の snippet 漏洩は**構造的に発生しない**
@@ -46,7 +47,7 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 
 - ライセンス: MIT / Apache-2.0 / BSD 系のみ (orval は MIT)
 - 対応 OS: apps/app は Windows/macOS/Linux 全対応を維持 (`packages/markitdown-client` は純 TS で cross-platform)
-- ES バージョン: 既存 7/8/9 を維持 (mapping 変種を `attachments-mappings-esN.ts` に分離)
+- ES バージョン: 既存のサポート範囲 (8/9) に従う (mapping 変種を `attachments-mappings-esN.ts` に分離)
 - 非互換ゼロ: 機能無効時は既存検索 API のレイテンシ・結果順序・応答形式を機能導入前と同一にする
 - API 後方互換: `IPageWithSearchMeta.attachmentHits` は optional に限定
 - OpenAPI drift 検知: CI で上流 `services/markitdown-extractor/` の OpenAPI spec と `packages/markitdown-client/openapi.json` の差分を検知
@@ -73,10 +74,11 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
   - 一括再インデックスのサーバ側バッチ処理と Socket.io 進捗イベント発行 (UI 描画は対象外)
   - 個別再抽出 apiv3 エンドポイント (`POST /_api/v3/attachments/:id/reextract`)
   - admin 用 apiv3 エンドポイント (`GET/PUT /_api/v3/admin/attachment-search/config`, `GET /failures`)
-  - `PUT /_api/v3/search/indices` の `includeAttachments` フラグ受理
+  - `PUT /_api/v3/search/indices` の `includeAttachments` フラグ受理と、添付を含む作り直しの非同期実行
   - 抽出失敗の MongoDB 永続化 (`ExtractionFailureLog`) と集計
   - Config キー群 (`app:attachmentFullTextSearch:extractorUri` / `:timeoutMs` / `:maxFileSizeBytes` の 3 キー) の定義と ConfigManager 経由の永続化。`extractorUri` は admin Config として扱い、環境変数 `GROWI_MARKITDOWN_EXTRACTOR_URI` を初期値として採り得る (既存 `app:elasticsearchUri` と同等のパターン)。機能の「有効/無効」は独立した Config キーを持たず、`searchService.isConfigured && extractorUri != null && extractorUri !== ''` の**算出値**として扱う。`maxConcurrency` は抽出サービス側の env var 専用で Config キーとしては提供しない
   - multi-index msearch のクエリビルダ、viewer フィルタ、pageId 集約
+  - 既存の検索演算子を、添付本文に当てる検索語と親ページに当てる絞り込み条件に振り分ける処理
   - 応答型 `IPageWithSearchMeta.attachmentHits[]` の optional 追加 (後方互換)
   - 機能無効化ゲートの全サーバ側入口への適用
   - 抽出成功/失敗/スキップの pino 構造化ログと監視メトリクス公開
@@ -144,6 +146,8 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 2. When 親ページの権限が変更された後に検索クエリが実行される, the apps/app shall 次回検索時の permission lookup が更新後の page_index を参照するため、追加の sync 処理なしに更新後の権限に基づいて添付ヒットの可視性を制御する <!-- derived from umbrella R8.2 -->
 3. The 添付検索の権限判定 shall 既存 `filterPagesByViewer` と**同一の権限モデル (grant 種別・granted users・granted groups) を page_index 側で (ES 上で) 適用**する。添付側に独自の権限実装を持たない <!-- derived from umbrella R8.3 -->
 4. If 親ページが既に削除されている添付が ES に残存する, the apps/app shall query-time permission lookup において当該 pageId が page_index に存在しない → アクセス不可と判定し、当該添付ヒットを検索結果から除外する (orphan sweeper による eventual cleanup が実行されるまでの間も漏洩は発生しない) <!-- derived from umbrella R8.4 -->
+5. When 検索クエリに検索演算子 (`prefix:` / `-prefix:` / `tag:` / `-tag:` / `author:` / `-author:` / `editor:` / `-editor:` / `group:` / `-group:`) が含まれる, the apps/app shall どの facet でも、添付ヒットを「同じ演算子で通常のページ検索をしたときに返りうるページ」に属するものに限定する
+6. The apps/app shall 検索演算子のトークンを添付本文 (`content`) の検索語として使わず、添付本文には演算子を除いた検索語 (通常語・否定語・フレーズ) だけを当てる
 
 ### Requirement 5: URI 設定による機能有効化と設定 API <!-- derived from umbrella R9.1〜R9.5 -->
 
@@ -153,7 +157,7 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 
 1. The apps/app shall 抽出サービスの接続先 URI (`extractorUri`) を admin Config として保持し、「ES が有効 AND `extractorUri` が設定済み (null/空文字でない)」を機能有効の判定式 (算出値) として提供する <!-- derived from umbrella R9.1 -->
 2. The apps/app shall 抽出サービスの接続先 URI (`extractorUri`)、最大ファイルサイズ (`maxFileSizeBytes`)、抽出タイムアウト (`timeoutMs`) の 3 つの Config キーを ConfigManager 経由で永続化し、admin API で取得・更新可能にする。同時実行上限 (`maxConcurrency`) は抽出サービス側の env var で管理し Config キーとしては提供しない <!-- derived from umbrella R9.2 -->
-3. The apps/app shall 設定 API 応答 (`GET /_api/v3/admin/attachment-search/config`) に算出値 `requiresReindex: boolean` を含める。当該フラグは**Config collection に persist せず**、「`Attachment.countDocuments()` > ES `attachments` index の `attachmentId` cardinality 数」が成立するとき true とする (算出は 30 秒 TTL の in-memory キャッシュ、`PUT config` 成功時に即 invalidate)。これにより URI 未設定→設定済みに変わった直後や、rebuild 前の初期 migration 状態で admin に取り込み推奨シグナルを提示できる <!-- derived from umbrella R9.3 (サーバ部分) -->
+3. The apps/app shall 設定 API 応答 (`GET /_api/v3/admin/attachment-search/config`) に算出値 `requiresReindex: boolean` を含める。当該フラグは**Config collection に persist せず**、「MongoDB 上の添付総数 > ES `attachments` index の `attachmentId` cardinality 数」が成立するとき true とする (算出は 30 秒 TTL の in-memory キャッシュ、`PUT config` 成功時に即 invalidate)。これにより URI 未設定→設定済みに変わった直後や、rebuild 前の初期 migration 状態で admin に取り込み推奨シグナルを提示できる <!-- derived from umbrella R9.3 (サーバ部分) -->
 4. Where `extractorUri` が未設定または空である (すなわち算出値 `isAttachmentFullTextSearchEnabled` が false), the apps/app shall 添付ヒットを検索結果に含めず、抽出サービスへの新規呼び出しを行わない <!-- derived from umbrella R9.4 -->
 5. When `extractorUri` が未設定または空である期間中に新規添付がアップロードされる, the apps/app shall 添付の保存を継続し、`extractorUri` 再設定後の一括再インデックスで取り込めるようにする <!-- derived from umbrella R9.5 -->
 
@@ -167,6 +171,8 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 2. If 一括再インデックス中に特定の添付で抽出が失敗する, the apps/app shall 当該添付をスキップして処理を継続し、失敗を構造化ログおよび ExtractionFailureLog に記録する <!-- derived from umbrella R10.4 -->
 3. The apps/app shall 一括再インデックスの進捗を既存 Socket.io チャネルと同経路で公開する (`AddAttachmentProgress` / `FinishAddAttachment` 相当)
 4. If 一括再インデックス実行中に apps/app が中断される, the apps/app shall tmp インデックスを alias swap せずに旧 index を維持する
+5. When `PUT /_api/v3/search/indices` が `includeAttachments=true` で呼ばれる, the apps/app shall Page/Comment と添付の作り直しの完了を待たずに応答を返し、作り直しの完了を `FinishAddAttachment` で、失敗を `AttachmentRebuildingFailed` で Socket.io 通知する
+6. If 添付を含む作り直しの実行中に再度 `includeAttachments=true` の作り直しが要求される, the apps/app shall 409 を返して二重起動しない
 
 ### Requirement 7: 個別再抽出 API <!-- derived from umbrella R11.2 -->
 
