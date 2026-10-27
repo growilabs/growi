@@ -127,7 +127,7 @@ apps/app/src/test-utils/
 
 ### Modified Files
 
-- `apps/app/tools/snapshot-route-middleware.ts` — `walkStack` / `extractMountPrefix` を `src/test-utils/express-route-walker.ts` から import する。出力（`tools/authz-matrix/baselines/route-middleware.json`）は変えない。
+- `apps/app/tools/snapshot-route-middleware.ts` — `listRegisteredRoutes` を `src/test-utils/express-route-walker.ts` から import する。出力（`tools/authz-matrix/baselines/route-middleware.json`）は変えない。
 - `apps/app/src/features/opentelemetry/server/semconv.ts` — 変更なし（`ATTR_HTTP_URL` は #12151 で追加済み）。
 
 ### Deleted Files
