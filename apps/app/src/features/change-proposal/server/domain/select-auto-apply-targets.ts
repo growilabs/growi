@@ -10,19 +10,34 @@ export type AutoApplyPageFacts = {
   readonly lastUpdateUserId: string | null;
 };
 
+// Provisional (design OQ-3): "own page" is decided by the creator until the
+// definition (creator vs last updater) is settled. Keep this the only place.
 export const isOwnPageForAutoApply = (
-  _page: AutoApplyPageFacts,
-  _requesterId: string,
-): boolean => {
-  throw new Error('Not implemented');
-};
+  page: AutoApplyPageFacts,
+  requesterId: string,
+): boolean => page.creatorId != null && page.creatorId === requesterId;
 
 export const selectAutoApplyTargets = (
-  _policy: AutoApplyPolicy,
-  _operations: readonly OperationRecord[],
-  _pageFacts: ReadonlyMap<string, AutoApplyPageFacts>,
-  _requesterId: string,
-  _relation: BasedOnRelation | null,
+  policy: AutoApplyPolicy,
+  operations: readonly OperationRecord[],
+  pageFacts: ReadonlyMap<string, AutoApplyPageFacts>,
+  requesterId: string,
+  relation: BasedOnRelation | null,
 ): readonly number[] => {
-  throw new Error('Not implemented');
+  if (relation === 'rework' || policy === 'none') {
+    return [];
+  }
+  if (policy === 'all') {
+    return operations.map((op) => op.index);
+  }
+  return operations
+    .filter((op) => {
+      if (op.type === 'create') {
+        return true;
+      }
+      // A move is judged by its source page, which is the one it carries.
+      const page = pageFacts.get(op.pageId);
+      return page != null && isOwnPageForAutoApply(page, requesterId);
+    })
+    .map((op) => op.index);
 };
