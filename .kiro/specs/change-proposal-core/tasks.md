@@ -40,7 +40,7 @@
   - 監査ログの action の名前と分類の名前を 5 言語の `admin.json` に足す
   - 監査ログの絞り込みの一覧に新しい分類と 4 つの action が出ること、activity の既存のテストが通ること、5 言語の翻訳キーの検査が通ることを確かめている（baseline は引き上げない）
   - _Requirements: 7.5, 7.7, 8.7_
-- [ ] 1.6 兄弟の spec の画面で共通に使う client の部品を作る
+- [x] 1.6 兄弟の spec の画面で共通に使う client の部品を作る
   - `features/change-proposal/client/shared/` に、操作の種類・操作の状態・全体の状態・理由・戻せない理由・段階・つながりの関係の 7 つの「値 → 翻訳キー」の表と、達成度の文言のキー（`ACHIEVEMENT_LABEL_KEY`）を、design の Client Shared の名前で作る。達成度の割合（切り捨て、分母が 0 なら無し）と残りの操作を決める純関数（`proposal-progress.ts`）と、短い ID を作る純関数と詳細ページの URL を作る `buildProposalHref(proposalId)`（どちらも `proposal-links.ts`。URL は `/me/change-proposals/{id}`。viewer と ai-agent はこの関数でリンクを作る）も作る。どの表も `satisfies Record<値の型, string>` で宣言する。入口の種類の表は作らない
   - 表が指すキー（`change_proposal.operation_type.*` など 8 つの接頭辞）を、5 言語の `translation.json` に足す。段階・つながり・達成度と、状態「古い」・全体の状態「破棄」の文言は、design の Client Shared の表のとおりにする（「古い」は対応が要る誤りでなく見送りとして、「破棄」は残りを反映せずに閉じたこととして表す）。`i18next.config.ts` の `extract.preservePatterns` に 8 つの接頭辞のワイルドカードを足す（`change_proposal.` で始まる静的な `t('…')` の呼び出しは作らない）
   - `RevisionDiff.tsx` の diff2html の設定と色の決め方を `diff2html-options.ts`（`buildDiff2HtmlOptions`・`useDiff2HtmlColorScheme`）に移し、`RevisionDiff` もそれを使う。`RevisionDiff.vendor-styles.ts` を `client/shared/diff2html.vendor-styles.ts` に移し、`RevisionDiff` は移した先の prebuilt を読み込む
