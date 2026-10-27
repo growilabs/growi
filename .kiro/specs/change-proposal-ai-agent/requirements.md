@@ -39,6 +39,7 @@ GROWI AI Agent は、検索と読み取りの結果をもとに答えること�
 - **AI の記録**: 書き込みの道具が Change Proposal を作るときに残す、AI が書いた要約・会話へのリンク・AI が読んだページの一覧。本人にだけ見せる。
 - **古い操作**: core が「元のリビジョンから変わっていたため書き込まなかった」とした編集の操作。画面では「見送り（ページが先に変わっていた）」と表す。
 - **完了・達成度・後続 Change Proposal・見直しの Change Proposal・元の Change Proposal・元の操作**: core の requirements.md の「本要件で使う言い方」と同じ。
+- **ページごとの通知・ページごとの通知の指定**: core の requirements.md の「本要件で使う言い方」と同じ。反映でページごとの通知が出るのは、管理者の設定と Change Proposal ごとの指定の両方が有効なときだけである。
 - **反映されなかった操作**: 状態が「古い」「失敗」「飛ばした」の操作のうち、本人が飛ばすことを選んだ操作を除いたもの。後続 Change Proposal で作り直す対象になる。
 - **後続・見直しの依頼**: 本人が画面のボタンで、元の Change Proposal と元の操作を選び、AI に後続または見直しの Change Proposal を作るよう頼むこと。依頼は本人のメッセージとして会話に送られ、元の Change Proposal と元の操作は、メッセージとは別に、その実行の値としてサーバーへ送られる。
 
@@ -49,7 +50,7 @@ GROWI AI Agent は、検索と読み取りの結果をもとに答えること�
   - 置き換えの指示から本文を組み立てる処理と、内容が大きく消える操作を断ること
   - 書き込み先の制限、AI が読んだページの記録と閲覧範囲の確認、ページの内容を信頼できないデータとして扱うこと
   - 本人の確認が要る案を保留にし、本人が確かめてから Change Proposal にする流れ
-  - チャット画面での表示・承認・飛ばす・破棄・取り消し・作り直し
+  - チャット画面での表示・承認・飛ばす・破棄・取り消し・作り直しと、ページごとの通知の指定の切り替え
   - AI の記録の保存と、本人だけが取得できる API
   - 反映済みの Change Proposal の詳細ページ（`change-proposal-viewer`）で、AI の記録を本人に見せる部品と、その部品を viewer の本人向けの場所に登録すること
   - 後続 Change Proposal と見直しの Change Proposal を AI に作らせる流れ（チャット画面のボタン、viewer の詳細ページの本人向けの操作の場所に登録する部品、AI への指示）
@@ -168,6 +169,7 @@ GROWI AI Agent は、検索と読み取りの結果をもとに答えること�
 9. If 依頼した人以外のユーザーが、保留中の案の取得・進める・やめるを求めた場合, then the AI Proposal Feature shall その案が存在しない場合と同じ応答を返す。
 10. If 読み取り専用ユーザーまたはゲストが、保留中の案を進めることを求めた場合, then the AI Proposal Feature shall それを受け付けない。
 11. If 1 回の実行の中で作った Change Proposal と保留中の案の合計が、決めた数に達している場合, then the AI Proposal Feature shall それ以上の案を作らず、上限に達したことを AI に返す。
+12. The AI Proposal Feature shall 書き込みの道具で作る Change Proposal と、保留中の案を進めて作る Change Proposal に、ページごとの通知の指定を渡さない（core の初期値の「出す」で保存される）。AI が受け取る道具の入力には、ページごとの通知を決める項目を置かない。
 
 ### Requirement 8: チャット画面での表示
 
@@ -200,6 +202,8 @@ GROWI AI Agent は、検索と読み取りの結果をもとに答えること�
 9. While 承認・飛ばす・破棄・取り消しの求めを core が処理している間, the AI Proposal Feature shall 同じ案への別の操作のボタンを押せないようにする。
 10. The AI Proposal Feature shall 破棄のボタンを「残りを反映せずに閉じる」という言葉で示し、古い操作を、対応が要る誤りではなく見送った操作として示す。
 11. While Change Proposal が完了している間, the AI Proposal Feature shall 承認・飛ばす・破棄のボタンを出さない。
+12. While Change Proposal の段階が承認待ちで、core が本人に返した管理者の設定でページごとの通知が有効である間, the AI Proposal Feature shall Change Proposal を表す表示に、ページごとの通知の指定の切り替えを、今の値とともに出す。管理者の設定が無効のとき、または段階が承認待ちでないときは出さない。
+13. When 本人がページごとの通知の指定の切り替えを変えた場合, the AI Proposal Feature shall core に指定の変更を求め、その値がこれから反映する操作にだけ使われることを示し、表示を core の今の状態に合わせる。求めの間は 9.9 と同じく、同じ案のほかのボタンを押せないようにし、断られた場合は 9.8 と同じく理由を示す。
 
 ### Requirement 10: AI の記録
 

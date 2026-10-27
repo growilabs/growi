@@ -36,6 +36,7 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 - **まとめた通知**: `change-proposal-core` が、反映または取り消しが終わったときに、Change Proposal ごとに 1 件だけ作るアプリ内通知。中身は受け取る人が閲覧できるページの分だけで作られている。
 - **段階・完了・達成度・後続・見直し・元の Change Proposal**: `change-proposal-core` の要件の「本要件で使う言い方」と同じ。段階と達成度は、core が依頼した人にだけ返す。
 - **つながり**: ある Change Proposal と、それを元にした後続・見直しの Change Proposal との関係。core が見る人ごとに絞って返す。
+- **ページごとの通知・ページごとの通知の指定**: `change-proposal-core` の要件の「本要件で使う言い方」と同じ。core は、指定と、管理者がページごとの通知を有効にしているかを、依頼した人にだけ返す。
 - **反映されなかった操作**: 状態が「古い」「失敗」「飛ばした」の操作のうち、依頼した人が飛ばすことを選んだ操作を除いたもの（core の画面の共通の部品が決める）。
 - **本人向けの操作**: 入口の spec が、依頼した人のために詳細ページに置く操作（AI チャットでは「後続 Change Proposal を作る」「AI に見直してもらう」）。Change Proposal 全体に置くものと、操作ごとに置くものがある。
 
@@ -47,7 +48,7 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
   - 詳細ページの「戻せるものを全部戻す」ボタンと、その結果の表示
   - 頼む通知の送信と、その通知の表示
   - まとめた通知の表示
-  - 依頼した人への完了と達成度の表示、つながりの表示、反映されなかった操作の一覧、入口の spec が宣言した本人向けの操作の置き場所
+  - 依頼した人への完了と達成度の表示、ページごとの通知の指定の表示、つながりの表示、反映されなかった操作の一覧、入口の spec が宣言した本人向けの操作の置き場所
   - 新しく足す文言の 5 言語（英語・日本語・中国語・フランス語・韓国語）の翻訳
 - **Out of scope**:
   - 戻せるかどうかの判定、取り消しの実行、見る人ごとの絞り込みの判定、まとめた通知の中身を作ること（`change-proposal-core`）
@@ -55,7 +56,7 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
   - チャット画面での Change Proposal の表示・承認・作り直し、AI が書いた要約と会話の保存（`change-proposal-ai-agent`）
   - 後続・見直しを頼む操作の中身（入口の spec。AI チャットでは `change-proposal-ai-agent`）。Vault・MCP の入口の本人向けの操作（将来）
   - 段階・達成度・つながりを決めること（`change-proposal-core`）
-  - 承認待ちの Change Proposal の承認・飛ばす・破棄の操作（詳細ページには置かない）
+  - 承認待ちの Change Proposal の承認・飛ばす・破棄の操作と、ページごとの通知の指定を変える操作（詳細ページには置かない。承認を行う入口の画面が持つ。AI チャットでは `change-proposal-ai-agent` のチャット画面）
   - Recent Changes を Change Proposal 単位でまとめ直すこと
   - 承認待ちの Change Proposal を本人以外に見せること
   - Change Proposal へのコメントや話し合い
@@ -214,6 +215,8 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 3. Where 見る人が依頼した人で、段階が破棄・期限切れ・取り下げのいずれかである場合, the Change Proposal Viewer shall その段階を言葉で表示する。破棄は「残りを反映せずに閉じた」と表示する。
 4. If 見る人が依頼した人でない場合, then the Change Proposal Viewer shall 段階と達成度を表示しない。
 5. The Change Proposal Viewer shall 状態が「古い」の操作を、core の画面の共通の部品の言葉（「見送り（ページが先に変わっていた）」）で表示し、対応が要る誤りの見た目では表示しない。
+6. Where 見る人が依頼した人で、core が返した管理者の設定でページごとの通知が有効である場合, the Change Proposal Viewer shall 詳細ページに、その Change Proposal のページごとの通知の指定（出す・出さない）を表示する。管理者の設定が無効のときと、見る人が依頼した人でないときは表示しない。
+7. The Change Proposal Viewer shall 詳細ページに、ページごとの通知の指定を変える操作を置かない。
 
 ### Requirement 12: つながりの表示
 

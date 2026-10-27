@@ -71,7 +71,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
   - 新しい通知の対象の種類を足した前例は `PageBulkExportJob`。対象は Mongoose のモデル名として登録されている必要がある（一覧の API が `populate` するため）。
   - activity は `createActivity` で直接作れる（監査ログの設定で記録の対象かどうかを確かめる）。`EssentialActionGroup` に入れた action は、監査ログが無効でも記録される。監査ログの絞り込みの一覧は、action の名前の先頭（`^PAGE_` など）で分類している。
   - 全文検索・GROWI Vault・画面の更新は `crowi.events.page` を受けて動き、`pageService` の中から出るので、反映でもそのまま動く。
-- **Implications**: 反映では route の通知の処理を呼ばず、移動とごみ箱への移動には通知を止める指定を渡す。まとめた通知は、受け取る人ごとに中身を作って `insertMany` で入れる。新しい action は `CHANGE_PROPOSAL_` で始め、監査ログの分類に新しい種類を足す。
+- **Implications**: 反映では route の応答のあとの処理を丸ごとは呼ばない。ページごとの通知を出すかは操作ごとに決め、出さないときは移動とごみ箱への移動に通知を止める指定を渡す（「ページごとの通知は 2 つの切り替えの両方が有効なときだけ出す」）。まとめた通知は、受け取る人ごとに中身を作って `insertMany` で入れる。新しい action は `CHANGE_PROPOSAL_` で始め、監査ログの分類に新しい種類を足す。
 
 ### 機能の置き場所と前例
 - **Findings**:
@@ -235,6 +235,18 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Context**: 要件 13.4。
 - **Selected Approach**: `selectAutoApplyTargets` に関係を渡し、見直しなら方針にかかわらず空を返す。
 - **Rationale**: 見直しは、ほかの人がその後に加えた編集をふまえて内容を作り直すものなので、元の案より人の編集とぶつかる見込みが高い。依頼した人が差分を確かめてから反映する。
+
+### Decision: ページごとの通知は 2 つの切り替えの両方が有効なときだけ出す
+- **Context**: 要件 7.1・7.10–7.19・8.9。design の OQ-5。理由の全体は umbrella の research.md の決定 8。
+- **Selected Approach**: 管理者の設定（初期値は出さない）と、Change Proposal ごとの指定（初期値は出す）の両方が真のときだけ、人の操作と同じページごとの通知を出す。2 つを組み合わせるのは純関数 `shouldSendPerPageNotifications` だけにし、ProposalApplier が操作を書く直前に両方を読み直して決める。取り消しの Change Proposal は元の指定を引き継ぐ。まとめた通知はいつも出す。
+- **追加で確かめた事実**: 人の操作のグローバル通知は、編集・新規作成・移動・ごみ箱へ移すのどれも route から送られ（ごみ箱から戻すには無い）、`globalNotificationService.fire` の中でページの閲覧範囲から送るかを決めている。編集の購読している人へのアプリ内通知は、route の `generateUpdateActivity` が `PAGE_UPDATE` の activity を `preNotify` つきで知らせて作られる。反映の activity（`CHANGE_PROPOSAL_APPLY`）とは別の action なので、1 つの activity の ID では両方を記録できない。
+- **Rationale**: 編集のアプリ内通知のために、操作ごとに `beginActivity` で `PAGE_UPDATE` の activity を作り、route と同じ処理（`emitPageUpdateActivity`）で知らせる。グローバル通知も route の送り方を `firePageGlobalNotification` に移して共有する。人の保存と同じ処理を通すので、受け取る人の決め方と閲覧範囲の判定がずれない。
+- **Trade-offs**: 両方を有効にすると、購読している人には同じ変更についてページごとの通知とまとめた通知の両方が届く。編集ごとに `PAGE_UPDATE` の activity が監査ログに増える。指定は操作ごとに読み直すので、操作 1 つにつき問い合わせが 1 回増える（本文を読まない小さな問い合わせにする）。
+
+### Decision: 上限の初期値は操作数 50、1 日の件数は上限なし
+- **Context**: 要件 8.10。design の OQ-2。理由は umbrella の research.md の決定 8。
+- **Selected Approach**: `changeProposal:maxOperationsPerProposal` の初期値を 50、`changeProposal:maxProposalsPerUserPerDay` の初期値を `null`（上限なし）にする。どちらも管理者が変えられる。
+- **Trade-offs**: ai-agent の書き込みの道具は 1 回の呼び出しで 20 個（`MAX_OPERATIONS_PER_CALL`）までしか受けないので、初期値のままでは操作数の上限で断られることは無い。管理者が 20 より小さくしたときは、core が `input-rejected`（`too-many-operations`）を返す。
 
 ## Risks & Mitigations
 - 人の保存の route に手が入る — 既存の `update-page.integ.ts` / `create-page.integ.ts` とページの結合テストを変更なしで通すことを、切り出しのタスクの完了条件にする。

@@ -79,6 +79,8 @@
 - ユーザーが指定したページの決め方（区切りの規則）と、閲覧範囲の比べ方の規則
 - 読み取りの道具の出力の形（読んだページを記録する処理がページ ID を取り出すため）
 - 1 回の実行の段数の上限
+- core のページごとの通知の扱い: `RequesterProposalState.perPageNotifications`（`value` と `isEnabledBySettings`）の形、指定を変える REST（`PUT /change-proposals/:id/per-page-notifications`）の入力と誤り、`createProposal` の任意の `perPageNotifications` の初期値（真）
+- core の操作数の上限の初期値（50）と、本 spec の `MAX_OPERATIONS_PER_CALL`（20）の大小
 - core の完了・達成度・つながりの形（`RequesterProposalState`、`ProposalLinkView`、`ChangeProposalView.basedOn`）、`BASED_ON_ELIGIBLE_STATUSES` の中身、`selectRemainingOperations` の決め方、`createProposal` の `basedOn` と `based-on-unavailable` / `based-on-operation-not-eligible`（「core の誤りの対応表」が扱う）、見直しを自動反映しない扱い
 - viewer の `requester-action-slots.ts` の部品の props（`ProposalActionSlotProps = { proposal: ChangeProposalView }`、`OperationActionSlotProps = { proposal: ChangeProposalView; operation: OperationView }`）と、場所を出す条件（依頼した人だけ）。`ProposalFollowUpAction` と `OperationReworkAction` はこの形に合わせている
 - チャットの API の入力の `proposalBase` の形と上限（`MAX_PROPOSAL_BASE_KEYS`）、チャットの送信の部品（transport の `prepareSendMessagesRequest`）が呼び出しごとの `body` を残すこと
@@ -200,7 +202,7 @@ apps/app/src/features/change-proposal-ai/
     │   ├── OperationRow.tsx                 # One operation: type, path, status, reason, diff toggle
     │   ├── OperationDiff.tsx                # Body diff (base vs proposed); diff2html options/styles from core client/shared; lazily loaded
     │   ├── hold-reason-labels.ts            # Tables: HoldReason / confirm error code -> change_proposal_chat.* key
-    │   ├── use-change-proposal.ts           # SWR for core GET + approve/skip/discard/revert mutations
+    │   ├── use-change-proposal.ts           # SWR for core GET + approve/skip/discard/revert/per-page-notifications mutations
     │   ├── use-held-draft.ts                # SWR for draft GET + confirm/cancel mutations
     │   ├── use-placement-candidates.ts      # suggest-path API for create placement
     │   ├── group-operations-by-page.ts      # Pure: rows per page and their operation keys
@@ -375,6 +377,7 @@ stateDiagram-v2
 | 7.5–7.8 | 進める・確かめ直す・やめる・期限 | HeldDraftService、Routes | `confirmDraft`、`cancelDraft`、TTL | 保留中の案を進める流れ |
 | 7.9, 7.10 | 本人以外、読み取り専用 | Routes、HeldDraftService | 存在しないものと同じ 404、`excludeReadOnlyUser` | — |
 | 7.11 | 1 回の実行の上限 | ProposeChanges | `MAX_PROPOSALS_PER_RUN` | — |
+| 7.12 | ページごとの通知の指定を渡さない（core の初期値の「出す」） | ProposeChanges、HeldDraftService、proposeChangesTool | `createProposal` の入力に `perPageNotifications` を入れない | 書き込みの道具の流れ |
 | 8.1–8.7 | 表示 | ProposeChangesToolPart、ProposalCard、HeldDraftCard、OperationRow、OperationDiff | `useChangeProposal`、`useHeldDraft`、`useAiRecord` | — |
 | 9.1–9.6, 9.8, 9.9 | 承認・飛ばす・破棄・取り消し | ProposalCard、useChangeProposal | core の REST | — |
 | 9.7 | 作り直し（古い操作 1 つを元にした後続の依頼） | ProposalCard、buildBasedOnRequest | `sendMessage` の `body.proposalBase` | 後続・見直しの依頼の流れ |
@@ -387,6 +390,7 @@ stateDiagram-v2
 | 12.2 | 読み取りの道具と参照の一覧を変えない | withReadRecording | 出力をそのまま返す | — |
 | 12.3 | 無効のとき変わらない | WriteCapability、growiAgent、ProposeChangesToolPart | — | — |
 | 8.8, 8.9 | 完了と達成度、つながりの表示 | ProposalCard | core の `requesterState`、`linkedProposals`、`basedOn`、`toAchievementPercent`、`PROPOSAL_LINK_LABEL_KEYS` | — |
+| 9.12, 9.13 | ページごとの通知の指定の切り替え（管理者の設定が有効で、承認待ちの間だけ） | ProposalCard、useChangeProposal | core の `requesterState.perPageNotifications`、`PUT /change-proposals/:id/per-page-notifications`、`change_proposal_chat.per_page_notifications.*` | — |
 | 9.10, 9.11 | 「残りを反映せずに閉じる」と見送りの言葉、完了した案のボタン | ProposalCard | `change_proposal_chat.discard_rest`、core の `OPERATION_STATUS_LABEL_KEYS` | — |
 | 13.1 | 「後続 Change Proposal を作る」を出す条件 | ProposalCard | core の `selectRemainingOperations` | — |
 | 13.2, 13.4 | 後続の依頼を送り、元は本人の選択だけから決める | buildBasedOnRequest、useSendBasedOnRequest、post-message、ProposeChanges | `proposalBase`、`ChangeProposalRunContext.basedOn`、`createProposal` の `basedOn` | 後続・見直しの依頼の流れ |
@@ -408,8 +412,8 @@ stateDiagram-v2
 | ReadLedger | services | 読んだページの記録と読み出し | 5.1, 5.2, 5.6 | ReadLedger Model (P0) | Service |
 | AudienceFacts | services | 閲覧範囲の事実の読み込み | 5.3–5.6 | Page、UserGroup (P0) | Service |
 | ResolveOperations | services | 対象を依頼した人の権限で取り、本文を組み立てる | 2.1–2.10, 3.1–3.6 | Page、Revision (P0)、Domain (P0) | Service |
-| ProposeChanges | services | 道具から呼ばれ、作るか保留にする | 4.6, 4.8, 5.7, 7.1–7.4, 7.11, 10.1, 13.2, 13.4–13.6, 14.2 | core createProposal (P0)、ResolveOperations (P0) | Service |
-| HeldDraftService | services | 保留中の案の取得・進める・やめる | 3.7, 4.7, 5.8, 7.5–7.10, 13.5, 13.6 | core createProposal (P0)、AudienceFacts (P0) | Service |
+| ProposeChanges | services | 道具から呼ばれ、作るか保留にする | 4.6, 4.8, 5.7, 7.1–7.4, 7.11, 7.12, 10.1, 13.2, 13.4–13.6, 14.2 | core createProposal (P0)、ResolveOperations (P0) | Service |
+| HeldDraftService | services | 保留中の案の取得・進める・やめる | 3.7, 4.7, 5.8, 7.5–7.10, 7.12, 13.5, 13.6 | core createProposal (P0)、AudienceFacts (P0) | Service |
 | AiRecordService | services | AI の記録の取得と、会話が消えた印 | 10.2–10.6 | AiRecord Model (P0)、Page (P0) | Service |
 | ChangeProposalAi Routes | routes | 保留中の案と AI の記録の REST | 7.5–7.10, 10.2–10.6 | services (P0) | API |
 | proposeChangesTool | mastra tools | AI が呼ぶ書き込みの道具 | 2.1, 3.1, 3.2, 7.2–7.4, 11.1 | ProposeChanges (P0) | Service |
@@ -693,12 +697,12 @@ function resolveOperations(input: {
 | Field | Detail |
 |-------|--------|
 | Intent | 書き込みの道具から呼ばれ、案をすぐ core に作らせるか、保留にする |
-| Requirements | 4.6, 4.8, 5.7, 7.1–7.4, 7.11, 10.1 |
+| Requirements | 4.6, 4.8, 5.7, 7.1–7.4, 7.11, 7.12, 10.1 |
 
 **Responsibilities & Constraints**
 - 1 回の実行の案の数（`runId` を持つ AI の記録の数）が `MAX_PROPOSALS_PER_RUN`（3）に達していれば `too-many-proposals-in-run` で断る。
 - `resolveOperations` → `classifyWriteTargets` → 書き込み先ごとに `isReadPageNarrower` → `decideProposalRoute`。
-- `create` なら core の `createProposal({ requester, entry: 'ai-chat', modelLabel, operations, request, basedOn })` を呼ぶ（`trigger` は渡さない。`basedOn` は実行の値にあるときだけ）。作れたら `getForViewer` で操作の `key` と状態を読み、`proposed` の AI の記録を保存する。`hold` なら `held` の AI の記録（操作と理由と一覧つき。実行の値に `basedOn` があればそれも）を保存する（要件 13.6）。
+- `create` なら core の `createProposal({ requester, entry: 'ai-chat', modelLabel, operations, request, basedOn })` を呼ぶ（`trigger` は渡さない。`basedOn` は実行の値にあるときだけ。`perPageNotifications` は渡さないので、core が「出す」で保存する。要件 7.12）。作れたら `getForViewer` で操作の `key` と状態を読み、`proposed` の AI の記録を保存する。`hold` なら `held` の AI の記録（操作と理由と一覧つき。実行の値に `basedOn` があればそれも）を保存する（要件 13.6）。
 - AI の提案である操作があれば、`logger.warn` に会話の ID・案の ID・ページの ID だけを書く（本文は書かない。要件 4.8）。
 - AI の記録の `readPages` には、その時点の読んだページの記録（ページ ID と読んだ時点のパス）をそのまま入れる。
 
@@ -745,7 +749,7 @@ function proposeChanges(input: { readonly operations: readonly RawOperation[]; r
 | Field | Detail |
 |-------|--------|
 | Intent | 保留中の案を、依頼した人だけに見せ、進める・やめる |
-| Requirements | 3.7, 4.7, 5.8, 7.5–7.10 |
+| Requirements | 3.7, 4.7, 5.8, 7.5–7.10, 7.12 |
 
 **Contracts**: Service [x]
 
@@ -767,7 +771,7 @@ interface HeldDraftService {
 ```
 - 置き場所を選び直した新規作成は、`isSpecifiedPlacement` を通さず、本人が選んだ置き場所として扱う（画面のボタンから来た値のため）。パスの形の検査は core が行う。
 - 閲覧範囲の確認は、`ProposeChanges` と同じ関数で行う。
-- `meta.trigger` は route が作った `{ kind: 'request', activityId }` で、そのまま `createProposal` に渡す。
+- `meta.trigger` は route が作った `{ kind: 'request', activityId }` で、そのまま `createProposal` に渡す。`perPageNotifications` は渡さない（core が「出す」で保存する。本人は作られたあとの `ProposalCard` で、承認待ちの操作について切り替えられる。要件 7.12・9.12）。
 - 保留中の案が `basedOn` を持つときは、そのまま `createProposal` に渡す。本人が操作の一部を外して進めても、`basedOn` は変えない（元の操作の一覧は、どの元の操作から来た案かを表すだけで、新しい操作と 1 対 1 ではないため。要件 13.6）。
 
 #### AiRecordService
@@ -836,6 +840,8 @@ type ProposeChangesToolInput = {
 - 編集の操作は `pageId` か `pagePath` のどちらかを持つ。本文全体を受け取る項目は持たない（要件 2.1）。
 - request context に `changeProposal` が無い実行では呼ばれない（登録しない）。それでも無ければ `context_error` を返す。
 - 失敗は例外ではなく出力の値で返す（読み取りの道具と同じ）。
+- 1 回の呼び出しの操作は `MAX_OPERATIONS_PER_CALL`（20）までで、core の 1 件あたりの操作数の上限の初期値（50）より小さい。そのため初期値のままでは、core が操作数の上限で断ることは無い。管理者が core の上限を 20 より小さくしたときは、core が `input-rejected`（理由 `too-many-operations` と上限の数）を返し、道具は「core の誤りの対応表」のとおり `core-input-rejected`（`detail` に core の理由の code）を返す。道具の側で操作を分けて複数の Change Proposal にはしない。
+- 入力には、ページごとの通知を決める項目を置かない（要件 7.12）。
 
 #### withReadRecording
 
@@ -902,6 +908,7 @@ function resolveGrowiAgentTools(ctx: RequestContext<MastraRequestContextShape>):
 #### Chat Cards（summary only）
 - `ProposeChangesToolPart`: 部品の状態が `output-available` のときだけ表示する。出力が `proposed` なら `ProposalCard`、`held` なら `HeldDraftCard`、`rejected` と `context_error` なら何も出さない（AI が応答で説明する）。出力の形が知らないものなら何も出さない（会話の記録に古い形が残っても壊れない）。
 - `ProposalCard`: `useChangeProposal(proposalId)` で core の `GET /change-proposals/:id` を取り、`useAiRecord(proposalId)`（`client/record` の barrel から）で要約を取る（要件 8.4・8.7）。core が本人に返す `requesterState` の段階が `settled` なら、見出しに「完了」と達成度（core の `ACHIEVEMENT_LABEL_KEY` と `toAchievementPercent`。達成度が無いときと割合が null のときは「完了」だけ）を出し、承認・飛ばす・破棄のボタンを出さない（要件 8.8・9.11）。操作の `linkedProposals` は行に「後続: #ID」「見直し: #ID」、Change Proposal の `basedOn` は見出しに「元: #ID」として、viewer の詳細ページへのリンクで出す。リンク先の URL は core の `client/shared/` の `buildProposalHref` で作り、URL を直接書かない。言葉は core の `PROPOSAL_LINK_LABEL_KEYS`、短い ID は `formatProposalShortId`（要件 8.9）。`groupOperationsByPage` でページごとの行にし、行ごとに「承認」「飛ばす」、全体に「すべて反映」「残りを反映せずに閉じる」（破棄。要件 9.10）「すべて取り消す」を出す。古い操作は core の表示名（見送り）で出し、誤りの色や印を付けない（要件 9.10）。core の `selectRemainingOperations` が 1 つ以上を返すとき、全体に「後続 Change Proposal を作る」を出す（要件 13.1）。状態が `BASED_ON_ELIGIBLE_STATUSES.rework` に入る操作の行に「AI に見直してもらう」を出し、取り消しを断られた操作では断られた理由の隣に置く（要件 14.1）。取り消しのボタンは `revertability.revertible` が真の操作にだけ出し、偽なら理由を出す（要件 9.5）。状態が `stale` の操作に「AI で作り直す」を出し、その操作 1 つを元にした後続の依頼を `buildBasedOnRequest` で作って `useSendBasedOnRequest` で送る（要件 9.7）。後続・見直しのボタンも同じ 2 つを使う（「後続・見直しの依頼の流れ」。要件 13.2・14.2）。見直しの Change Proposal（`basedOn.relation` が `rework`）では、承認するまで反映されないことの説明を出す（要件 14.4）。理由が `page-being-edited` などで `pending` に戻った操作には、理由と「もう一度承認」を出す（要件 9.6）。操作の求めの間は、同じ案のボタンを押せなくする（要件 9.9）。結果は core の応答で表示を更新し、そのあと取り直す（要件 9.8）。
+  - ページごとの通知の指定: core が本人に返す `requesterState.perPageNotifications.isEnabledBySettings` が真で、段階 `lifecycle` が `open` のときだけ、見出しの近くに切り替えを出す。今の値は `requesterState.perPageNotifications.value` から出す。切り替えると `useChangeProposal` の変更の関数で core の `PUT /change-proposals/:id/per-page-notifications` を呼び、求めの間は同じ案のほかのボタンも押せなくし（要件 9.9）、応答のあとで取り直す。404 と 409 は、ほかの操作と同じく理由を出して表示を取り直す。説明文で、これから反映する操作にだけ使われ、まとめた通知はいつも送られることを示す（要件 9.12・9.13）。管理者の設定はブラウザから直接読めないので、この応答の値だけで出すかを決める。作成の直後の自動反映ですべての操作が反映され、段階が `open` でなくなった案には出さない。
   - 承認の応答（`{ result: ApplyResult }`）: `type` が `done` なら、`results` の各要素について、`key` が同じ操作を含むページの行に、状態と理由を出す。`in-progress` なら、反映の途中であることを出し、取り直す。
   - 取り消しの応答（`{ result: RevertResult }`）: `operations` の各要素を、`key` が同じ操作を含むページの行に出す。`outcome` が `reverted` なら取り消し済み、`revert-refused` なら `reason`（`RevertRefusalReason`）、`skipped` なら理由 `page-being-edited` を出す（要件 9.4）。`revertProposalId` は表示に使わない。
 - `HeldDraftCard`: `useHeldDraft(draftId)` で取る。AI の提案である操作は「AI の提案」の印を付け、最初は選ばれていない（要件 4.6・4.7）。閲覧範囲が狭いページの一覧を出し、一覧があるときは「確かめた」のチェックを付けないと進められない（要件 5.7・5.8）。ユーザーが指定していない場所への新規作成には、`usePlacementCandidates`（`POST /_api/v3/ai-tools/suggest-path`、本文を渡す）で取った候補を出し、選べるようにする（要件 3.7）。`needs_reconfirmation` が返ったら、新しい一覧で出し直す。core が断ったとき（「core の誤りの対応表」の値）は理由を出す。`target_unavailable` と `base_revision_changed` では、返った `key` の操作に理由を出し、その操作を外して進めるか、やめて AI に頼み直すかを本人が選べるようにする。`based_on_unavailable` と `based_on_operation_not_eligible` では、元の Change Proposal の状態が変わったことを出す（操作の `key` は付かない）。
@@ -939,7 +946,11 @@ function resolveGrowiAgentTools(ctx: RequestContext<MastraRequestContextShape>):
 | `change_proposal_chat.request.rework` | Please rework the changes applied by Change Proposal {{shortId}}, keeping the edits made afterwards. Pages: {{paths}} | Change Proposal {{shortId}} で反映した変更を、その後に加えられた編集を残したまま見直してください。対象のページ: {{paths}} | 请在保留之后所做编辑的前提下，重新审视 Change Proposal {{shortId}} 已反映的更改。目标页面: {{paths}} | Veuillez réviser les modifications appliquées par le Change Proposal {{shortId}}, en conservant les modifications faites ensuite. Pages : {{paths}} | Change Proposal {{shortId}}에서 반영된 변경을, 이후에 추가된 편집을 유지한 채 재검토해 주세요. 대상 페이지: {{paths}} |
 | `change_proposal_chat.confirm_error.based_on_unavailable` | The original Change Proposal has changed, so this cannot continue. Open the original Change Proposal again. | 元の Change Proposal の状態が変わったため、続けられません。元の Change Proposal を開き直してください。 | 原 Change Proposal 的状态已更改，无法继续。请重新打开原 Change Proposal。 | Le Change Proposal d'origine a changé ; impossible de continuer. Rouvrez le Change Proposal d'origine. | 원본 Change Proposal의 상태가 바뀌어 계속할 수 없습니다. 원본 Change Proposal을 다시 열어 주세요. |
 | `change_proposal_chat.confirm_error.based_on_operation_not_eligible` | （上と同じ） | （上と同じ） | （上と同じ） | （上と同じ） | （上と同じ） |
+| `change_proposal_chat.per_page_notifications.label` | Send per-page notifications | ページごとの通知を出す | 发送逐页通知 | Envoyer des notifications par page | 페이지별 알림 보내기 |
+| `change_proposal_chat.per_page_notifications.help` | Used for the changes applied from now on. The combined notification is always sent. | これから反映する変更に使われます。まとめた通知は、この切り替えにかかわらず送られます。 | 适用于此后反映的更改。汇总通知始终会发送。 | S'applique aux modifications appliquées à partir de maintenant. La notification groupée est toujours envoyée. | 지금부터 반영하는 변경에 적용됩니다. 묶음 알림은 이 설정과 관계없이 항상 보냅니다. |
+| `change_proposal_chat.per_page_notifications.update_failed` | Could not change the notification setting. | 通知の指定を変えられませんでした。 | 无法更改通知设置。 | Impossible de modifier le paramètre de notification. | 알림 설정을 변경하지 못했습니다. |
 
+- ページごとの通知の 3 つのキーは、部品の中で `t('change_proposal_chat.per_page_notifications.label')` のように静的に呼ぶので、`preservePatterns` には書かない。
 - 依頼の文の 2 つのキーは `buildBasedOnRequest` の呼び出し側が関係ごとの表から引き、進めるときの誤りの 2 つのキーは `hold-reason-labels.ts` の表に足すので、4 つとも `i18next.config.ts` の `extract.preservePatterns` に 1 つずつ書く。
 
 ## Data Models
@@ -1206,14 +1217,14 @@ type AiRecordView = {
 
 ### Integration Tests
 - ReadLedger Model / AiRecord Model（実際の MongoDB に対して Prisma の拡張を呼ぶ。`.integ.ts` の共通の準備が、Prisma を Mongoose と同じ worker ごとの DB につなぐ）: Mongoose のモデルの `init()` を待ってから、4 つと 1 つの索引の名前と指定（TTL、`proposalId` を持つ文書だけを対象にする一意の索引、`threadId` の一意の索引）があること。`proposalId` を持たない記録が 2 つ以上あっても保存でき、同じ `proposalId` の記録は 2 つ目が断られること。同じ記録に対して `beginConfirm` を 10 個以上同時に呼ぶことを 20 回以上くり返し、毎回、真が 1 つだけであること（2 つだけを同時に呼ぶと、片方が読む前にもう片方が書き終わることが多く、条件と書き込みが分かれていても成功してしまうため）。条件付きの `updateMany` のあとで `updatedAt` が新しくなること。`appendLedgerEntries` を同じ会話に 10 個以上同時に呼んでも、同じページが重ならず、上限を超えないこと（要件 5.1・7.4・7.7・7.8・10.4）。
-- `proposeChanges`: 指定されたページの編集で core が作り、`proposed` の AI の記録ができ、道具の出力の操作に core の `key` が入る。core の `ServiceError` のすべての値が対応表の結果になり、`operationIndex` が AI の送った並びの番号になる。AI の提案・閲覧範囲が狭いページ・記録が欠けた場合に core を呼ばず `held` になる。閲覧できないページと存在しないページで同じ結果になる。1 回の実行の上限。実行の値に `basedOn` があるとき、すぐ作る案と保留中の案の両方に同じ `basedOn` が付き、core の `based-on-unavailable` / `based-on-operation-not-eligible` が対応表の結果になること（要件 2.10・3.6・4.6・5.7・7.1–7.4・7.11・10.1・13.2・13.5・13.6）。
+- `proposeChanges`: 指定されたページの編集で core が作り、`proposed` の AI の記録ができ、道具の出力の操作に core の `key` が入る。core の `ServiceError` のすべての値が対応表の結果になり、`operationIndex` が AI の送った並びの番号になる。AI の提案・閲覧範囲が狭いページ・記録が欠けた場合に core を呼ばず `held` になる。閲覧できないページと存在しないページで同じ結果になる。1 回の実行の上限。実行の値に `basedOn` があるとき、すぐ作る案と保留中の案の両方に同じ `basedOn` が付き、core の `based-on-unavailable` / `based-on-operation-not-eligible` が対応表の結果になること。道具で作った Change Proposal と保留中の案を進めて作った Change Proposal のページごとの通知の指定が、どちらも core の初期値の「出す」になること。管理者が core の操作数の上限を道具の上限より小さくしたとき、`core-input-rejected`（`too-many-operations`）が返り、Change Proposal が作られないこと（要件 2.10・3.6・4.6・5.7・7.1–7.4・7.11・7.12・10.1・13.2・13.5・13.6）。
 - 保留中の案の API: 本人以外・存在しない ID が同じ 404、選んだ操作だけで作られる、置き場所を選び直したパス、確かめ直しで新しいページが見つかると 409、確かめていないと 400、同時に 2 回進めても 1 つだけ作られる、やめた案は進められない、core の `ServiceError` のすべての値が対応表の HTTP の状態と code になる、作成の activity がこの route の activity として記録され、別の activity が残らない。`basedOn` を持つ保留中の案を進めると、作った Change Proposal に同じ `basedOn` が付き、見直しなら方針にかかわらず承認待ちになる（要件 7.5–7.10・13.6・14.4）。
 - AI の記録の API: 本人だけに返る、会話を消したあとも残り `isDeleted` が真になる、今閲覧できないページは一覧に出ない、AI の機能を無効にしても取得できる（要件 10.2–10.6）。
 - `withReadRecording`: 検索と読み取りの結果が会話の記録に入る、記録に失敗したら確認を求める、記録を始める前からある会話は確認を求める、書き込み機能が無効な実行では記録を作らず、すでにある記録は「欠けている」になる（要件 5.1・5.2・5.6・12.3）。
 - `post-message`: 読み取り専用ユーザー・書き込み機能が無効・ページの書き込みの scope が無いトークンでは書き込みの道具が渡らず、指示文が今と同じになる。`proposalBase` が形の検査を通らないと 400 になり、無いときは今と同じに動き、あるときは実行の値の `changeProposal.basedOn` に入ること（要件 1.1–1.5・6.5・12.3・13.2・13.4）。
 
 ### Component Tests（画面）
-- `ProposalCard`: 状態ごとの表示とボタン、取り消しのボタンは戻せる操作だけ、求めの間はボタンを押せない、断られたときの表示（要件 8.3・9.1–9.6・9.8・9.9）。完了した案で「完了」と達成度が出て、承認・飛ばす・破棄が出ないこと。破棄のボタンが「残りを反映せずに閉じる」であること。つながりのリンク。反映されなかった操作があるときだけ「後続 Change Proposal を作る」が出て、押すと元の操作の `key` つきで送られること。反映済み・取り消しを断られた操作にだけ「AI に見直してもらう」が出ること。「AI で作り直す」が古い操作 1 つの後続として送られること（要件 8.8・8.9・9.7・9.10・9.11・13.1・13.2・14.1・14.2・14.4）。
+- `ProposalCard`: 状態ごとの表示とボタン、取り消しのボタンは戻せる操作だけ、求めの間はボタンを押せない、断られたときの表示（要件 8.3・9.1–9.6・9.8・9.9）。完了した案で「完了」と達成度が出て、承認・飛ばす・破棄が出ないこと。破棄のボタンが「残りを反映せずに閉じる」であること。つながりのリンク。反映されなかった操作があるときだけ「後続 Change Proposal を作る」が出て、押すと元の操作の `key` つきで送られること。反映済み・取り消しを断られた操作にだけ「AI に見直してもらう」が出ること。「AI で作り直す」が古い操作 1 つの後続として送られること（要件 8.8・8.9・9.7・9.10・9.11・13.1・13.2・14.1・14.2・14.4）。ページごとの通知の切り替えが、core の応答で管理者の設定が有効かつ段階が承認待ちのときだけ今の値で出て、設定が無効のときと承認待ちでないときは出ないこと、切り替えると指定を変える API が新しい値で 1 回呼ばれ、その間ほかのボタンを押せないこと、断られたときに理由が出ること（要件 9.12・9.13）。
 - `ProposalFollowUpAction` と `OperationReworkAction`: 条件に合うときだけボタンが出ること、AI の記録の会話を開いて依頼が 1 回だけ送られること、会話が削除されているときと AI の記録が 404 のときに新しい会話で送られること、AI の機能が無効ならボタンが出ないこと。viewer の表の `'ai-chat'` の行から読み込めること（要件 15.1–15.3）。
 - `ChatSidebar` の依頼の受け取り: `openChatAndSend` の依頼が、保存されたメッセージを読み終えたあとに 1 回だけ、`body.proposalBase` つきで送られること。別の会話を開いたときは送られないこと（要件 15.2）。
 - `HeldDraftCard`: AI の提案は最初は選ばれていない、一覧があるときは「確かめた」が要る、置き場所の候補を選べる、`needs_reconfirmation` で出し直す（要件 3.7・4.7・5.7・5.8）。
