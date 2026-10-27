@@ -19,7 +19,6 @@ import {
   type IApiv3PageUpdateParams,
   PageUpdateErrorCode,
 } from '~/interfaces/apiv3';
-import type { IOptionsForUpdate } from '~/interfaces/page';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
@@ -33,10 +32,13 @@ import {
 import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
 import { configManager } from '~/server/service/config-manager/config-manager';
 import { isGrantImmutablePath } from '~/server/service/page/grant-immutable-path';
+import {
+  type UpdatePageBodyHumanOptions,
+  updatePageBody,
+} from '~/server/service/page-save';
 import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import { getYjsService } from '~/server/service/yjs';
-import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -179,6 +181,36 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     }
   }
 
+  async function respondConflict(
+    res: ApiV3Response,
+    latestRevisionId: string | undefined,
+  ) {
+    const latestRevision =
+      latestRevisionId != null
+        ? await prisma.revisions.findUnique({
+            where: { id: latestRevisionId },
+            include: { author: true },
+          })
+        : undefined;
+    const returnLatestRevision = {
+      revisionId: latestRevision?._id,
+      revisionBody: latestRevision?.body,
+      createdAt: latestRevision?.createdAt,
+      user: serializeUserSecurely(
+        latestRevision?.author as IUserHasId | undefined,
+      ),
+    };
+    return res.apiv3Err(
+      new ErrorV3(
+        'Posted param "revisionId" is outdated.',
+        PageUpdateErrorCode.CONFLICT,
+        undefined,
+        { returnLatestRevision },
+      ),
+      409,
+    );
+  }
+
   async function postAction(
     req: UpdatePageRequest,
     updatedPage: HydratedDocument<PageDocument>,
@@ -269,10 +301,6 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         );
       }
 
-      const currentPageRevisionId =
-        typeof currentPage.revision === 'string'
-          ? currentPage.revision
-          : currentPage.revision?._id.toString();
       const disableUserPages = configManager.getConfig(
         'security:disableUserPages',
       );
@@ -306,102 +334,40 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         }
       }
 
-      if (
-        currentPage != null &&
-        !(await currentPage.isUpdatable(sanitizeRevisionId, origin))
-      ) {
-        const latestRevision =
-          currentPageRevisionId != null
-            ? await prisma.revisions.findUnique({
-                where: { id: currentPageRevisionId },
-                include: { author: true },
-              })
-            : undefined;
-        const returnLatestRevision = {
-          revisionId: latestRevision?._id,
-          revisionBody: latestRevision?.body,
-          createdAt: latestRevision?.createdAt,
-          user: serializeUserSecurely(
-            latestRevision?.author as IUserHasId | undefined,
-          ),
-        };
-        return res.apiv3Err(
-          new ErrorV3(
-            'Posted param "revisionId" is outdated.',
-            PageUpdateErrorCode.CONFLICT,
-            undefined,
-            { returnLatestRevision },
-          ),
-          409,
-        );
-      }
       let updatedPage: HydratedDocument<PageDocument>;
-      let previousRevision: revisions | null = null;
+      let previousRevision: revisions | null;
       try {
         const {
           userRelatedGrantUserGroupIds,
           overwriteScopesOfDescendants,
           wip,
         } = req.body;
-        const options: IOptionsForUpdate = {
+        const options: UpdatePageBodyHumanOptions = {
           overwriteScopesOfDescendants,
-          origin,
           wip,
+          ...(grant != null ? { grant, userRelatedGrantUserGroupIds } : {}),
         };
-        if (grant != null) {
-          options.grant = grant;
-          options.userRelatedGrantUserGroupIds = userRelatedGrantUserGroupIds;
-        }
-
-        // Priority 1: Use provided revisionId (for conflict detection)
-        previousRevision = null;
-        if (sanitizeRevisionId != null) {
-          try {
-            previousRevision = await prisma.revisions.findUnique({
-              where: { id: sanitizeRevisionId },
-            });
-            if (!isRevisionOfPage(previousRevision, currentPage._id)) {
-              previousRevision = null;
-            }
-          } catch (error) {
-            logger.error(
-              {
-                revisionId: sanitizeRevisionId,
-                pageId: currentPage._id,
-                err: error,
-              },
-              'Failed to fetch previousRevision by revisionId',
-            );
-          }
-        }
-
-        // Priority 2: Fallback to currentPage.revision (for diff detection)
-        if (previousRevision == null && currentPage.revision != null) {
-          try {
-            previousRevision = await prisma.revisions.findUnique({
-              where: { id: currentPageRevisionId },
-            });
-          } catch (error) {
-            logger.error(
-              {
-                pageId: currentPage._id,
-                revisionId: currentPageRevisionId,
-                err: error,
-              },
-              'Failed to fetch previousRevision by currentPageRevisionId',
-            );
-          }
-        }
 
         // There are cases where "revisionId" is not required for revision updates
         // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
-        updatedPage = await crowi.pageService.updatePage(
-          currentPage,
-          body,
-          previousRevision?.body ?? null,
-          req.user,
-          options,
+        const saveResult = await updatePageBody(
+          { pageService: crowi.pageService },
+          {
+            mode: 'human',
+            page: currentPage,
+            body,
+            user: req.user,
+            clientRevisionId: sanitizeRevisionId,
+            origin,
+            options,
+          },
         );
+
+        if (saveResult.type === 'conflict') {
+          return await respondConflict(res, saveResult.latestRevisionId);
+        }
+        updatedPage = saveResult.page;
+        previousRevision = saveResult.previousRevision;
       } catch (err) {
         logger.error({ err }, 'Error occurred while updating a page.');
         return res.apiv3Err(err);

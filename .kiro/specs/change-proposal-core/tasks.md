@@ -68,7 +68,7 @@
   - 作成で渡した印が最初のリビジョンに保存され、ページに印の項目が無いこと、3 つの処理のそれぞれで、通知を止める指定のときにアプリ内通知が増えず、指定しないときは今と同じ数だけ増えることを結合テストで確かめている
   - _Requirements: 6.1, 6.2, 7.1_
   - _Depends: 1.3_
-- [ ] 2.4 上書き防止の確認と書き込みを、人の保存と共通の処理に切り出す
+- [x] 2.4 上書き防止の確認と書き込みを、人の保存と共通の処理に切り出す
   - 人の保存の方法: `isUpdatable` で確認を飛ばすかを決め、ページを読んだ時点のリビジョンを期待して書く。負けたときはページを読み直して確認をやり直し、決めた回数まで書き直す。確認が通らなければ今と同じ 409 `conflict` の結果を返す
   - 反映の方法: 元のリビジョンを期待して書き、`origin` を空にし、印（`IRevisionProposalMark`）を付ける。負けたら書き直さずに衝突の結果を返す。共通の処理は `features/change-proposal` を import しない（入力の型は `@growi/core` と apps/app の `interfaces` だけを使う）
   - ページの更新の route を、この処理を呼ぶ形に直す。middleware の順と、応答の前に activity を記録する位置は変えない
@@ -314,3 +314,5 @@
 - 2.1: 2.4 の共通処理は `crowi.pageService.updatePage` を呼ぶ形を守る（update-page-conflict-check.integ.ts がそれを spy している）
 - 2.2: `pushRevision` に `expectedRevisionId` を渡す呼び出しは、その直前にページを `save()` 済みにすること（条件付きの書き込みは 4 項目しか書かない）。`revisions.delete` が失敗すると RevisionConflictError でなく Prisma の例外になる点は、2.4 の呼び出し側で扱いを決める
 - 2.3: アプリ内通知の抑止は子を含む delete / restore には未配線（design 上、trash と restore は子を持たないページのみ）。renamePage の options の型は未付与なので、4.x の handler では `IOptionsForInAppNotificationSuppression` を使う。`updatePage` は条件付き pushRevision の前に `save()` でページを書くため、衝突時にも閲覧範囲等の `save()` 分は戻らない（反映では閲覧範囲を渡さないので無害。2.4 で人の保存を共通化するときに考慮）
+- 2.4: 保存の前後で閲覧範囲が「リンクを知っている人だけ」かどうかが変わる人の保存は、`expectedRevisionId` なしで 1 回だけ書く（`movesBetweenTreeAndRestricted`。条件付きにすると負けて書き直したとき子の付け替えが飛ばされ同じパスにページが 2 つできる）。この保存は反映と同時に起きると反映を確認なしで上書きしうるので、2.6 の同時実行テストか要件 3.16 の例外として記録する
+- 2.4: `revisions.delete` 失敗時は例外をそのまま投げる（`RevisionConflictError` に変えない）ので、4.x の「同じ印のリビジョンがあれば反映済み」の確認は、残った印付きリビジョンに引っかからない対策が要る。`normalizeLatestRevisionIfBroken` は route に残っていて反映のモードでは呼ばれない。負けたあとの再確認で 409 になっても閲覧範囲・WIP の `save()` 分は残る
