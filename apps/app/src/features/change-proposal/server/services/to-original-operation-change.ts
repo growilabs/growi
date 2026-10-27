@@ -1,4 +1,4 @@
-import type { FailureReason, RevertRefusalReason } from '../../interfaces';
+import type { OperationReason, RevertRefusalReason } from '../../interfaces';
 import type {
   OriginalOperationChange,
   RecordedOutcome,
@@ -18,20 +18,30 @@ const REVERT_REFUSAL_REASONS: Readonly<Record<RevertRefusalReason, true>> = {
 };
 
 const isRevertRefusalReason = (
-  reason: FailureReason,
+  reason: OperationReason,
 ): reason is RevertRefusalReason =>
   Object.hasOwn(REVERT_REFUSAL_REASONS, reason);
 
-const toRefusalReason = (reason: FailureReason): RevertRefusalReason => {
-  if (isRevertRefusalReason(reason)) {
-    return reason;
+// Why the original operation is refused when its revert operation ended stale or
+// failed (design "取り消しの流れ" table).
+export const toRevertRefusalReason = (outcome: {
+  readonly status: 'stale' | 'failed';
+  readonly reason?: OperationReason;
+}): RevertRefusalReason => {
+  if (outcome.status === 'stale') {
+    return 'edited-after-apply';
   }
-  return reason === 'path-occupied' ? 'original-path-occupied' : 'apply-failed';
+  if (outcome.reason != null && isRevertRefusalReason(outcome.reason)) {
+    return outcome.reason;
+  }
+  return outcome.reason === 'path-occupied'
+    ? 'original-path-occupied'
+    : 'apply-failed';
 };
 
-// Maps a revert operation's recorded outcome onto the original operation (design
-// "取り消しの流れ" table). null leaves the original as it is: a skipped revert
-// keeps it applied so the revert can be requested again.
+// Maps a revert operation's recorded outcome onto the original operation. null
+// leaves the original as it is: a skipped revert keeps it applied so the revert
+// can be requested again.
 export const toOriginalOperationChange = (
   outcome: RecordedOutcome,
   revertProposalId: string,
@@ -45,11 +55,10 @@ export const toOriginalOperationChange = (
         revertedAt: now,
       };
     case 'stale':
-      return { status: 'revert-refused', reason: 'edited-after-apply' };
     case 'failed':
       return {
         status: 'revert-refused',
-        reason: toRefusalReason(outcome.reason),
+        reason: toRevertRefusalReason(outcome),
       };
     case 'skipped':
     case 'pending':

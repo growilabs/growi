@@ -16,6 +16,7 @@ describe('change-proposal domain barrel', () => {
         'selectNotifiedPageIds',
         'selectVisibleOperations',
         'shouldSendPerPageNotifications',
+        'targetPageIdOf',
         'toRevisionProposalMark',
         'validateBasedOn',
         'validateProposalInput',

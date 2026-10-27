@@ -7,6 +7,7 @@ export type {
   ApprovalTargets,
   CreateProposalRequest,
   CreateProposalResult,
+  RevertTargets,
   ServiceError,
   ServiceResult,
 } from './services/change-proposal-service-types';

@@ -38,6 +38,7 @@ import {
   createRequesterActions,
   type RequesterActions,
 } from './requester-actions';
+import { createRevertAction, type RevertAction } from './revert-action';
 import {
   type ChangeProposalSettings,
   readChangeProposalSettings,
@@ -49,11 +50,12 @@ const logger = loggerFactory(
 
 const BASED_ON_RELATIONS: readonly string[] = ['follow-up', 'rework'];
 
-export type ChangeProposalService = RequesterActions & {
-  createProposal(
-    input: CreateProposalRequest,
-  ): Promise<ServiceResult<CreateProposalResult>>;
-};
+export type ChangeProposalService = RequesterActions &
+  RevertAction & {
+    createProposal(
+      input: CreateProposalRequest,
+    ): Promise<ServiceResult<CreateProposalResult>>;
+  };
 
 export type ChangeProposalServiceDeps = {
   readonly applier?: ProposalApplier;
@@ -228,6 +230,7 @@ export const createChangeProposalService = (
 
   return {
     ...createRequesterActions({ applier, now }),
+    ...createRevertAction({ applier, now }),
     async createProposal(input) {
       const settings = readChangeProposalSettings();
       const createdAt = now();

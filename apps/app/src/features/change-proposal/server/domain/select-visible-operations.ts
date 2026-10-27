@@ -14,7 +14,7 @@ const STATUSES_VISIBLE_TO_OTHERS: ReadonlySet<OperationStatus> = new Set([
 ]);
 
 // A create has no page until it is applied, so its target is the result page.
-const targetPageIdOf = (op: OperationRecord): string | undefined =>
+export const targetPageIdOf = (op: OperationRecord): string | undefined =>
   op.type === 'create' ? op.resultPageId : op.pageId;
 
 const isVisible = (op: OperationRecord, ctx: VisibilityContext): boolean => {
