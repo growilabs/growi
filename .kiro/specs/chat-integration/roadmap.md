@@ -56,24 +56,37 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 完了した項目は、この節から消す（経緯は git の履歴に残る）。amend spec は、対象の spec へ書き戻して自分を削除することが最後のタスクになる（`.claude/rules/spec-lifecycle.md`）。
 
+### 並べ方の基準
+
+項目ごとに「`agent`（コマンドの再編、順 7）は、これの上に作るか、これを変えるか」で分ける。
+
+- **上に作る** → 先に直す。
+- **変える** → 後に直す。先にやると 2 度手間になる。
+- **どちらでもない** → 先に直す。費用が小さく、`agent` を動く土台の上で試せる。
+
 ### 作業の順序
 
-| 順 | まとまり | 含む項目 | 進め方 | 対象 | 前提 |
-|---|---|---|---|---|---|
-| 1 | 表示順 | 本人にだけ見える返事が、入力より上に出る | 時刻を測って原因を調べてから直す | proxy | なし |
-| 2 | proxy の見え方 | 検索結果の見せ方、Slack への通知の文面 | spec を作らず直接直す（契約は変えない） | proxy（通知の文面は app の markdown にも及びうる） | なし |
-| 3 | proxy の不具合の一括修正 | Discord の Gateway、Enterprise Grid のチャンネル一覧、installation の特定、Discord のスレッド、Mattermost の 403 | spec を作らず直接直す。各項目にテストを付ける | proxy | なし |
-| 4 | app の見え方 | 管理画面と編集画面、承認画面 | amend spec `chat-integration-app-ui`（名前は仮）を作る | app | なし |
-| 5 | 通知の性能 | 通知の遅れ、定期処理の負荷 | amend spec `chat-integration-notification-latency`（名前は仮）を作る | app | なし |
-| 6 | URL の展開 | 展開で出す範囲の見直し | amend spec `chat-integration-link-preview`（名前は仮）を作る。確認フローまで含めるなら `/kiro-discovery` から | app（protocol と proxy にも及びうる） | なし |
-| 7 | コマンドの再編 | `agent` の追加、`keep` の吸収 | amend spec [chat-integration-agent](../chat-integration-agent/)。`brief.md` だけがあり、要件・設計・タスクの承認がこれから | umbrella、protocol、proxy、app | 3（installation の特定） |
-| 8 | コマンドの表示の締め | スラッシュコマンドの実機確認、`help` の一覧の書き方 | proxy の残タスク 12.4 | proxy | 7（コマンドの組が変わるため） |
+| 順 | まとまり | 含む項目 | 進め方 | 対象 |
+|---|---|---|---|---|
+| 1 | 表示順 | 本人にだけ見える返事が、入力より上に出る | 時刻を測って原因を調べてから直す | proxy |
+| 2 | proxy の見え方 | 検索結果の見せ方、Slack への通知の文面 | spec を作らず直接直す（契約は変えない） | proxy（通知の文面は app の markdown にも及びうる） |
+| 3 | proxy の不具合の一括修正 | Discord の Gateway、Enterprise Grid のチャンネル一覧、installation の特定、Mattermost の 403 | spec を作らず直接直す。各項目にテストを付ける | proxy |
+| 4 | app の見え方（`agent` と重ならない部分） | 承認画面、ページの編集画面、紐付け解除後のバッジ | amend spec `chat-integration-app-ui`（名前は仮） | app |
+| 5 | URL の展開の方針 | 公開範囲が「公開」のページは題名だけ出す | amend spec `chat-integration-link-preview`（名前は仮） | app（protocol と proxy にも及びうる） |
+| 6 | 通知の定期処理 | 定期処理の間隔、連携が無いテナントの問い合わせを飛ばす | amend spec `chat-integration-notification-load`（名前は仮） | app |
+| 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作る。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。`brief.md` だけがあり、要件・設計・タスクの承認がこれから | umbrella、protocol、proxy、app |
+| 8 | 管理画面の作り直し | 管理画面のうち、チャンネルの権限と「できること」の表 | amend spec `chat-integration-admin-ui`（名前は仮） | app |
+| 9 | コマンドの表示の締め | スラッシュコマンドの実機確認、`help` の一覧の書き方、Discord のスレッドでの追加入力 | proxy の残タスク 12.4 | proxy |
+| 10 | URL の展開の確認フロー（**リリースに含めるかが未決**） | 共有してよいかを本人に尋ねてから展開する | `agent` が済んでから判断する | 3 spec すべて |
 
-順 4・5・6 は app だけの変更で、proxy の順 1〜3 とは独立している。人手があれば並行して進められる。順 7 は規模が大きいので、順 1〜3 を終えてから要件の承認に入る。
+- 順 1〜3 は、順 7 の前提になる。順 3 の installation の特定は、`agent` の `brief.md` が明記している前提である。
+- 順 4・5・6 は app だけの変更で、順 1〜3 とは独立している。ただし、どれも `chat-integration-app/design.md` に書き戻すので、`agent` が書き換える節（権限、能力表）に触れるものを `agent` と同時には進めない。
+- 順 7 は規模が大きいので、順 1〜3 を終えてから要件の承認に入る。
 
 ### 1. 表示順
 
 - **Slack で、本人にだけ見えるメッセージが、呼びかけた入力より上に表示されることがある（優先度は高い）**: 実機試験（2026-10-27）で、`@GROWI search` への聞き返しが、入力の投稿より上に出た。内容は正しく本人にだけ見えるが、読む順序が逆になって使い心地が悪い。原因は未特定（Slack の画面が、本人にだけ見えるメッセージを受け取った順に差し込み、入力の表示より返事の受け取りが先になる短い間がある、という推測のみ）。表示位置を指定する手段は Slack の API に見当たらないので、再現したときの時刻を Slack の表示と proxy のログで数回分取って比べ、出すのを少し遅らせる案などが効くかを確かめてから決める。
+- **調べ方**: 時刻を目で比べず、受け取った入力の `ts` と、`chat.postEphemeral` が返す `message_ts` を、ずれたときと普通のときでログに取って比べる。あわせて、[chat-integration-agent の brief](../chat-integration-agent/brief.md)「実現性の確認の結果」2（スレッドの中の本人だけのメッセージは、スレッドが既にあるときだけ出る）も確かめる。`agent` が本人にだけ答える場所の設計が、この結果で決まる
 
 ### 2. proxy の見え方
 
@@ -82,27 +95,24 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - 題名とパスが同じ内容で重複しやすい。行ごとに GROWI の名前（`growi-chat-test`）が付き、1 つの GROWI しか無くても繰り返される。
   - 直す前に、各サービスで同じ内容がどう見えるかを、サービスごとの組み版（Slack は `<URL|題名>`、他は markdown のリンク）に分けて考える必要がある。
 - **Slack への通知の文面**: メッセージの書式が洗練されていない。ページ名・変更の種類・変更した人・リンクを読みやすく並べる。Slack の Block Kit など、サービスごとの表現を使うかも含めて検討する
-- **想定される影響範囲**: proxy の `outbound.ts`（サービスごとの描き分け）が中心。通知の文面は、GROWI が組み立てる markdown（`chat-integration-app`）にも及びうる。契約は変えないので、spec は作らず直接直し、proxy の design.md の該当節を更新する
+- **想定される影響範囲**: proxy の `outbound.ts`（サービスごとの描き分け）が中心。通知の文面は、GROWI が組み立てる markdown（`chat-integration-app`）にも及びうる。契約は変えないので、spec は作らず直接直し、proxy の design.md の該当節を更新する。`agent` の答えも同じ描き方を通るので、先に直す
 
 ### 3. proxy の不具合の一括修正
 
-実機試験と独立レビューで見つかった。直す順は、Discord 全体が動かない Gateway を先頭にし、次に Enterprise Grid、installation の特定、Discord のスレッド、Mattermost の 403。
+実機試験と独立レビューで見つかった。直す順は、Discord 全体が動かない Gateway を先頭にし、次に Enterprise Grid、installation の特定、Mattermost の 403。
 
 1. **Discord の Gateway を開いていないので、Discord の DM と mention が proxy に届かない**: `src/` のどこからもアダプタの `startGatewayListener` を呼んでいない。本人宛ての返事を DM で送ることはできるが、その DM での答え（要件 1.16）もチャンネルでの mention も届かない。umbrella の design.md の「Discord は Gateway で受ける」と食い違う。別の対応で直す。詳しくは [chat-integration-proxy の research.md](../chat-integration-proxy/research.md) の「既知の問題」2
 2. **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
 3. **DM や一覧にまだ載っていないチャンネルでのコマンドに、的外れな案内が返る**: installation の特定をチャンネル一覧に頼るため、「workspace がまだ登録されていません」と返る（bot が招待された直後は一覧をすぐ取り直すようにしたので、招待後の待ちは無くなった。DM と、bot の招待を伴わずに増えたチャンネルでは残る）
-4. **Discord のスレッド内で打ったスラッシュコマンドの追加入力が結び付かない**: 入力待ちを 4 区切りの `Channel.id`（`discord:<guild>:<parent>:<thread>`）で保存する一方、スレッドでの返答のイベントは 3 区切りの `Thread.channelId` を持つ
-5. **Mattermost で、本人にだけ見えるメッセージの権限不足（403）が「bot がチャンネルにいない」と記録される**: `classifyOutboundFailure` が 403 を `bot-not-in-channel` と分類する（アダプタの例外が応答の本文を持たず、見分けられない）。利用者には DM で届くので影響は無いが、DM も届かなかったときの運用者向けの報告の理由が誤る。同じ research.md の「既知の問題」1
+4. **Mattermost で、本人にだけ見えるメッセージの権限不足（403）が「bot がチャンネルにいない」と記録される**: `classifyOutboundFailure` が 403 を `bot-not-in-channel` と分類する（アダプタの例外が応答の本文を持たず、見分けられない）。利用者には DM で届くので影響は無いが、DM も届かなかったときの運用者向けの報告の理由が誤る。同じ research.md の「既知の問題」1
 
 ### 4. app の見え方（amend spec `chat-integration-app-ui`、名前は仮）
 
-- **管理画面と通知の見た目の改善**: 実機試験（2026-10-26、Slack）で次の点に気付いた。動作は正しいが、見た目と使い勝手を直す。
-  - **管理画面（`/admin/chat-integration`）**: Connected workspaces の「What this service can do」の表示が冗長。Notification destinations と Channel permissions を、それぞれ見出しのあるセクションに分けて見やすくする（画面は `AdminChatIntegration.tsx` など。文言は英語の直書きで i18n 未対応）
+`agent` が変えない部分だけをここで直す。管理画面は順 8。
+
+- **ページの編集画面と、紐付け解除後の管理画面**: 実機試験（2026-10-26、Slack）で気付いた。動作は正しいが、見た目と使い勝手を直す。
   - **ページの編集画面**: 「Chat notification channels」が縦に長く、編集画面のレイアウトを崩している（要件2.2 の保存時の通知先の選択）
   - **チャット側で紐付けを解除したあとの管理画面**: `@GROWI unregister` は proxy 側の関係と鍵だけを消し、GROWI には知らせない。管理画面は接続の状態・できること・チャンネル一覧を読めないことを赤字で示すので状況は分かるが、右上のバッジは緑の「active」のまま（GROWI 側の関係の記録による表示のため）
-  - **想定される影響範囲**: `chat-integration-app`（管理画面と編集画面）。通知の文面は順 2 で直す
-  - **次にやること**: 下の承認画面と同じ amend spec にまとめる
-
 - **要件7（アカウントの紐付け）の承認画面の作り直し**: 実機試験（2026-10-23、Slack）で、`/me/chat-integration/account-link/:token` の承認画面について次のフィードバックが出た。優先度は低いが、いずれ直す。
   - **体裁**: 見た目にもっと気を配る。サイドバーは要らないので、`BasicLayout` ではなく承認のためだけの簡素なレイアウトにする
   - **誤った承認を防ぐ**: 「どの GROWI（名前）に」「GROWI のどのログイン中ユーザーとして」「どのチャットサービス・workspace の、どのアカウントを」結び付けるのかを整理して見せる。Slack などの他製品の OAuth 承認画面を参考にする
@@ -110,20 +120,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - **想定される影響範囲**: `chat-integration-app` が中心（画面・レイアウト・注文の保存項目）。表示名を保存するだけなら protocol の契約は変わらない
   - **次にやること**: 規模が小さければ `chat-integration-app` の amend spec、そうでなければ `/kiro-discovery` から着手する
 
-### 5. 通知の性能（amend spec `chat-integration-notification-latency`、名前は仮）
-
-- **通知の遅れと、通知の定期処理の負荷を減らす**: 実機試験（2026-10-26）で、ページの保存から通知が届くまで最大 1 分かかることと、その定期処理がマルチテナント（GROWI.cloud など）で常にかかる負荷について見直した。
-  - **今の仕組み**: 通知は「書き留める」と「送る」の 2 段（`chat-integration-app` の設計）。ページの保存では `chat_notification_outbox` に 1 行書くだけで戻り（要件2.5）、`notification-dispatch-cron.ts` が **1 分ごと**（`'* * * * *'`）に送る。この 2 段は、保存をチャットのせいで遅らせない・失敗しても送り直せる（要件2.4）・複数台でも二重に送らない、のために要るので残す
-  - **遅れ**: 保存から届くまで 0〜60 秒（平均 30 秒ほど）
-  - **負荷**: 定期処理は、チャット連携を使っているかに関係なく、すべてのインスタンスで起動時に始まる（`crowi/index.ts`）。1 分ごとに MongoDB へ 2 回問い合わせる（送信待ちの行を取る `findOneAndUpdate` と、保持期間を過ぎた連携を探す `findOne`）。1 回は索引の効く小さな問い合わせだが、**使っていないテナントも常に払う**ので、テナント数に比例して共有の MongoDB にかかり続ける
-  - **改善案**:
-    1. 送信待ちの行を書いた直後に、送る処理を 1 回走らせる。いつもの通知は 1〜2 秒で届き、失敗しても定期処理が拾うので信頼性は変わらない
-    2. 定期処理は送り直しと止まった送信の回収だけを担うので、間隔を延ばす（例: 5 分）。保持期間を過ぎた連携の削除は 1 日 1 回で足りる
-    3. チャット連携が 1 つも無いテナントでは問い合わせを飛ばす（「連携があるか」の確認結果は一定時間覚えておく）
-  - **想定される影響範囲**: `chat-integration-app`（`notification-outbox.ts`・`notification-dispatcher.ts`・`notification-dispatch-cron.ts`・`pairing/sweep-unpaired-relations.ts`）。protocol と proxy は変わらない
-  - **次にやること**: `chat-integration-app` の amend spec。設計の「通知を 2 段に分ける」節に、すぐ送る経路と間隔の決め方を足す
-
-### 6. URL の展開（amend spec `chat-integration-link-preview`、名前は仮）
+### 5. URL の展開の方針（amend spec `chat-integration-link-preview`、名前は仮）
 
 - **要件6（URL の展開）で出す範囲の見直し**: 実機試験（2026-10-26、Slack）で、ログインしていない人の閲覧を許さない GROWI（`security:restrictGuestMode` が `Deny`）では、公開ページでも展開が「存在しないか、全員には見えない」になり、機能がほぼ使えないと分かった。今の判定は「ログインしていない人を含めて誰でも見られるページか」（`command-endpoint.ts` の `buildLinkPreview` に `isGuestAllowedToRead()` を渡す）で、チャンネルの参加者が全員 GROWI のユーザーとは限らないことを理由にしている。
   - **他製品の仕様（公式の説明で確かめた範囲）**: Notion は Slack に貼られたリンクを、ページを見る権限が無い人にも題名と作成者で展開し、見る権限が無い人がいれば貼った本人に権限を与えるかを尋ねる。Confluence Cloud は閲覧を制限したページだけを展開せず、制限の無いページ（ログインしたユーザーなら誰でも見られる）は展開する
@@ -132,30 +129,56 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
     - 公開範囲が「公開」で、ログインが必要 → **題名（と更新日など最小限）だけ出す**
     - 公開範囲が「本人だけ」「グループだけ」など → 今どおり何も出さない（存在しないページと見分けがつかない返し方、要件6.8）
   - **公開に限る理由**: GROWI の題名はパスの最後の部分なので、公開範囲を絞ったページでは題名を出すこと自体が漏れになる。パスの形の URL は URL 自体に題名を含むので、この変更が役に立つのは主に固定リンク（`/6adf…` の形）のとき
-  - **併せて検討する案（未決）**: 投稿者にだけ見える確認メッセージ（例: Slack の ephemeral message）で「全員に見せるか」を尋ね、「共有する」を選んだ場合だけ中身を展開する対話的な確認フロー（2026-09-09 の提案）。「今それを見ている人が誰か」をその場で判定し、チャット側のボタン操作を GROWI へ伝え返す往復が要るので、今の一往復の `link-preview` では成り立たない
   - **想定される影響範囲**: 方針の部分は `chat-integration-app`（`buildLinkPreview` の判定）が中心。題名だけを返す状態を `LinkPreviewResponse` で表す必要があれば `chat-integration-protocol` と、表示する `chat-integration-proxy` にも及ぶ。確認フローまで含めると 3 sub-spec すべてにまたがる
-  - **次にやること**: 方針の部分だけなら amend spec（要件6 の受け入れ条件を追記し、番号は振り直さない）。確認フローも含めるなら `/kiro-discovery` から着手する
+  - **次にやること**: 方針の部分だけなら amend spec（要件6 の受け入れ条件を追記し、番号は振り直さない）。確認フロー（順 10）は含めない
+
+### 6. 通知の定期処理（amend spec `chat-integration-notification-load`、名前は仮）
+
+- **通知の遅れと、通知の定期処理の負荷を減らす**: 実機試験（2026-10-26）で、ページの保存から通知が届くまで最大 1 分かかることと、その定期処理がマルチテナント（GROWI.cloud など）で常にかかる負荷について見直した。
+  - **今の仕組み**: 通知は「書き留める」と「送る」の 2 段（`chat-integration-app` の設計）。ページの保存では `chat_notification_outbox` に 1 行書くだけで戻り（要件2.5）、`notification-dispatch-cron.ts` が **1 分ごと**（`'* * * * *'`）に送る。この 2 段は、保存をチャットのせいで遅らせない・失敗しても送り直せる（要件2.4）・複数台でも二重に送らない、のために要るので残す
+  - **遅れ**: 保存から届くまで 0〜60 秒（平均 30 秒ほど）
+  - **負荷**: 定期処理は、チャット連携を使っているかに関係なく、すべてのインスタンスで起動時に始まる（`crowi/index.ts`）。1 分ごとに MongoDB へ 2 回問い合わせる（送信待ちの行を取る `findOneAndUpdate` と、保持期間を過ぎた連携を探す `findOne`）。1 回は索引の効く小さな問い合わせだが、**使っていないテナントも常に払う**ので、テナント数に比例して共有の MongoDB にかかり続ける
+  - **ここで直す改善案**: 次の 2 つ。
+    1. 定期処理は送り直しと止まった送信の回収だけを担うので、間隔を延ばす（例: 5 分）。保持期間を過ぎた連携の削除は 1 日 1 回で足りる
+    2. チャット連携が 1 つも無いテナントでは問い合わせを飛ばす（「連携があるか」の確認結果は一定時間覚えておく）
+  - **「書き込んだ直後に送る」は順 7 で作る**: 送り方が 2 通りにならないよう、`agent` が作る「答えをあとから送る口」と同じ経路にする（[chat-integration-agent の brief](../chat-integration-agent/brief.md) の Downstream）
+  - **想定される影響範囲**: `chat-integration-app`（`notification-outbox.ts`・`notification-dispatcher.ts`・`notification-dispatch-cron.ts`・`pairing/sweep-unpaired-relations.ts`）。protocol と proxy は変わらない
 
 ### 7. コマンドの再編（amend spec [chat-integration-agent](../chat-integration-agent/)）
 
 `search`・`create-page`・`agent` に再編する。`keep` は `agent` に吸収する。`brief.md` だけがあり、`spec.json` は無い。要件・設計・タスクの承認がこれから。答えを本人にだけ届ける仕組みは実装済み（[chat-integration-proxy の design.md](../chat-integration-proxy/design.md)「PrivateReplier — 本人宛ての返事の届け方」）。順 3 の installation の特定が前提。
 
+- **この spec の要件で決めること（roadmap から移した）**:
+  - **DM の先頭の `@誰か` が落ちる**: `agent` は DM や AI アプリの画面で自由な文章を受け取るので、「@alice について…」の先頭の語が落ちる。command 層が bot 自身の名前や id を知らないために起きる（[proxy の research.md](../chat-integration-proxy/research.md)「既知の問題」3）。直し方を要件で決める
+  - **Teams で、1 対 1 の会話で bot に答えるのに、アプリを `personal` の範囲でも入れる必要があるか**: 未確認。`agent` の Teams の経路がこれに依存する（同 research.md の Research Log）
+  - **通知の「書き込んだ直後に送る」**: 順 6 の説明を参照。`agent` の「あとから送る口」と同じ送り方で作る
 - **制約（直せない。`agent` の設計で扱い方を決める）**: official proxy では Slack の会話の取り込みが事実上使えない。Slack Marketplace の外で配布するアプリは、2025-05-29 以降、`conversations.history` が 1 分に 1 回・1 回 15 件までに制限される（組織が自分で作るアプリは対象外）。GROWI が運営する 1 つのアプリを多くの workspace に導入する形では、`keep`（要件 5）がこの制限を受ける。詳しくは [chat-integration-agent の brief](../chat-integration-agent/brief.md) の「実現性の確認の結果」3
 
-### 8. コマンドの表示の締め
+### 8. 管理画面の作り直し（amend spec `chat-integration-admin-ui`、名前は仮）
+
+`agent` が、チャンネルの権限と能力表に `agent` の行と DM の権限を足すので、その後に作り直す。先に作り直すと、もう一度直すことになる。
+
+- **管理画面（`/admin/chat-integration`）**: Connected workspaces の「What this service can do」の表示が冗長。Notification destinations と Channel permissions を、それぞれ見出しのあるセクションに分けて見やすくする（画面は `AdminChatIntegration.tsx` など。文言は英語の直書きで i18n 未対応）
+
+### 9. コマンドの表示の締め
 
 - **スラッシュコマンドを実際に動かす**: proxy の残タスク 12.4（`chat-integration-proxy/tasks.md`）。意図して未着手のまま追跡している。
 - **`help` の一覧の書き方**: コマンドの使い方が `/growi search [keyword]` のようなスラッシュコマンドの形で出るが、スラッシュコマンドは未対応（`chat-integration-proxy` のタスク 12.4）で、実際には `@GROWI search …` と打つ必要がある
+- **Discord のスレッド内で打ったスラッシュコマンドの追加入力が結び付かない**: 入力待ちを 4 区切りの `Channel.id`（`discord:<guild>:<parent>:<thread>`）で保存する一方、スレッドでの返答のイベントは 3 区切りの `Thread.channelId` を持つ。スラッシュコマンドから始めた場合の不具合である（メンションから始めた場合は、始めるときも続きも同じ 3 区切りの id を使うので影響しない）。スラッシュコマンドは上の残タスク 12.4 に含まれるので、ここで直す
+
+### 10. URL の展開の確認フロー（リリースに含めるかが未決）
+
+- **併せて検討する案（未決）**: 投稿者にだけ見える確認メッセージ（例: Slack の ephemeral message）で「全員に見せるか」を尋ね、「共有する」を選んだ場合だけ中身を展開する対話的な確認フロー（2026-09-09 の提案）。「今それを見ている人が誰か」をその場で判定し、チャット側のボタン操作を GROWI へ伝え返す往復が要るので、今の一往復の `link-preview` では成り立たない
+
+- **未決の点**: リリースに含めるか。含めないなら、「リリース判定に入れていないもの」へ移す。`agent` が作る「本人にだけ届ける」しくみと近いので、`agent` が済んでから判断する。含める場合は、`/kiro-discovery` から着手する
 
 ## リリース判定に入れていないもの
 
 直さずにリリースしてよいかの判断を、ユーザーに預けている。リリースに含めるなら、「リリース前に直すもの」へ移す。
 
-- **DM の先頭の `@誰か` が落ちる**: DM での答えが `@誰か` で始まると、その語が呼びかけとして落ちる。command 層が bot 自身の名前や id を知らないため（[proxy の research.md](../chat-integration-proxy/research.md)「既知の問題」3）
-- **Teams の `email` リアクションが未確認**: Teams が受け付けるかは実機でしか分からない（同 4）
-- **依頼のメッセージが無い依頼で、短い知らせが繰り返される**: slash command から始まった依頼など（同 5）
+- **Teams の `email` リアクションが未確認**: Teams が受け付けるかは実機でしか分からない（[proxy の research.md](../chat-integration-proxy/research.md)「既知の問題」4）
+- **依頼のメッセージが無い依頼で、短い知らせが繰り返される**: slash command から始まった依頼など（同 5）。順 9 でスラッシュコマンドを扱うときに、あわせて見直せる
 - **Mattermost で installation が複数あるとき、DM での「入力の期限切れ」の知らせが installation を引けない**（同 6）
-- **Teams で、利用者が 1 対 1 の会話で bot に答えるのに、アプリを `personal` の範囲でも入れる必要があるか**: 未確認（同 research.md の Research Log）
 
 ## Scope
 
