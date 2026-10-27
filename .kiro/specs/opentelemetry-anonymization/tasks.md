@@ -80,7 +80,7 @@
   - _Requirements: 1.1, 1.3, 1.4, 1.5_
   - _Depends: 1.1_
 
-- [ ] 4.2 一覧表とコード・挙動の網羅テストを作る
+- [x] 4.2 一覧表とコード・挙動の網羅テストを作る
   - 全ての例を hook に通し、`http.target` と `http.url` が期待どおりであることを確かめる
   - requirements.md の一覧表の行 ID の集合と、例の ID の集合が一致することを確かめる（spec ファイルの場所は 1 つの定数にまとめる）
   - すべてのパスの規則と共通パラメータ名が、少なくとも 1 つの例から参照されていることを確かめる
@@ -131,3 +131,4 @@
 - 3.2: 規則の宣言は `rules/index.ts` の `ANONYMIZATION_RULES`。`static-files` の `/vault.git` は design の表どおり前方一致（`/vault.gitpage` も静的ファイル扱いになる）。直すなら `=== '/vault.git'` か `startsWith('/vault.git/')`（レビューの任意提案）。
 - 3.3: 例の宣言は `rules/coverage-examples.ts` の `COVERAGE_EXAMPLES`（`route` は Express の登録どおりの文字列。照合は末尾 `/` を取り除いて比べるが `/` 自体は残す。`/*` と `/*/$` も登録されている）。ルートを持たない例は静的配信の URL だけ。`route` には、その URL を実際に処理する最初のルートを書く（全部を受ける `/*` は具体的なルートが無い場合だけ）。
 - 4.1: handler 4 本・module のインターフェース・古い `anonymizeQueryParams` を削除し、`anonymizeSearchParams` を `anonymizeQueryParams` に改名済み。`/_api/v3/page/check-page-existence?path=` など個別 URL の専用テストは消えたが、共通パラメータ名の規則で処理される。ルート単位の網羅は 4.2・4.3 が受け持つ。
+- 4.2: `coverage.spec.ts` は requirements.md の `## 匿名化対象一覧` の表を実行時に読む（`REQUIREMENTS_PATH` 定数）。この spec を改名・削除する／`kiro-spec-cleanup` をかけるときは、表を残すか、表を別の場所へ移して定数を直す。
