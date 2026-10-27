@@ -218,7 +218,7 @@ sequenceDiagram
 
 **Responsibilities & Constraints**
 - URL を最初の `?` でパスとクエリに分ける。`#` 以降はリクエストに含まれないため扱わない。
-- パスはパーセントエンコードを戻してから規則に当てる（`decodePathname`。壊れたエンコードは元のまま）。規則は先頭から順に調べ、最初に当てはまった 1 つだけを適用する。
+- パスはデコード前とデコード後（`decodePathname`。壊れたエンコードは元のまま）の両方を持つ `RequestPath` として規則に渡す。規則は先頭から順に調べ、最初に当てはまった 1 つだけを適用する。
 - クエリには `AnonymizationRules.sensitiveQueryParams` の置換を適用する。
 - パスとクエリのどちらも変化しなければ `null` を返す。
 - 規則のモジュールを import しない。
@@ -272,9 +272,14 @@ export type RedactPattern = {
   readonly params: readonly string[]; // e.g. ['linkId']
 };
 
+export type RequestPath = {
+  readonly raw: string; // as received (percent-encoded)
+  readonly decoded: string; // decodePathname(raw)
+};
+
 export type PathRule = {
   readonly id: PathRuleId;
-  readonly matches: (decodedPath: string) => boolean;
+  readonly matches: (path: RequestPath) => boolean;
   readonly action: PathAction;
 };
 
@@ -288,12 +293,12 @@ export type AnonymizationRules = {
 
 | Rule ID | 当てはまるパス | 動作 |
 |---|---|---|
-| `next-data` | `/_next/data/<buildId>/...json` | `<buildId>` の後の区切りが `AllLang` のいずれかなら locale として残し、その後ろ（`.json` を除く）を中のパスとして同じ規則の一覧に通し、外側を付け直す。中のパスが空（トップページ）なら変えない |
-| `static-files` | `/_next/`、`/static/`、`/images/`、`/_drawio-assets/`、`/uploads/`、`/vault.git` で始まる、または `/favicon.ico`・`/favicon.svg` | 変えない |
+| `next-data` | `/_next/data/<buildId>/...json` | `<buildId>` の後の区切りが `AllLang` のいずれかなら locale として残し、その後ろ（`.json` を除く）を中のパスとして同じ規則の一覧に通し、外側を付け直す。中のパスの `RequestPath` は、**デコード前**の外側のパスから切り出した文字列を `raw` とし、`decoded = decodePathname(raw)` とする（デコード済みの文字列から切り出さない）。中のパスが空（トップページ）なら変えない |
+| `static-files` | `/_next/`、`/_drawio-assets/`、`/uploads/`、`/vault.git` で始まる。`/favicon.ico`・`/favicon.svg`。`/static/`・`/images/` で始まり、最後の区切りが静的ファイルの拡張子（`png`・`jpg`・`jpeg`・`gif`・`svg`・`ico`・`webp`・`css`・`js`・`mjs`・`map`・`json`・`woff`・`woff2`・`ttf`・`otf`・`eot`）で終わる | 変えない（それ以外の `/static/`・`/images/` は、静的ファイルが無ければページ表示になるため、この規則に当てはめず `page-view` に任せる。`/images/v1.2` のような `.` を含むページ名もハッシュ化される） |
 | `secret-path-segments` | `/share/:linkId`、`/forgot-password/:token`、`/user-activation/:token` | 該当の区切りを `[ANONYMIZED]` にする |
 | `api-path-segments` | `/_api/v3/share-links/:id`、`/_api/v3/user-groups/:id/users/:username` | `id`（共有リンク）・`username` の区切りを `[ANONYMIZED]` にする。ユーザーグループの `:id` は ObjectId なので残す |
 | `kept-pages` | `/`、`/user`、パーマリンク（`/<24 桁の 16 進数>`）、パーマリンクの `.md` | 変えない |
-| `page-markdown` | `.md` で終わり、`.md` を除いた部分がページとして扱えるパス | `.md` を除いた部分を `hash-page-path` と同じ値にし、`.md` を付け直す |
+| `page-markdown` | `.md` で終わり、`.md` を除いた部分がユーザーページ（`isUserPage`）またはページとして扱えるパス（`isPageRoute`） | `.md` を除いた部分を `hash-page-path` と同じ値にし、`.md` を付け直す |
 | `trash-page` | `/trash/` で始まり、残りが空でないパス | `/trash` を残し、残りを `/` から始まるページパスとして `hash-page-path` と同じ値にする |
 | `page-view` | ユーザーページ（`isUserPage`）、またはページとして扱えるパス（`isPageRoute`） | `hash-page-path`（ユーザーページはユーザー名と配下を別々に、それ以外はパス全体をハッシュ化） |
 | （どれにも当てはまらない） | `/_api/...`、`/admin`、`/me`、`/login` などのシステムページ | 変えない |
@@ -301,7 +306,8 @@ export type AnonymizationRules = {
 全 URL 共通で匿名化するクエリパラメータ（`SENSITIVE_QUERY_PARAMS`）: `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`。
 
 - `isPageRoute` は既存の判定（`@growi/core` の `isCreatablePage` を、ページ名に使えない 1 文字の禁止文字を置き換えてから呼ぶ）を引き継ぐ。`.` による除外は行わない。
-- 判定に使うパスはデコード後の値。`static-files` はデコード前後どちらでも同じ結果になる文字だけを使う。
+- `secret-path-segments`・`api-path-segments` は、**デコード前**のパスを `/` で区切ってから型と照合し、置き換える（区切りの中の `%2F` を区切りとみなさないため。外部認証のユーザー名には文字の制約が無い）。それ以外の規則の判定とハッシュ化はデコード後のパスで行う。
+- どの規則もパスを変えなかった場合、出力のパスはデコード前の元の文字列のままにする（クエリだけが変わった場合も同じ）。
 
 #### CoverageExamples（`rules/coverage-examples.ts`）
 
@@ -312,6 +318,7 @@ export type CoverageExample = {
   readonly url: string;
   readonly expectedTarget: string | null; // null = 書き換えない
   readonly route?: string; // Express のルートの型（API とページ表示のルート）。照合テストで使う
+  readonly method?: string; // route の HTTP メソッド。省略時は GET
 };
 ```
 
@@ -344,16 +351,22 @@ export const redactPathParams: (pattern: string, path: string, params: readonly 
 export const anonymizeQueryParams: (search: string, paramNames: readonly string[]) => string;
 ```
 
+- 既存の `anonymizeQueryParams(target, paramNames)` は handler が使っている間は残し、新しい関数は別名で追加する。handler を削除する時点で古い関数を消し、新しい関数をこの名前にする。
 - `search` は `?` を含まないクエリ文字列。`&` で区切り、名前（デコード後、末尾の `[]` を除く）が `paramNames` に含まれる区切りの値だけを `%5BANONYMIZED%5D`（値が JSON 配列なら `%5B%22%5BANONYMIZED%5D%22%5D`）に置き換える。ほかの区切りは元の文字列のまま。
 
 #### ExpressRouteWalker（`src/test-utils/express-route-walker.ts`）
 
 ```typescript
-export type RegisteredRoute = { readonly method: string; readonly path: string };
+export type RegisteredRoute = {
+  readonly method: string;
+  readonly path: string; // mount prefix + route path
+  readonly middlewareNames: readonly string[];
+};
 export const listRegisteredRoutes: (app: { _router: unknown }) => readonly RegisteredRoute[];
 ```
 
-- `tools/snapshot-route-middleware.ts` の `walkStack` / `extractMountPrefix` を移したもの。マウント先の型とルートの型をつないだ完全なルートの型を返す。
+- `tools/snapshot-route-middleware.ts` の `walkStack` / `extractMountPrefix` を移したもの。マウント先の型とルートの型をつないだ完全なルートの型と、ミドルウェア名を、**すべてのルートについて**返す。`/_api/v3` への絞り込みと、無名ミドルウェアの検査はツール側に残す。
+- マウント先の下に `'/'` で登録されたルートは末尾に `/` が付いて出ることがあるため、照合テストは末尾の `/` を取り除いて比べる。
 
 ## Error Handling
 

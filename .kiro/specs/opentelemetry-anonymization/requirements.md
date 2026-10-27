@@ -149,12 +149,13 @@
 | `P04` | `/<. を含むページパス>` | ページパス（パス） | 匿名化する | `page-view` | `/[HASHED:...]` |
 | `P05` | `/user/<ユーザー名>` | ユーザー名（パス） | 匿名化する | `page-view` | `/user/[USERNAME_HASHED:...]` |
 | `P06` | `/user/<ユーザー名>/<配下>`（ユーザー名に `.` を含む場合を含む） | ユーザー名・ページパス（パス） | 匿名化する | `page-view` | `/user/[USERNAME_HASHED:...]/[HASHED:...]` |
-| `P07` | `/trash/<ページパス>` | ページパス（パス） | 匿名化する | `trash-page` | `/trash/[HASHED:...]` |
-| `P08` | `/<ページパス>.md` | ページパス（パス） | 匿名化する | `page-markdown` | `/[HASHED:...].md`（ハッシュは P01 と同じ値） |
+| `P07` | `/trash/<ページパス>` | ページパス（パス） | 匿名化する | `trash-page` | `/trash/[HASHED:...]`（ゴミ箱内のユーザーページは `/trash/user/[USERNAME_HASHED:...]/[HASHED:...]`） |
+| `P08` | `/<ページパス>.md`、`/user/<ユーザー名>.md` | ページパス・ユーザー名（パス） | 匿名化する | `page-markdown` | `/[HASHED:...].md`（ハッシュは P01 と同じ値）、`/user/[USERNAME_HASHED:...].md` |
 | `P09` | `/<途中に _search を含むページパス>?q=<キーワード>` | ページパス（パス）・キーワード（`q`） | 匿名化する | `page-view`、`sensitive-query-params` | `/[HASHED:...]?q=[ANONYMIZED]` |
 | `P10` | `/`、`/user` | なし | 意図的にそのまま残す（利用者データを含まない） | `kept-pages` | 変更なし |
 | `P11` | `/<id>`、`/<id>.md`（パーマリンク） | ページ ID（パス） | 意図的にそのまま残す（ObjectId は利用者データでなく、閲覧には権限が要る） | `kept-pages` | 変更なし |
-| `P12` | `/admin/...`、`/me`、`/login`、`/_search`（キーワードなし）などのシステムページ | なし | 意図的にそのまま残す（利用者データを含まない） | （規則なし） | 変更なし |
+| `P12` | `@growi/core` の `isCreatablePage` が作成不可とするシステムページ（`/admin/...`、`/me`、`/login`、`/tags`、`/trash`、`/share`、`/_search`（キーワードなし）、`/_private-legacy-pages`（キーワードなし）、`/attachment/<id>`、`/_api/...` など） | なし | 意図的にそのまま残す（利用者データを含まない） | （規則なし） | 変更なし |
+| `P13` | `/download/<id>`、`/ogp/<id>`、`/invited`、`/forgot-password`（トークンなし）、`/passport/...` など、作成可能なページパスと区別できないシステムのルート | なし | 匿名化する（利用者データは含まないが、ページ表示と区別できないためハッシュ化される。変更前と同じ） | `page-view` | `/[HASHED:...]` |
 
 ### 画面内遷移用のデータ URL
 
@@ -196,7 +197,7 @@
 | `A06` | `GET /_api/v3/page-listing/children?path=`、`/info?path=`、`/item?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
 | `A07` | `GET /_api/v3/pages/list?path=`、`/subordinated-list?path=` | ページパス（`path`） | 匿名化する。`limit` などは残す | `sensitive-query-params` | `path=[ANONYMIZED]` |
 | `A08` | `GET /_api/pages.updatePost?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
-| `A09` | `/_api/v3/page/info?pageId=`、`/attachment/<id>`、`/download/<id>` など ID だけを含む URL | ページ・添付ファイルの ID | 意図的にそのまま残す（ObjectId は利用者データでなく、閲覧には権限が要る） | （規則なし） | 変更なし |
+| `A09` | `/_api/v3/page/info?pageId=`、`/_api/v3/revisions/<id>` など、API で ID だけを含む URL | ページ・版の ID | 意図的にそのまま残す（ObjectId は利用者データでなく、閲覧には権限が要る） | （規則なし） | 変更なし |
 
 ### 秘密の値
 
@@ -212,7 +213,8 @@
 
 | ID | URL の形 | データの種類と場所 | 扱い | 規則 | 置換後の形 |
 |---|---|---|---|---|---|
-| `F01` | `/_next/static/...`、`/static/...`、`/images/...`、`/_drawio-assets/...`、`/favicon.ico`、`/favicon.svg` | なし | 意図的にそのまま残す（利用者データを含まない） | `static-files` | 変更なし |
+| `F01` | `/_next/static/...`、`/_drawio-assets/...`、`/uploads/...`、`/vault.git/...`、`/favicon.ico`、`/favicon.svg`、最後の区切りが静的ファイルの拡張子（`png`・`jpg`・`jpeg`・`gif`・`svg`・`ico`・`webp`・`css`・`js`・`mjs`・`map`・`json`・`woff`・`woff2`・`ttf`・`otf`・`eot`）で終わる `/static/...`・`/images/...` | なし | 意図的にそのまま残す（利用者データを含まない） | `static-files` | 変更なし |
+| `F02` | F01 に当てはまらない `/static/<ページパス>`・`/images/<ページパス>`（`/images/v1.2` のように `.` を含むページ名を含む） | ページパス（パス） | 匿名化する（静的ファイルが無ければページ表示になるため） | `page-view` | `/[HASHED:...]` |
 
 ### 未対応（既知の残課題）
 
