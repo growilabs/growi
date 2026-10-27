@@ -1,0 +1,22 @@
+{
+  "feature_name": "otel-anonymization-coverage",
+  "created_at": "2026-10-27T13:48:05.000Z",
+  "updated_at": "2026-10-27T13:48:05.000Z",
+  "language": "ja",
+  "phase": "initialized",
+  "approvals": {
+    "requirements": {
+      "generated": false,
+      "approved": false
+    },
+    "design": {
+      "generated": false,
+      "approved": false
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}
