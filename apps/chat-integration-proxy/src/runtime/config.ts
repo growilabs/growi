@@ -80,6 +80,8 @@ export interface ProxyConfig {
    * rewrites the address the chat service sees -- see `OAuthCallbackDeps.redirectUri`.
    */
   readonly oauthRedirectUri?: string;
+  /** Temporary diagnostics: log the timing of every private reply to stderr. */
+  readonly tracePrivateReplyTiming?: true;
 }
 
 // ---------------------------------------------------------------------------
@@ -556,5 +558,8 @@ export const loadConfig = (
     http: readHttpConfig(env),
     mattermostInstallations: readMattermostInstallations(env),
     oauthRedirectUri: read(env, 'OAUTH_REDIRECT_URI'),
+    ...(read(env, 'CHAT_INTEGRATION_TRACE_PRIVATE_REPLY_TIMING') === '1'
+      ? { tracePrivateReplyTiming: true as const }
+      : {}),
   };
 };

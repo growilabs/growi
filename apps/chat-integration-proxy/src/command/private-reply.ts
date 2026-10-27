@@ -57,6 +57,24 @@ export interface UndeliverableFact {
   readonly directFailure: string;
 }
 
+/**
+ * One Slack API round trip of a private reply, for the temporary
+ * private-reply timing trace. Carries ids and clock readings only -- never
+ * reply content (Requirement 1.12).
+ */
+export interface PrivateReplyTiming {
+  readonly via: 'ephemeral' | 'direct';
+  readonly channelId: string;
+  /** The request message's id, when the request came from a message. */
+  readonly sourceMessageId: string | null;
+  /** Epoch milliseconds read immediately before and after the platform call. */
+  readonly beforeMs: number;
+  readonly afterMs: number;
+  /** The id the platform answered with, or `null` on a failed post. */
+  readonly returnedId: string | null;
+  readonly ok: boolean;
+}
+
 export interface PrivateReplierDeps {
   readonly platform: Pick<
     PlatformFacade,
@@ -67,6 +85,9 @@ export interface PrivateReplierDeps {
     channel: SdkChannelRef,
   ) => Promise<string | null>;
   readonly reportUndeliverable: (fact: UndeliverableFact) => void;
+  /** Absent unless the operator turned the timing trace on. */
+  readonly traceTiming?: (timing: PrivateReplyTiming) => void;
+  readonly now?: () => number;
 }
 
 const REQUEST_SUMMARY_LIMIT = 80;
@@ -202,6 +223,35 @@ export const createPrivateReplier = (
     );
   };
 
+  const now = deps.now ?? Date.now;
+
+  /** Times `call` and hands the reading to the trace; the trace can never fail the reply. */
+  const timed = async <T>(
+    via: PrivateReplyTiming['via'],
+    origin: PrivateReplyOrigin,
+    call: () => Promise<T>,
+    describe: (outcome: T) => { ok: boolean; returnedId: string | null },
+  ): Promise<T> => {
+    const { traceTiming } = deps;
+    if (traceTiming == null) return call();
+    const beforeMs = now();
+    const outcome = await call();
+    const afterMs = now();
+    try {
+      traceTiming({
+        via,
+        channelId: origin.channel.channelId,
+        sourceMessageId: origin.sourceMessageId,
+        beforeMs,
+        afterMs,
+        ...describe(outcome),
+      });
+    } catch {
+      // Diagnostics only.
+    }
+    return outcome;
+  };
+
   const report = (fact: UndeliverableFact): void => {
     try {
       deps.reportUndeliverable(fact);
@@ -217,7 +267,21 @@ export const createPrivateReplier = (
   ): Promise<PrivateReplyOutcome> => {
     const ephemeral = await settle<EphemeralPostOutcome>(
       () =>
-        platform.postEphemeral(origin.channel, origin.actor, message, scope),
+        timed(
+          'ephemeral',
+          origin,
+          () =>
+            platform.postEphemeral(
+              origin.channel,
+              origin.actor,
+              message,
+              scope,
+            ),
+          (outcome) => ({
+            ok: outcome.ok,
+            returnedId: outcome.ok ? outcome.messageId : null,
+          }),
+        ),
       (error) => ({
         ok: false,
         reason: 'platform-error',
@@ -233,11 +297,20 @@ export const createPrivateReplier = (
     const header = headerOf(place ?? UNKNOWN_PLACE, origin.requestSummary);
     const direct = await settle(
       () =>
-        platform.postDirect(
-          origin.channel,
-          origin.actor,
-          withHeader(header, message),
-          scope,
+        timed(
+          'direct',
+          origin,
+          () =>
+            platform.postDirect(
+              origin.channel,
+              origin.actor,
+              withHeader(header, message),
+              scope,
+            ),
+          (outcome) => ({
+            ok: outcome.ok,
+            returnedId: outcome.ok ? outcome.messageId : null,
+          }),
         ),
       (error) => ({ ok: false, detail: messageOf(error) }) as const,
     );

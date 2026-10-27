@@ -72,6 +72,7 @@ import {
   ensureMattermostInstallations,
   type MattermostInstallationFailure,
 } from './mattermost-installations.js';
+import { createPrivateReplyTimingTrace } from './private-reply-timing.js';
 import { createSweeper, type Sweeper, type SweeperDeps } from './sweeper.js';
 
 /**
@@ -144,6 +145,11 @@ const defaultReporters: ProxyReporters = {
   },
 };
 
+const defaultWriteTimingTrace = (line: string): void => {
+  // biome-ignore lint/suspicious/noConsole: temporary diagnostics; the process shell is the one place that may write to stderr.
+  console.error(line);
+};
+
 /** The two edges that reach outside this process, and the reporters. */
 export interface ProxyDependencyOverrides {
   readonly createDb?: (databaseUrl: string) => PrismaClient;
@@ -154,6 +160,8 @@ export interface ProxyDependencyOverrides {
   /** A seam for the periodic work, so its lifecycle is provable without a schedule. */
   readonly createSweeper?: (deps: SweeperDeps) => Sweeper;
   readonly reporters?: ProxyReporters;
+  /** Receives each trace line; defaults to stderr. */
+  readonly writeTimingTrace?: (line: string) => void;
 }
 
 export interface ProxyDependencies {
@@ -191,6 +199,7 @@ export const createProxyDependencies = async (
     createInstallationStore: buildInstallationStore = createInstallationStore,
     createSweeper: buildSweeper = createSweeper,
     reporters = defaultReporters,
+    writeTimingTrace = defaultWriteTimingTrace,
   } = overrides;
   const { cipher } = config;
 
@@ -208,10 +217,13 @@ export const createProxyDependencies = async (
   const requestNonces = createRequestNonceRepository(db);
 
   const deferred = createDeferredEventSink();
+  const timingTrace = config.tracePrivateReplyTiming
+    ? createPrivateReplyTimingTrace(writeTimingTrace)
+    : null;
   const facade = await createFacade(
     config.platformApp,
     createInstallationProvider(installations),
-    deferred.sink,
+    timingTrace == null ? deferred.sink : timingTrace.wrapSink(deferred.sink),
     {
       reportOperationalFailure: reporters.reportOperationalFailure,
       // A forward reference, the same knot as the sink's: `refreshChannels`
@@ -294,6 +306,7 @@ export const createProxyDependencies = async (
     describePlace: (channel) =>
       describePlace({ installations, channels }, channel),
     resolveInstallationId,
+    ...(timingTrace == null ? {} : { traceTiming: timingTrace.traceTiming }),
     reportUndeliverable: (fact) =>
       reporters.reportOperationalFailure(
         `a private reply could not be delivered in ${fact.platform} channel ${fact.channelId}: the ephemeral message failed (${fact.ephemeralFailure}) and the direct message failed (${fact.directFailure})`,

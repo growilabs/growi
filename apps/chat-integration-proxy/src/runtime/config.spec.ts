@@ -414,6 +414,21 @@ describe('loadConfig', () => {
     });
   });
 
+  describe('private reply timing trace (temporary diagnostics)', () => {
+    const traceOf = (value: string | undefined) =>
+      loadConfig({
+        ...minimalEnv(),
+        CHAT_INTEGRATION_TRACE_PRIVATE_REPLY_TIMING: value,
+      }).tracePrivateReplyTiming;
+
+    it('is off unless the variable is exactly 1', () => {
+      expect(traceOf(undefined)).toBeUndefined();
+      expect(traceOf('0')).toBeUndefined();
+      expect(traceOf('true')).toBeUndefined();
+      expect(traceOf('1')).toBe(true);
+    });
+  });
+
   describe('the HTTP listener', () => {
     it('serves on a default port when none is configured, because the endpoints are always open', () => {
       expect(loadConfig(minimalEnv()).http.port).toBe(8080);

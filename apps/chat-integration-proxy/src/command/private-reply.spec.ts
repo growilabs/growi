@@ -521,3 +521,54 @@ describe('privateReplyOriginOf', () => {
     expect(origin.requestSummary).toBe(`search ${'x'.repeat(73)}…`);
   });
 });
+
+describe('private reply timing trace', () => {
+  const build = (
+    traceTiming: PrivateReplierDeps['traceTiming'],
+    ephemeral: EphemeralPostOutcome,
+  ) => {
+    const platform = mock<Platform>();
+    platform.postEphemeral.mockResolvedValue(ephemeral);
+    const readings = [1000, 1250];
+    const replier = createPrivateReplier({
+      platform,
+      describePlace: async () => null,
+      resolveInstallationId: async () => 'inst-1',
+      reportUndeliverable: vi.fn(),
+      traceTiming,
+      now: () => readings.shift() ?? 0,
+    });
+    return replier;
+  };
+
+  it('reports the readings around the Slack call, the returned id and the request id, without content', async () => {
+    const traceTiming = vi.fn();
+    const replier = build(traceTiming, { ok: true, messageId: 'e-1' });
+
+    await replier.reply(originOf(), { kind: 'markdown', markdown: SECRET });
+
+    expect(traceTiming).toHaveBeenCalledExactlyOnceWith({
+      via: 'ephemeral',
+      channelId: testSdkChannel('slack').channelId,
+      sourceMessageId: 'm-1',
+      beforeMs: 1000,
+      afterMs: 1250,
+      returnedId: 'e-1',
+      ok: true,
+    });
+    expect(JSON.stringify(traceTiming.mock.calls)).not.toContain(SECRET);
+  });
+
+  it('still delivers the reply when the trace itself throws', async () => {
+    const replier = build(
+      () => {
+        throw new Error('trace broke');
+      },
+      { ok: true, messageId: 'e-1' },
+    );
+
+    await expect(
+      replier.reply(originOf(), { kind: 'markdown', markdown: 'hi' }),
+    ).resolves.toEqual({ kind: 'in-place' });
+  });
+});

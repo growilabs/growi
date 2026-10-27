@@ -57,6 +57,7 @@ export type {
   PrivateReplierDeps,
   PrivateReplyOrigin,
   PrivateReplyOutcome,
+  PrivateReplyTiming,
   UndeliverableFact,
 } from './private-reply.js';
 export {
