@@ -39,7 +39,7 @@ export type CreateProposalRequest = {
   readonly entry: CreatableEntry;
   readonly modelLabel?: string;
   readonly operations: readonly CreatableOperationInput[];
-  readonly request?: { readonly ip?: string; readonly endpoint?: string };
+  readonly request?: RequestParameters;
   // request: the caller route's activity is settled as CHANGE_PROPOSAL_CREATE
   readonly trigger?: ApplyTrigger;
   readonly basedOn?: BasedOn;
@@ -51,3 +51,11 @@ export type CreateProposalResult = {
   // null when nothing was due for auto-apply
   readonly apply: ApplyResult | null;
 };
+
+export type RequestParameters = {
+  readonly ip?: string;
+  readonly endpoint?: string;
+};
+
+// Operation keys; a chosen key also approves the other pending operations on its page.
+export type ApprovalTargets = readonly string[] | 'all';

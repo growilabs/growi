@@ -210,7 +210,7 @@
   - `trigger` に request の activity を渡したとき、その activity が作成の activity として記録され、記録されないままの activity（`ACTION_UNSETTLED`）が別に残らず、作成直後の反映の activity が別の行として記録されることを結合テストで確かめている
   - 自分の Change Proposal を元にした後続が保存されて方針どおりに反映されること、見直しが方針「すべて」でも承認待ちになること、他の人の Change Proposal・存在しない ID・取り消しの Change Proposal を元にすると同じ結果で断られること、関係に合わない元の操作が key つきで断られること、完了した Change Proposal を元にできること、すべての操作の状態が作成の直後に決まった Change Proposal が完了になることを結合テストで確かめている
   - _Requirements: 1.1, 1.8, 1.9, 1.10, 1.11, 1.12, 1.14, 1.15, 1.17, 2.9, 2.10, 4.1, 4.2, 4.3, 7.7, 7.9, 13.1, 13.2, 13.3, 13.4, 13.7_
-- [ ] 5.2 承認・飛ばす・破棄と、ページごとの通知の指定の変更を作る
+- [x] 5.2 承認・飛ばす・破棄と、ページごとの通知の指定の変更を作る
   - 依頼した人でなければ「見つからない」を返す。段階が open でなければ（完了を含む）「反映できない状態」を返す
   - 飛ばしたあとで、「待ち」が残っていなければ完了にする更新を呼ぶ。破棄は「待ち」が 1 つ以上あることを条件にし、「待ち」が無い open の Change Proposal では完了にしてから「反映できない状態」を返す
   - 承認は、選んだ操作を同じページへの「待ち」の操作に広げて承認を付け、反映する。飛ばすと破棄は「待ち」の操作を「飛ばした」にする
@@ -338,3 +338,5 @@
 - 5.1: `modelLabel` の 100 文字の検査は `Array.from(label).length`（コードポイントの数）で数え、超えたら切り詰めずに断る（`.length` は絵文字を 2 と数え、バイト数は日本語が 33 文字前後で上限に達し、`Intl.Segmenter` は ICU の版で結果が変わり保存サイズに上限が付かない。サーバーとブラウザで数え方が一致し、保存サイズが最大 400 バイトに収まる）。画面側の `maxlength` は UTF-16 の単位で数えるのでサーバーより厳しくなるだけで緩くはならない
 - 5.1: server の barrel（`features/change-proposal/server/index.ts`、5.1 で新規作成）は `createChangeProposalService(crowi, deps?)` を export する。`createProposal` は返るオブジェクトのメソッドで、承認（5.2）・取り消し（5.3）・取得（6.1）が同じオブジェクトにメソッドを足す。design の File Structure と change-proposal-ai-agent の `ProposeChangesContext`（design 705 行目）は crowi もサービスの実体も持たずに `createProposal({...})` を呼ぶ前提なので、route の factory で `createChangeProposalService(crowi)` を作って mastra の requestContext 等で道具に渡す配線が要る（どの spec にもこの受け渡しを書いたタスクが無い。ai-agent 側の Revalidation Trigger に当たる。6.3 / 8 で決める）
 - 5.1: `input-rejected` の `rejection` は `CreateInputRejection`（domain の `InputRejection` に `invalid-entry`、`model-label-too-long`（`max: 100`）、`invalid-operation`（`index`）を足したもの）。ai-agent の誤りの対応表は code をそのまま detail に入れるので壊れないが、design の ServiceError の節と ai-agent への引き継ぎに書き足す。作成時に move の `fromPath` が今のパスと違えば `target-unavailable`（design に無い。反映時の move handler と同じ判断）。1 日の上限は「数えてから保存」なので同時の作成で少し超えうる。承認の書き込みで例外なら `apply: null`、反映で例外なら `{type:'in-progress'}`（承認は保存済みなので 5.4 の cron が拾う）。`MODEL_LABEL_MAX_CODE_POINTS` は barrel から export（使う側は ai-agent の予定）
+- 5.2: `approve(proposalId, user, targets, trigger)` は 4 引数（design どおり）。request の trigger の ip / endpoint は route の `addActivity` の情報から取られる。期限（`expiresAt`）を過ぎても cron が閉じるまでは lifecycle が open なので承認できる（5.4 の cron の間隔の話）。飛ばす・破棄は反映の権利（lease）を見ないので、反映がページを書いた直後に割り込むと「ページは書かれたのに操作が『飛ばした』と記録される」重なりが残る（design の検証 688 行目が受け入れている。対策を足すかは人の判断）。`setPerPageNotifications` は boolean 以外を not-found で断る（400 にするのは 6.4 の route の検査の役目）
+- 5.2 → 6.4 への申し送り: request の trigger で承認して `in-progress` が返ったとき、または done でも反映した操作が 0 件のとき、route の `addActivity` の id が確定しないまま残り、応答は 200 なので `ACTION_UNSETTLED` も付かず、承認の操作が監査記録に残らない。6.4 の route で、反映の activity が作られなかった場合にも承認の activity を記録する扱いを決める

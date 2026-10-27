@@ -35,6 +35,10 @@ import {
   type ProposalApplier,
 } from './proposal-applier';
 import {
+  createRequesterActions,
+  type RequesterActions,
+} from './requester-actions';
+import {
   type ChangeProposalSettings,
   readChangeProposalSettings,
 } from './settings';
@@ -45,7 +49,7 @@ const logger = loggerFactory(
 
 const BASED_ON_RELATIONS: readonly string[] = ['follow-up', 'rework'];
 
-export type ChangeProposalService = {
+export type ChangeProposalService = RequesterActions & {
   createProposal(
     input: CreateProposalRequest,
   ): Promise<ServiceResult<CreateProposalResult>>;
@@ -223,6 +227,7 @@ export const createChangeProposalService = (
   };
 
   return {
+    ...createRequesterActions({ applier, now }),
     async createProposal(input) {
       const settings = readChangeProposalSettings();
       const createdAt = now();
