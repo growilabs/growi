@@ -419,6 +419,81 @@ describe('move operation handler', () => {
     });
   });
 
+  describe('with Japanese paths', () => {
+    const japanesePath = (name: string): string => {
+      seq += 1;
+      return `${PREFIX}/日本語-${seq}/${name}`;
+    };
+
+    const redirectsFrom = async (paths: readonly string[]) =>
+      (
+        await prisma.pageredirects.findMany({
+          where: { fromPath: { in: [...paths] } },
+          select: { fromPath: true },
+        })
+      )
+        .map((r) => r.fromPath)
+        .sort();
+
+    it.each([
+      ['a full-width space', 'ページ　全角空白'],
+      ['regex metacharacters and a full-width space', 'a.b(1)[仮]{2}|x　y'],
+    ])('moves a page whose path has %s and its child there and back, removing exactly the redirects the move left', async (_label, name) => {
+      const handler = createMoveHandler(crowi);
+      const originalPath = japanesePath(name);
+      const movedPath = `${PREFIX}/テスト/プロポーザル（かっこ）-${seq}`;
+      const parent = await createPage(originalPath);
+      const child = await createPage(`${originalPath}/子ページ`);
+      const forward = moveOp(await findPage(parent._id), movedPath);
+      expectApplied(await handler.execute(forward, contextFor(forward, false)));
+      await waitForPageOperationsToFinish();
+      expect((await findPage(child._id)).path).toBe(`${movedPath}/子ページ`);
+      expect(
+        (await prisma.pageredirects.retrievePageRedirectEndpoints(originalPath))
+          ?.end.toPath,
+      ).toBe(movedPath);
+      // Differs from the moved tree only where an unescaped pattern would still
+      // match (a literal `.` or `|`), so it must survive the redirect removal.
+      const lookAlike = `${originalPath.replace(/[.　]/u, 'X')}/子ページ`;
+      await prisma.pageredirects.create({
+        data: { fromPath: lookAlike, toPath: movedPath },
+      });
+
+      const revert = moveOp(
+        await findPage(parent._id),
+        originalPath,
+        originalPath,
+      );
+      const outcome = await handler.execute(revert, contextFor(revert, false));
+      await waitForPageOperationsToFinish();
+
+      expectApplied(outcome);
+      expect((await findPage(parent._id)).path).toBe(originalPath);
+      expect((await findPage(child._id)).path).toBe(`${originalPath}/子ページ`);
+      expect(
+        await redirectsFrom([
+          originalPath,
+          `${originalPath}/子ページ`,
+          movedPath,
+          `${movedPath}/子ページ`,
+          lookAlike,
+        ]),
+      ).toEqual([lookAlike]);
+    });
+
+    it('fails with path-occupied when a page already sits at the Japanese destination', async () => {
+      const handler = createMoveHandler(crowi);
+      const page = await createPage(japanesePath('移動元'));
+      const occupant = await createPage(japanesePath('ページ　全角空白'));
+      const op = moveOp(page, occupant.path);
+
+      const outcome = await handler.execute(op, contextFor(op, false));
+
+      expect(outcome).toEqual({ status: 'failed', reason: 'path-occupied' });
+      expect((await findPage(page._id)).path).toBe(op.fromPath);
+    });
+  });
+
   describe('findExistingResult', () => {
     it('finds nothing before the move and the applied result after it, so a re-run does not move twice', async () => {
       const handler = createMoveHandler(crowi);

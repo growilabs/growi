@@ -129,6 +129,49 @@ describe('validateProposalInput', () => {
       ).toEqual({ ok: false, rejection: { code: 'body-too-large' } });
     });
 
+    describe('with Japanese and emoji bodies', () => {
+      it.each([
+        ['4 Japanese characters', 'あいうえ', 12],
+        ['a CRLF-separated Japanese body', '日本語\r\n本文', 17],
+        ['an emoji (a surrogate pair in UTF-16)', '😀', 4],
+        ['Japanese, ASCII and emoji mixed', 'ページa😀', 14],
+      ])('accepts %s exactly at its UTF-8 byte size and rejects it one byte below', (_label, body, bytes) => {
+        expect(
+          validateProposalInput(
+            [edit(body)],
+            limits({ maxTotalBodyBytes: bytes }),
+          ).ok,
+        ).toBe(true);
+        expect(
+          validateProposalInput(
+            [edit(body)],
+            limits({ maxTotalBodyBytes: bytes - 1 }),
+          ),
+        ).toEqual({ ok: false, rejection: { code: 'body-too-large' } });
+      });
+
+      it('sums Japanese bodies across edit and create operations', () => {
+        // 9 + 6 = 15 bytes
+        const ops = [edit('日本語'), create('/日本語/新規', 'ペー')];
+        expect(
+          validateProposalInput(ops, limits({ maxTotalBodyBytes: 15 })).ok,
+        ).toBe(true);
+        expect(
+          validateProposalInput(ops, limits({ maxTotalBodyBytes: 14 })),
+        ).toEqual({ ok: false, rejection: { code: 'body-too-large' } });
+      });
+
+      it('accepts a Japanese body of exactly 8 MiB and rejects one more byte', () => {
+        // 2,796,202 characters × 3 bytes + 2 bytes = 8,388,608 bytes
+        const atLimit = `${'あ'.repeat(2_796_202)}ab`;
+        expect(validateProposalInput([edit(atLimit)], limits()).ok).toBe(true);
+        expect(validateProposalInput([edit(`${atLimit}c`)], limits())).toEqual({
+          ok: false,
+          rejection: { code: 'body-too-large' },
+        });
+      });
+    });
+
     it('does not count move operations as body', () => {
       expect(
         validateProposalInput([move()], limits({ maxTotalBodyBytes: 0 })).ok,
@@ -195,6 +238,29 @@ describe('validateProposalInput', () => {
       expect(
         validateProposalInput([edit(), move('/trash/x')], limits()),
       ).toEqual({ ok: false, rejection: { code: 'invalid-path', index: 1 } });
+    });
+
+    it.each([
+      '/日本語/ページ　全角空白',
+      '/テスト/プロポーザル（かっこ）',
+      '/日本語/a.b(1)[仮]{2}|x　y',
+      '/絵文字😀/ページ',
+    ])('accepts the Japanese path %j as a create path and a move destination', (path) => {
+      expect(
+        validateProposalInput([create(path), move(path)], limits()).ok,
+      ).toBe(true);
+    });
+
+    it.each([
+      '/日本語/a.b+c(d)',
+      '/日本語/a^b',
+      '/日本語/ページ.md',
+      '/trash/日本語',
+    ])('rejects the Japanese path %j that GROWI cannot create', (path) => {
+      expect(validateProposalInput([create(path)], limits())).toEqual({
+        ok: false,
+        rejection: { code: 'invalid-path', index: 0 },
+      });
     });
 
     it('accepts ordinary paths including non-ASCII and user pages', () => {

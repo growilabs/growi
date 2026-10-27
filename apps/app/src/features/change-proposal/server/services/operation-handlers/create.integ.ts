@@ -307,6 +307,79 @@ describe('create operation handler', () => {
     });
   });
 
+  describe('with Japanese paths and bodies', () => {
+    const JAPANESE_BODY =
+      '# 日本語の本文\r\n\r\n絵文字😀と全角空白　を含む行\r\n';
+
+    const createJapaneseParent = async (
+      groupId: mongoose.Types.ObjectId,
+    ): Promise<HydratedDocument<PageDocument>> => {
+      seq += 1;
+      const prefixPage = await Page.findOne({ path: PREFIX });
+      return Page.create({
+        path: `${PREFIX}/日本語（親）-${seq}　a.b[1]`,
+        grant: PageGrant.GRANT_USER_GROUP,
+        grantedGroups: [{ item: groupId, type: GroupType.userGroup }],
+        parent: prefixPage?._id,
+        isEmpty: false,
+      });
+    };
+
+    it('creates a page two levels under a Japanese ancestor with its grant and stores the Japanese body unchanged', async () => {
+      const handler = createCreateHandler(crowi);
+      const parent = await createJapaneseParent(memberGroupId);
+      const op = {
+        ...createOp(`${parent.path}/中間/ページ　全角空白`),
+        body: JAPANESE_BODY,
+      };
+
+      const outcome = expectApplied(
+        await handler.execute(op, contextFor(op, false)),
+      );
+      await waitForPageOperationsToFinish();
+
+      const created = await Page.findOne({ path: op.path });
+      expect(created?._id.toString()).toBe(outcome.resultPageId);
+      expect(created?.grant).toBe(PageGrant.GRANT_USER_GROUP);
+      expect(
+        created?.grantedGroups.map((g) => getIdStringForRef(g.item)),
+      ).toEqual([memberGroupId.toString()]);
+      const revision = await prisma.revisions.findFirst({
+        where: { pageId: outcome.resultPageId },
+      });
+      // Revision bodies are read back with CR/CRLF turned into LF for every save.
+      expect(revision?.body).toBe(JAPANESE_BODY.replace(/\r\n/g, '\n'));
+    });
+
+    it('fails with target-unavailable when the requester cannot view the Japanese closest ancestor', async () => {
+      const handler = createCreateHandler(crowi);
+      const parent = await createJapaneseParent(foreignGroupId);
+      const op = createOp(`${parent.path}/子ページ`);
+
+      const outcome = await handler.execute(op, contextFor(op, false));
+
+      expect(outcome).toEqual({
+        status: 'failed',
+        reason: 'target-unavailable',
+      });
+      expect(await Page.exists({ path: op.path })).toBeNull();
+    });
+
+    it('fails with path-occupied when a non-empty page is at the Japanese path', async () => {
+      const handler = createCreateHandler(crowi);
+      const occupant = await createJapaneseParent(memberGroupId);
+      const op = createOp(occupant.path);
+      const ctx = contextFor(op, false);
+
+      const outcome = await handler.execute(op, ctx);
+
+      expect(outcome).toEqual({ status: 'failed', reason: 'path-occupied' });
+      expect(
+        await prisma.revisions.count({ where: { proposalId: ctx.proposalId } }),
+      ).toBe(0);
+    });
+  });
+
   describe('the refusals pageService.create actually throws', () => {
     const classifyRefusal = async (
       path: string,

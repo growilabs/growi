@@ -88,6 +88,24 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(found?.operations[1]).toMatchObject(createOp('/cp-integ/new'));
     });
 
+    it('reads back a Japanese model label and Japanese paths and bodies unchanged', async () => {
+      const modelLabel = 'モデル名（日本語）　絵文字😀';
+      const path = '/日本語/ページ　全角空白（かっこ）a.b[1]';
+      const body = '# 日本語の本文\r\n絵文字😀\r\n';
+
+      const created = await createProposal({
+        modelLabel,
+        operations: [editOp(PAGE_A, body), createOp(path, body)],
+      });
+      const found = await prisma.changeproposals.findProposal(created._id);
+
+      expect(found?.modelLabel).toBe(modelLabel);
+      expect(found?.operations).toMatchObject([
+        { type: 'edit', body },
+        { type: 'create', path, body },
+      ]);
+    });
+
     it('does not write absent optional fields, so the sparse indexes stay sparse', async () => {
       const created = await createProposal();
 

@@ -360,6 +360,41 @@ describe('edit operation handler', () => {
     });
   });
 
+  describe('with a Japanese body', () => {
+    const JAPANESE_BODY =
+      '# 日本語の本文\r\n\r\n絵文字😀👨‍👩‍👧と全角空白　、結合文字がを含む行\r\n';
+
+    it('stores the body and its length the same way a human save of the same text does', async () => {
+      const handler = createEditHandler(crowi);
+      const proposed = await createPage(other);
+      const humanSaved = await createPage(other);
+      const op = { ...(await editOp(proposed)), body: JAPANESE_BODY };
+
+      const outcome = expectApplied(
+        await handler.execute(op, contextFor(op, false)),
+      );
+      await humanEdit(humanSaved._id, JAPANESE_BODY);
+
+      const proposedRevision = await prisma.revisions.findUniqueOrThrow({
+        where: { id: outcome.resultRevisionId ?? '' },
+      });
+      const humanRevision = await prisma.revisions.findUniqueOrThrow({
+        where: { id: await currentRevisionIdOf(humanSaved._id) },
+      });
+      // Revision bodies are read back with CR/CRLF turned into LF for every save.
+      expect(proposedRevision.body).toBe(JAPANESE_BODY.replace(/\r\n/g, '\n'));
+      expect(proposedRevision.body).toBe(humanRevision.body);
+      const [proposedPage, humanPage] = await Promise.all([
+        findPage(proposed._id),
+        findPage(humanSaved._id),
+      ]);
+      expect(proposedPage.latestRevisionBodyLength).toBe(
+        humanPage.latestRevisionBodyLength,
+      );
+      expect(proposedPage.latestRevisionBodyLength).toBeGreaterThan(0);
+    });
+  });
+
   describe('findExistingResult', () => {
     it('finds nothing before the write and the same applied result after it, so a re-run does not write twice', async () => {
       const handler = createEditHandler(crowi);

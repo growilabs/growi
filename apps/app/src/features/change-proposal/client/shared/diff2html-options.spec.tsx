@@ -47,6 +47,31 @@ describe('buildDiff2HtmlOptions', () => {
   });
 });
 
+describe('diff2html with buildDiff2HtmlOptions on Japanese text', () => {
+  const japanesePatch = createPatch(
+    '/日本語/ページ　全角空白',
+    '見出し<b>&強調</b>\n変更前の行😀\n',
+    '見出し<b>&強調</b>\n変更後の行😀\n',
+  );
+
+  it('shows Japanese and emoji text as text and escapes markup in it', () => {
+    const rendered = html(
+      japanesePatch,
+      buildDiff2HtmlOptions(ColorSchemeType.LIGHT),
+    );
+    const container = document.createElement('div');
+    container.innerHTML = rendered;
+
+    expect(rendered).toContain('見出し&lt;b&gt;&amp;強調&lt;');
+    expect(container.querySelector('b')).toBeNull();
+    const text = container.textContent ?? '';
+    expect(text).toContain('見出し<b>&強調</b>');
+    expect(text).toContain('変更前の行😀');
+    expect(text).toContain('変更後の行😀');
+    expect(text).toContain('日本語/ページ\u3000全角空白');
+  });
+});
+
 describe('useDiff2HtmlColorScheme', () => {
   const setUserTheme = (theme: Themes | undefined) => {
     vi.mocked(useNextThemes).mockReturnValue({

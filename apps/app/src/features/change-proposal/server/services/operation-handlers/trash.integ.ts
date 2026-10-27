@@ -321,6 +321,34 @@ describe('trash operation handler', () => {
     });
   });
 
+  describe('with a Japanese path', () => {
+    const japanesePath = (): string => {
+      seq += 1;
+      return `${PREFIX}/日本語-${seq}/ページ　全角空白（かっこ）a.b[1]`;
+    };
+
+    it('moves the page to the trash under its Japanese path and notifies with the path it had before trashing', async () => {
+      const spies = installNotificationSpies();
+      const handler = createTrashHandler(crowi);
+      const page = await createPage(japanesePath());
+      const op = trashOp(page);
+      const ctx = contextFor(op, true);
+
+      const outcome = expectApplied(await handler.execute(op, ctx));
+      expect(await handler.findExistingResult(op, ctx)).toEqual(outcome);
+      await handler.sendPerPageNotifications(op, outcome, ctx);
+
+      expect((await findPage(page._id)).path).toBe(`/trash${page.path}`);
+      expect(spies.slackFire).toHaveBeenCalledWith(
+        GlobalNotificationSettingEvent.PAGE_DELETE,
+        page._id.toString(),
+        page.path,
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+  });
+
   describe('findExistingResult', () => {
     it('finds nothing before trashing and the applied result once the page is in the trash', async () => {
       const handler = createTrashHandler(crowi);

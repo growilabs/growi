@@ -11,6 +11,7 @@ import {
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
+import type { ChangeProposalNotificationSnapshot } from '../../interfaces';
 import { createOperationHandlers } from './operation-handlers';
 import {
   createApplierTestKit,
@@ -179,6 +180,65 @@ describe('ProposalApplier.apply', () => {
       endpoint: TEST_ENDPOINT,
     });
     expect(notifications[0].activities.map(String)).toEqual([activity.id]);
+  });
+
+  it('applies edit, create and move on Japanese paths and reports those paths unchanged in the notification', async () => {
+    const japaneseBody = '# 日本語の本文\n\n絵文字😀と全角空白\u3000を含む行\n';
+    const edited = await createPage('編集\u3000ページ');
+    const moved = await createPage('移動（元）');
+    await subscribe(edited);
+    await subscribe(moved);
+    const createdPath = nextPath('新規/ページ\u3000全角空白');
+    const movedTo = nextPath('移動先/a.b(1)[仮]{2}|x\u3000y');
+    const proposal = await storeProposal([
+      editInput(edited, japaneseBody),
+      { type: 'create', path: createdPath, body: japaneseBody },
+      {
+        type: 'move',
+        pageId: moved._id.toString(),
+        fromPath: moved.path,
+        toPath: movedTo,
+      },
+    ]);
+    const [editKey] = proposal.operations.map((op) => op.key);
+
+    const result = await newApplier().apply(
+      proposal._id,
+      { kind: 'background' },
+      request,
+    );
+    await waitForPageOperationsToFinish();
+
+    expect(result).toMatchObject({
+      type: 'done',
+      results: [
+        { status: 'applied' },
+        { status: 'applied' },
+        { status: 'applied' },
+      ],
+    });
+    expect((await markedRevisions(proposal._id, editKey))[0].body).toBe(
+      japaneseBody,
+    );
+    const createdPage = await mongoose
+      .model('Page')
+      .findOne({ path: createdPath });
+    expect(createdPage).not.toBeNull();
+    expect((await findPage(moved._id)).path).toBe(movedTo);
+
+    const [notification] = await aggregatedNotifications(proposal._id);
+    const snapshot = JSON.parse(
+      notification.snapshot,
+    ) as ChangeProposalNotificationSnapshot;
+    expect(
+      [...snapshot.pages].sort((a, b) => a.path.localeCompare(b.path)),
+    ).toEqual(
+      [
+        { id: edited._id.toString(), path: edited.path },
+        { id: moved._id.toString(), path: movedTo },
+      ].sort((a, b) => a.path.localeCompare(b.path)),
+    );
+    await waitForActivities(proposal._id, 1);
   });
 
   it('leaves unapproved pending operations alone and keeps the proposal open', async () => {

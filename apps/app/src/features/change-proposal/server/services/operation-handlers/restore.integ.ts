@@ -369,6 +369,36 @@ describe('restore operation handler', () => {
     });
   });
 
+  describe('with a Japanese path', () => {
+    it('restores a page trashed from a Japanese path and removes only the redirect trashing left there', async () => {
+      const handler = createRestoreHandler(crowi);
+      seq += 1;
+      const originalPath = `${PREFIX}/日本語-${seq}/ページ　全角空白（かっこ）a.b[1]`;
+      const created = await createPage(originalPath);
+      await crowi.pageService.deletePage(created, other, {}, false, {
+        ip: TEST_IP,
+        endpoint: TEST_ENDPOINT,
+      });
+      const page = await findPage(created._id);
+      expect(page.path).toBe(`/trash${originalPath}`);
+      const lookAlike = originalPath.replace('.', 'X');
+      await prisma.pageredirects.create({
+        data: { fromPath: lookAlike, toPath: page.path },
+      });
+      const op = restoreOp(page, originalPath);
+
+      expectApplied(await handler.execute(op, contextFor(op, false)));
+
+      expect((await findPage(page._id)).path).toBe(originalPath);
+      expect(
+        await prisma.pageredirects.retrievePageRedirectEndpoints(originalPath),
+      ).toBeNull();
+      expect(
+        await prisma.pageredirects.retrievePageRedirectEndpoints(lookAlike),
+      ).not.toBeNull();
+    });
+  });
+
   describe('findExistingResult', () => {
     it('finds nothing while the page is in the trash and the applied result once it is back at the original path', async () => {
       const handler = createRestoreHandler(crowi);

@@ -162,6 +162,42 @@ describe('ProposalApplier.apply writing revert results onto the original operati
     });
   });
 
+  it('reverts a move between Japanese paths and leaves no redirect at either path', async () => {
+    const page = await createPage('日本語/a.b(1)[仮]{2}|x　y');
+    const originalPath = page.path;
+    const movedTo = nextPath('移動先/ページ　全角空白（かっこ）');
+    const applied = await applyOriginal(
+      {
+        type: 'move',
+        pageId: page._id.toString(),
+        fromPath: originalPath,
+        toPath: movedTo,
+      },
+      page,
+    );
+    const revert = await revertOf(applied, {
+      type: 'move',
+      pageId: page._id.toString(),
+      fromPath: movedTo,
+      toPath: originalPath,
+      removeRedirectsFrom: originalPath,
+    });
+
+    await newApplier().apply(revert._id, { kind: 'background' });
+    await waitForPageOperationsToFinish();
+
+    expect((await findPage(page._id)).path).toBe(originalPath);
+    expect(
+      await prisma.pageredirects.count({
+        where: { fromPath: { in: [originalPath, movedTo] } },
+      }),
+    ).toBe(0);
+    expect(await originalOperation(applied)).toMatchObject({
+      status: 'reverted',
+      revertedByProposalId: revert._id,
+    });
+  });
+
   it('refuses the revert with edited-after-apply when the revert operation turns stale', async () => {
     const page = await createPage('edited-after');
     const staleBase = editInput(page, 'base body');
