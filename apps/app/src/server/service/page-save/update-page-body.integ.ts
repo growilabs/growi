@@ -106,6 +106,33 @@ describe('updatePageBody', () => {
     return updated.revision == null ? '' : getIdStringForRef(updated.revision);
   };
 
+  // A restricted page is off the tree; a public child at a deeper path hangs
+  // under an empty placeholder page at the same path.
+  const createRestrictedPageWithChild = async () => {
+    pageSeq += 1;
+    const path = `${PREFIX}/restricted-${pageSeq}`;
+    const created = await crowi.pageService.create(path, 'first body', user, {
+      grant: PageGrant.GRANT_RESTRICTED,
+    });
+    await waitForPageOperationsToFinish();
+    const child = await crowi.pageService.create(
+      `${path}/child`,
+      'child body',
+      user,
+      { grant: PageGrant.GRANT_PUBLIC },
+    );
+    await waitForPageOperationsToFinish();
+    await crowi.pageService.updatePage(
+      await findPage(created._id),
+      'second body',
+      'first body',
+      user,
+      { origin: Origin.Editor },
+    );
+    await waitForPageOperationsToFinish();
+    return { path, child, page: await findPage(created._id) };
+  };
+
   beforeAll(async () => {
     crowi = await getInstance();
     Page = mongoose.model<PageDocument, PageModel>('Page');
@@ -318,33 +345,6 @@ describe('updatePageBody', () => {
   });
 
   describe("mode 'human' with a grant change", () => {
-    // A restricted page is off the tree; a public child at a deeper path hangs
-    // under an empty placeholder page at the same path.
-    const createRestrictedPageWithChild = async () => {
-      pageSeq += 1;
-      const path = `${PREFIX}/restricted-${pageSeq}`;
-      const created = await crowi.pageService.create(path, 'first body', user, {
-        grant: PageGrant.GRANT_RESTRICTED,
-      });
-      await waitForPageOperationsToFinish();
-      const child = await crowi.pageService.create(
-        `${path}/child`,
-        'child body',
-        user,
-        { grant: PageGrant.GRANT_PUBLIC },
-      );
-      await waitForPageOperationsToFinish();
-      await crowi.pageService.updatePage(
-        await findPage(created._id),
-        'second body',
-        'first body',
-        user,
-        { origin: Origin.Editor },
-      );
-      await waitForPageOperationsToFinish();
-      return { path, child, page: await findPage(created._id) };
-    };
-
     it('keeps the tree consistent when a save that moves a restricted page onto the tree races another save', async () => {
       const {
         path,
@@ -478,6 +478,296 @@ describe('updatePageBody', () => {
           where: { pageId: page._id.toString(), body: 'proposed body' },
         }),
       ).toBe(0);
+    });
+  });
+
+  describe('a human save running at the same time as a proposal on the same page', () => {
+    // Enough rounds that both finishing orders occur; each round asserts only
+    // what must hold whichever side writes first.
+    const ROUNDS = 20;
+    const RACE_TIMEOUT_MS = 60_000;
+
+    const countRevisions = (pageId: mongoose.Types.ObjectId): Promise<number> =>
+      prisma.revisions.count({ where: { pageId: pageId.toString() } });
+
+    const countRevisionsWithBody = (
+      pageId: mongoose.Types.ObjectId,
+      body: string,
+    ): Promise<number> =>
+      prisma.revisions.count({ where: { pageId: pageId.toString(), body } });
+
+    const newProposalMark = (round: number): IRevisionProposalMark => ({
+      proposalId: new mongoose.Types.ObjectId().toString(),
+      proposalOperationKey: `op-race-${round}`,
+    });
+
+    const HUMAN_SAVE_KINDS = [
+      { saveKind: 'an editor save', origin: Origin.Editor },
+      { saveKind: 'an API save', origin: undefined },
+    ];
+
+    const saveAsHuman = (
+      page: HydratedDocument<PageDocument>,
+      body: string,
+      baseRevisionId: string,
+      origin: Origin | undefined,
+    ) =>
+      updatePageBody(
+        { pageService: crowi.pageService },
+        {
+          mode: 'human',
+          page,
+          body,
+          user,
+          clientRevisionId: baseRevisionId,
+          origin,
+          options: {},
+        },
+      );
+
+    const applyProposal = (
+      page: HydratedDocument<PageDocument>,
+      body: string,
+      baseRevisionId: string,
+      proposalMark: IRevisionProposalMark,
+    ) =>
+      updatePageBody(
+        { pageService: crowi.pageService },
+        {
+          mode: 'proposal',
+          page,
+          body,
+          user,
+          expectedRevisionId: baseRevisionId,
+          proposalMark,
+        },
+      );
+
+    it.each(HUMAN_SAVE_KINDS)(
+      `never lets $saveKind and a proposal overwrite each other, over ${ROUNDS} rounds`,
+      async ({ origin }) => {
+        for (let round = 0; round < ROUNDS; round++) {
+          // The latest revision comes from the editor, so an editor save skips
+          // the stale check and only the conditional write can protect the proposal.
+          // biome-ignore lint/performance/noAwaitInLoops: rounds must not overlap
+          const created = await createPage(Origin.Editor);
+          const baseRevisionId = created.revision?.toString() ?? '';
+          const revisionsBefore = await countRevisions(created._id);
+          const humanBody = `human body ${round}`;
+          const proposedBody = `proposed body ${round}`;
+          const proposalMark = newProposalMark(round);
+          const pageForHuman = await findPage(created._id);
+          const pageForProposal = await findPage(created._id);
+
+          const [humanResult, proposalResult] = await Promise.all([
+            saveAsHuman(pageForHuman, humanBody, baseRevisionId, origin),
+            applyProposal(
+              pageForProposal,
+              proposedBody,
+              baseRevisionId,
+              proposalMark,
+            ),
+          ]);
+          await waitForPageOperationsToFinish();
+
+          const latest = await latestRevisionOf(created._id);
+          expect(await countRevisions(created._id)).toBe(revisionsBefore + 1);
+
+          if (proposalResult.type === 'updated') {
+            expect(humanResult).toEqual({
+              type: 'conflict',
+              latestRevisionId: latest.id,
+            });
+            expect(latest).toMatchObject({
+              body: proposedBody,
+              ...proposalMark,
+            });
+            expect(latest.origin ?? undefined).toBeUndefined();
+            expect(await countRevisionsWithBody(created._id, humanBody)).toBe(
+              0,
+            );
+          } else {
+            expect(humanResult.type).toBe('updated');
+            expect(proposalResult).toEqual({
+              type: 'conflict',
+              latestRevisionId: latest.id,
+            });
+            expect(latest.body).toBe(humanBody);
+            expect(latest.origin ?? undefined).toBe(origin);
+            expect(latest.proposalId ?? undefined).toBeUndefined();
+            expect(
+              await countRevisionsWithBody(created._id, proposedBody),
+            ).toBe(0);
+          }
+        }
+      },
+      RACE_TIMEOUT_MS,
+    );
+
+    // The race above settles in either order only by scheduling; these pin each
+    // order so both outcomes are checked on every run.
+    it.each(
+      HUMAN_SAVE_KINDS,
+    )('turns $saveKind into a conflict when a proposal from the same base revision is written first', async ({
+      origin,
+    }) => {
+      const created = await createPage(Origin.Editor);
+      const baseRevisionId = created.revision?.toString() ?? '';
+      const revisionsBefore = await countRevisions(created._id);
+      const proposalMark = newProposalMark(0);
+      const stalePageForHuman = await findPage(created._id);
+
+      const proposalResult = await applyProposal(
+        await findPage(created._id),
+        'proposed body',
+        baseRevisionId,
+        proposalMark,
+      );
+      await waitForPageOperationsToFinish();
+      const humanResult = await saveAsHuman(
+        stalePageForHuman,
+        'human body',
+        baseRevisionId,
+        origin,
+      );
+      await waitForPageOperationsToFinish();
+
+      expect(proposalResult.type).toBe('updated');
+      const latest = await latestRevisionOf(created._id);
+      expect(humanResult).toEqual({
+        type: 'conflict',
+        latestRevisionId: latest.id,
+      });
+      expect(latest).toMatchObject({ body: 'proposed body', ...proposalMark });
+      expect(await countRevisions(created._id)).toBe(revisionsBefore + 1);
+      expect(await countRevisionsWithBody(created._id, 'human body')).toBe(0);
+    });
+
+    it.each(
+      HUMAN_SAVE_KINDS,
+    )('turns a proposal into a conflict when $saveKind from the same base revision is written first', async ({
+      origin,
+    }) => {
+      const created = await createPage(Origin.Editor);
+      const baseRevisionId = created.revision?.toString() ?? '';
+      const revisionsBefore = await countRevisions(created._id);
+      const stalePageForProposal = await findPage(created._id);
+
+      const humanResult = await saveAsHuman(
+        await findPage(created._id),
+        'human body',
+        baseRevisionId,
+        origin,
+      );
+      await waitForPageOperationsToFinish();
+      const proposalResult = await applyProposal(
+        stalePageForProposal,
+        'proposed body',
+        baseRevisionId,
+        newProposalMark(0),
+      );
+
+      expect(humanResult.type).toBe('updated');
+      const latest = await latestRevisionOf(created._id);
+      expect(proposalResult).toEqual({
+        type: 'conflict',
+        latestRevisionId: latest.id,
+      });
+      expect(latest.body).toBe('human body');
+      expect(await countRevisions(created._id)).toBe(revisionsBefore + 1);
+      expect(await countRevisionsWithBody(created._id, 'proposed body')).toBe(
+        0,
+      );
+    });
+
+    it(
+      `still lets both of two simultaneous editor saves through, over ${ROUNDS} rounds`,
+      async () => {
+        for (let round = 0; round < ROUNDS; round++) {
+          // biome-ignore lint/performance/noAwaitInLoops: rounds must not overlap
+          const created = await createPage(Origin.Editor);
+          const baseRevisionId = created.revision?.toString() ?? '';
+          const revisionsBefore = await countRevisions(created._id);
+          const bodies = [`editor A ${round}`, `editor B ${round}`];
+          const pages = [
+            await findPage(created._id),
+            await findPage(created._id),
+          ];
+
+          const results = await Promise.all(
+            bodies.map((body, i) =>
+              updatePageBody(
+                { pageService: crowi.pageService },
+                {
+                  mode: 'human',
+                  page: pages[i],
+                  body,
+                  user,
+                  clientRevisionId: baseRevisionId,
+                  origin: Origin.Editor,
+                  options: {},
+                },
+              ),
+            ),
+          );
+          await waitForPageOperationsToFinish();
+
+          expect(results.map((r) => r.type)).toEqual(['updated', 'updated']);
+          expect(await countRevisions(created._id)).toBe(revisionsBefore + 2);
+          expect(
+            await Promise.all(
+              bodies.map((body) => countRevisionsWithBody(created._id, body)),
+            ),
+          ).toEqual([1, 1]);
+          expect(bodies).toContain((await latestRevisionOf(created._id)).body);
+        }
+      },
+      RACE_TIMEOUT_MS,
+    );
+
+    // Documented exception to requirement 3.16 (design.md "PageSave Core",
+    // Risks): a save that moves a page between restricted and on-tree writes
+    // without the conditional check, so it can replace a proposal's revision.
+    it('lets a save that moves a restricted page onto the tree replace an already-applied proposal without the stale check', async () => {
+      const { page: stalePage } = await createRestrictedPageWithChild();
+      const baseRevisionId = stalePage.revision?.toString() ?? '';
+      const proposalMark = newProposalMark(0);
+
+      const proposalResult = await updatePageBody(
+        { pageService: crowi.pageService },
+        {
+          mode: 'proposal',
+          page: await findPage(stalePage._id),
+          body: 'proposed body',
+          user,
+          expectedRevisionId: baseRevisionId,
+          proposalMark,
+        },
+      );
+      await waitForPageOperationsToFinish();
+      expect(proposalResult.type).toBe('updated');
+
+      const humanResult = await updatePageBody(
+        { pageService: crowi.pageService },
+        {
+          mode: 'human',
+          page: stalePage,
+          body: 'my body',
+          user,
+          clientRevisionId: baseRevisionId,
+          origin: undefined,
+          options: { grant: PageGrant.GRANT_PUBLIC },
+        },
+      );
+      await waitForPageOperationsToFinish();
+
+      expect(humanResult.type).toBe('updated');
+      expect((await latestRevisionOf(stalePage._id)).body).toBe('my body');
+      expect(
+        await prisma.revisions.count({
+          where: { pageId: stalePage._id.toString(), ...proposalMark },
+        }),
+      ).toBe(1);
     });
   });
 });
