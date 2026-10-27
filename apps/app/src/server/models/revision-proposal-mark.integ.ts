@@ -77,4 +77,19 @@ describe('Revision proposal mark fields', () => {
 
     expect(index?.sparse).toBe(true);
   });
+
+  // A marked revision is the lasting record of what a proposal changed, so it must never expire.
+  it('has no TTL index on the revisions collection', async () => {
+    const Revision = mongoose.model('Revision');
+    await Revision.init();
+
+    const indexes = await Revision.collection.indexes();
+
+    expect(indexes.map((i) => i.name)).toContain(
+      'proposalId_1_proposalOperationKey_1',
+    );
+    expect(
+      indexes.filter((i) => i.expireAfterSeconds != null).map((i) => i.name),
+    ).toEqual([]);
+  });
 });

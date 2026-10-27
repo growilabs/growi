@@ -264,3 +264,19 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - prisma-engines 6.19.2 の `query-engine/connectors/mongodb-query-connector/src/root_queries/write.rs`（`update_records`）、`query-engine/core/src/query_graph_builder/write/update.rs`、`query-engine/core/src/executor/execute_operation.rs`、`mongodb-query-connector/src/root_queries/update/into_expression.rs` — 条件付きの更新の実行のしかた
 - `.kiro/specs/collaborative-editor/design.md` — 共同編集の文書の状態
 - `.kiro/specs/revision-diff-api/design.md` — 見る人ごとの絞り込みの前例
+
+## 反映の所要時間の計測（8.4）
+- **測ったもの**: 操作数の上限の初期値（50）いっぱいの Change Proposal（ページの編集 45 件 + 新規作成 5 件）を承認してから、反映が終わって `approve` が戻るまでの時間（`performance.now` で計測）。あわせて、ページごとのアプリ内通知が購読者全員の分そろうまでの時間も測った。どちらのモードでも、反映前のページの作成は計測の外で行い、最初の 1 回は捨て、通知なし・通知ありを交互に 3 回ずつ実行した。
+- **2 つのモード**: 「通知なし」は管理者の設定でページごとの通知を止めた場合。「通知あり」は管理者の設定と Change Proposal の値の両方を有効にした場合。編集した 45 ページそれぞれを 5 人が購読しており（アプリ内通知は 1 回の反映で 225 件）、全体の通知の設定（メール、対象は編集と作成）が本物の GlobalNotificationService を通る（設定の検索とメール本文の組み立ては実際に動く）。本物から差し替えたのは次の 4 つ: メールの送信（`mailService.send`）、ユーザーごとの通知の送信（`userNotificationService`）、編集中の人がいるかの情報源（テスト用の部品で常に「誰もいない」。YjsService は使わない）、ページのイベント（全文検索・Vault への反映の処理は動かさない）。
+- **結果**（単位はミリ秒。1 操作あたりは中央値を 50 で割った値）:
+
+| 回 | モード | 最小 | 中央値 | 最大 | 1 操作あたり |
+|---|---|---|---|---|---|
+| 1 回目 | 通知なし | 2058 | 2356 | 2411 | 47.1 |
+| 1 回目 | 通知あり | 2046 | 2346 | 2371 | 46.9 |
+| 2 回目 | 通知なし | 2089 | 2096 | 2124 | 41.9 |
+| 2 回目 | 通知あり | 2040 | 2274 | 2319 | 45.5 |
+
+- **読み方**: 通知ありと通知なしの差は、回ごとのばらつき（約 300 ミリ秒）と同じくらいの大きさにとどまった。ページごとのアプリ内通知は `approve` が戻った時点ですでにそろっていた（戻ってからそろうまでの差は 3 ミリ秒以内）。通知を出すことで処理が極端に遅くなる様子（ページ数に比例して問い合わせが増えすぎるような問題）は見られなかった。
+- **環境**: 開発用のコンテナ。MongoDB は `MONGO_URI` を設定せずに実行したため、メモリ上の MongoDB（結合テストの既定）を使った。CPU は 12th Gen Intel Core i7-12650H、`nproc` は 16。計測日は 2026-10-27。
+- **注意**: 開発用のコンテナでの数字で、本番の MongoDB（ネットワーク越し・レプリカセット）では 1 回の書き込みの往復が長くなるため、所要時間は増える。計測用のテストは `apps/app/src/features/change-proposal/server/services/change-proposal-apply-timing.integ.ts`（結果の正しさだけを確かめ、時間の上限は確かめない。測った数字はテストの出力に出る）。このテストは時間がかかるので、普段のテストの実行では飛ばされる。測るときは `CHANGE_PROPOSAL_MEASURE_TIMING=1 pnpm vitest run change-proposal-apply-timing` で実行する。
