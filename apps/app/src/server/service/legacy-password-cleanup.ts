@@ -24,7 +24,7 @@ type FacetResult = Partial<
   Record<keyof typeof FACETS, readonly { readonly n: number }[]>
 >;
 
-// One collection scan for all buckets (design.md "レビュー（code-review high）を受けた修正").
+// One collection scan for all buckets (design.md, first code-review fixes).
 export const countPasswordHashFormats = async (
   users: Collection,
   baseFilter: Filter<Document> = {},
@@ -58,7 +58,7 @@ export const countPasswordHashFormats = async (
   };
 };
 
-// Callers own any abort policy (see research.md "CLI では中止し、画面では中止しない理由").
+// Callers own any abort policy (see the abort-policy Decision in research.md).
 export const unsetLegacyPasswordOfMigratedUsers = async (
   users: Collection,
   baseFilter: Filter<Document> = {},

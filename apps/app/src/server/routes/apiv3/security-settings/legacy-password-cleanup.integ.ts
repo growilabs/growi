@@ -1,4 +1,4 @@
-// Contract: design.md "Testing Strategy → Integration（routes）". admin-required
+// Contract: design.md "Testing Strategy", routes integration. admin-required
 // and the apiv3 response extension are real; counts are asserted as deltas of
 // marker-seeded fixtures because the handler counts the whole collection.
 import type { NextFunction, Request, Response } from 'express';

@@ -10,7 +10,7 @@ import {
   scopeFilter,
 } from '../models/user/password-hash-format-filters';
 
-// Scope and exclusion rules: design.md "催促が必要なユーザーの一覧", research.md last section.
+// Scope and exclusion rules: design.md (Requirement 7 list), research.md last section.
 export const listUnmigratedUsersToNudge = async (
   users: Collection,
   externalAccounts: Collection,

@@ -58,9 +58,8 @@ export interface PasswordHashCleanupResult {
  *  1. Count `legacyOnly` users (`password` set, `passwordHash` unset), split by
  *     whether they are ACTIVE.
  *  2. If any ACTIVE one exists, ABORT without writing (Req 3.4). Why the CLI
- *     aborts while the admin screen does not: see research.md's Decision
- *     "CLI では中止し、画面では中止しない理由"
- *     (.kiro/specs/legacy-password-hash-cleanup/).
+ *     aborts while the admin screen does not: see the Decision on the abort
+ *     policy in .kiro/specs/legacy-password-hash-cleanup/research.md.
  *  3. Otherwise `$unset` the legacy `password` field from every `both` user
  *     (both fields present), keeping the scrypt `passwordHash` (Req 3.3).
  *

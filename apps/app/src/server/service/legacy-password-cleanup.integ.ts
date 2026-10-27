@@ -1,4 +1,4 @@
-// Contract: design.md "Testing Strategy → Integration（service）". Fixtures are
+// Contract: design.md "Testing Strategy", service integration. Fixtures are
 // marker-scoped so the shared `users` collection is never touched beyond them.
 import type { Collection } from 'mongodb';
 import { ObjectId } from 'mongodb';

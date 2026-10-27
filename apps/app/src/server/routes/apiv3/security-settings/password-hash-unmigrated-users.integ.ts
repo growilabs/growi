@@ -1,5 +1,5 @@
-// Contract: design.md "Testing Strategy → Integration（routes:
-// password-hash-unmigrated-users.integ.ts）". admin-required and the apiv3
+// Contract: design.md "Testing Strategy", routes integration for
+// password-hash-unmigrated-users.integ.ts. admin-required and the apiv3
 // response extension are real. The handler lists the whole collection, so marker
 // users get a far-future lastLoginAt to sort ahead of any pre-existing user.
 import type { NextFunction, Request, Response } from 'express';
