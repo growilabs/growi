@@ -601,6 +601,49 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     expect(await snapshotTree()).toEqual(before);
   });
 
+  it('removes the new empty ancestors above an off-tree page on the way when the rename fails', async () => {
+    await create(base, 'base body');
+    await create(`${base}/ex-parent`, 'body');
+    const target = await create(`${base}/ex-parent/target`, 'body');
+    // an off-tree page with no page above it, as a page left unmigrated is
+    const offTree = await create(`${base}/missing/off-tree`, 'body');
+    await Page.deleteOne({ path: `${base}/missing`, isEmpty: true });
+    await Page.updateOne({ _id: offTree._id }, { $set: { parent: null } });
+    const before = await snapshotTree();
+
+    const fault = new Error('simulated failure after creating the ancestors');
+    const realCreateEmptyPagesByPaths = Page.createEmptyPagesByPaths.bind(Page);
+    let emptyAncestorsAtFault: string[] = [];
+    const spy = vi
+      .spyOn(Page, 'createEmptyPagesByPaths')
+      .mockImplementationOnce(async (...args) => {
+        await realCreateEmptyPagesByPaths(...args);
+        const empties = await Page.find({
+          path: new RegExp(`^${base}/missing`),
+          isEmpty: true,
+        });
+        emptyAncestorsAtFault = empties.map((p) => p.path).sort();
+        throw fault;
+      });
+    let err: Error | null;
+    try {
+      err = await rename(
+        target,
+        `${base}/missing/off-tree/not-yet-existing/moved`,
+      );
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(err).toBe(fault);
+    // empty pages were created both below and above the off-tree page
+    expect(emptyAncestorsAtFault).toEqual([
+      `${base}/missing`,
+      `${base}/missing/off-tree/not-yet-existing`,
+    ]);
+    expect(await snapshotTree()).toEqual(before);
+  });
+
   it('restores the tree unchanged when detaching the page reports an error after it was applied', async () => {
     await create(base, 'base body');
     await create(`${base}/ex-parent`, 'body');

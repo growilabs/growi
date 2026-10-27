@@ -742,9 +742,11 @@ class PageService implements IPageService {
 
     let newParent: PageDocument | undefined;
     let renamedPage: PageDocument | null = null;
+    let isDetached = false;
     try {
       // 1. Take target off from tree
       await Page.takeOffFromTree(page._id);
+      isDetached = true;
 
       // 2. Find new parent
       // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
@@ -778,6 +780,7 @@ class PageService implements IPageService {
       const committedPage = await this.rollbackFailedRename({
         page,
         exParentId,
+        isDetached,
         newPagePath: newPagePathSanitized,
         emptyPageIds: emptyPagesToInsert.map((p) => p._id),
       });
@@ -998,11 +1001,14 @@ class PageService implements IPageService {
   private async rollbackFailedRename({
     page,
     exParentId,
+    isDetached,
     newPagePath,
     emptyPageIds,
   }: {
     page: PageDocument;
     exParentId: PageDocument['parent'];
+    // false when step 1 itself threw, whether or not its write applied
+    isDetached: boolean;
     newPagePath: string;
     emptyPageIds: PageDocument['_id'][];
   }): Promise<PageDocument | null> {
@@ -1016,17 +1022,13 @@ class PageService implements IPageService {
         { $set: { parent: exParentId } },
       );
       if (matchedCount === 0) {
+        // An unapplied step 1 left nothing to undo
+        if (!isDetached) {
+          return null;
+        }
         const currentPage = await Page.findById(page._id);
         if (currentPage?.path === newPagePath) {
           return currentPage;
-        }
-        // The detach itself failed without applying, so there is nothing to undo
-        const isUntouched =
-          currentPage?.path === page.path &&
-          getIdStringForRef(currentPage.parent ?? '') ===
-            getIdStringForRef(exParentId ?? '');
-        if (isUntouched) {
-          return null;
         }
         logger.warn(
           `Skipped reattaching "${page.path}" to its original parent after a failed rename: ` +
