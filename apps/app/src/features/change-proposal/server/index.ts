@@ -1,3 +1,5 @@
+export type { ChangeProposalRouterDeps } from './routes';
+export { createChangeProposalRouter } from './routes';
 export type {
   ChangeProposalService,
   ChangeProposalServiceDeps,

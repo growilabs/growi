@@ -62,6 +62,10 @@ const CURSOR_PATTERN = /^(\d{1,15})-([0-9a-f]{24})$/;
 const encodeCursor = (cursor: AppliedListCursor): string =>
   `${cursor.lastAppliedAt.getTime()}-${cursor.id}`;
 
+// The route rejects a malformed cursor with 400 instead of the service's empty result.
+export const isAppliedListCursor = (value: string): boolean =>
+  CURSOR_PATTERN.test(value);
+
 const decodeCursor = (value: string): AppliedListCursor | null => {
   const match = CURSOR_PATTERN.exec(value);
   return match == null
