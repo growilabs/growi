@@ -276,6 +276,53 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     expect(await snapshotTree()).toEqual(before);
   });
 
+  it('restores the tree unchanged when inserting the new ancestors fails partway', async () => {
+    await create(base, 'base body');
+    const target = await create(`${base}/target`, 'body');
+    const before = await snapshotTree();
+
+    const fault = new Error('simulated failure while inserting the ancestors');
+    const realInsertMany = Page.insertMany.bind(Page);
+    let emptyAncestorsAtFault: string[] = [];
+    const spy = vi
+      .spyOn(Page, 'insertMany')
+      // only the empty page at the target's own path gets in, then the insert fails
+      .mockImplementationOnce(async (docs) => {
+        const docsToInsert = Array.isArray(docs) ? docs : [docs];
+        await realInsertMany(
+          docsToInsert.filter((doc) => doc.path === target.path),
+        );
+        const empties = await Page.find({
+          path: new RegExp(`^${base}/`),
+          isEmpty: true,
+        });
+        emptyAncestorsAtFault = empties.map((p) => p.path);
+        throw fault;
+      });
+    let err: Error | null;
+    try {
+      err = await rename(target, `${base}/target/not-yet-existing/moved`);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(err).toBe(fault);
+    // otherwise the insert never got in and nothing is left to clean up
+    expect(emptyAncestorsAtFault).toEqual([`${base}/target`]);
+    expect(await snapshotTree()).toEqual(before);
+  });
+
+  it('fails and restores the tree unchanged when the destination is under the page only by case', async () => {
+    await create(base, 'base body');
+    const target = await create(`${base}/Target`, 'body');
+    const before = await snapshotTree();
+
+    const err = await rename(target, `${base}/target/moved`);
+
+    expect(err).not.toBeNull();
+    expect(await snapshotTree()).toEqual(before);
+  });
+
   it('surfaces the original error and names the leftover empty pages when removing them also fails', async () => {
     await create(base, 'base body');
     const target = await create(`${base}/target`, 'body');
