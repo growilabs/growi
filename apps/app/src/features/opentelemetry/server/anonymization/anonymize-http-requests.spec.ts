@@ -4,13 +4,17 @@ import { mock } from 'vitest-mock-extended';
 
 import { httpInstrumentationConfig } from './anonymize-http-requests';
 
-const getHttpTarget = (url: string): unknown => {
+const runHook = (url: string): Record<string, unknown> => {
   const hook = httpInstrumentationConfig.startIncomingSpanHook;
   if (hook == null) {
     throw new Error('startIncomingSpanHook is not configured');
   }
-  return hook(mock<IncomingMessage>({ url }))['http.target'];
+  return hook(
+    mock<IncomingMessage>({ url, headers: { host: 'wiki.example.com' } }),
+  );
 };
+
+const getHttpTarget = (url: string): unknown => runHook(url)['http.target'];
 
 describe('httpInstrumentationConfig.startIncomingSpanHook', () => {
   describe('page access', () => {
@@ -55,6 +59,21 @@ describe('httpInstrumentationConfig.startIncomingSpanHook', () => {
 
       expect(target).toMatch(/^\/_api\/v3\/pages\/list\?/);
       expect(target).not.toContain('%E6%97%A5');
+    });
+  });
+
+  describe('URL attributes other than http.target', () => {
+    it('should rebuild http.url from the anonymized target', () => {
+      const attributes = runHook('/Sandbox/%E7%A7%98%E5%AF%86?tab=history');
+
+      expect(attributes['http.url']).toBe(
+        `http://wiki.example.com${attributes['http.target']}`,
+      );
+      expect(attributes['http.url']).not.toContain('%E7%A7%98');
+    });
+
+    it('should not add http.url when nothing is anonymized', () => {
+      expect(runHook('/static/css/style.css')).not.toHaveProperty('http.url');
     });
   });
 });
