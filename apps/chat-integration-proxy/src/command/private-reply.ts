@@ -271,12 +271,10 @@ export const createPrivateReplier = (
           'ephemeral',
           origin,
           () =>
-            platform.postEphemeral(
-              origin.channel,
-              origin.actor,
-              message,
-              scope,
-            ),
+            platform.postEphemeral(origin.channel, origin.actor, message, {
+              ...scope,
+              requestMessageId: origin.sourceMessageId,
+            }),
           (outcome) => ({
             ok: outcome.ok,
             returnedId: outcome.ok ? outcome.messageId : null,

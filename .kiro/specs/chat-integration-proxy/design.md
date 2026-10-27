@@ -771,7 +771,10 @@ export interface PlatformFacade {
   post(target: ChannelRef, message: OutboundMessage): Promise<PostOutcome>;
   /** 本人にだけ見えるメッセージ。**DM には切り替えない**（切り替えは `PrivateReplier` が決める） */
   postEphemeral(target: ChannelRef, user: ChatAccountRef, message: OutboundMessage,
-    scope?: { readonly installationId: string }): Promise<EphemeralPostOutcome>;
+    /** `installationId` は他の呼び出しと同じ。`requestMessageId` は依頼のメッセージの id で、Slack だけが使う
+     *  （依頼と同じ秒に出して返事が依頼より上に並ぶのを避けるため、次の秒まで待つ。決定 P12）。
+     *  Slack の ts の形（`^\d+\.\d+$`）でなければ待たない */
+    scope?: { readonly installationId?: string; readonly requestMessageId?: string | null }): Promise<EphemeralPostOutcome>;
   /** 本人との 1 対 1 の会話を開き（既にあれば使い）、そこに投稿する。`near` は依頼が来たチャンネルで、
    *  `postEphemeral` の `target` と同じく、サービスと接続（`scope` があればその installation）を選ぶのに使う */
   postDirect(near: ChannelRef, user: ChatAccountRef, message: OutboundMessage,
@@ -907,6 +910,9 @@ flowchart TD
 ```
 
 - **本人だけのメッセージを出せるかは、能力表ではなく `postEphemeral` の結果で決める。** 失敗の種類（`bot-not-in-channel`・`platform-error`・`unsupported`）を問わず DM へ進み、利用者には何も出さない（proxy の research.md の決定 P3）
+- **Slack では、本人だけのメッセージを依頼のメッセージの次の秒まで待ってから出す。** `chat.postEphemeral` が返す `message_ts` は、秒の部分が Slack の現在の秒で、小数部は時刻ではなく通し番号である。依頼と同じ秒に出すと返事が依頼より上に並ぶ。`PrivateReplier` が `origin.sourceMessageId` を `postEphemeral` の `scope.requestMessageId` に渡し、待ちが要るかは `capabilities/platform-capabilities.ts` の `EPHEMERAL_MUST_FOLLOW_REQUEST_SECOND`（サービスごとの真偽値の表。今は Slack だけ `true`）で決める。待つのは `PlatformFacade.postEphemeral`（`platform/index.ts`）で、待ち方は `platform/ephemeral-ordering.ts`。「依頼の ts の秒 + 1 秒 + 余裕 250 ms」まで待ち、待ちの上限は 1500 ms、すでにその時刻を過ぎていれば待たない。依頼の id が無い・Slack の ts の形でない・表が `false` のサービスのときも待たない。待ちの失敗は投稿を止めない。待つ時計と sleep は `createPlatformFacade` の `callbacks.orderingClock` で差し替えられる（決定 P12）
+- **余裕 250 ms が守るのは、proxy の時計が Slack の時計より進んでいるときだけ。** proxy の時計が Slack より遅れている場合は、proxy が目標の時刻に着いたとき、Slack の時計はもう「依頼の次の秒 + 余裕」を過ぎている。待ちが上限に当たっても、投稿は Slack の時計で「依頼の ts + 1.5 秒以上」になり、次の秒に入るので、対策は効く。危ないのは proxy が Slack より 250 ms を超えて進んでいる場合で、待ちが短く、または 0 になり、返事が依頼と同じ秒に入りうる。運用者は、タイミング記録（`CHAT_INTEGRATION_TRACE_PRIVATE_REPLY_TIMING=1`）の `request_ts` と `returned_id` の整数部（秒）を比べて見分けられる。同じ秒なら返事は依頼の上に出る。記録の行には待った時間が `waited_ms=` で載る
+- **待ちが遅らせるのは本人だけのメッセージの投稿だけではない。** 本人だけのメッセージが失敗したとき（例: bot がチャンネルにいない）も、待ってから失敗が分かるので、そのあとの DM（`postDirect`）は最大でおよそ 1.25 秒遅れて送られる（proxy の時計が Slack より遅れているときの最悪値は上限の 1.5 秒）。`acknowledge`（依頼にリアクションを付けられないとき、「検索しています…」を本人だけのメッセージで出す経路。`orchestration/command-flow.ts` の `runSearch`）も同じ待ちを受け、検索の問い合わせの開始がその分遅れる。リアクション（`addReaction`）と、DM を直接出す経路そのものは待たない
 - **DM の本文は「見出し + 元の返事」。** 見出しは「<場所> での「<依頼>」への返事です」。場所の名前は保存済みのチャンネル一覧から引き（`runtime/describe-place.ts`）、引けなければ「元のチャンネル」。元の返事は変えない（要件 1.15）。`list` は題の前に、`markdown` と `choice` は本文の前に見出しを置く
 - **DM が届いたら、依頼のメッセージに `email`（封筒）のリアクションを付ける。** 付けられないとき（依頼のメッセージが無い、サービスが拒んだ）は、「<表示名> さん、返事を DM で送りました。」という内容を含まない短い文をその場に出す。同じリアクションが既に付いていれば成功なので、1 つの依頼から何通も DM に届いても、短い文は 2 回目から出ない（決定 P4）
 - **DM も送れなければ**、内容を含まない「届けられませんでした」の知らせ（本人の表示名と、bot からの DM を受け取れる設定かを確かめ、だめなら運用者に連絡してほしいという案内）をその場に出し、運用者に報告する。報告にはサービス名・チャンネルの id・2 つの失敗の理由だけを含め、返事の内容を含めない（要件 1.11・1.12）。知らせの投稿も失敗したら、報告だけが残る

@@ -53,6 +53,11 @@ import {
   type ConnectionUnitRef,
   createConnectionManager,
 } from './connection-manager.js';
+import {
+  type EphemeralOrderingClock,
+  realEphemeralOrderingClock,
+  waitBeforeEphemeral,
+} from './ephemeral-ordering.js';
 import { registerEventHandlers } from './event-handlers.js';
 import { fetchHistory as fetchHistoryOf } from './history.js';
 import type { InstallationProvider } from './installation-provider.js';
@@ -93,7 +98,15 @@ export interface PlatformFacade {
     target: SdkChannelRef,
     user: ChatAccountRef,
     message: OutboundMessage,
-    scope?: { readonly installationId: string },
+    /**
+     * `installationId` is the installation, as for every other call.
+     * `requestMessageId` is the message the reply answers, which a service
+     * that orders private messages by time uses to place the reply below it.
+     */
+    scope?: {
+      readonly installationId?: string;
+      readonly requestMessageId?: string | null;
+    },
   ): Promise<EphemeralPostOutcome>;
   /**
    * Opens (or reuses) the 1:1 conversation with `user` and posts there.
@@ -287,9 +300,18 @@ export const createPlatformFacade = async (
      * changes nothing until that refresh.
      */
     readonly refreshChannels?: (installationId: string) => Promise<void>;
+    /** Clock and sleep behind the Slack ephemeral ordering wait. */
+    readonly orderingClock?: EphemeralOrderingClock;
+    /** Told how long each Slack private post waited; diagnostics only. */
+    readonly onOrderingWait?: (waitedMs: number) => void;
   } = {},
 ): Promise<PlatformFacade> => {
-  const { reportOperationalFailure, refreshChannels } = callbacks;
+  const {
+    reportOperationalFailure,
+    refreshChannels,
+    orderingClock,
+    onOrderingWait,
+  } = callbacks;
   // `PostgresStateAdapter` does not connect lazily -- every one of its methods
   // throws until `connect()` has resolved -- which is why this function is
   // asynchronous (design.md).
@@ -477,8 +499,19 @@ export const createPlatformFacade = async (
     },
 
     async postEphemeral(target, user, message, scope) {
-      const context = outboundContext(target.platform, scope);
+      const context = outboundContext(
+        target.platform,
+        scope?.installationId == null
+          ? undefined
+          : { installationId: scope.installationId },
+      );
       if (context == null) return notAddressable(target.platform);
+      const waitedMs = await waitBeforeEphemeral(
+        target.platform,
+        scope?.requestMessageId,
+        orderingClock ?? realEphemeralOrderingClock,
+      );
+      onOrderingWait?.(waitedMs);
       return await postEphemeralOf(context, target, user, message);
     },
 

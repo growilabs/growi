@@ -26,6 +26,7 @@
   - **Mattermost**: `/posts/ephemeral` は `create_post_ephemeral`（今のところシステム管理者だけが持つ）を要し、普通の bot では 403 になる。DM は `/channels/direct`
   - **リアクション**: 4 つのアダプタとも `addReaction` を持つ。Chat SDK の共通の絵文字名に `eyes`・`email` があり、各アダプタが自分のサービスの名前に直す。Slack は `reactions:write`（マニフェストに有る）が要る
 - **利用者が DM に書けるか**: DM を「開く」こと（Slack の `im:write`）と、利用者が bot との DM に「書き込める」ことは別の設定で決まる。Slack は App Home の Messages タブ（マニフェストの `features.app_home.messages_tab_enabled: true` と `messages_tab_read_only_enabled: false`）。Teams は、利用者が 1 対 1 の会話で bot に答えるのに、アプリを `personal` の範囲でも入れる必要があるかは確かめていない（下の「既知の問題」）
+- **Slack の本人だけのメッセージの `ts` は作り物**: `chat.postEphemeral` が返す `message_ts` は、秒の部分が Slack の現在の秒で、小数部は時刻ではなく通し番号（`.001000`、`.001100`、`.001200` と、本人だけのメッセージ 1 通ごとに 100 ずつ増える）。利用者の本物のメッセージの ts は本物のマイクロ秒を持つ（例 `1793094041.008789`）。Slack は ts で並べるので、返事の並びは「依頼と同じ秒か、あとの秒か」で決まる（決定 P12）。`chat-integration-agent` の「スレッドの中の本人だけのメッセージ」の設計は、この並び方に頼る
 - **installation の指定**: Mattermost は installation ごとに接続を持つので、installation が 2 つ以上開いていると、installation を名指ししない呼び出しは宛先のアダプタを決められない（`platform/index.ts` の `outboundContext`）。Slack はイベントの処理の中ならイベントから token を選べるが、イベントの外（あとで届ける返事）では installation を名指ししないと token が無い
 - **Implications**: 本人だけのメッセージ → 失敗・未対応なら DM、の 2 段にする。DM に切り替えるかは SDK に任せず proxy 側で決める（決定 P2）。installation は 4 つの platform 呼び出しすべてに同じ値を渡す（決定 P9）
 
@@ -147,6 +148,29 @@
 - **Context**: 要件 1.16 は、利用者が bot との DM に書き込めることが前提。
 - **Selected Approach**: Slack のマニフェストに `im:write` と、`features.app_home.messages_tab_enabled: true`・`messages_tab_read_only_enabled: false` を入れる（`docs/setup-slack.md`・`docs/manual-e2e-slack.md`）。導入済みの workspace は導入し直さないと `im:write` を持たない。
 - **Trade-offs**: 導入し直すまでは、本人だけのメッセージが失敗したときに DM に落ちず、内容を含まない知らせになる。返事の内容がチャンネルに出ることは無い。
+
+### 決定 P12: Slack の本人だけのメッセージは、依頼のメッセージの次の秒まで待ってから出す
+
+- **Context**: Slack で、bot の本人だけのメッセージ（返事）が、利用者自身の依頼のメッセージより上に並ぶことがある。proxy は依頼のイベントを、依頼の ts の 0.3〜0.6 秒後に受けるので、すぐ出すと依頼と同じ秒に入りやすい。
+- **Evidence**（実機 5 回の手動試行の全件。時刻はタイミング記録 `CHAT_INTEGRATION_TRACE_PRIVATE_REPLY_TIMING=1` で取った）:
+
+  | 試行 | 依頼の ts | 返事の `message_ts` | 依頼と同じ秒か | 実際の並び |
+  |---|---|---|---|---|
+  | 1 | 1793094041.008789 | 1793094041.001000 | 同じ秒 | 依頼の上 |
+  | 2 | 1793094048.046589 | 1793094048.001100、1793094048.001200 | 同じ秒（2 通とも） | 2 通とも依頼の上 |
+  | 3 | 1793094055.650889 | 1793094056.001300、1793094056.001400 | 次の秒（2 通とも） | 2 通とも依頼の下 |
+  | 4 | 1793094064.140309 | 1793094064.001500、1793094065.001600 | 同じ秒、次の秒 | 前者が上、後者が下 |
+  | 5 | 1793094077.494289 | 1793094077.001700、1793094078.001800 | 同じ秒、次の秒 | 前者が上、後者が下 |
+
+  「同じ秒なら上、次の秒なら下」の予測が 5 回すべてで合った。
+- **Selected Approach**: 待つかどうかはサービスごとの表 `EPHEMERAL_MUST_FOLLOW_REQUEST_SECOND`（`capabilities/platform-capabilities.ts`。今は Slack だけ `true`）で宣言し、Slack では、依頼の ts の秒の次の秒の頭 + 時計のずれの余裕（250 ms）まで待ってから `chat.postEphemeral` を呼ぶ。待ちは最大 1500 ms で、その時刻をすでに過ぎていれば待たない。依頼の id は `PrivateReplier` が `origin.sourceMessageId` から `postEphemeral` の `scope.requestMessageId` に渡す。Slack の ts の形（`^\d+\.\d+$`）でないときは待たない。時計と sleep は差し替えられるので、試験は実時間を待たない。
+- **Rationale**: 並びを決めるのは ts で、呼び出す側が ts を指定できない。次の秒へ送れば、小数部の通し番号が何であっても依頼より後ろに並ぶ。上限を置くのは、proxy の時計が大きくずれていても返事を止めないため。
+  余裕の 250 ms が守るのは、proxy の時計が Slack の時計より進んでいるときだけである。proxy の時計が Slack より遅れている場合は、proxy が目標の時刻に着いたとき、Slack の時計はもう「依頼の次の秒 + 余裕」を過ぎている。待ちが上限に当たっても、投稿は Slack の時計で「依頼の ts + 1.5 秒以上」になり、次の秒に入るので、対策は効く。危ないのは proxy が Slack より 250 ms を超えて進んでいる場合で、待ちが短く、または 0 になり、返事が依頼と同じ秒に入りうる。タイミング記録の `request_ts` と `returned_id` の整数部（秒）が同じなら、その返事は依頼の上に出る。
+- **Alternatives considered**:
+  - `thread_ts` を付けてスレッドの中に出す: 依頼にスレッドが無いと表示されないことがあり（上の「サービスごとの本人だけのメッセージと DM」）、チャンネル直下に出す今の作りを変えてしまう
+  - あとから本人だけのメッセージを差し替えて並べ直す: Slack は本人だけのメッセージを書き換えられない
+  - 待たない: 依頼と同じ秒に入る場合が多く、上に並ぶ問題が残る
+- **Trade-offs**: 返事が最大でおよそ 1.25 秒遅れる（依頼の次の秒の頭までの残り + 余裕。proxy の時計が Slack より遅れているときの最悪値は上限の 1.5 秒）。余裕の 250 ms は、proxy と Slack の時計のずれが分からないまま置いた未検証の初期値で、実機で確かめて直す。待ちは本人だけのメッセージの投稿の前に入るので、それが失敗して DM に進む場合は DM も同じだけ遅れ、依頼にリアクションを付けられないときの `acknowledge`（本人だけのメッセージで「検索しています…」を出す経路）も同じ待ちを受けて、検索の問い合わせの開始が遅れる。DM を直接出す経路とリアクションそのものは並びの問題が無いので待たない。
 
 ## Synthesis
 

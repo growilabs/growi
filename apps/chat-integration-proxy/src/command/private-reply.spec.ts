@@ -111,7 +111,11 @@ const allPostedText = (platform: MockProxy<Platform>): string =>
 
 const scopesOf = (platform: MockProxy<Platform>): unknown[] => [
   ...platform.post.mock.calls.map((call) => call[2]),
-  ...platform.postEphemeral.mock.calls.map((call) => call[3]),
+  ...platform.postEphemeral.mock.calls.map((call) =>
+    call[3]?.installationId == null
+      ? undefined
+      : { installationId: call[3].installationId },
+  ),
   ...platform.postDirect.mock.calls.map((call) => call[3]),
   ...platform.addReaction.mock.calls.map((call) => call[2]),
 ];
@@ -177,7 +181,10 @@ describe('PrivateReplier.reply -- every failure combination', () => {
         origin.channel,
         actor,
         message,
-        { installationId: 'inst-1' },
+        {
+          installationId: 'inst-1',
+          requestMessageId: origin.sourceMessageId,
+        },
       );
       expect(platform.postDirect).not.toHaveBeenCalled();
       expect(platform.post).not.toHaveBeenCalled();
@@ -461,7 +468,7 @@ describe('PrivateReplier.acknowledge', () => {
       originOf().channel,
       actor,
       fallback,
-      { installationId: 'inst-resolved' },
+      { installationId: 'inst-resolved', requestMessageId: sourceMessageId },
     );
     expect(resolveInstallationId).toHaveBeenCalledTimes(1);
     expect(platform.addReaction).toHaveBeenCalledTimes(

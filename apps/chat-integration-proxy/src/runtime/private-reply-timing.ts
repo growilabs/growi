@@ -13,6 +13,8 @@ export interface PrivateReplyTimingTrace {
   /** Stamps the arrival time of each event for the replies it causes. */
   readonly wrapSink: (sink: PlatformEventSink) => PlatformEventSink;
   readonly traceTiming: (timing: PrivateReplyTiming) => void;
+  /** Records how long a private post waited, for the reply being handled. */
+  readonly recordWait: (waitedMs: number) => void;
 }
 
 const isoOf = (epochMs: number): string => new Date(epochMs).toISOString();
@@ -21,13 +23,22 @@ export const createPrivateReplyTimingTrace = (
   write: (line: string) => void,
   now: () => number = Date.now,
 ): PrivateReplyTimingTrace => {
-  const arrival = new AsyncLocalStorage<{ readonly receivedAtMs: number }>();
+  const arrival = new AsyncLocalStorage<{
+    readonly receivedAtMs: number;
+    waitedMs: number;
+  }>();
 
   return {
     wrapSink: (sink) => ({
       handle: (event) =>
-        arrival.run({ receivedAtMs: now() }, () => sink.handle(event)),
+        arrival.run({ receivedAtMs: now(), waitedMs: 0 }, () =>
+          sink.handle(event),
+        ),
     }),
+    recordWait: (waitedMs) => {
+      const store = arrival.getStore();
+      if (store != null) store.waitedMs = waitedMs;
+    },
     traceTiming: (timing) => {
       const received = arrival.getStore()?.receivedAtMs;
       // The facade addresses a private post at the channel, never a thread.
@@ -37,6 +48,7 @@ export const createPrivateReplyTimingTrace = (
           `via=${timing.via}`,
           `request_ts=${timing.sourceMessageId ?? 'none'}`,
           `received=${received == null ? 'unknown' : isoOf(received)}`,
+          `waited_ms=${arrival.getStore()?.waitedMs ?? 0}`,
           `before=${isoOf(timing.beforeMs)}`,
           `after=${isoOf(timing.afterMs)}`,
           `returned_id=${timing.returnedId ?? 'none'}`,

@@ -227,6 +227,22 @@ export const REQUIRES_INBOUND_REACHABILITY: Readonly<
 };
 
 /**
+ * Whether a private (ephemeral) message must be posted in a later second than
+ * the request it answers, because the service orders it by a synthetic
+ * timestamp that sorts above the request when both fall in the same second
+ * (Decision P12 in the proxy spec's research.md). Only Slack does. Separate
+ * from `CAPABILITY_TABLE`: it says nothing about what a service can do.
+ */
+export const EPHEMERAL_MUST_FOLLOW_REQUEST_SECOND: Readonly<
+  Record<PlatformName, boolean>
+> = {
+  slack: true,
+  discord: false,
+  teams: false,
+  mattermost: false,
+};
+
+/**
  * The services this table covers, from a table that has one entry per
  * `PlatformName` rather than from a hand-written list. Both tables in this
  * file are `Record<PlatformName, ...>`, so either would do; the connection

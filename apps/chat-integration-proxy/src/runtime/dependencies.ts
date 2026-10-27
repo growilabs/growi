@@ -230,6 +230,9 @@ export const createProxyDependencies = async (
       // lists through this facade. It only runs once a connection delivers an
       // event, and `server.ts` opens connections after this function returns.
       refreshChannels: (installationId) => refreshChannels(installationId),
+      ...(timingTrace == null
+        ? {}
+        : { onOrderingWait: timingTrace.recordWait }),
     },
   );
 

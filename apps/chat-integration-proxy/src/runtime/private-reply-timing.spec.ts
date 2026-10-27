@@ -28,7 +28,7 @@ describe('createPrivateReplyTimingTrace', () => {
     await trace.wrapSink(sink).handle(mock<PlatformEvent>());
 
     expect(lines).toEqual([
-      '[private-reply-timing] via=ephemeral request_ts=1700000000.000100 received=2026-10-27T01:02:03.100Z before=2026-10-27T01:02:03.500Z after=2026-10-27T01:02:03.900Z returned_id=1700000000.000200 channel=slack:C1 thread=false ok=true',
+      '[private-reply-timing] via=ephemeral request_ts=1700000000.000100 received=2026-10-27T01:02:03.100Z waited_ms=0 before=2026-10-27T01:02:03.500Z after=2026-10-27T01:02:03.900Z returned_id=1700000000.000200 channel=slack:C1 thread=false ok=true',
     ]);
   });
 
@@ -47,5 +47,20 @@ describe('createPrivateReplyTimingTrace', () => {
     expect(lines[0]).toContain('received=unknown');
     expect(lines[0]).toContain('returned_id=none');
     expect(lines[0]).toContain('ok=false');
+  });
+
+  it('reports how long the reply being handled waited before posting', async () => {
+    const lines: string[] = [];
+    const trace = createPrivateReplyTimingTrace((l) => lines.push(l));
+    const sink = mock<PlatformEventSink>();
+    sink.handle.mockImplementation(async () => {
+      await Promise.resolve();
+      trace.recordWait(750);
+      trace.traceTiming(timing);
+    });
+
+    await trace.wrapSink(sink).handle(mock<PlatformEvent>());
+
+    expect(lines[0]).toContain(' waited_ms=750 ');
   });
 });
