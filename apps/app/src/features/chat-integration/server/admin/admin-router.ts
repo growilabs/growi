@@ -417,7 +417,7 @@ const submitPairingHandler = async (
  * `POST /relations/:relationId/unpair` -- disconnects a chat workspace
  * (Requirement 9.7). This is the ONLY production caller of
  * `unpairRelation`, and it has to exist for two other pieces of this feature
- * to have anything to work on at all: the 90-day sweep
+ * to have anything to work on at all: the sweep
  * (`sweep-unpaired-relations.ts`) looks for `state: 'unpaired'` rows, and a
  * re-pairing inherits the previous relation's account links from the most
  * recent `unpaired` row for the same workspace

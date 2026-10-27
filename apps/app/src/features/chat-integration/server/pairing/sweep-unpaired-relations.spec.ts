@@ -1,5 +1,5 @@
-// Task 8.2's second half: the 90-day sweep design.md defers here from
-// `inherit-account-links.ts` ("解除済みの `chat_relations` の行そのものも 90 日で
+// Task 8.2's second half: the sweep design.md defers here from
+// `inherit-account-links.ts` ("解除済みの `chat_relations` の行そのものも 45 日で
 // 消す（`chat_account_links` と揃える）").
 
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
@@ -60,6 +60,10 @@ describe('sweepUnpairedRelations', () => {
 
   afterAll(async () => {
     await disconnectSelfContainedMongo(mongod);
+  });
+
+  it('keeps an unpaired relation for 45 days', () => {
+    expect(UNPAIRED_RETENTION_MS).toBe(45 * DAY_MS);
   });
 
   it('deletes an unpaired relation past the retention period together with its account links', async () => {

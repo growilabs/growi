@@ -661,7 +661,7 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
 
 | コレクション | 主な項目 | 索引・寿命 |
 |---|---|---|
-| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsVersion`, `createdAt`, `unpairedAt` | **`relationId` 単独で一意**（複合にしない。理由は下記）。**既にある `relationId` を返す `PairingResult` はペアリングを成立させず、管理者に知らせる**。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にし、`unpairedAt` に解除時刻を持たせる** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。`unpairedAt` は「いちばん新しい解除済みの行から引き継ぐ」（下記）の判定と、90日掃除（task 8.2）が起点にする値で、`createdAt`（最初のペアリング時刻）では代用できない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
+| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsVersion`, `createdAt`, `unpairedAt` | **`relationId` 単独で一意**（複合にしない。理由は下記）。**既にある `relationId` を返す `PairingResult` はペアリングを成立させず、管理者に知らせる**。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にし、`unpairedAt` に解除時刻を持たせる** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。`unpairedAt` は「いちばん新しい解除済みの行から引き継ぐ」（下記）の判定と、45日掃除（task 8.2）が起点にする値で、`createdAt`（最初のペアリング時刻）では代用できない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
 | `chat_account_links` | `relationId`, `userId`, `platform`, `accountId`, `linkedAt` | **`(relationId, platform, accountId)` 複合ユニーク**（下記）。**利用者が解除するまで残る。** 関係の解除では消さない（下記の再ペアリングを参照） |
 | `chat_integration_keys` | `relationId`, `side`(`own`/`peer`), `keyId`, `key`, `validFrom`, `revokedAt` | `(relationId, side, keyId)` 一意。**紐付け解除で削除**（秘密鍵を残さない） |
 | `chat_notification_outbox` | `requestId`, `relationId`, `targets`, `markdown`, `state`, `attempts`, `claimedAt`, `result`, `createdAt` | **`(state, claimedAt)` に索引**（`drain` が奪うときに引く）、**`(relationId, requestId)` に索引**（結果を書き戻すときに引く）。**送信済みは 30 日で TTL 索引により消す**。`given-up` は運用者が確認するまで残す |
@@ -920,7 +920,7 @@ proxy が `SettingsPullResponse` で取りに来るので取りこぼしは埋�
 **それが一意に決まるには結局 `relationId` の一意索引が要る。** 索引を張った時点で保証は済むので、
 間接の層は何も足さず、8 コレクションを載せ替える費用だけが残る。**関係を指す軸は `relationId` 1 本に保つ。**
 
-> **解除済みの行も一意索引の対象である。** 解除では行を消さず `state: 'unpaired'` のまま 90 日残すので、
+> **解除済みの行も一意索引の対象である。** 解除では行を消さず `state: 'unpaired'` のまま 45 日残すので、
 > **proxy が繋ぎ直しのときに同じ `relationId` を再発行すると、ペアリングが弾かれる。**
 > これが起きないのは **proxy が毎回新しい乱数を採番する**からである（protocol の
 > 「`relationId` は推測できない値にする。連番にしない」）。前提としてここに書いておく —
@@ -955,11 +955,12 @@ protocol spec が「`keyId` を単独で鍵にすると別の関係のものを�
 >
 > **引き継ぎ元が複数あるときは、いちばん新しい解除済みの行から引き継ぐ。**
 > 移す途中で `(relationId, platform, accountId)` がぶつかったら**新しいほうを残す**。
-> **解除済みの `chat_relations` の行そのものも 90 日で消す**（`chat_account_links` と揃える）。
-> 90 日の掃除は `NotificationDispatcher` と同じく**条件つき更新で 1 台だけ**が回す。
+> **解除済みの `chat_relations` の行そのものも 45 日で消す**（`chat_account_links` と揃える）。
+> 45 日の掃除は `NotificationDispatcher` と同じく**条件つき更新で 1 台だけ**が回す。
+> 管理画面の解除済みのカードには、消える日（解除した日 + 45 日）を表示する。いつまで残るのかが画面から分かるようにするためである。
 >
 > **`chat_account_links` を消すのは 2 つの場合だけ** — 利用者が解除したとき（要件 7.5）と、
-> 引き継ぎ先が無いまま一定期間（既定 90 日）過ぎたとき。
+> 引き継ぎ先が無いまま一定期間（既定 45 日）過ぎたとき。
 > **GROWI ユーザーが使えなくなっても消さない** — 利用者削除は `status` を変えるだけで
 > 文書は残り、`resolveActor` が状態を見て `user: null` にするので、行が残っていても安全である。
 > 復帰したときに紐付け直さずに済む（上記「`resolveActor` は「行が引けたか」では決められない」）。

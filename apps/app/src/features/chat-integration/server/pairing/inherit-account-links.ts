@@ -97,8 +97,8 @@ const findSourceRelationId = async (
  * the user established later" is the one that reflects their latest intent.
  *
  * The source relation's own `chat_relations` row is deliberately left in
- * place. Removing it belongs to the 90-day sweep (design.md "解除済みの
- * `chat_relations` の行そのものも 90 日で消す"), which is also what stops a row
+ * place. Removing it belongs to the sweep (design.md "解除済みの
+ * `chat_relations` の行そのものも 45 日で消す"), which is also what stops a row
  * from being inherited from twice in a way that matters -- once emptied, a
  * second run of this function finds no links to move.
  */

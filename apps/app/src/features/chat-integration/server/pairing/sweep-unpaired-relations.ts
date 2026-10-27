@@ -1,4 +1,4 @@
-// The 90-day sweep of unpaired relations (task 8.2, Requirement 9.7's tail).
+// The sweep of unpaired relations (task 8.2, Requirement 9.7's tail).
 //
 // Unlinking deliberately does NOT delete the `chat_relations` row: `platform`
 // and `workspaceId` have to survive so that re-pairing the same workspace can
@@ -13,7 +13,7 @@
 // one pass, which means application code.
 //
 // Runs on the same tick, and with the same "only one instance actually does
-// the work" property, as `NotificationDispatcher.drain` (design.md "90 日の
+// the work" property, as `NotificationDispatcher.drain` (design.md "45 日の
 // 掃除は `NotificationDispatcher` と同じく条件つき更新で 1 台だけが回す"): the
 // links are removed first and the relation row is then deleted under the very
 // condition that selected it, so two instances sweeping at once converge on
@@ -21,6 +21,7 @@
 
 import loggerFactory from '~/utils/logger';
 
+import { UNPAIRED_RETENTION_MS } from '../../unpaired-retention';
 import { ChatAccountLink } from '../account-link/models/chat-account-link';
 import { ChatRelation } from '../models/chat-relation';
 
@@ -28,12 +29,7 @@ const logger = loggerFactory(
   'growi:features:chat-integration:sweep-unpaired-relations',
 );
 
-/**
- * How long an unpaired relation is kept so a re-pairing can still inherit
- * its account links. design.md: "解除済みの `chat_relations` の行そのものも
- * 90 日で消す（`chat_account_links` と揃える）".
- */
-export const UNPAIRED_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+export { UNPAIRED_RETENTION_MS };
 
 /** Bound on one sweep, so a large backlog spreads over several ticks. */
 const MAX_RELATIONS_PER_SWEEP = 100;

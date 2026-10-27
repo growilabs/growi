@@ -349,7 +349,7 @@ export type UnpairRelationResult = 'unpaired' | 'not-found';
  * thing a later re-pairing can recognize the same workspace by, and losing
  * them loses every user's account link with them (design.md: "行を消してしまう
  * と、古い relationId がどの workspace のものだったか分からなくなり、引き継げない").
- * Removing the row is the 90-day sweep's job, not this function's.
+ * Removing the row is the sweep's job, not this function's.
  *
  * What IS deleted is everything that would let traffic keep flowing or leak:
  * the keys (so no signature from either side verifies any more -- this is
@@ -368,7 +368,7 @@ export const unpairRelation = async (
   }
 
   // Filtered on `state: 'active'` so a second call never overwrites the
-  // instant the 90-day sweep and the inheritance ordering both read.
+  // instant the sweep and the inheritance ordering both read.
   await ChatRelation.updateOne(
     { relationId, state: 'active' },
     { $set: { state: 'unpaired', unpairedAt: now } },

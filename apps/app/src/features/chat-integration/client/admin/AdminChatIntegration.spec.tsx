@@ -218,6 +218,22 @@ describe('AdminChatIntegration', () => {
     expect(within(rows[1]).getByText('unpaired')).toBeInTheDocument();
   });
 
+  it('tells the admin an unpaired relation is removed automatically, with the date', async () => {
+    stubApi({ relations: [ACTIVE_RELATION, UNPAIRED_RELATION] });
+
+    renderScreen();
+
+    const rows = await screen.findAllByTestId(
+      'grw-chat-integration-relation-row',
+    );
+    expect(
+      within(rows[1]).getByText(
+        /removed automatically on 2026-03-18 \(45 days after disconnection\)/i,
+      ),
+    ).toBeInTheDocument();
+    expect(within(rows[0]).queryByText(/removed automatically/i)).toBeNull();
+  });
+
   it('renders CapabilityReport generically, including a fabricated field no known platform sends', async () => {
     stubApi({ relations: [ACTIVE_RELATION] });
 

@@ -1,4 +1,4 @@
-// What actually turns `NotificationDispatcher` (and the 90-day sweep that
+// What actually turns `NotificationDispatcher` (and the sweep that
 // rides along with it) into something that happens.
 //
 // design.md: GROWI already has three collections-with-a-`state`-column that

@@ -521,7 +521,7 @@ describe('pairing-service', () => {
       expect(
         await ChatAccountLink.countDocuments({ relationId: 'relation-old' }),
       ).toBe(0);
-      // Deleting the emptied-out relation row is the 90-day cleanup's job
+      // Deleting the emptied-out relation row is the cleanup's job
       // (task 8.2), NOT this one's.
       expect(
         await ChatRelation.countDocuments({ relationId: 'relation-old' }),

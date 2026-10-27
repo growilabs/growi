@@ -13,7 +13,7 @@
 //
 // An active relation also offers the disconnect (Requirement 9.7) -- see
 // `UnpairButton`; it is the only place in the product from which a relation
-// can be marked `unpaired`, which the 90-day sweep and a re-pairing's
+// can be marked `unpaired`, which the sweep and a re-pairing's
 // account-link inheritance both depend on.
 //
 // Follows this feature's own client convention (see `MyChatAccountLinks.tsx`
@@ -45,6 +45,10 @@ import useSWR from 'swr';
 import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
+import {
+  UNPAIRED_RETENTION_DAYS,
+  UNPAIRED_RETENTION_MS,
+} from '../../unpaired-retention';
 import { NotificationDestinationsSection } from './NotificationDestinationsSection';
 
 // ============================================================================
@@ -562,6 +566,11 @@ const UnpairButton = ({
   );
 };
 
+const describeRemovalDate = (unpairedAt: string): string =>
+  new Date(new Date(unpairedAt).getTime() + UNPAIRED_RETENTION_MS)
+    .toISOString()
+    .slice(0, 10);
+
 /** One relation's row: static info plus, for an active relation, live capabilities + connection status. */
 const RelationRow = ({
   relation,
@@ -603,6 +612,13 @@ const RelationRow = ({
           {relation.state}
         </span>
       </div>
+
+      {!isActive && relation.unpairedAt != null && (
+        <p className="text-muted small mb-0">
+          Removed automatically on {describeRemovalDate(relation.unpairedAt)} (
+          {UNPAIRED_RETENTION_DAYS} days after disconnection).
+        </p>
+      )}
 
       {isActive && (
         <div className="mb-2">

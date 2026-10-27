@@ -910,7 +910,7 @@ describe('admin-router', () => {
       }).lean();
       // The row itself must SURVIVE: `platform`/`workspaceId` are the only
       // things a later re-pairing recognises the same workspace by, and
-      // `unpairedAt` is what the 90-day sweep and the account-link
+      // `unpairedAt` is what the sweep and the account-link
       // inheritance both read.
       expect(relation?.state).toBe('unpaired');
       expect(relation?.unpairedAt).toBeInstanceOf(Date);
@@ -967,7 +967,7 @@ describe('admin-router', () => {
       // `unpairRelation` alone (it filters its own write on `state:
       // 'active'`), and a second check here would be a second place that
       // could drift from it. `unpairedAt` must not be pushed forward either
-      // -- the 90-day sweep counts from the FIRST disconnection.
+      // -- the sweep counts from the FIRST disconnection.
       await seedRelationWithEverything();
       const app = buildApp(adminUser);
 

@@ -46,8 +46,8 @@ export interface IChatRelation {
    * Two things need it and neither can be derived from `createdAt`:
    * re-pairing has to inherit the account links of the MOST RECENTLY
    * unpaired relation for the same workspace (design.md "引き継ぎ元が複数ある
-   * ときは、いちばん新しい解除済みの行から引き継ぐ"), and the 90-day sweep of
-   * unpaired rows needs the instant the 90 days are counted from. Not a TTL
+   * ときは、いちばん新しい解除済みの行から引き継ぐ"), and the sweep of
+   * unpaired rows needs the instant the retention is counted from. Not a TTL
    * index: the sweep is the same conditional-update, one-host-only job that
    * `NotificationDispatcher` runs, because it has to remove the relation's
    * `chat_account_links` rows in the same pass.
