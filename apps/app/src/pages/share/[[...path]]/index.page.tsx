@@ -27,7 +27,7 @@ import {
   getServerSidePropsForSameRoute,
 } from './server-side-props';
 import type { EachProps, InitialProps } from './types';
-import { useSharedPageCSRFetch } from './use-shared-page-csr-fetch';
+import { useSharedPageNavigation } from './use-shared-page-navigation';
 
 // call superjson custom register
 registerPageToShowRevisionWithMeta();
@@ -56,11 +56,13 @@ const SharedPage: NextPageWithLayout<Props> = (props: Props) => {
   const rendererConfig = useRendererConfig();
   const isLinkSharingDisabled = useAtomValue(disableLinkSharingAtom);
 
-  // Fetch page data on client-side when SSR is skipped or navigated client-side
-  useSharedPageCSRFetch({
+  // Apply the navigated-to page, and fetch page data when SSR is skipped
+  useSharedPageNavigation({
     nextjsRoutingType: props.nextjsRoutingType,
+    currentPathname: props.currentPathname,
+    pageWithMeta,
+    isExpired,
     skipSSR: props.skipSSR,
-    pageId: pageWithMeta?.data?._id,
   });
 
   // If the data on the page changes without router.push, pageWithMeta remains old because getServerSideProps() is not executed

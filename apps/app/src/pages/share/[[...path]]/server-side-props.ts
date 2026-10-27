@@ -18,6 +18,7 @@ import {
 } from '../../general-page';
 import { addActivity } from '../../utils/activity';
 import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
+import { NEXT_JS_ROUTING_PAGE } from './consts';
 import { getPageDataForInitial } from './page-data-props';
 import type { Stage2EachProps, Stage2InitialProps } from './types';
 
@@ -26,6 +27,12 @@ const basisProps = {
     isNotCreatable: true,
     isForbidden: false,
     isIdenticalPathPage: false,
+  },
+};
+
+const nextjsRoutingProps = {
+  props: {
+    nextjsRoutingPage: NEXT_JS_ROUTING_PAGE,
   },
 };
 
@@ -74,7 +81,10 @@ export async function getServerSidePropsForInitial(
           rendererConfigResult,
           mergeGetServerSidePropsResults(
             i18nPropsResult,
-            mergeGetServerSidePropsResults(pageDataResult, basisProps),
+            mergeGetServerSidePropsResults(
+              pageDataResult,
+              mergeGetServerSidePropsResults(basisProps, nextjsRoutingProps),
+            ),
           ),
         ),
       ),
