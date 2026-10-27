@@ -63,21 +63,14 @@ export const deleteLegacyPasswordsHandlersFactory = (
     async (req: DeleteLegacyPasswordsRequest, res: ApiV3Response) => {
       const { user } = req;
 
+      let unset: number;
       try {
         const users = mongoose.connection.collection('users');
-        const { unset } = await unsetLegacyPasswordOfMigratedUsers(users);
+        ({ unset } = await unsetLegacyPasswordOfMigratedUsers(users));
 
         logger.info(
           `Legacy passwords deleted by ${user.username} (${user._id}): unsetCount=${unset}`,
         );
-
-        // emit before res.apiv3() — see rules/activity-recording.md
-        activityEvent.emit('update', res.locals.activity._id, {
-          action: SupportedAction.ACTION_ADMIN_LEGACY_PASSWORD_DELETE,
-        });
-
-        const body: DeleteLegacyPasswordsResponse = { unsetCount: unset };
-        return res.apiv3(body);
       } catch (err) {
         logger.error('Failed to delete legacy passwords', err);
         return res.apiv3Err(
@@ -88,6 +81,20 @@ export const deleteLegacyPasswordsHandlersFactory = (
           500,
         );
       }
+
+      // The deletion is already committed, so a failure to hand over the
+      // activity must not turn the response into an error.
+      try {
+        // emit before res.apiv3() — see rules/activity-recording.md
+        activityEvent.emit('update', res.locals.activity._id, {
+          action: SupportedAction.ACTION_ADMIN_LEGACY_PASSWORD_DELETE,
+        });
+      } catch (err) {
+        logger.error('Failed to record the legacy password deletion', err);
+      }
+
+      const body: DeleteLegacyPasswordsResponse = { unsetCount: unset };
+      return res.apiv3(body);
     },
   ];
 };

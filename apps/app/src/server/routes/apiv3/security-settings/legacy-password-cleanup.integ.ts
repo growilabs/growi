@@ -109,6 +109,8 @@ const EXPECTED_DELTA: PasswordHashFormatCounts = {
 
 const getMockLoggerInfo = () =>
   vi.mocked(vi.mocked(loggerFactory)('test').info);
+const getMockLoggerError = () =>
+  vi.mocked(vi.mocked(loggerFactory)('test').error);
 
 const HASH_FIELD_PATTERN = /"(password|passwordHash|user|users)"\s*:/;
 
@@ -291,6 +293,28 @@ describe('security-setting legacy password cleanup routes', () => {
       expect(
         getMockLoggerInfo().mock.calls.some((args) =>
           args.map(String).join(' ').includes('unsetCount=0'),
+        ),
+      ).toBe(true);
+    });
+
+    it('still returns the deleted count and logs the error when emitting the activity fails (Req 2.10)', async () => {
+      currentUser = adminUser;
+      vi.mocked(unsetLegacyPasswordOfMigratedUsers).mockResolvedValueOnce({
+        unset: 2,
+      });
+      activityEmit.mockImplementationOnce(() => {
+        throw new Error('emit failed');
+      });
+
+      const res = await request(app).delete('/legacy-passwords');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ unsetCount: 2 });
+      expect(
+        getMockLoggerError().mock.calls.some((args) =>
+          args.some(
+            (arg) => arg instanceof Error && arg.message === 'emit failed',
+          ),
         ),
       ).toBe(true);
     });
