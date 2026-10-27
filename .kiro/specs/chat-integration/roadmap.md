@@ -109,6 +109,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - **Discord の Gateway を開いていないので、Discord の DM と mention が proxy に届かない**: `src/` のどこからもアダプタの `startGatewayListener` を呼んでいない。本人宛ての返事を DM で送ることはできるが、その DM での答え（要件 1.16）もチャンネルでの mention も届かない。umbrella の design.md の「Discord は Gateway で受ける」と食い違う。別の対応で直す。詳しくは [chat-integration-proxy の research.md](../chat-integration-proxy/research.md) の「既知の問題」2
   - **Mattermost で、本人にだけ見えるメッセージの権限不足（403）が「bot がチャンネルにいない」と記録される**: `classifyOutboundFailure` が 403 を `bot-not-in-channel` と分類する（アダプタの例外が応答の本文を持たず、見分けられない）。利用者には DM で届くので影響は無いが、DM も届かなかったときの運用者向けの報告の理由が誤る。同じ research.md の「既知の問題」1
   - **official proxy では Slack の会話の取り込みが事実上使えない**: Slack Marketplace の外で配布するアプリは、2025-05-29 以降、`conversations.history` が 1 分に 1 回・1 回 15 件までに制限される（組織が自分で作るアプリは対象外）。GROWI が運営する 1 つのアプリを多くの workspace に導入する形では、`keep`（要件 5）がこの制限を受ける。詳しくは [chat-integration-agent の brief](../chat-integration-agent/brief.md) の「実現性の確認の結果」3
+  - **Slack で、本人にだけ見えるメッセージが、呼びかけた入力より上に表示されることがある（優先度は高い）**: 実機試験（2026-10-27）で、`@GROWI search` への聞き返しが、入力の投稿より上に出た。内容は正しく本人にだけ見えるが、読む順序が逆になって使い心地が悪い。原因は未特定（Slack の画面が、本人にだけ見えるメッセージを受け取った順に差し込み、入力の表示より返事の受け取りが先になる短い間がある、という推測のみ）。表示位置を指定する手段は Slack の API に見当たらないので、再現したときの時刻を Slack の表示と proxy のログで数回分取って比べ、出すのを少し遅らせる案などが効くかを確かめてから決める。
 
 ## Scope
 
