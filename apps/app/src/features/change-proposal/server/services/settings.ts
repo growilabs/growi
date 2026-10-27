@@ -42,6 +42,10 @@ const toLimit = (value: number | null | undefined): number | null =>
     ? value
     : null;
 
+// config-manager resolves "DB value ?? env/default", so a cleared limit must be
+// stored as 0 (read back as null by toLimit); null would restore the default.
+const toStoredLimit = (value: number | null): number => value ?? 0;
+
 const toAutoApplyPolicy = (value: unknown): AutoApplyPolicy =>
   AUTO_APPLY_POLICIES.find((policy) => policy === value) ?? 'none';
 
@@ -93,12 +97,14 @@ export const updateChangeProposalSettings = async (
     updates['changeProposal:autoApplyPolicy'] = input.autoApplyPolicy;
   }
   if (input.maxOperationsPerProposal !== undefined) {
-    updates['changeProposal:maxOperationsPerProposal'] =
-      input.maxOperationsPerProposal;
+    updates['changeProposal:maxOperationsPerProposal'] = toStoredLimit(
+      input.maxOperationsPerProposal,
+    );
   }
   if (input.maxProposalsPerUserPerDay !== undefined) {
-    updates['changeProposal:maxProposalsPerUserPerDay'] =
-      input.maxProposalsPerUserPerDay;
+    updates['changeProposal:maxProposalsPerUserPerDay'] = toStoredLimit(
+      input.maxProposalsPerUserPerDay,
+    );
   }
   if (input.perPageNotificationsEnabled !== undefined) {
     updates['changeProposal:perPageNotificationsEnabled'] =

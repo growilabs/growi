@@ -431,7 +431,7 @@ describe('config-definition change-proposal keys', () => {
     [
       'changeProposal:maxOperationsPerProposal',
       'CHANGE_PROPOSAL_MAX_OPERATIONS_PER_PROPOSAL',
-      null,
+      50,
     ],
     [
       'changeProposal:maxProposalsPerUserPerDay',

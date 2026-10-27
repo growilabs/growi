@@ -277,13 +277,14 @@
   - _Depends: 6.5_
 
 - [ ] 8. 全体の結合と確認
-- [ ] 8.1 設定の初期値を入れる
+- [x] 8.1 設定の初期値を入れる
   - config-manager は `DB値 ?? 環境変数/初期値` で値を決めるので、初期値を 50 にすると DB の `null`（管理者が上限を空にした）が 50 に戻る。`updateChangeProposalSettings` は上限に `null` が渡されたとき DB に `0` を保存するようにし（読む側の `toLimit` は 0 以下を `null` と読む）、settings.spec の「writes null to clear a limit」の期待値を直し、「上限を空にしたあと 51 個の操作の案が作れる」を結合テストに足す。`removeConfigs` は使わない（初期値に戻るため）
   - 上限の初期値（design の OQ-2 で決定済み）を、人に確かめずに入れる。1.2 で `null` にしておいた操作数の上限を 50 にし、1 日の件数の上限は `null`（上限なし）のまま初期値として確定させる
   - 承認待ちの期限（OQ-1）は、着手前に初期値を人に確かめ、決まっていれば 1.2 で `null` にしておいた設定キーの初期値に入れ、design の設定キーの表と Open Questions の該当の行を決まった値に書き直す。値が無いときの扱い（期限切れにしない）を残すかどうかも、あわせて確かめる。決まっていなければ、期限の部分だけを止める
   - 入れた初期値（操作数の上限 50、1 日の件数の上限 `null`）を設定キーの宣言のテストに足す
   - テストが成功し、初期値のままで、51 個の操作の作成が操作数の上限で断られ、50 個なら作れること、1 日に何件作っても件数の上限で断られないことを結合テストで確かめている。期限の初期値を入れた場合は、初期値のままで期限切れが動くことも確かめている
   - _Requirements: 2.5, 8.4, 8.10_
+  - _Blocked（期限の部分だけ）: 承認待ちの期限（OQ-1）の初期値は人が決めておらず入れていない。`changeProposal:pendingExpirationSeconds` の初期値は `null`（期限切れにしない）のまま。決まったら、設定キーの宣言・design の設定キーの表と OQ-1 の行・「初期値のままで期限切れが動く」結合テストを足す_
 - [ ] 8.2 作成から取り消しまでの流れを、まとめて結合テストで確かめる
   - 編集・新規作成・移動を含む Change Proposal を作り、ページ単位で承認して反映し、リビジョンの印（新規作成では最初のリビジョン）、作者、閲覧範囲、まとめた通知が 1 件ずつであること、ページごとの通知が出ていないことを確かめる
   - 途中の操作が「古い」になっても前の操作が戻らず、残りの操作が反映されることを確かめる
@@ -356,3 +357,4 @@
 - 【人の判断が必要・低】6.4: 承認したが反映が 0 件（`in-progress` を含む）のとき、その要求の監査記録は残らない（route の activity は確定せず finalizer が消す。承認だけを表す action が無く、0 件で APPLY を出すと嘘の行になるため。後で実際に反映する実行が依頼した人を操作者として APPLY を記録する）。飛ばす・破棄・ページごとの通知の指定の変更は成功しても activity を残さない（合う action が無く、要件も記録を求めていない。入力の誤り・404・409 は `ACTION_UNSETTLED` が 1 件残る）。残したいなら action を足す判断が要る
 - 6.5: 管理者の設定 API は `GET` / `PUT /_api/v3/change-proposal-settings`（`routerForAdmin`。`server/routes/admin/{index,get-settings,put-settings,settings-view}.ts`、`createChangeProposalAdminRouter(crowi)` を barrel から export、`apiv3/index.js` で登録）。PUT は厳密に検査（boolean のみ、上限は `null` か 1 以上の安全な整数、`autoApplyPolicy` は 3 値、`enabledOperationTypes` は edit / create / move の重複しない部分集合で空配列は「全部無効」、知らないキー（`pendingExpirationSeconds`・`useOnlyEnvVars` を含む）は 400）、一部の項目だけの更新は他の値を変えない、活動は成功時だけ応答の前に 1 件（失敗した試みは `ACTION_UNSETTLED` のみ）、`isEnabled` が真→偽のとき `withdrawAllPending` を待ってから応答（失敗はログに残して 200）。上限を空にする指定は `null` をそのまま `updateChangeProposalSettings` に渡す（8.1 で「0 を保存する」形に変わっても route の応答は変わらない）。環境変数での固定は新しい設定キー `env:useOnlyEnvVars:changeProposal`（`CHANGE_PROPOSAL_USES_ONLY_ENV_VARS`、初期値 `false`）と `ENV_ONLY_GROUPS` で行い、GET は `settings.useOnlyEnvVars` を返し、固定中の PUT は 400 `settings_fixed_by_env_vars`。管理者でないユーザーは `adminRequired` の標準で `/` へ 302（design の 403 を直した）。`ChangeProposalSettingsView` に `useOnlyEnvVars` を足し、`ChangeProposalSettingsUpdate` は `Partial<Omit<View, 'useOnlyEnvVars'>>`（7 の画面はこの値で全体を変更不可表示にする）。許す値の一覧 `AUTO_APPLY_POLICIES` / `CREATABLE_OPERATION_TYPES` は `services/settings.ts` に 1 か所。design.md の Admin Settings Routes と設定キー表に反映済み。route と middleware の対応の一覧（`tools/authz-matrix/baselines`）に 6.3〜6.5 の route はまだ入っていない（手で取り直す運用）
 - 7: 管理者の設定画面は `features/change-proposal/client/admin/`（`ChangeProposalSettings.tsx` が container、`use-change-proposal-settings.ts` が SWR hook、`change-proposal-settings-form-values.ts` が純関数 `toFormValues` / `buildUpdateRequest` / `isValidLimitText`、`EnvOnlyModeNotice.tsx`）と `pages/admin/change-proposal.page.tsx`（`/admin/change-proposal`）。`AdminNavigation.tsx` の 3 か所（`MenuLabel` の case・`MenuLink`・狭い画面の一覧）に 1 項目、`admin.json` 5 言語に `change_proposal_settings` ブロック 22 キー（design の 3 文言は 5 言語とも一字一句一致、`baseline.json` は未変更）。保存は変えた値だけを PUT し、何も変えていなければ PUT を送らず成功の toast だけ出す。`useOnlyEnvVars` が真のとき注意書きを出し、Save を含むフォーム全体を `<fieldset disabled>` にする。`register-to-input-props.ts` と `EnvOnlyModeNotice.tsx` は `features/mastra/client/admin` のほぼコピー（機能どうしの import を避けた。共通化は後の整理）。GROWI.cloud 用リンクの分岐にテストは無い。実際のブラウザでの確認はしていない（部品のテストのみ）
+- 8.1: 操作数の上限の初期値を 50、1 日の件数の上限を `null`（上限なし）で確定した。管理者が上限を空にすると `updateChangeProposalSettings` が DB に `0` を保存し（config-manager が `DB値 ?? 環境変数/初期値` で決めるため、`null` だと 50 に戻る）、読む側 `toLimit` が 0 以下を `null` と読む。環境変数が 0・空文字・数字以外でも上限なしになる。この 2 つのキーを直接 `getConfig` で読むのは `readChangeProposalSettings` だけ。期限の初期値（OQ-1）は未決のまま

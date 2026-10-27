@@ -152,14 +152,36 @@ describe('updateChangeProposalSettings', () => {
     });
   });
 
-  it('writes null to clear a limit', async () => {
+  it('stores 0 to clear a limit so the default does not take over', async () => {
     const manager = stubConfigs(allDefaults);
+
+    await updateChangeProposalSettings({
+      maxOperationsPerProposal: null,
+      maxProposalsPerUserPerDay: null,
+    });
+
+    expect(manager.updateConfigs).toHaveBeenCalledWith({
+      'changeProposal:maxOperationsPerProposal': 0,
+      'changeProposal:maxProposalsPerUserPerDay': 0,
+    });
+  });
+
+  it('reads a cleared limit back as null', async () => {
+    const stored: Record<string, unknown> = {
+      ...allDefaults,
+      'changeProposal:maxOperationsPerProposal': 50,
+    };
+    const manager = stubConfigs(stored);
+    Object.assign(manager, {
+      updateConfigs: (updates: Record<string, unknown>) => {
+        Object.assign(stored, updates);
+        return Promise.resolve();
+      },
+    });
 
     await updateChangeProposalSettings({ maxOperationsPerProposal: null });
 
-    expect(manager.updateConfigs).toHaveBeenCalledWith({
-      'changeProposal:maxOperationsPerProposal': null,
-    });
+    expect(readChangeProposalSettings().maxOperationsPerProposal).toBeNull();
   });
 
   it('does not touch the config manager for an empty update', async () => {

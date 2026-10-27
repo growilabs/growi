@@ -292,6 +292,23 @@ describe('change-proposal admin settings routes', () => {
         maxOperationsPerProposal: null,
         maxProposalsPerUserPerDay: null,
       });
+
+      const reread = await get();
+      expect(reread.body.settings).toMatchObject({
+        maxOperationsPerProposal: null,
+        maxProposalsPerUserPerDay: null,
+      });
+    });
+
+    it('shows the initial operation cap of 50 and no daily cap before any change', async () => {
+      asUser(admin);
+
+      const res = await get();
+
+      expect(res.body.settings).toMatchObject({
+        maxOperationsPerProposal: 50,
+        maxProposalsPerUserPerDay: null,
+      });
     });
 
     it('records exactly one settings update activity with the admin as operator', async () => {

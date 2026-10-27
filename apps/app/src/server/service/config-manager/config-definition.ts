@@ -1631,8 +1631,9 @@ export const CONFIG_DEFINITIONS = {
   }),
 
   // Change Proposal Settings
-  // The nullable numbers carry no default yet: null means the limit is not
-  // checked / the proposal never expires.
+  // null means "not checked" / "never expires". The settings screen stores 0
+  // (not null) to clear a limit, because a stored null falls back to the
+  // default here and would bring the operation cap back.
   'app:changeProposalEnabled': defineConfig<boolean>({
     envVarName: 'CHANGE_PROPOSAL_ENABLED',
     defaultValue: false,
@@ -1655,7 +1656,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   'changeProposal:maxOperationsPerProposal': defineConfig<number | null>({
     envVarName: 'CHANGE_PROPOSAL_MAX_OPERATIONS_PER_PROPOSAL',
-    defaultValue: null,
+    defaultValue: 50,
   }),
   'changeProposal:maxProposalsPerUserPerDay': defineConfig<number | null>({
     envVarName: 'CHANGE_PROPOSAL_MAX_PROPOSALS_PER_USER_PER_DAY',

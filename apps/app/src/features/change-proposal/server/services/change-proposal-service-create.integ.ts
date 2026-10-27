@@ -17,6 +17,7 @@ import {
 } from './change-proposal-service';
 import type { CreateProposalRequest } from './change-proposal-service-types';
 import { createApplierTestKit } from './proposal-applier.test-kit';
+import { updateChangeProposalSettings } from './settings';
 
 const TEST_IP = '10.0.0.151';
 const PREFIX = '/cp-service-create-integ';
@@ -192,6 +193,51 @@ describe('ChangeProposalService.createProposal: checks before saving', () => {
           code: 'input-rejected',
           rejection: { code: 'too-many-operations', max: 2 },
         },
+      });
+    });
+
+    describe('with the initial limits', () => {
+      const createOperations = (count: number, label: string) =>
+        Array.from({ length: count }, (_, n) => ({
+          type: 'create' as const,
+          path: kit.nextPath(`${label}-${n}`),
+          body: 'x',
+        }));
+
+      it('rejects 51 operations and accepts 50', async () => {
+        await expect(
+          create({ operations: createOperations(51, 'default-51') }),
+        ).resolves.toEqual({
+          ok: false,
+          error: {
+            code: 'input-rejected',
+            rejection: { code: 'too-many-operations', max: 50 },
+          },
+        });
+
+        const result = await create({
+          operations: createOperations(50, 'default-50'),
+        });
+        expect(result.ok).toBe(true);
+      });
+
+      it('never refuses for the number of proposals created in one day', async () => {
+        for (let n = 0; n < 5; n++) {
+          // biome-ignore lint/performance/noAwaitInLoops: each proposal must exist before the next is counted
+          const result = await create();
+          expect(result.ok).toBe(true);
+        }
+      });
+
+      it('accepts 51 operations once an admin clears the operation cap', async () => {
+        await updateChangeProposalSettings({
+          maxOperationsPerProposal: null,
+        });
+
+        const result = await create({
+          operations: createOperations(51, 'cleared-51'),
+        });
+        expect(result.ok).toBe(true);
       });
     });
 
