@@ -325,6 +325,23 @@ describe('planAdminRescue', () => {
       expect(plan.rescued).toEqual([]);
     });
 
+    test('rescues an admin whose only credential is the scrypt passwordHash', () => {
+      // Once the legacy password is cleaned up after the scrypt migration, an
+      // admin keeps only passwordHash and can still log in locally.
+      const admin = buildAdmin({
+        username: 'migrated-admin',
+        password: '',
+        passwordHash: 'scrypt$16384$8$1$c2FsdA$aGFzaA',
+      });
+
+      const plan = planAdminRescue([admin], [], buildArchiveIdentity());
+
+      expect(plan.rescued).toHaveLength(1);
+      expect(plan.rescued[0].user.passwordHash).toBe(
+        'scrypt$16384$8$1$c2FsdA$aGFzaA',
+      );
+    });
+
     test('ignores a user that is not an admin at all', () => {
       // Requirement 4.1: the rescue is about administrators; an ordinary member is
       // never rescued.
