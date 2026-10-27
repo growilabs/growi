@@ -111,7 +111,7 @@
   - _Requirements: 3.2, 4.1, 4.2, 4.3, 4.4, 4.5, 13.4, 13.7_
   - _Boundary: Domain Pure Functions_
   - _Depends: 1.1_
-- [ ] 3.3 (P) 戻せるかの判定と、取り消しの操作を作る純関数を作る
+- [x] 3.3 (P) 戻せるかの判定と、取り消しの操作を作る純関数を作る
   - design の `judgeRevertability` の規則（状態、ページが無い、反映後の編集、子のページ、反映後の移動、移動元のパスの使用、ごみ箱へ移した操作ではごみ箱に無い・元のパスに空でないページがある・最新のリビジョンが変わった、ごみ箱から戻した操作は新規作成と同じ規則）を理由の値つきで判定する。元のパスに空のページだけがあるときは、使われているとみなさない
   - 戻せる操作から、取り消しの操作（編集は元の本文に戻す編集、新規作成はごみ箱へ移す操作、移動は元のパスへの移動と消すリダイレクトの起点、ごみ箱へ移した操作はごみ箱から戻す操作、ごみ箱から戻した操作はもう一度ごみ箱へ移す操作）を作り、それぞれに戻す相手（Change Proposal の ID と操作の `key`）を持たせる
   - 理由ごとと、取り消しの取り消し（編集と移動は同じ形で戻せる、ごみ箱へ移した操作は条件を満たせばごみ箱から戻す、ごみ箱から戻した操作はもう一度ごみ箱へ移す）を単体テストで確かめている
@@ -319,3 +319,4 @@
 - 2.5: `emitPageUpdateActivity` は emit したときだけ true を返す（4.x の handler は false なら pendingActivityContext を消す）。page-save の 4 関数は express に依存せず 4.2/4.3 から直接呼べる
 - 2.7: `deleteRedirectsFromPathTree(fromPath)` は Prisma の startsWith が MongoDB で正規表現の記号をエスケープしないため raw の delete コマンド + `escapeStringForMongoRegex` で書いてある。`getConnectionCount(pageId)` はこのプロセスの接続数だけ（複数サーバー構成では他サーバーの接続を数えない。design OQ-6）
 - 3.1: `modelLabel` の 100 文字検査は 5.1（createProposal の入口）で行う（validateProposalInput の引数に modelLabel は無く、断る理由の型にも無いため）。5.x の入口では本文が文字列であることと、入口の種類が作成で受けられるもの（CreatableEntry）であることも確かめる
+- 3.3: `CurrentPageFacts.isPathOccupied` は「空のページは使われていない」前提（`Page.exists({ path, isEmpty: false })` と同じ基準）で 4.x / 5.x が作る。移動元のパス（move の取り消し）も同じ基準。`page-operation-in-progress` と `apply-failed` は judgeRevertability でなく取り消しの反映結果から決める。`buildRevertOperations` は必要な値が欠けると例外を投げる

@@ -127,7 +127,11 @@ export type CreatableOperationInput = Extract<
   OperationPayload,
   { type: CreatableOperationType }
 >;
-export type RevertOperationInput = OperationPayload & {
+// A revert never creates a page: a create is reversed by a trash.
+export type RevertOperationInput = Exclude<
+  OperationPayload,
+  { type: 'create' }
+> & {
   readonly revertTarget: ProposalMark;
 };
 
