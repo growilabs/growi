@@ -52,7 +52,7 @@ soft-delete to trash, restore, and permanent delete), and recognize the link
 forms GROWI supports — standard Markdown links (`[text](/path)`), wiki-links
 (`[[alias>/path]]`, where the link target is the part after `>`), raw HTML anchors,
 page permalinks that identify a page by its ID (`/{pageId}`), and absolute URLs
-whose origin is this wiki. The
+whose host is this wiki's. The
 requirements below describe the complete feature; the
 order of delivery is tracked separately in the implementation backlog.
 
@@ -60,8 +60,8 @@ order of delivery is tracked separately in the implementation backlog.
 
 - **In scope**: presenting incoming links (backlinks) per page; recognizing
   links from a page's rendered content — Markdown links, wiki-links, raw HTML
-  anchors, page permalinks (links by page ID), and absolute URLs whose origin is
-  this wiki — that target internal pages; filtering by the viewer's read permission;
+  anchors, page permalinks (links by page ID), and absolute URLs whose host is
+  this wiki's — that target internal pages; filtering by the viewer's read permission;
   keeping backlinks current as pages are created, updated, moved/renamed,
   trashed, restored, and permanently deleted; a one-time backfill for
   pre-existing pages; indicating trashed/broken link targets.
@@ -84,15 +84,15 @@ order of delivery is tracked separately in the implementation backlog.
 #### Acceptance Criteria
 1. When a user views a page, the Backlinks feature shall display the list of other pages that link to it.
 2. The Backlinks feature shall treat as a link any anchor (an `<a>` element) in the page's rendered content that targets an internal page, regardless of whether it was authored as a standard Markdown link (`[text](/path)`), a GROWI wiki-link (`[[alias>/path]]`, where the link target is the part after `>`), or raw HTML (`<a href="/path">`). Criteria 9–11 further define which link targets count as internal pages.
-3. For the purpose of backlinks, the Backlinks feature shall ignore links that do not point to another internal page, namely: external URLs (absolute URLs whose origin differs from this wiki's configured site URL) and same-page jump links (links whose target is only a `#…` fragment within the current page).
+3. For the purpose of backlinks, the Backlinks feature shall ignore links that do not point to another internal page, namely: external URLs (absolute URLs whose host differs from this wiki's configured site URL host; scheme and port are not compared) and same-page jump links (links whose target is only a `#…` fragment within the current page).
 4. Because links are recognized from rendered content rather than source text, the Backlinks feature shall not treat link-like text inside code spans or code blocks as a link.
 5. When a single source page links to the viewed page more than once, the Backlinks feature shall list that source page only once.
 6. The Backlinks feature shall exclude a page's link to itself — whether the link is authored by path or by the page's own permalink (page ID) — from that page's backlinks.
 7. When no other page links to the viewed page, the Backlinks feature shall present an explicit empty state.
-8. For each backlink, the Backlinks feature shall show the linking page's title and path.
+8. For each backlink, the Backlinks feature shall show the linking page's title and path, where the title is the page's title as derived from its path (the last path segment).
 9. The Backlinks feature shall treat a link whose resolved target path is a page permalink — an absolute path of the form `/{pageId}` consisting of a page's ID — as targeting that page by its ID, regardless of the page's current path. Recognition is based on the link's resolved absolute path; because relative links resolve against the linking page's location, a relative form such as `./{pageId}` is recognized only when it resolves to `/{pageId}`.
-10. When a link is an absolute URL whose origin matches this wiki's configured site URL, the Backlinks feature shall treat it as an internal link to the page identified by the URL's path component (query and fragment excluded).
-11. When this wiki's site URL (`app:siteUrl`) is not configured, the Backlinks feature shall not treat any absolute URL as an internal link, because absolute URLs cannot be distinguished from external ones without a configured origin to compare against.
+10. When a link is an absolute URL whose host matches the host of this wiki's configured site URL (scheme and port are not compared), the Backlinks feature shall treat it as an internal link to the page identified by the URL's path component (query and fragment excluded).
+11. When this wiki's site URL (`app:siteUrl`) is not configured, the Backlinks feature shall not treat any absolute URL as an internal link, because absolute URLs cannot be distinguished from external ones without a configured site host to compare against.
 
 ### Requirement 2: Permission-aware backlinks
 **Objective:** As a reader, I want backlinks limited to pages I am allowed to see, so that the feature never reveals restricted content.

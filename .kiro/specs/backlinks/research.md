@@ -7,8 +7,7 @@
   lifecycle, permission, rendering, and migration subsystems)
 - **Key Findings**:
   - GROWI has **no** links/backlinks infrastructure today; link handling is render-only.
-    A new server-side link index (`PageLink`) is required, closely mirroring the
-    `PageTagRelation` model precedent.
+    A new server-side link index (`PageLink`) is required, modelled as a Prisma-only collection (`pagelinks`, no Mongoose schema; indexes provisioned by a migration).
   - The existing remark/rehype link-resolution plugins (`relative-links`,
     `pukiwiki-like-linker`, `relative-links-by-pukiwiki-like-linker`) are **Node-compatible**
     and already resolve every link form (Markdown, wiki-link, raw HTML `<a>`) against a
@@ -159,9 +158,8 @@
     `yjs_writings` collection (not a Page revision) and do **not** emit `update`. So N users editing
     one large doc produce **one** `update` event per explicit save, not N concurrent extractions.
 - **Selected Approach**: `create`/`update` handlers enqueue `pageId` into an in-memory `Set` instead
-  of extracting inline; a paced tick drains a bounded number of ids per cycle, re-reading each
-  page's latest body at drain time and running the existing upsert handler.
-  - Same-page saves coalesce for free (the `Set` dedupes); the bounded per-tick drain paces parses
+  of extracting inline; a drain re-reads each queued page's latest body at drain time and runs the existing upsert handler, resting between pages in proportion to measured extraction cost.
+  - Same-page saves coalesce for free (the `Set` dedupes); the duty-cycle rest after each page paces parses
     for the many-distinct-pages case, yielding the loop between them.
   - A `delete`-family event removes the id from the set and routes to `reconcileDeletedPages`, so a
     stale upsert cannot re-create rows for a deleted page.
@@ -169,11 +167,13 @@
   information and collapsing them loses nothing. Pacing (not parallelism) is the right lever for
   CPU-bound work on one thread. Reuses the backfill's duty-cycle intuition.
 - **Superseded in part (review of B2.2)**: the coalescing dirty-set stands, but the *bounded ids per
-  tick* half was replaced by a duty cycle over measured extraction time. Measuring the real cost
+  tick* half was replaced by a duty cycle: a drain runs until the queue is empty and rests
+  `charged*(100-duty)/duty` after each page, where `charged` is the measured extraction time;
+  `drainIntervalMs` is only the coalescing window before a drain starts. Measuring the real cost
   showed it spans ~700x across bodies (1.6 ms at 0.2 KiB, 8.4 ms at 3.2 KiB, 88 ms at 32.6 KiB,
   1116 ms at 333 KiB), so a page-denominated budget was simultaneously a ~2.5% duty cycle for
   typical pages and a licence for ~3.3 s of blocking for three large ones. See design.md B2.2.
-- **Trade-offs**: Index trails the save by up to (tick interval × queue depth) — consistent with the
+- **Trade-offs**: Index trails the save by by the coalescing window plus the paced drain of the pages queued ahead — consistent with the
   already-async listener. The set is best-effort/in-memory: a restart drops pending work (self-heals
   on next edit or backfill), and coalescing is per-instance in multi-container deployments (safe
   because idempotent, but less dedup). A durable queue / off-thread parsing stays deferred.
@@ -224,10 +224,9 @@
   chain is longer than the cap with a not-found (an intermediate hop holds no live page). Page view
   therefore calls the static with no cap, and only the save path passes one.
   (`removePageRedirectsByToPath` walks the graph the other way and is also uncapped; it runs on
-  delete, not on save.) **Breadth is deliberately left unbounded for now** — one aggregation takes
-  every link path on the page, so a page with thousands of links sends a `$in` of that size into a
-  stage that cannot spill to disk. Judged out of scope for B4.1 and deferred to **B4.5**, which is
-  where the reasoning and the fix (chunk `fromPaths`) are written down.
+  delete, not on save.) **Breadth is chunked**: `fromPaths` are split into batches of `FROM_PATHS_CHUNK_SIZE` (100,
+  `page-redirect.ts`), so no single aggregation sends a `$in` of unbounded size into a stage that
+  cannot spill to disk (B4.5).
 
 ### Decision: requirement 6.4 implies a **forward-link health** read over the same index
 
@@ -251,7 +250,7 @@
   service, the backfill cron + its job/claim model, one apiv3 route, one SWR hook, and the panel
   components.
 - **Simplification**: No queue/worker in v1 (event listener is the seam); no stored state enum;
-  no rename/restore hooks; no second Markdown parser.
+  no rename hooks (target state needs no write); `revert` (restore) is subscribed only to re-extract the restored page's own outbound links; no second Markdown parser.
 
 ### Decision: backfill is an online `CronService` job, not a boot-time migrate-mongo migration
 
@@ -259,7 +258,7 @@
   backfill in a migrate-mongo migration. Investigation showed two problems for large-plan
   customers (instances with very many pages).
 - **Finding 1 — migrate-mongo blocks boot.** GROWI runs migrations synchronously in the Docker
-  entrypoint (`docker-entrypoint.ts:247`, `execFileSync`) *before* `spawnApp`, and via the
+  entrypoint (`runMigration` at `docker-entrypoint.ts:218-235`, called at `:300`, `execFileSync`) *before* `spawnApp`, and via the
   `preserver` npm hook (`package.json:17`). A data migration ⇒ the wiki is **offline for the full
   backfill duration**.
 - **Finding 2 — per-link resolution is the real cost.** Resolving one link at a time is
@@ -294,12 +293,12 @@
   add later, reusing the identical job). Implementation reuses the page-bulk-export scaffolding:
   `CronService` base, `createBatchStream`, the cursor→resume(progress marker)→`pipeline` skeleton, and
   the watchdog start/stop logic; the new code is link extraction/resolution, the in-memory `{path→_id}`
-  map, the `bulkWrite` upsert sink, and an atomic claim (stronger than the bulk-export watchdog race).
+  map, the write sink (Prisma raw/upsert; mechanism decided in B3), and an atomic claim (stronger than the bulk-export watchdog race).
 
 ### Decision: recognize permalink (`/{id}`) and same-wiki absolute-URL link targets
 
 - **Context**: Requirements 1.9–1.11 and 5.4 (added after the first design pass) extend recognition
-  to links written as page **permalinks** (`/{pageId}`) and to **absolute URLs** whose origin is
+  to links written as page **permalinks** (`/{pageId}`) and to **absolute URLs** whose host is
   this wiki. Requirement 1.3 redefines "external" as *different-host* absolute URLs, and 1.6 extends
   self-link exclusion to a page's own permalink.
 - **Sources Consulted**:
@@ -341,6 +340,18 @@
 - **Trade-offs**: absolute-URL recognition requires `app:siteUrl` to be configured (1.11); host (not
   origin) comparison ignores scheme/port, matching `NextLink`.
 
+### Decision: a share-link view hides the Backlinks tab
+
+- **Decision**: with `shareLinkId != null` the Backlinks tab is hidden in `PageAccessoriesModal` and
+  the navbar entry is disabled.
+- **Rationale**: a share link grants access to one page, not to the link graph around it.
+
+### Decision: `decodeURIComponent` runs on the pathname before `normalizePath`
+
+- **Decision**: `extractInternalLinkPaths` percent-decodes `url.pathname`, then normalizes. A link
+  whose path has malformed escapes throws on decode and is dropped.
+- **Rationale**: stored page paths are decoded, so non-ASCII paths only match when decoded first.
+
 ## Risks & Mitigations
 
 - **Index lag after save** (listener is async, not awaited) — Mitigation: acceptable for v1
@@ -355,7 +366,7 @@
   explicit non-trashed status filter to the backlink-source query; verify during implementation.
 - **Backfill on very large wikis** — Mitigation: online throttled `CronService` job (not a
   boot-blocking migration); in-memory `{path→_id}` resolution; cursor + `createBatchStream` +
-  idempotent `bulkWrite` upserts; resumable progress marker; atomic Mongo claim for
+  idempotent upserts (mechanism decided in B3); resumable progress marker; atomic Mongo claim for
   multi-instance. See the backfill decision above.
 - **Backfill CPU contention with live traffic** (single JS thread) — Mitigation: duty-cycle
   throttle via cron cadence; conservative default; admin-tunable. Full elimination needs
@@ -373,11 +384,11 @@
 - `apps/app/src/services/renderer/renderer.tsx:111-181` — shared remark/rehype pipeline
 - `apps/app/src/server/models/page-redirect.ts` — `retrievePageRedirectEndpointsBatch` ($graphLookup),
   with `retrievePageRedirectEndpoints` as a single-path lookup over it
-- `apps/app/src/pages/[[...path]]/page-data-props.ts:76` — the singular static's caller (page-view
+- `apps/app/src/pages/[[...path]]/page-data-props.ts:68` — the singular static's caller (page-view
   redirect banner); the resolution order there is what the link index must agree with
 - migrate-mongo refs: `20220131001218-convert-redirect-to-pages-to-page-redirect-documents.js`,
   `20211227060705-revision-path-to-page-id-schema-migration--fixed-8998.js`
-- `apps/app/docker/docker-entrypoint.ts:247` — migrations run synchronously at boot (blocking)
+- `apps/app/docker/docker-entrypoint.ts:218-235` (`runMigration`, called at `:300`) — migrations run synchronously at boot (blocking)
 - `apps/app/src/server/service/cron.ts` — `CronService` base (node-cron) for background jobs
 - `apps/app/src/server/service/page/index.ts` — `updatePage` emits `create`/`update` (explicit save only)
 - `apps/app/src/client/components/PageEditor/PageEditor.tsx` — save triggers (Save/Ctrl-S); no autosave
