@@ -108,10 +108,16 @@ const Layout = ({ children, ...props }: LayoutProps): JSX.Element => {
   return <ShareLinkLayout>{children}</ShareLinkLayout>;
 };
 
+// props.rendererConfig is absent on client-side navigation, so read the hydrated atom
+const DrawioViewerScriptWithAtom = (): JSX.Element => {
+  const rendererConfig = useRendererConfig();
+  return <DrawioViewerScript drawioUri={rendererConfig.drawioUri} />;
+};
+
 SharedPage.getLayout = function getLayout(page) {
   return (
     <>
-      <DrawioViewerScript drawioUri={page.props.rendererConfig.drawioUri} />
+      <DrawioViewerScriptWithAtom />
       <Layout {...page.props}>{page}</Layout>
     </>
   );
