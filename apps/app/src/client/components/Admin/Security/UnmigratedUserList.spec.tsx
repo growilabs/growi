@@ -56,7 +56,10 @@ const responseOf = (
   ...overrides,
 });
 
-const mockResponse = (data: unknown) => mock<AxiosResponse>({ data });
+// mock() writes proxies back into the nested objects of its overrides; cloning
+// keeps a reused fixture (e.g. page1) from nesting deeper on every response.
+const mockResponse = (data: unknown) =>
+  mock<AxiosResponse>({ data: structuredClone(data) });
 
 // happy-dom never reports intersections, so the list's InfiniteScroll gets an
 // observer double whose callback the test fires to simulate scrolling to the

@@ -41,6 +41,13 @@ vi.mock('~/client/util/toastr', () => ({
 
 const PREFIX = 'security_settings.legacy_password_cleanup';
 
+// mock() writes proxies back into the nested objects of its overrides, so
+// passing the same object again (a shared fixture, or a refetch of the same
+// data) nests one more proxy each time and slows every later test. Cloning
+// keeps each response independent.
+const axiosResponseOf = (data: unknown): AxiosResponse =>
+  mock<AxiosResponse>({ data: structuredClone(data) });
+
 const countsOf = (
   overrides: Partial<PasswordHashFormatCounts> = {},
 ): PasswordHashFormatCounts => ({
@@ -80,7 +87,7 @@ const mockStatus = (getData: unknown | (() => unknown)) => {
           ? getData()
           : getData
         : emptyUnmigratedUsers;
-    return Promise.resolve(mock<AxiosResponse>({ data }));
+    return Promise.resolve(axiosResponseOf(data));
   });
 };
 
@@ -88,7 +95,7 @@ const failStatus = () => {
   vi.mocked(apiv3Get).mockImplementation((endpoint: string) =>
     endpoint === STATUS_ENDPOINT
       ? Promise.reject(new Error('boom'))
-      : Promise.resolve(mock<AxiosResponse>({ data: emptyUnmigratedUsers })),
+      : Promise.resolve(axiosResponseOf(emptyUnmigratedUsers)),
   );
 };
 
@@ -317,15 +324,11 @@ describe('LegacyPasswordCleanupSetting', () => {
       let statusFetches = 0;
       vi.mocked(apiv3Get).mockImplementation((endpoint: string) => {
         if (endpoint !== STATUS_ENDPOINT) {
-          return Promise.resolve(
-            mock<AxiosResponse>({ data: emptyUnmigratedUsers }),
-          );
+          return Promise.resolve(axiosResponseOf(emptyUnmigratedUsers));
         }
         statusFetches += 1;
         return statusFetches === 1
-          ? Promise.resolve(
-              mock<AxiosResponse>({ data: { counts: countsOf() } }),
-            )
+          ? Promise.resolve(axiosResponseOf({ counts: countsOf() }))
           : Promise.reject(new Error('boom'));
       });
       renderSection();
@@ -347,15 +350,11 @@ describe('LegacyPasswordCleanupSetting', () => {
       let resolveRefetch: (res: AxiosResponse) => void = () => {};
       vi.mocked(apiv3Get).mockImplementation((endpoint: string) => {
         if (endpoint !== STATUS_ENDPOINT) {
-          return Promise.resolve(
-            mock<AxiosResponse>({ data: emptyUnmigratedUsers }),
-          );
+          return Promise.resolve(axiosResponseOf(emptyUnmigratedUsers));
         }
         statusFetches += 1;
         return statusFetches === 1
-          ? Promise.resolve(
-              mock<AxiosResponse>({ data: { counts: countsOf() } }),
-            )
+          ? Promise.resolve(axiosResponseOf({ counts: countsOf() }))
           : new Promise<AxiosResponse>((resolve) => {
               resolveRefetch = resolve;
             });
@@ -369,9 +368,7 @@ describe('LegacyPasswordCleanupSetting', () => {
       expect(screen.queryByText(`${PREFIX}.confirm.title`)).toBeNull();
       expect(deleteButton().hasAttribute('disabled')).toBe(true);
 
-      resolveRefetch(
-        mock<AxiosResponse>({ data: { counts: countsOf({ both: 8 }) } }),
-      );
+      resolveRefetch(axiosResponseOf({ counts: countsOf({ both: 8 }) }));
 
       expect(
         await screen.findByText(
@@ -411,7 +408,7 @@ describe('LegacyPasswordCleanupSetting', () => {
     it('closes the modal, reports the deleted count and refetches on success', async () => {
       mockStatus({ counts: countsOf() });
       vi.mocked(apiv3Delete).mockResolvedValue(
-        mock<AxiosResponse>({ data: { unsetCount: 3 } }),
+        axiosResponseOf({ unsetCount: 3 }),
       );
       renderSection();
       await screen.findByText(`${PREFIX}.count_label.both`);
@@ -442,9 +439,7 @@ describe('LegacyPasswordCleanupSetting', () => {
           upgradedOnly: 14,
           legacyOnly: { active: 0, nonActive: 0 },
         });
-        return Promise.resolve(
-          mock<AxiosResponse>({ data: { unsetCount: 3 } }),
-        );
+        return Promise.resolve(axiosResponseOf({ unsetCount: 3 }));
       });
       renderSection();
 
@@ -461,7 +456,7 @@ describe('LegacyPasswordCleanupSetting', () => {
     it('sends a single delete request when the confirm button is clicked twice', async () => {
       mockStatus({ counts: countsOf() });
       vi.mocked(apiv3Delete).mockResolvedValue(
-        mock<AxiosResponse>({ data: { unsetCount: 3 } }),
+        axiosResponseOf({ unsetCount: 3 }),
       );
       renderSection();
       await screen.findByText(`${PREFIX}.count_label.both`);
@@ -498,7 +493,7 @@ describe('LegacyPasswordCleanupSetting', () => {
         expect(deleteButton().hasAttribute('disabled')).toBe(true),
       );
 
-      resolveDelete(mock<AxiosResponse>({ data: { unsetCount: 3 } }));
+      resolveDelete(axiosResponseOf({ unsetCount: 3 }));
 
       await waitFor(() =>
         expect(toastSuccess).toHaveBeenCalledWith(`${PREFIX}.success [3]`),
@@ -531,7 +526,7 @@ describe('LegacyPasswordCleanupSetting', () => {
     it('treats a response without unsetCount as a failure', async () => {
       mockStatus({ counts: countsOf() });
       vi.mocked(apiv3Delete).mockResolvedValue(
-        mock<AxiosResponse>({ data: '<html></html>' }),
+        axiosResponseOf('<html></html>'),
       );
       renderSection();
 
