@@ -119,7 +119,7 @@
   - _Requirements: 5.5, 5.6, 5.7, 5.8, 5.12, 5.15, 5.16_
   - _Boundary: Domain Pure Functions_
   - _Depends: 1.1_
-- [ ] 3.4 (P) 見る人に返す操作を選ぶ純関数を作る
+- [x] 3.4 (P) 見る人に返す操作を選ぶ純関数を作る
   - 閲覧できるページの操作だけを残す。依頼した人以外には、状態が反映済み・取り消し済み・取り消しを断られたの操作だけを残し、リンクを知る人だけが見られるページの操作を残さない。Change Proposal の段階（open かどうか）は判断に使わない。まだページが無い新規作成の操作は依頼した人にだけ残す
   - 依頼した人・他の人・リンクを知る人だけが見られるページ・まだページが無い操作・操作の 7 つの状態の組み合わせを単体テストで確かめ、依頼した人以外には「待ち」「失敗」「古い」「飛ばした」が残らないことを確かめている
   - 1.1 で作った仮のファイルの中身を書く。barrel は書き換えない
@@ -320,3 +320,4 @@
 - 2.7: `deleteRedirectsFromPathTree(fromPath)` は Prisma の startsWith が MongoDB で正規表現の記号をエスケープしないため raw の delete コマンド + `escapeStringForMongoRegex` で書いてある。`getConnectionCount(pageId)` はこのプロセスの接続数だけ（複数サーバー構成では他サーバーの接続を数えない。design OQ-6）
 - 3.1: `modelLabel` の 100 文字検査は 5.1（createProposal の入口）で行う（validateProposalInput の引数に modelLabel は無く、断る理由の型にも無いため）。5.x の入口では本文が文字列であることと、入口の種類が作成で受けられるもの（CreatableEntry）であることも確かめる
 - 3.3: `CurrentPageFacts.isPathOccupied` は「空のページは使われていない」前提（`Page.exists({ path, isEmpty: false })` と同じ基準）で 4.x / 5.x が作る。移動元のパス（move の取り消し）も同じ基準。`page-operation-in-progress` と `apply-failed` は judgeRevertability でなく取り消しの反映結果から決める。`buildRevertOperations` は必要な値が欠けると例外を投げる
+- 3.4: `selectVisibleOperations` は絞った一覧だけを返す。件数や全体の状態（deriveProposalStatus）に見えない操作を混ぜない・ごみ箱のページを viewablePageIds に入れる扱いは、呼ぶ側（5.x ProposalQueryService）が `findByIdsAndViewer(..., true)` の引数で決める
