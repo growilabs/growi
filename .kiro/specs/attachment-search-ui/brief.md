@@ -33,7 +33,7 @@
 - **共有 Props 型**: 添付ヒット表示コンポーネント (`AttachmentHitCard` / `AttachmentSubEntry`) は共通の `AttachmentHitViewProps` base 型を拡張
 - **SWR hooks**: `use-attachment-reextract` (mutation)、`use-attachment-search-config` (admin config)、`use-attachment-extraction-failures` (admin failures) を `client/services/` に配置
 - **機能ゲート**: Config `app:attachmentFullTextSearch:enabled` を参照する SWR hook で全ての追加 UI を条件レンダリング
-- **サーバ専用依存の隔離**: `packages/markitdown-client` は server 専用依存。UI からは apps/app の apiv3 経由でのみ触る (SSR 到達性に影響しないように)
+- **サーバ専用依存の隔離**: `packages/attachment-text-extractor-client` は server 専用依存。UI からは apps/app の apiv3 経由でのみ触る (SSR 到達性に影響しないように)
 - **Turbopack 互換**: 重量級依存があれば `dynamic({ ssr: false })` で分離、既存パターンに従う
 
 ## Scope
@@ -66,7 +66,7 @@
 - apiv3 エンドポイント実装 (`POST /attachments/:id/reextract` / `GET /failures` / `GET|PUT /config` / `PUT /search/indices` の includeAttachments) — `attachment-search-indexing` spec
 - 応答型 `IPageWithSearchMeta.attachmentHits[]` の定義 — `attachment-search-indexing` spec
 - Config キー定義と永続化 — `attachment-search-indexing` spec
-- 抽出サービス本体 — `attachment-search-markitdown-extractor` spec
+- 抽出サービス本体 — `attachment-search-text-extractor` spec
 - 添付ビューア本体の変更 (既存ビューアへ遷移するだけ)
 - PDF/Office のインラインプレビュー
 - 形式別詳細ファセット (PDF だけ / xlsx だけ等)
@@ -86,7 +86,7 @@
 ## Out of Boundary
 
 - サーバ側 API やデータモデル (前段 spec の責務)
-- 抽出サービス本体 (`attachment-search-markitdown-extractor` spec)
+- 抽出サービス本体 (`attachment-search-text-extractor` spec)
 - 添付ファイル一覧モーダル自体の構造変更 (行アクション追加のみ)
 - 検索結果ページのレイアウト変更 (既存レイアウトを維持して拡張のみ)
 - i18n の新規キー追加以外 (既存の translation パイプラインに従う)

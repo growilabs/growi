@@ -1,29 +1,29 @@
 # Implementation Plan
 
-> 本 spec が所有する境界: `apps/app/src/features/search-attachments/server/**`、`apps/app/src/server/service/search-delegator/**` (添付拡張のみ)、`packages/markitdown-client/**`、`app:attachmentFullTextSearch:*` Config キー群、`apps/app/src/pages/basic-layout-page/get-server-side-props/search-configurations.ts` と `apps/app/src/pages/basic-layout-page/types.ts` (SSR prop 拡張のみ、hydrate / atom / UI コンポーネントは下流 `attachment-search-ui` spec の責務)。
+> 本 spec が所有する境界: `apps/app/src/features/search-attachments/server/**`、`apps/app/src/server/service/search-delegator/**` (添付拡張のみ)、`packages/attachment-text-extractor-client/**`、`app:attachmentFullTextSearch:*` Config キー群、`apps/app/src/pages/basic-layout-page/get-server-side-props/search-configurations.ts` と `apps/app/src/pages/basic-layout-page/types.ts` (SSR prop 拡張のみ、hydrate / atom / UI コンポーネントは下流 `attachment-search-ui` spec の責務)。
 
-## 1. Foundation: packages/markitdown-client と orval パイプライン
+## 1. Foundation: packages/attachment-text-extractor-client と orval パイプライン
 
-- [x] 1.1 `packages/markitdown-client` パッケージ雛形を追加する
-  - `package.json` / `tsconfig.json` / `src/index.ts` / `orval.config.js` / `openapi.json` (上流 `attachment-search-markitdown-extractor` spec の export をコミット) を作成する
+- [x] 1.1 `packages/attachment-text-extractor-client` パッケージ雛形を追加する
+  - `package.json` / `tsconfig.json` / `src/index.ts` / `orval.config.js` / `openapi.json` (上流 `attachment-search-text-extractor` spec の export をコミット) を作成する
   - `pdf-converter-client` と同じ export パターンで generated コード (`src/generated/`) を commit 対象とし、`src/index.ts` で re-export する
-  - pnpm workspace / Turborepo pipeline に組み込み、`apps/app` から型安全に import できる状態を確認する (`pnpm -F @growi/markitdown-client build` が成功することを観察)
+  - pnpm workspace / Turborepo pipeline に組み込み、`apps/app` から型安全に import できる状態を確認する (`pnpm -F @growi/attachment-text-extractor-client build` が成功することを観察)
   - _Requirements: 2.1_
-  - _Boundary: packages/markitdown-client_
+  - _Boundary: packages/attachment-text-extractor-client_
 
 - [x] 1.2 orval による TS クライアント自動生成と drift 検知 CI を整備する
   - `openapi.json` を入力に `src/generated/` を再生成する `pnpm gen` スクリプトを追加する
-  - CI に `pnpm -F @growi/markitdown-client gen && git diff --exit-code packages/markitdown-client/src/` を追加し、orval 出力 drift を検知する
-  - CI に `git diff --exit-code packages/markitdown-client/openapi.json` を追加し、上流 Python CI との 2 段 drift 検知を有効化する (上流 export 忘れ時に本 spec 側の CI が赤くなることを観察)
+  - CI に `pnpm -F @growi/attachment-text-extractor-client gen && git diff --exit-code packages/attachment-text-extractor-client/src/` を追加し、orval 出力 drift を検知する
+  - CI に `git diff --exit-code packages/attachment-text-extractor-client/openapi.json` を追加し、上流 Python CI との 2 段 drift 検知を有効化する (上流 export 忘れ時に本 spec 側の CI が赤くなることを観察)
   - _Requirements: 2.1_
-  - _Boundary: packages/markitdown-client, CI_
+  - _Boundary: packages/attachment-text-extractor-client, CI_
   - _Depends: 1.1_
 
 ## 2. Foundation: Config / ES mapping / feature module scaffolding
 
 - [x] 2.1 (P) `app:attachmentFullTextSearch:*` Config キー 4 件を config-definition に追加する
   - `extractorUri` / `extractorToken` / `timeoutMs` / `maxFileSizeBytes` の 4 キーを定義する
-  - `extractorToken` は既存 `app:openaiApiKey` と同パターンで encrypted storage を指定し、`extractorUri` は `GROWI_MARKITDOWN_EXTRACTOR_URI`、`extractorToken` は `GROWI_MARKITDOWN_SERVICE_TOKEN` を初期値に採り得るようにする
+  - `extractorToken` は既存 `app:openaiApiKey` と同パターンで encrypted storage を指定し、`extractorUri` は `GROWI_ATTACHMENT_EXTRACTOR_URI`、`extractorToken` は `GROWI_ATTACHMENT_EXTRACTOR_SERVICE_TOKEN` を初期値に採り得るようにする
   - ConfigManager 経由で get/set できることを単体テストで確認する (encrypted field は plaintext で persist されないことも assert)
   - _Requirements: 5.1, 5.2_
   - _Boundary: ConfigManager / config-definition_
@@ -66,7 +66,7 @@
   - _Boundary: features/search-attachments/server/services (helper)_
 
 - [x] 3.2 (P) `AttachmentTextExtractorService` 本体を実装する
-  - FileUploader からバイト取得し `markitdown-client` に multipart 送信、503 `service_busy` で exponential backoff + jitter 1 回 retry、2 回目 503 で `serviceBusy` 正規化
+  - FileUploader からバイト取得し `attachment-text-extractor-client` に multipart 送信、503 `service_busy` で exponential backoff + jitter 1 回 retry、2 回目 503 で `serviceBusy` 正規化
   - 毎回 `configManager.getConfig('app:attachmentFullTextSearch:extractorToken')` を取得して `Authorization: Bearer` を付与、未設定時は `serviceUnreachable` 正規化
   - 上流 401 は `serviceUnreachable` 正規化 + pino ERROR + FailureLog 対象
   - 呼び出し直前に extractor URI の DNS 解決結果が metadata IP literal のいずれかなら送信せず `serviceUnreachable` 正規化

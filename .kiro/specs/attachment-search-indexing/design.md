@@ -2,17 +2,17 @@
 
 ## Overview
 
-本 spec は GROWI 添付ファイル全文検索機能のうち **apps/app サーバ側の統合層** を定義する。上流 `attachment-search-markitdown-extractor` spec が提供する FastAPI 抽出マイクロサービスを `packages/markitdown-client` (orval 生成) 経由で呼び出し、添付ファイル専用 Elasticsearch インデックス (`attachments`) への書き込みを行う。既存の `AttachmentService` / `ElasticsearchDelegator` / `SearchService` / `ConfigManager` の拡張点を用い、独立サブシステムを作らずに feature module として統合する。
+本 spec は GROWI 添付ファイル全文検索機能のうち **apps/app サーバ側の統合層** を定義する。上流 `attachment-search-text-extractor` spec が提供する FastAPI 抽出マイクロサービスを `packages/attachment-text-extractor-client` (orval 生成) 経由で呼び出し、添付ファイル専用 Elasticsearch インデックス (`attachments`) への書き込みを行う。既存の `AttachmentService` / `ElasticsearchDelegator` / `SearchService` / `ConfigManager` の拡張点を用い、独立サブシステムを作らずに feature module として統合する。
 
 **Purpose**: apps/app 内で「抽出結果を ES へ upsert / 権限変更や削除を追従 / 一括再インデックスと個別再抽出を提供 / 検索クエリを multi-index で集約」する責務を完結させる。
 
 **Users**: GROWI 利用者 (検索応答の受け取り)、GROWI 管理者 (admin API 経由の有効化・運用)、GROWI 配布/運用者 (Config 経由の接続先管理)。UI コンポーネント自体は下流 `attachment-search-ui` spec が描画する。
 
-**Impact**: `apps/app/src/features/search-attachments/server/` の新設、新規パッケージ `packages/markitdown-client` の追加、`ElasticsearchDelegator` / `SearchService` / `AttachmentService` / `ConfigManager` への extension (最小差分)、既存キーワード検索 API (`GET /_api/search`) への optional クエリ追加、応答型 `IPageWithSearchMeta` への optional フィールド追加、`extractionfailurelogs` の Prisma モデルと index 作成 migration の追加。
+**Impact**: `apps/app/src/features/search-attachments/server/` の新設、新規パッケージ `packages/attachment-text-extractor-client` の追加、`ElasticsearchDelegator` / `SearchService` / `AttachmentService` / `ConfigManager` への extension (最小差分)、既存キーワード検索 API (`GET /_api/search`) への optional クエリ追加、応答型 `IPageWithSearchMeta` への optional フィールド追加、`extractionfailurelogs` の Prisma モデルと index 作成 migration の追加。
 
 ### Goals
 
-- 上流抽出サービス API 契約を `packages/markitdown-client` 経由で型安全に消費
+- 上流抽出サービス API 契約を `packages/attachment-text-extractor-client` 経由で型安全に消費
 - 添付の attach / detach / reextract / bulk を単一のインデクサで処理
 - 親ページ権限変更は添付 ES 文書を更新せず、検索時に page_index から query-time lookup して反映 (Option D)
 - multi-index msearch で Page と Attachment を並列クエリし、親ページ単位に集約
@@ -21,7 +21,7 @@
 
 ### Non-Goals
 
-- Python 抽出サービス本体・Dockerfile・k8s manifest (上流 `attachment-search-markitdown-extractor` spec)
+- Python 抽出サービス本体・Dockerfile・k8s manifest (上流 `attachment-search-text-extractor` spec)
 - 検索結果 UI / 添付一覧モーダル UI / 管理画面 UI (下流 `attachment-search-ui` spec)
 - 既存 Page 検索のクエリ・ランキング・権限モデル本体の改変
 - 添付ファイル保管方式の変更
@@ -32,7 +32,7 @@
 
 ### This Spec Owns
 
-- `packages/markitdown-client` の orval 生成パイプラインと `openapi.json` drift 検知の CI 入口
+- `packages/attachment-text-extractor-client` の orval 生成パイプラインと `openapi.json` drift 検知の CI 入口
 - 抽出クライアントラッパ (`AttachmentTextExtractorService`) による失敗正規化と到達不可フォールバック
 - 添付専用 ES インデックス `attachments` の mapping (ES 8/9) とライフサイクル (create / alias swap / bulk)。**添付 ES 文書に権限フィールドは保持しない** (`grant` / `granted_users` / `granted_groups` / `creator` を含まない)
 - `AttachmentSearchIndexer` による attach / detach / reextract / bulk の単一パイプライン
@@ -48,7 +48,7 @@
 
 ### Out of Boundary
 
-- Python 抽出サービス本体、FastAPI ルータ、Dockerfile、docker-compose / k8s manifest、NetworkPolicy (**`attachment-search-markitdown-extractor` spec**)
+- Python 抽出サービス本体、FastAPI ルータ、Dockerfile、docker-compose / k8s manifest、NetworkPolicy (**`attachment-search-text-extractor` spec**)
 - 検索結果 UI コンポーネント (`AttachmentHitCard` / `AttachmentSubEntry` / `SearchResultFacetTabs`)、添付モーダルの「再抽出」ボタン、管理画面 (`AttachmentSearchSettings` / `AttachmentExtractionFailures` / `RebuildWithAttachmentsCheckbox`)、ユーザ向けガイダンス文言 (**`attachment-search-ui` spec**)
 - 添付ファイル保管方式 (`FileUploader` 抽象は据え置き)
 - 既存 Page 検索 (Page/Comment) のクエリ・ランキング・権限モデル本体の改変
@@ -58,7 +58,7 @@
 
 ### Allowed Dependencies
 
-- **上流**: `attachment-search-markitdown-extractor` spec が提供する FastAPI OpenAPI spec (`POST /extract`、`ExtractResponse` / `ErrorResponse`)、Docker image、デプロイ manifest
+- **上流**: `attachment-search-text-extractor` spec が提供する FastAPI OpenAPI spec (`POST /extract`、`ExtractResponse` / `ErrorResponse`)、Docker image、デプロイ manifest
 - 既存 `AttachmentService.addAttachHandler` / `addDetachHandler` (ハンドラ登録のみ)
 - 既存 `ElasticsearchDelegator` (composition で添付向けメソッド合成、既存 Page 系メソッドは不変)。`searchAccessiblePages` からは既存の `createSearchQuery()` / `appendCriteriaForQueryString()` / `appendCriteriaForGroupFilter()` / `filterPagesByViewer()` を呼び出しのみで使う
 - 既存 `SearchService` の `parseSearchQuery()` / `resolve()` / `resolveFilterData()` (呼び出しのみ。演算子の解析ロジックは複製しない)
@@ -73,7 +73,7 @@
 
 ### Revalidation Triggers
 
-- **上流 API 契約の変更** (`attachment-search-markitdown-extractor` spec): `POST /extract` の request/response schema、エラーコード enum、HTTP ステータス対応の変更 → `packages/markitdown-client` 再生成、`AttachmentTextExtractorService` の正規化ロジック再確認、drift 検知 CI の再評価
+- **上流 API 契約の変更** (`attachment-search-text-extractor` spec): `POST /extract` の request/response schema、エラーコード enum、HTTP ステータス対応の変更 → `packages/attachment-text-extractor-client` 再生成、`AttachmentTextExtractorService` の正規化ロジック再確認、drift 検知 CI の再評価
 - **ES 添付 mapping のフィールド追加/削除**: 既存添付インデックスの再構築必要性判定、ES 8/9 mapping 変種の同期。特に権限フィールドを **再導入する変更は Option D の設計前提を覆す** ため、本 spec の本質的再検討が必要
 - **`IPageWithSearchMeta.attachmentHits[]` / `IAttachmentHit` の形状変更**: 下流 `attachment-search-ui` spec に破壊的変更を強いるため、spec 再調整が必須
 - **apiv3 エンドポイント契約** (reextract / admin config / admin failures / search indices 拡張) の request/response 変更: 下流 spec の SWR hook 再調整が必須
@@ -107,7 +107,7 @@
 
 ```mermaid
 graph TB
-    subgraph upstream [Upstream - attachment-search-markitdown-extractor spec]
+    subgraph upstream [Upstream - attachment-search-text-extractor spec]
         FastAPI[FastAPI /extract]
     end
 
@@ -129,7 +129,7 @@ graph TB
     end
 
     subgraph client_pkg [packages]
-        Client[markitdown-client<br/>orval-generated]
+        Client[attachment-text-extractor-client<br/>orval-generated]
     end
 
     subgraph storage [Storage]
@@ -167,7 +167,7 @@ graph TB
 **Architecture Integration**:
 - **選定パターン**: 既存拡張優先 (独立 delegator / ジョブキュー不採用)
 - **ドメイン/境界**: 「抽出クライアント」「indexer」「reindex batch」「orphan sweeper」「検索集約 (query-time permission lookup を含む)」を feature module 内で分離し、それぞれ単一責任を維持。添付側の権限同期 (AttachmentGrantSync) は **Option D 採用により設計上不要**
-- **依存方向**: apiv3 → service/indexer → (TextExtractor | ESDelegator) → (markitdown-client → 上流 | ES / Mongo)。逆流なし
+- **依存方向**: apiv3 → service/indexer → (TextExtractor | ESDelegator) → (attachment-text-extractor-client → 上流 | ES / Mongo)。逆流なし
 - **既存パターン維持**: AttachmentService ハンドラ仕様、ESDelegator のライフサイクル、Socket.io progress、apiv3 ルーティング、Config 定義、**`basic-layout-page/get-server-side-props/search-configurations.ts` の `searchConfig` SSR props パターン**
 - **Steering 準拠**: feature-based 配置、名前付き export、pino ログ、immutable 更新、pure 関数抽出 (msearch body builder)
 
@@ -182,7 +182,7 @@ graph TB
 |-------|------------------|-----------------|-------|
 | Server runtime | Node 24 / Express / pino | indexer / 権限 sync / reindex batch / apiv3 | 既存スタック踏襲 |
 | HTTP client | axios (orval 生成) | 抽出サービス呼び出し | server 専用依存 |
-| Client package | `packages/markitdown-client` (orval 生成) | 上流 OpenAPI → TS クライアント | `pdf-converter-client` 同パターン |
+| Client package | `packages/attachment-text-extractor-client` (orval 生成) | 上流 OpenAPI → TS クライアント | `pdf-converter-client` 同パターン |
 | Data — search | Elasticsearch 8/9 (既存) | 添付専用 index `attachments` | 既存 Page index とは別 index |
 | Data — log | MongoDB + Prisma (既存) | `extractionfailurelogs` collection (Prisma モデル) | TTL index 90 日は migrate-mongo の migration で作成 |
 | Messaging | Socket.io (既存) | 一括再インデックス進捗 | 添付向けイベント名を追加 |
@@ -196,7 +196,7 @@ apps/app/src/features/search-attachments/
 ├── server/
 │   ├── index.ts                                   # initAttachmentFullTextSearch(crowi)
 │   ├── services/
-│   │   ├── attachment-text-extractor.ts           # markitdown-client wrapper
+│   │   ├── attachment-text-extractor.ts           # attachment-text-extractor-client wrapper
 │   │   ├── attachment-search-indexer.ts           # attach/detach/reextract 単一窓口
 │   │   ├── attachment-search-delegator-extension.ts  # ESDelegator 拡張 (composition)
 │   │   ├── attachment-reindex-batch.ts            # bulk reindex + Socket.io progress + orphan sweeper invocation
@@ -222,7 +222,7 @@ apps/app/src/features/search-attachments/
 └── interfaces/
     └── attachment-search.ts                       # IAttachmentHit, IAttachmentEsDoc, ExtractionOutcome DTOs
 
-packages/markitdown-client/
+packages/attachment-text-extractor-client/
 ├── orval.config.js
 ├── openapi.json                                   # 上流 spec が export、commit 必須 (PR レビューで schema 変更を可視化)
 ├── package.json
@@ -233,10 +233,10 @@ packages/markitdown-client/
 
 #### OpenAPI / orval drift 検知パイプライン
 
-- **openapi.json**: 上流 `services/markitdown-extractor/scripts/export_openapi.py` が `packages/markitdown-client/openapi.json` を直接上書き生成。**commit 必須**
+- **openapi.json**: 上流 `services/attachment-text-extractor/scripts/export_openapi.py` が `packages/attachment-text-extractor-client/openapi.json` を直接上書き生成。**commit 必須**
 - **orval 生成物 (`src/`)**: 本 spec の responsibility として commit する。開発者が `openapi.json` 更新時に orval を実行して commit、または CI が regenerate → diff check
-- **Python CI (上流 spec)**: `export_openapi.py` 実行 + `git diff --exit-code packages/markitdown-client/openapi.json` で drift 検知
-- **Node CI (本 spec)**: orval 実行 + `git diff --exit-code packages/markitdown-client/src/` で drift 検知
+- **Python CI (上流 spec)**: `export_openapi.py` 実行 + `git diff --exit-code packages/attachment-text-extractor-client/openapi.json` で drift 検知
+- **Node CI (本 spec)**: orval 実行 + `git diff --exit-code packages/attachment-text-extractor-client/src/` で drift 検知
 - **turbo 依存での build 時再生成は不使用**: `services/` が pnpm workspace / turbo pipeline 外であるため、`pdf-converter-client` のような `dependsOn: ["@growi/pdf-converter#gen:swagger-spec"]` パターンは適用不可。commit artifact + 両 CI diff check が言語境界を跨ぐための最適解
 
 ### Modified Files
@@ -245,7 +245,7 @@ packages/markitdown-client/
 - [apps/app/src/server/routes/search.ts](apps/app/src/server/routes/search.ts) — 既存のキーワード検索 API (`GET /_api/search`、apiv1) に optional な `facet` / `resolve` クエリを追加。`facet` 省略時と `facet=pages` は従来の `searchKeyword()` → `formatSearchResult()` をそのまま通す。`all` / `attachments` で機能有効時は `searchService.searchByFacet()` を呼び、結果を既存の `IFormattedSearchResult` の形 (items に optional の `attachmentHits`、meta に optional の `facet` / `primaryResultIncomplete` / `nextCursor`) に詰めて返す
 - [apps/app/src/server/service/search.ts](apps/app/src/server/service/search.ts) — 優先 slot 駆動 primary + secondary enrichment 経路を `AttachmentSearchResultAggregator` として追加し、入口として `searchByFacet()` を置く (クエリ解析・delegator 解決・`resolveFilterData()` を 1 回だけ行って `AttachmentSearchInput` を組み立てる)。`registerUpdateEvent()` への権限変更リスナ追加は **不要** (Option D は query-time 方式のため)
 - [apps/app/src/server/service/search-delegator/elasticsearch.ts](apps/app/src/server/service/search-delegator/elasticsearch.ts) — `attachment-search-delegator-extension` との合成 (既存 Page 系メソッドは不変)
-- [apps/app/src/server/service/config-manager/config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) — `app:attachmentFullTextSearch:*` 4 キー追加 (`extractorUri` / **`extractorToken` (encrypted storage、write-only)** / `timeoutMs` / `maxFileSizeBytes`)。各キーの env var 名: `GROWI_MARKITDOWN_EXTRACTOR_URI` / `GROWI_MARKITDOWN_SERVICE_TOKEN` / `GROWI_MARKITDOWN_TIMEOUT_MS` / `GROWI_MARKITDOWN_MAX_FILE_SIZE_BYTES`。`enabled` / `maxConcurrency` は Config キーとしては提供せず、前者は算出値、後者は抽出サービス側の env var 専用。加えて `ENV_ONLY_GROUPS` に `env:useOnlyEnvVars:app:attachmentFullTextSearch` エントリを追加し、control env var `MARKITDOWN_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS=true` で 4 キー全てを env-only 強制できるようにする (マルチテナント向け詳細は下記「ENV_ONLY_GROUPS エントリ」参照)
+- [apps/app/src/server/service/config-manager/config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) — `app:attachmentFullTextSearch:*` 4 キー追加 (`extractorUri` / **`extractorToken` (encrypted storage、write-only)** / `timeoutMs` / `maxFileSizeBytes`)。各キーの env var 名: `GROWI_ATTACHMENT_EXTRACTOR_URI` / `GROWI_ATTACHMENT_EXTRACTOR_SERVICE_TOKEN` / `GROWI_ATTACHMENT_EXTRACTOR_TIMEOUT_MS` / `GROWI_ATTACHMENT_EXTRACTOR_MAX_FILE_SIZE_BYTES`。`enabled` / `maxConcurrency` は Config キーとしては提供せず、前者は算出値、後者は抽出サービス側の env var 専用。加えて `ENV_ONLY_GROUPS` に `env:useOnlyEnvVars:app:attachmentFullTextSearch` エントリを追加し、control env var `ATTACHMENT_EXTRACTOR_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS=true` で 4 キー全てを env-only 強制できるようにする (マルチテナント向け詳細は下記「ENV_ONLY_GROUPS エントリ」参照)
 - [apps/app/src/interfaces/search.ts](apps/app/src/interfaces/search.ts) — `IPageWithSearchMeta.attachmentHits?: IAttachmentHit[]` (optional) を追加
 - [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js) — `PUT /search/indices` に `includeAttachments` フラグを受理。true のときは `AttachmentReindexBatch.startRebuild()` を呼んで即応答し、実行中なら 409 `rebuild_in_progress`
 - [apps/app/src/interfaces/websocket.ts](apps/app/src/interfaces/websocket.ts) — `AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed` を追加
@@ -267,7 +267,7 @@ sequenceDiagram
     participant Att as AttachmentService
     participant Idx as AttachmentSearchIndexer
     participant Ext as AttachmentTextExtractorService
-    participant Mk as markitdown-client
+    participant Mk as attachment-text-extractor-client
     participant Upstream as FastAPI (upstream)
     participant ES as Elasticsearch
     participant Log as FailureLog
@@ -541,8 +541,8 @@ Key decisions:
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
-| MarkitdownClient (packages) | Package (TS) | 抽出 API の型安全クライアント (orval 生成) | 2.1, 6.1, 7.1, 1.3 | orval (P0), upstream FastAPI (P0) | Service |
-| AttachmentTextExtractorService | Server | クライアント wrapper + 失敗正規化 + 到達不可 fallback | 1.1, 1.2, 1.3, 1.4, 2.1 | MarkitdownClient (P0), FileUploader (P0) | Service |
+| AttachmentTextExtractorClient (packages) | Package (TS) | 抽出 API の型安全クライアント (orval 生成) | 2.1, 6.1, 7.1, 1.3 | orval (P0), upstream FastAPI (P0) | Service |
+| AttachmentTextExtractorService | Server | クライアント wrapper + 失敗正規化 + 到達不可 fallback | 1.1, 1.2, 1.3, 1.4, 2.1 | AttachmentTextExtractorClient (P0), FileUploader (P0) | Service |
 | AttachmentSearchIndexer | Server | attach/detach/reextract/bulk の単一窓口、rebuild window 中は live + tmp への dual-write | 2.1–2.5, 3.1, 3.4, 7.1 | TextExtractor (P0), ESDelegator extension (P0), AttachmentReindexBatch (P0, lifecycle 参照), FailureLogService (P1) | Service, Event |
 | AttachmentOrphanSweeper | Server | rebuildIndex 内で親 Page 不在の添付 doc を eventual cleanup | 3.2, 4.4 | Page model (P0), ESDelegator extension (P0) | Batch |
 | AttachmentReindexBatch | Server | ページと添付の一括再インデックスを裏で実行 (`startRebuild`) + progress + orphan sweeper 統合 + 実行中状態 (`isRebuilding/getTmpIndexName`) 公開 | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6 | TextExtractor (P0), ESDelegator extension (P0), AttachmentOrphanSweeper (P0), Socket.io (P1) | Batch |
@@ -560,11 +560,11 @@ Key decisions:
 
 | Field | Detail |
 |-------|--------|
-| Intent | MarkitdownClient のラッパ。バイト取得、タイムアウト、エラー正規化、到達不可時 fallback |
+| Intent | AttachmentTextExtractorClient のラッパ。バイト取得、タイムアウト、エラー正規化、到達不可時 fallback |
 | Requirements | 1.1, 1.2, 1.3, 1.4, 2.1 |
 
 **Responsibilities & Constraints**
-- FileUploader からバイトを取得し `markitdown-client` に multipart 送信
+- FileUploader からバイトを取得し `attachment-text-extractor-client` に multipart 送信
 - **503 `service_busy` retry (burst 耐性)**: 上流が 503 `service_busy` を返した場合、exponential backoff + jitter で**最大 1 回だけ retry** (default 500ms + jitter(0-500ms) 待機)。2 回目も 503 なら `serviceBusy` として正規化し ExtractionFailureLog に記録。retry 回数と base delay は `AttachmentSearchService` の設定可能定数として export (テスト容易性)。複雑な queue / BullMQ は初期実装では導入しない (k8s HPA が pod 増設で対応する前提)
 - **Bearer auth**: 呼び出しごとに `configManager.getConfig('app:attachmentFullTextSearch:extractorToken')` を取得し `Authorization: Bearer <token>` ヘッダに付与。token 未設定時は `isFeatureEnabled()` 段階で早期 return するので通常は到達しないが、保険として未設定検出時は `serviceUnreachable` 正規化
 - **extractorUri DNS rebinding 対策 (metadata IP のみ)**: 送信前に URI の host を DNS 解決し、結果がクラウドメタデータ endpoint IP literal (`169.254.169.254` / `fd00:ec2::254` / `100.100.100.200` / `192.0.0.192`) のいずれかに解決される場合のみ request を送らず `serviceUnreachable` 正規化。k8s 内部 DNS / loopback / RFC1918 への解決は許可
@@ -924,7 +924,7 @@ admin PUT 時に server 側で `extractorUri` の以下の**最小攻撃ベク�
 
 #### `extractorToken` (Bearer auth 対応)
 
-- 上流 `markitdown-extractor` サービスが Bearer 認証を必須化したため、本 spec も `extractorToken` Config キー (`app:attachmentFullTextSearch:extractorToken`) を追加
+- 上流 `attachment-text-extractor` サービスが Bearer 認証を必須化したため、本 spec も `extractorToken` Config キー (`app:attachmentFullTextSearch:extractorToken`) を追加
 - ES / MongoDB への平文 persist を避けるため、**既存 `configManager` の encrypted storage 機構** (`app:openaiApiKey` 等と同パターン) に載せて保存
 - API 応答では **値を一切返さない**。存在判定のみ `hasExtractorToken: boolean` として露出
 - `AttachmentTextExtractorService` は呼び出しごとに `configManager.getConfig('app:attachmentFullTextSearch:extractorToken')` で取得し、`Authorization: Bearer <token>` ヘッダに付与
@@ -939,7 +939,7 @@ GROWI.cloud のようなマルチテナント環境では、プラットフォ�
 ```typescript
 // CONFIG_DEFINITIONS に追加
 'env:useOnlyEnvVars:app:attachmentFullTextSearch': defineConfig<boolean>({
-  envVarName: 'MARKITDOWN_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+  envVarName: 'ATTACHMENT_EXTRACTOR_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
   defaultValue: false,
 }),
 
@@ -959,13 +959,13 @@ GROWI.cloud のようなマルチテナント環境では、プラットフォ�
 
 | Config キー | env var 名 | 備考 |
 |---|---|---|
-| `app:attachmentFullTextSearch:extractorUri` | `GROWI_MARKITDOWN_EXTRACTOR_URI` | |
-| `app:attachmentFullTextSearch:extractorToken` | `GROWI_MARKITDOWN_SERVICE_TOKEN` | encrypted storage |
-| `app:attachmentFullTextSearch:timeoutMs` | `GROWI_MARKITDOWN_TIMEOUT_MS` | |
-| `app:attachmentFullTextSearch:maxFileSizeBytes` | `GROWI_MARKITDOWN_MAX_FILE_SIZE_BYTES` | |
+| `app:attachmentFullTextSearch:extractorUri` | `GROWI_ATTACHMENT_EXTRACTOR_URI` | |
+| `app:attachmentFullTextSearch:extractorToken` | `GROWI_ATTACHMENT_EXTRACTOR_SERVICE_TOKEN` | encrypted storage |
+| `app:attachmentFullTextSearch:timeoutMs` | `GROWI_ATTACHMENT_EXTRACTOR_TIMEOUT_MS` | |
+| `app:attachmentFullTextSearch:maxFileSizeBytes` | `GROWI_ATTACHMENT_EXTRACTOR_MAX_FILE_SIZE_BYTES` | |
 
 **挙動**:
-- `MARKITDOWN_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS=true` を設定すると、上記 4 キーは DB 値を無視して環境変数の値のみを使用する
+- `ATTACHMENT_EXTRACTOR_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS=true` を設定すると、上記 4 キーは DB 値を無視して環境変数の値のみを使用する
 - GROWI.cloud プラットフォーム側でこの env var を設定することで、テナント管理者が admin UI から設定を上書きできなくなる（トークン文字列のテナント間衝突リスクを構造的に排除）
 - デフォルト (`false`) では通常の DB 優先動作（self-hosted 環境と完全互換）
 
@@ -1196,7 +1196,7 @@ interface IAttachmentHit {
 }
 ```
 
-**Upstream API consumption (type-only import from `packages/markitdown-client`)**: `ExtractResponse` / `ErrorResponse` / `PageInfo` は orval 生成型をそのまま消費。enum 同期は CI `check-openapi-drift` で担保。
+**Upstream API consumption (type-only import from `packages/attachment-text-extractor-client`)**: `ExtractResponse` / `ErrorResponse` / `PageInfo` は orval 生成型をそのまま消費。enum 同期は CI `check-openapi-drift` で担保。
 
 ## Error Handling
 
@@ -1225,7 +1225,7 @@ interface IAttachmentHit {
 - `AttachmentTextExtractorService` の失敗正規化: `service_busy` / `timeout` / `unreachable` / upstream 5xx がそれぞれ `ExtractionOutcome` の正しい variant にマップされること。**上流 401 `unauthorized` は `serviceUnreachable` に正規化される**こと
 - `AttachmentTextExtractorService` Bearer auth: 呼び出しごとに最新の `extractorToken` を取得し `Authorization: Bearer <token>` ヘッダが付与されること。token 未設定時は `serviceUnreachable` を返すこと
 - `AttachmentTextExtractorService` DNS rebinding 対策: `extractorUri` の host が metadata IP literal (`169.254.169.254` 等) に解決される場合のみ、request を送信せず `serviceUnreachable` になること。k8s 内部 DNS / loopback / RFC1918 に解決される場合は許可されること
-- extractorUri allowlist (admin PUT): `file://` / `ftp://` / `data:` / `http://169.254.169.254/` / `http://fd00:ec2::254/` / `http://100.100.100.200/` / `http://192.0.0.192/` が 400 `invalid_extractor_uri` で reject されること。`http://127.0.0.1/` / `http://markitdown.default.svc.cluster.local/` / `http://10.0.0.1/` は受理されること
+- extractorUri allowlist (admin PUT): `file://` / `ftp://` / `data:` / `http://169.254.169.254/` / `http://fd00:ec2::254/` / `http://100.100.100.200/` / `http://192.0.0.192/` が 400 `invalid_extractor_uri` で reject されること。`http://127.0.0.1/` / `http://attachment-text-extractor.default.svc.cluster.local/` / `http://10.0.0.1/` は受理されること
 - admin GET `/attachment-search/config` が `extractorToken` の値を返さず、`hasExtractorToken: boolean` だけ返すこと
 - admin PUT `/attachment-search/config` が `extractorToken: "secret"` を受理し encrypted storage に保存、以降 `hasExtractorToken: true` を返すこと。`extractorToken: null` で削除できること
 - `AttachmentSearchIndexer.onAttach` の有効化ゲート: 無効時に抽出呼び出しが一切発生しないこと (extractorToken 未設定時も無効扱いになる 4 条件の AND を全 path で verify)
@@ -1307,7 +1307,7 @@ interface IAttachmentHit {
 - **extractorUri allowlist (SSRF 防御、最小限)**: admin PUT での URI 受理時に (1) スキーム検証 (`http`/`https` のみ) と (2) クラウドメタデータ endpoint IP literal のピンポイント拒否 (`169.254.169.254` / `fd00:ec2::254` / `100.100.100.200` / `192.0.0.192`) のみを適用。k8s 内部 DNS / loopback / RFC1918 は許可する (正当な k8s / docker-compose デプロイで頻用)。DNS rebinding 対策として実呼び出し時に名前解決結果を再検証し、metadata IP literal に解決された場合のみ reject。admin 乗っ取り時の任意 URL (attacker.com) への添付流出リスクは admin アカウント保護の責務として切り分け、allowlist ではなく Bearer auth + NetworkPolicy で多層防御する設計
 - **Bearer auth (extractorToken)**: 上流抽出サービスへの全リクエストに `Authorization: Bearer` を付与。token は encrypted Config storage に保存し、admin GET API では `hasExtractorToken: boolean` のみ返却 (値は露出しない)。SSR props にも token 値は含めない。401 応答は `serviceUnreachable` に正規化して機能を自動 soft-disable、admin が token 不整合に気付くよう pino ERROR + FailureLog に記録
 - **fire-and-forget 下の可視性**: ハンドラが例外を握りつぶす特性を前提とし、FailureLog 永続化と pino ログを確実に呼ぶ二重経路で失敗を補足
-- **OpenAPI drift 検知**: `packages/markitdown-client/openapi.json` を committed artifact とし、CI で上流 `services/markitdown-extractor/` の `/openapi.json` と差分検知
+- **OpenAPI drift 検知**: `packages/attachment-text-extractor-client/openapi.json` を committed artifact とし、CI で上流 `services/attachment-text-extractor/` の `/openapi.json` と差分検知
 - **secret 管理**: `extractorToken` のみ encrypted storage に保持、admin GET API では値を露出しない (write-only)。それ以外の機能固有 secret は持たない (markitdown の外部 API キーは上流 spec 側で不使用と定義)
 
 ## Performance & Scalability
@@ -1384,6 +1384,6 @@ flowchart LR
 8. **secondary resolution の UX 案内**: `facet=all` で添付のみヒットがページ外に漏れる場合、UI で「添付優先モードに切替えて再検索」を誘導する文言と IA を `attachment-search-ui` spec 側で具体化。`facet=attachments` で `primaryResultIncomplete: true` 時の「追加読み込み」ボタン文言も同様に UI spec 側で確定
 5. **Socket.io イベント名の衝突回避**: `AddAttachmentProgress` / `FinishAddAttachment` の既存 namespace との衝突を init 時に検証
 6. **中断後 tmp index の自動クリーンアップと orphan sweeper の統合運用**: 初期は tmp index を手動削除、orphan sweeper は rebuildIndex 内のみで動作。両者が別時点で発生するため、運用 runbook 上の役割分担と失敗時のリカバリ手順を実装時に明文化する必要あり
-7. **`packages/markitdown-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
+7. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
 9. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒 TTL in-memory cache を持たせたものの、horizontal scale 時は pod ごとに cache が独立するため admin GET 連打で全 pod が個別に agg を叩きうる。tenant scope の term filter / `precision_threshold` 指定 / Redis shared cache による緩和 / MongoDB 上の counter doc 化 (`syncAttachmentIndexed` で inc / `onDetach` で dec) への置換、いずれかを post-launch で検討 (初期実装は 30 秒 TTL のまま出荷)
 10. **PDF fallback の N-page full-parse コスト**: markitdown PR #1263 未マージ時の pdfminer.six fallback は `page_numbers=[i]` で繰り返し呼ぶため、N ページ PDF を N 回 full-parse する。200 ページの PDF で線形に増えるレイテンシ。PR マージ後に fallback を削除する計画だが、それまでは大ページ数 PDF の extraction timeout が顕在化しうる (上流側 `TIMEOUT_S=60` が safety net)。実装時に pdfminer の `extract_pages(doc)` iterator 単回呼び出し + per-page buffering 版に差し替え可能かも併せて検討

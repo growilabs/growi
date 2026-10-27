@@ -127,12 +127,12 @@ umbrella 要件 R5.4 / R6.4 に準拠。
 umbrella design.md の UI Components 節より抽出:
 
 - 添付系 UI は全て既存 SearchPage と同経路 (SSR 経由) のため、Turbopack 外部化の対象になる可能性あり
-- `orval` 生成クライアント (`packages/markitdown-client`) は **server 専用依存**。UI からは apiv3 経由でのみ触る
+- `orval` 生成クライアント (`packages/attachment-text-extractor-client`) は **server 専用依存**。UI からは apiv3 経由でのみ触る
 - 重量級依存 (特に admin failures のテーブルライブラリ等) は `dynamic({ ssr: false })` で分離
 
 ### 本 spec の適用方針
 
-- `packages/markitdown-client` は UI から一切 import しない (静的解析で検知できるよう、feature module 内にガードを設置)
+- `packages/attachment-text-extractor-client` は UI から一切 import しない (静的解析で検知できるよう、feature module 内にガードを設置)
 - 新規コンポーネントは純粋な React + SWR + Jotai で構成し、Node 固有 API を避ける
 - 失敗ログテーブルが大きいライブラリを使う場合は動的 import を採用
 

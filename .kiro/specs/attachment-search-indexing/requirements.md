@@ -4,7 +4,7 @@
 
 ### 背景と問題
 
-GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` のみがインデックス対象で、ページに添付された PDF/Office/テキスト系ファイルの本文は検索できない。umbrella [`attachment-search`](../attachment-search/) の 3-way split により、本 spec (`attachment-search-indexing`) は **apps/app サーバ側の統合責務** を担当する。抽出処理本体は上流 spec [`attachment-search-markitdown-extractor`](../attachment-search-markitdown-extractor/) が、検索結果 UI / 管理画面 UI は下流 spec [`attachment-search-ui`](../attachment-search-ui/) が担当する。
+GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` のみがインデックス対象で、ページに添付された PDF/Office/テキスト系ファイルの本文は検索できない。umbrella [`attachment-search`](../attachment-search/) の 3-way split により、本 spec (`attachment-search-indexing`) は **apps/app サーバ側の統合責務** を担当する。抽出処理本体は上流 spec [`attachment-search-text-extractor`](../attachment-search-text-extractor/) が、検索結果 UI / 管理画面 UI は下流 spec [`attachment-search-ui`](../attachment-search-ui/) が担当する。
 
 ### 現状
 
@@ -30,13 +30,13 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 
 ### 採用アプローチ
 
-既存の `ElasticsearchDelegator` / `SearchService` / `AttachmentService` / `ConfigManager` を拡張し、apps/app 内に新規 feature module `features/search-attachments/server/` を配置する。抽出サービスへの HTTP 呼び出しは新規 `packages/markitdown-client` (orval 生成) を経由。独立 delegator は作らず、既存 ES delegator に composition で添付向けメソッドを追加する。**権限は添付 ES 文書に snapshot せず、検索時に page_index を viewer filter 付きで lookup する query-time permission lookup 方式 (Option D) を採用**。この設計により、添付側で権限同期リスナ (pageEvent 購読) を用意する必要がなく、sync drift 起因の snippet 漏洩が構造的に発生しない。
+既存の `ElasticsearchDelegator` / `SearchService` / `AttachmentService` / `ConfigManager` を拡張し、apps/app 内に新規 feature module `features/search-attachments/server/` を配置する。抽出サービスへの HTTP 呼び出しは新規 `packages/attachment-text-extractor-client` (orval 生成) を経由。独立 delegator は作らず、既存 ES delegator に composition で添付向けメソッドを追加する。**権限は添付 ES 文書に snapshot せず、検索時に page_index を viewer filter 付きで lookup する query-time permission lookup 方式 (Option D) を採用**。この設計により、添付側で権限同期リスナ (pageEvent 購読) を用意する必要がなく、sync drift 起因の snippet 漏洩が構造的に発生しない。
 
 ### スコープ
 
-- **In**: 添付 ES インデックス mapping / ハンドラ登録 / 権限変更連動 / 一括再インデックス / 個別再抽出 API / 失敗ログ model / admin API (設定・失敗ログ) / multi-index 検索集約 / 応答型拡張 / Config キー追加 (`extractorUri` / `timeoutMs` / `maxFileSizeBytes` の 3 キー、`extractorUri` は admin Config として扱う) / `packages/markitdown-client` orval パイプライン
+- **In**: 添付 ES インデックス mapping / ハンドラ登録 / 権限変更連動 / 一括再インデックス / 個別再抽出 API / 失敗ログ model / admin API (設定・失敗ログ) / multi-index 検索集約 / 応答型拡張 / Config キー追加 (`extractorUri` / `timeoutMs` / `maxFileSizeBytes` の 3 キー、`extractorUri` は admin Config として扱う) / `packages/attachment-text-extractor-client` orval パイプライン
 - **Out**:
-  - Python 抽出サービス本体の実装・Dockerfile・k8s manifest (上流 `attachment-search-markitdown-extractor` spec の責務)
+  - Python 抽出サービス本体の実装・Dockerfile・k8s manifest (上流 `attachment-search-text-extractor` spec の責務)
   - 検索結果 UI / 添付一覧モーダル UI / 管理画面 UI (下流 `attachment-search-ui` spec の責務)
   - 添付ファイル保管方式の変更 (`FileUploader` 抽象は据え置き)
   - 既存 Page 検索のクエリ・ランキング・権限モデル本体の改変
@@ -46,20 +46,20 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 ### 制約
 
 - ライセンス: MIT / Apache-2.0 / BSD 系のみ (orval は MIT)
-- 対応 OS: apps/app は Windows/macOS/Linux 全対応を維持 (`packages/markitdown-client` は純 TS で cross-platform)
+- 対応 OS: apps/app は Windows/macOS/Linux 全対応を維持 (`packages/attachment-text-extractor-client` は純 TS で cross-platform)
 - ES バージョン: 既存のサポート範囲 (8/9) に従う (mapping 変種を `attachments-mappings-esN.ts` に分離)
 - 非互換ゼロ: 機能無効時は既存検索 API のレイテンシ・結果順序・応答形式を機能導入前と同一にする
 - API 後方互換: `IPageWithSearchMeta.attachmentHits` は optional に限定
-- OpenAPI drift 検知: CI で上流 `services/markitdown-extractor/` の OpenAPI spec と `packages/markitdown-client/openapi.json` の差分を検知
+- OpenAPI drift 検知: CI で上流 `services/attachment-text-extractor/` の OpenAPI spec と `packages/attachment-text-extractor-client/openapi.json` の差分を検知
 - ハンドラ fire-and-forget 特性: 例外は pino ログと FailureLog 永続化で確実に捕捉
 
 詳細は [brief.md](./brief.md) を参照。
 
 ## Introduction
 
-本 spec は GROWI の添付ファイル全文検索機能のうち、**apps/app サーバ側の統合層**を定義する。具体的には、上流の抽出マイクロサービス (`attachment-search-markitdown-extractor`) が提供する OpenAPI を orval で TypeScript クライアント化し、添付アップロード・削除・親ページ権限変更といった既存イベントにフックして Elasticsearch への書き込みを行う。さらに、一括再インデックス・個別再抽出・抽出失敗の永続化といった運用系 API を提供し、検索実行時には Page index と添付専用 index を multi-index でクエリして親ページ単位に集約した応答を返す。
+本 spec は GROWI の添付ファイル全文検索機能のうち、**apps/app サーバ側の統合層**を定義する。具体的には、上流の抽出マイクロサービス (`attachment-search-text-extractor`) が提供する OpenAPI を orval で TypeScript クライアント化し、添付アップロード・削除・親ページ権限変更といった既存イベントにフックして Elasticsearch への書き込みを行う。さらに、一括再インデックス・個別再抽出・抽出失敗の永続化といった運用系 API を提供し、検索実行時には Page index と添付専用 index を multi-index でクエリして親ページ単位に集約した応答を返す。
 
-本 spec は上流 `attachment-search-markitdown-extractor` spec の API 契約 (`POST /extract` のリクエスト/レスポンス schema、エラーコード体系) に依存し、下流 `attachment-search-ui` spec に対して apiv3 エンドポイント契約と `IPageWithSearchMeta.attachmentHits[]` 応答型を提供する。UI コンポーネント・admin 画面の描画・ユーザ向けガイダンス文言は本 spec の責務外であり、下流 spec に委譲する。
+本 spec は上流 `attachment-search-text-extractor` spec の API 契約 (`POST /extract` のリクエスト/レスポンス schema、エラーコード体系) に依存し、下流 `attachment-search-ui` spec に対して apiv3 エンドポイント契約と `IPageWithSearchMeta.attachmentHits[]` 応答型を提供する。UI コンポーネント・admin 画面の描画・ユーザ向けガイダンス文言は本 spec の責務外であり、下流 spec に委譲する。
 
 機能無効時には抽出サービスへの呼び出しを行わず、既存検索 API の挙動を機能導入前と完全一致させることが絶対要件となる。抽出サービス到達不可時にも apps/app の添付保存・既存 Page 検索は継続動作する。
 
@@ -76,16 +76,16 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
   - admin 用 apiv3 エンドポイント (`GET/PUT /_api/v3/admin/attachment-search/config`, `GET /failures`)
   - `PUT /_api/v3/search/indices` の `includeAttachments` フラグ受理と、添付を含む作り直しの非同期実行
   - 抽出失敗の MongoDB 永続化 (`ExtractionFailureLog`) と集計
-  - Config キー群 (`app:attachmentFullTextSearch:extractorUri` / `:timeoutMs` / `:maxFileSizeBytes` の 3 キー) の定義と ConfigManager 経由の永続化。`extractorUri` は admin Config として扱い、環境変数 `GROWI_MARKITDOWN_EXTRACTOR_URI` を初期値として採り得る (既存 `app:elasticsearchUri` と同等のパターン)。機能の「有効/無効」は独立した Config キーを持たず、`searchService.isConfigured && extractorUri != null && extractorUri !== ''` の**算出値**として扱う。`maxConcurrency` は抽出サービス側の env var 専用で Config キーとしては提供しない
+  - Config キー群 (`app:attachmentFullTextSearch:extractorUri` / `:timeoutMs` / `:maxFileSizeBytes` の 3 キー) の定義と ConfigManager 経由の永続化。`extractorUri` は admin Config として扱い、環境変数 `GROWI_ATTACHMENT_EXTRACTOR_URI` を初期値として採り得る (既存 `app:elasticsearchUri` と同等のパターン)。機能の「有効/無効」は独立した Config キーを持たず、`searchService.isConfigured && extractorUri != null && extractorUri !== ''` の**算出値**として扱う。`maxConcurrency` は抽出サービス側の env var 専用で Config キーとしては提供しない
   - multi-index msearch のクエリビルダ、viewer フィルタ、pageId 集約
   - 既存の検索演算子を、添付本文に当てる検索語と親ページに当てる絞り込み条件に振り分ける処理
   - 応答型 `IPageWithSearchMeta.attachmentHits[]` の optional 追加 (後方互換)
   - 機能無効化ゲートの全サーバ側入口への適用
   - 抽出成功/失敗/スキップの pino 構造化ログと監視メトリクス公開
-  - `packages/markitdown-client` の orval 生成パイプラインと OpenAPI drift 検知
+  - `packages/attachment-text-extractor-client` の orval 生成パイプラインと OpenAPI drift 検知
 
 - **Out of scope (他 spec の責務)**:
-  - **上流 (`attachment-search-markitdown-extractor` spec)**: Python FastAPI 抽出サービス本体、Dockerfile、docker-compose / k8s manifest、セキュリティハードニング、OpenAPI エクスポートスクリプト
+  - **上流 (`attachment-search-text-extractor` spec)**: Python FastAPI 抽出サービス本体、Dockerfile、docker-compose / k8s manifest、セキュリティハードニング、OpenAPI エクスポートスクリプト
   - **下流 (`attachment-search-ui` spec)**: 検索結果 UI (左ペイン集約・右ペイン添付ヒットカード・ファセットタブ)、添付ファイル一覧モーダルの「再抽出」ボタン、管理画面の設定フォーム・失敗ログパネル・rebuild チェックボックス・UI ガイダンス文言
   - 添付ファイル本体の保管方式変更 (`FileUploader` は据え置き)
   - 既存 Page 検索 (Page/Comment) のクエリ・ランキング・権限モデル本体の改変
@@ -93,8 +93,8 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
   - 永続ジョブキュー基盤の導入
 
 - **Adjacent expectations (本 spec が前提とする隣接要素)**:
-  - 上流 `attachment-search-markitdown-extractor` が `POST /extract` (multipart) を提供し、`pages[]` / エラーコード体系を返すこと
-  - 上流 spec が `/openapi.json` を正しく出力し、`packages/markitdown-client/openapi.json` にコミットされ drift 検知 CI が機能すること
+  - 上流 `attachment-search-text-extractor` が `POST /extract` (multipart) を提供し、`pages[]` / エラーコード体系を返すこと
+  - 上流 spec が `/openapi.json` を正しく出力し、`packages/attachment-text-extractor-client/openapi.json` にコミットされ drift 検知 CI が機能すること
   - 既存 `AttachmentService` のハンドラ登録点、`pageEvent` の発火点、`FileUploader` の バイト取得 API が現行の契約を維持すること
   - 既存 `ElasticsearchDelegator` の `rebuildIndex()` tmp index → alias swap パターン、`filterPagesByViewer` 権限モデルを流用可能な形で維持すること
   - 既存 Socket.io progress チャネル (`AddPageProgress`, `FinishAddPage`, `RebuildingFailed`) と同経路で添付向け進捗イベントを発行できること

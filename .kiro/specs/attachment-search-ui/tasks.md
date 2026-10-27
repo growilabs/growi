@@ -280,7 +280,7 @@
   - `extractorUri` 空→非空 かつ `extractorToken` 設定して保存 → ガイダンス表示 → **同画面内で即座に** rebuild チェックボックス / 失敗ログパネルが表示される (`use-attachment-search-config` の `mutate()` reactivity)
   - `extractorUri` を空文字にクリア or `extractorToken` 削除ボタン → 同画面内で即座に feature-gated 兄弟 UI が非表示
   - `extractorUri` に `http://169.254.169.254/...` を入力 → 400 `invalid_extractor_uri` で inline エラー + toast
-  - `http://localhost/...` / `http://markitdown.default.svc.cluster.local/...` は正常受理
+  - `http://localhost/...` / `http://attachment-text-extractor.default.svc.cluster.local/...` は正常受理
   - `extractorToken` 既設時に空欄のまま他フィールド保存 → token 維持
   - Rebuild クリック → PUT payload に `includeAttachments: true`、Socket.io `AddAttachmentProgress` / `FinishAddAttachment` で進捗表示
   - Observable: 上記すべてのシナリオで UI 挙動が期待通り緑になる
@@ -299,7 +299,7 @@
   - _Boundary: accessibility_
 
 - [ ] 9.5 SSR 到達性 / Turbopack ビルド検証
-  - `turbo run build --filter @growi/app` を実行し、新規コンポーネントの import チェーンに server 専用依存 (`packages/markitdown-client` / mongoose / pino / ES client 等) が混入しないことを確認する
+  - `turbo run build --filter @growi/app` を実行し、新規コンポーネントの import チェーンに server 専用依存 (`packages/attachment-text-extractor-client` / mongoose / pino / ES client 等) が混入しないことを確認する
   - 重量 UI (失敗ログテーブル等) は `dynamic({ ssr: false })` で分離されていることを確認する
   - 機能無効時に既存 SearchPage / PageAttachmentList / ElasticsearchManagement の snapshot が導入前と完全一致することを確認する (R14.1 に相当する非互換ゼロ要件)
   - Observable: build が success、bundle analyzer で server-only チェーンが client バンドルに含まれないこと、機能 OFF snapshot が既存と diff ゼロ

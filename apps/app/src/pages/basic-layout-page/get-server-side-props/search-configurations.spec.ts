@@ -14,7 +14,7 @@ const createMockContext = (opts: {
   const {
     isConfigured,
     isReachable = false,
-    extractorUri = 'http://markitdown:8080',
+    extractorUri = 'http://attachment-text-extractor:8080',
     extractorToken = 'secret-token',
     isSearchScopeChildrenAsDefault = false,
   } = opts;
@@ -53,7 +53,7 @@ describe('getServerSideSearchConfigurationProps', () => {
   it('returns isAttachmentFullTextSearchEnabled=false when searchService is not configured', async () => {
     const ctx = createMockContext({
       isConfigured: false,
-      extractorUri: 'http://markitdown:8080',
+      extractorUri: 'http://attachment-text-extractor:8080',
       extractorToken: 'secret-token',
     });
 
@@ -96,7 +96,7 @@ describe('getServerSideSearchConfigurationProps', () => {
   it('returns isAttachmentFullTextSearchEnabled=false when extractorToken is null', async () => {
     const ctx = createMockContext({
       isConfigured: true,
-      extractorUri: 'http://markitdown:8080',
+      extractorUri: 'http://attachment-text-extractor:8080',
       extractorToken: null,
     });
 
@@ -110,7 +110,7 @@ describe('getServerSideSearchConfigurationProps', () => {
   it('returns isAttachmentFullTextSearchEnabled=false when extractorToken is empty string', async () => {
     const ctx = createMockContext({
       isConfigured: true,
-      extractorUri: 'http://markitdown:8080',
+      extractorUri: 'http://attachment-text-extractor:8080',
       extractorToken: '',
     });
 
@@ -124,7 +124,7 @@ describe('getServerSideSearchConfigurationProps', () => {
   it('returns isAttachmentFullTextSearchEnabled=true when all conditions are met', async () => {
     const ctx = createMockContext({
       isConfigured: true,
-      extractorUri: 'http://markitdown:8080',
+      extractorUri: 'http://attachment-text-extractor:8080',
       extractorToken: 'secret-token',
     });
 
@@ -139,7 +139,7 @@ describe('getServerSideSearchConfigurationProps', () => {
     const secretToken = 'super-secret-api-token-12345';
     const ctx = createMockContext({
       isConfigured: true,
-      extractorUri: 'http://markitdown:8080',
+      extractorUri: 'http://attachment-text-extractor:8080',
       extractorToken: secretToken,
     });
 
@@ -154,7 +154,7 @@ describe('getServerSideSearchConfigurationProps', () => {
   });
 
   it('does NOT include the extractorUri string value in SSR props', async () => {
-    const extractorUri = 'http://internal-markitdown-service:9999';
+    const extractorUri = 'http://internal-extractor-service:9999';
     const ctx = createMockContext({
       isConfigured: true,
       extractorUri,
@@ -176,7 +176,7 @@ describe('getServerSideSearchConfigurationProps', () => {
       isConfigured: true,
       isReachable: true,
       isSearchScopeChildrenAsDefault: true,
-      extractorUri: 'http://markitdown:8080',
+      extractorUri: 'http://attachment-text-extractor:8080',
       extractorToken: 'secret-token',
     });
 

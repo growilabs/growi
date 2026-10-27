@@ -1,5 +1,8 @@
 import dns from 'node:dns/promises';
-import { ErrorCode, postExtractExtractPost } from '@growi/markitdown-client';
+import {
+  ErrorCode,
+  postExtractExtractPost,
+} from '@growi/attachment-text-extractor-client';
 
 import type {
   ExtractedPage,
@@ -47,7 +50,7 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 }
 
 /**
- * Maps an Axios error response from the markitdown-extractor service to
+ * Maps an Axios error response from the attachment-text-extractor service to
  * an ExtractionOutcome discriminated union.
  *
  * Returns null when the error cannot be mapped (caller falls through to
@@ -88,7 +91,7 @@ function mapAxiosErrorToOutcome(
       // Log at ERROR level but NEVER include the token value
       logger.error(
         { attachmentId: attachment._id, status },
-        'markitdown-extractor returned 401 unauthorized',
+        'attachment-text-extractor returned 401 unauthorized',
       );
       return { kind: 'serviceUnreachable' };
     default:
@@ -117,7 +120,7 @@ type CallExtractorOptions = {
 };
 
 /**
- * Sends the attachment bytes to the markitdown-extractor service and returns
+ * Sends the attachment bytes to the attachment-text-extractor service and returns
  * an ExtractionOutcome. Always resolves (never throws).
  */
 async function callExtractor(
@@ -163,7 +166,7 @@ async function callExtractor(
 
 /**
  * Service that extracts text content from attachment files by delegating to the
- * markitdown-extractor microservice.
+ * attachment-text-extractor microservice.
  *
  * Design guarantees:
  * - Always returns an ExtractionOutcome — never throws

@@ -228,7 +228,7 @@ describe('attachment-search-admin', () => {
     it('4. valid URI updates config without error', async () => {
       vi.mocked(configManager.updateConfigs).mockResolvedValue(undefined);
 
-      const validUri = 'http://markitdown.example.com:8080';
+      const validUri = 'http://attachment-text-extractor.example.com:8080';
 
       // Simulate what the route handler does after validation passes
       await configManager.updateConfigs(

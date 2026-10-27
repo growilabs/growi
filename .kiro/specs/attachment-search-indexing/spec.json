@@ -5,7 +5,7 @@
   "language": "ja",
   "phase": "design-generated",
   "derived_from": "attachment-search",
-  "dependencies": ["attachment-search-markitdown-extractor"],
+  "dependencies": ["attachment-search-text-extractor"],
   "approvals": {
     "requirements": {
       "generated": true,

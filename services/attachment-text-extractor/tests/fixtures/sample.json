@@ -1,0 +1,10 @@
+{
+  "title": "GROWI Attachment Test",
+  "description": "Sample JSON fixture for attachment-text-extractor tests.",
+  "version": 1,
+  "tags": ["growi", "attachment", "test"],
+  "metadata": {
+    "author": "attachment-text-extractor",
+    "created": "2025-01-01"
+  }
+}

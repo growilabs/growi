@@ -3,7 +3,7 @@
 _Generated: 2026-04-17_
 _Derived from: `.kiro/specs/attachment-search/research.md` (umbrella)_
 
-本 spec の設計判断に関わる調査項目のみを umbrella research.md から抽出し再構成する。上流 `attachment-search-markitdown-extractor` の形式別抽出実装調査、下流 `attachment-search-ui` の UI コンポーネント調査は本 spec の範囲外であり、各 spec の research.md に残す。
+本 spec の設計判断に関わる調査項目のみを umbrella research.md から抽出し再構成する。上流 `attachment-search-text-extractor` の形式別抽出実装調査、下流 `attachment-search-ui` の UI コンポーネント調査は本 spec の範囲外であり、各 spec の research.md に残す。
 
 ## 1. AttachmentService ハンドラの fire-and-forget 特性と失敗可視化
 
@@ -113,8 +113,8 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
 
 ### 採用パイプライン
 
-1. 上流 `services/markitdown-extractor/scripts/export-openapi.py` が `/openapi.json` を `packages/markitdown-client/openapi.json` に書き出し (上流 spec 責務)
-2. `packages/markitdown-client` の turbo task で orval を実行し TS クライアント生成
+1. 上流 `services/attachment-text-extractor/scripts/export-openapi.py` が `/openapi.json` を `packages/attachment-text-extractor-client/openapi.json` に書き出し (上流 spec 責務)
+2. `packages/attachment-text-extractor-client` の turbo task で orval を実行し TS クライアント生成
 3. CI で上流 spec と下流 committed artifact の差分を検出する `check-openapi-drift` task を追加
 4. 差分検知時はビルド失敗、手動で orval 再生成して commit する運用
 

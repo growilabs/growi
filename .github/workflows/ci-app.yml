@@ -77,11 +77,11 @@ jobs:
           pnpm add turbo --global
           pnpm install --frozen-lockfile
 
-      - name: Check markitdown-client orval drift
+      - name: Check attachment-text-extractor-client orval drift
         run: |
-          pnpm -F @growi/markitdown-client gen
-          git diff --exit-code packages/markitdown-client/src/
-          git diff --exit-code packages/markitdown-client/openapi.json
+          pnpm -F @growi/attachment-text-extractor-client gen
+          git diff --exit-code packages/attachment-text-extractor-client/src/
+          git diff --exit-code packages/attachment-text-extractor-client/openapi.json
 
       - name: Lint
         run: |

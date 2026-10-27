@@ -21,7 +21,7 @@
 ### Non-Goals
 
 - apiv3 エンドポイント実装 / ES 連携 / Config 永続化 / 応答型定義 (上流 `attachment-search-indexing` 責務)
-- 抽出サービス本体 (`attachment-search-markitdown-extractor` 責務)
+- 抽出サービス本体 (`attachment-search-text-extractor` 責務)
 - 添付ビューア本体の機能追加、PDF インラインプレビュー、抽出テキスト全文プレビュー
 - 形式別詳細ファセット (PDF だけ / xlsx だけ等)、選択的再インデックス UI
 - 添付専用検索画面の新設 (既存 SearchPage を拡張する方針)
@@ -85,7 +85,7 @@ GROWI apps/app は Next.js 16 Pages Router + Express モノリス。クライア
 - **添付モーダル**: `PageAccessoriesModal/PageAttachment.tsx` が Jotai + SWR で開閉と一覧取得を制御。`PageAttachment/PageAttachmentList.tsx` が `@growi/ui` の `Attachment` コンポーネントに行 prop (`onAttachmentDeleteClicked` など) を渡すパターン。削除は `DeleteAttachmentModal` の Jotai atom で制御
 - **Admin 画面**: `Admin/ElasticsearchManagement/ElasticsearchManagement.tsx` に Reconnect / Normalize / Rebuild ボタンと Socket.io 進捗表示 (`AddPageProgress` / `FinishAddPage` / `RebuildingFailed`)
 - **状態管理**: 検索 UI は SWR + Jotai、admin は SWR で Config 同期、モーダルは Jotai atom
-- **SSR 到達性**: Pages Router + Turbopack 構成。server 専用依存 (DB 接続、pino、`packages/markitdown-client` 等) は client バンドルから到達可能な import チェーンに入れてはならない
+- **SSR 到達性**: Pages Router + Turbopack 構成。server 専用依存 (DB 接続、pino、`packages/attachment-text-extractor-client` 等) は client バンドルから到達可能な import チェーンに入れてはならない
 
 本 spec は**すべての既存拡張ポイントの内側**で動く。optional prop / conditional render を足すだけで、既存の構造・データフロー・SSR 到達性ルールを壊さない。
 
@@ -184,7 +184,7 @@ graph TB
 | Real-time | Socket.io client (既存) | rebuildIndex 進捗受信 | 既存 `AddPageProgress` listener と同経路 |
 | Bundler | Turbopack | SSR / client bundle 分離 | server 専用依存を client 経路から隔離 |
 
-> 上流 spec が `packages/markitdown-client` を定義するが、これは**server 専用依存**であり本 spec の UI から直接 import してはならない (apiv3 経由でのみ触る)。
+> 上流 spec が `packages/attachment-text-extractor-client` を定義するが、これは**server 専用依存**であり本 spec の UI から直接 import してはならない (apiv3 経由でのみ触る)。
 
 ## File Structure Plan
 
@@ -228,7 +228,7 @@ apps/app/src/features/search-attachments/client/
 
 ### SSR Reachability Note
 
-- `packages/markitdown-client` / pino logger / mongoose / ES client など server 専用依存は UI から直接 import しない
+- `packages/attachment-text-extractor-client` / pino logger / mongoose / ES client など server 専用依存は UI から直接 import しない
 - apiv3 呼び出しは `fetch` (または既存 `apiv3Get/Put/Post` ユーティリティ) 経由に限定
 - 重量級依存を使う場合 (特に admin failures の表テーブルライブラリ等) は `dynamic({ ssr: false })` で分離
 
@@ -838,7 +838,7 @@ export const isAttachmentFullTextSearchEnabledAtom = atom<boolean>(false);
 - 添付モーダルで再抽出ボタン → 成功 toast 表示 → 一覧が最新化
 - 管理画面で「添付も対象にする」を ON にして Rebuild → PUT が即 200 → 進行中表示 → `FinishAddAttachment` で完了表示に戻る。`AttachmentRebuildingFailed` を受けた場合は失敗表示になり Rebuild ボタンが再び押せる。進行中に別タブから Rebuild すると 409 で「作り直しが進行中」と表示される
 - 管理画面で `extractorUri` を空から非空に設定 **かつ** `extractorToken` を設定して保存 → ガイダンス表示 → **同画面内で即座に** rebuild チェックボックス / 失敗ログパネルが表示される (`use-attachment-search-config` の `mutate()` による SWR reactivity)。`extractorUri` を空文字にクリア or `extractorToken` を削除して保存すると soft-disable となり、同画面内で即座に追加 UI が非表示になる。非 admin ユーザの既存タブへの反映は次回フルロード時 (SSR hydrate 経由)
-- extractorUri に `http://169.254.169.254/...` (クラウドメタデータ endpoint) を入力して保存ボタンを押すと 400 `invalid_extractor_uri` で reject され、inline エラー + toast が表示されること。`http://localhost/...` や `http://markitdown.default.svc.cluster.local/...` は正常に受理されること
+- extractorUri に `http://169.254.169.254/...` (クラウドメタデータ endpoint) を入力して保存ボタンを押すと 400 `invalid_extractor_uri` で reject され、inline エラー + toast が表示されること。`http://localhost/...` や `http://attachment-text-extractor.default.svc.cluster.local/...` は正常に受理されること
 - extractorToken 入力欄: 既存設定時は空欄プレースホルダに "設定済み (値は表示されません)" が出る。空欄のまま他フィールドを保存しても既存 token は維持される。明示的な「token 削除」ボタンで `null` を送り、`hasExtractorToken: false` に遷移すると即座に `isAttachmentFullTextSearchEnabled` が false 側の UI に切替わる
 
 ### Accessibility
@@ -863,7 +863,7 @@ export const isAttachmentFullTextSearchEnabledAtom = atom<boolean>(false);
 
 ### Turbopack / SSR 到達性
 
-- `packages/markitdown-client` は**UI から import 禁止** (server 専用)
+- `packages/attachment-text-extractor-client` は**UI から import 禁止** (server 専用)
 - apiv3 呼び出しは `fetch` / 既存 `apiv3*` ユーティリティ経由
 - `dynamic` 使用時は `ssr: false` を明示し、SSR 経路の breakage を避ける
 

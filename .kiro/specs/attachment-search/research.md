@@ -81,8 +81,8 @@ ES 側は `grant` (enum) / `granted_users` (keyword array) / `granted_groups` (k
 - apps/app から axios クライアント経由で呼び出し
 
 #### 本機能への転用
-- **言語差異**: pdf-converter は Node.js、markitdown-extractor は **Python** 予定。Ts.ED は使わず **FastAPI + Uvicorn** とする
-- **OpenAPI 自動生成は転用可**: FastAPI の OpenAPI スキーマを orval で取り込み `packages/markitdown-client` を生成
+- **言語差異**: pdf-converter は Node.js、attachment-text-extractor は **Python** 予定。Ts.ED は使わず **FastAPI + Uvicorn** とする
+- **OpenAPI 自動生成は転用可**: FastAPI の OpenAPI スキーマを orval で取り込み `packages/attachment-text-extractor-client` を生成
 - **HTTP 契約**: pdf-converter は JSON 応答、本機能は入力が multipart/form-data (ファイルバイト)、出力は JSON (`{ pages: [{ pageNumber, content, label }] }`)
 - **FUSE は採用しない**: 短命リクエストのため pdf-converter とはデプロイ形態が異なる
 
@@ -98,7 +98,7 @@ ES 側は `grant` (enum) / `granted_users` (keyword array) / `granted_groups` (k
 
 | Req | 既存資産 | 新規作成 | Gap タグ |
 |---|---|---|---|
-| R1 抽出 API | — | `services/markitdown-extractor` / `packages/markitdown-client` | Missing |
+| R1 抽出 API | — | `services/attachment-text-extractor` / `packages/attachment-text-extractor-client` | Missing |
 | R2 リソース保護 | — | 抽出サービス側で FastAPI middleware / semaphore | Missing |
 | R3 自動インデックス化 | `addAttachHandler` | ES attachment index / attach→抽出→index ハンドラ | Extension + Missing |
 | R4 削除・権限追従 | `addDetachHandler`, Page 削除イベント | **権限変更イベント購読**、attachment 削除ハンドラ | Extension + Missing |
@@ -110,7 +110,7 @@ ES 側は `grant` (enum) / `granted_users` (keyword array) / `granted_groups` (k
 | R10 一括再インデックス | `addAllPages`, `rebuildIndex`, Socket.io progress | `addAllAttachments()` + チェックボックス UI | Extension |
 | R11 個別再抽出 | 添付一覧モーダル | 「再抽出」ボタン + API `POST /attachments/:id/reextract` | Extension + Missing |
 | R12 失敗可視化 | — | 失敗ログ model / 集計 API / admin パネル | Missing |
-| R13 デプロイ | pdf-converter Dockerfile/compose パターン | markitdown-extractor Dockerfile + compose 追記 + k8s manifest | Extension (pattern) + Missing |
+| R13 デプロイ | pdf-converter Dockerfile/compose パターン | attachment-text-extractor Dockerfile + compose 追記 + k8s manifest | Extension (pattern) + Missing |
 | R14 互換性・隔離 | 機能無効時のフェールセーフ | 機能フラグによる条件分岐 | Constraint |
 
 ### Complexity 信号
@@ -162,7 +162,7 @@ ES 側は `grant` (enum) / `granted_users` (keyword array) / `granted_groups` (k
 
 #### 組み合わせ戦略
 - **拡張**: SearchService / ElasticsearchDelegator / SearchResultList / SearchResultContent / ElasticsearchManagement / Crowi 初期化 / AttachmentService (ハンドラ登録のみ)
-- **新規**: services/markitdown-extractor / packages/markitdown-client / `attachments` ES index と mapping / AttachmentHitCard コンポーネント / ファセットタブ / 添付専用 admin セクション / 失敗ログ model
+- **新規**: services/attachment-text-extractor / packages/attachment-text-extractor-client / `attachments` ES index と mapping / AttachmentHitCard コンポーネント / ファセットタブ / 添付専用 admin セクション / 失敗ログ model
 - **リスク緩和**:
   - 機能フラグ (R9 の有効化トグル) による段階ロールアウト
   - 既存 Page index / 既存検索クエリは無変更に近い → 機能無効時の互換性を自然に担保 (R14)
@@ -189,8 +189,8 @@ ES 側は `grant` (enum) / `granted_users` (keyword array) / `granted_groups` (k
 
 | ワークパッケージ | Effort | Risk | 根拠 |
 |---|---|---|---|
-| services/markitdown-extractor (新規、FastAPI) | M | Medium | FastAPI 標準構成だが Python 言語追加で CI/配布系に新規導入が必要 |
-| packages/markitdown-client (orval 生成) | S | Low | pdf-converter-client の orval 設定を模倣できる |
+| services/attachment-text-extractor (新規、FastAPI) | M | Medium | FastAPI 標準構成だが Python 言語追加で CI/配布系に新規導入が必要 |
+| packages/attachment-text-extractor-client (orval 生成) | S | Low | pdf-converter-client の orval 設定を模倣できる |
 | ES attachments index + mapping + delegator 拡張 | M | Medium | 既存 delegator パターンを踏襲、ES 7/8/9 三版対応の mapping 追加 |
 | AttachmentService ハンドラ登録 + 抽出→index 連携 | M | Medium | 既存 hook は fire-and-forget、失敗可視化の配線を追加 |
 | 権限変更時の追従 (R4.3) | S | Medium | 現状 Page 権限変更時のハンドラ連携が弱い → 対応箇所特定が要調査 |
@@ -233,7 +233,7 @@ ES 側は `grant` (enum) / `granted_users` (keyword array) / `granted_groups` (k
 
 ## Conclusion
 
-Option C (Hybrid) を推奨。既存の `AttachmentService` / `ElasticsearchDelegator` / `SearchService` / `ElasticsearchManagement` / `SearchResultList` / `SearchResultContent` の拡張ポイントと、新規 `services/markitdown-extractor` / `packages/markitdown-client` / 添付専用 ES インデックス / 新規 UI コンポーネント群を組み合わせる。pdf-converter のマイクロサービス + orval パターンを転用しつつ、言語は Python (FastAPI) に切り替え、デプロイは共有サービス + HPA とする。
+Option C (Hybrid) を推奨。既存の `AttachmentService` / `ElasticsearchDelegator` / `SearchService` / `ElasticsearchManagement` / `SearchResultList` / `SearchResultContent` の拡張ポイントと、新規 `services/attachment-text-extractor` / `packages/attachment-text-extractor-client` / 添付専用 ES インデックス / 新規 UI コンポーネント群を組み合わせる。pdf-converter のマイクロサービス + orval パターンを転用しつつ、言語は Python (FastAPI) に切り替え、デプロイは共有サービス + HPA とする。
 
 design phase では上記「主要設計判断」および「Research Needed」を入力として、Boundary Commitments を確定する。
 
@@ -284,8 +284,8 @@ _Generated: 2026-04-17 (during `/kiro-spec-design`)_
 - FastAPI は `/openapi.json` を自動生成 ([FastAPI SDK generation docs](https://fastapi.tiangolo.com/advanced/generate-clients/))
 - pdf-converter と同じく orval が OpenAPI spec (yaml/json) を入力として axios ベースクライアントを生成可能
 - **採用パイプライン**:
-  1. FastAPI 側に `scripts/export-openapi.py` を置き、`/openapi.json` を `packages/markitdown-client/openapi.json` に書き出し
-  2. `packages/markitdown-client` の turbo task で orval を実行し TS クライアントを生成
+  1. FastAPI 側に `scripts/export-openapi.py` を置き、`/openapi.json` を `packages/attachment-text-extractor-client/openapi.json` に書き出し
+  2. `packages/attachment-text-extractor-client` の turbo task で orval を実行し TS クライアントを生成
   3. CI の pre-commit / pipeline で両ステップを実行し、差分を commit に反映 (Vinta / PropelAuth / full-stack-fastapi-template パターン)
 - 差分検出なしで CI を通す簡易版: クライアントコードをリポジトリにコミット (監査と可読性優先)、別途 `check-openapi-drift` を turbo task 化
 
@@ -327,7 +327,7 @@ _Source: brief.md (original single-spec phase, 2026-04-17)_
 
 ## 採用アーキテクチャ概要
 
-**Python 版 microsoft/markitdown を共有 HTTP マイクロサービス (`markitdown-extractor`) として分離し、apps/app (Node.js) から HTTP 経由で呼び出してテキスト抽出、結果を Elasticsearch にインデックスする。**
+**Python 版 microsoft/markitdown を共有 HTTP マイクロサービス (`attachment-text-extractor`) として分離し、apps/app (Node.js) から HTTP 経由で呼び出してテキスト抽出、結果を Elasticsearch にインデックスする。**
 
 ### 採用根拠
 

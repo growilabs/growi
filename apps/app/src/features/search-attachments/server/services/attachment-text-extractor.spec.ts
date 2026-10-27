@@ -14,8 +14,8 @@ import type { IAttachmentDocument } from '~/server/models/attachment';
 import { Attachment } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 
-// Mock the generated markitdown-client function
-vi.mock('@growi/markitdown-client', () => ({
+// Mock the generated attachment-text-extractor-client function
+vi.mock('@growi/attachment-text-extractor-client', () => ({
   postExtractExtractPost: vi.fn(),
   ErrorCode: {
     unauthorized: 'unauthorized',
@@ -80,9 +80,11 @@ describe('AttachmentTextExtractorService', () => {
     vi.clearAllMocks();
 
     // Import the mock to set expectations on it
-    const markitdownClient = await import('@growi/markitdown-client');
+    const extractorClient = await import(
+      '@growi/attachment-text-extractor-client'
+    );
     postExtractExtractPost =
-      markitdownClient.postExtractExtractPost as unknown as MockInstance;
+      extractorClient.postExtractExtractPost as unknown as MockInstance;
 
     // Setup file uploader mock
     mockFileUploader = {

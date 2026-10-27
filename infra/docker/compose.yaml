@@ -1,9 +1,9 @@
 services:
-  markitdown-extractor:
+  attachment-text-extractor:
     build:
-      context: ../../services/markitdown-extractor
+      context: ../../services/attachment-text-extractor
       dockerfile: Dockerfile
-    image: markitdown-extractor:local
+    image: attachment-text-extractor:local
     env_file:
       - .env
     ports:

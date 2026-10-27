@@ -2,7 +2,7 @@
 
 _Generated: 2026-04-17_
 
-本ドキュメントは 3-way split 後の 3 spec (`markitdown-extractor` / `attachment-search-indexing` / `attachment-search-ui`) に対して `/kiro-validate-design` が指摘した全 9 Critical/Minor Issues と、それらに対する解決の記録。
+本ドキュメントは 3-way split 後の 3 spec (`attachment-text-extractor` / `attachment-search-indexing` / `attachment-search-ui`) に対して `/kiro-validate-design` が指摘した全 9 Critical/Minor Issues と、それらに対する解決の記録。
 
 ## 経緯
 
@@ -22,9 +22,9 @@ _Generated: 2026-04-17_
 | 4 | attachment-search-indexing | 🔴 Critical | `pageEvent` 購読の網羅性が不透明、権限同期漏洩リスク | **Option D 採用**: 権限 snapshot 廃止、query-time permission lookup |
 | 5 | attachment-search-indexing | 🔴 Critical | rebuildIndex 中断時の tmp index 累積リスク | 既存 Page 側の `${indexName}-tmp` 固定名 + drop & create パターンに統一 |
 | 6 | attachment-search-indexing | 🔴 Critical | `requiresReindex` 状態遷移ルール未定義 | **count 方式 computed** (Config persist なし、30 秒 TTL cache) |
-| 7 | markitdown-extractor | 🟡 Minor | OpenAPI spec の下流引き渡しと drift 検知未確定 | commit 済み `openapi.json` + 両 CI の `git diff --exit-code` |
-| 8 | markitdown-extractor | 🟡 Minor | Python CI workflow の gate 条件未確定 | 必須 jobs テーブル確定 (image size 450MB / trivy CRITICAL+HIGH) |
-| 9 | markitdown-extractor | 🟡 Minor | pdfminer.six フォールバックの feature detection 未定 | 起動時 capability probe + `/readyz` expose |
+| 7 | attachment-text-extractor | 🟡 Minor | OpenAPI spec の下流引き渡しと drift 検知未確定 | commit 済み `openapi.json` + 両 CI の `git diff --exit-code` |
+| 8 | attachment-text-extractor | 🟡 Minor | Python CI workflow の gate 条件未確定 | 必須 jobs テーブル確定 (image size 450MB / trivy CRITICAL+HIGH) |
+| 9 | attachment-text-extractor | 🟡 Minor | pdfminer.six フォールバックの feature detection 未定 | 起動時 capability probe + `/readyz` expose |
 
 ---
 
@@ -147,13 +147,13 @@ async function computeRequiresReindex(): Promise<boolean> {
 
 **Resolution**: `services/` が pnpm workspace 外であるため pdf-converter の turbo 依存パターン (`@growi/pdf-converter#gen:swagger-spec`) は適用不可。**commit 済み `openapi.json` + 両 CI の `git diff --exit-code` 2 段検知**を採用。
 
-- `packages/markitdown-client/openapi.json`: 上流 Python スクリプトが直接上書き、commit 必須
-- Python CI: `export_openapi.py` 実行 + `git diff --exit-code packages/markitdown-client/openapi.json`
-- Node CI: orval 実行 + `git diff --exit-code packages/markitdown-client/src/`
+- `packages/attachment-text-extractor-client/openapi.json`: 上流 Python スクリプトが直接上書き、commit 必須
+- Python CI: `export_openapi.py` 実行 + `git diff --exit-code packages/attachment-text-extractor-client/openapi.json`
+- Node CI: orval 実行 + `git diff --exit-code packages/attachment-text-extractor-client/src/`
 - PR レビューで schema 変更が可視化、両 CI の drift 検知で commit し忘れを即 fail
 
 **Applied changes**:
-- markitdown-extractor/design.md: API Contract に drift 検知パイプラインを記述、pdf-converter との差異を明記、`Open Question #3` を [Resolved]
+- attachment-text-extractor/design.md: API Contract に drift 検知パイプラインを記述、pdf-converter との差異を明記、`Open Question #3` を [Resolved]
 - attachment-search-indexing/design.md: File Structure Plan に commit 方針を記述、drift 検知 2 段を明記、`Open Question #1` を [Resolved]
 
 ---
@@ -173,10 +173,10 @@ async function computeRequiresReindex(): Promise<boolean> {
 | Docker build | `docker build` | 失敗で fail |
 | Image size | `docker image inspect`、**>450MB で fail** | 目標 250-400MB + 余裕 50MB |
 | Trivy scan | `trivy image --severity CRITICAL,HIGH --exit-code 1` | 検出で fail |
-| OpenAPI drift | `git diff --exit-code packages/markitdown-client/openapi.json` | 未 commit で fail |
+| OpenAPI drift | `git diff --exit-code packages/attachment-text-extractor-client/openapi.json` | 未 commit で fail |
 | Release (main) | `docker push ghcr.io` | main branch push 時のみ |
 
-**Applied changes** (markitdown-extractor/design.md):
+**Applied changes** (attachment-text-extractor/design.md):
 - File Structure Plan § CI Workflow セクションを新設、必須 jobs テーブル化
 - image size 上限 450MB を design レベルの NFR として固定
 - `Open Question #2 / #4` を [Resolved] 化
@@ -196,7 +196,7 @@ async function computeRequiresReindex(): Promise<boolean> {
 - ランタイム try/except は不採用 (起動時 1 回判定で確定)
 - version pin: `markitdown>=0.1.5` (最小)、PR #1263 stable release 後に pin を上げて fallback 削除検討
 
-**Applied changes** (markitdown-extractor/design.md):
+**Applied changes** (attachment-text-extractor/design.md):
 - Per-format Extractors § pdf_extractor に Feature detection 戦略を明記
 - テストで `MarkItDown` mock による両 strategy 判定の verify 要件追加
 - `Open Question #1` を [Resolved] 化

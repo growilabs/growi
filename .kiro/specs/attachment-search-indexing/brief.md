@@ -4,7 +4,7 @@
 
 ## Problem
 
-`attachment-search-markitdown-extractor` spec で抽出サービスが動作しても、GROWI の既存検索基盤 (Elasticsearch) に抽出結果が流し込まれなければ検索できない。また、添付アップロード・削除・親ページ権限変更などのイベントに検索インデックスを追従させる仕組み、管理者向けの一括再インデックス・個別再抽出・失敗可視化の API が必要。
+`attachment-search-text-extractor` spec で抽出サービスが動作しても、GROWI の既存検索基盤 (Elasticsearch) に抽出結果が流し込まれなければ検索できない。また、添付アップロード・削除・親ページ権限変更などのイベントに検索インデックスを追従させる仕組み、管理者向けの一括再インデックス・個別再抽出・失敗可視化の API が必要。
 
 ## Current State
 
@@ -25,7 +25,7 @@
 - 抽出失敗が MongoDB に記録され admin が参照できる
 - 検索クエリが Page index と Attachment index を multi-index で評価し、結果を親ページ単位に集約した応答型を返す
 - Admin 画面用に設定 API / 失敗ログ API が提供される
-- `packages/markitdown-client` が orval で自動生成され apps/app から型安全に呼べる
+- `packages/attachment-text-extractor-client` が orval で自動生成され apps/app から型安全に呼べる
 
 ## Approach
 
@@ -35,7 +35,7 @@
 - **ES delegator 拡張**: 独立 delegator を作らず、既存 `ElasticsearchDelegator` に `syncAttachment*` メソッドと `addAllAttachments()` を composition で追加
 - **Indexer 単一窓口**: `AttachmentSearchIndexer.indexAttachment(attachmentId)` が attach/detach/reextract/bulk すべてのエントリポイント (Synthesis で汎化済み)
 - **権限スナップショット**: 添付 ES 文書に `grant` / `granted_users` / `granted_groups` をコピーして保持。親ページ変更時に `update_by_query` で partial update
-- **Client package**: `packages/markitdown-client/` を新規追加。orval が `services/markitdown-extractor/` の OpenAPI spec を入力に TS クライアントを自動生成 (pdf-converter-client と同パターン)
+- **Client package**: `packages/attachment-text-extractor-client/` を新規追加。orval が `services/attachment-text-extractor/` の OpenAPI spec を入力に TS クライアントを自動生成 (pdf-converter-client と同パターン)
 - **Config keys**: `app:attachmentFullTextSearch:enabled` / `extractorUrl` / `maxFileSizeBytes` / `timeoutMs` / `maxConcurrency` を [config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) に追加
 - **検索クエリ**: ES `_msearch` で page_index と attachments_index を並列クエリ、app 側で `pageId` 集約。viewer フィルタは既存 `filterPagesByViewer` と同じ権限モデル
 - **性能 fallback**: 添付 msearch が設定閾値を超過したら添付ヒットを除外し Page 結果のみ返す safety net
@@ -47,7 +47,7 @@
 
 #### 新規ファイル (feature module)
 - `apps/app/src/features/search-attachments/server/` 配下:
-  - `services/attachment-text-extractor.ts` (markitdown-client wrapper、failure 正規化)
+  - `services/attachment-text-extractor.ts` (attachment-text-extractor-client wrapper、failure 正規化)
   - `services/attachment-search-indexer.ts` (attach/detach/reextract 単一窓口)
   - `services/attachment-search-delegator-extension.ts` (ESDelegator 拡張)
   - `services/attachment-reindex-batch.ts` (bulk 再インデックス + Socket.io progress)
@@ -62,7 +62,7 @@
 - `apps/app/src/features/search-attachments/interfaces/attachment-search.ts` (DTOs: `IAttachmentHit`, `IAttachmentEsDoc`, `ExtractionFailure` 等)
 
 #### 新規パッケージ
-- `packages/markitdown-client/` (orval.config.js / openapi.json / 生成物 / package.json)
+- `packages/attachment-text-extractor-client/` (orval.config.js / openapi.json / 生成物 / package.json)
 
 #### 既存ファイル修正
 - [apps/app/src/server/crowi/index.ts](apps/app/src/server/crowi/index.ts): `initAttachmentFullTextSearch(this)` を searchService/attachmentService 初期化後に追加
@@ -73,9 +73,9 @@
 - [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js): `PUT /search/indices` に `includeAttachments` フラグ受理。添付を含む作り直しは裏で実行して即応答し、完了・失敗は Socket.io で通知
 
 ### Out
-- Python 抽出サービス本体の実装 — `attachment-search-markitdown-extractor` spec (前段 spec)
+- Python 抽出サービス本体の実装 — `attachment-search-text-extractor` spec (前段 spec)
 - 検索結果 UI / 添付モーダル UI / 管理画面 UI — `attachment-search-ui` spec (後段 spec)
-- OpenAPI export script の実装 — `attachment-search-markitdown-extractor` spec
+- OpenAPI export script の実装 — `attachment-search-text-extractor` spec
 - 添付ファイル自体の保管方式変更 (FileUploader 抽象は据え置き)
 - 既存 Page 検索クエリ・ランキング・権限モデル本体の改変
 - 永続ジョブキュー化 (fire-and-forget パターンを継続)
@@ -83,7 +83,7 @@
 
 ## Boundary Candidates
 
-1. **TS クライアントパッケージ** (`packages/markitdown-client/`) — OpenAPI 消費 → orval 生成、server 専用依存として apps/app に渡される
+1. **TS クライアントパッケージ** (`packages/attachment-text-extractor-client/`) — OpenAPI 消費 → orval 生成、server 専用依存として apps/app に渡される
 2. **抽出クライアント wrapper** (`attachment-text-extractor.ts`) — 到達不可/エラー正規化層
 3. **Indexer 層** (`attachment-search-indexer.ts` + grant-sync + reindex-batch) — ES への書き込み責務
 4. **ES 契約層** (`delegator-extension` + `mappings/*` + `queries/build-attachment-search-query.ts`) — Elasticsearch との接続責務
@@ -102,7 +102,7 @@
 ## Upstream / Downstream
 
 ### Upstream (依存先)
-- `attachment-search-markitdown-extractor` spec: OpenAPI spec と Docker image
+- `attachment-search-text-extractor` spec: OpenAPI spec と Docker image
 - 既存 `ElasticsearchDelegator` / `SearchService` / `AttachmentService` / `FileUploader` / `ConfigManager` / `pageEvent`
 - 既存 Socket.io progress チャネル (`AddPageProgress` 等) — 同パターンで `AddAttachmentProgress` を追加
 - 既存 `apps/pdf-converter` + `packages/pdf-converter-client` (orval パターンの参考)
@@ -117,18 +117,18 @@
 - **Extends**:
   - (暗黙) 既存検索 / 添付サブシステム。spec 化されていないが apps/app 内の SearchService / AttachmentService / ElasticsearchDelegator を拡張
 - **Adjacent**:
-  - `attachment-search-markitdown-extractor` (上流 API 提供元)
+  - `attachment-search-text-extractor` (上流 API 提供元)
   - `attachment-search-ui` (下流 UI 消費者)
   - `suggest-path` (既存 spec、検索体験で隣接するが責務は重ならない)
 
 ## Constraints
 
 - **ライセンス**: MIT / Apache-2.0 / BSD 系のみ (orval は MIT)
-- **対応 OS**: apps/app は Windows/macOS/Linux 全対応を維持 (markitdown-client は純 TS で cross-platform)
+- **対応 OS**: apps/app は Windows/macOS/Linux 全対応を維持 (attachment-text-extractor-client は純 TS で cross-platform)
 - **ES バージョン**: 既存のサポート範囲 (8/9) に従う (各 mapping 変種を `attachments-mappings-esN.ts` に分離)
 - **非互換ゼロ**: 機能無効時は既存検索 API のレイテンシ・結果順序・応答形式を機能導入前と同一にする (R14.1)
 - **マルチテナント**: 共有 ES クラスタの ingest ノード上では抽出処理を実行しない (apps/app 側で完結)。抽出サービスの同時実行上限で他テナント影響を抑える
 - **ハンドラの fire-and-forget 特性**: 例外は pino ログと FailureLog 永続化で確実に捕捉する (UI に通知する経路は別 spec の admin UI が担当)
 - **API 後方互換**: `IPageWithSearchMeta.attachmentHits` は optional に限定、既存クライアントが破壊的変更を受けないこと
-- **OpenAPI drift 検知**: CI で `services/markitdown-extractor/` の OpenAPI spec と `packages/markitdown-client/openapi.json` の差分を検知し、古いクライアントでのビルドを防ぐ
+- **OpenAPI drift 検知**: CI で `services/attachment-text-extractor/` の OpenAPI spec と `packages/attachment-text-extractor-client/openapi.json` の差分を検知し、古いクライアントでのビルドを防ぐ
 - **rebuildIndex 中断時の方針**: best-effort 冪等バッチ (alias swap 未実行で旧 index 維持、admin の再実行で最初からやり直し)。チェックポイント再開は初期実装では採用しない

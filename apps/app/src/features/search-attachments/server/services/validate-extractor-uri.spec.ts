@@ -86,7 +86,9 @@ describe('validateExtractorUri', () => {
 
   describe('should ACCEPT (ok: true)', () => {
     it('accepts docker-compose service name', () => {
-      expect(validateExtractorUri('http://markitdown-extractor:8000')).toEqual({
+      expect(
+        validateExtractorUri('http://attachment-text-extractor:8000'),
+      ).toEqual({
         ok: true,
       });
     });
@@ -94,7 +96,7 @@ describe('validateExtractorUri', () => {
     it('accepts k8s FQDN with .svc.cluster.local', () => {
       expect(
         validateExtractorUri(
-          'https://markitdown-extractor.svc.cluster.local:8000',
+          'https://attachment-text-extractor.svc.cluster.local:8000',
         ),
       ).toEqual({ ok: true });
     });
@@ -102,7 +104,7 @@ describe('validateExtractorUri', () => {
     it('accepts k8s FQDN with namespace.svc.cluster.local', () => {
       expect(
         validateExtractorUri(
-          'http://markitdown-extractor.default.svc.cluster.local',
+          'http://attachment-text-extractor.default.svc.cluster.local',
         ),
       ).toEqual({ ok: true });
     });

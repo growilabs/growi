@@ -522,23 +522,23 @@ export const CONFIG_DEFINITIONS = {
   // Attachment Full-Text Search Settings
   'app:attachmentFullTextSearch:extractorUri': defineConfig<string | undefined>(
     {
-      envVarName: 'GROWI_MARKITDOWN_EXTRACTOR_URI',
+      envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_URI',
       defaultValue: undefined,
     },
   ),
   'app:attachmentFullTextSearch:extractorToken': defineConfig<
     string | undefined
   >({
-    envVarName: 'GROWI_MARKITDOWN_SERVICE_TOKEN',
+    envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_SERVICE_TOKEN',
     defaultValue: undefined,
     isSecret: true,
   }),
   'app:attachmentFullTextSearch:timeoutMs': defineConfig<number>({
-    envVarName: 'GROWI_MARKITDOWN_TIMEOUT_MS',
+    envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_TIMEOUT_MS',
     defaultValue: 60000,
   }),
   'app:attachmentFullTextSearch:maxFileSizeBytes': defineConfig<number>({
-    envVarName: 'GROWI_MARKITDOWN_MAX_FILE_SIZE_BYTES',
+    envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_MAX_FILE_SIZE_BYTES',
     defaultValue: 52428800, // 50 MB
   }),
 
@@ -1571,7 +1571,7 @@ export const CONFIG_DEFINITIONS = {
 
   // Control Flags for Env Vars
   'env:useOnlyEnvVars:app:attachmentFullTextSearch': defineConfig<boolean>({
-    envVarName: 'MARKITDOWN_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+    envVarName: 'ATTACHMENT_EXTRACTOR_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
   }),
   'env:useOnlyEnvVars:app:siteUrl': defineConfig<boolean>({

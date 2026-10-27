@@ -9,7 +9,7 @@
 ### スコープ
 
 - **In**: 既存 SearchPage / PageAttachmentList / ElasticsearchManagement への拡張。新規コンポーネント群 (`AttachmentHitCard` / `AttachmentSubEntry` / `SearchResultFacetTabs` / `ReextractButton` / `AttachmentSearchSettings` / `AttachmentExtractionFailures` / `RebuildWithAttachmentsCheckbox`) と SWR hooks を feature module 配下に集約。機能無効時の UI 完全隠蔽。
-- **Out**: apiv3 エンドポイント実装、ES 連携、Config 永続化 (上流 `attachment-search-indexing` 責務)。抽出サービス本体 (`attachment-search-markitdown-extractor` 責務)。添付ビューア本体の変更、PDF インラインプレビュー、形式別詳細ファセット、抽出テキストの全文プレビュー表示、選択的再インデックス UI。
+- **Out**: apiv3 エンドポイント実装、ES 連携、Config 永続化 (上流 `attachment-search-indexing` 責務)。抽出サービス本体 (`attachment-search-text-extractor` 責務)。添付ビューア本体の変更、PDF インラインプレビュー、形式別詳細ファセット、抽出テキストの全文プレビュー表示、選択的再インデックス UI。
 
 詳細は [brief.md](./brief.md) を参照。
 
@@ -37,7 +37,7 @@ UI 拡張は 3 領域に分かれる。第 1 に検索結果画面で、左ペ�
   - Config キーの定義と MongoDB 永続化は上流 `attachment-search-indexing` spec
   - `IPageWithSearchMeta.attachmentHits[]` の型定義とサーバ側での構築は上流 `attachment-search-indexing` spec
   - ES 連携 / ES インデックス mapping / AttachmentService ハンドラ登録 / pageEvent 権限追従は上流 `attachment-search-indexing` spec
-  - 抽出サービス本体 (`attachment-search-markitdown-extractor` spec)
+  - 抽出サービス本体 (`attachment-search-text-extractor` spec)
   - 添付ビューア本体の改修 (既存ビューアへ遷移するだけ)
   - PDF インラインプレビュー、形式別詳細ファセット、抽出テキスト全文プレビュー、選択的再インデックス UI
 - **Adjacent expectations (this feature relies on these)**:
