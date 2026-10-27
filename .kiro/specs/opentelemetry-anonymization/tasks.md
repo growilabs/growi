@@ -106,7 +106,7 @@
   - 完了時: 上記の結果（件数と、平文が 0 件であること）と受信側への影響を、PR の説明に書ける形で記録してある
   - _Requirements: 1.2, 1.3, 1.4, 8.1, 8.2, 9.1, 9.2_
 
-- [ ] 5.2 apps/app 全体の lint・テスト・build を通す
+- [x] 5.2 apps/app 全体の lint・テスト・build を通す
   - `turbo run lint test build --filter @growi/app` 相当を実行する（routes 配下は触らないが、`tools/` と `test-utils` を変えるため lint 全体を回す）
   - 完了時: すべて成功する
   - _Requirements: 3.3_
@@ -133,3 +133,4 @@
 - 4.1: handler 4 本・module のインターフェース・古い `anonymizeQueryParams` を削除し、`anonymizeSearchParams` を `anonymizeQueryParams` に改名済み。`/_api/v3/page/check-page-existence?path=` など個別 URL の専用テストは消えたが、共通パラメータ名の規則で処理される。ルート単位の網羅は 4.2・4.3 が受け持つ。
 - 4.2: `coverage.spec.ts` は requirements.md の `## 匿名化対象一覧` の表を実行時に読む（`REQUIREMENTS_PATH` 定数）。この spec を改名・削除する／`kiro-spec-cleanup` をかけるときは、表を残すか、表を別の場所へ移して定数を直す。
 - 5.1: 変更前の handler と新実装を 218 件の URL で比べた（一覧表の例 84 件を含む）。変更前に匿名化されていて変更後に平文になった URL は 0 件、ASCII ページパスのハッシュは一致。hook の出力を計測部品の `getIncomingRequestAttributes` に通す 3 通り（未設定・`http`・`http/dup`）× 16 URL × Host 有無の 96 通りで、元の値が残った属性は 0 件。PR 説明用のまとめは作業用の一時領域にあり、リポジトリには入れていない。
+- 5.2: この worktree では pnpm/turbo が使えないため、`apps/app` で biome・route guard・import guard・stylelint・`tsc` 系の実体を直接実行した。結果: lint 一式と server build は成功。`tsgo --noEmit` は `packages/core/dist` 未ビルドによる既存の 2 件だけ。全テストの失敗 4 ファイル（vault-manager の dist 未ビルド、vendor-styles prebuilt 未生成）は本ブランチの変更と無関係。client build（`next build`）は未実施なので、CI で確かめる。
