@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. 前提の整備
-- [ ] 1.1 PR #12151 のマージ後の master から実装ブランチを作り直す
+- [x] 1.1 PR #12151 のマージ後の master から実装ブランチを作り直す
   - 本 spec のブランチ（spec ファイルのみ）を、PR #12151（URL 属性への反映）を含む master の最新に付け替える
   - 実装はこの付け替えの後に始める。`build-url-attributes` を本 spec で作り直さない
   - 完了時: 実装ブランチに `build-url-attributes` とそのテストがあり、匿名化まわりの既存テストがすべて通る
@@ -118,3 +118,8 @@
   - brief.md の Layer 4 の記述を本 spec への参照に置き換え、spec.json の `updated_at` を更新する（`phase` / `approvals` は変えない）
   - 完了時: `opentelemetry` spec の中で匿名化の契約を記述している箇所が、本 spec への参照だけになっている
   - _Requirements: 2.1_
+
+## Implementation Notes
+
+- 1.1: PR #12151 が未マージ（2026-10-27 時点）のため、実装ブランチは #12151 のコミット（`fix/otel-anonymize-http-url`）の上に載せた。#12151 のマージ後は `git rebase origin/master` でそのコミットが外れる。
+- 検証コマンド: worktree の `node_modules` は本体チェックアウトへの symlink で、`pnpm vitest` / `pnpm run` は `pnpm install` を誘発して失敗する。`apps/app` で `node_modules/.bin/vitest run <パターン>` を直接使う。
