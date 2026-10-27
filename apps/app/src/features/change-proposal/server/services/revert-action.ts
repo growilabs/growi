@@ -27,11 +27,13 @@ import type {
   ServiceResult,
 } from './change-proposal-service-types';
 import {
+  type DeleteAuthority,
   loadCurrentPageFacts,
   loadViewablePages,
   type ViewablePages,
 } from './current-page-facts';
 import { pageModel } from './operation-handlers/page-model';
+import type { PageDeletePermissionService } from './page-delete-permission';
 import { isRequesterAllowed } from './pre-write-checks';
 import type { ProposalApplier } from './proposal-applier';
 import { toRevertRefusalReason } from './to-original-operation-change';
@@ -176,8 +178,9 @@ const judgeOperations = async (
   proposal: ChangeProposalDocument,
   chosen: readonly OperationRecord[],
   pages: ViewablePages['pages'],
+  deleteAuthority: DeleteAuthority,
 ): Promise<readonly Judged[]> => {
-  const factsOf = await loadCurrentPageFacts(chosen, pages);
+  const factsOf = await loadCurrentPageFacts(chosen, pages, deleteAuthority);
   const preJudged: Judged[] = chosen.map((op) => {
     const facts = factsOf(op);
     const judgement = judgeRevertability(op, proposal.entry, facts);
@@ -208,8 +211,9 @@ const judgeOperations = async (
 export const createRevertAction = (deps: {
   readonly applier: ProposalApplier;
   readonly now: () => Date;
+  readonly pageService: PageDeletePermissionService;
 }): RevertAction => {
-  const { applier, now } = deps;
+  const { applier, now, pageService } = deps;
 
   // A refusal decided before any write is recorded on the original right away.
   const recordRefusals = async (
@@ -307,6 +311,7 @@ export const createRevertAction = (deps: {
         proposal,
         chooseOperations(visible, keys),
         viewable.pages,
+        { user, pageService },
       );
       const revertible = judged.flatMap((entry) =>
         entry.revertible == null ? [] : [entry.revertible],

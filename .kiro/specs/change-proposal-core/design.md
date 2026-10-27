@@ -540,6 +540,7 @@ type CurrentPageFacts = {
   readonly latestRevisionId: string | null;
   readonly hasChildren: boolean;
   readonly isPathOccupied: (path: string) => boolean; // pre-fetched occupancy of the paths this op needs
+  readonly canDelete: boolean; // whether the actor may delete the page (pageService.canDelete / pageDeletionAuthority), pre-fetched
 };
 function judgeRevertability(op: OperationRecord, proposalEntry: ProposalEntry, facts: CurrentPageFacts): Revertability;
 
@@ -615,7 +616,8 @@ function shouldSendPerPageNotifications(
   - 新規作成: 子のページがある → `has-children`。最新のリビジョンが反映で作ったリビジョンでない → `edited-after-apply`
   - 移動: ページのパスが移動先のままでない → `moved-after-apply`。移動元のパスが使われている → `original-path-occupied`
   - ごみ箱（取り消しで行った操作。要件 5.15）: ページのパスが、ごみ箱へ移したときのパス（`/trash` で始まるパス）のままでない → `not-in-trash`。ごみ箱へ移す前のパス（今のパスから先頭の `/trash` を除いたもの。既存の `Page.getRevertDeletedPageName` と同じ）に空でないページがある → `original-path-occupied`。最新のリビジョンが、この操作の `expectedRevisionId`（元の新規作成で作ったリビジョン）でない → `edited-after-apply`
-  - ごみ箱から戻す（取り消しで行った操作。要件 5.16）: 新規作成と同じ規則（子のページ、最新のリビジョンが `expectedRevisionId` のままか）
+  - ごみ箱から戻す（取り消しで行った操作。要件 5.16）: 新規作成と同じ規則（子のページ、最新のリビジョンが `expectedRevisionId` のままか、削除権限）
+  - 新規作成の取り消し（ごみ箱へ移す）の削除権限: 子のページ → 反映後の編集 の判定のあと、取り消しを求めた人が `pageService.canDelete`（管理者設定 `security:pageDeletionAuthority`。人の削除 route と同じく `getCreatorIdForCanDelete` で作成者を求める）で削除できなければ `not-deletable`。`CurrentPageFacts.canDelete` は ProposalService が取り消しを求めた人（取得では見る人）の権限でまとめて読む
   - それ以外 → 戻せる
 - ごみ箱へ移す前のパスに空のページ（子のページのためだけにある、中身の無いページ）があっても、使われているとはみなさない。既存の `revertDeletedPage` は、空のページがあればそれと置き換え、空でないページがあるときだけ `PathAlreadyExistsError` を投げるので、その判断に合わせる。
 - `selectAutoApplyTargets` は、`relation` が `rework` なら方針にかかわらず空を返す（見直しは依頼した人が差分を確かめてから反映する。要件 13.4）。`follow-up` と `null` は今までどおり方針で決める（要件 13.7）。
@@ -858,10 +860,10 @@ interface OperationHandler<T extends OperationRecord> {
   sendPerPageNotifications(op: T, outcome: Extract<OperationOutcome, { status: 'applied' }>, ctx: OperationContext): Promise<void>;
 }
 ```
-- **edit**: `Page.findByIdAndViewer(pageId, requester)` で取れなければ `failed: target-unavailable`。取れたら `updatePageBody({ mode: 'proposal', expectedRevisionId: baseRevisionId, proposalMark: toRevisionProposalMark({ proposalId, operationKey }), … })`。`conflict` なら `stale`。
-- **create**: 近い祖先のページを依頼した人が閲覧できなければ `failed: target-unavailable`。パスが使われていれば（`Page.exists({ path, isEmpty: false })`）`failed: path-occupied`。`pageService.create(path, body, requester, { proposalMark: toRevisionProposalMark({ proposalId, operationKey }) })` を、`grant` を渡さずに呼ぶ（閲覧範囲は祖先から引き継がれる。要件 3.9）。印は最初のリビジョンにだけ書き、ページには書かない（要件 6.2）。閲覧範囲を依頼した人に割り当てられずに断られたときは `failed: grant-not-assignable`。WIP は指定しない（OQ-4）。
-- **move**: 移動元のページを依頼した人が閲覧できなければ `failed: target-unavailable`。移動先が使われていれば `failed: path-occupied`。`pageService.renamePage(page, toPath, requester, { isRecursively: page.descendantCount > 0, createRedirectPage: true, updateMetadata: true, isInAppNotificationSuppressed: !perPageNotifications }, activityParameters)`。取り消しの移動（`removeRedirectsFrom` を持つ）では `createRedirectPage: false` にし、移動のあとで `deleteRedirectsFromPathTree(removeRedirectsFrom)` を呼ぶ（要件 5.7）。
-- **trash**（取り消しだけ。新規作成の取り消しと、ごみ箱から戻した操作の取り消しに使う）: ページの最新のリビジョンが `expectedRevisionId` でない、または子のページがあれば `failed`（理由は `judgeRevertability` と同じ値）。`pageService.deletePage(page, requester, { isInAppNotificationSuppressed: !perPageNotifications }, false, activityParameters)`。
+- **edit**: `Page.findByIdAndViewer(pageId, requester)` で取れなければ `failed: target-unavailable`。取れたら `updatePageBody({ mode: 'proposal', expectedRevisionId: baseRevisionId, proposalMark: toRevisionProposalMark({ proposalId, operationKey }), … })`。`conflict` なら `stale`。（ユーザーページの保護: `security:disableUserPages` が真で `/user` 配下ならページを読んだ直後、書き込みより前に `failed: target-unavailable`。判定は共通の `findUserPageWriteRefusal`（server/service/page/user-page-write-guard.ts）で、人の route と同じ `isUsersTopPage` / `isUserPage` を使う）
+- **create**: 近い祖先のページを依頼した人が閲覧できなければ `failed: target-unavailable`。パスが使われていれば（`Page.exists({ path, isEmpty: false })`）`failed: path-occupied`。`pageService.create(path, body, requester, { proposalMark: toRevisionProposalMark({ proposalId, operationKey }) })` を、`grant` を渡さずに呼ぶ（閲覧範囲は祖先から引き継がれる。要件 3.9）。印は最初のリビジョンにだけ書き、ページには書かない（要件 6.2）。閲覧範囲を依頼した人に割り当てられずに断られたときは `failed: grant-not-assignable`。WIP は指定しない（OQ-4）。（ユーザーページの保護: 作成先が無効の `/user` 配下、または存在しないユーザーのホームの下なら `failed: target-unavailable`）
+- **move**: 移動元のページを依頼した人が閲覧できなければ `failed: target-unavailable`。移動先が使われていれば `failed: path-occupied`。`pageService.renamePage(page, toPath, requester, { isRecursively: page.descendantCount > 0, createRedirectPage: true, updateMetadata: true, isInAppNotificationSuppressed: !perPageNotifications }, activityParameters)`。取り消しの移動（`removeRedirectsFrom` を持つ）では `createRedirectPage: false` にし、移動のあとで `deleteRedirectsFromPathTree(removeRedirectsFrom)` を呼ぶ（要件 5.7）。（ユーザーページの保護: 移動元と移動先の両方で無効の確認、持ち主の存在は移動先だけ。duplicate の route と同じ規則で、rename の route より厳しい）
+- **trash**（取り消しだけ。新規作成の取り消しと、ごみ箱から戻した操作の取り消しに使う）: ページの最新のリビジョンが `expectedRevisionId` でない、または子のページがあれば `failed`（理由は `judgeRevertability` と同じ値）。`pageService.deletePage(page, requester, { isInAppNotificationSuppressed: !perPageNotifications }, false, activityParameters)`。（反映前に `pageService.canDelete` で削除権限を確かめ、削除できなければ `failed: not-deletable`）
 - **restore**（取り消しだけ。ごみ箱へ移した操作の取り消しに使う。要件 5.15）: ページを依頼した人が閲覧できなければ `failed: target-unavailable`。ページのパスが `/trash` で始まらなければ `failed: not-in-trash`。最新のリビジョンが `expectedRevisionId` でなければ `failed: edited-after-apply`。`pageService.revertDeletedPage(page, requester, { isInAppNotificationSuppressed: !perPageNotifications }, false, activityParameters)` を呼び、`PathAlreadyExistsError` なら `failed: original-path-occupied`。戻したあとで、ごみ箱へ移したときに作られた「元のパス → ごみ箱のパス」のリダイレクトを `deleteByFromPath(toPath)` で消す（コードを読んだ範囲では、子のページを含めない `revertDeletedPage` はこのリダイレクトを消しておらず、ページを開くときはリダイレクトがページより先に調べられる。動かしては確かめていないので、タスク 4.3 の結合テストで確かめる）。子のページを持たないページだけが対象なので、`isRecursively` は常に偽にする。
 - `findExistingResult`: edit と create は、同じ `proposalId` と `proposalOperationKey` を持つリビジョンを探す。create は、見つかったリビジョンの `pageId` を作ったページとする。move は、ページのパスがすでに移動先なら反映済みとみなす。trash は、ページがすでにごみ箱にあれば反映済みとみなす。restore は、ページが `toPath` にあり、ごみ箱に無ければ反映済みとみなす。
 
@@ -971,7 +973,7 @@ function recordProposalActivity(args: {
 | Requirements | 1.*, 2.3–2.5, 2.9, 2.10, 4.*, 5.1–5.13, 7.14–7.17, 8.5, 8.10, 13.1–13.7 |
 
 **Responsibilities & Constraints**
-- 作成: 依頼した人がゲスト・読み取り専用でないこと、`validateProposalInput`、1 日の件数（依頼した人が、サーバーの日付の 0 時から作った、入口の種類が `revert` でない Change Proposal の数）、対象のページを依頼した人が閲覧できること（`findByIdAndViewer`、人の保存と同じ判定）、元のリビジョンが対象のページのものであること、`basedOn` があれば `validateBasedOn`（「後続と見直しの作成の流れ」）、を確かめてから保存する。閲覧できない場合と存在しない場合は同じ `target-unavailable` を返す（要件 1.11）。保存のあとで `selectAutoApplyTargets`（`basedOn` の関係を渡す。見直しなら空）の操作に `approvedAt` を付け、`apply` を呼ぶ。ページごとの通知の指定は、入口が `perPageNotifications` を渡せばその値、渡さなければ `true` で保存する。後続・見直しも同じ（要件 1.17）。操作数の上限は設定の値（初期値 50）で `validateProposalInput` が確かめ、1 日の件数は設定に数があるときだけ確かめる（初期値は値が無く、確かめない。要件 8.10）。
+- 作成: 依頼した人がゲスト・読み取り専用でないこと、`validateProposalInput`、1 日の件数（依頼した人が、サーバーの日付の 0 時から作った、入口の種類が `revert` でない Change Proposal の数）、対象のページを依頼した人が閲覧できること（`findByIdAndViewer`、人の保存と同じ判定）、元のリビジョンが対象のページのものであること、`basedOn` があれば `validateBasedOn`（「後続と見直しの作成の流れ」）、を確かめてから保存する。閲覧できない場合と存在しない場合は同じ `target-unavailable` を返す（要件 1.11）。保存のあとで `selectAutoApplyTargets`（`basedOn` の関係を渡す。見直しなら空）の操作に `approvedAt` を付け、`apply` を呼ぶ。ページごとの通知の指定は、入口が `perPageNotifications` を渡せばその値、渡さなければ `true` で保存する。後続・見直しも同じ（要件 1.17）。操作数の上限は設定の値（初期値 50）で `validateProposalInput` が確かめ、1 日の件数は設定に数があるときだけ確かめる（初期値は値が無く、確かめない。要件 8.10）。（対象のページの確認では、反映時と同じ `findUserPageWriteRefusal` で、ユーザーページの保護（無効の `/user` 配下、存在しないユーザーのホームの下）にあたる操作も `target-unavailable`（操作の番号つき）で断る。AI には「ページが無いか、閲覧できない」と同じ値で伝わる）
 - ページごとの通知の指定の変更: 依頼した人でなければ `not-found`、`lifecycle` が `open` でなければ `not-open` を返す（承認と同じ。要件 7.14–7.16）。`setPerPageNotifications` で書き、すでに反映した操作には何もしない。管理者の設定が無効のときも値は保存する（画面は、管理者の設定が有効なときだけ切り替えを出す）。
 - 承認・飛ばす・破棄: 依頼した人でなければ `not-found` を返す（要件 4.6）。`lifecycle` が `open` でなければ（完了を含む）`not-open` を返す（要件 4.7・2.10）。承認は `expandApprovalTargets` で同じページへの「待ち」の操作に広げる。飛ばすは、書いたあとで `settleIfNoPending` を呼ぶ（要件 2.9）。破棄は「待ち」が 1 つ以上あることを条件にし、「待ち」が無い Change Proposal（完了の書き込みの前で止まったもの）では `settleIfNoPending` を呼んで完了にしてから `not-open` を返す。
 - 取り消し: 「取り消しの流れ」のとおり。取り消しの Change Proposal のページごとの通知の指定は、元の Change Proposal の値をそのまま保存する（取り消した人が元の依頼した人と違っても同じ。要件 7.17）。取り消しの Change Proposal の操作は `approvedAt` に作成の日時を入れて保存し（取り消しを求めた人が承認したものとして扱う）、保存のあとで `apply` を呼ぶ。書き込み機能の設定と件数の上限を確かめない（要件 5.13）。読み取り専用・ゲストは受け付けない。元の Change Proposal の段階は見ないので、完了した Change Proposal も取り消せる（要件 2.10）。
@@ -1228,7 +1230,7 @@ type StaleReason = 'base-revision-changed';
 type SkipReason = 'skipped-by-requester' | 'discarded' | 'expired' | 'withdrawn' | 'page-being-edited';
 type RevertRefusalReason =
   | 'not-revertible-state' | 'target-unavailable' | 'edited-after-apply' | 'has-children'
-  | 'moved-after-apply' | 'original-path-occupied' | 'not-in-trash'
+  | 'moved-after-apply' | 'original-path-occupied' | 'not-in-trash' | 'not-deletable'
   | 'page-operation-in-progress' | 'apply-failed';
 type OperationReason = WaitingReason | FailureReason | StaleReason | SkipReason;
 type Revertability = { readonly revertible: true } | { readonly revertible: false; readonly reason: RevertRefusalReason };

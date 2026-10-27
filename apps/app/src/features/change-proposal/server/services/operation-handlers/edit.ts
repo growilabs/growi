@@ -6,6 +6,7 @@ import {
   beginActivity,
   pendingActivityContext,
 } from '~/server/service/activity/index';
+import { findUserPageWriteRefusal } from '~/server/service/page/user-page-write-guard';
 import {
   emitPageUpdateActivity,
   firePageGlobalNotification,
@@ -97,7 +98,10 @@ export const createEditHandler = (
 
   async execute(op, ctx): Promise<OperationOutcome> {
     const page = await pageModel().findByIdAndViewer(op.pageId, ctx.requester);
-    if (page == null) {
+    if (
+      page == null ||
+      (await findUserPageWriteRefusal({ existingPath: page.path })) != null
+    ) {
       return { status: 'failed', reason: 'target-unavailable' };
     }
     // Human saves run this in the route; once a newer revision exists it can no longer repair the base.

@@ -2,6 +2,7 @@ import { getIdStringForRef } from '@growi/core';
 
 import type Crowi from '~/server/crowi';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/consts';
+import { findUserPageWriteRefusal } from '~/server/service/page/user-page-write-guard';
 import { firePageGlobalNotification } from '~/server/service/page-save';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -43,6 +44,9 @@ export const createCreateHandler = (
   },
 
   async execute(op, ctx): Promise<OperationOutcome> {
+    if ((await findUserPageWriteRefusal({ newPath: op.path })) != null) {
+      return { status: 'failed', reason: 'target-unavailable' };
+    }
     const Page = pageModel();
     const ancestor = await Page.findNonEmptyClosestAncestor(op.path);
     if (

@@ -14,6 +14,7 @@ const REVERT_REFUSAL_REASONS: Readonly<Record<RevertRefusalReason, true>> = {
   'original-path-occupied': true,
   'not-in-trash': true,
   'page-operation-in-progress': true,
+  'not-deletable': true,
   'apply-failed': true,
 };
 

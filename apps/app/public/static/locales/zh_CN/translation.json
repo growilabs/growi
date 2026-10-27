@@ -1203,6 +1203,7 @@
       "moved_after_apply": "反映后页面又被移动过",
       "original_path_occupied": "原路径已存在页面",
       "not_in_trash": "页面已不在回收站中",
+      "not_deletable": "没有删除该页面的权限",
       "apply_failed": "撤销失败",
       "base_revision_changed": "反映前页面已被更改",
       "skipped_by_requester": "请求者已跳过",
@@ -1218,6 +1219,7 @@
       "moved_after_apply": "反映后页面又被移动过",
       "original_path_occupied": "原路径已存在页面",
       "not_in_trash": "页面已不在回收站中",
+      "not_deletable": "没有删除该页面的权限",
       "page_operation_in_progress": "页面上有其他操作正在进行",
       "apply_failed": "撤销失败"
     },

@@ -5,6 +5,7 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { findUserPageWriteRefusal } from '~/server/service/page/user-page-write-guard';
 import { prisma } from '~/utils/prisma';
 
 import type { CreatableOperationInput } from '../../interfaces';
@@ -55,18 +56,36 @@ const readViewablePages = async (
   );
 };
 
-const findUnavailableIndex = (
+// Same paths the edit / create / move handlers check at write time.
+const isUnavailable = async (
+  op: CreatableOperationInput,
+  pages: ReadonlyMap<string, HydratedDocument<PageDocument>>,
+): Promise<boolean> => {
+  if (op.type === 'create') {
+    return (await findUserPageWriteRefusal({ newPath: op.path })) != null;
+  }
+  const page = pages.get(op.pageId);
+  // A move is written from the path it was proposed for (the move handler's rule).
+  if (page == null || (op.type === 'move' && page.path !== op.fromPath)) {
+    return true;
+  }
+  const refusal = await findUserPageWriteRefusal(
+    op.type === 'move'
+      ? { existingPath: page.path, newPath: op.toPath }
+      : { existingPath: page.path },
+  );
+  return refusal != null;
+};
+
+const findUnavailableIndex = async (
   operations: readonly CreatableOperationInput[],
   pages: ReadonlyMap<string, HydratedDocument<PageDocument>>,
-): number =>
-  operations.findIndex((op) => {
-    if (!hasTargetPage(op)) {
-      return false;
-    }
-    const page = pages.get(op.pageId);
-    // A move is written from the path it was proposed for (the move handler's rule).
-    return page == null || (op.type === 'move' && page.path !== op.fromPath);
-  });
+): Promise<number> => {
+  const unavailable = await Promise.all(
+    operations.map((op) => isUnavailable(op, pages)),
+  );
+  return unavailable.indexOf(true);
+};
 
 const findBaseRevisionMismatchIndex = async (
   operations: readonly CreatableOperationInput[],
@@ -106,7 +125,7 @@ export const checkCreateTargets = async (
     ...new Set(operations.filter(hasTargetPage).map((op) => op.pageId)),
   ];
   const pages = await readViewablePages(pageIds, requester);
-  const unavailableIndex = findUnavailableIndex(operations, pages);
+  const unavailableIndex = await findUnavailableIndex(operations, pages);
   if (unavailableIndex !== -1) {
     return {
       ok: false,

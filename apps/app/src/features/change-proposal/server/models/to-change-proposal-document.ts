@@ -82,6 +82,7 @@ const OPERATION_REASONS: Record<OperationReason, true> = {
   'moved-after-apply': true,
   'original-path-occupied': true,
   'not-in-trash': true,
+  'not-deletable': true,
   'apply-failed': true,
   'base-revision-changed': true,
   'skipped-by-requester': true,

@@ -240,8 +240,11 @@ export const createChangeProposalService = (
 
   return {
     ...createRequesterActions({ applier, now }),
-    ...createRevertAction({ applier, now }),
-    ...createProposalQuery({ appliedListScan: deps.appliedListScan }),
+    ...createRevertAction({ applier, now, pageService: crowi.pageService }),
+    ...createProposalQuery({
+      appliedListScan: deps.appliedListScan,
+      pageService: crowi.pageService,
+    }),
     ...createMaintenanceActions({
       applier,
       now,

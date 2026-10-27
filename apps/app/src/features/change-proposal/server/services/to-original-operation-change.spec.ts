@@ -44,6 +44,7 @@ describe('toOriginalOperationChange', () => {
     'original-path-occupied',
     'not-in-trash',
     'page-operation-in-progress',
+    'not-deletable',
     'apply-failed',
   ])('keeps the failure reason %s, which is already a refusal reason', (reason) => {
     expect(toOriginalOperationChange(failed(reason), REVERT_ID, NOW)).toEqual({

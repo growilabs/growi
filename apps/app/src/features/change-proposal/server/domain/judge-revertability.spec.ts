@@ -11,6 +11,7 @@ const facts = (
   path: null,
   latestRevisionId: null,
   hasChildren: false,
+  canDelete: true,
   isPathOccupied: () => false,
   ...overrides,
 });
@@ -355,6 +356,81 @@ describe('judgeRevertability', () => {
       );
 
       expect(result).toEqual(refused('edited-after-apply'));
+    });
+  });
+
+  // Reverting a create or a restore moves the page to the trash, so the viewer
+  // must be allowed to delete it, as the human delete route requires.
+  describe("the viewer's delete authority", () => {
+    it.each([
+      ['create', createOp],
+      ['restore', restoreOp],
+    ] as const)('refuses a %s with not-deletable when the viewer may not delete the page', (_label, opOf) => {
+      const result = judgeRevertability(
+        opOf(),
+        'revert',
+        facts({
+          path: '/new',
+          latestRevisionId: 'r-created',
+          canDelete: false,
+        }),
+      );
+
+      expect(result).toEqual(refused('not-deletable'));
+    });
+
+    it('reports has-children and edited-after-apply before not-deletable, in the trash handler order', () => {
+      expect(
+        judgeRevertability(
+          createOp(),
+          'mcp',
+          facts({
+            path: '/new',
+            latestRevisionId: 'r-created',
+            hasChildren: true,
+            canDelete: false,
+          }),
+        ),
+      ).toEqual(refused('has-children'));
+      expect(
+        judgeRevertability(
+          createOp(),
+          'mcp',
+          facts({
+            path: '/new',
+            latestRevisionId: 'r-later',
+            canDelete: false,
+          }),
+        ),
+      ).toEqual(refused('edited-after-apply'));
+    });
+
+    it('does not ask about delete authority for an edit, a move or a trash, whose reverts delete nothing', () => {
+      expect(
+        judgeRevertability(
+          editOp(),
+          'mcp',
+          facts({ latestRevisionId: 'r-applied', canDelete: false }),
+        ),
+      ).toEqual({ revertible: true });
+      expect(
+        judgeRevertability(
+          moveOp(),
+          'mcp',
+          facts({ path: '/to', canDelete: false }),
+        ),
+      ).toEqual({ revertible: true });
+      expect(
+        judgeRevertability(
+          trashOp(),
+          'revert',
+          facts({
+            path: '/trash/new',
+            latestRevisionId: 'r-created',
+            canDelete: false,
+          }),
+        ),
+      ).toEqual({ revertible: true });
     });
   });
 });

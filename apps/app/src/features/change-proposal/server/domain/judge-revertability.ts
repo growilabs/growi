@@ -12,6 +12,9 @@ export type CurrentPageFacts = {
   readonly path: string | null;
   readonly latestRevisionId: string | null;
   readonly hasChildren: boolean;
+  // Whether the viewer may delete the page under the admin's deletion authority
+  // (pageService.canDelete, as the human delete route asks).
+  readonly canDelete: boolean;
   // True only when a non-empty page sits at the path; an empty placeholder page
   // does not block revertDeletedPage, so it must not count as occupied.
   readonly isPathOccupied: (path: string) => boolean;
@@ -32,6 +35,7 @@ const judgeRemovableNewPage = (
   if (facts.latestRevisionId !== expectedRevisionId) {
     return refuse('edited-after-apply');
   }
+  if (!facts.canDelete) return refuse('not-deletable');
   return REVERTIBLE;
 };
 

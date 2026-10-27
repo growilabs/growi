@@ -1,5 +1,6 @@
 import type Crowi from '~/server/crowi';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/consts';
+import { findUserPageWriteRefusal } from '~/server/service/page/user-page-write-guard';
 import { firePageGlobalNotification } from '~/server/service/page-save';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -67,6 +68,14 @@ export const createMoveHandler = (
             ? 'target-unavailable'
             : 'moved-after-apply',
       };
+    }
+    if (
+      (await findUserPageWriteRefusal({
+        existingPath: page.path,
+        newPath: op.toPath,
+      })) != null
+    ) {
+      return { status: 'failed', reason: 'target-unavailable' };
     }
     if (await isPathOccupied(op.toPath)) {
       return { status: 'failed', reason: 'path-occupied' };

@@ -319,6 +319,56 @@ describe('trash operation handler', () => {
       });
       expect((await findPage(page._id)).path).toBe(page.path);
     });
+
+    describe("under the admin's page deletion authority", () => {
+      afterEach(async () => {
+        await configManager.updateConfigs(
+          { 'security:pageDeletionAuthority': undefined },
+          { removeIfUndefined: true },
+        );
+      });
+
+      it('fails with not-deletable and leaves the page in place when only admins may delete', async () => {
+        await configManager.updateConfigs({
+          'security:pageDeletionAuthority': 'adminOnly',
+        });
+        const handler = createTrashHandler(crowi);
+        const page = await createPage(nextPath());
+        const op = trashOp(page);
+
+        const outcome = await handler.execute(op, contextFor(op, false));
+
+        expect(outcome).toEqual({ status: 'failed', reason: 'not-deletable' });
+        expect((await findPage(page._id)).path).toBe(page.path);
+      });
+
+      it("fails with not-deletable for someone else's page and trashes the requester's own when admins and authors may delete", async () => {
+        await configManager.updateConfigs({
+          'security:pageDeletionAuthority': 'adminAndAuthor',
+        });
+        const handler = createTrashHandler(crowi);
+        const othersPage = await createPage(nextPath());
+        const created = await crowi.pageService.create(
+          nextPath(),
+          'body',
+          requester,
+          {},
+        );
+        await waitForPageOperationsToFinish();
+        const ownPage = await findPage(created._id);
+        const othersOp = trashOp(othersPage);
+        const ownOp = trashOp(ownPage);
+
+        await expect(
+          handler.execute(othersOp, contextFor(othersOp, false)),
+        ).resolves.toEqual({ status: 'failed', reason: 'not-deletable' });
+        expectApplied(await handler.execute(ownOp, contextFor(ownOp, false)));
+        expect((await findPage(othersPage._id)).path).toBe(othersPage.path);
+        expect((await findPage(ownPage._id)).path).toBe(
+          `/trash${ownPage.path}`,
+        );
+      });
+    });
   });
 
   describe('with a Japanese path', () => {

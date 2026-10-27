@@ -5,6 +5,7 @@ import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificati
 import { firePageGlobalNotification } from '~/server/service/page-save';
 import loggerFactory from '~/utils/logger';
 
+import { canTrashPage } from '../page-delete-permission';
 import { latestRevisionIdOf, pageModel } from './page-model';
 import type {
   AppliedOutcome,
@@ -50,6 +51,9 @@ export const createTrashHandler = (
     }
     if (latestRevisionIdOf(page) !== op.expectedRevisionId) {
       return { status: 'failed', reason: 'edited-after-apply' };
+    }
+    if (!(await canTrashPage(crowi.pageService, page, ctx.requester))) {
+      return { status: 'failed', reason: 'not-deletable' };
     }
 
     await crowi.pageService.deletePage(

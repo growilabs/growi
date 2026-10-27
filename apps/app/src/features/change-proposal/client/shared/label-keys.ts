@@ -56,6 +56,7 @@ export const OPERATION_REASON_LABEL_KEYS = {
   'moved-after-apply': 'change_proposal.reason.moved_after_apply',
   'original-path-occupied': 'change_proposal.reason.original_path_occupied',
   'not-in-trash': 'change_proposal.reason.not_in_trash',
+  'not-deletable': 'change_proposal.reason.not_deletable',
   'apply-failed': 'change_proposal.reason.apply_failed',
   'base-revision-changed': 'change_proposal.reason.base_revision_changed',
   'skipped-by-requester': 'change_proposal.reason.skipped_by_requester',
@@ -77,6 +78,7 @@ export const REVERT_REFUSAL_REASON_LABEL_KEYS = {
   'original-path-occupied':
     'change_proposal.revert_refusal_reason.original_path_occupied',
   'not-in-trash': 'change_proposal.revert_refusal_reason.not_in_trash',
+  'not-deletable': 'change_proposal.revert_refusal_reason.not_deletable',
   'page-operation-in-progress':
     'change_proposal.revert_refusal_reason.page_operation_in_progress',
   'apply-failed': 'change_proposal.revert_refusal_reason.apply_failed',

@@ -22,6 +22,7 @@ import {
   loadViewablePages,
   type ViewablePages,
 } from './current-page-facts';
+import type { PageDeletePermissionService } from './page-delete-permission';
 import { isRequesterAllowed } from './pre-write-checks';
 import {
   type AppliedListScan,
@@ -51,6 +52,7 @@ export type ProposalQuery = ProposalListQuery &
 
 export type ProposalQueryDeps = {
   readonly appliedListScan?: AppliedListScan;
+  readonly pageService: PageDeletePermissionService;
 };
 
 const NOT_FOUND = { ok: false, error: { code: 'not-found' } } as const;
@@ -105,7 +107,7 @@ const narrowBasedOn = (
  * single findByIdsAndViewer call, read the same way as a revert reads it.
  */
 export const createProposalQuery = (
-  deps: ProposalQueryDeps = {},
+  deps: ProposalQueryDeps,
 ): ProposalQuery => ({
   ...createProposalListQuery(deps.appliedListScan),
   ...createRevisionMarksQuery(),
@@ -150,7 +152,10 @@ export const createProposalQuery = (
     const [factsOf, requesterOf] = await Promise.all([
       revertCandidates.length === 0
         ? null
-        : loadCurrentPageFacts(revertCandidates, viewable.pages),
+        : loadCurrentPageFacts(revertCandidates, viewable.pages, {
+            user: viewer,
+            pageService: deps.pageService,
+          }),
       readRequesters([proposal.requester]),
     ]);
     const candidateKeys = new Set(revertCandidates.map((op) => op.key));
