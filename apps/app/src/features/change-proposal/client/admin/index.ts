@@ -1,0 +1,1 @@
+export { ChangeProposalSettings } from './ChangeProposalSettings';

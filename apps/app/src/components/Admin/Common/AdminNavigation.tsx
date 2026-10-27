@@ -63,6 +63,13 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('ai_settings.ai_settings')}
         </>
       );
+    case 'change-proposal':
+      return (
+        <>
+          <span className="material-symbols-outlined me-1">rate_review</span>
+          {t('change_proposal_settings.change_proposal_settings')}
+        </>
+      );
     case 'importer':
       return (
         <>
@@ -271,6 +278,11 @@ export const AdminNavigation = (): JSX.Element => {
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/ai')}
           />
+          <MenuLink
+            menu="change-proposal"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/change-proposal')}
+          />
 
           <hr />
 
@@ -375,6 +387,9 @@ export const AdminNavigation = (): JSX.Element => {
             {isActiveMenu('/markdown') && <MenuLabel menu="markdown" />}
             {isActiveMenu('/customize') && <MenuLabel menu="customize" />}
             {isActiveMenu('/ai') && <MenuLabel menu="ai" />}
+            {isActiveMenu('/change-proposal') && (
+              <MenuLabel menu="change-proposal" />
+            )}
             {isActiveMenu('/importer') && <MenuLabel menu="importer" />}
             {isActiveMenu('/export') && <MenuLabel menu="export" />}
             {isActiveMenu(['/notification', '/global-notification']) && (
