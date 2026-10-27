@@ -111,7 +111,7 @@
   - 完了時: すべて成功する
   - _Requirements: 3.3_
 
-- [ ] 6. `opentelemetry` spec から匿名化の部分を移し終える
+- [x] 6. `opentelemetry` spec から匿名化の部分を移し終える
   - `opentelemetry` spec の requirements.md から要件 6 を削除し、Boundary の範囲外に「HTTP の匿名化は `opentelemetry-anonymization` を参照」を加える。要件 10.2 を本 spec への参照に置き換える（要件番号は振り直さない）
   - design.md の Layer 4、Extension Templates「新規 Anonymization Handler の追加」、Revalidation Triggers の該当行、File Structure の `anonymization/` 部分、Requirements Traceability の 6.x 行を、本 spec への参照に置き換える
   - research.md の「Anonymization Handler の登録順とパターン」「Decision: Anonymization は best-effort, module-based, opt-in」を本 spec の research.md への参照に置き換える（誤っていた「複数 module が同一 URL を匿名化することは現状無い」は持ち込まない）
