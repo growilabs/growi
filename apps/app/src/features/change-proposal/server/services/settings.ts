@@ -26,7 +26,11 @@ const OPERATION_TYPE_SWITCH_KEYS = {
   move: 'changeProposal:isMoveEnabled',
 } as const satisfies Record<CreatableOperationType, ConfigKey>;
 
-const AUTO_APPLY_POLICIES: readonly AutoApplyPolicy[] = [
+export const CREATABLE_OPERATION_TYPES = Object.keys(
+  OPERATION_TYPE_SWITCH_KEYS,
+) as readonly CreatableOperationType[];
+
+export const AUTO_APPLY_POLICIES: readonly AutoApplyPolicy[] = [
   'none',
   'own-pages',
   'all',

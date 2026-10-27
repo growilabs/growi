@@ -100,6 +100,7 @@ module.exports = {
         'AdminHome',
         'AppSettings',
         'AiSettings',
+        'ChangeProposalSettings',
         'ExternalUserGroups',
         'SecuritySetting',
         'MarkDownSetting',

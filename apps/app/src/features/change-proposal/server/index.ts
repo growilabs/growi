@@ -1,5 +1,7 @@
 export type { ChangeProposalRouterDeps } from './routes';
 export { createChangeProposalRouter } from './routes';
+export type { ChangeProposalAdminRouterDeps } from './routes/admin';
+export { createChangeProposalAdminRouter } from './routes/admin';
 export type {
   ChangeProposalService,
   ChangeProposalServiceDeps,

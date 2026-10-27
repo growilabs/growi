@@ -11,6 +11,10 @@ export type ChangeProposalSettingsView = {
   readonly maxOperationsPerProposal: number | null;
   readonly maxProposalsPerUserPerDay: number | null;
   readonly perPageNotificationsEnabled: boolean;
+  // env:useOnlyEnvVars:changeProposal fixes every value above to its env var.
+  readonly useOnlyEnvVars: boolean;
 };
 
-export type ChangeProposalSettingsUpdate = Partial<ChangeProposalSettingsView>;
+export type ChangeProposalSettingsUpdate = Partial<
+  Omit<ChangeProposalSettingsView, 'useOnlyEnvVars'>
+>;

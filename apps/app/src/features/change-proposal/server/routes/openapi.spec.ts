@@ -4,6 +4,8 @@ import swaggerJsdoc from 'swagger-jsdoc';
 
 const APP_ROOT = path.resolve(import.meta.dirname, '../../../../..');
 const ROUTES_GLOB = 'src/features/change-proposal/server/routes/*.ts';
+const ADMIN_ROUTES_GLOB =
+  'src/features/change-proposal/server/routes/admin/*.ts';
 
 type PathItem = Record<
   string,
@@ -22,25 +24,42 @@ const EXPECTED_OPERATIONS: [string, string][] = [
   ['/change-proposals/{id}/per-page-notifications', 'put'],
 ];
 
-describe('change-proposal OpenAPI documentation', () => {
-  it('documents all nine routes under the ChangeProposals tag', () => {
-    // WHY: swagger-jsdoc types its result as a bare object.
-    const spec = swaggerJsdoc({
-      definition: {
-        openapi: '3.0.1',
-        info: { title: 'test', version: '0.0.0' },
-      },
-      apis: [path.join(APP_ROOT, ROUTES_GLOB)],
-      failOnErrors: true,
-    }) as { paths?: Record<string, PathItem> };
+const documentedPaths = (glob: string): Record<string, PathItem> => {
+  // WHY: swagger-jsdoc types its result as a bare object.
+  const spec = swaggerJsdoc({
+    definition: {
+      openapi: '3.0.1',
+      info: { title: 'test', version: '0.0.0' },
+    },
+    apis: [path.join(APP_ROOT, glob)],
+    failOnErrors: true,
+  }) as { paths?: Record<string, PathItem> };
+  return spec.paths ?? {};
+};
 
-    const documented = Object.entries(spec.paths ?? {}).flatMap(
-      ([route, item]) => Object.keys(item).map((method) => [route, method]),
+describe('change-proposal OpenAPI documentation', () => {
+  it('documents the admin settings GET and PUT under the ChangeProposalSettings tag', () => {
+    const paths = documentedPaths(ADMIN_ROUTES_GLOB);
+
+    expect(Object.keys(paths)).toEqual(['/change-proposal-settings']);
+    const item = paths['/change-proposal-settings'];
+    expect(Object.keys(item).sort()).toEqual(['get', 'put']);
+    for (const operation of Object.values(item)) {
+      expect(operation.tags).toEqual(['ChangeProposalSettings']);
+      expect(operation.responses).toBeDefined();
+    }
+  });
+
+  it('documents all nine routes under the ChangeProposals tag', () => {
+    const paths = documentedPaths(ROUTES_GLOB);
+
+    const documented = Object.entries(paths).flatMap(([route, item]) =>
+      Object.keys(item).map((method) => [route, method]),
     );
     expect(documented).toEqual(expect.arrayContaining(EXPECTED_OPERATIONS));
     expect(documented).toHaveLength(EXPECTED_OPERATIONS.length);
     for (const [route, method] of EXPECTED_OPERATIONS) {
-      const operation = spec.paths?.[route]?.[method];
+      const operation = paths[route]?.[method];
       expect(operation?.tags).toEqual(['ChangeProposals']);
       expect(operation?.responses).toBeDefined();
     }
@@ -58,5 +77,7 @@ describe('change-proposal OpenAPI documentation', () => {
 
     expect(script).toContain(`"\${APP_PATH}/${ROUTES_GLOB}"`);
     expect(definition).toContain("'ChangeProposals'");
+    expect(script).toContain(`"\${APP_PATH}/${ADMIN_ROUTES_GLOB}"`);
+    expect(definition).toContain("'ChangeProposalSettings'");
   });
 });

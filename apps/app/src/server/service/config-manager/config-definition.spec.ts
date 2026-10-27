@@ -462,4 +462,29 @@ describe('config-definition change-proposal keys', () => {
     expect(CONFIG_DEFINITIONS[key].envVarName).toBe(envVarName);
     expect(CONFIG_DEFINITIONS[key].defaultValue).toBe(defaultValue);
   });
+  describe('env-only group env:useOnlyEnvVars:changeProposal', () => {
+    const changeProposalGroup = ENV_ONLY_GROUPS.find(
+      (group) => group.controlKey === 'env:useOnlyEnvVars:changeProposal',
+    );
+
+    it('is switched by CHANGE_PROPOSAL_USES_ONLY_ENV_VARS and off by default', () => {
+      const definition =
+        CONFIG_DEFINITIONS['env:useOnlyEnvVars:changeProposal'];
+      expect(definition.envVarName).toBe('CHANGE_PROPOSAL_USES_ONLY_ENV_VARS');
+      expect(definition.defaultValue).toBe(false);
+    });
+
+    it('targets exactly the keys the admin settings screen edits', () => {
+      expect(changeProposalGroup?.targetKeys).toEqual([
+        'app:changeProposalEnabled',
+        'changeProposal:isEditEnabled',
+        'changeProposal:isCreateEnabled',
+        'changeProposal:isMoveEnabled',
+        'changeProposal:autoApplyPolicy',
+        'changeProposal:maxOperationsPerProposal',
+        'changeProposal:maxProposalsPerUserPerDay',
+        'changeProposal:perPageNotificationsEnabled',
+      ]);
+    });
+  });
 });

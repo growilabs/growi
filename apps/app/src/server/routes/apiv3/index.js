@@ -4,7 +4,10 @@ import express from 'express';
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
 import { createAiUsageRouter } from '~/features/ai-usage/server';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
-import { createChangeProposalRouter } from '~/features/change-proposal/server';
+import {
+  createChangeProposalAdminRouter,
+  createChangeProposalRouter,
+} from '~/features/change-proposal/server';
 import { listCommentsRouteHandlersFactory } from '~/features/comment/server/routes/list';
 import { setup as setupExternalUserGroup } from '~/features/external-user-group/server/routes/apiv3/external-user-group';
 import { setup as setupExternalUserGroupRelation } from '~/features/external-user-group/server/routes/apiv3/external-user-group-relation';
@@ -112,6 +115,10 @@ export const setup = (crowi, app) => {
     setupContentDispositionSettings(crowi),
   );
   routerForAdmin.use('/ai-settings', adminAiSettingsRouteFactory(crowi));
+  routerForAdmin.use(
+    '/change-proposal-settings',
+    createChangeProposalAdminRouter(crowi),
+  );
   routerForAdmin.use('/app-settings', setupAppSettings(crowi));
   routerForAdmin.use('/customize-setting', setupCustomizeSetting(crowi));
   routerForAdmin.use('/notification-setting', setupNotificationSetting(crowi));

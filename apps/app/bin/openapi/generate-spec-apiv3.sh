@@ -33,6 +33,7 @@ swagger-jsdoc \
   "${APP_PATH}/src/features/revision-diff/server/routes/*.ts" \
   "${APP_PATH}/src/features/comment/server/routes/*.ts" \
   "${APP_PATH}/src/features/change-proposal/server/routes/*.ts" \
+  "${APP_PATH}/src/features/change-proposal/server/routes/admin/*.ts" \
   "${APP_PATH}/src/server/routes/apiv3/**/*.{js,ts}" \
   "${APP_PATH}/src/server/routes/login.js" \
   "${APP_PATH}/src/server/models/openapi/**/*.{js,ts}"

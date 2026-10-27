@@ -393,6 +393,7 @@ export const CONFIG_KEYS = [
   'changeProposal:pendingExpirationSeconds',
   'changeProposal:maintenanceCronSchedule',
   'changeProposal:perPageNotificationsEnabled',
+  'env:useOnlyEnvVars:changeProposal',
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
@@ -1672,6 +1673,10 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'CHANGE_PROPOSAL_PER_PAGE_NOTIFICATIONS_ENABLED',
     defaultValue: false,
   }),
+  'env:useOnlyEnvVars:changeProposal': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_USES_ONLY_ENV_VARS',
+    defaultValue: false,
+  }),
 } as const;
 
 export type ConfigValues = {
@@ -1760,6 +1765,21 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
       'ai:providerApiKeys',
       'ai:usageBaseModel',
       'ai:disabledReason',
+    ],
+  },
+  {
+    // The keys the admin settings screen edits. The expiry and the cron
+    // schedule are left out: no screen writes them.
+    controlKey: 'env:useOnlyEnvVars:changeProposal',
+    targetKeys: [
+      'app:changeProposalEnabled',
+      'changeProposal:isEditEnabled',
+      'changeProposal:isCreateEnabled',
+      'changeProposal:isMoveEnabled',
+      'changeProposal:autoApplyPolicy',
+      'changeProposal:maxOperationsPerProposal',
+      'changeProposal:maxProposalsPerUserPerDay',
+      'changeProposal:perPageNotificationsEnabled',
     ],
   },
 ];
