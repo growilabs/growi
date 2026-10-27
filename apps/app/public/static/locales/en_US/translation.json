@@ -1,6 +1,7 @@
 {
   "backlinks": {
     "failed_to_fetch": "Failed to fetch backlinks.",
+    "link_status_unavailable": "Couldn't check link status.",
     "no_backlinks": "There are no backlinks yet.",
     "outgoing_needing_attention": "Outgoing links needing attention",
     "panel": "Backlinks",
