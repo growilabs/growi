@@ -52,18 +52,19 @@ const UserTable = ({ users }: UserTableProps): JSX.Element => {
 export const UnmigratedUserList = (): JSX.Element => {
   const { t } = useTranslation('admin');
   const swrInfiniteResponse = useSWRInfinitePasswordHashUnmigratedUsers();
-  const { data, error, size, setSize, isValidating } = swrInfiniteResponse;
+  const { data, error, mutate, isValidating } = swrInfiniteResponse;
 
-  // The failed page is the last one of the current size and has no cached
-  // data, so re-setting the same size fetches it again — page 1 included.
+  // A bare mutate() refetches every loaded page. setSize(size) would only
+  // fetch pages without data, so a failed refetch of cached pages (e.g. on
+  // remount) would clear the error without any request.
   const retry = () => {
-    setSize(size);
+    mutate();
   };
 
   const renderBody = (): JSX.Element | null => {
     const totalCount = data?.[0]?.totalCount;
     // Only a failure before any page arrived replaces the list; a later
-    // page's failure keeps the rows already shown.
+    // failure (the next page, or a refetch of loaded pages) keeps the rows.
     if (error != null && totalCount == null) {
       return (
         <ErrorWithRetry
@@ -94,7 +95,7 @@ export const UnmigratedUserList = (): JSX.Element => {
           <>
             <UserTable users={users} />
             <ErrorWithRetry
-              message={t(`${I18N_PREFIX}.load_more_error`)}
+              message={t(`${I18N_PREFIX}.fetch_error`)}
               isRetrying={isValidating}
               onRetry={retry}
             />

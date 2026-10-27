@@ -280,16 +280,15 @@ describe('UnmigratedUserList', () => {
       renderList();
       await screen.findByRole('row', { name: /first-19/ });
       await scrollToEnd();
-      await screen.findByText(`${PREFIX}.load_more_error`);
+      await screen.findByText(`${PREFIX}.fetch_error`);
     };
 
-    it('keeps the loaded rows and shows the load-more error with a retry button', async () => {
+    it('keeps the loaded rows and shows the error with a retry button', async () => {
       await failSecondPage();
 
       expect(screen.getByRole('row', { name: /first-0/ })).toBeTruthy();
       expect(screen.getByRole('row', { name: /first-19/ })).toBeTruthy();
       expect(screen.getByRole('button', { name: RETRY_LABEL })).toBeTruthy();
-      expect(screen.queryByText(`${PREFIX}.fetch_error`)).toBeNull();
     });
 
     it('does not keep loading more while the error is shown', async () => {
@@ -299,27 +298,31 @@ describe('UnmigratedUserList', () => {
       await scrollToEnd();
 
       expect(apiv3Get).toHaveBeenCalledTimes(2);
-      expect(screen.getByText(`${PREFIX}.load_more_error`)).toBeTruthy();
+      expect(screen.getByText(`${PREFIX}.fetch_error`)).toBeTruthy();
     });
 
-    it('requests the failed page again on retry and appends its rows', async () => {
+    it('requests the loaded pages and the failed page again on retry and appends its rows', async () => {
       await failSecondPage();
-      vi.mocked(apiv3Get).mockResolvedValueOnce(
-        mockResponse(
-          responseOf([userOf({ username: 'second-0' })], {
-            totalCount: 21,
-            page: 2,
-          }),
-        ),
-      );
+      vi.mocked(apiv3Get)
+        .mockResolvedValueOnce(
+          mockResponse(responseOf(page1, { totalCount: 21, page: 1 })),
+        )
+        .mockResolvedValueOnce(
+          mockResponse(
+            responseOf([userOf({ username: 'second-0' })], {
+              totalCount: 21,
+              page: 2,
+            }),
+          ),
+        );
 
       fireEvent.click(screen.getByRole('button', { name: RETRY_LABEL }));
 
       expect(await screen.findByRole('row', { name: /second-0/ })).toBeTruthy();
       expect(screen.getByRole('row', { name: /first-0/ })).toBeTruthy();
-      expect(screen.queryByText(`${PREFIX}.load_more_error`)).toBeNull();
+      expect(screen.queryByText(`${PREFIX}.fetch_error`)).toBeNull();
       expect(screen.queryByRole('button', { name: RETRY_LABEL })).toBeNull();
-      expect(apiv3Get).toHaveBeenCalledTimes(3);
+      expect(apiv3Get).toHaveBeenCalledTimes(4);
       expect(apiv3Get).toHaveBeenLastCalledWith(ENDPOINT, {
         page: 2,
         limit: 20,
@@ -343,7 +346,6 @@ describe('UnmigratedUserList', () => {
       expect(await screen.findByText(`${PREFIX}.fetch_error`)).toBeTruthy();
       expect(screen.getByRole('button', { name: RETRY_LABEL })).toBeTruthy();
       expect(screen.queryByRole('table')).toBeNull();
-      expect(screen.queryByText(`${PREFIX}.load_more_error`)).toBeNull();
     });
 
     it('requests the first page again on retry and shows its rows', async () => {
@@ -402,6 +404,39 @@ describe('UnmigratedUserList', () => {
       );
       expect(screen.getByRole('row', { name: /bob/ })).toBeTruthy();
       expect(apiv3Get).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the rows on a failed refetch and replaces them with the refetched list on retry', async () => {
+      vi.mocked(apiv3Get)
+        .mockResolvedValueOnce(
+          mockResponse(
+            responseOf([
+              userOf({ username: 'alice' }),
+              userOf({ username: 'bob' }),
+            ]),
+          ),
+        )
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValueOnce(
+          mockResponse(responseOf([userOf({ username: 'bob' })])),
+        );
+      const { rerender } = render(<UnmigratedUserList key="first" />, {
+        wrapper: Wrapper,
+      });
+      await screen.findByRole('row', { name: /alice/ });
+
+      rerender(<UnmigratedUserList key="second" />);
+      await screen.findByText(`${PREFIX}.fetch_error`);
+      expect(screen.getByRole('row', { name: /alice/ })).toBeTruthy();
+
+      fireEvent.click(screen.getByRole('button', { name: RETRY_LABEL }));
+
+      await waitFor(() =>
+        expect(screen.queryByRole('row', { name: /alice/ })).toBeNull(),
+      );
+      expect(screen.getByRole('row', { name: /bob/ })).toBeTruthy();
+      expect(screen.queryByText(`${PREFIX}.fetch_error`)).toBeNull();
+      expect(apiv3Get).toHaveBeenCalledTimes(3);
     });
   });
 });

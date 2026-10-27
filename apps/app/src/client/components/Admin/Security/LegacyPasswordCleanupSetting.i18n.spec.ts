@@ -32,7 +32,6 @@ const REQUIRED_KEYS = [
   `${SECTION}.unmigrated_list.never_logged_in`,
   `${SECTION}.unmigrated_list.empty`,
   `${SECTION}.unmigrated_list.fetch_error`,
-  `${SECTION}.unmigrated_list.load_more_error`,
   `${SECTION}.retry`,
   'audit_log_action.ADMIN_LEGACY_PASSWORD_DELETE',
 ];

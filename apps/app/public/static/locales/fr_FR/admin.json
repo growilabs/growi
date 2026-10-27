@@ -46,8 +46,7 @@
         },
         "never_logged_in": "Jamais connecté",
         "empty": "Aucun utilisateur n'a besoin d'être incité à migrer.",
-        "fetch_error": "Échec de la récupération de la liste des utilisateurs à inciter à migrer",
-        "load_more_error": "Échec du chargement d'utilisateurs supplémentaires"
+        "fetch_error": "Échec de la récupération de la liste des utilisateurs à inciter à migrer"
       }
     },
     "scope_of_page_disclosure": "Confidentialité de la page",

@@ -55,8 +55,7 @@
         },
         "never_logged_in": "ログイン履歴なし",
         "empty": "移行を促す必要があるユーザーはいません",
-        "fetch_error": "移行を促すユーザーの一覧の取得に失敗しました",
-        "load_more_error": "ユーザーの追加読み込みに失敗しました"
+        "fetch_error": "移行を促すユーザーの一覧の取得に失敗しました"
       }
     },
     "scope_of_page_disclosure": "ページの公開範囲",
