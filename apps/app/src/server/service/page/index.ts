@@ -774,6 +774,7 @@ class PageService implements IPageService {
         page,
         exParentId,
         newPagePath: newPagePathSanitized,
+        newParentId: newParent?._id,
         emptyPageIds: emptyPagesToInsert.map((p) => p._id),
       });
       if (committedPage == null) {
@@ -992,11 +993,13 @@ class PageService implements IPageService {
     page,
     exParentId,
     newPagePath,
+    newParentId,
     emptyPageIds,
   }: {
     page: PageDocument;
     exParentId: PageDocument['parent'];
     newPagePath: string;
+    newParentId: PageDocument['_id'] | undefined;
     emptyPageIds: PageDocument['_id'][];
   }): Promise<PageDocument | null> {
     const Page = mongoose.model<IPage, PageModel>('Page');
@@ -1012,6 +1015,10 @@ class PageService implements IPageService {
         // Only after a matched rollback: if step 3 committed, these are the page's
         // new ancestors. Ids that were never inserted match nothing.
         await Page.deleteMany({ _id: { $in: emptyPageIds }, isEmpty: true });
+        // Step 2 may also have created empty ancestors for the new path, whose ids are unknown here
+        if (newParentId != null) {
+          await Page.removeLeafEmptyPagesRecursively(newParentId);
+        }
         return null;
       }
 
