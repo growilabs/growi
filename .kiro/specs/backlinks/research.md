@@ -400,6 +400,11 @@
     live-request numbers do not show.
   - *Scope limits*: admins who consider the last year, or the last 10,000 pages, enough can bound
     the backfill with config values. Coverage is then partial by choice, so the panel must say so.
+    On-prem keeps the limits optional. For GROWI.cloud the proposal is a bounded value set by infra
+    in the shared config, never unlimited, so a full backfill is not available there: it removes
+    the slow older-pages phase and cuts the total work and the overlap window, which are the main
+    levers on shared-DB load. The cost is that stable, rarely edited pages that link to others are
+    skipped until someone edits them; it is for Yuki and infra to accept.
   - *Precedent — v8 `revisions` index pre-creation* (internal wiki page, Redmine 186296): to avoid
     all apps building `{ author: 1, createdAt: -1 }` at once through `autoIndex` at v8 boot, infra
     pre-created it per app from an `operation-mongo` pod with the admin credential (databases named

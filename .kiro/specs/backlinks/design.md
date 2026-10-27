@@ -985,6 +985,13 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     per-app DB operation rate directly, whatever the parse time (a 1.3 ms page would otherwise be
     processed 100+ times a second). Default chosen in B3.2 from the performance run.
   - **The duty per phase** (below), unchanged.
+  - **Batched I/O (open — evaluate in B3.2).** Today each page costs its own body read and its own
+    write. Reading the bodies of a group of pages in one query and writing their rows with one bulk
+    operation would cut the number of commands and round trips, which is most of the cost for tiny
+    pages. It does not reduce the documents read or written, nor the oplog and replication
+    volume, so its benefit depends on how much of the load is per-command overhead; B3.4's
+    DB-side measurements decide whether it is worth the extra shape. It combines with the
+    per-page rest: group the I/O, but still rest after each page's parse.
 - **Scope limits (config-driven; the skipping mechanism is open — settle in B3.2).** Admins who do
   not need old pages can bound the backfill: `backlinks:backfillMaxAgeDays` (only pages with
   `updatedAt` within that many days) and `backlinks:backfillMaxPages` (only the newest N pages by
@@ -993,6 +1000,17 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   newest-N cutoff is read from the `updatedAt` index. Pages outside the limits are never processed,
   so Requirement 4 holds for the pages in scope. How the panel shows a partial index, and whether
   the job then marks itself `complete` or `complete (partial)`, is open.
+  - **On-prem** keeps both limits optional (unset = full backfill): it has its own database, so no
+    shared load forces a cap, and the admin opts in by setting the auto-start flag.
+  - **GROWI.cloud (proposed — infra to confirm)**: infra sets a bounded
+    `backlinks:backfillMaxAgeDays` and/or `backlinks:backfillMaxPages` in the shared deploy
+    config, and never an unlimited value, so a full backfill is not available on cloud. Customers
+    cannot change it (the values are env-set by infra and not exposed in the admin UI; confirm
+    in B3.2), and the older-pages phase does not run, which shortens every cloud backfill.
+    Widening it for one customer later is a config change and a restart by infra.
+  - **Known gap**: the limits are by `updatedAt`, so an old page that links to many pages and has
+    not been edited is skipped, and the backlinks *from* it are missing until someone edits it
+    (the live listener then indexes it). The panel's partial-index state must say so (4.4).
 - **Duty per phase** (config keys and env names proposed; B3 fixes them): recent pages
   (`updatedAt` within the last `backlinks:backfillRecentWindowDays`, default 365) at
   `backlinks:backfillRecentDutyCyclePercent` (default 25), then older pages at
@@ -1221,7 +1239,8 @@ interface IBacklinkResponse {
   per-page rest (duty cycle) and its bounded continuous block (one page) bound latency impact on live
   traffic; the in-memory `{path→_id}` map keeps link resolution CPU-bound, not round-trip-bound.
   Measured ~5 ms/page; full-speed ~10 min/100k pages, ~50 min/500k, scaled by duty cycle and page
-  size. Body reads remain one DB read per page unless B3.2 batches them.
+  size. Body reads remain one DB read per page unless B3.2 batches them (see Batched I/O in the
+  Delivery decision).
 
 ## Migration Strategy
 

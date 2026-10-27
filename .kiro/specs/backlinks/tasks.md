@@ -498,12 +498,15 @@ admin-triggered start was deferred as a one-line future change. Independent of B
     (retry policy settled below with the failing-page policy)
   - Add a way to skip old pages, for admins who need only recent ones: `backlinks:backfillMaxAgeDays`
     and `backlinks:backfillMaxPages` (newest N by `updatedAt`, cutoff read from the `updatedAt`
-    index and stored once with `recentCutoff`), both unset by default. Settle how the panel and the
+    index and stored once with `recentCutoff`), both unset by default (on-prem); the GROWI.cloud
+    deploy config sets a bounded value (design.md's proposal), and the keys are not exposed in the
+    admin UI. Settle how the panel and the
     job `status` show a partial index (Requirement 4 holds for the pages in scope)
   - Settle the remaining open questions and record them in design.md: write ordering against the
     live listener on the same page (can a stale backfill write overwrite fresher rows?), whether to
     cap the body size parsed (at what size, and how skipped pages are recorded) since one large page
-    stalls the thread for its whole parse, the default for `backfillMaxPagesPerSecond`, whether an
+    stalls the thread for its whole parse, the default for `backfillMaxPagesPerSecond`, whether to batch the body reads and the page-link
+    writes (fewer commands, same documents; judge it from B3.4's DB-side numbers), whether an
     infra-owned `pauseRequested` field is needed as a no-restart brake, the checkpoint cadence and
     lease length (the lease must outlast the checkpoint interval plus the longest single rest), and
     the policy for a page whose write keeps failing. The pacing shape is decided: the per-page proportional rest
