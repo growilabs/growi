@@ -51,7 +51,7 @@
   - _Depends: 1.1_
 
 - [ ] 2. 確認と書き込みを 1 回の更新にし、人の保存と共通にする
-- [ ] 2.1 今の上書き防止の確認の動きを、結合テストで先に固定する
+- [x] 2.1 今の上書き防止の確認の動きを、結合テストで先に固定する
   - `origin` が空のリビジョンが最新のとき、`origin: editor` で `revisionId` を送らない保存が 409 `conflict` になること
   - 最新のリビジョンの `origin` が `editor` か `view` のとき、`origin: editor` の保存が確認を飛ばして通ること
   - 切り出しの前のコードでこれらのテストが成功していることを確かめている（以後の変更で動きが変わらないことの基準にする）
@@ -311,3 +311,4 @@
 - 1.2: config-manager の `DB値 ?? 初期値` のため、上限の初期値を入れる 8.1 で「空にする」の保存方法（0 を保存）を変える必要がある（8.1 に記載済み）
 - 1.4: `modelLabel`（100 文字まで）は model では確かめない。どのタスクにも検査の担当が書かれていないので、3.1（validateProposalInput）か 5.1 で、入力の検査として 100 文字を超えたら断るようにする
 - 1.4: `changeproposals` は G2G 転送で移せる側（`TRANSFERABLE_COLLECTIONS`）に入れた（design の Modified Files には未記載）。model の拡張の関数の引数の形は `change-proposal-types.ts` を正とする（`skipPendingOperations` の `'all-pending'`、`recordOperationOutcome` が `skipped` と待ちに戻す `pending` も受ける、など）。本文を読まない一覧系は `ChangeProposalSummary` / `LinkedProposalRecord` を返す
+- 2.1: 2.4 の共通処理は `crowi.pageService.updatePage` を呼ぶ形を守る（update-page-conflict-check.integ.ts がそれを spy している）
