@@ -175,7 +175,7 @@
   - アプリ内通知の一覧の API が、Change Proposal を対象にした通知の `target` を `_id` だけにして返すようにする
   - 通知の一覧の API の応答に、受け取る人の snapshot 以外の Change Proposal の中身（他の操作、パス、本文）が入らないこと、受け取る人ごとの中身に閲覧できないページのパスと件数が入らないこと、閲覧できない人に通知が作られないこと、取り消しでは元の依頼した人に届き、ごみ箱へ移した・戻したページが中身に入ること、activity の操作者が依頼した人（取り消しでは取り消した人）であること、ページごとの通知を出した反映でも出さなかった反映でも、まとめた通知が同じように作られることを結合テストで確かめている
   - _Requirements: 7.2, 7.3, 7.4, 7.5, 7.8, 7.12_
-- [ ] 4.5 反映の権利の取り方・操作の順の実行・結果の記録を作る
+- [x] 4.5 反映の権利の取り方・操作の順の実行・結果の記録を作る
   - lease が無いか期限切れのときだけ取り、取れなければ「反映中」を返す。操作を 1 つ反映するたびに lease を延ばし、最後に手放す。lease の取得・延長・手放しと結果の記録は、1.4 の拡張の関数（条件付きの更新と件数の確認）だけで行い、延長か結果の記録が失敗したら（件数 0）、その実行を止める
   - 承認された「待ち」の操作を決めた順に 4.2・4.3 の表で実行し、1 周したあとで対象を読み直して、まだ試していない承認があれば続ける
   - 各操作を書き込む前に、表の「前の実行の書き込みを探す処理」を呼び、見つかったときは書き込まずにその結果を記録する（反映し直しても二度書かない役目はこの処理が持つ）
@@ -330,3 +330,5 @@
 - 4.4: `recordProposalActivity` は design と違い `crowi` を引数に取り `{ activityId }` を返す（裏で動くときの activity の ID は関数の中の `beginActivity` で作られ、`notifyApplied` の `activities` に渡すため）。route から呼ぶ（request）場合、操作者は route の `addActivity` が保存した「リクエストを送った人」になる（引数の operator は使われない）ので、承認・取り消しできるのは本人だけという前提を 4.5 / 5.x でも崩さない
 - 4.4: `notifyApplied` は渡された文書の中で反映済みの操作をすべて対象にする。4.5 の ProposalApplier は「この実行で反映済みと記録した操作だけを残した文書」を渡し、承認を 2 回に分けても通知が 1 回ずつで前回のページを再通知しないことを 4.5 のテストで確かめる。受け取る人ごとの `findByIdsAndViewer` は同時実行数に上限が無い（多数の購読者がいる場合の改善余地）
 - 4.4: 通知一覧 API は `targetModel` が ChangeProposal の通知の `target` を読み込まず `{ _id }` だけ返す（`in-app-notification.ts` の `getLatestNotificationsByUser` と route の `hideChangeProposalTargets`）。他の種類の `target` は今までどおり読み込まれることがテストで守られている
+- 4.5: `proposal-applier.ts` の 1 操作の流れは「前の確認（空き）→ `findExistingResult` → 後の確認（空き）→ ページごとの通知を出すかの決定（`decidePerPageNotifications`。4.5 で実装済み）→ `execute`」。4.6 は判断を作り直さず、編集中（`checkEditingPresence`）と重なる処理（`canOperate`）の確認を `findExistingResult` と `decidePerPageNotifications` の間に差し込み、設定・依頼した人の有効性の確認（今は依頼した人が見つからないとき `failed: requester-not-allowed` だけ）を広げ、`markOriginalOperation` を足す
+- 4.5: `apply(proposalId, trigger, request?)` の 3 番目の引数（ip と endpoint）は 5.1 の作成直後の反映が使う。不正な ID や存在しない文書は `in-progress` を返す（`ApplyResult` は `done | in-progress` のみ）ので、5.x の呼び出し側が先に存在を確かめる。実行の途中で lease を失うと、記録できた結果だけの `done` を返し settle は呼ばない。`createProposalApplier(crowi, deps?)` で handlers / notifier / now を差し替えられる。テストの準備処理は `proposal-applier.test-kit.ts`（`.integ.ts` で終わらないのでサーバーのビルド対象に入るが、vitest や `^/test/setup` は import していない。`routes/apiv3/page/test-utils/` に前例あり）
