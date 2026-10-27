@@ -530,3 +530,6 @@ export const useSWRInfinitePasswordHashUnmigratedUsers: () => SWRInfiniteRespons
 - **削除の流れを hook に切り出す**: セクションのコンポーネントが約 125 行あり、coding-style の「関数は 50 行未満」を超えていた。確認ダイアログの開閉、実行中の状態、件数の取り直し、削除、トーストとログを `useLegacyPasswordDelete`（同じディレクトリ。`useAuditLogExport` などと同じ置き方）に移し、コンポーネントは表示だけにする。件数の `mutate` は引数で受け取る（hook の中で件数の hook をもう一度呼ぶと、マウント時の取得が重なるため）。挙動は変えない。
 - **今回も見送ったもの**: オフセット方式、`distinct` と `$nin`、HTML の応答を弾く処理の重複、`features/` の配置は前回までと同じ理由で見送る。`distinct` と `$nin` は、外部アカウントと連携したユーザーが約 90 万人を超えると、クエリが BSON の 16MB の上限を超えて 500 になる。監査ログに削除件数を残す指摘は、件数はサーバーログに残すと決めた（Requirement 4.5）ので採らない。最新の件数が 0 のときの通知、drift テストの `res` の型は、今回は扱わない。
 
+
+## master を取り込んだあとの調整（2026-10-27）
+- **件数入りの文言を複数形のキーにする（6.1）**: master で入った i18n の監査（`lint:i18n`）は、`t(key, { count })` で呼ぶキーに、言語ごとの複数形のキーがあることを求める。`confirm.warning` と `success` は、en_US と fr_FR では `_one` / `_other`、ja_JP・ko_KR・zh_CN では `_other` で持つ（`translation.json` の `sources` と同じ持ち方）。en_US と fr_FR は、単数と複数で文言を分ける。

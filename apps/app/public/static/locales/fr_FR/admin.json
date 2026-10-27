@@ -34,11 +34,13 @@
       "delete_button": "Supprimer les mots de passe hérités",
       "confirm": {
         "title": "Supprimer les mots de passe hérités",
-        "warning": "Les mots de passe hérités de {{count}} utilisateur(s) seront supprimés. Cette action est irréversible.",
+        "warning_one": "Le mot de passe hérité de {{count}} utilisateur sera supprimé. Cette action est irréversible.",
+        "warning_other": "Les mots de passe hérités de {{count}} utilisateurs seront supprimés. Cette action est irréversible.",
         "downgrade_warning": "Si vous revenez à une version antérieure, les utilisateurs dont l'ancien mot de passe a été supprimé ne pourront pas se connecter sur cette version. Les utilisateurs actifs peuvent récupérer l'accès en réinitialisant leur mot de passe ; les autres (suspendus, invités, etc.) doivent être traités individuellement par un administrateur. Si vous venez de revenir d'une version antérieure, exécutez d'abord le script de préparation à la remise à niveau. Si vous supprimez avant de l'exécuter, les utilisateurs qui ont changé leur mot de passe pendant l'utilisation de la version antérieure ne pourront pas se connecter avec leur nouveau mot de passe.",
         "submit": "Supprimer"
       },
-      "success": "Les mots de passe hérités de {{count}} utilisateur(s) ont été supprimés",
+      "success_one": "Le mot de passe hérité de {{count}} utilisateur a été supprimé",
+      "success_other": "Les mots de passe hérités de {{count}} utilisateurs ont été supprimés",
       "delete_error": "Échec de la suppression des mots de passe hérités. Certains ont pu être supprimés.",
       "fetch_error": "Échec de la récupération de l'état de la migration des hachages de mots de passe",
       "retry": "Réessayer",

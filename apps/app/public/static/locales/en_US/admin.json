@@ -34,11 +34,13 @@
       "delete_button": "Delete legacy passwords",
       "confirm": {
         "title": "Delete legacy passwords",
-        "warning": "The legacy passwords of {{count}} user(s) will be deleted. This action cannot be undone.",
+        "warning_one": "The legacy password of {{count}} user will be deleted. This action cannot be undone.",
+        "warning_other": "The legacy passwords of {{count}} users will be deleted. This action cannot be undone.",
         "downgrade_warning": "If you downgrade to an older version, the users whose legacy password was deleted will not be able to log in on that version. Active users can recover by resetting their password; other users (suspended, invited, etc.) must be handled individually by an administrator. If you have just returned from an older version, run the re-upgrade preparation script first. If you delete before running it, users who changed their password while the older version was in use will not be able to log in with their new password.",
         "submit": "Delete"
       },
-      "success": "Deleted the legacy passwords of {{count}} user(s)",
+      "success_one": "Deleted the legacy password of {{count}} user",
+      "success_other": "Deleted the legacy passwords of {{count}} users",
       "delete_error": "Failed to delete legacy passwords. Some may have been deleted.",
       "fetch_error": "Failed to fetch the password hash migration status",
       "retry": "Retry",

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import i18next from 'i18next';
 import { describe, expect, it } from 'vitest';
 
 const LOCALES = ['en_US', 'ja_JP', 'fr_FR', 'ko_KR', 'zh_CN'] as const;
@@ -18,10 +19,8 @@ const REQUIRED_KEYS = [
   `${SECTION}.both_is_target_hint`,
   `${SECTION}.delete_button`,
   `${SECTION}.confirm.title`,
-  `${SECTION}.confirm.warning`,
   `${SECTION}.confirm.downgrade_warning`,
   `${SECTION}.confirm.submit`,
-  `${SECTION}.success`,
   `${SECTION}.delete_error`,
   `${SECTION}.fetch_error`,
   `${SECTION}.unmigrated_list.title`,
@@ -36,11 +35,9 @@ const REQUIRED_KEYS = [
   'audit_log_action.ADMIN_LEGACY_PASSWORD_DELETE',
 ];
 
-// Keys whose en_US text carries an interpolation placeholder
-const KEYS_WITH_COUNT_PLACEHOLDER = [
-  `${SECTION}.confirm.warning`,
-  `${SECTION}.success`,
-];
+// Called with `{ count }`, so i18next resolves them through the locale's plural
+// suffixes (`_one` / `_other`) rather than the bare key.
+const PLURAL_KEYS = [`${SECTION}.confirm.warning`, `${SECTION}.success`];
 
 const LOCALE_BASE = join(__dirname, '../../../../../public/static/locales');
 
@@ -66,19 +63,25 @@ describe('LegacyPasswordCleanupSetting i18n (admin.json)', () => {
     });
   });
 
-  it.each(
-    KEYS_WITH_COUNT_PLACEHOLDER,
-  )('en_US %s contains the {{count}} placeholder', (key) => {
-    expect(getNestedValue(locales.en_US, key)).toContain('{{count}}');
-  });
+  describe.each(LOCALES)('%s plural messages', (locale) => {
+    const t = (key: string, count: number): string => {
+      const instance = i18next.createInstance();
+      instance.init({
+        lng: locale.replace('_', '-'),
+        initImmediate: false,
+        resources: { [locale.replace('_', '-')]: { admin: locales[locale] } },
+        ns: ['admin'],
+        defaultNS: 'admin',
+      });
+      return instance.t(key, { count });
+    };
 
-  describe.each(
-    LOCALES.filter((l) => l !== 'en_US'),
-  )('%s placeholders', (locale) => {
-    it.each(
-      KEYS_WITH_COUNT_PLACEHOLDER,
-    )('keeps the {{count}} placeholder of %s', (key) => {
-      expect(getNestedValue(locales[locale], key)).toContain('{{count}}');
+    it.each(PLURAL_KEYS)('resolves %s with the count for 1 and 3', (key) => {
+      for (const count of [1, 3]) {
+        const message = t(key, count);
+        expect(message).not.toBe(key);
+        expect(message).toContain(String(count));
+      }
     });
   });
 });
