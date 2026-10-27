@@ -6,13 +6,14 @@ _Generated: 2026-04-17 (3-way split; derived from umbrella `attachment-search`)_
 
 ## Scope of this Research
 
-以下 5 点の設計判断について、採用根拠と代替案の比較を記録する:
+以下 6 点の設計判断について、採用根拠と代替案の比較を記録する:
 
 1. 抽出エンジン: microsoft/markitdown / pdfminer.six の採用理由と代替案 (Apache Tika / Docling / Unstructured)
 2. markitdown PR #1263 (PDF ページ分割) の状況とフォールバック設計の根拠
 3. FastAPI + uv + multi-stage Dockerfile 構成の選定理由
 4. extras `[pdf,docx,xlsx,pptx,outlook]` 選定の根拠
 5. `services/` ディレクトリ配置と pnpm workspace 境界の決定経緯
+6. 抽出エンジンの再比較: firecrawl/anydoc との比較 (メモリ・速度・日本語の抽出品質、2026-10)
 
 ---
 
@@ -219,6 +220,92 @@ umbrella design.md で議論された配置候補:
 - `services/markitdown-extractor/` 用の GitHub Actions workflow を**独立して新設** (`.github/workflows/markitdown-extractor.yml`)
 - 既存 Node 系 workflow には影響しない
 - 具体コマンド (`uv sync --locked` / `uv run pytest` / `uv run ruff check` / `docker build`) は実装時に確定 (Open Question)
+
+---
+
+## 6. 抽出エンジンの再比較: anydoc (2026-10)
+
+### 6.1 経緯と比較の前提
+
+- 2026-08 に Firecrawl が Rust 製の変換ライブラリ [firecrawl/anydoc](https://github.com/firecrawl/anydoc) (MIT) を公開した ([gihyo.jp の紹介記事](https://gihyo.jp/article/2026/08/anydoc))。Node / Python / Rust から使え、自社計測では markitdown より高速・高品質とされる。2026-10-27 時点で v0.2.4、貢献者 9 人
+- ユーザー判断 (2026-10-27):
+  - apps/app のプロセス内では動かさない。anydoc を採用する場合も、抽出サービスを別コンテナで動かす現在の構成を維持し、中で使うライブラリだけを替える
+  - Outlook MSG は対象外にしてよい (anydoc は MSG に非対応)。requirements.md の Req 1.5 からの削除は、エンジンの採否と合わせて決める
+- markitdown 側の状況 (2026-10-27 時点): 最新は v0.1.9。PDF のページ単位抽出を足す PR #1263 は未マージのまま (最終更新 2026-06)
+
+### 6.2 anydoc の特徴 (markitdown との違い)
+
+| 観点 | markitdown | anydoc |
+|---|---|---|
+| Office 系 | DOCX / XLSX / PPTX | 加えて DOC / XLS / PPT / XLSB / OpenDocument |
+| その他 | PDF / MSG / HTML / JSON / XML / CSV / EPUB / ipynb など | PDF / RTF / EPUB / CSV のみ。HTML / JSON / TXT / MSG は非対応 (`anydoc.Format` で確認) |
+| PDF | pdfminer 系で抽出 | 自社の pdf-inspector で直接 Markdown 化。画像だけのページがあるとページ番号付きでエラー |
+| 区切り | PPTX は `<!-- Slide number: N -->` を出す。PDF のページ区切りは無い | PPTX のスライド区切りも PDF のページ区切りも無い |
+| OCR | 使わない設定 | 手元では行わない。`ocr='hosted'` を指定すると文書全体を Firecrawl Parse に送るため、無効 (既定の `reject`) のまま使う |
+| 安全面 | Python。抽出サービス側で defusedxml による XXE 対策を入れている | Rust でメモリ安全。fuzz テストと、展開サイズ・入れ子の深さ・ノード数の固定上限あり。タイムアウトの指定手段は無い |
+
+HTML / JSON / TXT を anydoc で扱えない点は、抽出サービス側で次のように補える:
+
+- TXT / JSON / XML / YAML / MD / LOG / ipynb: 文字コードを判定 (Shift_JIS を含む) してテキストとして返す
+- HTML: Python 標準の `html.parser` で script / style を除きタグを取り除く。markitdown を HTML のためだけに残すと、待機時メモリ (6.3) が markitdown 構成の水準に戻る
+- CSV: anydoc に形式を明示して渡す
+
+### 6.3 メモリと速度の実測
+
+方法: Python 3.12 の仮想環境に `markitdown[pdf,docx,xlsx,pptx]==0.1.9` / `firecrawl-anydoc==0.2.4` / `pdfminer.six==20260107` を入れ、1 回の変換ごとに新しいプロセスを起動して計測した (各 3 回、メモリは最大値、時間は中央値)。メモリは RSS (プロセスが実際に使っている物理メモリの量)。16 コアの開発コンテナ 1 台。
+
+サンプル: デジタル庁の公開資料 6 件 (PDF 3 件: 116 / 47 / 41 ページ、PPTX 1 件: 61 スライド、XLSX 2 件) と、日本語の文章を生成した DOCX 2 件 (40 段落 / 6,000 段落 + 表 40 個)、PPTX 1 件 (300 スライド)、XLSX 1 件 (5 シート × 2 万行 × 10 列、6MB)。
+
+**待機時のメモリ** (ライブラリを読み込んだだけの状態。サービスの台数分かかる):
+
+| 構成 | 待機時 |
+|---|---|
+| 現在の設計 (markitdown + PDF ページ分割用の pdfminer) | 148.7MB |
+| anydoc + pdfminer | 35.3MB |
+
+markitdown は読み込み時点でファイル種別判定用の機械学習モデル (magika / onnxruntime) と pandas / numpy まで読み込むため重い。
+
+**変換中の最大メモリと時間**:
+
+| ファイル | 大きさ | markitdown | anydoc |
+|---|---|---|---|
+| PDF 116 ページ | 2.3MB | 158MB / 3.1 秒 | 44MB / 7.7 秒 |
+| PDF 47 ページ | 3.2MB | 158MB / 2.2 秒 | 44MB / 6.5 秒 |
+| PDF 41 ページ | 4.8MB | 161MB / 0.86 秒 | 50MB / 0.07 秒 |
+| PPTX 61 スライド | 5.6MB | 192MB / 0.29 秒 | 49MB / 0.04 秒 |
+| XLSX 小 (2 件) | 20KB | 152MB / 0.04 秒 | 25MB / 0.002 秒 |
+| DOCX 小 (生成) | 40KB | 165MB / 0.19 秒 | 30MB / 0.006 秒 |
+| DOCX 大 (生成) | 0.4MB | 202MB / 1.7 秒 | 59MB / 0.05 秒 |
+| PPTX 300 スライド (生成) | 0.4MB | 154MB / 0.59 秒 | 28MB / 0.01 秒 |
+| XLSX 5 シート × 2 万行 (生成) | 6MB | 617MB / 36.5 秒 | 623MB / 2.1 秒 |
+
+現在の設計の PDF 経路 (pdfminer で 1 ページずつ抽出) は、待機時から 11〜30MB 増え、1.1〜7.2 秒かかった。
+
+### 6.4 日本語の抽出品質
+
+方法: 基準となるテキストを別の手段で取り出し、各出力と比べた。基準は PPTX が python-pptx (図形・表・ノート)、XLSX が openpyxl、DOCX が python-docx、PDF が PyMuPDF。NFKC 正規化後の日本語 (ひらがな・カタカナ・漢字) だけを抜き出し、4 文字の並びがどれだけ一致するかを見た。
+
+- **文字化けは見つからなかった**: U+FFFD、`(cid:N)`、私用領域の文字、康煕部首 (「⽇」のような部首用の文字)、Latin-1 として読み違えた崩れ、のいずれも、両ライブラリ・全ファイルで 0 件
+- **欠落も少ない**: 基準の 4 文字の並びのうち出力に含まれる割合は、DOCX / XLSX / 生成 PPTX で 0.9995〜1.0、実物の PDF で 0.986〜0.997 (両ライブラリでほぼ同じ)、実物の PPTX で anydoc 0.988 / markitdown 0.949
+- **単語の途中で文字列が切れる**: PDF の折り返し位置で、anydoc は日本語の間に空白を入れ (116 ページの PDF で 2,558 か所)、markitdown は改行を残す (同 1,904 か所)。どちらも kuromoji の単語区切りを壊すため、検索語の一致が減る。116 ページの PDF で検索語の出現数を数えると、両ライブラリとも 5〜10% 程度少なかった (例: 「情報システム」は基準 478 件に対し anydoc 443 件・markitdown 443 件)。pdfminer で 1 ページずつ抽出する現在の設計の経路では、基準と同じ 478 件だった
+- **その他**: markitdown は PPTX の改行コード (垂直タブ `\x0b`) を出力にそのまま残す。anydoc は PPTX の一部で行の順番を入れ替える (表紙の日付と組織名が逆)
+
+### 6.5 結果からの判断材料
+
+- 待機時メモリは anydoc 構成で約 4 分の 1 になる。サービスを並べた台数分効く
+- 大きな XLSX はどちらのライブラリでも約 620MB まで膨らむ。6MB の入力でこの量なので、アップロード上限 (`maxFileSizeBytes`、既定 50MB) ではメモリを抑えられない。コンテナのメモリ上限は「この倍率 × 同時変換数」で決まり、ライブラリを替えても解決しない。design で扱う
+- 速さは Office 系で anydoc が 10〜30 倍速い。PDF は 3 件中 2 件で anydoc が 2〜3 倍遅い (記事のベンチマークは PDF を対象外にしていた)
+- PDF はどちらのライブラリを選んでも pdfminer で 1 ページずつ抽出する経路を使う。ページ区切りが得られるうえ、単語の途中で切れる問題も起きなかったため、PDF はエンジン選択に左右されない
+- PPTX を anydoc に替えるとスライド区切りが失われ、「1 添付 = スライドごとの N 文書」の設計が崩れる。PPTX だけ別の方法で分ける / 1 文書として扱う / PPTX は markitdown のまま (待機時メモリは markitdown 構成の水準に戻る) のいずれかを選ぶ必要がある
+- どちらのライブラリを採用する場合も、日本語の間に入った 1 文字分の空白・改行を詰める後処理を抽出サービスで入れると、検索語の一致が改善する見込みがある (未実装・未計測)
+
+### 6.6 この比較の限界
+
+- 実物は 6 件で、実物の DOCX は無い。大きなファイルはすべて生成したもの
+- 品質は文字の一致で見ており、表の構造や読み順の正しさは目で少し確かめただけ
+- 計測は開発コンテナ 1 台で行った。本番のコンテナでの値ではない
+
+採否は未決 (2026-10-27 時点)。
 
 ---
 
