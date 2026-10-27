@@ -77,6 +77,70 @@ describe('PageRedirect', () => {
     });
   });
 
+  describe('.deleteRedirectsFromPathTree', () => {
+    test('deletes redirects starting at the path and below it, and keeps the rest', async () => {
+      await prisma.pageredirects.createMany({
+        data: [
+          { fromPath: '/a', toPath: '/b' },
+          { fromPath: '/a/child', toPath: '/b/child' },
+          { fromPath: '/a/child/grand', toPath: '/b/child/grand' },
+          { fromPath: '/ab', toPath: '/other' },
+          { fromPath: '/x/a', toPath: '/a' },
+          { fromPath: '/z', toPath: '/a' },
+        ],
+      });
+
+      const result =
+        await prisma.pageredirects.deleteRedirectsFromPathTree('/a');
+
+      expect(result.count).toBe(3);
+      const remaining = await prisma.pageredirects.findMany({
+        select: { fromPath: true },
+      });
+      expect(remaining.map((r) => r.fromPath).sort()).toEqual([
+        '/ab',
+        '/x/a',
+        '/z',
+      ]);
+    });
+
+    test('treats regex metacharacters and non-ASCII whitespace in the path literally', async () => {
+      const path = '/a.b (1)\u3000x';
+      await prisma.pageredirects.createMany({
+        data: [
+          { fromPath: path, toPath: '/t1' },
+          { fromPath: `${path}/child`, toPath: '/t2' },
+          { fromPath: '/aXb (1)\u3000x', toPath: '/t3' },
+          { fromPath: '/aXb (1)\u3000x/child', toPath: '/t4' },
+        ],
+      });
+
+      const result =
+        await prisma.pageredirects.deleteRedirectsFromPathTree(path);
+
+      expect(result.count).toBe(2);
+      const remaining = await prisma.pageredirects.findMany({
+        select: { fromPath: true },
+      });
+      expect(remaining.map((r) => r.fromPath).sort()).toEqual([
+        '/aXb (1)\u3000x',
+        '/aXb (1)\u3000x/child',
+      ]);
+    });
+
+    test('deletes nothing when no redirect matches', async () => {
+      await prisma.pageredirects.createMany({
+        data: [{ fromPath: '/keep', toPath: '/t' }],
+      });
+
+      const result =
+        await prisma.pageredirects.deleteRedirectsFromPathTree('/none');
+
+      expect(result.count).toBe(0);
+      expect(await prisma.pageredirects.count()).toBe(1);
+    });
+  });
+
   describe('.createManyIgnoringDuplicates', () => {
     test('creates every document when there is no collision', async () => {
       // when:

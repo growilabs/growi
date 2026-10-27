@@ -1,3 +1,4 @@
+import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import { Schema } from 'mongoose';
 
 import { Prisma } from '~/generated/prisma/client';
@@ -61,6 +62,11 @@ function toDepthNumber(value: RawLong): number {
 // shape of the MongoDB `insert` command response
 // (https://www.mongodb.com/docs/manual/reference/command/insert/)
 type RawInsertCommandResult = {
+  writeErrors?: { index: number; code: number; errmsg: string }[];
+};
+// shape of the MongoDB `delete` command response
+type RawDeleteCommandResult = {
+  n: number;
   writeErrors?: { index: number; code: number; errmsg: string }[];
 };
 const MONGO_DUPLICATE_KEY_ERROR_CODE = 11000;
@@ -141,6 +147,40 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.pageredirects>(this);
           return context.deleteMany({ where: { fromPath } });
+        },
+
+        // The path itself plus everything under it; '/ab' is not under '/a'.
+        // Prisma's `startsWith` does not escape regex metacharacters on MongoDB,
+        // so the delete command is issued raw with an escaped $regex.
+        async deleteRedirectsFromPathTree(
+          fromPath: string,
+        ): Promise<{ count: number }> {
+          const base = fromPath.replace(/\/+$/, '');
+          const result = (await client.$runCommandRaw({
+            delete: 'pageredirects',
+            deletes: [
+              {
+                q: {
+                  $or: [
+                    { fromPath },
+                    {
+                      fromPath: {
+                        $regex: `^${escapeStringForMongoRegex(base)}/`,
+                      },
+                    },
+                  ],
+                },
+                limit: 0,
+              },
+            ],
+          })) as unknown as RawDeleteCommandResult;
+
+          if (result.writeErrors != null && result.writeErrors.length > 0) {
+            throw new Error(
+              `Failed to delete PageRedirect documents: ${result.writeErrors[0].errmsg}`,
+            );
+          }
+          return { count: result.n };
         },
 
         async removePageRedirectsByToPath(toPath: string): Promise<void> {
