@@ -236,7 +236,7 @@
   - _Requirements: 2.5, 2.9, 2.11, 3.14, 8.5_
 
 - [ ] 6. 取得と API
-- [ ] 6.1 見る人ごとに絞った 1 件の取得を作る
+- [x] 6.1 見る人ごとに絞った 1 件の取得を作る
   - 操作のページをまとめて 1 回で確かめ、`selectVisibleOperations` で見る人に返す操作を選ぶ。依頼した人以外には、返す操作が 1 つも無いものを「見つからない」にする（承認待ちかどうかは判断に使わない）。全体の状態と最後に反映した日時は、依頼した人以外には返す操作だけから決める
   - 反映済みの操作ごとに、5.3 で作ったページの状態の読み込みを使って、見る人が取り消せる操作に「戻せるか」と理由を付ける。依頼した人以外には `index` と提案された本文を返さない
   - 依頼した人にだけ、段階と達成度（3.1）と、ページごとの通知の指定と管理者の設定の値（`requesterState.perPageNotifications`）を付ける
@@ -345,3 +345,5 @@
 - 【人の判断が必要・未解決】4.3 / 5.3: trash / restore の handler は閲覧できるかだけを確かめ、`pageService.canDelete`（管理者設定 `pageDeletionAuthority`、トップページ・ユーザーのホームの保護）を当てていない。取り消しの Change Proposal の依頼した人は「取り消した人」なので、新規作成されたページを閲覧できる人なら誰でも、削除権限の確認を通らずにそのページをごみ箱へ移せる。design どおりの実装のまま残してあり、`canDelete` を当てるかは人が決める
 - 5.4: 保守処理は `services/maintenance-actions.ts`（`expireDueProposals(now)` / `withdrawAllPending()` / `resumeInterruptedApplies(now)` / `settleStalledProposals()` を `createChangeProposalService` の返すオブジェクトに足してある）と `services/maintenance-cron.ts`（`CronService` 継承。1 回の順は取り下げ → 期限切れ → 再開 → 完了。取り下げは書き込み機能が無効のときだけ、取り消しの Change Proposal と「待ち」の無い案は対象外。開始前に最大 2 分のずらす待ち、保守モードでは動かず、同じサーバーで前の実行が終わっていなければ飛ばす。書き込み機能の有効・無効にかかわらず起動し、間隔の設定が空のときだけ起動しない）。`server/crowi/index.ts` の `setupCron` が動的 import で起動する。YjsService は `start()` で初期化されるので、毎回の実行で `getYjsService()` が使えるかを確かめ、使えるようになるまで再開の段階だけを飛ばす。1.4 の finder に省略可能な `excludeIds`（`idNotIn`）を足した（1 回の実行で一度試した ID を再び試さず、例外になり続ける案が他の案を押し出さないため。design 978 行目）。1 回の実行で 1 つの段階が扱う件数は最大 5000 件（100 件 × 50 回）
 - 【人の判断が必要・未解決】5.4: 取り消しの Change Proposal の反映が `recordOperationOutcome` と `markOriginalOperation` の間で止まると、取り消しの操作はもう「待ち」でないので再開の候補に入らず、完了の段階が取り消しの Change Proposal を `settled` にし、元の操作は「反映済み」のまま残る。design にも research にも直す手順が無い（直すなら、元の操作と取り消しの操作の結果を突き合わせて `markOriginalOperation` をやり直す保守処理を足す）。もう 1 つ: 6.x の route と change-proposal-ai-agent にサービスの実体を渡す仕組みがまだ無く、cron は自分で `createChangeProposalService(crowi)` を作っている（5.1 の申し送り）。6.3 で route から使う実体の置き場所を決める
+- 6.1: 取得は `services/proposal-query.ts` の `getForViewer(proposalId, viewer)`（design の名前。`ProposalQuery` 型を `createChangeProposalService` の返すオブジェクトに足してある。`to-operation-view.ts` が `OperationView` を作る）。依頼した人以外には `index` と本文を返さず、全体の状態・`lastAppliedAt` は見える操作だけから決める。存在しない ID・形式が誤った ID・何も見えない案は同じ `not-found`（かかる時間は揃っていない。要件は求めていない）。ページの閲覧確認は `loadViewablePages` 1 回で、本体・後続・見直し・元の案のページをまとめて確かめる。`revertability` は `isRequesterAllowed(viewer)` が真の見る人にだけ付く（読み取り専用・有効でない・ゲストには付かない。`revert()` と同じ判定）。`selectVisibleOperations` / `targetPageIdOf` は `VisibilityOperationFacts` について generic にした（動きは同じ）
+- 6.1 の判断が要る点: 達成度は「見える操作」で数えている（要件 12.2「全体の操作の数」と要件 9.4「閲覧できない操作の件数を含めない」の文言がぶつかっており、9.4 と Notes 3.4 を優先した。6.2 の `listMine` も同じ選択にする。人の確認が要る）。画面が「戻せる」と出しても、編集の元のリビジョンの本文が読めないと取り消しが `apply-failed` で断られることがある（Notes 3.3 のとおり）。戻せない理由 `has-children` / `path-occupied` から、見えないページの存在が分かりうる（5.14 と 3.3 の判定の性質）

@@ -1,4 +1,13 @@
-import type { OperationRecord, OperationStatus } from '../../interfaces';
+import type { OperationStatus, OperationType } from '../../interfaces';
+
+// The parts of an operation visibility depends on; OperationRecord and the
+// operations of a linked-proposal record both satisfy it.
+export type VisibilityOperationFacts = {
+  readonly type: OperationType;
+  readonly status: OperationStatus;
+  readonly pageId?: string;
+  readonly resultPageId?: string;
+};
 
 export type VisibilityContext = {
   readonly isRequester: boolean;
@@ -14,10 +23,14 @@ const STATUSES_VISIBLE_TO_OTHERS: ReadonlySet<OperationStatus> = new Set([
 ]);
 
 // A create has no page until it is applied, so its target is the result page.
-export const targetPageIdOf = (op: OperationRecord): string | undefined =>
-  op.type === 'create' ? op.resultPageId : op.pageId;
+export const targetPageIdOf = (
+  op: VisibilityOperationFacts,
+): string | undefined => (op.type === 'create' ? op.resultPageId : op.pageId);
 
-const isVisible = (op: OperationRecord, ctx: VisibilityContext): boolean => {
+const isVisible = (
+  op: VisibilityOperationFacts,
+  ctx: VisibilityContext,
+): boolean => {
   const pageId = targetPageIdOf(op);
 
   if (pageId == null) {
@@ -35,7 +48,7 @@ const isVisible = (op: OperationRecord, ctx: VisibilityContext): boolean => {
   );
 };
 
-export const selectVisibleOperations = (
-  operations: readonly OperationRecord[],
+export const selectVisibleOperations = <T extends VisibilityOperationFacts>(
+  operations: readonly T[],
   ctx: VisibilityContext,
-): readonly OperationRecord[] => operations.filter((op) => isVisible(op, ctx));
+): readonly T[] => operations.filter((op) => isVisible(op, ctx));

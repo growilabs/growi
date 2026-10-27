@@ -38,6 +38,7 @@ import {
   createProposalApplier,
   type ProposalApplier,
 } from './proposal-applier';
+import { createProposalQuery, type ProposalQuery } from './proposal-query';
 import {
   createRequesterActions,
   type RequesterActions,
@@ -56,7 +57,8 @@ const BASED_ON_RELATIONS: readonly string[] = ['follow-up', 'rework'];
 
 export type ChangeProposalService = RequesterActions &
   RevertAction &
-  MaintenanceActions & {
+  MaintenanceActions &
+  ProposalQuery & {
     createProposal(
       input: CreateProposalRequest,
     ): Promise<ServiceResult<CreateProposalResult>>;
@@ -237,6 +239,7 @@ export const createChangeProposalService = (
   return {
     ...createRequesterActions({ applier, now }),
     ...createRevertAction({ applier, now }),
+    ...createProposalQuery(),
     ...createMaintenanceActions({
       applier,
       now,
