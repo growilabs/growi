@@ -150,7 +150,7 @@ const accountLinkNotice = (
   linkUrl: string,
 ): OutboundMessage =>
   markdown(
-    `GROWI「${growiLabel}」との紐付けが必要です。次のリンクを開き、その GROWI にログインした状態で紐付けを承認してください（1 回だけ使えます。短時間で失効します）: ${linkUrl}`,
+    `GROWI「${growiLabel}」との紐付けが必要です。次のリンクを開き、その GROWI にログインした状態で紐付けを承認してください（1 回だけ使えます。短時間で失効します）:\n\n<${linkUrl}>`,
   );
 
 /**

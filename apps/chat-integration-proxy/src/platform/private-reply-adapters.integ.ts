@@ -301,6 +301,27 @@ describe('Slack', () => {
     );
   });
 
+  it('hands Slack a link on its own line in markdown autolink form, localhost included', async () => {
+    const slack = await startSlack();
+
+    await postEphemeral(
+      slack.context,
+      channelRef('slack', 'slack:C0000000X'),
+      person('slack', 'U0ALICE01'),
+      {
+        kind: 'markdown',
+        markdown: 'Open this:\n\n<http://localhost:3000/link/abc>',
+      },
+    );
+
+    const sent = slack.service.requests.find(
+      (r) => r.path === '/api/chat.postEphemeral',
+    );
+    expect((sent?.body as { markdown_text?: string }).markdown_text).toBe(
+      'Open this:\n\n<http://localhost:3000/link/abc>',
+    );
+  });
+
   it('answers success when the same reaction is added twice (already_reacted)', async () => {
     const slack = await startSlack();
     const target = {

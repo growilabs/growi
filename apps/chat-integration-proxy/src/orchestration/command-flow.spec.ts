@@ -656,7 +656,9 @@ describe('the five commands, end to end', () => {
     );
     const notice = harness.ephemeralMessages().at(-1);
     if (notice?.kind !== 'markdown') throw new Error('expected markdown');
-    expect(notice.markdown).toContain('https://rel-b.example.com/link/abc');
+    expect(notice.markdown).toContain(
+      '\n\n<https://rel-b.example.com/link/abc>',
+    );
     expect(notice.markdown).toContain(GROWI_B.growiLabel);
     expect(harness.platform.post).not.toHaveBeenCalled();
   });
