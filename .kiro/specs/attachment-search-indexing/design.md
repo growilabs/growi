@@ -2,13 +2,13 @@
 
 ## Overview
 
-本 spec は GROWI 添付ファイル全文検索機能のうち **apps/app サーバ側の統合層** を定義する。上流 `attachment-search-markitdown-extractor` spec が提供する FastAPI 抽出マイクロサービスを `packages/markitdown-client` (orval 生成) 経由で呼び出し、添付ファイル専用 Elasticsearch インデックス (`attachments`) への書き込みを行う。既存の `AttachmentService` / `ElasticsearchDelegator` / `SearchService` / `ConfigManager` / `pageEvent` の拡張点を用い、独立サブシステムを作らずに feature module として統合する。
+本 spec は GROWI 添付ファイル全文検索機能のうち **apps/app サーバ側の統合層** を定義する。上流 `attachment-search-markitdown-extractor` spec が提供する FastAPI 抽出マイクロサービスを `packages/markitdown-client` (orval 生成) 経由で呼び出し、添付ファイル専用 Elasticsearch インデックス (`attachments`) への書き込みを行う。既存の `AttachmentService` / `ElasticsearchDelegator` / `SearchService` / `ConfigManager` の拡張点を用い、独立サブシステムを作らずに feature module として統合する。
 
 **Purpose**: apps/app 内で「抽出結果を ES へ upsert / 権限変更や削除を追従 / 一括再インデックスと個別再抽出を提供 / 検索クエリを multi-index で集約」する責務を完結させる。
 
 **Users**: GROWI 利用者 (検索応答の受け取り)、GROWI 管理者 (admin API 経由の有効化・運用)、GROWI 配布/運用者 (Config 経由の接続先管理)。UI コンポーネント自体は下流 `attachment-search-ui` spec が描画する。
 
-**Impact**: `apps/app/src/features/search-attachments/server/` の新設、新規パッケージ `packages/markitdown-client` の追加、`ElasticsearchDelegator` / `SearchService` / `AttachmentService` / `ConfigManager` / `pageEvent` への extension (最小差分)、応答型 `IPageWithSearchMeta` への optional フィールド追加。
+**Impact**: `apps/app/src/features/search-attachments/server/` の新設、新規パッケージ `packages/markitdown-client` の追加、`ElasticsearchDelegator` / `SearchService` / `AttachmentService` / `ConfigManager` への extension (最小差分)、既存キーワード検索 API (`GET /_api/search`) への optional クエリ追加、応答型 `IPageWithSearchMeta` への optional フィールド追加、`extractionfailurelogs` の Prisma モデルと index 作成 migration の追加。
 
 ### Goals
 
@@ -41,7 +41,7 @@
 - `ExtractionFailureLogService` による MongoDB 永続化と集計 API (Prisma モデル `extractionfailurelogs`。TTL index は migrate-mongo の migration で作成)
 - `SearchService` extended による multi-index msearch / pageId 集約 / query-time permission lookup / 検索演算子の振り分け (本文語は添付本文へ、絞り込み条件は親ページへ)
 - `IPageWithSearchMeta` への optional `attachmentHits[]` 追加 (サーバ応答契約)
-- apiv3 エンドポイント群 (reextract / admin config / admin failures / search indices 拡張)
+- apiv3 エンドポイント群 (reextract / admin config / admin failures / search indices 拡張) と、既存キーワード検索 API (`GET /_api/search`) への optional な `facet` / `resolve` の追加
 - Config キー群 (`app:attachmentFullTextSearch:extractorUri` / `:extractorToken` / `:timeoutMs` / `:maxFileSizeBytes` の 4 キー) の定義と永続化。`extractorToken` は encrypted storage (`app:openaiApiKey` と同パターン)、`enabled` は算出値に移行して Config からは削除、`maxConcurrency` は抽出サービス側の env var 専用とし Config からは削除
 - Crowi 初期化での `initAttachmentFullTextSearch(crowi)` 配線
 - `SearchConfigurationProps.searchConfig` SSR プロパティへの `isAttachmentFullTextSearchEnabled` フィールド追加と関連型 (`apps/app/src/pages/basic-layout-page/types.ts`) の拡張、および `getServerSideSearchConfigurationProps` のサーバ生成ロジック拡張 (非 admin 一般ユーザが SSR 時点で機能有効フラグを参照できる公式経路)
@@ -60,12 +60,14 @@
 
 - **上流**: `attachment-search-markitdown-extractor` spec が提供する FastAPI OpenAPI spec (`POST /extract`、`ExtractResponse` / `ErrorResponse`)、Docker image、デプロイ manifest
 - 既存 `AttachmentService.addAttachHandler` / `addDetachHandler` (ハンドラ登録のみ)
-- 既存 `ElasticsearchDelegator` (composition で添付向けメソッド合成、既存 Page 系メソッドは不変)
-- 既存 `SearchService.registerUpdateEvent()` (リスナ追加のみ)
+- 既存 `ElasticsearchDelegator` (composition で添付向けメソッド合成、既存 Page 系メソッドは不変)。`searchAccessiblePages` からは既存の `createSearchQuery()` / `appendCriteriaForQueryString()` / `appendCriteriaForGroupFilter()` / `filterPagesByViewer()` を呼び出しのみで使う
+- 既存 `SearchService` の `parseSearchQuery()` / `resolve()` / `resolveFilterData()` (呼び出しのみ。演算子の解析ロジックは複製しない)
+- 既存 `prisma.attachments` (読み取りのみ。Attachment の作成・削除は `AttachmentService` が行う)
+- 既存 `GET /_api/search` ハンドラ (`routes/search.ts`、optional なクエリの追加のみ。`facet` 省略時の処理は変えない)
+- 既存 migrate-mongo の migration 置き場 (`src/migrations/`) と `non-transferable-collections.ts` (追加のみ)
 - 既存 `FileUploader` (バイト取得のみ)
 - 既存 `ConfigManager` / `config-definition.ts` (キー追加のみ)
 - 既存 Socket.io progress channel (添付向けイベント名を追加)
-- 既存 `pageEvent` の `updateMany` / `syncDescendantsUpdate` / page delete
 - 既存 `IPageWithSearchMeta` (optional フィールド追加のみ)
 - `pdf-converter-client` パターン (orval 設定の参考)
 
@@ -240,14 +242,15 @@ packages/markitdown-client/
 ### Modified Files
 
 - [apps/app/src/server/crowi/index.ts](apps/app/src/server/crowi/index.ts) — `initAttachmentFullTextSearch(this)` を searchService / attachmentService 初期化後に追加
-- [apps/app/src/server/service/search.ts](apps/app/src/server/service/search.ts) — 優先 slot 駆動 primary + secondary enrichment 経路を `AttachmentSearchResultAggregator` として追加。`registerUpdateEvent()` への権限変更リスナ追加は **不要** (Option D は query-time 方式のため)
+- [apps/app/src/server/routes/search.ts](apps/app/src/server/routes/search.ts) — 既存のキーワード検索 API (`GET /_api/search`、apiv1) に optional な `facet` / `resolve` クエリを追加。`facet` 省略時と `facet=pages` は従来の `searchKeyword()` → `formatSearchResult()` をそのまま通す。`all` / `attachments` で機能有効時は `searchService.searchByFacet()` を呼び、結果を既存の `IFormattedSearchResult` の形 (items に optional の `attachmentHits`、meta に optional の `facet` / `primaryResultIncomplete` / `nextCursor`) に詰めて返す
+- [apps/app/src/server/service/search.ts](apps/app/src/server/service/search.ts) — 優先 slot 駆動 primary + secondary enrichment 経路を `AttachmentSearchResultAggregator` として追加し、入口として `searchByFacet()` を置く (クエリ解析・delegator 解決・`resolveFilterData()` を 1 回だけ行って `AttachmentSearchInput` を組み立てる)。`registerUpdateEvent()` への権限変更リスナ追加は **不要** (Option D は query-time 方式のため)
 - [apps/app/src/server/service/search-delegator/elasticsearch.ts](apps/app/src/server/service/search-delegator/elasticsearch.ts) — `attachment-search-delegator-extension` との合成 (既存 Page 系メソッドは不変)
 - [apps/app/src/server/service/config-manager/config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) — `app:attachmentFullTextSearch:*` 4 キー追加 (`extractorUri` / **`extractorToken` (encrypted storage、write-only)** / `timeoutMs` / `maxFileSizeBytes`)。各キーの env var 名: `GROWI_MARKITDOWN_EXTRACTOR_URI` / `GROWI_MARKITDOWN_SERVICE_TOKEN` / `GROWI_MARKITDOWN_TIMEOUT_MS` / `GROWI_MARKITDOWN_MAX_FILE_SIZE_BYTES`。`enabled` / `maxConcurrency` は Config キーとしては提供せず、前者は算出値、後者は抽出サービス側の env var 専用。加えて `ENV_ONLY_GROUPS` に `env:useOnlyEnvVars:app:attachmentFullTextSearch` エントリを追加し、control env var `MARKITDOWN_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS=true` で 4 キー全てを env-only 強制できるようにする (マルチテナント向け詳細は下記「ENV_ONLY_GROUPS エントリ」参照)
 - [apps/app/src/interfaces/search.ts](apps/app/src/interfaces/search.ts) — `IPageWithSearchMeta.attachmentHits?: IAttachmentHit[]` (optional) を追加
 - [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js) — `PUT /search/indices` に `includeAttachments` フラグを受理。true のときは `AttachmentReindexBatch.startRebuild()` を呼んで即応答し、実行中なら 409 `rebuild_in_progress`
 - [apps/app/src/interfaces/websocket.ts](apps/app/src/interfaces/websocket.ts) — `AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed` を追加
 - [apps/app/prisma/schema.prisma](apps/app/prisma/schema.prisma) — `extractionfailurelogs` model を追加
-- `apps/app/src/migrations/<timestamp>-add-indexes-to-extractionfailurelogs.js` (新規) — `occurredAt` の 90 日 TTL index と `attachmentId` / `retentionGroupHash` の index を作成
+- `apps/app/src/migrations/<timestamp>-add-indexes-to-extractionfailurelogs.js` (新規) — `occurredAt` の 90 日 TTL index と `attachmentId` / `retentionGroupHash` の index を作成 (既存 migration と同じく ESM の named export `up` / `down`)
 - [apps/app/src/server/service/import/non-transferable-collections.ts](apps/app/src/server/service/import/non-transferable-collections.ts) — `extractionfailurelogs` を G2G 転送の対象外に追加
 - [apps/app/src/pages/basic-layout-page/get-server-side-props/search-configurations.ts](apps/app/src/pages/basic-layout-page/get-server-side-props/search-configurations.ts) — `getServerSideSearchConfigurationProps` を拡張し、`searchService.isConfigured` と `ConfigManager.getConfig('app:attachmentFullTextSearch:extractorUri')` から算出した `searchConfig.isAttachmentFullTextSearchEnabled` を SSR props に含める (既存フィールドは非破壊)
 - [apps/app/src/pages/basic-layout-page/types.ts](apps/app/src/pages/basic-layout-page/types.ts) — `SearchConfigurationProps.searchConfig` 型に `isAttachmentFullTextSearchEnabled: boolean` フィールドを追加 (既存 `isSearchServiceConfigured` / `isSearchServiceReachable` / `isSearchScopeChildrenAsDefault` は据え置き)
@@ -306,7 +309,7 @@ facet 値との対応 (外部 API の名称は不変、UI spec `activeFacetAtom`
 | facet | 優先 slot | secondary 解決 | ユースケース |
 |---|---|---|---|
 | `pages` | pages のみ | なし | 従来の Page 検索完全互換 (attachments_index を一切叩かない) |
-| `all` (default) | pages (slot A) | あり | デフォルト統合検索。Page ヒットをページング基準とし、その同一ページに紐づく添付ヒットを埋め込む |
+| `all` (UI の既定) | pages (slot A) | あり | UI が既定で指定する統合検索。Page ヒットをページング基準とし、その同一ページに紐づく添付ヒットを埋め込む |
 | `attachments` | attachments (slot B) | あり | 添付中心検索。添付ヒットをページング基準とし、親 Page メタを埋め込む |
 
 #### 2.1 一次結果 (primary) の取得
@@ -314,12 +317,12 @@ facet 値との対応 (外部 API の名称は不変、UI spec `activeFacetAtom`
 ```mermaid
 sequenceDiagram
     participant UI as SearchPage (downstream)
-    participant Api as apiv3 search
+    participant Api as search API (/_api/search)
     participant Svc as SearchResultAggregator
     participant Del as ESDelegator extended
     participant ES as Elasticsearch
 
-    UI->>Api: GET /search?q=...&facet=all|pages|attachments&resolve=primary|full
+    UI->>Api: GET /_api/search?q=...&facet=all|pages|attachments&resolve=primary|full
     Api->>Svc: searchPrimary(query, viewer, { facet, from, size })
 
     alt facet=pages
@@ -854,12 +857,17 @@ interface ISecondarySearchResult {
 
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | /_api/v3/search | `?q=&facet=all\|pages\|attachments&from=&size=&resolve=primary\|full` | `IPrimarySearchResult` (既存 search endpoint の拡張) | 400 invalid, 503 feature_disabled |
+| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=all\|pages\|attachments&offset=&limit=&resolve=primary\|full` (`facet` 省略時は `pages` = 従来どおり) | 既存の `IFormattedSearchResult` (items に optional `attachmentHits`、meta に optional `facet` / `primaryResultIncomplete` / `nextCursor`) | 既存どおり |
 | GET | /_api/v3/search/attachments | `?q=&pageIds=id1,id2,...` (pageIds は primary 結果の pageId 配列、≤ ページサイズ) | `ISecondarySearchResult` | 400 invalid (pageIds 超過等), 503 feature_disabled |
 | POST | /_api/v3/attachments/:id/reextract | — | `{ outcome: ExtractionOutcome }` | 400 invalid, 403 forbidden, 404 not_found, 503 feature_disabled |
 | GET | /_api/v3/admin/attachment-search/failures | `?limit=N&since=iso` | `{ items: ExtractionFailure[], total: number }` | 403 forbidden |
 | GET | /_api/v3/admin/attachment-search/config | — | `AttachmentSearchConfig` | 403 forbidden |
 | PUT | /_api/v3/admin/attachment-search/config | `AttachmentSearchConfigUpdate` | `AttachmentSearchConfig` | 400 validation, 403 forbidden |
+
+**`GET /_api/search` の互換性** (Req 9.1 / 9.3):
+- `facet` を付けない既存の利用者 (UI 以外の API 利用者、MCP など) には、機能の有効・無効にかかわらず従来と同じ処理・同じ応答を返す。UI は既定で `facet=all` を明示して送る
+- 機能無効時に `facet=all` / `attachments` が来た場合は `pages` として処理する (503 にはしない。検索そのものは成立するため)
+- 応答の外形 (`ApiResponse.success` + `IFormattedSearchResult`) は変えず、追加分はすべて optional
 
 **`GET /_api/v3/search/attachments` の制約**:
 - `pageIds` は **必須**、要素数の上限はページサイズ (default 20、admin 設定で可変) と一致。超過は 400
@@ -1346,7 +1354,7 @@ flowchart LR
     B -.->|new install| F
 ```
 
-- Phase 1: コード deploy (`extractorUri` 未設定 default)。起動時の migrate-mongo で `extractionfailurelogs` の index を作成。算出値 `isAttachmentFullTextSearchEnabled` が `false` のため既存挙動と完全互換
+- Phase 1: コード deploy (`extractorUri` 未設定 default)。deploy 時の `pnpm run migrate` (サーバ起動前に走る migrate-mongo) で `extractionfailurelogs` の index を作成。算出値 `isAttachmentFullTextSearchEnabled` が `false` のため既存挙動と完全互換
 - Phase 2: admin API で `extractorUri` を設定 (= 機能有効化)。以降の新規アップロードは自動インデックス
 - Phase 3: 既存添付を取り込む admin は rebuildIndex を実行
 - ロールバック (soft-disable): admin UI で `extractorUri` を空文字 / null にクリア → 算出値 `isAttachmentFullTextSearchEnabled` が `false` に遷移し検索経路は旧挙動。`attachments` index は残置されるが参照されない

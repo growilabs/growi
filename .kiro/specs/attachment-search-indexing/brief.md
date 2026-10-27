@@ -17,7 +17,7 @@
 
 ## Desired Outcome
 
-- 添付専用 Elasticsearch インデックス `attachments` (ES 7/8/9 対応 mapping) が存在し、1 添付 = N 文書 (ページ/スライド/シート単位) で運用される
+- 添付専用 Elasticsearch インデックス `attachments` (ES 8/9 対応 mapping) が存在し、1 添付 = N 文書 (ページ/スライド/シート単位) で運用される
 - 添付アップロード時に自動で抽出サービスを呼び出し、結果を ES にインデックスする (機能無効時は一切呼び出さない)
 - 添付削除・親ページ削除・親ページ権限変更が ES に反映される
 - 既存添付を一括でインデックス化する admin 操作が提供される (rebuildIndex 拡張)
@@ -51,10 +51,9 @@
   - `services/attachment-search-indexer.ts` (attach/detach/reextract 単一窓口)
   - `services/attachment-search-delegator-extension.ts` (ESDelegator 拡張)
   - `services/attachment-reindex-batch.ts` (bulk 再インデックス + Socket.io progress)
-  - `services/attachment-grant-sync.ts` (pageEvent listener)
   - `services/extraction-failure-log-service.ts`
-  - `models/extraction-failure-log.ts` (Mongoose schema + TTL index)
-  - `mappings/attachments-mappings-es{7,8,9}.ts`
+  - `models/extraction-failure-log.ts` (Prisma モデル `extractionfailurelogs` の操作。TTL index は migrate-mongo の migration で作成)
+  - `mappings/attachments-mappings-es{8,9}.ts`
   - `queries/build-attachment-search-query.ts` (msearch body builder)
   - `routes/apiv3/attachment-reextract.ts` (`POST /_api/v3/attachments/:id/reextract`)
   - `routes/apiv3/attachment-search-admin.ts` (`GET /failures`, `GET|PUT /config`)
@@ -71,7 +70,7 @@
 - [apps/app/src/server/service/search-delegator/elasticsearch.ts](apps/app/src/server/service/search-delegator/elasticsearch.ts): 拡張モジュールとの合成
 - [apps/app/src/server/service/config-manager/config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts): 新規 Config キー 5 件
 - [apps/app/src/interfaces/search.ts](apps/app/src/interfaces/search.ts): `IPageWithSearchMeta.attachmentHits[]` optional 追加
-- [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js): `PUT /search/indices` に `includeAttachments` フラグ受理
+- [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js): `PUT /search/indices` に `includeAttachments` フラグ受理。添付を含む作り直しは裏で実行して即応答し、完了・失敗は Socket.io で通知
 
 ### Out
 - Python 抽出サービス本体の実装 — `attachment-search-markitdown-extractor` spec (前段 spec)
@@ -126,7 +125,7 @@
 
 - **ライセンス**: MIT / Apache-2.0 / BSD 系のみ (orval は MIT)
 - **対応 OS**: apps/app は Windows/macOS/Linux 全対応を維持 (markitdown-client は純 TS で cross-platform)
-- **ES バージョン**: 既存 7/8/9 を維持 (各 mapping 変種を `attachments-mappings-esN.ts` に分離)
+- **ES バージョン**: 既存のサポート範囲 (8/9) に従う (各 mapping 変種を `attachments-mappings-esN.ts` に分離)
 - **非互換ゼロ**: 機能無効時は既存検索 API のレイテンシ・結果順序・応答形式を機能導入前と同一にする (R14.1)
 - **マルチテナント**: 共有 ES クラスタの ingest ノード上では抽出処理を実行しない (apps/app 側で完結)。抽出サービスの同時実行上限で他テナント影響を抑える
 - **ハンドラの fire-and-forget 特性**: 例外は pino ログと FailureLog 永続化で確実に捕捉する (UI に通知する経路は別 spec の admin UI が担当)

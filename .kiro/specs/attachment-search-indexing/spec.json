@@ -1,7 +1,7 @@
 {
   "feature_name": "attachment-search-indexing",
   "created_at": "2026-04-17T16:30:00.000Z",
-  "updated_at": "2026-10-27T09:34:05.061Z",
+  "updated_at": "2026-10-27T09:37:56.526Z",
   "language": "ja",
   "phase": "design-generated",
   "derived_from": "attachment-search",
@@ -9,7 +9,7 @@
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "design": {
       "generated": true,

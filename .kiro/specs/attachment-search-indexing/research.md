@@ -125,6 +125,8 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
 
 ## 7. 添付権限スナップショット vs lookup
 
+> **この節の結論は採用されていない。** 設計はその後、権限を添付文書に持たず検索時に page_index から引く方式 (Option D) に移った。採用理由と現在の方式は design.md の Security Considerations と、umbrella の [design-review-fixes.md](../attachment-search/design-review-fixes.md) を参照。以下は検討の記録として残す。
+
 ### 比較観点
 
 | 案 | 長所 | 短所 |
