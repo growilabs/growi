@@ -3,6 +3,7 @@ export * from './build-revert-operations';
 export * from './compute-achievement';
 export * from './derive-proposal-status';
 export * from './expand-approval-targets';
+export * from './is-movable-source-path';
 export * from './judge-revertability';
 export * from './plan-apply-order';
 export * from './select-auto-apply-targets';

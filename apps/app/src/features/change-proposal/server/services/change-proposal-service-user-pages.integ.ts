@@ -8,7 +8,10 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
-import type { CreatableOperationInput } from '../../interfaces';
+import type {
+  ChangeProposalDocument,
+  CreatableOperationInput,
+} from '../../interfaces';
 import type { CreateOperationInput } from '../models/change-proposal-types';
 import {
   type ChangeProposalService,
@@ -213,6 +216,20 @@ describe('Change Proposals and the protection of user pages', () => {
       expect((await kit.findPage(outside._id)).path).toBe(outside.path);
       expect(await Page().exists({ path: moveTo })).toBeNull();
     });
+
+    it('fails, at apply, a stored move out of /user, leaving the page where it is', async () => {
+      const inside = await createPageAt(userPagePath('stored-move-out'));
+      const moveTo = kit.nextPath('stored-moved-out');
+      await setUserPagesDisabled(true);
+
+      const applied = await applyStored([moveInput(inside, moveTo)]);
+
+      expect(applied.operations.map((op) => [op.status, op.reason])).toEqual([
+        ['failed', 'target-unavailable'],
+      ]);
+      expect((await kit.findPage(inside._id)).path).toBe(inside.path);
+      expect(await Page().exists({ path: moveTo })).toBeNull();
+    });
   });
 
   describe('with user pages enabled', () => {
@@ -291,6 +308,80 @@ describe('Change Proposals and the protection of user pages', () => {
       ]);
       expect(await Page().exists({ path: createPath })).toBeNull();
       expect((await kit.findPage(outside._id)).path).toBe(outside.path);
+    });
+  });
+
+  describe('moving a page the human UI cannot move', () => {
+    const trashedPage = async (label: string) => {
+      const page = await kit.createPage(label);
+      await crowi.pageService.deletePage(page, users.other, {}, false, {
+        ip: TEST_IP,
+      });
+      await kit.waitForPageOperationsToFinish();
+      return kit.findPage(page._id);
+    };
+
+    // The home stays once created; a second create at its path would be refused.
+    const ownerHome = async () =>
+      (await Page().findOne({ path: OWNER_HOME, isEmpty: false })) ??
+      createPageAt(OWNER_HOME);
+
+    const topPage = async () => {
+      const page = await Page().findOne({ path: '/' });
+      if (page == null) throw new Error('no top page');
+      return page;
+    };
+
+    it('refuses, at creation, a move of the top page, a user home or a page in the trash', async () => {
+      const home = await ownerHome();
+      const trashed = await trashedPage('creation-trashed');
+      const sources = [await topPage(), home, trashed];
+
+      const results = await Promise.all(
+        sources.map((source) =>
+          createProposalWith(moveInput(source, kit.nextPath('moved'))),
+        ),
+      );
+
+      expect(results).toEqual(
+        sources.map(() => ({
+          ok: false,
+          error: { code: 'target-unavailable', index: 1 },
+        })),
+      );
+    });
+
+    it('fails, at apply, a stored move of the top page, a user home or a page in the trash, moving nothing', async () => {
+      const top = await topPage();
+      const home = await ownerHome();
+      const trashed = await trashedPage('apply-trashed');
+      const destinations = [
+        kit.nextPath('top-moved'),
+        kit.nextPath('home-moved'),
+        kit.nextPath('trashed-moved'),
+      ];
+
+      const appliedProposals: ChangeProposalDocument[] = [];
+      for (const [i, source] of [top, home, trashed].entries()) {
+        // biome-ignore lint/performance/noAwaitInLoops: applied one at a time so no page operation overlaps another
+        const applied = await applyStored([moveInput(source, destinations[i])]);
+        appliedProposals.push(applied);
+      }
+
+      expect(
+        appliedProposals.map(({ operations: [op] }) => [op.status, op.reason]),
+      ).toEqual([
+        ['failed', 'target-unavailable'],
+        ['failed', 'target-unavailable'],
+        ['failed', 'target-unavailable'],
+      ]);
+      expect((await kit.findPage(top._id)).path).toBe('/');
+      expect((await kit.findPage(home._id)).path).toBe(OWNER_HOME);
+      expect((await kit.findPage(trashed._id)).path).toBe(trashed.path);
+      for (const path of destinations) {
+        // biome-ignore lint/performance/noAwaitInLoops: a handful of paths
+        expect(await Page().exists({ path })).toBeNull();
+      }
     });
   });
 });

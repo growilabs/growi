@@ -5,6 +5,7 @@ import { firePageGlobalNotification } from '~/server/service/page-save';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
+import { isMovableSourcePath } from '../../domain';
 import { classifyCreateError } from './classify-create-error';
 import { isPathOccupied, pageModel } from './page-model';
 import type {
@@ -70,6 +71,7 @@ export const createMoveHandler = (
       };
     }
     if (
+      !isMovableSourcePath(page.path) ||
       (await findUserPageWriteRefusal({
         existingPath: page.path,
         newPath: op.toPath,

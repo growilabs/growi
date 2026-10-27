@@ -9,6 +9,7 @@ describe('change-proposal domain barrel', () => {
         'computeAchievement',
         'deriveProposalStatus',
         'expandApprovalTargets',
+        'isMovableSourcePath',
         'isOwnPageForAutoApply',
         'judgeRevertability',
         'planApplyOrder',

@@ -302,6 +302,41 @@ describe('ProposalApplier.apply pre-write checks', () => {
     expect((await findPage(moved._id)).path).toBe(moved.path);
   });
 
+  it('puts a move of a page without children back to waiting while a page operation writes below that page', async () => {
+    const moved = await createPage('overlapped-below');
+    await PageOperation().create({
+      actionType: PageActionType.Rename,
+      actionStage: PageActionStage.Main,
+      fromPath: nextPath('elsewhere'),
+      toPath: `${moved.path}/incoming`,
+      page: { _id: new mongoose.Types.ObjectId(), path: nextPath('elsewhere') },
+      user: { _id: users.other._id },
+    });
+    const movedTo = nextPath('overlapped-below-to');
+    const proposal = await storeProposal([
+      {
+        type: 'move',
+        pageId: moved._id.toString(),
+        fromPath: moved.path,
+        toPath: movedTo,
+      },
+    ]);
+    const [key] = proposal.operations.map((op) => op.key);
+
+    const result = await newApplier({ pageOperationWait: SHORT_WAIT }).apply(
+      proposal._id,
+      { kind: 'background' },
+    );
+
+    expect(result).toEqual({
+      type: 'done',
+      results: [
+        { key, status: 'pending', reason: 'page-operation-in-progress' },
+      ],
+    });
+    expect((await findPage(moved._id)).path).toBe(moved.path);
+  });
+
   it('waits for an overlapping page operation that ends within the wait and then applies', async () => {
     const page = await createPage('briefly-overlapped');
     const pageOperation = await occupyWithPageOperation(page.path);

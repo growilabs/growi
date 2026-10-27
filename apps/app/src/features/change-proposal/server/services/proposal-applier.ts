@@ -373,6 +373,24 @@ export const createProposalApplier = (
     });
   };
 
+  // A later run reports only what it applies itself, so the writes of a run that
+  // threw are reported now or never (requirement 7.5). The run's own error is
+  // what the caller must see, so a reporting failure is only logged.
+  const reportAppliedBeforeFailure = async (
+    run: RunContext,
+    trigger: ApplyTrigger,
+    appliedKeys: ReadonlySet<string>,
+  ): Promise<void> => {
+    try {
+      await reportApplied(run, trigger, appliedKeys);
+    } catch (err) {
+      logger.error(
+        { err, proposalId: run.proposalId },
+        'Failed to report the operations applied before the run stopped',
+      );
+    }
+  };
+
   return {
     async apply(proposalId, trigger, request = {}) {
       const token = randomUUID();
@@ -395,22 +413,30 @@ export const createProposalApplier = (
       };
       let run: RunContext | null = null;
       try {
-        const proposal = await prisma.changeproposals.findProposal(proposalId);
-        const requesterId = proposal?.requester ?? null;
-        run = {
-          proposalId,
-          token,
-          isRevert: proposal?.entry === 'revert',
-          requesterId,
-          requester: await findRequester(requesterId),
-          request,
-        };
-        await applyApproved(run, state);
-        if (!state.leaseLost) {
-          await prisma.changeproposals.settleIfNoPending(proposalId);
+        try {
+          const proposal =
+            await prisma.changeproposals.findProposal(proposalId);
+          const requesterId = proposal?.requester ?? null;
+          run = {
+            proposalId,
+            token,
+            isRevert: proposal?.entry === 'revert',
+            requesterId,
+            requester: await findRequester(requesterId),
+            request,
+          };
+          await applyApproved(run, state);
+          if (!state.leaseLost) {
+            await prisma.changeproposals.settleIfNoPending(proposalId);
+          }
+        } finally {
+          await prisma.changeproposals.releaseApplyLease(proposalId, token);
         }
-      } finally {
-        await prisma.changeproposals.releaseApplyLease(proposalId, token);
+      } catch (runError) {
+        if (run != null && state.appliedKeys.size > 0) {
+          await reportAppliedBeforeFailure(run, trigger, state.appliedKeys);
+        }
+        throw runError;
       }
 
       if (run != null && state.appliedKeys.size > 0) {

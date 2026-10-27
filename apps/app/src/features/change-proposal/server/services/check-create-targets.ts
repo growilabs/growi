@@ -9,7 +9,7 @@ import { findUserPageWriteRefusal } from '~/server/service/page/user-page-write-
 import { prisma } from '~/utils/prisma';
 
 import type { CreatableOperationInput } from '../../interfaces';
-import type { AutoApplyPageFacts } from '../domain';
+import { type AutoApplyPageFacts, isMovableSourcePath } from '../domain';
 import type { ServiceError } from './change-proposal-service-types';
 
 type PageTargetOperation = Extract<
@@ -65,8 +65,15 @@ const isUnavailable = async (
     return (await findUserPageWriteRefusal({ newPath: op.path })) != null;
   }
   const page = pages.get(op.pageId);
-  // A move is written from the path it was proposed for (the move handler's rule).
-  if (page == null || (op.type === 'move' && page.path !== op.fromPath)) {
+  if (page == null) {
+    return true;
+  }
+  // A move is written from the path it was proposed for, and only from a page a
+  // person could move (the move handler's rules).
+  if (
+    op.type === 'move' &&
+    (page.path !== op.fromPath || !isMovableSourcePath(page.path))
+  ) {
     return true;
   }
   const refusal = await findUserPageWriteRefusal(
