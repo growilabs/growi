@@ -189,6 +189,15 @@ export const generateEditorPath = (...paths: string[]): string => {
   }
 };
 
+// Equivalent to /^${areaPath}\/.+/i with areaPath matched literally
+const isInDescendantArea = (path: string, areaPath: string): boolean => {
+  const prefix = `${areaPath}/`.toLowerCase();
+  const lowerCasedPath = path.toLowerCase();
+  return (
+    lowerCasedPath.length > prefix.length && lowerCasedPath.startsWith(prefix)
+  );
+};
+
 /**
  * return paths without duplicate area of regexp /^${path}\/.+/i
  * ex. expect(omitDuplicateAreaPathFromPaths(['/A', '/A/B', '/A/B/C'])).toStrictEqual(['/A'])
@@ -198,11 +207,7 @@ export const generateEditorPath = (...paths: string[]): string => {
 export const omitDuplicateAreaPathFromPaths = (paths: string[]): string[] => {
   const uniquePaths = Array.from(new Set(paths));
   return uniquePaths.filter((path) => {
-    const isDuplicate =
-      uniquePaths.filter((p) => new RegExp(`^${p}\\/.+`, 'i').test(path))
-        .length > 0;
-
-    return !isDuplicate;
+    return !uniquePaths.some((p) => isInDescendantArea(path, p));
   });
 };
 
@@ -215,11 +220,7 @@ export const omitDuplicateAreaPathFromPaths = (paths: string[]): string[] => {
 // biome-ignore lint/suspicious/noExplicitAny: ignore
 export const omitDuplicateAreaPageFromPages = (pages: any[]): any[] => {
   return pages.filter((page) => {
-    const isDuplicate = pages.some((p) =>
-      new RegExp(`^${p.path}\\/.+`, 'i').test(page.path),
-    );
-
-    return !isDuplicate;
+    return !pages.some((p) => isInDescendantArea(page.path, p.path));
   });
 };
 
