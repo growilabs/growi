@@ -61,10 +61,12 @@ jobs:
           turbo run build --filter @growi/vault-manager
 
       - name: Start MongoDB (replica set)
-        uses: supercharge/mongodb-github-action@1.12.1
+        uses: supercharge/mongodb-github-action@89d1ecb837145f486898e235478a7e267f68c44e # unreleased main (adds mongodb-extra-env)
         with:
-          mongodb-version: '6.0'
+          mongodb-version: '8.0'
           mongodb-replica-set: rs0
+          mongodb-extra-env: |
+            GLIBC_TUNABLES=glibc.pthread.rseq=1
 
       - name: Run integration tests
         run: |

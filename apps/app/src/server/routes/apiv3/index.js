@@ -2,6 +2,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
+import { createAiUsageRouter } from '~/features/ai-usage/server';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
 import { createChatIntegrationRouter } from '~/features/chat-integration/server';
 import { listCommentsRouteHandlersFactory } from '~/features/comment/server/routes/list';
@@ -100,6 +101,8 @@ export const setup = (crowi, app) => {
   addCustomFunctionToResponse(express, crowi);
 
   routerForAdmin.use('/healthcheck', setupHealthcheck(crowi));
+  // Must stay outside the maintenance check and aiReadyGuard (see ai-usage-metering design.md, AiUsageRoute).
+  routerForAdmin.use('/ai-usage', createAiUsageRouter());
 
   // admin
   routerForAdmin.use('/admin-home', setupAdminHome(crowi));

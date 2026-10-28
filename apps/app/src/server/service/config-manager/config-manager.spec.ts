@@ -324,9 +324,10 @@ describe('ConfigManager test', () => {
     });
 
     describe('env-only mode for AI settings (env:useOnlyEnvVars:ai)', () => {
-      // The 3 keys fixed by the env:useOnlyEnvVars:ai control key: the AI
-      // enable toggle + the two provider connection keys (multi-provider
-      // settings and per-provider API keys). ai:allowedModels is deliberately
+      // The 3 connection keys fixed by the env:useOnlyEnvVars:ai control key:
+      // the AI enable toggle + the two provider connection keys (multi-provider
+      // settings and per-provider API keys). The two usage-metering keys are
+      // also in the group but are covered by their own readers. ai:allowedModels is deliberately
       // NOT part of the group: model settings stay editable from the admin UI
       // even in env-only mode (R5.3).
       const aiEnvOnlyKeys = [

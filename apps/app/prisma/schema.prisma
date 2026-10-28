@@ -94,8 +94,33 @@ model activities {
   @@index([createdAt], map: "createdAt_1")
 }
 
+model aiusagelogs {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  v                Int      @default(0) @map("__v")
+  userId           String   @db.ObjectId
+  feature          String
+  provider         String
+  modelId          String
+  callCount        Int
+  inputTokens      Int
+  outputTokens     Int
+  // Nullable fields are always written (as null when absent), never omitted:
+  // the usage aggregation counts a null weightedUnits as "unknown".
+  reasoningTokens  Int?
+  cacheReadTokens  Int?
+  cacheWriteTokens Int?
+  estimatedCostUsd Float?
+  weightedUnits    Float?
+  baseModelKey     String?
+  createdAt        DateTime @default(now())
+
+  // TTL (expireAfterSeconds: 90 days) is created by the Mongoose schema.
+  @@index([createdAt], map: "createdAt_1")
+}
+
 model attachments {
   id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  v                     Int       @default(0) @map("__v")
   pageId                String?   @map("page") @db.ObjectId
   creatorId             String?   @map("creator") @db.ObjectId
   filePath              String?
@@ -107,11 +132,11 @@ model attachments {
   temporaryUrlExpiredAt DateTime?
   attachmentType        String
   createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
 
-  creator              users?  @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  page                 pages?  @relation(fields: [pageId], references: [id])
-  userImageAttachments users[] @relation("UserImageAttachment")
+  creator              users?               @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page                 pages?               @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userImageAttachments users[]              @relation("UserImageAttachment")
+  pagebulkexportjobs   pagebulkexportjobs[]
 
   @@index([pageId], map: "page_1")
   @@index([creatorId], map: "creator_1")
@@ -337,7 +362,36 @@ model newsreadstatuses {
 }
 
 model pagebulkexportjobs {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+  id                       String    @id @default(auto()) @map("_id") @db.ObjectId
+  v                        Int       @default(0) @map("__v")
+  userId                   String    @map("user") @db.ObjectId
+  // optional: page complete-deletion (see deleteCompletelyOperation) does not
+  // touch jobs, so a job can keep pointing at a page that no longer exists.
+  // The relation below is NoAction on purpose; see the P2014 note in
+  // delete-completely-operation.ts.
+  pageId                   String?   @map("page") @db.ObjectId
+  lastExportedPagePath     String?
+  format                   String
+  completedAt              DateTime?
+  // optional: the attachment is hard-deleted by the download-expiration cleanup
+  // (PageBulkExportJobCleanUpCronService) while the job row survives until the
+  // same cron pass deletes it
+  attachmentId             String?   @map("attachment") @db.ObjectId
+  status                   String
+  statusOnPreviousCronExec String?
+  restartFlag              Boolean   @default(false)
+  revisionListHash         String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  user       users        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page       pages?       @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // SetNull (not NoAction): the cleanup removes the attachment before deleting the
+  // job so that a failed removal leaves the job row for the next cron to retry.
+  // NoAction would make Prisma reject deleting an attachment a job still references.
+  attachment attachments? @relation(fields: [attachmentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([attachmentId], map: "attachment_1")
 }
 
 model pagebulkexportpagesnapshots {
@@ -403,17 +457,18 @@ model pages {
   wip                      Boolean?
   wipExpiredAt             DateTime?
 
-  creator          users?             @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  lastUpdateUser   users?             @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  parent           pages?             @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children         pages[]            @relation("ParentChild")
-  deleteUser       users?             @relation("DeletedPages", fields: [deleteUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  revisions        revisions[]
-  comments         comments[]
-  attachments      attachments[]
-  bookmarks        bookmarks[]
-  pagetagrelations pagetagrelations[]
-  sharelinks       sharelinks[]
+  creator            users?               @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lastUpdateUser     users?               @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  parent             pages?               @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children           pages[]              @relation("ParentChild")
+  deleteUser         users?               @relation("DeletedPages", fields: [deleteUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revisions          revisions[]
+  comments           comments[]
+  attachments        attachments[]
+  bookmarks          bookmarks[]
+  pagetagrelations   pagetagrelations[]
+  sharelinks         sharelinks[]
+  pagebulkexportjobs pagebulkexportjobs[]
 
   @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")
@@ -602,17 +657,18 @@ model users {
   updatedAt               DateTime  @updatedAt
 
   activities             activities[]
-  comments               comments[]         @relation("CommentCreator")
-  resolvedInlineComments comments[]         @relation("InlineCommentResolver")
+  comments               comments[]           @relation("CommentCreator")
+  resolvedInlineComments comments[]           @relation("InlineCommentResolver")
   revisions              revisions[]
-  createdPages           pages[]            @relation("CreatedPages")
-  deletedPages           pages[]            @relation("DeletedPages")
-  lastUpdatedPages       pages[]            @relation("LastUpdatedPages")
-  imageAttachment        attachments?       @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
-  createdAttachments     attachments[]      @relation("CreatedAttachments")
+  createdPages           pages[]              @relation("CreatedPages")
+  deletedPages           pages[]              @relation("DeletedPages")
+  lastUpdatedPages       pages[]              @relation("LastUpdatedPages")
+  imageAttachment        attachments?         @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
+  createdAttachments     attachments[]        @relation("CreatedAttachments")
   externalaccounts       externalaccounts[]
   bookmarks              bookmarks[]
   bookmarkfolders        bookmarkfolders[]
+  pagebulkexportjobs     pagebulkexportjobs[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")

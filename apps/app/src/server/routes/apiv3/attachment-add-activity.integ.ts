@@ -53,7 +53,6 @@ import {
 } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type Crowi from '~/server/crowi';
-import { Attachment } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
@@ -200,7 +199,9 @@ describe('POST /attachment — activity settled with attachment snapshot (read b
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
     // Remove attachments uploaded by this suite through the real service so
     // the GridFS blobs are deleted along with the metadata docs.
-    const uploaded = await Attachment.find({ creator: testUserId });
+    const uploaded = await prisma.attachments.findMany({
+      where: { creatorId: testUserId.toString() },
+    });
     await Promise.all(
       uploaded.map((attachment) =>
         crowi.attachmentService.removeAttachment(attachment._id),
@@ -250,7 +251,11 @@ describe('POST /attachment — activity settled with attachment snapshot (read b
     // The upload really happened: the attachment doc exists in the real DB
     // (its _id is what the emit must have recorded as target).
     const uploadedAttachmentId: string = res.body.data.attachment._id;
-    expect(await Attachment.findById(uploadedAttachmentId)).not.toBeNull();
+    expect(
+      await prisma.attachments.findUnique({
+        where: { id: uploadedAttachmentId },
+      }),
+    ).not.toBeNull();
 
     // Assert: read the activity back from the real DB
     const settled = await readBackSettledActivity();

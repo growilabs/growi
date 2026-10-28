@@ -20,18 +20,12 @@ import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 import { ResponseMode } from '~/server/interfaces/attachment';
-import {
-  Attachment,
-  type IAttachmentDocument,
-} from '~/server/models/attachment';
+import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { isAttachmentAccessibleToViewer } from '~/server/service/attachment/resolve-accessible-attachment';
 import type { FileUploader } from '~/server/service/file-uploader/file-uploader';
+import { prisma } from '~/utils/prisma';
 
 import { embedAttachmentImages } from './embed-images';
-
-vi.mock('~/server/models/attachment', () => ({
-  Attachment: { find: vi.fn() },
-}));
 
 vi.mock('~/server/service/attachment/resolve-accessible-attachment', () => ({
   isAttachmentAccessibleToViewer: vi.fn(),
@@ -46,6 +40,7 @@ describe('embedAttachmentImages', () => {
     outputDir = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'embed-images-spec-'),
     );
+    vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([]);
   });
 
   afterEach(async () => {
@@ -71,7 +66,7 @@ describe('embedAttachmentImages', () => {
     });
 
     expect(result).toBe(html);
-    expect(Attachment.find).not.toHaveBeenCalled();
+    expect(prisma.attachments.findMany).not.toHaveBeenCalled();
   });
 
   it('leaves the html unchanged for non-RELAY response modes', async () => {
@@ -89,16 +84,16 @@ describe('embedAttachmentImages', () => {
     });
 
     expect(result).toBe(html);
-    expect(Attachment.find).not.toHaveBeenCalled();
+    expect(prisma.attachments.findMany).not.toHaveBeenCalled();
   });
 
   it('does not embed an attachment the exporting user cannot access', async () => {
-    const attachment = mock<IAttachmentDocument>({
-      _id: attachmentId,
+    const attachment = mock<AttachmentWithComputed>({
+      id: attachmentId,
       fileName: 'secret.png',
-      page: '000000000000000000000099',
+      pageId: '000000000000000000000099',
     });
-    vi.mocked(Attachment.find).mockResolvedValue([attachment]);
+    vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([attachment]);
     vi.mocked(isAttachmentAccessibleToViewer).mockResolvedValue(false);
     const findDeliveryFile = vi.fn();
     const fileUploadService = mock<FileUploader>({
@@ -125,12 +120,12 @@ describe('embedAttachmentImages', () => {
   });
 
   it('downloads and rewrites the src for an accessible attachment', async () => {
-    const attachment = mock<IAttachmentDocument>({
-      _id: attachmentId,
+    const attachment = mock<AttachmentWithComputed>({
+      id: attachmentId,
       fileName: 'photo.png',
-      page: '000000000000000000000099',
+      pageId: '000000000000000000000099',
     });
-    vi.mocked(Attachment.find).mockResolvedValue([attachment]);
+    vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([attachment]);
     vi.mocked(isAttachmentAccessibleToViewer).mockResolvedValue(true);
     const fileUploadService = mock<FileUploader>({
       determineResponseMode: vi.fn().mockReturnValue(ResponseMode.RELAY),
@@ -147,8 +142,8 @@ describe('embedAttachmentImages', () => {
     );
 
     expect(result).not.toContain(`/attachment/${attachmentId}`);
-    expect(Attachment.find).toHaveBeenCalledWith({
-      _id: { $in: [attachmentId] },
+    expect(prisma.attachments.findMany).toHaveBeenCalledWith({
+      where: { id: { in: [attachmentId] } },
     });
     const assetFilePath = path.join(
       outputDir,
@@ -161,12 +156,12 @@ describe('embedAttachmentImages', () => {
   });
 
   it('does not leave a truncated asset file behind when the download stream errors', async () => {
-    const attachment = mock<IAttachmentDocument>({
-      _id: attachmentId,
+    const attachment = mock<AttachmentWithComputed>({
+      id: attachmentId,
       fileName: 'photo.png',
-      page: '000000000000000000000099',
+      pageId: '000000000000000000000099',
     });
-    vi.mocked(Attachment.find).mockResolvedValue([attachment]);
+    vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([attachment]);
     vi.mocked(isAttachmentAccessibleToViewer).mockResolvedValue(true);
 
     const failingReadable = new Readable({

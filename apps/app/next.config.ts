@@ -83,6 +83,7 @@ const nextConfig: NextConfig = {
       mongoose: { browser: './src/lib/empty-module.ts' },
       'i18next-fs-backend': { browser: './src/lib/empty-module.ts' },
       'core-js': { browser: './src/lib/empty-module.ts' },
+      '~/utils/prisma': { browser: './src/lib/empty-prisma.ts' },
     },
   },
 };
