@@ -72,7 +72,7 @@
   - _Boundary: ArchiveGuard_
 
 - [ ] 3. 形式ごとの変換 (ライブラリの呼び出し)
-- [ ] 3.1 (P) anydoc で Office 系を変換する処理を実装する
+- [x] 3.1 (P) anydoc で Office 系を変換する処理を実装する
   - 形式を必ず明示して呼び、OCR の引数は渡さない (外部送信をしない)
   - anydoc の例外を、暗号化・壊れたファイル・上限超過・サポート対象外・想定外 (Rust の panic を含む) の失敗の種類に分ける。panic は `BaseException` 系なので取りこぼさない
   - 完了の状態: DOCX / RTF / EPUB / CSV / 旧形式 DOC・PPT・XLS / OpenDocument が 1 つのテキストになり、暗号化した DOCX が暗号化、壊れた DOCX が壊れたファイル、展開すると巨大になる DOCX と深い入れ子の DOCX が上限超過になることをテストで確かめられる
@@ -221,3 +221,6 @@
 
 - 1.4: 時間切れ用の大きな XLSX (5 シート × 2 万行) は anydoc で約 0.2 秒で変換でき、`TIMEOUT_S` (整数) の最小値 1 秒では時間切れにならない。6.3 / 6.4 の実行管理は期限を `Settings.TIMEOUT_S` とは別の float 引数で受け取り、テストは 1 秒未満の期限を直接渡すこと。
 - 1.4: 変換の実測では、非表示シート・空シート・グラフシートは anydoc の出力に現れず、表示シートが 1 枚だけの XLSX は `##` 見出しが付かない。4.3 のシート分割はこの出力を前提に組む。
+- 3.1: `convert_office` は anydoc の例外を `from None` で包み直すが、元の例外 (anydoc が入力の先頭バイトを引用することがある) は `__context__` に残る。子プロセスの入口 (6.1) は `kind` / `detail` だけを親に送り、例外オブジェクトや traceback を送らないこと。
+- 3.1: RLIMIT_AS 超過で起きる `MemoryError` は `convert_office` では internal (500) になる。メモリ超過 (resource_limit_exceeded) として扱うかどうかは 6.1 / 6.3 で決める。
+- 2.4: ZIP の部品を読むときに漏れる例外は BadZipFile だけではない (zlib.error / EOFError / OSError / lzma.LZMAError / NotImplementedError / ValueError / UnicodeDecodeError)。Python 3.12 では未対応の圧縮方式 (method 9) が RuntimeError で出るので、ZIP の暗号化フラグ (bit 0) で encrypted と malformed を分けている。4.1 / 4.3 は `read_part` だけで部品を読むこと。
