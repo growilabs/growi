@@ -5,6 +5,7 @@
 
 import { Types } from 'mongoose';
 
+import { sanitizeEndpointForIndex } from '~/server/service/search-delegator/sanitize-endpoint-for-index';
 import { prisma } from '~/utils/prisma';
 
 // A sentinel ip value so cleanup deletes only this suite's rows.
@@ -106,7 +107,7 @@ describe('findEndpointsByEndpointRegex', () => {
     expect(result).toEqual(['/_api/search']);
   });
 
-  it('returns [] for a q that carries a query string, matching the path-only ES index', async () => {
+  it('returns [] for a q that reaches into the query string, so a stored token cannot be probed by prefix', async () => {
     await prisma.activities.createMany({
       data: [
         makeActivityData({ endpoint: '/_api/search?access_token=abc123' }),
@@ -119,6 +120,34 @@ describe('findEndpointsByEndpointRegex', () => {
     );
 
     expect(result).toEqual([]);
+  });
+
+  it('groups by the same path that sanitizeEndpointForIndex indexes into ES', async () => {
+    const seeded = [
+      '/_api/v3/pages',
+      '/_api/v3/pages?limit=10',
+      '/_api/v3/pages/list?path=%2F&page=2',
+      '/_api/v3/pages/rename?access_token=abc',
+      '/_api/v3/pages?',
+      '/_api/v3/users',
+    ];
+    await prisma.activities.createMany({
+      data: seeded.map((endpoint) => makeActivityData({ endpoint })),
+    });
+    const q = '/_api/v3/pages';
+
+    const result = await prisma.activities.findEndpointsByEndpointRegex(q, {
+      offset: 0,
+      limit: 10,
+    });
+
+    const expected = [
+      ...new Set(
+        seeded.map(sanitizeEndpointForIndex).filter((p) => p.startsWith(q)),
+      ),
+    ];
+    expect(result).toHaveLength(expected.length);
+    expect(result).toEqual(expect.arrayContaining(expected));
   });
 
   it('returns [] when no endpoint matches the query', async () => {

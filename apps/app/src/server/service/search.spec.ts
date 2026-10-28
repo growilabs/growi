@@ -331,6 +331,56 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     ).toHaveBeenCalledWith('endpoint', '/api/v3/pages', 10);
   });
 
+  it('should search ES by the path when q carries a query string', async () => {
+    vi.mocked(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockResolvedValue(['/_api/search']);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['endpoint'],
+      '/_api/search?q=foo',
+      10,
+    );
+
+    expect(result).toEqual({ endpoint: { endpoints: ['/_api/search'] } });
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).toHaveBeenCalledWith('endpoint', '/_api/search', 10);
+  });
+
+  it('should search the MongoDB fallback by the path when q carries a query string', async () => {
+    searchService.isConfiguredOverride = false;
+    mockFindEndpointsByEndpointRegex.mockResolvedValue(['/_api/search']);
+
+    await searchService.searchAuditlogSuggestions(
+      ['endpoint'],
+      '/_api/search?q=foo',
+      10,
+    );
+
+    expect(mockFindEndpointsByEndpointRegex).toHaveBeenCalledWith(
+      '/_api/search',
+      { offset: 0, limit: 10 },
+    );
+  });
+
+  it.each([
+    '?q=foo',
+    '?',
+  ])('should return no endpoints without querying either backend when q=%j has no path', async (q) => {
+    const result = await searchService.searchAuditlogSuggestions(
+      ['endpoint'],
+      q,
+      10,
+    );
+
+    expect(result).toEqual({ endpoint: { endpoints: [] } });
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).not.toHaveBeenCalled();
+    expect(mockFindEndpointsByEndpointRegex).not.toHaveBeenCalled();
+  });
+
   it('should return {} without calling ES when q is whitespace only', async () => {
     const result = await searchService.searchAuditlogSuggestions(
       ['endpoint'],
@@ -393,7 +443,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
       new Error('operation exceeded time limit'),
     );
     mockFindEndpointsByEndpointRegex.mockRejectedValueOnce(
-      new Error('operation exceeded time limit'),
+      new Error('endpoint scan failed'),
     );
 
     await expect(
@@ -402,7 +452,12 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
         'ali',
         10,
       ),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      errors: [
+        expect.objectContaining({ message: 'operation exceeded time limit' }),
+        expect.objectContaining({ message: 'endpoint scan failed' }),
+      ],
+    });
   });
 
   it('should use the MongoDB fallback for endpoint when ES is not configured', async () => {

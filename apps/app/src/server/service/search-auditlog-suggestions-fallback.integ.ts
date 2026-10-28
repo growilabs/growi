@@ -93,4 +93,22 @@ describe('SearchService.searchAuditlogSuggestions() MongoDB fallback (real Prism
 
     expect(result.endpoint?.endpoints).toContain('/api/v3/pages');
   });
+
+  it('answers a pasted URL by its path alone, whether or not its query string prefixes a stored token', async () => {
+    await prisma.activities.createMany({
+      data: [
+        makeActivityData({ endpoint: '/_api/search?access_token=abc123' }),
+      ],
+    });
+
+    const search = (q: string) =>
+      searchService.searchAuditlogSuggestions(['endpoint'], q, 10);
+
+    expect(await search('/_api/search?access_token=ab')).toEqual({
+      endpoint: { endpoints: ['/_api/search'] },
+    });
+    expect(await search('/_api/search?access_token=zz')).toEqual({
+      endpoint: { endpoints: ['/_api/search'] },
+    });
+  });
 });

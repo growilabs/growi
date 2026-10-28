@@ -486,9 +486,13 @@ export const setup = (crowi: Crowi): Router => {
    *         in: query
    *         required: false
    *         description: Field(s) to suggest. Repeatable. When omitted, every field is searched.
+   *         style: form
+   *         explode: true
    *         schema:
-   *           type: string
-   *           enum: [username, endpoint]
+   *           type: array
+   *           items:
+   *             type: string
+   *             enum: [username, endpoint]
    *       - name: q
    *         in: query
    *         required: false
@@ -501,7 +505,7 @@ export const setup = (crowi: Crowi): Router => {
    *           type: integer
    *     responses:
    *       200:
-   *         description: Suggestions fetched successfully
+   *         description: Suggestions fetched successfully. A requested field whose search failed is omitted from the response; the request fails only when every requested field fails.
    */
   router.get(
     '/suggestions',

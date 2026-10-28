@@ -304,10 +304,11 @@ type SuggestionFieldSpec = {
   readonly fieldPath: string;
   readonly groupKey: Prisma.InputJsonValue;
   // Below this trimmed length the prefix matches most of the collection, so
-  // the fallback short-circuits instead of scanning (ES has no such cost).
+  // the fallback short-circuits rather than group it. Not a scan-cost bound:
+  // neither field is indexed, so a longer query still scans the collection.
   readonly minQueryLength: number;
-  // A query the ES-indexed value can never match; the fallback must not
-  // answer it either.
+  // A query that would match into the raw stored value's credential-bearing
+  // part; answering it would let a caller probe that part by prefix.
   readonly isUnmatchableQuery?: (q: string) => boolean;
 };
 
@@ -324,7 +325,7 @@ const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
   groupKey: { $arrayElemAt: [{ $split: ['$endpoint', '?'] }, 0] },
   // Every endpoint starts with '/', which narrows nothing.
   minQueryLength: 3,
-  // The indexed value is cut at the first '?', so it never contains one.
+  // The stored endpoint may still carry e.g. `access_token` after the '?'.
   isUnmatchableQuery: (q) => q.includes('?'),
 };
 

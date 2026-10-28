@@ -10,8 +10,8 @@
  * parameter names in sync.
  *
  * As a result the indexed value is path-only and deliberately diverges from the
- * `endpoint` stored in MongoDB: a search term that carries a query string will
- * not match.
+ * `endpoint` stored in MongoDB. The endpoint suggestion handler passes its query
+ * through this function too, so a pasted URL is matched by its path.
  */
 export const sanitizeEndpointForIndex = (endpoint: string): string =>
   endpoint.split('?')[0];

@@ -46,6 +46,7 @@ import { hasIntersection } from '../util/compare-objectId';
 import { configManager } from './config-manager';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
+import { sanitizeEndpointForIndex } from './search-delegator/sanitize-endpoint-for-index';
 
 const logger = loggerFactory('growi:service:search');
 
@@ -194,10 +195,15 @@ const AUDITLOG_SUGGESTION_HANDLERS: {
   // Unlike username, no User-model classification applies — endpoints have
   // no notion of Active/Inactive.
   async endpoint(searchService, q, limit) {
+    // Both backends match against the path-only value, so a pasted URL's
+    // query string is dropped here once rather than in each backend.
+    const pathQ = sanitizeEndpointForIndex(q).trim();
+    if (pathQ === '') return { endpoint: { endpoints: [] } };
+
     const endpoints = await searchAuditlogFieldValues(
       searchService,
       'endpoint',
-      q,
+      pathQ,
       limit,
       (query, option) =>
         prisma.activities.findEndpointsByEndpointRegex(query, option),
@@ -492,7 +498,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
       return [];
     });
     if (settled.length > 0 && responses.length === 0) {
-      throw new Error('Failed to search auditlog suggestions for all fields.');
+      throw new AggregateError(
+        settled.flatMap((result) =>
+          result.status === 'rejected' ? [result.reason] : [],
+        ),
+        'Failed to search auditlog suggestions for all fields.',
+      );
     }
 
     return Object.assign({}, ...responses);
