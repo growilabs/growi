@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
+import { getIdStringForRef } from '@growi/core';
 import mongoose from 'mongoose';
+
+import type { auditlogbulkexportjobs } from '~/generated/prisma/client';
+import { prisma } from '~/utils/prisma';
 
 import type {
   AuditLogBulkExportFormat,
@@ -10,8 +14,6 @@ import {
   AuditLogBulkExportJobInProgressJobStatus,
   AuditLogBulkExportJobStatus,
 } from '../../interfaces/audit-log-bulk-export';
-import type { AuditLogBulkExportJobDocument } from '../models/audit-log-bulk-export-job';
-import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
 
 export interface IAuditLogBulkExportService {
   createOrResetExportJob: (
@@ -20,7 +22,7 @@ export interface IAuditLogBulkExportService {
     currentUser,
     restartJob?: boolean,
   ) => Promise<string>;
-  resetExportJob: (job: AuditLogBulkExportJobDocument) => Promise<void>;
+  resetExportJob: (job: auditlogbulkexportjobs) => Promise<void>;
 }
 
 /** ============================== utils ============================== */
@@ -59,9 +61,9 @@ function sha256(input: string): string {
 /** ============================== error ============================== */
 
 export class DuplicateAuditLogBulkExportJobError extends Error {
-  duplicateJob: AuditLogBulkExportJobDocument;
+  duplicateJob: auditlogbulkexportjobs;
 
-  constructor(duplicateJob: AuditLogBulkExportJobDocument) {
+  constructor(duplicateJob: auditlogbulkexportjobs) {
     super('Duplicate audit-log bulk export job is in progress');
     this.duplicateJob = duplicateJob;
   }
@@ -95,40 +97,48 @@ class AuditLogBulkExportService implements IAuditLogBulkExportService {
     const normalizedFilters = canonicalizeFilters(filters);
     const filterHash = sha256(JSON.stringify(normalizedFilters));
 
-    const duplicateInProgress: AuditLogBulkExportJobDocument | null =
-      await AuditLogBulkExportJob.findOne({
-        user: { $eq: currentUser },
+    const duplicateInProgress = await prisma.auditlogbulkexportjobs.findFirst({
+      where: {
+        userId: getIdStringForRef(currentUser),
         filterHash,
-        $or: Object.values(AuditLogBulkExportJobInProgressJobStatus).map(
-          (status) => ({ status }),
-        ),
-      });
+        status: { in: Object.values(AuditLogBulkExportJobInProgressJobStatus) },
+      },
+    });
 
     if (duplicateInProgress != null) {
       if (restartJob) {
         await this.resetExportJob(duplicateInProgress);
-        return duplicateInProgress._id.toString();
+        return duplicateInProgress.id;
       }
       throw new DuplicateAuditLogBulkExportJobError(duplicateInProgress);
     }
 
-    const createdJob = await AuditLogBulkExportJob.create({
-      user: currentUser,
-      filters,
-      filterHash,
-      format,
-      status: AuditLogBulkExportJobStatus.exporting,
-      totalExportedCount: 0,
+    const createdJob = await prisma.auditlogbulkexportjobs.create({
+      data: {
+        userId: getIdStringForRef(currentUser),
+        filters: {
+          users: filters.users?.map(getIdStringForRef),
+          actions: filters.actions,
+          dateFrom: filters.dateFrom,
+          dateTo: filters.dateTo,
+        },
+        filterHash,
+        format,
+        status: AuditLogBulkExportJobStatus.exporting,
+        totalExportedCount: 0,
+      },
     });
-    return createdJob._id.toString();
+    return createdJob.id;
   }
 
   /**
    * Reset audit-log export job in progress
    */
-  async resetExportJob(job: AuditLogBulkExportJobDocument): Promise<void> {
-    job.restartFlag = true;
-    await job.save();
+  async resetExportJob(job: auditlogbulkexportjobs): Promise<void> {
+    await prisma.auditlogbulkexportjobs.update({
+      where: { id: job.id },
+      data: { restartFlag: true },
+    });
   }
 }
 

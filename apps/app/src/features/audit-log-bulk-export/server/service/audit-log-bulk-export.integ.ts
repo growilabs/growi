@@ -2,12 +2,12 @@ import mongoose from 'mongoose';
 
 import type { SupportedActionType } from '~/interfaces/activity';
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 import {
   AuditLogBulkExportFormat,
   AuditLogBulkExportJobStatus,
 } from '../../interfaces/audit-log-bulk-export';
-import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
 import {
   auditLogBulkExportService,
   DuplicateAuditLogBulkExportJobError,
@@ -39,7 +39,7 @@ describe('AuditLogBulkExportService', () => {
   });
 
   afterEach(async () => {
-    await AuditLogBulkExportJob.deleteMany({});
+    await prisma.auditlogbulkexportjobs.deleteMany();
   });
 
   afterAll(async () => {
@@ -67,9 +67,11 @@ describe('AuditLogBulkExportService', () => {
 
         expect(jobId).toMatch(/^[0-9a-fA-F]{24}$/);
 
-        const createdJob = await AuditLogBulkExportJob.findById(jobId);
+        const createdJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: jobId },
+        });
         expect(createdJob).toBeDefined();
-        expect(createdJob?.user).toEqual(user._id);
+        expect(createdJob?.userId).toBe(user._id.toString());
         expect(createdJob?.format).toBe(AuditLogBulkExportFormat.json);
         expect(createdJob?.status).toBe(AuditLogBulkExportJobStatus.exporting);
         expect(createdJob?.totalExportedCount).toBe(0);
@@ -91,7 +93,9 @@ describe('AuditLogBulkExportService', () => {
           user._id,
         );
 
-        const createdJob = await AuditLogBulkExportJob.findById(jobId);
+        const createdJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: jobId },
+        });
         expect(createdJob).toBeDefined();
         expect(createdJob?.format).toBe(AuditLogBulkExportFormat.json);
         expect(createdJob?.filters).toMatchObject({
@@ -112,11 +116,11 @@ describe('AuditLogBulkExportService', () => {
           user._id,
         );
 
-        const createdJob = await AuditLogBulkExportJob.findById(jobId);
+        const createdJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: jobId },
+        });
         expect(createdJob?.filters.actions).toEqual(['PAGE_CREATE']);
-        expect(createdJob?.filters.users?.map(String)).toContain(
-          user._id.toString(),
-        );
+        expect(createdJob?.filters.users).toContain(user._id.toString());
       });
 
       it('should reset existing job when restartJob is true', async () => {
@@ -141,7 +145,9 @@ describe('AuditLogBulkExportService', () => {
 
         expect(secondJobId).toBe(firstJobId);
 
-        const job = await AuditLogBulkExportJob.findById(firstJobId);
+        const job = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: firstJobId },
+        });
         expect(job?.restartFlag).toBe(true);
       });
     });
@@ -234,11 +240,10 @@ describe('AuditLogBulkExportService', () => {
             user._id,
           );
 
-        const firstJob = await AuditLogBulkExportJob.findById(firstJobId);
-        if (firstJob) {
-          firstJob.status = AuditLogBulkExportJobStatus.completed;
-          await firstJob.save();
-        }
+        await prisma.auditlogbulkexportjobs.update({
+          where: { id: firstJobId },
+          data: { status: AuditLogBulkExportJobStatus.completed },
+        });
 
         const secondJobId =
           await auditLogBulkExportService.createOrResetExportJob(
@@ -262,14 +267,18 @@ describe('AuditLogBulkExportService', () => {
         user._id,
       );
 
-      const job = await AuditLogBulkExportJob.findById(jobId);
+      const job = await prisma.auditlogbulkexportjobs.findUnique({
+        where: { id: jobId },
+      });
       expect(job?.restartFlag).toBeFalsy();
 
       if (job) {
         await auditLogBulkExportService.resetExportJob(job);
       }
 
-      const updatedJob = await AuditLogBulkExportJob.findById(jobId);
+      const updatedJob = await prisma.auditlogbulkexportjobs.findUnique({
+        where: { id: jobId },
+      });
       expect(updatedJob?.restartFlag).toBe(true);
     });
   });

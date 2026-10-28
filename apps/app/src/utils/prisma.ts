@@ -1,4 +1,5 @@
 import { extension as AiUsageLogExtension } from '~/features/ai-usage/server/models/ai-usage-log';
+import { extension as AuditLogBulkExportJobExtension } from '~/features/audit-log-bulk-export/server/models/audit-log-bulk-export-job';
 import { extension as CommentExtension } from '~/features/comment/server';
 import { extension as MastraRefreshedModelCatalogExtension } from '~/features/mastra/server/models/refreshed-model-catalog';
 import { extension as PageBulkExportJobExtension } from '~/features/page-bulk-export/server/models/page-bulk-export-job';
@@ -221,6 +222,7 @@ export const createPrisma = (datasourceUrl?: string) =>
     .$extends(ActivityExtension)
     .$extends(AiUsageLogExtension)
     .$extends(AttachmentExtension)
+    .$extends(AuditLogBulkExportJobExtension)
     .$extends(BookmarkExtension)
     .$extends(BookmarkFolderExtension)
     .$extends(CommentExtension)

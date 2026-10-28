@@ -1,8 +1,8 @@
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
+import { prisma } from '~/utils/prisma';
 
 import { AuditLogBulkExportJobInProgressJobStatus } from '../../interfaces/audit-log-bulk-export';
-import AuditLogExportJob from '../models/audit-log-bulk-export-job';
 import { auditLogBulkExportJobCronService } from './audit-log-bulk-export-job-cron';
 
 /**
@@ -18,13 +18,14 @@ class CheckAuditLogBulkExportJobInProgressCronService extends CronService {
     const isAuditLogEnabled = configManager.getConfig('app:auditLogEnabled');
     if (!isAuditLogEnabled) return;
 
-    const auditLogExportJobInProgress = await AuditLogExportJob.findOne({
-      $or: Object.values(AuditLogBulkExportJobInProgressJobStatus).map(
-        (status) => ({
-          status,
-        }),
-      ),
-    });
+    const auditLogExportJobInProgress =
+      await prisma.auditlogbulkexportjobs.findFirst({
+        where: {
+          status: {
+            in: Object.values(AuditLogBulkExportJobInProgressJobStatus),
+          },
+        },
+      });
     const auditLogExportInProgressExists = auditLogExportJobInProgress != null;
 
     if (

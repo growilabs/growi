@@ -3,12 +3,12 @@ import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 import {
   AuditLogBulkExportFormat,
   AuditLogBulkExportJobStatus,
 } from '../../interfaces/audit-log-bulk-export';
-import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
 import instantiateAuditLogBulkExportJobCleanUpCronService, {
   auditLogBulkExportJobCleanUpCronService,
 } from './audit-log-bulk-export-job-clean-up-cron';
@@ -36,20 +36,21 @@ vi.mock('./audit-log-bulk-export-job-cron', () => {
 
 describe('AuditLogBulkExportJobCleanUpCronService', () => {
   const crowi = {} as Crowi;
-  let user: IUser;
+  let userId: string;
 
   beforeAll(async () => {
     await configManager.loadConfigs();
-    user = await User.create({
+    const user = await User.create({
       name: 'Example for AuditLogBulkExportJobCleanUpCronService Test',
       username: 'audit log bulk export job cleanup cron test user',
       email: 'auditLogBulkExportCleanUpCronTestUser@example.com',
     });
+    userId = user._id.toString();
     instantiateAuditLogBulkExportJobCleanUpCronService(crowi);
   });
 
   beforeEach(async () => {
-    await AuditLogBulkExportJob.deleteMany();
+    await prisma.auditlogbulkexportjobs.deleteMany();
   });
 
   describe('deleteExpiredExportJobs', () => {
@@ -63,58 +64,60 @@ describe('AuditLogBulkExportJobCleanUpCronService', () => {
         86400,
       );
 
-      await AuditLogBulkExportJob.insertMany([
-        {
-          _id: jobId1,
-          user,
-          filters: {},
-          filterHash: 'hash1',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          restartFlag: false,
-          createdAt: new Date(Date.now()),
-        },
-        {
-          _id: jobId2,
-          user,
-          filters: {},
-          filterHash: 'hash2',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          restartFlag: false,
-          createdAt: new Date(Date.now() - 86400 * 1000 - 1),
-        },
-        {
-          _id: jobId3,
-          user,
-          filters: {},
-          filterHash: 'hash3',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.uploading,
-          restartFlag: false,
-          createdAt: new Date(Date.now() - 86400 * 1000 - 2),
-        },
-        {
-          _id: jobId4,
-          user,
-          filters: {},
-          filterHash: 'hash4',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.failed,
-          restartFlag: false,
-        },
-      ]);
+      await prisma.auditlogbulkexportjobs.createMany({
+        data: [
+          {
+            id: jobId1.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash1',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            restartFlag: false,
+            createdAt: new Date(Date.now()),
+          },
+          {
+            id: jobId2.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash2',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            restartFlag: false,
+            createdAt: new Date(Date.now() - 86400 * 1000 - 1),
+          },
+          {
+            id: jobId3.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash3',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.uploading,
+            restartFlag: false,
+            createdAt: new Date(Date.now() - 86400 * 1000 - 2),
+          },
+          {
+            id: jobId4.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash4',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.failed,
+            restartFlag: false,
+          },
+        ],
+      });
     });
 
     test('should delete expired jobs', async () => {
-      expect(await AuditLogBulkExportJob.find()).toHaveLength(4);
+      expect(await prisma.auditlogbulkexportjobs.findMany()).toHaveLength(4);
 
       await auditLogBulkExportJobCleanUpCronService?.deleteExpiredExportJobs();
-      const jobs = await AuditLogBulkExportJob.find();
+      const jobs = await prisma.auditlogbulkexportjobs.findMany();
 
       expect(jobs).toHaveLength(2);
-      expect(jobs.map((job) => job._id).sort()).toStrictEqual(
-        [jobId1, jobId4].sort(),
+      expect(jobs.map((job) => job.id).sort()).toStrictEqual(
+        [jobId1, jobId4].map(String).sort(),
       );
     });
   });
@@ -130,57 +133,59 @@ describe('AuditLogBulkExportJobCleanUpCronService', () => {
         86400,
       );
 
-      await AuditLogBulkExportJob.insertMany([
-        {
-          _id: jobId1,
-          user,
-          filters: {},
-          filterHash: 'hash1',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.completed,
-          restartFlag: false,
-          completedAt: new Date(Date.now()),
-        },
-        {
-          _id: jobId2,
-          user,
-          filters: {},
-          filterHash: 'hash2',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.completed,
-          restartFlag: false,
-          completedAt: new Date(Date.now() - 86400 * 1000 - 1),
-        },
-        {
-          _id: jobId3,
-          user,
-          filters: {},
-          filterHash: 'hash3',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          restartFlag: false,
-        },
-        {
-          _id: jobId4,
-          user,
-          filters: {},
-          filterHash: 'hash4',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.failed,
-          restartFlag: false,
-        },
-      ]);
+      await prisma.auditlogbulkexportjobs.createMany({
+        data: [
+          {
+            id: jobId1.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash1',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.completed,
+            restartFlag: false,
+            completedAt: new Date(Date.now()),
+          },
+          {
+            id: jobId2.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash2',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.completed,
+            restartFlag: false,
+            completedAt: new Date(Date.now() - 86400 * 1000 - 1),
+          },
+          {
+            id: jobId3.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash3',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            restartFlag: false,
+          },
+          {
+            id: jobId4.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash4',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.failed,
+            restartFlag: false,
+          },
+        ],
+      });
     });
 
     test('should delete download expired jobs', async () => {
-      expect(await AuditLogBulkExportJob.find()).toHaveLength(4);
+      expect(await prisma.auditlogbulkexportjobs.findMany()).toHaveLength(4);
 
       await auditLogBulkExportJobCleanUpCronService?.deleteDownloadExpiredExportJobs();
-      const jobs = await AuditLogBulkExportJob.find();
+      const jobs = await prisma.auditlogbulkexportjobs.findMany();
 
       expect(jobs).toHaveLength(3);
-      expect(jobs.map((job) => job._id).sort()).toStrictEqual(
-        [jobId1, jobId3, jobId4].sort(),
+      expect(jobs.map((job) => job.id).sort()).toStrictEqual(
+        [jobId1, jobId3, jobId4].map(String).sort(),
       );
     });
   });
@@ -190,45 +195,47 @@ describe('AuditLogBulkExportJobCleanUpCronService', () => {
     const jobId2 = new mongoose.Types.ObjectId();
     const jobId3 = new mongoose.Types.ObjectId();
     beforeEach(async () => {
-      await AuditLogBulkExportJob.insertMany([
-        {
-          _id: jobId1,
-          user,
-          filters: {},
-          filterHash: 'hash1',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.failed,
-          restartFlag: false,
-        },
-        {
-          _id: jobId2,
-          user,
-          filters: {},
-          filterHash: 'hash2',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          restartFlag: false,
-        },
-        {
-          _id: jobId3,
-          user,
-          filters: {},
-          filterHash: 'hash3',
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.failed,
-          restartFlag: false,
-        },
-      ]);
+      await prisma.auditlogbulkexportjobs.createMany({
+        data: [
+          {
+            id: jobId1.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash1',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.failed,
+            restartFlag: false,
+          },
+          {
+            id: jobId2.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash2',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            restartFlag: false,
+          },
+          {
+            id: jobId3.toString(),
+            userId,
+            filters: {},
+            filterHash: 'hash3',
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.failed,
+            restartFlag: false,
+          },
+        ],
+      });
     });
 
     test('should delete failed export jobs', async () => {
-      expect(await AuditLogBulkExportJob.find()).toHaveLength(3);
+      expect(await prisma.auditlogbulkexportjobs.findMany()).toHaveLength(3);
 
       await auditLogBulkExportJobCleanUpCronService?.deleteFailedExportJobs();
-      const jobs = await AuditLogBulkExportJob.find();
+      const jobs = await prisma.auditlogbulkexportjobs.findMany();
 
       expect(jobs).toHaveLength(1);
-      expect(jobs.map((job) => job._id)).toStrictEqual([jobId2]);
+      expect(jobs.map((job) => job.id)).toStrictEqual([jobId2.toString()]);
     });
   });
 });

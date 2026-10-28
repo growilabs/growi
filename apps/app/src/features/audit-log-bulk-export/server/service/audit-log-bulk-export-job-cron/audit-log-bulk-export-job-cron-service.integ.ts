@@ -16,6 +16,7 @@ import {
   vi,
 } from 'vitest';
 
+import type { auditlogbulkexportjobs } from '~/generated/prisma/client';
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { ResponseMode } from '~/server/interfaces/attachment';
@@ -30,9 +31,6 @@ import {
   AuditLogBulkExportFormat,
   AuditLogBulkExportJobStatus,
 } from '../../../interfaces/audit-log-bulk-export';
-import AuditLogBulkExportJob, {
-  type AuditLogBulkExportJobDocument,
-} from '../../models/audit-log-bulk-export-job';
 import {
   AuditLogBulkExportJobExpiredError,
   AuditLogBulkExportJobRestartedError,
@@ -81,13 +79,15 @@ async function waitForCondition(
 }
 
 async function waitForJobStatus(
-  jobId: mongoose.Types.ObjectId,
+  jobId: string,
   status: AuditLogBulkExportJobStatus,
-): Promise<AuditLogBulkExportJobDocument> {
-  let latest: AuditLogBulkExportJobDocument | null = null;
+): Promise<auditlogbulkexportjobs> {
+  let latest: auditlogbulkexportjobs | null = null;
 
   await waitForCondition(async () => {
-    latest = await AuditLogBulkExportJob.findById(jobId);
+    latest = await prisma.auditlogbulkexportjobs.findUnique({
+      where: { id: jobId },
+    });
     return latest?.status === status;
   });
 
@@ -257,7 +257,7 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
 
   afterEach(async () => {
     await Activity.deleteMany({});
-    await AuditLogBulkExportJob.deleteMany({});
+    await prisma.auditlogbulkexportjobs.deleteMany();
     await prisma.attachments.deleteMany({});
 
     if (fs.existsSync(testTmpDir)) {
@@ -274,19 +274,21 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
   describe('1. Basic Operations (Happy Path)', () => {
     describe('1-1. No Filter → Export → ZIP → Upload', () => {
       it('should export all activities, create JSON files, and upload ZIP', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'test-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'test-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
+          },
         });
 
         await cronService.proceedBulkExportJob(job);
         const afterExport = await waitForJobStatus(
-          job._id,
+          job.id,
           AuditLogBulkExportJobStatus.uploading,
         );
 
@@ -319,7 +321,9 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
         expect(readable).toBeDefined();
         expect(attachment.originalName).toMatch(/audit-logs-.*\.zip$/);
 
-        const updatedJob = await AuditLogBulkExportJob.findById(job._id);
+        const updatedJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: job.id },
+        });
         expect([
           AuditLogBulkExportJobStatus.uploading,
           AuditLogBulkExportJobStatus.completed,
@@ -330,27 +334,29 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
 
     describe('1-2. With Filters (actions / dateFrom / dateTo / users)', () => {
       it('should export only filtered activities', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {
-            actions: [
-              SupportedAction.ACTION_PAGE_CREATE,
-              SupportedAction.ACTION_PAGE_UPDATE,
-            ],
-            dateFrom: new Date('2023-01-01T00:00:00Z'),
-            dateTo: new Date('2023-01-02T23:59:59Z'),
-            users: [testUser._id.toString()],
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {
+              actions: [
+                SupportedAction.ACTION_PAGE_CREATE,
+                SupportedAction.ACTION_PAGE_UPDATE,
+              ],
+              dateFrom: new Date('2023-01-01T00:00:00Z'),
+              dateTo: new Date('2023-01-02T23:59:59Z'),
+              users: [testUser._id.toString()],
+            },
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'filtered-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
           },
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'filtered-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
         });
 
         await cronService.proceedBulkExportJob(job);
         const afterExport = await waitForJobStatus(
-          job._id,
+          job.id,
           AuditLogBulkExportJobStatus.uploading,
         );
 
@@ -373,34 +379,42 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
           });
         }
 
-        const updatedJob = await AuditLogBulkExportJob.findById(job._id);
+        const updatedJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: job.id },
+        });
         expect(updatedJob?.totalExportedCount).toBeLessThanOrEqual(2);
       });
     });
 
     describe('1-3. Zero Results', () => {
       it('should handle cases with no matching activities', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {
-            actions: [SupportedAction.ACTION_USER_LOGOUT],
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {
+              actions: [SupportedAction.ACTION_USER_LOGOUT],
+            },
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'no-match-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
           },
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'no-match-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
         });
 
         const notifySpy = vi.spyOn(cronService, 'notifyExportResultAndCleanUp');
 
         await cronService.proceedBulkExportJob(job);
         await waitForCondition(async () => {
-          const updatedJob = await AuditLogBulkExportJob.findById(job._id);
+          const updatedJob = await prisma.auditlogbulkexportjobs.findUnique({
+            where: { id: job.id },
+          });
           return updatedJob?.status !== AuditLogBulkExportJobStatus.exporting;
         });
 
-        const afterExport = await AuditLogBulkExportJob.findById(job._id);
+        const afterExport = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: job.id },
+        });
         if (!afterExport) {
           throw new Error('Job not found after export phase');
         }
@@ -415,7 +429,7 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
 
         expect(notifySpy).toHaveBeenCalledWith(
           SupportedAction.ACTION_AUDIT_LOG_BULK_EXPORT_NO_RESULTS,
-          expect.objectContaining({ _id: job._id }),
+          expect.objectContaining({ id: job.id }),
         );
       });
     });
@@ -428,20 +442,22 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
         const middleIndex = Math.floor(activities.length / 2);
         const lastExportedId = activities[middleIndex]._id.toString();
 
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'resume-hash',
-          restartFlag: false,
-          totalExportedCount: middleIndex,
-          lastExportedId: lastExportedId,
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'resume-hash',
+            restartFlag: false,
+            totalExportedCount: middleIndex,
+            lastExportedId: lastExportedId,
+          },
         });
 
         await cronService.proceedBulkExportJob(job);
         const afterExport = await waitForJobStatus(
-          job._id,
+          job.id,
           AuditLogBulkExportJobStatus.uploading,
         );
 
@@ -467,28 +483,32 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
           });
         }
 
-        const updatedJob = await AuditLogBulkExportJob.findById(job._id);
+        const updatedJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: job.id },
+        });
         expect(updatedJob?.totalExportedCount).toBeGreaterThan(middleIndex);
       });
     });
 
     describe('2-2. totalExportedCount and lastExportedId Updates', () => {
       it('should properly update totalExportedCount and lastExportedId', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'count-test-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'count-test-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
+          },
         });
 
         const initialCount = job.totalExportedCount ?? 0;
 
         await cronService.proceedBulkExportJob(job);
         const updatedJob = await waitForJobStatus(
-          job._id,
+          job.id,
           AuditLogBulkExportJobStatus.uploading,
         );
         expect(updatedJob?.totalExportedCount).toBeGreaterThan(initialCount);
@@ -505,19 +525,21 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
   describe('3. Upload and Compression', () => {
     describe('3-1. ZIP Content Validity', () => {
       it('should create valid ZIP with JSON files in root', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'zip-test-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'zip-test-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
+          },
         });
 
         await cronService.proceedBulkExportJob(job);
         const afterExport = await waitForJobStatus(
-          job._id,
+          job.id,
           AuditLogBulkExportJobStatus.uploading,
         );
 
@@ -539,14 +561,16 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
           throw new Error('Upload failed');
         });
 
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.uploading,
-          filterHash: 'upload-fail-hash',
-          restartFlag: false,
-          totalExportedCount: 10,
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.uploading,
+            filterHash: 'upload-fail-hash',
+            restartFlag: false,
+            totalExportedCount: 10,
+          },
         });
 
         const notifySpy = vi.spyOn(cronService, 'notifyExportResultAndCleanUp');
@@ -561,16 +585,18 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
         expect(handleSpy).toHaveBeenCalledTimes(1);
         expect(notifySpy).toHaveBeenCalledWith(
           expect.anything(),
-          expect.objectContaining({ _id: job._id }),
+          expect.objectContaining({ id: job.id }),
         );
         expect(cleanSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ _id: job._id }),
+          expect.objectContaining({ id: job.id }),
         );
 
-        const reloaded = await AuditLogBulkExportJob.findById(job._id).lean();
+        const reloaded = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: job.id },
+        });
         expect(reloaded?.status).toBe(AuditLogBulkExportJobStatus.failed);
 
-        const s = cronService.getStreamInExecution(job._id);
+        const s = cronService.getStreamInExecution(job.id);
         expect(s).toBeUndefined();
       });
     });
@@ -579,25 +605,31 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
   describe('4. Error Handling', () => {
     describe('4-1. Nonexistent Users Filter', () => {
       it('should fail with no results for nonexistent usernames', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {
-            users: [new mongoose.Types.ObjectId()],
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {
+              users: [new mongoose.Types.ObjectId().toString()],
+            },
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'bad-user-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
           },
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'bad-user-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
         });
 
         await cronService.proceedBulkExportJob(job);
         await waitForCondition(async () => {
-          const updatedJob = await AuditLogBulkExportJob.findById(job._id);
+          const updatedJob = await prisma.auditlogbulkexportjobs.findUnique({
+            where: { id: job.id },
+          });
           return updatedJob?.status === AuditLogBulkExportJobStatus.failed;
         });
 
-        const updatedJob = await AuditLogBulkExportJob.findById(job._id);
+        const updatedJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: job.id },
+        });
         expect(updatedJob?.status).toBe(AuditLogBulkExportJobStatus.failed);
       });
     });
@@ -606,14 +638,16 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
       it('should handle filesystem errors', async () => {
         cronService.tmpOutputRootDir = '/invalid/path/that/does/not/exist';
 
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'fs-error-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'fs-error-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
+          },
         });
 
         await expect(async () => {
@@ -624,33 +658,39 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
 
     describe('4-3. Job Expiry and Restart Errors', () => {
       it('should handle AuditLogBulkExportJobExpiredError', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'expired-error-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'expired-error-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
+          },
         });
 
         const expiredError = new AuditLogBulkExportJobExpiredError();
 
         await cronService.handleError(expiredError, job);
 
-        const updatedJob = await AuditLogBulkExportJob.findById(job._id);
+        const updatedJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: job.id },
+        });
         expect(updatedJob?.status).toBe(AuditLogBulkExportJobStatus.failed);
       });
 
       it('should handle AuditLogBulkExportJobRestartedError', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'restarted-error-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'restarted-error-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
+          },
         });
 
         const restartedError = new AuditLogBulkExportJobRestartedError();
@@ -663,21 +703,23 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
   describe('5. State Transitions and Execution Control', () => {
     describe('5-1. State Flow', () => {
       it('should follow correct state transitions: exporting → uploading → completed', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'state-flow-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'state-flow-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
+          },
         });
 
         expect(job.status).toBe(AuditLogBulkExportJobStatus.exporting);
 
         await cronService.proceedBulkExportJob(job);
         const afterExport = await waitForJobStatus(
-          job._id,
+          job.id,
           AuditLogBulkExportJobStatus.uploading,
         );
 
@@ -691,59 +733,69 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
           afterExport,
         );
 
-        const finalJob = await AuditLogBulkExportJob.findById(job._id);
+        const finalJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: job.id },
+        });
         expect(finalJob?.status).toBe(AuditLogBulkExportJobStatus.completed);
       });
     });
 
     describe('5-2. Stream Lifecycle', () => {
       it('should properly manage stream execution lifecycle', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'stream-lifecycle-hash',
-          restartFlag: false,
-          totalExportedCount: 0,
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'stream-lifecycle-hash',
+            restartFlag: false,
+            totalExportedCount: 0,
+          },
         });
 
         await cronService.proceedBulkExportJob(job);
         const afterExport = await waitForJobStatus(
-          job._id,
+          job.id,
           AuditLogBulkExportJobStatus.uploading,
         );
 
         await cronService.cleanUpExportJobResources(afterExport);
-        const streamAfterCleanup = cronService.getStreamInExecution(job._id);
+        const streamAfterCleanup = cronService.getStreamInExecution(job.id);
         expect(streamAfterCleanup).toBeUndefined();
       });
     });
 
     describe('5-3. Restart Flag Handling', () => {
       it('should handle restartFlag correctly', async () => {
-        const job = await AuditLogBulkExportJob.create({
-          user: testUser._id,
-          filters: {},
-          format: AuditLogBulkExportFormat.json,
-          status: AuditLogBulkExportJobStatus.exporting,
-          filterHash: 'restart-flag-hash',
-          restartFlag: true,
-          totalExportedCount: 50,
-          lastExportedId: 'some-previous-id',
+        const job = await prisma.auditlogbulkexportjobs.create({
+          data: {
+            userId: testUser._id.toString(),
+            filters: {},
+            format: AuditLogBulkExportFormat.json,
+            status: AuditLogBulkExportJobStatus.exporting,
+            filterHash: 'restart-flag-hash',
+            restartFlag: true,
+            totalExportedCount: 50,
+            lastExportedId: 'some-previous-id',
+          },
         });
 
         await cronService.proceedBulkExportJob(job);
         await waitForCondition(async () => {
-          const updatedJob = await AuditLogBulkExportJob.findById(job._id);
+          const updatedJob = await prisma.auditlogbulkexportjobs.findUnique({
+            where: { id: job.id },
+          });
           return updatedJob?.restartFlag === false;
         });
 
-        const updatedJob = await AuditLogBulkExportJob.findById(job._id);
+        const updatedJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: job.id },
+        });
 
         expect(updatedJob?.restartFlag).toBe(false);
         expect(updatedJob?.totalExportedCount).toBe(0);
-        expect(updatedJob?.lastExportedId).toBeUndefined();
+        expect(updatedJob?.lastExportedId).toBeNull();
         expect(updatedJob?.status).toBe(AuditLogBulkExportJobStatus.exporting);
       });
     });
