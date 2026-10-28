@@ -561,11 +561,12 @@ export const setup = (crowi) => {
 
       const pagesInTrash = await crowi.pageService.findAllTrashPages(req.user);
 
-      const deletablePages = crowi.pageService.filterPagesByCanDeleteCompletely(
-        pagesInTrash,
-        req.user,
-        true,
-      );
+      const deletablePages =
+        await crowi.pageService.filterPagesByCanDeleteCompletely(
+          pagesInTrash,
+          req.user,
+          true,
+        );
 
       if (deletablePages.length === 0) {
         const msg = 'No pages can be deleted.';

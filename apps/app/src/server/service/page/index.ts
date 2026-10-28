@@ -475,16 +475,17 @@ class PageService implements IPageService {
   ): Promise<PageDocument[]> {
     const userRelatedGroups =
       await this.pageGrantService.getUserRelatedGroups(user);
-    const filteredPages = pages.filter(async (p) => {
+    // canDeleteFunction is synchronous; the predicate must stay synchronous too,
+    // since filter() treats a returned Promise as truthy and keeps every page.
+    const filteredPages = pages.filter((p) => {
       if (p.isEmpty) return true;
-      const canDelete = canDeleteFunction(
+      return canDeleteFunction(
         p,
         p.creator == null ? null : getIdForRef(p.creator),
         user,
         isRecursively,
         userRelatedGroups,
       );
-      return canDelete;
     });
 
     if (!this.canDeleteUserHomepageByConfig()) {

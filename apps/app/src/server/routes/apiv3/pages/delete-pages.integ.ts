@@ -29,6 +29,7 @@ import request from 'supertest';
 
 import { getInstance } from '^/test/setup/crowi';
 
+import { PageDeleteConfigValue } from '~/interfaces/page-delete-config';
 import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
 import PageOperation from '~/server/models/page-operation';
@@ -303,6 +304,41 @@ describe('POST /delete', () => {
     // fixture cleanup can't race it.
     await waitForAncestorCleanupToSettle(parentId);
   }, 20_000);
+
+  it('keeps a page the requester is not allowed to delete', async () => {
+    const page = await createPage(targetPath, 'target body');
+    // The requester authored the page but is not an admin, so AdminOnly
+    // forbids the deletion.
+    await crowi.configManager.updateConfig(
+      'security:pageDeletionAuthority',
+      PageDeleteConfigValue.AdminOnly,
+    );
+
+    try {
+      const response = await request(app)
+        .post('/delete')
+        .set('X-Forwarded-For', TEST_IP)
+        .send({
+          pageIdToRevisionIdMap: {
+            [page._id.toString()]: latestRevisionIdOf(page),
+          },
+        });
+
+      expect(response.status).toBe(500);
+      expect(response.body.errors).toEqual([
+        expect.objectContaining({ message: 'No pages can be deleted.' }),
+      ]);
+      const survivingPage = await crowi.models.Page.findById(page._id);
+      expect(survivingPage?.path).toBe(targetPath);
+      expect(survivingPage?.status).toBe('published');
+    } finally {
+      await crowi.configManager.updateConfig(
+        'security:pageDeletionAuthority',
+        undefined,
+        { removeIfUndefined: true },
+      );
+    }
+  });
 
   it('does not crash when isAnyoneWithTheLink is set and the page cannot be found', async () => {
     // `pageIds.length !== 1` is rejected earlier when isAnyoneWithTheLink is
