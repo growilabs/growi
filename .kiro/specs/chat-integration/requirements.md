@@ -189,6 +189,10 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 4. If 通知先のチャンネルに bot が参加していないために投稿できなかった, then the chat-integration proxy shall 投稿できなかったこと・対象のチャンネル・投稿できるようにするために必要な操作 を運用者が後から確認できる形で記録する
 5. If 通知先のチャットサービスが応答しなかった, then the GROWI application shall ページの作成・編集・削除・移動そのものは完了させる
 6. When 1 つの GROWI に複数のチャットサービスが紐づいている, the GROWI application shall 設定された全ての宛先へ通知を投稿する
+<!-- 2.7〜2.11 は chat-integration-notification-load が予約している番号。詰めない -->
+12. While 保存時の通知先を選ぶ部品が表示されている, the GROWI application shall 選べるチャンネルの数にかかわらず、保存の操作欄の高さと、ほかの部品の並びを変えない
+13. The GROWI application shall 保存時の通知先を選ぶ部品に、選択中のチャンネルの件数を、選択肢を開かなくても分かる形で示す
+14. When 編集した人が通知先の選択肢を開いた, the GROWI application shall チャンネルを workspace ごとにまとめ、チャンネルの数が多くても選択肢の領域が画面からはみ出さず、中をスクロールして選べるようにする
 
 ### Requirement 3: 複数の GROWI をまたぐ検索
 
@@ -266,6 +270,10 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 6. If 紐付いていない利用者が書き込みを伴う操作を実行した, then the GROWI application shall その操作を実行せず、どの GROWI に対する紐付けが必要かが分かる形で手順を返す
 7. The GROWI application shall 利用者が、自分に紐付いているチャットアカウントの一覧を確認して個別に解除できるようにする
 8. The chat-integration proxy shall チャットのアカウントと GROWI ユーザーの対応表を保持しない
+9. The GROWI application shall アカウントの紐付けの承認画面を、GROWI のサイドバーやナビゲーションなど承認に関係しない部品を含まない、承認のためだけの画面として表示する
+10. When 承認画面が表示された, the GROWI application shall 承認の前に次の 3 つを、互いに区別できる形で示す: この GROWI の名前、この GROWI にログインしているユーザー、紐付けるチャットのアカウント（チャットサービス・workspace・アカウントの識別子）
+11. Where 紐付けの開始時にチャットサービスがアカウントの表示名を伝えていた, the GROWI application shall 承認画面に表示名を、アカウントの識別子と併せて示す。表示名しか伝えていない場合は出さない
+12. When 承認画面が表示された, the GROWI application shall 承認の前に、リンクの有効期限と、心当たりがなければ承認せずに閉じてよいことを示す
 
 ### Requirement 8: 1 つの workspace に複数の GROWI が紐づくときの振る舞い
 
@@ -293,6 +301,11 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 5. When 紐付けが成立した, the chat-integration proxy shall 以降お互いを確認するために必要な情報を双方に登録する
 6. The chat-integration proxy shall 紐付けの過程で、相手になりすますために使える秘密を通信路に流さない
 7. When 管理者が紐付けを解除した, the chat-integration proxy shall 以降その GROWI との間のリクエストを処理しない
+<!-- 9.8 は chat-integration-notification-load が予約している番号。詰めない -->
+9. If 管理画面が関係の接続の状態を proxy に問い合わせ、proxy が GROWI の署名を受け付けなかった, then the GROWI application shall その関係に「接続が切れている」状態を示し、「active」としては示さない
+10. When 管理画面が関係の「接続が切れている」状態を示した, the GROWI application shall 原因を断定せず、チャット側で解除された可能性があることと、GROWI 側の解除（要件 9.7）で片付けられることを示す
+11. If 接続の状態を、proxy に届かない・proxy が失敗を返したなど、署名の拒否以外の理由で取得できなかった, then the GROWI application shall 「接続が切れている」とは示さず、状態を確認できなかったことだけを示す
+12. While 関係が「接続が切れている」状態として示されている, the GROWI application shall その関係を自動では解除せず、管理者が GROWI 側で解除する操作（要件 9.7）を使えるままにする
 
 ### Requirement 10: リクエストごとの相手の確認と鍵の入れ替え
 

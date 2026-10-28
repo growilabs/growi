@@ -71,7 +71,6 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 | 1 | 表示順 | 本人にだけ見える返事が、入力より上に出る | 時刻を測って原因を調べてから直す | proxy |
 | 2 | proxy の見え方 | 検索結果の見せ方、Slack への通知の文面 | spec を作らず直接直す（契約は変えない） | proxy（通知の文面は app の markdown にも及びうる） |
 | 3 | proxy の不具合の一括修正 | Discord の Gateway、Enterprise Grid のチャンネル一覧、installation の特定、Mattermost の 403 | spec を作らず直接直す。各項目にテストを付ける | proxy |
-| 4 | app の見え方（`agent` と重ならない部分） | 承認画面、ページの編集画面、紐付け解除後のバッジ | amend spec `chat-integration-app-ui`（名前は仮） | app |
 | 5 | URL の展開の方針 | 公開範囲が「公開」のページは題名だけ出す | amend spec `chat-integration-link-preview`（名前は仮） | app（protocol と proxy にも及びうる） |
 | 6 | 通知の定期処理の負荷 | 連携が無いテナントの問い合わせを飛ばす、解除済みの連携の掃除を 1 日 1 回にする | amend spec `chat-integration-notification-load`（名前は仮） | app |
 | 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作り、それと同時に定期処理の間隔を延ばす。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。`brief.md` だけがあり、要件・設計・タスクの承認がこれから | umbrella、protocol、proxy、app |
@@ -80,7 +79,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 | 10 | URL の展開の確認フロー | 共有してよいかを本人に尋ねてから展開する | `/kiro-discovery` から着手する。`agent` の「本人にだけ届ける」しくみの上に作るので、`agent` の後 | 3 spec すべて |
 
 - 順 1〜3 は、順 7 の前提になる。順 3 の installation の特定は、`agent` の `brief.md` が明記している前提である。
-- 順 4・5・6 は app だけの変更で、順 1〜3 とは独立している。ただし、どれも `chat-integration-app/design.md` に書き戻すので、`agent` が書き換える節（権限、能力表）に触れるものを `agent` と同時には進めない。
+- 順 5・6 は app だけの変更で、順 1〜3 とは独立している（順 4 は完了し、番号は欠番のまま残す）。ただし、どれも `chat-integration-app/design.md` に書き戻すので、`agent` が書き換える節（権限、能力表）に触れるものを `agent` と同時には進めない。
 - 順 7 は規模が大きいので、順 1〜3 を終えてから要件の承認に入る。
 
 ### 1. 表示順
@@ -105,20 +104,6 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 2. **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
 3. **DM や一覧にまだ載っていないチャンネルでのコマンドに、的外れな案内が返る**: installation の特定をチャンネル一覧に頼るため、「workspace がまだ登録されていません」と返る（bot が招待された直後は一覧をすぐ取り直すようにしたので、招待後の待ちは無くなった。DM と、bot の招待を伴わずに増えたチャンネルでは残る）
 4. **Mattermost で、本人にだけ見えるメッセージの権限不足（403）が「bot がチャンネルにいない」と記録される**: `classifyOutboundFailure` が 403 を `bot-not-in-channel` と分類する（アダプタの例外が応答の本文を持たず、見分けられない）。利用者には DM で届くので影響は無いが、DM も届かなかったときの運用者向けの報告の理由が誤る。同じ research.md の「既知の問題」1
-
-### 4. app の見え方（amend spec `chat-integration-app-ui`、名前は仮）
-
-`agent` が変えない部分だけをここで直す。管理画面は順 8。
-
-- **ページの編集画面と、紐付け解除後の管理画面**: 実機試験（2026-10-26、Slack）で気付いた。動作は正しいが、見た目と使い勝手を直す。
-  - **ページの編集画面**: 「Chat notification channels」が縦に長く、編集画面のレイアウトを崩している（要件2.2 の保存時の通知先の選択）
-  - **チャット側で紐付けを解除したあとの管理画面**: `@GROWI unregister` は proxy 側の関係と鍵だけを消し、GROWI には知らせない。管理画面は接続の状態・できること・チャンネル一覧を読めないことを赤字で示すので状況は分かるが、右上のバッジは緑の「active」のまま（GROWI 側の関係の記録による表示のため）
-- **要件7（アカウントの紐付け）の承認画面の作り直し**: 実機試験（2026-10-23、Slack）で、`/me/chat-integration/account-link/:token` の承認画面について次のフィードバックが出た。優先度は低いが、いずれ直す。
-  - **体裁**: 見た目にもっと気を配る。サイドバーは要らないので、`BasicLayout` ではなく承認のためだけの簡素なレイアウトにする
-  - **誤った承認を防ぐ**: 「どの GROWI（名前）に」「GROWI のどのログイン中ユーザーとして」「どのチャットサービス・workspace の、どのアカウントを」結び付けるのかを整理して見せる。Slack などの他製品の OAuth 承認画面を参考にする
-  - **今の実装との差**: 画面は `AccountLinkApproval.tsx` で、文言が英語の直書き（i18n 未対応）。出せる情報は `platform`・`accountId`（Slack なら `U…` の ID のみ）・`workspaceName`・`relationLabel`・`growiUsername`。チャットアカウントの表示名は `chat_account_link_orders` に保存していないので、表示名を出すなら注文を作るとき（`account-link-start` の `actor.displayName`）に保存する必要がある
-  - **想定される影響範囲**: `chat-integration-app` が中心（画面・レイアウト・注文の保存項目）。表示名を保存するだけなら protocol の契約は変わらない
-  - **次にやること**: 規模が小さければ `chat-integration-app` の amend spec、そうでなければ `/kiro-discovery` から着手する
 
 ### 5. URL の展開の方針（amend spec `chat-integration-link-preview`、名前は仮）
 
