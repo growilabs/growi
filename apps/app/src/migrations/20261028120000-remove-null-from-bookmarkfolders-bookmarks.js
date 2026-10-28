@@ -35,6 +35,14 @@ export async function up() {
     ],
   });
 
+  // $runCommandRaw returns per-document failures in the reply (ok: 1) instead
+  // of throwing; fail so migrate-mongo does not record this as applied.
+  if (result.writeErrors != null || result.writeConcernError != null) {
+    throw new Error(
+      `Failed to remove null from bookmarkfolders.bookmarks: ${JSON.stringify(result)}`,
+    );
+  }
+
   logger.info('Migration has successfully applied', { result });
 }
 

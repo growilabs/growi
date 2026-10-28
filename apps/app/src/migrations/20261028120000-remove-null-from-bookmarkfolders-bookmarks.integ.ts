@@ -112,6 +112,36 @@ describe('remove-null-from-bookmarkfolders-bookmarks', () => {
     }
     const broken = await collection.findOne({ _id: brokenId });
     expect(broken?.bookmarks).toEqual([]);
+    // Leaving `bookmarks: null` / a missing field as is relies on Prisma
+    // reading them as an empty list
+    const folders = await prisma.bookmarkfolders.findMany({
+      where: { ownerId: ownerId.toString() },
+    });
+    expect(
+      Object.fromEntries(folders.map((f) => [f.name, f.bookmarkIds])),
+    ).toEqual({
+      valid: [bookmark.toString()],
+      'null-field': [],
+      'no-field': [],
+      broken: [],
+    });
+  });
+
+  it('fails instead of reporting success when a folder cannot be cleaned', async () => {
+    const id = new ObjectId();
+    // A non-numeric __v makes the update fail for this document only
+    await collection.insertOne({
+      _id: id,
+      name: 'uncleanable',
+      owner: ownerId,
+      bookmarks: [null],
+      __v: 'not-a-number',
+    });
+
+    await expect(migrate.up()).rejects.toThrow();
+
+    const folder = await collection.findOne({ _id: id });
+    expect(folder?.bookmarks).toEqual([null]);
   });
 
   it('is idempotent (re-running does not change the cleaned folder)', async () => {
