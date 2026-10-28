@@ -1138,5 +1138,34 @@
       "label": "표 빌더",
       "description": ""
     }
+  },
+  "chat_integration": {
+    "account_link": {
+      "page_title": "채팅 계정 연결",
+      "heading": "계정 연결 확인",
+      "growi_heading": "이 GROWI",
+      "you_heading": "나 (GROWI에 로그인 중)",
+      "chat_account_heading": "연결할 채팅 계정",
+      "id_label": "ID",
+      "expires_at": "이 링크는 {{expiresAt}}까지 유효합니다.",
+      "ignore_hint": "짐작 가는 요청이 아니라면 승인하지 말고 이 페이지를 닫으세요.",
+      "approve": "승인",
+      "linked": "채팅 계정이 GROWI 계정에 연결되었습니다.",
+      "taken_by_another_user": "이 채팅 계정은 이미 다른 GROWI 사용자에게 연결되어 있습니다.",
+      "invalid_or_expired": "이 링크는 유효하지 않거나 이미 사용되었거나 만료되었습니다.",
+      "loading": "불러오는 중…",
+      "name_label": "이름",
+      "user_label": "사용자",
+      "service_label": "서비스",
+      "account_label": "계정"
+    },
+    "destination_select": {
+      "summary_none": "채팅 알림",
+      "summary_selected": "채팅 알림: {{selectedCount}}개 선택됨",
+      "private": "(비공개)",
+      "partial_warning_title": "일부 workspace의 채널을 가져오지 못했습니다",
+      "partial_warning_detail": "{{workspace}}의 채널을 가져오지 못했습니다({{reason}})",
+      "aria_label": "채팅 알림 채널"
+    }
   }
 }

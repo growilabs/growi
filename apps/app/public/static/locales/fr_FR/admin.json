@@ -1425,5 +1425,11 @@
     "turn_it_off": "Désactivez le mode maintenance depuis Administration > Paramètres de l'application sur le GROWI qui a été fermé, une fois le résultat vérifié.",
     "cancel": "Annuler",
     "proceed": "Compris, continuer"
+  },
+  "chat_integration": {
+    "connection_lost": {
+      "badge": "Connexion perdue",
+      "detail": "Le proxy n'accepte plus ce GROWI. L'association a peut-être été supprimée côté chat (par exemple avec `unregister`) : les notifications et les commandes sont alors indisponibles. Un décalage d'horloge ou une clé différente peut produire le même état. Pour nettoyer cette relation côté GROWI, cliquez sur « Disconnect » ci-dessous, ou essayez de refaire l'association."
+    }
   }
 }

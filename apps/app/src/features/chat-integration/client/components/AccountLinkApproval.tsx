@@ -1,25 +1,26 @@
 // The approval screen for a one-time chat-account-link token (design.md
-// "ChatAccountLink" -- "承認画面" row: "ログイン必須。どのチャットアカウン
-// トを、どの GROWI ユーザーに結び付けるのかを画面に出す"). Rendered from
-// `pages/me/[[...path]].page.tsx`'s `chat-integration` entry -- the page
-// component reads the token itself (via `useRouter()`) rather than the
-// dispatcher passing it down, since the dispatcher only routes on the
-// FIRST path segment (`me/[[...path]].page.tsx`'s own fix, task 6.1).
+// "ChatAccountLink" -- "承認画面" row). Rendered by the dedicated page
+// `pages/me/chat-integration/account-link/[token].page.tsx`, which supplies
+// the token through `router.query.token`.
+//
+// It shows, before approval, three distinct groups: this GROWI, the GROWI
+// user who is logged in, and the chat account to be linked. The chat
+// account's display name is only ever shown next to its identifier -- a
+// display name is chosen by the account owner and is not an identity.
 //
 // Login itself is already enforced twice before this component ever
 // mounts: the Express route this page lives under (`/me/*`,
 // `server/routes/index.js`) requires login before Next.js renders
 // anything, and the API this component calls
-// (`account-link-router.ts`) requires it independently. This component
-// adds nothing to that enforcement -- it only renders what a logged-in
-// user is shown.
+// (`account-link-router.ts`) requires it independently.
 
-import { type JSX, useState } from 'react';
+import { type JSX, type ReactNode, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 import useSWR from 'swr';
 
 import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
+import { useAppTitle, useSiteUrl } from '~/states/global';
 
 interface AccountLinkOrderDisplay {
   readonly platform: string;
@@ -27,19 +28,32 @@ interface AccountLinkOrderDisplay {
   readonly workspaceName: string;
   readonly relationLabel: string | null;
   readonly growiUsername: string;
+  readonly growiName: string | null;
+  readonly accountDisplayName: string | null;
+  readonly expiresAt: string;
 }
 
-/**
- * `/me/chat-integration/account-link/:token` -- the 3rd path segment is the
- * token (`create-link-order.ts`'s `ACCOUNT_LINK_ACCEPT_PATH`, followed by
- * `/:token`). Segments before it (`chat-integration`, `account-link`) are
- * fixed by that same constant, so only the token varies.
- */
+const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
+
 const useAccountLinkToken = (): string | undefined => {
   const router = useRouter();
-  const { path } = router.query;
-  const segments = Array.isArray(path) ? path : [];
-  return segments[2];
+  const { token } = router.query;
+  // The token goes into an API path; accept only what the server issues
+  // (32 random bytes, hex) so a crafted link cannot steer the request.
+  return typeof token === 'string' && TOKEN_PATTERN.test(token)
+    ? token
+    : undefined;
+};
+
+const hostnameOf = (siteUrl: string | undefined): string | null => {
+  if (!siteUrl) {
+    return null;
+  }
+  try {
+    return new URL(siteUrl).hostname;
+  } catch {
+    return null;
+  }
 };
 
 const fetchOrder = async (
@@ -72,35 +86,93 @@ const approveOrder = async (token: string): Promise<ApprovalOutcome> => {
   }
 };
 
+const Card = ({ children }: { children: ReactNode }): JSX.Element => (
+  <div className="container py-5" style={{ maxWidth: 480 }}>
+    <div className="card shadow-sm">
+      <div className="card-body">{children}</div>
+    </div>
+  </div>
+);
+
+const Group = ({
+  heading,
+  children,
+}: {
+  heading: string;
+  children: ReactNode;
+}): JSX.Element => (
+  <fieldset className="mb-3">
+    <legend className="fs-6 fw-bold text-muted mb-1">{heading}</legend>
+    <dl className="mb-0">{children}</dl>
+  </fieldset>
+);
+
+const Row = ({
+  term,
+  children,
+}: {
+  term: string;
+  children: ReactNode;
+}): JSX.Element => (
+  <div className="d-flex gap-2">
+    <dt className="fw-normal text-muted">{term}</dt>
+    <dd className="mb-0">{children}</dd>
+  </div>
+);
+
 export const AccountLinkApproval = (): JSX.Element => {
   const { t } = useTranslation();
   const token = useAccountLinkToken();
+  const appTitle = useAppTitle();
+  const siteUrl = useSiteUrl();
   const [outcome, setOutcome] = useState<ApprovalOutcome | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: display, error } = useSWR(
     token != null ? ['chat-integration-account-link', token] : null,
     () => fetchOrder(token as string),
+    // Approving revokes the order, so a refetch after approval would turn
+    // the success screen into "invalid or expired".
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    },
   );
 
   if (token == null) {
-    return <h2>{t('commons:not_found_page.page_not_exist')}</h2>;
+    return (
+      <Card>
+        <p className="mb-0">{t('commons:not_found_page.page_not_exist')}</p>
+      </Card>
+    );
   }
 
-  if (outcome === 'linked') {
-    return <p>Your chat account has been linked to your GROWI account.</p>;
-  }
   if (outcome === 'taken-by-another-user') {
     return (
-      <p>This chat account is already linked to a different GROWI user.</p>
+      <Card>
+        <p className="mb-0">
+          {t('chat_integration.account_link.taken_by_another_user')}
+        </p>
+      </Card>
     );
   }
   if (outcome === 'invalid-or-expired' || error || display === null) {
-    return <p>This link is invalid, already used, or has expired.</p>;
+    return (
+      <Card>
+        <p className="mb-0">
+          {t('chat_integration.account_link.invalid_or_expired')}
+        </p>
+      </Card>
+    );
   }
 
   if (display == null) {
-    return <p>Loading…</p>;
+    return (
+      <Card>
+        <p className="mb-0">{t('chat_integration.account_link.loading')}</p>
+      </Card>
+    );
   }
 
   const handleApprove = async (): Promise<void> => {
@@ -110,23 +182,80 @@ export const AccountLinkApproval = (): JSX.Element => {
     setOutcome(result);
   };
 
+  const host = hostnameOf(siteUrl);
+
   return (
-    <div>
-      <p>
-        Link the following chat account to your GROWI account (
-        <strong>{display.growiUsername}</strong>)?
-      </p>
-      <ul>
-        <li>Platform: {display.platform}</li>
-        <li>Chat account: {display.accountId}</li>
-        <li>Workspace: {display.workspaceName}</li>
-        {display.relationLabel != null && (
-          <li>Connection label: {display.relationLabel}</li>
-        )}
-      </ul>
-      <button type="button" onClick={handleApprove} disabled={isSubmitting}>
-        Approve
-      </button>
-    </div>
+    <Card>
+      <h1 className="fs-5 mb-3">
+        {t('chat_integration.account_link.heading')}
+      </h1>
+
+      {outcome !== 'linked' && (
+        <Group heading={t('chat_integration.account_link.growi_heading')}>
+          <Row term={t('chat_integration.account_link.name_label')}>
+            {appTitle}
+          </Row>
+          {host != null && <Row term="URL">{host}</Row>}
+        </Group>
+      )}
+
+      {outcome !== 'linked' && (
+        <Group heading={t('chat_integration.account_link.you_heading')}>
+          <Row term={t('chat_integration.account_link.user_label')}>
+            {display.growiName != null && (
+              <bdi className="me-2">{display.growiName}</bdi>
+            )}
+            <bdi>@{display.growiUsername}</bdi>
+          </Row>
+        </Group>
+      )}
+
+      <Group heading={t('chat_integration.account_link.chat_account_heading')}>
+        <Row term={t('chat_integration.account_link.service_label')}>
+          <span className="text-capitalize">{display.platform}</span>
+          {' · '}
+          <bdi>{display.workspaceName}</bdi>
+          {display.relationLabel != null && (
+            <bdi> ({display.relationLabel})</bdi>
+          )}
+        </Row>
+        <Row term={t('chat_integration.account_link.account_label')}>
+          {display.accountDisplayName != null && (
+            <bdi className="me-2">{display.accountDisplayName}</bdi>
+          )}
+          <span>
+            <span className="text-muted me-1">
+              {t('chat_integration.account_link.id_label')}:
+            </span>
+            <bdi>{display.accountId}</bdi>
+          </span>
+        </Row>
+      </Group>
+
+      {outcome === 'linked' ? (
+        <p className="mb-0">{t('chat_integration.account_link.linked')}</p>
+      ) : (
+        <>
+          <p className="small mb-1">
+            {t('chat_integration.account_link.expires_at', {
+              expiresAt: new Date(display.expiresAt).toLocaleString(),
+            })}
+          </p>
+          <p className="small text-muted">
+            {t('chat_integration.account_link.ignore_hint')}
+          </p>
+          <div className="text-end">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleApprove}
+              disabled={isSubmitting}
+            >
+              {t('chat_integration.account_link.approve')}
+            </button>
+          </div>
+        </>
+      )}
+    </Card>
   );
 };

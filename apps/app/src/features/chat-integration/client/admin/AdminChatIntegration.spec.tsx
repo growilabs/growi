@@ -12,7 +12,14 @@
 //   - an active relation offers a disconnect (Requirement 9.7) that asks for
 //     confirmation, calls the unpair endpoint, and re-reads the relation list
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,6 +34,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('~/client/util/apiv3-client', () => ({
   apiv3Get: mocks.apiv3Get,
   apiv3Post: mocks.apiv3Post,
+}));
+
+vi.mock('next-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 vi.mock('~/client/util/toastr', () => ({
@@ -158,11 +169,13 @@ const stubApi = ({
   encryptionReason = 'unset',
   relations = [ACTIVE_RELATION],
   destinations = DESTINATIONS,
+  connectionStatus = () => Promise.resolve({ data: CONNECTION_STATUS }),
 }: {
   encryptionConfigured?: boolean;
   encryptionReason?: 'unset' | 'invalid-key' | 'invalid-generation';
   relations?: AdminRelationListItem[];
   destinations?: DestinationsView;
+  connectionStatus?: () => Promise<unknown>;
 } = {}) => {
   mocks.apiv3Get.mockImplementation((url: string) => {
     if (url === '/chat-integration/admin/encryption-status') {
@@ -179,7 +192,7 @@ const stubApi = ({
       return Promise.resolve({ data: CAPABILITY_REPORT });
     }
     if (url.endsWith('/connection-status')) {
-      return Promise.resolve({ data: CONNECTION_STATUS });
+      return connectionStatus();
     }
     if (url.endsWith('/settings')) {
       return Promise.resolve({ data: SETTINGS });
@@ -196,7 +209,13 @@ const stubApi = ({
 // `apiv3Get` again (same reasoning as this feature's other client specs).
 const renderScreen = () =>
   render(
-    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+    <SWRConfig
+      value={{
+        provider: () => new Map(),
+        dedupingInterval: 0,
+        focusThrottleInterval: 0,
+      }}
+    >
       <AdminChatIntegration />
     </SWRConfig>,
   );
@@ -299,6 +318,88 @@ describe('AdminChatIntegration', () => {
     expect(
       await screen.findByTestId('grw-chat-integration-connection-health'),
     ).toHaveTextContent('connected');
+  });
+
+  describe('a relation the proxy no longer accepts (Requirements 9.9-9.12)', () => {
+    const REJECTED = [{ code: 'rejected', message: 'rejected' }];
+    const LOST_BADGE = 'chat_integration.connection_lost.badge';
+    const LOST_DETAIL = 'chat_integration.connection_lost.detail';
+
+    it('shows "connection lost" instead of "active", with the explanation and the Disconnect action', async () => {
+      stubApi({ connectionStatus: () => Promise.reject(REJECTED) });
+
+      renderScreen();
+
+      const row = await screen.findByTestId(
+        'grw-chat-integration-relation-row',
+      );
+      expect(await within(row).findByText(LOST_DETAIL)).toBeInTheDocument();
+      expect(within(row).getByText(LOST_BADGE)).toBeInTheDocument();
+      expect(within(row).queryByText('active')).toBeNull();
+      expect(
+        within(row).getByRole('button', { name: 'Disconnect' }),
+      ).toBeEnabled();
+    });
+
+    it('does not keep showing the last good health next to the lost state', async () => {
+      let calls = 0;
+      stubApi({
+        connectionStatus: () => {
+          calls += 1;
+          return calls === 1
+            ? Promise.resolve({ data: CONNECTION_STATUS })
+            : Promise.reject(REJECTED);
+        },
+      });
+
+      renderScreen();
+      expect(
+        await screen.findByTestId('grw-chat-integration-connection-health'),
+      ).toHaveTextContent('connected');
+
+      await act(async () => {
+        fireEvent.focus(window);
+      });
+
+      expect(await screen.findByText(LOST_DETAIL)).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('grw-chat-integration-connection-health'),
+      ).toBeNull();
+    });
+
+    it('keeps the green "active" badge when the check failed for another reason', async () => {
+      stubApi({
+        connectionStatus: () =>
+          Promise.reject([{ code: 'unreachable', message: 'unreachable' }]),
+      });
+
+      renderScreen();
+
+      expect(
+        await screen.findByText('Failed to load connection status'),
+      ).toBeInTheDocument();
+      const row = screen.getByTestId('grw-chat-integration-relation-row');
+      expect(within(row).getByText('active')).toBeInTheDocument();
+      expect(within(row).queryByText(LOST_BADGE)).toBeNull();
+      expect(within(row).queryByText(LOST_DETAIL)).toBeNull();
+    });
+
+    it('shows a relation whose connection is fine exactly as before', async () => {
+      stubApi();
+
+      renderScreen();
+
+      const row = await screen.findByTestId(
+        'grw-chat-integration-relation-row',
+      );
+      expect(within(row).getByText('active')).toBeInTheDocument();
+      expect(
+        await within(row).findByTestId(
+          'grw-chat-integration-connection-health',
+        ),
+      ).toHaveTextContent('connected');
+      expect(within(row).queryByText(LOST_BADGE)).toBeNull();
+    });
   });
 
   describe('channel permissions (task 9.2)', () => {

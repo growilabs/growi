@@ -455,6 +455,15 @@ describe('proxy-client', () => {
       expect(outcome).toEqual({ ok: false, reason: 'http-error' });
     });
 
+    it("refuses with rejected when the proxy answers 401 -- it did not accept this GROWI's signature", async () => {
+      const relationId = 'relation-rejected';
+      await setUpRelation(relationId);
+      vi.mocked(axios.post).mockResolvedValueOnce({ status: 401, data: '' });
+
+      const outcome = await fetchCapabilities(relationId);
+      expect(outcome).toEqual({ ok: false, reason: 'rejected' });
+    });
+
     it('refuses with unreachable when the request itself fails', async () => {
       const relationId = 'relation-unreachable';
       await setUpRelation(relationId);

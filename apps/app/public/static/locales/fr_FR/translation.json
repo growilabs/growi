@@ -1159,5 +1159,34 @@
       "label": "Générateur de tableau",
       "description": ""
     }
+  },
+  "chat_integration": {
+    "account_link": {
+      "page_title": "Associer un compte de chat",
+      "heading": "Confirmer l'association du compte",
+      "growi_heading": "Ce GROWI",
+      "you_heading": "Vous (connecté à GROWI)",
+      "chat_account_heading": "Compte de chat à associer",
+      "id_label": "ID",
+      "expires_at": "Ce lien est valable jusqu'au {{expiresAt}}.",
+      "ignore_hint": "Si vous ne reconnaissez pas cette demande, fermez cette page sans approuver.",
+      "approve": "Approuver",
+      "linked": "Votre compte de chat a été associé à votre compte GROWI.",
+      "taken_by_another_user": "Ce compte de chat est déjà associé à un autre utilisateur GROWI.",
+      "invalid_or_expired": "Ce lien est invalide, déjà utilisé ou expiré.",
+      "loading": "Chargement…",
+      "name_label": "Nom",
+      "user_label": "Utilisateur",
+      "service_label": "Service",
+      "account_label": "Compte"
+    },
+    "destination_select": {
+      "summary_none": "Notification de chat",
+      "summary_selected": "Notification de chat : {{selectedCount}} sélectionné(s)",
+      "private": "(privé)",
+      "partial_warning_title": "Les canaux de certains workspaces n'ont pas pu être listés",
+      "partial_warning_detail": "Les canaux de {{workspace}} n'ont pas pu être listés ({{reason}})",
+      "aria_label": "Canaux de notification de chat"
+    }
   }
 }

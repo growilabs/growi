@@ -1211,5 +1211,34 @@
         "description": ""
       }
     }
+  },
+  "chat_integration": {
+    "account_link": {
+      "page_title": "Link Chat Account",
+      "heading": "Confirm account linking",
+      "growi_heading": "This GROWI",
+      "you_heading": "You (logged in to GROWI)",
+      "chat_account_heading": "Chat account to link",
+      "id_label": "ID",
+      "expires_at": "This link is valid until {{expiresAt}}.",
+      "ignore_hint": "If you do not recognize this request, close this page without approving.",
+      "approve": "Approve",
+      "linked": "Your chat account has been linked to your GROWI account.",
+      "taken_by_another_user": "This chat account is already linked to a different GROWI user.",
+      "invalid_or_expired": "This link is invalid, already used, or has expired.",
+      "loading": "Loading…",
+      "name_label": "Name",
+      "user_label": "User",
+      "service_label": "Service",
+      "account_label": "Account"
+    },
+    "destination_select": {
+      "summary_none": "Chat notification",
+      "summary_selected": "Chat notification: {{selectedCount}} selected",
+      "private": "(private)",
+      "partial_warning_title": "Channels of some workspaces could not be listed",
+      "partial_warning_detail": "Channels of {{workspace}} could not be listed ({{reason}})",
+      "aria_label": "Chat notification channels"
+    }
   }
 }

@@ -41,7 +41,7 @@ GROWI 内のイベントを通知として送り、チャットの利用者を G
 - `DestinationRegistry` — 宛先の集合（Gen 1 / Gen 2 を種類で分岐しない。要件 12.2）
 - `ChatAccountLink` — チャット利用者と GROWI ユーザーの紐付け（要件 7）
 - `KeyStore`（GROWI 側の実装）— 自分の鍵と proxy の公開鍵（要件 9.5, 10.5）
-- 管理画面と個人設定（要件 1.3, 11, 12.4, 12.5, 7.7）
+- 管理画面と個人設定（要件 1.3, 11, 12.4, 12.5, 7.7）、保存時の通知先の選択部品（要件 2.2, 2.12–2.14）、アカウントの紐付けの承認画面（要件 7.9–7.12）、関係の「接続が切れている」表示（要件 9.9–9.12）
 - **GROWI 側の新しいデータの一覧と、その消し方**
 
 ### Out of Boundary
@@ -62,6 +62,7 @@ GROWI 内のイベントを通知として送り、チャットの利用者を G
 
 - `@growi/chat` の契約が変わったとき
 - GROWI 本体の検索・権限判定の呼び出し契約が変わったとき（要件 3.6 / 3.7 が影響を受ける）
+- proxy の署名の検査が、署名を受け付けないとき 401 以外を返すようになったとき（`ProxyCallFailure` の `rejected` の判定を見直す。「管理画面の関係の状態」参照）
 - `chat-integration-proxy` の能力表・通知契約が変わったとき（下記「OAuth install `state` の発行・照合（task 9.0 で決着）」を参照）
 - `@growi/chat` の `CommandResponse`（`link-preview` kind）に「見つからない」を独立に表現するフィールド（例: `notFound: boolean`）が将来追加された場合、`buildLinkPreview` が固定文言を `path` に入れて表現している今のやり方は不要になるため見直すこと（下記「LinkPreviewMapper」参照）
 - `resolvePageFromUrl` の固定リンク判定（`PAGE_ID_PATTERN`。末尾セグメントが24桁16進文字列かどうかで判定している）の意味が変わった場合（例: 別の識別子形式を追加する）、`LinkPreviewMapper` 側のロジックも合わせて確認すること
@@ -151,8 +152,9 @@ apps/app/src/features/chat-integration/
 │       ├── chat-processed-request.ts
 │       └── chat-request-nonce.ts
 ├── client/
-│   ├── AdminChatIntegration/          # 要件 1.3, 11, 12.4, 12.5
-│   └── MeChatAccountLinks/            # 要件 7.7
+│   ├── admin/                         # 要件 1.3, 11, 12.4, 12.5, 9.9–9.12（AdminChatIntegration.tsx。関係の状態の導き方は relation-connection-state.ts）
+│   ├── components/                    # AccountLinkApproval.tsx（要件 7.9–7.12。置き場所は専用ページ）、MyChatAccountLinks.tsx（要件 7.7）
+│   └── notification/                  # ChatIntegrationDestinationSelect.tsx（要件 2.2, 2.12–2.14。保存時の通知先の選択部品）
 └── interfaces/
 ```
 
@@ -164,7 +166,10 @@ apps/app/src/features/chat-integration/
 | `server/service/user-notification/index.ts` | Slack 未設定で例外を投げる作りなので、Gen 2 の宛先だけでも成立するようにする |
 | `server/routes/apiv3/`（新規 1 ファイル） | Gen 2 の受け口。既存の `slack-integration.js` は変更しない |
 | `server/routes/apiv3/page/create-page.ts` / `update-page.ts`、`routes/comment.js` | **要件 2.2 の入力経路。** 現在は `isSlackEnabled` と `slackChannels`（カンマ区切りの名前）を読むが、Gen 2 は platform と channelId が要る。**Gen 1 の項目は残したまま** Gen 2 の宛先を別項目で受ける |
-| `client/components/SlackNotification.tsx`（または Gen 2 用の新規部品） | 保存時に宛先を選ぶ UI。Gen 2 はチャンネルを **id で選ぶ**ので、`ProxyClient` 経由でチャンネルの一覧を取る |
+| `client/notification/ChatIntegrationDestinationSelect.tsx`（`SavePageControls.tsx` の 2 か所が使う。モーダルの中の方へ `openInModal` を渡す） | 保存時に宛先を選ぶ UI。Gen 2 はチャンネルを **id で選ぶ**ので、`ProxyClient` 経由で取ったチャンネルの一覧から選ばせる（自由入力は無い。出力は `{ relationId, platform, channelId }` だけで名前を含まない）。形は `GrantSelector` と同じ — **1 行のトグルのボタン**（選択件数を出す）と**チェックボックスのメニュー**（workspace ごとの見出し、`max-height` は編集画面の下端の欄で `50vh`・モーダルの中で `30vh`、中をスクロール、1 つ選んでもメニューは閉じない）。閉じている間はメニューの中身を描かない（reactstrap は閉じていてもメニューを元の場所に描くので、描くとチャンネル数だけ要素が増える）。取得できなかった workspace はボタンに警告の印、メニューに詳細を出す。キーボード: 開いたら最初のチェックボックスへフォーカスを移し、Escape で閉じてボタンへ戻す（reactstrap の a11y 処理は `role="menuitem"` を前提とするので切る）。ボタンの件数の文言は `{{selectedCount}}`（`count` は i18next の複数形のキーを要求するので使わない） |
+| `pages/me/chat-integration/account-link/[token].page.tsx`（新規） | 承認画面の専用ページ。`RawLayout` で包み（サイドバー・ナビゲーションなし）、`getServerSideProps` は共通のプロパティと `translation` の i18n だけを取る。URL（`ACCOUNT_LINK_ACCEPT_PATH`）は `/me/chat-integration/account-link/:token`。Next.js は固定の経路を `[[...path]]` より優先する。`/me/*` は Express の `loginRequiredStrictly` を通る |
+| `pages/me/[[...path]].page.tsx` | `chat-integration` の項目を持たない（承認画面は専用ページへ） |
+| `client/components/PageEditor/EditorNavbarBottom/SavePageControls.tsx` | 選択部品の使用箇所のうち、モーダルの中の方へ `openInModal` を渡す |
 | `apps/app/package.json` | `@growi/chat` を `workspace:^` で追加 |
 | `apps/app/turbo.json` | **`@growi/chat#build` への依存を宣言する。** 同じリポジトリ内の build を作る依存が増えたら書き足す決まりである（`.claude/rules/project-structure.md`）。書かないと build の順序が狂い `dist/` が無い状態で型エラーになる |
 | `server/crowi/express-init.js` | **`bodyParser.json` より前に** `/peer/` だけ `express.raw` を通し、**`mongoSanitize` を `/peer/` の下から外す**（上記 2 節） |
@@ -193,7 +198,7 @@ apps/app/src/features/chat-integration/
 | `ChatAccountLink` | `server/account-link/` | 紐付け | 7.1–7.7 |
 | `KeyStore` | `server/keys/key-store.ts` | 鍵の保持と入れ替え | 9.5, 10.5, 10.6 |
 | `SignatureGuard` | `server/signature-guard.ts` | 届くリクエストの検証 | 10.1–10.4 |
-| `ProxyClient` | `server/proxy-client.ts` | **GROWI から proxy へ送る唯一の口**（通知・ペアリングの申請・設定の反映・鍵の登録と失効・能力の一覧・接続の状態・チャンネルの一覧）。**受け取った応答は必ず検査関数を通す**（`parseNotificationResult` / `parsePairingResult` ほか。応答に署名は付かず、`ChannelInventory` は通知の宛先を判定する唯一の材料、`PairingResult` は関係と相手の鍵になるので、壊れた値が入ると後から原因を辿れない） | 1.3, 1.4, 2.1–2.6, 9.5, 10.1, 10.5, 11.1, 11.2, 11.4 |
+| `ProxyClient` | `server/proxy-client.ts` | **GROWI から proxy へ送る唯一の口**（通知・ペアリングの申請・設定の反映・鍵の登録と失効・能力の一覧・接続の状態・チャンネルの一覧）。**失敗の種類は粗いまま**（`unknown-relation` / `no-signing-key` / `unreachable` / `rejected` / `http-error` / `malformed-response`）。`rejected` は署名付きの呼び出しが 401 で答えられたとき — proxy は署名を受け付けなかった理由を返さない（呼び出す側が関係の有無を探れないため）ので、理由は分からない。**受け取った応答は必ず検査関数を通す**（`parseNotificationResult` / `parsePairingResult` ほか。応答に署名は付かず、`ChannelInventory` は通知の宛先を判定する唯一の材料、`PairingResult` は関係と相手の鍵になるので、壊れた値が入ると後から原因を辿れない） | 1.3, 1.4, 2.1–2.6, 9.5, 10.1, 10.5, 11.1, 11.2, 11.4 |
 | `PairingEndpoint` | `server/pairing/pairing-endpoint.ts` | 所有確認に答える | 9.2, 9.3 |
 
 ---
@@ -642,9 +647,11 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
 | 段 | 何をするか |
 |---|---|
 | 発行 | `AccountLinkStartRequest` を受けて `chat_account_link_orders` に 1 行作り、`linkUrl` と `expiresAt` を返す |
-| 承認画面 | `pages/` に 1 枚。**ログイン必須**。**どのチャットアカウントを、どの GROWI ユーザーに結び付けるのかを画面に出す** — 出さないと利用者が取り違えたまま承認する。`workspaceName` と `platform` と表示名を `chat_relations` から引いて添える |
+| 承認画面 | 専用ページ `pages/me/chat-integration/account-link/[token].page.tsx`（サイドバーなし。要件 7.9）。**ログイン必須**。**どの GROWI に、どの GROWI ユーザーとして、どのチャットアカウントを結び付けるのかを画面に出す** — 出さないと利用者が取り違えたまま承認する（要件 7.10）。`workspaceName` と `platform` は `chat_relations` から、チャットアカウントの表示名は注文（`chat_account_link_orders.accountDisplayName`）から引いて添える。ログイン中のユーザー（`name` と `username`）と GROWI の名前（`useAppTitle()`・`useSiteUrl()` のホスト名）も出す。有効期限と「心当たりがなければ承認せずに閉じてください」も出す（要件 7.12） |
 | 承認 | `chat_account_links` に書き、**同じトランザクションで token を失効させる**。既に別の利用者に紐付いていれば複合ユニーク索引が弾き、`taken-by-another-user` として扱う（要件 7.4） |
 | 失効 | `expiredAt` の TTL 索引で自然に消える |
+- **表示名は識別の根拠にしない。** Slack などの表示名は本人が自由に決められる。承認画面は表示名を出すときも、**識別子（`accountId`）と workspace を同じ強さで必ず併記する**（要件 7.10・7.11）。表示名が無い注文は識別子だけを出す。表示名・workspace 名・識別子は `<bdi>` で囲み、右から左への制御文字で並びを入れ替えられないようにする
+- 承認画面のトークンは `router.query.token` から読み、**サーバーが発行する形（32 バイトの 16 進 64 桁）に合うものだけ**を API の経路に入れる（細工したリンクが別の API を指さないようにする）。承認後に注文は失効するので、承認画面は再取得（フォーカス・再接続）で取り直さない
 - 一意性の衝突（要件 7.4）は**複合ユニーク索引で**実現する。アプリ側の事前確認だけに頼らない
 - 解除（要件 7.5）: 行を削除する。以降の書き込みは要件 7.6 の経路に落ちる
 - **GROWI ユーザーが使えなくなったとき**: GROWI の利用者削除は文書を消さず `status` を
@@ -652,6 +659,33 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
   **掃除の引き金は「文書が消えたとき」ではなく「`status` が `STATUS_ACTIVE` でなくなったとき」**にする。
   ただし行を消す必要は無い — `resolveActor` が状態を見て `user: null` にするので（上記）、
   **紐付けの行は残したままで安全**である。利用者が復帰したときに紐付け直さずに済む
+
+### 管理画面の関係の状態（要件 9.9–9.12）
+
+GROWI の記録（`chat_relations.state`）は `active` / `unpaired` の 2 つだけで、チャット側で関係が解除されたことを GROWI は知らない。知る手段を新しく作らず（proxy → GROWI の通知を足すと `@growi/chat` と proxy の契約が変わる）、今ある信号を使う: 鍵を消した関係からの署名付きの呼び出しを、proxy は署名の検査で拒否して**空の 401** を返す。拒否の理由は返さない。
+
+- `ProxyClient` は署名付きの呼び出しが 401 で答えられたとき `rejected` を返す。管理画面の経路（`connectionStatusHandler`）は `rejected` を `ErrorV3` の code にして **502** で返す。**401 のまま返さない**（クライアントの共通処理が 401 をログイン切れと読むため）
+- `client/admin/relation-connection-state.ts` の純粋関数 `deriveRelationBadge(state, connectionStatusError)` と `isConnectionRejected(error)` が、`state` と接続の状態の問い合わせの失敗から、関係の行のバッジを決める。`apiv3` の失敗（配列の `errors[0].code`）を読む。フレームワークに依存しない
+
+| `relation.state` | 接続の状態の問い合わせ | バッジ | 「Connection」の行 |
+|---|---|---|---|
+| `unpaired` | 問い合わせない | `unpaired`（灰色） | 出さない |
+| `active` | 成功 | `active`（緑） | `connected` などの `health` |
+| `active` | 失敗（`rejected`） | **「接続が切れています」（赤）** | 説明文（要件 9.10）。**古い `health` は出さない** |
+| `active` | 失敗（それ以外） | `active`（緑のまま） | 「Failed to load connection status」（赤字） |
+| `active` | まだ読み込み中 | `active`（緑） | 何も出さない |
+
+- 「失敗（それ以外）」で緑のバッジを残すのは、GROWI の記録としては関係が `active` であり、切れたと断定できる材料が無いため（要件 9.11）
+- **前に成功した値が SWR のキャッシュに残る。** SWR は再取得が失敗しても前の成功値（`data`）を返し続けるので `error` と `data` が同時に入る。`rejected` のときは `data` を出さない（出すと「connected」と「接続が切れています」が並ぶ）
+- 説明文は原因を断定しない。時計のずれや鍵の不一致でも同じ状態になりうるので「チャット側で `unregister` された可能性」と書き、GROWI 側の関係を片付ける「Disconnect」（`UnpairButton`。proxy を呼ばず GROWI 側だけで完結するので、接続が切れていても動く）と、再度ペアリングを試す案内を添える。文言は `admin.json` の `chat_integration.connection_lost.badge` と `.detail`（管理画面は `admin` namespace だけを読み込む）。**自動では解除しない**（要件 9.12）
+
+### 保存時の通知先の選択部品が保つ契約（要件 2.2）
+
+選択部品の作りを変えても保つ。自由入力の欄が無い（`textbox`・`combobox` が無い）／出力は `relationId`・`platform`・`channelId` だけで `channelName` を含まない／2 つの workspace に同じ `channelId` があっても、選んだ方の `relationId` が出る／紐づく workspace が無ければ何も描かない。検索ボックスは付けない（付けると「選択肢からしか選べない」を崩しうる）。
+
+### 触れない部品
+
+管理画面の「できること」の表（`CapabilityReportTable`）・チャンネルの権限の節（`ChannelPermissionsSection`）・通知の宛先の節（`NotificationDestinationsSection`）・`UnpairButton` は、`RelationRow` の中での並びを含め、roadmap 順 8 が作り直すまで変えない。管理画面の、関係のバッジと「Connection」の行以外の文言は英語の直書きのまま。
 
 ---
 
@@ -669,7 +703,7 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
 | `chat_request_nonces` | `relationId`, `keyId`, `nonce`, `expiresAt` | `(relationId, keyId, nonce)` 一意。**`expiresAt` に TTL 索引** |
 | `chat_pending_pairings` | `registrationCode`, `proxyUri`, `growiUri`, `createdBy`, **`ownKeyId`**, **`ownKeyPair`（暗号化）**, `expiresAt` | `registrationCode` 一意。**`expiresAt` に TTL 索引**。要件 9.2 の所有確認に使う。**答えた `challenge` は記録しない** — どの問いにも答える形にしたため（上記） |
 | `chat_challenge_attempts` | `registrationCode`, `sourceKey`, `windowStartedAt`, `count` | **主キー `(registrationCode, sourceKey)`。`windowStartedAt` に TTL 索引。** 回数の上限は**送り元ごと**に数えると決めたので、保留の行に 1 組だけ持つ形では足りない（1 つの保留に対して送り元は複数ある）。**`sourceKey` の決め方は protocol spec の「送り元アドレスの決め方」に従う** — `req.ip` は Express の `trust proxy` に従うので、GROWI 側でも同じ前提が要る（設定が無ければ送り元を区別できていないことを運用者に見せる） |
-| `chat_account_link_orders` | `token`, `relationId`, `platform`, `accountId`, `isRevoked`, `createdAt`, `expiredAt` | `token` 一意。**`expiredAt` に TTL 索引**（既定 10 分）。要件 7.3 の一度きりのリンク。**`models/password-reset-order.ts` に倣う**（下記） |
+| `chat_account_link_orders` | `token`, `relationId`, `platform`, `accountId`, `accountDisplayName`（任意）, `isRevoked`, `createdAt`, `expiredAt` | `token` 一意。**`expiredAt` に TTL 索引**（既定 10 分）。要件 7.3 の一度きりのリンク。**`models/password-reset-order.ts` に倣う**（下記）。`accountDisplayName` は注文を新しく作るとき `actor.displayName` を保存する（前後の空白を落とし、空なら `null`）。使い回す注文は書き換えない |
 | `chat_channel_permissions` | `relationId`, `commandName`, **`channelScope`**(`all`/`none`/`listed`), `allowedChannels` | **`(relationId, commandName)` 一意。** **`allowedChannels` の値を 2 つの欄に分けて持つ** — protocol の `RelationSettings.channelPermissions[].allowedChannels` は「`'all'`（全チャンネル）／`'none'`（どこでも不可）／チャンネル id の並び」のどれかを取るが、Mongoose の 1 つの欄でこの 3 択をそのまま持つには `Schema.Types.Mixed` にするしかない。`Mixed` にすると、(a) 知らない値が保存されるのを防ぐ enum の検査が効かなくなり、(b) 変更の検出が `markModified` の呼び出し漏れで静かに失敗する（呼ばないと古い値が残る）。そこで `channelScope` に 3 択を持ち、id の並びは `channelScope` が `listed` のときだけ意味を持つ形にした。**どちらの向きの読み替えも `settings/allowed-channels.ts` の 1 か所だけが知っている** — 行を直接読む書き方をすると、`'all'`（全チャンネルで可）が空の並び、つまり「どこでも不可」に見えてしまう。 **行ごとの `updatedAt` は持たない** — protocol の `SettingsPushRequest.version` は関係ごとに 1 つの値なので、行ごとに持つと比べる基準が決まらない。版は `chat_relations.settingsVersion` に 1 つ持ち、**保存のたびに 1 増やす**。proxy が取りに来たときはそこから返す（要件 11.4） |
 | `chat_notification_destinations` | `platform`, `channelId`, **`channelName`**, `pathPattern`, `triggerEvents`, `relationId` | `channelName` は表示と要件 12.4 の突き合わせ用。**`ChannelInventory` を引いたときに合わせて更新する**（名前は変わりうるので、古いままだと注意喚起が出たり出なかったりする）。管理者が設定する。Gen 1 の設定とは**別に保存する**（要件 12.2） |
 | `chat_oauth_install_states` | `state`, `platform`, `createdBy`, `consumedAt`, `createdAt`, `expiresAt` | `state` 一意。**`expiresAt` に TTL 索引**（既定 5 分——account-link オーダーの 10 分より短い）。task 9.0 の CSRF 対策 `state`。**`consumedAt` で一度きりの使用を強制する**（`isRevoked` ではなく——人が明示的に取り消す概念ではないため） |

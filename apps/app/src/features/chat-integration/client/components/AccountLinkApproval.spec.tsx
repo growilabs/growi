@@ -1,17 +1,21 @@
-// Proves task 6.1's screen-level contract (design.md: "どのチャットアカウ
-// ントを、どの GROWI ユーザーに結び付けるのかを画面に出す") -- the screen
-// shows the chat account, GROWI user, and workspace before approval, and
-// calling approve reflects the outcome the API answered with.
+// The approval screen shows the GROWI, the logged-in user and the chat
+// account (with its identifier) before approval, and calling approve
+// reflects the outcome the API answered with (Requirements 7.10-7.12).
 
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  routerQuery: {
-    path: ['chat-integration', 'account-link', 'test-token'],
-  } as Record<string, unknown>,
+  routerQuery: { token: 'ab'.repeat(32) } as Record<string, unknown>,
   apiv3Get: vi.fn(),
   apiv3Post: vi.fn(),
 }));
@@ -21,7 +25,15 @@ vi.mock('next/router', () => ({
 }));
 
 vi.mock('next-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) =>
+      options == null ? key : `${key} ${JSON.stringify(options)}`,
+  }),
+}));
+
+vi.mock('~/states/global', () => ({
+  useAppTitle: () => 'Acme Wiki',
+  useSiteUrl: () => 'https://wiki.example.test',
 }));
 
 vi.mock('~/client/util/apiv3-client', () => ({
@@ -37,6 +49,9 @@ const DISPLAY = {
   workspaceName: 'Test Workspace',
   relationLabel: 'Our Slack',
   growiUsername: 'approving-user',
+  growiName: 'Approving Person',
+  accountDisplayName: 'Alice A.',
+  expiresAt: '2030-01-01T00:00:00.000Z',
 };
 
 // A fresh SWR cache per render -- otherwise a later test's fetch for the
@@ -45,7 +60,13 @@ const DISPLAY = {
 // singleton shared across every render in the process).
 const renderApproval = () =>
   render(
-    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+    <SWRConfig
+      value={{
+        provider: () => new Map(),
+        dedupingInterval: 0,
+        focusThrottleInterval: 0,
+      }}
+    >
       <AccountLinkApproval />
     </SWRConfig>,
   );
@@ -53,16 +74,71 @@ const renderApproval = () =>
 describe('AccountLinkApproval', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.routerQuery = { token: 'ab'.repeat(32) };
   });
 
-  it('shows which chat account, GROWI user, and workspace are about to be linked', async () => {
+  it('presents the GROWI, the logged-in user and the chat account as three distinct groups', async () => {
     mocks.apiv3Get.mockResolvedValue({ data: DISPLAY });
 
     renderApproval();
 
-    expect(await screen.findByText(/Test Workspace/)).toBeInTheDocument();
-    expect(screen.getByText(/U-alice/)).toBeInTheDocument();
-    expect(screen.getByText(/approving-user/)).toBeInTheDocument();
+    const growi = await screen.findByRole('group', {
+      name: 'chat_integration.account_link.growi_heading',
+    });
+    expect(within(growi).getByText('Acme Wiki')).toBeInTheDocument();
+    expect(within(growi).getByText('wiki.example.test')).toBeInTheDocument();
+
+    const you = screen.getByRole('group', {
+      name: 'chat_integration.account_link.you_heading',
+    });
+    expect(within(you).getByText('Approving Person')).toBeInTheDocument();
+    expect(within(you).getByText('@approving-user')).toBeInTheDocument();
+
+    const chat = screen.getByRole('group', {
+      name: 'chat_integration.account_link.chat_account_heading',
+    });
+    expect(within(chat).getByText('slack')).toBeInTheDocument();
+    expect(within(chat).getByText(/Test Workspace/)).toBeInTheDocument();
+    expect(within(chat).getByText(/Our Slack/)).toBeInTheDocument();
+  });
+
+  it('shows both the display name and the account identifier when the chat service gave a name', async () => {
+    mocks.apiv3Get.mockResolvedValue({ data: DISPLAY });
+
+    renderApproval();
+
+    const chat = await screen.findByRole('group', {
+      name: 'chat_integration.account_link.chat_account_heading',
+    });
+    expect(within(chat).getByText('Alice A.')).toBeInTheDocument();
+    expect(within(chat).getByText('U-alice')).toBeInTheDocument();
+  });
+
+  it('shows only the account identifier when the order has no display name', async () => {
+    mocks.apiv3Get.mockResolvedValue({
+      data: { ...DISPLAY, accountDisplayName: null },
+    });
+
+    renderApproval();
+
+    const chat = await screen.findByRole('group', {
+      name: 'chat_integration.account_link.chat_account_heading',
+    });
+    expect(within(chat).getByText('U-alice')).toBeInTheDocument();
+    expect(within(chat).queryByText('Alice A.')).not.toBeInTheDocument();
+  });
+
+  it('shows the expiry and tells the user to close the page if they do not recognize the request', async () => {
+    mocks.apiv3Get.mockResolvedValue({ data: DISPLAY });
+
+    renderApproval();
+
+    expect(
+      await screen.findByText('chat_integration.account_link.ignore_hint'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/chat_integration.account_link.expires_at.*"expiresAt"/),
+    ).toBeInTheDocument();
   });
 
   it('shows a linked confirmation after a successful approval', async () => {
@@ -71,11 +147,19 @@ describe('AccountLinkApproval', () => {
     const user = userEvent.setup();
 
     renderApproval();
-    await screen.findByRole('button', { name: /approve/i });
-    await user.click(screen.getByRole('button', { name: /approve/i }));
+    await screen.findByRole('button', {
+      name: 'chat_integration.account_link.approve',
+    });
+    await user.click(
+      screen.getByRole('button', {
+        name: 'chat_integration.account_link.approve',
+      }),
+    );
 
     await waitFor(() => {
-      expect(screen.getByText(/has been linked/i)).toBeInTheDocument();
+      expect(
+        screen.getByText('chat_integration.account_link.linked'),
+      ).toBeInTheDocument();
     });
   });
 
@@ -85,12 +169,18 @@ describe('AccountLinkApproval', () => {
     const user = userEvent.setup();
 
     renderApproval();
-    await screen.findByRole('button', { name: /approve/i });
-    await user.click(screen.getByRole('button', { name: /approve/i }));
+    await screen.findByRole('button', {
+      name: 'chat_integration.account_link.approve',
+    });
+    await user.click(
+      screen.getByRole('button', {
+        name: 'chat_integration.account_link.approve',
+      }),
+    );
 
     await waitFor(() => {
       expect(
-        screen.getByText(/already linked to a different GROWI user/i),
+        screen.getByText('chat_integration.account_link.taken_by_another_user'),
       ).toBeInTheDocument();
     });
   });
@@ -101,7 +191,47 @@ describe('AccountLinkApproval', () => {
     renderApproval();
 
     expect(
-      await screen.findByText(/invalid, already used, or has expired/i),
+      await screen.findByText(
+        'chat_integration.account_link.invalid_or_expired',
+      ),
     ).toBeInTheDocument();
+  });
+
+  it('keeps showing the success screen when the window regains focus after approval', async () => {
+    mocks.apiv3Get.mockResolvedValueOnce({ data: DISPLAY });
+    mocks.apiv3Post.mockResolvedValue({ data: { status: 'linked' } });
+    const user = userEvent.setup();
+
+    renderApproval();
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'chat_integration.account_link.approve',
+      }),
+    );
+    await screen.findByText('chat_integration.account_link.linked');
+
+    // The order is revoked by the approval, so any refetch would fail.
+    mocks.apiv3Get.mockRejectedValue(new Error('404'));
+    await act(async () => {
+      fireEvent.focus(window);
+    });
+
+    expect(
+      screen.getByText('chat_integration.account_link.linked'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('chat_integration.account_link.invalid_or_expired'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not call the API for a token that is not in the shape the server issues', async () => {
+    mocks.routerQuery = { token: '../../admin/something' };
+
+    renderApproval();
+
+    expect(
+      await screen.findByText('commons:not_found_page.page_not_exist'),
+    ).toBeInTheDocument();
+    expect(mocks.apiv3Get).not.toHaveBeenCalled();
   });
 });

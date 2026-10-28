@@ -1439,5 +1439,11 @@
     "turn_it_off": "Switch maintenance mode off from Admin > App Settings on the GROWI that was closed, once you have checked the result.",
     "cancel": "Cancel",
     "proceed": "Understood, proceed"
+  },
+  "chat_integration": {
+    "connection_lost": {
+      "badge": "Connection lost",
+      "detail": "The proxy no longer accepts this GROWI. The pairing may have been removed on the chat side (for example with `unregister`), so notifications and commands are unavailable. A clock difference or a key mismatch can cause the same state. To clean up this relation on the GROWI side, press \"Disconnect\" below, or try pairing again."
+    }
   }
 }

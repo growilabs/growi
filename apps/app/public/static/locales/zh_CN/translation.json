@@ -1158,5 +1158,34 @@
       "label": "表格构建器",
       "description": ""
     }
+  },
+  "chat_integration": {
+    "account_link": {
+      "page_title": "关联聊天账号",
+      "heading": "确认账号关联",
+      "growi_heading": "此 GROWI",
+      "you_heading": "您（已登录 GROWI）",
+      "chat_account_heading": "要关联的聊天账号",
+      "id_label": "ID",
+      "expires_at": "此链接在 {{expiresAt}} 之前有效。",
+      "ignore_hint": "如果您不清楚这个请求，请不要批准，直接关闭此页面。",
+      "approve": "批准",
+      "linked": "您的聊天账号已关联到 GROWI 账号。",
+      "taken_by_another_user": "此聊天账号已关联到其他 GROWI 用户。",
+      "invalid_or_expired": "此链接无效、已被使用或已过期。",
+      "loading": "加载中…",
+      "name_label": "名称",
+      "user_label": "用户",
+      "service_label": "服务",
+      "account_label": "账号"
+    },
+    "destination_select": {
+      "summary_none": "聊天通知",
+      "summary_selected": "聊天通知：已选择 {{selectedCount}} 个",
+      "private": "（私有）",
+      "partial_warning_title": "无法获取部分 workspace 的频道",
+      "partial_warning_detail": "无法获取 {{workspace}} 的频道（{{reason}}）",
+      "aria_label": "聊天通知频道"
+    }
   }
 }

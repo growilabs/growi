@@ -362,6 +362,7 @@ export const SavePageControls = (): JSX.Element | null => {
               <ChatIntegrationDestinationSelect
                 destinations={chatIntegrationDestinations}
                 onChange={chatIntegrationDestinationsChangedHandler}
+                openInModal
               />
 
               <div className="d-flex">
