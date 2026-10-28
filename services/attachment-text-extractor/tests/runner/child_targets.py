@@ -19,8 +19,9 @@ from multiprocessing.connection import Connection
 
 from app.conversion.errors import ConversionFailure
 from app.conversion.results import ConversionSuccess
-from app.runner import wire
+from app.runner import child_entry, wire
 from app.runner.child_entry import ChildParams
+from app.runner.platform_guards import apply_child_guards
 from app.schemas import PageInfo
 
 _PARENT_WAIT_S = 30.0
@@ -207,3 +208,64 @@ def result_then_stuck_target(
     _write_body(result_conn, wire.encode_success(ConversionSuccess(pages=[page], mime_type="text/plain")))
     time.sleep(_PARENT_WAIT_S)
     os._exit(0)
+
+
+# --- the real child_main with one part replaced inside the child ---------------------------
+# The replacement must happen in the child: forkserver children do not inherit the test
+# process's monkeypatches.
+
+
+class PanicException(BaseException):  # noqa: N818 - mirrors pyo3's name
+    """Stand-in for pyo3_runtime.PanicException, which derives from BaseException."""
+
+
+PanicException.__module__ = "pyo3_runtime"
+
+
+def _panic(*_args: object) -> None:
+    raise PanicException("index out of bounds: the len is 3 but the index is 7")
+
+
+def panic_in_convert_target(
+    input_conn: Connection, result_conn: Connection, liveness_conn: Connection, params: ChildParams
+) -> None:
+    child_entry.convert = _panic
+    child_entry.child_main(input_conn, result_conn, liveness_conn, params)
+
+
+def convert_forever_target(
+    input_conn: Connection, result_conn: Connection, liveness_conn: Connection, params: ChildParams
+) -> None:
+    # Keeps the child inside real conversion work for as long as the test needs it.
+    real_convert = child_entry.convert
+
+    def again(*args: object) -> None:
+        while True:
+            real_convert(*args)
+
+    child_entry.convert = again
+    child_entry.child_main(input_conn, result_conn, liveness_conn, params)
+
+
+def crash_or_convert_target(
+    input_conn: Connection, result_conn: Connection, liveness_conn: Connection, params: ChildParams
+) -> None:
+    if params.filename == "abort":
+        abort_target(input_conn, result_conn, liveness_conn, params)
+    elif params.filename == "segfault":
+        segfault_target(input_conn, result_conn, liveness_conn, params)
+    else:
+        child_entry.child_main(input_conn, result_conn, liveness_conn, params)
+
+
+def cpu_overrun_target(
+    input_conn: Connection, result_conn: Connection, liveness_conn: Connection, params: ChildParams
+) -> None:
+    # The production soft limit is at least 6 s; lowering only the soft limit (after the real
+    # guards set the signal disposition and the hard limit) lets the kernel send SIGXCPU after 1 s.
+    apply_child_guards(params.limits.max_child_rss_mb, params.timeout_s)
+    _, hard = resource.getrlimit(resource.RLIMIT_CPU)
+    resource.setrlimit(resource.RLIMIT_CPU, (1, hard))
+    _read_input(input_conn, params)
+    while True:
+        pass

@@ -34,7 +34,7 @@ _SHEET_NAME_ATTR = re.compile(rb'(<sheet\b[^>]*?\bname=)"[^"]*"')
 _SHEET_STATE_ATTR = re.compile(rb'(<sheet\b[^>]*?\bstate=)"[^"]*"')
 
 
-def _limits(cells: int = 100_000, entries: int = 10_000, uncompressed_mb: int = 512) -> ConversionLimits:
+def _limits(cells: int = 70_000, entries: int = 10_000, uncompressed_mb: int = 512) -> ConversionLimits:
     return ConversionLimits(
         max_child_rss_mb=512,
         max_result_bytes=1_000_000,

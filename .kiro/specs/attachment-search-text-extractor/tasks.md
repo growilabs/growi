@@ -30,14 +30,14 @@
   - _Requirements: 1.7_
 
 - [x] 1.3 設定項目・エラーコード・変換の共通の型を定める
-  - 設定に `MAX_CHILD_RSS_MB` (320)、`MAX_XLSX_CELLS` (100000)、`MAX_RESULT_BYTES` (16MiB)、`MAX_PDF_PAGES` (5000)、`MAX_ARCHIVE_ENTRIES` (10000)、`MAX_ARCHIVE_UNCOMPRESSED_MB` (512) を加え、既定値を `MAX_CONCURRENCY` 3、`TIMEOUT_S` 55 に変える。使われていなかった `MAX_EXTRACTED_BYTES` を外し、`MAX_CONCURRENCY` の説明を「全体の上限はワーカー数 × この値」に直す
+  - 設定に `MAX_CHILD_RSS_MB` (320)、`MAX_XLSX_CELLS` (70000)、`MAX_RESULT_BYTES` (16MiB)、`MAX_PDF_PAGES` (5000)、`MAX_ARCHIVE_ENTRIES` (10000)、`MAX_ARCHIVE_UNCOMPRESSED_MB` (512) を加え、既定値を `MAX_CONCURRENCY` 3、`TIMEOUT_S` 55 に変える。使われていなかった `MAX_EXTRACTED_BYTES` を外し、`MAX_CONCURRENCY` の説明を「全体の上限はワーカー数 × この値」に直す
   - API のエラーコードに暗号化 (`file_encrypted`) と上限超過 (`resource_limit_exceeded`) を加える
   - 変換の失敗の種類、変換の上限の値、形式と経路の型など、変換層と実行管理の両方が使う型を用意する。ipynb の出力 1 つあたりの文字数の上限は、設定項目にせず固定値 10000 として変換の上限の値に含める
   - 完了の状態: 設定の既定値と新しいエラーコードを確かめる単体テストが通る
   - _Requirements: 1.10, 2.1, 2.2, 2.3, 2.6_
 
 - [x] 1.4 テストで使うファイルを用意する仕組みを作る
-  - 実在の文書はリポジトリに入れず、原則としてテストの中で生成する: 複数シート・1 シート・非表示シート・空シート・グラフシートを含む XLSX、10 万セルを超える XLSX、時間切れを起こせる大きな XLSX (5 シート × 2 万行)、複数スライドの PPTX、画像入りの 40MB の DOCX / PPTX、暗号化した DOCX / XLSX / PPTX、ユーザーパスワード付きとオーナーパスワードだけの PDF、画像だけの PDF、壊れた PDF、展開すると巨大になる DOCX、XML を深く入れ子にした DOCX、Shift_JIS / EUC-JP / BOM 付き UTF-8 のテキスト
+  - 実在の文書はリポジトリに入れず、原則としてテストの中で生成する: 複数シート・1 シート・非表示シート・空シート・グラフシートを含む XLSX、7 万セルを超える XLSX、時間切れを起こせる大きな XLSX (5 シート × 1 万 4 千行)、複数スライドの PPTX、画像入りの 40MB の DOCX / PPTX、暗号化した DOCX / XLSX / PPTX、ユーザーパスワード付きとオーナーパスワードだけの PDF、画像だけの PDF、壊れた PDF、展開すると巨大になる DOCX、XML を深く入れ子にした DOCX、Shift_JIS / EUC-JP / BOM 付き UTF-8 のテキスト
   - ODT / ODS / ODP、RTF、EPUB は zipfile や文字列で組み立て、XLS は xlwt で生成する
   - 旧形式の DOC と PPT は Python だけでは作れないので、設計の例外 (design.md の Allowed Dependencies に記載) として Apache POI のテスト用ファイル (Apache-2.0) から小さなものを選んでリポジトリに置き、出典とライセンスを記録する
   - 大きなファイル (40MB、大きな XLSX) は生成に時間がかかるので、セッション単位で 1 回だけ生成する
@@ -99,7 +99,7 @@
 
 - [x] 4.2 (P) XLSX のセル数の事前検査を実装する
   - 全シートの XML を、XML として解析せず一定の大きさずつ読み、セルの印の数を数える。合計が上限を超えたら、anydoc を呼ばずに上限超過にする
-  - 完了の状態: 10 万セルを超える XLSX が上限超過になり、上限以下の XLSX は通ること、同じプロセスの中で検査の前後のメモリの最大使用量がほとんど増えないことをテストで確かめられる
+  - 完了の状態: 7 万セルを超える XLSX が上限超過になり、上限以下の XLSX は通ること、同じプロセスの中で検査の前後のメモリの最大使用量がほとんど増えないことをテストで確かめられる
   - _Requirements: 2.6_
   - _Boundary: XlsxSheetSplitter_
   - _Depends: 2.4_
@@ -151,13 +151,13 @@
   - 完了の状態: 正常な変換で成功と子の最大 RSS が返り、戻った時点で子が回収済みで残っていないことをテストで確かめられる
   - _Requirements: 2.2, 2.5, 2.6, 2.7_
 
-- [ ] 6.4 子プロセスの止め方と隔離をテストで確かめる
+- [x] 6.4 子プロセスの止め方と隔離をテストで確かめる
   - 大きな XLSX を短い期限で変換すると時間切れになり、子が回収済みで、親の RSS が元に戻り、直後の変換が成功する
   - RSS の上限を小さくするとメモリ超過になる。CPU 時間の上限を超えた子は時間切れに分類される
   - 子の中で abort と segfault を起こすと異常終了になり、同時に動いていた別の変換は成功する。子の中の想定外の例外 (Rust の panic に当たるもの) は想定外に分類される
   - 結果が `MAX_RESULT_BYTES` を超えると結果超過になる
   - 依頼元のワーカーを強制終了すると、子が 2 秒以内に終わる
-  - 既定の上限 (RSS 320MB、仮想メモリと CPU 時間の上限) のもとで、画像入りの 40MB の DOCX / PPTX と 10 万セルの XLSX が誤って止められない。10 万セルを超える XLSX はセル数の検査で止まり、子の RSS が上限に近づかない
+  - 既定の上限 (RSS 320MB、仮想メモリと CPU 時間の上限) のもとで、画像入りの 40MB の DOCX / PPTX と 7 万セルの XLSX が誤って止められない。7 万セルを超える XLSX はセル数の検査で止まり、子の RSS が上限に近づかない
   - 完了の状態: 上記のテストが Linux の CI で通る
   - _Requirements: 2.2, 2.5, 2.6, 2.7, 4.2_
 
@@ -219,7 +219,7 @@
 
 ## Implementation Notes
 
-- 1.4: 時間切れ用の大きな XLSX (5 シート × 2 万行) は anydoc で約 0.2 秒で変換でき、`TIMEOUT_S` (整数) の最小値 1 秒では時間切れにならない。6.3 / 6.4 の実行管理は期限を `Settings.TIMEOUT_S` とは別の float 引数で受け取り、テストは 1 秒未満の期限を直接渡すこと。
+- 1.4: 時間切れ用の大きな XLSX (5 シート × 1 万 4 千行) は anydoc で約 0.2 秒で変換でき、`TIMEOUT_S` (整数) の最小値 1 秒では時間切れにならない。6.3 / 6.4 の実行管理は期限を `Settings.TIMEOUT_S` とは別の float 引数で受け取り、テストは 1 秒未満の期限を直接渡すこと。
 - 1.4: 変換の実測では、非表示シート・空シート・グラフシートは anydoc の出力に現れず、表示シートが 1 枚だけの XLSX は `##` 見出しが付かない。4.3 のシート分割はこの出力を前提に組む。
 - 3.1: `convert_office` は anydoc の例外を `from None` で包み直すが、元の例外 (anydoc が入力の先頭バイトを引用することがある) は `__context__` に残る。子プロセスの入口 (6.1) は `kind` / `detail` だけを親に送り、例外オブジェクトや traceback を送らないこと。
 - 3.1: RLIMIT_AS 超過で起きる `MemoryError` は `convert_office` では internal (500) になる。メモリ超過 (resource_limit_exceeded) として扱うかどうかは 6.1 / 6.3 で決める。
@@ -239,9 +239,11 @@
 - 6.1: 監視スレッド (`os._exit`) は GIL を取れる間だけ働く。メインスレッドが時間のかかる Python の正規表現などで GIL を持ち続けると、パイプを閉じても子が終わるまで 25 秒かかった (anydoc の変換中と普通の Python のループ中は 0.01〜0.02 秒)。そのとき止めるのは `RLIMIT_CPU` と親の SIGKILL。`text.py` の `_META_CHARSET` (`[^>]*?`) と `pptx_split.py` の `_LINE_BREAK_MARKER` は入力次第で 2 乗の時間になりうるので、6.4 の「2 秒以内に終わる」テストは変換中の現実に近い負荷でも確かめる。
 - 6.1: 子から親への結果にも「長さ (4 バイト) + 本体」を付けた。上限は `2 × MAX_RESULT_BYTES + 1MiB`。6.3 は読む前に `wire.decode_frame_header(header, wire.max_result_frame_bytes(limits.max_result_bytes))` で確かめ、超えたら読み捨てて `result_too_large` にする。`write_frame` は non-blocking の fd を受け付けないので、6.3 は読み取りを自前で書く。start() の後、親は自分の手元にある「入力の読み取り側・結果の書き込み側・監視用パイプの読み取り側」の写しを閉じること (閉じないと EOF が届かない)。子の終了コード: 3 = 依頼元がいなくなった、4 = 入力の形が壊れていた。どちらも結果は送らない。
 - 6.1: `RLIMIT_AS` に当たると、XLSX は Rust 側の abort (exitcode -6、結果なし) になり、6.3 では「異常終了」(500) に分類される。メモリの主な守りは親の RSS 監視 (320MB、`memory_exceeded`) で、これは `RLIMIT_AS` (832MB) より先に効く。`MemoryError` は core が `internal` にまとめたままでよい。
-- 6.1: forkserver の準備 (6.2) では `RAYON_NUM_THREADS=1` を forkserver の起動前に設定する (今回のテストではこれが無くても、40MB の DOCX / PPTX と 10 万セルの XLSX は VmPeak 約 370MB 以下で通った)。CPU 時間の hard 上限が環境側で低いと soft と hard が同じ値になり、SIGXCPU より先に SIGKILL が届いて「時間切れ」が「異常終了」に分類される (珍しい配備だけ)。
+- 6.1: forkserver の準備 (6.2) では `RAYON_NUM_THREADS=1` を forkserver の起動前に設定する (今回のテストではこれが無くても、40MB の DOCX / PPTX と 7 万セルの XLSX は VmPeak 約 370MB 以下で通った)。CPU 時間の hard 上限が環境側で低いと soft と hard が同じ値になり、SIGXCPU より先に SIGKILL が届いて「時間切れ」が「異常終了」に分類される (珍しい配備だけ)。
 - 6.2: `ConversionRunner` の準備確認の使い方 (7.2 が守る): `/readyz` は `readiness()` が準備できていない (`stale` を含む) なら `await asyncio.to_thread(runner.verify)` で確かめ直し、その結果を返す。`readiness()` は新しいプロセスを作らず待たない。`verify()` は正常なら約 5ms、固まっていても `probe_timeout_s` + 約 0.5 秒 + 回収で戻る。k8s の readinessProbe の `timeoutSeconds` (8.2) はこれより長くするか、7.2 で `probe_timeout_s` を短く渡す。forkserver が死んだ直後に標準の処理がまだその死を見ていない間の最初の `Process.start()` は `EOFError` になるので、6.3 の `run()` はこれを「異常終了」として扱い、次のリクエストは立て直された forkserver を使う。
 - 6.2: Python 3.12 では forkserver に `__main__` を先読みさせる指定が効かず、子 1 つを作るたびに起動スクリプト (uvicorn) を読み直して約 29ms かかる (何も読み込まないスクリプトなら約 7ms)。8.1 で、forkserver にだけ読み込ませて `/readyz` には出さない別の一覧 (例 `uvicorn.main`) を足すか、起動を小さなスクリプト経由にするか決める。`stop()` は変換中の子が残っていると終わるまで止まる (3 秒動く子で 3.03 秒)。7.2 は 6.3 が子を回収した後にスレッドから呼ぶ。`/readyz` の dependencies に内部モジュール名 (`app.runner.child_entry`) が出るので、認証なしで呼べる `/readyz` に出してよいかを 7.2 で決める。`os.environ.setdefault` で RAYON_NUM_THREADS を書くのは、stdlib が forkserver に環境変数を渡す口を持たないため。TMPDIR は 8.1 の Dockerfile で設定する。
 - 6.3: `ConversionRunner.run(ConversionRequest(data, filename, mime_hint)) -> ConversionOutcome` と `ConversionRunner.from_settings(settings, **options)` が 7.1 / 7.2 の入口。子の最大 RSS は `ConversionSuccess` / `ConversionFailure` の省略可能な項目 `child_peak_rss_mb` で返す (親だけが入れ、親子間の JSON には載らない)。この項目は design.md の Contracts に未記載なので、9.2 の前に追記する。`app/runner/__init__.py` は design のファイル構成では ConversionRunner を公開するはずだが未公開 (6.2 から持ち越し)。7.1 / 7.2 で公開する。
 - 6.3: 分類の優先順位は、(1) 受け取りきった結果 (同じ見回りで期限が来ても結果を優先)、(2) 親が決めた timeout / memory_exceeded / result_too_large、(3) 結果なしで終わった子 (-SIGXCPU → timeout、その他は crashed)。結果超過は長さ欄だけで決め、本体は読まずに子を止める。最悪の場合の所要時間は期限 55 秒 + 回収待ち約 4 秒 = 約 59 秒で、apps/app 側の 60 秒に余裕が少ない (7.1 / 8.1 / 9.2 で TIMEOUT_S の既定を見直すか、apps/app 側の上限との関係を確認する)。`run()` は `start()` を前提にしない (先に呼ぶと forkserver が依存の先読みも RAYON_NUM_THREADS も無しで立つ)。7.2 は起動順を守る。親が wire → app.conversion.errors → app/conversion/__init__ → core の連鎖で anydoc / pypdfium2 を読み込み、RSS が約 9MB 増える (設計の 1 ワーカー約 120MB の範囲内)。8.1 の init (tini など) は、forkserver が落ちた後に残った子の回収に PID 1 が必要になるかどうかの材料。
 - 6.3 の改善案 (どれも必須ではない): pidfd が使えず forkserver を落とした珍しい組み合わせで、動いている子が exitcode 255 と読まれて SIGKILL を送らず、戻った時点で子が短い間残る。2 回の見回りの間に終わる変換は最大 RSS が小さく報告される (結果を受け取った後に VmHWM を読み直していない)。子が結果のパイプを先に閉じて動き続けると、期限と RSS を見ずに最大 2 秒待つ。`_read_exact` が bytearray から bytes に写すので結果 1 件あたり一時的に約 2 倍のメモリを使う。
+- 6.4: 実測で、1 シート 10 万行 × 1 列の XLSX は子の RSS が 328〜357MB になり、RSS 上限 320MB で止まった (設計の見積もり「10 万セルで 214MB」は合わなかった)。ユーザー判断で `MAX_XLSX_CELLS` の既定を 70,000 に下げた (design.md / research.md 更新済み)。実測 (既定の上限のもと): 1 シート 7 万行 × 1 列 = 最大 RSS 285MB (89%)・VmPeak 419MB、1 シート 7 千行 × 10 列 = 231MB、5 シート × 1 万 4 千行 = 146MB、44MB の DOCX = 266MB (83%)、48MB の DOCX (画像 12 枚) = 281MB (88%)。余裕が薄いので、環境差でテストが不安定になった場合はまず `tests/runner/test_child_isolation.py` の `0.95 × 上限` の許容を見る。5 シート × 1 万 4 千行は約 0.47 秒で変換できるので、時間切れのテストの期限 0.2 秒は余裕が約 2.3 倍。
+- 6.4: ワーカーを SIGKILL したとき、そのワーカーの forkserver の UNIX ソケットの一時フォルダ (`/tmp/pymp-*`) が残る。テストは `TMPDIR` をテスト用の場所にして防いでいる。本番では k8s が `/tmp` (tmpfs) を Pod ごと捨てるので問題ないが、compose では残りうる (8.1 で `/tmp` を tmpfs にする)。申し送り: タスク 7.1 は「時間切れ・異常終了の後でも次のリクエストが同時実行の枠を取れる」ことを確かめる (枠の返却は router の責務)。

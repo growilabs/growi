@@ -35,7 +35,7 @@ DEFAULT_LIMITS = ConversionLimits(
     max_pdf_pages=5000,
     max_archive_entries=10_000,
     max_archive_uncompressed_mb=512,
-    max_xlsx_cells=100_000,
+    max_xlsx_cells=70_000,
     ipynb_output_max_chars=10_000,
 )
 

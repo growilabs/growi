@@ -8,16 +8,18 @@ from pathlib import Path
 import pytest
 
 import app.conversion.xlsx_split as xlsx_split
+from app.config import Settings
 from app.conversion.archive_guard import inspect_archive
 from app.conversion.errors import ConversionError
 from app.conversion.limits import ConversionLimits
 from app.conversion.xlsx_split import enforce_cell_limit
+from fixture_files import write_xlsx_cells
 
 _WORKBOOK = "xl/workbook.xml"
 _SHEET1 = "xl/worksheets/sheet1.xml"
 
 
-def _limits(cells: int = 100_000, uncompressed_mb: int = 512) -> ConversionLimits:
+def _limits(cells: int = 70_000, uncompressed_mb: int = 512) -> ConversionLimits:
     return ConversionLimits(
         max_child_rss_mb=512,
         max_result_bytes=1_000_000,
@@ -185,6 +187,18 @@ def test_real_workbook_over_the_limit_is_rejected_and_at_the_limit_passes(
     _check(xlsx_large_for_timeout_path.read_bytes(), _limits())
     with pytest.raises(ConversionError) as exc:
         _check(xlsx_over_cell_limit_path.read_bytes(), _limits())
+    assert exc.value.kind == "limit_exceeded"
+
+
+def test_the_default_limit_admits_70000_cells_in_one_sheet_and_rejects_70001(tmp_path: Path) -> None:
+    limits = ConversionLimits.from_settings(Settings())
+    at_limit, over_limit = tmp_path / "at.xlsx", tmp_path / "over.xlsx"
+    write_xlsx_cells(at_limit, [("Data", 70_000, 1)])
+    write_xlsx_cells(over_limit, [("Data", 70_000, 1)], tail_cells=1)
+
+    _check(at_limit.read_bytes(), limits)
+    with pytest.raises(ConversionError) as exc:
+        _check(over_limit.read_bytes(), limits)
     assert exc.value.kind == "limit_exceeded"
 
 

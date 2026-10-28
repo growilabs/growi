@@ -92,7 +92,7 @@ class TestSettingsDefaults:
         ("name", "expected"),
         [
             ("MAX_CHILD_RSS_MB", 320),
-            ("MAX_XLSX_CELLS", 100000),
+            ("MAX_XLSX_CELLS", 70000),
             ("MAX_RESULT_BYTES", 16 * 1024 * 1024),
             ("MAX_PDF_PAGES", 5000),
             ("MAX_ARCHIVE_ENTRIES", 10000),

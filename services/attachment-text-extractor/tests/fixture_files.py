@@ -425,7 +425,7 @@ def xlsx_over_cell_limit_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(scope="session")
 def xlsx_large_for_timeout_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """5 sheets × 20,000 rows × 1 column = exactly ``MAX_XLSX_CELLS``.
+    """5 sheets × 14,000 rows × 1 column = exactly ``MAX_XLSX_CELLS``.
 
     Kept at the limit (not over) so it passes the cell pre-check and reaches
     anydoc, where a short deadline or a small RSS cap can stop it.

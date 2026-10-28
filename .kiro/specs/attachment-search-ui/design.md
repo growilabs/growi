@@ -804,7 +804,7 @@ export const isAttachmentFullTextSearchEnabledAtom = atom<boolean>(false);
   - `unsupported` → "このファイル形式は抽出に対応していません"
   - `tooLarge` → "ファイルサイズが上限を超えています"
   - `encrypted` → "パスワードで保護されたファイルのため、本文を検索できません"
-  - `resourceLimit` → "ファイルが大きすぎるか複雑すぎるため、本文を検索できません" (例: 10 万セルを超える Excel)
+  - `resourceLimit` → "ファイルが大きすぎるか複雑すぎるため、本文を検索できません" (例: 7 万セルを超える Excel)
   - `failed` → 上流が返す `message` を表示
 - **設定 validation エラー**: フォームフィールド近傍にインライン表示。保存ボタン disable
 - **機能無効時**: すべての追加 UI は `null` を返し、既存画面の表示は導入前と完全一致

@@ -26,7 +26,7 @@ pytest's temporary directory and returned as a `Path`. All others return `bytes`
 | `xlsx_hidden_sheet` | `Visible` + hidden `Secret` |
 | `xlsx_chart_sheet` | `Data` worksheet + `Chart` chartsheet |
 | `xlsx_over_cell_limit_path` | Exactly `MAX_XLSX_CELLS + 1` cells |
-| `xlsx_large_for_timeout_path` | 5 sheets × 20,000 rows × 1 column = exactly `MAX_XLSX_CELLS` (passes the cell pre-check) |
+| `xlsx_large_for_timeout_path` | 5 sheets × 14,000 rows × 1 column = exactly `MAX_XLSX_CELLS` (passes the cell pre-check) |
 | `pptx_multi_slide` | 3 slides with title + body |
 | `docx_large_images_path` / `pptx_large_images_path` | 40–50 MiB, 11 random-pixel PNGs (incompressible) |
 | `docx_encrypted` / `xlsx_encrypted` / `pptx_encrypted` | Agile-encrypted OOXML; password from the `office_password` fixture |

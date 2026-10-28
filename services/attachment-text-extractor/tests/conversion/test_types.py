@@ -82,7 +82,7 @@ def test_limits_from_settings_with_fixed_ipynb_cap(monkeypatch: pytest.MonkeyPat
         max_pdf_pages=5000,
         max_archive_entries=10000,
         max_archive_uncompressed_mb=512,
-        max_xlsx_cells=100000,
+        max_xlsx_cells=70000,
         ipynb_output_max_chars=10000,
     )
     assert not hasattr(Settings(), "IPYNB_OUTPUT_MAX_CHARS")

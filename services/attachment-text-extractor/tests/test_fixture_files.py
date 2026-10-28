@@ -91,7 +91,7 @@ def test_xlsx_over_cell_limit_exceeds_max_xlsx_cells_by_one(xlsx_over_cell_limit
 def test_xlsx_large_for_timeout_is_five_sheets_within_the_cell_limit(xlsx_large_for_timeout_path: Path) -> None:
     # Must stay at or under the limit so it reaches anydoc instead of the cell pre-check
     per_sheet = _xlsx_cells_per_sheet(xlsx_large_for_timeout_path)
-    assert per_sheet == [20_000] * 5
+    assert per_sheet == [14_000] * 5
     assert sum(per_sheet) == _default("MAX_XLSX_CELLS")
     wb = openpyxl.load_workbook(xlsx_large_for_timeout_path, read_only=True)
     try:

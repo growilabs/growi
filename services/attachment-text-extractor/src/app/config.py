@@ -34,8 +34,9 @@ class Settings(BaseSettings):
             (Req 2.3).
         MAX_CHILD_RSS_MB (int, default 320): RSS ceiling for one conversion
             child process (Req 2.6).
-        MAX_XLSX_CELLS (int, default 100000): Maximum total cell count across
-            all sheets of an XLSX file (Req 2.6).
+        MAX_XLSX_CELLS (int, default 70000): Maximum total cell count across
+            all sheets of an XLSX file (Req 2.6).  A single sheet at this size
+            stays under the default MAX_CHILD_RSS_MB.
         MAX_RESULT_BYTES (int, default 16 MiB): Maximum total size of one
             extraction result (Req 2.6).
         MAX_PDF_PAGES (int, default 5000): Maximum PDF page count (Req 2.6).
@@ -51,7 +52,7 @@ class Settings(BaseSettings):
     TIMEOUT_S: int = 55
     MAX_CONCURRENCY: int = 3
     MAX_CHILD_RSS_MB: int = 320
-    MAX_XLSX_CELLS: int = 100_000
+    MAX_XLSX_CELLS: int = 70_000
     MAX_RESULT_BYTES: int = 16 * 1024 * 1024
     MAX_PDF_PAGES: int = 5000
     MAX_ARCHIVE_ENTRIES: int = 10_000

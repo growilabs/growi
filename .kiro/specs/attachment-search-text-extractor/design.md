@@ -534,7 +534,7 @@ def convert_pptx(data: bytes, limits: ConversionLimits) -> list[PageInfo]: ...
 #### XlsxSheetSplitter
 
 - 前提: ArchiveGuard を通り、ZIP で `xl/workbook.xml` があること。満たさなければ OfficeConverter に `xlsx` としてそのまま渡し、1 要素で返す
-- **セル数の事前検査 (2.6)**: anydoc は XLSX を表全体の形でメモリに持つため、1 セルあたり約 1.9KB を使う (10 万セルで 214MB、20 万セルで 404MB)。anydoc に渡す前に、全シートの XML を先頭から順に少しずつ読んで `<c` タグ (セル) の数を数え、合計が `MAX_XLSX_CELLS` (既定 10 万) を超えたら `limit_exceeded` にする。数えるときは XML を解析せず、読み込みの大きさも 1 回あたり一定にするので、メモリはほとんど使わない。この上限を超える大きな XLSX は検索の対象にならない (下流でファイル名だけの文書になる)
+- **セル数の事前検査 (2.6)**: anydoc は XLSX を表全体の形でメモリに持つため、1 セルあたり約 2.5KB を使い、待機中の子 (約 80MB) に加えて 1 シート 10 万行 × 1 列で 328〜357MB、7 万行 × 1 列で約 285MB になる。anydoc に渡す前に、全シートの XML を先頭から順に少しずつ読んで `<c` タグ (セル) の数を数え、合計が `MAX_XLSX_CELLS` (既定 7 万) を超えたら `limit_exceeded` にする。数えるときは XML を解析せず、読み込みの大きさも 1 回あたり一定にするので、メモリはほとんど使わない。この上限を超える大きな XLSX は検索の対象にならない (下流でファイル名だけの文書になる)
 - `xl/workbook.xml` を defusedxml で解析し、各シートの名前を `ZZ<リクエストごとの乱数><連番>ZZ` に置き換え、非表示のシートを表示状態に戻したブックを作って、anydoc を 1 回だけ呼ぶ
 - 出力を `## 目印` の行で切り、目印から元のシート名に戻す (元の名前は XML の文字参照を戻してから使う)
 - `pageNumber` は workbook.xml でのシートの順番 (1 始まり。非表示・空・グラフのシートも数える)、`label` は元のシート名。空のシートは返さないので番号が飛ぶことがある。非表示のシートは含める
@@ -684,7 +684,7 @@ class ConversionError(Exception):    # 変換層の中だけで使い、Conversi
 | `MAX_FILE_SIZE_MB` | 50 | 受け付けるファイルの大きさの上限 | 既存 |
 | `TIMEOUT_S` | 55 | 1 件の変換の時間の上限。apps/app の `timeoutMs` (既定 60000) より 5 秒以上短くする | 既定を 60 から 55 に (実際に止まるようになる) |
 | `MAX_CHILD_RSS_MB` | 320 | 1 件の変換に許す RSS の上限。XLSX 以外の最悪値 (画像の多い 40MB の DOCX / PPTX で 188MB、50MB なら約 225MB の見込み) に余裕を持たせた値 | 新規 |
-| `MAX_XLSX_CELLS` | 100000 | XLSX の全シートのセル数の合計の上限。anydoc で 10 万セルは 214MB で、`MAX_CHILD_RSS_MB` に収まる | 新規 |
+| `MAX_XLSX_CELLS` | 70000 | XLSX の全シートのセル数の合計の上限。anydoc で 1 シート 7 万セルは約 285MB で、`MAX_CHILD_RSS_MB` に収まる (10 万セルは 328〜357MB で収まらない) | 新規 |
 | `MAX_RESULT_BYTES` | 16777216 (16MiB) | 1 件の結果 (全要素の合計) の上限 | 新規。使われていなかった `MAX_EXTRACTED_BYTES` (500MiB) を置き換える |
 | `MAX_PDF_PAGES` | 5000 | PDF のページ数の上限 | 新規 |
 | `MAX_ARCHIVE_ENTRIES` | 10000 | PPTX / XLSX の ZIP のエントリ数の上限 | 新規 |
@@ -695,7 +695,7 @@ Dockerfile で固定する環境変数:
 - `RAYON_NUM_THREADS=1`: anydoc 内部のスレッドプールを 1 本にする。設定しないとコア数ぶんのスレッドが立ち、仮想メモリのピークが 1.2GB に達した
 - `TMPDIR=/tmp`: forkserver は `$TMPDIR` の下に UNIX ソケットを作る。パスは 108 バイト未満でなければならない
 
-**メモリの守り方**: ファイルの大きさで形式ごとに上限を決めるのではなく、子が実際に使ったメモリ (RSS) を `MAX_CHILD_RSS_MB` で止める。入力の大きさとメモリの関係は形式と中身でばらつくため。ただし XLSX だけは、anydoc がセル数に比例してメモリを使い (1 セルあたり約 1.9KB)、小さなファイルでも上限を大きく超えるので、変換の前に `MAX_XLSX_CELLS` でセル数を検査して、上限に当たる前に分かりやすいエラーにする。旧形式の XLS と ODS はセル数を数えずに anydoc に渡し、大きなものは RSS の上限で止まる。
+**メモリの守り方**: ファイルの大きさで形式ごとに上限を決めるのではなく、子が実際に使ったメモリ (RSS) を `MAX_CHILD_RSS_MB` で止める。入力の大きさとメモリの関係は形式と中身でばらつくため。ただし XLSX だけは、anydoc がセル数に比例してメモリを使い (1 セルあたり約 2.5KB)、小さなファイルでも上限を大きく超えるので、変換の前に `MAX_XLSX_CELLS` でセル数を検査して、上限に当たる前に分かりやすいエラーにする。旧形式の XLS と ODS はセル数を数えずに anydoc に渡し、大きなものは RSS の上限で止まる。
 
 **メモリ上限の目安**: コンテナのメモリ上限 ≒ ワーカー数 × 120MB + ワーカー数 × `MAX_CONCURRENCY` × (`MAX_CHILD_RSS_MB` + 100MB + アップロード 50MB + 結果 16MiB × 3)。既定 (ワーカー 1・枠 3・RSS 320MB) で 120 + 3 × 518 ≒ 約 1.7GB。k8s の例では requests 512Mi / limits 2Gi とする。
 
@@ -758,8 +758,8 @@ Dockerfile で固定する環境変数:
 - **異常終了の隔離 (2.7)**: 子の中で `os.abort()` と segfault を起こすと `crashed` になり、同時に動いていた別の変換は成功する。`PanicException` 相当は `internal` になる
 - **ワーカーの消失**: 依頼元のワーカープロセスを強制終了すると、子が一定時間 (例: 2 秒) 以内に終わり、残らない
 - **結果の上限**: 大きな結果が `result_too_large` になる
-- **既定の上限で誤って止めない**: 既定の上限 (RSS 320MB、`RLIMIT_AS` = RSS の上限 + 512MB、`RLIMIT_CPU`) の下で、全形式の代表的なファイル (画像の多い 40MB の DOCX / PPTX、10 万セルの XLSX を含む) が成功する
-- **XLSX のセル数の上限 (2.6)**: 10 万セルを超える XLSX は、anydoc に渡す前に `limit_exceeded` になり、子の RSS が上限に近づかない
+- **既定の上限で誤って止めない**: 既定の上限 (RSS 320MB、`RLIMIT_AS` = RSS の上限 + 512MB、`RLIMIT_CPU`) の下で、全形式の代表的なファイル (画像の多い 40MB の DOCX / PPTX、7 万セルの XLSX を含む) が成功する
+- **XLSX のセル数の上限 (2.6)**: 7 万セルを超える XLSX は、anydoc に渡す前に `limit_exceeded` になり、子の RSS が上限に近づかない
 
 ### Integration / E2E Tests (HTTP)
 
