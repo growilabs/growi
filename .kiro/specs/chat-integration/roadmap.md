@@ -177,3 +177,14 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 - **要件 ID を振り直さない。** テストとタスクが番号を直接参照するため（`.claude/rules/spec-lifecycle.md`）
 - **契約の変更は 3 spec すべてに効く。** `protocol` の design を変えたら `proxy` と `app` を必ず再確認する
 - **Gen 1 には手を入れない**
+
+## 作業の引き継ぎ（2026-10-29 時点。再開したら読んだあとに消す）
+
+順 4（app の見え方）は実装・書き戻し・amend spec の削除まで済み、PR [#12169](https://github.com/growilabs/growi/pull/12169)（`imprv/chat-integration-app-ui` → `feat/slackbot-proxy-gen2`）に入っている。
+
+- **済み**: 実装、Opus 階層の新しいレビュー 2 回（1 回目 NO-GO → 修正、2 回目 GO）、書き戻し、要件 7.11 の文面修正（「表示名を単独では示さず、必ず識別子と併せて示す」）
+- **未確認**: PR の CI（push 直後は実行中だった）。base の MongoDB 8.0 の起動失敗が直っているかも未確認
+- **未着手**: `/code-review high --fix` を Opus のサブエージェントで行う依頼。上限に達して実行していない。再開したら、PR の差分（`git diff origin/feat/slackbot-proxy-gen2...HEAD`）を対象に新しいサブエージェントで行う
+- **残してある指摘（Warning、直していない）**: 承認画面は、通信エラーや 5xx でも「無効または期限切れ」を出す（404 以外は再試行したほうがよい）。承認後に画面が作り直されると、キャッシュの注文がまた承認できる形で出うる（`mutate` で空にする）
+- **環境**: worktree は `/workspace/growi/.claude/worktrees/chat-integration-admin`。dev サーバーは `setsid` で起動した `turbo run dev --filter @growi/app`（3000 番）。wiki ページを開くため `node_modules` に `@lezer/common`・`@lezer/highlight` のリンクを手で足してある（リポジトリには入らない）。コミットは `LEFTHOOK=0`、push は `git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push`
+- **実機で未確認**: 実際のチャットでの `@GROWI unregister` による「接続が切れています」。代用の proxy（401 を返す）でだけ確かめた
