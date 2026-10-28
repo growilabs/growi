@@ -149,6 +149,77 @@ describe('anonymizeUrl', () => {
     });
   });
 
+  // Pinned values equal the pre-change implementation, which hashed the
+  // pathname after the same normalization (requirements 9.2)
+  describe('request targets the URL parser normalizes', () => {
+    const HASHED_B = '/[HASHED:3e23e8160039594a]'; // /b
+    const HASHED_A_B = '/[HASHED:c14cddc033f64b9d]'; // /a/b
+    const HASHED_BAR = '/[HASHED:fcde2b2edba56bf4]'; // /bar
+    const HASHED_SECRET_PAGE = '/[HASHED:26be148f15928561]'; // /secret/page
+    const HASHED_WIKI_PAGE_ONLY = '/[HASHED:2f4a824f8eacbc70]'; // /wiki/page
+
+    it.each`
+      description                                    | url                                       | expected
+      ${'a ".." segment'}                            | ${'/a/../b'}                              | ${HASHED_B}
+      ${'an encoded ".." segment'}                   | ${'/a/%2e%2e/b'}                          | ${HASHED_B}
+      ${'a "." segment'}                             | ${'/a/./b'}                               | ${HASHED_A_B}
+      ${'an encoded "." segment'}                    | ${'/a/%2E/b'}                             | ${HASHED_A_B}
+      ${'a backslash'}                               | ${'/a\\b'}                                | ${HASHED_A_B}
+      ${'a "." segment in a user page'}              | ${'/user/john/./projects'}                | ${'/user/[USERNAME_HASHED:96d9632f363564cc]/[HASHED:2577c0f557b2e4b5]'}
+      ${'a leading "//" (authority)'}                | ${'//foo/bar'}                            | ${HASHED_BAR}
+      ${'a leading "//" with one segment'}           | ${'//foo'}                                | ${'/'}
+      ${'an absolute-form URL'}                      | ${'http://evil.example/secret/page'}      | ${HASHED_SECRET_PAGE}
+      ${'an absolute-form URL with an upper scheme'} | ${'HTTP://evil.example/secret/page'}      | ${HASHED_SECRET_PAGE}
+      ${'an absolute-form URL with a query'}         | ${'http://evil.example/secret/page?q=kw'} | ${`${HASHED_SECRET_PAGE}?q=%5BANONYMIZED%5D`}
+      ${'a raw non-ASCII path'}                      | ${'/Sandbox/日本語'}                      | ${'/[HASHED:4b62814263afc935]'}
+      ${'a raw space'}                               | ${'/a b'}                                 | ${'/[HASHED:c8687a08aa5d6ed2]'}
+      ${'an empty query'}                            | ${'/wiki/page?'}                          | ${HASHED_WIKI_PAGE_ONLY}
+      ${'a fragment'}                                | ${'/wiki/page#frag'}                      | ${HASHED_WIKI_PAGE_ONLY}
+      ${'a query without a path'}                    | ${'?q=kw'}                                | ${'/?q=%5BANONYMIZED%5D'}
+      ${'only "?"'}                                  | ${'?'}                                    | ${'/'}
+      ${'an empty string'}                           | ${''}                                     | ${'/'}
+    `(
+      'anonymizes the normalized value for $description',
+      ({ url, expected }) => {
+        expect(anonymizeUrl(url, rules)).toBe(expected);
+      },
+    );
+
+    it('returns the normalized value even when no rule changes it, so the raw form is never recorded', () => {
+      expect(anonymizeUrl('/_api/v3/../v3/pages?limit=10', rules)).toBe(
+        '/_api/v3/pages?limit=10',
+      );
+    });
+
+    describe('unparsable', () => {
+      afterEach(() => {
+        diag.disable();
+      });
+
+      it.each`
+        description                                    | url
+        ${'the normalized value has no absolute path'} | ${'foo:secret'}
+        ${'the URL cannot be parsed'}                  | ${'http://[secret/page'}
+      `(
+        'returns the fixed failure value without logging the URL when $description',
+        ({ url }) => {
+          const diagLogger = mock<DiagLogger>();
+          diag.setLogger(diagLogger, DiagLogLevel.WARN);
+
+          expect(anonymizeUrl(url, rules)).toBe('/[ANONYMIZATION_FAILED]');
+          expect(diagLogger.warn).toHaveBeenCalled();
+          expect(JSON.stringify(diagLogger.warn.mock.calls)).not.toContain(
+            'secret',
+          );
+        },
+      );
+    });
+
+    it('returns null for a URL that only looks like it needs normalization', () => {
+      expect(anonymizeUrl('/_api/v3/pages?from=/.hidden', rules)).toBeNull();
+    });
+  });
+
   describe('Next.js data URL', () => {
     it('re-applies the rule list to the inner page path and keeps the build ID and locale', () => {
       expect(

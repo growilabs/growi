@@ -105,6 +105,7 @@ apps/app/src/features/opentelemetry/server/anonymization/
 ├── coverage.spec.ts                 # 一覧表の網羅テスト: 全 coverage example を hook に通す／requirements.md と ID を突き合わせる（新規）
 ├── coverage-routes.integ.ts         # ルート照合テスト: example の route が実在するルートか（新規）
 ├── anonymize-http-requests.spec.ts  # Hook の URL 属性反映のテスト（#12151 のものを維持し、handler 前提の部分を整理）（変更）
+├── anonymize-http-requests.instrumentation.spec.ts # hook の出力を計測部品の getIncomingRequestAttributes に通し、記録される属性を確かめる（新規）
 ├── rules/
 │   ├── types.ts                     # PathRule / PathAction / AnonymizationRules / CoverageExample の型（新規）
 │   ├── path-rules.ts                # パスの規則の宣言（順序付き）（新規）
@@ -119,7 +120,9 @@ apps/app/src/features/opentelemetry/server/anonymization/
     ├── anonymize-query-params.ts    # 対象パラメータの値だけを置き換え、ほかの区切りは元のまま残す（変更）
     ├── anonymize-query-params.spec.ts # （変更）
     ├── build-url-attributes.ts      # PR #12151 で導入（変更なし）
-    └── build-url-attributes.spec.ts # PR #12151 で導入（変更なし）
+    ├── build-url-attributes.spec.ts # PR #12151 で導入（変更なし）
+    ├── recorded-target.ts           # 計測部品が記録する `http.target` の値を求める（新規）
+    └── recorded-target.spec.ts      # URL パーサーの結果との一致のテスト（新規）
 
 apps/app/src/test-utils/
 └── express-route-walker.ts          # app._router.stack を辿り (method, 完全なルートの型) を列挙する（新規。tools から移す）
@@ -153,6 +156,7 @@ sequenceDiagram
     participant A as buildUrlAttributes
     I->>H: startIncomingSpanHook(request)
     H->>E: anonymizeUrl(request.url, ANONYMIZATION_RULES)
+    E->>E: 計測部品が記録する値に正規化する（toRecordedTarget）
     E->>E: パスとクエリに分ける
     E->>E: パス: 最初に当てはまった規則を適用
     E->>E: クエリ: 共通パラメータ名を置換
@@ -178,7 +182,7 @@ sequenceDiagram
 | 1.3, 1.4 | `http.url`・`url.path`・`url.query` への反映 | UrlAttributeBuilder（#12151） | `buildUrlAttributes` | System Flows |
 | 1.5 | 当てはまらない URL は書き換えない | AnonymizeUrl | `anonymizeUrl` が null を返す | System Flows |
 | 2.1–2.3 | 一覧表の記載 | AnonymizationCoverageTable（requirements.md）, CoverageExamples | `CoverageExample` | — |
-| 2.4, 2.5 | 一覧表どおりに匿名化する／残す | AnonymizationRules, AnonymizeUrl | `PathRule`, `anonymizeUrl` | — |
+| 2.4, 2.5 | 一覧表どおりに匿名化する／残す | AnonymizationRules, AnonymizeUrl, RecordedTarget | `PathRule`, `anonymizeUrl`, `toRecordedTarget` | — |
 | 3.1, 3.2 | 一覧表の各行のテスト、ずれで失敗 | CoverageSpec | `CoverageExample` | — |
 | 3.3 | 実在しないルートで失敗 | CoverageRoutesSpec, ExpressRouteWalker | `listRegisteredRoutes` | — |
 | 4.1–4.4 | 検索キーワード・タグ名 | SensitiveQueryParams, PathRules（next-data） | `SENSITIVE_QUERY_PARAMS` | — |
@@ -190,20 +194,21 @@ sequenceDiagram
 | 6.6 | パーマリンク・トップ・`/user`・静的ファイル | PathRules（static-files, kept-pages） | `PathAction` | — |
 | 7.1–7.4 | 秘密の値 | PathRules（secret-path-segments, next-data）, SensitiveQueryParams | `PathAction` | — |
 | 8.1, 8.2 | 複数の扱いに当てはまる URL | AnonymizeUrl（パスとクエリの分離） | `anonymizeUrl` | System Flows |
-| 9.1, 9.2 | 置換形式と既存ハッシュ値の維持 | HashPagePath, AnonymizeQueryParams, CoverageExamples（回帰の固定値） | `hashPagePath`, `anonymizeQueryParams` | — |
+| 9.1, 9.2 | 置換形式と既存ハッシュ値の維持 | HashPagePath, AnonymizeQueryParams, RecordedTarget（変更前と同じ正規化）, CoverageExamples（回帰の固定値） | `hashPagePath`, `anonymizeQueryParams`, `toRecordedTarget` | — |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | HttpAnonymizationHook | Adapter | instrumentation-http から呼ばれ、実行関数と URL 属性の組み立てをつなぐ | 1.1, 1.3–1.5 | AnonymizeUrl (P0), UrlAttributeBuilder (P0) | Service |
-| AnonymizeUrl | Executor | 規則を受け取り、URL を匿名化する | 1.1, 1.5, 2.4, 2.5, 8.1, 8.2 | HashPagePath, PathPattern, AnonymizeQueryParams (P0) | Service |
+| AnonymizeUrl | Executor | 規則を受け取り、URL を匿名化する | 1.1, 1.5, 2.4, 2.5, 8.1, 8.2, 9.2 | RecordedTarget, HashPagePath, PathPattern, AnonymizeQueryParams (P0) | Service |
 | AnonymizationRules | Declaration | パスの規則と共通パラメータ名を宣言する | 2.4, 2.5, 4–7 | PathPattern, HashPagePath (P0) | State |
 | CoverageExamples | Declaration | 一覧表の各行を、テストできる例として宣言する | 2.1–2.3, 3.1, 9.2 | — | State |
 | HashPagePath | Utility | ページパスのデコード・判定・ハッシュ化 | 5.3, 6.1–6.3, 9.1, 9.2 | `@growi/core` (P0) | Service |
 | PathPattern | Utility | `:name` 形式の型と URL パスの照合・置換 | 5.2, 7.1, 7.2 | — | Service |
 | AnonymizeQueryParams | Utility | 対象パラメータの値だけを置き換える | 4.1–4.4, 5.1, 6.4, 7.1, 9.1 | — | Service |
 | UrlAttributeBuilder | Utility | 匿名化した値から URL 属性を作る（#12151） | 1.3, 1.4 | — | Service |
+| RecordedTarget | Utility | 計測部品が上書きなしで記録する `http.target` の値を求める | 1.3, 2.4, 9.2 | — | Service |
 | ExpressRouteWalker | Test util | 登録済みのルートを列挙する | 3.3 | Express 4 (P1) | Service |
 | CoverageSpec / CoverageRoutesSpec | Test | 網羅とずれの検出 | 3.1–3.3 | CoverageExamples (P0) | — |
 
@@ -214,10 +219,13 @@ sequenceDiagram
 | Field | Detail |
 |-------|--------|
 | Intent | 規則を受け取り、リクエストの URL（パス＋クエリ）を匿名化する |
-| Requirements | 1.1, 1.5, 2.4, 2.5, 8.1, 8.2 |
+| Requirements | 1.1, 1.5, 2.4, 2.5, 8.1, 8.2, 9.2 |
 
 **Responsibilities & Constraints**
-- URL を最初の `?` でパスとクエリに分ける。`#` 以降はリクエストに含まれないため扱わない。
+- 最初に、URL を計測部品が記録する値（`toRecordedTarget`。WHATWG の URL パーサーで解析した `pathname + search`）にそろえ、以降の規則はその値に通す。計測部品は hook が属性を返さないとき `request.url` を自分で解析して記録するため、規則が見た文字列と記録される文字列が違うと、規則が判定していない値が平文で残る（`/a/../secret` → `/secret`、`//host/secret` → パス `/secret`・`http.url` のホスト `host`、絶対形式 `http://host/secret` → `/secret`、`\` → `/`、空白や非 ASCII 文字のエンコード、末尾の `?` や `#` 以降の除去）。変更前の handler も同じ正規化をしてからハッシュ化していたため、ハッシュ値は変更前と同じになる（要件 9.2）。
+- 正規化で値が変わった URL は、規則で変化しなくても正規化した値を返す。`http.url` を Host ヘッダーから組み立て直し、URL の中のホストを記録させないため。正規化した値が `/` で始まらない（`foo:bar` のような形式）か、解析できない URL は、想定外の例外と同じく `/[ANONYMIZATION_FAILED]` にする。
+- 正規化で値が変わらない URL は元の文字列のまま規則に通す（デコード前の `%2F` を 1 区切りの中に保つ、置き換えないクエリを 1 バイトも変えない）。
+- URL を最初の `?` でパスとクエリに分ける。
 - パスはデコード前とデコード後（`decodePathname`。壊れたエンコードは元のまま）の両方を持つ `RequestPath` として規則に渡す。規則は先頭から順に調べ、最初に当てはまった 1 つだけを適用する。
 - クエリには `AnonymizationRules.sensitiveQueryParams` の置換を適用する。
 - パスとクエリのどちらも変化しなければ `null` を返す。
@@ -234,8 +242,8 @@ export const anonymizeUrl = (
 ): string | null;
 ```
 
-- Preconditions: `url` は `IncomingMessage.url`（`/` で始まるパス＋任意のクエリ）。
-- Postconditions: 戻り値が `null` でなければ、`rules` に従って匿名化された `http.target` の値。想定外の例外時は `'/[ANONYMIZATION_FAILED]'`。
+- Preconditions: `url` は `IncomingMessage.url`（通常は `/` で始まるパス＋任意のクエリ。`//` で始まる形・絶対形式・`.` の区切りなど、URL パーサーが書き換える形も受け取る）。
+- Postconditions: 戻り値が `null` なら、計測部品が記録する値は `url` と同じで、匿名化の必要がない。`null` でなければ、計測部品が記録する値を `rules` に従って匿名化した `http.target` の値。解析できない URL と想定外の例外時は `'/[ANONYMIZATION_FAILED]'`。
 
 #### HttpAnonymizationHook（`anonymize-http-requests.ts`）
 
@@ -335,6 +343,16 @@ export const hashPagePath: (decodedPath: string) => string;
 ```
 
 - `hashPagePath` は既存の `anonymizeUrlPath` の動作を変えずに移す（ユーザーページ・先頭と末尾の `/` の保持・SHA-256 の先頭 16 桁）。
+
+#### RecordedTarget（`utils/recorded-target.ts`）
+
+```typescript
+export const toRecordedTarget: (raw: string) => string; // throws TypeError when unparsable
+```
+
+- 戻り値は `new URL(raw, 'http://localhost')` の `pathname + search`。計測部品は Host ヘッダーを基準に解析するが、パスとクエリの結果は基準によらない。
+- `/` 1 つで始まり、URL パーサーが書き換えない文字（英数字と `-._~!英数字と `-._~!#### PathPattern（`utils/path-pattern.ts`）()*+,;=:@/%?[]`()*+,;=:@/%?[]`）だけでできていて、パスに `/.` か `/%2e` が無く、末尾が `?` でない値は、URL オブジェクトを作らずにそのまま返す。ほとんどのリクエストがこの形で、1 リクエストあたりの増分を小さく保つため。判定は線形時間の正規表現 2 つで行う。これ以外の文字を含む値は URL パーサーに通して比べるので、判定が保守的でも結果は変わらない。
+- テストは 0〜127 の全文字と非 ASCII の例を、いくつかの位置に置いた値で URL パーサーの結果と比べる。
 
 #### PathPattern（`utils/path-pattern.ts`）
 

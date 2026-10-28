@@ -113,6 +113,14 @@
 - **Selected Approach**: 実行関数が想定外の例外を捕まえたときは、`http.target` を固定の `/[ANONYMIZATION_FAILED]` にし、警告を記録する。
 - **Rationale**: best-effort であっても、失敗時に平文を送らない方が要件 2.4 の目的に合う。
 
+### Decision: 規則は計測部品が記録する値に通す
+
+- **Context**: `@opentelemetry/instrumentation-http` は hook が属性を返さないとき、`request.url` を WHATWG の URL パーサー（`new URL(request.url, '<scheme>://<Host>')`）で解析し、`pathname + search` を `http.target` と `url.path`/`url.query` に、`toString()` を `http.url` に記録する（`build/src/utils.js` の `getIncomingRequestAttributes`）。解析は `.`・`..` の区切り（`%2e` を含む）をたたみ、`\` を `/` にし、`//host/...` や `http://host/...` からホストを取り出し、空白や非 ASCII 文字をエンコードし、`#` 以降と空のクエリを捨てる。変更前の page-access handler は同じ解析をしてから判定とハッシュ化をしていた。
+- **Selected Approach**: `anonymizeUrl` は最初に `toRecordedTarget` で記録される値を求め、規則をその値に通す。値が元の文字列と違うときは、規則で変化しなくてもその値を返して上書きする。値が `/` で始まらない、または解析できないときは `/[ANONYMIZATION_FAILED]` にする。
+- **Rationale**: 規則が判定した文字列と記録される文字列が一致しないと、規則が見ていない値が平文で記録される（`/a/../secret` を元の形で判定して当てはまらなければ、計測部品が `/secret` を記録する）。上書きすれば `http.url` が Host ヘッダーから組み立て直され、URL の中のホストも残らない。正規化した値のハッシュは変更前と同じになる（要件 9.2）。
+- **Trade-offs**: 値が変わらない URL は元の文字列のまま規則に通す。デコード前の `%2F` を 1 区切りの中に保ち、置き換えないクエリを変えないため。通常の URL では文字の種類だけを調べて URL オブジェクトを作らない（増分は 1 リクエストあたり 70〜160ns）。
+- **Alternatives considered**: 常に URL オブジェクトで解析する案は、通常の URL でも 1 リクエストあたり約 0.25µs 増えるため採らなかった。hook 側で計測部品の属性をまとめて上書きする案は、何も匿名化しない URL まで上書きすることになり、要件 1.5 に反する。
+
 ### Decision: 一覧表は requirements.md に置き、テストで規則と突き合わせる
 
 - **Selected Approach**: 一覧表（行 ID・URL の例・データの種類と場所・規則・置換後の形）は `requirements.md` の「匿名化対象一覧」に置く。コード側の例（coverage examples）は同じ行 ID を持つ。単体テストが `requirements.md` から行 ID の列だけを読み取り、コードの例と集合として一致するかを確かめる。

@@ -59,6 +59,21 @@ export const COVERAGE_EXAMPLES: readonly CoverageExample[] = [
     expectedTarget: `/${H_SPECIAL}`,
     route: '/*',
   },
+  // The hash of the path after URL normalization, as before the change
+  {
+    id: 'P02',
+    ruleIds: ['page-view'],
+    url: '/wiki/tmp/../project/documentation',
+    expectedTarget: `/${H_WIKI_DOC}`,
+    route: '/*',
+  },
+  {
+    id: 'P02',
+    ruleIds: ['page-view'],
+    url: '//evil.example/wiki/project/documentation',
+    expectedTarget: `/${H_WIKI_DOC}`,
+    route: '/*',
+  },
   {
     id: 'P03',
     ruleIds: ['page-view'],

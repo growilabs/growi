@@ -10,6 +10,7 @@ import type {
 import { anonymizeQueryParams } from './utils/anonymize-query-params';
 import { decodePathname, hashPagePath } from './utils/hash-page-path';
 import { redactPathParams } from './utils/path-pattern';
+import { toRecordedTarget } from './utils/recorded-target';
 
 const logger = diag.createComponentLogger({
   namespace: 'growi:anonymization:anonymize-url',
@@ -129,37 +130,57 @@ const anonymizePath = (
 };
 
 /**
- * Anonymize a request URL (path + optional query) according to `rules`.
  * The path and the query are anonymized independently, so neither result
  * can undo the other.
- * @returns The anonymized `http.target`, or null when nothing changed
+ * @returns The anonymized target, or null when nothing changed
+ */
+const anonymizeTarget = (
+  target: string,
+  rules: AnonymizationRules,
+): string | null => {
+  const queryStart = target.indexOf('?');
+  const rawPath = queryStart === -1 ? target : target.slice(0, queryStart);
+  const search = queryStart === -1 ? null : target.slice(queryStart + 1);
+
+  const anonymizedPath = anonymizePath(
+    toRequestPath(rawPath),
+    rules.pathRules,
+    true,
+  );
+  const anonymizedSearch =
+    search == null
+      ? null
+      : anonymizeQueryParams(search, rules.sensitiveQueryParams);
+
+  const searchChanged = search != null && anonymizedSearch !== search;
+  if (anonymizedPath == null && !searchChanged) {
+    return null;
+  }
+
+  const query = anonymizedSearch == null ? '' : `?${anonymizedSearch}`;
+  return `${anonymizedPath ?? rawPath}${query}`;
+};
+
+/**
+ * Anonymize a request URL (path + optional query) according to `rules`.
+ * The rules judge the value the HTTP instrumentation would record, not the
+ * raw URL, so that its own URL normalization cannot record what they never
+ * saw (see design.md AnonymizeUrl).
+ * @returns The `http.target` to record, or null when the instrumentation's
+ * own value can be recorded as-is
  */
 export const anonymizeUrl = (
   url: string,
   rules: AnonymizationRules,
 ): string | null => {
   try {
-    const queryStart = url.indexOf('?');
-    const rawPath = queryStart === -1 ? url : url.slice(0, queryStart);
-    const search = queryStart === -1 ? null : url.slice(queryStart + 1);
-
-    const anonymizedPath = anonymizePath(
-      toRequestPath(rawPath),
-      rules.pathRules,
-      true,
-    );
-    const anonymizedSearch =
-      search == null
-        ? null
-        : anonymizeQueryParams(search, rules.sensitiveQueryParams);
-
-    const searchChanged = search != null && anonymizedSearch !== search;
-    if (anonymizedPath == null && !searchChanged) {
-      return null;
+    const target = toRecordedTarget(url);
+    if (!target.startsWith('/')) {
+      throw new Error('The request URL has no absolute path');
     }
-
-    const query = anonymizedSearch == null ? '' : `?${anonymizedSearch}`;
-    return `${anonymizedPath ?? rawPath}${query}`;
+    const anonymized = anonymizeTarget(target, rules);
+    // A normalized target is returned even when unchanged (see design.md AnonymizeUrl)
+    return anonymized ?? (target === url ? null : target);
   } catch (error) {
     // The URL is not logged because it may carry the very data being anonymized
     logger.warn(`Failed to anonymize the request URL: ${error}`);
