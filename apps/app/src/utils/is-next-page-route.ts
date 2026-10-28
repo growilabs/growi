@@ -36,13 +36,23 @@ const UNSAFE_PATH_PATTERNS: readonly RegExp[] = [
   /^\/-\/.*/,
   /^\/?https?:\/\/.+$/,
   /\/{2,}/,
-  /\s+\/\s+/,
+  /\s\/\s/,
   /\\/,
   /^(\.\.)$/,
   /(\/\.\.)\/?/,
   /\/edit$/,
-  /^(\/.+){130,}$/,
 ];
+
+// Counted rather than matched: a pattern like /^(\/.+){130,}$/ backtracks
+// exponentially in the number of slashes.
+const MAX_PAGE_DEPTH = 129;
+const exceedsMaxPageDepth = (pathname: string): boolean => {
+  return (
+    pathname.startsWith('/') &&
+    pathname.split('/').filter((segment) => segment !== '').length >
+      MAX_PAGE_DEPTH
+  );
+};
 
 const NON_NEXT_PAGE_PATTERNS: readonly RegExp[] = [
   ...EXPRESS_EXCLUSIVE_PATH_PATTERNS,
@@ -57,5 +67,8 @@ const NON_NEXT_PAGE_PATTERNS: readonly RegExp[] = [
  * to a full page load.
  */
 export const isNextPageRoute = (pathname: string): boolean => {
-  return !NON_NEXT_PAGE_PATTERNS.some((pattern) => pattern.test(pathname));
+  return (
+    !NON_NEXT_PAGE_PATTERNS.some((pattern) => pattern.test(pathname)) &&
+    !exceedsMaxPageDepth(pathname)
+  );
 };
