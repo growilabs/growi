@@ -184,7 +184,10 @@ export default defineWorkspace([
       name: 'app-components',
       environment: 'happy-dom',
       include: ['**/*.spec.{tsx,jsx}'],
-      setupFiles: ['./test/setup/jest-dom.ts'],
+      setupFiles: [
+        './test/setup/jest-dom.ts',
+        './test/setup/async-selectionchange.ts',
+      ],
     },
   }),
 ]);

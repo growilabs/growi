@@ -14,7 +14,10 @@ import {
   type RespondOptions,
   ResponseMode,
 } from '~/server/interfaces/attachment';
-import type { IAttachmentDocument } from '~/server/models/attachment';
+import type {
+  AttachmentDraft,
+  AttachmentWithComputed,
+} from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../config-manager';
@@ -58,7 +61,7 @@ class LocalFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
+  override async deleteFile(attachment: AttachmentWithComputed): Promise<void> {
     const filePath = this.getFilePathOnStorage(attachment);
     return this.deleteFileByFilePath(filePath);
   }
@@ -67,7 +70,7 @@ class LocalFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override async deleteFiles(
-    attachments: IAttachmentDocument[],
+    attachments: AttachmentWithComputed[],
   ): Promise<void> {
     await Promise.all(
       attachments.map((attachment) => {
@@ -90,7 +93,7 @@ class LocalFileUploader extends AbstractFileUploader {
     return fs.unlinkSync(filePath);
   }
 
-  getFilePathOnStorage(_attachment: IAttachmentDocument): string {
+  getFilePathOnStorage(_attachment: AttachmentDraft): string {
     throw new Error('Method not implemented.');
   }
 
@@ -108,7 +111,7 @@ class LocalFileUploader extends AbstractFileUploader {
    */
   override async uploadAttachment(
     readable: Readable,
-    attachment: IAttachmentDocument,
+    attachment: AttachmentDraft,
   ): Promise<void> {
     throw new Error('Method not implemented.');
   }
@@ -118,7 +121,7 @@ class LocalFileUploader extends AbstractFileUploader {
    */
   override respond(
     res: Response,
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
     opts?: RespondOptions,
   ): void {
     throw new Error('Method not implemented.');
@@ -128,7 +131,7 @@ class LocalFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override findDeliveryFile(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
   ): Promise<NodeJS.ReadableStream> {
     throw new Error('Method not implemented.');
   }
@@ -137,7 +140,7 @@ class LocalFileUploader extends AbstractFileUploader {
    * @inheritDoc
    */
   override async generateTemporaryUrl(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
     opts?: RespondOptions,
   ): Promise<TemporaryUrl> {
     throw new Error(
@@ -151,9 +154,9 @@ export const setup = (crowi: Crowi) => {
 
   const basePath = path.posix.join(crowi.publicDir, 'uploads');
 
-  lib.getFilePathOnStorage = (attachment: IAttachmentDocument) => {
+  lib.getFilePathOnStorage = (attachment: AttachmentDraft) => {
     const dirName =
-      attachment.page != null
+      attachment.pageId != null
         ? FilePathOnStoragePrefix.attachment
         : FilePathOnStoragePrefix.user;
 

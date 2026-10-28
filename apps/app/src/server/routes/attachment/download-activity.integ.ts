@@ -60,7 +60,6 @@ import {
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type Crowi from '~/server/crowi';
 import { AttachmentType } from '~/server/interfaces/attachment';
-import { Attachment } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -121,7 +120,7 @@ describe('GET /download/:id — activity recorded with attachment snapshot (read
   // for the authenticated case, left undefined for the guest case.
   let injectedUser: IUserHasId | undefined;
 
-  const createdAttachmentIds: Types.ObjectId[] = [];
+  const createdAttachmentIds: string[] = [];
 
   /**
    * Creates a real Attachment doc under the shared test page AND uploads
@@ -136,17 +135,19 @@ describe('GET /download/:id — activity recorded with attachment snapshot (read
     content: string;
   }) {
     const fileSize = Buffer.byteLength(overrides.content);
-    const attachment = await Attachment.create({
-      page: pageId,
-      creator: testUserId,
-      // fileName is globally unique — suffix with a fresh ObjectId
-      fileName: `attachment-download-activity-integ-${new Types.ObjectId().toHexString()}.dat`,
-      fileFormat: 'text/plain',
-      fileSize,
-      originalName: overrides.originalName,
-      attachmentType: AttachmentType.WIKI_PAGE,
+    const attachment = await prisma.attachments.create({
+      data: {
+        pageId: pageId.toString(),
+        creatorId: testUserId.toString(),
+        // fileName is globally unique — suffix with a fresh ObjectId
+        fileName: `attachment-download-activity-integ-${new Types.ObjectId().toHexString()}.dat`,
+        fileFormat: 'text/plain',
+        fileSize,
+        originalName: overrides.originalName,
+        attachmentType: AttachmentType.WIKI_PAGE,
+      },
     });
-    createdAttachmentIds.push(attachment._id);
+    createdAttachmentIds.push(attachment.id);
     await crowi.fileUploadService.uploadAttachment(
       Readable.from(Buffer.from(overrides.content)),
       attachment,

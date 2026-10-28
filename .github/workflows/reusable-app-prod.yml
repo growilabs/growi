@@ -81,7 +81,7 @@ jobs:
         # new runtime hook there can't silently go missing from the tarball
         # the way env-preload.mjs did before. The rest of bin/ is build-time
         # only and is intentionally excluded.
-        tar -zcf production.tar.gz --exclude ./apps/app/.next/cache \
+        tar -I 'zstd -T0' -cf production.tar.zst --exclude ./apps/app/.next/cache \
           package.json \
           node_modules \
           tsconfig.base.json \
@@ -98,13 +98,15 @@ jobs:
           apps/app/next.config.js \
           apps/app/package.json \
           apps/app/tsconfig.json
-        echo "file=production.tar.gz" >> $GITHUB_OUTPUT
+        echo "file=production.tar.zst" >> $GITHUB_OUTPUT
 
     - name: Upload production files as artifact
       uses: actions/upload-artifact@v4
       with:
         name: Production Files (node${{ inputs.node-version }})
         path: ${{ steps.archive-prod-files.outputs.file }}
+        # Already zstd-compressed; compressing again only adds time.
+        compression-level: 0
 
     - name: Upload report as artifact
       uses: actions/upload-artifact@v4
@@ -156,10 +158,12 @@ jobs:
     - uses: pnpm/action-setup@v6
 
     - name: Start MongoDB (replica set)
-      uses: supercharge/mongodb-github-action@1.12.1
+      uses: supercharge/mongodb-github-action@89d1ecb837145f486898e235478a7e267f68c44e # unreleased main (adds mongodb-extra-env)
       with:
         mongodb-version: ${{ matrix.mongodb-version }}
         mongodb-replica-set: rs0
+        mongodb-extra-env: |
+          GLIBC_TUNABLES=glibc.pthread.rseq=1
 
     - name: Start Elasticsearch with plugins
       uses: elastic/elastic-github-actions/elasticsearch@master
@@ -293,13 +297,15 @@ jobs:
     # that wasn't in the restored cache. With a primed cache, this only runs apt.
     - name: Install Playwright system deps and any missing browsers
       run: |
-        pnpm playwright install --with-deps
+        pnpm playwright install --with-deps ${{ matrix.browser }}
 
     - name: Start MongoDB (replica set)
-      uses: supercharge/mongodb-github-action@1.12.1
+      uses: supercharge/mongodb-github-action@89d1ecb837145f486898e235478a7e267f68c44e # unreleased main (adds mongodb-extra-env)
       with:
         mongodb-version: ${{ matrix.mongodb-version }}
         mongodb-replica-set: rs0
+        mongodb-extra-env: |
+          GLIBC_TUNABLES=glibc.pthread.rseq=1
 
     - name: Start Elasticsearch with plugins
       uses: elastic/elastic-github-actions/elasticsearch@master

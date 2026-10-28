@@ -1,4 +1,8 @@
 export {
+  STATIC_EXTENDED_COMMANDS,
+  useExtendedElementCommands,
+} from './extended-elements/index.js';
+export {
   codeBlockInsertion,
   lineMarkerInsertion,
   tableInsertion,

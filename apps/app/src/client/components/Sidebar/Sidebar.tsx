@@ -30,13 +30,15 @@ import {
 } from '~/states/ui/sidebar';
 
 import { DrawerToggler } from '../Common/DrawerToggler';
+import type { ResizableAreaProps } from '../Common/ResizableArea';
+// Imported directly, not via the barrel, so ResizableArea itself stays in the
+// dynamically loaded chunk below
+import { ResizableAreaFallback } from '../Common/ResizableArea/ResizableAreaFallback';
 import {
   AppTitleOnEditorSidebarHead,
   AppTitleOnSidebarHead,
   AppTitleOnSubnavigation,
 } from './AppTitle/AppTitle';
-import type { ResizableAreaProps } from './ResizableArea/props';
-import { ResizableAreaFallback } from './ResizableArea/ResizableAreaFallback';
 import { SidebarHead } from './SidebarHead';
 import { SidebarNav, type SidebarNavProps } from './SidebarNav';
 
@@ -47,15 +49,18 @@ const SidebarContents = dynamic(
   { ssr: false },
 );
 const ResizableArea = withLoadingProps<ResizableAreaProps>((useLoadingProps) =>
-  dynamic(() => import('./ResizableArea').then((mod) => mod.ResizableArea), {
-    ssr: false,
-    loading: () => {
-      const { children, ...rest } = useLoadingProps();
-      return (
-        <ResizableAreaFallback {...rest}>{children}</ResizableAreaFallback>
-      );
+  dynamic(
+    () => import('../Common/ResizableArea').then((mod) => mod.ResizableArea),
+    {
+      ssr: false,
+      loading: () => {
+        const { children, ...rest } = useLoadingProps();
+        return (
+          <ResizableAreaFallback {...rest}>{children}</ResizableAreaFallback>
+        );
+      },
     },
-  }),
+  ),
 );
 
 const resizableAreaMinWidth = 348;
