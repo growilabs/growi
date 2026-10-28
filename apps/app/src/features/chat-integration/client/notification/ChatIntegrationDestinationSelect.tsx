@@ -20,9 +20,8 @@
 //     2 works whether Gen 1 is configured or not (Requirements 12.1-12.3).
 //
 // The control is a one-line toggle button plus a checkbox menu (the same
-// shape as `GrantSelector`), so its height does not depend on how many
-// channels exist. A multi-select `<select>` grows with its options and
-// pushes the whole save bar taller.
+// shape as `GrantSelector`); why, and the reactstrap behaviour the keyboard
+// handling below works around, are in chat-integration-app/research.md.
 //
 // Renders nothing at all when no channel is available -- an instance with
 // no Gen 2 workspace paired sees no change to the save controls.
@@ -69,35 +68,25 @@ const fetchChannels = async (): Promise<SaveTimeChannelsView> => {
   return res.data;
 };
 
+interface ChannelGroup {
+  readonly relationId: string;
+  readonly workspaceName: string;
+  readonly channels: readonly SaveTimeChannelOption[];
+}
+
 /** Channels grouped per workspace, keeping the fetched order. */
 const groupByRelation = (
   channels: readonly SaveTimeChannelOption[],
-): ReadonlyArray<{
-  relationId: string;
-  workspaceName: string;
-  channels: SaveTimeChannelOption[];
-}> => {
-  const groups = new Map<
-    string,
-    {
-      relationId: string;
-      workspaceName: string;
-      channels: SaveTimeChannelOption[];
-    }
-  >();
-  for (const channel of channels) {
-    const group = groups.get(channel.relationId);
-    if (group == null) {
-      groups.set(channel.relationId, {
-        relationId: channel.relationId,
-        workspaceName: channel.workspaceName,
-        channels: [channel],
-      });
-    } else {
-      group.channels.push(channel);
-    }
-  }
-  return [...groups.values()];
+): readonly ChannelGroup[] => {
+  const relationIds = [...new Set(channels.map((c) => c.relationId))];
+  return relationIds.map((relationId) => {
+    const members = channels.filter((c) => c.relationId === relationId);
+    return {
+      relationId,
+      workspaceName: members[0].workspaceName,
+      channels: members,
+    };
+  });
 };
 
 const focusOnMount = (element: HTMLInputElement | null): void => {
@@ -230,7 +219,7 @@ export const ChatIntegrationDestinationSelect = ({
           )}
         </DropdownToggle>
         <DropdownMenu
-          container={openInModal ? '' : 'body'}
+          container={openInModal ? undefined : 'body'}
           // The content is a list of checkboxes, not menu items.
           role="dialog"
           aria-label={t('chat_integration.destination_select.aria_label')}

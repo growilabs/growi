@@ -1174,6 +1174,8 @@
       "taken_by_another_user": "此聊天账号已关联到其他 GROWI 用户。",
       "invalid_or_expired": "此链接无效、已被使用或已过期。",
       "loading": "加载中…",
+      "load_failed": "无法加载此链接。请检查网络连接后刷新页面。",
+      "approve_failed": "无法批准。请检查网络连接后重试。",
       "name_label": "名称",
       "user_label": "用户",
       "service_label": "服务",

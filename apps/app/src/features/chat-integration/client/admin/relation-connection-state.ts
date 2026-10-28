@@ -1,3 +1,5 @@
+import { isErrorV3 } from '@growi/core/dist/models';
+
 import type { AdminRelationListItem } from './types';
 
 export type RelationBadge = 'unpaired' | 'active' | 'connection-lost';
@@ -13,12 +15,7 @@ export const isConnectionRejected = (error: unknown): boolean => {
     return false;
   }
   const first: unknown = error[0];
-  return (
-    typeof first === 'object' &&
-    first != null &&
-    'code' in first &&
-    first.code === 'rejected'
-  );
+  return isErrorV3(first) && first.code === 'rejected';
 };
 
 /**

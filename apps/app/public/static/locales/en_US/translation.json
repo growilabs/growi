@@ -1227,6 +1227,8 @@
       "taken_by_another_user": "This chat account is already linked to a different GROWI user.",
       "invalid_or_expired": "This link is invalid, already used, or has expired.",
       "loading": "Loading…",
+      "load_failed": "Could not load this link. Check your connection and reload the page.",
+      "approve_failed": "Could not approve. Check your connection and try again.",
       "name_label": "Name",
       "user_label": "User",
       "service_label": "Service",

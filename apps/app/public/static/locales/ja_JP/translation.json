@@ -1211,6 +1211,8 @@
       "taken_by_another_user": "このチャットのアカウントは、すでに別の GROWI ユーザーに紐付いています。",
       "invalid_or_expired": "このリンクは無効か、使用済みか、有効期限が切れています。",
       "loading": "読み込み中…",
+      "load_failed": "リンクの内容を読み込めませんでした。接続を確かめて、ページを再読み込みしてください。",
+      "approve_failed": "承認できませんでした。接続を確かめて、もう一度お試しください。",
       "name_label": "名前",
       "user_label": "ユーザー",
       "service_label": "サービス",

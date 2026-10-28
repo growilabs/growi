@@ -11,7 +11,7 @@ import {
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { SWRConfig } from 'swr';
+import { type Cache, SWRConfig } from 'swr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -54,15 +54,20 @@ const DISPLAY = {
   expiresAt: '2030-01-01T00:00:00.000Z',
 };
 
+// What `apiv3` throws for the 404 both endpoints answer for a dead token.
+const INVALID_OR_EXPIRED = [
+  { code: 'invalid-or-expired', message: 'invalid or expired' },
+];
+
 // A fresh SWR cache per render -- otherwise a later test's fetch for the
 // same token/key resolves instantly from the previous test's cached data
 // instead of calling `apiv3Get` again (SWR's default cache is a module-level
 // singleton shared across every render in the process).
-const renderApproval = () =>
+const renderApproval = (cache: Cache = new Map()) =>
   render(
     <SWRConfig
       value={{
-        provider: () => new Map(),
+        provider: () => cache,
         dedupingInterval: 0,
         focusThrottleInterval: 0,
       }}
@@ -165,7 +170,9 @@ describe('AccountLinkApproval', () => {
 
   it("shows the 'taken by another user' outcome when the API refuses with that code", async () => {
     mocks.apiv3Get.mockResolvedValue({ data: DISPLAY });
-    mocks.apiv3Post.mockRejectedValue([{ code: 'taken-by-another-user' }]);
+    mocks.apiv3Post.mockRejectedValue([
+      { code: 'taken-by-another-user', message: 'taken' },
+    ]);
     const user = userEvent.setup();
 
     renderApproval();
@@ -186,7 +193,7 @@ describe('AccountLinkApproval', () => {
   });
 
   it('shows an invalid/expired message when the order cannot be found', async () => {
-    mocks.apiv3Get.mockRejectedValue(new Error('404'));
+    mocks.apiv3Get.mockRejectedValue(INVALID_OR_EXPIRED);
 
     renderApproval();
 
@@ -195,6 +202,77 @@ describe('AccountLinkApproval', () => {
         'chat_integration.account_link.invalid_or_expired',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('shows a load failure, not invalid/expired, when the order request fails for another reason', async () => {
+    // A network failure reaches the client as an empty error list.
+    mocks.apiv3Get.mockRejectedValue([]);
+
+    renderApproval();
+
+    expect(
+      await screen.findByText('chat_integration.account_link.load_failed'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('chat_integration.account_link.invalid_or_expired'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the approval available and shows an error when approving fails for another reason', async () => {
+    mocks.apiv3Get.mockResolvedValue({ data: DISPLAY });
+    mocks.apiv3Post.mockRejectedValue([]);
+    const user = userEvent.setup();
+
+    renderApproval();
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'chat_integration.account_link.approve',
+      }),
+    );
+
+    expect(
+      await screen.findByText('chat_integration.account_link.approve_failed'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('chat_integration.account_link.invalid_or_expired'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'chat_integration.account_link.approve',
+      }),
+    ).toBeEnabled();
+  });
+
+  it('does not offer an already-approved order again when the screen is shown anew', async () => {
+    const cache: Cache = new Map();
+    mocks.apiv3Get.mockResolvedValueOnce({ data: DISPLAY });
+    mocks.apiv3Post.mockResolvedValue({ data: { status: 'linked' } });
+    const user = userEvent.setup();
+
+    const first = renderApproval(cache);
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'chat_integration.account_link.approve',
+      }),
+    );
+    await screen.findByText('chat_integration.account_link.linked');
+    first.unmount();
+
+    // The approval revoked the order. The refetch never answers here, so
+    // what the screen shows comes from the cache alone.
+    mocks.apiv3Get.mockReturnValue(new Promise(() => {}));
+    renderApproval(cache);
+
+    expect(
+      await screen.findByText(
+        'chat_integration.account_link.invalid_or_expired',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: 'chat_integration.account_link.approve',
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps showing the success screen when the window regains focus after approval', async () => {
@@ -211,7 +289,7 @@ describe('AccountLinkApproval', () => {
     await screen.findByText('chat_integration.account_link.linked');
 
     // The order is revoked by the approval, so any refetch would fail.
-    mocks.apiv3Get.mockRejectedValue(new Error('404'));
+    mocks.apiv3Get.mockRejectedValue(INVALID_OR_EXPIRED);
     await act(async () => {
       fireEvent.focus(window);
     });

@@ -40,6 +40,22 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
+ * The one 404 both endpoints answer for a token that is not live. It carries
+ * a code so the screen can tell it apart from a network or server failure,
+ * which it must not report as a dead link; the code is the same for every
+ * reason, so it says nothing more than the status does.
+ */
+const answerInvalidOrExpired = (res: ApiV3Response): void => {
+  res.apiv3Err(
+    new ErrorV3(
+      'This link is invalid, already used, or has expired.',
+      'invalid-or-expired',
+    ),
+    404,
+  );
+};
+
+/**
  * `GET /:token` -- display data for the approval screen. Answers a uniform
  * 404 whenever the token does not resolve to a live order, regardless of
  * WHY (does not exist / already used / expired) -- see
@@ -54,7 +70,7 @@ const getOrderHandler = async (
 
   const result = await getAccountLinkOrderForApproval(token, user);
   if (result.status === 'not-found') {
-    res.status(404).end();
+    answerInvalidOrExpired(res);
     return;
   }
 
@@ -83,7 +99,7 @@ const approveOrderHandler = async (
       res.apiv3({ status: 'linked' });
       return;
     case 'invalid-or-expired':
-      res.status(404).end();
+      answerInvalidOrExpired(res);
       return;
     case 'taken-by-another-user':
       res.apiv3Err(

@@ -1175,6 +1175,8 @@
       "taken_by_another_user": "Ce compte de chat est déjà associé à un autre utilisateur GROWI.",
       "invalid_or_expired": "Ce lien est invalide, déjà utilisé ou expiré.",
       "loading": "Chargement…",
+      "load_failed": "Impossible de charger ce lien. Vérifiez votre connexion et rechargez la page.",
+      "approve_failed": "Impossible d’approuver. Vérifiez votre connexion et réessayez.",
       "name_label": "Nom",
       "user_label": "Utilisateur",
       "service_label": "Service",

@@ -1154,6 +1154,8 @@
       "taken_by_another_user": "이 채팅 계정은 이미 다른 GROWI 사용자에게 연결되어 있습니다.",
       "invalid_or_expired": "이 링크는 유효하지 않거나 이미 사용되었거나 만료되었습니다.",
       "loading": "불러오는 중…",
+      "load_failed": "이 링크를 불러올 수 없습니다. 연결을 확인한 뒤 페이지를 새로 고치세요.",
+      "approve_failed": "승인하지 못했습니다. 연결을 확인한 뒤 다시 시도하세요.",
       "name_label": "이름",
       "user_label": "사용자",
       "service_label": "서비스",

@@ -151,6 +151,7 @@ describe('account-link-router', () => {
       const response = await request(app).get(`${MOUNT_PATH}/no-such-token`);
 
       expect(response.status).toBe(404);
+      expect(response.body.errors[0].code).toBe('invalid-or-expired');
     });
 
     it('returns the display data for a live order when logged in', async () => {
@@ -204,6 +205,7 @@ describe('account-link-router', () => {
       );
 
       expect(second.status).toBe(404);
+      expect(second.body.errors[0].code).toBe('invalid-or-expired');
     });
 
     it("answers 409 'taken-by-another-user' when the chat account is already linked to someone else", async () => {

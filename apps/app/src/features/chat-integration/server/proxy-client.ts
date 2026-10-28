@@ -30,7 +30,8 @@
 //    `apps/chat-integration-proxy/src/routes/notification-routes.ts`), and
 //    `@growi/chat` declares no wire type for "settings push acknowledged" --
 //    there is nothing to check beyond the success status itself, which
-//    `callSignedOp` already turns into `http-error` when it is missing.
+//    `sendSigned` already turns into a failure (`rejected` for a 401,
+//    `http-error` for any other non-2xx) when it is missing.
 //
 // Retrying is the caller's decision (task 8.2's `NotificationDispatcher`,
 // among others): calling the same function again re-signs from scratch --
