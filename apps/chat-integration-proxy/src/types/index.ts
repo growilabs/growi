@@ -80,6 +80,7 @@ export type {
   SdkChannelRef,
   SdkMessageRef,
   TeamsGraphChannelId,
+  UnlistedScope,
 } from './channel.js';
 export type { ClosedNetworkConfig } from './closed-network-config.js';
 export type { DistributedLock } from './distributed-lock.js';
@@ -96,7 +97,9 @@ export type {
   ReactionOutcome,
 } from './outbound-message.js';
 export type {
+  EventInstallation,
   InstallationCredentials,
+  InstallationPlace,
   PlatformAppConfig,
   PlatformEvent,
   PlatformEventSink,

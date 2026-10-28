@@ -1116,6 +1116,41 @@ describe('where a private reply says it came from', () => {
     expect(harness.privateOrigins()[0]?.installationId).toBeNull();
   });
 
+  it('says the workspace is not registered for a place in no known installation', async () => {
+    vi.mocked(harness.resolveInstallationId).mockResolvedValue(null);
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search, 'foo'));
+
+    expect(harness.ephemeralMessages()).toEqual([
+      expect.objectContaining({
+        markdown: expect.stringContaining('まだ登録されていません'),
+      }),
+    ]);
+  });
+
+  it('asks for a workspace channel, not for registration, in a DM that belongs to no workspace', async () => {
+    vi.mocked(harness.resolveInstallationId).mockResolvedValue(null);
+
+    await harness.flow.startCommand({
+      ...invocationOf(COMMAND_NAMES.search, 'foo'),
+      installation: { kind: 'no-workspace' },
+    });
+
+    const said = harness.ephemeralMessages();
+    expect(said).toHaveLength(1);
+    expect(said[0]).toEqual(
+      expect.objectContaining({
+        markdown: expect.stringContaining('workspace のチャンネル'),
+      }),
+    );
+    expect(said[0]).not.toEqual(
+      expect.objectContaining({
+        markdown: expect.stringContaining('登録されていません'),
+      }),
+    );
+    expect(harness.selector.select).not.toHaveBeenCalled();
+  });
+
   it('leaves the installation unknown for a word it does not know', async () => {
     await harness.flow.startCommand(invocationOf('frobnicate'));
 
@@ -1135,6 +1170,24 @@ describe('where a private reply says it came from', () => {
     });
 
     expect(harness.privateOrigins()[0]?.sourceMessageId).toBe('M7');
+  });
+
+  it('speaks as the installation the event named when telling an input expired', async () => {
+    await harness.flow.reportExpired({
+      kind: 'mention',
+      platform: PLATFORM,
+      channel,
+      actor,
+      text: '/memo',
+      inDirectMessage: true,
+      messageId: 'M0001',
+      interaction: null,
+      installation: { kind: 'identified', installationId: 'inst-dm' },
+    });
+
+    expect(harness.privateOrigins()).toEqual([
+      expect.objectContaining({ installationId: 'inst-dm' }),
+    ]);
   });
 
   it('labels an expired input as the continuation of an input, on the message that carried it', async () => {

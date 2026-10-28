@@ -61,10 +61,10 @@ import {
 import type { RoutesAppDeps, SignatureGuardDeps } from '../routes/index.js';
 import type {
   AdminActorRoles,
+  InstallationPlace,
   Invocation,
   PlatformEvent,
   PlatformEventSink,
-  SdkChannelRef,
 } from '../types/index.js';
 import type { ProxyConfig } from './config.js';
 import { describePlace } from './describe-place.js';
@@ -250,6 +250,12 @@ export const createProxyDependencies = async (
         channels,
         installations,
         now: () => new Date(),
+        onPartialListing: (unlisted) =>
+          reporters.reportOperationalFailure(
+            `the channel inventory of installation ${installationId} left out ${unlisted
+              .map((entry) => `${entry.scope} (${entry.reason})`)
+              .join(', ')}; the channels saved for them are kept`,
+          ),
       },
       installationId,
     );
@@ -286,14 +292,19 @@ export const createProxyDependencies = async (
   });
 
   /**
-   * The gap `CommandFlowDeps` and `AdminFlowDeps` both leave open, filled once
-   * and handed to both ("the same gap, filled once"). An `SdkChannelRef`
-   * names the service and the channel but no installation, so the saved
-   * channel inventory is what turns one into the other.
+   * The rule `CommandFlowDeps` and `AdminFlowDeps` both take, written once.
+   * What the event named wins: the inventory lists neither DMs nor channels
+   * the bot reached uninvited. Only an event that named nothing falls back to
+   * the inventory, which maps a channel to the installation that listed it.
    */
-  const resolveInstallationId = async (
-    channel: SdkChannelRef,
-  ): Promise<string | null> => {
+  const resolveInstallationId = async ({
+    channel,
+    installation,
+  }: InstallationPlace): Promise<string | null> => {
+    if (installation?.kind === 'identified') {
+      return installation.installationId;
+    }
+    if (installation?.kind === 'no-workspace') return null;
     const candidates = await installations.listByPlatform(channel.platform);
     const channelId = inventoryChannelIdOfEvent(channel);
     for (const candidate of candidates) {
@@ -308,7 +319,7 @@ export const createProxyDependencies = async (
     platform: facade,
     describePlace: (channel) =>
       describePlace({ installations, channels }, channel),
-    resolveInstallationId,
+    resolveInstallationId: (channel) => resolveInstallationId({ channel }),
     ...(timingTrace == null ? {} : { traceTiming: timingTrace.traceTiming }),
     reportUndeliverable: (fact) =>
       reporters.reportOperationalFailure(
@@ -335,7 +346,7 @@ export const createProxyDependencies = async (
   const observeActorRoles = async (
     invocation: Invocation,
   ): Promise<AdminActorRoles | null> => {
-    const installationId = await resolveInstallationId(invocation.channel);
+    const installationId = await resolveInstallationId(invocation);
     if (installationId == null) return null;
     return await facade.observeActorRoles(
       installationId,

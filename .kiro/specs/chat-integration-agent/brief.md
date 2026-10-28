@@ -91,7 +91,7 @@
 
 - **Upstream**:
   - proxy の `PrivateReplier`（本人にだけ届ける部品。実装済み。`chat-integration-proxy` の design.md「PrivateReplier — 本人宛ての返事の届け方」）。`agent` はその上に、イベントの処理の外からあとで届ける部分と、スレッドの中で本人にだけ見せるためのスレッドの根元を足す
-  - DM やチャンネル一覧にまだ無い場所でのコマンドで installation を特定できない不具合の修正（spec 無しで直す。AI アプリの画面は中身が DM なので、この修正が前提）
+  - DM やチャンネル一覧にまだ無い場所での installation の特定（直した。`chat-integration-proxy` の research.md の決定 P16。AI アプリの画面は中身が DM なので、これが前提）。イベントが名指しする workspace で決めるので、Slack・Mattermost の DM は installation に決まる。Discord の DM はどの workspace にも属さないので決まらない。DM での扱い（Discord の DM と、権限が「すべてのチャンネル」の関係に DM を含めるか）は、この spec の要件 11 で決める
   - GROWI の AI Agent（`features/mastra`、実装済み）と、利用者ごとの会話の記録
 - **Downstream**:
   - 通知の「書き込んだ直後に送る」と、それと同時にやる定期処理の間隔の延長（umbrella の roadmap「リリース前に直すもの」の 6 と 7）は、この spec で作る「あとから送る口」と同じ送り方で作る。送り方を 2 通りにしないためで、この spec の範囲に含める。連携が無いテナントの問い合わせを飛ばす変更は `chat-integration-notification-load` が先に行う

@@ -9,6 +9,7 @@ import type { PrismaClient } from '../db/index.js';
 import type { ConnectionManager, PlatformFacade } from '../platform/index.js';
 import type {
   DistributedLock,
+  EventInstallation,
   PlatformEvent,
   PlatformEventSink,
 } from '../types/index.js';
@@ -429,6 +430,51 @@ describe('the bot being added to a channel', () => {
   });
 });
 
+describe('a channel refresh that could not list part of the service', () => {
+  it('tells the operator which part was left out, and keeps the saved channels it could not re-list', async () => {
+    const db = mockDeep<PrismaClient>();
+    db.installationChannel.deleteMany.mockResolvedValue({ count: 0 });
+    const facade = facadeMock();
+    vi.mocked(facade.listChannels).mockResolvedValue({
+      channels: [
+        {
+          platform: 'slack',
+          channelId: testSdkChannelId('slack', 'C1'),
+          channelName: 'general',
+          isPrivate: false,
+        },
+      ],
+      unlisted: [{ scope: 'T2', reason: 'team_access_not_granted' }],
+    });
+    const reportOperationalFailure = vi.fn();
+    let refreshChannels: ((installationId: string) => Promise<void>) | null =
+      null;
+
+    await createProxyDependencies(config(), {
+      createDb: () => db,
+      createFacade: (_appConfig, _installations, _sink, callbacks) => {
+        refreshChannels = callbacks?.refreshChannels ?? null;
+        return Promise.resolve(facade);
+      },
+      reporters: { reportOperationalFailure },
+    });
+    if (refreshChannels == null) {
+      throw new Error('the facade was given no way to refresh an inventory');
+    }
+
+    await (refreshChannels as (installationId: string) => Promise<void>)(
+      'inst-1',
+    );
+
+    expect(reportOperationalFailure).toHaveBeenCalledTimes(1);
+    const message = String(reportOperationalFailure.mock.calls[0]?.[0]);
+    expect(message).toContain('inst-1');
+    expect(message).toContain('T2');
+    expect(message).toContain('team_access_not_granted');
+    expect(db.installationChannel.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
 /**
  * Requirement 9.1's own trigger: 「管理者がチャット側で登録操作を行った」.
  *
@@ -549,5 +595,130 @@ describe('a register command typed in chat (Requirement 9.1)', () => {
 
     expect(db.pairingOrder.create).not.toHaveBeenCalled();
     expect(said()).toContain('判定できませんでした');
+  });
+});
+
+describe('a command typed where the saved channel inventory lists nothing (a DM)', () => {
+  const channel = testSdkChannel('slack');
+  const actor = {
+    platform: 'slack' as const,
+    accountId: 'U1',
+    displayName: 'Taro',
+  };
+
+  const registerTypedIn = async (
+    installation: EventInstallation | undefined,
+    inventoryListsThePlace = false,
+    text = 'register',
+  ) => {
+    const db = mockDeep<PrismaClient>();
+    db.installation.findMany.mockResolvedValue([
+      { id: 'inst-1', workspaceId: 'T1' },
+      { id: 'inst-2', workspaceId: 'T2' },
+    ] as never);
+    db.installationChannel.findUnique.mockResolvedValue(
+      inventoryListsThePlace
+        ? ({
+            installationId: 'inst-1',
+            platform: 'slack',
+            channelId: channel.channelId,
+            channelName: 'general',
+            isPrivate: false,
+            refreshedAt: new Date('2026-09-01T00:00:00.000Z'),
+          } as never)
+        : null,
+    );
+    db.pairingOrder.count.mockResolvedValue(0);
+    db.pairingOrder.create.mockResolvedValue({} as never);
+
+    const facade = mock<PlatformFacade>();
+    facade.connections.mockReturnValue(mock<ConnectionManager>());
+    facade.postEphemeral.mockResolvedValue({ ok: true, messageId: 'M1' });
+    facade.observeActorRoles.mockResolvedValue({ grantedFields: ['is_admin'] });
+
+    let sink: PlatformEventSink | null = null;
+    await createProxyDependencies(config(), {
+      createDb: () => db,
+      createFacade: (_appConfig, _installations, target) => {
+        sink = target;
+        return Promise.resolve(facade);
+      },
+    });
+    if (sink == null) throw new Error('the facade was built without a sink');
+
+    await (sink as PlatformEventSink).handle({
+      kind: 'mention',
+      platform: 'slack',
+      channel,
+      actor,
+      text,
+      inDirectMessage: true,
+      messageId: 'M0001',
+      interaction: null,
+      ...(installation == null ? {} : { installation }),
+    });
+
+    return {
+      facade,
+      db,
+      said: () =>
+        vi
+          .mocked(facade.postEphemeral)
+          .mock.calls.map(([, , message]) =>
+            message.kind === 'markdown' ? message.markdown : '',
+          )
+          .join('\n'),
+    };
+  };
+
+  it('runs on the installation the event named, though no inventory lists the place', async () => {
+    const { facade, db, said } = await registerTypedIn({
+      kind: 'identified',
+      installationId: 'inst-2',
+    });
+
+    expect(facade.observeActorRoles).toHaveBeenCalledWith(
+      'inst-2',
+      channel,
+      actor,
+    );
+    expect(db.pairingOrder.create).toHaveBeenCalledTimes(1);
+    expect(said()).toContain('登録コード');
+  });
+
+  it('still falls back to the inventory when the event named nothing, and refuses without it', async () => {
+    const { db } = await registerTypedIn(undefined);
+
+    expect(db.pairingOrder.create).not.toHaveBeenCalled();
+  });
+
+  it('asks for a workspace channel in a DM that belongs to no workspace', async () => {
+    const { db, said } = await registerTypedIn({ kind: 'no-workspace' });
+
+    expect(db.pairingOrder.create).not.toHaveBeenCalled();
+    expect(said()).toContain('workspace のチャンネル');
+  });
+
+  it('places a DM that belongs to no workspace in no installation, even when an inventory lists its id', async () => {
+    // `search` goes through the shared resolver itself (operator words stop
+    // earlier), so only the resolver can tell this apart.
+    const { db, said } = await registerTypedIn(
+      { kind: 'no-workspace' },
+      true,
+      'search foo',
+    );
+
+    expect(said()).toContain('workspace のチャンネル');
+    expect(db.relation.findMany).not.toHaveBeenCalled();
+  });
+
+  it('places a place an inventory lists in that installation when the event named none', async () => {
+    const { facade } = await registerTypedIn(undefined, true);
+
+    expect(facade.observeActorRoles).toHaveBeenCalledWith(
+      'inst-1',
+      channel,
+      actor,
+    );
   });
 });

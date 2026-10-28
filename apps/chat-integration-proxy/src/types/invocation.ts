@@ -22,7 +22,7 @@
 import type { ChatAccountRef, PlatformName } from '@growi/chat';
 
 import type { SdkChannelRef } from './channel.js';
-import type { InteractionRef } from './index.js';
+import type { EventInstallation, InteractionRef } from './index.js';
 
 export interface Invocation {
   readonly platform: PlatformName;
@@ -33,4 +33,10 @@ export interface Invocation {
   readonly interaction: InteractionRef | null;
   /** Optional so `pending_collection` rows saved before it existed still type-check. */
   readonly sourceMessageId?: string | null;
+  /**
+   * What the starting event said about its installation. Kept on the stored
+   * invocation so a collection resumed later resolves the same one; absent on
+   * rows saved before it existed, which resolve through the inventory.
+   */
+  readonly installation?: EventInstallation;
 }

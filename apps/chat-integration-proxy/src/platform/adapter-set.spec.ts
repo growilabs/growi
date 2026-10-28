@@ -234,7 +234,7 @@ describe("Slack's workspace of the event being handled", () => {
       apiUrl,
     });
 
-  const workspaceOfEventAs = (botToken: string): Promise<string> => {
+  const workspaceOfEventAs = (botToken: string): Promise<string | null> => {
     const factory = ADAPTER_FACTORIES.slack;
     if (
       factory.credentialSource !== 'app' ||
@@ -246,7 +246,7 @@ describe("Slack's workspace of the event being handled", () => {
     }
     const read = factory.workspaceOfEvent;
     const adapter = slackAdapter();
-    return adapter.withBotToken(botToken, () => read(adapter));
+    return adapter.withBotToken(botToken, () => read(adapter, 'slack:C1'));
   };
 
   it('answers the team for a workspace install, asked with the bot token of the event', async () => {
@@ -281,6 +281,65 @@ describe("Slack's workspace of the event being handled", () => {
     answers.set('xoxb-odd', { ok: true, user_id: 'UBOT' });
 
     await expect(workspaceOfEventAs('xoxb-odd')).rejects.toThrow();
+  });
+
+  it('asks Slack once per bot token, however many events that workspace sends', async () => {
+    answers.set('xoxb-busy', {
+      ok: true,
+      team_id: 'T3',
+      user_id: 'UBOT',
+      is_enterprise_install: false,
+    });
+
+    await expect(workspaceOfEventAs('xoxb-busy')).resolves.toBe('T3');
+    await expect(workspaceOfEventAs('xoxb-busy')).resolves.toBe('T3');
+    expect(askedWith).toEqual(['Bearer xoxb-busy']);
+  });
+
+  it('asks again after a failed answer, so one refusal is not remembered', async () => {
+    await expect(workspaceOfEventAs('xoxb-late')).rejects.toThrow();
+    answers.set('xoxb-late', {
+      ok: true,
+      team_id: 'T4',
+      user_id: 'UBOT',
+      is_enterprise_install: false,
+    });
+
+    await expect(workspaceOfEventAs('xoxb-late')).resolves.toBe('T4');
+  });
+});
+
+describe("Discord's workspace of the event being handled", () => {
+  // The guild is part of every Discord channel id the adapter hands an event
+  // with, and a DM carries `@me` in its place (`decodeThreadId`).
+  const workspaceOf = (channelId: string): Promise<string | null> => {
+    const factory = ADAPTER_FACTORIES.discord;
+    if (
+      factory.credentialSource !== 'app' ||
+      factory.workspaceOfEvent == null
+    ) {
+      throw new Error(
+        'Discord declares no way to read the workspace of an event',
+      );
+    }
+    const adapter = new DiscordAdapter({
+      applicationId: '900000000000000001',
+      publicKey: 'a'.repeat(64),
+      botToken: 'discord-bot-token',
+    });
+    return factory.workspaceOfEvent(adapter, channelId);
+  };
+
+  it('answers the guild of a server channel, the key the OAuth callback stores it under', async () => {
+    await expect(workspaceOf('discord:G100:C200')).resolves.toBe('G100');
+  });
+
+  it('answers the guild of a thread inside a server channel', async () => {
+    await expect(workspaceOf('discord:G100:C200:T300')).resolves.toBe('G100');
+  });
+
+  it('answers that a DM belongs to no workspace', async () => {
+    await expect(workspaceOf('discord:@me:C900')).resolves.toBeNull();
   });
 });
 

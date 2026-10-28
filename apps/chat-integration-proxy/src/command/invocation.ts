@@ -112,6 +112,9 @@ export const CommandInvocation = {
       argsText,
       interaction: event.interaction,
       sourceMessageId: event.kind === 'mention' ? event.messageId : null,
+      ...(event.installation == null
+        ? {}
+        : { installation: event.installation }),
     };
   },
 };

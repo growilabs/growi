@@ -633,6 +633,75 @@ describe('classifyOutboundFailure', () => {
     ).toBe('platform-error');
   });
 
+  it('reads a Mattermost 403 as not-a-member on an ordinary post, where nothing else can explain it', () => {
+    const forbidden = adapterError(
+      'PermissionError',
+      'mattermost',
+      'Permission denied: /channels/c1/posts',
+    );
+
+    expect(classifyOutboundFailure(forbidden)).toEqual({
+      ok: false,
+      reason: 'bot-not-in-channel',
+      remedy: expect.any(String),
+    });
+  });
+
+  it('reports a Mattermost 403 on the private message as a platform error that names the permission, not as a missing invitation', () => {
+    const forbidden = adapterError(
+      'PermissionError',
+      'mattermost',
+      'Permission denied: /posts/ephemeral',
+    );
+
+    expect(classifyOutboundFailure(forbidden, 'ephemeral')).toEqual({
+      ok: false,
+      reason: 'platform-error',
+      detail: expect.stringMatching(
+        /may lack the permission to post private messages/,
+      ),
+    });
+  });
+
+  it('still reads a channel that is not there as a missing invitation on the private message', () => {
+    const notFound = adapterError(
+      'ResourceNotFoundError',
+      'mattermost',
+      'resource not found',
+    );
+
+    expect(classifyOutboundFailure(notFound, 'ephemeral').reason).toBe(
+      'bot-not-in-channel',
+    );
+  });
+
+  it('keeps the original error text in the detail of a refused private message', () => {
+    const forbidden = adapterError(
+      'PermissionError',
+      'mattermost',
+      'Permission denied: /posts/ephemeral',
+    );
+
+    const outcome = classifyOutboundFailure(forbidden, 'ephemeral');
+
+    expect(outcome.ok === false && outcome.reason === 'platform-error').toBe(
+      true,
+    );
+    expect(JSON.stringify(outcome)).toContain('/posts/ephemeral');
+  });
+
+  it('leaves the permission hint off a missing scope on an ordinary post', () => {
+    const outcome = classifyOutboundFailure(
+      slackPlatformError('missing_scope'),
+    );
+
+    expect(outcome).toEqual({
+      ok: false,
+      reason: 'platform-error',
+      detail: 'An API error occurred: missing_scope',
+    });
+  });
+
   it('does not mistake an authentication or rate-limit failure for a missing invitation', () => {
     const others: ReadonlyArray<unknown> = [
       adapterError('AuthenticationError', 'slack', 'Token expired'),
@@ -730,7 +799,7 @@ describe('postEphemeral', () => {
     openDM.mockRestore();
   });
 
-  it('tells the user to invite the bot when the service refuses the channel, instead of throwing', async () => {
+  it('does not blame the invitation when Mattermost refuses the private message, since a 403 there is usually a missing permission', async () => {
     const adapter = mattermostAdapter;
     const send = vi
       .spyOn(adapter, 'postEphemeral')
@@ -751,8 +820,10 @@ describe('postEphemeral', () => {
 
     expect(outcome).toEqual({
       ok: false,
-      reason: 'bot-not-in-channel',
-      remedy: expect.any(String),
+      reason: 'platform-error',
+      detail: expect.stringMatching(
+        /may lack the permission to post private messages/,
+      ),
     });
 
     send.mockRestore();

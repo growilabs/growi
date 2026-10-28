@@ -385,7 +385,16 @@ export type ChannelAccessFailure = 'not-in-channel' | 'not-permitted';
 interface FailureRow {
   readonly failure: ChannelAccessFailure;
   readonly matches: (error: Error & Record<string, unknown>) => boolean;
+  /** Restricts the row to these operations; absent means every operation. */
+  readonly operations?: ReadonlyArray<OutboundOperation>;
 }
+
+/**
+ * Which call failed, for the rows whose meaning depends on it. A refusal of
+ * the private-message call says less about channel membership than a refusal
+ * of an ordinary post does.
+ */
+export type OutboundOperation = 'ephemeral' | 'other';
 
 /**
  * The Slack adapter's post-message path rethrows `@slack/web-api`'s own error
@@ -458,6 +467,16 @@ const FAILURE_ROWS: ReadonlyArray<FailureRow> = [
     matches: (error) =>
       error.adapter === 'teams' && error.name === 'PermissionError',
   },
+  // The server authorizes `/posts/ephemeral` only with the system permission
+  // `create_post_ephemeral` and does not check channel membership, so its 403
+  // means that permission is missing. This row must stay above the general
+  // Mattermost 403 row, which is right for the other calls.
+  {
+    failure: 'not-permitted',
+    operations: ['ephemeral'],
+    matches: (error) =>
+      error.adapter === 'mattermost' && error.name === 'PermissionError',
+  },
   // Mattermost: 403 for a channel the bot has not joined, 404 for one that is
   // not there.
   {
@@ -476,10 +495,17 @@ const FAILURE_ROWS: ReadonlyArray<FailureRow> = [
  */
 export const channelAccessFailure = (
   error: unknown,
+  operation: OutboundOperation = 'other',
 ): ChannelAccessFailure | null => {
   if (!(error instanceof Error)) return null;
   const carrier = error as Error & Record<string, unknown>;
-  return FAILURE_ROWS.find((row) => row.matches(carrier))?.failure ?? null;
+  return (
+    FAILURE_ROWS.find(
+      (row) =>
+        (row.operations == null || row.operations.includes(operation)) &&
+        row.matches(carrier),
+    )?.failure ?? null
+  );
 };
 
 /**
@@ -489,15 +515,16 @@ export const channelAccessFailure = (
  *
  * `PostOutcome` has a single actionable arm, so only `not-in-channel` reaches
  * it. A missing permission becomes `platform-error` with its detail where the
- * adapter reports it distinctly (Teams' `PermissionError`), but Mattermost
- * answers 403 both for a channel the bot has not joined and for a missing
- * permission such as `create_post_ephemeral`, so the latter is classified
- * `bot-not-in-channel` too (proxy research.md 既知の問題 1).
+ * adapter reports it distinctly (Teams' `PermissionError`). Mattermost's 403
+ * from the other calls is read as not-a-member; for the
+ * private-message call it is reported as a missing permission.
  */
 export const classifyOutboundFailure = (
   error: unknown,
+  operation: OutboundOperation = 'other',
 ): Extract<PostOutcome, { ok: false }> => {
-  if (channelAccessFailure(error) === 'not-in-channel') {
+  const failure = channelAccessFailure(error, operation);
+  if (failure === 'not-in-channel') {
     return {
       ok: false,
       reason: 'bot-not-in-channel',
@@ -505,10 +532,14 @@ export const classifyOutboundFailure = (
     };
   }
 
+  const message = error instanceof Error ? error.message : String(error);
   return {
     ok: false,
     reason: 'platform-error',
-    detail: error instanceof Error ? error.message : String(error),
+    detail:
+      failure === 'not-permitted' && operation === 'ephemeral'
+        ? `${message} (the bot may lack the permission to post private messages: create_post_ephemeral)`
+        : message,
   };
 };
 
@@ -527,12 +558,13 @@ const runScoped = <T>(
 const attempt = async (
   context: OutboundContext,
   send: () => Promise<{ readonly id: string }>,
+  operation: OutboundOperation = 'other',
 ): Promise<PostOutcome> => {
   try {
     const sent = await runScoped(context, send);
     return { ok: true, messageId: sent.id };
   } catch (error) {
-    return classifyOutboundFailure(error);
+    return classifyOutboundFailure(error, operation);
   }
 };
 
@@ -598,13 +630,16 @@ export const postEphemeral = async (
   const native = adapter.postEphemeral;
   if (native == null) return { ok: false, reason: 'unsupported' };
 
-  return await attempt(context, () =>
-    native.call(
-      adapter,
-      channelThreadId(adapter, target.platform, target.channelId, null),
-      user.accountId,
-      toPostable(message, target.platform, context.botName),
-    ),
+  return await attempt(
+    context,
+    () =>
+      native.call(
+        adapter,
+        channelThreadId(adapter, target.platform, target.channelId, null),
+        user.accountId,
+        toPostable(message, target.platform, context.botName),
+      ),
+    'ephemeral',
   );
 };
 

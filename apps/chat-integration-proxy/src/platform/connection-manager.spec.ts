@@ -49,7 +49,7 @@ interface FakeLocks {
 const fakeLocks = (
   outcomes: {
     readonly acquire?: (key: string) => boolean;
-    readonly renew?: (key: string) => boolean;
+    readonly renew?: (key: string) => boolean | Error;
   } = {},
 ): FakeLocks => {
   const calls: LockCall[] = [];
@@ -66,7 +66,9 @@ const fakeLocks = (
       },
       renew(key, ttlMs) {
         calls.push({ op: 'renew', key, ttlMs });
-        const extended = outcomes.renew?.(key) ?? true;
+        const outcome = outcomes.renew?.(key) ?? true;
+        if (outcome instanceof Error) return Promise.reject(outcome);
+        const extended = outcome;
         if (!extended) held.delete(key);
         return Promise.resolve(extended);
       },
@@ -107,7 +109,7 @@ const harness = (
     >;
     readonly lockOutcomes?: {
       readonly acquire?: (key: string) => boolean;
-      readonly renew?: (key: string) => boolean;
+      readonly renew?: (key: string) => boolean | Error;
     };
     readonly installationProvider?: InstallationProvider;
     readonly open?: (unit: ConnectionUnitRef) => Promise<void>;
@@ -304,6 +306,136 @@ describe('renewing what is already held', () => {
       'open:app:slack',
     ]);
     expect(afterLoss).toBe('reconnecting');
+  });
+});
+
+describe('a renewal that throws', () => {
+  const renewFailure = new Error('database unavailable');
+
+  it('closes the connection it can no longer keep alive, exactly once', async () => {
+    let outcome: boolean | Error = true;
+    const { deps, connections } = harness({
+      platforms: ['slack'],
+      lockOutcomes: { renew: () => outcome },
+    });
+    const manager = createConnectionManager(deps);
+
+    await manager.reconcile();
+    outcome = renewFailure;
+    await manager.reconcile();
+
+    expect(connections).toEqual(['open:app:slack', 'close:app:slack']);
+    expect((await manager.status())[0]?.state).toBe('reconnecting');
+  });
+
+  it('gives the lock back after a successful close so the unit is not stuck until the TTL', async () => {
+    let outcome: boolean | Error = true;
+    const { deps, locks } = harness({
+      platforms: ['slack'],
+      lockOutcomes: { renew: () => outcome },
+    });
+    const manager = createConnectionManager(deps);
+
+    await manager.reconcile();
+    outcome = renewFailure;
+    await manager.reconcile();
+
+    expect(locks.calls.slice(-2)).toEqual([
+      { op: 'renew', key: 'app:slack', ttlMs: LOCK_TTL_MS },
+      { op: 'release', key: 'app:slack' },
+    ]);
+  });
+
+  it('waits out the backoff before trying to acquire again', async () => {
+    let outcome: boolean | Error = true;
+    const { deps, locks } = harness({
+      platforms: ['slack'],
+      lockOutcomes: { renew: () => outcome },
+      now: () => new Date(0),
+    });
+    const manager = createConnectionManager(deps);
+
+    await manager.reconcile();
+    outcome = renewFailure;
+    await manager.reconcile();
+    await manager.reconcile();
+
+    expect(locks.calls.filter((c) => c.op === 'acquire')).toHaveLength(1);
+  });
+
+  it('does not close it a second time at shutdown', async () => {
+    let outcome: boolean | Error = true;
+    const { deps, connections } = harness({
+      platforms: ['slack'],
+      lockOutcomes: { renew: () => outcome },
+    });
+    const manager = createConnectionManager(deps);
+
+    await manager.reconcile();
+    outcome = renewFailure;
+    await manager.reconcile();
+    await manager.stopAll();
+
+    expect(connections.filter((c) => c === 'close:app:slack')).toHaveLength(1);
+  });
+
+  it('reopens the connection once the lock can be acquired again', async () => {
+    let outcome: boolean | Error = true;
+    let now = 0;
+    const { deps, connections } = harness({
+      platforms: ['slack'],
+      lockOutcomes: { renew: () => outcome },
+      now: () => new Date(now),
+    });
+    const manager = createConnectionManager(deps);
+
+    await manager.reconcile();
+    outcome = renewFailure;
+    await manager.reconcile();
+    outcome = true;
+    now += 10 * RECONCILE_INTERVAL_MS;
+    await manager.reconcile();
+
+    expect(connections).toEqual([
+      'open:app:slack',
+      'close:app:slack',
+      'open:app:slack',
+    ]);
+    expect((await manager.status())[0]?.state).toBe('connected');
+  });
+
+  it('still records the failure and keeps the other units going when closing also fails', async () => {
+    let outcome: boolean | Error = true;
+    const base = harness({
+      platforms: ['slack', 'discord'],
+      lockOutcomes: {
+        renew: (key) => (key === 'app:slack' ? outcome : true),
+      },
+    });
+    const close = vi.fn((unit: ConnectionUnitRef) =>
+      unit.lockKey === 'app:slack'
+        ? Promise.reject(new Error('close failed'))
+        : Promise.resolve(),
+    );
+    const manager = createConnectionManager({ ...base.deps, close });
+
+    await manager.reconcile();
+    outcome = renewFailure;
+    await manager.reconcile();
+
+    const states = Object.fromEntries(
+      (await manager.status()).map((row) => [row.lockKey, row.state]),
+    );
+    expect(states).toEqual({
+      'app:slack': 'reconnecting',
+      'app:discord': 'connected',
+    });
+    // The connection may still be open, so its lock must keep lapsing on its
+    // own rather than be handed to another instance early.
+    expect(base.locks.calls).not.toContainEqual({
+      op: 'release',
+      key: 'app:slack',
+    });
   });
 });
 

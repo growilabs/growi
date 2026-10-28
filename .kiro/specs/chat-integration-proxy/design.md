@@ -3,7 +3,7 @@
 > umbrella spec: [chat-integration](../chat-integration/)。要件は umbrella の `requirements.md` が持つ。
 > 通信契約・署名・チャンネル権限の判定は [chat-integration-protocol](../chat-integration-protocol/) が持つ。
 > 4 つの spec に共通する設計判断の根拠（決定 1〜14）は umbrella の `research.md`。本書で「決定 N」とだけ書くものはこちらを指す。
-> proxy に固有の判断（本人宛ての返事の届け方の決定 P1〜P12、Discord の Gateway の開き方の決定 P13）の根拠と、未解決の既知の問題は、本ディレクトリの `research.md`。
+> proxy に固有の判断（本人宛ての返事の届け方の決定 P1〜P12、Discord の Gateway の開き方の決定 P13、接続の更新の失敗の決定 P14、Enterprise Grid のチャンネル一覧の決定 P15、イベントの installation の決定 P16）の根拠と、未解決の既知の問題は、本ディレクトリの `research.md`。
 
 ## Overview
 
@@ -83,6 +83,8 @@ types → capabilities → db → platform → command → relation → growi �
 - 保存する形を変えたとき — `pending_collection.invocation`（JSON）の `sourceMessageId` と、`pending_collection.answer_channel_id`。
   保存済みの行は `sourceMessageId` を持たないことがあり、`answer_channel_id` は DM での答え（要件 1.16）の唯一の手がかり
 - Slack アプリのマニフェストの権限・設定（`im:write`、`features.app_home`）を変えたとき — 導入済みの workspace は導入し直すまで新しい権限を持たない
+- **Chat SDK の並行処理（`concurrency`）を既定の `drop` から変えるとき** — イベントの installation は、ハンドラが受けたイベントと同じ非同期の流れの中で Slack の bot トークンを読んで決める（「どの installation のイベントか」）。`queue`・`debounce`・`burst` では待たされたメッセージが前のイベントの流れの中で処理され、別のイベントの workspace に決まりうる（proxy の research.md の決定 P16）
+- **`ADAPTER_FACTORIES` の `workspaceOfEvent` を変えたとき、または Teams の installation を作る入口を足したとき** — DM と一覧に無いチャンネルでのコマンドがどの installation で動くかが変わる。`event-installation-adapters.integ.ts` を流す
 
 ---
 
@@ -215,7 +217,7 @@ Discord のアダプタは、初期化しただけでは Gateway を開かない
    これはロックが防ごうとしていたことそのもの
 
 したがって `reconcile()` を一定間隔で回し、**毎回** (a) 取れていない**接続の単位**のロックを取りに行き、
-(b) 自分が持っているロックを延ばし、(c) 延長に失敗したら**自分の接続を閉じる**、
+(b) 自分が持っているロックを延ばし、(c) 延長に失敗したら**自分の接続を閉じる**（延長が「失敗した」と返ったときだけでなく、データベース障害などで**例外になったときも同じ**。結果が分からないロックは誰も延ばさず 60 秒で切れるので、開いたままにすると別の台と二重に処理し続ける。閉じたあとは再接続待ちとして記録し、ロックを取り直せたら開き直す。閉じられたときはロックも返す — 返さないと、同じ持ち主でも寿命が切れるまで取り直せず、60〜80 秒は誰も接続しないまま「他の台が持っている」と出て、外から見ると `connected` に見える）、
 (d) **受け持ちが 0 件になったときだけ**閉じる、を行う。
 **アプリごとの接続（Slack / Discord）は受け持ちが 0 件でも保つ** — OAuth の折り返しの直後にすぐつながるため。
  installation が 1 件消えても、アプリごとの接続は閉じてはいけない。
@@ -319,6 +321,30 @@ mention から直接 modal を開こうとして手がかりが無い。この�
 `mention` は、DM の中で届いたか（`inDirectMessage`）と、依頼のメッセージの id（`messageId`）を運ぶ。
 Chat SDK は DM のメッセージを mention として届けるので、DM で打たれた答えもここを通る。
 
+#### どの installation のイベントか（proxy の research.md の決定 P16）
+
+**イベントが名指しする workspace を先に使い、保存済みのチャンネル一覧は、イベントが何も名指ししないときだけ使う。**
+チャンネル一覧には DM が載らず、bot の招待を伴わずに入れるようになったチャンネルも次の取り直しまで載らない。一覧だけに頼ると、そこでのコマンドが「workspace がまだ登録されていません」と断られる。
+
+- platform 層は、イベントを受けたハンドラの中で（Slack の bot トークンがまだ結び付いている間に）installation を調べ、`PlatformEvent.installation`（`EventInstallation`）に載せる。調べ方は `platform/event-installation.ts` の `lookUpEventInstallation` 1 つで、bot がチャンネルに追加されたときの一覧の取り直しも同じ規則を使う
+- `event-mapping.ts` がイベントを作れなかった（呼びかけもリンクも無いメッセージなど）ときは調べない。調べるのにサービスへの問い合わせが要ることがあるため
+- `CommandInvocation.normalize` が `Invocation.installation` に写す。保存した invocation（`pending_collection`）にも残るので、聞き返しのあとで再開した依頼も同じ installation で続く。この項目が無い古い行は一覧で引く
+- `runtime/dependencies.ts` の `resolveInstallationId` は、`identified` ならその installation、`no-workspace` なら「無し」を返し、項目が無いときだけ一覧で引く。`CommandFlow`・`AdminFlow`・`observeActorRoles` が同じ関数を使う。`PrivateReplier` はチャンネルだけを渡すが、`privateReplyOriginOf` が invocation の `identified` の installation を `installationId` に入れる
+
+| サービス | イベントから分かること | 決め方（`ADAPTER_FACTORIES` の宣言） |
+|---|---|---|
+| Slack | アダプタが、Socket Mode の封筒の `team_id`（組織全体の導入では `enterprise_id`）でそのイベントの bot トークンを選んでいる。DM も同じ | `workspaceOfEvent`: そのトークンで `auth.test` を呼び、`team_id`（組織全体の導入なら `enterprise_id`）を返す。トークンごとに 1 回だけ聞き、プロセスの中で覚える |
+| Discord | チャンネル id（`discord:<guild>:<channel>`）が guild を持つ。DM は guild の代わりに `@me` | `workspaceOfEvent`: アダプタの `decodeThreadId` で guild を返す。DM（`isDM`）は `null` を返し、`no-workspace` になる |
+| Mattermost | installation ごとに接続を開くので、イベントを受けた接続が installation そのもの | 接続を開いたときの installation の id をそのまま使う |
+| Teams | 宣言が無い（installation を作る入口がまだ無い） | イベントからは決めない。一覧で引く |
+
+**どの installation にも決まらないときの返事**:
+
+- `no-workspace`（Discord の DM）: 「この DM はどの workspace にも属していないため、どの workspace の GROWI を使うかを決められません。サーバーや workspace のチャンネルで bot に呼びかけてください。」（`orchestration/no-workspace-wording.ts`。`CommandFlow` と `AdminFlow` が同じ文を使う）。`AdminFlow` は権限を読む前にこれを返す（権限は installation を通して読むので、先に読むと「proxy の設定の問題」と誤って案内する）。リンクの展開は何も言わない（要件 6.4）
+- それ以外（イベントの workspace に installation が無く、一覧にも無い）: 今までどおり「このチャットの workspace がまだ登録されていません。」
+
+**DM で installation が決まったあと**: DM でも、チャンネル単位の権限の判定（`@growi/chat` の `judge`。proxy の `judgeEach` と GROWI の `checkChannelPermission` が同じ関数を使う）にそのまま届く。読み取りのコマンドは既定で許される。書き込みのコマンドは、権限の行が無ければ `no-settings` で断られるが、関係の権限が `'all'`（管理画面の「すべてのチャンネル」）なら DM からも許される（`create-page` など）。このときも GROWI では紐付けた利用者として動き、他の workspace の GROWI には届かない。**「すべてのチャンネル」に DM を含めるかは未決**で、`chat-integration-agent` が要件 11 に DM の扱いを足すときに、Discord の DM の扱いと合わせて決める。リンクの展開も DM で動く（出るのは、ログインしていない人も見られるページの題名などだけ）
+
 #### 聞き返しの届け方と、DM での答え（要件 1.14・1.16）
 
 **聞き返しは `PrivateReplier` で出す。** 値の聞き返し・答えの検証の失敗・GROWI の選択・前の入力を取り消した知らせの 4 つすべてが対象。
@@ -330,7 +356,7 @@ Chat SDK は DM のメッセージを mention として届けるので、DM で�
 1. `PrivateReplier.reply` が `direct` を返したら、`pendingCollections.routeAnswersVia(correlationId, DM のチャンネル id)` を呼び、行の `answer_channel_id` に書く。
    同じ platform・同じ本人で同じ DM を持つ他の行からは、その経路を外す（**同じ DM では新しい聞き返しが勝つ**）。外された古い依頼は元のチャンネルで引き続き答えられる
 2. `resume` の `findInFlight(platform, チャンネル, 本人)` は、まず行のチャンネルで探し、見つからなければ `answer_channel_id` で探す（元のチャンネルの行が優先）
-3. 答えを受け付けたあとは、保存した invocation（元のチャンネル）で続ける。installation も元のチャンネルで引くので、DM での installation の特定には依存しない
+3. 答えを受け付けたあとは、保存した invocation（元のチャンネル）で続ける。installation は、保存した invocation が持つ、依頼のイベントが名指しした installation で引き、無ければ元のチャンネルで引く（上の「どの installation のイベントか」）
 
 **答えの本文から呼びかけを外す規則**（`command/invocation.ts` の `stripAddressToken`。`CommandInvocation.normalize` も同じ規則）:
 
@@ -383,6 +409,7 @@ apps/chat-integration-proxy/
 │   │   ├── installation-provider.ts
 │   │   ├── installation-store.ts  # installation を作る・消す
 │   │   ├── event-mapping.ts       # SDK のイベント → PlatformEvent（SDK 型はここで止まる）
+│   │   ├── event-installation.ts  # イベントがどの installation のものか（コマンドと bot の追加で共通の規則）
 │   │   ├── outbound.ts            # 投稿・本人だけのメッセージ・DM・リアクション・差し替え・URL の展開
 │   │   ├── prompt.ts              # modal の開閉
 │   │   ├── history.ts
@@ -724,13 +751,20 @@ export interface InstallationStore {
 ```typescript
 
 /** platform 層が外へ渡すイベント。**Chat SDK の型を含めない** */
-export type PlatformEvent =
+export type PlatformEvent = (
   /** `inDirectMessage`: bot との 1 対 1 の会話の中か（非公開チャンネルでも真になる `channel.isPrivate` とは別）。`messageId`: 依頼のメッセージ自身の id */
   | { readonly kind: 'mention';       readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly text: string; readonly inDirectMessage: boolean; readonly messageId: string; readonly interaction: InteractionRef | null }
   | { readonly kind: 'slash-command'; readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly command: string; readonly text: string; readonly interaction: InteractionRef | null }
   | { readonly kind: 'modal-submit';  readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly correlationId: string; readonly values: Readonly<Record<string, string>> }
   | { readonly kind: 'action';        readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly correlationId: string; readonly actionId: string; readonly value: string | null; readonly interaction: InteractionRef | null }
-  | { readonly kind: 'link-posted';   readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly messageRef: MessageRef; readonly urls: ReadonlyArray<string> };
+  | { readonly kind: 'link-posted';   readonly platform: PlatformName; readonly channel: ChannelRef; readonly actor: ChatAccountRef; readonly messageRef: MessageRef; readonly urls: ReadonlyArray<string> }
+  /** どの種類のイベントにも付く。無いときは、イベントが installation を名指ししなかった（「どの installation のイベントか」） */
+  ) & { readonly installation?: EventInstallation };
+
+/** `identified`: イベントが名指しした installation。`no-workspace`: サービスが「この会話はどの workspace にも属さない」と言った（Discord の DM） */
+export type EventInstallation =
+  | { readonly kind: 'identified'; readonly installationId: string }
+  | { readonly kind: 'no-workspace' };
 
 export interface PlatformEventSink { handle(event: PlatformEvent): Promise<void> }
 
@@ -1023,10 +1057,10 @@ export const privateReplyOriginOf: (invocation: Invocation, installationId: stri
 
 | 呼び出し元 | `requestSummary` | `sourceMessageId` | `installationId` |
 |---|---|---|---|
-| `CommandFlow`（各コマンド）・`AdminFlow` | `privateReplyOriginOf` が作る。`create-page` の引数はページの本文を含みうるので、1 行目だけを使う | 保存した invocation のもの（mention の `messageId`。slash command は `null`） | `selectFor` などで引いた値。まだ引けていない段階（「workspace がまだ登録されていません」など）は `null` |
-| `ArgumentCollector`（聞き返し） | 同上 | 同上 | `null`（`PrivateReplier` が元のチャンネルから引く） |
+| `CommandFlow`（各コマンド）・`AdminFlow` | `privateReplyOriginOf` が作る。`create-page` の引数はページの本文を含みうるので、1 行目だけを使う | 保存した invocation のもの（mention の `messageId`。slash command は `null`） | `selectFor` などで引いた値。まだ引けていない段階（「workspace がまだ登録されていません」など）は、イベントが名指しした installation、無ければ `null` |
+| `ArgumentCollector`（聞き返し） | 同上 | 同上 | イベントが名指しした installation。無ければ `null`（`PrivateReplier` が元のチャンネルから引く） |
 | `CommandFlow.previewLinks`（GROWI を選べなかった説明） | 「リンクの展開」 | リンクを貼ったメッセージ | `previewLinks` が引いた値 |
-| `CommandFlow.reportExpired`（入力の期限切れ） | 「入力の続き」 | mention なら `messageId`、それ以外は `null` | `null` |
+| `CommandFlow.reportExpired`（入力の期限切れ） | 「入力の続き」 | mention なら `messageId`、それ以外は `null` | イベントが名指しした installation。無ければ `null` |
 
 **組み立て**: `runtime/dependencies.ts` が facade、`describePlace`（`runtime/describe-place.ts`）、既存の `resolveInstallationId`、
 `reportOperationalFailure` を渡して 1 つ作り、`CommandFlow`・`AdminFlow`・`ArgumentCollector` に渡す。
@@ -1049,7 +1083,7 @@ export const privateReplyOriginOf: (invocation: Invocation, installationId: stri
 | Teams | その場（本人だけのメッセージ。24 時間で消える）。失敗したときは DM | DM を開くには、利用者が一度 bot に呼びかけている必要がある |
 | Mattermost | bot にシステム管理者の権限があればその場、無ければ DM | 権限を与えるかを運用者が選ぶ |
 
-既知の問題（Mattermost の 403 の分類、DM の先頭の `@誰か` など）は proxy の research.md の「既知の問題」。
+既知の問題（DM の先頭の `@誰か` など）は proxy の research.md の「既知の問題」。
 
 
 ### FanOutCollector（検索とヘルプで共用）
@@ -1253,12 +1287,14 @@ bot が招待されていない公開チャンネルは、本当は `bot-not-in-
 |---|---|
 | 取り直し | **proxy が installation ごとに、自分の周期で**（既定 10 分）`PlatformFacade.listChannels()` を呼び、`installation_channel` に保存する |
 | **最初の 1 回** | **`InstallationStore.save()` が成功した直後に 1 回取り直す。** これが無いと、`installation_channel` が空のまま最初の周期を待つことになり、**紐付けた直後の 10 分間、通知がすべて断られる** |
-| **bot がチャンネルに追加されたとき** | **その installation をその場で取り直す。** コマンドもこの一覧でチャンネルの installation を引くので、これが無いと、bot を招待したばかりのチャンネルでは次の周期まで（最長 10 分）コマンドが「workspace が登録されていない」と断られる。どの installation かは、イベントを受けたアダプタから読む（Slack は `auth.test`。`ADAPTER_FACTORIES` の `workspaceOfEvent`）。人が参加したときは何もしない |
+| **bot がチャンネルに追加されたとき** | **その installation をその場で取り直す。** 通知の宛先の検査と GROWI に見せる宛先の候補はこの一覧を見るので、これが無いと、bot を招待したばかりのチャンネルは次の周期まで（最長 10 分）宛先にできない（イベントが installation を名指ししないサービスでは、コマンドもこの一覧で引く）。どの installation かは、コマンドと同じ規則（`lookUpEventInstallation`。上の「どの installation のイベントか」）で読む。人が参加したときは何もしない |
 | **消えたチャンネル** | **一覧が最後まで取れたときだけ、結果に無い行を消す。** 残すと、削除されたチャンネルが GROWI に宛先の候補として出続け、宛先の検査も通ったうえで投稿が失敗する |
 | 判定 | 通知が来たら**保存した一覧だけを見る**。無いチャンネルは `channel-not-in-installation` |
 | **id の形** | 一覧の行は Chat SDK の形（`slack:C…`。イベントの `Thread.channelId` と同じ）で保存する。宛先は GROWI からサービスが表示するままの形（`NativeChannelId`）で届くので、その installation の行のうち、サービスが表示する形に直すと宛先と一致する行を探し、見つかった行の id で投稿する。この引き当てが宛先の検査を兼ねる。Teams の行は Chat SDK の形にできないので、宛先にできないものとして扱う（umbrella research.md 決定 14） |
 | **一度も取れていない installation** | `installation.channels_synced_at` が `NULL` の状態と、非 `NULL`（取り直しは完了したが結果が空だった）状態を**区別する**。前者は `channel-not-in-installation` ではなく **`inventory-not-ready`** を返す。前者で「そのチャンネルは無い」と答えると、**運用者に間違った直し方（チャンネルを作り直す・bot を入れ直す）を案内してしまう** |
 | 取り直しの失敗 | **最後に取れた一覧をそのまま使い続ける**（新しい一覧が取れるまで判定は変わらない） |
+| **Slack の Enterprise Grid の組織全体への導入** | installation の `workspace_id` は組織の id（`E…`）になるが、`conversations.list` に組織の id は渡せない（`team_access_not_granted`）。この場合は `auth.teams.list` でアプリが許可された workspace（`T…`）を取り、workspace ごとに `conversations.list` を呼んで結果を 1 つにまとめる（複数の workspace に共有されたチャンネルは 1 行）。普通の単一 workspace の導入（`T…`）は今までどおり、その id でそのまま取る |
+| **一部の workspace だけ取れなかったとき** | 取れた workspace の分だけを保存し、取れなかった workspace は `ChannelListing.unlisted` に載せて呼ぶ側へ知らせる。**このとき「結果に無い行を消す」は行わない**（取れなかった workspace のチャンネルは、削除されたのか読めなかっただけなのか区別できないため）。`auth.teams.list` が失敗したとき、または全 workspace が失敗したときは一覧全体の失敗として、最後に取れた一覧を使い続ける。許可された workspace が 0 件のときは、空の一覧が完全な答えとして保存される |
 | 誰が回すか | `sweeper` と同じく**分散ロックで 1 台だけ**が取り直す。保存先は PostgreSQL なので、**ロックを持たない台も読める** |
 
 **その「最初の 1 回」が失敗したときは、installation を作り直させない。**

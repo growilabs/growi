@@ -107,6 +107,30 @@ const refreshHarness = (
   };
 };
 
+describe('refreshChannelInventory with a partial listing', () => {
+  it('saves what was listed but keeps the rows it could not re-list, and reports why', async () => {
+    const reported: unknown[] = [];
+    const harness = refreshHarness(() =>
+      Promise.resolve({
+        channels: [channelOf('C1')],
+        unlisted: [{ scope: 'T2', reason: 'team_access_not_granted' }],
+      }),
+    );
+    const deps: ChannelRefreshDeps = {
+      ...harness.deps,
+      onPartialListing: (unlisted) => reported.push(unlisted),
+    };
+
+    await refreshChannelInventory(deps, INSTALLATION_ID);
+
+    expect(harness.synced).toHaveLength(1);
+    expect(harness.deps.channels.deleteAllExcept).not.toHaveBeenCalled();
+    expect(reported).toEqual([
+      [{ scope: 'T2', reason: 'team_access_not_granted' }],
+    ]);
+  });
+});
+
 describe('refreshChannelInventory', () => {
   it('saves every channel it was given and marks the installation synced', async () => {
     const harness = refreshHarness(async () => ({
@@ -383,6 +407,299 @@ describe('CHANNEL_LISTERS.slack', () => {
     await expect(
       CHANNEL_LISTERS.slack(contextOf({ credentials: {} })),
     ).rejects.toThrow(/credential/i);
+  });
+});
+
+describe('CHANNEL_LISTERS.slack on an Enterprise Grid org-wide installation', () => {
+  const credentials: InstallationCredentials = {
+    slack: { botToken: 'xoxb-org' },
+  };
+
+  interface SlackCall {
+    readonly method: string;
+    readonly params: URLSearchParams;
+  }
+
+  type SlackAnswer = unknown | Error;
+
+  // Routes by Slack method and (for conversations.list) team_id, so a test
+  // states what each workspace answers instead of the order calls arrive in.
+  const slackRouter = (routes: {
+    readonly teams: ReadonlyArray<SlackAnswer>;
+    readonly channelsOf: Readonly<Record<string, ReadonlyArray<SlackAnswer>>>;
+  }) => {
+    const calls: SlackCall[] = [];
+    const teamsQueue = [...routes.teams];
+    const channelQueues = new Map(
+      Object.entries(routes.channelsOf).map(([team, answers]) => [
+        team,
+        [...answers],
+      ]),
+    );
+    const stub: typeof fetch = (input, init) => {
+      const url = input instanceof URL ? input.toString() : String(input);
+      const method = url.split('/').pop() ?? '';
+      const params = new URLSearchParams(String(init?.body ?? ''));
+      calls.push({ method, params });
+      const answer =
+        method === 'auth.teams.list'
+          ? teamsQueue.shift()
+          : channelQueues.get(params.get('team_id') ?? '')?.shift();
+      if (answer === undefined) {
+        return Promise.reject(new Error(`unexpected ${method} call`));
+      }
+      if (answer instanceof Error) return Promise.reject(answer);
+      return Promise.resolve(
+        new Response(JSON.stringify(answer), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    };
+    return {
+      stub,
+      calls,
+      queriedTeams: () =>
+        calls
+          .filter((call) => call.method === 'conversations.list')
+          .map((call) => call.params.get('team_id')),
+    };
+  };
+
+  const page = (
+    channels: ReadonlyArray<{ id: string; name: string; is_private?: boolean }>,
+    nextCursor = '',
+  ) => ({
+    ok: true,
+    channels,
+    response_metadata: { next_cursor: nextCursor },
+  });
+
+  const run = (
+    stub: typeof fetch,
+    reportUnlisted?: ChannelListerContext['reportUnlisted'],
+  ) =>
+    CHANNEL_LISTERS.slack(
+      contextOf({
+        workspaceId: 'E999',
+        credentials,
+        fetch: stub,
+        ...(reportUnlisted == null ? {} : { reportUnlisted }),
+      }),
+    );
+
+  it('lists each workspace the app is allowed in and merges the channels', async () => {
+    const router = slackRouter({
+      teams: [
+        {
+          ok: true,
+          teams: [{ id: 'T1' }, { id: 'T2' }],
+          response_metadata: { next_cursor: '' },
+        },
+      ],
+      channelsOf: {
+        T1: [page([{ id: 'C1', name: 'general' }])],
+        T2: [page([{ id: 'C2', name: 'secret', is_private: true }])],
+      },
+    });
+
+    const channels = await run(router.stub);
+
+    expect(
+      channels.map((c) => [c.channelId, c.channelName, c.isPrivate]),
+    ).toEqual([
+      ['slack:C1', 'general', false],
+      ['slack:C2', 'secret', true],
+    ]);
+    expect(router.queriedTeams()).toEqual(['T1', 'T2']);
+  });
+
+  it('never passes the organization id as team_id to conversations.list', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }] }],
+      channelsOf: { T1: [page([])] },
+    });
+
+    await run(router.stub);
+
+    expect(router.queriedTeams()).not.toContain('E999');
+  });
+
+  it('follows auth.teams.list pagination to every workspace', async () => {
+    const router = slackRouter({
+      teams: [
+        {
+          ok: true,
+          teams: [{ id: 'T1' }],
+          response_metadata: { next_cursor: 'more-teams' },
+        },
+        {
+          ok: true,
+          teams: [{ id: 'T2' }],
+          response_metadata: { next_cursor: '' },
+        },
+      ],
+      channelsOf: {
+        T1: [page([{ id: 'C1', name: 'a' }])],
+        T2: [page([{ id: 'C2', name: 'b' }])],
+      },
+    });
+
+    const channels = await run(router.stub);
+
+    expect(router.queriedTeams()).toEqual(['T1', 'T2']);
+    expect(channels.map((c) => c.channelId)).toEqual(['slack:C1', 'slack:C2']);
+  });
+
+  it('walks every channel page of each workspace', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }, { id: 'T2' }] }],
+      channelsOf: {
+        T1: [
+          page([{ id: 'C1', name: 'a' }], 'p2'),
+          page([{ id: 'C3', name: 'c' }]),
+        ],
+        T2: [page([{ id: 'C2', name: 'b' }])],
+      },
+    });
+
+    const channels = await run(router.stub);
+
+    expect(channels.map((c) => c.channelId)).toEqual([
+      'slack:C1',
+      'slack:C3',
+      'slack:C2',
+    ]);
+  });
+
+  it('lists a channel shared between two workspaces once', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }, { id: 'T2' }] }],
+      channelsOf: {
+        T1: [page([{ id: 'C9', name: 'shared' }])],
+        T2: [page([{ id: 'C9', name: 'shared' }])],
+      },
+    });
+
+    const channels = await run(router.stub);
+
+    expect(channels.map((c) => c.channelId)).toEqual(['slack:C9']);
+  });
+
+  it('answers with an empty list, not a failure, when the app is allowed in no workspace', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [], response_metadata: { next_cursor: '' } }],
+      channelsOf: {},
+    });
+
+    await expect(run(router.stub)).resolves.toEqual([]);
+    expect(router.queriedTeams()).toEqual([]);
+  });
+
+  it('still returns the other workspaces and reports the one that failed', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }, { id: 'T2' }, { id: 'T3' }] }],
+      channelsOf: {
+        T1: [page([{ id: 'C1', name: 'a' }])],
+        T2: [{ ok: false, error: 'team_access_not_granted' }],
+        T3: [page([{ id: 'C3', name: 'c' }])],
+      },
+    });
+    const unlisted: Array<{ scope: string; reason: string }> = [];
+
+    const channels = await run(router.stub, (entry) => unlisted.push(entry));
+
+    expect(channels.map((c) => c.channelId)).toEqual(['slack:C1', 'slack:C3']);
+    expect(unlisted).toHaveLength(1);
+    expect(unlisted[0]?.scope).toBe('T2');
+    expect(unlisted[0]?.reason).toMatch(/team_access_not_granted/);
+  });
+
+  it('drops the channels of a workspace that fails after its first page rather than keeping half of it', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }, { id: 'T2' }] }],
+      channelsOf: {
+        T1: [
+          page([{ id: 'C1', name: 'a' }], 'p2'),
+          new Error('connection reset'),
+        ],
+        T2: [page([{ id: 'C2', name: 'b' }])],
+      },
+    });
+    const unlisted: Array<{ scope: string; reason: string }> = [];
+
+    const channels = await run(router.stub, (entry) => unlisted.push(entry));
+
+    expect(channels.map((c) => c.channelId)).toEqual(['slack:C2']);
+    expect(unlisted.map((entry) => entry.scope)).toEqual(['T1']);
+  });
+
+  it('fails when every workspace fails, so the last complete inventory is kept', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }, { id: 'T2' }] }],
+      channelsOf: {
+        T1: [{ ok: false, error: 'team_access_not_granted' }],
+        T2: [{ ok: false, error: 'team_access_not_granted' }],
+      },
+    });
+
+    await expect(run(router.stub)).rejects.toThrow(/team_access_not_granted/);
+  });
+
+  it('fails when the workspace list itself cannot be read', async () => {
+    const router = slackRouter({
+      teams: [{ ok: false, error: 'missing_scope' }],
+      channelsOf: {},
+    });
+
+    await expect(run(router.stub)).rejects.toThrow(/missing_scope/);
+  });
+
+  it('keeps asking for the workspace itself when the installation is a single workspace', async () => {
+    const router = slackRouter({
+      teams: [],
+      channelsOf: { T123: [page([{ id: 'C1', name: 'a' }])] },
+    });
+
+    const channels = await CHANNEL_LISTERS.slack(
+      contextOf({ credentials, fetch: router.stub }),
+    );
+
+    expect(channels.map((c) => c.channelId)).toEqual(['slack:C1']);
+    expect(router.calls.map((call) => call.method)).toEqual([
+      'conversations.list',
+    ]);
+    expect(router.queriedTeams()).toEqual(['T123']);
+  });
+});
+
+describe('listChannels reports the scopes a lister could not list', () => {
+  it('carries them on the listing next to the channels it did get', async () => {
+    const lister: ChannelLister = (context) => {
+      context.reportUnlisted?.({
+        scope: 'T2',
+        reason: 'team_access_not_granted',
+      });
+      return Promise.resolve([
+        {
+          platform: 'slack',
+          channelId: testSdkChannelId('slack', 'C1'),
+          channelName: 'a',
+          isPrivate: false,
+        },
+      ]);
+    };
+
+    const listing = await listChannels('slack', CONTEXT, {
+      slack: lister,
+      discord: lister,
+      teams: lister,
+      mattermost: lister,
+    });
+
+    expect(listing.channels.map((c) => c.channelId)).toEqual(['slack:C1']);
+    expect(listing.unlisted).toEqual([
+      { scope: 'T2', reason: 'team_access_not_granted' },
+    ]);
   });
 });
 

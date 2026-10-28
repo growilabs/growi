@@ -66,7 +66,7 @@
 - **Findings**:
   - `resume` は mention を (platform, チャンネル, 本人) で探す。DM での答えはチャンネルが違うので、そのままでは見つからない
   - `toRecord` は、保存した invocation のチャンネルと行のチャンネルが一致しない行を捨てる。答えを受け付けるチャンネルを別の列で持てば、この検査と衝突しない
-  - 答えを受け付けたあとの処理は、保存した invocation（元のチャンネル）で installation を引く。DM のチャンネルで installation を引く箇所は無いので、「DM で installation を特定できない」不具合（umbrella の roadmap「リリース前に直すもの」の 3）に依存しない
+  - 答えを受け付けたあとの処理は、保存した invocation で installation を引く（依頼のイベントが名指しした installation、無ければ元のチャンネル。決定 P16）。DM のチャンネルで installation を引く箇所は無い
   - DM かどうかは、推測ではなく対応付けの段階（`event-mapping.ts`。スレッドが DM かを知っている）で印を付けられる
 - **Implications**: 決定 P6・P8
 
@@ -127,7 +127,7 @@
 - **Context**: 要件 1.9 は「失敗したら DM で届け直す」で、失敗の種類を区別しない。
 - **Alternatives Considered**: 失敗の種類（bot がチャンネルにいない、権限が無い、サービスの障害）ごとに、DM に進むか利用者に案内するかを分ける。
 - **Selected Approach**: `bot-not-in-channel`・`platform-error`・`unsupported` のどれでも DM へ進み、利用者には何も出さない。
-- **Rationale**: どの失敗でも、本人は返事を見ていない。DM は返事の内容をチャンネルに出さない道なので、どの場合に進んでも安全である。また、失敗の種類はいつも正しく見分けられるわけではない（Mattermost の権限不足の 403 は `bot-not-in-channel` に分類される。下の「既知の問題」1）。種類で分けると、その見分けの誤りがそのまま返事の取りこぼしになる。
+- **Rationale**: どの失敗でも、本人は返事を見ていない。DM は返事の内容をチャンネルに出さない道なので、どの場合に進んでも安全である。また、失敗の種類はいつも正しく見分けられるわけではない（Discord の 403 は、チャンネルに入っていない場合と権限が足りない場合を区別できず、どちらも `bot-not-in-channel` に分類される）。種類で分けると、その見分けの誤りがそのまま返事の取りこぼしになる。
 - **Trade-offs**: Mattermost で権限が無い間は、毎回いったん失敗してから DM に送る。1 回分の無駄な API 呼び出しは許容する（権限の有無を覚えておく仕組みは足さない。簡素さを優先）。
 
 ### 決定 P4: 「DM に届いた」「受け付けた」の知らせは、依頼のメッセージへのリアクションにする。付けられなければ内容を含まない短い文にする
@@ -163,13 +163,13 @@
 - **Context**: Key Findings 3。DM の本文には呼びかけが無いことが多い。
 - **Selected Approach**: `event-mapping.ts` が mention に `inDirectMessage`（スレッドが DM か）を付ける。`CommandInvocation.normalize` と `stripAddressToken` は、チャンネルでは先頭の語をいつも落とす。DM では、先頭の語が `@語` か `<@…>` の形のときだけ落とす（`invocation.ts` の `BOT_ADDRESS_SHAPE`）。
 - **Rationale**: 本物のアダプタで確かめた呼びかけの形（上の「本物のアダプタで確かめたこと」）は、4 サービスともこの 2 つの形に収まる。command 層には bot 自身の名前や id が届かないので、名前で突き合わせることはできない。
-- **Trade-offs**: DM の答えが `@誰か` で始まると、その語が落ちる（下の「既知の問題」2）。DM で `search foo` と打てばコマンドとして読まれるが、DM での installation の特定は別の不具合（umbrella の roadmap「リリース前に直すもの」の 3）なので、「workspace がまだ登録されていません」と返る。
+- **Trade-offs**: DM の答えが `@誰か` で始まると、その語が落ちる（下の「既知の問題」2）。DM で `search foo` と打てばコマンドとして読まれる。DM がどの installation のものかは、イベントが名指しする workspace で決める（決定 P16）。
 
 ### 決定 P9: 返事の宛先の情報に installation を持たせ、4 つの platform 呼び出しすべてに同じ値を渡す
 
 - **Context**: 上の Research Log の「installation の指定」。
-- **Selected Approach**: `PrivateReplyOrigin.installationId: string | null`。`command-flow` と `admin-flow` は、すでに引いた値を渡す。分からない呼び出し元（`argument-collector`、「workspace がまだ登録されていません」の返事、入力の期限切れの知らせ）は `null` を渡し、`PrivateReplier` が依頼のチャンネルから既存の `resolveInstallationId` で引く。引いた installation を、本人だけのメッセージ・DM・リアクション・知らせの 4 つすべてに同じ `scope` として渡す。引けなければ `scope` 無しで呼ぶ。
-- **Trade-offs**: `null` のときにチャンネル一覧を 1 回引く。DM の中で届いたイベントでは引けない（下の「既知の問題」5）。
+- **Selected Approach**: `PrivateReplyOrigin.installationId: string | null`。`command-flow` と `admin-flow` は、すでに引いた値を渡す。まだ引いていない呼び出し元（`argument-collector`、「workspace がまだ登録されていません」の返事、入力の期限切れの知らせ）は、依頼のイベントが名指しした installation（決定 P16）を渡し、それも無ければ `null` を渡す。`null` なら `PrivateReplier` が依頼のチャンネルから既存の `resolveInstallationId` で引く。引いた installation を、本人だけのメッセージ・DM・リアクション・知らせの 4 つすべてに同じ `scope` として渡す。引けなければ `scope` 無しで呼ぶ。
+- **Trade-offs**: `null` のときにチャンネル一覧を 1 回引く。イベントが installation を名指ししないサービス（今は Teams）の DM では引けない。
 
 ### 決定 P10: 届けられなかった返事を受けた呼び出し元は、重ねて知らせない
 
@@ -223,6 +223,44 @@
   - ログインに失敗し続けても、`ConnectionManager` の状態は `connected` のままになる。接続を開く処理はログインを待たずに終わり、ログインの成否は外から分からないため。失敗は運用者への報告に毎回残る。アダプタのログの文言を読んで判定する作りは、アダプタの更新で黙って壊れるので採らない
   - ログインの失敗の理由そのものは、アダプタのログ（標準出力）にしか出ない。proxy の報告は「早く終わった」ことと経過時間だけを書く
 
+### 決定 P14: ロックの延長が例外になったときは、自分の接続を閉じ、閉じられたらロックも返す
+
+- **Context**: `renew` が例外を投げる（データベース障害など）と、結果が分からないロックは誰も延ばさず、寿命（60 秒）で切れて別の台が接続を開く。接続を開いたままにすると 2 台がすべてのイベントを処理する。`releaseAndClose` と `stopAll` は `connected` の接続しか閉じないので、状態を `connected` のまま変えずに放置すると、誰も閉じない。ロックの取得は `ON CONFLICT ... WHERE expires_at <= now()` なので、同じ持ち主でも寿命が切れるまで取り直せない。
+- **Selected Approach**: 結果が分からない延長は、ロックを失ったものとして扱う。失敗を記録する前に `close` を呼び、`close` が成功したときだけ `release` も試みる（どちらの失敗も周回を止めず、失敗の記録と他の接続の処理に進む）。閉じた時点で状態は `connected` でなくなり、あとの `releaseAndClose` / `stopAll` は二重に閉じない。ロックを取り直せた周回で通常どおり開き直す。
+- **Rationale**: `release` の DELETE はトークンが一致する行だけを消すので、他の台のロックは消えない。返さないと、60〜80 秒は誰も接続しないまま、取れない側の状態が `held-by-other` になり、外向きには `connected` に見える（`HEALTH_BY_STATE`）。`close` が失敗したときは接続がまだ開いている可能性があり、このときロックを返すと別の台が早く取って二重処理になるので、返さずに寿命で切れるのを待つ。
+- **Trade-offs**: `close` が失敗した場合は、寿命が切れてから別の台が取るまでの間、二重処理が起きうる（design.md の「(c) で閉じ終わるまでの短い間」と同じく、state による重複の取り除きが受け止める）。データベースに届かないときは `release` も失敗するが、握りつぶして寿命に任せる。
+
+### 決定 P15: Slack の組織全体への導入では、`auth.teams.list` の workspace ごとにチャンネルを取り、取れなかった workspace があるときは消す処理を行わない
+
+- **Context**: 組織全体への導入の installation は `workspace_id` に組織の id（`E…`）を持つ。これを `conversations.list` の `team_id` に渡すと `team_access_not_granted` になり、一覧が空になる。一覧が空だと、その installation ではコマンドの権限確認も通知もできない。
+- **Selected Approach**: `workspace_id` が `E` で始まるときだけ、`auth.teams.list` でアプリが許可された workspace を取り（`cursor` で最後まで、1 ページ 100 件）、それぞれを `team_id` にして `conversations.list` を呼び、結果を 1 つにまとめる。複数の workspace に共有されたチャンネルは同じ id で返るので、1 行にする。`T…` の導入は従来どおり、その id でそのまま呼ぶ。`E` で判定してよい根拠は、`oauth-callback.ts` が `is_enterprise_install` のときだけ enterprise の id を `workspace_id` に保存することである。
+- 一部の workspace が失敗したとき: その workspace の分は 1 ページ目で失敗しても途中で失敗しても丸ごと捨て（半分だけ保存しない）、`ChannelListing.unlisted`（`{scope, reason}`）に載せる。保存側（`refreshChannelInventory`）は取れた分を保存し、`channels_synced_at` も更新するが、`deleteAllExcept` は呼ばない。呼ぶと、読めなかっただけの workspace のチャンネルがすべて消え、GROWI の宛先の候補と宛先の検査から消えてしまう。代わりに消えたチャンネルが残るが、次に全 workspace が取れた周期で消える。ある workspace が失敗し続ける間は、その installation の「消す処理」は止まったままで、運用者への報告も取り直しの周期ごとに繰り返される。
+- 全部が失敗、または `auth.teams.list` 自体が失敗したとき: 空の一覧にすると保存済みの正しい一覧を空で上書きするので、一覧全体の失敗として投げる（今までの「最後に取れた一覧を使い続ける」）。許可された workspace が 0 件のときは、空の一覧を完全な答えとして返す。
+- `unlisted` の知らせ先: `ChannelRefreshDeps.onPartialListing`（省略できる）。`runtime/dependencies.ts` の `refreshChannels` が、これを `reportOperationalFailure`（installation の id、取れなかった workspace とその理由、保存済みの行は残したこと）に繋ぐ。
+- 確かめたこと: 入っている `@chat-adapter/slack@4.38.1` が使う `@slack/web-api@7.19.0` の型定義で、`auth.teams.list` の引数（`cursor`・`limit`・`include_icon`）、応答の `Team.id`（workspace の id）、`conversations.list` の `team_id`（「組織の token では `team_id` が必須」と型の注記にある）を確認した。`auth.teams.list` は scope を要しない、というのは Slack の公式ドキュメントについての記憶で、`node_modules` では確かめられない。呼ぶ token の種類は、同梱のソースからは読み取れず、実機の Slack では確かめていない（組織全体の導入の token で呼ぶ前提）。
+
+### 決定 P16: イベントがどの installation のものかは、イベントが名指しする workspace で決め、チャンネル一覧はイベントが何も名指ししないときだけ使う
+
+- **Context**: これまでは保存済みのチャンネル一覧だけで、チャンネルから installation を引いていた。一覧には DM が載らず、bot の招待を伴わずに入れるようになったチャンネルも次の取り直しまで載らない。そこでのコマンドは「workspace がまだ登録されていません」と断られていた（bot が招待されたときは一覧をすぐ取り直すので、その場合だけは直っていた）。`chat-integration-agent` の brief は、DM で動く受け口の前提としてこの修正を挙げている。
+- **確かめたこと**（インストール済みのアダプタのコードと、本物のアダプタを使う結合試験 `src/platform/event-installation-adapters.integ.ts`）:
+  - Slack（`@chat-adapter/slack@4.38.1`）: Socket Mode の `events_api` は封筒の `authorizations[0]`／`team_id`／`enterprise_id`、`slash_commands` は `team_id`／`enterprise_id`／`is_enterprise_install`、`interactive` は `team.id`／`enterprise.id` から installation の鍵（普通は `team_id`、組織全体の導入では `enterprise_id`。`oauth-callback.ts` が `workspace_id` に保存する値と同じ）を作り、その bot トークンを `requestContext`（`AsyncLocalStorage`）に結び付けてから処理する。DM も同じ。`requestContext` は `protected` で外から読めないが、`webClient` はその中のトークンを使う。Chat SDK の `processMessage` は既定の並行処理（`drop`）ではハンドラを同じ非同期の流れの中で呼ぶので、ハンドラからもトークンが見える（結合試験で、DM のメッセージと DM の slash command の両方で確かめた。team を名指ししない封筒ではトークンが結び付かず、`webClient` が例外を投げ、運用者に報告されてイベントに installation が付かないことも同じ試験で確かめた）。これが正しいのは、Chat SDK の並行処理が既定の `drop` のときだけである。`queue`・`debounce`・`burst` では、待たされたメッセージを前のイベントの非同期の流れの中で処理するので、ハンドラが別のイベントのトークンを見る（例: Slack Connect の共有チャンネルで、別の workspace の bot として扱われる）。並行処理の設定を変える前に、この決定を見直す
+  - Discord（`@chat-adapter/discord@4.38.1`）: チャンネル id は `discord:<guild_id>:<channel_id>`。DM は `guild_id` が無く、`@me` が入る（`parseMessage`・interaction の処理）。公開されている `decodeThreadId`・`isDM` で読める。`oauth-callback.ts` は guild の id を `workspace_id` に保存する
+  - Mattermost: installation ごとに接続を開くので、イベントを受けた接続が installation そのもの
+  - Teams: activity は `conversation.tenantId`／`channelData.tenant.id` を持つが、proxy には Teams の installation を作る入口が無い（design.md の installation の入口の表）
+- **Selected Approach**: platform 層がハンドラの中で `lookUpEventInstallation`（`platform/event-installation.ts`）を呼び、結果を `PlatformEvent.installation` に載せる。サービスごとの違いは `ADAPTER_FACTORIES` の `workspaceOfEvent(adapter, channelId)` の宣言だけに置く（Slack は `auth.test` をトークンごとに 1 回、Discord は guild、DM なら `null`）。`Invocation` に写して `pending_collection` にも保存する。`resolveInstallationId` は `identified` ならそれを、`no-workspace` なら「無し」を返し、項目が無いときだけ一覧で引く。bot がチャンネルに追加されたときの取り直しも同じ関数で installation を決める。
+- **Alternatives Considered**:
+  - Slack の `requestContext` を、アダプタを継承して読む: API の呼び出しは要らないが、`createSlackAdapter` が組み立てる既定値（logger など）を proxy 側で写す必要があり、アダプタの更新で黙ってずれる
+  - Slack のメッセージの `raw` の `team` を読む: 組織全体の導入では installation の鍵が `enterprise_id` なので、`team` では引けない
+  - 一覧を先に引き、引けないときだけイベントを見る: Slack Connect の共有チャンネルのように、1 つのチャンネルが複数の installation の一覧に載るとき、一覧の最初に見つかったものを選んでしまう
+  - Discord の DM で、Discord の installation が 1 つしか無ければそれを使う: DM を送った人がその guild の参加者とは限らないので、参加していない guild の GROWI に依頼できてしまう。採らない
+- **Rationale**: イベントを受けたアダプタは、そのイベントがどの workspace のものかを知っている（Slack はそのトークンで処理している）。一覧はそれを後から推測しているだけである。
+- **Trade-offs**:
+  - Slack では、トークンごとに最初の 1 回だけ `auth.test` を呼ぶ（プロセスの中で覚える。失敗した答えは覚えない）。`event-mapping.ts` がイベントを作らなかったメッセージでは呼ばない
+  - Discord の DM は、どの guild のものかが分からないので、どの installation にも決めない。コマンドには「サーバーや workspace のチャンネルで呼びかけてください」と答える（design.md の「どの installation のイベントか」）。DM で使えるようにするかは、`chat-integration-agent` が要件 11 に DM の扱いを足すときに決める
+  - DM の installation が決まると、DM でもチャンネル単位の権限の判定（`@growi/chat` の `judge`。proxy の `relation/growi-selection.ts` の `judgeEach` と、GROWI の `command-endpoint.ts` の `checkChannelPermission` が同じ関数を使う）にそのまま届く。読み取りのコマンドは既定で許される。書き込みのコマンドは、そのコマンドに権限の行が無ければ `no-settings` で断られる。ただし関係の権限が `'all'`（管理画面の「すべてのチャンネル」）なら、チャンネルを問わず許されるので、DM からも `create-page` などの書き込みが届く。このときも GROWI では紐付けた利用者として動き、他の workspace の GROWI には届かない。**「すべてのチャンネル」に DM を含めるかは未決**で、`chat-integration-agent` が要件 11 に DM の扱いを足すときに、Discord の DM の扱いと合わせて決める。リンクの展開も DM で動くようになる（出るのは、ログインしていない人も見られるページの題名などだけ）。管理コマンドも、DM で installation が決まれば、従来どおり管理者かどうかを確かめたうえで実行まで進む。管理者の判定はチャンネルで広がらない: Slack の `is_admin`・`is_owner` は利用者そのものの属性で、Mattermost の DM はどのチームにも属さないので `team_admin` は効かず、`system_admin` だけが通る（`platform/actor-roles.ts`）
+  - 調べる処理が失敗した（`auth.test` が失敗した）ときは運用者への報告に残し、そのイベントは一覧で引く
+  - Teams は今までどおり一覧だけで引く
+
 ## Synthesis
 
 - **Generalization**: 「本人に届ける」は、検索の結果・聞き返し・エラー・登録コードに共通する 1 つの問題として扱う。インターフェースは「何の依頼への、どの installation としての返事か」を受け取る形である。あとから（イベントの処理の外で）届ける返事も、installation を名指しすれば token の問題は解ける。ただし「スレッドの中で本人だけに見せる」ためのスレッドの根元は持たないので、それが要る機能（`chat-integration-agent`）が `PrivateReplyOrigin` に足す（design.md の Revalidation Triggers）
@@ -237,13 +275,13 @@
 - Slack の Messages タブの設定が無い導入では、DM の聞き返しに答えられない — マニフェストと導入ドキュメントに含まれている
 - DM で打たれた本文の先頭の扱いが、本物の本文の形と食い違う — 4 サービスの本文を本物のアダプタの試験で確かめており、その形が試験の中に事実として書いてある
 
-## 既知の問題（未解決）
+## 既知の問題
 
-1. **Mattermost の 403 が「bot がチャンネルにいない」と分類される。** `/posts/ephemeral` が権限不足（`create_post_ephemeral` が無い）で 403 を返すと、`classifyOutboundFailure`（`platform/outbound.ts`）は `bot-not-in-channel`（「bot を招待して」）と分類する。アダプタが投げる `PermissionError` は応答の本文を持たないので、権限不足とチャンネル不参加を見分けられない。利用者への影響は無い（決定 P3 によりどちらでも DM に進む）が、DM も届かなかったときの運用者向けの報告（`reportUndeliverable`）に誤った理由が載る。今の分類は `platform/private-reply-adapters.integ.ts` の Mattermost の試験（「reaches /posts/ephemeral with the proxy's bare channel id …」）が固定しているので、分類を直すとその試験が落ちて気づける。`docs/setup-mattermost.md` にも既知の不整合として書いてある
+1. **（解消済み）** Mattermost の本人だけのメッセージの 403 は、`classifyOutboundFailure`（`platform/outbound.ts`）が権限不足として扱い、`bot-not-in-channel` にしない。`platform-error` の detail に「bot に本人宛てのメッセージを出す権限が無いかもしれない」と載る。アダプタが投げる `PermissionError` は応答の本文を持たず、Mattermost のサーバーは `/posts/ephemeral` をシステム権限 `create_post_ephemeral` だけで認可し、チャンネルの参加は調べない（サーバーの `createEphemeralPost` で確認）ので、この呼び出しの 403 は `create_post_ephemeral` の不足だけを意味する。そこで本人だけのメッセージの呼び出し（`postEphemeral`）の 403 は権限不足とみなし、通常の投稿の 403 は従来どおり `bot-not-in-channel` とする
 2. **DM の先頭の `@誰か` が落ちる。** 決定 P8 の規則は形で判定するので、DM での答えが `@誰か` で始まると、その語が呼びかけとして落ちる。command 層は bot 自身の名前や id を知らないので、今の作りでは避けられない。直すなら、platform 層が「呼びかけの語を外した本文」を渡す形に変える
 3. **Teams と、2 回目のリアクションは一部が未確認。** Teams の `email` リアクションはアダプタの対応表に無く、Teams が受け付けるかは実機で確かめていない（受け付けなければ短い文の知らせに落ちる。決定 P4）。同じリアクションの 2 回付けが成功になることは、Slack だけアダプタのコードで確かめた。Discord・Mattermost・Teams は仮定した応答の上での確認である。Teams で、利用者が 1 対 1 の会話で bot に答えるのにアプリを `personal` の範囲でも入れる必要があるかも未確認（`docs/setup-teams.md`）
 4. **依頼のメッセージが無い依頼では、DM に届くたびにその場に短い文が出る。** slash command から始まった依頼は依頼のメッセージの id（`sourceMessageId`）を持たない（`sourceMessageId` が無い古い保存済みの行から再開した依頼も同じ）ので、リアクションを付けられない。DM に届くたびに「返事を DM で送りました」という内容を含まない文がその場に出る。うるさいが、返事の内容は漏れない
-5. **Mattermost で installation が複数あるとき、DM の中で届いたイベントの「入力の期限切れ」の知らせは installation を引けない。** `reportExpired`（`orchestration/command-flow.ts`）はイベントのチャンネル（DM）を宛先にし、`installationId` を `null` で渡す。DM はチャンネル一覧に載らないので `resolveInstallationId` が引けず、`scope` 無しの呼び出しは宛先の接続を決められずに失敗する（その場合は運用者への報告だけが残る）
+5. **（解消済み）** Mattermost で installation が複数あるときの、DM の中で届いたイベントへの「入力の期限切れ」の知らせ。`reportExpired`（`orchestration/command-flow.ts`）は、イベントを受けた接続の installation（決定 P16）を `installationId` に渡すので、DM がチャンネル一覧に載らなくても宛先の接続が決まる
 6. **DM に落ちる経路は Slack の実機では起こせない**（上の Research Log）。結合試験と単体試験で守る
 7. **（本機能の外）`src/testing/instance-ownership-e2e.integ.ts` の「runs the periodic sweep on one instance at a time」は、この開発環境で失敗する。** 5 秒の上限に当たるか、試験が `proxy:sweep` のロックを取れずに失敗する。定期処理は起動時には動かない（`runtime/sweeper.ts` の `start`）ので、原因は、同じ試験の前の実行が残したロック（寿命 60 秒）か、同じ DB を使う別のプロセス（開発用に動かしている proxy など）が持つロックと見られる。Discord の Gateway の変更とは関係なく、変更より前のコミット（`59ef6d38d5`）でも同じく失敗した
 

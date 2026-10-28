@@ -59,6 +59,7 @@ import {
   waitBeforeEphemeral,
 } from './ephemeral-ordering.js';
 import { registerEventHandlers } from './event-handlers.js';
+import { identifyEventInstallation } from './event-installation.js';
 import { fetchHistory as fetchHistoryOf } from './history.js';
 import type { InstallationProvider } from './installation-provider.js';
 import { installationRunner } from './installation-scope.js';
@@ -257,17 +258,24 @@ const createPlatformBot = (
     userName: BOT_USER_NAME,
   });
   const { refreshChannels, installationId } = deps;
+  const lookupDeps = {
+    platform,
+    ...(installationId == null ? {} : { installationId }),
+    factories: ADAPTER_FACTORIES,
+    installations: deps.installations,
+  };
   registerEventHandlers(chat, {
     sink: deps.sink,
     modals: deps.modals,
+    identifyInstallation: identifyEventInstallation(
+      lookupDeps,
+      deps.reportOperationalFailure,
+    ),
     ...(refreshChannels == null
       ? {}
       : {
           onBotJoinedChannel: refreshOnBotJoin({
-            platform,
-            ...(installationId == null ? {} : { installationId }),
-            factories: ADAPTER_FACTORIES,
-            installations: deps.installations,
+            ...lookupDeps,
             refreshChannels,
             reportOperationalFailure: deps.reportOperationalFailure,
           }),

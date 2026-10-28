@@ -67,6 +67,7 @@ import type {
 } from '../relation/index.js';
 import type {
   HistoryMessage,
+  InstallationPlace,
   Invocation,
   ListRow,
   OutboundMessage,
@@ -76,6 +77,7 @@ import type {
 } from '../types/index.js';
 import type { AdminFlow } from './admin-flow.js';
 import type { CommandFlow, LinkPostedEvent } from './event-sink.js';
+import { NO_WORKSPACE_TEXT } from './no-workspace-wording.js';
 import { parseTimeRange, TIME_RANGE_USAGE } from './time-range.js';
 
 /**
@@ -102,18 +104,12 @@ export interface CommandFlowDeps {
   readonly growiClient: Pick<GrowiClient, 'sendCommand' | 'startAccountLink'>;
   readonly fanOutCollector: FanOutCollector;
   /**
-   * Which installation a channel belongs to.
-   *
-   * Injected because nothing on a `PlatformEvent` carries it: an event names
-   * the platform and the channel, while `GrowiSelector` is addressed by
-   * `installationId`, and no repository offers that lookup today
-   * (`InstallationProvider.resolve` is keyed by workspace id, which an event
-   * does not carry either). Passing it in keeps that gap in one visible
-   * place, to be filled by whoever composes this flow (task 9.x), instead of
-   * being guessed at here.
+   * Which installation a request belongs to: the one its event named, else
+   * the one whose saved channel inventory lists the channel. Injected so the
+   * rule lives in one place, shared with `AdminFlow` and `PrivateReplier`.
    */
   readonly resolveInstallationId: (
-    channel: SdkChannelRef,
+    place: InstallationPlace,
   ) => Promise<string | null>;
   /**
    * Where an operator word goes. Injected rather than built here so this flow
@@ -453,12 +449,14 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     readonly outcome: SelectionOutcome;
     readonly installationId: string;
   } | null> => {
-    const installationId = await resolveInstallationId(invocation.channel);
+    const installationId = await resolveInstallationId(invocation);
     if (installationId == null) {
       await tell(
         privateReplyOriginOf(invocation, null),
         markdown(
-          'このチャットの workspace がまだ登録されていません。運用者に設定を依頼してください。',
+          invocation.installation?.kind === 'no-workspace'
+            ? NO_WORKSPACE_TEXT
+            : 'このチャットの workspace がまだ登録されていません。運用者に設定を依頼してください。',
         ),
       );
       return null;
@@ -1051,7 +1049,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     },
 
     previewLinks: async (event: LinkPostedEvent) => {
-      const installationId = await resolveInstallationId(event.channel);
+      const installationId = await resolveInstallationId(event);
       if (installationId == null) return;
 
       // The same link pasted twice earns one summary, not two (Requirement
@@ -1115,7 +1113,10 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
           actor: event.actor,
           sourceMessageId: event.kind === 'mention' ? event.messageId : null,
           requestSummary: '入力の続き',
-          installationId: null,
+          installationId:
+            event.installation?.kind === 'identified'
+              ? event.installation.installationId
+              : null,
         },
         markdown(
           '入力の有効期限が切れました。お手数ですが、もう一度コマンドを打ち直してください。',

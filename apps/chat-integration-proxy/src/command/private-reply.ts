@@ -95,7 +95,8 @@ const REQUEST_SUMMARY_LIMIT = 80;
 /**
  * The origin of a reply to `invocation`. Only the first line of the
  * arguments is kept, so a page body typed after a `create-page` path never
- * reaches the DM header.
+ * reaches the DM header. A caller that has not resolved the installation yet
+ * still speaks as the one the request event itself named.
  */
 export const privateReplyOriginOf = (
   invocation: Invocation,
@@ -113,7 +114,11 @@ export const privateReplyOriginOf = (
       line.length > REQUEST_SUMMARY_LIMIT
         ? `${line.slice(0, REQUEST_SUMMARY_LIMIT)}…`
         : line,
-    installationId,
+    installationId:
+      installationId ??
+      (invocation.installation?.kind === 'identified'
+        ? invocation.installation.installationId
+        : null),
   };
 };
 
@@ -154,7 +159,7 @@ const withHeader = (
 };
 
 // The reason, never the remedy: the remedy is advice for a user and may not
-// match the actual cause (proxy research.md 既知の問題 1).
+// match the actual cause.
 const ephemeralFailureOf = (
   outcome: Extract<EphemeralPostOutcome, { ok: false }>,
 ): string =>

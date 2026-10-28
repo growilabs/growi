@@ -239,6 +239,34 @@ describe('register (Requirement 9.1)', () => {
     expect(harness.pairing.issueCode).not.toHaveBeenCalled();
     expect(harness.platform.post).not.toHaveBeenCalled();
   });
+
+  it('asks for a workspace channel, issuing nothing, in a DM that belongs to no workspace', async () => {
+    const harness = createHarness();
+    const flow = createAdminFlow({
+      db: mockDeep<PrismaClient>(),
+      platform: harness.platform,
+      privateReplier: harness.privateReplier,
+      pairing: harness.pairing,
+      keyService: harness.keyService,
+      growiClient: harness.growiClient,
+      resolveInstallationId: () => Promise.resolve(null),
+      // Roles are read through the installation, so none can be read here.
+      observeActorRoles: () => Promise.resolve(null),
+    });
+
+    await flow.run({
+      ...invocationOf('register'),
+      installation: { kind: 'no-workspace' },
+    });
+
+    expect(harness.privateReplier.reply).toHaveBeenCalledWith(
+      expect.objectContaining({ installationId: null }),
+      expect.objectContaining({
+        markdown: expect.stringContaining('workspace のチャンネル'),
+      }),
+    );
+    expect(harness.pairing.issueCode).not.toHaveBeenCalled();
+  });
 });
 
 describe('where each answer is shown', () => {

@@ -77,13 +77,16 @@ export type AdapterFactory =
         work: () => Promise<T>,
       ) => Promise<T>;
       /**
-       * The reverse of `bindInstallation`, for an event that does not name
-       * its workspace (the bot being added to a channel): which workspace --
-       * the key `installation.workspace_id` is stored under -- `adapter` is
-       * speaking for while it handles the current event. Called only inside
-       * that event's handling. Throws when the service cannot say.
+       * Which workspace -- the key `installation.workspace_id` is stored
+       * under -- the event being handled on `adapter` came from, given the
+       * channel id (Chat SDK form) the event names. `null` when the service
+       * says that conversation belongs to no workspace at all. Called only
+       * inside that event's handling. Throws when the service cannot say.
        */
-      readonly workspaceOfEvent?: (adapter: Adapter) => Promise<string>;
+      readonly workspaceOfEvent?: (
+        adapter: Adapter,
+        channelId: string,
+      ) => Promise<string | null>;
       /**
        * Present when initializing the adapter does not by itself start
        * receiving events, and the SDK instead listens for one bounded window
@@ -102,6 +105,39 @@ export type AdapterFactory =
       /** `null` when this installation carries no credentials for the service. */
       readonly create: (credentials: InstallationCredentials) => Adapter | null;
     };
+
+/**
+ * Which workspace a Slack bot token belongs to. A token never moves between
+ * workspaces, so each is asked about once per process; a failed answer is
+ * dropped so the next event asks again. Keyed by token, like the bot user id
+ * cache in `slack-installation-lookup.ts`, so a reinstall is a new entry.
+ */
+type SlackWebClient = SlackAdapter['webClient'];
+
+const slackWorkspaceByToken = new Map<string, Promise<string>>();
+
+const slackWorkspaceOfToken = (client: SlackWebClient): Promise<string> => {
+  const token = client.token;
+  const known = token == null ? undefined : slackWorkspaceByToken.get(token);
+  if (known != null) return known;
+
+  const asked = (async () => {
+    const answer = await client.auth.test();
+    const workspaceId =
+      answer.is_enterprise_install === true
+        ? answer.enterprise_id
+        : answer.team_id;
+    if (workspaceId == null || workspaceId === '') {
+      throw new Error('Slack auth.test named no workspace');
+    }
+    return workspaceId;
+  })();
+  if (token != null) {
+    slackWorkspaceByToken.set(token, asked);
+    asked.catch(() => slackWorkspaceByToken.delete(token));
+  }
+  return asked;
+};
 
 /**
  * The single declared place that says how each of the four services is
@@ -164,27 +200,36 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           installationId: workspaceId,
         });
       },
-      // `member_joined_channel` carries no team or enterprise id, but the
-      // adapter has already bound that workspace's bot token for the event,
-      // and `auth.test` answers whose token it is. Read the same way
-      // `oauth-callback.ts` stores `workspace_id`.
-      workspaceOfEvent: async (adapter) => {
+      // Not every event names its team or enterprise (`member_joined_channel`
+      // does not), but the adapter has already bound that workspace's bot
+      // token for the event, and `auth.test` answers whose token it is. Read
+      // the same way `oauth-callback.ts` stores `workspace_id`. A Slack DM
+      // belongs to its workspace like any channel, so this never answers
+      // `null`.
+      workspaceOfEvent: (adapter) => {
         if (!(adapter instanceof SlackAdapter)) {
           throw new TypeError('a Slack lookup was handed a non-Slack adapter');
         }
-        const answer = await adapter.webClient.auth.test();
-        const workspaceId =
-          answer.is_enterprise_install === true
-            ? answer.enterprise_id
-            : answer.team_id;
-        if (workspaceId == null || workspaceId === '') {
-          throw new Error('Slack auth.test named no workspace');
-        }
-        return workspaceId;
+        return slackWorkspaceOfToken(adapter.webClient);
       },
     },
     discord: {
       credentialSource: 'app',
+      // Every Discord channel id the adapter hands an event with carries its
+      // guild, the id `oauth-callback.ts` stores as `workspace_id`; a DM
+      // carries `@me` instead, belonging to no guild.
+      workspaceOfEvent: (adapter, channelId) => {
+        if (!(adapter instanceof DiscordAdapter)) {
+          throw new TypeError(
+            'a Discord lookup was handed a non-Discord adapter',
+          );
+        }
+        return Promise.resolve(
+          adapter.isDM(channelId)
+            ? null
+            : adapter.decodeThreadId(channelId).guildId,
+        );
+      },
       create: (appConfig) => {
         const discord = appConfig.discord;
         if (discord == null) return null;

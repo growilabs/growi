@@ -70,7 +70,6 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 |---|---|---|---|---|
 | 1 | 表示順 | 本人にだけ見える返事が、入力より上に出る | 時刻を測って原因を調べてから直す | proxy |
 | 2 | proxy の見え方 | 検索結果の見せ方、Slack への通知の文面 | spec を作らず直接直す（契約は変えない） | proxy（通知の文面は app の markdown にも及びうる） |
-| 3 | proxy の不具合の一括修正 | Enterprise Grid のチャンネル一覧、installation の特定、Mattermost の 403、接続の更新の失敗 | spec を作らず直接直す。各項目にテストを付ける | proxy |
 | 4 | app の見え方（`agent` と重ならない部分） | 承認画面、ページの編集画面、紐付け解除後のバッジ | amend spec `chat-integration-app-ui`（名前は仮） | app |
 | 5 | URL の展開の方針 | 公開範囲が「公開」のページは題名だけ出す | amend spec `chat-integration-link-preview`（名前は仮） | app（protocol と proxy にも及びうる） |
 | 6 | 通知の定期処理の負荷 | 連携が無いテナントの問い合わせを飛ばす、解除済みの連携の掃除を 1 日 1 回にする | amend spec `chat-integration-notification-load`（名前は仮） | app |
@@ -79,9 +78,10 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 | 9 | コマンドの表示の締め | スラッシュコマンドの実機確認、`help` の一覧の書き方、Discord のスレッドでの追加入力 | proxy の残タスク 12.4 | proxy |
 | 10 | URL の展開の確認フロー | 共有してよいかを本人に尋ねてから展開する | `/kiro-discovery` から着手する。`agent` の「本人にだけ届ける」しくみの上に作るので、`agent` の後 | 3 spec すべて |
 
-- 順 1〜3 は、順 7 の前提になる。順 3 の installation の特定は、`agent` の `brief.md` が明記している前提である。
-- 順 4・5・6 は app だけの変更で、順 1〜3 とは独立している。ただし、どれも `chat-integration-app/design.md` に書き戻すので、`agent` が書き換える節（権限、能力表）に触れるものを `agent` と同時には進めない。
-- 順 7 は規模が大きいので、順 1〜3 を終えてから要件の承認に入る。
+- 順 3（proxy の不具合の一括修正: Enterprise Grid のチャンネル一覧、installation の特定、Mattermost の 403、接続の更新の失敗）はすべて直したので表から外した。ほかの順の番号を変えないよう、3 は空き番号のまま残す。直した内容は [chat-integration-proxy の research.md](../chat-integration-proxy/research.md) の決定 P14・P15・P16 と「既知の問題」1。
+- 順 1・2 は、順 7 の前提になる（順 7 の前提だった順 3 は済んだ。`agent` の `brief.md` が前提に挙げる installation の特定もその 1 つ）。
+- 順 4・5・6 は app だけの変更で、順 1・2 とは独立している。ただし、どれも `chat-integration-app/design.md` に書き戻すので、`agent` が書き換える節（権限、能力表）に触れるものを `agent` と同時には進めない。
+- 順 7 は規模が大きいので、順 1・2 を終えてから要件の承認に入る。
 
 ### 1. 表示順
 
@@ -96,15 +96,6 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
   - 直す前に、各サービスで同じ内容がどう見えるかを、サービスごとの組み版（Slack は `<URL|題名>`、他は markdown のリンク）に分けて考える必要がある。
 - **Slack への通知の文面**: メッセージの書式が洗練されていない。ページ名・変更の種類・変更した人・リンクを読みやすく並べる。Slack の Block Kit など、サービスごとの表現を使うかも含めて検討する
 - **想定される影響範囲**: proxy の `outbound.ts`（サービスごとの描き分け）が中心。通知の文面は、GROWI が組み立てる markdown（`chat-integration-app`）にも及びうる。契約は変えないので、spec は作らず直接直し、proxy の design.md の該当節を更新する。`agent` の答えも同じ描き方を通るので、先に直す
-
-### 3. proxy の不具合の一括修正
-
-実機試験と独立レビューで見つかった。直す順は、Enterprise Grid、installation の特定、Mattermost の 403、接続の更新の失敗。
-
-1. **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
-2. **DM や一覧にまだ載っていないチャンネルでのコマンドに、的外れな案内が返る**: installation の特定をチャンネル一覧に頼るため、「workspace がまだ登録されていません」と返る（bot が招待された直後は一覧をすぐ取り直すようにしたので、招待後の待ちは無くなった。DM と、bot の招待を伴わずに増えたチャンネルでは残る）
-3. **Mattermost で、本人にだけ見えるメッセージの権限不足（403）が「bot がチャンネルにいない」と記録される**: `classifyOutboundFailure` が 403 を `bot-not-in-channel` と分類する（アダプタの例外が応答の本文を持たず、見分けられない）。利用者には DM で届くので影響は無いが、DM も届かなかったときの運用者向けの報告の理由が誤る。[chat-integration-proxy の research.md](../chat-integration-proxy/research.md) の「既知の問題」1
-4. **接続の更新（`renew`）がエラーで失敗すると、持っていた接続が止まらず、別のインスタンスと二重に処理される**: `connection-manager.ts` の `runCycle` は、`locks.renew` が false を返す場合は接続を閉じるが、例外を投げる場合は状態を変えるだけで `close` を呼ばない。ロックは 60 秒で切れて別のインスタンスが同じ接続（Discord の Gateway、Slack の Socket Mode）を開き、両方が同じイベントを処理する。直し方は、`renew` が例外を投げたとき、`connected` だった接続に対して先に `close` を呼んでから失敗として記録する
 
 ### 4. app の見え方（amend spec `chat-integration-app-ui`、名前は仮）
 
@@ -147,7 +138,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 ### 7. コマンドの再編（amend spec [chat-integration-agent](../chat-integration-agent/)）
 
-`search`・`create-page`・`agent` に再編する。`keep` は `agent` に吸収する。`brief.md` だけがあり、`spec.json` は無い。要件・設計・タスクの承認がこれから。答えを本人にだけ届ける仕組みは実装済み（[chat-integration-proxy の design.md](../chat-integration-proxy/design.md)「PrivateReplier — 本人宛ての返事の届け方」）。順 3 の installation の特定が前提。
+`search`・`create-page`・`agent` に再編する。`keep` は `agent` に吸収する。`brief.md` だけがあり、`spec.json` は無い。要件・設計・タスクの承認がこれから。答えを本人にだけ届ける仕組みは実装済み（[chat-integration-proxy の design.md](../chat-integration-proxy/design.md)「PrivateReplier — 本人宛ての返事の届け方」）。前提の installation の特定は直した（proxy の research.md の決定 P16）。
 
 - **この spec の要件で決めること（roadmap から移した）**:
   - **DM の先頭の `@誰か` が落ちる**: `agent` は DM や AI アプリの画面で自由な文章を受け取るので、「@alice について…」の先頭の語が落ちる。command 層が bot 自身の名前や id を知らないために起きる（[proxy の research.md](../chat-integration-proxy/research.md)「既知の問題」2）。直し方を要件で決める
