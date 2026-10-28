@@ -97,19 +97,9 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 - **Slack への通知の文面**: メッセージの書式が洗練されていない。ページ名・変更の種類・変更した人・リンクを読みやすく並べる。Slack の Block Kit など、サービスごとの表現を使うかも含めて検討する
 - **想定される影響範囲**: proxy の `outbound.ts`（サービスごとの描き分け）が中心。通知の文面は、GROWI が組み立てる markdown（`chat-integration-app`）にも及びうる。契約は変えないので、spec は作らず直接直し、proxy の design.md の該当節を更新する。`agent` の答えも同じ描き方を通るので、先に直す
 
-### 4. app の見え方（amend spec `chat-integration-app-ui`、名前は仮）
+### 4. app の見え方
 
-`agent` が変えない部分だけをここで直す。管理画面は順 8。
-
-- **ページの編集画面と、紐付け解除後の管理画面**: 実機試験（2026-10-26、Slack）で気付いた。動作は正しいが、見た目と使い勝手を直す。
-  - **ページの編集画面**: 「Chat notification channels」が縦に長く、編集画面のレイアウトを崩している（要件2.2 の保存時の通知先の選択）
-  - **チャット側で紐付けを解除したあとの管理画面**: `@GROWI unregister` は proxy 側の関係と鍵だけを消し、GROWI には知らせない。管理画面は接続の状態・できること・チャンネル一覧を読めないことを赤字で示すので状況は分かるが、右上のバッジは緑の「active」のまま（GROWI 側の関係の記録による表示のため）
-- **要件7（アカウントの紐付け）の承認画面の作り直し**: 実機試験（2026-10-23、Slack）で、`/me/chat-integration/account-link/:token` の承認画面について次のフィードバックが出た。優先度は低いが、いずれ直す。
-  - **体裁**: 見た目にもっと気を配る。サイドバーは要らないので、`BasicLayout` ではなく承認のためだけの簡素なレイアウトにする
-  - **誤った承認を防ぐ**: 「どの GROWI（名前）に」「GROWI のどのログイン中ユーザーとして」「どのチャットサービス・workspace の、どのアカウントを」結び付けるのかを整理して見せる。Slack などの他製品の OAuth 承認画面を参考にする
-  - **今の実装との差**: 画面は `AccountLinkApproval.tsx` で、文言が英語の直書き（i18n 未対応）。出せる情報は `platform`・`accountId`（Slack なら `U…` の ID のみ）・`workspaceName`・`relationLabel`・`growiUsername`。チャットアカウントの表示名は `chat_account_link_orders` に保存していないので、表示名を出すなら注文を作るとき（`account-link-start` の `actor.displayName`）に保存する必要がある
-  - **想定される影響範囲**: `chat-integration-app` が中心（画面・レイアウト・注文の保存項目）。表示名を保存するだけなら protocol の契約は変わらない
-  - **次にやること**: 規模が小さければ `chat-integration-app` の amend spec、そうでなければ `/kiro-discovery` から着手する
+別ブランチ `imprv/chat-integration-app-ui` で実装済みで、amend spec は本体の要件（`chat-integration/requirements.md`）と設計（`chat-integration-app/design.md`）に折り込み済み。承認画面、ページの編集画面、紐付け解除後のバッジは、このブランチを取り込むことで解決する。この `feat/slackbot-proxy-gen2` ブランチでは作業しない。
 
 ### 5. URL の展開の方針（amend spec `chat-integration-link-preview`、名前は仮）
 
