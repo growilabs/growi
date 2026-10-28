@@ -34,8 +34,8 @@ export { ACCOUNT_LINK_ORDER_DEFAULT_MINUTES };
 /** Path the one-time link resolves to, relative to the site root. Reserved for task 6.2's personal-settings screen. */
 const ACCOUNT_LINK_ACCEPT_PATH = '/me/chat-integration/account-link';
 
-const normalizeDisplayName = (displayName: string | undefined): string | null => {
-  const trimmed = displayName?.trim();
+const normalizeDisplayName = (displayName: string): string | null => {
+  const trimmed = displayName.trim();
   return trimmed ? trimmed : null;
 };
 

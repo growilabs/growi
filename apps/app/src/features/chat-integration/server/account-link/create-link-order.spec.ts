@@ -117,7 +117,6 @@ describe('findOrCreatePendingAccountLinkOrder', () => {
   it.each([
     ['whitespace only', '   '],
     ['empty', ''],
-    ['absent', undefined],
   ])('stores null when the display name is %s', async (_label, displayName) => {
     const order = await findOrCreatePendingAccountLinkOrder(RELATION_ID, {
       platform: 'slack',

@@ -40,6 +40,7 @@ vi.mock('~/client/components/Me/PersonalSettings', () => ({
 vi.mock('~/client/components/InAppNotification/InAppNotificationPage', () => ({
   InAppNotificationPage: () => <div>InAppNotificationMarker</div>,
 }));
+
 import type { ComponentProps } from 'react';
 
 import MePage from './[[...path]].page';

@@ -40,6 +40,7 @@ import {
   parseNativeChannelId,
   type RelationSettings,
 } from '@growi/chat';
+import { useTranslation } from 'next-i18next';
 import useSWR from 'swr';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
@@ -59,6 +60,10 @@ import {
 import { EncryptionKeyWarning } from './EncryptionKeyWarning';
 import { NotificationDestinationsSection } from './NotificationDestinationsSection';
 import { PairingSection } from './pairing/PairingSection';
+import {
+  deriveRelationBadge,
+  isConnectionRejected,
+} from './relation-connection-state';
 import type {
   AdminRelationListItem,
   EncryptionStatus,
@@ -501,6 +506,9 @@ const RelationRow = ({
   relation: AdminRelationListItem;
   onUnpaired: () => void;
 }): JSX.Element => {
+  // The admin screen loads only the `admin` namespace (see
+  // pages/admin/_shared/get-server-side-common-props.ts).
+  const { t } = useTranslation('admin');
   const isActive = relation.state === 'active';
 
   const { data: capabilities, error: capabilitiesError } =
@@ -520,6 +528,9 @@ const RelationRow = ({
       { refreshInterval: 15000 },
     );
 
+  const badge = deriveRelationBadge(relation.state, connectionStatusError);
+  const isConnectionLost = badge === 'connection-lost';
+
   return (
     <div
       className="border rounded p-3 mb-3"
@@ -530,8 +541,18 @@ const RelationRow = ({
           <strong>{relation.label ?? relation.workspaceName}</strong>{' '}
           <span className="text-muted">({relation.platform})</span>
         </div>
-        <span className={`badge ${isActive ? 'bg-success' : 'bg-secondary'}`}>
-          {relation.state}
+        <span
+          className={`badge ${
+            isConnectionLost
+              ? 'bg-danger'
+              : isActive
+                ? 'bg-success'
+                : 'bg-secondary'
+          }`}
+        >
+          {isConnectionLost
+            ? t('chat_integration.connection_lost.badge')
+            : relation.state}
         </span>
       </div>
 
@@ -545,12 +566,19 @@ const RelationRow = ({
       {isActive && (
         <div className="mb-2">
           <span className="fw-bold me-2">Connection:</span>
-          {connectionStatusError != null && (
+          {isConnectionRejected(connectionStatusError) && (
             <span className="text-danger">
-              Failed to load connection status
+              {t('chat_integration.connection_lost.detail')}
             </span>
           )}
-          {connectionStatus != null && (
+          {connectionStatusError != null &&
+            !isConnectionRejected(connectionStatusError) && (
+              <span className="text-danger">
+                Failed to load connection status
+              </span>
+            )}
+          {/* SWR keeps the last good value after a failed refresh; a rejected signature must not show it. */}
+          {connectionStatus != null && !isConnectionLost && (
             <span data-testid="grw-chat-integration-connection-health">
               {connectionStatus.health}
             </span>

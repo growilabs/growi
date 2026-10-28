@@ -81,28 +81,28 @@
   - _Requirements: 2.12_
   - _Depends: 3.2_
 
-- [ ] 4. 接続が切れた関係を、管理画面が正しく示す
-- [ ] 4.1 ★ proxy が署名を受け付けなかったことを、失敗の種類として分ける
+- [x] 4. 接続が切れた関係を、管理画面が正しく示す
+- [x] 4.1 ★ proxy が署名を受け付けなかったことを、失敗の種類として分ける
   - `proxy-client.ts` の `ProxyCallFailure` に `rejected` を足し、署名付きの呼び出しで応答が 401 のとき返す。ほかの 2xx 以外は `http-error` のまま。型の説明に、理由が分からないこと（proxy は拒否の理由を返さない）を書く
   - `ProxyCallFailure` を `switch` で網羅している箇所が無いこと（足して型検査が通ること）を確かめる
   - `admin-router.spec.ts` に、`fetchConnectionStatus` が `rejected` を返したとき、502 と `rejected` の code が返ることを足す（401 を返さない）
   - 観察できる完了条件: `proxy-client.spec.ts` で 401 → `rejected`、500 → `http-error`、接続失敗 → `unreachable` が示される。`admin-router.spec.ts` で code が届くことが示される。型検査が通る
   - _Requirements: 9.9, 9.11_
 
-- [ ] 4.2 ★ 関係のバッジを決める純粋関数を作る
+- [x] 4.2 ★ 関係のバッジを決める純粋関数を作る
   - `client/admin/relation-connection-state.ts` に `deriveRelationBadge(state, connectionStatusError)` と `isConnectionRejected(error)` を作る。入力と結果は design.md の表の 5 行
   - **`error` と古い `data` が同時にある場合を含む**（SWR は失敗しても前の成功値を返し続ける）
   - 観察できる完了条件: 5 行の組み合わせと、`apiv3` の失敗の形（配列の `errors[0].code`）の読み取りが `relation-connection-state.spec.ts` で示される
   - _Requirements: 9.9, 9.11_
   - _Depends: 4.1_
 
-- [ ] 4.3 接続が切れたときの文言を 5 言語で用意する
+- [x] 4.3 接続が切れたときの文言を 5 言語で用意する
   - `admin.json` に `chat_integration.connection_lost.badge` と `.detail`（原因を断定しない説明、「Disconnect」で片付けられること、再度ペアリングを試す案内）を足す。**`translation.json` ではなく `admin.json`**（管理画面は `admin` namespace だけを読み込む）
   - 5 言語すべてに訳を入れる。基準値は変えない
   - 観察できる完了条件: `pnpm run lint:i18n` が、基準値を変えずに通る
   - _Requirements: 9.10_
 
-- [ ] 4.4 ★ 管理画面の関係の行に、接続が切れた状態を出す
+- [x] 4.4 ★ 管理画面の関係の行に、接続が切れた状態を出す
   - `RelationRow` のバッジを `deriveRelationBadge` の結果で出す。「Connection」の行で、`rejected` のとき説明文を出し、古い `health` は出さない。ほかの失敗では今の「Failed to load connection status」のまま
   - `RelationRow` の中の並び、`CapabilityReportTable`・`ChannelPermissionsSection`・`NotificationDestinationsSection`・`UnpairButton` の呼び出しは変えない。`useTranslation` を足すので、`AdminChatIntegration.spec.tsx` の `next-i18next` の差し替えを確かめる
   - 観察できる完了条件: 接続の状態が `rejected` の関係に「active」でなく「接続が切れています」が出る、説明文と「Disconnect」が出る、**前に成功した `connected` が出ない**、署名の拒否以外の失敗では緑の「active」のままである、切れていない関係は今までどおり、ことが `AdminChatIntegration.spec.tsx` で示される。既存のテスト（表・権限・宛先・解除）が変わらず通る

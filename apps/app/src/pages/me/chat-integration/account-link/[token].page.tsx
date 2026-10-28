@@ -8,7 +8,10 @@ import { RawLayout } from '~/components/Layout/RawLayout';
 import { useCustomTitle } from '~/pages/utils/page-title-customization';
 
 import type { NextPageWithLayout } from '../../../_app.page';
-import type { CommonEachProps, CommonInitialProps } from '../../../common-props';
+import type {
+  CommonEachProps,
+  CommonInitialProps,
+} from '../../../common-props';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,

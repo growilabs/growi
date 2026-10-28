@@ -197,9 +197,7 @@ export const AccountLinkApproval = (): JSX.Element => {
         </Group>
       )}
 
-      <Group
-        heading={t('chat_integration.account_link.chat_account_heading')}
-      >
+      <Group heading={t('chat_integration.account_link.chat_account_heading')}>
         <Row term={t('chat_integration.account_link.service_label')}>
           <span className="text-capitalize">{display.platform}</span>
           {' · '}

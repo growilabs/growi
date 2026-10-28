@@ -134,12 +134,16 @@ describe('AccountLinkApproval', () => {
     await screen.findByRole('button', {
       name: 'chat_integration.account_link.approve',
     });
-    await user.click(screen.getByRole('button', {
-      name: 'chat_integration.account_link.approve',
-    }));
+    await user.click(
+      screen.getByRole('button', {
+        name: 'chat_integration.account_link.approve',
+      }),
+    );
 
     await waitFor(() => {
-      expect(screen.getByText('chat_integration.account_link.linked')).toBeInTheDocument();
+      expect(
+        screen.getByText('chat_integration.account_link.linked'),
+      ).toBeInTheDocument();
     });
   });
 
@@ -152,9 +156,11 @@ describe('AccountLinkApproval', () => {
     await screen.findByRole('button', {
       name: 'chat_integration.account_link.approve',
     });
-    await user.click(screen.getByRole('button', {
-      name: 'chat_integration.account_link.approve',
-    }));
+    await user.click(
+      screen.getByRole('button', {
+        name: 'chat_integration.account_link.approve',
+      }),
+    );
 
     await waitFor(() => {
       expect(
