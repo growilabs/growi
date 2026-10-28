@@ -40,6 +40,7 @@ import {
   parseNativeChannelId,
   type RelationSettings,
 } from '@growi/chat';
+import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import useSWR from 'swr';
 
 import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
@@ -703,13 +704,15 @@ const describePairingOutcome = (outcome: PairingOutcome): string => {
   }
 };
 
-/** Pairing form: paste a registration code the proxy issued (task 7.3). Disabled while the encryption key is unconfigured. */
-const PairingSection = ({
+/** Pairing form: paste a registration code the proxy issued (task 7.3). Rendered inside `PairingModal`, so its state is dropped whenever the modal closes. */
+const PairingForm = ({
   encryptionConfigured,
   onPaired,
+  onCancel,
 }: {
   encryptionConfigured: boolean;
   onPaired: () => void;
+  onCancel: () => void;
 }): JSX.Element => {
   const [form, setForm] = useState<PairingFormState>(EMPTY_PAIRING_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -743,7 +746,6 @@ const PairingSection = ({
         const outcome = res.data;
         if (outcome.status === 'paired') {
           toastSuccess(describePairingOutcome(outcome));
-          setForm(EMPTY_PAIRING_FORM);
           onPaired();
         } else {
           toastError(describePairingOutcome(outcome));
@@ -758,17 +760,8 @@ const PairingSection = ({
   );
 
   return (
-    <div className="mb-5" data-testid="grw-chat-integration-pairing-section">
-      <h2 className="admin-setting-header">Connect a workspace</h2>
-
-      {!encryptionConfigured && (
-        <div className="alert alert-warning" role="alert">
-          The chat-integration encryption key is not configured. Pairing is
-          disabled until an administrator sets it.
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit}>
+      <ModalBody>
         <div className="mb-2">
           <label className="form-label" htmlFor={registrationCodeId}>
             Registration code
@@ -779,7 +772,6 @@ const PairingSection = ({
             className="form-control"
             value={form.registrationCode}
             onChange={handleChange('registrationCode')}
-            disabled={!encryptionConfigured}
             required
           />
         </div>
@@ -793,7 +785,6 @@ const PairingSection = ({
             className="form-control"
             value={form.proxyUri}
             onChange={handleChange('proxyUri')}
-            disabled={!encryptionConfigured}
             required
           />
         </div>
@@ -807,11 +798,10 @@ const PairingSection = ({
             className="form-control"
             value={form.growiUri}
             onChange={handleChange('growiUri')}
-            disabled={!encryptionConfigured}
             required
           />
         </div>
-        <div className="mb-3">
+        <div className="mb-0">
           <label className="form-label" htmlFor={growiLabelId}>
             Label to show the chat service
           </label>
@@ -821,10 +811,19 @@ const PairingSection = ({
             className="form-control"
             value={form.growiLabel}
             onChange={handleChange('growiLabel')}
-            disabled={!encryptionConfigured}
             required
           />
         </div>
+      </ModalBody>
+      <div className="modal-footer">
+        <button
+          type="button"
+          className="btn btn-outline-secondary"
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
+          Cancel
+        </button>
         <button
           type="submit"
           className="btn btn-primary"
@@ -832,7 +831,62 @@ const PairingSection = ({
         >
           {isSubmitting ? 'Pairing…' : 'Pair'}
         </button>
-      </form>
+      </div>
+    </form>
+  );
+};
+
+/**
+ * The "Connected workspaces" heading together with the "connect a workspace"
+ * entry point: a button that opens the pairing form in a modal. The button is disabled -- and the reason shown beside it,
+ * on the page itself -- while the encryption key is unconfigured, so an
+ * administrator never opens a form that cannot be submitted.
+ */
+const PairingSection = ({
+  encryptionConfigured,
+  onPaired,
+}: {
+  encryptionConfigured: boolean;
+  onPaired: () => void;
+}): JSX.Element => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleOpen = useCallback(() => setIsOpen(true), []);
+  const handleClose = useCallback(() => setIsOpen(false), []);
+  const handlePaired = useCallback(() => {
+    setIsOpen(false);
+    onPaired();
+  }, [onPaired]);
+
+  return (
+    <div className="mb-3" data-testid="grw-chat-integration-pairing-section">
+      <div className="d-flex justify-content-between align-items-center">
+        <h2 className="admin-setting-header mb-0">Connected workspaces</h2>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleOpen}
+          disabled={!encryptionConfigured}
+        >
+          Connect a workspace
+        </button>
+      </div>
+
+      {!encryptionConfigured && (
+        <div className="alert alert-warning mt-3 mb-0" role="alert">
+          The chat-integration encryption key is not configured. Pairing is
+          disabled until an administrator sets it.
+        </div>
+      )}
+
+      <Modal isOpen={isOpen} toggle={handleClose}>
+        <ModalHeader toggle={handleClose}>Connect a workspace</ModalHeader>
+        <PairingForm
+          encryptionConfigured={encryptionConfigured}
+          onPaired={handlePaired}
+          onCancel={handleClose}
+        />
+      </Modal>
     </div>
   );
 };
@@ -869,7 +923,6 @@ export const AdminChatIntegration = (): JSX.Element => {
       />
 
       <div>
-        <h2 className="admin-setting-header">Connected workspaces</h2>
         {isLoading && <p>Loading…</p>}
         {!isLoading && (relations == null || relations.length === 0) && (
           <p>No workspace has been paired yet.</p>
