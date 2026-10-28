@@ -151,8 +151,8 @@ describe('POST /_api/v3/audit-log-bulk-export', () => {
       .post('/_api/v3/audit-log-bulk-export')
       .send({ filters: {} });
 
-    expect(res.status).not.toBe(201);
-    expect(res.body?.jobId).toBeUndefined();
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/');
     expect(createOrReset).not.toHaveBeenCalled();
   });
 
