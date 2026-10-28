@@ -48,7 +48,8 @@
 - PyPI の `firecrawl-anydoc` (版を固定)、`pypdfium2`、`charset-normalizer`、`defusedxml`、`fastapi`、`uvicorn[standard]`、`python-multipart`、`pydantic`、`pydantic-settings`。いずれも MIT / Apache-2.0 / BSD / PSF の許容的なライセンス
 - Python 3.12 の標準ライブラリ (`multiprocessing` の forkserver、`zipfile`、`html.parser`、`resource` など)
 - ベースイメージ `python:3.12-slim-bookworm` と、版を固定した uv のイメージ
-- テスト専用 (本番の image には入れない): `openpyxl` (MIT)、`python-pptx` (MIT)、`python-docx` (MIT)、`pypdf` (BSD-3)、`msoffcrypto-tool` (MIT)。テスト用のファイル (複数シート・非表示シートの XLSX、PPTX、暗号化した Office ファイルやパスワード付き PDF、展開すると巨大になるファイル) はテストの中で生成し、実在の文書はリポジトリに入れない
+- テスト専用 (本番の image には入れない): `openpyxl` (MIT)、`python-pptx` (MIT)、`python-docx` (MIT)、`pypdf` (BSD-3)、`msoffcrypto-tool` (MIT)、`xlwt` (BSD)、`PyYAML` (MIT)。テスト用のファイル (複数シート・非表示シートの XLSX、PPTX、暗号化した Office ファイルやパスワード付き PDF、展開すると巨大になるファイル、OpenDocument・RTF・EPUB・XLS) はテストの中で生成し、実在の文書はリポジトリに入れない
+- 例外: 旧形式の DOC と PPT は Python だけでは生成できないため、Apache POI のテスト用ファイル (Apache-2.0) から小さなものを選んでテスト用にリポジトリに置き、出典とライセンスを記録する
 - 使わないもの: markitdown、pdfminer.six、lxml、LGPL / GPL / AGPL のライブラリ、外部バイナリ、外向き通信 (python-pptx は本番では使わない)
 
 ### Revalidation Triggers
