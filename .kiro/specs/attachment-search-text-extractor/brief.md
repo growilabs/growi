@@ -10,7 +10,7 @@ GROWI には現在、添付ファイル (PDF / Office 等) のテキストを抽
 
 - GROWI monorepo には Python コードが存在せず、抽出ライブラリも未採用
 - 既存マイクロサービス `apps/pdf-converter` は HTML → PDF 専用 (Puppeteer ベース) で、テキスト抽出には転用できない
-- Office 系を Markdown に変換するライブラリ (firecrawl/anydoc、microsoft/markitdown など) と、PDF からページ単位でテキストを取り出すライブラリが PyPI から利用可能。選定の経緯は [research.md](./research.md) §6
+- Office 系を Markdown に変換するライブラリ (firecrawl/anydoc、microsoft/markitdown など) と、PDF からページ単位でテキストを取り出すライブラリが PyPI から利用可能。選定の理由は [research.md](./research.md) の §1「決定事項」と §2「採用理由と根拠」
 - Microsoft 公式の REST API 実装は存在しない (CLI / MCP のみ)。サードパーティ pre-built image も要件を完全に満たすものは不在 (詳細は [../attachment-search/research-docker-image.md](../attachment-search/research-docker-image.md))
 
 ## Desired Outcome
@@ -27,7 +27,7 @@ GROWI には現在、添付ファイル (PDF / Office 等) のテキストを抽
 **services/attachment-text-extractor/** に Python 3.12 + FastAPI + Uvicorn の独立サービスを新設する。
 
 - **ディレクトリ配置**: `services/` は本プロジェクトで新設されるトップレベルディレクトリ。**pnpm workspace と turbo pipeline の対象外** (pnpm-workspace.yaml / turbo.json は変更しない)
-- **抽出エンジン** (選定の経緯は [research.md](./research.md) §6.11):
+- **抽出エンジン** (決定の内容は [research.md](./research.md) §1「決定事項」):
   - Office 系 (DOCX / XLSX / RTF / EPUB / CSV / 旧形式 DOC・XLS・PPT / OpenDocument): firecrawl/anydoc。OCR は使わない (`ocr='reject'` のまま、Firecrawl Parse には送らない)
   - PPTX: スライドごとに 1 枚の PPTX パッケージに分けてから anydoc に渡す
   - PDF: pypdfium2 でページごとに抽出

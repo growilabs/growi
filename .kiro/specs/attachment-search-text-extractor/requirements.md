@@ -10,7 +10,7 @@ GROWI monorepo には添付ファイル (PDF / Office / テキスト系) から�
 
 - GROWI monorepo には Python コードが存在せず、抽出ライブラリも未採用
 - 既存マイクロサービス `apps/pdf-converter` は HTML → PDF 専用 (Puppeteer ベース) で、テキスト抽出には転用できない
-- Office 系を Markdown に変換するライブラリと、PDF からページ単位でテキストを取り出すライブラリが PyPI から利用可能 (選定の経緯は [research.md](./research.md) §6)
+- Office 系を Markdown に変換するライブラリと、PDF からページ単位でテキストを取り出すライブラリが PyPI から利用可能 (選定の理由は [research.md](./research.md) の §1「決定事項」と §2「採用理由と根拠」)
 - 要件を満たす既製の抽出 REST API の image は存在しない (詳細は [../attachment-search/research-docker-image.md](../attachment-search/research-docker-image.md))
 
 ### 達成したい姿
@@ -25,7 +25,7 @@ GROWI monorepo には添付ファイル (PDF / Office / テキスト系) から�
 
 ### アプローチ
 
-`services/attachment-text-extractor/` に Python 3.12 + FastAPI + Uvicorn の独立サービスを新設する。`services/` は本プロジェクトで新設されるトップレベルディレクトリで、**pnpm workspace / turbo pipeline の対象外** (`pnpm-workspace.yaml` / `turbo.json` は変更しない)。抽出エンジンは research.md §6.11 の決定 (Office 系は firecrawl/anydoc、PPTX はスライドごとに分けてから anydoc、PDF は pypdfium2、テキスト系はサービス自身で処理) に従い、詳細は design で定める。位置情報は PPTX はスライド単位、XLSX はシート単位、PDF はページ単位、その他形式は単一要素で扱う。Dockerfile は `python:3.12-slim-bookworm` + `uv` multi-stage、非 root (uid 10001) 実行、セキュリティハードニング (read-only rootfs / capabilities drop / egress 遮断 / tmpfs `/tmp`) に対応する。
+`services/attachment-text-extractor/` に Python 3.12 + FastAPI + Uvicorn の独立サービスを新設する。`services/` は本プロジェクトで新設されるトップレベルディレクトリで、**pnpm workspace / turbo pipeline の対象外** (`pnpm-workspace.yaml` / `turbo.json` は変更しない)。抽出エンジンは research.md §1「決定事項」の決定 (Office 系は firecrawl/anydoc、PPTX はスライドごとに分けてから anydoc、PDF は pypdfium2、テキスト系はサービス自身で処理) に従い、詳細は design で定める。位置情報は PPTX はスライド単位、XLSX はシート単位、PDF はページ単位、その他形式は単一要素で扱う。Dockerfile は `python:3.12-slim-bookworm` + `uv` multi-stage、非 root (uid 10001) 実行、セキュリティハードニング (read-only rootfs / capabilities drop / egress 遮断 / tmpfs `/tmp`) に対応する。
 
 ### スコープ
 
@@ -75,7 +75,7 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
   - Outlook MSG
   - Elasticsearch / MongoDB への直接アクセス (サービスはステートレス、DB 依存ゼロ)
 - **Adjacent expectations (this feature relies on these)**:
-  - 採用する抽出ライブラリ (research.md §6.11) が、対象プラットフォーム (linux x64 / arm64) 向けの wheel として PyPI から取得可能である
+  - 採用する抽出ライブラリ (research.md §1「決定事項」) が、対象プラットフォーム (linux x64 / arm64) 向けの wheel として PyPI から取得可能である
   - Docker / Kubernetes のランタイム (cgroups / seccomp / NetworkPolicy 対応 CNI) が前提
   - 下流 spec (`attachment-search-indexing`) は本 spec が export する OpenAPI spec を入力として orval で TS クライアントを生成し、HTTP multipart で `POST /extract` を呼ぶ
 
