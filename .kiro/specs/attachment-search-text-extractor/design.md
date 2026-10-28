@@ -460,6 +460,7 @@ class ConversionRunner:
   - `RLIMIT_AS` (仮想メモリの上限) を「RSS の上限 + 512MB」にする。最後の歯止め
   - `RLIMIT_CPU` (CPU 時間の上限) を「`TIMEOUT_S` + 5 秒」にする。親の SIGKILL が届かない場合の歯止めで、超えると子は SIGXCPU で終わる
   - `oom_score_adj` を 1000 にする。コンテナのメモリが足りなくなったとき、OS が uvicorn ではなく子を先に止めるようにする
+  - `RLIMIT_CORE` を 0 にする。SIGXCPU・abort・segfault の既定の動作はコアダンプで、コアの渡し先がホスト側の処理 (`core_pattern` の先頭が `|`) だと、コンテナの rootfs を読み取り専用にしても防げず、利用者のファイルの中身がホストのディスクに残るため
 - 監視用パイプを見張るスレッドを 1 つ立て、パイプが閉じた (依頼元のワーカーが落ちた) ら `os._exit` で終わる。CPython の非公開属性には頼らない
 - `ConversionCore.convert()` を呼び、`BaseException` まで捕まえて失敗の種類に変える (`SystemExit` / `KeyboardInterrupt` は投げ直す)
 - 結果は JSON にして 1 回だけ送る。成功: `{"ok": true, "pages": [...], "mimeType": "..."}`、失敗: `{"ok": false, "kind": "...", "detail": "..."}`

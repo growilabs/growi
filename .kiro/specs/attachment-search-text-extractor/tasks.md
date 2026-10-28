@@ -129,7 +129,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 1.9, 1.11, 2.6_
 
 - [ ] 6. 子プロセスでの実行
-- [ ] 6.1 子プロセスの入口と、親子間の受け渡しを実装する
+- [x] 6.1 子プロセスの入口と、親子間の受け渡しを実装する
   - 親から「長さ + 本体」の形でファイルを受け取り、結果は JSON で 1 回だけ送る (pickle を使わない)
   - 起動直後に、仮想メモリの上限 (RSS の上限 + 512MB)、CPU 時間の上限 (`TIMEOUT_S` + 5 秒)、OS のメモリ不足のときに先に止められる優先度 (`oom_score_adj` = 1000) を設定する。これらは Linux 以外では何もしない
   - 依頼元のワーカーだけが書き込み側を持つパイプを見張り、閉じたら自分で終わる
@@ -235,3 +235,8 @@
 - 4.4: `convert_text` の HTML / XML は半角空白・タブだけをまとめ、全角空白 (U+3000) と `&nbsp;` は残す。HTML / XML / ipynb / plain / csv のどの経路も、対になっていない surrogate を結果に含めない (含むと JSON の応答が UnicodeEncodeError で 500 になる)。
 - 5.1: `convert(data, filename, mime_hint, limits) -> ConversionSuccess` は失敗のとき `ConversionError` を投げる (`ConversionOutcome` を返すのは runner 側)。6.1 の子プロセスの入口がこれを `ConversionFailure` に変え、`BaseException` まで受けて `SystemExit` / `KeyboardInterrupt` だけ投げ直す。core は想定外の `Exception` (MemoryError 含む) を `internal` にまとめるので、MemoryError をメモリ超過として扱うと 6.1 / 6.3 で決めるなら core 側も直す。design.md のファイル構成欄 (183 行目付近) の `convert(data, filename, mime_hint)` は limits が抜けた書き間違いで、正式な契約は limits 付き。
 - 5.1: 拡張子を `.xls` にした入力は旧形式の経路に入り、セル数の検査を通らない (設計どおり。RSS 上限が受け持つ)。40MB の DOCX / PPTX を CSV / HTML として渡すとテストプロセスの最大メモリが約 0.9GB になる (4.4 の既知の問題)。6.4 でこの組み合わせも子プロセスの上限で止まることを確かめる。
+- 6.1: 子プロセスは `RLIMIT_CORE` を 0 にする (design.md の ChildEntry に追記済み)。6.4 は abort / segfault / SIGXCPU を起こすので、コアダンプが出ないことを前提にする。テストでは `WCOREDUMP` を判定に使わず、`/proc/<pid>/limits` の値で確かめる。
+- 6.1: 監視スレッド (`os._exit`) は GIL を取れる間だけ働く。メインスレッドが時間のかかる Python の正規表現などで GIL を持ち続けると、パイプを閉じても子が終わるまで 25 秒かかった (anydoc の変換中と普通の Python のループ中は 0.01〜0.02 秒)。そのとき止めるのは `RLIMIT_CPU` と親の SIGKILL。`text.py` の `_META_CHARSET` (`[^>]*?`) と `pptx_split.py` の `_LINE_BREAK_MARKER` は入力次第で 2 乗の時間になりうるので、6.4 の「2 秒以内に終わる」テストは変換中の現実に近い負荷でも確かめる。
+- 6.1: 子から親への結果にも「長さ (4 バイト) + 本体」を付けた。上限は `2 × MAX_RESULT_BYTES + 1MiB`。6.3 は読む前に `wire.decode_frame_header(header, wire.max_result_frame_bytes(limits.max_result_bytes))` で確かめ、超えたら読み捨てて `result_too_large` にする。`write_frame` は non-blocking の fd を受け付けないので、6.3 は読み取りを自前で書く。start() の後、親は自分の手元にある「入力の読み取り側・結果の書き込み側・監視用パイプの読み取り側」の写しを閉じること (閉じないと EOF が届かない)。子の終了コード: 3 = 依頼元がいなくなった、4 = 入力の形が壊れていた。どちらも結果は送らない。
+- 6.1: `RLIMIT_AS` に当たると、XLSX は Rust 側の abort (exitcode -6、結果なし) になり、6.3 では「異常終了」(500) に分類される。メモリの主な守りは親の RSS 監視 (320MB、`memory_exceeded`) で、これは `RLIMIT_AS` (832MB) より先に効く。`MemoryError` は core が `internal` にまとめたままでよい。
+- 6.1: forkserver の準備 (6.2) では `RAYON_NUM_THREADS=1` を forkserver の起動前に設定する (今回のテストではこれが無くても、40MB の DOCX / PPTX と 10 万セルの XLSX は VmPeak 約 370MB 以下で通った)。CPU 時間の hard 上限が環境側で低いと soft と hard が同じ値になり、SIGXCPU より先に SIGKILL が届いて「時間切れ」が「異常終了」に分類される (珍しい配備だけ)。
