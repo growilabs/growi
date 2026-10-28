@@ -11,7 +11,7 @@
 // module forgot to drop the body, nothing later in the pipeline would catch
 // it.
 //
-// Body embedding and diff construction intentionally replicate Gen 1's
+// Body embedding and diff construction intentionally follow Gen 1's
 // existing behavior (tasks.md: "本文の埋め込みと、更新時の差分の作り方は既存の振る舞いを
 // そのまま残す"), not a new design. `server/util/slack.js` (202 lines) is
 // design.md's own citation for this -- see `prepareAttachmentTextForCreate`/
@@ -19,9 +19,9 @@
 // `...`) and `prepareAttachmentTextForUpdate` (`diff.diffLines`, added lines
 // suffixed `:lower_left_fountain_pen:`, runs of >1 removed line summarized as
 // `:wastebasket: ... N lines`, single-line removals and unchanged lines
-// silently dropped). Both are reproduced verbatim below so a diff produced
-// here has the exact same shape Gen 1 already produces -- this is a
-// same-behavior port, not a reinterpretation.
+// silently dropped). The diff construction matches Gen 1; the one deliberate
+// display change is that the marker stays on the same line as the added text
+// and the diff carries no trailing newline.
 //
 // Only `pageCreate` and `pageEdit` carry a page-body excerpt/diff; `comment`
 // carries the comment's own body (truncated the same way, per the same Gen 1
@@ -105,7 +105,8 @@ const truncate = (body: string): string =>
  * never a full re-embed of the new body. Returns `''` when there is no
  * previous revision to diff against (Gen 1 returns `undefined` in that
  * case; an empty string keeps this module's `markdown` string concatenation
- * simple without changing the observable content).
+ * simple without changing the observable content). Unlike Gen 1, the marker
+ * is kept on the added text's own line and no trailing newline is left.
  */
 const buildDiffText = (
   previousBody: string | undefined,
@@ -118,14 +119,16 @@ const buildDiffText = (
   let diffText = '';
   for (const line of diff.diffLines(previousBody, currentBody)) {
     if (line.added) {
-      diffText += `${line.value} ... :lower_left_fountain_pen:`;
+      // Strip the chunk's own trailing newline so the marker stays on the
+      // same line as the text instead of dropping onto a line of its own.
+      diffText += `${line.value.replace(/\s+$/, '')} ... :lower_left_fountain_pen:\n`;
     } else if (line.removed) {
       if ((line.count ?? 0) > 1) {
         diffText += `:wastebasket: ... ${line.count} lines\n`;
       }
     }
   }
-  return diffText;
+  return diffText.trimEnd();
 };
 
 const header = (
@@ -134,20 +137,21 @@ const header = (
 ): string => {
   const { page, pageUrl, triggeredByUsername, oldPath } = input;
   const link = `[${page.path}](${pageUrl})`;
+  const by = `by ${triggeredByUsername}`;
 
   switch (event) {
     case 'pageCreate':
-      return `${triggeredByUsername} created ${link}`;
+      return `**Page created** · ${link} · ${by}`;
     case 'pageEdit':
-      return `${triggeredByUsername} edited ${link}`;
+      return `**Page edited** · ${link} · ${by}`;
     case 'pageDelete':
-      return `${triggeredByUsername} deleted ${link}`;
+      return `**Page deleted** · ${link} · ${by}`;
     case 'pageMove':
-      return `${triggeredByUsername} moved ${oldPath ?? '(unknown path)'} to ${link}`;
+      return `**Page moved** · ${oldPath ?? '(unknown path)'} → ${link} · ${by}`;
     case 'pageLike':
-      return `${triggeredByUsername} liked ${link}`;
+      return `**Page liked** · ${link} · ${by}`;
     case 'comment':
-      return `${triggeredByUsername} commented on ${link}`;
+      return `**New comment** · ${link} · ${by}`;
     default: {
       // Exhaustiveness guard: a new event added to
       // `GlobalNotificationSettingEvent` without a case here is a compile

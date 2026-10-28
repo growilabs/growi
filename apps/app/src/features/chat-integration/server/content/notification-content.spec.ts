@@ -206,4 +206,113 @@ describe('buildNotificationContent', () => {
       expect(result.markdown).not.toContain('y'.repeat(2001));
     });
   });
+
+  describe('message layout', () => {
+    const firstLine = (markdown: string): string => markdown.split('\n')[0];
+
+    it.each([
+      [GlobalNotificationSettingEvent.PAGE_CREATE, '**Page created**'],
+      [GlobalNotificationSettingEvent.PAGE_EDIT, '**Page edited**'],
+      [GlobalNotificationSettingEvent.PAGE_DELETE, '**Page deleted**'],
+      [GlobalNotificationSettingEvent.PAGE_LIKE, '**Page liked**'],
+      [GlobalNotificationSettingEvent.COMMENT, '**New comment**'],
+    ])('puts the change kind, the page link and the actor on the first line for %s', (event, label) => {
+      const { markdown } = buildNotificationContent(
+        baseInput({ event, commentBody: 'hi' }),
+      );
+
+      expect(firstLine(markdown)).toBe(
+        `${label} · [/public-page](https://growi.example.com/abc123) · by alice`,
+      );
+    });
+
+    it('shows the old path and the new page link on the first line for pageMove', () => {
+      const { markdown } = buildNotificationContent(
+        baseInput({
+          event: GlobalNotificationSettingEvent.PAGE_MOVE,
+          oldPath: '/old-location',
+        }),
+      );
+
+      expect(firstLine(markdown)).toBe(
+        '**Page moved** · /old-location → [/public-page](https://growi.example.com/abc123) · by alice',
+      );
+    });
+
+    it('separates the excerpt from the first line with a blank line', () => {
+      const { markdown } = buildNotificationContent(
+        baseInput({ page: { ...PUBLIC_PAGE, body: 'excerpt text' } }),
+      );
+
+      expect(markdown.split('\n').slice(1)).toEqual(['', 'excerpt text']);
+    });
+
+    it('keeps the added-line marker on the same line as the added text', () => {
+      const { markdown } = buildNotificationContent(
+        baseInput({
+          event: GlobalNotificationSettingEvent.PAGE_EDIT,
+          page: { ...PUBLIC_PAGE, body: 'a\nc\nd\n' },
+          previousBody: 'a\n',
+        }),
+      );
+
+      expect(markdown).toContain('c\nd ... :lower_left_fountain_pen:');
+      expect(markdown).not.toContain('\n ... :lower_left_fountain_pen:');
+    });
+
+    it('does not leave a trailing newline after a removed-lines summary', () => {
+      const { markdown } = buildNotificationContent(
+        baseInput({
+          event: GlobalNotificationSettingEvent.PAGE_EDIT,
+          page: { ...PUBLIC_PAGE, body: 'a\n' },
+          previousBody: 'a\nx\ny\n',
+        }),
+      );
+
+      expect(markdown.endsWith(':wastebasket: ... 2 lines')).toBe(true);
+    });
+
+    it('puts each added chunk on its own line, each followed by the marker', () => {
+      const { markdown } = buildNotificationContent(
+        baseInput({
+          event: GlobalNotificationSettingEvent.PAGE_EDIT,
+          page: { ...PUBLIC_PAGE, body: 'a\nX\nb\nY\n' },
+          previousBody: 'a\nb\n',
+        }),
+      );
+
+      expect(markdown.split('\n\n').slice(1).join('\n\n')).toBe(
+        'X ... :lower_left_fountain_pen:\nY ... :lower_left_fountain_pen:',
+      );
+    });
+
+    it('separates a removed-lines summary from the added text that follows it', () => {
+      const { markdown } = buildNotificationContent(
+        baseInput({
+          event: GlobalNotificationSettingEvent.PAGE_EDIT,
+          page: { ...PUBLIC_PAGE, body: 'a\nN\n' },
+          previousBody: 'a\nr1\nr2\n',
+        }),
+      );
+
+      expect(markdown.split('\n\n').slice(1).join('\n\n')).toBe(
+        ':wastebasket: ... 2 lines\nN ... :lower_left_fountain_pen:',
+      );
+    });
+
+    it.each([
+      ['a blank line', 'a\nc\n\n'],
+      ['CRLF line endings', 'a\r\nc\r\n'],
+    ])('keeps the marker on the text line when the added chunk ends with %s', (_name, body) => {
+      const { markdown } = buildNotificationContent(
+        baseInput({
+          event: GlobalNotificationSettingEvent.PAGE_EDIT,
+          page: { ...PUBLIC_PAGE, body },
+          previousBody: body.startsWith('a\r') ? 'a\r\n' : 'a\n',
+        }),
+      );
+
+      expect(markdown).toMatch(/c \.\.\. :lower_left_fountain_pen:$/);
+    });
+  });
 });

@@ -80,7 +80,7 @@ describe('UserNotificationService.fire', () => {
     // Content is built before the dispatcher factory is invoked -- proves
     // real markdown reaches enqueue, not a placeholder.
     expect(createGen2NotificationDispatcher).toHaveBeenCalledWith(
-      expect.stringContaining('someone created'),
+      expect.stringContaining('**Page created** · [/a]('),
       false,
     );
     expect(results).toEqual([]);

@@ -108,7 +108,7 @@ describe('GlobalNotificationService.fire', () => {
     // threaded into the dispatcher factory before dispatch -- proves
     // enqueue receives NotificationContent's output, not a placeholder.
     expect(createGen2NotificationDispatcher).toHaveBeenCalledWith(
-      expect.stringContaining('someone created'),
+      expect.stringContaining('**Page created** · [/a/b/c]('),
       false,
     );
     expect(dispatchAll).toHaveBeenCalledWith(
