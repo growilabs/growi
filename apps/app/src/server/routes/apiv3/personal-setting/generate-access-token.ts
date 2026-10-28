@@ -65,7 +65,7 @@ const validator = [
     .custom((scopes: Scope[]) => {
       scopes.forEach((scope) => {
         if (!isValidScope(scope)) {
-          throw new Error(`Invalid scope: ${scope}}`);
+          throw new Error(`Invalid scope: ${scope}`);
         }
       });
       return true;
