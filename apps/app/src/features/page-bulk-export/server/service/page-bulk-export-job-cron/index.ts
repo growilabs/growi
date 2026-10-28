@@ -321,6 +321,13 @@ class PageBulkExportJobCronService
     results.forEach((result) => {
       if (result.status === 'rejected') logger.error(result.reason);
     });
+
+    // A job row must not be deleted while its snapshots remain (see
+    // PageBulkExportJobCleanUpCronService.cleanUpAndDeleteBulkExportJobs).
+    const [snapshotsDeletion] = results;
+    if (snapshotsDeletion.status === 'rejected') {
+      throw snapshotsDeletion.reason;
+    }
   }
 
   private async notifyExportResult(
