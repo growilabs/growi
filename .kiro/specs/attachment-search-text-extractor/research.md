@@ -407,3 +407,109 @@ pypdfium2 の注意点: 改行が `\r\n` で出るため後処理の前に揃え
 
 - [../attachment-search/research.md](../attachment-search/research.md) — gap analysis / design phase discovery / implementation approach options
 - [../attachment-search/research-docker-image.md](../attachment-search/research-docker-image.md) — Microsoft 公式 / サードパーティ 8 件の pre-built image 比較、自前ビルドリファレンス Dockerfile
+
+---
+
+## 7. ギャップ分析: 既存実装と刷新後の要件 (2026-10-28)
+
+刷新した requirements.md (承認済み) と §6.11 の決定に対し、`services/attachment-text-extractor/` の既存実装 (旧 tasks.md 28 件中 17 件完了時点のコード) がどこまで使えるかを調べた。
+
+### 7.1 既存実装の現状
+
+旧設計は「HTTP の受け口」と「変換の中身」がはっきり分かれた構成で、受け口側はほぼ完成している。変換の中身は、単純な形式を markitdown に通す仮の実装だけ。
+
+| 部品 | ファイル | 状態 | 刷新後の扱い |
+|---|---|---|---|
+| 設定の読み込み | `src/app/config.py` | 完成 (`MAX_FILE_SIZE_MB` / `TIMEOUT_S` / `MAX_CONCURRENCY` / `ATTACHMENT_EXTRACTOR_SERVICE_TOKEN` / `MAX_EXTRACTED_BYTES`、トークン未設定で起動失敗) | 流用。形式別のサイズ上限などを足す可能性あり |
+| API の型 | `src/app/schemas.py` | 完成 (`PageInfo` / `ExtractResponse` / `ErrorCode` / `ErrorResponse`) | 流用。`ErrorCode` に暗号化と上限超過を追加 (Req 1.10 / 2.6) |
+| Bearer 認証 | `src/app/middleware/bearer_auth.py` | 完成 (`hmac.compare_digest`) | そのまま流用 |
+| XXE 対策の起動処理 | `src/app/security.py` | 完成 (`defusedxml.defuse_stdlib()` + lxml の API 確認) | 流用。lxml は markitdown 経由の依存なので、外れた後は lxml の確認部分が空振りになる。整理が要る |
+| リソース制限 | `src/app/limits.py` | サイズ上限と同時実行数は機能する。**タイムアウトは機能しない** (下記) | 同時実行数とサイズ上限は流用。タイムアウトは作り直し |
+| 抽出の振り分け | `src/app/services/extraction_service.py`、`extractors/__init__.py` | MIME の解決と、MIME → 抽出関数の対応表 (whitelist) は完成 | 振り分けの仕組みは流用。対応表の中身は入れ替え (MSG を外し、旧形式 Office / OpenDocument を足す) |
+| 単純形式の抽出 | `extractors/simple_extractor.py` | markitdown で全形式を 1 要素に変換。リクエストごとに `MarkItDown()` を作り直している | 作り直し (Office 系は anydoc、テキスト系は自前) |
+| PDF / PPTX / XLSX の抽出 | (なし) | 未着手。対応表では仮に simple_extractor に流している | 新規 |
+| ルーター | `routers/extract.py`、`routers/health.py` | 完成。health は markitdown のページ抽出の有無を返す `pdf_strategy` を持つ | extract は流用 (呼び出し先の変更のみ)。health は markitdown 前提の項目を外す |
+| アプリの組み立て | `src/app/main.py` | 完成。起動時に markitdown の PDF 対応を調べる `_probe_pdf_strategy()` がある | 流用。markitdown 前提の処理を外す |
+| OpenAPI の出力 | `scripts/export_openapi.py` | 完成 | そのまま流用 |
+| Dockerfile | `Dockerfile` | 完成 (multi-stage、uid 10001、`--workers ${WORKERS:-2}`)。uv のイメージが `latest` 指定 | 流用。uv の版固定は要検討 |
+| docker-compose | `infra/docker/compose.yaml` | 完成 (read-only rootfs、tmpfs `/tmp` 512MB、uid 10001) | 流用 |
+| k8s manifest | (なし) | 未着手 | 新規 (Req 3.2 / 3.3) |
+| Python 用 CI | (なし) | 未着手。Node 側の CI に orval の差分検知だけはある | 新規 |
+| 構造化ログ | (なし) | 未着手 (旧タスク 4.4) | 新規 |
+| 展開量の上限 (`MAX_EXTRACTED_BYTES`) | 設定値だけある | 未実装 (旧タスク 2.4) | Req 2.6 で作り直し |
+| テスト | `tests/` 15 ファイル、229 件成功 | 認証・設定・スキーマ・制限・ルーター・OpenAPI 出力は有効。markitdown 前提のテスト (`test_extract_simple.py` など) がある | 前者は流用、後者は作り直し |
+
+**タイムアウトが機能しない理由** (§6.8 で指摘済み、コードで再確認): `extraction_service.extract()` は `async def` だが、中で同期の抽出関数を直接呼んでいる。変換中はワーカーのイベントループが止まるため、`asyncio.wait_for` は変換が終わるまで発火しない。仮にスレッドへ逃がしても、スレッド上の変換は止められないので、Req 2.5 (処理そのものを止めて枠とメモリを解放する) は満たせない。
+
+### 7.2 要件と既存資産の対応
+
+| 要件 | 既存資産 | ギャップ |
+|---|---|---|
+| 1.1 `pages[]` で返す | schemas / extract ルーター | なし |
+| 1.2 PPTX をスライド単位で | なし | **新規**: スライドごとに分けて anydoc に渡す処理 |
+| 1.3 XLSX をシート単位で | なし | **新規**。anydoc はシートが 1 枚だとシート名を出さず、非表示シートと空シートを出力しない。シートの区切りとシート名をどう得るかは要調査 |
+| 1.4 PDF をページ単位で | なし | **新規**: pypdfium2 でページごとに抽出 |
+| 1.5 単純形式を 1 要素で | simple_extractor (markitdown) | **作り直し**: DOCX / RTF / EPUB / CSV は anydoc、HTML / TXT / JSON / XML / YAML / MD / LOG / ipynb は自前 |
+| 1.6 対象外の形式を拒否 | 対応表 + `UnsupportedFormatError` | 対応表から MSG を外すだけ |
+| 1.7 外部バイナリ・egress 不要 | — | 新しい依存 (anydoc / pypdfium2) は wheel で入る。anydoc の `ocr='hosted'` を使わないことの保証が要る |
+| 1.8 旧形式 Office / OpenDocument | なし | **新規**: 対応表への追加と anydoc での変換 |
+| 1.9 日本語の正規化 | なし | **新規**: 改行コードの統一と、日本語の間の空白・改行の除去 (純粋関数) |
+| 1.10 暗号化ファイル | なし | **新規**: エラーコード追加と、anydoc の `EncryptedError` / pypdfium2 のパスワード例外の変換 |
+| 1.11 壊れたファイル | `extraction_failed` | anydoc の `MalformedError` / `MissingPartError` などの対応づけ |
+| 2.1 サイズ上限 | `Limits.enforce_size` | なし。形式別の上限 (大きな XLSX 対策) を足すかは design で判断 |
+| 2.2 タイムアウト | `Limits.with_timeout` | **作り直し** (7.1 のとおり機能していない) |
+| 2.3 同時実行上限 | `Limits.acquire_slot` | 流用。ただし枠はワーカー (プロセス) ごとなので、全体の上限は「ワーカー数 × 枠」になる |
+| 2.4 egress 遮断下で動く | compose の network 設定 | k8s の NetworkPolicy が未作成 |
+| 2.5 タイムアウト時に処理を止める | なし | **新規**: kill できる子プロセスで変換する仕組み |
+| 2.6 細工ファイルの上限 | `MAX_EXTRACTED_BYTES` (未実装) | **新規**: anydoc の組み込み上限 + PPTX 分割処理での展開量上限 + 子プロセスのメモリ上限 |
+| 2.7 1 件の異常終了を波及させない | `except Exception` のみ | **新規**: 子プロセスでの隔離。`PanicException` (`BaseException` 系) を捕まえる |
+| 3.1 compose 同梱 | compose.yaml | なし |
+| 3.2 / 3.3 k8s 配布とハードニング | なし | **新規**: k8s manifest 例 |
+| 3.4 ステートレス | 設計上そうなっている | なし |
+| 4.1 / 4.2 マルチテナント隔離 | 同時実行上限 | なし |
+
+下流 (indexing spec) への影響: apps/app の `attachment-text-extractor.ts` は `ErrorCode` で `switch` し、知らないコードは `null` を返す。暗号化・上限超過のコードを足すと、orval で再生成したうえで apps/app 側に対応を足す必要がある。
+
+### 7.3 実装方針の選択肢
+
+**A. 既存コードをその場で直す**
+- 変更箇所: `simple_extractor.py` の書き換え、`extractors/` への PDF / PPTX / XLSX / テキスト系の追加、`limits.py` のタイムアウトの書き換え、`extraction_service.py` への子プロセス実行の組み込み
+- ✅ 変更が最小で、既存テストの多くがそのまま効く
+- ❌ 子プロセス実行・正規化・形式別抽出が既存のモジュールに入り込み、`extraction_service.py` と `limits.py` の責務がぼやける
+
+**B. サービスを一から作り直す**
+- ✅ 新方針に完全に合わせた構成にできる
+- ❌ 完成済みで問題のない受け口側 (認証・設定・スキーマ・OpenAPI 出力・Dockerfile・compose) と、そのテスト約 150 件を捨てることになる。作り直す理由がない
+
+**C. 受け口は残し、変換の中身を新しいモジュールとして作る (組み合わせ)**
+- 残す: `main.py` / `config.py` / `schemas.py` / `middleware/` / `security.py` / `routers/` / `scripts/` / Dockerfile / compose と、それらのテスト
+- 新しく作る: 形式別の抽出、日本語の正規化、子プロセスでの実行 (タイムアウト・メモリ上限・異常終了の隔離) を、受け口から独立した変換モジュールとしてまとめる。ルーターは今の `extract()` の代わりにこのモジュールを呼ぶ
+- 消す: markitdown 前提のコード (`simple_extractor.py`、`_probe_pdf_strategy()`、health の `pdf_strategy`) とそのテスト
+- ✅ 受け口の資産を活かしつつ、変換側を新方針で素直に組める。子プロセスとの境界は「バイト列と形式を渡し、`pages[]` かエラー種別を受け取る」形にでき、単体テストしやすい
+- ❌ 受け口と変換モジュールの間の取り決め (渡すもの、返すもの、エラーの種類) を design で決める必要がある
+
+### 7.4 規模とリスク
+
+- 規模: **M (3〜7 日)**。受け口側はほぼ完成しているが、子プロセスでの実行、形式別の抽出 4 種、正規化、k8s manifest、Python 用 CI が新規
+- リスク: **中**。
+  - 子プロセスでの実行は、read-only rootfs、tmpfs、uvicorn のワーカー数、同時実行の枠と組み合わさるため、未知の点がある
+  - PPTX の分割は anydoc の文書化されていない挙動に頼る (§6.10)
+
+### 7.5 design で調べる必要があること (Research Needed)
+
+1. **子プロセスでの実行方式**
+   - リクエストごとに子プロセスを作るか、あらかじめ作ったプロセスの集まりを使い、止めたら作り直すか
+   - fork と spawn のどちらを使うか
+   - uvicorn のワーカー数・同時実行の枠との関係
+   - read-only rootfs の下で multiprocessing が使う共有メモリ (`/dev/shm`) と一時領域が足りるか
+   - 子プロセスのメモリ上限 (`RLIMIT_AS`) が anydoc (Rust) と PDFium の下で期待どおり効くか
+   - 補足: 子プロセスのタイムアウト管理によく使われる `pebble` は LGPL なので使えない
+2. **XLSX のシート単位の分割**: シート名と区切りの取り方。案は 2 つあります。
+   - `xl/workbook.xml` からシート名を読み、anydoc の見出しと突き合わせる
+   - PPTX と同じく、シートごとに分けて anydoc に渡す
+   - あわせて、非表示シートを対象にするかを決める
+3. **テキスト系の扱い**: 文字コード判定に使うライブラリ (charset-normalizer は MIT)、ipynb で何を取り出すか (セルのソースだけか、出力も含むか)、JSON / XML / YAML をそのまま返すか
+4. **エラーの対応づけ**: anydoc の例外 (`EncryptedError` / `MalformedError` / `MissingPartError` / `ResourceLimitError` / `UnsupportedError` / `PanicException`) と pypdfium2 の例外を `ErrorCode` に対応づける。追加するコードの名前と HTTP ステータス
+5. **pypdfium2 の挙動**: 暗号化された PDF、文字のない (画像だけの) PDF、細工した PDF での振る舞い
+6. **health と readiness の中身**: markitdown 前提の項目を外した後に何を返すか (OpenAPI の変更を伴う)
+7. **イメージの大きさと arm64**: anydoc と pypdfium2 の linux arm64 用 wheel の有無と、実際のイメージの大きさ
