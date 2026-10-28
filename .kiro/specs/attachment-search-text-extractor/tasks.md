@@ -79,7 +79,7 @@
   - _Requirements: 1.5, 1.7, 1.8, 1.10, 1.11, 2.6_
   - _Boundary: OfficeConverter_
 
-- [ ] 3.2 (P) pypdfium2 で PDF をページごとに取り出す処理を実装する
+- [x] 3.2 (P) pypdfium2 で PDF をページごとに取り出す処理を実装する
   - ページ番号 (1 始まり) と、番号だけの文字列のラベルを付けて返す。改行を LF に揃えてから日本語の詰めをかける
   - 開くのにパスワードが要る PDF は暗号化、オーナーパスワードだけの PDF は抽出、開けない PDF は壊れたファイル、ページ数が上限を超えたら上限超過にする
   - 完了の状態: 生成した PDF でページ数どおりの要素が返り、パスワード付き PDF が暗号化、オーナーパスワードだけの PDF が抽出、画像だけの PDF が例外なく空の要素になることをテストで確かめられる
@@ -224,3 +224,5 @@
 - 3.1: `convert_office` は anydoc の例外を `from None` で包み直すが、元の例外 (anydoc が入力の先頭バイトを引用することがある) は `__context__` に残る。子プロセスの入口 (6.1) は `kind` / `detail` だけを親に送り、例外オブジェクトや traceback を送らないこと。
 - 3.1: RLIMIT_AS 超過で起きる `MemoryError` は `convert_office` では internal (500) になる。メモリ超過 (resource_limit_exceeded) として扱うかどうかは 6.1 / 6.3 で決める。
 - 2.4: ZIP の部品を読むときに漏れる例外は BadZipFile だけではない (zlib.error / EOFError / OSError / lzma.LZMAError / NotImplementedError / ValueError / UnicodeDecodeError)。Python 3.12 では未対応の圧縮方式 (method 9) が RuntimeError で出るので、ZIP の暗号化フラグ (bit 0) で encrypted と malformed を分けている。4.1 / 4.3 は `read_part` だけで部品を読むこと。
+- 3.2: `convert_pdf` は PdfiumError 以外を捕まえない (子プロセスの入口が `BaseException` まで受けて internal にする設計)。1 ページが 400 万文字の PDF は最大 RSS が約 540MB になる。ページ内の文字数は 3.2 では抑えられないので、6.3 / 6.4 の RSS 上限と仮想メモリの上限で止まることをテストで確かめる。
+- 3.2: `tests/conversion/test_pdf.py` は `tests/fixture_files.py` の非公開ヘルパー (`_build_pdf`、`_pdf_stream`) を import している。fixture_files.py に手を入れる次の機会に、公開名にするか日本語 PDF の生成処理ごと移す。
