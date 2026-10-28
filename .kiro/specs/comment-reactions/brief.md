@@ -142,6 +142,21 @@
   - コメントのリアルタイム更新（将来入れる場合は、リアクションもその対象になる）
   - GROWI MCP・SDK（コメントの応答の `reactions` を使う場合）
 
+## Future Direction: 絵文字基盤の独立パッケージ化（構想・本スペックの対象外）
+
+PR レビューでの指摘に基づく構想の記録。**本スペックではリファクタしない。** 実施する場合は、Slack カスタム絵文字の別スペックで扱う。
+
+- **指摘**: `EmojiPicker` を `packages/editor` に置き、コメントリアクション（`apps/app`）が使うのは、責務の分離の観点でよくない。`packages/editor` はエディタのためのパッケージで、エディタ以外の画面が使う部品を置く場所ではない。
+- **構想**: Slack カスタム絵文字に対応するとき、`EmojiPicker` を含む絵文字まわりの部品を、`apps/app` からも `packages/editor` からも独立した新規パッケージに置く。`apps/app` と `packages/editor` はどちらもそのパッケージに依存する。
+- **現在の置き場所**（実コードで確認）:
+  - ピッカー部品 `EmojiPicker`: `packages/editor/src/client/components/EmojiPicker/`（`@growi/editor/dist/client/components/EmojiPicker` として公開。`@emoji-mart/react` と `@emoji-mart/data` を遅延ロードする）。利用側は `apps/app` の `features/comment-reaction/client/components/CommentReactionBar/AddReactionButton.tsx`。
+  - エディタツールバーの `EmojiButton`: `packages/editor/src/client/components-internal/CodeMirrorEditor/Toolbar/EmojiButton.tsx`。`EmojiPicker` は使わず、自前で同じ emoji-mart を遅延ロードしている（重複あり）。
+  - 絵文字データ `@growi/emoji-mart-data`: `packages/emoji-mart-data/`（private パッケージ。`apps/app` と `packages/editor` の両方が依存）。利用側は本文レンダラーの `apps/app/src/services/renderer/remark-plugins/emoji.ts`、リアクションキーの `apps/app/src/features/comment-reaction/utils/reaction-key.ts`、エディタの `:` 自動補完 `packages/editor/src/client/services-internal/extensions/emojiAutocompletionSettings.ts`。
+  - emoji-mart 本体への依存: `packages/editor/package.json`（`emoji-mart`、`@emoji-mart/react`、`@emoji-mart/data`）。`apps/app` は `@emoji-mart/data` を devDependency に持つ。
+- **新パッケージに集めることを検討する対象**: `EmojiPicker`、`@growi/emoji-mart-data` に相当する絵文字データと別名の対応表、カスタム絵文字を足すための拡張点（標準絵文字とカスタム絵文字を同じ形で扱う入口）、`EmojiButton` との重複の解消。
+- **未決**: パッケージ名と、既存の `@growi/emoji-mart-data` を取り込むか並べるか。カスタム絵文字の取得元（Slack API）をパッケージに含めるか、`apps/app` 側に置いてパッケージには注入するだけにするか。
+- **前提となる設計**: 絵文字キーの名前空間（`unicode:` / `slack:<workspace>:<name>`）は本スペックで決めてあり、パッケージを分けてもキーの形式は変わらない。
+
 ## Existing Spec Touchpoints
 
 - **Extends**: [comment](../comment/)（コメント一覧 API の応答への `reactions` の追加と、コメント単体の取得 API の新設）。「Amend Target」のとおり、この部分は最終タスクで `comment` スペックへ書き戻す。それ以外のリアクション機能は、本スペックが新しい機能として持ち続ける。
