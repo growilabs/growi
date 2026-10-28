@@ -106,6 +106,21 @@ describe('findEndpointsByEndpointRegex', () => {
     expect(result).toEqual(['/_api/search']);
   });
 
+  it('returns [] for a q that carries a query string, matching the path-only ES index', async () => {
+    await prisma.activities.createMany({
+      data: [
+        makeActivityData({ endpoint: '/_api/search?access_token=abc123' }),
+      ],
+    });
+
+    const result = await prisma.activities.findEndpointsByEndpointRegex(
+      '/_api/search?access_token=ab',
+      { offset: 0, limit: 10 },
+    );
+
+    expect(result).toEqual([]);
+  });
+
   it('returns [] when no endpoint matches the query', async () => {
     await prisma.activities.createMany({
       data: [makeActivityData({ endpoint: '/api/v3/pages' })],
@@ -123,7 +138,7 @@ describe('findEndpointsByEndpointRegex', () => {
     '',
     ' ',
     'a',
-  ])('short-circuits to [] for q=%j even when a matching endpoint exists (MIN_QUERY_LENGTH guard)', async (q) => {
+  ])('short-circuits to [] for q=%j even when a matching endpoint exists (minQueryLength guard)', async (q) => {
     await prisma.activities.createMany({
       data: [makeActivityData({ endpoint: 'aaaaaaaaaa' })],
     });

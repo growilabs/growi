@@ -306,6 +306,9 @@ type SuggestionFieldSpec = {
   // Below this trimmed length the prefix matches most of the collection, so
   // the fallback short-circuits instead of scanning (ES has no such cost).
   readonly minQueryLength: number;
+  // A query the ES-indexed value can never match; the fallback must not
+  // answer it either.
+  readonly isUnmatchableQuery?: (q: string) => boolean;
 };
 
 const SNAPSHOT_USERNAME_SUGGESTION: SuggestionFieldSpec = {
@@ -321,6 +324,8 @@ const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
   groupKey: { $arrayElemAt: [{ $split: ['$endpoint', '?'] }, 0] },
   // Every endpoint starts with '/', which narrows nothing.
   minQueryLength: 3,
+  // The indexed value is cut at the first '?', so it never contains one.
+  isUnmatchableQuery: (q) => q.includes('?'),
 };
 
 const SNAPSHOT_USERNAME_GROUP_STAGE = buildFieldGroupStage(
@@ -340,13 +345,10 @@ const buildFieldPrefixMatchStage = (fieldPath: string, q: string) => ({
 const buildFieldSuggestionPipeline = (
   spec: SuggestionFieldSpec,
   q: string,
-  option: { offset: number; limit: number },
+  { offset, limit }: { offset: number; limit: number },
 ) => {
   if (q.trim().length < spec.minQueryLength) return null;
-
-  const opt = option || {};
-  const offset = opt.offset || 0;
-  const limit = opt.limit || 10;
+  if (spec.isUnmatchableQuery?.(q)) return null;
 
   return [
     buildFieldPrefixMatchStage(spec.fieldPath, q),
