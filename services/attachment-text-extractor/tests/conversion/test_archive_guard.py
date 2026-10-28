@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from app.conversion.archive_guard import inspect_archive, read_part
+from app.conversion.archive_guard import copy_part, inspect_archive, read_part
 from app.conversion.errors import ConversionError
 from app.conversion.limits import ConversionLimits
 
@@ -306,3 +306,111 @@ def test_read_part_on_corrupt_bzip2_or_lzma_entry_is_malformed(method: int) -> N
         with pytest.raises(ConversionError) as exc:
             read_part(archive, PPTX_PART, 1_000_000)
     assert exc.value.kind == "malformed"
+
+
+# ---------------------------------------------------------------------------
+# copy_part: same guarantees as read_part, without holding the part in memory
+# ---------------------------------------------------------------------------
+
+
+class _Sink(io.RawIOBase):
+    """Counts written bytes and keeps none of them."""
+
+    def __init__(self) -> None:
+        self.size = 0
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, data) -> int:  # noqa: ANN001 - bytes-like
+        self.size += len(data)
+        return len(data)
+
+
+def _copy(archive: zipfile.ZipFile, name: str, budget: int) -> bytes:
+    dest = io.BytesIO()
+    copied = copy_part(archive, name, dest, budget)
+    assert copied == len(dest.getvalue())
+    return dest.getvalue()
+
+
+def test_copy_part_copies_the_bytes_within_budget() -> None:
+    with zipfile.ZipFile(io.BytesIO(_zip([("a.xml", b"12345")]))) as zf:
+        assert _copy(zf, "a.xml", 5) == b"12345"
+
+
+def test_copy_part_over_budget_is_limit_exceeded() -> None:
+    with zipfile.ZipFile(io.BytesIO(_zip([("a.xml", b"A" * 1000)]))) as zf:
+        with pytest.raises(ConversionError) as exc:
+            _copy(zf, "a.xml", 999)
+    assert exc.value.kind == "limit_exceeded"
+
+
+def test_copy_part_with_header_lying_about_size_is_malformed() -> None:
+    honest = _zip([("a.xml", b"B" * 5000)], compression=zipfile.ZIP_STORED)
+    lying = honest.replace(struct.pack("<II", 5000, 5000), struct.pack("<II", 10, 10))
+    with zipfile.ZipFile(io.BytesIO(lying)) as zf:
+        with pytest.raises(ConversionError) as exc:
+            _copy(zf, "a.xml", 100_000)
+    assert exc.value.kind == "malformed"
+
+
+def test_copy_part_missing_part_is_malformed() -> None:
+    with zipfile.ZipFile(io.BytesIO(_zip([("a.xml", b"x")]))) as zf:
+        with pytest.raises(ConversionError) as exc:
+            _copy(zf, "nope.xml", 10)
+    assert exc.value.kind == "malformed"
+
+
+@pytest.mark.parametrize(
+    ("data", "kind"),
+    [
+        pytest.param(_corrupt_deflate_zip(), "malformed", id="corrupt-deflate-stream"),
+        pytest.param(_unsupported_method_zip(), "malformed", id="unsupported-compression-method"),
+        pytest.param(_encrypted_entry_zip(), "encrypted", id="zip-level-encryption-flag"),
+    ],
+)
+def test_copy_part_on_undecodable_entry_maps_to_a_conversion_error(data: bytes, kind: str) -> None:
+    with _opened(data, PPTX_PART, _limits()) as archive:
+        with pytest.raises(ConversionError) as exc:
+            _copy(archive, PPTX_PART, 1_000_000)
+    assert exc.value.kind == kind
+
+
+@pytest.mark.parametrize("storage", [zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED])
+def test_copy_part_on_data_truncated_after_open_is_malformed(storage: int) -> None:
+    rng = random.Random(2)
+    buf = io.BytesIO(_zip([(PPTX_PART, bytes(rng.getrandbits(8) for _ in range(5000)))], storage))
+    archive = zipfile.ZipFile(buf)
+    buf.truncate(30 + len(PPTX_PART) + 100)
+    with archive, pytest.raises(ConversionError) as exc:
+        _copy(archive, PPTX_PART, 1_000_000)
+    assert exc.value.kind == "malformed"
+
+
+def test_copy_part_leaves_the_archive_usable() -> None:
+    with zipfile.ZipFile(io.BytesIO(_zip([("a.xml", b"aaa"), ("b.xml", b"bbb")]))) as zf:
+        assert _copy(zf, "a.xml", 10) == b"aaa"
+        with pytest.raises(ConversionError):
+            _copy(zf, "b.xml", 1)
+        assert _copy(zf, "b.xml", 10) == b"bbb"
+        assert read_part(zf, "a.xml", 10) == b"aaa"
+
+
+def test_copy_part_streams_a_large_part_with_flat_memory() -> None:
+    chunk = b"\x00" * _MIB
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf, zf.open(PPTX_PART, "w", force_zip64=True) as part:
+        for _ in range(200):
+            part.write(chunk)
+    del chunk
+    with zipfile.ZipFile(io.BytesIO(buf.getvalue())) as archive:
+        sink = _Sink()
+        tracemalloc.start()
+        try:
+            copied = copy_part(archive, PPTX_PART, sink, 512 * _MIB)
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+    assert copied == sink.size == 200 * _MIB
+    assert peak < 10 * _MIB
