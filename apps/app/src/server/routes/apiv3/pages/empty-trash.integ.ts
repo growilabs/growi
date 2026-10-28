@@ -282,4 +282,21 @@ describe('DELETE /empty-trash', () => {
       }
     });
   });
+
+  it('judges each trashed page by the complete deletion authority for a single page', async () => {
+    const [ownPage] = await createTrashedPages([
+      { path: `${FIXTURE_ROOT}/own`, creator: requester._id },
+    ]);
+    await crowi.configManager.updateConfigs({
+      'security:pageCompleteDeletionAuthority':
+        PageDeleteConfigValue.AdminAndAuthor,
+      'security:pageRecursiveCompleteDeletionAuthority':
+        PageDeleteConfigValue.AdminOnly,
+    });
+
+    const response = await emptyTrash();
+
+    expect(response.status).toBe(200);
+    expect(await findSurvivingPaths([ownPage.path])).toEqual([]);
+  });
 });

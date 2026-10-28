@@ -561,11 +561,13 @@ export const setup = (crowi) => {
 
       const pagesInTrash = await crowi.pageService.findAllTrashPages(req.user);
 
+      // Each trashed page is deleted on its own, not together with its
+      // descendants, so it is judged by the single-page authority.
       const deletablePages =
         await crowi.pageService.filterPagesByCanDeleteCompletely(
           pagesInTrash,
           req.user,
-          true,
+          false,
         );
 
       if (pagesInTrash.length > 0 && deletablePages.length === 0) {
