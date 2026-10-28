@@ -234,7 +234,11 @@ export const ChatIntegrationDestinationSelect = ({
           {isOpen && (
             // biome-ignore lint/a11y/noStaticElementInteractions: closes the menu on Escape, which reactstrap does not do for focus inside the menu
             <div
-              style={{ maxHeight: '50vh', overflowY: 'auto' }}
+              // In the modal the menu opens downward from the middle of the screen, so it gets less room than the bottom bar's upward menu.
+              style={{
+                maxHeight: openInModal ? '30vh' : '50vh',
+                overflowY: 'auto',
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
                   setIsOpen(false);
