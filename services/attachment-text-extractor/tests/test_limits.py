@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.limits import ExtractionTimeoutError, FileTooLargeError, Limits, ServiceBusyError
+from app.limits import FileTooLargeError, Limits, ServiceBusyError
 
 # Use anyio as the async test runner (pytest-asyncio not installed; anyio plugin is)
 pytestmark = pytest.mark.anyio
@@ -27,13 +27,11 @@ pytestmark = pytest.mark.anyio
 def make_limits(
     *,
     max_file_size_mb: int = 10,
-    timeout_s: int = 5,
     max_concurrency: int = 2,
 ) -> Limits:
     """Return a Limits instance with test-friendly defaults."""
     return Limits(
         max_file_size_mb=max_file_size_mb,
-        timeout_s=timeout_s,
         max_concurrency=max_concurrency,
     )
 
@@ -52,10 +50,6 @@ class TestExceptions:
 
     def test_file_too_large_is_exception(self) -> None:
         exc = FileTooLargeError("big")
-        assert isinstance(exc, Exception)
-
-    def test_extraction_timeout_is_exception(self) -> None:
-        exc = ExtractionTimeoutError("slow")
         assert isinstance(exc, Exception)
 
 

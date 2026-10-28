@@ -54,7 +54,7 @@ File size is checked against the **actual accumulated body bytes**, not `Content
 
 ### 5. MIME whitelist via registry
 
-The format whitelist and conversion pipeline are being rebuilt (see `.kiro/specs/attachment-search-text-extractor/`); until the runner is wired, `POST /extract` returns 503 (`extraction_failed`) after the slot and size checks.
+The format whitelist and conversion pipeline are being rebuilt (see `.kiro/specs/attachment-search-text-extractor/`). `POST /extract` takes a slot, checks the size, then calls `ConversionRunner.run()` (read from `app.state.runner`) and maps the outcome via `app/routers/extract_errors.py`; the router never calls a conversion library. Until the app lifespan creates the runner (task 7.2), `app.state.runner` must be set by the caller (tests do).
 
 ### 6. Dependency licensing & egress
 
@@ -90,14 +90,17 @@ Commit the updated `openapi.json` together with the service change. If you add a
 
 `POST /extract` failure modes map to fixed (HTTP status, `ErrorCode`) pairs. These are part of the API contract — changing them is a breaking change for `packages/attachment-text-extractor-client`.
 
-| Condition | HTTP | `ErrorCode` |
+| Condition (runner `FailureKind`) | HTTP | `ErrorCode` |
 |---|---|---|
 | Missing/invalid Bearer token | 401 | `unauthorized` |
-| MIME not in registry | 400 | `unsupported_format` |
+| Format not supported (`unsupported`) | 400 | `unsupported_format` |
 | Body exceeds `MAX_FILE_SIZE_MB` | 413 | `file_too_large` |
-| Extraction exceeded `TIMEOUT_S` | 408 | `extraction_timeout` |
+| Password-protected document (`encrypted`) | 422 | `file_encrypted` |
+| Broken document (`malformed`) | 422 | `extraction_failed` |
+| Limit hit: `limit_exceeded`, `memory_exceeded`, `result_too_large` | 422 | `resource_limit_exceeded` |
+| Deadline or CPU limit hit (`timeout`) | 408 | `extraction_timeout` |
 | Concurrency limit reached | 503 | `service_busy` |
-| Unhandled extractor exception | 500 | `extraction_failed` |
+| Child died without a result (`crashed`), unexpected exception (`internal`) | 500 | `extraction_failed` |
 
 ## Specs and Discovery
 

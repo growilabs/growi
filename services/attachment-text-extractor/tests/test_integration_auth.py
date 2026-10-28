@@ -8,22 +8,29 @@ Boundary: ExtractRouter, BearerAuthMiddleware
 from __future__ import annotations
 
 
+class _EchoRunner:
+    """Stand-in until the app lifespan creates the real runner (task 7.2)."""
+
+    async def run(self, request):  # noqa: ANN001, ANN201
+        from app.conversion.results import ConversionSuccess
+        from app.schemas import PageInfo
+
+        return ConversionSuccess(pages=[PageInfo(pageNumber=None, label=None, content="ok")], mime_type="text/plain")
+
+
 class TestAuthIntegration:
     """Test Bearer token enforcement on POST /extract."""
 
-    def test_valid_token_reaches_extract(self, client, test_token):
-        """Valid Bearer token should not return 401.
-
-        A tiny TXT file with a correct token passes auth and reaches the
-        extraction handler (temporary 503 until the runner is wired).
-        """
+    def test_valid_token_reaches_extract(self, client, test_token, monkeypatch):
+        """A correct token passes auth and reaches the extraction handler."""
+        monkeypatch.setattr(client.app.state, "runner", _EchoRunner(), raising=False)
         txt_content = b"hello world"
         resp = client.post(
             "/extract",
             headers={"Authorization": f"Bearer {test_token}"},
             files={"file": ("hello.txt", txt_content, "text/plain")},
         )
-        assert resp.status_code == 503, f"Expected 503, got {resp.status_code}: {resp.text}"
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
     def test_missing_token_returns_401(self, client):
         """Request with no Authorization header must return 401.

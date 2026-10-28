@@ -7,20 +7,30 @@ Processing order:
   1. Bearer auth (enforced by BearerAuthMiddleware at the app level)
   2. Semaphore slot acquisition (ServiceBusyError → 503 service_busy)
   3. File size check (FileTooLargeError → 413 file_too_large)
-  4. Conversion — not wired yet; responds 503 until the
-     conversion runner is connected to this router.
+  4. ConversionRunner.run() in a child process; the outcome is mapped per
+     app.routers.extract_errors. No conversion library is called here.
 
-Requirements: 2.1, 2.3, 3.3
+Requirements: 1.1, 1.6, 1.10, 1.11, 2.1, 2.2, 2.3, 2.6, 2.7, 4.2
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, UploadFile
+import logging
+import re
+import time
+
+from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.config import Settings
+from app.conversion.errors import ConversionFailure
+from app.conversion.results import ConversionSuccess
 from app.limits import FileTooLargeError, Limits, ServiceBusyError
+from app.routers.extract_errors import FAILURE_RESPONSES
+from app.runner import ConversionRequest, ConversionRunner
 from app.schemas import ErrorCode, ErrorResponse, ExtractResponse
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Module-level Limits instance (lazily initialised)
@@ -43,10 +53,14 @@ def _get_limits() -> Limits:
         settings = Settings()
         limits = Limits(
             max_file_size_mb=settings.MAX_FILE_SIZE_MB,
-            timeout_s=settings.TIMEOUT_S,
             max_concurrency=settings.MAX_CONCURRENCY,
         )
     return limits
+
+
+def get_runner(request: Request) -> ConversionRunner:
+    """Return the runner the application lifespan stored on ``app.state``."""
+    return request.app.state.runner  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------
@@ -62,12 +76,48 @@ def _error_response(code: ErrorCode, message: str, status_code: int) -> JSONResp
     return JSONResponse(content=body.model_dump(), status_code=status_code)
 
 
+def _json_safe(text: str) -> str:
+    """Replace lone surrogates, which would make the JSON response fail to encode."""
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return text.encode("utf-8", errors="replace").decode("utf-8")
+    return text
+
+
+def _success_response(outcome: ConversionSuccess) -> ExtractResponse:
+    pages = [page.model_copy(update={"content": _json_safe(page.content)}) for page in outcome.pages]
+    return ExtractResponse(
+        pages=pages,
+        mimeType=outcome.mime_type,
+        extractedCharacters=sum(len(page.content) for page in pages),
+    )
+
+
+def _format_of(filename: str) -> str:
+    """Extension only: the file name itself is user-controlled and stays out of the log."""
+    suffix = filename.rsplit(".", 1)[-1] if "." in filename else ""
+    return re.sub(r"[^a-z0-9]", "", suffix.lower())[:10] or "unknown"
+
+
+def _log_request(*, fmt: str, size: int, started: float, result: str, rss_mb: int | None) -> None:
+    logger.info(
+        "extract format=%s size=%d duration_ms=%d result=%s child_peak_rss_mb=%s",
+        fmt,
+        size,
+        round((time.perf_counter() - started) * 1000),
+        result,
+        "unknown" if rss_mb is None else rss_mb,
+    )
+
+
 @router.post(
     "/extract",
     response_model=ExtractResponse,
     summary="Extract text from an uploaded file",
 )
 async def post_extract(
+    request: Request,
     file: UploadFile = File(..., description="File to extract text from"),  # noqa: B008
     mimeType: str | None = Form(None, description="Optional MIME type hint"),  # noqa: B008, N803
 ) -> JSONResponse | ExtractResponse:
@@ -76,33 +126,47 @@ async def post_extract(
     Authentication is handled upstream by BearerAuthMiddleware; this handler
     will only be reached by authenticated requests.
     """
-    # Resolve the limits instance (lazy singleton).
     _limits = _get_limits()
+    runner = get_runner(request)
+    filename = file.filename or ""
+    fmt = _format_of(filename)
+    started = time.perf_counter()
 
-    # Step 1: Acquire concurrency slot.
     try:
         async with _limits.acquire_slot():
-            # Step 2: Read file bytes and enforce size.
             data = await file.read()
             try:
                 await _limits.enforce_size(data)
             except FileTooLargeError as exc:
-                return _error_response(
-                    ErrorCode.file_too_large,
-                    str(exc),
-                    413,
-                )
+                _log_request(fmt=fmt, size=len(data), started=started, result="file_too_large", rss_mb=None)
+                return _error_response(ErrorCode.file_too_large, str(exc), 413)
 
-            # Step 3: Conversion is not wired yet.
-            return _error_response(
-                ErrorCode.extraction_failed,
-                "Text extraction is temporarily unavailable",
-                503,
+            try:
+                outcome = await runner.run(ConversionRequest(data=data, filename=filename, mime_hint=mimeType))
+            except Exception:
+                # The runner is not meant to raise; anything that does is an unexpected failure of this request only.
+                logger.exception("extract runner raised format=%s size=%d", fmt, len(data))
+                _log_request(fmt=fmt, size=len(data), started=started, result="internal", rss_mb=None)
+                code, status, message = FAILURE_RESPONSES["internal"]
+                return _error_response(code, message, status)
+
+            if isinstance(outcome, ConversionSuccess):
+                _log_request(
+                    fmt=outcome.mime_type,
+                    size=len(data),
+                    started=started,
+                    result="ok",
+                    rss_mb=outcome.child_peak_rss_mb,
+                )
+                return _success_response(outcome)
+
+            assert isinstance(outcome, ConversionFailure)
+            _log_request(
+                fmt=fmt, size=len(data), started=started, result=outcome.kind, rss_mb=outcome.child_peak_rss_mb
             )
+            code, status, message = FAILURE_RESPONSES[outcome.kind]
+            return _error_response(code, message, status)
 
     except ServiceBusyError as exc:
-        return _error_response(
-            ErrorCode.service_busy,
-            str(exc),
-            503,
-        )
+        logger.info("extract format=%s result=service_busy", fmt)
+        return _error_response(ErrorCode.service_busy, str(exc), 503)

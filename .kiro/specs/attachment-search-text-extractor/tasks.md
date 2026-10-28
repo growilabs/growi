@@ -162,7 +162,7 @@
   - _Requirements: 2.2, 2.5, 2.6, 2.7, 4.2_
 
 - [ ] 7. HTTP の受け口との接続と OpenAPI の書き出し
-- [ ] 7.1 抽出のルーターを実行管理につなぎ、エラー表どおりの応答にする
+- [x] 7.1 抽出のルーターを実行管理につなぎ、エラー表どおりの応答にする
   - 同時実行の枠とサイズ検査はそのまま使い、時間切れの処理をリソース制限の部品から外す
   - ルーターは変換ライブラリを呼ばず、実行管理の結果を設計のエラー表どおりの `ErrorCode` と HTTP ステータスに変える (暗号化・上限超過・壊れたファイルは 422、想定外と異常終了は 500)
   - 1 件ごとに、形式・大きさ・所要時間・結果・子の最大 RSS を 1 行のログに出す。ファイルの中身と Authorization ヘッダは出さない
@@ -247,3 +247,4 @@
 - 6.3 の改善案 (どれも必須ではない): pidfd が使えず forkserver を落とした珍しい組み合わせで、動いている子が exitcode 255 と読まれて SIGKILL を送らず、戻った時点で子が短い間残る。2 回の見回りの間に終わる変換は最大 RSS が小さく報告される (結果を受け取った後に VmHWM を読み直していない)。子が結果のパイプを先に閉じて動き続けると、期限と RSS を見ずに最大 2 秒待つ。`_read_exact` が bytearray から bytes に写すので結果 1 件あたり一時的に約 2 倍のメモリを使う。
 - 6.4: 実測で、1 シート 10 万行 × 1 列の XLSX は子の RSS が 328〜357MB になり、RSS 上限 320MB で止まった (設計の見積もり「10 万セルで 214MB」は合わなかった)。ユーザー判断で `MAX_XLSX_CELLS` の既定を 70,000 に下げた (design.md / research.md 更新済み)。実測 (既定の上限のもと): 1 シート 7 万行 × 1 列 = 最大 RSS 285MB (89%)・VmPeak 419MB、1 シート 7 千行 × 10 列 = 231MB、5 シート × 1 万 4 千行 = 146MB、44MB の DOCX = 266MB (83%)、48MB の DOCX (画像 12 枚) = 281MB (88%)。余裕が薄いので、環境差でテストが不安定になった場合はまず `tests/runner/test_child_isolation.py` の `0.95 × 上限` の許容を見る。5 シート × 1 万 4 千行は約 0.47 秒で変換できるので、時間切れのテストの期限 0.2 秒は余裕が約 2.3 倍。
 - 6.4: ワーカーを SIGKILL したとき、そのワーカーの forkserver の UNIX ソケットの一時フォルダ (`/tmp/pymp-*`) が残る。テストは `TMPDIR` をテスト用の場所にして防いでいる。本番では k8s が `/tmp` (tmpfs) を Pod ごと捨てるので問題ないが、compose では残りうる (8.1 で `/tmp` を tmpfs にする)。申し送り: タスク 7.1 は「時間切れ・異常終了の後でも次のリクエストが同時実行の枠を取れる」ことを確かめる (枠の返却は router の責務)。
+- 7.1: `POST /extract` は枠 → 本文の読み取り → サイズ検査 (413) → `runner.run` → `extract_errors.FAILURE_RESPONSES` の順。runner は `request.app.state.runner` から取る (`get_runner`、代わりの値なし)。7.2 は lifespan で `app.state.runner` を作り、`test_main.py` / `test_integration_auth.py` が使っている偽の runner の差し込みを、本物の起動に置き換える。改善案 (必須ではない): `extract.py` の `_json_safe` は `wire._require_str` が既にペアになっていない surrogate を拒否しているため、まず通らない上に置き換え文字が `?` で (core は U+FFFD)、毎回全ページを UTF-8 に変換し直す。消すか U+FFFD に揃える。ログの `format=` が成功時は MIME、失敗時は拡張子で揃っていない。503 の行に size / duration_ms / child_peak_rss_mb が無い。成功応答は `model_copy` + `response_model` の再検証 + `jsonable_encoder` で複製が多い (設計の 16MiB × 3 の範囲内)。`TestSlotRelease::test_slot_is_released_when_the_request_is_cancelled` は `Limits` だけを見ていてルーターを通っていない。時間の上限の申し送り (最悪 約 59 秒 vs apps/app 側 60 秒) は 8.1 / 9.2 で必ず扱う。

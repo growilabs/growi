@@ -140,16 +140,27 @@ class TestExtractAuthIntegration:
         assert body.get("code") == "unauthorized"
 
 
+class _EchoRunner:
+    """Stand-in until the app lifespan creates the real runner (task 7.2)."""
+
+    async def run(self, request):  # noqa: ANN001, ANN201
+        from app.conversion.results import ConversionSuccess
+        from app.schemas import PageInfo
+
+        return ConversionSuccess(pages=[PageInfo(pageNumber=None, label=None, content="ok")], mime_type="text/plain")
+
+
 class TestExtractIntakeIntegration:
     """POST /extract — authenticated requests reach the intake path."""
 
-    def test_extract_with_auth_returns_temporary_503(self, client, test_token) -> None:
-        """Until the runner is wired, a valid request gets 503 (extraction_failed)."""
+    def test_extract_with_auth_returns_pages(self, client, test_token, monkeypatch) -> None:
+        """An authenticated upload reaches the runner and gets the extracted pages."""
+        monkeypatch.setattr(client.app.state, "runner", _EchoRunner(), raising=False)
         sample_bytes = (FIXTURES_DIR / "sample.txt").read_bytes()
         response = client.post(
             "/extract",
             headers={"Authorization": f"Bearer {test_token}"},
             files={"file": ("sample.txt", BytesIO(sample_bytes), "text/plain")},
         )
-        assert response.status_code == 503
-        assert response.json()["code"] == "extraction_failed"
+        assert response.status_code == 200
+        assert response.json()["pages"][0]["content"] == "ok"

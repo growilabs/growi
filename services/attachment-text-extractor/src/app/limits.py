@@ -30,10 +30,6 @@ class FileTooLargeError(Exception):
     """Raised when the uploaded file exceeds the configured size limit (Req 2.1)."""
 
 
-class ExtractionTimeoutError(Exception):
-    """Raised when extraction exceeds the configured timeout (Req 2.2)."""
-
-
 # ---------------------------------------------------------------------------
 # Limits class
 # ---------------------------------------------------------------------------
@@ -47,7 +43,6 @@ class Limits:
 
     Args:
         max_file_size_mb: Maximum accepted file size in mebibytes.
-        timeout_s: Maximum seconds allowed for a single extraction.
         max_concurrency: Maximum simultaneous extraction slots.
     """
 
@@ -55,12 +50,10 @@ class Limits:
         self,
         *,
         max_file_size_mb: int,
-        timeout_s: int,
         max_concurrency: int,
     ) -> None:
         self._max_bytes: int = max_file_size_mb * 1024 * 1024
         self._max_file_size_mb: int = max_file_size_mb
-        self._timeout_s: int = timeout_s
         self._semaphore: asyncio.Semaphore = asyncio.Semaphore(max_concurrency)
 
     @asynccontextmanager
