@@ -384,7 +384,9 @@ describe('LegacyPasswordCleanupSetting', () => {
       await userEvent.click(deleteButton());
       await screen.findByText(`${PREFIX}.confirm.title`);
 
-      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      await userEvent.click(
+        screen.getByRole('button', { name: 'commons:Cancel' }),
+      );
 
       await waitFor(() =>
         expect(screen.queryByText(`${PREFIX}.confirm.title`)).toBeNull(),
