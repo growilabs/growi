@@ -9,7 +9,7 @@ _最終更新: 2026-10-28_
 1. **決定事項** — いま決まっていること。実装はここに従う
 2. **採用理由と根拠** — なぜそう決めたか。予備案と、判断に使った計測値
 3. **不採用にした選択肢** — 検討して採らなかったものと、その理由の一覧
-4. **既存実装とのギャップ分析** — design フェーズの入力。未決事項 (design で調べること) は §4.5 にまとめてある
+4. **既存実装とのギャップ分析** — design フェーズの入力。design に入る前の未決事項は §4.5 (すべて確定済み)
 5. **経緯** — 判断が変わってきた流れの要約と、参考にした外部記事
 
 umbrella 側の資料: [../attachment-search/research.md](../attachment-search/research.md) (末尾の「抽出アーキテクチャ選択の根拠」)、[../attachment-search/research-docker-image.md](../attachment-search/research-docker-image.md) (既製の Docker image の調査)。
@@ -23,17 +23,22 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 | 対象 | 抽出方法 | 返す単位 (`pages[]`) |
 |---|---|---|
 | DOCX / RTF / EPUB / CSV | firecrawl/anydoc | 1 要素 |
-| XLSX | anydoc | シートごと (シートの区切り方は未決、§4.5 の 2) |
+| XLSX | `xl/workbook.xml` の中でシート名を一意な目印に置き換え、全シートを表示状態にしてから anydoc を 1 回だけ呼び、出力を目印の見出しで切る | シートごと |
 | PPTX | スライドごとに 1 枚だけの PPTX パッケージに分けてから、それぞれを anydoc に渡す | スライドごと |
 | 旧形式 PPT | 分けられない (ZIP ではない) ので、丸ごと anydoc に渡す | 1 要素 |
-| 旧形式 DOC / XLS、OpenDocument (ODT / ODS / ODP) | anydoc | 1 要素 |
-| PDF | pypdfium2 でページごとに取り出す | ページごと |
+| 旧形式 DOC / XLS、OpenDocument (ODT / ODS / ODP) | anydoc (XLS は anydoc の形式名 `xlsx` を明示して渡す) | 1 要素 |
+| PDF | pypdfium2 でページごとに取り出す。開くのにパスワードが要らない (オーナーパスワードのみの) PDF は抽出する | ページごと |
+| CSV / TSV | 文字コードを判定して UTF-8 にしてから、anydoc に形式 `csv` を明示して渡す (区切り文字は anydoc が判定する) | 1 要素 |
 | HTML | サービス自身で処理する。Python 標準の `html.parser` で script / style を除き、タグを取り除く | 1 要素 |
-| TXT / JSON / XML / YAML / MD / LOG / ipynb | サービス自身で処理する。文字コードを判定 (Shift_JIS を含む) してテキストとして返す | 1 要素 |
+| TXT / MD / LOG / JSON / YAML | サービス自身で処理する。文字コードを判定してデコードしたテキストをそのまま返す (JSON / YAML は解析しない) | 1 要素 |
+| XML | サービス自身で処理する。DOCTYPE を取り除き、タグを取り除いたテキストを返す (エンティティは展開しない) | 1 要素 |
+| ipynb | サービス自身で処理する。セルの source と、テキストの出力 (stream、text/plain) を取り出す。画像の base64 は捨て、出力ごとに文字数の上限を設ける | 1 要素 |
 | Outlook MSG | 対象外。サポート対象外のエラーを返す | — |
 
 - markitdown と pdfminer.six は依存に入れない。
 - 抽出方法にかかわらず、すべての経路の最後に共通の後処理をかける。改行コードを LF に揃え、日本語の文字 (ひらがな・カタカナ・漢字) の間に入った 1 文字分の空白・改行を取り除く (Req 1.9)。この後処理は入出力が文字列だけの純粋関数にする。
+- 後処理の後に中身が空になった要素は `pages[]` から除く。ただし `pages[]` は最低 1 要素を必ず返す (全部が空なら中身が空の 1 要素)。下流の indexing は `pages[]` の要素ごとに検索文書を作り、ファイル名だけの文書は失敗したときにしか作らないため、空の配列を返すと画像だけの PDF や空のブックがファイル名でも見つからなくなる。
+- 文字コードの判定は、BOM → UTF-8 (厳密) → charset-normalizer (候補を `cp932` / `euc_jp` / `iso2022_jp` / `cp1252` に絞る) → cp932 → latin-1 の順に試す。HTML は先頭の `<meta charset>` を優先する。
 
 ### 1.2 ライブラリごとの使い方の条件
 
@@ -59,12 +64,34 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 
 - 改行が `\r\n` で出るので、日本語の後処理の前に LF に揃える。
 - PDFium (pypdfium2 の中身) は、1 つのプロセスの中で複数のスレッドから同時に使うことを想定していない。スレッドではなく、別々のプロセスから使う。
+- 開くのにパスワードが要る PDF は `PdfiumError` (err_code 4 / 5) になる。これを暗号化として扱う。オーナーパスワードだけの PDF は普通に開けるので抽出する (Req 1.12)。
+- 画像だけの PDF は例外にならず、全ページで `count_chars()` が 0 になる。空の結果として扱う (上の「最低 1 要素」の規則に従う)。
+- 壊れた PDF は err_code 1 / 2 / 3 になるが、PDFium が修復して全文を取り出せることもある。ページ数の上限はサービス側で設ける (空白ページ 10 万枚で 1.3 秒・155MB)。
+
+**XLSX のシート分割**
+
+- `xl/workbook.xml` の中で、各シートの名前を `ZZ<リクエストごとの乱数><連番>ZZ` に置き換え、非表示のシートを表示状態に戻してから、anydoc を 1 回だけ呼ぶ。出力を `## 目印` の行で切り、目印から元のシート名に戻す。30 シートのファイルで 205ms。
+- 元のシート名は、XML の文字参照 (`&lt;` など) を元に戻してから使う。
+- `pageNumber` は workbook.xml に並んでいる順番 (1 始まり、非表示・空・グラフのシートも数える) にし、`label` は元のシート名にする。空のシートは返さないので番号が飛ぶことがある。非表示のシートは、ファイルを開いた人なら誰でも表示に戻せるので対象に含める。
+- 目印の数が合わないときは、XLSX 全体を 1 要素として返し、ログに残す (別のシート分割処理を持たない)。
+- anydoc の版を固定した比較テストを置く。
+
+**ZIP を書き換える経路の前提**
+
+- PPTX と XLSX は、`zipfile.is_zipfile` が真で、必要な部品 (`ppt/presentation.xml` / `xl/workbook.xml`) があるときだけ書き換えの経路に入れる。暗号化された OOXML や旧形式は ZIP ではない (中身は CFB 形式) ので、書き換えずに形式を明示して anydoc にそのまま渡す。こうすると anydoc から型の付いた例外 (`EncryptedError` など) が返る。
+- ZIP を開く前に、`infolist()` でエントリ数と、申告された展開後のサイズの合計を確かめる。CPython は申告されたサイズを超えて展開しない (超えると CRC エラーになる) ことを確かめたので、申告値の検査で足りる。
 
 ### 1.3 サービスの構成
 
 - **動かす場所**: apps/app のプロセスの中では動かさない。独立したコンテナとして動かし、apps/app からは HTTP (multipart) で呼ぶ。
 - **配布**: GROWI.cloud では k8s の共有 Deployment + HPA (負荷に応じて Pod 数を自動で増減する仕組み) として、テナント間で共有する。OSS 版は docker-compose に 1 コンテナとして同梱する。サービスは状態を持たない。
-- **変換の実行**: 変換は、外から kill できる子プロセスで実行する。時間切れのときは子プロセスごと止め、同時実行の枠とメモリを確実に解放する (Req 2.5)。1 件の異常終了は、その子プロセスの中で閉じる (Req 2.7)。具体的な方式 (プロセスの作り方、数、メモリ上限のかけ方) は未決 (§4.5 の 1)。
+- **変換の実行**: 変換は、リクエストごとに 1 つの子プロセスで実行する。子プロセスは Python 標準の multiprocessing の forkserver 方式 (起動時に小さな親プロセスを 1 つ立てておき、変換のたびにそこから子を複製する方式) で作る。
+  - 時間切れのときは親が子に SIGKILL を送る。これで変換そのものが止まり、同時実行の枠とメモリが解放される (Req 2.5)。
+  - 1 件の異常終了は、その子の中で閉じる (Req 2.7)。
+  - メモリの主な守りは、親が子の RSS (プロセスが実際に使っている物理メモリの量) を 50ms ごとに見張り、上限を超えたら止める方式にする。OS の仮想メモリ上限 (`RLIMIT_AS`) は最後の歯止めとして、RSS の上限より大きめに設定する。
+  - 親と子のやり取りは Pipe だけで行い、子から親へは JSON を 1 回送る (pickle は使わない)。共有メモリ (`/dev/shm`) は使わない。
+  - uvicorn のワーカーが落ちたときに子が残らないよう、子は「依頼元のワーカーだけが書き込み側を持つパイプ」を見張り、それが閉じたら自分で終了する。CPython の非公開属性には頼らない。
+  - 全体の同時実行数は「uvicorn のワーカー数 × ワーカーごとの枠の数」になる。既定はワーカー 1 つとし、`MAX_CONCURRENCY` がそのまま全体の上限になるようにする。
 - **HTTP フレームワーク**: Python 3.12 + FastAPI + Uvicorn。
 - **ビルドツール**: uv。`uv.lock` で依存を固定し、`uv sync --locked --no-dev` で入れる。
 - **Dockerfile**: `python:3.12-slim-bookworm` をベースにした multi-stage 構成 (ビルド用の段と実行用の段を分け、実行用には成果物だけをコピーする構成)。ビルド用の段で uv を使って `.venv` を作り、実行用の段には `.venv` だけをコピーする。ffmpeg や exiftool などの外部バイナリは入れない。
@@ -79,14 +106,16 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 - **OCR と LLM は使わない**。画像の文字認識も、LLM による補助もしない。
 - **外向き通信 (egress) なしで動く**。k8s では NetworkPolicy で外向き通信を遮断する。anydoc の `ocr='hosted'` を使わないのはこのため (§1.2)。
 - **外部バイナリを使わない**。依存は PyPI から入る Python パッケージだけにする。ネイティブ拡張を含む wheel (ビルド済みの配布パッケージ) は使ってよい。anydoc と pypdfium2 はこれにあたる。
-- **ライセンスは MIT / Apache-2.0 / BSD 互換のものだけ**を採用する。GPL / AGPL 系は使わない。LGPL の `pebble` も使わないことにした (§3.7)。
+- **ライセンスは MIT / Apache-2.0 / BSD / PSF などの許容的なライセンスのものだけ**を採用する (defusedxml などは PSF)。GPL / AGPL 系は使わない。LGPL の `pebble` も使わないことにした (§3.7)。anydoc の wheel に同梱された SBOM の 113 部品も MIT / Apache / BSD / Zlib 系のみ。
 
 | 採用した依存 | ライセンス |
 |---|---|
 | firecrawl/anydoc (`firecrawl-anydoc`) | MIT |
 | pypdfium2 | BSD-3 / Apache-2.0 |
 | uv | Apache-2.0 |
-| charset-normalizer (文字コード判定の候補、§4.5 の 3) | MIT |
+| charset-normalizer | MIT |
+
+anydoc・pypdfium2・charset-normalizer は、いずれも linux x86_64 / aarch64 の manylinux_2_17 用 wheel がある (anydoc は musllinux 用も、abi3)。`python:3.12-slim-bookworm` (glibc 2.36) で問題なく動く。
 
 ### 1.5 見直しの条件
 
@@ -99,7 +128,7 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 
 ### 1.6 未決事項
 
-まだ決めていないこと (子プロセスでの実行方式、XLSX のシートの分け方、テキスト系の扱い、エラーコードの対応づけ、pypdfium2 の異常系の挙動、health の中身、image の大きさと arm64、XLSX のメモリ対策 など) は、§4.5「design で調べること」に一か所でまとめてある。
+なし。§4.5 の各項目は design で確定した (確定先を §4.5 の各項目に書いてある)。エラーコードの対応、設定の既定値、配備の条件は design.md に書く。
 
 ---
 
@@ -247,7 +276,7 @@ anydoc の出力にはスライドの区切りが無い。見出しを手がか�
 
 - 6MB の XLSX (5 シート × 2 万行) で、どちらのライブラリも約 620MB まで膨らむ。4 並列で変換すると anydoc 2.4GB / markitdown 1.9GB に達した。
 - アップロードの上限 (`maxFileSizeBytes`、既定 50MB) ではこのメモリを抑えられない。コンテナのメモリ上限は「入力に対するメモリの倍率 × 同時に変換する数」で決まり、ライブラリを替えても解決しない。
-- XLSX だけ受け付けるサイズの上限を下げるか、同時に変換する数を絞る必要がある。どちらにするかは design で決める (§4.5 の 9)。
+- 対策として、形式ごとのサイズ上限ではなく、子プロセスの RSS の上限で止める方式にした。入力の大きさとメモリの関係は形式や中身でばらつくため、実際に使ったメモリで止めるほうが確実だから。RSS の上限 300MB に対して、実際に止まったのは 309〜315MB だった。既定の上限は 620MB の XLSX が通る値にする (design.md で数値を定める)。
 
 ### 2.9 サービスの構成を選んだ理由
 
@@ -394,6 +423,27 @@ umbrella の [research-docker-image.md](../attachment-search/research-docker-ima
 | `packages/attachment-text-extractor/` に置く | `packages/` は「TS のライブラリ」を置く慣習が強く、実行するサービスを置くのは GROWI の既存の設計から外れる |
 | `pebble` (子プロセスのタイムアウト管理によく使われるライブラリ) | LGPL なのでライセンスの方針に合わない |
 
+### 3.8 変換の実行方式と細かな処理方法 (design の調査で見送ったもの)
+
+| 選択肢 | 不採用の理由 |
+|---|---|
+| 変換をスレッドで実行する | スレッドは外から止められず、Req 2.5 を満たせない。PDFium は 1 プロセス内の複数スレッドから使えない |
+| multiprocessing の fork 方式 | スレッドを持つ親 (uvicorn) から複製するため、子が止まることがあり、Python 3.12 で DeprecationWarning が出る。1 回あたりの上乗せは 3.5ms と最も小さかった |
+| 常駐ワーカーのプール (自作) | 大きな XLSX の変換後、ワーカーが 609MB を持ったまま返さない。CPU 時間の上限が仕事ごとではなく累積で効く |
+| `concurrent.futures.ProcessPoolExecutor` | 実行中の仕事を止められない。ワーカーが 1 つ落ちると、実行中の他の仕事と次の依頼まですべて失敗する (BrokenProcessPool) ので Req 2.7 を満たさない。共有メモリ (`/dev/shm`) も必要 |
+| subprocess で小さな CLI を起動する方式 (次点) | 隔離は最も素直だが、起動と import で 1 回あたり約 50ms かかり (forkserver の約 4 倍)、CPU もそのぶん使う |
+| `RLIMIT_AS` (仮想メモリの上限) を主なメモリの守りにする | anydoc (Rust) は確保に失敗すると abort し、親からは異常終了と区別できない。最後の歯止めにとどめる |
+| CPython の非公開属性 `_forkserver_alive_fd` を閉じて、ワーカーが落ちたときの子の残留を防ぐ | 非公開属性なので Python の版上げで壊れうる。依頼元だけが持つパイプを子が見張る方式にした |
+| `PDEATHSIG` (親が死んだら子も止める OS の設定) で子の残留を防ぐ | forkserver の子では「親」が forkserver になり、uvicorn のワーカーが落ちても効かない |
+| ファイル本体を Process の引数で子に渡す | pickle がイベントループを止める (6MB で 55〜68ms)。別の Pipe に非同期で書き込む |
+| XLSX: anydoc の `## シート名` の見出しをそのまま突き合わせる | 見出しを出す規則が一定しない (2 枚でも片方が非表示だと出ない、グラフシートだと出る)。シート名の先頭の空白が削られ、`<` は `\<` になる。非表示と空のシートは出力されない |
+| XLSX: シートごとに 1 枚だけのブックに分けて変換する | 正確だが、共有文字列をシートごとに読み直すため遅い (30 シート・共有文字列 5.4MB のファイルで 0.17 秒 → 1.3 秒)。グラフシートだけのパッケージは MalformedError になる |
+| XLSX: anydoc の `to_document()` で構造データを受け取る | 非表示のシートは同じように落ちる。Markdown への変換を自前で書く必要があり、埋め込み画像のバイト列も持ち続ける |
+| 文字コード: UTF-8 → cp932 → latin-1 の順に試すだけ | EUC-JP と cp1252 が文字化けしたまま通ってしまう |
+| 文字コード: charset-normalizer を候補を絞らずに使う | 短い Shift_JIS が big5、latin-1 が utf_16_be と誤判定された |
+| JSON / YAML を解析して値だけ取り出す | 深い入れ子の JSON は `json.loads` で RecursionError になり、YAML はエイリアスの展開で膨らむ。デコードしたテキストをそのまま使えば検索には十分 |
+| オーナーパスワードだけの PDF を暗号化として拒否する | 開くのにパスワードが要らず、誰でも読める内容なので、拒否すると検索できる文書が減るだけになる (Req 1.12 として要件に明記した) |
+
 ---
 
 ## 4. 既存実装とのギャップ分析 (2026-10-28)
@@ -483,7 +533,7 @@ umbrella の [research-docker-image.md](../attachment-search/research-docker-ima
 
 ### 4.5 design で調べること (Research Needed)
 
-この節が、本 spec の未決事項の一覧である。
+この節は、design に入る前に未決だった事項の一覧である。すべて design で確定した (各項目の末尾に確定先を書いてある)。
 
 1. **子プロセスでの実行方式**
    - リクエストごとに子プロセスを作るか、あらかじめ作ったプロセスの集まりを使い、止めたら作り直すか
@@ -492,20 +542,32 @@ umbrella の [research-docker-image.md](../attachment-search/research-docker-ima
    - read-only rootfs の下で multiprocessing が使う共有メモリ (`/dev/shm`) と一時領域が足りるか
    - 子プロセスのメモリ上限 (`RLIMIT_AS`) が anydoc (Rust) と PDFium の下で期待どおり効くか
    - 補足: 子プロセスのタイムアウト管理によく使われる `pebble` は LGPL なので使えない (§3.7)
+   - → 確定: forkserver で 1 リクエスト 1 子プロセス (§1.3、§3.8)
 2. **XLSX のシート単位の分割**: シート名と区切りの取り方。案は 2 つ。
    - `xl/workbook.xml` からシート名を読み、anydoc の見出しと突き合わせる
    - PPTX と同じく、シートごとに分けて anydoc に渡す
    - あわせて、非表示シートを対象にするかを決める
+   - → 確定: シート名を目印に置き換えて 1 回だけ変換する。非表示シートは含め、空のシートは除く (§1.1、§1.2)
 3. **テキスト系の扱い**: 文字コード判定に使うライブラリ (charset-normalizer は MIT)、ipynb で何を取り出すか (セルのソースだけか、出力も含むか)、JSON / XML / YAML をそのまま返すか
+   - → 確定 (§1.1、§1.2、§3.8)
 4. **エラーの対応づけ**: anydoc の例外 (`EncryptedError` / `MalformedError` / `MissingPartError` / `ResourceLimitError` / `UnsupportedError` / `PanicException`) と pypdfium2 の例外を `ErrorCode` に対応づける。追加するコードの名前と HTTP ステータス
+   - → 確定: `file_encrypted` / `resource_limit_exceeded` を追加 (design.md のエラー処理の節)
 5. **pypdfium2 の挙動**: 暗号化された PDF、文字のない (画像だけの) PDF、細工した PDF での振る舞い
+   - → 確定 (§1.2)
 6. **health と readiness の中身**: markitdown を前提にした項目を外した後に何を返すか (OpenAPI の変更を伴う)
+   - → 確定: `pdf_strategy` を外す。apps/app は health / readiness を呼んでいない (design.md)
 7. **image の大きさと arm64**: anydoc と pypdfium2 の linux arm64 用 wheel の有無と、実際の image の大きさ
+   - → 確定: arm64 用 wheel はある (§1.4)。image の大きさは CI で上限を検査する (design.md)
 8. **抽出の失敗を下流でどう扱うか**: anydoc は暗号化・破損などで文書全体を失敗にし、部分的な結果を返さない (§1.2)。pypdfium2 でも、暗号化された PDF ではパスワードの例外が上がる (詳しい挙動は 5 で確かめる)。これらの失敗を、indexing spec の Req 2.4 (失敗時はメタデータだけの文書を登録する) にどう対応づけるか。下流 spec と合わせて決める
+   - → 確定: エラーとして返し、下流がメタデータだけの文書を作る。成功時は最低 1 要素を返す (§1.1)。下流で直す箇所は design.md の「再検証が必要になる条件」に書く
 9. **大きな XLSX のメモリ対策**: XLSX だけ受け付けるサイズの上限を下げるか、同時に変換する数を絞るか。コンテナのメモリ上限をどう決めるか (§2.8)
+   - → 確定: 子プロセスの RSS の上限で止める (§1.3、§2.8)。メモリ上限の式は design.md
 10. **uv の image の版の固定**: Dockerfile で uv の image が `latest` 指定になっている
+    - → 確定: 版を固定する (design.md)
 11. **CI の具体的なコマンド**: `uv sync --locked` / `uv run pytest` / `uv run ruff check` / `docker build` を、どの順でどう組むか
+    - → 確定 (design.md)
 12. **TSV の扱い**: Req 1.5 は TSV を対象に含むが、§1.1 の表には TSV の経路が無い。CSV と同じく anydoc に形式を明示して渡すのか、テキストとして返すのかを決める
+    - → 確定: CSV と同じく、デコードしてから anydoc に `csv` を明示して渡す (§1.1)
 
 ---
 
