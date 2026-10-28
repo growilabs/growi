@@ -121,7 +121,7 @@
   - _Depends: 2.2, 3.1_
 
 - [ ] 5. 変換層の取りまとめ
-- [ ] 5.1 形式の判定から結果の組み立てまでを 1 つの入口にまとめる
+- [x] 5.1 形式の判定から結果の組み立てまでを 1 つの入口にまとめる
   - 形式を決めて経路ごとの変換を呼び、全要素の改行を揃え、中身が空の要素を除き、全部空なら空の 1 要素を返す
   - 結果の合計が上限を超えたら上限超過にする。失敗はすべて失敗の種類に分けて返す
   - 完了の状態: 対応する全形式の生成ファイルを入口に渡すと、設計どおりの単位・番号・ラベルの要素が返り、画像だけの PDF が空の 1 要素になり、MSG がサポート対象外になることをテストで確かめられる
@@ -233,3 +233,5 @@
 - 4.3: `pptx_split.py` と `xlsx_split.py` に、OOXML の XML 処理 (`_XML_ERRORS`、`_parse`、`_register_prefixes`、`_local_name`) の小さな複製がある。共通モジュールへの切り出しは 9.2 の前に整理する。
 - 4.4: 標準の `html.parser` は、`<a/////…>` や `</a x x …>` 4MB、属性だらけの 1 つのタグ 4MB で 450〜700MB を使う (`convert_text` では防げない)。anydoc の CSV 変換は入力の約 36 倍のメモリを使い、20MB の CSV で 721MB になった。6.3 / 6.4 の RSS テストで確かめ、CSV には変換前のサイズ上限 (または行数・セル数の事前検査) が要るかどうかを 5.1 / 9.2 で決める。
 - 4.4: `convert_text` の HTML / XML は半角空白・タブだけをまとめ、全角空白 (U+3000) と `&nbsp;` は残す。HTML / XML / ipynb / plain / csv のどの経路も、対になっていない surrogate を結果に含めない (含むと JSON の応答が UnicodeEncodeError で 500 になる)。
+- 5.1: `convert(data, filename, mime_hint, limits) -> ConversionSuccess` は失敗のとき `ConversionError` を投げる (`ConversionOutcome` を返すのは runner 側)。6.1 の子プロセスの入口がこれを `ConversionFailure` に変え、`BaseException` まで受けて `SystemExit` / `KeyboardInterrupt` だけ投げ直す。core は想定外の `Exception` (MemoryError 含む) を `internal` にまとめるので、MemoryError をメモリ超過として扱うと 6.1 / 6.3 で決めるなら core 側も直す。design.md のファイル構成欄 (183 行目付近) の `convert(data, filename, mime_hint)` は limits が抜けた書き間違いで、正式な契約は limits 付き。
+- 5.1: 拡張子を `.xls` にした入力は旧形式の経路に入り、セル数の検査を通らない (設計どおり。RSS 上限が受け持つ)。40MB の DOCX / PPTX を CSV / HTML として渡すとテストプロセスの最大メモリが約 0.9GB になる (4.4 の既知の問題)。6.4 でこの組み合わせも子プロセスの上限で止まることを確かめる。
