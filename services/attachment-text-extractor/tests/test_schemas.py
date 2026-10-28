@@ -144,7 +144,7 @@ class TestExtractResponse:
 
 
 class TestErrorCode:
-    """ErrorCode enum must define all 6 required values as str-based enum."""
+    """ErrorCode enum must define all 8 required values as str-based enum."""
 
     def test_imports_successfully(self) -> None:
         """ErrorCode must be importable from app.schemas."""
@@ -193,11 +193,21 @@ class TestErrorCode:
 
         assert ErrorCode.extraction_failed == "extraction_failed"
 
-    def test_exactly_six_members(self) -> None:
-        """ErrorCode must have exactly 6 members."""
+    def test_has_file_encrypted(self) -> None:
         from app.schemas import ErrorCode
 
-        assert len(list(ErrorCode)) == 6
+        assert ErrorCode.file_encrypted == "file_encrypted"
+
+    def test_has_resource_limit_exceeded(self) -> None:
+        from app.schemas import ErrorCode
+
+        assert ErrorCode.resource_limit_exceeded == "resource_limit_exceeded"
+
+    def test_exactly_eight_members(self) -> None:
+        """ErrorCode must have exactly 8 members."""
+        from app.schemas import ErrorCode
+
+        assert len(list(ErrorCode)) == 8
 
     def test_all_values_are_strings(self) -> None:
         """All ErrorCode values must be strings (JSON-serializable as-is)."""
@@ -272,8 +282,8 @@ class TestSchemaIntegration:
         assert "mimeType" in props
         assert "extractedCharacters" in props
 
-    def test_error_code_all_six_values(self) -> None:
-        """Completion criterion: ErrorCode must have exactly 6 values."""
+    def test_error_code_all_eight_values(self) -> None:
+        """Completion criterion: ErrorCode must have exactly 8 values."""
         from app.schemas import ErrorCode
 
         values = {member.value for member in ErrorCode}
@@ -284,6 +294,8 @@ class TestSchemaIntegration:
             "extraction_timeout",
             "service_busy",
             "extraction_failed",
+            "file_encrypted",
+            "resource_limit_exceeded",
         }
         assert values == expected
 

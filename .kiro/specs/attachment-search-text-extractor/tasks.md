@@ -29,7 +29,7 @@
   - 完了の状態: `uv sync --locked` が通り、既存のテストがすべて成功し、新しいライブラリを読み込める
   - _Requirements: 1.7_
 
-- [ ] 1.3 設定項目・エラーコード・変換の共通の型を定める
+- [x] 1.3 設定項目・エラーコード・変換の共通の型を定める
   - 設定に `MAX_CHILD_RSS_MB` (320)、`MAX_XLSX_CELLS` (100000)、`MAX_RESULT_BYTES` (16MiB)、`MAX_PDF_PAGES` (5000)、`MAX_ARCHIVE_ENTRIES` (10000)、`MAX_ARCHIVE_UNCOMPRESSED_MB` (512) を加え、既定値を `MAX_CONCURRENCY` 3、`TIMEOUT_S` 55 に変える。使われていなかった `MAX_EXTRACTED_BYTES` を外し、`MAX_CONCURRENCY` の説明を「全体の上限はワーカー数 × この値」に直す
   - API のエラーコードに暗号化 (`file_encrypted`) と上限超過 (`resource_limit_exceeded`) を加える
   - 変換の失敗の種類、変換の上限の値、形式と経路の型など、変換層と実行管理の両方が使う型を用意する。ipynb の出力 1 つあたりの文字数の上限は、設定項目にせず固定値 10000 として変換の上限の値に含める

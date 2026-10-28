@@ -49,6 +49,8 @@ class ErrorCode(StrEnum):
     extraction_timeout = "extraction_timeout"  # Req 2.2: extraction exceeded TIMEOUT_S
     service_busy = "service_busy"  # Req 2.3: concurrency limit reached
     extraction_failed = "extraction_failed"  # General extraction error
+    file_encrypted = "file_encrypted"  # Req 1.10: password-protected document
+    resource_limit_exceeded = "resource_limit_exceeded"  # Req 2.6: memory / result / page / archive limit hit
 
 
 class ErrorResponse(BaseModel):

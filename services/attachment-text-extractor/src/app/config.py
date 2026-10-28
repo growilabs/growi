@@ -26,23 +26,36 @@ class Settings(BaseSettings):
         MAX_FILE_SIZE_MB (int, default 50): Upper limit on the size of an
             uploaded file.  Requests that exceed this limit are rejected with
             HTTP 413 (Req 2.1).
-        TIMEOUT_S (int, default 60): Maximum seconds allowed for a single
-            extraction task before it is cancelled (Req 2.2).
-        MAX_CONCURRENCY (int, default 4): Maximum number of extractions that
-            may run simultaneously.  Set to ``max(2, workers * 2)`` in the
-            deployment environment (Req 2.3).  The default of 4 is a safe
-            conservative value for a two-worker deployment.
-        MAX_EXTRACTED_BYTES (int, default 524288000): Maximum bytes of
-            extracted Markdown to keep per file.  Acts as a zip-bomb guard.
-            Default is 500 MiB.
+        TIMEOUT_S (int, default 55): Maximum seconds allowed for a single
+            extraction before the child process is killed (Req 2.2).  Keep it
+            at least 5 seconds below the caller's timeout.
+        MAX_CONCURRENCY (int, default 3): Maximum number of simultaneous
+            extractions per worker.  The overall cap is workers x this value
+            (Req 2.3).
+        MAX_CHILD_RSS_MB (int, default 320): RSS ceiling for one conversion
+            child process (Req 2.6).
+        MAX_XLSX_CELLS (int, default 100000): Maximum total cell count across
+            all sheets of an XLSX file (Req 2.6).
+        MAX_RESULT_BYTES (int, default 16 MiB): Maximum total size of one
+            extraction result (Req 2.6).
+        MAX_PDF_PAGES (int, default 5000): Maximum PDF page count (Req 2.6).
+        MAX_ARCHIVE_ENTRIES (int, default 10000): Maximum ZIP entry count for
+            PPTX / XLSX (Req 2.6).
+        MAX_ARCHIVE_UNCOMPRESSED_MB (int, default 512): Maximum declared
+            uncompressed size of a ZIP archive (Req 2.6).
         LOG_LEVEL (str, default "INFO"): Python ``logging`` level name.
     """
 
-    # --- Limits (Reqs 2.1, 2.2, 2.3) ---
+    # --- Limits (Reqs 2.1, 2.2, 2.3, 2.6) ---
     MAX_FILE_SIZE_MB: int = 50
-    TIMEOUT_S: int = 60
-    MAX_CONCURRENCY: int = 4  # static default; set via env for production deployments
-    MAX_EXTRACTED_BYTES: int = 500 * 1024 * 1024  # 500 MiB zip-bomb guard
+    TIMEOUT_S: int = 55
+    MAX_CONCURRENCY: int = 3
+    MAX_CHILD_RSS_MB: int = 320
+    MAX_XLSX_CELLS: int = 100_000
+    MAX_RESULT_BYTES: int = 16 * 1024 * 1024
+    MAX_PDF_PAGES: int = 5000
+    MAX_ARCHIVE_ENTRIES: int = 10_000
+    MAX_ARCHIVE_UNCOMPRESSED_MB: int = 512
 
     # --- Observability ---
     LOG_LEVEL: str = "INFO"

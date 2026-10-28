@@ -8,6 +8,15 @@ that all other fields have correct defaults / types.
 import pytest
 from pydantic import ValidationError
 
+NEW_KEYS = (
+    "MAX_CHILD_RSS_MB",
+    "MAX_XLSX_CELLS",
+    "MAX_RESULT_BYTES",
+    "MAX_PDF_PAGES",
+    "MAX_ARCHIVE_ENTRIES",
+    "MAX_ARCHIVE_UNCOMPRESSED_MB",
+)
+
 
 class TestSettingsMissingToken:
     """ATTACHMENT_EXTRACTOR_SERVICE_TOKEN is required; omitting it must raise."""
@@ -60,7 +69,7 @@ class TestSettingsDefaults:
         """Return a Settings instance with only the required token set."""
         monkeypatch.setenv("ATTACHMENT_EXTRACTOR_SERVICE_TOKEN", "test-secret-token")
         # Clear optional overrides to exercise defaults
-        for key in ("MAX_FILE_SIZE_MB", "TIMEOUT_S", "MAX_CONCURRENCY", "MAX_EXTRACTED_BYTES", "LOG_LEVEL"):
+        for key in ("MAX_FILE_SIZE_MB", "TIMEOUT_S", "MAX_CONCURRENCY", "LOG_LEVEL", *NEW_KEYS):
             monkeypatch.delenv(key, raising=False)
 
         from importlib import reload
@@ -74,13 +83,27 @@ class TestSettingsDefaults:
         assert settings.MAX_FILE_SIZE_MB == 50  # type: ignore[attr-defined]
 
     def test_timeout_s_default(self, settings: object) -> None:
-        assert settings.TIMEOUT_S == 60  # type: ignore[attr-defined]
+        assert settings.TIMEOUT_S == 55  # type: ignore[attr-defined]
 
-    def test_max_concurrency_default_is_at_least_2(self, settings: object) -> None:
-        assert settings.MAX_CONCURRENCY >= 2  # type: ignore[attr-defined]
+    def test_max_concurrency_default(self, settings: object) -> None:
+        assert settings.MAX_CONCURRENCY == 3  # type: ignore[attr-defined]
 
-    def test_max_extracted_bytes_default(self, settings: object) -> None:
-        assert settings.MAX_EXTRACTED_BYTES == 500 * 1024 * 1024  # type: ignore[attr-defined]
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            ("MAX_CHILD_RSS_MB", 320),
+            ("MAX_XLSX_CELLS", 100000),
+            ("MAX_RESULT_BYTES", 16 * 1024 * 1024),
+            ("MAX_PDF_PAGES", 5000),
+            ("MAX_ARCHIVE_ENTRIES", 10000),
+            ("MAX_ARCHIVE_UNCOMPRESSED_MB", 512),
+        ],
+    )
+    def test_new_limit_defaults(self, settings: object, name: str, expected: int) -> None:
+        assert getattr(settings, name) == expected
+
+    def test_max_extracted_bytes_is_removed(self, settings: object) -> None:
+        assert not hasattr(settings, "MAX_EXTRACTED_BYTES")
 
     def test_log_level_default(self, settings: object) -> None:
         assert settings.LOG_LEVEL == "INFO"  # type: ignore[attr-defined]
@@ -95,7 +118,7 @@ class TestSettingsTyping:
     @pytest.fixture()
     def settings(self, monkeypatch: pytest.MonkeyPatch) -> object:
         monkeypatch.setenv("ATTACHMENT_EXTRACTOR_SERVICE_TOKEN", "typed-token")
-        for key in ("MAX_FILE_SIZE_MB", "TIMEOUT_S", "MAX_CONCURRENCY", "MAX_EXTRACTED_BYTES", "LOG_LEVEL"):
+        for key in ("MAX_FILE_SIZE_MB", "TIMEOUT_S", "MAX_CONCURRENCY", "LOG_LEVEL", *NEW_KEYS):
             monkeypatch.delenv(key, raising=False)
 
         from importlib import reload
@@ -114,8 +137,9 @@ class TestSettingsTyping:
     def test_max_concurrency_is_int(self, settings: object) -> None:
         assert isinstance(settings.MAX_CONCURRENCY, int)  # type: ignore[attr-defined]
 
-    def test_max_extracted_bytes_is_int(self, settings: object) -> None:
-        assert isinstance(settings.MAX_EXTRACTED_BYTES, int)  # type: ignore[attr-defined]
+    @pytest.mark.parametrize("name", NEW_KEYS)
+    def test_new_limits_are_int(self, settings: object, name: str) -> None:
+        assert isinstance(getattr(settings, name), int)
 
     def test_log_level_is_str(self, settings: object) -> None:
         assert isinstance(settings.LOG_LEVEL, str)  # type: ignore[attr-defined]
@@ -162,3 +186,16 @@ class TestSettingsEnvOverride:
         reload(config_module)
         s = config_module.Settings()
         assert s.LOG_LEVEL == "DEBUG"
+
+
+class TestSettingsNewEnvOverride:
+    def test_env_overrides_new_limit(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("ATTACHMENT_EXTRACTOR_SERVICE_TOKEN", "tok")
+        monkeypatch.setenv("MAX_CHILD_RSS_MB", "640")
+
+        from importlib import reload
+
+        import app.config as config_module
+
+        reload(config_module)
+        assert config_module.Settings().MAX_CHILD_RSS_MB == 640
