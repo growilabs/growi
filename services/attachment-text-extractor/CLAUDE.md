@@ -46,7 +46,7 @@ All runtime configuration is loaded via `Settings()` (Pydantic `BaseSettings`) a
 
 ### 3. XXE hardening on boot
 
-`apply_xxe_hardening()` must be called once at startup, before any XML is parsed. DOCX / XLSX / PPTX / EPUB are XML-in-ZIP and can carry crafted DTDs that trigger external-entity resolution (network egress) or billion-laughs DoS. The lxml API contract assertion inside the function is intentional — failure means the process cannot guarantee safety and must not start.
+`apply_xxe_hardening()` must be called once at startup, before any XML is parsed. DOCX / XLSX / PPTX / EPUB are XML-in-ZIP and can carry crafted DTDs that trigger external-entity resolution (network egress) or billion-laughs DoS.
 
 ### 4. Resource limits enforced post-read
 
@@ -54,11 +54,11 @@ File size is checked against the **actual accumulated body bytes**, not `Content
 
 ### 5. MIME whitelist via registry
 
-The extractor registry (`services/extractors/__init__.py`) is the **only** authoritative format whitelist. To add support for a new format, add a MIME → extractor entry and an extension → MIME entry there. Never branch on extension or content inside the router — keep dispatch table-driven.
+The format whitelist and conversion pipeline are being rebuilt (see `.kiro/specs/attachment-search-text-extractor/`); until the runner is wired, `POST /extract` returns 503 (`extraction_failed`) after the slot and size checks.
 
 ### 6. Dependency licensing & egress
 
-`markitdown[all]` is deliberately excluded. Only the extras that are MIT-licensed and run fully offline are permitted. The rationale and the list of excluded extras are documented in `pyproject.toml` comments — that file is the source of truth; do not duplicate the list here.
+Dependencies must be MIT/permissive-licensed and run fully offline (no network egress, no external binaries). The rationale lives in `pyproject.toml` comments.
 
 ## Coding Conventions
 

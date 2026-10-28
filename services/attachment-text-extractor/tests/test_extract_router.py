@@ -1,9 +1,8 @@
 """Tests for the extract router (POST /extract).
 
-Task 4.2 completion criteria:
-- POST /extract (multipart) returns 200 + ExtractResponse for TXT input
+Covers the intake path of POST /extract:
 - Bearer auth is enforced (401 without token)
-- Error cases map to correct HTTP status codes
+- Slot and size errors map to 503 service_busy / 413 file_too_large
 """
 
 from __future__ import annotations
@@ -51,10 +50,10 @@ def sample_txt_bytes() -> bytes:
     return (FIXTURES_DIR / "sample.txt").read_bytes()
 
 
-class TestExtractHappyPath:
-    """POST /extract — normal success cases."""
+class TestExtractIntake:
+    """POST /extract — behavior after the slot and size checks."""
 
-    def test_txt_returns_200(
+    def test_valid_upload_returns_temporary_503(
         self,
         extract_client: TestClient,
         auth_headers: dict[str, str],
@@ -65,85 +64,8 @@ class TestExtractHappyPath:
             headers=auth_headers,
             files={"file": ("sample.txt", BytesIO(sample_txt_bytes), "text/plain")},
         )
-        assert response.status_code == 200
-
-    def test_txt_response_has_pages(
-        self,
-        extract_client: TestClient,
-        auth_headers: dict[str, str],
-        sample_txt_bytes: bytes,
-    ) -> None:
-        response = extract_client.post(
-            "/extract",
-            headers=auth_headers,
-            files={"file": ("sample.txt", BytesIO(sample_txt_bytes), "text/plain")},
-        )
-        body = response.json()
-        assert "pages" in body
-        assert isinstance(body["pages"], list)
-        assert len(body["pages"]) >= 1
-
-    def test_txt_response_has_mime_type(
-        self,
-        extract_client: TestClient,
-        auth_headers: dict[str, str],
-        sample_txt_bytes: bytes,
-    ) -> None:
-        response = extract_client.post(
-            "/extract",
-            headers=auth_headers,
-            files={"file": ("sample.txt", BytesIO(sample_txt_bytes), "text/plain")},
-        )
-        body = response.json()
-        assert "mimeType" in body
-        assert isinstance(body["mimeType"], str)
-
-    def test_txt_response_has_extracted_characters(
-        self,
-        extract_client: TestClient,
-        auth_headers: dict[str, str],
-        sample_txt_bytes: bytes,
-    ) -> None:
-        response = extract_client.post(
-            "/extract",
-            headers=auth_headers,
-            files={"file": ("sample.txt", BytesIO(sample_txt_bytes), "text/plain")},
-        )
-        body = response.json()
-        assert "extractedCharacters" in body
-        assert isinstance(body["extractedCharacters"], int)
-        assert body["extractedCharacters"] >= 0
-
-    def test_extracted_characters_equals_sum_of_page_content_lengths(
-        self,
-        extract_client: TestClient,
-        auth_headers: dict[str, str],
-        sample_txt_bytes: bytes,
-    ) -> None:
-        """extractedCharacters must equal sum of all page content lengths."""
-        response = extract_client.post(
-            "/extract",
-            headers=auth_headers,
-            files={"file": ("sample.txt", BytesIO(sample_txt_bytes), "text/plain")},
-        )
-        body = response.json()
-        total = sum(len(p["content"]) for p in body["pages"])
-        assert body["extractedCharacters"] == total
-
-    def test_txt_with_mime_hint(
-        self,
-        extract_client: TestClient,
-        auth_headers: dict[str, str],
-        sample_txt_bytes: bytes,
-    ) -> None:
-        """Optional mimeType parameter should be accepted."""
-        response = extract_client.post(
-            "/extract",
-            headers=auth_headers,
-            files={"file": ("sample.txt", BytesIO(sample_txt_bytes), "text/plain")},
-            data={"mimeType": "text/plain"},
-        )
-        assert response.status_code == 200
+        assert response.status_code == 503
+        assert response.json().get("code") == "extraction_failed"
 
 
 class TestExtractAuth:
@@ -176,17 +98,6 @@ class TestExtractAuth:
 class TestExtractErrorCodes:
     """Error code → HTTP status mapping."""
 
-    def test_unsupported_format_returns_400(self, extract_client: TestClient, auth_headers: dict[str, str]) -> None:
-        """An unsupported file type triggers UnsupportedFormatError → 400."""
-        response = extract_client.post(
-            "/extract",
-            headers=auth_headers,
-            files={"file": ("photo.bmp", BytesIO(b"\x00\x01\x02"), "image/bmp")},
-        )
-        assert response.status_code == 400
-        body = response.json()
-        assert body.get("code") == "unsupported_format"
-
     def test_file_too_large_returns_413(self, extract_client: TestClient, auth_headers: dict[str, str]) -> None:
         """A file exceeding MAX_FILE_SIZE_MB triggers FileTooLargeError → 413."""
         from app.limits import FileTooLargeError
@@ -202,20 +113,6 @@ class TestExtractErrorCodes:
         assert response.status_code == 413
         body = response.json()
         assert body.get("code") == "file_too_large"
-
-    def test_extraction_timeout_returns_408(self, extract_client: TestClient, auth_headers: dict[str, str]) -> None:
-        """ExtractionTimeoutError → 408."""
-        from app.limits import ExtractionTimeoutError
-
-        with patch("app.limits.Limits.with_timeout", side_effect=ExtractionTimeoutError("timed out")):
-            response = extract_client.post(
-                "/extract",
-                headers=auth_headers,
-                files={"file": ("sample.txt", BytesIO(b"hello"), "text/plain")},
-            )
-        assert response.status_code == 408
-        body = response.json()
-        assert body.get("code") == "extraction_timeout"
 
     def test_service_busy_returns_503(self, extract_client: TestClient, auth_headers: dict[str, str]) -> None:
         """ServiceBusyError → 503."""

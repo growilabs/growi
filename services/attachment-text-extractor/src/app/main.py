@@ -3,15 +3,13 @@
 Startup sequence (Req 3.3, 3.4):
 1. Load Settings — fail fast if ATTACHMENT_EXTRACTOR_SERVICE_TOKEN is absent or empty.
 2. Apply XXE hardening (defusedxml.defuse_stdlib()) before any XML is parsed.
-3. Probe PDF extraction capability and cache the strategy as a module global.
-4. Wire health and extract routers.
-5. Add BearerAuthMiddleware (token from Settings).
-6. Add a minimal structured JSON logging middleware (full format in task 4.4).
+3. Wire health and extract routers.
+4. Add BearerAuthMiddleware (token from Settings).
+5. Add a minimal structured JSON logging middleware (full format in task 4.4).
 """
 
 from __future__ import annotations
 
-import inspect
 import json
 import logging
 import time
@@ -27,32 +25,6 @@ from app.routers import extract, health
 from app.security import apply_xxe_hardening
 
 logger = logging.getLogger(__name__)
-
-# Module-level cache for the PDF extraction strategy, populated at startup.
-# Exposed at module level so the health router can read it when needed.
-PDF_EXTRACTION_STRATEGY: str = "pdfminer_fallback"
-
-
-def _probe_pdf_strategy() -> str:
-    """Probe whether the installed markitdown supports per-page extraction.
-
-    Inspects the signature of ``MarkItDown().convert_stream``.  If the
-    ``extract_pages`` parameter is present the version supports per-page
-    PDF extraction; otherwise fall back to pdfminer-based extraction.
-
-    Returns:
-        "markitdown" if ``extract_pages`` is present in the signature,
-        "pdfminer_fallback" otherwise.
-    """
-    try:
-        from markitdown import MarkItDown  # type: ignore[import-not-found]
-
-        sig = inspect.signature(MarkItDown().convert_stream)
-        if "extract_pages" in sig.parameters:
-            return "markitdown"
-    except Exception as exc:  # pragma: no cover — guard against unexpected errors
-        logger.warning("PDF strategy probe failed: %s", exc)
-    return "pdfminer_fallback"
 
 
 class _MinimalLoggingMiddleware(BaseHTTPMiddleware):
@@ -94,12 +66,7 @@ def create_app() -> FastAPI:
     # Step 2: Apply XXE hardening before any XML document may be parsed.
     apply_xxe_hardening()
 
-    # Step 3: Probe PDF capability and cache result at module level.
-    global PDF_EXTRACTION_STRATEGY  # noqa: PLW0603
-    PDF_EXTRACTION_STRATEGY = _probe_pdf_strategy()
-    logger.info("PDF extraction strategy: %s", PDF_EXTRACTION_STRATEGY)
-
-    # Step 4: Create FastAPI app and wire routers.
+    # Step 3: Create FastAPI app and wire routers.
     application = FastAPI(
         title="Attachment Text Extractor",
         description="Attachment text extraction microservice for GROWI.",
@@ -109,7 +76,7 @@ def create_app() -> FastAPI:
     application.include_router(health.router)
     application.include_router(extract.router)
 
-    # Step 5: Add BearerAuthMiddleware (outermost so auth runs before routing).
+    # Step 4: Add BearerAuthMiddleware (outermost so auth runs before routing).
     # Middleware added with add_middleware is applied in LIFO order, so add the
     # logging middleware first so that it wraps the auth check as well.
     application.add_middleware(_MinimalLoggingMiddleware)

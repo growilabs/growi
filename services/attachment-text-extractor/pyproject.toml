@@ -1,21 +1,9 @@
 [project]
 name = "attachment-text-extractor"
 version = "0.1.0"
-description = "GROWI attachment text extraction microservice using markitdown"
+description = "GROWI attachment text extraction microservice"
 requires-python = ">=3.12"
 dependencies = [
-    # Extraction engine: use only the formats GROWI requires.
-    # [all] is intentionally excluded because it pulls in optional dependencies
-    # with unacceptable licensing or external runtime requirements:
-    #   - azure-ai-documentintelligence (Azure DI) — network egress, proprietary
-    #   - openai / anthropic client libs — network egress, LLM calls
-    #   - torch / torchvision / easyocr — OCR engine, GPL-adjacent runtime deps,
-    #     large image size (~2–4 GB), violates Req 1.7 (no external binary/network)
-    #   - youtube-transcript-api — network egress, violates Req 1.7
-    #   - pydub / speechbrain — audio/video transcription, not needed
-    # Only [pdf,docx,xlsx,pptx,outlook] is safe: MIT-licensed, pure Python, no
-    # network or binary dependencies at runtime.
-    "markitdown[pdf,docx,xlsx,pptx,outlook]>=0.1.5",
     # HTTP framework and ASGI server (all MIT)
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
@@ -24,10 +12,6 @@ dependencies = [
     # Schema / settings (MIT)
     "pydantic>=2",
     "pydantic-settings>=2",
-    # PDF page-boundary fallback: markitdown does not yet expose per-page offsets
-    # (see microsoft/markitdown#1263); pdfminer.six provides page-level text
-    # extraction without external binaries. (MIT license)
-    "pdfminer.six>=20221105",
     # XML/HTML safety: prevents XXE and billion-laughs attacks when parsing
     # DOCX / XLSX / PPTX ZIP members. (MIT license — no GPL/AGPL transitive deps)
     "defusedxml>=0.7.1",

@@ -2,7 +2,7 @@
 
 Task 4.1 completion criteria:
 - GET /healthz returns 200 with {"status": "ok"}
-- GET /readyz returns 200 with pdf_extraction_strategy field
+- GET /readyz returns 200 with status and dependencies
 - Both endpoints require no authentication
 """
 
@@ -68,18 +68,11 @@ class TestReadyz:
         body = response.json()
         assert body["status"] == "ready"
 
-    def test_contains_pdf_extraction_strategy(self, health_client: TestClient) -> None:
-        """pdf_extraction_strategy must be present in the readyz response."""
-        response = health_client.get("/readyz")
-        body = response.json()
-        assert "pdf_extraction_strategy" in body
-
-    def test_pdf_extraction_strategy_is_string(self, health_client: TestClient) -> None:
-        """pdf_extraction_strategy must be a non-empty string."""
-        response = health_client.get("/readyz")
-        body = response.json()
-        assert isinstance(body["pdf_extraction_strategy"], str)
-        assert body["pdf_extraction_strategy"] != ""
+    def test_does_not_contain_pdf_strategy(self, health_client: TestClient) -> None:
+        """The removed PDF strategy fields must not appear in the readyz response."""
+        body = health_client.get("/readyz").json()
+        assert "pdf_extraction_strategy" not in body
+        assert "pdf_strategy" not in body
 
     def test_no_auth_required(self, health_client: TestClient) -> None:
         """No Authorization header should still return 200."""

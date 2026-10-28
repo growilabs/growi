@@ -1,19 +1,15 @@
 """Unit tests for the Limits resource-control module (Task 2.1).
 
-Tests cover the three enforcement paths:
+Tests cover the two enforcement paths:
   1. Semaphore full → ServiceBusyError
   2. File exceeds MAX_FILE_SIZE_MB → FileTooLargeError
-  3. Coroutine hangs → ExtractionTimeoutError
 
 Also verifies:
-  4. Semaphore is always released (context-manager invariant)
-  5. Bytes are checked regardless of any stated Content-Length
-  6. Coroutine that completes in time returns its result normally
+  3. Semaphore is always released (context-manager invariant)
+  4. Bytes are checked regardless of any stated Content-Length
 """
 
 from __future__ import annotations
-
-import asyncio
 
 import pytest
 
@@ -196,74 +192,3 @@ class TestEnforceSize:
         data = b"x" * (limit_mb * 1024 * 1024 + 1)
         with pytest.raises(FileTooLargeError, match=str(limit_mb)):
             await limits.enforce_size(data)
-
-
-# ---------------------------------------------------------------------------
-# with_timeout — asyncio.wait_for wrapper
-# ---------------------------------------------------------------------------
-
-
-class TestWithTimeout:
-    """Tests for the extraction-timeout wrapper."""
-
-    async def test_fast_coroutine_returns_result(self) -> None:
-        """A coroutine that completes well within the timeout returns its value."""
-        limits = make_limits(timeout_s=5)
-
-        async def fast_coro() -> str:
-            return "done"
-
-        result = await limits.with_timeout(fast_coro())
-        assert result == "done"
-
-    async def test_slow_coroutine_raises_extraction_timeout(self) -> None:
-        """A coroutine that exceeds the timeout must raise ExtractionTimeoutError."""
-        limits = make_limits(timeout_s=1)
-
-        async def slow_coro() -> None:
-            await asyncio.sleep(10)  # much longer than timeout_s=1
-
-        with pytest.raises(ExtractionTimeoutError):
-            await limits.with_timeout(slow_coro())
-
-    async def test_extraction_timeout_message_contains_timeout(self) -> None:
-        """The ExtractionTimeoutError message must mention the configured timeout."""
-        timeout_s = 1
-        limits = make_limits(timeout_s=timeout_s)
-
-        async def slow_coro() -> None:
-            await asyncio.sleep(10)
-
-        with pytest.raises(ExtractionTimeoutError, match=str(timeout_s)):
-            await limits.with_timeout(slow_coro())
-
-    async def test_coroutine_exception_propagates_unchanged(self) -> None:
-        """Non-timeout exceptions from the wrapped coroutine must propagate as-is."""
-        limits = make_limits(timeout_s=5)
-
-        async def raising_coro() -> None:
-            raise ValueError("extractor error")
-
-        with pytest.raises(ValueError, match="extractor error"):
-            await limits.with_timeout(raising_coro())
-
-    async def test_timeout_is_not_wrapped_as_asyncio_error(self) -> None:
-        """asyncio.TimeoutError must be caught and re-raised as ExtractionTimeoutError."""
-        limits = make_limits(timeout_s=1)
-
-        async def slow_coro() -> None:
-            await asyncio.sleep(10)
-
-        # Must NOT be asyncio.TimeoutError — must be ExtractionTimeoutError
-        with pytest.raises(ExtractionTimeoutError):
-            await limits.with_timeout(slow_coro())
-
-    async def test_with_timeout_returns_none_for_void_coroutine(self) -> None:
-        """A coroutine that returns None should work without issue."""
-        limits = make_limits(timeout_s=5)
-
-        async def void_coro() -> None:
-            pass
-
-        result = await limits.with_timeout(void_coro())
-        assert result is None

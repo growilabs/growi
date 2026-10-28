@@ -14,8 +14,8 @@ class TestAuthIntegration:
     def test_valid_token_reaches_extract(self, client, test_token):
         """Valid Bearer token should not return 401.
 
-        A tiny TXT file with a correct token is accepted; it reaches the
-        extraction handler and returns 200.
+        A tiny TXT file with a correct token passes auth and reaches the
+        extraction handler (temporary 503 until the runner is wired).
         """
         txt_content = b"hello world"
         resp = client.post(
@@ -23,7 +23,7 @@ class TestAuthIntegration:
             headers={"Authorization": f"Bearer {test_token}"},
             files={"file": ("hello.txt", txt_content, "text/plain")},
         )
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        assert resp.status_code == 503, f"Expected 503, got {resp.status_code}: {resp.text}"
 
     def test_missing_token_returns_401(self, client):
         """Request with no Authorization header must return 401.

@@ -19,30 +19,6 @@ from fastapi import APIRouter
 router = APIRouter(tags=["health"])
 
 # ---------------------------------------------------------------------------
-# PDF strategy constant
-# ---------------------------------------------------------------------------
-# The definitive value will come from app.services.extractors.pdf_extractor
-# once task 3.1 is complete.  For now we return the default fallback strategy
-# and attempt a dynamic import so the value updates automatically when the
-# module becomes available.
-
-
-def _get_pdf_extraction_strategy() -> str:
-    """Return the current PDF extraction strategy identifier.
-
-    Tries to import the strategy constant from the pdf_extractor module
-    (task 3.1).  Falls back to 'pdfminer_fallback' if the module is not
-    yet available.
-    """
-    try:
-        from app.services.extractors.pdf_extractor import PDF_EXTRACTION_STRATEGY  # type: ignore[import-not-found]
-
-        return PDF_EXTRACTION_STRATEGY
-    except ImportError:
-        return "pdfminer_fallback"
-
-
-# ---------------------------------------------------------------------------
 # Route handlers
 # ---------------------------------------------------------------------------
 
@@ -59,11 +35,10 @@ async def healthz() -> dict[str, str]:
 
 @router.get("/readyz", summary="Readiness probe")
 async def readyz() -> dict[str, object]:
-    """Return readiness status including the PDF extraction strategy.
+    """Return readiness status including dependency import checks.
 
     Checks:
-    - Core dependency imports succeed (markitdown, pydantic, fastapi)
-    - PDF extraction strategy is resolvable
+    - Core dependency imports succeed (pydantic)
 
     Returns a 200 with ready=True when the service can accept traffic.
     Currently always returns ready because semaphore state changes per-request;
@@ -74,23 +49,13 @@ async def readyz() -> dict[str, object]:
     # canary for broken package installs detected at deploy time.
     dependencies: dict[str, str] = {}
     try:
-        import markitdown as _md  # noqa: F401
-
-        dependencies["markitdown"] = "ok"
-    except ImportError as exc:
-        dependencies["markitdown"] = f"error: {exc}"
-
-    try:
         import pydantic as _pydantic  # noqa: F401
 
         dependencies["pydantic"] = "ok"
     except ImportError as exc:
         dependencies["pydantic"] = f"error: {exc}"
 
-    pdf_strategy = _get_pdf_extraction_strategy()
-
     return {
         "status": "ready",
-        "pdf_extraction_strategy": pdf_strategy,
         "dependencies": dependencies,
     }

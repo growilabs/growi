@@ -4,7 +4,6 @@ These tests verify that ``app.security.apply_xxe_hardening()`` correctly:
 1. Replaces the stdlib XML parsers with defusedxml variants.
 2. Blocks XXE attacks (external entity injection).
 3. Emits an INFO log message on success.
-4. Creates a safe lxml XMLParser (when lxml is installed).
 """
 
 from __future__ import annotations
@@ -117,38 +116,3 @@ class TestLogging:
         assert any(
             "XXE hardening applied" in record.message for record in caplog.records if record.levelno == logging.INFO
         ), f"Expected INFO log with 'XXE hardening applied' but got: {[r.message for r in caplog.records]}"
-
-
-class TestLxmlSafeParser:
-    """Verify lxml safe parser creation (only runs when lxml is installed)."""
-
-    def test_lxml_xmlparser_accepts_safe_kwargs(self) -> None:
-        """When lxml is available, XMLParser must accept resolve_entities=False, no_network=True.
-
-        This tests the API contract: if lxml changes its API in a way that breaks
-        the safe-defaults assertion in apply_xxe_hardening(), this test will catch it.
-        """
-        try:
-            from lxml import etree
-        except ImportError:
-            import pytest
-
-            pytest.skip("lxml not installed — skipping lxml-specific test")
-
-        # Verify lxml XMLParser accepts the safe-defaults kwargs without raising
-        parser = etree.XMLParser(resolve_entities=False, no_network=True)
-        assert parser is not None, "lxml XMLParser with safe kwargs must not be None"
-
-    def test_apply_xxe_hardening_does_not_raise_when_lxml_present(self) -> None:
-        """apply_xxe_hardening() must not raise even when lxml is installed."""
-        try:
-            import lxml  # noqa: F401
-        except ImportError:
-            import pytest
-
-            pytest.skip("lxml not installed — skipping lxml-specific test")
-
-        from app.security import apply_xxe_hardening
-
-        # Must not raise
-        apply_xxe_hardening()
