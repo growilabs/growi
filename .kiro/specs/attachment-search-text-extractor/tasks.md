@@ -51,7 +51,7 @@
   - _Requirements: 1.9_
   - _Boundary: TextNormalizer_
 
-- [ ] 2.2 (P) 文字コードの判定とデコードを実装する
+- [x] 2.2 (P) 文字コードの判定とデコードを実装する
   - BOM → 宣言された文字コード (HTML の meta) → 厳密な UTF-8 → 候補を日本語系と cp1252 に絞った charset-normalizer → cp932 → latin-1 の順に試す
   - 完了の状態: UTF-8 (BOM あり / なし)、Shift_JIS、EUC-JP、ISO-2022-JP、cp1252 の試料が正しくデコードされ、短い Shift_JIS が誤判定されないことを単体テストで確かめられる
   - _Requirements: 1.5_
