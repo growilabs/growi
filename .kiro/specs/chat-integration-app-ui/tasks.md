@@ -13,15 +13,15 @@
 
 ---
 
-- [ ] 1. 注文に表示名を保存し、承認画面へ返す
-- [ ] 1.1 ★ 注文を作るとき、チャットアカウントの表示名を保存する
+- [x] 1. 注文に表示名を保存し、承認画面へ返す
+- [x] 1.1 ★ 注文を作るとき、チャットアカウントの表示名を保存する
   - `chat_account_link_orders` に `accountDisplayName`（任意、既定 `null`）を足す。型 `IChatAccountLinkOrder` にも足す
   - `findOrCreatePendingAccountLinkOrder` が新しい注文を作るとき `actor.displayName` を保存する（前後の空白を落とし、空なら `null`）。使い回す注文は書き換えない
   - model の `allFields` の確認に新しい列を足す
   - 観察できる完了条件: 新しい注文に表示名が保存され、使い回した注文は変わらず、空白だけの表示名は `null` になることが、`create-link-order.spec.ts` と model の spec で示される
   - _Requirements: 7.11_
 
-- [ ] 1.2 ★ 承認画面へ返す表示データに、表示名・ユーザー名・有効期限を含める
+- [x] 1.2 ★ 承認画面へ返す表示データに、表示名・ユーザー名・有効期限を含める
   - `getAccountLinkOrderForApproval` の `display` に `accountDisplayName` と `growiName`（承認しているユーザーの `name`）を足す。`expiresAt` は既に返しているので、`account-link-router.ts` が JSON にして返すことを確かめる
   - 観察できる完了条件: 表示名のある注文と無い注文の両方で、期待した項目が返ることが `account-link-service.spec.ts`（と、経路まで通す `account-link-router.spec.ts`）で示される
   - _Requirements: 7.10, 7.11, 7.12_

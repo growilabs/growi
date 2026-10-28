@@ -103,4 +103,44 @@ describe('findOrCreatePendingAccountLinkOrder', () => {
     expect(otherRelation.relationId).toBe('another-relation');
     expect(otherAccount.accountId).toBe('U-someone-else');
   });
+  it('stores the chat account display name on a new order, trimmed', async () => {
+    const order = await findOrCreatePendingAccountLinkOrder(RELATION_ID, {
+      ...ACTOR,
+      displayName: '  Alice A.  ',
+    });
+
+    expect(order.accountDisplayName).toBe('Alice A.');
+    const stored = await ChatAccountLinkOrder.findById(order._id).lean();
+    expect(stored?.accountDisplayName).toBe('Alice A.');
+  });
+
+  it.each([
+    ['whitespace only', '   '],
+    ['empty', ''],
+    ['absent', undefined],
+  ])('stores null when the display name is %s', async (_label, displayName) => {
+    const order = await findOrCreatePendingAccountLinkOrder(RELATION_ID, {
+      platform: 'slack',
+      accountId: 'U-actor',
+      displayName,
+    });
+
+    expect(order.accountDisplayName).toBeNull();
+  });
+
+  it('does not rewrite the display name of a reused order', async () => {
+    const first = await findOrCreatePendingAccountLinkOrder(RELATION_ID, {
+      ...ACTOR,
+      displayName: 'Before',
+    });
+    const second = await findOrCreatePendingAccountLinkOrder(RELATION_ID, {
+      ...ACTOR,
+      displayName: 'After',
+    });
+
+    expect(second._id.toString()).toBe(first._id.toString());
+    expect(second.accountDisplayName).toBe('Before');
+    const stored = await ChatAccountLinkOrder.findById(first._id).lean();
+    expect(stored?.accountDisplayName).toBe('Before');
+  });
 });

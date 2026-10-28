@@ -11,6 +11,7 @@ describe('ChatAccountLinkOrder schema', () => {
     'relationId',
     'platform',
     'accountId',
+    'accountDisplayName',
     'isRevoked',
     'createdAt',
     'expiredAt',

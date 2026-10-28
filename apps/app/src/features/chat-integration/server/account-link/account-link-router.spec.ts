@@ -35,6 +35,7 @@ const MOUNT_PATH = '/_api/v3/chat-integration/account-link';
 const approvingUser: IUserHasId = {
   _id: new Types.ObjectId().toString(),
   username: 'approving-user',
+  name: 'Approving Person',
   status: 2, // UserStatus.STATUS_ACTIVE -- loginRequiredFactory gates on this
 } as IUserHasId;
 
@@ -91,6 +92,7 @@ const seedLiveOrder = (token: string) =>
     relationId: RELATION_ID,
     platform: 'slack',
     accountId: 'U-alice',
+    accountDisplayName: 'Alice A.',
     isRevoked: false,
     createdAt: new Date(),
     expiredAt: new Date(Date.now() + 10 * 60_000),
@@ -164,7 +166,10 @@ describe('account-link-router', () => {
         accountId: 'U-alice',
         workspaceName: 'Test Workspace',
         growiUsername: approvingUser.username,
+        growiName: 'Approving Person',
+        accountDisplayName: 'Alice A.',
       });
+      expect(Date.parse(response.body.expiresAt)).toBeGreaterThan(Date.now());
     });
   });
 

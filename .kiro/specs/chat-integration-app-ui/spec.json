@@ -1,24 +1,27 @@
 {
   "feature_name": "chat-integration-app-ui",
   "created_at": "2026-10-27T00:00:00.000Z",
-  "updated_at": "2026-10-27T00:00:00.000Z",
+  "updated_at": "2026-10-28T12:30:00.000Z",
   "language": "ja",
-  "phase": "tasks-generated",
+  "phase": "implementation",
   "umbrella": "chat-integration",
-  "amends": ["chat-integration", "chat-integration-app"],
+  "amends": [
+    "chat-integration",
+    "chat-integration-app"
+  ],
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "tasks": {
       "generated": true,
-      "approved": false
+      "approved": true
     }
   },
-  "ready_for_implementation": false
+  "ready_for_implementation": true
 }
