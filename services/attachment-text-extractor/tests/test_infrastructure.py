@@ -76,10 +76,6 @@ class TestFixtureFiles:
         data = json.loads(raw)
         assert isinstance(data, dict)
 
-    def test_generate_fixtures_script_exists(self) -> None:
-        """generate_fixtures.py must exist for future binary fixture generation."""
-        assert (FIXTURES_DIR / "generate_fixtures.py").is_file()
-
     def test_readme_exists(self) -> None:
         """README.md must exist in tests/fixtures/ to document the fixture files."""
         assert (FIXTURES_DIR / "README.md").is_file()

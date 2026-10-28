@@ -72,3 +72,43 @@ def client(test_token: str):  # noqa: ANN201 — return type depends on import a
 
     with TestClient(app, raise_server_exceptions=True) as tc:
         yield tc
+
+
+# ---------------------------------------------------------------------------
+# Document fixtures (generated in-test; see tests/fixture_files.py)
+# ---------------------------------------------------------------------------
+from fixture_files import (  # noqa: E402, F401 — re-exported so pytest registers them for every test directory
+    docx_deeply_nested,
+    docx_encrypted,
+    docx_large_images_path,
+    docx_zip_bomb_path,
+    epub,
+    legacy_doc,
+    legacy_fixture_sha256,
+    legacy_ppt,
+    odp,
+    ods,
+    odt,
+    office_password,
+    pdf_corrupt,
+    pdf_image_only,
+    pdf_owner_password_only,
+    pdf_password,
+    pdf_text,
+    pdf_user_password,
+    pptx_encrypted,
+    pptx_large_images_path,
+    pptx_multi_slide,
+    rtf,
+    text_euc_jp,
+    text_shift_jis,
+    text_utf8_bom,
+    xls,
+    xlsx_chart_sheet,
+    xlsx_encrypted,
+    xlsx_hidden_sheet,
+    xlsx_large_for_timeout_path,
+    xlsx_multi_sheet,
+    xlsx_over_cell_limit_path,
+    xlsx_single_sheet,
+)
