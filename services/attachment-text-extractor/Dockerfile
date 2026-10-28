@@ -1,64 +1,63 @@
 # ---------------------------------------------------------------------------
 # Builder stage: install Python dependencies via uv into an isolated .venv
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.12.15-slim-bookworm AS builder
 
-# Install uv from the official image (Apache-2.0)
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Pinned exactly so that rebuilds resolve the same installer (the lockfile
+# pins the dependencies, not uv itself). Bump deliberately together with CI.
+COPY --from=ghcr.io/astral-sh/uv:0.12.24 /uv /usr/local/bin/uv
+
+# Compile bytecode at build time: the runtime rootfs is read-only and
+# PYTHONDONTWRITEBYTECODE is set, so nothing could be cached on first import.
+# Copy (not hardlink) so the .venv can be moved to the runtime stage as is.
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
 WORKDIR /app
 
-# Copy only the files uv needs to resolve and install dependencies.
-# Source code is intentionally excluded here so that changes to application
-# code do not invalidate the dependency cache layer.
+# Dependency manifests only, so application code changes keep this layer cached.
 COPY pyproject.toml uv.lock .python-version ./
 
-# Install production dependencies (no dev extras) into .venv.
-# --locked  : enforce the lockfile — never re-resolve
-# --no-dev  : skip dev-only dependency groups (pytest, httpx, ruff)
-# --no-install-project : skip editable-install of the project itself;
-#             we copy src/ manually so the layer stays cache-friendly
-RUN uv sync --locked --no-dev --no-install-project
+# `dev` is an optional extra, so it is never installed unless --extra dev is
+# passed; test-only libraries (openpyxl, pypdf, ...) stay out of the image.
+# --locked: never re-resolve. --no-install-project: src/ is copied below.
+RUN uv sync --locked --no-install-project
 
 # ---------------------------------------------------------------------------
 # Runtime stage: minimal image with only the pre-built .venv + app source
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.12.15-slim-bookworm AS runtime
 
-# Create a dedicated non-root user and group (uid/gid 10001).
-# --no-create-home avoids writing to /home, compatible with read-only rootfs.
+# Dedicated non-root user; no home dir keeps it compatible with a read-only rootfs.
 RUN groupadd --gid 10001 appgroup && \
     useradd --uid 10001 --gid appgroup --shell /bin/sh --no-create-home appuser
 
 WORKDIR /app
 
-# Copy the virtual environment produced by the builder.
-# Only .venv is copied — no uv binary, no source cache.
 COPY --from=builder /app/.venv /app/.venv
-
-# Copy application source code.
-# src/app/ contains the FastAPI application package.
 COPY src/ ./src/
 
-# Prepend the venv's bin directory so the runtime Python and all installed
-# scripts (uvicorn, etc.) are found without activating the venv explicitly.
-# PYTHONPATH: expose src/ so that `import app` resolves to src/app/ without
-# an editable install (the project is not installed as a package in .venv
-# because --no-install-project is used in the builder stage).
+# Precompile the app for the same reason as the builder (read-only rootfs).
+RUN python -m compileall -q src
+
+# PYTHONPATH exposes src/ without an editable install (--no-install-project).
+# RAYON_NUM_THREADS must be set before the forkserver starts: anydoc's thread
+# pool otherwise spawns one thread per core and virtual memory peaks at ~1.2GB.
+# TMPDIR: the forkserver creates its UNIX socket directory under it, so it must
+# be a short, writable path (a tmpfs on a read-only rootfs).
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app/src" \
-    # Suppress .pyc bytecode generation (not useful in containers)
     PYTHONDONTWRITEBYTECODE=1 \
-    # Ensure stdout/stderr are unbuffered so structured logs stream immediately
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    RAYON_NUM_THREADS=1 \
+    TMPDIR=/tmp
 
-# Drop to non-root before any EXPOSE or CMD directives.
 USER 10001
 
-# Document the service port; actual binding is controlled by CMD.
 EXPOSE 8000
 
-# Use sh -c so that ${WORKERS:-2} shell parameter expansion is evaluated at
-# container start time rather than image build time. ENTRYPOINT is
-# intentionally omitted; CMD alone avoids ambiguity when overriding in k8s.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WORKERS:-2}"]
+# sh -c evaluates ${WORKERS:-1} at start time; exec makes uvicorn PID 1 so
+# SIGTERM reaches it directly. Memory sizing assumes one worker (see compose).
+# Run with an init (`docker run --init`, compose `init: true`) so orphaned
+# conversion children are reaped if a forkserver dies; uvicorn does not reap them.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WORKERS:-1}"]

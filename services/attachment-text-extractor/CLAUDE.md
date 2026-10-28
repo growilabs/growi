@@ -76,6 +76,29 @@ Dependencies must be MIT/permissive-licensed and run fully offline (no network e
 - Use `httpx`-based `TestClient` (Starlette's), not `requests`.
 - Binary test documents are generated in-test as session-scoped, lazy pytest fixtures in `tests/fixture_files.py` (re-exported from `tests/conftest.py`; large ones are `*_path` fixtures written under `tmp_path_factory`). Do not commit real documents. The only committed binaries are the legacy DOC / PPT files in `tests/fixtures/legacy/` (Apache POI test data; source and license in its README).
 
+## Container Deployment
+
+`Dockerfile` pins uv, the Python base image, `RAYON_NUM_THREADS=1`, `TMPDIR=/tmp` and `WORKERS` default 1; `infra/docker/compose.yaml` carries the recommended `MAX_CONCURRENCY=3`, `mem_limit: 2g`, read-only rootfs, uid 10001, tmpfs `/tmp`, `cap_drop: ALL` and `init: true`. `/tmp` is the only writable path at runtime (forkserver socket directory). Static checks: `tests/test_deploy_config.py`. Always run with an init (`--init` / `init: true`) so orphaned conversion children are reaped; in k8s the Pod `/tmp` emptyDir/tmpfs is discarded with the Pod.
+
+Known follow-up: Python 3.12 cannot preload `__main__` into the forkserver, so each child re-imports the uvicorn entry script (~29ms vs ~7ms). Left as is; the overhead is negligible next to conversion time.
+
+Container smoke test (needs docker; reusable by CI):
+
+```bash
+docker build -t attachment-text-extractor services/attachment-text-extractor
+docker image inspect attachment-text-extractor --format '{{.Size}}'   # must be <= 400000000 (400MB)
+docker run -d --name ate --init --read-only --user 10001:10001 --network none \
+  --tmpfs /tmp:rw,size=64m,mode=1777 -e ATTACHMENT_EXTRACTOR_SERVICE_TOKEN=smoke-token \
+  attachment-text-extractor
+# --network none leaves no published port; run the checks inside the container's network namespace:
+docker exec ate python -c "import urllib.request,sys; print(urllib.request.urlopen('http://localhost:8000/readyz').read())"
+# POST /extract for a PDF and a DOCX (generate small files with pypdf / python-docx from the dev extra):
+curl -s -H 'Authorization: Bearer smoke-token' -F 'file=@sample.pdf;type=application/pdf' http://<container-ip-or-published-port>:8000/extract
+curl -s -H 'Authorization: Bearer smoke-token' -F 'file=@sample.docx' http://<container-ip-or-published-port>:8000/extract
+```
+
+With `--network none` there is no reachable IP, so for the curl steps either publish a port on a second run without `--network none` (egress is blocked in prod by NetworkPolicy, not needed for this check) or exec a Python client inside the container.
+
 ## Contract Export to GROWI
 
 The OpenAPI schema is the API contract between this service and GROWI's Node code. After **any** change to schemas, routes, or error codes:
