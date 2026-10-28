@@ -54,6 +54,7 @@ const activitySchema = new Schema<ActivityDocument>(
     },
     endpoint: {
       type: String,
+      index: true,
     },
     targetModel: {
       type: String,
