@@ -392,6 +392,13 @@
     are written, idempotent upsert, so at most one checkpoint interval is redone). Its edges are
     recorded in design.md: a stale flag cleared at claim, cancel of an unclaimed request, the
     claim released on stop, and a stop on a run with an expired lease. A stop changes no coverage.
+  - *Counts are computed on read, except the run total (decided 2026-10-28)*: the admin sees processed
+    of `runTotal` while a run is active and "about N older pages are not included" after a partial
+    run. `runTotal` is counted once at the first claim so the progress bar does not move; the
+    not-included count is computed when the state is read because a stored figure would go stale as
+    pages are created and edited. The `updatedAt` index serves the count. The numbers are worded as
+    approximate. The walk's page filter is defined once so a page the backfill skips cannot be
+    counted as remaining forever.
   - *A status line stays after completion*: the controls are hidden when coverage is `all`, but one
     line ("indexed for all pages, completed <date>") remains, so an admin who comes back can tell
     finished from missing. The server rejects the start independently of the UI.

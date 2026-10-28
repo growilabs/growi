@@ -465,7 +465,7 @@ Independent of B4/B5.
     computed once at the first claim, `coverage` (`none` / `partial` / `all`) with `coveredSince`,
     the current phase (`recent` / `older`), the `recentCutoff` computed once at the run's first
     claim, a progress marker (the last `_id` processed in the current phase, in `_id` order, reset
-    when the phase advances and at the start of each run), processed counts per phase, `completedAt`,
+    when the phase advances and at the start of each run), processed counts per phase, `runTotal` (the pages in the run's range, counted once at the first claim), `completedAt`,
     `lastError`, and an atomic-claim field with `leaseExpiresAt` so only one instance runs the job and
     a claim held by a dead owner can be taken over once its lease expires
   - Create the document idle at boot with an upsert that uses `$setOnInsert` (idle, `coverage:
@@ -509,12 +509,15 @@ Independent of B4/B5.
     `maxPages`: the `updatedAt` of the Nth newest page, read from the `updatedAt` index) and restrict
     the walk to the run's range (design.md); a scope already covered finishes at once. Check `stopRequested` at each checkpoint; when set, save the
     marker and counts, release the claim, set `stopped`, clear the flag and end the run. A claim clears a
-    stale `stopRequested`
+    stale `stopRequested`. At the first claim also count the pages in the run's range once and store
+    it as `runTotal`, and emit progress as processed / `runTotal`
   - Settle the remaining open questions and record them in design.md: write ordering against the
     live listener on the same page (can a stale backfill write overwrite fresher rows?), whether to
     cap the body size parsed (at what size, and how skipped pages are recorded) since one large page
     stalls the thread for its whole parse, the default for `backfillMaxPagesPerSecond`, whether to batch the body reads and the page-link
-    writes (fewer commands, same documents; judge it from B3.4's DB-side numbers), the checkpoint cadence and
+    writes (fewer commands, same documents; judge it from B3.4's DB-side numbers), which pages the walk scans (for example
+    empty or trashed pages), defined once in `backfill-range.ts` and shared by the walk, `runTotal` and
+    the admin counts, the checkpoint cadence and
     lease length (the lease must outlast the checkpoint interval plus the longest single rest), and
     the policy for a page whose write keeps failing. The pacing shape is decided: the per-page proportional rest
   - Done when running the job over a seeded dataset (including pages linked by permalink and by
@@ -585,7 +588,9 @@ Independent of B4/B5.
 
 - [ ] B3.6 Add the admin start, state, stop and resume endpoints
   - Add apiv3 admin routes behind `loginRequired` and `adminRequired`: GET the job state (status,
-    phase, progress counts, `coverage`, `coveredSince`, `completedAt`, `lastError`); POST start with a
+    phase, processed and `runTotal` while a run is active, `coverage`, `coveredSince`, `completedAt`,
+    `lastError`, and, computed on read, the number of pages not yet included and the total page count
+    (the `updatedAt`-index count with the walk's page filter)); POST start with a
     scope (`all`, `maxPages` N, or `since` date), which writes `requestedScope`, `requestedAt` and
     status `requested`; POST stop, which cancels an unclaimed request, sets `stopRequested` on a running
     run, and sets `stopped` directly when the run's lease has expired; and POST resume, valid only in
@@ -594,16 +599,18 @@ Independent of B4/B5.
     and when coverage is `all`
   - Done when a non-admin is refused on every route; a valid start writes the request and returns the
     state; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
-    without changing the document; two concurrent starts leave exactly one request; stop cancels an
+    without changing the document; two concurrent starts leave exactly one request; after a partial run the not-included count equals
+    the number of seeded pages older than `coveredSince` and excludes pages the walk skips; stop cancels an
     unclaimed request, flags a running one, and ends an expired-lease run directly; resume is
     rejected outside `stopped`
-  - _Requirements: 4.5, 4.6, 4.8, 4.9_
+  - _Requirements: 4.5, 4.6, 4.8, 4.9, 4.10_
   - _Boundary: backlinks-backfill-admin routes_
   - _Depends: B3.1_
 
 - [ ] B3.7 Add the admin settings section and the panel's partial-index state
   - Add an SWR hook for the job state and a section in the admin settings with a scope picker (all
-    pages, newest N, edited after a date), progress over the admin Socket.IO channel, and the states
+    pages, newest N, edited after a date), progress (processed of `runTotal`, count and percent) over the admin Socket.IO channel, the
+    not-included count in the partial-coverage line, and the states
     in design.md's table: not started, running, failed, stopping, stopped (Resume or a new scope), partial coverage (the
     control stays), all pages covered (a status line, no control). Choose where it sits in the admin
     menu and add the i18n keys for every locale the repo keeps
@@ -612,7 +619,7 @@ Independent of B4/B5.
   - Done when component tests render each state with the right text and controls (no start control
     when coverage is `all`, a disabled one while running), a started run's progress updates without a
     reload, and the panel shows the partial state for a partial index and none for `all`
-  - _Requirements: 4.4, 4.5, 4.6, 4.7, 4.8, 4.9_
+  - _Requirements: 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10_
   - _Boundary: BacklinksBackfillAdmin, BacklinksPanel_
   - _Depends: B3.6, B1.11_
 

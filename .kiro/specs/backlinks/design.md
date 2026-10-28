@@ -359,6 +359,7 @@ needs no write — derived state reads the restored page's status.
 | 4.7 | Partial coverage shown; wider re-run possible | `coverage` / `coveredSince` on the job; a run walks only the uncovered gap | Backfill flow |
 | 4.8 | Full coverage stated; no start offered | `coverage: all` -> status line only; start endpoint rejects | Backfill flow |
 | 4.9 | Admin can stop a run and continue it | `stopRequested` checked at each checkpoint; `stopped` status keeps the marker; resume re-requests the stored run | Backfill flow |
+| 4.10 | Processed / total while running; pages not included after a partial run | `runTotal` stored at the first claim; uncovered and total counts computed when the state is read | Backfill flow |
 | 5.1 | Links survive rename/move | resolveToPageIds redirect-following + `_id`-stable cache | Reconcile notes |
 | 5.2 | Descendants re-associated | same (each descendant keeps `_id`) | Reconcile notes |
 | 5.3 | Unresolvable move → broken | absent from the resolveToPageIds map → `toPage: null` → broken state | Read flow |
@@ -380,7 +381,7 @@ needs no write — derived state reads the restored page's status.
 | useSWRxBacklinks | Client store | Fetch backlinks **+ link targets** (B5.9) | 1.1,6.4 | apiv3Get (P0) | Service |
 | BacklinksPanel / BacklinkListItem | UI | Render list, empty state, target-state badge | 1.1,1.7,1.8,6.4 | useSWRxBacklinks, PageListItemS (P1) | — |
 | PageLinkBackfillCron | Batch | Populate pre-existing pages (self-paced, resumable, throttled, online) | 4.1,4.2,4.3,4.4 | CronService (P0), extractInternalLinkPaths (P0), Revision, in-memory path→id map (P0) | Batch, State |
-| backlinks-backfill-admin (routes) / BacklinksBackfillAdmin | API / UI | Start, observe, stop and resume the backfill from the admin settings | 4.5,4.6,4.7,4.8,4.9 | apiv3 middleware incl. `adminRequired` (P0), PageLinkBackfillJob (P0), admin Socket.IO channel (P1) | API |
+| backlinks-backfill-admin (routes) / BacklinksBackfillAdmin | API / UI | Start, observe, stop and resume the backfill from the admin settings | 4.5,4.6,4.7,4.8,4.9,4.10 | apiv3 middleware incl. `adminRequired` (P0), PageLinkBackfillJob (P0), admin Socket.IO channel (P1) | API |
 
 ### Data / Server logic
 
@@ -939,7 +940,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   and if it uses `$runCommandRaw`, its reply must go through `throwOnWriteErrors` like every other
   raw write here. B3 decides which; `ordered: false` remains the intent for a page's rows.
 - Idempotency: unique `{fromPage,toPath}` + upsert; safe to re-run and to resume mid-run (4.3).
-- Progress/observability: emit count/total over the existing admin Socket.IO channel (as the
+- Progress/observability: emit processed / `runTotal` over the existing admin Socket.IO channel (as the
   Elasticsearch reindex does).
 
 **Delivery decision (proposed): throttled, two-phase, started by an administrator from the admin settings, with the scope chosen at start.**
@@ -977,16 +978,28 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   the active run is, resets at the start of each run and phase, and means nothing once the run ends.
   Coverage says what is finished and persists between runs. The marker is an `_id` position and cannot
   define an `updatedAt` range, so it cannot stand in for coverage.
+- **Counts shown to the admin.** While a run is active: processed pages (the per-phase counts summed)
+  of `runTotal`, the number of pages in the run's range, counted once at the first claim and stored
+  on the job document so it does not move under the progress bar. After a partial run: the number of
+  pages not included, which is the count of pages with `updatedAt < coveredSince`, and the total
+  page count, so the line can say "about N older pages are not included". These two are **computed
+  when the state is read, not stored**, because pages are created and edited all the time and a
+  stored figure would go stale; the count uses the `updatedAt` index and the same range filter as the
+  walk. They are approximate and worded that way ("about"): pages edited after a run move out of the
+  uncovered range, and a percent after a partial run can drift. **Which pages count (open — settle
+  in B3.2):** the walk's page filter (for example whether empty or trashed pages are scanned) is
+  defined once, in `backfill-range.ts`, and used by the walk, `runTotal` and these counts, so a page
+  the backfill skips can never sit in "not included" forever.
 - **Admin settings (what the admin sees).** One state at a time, read from the job document:
 
   | Job document | Shown | Controls |
   |---|---|---|
-  | `coverage: none`, idle | "Backlinks have not been built for existing pages" | scope picker + Start |
-  | `requested` / `running` | progress (processed count, phase) over the admin Socket.IO channel | Stop; Start disabled |
+  | `coverage: none`, idle | "Backlinks have not been built for existing pages" (with the page count) | scope picker + Start |
+  | `requested` / `running` | processed of `runTotal` pages (count and percent) and the phase, over the admin Socket.IO channel | Stop; Start disabled |
   | `running` with `stopRequested` | "Stopping…" | none |
   | `failed` | the last error; the poll retries from the marker | none |
-  | `stopped` | where it stopped (processed count, phase) | Resume, or a new scope + Start |
-  | `coverage: partial`, idle | "Backlinks cover pages edited since `<coveredSince>`; older pages are not included" | scope picker + Start |
+  | `stopped` | where it stopped (processed of `runTotal`, phase) | Resume, or a new scope + Start |
+  | `coverage: partial`, idle | "Backlinks cover pages edited since `<coveredSince>`; about N older pages are not included" | scope picker + Start |
   | `coverage: all` | "Backlinks are indexed for all pages (completed `<completedAt>`)" | none |
 
   The line stays after completion instead of hiding the whole section, so an admin who comes back can
@@ -1053,7 +1066,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 - **The job document is both the control and the status surface.** The app upserts it at boot
   (`$setOnInsert`: idle, `coverage: none`); the admin endpoints write the request (`requestedScope`,
   `requestedAt`, `stopRequested`); the job writes everything else (`status`, `phase`, `runCutoff`,
-  `coverage`, `coveredSince`, progress marker, processed counts per phase, `recentCutoff`,
+  `coverage`, `coveredSince`, progress marker, processed counts per phase, `runTotal`, `recentCutoff`,
   claim/lease, `completedAt`, `lastError`). Infra reads `status` / `phase` / `coverage` / counts /
   `lastError` to watch progress; it never has to write. It is a document and not a config key
   because completion is state the job writes, not a setting an operator edits, and a copy in config

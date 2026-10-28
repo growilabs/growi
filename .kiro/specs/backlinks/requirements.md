@@ -127,6 +127,7 @@ order of delivery is tracked separately in the implementation backlog.
 7. Where an earlier run covered only part of the pages, the administration settings shall show which pages are covered and shall let an administrator run the process again over a wider scope.
 8. When backlinks have been built for all pages, the administration settings shall say so and shall not offer to start the process again.
 9. While the process is running, the administration settings shall let an administrator stop it, and shall let an administrator continue a stopped run from where it stopped.
+10. The administration settings shall show how many pages a running or stopped run has processed out of how many are in its range, and, where coverage is partial, approximately how many pages are not yet included.
 
 ### Requirement 5: Link integrity when a page is renamed or moved
 **Objective:** As an editor, I want links to a page to survive its rename or move, so that references are not silently broken.
