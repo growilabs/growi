@@ -1,12 +1,5 @@
-// Proves task 6.1's dispatch fix: a MULTI-segment `/me/*` path (e.g.
-// `chat-integration/account-link/:token`) resolves to its `mePagesMap`
-// entry, and the pre-existing SINGLE-segment entries are unaffected.
-//
-// Before the fix, `getTargetPageToRender` walked the whole path array with
-// `keys.reduce(...)`, treating each segment as one level of a nested map --
-// which 404ed on any path with more than one segment (the accumulator
-// became `{ title, component }`, not a map, after the first successful
-// lookup).
+// Proves the `/me/*` first-segment dispatch: the personal-settings and
+// notification entries resolve to their components.
 
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -47,13 +40,6 @@ vi.mock('~/client/components/Me/PersonalSettings', () => ({
 vi.mock('~/client/components/InAppNotification/InAppNotificationPage', () => ({
   InAppNotificationPage: () => <div>InAppNotificationMarker</div>,
 }));
-vi.mock(
-  '~/features/chat-integration/client/components/AccountLinkApproval',
-  () => ({
-    AccountLinkApproval: () => <div>AccountLinkApprovalMarker</div>,
-  }),
-);
-
 import type { ComponentProps } from 'react';
 
 import MePage from './[[...path]].page';
@@ -80,16 +66,6 @@ describe('MePage dispatch', () => {
     render(<MePage {...BASE_PROPS} />);
     expect(
       await screen.findByText('InAppNotificationMarker'),
-    ).toBeInTheDocument();
-  });
-
-  it('resolves a MULTI-segment path to its first-segment entry instead of 404ing', async () => {
-    mocks.routerQuery = {
-      path: ['chat-integration', 'account-link', 'some-token'],
-    };
-    render(<MePage {...BASE_PROPS} />);
-    expect(
-      await screen.findByText('AccountLinkApprovalMarker'),
     ).toBeInTheDocument();
   });
 });

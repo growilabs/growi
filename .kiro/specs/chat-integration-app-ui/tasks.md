@@ -27,7 +27,7 @@
   - _Requirements: 7.10, 7.11, 7.12_
   - _Depends: 1.1_
 
-- [ ] 2. 承認画面を作り直す
+- [x] 2. 承認画面を作り直す
 - [x] 2.1 承認画面と専用ページの文言を 5 言語で用意する
   - `translation.json` に `chat_integration.account_link.*` を足す: ページの見出し、画面の見出し、3 つの塊の見出し（この GROWI・あなた・紐付けるチャットのアカウント）、`ID`、有効期限の文、「心当たりがなければ承認せずに閉じてください」、承認ボタン、結果 3 種（成功・別のユーザーに紐付け済み・無効または期限切れ）、読み込み中
   - en_US・ja_JP・zh_CN・fr_FR・ko_KR の 5 言語すべてに訳を入れる。基準値は変えない
@@ -43,7 +43,7 @@
   - _Requirements: 7.10, 7.11, 7.12_
   - _Depends: 1.2, 2.1_
 
-- [ ] 2.3 ★ 承認画面を、サイドバーの無い専用ページで出す
+- [x] 2.3 ★ 承認画面を、サイドバーの無い専用ページで出す
   - `pages/me/chat-integration/account-link/[token].page.tsx` を足し、`RawLayout` で包む（`BasicLayout` と、そのための設定の取得は使わない）。`getServerSideProps` は共通のプロパティと `translation` の i18n だけを取る
   - `pages/me/[[...path]].page.tsx` から `chat-integration` の項目と `AccountLinkApproval` の dynamic import を消す。`[[...path]].page.spec.tsx` の対応するテストを、専用ページの spec へ移す
   - URL（`/me/chat-integration/account-link/:token`）と、`ACCOUNT_LINK_ACCEPT_PATH` は変えない
@@ -51,7 +51,7 @@
   - _Requirements: 7.9_
   - _Depends: 2.2_
 
-- [ ] 2.4 追加した page ファイルが Express の経路の一覧と食い違わないことを確かめる
+- [x] 2.4 追加した page ファイルが Express の経路の一覧と食い違わないことを確かめる
   - `next-express-route-consistency` スキルの手順で、`utils/is-next-page-route.ts` の `EXPRESS_EXCLUSIVE_PATH_PATTERNS` と、`server/routes/index.js` の `/me/*`、新しい page ファイルを突き合わせる
   - 食い違いがあれば、一覧の修正を報告する（黙って直さない）。食い違いが無ければ、無かったことを報告する
   - 観察できる完了条件: スキルの手順の結果（差分の有無）が、実装者の報告に書かれている
