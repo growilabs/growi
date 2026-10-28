@@ -1,13 +1,17 @@
-import type { IAttachment, IPage, IUser } from '@growi/core/dist/interfaces';
+import type { IPage, IUser } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import type { AccessTokenParser } from '@growi/core/dist/interfaces/server';
-import { serializeAttachmentSecurely } from '@growi/core/dist/models/serializers';
+import {
+  serializeAttachmentSecurely,
+  toLegacyAttachmentShape,
+} from '@growi/core/dist/models/serializers';
 import { OptionParser } from '@growi/core/dist/remark-plugins';
+import { objectIdUtils } from '@growi/core/dist/utils';
 import { loggerFactory } from '@growi/logger';
 import type { Request } from 'express';
 import { Router } from 'express';
 import type { HydratedDocument, Model } from 'mongoose';
-import mongoose, { model, Types } from 'mongoose';
+import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
 const logger = loggerFactory('growi:remark-attachment-refs:routes:refs');
@@ -19,6 +23,20 @@ function generateRegexp(expression: string): RegExp {
   return matches != null
     ? new RegExp(matches[1], matches[2])
     : new RegExp(expression);
+}
+
+// MongoDB rejects a JS-valid pattern that PCRE2 cannot parse (error code 51091);
+// Prisma reports it as P2010 with the server message in meta.message.
+function isInvalidRegexError(err: unknown): boolean {
+  const { code, meta } = err as {
+    code?: unknown;
+    meta?: { message?: unknown };
+  };
+  return (
+    code === 'P2010' &&
+    typeof meta?.message === 'string' &&
+    meta.message.includes('Error code 51091')
+  );
 }
 
 /**
@@ -75,9 +93,9 @@ export const routesFactory = (crowi): Router => {
 
   const accessTokenParser: AccessTokenParser = crowi.accessTokenParser;
 
-  const router = Router();
+  const prisma = crowi.prisma;
 
-  const ObjectId = Types.ObjectId;
+  const router = Router();
 
   // biome-ignore lint/suspicious/noExplicitAny: ignore
   const Page = mongoose.model<HydratedDocument<IPage>, Model<any> & any>(
@@ -123,18 +141,21 @@ export const routesFactory = (crowi): Router => {
         return;
       }
 
-      // convert ObjectId
       // biome-ignore lint/suspicious/noExplicitAny: ignore
       const orConditions: any[] = [{ originalName: fileNameOrId }];
-      if (fileNameOrId != null && ObjectId.isValid(fileNameOrId.toString())) {
-        orConditions.push({ _id: new ObjectId(fileNameOrId.toString()) });
+      // Prisma throws on a non-24-hex ObjectId, and ObjectId.isValid accepts
+      // any 12-character string such as `image001.png`
+      if (objectIdUtils.isValidObjectId(fileNameOrId?.toString())) {
+        orConditions.push({ id: fileNameOrId });
       }
 
-      const Attachment = model<IAttachment>('Attachment');
-      const attachment = await Attachment.findOne({
-        page: page._id,
-        $or: orConditions,
-      }).populate('creator');
+      const attachment = await prisma.attachments.findFirst({
+        where: {
+          pageId: page._id.toString(),
+          OR: orConditions,
+        },
+        include: { creator: true },
+      });
 
       // not found
       if (attachment == null) {
@@ -152,20 +173,22 @@ export const routesFactory = (crowi): Router => {
 
       // forbidden
       const isAccessible = await Page.isAccessiblePageByViewer(
-        attachment.page,
+        attachment.pageId,
         user,
       );
       if (!isAccessible) {
         logger.debug(
           `attachment '${attachment.id}' is forbidden for user '${user?.username}'`,
         );
-        res.status(403).send(`page '${attachment.page}' is forbidden.`);
+        res.status(403).send(`page '${attachment.pageId}' is forbidden.`);
         return;
       }
 
-      res
-        .status(200)
-        .send({ attachment: serializeAttachmentSecurely(attachment) });
+      res.status(200).send({
+        attachment: serializeAttachmentSecurely(
+          toLegacyAttachmentShape(attachment),
+        ),
+      });
     },
   );
 
@@ -243,21 +266,48 @@ export const routesFactory = (crowi): Router => {
 
       logger.debug('retrieve attachments for pages:', pageIds);
 
-      // create query to find
-      const Attachment = model<IAttachment>('Attachment');
-      let query = Attachment.find({
-        page: { $in: pageIds },
-      });
-      // add regex condition
-      if (regex != null) {
-        query = query.and([{ originalName: { $regex: regex } }]);
+      // Two queries on purpose:
+      // 1. findRaw: Prisma's typed filters cannot express an arbitrary regex,
+      //    so the filter is sent raw. This also keeps evaluation in MongoDB,
+      //    whose PCRE match limit bounds catastrophic backtracking; filtering
+      //    in-process with V8 has no such limit and would block the event loop.
+      //    findRaw returns bare documents (no `include`, no computed fields),
+      //    so only the matching ids are taken from it.
+      // 2. findMany: re-fetch those ids through the extended client to get
+      //    `creator` and the computed fields that serializeAttachmentSecurely needs.
+      let matchedRows: { _id: { $oid: string } }[];
+      try {
+        matchedRows = (await prisma.attachments.findRaw({
+          filter: {
+            page: { $in: pageIds.map((id: string) => ({ $oid: id })) },
+            ...(regex != null && {
+              originalName: {
+                $regex: regex.source,
+                // MongoDB rejects JS flags it has no equivalent for (g, y, d, v)
+                $options: regex.flags.replace(/[^imsu]/g, ''),
+              },
+            }),
+          },
+          options: { projection: { _id: 1 } },
+        })) as unknown as { _id: { $oid: string } }[];
+      } catch (err) {
+        if (isInvalidRegexError(err)) {
+          return res
+            .status(400)
+            .send("the 'regex' option is invalid as RegExp.");
+        }
+        logger.error('Failed to query attachments:', err);
+        return res.status(500).send('Failed to retrieve attachments.');
       }
 
-      const attachments = await query.populate('creator').exec();
+      const attachments = await prisma.attachments.findMany({
+        where: { id: { in: matchedRows.map((row) => row._id.$oid) } },
+        include: { creator: true },
+      });
 
       res.status(200).send({
         attachments: attachments.map((attachment) =>
-          serializeAttachmentSecurely(attachment),
+          serializeAttachmentSecurely(toLegacyAttachmentShape(attachment)),
         ),
       });
     },

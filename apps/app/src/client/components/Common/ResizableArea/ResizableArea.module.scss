@@ -7,6 +7,8 @@
 }
 
 
+// Positioned against the nearest positioned ancestor, so that ancestor must
+// not clip overflow or the hit area outside the panel becomes unreachable.
 .grw-navigation-draggable {
   position: absolute;
   top: 0;
@@ -31,6 +33,21 @@
     width: 3px;
     height: 100%;
     background-color: rgb(76, 154, 255);
+  }
+}
+
+// Mirrored for an area attached to the right viewport edge
+.grw-navigation-draggable-right {
+  right: 100%;
+  left: auto;
+
+  :global(.grw-navigation-draggable-hitarea) {
+    right: -4px;
+    left: auto;
+  }
+  :global(.grw-navigation-draggable-line) {
+    right: -1px;
+    left: auto;
   }
 }
 

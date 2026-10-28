@@ -1,6 +1,3 @@
-import type { IPage, Ref } from '@growi/core';
-import { getIdStringForRef } from '@growi/core';
-
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 
 import type { AttachmentLike } from '../attachment/attachment-removal-snapshot';
@@ -16,26 +13,24 @@ import type { AttachmentLike } from '../attachment/attachment-removal-snapshot';
  */
 
 /**
- * Minimal structural surface of a Mongoose attachment document that the
- * builder reads. The Mongoose schema holds the page reference as `page`,
- * while the recorder's AttachmentLike reads `pageId` (the Prisma alias);
- * the rename is centralized here so call sites cannot forget it.
- * `_id` is optional only because the Mongoose Document typing declares it
- * so — a found document always has one at runtime.
+ * Minimal structural surface of a prisma attachment row that the builder
+ * reads. `_id` is optional only because a hand-built fixture may omit it —
+ * a row returned by `prisma.attachments.findMany` always has one at runtime
+ * (the extension's computed field).
  */
 export type AttachmentSource = {
   _id?: ObjectIdLike;
-  originalName?: string;
+  originalName?: string | null;
   fileSize?: number;
-  page?: Ref<IPage>;
+  pageId?: string | null;
 };
 
 /**
- * Maps Mongoose attachment documents to the AttachmentLike shape consumed by
- * the cascade recorder. An attachment without `_id` (a typing artifact that
- * cannot occur for found documents) is excluded rather than given a bogus
- * activity target; an attachment without a page reference is kept, with
- * `pageId` left undefined (design: unresolvable inputs degrade to undefined).
+ * Maps prisma attachment rows to the AttachmentLike shape consumed by the
+ * cascade recorder. An attachment without `_id` (a typing artifact) is
+ * excluded rather than given a bogus activity target; an attachment without
+ * a page reference is kept, with `pageId` left undefined (design:
+ * unresolvable inputs degrade to undefined).
  */
 export const toAttachmentLikes = (
   attachments: AttachmentSource[],
@@ -47,12 +42,9 @@ export const toAttachmentLikes = (
     return [
       {
         _id: attachment._id.toString(),
-        originalName: attachment.originalName,
+        originalName: attachment.originalName ?? undefined,
         fileSize: attachment.fileSize,
-        pageId:
-          attachment.page != null
-            ? getIdStringForRef(attachment.page)
-            : undefined,
+        pageId: attachment.pageId ?? undefined,
       },
     ];
   });

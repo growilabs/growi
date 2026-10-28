@@ -1,6 +1,8 @@
 import { type JSX, memo, useCallback, useRef } from 'react';
 
+import { computeWidthFromPointer, isCollapseGesture } from './compute-width';
 import type { ResizableAreaProps } from './props';
+import { getViewportWidth } from './viewport';
 
 import styles from './ResizableArea.module.scss';
 
@@ -9,6 +11,8 @@ export const ResizableArea = memo((props: ResizableAreaProps): JSX.Element => {
     className,
     width,
     minWidth = 0,
+    maxWidth,
+    anchor = 'left',
     disabled,
     children,
     onResize,
@@ -17,39 +21,48 @@ export const ResizableArea = memo((props: ResizableAreaProps): JSX.Element => {
   } = props;
 
   const resizableContainer = useRef<HTMLDivElement>(null);
+  // Width reported by the last mousemove; null until the pointer has moved.
+  const draggedWidth = useRef<number | null>(null);
 
   const draggableAreaMoveHandler = useCallback(
     (event: MouseEvent) => {
       event.preventDefault();
 
-      const widthByMousePos = event.pageX;
-
-      const newWidth = Math.max(widthByMousePos, minWidth);
+      const newWidth = computeWidthFromPointer({
+        anchor,
+        pointerX: event.clientX,
+        viewportWidth: getViewportWidth(),
+        minWidth,
+        maxWidth,
+      });
+      draggedWidth.current = newWidth;
       onResize?.(newWidth);
       resizableContainer.current?.classList.add('dragging');
     },
-    [minWidth, onResize],
+    [anchor, maxWidth, minWidth, onResize],
   );
 
   const dragableAreaMouseUpHandler = useCallback(
     (event: MouseEvent) => {
-      if (resizableContainer.current == null) {
-        return;
+      const shouldCollapse =
+        onCollapsed != null &&
+        isCollapseGesture({
+          anchor,
+          pointerX: event.clientX,
+          viewportWidth: getViewportWidth(),
+          minWidth,
+        });
+
+      if (shouldCollapse) {
+        onCollapsed();
+      } else if (draggedWidth.current != null) {
+        onResizeDone?.(draggedWidth.current);
       }
 
-      const widthByMousePos = event.pageX;
-
-      if (widthByMousePos < minWidth / 2) {
-        // force collapsed
-        onCollapsed?.();
-      } else {
-        const newWidth = resizableContainer.current.clientWidth;
-        onResizeDone?.(newWidth);
-      }
-
-      resizableContainer.current.classList.remove('dragging');
+      draggedWidth.current = null;
+      resizableContainer.current?.classList.remove('dragging');
     },
-    [minWidth, onCollapsed, onResizeDone],
+    [anchor, minWidth, onCollapsed, onResizeDone],
   );
 
   const dragableAreaMouseDownHandler = useCallback(
@@ -59,6 +72,7 @@ export const ResizableArea = memo((props: ResizableAreaProps): JSX.Element => {
       }
 
       event.preventDefault();
+      draggedWidth.current = null;
 
       const removeEventListeners = () => {
         document.removeEventListener('mousemove', draggableAreaMoveHandler);
@@ -73,6 +87,11 @@ export const ResizableArea = memo((props: ResizableAreaProps): JSX.Element => {
     [dragableAreaMouseUpHandler, draggableAreaMoveHandler, disabled],
   );
 
+  const draggableClass =
+    anchor === 'right'
+      ? `${styles['grw-navigation-draggable']} ${styles['grw-navigation-draggable-right']}`
+      : styles['grw-navigation-draggable'];
+
   return (
     <>
       <div
@@ -82,7 +101,7 @@ export const ResizableArea = memo((props: ResizableAreaProps): JSX.Element => {
       >
         {children}
       </div>
-      <div className={styles['grw-navigation-draggable']}>
+      <div className={draggableClass}>
         {!disabled && (
           <>
             <button

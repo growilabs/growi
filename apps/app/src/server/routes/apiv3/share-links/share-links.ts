@@ -1,25 +1,46 @@
-// TODO remove this setting after implemented all
+import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { NextFunction, Request, Router } from 'express';
 import express from 'express';
+import { body, param, query, type ValidationChain } from 'express-validator';
+import type { HydratedDocument } from 'mongoose';
+import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
+
+import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { expiredAtValidator } from './expired-at-validator';
+
+type AuthorizedRequest<
+  TParams = Record<string, string>,
+  TQuery = Record<string, never>,
+  TBody = unknown,
+> = Request<TParams, unknown, TBody, TQuery> & {
+  user: IUserHasId;
+};
+
+interface CreateShareLinkBody {
+  relatedPage: string;
+  expiredAt?: string;
+  description?: string;
+}
 
 const logger = loggerFactory('growi:routes:apiv3:share-links');
 
 const router = express.Router();
 
-import { body, param, query } from 'express-validator';
-
-const validator = {};
+const validator: Record<string, ValidationChain[]> = {};
 
 /**
  * @swagger
@@ -80,24 +101,25 @@ const validator = {};
  *           description: The unique identifier of the share link
  */
 
-/**
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {import('express').Router} router
- */
-export const setup = (crowi) => {
-  const today = new Date();
+export const setup = (crowi: Crowi): Router => {
   const loginRequired = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
-  const addActivity = generateAddActivityMiddleware(crowi);
+  const addActivity = generateAddActivityMiddleware();
 
-  const { Page } = crowi.models;
+  const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+    'Page',
+  );
 
   const activityEvent = crowi.events.activity;
 
   /**
    * middleware to limit link sharing
    */
-  const linkSharingRequired = (req, res, next) => {
+  const linkSharingRequired = (
+    _req: Request,
+    res: ApiV3Response,
+    next: NextFunction,
+  ) => {
     const isLinkSharingDisabled = crowi.configManager.getConfig(
       'security:disableLinkSharing',
     );
@@ -152,14 +174,17 @@ export const setup = (crowi) => {
     linkSharingRequired,
     validator.getShareLinks,
     apiV3FormValidator,
-    async (req, res) => {
+    async (
+      req: AuthorizedRequest<Record<string, string>, { relatedPage: string }>,
+      res: ApiV3Response,
+    ) => {
       const { relatedPage } = req.query;
 
       const page = await Page.findByIdAndViewer(relatedPage, req.user);
 
       if (page == null) {
         const msg = 'Page is not found or forbidden';
-        logger.error('Error', msg);
+        logger.error(msg);
         return res.apiv3Err(new ErrorV3(msg, 'get-shareLink-failed'));
       }
 
@@ -170,6 +195,8 @@ export const setup = (crowi) => {
             relatedPage: {
               select: {
                 id: true,
+                // result-extension field added in utils/prisma.ts; absent from the select type
+                // @ts-expect-error
                 _id: true,
                 path: true,
               },
@@ -189,10 +216,7 @@ export const setup = (crowi) => {
     // validate the page id is MongoId
     body('relatedPage').isMongoId().withMessage('Page Id is required'),
     // validate expireation date is not empty, is not before today and is date.
-    body('expiredAt')
-      .if((value) => value != null)
-      .isAfter(today.toString())
-      .withMessage('Your Selected date is past'),
+    expiredAtValidator(),
     // validate the length of description is max 100.
     body('description')
       .isLength({ min: 0, max: 100 })
@@ -242,14 +266,21 @@ export const setup = (crowi) => {
     addActivity,
     validator.shareLinkStatus,
     apiV3FormValidator,
-    async (req, res) => {
+    async (
+      req: AuthorizedRequest<
+        Record<string, string>,
+        Record<string, never>,
+        CreateShareLinkBody
+      >,
+      res: ApiV3Response,
+    ) => {
       const { relatedPage, expiredAt, description } = req.body;
 
       const page = await Page.findByIdAndViewer(relatedPage, req.user);
 
       if (page == null) {
         const msg = 'Page is not found or forbidden';
-        logger.error('Error', msg);
+        logger.error(msg);
         return res.apiv3Err(new ErrorV3(msg, 'post-shareLink-failed'));
       }
 
@@ -319,13 +350,16 @@ export const setup = (crowi) => {
     addActivity,
     validator.deleteShareLinks,
     apiV3FormValidator,
-    async (req, res) => {
+    async (
+      req: AuthorizedRequest<Record<string, string>, { relatedPage: string }>,
+      res: ApiV3Response,
+    ) => {
       const { relatedPage } = req.query;
       const page = await Page.findByIdAndViewer(relatedPage, req.user);
 
       if (page == null) {
         const msg = 'Page is not found or forbidden';
-        logger.error('Error', msg);
+        logger.error(msg);
         return res.apiv3Err(
           new ErrorV3(msg, 'delete-shareLinks-for-page-failed'),
         );
@@ -380,7 +414,7 @@ export const setup = (crowi) => {
     loginRequired,
     adminRequired,
     addActivity,
-    async (req, res) => {
+    async (_req: AuthorizedRequest, res: ApiV3Response) => {
       try {
         const deletedShareLink = await prisma.sharelinks.deleteMany({});
         const deletedCount = deletedShareLink.count;
@@ -430,7 +464,7 @@ export const setup = (crowi) => {
     addActivity,
     validator.deleteShareLink,
     apiV3FormValidator,
-    async (req, res) => {
+    async (req: AuthorizedRequest<{ id: string }>, res: ApiV3Response) => {
       const { id } = req.params;
       const { user } = req;
 
@@ -455,7 +489,7 @@ export const setup = (crowi) => {
         }
 
         // check permission
-        if (!user.isAdmin) {
+        if (!user.admin) {
           const page = await Page.findByIdAndViewer(
             shareLinkToDelete.relatedPageId,
             user,
@@ -470,7 +504,7 @@ export const setup = (crowi) => {
           // deleted.
           if (page == null) {
             const msg = 'Page is not found or forbidden';
-            logger.error('Error', msg);
+            logger.error(msg);
             return res.apiv3Err(
               new ErrorV3(msg, 'delete-shareLink-failed'),
               404,

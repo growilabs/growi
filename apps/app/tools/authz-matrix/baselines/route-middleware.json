@@ -2,7 +2,7 @@
   "capturedAt": "2026-06-12T08:20:44.672Z",
   "node": "v24.15.0",
   "git": "447ddd20adb7737a63f9913ed98f40fe24cf080a",
-  "entryCount": 273,
+  "entryCount": 274,
   "entries": [
     {
       "method": "GET",
@@ -39,6 +39,11 @@
         "apiV3FormValidator",
         "<anonymous>"
       ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/ai-usage/",
+      "middlewares": ["middleware", "apiV3FormValidator", "<anonymous>"]
     },
     {
       "method": "GET",
