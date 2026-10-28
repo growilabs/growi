@@ -196,7 +196,7 @@ export const ChatIntegrationDestinationSelect = ({
             {selectedCount === 0
               ? t('chat_integration.destination_select.summary_none')
               : t('chat_integration.destination_select.summary_selected', {
-                  count: selectedCount,
+                  selectedCount,
                 })}
           </span>
           {hasUnavailable && (

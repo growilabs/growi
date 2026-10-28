@@ -189,7 +189,7 @@ describe('ChatIntegrationDestinationSelect', () => {
     });
 
     const toggle = await findToggle();
-    expect(toggle).toHaveTextContent('"count":2');
+    expect(toggle).toHaveTextContent('"selectedCount":2');
   });
 
   it('keeps the menu open after a channel is checked, so several can be picked in a row', async () => {

@@ -1161,7 +1161,7 @@
     },
     "destination_select": {
       "summary_none": "채팅 알림",
-      "summary_selected": "채팅 알림: {{count}}개 선택됨",
+      "summary_selected": "채팅 알림: {{selectedCount}}개 선택됨",
       "private": "(비공개)",
       "partial_warning_title": "일부 workspace의 채널을 가져오지 못했습니다",
       "partial_warning_detail": "{{workspace}}의 채널을 가져오지 못했습니다({{reason}})",

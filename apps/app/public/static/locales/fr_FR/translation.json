@@ -1182,7 +1182,7 @@
     },
     "destination_select": {
       "summary_none": "Notification de chat",
-      "summary_selected": "Notification de chat : {{count}} sélectionné(s)",
+      "summary_selected": "Notification de chat : {{selectedCount}} sélectionné(s)",
       "private": "(privé)",
       "partial_warning_title": "Les canaux de certains workspaces n'ont pas pu être listés",
       "partial_warning_detail": "Les canaux de {{workspace}} n'ont pas pu être listés ({{reason}})",

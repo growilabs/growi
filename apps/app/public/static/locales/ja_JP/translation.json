@@ -1218,7 +1218,7 @@
     },
     "destination_select": {
       "summary_none": "チャット通知",
-      "summary_selected": "チャット通知: {{count}} 件を選択中",
+      "summary_selected": "チャット通知: {{selectedCount}} 件を選択中",
       "private": "（非公開）",
       "partial_warning_title": "一部の workspace のチャンネルを取得できませんでした",
       "partial_warning_detail": "{{workspace}} のチャンネルを取得できませんでした（{{reason}}）",

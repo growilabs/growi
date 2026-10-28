@@ -1234,7 +1234,7 @@
     },
     "destination_select": {
       "summary_none": "Chat notification",
-      "summary_selected": "Chat notification: {{count}} selected",
+      "summary_selected": "Chat notification: {{selectedCount}} selected",
       "private": "(private)",
       "partial_warning_title": "Channels of some workspaces could not be listed",
       "partial_warning_detail": "Channels of {{workspace}} could not be listed ({{reason}})",

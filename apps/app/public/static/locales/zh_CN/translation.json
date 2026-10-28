@@ -1181,7 +1181,7 @@
     },
     "destination_select": {
       "summary_none": "聊天通知",
-      "summary_selected": "聊天通知：已选择 {{count}} 个",
+      "summary_selected": "聊天通知：已选择 {{selectedCount}} 个",
       "private": "（私有）",
       "partial_warning_title": "无法获取部分 workspace 的频道",
       "partial_warning_detail": "无法获取 {{workspace}} 的频道（{{reason}}）",

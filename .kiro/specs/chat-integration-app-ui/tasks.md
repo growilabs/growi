@@ -110,7 +110,7 @@
   - _Depends: 4.2, 4.3_
 
 - [ ] 5. 全体を確かめる
-- [ ] 5.1 検査とテストを通す
+- [x] 5.1 検査とテストを通す
   - `apps/app` で `pnpm run lint`（型検査・Biome・`route-top-level-guard`・`lint:i18n` を含む）と、触れたファイルのテスト（`pnpm vitest run <部分名>`）を通す。`npx` は使わない
   - `tools/i18n-audit/baseline.json` が変わっていないことを `git diff` で確かめる
   - 観察できる完了条件: 検査とテストが通り、`baseline.json` の差分が無い
