@@ -1,0 +1,31 @@
+{
+  "feature_name": "ai-usage",
+  "created_at": "2026-10-09T11:07:28Z",
+  "updated_at": "2026-10-09T11:07:28Z",
+  "language": "ja",
+  "phase": "umbrella-active",
+  "kind": "umbrella",
+  "sub_specs": [
+    "ai-usage-metering",
+    "ai-usage-growi-cloud",
+    "ai-usage-fair-use"
+  ],
+  "approvals": {
+    "requirements": {
+      "generated": false,
+      "approved": false,
+      "delegated_to_sub_specs": true
+    },
+    "design": {
+      "generated": false,
+      "approved": false,
+      "delegated_to_sub_specs": true
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false,
+      "delegated_to_sub_specs": true
+    }
+  },
+  "ready_for_implementation": false
+}

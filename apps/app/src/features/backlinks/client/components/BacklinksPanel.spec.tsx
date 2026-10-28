@@ -195,5 +195,41 @@ describe('BacklinksPanel', () => {
       const section = within(screen.getByTestId('backlinks-link-targets'));
       expect(section.getAllByRole('listitem')).toHaveLength(2);
     });
+
+    it('says the link status could not be checked when linkTargets is null, keeping the backlinks list', () => {
+      // Arrange
+      mockBacklinks({
+        data: {
+          backlinks: [{ pageId: 'p-a', path: '/foo' }],
+          linkTargets: null,
+        },
+        isLoading: false,
+      });
+
+      // Act
+      render(<BacklinksPanel />);
+
+      // Assert
+      expect(screen.getByTestId('backlinks-list')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('backlinks-link-status-unavailable'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('backlinks-link-targets'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not show the unavailable message when linkTargets is an empty list', () => {
+      // Arrange
+      mockBacklinks({ data: responseOf([]), isLoading: false });
+
+      // Act
+      render(<BacklinksPanel />);
+
+      // Assert
+      expect(
+        screen.queryByTestId('backlinks-link-status-unavailable'),
+      ).not.toBeInTheDocument();
+    });
   });
 });

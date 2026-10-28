@@ -1,5 +1,10 @@
+import {
+  AI_DISABLED_REASON_CATALOG_STALE,
+  readAiDisabledReason,
+} from '~/features/ai-usage/server';
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
+import { randomSleep } from '~/server/util/random-sleep';
 import loggerFactory from '~/utils/logger';
 
 import { refreshModelCatalog } from './ai-sdk-modules/refresh-model-catalog';
@@ -10,9 +15,51 @@ const logger = loggerFactory(
 );
 
 /**
+ * The refresh runs while AI is enabled, and also while AI is disabled for the
+ * stale-catalog reason (so the catalog can recover). Any other disabled state
+ * must not communicate externally.
+ */
+export const isCatalogRefreshAllowed = (): boolean =>
+  isAiEnabled() || readAiDisabledReason() === AI_DISABLED_REASON_CATALOG_STALE;
+
+/** Upper bound of the random delay before a scheduled fetch (1 hour). */
+export const MAX_SCHEDULED_REFRESH_DELAY_MS = 60 * 60 * 1000;
+
+type JitteredRefreshScheduler = {
+  readonly onTick: () => Promise<void>;
+};
+
+/**
+ * Wraps a job so each tick waits a random delay before running. A tick that
+ * arrives while an earlier one is still waiting cuts that wait short, so the
+ * earlier run happens immediately and never slips past the next tick (Req 6.5).
+ */
+export const createJitteredRefreshScheduler = (params: {
+  readonly maxDelayMs: number;
+  readonly run: () => Promise<void>;
+}): JitteredRefreshScheduler => {
+  let pendingWait: AbortController | undefined;
+
+  const onTick = async (): Promise<void> => {
+    pendingWait?.abort();
+    const wait = new AbortController();
+    pendingWait = wait;
+
+    await randomSleep(params.maxDelayMs, wait.signal);
+
+    if (pendingWait === wait) {
+      pendingWait = undefined;
+    }
+    await params.run();
+  };
+
+  return { onTick };
+};
+
+/**
  * Periodic model-catalog refresh (Req 9.3). Instantiated and started ONLY when
- * the opt-in schedule config is set (see startModelCatalogRefreshCronIfEnabled)
- * — the default configuration never communicates externally (Req 9.6).
+ * the refresh is allowed and the schedule config is non-empty (see
+ * startModelCatalogRefreshCronIfEnabled).
  */
 class ModelCatalogRefreshCronService extends CronService {
   override getCronSchedule(): string {
@@ -22,28 +69,30 @@ class ModelCatalogRefreshCronService extends CronService {
     return configManager.getConfig('ai:modelCatalogRefreshCronSchedule') ?? '';
   }
 
+  private readonly scheduler = createJitteredRefreshScheduler({
+    maxDelayMs: MAX_SCHEDULED_REFRESH_DELAY_MS,
+    run: () => refreshModelCatalog().then(() => undefined),
+  });
+
   override async executeJob(): Promise<void> {
     // refreshModelCatalog throws on failure WITHOUT persisting, so a failed
     // tick keeps the last-good catalog (Req 9.4); the CronService base wraps
     // executeJob and logs the error, and the schedule keeps running.
-    await refreshModelCatalog();
+    await this.scheduler.onTick();
   }
 }
 
 /**
- * Start the periodic refresh cron IFF the AI feature is enabled AND
- * `ai:modelCatalogRefreshCronSchedule` is set (opt-in, Req 9.3/9.6). Called from
- * Crowi#setupCron at boot. An invalid schedule expression is logged and skipped
- * — it must never break the boot sequence (Req 9.4).
+ * Start the periodic refresh cron IFF the refresh is allowed
+ * (isCatalogRefreshAllowed) AND `ai:modelCatalogRefreshCronSchedule` is set.
+ * Called from Crowi#setupCron at boot. An invalid schedule expression is logged
+ * and skipped — it must never break the boot sequence (Req 9.4).
  *
- * The schedule now defaults to a daily expression, so the AI-enabled gate is
- * what preserves the zero-external-communication default: with `app:aiEnabled`
- * off (the GROWI default) no refresh is ever scheduled. Once an admin turns AI
- * on, the catalog auto-refreshes on the default schedule; setting the env var to
- * an empty string opts back out (e.g. air-gapped AI deployments).
+ * The schedule defaults to a daily expression; setting the env var to an empty
+ * string opts out (e.g. air-gapped AI deployments).
  */
 export const startModelCatalogRefreshCronIfEnabled = (): void => {
-  if (!isAiEnabled()) {
+  if (!isCatalogRefreshAllowed()) {
     return;
   }
 
@@ -70,14 +119,13 @@ export const startModelCatalogRefreshCronIfEnabled = (): void => {
 };
 
 /**
- * Fire a one-shot catalog refresh after the server is up IFF the AI feature is
- * enabled AND `ai:modelCatalogRefreshOnStartup` is true (opt-in, Req 9.2/9.6;
- * intended for baked-image deployments such as growi-docker-compose).
- * Fire-and-forget: the boot sequence is never blocked, and a failure only logs a
+ * Fire a one-shot catalog refresh after the server is up IFF the refresh is
+ * allowed (isCatalogRefreshAllowed) AND `ai:modelCatalogRefreshOnStartup` is
+ * true (the default). Fire-and-forget: the boot sequence is never blocked, and a failure only logs a
  * warning — the bundled/last-good catalog stays in effect (Req 9.4).
  */
 export const triggerModelCatalogRefreshOnStartupIfEnabled = (): void => {
-  if (!isAiEnabled()) {
+  if (!isCatalogRefreshAllowed()) {
     return;
   }
 
