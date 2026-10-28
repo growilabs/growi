@@ -26,8 +26,8 @@
         "upgraded_only": "Nouveau format uniquement",
         "both": "Les deux formats (migrés, cible de la suppression)",
         "legacy_only": "Format hérité uniquement (non migré)",
-        "legacy_only_active": "Format hérité uniquement : ACTIVE",
-        "legacy_only_non_active": "Format hérité uniquement : non ACTIVE",
+        "legacy_only_active": "Format hérité uniquement : actifs",
+        "legacy_only_non_active": "Format hérité uniquement : non actifs (en attente d’approbation, suspendus, supprimés, invités)",
         "no_password": "Mot de passe non défini"
       },
       "both_is_target_hint": "Les utilisateurs ayant les deux formats sont la cible de la suppression. Seul leur mot de passe au format hérité est supprimé.",

@@ -26,8 +26,8 @@
         "upgraded_only": "仅新格式",
         "both": "两种格式（已迁移，删除对象）",
         "legacy_only": "仅旧格式（未迁移）",
-        "legacy_only_active": "仅旧格式：ACTIVE",
-        "legacy_only_non_active": "仅旧格式：非 ACTIVE",
+        "legacy_only_active": "仅旧格式：活跃",
+        "legacy_only_non_active": "仅旧格式：非活跃（待审批、已停用、已删除、已邀请）",
         "no_password": "未设置密码"
       },
       "both_is_target_hint": "同时拥有两种格式的用户是删除对象，只会删除其旧格式密码。",

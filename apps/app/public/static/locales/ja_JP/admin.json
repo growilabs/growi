@@ -26,8 +26,8 @@
         "upgraded_only": "新形式のみ",
         "both": "両形式（移行済み・削除対象）",
         "legacy_only": "旧形式のみ（未移行）",
-        "legacy_only_active": "旧形式のみ: ACTIVE",
-        "legacy_only_non_active": "旧形式のみ: ACTIVE 以外",
+        "legacy_only_active": "旧形式のみ: アクティブ",
+        "legacy_only_non_active": "旧形式のみ: アクティブ以外（承認待ち・停止中・削除済み・招待中）",
         "no_password": "パスワード未設定"
       },
       "both_is_target_hint": "両形式を持つユーザーが削除対象です。旧形式のパスワードのみが削除されます。",

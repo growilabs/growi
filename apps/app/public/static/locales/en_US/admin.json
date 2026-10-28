@@ -26,8 +26,8 @@
         "upgraded_only": "New format only",
         "both": "Both formats (migrated, deletion target)",
         "legacy_only": "Legacy format only (not migrated)",
-        "legacy_only_active": "Legacy format only: ACTIVE",
-        "legacy_only_non_active": "Legacy format only: not ACTIVE",
+        "legacy_only_active": "Legacy format only: active",
+        "legacy_only_non_active": "Legacy format only: not active (approval pending, suspended, deleted, invited)",
         "no_password": "No password set"
       },
       "both_is_target_hint": "Users with both formats are the target of the deletion. Only their legacy password is removed.",

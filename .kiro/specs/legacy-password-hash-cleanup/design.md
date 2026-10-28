@@ -533,3 +533,6 @@ export const useSWRInfinitePasswordHashUnmigratedUsers: () => SWRInfiniteRespons
 
 ## master を取り込んだあとの調整（2026-10-27）
 - **件数入りの文言を複数形のキーにする（6.1）**: master で入った i18n の監査（`lint:i18n`）は、`t(key, { count })` で呼ぶキーに、言語ごとの複数形のキーがあることを求める。`confirm.warning` と `success` は、en_US と fr_FR では `_one` / `_other`、ja_JP・ko_KR・zh_CN では `_other` で持つ（`translation.json` の `sources` と同じ持ち方）。en_US と fr_FR は、単数と複数で文言を分ける。
+
+## 実機確認を受けた文言の調整（2026-10-28）
+- **「旧形式のみ」の内訳の名前（1.2）**: 内部の定数名 `ACTIVE` をそのまま出さず、「アクティブ」「アクティブ以外（承認待ち・停止中・削除済み・招待中）」のように各言語の言葉で書く。「アクティブ以外」は承認待ちと招待中だけでなく、停止中と削除済みも含むので、含まれるステータスを書き出す。言葉は、確認ダイアログのダウングレードの警告文と揃える。
