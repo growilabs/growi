@@ -6,9 +6,9 @@
 //     hardcoded per-platform switch exists
 //   - live connection status shows for an active relation
 //   - the encryption-key-unconfigured state disables pairing and shows why
-//   - the pairing form lives in a modal opened from an "Add connection"
-//     button; submitting it calls the pairing endpoint with the entered
-//     fields, and a successful pairing closes the modal
+//     (the warning's wording is covered by EncryptionKeyWarning.spec.tsx)
+//   - a successful pairing re-reads the relation list (the form itself is
+//     covered by pairing/PairingSection.spec.tsx)
 //   - an active relation offers a disconnect (Requirement 9.7) that asks for
 //     confirmation, calls the unpair endpoint, and re-reads the relation list
 
@@ -668,39 +668,35 @@ describe('AdminChatIntegration', () => {
     );
   };
 
-  it('keeps the pairing form out of the page until the connect button is pressed', async () => {
+  // The form's own behaviour is proven in pairing/PairingSection.spec.tsx and
+  // the warning's wording in EncryptionKeyWarning.spec.tsx; what is proven
+  // here is that this screen wires them to the relation list and to the
+  // encryption status endpoint.
+  it('re-reads the relation list after a successful pairing', async () => {
     stubApi({ encryptionConfigured: true, relations: [] });
+    mocks.apiv3Post.mockResolvedValue({
+      data: { status: 'paired', relationId: 'relation-new' },
+    });
     const user = userEvent.setup();
 
     renderScreen();
 
-    expect(
-      screen.queryByLabelText(/registration code/i),
-    ).not.toBeInTheDocument();
-
     await openPairingModal(user);
+    await fillPairingForm(user);
+    const relationListReads = () =>
+      mocks.apiv3Get.mock.calls.filter(
+        ([url]) => url === '/chat-integration/admin/relations',
+      ).length;
+    const readsBefore = relationListReads();
+    await user.click(screen.getByRole('button', { name: /^pair$/i }));
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByLabelText(/registration code/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(relationListReads()).toBeGreaterThan(readsBefore);
+    });
   });
 
   describe('when the encryption key is not usable', () => {
-    it('shows a prominent warning at the top and disables the add-connection button', async () => {
-      stubApi({ encryptionConfigured: false, relations: [] });
-
-      renderScreen();
-
-      const warning = await screen.findByRole('alert');
-      expect(warning).toHaveTextContent(/chat integration is not available/i);
-      expect(
-        screen.getByRole('button', { name: /add connection/i }),
-      ).toBeDisabled();
-      expect(
-        screen.queryByLabelText(/registration code/i),
-      ).not.toBeInTheDocument();
-    });
-
-    it('places the warning above the connections heading', async () => {
+    it('shows the warning above the connections heading and disables the add-connection button', async () => {
       stubApi({ encryptionConfigured: false, relations: [] });
 
       renderScreen();
@@ -713,25 +709,12 @@ describe('AdminChatIntegration', () => {
         warning.compareDocumentPosition(heading) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
+      expect(
+        screen.getByRole('button', { name: /add connection/i }),
+      ).toBeDisabled();
     });
 
-    it('names the key variable and how to generate one when it is unset', async () => {
-      stubApi({
-        encryptionConfigured: false,
-        encryptionReason: 'unset',
-        relations: [],
-      });
-
-      renderScreen();
-
-      const warning = await screen.findByRole('alert');
-      expect(warning).toHaveTextContent(
-        /CHAT_INTEGRATION_KEY_ENCRYPTION_KEY is not set/,
-      );
-      expect(warning).toHaveTextContent(/openssl rand -base64 32/);
-    });
-
-    it('tells a malformed key apart from an unset one', async () => {
+    it('passes the reason from the status endpoint to the warning', async () => {
       stubApi({
         encryptionConfigured: false,
         encryptionReason: 'invalid-key',
@@ -740,23 +723,8 @@ describe('AdminChatIntegration', () => {
 
       renderScreen();
 
-      const warning = await screen.findByRole('alert');
-      expect(warning).toHaveTextContent(/is set, but it is not a valid key/);
-      expect(warning).not.toHaveTextContent(/is not set/);
-    });
-
-    it('names the generation variable when only the generation is invalid', async () => {
-      stubApi({
-        encryptionConfigured: false,
-        encryptionReason: 'invalid-generation',
-        relations: [],
-      });
-
-      renderScreen();
-
-      const warning = await screen.findByRole('alert');
-      expect(warning).toHaveTextContent(
-        /CHAT_INTEGRATION_KEY_ENCRYPTION_KEY_GENERATION/,
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /is set, but it is not a valid key/,
       );
     });
 
@@ -786,71 +754,5 @@ describe('AdminChatIntegration', () => {
       ).toBeEnabled();
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('submits the pairing form with the entered fields and closes the modal when paired', async () => {
-    stubApi({ encryptionConfigured: true, relations: [] });
-    mocks.apiv3Post.mockResolvedValue({
-      data: { status: 'paired', relationId: 'relation-new' },
-    });
-    const user = userEvent.setup();
-
-    renderScreen();
-
-    await openPairingModal(user);
-    await fillPairingForm(user);
-    await user.click(screen.getByRole('button', { name: /^pair$/i }));
-
-    await waitFor(() => {
-      expect(mocks.apiv3Post).toHaveBeenCalledWith(
-        '/chat-integration/admin/pairing',
-        {
-          registrationCode: 'the-code',
-          proxyUri: 'https://proxy.example.test',
-          growiUri: 'https://growi.example.test',
-          growiLabel: 'My GROWI',
-        },
-      );
-    });
-    expect(mocks.toastSuccess).toHaveBeenCalled();
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
-  });
-
-  it('shows an error toast (not a success) and keeps the modal open for a non-"paired" outcome', async () => {
-    stubApi({ encryptionConfigured: true, relations: [] });
-    mocks.apiv3Post.mockResolvedValue({
-      data: { status: 'code-expired' },
-    });
-    const user = userEvent.setup();
-
-    renderScreen();
-
-    await openPairingModal(user);
-    await fillPairingForm(user);
-    await user.click(screen.getByRole('button', { name: /^pair$/i }));
-
-    await waitFor(() => {
-      expect(mocks.toastError).toHaveBeenCalled();
-    });
-    expect(mocks.toastSuccess).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByLabelText(/registration code/i)).toHaveValue('the-code');
-  });
-
-  it('closes the pairing modal without calling the pairing endpoint when cancelled', async () => {
-    stubApi({ encryptionConfigured: true, relations: [] });
-    const user = userEvent.setup();
-
-    renderScreen();
-
-    await openPairingModal(user);
-    await user.click(await screen.findByRole('button', { name: /^cancel$/i }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
-    expect(mocks.apiv3Post).not.toHaveBeenCalled();
   });
 });
