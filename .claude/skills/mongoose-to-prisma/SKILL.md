@@ -114,6 +114,15 @@ Read `apps/app/prisma/schema.prisma` and check for the collection entry (use low
    > ⚠️ Prisma does not support sparse indexes. Create the index directly via a `migrate-mongo` migration using the native MongoDB driver (`collection.createIndex({ ... }, { sparse: true })`), following the precedent in `apps/app/src/migrations/20220411114257-set-sparse-option-to-slack-member-id.js`. A sparse index is a database-level property, independent of Mongoose/Prisma — once created this way it keeps applying to every write (Mongoose or Prisma) and survives the eventual full removal of Mongoose. Add a comment in `schema.prisma` noting the index is sparse and managed by a migration, not by Prisma, so a future `prisma db push` doesn't attempt to recreate it without the sparse flag.
 
    Show the proposed migration file before writing. Wait for approval before proceeding.
+7. **Stored values the Prisma type rejects** — Prisma checks every document it reads against `schema.prisma`; Mongoose never did. One legacy document whose stored value violates the declared type makes the whole read throw `Error converting field "<field>" of expected non-nullable type "<T>", found incompatible value of "null"` — so a single bad document can turn every listing that reads it into a 500. Dev and test databases almost never contain such documents, so this cannot be caught by running the code; it has to be reasoned out from the model's write history. Check each field:
+   - **Scalar list fields** (`String[]`, typically a Mongoose array of refs): could an element ever have been stored as `null`? Prisma cannot declare nullable list elements, so if yes the only fix is a data cleanup migration. Look for writes that push a value which may be null — `$push`/`$addToSet` of a lookup result that can be missing (`findOne(...)`, `doc?._id`), or an array assigned wholesale from request input. A list field that is itself `null`, or missing, reads as `[]` and is fine; only null **elements** fail.
+   - **Non-nullable scalars** (`String`, `DateTime`, `Int` without `?`): could the field be `null` or missing in documents written by older versions (e.g. the field was added to the Mongoose schema later, with no backfill)?
+   - **Read the history, not only the current file**: `git log -p -S'<field>' -- <model file>` and `git show <oldest still-supported release tag>:<model file>`. The bad write has often already been fixed in the current code — which is exactly why it is easy to miss — while the data it wrote is still in production databases.
+   - If such data can exist, decide per field: make the Prisma field optional (`T?`) when null is a legitimate value; otherwise add a `migrate-mongo` cleanup migration **in the same PR** as the Prisma migration, so it runs before any Prisma read reaches the data. Write it with `prisma.$runCommandRaw`, make it idempotent, and give it an `.integ.ts` that inserts each legacy shape via the raw driver and asserts Prisma can read it after `up()`. Precedents: `apps/app/src/migrations/20260721103639-backfill-users-timestamps.js` (missing required timestamps) and `apps/app/src/migrations/20261028120000-remove-null-from-bookmarkfolders-bookmarks.js` (null list elements).
+   - Keep the cleanup filter narrow. For null list elements use `{ <field>: { $elemMatch: { $eq: null } } }`, not `{ <field>: null }`: the latter also matches documents whose field itself is `null`, where `$pull` fails with `Cannot apply $pull to a non-array value` and the update stops at that document — matching documents after it are never cleaned.
+   - Worked example: `bookmarkfolders.bookmarks` was ported as `bookmarkIds String[]` without this check. v7's `insertOrUpdateBookmarkedPage` passed `{ new: true, upsert: true }` into `Bookmark.findOne`'s projection argument, so a missing bookmark was never created and `$addToSet: { bookmarks: null }` stored a null. The Prisma port no longer wrote nulls, but after upgrading to v8.0.0 every user with such a legacy folder got a 500 on their bookmark listings (#12165).
+
+   Present the per-field verdict (safe / loosen to optional / needs cleanup migration) and any proposed migration before writing. Wait for approval before proceeding.
 
 If `schema.prisma` needs changes, show a diff of the proposed additions and wait for approval before writing.
 
@@ -392,6 +401,7 @@ Remaining TODOs:
   - Add .$extends(extension) to apps/app/src/utils/prisma.ts to activate the new extension
   - <source file> Mongoose schema block to be removed after all models have been migrated
   - [run the sparse-index migration created in Step 2 (if applicable)]
+  - [run the legacy-data cleanup migration created in Step 2.7 (if applicable)]
 ```
 
 ---
