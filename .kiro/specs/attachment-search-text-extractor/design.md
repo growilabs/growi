@@ -13,7 +13,7 @@
 ### Goals
 
 - 対応形式のファイルを、決められた単位 (PDF はページ、PPTX はスライド、XLSX はシート、その他は 1 要素) の `pages[]` で返す (1.1–1.5, 1.8, 1.12)
-- 日本語の語の途中に入った空白・改行を取り除き、改行コードを揃えて返す (1.9)
+- 改行コードを揃え、PDF の抽出で日本語の語の途中に入った空白・改行を取り除いて返す (1.9)
 - 時間切れ・メモリの使いすぎ・細工されたファイル・異常終了を、その 1 件のエラーとして閉じ込め、変換そのものを確実に止める (2.1–2.7)
 - 外部バイナリと外向き通信なしで、read-only rootfs・非 root の共有 Deployment として動く (1.7, 2.4, 3.1–3.4, 4.1–4.2)
 
@@ -48,7 +48,8 @@
 - PyPI の `firecrawl-anydoc` (版を固定)、`pypdfium2`、`charset-normalizer`、`defusedxml`、`fastapi`、`uvicorn[standard]`、`python-multipart`、`pydantic`、`pydantic-settings`。いずれも MIT / Apache-2.0 / BSD / PSF の許容的なライセンス
 - Python 3.12 の標準ライブラリ (`multiprocessing` の forkserver、`zipfile`、`html.parser`、`resource` など)
 - ベースイメージ `python:3.12-slim-bookworm` と、版を固定した uv のイメージ
-- 使わないもの: markitdown、pdfminer.six、python-pptx、lxml、LGPL / GPL / AGPL のライブラリ、外部バイナリ、外向き通信
+- テスト専用 (本番の image には入れない): `openpyxl` (MIT)、`python-pptx` (MIT)、`python-docx` (MIT)、`pypdf` (BSD-3)、`msoffcrypto-tool` (MIT)。テスト用のファイル (複数シート・非表示シートの XLSX、PPTX、暗号化した Office ファイルやパスワード付き PDF、展開すると巨大になるファイル) はテストの中で生成し、実在の文書はリポジトリに入れない
+- 使わないもの: markitdown、pdfminer.six、lxml、LGPL / GPL / AGPL のライブラリ、外部バイナリ、外向き通信 (python-pptx は本番では使わない)
 
 ### Revalidation Triggers
 
@@ -58,6 +59,8 @@
 - **`extraction_failed` の HTTP ステータス**: 壊れたファイルは 422、想定外の異常は 500 になり、同じコードが 2 つのステータスを持つ。apps/app はステータスではなくコードで分岐しているので影響はないが、ステータスで判断する処理を足すときは注意する
 - **`pages[]` の規則**: 「最低 1 要素を返す」「中身が空の要素は除く (全部空なら空の 1 要素)」「`pageNumber` に飛びがありうる (XLSX の空シート)」は、下流の検索文書の作り方の前提になる
 - **health / readiness の応答**: `pdf_strategy` を外す。apps/app は health / readiness を呼んでいないことを確認済み
+- **`label` の中身**: PDF と PPTX の `label` は番号だけの文字列 (例: `"12"`) にし、「スライド」「p.」などの文言は付けない。GROWI は 5 言語に対応しており、文言は UI 側で各言語に合わせて付けるべきだから。attachment-search-ui spec は `label` を「Slide N / Sheet name / Page N」の表示文字列として想定しているので、形式と `pageNumber` から文言を組み立てる形に直す必要がある
+- **タイムアウトの順序**: apps/app の `timeoutMs` は、抽出サービスの `TIMEOUT_S` より 5 秒以上長くする (apps/app が先に諦めると、抽出サービス側の変換が無駄に続く)。抽出サービスの既定を 55 秒にし、apps/app の既定 60000ms と合わせる
 - **サイズ・時間の上限の既定値**: apps/app 側の `maxFileSizeBytes` / `timeoutMs` と食い違うと、apps/app が待つ前にこちらが打ち切る (またはその逆) ことが起きる
 
 ## Architecture
@@ -96,7 +99,8 @@ graph TB
             Pdf[pdf converter]
             Text[text converter]
             Guard[archive guard]
-            Normalizer[text normalizer]
+            Normalizer[newline normalizer]
+            Joiner[japanese break joiner]
         end
     end
     Client --> Auth
@@ -117,10 +121,12 @@ graph TB
     Xlsx --> Office
     Text --> Office
     Core --> Normalizer
+    Pdf --> Joiner
 ```
 
 **Key decisions**:
-- 変換に関わるもの (anydoc、pypdfium2、ZIP の書き換え、文字コード判定、正規化) は子プロセスの中だけで動く。親 (uvicorn のワーカー) は変換ライブラリを呼ばない
+- 変換に関わるもの (anydoc、pypdfium2、ZIP の書き換え、文字コード判定、正規化) は子プロセスの中だけで動く。
+- 正規化は 2 段に分ける。改行コードの統一 (CRLF / CR → LF) はすべての経路にかける。日本語の間の空白・改行の詰めは PDF の経路だけにかける。調査で語の途中の切れが見つかったのは PDF の抽出だけで、TXT や DOCX の改行は書き手が入れたものだから (1.9 は「抽出処理によって入った」ものだけを対象にしている)親 (uvicorn のワーカー) は変換ライブラリを呼ばない
 - 子と親の境界は「バイト列と形式を渡し、`pages[]` かエラーの種類を受け取る」だけにする。親は子の結果を JSON として受け取り、pickle は使わない (子が悪意あるファイルに乗っ取られても、親でコードが動かないようにするため)
 - 依存の向き: `schemas` / `config` → `conversion` (純粋な変換と正規化。HTTP もプロセスも知らない) → `runner` (子プロセスの管理) → `routers` → `main`。左の層は右の層を import しない
 - 同時実行の枠は uvicorn のワーカーごとに持つ。既定はワーカー 1 つとし、`MAX_CONCURRENCY` がそのまま全体の上限になる。変換は子で行われるので、ワーカーが 1 つでも応答は止まらない
@@ -177,7 +183,7 @@ services/attachment-text-extractor/
 │       ├── core.py                        #   形式の判定 → 変換 → 正規化 → 空要素の規則、例外の分類
 │       ├── formats.py                     #   MIME / 拡張子 → 形式と経路の対応表 (旧 extractors/__init__.py を置き換え)
 │       ├── errors.py                      #   変換の失敗の種類 (ConversionFailure) と分類
-│       ├── normalize.py                   #   改行の統一と日本語の間の空白・改行の除去 (純粋関数)
+│       ├── normalize.py                   #   改行の統一 (全経路) と、日本語の間の空白・改行の詰め (PDF の経路のみ) の純粋関数
 │       ├── charset.py                     #   文字コードの判定とデコード (純粋関数)
 │       ├── archive_guard.py               #   ZIP の事前検査 (エントリ数・展開後サイズ・必要な部品)
 │       ├── office.py                      #   anydoc の呼び出し (形式の明示、例外の分類)
@@ -269,7 +275,8 @@ graph TB
     Route -->|xlsx zip| XlsxPath[archive guard then marker then anydoc]
     Route -->|office or not zip| OfficePath[anydoc with explicit format]
     Route -->|text| TextPath[decode then handle]
-    PdfPath --> Norm[normalize]
+    PdfPath --> Join[join japanese breaks]
+    Join --> Norm[normalize newlines]
     PptxPath --> Norm
     XlsxPath --> Norm
     OfficePath --> Norm
@@ -294,7 +301,7 @@ graph TB
 | 1.6 | 対象外の形式を拒否 | FormatResolver | `resolve_format` → `unsupported` | 子の中の流れ |
 | 1.7 | 外部バイナリ・外向き通信なし | OfficeConverter (`ocr` 引数を使わない)、依存の構成 | — | — |
 | 1.8 | 旧形式 Office / OpenDocument を 1 要素で | FormatResolver, OfficeConverter | `convert_office` | 子の中の流れ |
-| 1.9 | 改行の統一と日本語の間の空白・改行の除去 | TextNormalizer | `normalize_text` | 子の中の流れ |
+| 1.9 | 改行の統一 (全経路) と、抽出で入った日本語の間の空白・改行の除去 (PDF) | TextNormalizer, PdfConverter | `normalize_newlines`, `join_broken_japanese` | 子の中の流れ |
 | 1.10 | 暗号化ファイルを拒否 | OfficeConverter, PdfConverter, ConversionCore | `file_encrypted` | エラー表 |
 | 1.11 | 壊れたファイル | ConversionCore | `extraction_failed` (422) | エラー表 |
 | 1.12 | オーナーパスワードだけの PDF は抽出 | PdfConverter | `convert_pdf` | 子の中の流れ |
@@ -332,7 +339,7 @@ graph TB
 | PdfConverter | Conversion | pypdfium2 でページごとに取り出す | 1.4, 1.10, 1.12, 2.6 | pypdfium2 (P0) | Service |
 | TextConverter | Conversion | テキスト系・HTML・XML・ipynb・CSV / TSV を扱う | 1.5 | CharsetDecoder (P0), OfficeConverter (CSV, P1) | Service |
 | ArchiveGuard | Conversion | ZIP の事前検査 | 2.6 | zipfile (P0) | Service |
-| TextNormalizer | Conversion | 改行の統一と日本語の間の空白・改行の除去 | 1.9 | — | Service |
+| TextNormalizer | Conversion | 改行の統一と、PDF の抽出で入った日本語の間の空白・改行の詰め | 1.9 | — | Service |
 | CharsetDecoder | Conversion | 文字コードの判定とデコード | 1.5 | charset-normalizer (P0) | Service |
 
 型の共通部分 (`ConversionFailure` など) は §Data Models にまとめる。
@@ -450,6 +457,7 @@ class ConversionRunner:
 **Responsibilities & Constraints**
 - 起動直後に設定するもの (Linux のみ、他の OS では何もしない):
   - `RLIMIT_AS` (仮想メモリの上限) を「RSS の上限 + 512MB」にする。最後の歯止め
+  - `RLIMIT_CPU` (CPU 時間の上限) を「`TIMEOUT_S` + 5 秒」にする。親の SIGKILL が届かない場合の歯止めで、超えると子は SIGXCPU で終わる
   - `oom_score_adj` を 1000 にする。コンテナのメモリが足りなくなったとき、OS が uvicorn ではなく子を先に止めるようにする
 - 監視用パイプを見張るスレッドを 1 つ立て、パイプが閉じた (依頼元のワーカーが落ちた) ら `os._exit` で終わる。CPython の非公開属性には頼らない
 - `ConversionCore.convert()` を呼び、`BaseException` まで捕まえて失敗の種類に変える (`SystemExit` / `KeyboardInterrupt` は投げ直す)
@@ -471,7 +479,7 @@ def convert(data: bytes, filename: str, mime_hint: str | None, limits: Conversio
     """Raises ConversionError (carrying a FailureKind) on any failure."""
 ```
 
-- 正規化 (`normalize_text`) は全経路の結果の各要素にかける
+- 改行コードの統一 (`normalize_newlines`) は全経路の結果の各要素にかける。日本語の間の詰め (`join_broken_japanese`) は PdfConverter の中でだけかける
 - 正規化の後に中身が空の要素は除く。全部が空なら `PageInfo(pageNumber=None, label=None, content="")` の 1 要素を返す。下流は要素ごとに検索文書を作り、ファイル名だけの文書は失敗時にしか作らないため、空の配列を返すと添付がファイル名でも見つからなくなる
 - 結果の合計の大きさが `MAX_RESULT_BYTES` を超えたら `result_too_large` にする
 
@@ -514,7 +522,7 @@ def convert_office(data: bytes, fmt: AnydocFormat) -> str: ...
 - 前提: ArchiveGuard を通り、ZIP で `ppt/presentation.xml` があること。満たさなければ OfficeConverter に `pptx` としてそのまま渡す (暗号化されていれば `encrypted` になる)
 - `presentation.xml` と関係ファイル (`.rels`) を defusedxml で解析し、スライドの並び順を得る。正規表現では書き換えない
 - スライドごとに、スライド一覧をその 1 枚だけにした `presentation.xml` と、そのスライドが参照する XML 部品だけを入れたパッケージを作り、anydoc に渡す。画像などの XML 以外の部品は入れない
-- `pageNumber` はスライドの順番 (1 始まり)、`label` は `"スライド N"` とする
+- `pageNumber` はスライドの順番 (1 始まり)、`label` はその番号の文字列 (例: `"3"`)。文言は UI 側で付ける
 - anydoc の出力から、PowerPoint が自動で付ける代替テキスト (「AI 生成コンテンツは誤りを含む可能性があります」などの決まった文) と、改行の印として出る行末の `\` を取り除く
 
 ```python
@@ -527,7 +535,9 @@ def convert_pptx(data: bytes, limits: ConversionLimits) -> list[PageInfo]: ...
 - `xl/workbook.xml` を defusedxml で解析し、各シートの名前を `ZZ<リクエストごとの乱数><連番>ZZ` に置き換え、非表示のシートを表示状態に戻したブックを作って、anydoc を 1 回だけ呼ぶ
 - 出力を `## 目印` の行で切り、目印から元のシート名に戻す (元の名前は XML の文字参照を戻してから使う)
 - `pageNumber` は workbook.xml でのシートの順番 (1 始まり。非表示・空・グラフのシートも数える)、`label` は元のシート名。空のシートは返さないので番号が飛ぶことがある。非表示のシートは含める
-- 目印の数がシートの数と合わないときは、ブック全体を 1 要素 (`pageNumber` / `label` は null) で返し、警告をログに残す
+- シートが 1 枚だけのブックでは、anydoc は見出しを出さない。このときは出力全体を 1 要素とし、`pageNumber=1`、`label` を workbook.xml のシート名にする
+- 空のシートとグラフだけのシートは目印が出力に現れないが、そもそも返さないシートなので問題にしない
+- 次のどれかに当たるときだけ、ブック全体を 1 要素 (`pageNumber` / `label` は null) で返し、警告をログに残す: 置き換えていない目印が出てくる、目印の順番が workbook.xml の順番と食い違う、最初の目印より前に空でないテキストがある (シートが 2 枚以上のとき)
 
 ```python
 def convert_xlsx(data: bytes, limits: ConversionLimits) -> list[PageInfo]: ...
@@ -535,12 +545,13 @@ def convert_xlsx(data: bytes, limits: ConversionLimits) -> list[PageInfo]: ...
 
 #### PdfConverter
 
-- pypdfium2 でページごとに文字を取り出す。`pageNumber` はページ番号 (1 始まり)、`label` は `"p.N"`
+- pypdfium2 でページごとに文字を取り出す。`pageNumber` はページ番号 (1 始まり)、`label` はその番号の文字列 (例: `"12"`)。文言は UI 側で付ける
+- 取り出したテキストの改行を LF に揃えてから、`join_broken_japanese` で日本語の文字に挟まれた 1 文字分の半角空白・改行を詰める (1.9)
 - 開くときにパスワードを求められる PDF (`PdfiumError` の err_code 4 / 5) は `encrypted` (1.10)。オーナーパスワードだけの PDF は普通に開けるので抽出する (1.12)
 - 開けない PDF (err_code 0 / 1 / 2 / 3) は `malformed` (1.11)。PDFium が修復して読める場合はそのまま抽出する
 - ページ数が `MAX_PDF_PAGES` を超えたら `limit_exceeded` (2.6)
 - 画像だけの PDF は例外にならず、全ページの文字数 (`count_chars()`) が 0 になる。ConversionCore の空要素の規則で 1 要素になる
-- 改行は `\r\n` で出る。正規化で LF に揃う
+- 改行は `\r\n` で出るので、詰めの前に LF に揃える
 
 ```python
 def convert_pdf(data: bytes, limits: ConversionLimits) -> list[PageInfo]: ...
@@ -573,13 +584,17 @@ def inspect_archive(data: bytes, required_part: str, limits: ConversionLimits) -
 #### TextNormalizer
 
 ```python
-def normalize_text(text: str) -> str:
-    """CRLF/CR → LF, then remove a single space, ideographic space, or newline
-    between two Japanese characters (hiragana, katakana, kanji, 々, ー)."""
+def normalize_newlines(text: str) -> str:
+    """CRLF/CR → LF. Applied on every path."""
+
+def join_broken_japanese(text: str) -> str:
+    """Remove a single ASCII space or a single newline between two Japanese
+    characters (hiragana, katakana, kanji, 々, ー). PDF path only."""
 ```
 
-- 純粋関数。入出力は文字列だけ
-- 対象は日本語の文字に挟まれた 1 文字分の空白 (半角・全角) と改行だけ。2 つ以上続く改行 (段落の区切り) は残す
+- どちらも純粋関数。入出力は文字列だけ
+- `join_broken_japanese` の対象は、日本語の文字に挟まれた 1 文字分の半角空白と、1 つだけの改行。全角空白 (書き手が入れたもの) と、2 つ以上続く改行 (段落の区切り) は残す
+- TXT / DOCX / PPTX などの経路には `join_broken_japanese` をかけない。これらの改行や空白は書き手が入れたものだから
 
 #### CharsetDecoder
 
@@ -643,9 +658,11 @@ class ConversionError(Exception):    # 変換層の中だけで使い、Conversi
 
 | Field | Type | PDF | PPTX | XLSX | その他 |
 |---|---|---|---|---|---|
-| `pageNumber` | `int \| None` | ページ番号 (1 始まり、空のページは除くので飛びうる) | スライドの順番 | workbook.xml での順番 (飛びうる) | null |
-| `label` | `str \| None` | `"p.N"` | `"スライド N"` | 元のシート名 | null |
-| `content` | `str` | 正規化済みのテキスト | 同左 | 同左 | 同左 |
+| `pageNumber` | `int \| None` | ページ番号 (1 始まり、空のページは除くので飛びうる) | スライドの順番 | workbook.xml での順番 (飛びうる。1 シートなら 1) | null |
+| `label` | `str \| None` | 番号の文字列 (`"12"`) | 番号の文字列 (`"3"`) | 元のシート名 | null |
+| `content` | `str` | 改行を揃え、日本語の間を詰めたテキスト | 改行を揃えたテキスト | 同左 | 同左 |
+
+`label` には言語に依存する文言を入れない。「スライド」「p.」などの文言は UI 側で付ける。
 
 **`ErrorCode` (2 つ追加)**: `unauthorized` / `unsupported_format` / `file_too_large` / `extraction_timeout` / `service_busy` / `extraction_failed` に、`file_encrypted` (1.10) と `resource_limit_exceeded` (2.6) を足す。
 
@@ -661,7 +678,7 @@ class ConversionError(Exception):    # 変換層の中だけで使い、Conversi
 | `WORKERS` | 1 | uvicorn のワーカー数 | 既定を 2 から 1 に |
 | `MAX_CONCURRENCY` | 2 | ワーカーごとの同時変換の数。ワーカー 1 つなら全体の上限 | 既定を 4 から 2 に。説明の「`max(2, workers×2)` に設定」を「全体の上限はワーカー数 × この値」に直す |
 | `MAX_FILE_SIZE_MB` | 50 | 受け付けるファイルの大きさの上限 | 既存 |
-| `TIMEOUT_S` | 60 | 1 件の変換の時間の上限 | 既存 (実際に止まるようになる) |
+| `TIMEOUT_S` | 55 | 1 件の変換の時間の上限。apps/app の `timeoutMs` (既定 60000) より 5 秒以上短くする | 既定を 60 から 55 に (実際に止まるようになる) |
 | `MAX_CHILD_RSS_MB` | 768 | 1 件の変換に許す RSS の上限。6MB・2 万行 × 5 シートの XLSX (約 620MB) が通る値 | 新規 |
 | `MAX_RESULT_BYTES` | 16777216 (16MiB) | 1 件の結果 (全要素の合計) の上限 | 新規。使われていなかった `MAX_EXTRACTED_BYTES` (500MiB) を置き換える |
 | `MAX_PDF_PAGES` | 5000 | PDF のページ数の上限 | 新規 |
@@ -696,7 +713,7 @@ Dockerfile で固定する環境変数:
 | anydoc の `ResourceLimitError`、ArchiveGuard の上限、`MAX_PDF_PAGES` の超過 | `limit_exceeded` | `resource_limit_exceeded` (新規) | 422 |
 | 親の RSS 監視で止めた | `memory_exceeded` | `resource_limit_exceeded` | 422 |
 | 結果が `MAX_RESULT_BYTES` を超えた | `result_too_large` | `resource_limit_exceeded` | 422 |
-| 期限を過ぎて親が止めた、子が SIGXCPU で終わった | `timeout` | `extraction_timeout` | 408 |
+| 期限を過ぎて親が止めた、子が `RLIMIT_CPU` を超えて SIGXCPU で終わった | `timeout` | `extraction_timeout` | 408 |
 | 結果を送る前に子が終わった (abort、segfault、OS のメモリ不足による強制終了を含む) | `crashed` | `extraction_failed` | 500 |
 | 子の中の想定外の例外 (`PanicException` を含む) | `internal` | `extraction_failed` | 500 |
 
@@ -712,7 +729,8 @@ Dockerfile で固定する環境変数:
 
 ### Unit Tests (`tests/conversion/`)
 
-- **正規化 (1.9)**: `"情報シス\nテム"` → `"情報システム"`、`"計画管 理"` → `"計画管理"`、全角空白も除く。段落の区切り (`\n\n`) と英単語の間の空白は残す。`\r\n` と `\r` が `\n` になる
+- **正規化 (1.9)**: `normalize_newlines` で `\r\n` と `\r` が `\n` になる。`join_broken_japanese` で `"情報シス\nテム"` → `"情報システム"`、`"計画管 理"` → `"計画管理"`。全角空白、段落の区切り (`\n\n`)、英単語の間の空白は残す
+- **書き手が入れた改行が残る (1.9)**: TXT の `"障害対応メモ\n本番環境で発生"` と、DOCX の段落の区切りが、変換後もそのまま残る (PDF 以外の経路では詰めない)
 - **文字コード判定**: UTF-8 (BOM あり / なし)、Shift_JIS、EUC-JP、ISO-2022-JP、cp1252 の日本語・英語の試料が正しくデコードされる。短い Shift_JIS が big5 と誤判定されない
 - **HTML / XML / ipynb**: script / style の中身が出ない。XML の DOCTYPE とエンティティが展開されない (billion laughs の試料で膨らまない)。ipynb で画像の base64 が出ず、セルの source とテキストの出力が出る
 - **形式判定 (1.6, 1.8)**: MSG が `unsupported` になる。旧形式・OpenDocument が office の経路になり、XLS が `xlsx` の形式名で渡される
@@ -723,7 +741,7 @@ Dockerfile で固定する環境変数:
 ### Contract Tests (anydoc の版に固定、`tests/conversion/`)
 
 - **PPTX の分割 (1.2)**: 実ファイルで、スライドごとに分けて変換した結果をつなぐと、丸ごと anydoc に渡した結果と一致する。スライド数どおりの要素が返る
-- **XLSX の目印 (1.3)**: 複数シート・1 シート・非表示シート・空シート・グラフシート・名前に `<` や `#` を含むシートで、シート名と順番が正しく対応する。目印の数が合わないときに 1 要素になる
+- **XLSX の目印 (1.3)**: 次の各場合で、シート名と順番が正しく対応する。1 シートだけ (`pageNumber=1`、`label` はシート名)、空のシートを含む複数シート、データのシート 1 枚とグラフシート、2 枚のうち 1 枚が非表示、名前に `<` や `#` を含むシート。置き換えていない目印や順番の食い違いがあるときは 1 要素になる
 - **XLS の形式名**: XLS を `xlsx` の形式名で渡して変換できる
 - **暗号化 (1.10, 1.12)**: テストの中で生成した、暗号化された DOCX / XLSX / PPTX とユーザーパスワード付き PDF が `encrypted` になる。オーナーパスワードだけの PDF は抽出できる
 - **細工ファイル (2.6)**: 展開すると巨大になる DOCX、XML を 10 万段入れ子にした DOCX が `limit_exceeded` になる
@@ -735,6 +753,7 @@ Dockerfile で固定する環境変数:
 - **異常終了の隔離 (2.7)**: 子の中で `os.abort()` と segfault を起こすと `crashed` になり、同時に動いていた別の変換は成功する。`PanicException` 相当は `internal` になる
 - **ワーカーの消失**: 依頼元のワーカープロセスを強制終了すると、子が一定時間 (例: 2 秒) 以内に終わり、残らない
 - **結果の上限**: 大きな結果が `result_too_large` になる
+- **既定の上限で誤って止めない**: 既定の上限 (RSS 768MB、`RLIMIT_AS` = RSS の上限 + 512MB、`RLIMIT_CPU`) の下で、全形式の代表的なファイル (6MB・2 万行 × 5 シートの XLSX を含む) が成功する
 
 ### Integration / E2E Tests (HTTP)
 

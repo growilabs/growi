@@ -34,7 +34,7 @@ GROWI には現在、添付ファイル (PDF / Office 等) のテキストを抽
   - HTML / TXT / JSON / XML / YAML / MD / LOG / ipynb: サービス自身で処理 (文字コード判定、HTML は標準の `html.parser` で script / style を除いてタグを除去)
   - Outlook MSG: 対象外
 - **位置情報**: PDF はページ単位、PPTX はスライド単位、XLSX はシート単位、その他は単一要素 (`pageNumber=null, label=null`)
-- **日本語の正規化**: 全経路の後に、改行コードを揃え、日本語の間に入った 1 文字分の空白・改行を詰める
+- **日本語の正規化**: 全経路の後に改行コードを揃える。PDF の経路では、日本語の間に入った 1 文字分の半角空白・改行も詰める
 - **リソース保護**: 最大サイズ制限、同時実行上限に加え、変換を kill できる子プロセスで実行してタイムアウト時に確実に止める。細工ファイル (展開後サイズ・入れ子の深さ) は上限で打ち切る
 - **Dockerfile**: `python:3.12-slim-bookworm` + `uv` multi-stage (builder stage で `uv sync --locked --no-dev` → runtime stage に `.venv` だけコピー)、非 root (uid 10001) 実行
 - **セキュリティ**: k8s で `readOnlyRootFilesystem: true`, `runAsNonRoot: true`, `capabilities: drop: [ALL]`, `allowPrivilegeEscalation: false`, seccomp `RuntimeDefault`, `/tmp` を size-limited tmpfs、NetworkPolicy で外部 egress 遮断
