@@ -62,6 +62,7 @@ export default defineWorkspace([
         './test/setup/elasticsearch.ts',
         './test/setup/migrate-mongo.ts',
         './test/setup/mongo/index.ts',
+        './test/setup/model-less-indexes.ts',
         './test/setup/prisma.ts',
       ],
       // Fork concurrency is capped in CI via the `test:integ` script's
@@ -120,6 +121,7 @@ export default defineWorkspace([
         './test/setup/elasticsearch.ts',
         './test/setup/migrate-mongo.ts',
         './test/setup/mongo/index.ts',
+        './test/setup/model-less-indexes.ts',
         './test/setup/prisma.ts',
       ],
       deps: { interopDefault: true },
