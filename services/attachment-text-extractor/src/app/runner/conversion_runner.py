@@ -1,8 +1,8 @@
 """Per-request conversion child management (design: ConversionRunner; Req 2.2, 2.5, 2.6, 2.7, 3.2).
 
-This section covers the forkserver lifecycle and readiness. Children are forked from one
-forkserver per worker process that has already imported the conversion dependencies, so a
-child does not pay the import cost again (research.md 1.3, 3.8).
+Children are forked from one forkserver per worker process that has already imported the
+conversion dependencies, so a child does not pay the import cost again (research.md 1.3, 3.8).
+run() hands one request to one child; the supervision itself lives in child_supervision.
 """
 
 from __future__ import annotations
@@ -22,7 +22,15 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from multiprocessing.connection import Connection
 from types import MappingProxyType
-from typing import Final
+from typing import TYPE_CHECKING, Any, Final
+
+from app.conversion.limits import ConversionLimits
+from app.conversion.results import ConversionOutcome
+from app.runner.child_entry import ChildParams, child_main
+from app.runner.child_supervision import ChildTarget, SupervisionTimings, run_child
+
+if TYPE_CHECKING:
+    from app.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +52,10 @@ _PROBE_REAP_TIMEOUT_S: Final = 2.0
 # Lets the probe thread notice its own poll timeout before verify() decides the spawn is stuck.
 _PROBE_GRACE_S: Final = 0.5
 _PROBE_MAX_BYTES: Final = 64 * 1024
+DEFAULT_POLL_INTERVAL_S: Final = 0.05
+DEFAULT_REAP_TIMEOUT_S: Final = 2.0
+DEFAULT_SPAWN_TIMEOUT_S: Final = 10.0
+_MIB: Final = 1024 * 1024
 _STATUS_OK: Final = "ok"
 _STATUS_MISSING: Final = "missing"
 
@@ -70,14 +82,53 @@ def _probe_main(result_conn: Connection, module_names: Sequence[str]) -> None:
     result_conn.close()
 
 
+@dataclass(frozen=True)
+class ConversionRequest:
+    data: bytes
+    filename: str
+    mime_hint: str | None
+
+
+@dataclass(frozen=True)
+class _RunLimits:
+    limits: ConversionLimits
+    timeout_s: float
+    max_input_bytes: int
+
+
 class ConversionRunner:
     def __init__(
         self,
         *,
+        limits: ConversionLimits | None = None,
+        timeout_s: float | None = None,
+        max_input_bytes: int | None = None,
+        child_target: ChildTarget = child_main,
+        poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
+        reap_timeout_s: float = DEFAULT_REAP_TIMEOUT_S,
+        spawn_timeout_s: float = DEFAULT_SPAWN_TIMEOUT_S,
         dependencies: Sequence[str] = CONVERSION_DEPENDENCIES,
         env_defaults: Mapping[str, str] = FORKSERVER_ENV_DEFAULTS,
         probe_timeout_s: float = DEFAULT_PROBE_TIMEOUT_S,
     ) -> None:
+        """`timeout_s` is a float separate from Settings.TIMEOUT_S so tests can pass sub-second deadlines.
+
+        The three request limits are optional only so readiness can be used on its own; run()
+        refuses to work without them. `child_target` must be a module-level function (it is
+        pickled by reference) with child_main's signature.
+        """
+        all_or_none = (limits, timeout_s, max_input_bytes)
+        if any(value is None for value in all_or_none) and any(value is not None for value in all_or_none):
+            raise ValueError("limits, timeout_s and max_input_bytes must be given together")
+        self._run_limits = (
+            None
+            if limits is None or timeout_s is None or max_input_bytes is None
+            else _RunLimits(limits=limits, timeout_s=timeout_s, max_input_bytes=max_input_bytes)
+        )
+        self._child_target = child_target
+        self._timings = SupervisionTimings(
+            poll_interval_s=poll_interval_s, reap_timeout_s=reap_timeout_s, spawn_timeout_s=spawn_timeout_s
+        )
         self._dependencies = tuple(dependencies)
         self._env_defaults = dict(env_defaults)
         self._probe_timeout_s = probe_timeout_s
@@ -87,6 +138,37 @@ class ConversionRunner:
         self._started = False
         self._last = _NOT_READY
         self._forkserver_pidfd: int | None = None
+
+    @classmethod
+    def from_settings(cls, settings: Settings, **options: Any) -> ConversionRunner:  # noqa: ANN401
+        """`options` are the remaining keyword arguments of the constructor (timings, child_target, ...)."""
+        return cls(
+            limits=ConversionLimits.from_settings(settings),
+            timeout_s=float(settings.TIMEOUT_S),
+            max_input_bytes=settings.MAX_FILE_SIZE_MB * _MIB,
+            **options,
+        )
+
+    async def run(self, request: ConversionRequest) -> ConversionOutcome:
+        """Convert in a fresh child; never raises for anything the child does.
+
+        Preconditions (the caller's job): a concurrency slot is held and the size is checked.
+        Postcondition: the child is killed and reaped when this returns, and also when the
+        awaiting task is cancelled (the CancelledError propagates). The outcome carries the
+        child's peak RSS in `child_peak_rss_mb` (None when it could not be sampled).
+        """
+        if self._run_limits is None:
+            raise RuntimeError("ConversionRunner was built without request limits; use from_settings()")
+        params = ChildParams(
+            filename=request.filename,
+            mime_hint=request.mime_hint,
+            limits=self._run_limits.limits,
+            timeout_s=self._run_limits.timeout_s,
+            max_input_bytes=self._run_limits.max_input_bytes,
+        )
+        return await run_child(
+            self._ctx, self._child_target, request.data, params, self._timings, _kill_standard_forkserver
+        )
 
     async def start(self) -> None:
         """Start the forkserver and wait until it has preloaded the dependencies (lifespan start-up).

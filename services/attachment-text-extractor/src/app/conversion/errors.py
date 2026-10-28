@@ -20,6 +20,8 @@ FailureKind = Literal[
 class ConversionFailure:
     kind: FailureKind
     detail: str  # Must never contain file contents; it ends up in logs and responses.
+    # Set by the runner from its own /proc sampling; never sent over the wire by the child.
+    child_peak_rss_mb: int | None = None
 
 
 class ConversionError(Exception):

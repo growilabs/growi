@@ -12,7 +12,7 @@ import signal
 import sys
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from multiprocessing.connection import Connection
 from pathlib import Path
 
@@ -27,7 +27,6 @@ pytestmark = [
 ]
 
 WAIT_S = 10.0
-ENV_KEYS = ("RAYON_NUM_THREADS",)
 
 
 def _env_probe(conn: Connection) -> None:
@@ -77,38 +76,6 @@ def _pid_exists(pid: int) -> bool:
     if not status.exists():
         return False
     return "State:\tZ" not in status.read_text()
-
-
-def _stop_any_forkserver() -> None:
-    for child in multiprocessing.active_children():
-        child.kill()
-        child.join(WAIT_S)
-    # A forkserver frozen by a test (SIGSTOP, an import that sleeps) would never exit on its own.
-    pid = multiprocessing.forkserver._forkserver._forkserver_pid
-    if pid is not None:
-        try:
-            os.kill(pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-    # Test-only stdlib hook ("Method used by unit tests to stop the server"); other test files may
-    # have started a forkserver with the default preload in this same pytest process.
-    multiprocessing.forkserver._forkserver._stop()
-
-
-@pytest.fixture
-def isolated_forkserver() -> Iterator[None]:
-    saved_env = {key: os.environ.pop(key, None) for key in ENV_KEYS}
-    _stop_any_forkserver()
-    yield
-    _stop_any_forkserver()
-    multiprocessing.get_context("forkserver").set_forkserver_preload(["__main__"])
-    for key, value in saved_env.items():
-        if value is None:
-            os.environ.pop(key, None)
-        else:
-            os.environ[key] = value
-    assert multiprocessing.active_children() == []
-    assert _probe_threads() == []
 
 
 def _probe_threads() -> list[threading.Thread]:

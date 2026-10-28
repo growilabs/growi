@@ -143,7 +143,7 @@
   - 完了の状態: 起動後に準備の確認が真になり、forkserver を止めると偽になることをテストで確かめられる
   - _Requirements: 2.5, 3.2_
 
-- [ ] 6.3 1 件の変換を子プロセスで実行し、監視して、結果を分類する
+- [x] 6.3 1 件の変換を子プロセスで実行し、監視して、結果を分類する
   - リクエストごとに子を 1 つ作り、ファイルをイベントループを止めずに送る
   - 50ms ごとに子の RSS と期限を確かめ、期限切れなら時間切れ、RSS の上限超えならメモリ超過として子を止める。結果が上限より大きければ読み捨てて結果超過にする。結果を受け取った場合も最後に必ず子を止め、2 秒を上限に回収する
   - 結果を送らずに子が終わったときは、SIGXCPU なら時間切れ、それ以外は異常終了に分ける
@@ -242,3 +242,6 @@
 - 6.1: forkserver の準備 (6.2) では `RAYON_NUM_THREADS=1` を forkserver の起動前に設定する (今回のテストではこれが無くても、40MB の DOCX / PPTX と 10 万セルの XLSX は VmPeak 約 370MB 以下で通った)。CPU 時間の hard 上限が環境側で低いと soft と hard が同じ値になり、SIGXCPU より先に SIGKILL が届いて「時間切れ」が「異常終了」に分類される (珍しい配備だけ)。
 - 6.2: `ConversionRunner` の準備確認の使い方 (7.2 が守る): `/readyz` は `readiness()` が準備できていない (`stale` を含む) なら `await asyncio.to_thread(runner.verify)` で確かめ直し、その結果を返す。`readiness()` は新しいプロセスを作らず待たない。`verify()` は正常なら約 5ms、固まっていても `probe_timeout_s` + 約 0.5 秒 + 回収で戻る。k8s の readinessProbe の `timeoutSeconds` (8.2) はこれより長くするか、7.2 で `probe_timeout_s` を短く渡す。forkserver が死んだ直後に標準の処理がまだその死を見ていない間の最初の `Process.start()` は `EOFError` になるので、6.3 の `run()` はこれを「異常終了」として扱い、次のリクエストは立て直された forkserver を使う。
 - 6.2: Python 3.12 では forkserver に `__main__` を先読みさせる指定が効かず、子 1 つを作るたびに起動スクリプト (uvicorn) を読み直して約 29ms かかる (何も読み込まないスクリプトなら約 7ms)。8.1 で、forkserver にだけ読み込ませて `/readyz` には出さない別の一覧 (例 `uvicorn.main`) を足すか、起動を小さなスクリプト経由にするか決める。`stop()` は変換中の子が残っていると終わるまで止まる (3 秒動く子で 3.03 秒)。7.2 は 6.3 が子を回収した後にスレッドから呼ぶ。`/readyz` の dependencies に内部モジュール名 (`app.runner.child_entry`) が出るので、認証なしで呼べる `/readyz` に出してよいかを 7.2 で決める。`os.environ.setdefault` で RAYON_NUM_THREADS を書くのは、stdlib が forkserver に環境変数を渡す口を持たないため。TMPDIR は 8.1 の Dockerfile で設定する。
+- 6.3: `ConversionRunner.run(ConversionRequest(data, filename, mime_hint)) -> ConversionOutcome` と `ConversionRunner.from_settings(settings, **options)` が 7.1 / 7.2 の入口。子の最大 RSS は `ConversionSuccess` / `ConversionFailure` の省略可能な項目 `child_peak_rss_mb` で返す (親だけが入れ、親子間の JSON には載らない)。この項目は design.md の Contracts に未記載なので、9.2 の前に追記する。`app/runner/__init__.py` は design のファイル構成では ConversionRunner を公開するはずだが未公開 (6.2 から持ち越し)。7.1 / 7.2 で公開する。
+- 6.3: 分類の優先順位は、(1) 受け取りきった結果 (同じ見回りで期限が来ても結果を優先)、(2) 親が決めた timeout / memory_exceeded / result_too_large、(3) 結果なしで終わった子 (-SIGXCPU → timeout、その他は crashed)。結果超過は長さ欄だけで決め、本体は読まずに子を止める。最悪の場合の所要時間は期限 55 秒 + 回収待ち約 4 秒 = 約 59 秒で、apps/app 側の 60 秒に余裕が少ない (7.1 / 8.1 / 9.2 で TIMEOUT_S の既定を見直すか、apps/app 側の上限との関係を確認する)。`run()` は `start()` を前提にしない (先に呼ぶと forkserver が依存の先読みも RAYON_NUM_THREADS も無しで立つ)。7.2 は起動順を守る。親が wire → app.conversion.errors → app/conversion/__init__ → core の連鎖で anydoc / pypdfium2 を読み込み、RSS が約 9MB 増える (設計の 1 ワーカー約 120MB の範囲内)。8.1 の init (tini など) は、forkserver が落ちた後に残った子の回収に PID 1 が必要になるかどうかの材料。
+- 6.3 の改善案 (どれも必須ではない): pidfd が使えず forkserver を落とした珍しい組み合わせで、動いている子が exitcode 255 と読まれて SIGKILL を送らず、戻った時点で子が短い間残る。2 回の見回りの間に終わる変換は最大 RSS が小さく報告される (結果を受け取った後に VmHWM を読み直していない)。子が結果のパイプを先に閉じて動き続けると、期限と RSS を見ずに最大 2 秒待つ。`_read_exact` が bytearray から bytes に写すので結果 1 件あたり一時的に約 2 倍のメモリを使う。

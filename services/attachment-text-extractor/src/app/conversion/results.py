@@ -10,6 +10,8 @@ from app.schemas import PageInfo
 class ConversionSuccess:
     pages: list[PageInfo]
     mime_type: str
+    # Set by the runner from its own /proc sampling; never sent over the wire by the child.
+    child_peak_rss_mb: int | None = None
 
 
 ConversionOutcome = ConversionSuccess | ConversionFailure
