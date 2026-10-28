@@ -68,6 +68,7 @@ import type {
 import type {
   HistoryMessage,
   Invocation,
+  ListRow,
   OutboundMessage,
   PlatformEvent,
   Relation,
@@ -290,14 +291,31 @@ const explanation = (
   return markdown(note == null ? head : `${head}\n${note}`);
 };
 
-const searchRowMarkdown = (item: SearchResultItem): string =>
-  `[${item.title}](${item.url}) — ${item.path}`;
+/**
+ * The path is shown only where it tells the reader more than the title does.
+ * GROWI answers a top-level page with a title that is its path minus the
+ * leading slash, and repeating that adds nothing.
+ */
+const searchRowOf = (item: SearchResultItem, growiLabel: string): ListRow => {
+  const repeatsTitle =
+    item.path === item.title || item.path === `/${item.title}`;
+  return {
+    primary: { kind: 'link', label: item.title, url: item.url },
+    ...(repeatsTitle ? {} : { detail: item.path }),
+    sourceLabel: growiLabel,
+  };
+};
 
-const helpRowMarkdown = (entry: {
-  name: CommandName;
-  usage: string;
-  description: string;
-}): string => `\`${entry.usage}\` — ${entry.description}`;
+const helpRowOf = (
+  entry: { name: CommandName; usage: string; description: string },
+  growiLabel: string,
+): ListRow => ({
+  primary: {
+    kind: 'text',
+    markdown: `\`${entry.usage}\` — ${entry.description}`,
+  },
+  sourceLabel: growiLabel,
+});
 
 const previewMarkdown = (
   response: Extract<CommandResponse, { kind: 'link-preview' }>,
@@ -750,11 +768,11 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
         : {
             kind: 'list',
             title: `「${keyword}」の検索結果`,
-            // Requirement 3.3: every row says which GROWI it came from.
-            rows: fused.map((result) => ({
-              markdown: searchRowMarkdown(result.item),
-              sourceLabel: result.growiLabel,
-            })),
+            // Requirement 3.3: every row carries the GROWI it came from; the
+            // renderer names it once when all rows share it.
+            rows: fused.map((result) =>
+              searchRowOf(result.item, result.growiLabel),
+            ),
             ...(footer == null ? {} : { footer }),
           },
     );
@@ -817,10 +835,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     const rows = answered.flatMap((entry) =>
       entry.value
         .filter((command) => permitted.get(command.name)?.has(entry.relationId))
-        .map((command) => ({
-          markdown: helpRowMarkdown(command),
-          sourceLabel: entry.growiLabel,
-        })),
+        .map((command) => helpRowOf(command, entry.growiLabel)),
     );
 
     const footer = footerOf(outcome, declined);

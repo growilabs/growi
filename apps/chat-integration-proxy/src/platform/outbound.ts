@@ -29,6 +29,7 @@ import {
   Button,
   Card,
   type CardElement,
+  CardLink,
   CardText,
   ChannelImpl,
   Divider,
@@ -42,6 +43,7 @@ import { supports } from '../capabilities/index.js';
 import type {
   DirectPostOutcome,
   EphemeralPostOutcome,
+  ListRow,
   OutboundMessage,
   PostOutcome,
   ReactionName,
@@ -95,38 +97,100 @@ const NOT_IN_CHANNEL_REMEDY =
 // OutboundMessage -> what the SDK posts
 // --------------------------------------------------------------------------
 
+type ListMessage = Extract<OutboundMessage, { kind: 'list' }>;
+
 /**
- * A row of a `list`, and a `list`'s footer, rendered as plain markdown.
+ * Percent-encodes only the characters that end or split a link in markdown
+ * or Slack's `<url|label>` -- a backtick, for one, pairs with a backtick in
+ * the label into a code span that swallows the link. GROWI joins a raw page path onto its site URL,
+ * so these can appear; `%` and everything else stay as they are, so an
+ * already-encoded URL is not encoded twice.
+ */
+const LINK_BREAKING = /[ |()[\]<>`]/g;
+const encodeLinkUrl = (url: string): string =>
+  url.replace(
+    LINK_BREAKING,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+
+/**
+ * The GROWI name every row shares, or `undefined` when the rows come from
+ * more than one. A shared name is shown once for the list instead of on each
+ * row -- repeating it says nothing when there is only one GROWI to tell apart.
+ */
+const sharedSourceOf = (message: ListMessage): string | undefined => {
+  const labels = new Set(message.rows.map((row) => row.sourceLabel));
+  const [only] = labels;
+  return labels.size === 1 ? only : undefined;
+};
+
+/** The muted parts of a row: its detail, and its GROWI name unless shared. */
+const secondaryOf = (
+  row: ListRow,
+  sharedSource: string | undefined,
+): string | undefined =>
+  [row.detail, sharedSource == null ? row.sourceLabel : undefined]
+    .filter((part) => part != null && part !== '')
+    .join(' · ') || undefined;
+
+/**
+ * A `list` rendered as plain markdown.
  *
  * Used when `card` is not `full` on the target service -- design.md's
  * capability table gives Mattermost `degraded` with the documented fallback
  * 「markdown で投稿する」. Every row and its source label survives the
  * fallback: what is lost is the card's visual framing, not information.
  */
-const listToMarkdown = (
-  message: Extract<OutboundMessage, { kind: 'list' }>,
-): string =>
-  [
+const listToMarkdown = (message: ListMessage): string => {
+  const sharedSource = sharedSourceOf(message);
+  const rowLine = (row: ListRow): string => {
+    const primary =
+      row.primary.kind === 'link'
+        ? `[${row.primary.label}](${encodeLinkUrl(row.primary.url)})`
+        : row.primary.markdown;
+    const secondary = secondaryOf(row, sharedSource);
+    return secondary == null ? `- ${primary}` : `- ${primary} — ${secondary}`;
+  };
+  return [
     `**${message.title}**`,
-    ...message.rows.map((row) => `- ${row.markdown} — ${row.sourceLabel}`),
+    ...(sharedSource == null ? [] : [sharedSource]),
+    ...message.rows.map(rowLine),
     ...(message.footer == null ? [] : ['', message.footer]),
   ].join('\n');
+};
 
-const listToCard = (
-  message: Extract<OutboundMessage, { kind: 'list' }>,
-): CardElement =>
-  Card({
+/**
+ * A `list` rendered as a card. A link row goes in as a `CardLink` rather
+ * than markdown in a `CardText`, because each adapter draws a `CardLink` in
+ * its own service's link syntax while card text reaches Slack unconverted
+ * (proxy research.md, 「一覧の行のリンク」).
+ */
+const listToCard = (message: ListMessage): CardElement => {
+  const sharedSource = sharedSourceOf(message);
+  return Card({
     title: message.title,
+    ...(sharedSource == null ? {} : { subtitle: sharedSource }),
     children: [
-      ...message.rows.flatMap((row) => [
-        CardText(row.markdown),
-        CardText(row.sourceLabel, { style: 'muted' }),
-      ]),
+      ...message.rows.flatMap((row) => {
+        const secondary = secondaryOf(row, sharedSource);
+        return [
+          row.primary.kind === 'link'
+            ? CardLink({
+                url: encodeLinkUrl(row.primary.url),
+                label: row.primary.label,
+              })
+            : CardText(row.primary.markdown),
+          ...(secondary == null
+            ? []
+            : [CardText(secondary, { style: 'muted' })]),
+        ];
+      }),
       ...(message.footer == null
         ? []
         : [Divider(), CardText(message.footer, { style: 'muted' })]),
     ],
   });
+};
 
 /**
  * A `choice` rendered as buttons.

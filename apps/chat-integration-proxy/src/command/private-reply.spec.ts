@@ -26,7 +26,13 @@ const REPLIES: ReadonlyArray<OutboundMessage> = [
   {
     kind: 'list',
     title: '検索結果',
-    rows: [{ markdown: `[${SECRET}](https://wiki/p)`, sourceLabel: 'wiki' }],
+    rows: [
+      {
+        primary: { kind: 'link', label: SECRET, url: 'https://wiki/p' },
+        detail: `/team/${SECRET}`,
+        sourceLabel: 'wiki',
+      },
+    ],
     footer: `note ${SECRET}`,
   },
   {

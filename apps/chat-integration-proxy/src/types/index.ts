@@ -89,6 +89,7 @@ export type {
   EphemeralPostOutcome,
   HistoryMessage,
   HistoryOutcome,
+  ListRow,
   OutboundMessage,
   PostOutcome,
   ReactionName,

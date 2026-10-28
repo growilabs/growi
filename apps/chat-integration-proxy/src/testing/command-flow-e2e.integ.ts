@@ -500,11 +500,13 @@ describe('a command run end to end', () => {
     expect(
       list.rows.map((row) => ({
         sourceLabel: row.sourceLabel,
-        hasUrl: row.markdown.includes(
-          row.sourceLabel === 'GROWI A'
-            ? 'http://growi-a.test/e2e/minutes'
-            : 'http://growi-b.test/e2e/minutes',
-        ),
+        hasUrl:
+          row.primary.kind === 'link' &&
+          row.primary.url.includes(
+            row.sourceLabel === 'GROWI A'
+              ? 'http://growi-a.test/e2e/minutes'
+              : 'http://growi-b.test/e2e/minutes',
+          ),
       })),
     ).toEqual(
       expect.arrayContaining([

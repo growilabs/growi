@@ -41,6 +41,24 @@
 - **Teams のリアクション**: `eyes` は Teams の `1f440_eyes` に直るが、`email` はアダプタの対応表に無く、`email` のまま送られる
 - **同じリアクションを 2 回付ける**: Slack は 2 回目に `already_reacted` を返し、`addReaction` はそれを成功として返す（アダプタのコードで確かめた）。Discord（204）・Mattermost（200）・Teams（200）は、2 回目も成功を返すと仮定した応答の上で確かめた
 
+### 一覧の行のリンク
+
+2026-10-27 に本物の Slack で、検索結果の行が `[タイトル](URL)` の文字のまま出て、URL の部分だけがリンクになっているのを見た。インストール済みのアダプタ（4.38.1。Mattermost は 1.1.3）のコードを読み、Slack は `cardToBlockKit` に実際に通して確かめた。
+
+- **Slack**: `CardText` は `mrkdwn` の section（`muted` なら context）になる。変換は絵文字と `**太字**` → `*太字*` だけで、`[t](u)` はそのまま送られる。Slack の `mrkdwn` は `[t](u)` を知らないので文字のまま出る。これが見えた症状の原因。
+  `CardLink` は `<url|label>` の section になり、リンクとして出る。一方、Card ではない `{ markdown }` の投稿（`postMessage`・`postEphemeral`）は `markdown_text` で送られ、Slack が markdown として描くので `[t](u)` もリンクになる。response_url での書き換えでは、アダプタが markdown を `mrkdwn` に直し、リンクを `<u|t>` にする
+- **Discord**: `CardText` の中身はそのまま embed（または Components v2 の text display）に入る。Discord は `[t](u)` をリンクとして描く。`CardLink` は `[label](url)` になる。`muted` は `*…*`（斜体）で囲まれる
+- **Teams**: `CardText` は Adaptive Card の TextBlock になる。TextBlock は `[t](u)` をリンクとして描く。`CardLink` は `[label](url)` の TextBlock になる。`muted` は `isSubtle`。Card の `subtitle` も薄い TextBlock として描かれる
+- **Mattermost**: 能力表で `card` が `degraded` なので、proxy は Card を送らず markdown を送る。アダプタは markdown をいったん解析してから markdown に戻して送るので、`[t](u)` はリンクになる
+- **Implications**: 一覧の行の中身を文字列に組み立てず、リンクを `CardLink` として渡せば、4 サービスとも各アダプタがそのサービスの書き方でリンクを描く。proxy 側にサービスごとの表は要らない（design.md の「一覧の描き方」）。
+- **リンクの URL に入る文字**: GROWI はページのパスをエンコードせずにサイトの URL へつなぐ（app の `search-result-mapper.ts` の `urljoin(siteUrl, page.path)`）。そのため URL に空白・`|`・`(`・`)`・`[`・`]`・`` ` `` が入りうる。
+  これらはリンクの書き方の区切りと同じ文字なので、そのまま送るとリンクが途中で切れる。Slack の `<url|label>` では、URL の中の `|` から後ろがリンクの文字として読まれ、別のページへのリンクになる。`[label](url)`（Discord・Teams・Mattermost）では、空白や `)` でリンクが終わる。`` ` `` はパスの最後の部分（＝リンクの文字）と URL の両方に入るので、markdown が `](` をまたいで 2 つの `` ` `` を組にしてコードとして読み、リンクが消える（Mattermost で `` [a`b](https://g.example/a`b) `` を解析して戻すと、ただの文字になる。`%60` にすればリンクのまま残る）。Mattermost のアダプタは markdown をいったん解析してから戻すので、そこでリンクでなくなる。
+  アダプタはどれも URL をエンコードしない。そこで proxy が `platform/outbound.ts` で、これらの文字と `<` `>` だけをパーセントエンコードしてから `CardLink` と markdown のリンクに渡す。`%` やその他の文字は変えないので、すでにエンコード済みの URL を二重にエンコードしない
+- **リンクの文字（label）**: Slack では label の中の `|` は区切りとして扱われず、そのまま表示される。一方、markdown で描くサービス（Discord・Teams・Mattermost）では、組になっていない `[` や `]`、リンクの形をしたタイトル（`foo]` や `[x](https:evil.example)` など）があると、リンクの文字の側が崩れる。
+  これはこの変更で生まれたものではない（以前のコードも同じ `[title](url)` を組み立てていた）。バックスラッシュでエスケープすると Slack では `\` がそのまま見えてしまい、サービスごとに扱いを変えるにはサービス名での分岐が要る。また、これを悪用できるのはページを編集できる人だけで、その人はもともとページ本文に任意のリンクを書ける。そのため、あえて対処しない
+- **文字参照を含むパス（既知の制限）**: パスに `&lt;` のような HTML の文字参照がそのまま入っていると、Slack の `<url|label>` と、Mattermost のアダプタの解析と組み立て直しで `<` として読まれる。まれなので対処しない
+- **薄い文字で出す補足**: パスは Slack の context（mrkdwn）と Discord の `*…*` の中にそのまま入るので、パスに `_x_` や `~x~` があると斜体や取り消し線になる。今は対処しない
+
 ### 引数の聞き返しと DM
 
 - **Context**: 要件 1.16（DM で聞き返したら DM での答えを受け付ける）。

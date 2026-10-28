@@ -14,15 +14,30 @@ import type { ChatAccountRef } from '@growi/chat';
 
 import type { SdkChannelRef } from './channel.js';
 
+/**
+ * One row of a `list`, kept as data so `platform/outbound.ts` can draw a
+ * link the way each service renders one: a markdown link written into card
+ * text reaches Slack as raw characters (proxy research.md, 「一覧の行のリンク」).
+ */
+export interface ListRow {
+  readonly primary:
+    | { readonly kind: 'link'; readonly label: string; readonly url: string }
+    | { readonly kind: 'text'; readonly markdown: string };
+  /** Plain secondary text shown muted under the primary content. */
+  readonly detail?: string;
+  /**
+   * Always set; the renderer shows it once for the whole list when every row
+   * shares it, and per row otherwise.
+   */
+  readonly sourceLabel: string;
+}
+
 export type OutboundMessage =
   | { readonly kind: 'markdown'; readonly markdown: string }
   | {
       readonly kind: 'list';
       readonly title: string;
-      readonly rows: ReadonlyArray<{
-        readonly markdown: string;
-        readonly sourceLabel: string;
-      }>;
+      readonly rows: ReadonlyArray<ListRow>;
       readonly footer?: string;
     }
   | {

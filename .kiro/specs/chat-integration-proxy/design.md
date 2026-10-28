@@ -738,10 +738,24 @@ export type ReactionName = 'eyes' | 'email';   // 受け付けた / DM に届い
  * Card への変換は `platform/outbound.ts` の中だけで行う。ここに SDK の型が入ると、
  * 組み立てる `orchestration/` が SDK を import することになり、決定 2 の lint に例外が要る。
  */
+/**
+ * 一覧の 1 行。文字列に組み立てず、リンクとその他の文字を分けて持つ。
+ * どう描くかはサービスごとに違うので、`platform/outbound.ts` が決める（下の「一覧の描き方」）
+ */
+export interface ListRow {
+  readonly primary:
+    | { readonly kind: 'link'; readonly label: string; readonly url: string }   // 検索の結果
+    | { readonly kind: 'text'; readonly markdown: string };                     // ヘルプの行
+  /** 主な内容の下に薄く出す補足（検索ではパス。タイトルと同じことしか言わないなら持たない） */
+  readonly detail?: string;
+  /** どの GROWI の行か。必ず持つ。全行で同じなら一覧に 1 回だけ出す */
+  readonly sourceLabel: string;
+}
+
 export type OutboundMessage =
   | { readonly kind: 'markdown'; readonly markdown: string }
   | { readonly kind: 'list'; readonly title: string;
-      readonly rows: ReadonlyArray<{ readonly markdown: string; readonly sourceLabel: string }>;
+      readonly rows: ReadonlyArray<ListRow>;
       readonly footer?: string }
   | { readonly kind: 'choice'; readonly prompt: string;
       /** `ArgumentCollector.resume` が進行中のやり取りを引く鍵。`outbound.ts` が `encodeActionId()` でボタンの action id に載せる */
@@ -842,6 +856,20 @@ Bot Framework の利用者 ID しか運ばず、Graph が所属を引くため�
 - Invariants: **platform 層の出入口に Chat SDK の型を含めない。** 出入口は `PlatformAppConfig` / `InstallationCredentials` /
   `PlatformEvent` / `OutboundMessage` / `HistoryOutcome` / `HistoryMessage` / `DistributedLock` の 7 つと、各操作の結果の型（`PostOutcome`・`EphemeralPostOutcome`・`DirectPostOutcome`・`ReactionOutcome`）。これらがどれも proxy 自身の型だけで書けることが、
   lint（`chat` / `@chat-adapter/*` の import を `platform/**` 以外で禁止）を**例外なしに**書ける条件
+
+**一覧の描き方**（`platform/outbound.ts` の `toPostable`）:
+
+- `card` が `full` のサービス（Slack・Discord・Teams）では Card にする。リンクの行は `CardText` に markdown のリンクを書かず、Chat SDK の `CardLink` にする。
+  各アダプタが `CardLink` をそのサービスのリンクの書き方に直す（Slack は `<url|label>`、Discord と Teams は `[label](url)`）。
+  `CardText` に書いた `[label](url)` は Slack ではリンクにならず、文字のまま出る（proxy の research.md「一覧の行のリンク」）。
+  各アダプタがそれぞれのサービスの書き方に直すので、proxy 側に能力表の行もサービス名での分岐も要らない
+- ヘルプの行（`text`）は今までどおり `CardText` に markdown を書く
+- リンクの URL は、渡す前に空白・`|`・`(`・`)`・`[`・`]`・`<`・`>`・`` ` `` だけをパーセントエンコードする。GROWI はパスをエンコードせずに URL を作るので、これらがあるとリンクが途中で切れる（proxy の research.md「一覧の行のリンク」）。`CardLink` と Mattermost の markdown の両方に同じ処理を通す
+- `detail` と GROWI の名前は、行のすぐ下に薄い文字（`muted`）で `·` でつないで出す
+- 全行の `sourceLabel` が同じとき（結果を返した GROWI が 1 つだけのとき）は、名前を行ごとに繰り返さず、Card の `subtitle` に 1 回だけ出す。
+  2 つ以上の GROWI の行が混ざるときだけ、行ごとに出す。判断は描く側で行い、`orchestration/` は常に各行に名前を入れる
+- `card` が `degraded` のサービス（Mattermost）では markdown にする。リンクは `[label](url)`、補足は ` — ` のあとに続け、共通の名前はタイトルの次の行に 1 回だけ出す
+- 検索の行は `orchestration/command-flow.ts` が作る。リンクの文字はページのタイトル、`detail` はパス。パスがタイトルそのもの、またはタイトルの前に `/` を付けただけのときは `detail` を持たない
 
 **本人だけのメッセージ・DM・リアクションの 3 つの仕組み**（`platform/outbound.ts`）:
 

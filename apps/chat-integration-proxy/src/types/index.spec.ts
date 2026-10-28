@@ -123,7 +123,12 @@ describe('OutboundMessage / HistoryOutcome / HistoryMessage', () => {
     const list: OutboundMessage = {
       kind: 'list',
       title: 'Search results',
-      rows: [{ markdown: '- foo', sourceLabel: 'Engineering GROWI' }],
+      rows: [
+        {
+          primary: { kind: 'text', markdown: 'foo' },
+          sourceLabel: 'Engineering GROWI',
+        },
+      ],
       footer: '2 more not shown',
     };
     const choice: OutboundMessage = {

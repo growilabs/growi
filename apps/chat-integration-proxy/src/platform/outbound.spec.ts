@@ -9,13 +9,24 @@
 // thread-id format is at stake the assertion is a round trip through the
 // *real* adapter (`channelIdFromThreadId`), never a hard-coded string, so the
 // test cannot drift into re-stating an adapter's private encoding.
-import { createDiscordAdapter } from '@chat-adapter/discord';
-import { createSlackAdapter } from '@chat-adapter/slack';
-import { createTeamsAdapter } from '@chat-adapter/teams';
+import {
+  cardToDiscordPayload,
+  createDiscordAdapter,
+} from '@chat-adapter/discord';
+import { cardToBlockKit, createSlackAdapter } from '@chat-adapter/slack';
+import { cardToAdaptiveCard, createTeamsAdapter } from '@chat-adapter/teams';
 import type { ChatAccountRef, PlatformName } from '@growi/chat';
-import type { Adapter, CardElement, StateAdapter } from 'chat';
+import {
+  type Adapter,
+  type CardElement,
+  isLinkNode,
+  parseMarkdown,
+  type StateAdapter,
+  walkAst,
+} from 'chat';
 import {
   createMattermostAdapter,
+  MattermostFormatConverter,
   type MattermostPost,
 } from 'chat-adapter-mattermost';
 import { mock } from 'vitest-mock-extended';
@@ -96,10 +107,49 @@ const LIST: OutboundMessage = {
   kind: 'list',
   title: '検索結果',
   rows: [
-    { markdown: '[/foo](https://growi.example/foo)', sourceLabel: 'wiki-a' },
-    { markdown: '[/bar](https://growi.example/bar)', sourceLabel: 'wiki-b' },
+    {
+      primary: { kind: 'link', label: 'foo', url: 'https://growi.example/foo' },
+      detail: '/team/foo',
+      sourceLabel: 'wiki-a',
+    },
+    {
+      primary: { kind: 'link', label: 'bar', url: 'https://growi.example/bar' },
+      sourceLabel: 'wiki-b',
+    },
   ],
   footer: '3 件中 2 件',
+};
+
+/** Every row from one GROWI, as when only one GROWI contributed results. */
+const SINGLE_SOURCE_LIST: OutboundMessage = {
+  kind: 'list',
+  title: '検索結果',
+  rows: [
+    {
+      primary: { kind: 'link', label: 'foo', url: 'https://growi.example/foo' },
+      sourceLabel: 'Only GROWI',
+    },
+    {
+      primary: { kind: 'link', label: 'bar', url: 'https://growi.example/bar' },
+      sourceLabel: 'Only GROWI',
+    },
+  ],
+};
+
+/** A help list: rows whose primary content is markdown, not a link. */
+const TEXT_LIST: OutboundMessage = {
+  kind: 'list',
+  title: 'コマンド',
+  rows: [
+    {
+      primary: { kind: 'text', markdown: '`search <word>` — searches pages' },
+      sourceLabel: 'wiki-a',
+    },
+    {
+      primary: { kind: 'text', markdown: '`help` — lists commands' },
+      sourceLabel: 'wiki-b',
+    },
+  ],
 };
 
 const CHOICE: OutboundMessage = {
@@ -222,10 +272,27 @@ const buttonIdsOf = (card: CardElement): readonly string[] =>
       : [],
   );
 
-const textOf = (card: CardElement): string =>
-  card.children
-    .flatMap((child) => (child.type === 'text' ? [child.content] : []))
-    .join('\n');
+/** Each card service's own conversion: what its API receives from the adapter. */
+const CARD_RENDERERS: Readonly<
+  Record<Exclude<PlatformName, 'mattermost'>, (card: CardElement) => unknown>
+> = {
+  slack: cardToBlockKit,
+  discord: (card) => cardToDiscordPayload(card),
+  teams: (card) => cardToAdaptiveCard(card).body,
+};
+
+/** Everything a reader of `message` on `platform` is sent, as one string. */
+const renderedOn = (
+  platform: PlatformName,
+  message: OutboundMessage,
+): string => {
+  const postable = toPostable(message, platform, BOT_NAME);
+  if (!isCard(postable)) return markdownOf(postable);
+  if (platform === 'mattermost') {
+    throw new Error('mattermost is expected to receive markdown');
+  }
+  return JSON.stringify(CARD_RENDERERS[platform](postable));
+};
 
 describe('toPostable -- the capability table decides the rendering, not the service name', () => {
   it('renders a markdown message as markdown on every service', () => {
@@ -236,33 +303,95 @@ describe('toPostable -- the capability table decides the rendering, not the serv
     }
   });
 
-  it('renders a list as a card where `card` is full', () => {
-    for (const platform of ['slack', 'discord', 'teams'] as const) {
-      const postable = toPostable(LIST, platform, BOT_NAME);
-      expect(isCard(postable)).toBe(true);
-      if (!isCard(postable)) return;
+  it('renders a link row as a link each card service draws, never as raw markdown link text', () => {
+    // What the reader sees is what each adapter turns the card into, so the
+    // assertion runs on that output rather than on the card itself.
+    const slack = renderedOn('slack', LIST);
+    expect(slack).toContain('<https://growi.example/foo|foo>');
+    expect(slack).not.toContain('](');
 
-      expect(postable.title).toBe('検索結果');
-      const rendered = textOf(postable);
-      for (const row of LIST.kind === 'list' ? LIST.rows : []) {
-        expect(rendered).toContain(row.markdown);
-        expect(rendered).toContain(row.sourceLabel);
-      }
+    for (const platform of ['discord', 'teams'] as const) {
+      expect(renderedOn(platform, LIST)).toContain(
+        '[foo](https://growi.example/foo)',
+      );
     }
   });
 
-  it('renders the same list as plain markdown where `card` is only degraded, losing no row', () => {
+  it('keeps every row, its detail and its GROWI name when the rows come from several GROWI', () => {
+    for (const platform of PLATFORMS) {
+      const rendered = renderedOn(platform, LIST);
+      expect(rendered).toContain('検索結果');
+      expect(rendered).toContain('/team/foo');
+      expect(rendered).toContain('wiki-a');
+      expect(rendered).toContain('wiki-b');
+      expect(rendered).toContain('bar');
+      expect(rendered).toContain('3 件中 2 件');
+    }
+  });
+
+  it('names a single GROWI once instead of on every row', () => {
+    for (const platform of PLATFORMS) {
+      const rendered = renderedOn(platform, SINGLE_SOURCE_LIST);
+      expect(rendered.split('Only GROWI')).toHaveLength(2);
+      expect(rendered).toContain('foo');
+      expect(rendered).toContain('bar');
+    }
+  });
+
+  it('keeps a link whole when the page path holds characters link syntax reserves', () => {
+    // GROWI joins the raw page path onto its site URL without encoding it.
+    const message: OutboundMessage = {
+      kind: 'list',
+      title: '検索結果',
+      rows: [
+        {
+          primary: {
+            kind: 'link',
+            label: 'a`b',
+            url: 'https://growi.example/team/<a> b (1)|x[2]%41/a`b',
+          },
+          sourceLabel: 'wiki-a',
+        },
+      ],
+    };
+    const encoded =
+      'https://growi.example/team/%3Ca%3E%20b%20%281%29%7Cx%5B2%5D%41/a%60b';
+
+    expect(renderedOn('slack', message)).toContain(`<${encoded}|a\`b>`);
+    for (const platform of ['discord', 'teams'] as const) {
+      expect(renderedOn(platform, message)).toContain(`[a\`b](${encoded})`);
+    }
+
+    // Mattermost re-serializes the markdown before posting; the link has to
+    // survive that round trip, not only the string this module writes.
+    const posted = new MattermostFormatConverter().renderPostable({
+      markdown: markdownOf(toPostable(message, 'mattermost', BOT_NAME)),
+    });
+    const urls: string[] = [];
+    walkAst(parseMarkdown(posted), (node) => {
+      if (isLinkNode(node)) urls.push(node.url);
+      return node;
+    });
+    expect(urls).toEqual([encoded]);
+  });
+
+  it('renders the list as plain markdown where `card` is only degraded, with markdown links', () => {
     // Mattermost is the one service whose `card` row is `degraded`; the
     // documented fallback is 「markdown で投稿する」.
-    const postable = toPostable(LIST, 'mattermost', BOT_NAME);
-    const rendered = markdownOf(postable);
+    const rendered = markdownOf(toPostable(LIST, 'mattermost', BOT_NAME));
 
-    expect(rendered).toContain('検索結果');
-    for (const row of LIST.kind === 'list' ? LIST.rows : []) {
-      expect(rendered).toContain(row.markdown);
-      expect(rendered).toContain(row.sourceLabel);
+    expect(rendered).toContain('[foo](https://growi.example/foo)');
+    expect(rendered).toContain('[bar](https://growi.example/bar)');
+  });
+
+  it('keeps a markdown row as written, on every service', () => {
+    for (const platform of PLATFORMS) {
+      const rendered = renderedOn(platform, TEXT_LIST);
+      expect(rendered).toContain('`search <word>` — searches pages');
+      expect(rendered).toContain('`help` — lists commands');
+      expect(rendered).toContain('wiki-a');
+      expect(rendered).toContain('wiki-b');
     }
-    expect(rendered).toContain('3 件中 2 件');
   });
 
   it('renders a choice as pressable buttons where interactive actions work', () => {

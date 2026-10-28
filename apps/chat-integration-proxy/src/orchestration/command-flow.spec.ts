@@ -172,6 +172,70 @@ describe('the five commands, end to end', () => {
     harness = createHarness();
   });
 
+  it('search: links each result by its title, and adds the path only where it says more than the title', async () => {
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'execute',
+      targets: [GROWI_A],
+      excluded: [],
+    });
+    vi.mocked(harness.collector.start).mockResolvedValue({
+      status: 'collected',
+      values: { keyword: 'memo' },
+    });
+    const item = (rank: number, path: string, title: string) => ({
+      rank,
+      path,
+      title,
+      url: `https://example.com${path}`,
+      updatedAt: '2026-09-01T00:00:00.000Z',
+      commentCount: 0,
+    });
+    vi.mocked(harness.growiClient.sendCommand).mockResolvedValue({
+      ok: true,
+      response: {
+        kind: 'search',
+        appliedAs: 'linked-user',
+        items: [
+          item(1, '/memo', 'memo'),
+          item(2, '/team/memo', 'memo'),
+          item(3, '/', '/'),
+        ],
+      },
+    });
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search));
+
+    const message = harness.ephemeralMessages().at(-1);
+    if (message?.kind !== 'list') throw new Error('expected a list');
+    expect(
+      message.rows.map((row) => ({
+        primary: row.primary,
+        detail: row.detail,
+      })),
+    ).toEqual([
+      {
+        primary: {
+          kind: 'link',
+          label: 'memo',
+          url: 'https://example.com/memo',
+        },
+        detail: undefined,
+      },
+      {
+        primary: {
+          kind: 'link',
+          label: 'memo',
+          url: 'https://example.com/team/memo',
+        },
+        detail: '/team/memo',
+      },
+      {
+        primary: { kind: 'link', label: '/', url: 'https://example.com/' },
+        detail: undefined,
+      },
+    ]);
+  });
+
   it('search: asks every permitted GROWI, then sends one merged list to the asker alone', async () => {
     vi.mocked(harness.selector.select).mockResolvedValue({
       kind: 'execute',
@@ -217,7 +281,11 @@ describe('the five commands, end to end', () => {
       'GROWI A',
       'GROWI B',
     ]);
-    expect(message.rows[0]?.markdown).toContain('https://example.com/Alpha');
+    expect(message.rows[0]?.primary).toEqual({
+      kind: 'link',
+      label: 'Alpha',
+      url: 'https://example.com/Alpha',
+    });
     // Requirement 11.3: a GROWI left out by channel permission is named, so
     // the search does not go quietly incomplete.
     expect(message.footer).toContain('GROWI C');
@@ -352,7 +420,9 @@ describe('the five commands, end to end', () => {
     const shown = harness.ephemeralMessages().at(-1);
     if (shown?.kind !== 'list') throw new Error('expected the merged list');
     expect(shown.rows[0]?.sourceLabel).toBe('GROWI A');
-    expect(shown.rows[0]?.markdown).toContain('https://example.com/Alpha');
+    expect(shown.rows[0]?.primary).toMatchObject({
+      url: 'https://example.com/Alpha',
+    });
   });
 
   it('help: leaves out a command this channel is not allowed to run', async () => {
@@ -402,7 +472,9 @@ describe('the five commands, end to end', () => {
 
     const [, message] = vi.mocked(harness.platform.replace).mock.calls[0] ?? [];
     if (message?.kind !== 'list') throw new Error('expected a list');
-    const text = message.rows.map((row) => row.markdown).join('\n');
+    const text = message.rows
+      .map((row) => (row.primary.kind === 'text' ? row.primary.markdown : ''))
+      .join('\n');
     expect(text).toContain('search <word>');
     expect(text).not.toContain('create-page');
     // Requirement 14.3: which GROWI each line came from.
@@ -447,7 +519,10 @@ describe('the five commands, end to end', () => {
     const [origin, shown] = harness.privateReplier.reply.mock.calls[0] ?? [];
     expect(origin?.installationId).toBe(INSTALLATION_ID);
     if (shown?.kind !== 'list') throw new Error('expected the help list');
-    expect(shown.rows[0]?.markdown).toContain('search <word>');
+    expect(shown.rows[0]?.primary).toMatchObject({
+      kind: 'text',
+      markdown: expect.stringContaining('search <word>'),
+    });
   });
 
   it('create-page: sends to the single permitted GROWI and posts the new page', async () => {
