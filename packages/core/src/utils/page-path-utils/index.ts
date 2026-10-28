@@ -105,19 +105,33 @@ const restrictedPatternsToCreate: Array<RegExp> = [
   /^\/_apix?(\/.*)?/,
   /^\/?https?:\/\/.+$/, // avoid miss in renaming
   /\/{2,}/, // avoid miss in renaming
-  /\s+\/\s+/, // avoid miss in renaming
-  /.+\/edit$/,
-  /.+\.md$/,
+  /\s\/\s/, // avoid miss in renaming
+  /.\/edit$/,
+  /.\.md$/,
   /^(\.\.)$/, // see: https://github.com/growilabs/growi/issues/3582
   /(\/\.\.)\/?/, // see: https://github.com/growilabs/growi/issues/3582
   /\\/, // see: https://github.com/growilabs/growi/issues/7241
   /^\/(_search|_private-legacy-pages|_news)(\/.*|$)/,
   /^\/(installer|register|login|logout|admin|me|files|trash|paste|comments|tags|share|attachment)(\/.*|$)/,
   /^\/user(?:\/[^/]+)?$/, // https://regex101.com/r/9Eh2S1/1
-  /^(\/.+){130,}$/, // avoid deep layer path. see: https://regex101.com/r/L0kzOD/1
 ];
+
+// Counted rather than matched: a pattern like /^(\/.+){130,}$/ backtracks
+// exponentially in the number of slashes.
+const MAX_CREATABLE_PAGE_DEPTH = 129;
+const exceedsMaxCreatablePageDepth = (path: string): boolean => {
+  return (
+    path.startsWith('/') &&
+    path.split('/').filter((segment) => segment !== '').length >
+      MAX_CREATABLE_PAGE_DEPTH
+  );
+};
+
 export const isCreatablePage = (path: string): boolean => {
-  return !restrictedPatternsToCreate.some((pattern) => path.match(pattern));
+  return (
+    !restrictedPatternsToCreate.some((pattern) => path.match(pattern)) &&
+    !exceedsMaxCreatablePageDepth(path)
+  );
 };
 
 /**
