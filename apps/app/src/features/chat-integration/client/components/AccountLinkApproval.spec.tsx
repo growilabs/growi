@@ -1,15 +1,21 @@
-// Proves task 6.1's screen-level contract (design.md: "どのチャットアカウ
-// ントを、どの GROWI ユーザーに結び付けるのかを画面に出す") -- the screen
-// shows the chat account, GROWI user, and workspace before approval, and
-// calling approve reflects the outcome the API answered with.
+// The approval screen shows the GROWI, the logged-in user and the chat
+// account (with its identifier) before approval, and calling approve
+// reflects the outcome the API answered with (Requirements 7.10-7.12).
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SWRConfig } from 'swr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  routerQuery: { token: 'test-token' } as Record<string, unknown>,
+  routerQuery: { token: 'ab'.repeat(32) } as Record<string, unknown>,
   apiv3Get: vi.fn(),
   apiv3Post: vi.fn(),
 }));
@@ -19,7 +25,10 @@ vi.mock('next/router', () => ({
 }));
 
 vi.mock('next-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) =>
+      options == null ? key : `${key} ${JSON.stringify(options)}`,
+  }),
 }));
 
 vi.mock('~/states/global', () => ({
@@ -51,7 +60,13 @@ const DISPLAY = {
 // singleton shared across every render in the process).
 const renderApproval = () =>
   render(
-    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+    <SWRConfig
+      value={{
+        provider: () => new Map(),
+        dedupingInterval: 0,
+        focusThrottleInterval: 0,
+      }}
+    >
       <AccountLinkApproval />
     </SWRConfig>,
   );
@@ -59,6 +74,7 @@ const renderApproval = () =>
 describe('AccountLinkApproval', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.routerQuery = { token: 'ab'.repeat(32) };
   });
 
   it('presents the GROWI, the logged-in user and the chat account as three distinct groups', async () => {
@@ -121,7 +137,7 @@ describe('AccountLinkApproval', () => {
       await screen.findByText('chat_integration.account_link.ignore_hint'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('chat_integration.account_link.expires_at'),
+      screen.getByText(/chat_integration.account_link.expires_at.*"expiresAt"/),
     ).toBeInTheDocument();
   });
 
@@ -179,5 +195,43 @@ describe('AccountLinkApproval', () => {
         'chat_integration.account_link.invalid_or_expired',
       ),
     ).toBeInTheDocument();
+  });
+
+  it('keeps showing the success screen when the window regains focus after approval', async () => {
+    mocks.apiv3Get.mockResolvedValueOnce({ data: DISPLAY });
+    mocks.apiv3Post.mockResolvedValue({ data: { status: 'linked' } });
+    const user = userEvent.setup();
+
+    renderApproval();
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'chat_integration.account_link.approve',
+      }),
+    );
+    await screen.findByText('chat_integration.account_link.linked');
+
+    // The order is revoked by the approval, so any refetch would fail.
+    mocks.apiv3Get.mockRejectedValue(new Error('404'));
+    await act(async () => {
+      fireEvent.focus(window);
+    });
+
+    expect(
+      screen.getByText('chat_integration.account_link.linked'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('chat_integration.account_link.invalid_or_expired'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not call the API for a token that is not in the shape the server issues', async () => {
+    mocks.routerQuery = { token: '../../admin/something' };
+
+    renderApproval();
+
+    expect(
+      await screen.findByText('commons:not_found_page.page_not_exist'),
+    ).toBeInTheDocument();
+    expect(mocks.apiv3Get).not.toHaveBeenCalled();
   });
 });

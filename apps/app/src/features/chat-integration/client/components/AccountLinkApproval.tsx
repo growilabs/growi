@@ -33,10 +33,16 @@ interface AccountLinkOrderDisplay {
   readonly expiresAt: string;
 }
 
+const TOKEN_PATTERN = /^[0-9a-f]{64}$/;
+
 const useAccountLinkToken = (): string | undefined => {
   const router = useRouter();
   const { token } = router.query;
-  return typeof token === 'string' ? token : undefined;
+  // The token goes into an API path; accept only what the server issues
+  // (32 random bytes, hex) so a crafted link cannot steer the request.
+  return typeof token === 'string' && TOKEN_PATTERN.test(token)
+    ? token
+    : undefined;
 };
 
 const hostnameOf = (siteUrl: string | undefined): string | null => {
@@ -125,6 +131,13 @@ export const AccountLinkApproval = (): JSX.Element => {
   const { data: display, error } = useSWR(
     token != null ? ['chat-integration-account-link', token] : null,
     () => fetchOrder(token as string),
+    // Approving revokes the order, so a refetch after approval would turn
+    // the success screen into "invalid or expired".
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    },
   );
 
   if (token == null) {
@@ -190,9 +203,9 @@ export const AccountLinkApproval = (): JSX.Element => {
         <Group heading={t('chat_integration.account_link.you_heading')}>
           <Row term={t('chat_integration.account_link.user_label')}>
             {display.growiName != null && (
-              <span className="me-2">{display.growiName}</span>
+              <bdi className="me-2">{display.growiName}</bdi>
             )}
-            <span>@{display.growiUsername}</span>
+            <bdi>@{display.growiUsername}</bdi>
           </Row>
         </Group>
       )}
@@ -201,20 +214,20 @@ export const AccountLinkApproval = (): JSX.Element => {
         <Row term={t('chat_integration.account_link.service_label')}>
           <span className="text-capitalize">{display.platform}</span>
           {' · '}
-          <span>{display.workspaceName}</span>
+          <bdi>{display.workspaceName}</bdi>
           {display.relationLabel != null && (
-            <span>（{display.relationLabel}）</span>
+            <bdi> ({display.relationLabel})</bdi>
           )}
         </Row>
         <Row term={t('chat_integration.account_link.account_label')}>
           {display.accountDisplayName != null && (
-            <span className="me-2">{display.accountDisplayName}</span>
+            <bdi className="me-2">{display.accountDisplayName}</bdi>
           )}
           <span>
             <span className="text-muted me-1">
               {t('chat_integration.account_link.id_label')}:
             </span>
-            <span>{display.accountId}</span>
+            <bdi>{display.accountId}</bdi>
           </span>
         </Row>
       </Group>

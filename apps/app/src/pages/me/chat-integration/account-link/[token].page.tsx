@@ -58,7 +58,7 @@ export const getServerSideProps: GetServerSideProps = async (
     await Promise.all([
       getServerSideCommonInitialProps(context),
       getServerSideCommonEachProps(context),
-      getServerSideI18nProps(context, ['translation', 'commons']),
+      getServerSideI18nProps(context, ['translation']),
     ]);
 
   return mergeGetServerSidePropsResults(

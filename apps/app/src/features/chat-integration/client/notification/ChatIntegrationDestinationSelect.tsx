@@ -27,7 +27,7 @@
 // Renders nothing at all when no channel is available -- an instance with
 // no Gen 2 workspace paired sees no change to the save controls.
 
-import { type JSX, useCallback, useId, useMemo, useState } from 'react';
+import { type JSX, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Dropdown, DropdownMenu, DropdownToggle } from 'reactstrap';
 import useSWR from 'swr';
@@ -100,6 +100,10 @@ const groupByRelation = (
   return [...groups.values()];
 };
 
+const focusOnMount = (element: HTMLInputElement | null): void => {
+  element?.focus({ preventScroll: true });
+};
+
 export const ChatIntegrationDestinationSelect = ({
   destinations,
   onChange,
@@ -114,6 +118,7 @@ export const ChatIntegrationDestinationSelect = ({
 }): JSX.Element | null => {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   // Not revalidated on focus: the list changes only when an administrator
   // pairs a workspace, and a refetch mid-edit could drop a channel the
@@ -169,6 +174,21 @@ export const ChatIntegrationDestinationSelect = ({
   );
   const selectedCount = selectedChannels.length;
   const hasUnavailable = data.unavailableRelations.length > 0;
+  const firstChannel = groups[0]?.channels[0];
+  const summary =
+    selectedCount === 0
+      ? t('chat_integration.destination_select.summary_none')
+      : t('chat_integration.destination_select.summary_selected', {
+          selectedCount,
+        });
+  const accessibleName = [
+    `${t('chat_integration.destination_select.aria_label')}: ${summary}`,
+    hasUnavailable
+      ? t('chat_integration.destination_select.partial_warning_title')
+      : null,
+  ]
+    .filter((part) => part != null)
+    .join('. ');
 
   return (
     <div data-testid="grw-chat-integration-save-time-destinations">
@@ -177,12 +197,17 @@ export const ChatIntegrationDestinationSelect = ({
         toggle={() => setIsOpen((prev) => !prev)}
         direction={openInModal ? 'down' : 'up'}
         size="sm"
+        // reactstrap's keyboard handling only knows `role="menuitem"` children;
+        // with it on, Tab from the toggle moves focus nowhere. Focus moves into
+        // the menu on open instead (see `focusOnMount`) and Tab walks the boxes.
+        a11y={false}
       >
         <DropdownToggle
           color="outline-secondary"
           caret
           className="w-100 text-truncate d-flex justify-content-between align-items-center"
-          aria-label={t('chat_integration.destination_select.aria_label')}
+          innerRef={toggleRef}
+          aria-label={accessibleName}
           title={
             selectedChannels
               .map(
@@ -192,13 +217,7 @@ export const ChatIntegrationDestinationSelect = ({
               .join('\n') || undefined
           }
         >
-          <span className="text-truncate">
-            {selectedCount === 0
-              ? t('chat_integration.destination_select.summary_none')
-              : t('chat_integration.destination_select.summary_selected', {
-                  selectedCount,
-                })}
-          </span>
+          <span className="text-truncate">{summary}</span>
           {hasUnavailable && (
             <span
               className="material-symbols-outlined text-warning ms-1 fs-6"
@@ -213,7 +232,16 @@ export const ChatIntegrationDestinationSelect = ({
         <DropdownMenu container={openInModal ? '' : 'body'}>
           {/* Closed, reactstrap still renders the menu in place (hidden by CSS); skip its content then so the bar stays small however many channels exist. */}
           {isOpen && (
-            <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+            // biome-ignore lint/a11y/noStaticElementInteractions: closes the menu on Escape, which reactstrap does not do for focus inside the menu
+            <div
+              style={{ maxHeight: '50vh', overflowY: 'auto' }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setIsOpen(false);
+                  toggleRef.current?.focus();
+                }
+              }}
+            >
               {groups.map((group) => {
                 const headingId = `${idPrefix}-${group.relationId}`;
                 return (
@@ -234,6 +262,11 @@ export const ChatIntegrationDestinationSelect = ({
                             id={checkboxId}
                             type="checkbox"
                             className="form-check-input"
+                            ref={
+                              channel === firstChannel
+                                ? focusOnMount
+                                : undefined
+                            }
                             checked={selectedKeys.has(
                               keyOf(channel.relationId, channel.channelId),
                             )}

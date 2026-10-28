@@ -35,7 +35,7 @@ describe('deriveRelationBadge', () => {
     expect(deriveRelationBadge('unpaired', undefined)).toBe('unpaired');
   });
 
-  it('shows an active relation with a healthy check as active', () => {
+  it('shows an active relation as active while the check succeeds or is still loading (no error yet)', () => {
     expect(deriveRelationBadge('active', undefined)).toBe('active');
   });
 
@@ -47,10 +47,6 @@ describe('deriveRelationBadge', () => {
 
   it('keeps an active relation active when the check failed for another reason', () => {
     expect(deriveRelationBadge('active', unreachableError)).toBe('active');
-  });
-
-  it('keeps an active relation active while the check is still loading', () => {
-    expect(deriveRelationBadge('active', undefined)).toBe('active');
   });
 
   it('does not turn an unpaired relation into connection-lost, whatever error is held', () => {

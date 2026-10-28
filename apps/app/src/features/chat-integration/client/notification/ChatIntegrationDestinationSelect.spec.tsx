@@ -263,4 +263,62 @@ describe('ChatIntegrationDestinationSelect', () => {
     expect(await screen.findByText(/Workspace B/)).toBeInTheDocument();
     expect(screen.getByText(/unreachable/)).toBeInTheDocument();
   });
+
+  it('moves focus into the menu when it opens, so the boxes are reachable and toggleable from the keyboard', async () => {
+    mocks.apiv3Get.mockResolvedValue({
+      data: { channels: CHANNELS, unavailableRelations: [] },
+    });
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+
+    renderSelect({ onChange });
+    const toggle = await findToggle();
+    toggle.focus();
+    await user.keyboard('{Enter}');
+
+    const firstBox = within(
+      screen.getByRole('group', { name: /Workspace A/ }),
+    ).getByRole('checkbox');
+    expect(firstBox).toHaveFocus();
+
+    await user.keyboard(' ');
+    expect(onChange).toHaveBeenCalledWith([
+      { relationId: 'relation-a', platform: 'slack', channelId: 'C0001' },
+    ]);
+  });
+
+  it('closes on Escape and returns focus to the toggle', async () => {
+    mocks.apiv3Get.mockResolvedValue({
+      data: { channels: CHANNELS, unavailableRelations: [] },
+    });
+    const user = userEvent.setup();
+
+    renderSelect();
+    const toggle = await openMenu(user);
+    await user.keyboard('{Escape}');
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+  });
+
+  it('includes the selected count and a partial-failure notice in the accessible name of the toggle', async () => {
+    mocks.apiv3Get.mockResolvedValue({
+      data: {
+        channels: CHANNELS,
+        unavailableRelations: [
+          { relationId: 'relation-c', workspaceName: 'C', reason: 'x' },
+        ],
+      },
+    });
+
+    renderSelect({
+      destinations: [
+        { relationId: 'relation-a', platform: 'slack', channelId: 'C0001' },
+      ],
+    });
+
+    const toggle = await findToggle();
+    expect(toggle).toHaveAccessibleName(/"selectedCount":1/);
+    expect(toggle).toHaveAccessibleName(/partial_warning_title/);
+  });
 });

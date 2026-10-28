@@ -65,7 +65,7 @@ const renderPage = () => {
 
 describe('account link approval page', () => {
   beforeEach(() => {
-    mocks.routerQuery = { token: 'some-token' };
+    mocks.routerQuery = { token: 'cd'.repeat(32) };
   });
 
   it('renders the approval screen for the token in the URL', async () => {
