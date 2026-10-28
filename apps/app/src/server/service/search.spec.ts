@@ -346,14 +346,22 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     ).toHaveBeenCalledWith('endpoint', '/api/v3/pages', 10);
   });
 
-  it('should search ES by the path when q carries a query string', async () => {
+  const PATH_ONLY_ENDPOINT_QUERIES = [
+    '/_api/search?q=foo',
+    'https://wiki.example.com/_api/search?q=foo',
+    'http://localhost:3000/_api/search',
+  ];
+
+  it.each(
+    PATH_ONLY_ENDPOINT_QUERIES,
+  )('should search ES by the path when q=%j', async (q) => {
     vi.mocked(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).mockResolvedValue(['/_api/search']);
 
     const result = await searchService.searchAuditlogSuggestions(
       ['endpoint'],
-      '/_api/search?q=foo',
+      q,
       10,
     );
 
@@ -363,15 +371,13 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     ).toHaveBeenCalledWith('endpoint', '/_api/search', 10);
   });
 
-  it('should search the MongoDB fallback by the path when q carries a query string', async () => {
+  it.each(
+    PATH_ONLY_ENDPOINT_QUERIES,
+  )('should search the MongoDB fallback by the path when q=%j', async (q) => {
     searchService.isConfiguredOverride = false;
     mockFindEndpointsByEndpointRegex.mockResolvedValueOnce(['/_api/search']);
 
-    await searchService.searchAuditlogSuggestions(
-      ['endpoint'],
-      '/_api/search?q=foo',
-      10,
-    );
+    await searchService.searchAuditlogSuggestions(['endpoint'], q, 10);
 
     expect(mockFindEndpointsByEndpointRegex).toHaveBeenCalledWith(
       '/_api/search',
@@ -382,6 +388,8 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
   it.each([
     '?q=foo',
     '?',
+    'https://wiki.example.com',
+    'https://wiki.example.com?q=foo',
   ])('should return no endpoints without querying either backend when q=%j has no path', async (q) => {
     const result = await searchService.searchAuditlogSuggestions(
       ['endpoint'],
@@ -396,12 +404,9 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     expect(mockFindEndpointsByEndpointRegex).not.toHaveBeenCalled();
   });
 
-  describe.each([
-    { backend: 'Elasticsearch', isConfigured: true },
-    { backend: 'the MongoDB fallback', isConfigured: false },
-  ])('below the minimum query length, on $backend', ({ isConfigured }) => {
+  describe('below the MongoDB fallback minimum query length', () => {
     beforeEach(() => {
-      searchService.isConfiguredOverride = isConfigured;
+      searchService.isConfiguredOverride = false;
       setupUserModelMock(mockUserModel, []);
     });
 
@@ -417,7 +422,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
         q: '/a?q=foo',
         expected: { endpoint: { endpoints: [] } },
       },
-    ] as const)('should return no $field suggestions for q=$q without querying either backend', async ({
+    ] as const)('should return no $field suggestions for q=$q without querying MongoDB', async ({
       field,
       q,
       expected,
@@ -429,28 +434,55 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
       );
 
       expect(result).toEqual(expected);
-      expect(
-        searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
-      ).not.toHaveBeenCalled();
       expect(mockFindSnapshotUsernamesByUsernameRegex).not.toHaveBeenCalled();
       expect(mockFindEndpointsByEndpointRegex).not.toHaveBeenCalled();
+    });
+
+    it('should not fall back to MongoDB for a short q when Elasticsearch fails', async () => {
+      searchService.isConfiguredOverride = true;
+      vi.mocked(
+        searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+      ).mockRejectedValueOnce(new Error('ES is down'));
+
+      const result = await searchService.searchAuditlogSuggestions(
+        ['username'],
+        'a',
+        10,
+      );
+
+      expect(result).toEqual({
+        username: { activeUsernames: [], inactiveUsernames: [] },
+      });
+      expect(mockFindSnapshotUsernamesByUsernameRegex).not.toHaveBeenCalled();
     });
   });
 
   it.each([
-    { field: 'username', q: 'al' },
-    { field: 'endpoint', q: '/ap' },
-  ] as const)('should query Elasticsearch once q reaches the $field minimum length', async ({
+    { field: 'username', q: 'a', hit: 'alice' },
+    { field: 'endpoint', q: '/a', hit: '/api/v3/pages' },
+  ] as const)('should answer a $field q shorter than the fallback minimum from Elasticsearch', async ({
     field,
     q,
+    hit,
   }) => {
     vi.mocked(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
-    ).mockResolvedValue([]);
-    setupUserModelMock(mockUserModel, []);
+    ).mockResolvedValueOnce([hit]);
+    setupUserModelMock(mockUserModel, [
+      { username: 'alice', status: UserStatus.STATUS_ACTIVE },
+    ]);
 
-    await searchService.searchAuditlogSuggestions([field], q, 10);
+    const result = await searchService.searchAuditlogSuggestions(
+      [field],
+      q,
+      10,
+    );
 
+    expect(
+      field === 'username'
+        ? result.username?.activeUsernames
+        : result.endpoint?.endpoints,
+    ).toEqual([hit]);
     expect(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).toHaveBeenCalledWith(field, q, 10);

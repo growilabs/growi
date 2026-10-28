@@ -296,10 +296,6 @@ const buildSnapshotUsernameSubstringMatchStage = (q: string) => ({
   },
 });
 
-const buildFieldGroupStage = (groupKey: Prisma.InputJsonValue) => ({
-  $group: { _id: groupKey },
-});
-
 type SuggestionFieldSpec = {
   readonly fieldPath: string;
   readonly groupKey: Prisma.InputJsonValue;
@@ -322,9 +318,9 @@ const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
   isUnmatchableQuery: (q) => q.includes('?'),
 };
 
-const SNAPSHOT_USERNAME_GROUP_STAGE = buildFieldGroupStage(
-  SNAPSHOT_USERNAME_SUGGESTION.groupKey,
-);
+const SNAPSHOT_USERNAME_GROUP_STAGE = {
+  $group: { _id: SNAPSHOT_USERNAME_SUGGESTION.groupKey },
+};
 
 // Prefix-only, unlike ES's fuzzy match for username: MongoDB has no native
 // fuzzy match.
@@ -358,8 +354,8 @@ const buildFieldSuggestionPipeline = (
 // MongoDB when ES is unreachable for every tenant at once.
 const AGGREGATE_MAX_TIME_MS = 5000;
 
-// Shared by every suggestion field's ES-fallback method, so adding a field
-// (e.g. `ip`) only means declaring its SuggestionFieldSpec.
+// Shared by every suggestion field's ES-fallback method. A new field (e.g.
+// `ip`) declares a SuggestionFieldSpec plus its own extension method below.
 const findSuggestionValuesByPrefix = async (
   context: Pick<typeof prisma.activities, 'aggregateRaw'>,
   spec: SuggestionFieldSpec,

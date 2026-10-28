@@ -19,16 +19,22 @@ type AuditlogSuggestionBackend = Pick<
   'isReachable' | 'fullTextSearchDelegator'
 >;
 
-// Below this length a prefix matches most stored values. Checked before the
-// ES-or-MongoDB choice so both backends answer a given q the same way. Not a
-// fallback scan-cost bound: a case-insensitive regex cannot range-scan an index.
-const AUDITLOG_SUGGESTION_MIN_QUERY_LENGTH: {
+// Below this length a prefix matches most stored values, so the MongoDB
+// fallback would group most of the collection for a near-useless list. ES has
+// no such limit, so a 1-char username (e.g. `a`) stays suggestible there.
+const AUDITLOG_SUGGESTION_FALLBACK_MIN_QUERY_LENGTH: {
   readonly [K in AuditlogSuggestionField]: number;
 } = {
   username: 2,
   // Every endpoint starts with '/', which narrows nothing.
   endpoint: 3,
 };
+
+// `endpoint` is stored as `req.originalUrl`, which has no scheme or host.
+const URL_ORIGIN_PATTERN = /^[a-z][a-z\d+.-]*:\/\/[^/?#]*/i;
+
+const toEndpointSearchPath = (q: string): string =>
+  sanitizeEndpointForIndex(q.replace(URL_ORIGIN_PATTERN, '')).trim();
 
 async function searchAuditlogFieldValues(
   backend: AuditlogSuggestionBackend,
@@ -40,8 +46,6 @@ async function searchAuditlogFieldValues(
     option: { offset: number; limit: number },
   ) => Promise<string[]>,
 ): Promise<string[]> {
-  if (q.length < AUDITLOG_SUGGESTION_MIN_QUERY_LENGTH[field]) return [];
-
   if (backend.isReachable) {
     try {
       return await backend.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
@@ -56,11 +60,14 @@ async function searchAuditlogFieldValues(
       );
     }
   }
+  if (q.length < AUDITLOG_SUGGESTION_FALLBACK_MIN_QUERY_LENGTH[field]) {
+    return [];
+  }
   return mongoFallback(q, { offset: 0, limit });
 }
 
-// Adding a field (e.g. `ip`) means adding one entry here — no change to
-// searchAuditlogSuggestions itself.
+// searchAuditlogSuggestions dispatches through this map, so a new field (e.g.
+// `ip`) needs no change there.
 const AUDITLOG_SUGGESTION_HANDLERS: {
   [K in AuditlogSuggestionField]: (
     backend: AuditlogSuggestionBackend,
@@ -111,8 +118,9 @@ const AUDITLOG_SUGGESTION_HANDLERS: {
   // no notion of Active/Inactive.
   async endpoint(backend, q, limit) {
     // Both backends match against the path-only value, so a pasted URL's
-    // query string is dropped here once rather than in each backend.
-    const pathQ = sanitizeEndpointForIndex(q).trim();
+    // origin and query string are dropped here once rather than in each backend.
+    const pathQ = toEndpointSearchPath(q);
+    if (pathQ === '') return { endpoint: { endpoints: [] } };
 
     const endpoints = await searchAuditlogFieldValues(
       backend,

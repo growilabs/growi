@@ -12,7 +12,7 @@ import { prisma } from '~/utils/prisma';
 const TEST_IP = '10.0.0.73';
 
 /** Build a minimal activities record for seeding via prisma.activities.createMany. */
-function makeActivityData(overrides: { endpoint: string; userId?: string }) {
+function makeActivityData(overrides: { endpoint: string }) {
   return {
     id: new Types.ObjectId().toHexString(),
     v: 0,
@@ -23,7 +23,7 @@ function makeActivityData(overrides: { endpoint: string; userId?: string }) {
     // `snapshot` is a required composite (schema.prisma); this suite only
     // exercises the top-level `endpoint` field, so username is left unset.
     snapshot: { id: new Types.ObjectId().toHexString() },
-    userId: overrides.userId ?? new Types.ObjectId().toHexString(),
+    userId: new Types.ObjectId().toHexString(),
   };
 }
 

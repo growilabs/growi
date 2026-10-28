@@ -110,5 +110,10 @@ describe('SearchService.searchAuditlogSuggestions() MongoDB fallback (real Prism
     expect(await search('/_api/search?access_token=zz')).toEqual({
       endpoint: { endpoints: ['/_api/search'] },
     });
+    expect(
+      await search('https://wiki.example.com/_api/search?access_token=zz'),
+    ).toEqual({
+      endpoint: { endpoints: ['/_api/search'] },
+    });
   });
 });
