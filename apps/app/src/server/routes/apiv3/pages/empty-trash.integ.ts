@@ -175,7 +175,7 @@ describe('DELETE /empty-trash', () => {
     expect(response.status).toBe(200);
   });
 
-  it('answers 500 and keeps the page when no trashed page may be deleted completely', async () => {
+  it('answers 403 and keeps the page when no trashed page may be deleted completely', async () => {
     const [trashedPage] = await createTrashedPages([
       { path: `${FIXTURE_ROOT}/target`, creator: requester._id },
     ]);
@@ -188,9 +188,11 @@ describe('DELETE /empty-trash', () => {
 
     const response = await emptyTrash();
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(403);
     expect(response.body.errors).toEqual([
-      expect.objectContaining({ message: 'No pages can be deleted.' }),
+      expect.objectContaining({
+        code: 'complete_deletion_not_allowed_for_user',
+      }),
     ]);
     expect(await findSurvivingPaths([trashedPage.path])).toEqual([
       trashedPage.path,

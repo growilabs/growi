@@ -268,10 +268,10 @@ describe('POST /delete', () => {
         },
       });
 
-    // Every selected page is filtered out, which the route reports as
-    // "No pages can be deleted." — a 500 for what is really a conflict. The status is
-    // asserted as it is today; a fix that reports 409 instead should update this.
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(409);
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ code: 'outdated' }),
+    ]);
 
     const survivingPage = await crowi.models.Page.findById(page._id);
     expect(survivingPage?.path).toBe(targetPath);
@@ -328,9 +328,9 @@ describe('POST /delete', () => {
           },
         });
 
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(403);
       expect(response.body.errors).toEqual([
-        expect.objectContaining({ message: 'No pages can be deleted.' }),
+        expect.objectContaining({ code: 'deletion_not_allowed_for_user' }),
       ]);
       const survivingPage = await crowi.models.Page.findById(page._id);
       expect(survivingPage?.path).toBe(targetPath);
@@ -338,6 +338,41 @@ describe('POST /delete', () => {
     } finally {
       await crowi.configManager.updateConfig(
         'security:pageDeletionAuthority',
+        undefined,
+        { removeIfUndefined: true },
+      );
+    }
+  });
+
+  it('keeps a page the requester is not allowed to delete completely', async () => {
+    const page = await createPage(targetPath, 'target body');
+    await crowi.configManager.updateConfig(
+      'security:pageCompleteDeletionAuthority',
+      PageDeleteConfigValue.AdminOnly,
+    );
+
+    try {
+      const response = await request(app)
+        .post('/delete')
+        .set('X-Forwarded-For', TEST_IP)
+        .send({
+          pageIdToRevisionIdMap: {
+            [page._id.toString()]: latestRevisionIdOf(page),
+          },
+          isCompletely: true,
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.errors).toEqual([
+        expect.objectContaining({
+          code: 'complete_deletion_not_allowed_for_user',
+        }),
+      ]);
+      const survivingPage = await crowi.models.Page.findById(page._id);
+      expect(survivingPage?.path).toBe(targetPath);
+    } finally {
+      await crowi.configManager.updateConfig(
+        'security:pageCompleteDeletionAuthority',
         undefined,
         { removeIfUndefined: true },
       );
@@ -362,16 +397,13 @@ describe('POST /delete', () => {
         isAnyoneWithTheLink: true,
       });
 
-    // Falls through to the same "nothing to delete" response every other
-    // filtered-out case gets (see the 500 comment on the first test above) —
-    // not a crash, and not a distinguishable status for this pageId. Assert
-    // the message too: a naive `pagesToDelete[0]?.grant` rewrite of the fix
-    // would still return 500 here, but via the sibling "grant of the
-    // retrieved page is not restricted" branch instead of this fallthrough —
-    // a status-only assertion would not catch that.
-    expect(response.status).toBe(500);
+    // The same uniform 404 as an unreadable page, so the response does not
+    // reveal whether the page exists. Assert the code too: a naive
+    // `pagesToDelete[0]?.grant` rewrite of the fix would answer through the
+    // sibling "grant of the retrieved page is not restricted" branch instead.
+    expect(response.status).toBe(404);
     expect(response.body.errors).toEqual([
-      expect.objectContaining({ message: 'No pages can be deleted.' }),
+      expect.objectContaining({ code: 'notfound_or_forbidden' }),
     ]);
   });
 });
