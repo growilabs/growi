@@ -198,7 +198,7 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 
 1. When 利用者が検索コマンドを実行した, the chat-integration proxy shall そのチャンネルに紐づく全ての GROWI へ同じ検索語を送る
 2. When 紐づく全ての GROWI から結果が返った, the chat-integration proxy shall 各 GROWI の上位から順に交互に取り出して並べた 1 本のリストとして利用者に示す
-3. The chat-integration proxy shall 結果の各行に、どの GROWI の結果かを示す
+3. The chat-integration proxy shall 結果が複数の GROWI から混ざるときは結果の各行に、どの GROWI の結果かを示し、1 つの GROWI の結果だけのときはその GROWI の名前を一覧に 1 回だけ示す
 4. If 定められた待ち時間の内に応答しなかった GROWI があった, then the chat-integration proxy shall 間に合った GROWI の結果を利用者に示したうえで、応答しなかった GROWI を名前付きで示す
 5. If 紐づく全ての GROWI が待ち時間の内に応答しなかった, then the chat-integration proxy shall 結果が得られなかったことと、応答しなかった GROWI を利用者に示す
 6. The GROWI application shall 検索を実行した利用者に対応する GROWI ユーザーの閲覧権限を適用した結果だけを返す

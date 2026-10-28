@@ -70,7 +70,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 |---|---|---|---|---|
 | 1 | 表示順 | 本人にだけ見える返事が、入力より上に出る | 時刻を測って原因を調べてから直す | proxy |
 | 2 | proxy の見え方 | 検索結果の見せ方、Slack への通知の文面 | spec を作らず直接直す（契約は変えない） | proxy（通知の文面は app の markdown にも及びうる） |
-| 4 | app の見え方（`agent` と重ならない部分） | 承認画面、ページの編集画面、紐付け解除後のバッジ | amend spec `chat-integration-app-ui`（名前は仮） | app |
+| 4 | app の見え方（`agent` と重ならない部分） | 承認画面、ページの編集画面、紐付け解除後のバッジ | 別ブランチ `imprv/chat-integration-app-ui` で実装済み（amend spec は本体に折り込み済み）。このブランチの取り込みで解決する | app |
 | 5 | URL の展開の方針 | 公開範囲が「公開」のページは題名だけ出す | amend spec `chat-integration-link-preview`（名前は仮） | app（protocol と proxy にも及びうる） |
 | 6 | 通知の定期処理の負荷 | 連携が無いテナントの問い合わせを飛ばす、解除済みの連携の掃除を 1 日 1 回にする | amend spec `chat-integration-notification-load`（名前は仮） | app |
 | 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作り、それと同時に定期処理の間隔を延ばす。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。`brief.md` だけがあり、要件・設計・タスクの承認がこれから | umbrella、protocol、proxy、app |
