@@ -407,7 +407,7 @@ export interface AttachmentHitViewProps {
   readonly fileFormat: string;      // MIME type
   readonly fileSize: number;
   readonly pageNumber: number | null;
-  readonly label: string | null;    // 表示用ラベル (Slide N / Sheet name / Page N)
+  readonly label: string | null;    // 上流の label。PDF / PPTX は番号の文字列、XLSX はシート名。文言を含まない (下記の formatAttachmentHitLocation で表示用に組み立てる)
   readonly snippet: readonly SnippetSegment[];  // 構造化 segment 配列 (XSS 防御契約、上流 IAttachmentHit.snippet から射影)
   readonly score: number;           // 関連度スコア (上流 IAttachmentHit.score から射影)
   readonly viewerHref: string;      // 既存添付ビューアへの遷移先
@@ -513,7 +513,7 @@ interface ReextractButtonProps {
 **Responsibilities & Constraints**
 - 機能無効時は `null` を返す
 - 連打防止: 処理中は button disabled + spinner
-- 成功/失敗は `ExtractionOutcome.kind` に応じた i18n キーで toast 表示 (`serviceUnreachable` / `timeout` / `serviceBusy` / `unsupported` / `tooLarge` / `failed` の 6 分岐 + success)
+- 成功/失敗は `ExtractionOutcome.kind` に応じた i18n キーで toast 表示 (`serviceUnreachable` / `timeout` / `serviceBusy` / `unsupported` / `tooLarge` / `encrypted` / `resourceLimit` / `failed` の 8 分岐 + success)
 
 #### AttachmentSearchSettings
 
@@ -731,8 +731,12 @@ type ExtractionOutcome =
   | { kind: 'timeout' }
   | { kind: 'serviceBusy' }
   | { kind: 'serviceUnreachable' }
+  | { kind: 'encrypted' }
+  | { kind: 'resourceLimit'; message: string }
   | { kind: 'failed'; reasonCode: string; message: string };
 ```
+
+**添付ヒットの位置の表示 (`formatAttachmentHitLocation`)**: 上流の `label` は言語に依存しない値 (PDF / PPTX は番号の文字列、XLSX はシート名、その他は null) なので、表示用の文言は UI で組み立てる。`fileFormat` (MIME) と `label` / `pageNumber` から、PDF は i18n キー `attachment_full_text_search.location.page` (例: 「p.{{n}}」)、PPTX は `attachment_full_text_search.location.slide` (例: 「スライド {{n}}」)、XLSX はシート名をそのまま、それ以外は位置を表示しない。純粋関数として `client/utils/` に置き、単体テストで形式ごとの出力を確かめる
 
 ### UI-owned view types
 
@@ -799,6 +803,8 @@ export const isAttachmentFullTextSearchEnabledAtom = atom<boolean>(false);
   - `serviceBusy` → "抽出サービスが混雑しています。しばらくしてから再試行してください"
   - `unsupported` → "このファイル形式は抽出に対応していません"
   - `tooLarge` → "ファイルサイズが上限を超えています"
+  - `encrypted` → "パスワードで保護されたファイルのため、本文を検索できません"
+  - `resourceLimit` → "ファイルが大きすぎるか複雑すぎるため、本文を検索できません" (例: 10 万セルを超える Excel)
   - `failed` → 上流が返す `message` を表示
 - **設定 validation エラー**: フォームフィールド近傍にインライン表示。保存ボタン disable
 - **機能無効時**: すべての追加 UI は `null` を返し、既存画面の表示は導入前と完全一致

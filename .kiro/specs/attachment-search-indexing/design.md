@@ -569,8 +569,9 @@ Key decisions:
 - **Bearer auth**: 呼び出しごとに `configManager.getConfig('app:attachmentFullTextSearch:extractorToken')` を取得し `Authorization: Bearer <token>` ヘッダに付与。token 未設定時は `isFeatureEnabled()` 段階で早期 return するので通常は到達しないが、保険として未設定検出時は `serviceUnreachable` 正規化
 - **extractorUri DNS rebinding 対策 (metadata IP のみ)**: 送信前に URI の host を DNS 解決し、結果がクラウドメタデータ endpoint IP literal (`169.254.169.254` / `fd00:ec2::254` / `100.100.100.200` / `192.0.0.192`) のいずれかに解決される場合のみ request を送らず `serviceUnreachable` 正規化。k8s 内部 DNS / loopback / RFC1918 への解決は許可
 - **Bearer auth 失敗**: 上流 401 `unauthorized` は `extraction_failed` ではなく**`serviceUnreachable` に正規化** (機能を soft-disable 相当に degrade、admin が token 不整合に気付くよう pino ERROR ログ + ExtractionFailureLog 記録)。token 回転中の一時的な不一致も自動的に failing open せず、新 token が伝搬するまで抽出は停止。**pino ログ出力時は `Authorization` ヘッダ値をログオブジェクトに含めない** (request オブジェクトや headers をそのまま渡さない。token が共有リソースである extractor へのアクセス権そのものであるため、ログ経由の漏洩を防ぐ)
-- ネットワーク層エラーと抽出サービスエラーコードを `ExtractionOutcome` に統一正規化
+- ネットワーク層エラーと抽出サービスエラーコードを `ExtractionOutcome` に統一正規化。抽出サービスのエラーコードとの対応: `unsupported_format` → `unsupported`、`file_too_large` → `tooLarge`、`extraction_timeout` → `timeout`、`service_busy` → `serviceBusy`、`file_encrypted` → `encrypted`、`resource_limit_exceeded` → `resourceLimit`、`extraction_failed` → `failed`、`unauthorized` → `serviceUnreachable`。`extraction_failed` は抽出サービス側で 422 (壊れたファイル) と 500 (想定外の異常) の 2 つのステータスを持つが、分岐はコードで行う
 - 到達不可時に catch-all し `serviceUnreachable` を返す (throw しない)
+- **タイムアウトの順序**: `app:attachmentFullTextSearch:timeoutMs` は抽出サービスの `TIMEOUT_S` より 5 秒以上長くする。抽出サービスの既定は 55 秒なので、こちらの既定 60000ms と合う (こちらが先に諦めると、抽出サービス側の変換が無駄に続く)
 
 **Contracts**: **Service [x]**
 
@@ -582,6 +583,8 @@ export type ExtractionOutcome =
   | { kind: 'timeout' }
   | { kind: 'serviceBusy' }
   | { kind: 'serviceUnreachable' }
+  | { kind: 'encrypted' }                                   // 抽出サービスの file_encrypted (暗号化・パスワード付き)
+  | { kind: 'resourceLimit'; message: string }              // 抽出サービスの resource_limit_exceeded (展開量・セル数・メモリ・結果の大きさなどの上限超過)
   | { kind: 'failed'; reasonCode: string; message: string };
 
 export interface ExtractedPage {
@@ -1126,7 +1129,7 @@ Primary fields:
   attachmentId: keyword            # Attachment の id (24 桁の 16 進文字列)
   pageId: keyword                  # 親ページの id (permission は query-time に page_index から lookup)
   pageNumber: integer (nullable)   # 1始まり、位置概念なしは null
-  label: keyword (nullable)        # 表示用ラベル
+  label: keyword (nullable)        # 抽出サービスの label。PDF / PPTX は番号の文字列 (例 "12")、XLSX はシート名。「p.」「スライド」などの文言は含まない (UI が付ける)
   fileName: keyword
   originalName: text + keyword     # 検索対象
   fileFormat: keyword              # MIME type
@@ -1159,7 +1162,7 @@ model extractionfailurelogs {
   fileName           String
   fileFormat         String
   fileSize           Int
-  reasonCode         String   // 'unsupportedFormat' | 'fileTooLarge' | 'extractionTimeout' | 'serviceBusy' | 'serviceUnreachable' | 'extractionFailed'
+  reasonCode         String   // 'unsupportedFormat' | 'fileTooLarge' | 'extractionTimeout' | 'serviceBusy' | 'serviceUnreachable' | 'fileEncrypted' | 'resourceLimitExceeded' | 'extractionFailed'
   message            String?
   occurredAt         DateTime @db.Date
   retentionGroupHash String   // 重複抑制 (attachmentId + reasonCode ローリング)
@@ -1204,7 +1207,7 @@ interface IAttachmentHit {
 
 - **User Errors (4xx)**: 再抽出 API の権限不足 (403)、存在しない添付 (404)、機能無効 (503 feature_disabled)、admin config バリデーション (400)
 - **System Errors (5xx)**: 抽出サービス到達不可 / ES エラーは apps/app 側で握りつぶし、「検索対象外」として保存を継続 (Req 1)
-- **Extraction-specific errors**: 上流が返す `unsupported_format` / `file_too_large` / `extraction_timeout` / `service_busy` / `extraction_failed` を `AttachmentTextExtractorService` で `ExtractionOutcome` に統一正規化
+- **Extraction-specific errors**: 上流が返す `unsupported_format` / `file_too_large` / `extraction_timeout` / `service_busy` / `file_encrypted` / `resource_limit_exceeded` / `extraction_failed` を `AttachmentTextExtractorService` で `ExtractionOutcome` に統一正規化。`encrypted` と `resourceLimit` も他の失敗と同じく、メタデータだけの文書を登録し ExtractionFailureLog に記録する (Req 2.4 / 8.3)。上流は成功時に `pages[]` を最低 1 要素返す (中身が空の場合あり) ので、画像だけの PDF なども成功として 1 文書が登録される
 - **到達不可**: ネットワーク層 throw を catch して `serviceUnreachable` に畳み込む
 - **Permission 判定失敗**: `facet=attachments` primary または secondary の viewer 再検証で `searchAccessiblePages` が失敗した場合、Aggregator は該当添付ヒットを全て除外する fail-close 経路に合流 (漏洩防止優先)。facet=`all` primary では pages viewer filter が有効なので別経路で degrade
 - **Permission 判定は「返ってきたものだけ許可」(fail-close 徹底)**: `searchAccessiblePages` の応答に含まれた pageId だけを許可し、含まれない pageId (存在しない・権限が無い・絞り込み条件を満たさない) は理由を区別せず一律除外する。shard の一部失敗 (`_shards.failed > 0`) を含む応答は判定に使わず、全件除外する。**「応答に無い pageId を許可する」fail-open ブランチは絶対に実装しない**
