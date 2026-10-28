@@ -30,7 +30,7 @@
 // here: the proxy is the single source of truth for what each service can
 // do (task 9.1's own warning against deciding this independently).
 
-import { type JSX, useCallback, useId, useState } from 'react';
+import { type JSX, useCallback, useState } from 'react';
 import {
   type CapabilityReport,
   COMMAND_NAMES,
@@ -40,110 +40,31 @@ import {
   parseNativeChannelId,
   type RelationSettings,
 } from '@growi/chat';
-import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import useSWR from 'swr';
 
-import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
+import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
 import {
   UNPAIRED_RETENTION_DAYS,
   UNPAIRED_RETENTION_MS,
 } from '../../unpaired-retention';
+import {
+  fetchCapabilitiesFor,
+  fetchConnectionStatusFor,
+  fetchEncryptionStatus,
+  fetchRelations,
+  fetchSettingsFor,
+} from './api';
+import { EncryptionKeyWarning } from './EncryptionKeyWarning';
 import { NotificationDestinationsSection } from './NotificationDestinationsSection';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface EncryptionStatus {
-  readonly configured: boolean;
-  readonly reason?: 'unset' | 'invalid-key' | 'invalid-generation';
-}
-
-interface AdminRelationListItem {
-  readonly relationId: string;
-  readonly platform: string;
-  readonly workspaceId: string;
-  readonly workspaceName: string;
-  readonly label: string | null;
-  readonly state: 'active' | 'unpaired';
-  readonly createdAt: string;
-  readonly unpairedAt: string | null;
-}
-
-interface RelationSettingsView {
-  readonly settings: RelationSettings;
-  readonly version: number;
-}
-
-type SaveSettingsOutcome = {
-  readonly status: 'saved';
-  readonly version: number;
-  readonly push:
-    | { readonly ok: true }
-    | { readonly ok: false; readonly reason: string };
-};
-
-type PairingOutcome =
-  | { readonly status: 'paired'; readonly relationId: string }
-  | { readonly status: 'relation-already-known'; readonly relationId: string }
-  | { readonly status: 'already-paired'; readonly detail: string }
-  | { readonly status: 'code-expired' }
-  | { readonly status: 'ownership-unverified'; readonly detail: string }
-  | { readonly status: 'call-failed'; readonly reason: string }
-  | { readonly status: 'key-encryption-unconfigured' };
-
-// ============================================================================
-// Fetchers
-// ============================================================================
-
-const fetchEncryptionStatus = async (): Promise<EncryptionStatus> => {
-  const res = await apiv3Get<EncryptionStatus>(
-    '/chat-integration/admin/encryption-status',
-  );
-  return res.data;
-};
-
-const fetchRelations = async (): Promise<AdminRelationListItem[]> => {
-  const res = await apiv3Get<{ relations: AdminRelationListItem[] }>(
-    '/chat-integration/admin/relations',
-  );
-  return res.data.relations;
-};
-
-const fetchCapabilitiesFor = (
-  relationId: string,
-): (() => Promise<CapabilityReport>) => {
-  return async () => {
-    const res = await apiv3Get<CapabilityReport>(
-      `/chat-integration/admin/relations/${relationId}/capabilities`,
-    );
-    return res.data;
-  };
-};
-
-const fetchConnectionStatusFor = (
-  relationId: string,
-): (() => Promise<ConnectionStatusView>) => {
-  return async () => {
-    const res = await apiv3Get<ConnectionStatusView>(
-      `/chat-integration/admin/relations/${relationId}/connection-status`,
-    );
-    return res.data;
-  };
-};
-
-const fetchSettingsFor = (
-  relationId: string,
-): (() => Promise<RelationSettingsView>) => {
-  return async () => {
-    const res = await apiv3Get<RelationSettingsView>(
-      `/chat-integration/admin/relations/${relationId}/settings`,
-    );
-    return res.data;
-  };
-};
+import { PairingSection } from './pairing/PairingSection';
+import type {
+  AdminRelationListItem,
+  EncryptionStatus,
+  RelationSettingsView,
+  SaveSettingsOutcome,
+} from './types';
 
 // ============================================================================
 // Sub-sections
@@ -665,289 +586,6 @@ const RelationRow = ({
           />
         </div>
       )}
-    </div>
-  );
-};
-
-interface PairingFormState {
-  readonly registrationCode: string;
-  readonly proxyUri: string;
-  readonly growiUri: string;
-  readonly growiLabel: string;
-}
-
-const EMPTY_PAIRING_FORM: PairingFormState = {
-  registrationCode: '',
-  proxyUri: '',
-  growiUri: '',
-  growiLabel: '',
-};
-
-const describePairingOutcome = (outcome: PairingOutcome): string => {
-  switch (outcome.status) {
-    case 'paired':
-      return `Paired successfully (relation: ${outcome.relationId}).`;
-    case 'relation-already-known':
-      return 'This proxy already returned a relation this GROWI already has -- pairing was not established.';
-    case 'already-paired':
-      return `The proxy refused: ${outcome.detail}`;
-    case 'code-expired':
-      return 'The registration code has expired.';
-    case 'ownership-unverified':
-      return `The proxy could not verify this GROWI's URL: ${outcome.detail}`;
-    case 'call-failed':
-      return `Could not reach the proxy (${outcome.reason}).`;
-    case 'key-encryption-unconfigured':
-      return 'The encryption key is not configured -- pairing cannot start.';
-    default:
-      return 'Unknown outcome.';
-  }
-};
-
-/** Pairing form: paste a registration code the proxy issued (task 7.3). Rendered inside `PairingModal`, so its state is dropped whenever the modal closes. */
-const PairingForm = ({
-  encryptionConfigured,
-  onPaired,
-  onCancel,
-}: {
-  encryptionConfigured: boolean;
-  onPaired: () => void;
-  onCancel: () => void;
-}): JSX.Element => {
-  const [form, setForm] = useState<PairingFormState>(EMPTY_PAIRING_FORM);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // useId() output is safe here (id=/htmlFor= use getElementById, which does
-  // not parse the colons useId() produces as CSS) -- see
-  // apps/app/.claude/rules/ui-pitfalls.md. Only a reactstrap `target` prop
-  // would be unsafe, and none of these fields use one.
-  const registrationCodeId = useId();
-  const proxyUriId = useId();
-  const growiUriId = useId();
-  const growiLabelId = useId();
-
-  const handleChange = useCallback(
-    (field: keyof PairingFormState) =>
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        setForm((prev) => ({ ...prev, [field]: e.target.value }));
-      },
-    [],
-  );
-
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      setIsSubmitting(true);
-      try {
-        const res = await apiv3Post<PairingOutcome>(
-          '/chat-integration/admin/pairing',
-          form,
-        );
-        const outcome = res.data;
-        if (outcome.status === 'paired') {
-          toastSuccess(describePairingOutcome(outcome));
-          onPaired();
-        } else {
-          toastError(describePairingOutcome(outcome));
-        }
-      } catch (err) {
-        toastError(err);
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [form, onPaired],
-  );
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <ModalBody>
-        <div className="mb-2">
-          <label className="form-label" htmlFor={registrationCodeId}>
-            Registration code
-          </label>
-          <input
-            id={registrationCodeId}
-            type="text"
-            className="form-control"
-            value={form.registrationCode}
-            onChange={handleChange('registrationCode')}
-            required
-          />
-        </div>
-        <div className="mb-2">
-          <label className="form-label" htmlFor={proxyUriId}>
-            Proxy URL
-          </label>
-          <input
-            id={proxyUriId}
-            type="text"
-            className="form-control"
-            value={form.proxyUri}
-            onChange={handleChange('proxyUri')}
-            required
-          />
-        </div>
-        <div className="mb-2">
-          <label className="form-label" htmlFor={growiUriId}>
-            This GROWI's URL
-          </label>
-          <input
-            id={growiUriId}
-            type="text"
-            className="form-control"
-            value={form.growiUri}
-            onChange={handleChange('growiUri')}
-            required
-          />
-        </div>
-        <div className="mb-0">
-          <label className="form-label" htmlFor={growiLabelId}>
-            Label to show the chat service
-          </label>
-          <input
-            id={growiLabelId}
-            type="text"
-            className="form-control"
-            value={form.growiLabel}
-            onChange={handleChange('growiLabel')}
-            required
-          />
-        </div>
-      </ModalBody>
-      <div className="modal-footer">
-        <button
-          type="button"
-          className="btn btn-outline-secondary"
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={!encryptionConfigured || isSubmitting}
-        >
-          {isSubmitting ? 'Pairing…' : 'Pair'}
-        </button>
-      </div>
-    </form>
-  );
-};
-
-const ENCRYPTION_KEY_ENV_NAME = 'CHAT_INTEGRATION_KEY_ENCRYPTION_KEY';
-const ENCRYPTION_KEY_GENERATION_ENV_NAME =
-  'CHAT_INTEGRATION_KEY_ENCRYPTION_KEY_GENERATION';
-
-const describeEncryptionProblem = (
-  reason: EncryptionStatus['reason'],
-): JSX.Element => {
-  switch (reason) {
-    case 'invalid-key':
-      return (
-        <>
-          <code>{ENCRYPTION_KEY_ENV_NAME}</code> is set, but it is not a valid
-          key. It must be 32 random bytes, base64-encoded. Generate one with{' '}
-          <code>openssl rand -base64 32</code>.
-        </>
-      );
-    case 'invalid-generation':
-      return (
-        <>
-          <code>{ENCRYPTION_KEY_GENERATION_ENV_NAME}</code> is set, but it is
-          not a whole number of 1 or more.
-        </>
-      );
-    default:
-      return (
-        <>
-          <code>{ENCRYPTION_KEY_ENV_NAME}</code> is not set. Set it to 32 random
-          bytes, base64-encoded. Generate one with{' '}
-          <code>openssl rand -base64 32</code>.
-        </>
-      );
-  }
-};
-
-/**
- * Shown at the top of the screen while the encryption key this feature needs
- * is missing or malformed. The key protects the private keys GROWI signs
- * with, so without it a new connection cannot be added and a stored private
- * key cannot be decrypted either. Nothing is shown until the status has
- * loaded, so a configured screen never flashes the warning.
- */
-const EncryptionKeyWarning = ({
-  status,
-}: {
-  status: EncryptionStatus | undefined;
-}): JSX.Element | null => {
-  if (status == null || status.configured) {
-    return null;
-  }
-
-  return (
-    <div
-      className="alert alert-danger mb-4"
-      role="alert"
-      data-testid="grw-chat-integration-encryption-warning"
-    >
-      <h3 className="alert-heading h5">Chat integration is not available</h3>
-      <p className="mb-2">
-        GROWI encrypts the private keys it signs chat integration requests with.
-        Until the encryption key is configured, no connection can be added, and
-        the private keys of connections added earlier cannot be used either.
-      </p>
-      <p className="mb-2">{describeEncryptionProblem(status.reason)}</p>
-      <p className="mb-0">Restart GROWI after changing the environment.</p>
-    </div>
-  );
-};
-
-/**
- * The "Connections" heading together with the "Add connection" entry point:
- * a button that opens the pairing form in a modal. The button is disabled
- * while the encryption key is unconfigured; the reason is shown by
- * `EncryptionKeyWarning` at the top of the screen.
- */
-const PairingSection = ({
-  encryptionConfigured,
-  onPaired,
-}: {
-  encryptionConfigured: boolean;
-  onPaired: () => void;
-}): JSX.Element => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const handleOpen = useCallback(() => setIsOpen(true), []);
-  const handleClose = useCallback(() => setIsOpen(false), []);
-  const handlePaired = useCallback(() => {
-    setIsOpen(false);
-    onPaired();
-  }, [onPaired]);
-
-  return (
-    <div className="mb-3" data-testid="grw-chat-integration-pairing-section">
-      <div className="d-flex justify-content-between align-items-center">
-        <h2 className="admin-setting-header mb-0">Connections</h2>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={handleOpen}
-          disabled={!encryptionConfigured}
-        >
-          Add connection
-        </button>
-      </div>
-
-      <Modal isOpen={isOpen} toggle={handleClose}>
-        <ModalHeader toggle={handleClose}>Add connection</ModalHeader>
-        <PairingForm
-          encryptionConfigured={encryptionConfigured}
-          onPaired={handlePaired}
-          onCancel={handleClose}
-        />
-      </Modal>
     </div>
   );
 };
