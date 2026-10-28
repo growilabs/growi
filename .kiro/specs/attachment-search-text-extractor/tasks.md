@@ -88,7 +88,7 @@
   - _Depends: 2.1_
 
 - [ ] 4. ZIP を書き換える変換とテキスト系の処理
-- [ ] 4.1 (P) PPTX をスライドごとに分けて anydoc に渡す処理を実装する
+- [x] 4.1 (P) PPTX をスライドごとに分けて anydoc に渡す処理を実装する
   - ZIP の事前検査を通ったものだけを対象にし、スライド一覧と関係ファイルを defusedxml で解析して、1 枚のスライドとそれが参照する XML 部品だけのパッケージを作る。画像などは入れない
   - 通らないもの (暗号化された PPTX、旧形式) は、Office 系の変換にそのまま渡す
   - PowerPoint の自動生成の代替テキストと、行末の改行の印を取り除く。ラベルはスライド番号の文字列にする
@@ -226,3 +226,5 @@
 - 2.4: ZIP の部品を読むときに漏れる例外は BadZipFile だけではない (zlib.error / EOFError / OSError / lzma.LZMAError / NotImplementedError / ValueError / UnicodeDecodeError)。Python 3.12 では未対応の圧縮方式 (method 9) が RuntimeError で出るので、ZIP の暗号化フラグ (bit 0) で encrypted と malformed を分けている。4.1 / 4.3 は `read_part` だけで部品を読むこと。
 - 3.2: `convert_pdf` は PdfiumError 以外を捕まえない (子プロセスの入口が `BaseException` まで受けて internal にする設計)。1 ページが 400 万文字の PDF は最大 RSS が約 540MB になる。ページ内の文字数は 3.2 では抑えられないので、6.3 / 6.4 の RSS 上限と仮想メモリの上限で止まることをテストで確かめる。
 - 3.2: `tests/conversion/test_pdf.py` は `tests/fixture_files.py` の非公開ヘルパー (`_build_pdf`、`_pdf_stream`) を import している。fixture_files.py に手を入れる次の機会に、公開名にするか日本語 PDF の生成処理ごと移す。
+- 4.1: PowerPoint の自動代替テキストは、anydoc の出力では「説明 + 半角空白 2 つ + 決まり文」の 1 行になる。除去はこの形に限る。作者が `X  決まり文` (半角空白ちょうど 2 つ) と打った行は見分けられず消える。4.3 でも XML 宣言の文字コードが不正なとき、パーサーは LookupError / ValueError を投げるので、`ParseError` だけでなくこれらも malformed にすること。
+- 4.1: 分割変換は共有部品 (マスター・レイアウト・テーマ) をスライドごとのパッケージにコピーするため、処理量は「スライド数 × 共有部品の大きさ」に比例する (2000 枚・マスター 200KB で約 6 秒)。上限は TIMEOUT_S と RSS 上限が受け持つ。
