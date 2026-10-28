@@ -115,6 +115,14 @@ def _log_request(*, fmt: str, size: int, started: float, result: str, rss_mb: in
     "/extract",
     response_model=ExtractResponse,
     summary="Extract text from an uploaded file",
+    responses={
+        400: {"model": ErrorResponse, "description": "Unsupported file format"},
+        408: {"model": ErrorResponse, "description": "Extraction timed out"},
+        413: {"model": ErrorResponse, "description": "File too large"},
+        422: {"model": ErrorResponse, "description": "Encrypted, malformed or over-limit document"},
+        500: {"model": ErrorResponse, "description": "Extraction process failed"},
+        503: {"model": ErrorResponse, "description": "All concurrency slots are busy"},
+    },
 )
 async def post_extract(
     request: Request,

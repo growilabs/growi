@@ -8,47 +8,7 @@
 
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import axios from 'axios';
-export type ReadyzReadyzGet200 = { [key: string]: unknown };
-
 export type HealthzHealthzGet200 = { [key: string]: string };
-
-/**
- * Machine-readable error codes for all defined failure modes.
-
-Extends str so that values serialize as plain JSON strings rather than
-enum objects, ensuring compatibility with FastAPI's OpenAPI generation.
- */
-export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
-
-// eslint-disable-next-line @typescript-eslint/no-redeclare
-export const ErrorCode = {
-  unauthorized: 'unauthorized',
-  unsupported_format: 'unsupported_format',
-  file_too_large: 'file_too_large',
-  extraction_timeout: 'extraction_timeout',
-  service_busy: 'service_busy',
-  extraction_failed: 'extraction_failed',
-} as const;
-
-/**
- * Error response body returned for all 4xx/5xx responses from POST /extract.
- */
-export interface ErrorResponse {
-  code: ErrorCode;
-  message: string;
-}
-
-export type ValidationErrorLocItem = string | number;
-
-export type ValidationErrorCtx = { [key: string]: unknown };
-
-export interface ValidationError {
-  ctx?: ValidationErrorCtx;
-  input?: unknown;
-  loc: ValidationErrorLocItem[];
-  msg: string;
-  type: string;
-}
 
 export type PageInfoPageNumber = number | null;
 
@@ -66,10 +26,6 @@ export interface PageInfo {
   pageNumber: PageInfoPageNumber;
 }
 
-export interface HTTPValidationError {
-  detail?: ValidationError[];
-}
-
 /**
  * Successful extraction response returned by POST /extract.
 
@@ -80,6 +36,34 @@ export interface ExtractResponse {
   extractedCharacters: number;
   mimeType: string;
   pages: PageInfo[];
+}
+
+/**
+ * Machine-readable error codes for all defined failure modes.
+
+Extends str so that values serialize as plain JSON strings rather than
+enum objects, ensuring compatibility with FastAPI's OpenAPI generation.
+ */
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const ErrorCode = {
+  unauthorized: 'unauthorized',
+  unsupported_format: 'unsupported_format',
+  file_too_large: 'file_too_large',
+  extraction_timeout: 'extraction_timeout',
+  service_busy: 'service_busy',
+  extraction_failed: 'extraction_failed',
+  file_encrypted: 'file_encrypted',
+  resource_limit_exceeded: 'resource_limit_exceeded',
+} as const;
+
+/**
+ * Error response body returned for all 4xx/5xx responses from POST /extract.
+ */
+export interface ErrorResponse {
+  code: ErrorCode;
+  message: string;
 }
 
 /**
@@ -108,31 +92,21 @@ export const healthzHealthzGet = <TData = AxiosResponse<HealthzHealthzGet200>>(
 };
 
 /**
- * Return readiness status including the PDF extraction strategy.
+ * 200 ``ready`` when the forkserver runs and has loaded the conversion dependencies, else 503.
 
-Checks:
-- Core dependency imports succeed (markitdown, pydantic, fastapi)
-- PDF extraction strategy is resolvable
-
-Returns a 200 with ready=True when the service can accept traffic.
-Currently always returns ready because semaphore state changes per-request;
-a 503 path would be added if startup-time checks ever fail.
+A not-ready cached state is re-verified (in a thread: it forks a probe child), so a pod that was
+taken out of service gets the call that brings it back. The body never carries paths or
+exception text.
  * @summary Readiness probe
  */
-export const readyzReadyzGet = <TData = AxiosResponse<ReadyzReadyzGet200>>(
+export const readyzReadyzGet = <TData = AxiosResponse<unknown>>(
   options?: AxiosRequestConfig,
 ): Promise<TData> => {
   return axios.get(`/readyz`, options);
 };
 
 /**
- * Receive a multipart upload and return extracted text as ExtractResponse.
-
-Processing order:
-1. Acquire concurrency slot (non-blocking; raises ServiceBusyError if full)
-2. Read file bytes and enforce size limit
-3. Dispatch to extractor with timeout guard
-4. Assemble and return ExtractResponse
+ * Receive a multipart upload, enforce the slot and size limits, then convert.
 
 Authentication is handled upstream by BearerAuthMiddleware; this handler
 will only be reached by authenticated requests.
@@ -155,5 +129,5 @@ export const postExtractExtractPost = <TData = AxiosResponse<ExtractResponse>>(
 };
 
 export type HealthzHealthzGetResult = AxiosResponse<HealthzHealthzGet200>;
-export type ReadyzReadyzGetResult = AxiosResponse<ReadyzReadyzGet200>;
+export type ReadyzReadyzGetResult = AxiosResponse<unknown>;
 export type PostExtractExtractPostResult = AxiosResponse<ExtractResponse>;

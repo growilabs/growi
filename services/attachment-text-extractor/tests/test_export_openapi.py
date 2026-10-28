@@ -161,3 +161,22 @@ def test_export_via_subprocess(tmp_path: Path) -> None:
 
     for required_schema in ("ExtractResponse", "ErrorResponse", "ErrorCode"):
         assert required_schema in components_schemas, f"'{required_schema}' not found after subprocess run"
+
+
+def test_extract_documents_every_error_status_and_new_codes(tmp_path: Path) -> None:
+    """POST /extract documents each error status the router returns; ErrorCode has the resource codes."""
+    output_file = tmp_path / "openapi.json"
+
+    module = _load_script()
+    sys.argv = ["export_openapi.py", "--output", str(output_file)]
+    module.main()
+
+    schema = json.loads(output_file.read_text(encoding="utf-8"))
+    responses = schema["paths"]["/extract"]["post"]["responses"]
+    for status in ("400", "408", "413", "422", "500", "503"):
+        ref = responses[status]["content"]["application/json"]["schema"]["$ref"]
+        assert ref == "#/components/schemas/ErrorResponse", f"{status}: {ref}"
+
+    codes = schema["components"]["schemas"]["ErrorCode"]["enum"]
+    assert {"file_encrypted", "resource_limit_exceeded"} <= set(codes)
+    assert "pdf_strategy" not in json.dumps(schema)

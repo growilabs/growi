@@ -34,18 +34,14 @@
       "get": {
         "tags": ["health"],
         "summary": "Readiness probe",
-        "description": "Return readiness status including the PDF extraction strategy.\n\nChecks:\n- Core dependency imports succeed (markitdown, pydantic, fastapi)\n- PDF extraction strategy is resolvable\n\nReturns a 200 with ready=True when the service can accept traffic.\nCurrently always returns ready because semaphore state changes per-request;\na 503 path would be added if startup-time checks ever fail.",
+        "description": "200 ``ready`` when the forkserver runs and has loaded the conversion dependencies, else 503.\n\nA not-ready cached state is re-verified (in a thread: it forks a probe child), so a pod that was\ntaken out of service gets the call that brings it back. The body never carries paths or\nexception text.",
         "operationId": "readyz_readyz_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Readyz Readyz Get"
-                }
+                "schema": {}
               }
             }
           }
@@ -56,7 +52,7 @@
       "post": {
         "tags": ["extract"],
         "summary": "Extract text from an uploaded file",
-        "description": "Receive a multipart upload and return extracted text as ExtractResponse.\n\nProcessing order:\n1. Acquire concurrency slot (non-blocking; raises ServiceBusyError if full)\n2. Read file bytes and enforce size limit\n3. Dispatch to extractor with timeout guard\n4. Assemble and return ExtractResponse\n\nAuthentication is handled upstream by BearerAuthMiddleware; this handler\nwill only be reached by authenticated requests.",
+        "description": "Receive a multipart upload, enforce the slot and size limits, then convert.\n\nAuthentication is handled upstream by BearerAuthMiddleware; this handler\nwill only be reached by authenticated requests.",
         "operationId": "post_extract_extract_post",
         "requestBody": {
           "content": {
@@ -79,12 +75,62 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "Unsupported file format",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Extraction timed out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Encrypted, malformed or over-limit document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Extraction process failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "All concurrency slots are busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -120,6 +166,36 @@
         "required": ["file"],
         "title": "Body_post_extract_extract_post"
       },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "unauthorized",
+          "unsupported_format",
+          "file_too_large",
+          "extraction_timeout",
+          "service_busy",
+          "extraction_failed",
+          "file_encrypted",
+          "resource_limit_exceeded"
+        ],
+        "title": "ErrorCode",
+        "description": "Machine-readable error codes for all defined failure modes.\n\nExtends str so that values serialize as plain JSON strings rather than\nenum objects, ensuring compatibility with FastAPI's OpenAPI generation."
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": ["code", "message"],
+        "title": "ErrorResponse",
+        "description": "Error response body returned for all 4xx/5xx responses from POST /extract."
+      },
       "ExtractResponse": {
         "properties": {
           "pages": {
@@ -142,19 +218,6 @@
         "required": ["pages", "mimeType", "extractedCharacters"],
         "title": "ExtractResponse",
         "description": "Successful extraction response returned by POST /extract.\n\nextractedCharacters is the sum of len(page.content) across all pages and\nis provided for audit logging and metrics purposes (Req 1.1)."
-      },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
       },
       "PageInfo": {
         "properties": {
@@ -189,70 +252,6 @@
         "required": ["pageNumber", "label", "content"],
         "title": "PageInfo",
         "description": "Information extracted from a single logical page or section of a document.\n\npageNumber and label are None when the source format has no positional\npage concept (e.g. plain text files)."
-      },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
-          }
-        },
-        "type": "object",
-        "required": ["loc", "msg", "type"],
-        "title": "ValidationError"
-      },
-      "ErrorCode": {
-        "description": "Machine-readable error codes for all defined failure modes.\n\nExtends str so that values serialize as plain JSON strings rather than\nenum objects, ensuring compatibility with FastAPI's OpenAPI generation.",
-        "enum": [
-          "unauthorized",
-          "unsupported_format",
-          "file_too_large",
-          "extraction_timeout",
-          "service_busy",
-          "extraction_failed"
-        ],
-        "title": "ErrorCode",
-        "type": "string"
-      },
-      "ErrorResponse": {
-        "description": "Error response body returned for all 4xx/5xx responses from POST /extract.",
-        "properties": {
-          "code": {
-            "$ref": "#/components/schemas/ErrorCode"
-          },
-          "message": {
-            "title": "Message",
-            "type": "string"
-          }
-        },
-        "required": ["code", "message"],
-        "title": "ErrorResponse",
-        "type": "object"
       }
     }
   }
