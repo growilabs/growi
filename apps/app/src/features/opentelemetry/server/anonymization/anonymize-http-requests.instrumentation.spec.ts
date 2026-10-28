@@ -102,6 +102,8 @@ describe('URL attributes recorded by the HTTP instrumentation', () => {
         /secret|evil|日本語|%E6%97%A5/i,
       );
     }
-    expect(recorded['http.url']).toMatch(new RegExp(`^http://${HOST}/`));
+    expect(String(recorded['http.url']).startsWith(`http://${HOST}/`)).toBe(
+      true,
+    );
   });
 });
