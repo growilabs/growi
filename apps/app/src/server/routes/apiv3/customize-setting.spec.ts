@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import request from 'supertest';
@@ -42,7 +45,9 @@ vi.mock('~/features/growi-plugin/server/models', () => ({
 
 // The router is a module-level singleton, so it is set up only once
 const crowi = mockDeep<Crowi>();
-crowi.tmpDir = `${process.cwd()}/tmp/`;
+// multer writes uploads under `${crowi.tmpDir}uploads`, so the trailing separator matters
+const tmpDir = mkdtempSync(path.join(tmpdir(), 'customize-setting-spec-'));
+crowi.tmpDir = `${tmpDir}${path.sep}`;
 const router = setup(crowi);
 
 const buildApp = (user: TestUser) => {
@@ -60,6 +65,10 @@ const buildApp = (user: TestUser) => {
 };
 
 describe('customize-setting routes for a non-admin user', () => {
+  afterAll(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
