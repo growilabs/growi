@@ -7,9 +7,9 @@
  * Promise and every page passed the filter, so the conflict was ignored and the page
  * was deleted anyway.
  *
- * The deletion authority filter (`pageService.filterPagesByCanDelete`) had the same
- * flaw — an async predicate passed to `Array#filter` — so a page the requester is
- * not allowed to delete was deleted as well.
+ * The route also filters them through the deletion authority
+ * (`pageService.filterPagesByCanDelete`), so a page the requester is not allowed to
+ * delete must be left in place as well.
  *
  * Only the filtered-out cases are covered here. They are the cases the filters exist
  * for, and they are answered before `deleteMultiplePages` — which the route fires without
