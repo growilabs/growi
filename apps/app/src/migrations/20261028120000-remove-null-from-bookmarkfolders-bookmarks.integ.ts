@@ -4,9 +4,11 @@
  * Contract under test (asserts observable DB state and Prisma readability):
  *  - a folder whose `bookmarks` array contains null elements becomes readable
  *    by Prisma, keeping its valid bookmark ids in their original order;
- *  - folders without null elements (valid array, `bookmarks: null`, field
- *    missing) are left completely untouched, and their presence does not stop
- *    the cleanup of the others;
+ *  - a folder whose `bookmarks` field itself is null becomes an empty array,
+ *    so later `$pull` / `$addToSet` on it succeed;
+ *  - folders already in a valid shape (valid array, field missing) are left
+ *    completely untouched, and their presence does not stop the cleanup of
+ *    the others;
  *  - re-running is a no-op (idempotent).
  *
  * Legacy documents are inserted via the raw driver so that Mongoose does not
@@ -74,7 +76,45 @@ describe('remove-null-from-bookmarkfolders-bookmarks', () => {
     });
   });
 
-  it('leaves folders without null elements untouched and still cleans the rest', async () => {
+  it('turns a null bookmarks field into an empty array, without touching an array that holds valid ids', async () => {
+    const bookmark = new ObjectId();
+    const nullFieldId = new ObjectId();
+    const mixedId = new ObjectId();
+    await collection.insertMany([
+      {
+        _id: nullFieldId,
+        name: 'null-field',
+        owner: ownerId,
+        bookmarks: null,
+        __v: 0,
+      },
+      {
+        _id: mixedId,
+        name: 'mixed',
+        owner: ownerId,
+        bookmarks: [bookmark, null],
+        __v: 0,
+      },
+    ]);
+
+    await migrate.up();
+
+    const nullField = await collection.findOne({ _id: nullFieldId });
+    expect(nullField?.bookmarks).toEqual([]);
+    const mixed = await collection.findOne({ _id: mixedId });
+    expect(mixed?.bookmarks).toEqual([bookmark]);
+    // Writes that previously failed on the null field now succeed
+    const added = new ObjectId();
+    await collection.updateOne(
+      { _id: nullFieldId },
+      { $addToSet: { bookmarks: added } },
+    );
+    expect(
+      (await collection.findOne({ _id: nullFieldId }))?.bookmarks,
+    ).toEqual([added]);
+  });
+
+  it('leaves folders already in a valid shape untouched and still cleans the rest', async () => {
     const bookmark = new ObjectId();
     const untouched = [
       {
@@ -82,13 +122,6 @@ describe('remove-null-from-bookmarkfolders-bookmarks', () => {
         name: 'valid',
         owner: ownerId,
         bookmarks: [bookmark],
-        __v: 0,
-      },
-      {
-        _id: new ObjectId(),
-        name: 'null-field',
-        owner: ownerId,
-        bookmarks: null,
         __v: 0,
       },
       { _id: new ObjectId(), name: 'no-field', owner: ownerId, __v: 0 },
@@ -112,8 +145,7 @@ describe('remove-null-from-bookmarkfolders-bookmarks', () => {
     }
     const broken = await collection.findOne({ _id: brokenId });
     expect(broken?.bookmarks).toEqual([]);
-    // Leaving `bookmarks: null` / a missing field as is relies on Prisma
-    // reading them as an empty list
+    // Leaving a missing field as is relies on Prisma reading it as an empty list
     const folders = await prisma.bookmarkfolders.findMany({
       where: { ownerId: ownerId.toString() },
     });
@@ -121,7 +153,6 @@ describe('remove-null-from-bookmarkfolders-bookmarks', () => {
       Object.fromEntries(folders.map((f) => [f.name, f.bookmarkIds])),
     ).toEqual({
       valid: [bookmark.toString()],
-      'null-field': [],
       'no-field': [],
       broken: [],
     });
