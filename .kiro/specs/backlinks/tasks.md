@@ -447,33 +447,41 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
 
 ## Story B3 — Backfill of pre-existing pages
 
-**Nature:** Online, throttled, resumable, two-phase (recent pages first) job, started by a
-`CronService` poll and run as a self-paced loop (rest proportional to work, per page), that
-populates rows for pages that existed before the feature. It is off by default
-(`BACKLINKS_BACKFILL_AUTO_START`); when on, each app starts at its own `startAt`, derived from a
-uniform start window so a fleet spreads out with no per-app setup (see design.md's Delivery
-decision). Reuses the page-bulk-export scaffolding (`CronService` base,
-`createBatchStream`, cursor→resume skeleton) and the B1 extractor; the new code is the in-memory
-`{path→_id}` map, the per-page upsert sink, the paced loop, and the atomic claim. An
-admin-triggered start was deferred as a one-line future change. Independent of B4/B5.
+**Nature:** Online, throttled, resumable, two-phase (recent pages first) job, started by an
+administrator from the admin settings with a chosen scope (all pages, the newest N, or the pages
+edited after a date), picked up by a `CronService` poll and run as a self-paced loop (rest
+proportional to work, per page), that populates rows for pages that existed before the feature.
+Nothing starts on its own and there are no start environment variables. The GROWI.cloud start policy
+is an open decision (design.md's Delivery decision); the control is the same on cloud for now.
+Reuses the page-bulk-export scaffolding (`CronService` base, `createBatchStream`, cursor→resume
+skeleton) and the B1 extractor; the new code is the in-memory `{path→_id}` map, the per-page upsert
+sink, the paced loop, the atomic claim, the coverage record, and the admin endpoints and section.
+Independent of B4/B5.
 
 - [ ] B3.1 Add the backfill job state model
-  - Add a single-document model tracking backfill `status` (`idle` / `running` / `complete` /
-    `failed`; plus `paused` only if a pause field is adopted), the current phase (`recent` / `older`), the `recentCutoff` computed once
-    at the first claim, a progress marker (the last `_id` processed in the current phase, in `_id`
-    order, reset when the phase advances), processed counts per phase, `completedAt`, `lastError`,
-    `firstBootAt` and `startAt`, and an atomic-claim field with `leaseExpiresAt` so only
-    one instance runs the job, it stops once complete, and a claim held by a dead owner can be
-    taken over once its lease expires
-  - Create the document idle at boot with an upsert that uses `$setOnInsert`, setting `firstBootAt`
-    and `startAt = firstBootAt + hash(app:growiAppIdForCloud) mod startWindow` (a pure function;
-    offset 0 when the window is unset or the id is absent), so a restart never moves the slot
+  - Add a single-document model tracking backfill `status` (`idle` / `requested` / `running` /
+    `complete` / `failed`; plus `stopped`), the admin's
+    `requestedScope` and `requestedAt` and `stopRequested`, the run's `runCutoff`
+    computed once at the first claim, `coverage` (`none` / `partial` / `all`) with `coveredSince`,
+    the current phase (`recent` / `older`), the `recentCutoff` computed once at the run's first
+    claim, a progress marker (the last `_id` processed in the current phase, in `_id` order, reset
+    when the phase advances and at the start of each run), processed counts per phase, `completedAt`,
+    `lastError`, and an atomic-claim field with `leaseExpiresAt` so only one instance runs the job and
+    a claim held by a dead owner can be taken over once its lease expires
+  - Create the document idle at boot with an upsert that uses `$setOnInsert` (idle, `coverage:
+    none`), so a restart never resets coverage or progress and a missing document is recreated
+  - Add the two pure functions in `backfill-range.ts`: the run's `updatedAt` range from a scope and
+    the current coverage (the gap only), and the coverage after a completed run
+    (`coveredSince = min(coveredSince, runCutoff)`; `all` when the run had no lower bound)
   - Done when a unit test shows the claim succeeds once, is rejected for a second concurrent
-    claimant while the lease is live, and succeeds for a new claimant after the lease expires, and
-    a second boot leaves an existing `startAt` and the progress fields untouched; the offset function
-    is deterministic, stays within the window, and spreads a sample of ids roughly evenly
-  - _Requirements: 4.3_
-  - _Boundary: PageLinkBackfillJob_
+    claimant while the lease is live, and succeeds for a new claimant after the lease expires, a
+    second boot leaves existing coverage and progress fields untouched, and a deleted document is
+    recreated idle with coverage `none`; and table tests cover the pure functions: all from none
+    gives `all`; `since` from none gives `partial` at that date; a wider `since` after a partial run
+    walks only the gap and lowers `coveredSince`; all after a partial run walks the gap and gives
+    `all`; a scope already covered is a no-op
+  - _Requirements: 4.3, 4.4, 4.7, 4.8_
+  - _Boundary: PageLinkBackfillJob, backfill-range_
   - _Depends: B1.2_
 
 - [ ] B3.2 Implement the throttled, resumable backfill job
@@ -482,9 +490,10 @@ admin-triggered start was deferred as a one-line future change. Independent of B
     links via the B1 extractor (passing the configured site URL), resolve permalink targets via an
     id-existence check against the known page ids (not the path map), upsert that page's rows, then
     rest. Persist the progress marker at each checkpoint and resume from it on restart
-  - Run two phases in order: pages with `updatedAt >= recentCutoff` at the recent duty (default
-    25%), then the remaining pages at the older duty (default 10%); complete only when the second
-    finishes. Window and both duties are config-driven (design.md's Delivery decision)
+  - Within the run's range, run two phases in order: pages with `updatedAt >= recentCutoff` at the
+    recent duty (default 25%), then the remaining pages at the older duty (default 10%); the run is
+    complete only when the second finishes, and then records its coverage (B3.1). Window and both
+    duties are config-driven (design.md's Delivery decision)
   - Pace by resting `restRatio × pageCycleMs` after each page, where the page cycle is the body read,
     parse and writes (not the parse alone), with the charged work capped as in the live drain;
     extract the drain's rest computation into one pure function both call. Enforce a minimum
@@ -492,47 +501,43 @@ admin-triggered start was deferred as a one-line future change. Independent of B
     rate is bounded whatever the parse time. The rest
     is the yield, so there is no tick budget or slice limit. Checkpoint every N pages or T seconds:
     save the marker and counts, renew the lease. Guard against a second
-    loop with an in-process `isRunning` flag reset in `finally`; skip immediately once the job
-    document is complete
+    loop with an in-process `isRunning` flag reset in `finally`; skip immediately when no
+    request is pending
   - Record `lastError` and set `status: failed` when the loop fails; the tick retries a failed job
     (retry policy settled below with the failing-page policy)
-  - Add a way to skip old pages, for admins who need only recent ones: `backlinks:backfillMaxAgeDays`
-    and `backlinks:backfillMaxPages` (newest N by `updatedAt`, cutoff read from the `updatedAt`
-    index and stored once with `recentCutoff`), both unset by default (on-prem); the GROWI.cloud
-    deploy config sets a bounded value (design.md's proposal), and the keys are not exposed in the
-    admin UI. Settle how the panel and the
-    job `status` show a partial index (Requirement 4 holds for the pages in scope)
+  - Resolve the requested scope to `runCutoff` once at the first claim (`since`: the date;
+    `maxPages`: the `updatedAt` of the Nth newest page, read from the `updatedAt` index) and restrict
+    the walk to the run's range (design.md); a scope already covered finishes at once. Check `stopRequested` at each checkpoint; when set, save the
+    marker and counts, release the claim, set `stopped`, clear the flag and end the run. A claim clears a
+    stale `stopRequested`
   - Settle the remaining open questions and record them in design.md: write ordering against the
     live listener on the same page (can a stale backfill write overwrite fresher rows?), whether to
     cap the body size parsed (at what size, and how skipped pages are recorded) since one large page
     stalls the thread for its whole parse, the default for `backfillMaxPagesPerSecond`, whether to batch the body reads and the page-link
-    writes (fewer commands, same documents; judge it from B3.4's DB-side numbers), whether an
-    infra-owned `pauseRequested` field is needed as a no-restart brake, the checkpoint cadence and
+    writes (fewer commands, same documents; judge it from B3.4's DB-side numbers), the checkpoint cadence and
     lease length (the lease must outlast the checkpoint interval plus the longest single rest), and
     the policy for a page whose write keeps failing. The pacing shape is decided: the per-page proportional rest
   - Done when running the job over a seeded dataset (including pages linked by permalink and by
     same-wiki absolute URL) populates rows equivalent to the live path, a re-run/resume adds no
     duplicates, no second loop starts while one is running, and progress is emitted on the admin
-    channel; the page-rate floor is never exceeded on a seeded set of tiny pages, and with the age
-    or page-count limit set only the in-scope pages are processed
-  - _Requirements: 4.1, 4.2, 4.3, 4.4_
+    channel; the page-rate floor is never exceeded on a seeded set of tiny pages, and for each scope (all, newest N, since a date) only the pages in the range are processed, and a
+    second run over a wider scope processes only the gap and ends with the right coverage
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 4.9_
   - _Boundary: PageLinkBackfillCron_
   - _Depends: B3.1, B1.3, B1.2_
 
-- [ ] B3.3 Register the backfill job and gate its start
-  - Register the backfill cron poll in server setup; when the start rule allows, an idle tick starts
-    the paced loop (B3.2). Stop the poll permanently once the job document is marked complete
-  - Implement the start rule as a pure function of `backlinks:backfillAutoStart` (default `false`),
-    the job document's `startAt` and the current time. The tick reads the job document directly
-    from the database, not through `configManager`; the idle interval is chosen here (1 to 5
-    minutes). `complete` unschedules the tick and is not re-scheduled at boot; `failed` keeps the
-    tick so the job is retried from the marker
+- [ ] B3.3 Register the backfill job and start it from a request
+  - Register the backfill cron poll in server setup; an idle tick claims a pending start request, or
+    a run whose lease has expired, and starts the paced loop (B3.2). Do not schedule the poll at boot
+    when coverage is already `all`. The tick reads the job document directly from the database, not
+    through `configManager`; the idle interval is chosen here (1 to 5 minutes), as is whether the
+    start endpoint (B3.6) also nudges an immediate claim. `failed` keeps the tick so the job is
+    retried from the marker; a finished run returns the document to rest
   - Note: edits the same server-setup file as B1.12 — sequence after it to avoid a merge
-  - Done when a truth-table test covers the start rule (off, waiting for `startAt`, past `startAt`),
-    an app with the flag on and `startAt` in the past starts within one idle interval, and the job
-    claims and runs both phases to completion on a fresh dataset and marks itself complete so it
-    does not re-run
-  - _Requirements: 4.1_
+  - Done when a pending request starts within one idle interval, the job claims and runs both phases
+    to completion on a fresh dataset and records its coverage, an idle document with no request
+    starts nothing, and a document with coverage `all` schedules no poll
+  - _Requirements: 4.1, 4.5_
   - _Boundary: crowi setup, PageLinkBackfillCron_
   - _Depends: B3.2, B1.12_
 
@@ -541,7 +546,10 @@ admin-triggered start was deferred as a one-line future change. Independent of B
     produces no duplicates; the atomic claim prevents two instances/ticks double-processing
   - Correctness cases: kill mid-run and resume (no missing or duplicate rows); two instances (only
     one works); owner stopped and lease expires (another takes over); artificially slow write
-    (an idle tick does not start a second loop); backfilled rows equal the live path's for the same pages (4.2)
+    (an idle tick does not start a second loop); backfilled rows equal the live path's for the same pages (4.2); a bounded run followed by an
+    all-pages run ends with the same rows as one all-pages run, and the second walks only the gap (4.7);
+    stop mid-run then resume ends with the same rows as an uninterrupted run, with no duplicates and
+    coverage unchanged by the stop (4.9); a Stop clicked as the run finishes does not stop the next run
   - Done when these pass against a seeded dataset
   - Performance run (not part of CI): seed ~45–50k pages in a separate database (e.g. `growi_perf`)
     with `insertMany`, so the live listener creates no `PageLink` rows, using a realistic spread of
@@ -550,10 +558,10 @@ admin-triggered start was deferred as a one-line future change. Independent of B
     the job. Also measure the database side per app, which decides how many apps may run at once:
     operations per second, bytes written, oplog growth and replication delay, with many small
     pages as well as typical ones, at the default duty and with the page-rate floor. From the
-    per-app duration across a realistic page-count spread, size the start window and the number
-    of apps that may overlap, and decide whether the fixed limits suffice or the app needs to back
+    per-app duration across a realistic page-count spread, estimate how many apps may
+    overlap (input to the open GROWI.cloud decision in design.md), and decide whether the fixed limits suffice or the app needs to back
     off when its own database round trips slow down (design.md's fallback). Agree the success numbers before running
-  - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 4.9_
   - _Depends: B3.2_
 
 - [ ] B3.5 Index the descendants of a recursive duplicate
@@ -574,6 +582,39 @@ admin-triggered start was deferred as a one-line future change. Independent of B
   - _Requirements: 3.1, 3.2_
   - _Boundary: PageService (page events), PageLinkService_
   - _Depends: B1.12_
+
+- [ ] B3.6 Add the admin start, state, stop and resume endpoints
+  - Add apiv3 admin routes behind `loginRequired` and `adminRequired`: GET the job state (status,
+    phase, progress counts, `coverage`, `coveredSince`, `completedAt`, `lastError`); POST start with a
+    scope (`all`, `maxPages` N, or `since` date), which writes `requestedScope`, `requestedAt` and
+    status `requested`; POST stop, which cancels an unclaimed request, sets `stopRequested` on a running
+    run, and sets `stopped` directly when the run's lease has expired; and POST resume, valid only in
+    `stopped`, which sets `requested` and keeps the scope, `runCutoff` and the marker. Validate the
+    scope (N a positive integer, the date not in the future). Reject a start while a run is active
+    and when coverage is `all`
+  - Done when a non-admin is refused on every route; a valid start writes the request and returns the
+    state; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
+    without changing the document; two concurrent starts leave exactly one request; stop cancels an
+    unclaimed request, flags a running one, and ends an expired-lease run directly; resume is
+    rejected outside `stopped`
+  - _Requirements: 4.5, 4.6, 4.8, 4.9_
+  - _Boundary: backlinks-backfill-admin routes_
+  - _Depends: B3.1_
+
+- [ ] B3.7 Add the admin settings section and the panel's partial-index state
+  - Add an SWR hook for the job state and a section in the admin settings with a scope picker (all
+    pages, newest N, edited after a date), progress over the admin Socket.IO channel, and the states
+    in design.md's table: not started, running, failed, stopping, stopped (Resume or a new scope), partial coverage (the
+    control stays), all pages covered (a status line, no control). Choose where it sits in the admin
+    menu and add the i18n keys for every locale the repo keeps
+  - Make the backlinks panel show an "index still building / partial" state whenever coverage is not
+    `all` or a run is active, saying that pages not edited since `coveredSince` are not included
+  - Done when component tests render each state with the right text and controls (no start control
+    when coverage is `all`, a disabled one while running), a started run's progress updates without a
+    reload, and the panel shows the partial state for a partial index and none for `all`
+  - _Requirements: 4.4, 4.5, 4.6, 4.7, 4.8, 4.9_
+  - _Boundary: BacklinksBackfillAdmin, BacklinksPanel_
+  - _Depends: B3.6, B1.11_
 
 ---
 

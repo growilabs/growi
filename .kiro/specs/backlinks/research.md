@@ -364,22 +364,43 @@
   (acceptable per 4.2 — completeness only required *after* completion; new edits index instantly).
   In-process means the parse still shares the one JS thread; the duty cycle bounds but cannot
   remove that contention — only `worker_threads` could, which GROWI lacks (deferred).
-- **Delivery decision (proposed — pending infra agreement)**: throttled, two-phase (recent pages at
-  25% duty, then older at 10%); off by default; on GROWI.cloud each app starts itself at a `startAt`
-  derived from one uniform start window. Admin-triggered start deferred (a one-line wiring change
-  to add later, reusing the identical job). The start rule and settings are in design.md's Delivery
-  decision; the reasoning behind them is here:
-  - *Off by default*: an upgrade has never run a heavy job, and admins do not expect one, so the
-    default is `false` and on-prem opts in. The cost is that an on-prem admin who never sets it gets
-    no backfill, which is why the admin-triggered start is worth revisiting.
+- **Delivery decision (proposed)**: throttled, two-phase (recent pages at 25% duty, then older at
+  10%); started by an administrator from the admin settings with a scope (all pages, the newest N, or
+  pages edited after a date), the same on-prem and on GROWI.cloud for now. The GROWI.cloud policy
+  is open (see the last bullet of this decision). The mechanism and settings are in design.md's
+  Delivery decision; the reasoning behind them is here:
+  - *Admin-started, no start env variables (decided 2026-10-28)*: an upgrade has never run a heavy
+    job and admins do not expect one, so nothing starts on its own. The earlier on-prem design
+    opted in with an env flag, which left an admin who never set it with no backfill and gave the
+    admin no say in scope; a start control with a scope fixes both, so the auto-start flag, the
+    start window and the scope-limit env values are dropped.
+  - *Coverage recorded as a cutoff (`coverage` + `coveredSince`)*: every scope is an `updatedAt`
+    boundary (`maxPages` is the boundary at the Nth newest page), so "what is done" is one date,
+    and "all pages done" is a run with no lower bound that reaches the end of its cursor, with no
+    need to detect the oldest page. A second run then walks only the gap. A run moves `coveredSince`
+    only on completion: the walk is in `_id` order, so a stopped run has no clean cutoff, and the
+    progress marker (an `_id` position that resets each run) cannot define an `updatedAt` range. A
+    marker and a coverage cutoff therefore both exist, with different lifetimes.
+  - *Control document, not a config key, holds the completion state*: completion is written by the
+    job, not edited by an operator, the document already is the status surface and the tick reads
+    it directly, and a copy in config could disagree with it. If the document goes missing, the boot
+    upsert recreates it as "not started", and a rerun is harmless because the upsert is idempotent;
+    reconstructing "complete" from `pagelinks` is not possible (a page without links has no rows).
+  - *Stop and resume are part of the design (decided 2026-10-28)*: now that admins start the job, a
+    long run on a large wiki needs a way to be interrupted that is not a restart. It is cheap because
+    resume is the crash-recovery path the design already has (marker saved only after a page's rows
+    are written, idempotent upsert, so at most one checkpoint interval is redone). Its edges are
+    recorded in design.md: a stale flag cleared at claim, cancel of an unclaimed request, the
+    claim released on stop, and a stop on a run with an expired lease. A stop changes no coverage.
+  - *A status line stays after completion*: the controls are hidden when coverage is `all`, but one
+    line ("indexed for all pages, completed <date>") remains, so an admin who comes back can tell
+    finished from missing. The server rejects the start independently of the UI.
   - *Unconditional auto-start was rejected for cloud*: apps share one MongoDB, a duty cycle bounds
     per-instance load only, so a fleet starting together has no aggregate cap.
-  - *An admin button was rejected for cloud*: it would let customers start backfills at arbitrary
-    times, outside the start window.
   - *Two phases by `updatedAt`, with a stored cutoff*: skipping old pages entirely would break full
     coverage (4.1), so they run second at a lower duty. The cutoff is stored on the job so the sets
     do not shift across restarts.
-  - *Cloud start mechanism: a uniform start window (proposed)*. The constraint from the infra
+  - *Cloud candidate (1), kept for the open cloud decision: a uniform start window*. The constraint from the infra
     review is that GROWI.cloud infra must not do repeated work: one-time setup at release (the same
     env values everywhere) is fine, starting a few apps at a time and checking load between batches
     is not. A start flag in the job document needed exactly that repeated work, so it was dropped.
@@ -398,13 +419,13 @@
     page cycle, a page-rate floor bounds the operation rate directly, and B3.4 measures the
     database side (operations/s, writes, oplog, replication delay) that the event-loop and
     live-request numbers do not show.
-  - *Scope limits*: admins who consider the last year, or the last 10,000 pages, enough can bound
-    the backfill with config values. Coverage is then partial by choice, so the panel must say so.
-    On-prem keeps the limits optional. For GROWI.cloud the proposal is a bounded value set by infra
-    in the shared config, never unlimited, so a full backfill is not available there: it removes
-    the slow older-pages phase and cuts the total work and the overlap window, which are the main
-    levers on shared-DB load. The cost is that stable, rarely edited pages that link to others are
-    skipped until someone edits them; it is for Yuki and infra to accept.
+  - *Cloud candidate (2): a bounded scope set by infra*: bounding the backfill (for example the last
+    year, or the last 10,000 pages) removes the slow older-pages phase and cuts the total work and the
+    overlap window, which are the main levers on shared-DB load. As an env value infra sets in the
+    shared config, never unlimited, it would also mean a full backfill is not available on cloud. The
+    cost is that stable, rarely edited pages that link to others are skipped until someone edits
+    them or a wider run covers them; it is for Yuki and infra to accept. With the admin choosing the
+    scope, this only applies if the control is bounded on cloud.
   - *Precedent — v8 `revisions` index pre-creation* (internal wiki page, Redmine 186296): to avoid
     all apps building `{ author: 1, createdAt: -1 }` at once through `autoIndex` at v8 boot, infra
     pre-created it per app from an `operation-mongo` pod with the admin credential (databases named
@@ -422,7 +443,7 @@
     work the backfill must avoid, and `createIndex` (one call, database-side only) is not a
     safety argument for a job that parses markdown in the app and may issue tens of thousands to
     hundreds of thousands of reads and writes (estimated) over minutes to hours.
-  - *Considered, not adopted for the cloud start*: a start flag in the job document set by infra
+  - *Considered, not adopted for a cloud-side start*: a start flag in the job document set by infra
     (manual wave control); an env var per app or per wave (per-app values to maintain, a restart per
     wave); relying on the release cadence as the wave (concurrent backfills would be
     `5 × (duration ÷ 20 min)` and nothing bounds the duration); fixed 1-hour slots by app index
@@ -446,11 +467,17 @@
     duration. (2) The release goes out at the normal cadence (about 295 active apps finish in
     under a day), so each app's own first boot is the anchor of its start window, not a release
     timestamp. (3) The design no longer needs infra to write to tenant databases.
-  - *Still to confirm with the infra team*: that they will set the same env values (auto-start
-    and the start window) on every cloud app once at release; that `app:growiAppIdForCloud` is set at
-    boot on every cloud app; how they will watch progress across apps; the cluster headroom and which apps share which cluster. The backfill
-    load they would be shown is estimated, not measured — B3.4's performance run replaces the
-    estimates.
+  - *Open: the GROWI.cloud policy (2026-10-28)*: the admin control is usable on cloud for now, which
+    reverses the earlier rejection of an admin button on cloud (customers could start backfills at
+    arbitrary times, outside any start window). The shared-DB concern behind that rejection still
+    stands: many customer admins starting full backfills together load the shared cluster at
+    (apps × duty). The candidates are (1) hide the control on cloud and keep an infra-driven start
+    there, (2) show it with a scope bounded by infra config, (3) show it unbounded and rely on the
+    per-app limits and the latency-backoff fallback. B3.4's per-app duration and database-side
+    numbers are the input. To confirm with the infra team once a candidate is chosen: the env values
+    they would set once at release, that `app:growiAppIdForCloud` is set at boot on every cloud app
+    (candidate 1), how they will watch progress across apps, and the cluster headroom and which apps
+    share which cluster. The backfill load they would be shown is estimated, not measured.
   Implementation reuses the page-bulk-export scaffolding:
   `CronService` base, `createBatchStream`, the cursor→resume(progress marker)→`pipeline` skeleton, and
   the watchdog start/stop logic; the new code is link extraction/resolution, the in-memory `{path→_id}`
