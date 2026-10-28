@@ -137,7 +137,7 @@
   - 完了の状態: 子の入口を単独で起動し、正常なファイルで成功の JSON、壊れたファイルで失敗の JSON が返り、Linux では上限と優先度が設定されていることをテストで確かめられる
   - _Requirements: 2.5, 2.6, 2.7_
 
-- [ ] 6.2 forkserver の起動と準備の確認を実装する
+- [x] 6.2 forkserver の起動と準備の確認を実装する
   - アプリの起動時に forkserver を立ち上げ、変換の依存を forkserver の中で先に読み込ませる
   - forkserver が動いていて依存を読み込めているかどうかを返す
   - 完了の状態: 起動後に準備の確認が真になり、forkserver を止めると偽になることをテストで確かめられる
@@ -240,3 +240,5 @@
 - 6.1: 子から親への結果にも「長さ (4 バイト) + 本体」を付けた。上限は `2 × MAX_RESULT_BYTES + 1MiB`。6.3 は読む前に `wire.decode_frame_header(header, wire.max_result_frame_bytes(limits.max_result_bytes))` で確かめ、超えたら読み捨てて `result_too_large` にする。`write_frame` は non-blocking の fd を受け付けないので、6.3 は読み取りを自前で書く。start() の後、親は自分の手元にある「入力の読み取り側・結果の書き込み側・監視用パイプの読み取り側」の写しを閉じること (閉じないと EOF が届かない)。子の終了コード: 3 = 依頼元がいなくなった、4 = 入力の形が壊れていた。どちらも結果は送らない。
 - 6.1: `RLIMIT_AS` に当たると、XLSX は Rust 側の abort (exitcode -6、結果なし) になり、6.3 では「異常終了」(500) に分類される。メモリの主な守りは親の RSS 監視 (320MB、`memory_exceeded`) で、これは `RLIMIT_AS` (832MB) より先に効く。`MemoryError` は core が `internal` にまとめたままでよい。
 - 6.1: forkserver の準備 (6.2) では `RAYON_NUM_THREADS=1` を forkserver の起動前に設定する (今回のテストではこれが無くても、40MB の DOCX / PPTX と 10 万セルの XLSX は VmPeak 約 370MB 以下で通った)。CPU 時間の hard 上限が環境側で低いと soft と hard が同じ値になり、SIGXCPU より先に SIGKILL が届いて「時間切れ」が「異常終了」に分類される (珍しい配備だけ)。
+- 6.2: `ConversionRunner` の準備確認の使い方 (7.2 が守る): `/readyz` は `readiness()` が準備できていない (`stale` を含む) なら `await asyncio.to_thread(runner.verify)` で確かめ直し、その結果を返す。`readiness()` は新しいプロセスを作らず待たない。`verify()` は正常なら約 5ms、固まっていても `probe_timeout_s` + 約 0.5 秒 + 回収で戻る。k8s の readinessProbe の `timeoutSeconds` (8.2) はこれより長くするか、7.2 で `probe_timeout_s` を短く渡す。forkserver が死んだ直後に標準の処理がまだその死を見ていない間の最初の `Process.start()` は `EOFError` になるので、6.3 の `run()` はこれを「異常終了」として扱い、次のリクエストは立て直された forkserver を使う。
+- 6.2: Python 3.12 では forkserver に `__main__` を先読みさせる指定が効かず、子 1 つを作るたびに起動スクリプト (uvicorn) を読み直して約 29ms かかる (何も読み込まないスクリプトなら約 7ms)。8.1 で、forkserver にだけ読み込ませて `/readyz` には出さない別の一覧 (例 `uvicorn.main`) を足すか、起動を小さなスクリプト経由にするか決める。`stop()` は変換中の子が残っていると終わるまで止まる (3 秒動く子で 3.03 秒)。7.2 は 6.3 が子を回収した後にスレッドから呼ぶ。`/readyz` の dependencies に内部モジュール名 (`app.runner.child_entry`) が出るので、認証なしで呼べる `/readyz` に出してよいかを 7.2 で決める。`os.environ.setdefault` で RAYON_NUM_THREADS を書くのは、stdlib が forkserver に環境変数を渡す口を持たないため。TMPDIR は 8.1 の Dockerfile で設定する。
