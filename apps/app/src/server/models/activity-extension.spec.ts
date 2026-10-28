@@ -421,7 +421,7 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
    *     plain findSnapshotUsernamesByUsernameRegex variant below)
    *   - Both aggregateRaw calls pass `options: { maxTimeMS: 5000 }`
    *   - Empty aggregateRaw results → { usernames: [], totalCount: 0 }
-   *   - No MIN_QUERY_LENGTH short-circuit — an empty `q` legitimately matches
+   *   - No minimum-length short-circuit — an empty `q` legitimately matches
    *     every username for the `/usernames` admin listing caller
    */
   const buildAggregateClient = () => {
@@ -586,8 +586,7 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
         { sortOpt: 1, offset: 0, limit: 10 },
       );
 
-    // Assert: aggregateRaw was actually invoked (no short-circuit), unlike the
-    // plain findSnapshotUsernamesByUsernameRegex variant below
+    // Assert: aggregateRaw was actually invoked (no short-circuit)
     expect(aggregateRawSpy).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ usernames: ['alice'], totalCount: 1 });
   });
@@ -620,13 +619,11 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
   /**
    * Plain (no total count) variant used by the MongoDB fallback path
    * (SearchService.searchAuditlogUsernames — invoked only when Elasticsearch
-   * is unreachable/unconfigured). Shares the $group stage with the
-   * WithTotalCount variant's usernames pipeline, but matches by prefix
-   * (`^`-anchored) rather than substring — WithTotalCount's substring match is
+   * is unreachable/unconfigured). Unlike the WithTotalCount variant, it
+   * orders by hit count and matches by prefix (`^`-anchored) rather than
+   * substring — WithTotalCount's substring match is
    * specific to its own production caller (the `/usernames` admin API) and
-   * must not leak here or vice versa. Also additionally
-   * short-circuits below MIN_QUERY_LENGTH so a whitespace/single-char query
-   * never reaches MongoDB (design.md; req 3.4).
+   * must not leak here or vice versa.
    */
   const buildAggregateClient = () => {
     const base = new PrismaClient({
@@ -677,8 +674,8 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
             'snapshot.username': { $regex: '^a\\.b', $options: 'i' },
           },
         },
-        { $group: { _id: '$snapshot.username' } },
-        { $sort: { _id: 1 } },
+        { $group: { _id: '$snapshot.username', count: { $sum: 1 } } },
+        { $sort: { count: -1, _id: 1 } },
         { $skip: 3 },
         { $limit: 15 },
       ],
@@ -701,34 +698,5 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
     expect(callArgs.pipeline[0]).toEqual({
       $match: { 'snapshot.username': { $regex: '^ali', $options: 'i' } },
     });
-  });
-
-  it.each([
-    '',
-    ' ',
-    'a',
-  ])('short-circuits to [] without querying MongoDB when q=%j (below MIN_QUERY_LENGTH)', async (q) => {
-    const { client, aggregateRawSpy } = buildAggregateClient();
-
-    const result = await client.activities.findSnapshotUsernamesByUsernameRegex(
-      q,
-      { offset: 0, limit: 10 },
-    );
-
-    expect(result).toEqual([]);
-    expect(aggregateRawSpy).not.toHaveBeenCalled();
-  });
-
-  it('queries MongoDB once q reaches MIN_QUERY_LENGTH (2 chars)', async () => {
-    const { client, aggregateRawSpy } = buildAggregateClient();
-    aggregateRawSpy.mockResolvedValueOnce([{ _id: 'al' }] as never);
-
-    const result = await client.activities.findSnapshotUsernamesByUsernameRegex(
-      'al',
-      { offset: 0, limit: 10 },
-    );
-
-    expect(aggregateRawSpy).toHaveBeenCalledTimes(1);
-    expect(result).toEqual(['al']);
   });
 });

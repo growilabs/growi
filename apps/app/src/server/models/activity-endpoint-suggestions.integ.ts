@@ -163,34 +163,30 @@ describe('findEndpointsByEndpointRegex', () => {
     expect(result).toEqual([]);
   });
 
-  it.each([
-    '',
-    ' ',
-    'a',
-  ])('short-circuits to [] for q=%j even when a matching endpoint exists (minQueryLength guard)', async (q) => {
+  it('orders paths by hit count, then alphabetically, like the ES terms aggregation', async () => {
     await prisma.activities.createMany({
-      data: [makeActivityData({ endpoint: 'aaaaaaaaaa' })],
+      data: [
+        '/api/v3/d',
+        '/api/v3/c',
+        '/api/v3/a',
+        '/api/v3/a?limit=10',
+        '/api/v3/b',
+        '/api/v3/b',
+        '/api/v3/b',
+      ].map((endpoint) => makeActivityData({ endpoint })),
     });
 
-    const result = await prisma.activities.findEndpointsByEndpointRegex(q, {
-      offset: 0,
-      limit: 10,
-    });
+    const result = await prisma.activities.findEndpointsByEndpointRegex(
+      '/api/v3/',
+      { offset: 0, limit: 10 },
+    );
 
-    expect(result).toEqual([]);
-  });
-
-  it('short-circuits to [] for a "/" plus one character, since the leading "/" narrows nothing', async () => {
-    await prisma.activities.createMany({
-      data: [makeActivityData({ endpoint: '/api/v3/pages' })],
-    });
-
-    const result = await prisma.activities.findEndpointsByEndpointRegex('/a', {
-      offset: 0,
-      limit: 10,
-    });
-
-    expect(result).toEqual([]);
+    expect(result).toEqual([
+      '/api/v3/b',
+      '/api/v3/a',
+      '/api/v3/c',
+      '/api/v3/d',
+    ]);
   });
 
   it('matches by prefix even with incidental surrounding whitespace in q', async () => {

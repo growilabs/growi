@@ -108,6 +108,16 @@ const isPermanentMappingRejection = (err: unknown): boolean =>
     (err as { statusCode: unknown }).statusCode,
   );
 
+// Fuzzy compares q against the whole stored value, so it only helps a fully
+// typed value. Endpoints are looked up by partial path, where it just adds
+// near-miss paths (e.g. `/_api/v3/tags` for `/_api/v3/page`).
+const AUDITLOG_SUGGESTION_FUZZY: {
+  readonly [K in AuditlogSuggestionField]: boolean;
+} = {
+  username: true,
+  endpoint: false,
+};
+
 class ElasticsearchDelegator
   implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
 {
@@ -968,7 +978,9 @@ class ElasticsearchDelegator
               [field]: { value: `${escaped}*`, case_insensitive: true },
             },
           },
-          { fuzzy: { [field]: { value: escaped, fuzziness: 'AUTO' } } },
+          ...(AUDITLOG_SUGGESTION_FUZZY[field]
+            ? [{ fuzzy: { [field]: { value: escaped, fuzziness: 'AUTO' } } }]
+            : []),
         ],
       },
     };

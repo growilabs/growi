@@ -11,7 +11,8 @@
  *
  * As a result the indexed value is path-only and deliberately diverges from the
  * `endpoint` stored in MongoDB. The endpoint suggestion handler passes its query
- * through this function too, so a pasted URL is matched by its path.
+ * through this function too, so a query string in the search term is dropped
+ * the same way.
  */
 export const sanitizeEndpointForIndex = (endpoint: string): string =>
   endpoint.split('?')[0];

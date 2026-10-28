@@ -536,7 +536,7 @@ export const setup = (crowi: Crowi): Router => {
         );
         return res.apiv3(result);
       } catch (err) {
-        logger.error('Failed to get suggestions', err);
+        logger.error({ err }, 'Failed to get suggestions');
         return res.apiv3Err(err, 500);
       }
     },

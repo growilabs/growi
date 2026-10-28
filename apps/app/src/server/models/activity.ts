@@ -276,9 +276,8 @@ function buildSnapshotUpdateEnvelope(
 }
 
 // escapeStringForMongoRegex, not RegExp.escape (mongodb-regex rule — PCRE2
-// rejects RegExp.escape's \uXXXX output). Trims `q` so the match stays
-// consistent with minQueryLength's trimmed-length check below (untrimmed
-// would leave stray leading/trailing space characters in the pattern).
+// rejects RegExp.escape's \uXXXX output). Trims `q` so stray leading/trailing
+// space characters never end up in the pattern.
 const escapeSuggestionQuery = (q: string): string =>
   escapeStringForMongoRegex(q.trim());
 
@@ -303,10 +302,6 @@ const buildFieldGroupStage = (groupKey: Prisma.InputJsonValue) => ({
 type SuggestionFieldSpec = {
   readonly fieldPath: string;
   readonly groupKey: Prisma.InputJsonValue;
-  // Below this trimmed length the prefix matches most of the collection, so
-  // the fallback short-circuits rather than group it. Not a scan-cost bound:
-  // neither field is indexed, so a longer query still scans the collection.
-  readonly minQueryLength: number;
   // A query that would match into the raw stored value's credential-bearing
   // part; answering it would let a caller probe that part by prefix.
   readonly isUnmatchableQuery?: (q: string) => boolean;
@@ -315,7 +310,6 @@ type SuggestionFieldSpec = {
 const SNAPSHOT_USERNAME_SUGGESTION: SuggestionFieldSpec = {
   fieldPath: 'snapshot.username',
   groupKey: '$snapshot.username',
-  minQueryLength: 2,
 };
 
 const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
@@ -323,8 +317,6 @@ const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
   // Mongo-side equivalent of sanitizeEndpointForIndex: the stored endpoint
   // keeps its query string, the ES index does not.
   groupKey: { $arrayElemAt: [{ $split: ['$endpoint', '?'] }, 0] },
-  // Every endpoint starts with '/', which narrows nothing.
-  minQueryLength: 3,
   // The stored endpoint may still carry e.g. `access_token` after the '?'.
   isUnmatchableQuery: (q) => q.includes('?'),
 };
@@ -333,7 +325,8 @@ const SNAPSHOT_USERNAME_GROUP_STAGE = buildFieldGroupStage(
   SNAPSHOT_USERNAME_SUGGESTION.groupKey,
 );
 
-// Prefix-only, unlike ES's `fuzziness: 'AUTO'`: MongoDB has no native fuzzy match.
+// Prefix-only, unlike ES's fuzzy match for username: MongoDB has no native
+// fuzzy match.
 const buildFieldPrefixMatchStage = (fieldPath: string, q: string) => ({
   $match: {
     [fieldPath]: {
@@ -348,13 +341,13 @@ const buildFieldSuggestionPipeline = (
   q: string,
   { offset, limit }: { offset: number; limit: number },
 ) => {
-  if (q.trim().length < spec.minQueryLength) return null;
   if (spec.isUnmatchableQuery?.(q)) return null;
 
   return [
     buildFieldPrefixMatchStage(spec.fieldPath, q),
-    buildFieldGroupStage(spec.groupKey),
-    { $sort: { _id: 1 } },
+    { $group: { _id: spec.groupKey, count: { $sum: 1 } } },
+    // ES's terms aggregation order: doc_count desc, then key asc.
+    { $sort: { count: -1, _id: 1 } },
     { $skip: offset },
     { $limit: limit },
   ];
@@ -585,9 +578,8 @@ export const extension = Prisma.defineExtension((client) => {
          * Unbounded by design — no `$limit` before `$match` (a prior cap there
          * silently hid matches beyond it); `maxTimeMS` bounds runtime instead.
          *
-         * No minQueryLength guard here (unlike the plain variant): the
-         * `/usernames` admin listing route relies on an empty `q` matching
-         * every username.
+         * No minimum query length: the `/usernames` admin listing route
+         * relies on an empty `q` matching every username.
          *
          * Requirements: 3.4 — design.md: ActivityExtension Contracts (findSnapshotUsernames).
          */

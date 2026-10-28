@@ -15,9 +15,20 @@ import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 const {
   mockFindSnapshotUsernamesByUsernameRegex,
   mockFindEndpointsByEndpointRegex,
+  mockLoggerError,
 } = vi.hoisted(() => ({
   mockFindSnapshotUsernamesByUsernameRegex: vi.fn(),
   mockFindEndpointsByEndpointRegex: vi.fn(),
+  mockLoggerError: vi.fn(),
+}));
+
+vi.mock('~/utils/logger', () => ({
+  default: () => ({
+    warn: vi.fn(),
+    error: mockLoggerError,
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
 }));
 
 vi.mock('~/server/models/named-query', () => ({
@@ -220,7 +231,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
 
   it('should classify active and inactive usernames from the MongoDB fallback when ES is not configured', async () => {
     searchService.isConfiguredOverride = false;
-    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValue([
+    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValueOnce([
       'alice',
       'bob',
     ]);
@@ -254,7 +265,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     vi.mocked(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).mockRejectedValue(new Error('ES is down'));
-    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValue(['alice']);
+    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValueOnce(['alice']);
     setupUserModelMock(mockUserModel, [
       { username: 'alice', status: UserStatus.STATUS_ACTIVE },
     ]);
@@ -272,11 +283,15 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
       'ali',
       { offset: 0, limit: 10 },
     );
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      { err: expect.objectContaining({ message: 'ES is down' }) },
+      expect.stringContaining('Falling back to MongoDB'),
+    );
   });
 
   it('should use the MongoDB fallback when ES is configured but unreachable', async () => {
     searchService.isErrorOccuredOnHealthcheck = true;
-    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValue(['alice']);
+    mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValueOnce(['alice']);
     setupUserModelMock(mockUserModel, [
       { username: 'alice', status: UserStatus.STATUS_ACTIVE },
     ]);
@@ -350,7 +365,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
 
   it('should search the MongoDB fallback by the path when q carries a query string', async () => {
     searchService.isConfiguredOverride = false;
-    mockFindEndpointsByEndpointRegex.mockResolvedValue(['/_api/search']);
+    mockFindEndpointsByEndpointRegex.mockResolvedValueOnce(['/_api/search']);
 
     await searchService.searchAuditlogSuggestions(
       ['endpoint'],
@@ -381,6 +396,66 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     expect(mockFindEndpointsByEndpointRegex).not.toHaveBeenCalled();
   });
 
+  describe.each([
+    { backend: 'Elasticsearch', isConfigured: true },
+    { backend: 'the MongoDB fallback', isConfigured: false },
+  ])('below the minimum query length, on $backend', ({ isConfigured }) => {
+    beforeEach(() => {
+      searchService.isConfiguredOverride = isConfigured;
+      setupUserModelMock(mockUserModel, []);
+    });
+
+    it.each([
+      {
+        field: 'username',
+        q: 'a',
+        expected: { username: { activeUsernames: [], inactiveUsernames: [] } },
+      },
+      { field: 'endpoint', q: '/a', expected: { endpoint: { endpoints: [] } } },
+      {
+        field: 'endpoint',
+        q: '/a?q=foo',
+        expected: { endpoint: { endpoints: [] } },
+      },
+    ] as const)('should return no $field suggestions for q=$q without querying either backend', async ({
+      field,
+      q,
+      expected,
+    }) => {
+      const result = await searchService.searchAuditlogSuggestions(
+        [field],
+        q,
+        10,
+      );
+
+      expect(result).toEqual(expected);
+      expect(
+        searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+      ).not.toHaveBeenCalled();
+      expect(mockFindSnapshotUsernamesByUsernameRegex).not.toHaveBeenCalled();
+      expect(mockFindEndpointsByEndpointRegex).not.toHaveBeenCalled();
+    });
+  });
+
+  it.each([
+    { field: 'username', q: 'al' },
+    { field: 'endpoint', q: '/ap' },
+  ] as const)('should query Elasticsearch once q reaches the $field minimum length', async ({
+    field,
+    q,
+  }) => {
+    vi.mocked(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockResolvedValue([]);
+    setupUserModelMock(mockUserModel, []);
+
+    await searchService.searchAuditlogSuggestions([field], q, 10);
+
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).toHaveBeenCalledWith(field, q, 10);
+  });
+
   it('should return {} without calling ES when q is whitespace only', async () => {
     const result = await searchService.searchAuditlogSuggestions(
       ['endpoint'],
@@ -406,7 +481,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
 
     const result = await searchService.searchAuditlogSuggestions(
       ['username', 'endpoint'],
-      'a',
+      'ali',
       10,
     );
 
@@ -435,6 +510,14 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     expect(result).toEqual({
       username: { activeUsernames: ['alice'], inactiveUsernames: [] },
     });
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({
+          message: 'operation exceeded time limit',
+        }),
+      },
+      expect.stringContaining('(endpoint)'),
+    );
   });
 
   it('should reject when every requested field fails', async () => {
@@ -458,11 +541,13 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
         expect.objectContaining({ message: 'endpoint scan failed' }),
       ],
     });
+    // The caller logs the AggregateError once; per-field logs would duplicate it.
+    expect(mockLoggerError).not.toHaveBeenCalled();
   });
 
   it('should use the MongoDB fallback for endpoint when ES is not configured', async () => {
     searchService.isConfiguredOverride = false;
-    mockFindEndpointsByEndpointRegex.mockResolvedValue(['/api/v3/pages']);
+    mockFindEndpointsByEndpointRegex.mockResolvedValueOnce(['/api/v3/pages']);
 
     const result = await searchService.searchAuditlogSuggestions(
       ['endpoint'],
@@ -486,7 +571,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     vi.mocked(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).mockRejectedValue(new Error('ES is down'));
-    mockFindEndpointsByEndpointRegex.mockResolvedValue(['/api/v3/pages']);
+    mockFindEndpointsByEndpointRegex.mockResolvedValueOnce(['/api/v3/pages']);
 
     const result = await searchService.searchAuditlogSuggestions(
       ['endpoint'],

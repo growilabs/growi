@@ -1,4 +1,4 @@
-import type { IPage, IPageHasId, IUser } from '@growi/core';
+import type { IPage, IPageHasId } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
@@ -20,13 +20,9 @@ import type {
   IPageWithSearchMeta,
   ISearchResult,
 } from '~/interfaces/search';
-import {
-  USER_FIELDS_EXCEPT_CONFIDENTIAL,
-  UserStatus,
-} from '~/server/models/user/conts';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
 import UserGroup from '~/server/models/user-group';
 import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
@@ -44,9 +40,9 @@ import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
 import { hasIntersection } from '../util/compare-objectId';
 import { configManager } from './config-manager';
+import { searchAuditlogSuggestions } from './search-auditlog-suggestions';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
-import { sanitizeEndpointForIndex } from './search-delegator/sanitize-endpoint-for-index';
 
 const logger = loggerFactory('growi:service:search');
 
@@ -115,102 +111,6 @@ const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
     pages,
     totalCount,
   };
-};
-
-async function searchAuditlogFieldValues(
-  searchService: SearchService,
-  field: AuditlogSuggestionField,
-  q: string,
-  limit: number,
-  mongoFallback: (
-    q: string,
-    option: { offset: number; limit: number },
-  ) => Promise<string[]>,
-): Promise<string[]> {
-  if (searchService.isReachable) {
-    try {
-      return await searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
-        field,
-        q,
-        limit,
-      );
-    } catch (err) {
-      logger.error(
-        `Failed to search auditlog suggestions (${field}) on Elasticsearch. Falling back to MongoDB.`,
-        err,
-      );
-    }
-  }
-  return mongoFallback(q, { offset: 0, limit });
-}
-
-// Adding a field (e.g. `ip`) means adding one entry here — no change to
-// searchAuditlogSuggestions itself.
-const AUDITLOG_SUGGESTION_HANDLERS: {
-  [K in AuditlogSuggestionField]: (
-    searchService: SearchService,
-    q: string,
-    limit: number,
-  ) => Promise<AuditlogSuggestionsResponse>;
-} = {
-  async username(searchService, q, limit) {
-    const usernames = await searchAuditlogFieldValues(
-      searchService,
-      'username',
-      q,
-      limit,
-      // Wrapped, not passed directly: the Prisma extension method reads
-      // `this` via Prisma.getExtensionContext, so passing it as a bare
-      // reference would detach it from `prisma.activities` and throw.
-      (query, option) =>
-        prisma.activities.findSnapshotUsernamesByUsernameRegex(query, option),
-    );
-
-    const User = mongoose.model<IUser>('User');
-    const users =
-      usernames.length === 0
-        ? []
-        : await User.find({ username: { $in: usernames } })
-            .select('username status')
-            .lean();
-
-    const activeUsernames = new Set(
-      users
-        .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
-        .map((u) => u.username),
-    );
-
-    // A username with no live User match (e.g. deleted -- statusDelete()
-    // renames the User doc's username to `deleted_at_*`) must still be
-    // searchable in the audit trail, so anything not proven active is
-    // treated as inactive rather than silently dropped.
-    return {
-      username: {
-        activeUsernames: usernames.filter((u) => activeUsernames.has(u)),
-        inactiveUsernames: usernames.filter((u) => !activeUsernames.has(u)),
-      },
-    };
-  },
-
-  // Unlike username, no User-model classification applies — endpoints have
-  // no notion of Active/Inactive.
-  async endpoint(searchService, q, limit) {
-    // Both backends match against the path-only value, so a pasted URL's
-    // query string is dropped here once rather than in each backend.
-    const pathQ = sanitizeEndpointForIndex(q).trim();
-    if (pathQ === '') return { endpoint: { endpoints: [] } };
-
-    const endpoints = await searchAuditlogFieldValues(
-      searchService,
-      'endpoint',
-      pathQ,
-      limit,
-      (query, option) =>
-        prisma.activities.findEndpointsByEndpointRegex(query, option),
-    );
-
-    return { endpoint: { endpoints } };
-  },
 };
 
 class SearchService implements SearchQueryParser, SearchResolver {
@@ -477,36 +377,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     q: string,
     limit: number,
   ): Promise<AuditlogSuggestionsResponse> {
-    const trimmedQ = q.trim();
-    if (trimmedQ === '') return {};
-
-    const uniqueFields = [...new Set(fields)];
-    const settled = await Promise.allSettled(
-      uniqueFields.map((field) =>
-        AUDITLOG_SUGGESTION_HANDLERS[field](this, trimmedQ, limit),
-      ),
-    );
-
-    // A failing field is dropped so it can't take the others down with it;
-    // only when every field fails does the request fail.
-    const responses = settled.flatMap((result, i) => {
-      if (result.status === 'fulfilled') return [result.value];
-      logger.error(
-        `Failed to search auditlog suggestions (${uniqueFields[i]}).`,
-        result.reason,
-      );
-      return [];
-    });
-    if (settled.length > 0 && responses.length === 0) {
-      throw new AggregateError(
-        settled.flatMap((result) =>
-          result.status === 'rejected' ? [result.reason] : [],
-        ),
-        'Failed to search auditlog suggestions for all fields.',
-      );
-    }
-
-    return Object.assign({}, ...responses);
+    return searchAuditlogSuggestions(this, fields, q, limit);
   }
 
   async parseSearchQuery(
