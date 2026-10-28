@@ -57,8 +57,7 @@ def _serve(
     """Start the real app (lifespan included) with `env` as settings.
 
     `timeout_s` overrides the runner deadline with a float: Settings.TIMEOUT_S is an integer, so
-    a sub-second deadline cannot come from the environment. The router keeps a lazily created
-    process-wide Limits object, so it is reset to make the settings above take effect.
+    a sub-second deadline cannot come from the environment.
     """
     with pytest.MonkeyPatch.context() as mp:
         mp.setenv("ATTACHMENT_EXTRACTOR_SERVICE_TOKEN", TOKEN)
@@ -66,10 +65,8 @@ def _serve(
             mp.setenv(key, str(value))
         from app import main
         from app.conversion.limits import ConversionLimits
-        from app.routers import extract as extract_router
         from app.runner import ConversionRunner
 
-        mp.setattr(extract_router, "limits", None)
         if timeout_s is not None:
 
             def from_settings(settings: Any, **options: Any) -> ConversionRunner:  # noqa: ANN401
@@ -438,10 +435,9 @@ class TestHygieneOverHttp:
 
 
 class TestRequestShapeOverHttp:
-    def test_missing_file_field_is_a_422_validation_error(self, default_client: TestClient) -> None:
+    def test_missing_file_field_is_a_422_error_response(self, default_client: TestClient) -> None:
         response = default_client.post("/extract", headers=AUTH, data={"mimeType": "text/plain"})
-        assert response.status_code == 422
-        assert response.json()["detail"][0]["loc"] == ["body", "file"]
+        _assert_error(response, 422, "extraction_failed", "")
 
     def test_empty_text_file_is_one_empty_element(self, default_client: TestClient) -> None:
         response = _post(default_client, "empty.txt", b"")
@@ -543,11 +539,8 @@ class TestChildFailureRowsOverHttp:
             assert _post(client, "a.txt", b"x").status_code == 500
 
 
-def _all_slots_taken() -> bool:
-    from app.routers import extract as extract_router
-
-    limits = extract_router.limits
-    return limits is not None and limits._semaphore.locked()
+def _all_slots_taken(client: TestClient) -> bool:
+    return client.app.state.limits._semaphore.locked()
 
 
 class TestServiceBusyOverHttp:
@@ -564,9 +557,9 @@ class TestServiceBusyOverHttp:
             try:
                 # Probing before the slow request has its slot would let the probe take the slot instead.
                 deadline = time.monotonic() + 10
-                while not _all_slots_taken() and time.monotonic() < deadline:
+                while not _all_slots_taken(client) and time.monotonic() < deadline:
                     time.sleep(0.02)
-                assert _all_slots_taken(), "the slow request never took the only slot"
+                assert _all_slots_taken(client), "the slow request never took the only slot"
                 began = time.monotonic()
                 response = _post(client, "0", b"probe")
                 elapsed = time.monotonic() - began

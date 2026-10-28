@@ -242,3 +242,47 @@ class TestLifespan:
             pid = app.state.runner.readiness().forkserver_pid
         if pid is not None:
             assert _wait_gone(pid)
+
+
+class TestAppLogging:
+    """create_app sends the app.* loggers to stderr; uvicorn configures only its own loggers."""
+
+    def _handlers(self) -> list:
+        import logging
+
+        return [h for h in logging.getLogger("app").handlers if h.get_name() == "attachment-text-extractor"]
+
+    def test_repeated_create_app_adds_one_handler_only(self, test_token) -> None:
+        _create_app()
+        _create_app()
+        assert len(self._handlers()) == 1
+
+    def test_log_level_setting_applies_to_the_app_logger(self, test_token, monkeypatch) -> None:
+        import logging
+
+        app_logger = logging.getLogger("app")
+        saved = app_logger.level
+        try:
+            monkeypatch.setenv("LOG_LEVEL", "WARNING")
+            _create_app()
+            assert app_logger.level == logging.WARNING
+        finally:
+            # The app logger is process-wide; later caplog-based tests need INFO records.
+            app_logger.setLevel(saved)
+
+    def test_root_and_uvicorn_loggers_are_untouched(self, test_token) -> None:
+        import logging
+
+        before = (list(logging.getLogger().handlers), list(logging.getLogger("uvicorn").handlers))
+        _create_app()
+        assert (list(logging.getLogger().handlers), list(logging.getLogger("uvicorn").handlers)) == before
+
+
+class TestOpenApiRequestBody:
+    def test_extract_documents_the_multipart_form(self, client) -> None:
+        schema = client.get("/openapi.json").json()
+        body = schema["paths"]["/extract"]["post"]["requestBody"]
+        ref = body["content"]["multipart/form-data"]["schema"]["$ref"]
+        form = schema["components"]["schemas"][ref.rsplit("/", 1)[-1]]
+        assert form["required"] == ["file"]
+        assert set(form["properties"]) == {"file", "mimeType"}

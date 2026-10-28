@@ -23,7 +23,7 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 | 対象 | 抽出方法 | 返す単位 (`pages[]`) |
 |---|---|---|
 | DOCX / RTF / EPUB / CSV | firecrawl/anydoc | 1 要素 |
-| XLSX | `xl/workbook.xml` の中でシート名を一意な目印に置き換え、全シートを表示状態にしてから anydoc を 1 回だけ呼び、出力を目印の見出しで切る (全シートのセル数が 10 万を超えるものは変換の前に上限超過のエラーにする) | シートごと |
+| XLSX | `xl/workbook.xml` の中でシート名を一意な目印に置き換え、全シートを表示状態にしてから anydoc を 1 回だけ呼び、出力を目印の見出しで切る (全シートのセル数が 7 万を超えるものは変換の前に上限超過のエラーにする) | シートごと |
 | PPTX | スライドごとに 1 枚だけの PPTX パッケージに分けてから、それぞれを anydoc に渡す | スライドごと |
 | 旧形式 PPT | 分けられない (ZIP ではない) ので、丸ごと anydoc に渡す | 1 要素 |
 | 旧形式 DOC / XLS、OpenDocument (ODT / ODS / ODP) | anydoc (XLS は anydoc の形式名 `xlsx` を明示して渡す) | 1 要素 |

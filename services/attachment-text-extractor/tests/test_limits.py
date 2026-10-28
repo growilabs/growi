@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.limits import FileTooLargeError, Limits, ServiceBusyError
+from app.limits import MULTIPART_OVERHEAD_BYTES, FileTooLargeError, Limits, ServiceBusyError
 
 # Use anyio as the async test runner (pytest-asyncio not installed; anyio plugin is)
 pytestmark = pytest.mark.anyio
@@ -33,6 +33,7 @@ def make_limits(
     return Limits(
         max_file_size_mb=max_file_size_mb,
         max_concurrency=max_concurrency,
+        upload_timeout_s=15,
     )
 
 
@@ -186,3 +187,31 @@ class TestEnforceSize:
         data = b"x" * (limit_mb * 1024 * 1024 + 1)
         with pytest.raises(FileTooLargeError, match=str(limit_mb)):
             await limits.enforce_size(data)
+
+
+# ---------------------------------------------------------------------------
+# Body cap and settings
+# ---------------------------------------------------------------------------
+
+
+class TestBodyCap:
+    def test_body_cap_is_the_file_limit_plus_the_multipart_overhead(self) -> None:
+        limits = make_limits(max_file_size_mb=1)
+        assert limits.max_body_bytes == 1024 * 1024 + MULTIPART_OVERHEAD_BYTES
+        limits.check_body_size(limits.max_body_bytes)  # at the cap: accepted
+
+    def test_body_over_the_cap_raises_file_too_large(self) -> None:
+        limits = make_limits(max_file_size_mb=1)
+        with pytest.raises(FileTooLargeError, match="1 MiB"):
+            limits.check_body_size(limits.max_body_bytes + 1)
+
+    def test_from_settings_reads_the_intake_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import Settings
+
+        monkeypatch.setenv("MAX_FILE_SIZE_MB", "2")
+        monkeypatch.setenv("MAX_CONCURRENCY", "1")
+        monkeypatch.setenv("UPLOAD_TIMEOUT_S", "7")
+        limits = Limits.from_settings(Settings())
+        assert limits.max_body_bytes == 2 * 1024 * 1024 + MULTIPART_OVERHEAD_BYTES
+        assert limits.upload_timeout_s == 7
+        assert limits._semaphore._value == 1

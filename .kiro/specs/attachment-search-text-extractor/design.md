@@ -172,10 +172,13 @@ services/attachment-text-extractor/
 │   ├── middleware/bearer_auth.py          # 変更なし
 │   ├── routers/
 │   │   ├── extract.py                     # [Modified] ConversionRunner を呼び、結果をエラー表に従って応答に変える
+│   │   ├── extract_upload.py              # [New] 本文の受信 (枠の後・メモリだけ・届いたバイト数の上限と期限・不正な本文の判定)
+│   │   ├── extract_errors.py              # [New] FailureKind → ErrorCode / HTTP ステータスの表 (全 FailureKind をキーに持つ)
 │   │   └── health.py                      # [Modified] pdf_strategy を削除、readyz で forkserver と依存の読み込みを確認
 │   ├── runner/                            # [New] 親プロセス側: 子プロセスの起動・監視・停止
 │   │   ├── __init__.py                    #   ConversionRunner を公開
-│   │   ├── conversion_runner.py           #   1 リクエスト 1 子プロセスの実行、時間切れ・RSS 超過・異常終了の判定
+│   │   ├── conversion_runner.py           #   ConversionRunner: forkserver の起動と準備の確認、run() の入口
+│   │   ├── child_supervision.py           #   1 リクエスト 1 子プロセスの監視: 送信・受信・時間切れ・RSS 超過・異常終了の判定、必ず kill して回収
 │   │   ├── child_entry.py                 #   子プロセスの入口: 上限の設定、親の監視、変換の呼び出し、結果の送信
 │   │   ├── wire.py                        #   親子間の受け渡し (長さつきのバイト列、結果の JSON の型)
 │   │   └── platform_guards.py             #   Linux だけの設定 (oom_score_adj、RLIMIT_AS) を他の OS では何もしない形で包む
@@ -184,6 +187,9 @@ services/attachment-text-extractor/
 │       ├── core.py                        #   形式の判定 → 変換 → 正規化 → 空要素の規則、例外の分類
 │       ├── formats.py                     #   MIME / 拡張子 → 形式と経路の対応表 (旧 extractors/__init__.py を置き換え)
 │       ├── errors.py                      #   変換の失敗の種類 (ConversionFailure) と分類
+│       ├── limits.py                      #   ConversionLimits (Settings から作る上限の値)
+│       ├── results.py                     #   ConversionSuccess / ConversionOutcome
+│       ├── ooxml_xml.py                   #   OOXML の XML 処理 (defusedxml での解析、名前空間の接頭辞の保持) を PPTX / XLSX の分割で共有
 │       ├── normalize.py                   #   改行の統一 (全経路) と、日本語の間の空白・改行の詰め (PDF の経路のみ) の純粋関数
 │       ├── charset.py                     #   文字コードの判定とデコード (純粋関数)
 │       ├── archive_guard.py               #   ZIP の事前検査 (エントリ数・展開後サイズ・必要な部品)
@@ -196,7 +202,11 @@ services/attachment-text-extractor/
 │   ├── conversion/                        # [New] 純粋な変換の単体テストと、anydoc の版に固定した契約テスト
 │   ├── runner/                            # [New] 子プロセスの時間切れ・RSS 超過・異常終了・ワーカー消失のテスト
 │   └── (既存のテスト)                      # [Modified/Deleted] 下記
-└── scripts/export_openapi.py              # 変更なし
+├── scripts/
+│   ├── export_openapi.py                  # 変更なし
+│   ├── check_openapi_drift.py             # [New] 書き出した OpenAPI と Git 管理下のファイルを JSON として比べる (biome 整形の差を無視)
+│   └── smoke_extract.py                   # [New] CI のコンテナ内の抽出確認と、確認用ファイルの生成
+
 
 infra/docker/compose.yaml                  # [Modified] WORKERS / MAX_CONCURRENCY / メモリ上限の推奨値
 .github/workflows/attachment-text-extractor.yml   # [New] Python 用 CI
@@ -351,11 +361,12 @@ graph TB
 
 | Field | Detail |
 |---|---|
-| Intent | `POST /extract` を受け、枠 → サイズ → 子での変換の順に通し、結果を `ExtractResponse` かエラー応答に変える |
+| Intent | `POST /extract` を受け、枠 → 本文の受信 (大きさと期限の上限つき) → サイズ → 子での変換の順に通し、結果を `ExtractResponse` かエラー応答に変える |
 | Requirements | 1.1, 2.1, 2.2, 2.3, 4.2 |
 
 **Responsibilities & Constraints**
-- 枠を取る → ファイルを読む → サイズを検査する → `ConversionRunner.run()` を await する → 結果を応答に変える。変換ライブラリは呼ばない
+- 認証 → `Content-Length` の早期検査 (上限を超える宣言なら本文を読まずに 413) → 枠を取る (空きがなければ本文を受け取らずに 503) → 本文をメモリに受け取る (届いたバイト数を数えて上限を超えたら 413、`UPLOAD_TIMEOUT_S` を過ぎたら 408) → `enforce_size` → `ConversionRunner.run()` を await する → 結果を応答に変える。変換ライブラリは呼ばない
+- FastAPI は引数 (`UploadFile`) を解決する時点で本文をすべて受信し、1MB を超える部分を `TMPDIR` のファイルに書き出す。これでは枠より先に受信が起き、大きさの上限も効かず、小さな tmpfs を満たしてしまうので、ハンドラーが自分で本文を読む。ファイルはメモリにだけ置く (一時ファイルを作らない)。不正な本文 (`file` が無い、multipart でない、ファイルが 2 つ、など) は固定のメッセージで 422 `extraction_failed` にし、受け取った入力は返さない
 - エラーの種類から `ErrorCode` と HTTP ステータスへの変換は §Error Handling の表に従う
 - Bearer 認証は既存のミドルウェアが先に行う
 
@@ -379,6 +390,7 @@ graph TB
 #### Limits (変更)
 
 - 残す: `acquire_slot()` (待たずに取れなければ `ServiceBusyError`)、`enforce_size(data)` (実際のバイト数で検査)
+- 足す: `Limits.from_settings(settings)`、`max_body_bytes` (ファイルの上限 + multipart の囲み分 64KiB)、`check_body_size`、`upload_timeout_s`。`Limits` は lifespan で 1 回だけ作り `app.state.limits` に置く
 - 消す: `with_timeout()`。時間切れは ConversionRunner が子を止めることで扱う
 - 枠の数はワーカーごと。全体の同時実行数は「ワーカー数 × `MAX_CONCURRENCY`」になる。既定はワーカー 1 つ
 
@@ -441,9 +453,14 @@ class ConversionFailure:
 ConversionOutcome = ConversionSuccess | ConversionFailure
 
 class ConversionRunner:
-    async def start(self) -> None: ...          # lifespan で呼ぶ。forkserver を起動する
+    @classmethod
+    def from_settings(cls, settings, **options) -> "ConversionRunner": ...   # TIMEOUT_S などを渡して作る
+    async def start(self) -> None: ...          # lifespan で呼ぶ。forkserver を起動する。失敗しても例外は出さず、準備できていない状態になる
     async def run(self, request: ConversionRequest) -> ConversionOutcome: ...
+    def readiness(self) -> Readiness: ...       # 新しいプロセスを作らず待たない。準備できていない・再確認が必要 (stale) なら verify() で確かめ直す
+    def verify(self) -> Readiness: ...          # 確認用の子を 1 つ作って確かめる (約 5ms、最悪でも probe_timeout_s + 約 0.5 秒)。to_thread で呼ぶ
     def is_ready(self) -> bool: ...
+    def stop(self) -> None: ...                 # 変換中の子が残っていると終わるまで止まる。to_thread で呼ぶ
 ```
 
 - Preconditions: 呼び出し側が枠を確保し、サイズ検査を済ませている
@@ -684,6 +701,7 @@ class ConversionError(Exception):    # 変換層の中だけで使い、Conversi
 | `WORKERS` | 1 | uvicorn のワーカー数 | 既定を 2 から 1 に |
 | `MAX_CONCURRENCY` | 3 | ワーカーごとの同時変換の数。ワーカー 1 つなら全体の上限 | 既定を 4 から 3 に。説明の「`max(2, workers×2)` に設定」を「全体の上限はワーカー数 × この値」に直す |
 | `MAX_FILE_SIZE_MB` | 50 | 受け付けるファイルの大きさの上限 | 既存 |
+| `UPLOAD_TIMEOUT_S` | 15 | 本文を受け取り終えるまでの時間の上限。超えたら 408 (`extraction_timeout`)。50MiB なら毎秒約 3.4MB 以上の転送が要る。変換の `TIMEOUT_S` とは別に数える | 新規 |
 | `TIMEOUT_S` | 55 | 1 件の変換の時間の上限。apps/app の `timeoutMs` (既定 60000) より 5 秒以上短くする | 既定を 60 から 55 に (実際に止まるようになる) |
 | `MAX_CHILD_RSS_MB` | 320 | 1 件の変換に許す RSS の上限。XLSX 以外の最悪値 (画像の多い 40MB の DOCX / PPTX で 188MB、50MB なら約 225MB の見込み) に余裕を持たせた値 | 新規 |
 | `MAX_XLSX_CELLS` | 70000 | XLSX の全シートのセル数の合計の上限。anydoc で 1 シート 7 万セルは約 285MB で、`MAX_CHILD_RSS_MB` に収まる (10 万セルは 328〜357MB で収まらない) | 新規 |
@@ -691,7 +709,7 @@ class ConversionError(Exception):    # 変換層の中だけで使い、Conversi
 | `MAX_PDF_PAGES` | 5000 | PDF のページ数の上限 | 新規 |
 | `MAX_ARCHIVE_ENTRIES` | 10000 | PPTX / XLSX の ZIP のエントリ数の上限 | 新規 |
 | `MAX_ARCHIVE_UNCOMPRESSED_MB` | 512 | ZIP の申告された展開後サイズの合計の上限 (anydoc の組み込み上限と同じ値) | 新規 |
-| `LOG_LEVEL` | INFO | ログの細かさ | 既存 |
+| `LOG_LEVEL` | INFO | ログの細かさ。起動時に検査し、`app` ロガーに標準エラーへの出力先を 1 つだけ付ける (uvicorn は `app.*` のロガーに出力先を付けないため) | 既存 |
 
 Dockerfile で固定する環境変数:
 - `RAYON_NUM_THREADS=1`: anydoc 内部のスレッドプールを 1 本にする。設定しないとコア数ぶんのスレッドが立ち、仮想メモリのピークが 1.2GB に達した
@@ -699,7 +717,7 @@ Dockerfile で固定する環境変数:
 
 **メモリの守り方**: ファイルの大きさで形式ごとに上限を決めるのではなく、子が実際に使ったメモリ (RSS) を `MAX_CHILD_RSS_MB` で止める。入力の大きさとメモリの関係は形式と中身でばらつくため。ただし XLSX だけは、anydoc がセル数に比例してメモリを使い (1 セルあたり約 2.5KB)、小さなファイルでも上限を大きく超えるので、変換の前に `MAX_XLSX_CELLS` でセル数を検査して、上限に当たる前に分かりやすいエラーにする。旧形式の XLS と ODS はセル数を数えずに anydoc に渡し、大きなものは RSS の上限で止まる。
 
-**メモリ上限の目安**: コンテナのメモリ上限 ≒ ワーカー数 × 120MB + ワーカー数 × `MAX_CONCURRENCY` × (`MAX_CHILD_RSS_MB` + 100MB + アップロード 50MB + 結果 16MiB × 3)。既定 (ワーカー 1・枠 3・RSS 320MB) で 120 + 3 × 518 ≒ 約 1.7GB。k8s の例では requests 512Mi / limits 2Gi とする。
+**メモリ上限の目安**: コンテナのメモリ上限 ≒ ワーカー数 × 120MB + ワーカー数 × `MAX_CONCURRENCY` × (`MAX_CHILD_RSS_MB` + 100MB + アップロード 2 × `MAX_FILE_SIZE_MB` + 結果 16MiB × 3)。アップロードは一時ファイルを作らずメモリにだけ置き、解析中だけ約 2 倍の大きさになる。既定 (ワーカー 1・枠 3・RSS 320MB) で 120 + 3 × (320 + 100 + 100 + 48) ≒ 約 1.8GB (3 件 × 50MB を同時に送ったときのワーカーの最大 RSS の実測は 263MiB)。k8s の例では requests 512Mi / limits 2Gi とする。
 
 ## Error Handling
 
@@ -713,7 +731,9 @@ Dockerfile で固定する環境変数:
 |---|---|---|---|
 | Bearer トークンがない・違う | — | `unauthorized` | 401 |
 | 枠が空いていない | — | `service_busy` | 503 |
-| ファイルの大きさが `MAX_FILE_SIZE_MB` を超える | — | `file_too_large` | 413 |
+| ファイルの大きさが `MAX_FILE_SIZE_MB` を超える (宣言された `Content-Length` か、受け取ったバイト数で判定) | — | `file_too_large` | 413 |
+| 本文を `UPLOAD_TIMEOUT_S` 以内に受け取り終えられない | — | `extraction_timeout` | 408 |
+| 本文の形が不正 (`file` が無い・テキストの欄で届いた・multipart でない・ファイルが 2 つ以上・部品ヘッダーが約 4KiB 超) | — | `extraction_failed` | 422 |
 | 対応表にない形式、anydoc の `UnsupportedError` | `unsupported` | `unsupported_format` | 400 |
 | anydoc の `EncryptedError`、pypdfium2 の `PdfiumError` (err_code 4 / 5) | `encrypted` | `file_encrypted` (新規) | 422 |
 | anydoc の `MalformedError` / `MissingPartError`、pypdfium2 の `PdfiumError` (err_code 0 / 1 / 2 / 3) | `malformed` | `extraction_failed` | 422 |
@@ -729,7 +749,7 @@ Dockerfile で固定する環境変数:
 
 ### Monitoring
 
-- 1 件ごとに、形式・大きさ・所要時間・結果 (成功 / 失敗の種類)・子の最大 RSS をログに出す。ファイル名はログに出してよいが、中身と Authorization ヘッダは出さない
+- 1 件ごとに、形式・大きさ・所要時間・結果 (成功 / 失敗の種類。変換に入る前の `service_busy` / `file_too_large` / `upload_timeout` / `invalid_upload` / `client_disconnected` を含む)・子の最大 RSS をログに出す。ファイル名・中身・Authorization ヘッダは出さない
 - 構造化ログの整備は本 spec の範囲外とし、既存の最小限のログのミドルウェアを使う
 
 ## Testing Strategy

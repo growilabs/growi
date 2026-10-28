@@ -4,10 +4,12 @@ Provides:
   POST /extract — multipart file upload
 
 Processing order:
-  1. Bearer auth (enforced by BearerAuthMiddleware at the app level)
-  2. Semaphore slot acquisition (ServiceBusyError → 503 service_busy)
-  3. File size check (FileTooLargeError → 413 file_too_large)
-  4. ConversionRunner.run() in a child process; the outcome is mapped per
+  1. Bearer auth (enforced by BearerAuthMiddleware at the app level, before any of the below)
+  2. Declared Content-Length over the cap → 413 file_too_large, without reading the body
+  3. Semaphore slot acquisition, before the body is read (ServiceBusyError → 503 service_busy)
+  4. Body received under the slot (app.routers.extract_upload): capped while it streams in
+     (413), deadlined (408), held in memory only
+  5. ConversionRunner.run() in a child process; the outcome is mapped per
      app.routers.extract_errors. No conversion library is called here.
 
 Requirements: 1.1, 1.6, 1.10, 1.11, 2.1, 2.2, 2.3, 2.6, 2.7, 4.2
@@ -18,49 +20,66 @@ from __future__ import annotations
 import logging
 import re
 import time
+from dataclasses import dataclass, field
+from typing import Any, Final
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from starlette.requests import ClientDisconnect
 
-from app.config import Settings
 from app.conversion.errors import ConversionFailure
 from app.conversion.results import ConversionSuccess
 from app.limits import FileTooLargeError, Limits, ServiceBusyError
 from app.routers.extract_errors import FAILURE_RESPONSES
+from app.routers.extract_upload import (
+    FILE_FIELD,
+    MIME_HINT_FIELD,
+    InvalidUploadError,
+    Upload,
+    UploadTimeoutError,
+    check_declared_length,
+    receive_upload,
+)
 from app.runner import ConversionRequest, ConversionRunner
 from app.schemas import ErrorCode, ErrorResponse, ExtractResponse
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Module-level Limits instance (lazily initialised)
-# ---------------------------------------------------------------------------
-# ``limits`` is initialised on first use rather than at import time.  This
-# avoids a ValidationError during test collection when
-# ATTACHMENT_EXTRACTOR_SERVICE_TOKEN has not yet been injected into the environment
-# (the autouse fixture runs after collection).
-#
-# The instance is exposed at module level so tests can patch it directly:
-#   patch.object(extract_module.limits, "enforce_size", ...)
+# The handler parses the body itself (see extract_upload), so FastAPI cannot derive the request
+# body schema; this is the schema FastAPI generated for the former File / Form parameters.
+FORM_SCHEMA_NAME: Final = "Body_post_extract_extract_post"
+FORM_SCHEMA: Final[dict[str, Any]] = {
+    "properties": {
+        FILE_FIELD: {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "File to extract text from",
+        },
+        MIME_HINT_FIELD: {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "Mimetype",
+            "description": "Optional MIME type hint",
+        },
+    },
+    "type": "object",
+    "required": [FILE_FIELD],
+    "title": FORM_SCHEMA_NAME,
+}
 
-limits: Limits | None = None  # populated by _get_limits() on first request
-
-
-def _get_limits() -> Limits:
-    """Return the module-level Limits singleton, creating it on first call."""
-    global limits  # noqa: PLW0603
-    if limits is None:
-        settings = Settings()
-        limits = Limits(
-            max_file_size_mb=settings.MAX_FILE_SIZE_MB,
-            max_concurrency=settings.MAX_CONCURRENCY,
-        )
-    return limits
+_INVALID_UPLOAD_MESSAGE: Final = "The request must be a multipart/form-data body with one 'file' part"
+_UPLOAD_TIMEOUT_MESSAGE: Final = "upload_timeout: the request body was not received in time"
+_DISCONNECTED_MESSAGE: Final = "client_disconnected: the request body ended early"
 
 
 def get_runner(request: Request) -> ConversionRunner:
     """Return the runner the application lifespan stored on ``app.state``."""
     return request.app.state.runner  # type: ignore[no-any-return]
+
+
+def get_limits(request: Request) -> Limits:
+    """Return the intake limits the application lifespan stored on ``app.state``."""
+    return request.app.state.limits  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------
@@ -76,21 +95,11 @@ def _error_response(code: ErrorCode, message: str, status_code: int) -> JSONResp
     return JSONResponse(content=body.model_dump(), status_code=status_code)
 
 
-def _json_safe(text: str) -> str:
-    """Replace lone surrogates, which would make the JSON response fail to encode."""
-    try:
-        text.encode("utf-8")
-    except UnicodeEncodeError:
-        return text.encode("utf-8", errors="replace").decode("utf-8")
-    return text
-
-
 def _success_response(outcome: ConversionSuccess) -> ExtractResponse:
-    pages = [page.model_copy(update={"content": _json_safe(page.content)}) for page in outcome.pages]
     return ExtractResponse(
-        pages=pages,
+        pages=outcome.pages,
         mimeType=outcome.mime_type,
-        extractedCharacters=sum(len(page.content) for page in pages),
+        extractedCharacters=sum(len(page.content) for page in outcome.pages),
     )
 
 
@@ -100,21 +109,33 @@ def _format_of(filename: str) -> str:
     return re.sub(r"[^a-z0-9]", "", suffix.lower())[:10] or "unknown"
 
 
-def _log_request(*, fmt: str, size: int, started: float, result: str, rss_mb: int | None) -> None:
-    logger.info(
-        "extract format=%s size=%d duration_ms=%d result=%s child_peak_rss_mb=%s",
-        fmt,
-        size,
-        round((time.perf_counter() - started) * 1000),
-        result,
-        "unknown" if rss_mb is None else rss_mb,
-    )
+@dataclass
+class _RequestLog:
+    started: float = field(default_factory=time.perf_counter)
+    fmt: str = "unknown"
+    size: int = 0
+
+    def write(self, result: str, rss_mb: int | None = None) -> None:
+        logger.info(
+            "extract format=%s size=%d duration_ms=%d result=%s child_peak_rss_mb=%s",
+            self.fmt,
+            self.size,
+            round((time.perf_counter() - self.started) * 1000),
+            result,
+            "unknown" if rss_mb is None else rss_mb,
+        )
 
 
 @router.post(
     "/extract",
     response_model=ExtractResponse,
     summary="Extract text from an uploaded file",
+    openapi_extra={
+        "requestBody": {
+            "content": {"multipart/form-data": {"schema": {"$ref": f"#/components/schemas/{FORM_SCHEMA_NAME}"}}},
+            "required": True,
+        }
+    },
     responses={
         400: {"model": ErrorResponse, "description": "Unsupported file format"},
         408: {"model": ErrorResponse, "description": "Extraction timed out"},
@@ -124,57 +145,56 @@ def _log_request(*, fmt: str, size: int, started: float, result: str, rss_mb: in
         503: {"model": ErrorResponse, "description": "All concurrency slots are busy"},
     },
 )
-async def post_extract(
-    request: Request,
-    file: UploadFile = File(..., description="File to extract text from"),  # noqa: B008
-    mimeType: str | None = Form(None, description="Optional MIME type hint"),  # noqa: B008, N803
-) -> JSONResponse | ExtractResponse:
+async def post_extract(request: Request) -> JSONResponse | ExtractResponse:
     """Receive a multipart upload, enforce the slot and size limits, then convert.
 
     Authentication is handled upstream by BearerAuthMiddleware; this handler
     will only be reached by authenticated requests.
     """
-    _limits = _get_limits()
-    runner = get_runner(request)
-    filename = file.filename or ""
-    fmt = _format_of(filename)
-    started = time.perf_counter()
-
+    limits = get_limits(request)
+    log = _RequestLog()
     try:
-        async with _limits.acquire_slot():
-            data = await file.read()
-            try:
-                await _limits.enforce_size(data)
-            except FileTooLargeError as exc:
-                _log_request(fmt=fmt, size=len(data), started=started, result="file_too_large", rss_mb=None)
-                return _error_response(ErrorCode.file_too_large, str(exc), 413)
-
-            try:
-                outcome = await runner.run(ConversionRequest(data=data, filename=filename, mime_hint=mimeType))
-            except Exception:
-                # The runner is not meant to raise; anything that does is an unexpected failure of this request only.
-                logger.exception("extract runner raised format=%s size=%d", fmt, len(data))
-                _log_request(fmt=fmt, size=len(data), started=started, result="internal", rss_mb=None)
-                code, status, message = FAILURE_RESPONSES["internal"]
-                return _error_response(code, message, status)
-
-            if isinstance(outcome, ConversionSuccess):
-                _log_request(
-                    fmt=outcome.mime_type,
-                    size=len(data),
-                    started=started,
-                    result="ok",
-                    rss_mb=outcome.child_peak_rss_mb,
-                )
-                return _success_response(outcome)
-
-            assert isinstance(outcome, ConversionFailure)
-            _log_request(
-                fmt=fmt, size=len(data), started=started, result=outcome.kind, rss_mb=outcome.child_peak_rss_mb
-            )
-            code, status, message = FAILURE_RESPONSES[outcome.kind]
-            return _error_response(code, message, status)
-
+        check_declared_length(request.headers, limits)
+        async with limits.acquire_slot():
+            upload = await receive_upload(request, limits)
+            log.fmt, log.size = _format_of(upload.filename), len(upload.data)
+            return await _convert(get_runner(request), upload, log)
     except ServiceBusyError as exc:
-        logger.info("extract format=%s result=service_busy", fmt)
+        log.write("service_busy")
         return _error_response(ErrorCode.service_busy, str(exc), 503)
+    except FileTooLargeError as exc:
+        log.write("file_too_large")
+        return _error_response(ErrorCode.file_too_large, str(exc), 413)
+    except UploadTimeoutError:
+        log.write("upload_timeout")
+        return _error_response(ErrorCode.extraction_timeout, _UPLOAD_TIMEOUT_MESSAGE, 408)
+    except InvalidUploadError:
+        log.write("invalid_upload")
+        return _error_response(ErrorCode.extraction_failed, _INVALID_UPLOAD_MESSAGE, 422)
+    except ClientDisconnect:
+        # Nobody is left to read a response; the slot is already released.
+        log.write("client_disconnected")
+        return _error_response(ErrorCode.extraction_failed, _DISCONNECTED_MESSAGE, 422)
+
+
+async def _convert(runner: ConversionRunner, upload: Upload, log: _RequestLog) -> JSONResponse | ExtractResponse:
+    try:
+        outcome = await runner.run(
+            ConversionRequest(data=upload.data, filename=upload.filename, mime_hint=upload.mime_hint)
+        )
+    except Exception:
+        # The runner is not meant to raise; anything that does is an unexpected failure of this request only.
+        logger.exception("extract runner raised format=%s size=%d", log.fmt, log.size)
+        log.write("internal")
+        code, status, message = FAILURE_RESPONSES["internal"]
+        return _error_response(code, message, status)
+
+    if isinstance(outcome, ConversionSuccess):
+        log.fmt = outcome.mime_type
+        log.write("ok", outcome.child_peak_rss_mb)
+        return _success_response(outcome)
+
+    assert isinstance(outcome, ConversionFailure)
+    log.write(outcome.kind, outcome.child_peak_rss_mb)
+    code, status, message = FAILURE_RESPONSES[outcome.kind]
+    return _error_response(code, message, status)

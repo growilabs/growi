@@ -6,7 +6,9 @@ must be provided; the service will fail to start (fail-fast) if it is absent
 or contains only whitespace.
 """
 
-from pydantic import field_validator
+import logging
+
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -29,6 +31,9 @@ class Settings(BaseSettings):
         TIMEOUT_S (int, default 55): Maximum seconds allowed for a single
             extraction before the child process is killed (Req 2.2).  Keep it
             at least 5 seconds below the caller's timeout.
+        UPLOAD_TIMEOUT_S (int, default 15): Maximum seconds for receiving one
+            request body, counted from the moment its concurrency slot is taken.
+            A slower upload is answered with HTTP 408 and frees the slot.
         MAX_CONCURRENCY (int, default 3): Maximum number of simultaneous
             extractions per worker.  The overall cap is workers x this value
             (Req 2.3).
@@ -44,12 +49,14 @@ class Settings(BaseSettings):
             PPTX / XLSX (Req 2.6).
         MAX_ARCHIVE_UNCOMPRESSED_MB (int, default 512): Maximum declared
             uncompressed size of a ZIP archive (Req 2.6).
-        LOG_LEVEL (str, default "INFO"): Python ``logging`` level name.
+        LOG_LEVEL (str, default "INFO"): Python ``logging`` level name for the
+            ``app`` loggers; an unknown name fails at startup.
     """
 
     # --- Limits (Reqs 2.1, 2.2, 2.3, 2.6) ---
     MAX_FILE_SIZE_MB: int = 50
     TIMEOUT_S: int = 55
+    UPLOAD_TIMEOUT_S: int = Field(default=15, gt=0)
     MAX_CONCURRENCY: int = 3
     MAX_CHILD_RSS_MB: int = 320
     MAX_XLSX_CELLS: int = 70_000
@@ -71,6 +78,14 @@ class Settings(BaseSettings):
         if not v.strip():
             raise ValueError("ATTACHMENT_EXTRACTOR_SERVICE_TOKEN must not be empty or whitespace")
         return v
+
+    @field_validator("LOG_LEVEL")
+    @classmethod
+    def log_level_must_be_known(cls, v: str) -> str:
+        level = v.strip().upper()
+        if level not in logging.getLevelNamesMapping():
+            raise ValueError(f"LOG_LEVEL must be a logging level name, got {v!r}")
+        return level
 
     model_config = {
         "env_file": ".env",

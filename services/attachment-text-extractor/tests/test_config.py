@@ -199,3 +199,36 @@ class TestSettingsNewEnvOverride:
 
         reload(config_module)
         assert config_module.Settings().MAX_CHILD_RSS_MB == 640
+
+
+class TestIntakeAndLoggingSettings:
+    @pytest.fixture(autouse=True)
+    def _clean(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        for key in ("UPLOAD_TIMEOUT_S", "LOG_LEVEL"):
+            monkeypatch.delenv(key, raising=False)
+
+    def test_upload_timeout_default(self) -> None:
+        from app.config import Settings
+
+        assert Settings().UPLOAD_TIMEOUT_S == 15
+
+    @pytest.mark.parametrize("value", ["0", "-1", "abc"])
+    def test_upload_timeout_must_be_a_positive_integer(self, monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+        from app.config import Settings
+
+        monkeypatch.setenv("UPLOAD_TIMEOUT_S", value)
+        with pytest.raises(ValidationError):
+            Settings()
+
+    def test_log_level_is_normalised_to_upper_case(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import Settings
+
+        monkeypatch.setenv("LOG_LEVEL", "warning")
+        assert Settings().LOG_LEVEL == "WARNING"
+
+    def test_unknown_log_level_fails_at_startup(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from app.config import Settings
+
+        monkeypatch.setenv("LOG_LEVEL", "LOUD")
+        with pytest.raises(ValidationError):
+            Settings()

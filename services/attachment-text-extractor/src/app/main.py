@@ -16,12 +16,15 @@ every /readyz call retries the probe, which restarts a dead forkserver).
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
+import os
+import sys
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Final
 
 from fastapi import FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -29,12 +32,33 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.config import Settings
+from app.limits import Limits
 from app.middleware.bearer_auth import BearerAuthMiddleware
 from app.routers import extract, health
 from app.runner import ConversionRunner
 from app.security import apply_xxe_hardening
 
 logger = logging.getLogger(__name__)
+
+_TOKEN_ENV: Final = "ATTACHMENT_EXTRACTOR_SERVICE_TOKEN"  # noqa: S105 — the variable name, not a secret
+_LOG_HANDLER_NAME: Final = "attachment-text-extractor"
+_LOG_FORMAT: Final = "%(asctime)s %(levelname)s %(name)s %(message)s"
+
+
+def configure_logging(level: str) -> None:
+    """Send the ``app.*`` loggers to stderr at `level` (idempotent).
+
+    uvicorn configures only its own loggers, so without this the per-request lines are dropped.
+    The root logger and uvicorn's loggers are left alone; records still propagate, so pytest's
+    caplog sees them.
+    """
+    app_logger = logging.getLogger("app")
+    app_logger.setLevel(level)
+    if not any(handler.get_name() == _LOG_HANDLER_NAME for handler in app_logger.handlers):
+        handler = logging.StreamHandler(sys.stderr)
+        handler.set_name(_LOG_HANDLER_NAME)
+        handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+        app_logger.addHandler(handler)
 
 
 class _MinimalLoggingMiddleware(BaseHTTPMiddleware):
@@ -77,13 +101,19 @@ def create_app(**runner_options: Any) -> FastAPI:  # noqa: ANN401
     # Step 1: Load config — raises ValidationError if token is missing/empty.
     settings = Settings()
 
+    configure_logging(settings.LOG_LEVEL)
+
     # Step 2: Apply XXE hardening before any XML document may be parsed.
     apply_xxe_hardening()
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        application.state.limits = Limits.from_settings(settings)
         runner = ConversionRunner.from_settings(settings, **runner_options)
         application.state.runner = runner
+        # The stdlib forkserver inherits the whole environment and every conversion child forks
+        # from it; settings already holds the token, so it must not reach those processes.
+        os.environ.pop(_TOKEN_ENV, None)
         # Must finish before serving: the preload list only applies to a forkserver not yet started.
         await runner.start()
         try:
@@ -102,6 +132,7 @@ def create_app(**runner_options: Any) -> FastAPI:  # noqa: ANN401
 
     application.include_router(health.router)
     application.include_router(extract.router)
+    application.openapi = lambda: _openapi_with_extract_form(application)  # type: ignore[method-assign]
 
     # Step 4: Add BearerAuthMiddleware (outermost so auth runs before routing).
     # Middleware added with add_middleware is applied in LIFO order, so add the
@@ -110,6 +141,15 @@ def create_app(**runner_options: Any) -> FastAPI:  # noqa: ANN401
     application.add_middleware(BearerAuthMiddleware, token=settings.ATTACHMENT_EXTRACTOR_SERVICE_TOKEN)
 
     return application
+
+
+def _openapi_with_extract_form(application: FastAPI) -> dict[str, Any]:
+    """FastAPI's schema plus the POST /extract form body, which the router parses itself."""
+    if application.openapi_schema is None:
+        schema = FastAPI.openapi(application)
+        schemas = schema.setdefault("components", {}).setdefault("schemas", {})
+        schemas[extract.FORM_SCHEMA_NAME] = copy.deepcopy(extract.FORM_SCHEMA)
+    return application.openapi_schema  # type: ignore[return-value]
 
 
 # Module-level app instance.  The import ``from app.main import app`` in the

@@ -3,11 +3,13 @@
 # Lines marked "EDIT:" are placeholders the operator must change before applying.
 #
 # Memory budget (design.md, Performance): the container limit is derived from
-#   WORKERS*120MB + WORKERS*MAX_CONCURRENCY*(MAX_CHILD_RSS_MB + 100 + 50 + 48)
-#   = 120 + 3 * (320 + 100 + 50 + 48) ~= 1.7GB for the defaults (1 worker x 3 slots),
-# so limits.memory is 2Gi. requests.memory is 512Mi because an idle Pod holds
-# only ~120MB and most conversions use far less than the worst case.
-# The /tmp tmpfs counts against the memory limit, hence its small sizeLimit.
+#   WORKERS*120MB + WORKERS*MAX_CONCURRENCY*(MAX_CHILD_RSS_MB + 100 + 2*MAX_FILE_SIZE_MB + 48)
+#   = 120 + 3 * (320 + 100 + 100 + 48) ~= 1.8GB for the defaults (1 worker x 3 slots),
+# so limits.memory is 2Gi. An upload is held in the worker's memory only (about twice
+# its size while it is parsed), never spooled to /tmp. requests.memory is 512Mi because
+# an idle Pod holds only ~120MB and most conversions use far less than the worst case.
+# The /tmp tmpfs (forkserver socket only) counts against the memory limit, hence its
+# small sizeLimit.
 #
 # If you raise WORKERS or MAX_CONCURRENCY, recompute the budget and raise limits.
 #
@@ -40,8 +42,9 @@ spec:
         app.kubernetes.io/name: attachment-text-extractor
     spec:
       automountServiceAccountToken: false
-      # Must exceed TIMEOUT_S (55s) plus reaping so in-flight conversions finish on rollout.
-      terminationGracePeriodSeconds: 75
+      # Must exceed UPLOAD_TIMEOUT_S (15s) + TIMEOUT_S (55s) + reaping so in-flight
+      # requests finish on rollout.
+      terminationGracePeriodSeconds: 85
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001

@@ -16,6 +16,8 @@ import yaml
 K8S_DIR = Path(__file__).parents[1] / "deploy" / "k8s"
 APP_PORT = 8000
 TIMEOUT_S = 55
+UPLOAD_TIMEOUT_S = 15
+MAX_FILE_SIZE_MB = 50
 RUNNER_PROBE_TIMEOUT_S = 10
 
 if not K8S_DIR.is_dir():
@@ -122,11 +124,12 @@ class TestResources:
         assert "cpu" in res["limits"]
 
     def test_limit_covers_the_documented_budget(self, container: dict[str, Any]) -> None:
-        # WORKERS*120 + WORKERS*MAX_CONCURRENCY*(MAX_CHILD_RSS_MB + 100 + 50 + 48), defaults 1 / 3 / 320.
+        # WORKERS*120 + WORKERS*MAX_CONCURRENCY*(MAX_CHILD_RSS_MB + 100 + 2*MAX_FILE_SIZE_MB + 48),
+        # defaults 1 / 3 / 320 / 50: the upload is held in memory, twice its size while parsed.
         env = _env(container)
         workers = int(env["WORKERS"]["value"])
         concurrency = int(env["MAX_CONCURRENCY"]["value"])
-        budget = workers * 120 + workers * concurrency * (320 + 100 + 50 + 48)
+        budget = workers * 120 + workers * concurrency * (320 + 100 + 2 * MAX_FILE_SIZE_MB + 48)
         assert budget <= _mem_mi(container["resources"]["limits"]["memory"])
 
 
@@ -178,8 +181,8 @@ class TestProbes:
 
 
 class TestRollout:
-    def test_grace_period_outlasts_a_conversion(self, pod_spec: dict[str, Any]) -> None:
-        assert pod_spec["terminationGracePeriodSeconds"] >= TIMEOUT_S + 10
+    def test_grace_period_outlasts_an_upload_and_a_conversion(self, pod_spec: dict[str, Any]) -> None:
+        assert pod_spec["terminationGracePeriodSeconds"] >= UPLOAD_TIMEOUT_S + TIMEOUT_S + 10
 
     def test_rolling_update_keeps_capacity(self, deployment: dict[str, Any]) -> None:
         assert deployment["spec"]["strategy"]["rollingUpdate"]["maxUnavailable"] == 0
