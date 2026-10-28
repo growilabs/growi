@@ -111,7 +111,7 @@
   - _Requirements: 1.3_
   - _Depends: 3.1, 4.2_
 
-- [ ] 4.4 (P) テキスト系・HTML・XML・ipynb・CSV / TSV の処理を実装する
+- [x] 4.4 (P) テキスト系・HTML・XML・ipynb・CSV / TSV の処理を実装する
   - HTML は標準の html.parser で script / style / template / noscript / svg の中身を捨て、ブロック要素で改行を入れる
   - XML は DOCTYPE を取り除いてからタグを除く (解析しない)。ipynb はセルの source とテキストの出力を取り出し、画像の base64 を捨て、出力ごとの文字数に上限を設ける。TXT / MD / LOG / JSON / YAML はデコードしたテキストをそのまま返す
   - CSV / TSV はデコードして UTF-8 にしてから、anydoc に形式 `csv` で渡す
@@ -231,3 +231,5 @@
 - 4.2: セル数の検査 (`enforce_cell_limit`) は `.rels` 以外のすべての部品を数える。anydoc が `workbook.xml.rels` のリンク先でシートを探すため、パスや拡張子の名前で絞ると、サブディレクトリ・`..` を含むリンク・大文字拡張子・パッケージ直下に置いたシートで検査をすり抜けられる。BOM 付き UTF-16 の部品は malformed として止める。4.3 は `inspect_archive(data, "xl/workbook.xml", limits)` で開いた archive をこの関数に渡し、呼び出し側で close すること。空の `<row` を大量に並べる入力 (50 万行で約 268MB) はセル数の指標の対象外で、RSS 上限が受け持つ。
 - 4.3: ZIP を書き換えて anydoc に渡す経路は、部品を丸ごと読まず `archive_guard.copy_part` で 64KiB ずつコピーする (ピボットキャッシュなど、セル数の検査が数えない大きな部品があるため。丸ごと読むと 15MB の XLSX が 403MB になり RSS 上限を超えた)。workbook.xml のように XML として解析する部品だけ `read_part` を使う。5.1 / 6.4 の RSS テストは images48 相当 (48MB・画像 12 枚: 全体変換 130MB / 分割 179MB) とピボット付きのブックでも確かめること。
 - 4.3: `pptx_split.py` と `xlsx_split.py` に、OOXML の XML 処理 (`_XML_ERRORS`、`_parse`、`_register_prefixes`、`_local_name`) の小さな複製がある。共通モジュールへの切り出しは 9.2 の前に整理する。
+- 4.4: 標準の `html.parser` は、`<a/////…>` や `</a x x …>` 4MB、属性だらけの 1 つのタグ 4MB で 450〜700MB を使う (`convert_text` では防げない)。anydoc の CSV 変換は入力の約 36 倍のメモリを使い、20MB の CSV で 721MB になった。6.3 / 6.4 の RSS テストで確かめ、CSV には変換前のサイズ上限 (または行数・セル数の事前検査) が要るかどうかを 5.1 / 9.2 で決める。
+- 4.4: `convert_text` の HTML / XML は半角空白・タブだけをまとめ、全角空白 (U+3000) と `&nbsp;` は残す。HTML / XML / ipynb / plain / csv のどの経路も、対になっていない surrogate を結果に含めない (含むと JSON の応答が UnicodeEncodeError で 500 になる)。
