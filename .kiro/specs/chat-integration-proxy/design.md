@@ -340,7 +340,7 @@ Chat SDK は DM のメッセージを mention として届けるので、DM で�
 
 **どの installation にも決まらないときの返事**:
 
-- `no-workspace`（Discord の DM）: 「この DM はどの workspace にも属していないため、どの workspace の GROWI を使うかを決められません。サーバーや workspace のチャンネルで bot に呼びかけてください。」（`orchestration/no-workspace-wording.ts`。`CommandFlow` と `AdminFlow` が同じ文を使う）。`AdminFlow` は権限を読む前にこれを返す（権限は installation を通して読むので、先に読むと「proxy の設定の問題」と誤って案内する）。リンクの展開は何も言わない（要件 6.4）
+- `no-workspace`（Discord の DM）: 「この DM（bot との 1 対 1 のメッセージ）では、どの GROWI を使うかを決められません。bot を追加した Discord のサーバー（チャンネルが並んでいる場所）の中のチャンネルで、bot に呼びかけてください。」（`orchestration/no-workspace-wording.ts`。`CommandFlow` と `AdminFlow` が同じ文を使う）。`AdminFlow` は権限を読む前にこれを返す（権限は installation を通して読むので、先に読むと「proxy の設定の問題」と誤って案内する）。リンクの展開は何も言わない（要件 6.4）
 - それ以外（イベントの workspace に installation が無く、一覧にも無い）: 今までどおり「このチャットの workspace がまだ登録されていません。」
 
 **DM で installation が決まったあと**: DM でも、チャンネル単位の権限の判定（`@growi/chat` の `judge`。proxy の `judgeEach` と GROWI の `checkChannelPermission` が同じ関数を使う）にそのまま届く。読み取りのコマンドは既定で許される。書き込みのコマンドは、権限の行が無ければ `no-settings` で断られるが、関係の権限が `'all'`（管理画面の「すべてのチャンネル」）なら DM からも許される（`create-page` など）。このときも GROWI では紐付けた利用者として動き、他の workspace の GROWI には届かない。**「すべてのチャンネル」には DM を含める**（利用者が決めた）。Discord の DM の扱いは未決で、`chat-integration-agent` が要件 11 に DM の扱いを足すときに決める。リンクの展開も DM で動く（出るのは、ログインしていない人も見られるページの題名などだけ）

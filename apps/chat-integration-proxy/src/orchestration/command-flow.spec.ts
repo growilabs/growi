@@ -1140,7 +1140,7 @@ describe('where a private reply says it came from', () => {
     expect(said).toHaveLength(1);
     expect(said[0]).toEqual(
       expect.objectContaining({
-        markdown: expect.stringContaining('workspace のチャンネル'),
+        markdown: expect.stringContaining('チャンネルが並んでいる場所'),
       }),
     );
     expect(said[0]).not.toEqual(

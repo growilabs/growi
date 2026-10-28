@@ -262,7 +262,7 @@ describe('register (Requirement 9.1)', () => {
     expect(harness.privateReplier.reply).toHaveBeenCalledWith(
       expect.objectContaining({ installationId: null }),
       expect.objectContaining({
-        markdown: expect.stringContaining('workspace のチャンネル'),
+        markdown: expect.stringContaining('チャンネルが並んでいる場所'),
       }),
     );
     expect(harness.pairing.issueCode).not.toHaveBeenCalled();

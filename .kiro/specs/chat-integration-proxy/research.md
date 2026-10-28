@@ -256,7 +256,7 @@
 - **Rationale**: イベントを受けたアダプタは、そのイベントがどの workspace のものかを知っている（Slack はそのトークンで処理している）。一覧はそれを後から推測しているだけである。
 - **Trade-offs**:
   - Slack では、トークンごとに最初の 1 回だけ `auth.test` を呼ぶ（プロセスの中で覚える。失敗した答えは覚えない）。`event-mapping.ts` がイベントを作らなかったメッセージでは呼ばない
-  - Discord の DM は、どの guild のものかが分からないので、どの installation にも決めない。コマンドには「サーバーや workspace のチャンネルで呼びかけてください」と答える（design.md の「どの installation のイベントか」）。DM で使えるようにするかは、`chat-integration-agent` が要件 11 に DM の扱いを足すときに決める
+  - Discord の DM は、どの guild のものかが分からないので、どの installation にも決めない。コマンドには「bot を追加した Discord のサーバー（チャンネルが並んでいる場所）の中のチャンネルで呼びかけてください」と答える。Discord の DM は当面このまま断ると決めた（利用者が決めた。DM の中で GROWI を選ばせる案は、必要になったときに `chat-integration-agent` の要件 11 で検討する）（design.md の「どの installation のイベントか」）。Discord の DM を使えるようにするかは、必要になったときに `chat-integration-agent` の要件 11 で決める
   - DM の installation が決まると、DM でもチャンネル単位の権限の判定（`@growi/chat` の `judge`。proxy の `relation/growi-selection.ts` の `judgeEach` と、GROWI の `command-endpoint.ts` の `checkChannelPermission` が同じ関数を使う）にそのまま届く。読み取りのコマンドは既定で許される。書き込みのコマンドは、そのコマンドに権限の行が無ければ `no-settings` で断られる。ただし関係の権限が `'all'`（管理画面の「すべてのチャンネル」）なら、チャンネルを問わず許されるので、DM からも `create-page` などの書き込みが届く。このときも GROWI では紐付けた利用者として動き、他の workspace の GROWI には届かない。**「すべてのチャンネル」には DM を含める**（利用者が決めた）。Discord の DM の扱いは未決で、`chat-integration-agent` が要件 11 に DM の扱いを足すときに決める。リンクの展開も DM で動くようになる（出るのは、ログインしていない人も見られるページの題名などだけ）。管理コマンドも、DM で installation が決まれば、従来どおり管理者かどうかを確かめたうえで実行まで進む。管理者の判定はチャンネルで広がらない: Slack の `is_admin`・`is_owner` は利用者そのものの属性で、Mattermost の DM はどのチームにも属さないので `team_admin` は効かず、`system_admin` だけが通る（`platform/actor-roles.ts`）
   - 調べる処理が失敗した（`auth.test` が失敗した）ときは運用者への報告に残し、そのイベントは一覧で引く
   - Teams は今までどおり一覧だけで引く
