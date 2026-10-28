@@ -6,8 +6,9 @@
 //     hardcoded per-platform switch exists
 //   - live connection status shows for an active relation
 //   - the encryption-key-unconfigured state disables pairing and shows why
-//   - submitting the pairing form calls the pairing endpoint with the
-//     entered fields
+//     (the warning's wording is covered by EncryptionKeyWarning.spec.tsx)
+//   - a successful pairing re-reads the relation list (the form itself is
+//     covered by pairing/PairingSection.spec.tsx)
 //   - an active relation offers a disconnect (Requirement 9.7) that asks for
 //     confirmation, calls the unpair endpoint, and re-reads the relation list
 
@@ -154,10 +155,12 @@ const DESTINATIONS: DestinationsView = {
 // an implementation spy on internal function names.
 const stubApi = ({
   encryptionConfigured = true,
+  encryptionReason = 'unset',
   relations = [ACTIVE_RELATION],
   destinations = DESTINATIONS,
 }: {
   encryptionConfigured?: boolean;
+  encryptionReason?: 'unset' | 'invalid-key' | 'invalid-generation';
   relations?: AdminRelationListItem[];
   destinations?: DestinationsView;
 } = {}) => {
@@ -166,7 +169,7 @@ const stubApi = ({
       return Promise.resolve({
         data: encryptionConfigured
           ? { configured: true }
-          : { configured: false, reason: 'unset' },
+          : { configured: false, reason: encryptionReason },
       });
     }
     if (url === '/chat-integration/admin/relations') {
@@ -550,7 +553,7 @@ describe('AdminChatIntegration', () => {
     });
   });
 
-  describe('disconnecting a workspace (Requirement 9.7)', () => {
+  describe('disconnecting a connection (Requirement 9.7)', () => {
     it('asks for confirmation first, and posts nothing until it is given', async () => {
       // Disconnecting deletes this relation's keys, channel permissions and
       // notification destinations, so a single stray click must not do it.
@@ -632,20 +635,44 @@ describe('AdminChatIntegration', () => {
     });
   });
 
-  it('shows the encryption-key-unconfigured warning and disables the pairing form', async () => {
-    stubApi({ encryptionConfigured: false, relations: [] });
+  const openPairingModal = async (
+    user: ReturnType<typeof userEvent.setup>,
+  ): Promise<void> => {
+    const openButton = await screen.findByRole('button', {
+      name: /add connection/i,
+    });
+    await waitFor(() => {
+      expect(openButton).toBeEnabled();
+    });
+    await user.click(openButton);
+  };
 
-    renderScreen();
+  const fillPairingForm = async (
+    user: ReturnType<typeof userEvent.setup>,
+  ): Promise<void> => {
+    await user.type(
+      await screen.findByLabelText(/registration code/i),
+      'the-code',
+    );
+    await user.type(
+      screen.getByLabelText(/proxy url/i),
+      'https://proxy.example.test',
+    );
+    await user.type(
+      screen.getByLabelText(/this growi's url/i),
+      'https://growi.example.test',
+    );
+    await user.type(
+      screen.getByLabelText(/label to show the chat service/i),
+      'My GROWI',
+    );
+  };
 
-    expect(
-      await screen.findByText(/encryption key is not configured/i),
-    ).toBeInTheDocument();
-    const submitButton = await screen.findByRole('button', { name: /pair/i });
-    expect(submitButton).toBeDisabled();
-    expect(screen.getByLabelText(/registration code/i)).toBeDisabled();
-  });
-
-  it('submits the pairing form with the entered fields when the key is configured', async () => {
+  // The form's own behaviour is proven in pairing/PairingSection.spec.tsx and
+  // the warning's wording in EncryptionKeyWarning.spec.tsx; what is proven
+  // here is that this screen wires them to the relation list and to the
+  // encryption status endpoint.
+  it('re-reads the relation list after a successful pairing', async () => {
     stubApi({ encryptionConfigured: true, relations: [] });
     mocks.apiv3Post.mockResolvedValue({
       data: { status: 'paired', relationId: 'relation-new' },
@@ -654,68 +681,78 @@ describe('AdminChatIntegration', () => {
 
     renderScreen();
 
-    await user.type(
-      await screen.findByLabelText(/registration code/i),
-      'the-code',
-    );
-    await user.type(
-      screen.getByLabelText(/proxy url/i),
-      'https://proxy.example.test',
-    );
-    await user.type(
-      screen.getByLabelText(/this growi's url/i),
-      'https://growi.example.test',
-    );
-    await user.type(
-      screen.getByLabelText(/label to show the chat service/i),
-      'My GROWI',
-    );
-    await user.click(screen.getByRole('button', { name: /pair/i }));
+    await openPairingModal(user);
+    await fillPairingForm(user);
+    const relationListReads = () =>
+      mocks.apiv3Get.mock.calls.filter(
+        ([url]) => url === '/chat-integration/admin/relations',
+      ).length;
+    const readsBefore = relationListReads();
+    await user.click(screen.getByRole('button', { name: /^pair$/i }));
 
     await waitFor(() => {
-      expect(mocks.apiv3Post).toHaveBeenCalledWith(
-        '/chat-integration/admin/pairing',
-        {
-          registrationCode: 'the-code',
-          proxyUri: 'https://proxy.example.test',
-          growiUri: 'https://growi.example.test',
-          growiLabel: 'My GROWI',
-        },
-      );
+      expect(relationListReads()).toBeGreaterThan(readsBefore);
     });
-    expect(mocks.toastSuccess).toHaveBeenCalled();
   });
 
-  it('shows an error toast (not a success) for a non-"paired" outcome', async () => {
-    stubApi({ encryptionConfigured: true, relations: [] });
-    mocks.apiv3Post.mockResolvedValue({
-      data: { status: 'code-expired' },
+  describe('when the encryption key is not usable', () => {
+    it('shows the warning above the connections heading and disables the add-connection button', async () => {
+      stubApi({ encryptionConfigured: false, relations: [] });
+
+      renderScreen();
+
+      const warning = await screen.findByTestId(
+        'grw-chat-integration-encryption-warning',
+      );
+      const heading = screen.getByRole('heading', { name: 'Connections' });
+      expect(
+        warning.compareDocumentPosition(heading) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        screen.getByRole('button', { name: /add connection/i }),
+      ).toBeDisabled();
     });
-    const user = userEvent.setup();
+
+    it('passes the reason from the status endpoint to the warning', async () => {
+      stubApi({
+        encryptionConfigured: false,
+        encryptionReason: 'invalid-key',
+        relations: [],
+      });
+
+      renderScreen();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /is set, but it is not a valid key/,
+      );
+    });
+
+    it('keeps listing the connections that already exist', async () => {
+      stubApi({ encryptionConfigured: false, relations: [ACTIVE_RELATION] });
+
+      renderScreen();
+
+      expect(await screen.findByText('Active Workspace')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /disconnect/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('shows no warning while the encryption key is usable', async () => {
+    stubApi({ encryptionConfigured: true, relations: [] });
 
     renderScreen();
 
-    await user.type(
-      await screen.findByLabelText(/registration code/i),
-      'the-code',
-    );
-    await user.type(
-      screen.getByLabelText(/proxy url/i),
-      'https://proxy.example.test',
-    );
-    await user.type(
-      screen.getByLabelText(/this growi's url/i),
-      'https://growi.example.test',
-    );
-    await user.type(
-      screen.getByLabelText(/label to show the chat service/i),
-      'My GROWI',
-    );
-    await user.click(screen.getByRole('button', { name: /pair/i }));
-
+    expect(
+      await screen.findByText(/no connection has been added yet/i),
+    ).toBeInTheDocument();
     await waitFor(() => {
-      expect(mocks.toastError).toHaveBeenCalled();
+      expect(
+        screen.getByRole('button', { name: /add connection/i }),
+      ).toBeEnabled();
     });
-    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
