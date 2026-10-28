@@ -11,7 +11,7 @@ import { type IUserHasId, PageGrant } from '@growi/core';
 import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
-import mongoose, { type HydratedDocument } from 'mongoose';
+import mongoose, { type HydratedDocument, Types } from 'mongoose';
 import request from 'supertest';
 
 import { getInstance } from '^/test/setup/crowi';
@@ -130,15 +130,45 @@ describe('DELETE /empty-trash', () => {
       PageDeleteConfigValue.AdminOnly,
     );
 
+    await request(app).delete('/empty-trash').set('X-Forwarded-For', TEST_IP);
+
+    // The response itself is not asserted: it depends on whatever else other
+    // suites left in the shared trash.
+    const survivingPage = await Page.findById(trashedPage._id);
+    expect(survivingPage?.path).toBe(trashedPath);
+  });
+
+  it('deletes only the trashed pages the requester is allowed to delete completely', async () => {
+    const { Page } = crowi.models;
+    const [ownPage, othersPage] = await Page.create([
+      {
+        path: `${FIXTURE_ROOT}/own`,
+        grant: PageGrant.GRANT_PUBLIC,
+        status: 'deleted',
+        creator: requester._id,
+        lastUpdateUser: requester._id,
+        parent: null,
+      },
+      {
+        path: `${FIXTURE_ROOT}/others`,
+        grant: PageGrant.GRANT_PUBLIC,
+        status: 'deleted',
+        creator: new Types.ObjectId(),
+        lastUpdateUser: new Types.ObjectId(),
+        parent: null,
+      },
+    ]);
+    await crowi.configManager.updateConfig(
+      'security:pageCompleteDeletionAuthority',
+      PageDeleteConfigValue.AdminAndAuthor,
+    );
+
     const response = await request(app)
       .delete('/empty-trash')
       .set('X-Forwarded-For', TEST_IP);
 
-    expect(response.status).toBe(500);
-    expect(response.body.errors).toEqual([
-      expect.objectContaining({ message: 'No pages can be deleted.' }),
-    ]);
-    const survivingPage = await Page.findById(trashedPage._id);
-    expect(survivingPage?.path).toBe(trashedPath);
+    expect(response.status).toBe(200);
+    expect(await Page.findById(ownPage._id)).toBeNull();
+    expect((await Page.findById(othersPage._id))?.path).toBe(othersPage.path);
   });
 });

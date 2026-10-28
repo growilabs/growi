@@ -7,8 +7,12 @@
  * Promise and every page passed the filter, so the conflict was ignored and the page
  * was deleted anyway.
  *
- * Only the conflict case is covered here. It is the case the filter exists for, and
- * it is answered before `deleteMultiplePages` — which the route fires without
+ * The deletion authority filter (`pageService.filterPagesByCanDelete`) had the same
+ * flaw — an async predicate passed to `Array#filter` — so a page the requester is
+ * not allowed to delete was deleted as well.
+ *
+ * Only the filtered-out cases are covered here. They are the cases the filters exist
+ * for, and they are answered before `deleteMultiplePages` — which the route fires without
  * awaiting — is reached, so the test needs no background work to settle. The
  * successful deletion of a page is covered by service/page/v5.public-page.integ.ts.
  *
