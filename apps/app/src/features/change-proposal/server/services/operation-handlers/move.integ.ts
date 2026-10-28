@@ -500,6 +500,7 @@ describe('move operation handler', () => {
       );
     });
 
+    // Creation refuses such a destination; the exact comparison stays for data already stored.
     it('removes the redirects a move to a destination with a trailing slash created, and keeps the others', async () => {
       const parent = await createPage(nextPath());
       const originalPath = parent.path;

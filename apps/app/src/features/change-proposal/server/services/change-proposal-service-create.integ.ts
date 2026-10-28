@@ -391,6 +391,46 @@ describe('ChangeProposalService.createProposal: checks before saving', () => {
       expect(await countProposalsOf(users.requester)).toBe(before);
     });
 
+    it('rejects a create path or move destination ending in a slash without saving, even next to an existing page', async () => {
+      const existing = await kit.createPage('trailing-dup');
+      const movable = await kit.createPage('trailing-move');
+      const before = await countProposalsOf(users.requester);
+
+      await expect(
+        create({
+          operations: [
+            { type: 'create', path: `${existing.path}/`, body: 'x' },
+          ],
+        }),
+      ).resolves.toEqual({
+        ok: false,
+        error: {
+          code: 'input-rejected',
+          rejection: { code: 'invalid-path', index: 0 },
+        },
+      });
+      await expect(
+        create({
+          operations: [
+            { type: 'create', path: kit.nextPath('ok'), body: 'x' },
+            {
+              type: 'move',
+              pageId: movable._id.toString(),
+              fromPath: movable.path,
+              toPath: `${kit.nextPath('移動先')}/`,
+            },
+          ],
+        }),
+      ).resolves.toEqual({
+        ok: false,
+        error: {
+          code: 'input-rejected',
+          rejection: { code: 'invalid-path', index: 1 },
+        },
+      });
+      expect(await countProposalsOf(users.requester)).toBe(before);
+    });
+
     it('rejects a move whose source page is not at the given path any more', async () => {
       const page = await kit.createPage('move-src');
 

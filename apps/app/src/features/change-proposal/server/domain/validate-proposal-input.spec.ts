@@ -263,6 +263,30 @@ describe('validateProposalInput', () => {
       });
     });
 
+    it.each([
+      '/dup-1/',
+      '/a/b/',
+      '/日本語/ページ/',
+      '/a/b//',
+    ])('rejects the trailing-slash path %j as a create path and a move destination', (path) => {
+      expect(validateProposalInput([create(path)], limits())).toEqual({
+        ok: false,
+        rejection: { code: 'invalid-path', index: 0 },
+      });
+      expect(validateProposalInput([edit(), move(path)], limits())).toEqual({
+        ok: false,
+        rejection: { code: 'invalid-path', index: 1 },
+      });
+    });
+
+    // '/' is already canonical; the always-present root page makes the
+    // occupied-path checks refuse it later.
+    it('does not treat the root path as a trailing-slash path', () => {
+      expect(validateProposalInput([create('/'), move('/')], limits()).ok).toBe(
+        true,
+      );
+    });
+
     it('accepts ordinary paths including non-ASCII and user pages', () => {
       expect(
         validateProposalInput(

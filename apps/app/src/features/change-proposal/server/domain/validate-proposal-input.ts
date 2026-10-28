@@ -1,4 +1,5 @@
 import { isCreatablePage } from '@growi/core/dist/utils/page-path-utils';
+import { normalizePath } from '@growi/core/dist/utils/path-utils';
 
 import type {
   CreatableOperationInput,
@@ -40,8 +41,10 @@ const destinationPathOf = (
   return null;
 };
 
+// Applying does not normalize, so only the canonical form is accepted: a
+// trailing slash would otherwise name a second page beside the canonical one.
 const isUsablePagePath = (path: string): boolean =>
-  path.startsWith('/') && isCreatablePage(path);
+  path.startsWith('/') && path === normalizePath(path) && isCreatablePage(path);
 
 export const validateProposalInput = (
   operations: readonly CreatableOperationInput[],
