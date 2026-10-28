@@ -73,7 +73,7 @@ describe('DELETE /empty-trash', () => {
   };
 
   const createTrashedPages = (
-    entries: { path: string; creator: Types.ObjectId }[],
+    entries: { path: string; creator: Types.ObjectId | string }[],
   ) =>
     crowi.models.Page.create(
       entries.map(({ path, creator }) => ({
