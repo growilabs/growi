@@ -19,6 +19,44 @@
   "days": "jours",
   "security_settings": {
     "security_settings": "Sécurité",
+    "legacy_password_cleanup": {
+      "title": "État de la migration des hachages de mots de passe",
+      "description": "Supprime les mots de passe au format hérité (SHA-256) des utilisateurs qui possèdent déjà un mot de passe au nouveau format. Cela évite de conserver dans la base de données des hachages peu sûrs.",
+      "count_label": {
+        "upgraded_only": "Nouveau format uniquement",
+        "both": "Les deux formats (migrés, cible de la suppression)",
+        "legacy_only": "Format hérité uniquement (non migré)",
+        "legacy_only_active": "Format hérité uniquement : actifs",
+        "legacy_only_non_active": "Format hérité uniquement : non actifs (en attente d’approbation, suspendus, supprimés, invités)",
+        "no_password": "Mot de passe non défini"
+      },
+      "both_is_target_hint": "Les utilisateurs ayant les deux formats sont la cible de la suppression. Seul leur mot de passe au format hérité est supprimé.",
+      "delete_button": "Supprimer les mots de passe hérités",
+      "confirm": {
+        "title": "Supprimer les mots de passe hérités",
+        "warning_one": "Le mot de passe hérité de {{count}} utilisateur sera supprimé. Cette action est irréversible.",
+        "warning_other": "Les mots de passe hérités de {{count}} utilisateurs seront supprimés. Cette action est irréversible.",
+        "downgrade_warning": "Si vous revenez à une version antérieure, les utilisateurs dont l'ancien mot de passe a été supprimé ne pourront pas se connecter sur cette version. Les utilisateurs actifs peuvent récupérer l'accès en réinitialisant leur mot de passe ; les autres (suspendus, invités, etc.) doivent être traités individuellement par un administrateur. Si vous venez de revenir d'une version antérieure, exécutez d'abord le script de préparation à la remise à niveau. Si vous supprimez avant de l'exécuter, les utilisateurs qui ont changé leur mot de passe pendant l'utilisation de la version antérieure ne pourront pas se connecter avec leur nouveau mot de passe.",
+        "submit": "Supprimer"
+      },
+      "success_one": "Le mot de passe hérité de {{count}} utilisateur a été supprimé",
+      "success_other": "Les mots de passe hérités de {{count}} utilisateurs ont été supprimés",
+      "delete_error": "Échec de la suppression des mots de passe hérités. Certains ont pu être supprimés.",
+      "fetch_error": "Échec de la récupération de l'état de la migration des hachages de mots de passe",
+      "retry": "Réessayer",
+      "unmigrated_list": {
+        "title": "Utilisateurs à inciter à migrer",
+        "description": "Ces utilisateurs n'ont encore qu'un mot de passe au format hérité. Ils seront migrés automatiquement lors de leur prochaine connexion avec leur mot de passe. Les utilisateurs liés à une authentification externe (LDAP, OAuth, SAML, etc.) ne sont pas listés, car la connexion via ces méthodes ne migre pas le mot de passe.",
+        "column": {
+          "username": "Nom d'utilisateur",
+          "email": "Adresse courriel",
+          "last_login": "Dernière connexion"
+        },
+        "never_logged_in": "Jamais connecté",
+        "empty": "Aucun utilisateur n'a besoin d'être incité à migrer.",
+        "fetch_error": "Échec de la récupération de la liste des utilisateurs à inciter à migrer"
+      }
+    },
     "scope_of_page_disclosure": "Confidentialité de la page",
     "set_point": "Valeur",
     "Guest Users Access": "Accès public",
@@ -1159,6 +1197,7 @@
     "ADMIN_MAINTENANCEMODE_ENABLED": "Activer mode maintenance",
     "ADMIN_MAINTENANCEMODE_DISABLED": "Désactiver mode maintenance",
     "ADMIN_SECURITY_SETTINGS_UPDATE": "Mettre à jour les paramètres de sécurité",
+    "ADMIN_LEGACY_PASSWORD_DELETE": "Supprimer les mots de passe hérités",
     "ADMIN_PERMIT_SHARE_LINK": "Activer liens de partage",
     "ADMIN_REJECT_SHARE_LINK": "Désactiver liens de partage",
     "ADMIN_AUTH_ID_PASS_ENABLED": "Activer authentification ID/Password",

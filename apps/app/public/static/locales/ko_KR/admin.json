@@ -19,6 +19,42 @@
   "days": "일",
   "security_settings": {
     "security_settings": "보안 설정",
+    "legacy_password_cleanup": {
+      "title": "비밀번호 해시 마이그레이션 현황",
+      "description": "이미 새 형식의 비밀번호를 가진 사용자의 이전 형식(SHA-256) 비밀번호를 삭제합니다. 취약한 해시가 데이터베이스에 계속 남는 것을 방지합니다.",
+      "count_label": {
+        "upgraded_only": "새 형식만",
+        "both": "두 형식 모두 (이전 완료, 삭제 대상)",
+        "legacy_only": "이전 형식만 (미마이그레이션)",
+        "legacy_only_active": "이전 형식만: 활성",
+        "legacy_only_non_active": "이전 형식만: 활성 아님 (승인 대기, 정지, 삭제됨, 초대됨)",
+        "no_password": "비밀번호 미설정"
+      },
+      "both_is_target_hint": "두 형식을 모두 가진 사용자가 삭제 대상입니다. 이전 형식의 비밀번호만 삭제됩니다.",
+      "delete_button": "이전 형식 비밀번호 삭제",
+      "confirm": {
+        "title": "이전 형식 비밀번호 삭제",
+        "warning_other": "{{count}}명의 사용자의 이전 형식 비밀번호가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+        "downgrade_warning": "이전 버전으로 되돌리는(다운그레이드) 경우, 삭제된 사용자는 되돌린 버전에서 로그인할 수 없습니다. 활성 사용자는 비밀번호 재설정으로 복구할 수 있지만, 그 외(정지·초대 등) 사용자는 관리자가 개별적으로 대응해야 합니다. 이전 버전에서 막 되돌아온 경우에는 먼저 재업그레이드 준비 스크립트를 실행하세요. 실행하지 않고 삭제하면, 이전 버전을 사용하던 동안 비밀번호를 변경한 사용자가 변경한 비밀번호로 로그인할 수 없게 됩니다.",
+        "submit": "삭제"
+      },
+      "success_other": "{{count}}명의 사용자의 이전 형식 비밀번호를 삭제했습니다",
+      "delete_error": "이전 형식 비밀번호 삭제에 실패했습니다. 일부가 삭제되었을 수 있습니다.",
+      "fetch_error": "비밀번호 해시 마이그레이션 현황을 가져오지 못했습니다",
+      "retry": "다시 시도",
+      "unmigrated_list": {
+        "title": "마이그레이션을 유도해야 하는 사용자",
+        "description": "이전 형식의 비밀번호만 가지고 있는 사용자입니다. 비밀번호로 한 번 로그인하면 자동으로 마이그레이션됩니다. LDAP, OAuth, SAML 등 외부 인증과 연동된 사용자는 외부 인증으로 로그인해도 비밀번호가 마이그레이션되지 않으므로 목록에 포함되지 않습니다.",
+        "column": {
+          "username": "사용자 이름",
+          "email": "이메일",
+          "last_login": "최종 로그인"
+        },
+        "never_logged_in": "로그인 기록 없음",
+        "empty": "마이그레이션을 유도해야 하는 사용자가 없습니다",
+        "fetch_error": "마이그레이션을 유도할 사용자 목록을 가져오지 못했습니다"
+      }
+    },
     "scope_of_page_disclosure": "페이지 공개 범위",
     "set_point": "설정 지점",
     "Guest Users Access": "게스트 사용자 접근",
@@ -1162,6 +1198,7 @@
     "ADMIN_MAINTENANCEMODE_ENABLED": "유지 보수 모드 활성화",
     "ADMIN_MAINTENANCEMODE_DISABLED": "유지 보수 모드 비활성화",
     "ADMIN_SECURITY_SETTINGS_UPDATE": "보안 설정 업데이트",
+    "ADMIN_LEGACY_PASSWORD_DELETE": "이전 형식 비밀번호 삭제",
     "ADMIN_PERMIT_SHARE_LINK": "공유 링크 활성화",
     "ADMIN_REJECT_SHARE_LINK": "공유 링크 비활성화",
     "ADMIN_AUTH_ID_PASS_ENABLED": "ID/비밀번호 인증 활성화",

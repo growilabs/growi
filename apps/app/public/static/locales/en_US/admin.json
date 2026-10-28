@@ -19,6 +19,44 @@
   "days": "days",
   "security_settings": {
     "security_settings": "Security Settings",
+    "legacy_password_cleanup": {
+      "title": "Password hash migration status",
+      "description": "Remove the legacy SHA-256 passwords of users who already have a password in the new format. This reduces the amount of weakly hashed data kept in the database.",
+      "count_label": {
+        "upgraded_only": "New format only",
+        "both": "Both formats (migrated, deletion target)",
+        "legacy_only": "Legacy format only (not migrated)",
+        "legacy_only_active": "Legacy format only: active",
+        "legacy_only_non_active": "Legacy format only: not active (approval pending, suspended, deleted, invited)",
+        "no_password": "No password set"
+      },
+      "both_is_target_hint": "Users with both formats are the target of the deletion. Only their legacy password is removed.",
+      "delete_button": "Delete legacy passwords",
+      "confirm": {
+        "title": "Delete legacy passwords",
+        "warning_one": "The legacy password of {{count}} user will be deleted. This action cannot be undone.",
+        "warning_other": "The legacy passwords of {{count}} users will be deleted. This action cannot be undone.",
+        "downgrade_warning": "If you downgrade to an older version, the users whose legacy password was deleted will not be able to log in on that version. Active users can recover by resetting their password; other users (suspended, invited, etc.) must be handled individually by an administrator. If you have just returned from an older version, run the re-upgrade preparation script first. If you delete before running it, users who changed their password while the older version was in use will not be able to log in with their new password.",
+        "submit": "Delete"
+      },
+      "success_one": "Deleted the legacy password of {{count}} user",
+      "success_other": "Deleted the legacy passwords of {{count}} users",
+      "delete_error": "Failed to delete legacy passwords. Some may have been deleted.",
+      "fetch_error": "Failed to fetch the password hash migration status",
+      "retry": "Retry",
+      "unmigrated_list": {
+        "title": "Users to nudge toward migration",
+        "description": "These users still have only a legacy-format password. They are migrated automatically the next time they log in with their password. Users linked to an external authentication (LDAP, OAuth, SAML, etc.) are not listed, because logging in through those does not migrate the password.",
+        "column": {
+          "username": "Username",
+          "email": "Email",
+          "last_login": "Last login"
+        },
+        "never_logged_in": "Never logged in",
+        "empty": "No users need to be nudged",
+        "fetch_error": "Failed to fetch the list of users to nudge"
+      }
+    },
     "scope_of_page_disclosure": "Scope of page disclosure",
     "set_point": "Set point",
     "Guest Users Access": "Guest users access",
@@ -1172,6 +1210,7 @@
     "ADMIN_MAINTENANCEMODE_ENABLED": "Enable Maintenance Mode",
     "ADMIN_MAINTENANCEMODE_DISABLED": "Disabled Maintenance Mode",
     "ADMIN_SECURITY_SETTINGS_UPDATE": "Update Security Settings",
+    "ADMIN_LEGACY_PASSWORD_DELETE": "Delete legacy passwords",
     "ADMIN_PERMIT_SHARE_LINK": "Enable Share Link",
     "ADMIN_REJECT_SHARE_LINK": "Disable Share Link",
     "ADMIN_AUTH_ID_PASS_ENABLED": "Enable ID/Password auth",

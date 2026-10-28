@@ -7,6 +7,7 @@ import CustomNav from '../../CustomNavigation/CustomNav';
 import GitHubSecuritySetting from './GitHubSecuritySetting';
 import GoogleSecuritySetting from './GoogleSecuritySetting';
 import LdapSecuritySetting from './LdapSecuritySetting';
+import { LegacyPasswordCleanupSetting } from './LegacyPasswordCleanupSetting';
 import LocalSecuritySetting from './LocalSecuritySetting';
 import OidcSecuritySetting from './OidcSecuritySetting';
 import SamlSecuritySetting from './SamlSecuritySetting';
@@ -82,6 +83,9 @@ const SecurityManagementContents = () => {
       <div className="mb-5">
         <ShareLinkSetting />
       </div>
+
+      {/* Legacy password hash migration status and cleanup; renders nothing once no legacy password remains */}
+      <LegacyPasswordCleanupSetting />
 
       {/* XSS configuration link */}
       <div className="mb-5">

@@ -19,6 +19,42 @@
   "days": "天",
   "security_settings": {
     "security_settings": "安全设置",
+    "legacy_password_cleanup": {
+      "title": "密码哈希迁移状态",
+      "description": "为已拥有新格式密码的用户删除旧格式（SHA-256）密码，避免数据库中继续保留安全性较弱的哈希。",
+      "count_label": {
+        "upgraded_only": "仅新格式",
+        "both": "两种格式（已迁移，删除对象）",
+        "legacy_only": "仅旧格式（未迁移）",
+        "legacy_only_active": "仅旧格式：活跃",
+        "legacy_only_non_active": "仅旧格式：非活跃（待审批、已停用、已删除、已邀请）",
+        "no_password": "未设置密码"
+      },
+      "both_is_target_hint": "同时拥有两种格式的用户是删除对象，只会删除其旧格式密码。",
+      "delete_button": "删除旧格式密码",
+      "confirm": {
+        "title": "删除旧格式密码",
+        "warning_other": "将删除 {{count}} 位用户的旧格式密码。此操作无法撤销。",
+        "downgrade_warning": "如果回退到旧版本（降级），已删除旧密码的用户将无法在该版本上登录。活跃用户可以通过重置密码恢复，其他用户（已停用、已邀请等）需要由管理员单独处理。如果刚从旧版本升级回来，请先运行重新升级准备脚本。如果在运行之前删除，在使用旧版本期间修改过密码的用户将无法使用修改后的密码登录。",
+        "submit": "删除"
+      },
+      "success_other": "已删除 {{count}} 位用户的旧格式密码",
+      "delete_error": "删除旧格式密码失败。部分密码可能已被删除。",
+      "fetch_error": "获取密码哈希迁移状态失败",
+      "retry": "重试",
+      "unmigrated_list": {
+        "title": "需要提示迁移的用户",
+        "description": "这些用户目前仅有旧格式密码，使用密码登录一次后将自动完成迁移。与 LDAP、OAuth、SAML 等外部认证关联的用户不会列出，因为通过外部认证登录不会迁移密码。",
+        "column": {
+          "username": "帐号",
+          "email": "电子邮件",
+          "last_login": "上次登录"
+        },
+        "never_logged_in": "从未登录",
+        "empty": "没有需要提示迁移的用户",
+        "fetch_error": "获取需要提示迁移的用户列表失败"
+      }
+    },
     "scope_of_page_disclosure": "页面公开范围",
     "set_point": "设定值",
     "Guest Users Access": "来宾用户访问",
@@ -1161,6 +1197,7 @@
     "ADMIN_MAINTENANCEMODE_ENABLED": "启用维护模式",
     "ADMIN_MAINTENANCEMODE_DISABLED": "禁用维护模式",
     "ADMIN_SECURITY_SETTINGS_UPDATE": "更新安全设置",
+    "ADMIN_LEGACY_PASSWORD_DELETE": "删除旧格式密码",
     "ADMIN_PERMIT_SHARE_LINK": "启用分享链接",
     "ADMIN_REJECT_SHARE_LINK": "禁用分享链接",
     "ADMIN_AUTH_ID_PASS_ENABLED": "启用 ID/密码验证",

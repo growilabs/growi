@@ -19,6 +19,42 @@
   "days": "日",
   "security_settings": {
     "security_settings": "セキュリティ設定",
+    "legacy_password_cleanup": {
+      "title": "パスワードハッシュの移行状況",
+      "description": "新形式のパスワードを既に持っているユーザーについて、旧形式（SHA-256）のパスワードを削除します。脆弱なハッシュがデータベースに残り続けることを防ぎます。",
+      "count_label": {
+        "upgraded_only": "新形式のみ",
+        "both": "両形式（移行済み・削除対象）",
+        "legacy_only": "旧形式のみ（未移行）",
+        "legacy_only_active": "旧形式のみ: アクティブ",
+        "legacy_only_non_active": "旧形式のみ: アクティブ以外（承認待ち・停止中・削除済み・招待中）",
+        "no_password": "パスワード未設定"
+      },
+      "both_is_target_hint": "両形式を持つユーザーが削除対象です。旧形式のパスワードのみが削除されます。",
+      "delete_button": "旧形式パスワードを削除",
+      "confirm": {
+        "title": "旧形式パスワードの削除",
+        "warning_other": "{{count}} 人のユーザーの旧形式パスワードを削除します。この操作は取り消せません。",
+        "downgrade_warning": "旧バージョンに戻す（ダウングレードする）場合、削除したユーザーは戻した後のバージョンではログインできなくなります。アクティブなユーザーはパスワードのリセットで復旧できますが、それ以外（停止中・招待中など）のユーザーは管理者が個別に対応する必要があります。旧バージョンから戻した直後の場合は、先に再アップグレード準備スクリプトを実行してください。実行せずに削除すると、旧バージョンを使っていた間にパスワードを変更したユーザーが、変更後のパスワードでログインできなくなります。",
+        "submit": "削除する"
+      },
+      "success_other": "{{count}} 人のユーザーの旧形式パスワードを削除しました",
+      "delete_error": "旧形式パスワードの削除に失敗しました。一部が削除されている可能性があります。",
+      "fetch_error": "パスワードハッシュの移行状況の取得に失敗しました",
+      "retry": "再試行",
+      "unmigrated_list": {
+        "title": "移行を促す必要があるユーザー",
+        "description": "旧形式のパスワードしか持っていないユーザーです。パスワードで一度ログインすると自動的に移行されます。LDAP・OAuth・SAML などの外部認証と連携しているユーザーは、外部認証でのログインではパスワードが移行されないため、一覧に含まれません。",
+        "column": {
+          "username": "ユーザー名",
+          "email": "メールアドレス",
+          "last_login": "最終ログイン"
+        },
+        "never_logged_in": "ログイン履歴なし",
+        "empty": "移行を促す必要があるユーザーはいません",
+        "fetch_error": "移行を促すユーザーの一覧の取得に失敗しました"
+      }
+    },
     "scope_of_page_disclosure": "ページの公開範囲",
     "set_point": "設定値",
     "Guest Users Access": "ゲストユーザーのアクセス",
@@ -1161,6 +1197,7 @@
     "ADMIN_MAINTENANCEMODE_ENABLED": "メンテナンスモードの開始",
     "ADMIN_MAINTENANCEMODE_DISABLED": "メンテナンスモードの終了",
     "ADMIN_SECURITY_SETTINGS_UPDATE": "セキュリティ設定の更新",
+    "ADMIN_LEGACY_PASSWORD_DELETE": "旧形式パスワードの削除",
     "ADMIN_PERMIT_SHARE_LINK": "共有リンクの有効化",
     "ADMIN_REJECT_SHARE_LINK": "共有リンクの無効化",
     "ADMIN_AUTH_ID_PASS_ENABLED": "ID/Password 認証を有効",
