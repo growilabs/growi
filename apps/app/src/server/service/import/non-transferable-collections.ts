@@ -109,6 +109,7 @@ export const TRANSFERABLE_COLLECTIONS: ReadonlySet<string> = new Set([
   'pagetagrelations',
   'passwordresetorders',
   'revisions',
+  'searchhistories',
   'sharelinks',
   'slackappintegrations',
   'subscriptions',

@@ -480,6 +480,15 @@ model rlflx {
   @@index([expire(sort: Desc)], map: "expire_-1")
 }
 
+model searchhistories {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String   @map("user") @db.ObjectId
+  keyword        String
+  lastSearchedAt DateTime
+
+  @@unique([userId, keyword], map: "user_1_keyword_1")
+}
+
 model sessions {
   id      String   @id @map("_id")
   expires DateTime
