@@ -262,7 +262,9 @@ describe('register (Requirement 9.1)', () => {
     expect(harness.privateReplier.reply).toHaveBeenCalledWith(
       expect.objectContaining({ installationId: null }),
       expect.objectContaining({
-        markdown: expect.stringContaining('チャンネルが並んでいる場所'),
+        markdown: expect.stringContaining(
+          'DM から bot に呼びかけることはできません',
+        ),
       }),
     );
     expect(harness.pairing.issueCode).not.toHaveBeenCalled();

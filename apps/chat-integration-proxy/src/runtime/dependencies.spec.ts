@@ -696,7 +696,7 @@ describe('a command typed where the saved channel inventory lists nothing (a DM)
     const { db, said } = await registerTypedIn({ kind: 'no-workspace' });
 
     expect(db.pairingOrder.create).not.toHaveBeenCalled();
-    expect(said()).toContain('チャンネルが並んでいる場所');
+    expect(said()).toContain('DM から bot に呼びかけることはできません');
   });
 
   it('places a DM that belongs to no workspace in no installation, even when an inventory lists its id', async () => {
@@ -708,7 +708,7 @@ describe('a command typed where the saved channel inventory lists nothing (a DM)
       'search foo',
     );
 
-    expect(said()).toContain('チャンネルが並んでいる場所');
+    expect(said()).toContain('DM から bot に呼びかけることはできません');
     expect(db.relation.findMany).not.toHaveBeenCalled();
   });
 
