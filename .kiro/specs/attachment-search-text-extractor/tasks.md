@@ -57,7 +57,7 @@
   - _Requirements: 1.5_
   - _Boundary: CharsetDecoder_
 
-- [ ] 2.3 (P) 形式と経路を決める対応表を実装する
+- [x] 2.3 (P) 形式と経路を決める対応表を実装する
   - MIME の手がかりを優先し、なければ拡張子から形式を決め、経路 (pdf / pptx / xlsx / office / text) と anydoc に渡す形式名を返す
   - 旧形式 DOC / PPT / XLS と OpenDocument を office の経路に入れ、XLS は anydoc の形式名 `xlsx` で渡す。Outlook MSG と対応表にない形式はサポート対象外にする
   - 完了の状態: 設計の対応表の全行と、MSG がサポート対象外になることを単体テストで確かめられる
