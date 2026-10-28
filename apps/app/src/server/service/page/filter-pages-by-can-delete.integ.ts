@@ -57,6 +57,15 @@ describe('PageService.filterPagesByCanDelete / filterPagesByCanDeleteCompletely'
       lastUpdateUser: author._id,
       isEmpty: false,
     });
+    // An empty page has no creator of its own; the closest non-empty ancestor
+    // is looked up in the database.
+    await Page.create({
+      path: '/fpbcd',
+      grant: Page.GRANT_PUBLIC,
+      creator: author._id,
+      lastUpdateUser: author._id,
+      isEmpty: false,
+    });
     emptyPage = new Page({
       path: '/fpbcd/empty-page',
       grant: Page.GRANT_PUBLIC,
@@ -69,6 +78,7 @@ describe('PageService.filterPagesByCanDelete / filterPagesByCanDeleteCompletely'
       Object.fromEntries(DELETE_AUTHORITY_KEYS.map((key) => [key, undefined])),
       { removeIfUndefined: true },
     );
+    await Page.deleteMany({ path: '/fpbcd' });
     await User.deleteMany({ username: { $regex: /^fpbcd-/ } });
   });
 
@@ -125,14 +135,33 @@ describe('PageService.filterPagesByCanDelete / filterPagesByCanDeleteCompletely'
     it.each([
       'filterPagesByCanDelete',
       'filterPagesByCanDeleteCompletely',
-    ] as const)('%s keeps an empty page and drops only the forbidden one from a mixed list', async (method) => {
+    ] as const)('%s keeps an empty page for a non-recursive deletion and drops only the forbidden one', async (method) => {
       const result = await crowi.pageService[method](
         [authorsPage, emptyPage],
         asOperator(otherUser),
-        true,
+        false,
       );
 
       expect(result.map((p) => p.path)).toEqual([emptyPage.path]);
+    });
+
+    it.each([
+      'filterPagesByCanDelete',
+      'filterPagesByCanDeleteCompletely',
+    ] as const)('%s judges an empty page by its closest non-empty ancestor for a recursive deletion', async (method) => {
+      const byOtherUser = await crowi.pageService[method](
+        [emptyPage],
+        asOperator(otherUser),
+        true,
+      );
+      const byAncestorsAuthor = await crowi.pageService[method](
+        [emptyPage],
+        asOperator(author),
+        true,
+      );
+
+      expect(byOtherUser).toEqual([]);
+      expect(byAncestorsAuthor.map((p) => p.path)).toEqual([emptyPage.path]);
     });
   });
 });

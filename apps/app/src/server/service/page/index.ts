@@ -475,13 +475,21 @@ class PageService implements IPageService {
   ): Promise<PageDocument[]> {
     const userRelatedGroups =
       await this.pageGrantService.getUserRelatedGroups(user);
-    // canDeleteFunction is synchronous; the predicate must stay synchronous too,
-    // since filter() treats a returned Promise as truthy and keeps every page.
-    const filteredPages = pages.filter((p) => {
-      if (p.isEmpty) return true;
+    // An empty page is skipped by a non-recursive deletion, but deleting it
+    // recursively deletes everything under it, so it is judged then.
+    const shouldJudge = (p: PageDocument) => !p.isEmpty || isRecursively;
+    // Resolved up front: filter() treats a returned Promise as truthy and
+    // keeps every page, so the predicate below must stay synchronous.
+    const creatorIds = await Promise.all(
+      pages.map((p) =>
+        shouldJudge(p) ? this.getCreatorIdForCanDelete(p) : null,
+      ),
+    );
+    const filteredPages = pages.filter((p, index) => {
+      if (!shouldJudge(p)) return true;
       return canDeleteFunction(
         p,
-        p.creator == null ? null : getIdForRef(p.creator),
+        creatorIds[index],
         user,
         isRecursively,
         userRelatedGroups,
