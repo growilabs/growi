@@ -9,6 +9,7 @@
 
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { DiscordAdapter } from '@chat-adapter/discord';
 import { createSlackAdapter, type SlackAdapter } from '@chat-adapter/slack';
 import type { PlatformName } from '@growi/chat';
 import type { Adapter } from 'chat';
@@ -280,5 +281,89 @@ describe("Slack's workspace of the event being handled", () => {
     answers.set('xoxb-odd', { ok: true, user_id: 'UBOT' });
 
     await expect(workspaceOfEventAs('xoxb-odd')).rejects.toThrow();
+  });
+});
+
+describe('listener windows (services that must be told to start listening)', () => {
+  it('only Discord declares one: Slack listens as soon as its adapter is initialized, Teams dials in, Mattermost connects per installation', () => {
+    const declared = Object.fromEntries(
+      Object.entries(ADAPTER_FACTORIES).map(([platform, factory]) => [
+        platform,
+        factory.credentialSource === 'app' &&
+          factory.startListenerWindow != null,
+      ]),
+    );
+
+    expect(declared).toEqual({
+      slack: false,
+      discord: true,
+      teams: false,
+      mattermost: false,
+    });
+  });
+
+  describe("Discord's Gateway window", () => {
+    const discordFactory = ADAPTER_FACTORIES.discord;
+    const startWindow =
+      discordFactory.credentialSource === 'app'
+        ? discordFactory.startListenerWindow
+        : undefined;
+    const buildAdapter = (): Adapter => {
+      const adapter = createAppAdapters(
+        FULL_APP_CONFIG,
+        ADAPTER_FACTORIES,
+        CONTEXT,
+      ).discord;
+      if (adapter == null) throw new Error('discord adapter not built');
+      return adapter;
+    };
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('fails to open when the adapter was never initialized with its Chat instance', async () => {
+      const adapter = buildAdapter();
+
+      await expect(
+        startWindow?.(adapter, 1_000, new AbortController().signal),
+      ).rejects.toThrow(/500/);
+    });
+
+    it('asks the adapter to listen for the window, stoppable by the signal, handling events itself rather than forwarding them', async () => {
+      const adapter = buildAdapter();
+      if (!(adapter instanceof DiscordAdapter)) throw new Error('not discord');
+      let endListening: () => void = () => undefined;
+      const listen = vi
+        .spyOn(adapter, 'startGatewayListener')
+        .mockImplementation((options) => {
+          options.waitUntil?.(
+            new Promise<void>((resolve) => {
+              endListening = resolve;
+            }),
+          );
+          return Promise.resolve(new Response('{}', { status: 200 }));
+        });
+      const controller = new AbortController();
+
+      const window = await startWindow?.(adapter, 1_000, controller.signal);
+
+      expect(listen).toHaveBeenCalledTimes(1);
+      const [, durationMs, signal, webhookUrl] = listen.mock.calls[0] ?? [];
+      expect(durationMs).toBe(1_000);
+      expect(signal).toBe(controller.signal);
+      expect(webhookUrl).toBeUndefined();
+
+      let ended = false;
+      void window?.ended.then(() => {
+        ended = true;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(ended).toBe(false);
+
+      endListening();
+      await window?.ended;
+      expect(ended).toBe(true);
+    });
   });
 });

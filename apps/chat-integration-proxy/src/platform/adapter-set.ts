@@ -9,7 +9,7 @@
 // the layer's outward-facing surface (`PlatformFacade`), not about its
 // internals. `bot-factory.ts` composes what this file builds; nothing outside
 // `platform/` imports either.
-import { createDiscordAdapter } from '@chat-adapter/discord';
+import { createDiscordAdapter, DiscordAdapter } from '@chat-adapter/discord';
 import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
 import {
   createPostgresState,
@@ -25,6 +25,7 @@ import type {
   PlatformAppConfig,
 } from '../types/index.js';
 import type { InstallationProvider } from './installation-provider.js';
+import type { ListenerWindow } from './listener-loop.js';
 import { createSlackInstallationLookup } from './slack-installation-lookup.js';
 
 /**
@@ -83,6 +84,18 @@ export type AdapterFactory =
        * that event's handling. Throws when the service cannot say.
        */
       readonly workspaceOfEvent?: (adapter: Adapter) => Promise<string>;
+      /**
+       * Present when initializing the adapter does not by itself start
+       * receiving events, and the SDK instead listens for one bounded window
+       * per call. The connection that holds this service's lock keeps
+       * calling it (`listener-loop.ts`) until the lock is given back.
+       * Rejects when the window could not be opened.
+       */
+      readonly startListenerWindow?: (
+        adapter: Adapter,
+        durationMs: number,
+        signal: AbortSignal,
+      ) => Promise<ListenerWindow>;
     }
   | {
       readonly credentialSource: 'installation';
@@ -180,6 +193,34 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           publicKey: discord.publicKey,
           botToken: discord.botToken,
         });
+      },
+      // No `webhookUrl`: without one the adapter hands each Gateway event to
+      // the Chat instance it was initialized with, the one every handler is
+      // registered on. The window promise reaches us only through
+      // `waitUntil`, and it never rejects (research.md).
+      startListenerWindow: async (adapter, durationMs, signal) => {
+        if (!(adapter instanceof DiscordAdapter)) {
+          throw new TypeError(
+            'a Discord listener was handed a non-Discord adapter',
+          );
+        }
+        const captured: { listening?: Promise<unknown> } = {};
+        const response = await adapter.startGatewayListener(
+          {
+            waitUntil: (task) => {
+              captured.listening = task;
+            },
+          },
+          durationMs,
+          signal,
+        );
+        const { listening } = captured;
+        if (!response.ok || listening == null) {
+          throw new Error(
+            `the Discord Gateway listener did not start (${response.status}): ${await response.text()}`,
+          );
+        }
+        return { ended: listening.then(() => undefined) };
       },
     },
     teams: {

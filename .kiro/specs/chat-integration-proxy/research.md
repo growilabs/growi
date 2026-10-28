@@ -81,6 +81,22 @@
 - **Findings**: Slack では、bot がいないチャンネルでの呼びかけはそもそもイベントが proxy に届かない。引数の聞き返しは依頼の直後、本人がチャンネルにいる間に出るので、本人だけのメッセージが成功する。DM に落ちるのは、依頼のあとで本人がチャンネルを抜けるといった、返事を出す直前の競合に限られる
 - **Implications**: DM に落ちる経路（見出し、封筒のリアクション、内容を含まない知らせ、DM での答え）は、実機試験の手順に入れず、単体試験（`command/private-reply.spec.ts`・`command/argument-collector.spec.ts`）と結合試験（`platform/private-reply-adapters.integ.ts`）で守る。実機試験の手順（`docs/manual-e2e-slack.md`）もそう書いている
 
+### Discord の Gateway の生涯
+
+- **Context**: Discord の DM と mention は Gateway（Discord への常時接続の WebSocket）でしか届かない。アダプタは初期化しただけでは Gateway を開かない（Slack は `initialize` の中で Socket Mode を開くので違う）。
+- **Sources Consulted**: `@chat-adapter/discord@4.38.1` の `dist/index.js`（`startGatewayListener`・`runGatewayListener`・`setupLegacyGatewayHandlers`・`handleGatewayMessage`・`initialize`）、`@discordjs/ws@1.2.3` の `dist/index.js`（`WebSocketShard.onClose`）
+- **Findings**:
+  - `startGatewayListener(options, durationMs = 180000, abortSignal?, webhookUrl?)` は、ログインを待たずにすぐ `Response` を返す。アダプタが Chat のインスタンスで初期化されていない（`initialize(chat)` を呼んでいない）とき、または `options.waitUntil` が無いときは 500 を返し、何も始めない。それ以外は 200 を返し、聞き続ける処理の promise を `waitUntil` に渡す。promise はここからしか受け取れない
+  - 聞き続ける処理は、discord.js の Client を作ってログインし、`durationMs` が過ぎるか `abortSignal` が abort されるまで待ってから Client を壊す。**1 回の呼び出しで聞くのは決まった長さの間だけ**なので、常駐するには呼び直し続けるしかない。abort を待ち始めるのはログインが終わったあとなので、ログインの途中で abort しても、ログインが終わるまで Client は壊れない。Client を壊す `client.destroy()` は待たずに呼ばれるので、聞き続ける処理の promise は WebSocket が閉じ切る前に終わる
+  - abort の listener は `{ once: true }` で signal に付けられ、期間が時間切れで終わったときは外されない
+  - 期間の途中で接続が切れたとき、`@discordjs/ws` は close code ごとに、同じセッションを続ける（Resume）か、新しく接続し直す（Reconnect）。ただし、認証の失敗（4004）・許されていない intent（4014）・不正な intent・shard の誤り・API の版の誤りでは、エラーを出して接続し直さない。この場合、その期間が終わるまで Gateway は止まったままになる（コードを読んで確かめた。実機では起こしていない）
+  - ログインの失敗（トークンの誤り、Message Content Intent が無効で close code 4014 など）は、アダプタが自分のログに書いて握りつぶす。promise は失敗にならず、すぐに終わる。**外から見える失敗の印は「期間より早く終わった」ことだけ**である
+  - `durationMs` は `setTimeout` に渡される。2^31-1 ms を超える値は 1 ms として扱われ、すぐ終わってしまう
+  - `webhookUrl` を渡さないと、届いたメッセージ・リアクション・interaction をアダプタが自分で処理し、初期化に使った Chat のインスタンスの `handleIncomingMessage` などに渡す。proxy は platform ごとの Chat のインスタンスに `registerEventHandlers` で処理を登録しているので、Slack の Socket Mode と同じ入口（`onNewMention`・`onNewMessage`）に入る
+  - アダプタには `disconnect` が無い。止めるには `abortSignal` を使うしかない
+  - mention がスレッドの外で届くと、アダプタはそのメッセージに Discord のスレッドを作り、スレッドを宛先にしてイベントを渡す
+- **Implications**: 決定 P13
+
 ## Architecture Pattern Evaluation
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
@@ -120,7 +136,7 @@
 - **Alternatives Considered**: 本人だけの「検索しています…」を出して、結果は別のメッセージで届ける（Discord では DM が 2 通になる）。チャンネルに短い文を出す（Discord では毎回チャンネルに文が残る）。
 - **Selected Approach**: 受け付けたら依頼のメッセージに `eyes`、DM に届けたら `email`（封筒）のリアクションを付ける。付けられないとき（依頼のメッセージが無い、サービスが拒んだ）は、受け付けの知らせは本人宛ての返事として「「…」を検索しています…」を出し、DM の知らせは「<表示名> さん、返事を DM で送りました。」という内容を含まない短い文をその場に出す。同じリアクションが既に付いているとき（Slack の `already_reacted`）は成功として扱う。
 - **Rationale**: リアクションは内容を含まず、チャンネルに文を増やさない。1 つの依頼から本人宛ての返事が何通も DM に届く（GROWI ごとの紐付けの案内と結果、複数の聞き返し）ので、2 通目以降で短い文に落ちないよう「既に付いている」を成功にする。
-- **Trade-offs**: リアクションは誰からも見える（何かを頼んだことは分かる）。頼んだこと自体は、メンションが全員に見えている時点で既に見えている。次の場面ではリアクションが付かず短い文になるが、どれも返事の内容は出ないので受け入れる: Teams（`email` を直せない）、Discord の既存のスレッドの中での依頼（リアクションの宛先が親のチャンネルになって失敗しうる）、依頼のメッセージが無い依頼（slash command から始まった依頼など。下の「既知の問題」5）。
+- **Trade-offs**: リアクションは誰からも見える（何かを頼んだことは分かる）。頼んだこと自体は、メンションが全員に見えている時点で既に見えている。次の場面ではリアクションが付かず短い文になるが、どれも返事の内容は出ないので受け入れる: Teams（`email` を直せない）、Discord の既存のスレッドの中での依頼（リアクションの宛先が親のチャンネルになって失敗しうる）、依頼のメッセージが無い依頼（slash command から始まった依頼など。下の「既知の問題」4）。
 
 ### 決定 P5: DM の見出しに使う場所の名前は、保存済みのチャンネル一覧から引く
 
@@ -147,13 +163,13 @@
 - **Context**: Key Findings 3。DM の本文には呼びかけが無いことが多い。
 - **Selected Approach**: `event-mapping.ts` が mention に `inDirectMessage`（スレッドが DM か）を付ける。`CommandInvocation.normalize` と `stripAddressToken` は、チャンネルでは先頭の語をいつも落とす。DM では、先頭の語が `@語` か `<@…>` の形のときだけ落とす（`invocation.ts` の `BOT_ADDRESS_SHAPE`）。
 - **Rationale**: 本物のアダプタで確かめた呼びかけの形（上の「本物のアダプタで確かめたこと」）は、4 サービスともこの 2 つの形に収まる。command 層には bot 自身の名前や id が届かないので、名前で突き合わせることはできない。
-- **Trade-offs**: DM の答えが `@誰か` で始まると、その語が落ちる（下の「既知の問題」3）。DM で `search foo` と打てばコマンドとして読まれるが、DM での installation の特定は別の不具合（umbrella の roadmap「リリース前に直すもの」の 3）なので、「workspace がまだ登録されていません」と返る。
+- **Trade-offs**: DM の答えが `@誰か` で始まると、その語が落ちる（下の「既知の問題」2）。DM で `search foo` と打てばコマンドとして読まれるが、DM での installation の特定は別の不具合（umbrella の roadmap「リリース前に直すもの」の 3）なので、「workspace がまだ登録されていません」と返る。
 
 ### 決定 P9: 返事の宛先の情報に installation を持たせ、4 つの platform 呼び出しすべてに同じ値を渡す
 
 - **Context**: 上の Research Log の「installation の指定」。
 - **Selected Approach**: `PrivateReplyOrigin.installationId: string | null`。`command-flow` と `admin-flow` は、すでに引いた値を渡す。分からない呼び出し元（`argument-collector`、「workspace がまだ登録されていません」の返事、入力の期限切れの知らせ）は `null` を渡し、`PrivateReplier` が依頼のチャンネルから既存の `resolveInstallationId` で引く。引いた installation を、本人だけのメッセージ・DM・リアクション・知らせの 4 つすべてに同じ `scope` として渡す。引けなければ `scope` 無しで呼ぶ。
-- **Trade-offs**: `null` のときにチャンネル一覧を 1 回引く。DM の中で届いたイベントでは引けない（下の「既知の問題」6）。
+- **Trade-offs**: `null` のときにチャンネル一覧を 1 回引く。DM の中で届いたイベントでは引けない（下の「既知の問題」5）。
 
 ### 決定 P10: 届けられなかった返事を受けた呼び出し元は、重ねて知らせない
 
@@ -190,6 +206,23 @@
   - 待たない: 依頼と同じ秒に入る場合が多く、上に並ぶ問題が残る
 - **Trade-offs**: 返事が最大でおよそ 1.25 秒遅れる（依頼の次の秒の頭までの残り + 余裕。proxy の時計が Slack より遅れているときの最悪値は上限の 1.5 秒）。余裕の 250 ms は、proxy と Slack の時計のずれが分からないまま置いた未検証の初期値で、実機で確かめて直す。待ちは本人だけのメッセージの投稿の前に入るので、それが失敗して DM に進む場合は DM も同じだけ遅れ、依頼にリアクションを付けられないときの `acknowledge`（本人だけのメッセージで「検索しています…」を出す経路）も同じ待ちを受けて、検索の問い合わせの開始が遅れる。DM を直接出す経路とリアクションそのものは並びの問題が無いので待たない。
 
+### 決定 P13: Discord の Gateway は `app:discord` のロックを持つ間だけ、24 時間ずつ呼び直して開き続ける
+
+- **Context**: 上の「Discord の Gateway の生涯」。同じ bot トークンで 2 つの Gateway を開くと、すべてのイベントが 2 回処理される。
+- **Selected Approach**:
+  - Gateway を開くのは、`ConnectionManager` が `app:discord` のロックを取って接続を開くとき（`platform/index.ts` の `openConnection`）。閉じるのは、ロックを失ったときと終了するとき（`closeConnection`）。サービス名で分けず、`ADAPTER_FACTORIES` のエントリに「1 回分の期間だけ聞く」関数 `startListenerWindow` を持たせ、持っているサービスだけで動かす。今は Discord だけが持つ
+  - 呼び直しは `platform/listener-loop.ts` が受け持つ。期間は 24 時間（`LISTENER_WINDOW_MS`）。期間いっぱい聞いて終わったら、すぐ次を開く。早く終わったら（＝ログインの失敗）運用者への報告（`reportOperationalFailure`）に経過時間と次の試行までの待ちを書き、5 秒から倍々で最大 5 分まで待ってから開き直す。期間いっぱい聞けたら待ちを最初に戻す。開き直しが拒まれたときも同じく報告して待つ
+  - 最初の 1 回が開けないとき（500 が返ったとき）だけは、接続を開く処理そのものを失敗させる。`ConnectionManager` がロックを返し、自分の間隔で再試行する
+  - 閉じるときは abort してから、聞き続ける処理が終わるまで待つ。終わった時点で、アダプタはイベントの処理をやめ、Client を閉じ始めている（アダプタは `client.destroy()` の完了を待たないので、WebSocket はまだ閉じている途中のことがある）。そのあとでロックを返すので、別のインスタンスが Gateway を開く時点では、こちらはもうイベントを処理しない。ただし待つのは最大 5 秒（`STOP_WAIT_MS`）で、超えたら運用者への報告に残して先へ進む。閉じる処理は `ConnectionManager` の周回の中で走るので、ログインが長引いたときに待ち続けると、他の接続のロックの延長が止まって期限が切れ、別のインスタンスとの二重処理を招くため。超えた場合の短い重なりは、design.md の「(c) で閉じ終わるまでの短い間」と同じく、state による重複の取り除きが受け止める。開き直しの途中で止められたときは、開きかけの期間も同じく待つ。間隔を空けている間の abort は、待ちをすぐ終わらせる
+  - 期間ごとに新しい `AbortController` を作り、その期間にだけ渡す。アダプタは期間が時間切れで終わっても abort の listener を signal から外さないので、1 つの signal を使い回すと、終わった期間の Client がその listener から参照され続けてメモリに残る
+  - `webhookUrl` は渡さない。イベントは他のサービスと同じ入口に入る
+- **Rationale**: 1 回の期間を長くするほど、開き直しの回数（＝開き直しのログインの間に送られたイベントを取りこぼす回数）が減る。24 時間はタイマーの上限（約 24.8 日）より十分短く、1 日 1 回の短い切れ目で済む。期間の途中の切断は discord.js が自分で再接続する。
+- **Trade-offs**:
+  - 開き直しのたびに、ログインの間（数秒）に送られたイベントは届かないと見込む。開き直しは新しいセッションを始める（Resume しない）ためで、Discord が前のセッションの間のイベントを新しいセッションに送らないことは Gateway の仕組みからの推定であり、実機では確かめていない
+  - 期間の途中で、接続し直さない種類の切断（上の Findings。例: 運用中に bot トークンを作り直した）が起きると、その期間が終わるまで最大 24 時間、Discord のイベントが届かない。proxy はこれを検知しない。トークンを作り直したら proxy を再起動する（`docs/setup-discord.md`）
+  - ログインに失敗し続けても、`ConnectionManager` の状態は `connected` のままになる。接続を開く処理はログインを待たずに終わり、ログインの成否は外から分からないため。失敗は運用者への報告に毎回残る。アダプタのログの文言を読んで判定する作りは、アダプタの更新で黙って壊れるので採らない
+  - ログインの失敗の理由そのものは、アダプタのログ（標準出力）にしか出ない。proxy の報告は「早く終わった」ことと経過時間だけを書く
+
 ## Synthesis
 
 - **Generalization**: 「本人に届ける」は、検索の結果・聞き返し・エラー・登録コードに共通する 1 つの問題として扱う。インターフェースは「何の依頼への、どの installation としての返事か」を受け取る形である。あとから（イベントの処理の外で）届ける返事も、installation を名指しすれば token の問題は解ける。ただし「スレッドの中で本人だけに見せる」ためのスレッドの根元は持たないので、それが要る機能（`chat-integration-agent`）が `PrivateReplyOrigin` に足す（design.md の Revalidation Triggers）
@@ -207,13 +240,12 @@
 ## 既知の問題（未解決）
 
 1. **Mattermost の 403 が「bot がチャンネルにいない」と分類される。** `/posts/ephemeral` が権限不足（`create_post_ephemeral` が無い）で 403 を返すと、`classifyOutboundFailure`（`platform/outbound.ts`）は `bot-not-in-channel`（「bot を招待して」）と分類する。アダプタが投げる `PermissionError` は応答の本文を持たないので、権限不足とチャンネル不参加を見分けられない。利用者への影響は無い（決定 P3 によりどちらでも DM に進む）が、DM も届かなかったときの運用者向けの報告（`reportUndeliverable`）に誤った理由が載る。今の分類は `platform/private-reply-adapters.integ.ts` の Mattermost の試験（「reaches /posts/ephemeral with the proxy's bare channel id …」）が固定しているので、分類を直すとその試験が落ちて気づける。`docs/setup-mattermost.md` にも既知の不整合として書いてある
-2. **Discord の Gateway を開いていないので、Discord の DM と mention が proxy に届かない。** `src/` のどこからもアダプタの `startGatewayListener` を呼んでいない。そのため Discord では、本人宛ての返事を DM で送ることはできるが、利用者がその DM に書いた答え（要件 1.16）もチャンネルでの mention も proxy に届かない。umbrella の design.md の「Discord は Gateway で受ける」という記述と食い違う。以前からある不整合で、別の対応で直す（umbrella の roadmap「リリース前に直すもの」の 3）。`docs/setup-discord.md` にも書いてある
-3. **DM の先頭の `@誰か` が落ちる。** 決定 P8 の規則は形で判定するので、DM での答えが `@誰か` で始まると、その語が呼びかけとして落ちる。command 層は bot 自身の名前や id を知らないので、今の作りでは避けられない。直すなら、platform 層が「呼びかけの語を外した本文」を渡す形に変える
-4. **Teams と、2 回目のリアクションは一部が未確認。** Teams の `email` リアクションはアダプタの対応表に無く、Teams が受け付けるかは実機で確かめていない（受け付けなければ短い文の知らせに落ちる。決定 P4）。同じリアクションの 2 回付けが成功になることは、Slack だけアダプタのコードで確かめた。Discord・Mattermost・Teams は仮定した応答の上での確認である。Teams で、利用者が 1 対 1 の会話で bot に答えるのにアプリを `personal` の範囲でも入れる必要があるかも未確認（`docs/setup-teams.md`）
-5. **依頼のメッセージが無い依頼では、DM に届くたびにその場に短い文が出る。** slash command から始まった依頼は依頼のメッセージの id（`sourceMessageId`）を持たない（`sourceMessageId` が無い古い保存済みの行から再開した依頼も同じ）ので、リアクションを付けられない。DM に届くたびに「返事を DM で送りました」という内容を含まない文がその場に出る。うるさいが、返事の内容は漏れない
-6. **Mattermost で installation が複数あるとき、DM の中で届いたイベントの「入力の期限切れ」の知らせは installation を引けない。** `reportExpired`（`orchestration/command-flow.ts`）はイベントのチャンネル（DM）を宛先にし、`installationId` を `null` で渡す。DM はチャンネル一覧に載らないので `resolveInstallationId` が引けず、`scope` 無しの呼び出しは宛先の接続を決められずに失敗する（その場合は運用者への報告だけが残る）
-7. **DM に落ちる経路は Slack の実機では起こせない**（上の Research Log）。結合試験と単体試験で守る
-8. **（本機能の外）`src/testing/instance-ownership-e2e.integ.ts` の「runs the periodic sweep on one instance at a time」は、この開発環境では 5 秒の上限で時々失敗する。** この機能の無いコミットでも同じように失敗する
+2. **DM の先頭の `@誰か` が落ちる。** 決定 P8 の規則は形で判定するので、DM での答えが `@誰か` で始まると、その語が呼びかけとして落ちる。command 層は bot 自身の名前や id を知らないので、今の作りでは避けられない。直すなら、platform 層が「呼びかけの語を外した本文」を渡す形に変える
+3. **Teams と、2 回目のリアクションは一部が未確認。** Teams の `email` リアクションはアダプタの対応表に無く、Teams が受け付けるかは実機で確かめていない（受け付けなければ短い文の知らせに落ちる。決定 P4）。同じリアクションの 2 回付けが成功になることは、Slack だけアダプタのコードで確かめた。Discord・Mattermost・Teams は仮定した応答の上での確認である。Teams で、利用者が 1 対 1 の会話で bot に答えるのにアプリを `personal` の範囲でも入れる必要があるかも未確認（`docs/setup-teams.md`）
+4. **依頼のメッセージが無い依頼では、DM に届くたびにその場に短い文が出る。** slash command から始まった依頼は依頼のメッセージの id（`sourceMessageId`）を持たない（`sourceMessageId` が無い古い保存済みの行から再開した依頼も同じ）ので、リアクションを付けられない。DM に届くたびに「返事を DM で送りました」という内容を含まない文がその場に出る。うるさいが、返事の内容は漏れない
+5. **Mattermost で installation が複数あるとき、DM の中で届いたイベントの「入力の期限切れ」の知らせは installation を引けない。** `reportExpired`（`orchestration/command-flow.ts`）はイベントのチャンネル（DM）を宛先にし、`installationId` を `null` で渡す。DM はチャンネル一覧に載らないので `resolveInstallationId` が引けず、`scope` 無しの呼び出しは宛先の接続を決められずに失敗する（その場合は運用者への報告だけが残る）
+6. **DM に落ちる経路は Slack の実機では起こせない**（上の Research Log）。結合試験と単体試験で守る
+7. **（本機能の外）`src/testing/instance-ownership-e2e.integ.ts` の「runs the periodic sweep on one instance at a time」は、この開発環境で失敗する。** 5 秒の上限に当たるか、試験が `proxy:sweep` のロックを取れずに失敗する。定期処理は起動時には動かない（`runtime/sweeper.ts` の `start`）ので、原因は、同じ試験の前の実行が残したロック（寿命 60 秒）か、同じ DB を使う別のプロセス（開発用に動かしている proxy など）が持つロックと見られる。Discord の Gateway の変更とは関係なく、変更より前のコミット（`59ef6d38d5`）でも同じく失敗した
 
 ## References
 

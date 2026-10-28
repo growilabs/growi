@@ -3,7 +3,7 @@
 > umbrella spec: [chat-integration](../chat-integration/)。要件は umbrella の `requirements.md` が持つ。
 > 通信契約・署名・チャンネル権限の判定は [chat-integration-protocol](../chat-integration-protocol/) が持つ。
 > 4 つの spec に共通する設計判断の根拠（決定 1〜14）は umbrella の `research.md`。本書で「決定 N」とだけ書くものはこちらを指す。
-> proxy に固有の判断（本人宛ての返事の届け方。決定 P1〜P11）の根拠と、未解決の既知の問題は、本ディレクトリの `research.md`。
+> proxy に固有の判断（本人宛ての返事の届け方の決定 P1〜P12、Discord の Gateway の開き方の決定 P13）の根拠と、未解決の既知の問題は、本ディレクトリの `research.md`。
 
 ## Overview
 
@@ -69,6 +69,9 @@ types → capabilities → db → platform → command → relation → growi �
 - 対応するチャットサービスが増減したとき（能力表と要件 1.2 / 5.6 / 6.5 の対象が変わる）
 - Chat SDK を更新したとき — **能力表を必ず突き合わせる**（docs が `protected` 拡張面を「まだ安定と見なしていない」と明記）
 - 能力表の「要確認」の行を実物で確かめたとき（`plainReply`）
+- Discord のアダプタを更新したとき — **`startGatewayListener` の約束を突き合わせる**: 聞き続ける処理の promise を `waitUntil` で渡す、
+  決まった期間で閉じる、ログインの失敗を握りつぶして早く終わる、`webhookUrl` 無しならイベントを自分で Chat に渡す、`abortSignal` で止まる。
+  proxy の Gateway の開き直し（決定 P13）はこの 5 つに寄りかかっている
 - Chat SDK かアダプタを更新したとき — **`postEphemeral`・`openDM`・`addReaction` の振る舞いも突き合わせる**。
   本人だけのメッセージは `ChannelImpl` を通さずアダプタを直接呼び、DM への切り替えも proxy が自分で行う（proxy の research.md の決定 P2）ので、SDK 側の変更に自動では追従しない。
   `private-reply-adapters.integ.ts` を流し、DM のチャンネル id の一致・DM の本文の先頭の形・同じリアクションの 2 回付けを確かめ直す
@@ -181,6 +184,24 @@ export interface ConnectionManager {
 
 **切れたときは指数的に間隔を空けて張り直す。** 上限を超えたら `failed` として記録し、運用者に見える形で残す。
 **1 つの接続の失敗を他へ波及させない**（要件 1.4）。
+
+#### Discord の Gateway
+
+Discord のアダプタは、初期化しただけでは Gateway を開かない。`startGatewayListener` を呼ぶと、
+**決まった長さの間だけ**聞いて閉じる。そこで `app:discord` のロックを持っている間だけ、
+`platform/listener-loop.ts` が 24 時間ずつ呼び直して開き続ける。
+
+- **開く・閉じるは `ConnectionManager` の `open` / `close` に乗せる。** ロックを取ったら開き、
+  ロックを失ったとき・終了するときに閉じる。閉じるときは、アダプタがイベントの処理をやめるのを待ってからロックを返す。
+  ただし待つのは最大 5 秒で、他の接続のロックの延長を止めない
+- **期間ごとに別の abort 用の signal を渡す。** アダプタは時間切れで終わった期間の listener を signal から外さないので、使い回すと終わった Client がメモリに残る
+- **サービス名で分けない。** `ADAPTER_FACTORIES` のエントリが `startListenerWindow`（1 回分の期間だけ聞く関数）を
+  持つサービスだけで動く。今は Discord だけが持つ
+- **ログインの失敗は「期間より早く終わった」ことでしか分からない**（アダプタが握りつぶす）。
+  早く終わったら運用者への報告に残し、間隔を空けて開き直す。最初の 1 回が開けないときだけ `open` を失敗させる
+- イベントは Slack の Socket Mode と同じ入口（`registerEventHandlers` が登録した処理）に入る
+
+根拠と、開き直しのたびに数秒分のイベントを取りこぼすことなどの代償は proxy の research.md の決定 P13。
 
 #### 起動時に 1 回では成立しない
 
@@ -358,6 +379,7 @@ apps/chat-integration-proxy/
 │   │   ├── bot-factory.ts
 │   │   ├── adapter-set.ts         # 接続情報を受け取ってアダプタと state を組み立てる
 │   │   ├── connection-manager.ts  # 常時接続の生涯
+│   │   ├── listener-loop.ts       # 期間を区切って聞くサービス（Discord の Gateway）を開き直し続ける
 │   │   ├── installation-provider.ts
 │   │   ├── installation-store.ts  # installation を作る・消す
 │   │   ├── event-mapping.ts       # SDK のイベント → PlatformEvent（SDK 型はここで止まる）
@@ -1027,7 +1049,7 @@ export const privateReplyOriginOf: (invocation: Invocation, installationId: stri
 | Teams | その場（本人だけのメッセージ。24 時間で消える）。失敗したときは DM | DM を開くには、利用者が一度 bot に呼びかけている必要がある |
 | Mattermost | bot にシステム管理者の権限があればその場、無ければ DM | 権限を与えるかを運用者が選ぶ |
 
-既知の問題（Mattermost の 403 の分類、Discord の Gateway、DM の先頭の `@誰か` など）は proxy の research.md の「既知の問題」。
+既知の問題（Mattermost の 403 の分類、DM の先頭の `@誰か` など）は proxy の research.md の「既知の問題」。
 
 
 ### FanOutCollector（検索とヘルプで共用）
@@ -1470,7 +1492,7 @@ Chat SDK の state（購読・分散ロック・重複排除）は `@chat-adapte
 
 1. Slack: mention → ボタン → modal → ページ作成 → リンクが投稿される（4.1–4.3・8.2）
 2. Mattermost: mention → 番号つき一覧 → `@growi 1` で選択 → 引数と聞き返しでページ作成（1.2・8.2）
-3. Discord: mention による検索が 2 台の GROWI の結果を出典つきで返す（3.1–3.3）。結果は本人への DM で届く（Discord には本人にだけ見えるメッセージが無い）。ただし proxy は今 Discord の Gateway を開かないので mention が届かず、この試験は今は行えない（proxy の research.md の既知の問題 2）
+3. Discord: mention による検索が 2 台の GROWI の結果を出典つきで返す（3.1–3.3）。結果は本人への DM で届く（Discord には本人にだけ見えるメッセージが無い）
 4. **Teams**: mention → modal → ページ作成。**外部から接続を受ける唯一のサービス**で、
    slash command は使えず modal は使えるという他と違う組み合わせを持つため確かめる価値が最も高い（1.1・1.2・13.3）
 5. **通知**（要件 2）: GROWI がページを保存 → 通知が指定のチャンネルへ届く →

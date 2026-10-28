@@ -70,7 +70,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 |---|---|---|---|---|
 | 1 | 表示順 | 本人にだけ見える返事が、入力より上に出る | 時刻を測って原因を調べてから直す | proxy |
 | 2 | proxy の見え方 | 検索結果の見せ方、Slack への通知の文面 | spec を作らず直接直す（契約は変えない） | proxy（通知の文面は app の markdown にも及びうる） |
-| 3 | proxy の不具合の一括修正 | Discord の Gateway、Enterprise Grid のチャンネル一覧、installation の特定、Mattermost の 403 | spec を作らず直接直す。各項目にテストを付ける | proxy |
+| 3 | proxy の不具合の一括修正 | Enterprise Grid のチャンネル一覧、installation の特定、Mattermost の 403、接続の更新の失敗 | spec を作らず直接直す。各項目にテストを付ける | proxy |
 | 4 | app の見え方（`agent` と重ならない部分） | 承認画面、ページの編集画面、紐付け解除後のバッジ | amend spec `chat-integration-app-ui`（名前は仮） | app |
 | 5 | URL の展開の方針 | 公開範囲が「公開」のページは題名だけ出す | amend spec `chat-integration-link-preview`（名前は仮） | app（protocol と proxy にも及びうる） |
 | 6 | 通知の定期処理の負荷 | 連携が無いテナントの問い合わせを飛ばす、解除済みの連携の掃除を 1 日 1 回にする | amend spec `chat-integration-notification-load`（名前は仮） | app |
@@ -99,12 +99,12 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 ### 3. proxy の不具合の一括修正
 
-実機試験と独立レビューで見つかった。直す順は、Discord 全体が動かない Gateway を先頭にし、次に Enterprise Grid、installation の特定、Mattermost の 403。
+実機試験と独立レビューで見つかった。直す順は、Enterprise Grid、installation の特定、Mattermost の 403、接続の更新の失敗。
 
-1. **Discord の Gateway を開いていないので、Discord の DM と mention が proxy に届かない**: `src/` のどこからもアダプタの `startGatewayListener` を呼んでいない。本人宛ての返事を DM で送ることはできるが、その DM での答え（要件 1.16）もチャンネルでの mention も届かない。umbrella の design.md の「Discord は Gateway で受ける」と食い違う。別の対応で直す。詳しくは [chat-integration-proxy の research.md](../chat-integration-proxy/research.md) の「既知の問題」2
-2. **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
-3. **DM や一覧にまだ載っていないチャンネルでのコマンドに、的外れな案内が返る**: installation の特定をチャンネル一覧に頼るため、「workspace がまだ登録されていません」と返る（bot が招待された直後は一覧をすぐ取り直すようにしたので、招待後の待ちは無くなった。DM と、bot の招待を伴わずに増えたチャンネルでは残る）
-4. **Mattermost で、本人にだけ見えるメッセージの権限不足（403）が「bot がチャンネルにいない」と記録される**: `classifyOutboundFailure` が 403 を `bot-not-in-channel` と分類する（アダプタの例外が応答の本文を持たず、見分けられない）。利用者には DM で届くので影響は無いが、DM も届かなかったときの運用者向けの報告の理由が誤る。同じ research.md の「既知の問題」1
+1. **Enterprise Grid の組織全体への導入で、チャンネル一覧が取れない**: `platform/channels.ts` が `conversations.list` の `team_id` に installation の `workspace_id`（組織全体の導入では組織の `E…`）を渡すため、`team_access_not_granted` になる。本来は `auth.teams.list` で許可された workspace ごとに取る。一覧が空なので、その installation ではコマンドの権限確認も通知もできない
+2. **DM や一覧にまだ載っていないチャンネルでのコマンドに、的外れな案内が返る**: installation の特定をチャンネル一覧に頼るため、「workspace がまだ登録されていません」と返る（bot が招待された直後は一覧をすぐ取り直すようにしたので、招待後の待ちは無くなった。DM と、bot の招待を伴わずに増えたチャンネルでは残る）
+3. **Mattermost で、本人にだけ見えるメッセージの権限不足（403）が「bot がチャンネルにいない」と記録される**: `classifyOutboundFailure` が 403 を `bot-not-in-channel` と分類する（アダプタの例外が応答の本文を持たず、見分けられない）。利用者には DM で届くので影響は無いが、DM も届かなかったときの運用者向けの報告の理由が誤る。[chat-integration-proxy の research.md](../chat-integration-proxy/research.md) の「既知の問題」1
+4. **接続の更新（`renew`）がエラーで失敗すると、持っていた接続が止まらず、別のインスタンスと二重に処理される**: `connection-manager.ts` の `runCycle` は、`locks.renew` が false を返す場合は接続を閉じるが、例外を投げる場合は状態を変えるだけで `close` を呼ばない。ロックは 60 秒で切れて別のインスタンスが同じ接続（Discord の Gateway、Slack の Socket Mode）を開き、両方が同じイベントを処理する。直し方は、`renew` が例外を投げたとき、`connected` だった接続に対して先に `close` を呼んでから失敗として記録する
 
 ### 4. app の見え方（amend spec `chat-integration-app-ui`、名前は仮）
 
@@ -150,7 +150,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 `search`・`create-page`・`agent` に再編する。`keep` は `agent` に吸収する。`brief.md` だけがあり、`spec.json` は無い。要件・設計・タスクの承認がこれから。答えを本人にだけ届ける仕組みは実装済み（[chat-integration-proxy の design.md](../chat-integration-proxy/design.md)「PrivateReplier — 本人宛ての返事の届け方」）。順 3 の installation の特定が前提。
 
 - **この spec の要件で決めること（roadmap から移した）**:
-  - **DM の先頭の `@誰か` が落ちる**: `agent` は DM や AI アプリの画面で自由な文章を受け取るので、「@alice について…」の先頭の語が落ちる。command 層が bot 自身の名前や id を知らないために起きる（[proxy の research.md](../chat-integration-proxy/research.md)「既知の問題」3）。直し方を要件で決める
+  - **DM の先頭の `@誰か` が落ちる**: `agent` は DM や AI アプリの画面で自由な文章を受け取るので、「@alice について…」の先頭の語が落ちる。command 層が bot 自身の名前や id を知らないために起きる（[proxy の research.md](../chat-integration-proxy/research.md)「既知の問題」2）。直し方を要件で決める
   - **Teams で、1 対 1 の会話で bot に答えるのに、アプリを `personal` の範囲でも入れる必要があるか**: 未確認。`agent` の Teams の経路がこれに依存する（同 research.md の Research Log）
   - **通知の「書き込んだ直後に送る」**: 順 6 の説明を参照。`agent` の「あとから送る口」と同じ送り方で作る
 - **制約（直せない。`agent` の設計で扱い方を決める）**: official proxy では Slack の会話の取り込みが事実上使えない。Slack Marketplace の外で配布するアプリは、2025-05-29 以降、`conversations.history` が 1 分に 1 回・1 回 15 件までに制限される（組織が自分で作るアプリは対象外）。GROWI が運営する 1 つのアプリを多くの workspace に導入する形では、`keep`（要件 5）がこの制限を受ける。詳しくは [chat-integration-agent の brief](../chat-integration-agent/brief.md) の「実現性の確認の結果」3
@@ -177,9 +177,9 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 直さずにリリースしてよいかの判断を、ユーザーに預けている。リリースに含めるなら、「リリース前に直すもの」へ移す。
 
-- **Teams の `email` リアクションが未確認**: Teams が受け付けるかは実機でしか分からない（[proxy の research.md](../chat-integration-proxy/research.md)「既知の問題」4）
-- **依頼のメッセージが無い依頼で、短い知らせが繰り返される**: slash command から始まった依頼など（同 5）。順 9 でスラッシュコマンドを扱うときに、あわせて見直せる
-- **Mattermost で installation が複数あるとき、DM での「入力の期限切れ」の知らせが installation を引けない**（同 6）
+- **Teams の `email` リアクションが未確認**: Teams が受け付けるかは実機でしか分からない（[proxy の research.md](../chat-integration-proxy/research.md)「既知の問題」3）
+- **依頼のメッセージが無い依頼で、短い知らせが繰り返される**: slash command から始まった依頼など（同 4）。順 9 でスラッシュコマンドを扱うときに、あわせて見直せる
+- **Mattermost で installation が複数あるとき、DM での「入力の期限切れ」の知らせが installation を引けない**（同 5）
 
 ## Scope
 

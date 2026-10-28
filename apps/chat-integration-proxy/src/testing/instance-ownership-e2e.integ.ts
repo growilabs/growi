@@ -44,14 +44,14 @@
 // alternative reading of that bullet: its lock is one global `proxy:sweep`
 // key, not one key per installation.
 //
-// **Why Discord can be driven through the completely real facade.** Its
-// adapter's `initialize()` only resolves an application id, and a literal
-// `applicationId` is already resolved, so opening the `app:discord` unit
-// touches no network and exposes no `disconnect()` to fail on either. That is
-// the same fact Implementation Note 3.8 (d) records as a Revalidation Trigger
-// candidate -- **if Discord ever gains a real Gateway connection, the cases
-// below that use the real facade have to move to the injected-dial mechanism
-// the Mattermost cases already use.**
+// **Why Discord is driven through the real facade with only its Gateway
+// stubbed.** Its adapter's `initialize()` only resolves an application id,
+// and a literal `applicationId` is already resolved, so it touches no
+// network. Holding `app:discord` also starts the Gateway
+// (`startGatewayListener`), which would log in to Discord -- so that one
+// call is replaced by a window that stays open until its signal aborts, and
+// the cases count the windows still open: exactly one instance may be
+// receiving Discord's events at a time.
 //
 // **Why the Mattermost cases inject `open`/`close`.** Its adapter's
 // `initialize()` fetches `/api/v4/users/me` and then opens a WebSocket, and
@@ -76,6 +76,7 @@ import {
   type ConnectionUnitRef,
   createConnectionManager,
 } from '../platform/connection-manager.js';
+import { standInForDiscordGateway } from '../platform/discord-gateway-stand-in.js';
 import type {
   ConnectionStatusRow,
   InstallationProvider,
@@ -152,10 +153,13 @@ const proxyConfig = (): ProxyConfig => ({
 let cluster: ProxyCluster | null = null;
 const closers: Array<() => Promise<void>> = [];
 
+const gateway = standInForDiscordGateway();
+
 afterEach(async () => {
   await cluster?.stopAll();
   cluster = null;
   await Promise.all(closers.splice(0).map((close) => close()));
+  gateway.reset();
 });
 
 const openDb = (): PrismaClient => {
@@ -382,6 +386,7 @@ describe('what two running proxy instances each own (task 11.4)', () => {
     // The other instance is not idle by accident -- `held-by-other` is only
     // reachable by asking PostgreSQL for the grant and being refused.
     expect(ownership.heldByOther).toHaveLength(1);
+    expect(gateway.open()).toBe(1);
 
     // Nothing else was opened: with no installations, an app-wide service is
     // still wanted, and a per-installation one is not.
@@ -414,6 +419,9 @@ describe('what two running proxy instances each own (task 11.4)', () => {
     expect(
       (await rowFor(running.get(successor), DISCORD_LOCK_KEY))?.state,
     ).toBe('connected');
+    // The stopped owner's Gateway is closed and the successor's is open.
+    expect(gateway.opened()).toBe(2);
+    expect(gateway.open()).toBe(1);
   });
 
   it('gives each installation of a per-installation service to exactly one instance', async () => {

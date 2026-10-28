@@ -62,6 +62,7 @@ import { registerEventHandlers } from './event-handlers.js';
 import { fetchHistory as fetchHistoryOf } from './history.js';
 import type { InstallationProvider } from './installation-provider.js';
 import { installationRunner } from './installation-scope.js';
+import { type RunningListener, startListenerLoop } from './listener-loop.js';
 import {
   addReaction as addReactionOf,
   attachPreview as attachPreviewOf,
@@ -349,6 +350,9 @@ export const createPlatformFacade = async (
     }),
   );
 
+  /** Listeners kept running for a held app-wide connection, keyed by lock key. */
+  const listeners = new Map<string, RunningListener>();
+
   /** Open per-installation connections, keyed by installation id. */
   const installationBots = new Map<string, PlatformBot>();
 
@@ -387,6 +391,23 @@ export const createPlatformFacade = async (
       // The adapter, not `Chat.initialize()`: the latter would start every
       // adapter of the instance, and only this one's lock is held.
       await bot.adapter.initialize(bot.chat);
+      const factory = ADAPTER_FACTORIES[unit.platform];
+      const startWindow =
+        factory.credentialSource === 'app'
+          ? factory.startListenerWindow
+          : undefined;
+      if (startWindow != null) {
+        await listeners.get(unit.lockKey)?.stop();
+        listeners.set(
+          unit.lockKey,
+          await startListenerLoop({
+            label: unit.platform,
+            startWindow: (durationMs, signal) =>
+              startWindow(bot.adapter, durationMs, signal),
+            report: handlerDeps.reportOperationalFailure,
+          }),
+        );
+      }
       return;
     }
 
@@ -426,6 +447,13 @@ export const createPlatformFacade = async (
     if (unit.installationId != null) {
       installationBots.delete(unit.installationId);
     }
+    // Awaited before the lock is given back, so this instance has stopped
+    // handling events before another one can start its own listener. The
+    // SDK does not await the client's teardown, so the socket may still be
+    // closing.
+    const listener = listeners.get(unit.lockKey);
+    listeners.delete(unit.lockKey);
+    await listener?.stop();
     // Never `Chat.shutdown()`: it disconnects the shared state adapter, which
     // would take the distributed lock and every other connection down with it.
     // `disconnect` is optional -- an adapter that opens nothing has none.
