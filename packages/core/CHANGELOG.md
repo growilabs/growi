@@ -1,5 +1,11 @@
 # @growi/core
 
+## 3.1.2
+
+### Patch Changes
+
+- [#12159](https://github.com/growilabs/growi/pull/12159) [`c0e2f63`](https://github.com/growilabs/growi/commit/c0e2f63b0d5c5993362ee74a8a4b21873900494f) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Make `isCreatablePage` run in linear time. The page depth limit (130 levels) is now checked by counting path segments instead of a regular expression whose time grew exponentially with the number of slashes, and the trailing `/edit` / `.md` and spaces-around-slash checks no longer slow down quadratically on long paths. The depth check is exported from `page-path-utils` as `exceedsMaxPageDepth`.
+
 ## 3.1.1
 
 ### Patch Changes
