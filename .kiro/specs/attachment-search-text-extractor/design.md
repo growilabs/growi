@@ -180,7 +180,7 @@ services/attachment-text-extractor/
 │   │   ├── wire.py                        #   親子間の受け渡し (長さつきのバイト列、結果の JSON の型)
 │   │   └── platform_guards.py             #   Linux だけの設定 (oom_score_adj、RLIMIT_AS) を他の OS では何もしない形で包む
 │   └── conversion/                        # [New] 子プロセスの中で動く純粋な変換 (HTTP もプロセスも知らない)
-│       ├── __init__.py                    #   convert(data, filename, mime_hint) を公開
+│       ├── __init__.py                    #   convert(data, filename, mime_hint, limits) を公開
 │       ├── core.py                        #   形式の判定 → 変換 → 正規化 → 空要素の規則、例外の分類
 │       ├── formats.py                     #   MIME / 拡張子 → 形式と経路の対応表 (旧 extractors/__init__.py を置き換え)
 │       ├── errors.py                      #   変換の失敗の種類 (ConversionFailure) と分類
@@ -418,6 +418,7 @@ class ConversionRequest:
 class ConversionSuccess:
     pages: list[PageInfo]
     mime_type: str
+    child_peak_rss_mb: int | None = None   # 親だけが入れる。親子間の JSON には載せない
 
 FailureKind = Literal[
     "unsupported",        # 1.6
@@ -435,6 +436,7 @@ FailureKind = Literal[
 class ConversionFailure:
     kind: FailureKind
     detail: str           # ログと応答の message 用。ファイルの中身は含めない
+    child_peak_rss_mb: int | None = None   # 親だけが入れる。親子間の JSON には載せない
 
 ConversionOutcome = ConversionSuccess | ConversionFailure
 

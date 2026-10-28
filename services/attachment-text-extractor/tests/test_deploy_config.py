@@ -109,6 +109,9 @@ class TestCompose:
         assert compose_service["healthcheck"]["test"]
         assert compose_service["init"] is True
 
+    def test_service_has_no_persistent_volume(self, compose_service: dict) -> None:
+        assert not compose_service.get("volumes")
+
     def test_network_blocks_egress(self) -> None:
         if not COMPOSE.is_file():
             pytest.skip("compose file not found")

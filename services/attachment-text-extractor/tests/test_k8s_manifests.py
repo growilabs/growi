@@ -104,6 +104,12 @@ class TestTmpVolume:
         assert len(pod_spec["volumes"]) == 1
 
 
+class TestStatelessness:
+    def test_deployment_has_no_persistent_storage(self, deployment: dict[str, Any], pod_spec: dict[str, Any]) -> None:
+        assert deployment["kind"] == "Deployment"
+        assert not any("persistentVolumeClaim" in v for v in pod_spec["volumes"])
+
+
 class TestResources:
     def test_memory_requests_and_limits(self, container: dict[str, Any]) -> None:
         res = container["resources"]

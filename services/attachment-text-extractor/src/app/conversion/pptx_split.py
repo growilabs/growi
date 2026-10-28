@@ -14,16 +14,14 @@ from collections.abc import Iterator
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from urllib.parse import unquote
-from xml.etree.ElementTree import Element, ParseError, register_namespace, tostring
+from xml.etree.ElementTree import Element, tostring
 from xml.sax.saxutils import quoteattr
-
-from defusedxml import DefusedXmlException
-from defusedxml.ElementTree import fromstring, iterparse
 
 from app.conversion.archive_guard import inspect_archive, read_part
 from app.conversion.errors import ConversionError
 from app.conversion.limits import ConversionLimits
 from app.conversion.office import convert_office
+from app.conversion.ooxml_xml import local_name, parse, register_prefixes
 from app.schemas import PageInfo
 
 _MIB = 1024 * 1024
@@ -48,9 +46,6 @@ _AUTO_ALT_TEXT_LINE = re.compile(
 # anydoc marks a soft line break with a trailing backslash and escapes literal ones as "\\",
 # so only an odd run of trailing backslashes ends in a marker.
 _LINE_BREAK_MARKER = re.compile(r"(?<!\\)((?:\\\\)*)\\$", re.MULTILINE)
-# Besides ParseError, expat raises LookupError for an unknown declared encoding and ValueError
-# (UnicodeError included) for one it cannot use; all of them mean the part is not usable XML.
-_XML_ERRORS = (ParseError, DefusedXmlException, LookupError, ValueError)
 
 
 @dataclass(frozen=True)
@@ -96,12 +91,12 @@ class _Splitter:
         self._shared: dict[str, bytes] = {}
 
         presentation_xml = self._read(_PRESENTATION)
-        self._presentation = _parse(presentation_xml)
-        _register_prefixes(presentation_xml)
+        self._presentation = parse(presentation_xml, "PPTX part")
+        register_prefixes(presentation_xml, "PPTX part")
         self._slide_id_list = _find_child(self._presentation, "sldIdLst")
         self._slide_ids: list[Element] = []
         if self._slide_id_list is not None:
-            self._slide_ids = [child for child in self._slide_id_list if _local_name(child.tag) == "sldId"]
+            self._slide_ids = [child for child in self._slide_id_list if local_name(child.tag) == "sldId"]
             if len(self._slide_ids) > limits.max_archive_entries:
                 raise ConversionError("limit_exceeded", "slide list is longer than the archive entry limit")
             # Emptied once; each package re-adds only its own entry.
@@ -114,7 +109,7 @@ class _Splitter:
         shared_roots += [rel.part for rel in self._presentation_rels if rel.part and not _is_slide(rel)]
         for part in self._closure(shared_roots, excluded=self._slide_parts | {_PRESENTATION}):
             self._shared[part] = self._read(part)
-        self._content_types = _parse(self._read(_CONTENT_TYPES))
+        self._content_types = parse(self._read(_CONTENT_TYPES), "PPTX part")
 
     def packages(self) -> Iterator[bytes]:
         """One package per slide entry, built lazily so only one is held in memory at a time."""
@@ -169,8 +164,8 @@ class _Splitter:
         if rels_name in self._names:
             raw = self._read(rels_name)
             self._raw_rels[part] = raw
-            for node in _parse(raw):
-                if _local_name(node.tag) != "Relationship":
+            for node in parse(raw, "PPTX part"):
+                if local_name(node.tag) != "Relationship":
                     continue
                 external = node.get("TargetMode", "Internal") == "External"
                 target = node.get("Target", "")
@@ -214,7 +209,7 @@ class _Splitter:
         lowered = {part.lower() for part in parts}
         items = []
         for node in self._content_types:
-            kind = _local_name(node.tag)
+            kind = local_name(node.tag)
             if kind == "Default":
                 items.append(
                     f"<Default Extension={_attr(node, 'Extension')} ContentType={_attr(node, 'ContentType')}/>"
@@ -224,25 +219,8 @@ class _Splitter:
         return _xml_document(f'<Types xmlns="{_CONTENT_TYPES_NS}">{"".join(items)}</Types>')
 
 
-def _parse(body: bytes) -> Element:
-    try:
-        return fromstring(body)
-    except _XML_ERRORS:
-        raise ConversionError("malformed", "PPTX part is not well-formed XML") from None
-
-
-def _register_prefixes(body: bytes) -> None:
-    # Keeping the document's own prefixes avoids ns0-style renames that break mc:Ignorable lists.
-    try:
-        for _event, (prefix, uri) in iterparse(io.BytesIO(body), events=("start-ns",)):
-            if prefix and not re.fullmatch(r"ns\d+", prefix):
-                register_namespace(prefix, uri)
-    except _XML_ERRORS:
-        raise ConversionError("malformed", "PPTX part is not well-formed XML") from None
-
-
 def _find_child(root: Element, name: str) -> Element | None:
-    return next((child for child in root if _local_name(child.tag) == name), None)
+    return next((child for child in root if local_name(child.tag) == name), None)
 
 
 def _rel_id_of(entry: Element) -> str | None:
@@ -251,10 +229,6 @@ def _rel_id_of(entry: Element) -> str | None:
 
 def _is_slide(rel: _Relationship) -> bool:
     return rel.rel_type.endswith(_SLIDE_REL_SUFFIX)
-
-
-def _local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
 
 
 def _rels_name(part: str) -> str:

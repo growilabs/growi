@@ -2,6 +2,9 @@
 
 import importlib
 import importlib.metadata
+import re
+import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -26,3 +29,10 @@ def test_anydoc_converts_csv_without_network() -> None:
 
     out = anydoc.to_markdown_bytes(b"a,b\n1,2\n", "csv")
     assert "a" in out and "2" in out
+
+
+def test_production_dependencies_exclude_external_binary_and_removed_libraries() -> None:
+    pyproject = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())
+    declared = {re.split(r"[\[<>=!~ ;]", spec, maxsplit=1)[0].lower() for spec in pyproject["project"]["dependencies"]}
+    banned = {"markitdown", "pdfminer.six", "pdfplumber", "lxml", "openpyxl", "pypdf", "pytesseract", "ocrmypdf"}
+    assert declared.isdisjoint(banned)

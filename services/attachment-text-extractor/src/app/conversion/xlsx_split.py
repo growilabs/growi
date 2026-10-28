@@ -13,15 +13,13 @@ import logging
 import re
 import secrets
 import zipfile
-from xml.etree.ElementTree import Element, ParseError, register_namespace, tostring
-
-from defusedxml import DefusedXmlException
-from defusedxml.ElementTree import fromstring, iterparse
+from xml.etree.ElementTree import Element, tostring
 
 from app.conversion.archive_guard import _UNREADABLE_PART_ERRORS, copy_part, inspect_archive, read_part
 from app.conversion.errors import ConversionError
 from app.conversion.limits import ConversionLimits
 from app.conversion.office import convert_office
+from app.conversion.ooxml_xml import local_name, parse, register_prefixes
 from app.schemas import PageInfo
 
 logger = logging.getLogger(__name__)
@@ -29,10 +27,6 @@ logger = logging.getLogger(__name__)
 _WORKBOOK = "xl/workbook.xml"
 # Hex only: anydoc prints headings verbatim, and no Markdown escaping touches alphanumerics.
 _TOKEN_BYTES = 16
-# Besides ParseError, expat raises LookupError for an unknown declared encoding and ValueError
-# (UnicodeError included) for one it cannot use; all of them mean the part is not usable XML.
-_XML_ERRORS = (ParseError, DefusedXmlException, LookupError, ValueError)
-
 _MIB = 1024 * 1024
 _CHUNK_BYTES = 64 * 1024
 # Longest start tag head kept between chunks; a tag head longer than this cannot be a cell.
@@ -125,8 +119,8 @@ def _marked_package(archive: zipfile.ZipFile, token: str, limits: ConversionLimi
     budget = limits.max_archive_uncompressed_mb * _MIB
     workbook_xml = read_part(archive, _WORKBOOK, budget)
     budget -= len(workbook_xml)
-    root = _parse(workbook_xml)
-    _register_prefixes(workbook_xml)
+    root = parse(workbook_xml, "workbook.xml")
+    register_prefixes(workbook_xml, "workbook.xml")
     sheets = _sheet_entries(root)
     if len(sheets) > limits.max_archive_entries:
         raise ConversionError("limit_exceeded", "sheet list is longer than the archive entry limit")
@@ -164,10 +158,10 @@ def _distinct_names(archive: zipfile.ZipFile) -> list[str]:
 
 
 def _sheet_entries(root: Element) -> list[Element]:
-    sheets = next((child for child in root if _local_name(child.tag) == "sheets"), None)
+    sheets = next((child for child in root if local_name(child.tag) == "sheets"), None)
     if sheets is None:
         return []
-    return [child for child in sheets if _local_name(child.tag) == "sheet"]
+    return [child for child in sheets if local_name(child.tag) == "sheet"]
 
 
 def _split(markdown: str, token: str, names: list[str | None]) -> list[PageInfo]:
@@ -205,24 +199,3 @@ def _restored(markdown: str, token: str, names: list[str | None]) -> str:
         return (names[position - 1] or "") if 1 <= position <= len(names) else ""
 
     return re.sub(rf"ZZ{token}(\d+)ZZ", original, markdown)
-
-
-def _parse(body: bytes) -> Element:
-    try:
-        return fromstring(body)
-    except _XML_ERRORS:
-        raise ConversionError("malformed", "workbook.xml is not well-formed XML") from None
-
-
-def _register_prefixes(body: bytes) -> None:
-    # Keeping the document's own prefixes avoids ns0-style renames that break mc:Ignorable lists.
-    try:
-        for _event, (prefix, uri) in iterparse(io.BytesIO(body), events=("start-ns",)):
-            if prefix and not re.fullmatch(r"ns\d+", prefix):
-                register_namespace(prefix, uri)
-    except _XML_ERRORS:
-        raise ConversionError("malformed", "workbook.xml is not well-formed XML") from None
-
-
-def _local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
