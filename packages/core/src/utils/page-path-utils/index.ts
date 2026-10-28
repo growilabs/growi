@@ -1,5 +1,6 @@
 import { isValidObjectId } from '../objectid-utils.js';
 import { addTrailingSlash } from '../path-utils.js';
+import { exceedsMaxPageDepth } from './exceeds-max-page-depth.js';
 import { isTopPage as _isTopPage } from './is-top-page.js';
 
 export const isTopPage = _isTopPage;
@@ -116,21 +117,10 @@ const restrictedPatternsToCreate: Array<RegExp> = [
   /^\/user(?:\/[^/]+)?$/, // https://regex101.com/r/9Eh2S1/1
 ];
 
-// Counted rather than matched: a pattern like /^(\/.+){130,}$/ backtracks
-// exponentially in the number of slashes.
-const MAX_CREATABLE_PAGE_DEPTH = 129;
-const exceedsMaxCreatablePageDepth = (path: string): boolean => {
-  return (
-    path.startsWith('/') &&
-    path.split('/').filter((segment) => segment !== '').length >
-      MAX_CREATABLE_PAGE_DEPTH
-  );
-};
-
 export const isCreatablePage = (path: string): boolean => {
   return (
     !restrictedPatternsToCreate.some((pattern) => path.match(pattern)) &&
-    !exceedsMaxCreatablePageDepth(path)
+    !exceedsMaxPageDepth(path)
   );
 };
 
@@ -325,4 +315,5 @@ export const isGlobPatternPath = (path: string): boolean => {
   return globPattern.test(path);
 };
 
+export * from './exceeds-max-page-depth.js';
 export * from './is-top-page.js';

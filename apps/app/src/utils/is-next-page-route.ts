@@ -1,3 +1,5 @@
+import { exceedsMaxPageDepth } from '@growi/core/dist/utils/page-path-utils';
+
 import { DRAWIO_ASSET_PROXY_PATH } from '~/features/drawio/consts';
 
 /**
@@ -42,17 +44,6 @@ const UNSAFE_PATH_PATTERNS: readonly RegExp[] = [
   /(\/\.\.)\/?/,
   /\/edit$/,
 ];
-
-// Counted rather than matched: a pattern like /^(\/.+){130,}$/ backtracks
-// exponentially in the number of slashes.
-const MAX_PAGE_DEPTH = 129;
-const exceedsMaxPageDepth = (pathname: string): boolean => {
-  return (
-    pathname.startsWith('/') &&
-    pathname.split('/').filter((segment) => segment !== '').length >
-      MAX_PAGE_DEPTH
-  );
-};
 
 const NON_NEXT_PAGE_PATTERNS: readonly RegExp[] = [
   ...EXPRESS_EXCLUSIVE_PATH_PATTERNS,
