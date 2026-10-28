@@ -6,13 +6,22 @@ Startup sequence (Req 3.3, 3.4):
 3. Wire health and extract routers.
 4. Add BearerAuthMiddleware (token from Settings).
 5. Add a minimal structured JSON logging middleware (full format in task 4.4).
+
+The lifespan creates the ConversionRunner and starts its forkserver before the first request is
+served. A forkserver that cannot start never aborts the boot: start() reports it as not ready, so
+/readyz answers 503 while /healthz stays ok (a restart would not fix a missing dependency, and
+every /readyz call retries the probe, which restarts a dead forkserver).
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -22,6 +31,7 @@ from starlette.responses import Response
 from app.config import Settings
 from app.middleware.bearer_auth import BearerAuthMiddleware
 from app.routers import extract, health
+from app.runner import ConversionRunner
 from app.security import apply_xxe_hardening
 
 logger = logging.getLogger(__name__)
@@ -49,13 +59,17 @@ class _MinimalLoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def create_app() -> FastAPI:
+def create_app(**runner_options: Any) -> FastAPI:  # noqa: ANN401
     """Create and configure the FastAPI application.
 
     The function is called once at module load time (via ``app = create_app()``
     at the bottom of this module).  Calling it while
     ``ATTACHMENT_EXTRACTOR_SERVICE_TOKEN`` is not set raises ``ValidationError`` from
     Pydantic — this is the intended fail-fast behaviour (Req 3.3).
+
+    Args:
+        runner_options: Extra keyword arguments for ``ConversionRunner.from_settings``
+            (tests use them for short probe timeouts).
 
     Returns:
         A fully configured FastAPI application instance.
@@ -66,8 +80,21 @@ def create_app() -> FastAPI:
     # Step 2: Apply XXE hardening before any XML document may be parsed.
     apply_xxe_hardening()
 
+    @asynccontextmanager
+    async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        runner = ConversionRunner.from_settings(settings, **runner_options)
+        application.state.runner = runner
+        # Must finish before serving: the preload list only applies to a forkserver not yet started.
+        await runner.start()
+        try:
+            yield
+        finally:
+            # stop() waits for every child of the forkserver, so it must not block the event loop.
+            await asyncio.to_thread(runner.stop)
+
     # Step 3: Create FastAPI app and wire routers.
     application = FastAPI(
+        lifespan=lifespan,
         title="Attachment Text Extractor",
         description="Attachment text extraction microservice for GROWI.",
         version="1.0.0",

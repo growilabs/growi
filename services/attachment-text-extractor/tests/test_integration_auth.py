@@ -8,22 +8,11 @@ Boundary: ExtractRouter, BearerAuthMiddleware
 from __future__ import annotations
 
 
-class _EchoRunner:
-    """Stand-in until the app lifespan creates the real runner (task 7.2)."""
-
-    async def run(self, request):  # noqa: ANN001, ANN201
-        from app.conversion.results import ConversionSuccess
-        from app.schemas import PageInfo
-
-        return ConversionSuccess(pages=[PageInfo(pageNumber=None, label=None, content="ok")], mime_type="text/plain")
-
-
 class TestAuthIntegration:
     """Test Bearer token enforcement on POST /extract."""
 
-    def test_valid_token_reaches_extract(self, client, test_token, monkeypatch):
+    def test_valid_token_reaches_extract(self, client, test_token):
         """A correct token passes auth and reaches the extraction handler."""
-        monkeypatch.setattr(client.app.state, "runner", _EchoRunner(), raising=False)
         txt_content = b"hello world"
         resp = client.post(
             "/extract",

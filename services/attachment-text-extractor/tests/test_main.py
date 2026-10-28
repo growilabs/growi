@@ -15,8 +15,13 @@ Requirements: 1.1, 3.3, 3.4
 
 from __future__ import annotations
 
+import os
+import signal
+import time
 from io import BytesIO
 from pathlib import Path
+
+from starlette.testclient import TestClient
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -140,27 +145,100 @@ class TestExtractAuthIntegration:
         assert body.get("code") == "unauthorized"
 
 
-class _EchoRunner:
-    """Stand-in until the app lifespan creates the real runner (task 7.2)."""
-
-    async def run(self, request):  # noqa: ANN001, ANN201
-        from app.conversion.results import ConversionSuccess
-        from app.schemas import PageInfo
-
-        return ConversionSuccess(pages=[PageInfo(pageNumber=None, label=None, content="ok")], mime_type="text/plain")
-
-
 class TestExtractIntakeIntegration:
-    """POST /extract — authenticated requests reach the intake path."""
+    """POST /extract — authenticated requests reach the real runner started by the lifespan."""
 
-    def test_extract_with_auth_returns_pages(self, client, test_token, monkeypatch) -> None:
-        """An authenticated upload reaches the runner and gets the extracted pages."""
-        monkeypatch.setattr(client.app.state, "runner", _EchoRunner(), raising=False)
-        sample_bytes = (FIXTURES_DIR / "sample.txt").read_bytes()
+    def test_extract_with_auth_returns_pages(self, client, test_token) -> None:
+        """An authenticated upload is converted in a real child process."""
         response = client.post(
             "/extract",
             headers={"Authorization": f"Bearer {test_token}"},
-            files={"file": ("sample.txt", BytesIO(sample_bytes), "text/plain")},
+            files={"file": ("sample.txt", b"hello lifespan", "text/plain")},
         )
         assert response.status_code == 200
-        assert response.json()["pages"][0]["content"] == "ok"
+        assert "hello lifespan" in response.json()["pages"][0]["content"]
+
+
+def _create_app(**runner_options):  # noqa: ANN003, ANN202
+    # Deferred: importing app.main builds the module-level app, which needs the token env var.
+    from app.main import create_app
+
+    return create_app(**runner_options)
+
+
+def _alive(pid: int) -> bool:
+    # A killed forkserver stays a zombie (it is our child) until reaped; that is not running.
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+    except FileNotFoundError:
+        return False
+    return stat.rsplit(")", 1)[1].split()[0] != "Z"
+
+
+def _wait_gone(pid: int, timeout_s: float = 5.0) -> bool:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if not _alive(pid):
+            return True
+        time.sleep(0.05)
+    return False
+
+
+class TestLifespan:
+    """The app starts the forkserver before serving and stops it on shutdown (Req 3.2, 3.4)."""
+
+    def test_readyz_is_ready_with_dependencies_loaded(self, client) -> None:
+        response = client.get("/readyz")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "ready"
+        assert set(body["dependencies"]) == {"anydoc", "pypdfium2", "charset-normalizer", "converter"}
+        assert set(body["dependencies"].values()) == {"ok"}
+
+    def test_readyz_exposes_no_internal_module_names(self, client) -> None:
+        assert "app.runner" not in client.get("/readyz").text
+
+    def test_runner_is_stored_on_app_state_before_serving(self, client) -> None:
+        assert client.app.state.runner.is_ready()
+
+    def test_forkserver_is_stopped_on_shutdown(self, test_token) -> None:
+        app = _create_app()
+        with TestClient(app) as tc:
+            assert tc.get("/readyz").status_code == 200
+            pid = app.state.runner.readiness().forkserver_pid
+            assert pid is not None
+            assert _alive(pid)
+        assert _wait_gone(pid), "forkserver still running after the lifespan ended"
+        assert not app.state.runner.is_ready()
+
+    def test_killed_forkserver_is_healed_by_the_next_readyz(self, test_token) -> None:
+        """readiness() reads the dead forkserver as stale, so readyz re-verifies, which restarts it."""
+        app = _create_app()
+        with TestClient(app) as tc:
+            old_pid = app.state.runner.readiness().forkserver_pid
+            os.kill(old_pid, signal.SIGKILL)
+            assert _wait_gone(old_pid)
+            assert app.state.runner.readiness().stale
+            response = tc.get("/readyz")
+            assert response.status_code == 200
+            new_pid = app.state.runner.readiness().forkserver_pid
+            assert new_pid != old_pid
+        assert _wait_gone(new_pid)
+
+    def test_missing_dependency_boots_not_ready_and_readyz_gives_503(self, test_token) -> None:
+        """A forkserver that cannot load a dependency never aborts startup; liveness stays ok."""
+        app = _create_app(dependencies=("anydoc", "no_such_module_for_readiness_test"), probe_timeout_s=2.0)
+        with TestClient(app) as tc:
+            assert tc.get("/healthz").json() == {"status": "ok"}
+            began = time.monotonic()
+            response = tc.get("/readyz")
+            assert time.monotonic() - began < 5.0
+            assert response.status_code == 503
+            body = response.json()
+            assert body["status"] == "not_ready"
+            assert body["dependencies"]["anydoc"] == "ok"
+            assert body["dependencies"]["converter"] == "missing"
+            assert "no_such_module" not in response.text
+            pid = app.state.runner.readiness().forkserver_pid
+        if pid is not None:
+            assert _wait_gone(pid)

@@ -54,7 +54,7 @@ File size is checked against the **actual accumulated body bytes**, not `Content
 
 ### 5. MIME whitelist via registry
 
-The format whitelist and conversion pipeline are being rebuilt (see `.kiro/specs/attachment-search-text-extractor/`). `POST /extract` takes a slot, checks the size, then calls `ConversionRunner.run()` (read from `app.state.runner`) and maps the outcome via `app/routers/extract_errors.py`; the router never calls a conversion library. Until the app lifespan creates the runner (task 7.2), `app.state.runner` must be set by the caller (tests do).
+The format whitelist and conversion pipeline are being rebuilt (see `.kiro/specs/attachment-search-text-extractor/`). `POST /extract` takes a slot, checks the size, then calls `ConversionRunner.run()` (read from `app.state.runner`) and maps the outcome via `app/routers/extract_errors.py`; the router never calls a conversion library. The app lifespan (`create_app`) creates the runner from Settings, awaits `runner.start()` before serving and stops it in a thread on shutdown; a forkserver that cannot start boots not-ready (`/readyz` 503, `/healthz` ok) instead of aborting. `/readyz` re-verifies through `runner.verify` whenever the cached readiness is not ready, and shows only public dependency names. Tests get the real runner through the `client` fixture (TestClient as a context manager runs the lifespan); `create_app(**runner_options)` lets a test pass e.g. `probe_timeout_s`.
 
 ### 6. Dependency licensing & egress
 
