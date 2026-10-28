@@ -189,7 +189,7 @@ export const generateEditorPath = (...paths: string[]): string => {
   }
 };
 
-// Equivalent to /^${areaPath}\/.+/i with areaPath matched literally
+// Same result as /^${areaPath}\/.+/i for ordinary paths, with areaPath matched literally
 const isInDescendantArea = (path: string, areaPath: string): boolean => {
   const prefix = `${areaPath}/`.toLowerCase();
   const lowerCasedPath = path.toLowerCase();
