@@ -189,7 +189,7 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 4. If 通知先のチャンネルに bot が参加していないために投稿できなかった, then the chat-integration proxy shall 投稿できなかったこと・対象のチャンネル・投稿できるようにするために必要な操作 を運用者が後から確認できる形で記録する
 5. If 通知先のチャットサービスが応答しなかった, then the GROWI application shall ページの作成・編集・削除・移動そのものは完了させる
 6. When 1 つの GROWI に複数のチャットサービスが紐づいている, the GROWI application shall 設定された全ての宛先へ通知を投稿する
-<!-- 2.7〜2.11 は chat-integration-notification-load が予約している番号。詰めない -->
+<!-- 2.7〜2.9 は chat-integration-notification-load、2.10・2.11 は chat-integration-agent 用の空き番号。詰めない -->
 12. While 保存時の通知先を選ぶ部品が表示されている, the GROWI application shall 選べるチャンネルの数にかかわらず、保存の操作欄の高さと、ほかの部品の並びを変えない
 13. The GROWI application shall 保存時の通知先を選ぶ部品に、選択中のチャンネルの件数を、選択肢を開かなくても分かる形で示す
 14. When 編集した人が通知先の選択肢を開いた, the GROWI application shall チャンネルを workspace ごとにまとめ、チャンネルの数が多くても選択肢の領域が画面からはみ出さず、中をスクロールして選べるようにする

@@ -321,4 +321,43 @@ describe('ChatIntegrationDestinationSelect', () => {
     expect(toggle).toHaveAccessibleName(/"selectedCount":1/);
     expect(toggle).toHaveAccessibleName(/partial_warning_title/);
   });
+
+  it('returns focus to the toggle and closes when tabbing out of the last checkbox or back past the first', async () => {
+    mocks.apiv3Get.mockResolvedValue({
+      data: { channels: CHANNELS, unavailableRelations: [] },
+    });
+    const user = userEvent.setup();
+
+    renderSelect();
+    const toggle = await openMenu(user);
+    const boxes = screen.getAllByRole('checkbox');
+    await user.tab();
+    expect(boxes[1]).toHaveFocus();
+    await user.tab();
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    expect(screen.getAllByRole('checkbox')[0]).toHaveFocus();
+    await user.tab({ shift: true });
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+  });
+
+  it('closes when the user clicks outside the menu', async () => {
+    mocks.apiv3Get.mockResolvedValue({
+      data: { channels: CHANNELS, unavailableRelations: [] },
+    });
+    const user = userEvent.setup();
+
+    renderSelect();
+    const toggle = await openMenu(user);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(document.body);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
 });

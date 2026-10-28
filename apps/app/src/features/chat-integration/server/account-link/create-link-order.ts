@@ -9,11 +9,9 @@
 // or create the pending order", or they will drift into two different
 // answers for the same account.
 //
-// design.md never pins the exact route this link points to -- the personal
-// settings tab that accepts it (task 6.2) does not exist yet. The path below
-// is a placeholder namespace reserved for that screen; whichever task builds
-// it must keep this same path (or update this constant), not invent a
-// second one.
+// The link points at the approval screen's dedicated page
+// (`pages/me/chat-integration/account-link/[token].page.tsx`); keep
+// `ACCOUNT_LINK_ACCEPT_PATH` and that page's location in step.
 
 import { randomBytes } from 'node:crypto';
 import type { ChatAccountRef } from '@growi/chat';
@@ -31,7 +29,7 @@ import {
 // message) do not have to reach into the model module themselves.
 export { ACCOUNT_LINK_ORDER_DEFAULT_MINUTES };
 
-/** Path the one-time link resolves to, relative to the site root. Reserved for task 6.2's personal-settings screen. */
+/** Path the one-time link resolves to, relative to the site root. */
 const ACCOUNT_LINK_ACCEPT_PATH = '/me/chat-integration/account-link';
 
 const normalizeDisplayName = (displayName: string): string | null => {

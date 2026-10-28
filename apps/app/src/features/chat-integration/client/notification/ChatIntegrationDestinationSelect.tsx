@@ -229,7 +229,12 @@ export const ChatIntegrationDestinationSelect = ({
             </span>
           )}
         </DropdownToggle>
-        <DropdownMenu container={openInModal ? '' : 'body'}>
+        <DropdownMenu
+          container={openInModal ? '' : 'body'}
+          // The content is a list of checkboxes, not menu items.
+          role="dialog"
+          aria-label={t('chat_integration.destination_select.aria_label')}
+        >
           {/* Closed, reactstrap still renders the menu in place (hidden by CSS); skip its content then so the bar stays small however many channels exist. */}
           {isOpen && (
             // biome-ignore lint/a11y/noStaticElementInteractions: closes the menu on Escape, which reactstrap does not do for focus inside the menu
@@ -241,6 +246,22 @@ export const ChatIntegrationDestinationSelect = ({
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') {
+                  setIsOpen(false);
+                  toggleRef.current?.focus();
+                  return;
+                }
+                if (e.key !== 'Tab') {
+                  return;
+                }
+                // Out of the last / back past the first box, focus returns to
+                // the toggle: the bottom bar's menu is portaled to <body>, so
+                // the natural tab order would land somewhere unrelated.
+                const boxes = e.currentTarget.querySelectorAll('input');
+                const leaving = e.shiftKey
+                  ? e.target === boxes[0]
+                  : e.target === boxes[boxes.length - 1];
+                if (leaving) {
+                  e.preventDefault();
                   setIsOpen(false);
                   toggleRef.current?.focus();
                 }

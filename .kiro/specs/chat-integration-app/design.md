@@ -152,10 +152,9 @@ apps/app/src/features/chat-integration/
 │       ├── chat-processed-request.ts
 │       └── chat-request-nonce.ts
 ├── client/
-│   ├── AdminChatIntegration/          # 要件 1.3, 11, 12.4, 12.5, 9.9–9.12（関係の状態の導き方は relation-connection-state.ts）
-│   ├── AccountLinkApproval/           # 要件 7.9–7.12（承認画面。置き場所は専用ページ）
-│   ├── ChatIntegrationDestinationSelect/  # 要件 2.2, 2.12–2.14（保存時の通知先の選択部品）
-│   └── MeChatAccountLinks/            # 要件 7.7
+│   ├── admin/                         # 要件 1.3, 11, 12.4, 12.5, 9.9–9.12（AdminChatIntegration.tsx。関係の状態の導き方は relation-connection-state.ts）
+│   ├── components/                    # AccountLinkApproval.tsx（要件 7.9–7.12。置き場所は専用ページ）、MyChatAccountLinks.tsx（要件 7.7）
+│   └── notification/                  # ChatIntegrationDestinationSelect.tsx（要件 2.2, 2.12–2.14。保存時の通知先の選択部品）
 └── interfaces/
 ```
 
@@ -651,7 +650,7 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
 | 承認画面 | 専用ページ `pages/me/chat-integration/account-link/[token].page.tsx`（サイドバーなし。要件 7.9）。**ログイン必須**。**どの GROWI に、どの GROWI ユーザーとして、どのチャットアカウントを結び付けるのかを画面に出す** — 出さないと利用者が取り違えたまま承認する（要件 7.10）。`workspaceName` と `platform` は `chat_relations` から、チャットアカウントの表示名は注文（`chat_account_link_orders.accountDisplayName`）から引いて添える。ログイン中のユーザー（`name` と `username`）と GROWI の名前（`useAppTitle()`・`useSiteUrl()` のホスト名）も出す。有効期限と「心当たりがなければ承認せずに閉じてください」も出す（要件 7.12） |
 | 承認 | `chat_account_links` に書き、**同じトランザクションで token を失効させる**。既に別の利用者に紐付いていれば複合ユニーク索引が弾き、`taken-by-another-user` として扱う（要件 7.4） |
 | 失効 | `expiredAt` の TTL 索引で自然に消える |
-- **表示名は識別の根拠にしない。** Slack などの表示名は本人が自由に決められる。承認画面は表示名を出すときも、**識別子（`accountId`）と workspace を同じ強さで必ず併記する**（要件 7.10・7.11）。表示名しか伝えていない注文は表示名を出さない（識別子だけを出す）。表示名・workspace 名・識別子は `<bdi>` で囲み、右から左への制御文字で並びを入れ替えられないようにする
+- **表示名は識別の根拠にしない。** Slack などの表示名は本人が自由に決められる。承認画面は表示名を出すときも、**識別子（`accountId`）と workspace を同じ強さで必ず併記する**（要件 7.10・7.11）。表示名が無い注文は識別子だけを出す。表示名・workspace 名・識別子は `<bdi>` で囲み、右から左への制御文字で並びを入れ替えられないようにする
 - 承認画面のトークンは `router.query.token` から読み、**サーバーが発行する形（32 バイトの 16 進 64 桁）に合うものだけ**を API の経路に入れる（細工したリンクが別の API を指さないようにする）。承認後に注文は失効するので、承認画面は再取得（フォーカス・再接続）で取り直さない
 - 一意性の衝突（要件 7.4）は**複合ユニーク索引で**実現する。アプリ側の事前確認だけに頼らない
 - 解除（要件 7.5）: 行を削除する。以降の書き込みは要件 7.6 の経路に落ちる

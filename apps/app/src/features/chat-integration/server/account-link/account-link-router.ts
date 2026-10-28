@@ -1,5 +1,5 @@
-// The two endpoints the approval screen (task 6.1's `pages/` entry, see
-// `apps/app/src/pages/me/[[...path]].page.tsx`) talks to: "what am I about
+// The two endpoints the approval screen (the dedicated page
+// `apps/app/src/pages/me/chat-integration/account-link/[token].page.tsx`) talks to: "what am I about
 // to approve" and "approve it". Mounted under this feature's own apiv3
 // prefix (`server/index.ts`'s `createChatIntegrationRouter`), NOT under
 // `/peer/` -- these are ordinary logged-in-browser JSON requests, not
