@@ -1,23 +1,42 @@
 # Implementation Plan
 
-> 既存の受け口 (FastAPI アプリ、設定、Bearer 認証、API の型、ルーター、OpenAPI の書き出し、Dockerfile、compose) は流用する。markitdown に頼る変換は、新しい変換層と子プロセスでの実行に置き換えた後で削除する (タスク 7.3)。作業ディレクトリは `services/attachment-text-extractor/`。
+> 作業ディレクトリは `services/attachment-text-extractor/`。既存の受け口 (FastAPI アプリ、設定、Bearer 認証、API の型、ルーター、OpenAPI の書き出し、Dockerfile、compose) とそのテストは流用する。markitdown に頼る旧実装は、最初のタスク (1.1) で、旧実装だけを確かめていたテストと一緒に削除し、新しい構成で一から作る。1.1 から 7.1 までの間は抽出が動かない。
+>
+> 削除するテストと、その観点を新しく確かめるタスクの対応:
+>
+> | 削除するテスト | 確かめていた観点 | 新しく確かめるタスク |
+> |---|---|---|
+> | `test_extract_simple.py` | 単純形式を 1 要素で返す | 3.1, 4.4, 5.1 |
+> | `test_extraction_service.py` | MIME と拡張子からの形式判定、サポート対象外 | 2.3, 5.1 |
+> | `test_limits.py` の時間切れの包み関数のテスト | 時間切れ | 6.3, 6.4 |
+> | `test_security.py` の lxml の確認 | lxml の安全な設定 | なし (lxml は依存から外れる) |
+> | `test_e2e_extract.py` | HTTP 経由の抽出 | 9.1 |
+> | `test_extract_router.py` のうち変換の結果を前提にするもの | 成功・サポート対象外・時間切れの応答 | 7.1 |
 
 - [ ] 1. 土台: 依存・設定・エラーコード・テスト用ファイル
-- [ ] 1.1 新しい変換ライブラリとテスト専用の依存を追加する
-  - 本番の依存に anydoc (版を固定)、pypdfium2、charset-normalizer を加える。markitdown と pdfminer.six は、置き換えが終わるまで残す (タスク 7.3 で外す)
+- [ ] 1.1 markitdown に頼る旧実装と、それだけを確かめていたテストを削除する
+  - 旧い変換の処理 (単純形式の変換、振り分け表、抽出サービス)、markitdown の PDF 対応を調べる起動処理、health の `pdf_strategy`、XXE 対策の起動処理の lxml の確認、リソース制限の時間切れの包み関数を削除する
+  - 上の表のテストを削除する。受け口のテスト (認証、設定、API の型、同時実行の枠とサイズ検査、OpenAPI の書き出しなど) は残す
+  - 抽出のルーターは変換の呼び出しを外し、7.1 で実行管理につなぐまでの間、枠とサイズの検査の後に「サービス停止中」の 503 を返すようにする
+  - markitdown と pdfminer.six を依存から外し、lockfile を更新する
+  - 完了の状態: リポジトリに markitdown と pdfminer の import が残らず、アプリが起動し、残した受け口のテストがすべて通る
+  - _Requirements: 1.7_
+
+- [ ] 1.2 新しい変換ライブラリとテスト専用の依存を追加する
+  - 本番の依存に anydoc (版を固定)、pypdfium2、charset-normalizer を加える
   - テスト専用の依存に openpyxl、python-pptx、python-docx、pypdf、msoffcrypto-tool、xlwt、PyYAML を加え、本番の image には入らないようにする
   - lockfile を更新し、本番とテスト専用の全依存のライセンスが MIT / Apache-2.0 / BSD / PSF の範囲であることを確かめる
   - 完了の状態: `uv sync --locked` が通り、既存のテストがすべて成功し、新しいライブラリを読み込める
   - _Requirements: 1.7_
 
-- [ ] 1.2 設定項目・エラーコード・変換の共通の型を定める
+- [ ] 1.3 設定項目・エラーコード・変換の共通の型を定める
   - 設定に `MAX_CHILD_RSS_MB` (320)、`MAX_XLSX_CELLS` (100000)、`MAX_RESULT_BYTES` (16MiB)、`MAX_PDF_PAGES` (5000)、`MAX_ARCHIVE_ENTRIES` (10000)、`MAX_ARCHIVE_UNCOMPRESSED_MB` (512) を加え、既定値を `MAX_CONCURRENCY` 3、`TIMEOUT_S` 55 に変える。使われていなかった `MAX_EXTRACTED_BYTES` を外し、`MAX_CONCURRENCY` の説明を「全体の上限はワーカー数 × この値」に直す
   - API のエラーコードに暗号化 (`file_encrypted`) と上限超過 (`resource_limit_exceeded`) を加える
   - 変換の失敗の種類、変換の上限の値、形式と経路の型など、変換層と実行管理の両方が使う型を用意する。ipynb の出力 1 つあたりの文字数の上限は、設定項目にせず固定値 10000 として変換の上限の値に含める
   - 完了の状態: 設定の既定値と新しいエラーコードを確かめる単体テストが通る
   - _Requirements: 1.10, 2.1, 2.2, 2.3, 2.6_
 
-- [ ] 1.3 テストで使うファイルを用意する仕組みを作る
+- [ ] 1.4 テストで使うファイルを用意する仕組みを作る
   - 実在の文書はリポジトリに入れず、原則としてテストの中で生成する: 複数シート・1 シート・非表示シート・空シート・グラフシートを含む XLSX、10 万セルを超える XLSX、時間切れを起こせる大きな XLSX (5 シート × 2 万行)、複数スライドの PPTX、画像入りの 40MB の DOCX / PPTX、暗号化した DOCX / XLSX / PPTX、ユーザーパスワード付きとオーナーパスワードだけの PDF、画像だけの PDF、壊れた PDF、展開すると巨大になる DOCX、XML を深く入れ子にした DOCX、Shift_JIS / EUC-JP / BOM 付き UTF-8 のテキスト
   - ODT / ODS / ODP、RTF、EPUB は zipfile や文字列で組み立て、XLS は xlwt で生成する
   - 旧形式の DOC と PPT は Python だけでは作れないので、設計の例外 (design.md の Allowed Dependencies に記載) として Apache POI のテスト用ファイル (Apache-2.0) から小さなものを選んでリポジトリに置き、出典とライセンスを記録する
@@ -142,30 +161,28 @@
   - 完了の状態: 上記のテストが Linux の CI で通る
   - _Requirements: 2.2, 2.5, 2.6, 2.7, 4.2_
 
-- [ ] 7. HTTP の受け口との接続と、旧実装の削除
+- [ ] 7. HTTP の受け口との接続と OpenAPI の書き出し
 - [ ] 7.1 抽出のルーターを実行管理につなぎ、エラー表どおりの応答にする
   - 同時実行の枠とサイズ検査はそのまま使い、時間切れの処理をリソース制限の部品から外す
   - ルーターは変換ライブラリを呼ばず、実行管理の結果を設計のエラー表どおりの `ErrorCode` と HTTP ステータスに変える (暗号化・上限超過・壊れたファイルは 422、想定外と異常終了は 500)
   - 1 件ごとに、形式・大きさ・所要時間・結果・子の最大 RSS を 1 行のログに出す。ファイルの中身と Authorization ヘッダは出さない
-  - 既存のテスト (リソース制限、ルーター、HTTP の結合テスト) を新しい構成に合わせて直す
+  - 1.1 で入れた一時的な 503 を外す。残したルーターのテストを新しい構成に合わせて直す
   - 完了の状態: ルーターのテストで、成功・サポート対象外・サイズ超過・暗号化・上限超過・時間切れ・異常終了・枠の不足のそれぞれが期待どおりのコードとステータスになり、時間切れや異常終了の後でも次のリクエストが枠を取れ、ログにファイルの中身とトークンが出ないことを確かめられる。既存のテストがすべて通る
   - _Requirements: 1.1, 1.6, 1.10, 1.11, 2.1, 2.2, 2.3, 2.6, 2.7, 4.2_
   - _Depends: 5.1, 6.3_
 
 - [ ] 7.2 アプリの起動処理と health / readiness を新しい構成に合わせる
-  - 起動時に forkserver を立ち上げる。markitdown の PDF 対応を調べる起動処理と、health の `pdf_strategy` を外す
+  - 起動時に forkserver を立ち上げる
   - readiness は forkserver が動いていて変換の依存を読み込めるときだけ ready を返す
-  - XXE 対策の起動処理から lxml の確認を外す (defusedxml による防御は残す)
-  - 既存のテスト (セキュリティの lxml の確認、health、アプリの組み立て) を新しい構成に合わせて直す
+  - 残した health とアプリの組み立てのテストを新しい構成に合わせて直す
   - 完了の状態: アプリが起動し、`/healthz` が ok、`/readyz` が ready を返し、応答に `pdf_strategy` が含まれないことをテストで確かめられる。既存のテストがすべて通る
   - _Requirements: 3.2, 3.4_
   - _Depends: 6.2_
 
-- [ ] 7.3 markitdown に頼る旧実装を取り除き、OpenAPI を書き出し直す
-  - 旧い変換の処理と振り分け表、それらのテストを削除し、markitdown と pdfminer.six を依存から外して lockfile を更新する
+- [ ] 7.3 OpenAPI を書き出し直す
   - OpenAPI を書き出し直して `packages/attachment-text-extractor-client/openapi.json` を更新し、生成されたクライアントも再生成して差分を揃える (Node 側の CI の差分検知を通すため)
-  - 完了の状態: リポジトリに markitdown と pdfminer の import が残らず、全テストが通り、OpenAPI に新しいエラーコードが現れ、`pdf_strategy` が消えている
-  - _Requirements: 1.6, 1.7_
+  - 完了の状態: OpenAPI に新しいエラーコードが現れ、`pdf_strategy` が消え、Node 側の CI の差分検知 (orval で再生成して差分がない) が通る
+  - _Requirements: 1.6, 1.10, 2.6_
 
 - [ ] 8. 配布物と CI
 - [ ] 8.1 Dockerfile と docker-compose を新しい構成に合わせる
