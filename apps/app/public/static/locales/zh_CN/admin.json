@@ -1427,5 +1427,11 @@
     "turn_it_off": "确认结果后，请从已关闭一侧 GROWI 的 管理 > 应用设置 中关闭维护模式。",
     "cancel": "取消",
     "proceed": "已了解，继续"
+  },
+  "chat_integration": {
+    "connection_lost": {
+      "badge": "连接已断开",
+      "detail": "proxy 不再接受此 GROWI。聊天一侧可能已解除配对（例如执行了 `unregister`），因此通知和命令无法使用。时钟偏差或密钥不一致也可能导致相同状态。要在 GROWI 一侧清理此关系，请点击下方的“Disconnect”，也可以重新尝试配对。"
+    }
   }
 }

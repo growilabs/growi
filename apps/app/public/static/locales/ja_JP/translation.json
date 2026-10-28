@@ -1195,5 +1195,34 @@
         "description": ""
       }
     }
+  },
+  "chat_integration": {
+    "account_link": {
+      "page_title": "チャットアカウントの紐付け",
+      "heading": "アカウントの紐付けの確認",
+      "growi_heading": "この GROWI",
+      "you_heading": "あなた（GROWI にログイン中）",
+      "chat_account_heading": "紐付けるチャットのアカウント",
+      "id_label": "ID",
+      "expires_at": "このリンクは {{expiresAt}} まで有効です。",
+      "ignore_hint": "心当たりがなければ、承認せずにこのページを閉じてください。",
+      "approve": "承認する",
+      "linked": "チャットのアカウントを GROWI のアカウントに紐付けました。",
+      "taken_by_another_user": "このチャットのアカウントは、すでに別の GROWI ユーザーに紐付いています。",
+      "invalid_or_expired": "このリンクは無効か、使用済みか、有効期限が切れています。",
+      "loading": "読み込み中…",
+      "name_label": "名前",
+      "user_label": "ユーザー",
+      "service_label": "サービス",
+      "account_label": "アカウント"
+    },
+    "destination_select": {
+      "summary_none": "チャット通知",
+      "summary_selected": "チャット通知: {{count}} 件を選択中",
+      "private": "（非公開）",
+      "partial_warning_title": "一部の workspace のチャンネルを取得できませんでした",
+      "partial_warning_detail": "{{workspace}} のチャンネルを取得できませんでした（{{reason}}）",
+      "aria_label": "チャット通知の送信先チャンネル"
+    }
   }
 }
