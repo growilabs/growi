@@ -7,7 +7,11 @@
  * lives under one path prefix.
  */
 
-import { type IUserHasId, PageGrant } from '@growi/core';
+import {
+  type IUserHasId,
+  PageGrant,
+  SubscriptionStatusType,
+} from '@growi/core';
 import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
@@ -19,6 +23,9 @@ import { getInstance } from '^/test/setup/crowi';
 import { SupportedAction } from '~/interfaces/activity';
 import { PageDeleteConfigValue } from '~/interfaces/page-delete-config';
 import type Crowi from '~/server/crowi';
+import { InAppNotification } from '~/server/models/in-app-notification';
+import Subscription from '~/server/models/subscription';
+import { UserStatus } from '~/server/models/user/conts';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import { LIMIT_FOR_MULTIPLE_PAGE_OP } from '~/server/service/page/consts';
 import { prisma } from '~/utils/prisma';
@@ -48,6 +55,7 @@ vi.mock('~/server/middlewares/admin-required', () => ({
 const FIXTURE_ROOT = '/trash/empty-trash-route-integ';
 
 const requesterUsername = 'empty-trash-route-integ-requester';
+const subscriberUsername = 'empty-trash-route-integ-subscriber';
 
 // Sentinel ip (reached via X-Forwarded-For) so cleanup removes only the activity rows
 // this suite created. Keep it distinct from the sentinels sibling suites use.
@@ -66,6 +74,7 @@ describe('DELETE /empty-trash', () => {
   let app: express.Application;
   let crowi: Crowi;
   let requester: HydratedDocument<IUserHasId>;
+  let subscriber: HydratedDocument<IUserHasId>;
 
   const removeFixtures = async (): Promise<void> => {
     await crowi.models.Page.deleteMany({ path: fixturePathPattern });
@@ -98,12 +107,23 @@ describe('DELETE /empty-trash', () => {
     crowi = await getInstance();
     const User = mongoose.model<IUserHasId>('User');
 
-    await User.deleteMany({ username: requesterUsername });
-    requester = await User.create({
-      name: requesterUsername,
-      username: requesterUsername,
-      email: `${requesterUsername}@example.com`,
+    await User.deleteMany({
+      username: { $in: [requesterUsername, subscriberUsername] },
     });
+    [requester, subscriber] = await User.create([
+      {
+        name: requesterUsername,
+        username: requesterUsername,
+        email: `${requesterUsername}@example.com`,
+      },
+      {
+        name: subscriberUsername,
+        username: subscriberUsername,
+        email: `${subscriberUsername}@example.com`,
+        // only active users are notified
+        status: UserStatus.STATUS_ACTIVE,
+      },
+    ]);
 
     const responseHelpers: { response: Record<string, unknown> } = {
       response: {},
@@ -144,7 +164,9 @@ describe('DELETE /empty-trash', () => {
   });
 
   afterAll(async () => {
-    await crowi.models.User.deleteMany({ username: requesterUsername });
+    await crowi.models.User.deleteMany({
+      username: { $in: [requesterUsername, subscriberUsername] },
+    });
   });
 
   it('answers 200 when the trash is already empty', async () => {
@@ -252,15 +274,15 @@ describe('DELETE /empty-trash', () => {
     });
 
     it('records the complete deletion and notifies subscribers as a full empty does', async () => {
-      await createTrashedPages([
+      const [ownPage] = await createTrashedPages([
         { path: `${FIXTURE_ROOT}/own`, creator: requester._id },
         { path: `${FIXTURE_ROOT}/others`, creator: new Types.ObjectId() },
       ]);
-      const notifiedActions: string[] = [];
-      const onUpdated = (activity: { action: string } | null) => {
-        if (activity != null) notifiedActions.push(activity.action);
-      };
-      crowi.events.activity.on('updated', onUpdated);
+      await Subscription.subscribeByPageId(
+        new Types.ObjectId(subscriber._id),
+        ownPage._id,
+        SubscriptionStatusType.SUBSCRIBE,
+      );
 
       try {
         const response = await emptyTrash();
@@ -274,11 +296,17 @@ describe('DELETE /empty-trash', () => {
         });
         expect(recorded).toHaveLength(1);
         expect(recorded[0].userId).toBe(requester._id.toString());
-        expect(notifiedActions).toContain(
-          SupportedAction.ACTION_PAGE_RECURSIVELY_DELETE_COMPLETELY,
-        );
+        // The notification is written after the response, so wait for it.
+        await vi.waitFor(async () => {
+          const notification = await InAppNotification.findOne({
+            user: subscriber._id,
+            action: SupportedAction.ACTION_PAGE_RECURSIVELY_DELETE_COMPLETELY,
+          });
+          expect(notification).not.toBeNull();
+        });
       } finally {
-        crowi.events.activity.off('updated', onUpdated);
+        await Subscription.deleteMany({ user: subscriber._id });
+        await InAppNotification.deleteMany({ user: subscriber._id });
       }
     });
   });
