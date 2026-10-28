@@ -1,5 +1,5 @@
 import type { IncomingMessage } from 'node:http';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
 import { httpInstrumentationConfig } from './anonymize-http-requests';
@@ -51,18 +51,33 @@ describe('httpInstrumentationConfig.startIncomingSpanHook', () => {
     });
   });
 
-  describe('API requests', () => {
-    it('should not let page access anonymization override a page API result', () => {
+  describe('query parameters', () => {
+    it('should anonymize a sensitive parameter on any URL and keep the others', () => {
+      expect(
+        getHttpTarget('/_api/v3/page/exist-paths?fromPath=%2Fsecret&limit=5'),
+      ).toBe('/_api/v3/page/exist-paths?fromPath=%5BANONYMIZED%5D&limit=5');
+    });
+
+    it('should keep the API path while anonymizing a page path parameter', () => {
       const target = getHttpTarget(
         '/_api/v3/pages/list?path=%2FSandbox%2F%E6%97%A5&limit=10',
       );
 
-      expect(target).toMatch(/^\/_api\/v3\/pages\/list\?/);
-      expect(target).not.toContain('%E6%97%A5');
+      expect(target).toBe('/_api/v3/pages/list?path=%5BANONYMIZED%5D&limit=10');
+    });
+  });
+
+  describe('URLs outside the anonymization targets', () => {
+    it('should return no attributes for a static file URL', () => {
+      expect(runHook('/static/css/style.css')).toEqual({});
     });
   });
 
   describe('URL attributes other than http.target', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     it('should rebuild http.url from the anonymized target', () => {
       const attributes = runHook('/Sandbox/%E7%A7%98%E5%AF%86?tab=history');
 
@@ -72,8 +87,24 @@ describe('httpInstrumentationConfig.startIncomingSpanHook', () => {
       expect(attributes['http.url']).not.toContain('%E7%A7%98');
     });
 
-    it('should not add http.url when nothing is anonymized', () => {
-      expect(runHook('/static/css/style.css')).not.toHaveProperty('http.url');
+    it('should not add url.path or url.query without the stable semconv opt-in', () => {
+      vi.stubEnv('OTEL_SEMCONV_STABILITY_OPT_IN', '');
+      const attributes = runHook('/_api/v3/search?q=secret');
+
+      expect(attributes).not.toHaveProperty('url.path');
+      expect(attributes).not.toHaveProperty('url.query');
+    });
+
+    it('should set url.path and url.query from the anonymized target with the stable semconv opt-in', () => {
+      vi.stubEnv('OTEL_SEMCONV_STABILITY_OPT_IN', 'http/dup');
+
+      const attributes = runHook('/_api/v3/search?q=secret&limit=10');
+
+      expect(attributes['http.target']).toBe(
+        '/_api/v3/search?q=%5BANONYMIZED%5D&limit=10',
+      );
+      expect(attributes['url.path']).toBe('/_api/v3/search');
+      expect(attributes['url.query']).toBe('q=%5BANONYMIZED%5D&limit=10');
     });
   });
 });
