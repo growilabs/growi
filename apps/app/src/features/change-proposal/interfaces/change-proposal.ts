@@ -4,8 +4,8 @@ export const MAX_TOTAL_BODY_BYTES = 8 * 1024 * 1024;
 export type ProposalEntry = 'ai-chat' | 'vault' | 'mcp' | 'revert';
 export type CreatableEntry = Exclude<ProposalEntry, 'revert'>;
 export type CreatableOperationType = 'edit' | 'create' | 'move';
-// trash / restore exist only in revert proposals
-export type OperationType = CreatableOperationType | 'trash' | 'restore';
+// delete-completely exists only in revert proposals
+export type OperationType = CreatableOperationType | 'delete-completely';
 export type ProposalLifecycle =
   | 'open'
   | 'settled'
@@ -40,7 +40,6 @@ export type RevertRefusalReason =
   | 'has-children'
   | 'moved-after-apply'
   | 'original-path-occupied'
-  | 'not-in-trash'
   | 'page-operation-in-progress'
   | 'not-deletable'
   | 'apply-failed';
@@ -113,22 +112,16 @@ export type OperationPayload =
       readonly removeRedirectsFrom?: string;
     }
   | {
-      readonly type: 'trash';
+      readonly type: 'delete-completely';
       readonly pageId: string;
       readonly expectedRevisionId: string;
-    }
-  | {
-      readonly type: 'restore';
-      readonly pageId: string;
-      readonly expectedRevisionId: string;
-      readonly toPath: string;
     };
 
 export type CreatableOperationInput = Extract<
   OperationPayload,
   { type: CreatableOperationType }
 >;
-// A revert never creates a page: a create is reversed by a trash.
+// A revert never creates a page: a create is reversed by a complete deletion.
 export type RevertOperationInput = Exclude<
   OperationPayload,
   { type: 'create' }

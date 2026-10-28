@@ -59,7 +59,7 @@
 - `isUpdatable` の判定の中身と、エディタが `revisionId` を送るかどうかの判定（変えない）
 
 ### Allowed Dependencies
-- `apps/app/src/server/service/page/`（`pageService.updatePage` / `create` / `renamePage` / `deletePage` / `revertDeletedPage`）と `pageOperationService.canOperate`
+- `apps/app/src/server/service/page/`（`pageService.updatePage` / `create` / `renamePage` / `deleteCompletely`）と `pageOperationService.canOperate`
 - `apps/app/src/server/models/`（`Page`・`Revision`・`PageRedirect`・`Subscription`・`InAppNotification`・`User`）
 - `crowi.globalNotificationService`（`page-save/page-notifications.ts` の `firePageGlobalNotification` から呼ぶ）と、`server/service/activity/` の `shouldGenerateUpdate`（`emitPageUpdateActivity` から呼ぶ）
 - `apps/app/prisma/schema.prisma` と `apps/app/src/utils/prisma.ts`（`createPrisma()` に Change Proposal の拡張を登録する）
@@ -94,8 +94,8 @@
 
 ### Existing Architecture Analysis
 - ページの更新は route（`routes/apiv3/page/update-page.ts`）が、上書き防止の確認（`isUpdatable`）・書き込み（`pageService.updatePage`）・activity・通知・共同編集の文書の置き換えを順に呼ぶ。書き込みのときに最新のリビジョンを条件にしていない。
-- 作成・更新の通知は route から、移動・ごみ箱への移動のアプリ内通知は `pageService` の中から出る。全文検索・GROWI Vault・画面の更新は `crowi.events.page` を受けて動く。
-- 人の操作のページごとの通知の出どころは次のとおりである。グローバル通知（`globalNotificationService.fire`）は、どれも route が送る（編集 `PAGE_EDIT` は `update-page.ts`、新規作成 `PAGE_CREATE` は `create-page.ts`、移動 `PAGE_MOVE` は `apiv3/pages/index.js`、ごみ箱へ移す `PAGE_DELETE` は `routes/page.js`。ごみ箱から戻すにはグローバル通知が無い）。`fire` は中で、ページの閲覧範囲から送るかどうかを決める（`isSendNotification`。リンクを知る人だけ・特定のユーザーだけのページには送らず、本人だけ・グループのページは管理者の設定に従う）。購読している人へのアプリ内通知は、編集では route の `generateUpdateActivity` が `PAGE_UPDATE` の activity を `preNotify` つきで知らせることで作られ（同じ人の 5 分以内の更新では `shouldGenerateUpdate` が作らない）、移動・ごみ箱へ移す・ごみ箱から戻すでは `pageService` の中で作られる。新規作成ではアプリ内通知は出ない。
+- 作成・更新の通知は route から、移動・完全な削除のアプリ内通知は `pageService` の中から出る。全文検索・GROWI Vault・画面の更新は `crowi.events.page` を受けて動く。
+- 人の操作のページごとの通知の出どころは次のとおりである。グローバル通知（`globalNotificationService.fire`）は、どれも route が送る（編集 `PAGE_EDIT` は `update-page.ts`、新規作成 `PAGE_CREATE` は `create-page.ts`、移動 `PAGE_MOVE` は `apiv3/pages/index.js`、完全な削除 `PAGE_DELETE` は `routes/page.js`。完全な削除でも、ごみ箱へ移すときと同じ `PAGE_DELETE` を、削除する前のページで送る）。`fire` は中で、ページの閲覧範囲から送るかどうかを決める（`isSendNotification`。リンクを知る人だけ・特定のユーザーだけのページには送らず、本人だけ・グループのページは管理者の設定に従う）。購読している人へのアプリ内通知は、編集では route の `generateUpdateActivity` が `PAGE_UPDATE` の activity を `preNotify` つきで知らせることで作られ（同じ人の 5 分以内の更新では `shouldGenerateUpdate` が作らない）、移動・完全な削除では `pageService` の中で作られる。新規作成ではアプリ内通知は出ない。
 - 共同編集の接続数は、プロセスごとのメモリにだけある。
 
 ### Architecture Pattern & Boundary Map
@@ -187,8 +187,7 @@ apps/app/src/features/change-proposal/
 │   │   │   ├── edit.ts
 │   │   │   ├── create.ts
 │   │   │   ├── move.ts
-│   │   │   ├── trash.ts            # Used only by revert proposals
-│   │   │   └── restore.ts          # Used only by revert proposals; wraps pageService.revertDeletedPage
+│   │   │   └── delete-completely.ts  # Used only by revert proposals; wraps pageService.deleteCompletely
 │   │   ├── proposal-applier.ts     # Lease, ordering, idempotent re-run, result persistence
 │   │   ├── proposal-notifier.ts    # Aggregated per-recipient in-app notification
 │   │   ├── proposal-activity.ts    # Records CHANGE_PROPOSAL_* activities
@@ -245,8 +244,8 @@ apps/app/src/pages/admin/change-proposal.page.tsx   # Admin page (same shape as 
 - `apps/app/src/server/models/page.ts` — `pushRevision` に任意の `{ expectedRevisionId }` を足し、渡されたときは条件付きの更新で書く（ページの schema に項目は足さない）
 - `apps/app/src/server/models/errors.ts` — `RevisionConflictError` を足す
 - `apps/app/src/interfaces/page.ts` — `IOptionsForUpdate` に `expectedRevisionId?` と `proposalMark?: IRevisionProposalMark`、`IOptionsForCreate` に `proposalMark?: IRevisionProposalMark` を足す（作成では、印は最初のリビジョンにだけ書く）。型は `@growi/core` から import し、`features/change-proposal` は import しない
-- `apps/app/src/server/service/page/index.ts` / `page-service.ts` — `updatePage` と `create` が `proposalMark` と `expectedRevisionId` を下へ渡す。`renamePage` と `deletePage` の options に `isInAppNotificationSuppressed?` を足し、真のときは `activityEvent.emit('updated', …)` を出さない（activity の記録は今のまま）。`revertDeletedPage` の options にも同じ指定を足す。子のページを含めない戻し方では今 `activityEvent.emit('update', activityId, parameters, page, preNotifyService.generatePreNotify)` を出しているので、指定が真のときは 4 番目と 5 番目の引数を渡さずに `emit` する（activity は今のまま記録し、アプリ内通知は作らない）
-- `apps/app/src/server/models/page-redirect.ts` — `deleteRedirectsCreatedByMove({ fromPath, toPath })`（移動元 `fromPath` から移動先 `toPath` への移動で作られる形、つまり `fromPath + suffix → toPath + suffix`（suffix は空か `/…`。対応づけは `renamePage` と同じく移動先の文字列をそのまま前に付ける `toPath + fromPath.slice(fromPath の長さ)`）のリダイレクトだけを消す。移動元の下にある、ほかの移動で作られたリダイレクトは残す。作成時に末尾が `/` のパスを断るので移動先に `/` は付かないが、付いていても完全一致で比べるので、`移動先//child` のように移動が実際に書いた組だけが消える。1 回の移動で何万件もできることがあるので、候補を `fromPath` の順に 1000 件ずつ読み、消す組を `_id` で 1000 件以下ずつ消す（1 回のコマンドを MongoDB の 16MB の上限より十分小さく保つ）。何度呼んでも結果は同じ。移動元そのもののリダイレクト（戻したページを隠す `/A → /B`）を、下のページの分より先に消すので、途中の組で失敗しても残りうるのは下のページの分だけ）を Prisma の拡張に足す。ごみ箱から戻す操作は、既存の `deleteByFromPath` を使う
+- `apps/app/src/server/service/page/index.ts` / `page-service.ts` — `updatePage` と `create` が `proposalMark` と `expectedRevisionId` を下へ渡す。`renamePage`・`deletePage`・`deleteCompletely` の options に `isInAppNotificationSuppressed?` を足し、真のときは `activityEvent.emit('updated', …)` を出さない（activity の記録は今のまま）。`deleteCompletely` で止めるのは子のページを含めない削除だけで、子のページごと消す削除は今のまま通知する。`revertDeletedPage` の options にも同じ指定がある（子のページを含めない戻し方では、指定が真のとき `activityEvent.emit('update', …)` の 4 番目と 5 番目の引数を渡さない）が、Change Proposal はもう使わない
+- `apps/app/src/server/models/page-redirect.ts` — `deleteRedirectsCreatedByMove({ fromPath, toPath })`（移動元 `fromPath` から移動先 `toPath` への移動で作られる形、つまり `fromPath + suffix → toPath + suffix`（suffix は空か `/…`。対応づけは `renamePage` と同じく移動先の文字列をそのまま前に付ける `toPath + fromPath.slice(fromPath の長さ)`）のリダイレクトだけを消す。移動元の下にある、ほかの移動で作られたリダイレクトは残す。作成時に末尾が `/` のパスを断るので移動先に `/` は付かないが、付いていても完全一致で比べるので、`移動先//child` のように移動が実際に書いた組だけが消える。1 回の移動で何万件もできることがあるので、候補を `fromPath` の順に 1000 件ずつ読み、消す組を `_id` で 1000 件以下ずつ消す（1 回のコマンドを MongoDB の 16MB の上限より十分小さく保つ）。何度呼んでも結果は同じ。移動元そのもののリダイレクト（戻したページを隠す `/A → /B`）を、下のページの分より先に消すので、途中の組で失敗しても残りうるのは下のページの分だけ）を Prisma の拡張に足す
 - `apps/app/src/server/service/yjs/yjs.ts` — `IYjsService` に `getConnectionCount(pageId): number` を足す（このプロセスの `docs.get(pageId)?.conns.size ?? 0`）
 - `apps/app/src/server/routes/apiv3/page/update-page.ts` — 確認と書き込みを `updatePageBody` に、`postAction` を `human-save-effects` に移す。`generateUpdateActivity` の中身（`shouldGenerateUpdate` の判断と `PAGE_UPDATE` の emit）を `page-notifications.ts` の `emitPageUpdateActivity` に移し、route は自分の activity の ID を渡して同じ位置で呼ぶ。middleware の順と activity の emit の位置は変えない
 - `apps/app/src/server/routes/apiv3/page/create-page.ts` — `postAction` を `human-save-effects` に移す
@@ -353,14 +352,14 @@ stateDiagram-v2
 ### 取り消しの流れ
 1. 取り消しを求めた人が閲覧できる、指定された操作（指定が無ければ、閲覧できる反映済みの操作のすべて）を選ぶ（`selectVisibleOperations`）。
 2. 選んだ操作ごとに、その時点のページの状態で戻せるかを判定する（`judgeRevertability`）。戻せない操作は、元の Change Proposal の中で「取り消しを断られた」にし、理由を記録する。
-3. 戻せる操作から、取り消しの Change Proposal の操作を作る（`buildRevertOperations`）。入口の種類は `revert`、依頼した人は取り消しを求めた人、各操作は戻す相手（元の Change Proposal の ID と、元の操作の `key`）を持つ。編集は元の本文に戻す編集、新規作成はごみ箱へ移す操作（`trash`）、移動は元のパスへ戻す移動になる。取り消しの Change Proposal の操作を戻すときは、編集と移動は同じ形で、`trash` はごみ箱から戻す操作（`restore`）、`restore` はもう一度 `trash` になる（要件 5.12・5.15・5.16）。
+3. 戻せる操作から、取り消しの Change Proposal の操作を作る（`buildRevertOperations`）。入口の種類は `revert`、依頼した人は取り消しを求めた人、各操作は戻す相手（元の Change Proposal の ID と、元の操作の `key`）を持つ。編集は元の本文に戻す編集、新規作成はページを完全に削除する操作（`delete-completely`。ごみ箱には残さない）、移動は元のパスへ戻す移動になる。取り消しの Change Proposal の操作を戻すときは、編集と移動は同じ形になる。`delete-completely` は、消したページを戻せないので取り消せない（`judgeRevertability` が `target-unavailable` で断る。要件 5.12・5.15）。
 4. 自動反映の方針と承認を通さず、すぐに反映する（要件 5.10）。取り消しの Change Proposal の操作は、作る時点で `approvedAt` に作成の日時を入れて保存する（取り消しを求めた人が承認したものとして扱う）。これにより、`ProposalApplier`（`approvedAt` を持つ「待ち」の操作だけを反映する）と保守用の cron の再開の候補が、通常の承認済みの操作と同じようにこの操作を拾う。反映が終わったあとの完了は `settleIfNoPending` が行う。
 5. 反映済みになった取り消しの操作に対応する元の操作を「取り消し済み」にし、取り消しの Change Proposal の ID を記録する。取り消しの操作が「古い」「失敗」になったときは、元の操作を「取り消しを断られた」にし、次の表で理由を決める。編集中の人がいたときは、取り消しの操作を「飛ばした」にし、元の操作は「反映済み」のまま残す（要件 5.11）。
 
 | 取り消しの操作の結果 | 元の操作に記録する理由（`RevertRefusalReason`） |
 |---|---|
 | 古い（`base-revision-changed`） | `edited-after-apply` |
-| 失敗で、理由がすでに `RevertRefusalReason` の値（`target-unavailable`・`has-children`・`not-in-trash` など） | その値のまま |
+| 失敗で、理由がすでに `RevertRefusalReason` の値（`target-unavailable`・`has-children`・`not-deletable` など） | その値のまま |
 | 失敗で、理由が `path-occupied` | `original-path-occupied` |
 | 重なる `PageOperation` が決めた時間を過ぎても残った | `page-operation-in-progress` |
 | 失敗で、それ以外の理由（`write-error`・`requester-not-allowed`・`grant-not-assignable`） | `apply-failed` |
@@ -404,8 +403,8 @@ stateDiagram-v2
 | 5.1, 5.10 | 取り消しの Change Proposal とすぐの適用 | ChangeProposalService | `revert` | 取り消しの流れ |
 | 5.2–5.4 | 誰が何を取り消せるか | selectVisibleOperations | `revert` | 取り消しの流れ |
 | 5.5–5.8 | 戻してよい条件 | judgeRevertability、buildRevertOperations | `judgeRevertability` | 取り消しの流れ |
-| 5.15 | ごみ箱へ移した操作の取り消し（ごみ箱から戻す） | judgeRevertability、buildRevertOperations、RestoreHandler | `judgeRevertability`、`pageService.revertDeletedPage` | 取り消しの流れ |
-| 5.16 | ごみ箱から戻した操作の取り消し（もう一度ごみ箱へ） | judgeRevertability、buildRevertOperations、TrashHandler | `judgeRevertability` | 取り消しの流れ |
+| 5.15 | 完全な削除の取り消しは断る | judgeRevertability | `judgeRevertability` | 取り消しの流れ |
+| 5.16 | 完全に削除してよいかの判定（人の完全な削除と同じ条件と、ごみ箱へ移す権限） | judgeRevertability、DeleteCompletelyHandler、page-delete-permission | `createCanDeletePageCompletely` | 取り消しの流れ |
 | 5.7 | リダイレクトを消す | MoveHandler | `deleteRedirectsCreatedByMove` | — |
 | 5.9 | 取り消し済みの記録 | ProposalApplier | — | 取り消しの流れ |
 | 5.11 | 編集中のページの取り消し | ProposalApplier | — | 取り消しの流れ |
@@ -423,7 +422,7 @@ stateDiagram-v2
 | 7.17 | 取り消しは元の指定を引き継ぐ | ChangeProposalService | `revert` | 取り消しの流れ |
 | 7.18 | 指定と管理者の設定を依頼した人にだけ返す | ProposalQueryService | `RequesterProposalState.perPageNotifications` | — |
 | 7.2–7.4 | まとめた通知、見えるページだけ | ProposalNotifier | `notifyApplied` | 反映の流れ |
-| 7.8 | 取り消しの通知（元の依頼した人、ごみ箱の操作のページ） | ProposalNotifier | `notifyApplied` | 取り消しの流れ |
+| 7.8 | 取り消しの通知（元の依頼した人、完全に削除したページは元の依頼した人にだけ） | ProposalNotifier | `notifyApplied` | 取り消しの流れ |
 | 7.5, 7.7 | activity | ProposalActivity | `recordProposalActivity` | — |
 | 7.9 | request の中の作成は、その request の activity に記録 | ProposalActivity、ChangeProposalService | `createProposal` の `trigger` | — |
 | 7.6 | 人の保存の通知を変えない | PageSave Core、human-save-effects | — | — |
@@ -540,7 +539,7 @@ type CurrentPageFacts = {
   readonly latestRevisionId: string | null;
   readonly hasChildren: boolean;
   readonly isPathOccupied: (path: string) => boolean; // pre-fetched occupancy of the paths this op needs
-  readonly canDelete: boolean; // whether the actor may delete the page (pageService.canDelete / pageDeletionAuthority), pre-fetched
+  readonly canDelete: boolean; // whether the actor may delete the page completely (createCanDeletePageCompletely), pre-fetched for created pages only
 };
 function judgeRevertability(op: OperationRecord, proposalEntry: ProposalEntry, facts: CurrentPageFacts): Revertability;
 
@@ -550,7 +549,6 @@ function buildRevertOperations(
   revertible: readonly {
     readonly key: string;
     readonly originalBody?: string;   // edit: body of the base revision
-    readonly restoreToPath?: string;  // trash: the path the page had before it was trashed
   }[],
 ): readonly RevertOperationInput[];
 
@@ -605,7 +603,7 @@ function shouldSendPerPageNotifications(
   6. それ以外 → `applied`
 - 依頼した人以外への応答では、`deriveProposalStatus` に見える操作だけを渡す（見えない操作の状態が全体の状態に表れないようにする。要件 9.4）。依頼した人以外に見える操作は「反映済み」「取り消し済み」「取り消しを断られた」だけなので、規則 1・2・5 には当てはまらず、全体の状態は `applied` / `reverted` / `partially-reverted` のどれかになる（`pending` と `partially-applied` にはならない。要件 9.2）。
 - `selectVisibleOperations` の規則（要件の「見る人に返す操作」をそのまま表す。1 件の取得・反映済みの一覧・リビジョンの印の 3 つが、すべてこの関数を通す）:
-  - 対象のページ（編集・移動・ごみ箱・ごみ箱から戻すでは `pageId`、新規作成では反映で作った `resultPageId`）が `viewablePageIds` に無い操作は返さない。
+  - 対象のページ（編集・移動・完全な削除では `pageId`、新規作成では反映で作った `resultPageId`）が `viewablePageIds` に無い操作は返さない。ただし、対象のページがもう存在しない操作（`deletedPageIds`。完全に削除されたページ）は、まだページが無い新規作成と同じく、依頼した人にだけ返す。ページが無いので閲覧できるかを判定できず、依頼した人以外には存在も知らせないためである。`loadViewablePages` は、見る人が読めなかったページだけについて、存在するかを 1 回の問い合わせで確かめる。
   - 依頼した人以外には、状態が `applied` / `reverted` / `revert-refused` でない操作を返さない。Change Proposal の `lifecycle` はこの判断に使わない（要件 9.2）。
   - 依頼した人以外には、`anyoneWithLinkPageIds` に入るページの操作を返さない（要件 9.5）。
   - まだページが無い新規作成の操作（待ち・失敗・古い・飛ばした）は、依頼した人にだけ返す。
@@ -615,11 +613,9 @@ function shouldSendPerPageNotifications(
   - 編集: `latestRevisionId` が反映で作ったリビジョンでない → `edited-after-apply`
   - 新規作成: 子のページがある → `has-children`。最新のリビジョンが反映で作ったリビジョンでない → `edited-after-apply`
   - 移動: ページのパスが移動先のままでない → `moved-after-apply`。移動元のパスが使われている → `original-path-occupied`
-  - ごみ箱（取り消しで行った操作。要件 5.15）: ページのパスが、ごみ箱へ移したときのパス（`/trash` で始まるパス）のままでない → `not-in-trash`。ごみ箱へ移す前のパス（今のパスから先頭の `/trash` を除いたもの。既存の `Page.getRevertDeletedPageName` と同じ）に空でないページがある → `original-path-occupied`。最新のリビジョンが、この操作の `expectedRevisionId`（元の新規作成で作ったリビジョン）でない → `edited-after-apply`
-  - ごみ箱から戻す（取り消しで行った操作。要件 5.16）: 新規作成と同じ規則（子のページ、最新のリビジョンが `expectedRevisionId` のままか、削除権限）
-  - 新規作成の取り消し（ごみ箱へ移す）の削除権限: 子のページ → 反映後の編集 の判定のあと、取り消しを求めた人が `pageService.canDelete`（管理者設定 `security:pageDeletionAuthority`。人の削除 route と同じく `getCreatorIdForCanDelete` で作成者を求める）で削除できなければ `not-deletable`。`CurrentPageFacts.canDelete` は ProposalService が取り消しを求めた人（取得では見る人）の権限でまとめて読む
+  - 完全な削除（取り消しで行った操作。要件 5.15）: いつも `target-unavailable`（消したページは戻せない）
+  - 新規作成の取り消し（完全な削除）の削除権限（要件 5.16）: 子のページ → 反映後の編集 の判定のあと、取り消しを求めた人がそのページを完全に削除してよくなければ `not-deletable`。判定は `createCanDeletePageCompletely`（`services/page-delete-permission.ts`）で、人の完全な削除の route（`routes/page.js`）と同じ `canDeleteCompletely`（管理者設定 `security:pageCompleteDeletionAuthority`。複数のグループに公開されたページで公開先のすべてのグループに属することを求める設定もこの中で見る。所属グループは `pageGrantService.getUserRelatedGroups` で 1 人につき 1 回読む）と、ユーザーのホームのページでの `canDeleteUserHomepageByConfig` と `isUsersHomepageOwnerAbsent` に加えて、route が見ていない `canDelete`（`security:pageDeletionAuthority`）も求める。作成者は `getCreatorIdForCanDelete` で求める。人の操作より弱くならないように、どちらの権限も満たすことを条件にする。`CurrentPageFacts.canDelete` は ProposalService が取り消しを求めた人（取得では見る人）の権限で、新規作成で作ったページについてだけまとめて読む。handler も書き込みの直前に同じ関数で確かめるので、表示する「戻せるか」と実際の判定がずれない
   - それ以外 → 戻せる
-- ごみ箱へ移す前のパスに空のページ（子のページのためだけにある、中身の無いページ）があっても、使われているとはみなさない。既存の `revertDeletedPage` は、空のページがあればそれと置き換え、空でないページがあるときだけ `PathAlreadyExistsError` を投げるので、その判断に合わせる。
 - `selectAutoApplyTargets` は、`relation` が `rework` なら方針にかかわらず空を返す（見直しは依頼した人が差分を確かめてから反映する。要件 13.4）。`follow-up` と `null` は今までどおり方針で決める（要件 13.7）。
 - `validateBasedOn` の規則（上から順に当てはめる）:
   1. `base` が無い、`base.requester` が `requesterId` でない、`base.entry` が `revert` → `based-on-unavailable`（3 つを区別しない。要件 13.2）
@@ -823,15 +819,14 @@ function emitPageUpdateActivity(
 - 種類をキーにした表（`OPERATION_HANDLERS`）で持ち、実行する側は種類で分岐しない。
 - 書き込みはすべて `pageService` か PageSave Core を通す。全文検索・GROWI Vault・画面の更新は、`pageService` の中から出る `crowi.events.page` でそのまま動く（要件 3.17）。
 - route の応答のあとの処理（`runAfterHumanUpdate` / `runAfterHumanCreate`。保存ごとに選んだ Slack のチャンネルへの通知、購読の作成、共同編集の文書の置き換え）は呼ばない（要件 7.11）。
-- ページごとの通知は、`OperationContext.perPageNotifications`（`shouldSendPerPageNotifications` の結果。ProposalApplier が操作ごとに決める）だけで出すかを決める。handler は設定も Change Proposal の指定も読まない。偽のときは、どの種類でもページごとの通知を出さない（要件 7.1）。真のときは、人が同じ操作をしたときと同じ通知を、次の表のとおりに出す（要件 7.10）。移動・ごみ箱へ移す・ごみ箱から戻すのアプリ内通知は、`pageService` の呼び出しの指定で `execute` の中で出る。それ以外（表の `sendPerPageNotifications` の列）は、ProposalApplier が操作の結果を記録したあとで呼ぶ `sendPerPageNotifications` が出す。
+- ページごとの通知は、`OperationContext.perPageNotifications`（`shouldSendPerPageNotifications` の結果。ProposalApplier が操作ごとに決める）だけで出すかを決める。handler は設定も Change Proposal の指定も読まない。偽のときは、どの種類でもページごとの通知を出さない（要件 7.1）。真のときは、人が同じ操作をしたときと同じ通知を、次の表のとおりに出す（要件 7.10）。移動・完全な削除のアプリ内通知は、`pageService` の呼び出しの指定で `execute` の中で出る。それ以外（表の `sendPerPageNotifications` の列）は、ProposalApplier が操作の結果を記録したあとで呼ぶ `sendPerPageNotifications` が出す。
 
 | 操作の種類 | 購読している人へのアプリ内通知 | グローバル通知（`sendPerPageNotifications`） |
 |---|---|---|
 | edit | `sendPerPageNotifications` の中で、`beginActivity` で依頼した人を操作者とする activity の ID を作り、`emitPageUpdateActivity` を呼ぶ（人の保存と同じく、同じ人の 5 分以内の更新では作らない。作らなかったときは `pendingActivityContext.clear` で文脈を消す） | `firePageGlobalNotification(PAGE_EDIT)` |
 | create | 出さない（人の作成でも出ない） | `firePageGlobalNotification(PAGE_CREATE)` |
 | move | `renamePage` に `isInAppNotificationSuppressed: false` を渡す | `firePageGlobalNotification(PAGE_MOVE, { oldPath: fromPath })` |
-| trash | `deletePage` に `isInAppNotificationSuppressed: false` を渡す | `firePageGlobalNotification(PAGE_DELETE)` |
-| restore | `revertDeletedPage` に `isInAppNotificationSuppressed: false` を渡す | 出さない（人がごみ箱から戻してもグローバル通知は無い） |
+| delete-completely | `deleteCompletely` に `isInAppNotificationSuppressed: false` を渡す | `firePageGlobalNotification(PAGE_DELETE)`（削除する前のページで送る。消したあとは読み直せないので、`execute` が消す前のページを操作ごとに覚えておき（操作の object を鍵にした `WeakMap`）、`sendPerPageNotifications` で使う） |
 
 - `sendPerPageNotifications` は、ProposalApplier が `recordOperationOutcome` で「反映済み」を記録できたあとで、`perPageNotifications` が真のときだけ呼ぶ。グローバル通知はメールと Slack の送信を待つので、送るのが遅くても、書けた結果の記録が遅れないようにするためである。`findExistingResult` が前の実行の書き込みを見つけた操作では呼ばない（前の実行が通知を送る前に止まった場合、その操作のページごとの通知は出ないままになる）。送るのに失敗してもログに残すだけで、操作の結果は変えない。ページの閲覧範囲による送る・送らないの判定は `globalNotificationService.fire` の中の既存の判定のままにする。
 - 編集で作る `PAGE_UPDATE` の activity は、人の保存と同じく監査ログにも残る。反映の activity（`CHANGE_PROPOSAL_APPLY`）とは別の行になる。
@@ -863,12 +858,11 @@ interface OperationHandler<T extends OperationRecord> {
 - **edit**: `Page.findByIdAndViewer(pageId, requester)` で取れなければ `failed: target-unavailable`。取れたら `updatePageBody({ mode: 'proposal', expectedRevisionId: baseRevisionId, proposalMark: toRevisionProposalMark({ proposalId, operationKey }), … })`。`conflict` なら `stale`。（ユーザーページの保護: `security:disableUserPages` が真で `/user` 配下ならページを読んだ直後、書き込みより前に `failed: target-unavailable`。判定は共通の `findUserPageWriteRefusal`（server/service/page/user-page-write-guard.ts）で、人の route と同じ `isUsersTopPage` / `isUserPage` を使う）
 - **create**: 近い祖先のページを依頼した人が閲覧できなければ `failed: target-unavailable`。パスが使われていれば（`Page.exists({ path, isEmpty: false })`）`failed: path-occupied`。`pageService.create(path, body, requester, { proposalMark: toRevisionProposalMark({ proposalId, operationKey }) })` を、`grant` を渡さずに呼ぶ（閲覧範囲は祖先から引き継がれる。要件 3.9）。印は最初のリビジョンにだけ書き、ページには書かない（要件 6.2）。閲覧範囲を依頼した人に割り当てられずに断られたときは `failed: grant-not-assignable`。WIP は指定しない（OQ-4）。（ユーザーページの保護: 作成先が無効の `/user` 配下、または存在しないユーザーのホームの下なら `failed: target-unavailable`）
 - **move**: 移動元のページを依頼した人が閲覧できなければ `failed: target-unavailable`。移動先が使われていれば `failed: path-occupied`。`pageService.renamePage(page, toPath, requester, { isRecursively: page.descendantCount > 0, createRedirectPage: true, updateMetadata: true, isInAppNotificationSuppressed: !perPageNotifications }, activityParameters)`。取り消しの移動（`removeRedirectsFrom` を持つ）では `createRedirectPage: false` にし、移動のあとで `deleteRedirectsCreatedByMove({ fromPath: removeRedirectsFrom, toPath: 取り消しの操作の fromPath })` を呼び、元の移動が作ったリダイレクトだけを消す（要件 5.7。`findExistingResult` で途中の後始末を済ませるときも同じ条件）。（ユーザーページの保護: 移動元と移動先の両方で無効の確認、持ち主の存在は移動先だけ。duplicate の route と同じ規則で、rename の route より厳しい）（移動元は `isMovableSourcePath`（`isMovablePage` かつごみ箱でない。domain の公開関数）を満たすページだけ。`/`・`/user`・ユーザーのホーム・ごみ箱の中は、作成時は `target-unavailable`（操作の番号つき）、反映時は `failed: target-unavailable`。事前の `canOperate` の範囲は `renamePage` と同じ `(true, 移動元, 移動先)`）
-- **trash**（取り消しだけ。新規作成の取り消しと、ごみ箱から戻した操作の取り消しに使う）: ページの最新のリビジョンが `expectedRevisionId` でない、または子のページがあれば `failed`（理由は `judgeRevertability` と同じ値）。`pageService.deletePage(page, requester, { isInAppNotificationSuppressed: !perPageNotifications }, false, activityParameters)`。（反映前に `pageService.canDelete` で削除権限を確かめ、削除できなければ `failed: not-deletable`）
-- **restore**（取り消しだけ。ごみ箱へ移した操作の取り消しに使う。要件 5.15）: ページを依頼した人が閲覧できなければ `failed: target-unavailable`。ページのパスが `/trash` で始まらなければ `failed: not-in-trash`。最新のリビジョンが `expectedRevisionId` でなければ `failed: edited-after-apply`。`pageService.revertDeletedPage(page, requester, { isInAppNotificationSuppressed: !perPageNotifications }, false, activityParameters)` を呼び、`PathAlreadyExistsError` なら `failed: original-path-occupied`。戻したあとで、ごみ箱へ移したときに作られた「元のパス → ごみ箱のパス」のリダイレクトを `deleteByFromPath(toPath)` で消す（コードを読んだ範囲では、子のページを含めない `revertDeletedPage` はこのリダイレクトを消しておらず、ページを開くときはリダイレクトがページより先に調べられる。動かしては確かめていないので、タスク 4.3 の結合テストで確かめる）。子のページを持たないページだけが対象なので、`isRecursively` は常に偽にする。
-- `findExistingResult`: edit と create は、同じ `proposalId` と `proposalOperationKey` を持つリビジョンを探す。create は、見つかったリビジョンの `pageId` を作ったページとする。move は、ページのパスがすでに移動先なら反映済みとみなす。trash は、ページがすでにごみ箱にあれば反映済みとみなす。restore は、ページが `toPath` にあり、ごみ箱に無ければ反映済みとみなす。
+- **delete-completely**（取り消しだけ。新規作成の取り消しに使う。要件 5.6・5.16）: ページを依頼した人が閲覧できなければ `failed: target-unavailable`。子のページがある、最新のリビジョンが `expectedRevisionId` でない、完全に削除してよくない（`createCanDeletePageCompletely`）の順で確かめ、理由は `judgeRevertability` と同じ値にする。`pageService.deleteCompletely(page, requester, { isInAppNotificationSuppressed: !perPageNotifications }, false, false, activityParameters)` を呼ぶ。子のページを持たないページだけが対象なので、`isRecursively` は常に偽にする。activity（`PAGE_DELETE_COMPLETELY`）は `deleteCompletely` が記録する。
+- `findExistingResult`: edit と create は、同じ `proposalId` と `proposalOperationKey` を持つリビジョンを探す。create は、見つかったリビジョンの `pageId` を作ったページとする。move は、ページのパスがすでに移動先なら反映済みとみなす。delete-completely は、ページがもう存在しなければ反映済みとみなす（ごみ箱にあるページは、まだ存在するので反映済みとみなさない）。
 
 **Implementation Notes**
-- Integration: `renamePage`・`deletePage`・`revertDeletedPage` は、通知を止めても activity（`PAGE_RENAME`・`PAGE_DELETE`・`PAGE_REVERT` など）を今のまま記録する。
+- Integration: `renamePage`・`deleteCompletely` は、通知を止めても activity（`PAGE_RENAME`・`PAGE_DELETE_COMPLETELY` など）を今のまま記録する。
 - Validation: 結合テストで、`perPageNotifications` が偽のときは、どの種類でも反映のあとに `InAppNotification` が増えず、グローバル通知の送信が呼ばれないことを確かめる。真のときは、上の表のとおりに購読している人へのアプリ内通知が作られ、グローバル通知が送られること、閲覧範囲が「リンクを知る人だけ」のページにはグローバル通知が送られないこと（`isSendNotification` の既存の判定）、保存ごとの Slack のチャンネルへの通知が送られないことを確かめる。
 - Risks: 子のページの移動は裏で続き、反映の処理は待たない（今の移動と同じ）。`pageService.create` はページを保存してからリビジョンを書くので、その間で処理が止まると、印の付いたリビジョンの無いページが残る。もう一度反映したときは印が見つからず、パスが使われているので `failed: path-occupied` になる。二度書くことは無いが、その操作は「失敗」として残る。
 
@@ -916,7 +910,7 @@ interface ProposalApplier {
 | Requirements | 7.2–7.4, 7.8, 7.12 |
 
 **Responsibilities & Constraints**
-- 対象のページ: 反映済みの編集と移動の操作のページ。取り消しの Change Proposal では、ごみ箱へ移す操作（`trash`）とごみ箱から戻す操作（`restore`）のページも含める（人がごみ箱へ移す・戻すときも、そのページを購読している人にアプリ内通知が出るため。要件 7.8）。人の保存で新規作成をしてもアプリ内通知は出ないので、新規作成のページは対象にしない。
+- 対象のページ: 反映済みの編集と移動の操作のページ。取り消しの Change Proposal では、完全に削除する操作（`delete-completely`）のページも含める（人が完全に削除するときも、そのページを購読している人にアプリ内通知が出るため。要件 7.8）。完全に削除したページは誰も閲覧できないので、受け取る人ごとの閲覧の判定では外れる。元の Change Proposal の依頼した人にだけ、元の新規作成の操作のパスで加える（その人は元の Change Proposal でその新規作成をすでに見られるので、新しく知らせることは無い）。元の依頼した人への通知の snapshot は、`proposalId` と `entry` を元の Change Proposal のものにする。取り消しの Change Proposal の完全な削除の操作は取り消した人にしか見せないので、取り消しの Change Proposal を指すと、その人が開けないことがあるためである（research.md の決定「取り消しの通知は、元の依頼した人にも送る」）。ほかの受け取る人の通知は取り消しの Change Proposal を指す。人の保存で新規作成をしてもアプリ内通知は出ないので、新規作成のページは対象にしない。
 - 受け取る人: 対象のページを購読している人（`Subscription.getSubscription`）の和集合。取り消しの Change Proposal では、元の Change Proposal（`revertOf`）の依頼した人も加える。そこから、この Change Proposal の依頼した人（取り消しでは取り消した人）を除き、有効なユーザーだけに絞る。
 - 受け取る人ごとに、対象のページ ID を `Page.findByIdsAndViewer(pageIds, user, null, false, false)` で確かめ（リンクを知る人だけが見られるページは含めない）、閲覧できるページの分だけで snapshot を作る。1 つも無ければその人には作らない（要件 7.4）。元の Change Proposal の依頼した人にも、同じ絞り込みを行う。
 - ページごとの通知の管理者の設定と Change Proposal の指定は見ない。ページごとの通知を出した反映でも、まとめた通知は同じように作る（要件 7.12）。そのため、両方を有効にすると、購読している人は同じ変更についてページごとの通知とまとめた通知の両方を受け取る。
@@ -1200,7 +1194,7 @@ function useDiff2HtmlColorScheme(): ColorSchemeType; // GROWI theme first, then 
 - 集約の単位は Change Proposal 1 件。操作は Change Proposal の中にだけあり、単独では存在しない。
 - 不変の条件:
   - 移動の操作は 1 件に 1 つまで（取り消しの Change Proposal も同じ）。
-  - 入口の種類が `revert` の Change Proposal は `revertOf` を持ち、各操作が `revertTarget` を持つ。操作の種類 `trash` と `restore` は、入口の種類が `revert` の Change Proposal にだけある。
+  - 入口の種類が `revert` の Change Proposal は `revertOf` を持ち、各操作が `revertTarget` を持つ。操作の種類 `delete-completely` は、入口の種類が `revert` の Change Proposal にだけある。
   - 操作の `index` は作成のときに 0 から振り、変えない。
   - 全体の状態は保存しない。`lifecycle` と操作の状態から `deriveProposalStatus` で決める。
   - `lifecycle` が `settled` の Change Proposal には「待ち」の操作が無い。`open` 以外の `lifecycle` は変わらない。
@@ -1213,7 +1207,7 @@ function useDiff2HtmlColorScheme(): ColorSchemeType; // GROWI theme first, then 
 type ProposalEntry = 'ai-chat' | 'vault' | 'mcp' | 'revert';
 type CreatableEntry = Exclude<ProposalEntry, 'revert'>;
 type CreatableOperationType = 'edit' | 'create' | 'move';
-type OperationType = CreatableOperationType | 'trash' | 'restore'; // trash / restore: revert proposals only
+type OperationType = CreatableOperationType | 'delete-completely'; // delete-completely: revert proposals only
 type ProposalLifecycle = 'open' | 'settled' | 'discarded' | 'expired' | 'withdrawn';
 type OperationStatus = 'pending' | 'applied' | 'failed' | 'stale' | 'skipped' | 'reverted' | 'revert-refused';
 type ProposalStatus =
@@ -1230,7 +1224,7 @@ type StaleReason = 'base-revision-changed';
 type SkipReason = 'skipped-by-requester' | 'discarded' | 'expired' | 'withdrawn' | 'page-being-edited';
 type RevertRefusalReason =
   | 'not-revertible-state' | 'target-unavailable' | 'edited-after-apply' | 'has-children'
-  | 'moved-after-apply' | 'original-path-occupied' | 'not-in-trash' | 'not-deletable'
+  | 'moved-after-apply' | 'original-path-occupied' | 'not-deletable'
   | 'page-operation-in-progress' | 'apply-failed';
 type OperationReason = WaitingReason | FailureReason | StaleReason | SkipReason;
 type Revertability = { readonly revertible: true } | { readonly revertible: false; readonly reason: RevertRefusalReason };
@@ -1255,8 +1249,7 @@ type OperationPayload =
   | { readonly type: 'edit'; readonly pageId: string; readonly baseRevisionId: string; readonly body: string }
   | { readonly type: 'create'; readonly path: string; readonly body: string }
   | { readonly type: 'move'; readonly pageId: string; readonly fromPath: string; readonly toPath: string; readonly removeRedirectsFrom?: string }
-  | { readonly type: 'trash'; readonly pageId: string; readonly expectedRevisionId: string }
-  | { readonly type: 'restore'; readonly pageId: string; readonly expectedRevisionId: string; readonly toPath: string };
+  | { readonly type: 'delete-completely'; readonly pageId: string; readonly expectedRevisionId: string };
 
 type OperationRecord = OperationPayload & {
   readonly index: number;
@@ -1419,7 +1412,7 @@ type OperationView = {
   readonly page?: { readonly id: string; readonly path: string };   // current page, only when visible
   readonly path?: string;                                           // create: target path
   readonly fromPath?: string;                                       // move
-  readonly toPath?: string;                                         // move, restore
+  readonly toPath?: string;                                         // move
   readonly baseRevisionId?: string;                                 // edit
   readonly resultRevisionId?: string;
   readonly proposedBody?: string;                                   // requester only
@@ -1519,7 +1512,7 @@ type ChangeProposalNotificationSnapshot = {
 - **`origin` と上書き防止の確認**: 反映（`origin` 空）のあと、反映の前に開いていたエディタの保存（`origin: editor`、`revisionId` なし）が 409 `conflict` になる。反映の前の最新のリビジョンが `editor` のとき、エディタどうしの保存は今までどおり確認を飛ばして通る（要件 3.11・10.1）。
 - **人の保存と反映が同時に起きたとき**: 同じページへの人の保存と反映を同時に走らせ、どちらの順になっても、最新のリビジョンが相手の内容を確認なしに上書きしていないこと、反映が負けたときは「古い」になることを確かめる（要件 3.3・3.4・3.16）。
 - **移動を戻したときのリダイレクト**: A→B の移動（子のページあり）を取り消したあと、`/A` がページそのものを表示し、元の移動が作ったリダイレクト（A→B と、子のページの A/x→B/x）が残っておらず、A の下にある、ほかの移動で作られたリダイレクト（例: A/old→X）は残っていること（要件 5.7）。
-- **ごみ箱から戻したときのリダイレクト**: 新規作成を取り消してごみ箱へ移し、その取り消しをさらに取り消したあと、元のパスがページそのものを表示し、元のパスを起点とするリダイレクトが残っていないこと（要件 5.15）。
+- **新規作成の取り消しで何も残らないこと**: 新規作成を取り消したあと、作ったページもそのリビジョンも無く、ごみ箱にも残っていないこと。その取り消しの取り消しが `target-unavailable` で断られること（要件 5.6・5.15）。
 
 ### Unit Tests（純関数）
 - `validateProposalInput`: 移動 2 つ、上限、本文の大きさ、無効な種類、使えないパス（`normalizePath` を通すと変わるパス、つまり末尾に `/` が付いたパスも含む。反映では正規化しないため）、`revert` の入口を受けない（要件 1.5–1.7・1.13・1.14・1.16）。
@@ -1529,21 +1522,21 @@ type ChangeProposalNotificationSnapshot = {
 - `buildProposalLinks`: 返す操作にだけつながりが付くこと、見えないつながりが付かないこと（要件 14.1・14.3）。
 - `planApplyOrder` と `expandApprovalTargets`: 移動を最後にする、同じページへの操作に広げる（要件 3.2・4.4・4.5）。
 - `selectAutoApplyTargets`: 3 つの方針、新規作成の扱い、移動は移動元で判定。関係が `rework` なら方針が「すべて」でも空になり、`follow-up` は方針どおりになること（要件 4.1–4.3・13.4・13.7）。
-- `judgeRevertability` と `buildRevertOperations`: 操作の種類ごと（編集・新規作成・移動・ごみ箱・ごみ箱から戻す）の理由の値と、取り消しの取り消しで作る操作の種類（要件 5.5–5.8・5.12・5.15・5.16）。
+- `judgeRevertability` と `buildRevertOperations`: 操作の種類ごと（編集・新規作成・移動・完全な削除）の理由の値と、取り消しの取り消しで作る操作の種類（要件 5.5–5.8・5.12・5.15・5.16）。
 - `selectVisibleOperations`: 依頼した人とそれ以外、操作の 7 つの状態、リンクを知る人だけが見られるページ。依頼した人以外には「待ち」「失敗」「古い」「飛ばした」が返らないこと（要件 5.2–5.4・9.2・9.5）。
 - `toRevisionProposalMark`: `operationKey` が `proposalOperationKey` になり、ほかの項目が入らないこと（要件 6.1・6.6）。
 - `shouldSendPerPageNotifications`: 4 つの組み合わせのうち、両方が真のときだけ真になること（要件 7.1・7.10）。
-- `toChangeProposalDocument`: 5 つの操作の種類それぞれで、Prisma の行から `OperationRecord` の正しい種類になること。`basedOn` と段階 `settled` が読めること。種類に必要な項目が欠けた行と、知らない状態・段階・関係の値で例外になること。
+- `toChangeProposalDocument`: 4 つの操作の種類それぞれで、Prisma の行から `OperationRecord` の正しい種類になること。`basedOn` と段階 `settled` が読めること。種類に必要な項目が欠けた行と、知らない状態・段階・関係の値で例外になること。
 
 ### Integration Tests
 - ChangeProposal Model（実際の MongoDB に対して Prisma の拡張を呼ぶ。`.integ.ts` の共通の準備が、Prisma を Mongoose と同じ worker ごとの DB につなぐ）: 作成と読み出し。配列の 1 つの要素だけが条件付きで書き換わり、ほかの要素と本文が変わらないこと。同じ文書に対して同じ条件付きの更新（`claimApplyLease`・`recordOperationOutcome`・`closeIfStillOpen`）を 10 個以上同時に呼ぶことを 20 回以上くり返し、毎回、真が 1 つだけであること。条件付きの `updateMany` のあとで `updatedAt` が新しくなること。lease が無い文書に承認された「待ち」の操作が残っているとき、再開の候補に入ること。lease の `token` が違う `recordOperationOutcome` が書けないこと。最後の 2 つの「待ち」を反映の結果の記録と飛ばす処理で同時に「待ち」でなくし、それぞれのあとで `settleIfNoPending` を呼ぶことを 20 回以上くり返し、毎回 `settled` で終わること。`closeIfStillOpen` が「待ち」の無い文書を閉じないこと。`findLinkedProposals` が `basedOn.proposalId` で後続・見直しだけを新しい順に返すこと。Mongoose のモデルの `init()` を待ったあとで、6 つの索引の名前と疎の指定（4 つが疎）が Physical Data Model のとおりで、TTL 索引が無いこと（要件 2.8・2.9・2.11・3.14・3.15・14.1）。
 - 反映の流れ: 編集・新規作成・移動を含む Change Proposal を反映し、リビジョンの印（新規作成では最初のリビジョン）、ページに印の項目が無いこと、作者、閲覧範囲（親と同じ）、`origin` が空、を確かめる（要件 3.9・3.10・6.1・6.2・6.4）。
 - 二度書かない: 反映の途中で処理を止めたことにして（lease を期限切れにする）、もう一度反映しても同じ操作のリビジョンが 1 つだけであること。同時に 2 回 `apply` しても同じ（要件 3.14・3.15）。
 - 編集中の人: 接続数が 1 以上、または `draft` のとき「待ち」に残り `approvedAt` が消えること（要件 3.5・4.8）。
-- 通知: 管理者の設定が無効（初期値）のとき、反映でページごとのアプリ内通知・グローバル通知が出ないこと。まとめた通知が受け取る人ごとに、閲覧できるページだけで 1 件ずつ作られ、何も閲覧できない人には作られないこと。取り消しでは、元の依頼した人にも届き、ごみ箱へ移した・戻したページも中身に入ること（要件 7.1–7.4・7.8）。
-- ページごとの通知: 管理者の設定が有効で Change Proposal の指定が「出す」のとき、編集・移動・ごみ箱へ移す・ごみ箱から戻すのページの購読している人にアプリ内通知が作られ、編集・新規作成・移動・ごみ箱へ移すでグローバル通知が送られること。閲覧範囲が「リンクを知る人だけ」のページにはグローバル通知が送られないこと。保存ごとの Slack のチャンネルへの通知が送られないこと。まとめた通知も同じように作られること。管理者の設定が有効で指定が「出さない」のときは、ページごとの通知が出ないこと。承認待ちの Change Proposal で一部を反映したあとに指定を変えると、そのあとに反映した操作にだけ新しい値が使われること。取り消しの Change Proposal が元の指定を引き継ぐこと。依頼した人以外と、承認待ちでない Change Proposal への指定の変更が、それぞれ 404 と 409 になること（要件 7.10–7.17）。
+- 通知: 管理者の設定が無効（初期値）のとき、反映でページごとのアプリ内通知・グローバル通知が出ないこと。まとめた通知が受け取る人ごとに、閲覧できるページだけで 1 件ずつ作られ、何も閲覧できない人には作られないこと。取り消しでは、元の依頼した人にも届き、完全に削除したページは元の依頼した人の中身にだけ、元の新規作成のパスで入ること。通知を受け取った人それぞれが、snapshot の `proposalId` の Change Proposal を `getForViewer` で開けること（要件 7.1–7.4・7.8）。
+- ページごとの通知: 管理者の設定が有効で Change Proposal の指定が「出す」のとき、編集・移動・完全な削除のページの購読している人にアプリ内通知が作られ、編集・新規作成・移動・完全な削除でグローバル通知が送られること。閲覧範囲が「リンクを知る人だけ」のページにはグローバル通知が送られないこと。保存ごとの Slack のチャンネルへの通知が送られないこと。まとめた通知も同じように作られること。管理者の設定が有効で指定が「出さない」のときは、ページごとの通知が出ないこと。承認待ちの Change Proposal で一部を反映したあとに指定を変えると、そのあとに反映した操作にだけ新しい値が使われること。取り消しの Change Proposal が元の指定を引き継ぐこと。依頼した人以外と、承認待ちでない Change Proposal への指定の変更が、それぞれ 404 と 409 になること（要件 7.10–7.17）。
 - 取得: `requesterState.perPageNotifications` が依頼した人にだけ返り、指定と管理者の設定の値が入ること（要件 7.18）。
-- 取り消し: 取り消しの Change Proposal の操作が `approvedAt` つきで保存され、`apply` が承認の手順なしにそれを反映し、反映が終わると `settleIfNoPending` で段階が `settled` になること。編集・新規作成・移動それぞれの戻せる場合と断られる場合、他の人による一部の取り消し、取り消しの取り消し、ごみ箱へ移した操作の取り消し（ごみ箱から戻す）と、その条件を満たさない場合（要件 5.*）。
+- 取り消し: 取り消しの Change Proposal の操作が `approvedAt` つきで保存され、`apply` が承認の手順なしにそれを反映し、反映が終わると `settleIfNoPending` で段階が `settled` になること。編集・新規作成・移動それぞれの戻せる場合と断られる場合、他の人による一部の取り消し、取り消しの取り消し、完全に削除した操作の取り消しが断られること、完全に削除してよい権限が無い場合（要件 5.*）。
 - API: 見えない Change Proposal・依頼した人でない承認・存在しない ID がすべて同じ 404 であること、応答に見えない操作の件数が出ないこと。承認待ちの Change Proposal でも、反映済みの操作があれば依頼した人以外にはその操作だけが返り、`lastAppliedAt` が見える操作の日時になること（要件 9.1–9.5・9.10・4.6）。
 - 既存のリビジョンの応答: `/pages/recent`・`/revisions/list`・ページの取得で読み込まれるリビジョンに、`proposalId` と `proposalOperationKey` 以外の印の項目（並び順の番号など）が入らないこと（要件 6.6）。
 - 完了: 自動反映ですべての操作の状態が決まった作成、承認による反映で最後の操作の状態が決まったとき、最後の「待ち」を飛ばしたとき、取り消しの Change Proposal の反映が終わったときに、段階が `settled` になること。完了した Change Proposal の承認・飛ばす・破棄が 409 `not_open` になり、取り消しは受け付けられること。2 つの書き込みの間で止まったことにした文書（`open` で「待ち」が無い）を、保守用の cron が完了にし、期限切れにはしないこと（要件 2.9–2.11）。
@@ -1597,6 +1590,6 @@ umbrella の roadmap の「未決の論点」のうち、上限の初期値（OQ
 - `changeproposals` の条件付きの更新が 1 回の処理として扱えるのは、Prisma のクエリエンジンが、読んでから書く処理を MongoDB の transaction の中で行い、衝突したらやり直す作りによる。Prisma の文書に書かれた約束ではない。ChangeProposal Model の同時実行の結合テストで確かめ、Prisma の版を上げたときに確かめ直す（Revalidation Triggers）。成り立たないと分かった関数だけを `$runCommandRaw` に置き換える。
 - 1 回の条件付きの更新は、読み・書き・transaction の確定の 3 回の往復になり、書き込みが衝突するとやり直す。反映は操作ごとに数回の更新を行うので、操作数の上限いっぱいの Change Proposal で反映の時間を測る（Performance）。
 - 1 つの Change Proposal の中で、前の操作の裏の処理（`PageOperation`）が残っていると次の操作が待たされる。待つ時間の上限を超えたら「待ち」に戻す（取り消しの操作は、元の操作を `page-operation-in-progress` で「取り消しを断られた」にする）。
-- ごみ箱から戻す操作は、既存の `revertDeletedPage` に頼る。戻したあとに「元のパス → ごみ箱のパス」のリダイレクトが残るかどうかは、コードを読んだだけで動かしては確かめていない。restore の handler は戻したあとでそのリダイレクトを消し、結合テストで元のパスを開いて確かめる。
+- 完全に削除したページは戻せない。新規作成の取り消しを取り消したくなっても、もう一度作り直すしかない（research.md の決定「新規作成の取り消しは完全な削除にする」）。
 - 「待ち」の操作の状態を変える書き込みと完了の書き込みは別々の更新なので、その間で処理が止まると、`open` のまま「待ち」が無い Change Proposal が保守用の cron の次の実行まで残る。その間に承認と飛ばすを求めても、反映するもの・飛ばすものが無い。破棄を求めると、「待ち」があることを条件にしているので破棄にはならず、その場で完了にしてから `not-open` を返す。期限切れと取り下げの対象にもならない。そのため、利用者に見える違いは段階が「完了」と表示されるのが遅れることだけである。
 - 1 件の取得で、後続・見直しのつながりを読むために問い合わせが 1 回増え、依頼した人以外には、つながった先の操作のページも閲覧の確認に加わる。読むつながりは `LINKED_PROPOSALS_LIMIT`（50 件）までにし、それより古いつながりは返さない。

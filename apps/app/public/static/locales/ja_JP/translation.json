@@ -1201,8 +1201,7 @@
       "edit": "ページの編集",
       "create": "ページの作成",
       "move": "ページの移動",
-      "trash": "ゴミ箱へ移動",
-      "restore": "ゴミ箱から復元"
+      "delete_completely": "ページの完全削除"
     },
     "operation_status": {
       "pending": "承認待ち",
@@ -1239,7 +1238,6 @@
       "has_children": "ページに子ページがある",
       "moved_after_apply": "反映のあとにページが移動された",
       "original_path_occupied": "元のパスにはすでにページがある",
-      "not_in_trash": "ページがもうゴミ箱にない",
       "not_deletable": "ページを削除する権限がない",
       "apply_failed": "取り消しに失敗した",
       "base_revision_changed": "反映の前にページが変わっていた",
@@ -1255,7 +1253,6 @@
       "has_children": "ページに子ページがある",
       "moved_after_apply": "反映のあとにページが移動された",
       "original_path_occupied": "元のパスにはすでにページがある",
-      "not_in_trash": "ページがもうゴミ箱にない",
       "not_deletable": "ページを削除する権限がない",
       "page_operation_in_progress": "ページに対する別の操作が実行中",
       "apply_failed": "取り消しに失敗した"

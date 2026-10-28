@@ -39,34 +39,75 @@ type NotificationInput = {
   readonly snapshot: ChangeProposalNotificationSnapshot;
 };
 
+type NotifiedPage = ChangeProposalNotificationSnapshot['pages'][number];
+
+// The original proposal a revert proposal reverts, or null for any other proposal.
+const findOriginal = (
+  proposal: ChangeProposalDocument,
+): Promise<ChangeProposalDocument | null> =>
+  proposal.entry === 'revert' && proposal.revertOf != null
+    ? prisma.changeproposals.findProposal(proposal.revertOf)
+    : Promise.resolve(null);
+
+// Pages a revert deleted completely, named by the path the original requester
+// asked to create. No viewer check can read a deleted page, so only that requester,
+// who already sees the create in the original proposal, is told about them.
+const findDeletedCreatedPages = (
+  proposal: ChangeProposalDocument,
+  original: ChangeProposalDocument | null,
+): NotifiedPage[] => {
+  if (original == null) {
+    return [];
+  }
+  const createdPaths = new Map(
+    original.operations.flatMap((op) =>
+      op.type === 'create' ? [[op.key, op.path] as const] : [],
+    ),
+  );
+  return proposal.operations.flatMap((op) => {
+    if (op.type !== 'delete-completely' || op.status !== 'applied') {
+      return [];
+    }
+    const path =
+      op.revertTarget == null
+        ? undefined
+        : createdPaths.get(op.revertTarget.operationKey);
+    return path == null ? [] : [{ id: op.pageId, path }];
+  });
+};
+
 const userModel = () => mongoose.model<IUserHasId>('User');
 
 const findRecipientIds = async (
   proposal: ChangeProposalDocument,
+  original: ChangeProposalDocument | null,
   pageIds: readonly string[],
 ): Promise<string[]> => {
   const subscribers = await Promise.all(
     pageIds.map((pageId) => Subscription.getSubscription(pageId)),
   );
   const candidates = new Set(subscribers.flat().map(String));
-  if (proposal.entry === 'revert' && proposal.revertOf != null) {
-    const original = await prisma.changeproposals.findProposal(
-      proposal.revertOf,
-    );
-    if (original != null) {
-      candidates.add(original.requester);
-    }
+  if (original != null) {
+    candidates.add(original.requester);
   }
   candidates.delete(proposal.requester);
   return [...candidates];
 };
 
-const buildNotificationInputs = async (
-  proposal: ChangeProposalDocument,
-  action: NotifyAppliedArgs['action'],
-  pageIds: readonly string[],
-  recipientIds: readonly string[],
-): Promise<NotificationInput[]> => {
+const buildNotificationInputs = async ({
+  proposal,
+  original,
+  action,
+  pageIds,
+  recipientIds,
+}: {
+  readonly proposal: ChangeProposalDocument;
+  readonly original: ChangeProposalDocument | null;
+  readonly action: NotifyAppliedArgs['action'];
+  readonly pageIds: readonly string[];
+  readonly recipientIds: readonly string[];
+}): Promise<NotificationInput[]> => {
+  const deletedCreatedPages = findDeletedCreatedPages(proposal, original);
   const User = userModel();
   const [recipients, requester] = await Promise.all([
     User.find({
@@ -99,18 +140,27 @@ const buildNotificationInputs = async (
         false,
         false,
       );
-      if (viewable.length === 0) {
+      const isOriginalRequester =
+        original != null && recipient._id.toString() === original.requester;
+      const pages: NotifiedPage[] = [
+        ...viewable.map((page) => ({
+          id: page._id.toString(),
+          path: page.path,
+        })),
+        ...(isOriginalRequester ? deletedCreatedPages : []),
+      ];
+      if (pages.length === 0) {
         return null;
       }
+      // The original requester may not be able to open the revert proposal (its
+      // deleted pages are shown to the reverter only), but always sees the
+      // original, where every reverted operation is recorded.
+      const linked = isOriginalRequester
+        ? { proposalId: original._id, entry: original.entry }
+        : {};
       return {
         user: recipient._id.toString(),
-        snapshot: {
-          ...base,
-          pages: viewable.map((page) => ({
-            id: page._id.toString(),
-            path: page.path,
-          })),
-        },
+        snapshot: { ...base, ...linked, pages },
       };
     }),
   );
@@ -124,16 +174,18 @@ export const createProposalNotifier = (crowi: Crowi): ProposalNotifier => ({
       if (pageIds.length === 0) {
         return;
       }
-      const recipientIds = await findRecipientIds(proposal, pageIds);
+      const original = await findOriginal(proposal);
+      const recipientIds = await findRecipientIds(proposal, original, pageIds);
       if (recipientIds.length === 0) {
         return;
       }
-      const inputs = await buildNotificationInputs(
+      const inputs = await buildNotificationInputs({
         proposal,
+        original,
         action,
         pageIds,
         recipientIds,
-      );
+      });
       if (inputs.length === 0) {
         return;
       }

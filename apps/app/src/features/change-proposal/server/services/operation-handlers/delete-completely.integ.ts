@@ -1,5 +1,6 @@
 import type { IUserHasId } from '@growi/core';
 import {
+  GroupType,
   getIdStringForRef,
   PageGrant,
   SubscriptionStatusType,
@@ -26,7 +27,7 @@ import { GlobalNotificationService } from '~/server/service/global-notification'
 import type { UserNotificationService } from '~/server/service/user-notification';
 import { prisma } from '~/utils/prisma';
 
-import { createTrashHandler } from './trash';
+import { createDeleteCompletelyHandler } from './delete-completely';
 import type {
   AppliedOutcome,
   OperationContext,
@@ -34,22 +35,25 @@ import type {
   OperationRecordOf,
 } from './types';
 
-const PREFIX = '/cp-trash-handler-integ';
+const PREFIX = '/cp-delete-completely-handler-integ';
 const TEST_IP = '10.0.0.145';
-const TEST_ENDPOINT = '/_api/v3/cp-trash-handler-integ';
-const REQUESTER_USERNAME = 'cpTrashHandlerRequester';
-const SUBSCRIBER_USERNAME = 'cpTrashHandlerSubscriber';
-const OTHER_USERNAME = 'cpTrashHandlerOther';
+const TEST_ENDPOINT = '/_api/v3/cp-delete-completely-handler-integ';
+const REQUESTER_USERNAME = 'cpDeleteCompletelyRequester';
+const SUBSCRIBER_USERNAME = 'cpDeleteCompletelySubscriber';
+const OTHER_USERNAME = 'cpDeleteCompletelyOther';
+const GROUP_NAMES = ['cpDeleteCompletelyGroupA', 'cpDeleteCompletelyGroupB'];
 
-type TrashOperation = OperationRecordOf<'trash'>;
+type DeleteCompletelyOperation = OperationRecordOf<'delete-completely'>;
 
-describe('trash operation handler', () => {
+describe('delete-completely operation handler', () => {
   let crowi: Crowi;
   let Page: PageModel;
   let PageOperation: PageOperationModel;
   let requester: HydratedDocument<IUserHasId>;
   let subscriber: HydratedDocument<IUserHasId>;
   let other: HydratedDocument<IUserHasId>;
+  // `other` is in both groups, the requester only in the first.
+  let groupIds: mongoose.Types.ObjectId[] = [];
   let seq = 0;
   let restoreServices: () => void = () => {};
 
@@ -70,6 +74,10 @@ describe('trash operation handler', () => {
     return `${PREFIX}/page-${seq}`;
   };
 
+  const pageExists = async (
+    pageId: mongoose.Types.ObjectId | string,
+  ): Promise<boolean> => (await Page.exists({ _id: pageId })) != null;
+
   const findPage = async (
     pageId: mongoose.Types.ObjectId | string,
   ): Promise<HydratedDocument<PageDocument>> => {
@@ -78,6 +86,18 @@ describe('trash operation handler', () => {
       throw new Error(`page ${pageId} not found`);
     }
     return page;
+  };
+
+  // The home page of a user who exists.
+  const userHomePage = async (): Promise<HydratedDocument<PageDocument>> => {
+    const path = `/user/${OTHER_USERNAME}`;
+    const existing = await Page.findOne({ path });
+    if (existing != null) {
+      return existing;
+    }
+    const created = await crowi.pageService.create(path, 'body', other, {});
+    await waitForPageOperationsToFinish();
+    return findPage(created._id);
   };
 
   const createPage = async (
@@ -91,14 +111,16 @@ describe('trash operation handler', () => {
     return findPage(page._id);
   };
 
-  const trashOp = (page: HydratedDocument<PageDocument>): TrashOperation => {
+  const deleteOp = (
+    page: HydratedDocument<PageDocument>,
+  ): DeleteCompletelyOperation => {
     if (page.revision == null) {
       throw new Error(`page ${page._id} has no revision`);
     }
     return {
-      type: 'trash',
+      type: 'delete-completely',
       index: 0,
-      key: 'op-trash',
+      key: 'op-delete-completely',
       status: 'pending',
       pageId: page._id.toString(),
       expectedRevisionId: getIdStringForRef(page.revision),
@@ -106,7 +128,7 @@ describe('trash operation handler', () => {
   };
 
   const contextFor = (
-    op: TrashOperation,
+    op: DeleteCompletelyOperation,
     perPageNotifications: boolean,
   ): OperationContext => ({
     proposalId: new mongoose.Types.ObjectId().toString(),
@@ -148,7 +170,7 @@ describe('trash operation handler', () => {
     InAppNotification.countDocuments({
       user: subscriber._id,
       target: pageId,
-      action: SupportedAction.ACTION_PAGE_DELETE,
+      action: SupportedAction.ACTION_PAGE_DELETE_COMPLETELY,
     }).exec();
 
   // The integration Crowi has no notification services; a real global one is
@@ -203,6 +225,18 @@ describe('trash operation handler', () => {
     requester = await createUser(REQUESTER_USERNAME);
     subscriber = await createUser(SUBSCRIBER_USERNAME);
     other = await createUser(OTHER_USERNAME);
+
+    const groups = await mongoose
+      .model('UserGroup')
+      .create(GROUP_NAMES.map((name) => ({ name })));
+    groupIds = groups.map((group) => group._id);
+    await mongoose.model('UserGroupRelation').create([
+      ...groupIds.map((relatedGroup) => ({
+        relatedGroup,
+        relatedUser: other._id,
+      })),
+      { relatedGroup: groupIds[0], relatedUser: requester._id },
+    ]);
   });
 
   let pageEventEmit: ReturnType<typeof vi.spyOn>;
@@ -223,7 +257,10 @@ describe('trash operation handler', () => {
 
   afterAll(async () => {
     const pages = await Page.find({
-      path: new RegExp(`^(/trash)?${PREFIX}(/|$)`),
+      $or: [
+        { path: new RegExp(`^(/trash)?${PREFIX}(/|$)`) },
+        { path: `/user/${OTHER_USERNAME}` },
+      ],
     });
     const pageIds = pages.map((p) => p._id);
     await prisma.revisions.deleteMany({
@@ -236,6 +273,10 @@ describe('trash operation handler', () => {
     await Subscription.deleteMany({ target: { $in: pageIds } });
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
     await Page.deleteMany({ _id: { $in: pageIds } });
+    await mongoose
+      .model('UserGroupRelation')
+      .deleteMany({ relatedGroup: { $in: groupIds } });
+    await mongoose.model('UserGroup').deleteMany({ _id: { $in: groupIds } });
     await mongoose.model('User').deleteMany({
       username: {
         $in: [REQUESTER_USERNAME, SUBSCRIBER_USERNAME, OTHER_USERNAME],
@@ -248,10 +289,10 @@ describe('trash operation handler', () => {
   });
 
   describe('execute', () => {
-    it('moves the page to the trash as the requester, records the delete activity and emits the delete event', async () => {
-      const handler = createTrashHandler(crowi);
+    it('deletes the page completely as the requester, leaving nothing in the trash, records the complete-deletion activity and emits the deleteCompletely event', async () => {
+      const handler = createDeleteCompletelyHandler(crowi);
       const page = await createPage(nextPath());
-      const op = trashOp(page);
+      const op = deleteOp(page);
 
       const outcome = await handler.execute(op, contextFor(op, false));
 
@@ -260,30 +301,32 @@ describe('trash operation handler', () => {
         resultPageId: page._id.toString(),
         resultRevisionId: null,
       });
-      const trashed = await findPage(page._id);
-      expect(trashed.path).toBe(`/trash${page.path}`);
-      expect(trashed.status).toBe(Page.STATUS_DELETED);
-      expect(trashed.deleteUser?.toString()).toBe(requester._id.toString());
+      expect(await pageExists(page._id)).toBe(false);
+      expect(await Page.exists({ path: `/trash${page.path}` })).toBeNull();
+      expect(
+        await prisma.revisions.count({
+          where: { pageId: page._id.toString() },
+        }),
+      ).toBe(0);
       const activity = await prisma.activities.findFirst({
         where: {
           ip: TEST_IP,
           target: page._id.toString(),
-          action: SupportedAction.ACTION_PAGE_DELETE,
+          action: SupportedAction.ACTION_PAGE_DELETE_COMPLETELY,
         },
       });
       expect(activity?.userId).toBe(requester._id.toString());
       expect(pageEventEmit).toHaveBeenCalledWith(
-        'delete',
+        'deleteCompletely',
         expect.objectContaining({ path: page.path }),
-        expect.objectContaining({ path: trashed.path }),
         expect.anything(),
       );
     });
 
     it('fails with edited-after-apply and leaves the page in place when the latest revision is not the expected one', async () => {
-      const handler = createTrashHandler(crowi);
+      const handler = createDeleteCompletelyHandler(crowi);
       const page = await createPage(nextPath());
-      const op = trashOp(page);
+      const op = deleteOp(page);
       await crowi.pageService.updatePage(page, 'edited', null, other, {});
       await waitForPageOperationsToFinish();
 
@@ -297,10 +340,10 @@ describe('trash operation handler', () => {
     });
 
     it('fails with has-children and leaves the page in place when it has a child page', async () => {
-      const handler = createTrashHandler(crowi);
+      const handler = createDeleteCompletelyHandler(crowi);
       const page = await createPage(nextPath());
       await createPage(`${page.path}/child`);
-      const op = trashOp(page);
+      const op = deleteOp(page);
 
       const outcome = await handler.execute(op, contextFor(op, false));
 
@@ -309,9 +352,9 @@ describe('trash operation handler', () => {
     });
 
     it('fails with target-unavailable when the requester cannot view the page', async () => {
-      const handler = createTrashHandler(crowi);
+      const handler = createDeleteCompletelyHandler(crowi);
       const page = await createPage(nextPath(), PageGrant.GRANT_OWNER);
-      const op = trashOp(page);
+      const op = deleteOp(page);
 
       const outcome = await handler.execute(op, contextFor(op, false));
 
@@ -322,21 +365,26 @@ describe('trash operation handler', () => {
       expect((await findPage(page._id)).path).toBe(page.path);
     });
 
-    describe("under the admin's page deletion authority", () => {
+    describe("under the admin's page deletion authorities", () => {
       afterEach(async () => {
         await configManager.updateConfigs(
-          { 'security:pageDeletionAuthority': undefined },
+          {
+            'security:pageDeletionAuthority': undefined,
+            'security:pageCompleteDeletionAuthority': undefined,
+            'security:user-homepage-deletion:isEnabled': undefined,
+          },
           { removeIfUndefined: true },
         );
       });
 
-      it('fails with not-deletable and leaves the page in place when only admins may delete', async () => {
-        await configManager.updateConfigs({
-          'security:pageDeletionAuthority': 'adminOnly',
-        });
-        const handler = createTrashHandler(crowi);
+      it.each([
+        ['moving to the trash', 'security:pageDeletionAuthority'],
+        ['deleting completely', 'security:pageCompleteDeletionAuthority'],
+      ] as const)('fails with not-deletable and leaves the page in place when only admins may delete by %s', async (_label, key) => {
+        await configManager.updateConfigs({ [key]: 'adminOnly' });
+        const handler = createDeleteCompletelyHandler(crowi);
         const page = await createPage(nextPath());
-        const op = trashOp(page);
+        const op = deleteOp(page);
 
         const outcome = await handler.execute(op, contextFor(op, false));
 
@@ -344,11 +392,11 @@ describe('trash operation handler', () => {
         expect((await findPage(page._id)).path).toBe(page.path);
       });
 
-      it("fails with not-deletable for someone else's page and trashes the requester's own when admins and authors may delete", async () => {
+      it("fails with not-deletable for someone else's page and deletes the requester's own when admins and authors may delete completely", async () => {
         await configManager.updateConfigs({
-          'security:pageDeletionAuthority': 'adminAndAuthor',
+          'security:pageCompleteDeletionAuthority': 'adminAndAuthor',
         });
-        const handler = createTrashHandler(crowi);
+        const handler = createDeleteCompletelyHandler(crowi);
         const othersPage = await createPage(nextPath());
         const created = await crowi.pageService.create(
           nextPath(),
@@ -358,17 +406,60 @@ describe('trash operation handler', () => {
         );
         await waitForPageOperationsToFinish();
         const ownPage = await findPage(created._id);
-        const othersOp = trashOp(othersPage);
-        const ownOp = trashOp(ownPage);
+        const othersOp = deleteOp(othersPage);
+        const ownOp = deleteOp(ownPage);
 
         await expect(
           handler.execute(othersOp, contextFor(othersOp, false)),
         ).resolves.toEqual({ status: 'failed', reason: 'not-deletable' });
         expectApplied(await handler.execute(ownOp, contextFor(ownOp, false)));
         expect((await findPage(othersPage._id)).path).toBe(othersPage.path);
-        expect((await findPage(ownPage._id)).path).toBe(
-          `/trash${ownPage.path}`,
+        expect(await pageExists(ownPage._id)).toBe(false);
+      });
+
+      // The all-groups rule applies only while anyone may delete completely.
+      it('fails with not-deletable on a page granted to several groups when the requester is in only some of them', async () => {
+        await configManager.updateConfigs({
+          'security:pageCompleteDeletionAuthority': 'anyOne',
+        });
+        const handler = createDeleteCompletelyHandler(crowi);
+        const created = await crowi.pageService.create(
+          nextPath(),
+          'body',
+          other,
+          {
+            grant: PageGrant.GRANT_USER_GROUP,
+            grantUserGroupIds: groupIds.map((item) => ({
+              item,
+              type: GroupType.userGroup,
+            })),
+          },
         );
+        await waitForPageOperationsToFinish();
+        const page = await findPage(created._id);
+        const op = deleteOp(page);
+
+        const outcome = await handler.execute(op, contextFor(op, false));
+
+        expect(outcome).toEqual({ status: 'failed', reason: 'not-deletable' });
+        expect(await pageExists(page._id)).toBe(true);
+      });
+
+      it.each([
+        ['user home deletion is turned off', false],
+        ['its owner still exists', true],
+      ])('fails with not-deletable on a user home page when %s', async (_label, isEnabled) => {
+        await configManager.updateConfigs({
+          'security:user-homepage-deletion:isEnabled': isEnabled,
+        });
+        const handler = createDeleteCompletelyHandler(crowi);
+        const page = await userHomePage();
+        const op = deleteOp(page);
+
+        const outcome = await handler.execute(op, contextFor(op, false));
+
+        expect(outcome).toEqual({ status: 'failed', reason: 'not-deletable' });
+        expect(await pageExists(page._id)).toBe(true);
       });
     });
   });
@@ -379,18 +470,17 @@ describe('trash operation handler', () => {
       return `${PREFIX}/日本語-${seq}/ページ　全角空白（かっこ）a.b[1]`;
     };
 
-    it('moves the page to the trash under its Japanese path and notifies with the path it had before trashing', async () => {
+    it('deletes the page under its Japanese path and notifies with that path', async () => {
       const spies = installNotificationSpies();
-      const handler = createTrashHandler(crowi);
+      const handler = createDeleteCompletelyHandler(crowi);
       const page = await createPage(japanesePath());
-      const op = trashOp(page);
+      const op = deleteOp(page);
       const ctx = contextFor(op, true);
 
       const outcome = expectApplied(await handler.execute(op, ctx));
-      expect(await handler.findExistingResult(op, ctx)).toEqual(outcome);
       await handler.sendPerPageNotifications(op, outcome, ctx);
 
-      expect((await findPage(page._id)).path).toBe(`/trash${page.path}`);
+      expect(await pageExists(page._id)).toBe(false);
       expect(spies.slackFire).toHaveBeenCalledWith(
         GlobalNotificationSettingEvent.PAGE_DELETE,
         page._id.toString(),
@@ -402,10 +492,10 @@ describe('trash operation handler', () => {
   });
 
   describe('findExistingResult', () => {
-    it('finds nothing before trashing and the applied result once the page is in the trash', async () => {
-      const handler = createTrashHandler(crowi);
+    it('finds nothing before the deletion and the applied result once the page is gone', async () => {
+      const handler = createDeleteCompletelyHandler(crowi);
       const page = await createPage(nextPath());
-      const op = trashOp(page);
+      const op = deleteOp(page);
       const ctx = contextFor(op, false);
 
       expect(await handler.findExistingResult(op, ctx)).toBeNull();
@@ -413,61 +503,67 @@ describe('trash operation handler', () => {
 
       expect(await handler.findExistingResult(op, ctx)).toEqual(applied);
     });
+
+    it('finds nothing while the page sits in the trash', async () => {
+      const handler = createDeleteCompletelyHandler(crowi);
+      const page = await createPage(nextPath());
+      const op = deleteOp(page);
+      await crowi.pageService.deletePage(page, other, {}, false, {});
+      await waitForPageOperationsToFinish();
+
+      expect(
+        await handler.findExistingResult(op, contextFor(op, false)),
+      ).toBeNull();
+    });
   });
 
   describe('per-page notifications', () => {
-    it('sends no global notification from the page service itself, but notifies subscribers in-app when perPageNotifications is true', async () => {
+    it('notifies subscribers in-app, and sends no global notification from the page service itself, when perPageNotifications is true', async () => {
       const spies = installNotificationSpies();
-      const handler = createTrashHandler(crowi);
+      const handler = createDeleteCompletelyHandler(crowi);
       const page = await createPage(nextPath());
       await subscribe(page);
       const notifyingEmits = spyNotifyingEmits(page._id);
-      const op = trashOp(page);
+      const op = deleteOp(page);
 
       expectApplied(await handler.execute(op, contextFor(op, true)));
 
-      await vi.waitFor(
-        async () => {
-          expect(await countDeleteNotifications(page._id)).toBe(1);
-        },
-        { timeout: 5000, interval: 50 },
-      );
       expect(notifyingEmits()).toBe(1);
       expect(spies.mailFire).not.toHaveBeenCalled();
       expect(spies.slackFire).not.toHaveBeenCalled();
       expect(spies.userFire).not.toHaveBeenCalled();
     });
 
-    it('sends no in-app notification when perPageNotifications is false, and still records the delete activity', async () => {
+    it('sends no in-app notification when perPageNotifications is false, and still records the complete-deletion activity', async () => {
       const spies = installNotificationSpies();
-      const handler = createTrashHandler(crowi);
+      const handler = createDeleteCompletelyHandler(crowi);
       const page = await createPage(nextPath());
       await subscribe(page);
       const notifyingEmits = spyNotifyingEmits(page._id);
-      const op = trashOp(page);
+      const op = deleteOp(page);
 
       expectApplied(await handler.execute(op, contextFor(op, false)));
 
+      expect(notifyingEmits()).toBe(0);
       expect(await countDeleteNotifications(page._id)).toBe(0);
       expect(
         await prisma.activities.count({
           where: {
             ip: TEST_IP,
             target: page._id.toString(),
-            action: SupportedAction.ACTION_PAGE_DELETE,
+            action: SupportedAction.ACTION_PAGE_DELETE_COMPLETELY,
           },
         }),
       ).toBe(1);
-      expect(notifyingEmits()).toBe(0);
       expect(spies.mailFire).not.toHaveBeenCalled();
       expect(spies.slackFire).not.toHaveBeenCalled();
     });
 
-    it('sends the delete global notification for the path the page had before trashing, as the delete route does', async () => {
+    it('sends the delete global notification with the page as it was before the deletion, as the delete route does', async () => {
       const spies = installNotificationSpies();
-      const handler = createTrashHandler(crowi);
+      const handler = createDeleteCompletelyHandler(crowi);
       const page = await createPage(nextPath());
-      const op = trashOp(page);
+      const op = deleteOp(page);
       const ctx = contextFor(op, true);
       const outcome = expectApplied(await handler.execute(op, ctx));
 
@@ -488,27 +584,27 @@ describe('trash operation handler', () => {
         expect.anything(),
       );
       expect(spies.userFire).not.toHaveBeenCalled();
-      expect((await findPage(page._id)).path).toBe(`/trash${page.path}`);
     });
 
-    it('does not throw when the trashed page is gone', async () => {
+    it('sends nothing and does not throw for an operation this handler did not delete', async () => {
       const spies = installNotificationSpies();
-      const handler = createTrashHandler(crowi);
+      const handler = createDeleteCompletelyHandler(crowi);
       const page = await createPage(nextPath());
-      const op = trashOp(page);
+      const op = deleteOp(page);
 
       await expect(
         handler.sendPerPageNotifications(
           op,
           {
             status: 'applied',
-            resultPageId: new mongoose.Types.ObjectId().toString(),
+            resultPageId: page._id.toString(),
             resultRevisionId: null,
           },
           contextFor(op, true),
         ),
       ).resolves.toBeUndefined();
       expect(spies.mailFire).not.toHaveBeenCalled();
+      expect(spies.slackFire).not.toHaveBeenCalled();
     });
   });
 });

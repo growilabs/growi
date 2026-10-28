@@ -57,6 +57,7 @@ describe('validateProposalInput', () => {
     it.each([
       'trash',
       'restore',
+      'delete-completely',
       'delete',
       '',
     ])('rejects type %j with the index of the first offender', (type) => {

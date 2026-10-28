@@ -197,7 +197,7 @@ describe('ChangeProposalService.revert', () => {
       expect(revert.expiresAt).toBeUndefined();
       expect(revert.operations.map((op) => [op.type, op.status])).toEqual([
         ['edit', 'applied'],
-        ['trash', 'applied'],
+        ['delete-completely', 'applied'],
         ['move', 'applied'],
       ]);
       for (const op of revert.operations) {
@@ -221,9 +221,8 @@ describe('ChangeProposalService.revert', () => {
         ['reverted', revertProposalId],
       ]);
       expect(await revisionBodyOf(edited._id.toString())).toBe('base body');
-      expect((await kit.findPage(createdPageId)).path).toBe(
-        `/trash${createdPath}`,
-      );
+      expect(await Page().exists({ _id: createdPageId })).toBeNull();
+      expect(await Page().exists({ path: `/trash${createdPath}` })).toBeNull();
       expect((await kit.findPage(moved._id)).path).toBe(movedFrom);
     });
 

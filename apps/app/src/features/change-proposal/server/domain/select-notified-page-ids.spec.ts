@@ -29,21 +29,12 @@ const move = (pageId: string, status: OperationRecord['status']) =>
     toPath: '/b',
     status,
   }) as const;
-const trash = (pageId: string) =>
+const deleteCompletely = (pageId: string) =>
   ({
     ...base,
-    type: 'trash',
+    type: 'delete-completely',
     pageId,
     expectedRevisionId: 'r',
-    status: 'applied',
-  }) as const;
-const restore = (pageId: string) =>
-  ({
-    ...base,
-    type: 'restore',
-    pageId,
-    expectedRevisionId: 'r',
-    toPath: '/p',
     status: 'applied',
   }) as const;
 const create = {
@@ -69,15 +60,14 @@ describe('selectNotifiedPageIds', () => {
     expect(selectNotifiedPageIds(proposal)).toEqual(['p1', 'p2']);
   });
 
-  it('also takes applied trash and restore pages in a revert proposal', () => {
+  it('also takes completely deleted pages in a revert proposal', () => {
     const proposal = proposalWith('revert', [
       edit('p1', 'applied'),
-      trash('p2'),
-      restore('p3'),
+      deleteCompletely('p2'),
       move('p4', 'skipped'),
     ]);
 
-    expect(selectNotifiedPageIds(proposal)).toEqual(['p1', 'p2', 'p3']);
+    expect(selectNotifiedPageIds(proposal)).toEqual(['p1', 'p2']);
   });
 
   it('lists a page once even when several operations touched it', () => {

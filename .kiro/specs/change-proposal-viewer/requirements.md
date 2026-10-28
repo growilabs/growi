@@ -89,7 +89,7 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 **Objective:** 詳細ページを見るユーザーとして、操作ごとに、どのページがどう変わり、いまどうなっているかを知りたい。戻すかどうかを判断するため。
 
 #### Acceptance Criteria
-1. The Change Proposal Viewer shall 見える操作ごとに、操作の種類（編集・新規作成・移動・ごみ箱へ移す・ごみ箱から戻す）、対象のページのパス、操作の状態を表示する。
+1. The Change Proposal Viewer shall 見える操作ごとに、操作の種類（編集・新規作成・移動・完全な削除）、対象のページのパス、操作の状態を表示する。
 2. When 見る人が反映でリビジョンが作られた編集の操作の差分を開いた場合, the Change Proposal Viewer shall 元のリビジョンと反映で作られたリビジョンの差分を、ページ履歴の差分と同じ見た目で表示する。
 3. When 見る人が反映でページが作られた新規作成の操作の差分を開いた場合, the Change Proposal Viewer shall 空の本文と作られたリビジョンの差分を、ページ履歴の差分と同じ見た目で表示する。
 4. The Change Proposal Viewer shall 移動の操作について、移動元のパスと移動先のパスを表示する。

@@ -246,13 +246,13 @@ export const createChangeProposalService = (
     ...createRevertAction({
       applier,
       now,
-      pageService: crowi.pageService,
+      deletePermission: crowi,
       markRetryWait: deps.markRetryWait,
       writeOriginalMark: deps.writeOriginalMark,
     }),
     ...createProposalQuery({
       appliedListScan: deps.appliedListScan,
-      pageService: crowi.pageService,
+      deletePermission: crowi,
     }),
     ...createMaintenanceActions({
       applier,

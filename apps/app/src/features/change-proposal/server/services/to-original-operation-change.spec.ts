@@ -42,7 +42,6 @@ describe('toOriginalOperationChange', () => {
     'has-children',
     'moved-after-apply',
     'original-path-occupied',
-    'not-in-trash',
     'page-operation-in-progress',
     'not-deletable',
     'apply-failed',

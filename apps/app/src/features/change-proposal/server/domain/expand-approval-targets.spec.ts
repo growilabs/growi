@@ -2,7 +2,11 @@ import type { OperationRecord, OperationStatus } from '../../interfaces';
 import { expandApprovalTargets } from './expand-approval-targets';
 
 type Spec =
-  | { index: number; type: 'edit' | 'move' | 'trash'; pageId: string }
+  | {
+      index: number;
+      type: 'edit' | 'move' | 'delete-completely';
+      pageId: string;
+    }
   | { index: number; type: 'create'; path: string };
 
 const build = (
@@ -97,7 +101,7 @@ describe('expandApprovalTargets', () => {
       [
         { index: 0, type: 'edit', pageId: 'p1' },
         { index: 1, type: 'move', pageId: 'p1' },
-        { index: 2, type: 'trash', pageId: 'p1' },
+        { index: 2, type: 'delete-completely', pageId: 'p1' },
       ],
       { 1: 'applied', 2: 'failed' },
     );

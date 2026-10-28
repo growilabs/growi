@@ -13,8 +13,7 @@ export const OPERATION_TYPE_LABEL_KEYS = {
   edit: 'change_proposal.operation_type.edit',
   create: 'change_proposal.operation_type.create',
   move: 'change_proposal.operation_type.move',
-  trash: 'change_proposal.operation_type.trash',
-  restore: 'change_proposal.operation_type.restore',
+  'delete-completely': 'change_proposal.operation_type.delete_completely',
 } as const satisfies Record<OperationType, string>;
 
 export const OPERATION_STATUS_LABEL_KEYS = {
@@ -55,7 +54,6 @@ export const OPERATION_REASON_LABEL_KEYS = {
   'has-children': 'change_proposal.reason.has_children',
   'moved-after-apply': 'change_proposal.reason.moved_after_apply',
   'original-path-occupied': 'change_proposal.reason.original_path_occupied',
-  'not-in-trash': 'change_proposal.reason.not_in_trash',
   'not-deletable': 'change_proposal.reason.not_deletable',
   'apply-failed': 'change_proposal.reason.apply_failed',
   'base-revision-changed': 'change_proposal.reason.base_revision_changed',
@@ -77,7 +75,6 @@ export const REVERT_REFUSAL_REASON_LABEL_KEYS = {
     'change_proposal.revert_refusal_reason.moved_after_apply',
   'original-path-occupied':
     'change_proposal.revert_refusal_reason.original_path_occupied',
-  'not-in-trash': 'change_proposal.revert_refusal_reason.not_in_trash',
   'not-deletable': 'change_proposal.revert_refusal_reason.not_deletable',
   'page-operation-in-progress':
     'change_proposal.revert_refusal_reason.page_operation_in_progress',

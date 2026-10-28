@@ -376,7 +376,7 @@ describe('ChangeProposalService.getForViewer', () => {
       ]);
     });
 
-    it('keeps a reverted create whose page now sits in the trash', async () => {
+    it('shows a reverted create whose page was deleted completely to its requester only', async () => {
       const path = kit.nextPath('日本語　ページ（作成）');
       const original = await applyAll([{ type: 'create', path, body: '本文' }]);
       await service.revert(
@@ -388,22 +388,17 @@ describe('ChangeProposalService.getForViewer', () => {
       await kit.waitForPageOperationsToFinish();
 
       const view = viewOf(
-        await service.getForViewer(original._id, users.subscriber),
+        await service.getForViewer(original._id, users.requester),
       );
 
       expect(view.status).toBe('reverted');
       expect(view.operations).toEqual([
-        expect.objectContaining({
-          type: 'create',
-          status: 'reverted',
-          path,
-          page: {
-            id: original.operations[0].resultPageId,
-            path: `/trash${path}`,
-          },
-        }),
+        expect.objectContaining({ type: 'create', status: 'reverted', path }),
       ]);
-      expect(view.operations[0]).not.toHaveProperty('revertability');
+      expect(view.operations[0]).not.toHaveProperty('page');
+      await expect(
+        service.getForViewer(original._id, users.subscriber),
+      ).resolves.toEqual({ ok: false, error: { code: 'not-found' } });
     });
   });
 

@@ -15,7 +15,6 @@ import type {
 } from '../../interfaces';
 import {
   buildRevertOperations,
-  type CurrentPageFacts,
   judgeRevertability,
   type RevertibleOperationFacts,
   selectVisibleOperations,
@@ -38,8 +37,7 @@ import {
   waitBeforeMarkRetry,
   writeOriginalMarkToDb,
 } from './mark-original-operation';
-import { pageModel } from './operation-handlers/page-model';
-import type { PageDeletePermissionService } from './page-delete-permission';
+import type { PageDeletePermissionServices } from './page-delete-permission';
 import { isRequesterAllowed } from './pre-write-checks';
 import type { ProposalApplier } from './proposal-applier';
 import { toRevertRefusalReason } from './to-original-operation-change';
@@ -62,7 +60,6 @@ type RevertOutcome = RevertResult['operations'][number];
 
 type Judged = {
   readonly op: OperationRecord;
-  readonly facts: CurrentPageFacts;
   readonly refusal: RevertRefusalReason | null;
   // Set exactly when refusal is null
   readonly revertible?: RevertibleOperationFacts;
@@ -114,6 +111,7 @@ const readVisibleOperations = async (
     isRequester: proposal.requester === user._id.toString(),
     viewablePageIds: viewable.viewablePageIds,
     anyoneWithLinkPageIds: viewable.anyoneWithLinkPageIds,
+    deletedPageIds: viewable.deletedPageIds,
   });
   return { visible, viewable };
 };
@@ -138,7 +136,7 @@ const readOriginalBodies = async (
 
 // What buildRevertOperations needs per operation, or null when it cannot be had.
 const toRevertibleFacts = (
-  { op, facts }: Judged,
+  { op }: Judged,
   bodies: ReadonlyMap<string, string>,
 ): RevertibleOperationFacts | null => {
   switch (op.type) {
@@ -146,13 +144,6 @@ const toRevertibleFacts = (
       const originalBody = bodies.get(op.baseRevisionId);
       return originalBody == null ? null : { key: op.key, originalBody };
     }
-    case 'trash':
-      return facts.path == null
-        ? null
-        : {
-            key: op.key,
-            restoreToPath: pageModel().getRevertDeletedPageName(facts.path),
-          };
     default:
       return { key: op.key };
   }
@@ -188,11 +179,9 @@ const judgeOperations = async (
 ): Promise<readonly Judged[]> => {
   const factsOf = await loadCurrentPageFacts(chosen, pages, deleteAuthority);
   const preJudged: Judged[] = chosen.map((op) => {
-    const facts = factsOf(op);
-    const judgement = judgeRevertability(op, proposal.entry, facts);
+    const judgement = judgeRevertability(op, proposal.entry, factsOf(op));
     return {
       op,
-      facts,
       refusal: judgement.revertible ? null : judgement.reason,
     };
   });
@@ -217,11 +206,11 @@ const judgeOperations = async (
 export const createRevertAction = (deps: {
   readonly applier: ProposalApplier;
   readonly now: () => Date;
-  readonly pageService: PageDeletePermissionService;
+  readonly deletePermission: PageDeletePermissionServices;
   readonly markRetryWait?: () => Promise<void>;
   readonly writeOriginalMark?: WriteOriginalMark;
 }): RevertAction => {
-  const { applier, now, pageService } = deps;
+  const { applier, now, deletePermission } = deps;
   const originalMark = {
     write: deps.writeOriginalMark ?? writeOriginalMarkToDb,
     wait: deps.markRetryWait ?? waitBeforeMarkRetry,
@@ -338,7 +327,7 @@ export const createRevertAction = (deps: {
         proposal,
         chooseOperations(visible, keys),
         viewable.pages,
-        { user, pageService },
+        { user, services: deletePermission },
       );
       const revertible = judged.flatMap((entry) =>
         entry.revertible == null ? [] : [entry.revertible],

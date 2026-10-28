@@ -219,11 +219,10 @@ export const createApplierTestKit = (args: {
       edit: { ...real.edit, sendPerPageNotifications, ...overrides.edit },
       create: { ...real.create, sendPerPageNotifications, ...overrides.create },
       move: { ...real.move, sendPerPageNotifications, ...overrides.move },
-      trash: { ...real.trash, sendPerPageNotifications, ...overrides.trash },
-      restore: {
-        ...real.restore,
+      'delete-completely': {
+        ...real['delete-completely'],
         sendPerPageNotifications,
-        ...overrides.restore,
+        ...overrides['delete-completely'],
       },
     };
     return { table, real };

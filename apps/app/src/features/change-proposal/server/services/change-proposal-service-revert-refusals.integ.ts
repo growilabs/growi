@@ -261,41 +261,81 @@ describe('ChangeProposalService.revert judging each operation against the curren
   });
 
   describe('a revert proposal', () => {
-    it('restores a page its trash removed, and trashes it again when that restore is reverted', async () => {
+    it('deletes the created page completely, leaving nothing in the trash, and refuses to bring it back', async () => {
       const path = kit.nextPath('日本語/新しい　ページ（仮）');
       const original = await applyOriginal([
         { type: 'create', path, body: '作った本文' },
       ]);
       const pageId = createdPageIdOf(original);
 
-      const trashing = await revertSingle(original);
-      expect(trashing.operations.map((op) => op.type)).toEqual(['trash']);
-      expect((await kit.findPage(pageId)).path).toBe(`/trash${path}`);
-
-      const restoring = await revertSingle(trashing);
-      expect(restoring).toMatchObject({
-        entry: 'revert',
-        revertOf: trashing._id,
-        lifecycle: 'settled',
-      });
-      expect(restoring.operations.map((op) => op.type)).toEqual(['restore']);
-      expect((await kit.findPage(pageId)).path).toBe(path);
-      expect(
-        await prisma.pageredirects.count({ where: { fromPath: path } }),
-      ).toBe(0);
+      const deleting = await revertSingle(original);
+      expect(deleting.operations.map((op) => op.type)).toEqual([
+        'delete-completely',
+      ]);
+      expect(await Page().exists({ _id: pageId })).toBeNull();
+      expect(await Page().exists({ path: `/trash${path}` })).toBeNull();
       expect(
         kit.operationOf(
-          await kit.reload(trashing._id),
-          trashing.operations[0].key,
+          await kit.reload(original._id),
+          original.operations[0].key,
         ),
       ).toMatchObject({
         status: 'reverted',
-        revertedByProposalId: restoring._id,
+        revertedByProposalId: deleting._id,
       });
 
-      const trashingAgain = await revertSingle(restoring);
-      expect(trashingAgain.operations.map((op) => op.type)).toEqual(['trash']);
-      expect((await kit.findPage(pageId)).path).toBe(`/trash${path}`);
+      await expectRefused(deleting, 'target-unavailable');
+    });
+
+    it('keeps showing the reverted create and the deletion to their requesters only', async () => {
+      const original = await applyOriginal([
+        {
+          type: 'create',
+          path: kit.nextPath('shown-after-deletion'),
+          body: 'b',
+        },
+      ]);
+      const deleting = await revertSingle(original);
+
+      const forRequester = await service.getForViewer(
+        original._id,
+        users.requester,
+      );
+      expect(forRequester).toMatchObject({
+        ok: true,
+        value: {
+          operations: [
+            {
+              key: original.operations[0].key,
+              type: 'create',
+              status: 'reverted',
+            },
+          ],
+        },
+      });
+      await expect(
+        service.getForViewer(deleting._id, users.requester),
+      ).resolves.toMatchObject({
+        ok: true,
+        value: {
+          operations: [
+            {
+              type: 'delete-completely',
+              status: 'applied',
+              revertability: {
+                revertible: false,
+                reason: 'target-unavailable',
+              },
+            },
+          ],
+        },
+      });
+      for (const proposalId of [original._id, deleting._id]) {
+        // biome-ignore lint/performance/noAwaitInLoops: two independent reads
+        await expect(
+          service.getForViewer(proposalId, users.other),
+        ).resolves.toEqual({ ok: false, error: { code: 'not-found' } });
+      }
     });
 
     it('puts the proposed body back when the revert of an edit is reverted', async () => {
@@ -309,51 +349,6 @@ describe('ChangeProposalService.revert judging each operation against the curren
 
       await revertSingle(reverting);
       expect(await latestBodyOf(page._id.toString())).toBe('提案の本文 😀');
-    });
-
-    it('refuses to restore with not-in-trash once the page was restored by hand', async () => {
-      const original = await applyOriginal([
-        { type: 'create', path: kit.nextPath('restored-by-hand'), body: 'b' },
-      ]);
-      const trashing = await revertSingle(original);
-      const trashed = await kit.findPage(createdPageIdOf(original));
-      await crowi.pageService.revertDeletedPage(
-        trashed,
-        users.other,
-        {},
-        false,
-        {
-          ip: TEST_IP,
-        },
-      );
-      await kit.waitForPageOperationsToFinish();
-
-      await expectRefused(trashing, 'not-in-trash');
-    });
-
-    it('refuses to restore with original-path-occupied once a page sits where the trashed page was', async () => {
-      const path = kit.nextPath('restore-occupied');
-      const original = await applyOriginal([
-        { type: 'create', path, body: 'b' },
-      ]);
-      const trashing = await revertSingle(original);
-      await createPageAt(path);
-
-      await expectRefused(trashing, 'original-path-occupied');
-    });
-
-    it('restores when only an empty page holds the path the trashed page had', async () => {
-      const path = kit.nextPath('restore-placeholder');
-      const original = await applyOriginal([
-        { type: 'create', path, body: 'b' },
-      ]);
-      const trashing = await revertSingle(original);
-      await createPageAt(`${path}/child`);
-      expect(await Page().exists({ path, isEmpty: true })).not.toBeNull();
-
-      await revertSingle(trashing);
-
-      expect((await kit.findPage(createdPageIdOf(original))).path).toBe(path);
     });
   });
 

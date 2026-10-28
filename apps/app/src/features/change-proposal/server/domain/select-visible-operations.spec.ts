@@ -54,6 +54,7 @@ const ctx = (
   isRequester: false,
   viewablePageIds: new Set(['p1', 'p-new']),
   anyoneWithLinkPageIds: new Set(),
+  deletedPageIds: new Set(),
   ...overrides,
 });
 
@@ -170,6 +171,31 @@ describe('selectVisibleOperations', () => {
       );
       expect(result).toEqual([]);
       expect(JSON.stringify(result)).not.toContain('secret');
+    });
+  });
+
+  describe('an operation whose page was deleted completely', () => {
+    const deleted = ctx({
+      viewablePageIds: new Set(),
+      deletedPageIds: new Set(['p-gone']),
+    });
+
+    it.each(
+      STATUSES,
+    )('is kept for the requester (%s), like a create that has no page yet', (status) => {
+      const ops = [editOp(status, 'p-gone'), createOp(status, 'p-gone')];
+      expect(
+        selectVisibleOperations(ops, { ...deleted, isRequester: true }),
+      ).toEqual(ops);
+    });
+
+    it.each(STATUSES)('is dropped for anyone else (%s)', (status) => {
+      expect(
+        selectVisibleOperations(
+          [editOp(status, 'p-gone'), createOp(status, 'p-gone')],
+          deleted,
+        ),
+      ).toEqual([]);
     });
   });
 

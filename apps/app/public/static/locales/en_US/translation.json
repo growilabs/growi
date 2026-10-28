@@ -1217,8 +1217,7 @@
       "edit": "Edit page",
       "create": "Create page",
       "move": "Move page",
-      "trash": "Move to trash",
-      "restore": "Restore from trash"
+      "delete_completely": "Delete page completely"
     },
     "operation_status": {
       "pending": "Waiting for approval",
@@ -1255,7 +1254,6 @@
       "has_children": "The page has child pages",
       "moved_after_apply": "The page was moved after it was applied",
       "original_path_occupied": "A page already exists at the original path",
-      "not_in_trash": "The page is no longer in the trash",
       "not_deletable": "You are not allowed to delete the page",
       "apply_failed": "Reverting failed",
       "base_revision_changed": "The page had changed before it was applied",
@@ -1271,7 +1269,6 @@
       "has_children": "The page has child pages",
       "moved_after_apply": "The page was moved after it was applied",
       "original_path_occupied": "A page already exists at the original path",
-      "not_in_trash": "The page is no longer in the trash",
       "not_deletable": "You are not allowed to delete the page",
       "page_operation_in_progress": "Another operation on the page is in progress",
       "apply_failed": "Reverting failed"

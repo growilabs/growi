@@ -143,7 +143,7 @@ export interface IPageService {
   deleteCompletely(
     page,
     user,
-    options,
+    options: IOptionsForInAppNotificationSuppression,
     isRecursively: boolean,
     preventEmitting: boolean,
     activityParameters,

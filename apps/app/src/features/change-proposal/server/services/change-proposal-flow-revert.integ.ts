@@ -49,7 +49,7 @@ describe('change proposal flow: apply, revert everything, then revert the revert
   const PageOperation = () =>
     mongoose.model<IPageOperation, PageOperationModel>('PageOperation');
 
-  // The kit only waits for operations under PREFIX; a restore starts from the trash.
+  // Also waits for operations started from a trashed page under PREFIX.
   const waitForPageOperations = async (): Promise<void> => {
     await vi.waitFor(
       async () => {
@@ -160,7 +160,7 @@ describe('change proposal flow: apply, revert everything, then revert the revert
     await kit.tearDown();
   });
 
-  it('records each revert on the operations it reverted and moves the created page to the trash and back', async () => {
+  it('records each revert on the operations it reverted, deletes the created page completely and refuses to bring it back', async () => {
     const edited = await kit.createPage('取り消し/編集　ページ');
     const moved = await kit.createPage('取り消し/移動元');
     await kit.subscribe(edited);
@@ -189,7 +189,6 @@ describe('change proposal flow: apply, revert everything, then revert the revert
     expect(original.lifecycle).toBe('settled');
     const createdPageId = original.operations[1].resultPageId;
     if (createdPageId == null) throw new Error('create was not applied');
-    const createdRevisionId = original.operations[1].resultRevisionId;
 
     // 1st revert: everything the requester sees
     const first = await revertAll(proposalId);
@@ -204,7 +203,7 @@ describe('change proposal flow: apply, revert everything, then revert the revert
     });
     expect(statesOf(first.revert)).toEqual([
       ['edit', 'applied', undefined],
-      ['trash', 'applied', undefined],
+      ['delete-completely', 'applied', undefined],
       ['move', 'applied', undefined],
     ]);
     expect(statesOf(await kit.reload(proposalId))).toEqual([
@@ -213,8 +212,8 @@ describe('change proposal flow: apply, revert everything, then revert the revert
       ['move', 'reverted', first.revert._id],
     ]);
     expect(await latestBodyOf(edited._id.toString())).toBe('base body');
-    const trashedPage = await kit.findPage(createdPageId);
-    expect(trashedPage.path).toBe(`/trash${createdPath}`);
+    expect(await Page().exists({ _id: createdPageId })).toBeNull();
+    expect(await Page().exists({ path: `/trash${createdPath}` })).toBeNull();
     expect((await kit.findPage(moved._id)).path).toBe(originalMovedPath);
     // the subscriber hears about the revert once, as a revert
     expect(
@@ -232,12 +231,16 @@ describe('change proposal flow: apply, revert everything, then revert the revert
     // 2nd revert: the revert proposal itself
     const second = await revertAll(first.revert._id);
 
-    expect(second.result.operations).toEqual(
-      first.revert.operations.map((op) => ({
-        key: op.key,
-        outcome: 'reverted',
-      })),
-    );
+    const [firstEdit, firstDelete, firstMove] = first.revert.operations;
+    expect(second.result.operations).toEqual([
+      { key: firstEdit.key, outcome: 'reverted' },
+      {
+        key: firstDelete.key,
+        outcome: 'revert-refused',
+        reason: 'target-unavailable',
+      },
+      { key: firstMove.key, outcome: 'reverted' },
+    ]);
     expect(second.revert).toMatchObject({
       entry: 'revert',
       revertOf: first.revert._id,
@@ -245,12 +248,11 @@ describe('change proposal flow: apply, revert everything, then revert the revert
     });
     expect(statesOf(second.revert)).toEqual([
       ['edit', 'applied', undefined],
-      ['restore', 'applied', undefined],
       ['move', 'applied', undefined],
     ]);
     expect(statesOf(await kit.reload(first.revert._id))).toEqual([
       ['edit', 'reverted', second.revert._id],
-      ['trash', 'reverted', second.revert._id],
+      ['delete-completely', 'revert-refused', undefined],
       ['move', 'reverted', second.revert._id],
     ]);
     // the original keeps the record of the revert that reverted it
@@ -260,13 +262,11 @@ describe('change proposal flow: apply, revert everything, then revert the revert
       ['move', 'reverted', first.revert._id],
     ]);
     expect(await latestBodyOf(edited._id.toString())).toBe('提案した本文');
-    const restored = await kit.findPage(createdPageId);
-    expect(restored.path).toBe(createdPath);
-    expect(getIdStringForRef(restored.revision ?? '')).toBe(createdRevisionId);
+    expect(await Page().exists({ _id: createdPageId })).toBeNull();
     expect((await kit.findPage(moved._id)).path).toBe(movedTo);
 
     expect((await viewOf(proposalId)).status).toBe('reverted');
-    expect((await viewOf(first.revert._id)).status).toBe('reverted');
+    expect((await viewOf(first.revert._id)).status).toBe('partially-reverted');
     expect((await viewOf(second.revert._id)).status).toBe('applied');
   });
 });

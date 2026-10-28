@@ -1,5 +1,3 @@
-import { isTrashPage } from '@growi/core/dist/utils/page-path-utils';
-
 import type {
   OperationRecord,
   ProposalEntry,
@@ -12,8 +10,8 @@ export type CurrentPageFacts = {
   readonly path: string | null;
   readonly latestRevisionId: string | null;
   readonly hasChildren: boolean;
-  // Whether the viewer may delete the page under the admin's deletion authority
-  // (pageService.canDelete, as the human delete route asks).
+  // Whether the viewer may delete the page completely under the admin's deletion
+  // authorities (see canDeletePageCompletely).
   readonly canDelete: boolean;
   // True only when a non-empty page sits at the path; an empty placeholder page
   // does not block revertDeletedPage, so it must not count as occupied.
@@ -39,10 +37,6 @@ const judgeRemovableNewPage = (
   return REVERTIBLE;
 };
 
-// Same derivation as Page.getRevertDeletedPageName
-const toPreTrashPath = (trashPath: string): string =>
-  trashPath.replace('/trash', '');
-
 export const judgeRevertability = (
   op: OperationRecord,
   _proposalEntry: ProposalEntry,
@@ -60,25 +54,15 @@ export const judgeRevertability = (
         : refuse('edited-after-apply');
     case 'create':
       return judgeRemovableNewPage(op.resultRevisionId, facts);
-    case 'restore':
-      return judgeRemovableNewPage(op.expectedRevisionId, facts);
     case 'move':
       if (facts.path !== op.toPath) return refuse('moved-after-apply');
       if (facts.isPathOccupied(op.fromPath)) {
         return refuse('original-path-occupied');
       }
       return REVERTIBLE;
-    case 'trash':
-      if (facts.path == null || !isTrashPage(facts.path)) {
-        return refuse('not-in-trash');
-      }
-      if (facts.isPathOccupied(toPreTrashPath(facts.path))) {
-        return refuse('original-path-occupied');
-      }
-      if (facts.latestRevisionId !== op.expectedRevisionId) {
-        return refuse('edited-after-apply');
-      }
-      return REVERTIBLE;
+    // The deleted page is gone for good, so nothing can bring it back.
+    case 'delete-completely':
+      return refuse('target-unavailable');
     default: {
       const unreachable: never = op;
       throw new Error(`Unknown operation: ${JSON.stringify(unreachable)}`);

@@ -80,9 +80,9 @@ const sleep = (ms: number): Promise<void> =>
 
 // The scope the pageService write itself then checks, so an overlap is waited on
 // here instead of failing inside the write: create (false, null, path);
-// renamePage always recursive (true, from, to); revertDeletedPage and deletePage
-// non-recursive, where canOperate skips trash paths, so the trash side may be
-// left out. updatePage has no canOperate call, so an edit uses the page's path.
+// renamePage always recursive (true, from, to); deleteCompletely non-recursive
+// (false, path, null). updatePage has no canOperate call, so an edit uses the
+// page's path.
 const toPageOperationScope = (
   op: OperationRecord,
   page: PageFacts | null,
@@ -93,10 +93,8 @@ const toPageOperationScope = (
       return [false, null, op.path];
     case 'move':
       return [true, fromPath, op.toPath];
-    case 'restore':
-      return [false, fromPath, op.toPath];
     case 'edit':
-    case 'trash':
+    case 'delete-completely':
       return [false, fromPath, null];
   }
 };

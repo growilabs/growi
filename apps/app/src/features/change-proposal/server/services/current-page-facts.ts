@@ -1,6 +1,5 @@
 import type { IUserHasId } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
-import { isTrashPage } from '@growi/core/dist/utils/page-path-utils';
 import type { HydratedDocument } from 'mongoose';
 
 import type { PageDocument } from '~/server/models/page';
@@ -13,8 +12,8 @@ import {
 } from '../domain';
 import { pageModel } from './operation-handlers/page-model';
 import {
-  canTrashPage,
-  type PageDeletePermissionService,
+  createCanDeletePageCompletely,
+  type PageDeletePermissionServices,
 } from './page-delete-permission';
 
 export type ViewablePages = Omit<VisibilityContext, 'isRequester'> & {
@@ -34,11 +33,25 @@ const MISSING_PAGE: CurrentPageFacts = {
 // or the viewer the revertability is shown to.
 export type DeleteAuthority = {
   readonly user: IUserHasId;
-  readonly pageService: PageDeletePermissionService;
+  readonly services: PageDeletePermissionServices;
 };
 
-// Trashed pages are included because a revert proposal's trash is itself revertible;
-// "anyone with the link" pages are kept apart so non-requesters can be denied them.
+// Trashed pages are included because an operation on a page a human trashed still
+// shows; "anyone with the link" pages are kept apart so non-requesters can be
+// denied them, and pages that no longer exist so only the requester sees them.
+// Asked only about the pages the viewer could not read, which are usually none.
+const findDeletedPageIds = async (
+  pageIds: readonly string[],
+): Promise<ReadonlySet<string>> => {
+  const unique = [...new Set(pageIds)];
+  if (unique.length === 0) {
+    return new Set();
+  }
+  const existing = await pageModel().distinct('_id', { _id: { $in: unique } });
+  const existingIds = new Set((existing as unknown[]).map(String));
+  return new Set(unique.filter((id) => !existingIds.has(id)));
+};
+
 export const loadViewablePages = async (
   pageIds: readonly string[],
   viewer: IUserHasId,
@@ -58,6 +71,9 @@ export const loadViewablePages = async (
   return {
     pages,
     viewablePageIds: new Set(pages.keys()),
+    deletedPageIds: await findDeletedPageIds(
+      pageIds.filter((id) => !pages.has(id)),
+    ),
     anyoneWithLinkPageIds: new Set(
       found
         .filter((page) => page.grant === Page.GRANT_RESTRICTED)
@@ -66,42 +82,41 @@ export const loadViewablePages = async (
   };
 };
 
-// The only paths judgeRevertability asks about: where a move came from, and where
-// a trashed page returns to (the same name revertDeletedPage computes).
-const pathsToCheck = (
-  operations: readonly OperationRecord[],
-  pages: ViewablePages['pages'],
-): string[] =>
-  operations.flatMap((op) => {
-    if (op.type === 'move') {
-      return [op.fromPath];
-    }
-    const pageId = targetPageIdOf(op);
-    const page = pageId == null ? undefined : pages.get(pageId);
-    return op.type === 'trash' && page != null && isTrashPage(page.path)
-      ? [pageModel().getRevertDeletedPageName(page.path) as string]
-      : [];
-  });
+// The only paths judgeRevertability asks about: where a move came from.
+const pathsToCheck = (operations: readonly OperationRecord[]): string[] =>
+  operations.flatMap((op) => (op.type === 'move' ? [op.fromPath] : []));
 
-// No query for a non-empty page; an empty one reads its closest non-empty ancestor.
+// Only a create's revert deletes a page, so only created pages are judged.
 const loadDeletablePageIds = async (
   operations: readonly OperationRecord[],
   pages: ViewablePages['pages'],
-  { user, pageService }: DeleteAuthority,
+  { user, services }: DeleteAuthority,
 ): Promise<ReadonlySet<string>> => {
-  const targetIds = new Set(operations.map(targetPageIdOf));
+  const targetIds = new Set(
+    operations.flatMap((op) =>
+      op.type === 'create' && op.resultPageId != null ? [op.resultPageId] : [],
+    ),
+  );
   const targets = [...pages.entries()].filter(([id]) => targetIds.has(id));
+  if (targets.length === 0) {
+    return new Set();
+  }
+  const canDeletePageCompletely = await createCanDeletePageCompletely(
+    services,
+    user,
+  );
   const deletable = await Promise.all(
     targets.map(async ([id, page]) =>
-      (await canTrashPage(pageService, page, user)) ? [id] : [],
+      (await canDeletePageCompletely(page)) ? [id] : [],
     ),
   );
   return new Set(deletable.flat());
 };
 
 /**
- * Reads, in two queries for any number of operations (plus one per empty
- * target page for the delete authority), the page state judgeRevertability
+ * Reads, in two queries for any number of operations (plus, when a create is
+ * among them, one for the user's groups and one per empty created page for the
+ * delete authority), the page state judgeRevertability
  * needs. `pages` are the operations' target pages as already
  * loaded (loadViewablePages); an operation whose page is not there reads as missing.
  */
@@ -112,10 +127,10 @@ export const loadCurrentPageFacts = async (
 ): Promise<(op: OperationRecord) => CurrentPageFacts> => {
   const Page = pageModel();
   const pageObjectIds = [...pages.values()].map((page) => page._id);
-  const paths = [...new Set(pathsToCheck(operations, pages))];
+  const paths = [...new Set(pathsToCheck(operations))];
 
   const [parentIds, occupiedPaths, deletablePageIds] = await Promise.all([
-    // An empty child counts, as in the trash handler: deletePage would leave an empty page behind.
+    // An empty child counts, as in the delete-completely handler: deleteCompletely would leave an empty page behind.
     pageObjectIds.length === 0
       ? []
       : Page.distinct('parent', { parent: { $in: pageObjectIds } }),

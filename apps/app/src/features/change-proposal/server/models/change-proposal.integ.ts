@@ -135,7 +135,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         perPageNotifications: false,
         operations: [
           {
-            type: 'trash',
+            type: 'delete-completely',
             pageId: PAGE_A,
             expectedRevisionId: REVISION_A,
             revertTarget: {
@@ -163,7 +163,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(readRevert?.revertOf).toBe(base._id);
       expect(readRevert?.perPageNotifications).toBe(false);
       expect(readRevert?.operations[0]).toMatchObject({
-        type: 'trash',
+        type: 'delete-completely',
         approvedAt,
         revertTarget: {
           proposalId: base._id,
@@ -578,7 +578,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         revertOf: newObjectId(),
         operations: [
           {
-            type: 'trash',
+            type: 'delete-completely',
             pageId: PAGE_A,
             expectedRevisionId: REVISION_A,
             revertTarget: { proposalId: newObjectId(), operationKey: 'k' },
@@ -849,7 +849,7 @@ describe('ChangeProposal model (Prisma extension)', () => {
         revertOf: first._id,
         operations: [
           {
-            type: 'trash',
+            type: 'delete-completely',
             pageId: PAGE_A,
             expectedRevisionId: REVISION_A,
             revertTarget: { proposalId: first._id, operationKey: 'k' },

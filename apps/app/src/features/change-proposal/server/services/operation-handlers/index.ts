@@ -2,10 +2,9 @@ import type Crowi from '~/server/crowi';
 
 import type { OperationType } from '../../../interfaces';
 import { createCreateHandler } from './create';
+import { createDeleteCompletelyHandler } from './delete-completely';
 import { createEditHandler } from './edit';
 import { createMoveHandler } from './move';
-import { createRestoreHandler } from './restore';
-import { createTrashHandler } from './trash';
 import type { OperationHandlerTable } from './types';
 
 export type {
@@ -24,8 +23,7 @@ export const createOperationHandlers = (
   edit: createEditHandler(crowi),
   create: createCreateHandler(crowi),
   move: createMoveHandler(crowi),
-  trash: createTrashHandler(crowi),
-  restore: createRestoreHandler(crowi),
+  'delete-completely': createDeleteCompletelyHandler(crowi),
 });
 
 export const getOperationHandler = <K extends OperationType>(

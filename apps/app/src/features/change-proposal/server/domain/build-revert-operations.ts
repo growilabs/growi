@@ -7,7 +7,6 @@ import type {
 export type RevertibleOperationFacts = {
   readonly key: string;
   readonly originalBody?: string;
-  readonly restoreToPath?: string;
 };
 
 const required = <T>(value: T | undefined, what: string, key: string): T => {
@@ -37,7 +36,7 @@ const toRevertOperation = (
       };
     case 'create':
       return {
-        type: 'trash',
+        type: 'delete-completely',
         pageId: required(op.resultPageId, 'missing resultPageId', op.key),
         expectedRevisionId: required(
           op.resultRevisionId,
@@ -55,21 +54,10 @@ const toRevertOperation = (
         removeRedirectsFrom: op.fromPath,
         revertTarget,
       };
-    case 'trash':
-      return {
-        type: 'restore',
-        pageId: op.pageId,
-        expectedRevisionId: op.expectedRevisionId,
-        toPath: required(facts.restoreToPath, 'missing restoreToPath', op.key),
-        revertTarget,
-      };
-    case 'restore':
-      return {
-        type: 'trash',
-        pageId: op.pageId,
-        expectedRevisionId: op.expectedRevisionId,
-        revertTarget,
-      };
+    case 'delete-completely':
+      throw new Error(
+        `Operation ${op.key} is a complete deletion, which cannot be reverted`,
+      );
     default: {
       const unreachable: never = op;
       throw new Error(`Unknown operation: ${JSON.stringify(unreachable)}`);

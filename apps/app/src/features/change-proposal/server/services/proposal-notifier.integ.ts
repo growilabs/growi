@@ -421,22 +421,24 @@ describe('ProposalNotifier.notifyApplied', () => {
   });
 
   describe('a revert proposal', () => {
-    it('includes trashed and restored pages and notifies the original requester as well', async () => {
-      const trashed = await createPage('trashed');
-      await Page.updateOne(
-        { _id: trashed._id },
-        { path: `/trash${trashed.path}`, status: Page.STATUS_DELETED },
-      );
-      const trashedNow = await Page.findById(trashed._id).orFail();
-      const restored = await createPage('restored');
-      const edited = await createPage(
+    it('notifies the original requester as well, with the pages the revert deleted completely only for that requester', async () => {
+      const deleted = await createPage('deleted-created');
+      await Page.deleteOne({ _id: deleted._id });
+      const publicEdited = await createPage('revert-edited-public');
+      const groupEdited = await createPage(
         'revert-edited',
         PageGrant.GRANT_USER_GROUP,
       );
-      await subscribe(users.subscriber, restored);
+      await subscribe(users.subscriber, publicEdited);
 
       const original = await storeProposal({ requester: users.original }, [
-        { input: editInput(edited), status: 'reverted' },
+        {
+          input: { type: 'create', path: deleted.path, body: 'body' },
+          status: 'reverted',
+          resultPageId: deleted._id.toString(),
+        },
+        { input: editInput(publicEdited), status: 'reverted' },
+        { input: editInput(groupEdited), status: 'reverted' },
       ]);
       const revert = await storeProposal(
         {
@@ -447,22 +449,18 @@ describe('ProposalNotifier.notifyApplied', () => {
         [
           {
             input: {
-              type: 'trash',
-              pageId: trashed._id.toString(),
+              type: 'delete-completely',
+              pageId: deleted._id.toString(),
               expectedRevisionId: new mongoose.Types.ObjectId().toString(),
+              revertTarget: {
+                proposalId: original._id,
+                operationKey: original.operations[0].key,
+              },
             },
             status: 'applied',
           },
-          {
-            input: {
-              type: 'restore',
-              pageId: restored._id.toString(),
-              expectedRevisionId: new mongoose.Types.ObjectId().toString(),
-              toPath: restored.path,
-            },
-            status: 'applied',
-          },
-          { input: editInput(edited), status: 'applied' },
+          { input: editInput(publicEdited), status: 'applied' },
+          { input: editInput(groupEdited), status: 'applied' },
         ],
       );
 
@@ -482,11 +480,13 @@ describe('ProposalNotifier.notifyApplied', () => {
         ),
       ).toBe(true);
 
-      // The original requester is outside the group, so the group page stays out.
+      // The original requester is outside the group, so the group page stays out;
+      // the deleted page is named by the path that requester asked to create, and
+      // the notification links to the original, which that requester can open.
       const forOriginal = snapshotOf(notifications, users.original);
       expect(forOriginal).toMatchObject({
-        proposalId: revert._id,
-        entry: 'revert',
+        proposalId: original._id,
+        entry: original.entry,
         kind: 'revert',
         requester: {
           id: users.requester._id.toString(),
@@ -494,21 +494,32 @@ describe('ProposalNotifier.notifyApplied', () => {
         },
       });
       expect([...(forOriginal?.pages ?? [])].sort(byId)).toEqual(
-        [pageEntry(trashedNow), pageEntry(restored)].sort(byId),
+        [
+          { id: deleted._id.toString(), path: deleted.path },
+          pageEntry(publicEdited),
+        ].sort(byId),
       );
-      // Content covers every target page the recipient can view, not only the subscribed one.
+      // Content covers every target page the recipient can view, not only the
+      // subscribed one, and never a deleted page.
       const forSubscriber = snapshotOf(notifications, users.subscriber);
       expect([...(forSubscriber?.pages ?? [])].sort(byId)).toEqual(
-        [pageEntry(trashedNow), pageEntry(restored), pageEntry(edited)].sort(
-          byId,
-        ),
+        [pageEntry(publicEdited), pageEntry(groupEdited)].sort(byId),
       );
+      expect(forSubscriber).toMatchObject({
+        proposalId: revert._id,
+        entry: 'revert',
+      });
     });
 
-    it('does not notify the reverter when the reverter is the original requester', async () => {
-      const restored = await createPage('self-restored');
-      const original = await storeProposal({ requester: users.requester }, [
-        { input: editInput(restored), status: 'reverted' },
+    it('notifies the original requester about a revert that only deleted a page they had created', async () => {
+      const deleted = await createPage('only-deleted-created');
+      await Page.deleteOne({ _id: deleted._id });
+      const original = await storeProposal({ requester: users.original }, [
+        {
+          input: { type: 'create', path: deleted.path, body: 'body' },
+          status: 'reverted',
+          resultPageId: deleted._id.toString(),
+        },
       ]);
       const revert = await storeProposal(
         {
@@ -519,14 +530,46 @@ describe('ProposalNotifier.notifyApplied', () => {
         [
           {
             input: {
-              type: 'restore',
-              pageId: restored._id.toString(),
+              type: 'delete-completely',
+              pageId: deleted._id.toString(),
               expectedRevisionId: new mongoose.Types.ObjectId().toString(),
-              toPath: restored.path,
+              revertTarget: {
+                proposalId: original._id,
+                operationKey: original.operations[0].key,
+              },
             },
             status: 'applied',
           },
         ],
+      );
+
+      await createProposalNotifier(crowi).notifyApplied({
+        proposal: revert,
+        activityId: new mongoose.Types.ObjectId().toString(),
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_REVERT,
+      });
+
+      const notifications = await notificationsFor(revert._id);
+      expect(notifications.map((n) => n.user.toString())).toEqual([
+        users.original._id.toString(),
+      ]);
+      expect(snapshotOf(notifications, users.original)?.pages).toEqual([
+        { id: deleted._id.toString(), path: deleted.path },
+      ]);
+    });
+
+    it('does not notify the reverter when the reverter is the original requester', async () => {
+      const edited = await createPage('self-reverted');
+      const original = await storeProposal({ requester: users.requester }, [
+        { input: editInput(edited), status: 'reverted' },
+      ]);
+      const revert = await storeProposal(
+        {
+          requester: users.requester,
+          entry: 'revert',
+          revertOf: original._id,
+        },
+        [{ input: editInput(edited), status: 'applied' }],
       );
 
       await createProposalNotifier(crowi).notifyApplied({

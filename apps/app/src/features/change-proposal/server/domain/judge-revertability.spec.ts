@@ -60,20 +60,13 @@ const moveOp = (status?: OperationStatus): OpOf<'move'> => ({
   resultPageId: 'p1',
 });
 
-const trashOp = (status?: OperationStatus): OpOf<'trash'> => ({
+const deleteCompletelyOp = (
+  status?: OperationStatus,
+): OpOf<'delete-completely'> => ({
   ...common(status),
-  type: 'trash',
+  type: 'delete-completely',
   pageId: 'p-new',
   expectedRevisionId: 'r-created',
-  resultPageId: 'p-new',
-});
-
-const restoreOp = (status?: OperationStatus): OpOf<'restore'> => ({
-  ...common(status),
-  type: 'restore',
-  pageId: 'p-new',
-  expectedRevisionId: 'r-created',
-  toPath: '/new',
   resultPageId: 'p-new',
 });
 
@@ -116,8 +109,7 @@ describe('judgeRevertability', () => {
       ['edit', editOp()],
       ['create', createOp()],
       ['move', moveOp()],
-      ['trash', trashOp()],
-      ['restore', restoreOp()],
+      ['delete-completely', deleteCompletelyOp()],
     ])('refuses %s with target-unavailable when the page does not exist', (_label, op) => {
       const result = judgeRevertability(
         op,
@@ -258,116 +250,32 @@ describe('judgeRevertability', () => {
     });
   });
 
-  describe('trash made by a revert proposal (Req 5.15)', () => {
-    it('is revertible while still in the trash, the original path is free and the revision is unchanged', () => {
-      const result = judgeRevertability(
-        trashOp(),
-        'revert',
-        facts({
-          path: '/trash/new',
-          latestRevisionId: 'r-created',
-          isPathOccupied: occupiedOnly('/trash/new'),
-        }),
-      );
-
-      expect(result).toEqual({ revertible: true });
+  describe('complete deletion made by a revert proposal (Req 5.15)', () => {
+    it('refuses with target-unavailable, since the deleted page cannot be brought back', () => {
+      expect(
+        judgeRevertability(
+          deleteCompletelyOp(),
+          'revert',
+          facts({ exists: false }),
+        ),
+      ).toEqual(refused('target-unavailable'));
     });
 
-    it('refuses with not-in-trash when the page is no longer in the trash', () => {
-      const result = judgeRevertability(
-        trashOp(),
-        'revert',
-        facts({ path: '/new', latestRevisionId: 'r-created' }),
-      );
-
-      expect(result).toEqual(refused('not-in-trash'));
-    });
-
-    it('refuses with original-path-occupied when a non-empty page sits at the pre-trash path', () => {
-      const result = judgeRevertability(
-        trashOp(),
-        'revert',
-        facts({
-          path: '/trash/new',
-          latestRevisionId: 'r-created',
-          isPathOccupied: occupiedOnly('/new'),
-        }),
-      );
-
-      expect(result).toEqual(refused('original-path-occupied'));
-    });
-
-    it('does not treat an empty page at the pre-trash path as occupying it', () => {
-      // isPathOccupied reports only non-empty pages; an empty placeholder yields false
-      const result = judgeRevertability(
-        trashOp(),
-        'revert',
-        facts({
-          path: '/trash/new',
-          latestRevisionId: 'r-created',
-          isPathOccupied: () => false,
-        }),
-      );
-
-      expect(result).toEqual({ revertible: true });
-    });
-
-    it('refuses with edited-after-apply when the latest revision is not the one the original create made', () => {
-      const result = judgeRevertability(
-        trashOp(),
-        'revert',
-        facts({ path: '/trash/new', latestRevisionId: 'r-later' }),
-      );
-
-      expect(result).toEqual(refused('edited-after-apply'));
+    it('refuses with target-unavailable even if a page with the same id were still found', () => {
+      expect(
+        judgeRevertability(
+          deleteCompletelyOp(),
+          'revert',
+          facts({ path: '/new', latestRevisionId: 'r-created' }),
+        ),
+      ).toEqual(refused('target-unavailable'));
     });
   });
 
-  describe('restore made by a revert proposal (Req 5.16)', () => {
-    it('is revertible under the create rules', () => {
-      const result = judgeRevertability(
-        restoreOp(),
-        'revert',
-        facts({ path: '/new', latestRevisionId: 'r-created' }),
-      );
-
-      expect(result).toEqual({ revertible: true });
-    });
-
-    it('refuses with has-children when the page has children', () => {
-      const result = judgeRevertability(
-        restoreOp(),
-        'revert',
-        facts({
-          path: '/new',
-          latestRevisionId: 'r-created',
-          hasChildren: true,
-        }),
-      );
-
-      expect(result).toEqual(refused('has-children'));
-    });
-
-    it('refuses with edited-after-apply when the latest revision changed', () => {
-      const result = judgeRevertability(
-        restoreOp(),
-        'revert',
-        facts({ path: '/new', latestRevisionId: 'r-later' }),
-      );
-
-      expect(result).toEqual(refused('edited-after-apply'));
-    });
-  });
-
-  // Reverting a create or a restore moves the page to the trash, so the viewer
-  // must be allowed to delete it, as the human delete route requires.
   describe("the viewer's delete authority", () => {
-    it.each([
-      ['create', createOp],
-      ['restore', restoreOp],
-    ] as const)('refuses a %s with not-deletable when the viewer may not delete the page', (_label, opOf) => {
+    it('refuses a create with not-deletable when the viewer may not delete the page completely', () => {
       const result = judgeRevertability(
-        opOf(),
+        createOp(),
         'revert',
         facts({
           path: '/new',
@@ -379,7 +287,7 @@ describe('judgeRevertability', () => {
       expect(result).toEqual(refused('not-deletable'));
     });
 
-    it('reports has-children and edited-after-apply before not-deletable, in the trash handler order', () => {
+    it('reports has-children and edited-after-apply before not-deletable, in the delete-completely handler order', () => {
       expect(
         judgeRevertability(
           createOp(),
@@ -405,7 +313,7 @@ describe('judgeRevertability', () => {
       ).toEqual(refused('edited-after-apply'));
     });
 
-    it('does not ask about delete authority for an edit, a move or a trash, whose reverts delete nothing', () => {
+    it('does not ask about delete authority for an edit or a move, whose reverts delete nothing', () => {
       expect(
         judgeRevertability(
           editOp(),
@@ -418,17 +326,6 @@ describe('judgeRevertability', () => {
           moveOp(),
           'mcp',
           facts({ path: '/to', canDelete: false }),
-        ),
-      ).toEqual({ revertible: true });
-      expect(
-        judgeRevertability(
-          trashOp(),
-          'revert',
-          facts({
-            path: '/trash/new',
-            latestRevisionId: 'r-created',
-            canDelete: false,
-          }),
         ),
       ).toEqual({ revertible: true });
     });

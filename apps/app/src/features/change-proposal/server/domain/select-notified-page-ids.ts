@@ -1,12 +1,12 @@
 import type { ChangeProposalDocument, OperationType } from '../../interfaces';
 
 // A human page creation sends no in-app notification, so created pages are not
-// notified either; trash / restore exist only in revert proposals.
+// notified either; delete-completely exists only in revert proposals.
 const NOTIFIED_TYPES: {
   readonly [K in 'normal' | 'revert']: readonly OperationType[];
 } = {
   normal: ['edit', 'move'],
-  revert: ['edit', 'move', 'trash', 'restore'],
+  revert: ['edit', 'move', 'delete-completely'],
 };
 
 export const selectNotifiedPageIds = (

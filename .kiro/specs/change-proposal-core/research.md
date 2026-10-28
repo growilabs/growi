@@ -25,30 +25,17 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Findings**: `pushRevision(pageData, newRevisionData, user)`（`models/page.ts:1085`）は、リビジョンを作り、`page.revision` などを設定して `save()` する。今の `revision` が何かを条件にしていない。`isUpdatable` は route の中で先に呼ばれるだけである。
 - **Implications**: `pushRevision` に「期待するリビジョンの ID」を任意で渡せるようにし、渡されたときは `Page.findOneAndUpdate({ _id, revision: 期待する ID }, …)` で書く。一致しなければ作ったリビジョンを消して例外を投げる。人の保存も同じ仕組みに乗せると、反映の側でも人の保存の側でも、確認から書き込みまでの間に別の書き込みが入ったときに、それを見つけて書き込みを止められる（Design Decisions の「確認と書き込みを 1 回の更新にする」）。
 
-### 作成と移動とごみ箱（`service/page/index.ts`）
+### 作成と移動と削除（`service/page/index.ts`）
 - **Findings**:
   - `create(path, body, user, options)` は、近い祖先のページの閲覧範囲を引き継ぐ（`grant` を渡さなければ祖先の `grant`、グループは祖先の `grantedGroups`。`onlyInheritUserRelatedGrantedGroups` が真なら、依頼した人が属するグループだけ）。パスが使われていれば `Error('Cannot process create')` を投げる。作る前に、そのパスからのリダイレクトを消す。
   - `renamePage(page, newPagePath, user, options, activityParameters)` の options は `isRecursively` / `createRedirectPage` / `updateMetadata` だけである。activity を自分で作り、子のページが無ければ中でアプリ内通知のための `updated` を出す。子のページの移動は待たずに裏で続く（`PageOperation` で再開できる）。
   - リダイレクト（`PageRedirect`、`fromPath` は一意）は、移動のときに「移動元 → 移動先」で作られる。移動を戻しても、元のリダイレクトは消えない。そのため A→B のあと B→A と戻すと、`/A` を開いたときにリダイレクトをたどって `/B` へ行ってしまう。消す手段は `create()` の中の `deleteByFromPath` と、旧 API の `pages.unlink`（`toPath` で消す）だけである。
-  - `deletePage(page, user, options, isRecursively, activityParameters)` も、中で activity を作り `updated` を出す。
+  - `deletePage(page, user, options, isRecursively, activityParameters)` も、中で activity を作り `updated` を出す。`deleteCompletely(page, user, options, isRecursively, preventEmitting, activityParameters)` は、ページとリビジョンなどをごみ箱を通さずに消し、activity（`PAGE_DELETE_COMPLETELY`）を作り、子のページを含めない削除では `updated` を出す。このときアプリ内通知を止める指定は無かった。人の完全な削除の route（`routes/page.js`）は `canDeleteCompletely` とユーザーのホームの条件を確かめ、`canDelete` は確かめない。削除のあとで、消す前のページで `PAGE_DELETE` のグローバル通知を送る。
   - 作成・更新・移動・削除は、どれも裏の処理のために `PageOperation` を作り、終わるまで残す。`pageOperationService.canOperate` は、重なるパスに `PageOperation` があると作成や移動を断る。
 - **Implications**:
-  - 移動とごみ箱への移動には「アプリ内通知を出さない」指定を足す。
+  - 移動と完全な削除には「アプリ内通知を出さない」指定を足す。
   - 移動を戻すときは、元の移動が作ったリダイレクト（移動元+suffix → 移動先+suffix。子のページの分も含む）だけを、反映の側で消す。移動元の下にあっても、ほかの移動で作られたリダイレクトは消さない（人の操作も消さない）。
   - 1 つの Change Proposal の中で、前の操作の裏の処理が終わる前に次の操作が断られることがある。反映の側で、重なる `PageOperation` が消えるのを決まった時間だけ待つ。
-
-### ごみ箱から戻す処理（`pageService.revertDeletedPage`）
-- **Context**: 新規作成を取り消してごみ箱へ移した操作を、さらに取り消せるようにするため、既存の「ごみ箱から戻す」処理を確かめた。
-- **Findings**:
-  - `revertDeletedPage(page, user, options, isRecursively, activityParameters)` は、ごみ箱のパスから先頭の `/trash` を除いたパス（`Page.getRevertDeletedPageName`）へページを戻す。そのパスに空でないページがあると `PathAlreadyExistsError` を投げ、空のページだけがあるときはそれと置き換える。重なる `PageOperation` があれば断る。
-  - 自分で `beginActivity` を呼んで activity（`PAGE_REVERT` など）を作る。子のページを含めない戻し方では、`activityEvent.emit('update', activityId, parameters, page, preNotifyService.generatePreNotify)` で、ページを購読している人へのアプリ内通知も作る。通知を止める指定は今は無い。
-  - ごみ箱へ移す処理（`deletePage` の中の `deleteNonEmptyTarget`）は、ページのパスを `/trash/…` に変え、「元のパス → ごみ箱のパス」のリダイレクトを作る。リビジョンは作らないので、ごみ箱にあるページの最新のリビジョンは、ごみ箱へ移す前と同じである。
-  - 子のページを含めない戻し方の中には、このリダイレクトを消す処理が見当たらない。ページを開くときの処理（`page-data-props.ts`）は、ページを探す前にリダイレクトを調べる（未確認: 動かしては確かめていない）。
-- **Implications**:
-  - ごみ箱から戻す操作（`restore`）は `revertDeletedPage` を使い、同じ判断（空でないページがあれば断る、空のページは置き換える）に合わせる。
-  - `revertDeletedPage` の options に、移動・ごみ箱と同じ「アプリ内通知を出さない」指定を足す。
-  - 戻したあとで、元のパスを起点とするリダイレクトを消し、結合テストで元のパスを開いて確かめる。
-  - 「最新のリビジョンが、元の新規作成で作ったリビジョンのままか」は、ごみ箱にある間にリビジョンが変わらないので、そのまま比べられる。
 
 ### 共同編集（`service/yjs/`）
 - **Findings**:
@@ -71,7 +58,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
   - 新しい通知の対象の種類を足した前例は `PageBulkExportJob`。対象は Mongoose のモデル名として登録されている必要がある（一覧の API が `populate` するため）。
   - activity は `createActivity` で直接作れる（監査ログの設定で記録の対象かどうかを確かめる）。`EssentialActionGroup` に入れた action は、監査ログが無効でも記録される。監査ログの絞り込みの一覧は、action の名前の先頭（`^PAGE_` など）で分類している。
   - 全文検索・GROWI Vault・画面の更新は `crowi.events.page` を受けて動き、`pageService` の中から出るので、反映でもそのまま動く。
-- **Implications**: 反映では route の応答のあとの処理を丸ごとは呼ばない。ページごとの通知を出すかは操作ごとに決め、出さないときは移動とごみ箱への移動に通知を止める指定を渡す（「ページごとの通知は 2 つの切り替えの両方が有効なときだけ出す」）。まとめた通知は、受け取る人ごとに中身を作って `insertMany` で入れる。新しい action は `CHANGE_PROPOSAL_` で始め、監査ログの分類に新しい種類を足す。
+- **Implications**: 反映では route の応答のあとの処理を丸ごとは呼ばない。ページごとの通知を出すかは操作ごとに決め、出さないときは移動と完全な削除に通知を止める指定を渡す（「ページごとの通知は 2 つの切り替えの両方が有効なときだけ出す」）。まとめた通知は、受け取る人ごとに中身を作って `insertMany` で入れる。新しい action は `CHANGE_PROPOSAL_` で始め、監査ログの分類に新しい種類を足す。
 
 ### 機能の置き場所と前例
 - **Findings**:
@@ -111,9 +98,9 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 
 ### Decision: 取り消しは反映と同じ操作の種類で表す
 - **Context**: umbrella の決定 4。
-- **Selected Approach**: 取り消しの Change Proposal の操作は、編集（元の本文に戻す。元のリビジョンは反映で作ったリビジョン）、移動（元のパスへ戻し、移動元を起点とするリダイレクトを消す）、ごみ箱へ移す（新規作成で作ったページをごみ箱へ移す）、ごみ箱から戻す（ごみ箱へ移したページを元のパスへ戻す）の 4 種類にする。後の 2 つは取り消しのときだけ使う。各操作は、どの Change Proposal のどの操作（`key`）を戻すかを持つ。
-- **Rationale**: 編集と移動は、通常の操作と同じ処理と同じ確認で戻せる。ごみ箱へ移すと戻すは互いに逆の操作なので、取り消しの取り消しを何度重ねても、同じ判定で扱える。ごみ箱から戻す処理は既存の `revertDeletedPage` があるので、新しく書かない。
-- **Trade-offs**: ごみ箱から戻すのは、ページがまだごみ箱にあり、元のパスに空でないページが無く、最新のリビジョンが元の新規作成で作ったもののままのときだけにする。人が先にごみ箱から戻した場合や、元のパスに別のページを作った場合は、理由を付けて断る。
+- **Selected Approach**: 取り消しの Change Proposal の操作は、編集（元の本文に戻す。元のリビジョンは反映で作ったリビジョン）、移動（元のパスへ戻し、移動元を起点とするリダイレクトを消す）、完全な削除（新規作成で作ったページを完全に削除する）の 3 種類にする。完全な削除は取り消しのときだけ使う。各操作は、どの Change Proposal のどの操作（`key`）を戻すかを持つ。
+- **Rationale**: 編集と移動は、通常の操作と同じ処理と同じ確認で戻せる。新規作成をどう戻すかは、次の決定「新規作成の取り消しは完全な削除にする」による。
+- **Trade-offs**: 完全な削除は戻せないので、取り消しの取り消しができるのは編集と移動だけになる。
 
 ### Decision: 自動反映の「自分が作ったページ」の判定を 1 つの関数にする
 - **Context**: umbrella の未決の論点（作成者か、最後の更新者か）。
@@ -165,8 +152,8 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 
 ### Decision: 取り消しの通知は、元の依頼した人にも送る
 - **Context**: 要件 7.8。
-- **Selected Approach**: 取り消しの Change Proposal を反映したときは、通知の対象のページにごみ箱へ移す・戻すのページも含め、元の Change Proposal の依頼した人も受け取る人に加える。中身は受け取る人ごとに、閲覧できるページの分だけで作る。
-- **Rationale**: 自分が頼んだ変更を他の人が取り消したことは、そのページを購読していなくても、依頼した人が知るべきことである。ごみ箱へ移す・戻すは、人が行ったときも購読している人に通知が出る。
+- **Selected Approach**: 取り消しの Change Proposal を反映したときは、通知の対象のページに完全に削除したページも含め、元の Change Proposal の依頼した人も受け取る人に加える。中身は受け取る人ごとに、閲覧できるページの分だけで作る。完全に削除したページは誰も閲覧できないので、元の Change Proposal の依頼した人にだけ、その人が新規作成を求めたときのパスで含める。
+- **Rationale**: 自分が頼んだ変更を他の人が取り消したことは、そのページを購読していなくても、依頼した人が知るべきことである。完全な削除は、人が行ったときも購読している人に通知が出る。消したページのパスは、元の依頼した人が元の Change Proposal ですでに見られるので、その人に知らせても新しく漏れることは無い。今のパス（人が後から移動していれば違うパス）は使わない。元の依頼した人への通知は、元の Change Proposal を指す（snapshot の `proposalId` と `entry` を元のものにする）。画面は通知から `proposalId` の詳細ページへつなぐが、取り消しの Change Proposal の完全な削除の操作は、取り消した人にしか見せないので、それだけの取り消しでは元の依頼した人が開けず「見つからない」になる。元の Change Proposal なら、取り消された操作がすべて記録されていて、その人はいつも開ける。ほかの受け取る人の通知は、今までどおり取り消しの Change Proposal を指す（その人が閲覧できるページの操作があるので開ける）。
 
 ### Decision: 入口の request の中の作成は、その request の activity に記録する
 - **Context**: 要件 7.9。入口の route は `addActivity` で activity を 1 つ作る。作成のサービスが別の activity を作ると、route の activity が記録されないまま（`ACTION_UNSETTLED`）残る。
@@ -239,7 +226,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 ### Decision: ページごとの通知は 2 つの切り替えの両方が有効なときだけ出す
 - **Context**: 要件 7.1・7.10–7.19・8.9。design の OQ-5。理由の全体は umbrella の research.md の決定 8。
 - **Selected Approach**: 管理者の設定（初期値は出さない）と、Change Proposal ごとの指定（初期値は出す）の両方が真のときだけ、人の操作と同じページごとの通知を出す。2 つを組み合わせるのは純関数 `shouldSendPerPageNotifications` だけにし、ProposalApplier が操作を書く直前に両方を読み直して決める。取り消しの Change Proposal は元の指定を引き継ぐ。まとめた通知はいつも出す。
-- **追加で確かめた事実**: 人の操作のグローバル通知は、編集・新規作成・移動・ごみ箱へ移すのどれも route から送られ（ごみ箱から戻すには無い）、`globalNotificationService.fire` の中でページの閲覧範囲から送るかを決めている。編集の購読している人へのアプリ内通知は、route の `generateUpdateActivity` が `PAGE_UPDATE` の activity を `preNotify` つきで知らせて作られる。反映の activity（`CHANGE_PROPOSAL_APPLY`）とは別の action なので、1 つの activity の ID では両方を記録できない。
+- **追加で確かめた事実**: 人の操作のグローバル通知は、編集・新規作成・移動・削除（ごみ箱へ移すと完全な削除）のどれも route から送られ、`globalNotificationService.fire` の中でページの閲覧範囲から送るかを決めている。編集の購読している人へのアプリ内通知は、route の `generateUpdateActivity` が `PAGE_UPDATE` の activity を `preNotify` つきで知らせて作られる。反映の activity（`CHANGE_PROPOSAL_APPLY`）とは別の action なので、1 つの activity の ID では両方を記録できない。
 - **Rationale**: 編集のアプリ内通知のために、操作ごとに `beginActivity` で `PAGE_UPDATE` の activity を作り、route と同じ処理（`emitPageUpdateActivity`）で知らせる。グローバル通知も route の送り方を `firePageGlobalNotification` に移して共有する。人の保存と同じ処理を通すので、受け取る人の決め方と閲覧範囲の判定がずれない。
 - **Trade-offs**: 両方を有効にすると、購読している人には同じ変更についてページごとの通知とまとめた通知の両方が届く。編集ごとに `PAGE_UPDATE` の activity が監査ログに増える。指定は操作ごとに読み直すので、操作 1 つにつき問い合わせが 1 回増える（本文を読まない小さな問い合わせにする）。
 
@@ -259,6 +246,17 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Selected Approach**: 2（人が決めた）。150 ミリ秒の間を置いて 2 回までやり直し、それでも例外ならログに残して進む。`false`（元の操作がもう取り消せる状態でない）は正しい結果なのでやり直さない。取り消しの前に断ると決めた操作の記録（`revert` の受付の中）も、同じやり直しを使い、書けなくても受付全体を失敗にしない。
 - **Rationale**: 一時的な障害はたいていすぐ直るので、その場のやり直しで足りる。cron で書き直すには、取り消しの操作と元の操作を突き合わせる新しい問い合わせと、その処理の結合テストが要り、得られるものに比べて大きい。
 - **Trade-offs**: 3 回とも失敗したときは、元の操作が「反映済み」のまま残る。もう一度取り消しを求めると判定し直されるが、取り消しで変わったページに対しては、たいてい「取り消しを断られた」になる。
+
+### Decision: 新規作成の取り消しは完全な削除にする
+- **Context**: 要件 5.6・5.15・5.16。新規作成の取り消しは、はじめは作ったページをごみ箱へ移し、その取り消しをさらに取り消すとごみ箱から戻す形にしていた。
+- **Alternatives Considered**: 1. ごみ箱へ移す（取り消しの取り消しで戻せる）。2. 完全に削除する。
+- **Selected Approach**: 2（人が決めた）。新規作成の取り消しは、作ったページを `pageService.deleteCompletely` で完全に削除し、ごみ箱に残さない。完全な削除の取り消しは `target-unavailable` で断る。ごみ箱へ移す・ごみ箱から戻す操作は作られなくなるので、操作の種類（`trash`・`restore`）、断る理由 `not-in-trash`、その handler と翻訳を消した。
+- **Rationale**: Change Proposal を受け入れる前は、そのページはごみ箱にも無かった。取り消したあとでごみ箱に残るのは、受け入れる前の状態に戻ったとは言えず不自然である。
+- **権限**: 人が画面から完全に削除するときの route（`routes/page.js`）は、`canDeleteCompletely`（`security:pageCompleteDeletionAuthority`。複数のグループに公開されたページで、公開先のすべてのグループに属していることを求める設定も含む）と、ユーザーのホームのページでの `canDeleteUserHomepageByConfig`・`isUsersHomepageOwnerAbsent` を確かめる。取り消しでは、これに加えて route が確かめていない `canDelete`（`security:pageDeletionAuthority`）も求める。人ができる以上のことを取り消しでできないようにするためで、どちらの権限が厳しく設定されていても、それに従う。表示する「戻せるか」（要件 5.14）と、書き込みの直前の判定は、同じ関数（`createCanDeletePageCompletely`）で行う。
+- **やり直しの扱い**: handler の `findExistingResult` は、ページがもう存在しなければ「反映済み」とみなす。`deleteCompletely` のあと、結果を記録する前に処理が止まった場合に、やり直しで同じ操作を記録できるようにするためである。人が同じ間に完全に削除した場合も「反映済み」になるが、ページが無いという結果は同じなので、止まったあとのやり直しを優先する。
+- **見せ方**: 完全に削除したページは、閲覧できるかを判定できない。対象のページがもう存在しない操作は、まだページが無い新規作成と同じく、依頼した人にだけ返す（依頼した人以外には存在も知らせない）。人が後からページを完全に削除した操作も同じ扱いになる。
+- **Trade-offs**: 取り消しの取り消しで、作ったページを戻すことはできない。間違えて取り消したときは、もう一度作り直す。完全な削除の権限を管理者だけにしている GROWI では、管理者でない人は新規作成を取り消せない（`not-deletable`）。依頼した人以外は、新規作成を取り消したあとの元の操作を見られなくなる。
+- **共通の処理の変更**: `deleteCompletely` は、子のページを含めない削除で、アプリ内通知を止める指定（`isInAppNotificationSuppressed`）を見ていなかった。ページごとの通知を出さない設定でも通知が出てしまうので、`deletePage` と同じように、指定が真のときは `updated` を出さないようにした（activity は今のまま記録する）。
 
 ## Risks & Mitigations
 - 人の保存の route に手が入る — 既存の `update-page.integ.ts` / `create-page.integ.ts` とページの結合テストを変更なしで通すことを、切り出しのタスクの完了条件にする。

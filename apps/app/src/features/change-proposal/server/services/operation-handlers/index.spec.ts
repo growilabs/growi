@@ -11,8 +11,7 @@ describe('operation handler table', () => {
     'edit',
     'create',
     'move',
-    'trash',
-    'restore',
+    'delete-completely',
   ] as const)('has a handler for %s', (type) => {
     const handler = getOperationHandler(table, type);
     expect(handler.findExistingResult).toBeTypeOf('function');

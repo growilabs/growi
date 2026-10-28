@@ -1165,8 +1165,7 @@
       "edit": "Modifier la page",
       "create": "Créer la page",
       "move": "Déplacer la page",
-      "trash": "Mettre à la corbeille",
-      "restore": "Restaurer depuis la corbeille"
+      "delete_completely": "Supprimer définitivement la page"
     },
     "operation_status": {
       "pending": "En attente d'approbation",
@@ -1203,7 +1202,6 @@
       "has_children": "La page a des pages enfants",
       "moved_after_apply": "La page a été déplacée après l'application",
       "original_path_occupied": "Une page existe déjà au chemin d'origine",
-      "not_in_trash": "La page n'est plus dans la corbeille",
       "not_deletable": "Vous n'êtes pas autorisé à supprimer la page",
       "apply_failed": "Échec de l'annulation",
       "base_revision_changed": "La page avait changé avant l'application",
@@ -1219,7 +1217,6 @@
       "has_children": "La page a des pages enfants",
       "moved_after_apply": "La page a été déplacée après l'application",
       "original_path_occupied": "Une page existe déjà au chemin d'origine",
-      "not_in_trash": "La page n'est plus dans la corbeille",
       "not_deletable": "Vous n'êtes pas autorisé à supprimer la page",
       "page_operation_in_progress": "Une autre opération sur la page est en cours",
       "apply_failed": "Échec de l'annulation"

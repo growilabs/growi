@@ -164,7 +164,7 @@ describe('toChangeProposalDocument', () => {
     });
   });
 
-  it('maps trash and restore operations of a revert proposal with their revert targets', () => {
+  it('maps delete-completely operations of a revert proposal with their revert targets', () => {
     const revertedAt = new Date('2026-10-02T00:00:00Z');
     const doc = toChangeProposalDocument(
       proposalRow({
@@ -172,7 +172,7 @@ describe('toChangeProposalDocument', () => {
         revertOf: '65f0000000000000000000aa',
         operations: [
           operationRow({
-            type: 'trash',
+            type: 'delete-completely',
             pageId: PAGE_ID,
             expectedRevisionId: REVISION_ID,
             revertTarget: {
@@ -183,11 +183,10 @@ describe('toChangeProposalDocument', () => {
           operationRow({
             index: 1,
             key: 'k-1',
-            type: 'restore',
+            type: 'delete-completely',
             status: 'applied',
             pageId: PAGE_ID,
             expectedRevisionId: REVISION_ID,
-            toPath: '/restored',
             appliedAt: revertedAt,
             resultPageId: PAGE_ID,
             revertTarget: {
@@ -201,7 +200,7 @@ describe('toChangeProposalDocument', () => {
 
     expect(doc.revertOf).toBe('65f0000000000000000000aa');
     expect(doc.operations[0]).toStrictEqual({
-      type: 'trash',
+      type: 'delete-completely',
       pageId: PAGE_ID,
       expectedRevisionId: REVISION_ID,
       index: 0,
@@ -213,10 +212,9 @@ describe('toChangeProposalDocument', () => {
       },
     });
     expect(doc.operations[1]).toStrictEqual({
-      type: 'restore',
+      type: 'delete-completely',
       pageId: PAGE_ID,
       expectedRevisionId: REVISION_ID,
-      toPath: '/restored',
       index: 1,
       key: 'k-1',
       status: 'applied',
@@ -283,10 +281,9 @@ describe('toChangeProposalDocument', () => {
     ],
     ['create without path', { type: 'create', body: 'b' }],
     ['move without toPath', { type: 'move', pageId: PAGE_ID, fromPath: '/a' }],
-    ['trash without expectedRevisionId', { type: 'trash', pageId: PAGE_ID }],
     [
-      'restore without toPath',
-      { type: 'restore', pageId: PAGE_ID, expectedRevisionId: REVISION_ID },
+      'delete-completely without expectedRevisionId',
+      { type: 'delete-completely', pageId: PAGE_ID },
     ],
   ] satisfies [
     string,

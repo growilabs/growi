@@ -13,6 +13,8 @@ export type VisibilityContext = {
   readonly isRequester: boolean;
   readonly viewablePageIds: ReadonlySet<string>;
   readonly anyoneWithLinkPageIds: ReadonlySet<string>;
+  // Pages that no longer exist at all; viewability cannot be judged for them.
+  readonly deletedPageIds: ReadonlySet<string>;
 };
 
 // Statuses that say nothing about work in flight or never done, safe for non-requesters.
@@ -33,7 +35,8 @@ const isVisible = (
 ): boolean => {
   const pageId = targetPageIdOf(op);
 
-  if (pageId == null) {
+  // Like a create with no page yet, only the requester sees it.
+  if (pageId == null || ctx.deletedPageIds.has(pageId)) {
     return ctx.isRequester;
   }
   if (!ctx.viewablePageIds.has(pageId)) {

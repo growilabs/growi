@@ -3,7 +3,7 @@ import { planApplyOrder } from './plan-apply-order';
 
 const op = (
   index: number,
-  type: 'edit' | 'create' | 'move' | 'trash',
+  type: 'edit' | 'create' | 'move' | 'delete-completely',
 ): OperationRecord => {
   const base = { index, key: `k${index}`, status: 'pending' as const };
   switch (type) {
@@ -25,14 +25,14 @@ const op = (
         fromPath: '/a',
         toPath: '/b',
       };
-    case 'trash':
+    case 'delete-completely':
       return { ...base, type, pageId: `p${index}`, expectedRevisionId: 'r' };
   }
 };
 
 describe('planApplyOrder', () => {
   it('keeps the stored order when there is no move', () => {
-    const ops = [op(0, 'edit'), op(1, 'create'), op(2, 'trash')];
+    const ops = [op(0, 'edit'), op(1, 'create'), op(2, 'delete-completely')];
     expect(planApplyOrder(ops, [0, 1, 2])).toEqual([0, 1, 2]);
   });
 

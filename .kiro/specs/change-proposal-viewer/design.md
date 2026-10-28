@@ -482,7 +482,7 @@ type RevertRequestActionResult =
   | { readonly type: 'error'; readonly code: 'not-found' | 'message-too-long' | 'recently-requested' | 'own-proposal' | 'requester-unavailable' | 'unknown' };
 function sendRevertRequest(proposalId: string, message: string): Promise<RevertRequestActionResult>;
 ```
-- 差分は、操作を開いたときに 1 組だけ `POST /revisions/diff` で取る。`toDiffPair` が null の操作（移動・ごみ箱へ移す・ごみ箱から戻す・まだ反映していない操作）は差分を持たない（要件 2.12）。結果が `forbidden` / `invalid` のときと通信の失敗のときは `unavailable` にする（要件 2.11）。
+- 差分は、操作を開いたときに 1 組だけ `POST /revisions/diff` で取る。`toDiffPair` が null の操作（移動・完全な削除・まだ反映していない操作）は差分を持たない（要件 2.12）。結果が `forbidden` / `invalid` のときと通信の失敗のときは `unavailable` にする（要件 2.11）。
 - `refreshAfterRevert` は、詳細の鍵、`mutateRecentlyUpdated()`、`mutateAllRevisionMarks()` を取り直す（要件 3.4・3.5）。
 - `RevertResult` は core の `interfaces/api.ts` の型をそのまま使い、viewer で形を作り直さない。形は `{ revertProposalId?: string; operations: ({ key; outcome: 'reverted' } | { key; outcome: 'revert-refused'; reason: RevertRefusalReason } | { key; outcome: 'skipped'; reason: 'page-being-edited' })[] }` で、操作は `key` で指す（要件 3.4）。
 - 反映済みの一覧は、続きの 1 回分が空で `nextCursor` があるときに、続けて `APPLIED_LIST_AUTO_CONTINUE_LIMIT` 回まで読む。それでも空なら「さらに読み込む」ボタンを出す。「これ以上無い」は `nextCursor` が null のときだけ出す（要件 8.5）。
@@ -759,7 +759,7 @@ viewer が前提にしている core の決まりを挙げる。どれも core �
 | U1 | リビジョンやページに書いた項目は、既存の応答（ページの `revision` の読み込み、`/revisions/list`、`/pages/recent`）にそのまま載る。並び順の番号を書くと、番号が飛んでいることから見えない操作があると分かるため、番号は書かない | ページには項目を足さない。リビジョンには `proposalId` と `proposalOperationKey`（操作ごとの乱数の `key`）だけを書く。`key` は並び順の情報を持たないので、ほかの操作について何も分からない（core の File Structure の Modified Files と Physical Data Model） | 印は `revision-marks` の API だけから取り、既存の応答の `proposalId` / `proposalOperationKey` は読まない。Recent Changes と作者の表示の印は、今のリビジョンの `proposalId` を core が引いて返す |
 | U2 | 見えない操作も含めた最後の反映日時を依頼した人以外に返すと、見える操作の日時との食い違いから、ほかに操作があると分かる | 依頼した人以外への詳細と一覧の `lastAppliedAt` は、見える操作だけから決める。反映済みの一覧を読む順は保存した値のままで、これは core が受け入れたリスクとして記録している（core の `ProposalQueryService`） | 詳細と一覧のどちらも core の `lastAppliedAt` をそのまま表示する |
 | U3 | viewer は取り消しの結果を操作ごとに表示するので、項目の名前と値を型として 1 か所で決めておく必要がある | `interfaces/api.ts` に `RevertResult` を型として宣言する（形は Proposal Data Hooks の注記に書いた）。`ApplyResult` も操作を `key` で指す | `RevertResultList` が `outcome` の 3 つの値ごとに表示する。`ApplyResult` は使わない |
-| U4 | まとめた通知の受け取る人は操作のページを購読している人なので、それだけでは、他の人が取り消したことが元の Change Proposal を依頼した人に届かない | 取り消しの Change Proposal の通知では、元の Change Proposal を依頼した人を受け取る人に加え、ごみ箱へ移す操作と、ごみ箱から戻す操作のページも含める。中身は受け取る人ごとに絞る（core の `ProposalNotifier`） | 通知の表示（`useChangeProposalModelNotification`）は変えない |
+| U4 | まとめた通知の受け取る人は操作のページを購読している人なので、それだけでは、他の人が取り消したことが元の Change Proposal を依頼した人に届かない | 取り消しの Change Proposal の通知では、元の Change Proposal を依頼した人を受け取る人に加え、完全に削除する操作のページも含める（完全に削除したページは、元の Change Proposal を依頼した人にだけ、元の新規作成のパスで含める）。中身は受け取る人ごとに絞る（core の `ProposalNotifier`） | 通知の表示（`useChangeProposalModelNotification`）は変えない |
 | U5 | 印・反映済みの一覧・まとめた通知が指す Change Proposal を、本人以外が開いて「見つからない」になってはいけない | 依頼した人以外には、閲覧できるページへの操作のうち状態が反映済み・取り消し済み・取り消しを断られた、のどれかである操作だけを返し、それが 1 つ以上あるときに返す。`lifecycle` は条件に入らない。同じ条件を 1 件の取得・反映済みの一覧・リビジョンの印に当てる（core の `selectVisibleOperations` と server の barrel の `getForViewer`） | 詳細ページは core の結果をそのまま表示する。依頼した人以外には、待ち・失敗・古い・飛ばしたの操作と、全体の状態の「承認待ち」「一部だけ反映」は届かない |
 | U6 | 段階と達成度、つながりを依頼した人以外に返すと、見えない操作の有無や、他の人には「見つからない」になる Change Proposal の存在が分かる | 段階と達成度は `requesterState` として依頼した人にだけ返す。つながりは、見る人が開ける Change Proposal へのものだけを、見る人に返す操作にだけ付けて返し、元の操作の `key` も見る人に返す分に絞る（core の要件 12・14） | viewer は core が返したものだけを表示し、自分では判定しない |
 

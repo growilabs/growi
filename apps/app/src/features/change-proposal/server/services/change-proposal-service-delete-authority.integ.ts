@@ -11,7 +11,11 @@ import { UserStatus } from '~/server/models/user/conts';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
-import type { ChangeProposalDocument, RevertResult } from '../../interfaces';
+import type {
+  ChangeProposalDocument,
+  ChangeProposalNotificationSnapshot,
+  RevertResult,
+} from '../../interfaces';
 import type { CreateOperationInput } from '../models/change-proposal-types';
 import {
   type ChangeProposalService,
@@ -44,11 +48,11 @@ describe("ChangeProposalService.revert and the admin's page deletion authority",
 
   const setDeletionAuthority = (
     value: IPageDeleteConfigValueToProcessValidation | undefined,
+    key:
+      | 'security:pageDeletionAuthority'
+      | 'security:pageCompleteDeletionAuthority' = 'security:pageDeletionAuthority',
   ) =>
-    configManager.updateConfigs(
-      { 'security:pageDeletionAuthority': value },
-      { removeIfUndefined: true },
-    );
+    configManager.updateConfigs({ [key]: value }, { removeIfUndefined: true });
 
   // The author's proposal creates one page; the page's creator is the author.
   const applyCreate = async (): Promise<ChangeProposalDocument> => {
@@ -126,8 +130,9 @@ describe("ChangeProposalService.revert and the admin's page deletion authority",
     return result.value.revertProposalId;
   };
 
-  const expectInTrash = async (proposal: ChangeProposalDocument) => {
-    expect((await resultPageOf(proposal)).path).toMatch(/^\/trash\//);
+  const expectDeletedCompletely = async (proposal: ChangeProposalDocument) => {
+    const pageId = proposal.operations[0].resultPageId;
+    expect(await Page().exists({ _id: pageId })).toBeNull();
   };
 
   const revertabilityFor = async (proposalId: string, viewer: IUserHasId) => {
@@ -159,6 +164,10 @@ describe("ChangeProposalService.revert and the admin's page deletion authority",
   afterEach(async () => {
     await kit.waitForPageOperationsToFinish();
     await setDeletionAuthority(undefined);
+    await setDeletionAuthority(
+      undefined,
+      'security:pageCompleteDeletionAuthority',
+    );
     vi.restoreAllMocks();
   });
 
@@ -207,7 +216,7 @@ describe("ChangeProposalService.revert and the admin's page deletion authority",
       const proposal = await applyCreate();
 
       await expectReverted(proposal, admin);
-      await expectInTrash(proposal);
+      await expectDeletedCompletely(proposal);
     });
 
     it('shows the create as not revertible to a non-admin viewer and revertible to an admin', async () => {
@@ -220,20 +229,33 @@ describe("ChangeProposalService.revert and the admin's page deletion authority",
         revertible: true,
       });
     });
+  });
 
-    it('refuses with not-deletable a revert of a restore, which would move the page to the trash again', async () => {
-      await setDeletionAuthority(undefined);
-      const proposal = await applyCreate();
-      const trashProposalId = await expectReverted(proposal, users.requester);
-      const restoreProposalId = await expectReverted(
-        await kit.reload(trashProposalId),
-        users.requester,
+  describe('when only admins may delete pages completely, while anyone may move them to the trash', () => {
+    beforeEach(async () => {
+      await setDeletionAuthority(
+        'adminOnly',
+        'security:pageCompleteDeletionAuthority',
       );
-      const restoreProposal = await kit.reload(restoreProposalId);
-      expect(restoreProposal.operations[0].type).toBe('restore');
-      await setDeletionAuthority('adminOnly');
+    });
 
-      await expectNotDeletable(restoreProposal, users.other);
+    it('refuses the author with not-deletable and shows the create as not revertible, leaving the page in place', async () => {
+      const proposal = await applyCreate();
+
+      await expect(
+        revertabilityFor(proposal._id, users.requester),
+      ).resolves.toEqual({ revertible: false, reason: 'not-deletable' });
+      await expectNotDeletable(proposal, users.requester);
+    });
+
+    it('lets an admin revert', async () => {
+      const proposal = await applyCreate();
+
+      await expect(revertabilityFor(proposal._id, admin)).resolves.toEqual({
+        revertible: true,
+      });
+      await expectReverted(proposal, admin);
+      await expectDeletedCompletely(proposal);
     });
   });
 
@@ -252,7 +274,116 @@ describe("ChangeProposalService.revert and the admin's page deletion authority",
       const proposal = await applyCreate();
 
       await expectReverted(proposal, users.requester);
-      await expectInTrash(proposal);
+      await expectDeletedCompletely(proposal);
+    });
+  });
+
+  it('tells the original requester, by the path they asked to create, when another user reverts the create', async () => {
+    const proposal = await applyCreate();
+    const [created] = proposal.operations;
+    if (created.type !== 'create') throw new Error('expected a create');
+    const { path, resultPageId } = created;
+
+    const revertProposalId = await expectReverted(proposal, users.other);
+
+    await vi.waitFor(
+      async () => {
+        const notifications =
+          await kit.aggregatedNotifications(revertProposalId);
+        expect(
+          notifications.map((n) => ({
+            user: String(n.user),
+            pages: (
+              JSON.parse(n.snapshot) as ChangeProposalNotificationSnapshot
+            ).pages,
+          })),
+        ).toEqual([
+          {
+            user: users.requester._id.toString(),
+            pages: [{ id: resultPageId, path }],
+          },
+        ]);
+      },
+      { timeout: 5000, interval: 50 },
+    );
+  });
+
+  describe('the proposal each revert notification points at', () => {
+    const notifiedProposals = async (revertProposalId: string) => {
+      const notifications = await kit.aggregatedNotifications(revertProposalId);
+      return notifications.map((n) => ({
+        user: String(n.user),
+        proposalId: (
+          JSON.parse(n.snapshot) as ChangeProposalNotificationSnapshot
+        ).proposalId,
+      }));
+    };
+
+    const recipientOf = (userId: string): IUserHasId => {
+      const recipient = [users.requester, users.subscriber, users.other].find(
+        (user) => user._id.toString() === userId,
+      );
+      if (recipient == null) throw new Error(`unexpected recipient ${userId}`);
+      return recipient;
+    };
+
+    // The viewer links a notification to snapshot.proposalId, so every recipient
+    // must be able to open that proposal.
+    const expectEveryRecipientCanOpen = async (revertProposalId: string) => {
+      const notified = await notifiedProposals(revertProposalId);
+      for (const { user, proposalId } of notified) {
+        // biome-ignore lint/performance/noAwaitInLoops: a few recipients, read one by one
+        const view = await service.getForViewer(proposalId, recipientOf(user));
+        expect({ user, ok: view.ok }).toEqual({ user, ok: true });
+      }
+      return notified;
+    };
+
+    it('lets the original requester open it when the revert only deleted a page they had created', async () => {
+      const proposal = await applyCreate();
+
+      const revertProposalId = await expectReverted(proposal, users.other);
+
+      const notified = await expectEveryRecipientCanOpen(revertProposalId);
+      expect(notified).toEqual([
+        { user: users.requester._id.toString(), proposalId: proposal._id },
+      ]);
+      expect(
+        (await service.getForViewer(revertProposalId, users.other)).ok,
+      ).toBe(true);
+    });
+
+    it('lets the original requester and a subscriber of a remaining page open it', async () => {
+      const edited = await kit.createPage('contract-edited');
+      await kit.subscribe(edited);
+      const proposal = await kit.storeProposal([
+        { type: 'create', path: kit.nextPath('contract-created'), body: 'b' },
+        kit.editInput(edited, 'proposed body'),
+      ]);
+      await kit.newApplier().apply(proposal._id, BACKGROUND);
+      await kit.waitForPageOperationsToFinish();
+
+      const result = await revertAs(proposal._id, users.other);
+      if (!result.ok || result.value.revertProposalId == null) {
+        throw new Error('no revert proposal was created');
+      }
+      const { revertProposalId } = result.value;
+
+      const notified = await expectEveryRecipientCanOpen(revertProposalId);
+      expect(
+        [...notified].sort((a, b) => a.user.localeCompare(b.user)),
+      ).toEqual(
+        [
+          { user: users.requester._id.toString(), proposalId: proposal._id },
+          {
+            user: users.subscriber._id.toString(),
+            proposalId: revertProposalId,
+          },
+        ].sort((a, b) => a.user.localeCompare(b.user)),
+      );
+      expect(
+        (await service.getForViewer(revertProposalId, users.other)).ok,
+      ).toBe(true);
     });
   });
 
@@ -268,7 +399,7 @@ describe("ChangeProposalService.revert and the admin's page deletion authority",
         revertabilityFor(proposal._id, users.other),
       ).resolves.toEqual({ revertible: true });
       await expectReverted(proposal, users.other);
-      await expectInTrash(proposal);
+      await expectDeletedCompletely(proposal);
     });
   });
 });

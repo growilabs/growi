@@ -2401,7 +2401,7 @@ class PageService implements IPageService {
   async deleteCompletely(
     page,
     user,
-    options = {},
+    options: IOptionsForInAppNotificationSuppression = {},
     isRecursively = false,
     preventEmitting = false,
     activityParameters,
@@ -2537,7 +2537,7 @@ class PageService implements IPageService {
           throw err;
         }
       })();
-    } else {
+    } else if (!options.isInAppNotificationSuppressed) {
       const preNotify = preNotifyService.generatePreNotify(activity);
 
       this.activityEvent.emit('updated', activity, page, preNotify);

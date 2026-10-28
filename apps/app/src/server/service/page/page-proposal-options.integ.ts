@@ -319,6 +319,24 @@ describe('PageService options used by change proposals', () => {
         ),
     },
     {
+      name: 'deleteCompletely',
+      action: SupportedAction.ACTION_PAGE_DELETE_COMPLETELY,
+      expectedNotifications: 1,
+      prepare: (page: HydratedDocument<PageDocument>) => Promise.resolve(page),
+      run: (
+        page: HydratedDocument<PageDocument>,
+        options: { isInAppNotificationSuppressed?: boolean },
+      ) =>
+        crowi.pageService.deleteCompletely(
+          page,
+          actor,
+          options,
+          false,
+          false,
+          activityParameters,
+        ),
+    },
+    {
       name: 'revertDeletedPage',
       action: SupportedAction.ACTION_PAGE_REVERT,
       expectedNotifications: 1,

@@ -57,12 +57,12 @@ describe('buildRevertOperations', () => {
     ]);
   });
 
-  it('reverses a create into trashing the created page, expecting the created revision (Req 5.6)', () => {
+  it('reverses a create into deleting the created page completely, expecting the created revision (Req 5.6)', () => {
     const result = buildRevertOperations(original, [{ key: 'k-create' }]);
 
     expect(result).toEqual([
       {
-        type: 'trash',
+        type: 'delete-completely',
         pageId: 'p-new',
         expectedRevisionId: 'r-created',
         revertTarget: { proposalId: 'cp-orig', operationKey: 'k-create' },
@@ -126,11 +126,11 @@ describe('buildRevertOperations', () => {
       resultPageId: 'p-move',
       revertTarget: { proposalId: 'cp-orig', operationKey: 'k-move' },
     };
-    const revertTrash: OperationRecord = {
+    const revertDelete: OperationRecord = {
       ...applied,
       index: 2,
-      key: 'rk-trash',
-      type: 'trash',
+      key: 'rk-delete',
+      type: 'delete-completely',
       pageId: 'p-new',
       expectedRevisionId: 'r-created',
       resultPageId: 'p-new',
@@ -138,7 +138,7 @@ describe('buildRevertOperations', () => {
     };
     const revertProposal = Object.freeze({
       proposalId: 'cp-revert',
-      operations: Object.freeze([revertEdit, revertMove, revertTrash]),
+      operations: Object.freeze([revertEdit, revertMove, revertDelete]),
     });
 
     it('reverses an edit in the same shape (Req 5.12)', () => {
@@ -174,51 +174,10 @@ describe('buildRevertOperations', () => {
       ]);
     });
 
-    it('reverses a trash into a restore to the pre-trash path, expecting the same revision (Req 5.15)', () => {
-      const result = buildRevertOperations(revertProposal, [
-        { key: 'rk-trash', restoreToPath: '/new' },
-      ]);
-
-      expect(result).toEqual([
-        {
-          type: 'restore',
-          pageId: 'p-new',
-          expectedRevisionId: 'r-created',
-          toPath: '/new',
-          revertTarget: { proposalId: 'cp-revert', operationKey: 'rk-trash' },
-        },
-      ]);
-    });
-
-    it('reverses a restore into trashing the page again, expecting the same revision (Req 5.16)', () => {
-      const revertRestore: OperationRecord = {
-        ...applied,
-        index: 0,
-        key: 'rrk-restore',
-        type: 'restore',
-        pageId: 'p-new',
-        expectedRevisionId: 'r-created',
-        toPath: '/new',
-        resultPageId: 'p-new',
-        revertTarget: { proposalId: 'cp-revert', operationKey: 'rk-trash' },
-      };
-
-      const result = buildRevertOperations(
-        { proposalId: 'cp-revert-2', operations: [revertRestore] },
-        [{ key: 'rrk-restore' }],
-      );
-
-      expect(result).toEqual([
-        {
-          type: 'trash',
-          pageId: 'p-new',
-          expectedRevisionId: 'r-created',
-          revertTarget: {
-            proposalId: 'cp-revert-2',
-            operationKey: 'rrk-restore',
-          },
-        },
-      ]);
+    it('throws for a complete deletion, which cannot be reverted (Req 5.15)', () => {
+      expect(() =>
+        buildRevertOperations(revertProposal, [{ key: 'rk-delete' }]),
+      ).toThrow(/cannot be reverted/);
     });
   });
 
@@ -233,23 +192,6 @@ describe('buildRevertOperations', () => {
       expect(() =>
         buildRevertOperations(original, [{ key: 'k-edit' }]),
       ).toThrow(/missing originalBody/);
-    });
-
-    it('throws for a trash without the path to restore to', () => {
-      const trash: OperationRecord = {
-        ...applied,
-        index: 0,
-        key: 'rk-trash',
-        type: 'trash',
-        pageId: 'p-new',
-        expectedRevisionId: 'r-created',
-      };
-
-      expect(() =>
-        buildRevertOperations({ proposalId: 'cp', operations: [trash] }, [
-          { key: 'rk-trash' },
-        ]),
-      ).toThrow(/missing restoreToPath/);
     });
 
     it('throws for an applied create without the created page or revision', () => {

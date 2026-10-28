@@ -58,6 +58,7 @@ export const contextFor = (
   isRequester: requesterId === viewerId,
   viewablePageIds: viewable.viewablePageIds,
   anyoneWithLinkPageIds: viewable.anyoneWithLinkPageIds,
+  deletedPageIds: viewable.deletedPageIds,
 });
 
 // The newest appliedAt among the returned operations; the stored value may come

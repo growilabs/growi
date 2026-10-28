@@ -64,12 +64,13 @@ describe('retryOnError', () => {
 
   it('waits between attempts, never after the last one', async () => {
     const events: string[] = [];
-    const task = vi.fn(async () => {
+    const task = vi.fn((): Promise<never> => {
       events.push('attempt');
-      throw new Error('always');
+      return Promise.reject(new Error('always'));
     });
-    const wait = async (): Promise<void> => {
+    const wait = (): Promise<void> => {
       events.push('wait');
+      return Promise.resolve();
     };
 
     await expect(retryOnError(task, { retries: 2, wait })).rejects.toThrow();

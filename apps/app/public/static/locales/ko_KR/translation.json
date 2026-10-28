@@ -1144,8 +1144,7 @@
       "edit": "페이지 편집",
       "create": "페이지 생성",
       "move": "페이지 이동",
-      "trash": "휴지통으로 이동",
-      "restore": "휴지통에서 복원"
+      "delete_completely": "페이지 완전 삭제"
     },
     "operation_status": {
       "pending": "승인 대기",
@@ -1182,7 +1181,6 @@
       "has_children": "페이지에 하위 페이지가 있음",
       "moved_after_apply": "반영 후 페이지가 이동됨",
       "original_path_occupied": "원래 경로에 이미 페이지가 있음",
-      "not_in_trash": "페이지가 더 이상 휴지통에 없음",
       "not_deletable": "페이지를 삭제할 권한이 없음",
       "apply_failed": "되돌리기에 실패함",
       "base_revision_changed": "반영 전에 페이지가 변경됨",
@@ -1198,7 +1196,6 @@
       "has_children": "페이지에 하위 페이지가 있음",
       "moved_after_apply": "반영 후 페이지가 이동됨",
       "original_path_occupied": "원래 경로에 이미 페이지가 있음",
-      "not_in_trash": "페이지가 더 이상 휴지통에 없음",
       "not_deletable": "페이지를 삭제할 권한이 없음",
       "page_operation_in_progress": "페이지에 대한 다른 작업이 진행 중",
       "apply_failed": "되돌리기에 실패함"

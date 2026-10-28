@@ -22,7 +22,7 @@ import {
   loadViewablePages,
   type ViewablePages,
 } from './current-page-facts';
-import type { PageDeletePermissionService } from './page-delete-permission';
+import type { PageDeletePermissionServices } from './page-delete-permission';
 import { isRequesterAllowed } from './pre-write-checks';
 import {
   type AppliedListScan,
@@ -52,7 +52,7 @@ export type ProposalQuery = ProposalListQuery &
 
 export type ProposalQueryDeps = {
   readonly appliedListScan?: AppliedListScan;
-  readonly pageService: PageDeletePermissionService;
+  readonly deletePermission: PageDeletePermissionServices;
 };
 
 const NOT_FOUND = { ok: false, error: { code: 'not-found' } } as const;
@@ -154,7 +154,7 @@ export const createProposalQuery = (
         ? null
         : loadCurrentPageFacts(revertCandidates, viewable.pages, {
             user: viewer,
-            pageService: deps.pageService,
+            services: deps.deletePermission,
           }),
       readRequesters([proposal.requester]),
     ]);

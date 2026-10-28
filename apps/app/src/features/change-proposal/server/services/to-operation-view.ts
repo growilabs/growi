@@ -29,9 +29,7 @@ const typeSpecificFields = (
       };
     case 'move':
       return { fromPath: op.fromPath, toPath: op.toPath };
-    case 'restore':
-      return { toPath: op.toPath };
-    case 'trash':
+    case 'delete-completely':
       return {};
   }
 };

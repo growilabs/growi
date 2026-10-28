@@ -54,8 +54,7 @@ const OPERATION_TYPES: Record<OperationType, true> = {
   edit: true,
   create: true,
   move: true,
-  trash: true,
-  restore: true,
+  'delete-completely': true,
 };
 const OPERATION_STATUSES: Record<OperationStatus, true> = {
   pending: true,
@@ -81,7 +80,6 @@ const OPERATION_REASONS: Record<OperationReason, true> = {
   'has-children': true,
   'moved-after-apply': true,
   'original-path-occupied': true,
-  'not-in-trash': true,
   'not-deletable': true,
   'apply-failed': true,
   'base-revision-changed': true,
@@ -145,7 +143,7 @@ const toPayloadWithoutBody = (
         toPath: required(row.toPath, 'toPath', type),
         ...optional('removeRedirectsFrom', row.removeRedirectsFrom),
       };
-    case 'trash':
+    case 'delete-completely':
       return {
         type,
         pageId: required(row.pageId, 'pageId', type),
@@ -154,17 +152,6 @@ const toPayloadWithoutBody = (
           'expectedRevisionId',
           type,
         ),
-      };
-    case 'restore':
-      return {
-        type,
-        pageId: required(row.pageId, 'pageId', type),
-        expectedRevisionId: required(
-          row.expectedRevisionId,
-          'expectedRevisionId',
-          type,
-        ),
-        toPath: required(row.toPath, 'toPath', type),
       };
   }
 };
