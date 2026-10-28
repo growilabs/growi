@@ -568,57 +568,35 @@ export const setup = (crowi) => {
           true,
         );
 
-      if (deletablePages.length === 0) {
+      if (pagesInTrash.length > 0 && deletablePages.length === 0) {
         const msg = 'No pages can be deleted.';
         return res.apiv3Err(new ErrorV3(msg), 500);
       }
 
+      const isAllDeletable = deletablePages.length === pagesInTrash.length;
       const parameters = { action: SupportedAction.ACTION_PAGE_EMPTY_TRASH };
 
-      // when some pages are not deletable
-      if (deletablePages.length < pagesInTrash.length) {
-        try {
-          const options = { isCompletely: true, isRecursively: true };
-          await crowi.pageService.deleteMultiplePages(
-            deletablePages,
-            req.user,
-            options,
-          );
+      try {
+        const activityParameters = {
+          ip: req.ip,
+          endpoint: req.originalUrl,
+        };
+        const pages = await crowi.pageService.emptyTrashPage(
+          req.user,
+          options,
+          activityParameters,
+          isAllDeletable ? undefined : deletablePages.map((p) => p._id),
+        );
 
-          activityEvent.emit('update', res.locals.activity._id, parameters);
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-          return res.apiv3({ deletablePages });
-        } catch (err) {
-          logger.error(err);
-          return res.apiv3Err(
-            new ErrorV3('Failed to update page.', 'unknown'),
-            500,
-          );
-        }
-      }
-      // when all pages are deletable
-      else {
-        try {
-          const activityParameters = {
-            ip: req.ip,
-            endpoint: req.originalUrl,
-          };
-          const pages = await crowi.pageService.emptyTrashPage(
-            req.user,
-            options,
-            activityParameters,
-          );
-
-          activityEvent.emit('update', res.locals.activity._id, parameters);
-
-          return res.apiv3({ pages });
-        } catch (err) {
-          logger.error(err);
-          return res.apiv3Err(
-            new ErrorV3('Failed to update page.', 'unknown'),
-            500,
-          );
-        }
+        return res.apiv3(isAllDeletable ? { pages } : { deletablePages });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(
+          new ErrorV3('Failed to update page.', 'unknown'),
+          500,
+        );
       }
     },
   );

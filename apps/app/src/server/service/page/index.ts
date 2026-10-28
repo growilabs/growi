@@ -552,10 +552,12 @@ class PageService implements IPageService {
    * Generate read stream to operate descendants of the specified page path
    * @param {string} targetPagePath
    * @param {User} viewer
+   * @param pageIds when given, only these descendants are read
    */
   private async generateReadStreamToOperateOnlyDescendants(
     targetPagePath,
     userToOperate,
+    pageIds?: ObjectIdLike[],
   ) {
     const Page = mongoose.model<IPage, PageModel>('Page');
     const { PageQueryBuilder } = Page;
@@ -563,6 +565,9 @@ class PageService implements IPageService {
     const builder = new PageQueryBuilder(Page.find(), true)
       .addConditionAsRootOrNotOnTree() // to avoid affecting v5 pages
       .addConditionToListOnlyDescendants(targetPagePath);
+    if (pageIds != null) {
+      builder.addConditionToListByPageIdsArray(pageIds);
+    }
 
     await Page.addConditionToFilteringByViewerToEdit(builder, userToOperate);
     return builder.query.lean().cursor({ batchSize: BULK_REINDEX_SIZE });
@@ -2730,7 +2735,15 @@ class PageService implements IPageService {
     return;
   }
 
-  async emptyTrashPage(user, options = {}, activityParameters) {
+  /**
+   * @param pageIdsToDelete when given, only these trashed pages are deleted
+   */
+  async emptyTrashPage(
+    user,
+    options = {},
+    activityParameters,
+    pageIdsToDelete?: ObjectIdLike[],
+  ) {
     const page = { path: '/trash' };
 
     const parameters = {
@@ -2753,6 +2766,7 @@ class PageService implements IPageService {
       options,
       true,
       descendantsSubscribedSets,
+      pageIdsToDelete,
     );
     const descendantsSubscribedUsers = Array.from(
       descendantsSubscribedSets,
@@ -2776,11 +2790,13 @@ class PageService implements IPageService {
     options = {},
     shouldUseV4Process = true,
     descendantsSubscribedSets?,
+    pageIds?: ObjectIdLike[],
   ): Promise<number> {
     const readStream = shouldUseV4Process // pages don't have parents
       ? await this.generateReadStreamToOperateOnlyDescendants(
           targetPage.path,
           user,
+          pageIds,
         )
       : await new PageCursorsForDescendantsFactory(
           user,
