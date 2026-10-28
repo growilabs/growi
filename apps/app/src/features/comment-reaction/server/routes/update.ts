@@ -28,7 +28,7 @@ import type {
   UpdateCommentReactionResponseBody,
 } from '../../dto';
 import type { ReactionKey } from '../../interfaces';
-import { normalizeReactionKey } from '../../utils';
+import { normalizeReactionKey, tryParseReactionKey } from '../../utils';
 import {
   addReaction,
   removeReaction,
@@ -49,11 +49,36 @@ type Req = Request<
 
 type ReactionTarget = { commentId: string; pageId: string };
 
-type Reaction = ReactionTarget & { emoji: ReactionKey };
+// Removal validates shape only (see research.md, "解除は送られたキーと正規化したキーの両方で削除し…").
+type ReactionChange =
+  | { readonly isReacted: true; readonly emoji: ReactionKey }
+  | {
+      readonly isReacted: false;
+      readonly sentEmoji: string;
+      readonly loggedEmoji: string;
+    };
 
 type ApplyReactionResult =
   | { kind: 'kind-limit-exceeded' }
   | { kind: 'applied'; changed: boolean };
+
+const resolveReactionChange = (body: {
+  emoji: string;
+  isReacted: boolean;
+}): ReactionChange | null => {
+  const normalized = normalizeReactionKey(body.emoji);
+  if (body.isReacted) {
+    return normalized.ok ? { isReacted: true, emoji: normalized.value } : null;
+  }
+  if (!normalized.ok && tryParseReactionKey(body.emoji) == null) {
+    return null;
+  }
+  return {
+    isReacted: false,
+    sentEmoji: body.emoji,
+    loggedEmoji: normalized.ok ? normalized.value : body.emoji,
+  };
+};
 
 // Null covers a missing comment and a page the viewer cannot see alike, so
 // callers cannot tell the two apart.
@@ -81,13 +106,12 @@ const resolveViewableComment = async (
 };
 
 const applyReaction = async (
-  { emoji, ...target }: Reaction,
-  requestedEmoji: string,
+  target: ReactionTarget,
+  change: ReactionChange,
   userId: string,
-  isReacted: boolean,
 ): Promise<ApplyReactionResult> => {
-  if (isReacted) {
-    const added = await addReaction({ prisma }, target, userId, emoji);
+  if (change.isReacted) {
+    const added = await addReaction({ prisma }, target, userId, change.emoji);
     return added.kind === 'kind-limit-exceeded'
       ? { kind: 'kind-limit-exceeded' }
       : { kind: 'applied', changed: added.kind === 'added' };
@@ -96,7 +120,7 @@ const applyReaction = async (
     { prisma },
     target,
     userId,
-    requestedEmoji,
+    change.sentEmoji,
   );
   return { kind: 'applied', changed: removed.kind === 'removed' };
 };
@@ -106,17 +130,20 @@ const recordReactionActivity = (
   crowi: Crowi,
   req: Req,
   res: ApiV3Response,
-  { emoji, ...target }: Reaction,
+  { target, change }: { target: ReactionTarget; change: ReactionChange },
 ): void => {
   crowi.events.activity.emit('update', res.locals.activity._id, {
-    action: req.body.isReacted
+    action: change.isReacted
       ? SupportedAction.ACTION_COMMENT_REACTION_ADD
       : SupportedAction.ACTION_COMMENT_REACTION_REMOVE,
     target: target.pageId,
     targetModel: SupportedTargetModel.MODEL_PAGE,
     event: target.commentId,
     eventModel: SupportedEventModel.MODEL_COMMENT,
-    snapshot: { username: req.user.username, emoji },
+    snapshot: {
+      username: req.user.username,
+      emoji: change.isReacted ? change.emoji : change.loggedEmoji,
+    },
   });
 };
 
@@ -202,9 +229,13 @@ const updateFailedError = (): ErrorV3 =>
  *            description: >
  *              A parameter is missing or malformed, or the requester is a
  *              read-only user who may not comment (error code
- *              `validation_failed`); or `emoji` is not a usable reaction, such
- *              as an unknown emoji or a skin tone on an emoji without skin
- *              tones (error code `invalid-reaction-emoji`).
+ *              `validation_failed`); or, when adding, `emoji` is not a usable
+ *              reaction, such as an unknown emoji or a skin tone on an emoji
+ *              without skin tones; or, when removing, `emoji` is not shaped
+ *              like a reaction key (`unicode:<shortcode>[::skin-tone-N]`)
+ *              (error code `invalid-reaction-emoji`). A removal does not check
+ *              the emoji against the current emoji data, so a stored reaction
+ *              whose emoji is no longer known can still be removed.
  *            content:
  *              application/json:
  *                schema:
@@ -264,19 +295,13 @@ export const updateCommentReactionRouteHandlersFactory = (
           return res.apiv3Err(notFoundOrForbidden(), 404);
         }
 
-        const emoji = normalizeReactionKey(req.body.emoji);
-        if (!emoji.ok) {
+        const change = resolveReactionChange(req.body);
+        if (change == null) {
           return res.apiv3Err(invalidReactionEmojiError(), 400);
         }
 
-        const reaction = { ...target, emoji: emoji.value };
         const userId = String(req.user._id);
-        const result = await applyReaction(
-          reaction,
-          req.body.emoji,
-          userId,
-          req.body.isReacted,
-        );
+        const result = await applyReaction(target, change, userId);
         if (result.kind === 'kind-limit-exceeded') {
           return res.apiv3Err(kindLimitExceededError(), 409);
         }
@@ -286,11 +311,15 @@ export const updateCommentReactionRouteHandlersFactory = (
           { ...target, viewerId: userId },
         );
         if (comment == null) {
+          // The comment was deleted after the check; do not leave the row behind.
+          if (change.isReacted && result.changed) {
+            await removeReaction({ prisma }, target, userId, change.emoji);
+          }
           return res.apiv3Err(notFoundOrForbidden(), 404);
         }
 
         if (result.changed) {
-          recordReactionActivity(crowi, req, res, reaction);
+          recordReactionActivity(crowi, req, res, { target, change });
         }
 
         const responseBody: UpdateCommentReactionResponseBody = {

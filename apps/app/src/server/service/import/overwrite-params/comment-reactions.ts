@@ -21,7 +21,7 @@ const restoreObjectId: OverwriteFunction = (value) => {
   return value;
 };
 
-// Keys exported before normalization may hold an alias; one that cannot be normalized is kept as is.
+// A key that cannot be normalized is kept as is (see research.md, "解除は送られたキーと正規化したキーの両方で削除し…").
 const normalizeEmoji: OverwriteFunction = (value) => {
   if (typeof value !== 'string') {
     return value;

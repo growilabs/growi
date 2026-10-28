@@ -196,17 +196,17 @@
 - **Follow-up**: 将来 `slack:<teamId>:<name>` などを足すときは、パーサーの判別ユニオンに variant を足す。
 
 ### Decision: 解除は送られたキーと正規化したキーの両方で削除し、インポートでは `emoji` を正規化する
-- **Context**: 正規化されずに保存されたキー（例: `unicode:thumbsup`）の行がインポートで入りうる。route が正規化したキー（`unicode:+1`）だけで削除すると、その行のリアクションを利用者が外せない。
+- **Context**: 絵文字データ（`@growi/emoji-mart-data`）の版が変わると、保存済みの正規のキーが別名になったり（例: `unicode:thumbsup` が正規の id でなくなる）、id そのものが消えたりする。GROWI の更新や、版の違う GROWI 間の G2G・インポートで起きる（design.md の Revalidation Triggers「emoji-mart のバージョン更新」）。route が正規化したキーだけで削除すると、そうした行を利用者が外せない。
 - **Alternatives Considered**:
   1. インポートでの正規化だけにする（それ以前に入った行が残る）
   2. 解除だけを両方のキーで削除する（保存する行が正規の形にそろわない）
   3. 両方入れる
 - **Selected Approach**: 3。`removeReaction` は送られたままのキーとその正規形の両方を `deleteMany` の対象にし、`overwrite-params/comment-reactions.ts` は `emoji` を正規化する（正規化できない値はそのまま返す）。
 - **Rationale**: インポートの正規化で今後の行を正規の形にそろえ、解除の両方削除で、すでに入った行を外せるようにする。
+- **解除時の検証**: 追加（`isReacted: true`）は `normalizeReactionKey` で確かめるが、解除（`isReacted: false`）は `tryParseReactionKey` で形式だけを確かめ、今の絵文字データにあるかは問わずに `removeReaction` へ渡す。今の絵文字データに無い id のキーで保存された行も外せるようにするため。形式に合わない値は `invalid-reaction-emoji` の 400。監査ログの snapshot の `emoji` は、正規化できれば正規形、できなければ送られたキー。
 - **Trade-offs**: `removeReaction` の引数が `ReactionKey` から送られたままの文字列に広がり、サービスで再度正規化する。別名と正規のキーの行が同じ `(commentId, userId)` に両方あるとき、別名のチップを押して解除すると、送られたキーと正規形の両方が対象になるので両方の行が消える（同じ絵文字なので意図どおり）。正規のチップを押して解除した場合は、送られたキーが正規形そのものなので正規の行だけが消え、別名の行とそのチップは残る。
 - **Follow-up**: 次の点は未対応で、先送りにする。表示側で正規化してまとめるか、既存の行を移行で正規化するかを別途決める。
   - 別名のキーの行が別のチップとして表示される（要件 4.5）。
-  - 正規化できない保存済みのキー（例: 今の絵文字データに無い id）の行は外せない。route が `normalizeReactionKey` に失敗したキーを `invalid-reaction-emoji` の 400 で拒否し、サービスまで届かないため。
   - 別名と正規のキーの行が同じコメントに両方あると、種類数の上限（`distinct: ['emoji']` で数える）に 2 種類として数えられる。
 
 ### Decision: インポート・G2G の置き換えで、消えたコメントとページのリアクションが残るのを許容する

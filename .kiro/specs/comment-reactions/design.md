@@ -555,7 +555,7 @@ declare function resolveReactionGlyph(key: ReactionKey): string | null;
 | Requirements | 2.4, 2.5, 2.6, 2.7, 2.8, 7.1, 7.2, 7.3 |
 
 **Responsibilities & Constraints**
-- 呼び出し元（route）で、認証、閲覧判定、キーの検証が済んでいることを前提にする（追加は正規化済みのキーを受け取り、解除は送られたままのキーを受け取る）。投稿者本人かどうかは判定しない（要件 2.6）。
+- 呼び出し元（route）で、認証、閲覧判定、キーの検証が済んでいることを前提にする（追加は正規化済みのキーを受け取り、解除は形式だけを確かめた、送られたままのキーを受け取る。解除は今の絵文字データに無いキーでも通す）。投稿者本人かどうかは判定しない（要件 2.6）。
 - 上限の判定: そのコメントに現在ある異なる `emoji` の数が `MAX_REACTION_KINDS_PER_COMMENT` 以上で、かつ追加する `emoji` がまだ無い場合だけ拒否する（要件 7.2、7.3）。
 
 **Contracts**: Service [x]
@@ -585,7 +585,7 @@ declare function addReaction(
   emoji: ReactionKey,
 ): Promise<AddReactionResult>;
 
-/** `emoji` は利用者が送ったままのキー。正規化前の別名で保存された行も外せるよう、送られたキーと正規化したキーの両方で削除する。 */
+/** `emoji` は利用者が送ったままのキー。送られたキーと正規化したキーの両方で削除する（research.md の Decision「解除は送られたキーと正規化したキーの両方で削除し…」）。 */
 declare function removeReaction(
   deps: CommentReactionServiceDeps,
   target: ReactionTarget,
@@ -594,7 +594,7 @@ declare function removeReaction(
 ): Promise<RemoveReactionResult>;
 ```
 - 2つの関数は、`loadReactionChips` と同じく、依存（`{ prisma }`）を先頭の引数に取る。クラスやオブジェクトにまとめない。
-- Preconditions: `target` は閲覧判定済みの実在するコメント。`addReaction` の `emoji` は `normalizeReactionKey` を通ったキー。`removeReaction` の `emoji` は、route が `normalizeReactionKey` で検証済みの、送られたままのキー。
+- Preconditions: `target` は閲覧判定済みの実在するコメント。`addReaction` の `emoji` は `normalizeReactionKey` を通ったキー。`removeReaction` の `emoji` は、route が `tryParseReactionKey` で形式だけを確かめた、送られたままのキー。
 - Postconditions: `added` / `already-reacted` の後は行がちょうど1つ存在する。`removed` / `not-reacted` の後は行が存在しない。
 - Invariants: 同じ `(commentId, userId, emoji)` の行は高々1つ。
 
@@ -678,7 +678,7 @@ declare function loadReactionChips(
 - 対象の解決: `prisma.comments.findUnique({ where: { id }, select: { id, pageId } })` で存在を確認し、続けて `findPageAndMetaDataByViewer` で閲覧判定をする。どちらで失敗しても、同じ 404 `notfound_or_forbidden` を返す（要件 5.3、`page-write-action-403-404.md`）。
 - 監査ログ: `changed` が true のときだけ、`res.apiv3()` の前に `activityEvent.emit('update', res.locals.activity._id, { action, target: pageId, targetModel: MODEL_PAGE, event: commentId, eventModel: MODEL_COMMENT, snapshot: { username, emoji } })` を呼ぶ。
 - 応答のコメントは `getCommentListItem({ commentId, pageId, viewerId: req.user._id })` で作る。書き込みの後に読み直すので、他の利用者のリアクションも含めた最新の状態になる（要件 2.9）。読み直しの `await` は emit より前に済ませ、emit と `res.apiv3()` の間に `await` を挟まない（Rule 1）。
-- 読み直しが `null`（対象の解決のあと、書き込みか読み直しまでの間にコメントが削除された）のときは、emit せずに 404 `notfound_or_forbidden` を返す。利用者から見ると対象がもう無いので、対象の解決で見つからなかったときと同じ応答にそろえる。追加・解除としては記録せず（要件 9.4 の「拒否」と同じ扱い）、`addActivity` の finalizer が `ACTION_UNSETTLED` を残す。コメントの削除そのものは `COMMENT_REMOVE` で記録される。
+- 読み直しが `null`（対象の解決のあと、書き込みか読み直しまでの間にコメントが削除された）のときは、この要求で行を追加していた（`isReacted: true` で `changed: true`）なら、その行を削除してから、emit せずに 404 `notfound_or_forbidden` を返す。削除は、削除済みのコメントに行が孤立して残らないようにするため。利用者から見ると対象がもう無いので、対象の解決で見つからなかったときと同じ応答にそろえる。追加・解除としては記録せず（要件 9.4 の「拒否」と同じ扱い）、`addActivity` の finalizer が `ACTION_UNSETTLED` を残す。コメントの削除そのものは `COMMENT_REMOVE` で記録される。
 - 読み直しでリアクションの取り込みだけが失敗した（`comment.reactions` が `null`）ときは、書き込みは成功しているので、200 と `changed` の値をそのまま返す。クライアントはこの `comment` で置き換えず、一覧を取り直す（「useCommentReactions」を参照）。
 
 **Contracts**: API [x]
@@ -702,7 +702,7 @@ type UpdateCommentReactionResponseBody = {
 };
 ```
 - 型は `features/comment-reaction/dto/update-comment-reaction.ts` に置く（応答が `comment` の `ICommentListItem` を含み、層 1 の `interfaces` から `comment` を import できないため）。
-- Validation: `id` は `isMongoId()`。`emoji` は `isString()` と長さの上限（64 文字）のあと、handler で `normalizeReactionKey` を通す。`isReacted` は `isBoolean({ strict: true })`。
+- Validation: `id` は `isMongoId()`。`emoji` は `isString()` と長さの上限（64 文字）のあと、handler で、追加は `normalizeReactionKey` を通し、解除は `tryParseReactionKey` で形式だけを確かめる（今の絵文字データに無いキーでも通す）。`isReacted` は `isBoolean({ strict: true })`。
 - 追加と解除を1つの PUT の body にまとめるのは、ページの「いいね」（`PUT /_api/v3/page/likes` の `{ pageId, bool }`）と揃えるためと、`emoji` をクエリに載せないため（`unicode:+1` の `+` は、クエリでは手で書いた要求で空白に化ける）。
 - Idempotency: 同じ PUT を何度送っても結果の状態は同じで、2回目以降は `changed: false`（要件 2.7、2.8）。
 - エラーの応答（4xx / 5xx）には `comment` を含めない。クライアントの扱いは「useCommentReactions」の「失敗時の扱い」に従う。
@@ -851,7 +851,7 @@ type CommentReactionBarProps = {
 
 ### Domain Model
 - 集約: リアクションは、コメントに従属する値に近いエンティティ。単独で更新されず、追加と削除だけを持つ。外から見るときは、常にコメントの一部（`ICommentListItem.reactions`）として現れる。
-- 不変条件: `(commentId, userId, emoji)` は一意。`emoji` は `normalizeReactionKey` を通った正規の形（インポート時に `overwrite-params` が正規化する。それ以前にインポートされた別名のキーの行は、解除時に別名でも削除できる）。`pageId` は、そのコメントの `pageId` と一致する（コメントはページをまたいで移動しない）。
+- 不変条件: `(commentId, userId, emoji)` は一意。`emoji` は `normalizeReactionKey` を通った正規の形（インポート時に `overwrite-params` が正規化する。絵文字データの版が変わって別名や未知の id になった保存済みのキーの行は、解除時に送られたキーでも削除できる）。`pageId` は、そのコメントの `pageId` と一致する（コメントはページをまたいで移動しない）。
 
 ### Physical Data Model
 
@@ -903,7 +903,7 @@ type CommentReactionBarProps = {
 - `@growi/emoji-mart-data`: 既存の `skins[0]` の値が拡張前と一致すること、肌の色対応の絵文字が6件の `skins` を持つこと、`aliases` の存在。`@emoji-mart/data` の既定の export のすべての id（と肌の色）が `normalizeReactionKey` を通ること（ピッカーとサーバーの検証のずれの検出）。
 
 ### Integration Tests
-- PUT: 追加（`isReacted: true`）・解除（`isReacted: false`）の成功と、応答の `comment.reactions` が最新であること（他の利用者の行も含む）。同じ要求の2回目が `changed: false` で行が増減しないこと。同時の二重追加で行が1つになること（統合テストの DB には migration でインデックスが作られている前提）。上限で新しい絵文字が 409 になり、既存の絵文字は追加できること。自分のコメントにも付けられること。読み直しが `null` になる場合（読み直しの関数を差し替えて再現する）に、404 `notfound_or_forbidden` を返し、追加・解除の監査ログが残らないこと。読み直しでリアクションの取り込みだけが失敗する場合に、200 で `comment.reactions` が `null` になること（要件 2.1〜2.9、7.1〜7.3、9.4）。
+- PUT: 追加（`isReacted: true`）・解除（`isReacted: false`）の成功と、応答の `comment.reactions` が最新であること（他の利用者の行も含む）。同じ要求の2回目が `changed: false` で行が増減しないこと。同時の二重追加で行が1つになること（統合テストの DB には migration でインデックスが作られている前提）。上限で新しい絵文字が 409 になり、既存の絵文字は追加できること。自分のコメントにも付けられること。読み直しが `null` になる場合（読み直しの関数を差し替えて再現する）に、404 `notfound_or_forbidden` を返し、追加・解除の監査ログが残らず、追加した行も残らない（行数が 0 のまま）こと。今の絵文字データに無いキーで保存された行を、解除で外せること。読み直しでリアクションの取り込みだけが失敗する場合に、200 で `comment.reactions` が `null` になること（要件 2.1〜2.9、7.1〜7.3、9.4）。
 - PUT の認可: 未ログインの拒否、閲覧権限の無いページのコメントと存在しないコメントが同じ 404 であること、閲覧専用ユーザーが設定で拒否／許可されること（要件 5.1〜5.5）。
 - 監査ログ: 追加・解除で `COMMENT_REACTION_ADD` / `_REMOVE` の行が、操作者・対象・`snapshot.emoji` 付きで1件残ること。**確かめ方**: 本物の route（`PUT /comments/:id/reactions`）を通し、emit → `settleActivityRecord` → `createByParameters` の経路を実際に動かしたあと、メソッドや応答の返り値ではなく、**DB から読み直して**確かめる（`prisma.activities.findFirst({ where: { action, event: commentId } })` で新しく取得するか、`mongoose.connection.collection('activities')` から生の文書を読む）。`snapshot.emoji` が送った `ReactionKey` と一致し、`snapshot.username` も残っていることを確認する（`emoji` の取りこぼしは返り値では見えず、保存された文書でしか分からないため）。`changed: false` と拒否では、追加・解除の行が残らないこと。応答が即座に終わっても操作者が残ること（`activity-recording.md` の drift テスト）。通知が作られないこと（要件 9.1〜9.5）。
 - 一覧（`list.integ.ts` の拡張）: 各コメントに `reactions` が載ること（リアクションの無いコメントは `[]`）。`reactedByMe` が要求者で変わること。共有リンク経由で、インラインコメントのリアクションも返ること。リアクションの取り込みを失敗させたとき、コメントが返り `reactions` が `null` になること。旧 API `comments.get` の応答に `reactions` が無いこと（要件 6.1、6.2、6.5）。

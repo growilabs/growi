@@ -71,10 +71,7 @@ export const addReaction = async (
   return { kind: 'added' };
 };
 
-/**
- * `emoji` is the key as sent by the client. A row imported before keys were normalized may
- * still be stored under an alias, so both the sent and the canonical form are removed.
- */
+/** `emoji` is the key as sent; the canonical form is removed too (see research.md, "解除は送られたキーと正規化したキーの両方で削除し…"). */
 export const removeReaction = async (
   { prisma: client }: CommentReactionServiceDeps,
   { commentId }: ReactionTarget,

@@ -475,6 +475,50 @@ describe('PUT /_api/v3/comments/:id/reactions', () => {
       ).toBe(0);
     });
 
+    it.each([
+      [
+        'an id missing from the current emoji data',
+        'unicode:removed_in_new_data',
+      ],
+      [
+        'a skin tone on an emoji without skin tones',
+        'unicode:100::skin-tone-2',
+      ],
+    ])('removes a row stored under %s', async (_label, emoji) => {
+      currentUser = viewer;
+      const commentId = await createComment();
+      await prisma.commentreactions.create({
+        data: {
+          commentId,
+          pageId: publicPageId,
+          userId: String(viewer._id),
+          emoji,
+          createdAt: new Date(),
+        },
+      });
+
+      const res = await putReaction(commentId, { emoji, isReacted: false });
+
+      expect(res.status).toBe(200);
+      expect(res.body.changed).toBe(true);
+      expect(await countRows(commentId, String(viewer._id), emoji)).toBe(0);
+    });
+
+    it.each([
+      ['an unsupported namespace', 'custom:party'],
+      ['a value that is not a reaction key', 'thumbsup'],
+    ])('rejects removing %s with 400 invalid-reaction-emoji', async (_label, emoji) => {
+      currentUser = viewer;
+      const commentId = await createComment();
+
+      const res = await putReaction(commentId, { emoji, isReacted: false });
+
+      expect(res.status).toBe(400);
+      expect(res.body.errors).toEqual([
+        expect.objectContaining({ code: 'invalid-reaction-emoji' }),
+      ]);
+    });
+
     it('lets the author react to their own comment', async () => {
       currentUser = owner;
       const commentId = await createComment();
@@ -560,6 +604,9 @@ describe('PUT /_api/v3/comments/:id/reactions', () => {
       expect(res.body.errors).toEqual([
         expect.objectContaining({ code: 'notfound_or_forbidden' }),
       ]);
+      expect(
+        await prisma.commentreactions.count({ where: { commentId } }),
+      ).toBe(0);
     });
 
     it('answers 200 with reactions: null when only the reactions cannot be read back', async () => {

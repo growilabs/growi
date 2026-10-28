@@ -277,6 +277,29 @@ describe('PUT /_api/v3/comments/:id/reactions — audit log', () => {
       expect(rows[0].snapshot.emoji).toBe(THUMBS_UP);
     });
 
+    it('stores the key as sent when a removed row held a key the emoji data no longer knows', async () => {
+      const commentId = await createComment();
+      const emoji = 'unicode:removed_in_new_data';
+      await prisma.commentreactions.create({
+        data: {
+          commentId,
+          pageId: publicPageId,
+          userId: viewerId(),
+          emoji,
+          createdAt: new Date(),
+        },
+      });
+
+      await putReaction(commentId, { emoji, isReacted: false });
+
+      const rows = await waitFor(
+        () => reactionRows(commentId),
+        (found) => found.length > 0,
+        'the COMMENT_REACTION_REMOVE row',
+      );
+      expect(rows[0]).toMatchObject({ action: REMOVE, snapshot: { emoji } });
+    });
+
     it('keeps the operator on the row when the response finishes immediately', async () => {
       const commentId = await createComment();
       // A fake response whose apiv3() fires 'finish' synchronously reproduces
