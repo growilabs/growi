@@ -483,11 +483,11 @@ const ChannelPermissionsSection = ({
 };
 
 // ============================================================================
-// Disconnecting a workspace (Requirement 9.7)
+// Disconnecting a connection (Requirement 9.7)
 // ============================================================================
 
 /**
- * The "disconnect this workspace" control -- the only way an administrator
+ * The "disconnect this connection" control -- the only way an administrator
  * can reach `unpairRelation`, which deletes this relation's keys, channel
  * permissions and notification destinations and marks the relation
  * `unpaired`.
@@ -518,7 +518,7 @@ const UnpairButton = ({
         {},
       );
       toastSuccess(
-        'Disconnected. This workspace’s keys, channel permissions and notification destinations have been removed.',
+        'Disconnected. This connection’s keys, channel permissions and notification destinations have been removed.',
       );
       setIsConfirming(false);
       onUnpaired();
@@ -544,7 +544,7 @@ const UnpairButton = ({
   return (
     <div data-testid="grw-chat-integration-unpair-confirm">
       <p className="text-danger mb-2">
-        Disconnecting removes this workspace’s keys, channel permissions and
+        Disconnecting removes this connection’s keys, channel permissions and
         notification destinations. Reconnecting needs a new registration code.
       </p>
       <button
@@ -836,11 +836,79 @@ const PairingForm = ({
   );
 };
 
+const ENCRYPTION_KEY_ENV_NAME = 'CHAT_INTEGRATION_KEY_ENCRYPTION_KEY';
+const ENCRYPTION_KEY_GENERATION_ENV_NAME =
+  'CHAT_INTEGRATION_KEY_ENCRYPTION_KEY_GENERATION';
+
+const describeEncryptionProblem = (
+  reason: EncryptionStatus['reason'],
+): JSX.Element => {
+  switch (reason) {
+    case 'invalid-key':
+      return (
+        <>
+          <code>{ENCRYPTION_KEY_ENV_NAME}</code> is set, but it is not a valid
+          key. It must be 32 random bytes, base64-encoded. Generate one with{' '}
+          <code>openssl rand -base64 32</code>.
+        </>
+      );
+    case 'invalid-generation':
+      return (
+        <>
+          <code>{ENCRYPTION_KEY_GENERATION_ENV_NAME}</code> is set, but it is
+          not a whole number of 1 or more.
+        </>
+      );
+    default:
+      return (
+        <>
+          <code>{ENCRYPTION_KEY_ENV_NAME}</code> is not set. Set it to 32 random
+          bytes, base64-encoded. Generate one with{' '}
+          <code>openssl rand -base64 32</code>.
+        </>
+      );
+  }
+};
+
 /**
- * The "Connected workspaces" heading together with the "connect a workspace"
- * entry point: a button that opens the pairing form in a modal. The button is disabled -- and the reason shown beside it,
- * on the page itself -- while the encryption key is unconfigured, so an
- * administrator never opens a form that cannot be submitted.
+ * Shown at the top of the screen while the encryption key this feature needs
+ * is missing or malformed. The key protects the private keys GROWI signs
+ * with, so without it a new connection cannot be added and a stored private
+ * key cannot be decrypted either. Nothing is shown until the status has
+ * loaded, so a configured screen never flashes the warning.
+ */
+const EncryptionKeyWarning = ({
+  status,
+}: {
+  status: EncryptionStatus | undefined;
+}): JSX.Element | null => {
+  if (status == null || status.configured) {
+    return null;
+  }
+
+  return (
+    <div
+      className="alert alert-danger mb-4"
+      role="alert"
+      data-testid="grw-chat-integration-encryption-warning"
+    >
+      <h3 className="alert-heading h5">Chat integration is not available</h3>
+      <p className="mb-2">
+        GROWI encrypts the private keys it signs chat integration requests with.
+        Until the encryption key is configured, no connection can be added, and
+        the private keys of connections added earlier cannot be used either.
+      </p>
+      <p className="mb-2">{describeEncryptionProblem(status.reason)}</p>
+      <p className="mb-0">Restart GROWI after changing the environment.</p>
+    </div>
+  );
+};
+
+/**
+ * The "Connections" heading together with the "Add connection" entry point:
+ * a button that opens the pairing form in a modal. The button is disabled
+ * while the encryption key is unconfigured; the reason is shown by
+ * `EncryptionKeyWarning` at the top of the screen.
  */
 const PairingSection = ({
   encryptionConfigured,
@@ -861,26 +929,19 @@ const PairingSection = ({
   return (
     <div className="mb-3" data-testid="grw-chat-integration-pairing-section">
       <div className="d-flex justify-content-between align-items-center">
-        <h2 className="admin-setting-header mb-0">Connected workspaces</h2>
+        <h2 className="admin-setting-header mb-0">Connections</h2>
         <button
           type="button"
           className="btn btn-primary"
           onClick={handleOpen}
           disabled={!encryptionConfigured}
         >
-          Connect a workspace
+          Add connection
         </button>
       </div>
 
-      {!encryptionConfigured && (
-        <div className="alert alert-warning mt-3 mb-0" role="alert">
-          The chat-integration encryption key is not configured. Pairing is
-          disabled until an administrator sets it.
-        </div>
-      )}
-
       <Modal isOpen={isOpen} toggle={handleClose}>
-        <ModalHeader toggle={handleClose}>Connect a workspace</ModalHeader>
+        <ModalHeader toggle={handleClose}>Add connection</ModalHeader>
         <PairingForm
           encryptionConfigured={encryptionConfigured}
           onPaired={handlePaired}
@@ -917,6 +978,7 @@ export const AdminChatIntegration = (): JSX.Element => {
 
   return (
     <div data-testid="grw-chat-integration-admin">
+      <EncryptionKeyWarning status={encryptionStatus} />
       <PairingSection
         encryptionConfigured={encryptionStatus?.configured ?? false}
         onPaired={handleRelationsChanged}
@@ -925,7 +987,7 @@ export const AdminChatIntegration = (): JSX.Element => {
       <div>
         {isLoading && <p>Loading…</p>}
         {!isLoading && (relations == null || relations.length === 0) && (
-          <p>No workspace has been paired yet.</p>
+          <p>No connection has been added yet.</p>
         )}
         {relations?.map((relation) => (
           <RelationRow

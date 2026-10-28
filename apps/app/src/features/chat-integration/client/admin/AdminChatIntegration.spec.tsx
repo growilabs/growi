@@ -6,7 +6,7 @@
 //     hardcoded per-platform switch exists
 //   - live connection status shows for an active relation
 //   - the encryption-key-unconfigured state disables pairing and shows why
-//   - the pairing form lives in a modal opened from a "Connect a workspace"
+//   - the pairing form lives in a modal opened from an "Add connection"
 //     button; submitting it calls the pairing endpoint with the entered
 //     fields, and a successful pairing closes the modal
 //   - an active relation offers a disconnect (Requirement 9.7) that asks for
@@ -155,10 +155,12 @@ const DESTINATIONS: DestinationsView = {
 // an implementation spy on internal function names.
 const stubApi = ({
   encryptionConfigured = true,
+  encryptionReason = 'unset',
   relations = [ACTIVE_RELATION],
   destinations = DESTINATIONS,
 }: {
   encryptionConfigured?: boolean;
+  encryptionReason?: 'unset' | 'invalid-key' | 'invalid-generation';
   relations?: AdminRelationListItem[];
   destinations?: DestinationsView;
 } = {}) => {
@@ -167,7 +169,7 @@ const stubApi = ({
       return Promise.resolve({
         data: encryptionConfigured
           ? { configured: true }
-          : { configured: false, reason: 'unset' },
+          : { configured: false, reason: encryptionReason },
       });
     }
     if (url === '/chat-integration/admin/relations') {
@@ -551,7 +553,7 @@ describe('AdminChatIntegration', () => {
     });
   });
 
-  describe('disconnecting a workspace (Requirement 9.7)', () => {
+  describe('disconnecting a connection (Requirement 9.7)', () => {
     it('asks for confirmation first, and posts nothing until it is given', async () => {
       // Disconnecting deletes this relation's keys, channel permissions and
       // notification destinations, so a single stray click must not do it.
@@ -637,7 +639,7 @@ describe('AdminChatIntegration', () => {
     user: ReturnType<typeof userEvent.setup>,
   ): Promise<void> => {
     const openButton = await screen.findByRole('button', {
-      name: /connect a workspace/i,
+      name: /add connection/i,
     });
     await waitFor(() => {
       expect(openButton).toBeEnabled();
@@ -682,20 +684,108 @@ describe('AdminChatIntegration', () => {
     expect(screen.getByLabelText(/registration code/i)).toBeInTheDocument();
   });
 
-  it('shows the encryption-key-unconfigured warning and disables the connect button', async () => {
-    stubApi({ encryptionConfigured: false, relations: [] });
+  describe('when the encryption key is not usable', () => {
+    it('shows a prominent warning at the top and disables the add-connection button', async () => {
+      stubApi({ encryptionConfigured: false, relations: [] });
+
+      renderScreen();
+
+      const warning = await screen.findByRole('alert');
+      expect(warning).toHaveTextContent(/chat integration is not available/i);
+      expect(
+        screen.getByRole('button', { name: /add connection/i }),
+      ).toBeDisabled();
+      expect(
+        screen.queryByLabelText(/registration code/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('places the warning above the connections heading', async () => {
+      stubApi({ encryptionConfigured: false, relations: [] });
+
+      renderScreen();
+
+      const warning = await screen.findByTestId(
+        'grw-chat-integration-encryption-warning',
+      );
+      const heading = screen.getByRole('heading', { name: 'Connections' });
+      expect(
+        warning.compareDocumentPosition(heading) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('names the key variable and how to generate one when it is unset', async () => {
+      stubApi({
+        encryptionConfigured: false,
+        encryptionReason: 'unset',
+        relations: [],
+      });
+
+      renderScreen();
+
+      const warning = await screen.findByRole('alert');
+      expect(warning).toHaveTextContent(
+        /CHAT_INTEGRATION_KEY_ENCRYPTION_KEY is not set/,
+      );
+      expect(warning).toHaveTextContent(/openssl rand -base64 32/);
+    });
+
+    it('tells a malformed key apart from an unset one', async () => {
+      stubApi({
+        encryptionConfigured: false,
+        encryptionReason: 'invalid-key',
+        relations: [],
+      });
+
+      renderScreen();
+
+      const warning = await screen.findByRole('alert');
+      expect(warning).toHaveTextContent(/is set, but it is not a valid key/);
+      expect(warning).not.toHaveTextContent(/is not set/);
+    });
+
+    it('names the generation variable when only the generation is invalid', async () => {
+      stubApi({
+        encryptionConfigured: false,
+        encryptionReason: 'invalid-generation',
+        relations: [],
+      });
+
+      renderScreen();
+
+      const warning = await screen.findByRole('alert');
+      expect(warning).toHaveTextContent(
+        /CHAT_INTEGRATION_KEY_ENCRYPTION_KEY_GENERATION/,
+      );
+    });
+
+    it('keeps listing the connections that already exist', async () => {
+      stubApi({ encryptionConfigured: false, relations: [ACTIVE_RELATION] });
+
+      renderScreen();
+
+      expect(await screen.findByText('Active Workspace')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /disconnect/i }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('shows no warning while the encryption key is usable', async () => {
+    stubApi({ encryptionConfigured: true, relations: [] });
 
     renderScreen();
 
     expect(
-      await screen.findByText(/encryption key is not configured/i),
+      await screen.findByText(/no connection has been added yet/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /connect a workspace/i }),
-    ).toBeDisabled();
-    expect(
-      screen.queryByLabelText(/registration code/i),
-    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /add connection/i }),
+      ).toBeEnabled();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('submits the pairing form with the entered fields and closes the modal when paired', async () => {
