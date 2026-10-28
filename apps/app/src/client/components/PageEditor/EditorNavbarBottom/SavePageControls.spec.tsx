@@ -18,7 +18,10 @@ import type { SaveOptions } from '../PageEditor';
 const mocks = vi.hoisted(() => ({ apiv3Get: vi.fn() }));
 
 vi.mock('next-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) =>
+      options == null ? key : `${key} ${JSON.stringify(options)}`,
+  }),
 }));
 vi.mock('~/client/util/apiv3-client', () => ({ apiv3Get: mocks.apiv3Get }));
 vi.mock('~/states/page', () => ({
@@ -109,10 +112,12 @@ describe('SavePageControls', () => {
 
     renderControls();
 
-    await user.selectOptions(
-      await screen.findByRole('listbox'),
-      screen.getByRole('option', { name: /general/ }),
+    await user.click(
+      await screen.findByRole('button', {
+        name: /chat_integration.destination_select.aria_label/,
+      }),
     );
+    await user.click(screen.getByRole('checkbox', { name: /general/ }));
     await user.click(screen.getByTestId('save-page-btn'));
 
     await waitFor(() => {
@@ -128,7 +133,9 @@ describe('SavePageControls', () => {
 
     renderControls();
 
-    await screen.findByRole('listbox');
+    await screen.findByRole('button', {
+      name: /chat_integration.destination_select.aria_label/,
+    });
     await user.click(screen.getByTestId('save-page-btn'));
 
     await waitFor(() => {

@@ -58,14 +58,14 @@
   - _Requirements: 7.9_
   - _Depends: 2.3_
 
-- [ ] 3. 保存時の通知先の選択部品を、高さが変わらない形にする
-- [ ] 3.1 選択部品の文言を 5 言語で用意する
+- [x] 3. 保存時の通知先の選択部品を、高さが変わらない形にする
+- [x] 3.1 選択部品の文言を 5 言語で用意する
   - `translation.json` に `chat_integration.destination_select.*` を足す: ボタンのラベル（0 件のとき・`{{count}}` 件のとき）、`(private)`、一部の workspace を取得できなかったことの印の説明と、メニュー内の警告、ボタンの `aria-label`
   - 5 言語すべてに訳を入れる。基準値は変えない
   - 観察できる完了条件: `pnpm run lint:i18n` が、基準値を変えずに通る
   - _Requirements: 2.13, 2.14_
 
-- [ ] 3.2 ★ 選択部品を、トグルのボタンとチェックボックスのメニューに作り直す
+- [x] 3.2 ★ 選択部品を、トグルのボタンとチェックボックスのメニューに作り直す
   - 既存の `ChatIntegrationDestinationSelect.spec.tsx` を、`listbox`・`selectOptions` から `checkbox` を使う形に書き換える。**保つ契約の 4 つ**（自由入力が無い、出力は `relationId`・`platform`・`channelId` だけ、同じ `channelId` の 2 つの workspace を取り違えない、紐づく workspace が無ければ何も描かない）を先に書いて、新しい実装でも通ることを確かめる
   - ボタンに選択件数を出す。メニューは workspace ごとの見出し + チェックボックス。`max-height: 50vh` で中をスクロールする。1 つ選んでもメニューを閉じない。取得できなかった workspace があればボタンに警告の印、メニューに詳細を出す
   - `openInModal?: boolean` を足し、メニューの向きを `GrantSelector` と同じにする（既定は上向き、`openInModal` のときは下向き）
@@ -74,7 +74,7 @@
   - _Requirements: 2.12, 2.13, 2.14_
   - _Depends: 3.1_
 
-- [ ] 3.3 ★ 保存の操作欄から、選択部品へ向きを渡す
+- [x] 3.3 ★ 保存の操作欄から、選択部品へ向きを渡す
   - `SavePageControls.tsx` の 2 か所の使用箇所のうち、モーダルの中の方へ `openInModal` を渡す
   - `SavePageControls.spec.tsx` の既存の 2 件を、`checkbox` を使う形に書き換える
   - 観察できる完了条件: 選んだチャンネルが `chatIntegrationDestinations` として保存に載ること、何も選ばなければ空であることが spec で示される。Gen 1 の項目（`slackChannels`・`isSlackEnabled`）が変わらない
