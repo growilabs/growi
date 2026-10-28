@@ -14,6 +14,10 @@ import { prisma } from '~/utils/prisma';
 
 import type { ChangeProposalDocument, OperationRecord } from '../../interfaces';
 import type { CreateOperationInput } from '../models/change-proposal-types';
+import {
+  type WriteOriginalMark,
+  writeOriginalMarkToDb,
+} from './mark-original-operation';
 import { createOperationHandlers } from './operation-handlers';
 import { createApplierTestKit } from './proposal-applier.test-kit';
 
@@ -408,6 +412,97 @@ describe('ProposalApplier.apply writing revert results onto the original operati
     expect(await originalOperation(applied)).toMatchObject({
       status: 'revert-refused',
       reason: 'page-operation-in-progress',
+    });
+  });
+
+  describe('when writing onto the original operation throws', () => {
+    const noWait = (): Promise<void> => Promise.resolve();
+
+    // Throws on the first `failures` calls, then writes for real.
+    const failMarkTimes = (failures: number) => {
+      let left = failures;
+      return vi.fn<WriteOriginalMark>((...args) => {
+        if (left > 0) {
+          left -= 1;
+          return Promise.reject(new Error('transient'));
+        }
+        return writeOriginalMarkToDb(...args);
+      });
+    };
+
+    it('writes the revert result onto the original when the first two attempts throw', async () => {
+      const applied = await applyOriginalEdit('mark-retried');
+      const revert = await revertOf(
+        applied,
+        editInput(applied.page, 'base body'),
+      );
+      const markSpy = failMarkTimes(2);
+
+      await newApplier({
+        markRetryWait: noWait,
+        writeOriginalMark: markSpy,
+      }).apply(revert._id, {
+        kind: 'background',
+      });
+
+      expect(markSpy).toHaveBeenCalledTimes(3);
+      expect(await originalOperation(applied)).toMatchObject({
+        status: 'reverted',
+        revertedByProposalId: revert._id,
+      });
+    });
+
+    it('gives up after two retries, keeps the revert outcome and goes on with the next operation', async () => {
+      const first = await applyOriginalEdit('mark-fails-first');
+      const second = await applyOriginalEdit('mark-fails-second');
+      const revert = await storeProposal(
+        [first, second].map((applied) => ({
+          ...editInput(applied.page, 'base body'),
+          revertTarget: {
+            proposalId: applied.original._id,
+            operationKey: applied.originalKey,
+          },
+        })),
+        { entry: 'revert', revertOf: first.original._id },
+      );
+      const markSpy = failMarkTimes(3);
+
+      const result = await newApplier({
+        markRetryWait: noWait,
+        writeOriginalMark: markSpy,
+      }).apply(revert._id, { kind: 'background' });
+
+      expect(result).toEqual({
+        type: 'done',
+        results: revert.operations.map((op) => ({
+          key: op.key,
+          status: 'applied',
+        })),
+      });
+      expect(markSpy).toHaveBeenCalledTimes(4);
+      expect((await originalOperation(first)).status).toBe('applied');
+      expect(await originalOperation(second)).toMatchObject({
+        status: 'reverted',
+        revertedByProposalId: revert._id,
+      });
+    });
+
+    it('does not retry when the original operation is no longer revertible', async () => {
+      const applied = await applyOriginalEdit('mark-not-revertible');
+      const revert = await revertOf(
+        applied,
+        editInput(applied.page, 'base body'),
+      );
+      const markSpy = vi.fn<WriteOriginalMark>().mockResolvedValue(false);
+
+      await newApplier({
+        markRetryWait: noWait,
+        writeOriginalMark: markSpy,
+      }).apply(revert._id, {
+        kind: 'background',
+      });
+
+      expect(markSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

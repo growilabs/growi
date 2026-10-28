@@ -248,6 +248,18 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Selected Approach**: `changeProposal:maxOperationsPerProposal` の初期値を 50、`changeProposal:maxProposalsPerUserPerDay` の初期値を `null`（上限なし）にする。どちらも管理者が変えられる。
 - **Trade-offs**: ai-agent の書き込みの道具は 1 回の呼び出しで 20 個（`MAX_OPERATIONS_PER_CALL`）までしか受けないので、初期値のままでは操作数の上限で断られることは無い。管理者が 20 より小さくしたときは、core が `input-rejected`（`too-many-operations`）を返す。
 
+### Decision: 承認待ちの期限の初期値は 30 日にする
+- **Context**: 要件 2.5。design の OQ-1 の期限の部分。初期値を `null`（期限なし）にしていたので、初期の状態では承認待ちの Change Proposal がいつまでも残り、要件 2.5 の期限切れが動かなかった。
+- **Selected Approach**: `changeProposal:pendingExpirationSeconds` の初期値を 30 日（`2592000` 秒）にする（人が決めた）。値の決め方は今までどおり「DB の値があればそれ、無ければ環境変数か初期値」で、読む側の `toLimit` が 0 以下と数字以外を `null`（期限なし）と読む。この設定は画面に出していないので、期限をなくすには環境変数に `0` を入れる。期限は作成のときに `expiresAt` として保存し、保守用の cron はその `expiresAt` だけを見るので、cron の候補の決め方は変えない。
+- **Trade-offs**: 初期値を変える前に作られた Change Proposal には `expiresAt` が無く、期限切れにならない（作り直すか、人が破棄する）。期限の長さを変えても、すでに作られた Change Proposal の期限は変わらない。破棄・期限切れの案の本文をいつ消すかは、まだ決めていない。
+
+### Decision: 取り消しの結果を元の操作に書く処理は、例外のときだけその場で 2 回までやり直す
+- **Context**: 要件 5.9・13.5。取り消しの操作の結果を記録したあと、元の操作に書く `markOriginalOperation` が DB の一時的な障害で例外になると、元の操作は「反映済み」のまま残り、取り消しの Change Proposal は完了になるので、直す処理が無かった。
+- **Alternatives Considered**: 1. 保守用の cron で、元の操作と取り消しの操作の結果を突き合わせて書き直す。2. その場で短い間を置いてやり直す。
+- **Selected Approach**: 2（人が決めた）。150 ミリ秒の間を置いて 2 回までやり直し、それでも例外ならログに残して進む。`false`（元の操作がもう取り消せる状態でない）は正しい結果なのでやり直さない。取り消しの前に断ると決めた操作の記録（`revert` の受付の中）も、同じやり直しを使い、書けなくても受付全体を失敗にしない。
+- **Rationale**: 一時的な障害はたいていすぐ直るので、その場のやり直しで足りる。cron で書き直すには、取り消しの操作と元の操作を突き合わせる新しい問い合わせと、その処理の結合テストが要り、得られるものに比べて大きい。
+- **Trade-offs**: 3 回とも失敗したときは、元の操作が「反映済み」のまま残る。もう一度取り消しを求めると判定し直されるが、取り消しで変わったページに対しては、たいてい「取り消しを断られた」になる。
+
 ## Risks & Mitigations
 - 人の保存の route に手が入る — 既存の `update-page.integ.ts` / `create-page.integ.ts` とページの結合テストを変更なしで通すことを、切り出しのタスクの完了条件にする。
 - 複数台のサーバーで、別のプロセスにつながっている編集者を見落とす — 分かっている制約として design に書き、umbrella の未決の論点に残す。

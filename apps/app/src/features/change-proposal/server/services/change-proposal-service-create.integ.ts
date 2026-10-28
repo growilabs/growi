@@ -525,24 +525,42 @@ describe('ChangeProposalService.createProposal: checks before saving', () => {
       expect(keys.every((k) => /^[0-9a-f-]{36}$/.test(k))).toBe(true);
     });
 
-    it('stores an expiry only while the pending expiration is configured', async () => {
-      const without = await create();
-      await configManager.updateConfigs({
-        'changeProposal:pendingExpirationSeconds': 3600,
-      });
-      const withExpiry = await fixedClockService.createProposal({
-        requester: users.requester,
-        entry: 'ai-chat',
-        operations: [{ type: 'create', path: kit.nextPath('exp'), body: 'x' }],
+    describe('the expiry it stores', () => {
+      const createAtFixedClock = async (): Promise<Date | undefined> => {
+        const created = await fixedClockService.createProposal({
+          requester: users.requester,
+          entry: 'ai-chat',
+          operations: [
+            { type: 'create', path: kit.nextPath('exp'), body: 'x' },
+          ],
+        });
+        if (!created.ok) throw new Error('not created');
+        return (await kit.reload(created.value.proposalId)).expiresAt;
+      };
+
+      it('is 30 days after creation when the expiration is not configured', async () => {
+        await expect(createAtFixedClock()).resolves.toEqual(
+          new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        );
       });
 
-      if (!without.ok || !withExpiry.ok) throw new Error('not created');
-      expect(
-        (await kit.reload(without.value.proposalId)).expiresAt,
-      ).toBeUndefined();
-      expect((await kit.reload(withExpiry.value.proposalId)).expiresAt).toEqual(
-        new Date(now.getTime() + 3600 * 1000),
-      );
+      it('follows the configured expiration', async () => {
+        await configManager.updateConfigs({
+          'changeProposal:pendingExpirationSeconds': 3600,
+        });
+
+        await expect(createAtFixedClock()).resolves.toEqual(
+          new Date(now.getTime() + 3600 * 1000),
+        );
+      });
+
+      it('is absent once the expiration is cleared to 0', async () => {
+        await configManager.updateConfigs({
+          'changeProposal:pendingExpirationSeconds': 0,
+        });
+
+        await expect(createAtFixedClock()).resolves.toBeUndefined();
+      });
     });
 
     it('stores the per-page notification switch as given, and true when omitted', async () => {

@@ -32,6 +32,12 @@ import {
   loadViewablePages,
   type ViewablePages,
 } from './current-page-facts';
+import {
+  markOriginalOperationWithRetry,
+  type WriteOriginalMark,
+  waitBeforeMarkRetry,
+  writeOriginalMarkToDb,
+} from './mark-original-operation';
 import { pageModel } from './operation-handlers/page-model';
 import type { PageDeletePermissionService } from './page-delete-permission';
 import { isRequesterAllowed } from './pre-write-checks';
@@ -212,10 +218,36 @@ export const createRevertAction = (deps: {
   readonly applier: ProposalApplier;
   readonly now: () => Date;
   readonly pageService: PageDeletePermissionService;
+  readonly markRetryWait?: () => Promise<void>;
+  readonly writeOriginalMark?: WriteOriginalMark;
 }): RevertAction => {
   const { applier, now, pageService } = deps;
+  const originalMark = {
+    write: deps.writeOriginalMark ?? writeOriginalMarkToDb,
+    wait: deps.markRetryWait ?? waitBeforeMarkRetry,
+  };
 
   // A refusal decided before any write is recorded on the original right away.
+  // The answer already carries it, so a write that keeps failing is only logged.
+  const recordRefusal = async (
+    proposalId: string,
+    operationKey: string,
+    reason: RevertRefusalReason,
+  ): Promise<void> => {
+    try {
+      await markOriginalOperationWithRetry(
+        { proposalId, operationKey },
+        { status: 'revert-refused', reason },
+        originalMark,
+      );
+    } catch (err) {
+      logger.error(
+        { err, proposalId, operationKey },
+        'Failed to record a revert refusal on the original operation after retrying',
+      );
+    }
+  };
+
   const recordRefusals = async (
     proposalId: string,
     judged: readonly Judged[],
@@ -224,12 +256,7 @@ export const createRevertAction = (deps: {
       judged.flatMap(({ op, refusal }) =>
         refusal == null || !REVERT_CANDIDATE_STATUSES.has(op.status)
           ? []
-          : [
-              prisma.changeproposals.markOriginalOperation(proposalId, op.key, {
-                status: 'revert-refused',
-                reason: refusal,
-              }),
-            ],
+          : [recordRefusal(proposalId, op.key, refusal)],
       ),
     );
   };

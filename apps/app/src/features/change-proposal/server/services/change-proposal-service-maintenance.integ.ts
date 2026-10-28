@@ -187,6 +187,35 @@ describe('ChangeProposalService maintenance: expiry, withdrawal, resume and sett
       expect(stored.map((p) => p.lifecycle)).toEqual(Array(5).fill('expired'));
     });
 
+    it('expires a proposal created under the default expiry once 30 days have passed', async () => {
+      const createdAt = new Date('2026-01-01T00:00:00.000Z');
+      const thirtyDaysLater = new Date(
+        createdAt.getTime() + 30 * 24 * AN_HOUR_MS,
+      );
+      const fixedClock = createChangeProposalService(crowi, {
+        applier,
+        now: () => createdAt,
+      });
+      const created = await fixedClock.createProposal({
+        requester: users.requester,
+        entry: 'ai-chat',
+        operations: [
+          { type: 'create', path: kit.nextPath('expire-default'), body: 'x' },
+        ],
+      });
+      if (!created.ok) throw new Error('not created');
+
+      await service.expireDueProposals(new Date(thirtyDaysLater.getTime() - 1));
+      expect((await kit.reload(created.value.proposalId)).lifecycle).toBe(
+        'open',
+      );
+
+      await service.expireDueProposals(thirtyDaysLater);
+      expect((await kit.reload(created.value.proposalId)).lifecycle).toBe(
+        'expired',
+      );
+    });
+
     it(
       'closes each proposal once when two servers expire at the same time',
       async () => {

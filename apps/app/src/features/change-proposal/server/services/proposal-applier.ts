@@ -20,6 +20,12 @@ import { planApplyOrder, shouldSendPerPageNotifications } from '../domain';
 import type { RecordedOutcome } from '../models/change-proposal-types';
 import type { EditingPresenceSource } from './editing-presence';
 import {
+  markOriginalOperationWithRetry,
+  type WriteOriginalMark,
+  waitBeforeMarkRetry,
+  writeOriginalMarkToDb,
+} from './mark-original-operation';
+import {
   createOperationHandlers,
   type OperationContext,
   type OperationHandler,
@@ -65,6 +71,8 @@ export type ProposalApplierDeps = {
   // Resolved at check time by default: the YjsService is initialized after the services.
   readonly presenceSource?: EditingPresenceSource;
   readonly pageOperationWait?: PageOperationWait;
+  readonly markRetryWait?: () => Promise<void>;
+  readonly writeOriginalMark?: WriteOriginalMark;
 };
 
 type OperationResult = Extract<
@@ -201,6 +209,10 @@ export const createProposalApplier = (
   const now = deps.now ?? (() => new Date());
   const pageOperationWait =
     deps.pageOperationWait ?? DEFAULT_PAGE_OPERATION_WAIT;
+  const originalMark = {
+    write: deps.writeOriginalMark ?? writeOriginalMarkToDb,
+    wait: deps.markRetryWait ?? waitBeforeMarkRetry,
+  };
 
   // Design order: settings (not for reverts), requester, editing presence, overlap.
   const checkBeforeWrite = async (
@@ -266,10 +278,10 @@ export const createProposalApplier = (
       revertTarget: op.revertTarget,
     };
     try {
-      const marked = await prisma.changeproposals.markOriginalOperation(
-        op.revertTarget.proposalId,
-        op.revertTarget.operationKey,
+      const marked = await markOriginalOperationWithRetry(
+        op.revertTarget,
         change,
+        originalMark,
       );
       if (!marked) {
         logger.warn(
@@ -281,7 +293,7 @@ export const createProposalApplier = (
       // The revert outcome is already recorded; a failed mark must not stop the run.
       logger.error(
         { ...logContext, err },
-        'Failed to write the revert result onto the original operation',
+        'Failed to write the revert result onto the original operation after retrying',
       );
     }
   };

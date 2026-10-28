@@ -708,7 +708,7 @@ type ChangeProposalSettings = {
   readonly autoApplyPolicy: AutoApplyPolicy;
   readonly maxOperationsPerProposal: number | null;   // default 50; null: not checked (only when an admin clears it)
   readonly maxProposalsPerUserPerDay: number | null;  // default null: no limit; checked only when an admin sets a number
-  readonly pendingExpirationSeconds: number | null;   // null: never expires until OQ-1 is decided
+  readonly pendingExpirationSeconds: number | null;   // null: never expires (default 30 days; 0 or less reads as null)
   readonly perPageNotificationsEnabled: boolean;      // default false: apply sends no per-page notifications
 };
 function readChangeProposalSettings(): ChangeProposalSettings;
@@ -1395,13 +1395,13 @@ model changeproposals {
 | `changeProposal:autoApplyPolicy` | `AutoApplyPolicy` | `'none'` | `CHANGE_PROPOSAL_AUTO_APPLY_POLICY` | あり |
 | `changeProposal:maxOperationsPerProposal` | number | `50` | `CHANGE_PROPOSAL_MAX_OPERATIONS_PER_PROPOSAL` | あり |
 | `changeProposal:maxProposalsPerUserPerDay` | number | `null`（上限なし） | `CHANGE_PROPOSAL_MAX_PROPOSALS_PER_USER_PER_DAY` | あり |
-| `changeProposal:pendingExpirationSeconds` | number | 未決（OQ-1） | `CHANGE_PROPOSAL_PENDING_EXPIRATION_SECONDS` | なし |
+| `changeProposal:pendingExpirationSeconds` | number | `2592000`（30 日） | `CHANGE_PROPOSAL_PENDING_EXPIRATION_SECONDS` | なし |
 | `changeProposal:maintenanceCronSchedule` | string | `'*/10 * * * *'` | `CHANGE_PROPOSAL_MAINTENANCE_CRON_SCHEDULE` | なし |
 | `changeProposal:perPageNotificationsEnabled` | boolean | `false` | `CHANGE_PROPOSAL_PER_PAGE_NOTIFICATIONS_ENABLED` | あり |
 | `env:useOnlyEnvVars:changeProposal` | boolean | `false` | `CHANGE_PROPOSAL_USES_ONLY_ENV_VARS` | なし（`ENV_ONLY_GROUPS` の切り替え。真のとき画面で変える 8 つのキーを環境変数で固定する） |
 
 - 操作数の上限の初期値は 50 である。管理者は数を変えられ、空にすると確かめない。1 日の件数の上限の初期値は `null`（値が無い）で、これは「上限なし」を意図した初期値である。管理者が数を入れたときだけ確かめる（要件 8.10）。
-- 承認待ちの期限は、初期値が未決（OQ-1）なので、決まるまで初期値を `null` として宣言する。値が無い間は期限切れにしない。決まった値を入れるまでを実装の完了の条件に含める（tasks.md の 8.1）。
+- 承認待ちの期限の初期値は 30 日（`2592000` 秒）である（OQ-1 で決定）。作成のときに `createdAt` にこの秒数を足して `expiresAt` に入れ、保守用の cron はこの `expiresAt` を見て期限切れにする。値が 0 以下・数字以外のときは `null`（期限なし）と読み、期限切れにしない。この設定は画面に出していないので、期限をなくすには環境変数に `0` を入れる。
 - ページごとの通知の初期値は `false` である。初期の状態では、反映でページごとの通知を出さない（要件 8.9）。
 - 操作ごとの有効化の初期値は有効にする。全体の書き込み機能が初期値で無効なので、管理者が有効にしたときに 3 つとも使える状態から始まる。
 
@@ -1499,6 +1499,7 @@ type ChangeProposalNotificationSnapshot = {
 - サービスは例外ではなく `ServiceResult` の判別共用体で失敗を返す。route はそれを HTTP の状態と `ErrorV3` の code に写す。
 - 操作ごとの失敗は Change Proposal の中の操作の状態と理由で表し、Change Proposal 全体の失敗にしない（要件 3.13）。
 - 予期しない例外（DB の障害など）は、その操作を `failed: write-error` にして記録し、次の操作へ進む。lease の延長に失敗したときは、その実行を止める（再開は cron が行う）。 反映の実行そのものが途中で例外になった場合も、その回で反映済みになった操作が 1 件以上あれば、lease を手放したあとで ProposalActivity と ProposalNotifier を 1 回だけ呼び（要件 7.5・7.2・7.8）、元の例外をそのまま呼び出し側へ投げ直す（呼び出し側は `in-progress` として扱い、残りは保守用の cron が再開する）。記録と通知の呼び出し自体が失敗しても、ログに残すだけで元の例外を隠さない。
+- 取り消しの結果を元の操作に書く `markOriginalOperation` が例外になったときは、短い間（既定 150 ミリ秒）を置いて 2 回までやり直す（最初の 1 回と合わせて最大 3 回）。やり直すのは例外のときだけで、`false`（元の操作がもう取り消せる状態でない）はやり直さず、今までどおり警告のログに残す。3 回とも例外なら、ログに残して次の操作へ進み、その実行は止めない。この書き込みは、反映の後（ProposalApplier）と、取り消しの前に断ると決めた操作の記録（`revert` の受付）の 2 か所にあり、どちらも同じやり直しを使う。断った記録が書けなくても、応答には断った理由を返し、ほかの取り消せる操作の取り消しは続ける。保守用の cron で後から書き直す処理は作らない。やり直しても書けなかった元の操作は「反映済み」のまま残り、もう一度取り消しを求めれば判定し直される。待つ間（`markRetryWait`）と書き込みそのもの（`writeOriginalMark`）は ProposalApplier と ChangeProposalService の依存で差し替えられ、テストでは待たずに失敗する書き込みを渡す。
 
 ### Error Categories and Responses
 - **入力の誤り（400）**: `input-rejected`（理由の code を返す）、`daily-limit-reached`、`base-revision-mismatch`。
@@ -1578,11 +1579,11 @@ type ChangeProposalNotificationSnapshot = {
 
 ## Open Questions / Risks
 
-umbrella の roadmap の「未決の論点」のうち、上限の初期値（OQ-2）は決まった。ほかは brief でも決まっていないので未決のまま残す。ページごとの通知の扱い（OQ-5）は本 spec の設計で出た論点で、これも決まった（umbrella の research.md の決定 8）。
+umbrella の roadmap の「未決の論点」のうち、上限の初期値（OQ-2）と承認待ちの期限の初期値（OQ-1 の期限の部分）は決まった。ほかは brief でも決まっていないので未決のまま残す。ページごとの通知の扱い（OQ-5）は本 spec の設計で出た論点で、これも決まった（umbrella の research.md の決定 8）。
 
 | ID | 論点 | 本 design での扱い |
 |---|---|---|
-| OQ-1 | 承認待ちの Change Proposal の期限（何日で期限切れにするか）と、破棄・期限切れの案の本文をいつ消すか | 期限は設定キー `changeProposal:pendingExpirationSeconds` で持つが、初期値は未決。本文を消す処理は作らず、決まるまでは残す |
+| OQ-1 | 承認待ちの Change Proposal の期限（何日で期限切れにするか）と、破棄・期限切れの案の本文をいつ消すか | 期限は決定。初期値は 30 日で、環境変数で変えられ、`0` で期限をなくせる（research.md の決定「承認待ちの期限の初期値」）。本文をいつ消すかは未決で、本文を消す処理は作らず、決まるまでは残す |
 | OQ-2 | 1 回の実行で扱うページ数と操作数の上限の初期値 | 決定。1 件あたりの操作数の上限は 50、依頼した人ごとの 1 日の件数の上限は「上限なし」（`null`）を初期値にし、どちらも管理者が変えられる（要件 8.10） |
 | OQ-3 | 自動反映の「自分が作ったページだけ」の「作った」の定義（作成者か、最後の更新者か） | 判定を `isOwnPageForAutoApply` 1 つにまとめる。決まるまでは作成者で判定する仮の実装にする |
 | OQ-4 | AI が新しく作るページを WIP にするかどうか | 作成の操作は WIP の指定を持たない。決まったら、作成の操作に指定を足す |

@@ -1664,7 +1664,7 @@ export const CONFIG_DEFINITIONS = {
   }),
   'changeProposal:pendingExpirationSeconds': defineConfig<number | null>({
     envVarName: 'CHANGE_PROPOSAL_PENDING_EXPIRATION_SECONDS',
-    defaultValue: null,
+    defaultValue: 30 * 24 * 60 * 60,
   }),
   'changeProposal:maintenanceCronSchedule': defineConfig<string>({
     envVarName: 'CHANGE_PROPOSAL_MAINTENANCE_CRON_SCHEDULE',

@@ -28,6 +28,7 @@ import {
   createMaintenanceActions,
   type MaintenanceActions,
 } from './maintenance-actions';
+import type { WriteOriginalMark } from './mark-original-operation';
 import {
   type NormalizedCreateInput,
   normalizeCreateInput,
@@ -70,6 +71,8 @@ export type ChangeProposalServiceDeps = {
   readonly now?: () => Date;
   readonly maintenanceBatchSize?: number;
   readonly appliedListScan?: AppliedListScan;
+  readonly markRetryWait?: () => Promise<void>;
+  readonly writeOriginalMark?: WriteOriginalMark;
 };
 
 const fail = (error: ServiceError): { ok: false; error: ServiceError } => ({
@@ -240,7 +243,13 @@ export const createChangeProposalService = (
 
   return {
     ...createRequesterActions({ applier, now }),
-    ...createRevertAction({ applier, now, pageService: crowi.pageService }),
+    ...createRevertAction({
+      applier,
+      now,
+      pageService: crowi.pageService,
+      markRetryWait: deps.markRetryWait,
+      writeOriginalMark: deps.writeOriginalMark,
+    }),
     ...createProposalQuery({
       appliedListScan: deps.appliedListScan,
       pageService: crowi.pageService,

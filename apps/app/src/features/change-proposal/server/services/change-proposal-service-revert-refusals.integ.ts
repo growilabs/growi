@@ -17,6 +17,7 @@ import {
   createChangeProposalService,
 } from './change-proposal-service';
 import type { ServiceResult } from './change-proposal-service-types';
+import type { WriteOriginalMark } from './mark-original-operation';
 import { createApplierTestKit } from './proposal-applier.test-kit';
 
 const TEST_IP = '10.0.0.155';
@@ -353,6 +354,57 @@ describe('ChangeProposalService.revert judging each operation against the curren
       await revertSingle(trashing);
 
       expect((await kit.findPage(createdPageIdOf(original))).path).toBe(path);
+    });
+  });
+
+  describe('when recording a refusal on the original operation keeps throwing', () => {
+    it('still answers the refusal and reverts the other operations', async () => {
+      const edited = await kit.createPage('refusal-mark-fails-edited');
+      const untouched = await kit.createPage('refusal-mark-fails-untouched');
+      const original = await applyOriginal([
+        kit.editInput(edited, '提案の本文 1'),
+        kit.editInput(untouched, '提案の本文 2'),
+      ]);
+      await applyOriginal(
+        [kit.editInput(await kit.findPage(edited._id), '人が直した本文')],
+        users.other,
+      );
+      const [editedKey, untouchedKey] = original.operations.map((op) => op.key);
+      const markSpy = vi
+        .fn<WriteOriginalMark>()
+        .mockRejectedValue(new Error('down'));
+      const failingMark = {
+        markRetryWait: () => Promise.resolve(),
+        writeOriginalMark: markSpy,
+      };
+      const noWaitService = createChangeProposalService(crowi, {
+        applier: kit.newApplier(failingMark),
+        ...failingMark,
+      });
+
+      const result = await noWaitService.revert(
+        original._id,
+        users.requester,
+        'all-visible',
+        BACKGROUND,
+      );
+      await kit.waitForPageOperationsToFinish();
+
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          operations: expect.arrayContaining([
+            {
+              key: editedKey,
+              outcome: 'revert-refused',
+              reason: 'edited-after-apply',
+            },
+            { key: untouchedKey, outcome: 'reverted' },
+          ]),
+        },
+      });
+      // Each of the two writes onto the original is tried three times.
+      expect(markSpy).toHaveBeenCalledTimes(6);
     });
   });
 });

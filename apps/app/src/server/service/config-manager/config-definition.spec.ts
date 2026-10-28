@@ -441,7 +441,7 @@ describe('config-definition change-proposal keys', () => {
     [
       'changeProposal:pendingExpirationSeconds',
       'CHANGE_PROPOSAL_PENDING_EXPIRATION_SECONDS',
-      null,
+      2592000,
     ],
     [
       'changeProposal:maintenanceCronSchedule',
