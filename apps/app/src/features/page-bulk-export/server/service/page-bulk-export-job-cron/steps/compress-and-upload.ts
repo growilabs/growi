@@ -3,14 +3,14 @@ import type { Archiver } from 'archiver';
 import archiver from 'archiver';
 
 import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export';
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
 import { SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
-import type { IAttachmentDocument } from '~/server/models/attachment';
-import { Attachment } from '~/server/models/attachment';
+import type { AttachmentDraft } from '~/server/models/attachment';
 import type { FileUploader } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
 import type { IPageBulkExportJobCronService } from '..';
 
 const logger = loggerFactory(
@@ -33,22 +33,27 @@ function setUpPageArchiver(): Archiver {
 
 async function postProcess(
   this: IPageBulkExportJobCronService,
-  pageBulkExportJob: PageBulkExportJobDocument,
-  attachment: IAttachmentDocument,
+  pageBulkExportJob: pagebulkexportjobs,
+  draft: AttachmentDraft,
   fileSize: number,
 ): Promise<void> {
-  attachment.fileSize = fileSize;
-  await attachment.save();
+  const attachment = await prisma.attachments.create({
+    data: { ...draft, fileSize },
+  });
 
-  pageBulkExportJob.completedAt = new Date();
-  pageBulkExportJob.attachment = attachment._id;
-  pageBulkExportJob.status = PageBulkExportJobStatus.completed;
-  await pageBulkExportJob.save();
+  const updated = await prisma.pagebulkexportjobs.update({
+    where: { id: pageBulkExportJob.id },
+    data: {
+      completedAt: new Date(),
+      attachmentId: attachment.id,
+      status: PageBulkExportJobStatus.completed,
+    },
+  });
 
-  this.removeStreamInExecution(pageBulkExportJob._id);
+  this.removeStreamInExecution(updated.id);
   await this.notifyExportResultAndCleanUp(
     SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED,
-    pageBulkExportJob,
+    updated,
   );
 }
 
@@ -63,14 +68,14 @@ async function postProcess(
 export async function compressAndUpload(
   this: IPageBulkExportJobCronService,
   user,
-  pageBulkExportJob: PageBulkExportJobDocument,
+  pageBulkExportJob: pagebulkexportjobs,
 ): Promise<void> {
   const pageArchiver = setUpPageArchiver();
 
   if (pageBulkExportJob.revisionListHash == null)
     throw new Error('revisionListHash is not set');
   const originalName = `${pageBulkExportJob.revisionListHash}.${this.compressExtension}`;
-  const attachment = Attachment.createWithoutSave(
+  const draft = prisma.attachments.createWithoutSave(
     null,
     user,
     originalName,
@@ -93,13 +98,13 @@ export async function compressAndUpload(
   pageArchiver.directory(this.getTmpOutputDir(pageBulkExportJob), false);
   pageArchiver.finalize();
 
-  this.setStreamsInExecution(pageBulkExportJob._id, pageArchiver, uploadStream);
+  this.setStreamsInExecution(pageBulkExportJob.id, pageArchiver, uploadStream);
 
   try {
-    await fileUploadService.uploadAttachment(uploadStream, attachment);
+    await fileUploadService.uploadAttachment(uploadStream, draft);
     await postProcess.bind(this)(
       pageBulkExportJob,
-      attachment,
+      draft,
       pageArchiver.pointer(),
     );
   } catch (e) {

@@ -22,6 +22,8 @@ const {
     modelId,
   }));
   const anthropicProviderFn = vi.fn((modelId: string) => ({
+    specificationVersion: 'v3',
+    provider: 'anthropic.messages',
     tag: 'anthropic-model',
     modelId,
   }));
@@ -81,7 +83,10 @@ describe('key-based provider resolvers', () => {
       apiKey: 'key-for-anthropic',
     });
     expect(anthropicProviderFn).toHaveBeenCalledWith('claude-test');
-    expect(result).toEqual({ tag: 'anthropic-model', modelId: 'claude-test' });
+    expect(result).toMatchObject({
+      provider: 'anthropic.messages',
+      modelId: 'claude-test',
+    });
   });
 
   it('resolveGoogleModel reads its OWN provider key and constructs Google with it + the model argument', async () => {

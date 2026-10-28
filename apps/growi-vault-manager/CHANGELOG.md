@@ -1,5 +1,33 @@
 # @growi/vault-manager
 
+## 1.1.5
+
+### Patch Changes
+
+- Updated dependencies [[`c0e2f63`](https://github.com/growilabs/growi/commit/c0e2f63b0d5c5993362ee74a8a4b21873900494f)]:
+  - @growi/core@3.1.2
+
+## 1.1.4
+
+### Patch Changes
+
+- Updated dependencies [[`7d3c061`](https://github.com/growilabs/growi/commit/7d3c06199d8267bcf651b167b3bfbcdc6752d02d)]:
+  - @growi/core@3.1.1
+
+## 1.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`e50350f`](https://github.com/growilabs/growi/commit/e50350fc349e14ff6f8984d753676e62bac73920)]:
+  - @growi/core@3.1.0
+
+## 1.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`fd3a693`](https://github.com/growilabs/growi/commit/fd3a69339f65a4062fab8852b02e8a5c7110f751)]:
+  - @growi/core@3.0.1
+
 ## 1.1.1
 
 ### Patch Changes

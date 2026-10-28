@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "8.0.8-RC.0",
+  "version": "8.0.9-RC.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -181,7 +181,7 @@
     "axios": "^1.16.0",
     "axios-retry": "^3.2.4",
     "babel-plugin-superjson-next": "^0.4.2",
-    "body-parser": "^1.20.6",
+    "body-parser": "^1.20.9",
     "bootstrap": "^5.3.8",
     "bson-objectid": "^2.0.4",
     "class-variance-authority": "^0.7.1",
@@ -259,7 +259,7 @@
     "multer-autoreap": "^1.0.3",
     "mustache": "^4.2.0",
     "nanoid": "^5.1.6",
-    "next": "^16.3.3",
+    "next": "^16.3.8",
     "next-dynamic-loading-props": "^0.1.1",
     "next-i18next": "^15.3.1",
     "next-themes": "^0.4.6",
@@ -354,7 +354,7 @@
     "y-mongodb-provider": "^0.2.0",
     "y-websocket": "^2.0.4",
     "yjs": "^13.6.18",
-    "zod": "^4.1.9"
+    "zod": "^4.6.6"
   },
   "// comments for defDependencies": {
     "@handsontable/react": "v3 requires handsontable >= 7.0.0.",

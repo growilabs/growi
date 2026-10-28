@@ -5,12 +5,12 @@ import { mock } from 'vitest-mock-extended';
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 import {
   PageBulkExportFormat,
   PageBulkExportJobStatus,
 } from '../../../interfaces/page-bulk-export';
-import PageBulkExportJob from '../../models/page-bulk-export-job';
 import instanciatePageBulkExportJobCronService, {
   pageBulkExportJobCronService,
 } from './index';
@@ -44,7 +44,7 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
   });
 
   beforeEach(async () => {
-    await PageBulkExportJob.deleteMany();
+    await prisma.pagebulkexportjobs.deleteMany();
   });
 
   test('should set completedAt when a job is completed without it (duplicate-reuse path)', async () => {
@@ -52,13 +52,15 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
     // the initial status is irrelevant because notifyExportResultAndCleanUp overwrites it
     // from the action argument. (Real duplicate-reuse path enters with status=completed,
     // simplified to status=exporting here.)
-    const job = await PageBulkExportJob.create({
-      user: new mongoose.Types.ObjectId(),
-      page: new mongoose.Types.ObjectId(),
-      format: PageBulkExportFormat.md,
-      status: PageBulkExportJobStatus.exporting,
+    const job = await prisma.pagebulkexportjobs.create({
+      data: {
+        userId: new mongoose.Types.ObjectId().toString(),
+        pageId: new mongoose.Types.ObjectId().toString(),
+        format: PageBulkExportFormat.md,
+        status: PageBulkExportJobStatus.exporting,
+      },
     });
-    expect(job.completedAt).toBeUndefined();
+    expect(job.completedAt).toBeNull();
 
     // act
     const before = Date.now();
@@ -71,7 +73,9 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
     // assert: completedAt is a Date stamped during this call (not a sentinel
     // like new Date(0) or a stale value), so the download-expiration query
     // `{ completedAt: { $lt: thresholdDate } }` will correctly include it.
-    const updated = await PageBulkExportJob.findById(job._id);
+    const updated = await prisma.pagebulkexportjobs.findUnique({
+      where: { id: job.id },
+    });
     expect(updated?.status).toBe(PageBulkExportJobStatus.completed);
     const completedAtMs = updated?.completedAt?.getTime();
     expect(completedAtMs).toBeGreaterThanOrEqual(before);
@@ -81,12 +85,14 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
   test('should preserve an already-set completedAt (normal completion path)', async () => {
     // arrange
     const originalCompletedAt = new Date('2020-01-01T00:00:00.000Z');
-    const job = await PageBulkExportJob.create({
-      user: new mongoose.Types.ObjectId(),
-      page: new mongoose.Types.ObjectId(),
-      format: PageBulkExportFormat.md,
-      status: PageBulkExportJobStatus.uploading,
-      completedAt: originalCompletedAt,
+    const job = await prisma.pagebulkexportjobs.create({
+      data: {
+        userId: new mongoose.Types.ObjectId().toString(),
+        pageId: new mongoose.Types.ObjectId().toString(),
+        format: PageBulkExportFormat.md,
+        status: PageBulkExportJobStatus.uploading,
+        completedAt: originalCompletedAt,
+      },
     });
 
     // act
@@ -96,7 +102,9 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
     );
 
     // assert
-    const updated = await PageBulkExportJob.findById(job._id);
+    const updated = await prisma.pagebulkexportjobs.findUnique({
+      where: { id: job.id },
+    });
     expect(updated?.completedAt?.toISOString()).toBe(
       originalCompletedAt.toISOString(),
     );
@@ -104,11 +112,13 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
 
   test('should not set completedAt when the job failed', async () => {
     // arrange
-    const job = await PageBulkExportJob.create({
-      user: new mongoose.Types.ObjectId(),
-      page: new mongoose.Types.ObjectId(),
-      format: PageBulkExportFormat.md,
-      status: PageBulkExportJobStatus.exporting,
+    const job = await prisma.pagebulkexportjobs.create({
+      data: {
+        userId: new mongoose.Types.ObjectId().toString(),
+        pageId: new mongoose.Types.ObjectId().toString(),
+        format: PageBulkExportFormat.md,
+        status: PageBulkExportJobStatus.exporting,
+      },
     });
 
     // act
@@ -118,9 +128,11 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
     );
 
     // assert
-    const updated = await PageBulkExportJob.findById(job._id);
+    const updated = await prisma.pagebulkexportjobs.findUnique({
+      where: { id: job.id },
+    });
     expect(updated?.status).toBe(PageBulkExportJobStatus.failed);
-    expect(updated?.completedAt).toBeUndefined();
+    expect(updated?.completedAt).toBeNull();
   });
 
   // JOB_EXPIRED is a third action that flows through the same choke point.
@@ -129,11 +141,13 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
   // silently start backfilling completedAt on expired jobs.
   test('should not set completedAt when the job expired', async () => {
     // arrange
-    const job = await PageBulkExportJob.create({
-      user: new mongoose.Types.ObjectId(),
-      page: new mongoose.Types.ObjectId(),
-      format: PageBulkExportFormat.md,
-      status: PageBulkExportJobStatus.exporting,
+    const job = await prisma.pagebulkexportjobs.create({
+      data: {
+        userId: new mongoose.Types.ObjectId().toString(),
+        pageId: new mongoose.Types.ObjectId().toString(),
+        format: PageBulkExportFormat.md,
+        status: PageBulkExportJobStatus.exporting,
+      },
     });
 
     // act
@@ -143,8 +157,10 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
     );
 
     // assert
-    const updated = await PageBulkExportJob.findById(job._id);
+    const updated = await prisma.pagebulkexportjobs.findUnique({
+      where: { id: job.id },
+    });
     expect(updated?.status).toBe(PageBulkExportJobStatus.failed);
-    expect(updated?.completedAt).toBeUndefined();
+    expect(updated?.completedAt).toBeNull();
   });
 });

@@ -1,6 +1,8 @@
 // tests for assuring axios request succeeds in version change
 
 import type { Server } from 'node:http';
+import { version as prismaClientVersion } from '@prisma/client/package.json';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { renderHook, waitFor } from '@testing-library/react';
 import axios from 'axios';
 import express from 'express';
@@ -8,22 +10,34 @@ import express from 'express';
 import refsMiddleware from '../../server/index.js';
 import { useSWRxRef, useSWRxRefs } from './refs.js';
 
-// Mock the IAttachmentHasId type for testing
+// Mock a Prisma `attachments` row (pageId/creatorId, not page/creator IDs --
+// see AttachmentPrismaRow in server/routes/refs.ts) for testing
 const mockAttachment = {
   _id: '507f1f77bcf86cd799439011',
   fileFormat: 'image/jpeg',
   fileName: 'test-image.jpg',
   originalName: 'test-image.jpg',
   filePath: 'attachment/507f1f77bcf86cd799439011.jpg',
+  pageId: '507f1f77bcf86cd799439013',
+  creatorId: '507f1f77bcf86cd799439012',
   creator: {
     _id: '507f1f77bcf86cd799439012',
     name: 'Test User',
     username: 'testuser',
+    imageAttachmentId: null,
   },
-  page: '507f1f77bcf86cd799439013',
   createdAt: '2023-01-01T00:00:00.000Z',
   fileSize: 1024000,
 };
+
+// Bound once at server setup (mirrors crowi.prisma.attachments being read
+// once in routesFactory), so their resolved values must be re-armed in
+// beforeEach after vi.restoreAllMocks() clears vi.fn() implementations.
+const mockFindFirstAttachment = vi.fn().mockResolvedValue(mockAttachment);
+const mockFindManyAttachments = vi.fn().mockResolvedValue([mockAttachment]);
+const mockFindRawAttachments = vi
+  .fn()
+  .mockResolvedValue([{ _id: { $oid: mockAttachment._id } }]);
 
 vi.mock('mongoose', async (importOriginal) => {
   const actual = await importOriginal<typeof import('mongoose')>();
@@ -42,19 +56,8 @@ vi.mock('mongoose', async (importOriginal) => {
     };
   }
 
-  // Create Attachment model mock
-  const createAttachmentModel = () => ({
-    findOne: vi.fn().mockReturnValue({
-      populate: vi.fn().mockResolvedValue(mockAttachment),
-    }),
-    find: vi.fn().mockReturnValue({
-      and: vi.fn().mockReturnThis(),
-      populate: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([mockAttachment]),
-    }),
-  });
-
-  // Create Page model mock
+  // Create Page model mock (the only model still fetched via mongoose.model
+  // -- Attachment reads now go through crowi.prisma.attachments, mocked below)
   const createPageModel = () => ({
     findByPathAndViewer: vi.fn().mockResolvedValue({
       _id: '507f1f77bcf86cd799439013',
@@ -71,21 +74,13 @@ vi.mock('mongoose', async (importOriginal) => {
     PageQueryBuilder: MockPageQueryBuilder,
   });
 
-  // Create a shared mock model factory that returns new instances
-  const createMockModel = (modelName: string) => {
-    if (modelName === 'Attachment') {
-      return createAttachmentModel();
-    }
-    return createPageModel();
-  };
-
   return {
     ...actual,
     default: {
       ...actual.default,
-      model: createMockModel,
+      model: createPageModel,
     },
-    model: createMockModel,
+    model: createPageModel,
     Types: actual.Types,
   };
 });
@@ -98,9 +93,8 @@ vi.mock('@growi/core', () => ({
 }));
 
 vi.mock('@growi/core/dist/models/serializers', () => ({
-  serializeAttachmentSecurely: vi
-    .fn()
-    .mockImplementation((attachment) => attachment),
+  serializeAttachmentSecurely: (attachment) => attachment,
+  toLegacyAttachmentShape: (attachment) => attachment,
 }));
 
 vi.mock('@growi/core/dist/remark-plugins', () => ({
@@ -157,6 +151,13 @@ describe('useSWRxRef and useSWRxRefs integration tests', () => {
         req.user = { _id: '507f1f77bcf86cd799439012', username: 'testuser' };
         next();
       },
+      prisma: {
+        attachments: {
+          findFirst: mockFindFirstAttachment,
+          findMany: mockFindManyAttachments,
+          findRaw: mockFindRawAttachments,
+        },
+      },
     };
 
     refsMiddleware(mockCrowi, app);
@@ -177,6 +178,14 @@ describe('useSWRxRef and useSWRxRefs integration tests', () => {
         });
       });
     }
+  });
+
+  beforeEach(() => {
+    mockFindFirstAttachment.mockResolvedValue(mockAttachment);
+    mockFindManyAttachments.mockResolvedValue([mockAttachment]);
+    mockFindRawAttachments.mockResolvedValue([
+      { _id: { $oid: mockAttachment._id } },
+    ]);
   });
 
   afterEach(() => {
@@ -277,6 +286,87 @@ describe('useSWRxRef and useSWRxRefs integration tests', () => {
       expect(result.current.error).toBeUndefined();
 
       axiosGetSpy.mockRestore();
+    });
+
+    it.each([
+      '/png/g',
+      '/png/y',
+    ])('sends the regex option %s to MongoDB with flags MongoDB supports', async (regex) => {
+      const axiosGetSpy = setupAxiosSpy();
+
+      const { result } = renderHook(() =>
+        useSWRxRefs('/test-page', undefined, { regex }, false),
+      );
+
+      await waitFor(() => expect(result.current.data).toBeDefined(), {
+        timeout: 5000,
+      });
+
+      expect(mockFindRawAttachments).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filter: expect.objectContaining({
+            originalName: { $regex: 'png', $options: '' },
+          }),
+        }),
+      );
+
+      axiosGetSpy.mockRestore();
+    });
+
+    describe('when findRaw fails', () => {
+      const fetchRefs = (): Promise<Response> => {
+        const url = new URL('/_api/attachment-refs/refs', TEST_SERVER_URL);
+        url.searchParams.set('pagePath', '/test-page');
+        url.searchParams.set('options', JSON.stringify({ regex: '/png/' }));
+        return fetch(url);
+      };
+
+      it('responds 400 for an invalid-regex error from MongoDB (Prisma P2010 / code 51091)', async () => {
+        mockFindRawAttachments.mockRejectedValueOnce(
+          new PrismaClientKnownRequestError('raw query failed', {
+            code: 'P2010',
+            clientVersion: prismaClientVersion,
+            meta: {
+              message: 'Error code 51091: Regular expression is invalid',
+            },
+          }),
+        );
+
+        const res = await fetchRefs();
+
+        expect(res.status).toBe(400);
+      });
+
+      it.each([
+        {
+          name: 'a P2010 error that is not an invalid-regex error',
+          error: new PrismaClientKnownRequestError('raw query failed', {
+            code: 'P2010',
+            clientVersion: prismaClientVersion,
+            meta: { message: 'Error code 1: other' },
+          }),
+        },
+        {
+          name: 'a different Prisma error code',
+          error: new PrismaClientKnownRequestError('raw query failed', {
+            code: 'P2025',
+            clientVersion: prismaClientVersion,
+            meta: {
+              message: 'Error code 51091: Regular expression is invalid',
+            },
+          }),
+        },
+        {
+          name: 'a non-Prisma error',
+          error: new Error('connection lost'),
+        },
+      ])('responds 500 for $name', async ({ error }) => {
+        mockFindRawAttachments.mockRejectedValueOnce(error);
+
+        const res = await fetchRefs();
+
+        expect(res.status).toBe(500);
+      });
     });
   });
 });
