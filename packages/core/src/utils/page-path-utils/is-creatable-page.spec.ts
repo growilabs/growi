@@ -120,4 +120,55 @@ describe('isCreatablePage', () => {
       expect(isCreatablePage(path)).toBe(false);
     });
   });
+
+  describe('depth restriction', () => {
+    it.each([
+      { depth: 1, trailingSlash: false, expected: true },
+      { depth: 129, trailingSlash: false, expected: true },
+      { depth: 129, trailingSlash: true, expected: true },
+      { depth: 130, trailingSlash: false, expected: false },
+      { depth: 130, trailingSlash: true, expected: false },
+      { depth: 131, trailingSlash: false, expected: false },
+    ])('depth $depth (trailing slash: $trailingSlash) is creatable: $expected', ({
+      depth,
+      trailingSlash,
+      expected,
+    }) => {
+      const path = `${'/seg'.repeat(depth)}${trailingSlash ? '/' : ''}`;
+      expect(isCreatablePage(path)).toBe(expected);
+    });
+  });
+
+  describe('boundaries of the suffix and spacing restrictions', () => {
+    it.each([
+      ['/edit', true], // nothing precedes "/edit"
+      ['/a/edit', false],
+      ['/.md', false],
+      ['/a.md', false],
+      ['/a /b', true], // space only before the slash
+      ['/a/ b', true], // space only after the slash
+      ['/a / b', false],
+    ])('"%s" is creatable: %s', (path, expected) => {
+      expect(isCreatablePage(path)).toBe(expected);
+    });
+  });
+
+  describe('time taken for adversarial input', () => {
+    const LIMIT_MS = 100;
+
+    const elapsedMs = (path: string): number => {
+      const start = performance.now();
+      isCreatablePage(path);
+      return performance.now() - start;
+    };
+
+    it.each([
+      ['a shallow path with many segments', '/LongSegment'.repeat(26)],
+      ['a path far deeper than the limit', '/LongSegment'.repeat(4000)],
+      ['a long run of whitespace', `/${' '.repeat(64000)}`],
+      ['a long segment without slashes', `/${'a'.repeat(64000)}`],
+    ])('returns within the limit for %s', (_, path) => {
+      expect(elapsedMs(path)).toBeLessThan(LIMIT_MS);
+    });
+  });
 });

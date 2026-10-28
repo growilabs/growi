@@ -268,7 +268,7 @@ picker はマージまでに拡張されており、以下が設計時の想定�
 |---|---|---|
 | 同梱カタログの場所 | `src/features/mastra/server/services/ai-sdk-modules/model-catalog-data.json` | `apps/app/resource/model-catalog-data.json` |
 | カタログの提供元 | 同梱資産の read のみ | **実効カタログ** = DB のリフレッシュ済みカタログ(Prisma モデル `refreshed-model-catalog`)?? 同梱資産(`effective-model-catalog.ts`) |
-| 外部通信 | なし | **opt-in** のリフレッシュ(既定 OFF): 起動時 `ai:modelCatalogRefreshOnStartup` / cron `ai:modelCatalogRefreshCronSchedule` / 手動 POST `/ai-settings/refresh-model-catalog`(`AllowedModelsField` に導線あり) |
+| 外部通信 | なし | カタログのリフレッシュ: 起動時 `ai:modelCatalogRefreshOnStartup`(既定 ON) / cron `ai:modelCatalogRefreshCronSchedule`(既定日次。取得時刻をランダムにずらす) / 手動 POST `/ai-settings/refresh-model-catalog`(`AllowedModelsField` に導線あり)。起動時・cron は AI 有効時、または停止理由が `catalog_stale` のときだけ動くので、既定構成(AI 無効・停止理由なし)では外部通信しない |
 | ロケール | en/ja/zh/fr | **ko_KR が追加**(dev/8.0.x 由来。tasks 6.6 は 5 ロケールに修正済み) |
 
 ### 本 spec への影響(確認結果)
@@ -276,3 +276,7 @@ picker はマージまでに拡張されており、以下が設計時の想定�
 - **依拠契約は不変**: `get-available-models` は provider 引数 → `getEffectiveSelectableModelIds(provider)` で `SelectableModelsResponse` を返す(呼び出し契約は設計時と同一)。`AllowedModel` 形・`AI_SETTING_KEYS`・env-only グループ(旧 5 キー)も設計の前提どおり。
 - **spec 文書の更新(実施済み)**: design の Out of Boundary / Allowed Dependencies を picker 最終形のファイル群・契約へ更新。カタログリフレッシュ 2 config キーは `ai:*` prefix だが**変更対象外**と明記(task 2.1 に温存 bullet 追加 — `ai:*` 一括整理への巻き込み防止)。`AllowedModelsField` の provider スコープ化(task 6.4)で**手動リフレッシュ導線を維持**する bullet を追加。requirements の関連 spec 記載・Adjacent expectations を「実装済み + 実効カタログ」前提へ更新。
 - **タスクグラフへの構造的影響なし**: 追加・削除タスクなし(既存タスクへの bullet 追記のみ)。
+
+## env-only グループの固定対象に基準モデルと停止理由を含める
+
+**決定**: ai グループの targetKeys は接続設定 3 キー(`app:aiEnabled` / `ai:providers` / `ai:providerApiKeys`)に、利用量計測の基準モデル(`ai:usageBaseModel` / `AI_USAGE_BASE_MODEL`)と AI の停止理由(`ai:disabledReason` / `AI_DISABLED_REASON`)を加えた 5 キーとする。この 2 つはデプロイ側(GROWI.cloud 等)が注入する値で、管理画面から設定させない。グループに入れるのは「この値は env でしか設定しない」という意図をコードに残すためであり、実際に DB の値が混ざらないことは、読む側が `ConfigSource.env` を指定して読むことで守る。モデル設定(`ai:allowedModels`)をグループから外す方針(5.3)は変えない。
