@@ -22,7 +22,7 @@
   - 完了の状態: リポジトリに markitdown と pdfminer の import が残らず、アプリが起動し、残した受け口のテストがすべて通る
   - _Requirements: 1.7_
 
-- [ ] 1.2 新しい変換ライブラリとテスト専用の依存を追加する
+- [x] 1.2 新しい変換ライブラリとテスト専用の依存を追加する
   - 本番の依存に anydoc (版を固定)、pypdfium2、charset-normalizer を加える
   - テスト専用の依存に openpyxl、python-pptx、python-docx、pypdf、msoffcrypto-tool、xlwt、PyYAML を加え、本番の image には入らないようにする
   - lockfile を更新し、本番とテスト専用の全依存のライセンスが MIT / Apache-2.0 / BSD / PSF の範囲であることを確かめる
