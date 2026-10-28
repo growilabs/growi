@@ -97,7 +97,7 @@
   - _Boundary: PptxSlideSplitter_
   - _Depends: 2.4, 3.1_
 
-- [ ] 4.2 (P) XLSX のセル数の事前検査を実装する
+- [x] 4.2 (P) XLSX のセル数の事前検査を実装する
   - 全シートの XML を、XML として解析せず一定の大きさずつ読み、セルの印の数を数える。合計が上限を超えたら、anydoc を呼ばずに上限超過にする
   - 完了の状態: 10 万セルを超える XLSX が上限超過になり、上限以下の XLSX は通ること、同じプロセスの中で検査の前後のメモリの最大使用量がほとんど増えないことをテストで確かめられる
   - _Requirements: 2.6_
@@ -228,3 +228,4 @@
 - 3.2: `tests/conversion/test_pdf.py` は `tests/fixture_files.py` の非公開ヘルパー (`_build_pdf`、`_pdf_stream`) を import している。fixture_files.py に手を入れる次の機会に、公開名にするか日本語 PDF の生成処理ごと移す。
 - 4.1: PowerPoint の自動代替テキストは、anydoc の出力では「説明 + 半角空白 2 つ + 決まり文」の 1 行になる。除去はこの形に限る。作者が `X  決まり文` (半角空白ちょうど 2 つ) と打った行は見分けられず消える。4.3 でも XML 宣言の文字コードが不正なとき、パーサーは LookupError / ValueError を投げるので、`ParseError` だけでなくこれらも malformed にすること。
 - 4.1: 分割変換は共有部品 (マスター・レイアウト・テーマ) をスライドごとのパッケージにコピーするため、処理量は「スライド数 × 共有部品の大きさ」に比例する (2000 枚・マスター 200KB で約 6 秒)。上限は TIMEOUT_S と RSS 上限が受け持つ。
+- 4.2: セル数の検査 (`enforce_cell_limit`) は `.rels` 以外のすべての部品を数える。anydoc が `workbook.xml.rels` のリンク先でシートを探すため、パスや拡張子の名前で絞ると、サブディレクトリ・`..` を含むリンク・大文字拡張子・パッケージ直下に置いたシートで検査をすり抜けられる。BOM 付き UTF-16 の部品は malformed として止める。4.3 は `inspect_archive(data, "xl/workbook.xml", limits)` で開いた archive をこの関数に渡し、呼び出し側で close すること。空の `<row` を大量に並べる入力 (50 万行で約 268MB) はセル数の指標の対象外で、RSS 上限が受け持つ。
