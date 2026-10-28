@@ -272,7 +272,7 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 8. The chat-integration proxy shall チャットのアカウントと GROWI ユーザーの対応表を保持しない
 9. The GROWI application shall アカウントの紐付けの承認画面を、GROWI のサイドバーやナビゲーションなど承認に関係しない部品を含まない、承認のためだけの画面として表示する
 10. When 承認画面が表示された, the GROWI application shall 承認の前に次の 3 つを、互いに区別できる形で示す: この GROWI の名前、この GROWI にログインしているユーザー、紐付けるチャットのアカウント（チャットサービス・workspace・アカウントの識別子）
-11. Where 紐付けの開始時にチャットサービスがアカウントの表示名を伝えていた, the GROWI application shall 承認画面に表示名を、アカウントの識別子と併せて示す。表示名しか伝えていない場合は出さない
+11. Where 紐付けの開始時にチャットサービスがアカウントの表示名を伝えていた, the GROWI application shall 承認画面に表示名を、アカウントの識別子と併せて示す。表示名を単独では示さず、必ず識別子と併せて示す
 12. When 承認画面が表示された, the GROWI application shall 承認の前に、リンクの有効期限と、心当たりがなければ承認せずに閉じてよいことを示す
 
 ### Requirement 8: 1 つの workspace に複数の GROWI が紐づくときの振る舞い
