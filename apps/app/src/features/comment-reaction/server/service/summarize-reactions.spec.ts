@@ -175,4 +175,21 @@ describe('summarizeReactions', () => {
 
     expect(rows).toEqual(snapshot);
   });
+
+  it('keeps chronological user order and chip order when one chip has many rows', () => {
+    const COUNT = 500;
+    const rows = Array.from({ length: COUNT }, (_, i) =>
+      row(C1, oid(1000 + i), 'unicode:+1', COUNT - i),
+    );
+    rows.push(row(C1, oid(1), 'unicode:heart', 0));
+
+    const chips = summarizeReactions(rows, usersById, null, formatUser).get(C1);
+
+    expect(chips?.map((c) => [c.emoji, c.count])).toEqual([
+      ['unicode:heart', 1],
+      ['unicode:+1', COUNT],
+    ]);
+    expect(chips?.[1].users[0]).toBe(oid(1000 + COUNT - 1));
+    expect(chips?.[1].users[COUNT - 1]).toBe(oid(1000));
+  });
 });
