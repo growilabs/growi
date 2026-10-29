@@ -30,7 +30,13 @@ export const CommentReactionBar = ({
   }
 
   return (
-    <div className={styles['reaction-bar']}>
+    <div
+      className={
+        chips.length === 0
+          ? `${styles['reaction-bar']} ${styles['reaction-bar-empty']}`
+          : styles['reaction-bar']
+      }
+    >
       {chips.map((chip) => (
         <ReactionChip
           key={chip.emoji}

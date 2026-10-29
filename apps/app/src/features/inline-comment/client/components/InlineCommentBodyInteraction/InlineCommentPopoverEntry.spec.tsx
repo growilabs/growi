@@ -201,6 +201,17 @@ describe('InlineCommentPopoverEntry', () => {
     expect(container.querySelector('.page-comment-body')).toBeNull();
   });
 
+  it('scopes the reaction bar to its own hover area, not to the whole popover', () => {
+    renderEntry();
+
+    const bar = screen.getByTestId('comment-reaction-bar');
+    const scope = bar.closest('.comment-reaction-hover-scope');
+    expect(scope).not.toBeNull();
+    expect(
+      scope?.contains(screen.getByTestId(`${TEST_ID_PREFIX}-header`)),
+    ).toBe(true);
+  });
+
   it('renders beforeBody between the header and the body, and headerExtra inside the header row', () => {
     renderEntry({
       beforeBody: <div data-testid="before-body-slot" />,

@@ -108,7 +108,12 @@ const pickEmoji = async (
   const press = (locator: Locator) =>
     useTap ? locator.tap() : locator.click();
 
-  await press(scope.getByRole('button', { name: 'Add reaction' }));
+  // A comment without reactions reveals its add button on hover; touch has no hover.
+  const addButton = scope.getByRole('button', { name: 'Add reaction' });
+  if (!useTap) {
+    await scope.hover();
+  }
+  await press(addButton);
   const picker = emojiPicker(page);
   await expect(picker).toBeVisible();
 
@@ -219,9 +224,20 @@ test.describe('Comment reactions', () => {
     await expect(reactionCountButtons(comment)).toHaveCount(0);
 
     await page.reload();
-    await expect(
-      comment.getByRole('button', { name: 'Add reaction' }),
-    ).toBeVisible();
+    const addButton = comment.getByRole('button', { name: 'Add reaction' });
+    // The fade is applied on the wrapper, and `opacity` is not inherited by the button.
+    const addReaction = addButton.locator('xpath=..');
+    await page.mouse.move(0, 0);
+    await expect(addReaction).toHaveCSS('opacity', '0');
+    await comment.hover();
+    await expect(addReaction).toHaveCSS('opacity', '1');
+    await page.mouse.move(0, 0);
+    await expect(addReaction).toHaveCSS('opacity', '0');
+    await addButton.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(addButton).toBeFocused();
+    await expect(addReaction).toHaveCSS('opacity', '1');
     await expect(reactionCountButtons(comment)).toHaveCount(0);
   });
 

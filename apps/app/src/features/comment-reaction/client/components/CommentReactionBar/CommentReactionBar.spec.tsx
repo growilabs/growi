@@ -31,7 +31,12 @@ vi.mock('next-i18next', () => ({
 vi.mock('~/stores-universal/use-next-themes', () => ({
   useNextThemes: () => ({ resolvedTheme: 'light' }),
 }));
-vi.mock('./CommentReactionBar.module.scss', () => ({ default: {} }));
+vi.mock('./CommentReactionBar.module.scss', () => ({
+  default: {
+    'reaction-bar': 'reaction-bar',
+    'reaction-bar-empty': 'reaction-bar-empty',
+  },
+}));
 // Stands in for the lazily loaded emoji-mart picker; the real one is covered in @growi/editor.
 vi.mock('@growi/editor/dist/client/components/EmojiPicker', () => ({
   EmojiPicker: ({
@@ -127,6 +132,39 @@ describe('CommentReactionBar', () => {
         .textContent,
     ).toContain('1');
     expect(addButton()).not.toBeNull();
+  });
+
+  it('marks the bar as empty, keeping the add button focusable under its accessible name, when there are no chips', async () => {
+    setup({ chips: [] });
+
+    const { container } = render(
+      <CommentReactionBar
+        pageId="page1"
+        commentId="comment1"
+        isReadOnly={false}
+      />,
+    );
+
+    expect(container.querySelector('.reaction-bar-empty')).not.toBeNull();
+    const button = addButton() as HTMLElement;
+    expect(button).not.toBeNull();
+    await userEvent.tab();
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('does not mark the bar as empty once the comment has a chip', () => {
+    setup({ chips: [makeChip()] });
+
+    const { container } = render(
+      <CommentReactionBar
+        pageId="page1"
+        commentId="comment1"
+        isReadOnly={false}
+      />,
+    );
+
+    expect(container.querySelector('.reaction-bar')).not.toBeNull();
+    expect(container.querySelector('.reaction-bar-empty')).toBeNull();
   });
 
   it('reads the chips of the given comment and gates on the isReadOnly it was given', () => {

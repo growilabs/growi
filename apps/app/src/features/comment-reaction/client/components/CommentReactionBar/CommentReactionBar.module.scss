@@ -83,3 +83,42 @@
   gap: 0.375rem;
   align-items: center;
 }
+
+// With no reaction yet, the add button is revealed by hovering its comment or focusing it.
+// `opacity` (not `visibility`/`display`) keeps it in the tab order and the accessibility tree.
+// The bar collapses to zero height and the button overlays the comment's bottom edge, so
+// revealing it does not shift the layout. Without hover support (touch) it stays visible.
+@media (hover: hover) {
+  .reaction-bar.reaction-bar-empty {
+    position: relative;
+    height: 0;
+
+    .add-reaction {
+      position: absolute;
+      top: -0.5rem;
+      left: 0;
+      opacity: 0;
+
+      &:has(:focus-visible) {
+        opacity: 1;
+      }
+    }
+
+    // Keeps an error or confirmation shown right below the bar clear of the overlaid button.
+    // A margin-bottom on the bar collapses with the next element's own margin (even an
+    // `!important` utility one), so only the larger of the two applies.
+    &:has(+ *) {
+      margin-bottom: 1rem;
+    }
+  }
+
+  // The popover's resolve error follows the entry's wrapper rather than the bar.
+  :global(.comment-reaction-hover-scope):has(.reaction-bar-empty):has(+ *) {
+    margin-bottom: 1rem;
+  }
+
+  :global(.page-comment-main):hover .reaction-bar-empty .add-reaction,
+  :global(.comment-reaction-hover-scope):hover .reaction-bar-empty .add-reaction {
+    opacity: 1;
+  }
+}

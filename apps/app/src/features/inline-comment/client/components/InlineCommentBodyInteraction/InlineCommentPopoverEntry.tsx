@@ -132,7 +132,7 @@ export const InlineCommentPopoverEntry = (
   };
 
   return (
-    <>
+    <div className="comment-reaction-hover-scope">
       <div
         data-testid={`${testIdPrefix}-header`}
         className="d-flex align-items-center gap-2"
@@ -279,6 +279,6 @@ export const InlineCommentPopoverEntry = (
           onConfirm={handleDeleteConfirm}
         />
       )}
-    </>
+    </div>
   );
 };
