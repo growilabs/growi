@@ -152,6 +152,77 @@ describe('buildLinkPreview', () => {
     });
   });
 
+  describe('a non-public page in an OPEN GROWI is answered exactly as today (Requirement 6.12)', () => {
+    const nonPublicGrants = [
+      { name: 'GRANT_OWNER', grant: PageGrant.GRANT_OWNER },
+      { name: 'GRANT_USER_GROUP', grant: PageGrant.GRANT_USER_GROUP },
+      { name: 'GRANT_RESTRICTED', grant: PageGrant.GRANT_RESTRICTED },
+      { name: 'GRANT_SPECIFIED', grant: PageGrant.GRANT_SPECIFIED },
+    ];
+
+    it.each(
+      nonPublicGrants,
+    )('answers a permalink to a page with $name byte-for-byte like a not-found permalink', ({
+      grant,
+    }) => {
+      const notFound = buildLinkPreview(
+        { isPermalink: true, page: null },
+        true,
+      );
+
+      const result = buildLinkPreview(
+        { isPermalink: true, page: page(grant) },
+        true,
+      );
+
+      expect(result).toStrictEqual(notFound);
+      // toStrictEqual ignores key order; the wire bytes do not.
+      expect(JSON.stringify(result)).toBe(JSON.stringify(notFound));
+      expect(result).toStrictEqual({
+        path: PERMALINK_UNAVAILABLE_MESSAGE,
+        restricted: true,
+      });
+    });
+
+    it.each(
+      nonPublicGrants,
+    )('gives exactly the path and restricted for a path-form URL to a page with $name', ({
+      grant,
+    }) => {
+      const result = buildLinkPreview(pathTarget(grant), true);
+
+      expect(result).toStrictEqual({
+        path: '/team/onboarding',
+        restricted: true,
+      });
+      expect(JSON.stringify(result)).toBe(
+        '{"path":"/team/onboarding","restricted":true}',
+      );
+    });
+  });
+
+  it('treats a page whose grant field is absent (undefined) like a legacy null-grant page', () => {
+    const absentGrant = { grant: undefined };
+    const permalinkTarget: LinkPreviewUrlTarget = {
+      isPermalink: true,
+      page: { ...page(null), ...absentGrant },
+    };
+    const pathFormTarget: LinkPreviewUrlTarget = {
+      isPermalink: false,
+      page: { ...page(null), ...absentGrant },
+    };
+
+    expect(buildLinkPreview(permalinkTarget, false)).toStrictEqual(
+      buildLinkPreview({ isPermalink: true, page: page(null) }, false),
+    );
+    expect(buildLinkPreview(pathFormTarget, false)).toStrictEqual({
+      path: '/team/onboarding',
+      restricted: true,
+      updatedAt: '2026-01-15T09:30:00.000Z',
+    });
+    expect(buildLinkPreview(pathFormTarget, true)?.restricted).toBe(false);
+  });
+
   it('gives path-only for a non-public page in a closed GROWI (both gates fail)', () => {
     const result = buildLinkPreview(
       pathTarget(PageGrant.GRANT_SPECIFIED),

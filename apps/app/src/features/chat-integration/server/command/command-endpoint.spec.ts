@@ -667,7 +667,7 @@ describe('createCommandEndpoint (task 5.1)', () => {
         }),
       );
 
-      expect(response).toEqual({
+      expect(response).toStrictEqual({
         kind: 'link-preview',
         path: 'closed-public-target',
         restricted: true,
