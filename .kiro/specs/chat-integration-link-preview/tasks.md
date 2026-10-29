@@ -4,7 +4,7 @@
 > **最後のタスク（4）で対象の spec へ書き戻し、このディレクトリを消すまでが完了。** 実装が入っただけでは完了ではない。
 
 - [ ] 1. 題名の決め方を 1 つの関数にまとめる
-- [ ] 1.1 `titleFromPath` を共有のファイルへ移す
+- [x] 1.1 `titleFromPath` を共有のファイルへ移す
   - `apps/app/src/features/chat-integration/server/content/search-result-mapper.ts` の `titleFromPath` を `content/title-from-path.ts` へ移し、`search-result-mapper.ts` はそこから読む
   - 動きは変えない（振る舞いを変えない整理なので、先に失敗するテストは要らない）
   - 完了の条件: `search-result-mapper.spec.ts` が変更なしで通る

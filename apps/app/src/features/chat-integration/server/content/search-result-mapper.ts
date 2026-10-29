@@ -20,9 +20,10 @@
 // leak the very permission information `filterPagesForViewer` already used to
 // decide this page belongs in the list at all.
 
-import nodePath from 'node:path';
 import type { SearchResultItem } from '@growi/chat';
 import urljoin from 'url-join';
+
+import { titleFromPath } from './title-from-path';
 
 /**
  * The fields this mapper reads off an already-filtered page. `rank` comes
@@ -35,15 +36,6 @@ export interface SearchResultPageSource {
   readonly updatedAt: Date;
   readonly commentCount: number;
 }
-
-// GROWI pages have no separate title field -- the search index itself only
-// carries `path` / counts / `updated_at` / `tag_names` / `comments` (design.md,
-// "検索結果だけでは判断できない" section). The last path segment is used as the
-// display title, falling back to the full path for the root ("/"), matching
-// the existing convention in
-// `features/page-markdown/server/services/respond-with-page-markdown.ts`
-// (`titleFromPath`).
-const titleFromPath = (path: string): string => nodePath.basename(path) || path;
 
 /**
  * Maps already-filtered, already-ranked pages to `SearchResultItem`s.
