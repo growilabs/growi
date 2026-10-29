@@ -1112,6 +1112,15 @@ export type CommandResponse =
   | { readonly kind: typeof RESPONSE_KINDS.error; readonly code: 'forbidden' | 'path-conflict' | 'invalid' | 'not-permitted-in-channel' | 'no-settings' | 'unknown-kind'; readonly message: string };
 ```
 
+**`link-preview` の応答の中身の決まり**（型の形には表れないが、proxy と GROWI の両方が寄りかかっている。要件 6）:
+
+- `path` は「場所として表示する文字列」で、実在のパス・ページの題名・固定文言のどれかが入る。どれを入れるかは GROWI が決め、proxy は区別せずにそのまま表示する
+- `restricted: true` のとき、`excerpt` と `commentCount` は含まない。`updatedAt` は含むことがある（公開範囲が「公開」のページで、ログインが必要な GROWI のとき。要件 6.9〜6.11）
+- `restricted: false` のときは、`excerpt`・`updatedAt`・`commentCount` を含む（要件 6.2）
+
+解析関数（`parse/parse-command.ts`）は `restricted` の値に関係なく 3 つの任意フィールドを受け付けるので、上の決まりは型でも解析でも強制しない。GROWI 側の判定（`buildLinkPreview`）と proxy 側の表示（`previewMarkdown`）がそれぞれ守る。
+新しいフィールドを足さずにこの使い方にした理由は [chat-integration-app の research.md](../chat-integration-app/research.md) の「通信契約の型は変えず、`restricted: true` の応答に `updatedAt` を入れてよいことにする」。
+
 **通知の再送は宛先ごとに記録する**（`CommandRequest` とは扱いが違う）。
 `(relationId, requestId)` だけで記録して同じ応答を返すと、**やり直しは記録を読み直すだけで投稿を一度も試みない。**
 宛先の一部が `timeout` や `platform-error` だった通知は、何度やり直しても同じ結果が返って上限に達する。

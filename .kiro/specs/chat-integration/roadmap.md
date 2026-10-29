@@ -9,7 +9,7 @@
 Gen 1 には手を入れず、GROWI 本体で両方を同時に有効にできる形で併存させる。
 
 前提・確定済みの決定（決定 1〜10）・調査の記録は、本ディレクトリの `brief.md` と `research.md` にある。
-要件（14 件・受け入れ条件 107 件）は本 umbrella の `requirements.md` が持ち、**sub-spec は要件 ID を参照する。番号は振り直さない。**
+要件（14 件・受け入れ条件 112 件）は本 umbrella の `requirements.md` が持ち、**sub-spec は要件 ID を参照する。番号は振り直さない。**
 
 ## 分割の経緯
 
@@ -71,7 +71,6 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 | 1 | 表示順 | 本人にだけ見える返事が、入力より上に出る | 時刻を測って原因を調べてから直す | proxy |
 | 2 | proxy の見え方 | 検索結果の見せ方、Slack への通知の文面 | spec を作らず直接直す（契約は変えない） | proxy（通知の文面は app の markdown にも及びうる） |
 | 4 | app の見え方（`agent` と重ならない部分） | 承認画面、ページの編集画面、紐付け解除後のバッジ | 別ブランチ `imprv/chat-integration-app-ui` で実装済み（amend spec は本体に折り込み済み）。このブランチの取り込みで解決する | app |
-| 5 | URL の展開の方針 | 公開範囲が「公開」のページは題名だけ出す | amend spec `chat-integration-link-preview`（名前は仮） | app（protocol と proxy にも及びうる） |
 | 6 | 通知の定期処理の負荷 | 連携が無いテナントの問い合わせを飛ばす、解除済みの連携の掃除を 1 日 1 回にする | amend spec `chat-integration-notification-load`（名前は仮） | app |
 | 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作り、それと同時に定期処理の間隔を延ばす。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。`brief.md` だけがあり、要件・設計・タスクの承認がこれから | umbrella、protocol、proxy、app |
 | 8 | 管理画面の作り直し | 管理画面のうち、チャンネルの権限と「できること」の表 | amend spec `chat-integration-admin-ui`（名前は仮） | app |
@@ -79,8 +78,9 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 | 10 | URL の展開の確認フロー | 共有してよいかを本人に尋ねてから展開する | `/kiro-discovery` から着手する。`agent` の「本人にだけ届ける」しくみの上に作るので、`agent` の後 | 3 spec すべて |
 
 - 順 3（proxy の不具合の一括修正: Enterprise Grid のチャンネル一覧、installation の特定、Mattermost の 403、接続の更新の失敗）はすべて直したので表から外した。ほかの順の番号を変えないよう、3 は空き番号のまま残す。直した内容は [chat-integration-proxy の research.md](../chat-integration-proxy/research.md) の決定 P14・P15・P16 と「既知の問題」1。
+- 順 5（URL の展開の方針: ログインが必要な GROWI でも、公開範囲が「公開」のページは題名と更新日時を出す）は済んだので表から外した。5 も空き番号のまま残す。決まったことは要件 6.9〜6.13（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)「LinkPreviewMapper（URL の展開の応答）」、理由は [chat-integration-app の research.md](../chat-integration-app/research.md) と本ディレクトリの research.md の決定 15。
 - 順 1・2 は、順 7 の前提になる（順 7 の前提だった順 3 は済んだ。`agent` の `brief.md` が前提に挙げる installation の特定もその 1 つ）。
-- 順 4・5・6 は app だけの変更で、順 1・2 とは独立している。ただし、どれも `chat-integration-app/design.md` に書き戻すので、`agent` が書き換える節（権限、能力表）に触れるものを `agent` と同時には進めない。
+- 順 4・6 は app だけの変更で、順 1・2 とは独立している。ただし、どれも `chat-integration-app/design.md` に書き戻すので、`agent` が書き換える節（権限、能力表）に触れるものを `agent` と同時には進めない。
 - 順 7 は規模が大きいので、順 1・2 を終えてから要件の承認に入る。
 
 ### 1. 表示順
@@ -100,18 +100,6 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 ### 4. app の見え方
 
 別ブランチ `imprv/chat-integration-app-ui` で実装済みで、amend spec は本体の要件（`chat-integration/requirements.md`）と設計（`chat-integration-app/design.md`）に折り込み済み。承認画面、ページの編集画面、紐付け解除後のバッジは、このブランチを取り込むことで解決する。この `feat/slackbot-proxy-gen2` ブランチでは作業しない。
-
-### 5. URL の展開の方針（amend spec `chat-integration-link-preview`、名前は仮）
-
-- **要件6（URL の展開）で出す範囲の見直し**: 実機試験（2026-10-26、Slack）で、ログインしていない人の閲覧を許さない GROWI（`security:restrictGuestMode` が `Deny`）では、公開ページでも展開が「存在しないか、全員には見えない」になり、機能がほぼ使えないと分かった。今の判定は「ログインしていない人を含めて誰でも見られるページか」（`command-endpoint.ts` の `buildLinkPreview` に `isGuestAllowedToRead()` を渡す）で、チャンネルの参加者が全員 GROWI のユーザーとは限らないことを理由にしている。
-  - **他製品の仕様（公式の説明で確かめた範囲）**: Notion は Slack に貼られたリンクを、ページを見る権限が無い人にも題名と作成者で展開し、見る権限が無い人がいれば貼った本人に権限を与えるかを尋ねる。Confluence Cloud は閲覧を制限したページだけを展開せず、制限の無いページ（ログインしたユーザーなら誰でも見られる）は展開する
-  - **方針（決定）: 題名など最小限は出す。ただし公開範囲が「公開」のページに限る**:
-    - 公開範囲が「公開」で、ログインしていない人も見られる → 今どおり題名と本文の一部
-    - 公開範囲が「公開」で、ログインが必要 → **題名（と更新日など最小限）だけ出す**
-    - 公開範囲が「本人だけ」「グループだけ」など → 今どおり何も出さない（存在しないページと見分けがつかない返し方、要件6.8）
-  - **公開に限る理由**: GROWI の題名はパスの最後の部分なので、公開範囲を絞ったページでは題名を出すこと自体が漏れになる。パスの形の URL は URL 自体に題名を含むので、この変更が役に立つのは主に固定リンク（`/6adf…` の形）のとき
-  - **想定される影響範囲**: 方針の部分は `chat-integration-app`（`buildLinkPreview` の判定）が中心。題名だけを返す状態を `LinkPreviewResponse` で表す必要があれば `chat-integration-protocol` と、表示する `chat-integration-proxy` にも及ぶ。確認フローまで含めると 3 sub-spec すべてにまたがる
-  - **次にやること**: 方針の部分だけなら amend spec（要件6 の受け入れ条件を追記し、番号は振り直さない）。確認フローはこの spec に含めず、順 10 で扱う
 
 ### 6. 通知の定期処理（amend spec `chat-integration-notification-load`、名前は仮）
 
@@ -152,7 +140,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 - **案**: 投稿者にだけ見える確認メッセージ（例: Slack の ephemeral message）で「全員に見せるか」を尋ね、「共有する」を選んだ場合だけ中身を展開する対話的な確認フロー（2026-09-09 の提案）。「今それを見ている人が誰か」をその場で判定し、チャット側のボタン操作を GROWI へ伝え返す往復が要るので、今の一往復の `link-preview` では成り立たない
 
-- **リリースに含める**（2026-10-27 に決定）。`agent` が作る「本人にだけ届ける」しくみと近いので、`agent` の後に、`/kiro-discovery` から着手する。要件 6 の受け入れ条件の追記になるので、番号は振り直さない
+- **リリースに含める**（2026-10-27 に決定）。`agent` が作る「本人にだけ届ける」しくみと近いので、`agent` の後に、`/kiro-discovery` から着手する。要件 6 の受け入れ条件の追記になるので、番号は振り直さず、6.14 から振る。投稿者が「共有する」を選ぶ前に出すものは、要件 6.9〜6.12 で決めた範囲（公開範囲が「公開」のページの題名と更新日時など）の上に乗る
 
 ## リリース判定に入れていないもの
 

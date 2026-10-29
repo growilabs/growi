@@ -241,16 +241,28 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 
 **Objective:** As a チャンネルで GROWI のリンクを共有する人, I want リンクを貼るだけで中身の概要が見えること, so that 相手が開かなくても何の話か分かる
 
+この要件で使う言葉:
+
+- **公開範囲が「公開」のページ**: GROWI のページの公開範囲の設定が「公開」（`GRANT_PUBLIC`）のページ。公開範囲の設定を持たない古いページも含める。**「リンクを知っている人だけ」（`GRANT_RESTRICTED`）は含めない**
+- **ログインが必要な GROWI**: ログインしていない人にページを読ませない設定の GROWI（`aclService.isGuestAllowedToRead()` が偽）。`security:wikiMode` が `private` のとき、および `security:wikiMode` が `public` ではなく、`security:restrictGuestMode` が `Readonly` 以外（`Deny`・未設定を含む）のとき
+- **誰でも閲覧できるページ**: 公開範囲が「公開」で、かつログインが必要な GROWI ではないページ
+- **題名**: ページのパスの最後の部分。ルートのページ（`/`）では `/`。検索の結果の題名（要件 3.9 の `title`）と同じ決め方
+
 #### Acceptance Criteria
 
 1. When 利用者が、紐づく GROWI のページ URL をチャンネルに投稿した, the chat-integration proxy shall そのメッセージに、ページのパスを含む要約を添える
 2. While 対象のページが誰でも閲覧できるページである, the chat-integration proxy shall 要約に本文の冒頭・更新日時・コメント数を含める
-3. While 対象のページが誰でも閲覧できるわけではないページである, the chat-integration proxy shall 要約にパス以外の内容を含めない
+3. While 対象のページが誰でも閲覧できるわけではないページであり、6.9 の状態でもない, the chat-integration proxy shall 要約にパス以外の内容を含めない
 4. If 対象の URL が、そのチャンネルに紐づくどの GROWI のものでもない, then the chat-integration proxy shall 何も添えない
 5. Where あるチャットサービスが、投稿されたリンクを bot に通知する仕組みを持たない, the chat-integration proxy shall そのサービスではこの機能を使えないことを運用者に示す
 6. While 利用者が投稿した URL が対象のページをパス以外の識別子で指す固定リンクであり、かつそのページが誰でも閲覧できるページでない, the GROWI application shall 要約にパスを含めない
 7. While 利用者が投稿した URL がパスで対象のページを指している（固定リンクではない）, the GROWI application shall そのページが誰でも閲覧できるページでない場合であっても、要約にパスを含める
-8. If 利用者が投稿した URL が、対象のページをパス以外の識別子で指す固定リンクであり、その識別子に一致するページがこの GROWI に存在しない, then the GROWI application shall 対象のページは存在するが誰でも閲覧できるページではない場合と、区別できない形の応答を返す
+8. If 利用者が投稿した URL が、対象のページをパス以外の識別子で指す固定リンクであり、その識別子に一致するページがこの GROWI に存在しない, then the GROWI application shall 対象のページは存在するが誰でも閲覧できるページではなく、6.9 の状態でもない場合と、区別できない形の応答を返す
+9. While 対象のページの公開範囲が「公開」であり、かつ紐づく GROWI がログインが必要な GROWI である, the GROWI application shall 要約にページの題名と更新日時を含め、本文の冒頭とコメント数を含めない
+10. While 6.9 の状態であり、かつ利用者が投稿した URL が、対象のページをパス以外の識別子で指す固定リンクである, the GROWI application shall 要約に題名を含め、パス全体を含めない
+11. While 6.9 の状態であり、かつ利用者が投稿した URL がパスで対象のページを指している, the GROWI application shall 要約にパスと更新日時を含める
+12. While 対象のページの公開範囲が「公開」以外（本人だけ・グループだけ・リンクを知っている人だけ・特定のユーザーだけ）である, the GROWI application shall GROWI がログインを必要とするかどうかに関わらず、要約に更新日時を含めず、固定リンクの場合は題名も含めずに対象のページが存在しない場合と区別できない形の応答を返し、パスで指す URL の場合は 6.3・6.7 のとおりパスだけを含める
+13. When the chat-integration proxy が 6.9 の状態の要約を受け取った, the chat-integration proxy shall パス（固定リンクの場合は題名）と更新日時を表示し、本文の冒頭とコメント数を表示しない
 
 ### Requirement 7: チャットの利用者と GROWI ユーザーの紐付け
 

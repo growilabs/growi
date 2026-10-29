@@ -1,7 +1,7 @@
 # Technical Design — chat-integration（umbrella）
 
 > **本書は全体像と分担だけを持つ。** 部品の設計は 3 つの sub-spec にある。
-> 要件は本ディレクトリの `requirements.md`（14 件・受け入れ条件 107 件）。設計判断の根拠は `research.md`（決定 1〜10）。
+> 要件は本ディレクトリの `requirements.md`（14 件・受け入れ条件 112 件）。設計判断の根拠は `research.md`（決定 1〜10）。
 > 分割の経緯と方針は `roadmap.md`。
 
 ## Sub-spec の分担
@@ -27,7 +27,7 @@
 | 3. 複数の GROWI をまたぐ検索 | 3.1–3.14 | `app` / `protocol` / `proxy` |
 | 4. チャットからのページ作成 | 4.1–4.6 | `app` / `proxy` |
 | 5. チャットの会話の取り込み | 5.1–5.6 | `app` / `proxy` |
-| 6. GROWI の URL の展開 | 6.1–6.8 | `app` / `proxy` |
+| 6. GROWI の URL の展開 | 6.1–6.13 | `app` / `proxy` |
 | 7. チャットの利用者と GROWI ユーザーの紐付け | 7.1–7.8 | `app` / `protocol` |
 | 8. 1 つの workspace に複数の GROWI が紐づくときの振る舞い | 8.1–8.6 | `proxy` |
 | 9. chat-integration proxy と GROWI の紐付け | 9.1–9.7 | `protocol` / `proxy` |

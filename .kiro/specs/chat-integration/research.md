@@ -480,6 +480,18 @@ createSlackAdapter({
   一覧の行とイベントの id が一致することと、契約の id が往復して元の Chat SDK の形に戻ることは、本物のアダプタを使う
   テストで確かめる。Teams の扱いは未解決のまま残っている。
 
+### 決定 15: URL の展開で、ログインが必要な GROWI でも出すのは、公開範囲が「公開」のページの題名と更新日時に限る
+
+- **Context**: ログインしていない人の閲覧を許さない GROWI（`security:restrictGuestMode` が `Deny` など）では、
+  公開範囲が「公開」のページでも展開がパスだけ（固定リンクでは固定文言だけ）になり、社内向けの GROWI のほとんどで
+  URL の展開がほぼ使えなかった（2026-10-26 の Slack での実機試験）。
+- **Alternatives Considered**: 公開範囲に関わらず題名を出す（Notion に近い）／公開範囲が「公開」のページに限って題名を出す（Confluence Cloud に近い）
+- **Selected Approach**: 公開範囲が「公開」のページに限り、題名（パスで指す URL ならパス）と更新日時を出す。本文の冒頭とコメント数は出さない（要件 6.9〜6.13）
+- **Rationale**: GROWI の題名はパスの最後の部分で、利用者が中身を表す言葉を書くことが多い。公開範囲を絞ったページでは題名を出すこと自体が漏れになる。
+  公開範囲が「公開」のページは、その GROWI にログインできる人なら誰でも題名と更新日時を見られる。
+- **Follow-up**: 理由の詳細、`GRANT_RESTRICTED` を「公開」に含めない理由、固定リンクで題名だけを出す理由、採らなかった案は
+  [chat-integration-app の research.md](../chat-integration-app/research.md)。投稿者に「全員に見せるか」を尋ねる確認フローは roadmap の順 10 で扱う
+
 ## Risks & Mitigations
 
 | リスク | 緩和 |

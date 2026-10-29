@@ -343,7 +343,7 @@ Chat SDK は DM のメッセージを mention として届けるので、DM で�
 - `no-workspace`（Discord の DM）: 「Discord では DM から bot に呼びかけることはできません。bot を追加したチャンネルで呼びかけてください。」（`orchestration/no-workspace-wording.ts`。`CommandFlow` と `AdminFlow` が同じ文を使う）。`AdminFlow` は権限を読む前にこれを返す（権限は installation を通して読むので、先に読むと「proxy の設定の問題」と誤って案内する）。リンクの展開は何も言わない（要件 6.4）
 - それ以外（イベントの workspace に installation が無く、一覧にも無い）: 今までどおり「このチャットの workspace がまだ登録されていません。」
 
-**DM で installation が決まったあと**: DM でも、チャンネル単位の権限の判定（`@growi/chat` の `judge`。proxy の `judgeEach` と GROWI の `checkChannelPermission` が同じ関数を使う）にそのまま届く。読み取りのコマンドは既定で許される。書き込みのコマンドは、権限の行が無ければ `no-settings` で断られるが、関係の権限が `'all'`（管理画面の「すべてのチャンネル」）なら DM からも許される（`create-page` など）。このときも GROWI では紐付けた利用者として動き、他の workspace の GROWI には届かない。**「すべてのチャンネル」には DM を含める**（利用者が決めた）。Discord の DM の扱いは未決で、`chat-integration-agent` が要件 11 に DM の扱いを足すときに決める。リンクの展開も DM で動く（出るのは、ログインしていない人も見られるページの題名などだけ）
+**DM で installation が決まったあと**: DM でも、チャンネル単位の権限の判定（`@growi/chat` の `judge`。proxy の `judgeEach` と GROWI の `checkChannelPermission` が同じ関数を使う）にそのまま届く。読み取りのコマンドは既定で許される。書き込みのコマンドは、権限の行が無ければ `no-settings` で断られるが、関係の権限が `'all'`（管理画面の「すべてのチャンネル」）なら DM からも許される（`create-page` など）。このときも GROWI では紐付けた利用者として動き、他の workspace の GROWI には届かない。**「すべてのチャンネル」には DM を含める**（利用者が決めた）。Discord の DM の扱いは未決で、`chat-integration-agent` が要件 11 に DM の扱いを足すときに決める。リンクの展開も DM で動く（出る中身はチャンネルに貼ったときと同じで、要件 6 のとおり GROWI が決める。下記「CommandFlow.previewLinks — URL の展開の表示」）
 
 #### 聞き返しの届け方と、DM での答え（要件 1.14・1.16）
 
@@ -492,7 +492,7 @@ apps/chat-integration-proxy/
 | `SearchFusion` | `growi/search-fusion.ts` | 重みつきの式で 1 本に統合 | 3.2, 3.3, 3.8 |
 | `GrowiClient` | `growi/growi-client.ts` | 署名つきで GROWI を呼ぶ（`GrowiUriResolver` を通す）。**受け取った応答は必ず検査関数を通す**（`parseCommandResponse` ほか。応答に署名は付かないので形の確かめが唯一の受け入れ条件） | 3.1, 4.2, 5.2, 7.3, 9.2, 10.1, 10.5, 14.2 |
 | `EventSink` | `orchestration/event-sink.ts` | イベントを受けて各層を呼ぶ | 1.1, 1.2, 3.1, 4.1, 6.1, 14.1 |
-| `CommandFlow` / `AdminFlow` | `orchestration/command-flow.ts`・`admin-flow.ts` | コマンドを順に実行する。本人宛ての返事は `PrivateReplier` で、チャンネル向けの返事は `post` で出す | 1.14, 3.10–3.14 ほか |
+| `CommandFlow` / `AdminFlow` | `orchestration/command-flow.ts`・`admin-flow.ts` | コマンドを順に実行する。本人宛ての返事は `PrivateReplier` で、チャンネル向けの返事は `post` で出す | 1.14, 3.10–3.14, 6.13 ほか |
 | **`SignatureGuard`** | `routes/signature-guard.ts` | **届くリクエストの署名を検証する。この proxy の一番外側の守り** | **10.1, 10.2, 10.3, 10.4** |
 | `InboundFlow` | `orchestration/inbound-flow.ts` | GROWI からの通知・設定・鍵の追加と失効 | 2.1–2.6, **10.5**, **10.7**, 11.4 |
 
@@ -1085,6 +1085,19 @@ export const privateReplyOriginOf: (invocation: Invocation, installationId: stri
 
 既知の問題（DM の先頭の `@誰か` など）は proxy の research.md の「既知の問題」。
 
+
+### CommandFlow.previewLinks — URL の展開の表示
+
+`previewLinks` は GROWI から届いた `link-preview` の応答を、`previewMarkdown`（`orchestration/command-flow.ts`）で markdown にして、リンクを貼ったメッセージに `attachPreview` で添える。`link-preview` 以外の応答（`error`・`account-link-required`）は黙って捨てる。
+
+| 応答 | 表示 |
+|---|---|
+| `restricted: false` | 1 行目に `<GROWI の表示名>: <path>`、続けて本文の冒頭、最後に `更新: <updatedAt> / コメント: <commentCount>`（届いたものだけ） |
+| `restricted: true` | 1 行目に `<GROWI の表示名>: <path>`。`updatedAt` が届いていれば 2 行目に `更新: <updatedAt>`（要件 6.13） |
+
+- `restricted: true` のときは、`excerpt` と `commentCount` が届いても表示しない（要件 6.3・6.13）。GROWI 側も含めない決まりだが、proxy でも出さない
+- `path` が実在のパスか、題名か、固定文言かを proxy は区別しない。何を出すかは GROWI が決める（protocol の design.md の `CommandResponse` の説明）
+- `updatedAt` は GROWI から届いた文字列をそのまま出す（`restricted` の値によらず同じ書き方）
 
 ### FanOutCollector（検索とヘルプで共用）
 
