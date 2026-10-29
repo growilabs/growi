@@ -48,6 +48,9 @@ const marpitOption: MarpOptions = {
   emoji: undefined,
   html: false,
   math: false,
+  // The CSS minifier breaks when Turbopack drops "use strict" from client chunks.
+  // Revert once https://github.com/vercel/next.js/issues/100617 is fixed.
+  minifyCSS: false,
 };
 
 const slideMarpitOption = marpitOption;
