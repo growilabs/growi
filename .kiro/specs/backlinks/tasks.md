@@ -464,7 +464,7 @@ skeleton) and the B1 extractor; the new code is the in-memory `{path→_id}` map
 sink (Prisma raw commands; `pagelinks` has no `Model.bulkWrite`), the paced loop, the atomic claim, the coverage record, and the admin endpoints and section.
 Independent of B4/B5.
 
-- [ ] B3.1 Add the backfill job state model
+- [x] B3.1 Add the backfill job state model
   - Add a single-document model tracking backfill `status` (`idle` / `requested` / `running` /
     `complete` / `failed`; plus `stopped`), the admin's
     `requestedScope` and `requestedAt` and `stopRequested`, the run's `runCutoff`

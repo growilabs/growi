@@ -56,6 +56,11 @@ export const NON_TRANSFERABLE_COLLECTIONS: ReadonlySet<string> = new Set([
   'pagebulkexportpagesnapshots',
   'pageoperations',
 
+  // The backlinks backfill's control document: which process holds the lease, and how far
+  // the scan has got. Carrying it would make the destination believe its own backfill is
+  // already done (or held by a process that does not exist there).
+  'pagelinkbackfilljobs',
+
   // Mail that this environment failed to send and will retry.
   'failedemails',
 

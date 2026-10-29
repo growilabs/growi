@@ -398,6 +398,43 @@ model pagebulkexportpagesnapshots {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 }
 
+// The scope an administrator picked for a backfill run: all pages, the newest `maxPages` pages,
+// or the pages edited since `since`. Exactly one of the two optional fields is set for the
+// latter two kinds.
+type PagelinkbackfilljobsRequestedScope {
+  kind     String
+  maxPages Int?
+  since    DateTime?
+}
+
+model pagelinkbackfilljobs {
+  // The single control/status document of the backlinks backfill. Prisma-only and `v`-less like
+  // pagelinks. GROWI.cloud infra reads `status`, `coverage`, `coveredSince`, `processed`,
+  // `completedAt` and `lastError` directly to watch progress, so this collection name and
+  // those field names are an operator contract. The admin endpoints write the request fields
+  // (`requestedScope`, `requestedAt`, `stopRequested`); the job writes everything else.
+  id             String                              @id @default(auto()) @map("_id") @db.ObjectId
+  // idle / requested / running / stopped / complete / failed
+  status         String                              @default("idle")
+  requestedScope PagelinkbackfilljobsRequestedScope?
+  requestedAt    DateTime?
+  stopRequested  Boolean                             @default(false)
+  // Fixed at the run's first claim so they do not float across restarts.
+  runCutoff      DateTime?
+  runTotal       Int?
+  // none / partial / all. `coveredSince` is the `updatedAt` boundary every page at or after
+  // which has been backfilled; it moves only when a run completes.
+  coverage       String                              @default("none")
+  coveredSince   DateTime?
+  // The last `_id` processed in the current run; reset when a run starts.
+  progressMarker String?                             @db.ObjectId
+  processed      Int                                 @default(0)
+  completedAt    DateTime?
+  lastError      String?
+  claimedBy      String?
+  leaseExpiresAt DateTime?
+}
+
 model pagelinks {
   // No `v`/`__v`: this collection is prisma-only and has never been written by
   // mongoose, so it carries no optimistic-concurrency version key — same as the other
