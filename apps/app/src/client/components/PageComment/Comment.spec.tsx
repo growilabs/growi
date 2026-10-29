@@ -42,6 +42,18 @@ vi.mock('~/features/comment-reaction/client', () => ({
       data-read-only={String(props.isReadOnly)}
     />
   ),
+  CommentReactionHeaderButton: (props: {
+    pageId: string;
+    commentId: string;
+    isReadOnly: boolean;
+  }) => (
+    <span
+      data-testid="comment-reaction-header-button"
+      data-page-id={props.pageId}
+      data-comment-id={props.commentId}
+      data-read-only={String(props.isReadOnly)}
+    />
+  ),
 }));
 
 vi.mock('./Comment.module.scss', () => ({
@@ -362,5 +374,37 @@ describe('Comment — reaction bar', () => {
       'data-read-only',
       'true',
     );
+  });
+});
+
+describe('Comment — add-reaction button', () => {
+  it('sits in the header row right after the history link, outside the body and the footer', () => {
+    const { container } = renderComment(baseComment, { isReadOnly: false });
+
+    const button = screen.getByTestId('comment-reaction-header-button');
+    const header = container.querySelector('.page-comment-main > .d-flex');
+    const historyLink = container.querySelector(
+      `#page-comment-revision-${baseComment._id}`,
+    );
+    expect(header).toContainElement(button);
+    expect(historyLink).not.toBeNull();
+    expect(
+      (historyLink as Element).compareDocumentPosition(button) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // `.icon-button-container` hides with `visibility`, which would drop it from the tab order.
+    expect(historyLink?.parentElement).not.toContainElement(button);
+    expect(container.querySelector('.page-comment-body')).not.toContainElement(
+      button,
+    );
+  });
+
+  it('is told which comment it acts on and whether the hosting view is read-only', () => {
+    renderComment(baseComment, { isReadOnly: true });
+
+    const button = screen.getByTestId('comment-reaction-header-button');
+    expect(button).toHaveAttribute('data-page-id', 'page1');
+    expect(button).toHaveAttribute('data-comment-id', baseComment._id);
+    expect(button).toHaveAttribute('data-read-only', 'true');
   });
 });

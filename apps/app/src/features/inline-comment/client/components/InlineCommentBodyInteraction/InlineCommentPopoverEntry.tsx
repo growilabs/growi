@@ -30,7 +30,10 @@ import { DeleteConfirmAlert } from '~/client/components/PageComment/DeleteConfir
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
 import { Username } from '~/components/User/Username';
 import type { ICommentCreatorSummary } from '~/features/comment/interfaces';
-import { CommentReactionBar } from '~/features/comment-reaction/client';
+import {
+  CommentReactionBar,
+  CommentReactionHeaderButton,
+} from '~/features/comment-reaction/client';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 
 import { MentionPickerButton } from '../InlineCommentForm/MentionPickerButton';
@@ -132,7 +135,7 @@ export const InlineCommentPopoverEntry = (
   };
 
   return (
-    <div className="comment-reaction-hover-scope">
+    <div>
       <div
         data-testid={`${testIdPrefix}-header`}
         className="d-flex align-items-center gap-2"
@@ -155,6 +158,12 @@ export const InlineCommentPopoverEntry = (
           <FormattedDistanceDate id={id} date={createdAt} />
         </span>
         <span className="ms-auto d-flex align-items-center gap-2">
+          {/* First, so the controls below keep their positions and the close button stays last. */}
+          <CommentReactionHeaderButton
+            pageId={pageId}
+            commentId={id}
+            isReadOnly={false}
+          />
           {/* The author-only controls come first so `headerExtra`'s close
               button stays the last element of the row. They are hidden while
               this entry is being edited or awaiting delete confirmation --

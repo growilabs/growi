@@ -32,10 +32,7 @@ vi.mock('~/stores-universal/use-next-themes', () => ({
   useNextThemes: () => ({ resolvedTheme: 'light' }),
 }));
 vi.mock('./CommentReactionBar.module.scss', () => ({
-  default: {
-    'reaction-bar': 'reaction-bar',
-    'reaction-bar-empty': 'reaction-bar-empty',
-  },
+  default: { 'reaction-bar': 'reaction-bar' },
 }));
 // Stands in for the lazily loaded emoji-mart picker; the real one is covered in @growi/editor.
 vi.mock('@growi/editor/dist/client/components/EmojiPicker', () => ({
@@ -134,7 +131,7 @@ describe('CommentReactionBar', () => {
     expect(addButton()).not.toBeNull();
   });
 
-  it('marks the bar as empty, keeping the add button focusable under its accessible name, when there are no chips', async () => {
+  it('takes no space when the comment has no reactions, leaving the add button to the header', () => {
     setup({ chips: [] });
 
     const { container } = render(
@@ -145,26 +142,8 @@ describe('CommentReactionBar', () => {
       />,
     );
 
-    expect(container.querySelector('.reaction-bar-empty')).not.toBeNull();
-    const button = addButton() as HTMLElement;
-    expect(button).not.toBeNull();
-    await userEvent.tab();
-    expect(document.activeElement).toBe(button);
-  });
-
-  it('does not mark the bar as empty once the comment has a chip', () => {
-    setup({ chips: [makeChip()] });
-
-    const { container } = render(
-      <CommentReactionBar
-        pageId="page1"
-        commentId="comment1"
-        isReadOnly={false}
-      />,
-    );
-
-    expect(container.querySelector('.reaction-bar')).not.toBeNull();
-    expect(container.querySelector('.reaction-bar-empty')).toBeNull();
+    expect(container.firstChild).toBeNull();
+    expect(addButton()).toBeNull();
   });
 
   it('reads the chips of the given comment and gates on the isReadOnly it was given', () => {
@@ -243,21 +222,6 @@ describe('CommentReactionBar', () => {
     );
 
     expect(container.firstChild).toBeNull();
-  });
-
-  it('shows only the add button when there are no chips and reactions are allowed', () => {
-    setup({ chips: [] });
-
-    render(
-      <CommentReactionBar
-        pageId="page1"
-        commentId="comment1"
-        isReadOnly={false}
-      />,
-    );
-
-    expect(addButton()).not.toBeNull();
-    expect(screen.queryByRole('button', { name: /reacted_count/ })).toBeNull();
   });
 
   it.each([

@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import type { JSX, RefObject } from 'react';
 import { useCallback, useRef, useState } from 'react';
 import {
   EmojiPicker,
@@ -12,6 +12,7 @@ import { useNextThemes } from '~/stores-universal/use-next-themes';
 import type { ReactionKey } from '../../../interfaces';
 import { MAX_REACTION_KINDS_PER_COMMENT } from '../../../interfaces';
 import { fromPickerSelection } from '../../../utils';
+import { reactionAddButtonAttributes } from '../../utils/focus-add-reaction-button';
 
 import styles from './CommentReactionBar.module.scss';
 
@@ -21,20 +22,27 @@ type AddReactionButtonProps = {
   readonly chipCount: number;
   /** Disables the button while a write is in flight. */
   readonly isUpdating?: boolean;
-  readonly onAdd: (emoji: ReactionKey) => void;
+  /** Lets the hosting view style or place the button without the reaction feature knowing its classes. */
+  readonly className?: string;
+  /** Lets the host find where this button sits, e.g. to hand its focus on after it unmounts. */
+  readonly rootRef?: RefObject<HTMLSpanElement>;
+  readonly onAdd: (emoji: ReactionKey) => void | Promise<void>;
 };
 
 export const AddReactionButton = ({
   canReact,
   chipCount,
   isUpdating = false,
+  className,
+  rootRef,
   onAdd,
 }: AddReactionButtonProps): JSX.Element | null => {
   const { t } = useTranslation();
   const { resolvedTheme } = useNextThemes();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   // A ref target: useId() output contains colons, which reactstrap cannot resolve as a selector.
-  const wrapperRef = useRef<HTMLSpanElement>(null);
+  const ownRef = useRef<HTMLSpanElement>(null);
+  const wrapperRef = rootRef ?? ownRef;
 
   const openPicker = useCallback(() => {
     setIsPickerOpen(true);
@@ -51,7 +59,7 @@ export const AddReactionButton = ({
       if (!key.ok) {
         return;
       }
-      onAdd(key.value);
+      void onAdd(key.value);
     },
     [onAdd],
   );
@@ -65,12 +73,20 @@ export const AddReactionButton = ({
   return (
     <>
       {/* A disabled button emits no mouse events, so the tooltip hangs off its wrapper. */}
-      <span ref={wrapperRef} className={styles['add-reaction']}>
+      <span
+        ref={wrapperRef}
+        className={
+          className != null
+            ? `${styles['add-reaction']} ${className}`
+            : styles['add-reaction']
+        }
+      >
         <button
           type="button"
           className={styles['add-reaction-button']}
           aria-label={t('comment_reaction.add_reaction')}
           aria-haspopup="dialog"
+          {...reactionAddButtonAttributes}
           disabled={isLimitReached || isUpdating}
           onClick={openPicker}
         >

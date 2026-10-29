@@ -49,7 +49,7 @@
 - `PUT /_api/v3/comments/:id/reactions` の契約（入力、応答、認可、エラー）
 - 1コメントあたりの絵文字の種類数の上限（`MAX_REACTION_KINDS_PER_COMMENT`）
 - 監査ログの action `COMMENT_REACTION_ADD` / `COMMENT_REACTION_REMOVE` と、その snapshot の variant（`CommentReactionSnapshot`）
-- 画面のリアクションの部品群（`CommentReactionBar` ほか）と、コメント一覧のキャッシュからリアクションを読み書きするフック
+- 画面のリアクションの部品群（`CommentReactionBar`、`CommentReactionHeaderButton` ほか）と、コメント一覧のキャッシュからリアクションを読み書きするフック。client の公開口はこの2つの部品だけで、コメントの表示部品 → リアクションの部品の一方向にだけ依存する（リアクション側はコメント側のコンポーネント・クラス名を知らない）
 - `packages/editor` の公開コンポーネント `EmojiPicker`（エディタに依存しない、遅延読み込みのピッカー）
 - `@growi/emoji-mart-data` の出力の拡張（肌の色違いのグリフ、別名の対応表）
 - **書き戻しまでの間だけ**: `comment` スペックの契約の変更（`ICommentListItem.reactions`、`GET /_api/v3/comments/:id`）。書き戻した後は `comment` スペックが持つ
@@ -115,6 +115,7 @@ graph TB
     subgraph Client
         CommentViews[Comment views]
         ReactionBar[CommentReactionBar]
+        HeaderButton[CommentReactionHeaderButton]
         ReactionHooks[comment reaction hooks]
         CommentListStore[useSWRxCommentList]
         Picker[EmojiPicker in editor package]
@@ -135,6 +136,8 @@ graph TB
     DeletePaths[comment delete paths]
     Activity[activity event]
     CommentViews --> ReactionBar
+    CommentViews --> HeaderButton
+    HeaderButton --> ReactionHooks
     ReactionBar --> ReactionHooks
     ReactionBar --> Picker
     ReactionHooks --> CommentListStore
@@ -215,10 +218,12 @@ apps/app/src/features/comment-reaction/
     │   ├── classify-reaction-update-failure.ts      # PUT の失敗 → 利用者に示す失敗の種類（純粋関数）
     │   └── classify-reaction-update-failure.spec.ts
     └── components/
-        ├── index.ts                 # 公開: CommentReactionBar だけ
+        ├── index.ts                 # 公開: CommentReactionBar と CommentReactionHeaderButton だけ
         └── CommentReactionBar/
-            ├── CommentReactionBar.tsx       # 1コメント分のチップ列と「リアクション追加」
+            ├── CommentReactionBar.tsx       # 1コメント分のチップ列（1件以上あるとき、末尾に「リアクション追加」）
             ├── CommentReactionBar.spec.tsx
+            ├── CommentReactionHeaderButton.tsx  # リアクションが 0 件のコメントのヘッダー用「リアクション追加」
+            ├── CommentReactionHeaderButton.spec.tsx
             ├── CommentReactionBar.module.scss
             ├── ReactionChip.tsx             # 絵文字の部分（追加・解除）と人数の部分（利用者一覧を開く）、自分の強調
             ├── ReactionChip.spec.tsx
@@ -272,8 +277,9 @@ packages/editor/src/client/components/EmojiPicker/
 - `apps/app/src/server/models/activity.ts` — `createByParameters` の `snapshotData` と `buildSnapshotUpdateEnvelope` に `emoji` を足す。両者が読む型を `AttachmentRemoveSnapshot` から `SnapshotFields` に広げる。Mongoose の `snapshotSchema` には足さない（「Activity 定義の拡張」を参照）。
 - `apps/app/src/server/service/import/non-transferable-collections.ts` — `TRANSFERABLE_COLLECTIONS` に `'commentreactions'` を追加。
 - `apps/app/src/server/service/import/overwrite-params/index.ts` — `generateOverwriteParams` に `case 'commentreactions'` を追加し、`comment-reactions.ts` の params を返す。
-- `apps/app/src/client/components/PageComment/Comment.tsx` — `CommentCard` の `footer` に `CommentReactionBar` を追加（`isReadOnly` を渡す）。
-- `apps/app/src/features/inline-comment/client/components/InlineCommentItem/InlineCommentItem.tsx`、`InlineCommentReplies.tsx`、`InlineCommentBodyInteraction/InlineCommentPopoverEntry.tsx` — `footer` に `CommentReactionBar` を追加。`CollapsedInlineCommentItem` には追加しない（折りたたみ表示では本文も出さないため）。
+- `apps/app/src/client/components/PageComment/Comment.tsx` — `CommentCard` の `footer` に `CommentReactionBar` を追加（`isReadOnly` を渡す）。`headerEnd` の「投稿時のページを表示」の直後に `CommentReactionHeaderButton` を置く。
+- `apps/app/src/features/inline-comment/client/components/InlineCommentItem/InlineCommentItem.tsx`、`InlineCommentReplies.tsx`、`InlineCommentBodyInteraction/InlineCommentPopoverEntry.tsx` — `footer`（ポップオーバーは本文の下）に `CommentReactionBar` を追加し、ヘッダーに `CommentReactionHeaderButton` を置く。置き場所は、「投稿時のページを表示」のあるヘッダー（末尾のコメント、インラインコメントの原本（広い画面）と返信）ではその直後、無いヘッダー（インラインコメントの原本（狭い画面。履歴は ⋮ のメニューの中）、ポップオーバーの各項目）では右側の操作の並びの先頭。`CollapsedInlineCommentItem` には追加しない（折りたたみ表示では本文も出さないため）。
+- `apps/app/src/client/components/PageComment/_comment-inheritance.scss` — ヘッダーの「リアクション追加」を、コメントにマウスを乗せたとき、またはフォーカスしたときだけ表示する mixin（`reveal-reaction-add-control`）。ホバーの範囲（どの要素にマウスを乗せると出るか）はコメント側が持つので、`Comment.module.scss` と `InlineCommentItem.module.scss` がそれぞれ `.page-comment-main` の中で include する。ポップオーバーは include せず、編集・削除と同じく常に表示する（短時間しか表示されず、操作を見つけにくいと困るため）。
 - `apps/app/public/static/locales/{en_US,fr_FR,ja_JP,ko_KR,zh_CN}/translation.json` — `comment_reaction.*` の文言を追加。
 - `apps/app/public/static/locales/{en_US,fr_FR,ja_JP,ko_KR,zh_CN}/admin.json` — `COMMENT_REACTION_ADD` / `COMMENT_REACTION_REMOVE` の表示名を追加。
 - `packages/emoji-mart-data/bin/build-lookup.ts`（`buildLookup` / `buildAliases`。`extract.ts` から切り出した純粋関数）とそのテスト。
@@ -352,7 +358,7 @@ graph TB
 | 1.5, 1.10 | リアクションした利用者の表示、退会者は投稿者と同じ規則 | summarizeReactions, ReactionChip, ReactionUsersPopover | `ReactionUser`（`ReactionUserSummary` または ID 文字列）、人数の部分のクリック・タップで開く Popover | — |
 | 1.6 | 最初に付いた順 | summarizeReactions | チップの並び（残っている行の最小 `createdAt` の昇順） | — |
 | 1.7 | リアクションが無ければチップなし | CommentReactionBar | `reactions: []` | — |
-| 1.8 | 末尾のコメント欄とインラインコメントの両方 | CommentReactionBar の差し込み先 | `CommentCard.footer` | — |
+| 1.8 | 末尾のコメント欄とインラインコメントの両方 | CommentReactionBar の差し込み先 | `CommentCard.footer`（ポップオーバーは本文の下） | — |
 | 1.9 | 退会・削除された利用者も人数に数える | summarizeReactions | `count` は行数 | — |
 | 2.1, 2.2, 2.3 | チップの押下で追加・解除、0 で非表示 | ReactionChip, useCommentReactions, update route | `PUT /comments/:id/reactions` | 追加・解除 |
 | 2.4, 2.5 | 同一絵文字は1つ、異なる絵文字は複数 | commentreactions model, index migration | 一意インデックス `(comment, user, emoji)`（migration で作成） | — |
@@ -360,11 +366,11 @@ graph TB
 | 2.7, 2.8 | 古い画面からの重複要求は成功扱い | CommentReactionService | `{ changed: false }` | 追加・解除 |
 | 2.9 | 完了後に最新の状態を表示 | update route, getCommentListItem, useCommentReactions | PUT の応答の `comment`、キャッシュの1件の置き換え | 追加・解除 |
 | 2.10 | 失敗の表示と操作前の状態 | useCommentReactions, classifyReactionUpdateFailure | 楽観的更新なし（失敗してもキャッシュを変えない）、失敗の種類ごとの `toastError`、一覧の取り直し | 追加・解除 |
-| 3.1, 3.2 | 「リアクション追加」でピッカーを開く | AddReactionButton, EmojiPicker | `EmojiPickerProps` | — |
+| 3.1, 3.2 | 「リアクション追加」でピッカーを開く | AddReactionButton, CommentReactionHeaderButton, EmojiPicker | `EmojiPickerProps` | — |
 | 3.3, 3.4 | 新規はチップ追加、既存は追加と同じ扱い | AddReactionButton, reaction-key | `fromPickerSelection` → PUT | 追加・解除 |
 | 3.5 | 肌の色の選択 | EmojiPicker | emoji-mart の `skin` / `skinTonePosition` | — |
 | 3.6 | 閉じたら変更しない | AddReactionButton | `onClose` | — |
-| 3.7 | インラインコメントと返信にも「リアクション追加」と追加・解除 | CommentReactionBar の差し込み先 | — | — |
+| 3.7 | インラインコメントと返信にも「リアクション追加」と追加・解除 | CommentReactionBar と CommentReactionHeaderButton の差し込み先 | `CommentCard.headerEnd`、ポップオーバーのヘッダー | — |
 | 4.1, 4.2 | 標準絵文字だけ、存在しない絵文字は拒否 | reaction-key, update route | 400 `invalid-reaction-emoji` | — |
 | 4.3, 4.4 | 肌の色は 2〜6、非対応の絵文字への肌の色は拒否 | reaction-key | `ParsedReactionKey.skinTone` | — |
 | 4.5 | 別名を1つの絵文字として扱う | reaction-key | `normalizeReactionKey` | — |
@@ -417,7 +423,8 @@ graph TB
 | useCommentReactions | Client / hook | 一覧のキャッシュから読み、PUT の応答で1件を置き換える。失敗時はエラーを示して一覧を取り直す | 1.1, 2.1, 2.2, 2.9, 2.10, 6.5, 7.2 | useSWRxCommentList（P0）、apiv3-client（P0）、classifyReactionUpdateFailure（P0） | State |
 | classifyReactionUpdateFailure | Client / utils | PUT の失敗を、利用者に示す種類に分ける（純粋関数） | 2.10, 7.2 | — | Service |
 | useCanReactToComments | Client / hook | 画面上のリアクション可否 | 5.4–5.8, 6.2 | context フック（P0） | State |
-| CommentReactionBar | Client / UI | 1コメント分のチップ列と「リアクション追加」 | 1.1–1.8, 2.3, 3.1, 3.7, 6.2, 6.3, 6.5 | hooks（P0） | — |
+| CommentReactionBar | Client / UI | 1コメント分のチップ列（1件以上あるとき末尾に「リアクション追加」） | 1.1–1.8, 2.3, 3.1, 3.7, 6.2, 6.3, 6.5 | hooks（P0） | — |
+| CommentReactionHeaderButton | Client / UI | リアクションが 0 件のコメントのヘッダー用「リアクション追加」 | 3.1, 3.7, 5.4, 5.6, 6.2, 6.5 | hooks（P0）、AddReactionButton（P0） | — |
 | ReactionChip | Client / UI | チップの表示、絵文字の部分の押下（追加・解除）、人数の部分の押下（利用者一覧） | 1.2, 1.4, 1.5, 1.10, 2.1, 2.2, 6.2 | reaction-key（P0）、ReactionUsersPopover（P0） | — |
 | ReactionUsersPopover | Client / UI | リアクションした利用者の一覧 | 1.5, 1.10, 6.2 | reactstrap `Popover`（P0） | — |
 | AddReactionButton | Client / UI | 「リアクション追加」とピッカー、上限時の無効化 | 3.1–3.6, 7.2 | EmojiPicker（P0） | — |
@@ -823,7 +830,7 @@ declare function useCanReactToComments(isReadOnly: boolean): boolean;
 
 | Field | Detail |
 |-------|--------|
-| Intent | 1コメント分のチップ列と「リアクション追加」を描画する |
+| Intent | 1コメント分のチップ列を描画し、チップが 1 件以上あるときだけ、その末尾に「リアクション追加」を置く |
 | Requirements | 1.1, 1.2, 1.3, 1.4, 1.7, 1.8, 2.3, 3.1, 3.7, 6.2, 6.3, 6.5 |
 
 ```typescript
@@ -833,9 +840,31 @@ type CommentReactionBarProps = {
   readonly isReadOnly: boolean;
 };
 ```
-- `useCommentReactions(pageId, commentId)` のチップを並べる。チップが無く、かつ `canReact` が false のときは何も描画しない（要件 1.7）。`chips` が `null`（サーバーで取り込めなかった）のときも何も描画しない（要件 6.5）。
+- `useCommentReactions(pageId, commentId)` のチップを並べる。チップが無いときは、`canReact` によらず何も描画しない（要件 1.7。チップの行は縦の面積を取らない。そのときの「リアクション追加」は `CommentReactionHeaderButton` が持つ）。`chips` が `null`（サーバーで取り込めなかった）のときも何も描画しない（要件 6.5）。
 - 差し込み先: `Comment.tsx`（`isReadOnly` を渡す。共有リンクの画面・検索結果のプレビューでは true）、`InlineCommentItem`、`InlineCommentReplyItem`、`InlineCommentPopoverEntry`（`isReadOnly = false`）。インラインコメントの部品は、共有リンクの画面と検索結果のプレビューでは描画されないので、その画面ではインラインコメントのリアクションも出ない（要件 6.3）。
 - `CommentCard` の `footer` は `.page-comment-main` の中にあり、`pointer-events` が有効なのでクリックできる。
+
+#### CommentReactionHeaderButton
+
+| Field | Detail |
+|-------|--------|
+| Intent | リアクションが 0 件のコメントの「リアクション追加」を、コメントのヘッダーに置けるようにする |
+| Requirements | 3.1, 3.7, 5.4, 5.6, 6.2, 6.5 |
+
+```typescript
+type CommentReactionHeaderButtonProps = {
+  readonly pageId: string;
+  readonly commentId: string;
+  readonly isReadOnly: boolean;
+  /** 置き場所の余白と、表示の出し分けは、ヘッダーを持つ側が渡す。 */
+  readonly className?: string;
+};
+```
+- `useCommentReactions` と `useCanReactToComments` を `CommentReactionBar` と同じ引数で呼び、`chips` が `null`・読み込み中・1 件以上のとき、`canReact` が false のときは何も描画しない（要件 5.4、5.6、6.2、6.5）。0 件のときだけ `AddReactionButton` を描画する。1 件以上になると、この部品は消え、`CommentReactionBar` の末尾の「リアクション追加」に替わる。ボタンは同時に1つしか存在しない（読み上げ名と E2E の `getByRole` が重ならない）。
+- **公開口を2つにする理由と依存の向き**: 追加ボタンをコメントのヘッダー（`CommentCard.headerEnd`）に置くには、フッターに置く `CommentReactionBar` とは別の場所に描画できる部品が要る。部品を公開しなければ、ヘッダーを作るコメント側が、リアクションの内部（`AddReactionButton`、フック）を直接 import することになる。そのため、ヘッダー用の入口を1つだけ足して公開する。依存の向きは、コメントの表示部品 → リアクションの部品の一方向のままで、リアクション側は `CommentCard` や `.page-comment-main` などコメント側の名前を import も参照もしない。
+- **最初のリアクションの後のフォーカス**: 最初のリアクションが付くと、このボタンが消えてフォーカスが `body` に落ちる。そのため追加の完了後（`setReaction` の後、次の描画フレーム）に、`CommentReactionBar` の行の末尾の追加ボタンへフォーカスを移す（`focusAddReactionButton(commentId, origin)`。同じコメントがページ下部のスレッドと本文のポップオーバーの両方に出ることがあるので、追加を始めたヘッダーの行（`origin`）から外側へたどり、そのコメントの行を最初に含む祖先の中の追加ボタンだけを探す。フォーカスが `body` にあるときだけ移し、利用者が別の要素へ動かしていたら動かさない。追加が失敗して行が現れなければ何も移さない。マウスで追加したときも同じ手順で移る）。バーと追加ボタンは、`data-reaction-bar-comment-id` と `data-reaction-add-button` の属性でこの関数が見つける（部品どうしの状態の受け渡しや、モジュールの共有状態を持たない）。
+- 2 つの部品はそれぞれ `useCommentReactions` を呼ぶ。チップは同じコメント一覧のキャッシュを読むので表示は常に一致する。更新中の状態（`isUpdating`）はフックごとに持つが、同時に操作できるのは、0 件のときはヘッダーのボタン、1 件以上のときはチップとフッターのボタンのどちらか一方だけなので、書き込みが重ならない。
+- **表示の出し分けはコメント側が持つ**: ヘッダーのボタンは、コメントにマウスを乗せたとき、またはボタンにキーボードでフォーカスしたときだけ表示する（ホバーできない端末と、本文のポップオーバーでは常に表示）。「どの要素にマウスを乗せると出るか」はコメント側の構造の知識なので、`className` で渡すクラス（`reaction-add-control`）を、コメント側の SCSS が `_comment-inheritance.scss` の mixin で定義する。リアクション側の SCSS は、コメント側のクラス名（`.page-comment-main` など）を参照しない。
 
 **Implementation Notes（ReactionChip / AddReactionButton / EmojiPicker）**
 - ReactionChip: 1つのチップを、見た目は1つの枠のまま、押せる部分を2つに分ける（要件 1.5。マウスでもタッチ端末でも同じ操作で、追加・解除と利用者の確認を区別できるようにする）。
@@ -844,7 +873,7 @@ type CommentReactionBarProps = {
   - 2つの部分は区切り線を引かず、絵文字の右側と人数の左側の余白を 0 にして詰める。絵文字だけのチップを想定して、高さは `min-height: 1.5rem` までにする（押せる部分は2つのまま）。
   - Popover の対象は、人数ボタンへの ref（`ReactionUsersPopover` の `target` は `RefObject<HTMLElement>`）。`useId()` の文字列はコロンを含み、reactstrap がセレクターとして解決できないため使わない（`apps/app/.claude/rules/ui-pitfalls.md`）。
 - ReactionUsersPopover: reactstrap の `Popover`（`trigger="legacy"`。クリック・タップで開き、外側のクリック・タップで閉じる）で、チップの `users` を `createdAt` の昇順のまま並べる。表示名は、`name` があれば `name`、無ければ `username`、ID 文字列ならそのまま（要件 1.10）。人数が多いときは、高さの上限を決めて中をスクロールさせる。
-- AddReactionButton: 見た目は Material Symbols Outlined の `add_reaction`（`material-symbols-outlined fs-5`、`aria-hidden`）で、読み上げ名は `button` の `aria-label`（`comment_reaction.add_reaction`）が担う。高さはチップと同じ `min-height: 1.5rem`。リアクションが 0 件のコメントでは、ふだんは見えなくし、そのコメントにマウスを乗せたとき、またはこのボタンにキーボードでフォーカスしたときに表示する（ホバーできない端末と、1 件以上あるコメントでは常に表示）。隠すのは `opacity: 0` で行い、`display` や `visibility` は使わない（Tab で到達でき、読み上げの名前も変わらない）。隠している間は `pointer-events: none` も付け、コメント本文の最終行に重なっても、クリックや文字の選択を受け取らない（表示したときに戻す）。0 件のときバーは高さ 0 になり、ボタンはコメントの下端に重ねて置くので、表示してもレイアウトは動かない。バーの直後にエラー文や削除確認が出ているときだけ、バーの下に 1rem の余白（`margin-bottom`。次の要素の余白と重なり、大きいほうだけが効く）を取り、ボタンと重ならないようにする。ホバーの範囲は `.page-comment-main`（ページ末尾のコメント、インラインコメントとその返信）と、ポップオーバーの各項目を包む `.comment-reaction-hover-scope` で、いずれもコメント1件ごとに独立している。`canReact` のときだけ描画する（要件 3.1、5.4、5.6、5.7）。ツールチップは常に表示し（ホバーとキーボードフォーカス）、通常は `comment_reaction.add_reaction` を示す。チップの数が `MAX_REACTION_KINDS_PER_COMMENT` 以上なら無効化し、ツールチップの文言を `comment_reaction.kind_limit_reached` に切り替えて上限に達したことを示す。サーバーの 409 を受けた場合は、`useCommentReactions` が同じ文言のトーストを出して一覧を取り直す（要件 7.2）。ピッカーの `onSelect` は `fromPickerSelection` でキーにし、`setReaction(key, true)` を呼ぶ（要件 3.3、3.4）。閉じたら何もしない（要件 3.6）。
+- AddReactionButton: 見た目は Material Symbols Outlined の `add_reaction`（`material-symbols-outlined fs-5`、`aria-hidden`）で、読み上げ名は `button` の `aria-label`（`comment_reaction.add_reaction`）が担う。高さはチップと同じ `min-height: 1.5rem`。自身は常に表示する（隠す処理は持たない）。リアクションが 0 件のコメントでは `CommentReactionHeaderButton` がヘッダーに置き、ホストが渡す `className` で、コメントにマウスを乗せたとき、またはこのボタンにキーボードでフォーカスしたときだけ表示される（ホバーできない端末では常に表示。隠すのは `opacity: 0` で行い、`display` や `visibility` は使わない。Tab で到達でき、読み上げの名前も変わらない。ヘッダーは本文と重ならないので、`pointer-events` は触らない）。1 件以上あるコメントでは `CommentReactionBar` がチップ行の末尾に常に表示する。ホバーの範囲は `.page-comment-main`（ページ末尾のコメント、インラインコメントとその返信）で、コメント1件ごとに独立している。本文のポップオーバーでは、編集・削除と同じく隠さず常に表示する。`canReact` のときだけ描画する（要件 3.1、5.4、5.6、5.7）。ツールチップは常に表示し（ホバーとキーボードフォーカス）、通常は `comment_reaction.add_reaction` を示す。チップの数が `MAX_REACTION_KINDS_PER_COMMENT` 以上なら無効化し、ツールチップの文言を `comment_reaction.kind_limit_reached` に切り替えて上限に達したことを示す。サーバーの 409 を受けた場合は、`useCommentReactions` が同じ文言のトーストを出して一覧を取り直す（要件 7.2）。ピッカーの `onSelect` は `fromPickerSelection` でキーにし、`setReaction(key, true)` を呼ぶ（要件 3.3、3.4）。閉じたら何もしない（要件 3.6）。
 - EmojiPicker（`packages/editor`）: props は `{ isOpen: boolean; onSelect: (selection: EmojiPickerSelection) => void; onClose: () => void; theme?: 'light' | 'dark' | 'auto' }`。`EmojiPickerSelection` は絵文字の種類を `kind` で見分ける判別ユニオンで、いまのメンバーは `{ kind: 'native'; id: string; skin?: number }` だけ。初めて開いたときに `@emoji-mart/react` と `@emoji-mart/data` を動的 import する（ページ表示時の読み込みを増やさない）。読み込みに失敗したときはエラーを `console.error` に記録して `onClose` を呼ぶ。親の開閉の状態が閉に戻るので、次に開いたときに読み込みをやり直せる（「リアクション追加」が効かなくなったままにならない）。`@emoji-mart/data` の既定の export は `sets/15/native.json` で、`@growi/emoji-mart-data` の抽出元（サーバーの検証の根拠）と同じデータなので、ピッカーで選べる絵文字はすべてサーバーの検証を通る。reactstrap の `Modal`（中央寄せ）で表示し、`modal-content` の背景・枠線・影（`box-shadow`）はすべて消して、ピッカーだけが見えるようにし、スマートフォンでも使える。`skinTonePosition` を有効にする（要件 3.5）。
 - 文言: `comment_reaction.add_reaction`、`comment_reaction.reacted_by`、`comment_reaction.reacted_count`、`comment_reaction.kind_limit_reached`、`comment_reaction.comment_unavailable`、`comment_reaction.update_failed` を5言語に追加する。
 
@@ -900,7 +929,8 @@ type CommentReactionBarProps = {
 - `useCommentReactions`: 一覧のキャッシュから該当コメントのチップを読むこと。PUT の成功で該当する1件だけが置き換わり、再取得しないこと。成功でも応答の `reactions` が `null` なら、置き換えずに一覧を取り直し、エラーを出さないこと。失敗（409、404、それ以外）では、取り直しの前にキャッシュが変わらないこと、種類ごとの文言でトーストが出ること、一覧が取り直されること、`setReaction` が reject しないこと。取り直しも失敗したとき、表示が操作前のまま残ること（要件 2.9、2.10、6.5、7.2）。
 - `classifyReactionUpdateFailure`: `reaction-kind-limit-exceeded` → `kind-limit-exceeded`、`notfound_or_forbidden` → `comment-unavailable`、`validation_failed`・`invalid-reaction-emoji`・`code` の無いエラー・配列でない値・通信の失敗 → `failed` になること。
 - `useCanReactToComments`: ゲスト、共有リンク、閲覧専用（許可あり／なし）、`isReadOnly`、ごみ箱のページでも判定が変わらないこと（要件 5.4〜5.8、6.2）。
-- `CommentReactionBar`: チップと人数の表示、自分のチップの `aria-pressed`、絵文字の部分を押すと API が呼ばれること、人数の部分を押すと利用者一覧（表示名、`username`、ID 文字列）が開き API は呼ばれないこと、`canReact` が false のとき「リアクション追加」が無く、絵文字の部分を押しても API を呼ばず、人数の部分からは利用者一覧が開くこと、上限で「リアクション追加」が無効になること、チップが無く読み取り専用なら何も描画しないこと、`chips` が `null` なら何も描画しないこと（要件 1.1〜1.7、1.10、3.1、6.2、6.5、7.2）。
+- `CommentReactionHeaderButton`: 0 件のときだけ「リアクション追加」が描画され、1 件以上・`canReact` が false・`chips` が `null` や読み込み中では何も描画されないこと、Tab で到達できること、選んだ絵文字で追加が要求されること、更新中は無効になること、渡した `className` が最も外側の要素に付くこと、最初のリアクションの追加でヘッダーのボタンが消えたあと、フォーカスがチップ行の末尾の追加ボタンへ移ること（同じコメントが2か所に出ているときは、追加を始めた側へ移ること、利用者が別の要素へ動かしていたら動かさないこと、失敗して行が現れないときは何も動かさないこと）。コメント側のヘッダー（`Comment`、`InlineCommentItem`（広い画面と狭い画面）、`InlineCommentReplies`、`InlineCommentPopoverEntry`）に置かれること、折りたたみ表示には無いこと、ポップオーバーでは表示の出し分けのクラスを渡さないこと。表示の出し分け（`opacity`、ホバー、フォーカス、本文と重ならない位置）は CSS の挙動なので E2E で確かめる（要件 3.1、3.7）。
+- `CommentReactionBar`: チップと人数の表示、自分のチップの `aria-pressed`、絵文字の部分を押すと API が呼ばれること、人数の部分を押すと利用者一覧（表示名、`username`、ID 文字列）が開き API は呼ばれないこと、`canReact` が false のとき「リアクション追加」が無く、絵文字の部分を押しても API を呼ばず、人数の部分からは利用者一覧が開くこと、上限で「リアクション追加」が無効になること、チップが無ければ（読み取り専用でなくても）何も描画しないこと、`chips` が `null` なら何も描画しないこと（要件 1.1〜1.7、1.10、3.1、6.2、6.5、7.2）。
 - `overwrite-params/comment-reactions`: 24 桁の16進文字列が ObjectId になること、不正な値はそのまま返ること、`emoji` の別名（肌の色つきを含む）が正規のキーになり、正規化できない値はそのまま返ること、`generateOverwriteParams('commentreactions', ...)` がこの params を返すこと（要件 10.2）。
 - `@growi/emoji-mart-data`: 既存の `skins[0]` の値が拡張前と一致すること、肌の色対応の絵文字が6件の `skins` を持つこと、`aliases` の存在。`@emoji-mart/data` の既定の export のすべての id（と肌の色）が `normalizeReactionKey` を通ること（ピッカーとサーバーの検証のずれの検出）。
 

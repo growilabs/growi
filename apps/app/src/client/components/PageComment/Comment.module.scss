@@ -51,6 +51,10 @@
       &:hover .icon-button-container {
         visibility: visible;
       }
+
+      // Not under `.icon-button-container`: `visibility: hidden` takes the add-reaction
+      // button out of the tab order.
+      @include comment-inheritance.reveal-reaction-add-control;
     }
 
     // comment body

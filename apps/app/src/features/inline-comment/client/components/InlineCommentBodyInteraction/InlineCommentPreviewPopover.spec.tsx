@@ -57,6 +57,18 @@ vi.mock('~/features/comment-reaction/client', () => ({
       data-read-only={String(props.isReadOnly)}
     />
   ),
+  CommentReactionHeaderButton: (props: {
+    pageId: string;
+    commentId: string;
+    isReadOnly: boolean;
+  }) => (
+    <span
+      data-testid="comment-reaction-header-button"
+      data-page-id={props.pageId}
+      data-comment-id={props.commentId}
+      data-read-only={String(props.isReadOnly)}
+    />
+  ),
 }));
 
 vi.mock('@popperjs/core', () => ({
@@ -1307,6 +1319,22 @@ describe('InlineCommentPreviewPopover — reaction bar', () => {
     for (const bar of bars) {
       expect(bar).toHaveAttribute('data-page-id', 'page1');
       expect(bar).toHaveAttribute('data-read-only', 'false');
+    }
+  });
+});
+
+describe('InlineCommentPreviewPopover — add-reaction button', () => {
+  it('puts an add-reaction button in the header of the origin comment and of each reply', () => {
+    renderPopover({
+      replies: [reply({ id: 'reply1' }), reply({ id: 'reply2' })],
+    });
+
+    const buttons = screen.getAllByTestId('comment-reaction-header-button');
+    expect(
+      buttons.map((button) => button.getAttribute('data-comment-id')).sort(),
+    ).toEqual(['comment1', 'reply1', 'reply2']);
+    for (const button of buttons) {
+      expect(button.closest('[data-testid$="-header"]')).not.toBeNull();
     }
   });
 });

@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 
 import { useCanReactToComments } from '../../hooks/use-can-react-to-comments';
 import { useCommentReactions } from '../../hooks/use-comment-reactions';
+import { reactionBarAttributes } from '../../utils/focus-add-reaction-button';
 import { AddReactionButton } from './AddReactionButton';
 import { ReactionChip } from './ReactionChip';
 
@@ -25,17 +26,15 @@ export const CommentReactionBar = ({
   );
   const canReact = useCanReactToComments(isReadOnly);
 
-  if (chips == null || (chips.length === 0 && !canReact)) {
+  // With no reaction the row takes no space; the header's add button (CommentReactionHeaderButton) covers that case.
+  if (chips == null || chips.length === 0) {
     return null;
   }
 
   return (
     <div
-      className={
-        chips.length === 0
-          ? `${styles['reaction-bar']} ${styles['reaction-bar-empty']}`
-          : styles['reaction-bar']
-      }
+      className={styles['reaction-bar']}
+      {...reactionBarAttributes(commentId)}
     >
       {chips.map((chip) => (
         <ReactionChip

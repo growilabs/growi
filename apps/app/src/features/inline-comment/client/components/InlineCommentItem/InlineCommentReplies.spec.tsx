@@ -50,6 +50,18 @@ vi.mock('~/features/comment-reaction/client', () => ({
       data-read-only={String(props.isReadOnly)}
     />
   ),
+  CommentReactionHeaderButton: (props: {
+    pageId: string;
+    commentId: string;
+    isReadOnly: boolean;
+  }) => (
+    <span
+      data-testid="comment-reaction-header-button"
+      data-page-id={props.pageId}
+      data-comment-id={props.commentId}
+      data-read-only={String(props.isReadOnly)}
+    />
+  ),
 }));
 
 // `InlineCommentReplyItem` reuses `InlineCommentItem.module.scss`'s
@@ -758,6 +770,38 @@ describe('InlineCommentReplies — reaction bar', () => {
     for (const bar of bars) {
       expect(bar).toHaveAttribute('data-page-id', 'page1');
       expect(bar).toHaveAttribute('data-read-only', 'false');
+    }
+  });
+});
+
+describe('InlineCommentReplies — add-reaction button', () => {
+  it('puts one add-reaction button per reply in that reply header, right after its history link', () => {
+    renderReplies({
+      replies: [reply({ id: 'reply1' }), reply({ id: 'reply2' })],
+    });
+
+    for (const id of ['reply1', 'reply2']) {
+      const button = document
+        .getElementById(id)
+        ?.querySelector<HTMLElement>(
+          '[data-testid="comment-reaction-header-button"]',
+        );
+      const historyLink = document.getElementById(
+        `page-comment-revision-${id}`,
+      );
+      expect(button).not.toBeNull();
+      expect(button).toHaveAttribute('data-comment-id', id);
+      expect(button).toHaveAttribute('data-page-id', 'page1');
+      expect(button).toHaveAttribute('data-read-only', 'false');
+      expect(
+        (historyLink as Element).compareDocumentPosition(
+          button as HTMLElement,
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      // `.icon-button-container` hides with `visibility`, which would drop it from the tab order.
+      expect(historyLink?.closest('.ms-2')).not.toContainElement(
+        button as HTMLElement,
+      );
     }
   });
 });

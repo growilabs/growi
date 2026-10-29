@@ -28,7 +28,10 @@ import { CommentEditor } from '~/client/components/PageComment/CommentEditor';
 import { CommentRevisionLink } from '~/client/components/PageComment/CommentRevisionLink';
 import { DeleteConfirmAlert } from '~/client/components/PageComment/DeleteConfirmAlert';
 import RevisionRenderer from '~/components/PageView/RevisionRenderer';
-import { CommentReactionBar } from '~/features/comment-reaction/client';
+import {
+  CommentReactionBar,
+  CommentReactionHeaderButton,
+} from '~/features/comment-reaction/client';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 import { useCurrentUser } from '~/states/global';
 
@@ -134,6 +137,12 @@ const InlineCommentReplyItem: FC<InlineCommentReplyItemProps> = (
                   revisionId={revisionId}
                 />
               </span>
+              <CommentReactionHeaderButton
+                pageId={pageId}
+                commentId={reply.id}
+                isReadOnly={false}
+                className={`ms-1 ${styles['reaction-add-control']}`}
+              />
               {isOwnReply && !isDeleteConfirmOpen && (
                 <span className="ms-auto d-flex align-items-center gap-2">
                   <span

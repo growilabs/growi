@@ -64,6 +64,20 @@ describe('AddReactionButton', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
+  it('puts the className given by its host on its outermost element', () => {
+    const { container } = render(
+      <AddReactionButton
+        canReact
+        chipCount={0}
+        className="host-class"
+        onAdd={vi.fn()}
+      />,
+    );
+
+    expect(container.firstElementChild).toHaveClass('host-class');
+    expect(container.firstElementChild).toContainElement(addButton());
+  });
+
   it('is enabled and keeps the picker closed until pressed', () => {
     render(<AddReactionButton canReact chipCount={0} onAdd={vi.fn()} />);
 

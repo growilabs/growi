@@ -108,7 +108,7 @@ const pickEmoji = async (
   const press = (locator: Locator) =>
     useTap ? locator.tap() : locator.click();
 
-  // A comment without reactions reveals its add button on hover; touch has no hover.
+  // A comment without reactions reveals its header add button on hover; touch has no hover.
   const addButton = scope.getByRole('button', { name: 'Add reaction' });
   if (!useTap) {
     await scope.hover();
@@ -229,21 +229,130 @@ test.describe('Comment reactions', () => {
     const addReaction = addButton.locator('xpath=..');
     await page.mouse.move(0, 0);
     await expect(addReaction).toHaveCSS('opacity', '0');
-    // Hidden, it must not swallow clicks or selection meant for the comment text underneath.
-    await expect(addReaction).toHaveCSS('pointer-events', 'none');
     await comment.hover();
     await expect(addReaction).toHaveCSS('opacity', '1');
-    await expect(addReaction).toHaveCSS('pointer-events', 'auto');
     await page.mouse.move(0, 0);
     await expect(addReaction).toHaveCSS('opacity', '0');
-    await expect(addReaction).toHaveCSS('pointer-events', 'none');
     await addButton.focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     await expect(addButton).toBeFocused();
     await expect(addReaction).toHaveCSS('opacity', '1');
-    await expect(addReaction).toHaveCSS('pointer-events', 'auto');
     await expect(reactionCountButtons(comment)).toHaveCount(0);
+
+    // It sits in the header beside the history link, not over the comment body.
+    const historyLink = comment.locator('a[id^="page-comment-revision-"]');
+    const [addBox, historyBox, bodyBox] = await Promise.all([
+      addButton.boundingBox(),
+      historyLink.boundingBox(),
+      comment.locator('.page-comment-body').boundingBox(),
+    ]);
+    if (addBox == null || historyBox == null || bodyBox == null) {
+      throw new Error('bounding box not available');
+    }
+    expect(addBox.x).toBeGreaterThanOrEqual(historyBox.x + historyBox.width);
+    expect(addBox.y + addBox.height).toBeLessThanOrEqual(bodyBox.y);
+  });
+
+  test('With reactions the add button moves to the end of the chip row and stays visible, and the header has none (Req 3.1)', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(pagePath(testInfo));
+    const comment = normalComment(page);
+
+    await pickEmoji(page, comment, THUMBS_UP);
+    const emojiButton = reactionEmojiButton(comment, '+1');
+    await expect(emojiButton).toBeVisible();
+
+    // Exactly one add button, after the chip, and not hidden behind the hover reveal.
+    const addButton = comment.getByRole('button', { name: 'Add reaction' });
+    await expect(addButton).toHaveCount(1);
+    await page.mouse.move(0, 0);
+    await expect(addButton.locator('xpath=..')).toHaveCSS('opacity', '1');
+    const [chipBox, addBox, bodyBox] = await Promise.all([
+      emojiButton.boundingBox(),
+      addButton.boundingBox(),
+      comment.locator('.page-comment-body').boundingBox(),
+    ]);
+    if (chipBox == null || addBox == null || bodyBox == null) {
+      throw new Error('bounding box not available');
+    }
+    expect(addBox.x).toBeGreaterThanOrEqual(chipBox.x + chipBox.width);
+    expect(addBox.y).toBeGreaterThanOrEqual(bodyBox.y + bodyBox.height);
+
+    await emojiButton.click();
+    await expect(emojiButton).toHaveCount(0);
+  });
+
+  test('After the first reaction is added with the keyboard, focus lands on the add button at the end of the chip row', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(pagePath(testInfo));
+    const comment = normalComment(page);
+    const addButton = comment.getByRole('button', { name: 'Add reaction' });
+
+    await addButton.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(addButton).toBeFocused();
+    await page.keyboard.press('Enter');
+    const picker = emojiPicker(page);
+    await expect(picker).toBeVisible();
+    await picker.getByPlaceholder('Search').fill('thumbs up');
+    await picker
+      .getByRole('button', { name: THUMBS_UP, exact: true })
+      .first()
+      .click();
+    await expect(picker).toBeHidden();
+
+    const emojiButton = reactionEmojiButton(comment, '+1');
+    await expect(emojiButton).toBeVisible();
+    await expect(addButton).toHaveCount(1);
+    await expect(addButton).toBeFocused();
+
+    await emojiButton.click();
+    await expect(emojiButton).toHaveCount(0);
+  });
+
+  test('In the popover the add button is always visible, without hovering', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(pagePath(testInfo));
+    const popover = await openPopoverFromHighlight(page, targetSentence);
+    const origin = popover.getByTestId('inline-comment-preview-popover-origin');
+    const addReaction = origin
+      .getByRole('button', { name: 'Add reaction' })
+      .locator('xpath=..');
+
+    await page.mouse.move(0, 0);
+    await expect(addReaction).toHaveCSS('opacity', '1');
+  });
+
+  test('After the first reaction is added with the keyboard in the popover, focus stays in the popover, not in the thread copy', async ({
+    page,
+  }, testInfo) => {
+    await page.goto(pagePath(testInfo));
+    const popover = await openPopoverFromHighlight(page, targetSentence);
+    const origin = popover.getByTestId('inline-comment-preview-popover-origin');
+    const addButton = origin.getByRole('button', { name: 'Add reaction' });
+
+    await addButton.focus();
+    await page.keyboard.press('Enter');
+    const picker = emojiPicker(page);
+    await expect(picker).toBeVisible();
+    await picker.getByPlaceholder('Search').fill('thumbs up');
+    await picker
+      .getByRole('button', { name: THUMBS_UP, exact: true })
+      .first()
+      .click();
+    await expect(picker).toBeHidden();
+
+    const emojiButton = reactionEmojiButton(origin, '+1');
+    await expect(emojiButton).toBeVisible();
+    await expect(addButton).toBeFocused();
+
+    await emojiButton.click();
+    await expect(emojiButton).toHaveCount(0);
   });
 
   test('The same emoji with a different skin tone becomes a separate chip (Req 1.3, 3.5)', async ({

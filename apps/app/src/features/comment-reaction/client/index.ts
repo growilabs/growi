@@ -1,1 +1,1 @@
-export { CommentReactionBar } from './components';
+export { CommentReactionBar, CommentReactionHeaderButton } from './components';
