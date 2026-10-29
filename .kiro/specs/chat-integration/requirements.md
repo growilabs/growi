@@ -266,6 +266,7 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 11. While 6.9 の状態であり、かつ利用者が投稿した URL がパスで対象のページを指している, the GROWI application shall 要約にパスと更新日時を含める
 12. While 対象のページの公開範囲が「公開」以外（本人だけ・グループだけ・リンクを知っている人だけ・特定のユーザーだけ）である, the GROWI application shall GROWI がログインを必要とするかどうかに関わらず、要約に更新日時を含めず、固定リンクの場合は題名も含めずに対象のページが存在しない場合と区別できない形の応答を返し、パスで指す URL の場合は 6.3・6.7 のとおりパスだけを含める
 13. When the chat-integration proxy が 6.9 の状態の要約を受け取った, the chat-integration proxy shall パス（固定リンクの場合は題名）と更新日時を表示し、本文の冒頭とコメント数を表示しない
+14. While 対象のページが、子ページを作ったときに自動でできる本文の無い親ページ（空のページ）である, the GROWI application shall GROWI がログインを必要とするかどうかに関わらず、ページが存在しない場合と区別できない形の応答を返す
 
 ### Requirement 7: チャットの利用者と GROWI ユーザーの紐付け
 
@@ -309,6 +310,7 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 6. The chat-integration proxy shall 紐付けの過程で、相手になりすますために使える秘密を通信路に流さない
 7. When 管理者が紐付けを解除した, the chat-integration proxy shall 以降その GROWI との間のリクエストを処理しない
 8. When 紐付けを解除してから保持期間（45 日）が過ぎた, the GROWI application shall その連携と、それに属するチャット利用者の紐付けを、保持期間が過ぎてから 1 日と 1 時間以内に消し、この掃除のための問い合わせは通知の定期処理とは別に 1 日 1 回だけ行う
+9. When 同じ workspace が再び紐付けられた, the GROWI application shall 解除から保持期間（45 日）が過ぎた連携からは、まだ消えていなくても、チャット利用者の紐付けを引き継がない
 
 ### Requirement 10: リクエストごとの相手の確認と鍵の入れ替え
 

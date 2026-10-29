@@ -440,7 +440,7 @@ proxy は届かなかった要求をやり直すので**失敗は繰り返し届
 
 `link-preview` コマンドの URL 展開は 2 段に分かれている。
 
-1. `resolvePageFromUrl`（`command-endpoint.ts`）— URL からページを解決する。末尾セグメントが24桁16進文字列（Mongo の ObjectId 形式。ページをパス以外の識別子で指す「固定リンク」の形）なら `_id` で、そうでなければ `path` で `Page.findOne` する
+1. `resolvePageFromUrl`（`command-endpoint.ts`）— URL からページを解決する。末尾セグメントが24桁16進文字列（Mongo の ObjectId 形式。ページをパス以外の識別子で指す「固定リンク」の形）なら `_id` で、そうでなければ `path` で `Page.findOne` する。本文の無い空の親ページ（`isEmpty: true`）は検索で除き、見つからなかったものとして扱う（research.md の「空の親ページは「見つからない」と同じに扱う」）
 2. `buildLinkPreview`（`content/link-preview-mapper.ts`）— 解決結果（ページの有無・固定リンクかどうか）と、GROWI がログインしていない人にも読ませるか（`isGuestAllowedToRead`）を受け取り、応答を組み立てる純粋関数
 
 何を出すかは、ページの公開範囲と GROWI の設定の 2 つだけで決まる。URL を貼った人やチャンネルの参加者によらない（`buildLinkPreview` は `user` も `userGroups` も受け取らない）。
@@ -518,7 +518,7 @@ function buildLinkPreview(
 3. `!isGuestAllowedToRead`（公開範囲が「公開」で、ログインが必要な GROWI）: `{ path: 固定リンクなら titleFromPath(page.path)、パスで指す URL なら page.path, restricted: true, updatedAt }`（要件 6.9〜6.11）
 4. それ以外（公開範囲が「公開」で、ログインしていない人も読める GROWI）: `{ path: page.path, restricted: false, excerpt, updatedAt, commentCount }`（要件 6.2）
 
-公開範囲が「公開」かどうかは `PublicPageFilter`（`isPubliclyReadablePage`）が決める。`GRANT_PUBLIC` と、公開範囲の設定を持たない古いページが当たる。`GRANT_RESTRICTED`（リンクを知っている人だけ）は当たらない（理由は research.md の「「リンクを知っている人だけ」（`GRANT_RESTRICTED`）は「公開」に含めない」）。ゴミ箱に入ったページも、公開範囲だけで同じように扱う（research.md の「ゴミ箱に入ったページも、同じ扱いのままにする」）。
+公開範囲が「公開」かどうかは `PublicPageFilter`（`isPubliclyReadablePage`）が決める。`GRANT_PUBLIC` と、公開範囲の設定を持たない古いページが当たる。`GRANT_RESTRICTED`（リンクを知っている人だけ）は当たらない（理由は research.md の「「リンクを知っている人だけ」（`GRANT_RESTRICTED`）は「公開」に含めない」）。ゴミ箱に入ったページも、公開範囲だけで同じように扱う（research.md の「ゴミ箱に入ったページも、同じ扱いのままにする」）。空の親ページは、ここに届く前に `resolvePageFromUrl` が「見つからない」にする。
 
 **固定文言**: `PERMALINK_UNAVAILABLE_MESSAGE` は、`errorResponse('invalid', 'This URL does not match any page on this GROWI.')` と同じ英語表記の慣習に合わせた定数。ページの状態にもリクエストにも依存しない定数であることが重要——「見つからない」と「公開範囲を絞ったページ」で呼び出しコードが変わっても、同じ定数を参照する限り文字列は必ず一致する。
 
@@ -760,7 +760,7 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
 
 | コレクション | 主な項目 | 索引・寿命 |
 |---|---|---|
-| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsVersion`, `createdAt`, `unpairedAt` | **`relationId` 単独で一意**（複合にしない。理由は下記）。**既にある `relationId` を返す `PairingResult` はペアリングを成立させず、管理者に知らせる**。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にし、`unpairedAt` に解除時刻を持たせる** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。`unpairedAt` は「いちばん新しい解除済みの行から引き継ぐ」（下記）の判定と、45日掃除（task 8.2）が起点にする値で、`createdAt`（最初のペアリング時刻）では代用できない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
+| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsVersion`, `createdAt`, `unpairedAt` | **`relationId` 単独で一意**（複合にしない。理由は下記）。**既にある `relationId` を返す `PairingResult` はペアリングを成立させず、管理者に知らせる**。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にし、`unpairedAt` に解除時刻を持たせる** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。`unpairedAt` は「いちばん新しい解除済みの行から引き継ぐ」（下記）の判定（引き継ぎ元になれる範囲も `unpairedAt` で絞る）と、45日掃除（task 8.2）が起点にする値で、`createdAt`（最初のペアリング時刻）では代用できない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
 | `chat_account_links` | `relationId`, `userId`, `platform`, `accountId`, `linkedAt` | **`(relationId, platform, accountId)` 複合ユニーク**（下記）。**利用者が解除するまで残る。** 関係の解除では消さない（下記の再ペアリングを参照） |
 | `chat_integration_keys` | `relationId`, `side`(`own`/`peer`), `keyId`, `key`, `validFrom`, `revokedAt` | `(relationId, side, keyId)` 一意。**紐付け解除で削除**（秘密鍵を残さない） |
 | `chat_notification_outbox` | `requestId`, `relationId`, `targets`, `markdown`, `state`, `attempts`, `claimedAt`, `result`, `createdAt` | **`(state, claimedAt)` に索引**（`drain` が奪うときに引く）、**`(relationId, requestId)` に索引**（結果を書き戻すときに引く）。**送信済みは 30 日で TTL 索引により消す**。`given-up` は運用者が確認するまで残す |
@@ -1053,12 +1053,14 @@ protocol spec が「`keyId` を単独で鍵にすると別の関係のものを�
 > 古い行を消す。**行を消してしまうと、古い `relationId` がどの workspace のものだったか分からなくなり、引き継げない。**
 >
 > **引き継ぎ元が複数あるときは、いちばん新しい解除済みの行から引き継ぐ。**
+> 引き継ぎ元は保持期間の内側にある行に限る（`unpairedAt >= now − 45 日`。掃除の `$lt` の条件と境目が同じ）。
+> 保持期間を過ぎた行は、掃除が消すより前でも引き継ぎ元にならない。
 > 移す途中で `(relationId, platform, accountId)` がぶつかったら**新しいほうを残す**。
 > **解除済みの `chat_relations` の行そのものも 45 日で消す**（`chat_account_links` と揃える）。
 > 45 日の掃除は、通知とは別の定期処理（`UnpairedRelationSweepCronService`）が**1 日 1 回**回す（要件 9.8）。
 > 毎日 2 時（`'0 2 * * *'`）にすべてのプロセスで動き、多くの GROWI が同じ瞬間にデータベースへ問い合わせないよう、
 > 最初に最大 60 分ランダムに待つ。待った後に連携があるかを確かめ（上記「連携が無い GROWI では問い合わせない」）、
-> あるときだけ掃除する。掃除は紐付けを先に消し、関係の行は選んだときと同じ条件で消すので、
+> あるときだけ掃除する。1 回の実行で期限切れの行をすべて消しきる（1 回の実行の上限は安全のための 10,000 件で、超えた分は翌日の実行が続ける）。掃除は紐付けを先に消し、関係の行は選んだときと同じ条件で消すので、
 > 複数のプロセスが同じ日に回しても同じ結果に落ち着く。保持期間が過ぎてから消えるまでは最大 1 日と 1 時間。
 > 管理画面の解除済みのカードには、消える日（解除した日 + 45 日）を表示する。いつまで残るのかが画面から分かるようにするためである。
 >

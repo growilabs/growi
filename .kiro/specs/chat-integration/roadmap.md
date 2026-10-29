@@ -9,7 +9,7 @@
 Gen 1 には手を入れず、GROWI 本体で両方を同時に有効にできる形で併存させる。
 
 前提・確定済みの決定（決定 1〜10）・調査の記録は、本ディレクトリの `brief.md` と `research.md` にある。
-要件（14 件・受け入れ条件 116 件）は本 umbrella の `requirements.md` が持ち、**sub-spec は要件 ID を参照する。番号は振り直さない。**
+要件（14 件・受け入れ条件 118 件）は本 umbrella の `requirements.md` が持ち、**sub-spec は要件 ID を参照する。番号は振り直さない。**
 
 ## 分割の経緯
 
@@ -75,11 +75,12 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 | 8 | 管理画面の作り直し | 管理画面のうち、チャンネルの権限と「できること」の表 | amend spec `chat-integration-admin-ui`（名前は仮） | app |
 | 9 | コマンドの表示の締め | スラッシュコマンドの実機確認、`help` の一覧の書き方、Discord のスレッドでの追加入力 | proxy の残タスク 12.4 | proxy |
 | 10 | URL の展開の確認フロー | 共有してよいかを本人に尋ねてから展開する | `/kiro-discovery` から着手する。`agent` の「本人にだけ届ける」しくみの上に作るので、`agent` の後 | 3 spec すべて |
-| 11 | 順 5・6 の実装で見つかった小さな直し | 繋ぎ直しの引き継ぎ元の期限、掃除の 1 回の上限、空ページとゴミ箱のページの扱い | spec を作らず直接直す。各項目にテストを付ける | app |
 
 - 順 3（proxy の不具合の一括修正: Enterprise Grid のチャンネル一覧、installation の特定、Mattermost の 403、接続の更新の失敗）はすべて直したので表から外した。ほかの順の番号を変えないよう、3 は空き番号のまま残す。直した内容は [chat-integration-proxy の research.md](../chat-integration-proxy/research.md) の決定 P14・P15・P16 と「既知の問題」1。
 - 順 5（URL の展開の方針: ログインが必要な GROWI でも、公開範囲が「公開」のページは題名と更新日時を出す）は済んだので表から外した。5 も空き番号のまま残す。決まったことは要件 6.9〜6.13（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)「LinkPreviewMapper（URL の展開の応答）」、理由は [chat-integration-app の research.md](../chat-integration-app/research.md) と本ディレクトリの research.md の決定 15。
 - 順 6（通知の定期処理の負荷: 連携が無いテナントの問い合わせを飛ばす、解除済みの連携の掃除を 1 日 1 回にする）は済んだので表から外した。6 も空き番号のまま残す。決まったことは要件 2.7〜2.9・9.8（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)「通知を 2 段に分ける」、理由は [chat-integration-app の research.md](../chat-integration-app/research.md) と本ディレクトリの research.md の決定 16。定期処理の間隔を延ばすのは順 7 で行う。
+- 順 11（順 5・6 の実装で見つかった小さな直し: 繋ぎ直しの引き継ぎ元の期限、掃除の 1 回の上限、空ページの扱い）は直したので表から外した。11 も空き番号のまま残す。決まったことは要件 6.14・9.9（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)、理由は [chat-integration-app の research.md](../chat-integration-app/research.md)。ゴミ箱に入ったページは、除かないままにした（同 research.md）。
+- 別ブランチ `imprv/chat-integration-app-ui` を取り込むときの注意（取り込む作業の中で行う）: そのブランチの `requirements.md` に、`chat-integration-notification-load` が 2.7〜2.9 と 9.8 を予約していることを示すコメントがある。この spec はすでに本体へ書き戻して削除したので、コメントを消すか、spec 名を外した形に直す。あわせて、受け入れ条件の総数を数え直す。
 - 順 1・2 は、順 7 の前提になる（順 7 の前提だった順 3 は済んだ。`agent` の `brief.md` が前提に挙げる installation の特定もその 1 つ）。
 - 順 4 は app だけの変更で、順 1・2 とは独立している。ただし、`chat-integration-app/design.md` に書き戻すので、`agent` が書き換える節（権限、能力表）に触れるものを `agent` と同時には進めない。
 - 順 7 は規模が大きいので、順 1・2 を終えてから要件の承認に入る。
@@ -128,17 +129,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 - **案**: 投稿者にだけ見える確認メッセージ（例: Slack の ephemeral message）で「全員に見せるか」を尋ね、「共有する」を選んだ場合だけ中身を展開する対話的な確認フロー（2026-09-09 の提案）。「今それを見ている人が誰か」をその場で判定し、チャット側のボタン操作を GROWI へ伝え返す往復が要るので、今の一往復の `link-preview` では成り立たない
 
-- **リリースに含める**（2026-10-27 に決定）。`agent` が作る「本人にだけ届ける」しくみと近いので、`agent` の後に、`/kiro-discovery` から着手する。要件 6 の受け入れ条件の追記になるので、番号は振り直さず、6.14 から振る。投稿者が「共有する」を選ぶ前に出すものは、要件 6.9〜6.12 で決めた範囲（公開範囲が「公開」のページの題名と更新日時など）の上に乗る
-
-### 11. 順 5・6 の実装で見つかった小さな直し
-
-順 5・6 の最終確認（Opus）で見つかった。どれも仕様違反ではないが、リリース前に直す。
-
-1. **繋ぎ直したときの引き継ぎ元の探索が、解除から 45 日を過ぎた行も拾う**: `pairing/inherit-account-links.ts` の `findSourceRelationId` は `state: 'unpaired'`・platform・workspaceId だけで絞り、`unpairedAt` を見ない。掃除が毎分から 1 日 1 回になったので、保持期間を過ぎたのに消えていない行が残る時間が、約 1 分から最大 1 日と 1 時間に延びた。その間に繋ぎ直すと、管理画面が「自動で消える」と示した連携の利用者の紐付けが新しい連携へ戻る。直し方は、探索の条件に `unpairedAt: { $gte: now - UNPAIRED_RETENTION_MS }` を足し、期限切れの行から引き継がないことを確かめるテストを足す
-2. **掃除が 1 回に最大 100 件しか消さない**: `pairing/sweep-unpaired-relations.ts` の `MAX_RELATIONS_PER_SWEEP = 100` は毎分の定期処理を前提にした上限で、1 日 1 回になった今は、同じ日に期限が来る行が 100 件を超えると要件 9.8（1 日と 1 時間以内）を守れない。コメントの「数回に分けて消す」も実態と合わない。直し方は、1 回の実行の中で候補が無くなるまで繰り返し、100 件を超える場合のテストを足す
-3. **空のページとゴミ箱のページを、公開範囲の判定にそのまま通している**: `command/command-endpoint.ts` の `resolvePageFromUrl` は `isEmpty: true`（子ページを作ったときに自動でできる、本文の無い親ページ。公開範囲は既定で「公開」）と、削除済み（`status: deleted`）のページを除いていない。ログインが必要な GROWI で、紐付け済みの利用者がこうしたページの固定リンクを貼ると、題名と更新日時が返る。空の親ページの更新日時は、その下に作られた非公開ページの時刻の手がかりになりうる。直し方は、`isEmpty` と削除済みのページを「見つからない」と同じに扱い（固定リンクは固定文言、パスの URL は今と同じくパスだけ）、テストを足す
-
-別ブランチ `imprv/chat-integration-app-ui` を取り込むときの注意（取り込む作業の中で行う）: そのブランチの `requirements.md` に、`chat-integration-notification-load` が 2.7〜2.9 と 9.8 を予約していることを示すコメントがある。この spec はすでに本体へ書き戻して削除したので、コメントを消すか、spec 名を外した形に直す。あわせて、受け入れ条件の総数を数え直す。
+- **リリースに含める**（2026-10-27 に決定）。`agent` が作る「本人にだけ届ける」しくみと近いので、`agent` の後に、`/kiro-discovery` から着手する。要件 6 の受け入れ条件の追記になるので、番号は振り直さず、6.15 から振る。投稿者が「共有する」を選ぶ前に出すものは、要件 6.9〜6.12 で決めた範囲（公開範囲が「公開」のページの題名と更新日時など）の上に乗る
 
 ## リリース判定に入れていないもの
 
