@@ -22,6 +22,25 @@ import type { PageOperationDocument } from '~/server/models/page-operation';
 import type { UserGroupDocument } from '~/server/models/user-group';
 import type { ActivityActor } from '~/server/service/attachment/attachment-removal-snapshot';
 
+export type DeletionOptions = {
+  isCompletely: boolean;
+  isRecursively: boolean;
+};
+
+export type DeletionVerdict =
+  | 'permitted'
+  | 'forbidden'
+  | 'protected_user_homepage';
+
+export type EmptyTrashResult =
+  | { isForbidden: true }
+  | {
+      isForbidden: false;
+      isAllDeletable: boolean;
+      deletablePages: PageDocument[];
+      nDeletedNonEmptyPages: number;
+    };
+
 export interface IPageService {
   // Page event emitter
   pageEvent: EventEmitter;
@@ -151,6 +170,24 @@ export interface IPageService {
     activity?,
   ): Promise<void>;
   deletePage(page, user, options, isRecursively: boolean, activityParameters);
+  // Deletion requested by a user: judge the deletion authority before deleting
+  judgeDeletion(
+    page: PageDocument,
+    user: IUserHasId,
+    options: DeletionOptions,
+  ): Promise<DeletionVerdict>;
+  filterPagesByDeletionAuthority(
+    pages: PageDocument[],
+    user: IUserHasId,
+    options: DeletionOptions,
+  ): Promise<PageDocument[]>;
+  deletePagesWithAuthority(
+    pages: PageDocument[],
+    user: IUserHasId,
+    options: DeletionOptions,
+    activityParameters,
+  ): Promise<PageDocument[]>;
+  emptyTrash(user: IUserHasId, activityParameters): Promise<EmptyTrashResult>;
   duplicateRecursivelyMainOperation(
     page: PageDocument,
     newPagePath: string,

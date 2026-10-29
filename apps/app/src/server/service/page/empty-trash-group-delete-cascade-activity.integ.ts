@@ -3,8 +3,8 @@
  * bulk-deletion paths that reach deleteCompletelyOperation through the
  * deleteMultipleCompletely seam (task 7.3; read-back-from-real-DB style):
  *
- *   A. Empty trash: the REAL pageService.emptyTrashPage (batches of the
- *      given trashed pages) → deleteMultipleCompletely(batch, user) →
+ *   A. Empty trash: the REAL pageService#deleteTrashedPagesCompletely
+ *      (batches of the given trashed pages) → deleteMultipleCompletely(batch, user) →
  *      deleteCompletelyOperation(ids, paths, { user }) →
  *      recordCascadeAttachmentRemovals (BEFORE removeAllAttachments).
  *   B. Group deletion: the REAL
@@ -30,10 +30,10 @@
  * Activity rows are filtered by target/userId, NOT by a sentinel ip —
  * on these paths ip degrades to '' so an ip filter would match nothing.
  * The sentinel ip 10.0.0.77 (unused by sibling suites: .55/.56/.57/.70-.76/
- * .88/.99, 127.0.0.1) is passed only to emptyTrashPage's activityParameters
- * to prove ip was genuinely available at the entry point (it lands on the
- * parent PAGE_RECURSIVELY_DELETE_COMPLETELY activity) yet still degrades at
- * the seam.
+ * .88/.99, 127.0.0.1) is passed only to deleteTrashedPagesCompletely's
+ * activityParameters to prove ip was genuinely available at the entry point
+ * (it lands on the parent PAGE_RECURSIVELY_DELETE_COMPLETELY activity) yet
+ * still degrades at the seam.
  *
  * Requires a real MongoDB (wired by vitest.workspace.mts integ setup;
  * per-worker DB isolation via test/setup/mongo + test/setup/prisma).
@@ -74,7 +74,7 @@ const TRASH_PAGE_PATH = '/trash/empty-trash-cascade-activity-integ';
 const GROUP_PAGE_PATH = '/group-delete-cascade-activity-integ';
 const GROUP_NAME = 'group-delete-cascade-activity-integ-group';
 
-// Passed to emptyTrashPage's activityParameters only — see header comment.
+// Passed to deleteTrashedPagesCompletely's activityParameters only — see header comment.
 const TRASH_ENTRY_IP = '10.0.0.77';
 const TRASH_ENTRY_ENDPOINT = '/_api/v3/pages/empty-trash-cascade-integ';
 
@@ -90,9 +90,8 @@ const GROUP_ATTACHMENT_FIXTURE = {
 
 describe('cascade attachment-removal activities through the deleteMultipleCompletely seam (read back from DB)', () => {
   let crowi: Crowi;
-  // The concrete service: emptyTrashPage is not part of the IPageService
-  // interface (its only production caller is the untyped apiv3 route), so
-  // crowi.pageService is narrowed to the implementation class below.
+  // The concrete service: deleteTrashedPagesCompletely is private to the
+  // implementation class, so crowi.pageService is narrowed to it below.
   let pageService: PageService;
   let Page: PageModel;
   // crowi.models.User is Model<any>, so the created docs are untyped; the
@@ -153,7 +152,7 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
     // createActivity delegates to shoudUpdateActivity, which reads these via
     // configManager.getConfig — the DB-sourced value written by this explicit
     // API wins over env. ACTION_ATTACHMENT_REMOVE is in MediumActionGroup.
-    // (app:isV5Compatible is NOT needed: neither emptyTrashPage nor
+    // (app:isV5Compatible is NOT needed: neither deleteTrashedPagesCompletely nor
     // handlePrivatePagesForGroupsToDelete goes through shouldUseV4Process.)
     await configManager.updateConfigs({
       'app:auditLogEnabled': true,
@@ -229,7 +228,7 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
     );
   });
 
-  describe('emptyTrashPage (empty trash)', () => {
+  describe('deleteTrashedPagesCompletely (empty trash)', () => {
     it('req 3.2 — creates one ACTION_ATTACHMENT_REMOVE activity per trashed attachment, recorded for the OPERATOR with the four snapshot fields + username; ip/endpoint degrade to ""', async () => {
       // Arrange: a real trashed page (path under /trash, off-tree, public —
       // exactly what generateReadStreamToOperateOnlyDescendants('/trash')
@@ -258,13 +257,13 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
       // activityParameters its production caller (apiv3 empty-trash route)
       // provides — proving below that ip/endpoint were available here yet
       // do not survive the deleteMultipleCompletely seam.
-      await pageService.emptyTrashPage(
+      await pageService['deleteTrashedPagesCompletely'](
         trashOperator,
         {
           ip: TRASH_ENTRY_IP,
           endpoint: TRASH_ENTRY_ENDPOINT,
         },
-        [trashedPage._id],
+        [trashedPage],
       );
 
       // Assert: read the cascade activities back from the real DB. The
