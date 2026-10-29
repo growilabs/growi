@@ -1,6 +1,5 @@
 import { useIsCommentActionBlockedForReadOnlyUser } from '~/client/components/NotAvailableForReadOnlyUser';
 import { useIsGuestUser, useIsSharedUser } from '~/states/context';
-import { useIsTrashPage } from '~/states/page';
 
 /**
  * UI gating only; the server enforces authorization on its own.
@@ -10,13 +9,11 @@ export const useCanReactToComments = (isReadOnly: boolean): boolean => {
   const isGuestUser = useIsGuestUser();
   const isSharedUser = useIsSharedUser();
   const isBlockedForReadOnlyUser = useIsCommentActionBlockedForReadOnlyUser();
-  const isTrashPage = useIsTrashPage();
 
   return !(
     isReadOnly ||
     isGuestUser ||
     isSharedUser ||
-    isBlockedForReadOnlyUser ||
-    isTrashPage
+    isBlockedForReadOnlyUser
   );
 };

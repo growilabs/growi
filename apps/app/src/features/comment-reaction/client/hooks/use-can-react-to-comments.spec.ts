@@ -61,6 +61,10 @@ describe('useCanReactToComments', () => {
     expect(render(allowed)).toBe(true);
   });
 
+  it('allows reacting on a page in the trash', () => {
+    expect(render({ ...allowed, isTrash: true })).toBe(true);
+  });
+
   it('allows a read-only user when the setting allows read-only users to comment', () => {
     // useIsCommentActionBlockedForReadOnlyUser is false in this case; its own
     // spec covers how the setting maps to that flag.
@@ -79,14 +83,11 @@ describe('useCanReactToComments', () => {
       'a read-only user is not allowed to comment',
       { isBlockedReadOnlyUser: true },
     ],
-    ['the page is in the trash', { isTrash: true }],
   ])('disallows reacting when %s', (_label, override) => {
     expect(render({ ...allowed, ...override })).toBe(false);
   });
 
   it('disallows reacting when several conditions apply at once', () => {
-    expect(
-      render({ ...allowed, isGuest: true, isShared: true, isTrash: true }),
-    ).toBe(false);
+    expect(render({ ...allowed, isGuest: true, isShared: true })).toBe(false);
   });
 });

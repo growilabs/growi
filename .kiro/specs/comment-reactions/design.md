@@ -80,7 +80,7 @@
 - サーバーの認可は、既存の部品（`accessTokenParser`、`certifySharedPage`、`loginRequiredFactory`、`excludeReadOnlyUserIfCommentNotAllowed`、`generateAddActivityMiddleware`、`apiV3FormValidator`、`findPageAndMetaDataByViewer`）だけで組む。並行実装しない
 - import の `overwrite-params`（`server/service/import/overwrite-params/comment-reactions.ts`）は、`emoji` の正規化のために 1 の `features/comment-reaction/utils`（`normalizeReactionKey`）に依存してよい。`comment-reaction` のほかのコードは import しない
 - 削除の経路（`removeWithReplies`、`deleteReply`、`deleteCompletelyOperation`）は、Prisma の `commentreactions` だけを直接使う。`comment-reaction` のコードは import しない
-- クライアントは、`states/context.ts` のフック、`useIsCommentActionBlockedForReadOnlyUser`、`useIsTrashPage`、`apiv3-client`、`toastr`、reactstrap、`@growi/editor/dist/client/components/EmojiPicker` を使ってよい
+- クライアントは、`states/context.ts` のフック、`useIsCommentActionBlockedForReadOnlyUser`、`apiv3-client`、`toastr`、reactstrap、`@growi/editor/dist/client/components/EmojiPicker` を使ってよい
 
 ### Revalidation Triggers
 - リアクションキーの形式の変更（名前空間の追加、肌の色の表記の変更）。G2G で運んだ既存データ、監査ログの snapshot、将来の Slack 連携に影響する
@@ -373,6 +373,7 @@ graph TB
 | 5.3 | 権限なし・存在しないコメントは同じ応答 | update route | 404 `notfound_or_forbidden` | — |
 | 5.4, 5.5 | 閲覧専用ユーザーはコメント設定に連動 | update route, useCanReactToComments | `excludeReadOnlyUserIfCommentNotAllowed`、`useIsCommentActionBlockedForReadOnlyUser` | — |
 | 5.6, 5.7 | 共有リンク・ゲストは手段なし | useCanReactToComments, update route | `loginRequiredStrictly`、「＋」非表示、チップは非活性 | — |
+| 5.8 | ごみ箱のページでも追加・解除できる | useCanReactToComments | ごみ箱かどうかを判定に使わない（クライアントの判定も、サーバーの update route も、ごみ箱かどうかで分岐しない） | — |
 | 6.1 | コメントを読める相手と同じ範囲で返す | comment の list / get route, loadReactionChips | `ICommentListItem.reactions` | 読み取り |
 | 6.2 | ゲスト・共有リンクにも読み取り専用で表示 | CommentReactionBar, ReactionChip, ReactionUsersPopover | `canReact = false`（絵文字の部分は押せない。人数の部分から利用者一覧を開ける） | — |
 | 6.3 | 共有リンク画面・検索プレビューでインラインのリアクションを出さない | 差し込み先の選定 | インラインコメントの部品が描画されない画面には出ない | — |
@@ -415,7 +416,7 @@ graph TB
 | Activity 定義の拡張 | 既存 interfaces, activity model | action と snapshot の variant、snapshot の保存口への `emoji` の追加 | 9.1–9.5 | activity-log-snapshot の方針（P1）、`createByParameters`（P0） | — |
 | useCommentReactions | Client / hook | 一覧のキャッシュから読み、PUT の応答で1件を置き換える。失敗時はエラーを示して一覧を取り直す | 1.1, 2.1, 2.2, 2.9, 2.10, 6.5, 7.2 | useSWRxCommentList（P0）、apiv3-client（P0）、classifyReactionUpdateFailure（P0） | State |
 | classifyReactionUpdateFailure | Client / utils | PUT の失敗を、利用者に示す種類に分ける（純粋関数） | 2.10, 7.2 | — | Service |
-| useCanReactToComments | Client / hook | 画面上のリアクション可否 | 5.4–5.7, 6.2 | context フック（P0） | State |
+| useCanReactToComments | Client / hook | 画面上のリアクション可否 | 5.4–5.8, 6.2 | context フック（P0） | State |
 | CommentReactionBar | Client / UI | 1コメント分のチップ列と「＋」 | 1.1–1.8, 2.3, 3.1, 3.7, 6.2, 6.3, 6.5 | hooks（P0） | — |
 | ReactionChip | Client / UI | チップの表示、絵文字の部分の押下（追加・解除）、人数の部分の押下（利用者一覧） | 1.2, 1.4, 1.5, 1.10, 2.1, 2.2, 6.2 | reaction-key（P0）、ReactionUsersPopover（P0） | — |
 | ReactionUsersPopover | Client / UI | リアクションした利用者の一覧 | 1.5, 1.10, 6.2 | reactstrap `Popover`（P0） | — |
@@ -808,14 +809,14 @@ declare function useCommentReactions(pageId: string, commentId: string): UseComm
 | Field | Detail |
 |-------|--------|
 | Intent | 画面上でリアクションの追加・解除を許すかの判定 |
-| Requirements | 5.4, 5.5, 5.6, 5.7, 6.2 |
+| Requirements | 5.4, 5.5, 5.6, 5.7, 5.8, 6.2 |
 
 ```typescript
 /** isReadOnly: the hosting view is read-only (share-link view, search preview). */
 declare function useCanReactToComments(isReadOnly: boolean): boolean;
 ```
-- `false` になる条件: `isReadOnly`、`useIsGuestUser()`、`useIsSharedUser()`、`useIsCommentActionBlockedForReadOnlyUser()`、`useIsTrashPage()` のどれかが真。
-- ごみ箱のページでは、コメントの入力欄を出さない既存の挙動（`Comments.tsx` の `isDeleted`）に合わせて、リアクションも読み取り専用にする（チップは表示する）。サーバーは、ごみ箱のページかどうかで拒否しない（コメントの投稿の既存の扱いと同じ）。
+- `false` になる条件: `isReadOnly`、`useIsGuestUser()`、`useIsSharedUser()`、`useIsCommentActionBlockedForReadOnlyUser()` のどれかが真。
+- ごみ箱のページかどうかは判定に使わない。ごみ箱のページでも、コメントの入力欄を出さない既存の挙動（`Comments.tsx` の `isDeleted`）とは別に、リアクションの追加・解除を許す。サーバーも、ごみ箱のページかどうかで拒否しない。
 - サーバーの認可の代わりではなく、UI を出し分けるためだけに使う（サーバーは route で拒否する）。
 
 #### CommentReactionBar
@@ -898,7 +899,7 @@ type CommentReactionBarProps = {
 - `toCommentListItem`: `reactions` に渡したチップ（`[]` と `null` を含む）がそのまま入ること、`toLegacyCommentListItem` の結果に `reactions` のキーが無いこと。
 - `useCommentReactions`: 一覧のキャッシュから該当コメントのチップを読むこと。PUT の成功で該当する1件だけが置き換わり、再取得しないこと。成功でも応答の `reactions` が `null` なら、置き換えずに一覧を取り直し、エラーを出さないこと。失敗（409、404、それ以外）では、取り直しの前にキャッシュが変わらないこと、種類ごとの文言でトーストが出ること、一覧が取り直されること、`setReaction` が reject しないこと。取り直しも失敗したとき、表示が操作前のまま残ること（要件 2.9、2.10、6.5、7.2）。
 - `classifyReactionUpdateFailure`: `reaction-kind-limit-exceeded` → `kind-limit-exceeded`、`notfound_or_forbidden` → `comment-unavailable`、`validation_failed`・`invalid-reaction-emoji`・`code` の無いエラー・配列でない値・通信の失敗 → `failed` になること。
-- `useCanReactToComments`: ゲスト、共有リンク、閲覧専用（許可あり／なし）、`isReadOnly`、ごみ箱のページの組み合わせ（要件 5.4〜5.7、6.2）。
+- `useCanReactToComments`: ゲスト、共有リンク、閲覧専用（許可あり／なし）、`isReadOnly`、ごみ箱のページでも判定が変わらないこと（要件 5.4〜5.8、6.2）。
 - `CommentReactionBar`: チップと人数の表示、自分のチップの `aria-pressed`、絵文字の部分を押すと API が呼ばれること、人数の部分を押すと利用者一覧（表示名、`username`、ID 文字列）が開き API は呼ばれないこと、`canReact` が false のとき「＋」が無く、絵文字の部分を押しても API を呼ばず、人数の部分からは利用者一覧が開くこと、上限で「＋」が無効になること、チップが無く読み取り専用なら何も描画しないこと、`chips` が `null` なら何も描画しないこと（要件 1.1〜1.7、1.10、3.1、6.2、6.5、7.2）。
 - `overwrite-params/comment-reactions`: 24 桁の16進文字列が ObjectId になること、不正な値はそのまま返ること、`emoji` の別名（肌の色つきを含む）が正規のキーになり、正規化できない値はそのまま返ること、`generateOverwriteParams('commentreactions', ...)` がこの params を返すこと（要件 10.2）。
 - `@growi/emoji-mart-data`: 既存の `skins[0]` の値が拡張前と一致すること、肌の色対応の絵文字が6件の `skins` を持つこと、`aliases` の存在。`@emoji-mart/data` の既定の export のすべての id（と肌の色）が `normalizeReactionKey` を通ること（ピッカーとサーバーの検証のずれの検出）。
