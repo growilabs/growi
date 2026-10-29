@@ -307,6 +307,43 @@ describe('POST /delete', () => {
     await waitForAncestorCleanupToSettle(parentId);
   }, 20_000);
 
+  it('deletes the selected pages and their descendants under the default settings', async () => {
+    const pageA = await createPage(`${FIXTURE_ROOT}/a`, 'a body');
+    const childOfA = await createPage(`${FIXTURE_ROOT}/a/child`, 'child body');
+    const pageB = await createPage(`${FIXTURE_ROOT}/b`, 'b body');
+    if (pageA.parent == null) {
+      throw new Error('the fixture page must have a parent');
+    }
+    const parentId = getIdStringForRef(pageA.parent);
+
+    const response = await request(app)
+      .post('/delete')
+      .set('X-Forwarded-For', TEST_IP)
+      .send({
+        pageIdToRevisionIdMap: {
+          [pageA._id.toString()]: latestRevisionIdOf(pageA),
+          [pageB._id.toString()]: latestRevisionIdOf(pageB),
+        },
+        isRecursively: true,
+      });
+
+    expect(response.status).toBe(200);
+    for (const page of [pageA, childOfA, pageB]) {
+      const deletedPage = await waitForPageToBeDeleted(page._id);
+      expect(deletedPage.path).toBe(`/trash${page.path}`);
+    }
+
+    await waitForAncestorCleanupToSettle(parentId);
+    await vi.waitFor(
+      async () => {
+        expect(
+          await PageOperation.countDocuments({ fromPath: fixturePathPattern }),
+        ).toBe(0);
+      },
+      { timeout: 10_000 },
+    );
+  }, 30_000);
+
   it('keeps a page the requester is not allowed to delete', async () => {
     const page = await createPage(targetPath, 'target body');
     // The requester authored the page but is not an admin, so AdminOnly

@@ -175,6 +175,24 @@ describe('DELETE /empty-trash', () => {
     expect(response.status).toBe(200);
   });
 
+  it('deletes every trashed page under the default settings', async () => {
+    const paths = [
+      `${FIXTURE_ROOT}/own`,
+      `${FIXTURE_ROOT}/others`,
+      `${FIXTURE_ROOT}/others/child`,
+    ];
+    await createTrashedPages([
+      { path: paths[0], creator: requester._id },
+      { path: paths[1], creator: new Types.ObjectId() },
+      { path: paths[2], creator: new Types.ObjectId() },
+    ]);
+
+    const response = await emptyTrash();
+
+    expect(response.status).toBe(200);
+    expect(await findSurvivingPaths(paths)).toEqual([]);
+  });
+
   it('answers 403 and keeps the page when no trashed page may be deleted completely', async () => {
     const [trashedPage] = await createTrashedPages([
       { path: `${FIXTURE_ROOT}/target`, creator: requester._id },
