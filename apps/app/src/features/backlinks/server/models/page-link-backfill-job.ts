@@ -11,8 +11,6 @@ const JOB_ID = { $oid: '000000000000000000000001' };
 export interface BackfillClaimOptions {
   /** How long the claim stays valid without a renewal. */
   readonly leaseMs: number;
-  /** Becomes the job's cutoff only if the job has none yet. */
-  readonly recentCutoff: Date;
 }
 
 // Raw commands, not the query API: Prisma's `upsert` has no `$setOnInsert`, and `update`
@@ -22,8 +20,8 @@ export const extension = Prisma.defineExtension((client) => {
     model: {
       pagelinkbackfilljobs: {
         /**
-         * Create the job document idle if it is missing; never touch an existing one, so a
-         * `startRequested: true` written by infra survives every later boot.
+         * Create the job document idle if it is missing; never touch an existing one, so coverage
+         * and progress survive every later boot.
          *
          * Every field is written because raw inserts do not get the schema's `@default`s.
          */
@@ -36,12 +34,15 @@ export const extension = Prisma.defineExtension((client) => {
                 u: {
                   $setOnInsert: {
                     status: 'idle',
-                    phase: null,
-                    recentCutoff: null,
+                    requestedScope: null,
+                    requestedAt: null,
+                    stopRequested: false,
+                    runCutoff: null,
+                    runTotal: null,
+                    coverage: 'none',
+                    coveredSince: null,
                     progressMarker: null,
-                    recentProcessed: 0,
-                    olderProcessed: 0,
-                    startRequested: false,
+                    processed: 0,
                     completedAt: null,
                     lastError: null,
                     claimedBy: null,
@@ -68,7 +69,7 @@ export const extension = Prisma.defineExtension((client) => {
          */
         async tryClaim(
           owner: string,
-          { leaseMs, recentCutoff }: BackfillClaimOptions,
+          { leaseMs }: BackfillClaimOptions,
         ): Promise<boolean> {
           const result = await client.$runCommandRaw({
             findAndModify: COLLECTION,
@@ -82,22 +83,14 @@ export const extension = Prisma.defineExtension((client) => {
                 ],
               },
             },
-            // A pipeline update, so the lease can be computed from `$$NOW` and the first-claim
-            // values kept by `$ifNull`. `$literal` stops an owner id starting with `$` from
-            // being read as a field path.
+            // A pipeline update, so the lease can be computed from `$$NOW`. `$literal` stops an
+            // owner id starting with `$` from being read as a field path.
             update: [
               {
                 $set: {
                   claimedBy: { $literal: owner },
                   status: 'running',
                   leaseExpiresAt: { $add: ['$$NOW', leaseMs] },
-                  phase: { $ifNull: ['$phase', 'recent'] },
-                  recentCutoff: {
-                    $ifNull: [
-                      '$recentCutoff',
-                      { $date: recentCutoff.toISOString() },
-                    ],
-                  },
                 },
               },
             ],
