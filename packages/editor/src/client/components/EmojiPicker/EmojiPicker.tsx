@@ -81,7 +81,7 @@ export const EmojiPicker = (props: EmojiPickerProps): JSX.Element | null => {
       centered
       fade={false}
       backdropClassName="emoji-picker-modal"
-      contentClassName="border-0 bg-transparent align-items-center"
+      contentClassName="border-0 bg-transparent shadow-none align-items-center"
     >
       <Picker
         onEmojiSelect={handleEmojiSelect}

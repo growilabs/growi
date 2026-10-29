@@ -70,6 +70,16 @@ describe('EmojiPicker', () => {
     expect(loadCounter).toEqual({ picker: 1, data: 1 });
   });
 
+  it('leaves no visible frame (background, border, shadow) around the picker', async () => {
+    render(<EmojiPicker isOpen onSelect={vi.fn()} onClose={vi.fn()} />);
+    await screen.findByTestId('fake-picker');
+
+    const content = document.querySelector('.modal-content');
+    expect(content?.classList.contains('bg-transparent')).toBe(true);
+    expect(content?.classList.contains('border-0')).toBe(true);
+    expect(content?.classList.contains('shadow-none')).toBe(true);
+  });
+
   it('passes a native selection with the emoji id and skin tone number to onSelect', async () => {
     const onSelect = vi.fn();
     render(<EmojiPicker isOpen onSelect={onSelect} onClose={vi.fn()} />);

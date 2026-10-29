@@ -217,14 +217,14 @@ apps/app/src/features/comment-reaction/
     └── components/
         ├── index.ts                 # 公開: CommentReactionBar だけ
         └── CommentReactionBar/
-            ├── CommentReactionBar.tsx       # 1コメント分のチップ列と「＋」
+            ├── CommentReactionBar.tsx       # 1コメント分のチップ列と「リアクション追加」
             ├── CommentReactionBar.spec.tsx
             ├── CommentReactionBar.module.scss
             ├── ReactionChip.tsx             # 絵文字の部分（追加・解除）と人数の部分（利用者一覧を開く）、自分の強調
             ├── ReactionChip.spec.tsx
             ├── ReactionUsersPopover.tsx     # 人数の部分から開く、リアクションした利用者の一覧
             ├── ReactionUsersPopover.spec.tsx
-            ├── AddReactionButton.tsx        # 「＋」とピッカーの開閉、上限時の無効化
+            ├── AddReactionButton.tsx        # 「リアクション追加」とピッカーの開閉、上限時の無効化
             └── AddReactionButton.spec.tsx
 
 apps/app/src/features/comment/server/
@@ -360,11 +360,11 @@ graph TB
 | 2.7, 2.8 | 古い画面からの重複要求は成功扱い | CommentReactionService | `{ changed: false }` | 追加・解除 |
 | 2.9 | 完了後に最新の状態を表示 | update route, getCommentListItem, useCommentReactions | PUT の応答の `comment`、キャッシュの1件の置き換え | 追加・解除 |
 | 2.10 | 失敗の表示と操作前の状態 | useCommentReactions, classifyReactionUpdateFailure | 楽観的更新なし（失敗してもキャッシュを変えない）、失敗の種類ごとの `toastError`、一覧の取り直し | 追加・解除 |
-| 3.1, 3.2 | 「＋」でピッカーを開く | AddReactionButton, EmojiPicker | `EmojiPickerProps` | — |
+| 3.1, 3.2 | 「リアクション追加」でピッカーを開く | AddReactionButton, EmojiPicker | `EmojiPickerProps` | — |
 | 3.3, 3.4 | 新規はチップ追加、既存は追加と同じ扱い | AddReactionButton, reaction-key | `fromPickerSelection` → PUT | 追加・解除 |
 | 3.5 | 肌の色の選択 | EmojiPicker | emoji-mart の `skin` / `skinTonePosition` | — |
 | 3.6 | 閉じたら変更しない | AddReactionButton | `onClose` | — |
-| 3.7 | インラインコメントと返信にも「＋」と追加・解除 | CommentReactionBar の差し込み先 | — | — |
+| 3.7 | インラインコメントと返信にも「リアクション追加」と追加・解除 | CommentReactionBar の差し込み先 | — | — |
 | 4.1, 4.2 | 標準絵文字だけ、存在しない絵文字は拒否 | reaction-key, update route | 400 `invalid-reaction-emoji` | — |
 | 4.3, 4.4 | 肌の色は 2〜6、非対応の絵文字への肌の色は拒否 | reaction-key | `ParsedReactionKey.skinTone` | — |
 | 4.5 | 別名を1つの絵文字として扱う | reaction-key | `normalizeReactionKey` | — |
@@ -372,7 +372,7 @@ graph TB
 | 5.1, 5.2 | 閲覧権限のあるログインユーザーだけ | update route | `loginRequiredStrictly`、閲覧判定 | — |
 | 5.3 | 権限なし・存在しないコメントは同じ応答 | update route | 404 `notfound_or_forbidden` | — |
 | 5.4, 5.5 | 閲覧専用ユーザーはコメント設定に連動 | update route, useCanReactToComments | `excludeReadOnlyUserIfCommentNotAllowed`、`useIsCommentActionBlockedForReadOnlyUser` | — |
-| 5.6, 5.7 | 共有リンク・ゲストは手段なし | useCanReactToComments, update route | `loginRequiredStrictly`、「＋」非表示、チップは非活性 | — |
+| 5.6, 5.7 | 共有リンク・ゲストは手段なし | useCanReactToComments, update route | `loginRequiredStrictly`、「リアクション追加」非表示、チップは非活性 | — |
 | 5.8 | ごみ箱のページでも追加・解除できる | useCanReactToComments | ごみ箱かどうかを判定に使わない（クライアントの判定も、サーバーの update route も、ごみ箱かどうかで分岐しない） | — |
 | 6.1 | コメントを読める相手と同じ範囲で返す | comment の list / get route, loadReactionChips | `ICommentListItem.reactions` | 読み取り |
 | 6.2 | ゲスト・共有リンクにも読み取り専用で表示 | CommentReactionBar, ReactionChip, ReactionUsersPopover | `canReact = false`（絵文字の部分は押せない。人数の部分から利用者一覧を開ける） | — |
@@ -417,10 +417,10 @@ graph TB
 | useCommentReactions | Client / hook | 一覧のキャッシュから読み、PUT の応答で1件を置き換える。失敗時はエラーを示して一覧を取り直す | 1.1, 2.1, 2.2, 2.9, 2.10, 6.5, 7.2 | useSWRxCommentList（P0）、apiv3-client（P0）、classifyReactionUpdateFailure（P0） | State |
 | classifyReactionUpdateFailure | Client / utils | PUT の失敗を、利用者に示す種類に分ける（純粋関数） | 2.10, 7.2 | — | Service |
 | useCanReactToComments | Client / hook | 画面上のリアクション可否 | 5.4–5.8, 6.2 | context フック（P0） | State |
-| CommentReactionBar | Client / UI | 1コメント分のチップ列と「＋」 | 1.1–1.8, 2.3, 3.1, 3.7, 6.2, 6.3, 6.5 | hooks（P0） | — |
+| CommentReactionBar | Client / UI | 1コメント分のチップ列と「リアクション追加」 | 1.1–1.8, 2.3, 3.1, 3.7, 6.2, 6.3, 6.5 | hooks（P0） | — |
 | ReactionChip | Client / UI | チップの表示、絵文字の部分の押下（追加・解除）、人数の部分の押下（利用者一覧） | 1.2, 1.4, 1.5, 1.10, 2.1, 2.2, 6.2 | reaction-key（P0）、ReactionUsersPopover（P0） | — |
 | ReactionUsersPopover | Client / UI | リアクションした利用者の一覧 | 1.5, 1.10, 6.2 | reactstrap `Popover`（P0） | — |
-| AddReactionButton | Client / UI | 「＋」とピッカー、上限時の無効化 | 3.1–3.6, 7.2 | EmojiPicker（P0） | — |
+| AddReactionButton | Client / UI | 「リアクション追加」とピッカー、上限時の無効化 | 3.1–3.6, 7.2 | EmojiPicker（P0） | — |
 | EmojiPicker | editor package / UI | 遅延読み込みのピッカー | 3.2, 3.5, 3.6 | emoji-mart（P0） | — |
 
 ### Reaction core
@@ -784,9 +784,9 @@ declare function useCommentReactions(pageId: string, commentId: string): UseComm
 - State model: 読み取りは `useSWRxCommentList(pageId)` の `data` から `id === commentId` の1件の `reactions` を取り出す。新しい取得は増やさない。末尾のコメント欄とインラインコメント（`groupInlineComments` の型を経由しない）が、同じキャッシュから読む。
 - Persistence & consistency: `setReaction` は `apiv3Put('/comments/:id/reactions', { emoji, isReacted })` を呼ぶ。楽観的更新はしない（要求の前にキャッシュを書き換えない）。
   - 成功して、応答の `comment.reactions` が `null` でないとき: `mutate(updater, { revalidate: false })` で、一覧の `id === commentId` の1件を、応答の `comment` に置き換える（要件 2.9）。
-  - 成功したが、応答の `comment.reactions` が `null`（サーバーで読み直しのときにリアクションだけ取り込めなかった）のとき: 1件の置き換えはせず、`mutate()` で一覧を取り直す。置き換えると、バー（「＋」を含む）が消えたまま戻らなくなるため。エラーは表示しない（書き込みは成功している）。
+  - 成功したが、応答の `comment.reactions` が `null`（サーバーで読み直しのときにリアクションだけ取り込めなかった）のとき: 1件の置き換えはせず、`mutate()` で一覧を取り直す。置き換えると、バー（「リアクション追加」を含む）が消えたまま戻らなくなるため。エラーは表示しない（書き込みは成功している）。
   - 失敗したとき: 下の「失敗時の扱い」に従う。
-- Concurrency strategy: 要求中（一覧の取り直しを待つ間を含む）は `isUpdating` を true にし、部品はチップと「＋」の押下を無効にする。
+- Concurrency strategy: 要求中（一覧の取り直しを待つ間を含む）は `isUpdating` を true にし、部品はチップと「リアクション追加」の押下を無効にする。
 - 置き換える1件は、一覧のほかの項目（本文、解決状態など）も最新になる。インラインコメントの表示は、置き換えた後の一覧を `groupInlineComments` で組み直したものになる。
 
 ##### 失敗時の扱い
@@ -797,11 +797,11 @@ declare function useCommentReactions(pageId: string, commentId: string): UseComm
 
 | 失敗の種類（`ReactionUpdateFailureKind`） | 判定（apiv3-client が投げる `ErrorV3` の `code`） | 主な原因 | 文言 | 取り直しの後の表示 |
 |---|---|---|---|---|
-| `kind-limit-exceeded` | `reaction-kind-limit-exceeded`（409） | 他の利用者が新しい絵文字を付けて、上限に達していた | `comment_reaction.kind_limit_reached`（要件 7.2） | チップが上限まで並び、「＋」が無効になる |
+| `kind-limit-exceeded` | `reaction-kind-limit-exceeded`（409） | 他の利用者が新しい絵文字を付けて、上限に達していた | `comment_reaction.kind_limit_reached`（要件 7.2） | チップが上限まで並び、「リアクション追加」が無効になる |
 | `comment-unavailable` | `notfound_or_forbidden`（404） | コメントが削除された（書き込みの前でも、読み直しの前でも）、ページが完全に削除された、閲覧権限を失った | `comment_reaction.comment_unavailable` | 削除されたコメントは一覧から消える。ページ自体を読めなくなったときは、一覧の取得もエラーになり、SWR が前のデータを保つ |
 | `failed` | 上記以外のすべて | 権限エラー（セッション切れの 401/403。`loginRequired` は本文の無い 403 を返すので `code` を持たない）、閲覧専用ユーザーへの設定変更（400 `validation_failed`）、不正な絵文字（400 `invalid-reaction-emoji`。画面からは通常起きない）、500、通信の失敗 | `comment_reaction.update_failed` | 最新の一覧（変化が無ければ操作前と同じ） |
 
-- 権限エラーを専用の文言に分けないのは、`code` で確実に見分けられないため（本文の無い 403、`validation_failed` は入力の形式不正と共用）。権限の変化そのもの（ログアウト、閲覧専用の設定）は、一覧ではなく context のフックが持つ状態なので、取り直しでは「＋」の表示は変わらない。次にページを読み込んだときにそろう。
+- 権限エラーを専用の文言に分けないのは、`code` で確実に見分けられないため（本文の無い 403、`validation_failed` は入力の形式不正と共用）。権限の変化そのもの（ログアウト、閲覧専用の設定）は、一覧ではなく context のフックが持つ状態なので、取り直しでは「リアクション追加」の表示は変わらない。次にページを読み込んだときにそろう。
 - `classifyReactionUpdateFailure(errors: unknown): ReactionUpdateFailureKind` は純粋関数で、apiv3-client が投げる値（`ErrorV3` の配列、または配列でない値）を受け取り、知らない形のときは `failed` を返す。
 
 #### useCanReactToComments
@@ -823,7 +823,7 @@ declare function useCanReactToComments(isReadOnly: boolean): boolean;
 
 | Field | Detail |
 |-------|--------|
-| Intent | 1コメント分のチップ列と「＋」を描画する |
+| Intent | 1コメント分のチップ列と「リアクション追加」を描画する |
 | Requirements | 1.1, 1.2, 1.3, 1.4, 1.7, 1.8, 2.3, 3.1, 3.7, 6.2, 6.3, 6.5 |
 
 ```typescript
@@ -841,11 +841,11 @@ type CommentReactionBarProps = {
 - ReactionChip: 1つのチップを、見た目は1つの枠のまま、押せる部分を2つに分ける（要件 1.5。マウスでもタッチ端末でも同じ操作で、追加・解除と利用者の確認を区別できるようにする）。
   - **絵文字の部分**: `canReact` が true のときは `button` 要素で、押すと追加・解除する（要件 2.1、2.2）。`aria-pressed={reactedByMe}`、`aria-label` に絵文字名を入れる。`canReact` が false のときは押せない要素（`span`）にする。グリフは `resolveReactionGlyph`。解決できない（絵文字データの更新で消えた）ときは `:<shortcode>:` の文字列を出す。
   - **人数の部分**: `canReact` によらず、常に `button` 要素にする。押す（クリック・タップ）と `ReactionUsersPopover` を開き、もう一度押すか外側を押すと閉じる。追加・解除の API は呼ばない。`aria-label` に人数（「N 人がリアクション」）を入れ、`aria-haspopup="dialog"` と `aria-expanded` を付ける。ゲスト・共有リンク閲覧者も、この部分から利用者一覧を見られる（要件 6.2）。
-  - 2つの部分は枠の中で区切り線で分け、タッチ端末で押し分けられるよう、それぞれの押せる範囲を十分な大きさにする（具体的な寸法は実装で決める）。
+  - 2つの部分は区切り線を引かず、絵文字の右側と人数の左側の余白を 0 にして詰める。絵文字だけのチップを想定して、高さは `min-height: 1.5rem` までにする（押せる部分は2つのまま）。
   - Popover の対象は、人数ボタンへの ref（`ReactionUsersPopover` の `target` は `RefObject<HTMLElement>`）。`useId()` の文字列はコロンを含み、reactstrap がセレクターとして解決できないため使わない（`apps/app/.claude/rules/ui-pitfalls.md`）。
 - ReactionUsersPopover: reactstrap の `Popover`（`trigger="legacy"`。クリック・タップで開き、外側のクリック・タップで閉じる）で、チップの `users` を `createdAt` の昇順のまま並べる。表示名は、`name` があれば `name`、無ければ `username`、ID 文字列ならそのまま（要件 1.10）。人数が多いときは、高さの上限を決めて中をスクロールさせる。
-- AddReactionButton: `canReact` のときだけ描画する（要件 3.1、5.4、5.6、5.7）。チップの数が `MAX_REACTION_KINDS_PER_COMMENT` 以上なら無効化し、ツールチップで上限に達したことを示す。サーバーの 409 を受けた場合は、`useCommentReactions` が同じ文言のトーストを出して一覧を取り直す（要件 7.2）。ピッカーの `onSelect` は `fromPickerSelection` でキーにし、`setReaction(key, true)` を呼ぶ（要件 3.3、3.4）。閉じたら何もしない（要件 3.6）。
-- EmojiPicker（`packages/editor`）: props は `{ isOpen: boolean; onSelect: (selection: EmojiPickerSelection) => void; onClose: () => void; theme?: 'light' | 'dark' | 'auto' }`。`EmojiPickerSelection` は絵文字の種類を `kind` で見分ける判別ユニオンで、いまのメンバーは `{ kind: 'native'; id: string; skin?: number }` だけ。初めて開いたときに `@emoji-mart/react` と `@emoji-mart/data` を動的 import する（ページ表示時の読み込みを増やさない）。読み込みに失敗したときはエラーを `console.error` に記録して `onClose` を呼ぶ。親の開閉の状態が閉に戻るので、次に開いたときに読み込みをやり直せる（「＋」が効かなくなったままにならない）。`@emoji-mart/data` の既定の export は `sets/15/native.json` で、`@growi/emoji-mart-data` の抽出元（サーバーの検証の根拠）と同じデータなので、ピッカーで選べる絵文字はすべてサーバーの検証を通る。reactstrap の `Modal`（中央寄せ）で表示し、スマートフォンでも使える。`skinTonePosition` を有効にする（要件 3.5）。
+- AddReactionButton: 見た目は Material Symbols Outlined の `add_reaction`（`material-symbols-outlined fs-5`、`aria-hidden`）で、読み上げ名は `button` の `aria-label`（`comment_reaction.add_reaction`）が担う。高さはチップと同じ `min-height: 1.5rem`。`canReact` のときだけ描画する（要件 3.1、5.4、5.6、5.7）。チップの数が `MAX_REACTION_KINDS_PER_COMMENT` 以上なら無効化し、ツールチップで上限に達したことを示す。サーバーの 409 を受けた場合は、`useCommentReactions` が同じ文言のトーストを出して一覧を取り直す（要件 7.2）。ピッカーの `onSelect` は `fromPickerSelection` でキーにし、`setReaction(key, true)` を呼ぶ（要件 3.3、3.4）。閉じたら何もしない（要件 3.6）。
+- EmojiPicker（`packages/editor`）: props は `{ isOpen: boolean; onSelect: (selection: EmojiPickerSelection) => void; onClose: () => void; theme?: 'light' | 'dark' | 'auto' }`。`EmojiPickerSelection` は絵文字の種類を `kind` で見分ける判別ユニオンで、いまのメンバーは `{ kind: 'native'; id: string; skin?: number }` だけ。初めて開いたときに `@emoji-mart/react` と `@emoji-mart/data` を動的 import する（ページ表示時の読み込みを増やさない）。読み込みに失敗したときはエラーを `console.error` に記録して `onClose` を呼ぶ。親の開閉の状態が閉に戻るので、次に開いたときに読み込みをやり直せる（「リアクション追加」が効かなくなったままにならない）。`@emoji-mart/data` の既定の export は `sets/15/native.json` で、`@growi/emoji-mart-data` の抽出元（サーバーの検証の根拠）と同じデータなので、ピッカーで選べる絵文字はすべてサーバーの検証を通る。reactstrap の `Modal`（中央寄せ）で表示し、`modal-content` の背景・枠線・影（`box-shadow`）はすべて消して、ピッカーだけが見えるようにし、スマートフォンでも使える。`skinTonePosition` を有効にする（要件 3.5）。
 - 文言: `comment_reaction.add_reaction`、`comment_reaction.reacted_by`、`comment_reaction.reacted_count`、`comment_reaction.kind_limit_reached`、`comment_reaction.comment_unavailable`、`comment_reaction.update_failed` を5言語に追加する。
 
 ## Data Models
@@ -900,7 +900,7 @@ type CommentReactionBarProps = {
 - `useCommentReactions`: 一覧のキャッシュから該当コメントのチップを読むこと。PUT の成功で該当する1件だけが置き換わり、再取得しないこと。成功でも応答の `reactions` が `null` なら、置き換えずに一覧を取り直し、エラーを出さないこと。失敗（409、404、それ以外）では、取り直しの前にキャッシュが変わらないこと、種類ごとの文言でトーストが出ること、一覧が取り直されること、`setReaction` が reject しないこと。取り直しも失敗したとき、表示が操作前のまま残ること（要件 2.9、2.10、6.5、7.2）。
 - `classifyReactionUpdateFailure`: `reaction-kind-limit-exceeded` → `kind-limit-exceeded`、`notfound_or_forbidden` → `comment-unavailable`、`validation_failed`・`invalid-reaction-emoji`・`code` の無いエラー・配列でない値・通信の失敗 → `failed` になること。
 - `useCanReactToComments`: ゲスト、共有リンク、閲覧専用（許可あり／なし）、`isReadOnly`、ごみ箱のページでも判定が変わらないこと（要件 5.4〜5.8、6.2）。
-- `CommentReactionBar`: チップと人数の表示、自分のチップの `aria-pressed`、絵文字の部分を押すと API が呼ばれること、人数の部分を押すと利用者一覧（表示名、`username`、ID 文字列）が開き API は呼ばれないこと、`canReact` が false のとき「＋」が無く、絵文字の部分を押しても API を呼ばず、人数の部分からは利用者一覧が開くこと、上限で「＋」が無効になること、チップが無く読み取り専用なら何も描画しないこと、`chips` が `null` なら何も描画しないこと（要件 1.1〜1.7、1.10、3.1、6.2、6.5、7.2）。
+- `CommentReactionBar`: チップと人数の表示、自分のチップの `aria-pressed`、絵文字の部分を押すと API が呼ばれること、人数の部分を押すと利用者一覧（表示名、`username`、ID 文字列）が開き API は呼ばれないこと、`canReact` が false のとき「リアクション追加」が無く、絵文字の部分を押しても API を呼ばず、人数の部分からは利用者一覧が開くこと、上限で「リアクション追加」が無効になること、チップが無く読み取り専用なら何も描画しないこと、`chips` が `null` なら何も描画しないこと（要件 1.1〜1.7、1.10、3.1、6.2、6.5、7.2）。
 - `overwrite-params/comment-reactions`: 24 桁の16進文字列が ObjectId になること、不正な値はそのまま返ること、`emoji` の別名（肌の色つきを含む）が正規のキーになり、正規化できない値はそのまま返ること、`generateOverwriteParams('commentreactions', ...)` がこの params を返すこと（要件 10.2）。
 - `@growi/emoji-mart-data`: 既存の `skins[0]` の値が拡張前と一致すること、肌の色対応の絵文字が6件の `skins` を持つこと、`aliases` の存在。`@emoji-mart/data` の既定の export のすべての id（と肌の色）が `normalizeReactionKey` を通ること（ピッカーとサーバーの検証のずれの検出）。
 
@@ -925,10 +925,10 @@ type CommentReactionBarProps = {
 - index migration（`20261016120000-add-indexes-to-commentreactions.integ.ts`）: `up` で2つのインデックスが、Prisma の `map` と同じ名前・キーで作られること。重複した文書があるとき、最も古い1件が残り、一意インデックスが作られること。2回実行しても失敗しないこと。`down` でインデックスが消えること（コレクションが無くても失敗しないこと）。
 
 ### E2E/UI Tests
-- 通常コメントに「＋」から 👍 を付け、チップの人数が 1 になり、もう一度押すと消えること（要件 2.1〜2.3、3.3）。
+- 通常コメントに「リアクション追加」から 👍 を付け、チップの人数が 1 になり、もう一度押すと消えること（要件 2.1〜2.3、3.3）。
 - ピッカーで肌の色を変えて同じ絵文字を付けると、別のチップになること（要件 1.3、3.5）。
 - インラインコメントの返信にリアクションを付けられ、本文のポップオーバーと末尾の一覧の両方に反映されること（要件 1.8、3.7）。
-- 共有リンクの画面で、通常コメントのチップは見えるが「＋」が無く、インラインコメントのリアクションは出ないこと（要件 5.6、6.2、6.3）。
+- 共有リンクの画面で、通常コメントのチップは見えるが「リアクション追加」が無く、インラインコメントのリアクションは出ないこと（要件 5.6、6.2、6.3）。
 - スマートフォンの画面幅とタッチ操作で、チップの人数の部分をタップすると利用者一覧が開き、リアクションが変わらないこと。絵文字の部分をタップすると追加・解除されること（要件 1.5、2.1、2.2）。
 
 ## Security Considerations
@@ -942,7 +942,7 @@ type CommentReactionBarProps = {
 ## Performance & Scalability
 - 一覧の取得に、`commentreactions.findMany({ where: { commentId: { in: commentIds } } })`（一意インデックスの先頭の `comment` を使う）と、リアクションした利用者の `users.findMany({ where: { id: { in } } })`（`_id` のインデックス）の2回が加わる。行数は、前者が「コメント数 × 種類数（最大 20）× 利用者数」、後者が「そのページでリアクションした利用者の数」で上限がある。
 - 追加・解除のたびの一覧全体の再取得はしない（応答の1件でキャッシュを置き換える）。
-- ピッカーと emoji-mart のデータは、初めて「＋」を押したときに読み込む。ページ表示時のバンドルに入るのは `@growi/emoji-mart-data` の増分（数十 KB の見込み）だけで、これは本文のレンダラーが既に読み込んでいるデータの拡張になる。
+- ピッカーと emoji-mart のデータは、初めて「リアクション追加」を押したときに読み込む。ページ表示時のバンドルに入るのは `@growi/emoji-mart-data` の増分（数十 KB の見込み）だけで、これは本文のレンダラーが既に読み込んでいるデータの拡張になる。
 - 追加の API の流量制限は設けない。既定の流量制限（利用者ごとに 1 分 500 回）が適用される。
 
 ## Migration Strategy
@@ -965,7 +965,7 @@ type CommentReactionBarProps = {
     - 既定の設定と Small の環境では記録されない。記録したい環境は、詳細度を Medium 以上にするか、`AUDIT_LOG_ADDITIONAL_ACTIONS` に `COMMENT_REACTION_ADD,COMMENT_REACTION_REMOVE` を足せば、リアクションだけを記録できる。
   - どちらの案でも、要件 9.4（状態を変えない要求・拒否は記録しない）と 9.5（通知しない。`EssentialActionGroup` に入れない）は変わらない。
 - **種類数の上限の厳密さ**: 同時に別々の新しい絵文字が追加されると、上限を超えうる（research.md の Decision）。
-- **チップの押し間違い（要件 1.5、2.1、2.2）**: 利用者一覧は人数の部分を押して開き、追加・解除は絵文字の部分を押して行う。そのため、マウスでもタッチ端末でも、リアクションできる利用者もできない利用者も、同じ操作で一覧を見られる。一方で、小さなチップの中に押せる部分が2つ並ぶので、タッチ端末では隣の部分を押し間違えうる（一覧を見ようとして、リアクションを外してしまう）。区切り線と押せる範囲の大きさで減らし、E2E で確かめる。押し間違えても、もう一度押せば元に戻せる。マウスで押さずに一覧を見る手段（hover で出すツールチップ）は、v1 では足さない。
+- **チップの押し間違い（要件 1.5、2.1、2.2）**: 利用者一覧は人数の部分を押して開き、追加・解除は絵文字の部分を押して行う。そのため、マウスでもタッチ端末でも、リアクションできる利用者もできない利用者も、同じ操作で一覧を見られる。一方で、小さなチップの中に押せる部分が2つ並ぶので、タッチ端末では隣の部分を押し間違えうる（一覧を見ようとして、リアクションを外してしまう）。区切り線を無くして詰めたチップ（高さ `min-height: 1.5rem`）では押せる範囲が小さくなるが、このトレードオフはデザインの指定として受け入れる。絵文字と人数で位置が分かれていることで減らし、E2E で確かめる。押し間違えても、もう一度押せば元に戻せる。マウスで押さずに一覧を見る手段（hover で出すツールチップ）は、v1 では足さない。
 - **コメントの取得とリアクションの結合**: リアクションがコメントの応答に載るので、リアクションの不具合がコメントの表示に波及しうる。取り込みの失敗は `reactions: null` に閉じ込めるが、集計の性能劣化はコメント一覧の応答時間に直接効く。
 - **応答の要求者依存**: `reactedByMe` は要求者ごとに変わるので、コメント一覧の応答も要求者ごとになる。もともと閲覧権限で要求者ごとの応答なので、新たな制約は生まない。
 - **Slack 名との対応**: emoji-mart の id と Slack のショートコードが一部ずれる可能性がある。v1 では Slack と連携しないため実害はないが、Slack 連携のスペックで対応表を検証する。

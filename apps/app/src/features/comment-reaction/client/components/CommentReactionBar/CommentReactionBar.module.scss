@@ -1,5 +1,5 @@
-// One bordered frame split into two pressable parts. Each part keeps a
-// touch-sized hit area so a tap on one never lands on the other.
+// One bordered frame split into two pressable parts: the emoji part keeps the
+// frame's left padding and the count part its right padding, so the two sit flush.
 .reaction-chip {
   display: inline-flex;
   align-items: stretch;
@@ -14,9 +14,8 @@
 
   .reaction-chip-emoji,
   .reaction-chip-count {
-    min-width: 2.25rem;
-    min-height: 2rem;
-    padding: 0 0.5rem;
+    min-height: 1.5rem;
+    padding: 0;
     color: inherit;
     background: transparent;
     border: 0;
@@ -26,11 +25,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    padding-left: 0.5rem;
   }
 
   .reaction-chip-count {
+    padding-right: 0.5rem;
     font-size: 0.85rem;
-    border-left: 1px solid var(--bs-border-color);
   }
 
   button.reaction-chip-emoji:not(:disabled):hover,
@@ -56,8 +56,10 @@
   display: inline-flex;
 
   .add-reaction-button {
-    min-width: 2.25rem;
-    min-height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.5rem;
     padding: 0 0.5rem;
     color: inherit;
     background: transparent;

@@ -74,7 +74,9 @@ export const AddReactionButton = ({
           disabled={isLimitReached || isUpdating}
           onClick={openPicker}
         >
-          +
+          <span className="material-symbols-outlined fs-5" aria-hidden="true">
+            add_reaction
+          </span>
         </button>
       </span>
       {isLimitReached && (

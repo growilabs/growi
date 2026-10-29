@@ -71,6 +71,14 @@ describe('AddReactionButton', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('shows an icon, hidden from assistive tech, while keeping the accessible name', () => {
+    render(<AddReactionButton canReact chipCount={0} onAdd={vi.fn()} />);
+
+    const icon = addButton().querySelector('.material-symbols-outlined');
+    expect(icon?.textContent).toBe('add_reaction');
+    expect(icon?.getAttribute('aria-hidden')).toBe('true');
+  });
+
   it('opens the picker when pressed', async () => {
     render(<AddReactionButton canReact chipCount={0} onAdd={vi.fn()} />);
 

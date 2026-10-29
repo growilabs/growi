@@ -196,7 +196,7 @@ test.describe('Comment reactions', () => {
     await expect(inlineReplyInThread(page)).toContainText(inlineReplyText);
   });
 
-  test('Adding 👍 from "+" shows a chip with count 1, and pressing it again removes it (Req 2.1, 2.2, 2.3, 3.3)', async ({
+  test('Adding 👍 from the add-reaction button shows a chip with count 1, and pressing it again removes it (Req 2.1, 2.2, 2.3, 3.3)', async ({
     page,
   }, testInfo) => {
     await page.goto(pagePath(testInfo));
@@ -273,7 +273,7 @@ test.describe('Comment reactions', () => {
     await expect(reactionEmojiButton(replyInThread, '+1')).toHaveCount(0);
   });
 
-  test('The share-link view shows normal comment chips without "+", and no inline comment reactions (Req 5.6, 6.2, 6.3)', async ({
+  test('The share-link view shows normal comment chips without the add-reaction button, and no inline comment reactions (Req 5.6, 6.2, 6.3)', async ({
     browser,
     page,
     request,
@@ -310,7 +310,7 @@ test.describe('Comment reactions', () => {
 
       await expect(reactionCountButtons(guestComment)).toHaveText(['1', '1']);
       await expect(guestComment.getByText(THUMBS_UP).first()).toBeVisible();
-      // Read-only: the emoji part is not a toggle and there is no "+".
+      // Read-only: the emoji part is not a toggle and there is no add-reaction button.
       await expect(
         guestComment.getByRole('button', { name: '+1', exact: true }),
       ).toHaveCount(0);
