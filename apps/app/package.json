@@ -361,6 +361,7 @@
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^10.1.1",
+    "@emoji-mart/data": "^1.2.1",
     "@growi/core-styles": "workspace:^",
     "@growi/custom-icons": "workspace:^",
     "@growi/editor": "workspace:^",

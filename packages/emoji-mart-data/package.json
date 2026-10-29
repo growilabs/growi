@@ -16,7 +16,8 @@
   "scripts": {
     "build": "node bin/extract.ts",
     "dev": "node bin/extract.ts",
-    "lint": "biome check"
+    "lint": "biome check",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@emoji-mart/data": "^1.2.1"

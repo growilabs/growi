@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type {
+  ReactionChip,
+  ReactionKey,
+} from '~/features/comment-reaction/interfaces';
+
 import {
   type CommentListRow,
   toCommentListItem,
+  toCreatorSummary,
   toLegacyCommentListItem,
 } from './to-comment-list-item';
 
@@ -66,7 +72,7 @@ const baseRow: CommentListRow = {
 
 describe('toCommentListItem', () => {
   it('exposes the legacy alias fields for a normal comment', () => {
-    const item = toCommentListItem({ ...baseRow, replyToId: 'comment-0' });
+    const item = toCommentListItem({ ...baseRow, replyToId: 'comment-0' }, []);
 
     expect(item).toMatchObject({
       _id: 'comment-1',
@@ -86,7 +92,7 @@ describe('toCommentListItem', () => {
   });
 
   it('keeps null aliases when revision and replyTo are absent', () => {
-    const item = toCommentListItem({ ...baseRow, revisionId: null });
+    const item = toCommentListItem({ ...baseRow, revisionId: null }, []);
 
     expect(item.revision).toBeNull();
     expect(item.replyTo).toBeNull();
@@ -94,17 +100,20 @@ describe('toCommentListItem', () => {
 
   it('carries the inline fields of an inline comment', () => {
     const resolvedAt = new Date('2026-02-01T00:00:00.000Z');
-    const item = toCommentListItem({
-      ...baseRow,
-      isInline: true,
-      quote: 'selected',
-      prefix: 'before ',
-      suffix: ' after',
-      approxOffset: 12,
-      anchorOriginRevisionId: 'rev-0',
-      resolvedById: 'user-2',
-      resolvedAt,
-    });
+    const item = toCommentListItem(
+      {
+        ...baseRow,
+        isInline: true,
+        quote: 'selected',
+        prefix: 'before ',
+        suffix: ' after',
+        approxOffset: 12,
+        anchorOriginRevisionId: 'rev-0',
+        resolvedById: 'user-2',
+        resolvedAt,
+      },
+      [],
+    );
 
     expect(item).toMatchObject({
       page: 'page-1',
@@ -121,17 +130,20 @@ describe('toCommentListItem', () => {
   });
 
   it('returns only the creator fields the screens use', () => {
-    const item = toCommentListItem({
-      ...baseRow,
-      creator: {
-        ...creatorRow,
-        googleId: 'google-sentinel',
-        slackMemberId: 'slack-sentinel',
-        lastLoginAt: createdAt,
-        admin: true,
-        imageUrlCached: '/images/alice.png',
+    const item = toCommentListItem(
+      {
+        ...baseRow,
+        creator: {
+          ...creatorRow,
+          googleId: 'google-sentinel',
+          slackMemberId: 'slack-sentinel',
+          lastLoginAt: createdAt,
+          admin: true,
+          imageUrlCached: '/images/alice.png',
+        },
       },
-    });
+      [],
+    );
 
     expect(item.creator).toEqual({
       _id: 'user-1',
@@ -142,25 +154,72 @@ describe('toCommentListItem', () => {
   });
 
   it('does not return the creator email even when the user publishes it', () => {
-    const item = toCommentListItem({
-      ...baseRow,
-      creator: { ...creatorRow, isEmailPublished: true },
-    });
+    const item = toCommentListItem(
+      {
+        ...baseRow,
+        creator: { ...creatorRow, isEmailPublished: true },
+      },
+      [],
+    );
 
     expect(item.creator).not.toHaveProperty('email');
   });
 
   it('falls back to the creator id when the creator row is missing', () => {
-    const item = toCommentListItem({ ...baseRow, creator: null });
+    const item = toCommentListItem({ ...baseRow, creator: null }, []);
 
     expect(item.creator).toBe('user-1');
   });
 });
 
+describe('toCommentListItem reactions', () => {
+  const chip: ReactionChip = {
+    emoji: ':+1:' as ReactionKey,
+    count: 1,
+    reactedByMe: true,
+    users: ['user-1'],
+  };
+
+  it('carries the given chips as they are', () => {
+    expect(toCommentListItem(baseRow, [chip]).reactions).toEqual([chip]);
+  });
+
+  it('carries an empty array as an empty array', () => {
+    expect(toCommentListItem(baseRow, []).reactions).toEqual([]);
+  });
+
+  it('carries null as null so a failed load stays distinct from no reactions', () => {
+    expect(toCommentListItem(baseRow, null).reactions).toBeNull();
+  });
+});
+
+describe('toCreatorSummary', () => {
+  it('accepts a row with only the four summary fields', () => {
+    expect(
+      toCreatorSummary({
+        _id: 'user-1',
+        username: 'alice',
+        name: 'Alice',
+        imageUrlCached: null,
+      }),
+    ).toEqual({
+      _id: 'user-1',
+      username: 'alice',
+      name: 'Alice',
+      imageUrlCached: null,
+    });
+  });
+});
+
 describe('toLegacyCommentListItem', () => {
+  it('has no reactions key', () => {
+    expect(toLegacyCommentListItem(baseRow)).not.toHaveProperty('reactions');
+  });
+
   it('formats the common fields the same way as toCommentListItem', () => {
     expect(toLegacyCommentListItem(baseRow)).toEqual({
-      ...toCommentListItem(baseRow),
+      ...toCommentListItem(baseRow, []),
+      reactions: undefined,
       creator: expect.any(Object),
     });
   });

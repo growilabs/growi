@@ -1138,6 +1138,8 @@
     "COMMENT_CREATE": "댓글 생성",
     "COMMENT_UPDATE": "댓글 업데이트",
     "COMMENT_REMOVE": "댓글 제거",
+    "COMMENT_REACTION_ADD": "댓글 반응 추가",
+    "COMMENT_REACTION_REMOVE": "댓글 반응 제거",
     "SHARE_LINK_CREATE": "공유 링크 생성",
     "SHARE_LINK_DELETE": "공유 링크 삭제",
     "SHARE_LINK_DELETE_BY_PAGE": "페이지의 모든 공유 링크 제거",

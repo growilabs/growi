@@ -290,8 +290,9 @@ function makeDeleteCommentDeps(
 
 /**
  * Builds a fully-mocked `InlineCommentServiceDeps` for `deleteReply()`:
- * `findUnique` resolves with `targetRow` and a plain `delete` is stubbed
- * (deleteReply does not use `removeWithReplies` — see design.md).
+ * `findUnique` resolves with `targetRow`, and `delete`, the reactions
+ * `deleteMany` and `$transaction` are stubbed (deleteReply deletes the reply's
+ * reactions and the reply in one transaction, not via `removeWithReplies`).
  */
 function makeDeleteReplyDeps(
   targetRow: CommentsRow | null,
@@ -301,9 +302,13 @@ function makeDeleteReplyDeps(
       findUnique: vi.fn().mockResolvedValue(targetRow),
       delete: vi.fn().mockResolvedValue(targetRow ?? makeReplyRow()),
     },
+    commentreactions: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     activities: {
       createByParameters: vi.fn().mockResolvedValue(makeActivity()),
     },
+    $transaction: vi.fn().mockResolvedValue([]),
   });
   const commentService = mock<PickedCommentService>({});
   return {
@@ -1080,7 +1085,7 @@ describe('InlineCommentService.deleteReply', () => {
     expect(deps.prisma.comments.delete).toHaveBeenCalledWith({
       where: { id },
     });
-    // No cascade for a reply — see design.md: only deleteComment cascades.
+    // A reply has no replies to cascade to: only deleteComment uses removeWithReplies.
     expect(deps.prisma.comments.removeWithReplies).not.toHaveBeenCalled();
 
     const [activityParams] = vi.mocked(

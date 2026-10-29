@@ -94,6 +94,7 @@ describe('ActivityExtension.createByParameters - data-building contract', () => 
         pagePath: null,
         pageId: null,
         fileSize: null,
+        emoji: null,
       },
     };
     const createSpy = vi
@@ -227,6 +228,7 @@ describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () =
       pagePath: null,
       pageId: null,
       fileSize: null,
+      emoji: null,
     },
     user: { id: 'user-id-1', username: 'alice' },
   };

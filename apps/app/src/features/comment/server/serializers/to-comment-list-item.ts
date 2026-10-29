@@ -1,3 +1,4 @@
+import type { ReactionChip } from '~/features/comment-reaction/interfaces';
 import type { Prisma } from '~/generated/prisma/client';
 import type { PrismaClient } from '~/utils/prisma';
 
@@ -20,16 +21,22 @@ type LegacyCommentCreator = Omit<
   'password' | 'apiToken' | 'email'
 > & { email?: string | null };
 
-type CommentListItemWith<TCreator> = Omit<ICommentListItem, 'creator'> & {
+type CommentListItemWith<TCreator> = Omit<
+  ICommentListItem,
+  'creator' | 'reactions'
+> & {
   creator: TCreator | string | null;
 };
 
-const toCreatorSummary = ({
+export const toCreatorSummary = ({
   _id,
   username,
   name,
   imageUrlCached,
-}: CreatorRow): ICommentCreatorSummary => ({
+}: Pick<
+  CreatorRow,
+  '_id' | 'username' | 'name' | 'imageUrlCached'
+>): ICommentCreatorSummary => ({
   _id,
   username,
   name,
@@ -54,9 +61,17 @@ const createCommentListItemMapper =
     replyTo: row.replyToId,
   });
 
-/** For `GET /_api/v3/comments`. */
-export const toCommentListItem: (row: CommentListRow) => ICommentListItem =
+const toCommentListItemWithoutReactions =
   createCommentListItemMapper(toCreatorSummary);
+
+/** For `GET /_api/v3/comments`; `chips` is `null` when the reactions could not be loaded. */
+export const toCommentListItem = (
+  row: CommentListRow,
+  chips: readonly ReactionChip[] | null,
+): ICommentListItem => ({
+  ...toCommentListItemWithoutReactions(row),
+  reactions: chips,
+});
 
 /** For the deprecated `GET /_api/comments.get`, whose output must not change. */
 export const toLegacyCommentListItem: (

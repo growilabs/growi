@@ -1,0 +1,85 @@
+// One bordered frame split into two pressable parts: the emoji part keeps the
+// frame's left padding and the count part its right padding, so the two sit flush.
+.reaction-chip {
+  display: inline-flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 1rem;
+
+  &.reaction-chip-mine {
+    background-color: var(--bs-primary-bg-subtle);
+    border-color: var(--bs-primary);
+  }
+
+  .reaction-chip-emoji,
+  .reaction-chip-count {
+    min-height: 1.5rem;
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    border: 0;
+  }
+
+  .reaction-chip-emoji {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 0.5rem;
+  }
+
+  .reaction-chip-count {
+    padding-right: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  button.reaction-chip-emoji:not(:disabled):hover,
+  .reaction-chip-count:hover {
+    background-color: var(--bs-secondary-bg);
+  }
+
+  button:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}
+
+.reaction-users-list {
+  max-height: 12rem;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.add-reaction {
+  display: inline-flex;
+
+  .add-reaction-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 1.5rem;
+    padding: 0 0.5rem;
+    color: inherit;
+    background: transparent;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 1rem;
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
+
+    &:not(:disabled):hover {
+      background-color: var(--bs-secondary-bg);
+    }
+  }
+}
+
+.reaction-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  align-items: center;
+}

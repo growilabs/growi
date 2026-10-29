@@ -4,7 +4,9 @@ import express from 'express';
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
 import { createAiUsageRouter } from '~/features/ai-usage/server';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
+import { getCommentRouteHandlersFactory } from '~/features/comment/server/routes/get';
 import { listCommentsRouteHandlersFactory } from '~/features/comment/server/routes/list';
+import { updateCommentReactionRouteHandlersFactory } from '~/features/comment-reaction/server/routes/update';
 import { setup as setupExternalUserGroup } from '~/features/external-user-group/server/routes/apiv3/external-user-group';
 import { setup as setupExternalUserGroupRelation } from '~/features/external-user-group/server/routes/apiv3/external-user-group-relation';
 import { setup as growiPlugin } from '~/features/growi-plugin/server/routes/apiv3/admin';
@@ -255,9 +257,14 @@ export const setup = (crowi, app) => {
   }
 
   {
-    // Read-only: only GET is registered on /comments.
+    // Comments themselves are read-only here; the only write is a reaction.
     const commentsRouter = express.Router();
     commentsRouter.get('/', listCommentsRouteHandlersFactory(crowi));
+    commentsRouter.get('/:id', getCommentRouteHandlersFactory(crowi));
+    commentsRouter.put(
+      '/:id/reactions',
+      updateCommentReactionRouteHandlersFactory(crowi),
+    );
     router.use('/comments', commentsRouter);
   }
 

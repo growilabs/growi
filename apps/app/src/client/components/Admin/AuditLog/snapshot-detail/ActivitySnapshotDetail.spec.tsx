@@ -158,5 +158,22 @@ describe('ActivitySnapshotDetail', () => {
         screen.queryByText('admin:audit_log_snapshot.file_name'),
       ).not.toBeInTheDocument();
     });
+
+    it('shows a comment reaction snapshot as raw key-value including the emoji', () => {
+      const activity = buildActivity({
+        action: SupportedAction.ACTION_COMMENT_REACTION_ADD,
+        snapshot: { username: 'carol', emoji: 'thumbsup' },
+      });
+
+      expect(() =>
+        render(<ActivitySnapshotDetail activity={activity} />),
+      ).not.toThrow();
+
+      expect(screen.getByText('username')).toBeInTheDocument();
+      expect(screen.getByText('carol')).toBeInTheDocument();
+      expect(screen.getByText('emoji')).toBeInTheDocument();
+      expect(screen.getByText('thumbsup')).toBeInTheDocument();
+      expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    });
   });
 });

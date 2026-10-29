@@ -30,6 +30,7 @@ const baseItem = (id: string): ICommentListItem => ({
   anchorOriginRevisionId: null,
   resolvedById: null,
   resolvedAt: null,
+  reactions: [],
 });
 
 const originItem = (

@@ -411,6 +411,14 @@
     "comment_management_is_not_allowed": "不允许操作评论。",
     "no_comments": "暂无评论。"
   },
+  "comment_reaction": {
+    "add_reaction": "添加表情回应",
+    "reacted_by": "回应者",
+    "reacted_count": "{{count}} 人回应",
+    "kind_limit_reached": "此评论无法再添加更多种类的表情回应。",
+    "comment_unavailable": "此评论已不可用。",
+    "update_failed": "更新表情回应失败。"
+  },
   "inline_comment": {
     "expand": "展开",
     "collapse": "折叠",

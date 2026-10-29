@@ -5,9 +5,9 @@ import { Schema, Types } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
 import type {
-  AttachmentRemoveSnapshot,
   IActivity,
   ISnapshot,
+  SnapshotFields,
   SupportedActionType,
   SupportedEventModelType,
   SupportedTargetModelType,
@@ -258,11 +258,11 @@ function buildSnapshotUpdateEnvelope(
 ): Prisma.ActivitiesSnapshotUpdateEnvelopeInput | undefined {
   if (snapshot == null) return undefined;
 
-  // Every ISnapshot variant is structurally assignable to
-  // AttachmentRemoveSnapshot (all fields optional), so widening here lets us
-  // read the attachment fields type-safely — they are simply undefined for
-  // the default variant. Plain assignability, no casts.
-  const snap: AttachmentRemoveSnapshot = snapshot;
+  // Every ISnapshot variant is structurally assignable to SnapshotFields
+  // (all fields optional), so widening here lets us read every variant's
+  // fields type-safely — they are simply undefined when the variant lacks
+  // them. Plain assignability, no casts.
+  const snap: SnapshotFields = snapshot;
 
   return {
     update: {
@@ -271,6 +271,7 @@ function buildSnapshotUpdateEnvelope(
       pagePath: snap.pagePath,
       pageId: snap.pageId,
       fileSize: snap.fileSize,
+      emoji: snap.emoji,
     },
   };
 }
@@ -437,10 +438,11 @@ export const extension = Prisma.defineExtension((client) => {
             parameters;
 
           // Every ISnapshot variant is structurally assignable to
-          // AttachmentRemoveSnapshot (all fields optional), so widening here
-          // lets us read the attachment fields type-safely — they are simply
-          // undefined for the default variant. Plain assignability, no casts.
-          const snap: AttachmentRemoveSnapshot | undefined = snapshot;
+          // SnapshotFields (all fields optional), so widening here lets us
+          // read every variant's fields type-safely — they are simply
+          // undefined when the variant lacks them. Plain assignability, no
+          // casts.
+          const snap: SnapshotFields | undefined = snapshot;
 
           // Build the snapshot composite type Prisma requires. snapshot.id
           // maps to _id in the ActivitiesSnapshot composite; generate a new
@@ -459,6 +461,7 @@ export const extension = Prisma.defineExtension((client) => {
               pagePath: snap?.pagePath,
               pageId: snap?.pageId,
               fileSize: snap?.fileSize,
+              emoji: snap?.emoji,
             };
 
           const data: Prisma.activitiesUncheckedCreateInput = {

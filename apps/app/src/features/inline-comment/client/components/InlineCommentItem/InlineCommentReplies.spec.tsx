@@ -37,6 +37,33 @@ import { InlineCommentReplies } from './InlineCommentReplies';
 // successful submit both close it back to the toggle button".
 // ---------------------------------------------------------------------------
 
+vi.mock('~/features/comment-reaction/client', () => ({
+  CommentReactionBar: (props: {
+    pageId: string;
+    commentId: string;
+    isReadOnly: boolean;
+  }) => (
+    <div
+      data-testid="comment-reaction-bar"
+      data-page-id={props.pageId}
+      data-comment-id={props.commentId}
+      data-read-only={String(props.isReadOnly)}
+    />
+  ),
+  CommentReactionHeaderButton: (props: {
+    pageId: string;
+    commentId: string;
+    isReadOnly: boolean;
+  }) => (
+    <span
+      data-testid="comment-reaction-header-button"
+      data-page-id={props.pageId}
+      data-comment-id={props.commentId}
+      data-read-only={String(props.isReadOnly)}
+    />
+  ),
+}));
+
 // `InlineCommentReplyItem` reuses `InlineCommentItem.module.scss`'s
 // `.icon-button-container` hover-visibility rule via import, not by
 // duplicating a new rule -- see InlineCommentReplies.tsx's top-of-file
@@ -727,5 +754,54 @@ describe('InlineCommentReplies', () => {
 
       expect(link?.closest('.icon-button-container')).not.toBeNull();
     });
+  });
+});
+
+describe('InlineCommentReplies — reaction bar', () => {
+  it('shows one reaction bar per reply, keyed to that reply', () => {
+    renderReplies({
+      replies: [reply({ id: 'reply1' }), reply({ id: 'reply2' })],
+    });
+
+    const bars = screen.getAllByTestId('comment-reaction-bar');
+    expect(
+      bars.map((bar) => bar.getAttribute('data-comment-id')).sort(),
+    ).toEqual(['reply1', 'reply2']);
+    for (const bar of bars) {
+      expect(bar).toHaveAttribute('data-page-id', 'page1');
+      expect(bar).toHaveAttribute('data-read-only', 'false');
+    }
+  });
+});
+
+describe('InlineCommentReplies — add-reaction button', () => {
+  it('puts one add-reaction button per reply in that reply header, right after its history link', () => {
+    renderReplies({
+      replies: [reply({ id: 'reply1' }), reply({ id: 'reply2' })],
+    });
+
+    for (const id of ['reply1', 'reply2']) {
+      const button = document
+        .getElementById(id)
+        ?.querySelector<HTMLElement>(
+          '[data-testid="comment-reaction-header-button"]',
+        );
+      const historyLink = document.getElementById(
+        `page-comment-revision-${id}`,
+      );
+      expect(button).not.toBeNull();
+      expect(button).toHaveAttribute('data-comment-id', id);
+      expect(button).toHaveAttribute('data-page-id', 'page1');
+      expect(button).toHaveAttribute('data-read-only', 'false');
+      expect(
+        (historyLink as Element).compareDocumentPosition(
+          button as HTMLElement,
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      // `.icon-button-container` hides with `visibility`, which would drop it from the tab order.
+      expect(historyLink?.closest('.ms-2')).not.toContainElement(
+        button as HTMLElement,
+      );
+    }
   });
 });

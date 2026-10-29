@@ -1137,6 +1137,8 @@
     "COMMENT_CREATE": "创建评论",
     "COMMENT_UPDATE": "更新评论",
     "COMMENT_REMOVE": "删除评论",
+    "COMMENT_REACTION_ADD": "添加评论表情回应",
+    "COMMENT_REACTION_REMOVE": "移除评论表情回应",
     "SHARE_LINK_CREATE": "创建分享链接",
     "SHARE_LINK_DELETE": "删除分享链接",
     "SHARE_LINK_DELETE_BY_PAGE": "删除页面上的所有共享链接",

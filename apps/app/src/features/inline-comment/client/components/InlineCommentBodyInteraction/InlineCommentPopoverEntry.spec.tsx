@@ -23,6 +23,35 @@ import type { RendererOptions } from '~/interfaces/renderer-options';
 // Module mocks
 // ---------------------------------------------------------------------------
 
+vi.mock('~/features/comment-reaction/client', () => ({
+  CommentReactionBar: (props: {
+    pageId: string;
+    commentId: string;
+    isReadOnly: boolean;
+  }) => (
+    <div
+      data-testid="comment-reaction-bar"
+      data-page-id={props.pageId}
+      data-comment-id={props.commentId}
+      data-read-only={String(props.isReadOnly)}
+    />
+  ),
+  CommentReactionHeaderButton: (props: {
+    pageId: string;
+    commentId: string;
+    isReadOnly: boolean;
+    className?: string;
+  }) => (
+    <span
+      data-testid="comment-reaction-header-button"
+      data-class-name={props.className ?? ''}
+      data-page-id={props.pageId}
+      data-comment-id={props.commentId}
+      data-read-only={String(props.isReadOnly)}
+    />
+  ),
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
@@ -127,6 +156,7 @@ const renderEntry = (overrides: RenderOverrides = {}) =>
   render(
     <InlineCommentPopoverEntry
       id="comment1"
+      pageId="page1"
       creator={null}
       createdAt={new Date('2026-01-01T00:00:00.000Z')}
       commentText={overrides.commentText ?? 'the comment body'}
@@ -442,5 +472,51 @@ describe('InlineCommentPopoverEntry', () => {
     expect(
       screen.queryByTestId(`${TEST_ID_PREFIX}-delete-button`),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('InlineCommentPopoverEntry — reaction bar', () => {
+  it('shows the reaction bar for this entry', () => {
+    renderEntry();
+
+    const bar = screen.getByTestId('comment-reaction-bar');
+    expect(bar).toHaveAttribute('data-page-id', 'page1');
+    expect(bar).toHaveAttribute('data-comment-id', 'comment1');
+    expect(bar).toHaveAttribute('data-read-only', 'false');
+  });
+});
+
+describe('InlineCommentPopoverEntry — add-reaction button', () => {
+  it('sits in the header row, before the controls given as headerExtra', () => {
+    renderEntry({
+      headerExtra: <button type="button" data-testid="header-extra-slot" />,
+    });
+
+    const header = screen.getByTestId(`${TEST_ID_PREFIX}-header`);
+    const button = screen.getByTestId('comment-reaction-header-button');
+    expect(header).toContainElement(button);
+    expect(
+      button.compareDocumentPosition(screen.getByTestId('header-extra-slot')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(button).toHaveAttribute('data-comment-id', 'comment1');
+    expect(button).toHaveAttribute('data-page-id', 'page1');
+    expect(button).toHaveAttribute('data-read-only', 'false');
+  });
+
+  it('is not wrapped in any hover-reveal class, like the always-visible edit and delete buttons beside it', () => {
+    renderEntry();
+
+    expect(
+      screen.getByTestId('comment-reaction-header-button'),
+    ).toHaveAttribute('data-class-name', '');
+  });
+
+  it('is shown to a viewer who is not the author too', () => {
+    renderEntry({ isOwn: false });
+
+    expect(screen.getByTestId(`${TEST_ID_PREFIX}-header`)).toContainElement(
+      screen.getByTestId('comment-reaction-header-button'),
+    );
   });
 });

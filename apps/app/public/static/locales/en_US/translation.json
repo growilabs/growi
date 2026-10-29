@@ -419,6 +419,15 @@
     "comment_management_is_not_allowed": "Comment management is not allowed.",
     "no_comments": "There are no comments yet."
   },
+  "comment_reaction": {
+    "add_reaction": "Add reaction",
+    "reacted_by": "Reacted by",
+    "reacted_count_one": "{{count}} person reacted",
+    "reacted_count_other": "{{count}} people reacted",
+    "kind_limit_reached": "You can't add any more kinds of reactions to this comment.",
+    "comment_unavailable": "This comment is no longer available.",
+    "update_failed": "Failed to update the reaction."
+  },
   "inline_comment": {
     "start_comment": "Comment",
     "resolved": "Resolved",

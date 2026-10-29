@@ -29,6 +29,26 @@
   height: 30px;
 }
 
+// Reveals the add-reaction button placed in a comment's header while the includer's comment is
+// hovered, or while the button has keyboard focus. `opacity` rather than `visibility` keeps it in the
+// tab order. Without hover support (touch) nothing is hidden. Include inside the rule of the
+// element whose hover reveals the button; the button's host passes `reaction-add-control` as its className.
+@mixin reveal-reaction-add-control {
+  @media (hover: hover) {
+    .reaction-add-control {
+      opacity: 0;
+
+      &:has(:focus-visible) {
+        opacity: 1;
+      }
+    }
+
+    &:hover .reaction-add-control {
+      opacity: 1;
+    }
+  }
+}
+
 $codemirror-default-height: 300px;
 
 // // Light mode color

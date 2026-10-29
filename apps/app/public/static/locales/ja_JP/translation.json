@@ -411,6 +411,14 @@
     "comment_management_is_not_allowed": "コメントの操作が許可されていません。",
     "no_comments": "コメントはありません。"
   },
+  "comment_reaction": {
+    "add_reaction": "リアクションを追加",
+    "reacted_by": "リアクションした人",
+    "reacted_count": "{{count}} 人がリアクション",
+    "kind_limit_reached": "このコメントには、これ以上リアクションの種類を追加できません。",
+    "comment_unavailable": "このコメントは利用できなくなりました。",
+    "update_failed": "リアクションの更新に失敗しました。"
+  },
   "inline_comment": {
     "expand": "展開",
     "collapse": "折りたたみ",

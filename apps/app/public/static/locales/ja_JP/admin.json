@@ -1137,6 +1137,8 @@
     "COMMENT_CREATE": "コメントの作成",
     "COMMENT_UPDATE": "コメントの更新",
     "COMMENT_REMOVE": "コメントの削除",
+    "COMMENT_REACTION_ADD": "コメントへのリアクションの追加",
+    "COMMENT_REACTION_REMOVE": "コメントへのリアクションの解除",
     "SHARE_LINK_CREATE": "共有リンクの作成",
     "SHARE_LINK_DELETE": "共有リンクの削除",
     "SHARE_LINK_DELETE_BY_PAGE": "ページ内の共有リンクを全て削除",

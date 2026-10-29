@@ -1135,6 +1135,8 @@
     "COMMENT_CREATE": "Ajouter un commentaire",
     "COMMENT_UPDATE": "Modifier un commentaire",
     "COMMENT_REMOVE": "Supprimer un commentaire",
+    "COMMENT_REACTION_ADD": "Ajouter une réaction à un commentaire",
+    "COMMENT_REACTION_REMOVE": "Supprimer une réaction à un commentaire",
     "SHARE_LINK_CREATE": "Ajouter un lien de partage",
     "SHARE_LINK_DELETE": "Supprimer un lien de partage",
     "SHARE_LINK_DELETE_BY_PAGE": "Supprimer les liens de partage de la page",

@@ -37,6 +37,7 @@ type ActivitiesSnapshot {
   pagePath     String?
   pageId       String? @db.ObjectId
   fileSize     Int?
+  emoji        String?
 }
 
 type PageoperationsExPage {
@@ -218,6 +219,22 @@ model comments {
   @@index([creatorId], map: "creator_1")
   @@index([revisionId], map: "revision_1")
   @@index([pageId, isInline])
+}
+
+// No Prisma relations to comments / pages / users on purpose (see the
+// comment-reactions design.md "削除経路の拡張"). The indexes are created by the
+// migration script; the declarations here only provide types and findUnique.
+model commentreactions {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  v         Int      @default(0) @map("__v")
+  commentId String   @map("comment") @db.ObjectId
+  pageId    String   @map("page") @db.ObjectId
+  userId    String   @map("user") @db.ObjectId
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId, emoji], map: "comment_1_user_1_emoji_1")
+  @@index([pageId], map: "page_1")
 }
 
 model configs {

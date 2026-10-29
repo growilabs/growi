@@ -1,5 +1,5 @@
 import type { IUser } from '@growi/core';
-import { isIPageNotFoundInfo, SCOPE } from '@growi/core';
+import { SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { query } from 'express-validator';
@@ -11,7 +11,6 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import { setup as certifySharedPageFactory } from '~/server/middlewares/certify-shared-page';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -19,8 +18,11 @@ import type {
   ListCommentsRequestQuery,
   ListCommentsResponseBody,
 } from '../../interfaces';
+import { canViewCommentsOfPage } from '../authorization/can-view-comments-of-page';
 import { toCommentListItem } from '../serializers/to-comment-list-item';
 import { type ListCommentsInput, listComments } from '../service/comment-list';
+import { loadReactionChipsOrNull } from '../service/load-reaction-chips-or-null';
+import { notFoundOrForbidden } from './not-found-or-forbidden';
 
 const logger = loggerFactory('growi:routes:apiv3:comments:list');
 
@@ -33,11 +35,6 @@ type Req = Request<
   user?: HydratedDocument<IUser>;
   isSharedPage?: boolean;
 };
-
-// Same body for "page missing", "page forbidden" and "revision not found" so
-// the response never tells which one it was (rules/page-write-action-403-404.md).
-const notFoundOrForbidden = (): ErrorV3 =>
-  new ErrorV3('Page is not found or forbidden', 'notfound_or_forbidden');
 
 /**
  * @swagger
@@ -76,6 +73,7 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *          - anchorOriginRevisionId
  *          - resolvedById
  *          - resolvedAt
+ *          - reactions
  *        properties:
  *          _id:
  *            type: string
@@ -196,6 +194,70 @@ const notFoundOrForbidden = (): ErrorV3 =>
  *            format: date-time
  *            nullable: true
  *            description: Inline only. When the thread was resolved. Null while unresolved.
+ *          reactions:
+ *            type: array
+ *            nullable: true
+ *            description: >
+ *              Emoji reactions on this comment, one chip per emoji (skin-tone
+ *              variants are separate chips), ordered by when the earliest
+ *              remaining reaction of each emoji was added. An empty array means
+ *              the comment has no reactions; null means the reactions could not
+ *              be loaded (the comments are still returned).
+ *            items:
+ *              $ref: '#/components/schemas/CommentReactionChip'
+ *      CommentReactionChip:
+ *        description: The reactions of one emoji on a comment.
+ *        type: object
+ *        additionalProperties: false
+ *        required:
+ *          - emoji
+ *          - count
+ *          - reactedByMe
+ *          - users
+ *        properties:
+ *          emoji:
+ *            type: string
+ *            description: >
+ *              Reaction key in canonical form `unicode:<emoji-mart id>`, with
+ *              `::skin-tone-<2-6>` appended for a skin-tone variant (e.g.
+ *              `unicode:+1`, `unicode:+1::skin-tone-3`).
+ *            example: 'unicode:+1'
+ *          count:
+ *            type: integer
+ *            minimum: 1
+ *            description: Number of users who reacted with this emoji, including users whose record no longer exists.
+ *          reactedByMe:
+ *            type: boolean
+ *            description: Whether the requesting user reacted with this emoji. Always false for a guest.
+ *          users:
+ *            type: array
+ *            description: The users who reacted with this emoji, in the order they reacted.
+ *            items:
+ *              oneOf:
+ *                - type: object
+ *                  additionalProperties: false
+ *                  required:
+ *                    - _id
+ *                    - username
+ *                    - name
+ *                    - imageUrlCached
+ *                  properties:
+ *                    _id:
+ *                      type: string
+ *                      description: User ID.
+ *                    username:
+ *                      type: string
+ *                      description: Username, used for the user's home page path.
+ *                    name:
+ *                      type: string
+ *                      nullable: true
+ *                      description: Display name.
+ *                    imageUrlCached:
+ *                      type: string
+ *                      nullable: true
+ *                      description: URL of the profile image. Null when not cached yet.
+ *                - type: string
+ *                  description: The user ID when the user record no longer exists (same rule as the comment `creator`).
  */
 
 /**
@@ -292,20 +354,6 @@ export const listCommentsRouteHandlersFactory = (
     query('shareLinkId').optional().isString().bail().isMongoId(),
   ];
 
-  // Trust only the flag set by certifySharedPage, which verified that the
-  // share link belongs to this pageId; never the raw shareLinkId query.
-  const canViewPage = async (req: Req): Promise<boolean> => {
-    if (req.isSharedPage === true) {
-      return true;
-    }
-    const { meta } = await findPageAndMetaDataByViewer(
-      pageService,
-      pageGrantService,
-      { pageId: req.query.pageId, path: null, user: req.user, basicOnly: true },
-    );
-    return !isIPageNotFoundInfo(meta);
-  };
-
   // revisionId is dropped on share-link access (see design.md, list route).
   const toListInput = (req: Req): ListCommentsInput =>
     req.isSharedPage === true
@@ -320,7 +368,12 @@ export const listCommentsRouteHandlersFactory = (
     loginRequired,
     async (req: Req, res: ApiV3Response) => {
       try {
-        if (!(await canViewPage(req))) {
+        if (
+          !(await canViewCommentsOfPage(
+            { pageService, pageGrantService },
+            { req, pageId: req.query.pageId },
+          ))
+        ) {
           return res.apiv3Err(notFoundOrForbidden(), 404);
         }
 
@@ -329,8 +382,22 @@ export const listCommentsRouteHandlersFactory = (
           return res.apiv3Err(notFoundOrForbidden(), 404);
         }
 
+        const chipsByCommentId = await loadReactionChipsOrNull(
+          { prisma },
+          {
+            commentIds: result.comments.map((row) => row.id),
+            viewerId: req.user != null ? String(req.user._id) : null,
+          },
+        );
         const body: ListCommentsResponseBody = {
-          comments: result.comments.map(toCommentListItem),
+          comments: result.comments.map((row) =>
+            toCommentListItem(
+              row,
+              chipsByCommentId == null
+                ? null
+                : (chipsByCommentId.get(row.id) ?? []),
+            ),
+          ),
         };
         return res.apiv3(body);
       } catch (err) {

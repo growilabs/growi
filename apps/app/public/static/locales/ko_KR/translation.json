@@ -389,6 +389,14 @@
     "comment_management_is_not_allowed": "댓글 관리가 허용되지 않습니다.",
     "no_comments": "댓글이 없습니다."
   },
+  "comment_reaction": {
+    "add_reaction": "리액션 추가",
+    "reacted_by": "리액션한 사람",
+    "reacted_count": "{{count}}명이 리액션",
+    "kind_limit_reached": "이 댓글에는 더 이상 리액션 종류를 추가할 수 없습니다.",
+    "comment_unavailable": "이 댓글은 더 이상 사용할 수 없습니다.",
+    "update_failed": "리액션을 업데이트하지 못했습니다."
+  },
   "inline_comment": {
     "expand": "펼치기",
     "collapse": "접기",

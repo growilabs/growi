@@ -15,6 +15,10 @@
     "lint": {
       "dependsOn": ["@growi/core#dev", "@growi/emoji-mart-data#build"]
     },
+    "test": {
+      "dependsOn": ["@growi/core#dev", "@growi/emoji-mart-data#build"],
+      "outputLogs": "new-only"
+    },
     "serve": {
       "dependsOn": ["@growi/core#dev"],
       "cache": false,

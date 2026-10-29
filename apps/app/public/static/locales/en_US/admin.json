@@ -1148,6 +1148,8 @@
     "COMMENT_CREATE": "Create comment",
     "COMMENT_UPDATE": "Update comment",
     "COMMENT_REMOVE": "Delete comment",
+    "COMMENT_REACTION_ADD": "Add comment reaction",
+    "COMMENT_REACTION_REMOVE": "Remove comment reaction",
     "SHARE_LINK_CREATE": "Create Share link",
     "SHARE_LINK_DELETE": "Delete Share link",
     "SHARE_LINK_DELETE_BY_PAGE": "Remove all shared links on the page",

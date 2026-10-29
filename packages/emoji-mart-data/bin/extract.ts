@@ -12,6 +12,9 @@
  * Or directly (from packages/emoji-mart-data/):
  *   node bin/extract.ts
  *
+ * Skin-tone-capable emojis carry 6 skins (default + skin-tone-2..6); `aliases`
+ * maps alias -> canonical id.
+ *
  * Output: dist/index.js, dist/index.d.ts
  * Re-run whenever @emoji-mart/data is upgraded.
  */
@@ -19,25 +22,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-type EmojiEntry = { skins: { native: string }[] };
-
-type EmojiData = {
-  categories: { id: string; emojis: string[] }[];
-  emojis: Record<string, EmojiEntry>;
-};
-
-type NativeLookup = Record<string, { skins: [{ native: string }] }>;
-
-const EMOJI_CATEGORIES = [
-  'people',
-  'nature',
-  'foods',
-  'activity',
-  'places',
-  'objects',
-  'symbols',
-  'flags',
-] as const;
+import { buildAliases, buildLookup, type EmojiData } from './build-lookup.ts';
 
 const inputPath = resolve(
   import.meta.dirname,
@@ -46,16 +31,8 @@ const inputPath = resolve(
 
 const raw: EmojiData = JSON.parse(readFileSync(inputPath, 'utf8'));
 
-// Build lookup in category order so consumers get UX-friendly suggestion order.
-const lookup: NativeLookup = {};
-for (const catId of EMOJI_CATEGORIES) {
-  const cat = raw.categories.find((c) => c.id === catId);
-  if (!cat) continue;
-  for (const name of cat.emojis) {
-    const native = raw.emojis[name]?.skins?.[0]?.native;
-    if (native) lookup[name] = { skins: [{ native }] };
-  }
-}
+const lookup = buildLookup(raw);
+const aliases = buildAliases(raw, lookup);
 
 const distDir = resolve(import.meta.dirname, '../dist');
 mkdirSync(distDir, { recursive: true });
@@ -65,7 +42,7 @@ mkdirSync(distDir, { recursive: true });
 const jsPath = resolve(distDir, 'index.js');
 writeFileSync(
   jsPath,
-  `// Generated — do not edit. Run \`node bin/extract.ts\` to regenerate.\nexport default ${JSON.stringify(lookup)};\n`,
+  `// Generated — do not edit. Run \`node bin/extract.ts\` to regenerate.\nexport default ${JSON.stringify(lookup)};\nexport const aliases = ${JSON.stringify(aliases)};\n`,
   'utf8',
 );
 console.log(`Wrote ${Object.keys(lookup).length} entries to ${jsPath}`);
@@ -74,9 +51,13 @@ const dtsPath = resolve(distDir, 'index.d.ts');
 writeFileSync(
   dtsPath,
   [
-    'export type NativeLookup = Record<string, { skins: [{ native: string }] }>;',
+    'export type NativeLookup = Record<',
+    '  string,',
+    '  { skins: readonly [{ native: string }, ...{ native: string }[]] }',
+    '>;',
     'declare const _default: NativeLookup;',
     'export default _default;',
+    'export declare const aliases: Readonly<Record<string, string>>;',
     '',
   ].join('\n'),
   'utf8',

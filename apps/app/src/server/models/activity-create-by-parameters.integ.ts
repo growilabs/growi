@@ -27,7 +27,11 @@
 
 import { Types } from 'mongoose';
 
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import {
+  SupportedAction,
+  SupportedEventModel,
+  SupportedTargetModel,
+} from '~/interfaces/activity';
 import { prisma } from '~/utils/prisma';
 
 // Sentinel values so cleanup deletes only this suite's rows.
@@ -110,6 +114,52 @@ describe('createByParameters — snapshot persistence (read back from DB)', () =
     // Prisma materializes missing optional composite fields as null on read
     expect(persisted?.snapshot.pagePath).toBeNull();
     expect(persisted?.snapshot.pageId).toBeNull();
+  });
+
+  it('persists the emoji of a CommentReactionSnapshot together with the username', async () => {
+    const commentId = new Types.ObjectId().toHexString();
+
+    await prisma.activities.createByParameters({
+      action: SupportedAction.ACTION_COMMENT_REACTION_ADD,
+      ip: TEST_IP,
+      endpoint: TEST_ENDPOINT,
+      user: new Types.ObjectId().toHexString(),
+      target: new Types.ObjectId().toHexString(),
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+      event: commentId,
+      eventModel: SupportedEventModel.MODEL_COMMENT,
+      snapshot: { username: 'alice', emoji: 'thumbsup' },
+    });
+
+    const persisted = await prisma.activities.findFirst({
+      where: {
+        ip: TEST_IP,
+        action: SupportedAction.ACTION_COMMENT_REACTION_ADD,
+      },
+    });
+    expect(persisted?.snapshot).toMatchObject({
+      username: 'alice',
+      emoji: 'thumbsup',
+    });
+  });
+
+  it('leaves the emoji unset on snapshots that carry none, and keeps attachment fields as they were', async () => {
+    await prisma.activities.createByParameters({
+      action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      ip: TEST_IP,
+      endpoint: TEST_ENDPOINT,
+      snapshot: { username: 'dave', originalName: 'a.png', fileSize: 5 },
+    });
+
+    const persisted = await prisma.activities.findFirst({
+      where: { ip: TEST_IP, action: SupportedAction.ACTION_ATTACHMENT_REMOVE },
+    });
+    expect(persisted?.snapshot).toMatchObject({
+      username: 'dave',
+      originalName: 'a.png',
+      fileSize: 5,
+    });
+    expect(persisted?.snapshot.emoji).toBeNull();
   });
 
   it('req 4.2 — a username-only snapshot (DefaultSnapshot) keeps working unchanged', async () => {

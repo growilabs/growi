@@ -58,6 +58,7 @@ const listItem = (
   anchorOriginRevisionId: 'revision1',
   resolvedById: null,
   resolvedAt: null,
+  reactions: [],
   ...overrides,
 });
 

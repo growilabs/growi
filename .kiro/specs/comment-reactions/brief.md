@@ -36,7 +36,7 @@
 - ログインユーザーが、通常コメントとインラインコメント（どちらも返信を含む）に標準絵文字でリアクションを付けられる。
 - 同じ絵文字のリアクションは1つのチップ（絵文字＋人数）にまとめて表示される。誰がリアクションしたかも確認できる。
 - 自分が付けたリアクションは見た目で区別でき、チップを押すと追加・解除できる。
-- 「＋」ボタンから絵文字ピッカーを開き、まだ付いていない絵文字を追加できる。
+- 「リアクション追加」ボタンから絵文字ピッカーを開き、まだ付いていない絵文字を追加できる。
 - API の利用者（GROWI MCP、外部スクリプトなど）が、コメントと一緒にリアクションを読める。
 - 将来、Slack ワークスペースのカスタム絵文字を足すときに、データモデルと API の作り直しが要らない。
 
@@ -86,7 +86,7 @@
 - **In**:
   - 通常コメントとインラインコメント（どちらも返信を含む）への標準絵文字リアクションの追加と解除
   - 絵文字ごとにまとめた表示（チップ＋人数）、自分のリアクションの強調表示、リアクションした利用者の確認
-  - 「＋」から開く絵文字ピッカーによる新しい絵文字の追加
+  - 「リアクション追加」から開く絵文字ピッカーによる新しい絵文字の追加
   - Slack 準拠の肌の色（`::skin-tone-2`〜`6`）付きリアクション
   - ゲスト（ゲスト閲覧が許可されている Wiki）と共有リンク閲覧者への読み取り専用表示。共有リンクの画面と検索結果のプレビューでは、インラインコメントのリアクションは表示しない
   - コメント一覧 API の応答へのリアクションの追加と、コメント単体の取得 API の新設（`comment` スペックへの書き戻しを含む）
@@ -111,7 +111,7 @@
 - **コメントの API への統合**: 一覧・単体の取得の応答へのリアクションの取り込みと、コメント単体の取得 API（`comment` スペックへの書き戻しの対象）
 - **書き込みの API と認可**: `PUT /_api/v3/comments/:id/reactions`、閲覧権限の確認、監査ログの記録
 - **絵文字ピッカー**: `packages/editor` に、エディタに依存しない遅延ロードのピッカー部品 `EmojiPicker` を新設して公開する（既存の `EmojiButton` には手を入れない）
-- **リアクションバー UI**: チップ、人数、自分のリアクションの強調、利用者の一覧、「＋」ボタン。`CommentCard` の `footer` に差し込む
+- **リアクションバー UI**: チップ、人数、自分のリアクションの強調、利用者の一覧、「リアクション追加」ボタン。`CommentCard` の `footer` に差し込む
 - **削除と監査ログ**: 削除経路へのリアクションの削除の追加、Activity の action と snapshot の追加
 - **G2G 移行・インポート**: 移行対象コレクションとしての登録と、インポート時の参照項目の型変換
 
@@ -142,6 +142,21 @@
   - コメントのリアルタイム更新（将来入れる場合は、リアクションもその対象になる）
   - GROWI MCP・SDK（コメントの応答の `reactions` を使う場合）
 
+## Future Direction: 絵文字基盤の独立パッケージ化（構想・本スペックの対象外）
+
+PR レビューでの指摘に基づく構想の記録。**本スペックではリファクタしない。** 実施する場合は、Slack カスタム絵文字の別スペックで扱う。
+
+- **指摘**: `EmojiPicker` を `packages/editor` に置き、コメントリアクション（`apps/app`）が使うのは、責務の分離の観点でよくない。`packages/editor` はエディタのためのパッケージで、エディタ以外の画面が使う部品を置く場所ではない。
+- **構想**: Slack カスタム絵文字に対応するとき、`EmojiPicker` を含む絵文字まわりの部品を、`apps/app` からも `packages/editor` からも独立した新規パッケージに置く。`apps/app` と `packages/editor` はどちらもそのパッケージに依存する。
+- **現在の置き場所**（実コードで確認）:
+  - ピッカー部品 `EmojiPicker`: `packages/editor/src/client/components/EmojiPicker/`（`@growi/editor/dist/client/components/EmojiPicker` として公開。`@emoji-mart/react` と `@emoji-mart/data` を遅延ロードする）。利用側は `apps/app` の `features/comment-reaction/client/components/CommentReactionBar/AddReactionButton.tsx`。
+  - エディタツールバーの `EmojiButton`: `packages/editor/src/client/components-internal/CodeMirrorEditor/Toolbar/EmojiButton.tsx`。`EmojiPicker` は使わず、自前で同じ emoji-mart を遅延ロードしている（重複あり）。
+  - 絵文字データ `@growi/emoji-mart-data`: `packages/emoji-mart-data/`（private パッケージ。`apps/app` と `packages/editor` の両方が依存）。利用側は本文レンダラーの `apps/app/src/services/renderer/remark-plugins/emoji.ts`、リアクションキーの `apps/app/src/features/comment-reaction/utils/reaction-key.ts`、エディタの `:` 自動補完 `packages/editor/src/client/services-internal/extensions/emojiAutocompletionSettings.ts`。
+  - emoji-mart 本体への依存: `packages/editor/package.json`（`emoji-mart`、`@emoji-mart/react`、`@emoji-mart/data`）。`apps/app` は `@emoji-mart/data` を devDependency に持つ。
+- **新パッケージに集めることを検討する対象**: `EmojiPicker`、`@growi/emoji-mart-data` に相当する絵文字データと別名の対応表、カスタム絵文字を足すための拡張点（標準絵文字とカスタム絵文字を同じ形で扱う入口）、`EmojiButton` との重複の解消。
+- **未決**: パッケージ名と、既存の `@growi/emoji-mart-data` を取り込むか並べるか。カスタム絵文字の取得元（Slack API）をパッケージに含めるか、`apps/app` 側に置いてパッケージには注入するだけにするか。
+- **前提となる設計**: 絵文字キーの名前空間（`unicode:` / `slack:<workspace>:<name>`）は本スペックで決めてあり、パッケージを分けてもキーの形式は変わらない。
+
 ## Existing Spec Touchpoints
 
 - **Extends**: [comment](../comment/)（コメント一覧 API の応答への `reactions` の追加と、コメント単体の取得 API の新設）。「Amend Target」のとおり、この部分は最終タスクで `comment` スペックへ書き戻す。それ以外のリアクション機能は、本スペックが新しい機能として持ち続ける。
@@ -170,7 +185,7 @@
   - コメントにはリアルタイム更新が無いので、画面の状態が古いまま操作されることがある。反転型では、別タブで付けた 👍 を古い画面から押すと、本人の意図（追加）に反して解除になってしまう。
   - 明示型なら、既に付いているものへの「追加」や、付いていないものへの「解除」は何もせずに成功扱いにでき、何度送っても結果が変わらない。
   - `emoji` はクエリではなく JSON body で送る（`unicode:+1` の `+` がクエリでは空白に化けるため）。
-- **GROWI 間移行（G2G）・インポート**: リアクションのコレクションは移行対象とし、`non-transferable-collections.ts` の `TRANSFERABLE_COLLECTIONS` に登録する。Mongoose のモデルが無いコレクションは、インポート時に `_id` と日付以外の参照項目が文字列のまま入るので、コレクションごとの `overwrite-params` で `comment` / `page` / `user` を ObjectId に戻す（G2G とファイルインポートの両方で適用される）。
+- **GROWI 間移行（G2G）・インポート**: リアクションのコレクションは移行対象とし、`non-transferable-collections.ts` の `TRANSFERABLE_COLLECTIONS` に登録する。Mongoose のモデルが無いコレクションは、インポート時に `_id` と日付以外の参照項目が文字列のまま入るので、コレクションごとの `overwrite-params` で `comment` / `page` / `user` を ObjectId に戻し、`emoji` を正規のキーにそろえる（G2G とファイルインポートの両方で適用される）。
 - **監査ログ**: 新しい action は `MediumActionGroup` に入れ（既存のコメント操作と同じ扱い）、通知のグループには入れない。snapshot の `emoji` は、Prisma の `ActivitiesSnapshot` に足すだけでは保存されない（`createByParameters` などが決まった項目だけを取り出して保存し直すため）ので、保存口にも足す。Mongoose の `snapshotSchema` には足さない（書き込みも読み取りも Prisma で行われるため）。
 - **絵文字キー**
   - 標準絵文字は `@growi/emoji-mart-data` に存在するショートコードだけを受け付け、サーバー側で検証する（任意の文字列を保存させない）。
@@ -182,4 +197,4 @@
   - **肌の色を付けられる絵文字**: 絵文字データに肌の色違いがある Unicode 絵文字だけ。それ以外への `::skin-tone-N` はサーバー側で拒否する。
   - **絵文字データ**: `@growi/emoji-mart-data` の出力を広げ、肌の色違いのグリフと別名の対応表も持たせる（サーバーの検証とクライアントの表示の両方で使う）。ピッカーが読み込む `@emoji-mart/data` の既定のデータは、`@growi/emoji-mart-data` の抽出元と同じ。
 - **ピッカーのバンドルサイズ**: emoji-mart はデータが大きいので、エディタと同じく遅延ロードにして、ページ閲覧時の初回ロードを増やさない。
-- **i18n**: UI 文言（ツールチップ、「＋」ボタンのラベル、利用者の一覧など）は既存の i18n の仕組みに乗せる。
+- **i18n**: UI 文言（ツールチップ、「リアクション追加」ボタンのラベル、利用者の一覧など）は既存の i18n の仕組みに乗せる。

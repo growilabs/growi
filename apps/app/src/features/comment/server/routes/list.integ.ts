@@ -9,6 +9,9 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
+import apiV1FormValidator from '~/server/middlewares/apiv1-form-validator';
+import { setup as certifySharedPageFactory } from '~/server/middlewares/certify-shared-page';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { AccessToken } from '~/server/models/access-token';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
@@ -24,6 +27,7 @@ import { listCommentsRouteHandlersFactory } from './list';
 const WORKER_ID = process.env.VITEST_WORKER_ID ?? '1';
 const BASE = `/comment-list-route-integ-${WORKER_ID}`;
 const MOUNT_PATH = '/_api/v3/comments';
+const LEGACY_PATH = '/_api/comments.get';
 // Fixed literal so the validation table (built at collection time) never depends on beforeAll state.
 const VALID_ID = '6512f0c0a1b2c3d4e5f60718';
 // Values seeded on the comment author that the list response must never carry.
@@ -61,6 +65,15 @@ describe('GET /_api/v3/comments', () => {
   let shareLinkId: string;
   let expiredShareLinkId: string;
 
+  // A public page whose comment author and one reacting user have no user document.
+  let orphanPageId: string;
+  let orphanCommentId: string;
+  // A public page whose only reaction row is malformed, so loading reactions fails.
+  let brokenPageId: string;
+  let brokenCommentId: string;
+  const missingCreatorId = String(new Types.ObjectId());
+  const missingReactorId = String(new Types.ObjectId());
+
   let pageReadToken: string;
   let wrongScopeToken: string;
 
@@ -76,7 +89,15 @@ describe('GET /_api/v3/comments', () => {
     const ownerName = `comment-list-route-owner-${WORKER_ID}`;
     await User.deleteMany({ username: { $in: [viewerName, ownerName] } });
     await Page.deleteMany({
-      path: { $in: [`${BASE}/public`, `${BASE}/private`, `${BASE}/shared`] },
+      path: {
+        $in: [
+          `${BASE}/public`,
+          `${BASE}/private`,
+          `${BASE}/shared`,
+          `${BASE}/orphan`,
+          `${BASE}/broken`,
+        ],
+      },
     });
 
     viewer = await User.create({
@@ -232,6 +253,108 @@ describe('GET /_api/v3/comments', () => {
       })
     ).id;
 
+    const orphanPage = await Page.create({
+      path: `${BASE}/orphan`,
+      grant: PageGrant.GRANT_PUBLIC,
+      creator: owner._id,
+      lastUpdateUser: owner._id,
+      isEmpty: true,
+    });
+    orphanPageId = String(orphanPage._id);
+    orphanCommentId = (
+      await prisma.comments.create({
+        data: {
+          pageId: orphanPageId,
+          creatorId: missingCreatorId,
+          comment: 'comment by a user whose document is gone',
+          isInline: false,
+        },
+      })
+    ).id;
+
+    const brokenPage = await Page.create({
+      path: `${BASE}/broken`,
+      grant: PageGrant.GRANT_PUBLIC,
+      creator: owner._id,
+      lastUpdateUser: owner._id,
+      isEmpty: true,
+    });
+    brokenPageId = String(brokenPage._id);
+    brokenCommentId = (
+      await prisma.comments.create({
+        data: {
+          pageId: brokenPageId,
+          creatorId: String(owner._id),
+          comment: 'comment whose reactions cannot be read',
+          isInline: false,
+        },
+      })
+    ).id;
+    // Written around Prisma: a row lacking the required `emoji` makes the reaction read throw.
+    await mongoose.connection.collection('commentreactions').insertOne({
+      comment: new Types.ObjectId(brokenCommentId),
+      page: new Types.ObjectId(brokenPageId),
+      user: owner._id,
+      createdAt: new Date(),
+    });
+
+    // Explicit createdAt values make chip order and user order deterministic.
+    const reactionAt = (minute: number): Date =>
+      new Date(Date.UTC(2026, 0, 1, 0, minute));
+    await prisma.commentreactions.createMany({
+      data: [
+        {
+          commentId: regularCommentId,
+          pageId: publicPageId,
+          userId: String(owner._id),
+          emoji: 'unicode:+1',
+          createdAt: reactionAt(1),
+        },
+        {
+          commentId: regularCommentId,
+          pageId: publicPageId,
+          userId: String(viewer._id),
+          emoji: 'unicode:+1',
+          createdAt: reactionAt(2),
+        },
+        {
+          commentId: regularCommentId,
+          pageId: publicPageId,
+          userId: String(owner._id),
+          emoji: 'unicode:tada',
+          createdAt: reactionAt(3),
+        },
+        {
+          commentId: sharedNewInlineCommentId,
+          pageId: sharedPageId,
+          userId: String(owner._id),
+          emoji: 'unicode:eyes',
+          createdAt: reactionAt(4),
+        },
+        {
+          commentId: sharedOldRegularCommentId,
+          pageId: sharedPageId,
+          userId: String(viewer._id),
+          emoji: 'unicode:tada',
+          createdAt: reactionAt(5),
+        },
+        {
+          commentId: orphanCommentId,
+          pageId: orphanPageId,
+          userId: missingReactorId,
+          emoji: 'unicode:+1',
+          createdAt: reactionAt(6),
+        },
+        {
+          commentId: orphanCommentId,
+          pageId: orphanPageId,
+          userId: String(viewer._id),
+          emoji: 'unicode:+1',
+          createdAt: reactionAt(7),
+        },
+      ],
+    });
+
     const oneDayLater = new Date(Date.now() + 1000 * 60 * 60 * 24);
     pageReadToken = (
       await AccessToken.generateToken(viewer._id, oneDayLater, [
@@ -261,10 +384,31 @@ describe('GET /_api/v3/comments', () => {
     // Mounted with app.use so req.baseUrl matches /_api/..., which is what
     // makes loginRequired answer 403 instead of redirecting to /login.
     app.use(MOUNT_PATH, listCommentsRouteHandlersFactory(crowi));
+
+    // The deprecated apiv1 route, wired as in routes/index.js.
+    const { setup: setupComment } = await import('~/server/routes/comment');
+    const legacyComment = setupComment(crowi, {});
+    app.get(
+      LEGACY_PATH,
+      legacyComment.api.validators.get(),
+      apiV1FormValidator,
+      certifySharedPageFactory(crowi),
+      loginRequiredFactory(crowi, true),
+      legacyComment.api.get,
+    );
   }, 120_000);
 
   afterAll(async () => {
-    const pageIds = [publicPageId, forbiddenPageId, sharedPageId];
+    const pageIds = [
+      publicPageId,
+      forbiddenPageId,
+      sharedPageId,
+      orphanPageId,
+      brokenPageId,
+    ];
+    await mongoose.connection.collection('commentreactions').deleteMany({
+      page: { $in: pageIds.map((id) => new Types.ObjectId(id)) },
+    });
     await prisma.comments.deleteMany({ where: { pageId: { in: pageIds } } });
     await prisma.revisions.deleteMany({ where: { pageId: { in: pageIds } } });
     await prisma.sharelinks.deleteMany({
@@ -540,6 +684,157 @@ describe('GET /_api/v3/comments', () => {
           expect(JSON.stringify(res.body)).not.toContain('shared old regular');
         }
       });
+    });
+  });
+
+  describe('reactions on each comment (comment-reactions Requirement 1.9, 1.10, 6.1, 6.2, 6.4, 6.5, 11.1, 11.5, 11.6)', () => {
+    const summaryOf = (user: HydratedDocument<IUser>) => ({
+      _id: String(user._id),
+      username: user.username,
+      name: user.name,
+      imageUrlCached: user.imageUrlCached ?? null,
+    });
+
+    const reactionsOf = (
+      res: request.Response,
+      commentId: string,
+    ): ICommentListItem['reactions'] | undefined => {
+      const comments: ICommentListItem[] = res.body.comments;
+      return comments.find((c) => c.id === commentId)?.reactions;
+    };
+
+    const expectedRegularChips = (myReactions: {
+      plusOne: boolean;
+      tada: boolean;
+    }) => [
+      {
+        emoji: 'unicode:+1',
+        count: 2,
+        reactedByMe: myReactions.plusOne,
+        users: [summaryOf(owner), summaryOf(viewer)],
+      },
+      {
+        emoji: 'unicode:tada',
+        count: 1,
+        reactedByMe: myReactions.tada,
+        users: [summaryOf(owner)],
+      },
+    ];
+
+    it('carries the chips of each comment, formatted with the 4-field creator summary, and [] for a comment without reactions', async () => {
+      currentUser = viewer;
+
+      const res = await getComments({ pageId: publicPageId });
+
+      expect(res.status).toBe(200);
+      expect(reactionsOf(res, regularCommentId)).toEqual(
+        expectedRegularChips({ plusOne: true, tada: false }),
+      );
+      expect(reactionsOf(res, inlineCommentId)).toEqual([]);
+    });
+
+    it.each([
+      ['the owner', () => owner, { plusOne: true, tada: true }],
+      ['a guest', () => undefined, { plusOne: false, tada: false }],
+    ])('marks reactedByMe from the point of view of %s', async (_label, requesterOf, myReactions) => {
+      vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(true);
+      currentUser = requesterOf();
+
+      const res = await getComments({ pageId: publicPageId });
+
+      expect(res.status).toBe(200);
+      expect(reactionsOf(res, regularCommentId)).toEqual(
+        expectedRegularChips(myReactions),
+      );
+    });
+
+    it('returns the same reactions to a Bearer access token holder', async () => {
+      vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(false);
+
+      const res = await getComments({ pageId: publicPageId }).set(
+        'Authorization',
+        `Bearer ${pageReadToken}`,
+      );
+
+      expect(res.status).toBe(200);
+      expect(reactionsOf(res, regularCommentId)).toEqual(
+        expectedRegularChips({ plusOne: true, tada: false }),
+      );
+    });
+
+    it('returns the reactions of an inline comment through a share link', async () => {
+      vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(false);
+
+      const res = await getComments({ pageId: sharedPageId, shareLinkId });
+
+      expect(res.status).toBe(200);
+      expect(reactionsOf(res, sharedNewInlineCommentId)).toEqual([
+        {
+          emoji: 'unicode:eyes',
+          count: 1,
+          reactedByMe: false,
+          users: [summaryOf(owner)],
+        },
+      ]);
+      expect(reactionsOf(res, sharedOldRegularCommentId)).toEqual([
+        {
+          emoji: 'unicode:tada',
+          count: 1,
+          reactedByMe: false,
+          users: [summaryOf(viewer)],
+        },
+      ]);
+    });
+
+    it('still returns the comments, with reactions null, when the reactions cannot be loaded', async () => {
+      currentUser = viewer;
+
+      const res = await getComments({ pageId: brokenPageId });
+
+      expect(res.status).toBe(200);
+      const comments: ICommentListItem[] = res.body.comments;
+      expect(comments).toHaveLength(1);
+      expect(comments[0]).toMatchObject({
+        id: brokenCommentId,
+        comment: 'comment whose reactions cannot be read',
+        reactions: null,
+      });
+    });
+
+    it('counts a reaction of a user whose document is gone as the bare id, the same shape as a missing author', async () => {
+      currentUser = viewer;
+
+      const res = await getComments({ pageId: orphanPageId });
+
+      expect(res.status).toBe(200);
+      const [comment]: ICommentListItem[] = res.body.comments;
+      expect(comment.creator).toBe(missingCreatorId);
+      expect(comment.reactions).toEqual([
+        {
+          emoji: 'unicode:+1',
+          count: 2,
+          reactedByMe: true,
+          users: [missingReactorId, summaryOf(viewer)],
+        },
+      ]);
+    });
+
+    // Through the share link: the legacy viewer check skips empty pages, which these fixtures are.
+    it('leaves the legacy comments.get response without a reactions key', async () => {
+      vi.spyOn(crowi.aclService, 'isGuestAllowedToRead').mockReturnValue(false);
+
+      const res = await request(app)
+        .get(LEGACY_PATH)
+        .query({ page_id: sharedPageId, shareLinkId });
+
+      expect(res.status).toBe(200);
+      const legacyComments: Record<string, unknown>[] = res.body.comments;
+      expect(legacyComments.map((c) => c._id)).toEqual([
+        sharedOldRegularCommentId,
+      ]);
+      for (const comment of legacyComments) {
+        expect(comment).not.toHaveProperty('reactions');
+      }
     });
   });
 
