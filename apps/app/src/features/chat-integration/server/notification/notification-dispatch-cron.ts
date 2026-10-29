@@ -1,5 +1,4 @@
-// What actually turns `NotificationDispatcher` (and the sweep that
-// rides along with it) into something that happens.
+// What actually turns `NotificationDispatcher` into something that happens.
 //
 // design.md: GROWI already has three collections-with-a-`state`-column that
 // are worked through periodically (`page-bulk-export`,
@@ -10,13 +9,15 @@
 // place to look, so this is a `CronService` too, running once a minute.
 //
 // The cron gives no exclusion of its own -- every instance ticks -- which is
-// exactly why both halves of the job take a row at a time with a conditional
-// update. See `notification-dispatcher.ts` and `sweep-unpaired-relations.ts`.
+// exactly why the drain takes a row at a time with a conditional update. See
+// `notification-dispatcher.ts`. A tick that finds no chat integration at all
+// does nothing, so a GROWI that never used one pays no per-minute queries.
 
 import CronService from '~/server/service/cron';
 import loggerFactory from '~/utils/logger';
 
-import { sweepUnpairedRelations } from '../pairing/sweep-unpaired-relations';
+import type { IntegrationPresence } from '../integration-presence';
+import { integrationPresence } from '../integration-presence';
 import type { NotificationDispatcher } from './notification-dispatcher';
 import { notificationDispatcher } from './notification-dispatcher';
 
@@ -26,17 +27,21 @@ const logger = loggerFactory(
 
 export interface ChatNotificationDispatchCronDeps {
   readonly dispatcher?: NotificationDispatcher;
-  readonly sweep?: typeof sweepUnpairedRelations;
+  readonly presence?: IntegrationPresence;
+  /** Test seam; production uses `() => new Date()`. */
+  readonly clock?: () => Date;
 }
 
 export class ChatNotificationDispatchCronService extends CronService {
   private readonly dispatcher: NotificationDispatcher;
-  private readonly sweep: typeof sweepUnpairedRelations;
+  private readonly presence: IntegrationPresence;
+  private readonly clock: () => Date;
 
   constructor(deps: ChatNotificationDispatchCronDeps = {}) {
     super();
     this.dispatcher = deps.dispatcher ?? notificationDispatcher;
-    this.sweep = deps.sweep ?? sweepUnpairedRelations;
+    this.presence = deps.presence ?? integrationPresence;
+    this.clock = deps.clock ?? (() => new Date());
   }
 
   override getCronSchedule(): string {
@@ -44,23 +49,18 @@ export class ChatNotificationDispatchCronService extends CronService {
   }
 
   override async executeJob(): Promise<void> {
-    // One instant for both halves, so a row's backoff and a relation's
-    // retention are measured against the same "now".
-    const now = new Date();
+    const now = this.clock();
 
-    // Each half is guarded separately: `CronService` already logs a thrown
-    // job, but a single catch-all would let a failing delivery attempt keep
-    // the sweep from ever running (and the reverse).
+    if (!(await this.presence.hasAnyIntegration(now))) {
+      return;
+    }
+
+    // `CronService` already logs a thrown job, but catching here keeps the
+    // failure message specific to the outbox.
     try {
       await this.dispatcher.drain(now);
     } catch (err) {
       logger.error('Failed to drain the chat notification outbox', err);
-    }
-
-    try {
-      await this.sweep(now);
-    } catch (err) {
-      logger.error('Failed to sweep expired chat relations', err);
     }
   }
 }

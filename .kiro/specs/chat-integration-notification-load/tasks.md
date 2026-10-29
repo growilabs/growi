@@ -38,7 +38,7 @@
   - _Requirements: 9.8, 2.7_
   - _Depends: 1.1_
 
-- [ ] 3.2 通知の定期処理から掃除を外し、判定で問い合わせを飛ばす（振る舞い）
+- [x] 3.2 通知の定期処理から掃除を外し、判定で問い合わせを飛ばす（振る舞い）
   - `ChatNotificationDispatchCronService` の差し替え口から `sweep` を外し、`presence` と `clock` を足す
   - `executeJob` は `clock()` の時刻で判定し、「無い」なら何もしない。「ある」なら `drain(now)` を呼ぶ
   - スケジュールは変えない（1 分のまま）
