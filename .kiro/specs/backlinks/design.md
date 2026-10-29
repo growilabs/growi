@@ -107,8 +107,8 @@ Re-check this feature if any of the following change:
   (would force consumers of the read API to revalidate).
 - The page-bulk-export job pattern / `CronService` base, or the backfill job's claim/progress
   contract (affects backfill resumability and multi-instance safety).
-- The `PageLinkBackfillJob` document's operator-facing fields (`status`, `phase`, `coverage`,
-  `coveredSince`, counts, `completedAt`, `lastError`) or its collection name: GROWI.cloud infra reads them
+- The `PageLinkBackfillJob` document's operator-facing fields (`status`, `coverage`,
+  `coveredSince`, `processed`, `completedAt`, `lastError`) or its collection name: GROWI.cloud infra reads them
   directly to watch progress, so a rename breaks their monitoring.
 - `isPermalink` / `removeHeadingSlash` semantics, or GROWI's permalink convention (`/{pageId}`).
 - The `app:siteUrl` config key, or `NextLink`'s own-host rule (`isExternalLink`: compares
@@ -884,8 +884,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   `restRatio = (100 − duty) / duty` — the same rule the live drain uses (B2.2, which charges its
   extraction time), so the duty is exact over the cycle by construction. A floor on the interval
   between pages (`backlinks:backfillMaxPagesPerSecond`, see the Delivery decision) additionally
-  bounds the database operation rate. The duty is set per phase (25% for recent pages, 10% for older ones,
-  operator-tunable — see the Delivery decision). The rest is also the yield, so there is no tick
+  bounds the database operation rate. The duty is one operator-tunable value (default 25%; see the
+  Delivery decision). The rest is also the yield, so there is no tick
   budget, no slice limit and no zero-length yield. The charged work is capped at the drain's
   `MAX_CHARGED_EXTRACTION_MS` (5000 ms), which bounds the charge, not the resulting rest, so the
   configured duty stays exact for every legitimate measurement. A timer's 1 ms floor makes the
@@ -909,11 +909,11 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   is visible rather than silent) is undecided. The save-time listener has the same single-page
   exposure, so whether the cap is shared with it is part of that decision. Off-thread parsing is
   the alternative and stays deferred.
-- **Checkpoint cadence (open — settle in B3.2)**: the progress marker, the per-phase counts, the
+- **Checkpoint cadence (open — settle in B3.2)**: the progress marker, the processed count, the
   lease renewal run every N pages or T seconds, not after every page.
   The marker is advanced in memory only after a page's rows are written and saved at the
   checkpoint, so a crash redoes at most one interval's pages, which the idempotent upsert makes
-  safe. `leaseExpiresAt` must outlast T plus the longest single rest (up to 45 s at 10% duty with
+  safe. `leaseExpiresAt` must outlast T plus the longest single rest (up to 15 s at 25% duty with
   the charge capped at 5000 ms), or a healthy loop loses its claim between checkpoints. N, T and
   the lease length are B3.2 choices, to be set from the performance run.
 - **Failing page (open — settle in B3.2)**: a page whose write keeps failing needs a policy so it
@@ -924,21 +924,9 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   option, so an idle tick that falls due while the loop is running would start a second loop on
   the same progress marker. An **in-process `isRunning` flag**, set when the loop starts and reset
   in `finally`, makes that tick return immediately.
-- **Two phases, recent pages first**: within the run's range the job walks the pages up to twice,
-  each a separate pass in `_id` order. Phase `recent` takes pages with `updatedAt >= recentCutoff`,
-  phase `older` takes the rest of the range; the run is complete only when `older` finishes (a range
-  with nothing older than `recentCutoff` has only the first phase), so an all-pages run still reaches
-  full coverage (4.1) and old pages simply fill in later. `recentCutoff` (now minus the recent
-  window, default 365 days) is **computed once at the run's first claim and stored on the job
-  document**, because a cutoff that floated with "now" would move pages between the two sets across
-  restarts. A page edited during the backfill is indexed by the live listener, so landing in either
-  set at the time it is reached is harmless (idempotent). The filter is applied while scanning in
-  `_id` order, so skipped pages never have their bodies read. `Page` already has a single-field
-  `updatedAt` index; B3.2 confirms with `explain` that neither phase's `updatedAt` + `_id` scan
-  degrades into a slow query, and adds no new index unless that measurement shows a need.
-- **Resumable**: a `PageLinkBackfillJob` document stores the current `phase` and a progress marker —
-  the **last `_id` processed in that phase, walking pages in `_id` order** — so a restart continues
-  rather than restarting (4.3). The marker resets when the phase advances and at the start of each run.
+- **Resumable**: a `PageLinkBackfillJob` document stores a progress marker —
+  the **last `_id` processed, walking pages in `_id` order** — so a restart continues
+  rather than restarting (4.3). The marker resets at the start of each run.
   The marker is saved at a checkpoint, and only up to a page whose page-link writes are done:
   delivery is at-least-once, a crash redoes at most one checkpoint interval, and the idempotent
   upsert on `{fromPage,toPath}` makes that safe. Saving it ahead of the writes would silently skip
@@ -971,7 +959,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   whose lease has expired; the loop then runs (paced). It is not scheduled at boot when coverage is
   already `all`, since nothing can start.
 - Input: a cursor page-batch (`Page.find(...).cursor({ batch_size })` + `createBatchStream`) in
-  `_id` order, restricted to the run's range and the current phase's `updatedAt` range and starting after the progress
+  `_id` order, restricted to the run's `updatedAt` range and starting after the progress
   marker; body via `Revision.findById(page.revision).body`. The loop walks it page by page and
   rests after each page; there is no per-tick chunk.
 - Per page: `extractInternalLinkPaths(body, page.path, siteUrl)` → resolve each path via the in-memory
@@ -984,7 +972,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 - Progress/observability: emit processed / `runTotal` over the existing admin Socket.IO channel (as the
   Elasticsearch reindex does).
 
-**Delivery decision (proposed): throttled, two-phase, started by an administrator from the admin settings, with the scope chosen at start.**
+**Delivery decision (proposed): throttled, started by an administrator from the admin settings, with the scope chosen at start.**
 - **Started by an administrator, on-prem and GROWI.cloud alike.** The admin settings offer a start
   control with a scope: all pages, the newest N pages (`maxPages`), or the pages edited after a
   given date (`since`). Nothing starts on its own: an upgrade has never run a heavy job and admins do
@@ -1015,11 +1003,11 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   completes, because the walk is in `_id` order and a stopped or crashed run leaves no clean cutoff;
   it resumes from its marker instead. The range from a scope and the coverage after a run are pure
   functions (`backfill-range.ts`), tested as tables.
-- **Progress marker vs. coverage.** The marker (last `_id` processed in the current phase) says where
-  the active run is, resets at the start of each run and phase, and means nothing once the run ends.
+- **Progress marker vs. coverage.** The marker (last `_id` processed in the run) says where
+  the active run is, resets at the start of each run, and means nothing once the run ends.
   Coverage says what is finished and persists between runs. The marker is an `_id` position and cannot
   define an `updatedAt` range, so it cannot stand in for coverage.
-- **Counts shown to the admin.** While a run is active: processed pages (the per-phase counts summed)
+- **Counts shown to the admin.** While a run is active: processed pages
   of `runTotal`, the number of pages in the run's range, counted once at the first claim and stored
   on the job document so it does not move under the progress bar. After a partial run: the number of
   pages not included, which is the count of pages with `updatedAt < coveredSince`, and the total
@@ -1036,10 +1024,10 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   | Job document | Shown | Controls |
   |---|---|---|
   | `coverage: none`, idle | "Backlinks have not been built for existing pages" (with the page count) | scope picker + Start |
-  | `requested` / `running` | processed of `runTotal` pages (count and percent) and the phase, over the admin Socket.IO channel | Stop; Start disabled |
+  | `requested` / `running` | processed of `runTotal` pages (count and percent), over the admin Socket.IO channel | Stop; Start disabled |
   | `running` with `stopRequested` | "Stopping…" | none |
   | `failed` | the last error; the poll retries from the marker | none |
-  | `stopped` | where it stopped (processed of `runTotal`, phase) | Resume, or a new scope + Start |
+  | `stopped` | where it stopped (processed of `runTotal`) | Resume, or a new scope + Start |
   | `coverage: partial`, idle | "Backlinks cover pages edited since `<coveredSince>`; about N older pages are not included" | scope picker + Start |
   | `coverage: all` | "Backlinks are indexed for all pages (completed `<completedAt>`)" | none |
 
@@ -1054,7 +1042,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   - For a `running` run the endpoint sets `stopRequested`. The loop checks it at each checkpoint,
     saves the marker and counts, releases its claim, sets `stopped`, clears the flag and exits, so
     Resume does not wait for the lease to expire. The stop takes effect at the next checkpoint plus
-    at most one rest (about 45 s at 10% duty), which is why the UI shows "Stopping…" until the
+    at most one rest (about 15 s at 25% duty), which is why the UI shows "Stopping…" until the
     status changes. If the run's lease has already expired (a dead owner), the endpoint sets
     `stopped` directly, since no loop will see the flag.
   - A claim clears any stale `stopRequested`, so a Stop clicked as a run finishes cannot stop the
@@ -1087,7 +1075,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   - **A floor on the interval between pages**, `backlinks:backfillMaxPagesPerSecond`, bounds the
     per-app DB operation rate directly, whatever the parse time (a 1.3 ms page would otherwise be
     processed 100+ times a second). Default chosen in B3.2 from the performance run.
-  - **The duty per phase** (below), unchanged.
+  - **The duty** (below), unchanged.
   - **Batched I/O (open — evaluate in B3.2).** Today each page costs its own body read and its own
     write. Reading the bodies of a group of pages in one query and writing their rows with one bulk
     operation would cut the number of commands and round trips, which is most of the cost for tiny
@@ -1095,20 +1083,14 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     volume, so its benefit depends on how much of the load is per-command overhead; B3.4's
     DB-side measurements decide whether it is worth the extra shape. It combines with the
     per-page rest: group the I/O, but still rest after each page's parse.
-- **Duty per phase** (config keys and env names proposed; B3 fixes them): recent pages
-  (`updatedAt` within the last `backlinks:backfillRecentWindowDays`, default 365) at
-  `backlinks:backfillRecentDutyCyclePercent` (default 25), then older pages at
-  `backlinks:backfillOlderDutyCyclePercent` (default 10). All are operator-tunable so cloud can
-  change them without a release. These are separate from `backlinks:dutyCyclePercent`, which
-  paces the live listener's queue.
-- **Known gap of a partial scope**: coverage is by `updatedAt`, so an old page that links to many pages
-  and has not been edited is skipped, and the backlinks *from* it are missing until someone edits it
-  (the live listener then indexes it) or a wider run covers it. The panel says so (4.4).
+- **Duty** (config key and env name proposed; B3 fixes them): the loop runs at
+  `backlinks:backfillDutyCyclePercent` (default 25), operator-tunable so cloud can change it without a
+  release. It is separate from `backlinks:dutyCyclePercent`, which paces the live listener's queue.
 - **The job document is both the control and the status surface.** The app upserts it at boot
   (`$setOnInsert`: idle, `coverage: none`); the admin endpoints write the request (`requestedScope`,
-  `requestedAt`, `stopRequested`); the job writes everything else (`status`, `phase`, `runCutoff`,
-  `coverage`, `coveredSince`, progress marker, processed counts per phase, `runTotal`, `recentCutoff`,
-  claim/lease, `completedAt`, `lastError`). Infra reads `status` / `phase` / `coverage` / counts /
+  `requestedAt`, `stopRequested`); the job writes everything else (`status`, `runCutoff`,
+  `coverage`, `coveredSince`, progress marker, `processed`, `runTotal`,
+  claim/lease, `completedAt`, `lastError`). Infra reads `status` / `coverage` / `processed` /
   `lastError` to watch progress; it never has to write. It is a document and not a config key
   because completion is state the job writes, not a setting an operator edits, and a copy in config
   could disagree with it. The tick reads the document directly from the database, not through
