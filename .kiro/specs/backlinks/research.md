@@ -363,8 +363,7 @@
   (acceptable per 4.2 — completeness only required *after* completion; new edits index instantly).
   In-process means the parse still shares the one JS thread; the duty cycle bounds but cannot
   remove that contention — only `worker_threads` could, which GROWI lacks (deferred).
-- **Delivery decision (proposed)**: throttled, two-phase (recent pages at 25% duty, then older at
-  10%); started by an administrator from the admin settings with a scope (all pages, the newest N, or
+- **Delivery decision (proposed)**: throttled (one pass at 25% duty); started by an administrator from the admin settings with a scope (all pages, the newest N, or
   pages edited after a date), the same on-prem and on GROWI.cloud for now. The GROWI.cloud policy
   is open (see the last bullet of this decision). The mechanism and settings are in design.md's
   Delivery decision; the reasoning behind them is here:
@@ -403,9 +402,15 @@
     finished from missing. The server rejects the start independently of the UI.
   - *Unconditional auto-start was rejected for cloud*: apps share one MongoDB, a duty cycle bounds
     per-instance load only, so a fleet starting together has no aggregate cap.
-  - *Two phases by `updatedAt`, with a stored cutoff*: skipping old pages entirely would break full
-    coverage (4.1), so they run second at a lower duty. The cutoff is stored on the job so the sets
-    do not shift across restarts.
+  - *One pass at one duty, no recent-first phases (decided 2026-10-29)*: an earlier design walked
+    recent pages (edited within a year) at 25% duty, then older pages at 10%, with a stored
+    `recentCutoff` so the two sets did not shift across restarts. The phases only ordered the work;
+    scope and coverage already bound it. An administrator who wants recent pages first runs a recent
+    scope first and then a wider one, and the second run walks only the gap (`coveredSince`). Dropping
+    the phases removes `phase`, `recentCutoff` and the second counter, the marker reset between
+    phases and the second `updatedAt` filter. A lower duty for old pages only stretches the same
+    work over more time: it lowers the peak per app but not the total load, and it lengthens the
+    window in which apps overlap. The duty protects the app's own event loop, and one value does that.
   - *Cloud candidate (1), kept for the open cloud decision: a uniform start window*. The constraint from the infra
     review is that GROWI.cloud infra must not do repeated work: one-time setup at release (the same
     env values everywhere) is fine, starting a few apps at a time and checking load between batches
@@ -426,7 +431,7 @@
     database side (operations/s, writes, oplog, replication delay) that the event-loop and
     live-request numbers do not show.
   - *Cloud candidate (2): a bounded scope set by infra*: bounding the backfill (for example the last
-    year, or the last 10,000 pages) removes the slow older-pages phase and cuts the total work and the
+    year, or the last 10,000 pages) cuts the total work and the
     overlap window, which are the main levers on shared-DB load. As an env value infra sets in the
     shared config, never unlimited, it would also mean a full backfill is not available on cloud. The
     cost is that stable, rarely edited pages that link to others are skipped until someone edits

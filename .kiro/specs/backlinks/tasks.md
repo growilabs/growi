@@ -453,7 +453,7 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
 
 ## Story B3 — Backfill of pre-existing pages
 
-**Nature:** Online, throttled, resumable, two-phase (recent pages first) job, started by an
+**Nature:** Online, throttled, resumable job, started by an
 administrator from the admin settings with a chosen scope (all pages, the newest N, or the pages
 edited after a date), picked up by a `CronService` poll and run as a self-paced loop (rest
 proportional to work, per page), that populates rows for pages that existed before the feature.
@@ -469,9 +469,8 @@ Independent of B4/B5.
     `complete` / `failed`; plus `stopped`), the admin's
     `requestedScope` and `requestedAt` and `stopRequested`, the run's `runCutoff`
     computed once at the first claim, `coverage` (`none` / `partial` / `all`) with `coveredSince`,
-    the current phase (`recent` / `older`), the `recentCutoff` computed once at the run's first
-    claim, a progress marker (the last `_id` processed in the current phase, in `_id` order, reset
-    when the phase advances and at the start of each run), processed counts per phase, `runTotal` (the pages in the run's range, counted once at the first claim), `completedAt`,
+    a progress marker (the last `_id` processed, in `_id` order, reset at the start of each run),
+    the `processed` count, `runTotal` (the pages in the run's range, counted once at the first claim), `completedAt`,
     `lastError`, and an atomic-claim field with `leaseExpiresAt` so only one instance runs the job and
     a claim held by a dead owner can be taken over once its lease expires
   - Create the document idle at boot with an upsert that uses `$setOnInsert` (idle, `coverage:
@@ -496,10 +495,9 @@ Independent of B4/B5.
     links via the B1 extractor (passing the configured site URL), resolve permalink targets via an
     id-existence check against the known page ids (not the path map), upsert that page's rows, then
     rest. Persist the progress marker at each checkpoint and resume from it on restart
-  - Within the run's range, run two phases in order: pages with `updatedAt >= recentCutoff` at the
-    recent duty (default 25%), then the remaining pages at the older duty (default 10%); the run is
-    complete only when the second finishes, and then records its coverage (B3.1). Window and both
-    duties are config-driven (design.md's Delivery decision)
+  - Walk the run's range in one pass at the backfill duty (default 25%); the run is complete when
+    the cursor is exhausted, and then records its coverage (B3.1). The duty is config-driven
+    (design.md's Delivery decision)
   - Pace by resting `restRatio × pageCycleMs` after each page, where the page cycle is the body read,
     parse and writes (not the parse alone), with the charged work capped as in the live drain;
     extract the drain's rest computation into one pure function both call. Enforce a minimum
@@ -543,7 +541,7 @@ Independent of B4/B5.
     start endpoint (B3.6) also nudges an immediate claim. `failed` keeps the tick so the job is
     retried from the marker; a finished run returns the document to rest
   - Note: edits the same server-setup file as B1.12 — sequence after it to avoid a merge
-  - Done when a pending request starts within one idle interval, the job claims and runs both phases
+  - Done when a pending request starts within one idle interval, the job claims and runs
     to completion on a fresh dataset and records its coverage, an idle document with no request
     starts nothing, and a document with coverage `all` schedules no poll
   - _Requirements: 4.1, 4.5_
@@ -594,7 +592,7 @@ Independent of B4/B5.
 
 - [ ] B3.6 Add the admin start, state, stop and resume endpoints
   - Add apiv3 admin routes behind `loginRequired` and `adminRequired`: GET the job state (status,
-    phase, processed and `runTotal` while a run is active, `coverage`, `coveredSince`, `completedAt`,
+    processed and `runTotal` while a run is active, `coverage`, `coveredSince`, `completedAt`,
     `lastError`, and, computed on read, the number of pages not yet included and the total page count
     (the `updatedAt`-index count with the walk's page filter)); POST start with a
     scope (`all`, `maxPages` N, or `since` date), which writes `requestedScope`, `requestedAt` and
