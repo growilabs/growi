@@ -26,7 +26,7 @@
   - _Requirements: 6.12_
 
 - [ ] 3. proxy の表示で更新日時を出す
-- [ ] 3.1 `previewMarkdown` の `restricted: true` の分岐で `updatedAt` を出す（振る舞いを変えるタスク）
+- [x] 3.1 `previewMarkdown` の `restricted: true` の分岐で `updatedAt` を出す（振る舞いを変えるタスク）
   - 先に `apps/chat-integration-proxy/src/orchestration/command-flow.spec.ts` に design.md「Testing Strategy」の 8・9 を足し、8 が失敗することを確かめる
   - `apps/chat-integration-proxy/src/orchestration/command-flow.ts` の `previewMarkdown` を、design.md「proxy の previewMarkdown」の形にする。`restricted: true` のときに本文の冒頭とコメント数を出さないことは保つ
   - 完了の条件: 8〜10 のテストが通る（10 は既存の `{ restricted: true, path }` のテスト）

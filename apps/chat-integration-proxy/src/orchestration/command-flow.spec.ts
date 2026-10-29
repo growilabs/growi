@@ -1302,6 +1302,61 @@ describe('previewLinks', () => {
     expect(harness.privateReplier.reply).not.toHaveBeenCalled();
   });
 
+  describe('rendering a restricted summary', () => {
+    const previewOf = async (
+      response: Extract<CommandResponse, { kind: 'link-preview' }>,
+    ): Promise<string> => {
+      vi.mocked(harness.selector.select).mockResolvedValue({
+        kind: 'execute',
+        targets: [GROWI_A],
+        excluded: [],
+      });
+      vi.mocked(harness.growiClient.sendCommand).mockResolvedValue({
+        ok: true,
+        response,
+      });
+      await harness.flow.previewLinks(linkEvent);
+      const [, preview] =
+        vi.mocked(harness.platform.attachPreview).mock.calls[0] ?? [];
+      if (preview?.kind !== 'markdown') throw new Error('expected markdown');
+      return preview.markdown;
+    };
+
+    it('shows the path and the update time on two lines', async () => {
+      expect(
+        await previewOf({
+          kind: 'link-preview',
+          path: 'Sandbox',
+          restricted: true,
+          updatedAt: '2026-10-01T00:00:00.000Z',
+        }),
+      ).toBe('GROWI A: Sandbox\n更新: 2026-10-01T00:00:00.000Z');
+    });
+
+    it('never shows the excerpt or the comment count', async () => {
+      const text = await previewOf({
+        kind: 'link-preview',
+        path: '/Sandbox',
+        restricted: true,
+        excerpt: 'secret body',
+        commentCount: 7,
+        updatedAt: '2026-10-01T00:00:00.000Z',
+      });
+      expect(text).not.toContain('secret body');
+      expect(text).not.toContain('コメント');
+    });
+
+    it('shows only the path when there is no update time', async () => {
+      expect(
+        await previewOf({
+          kind: 'link-preview',
+          path: '/Sandbox',
+          restricted: true,
+        }),
+      ).toBe('GROWI A: /Sandbox');
+    });
+  });
+
   it('summarises the same link once, however often the message repeats it', async () => {
     vi.mocked(harness.selector.select).mockResolvedValue({
       kind: 'execute',

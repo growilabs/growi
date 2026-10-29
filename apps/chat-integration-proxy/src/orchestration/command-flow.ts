@@ -316,26 +316,29 @@ const helpRowOf = (
 const previewMarkdown = (
   response: Extract<CommandResponse, { kind: 'link-preview' }>,
   growiLabel: string,
-): OutboundMessage =>
-  markdown(
-    response.restricted
-      ? // Requirement 6.3: nothing but the path for a page not everyone can read.
-        `${growiLabel}: ${response.path}`
-      : [
-          `${growiLabel}: ${response.path}`,
-          response.excerpt,
-          [
-            response.updatedAt == null ? null : `更新: ${response.updatedAt}`,
-            response.commentCount == null
-              ? null
-              : `コメント: ${response.commentCount}`,
-          ]
-            .filter((part) => part != null)
-            .join(' / ') || null,
+): OutboundMessage => {
+  const updated =
+    response.updatedAt == null ? null : `更新: ${response.updatedAt}`;
+  // Requirements 6.3, 6.13: a restricted summary never carries the excerpt or
+  // the comment count, even if a response arrives with them.
+  const lines = response.restricted
+    ? [`${growiLabel}: ${response.path}`, updated]
+    : [
+        `${growiLabel}: ${response.path}`,
+        response.excerpt,
+        [
+          updated,
+          response.commentCount == null
+            ? null
+            : `コメント: ${response.commentCount}`,
         ]
-          .filter((line) => line != null && line !== '')
-          .join('\n'),
+          .filter((part) => part != null)
+          .join(' / ') || null,
+      ];
+  return markdown(
+    lines.filter((line) => line != null && line !== '').join('\n'),
   );
+};
 
 // ---------------------------------------------------------------------------
 // Reading the command's own declaration
