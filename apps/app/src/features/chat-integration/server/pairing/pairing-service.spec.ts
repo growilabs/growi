@@ -228,6 +228,10 @@ const seedUnpairedRelation = (relationId: string, unpairedAt: Date) =>
     settingsVersion: 0,
   });
 
+/** Relative to the real clock because `submitPairingRequest` reads it itself. */
+const daysAgo = (days: number): Date =>
+  new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
 const seedLink = (
   relationId: string,
   accountId: string,
@@ -532,9 +536,9 @@ describe('pairing-service', () => {
       // Seeded directly rather than through two pair/unpair cycles: a real
       // second pairing would already have inherited the first generation's
       // links, so there would be nothing left to prove about the ordering.
-      await seedUnpairedRelation('relation-older', new Date('2026-01-10'));
+      await seedUnpairedRelation('relation-older', daysAgo(20));
       await seedLink('relation-older', 'OLD', new Date('2026-01-01'));
-      await seedUnpairedRelation('relation-newer', new Date('2026-02-10'));
+      await seedUnpairedRelation('relation-newer', daysAgo(10));
       await seedLink('relation-newer', 'NEW', new Date('2026-02-01'));
 
       const { outcome } = await submitWith(
@@ -553,6 +557,23 @@ describe('pairing-service', () => {
       expect(
         await ChatAccountLink.countDocuments({ relationId: 'relation-older' }),
       ).toBe(1);
+    });
+
+    it('does not inherit from an unpaired relation whose retention has passed', async () => {
+      await seedUnpairedRelation('relation-expired', daysAgo(46));
+      await seedLink('relation-expired', 'U1', new Date('2026-01-01'));
+
+      const { outcome } = await submitWith(
+        pairedResult('relation-new', peerKeyPair().publicKey),
+      );
+
+      expect(outcome).toMatchObject({
+        status: 'paired',
+        inheritance: { inheritedFrom: null, movedCount: 0 },
+      });
+      expect(
+        await ChatAccountLink.countDocuments({ relationId: 'relation-new' }),
+      ).toBe(0);
     });
 
     it('keeps the newer of two colliding links for the same (platform, accountId) and drops the older one', async () => {

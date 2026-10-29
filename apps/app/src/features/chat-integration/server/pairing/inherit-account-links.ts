@@ -28,6 +28,7 @@
 
 import type { PlatformName } from '@growi/chat';
 
+import { UNPAIRED_RETENTION_MS } from '../../unpaired-retention';
 import { ChatAccountLink } from '../account-link/models/chat-account-link';
 import { ChatRelation } from '../models/chat-relation';
 
@@ -69,12 +70,20 @@ const NOTHING_INHERITED: AccountLinkInheritance = {
  * most recently unpaired one, per design.md's "引き継ぎ元が複数あるときは、いちばん
  * 新しい解除済みの行から引き継ぐ". Only one is chosen -- merging every unpaired
  * generation would resurrect links a user unlinked two pairings ago.
+ *
+ * A relation past its retention is never a source even while the daily sweep
+ * has not removed it yet: the admin screen already told the admin it is gone.
+ * `$gte` is the exact complement of the sweep's `$lt`, so a row is inherited
+ * from if and only if the sweep would keep it.
  */
 const findSourceRelationId = async (
   target: InheritanceTarget,
+  now: Date,
 ): Promise<string | null> => {
+  const retainedSince = new Date(now.getTime() - UNPAIRED_RETENTION_MS);
   const source = await ChatRelation.findOne({
     state: 'unpaired',
+    unpairedAt: { $gte: retainedSince },
     platform: target.platform,
     workspaceId: target.workspaceId,
     relationId: { $ne: target.relationId },
@@ -104,8 +113,9 @@ const findSourceRelationId = async (
  */
 export const inheritAccountLinks = async (
   target: InheritanceTarget,
+  now: Date,
 ): Promise<AccountLinkInheritance> => {
-  const sourceRelationId = await findSourceRelationId(target);
+  const sourceRelationId = await findSourceRelationId(target, now);
   if (sourceRelationId == null) {
     return NOTHING_INHERITED;
   }
