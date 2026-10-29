@@ -158,6 +158,39 @@ describe('useCommentReactions', () => {
     });
   });
 
+  describe('lookup cost with many comments', () => {
+    it('does not rescan the whole list for every comment on a render', async () => {
+      const COUNT = 30;
+      let idReads = 0;
+      const countingItem = (id: string): ICommentListItem => {
+        const item = commentItem(id, { reactions: [chip(THUMBS_UP)] });
+        return Object.defineProperty(item, 'id', {
+          enumerable: true,
+          get: () => {
+            idReads += 1;
+            return id;
+          },
+        });
+      };
+      const ids = Array.from({ length: COUNT }, (_, i) => `c${i}`);
+      vi.mocked(apiv3Get).mockResolvedValue(getResponse(ids.map(countingItem)));
+
+      const { result, rerender } = renderHook(
+        () => ids.map((id) => useCommentReactions('page1', id).chips),
+        { wrapper },
+      );
+      await waitFor(() => expect(result.current[0]).not.toBeUndefined());
+      expect(result.current[COUNT - 1]).toEqual([chip(THUMBS_UP)]);
+
+      idReads = 0;
+      rerender();
+
+      // a per-comment linear scan would read about COUNT^2 / 2 ids here
+      expect(idReads).toBeLessThanOrEqual(COUNT);
+      expect(result.current[COUNT - 1]).toEqual([chip(THUMBS_UP)]);
+    });
+  });
+
   describe('setReaction on success', () => {
     it('sends the explicit add request and replaces only the target comment, without refetching', async () => {
       const { result } = await renderLoaded('c1');

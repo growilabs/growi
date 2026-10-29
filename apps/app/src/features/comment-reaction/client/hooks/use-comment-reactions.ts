@@ -15,6 +15,7 @@ import {
   classifyReactionUpdateFailure,
   type ReactionUpdateFailureKind,
 } from '../utils/classify-reaction-update-failure';
+import { findReactionsByCommentId } from '../utils/find-reactions-by-comment-id';
 
 const MESSAGE_KEY_BY_FAILURE: Readonly<
   Record<ReactionUpdateFailureKind, string>
@@ -46,8 +47,7 @@ export const useCommentReactions = (
   const chips =
     comments == null
       ? undefined
-      : (comments.find((comment) => comment.id === commentId)?.reactions ??
-        null);
+      : findReactionsByCommentId(comments, commentId);
 
   // SWR keeps the previous data when a refetch fails, so the display then stays as it was.
   const refetchQuietly = useCallback(async (): Promise<void> => {
