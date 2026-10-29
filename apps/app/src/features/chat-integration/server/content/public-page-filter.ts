@@ -1,5 +1,5 @@
 // Judging whether a page is readable by anyone, regardless of who is asking
-// (design.md's `PublicPageFilter` -- Requirements 2.3, 6.3).
+// (design.md's `PublicPageFilter` -- Requirements 2.3, 6.3, 6.9, 6.12).
 //
 // This is a different question from `ViewerPageFilter`'s (`./viewer-page-filter.ts`):
 // that one asks "can THIS actor see this page" and needs `user`/`userGroups` plus a
@@ -15,8 +15,8 @@
 //     that was just saved, and only needs to know whether to keep or drop that body
 //     (Requirement 2.3);
 //   - link preview mapping loads the page referenced by the pasted URL to build its
-//     summary, and only needs to know whether to keep or drop the excerpt/date/
-//     comment-count fields (Requirement 6.3).
+//     summary, and needs to know whether the page's grant lets the summary go past
+//     the bare path at all (Requirements 6.3, 6.9, 6.12).
 // Neither caller has a bare search hit in hand at this point, so this filter takes an
 // already-fetched page (or anything carrying its `grant` field) and returns a plain
 // boolean -- no query, no re-fetch.

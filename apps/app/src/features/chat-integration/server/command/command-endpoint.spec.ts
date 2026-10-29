@@ -646,6 +646,36 @@ describe('createCommandEndpoint (task 5.1)', () => {
     });
   });
 
+  describe('link-preview on a CLOSED GROWI (Requirement 6.9, 6.10)', () => {
+    it('returns only the title and updated-at for a linked actor pasting a permalink to a publicly-granted page', async () => {
+      const publicPage = await createPageWithRevision({
+        path: '/team/closed-public-target',
+        grant: PageGrant.GRANT_PUBLIC,
+        body: 'z'.repeat(50),
+        commentCount: 5,
+        updatedAt: new Date('2026-05-01T00:00:00.000Z'),
+      });
+      const user = await createUser();
+      await linkActorTo(user._id);
+      const crowi = buildCrowi({ isGuestAllowedToRead: false });
+      const endpoint = createCommandEndpoint(crowi);
+
+      const response = await endpoint.handle(
+        linkPreviewRequest({
+          requestId: 'req-link-closed-public-permalink',
+          pageUrl: `https://growi.example.test/${publicPage._id.toString()}`,
+        }),
+      );
+
+      expect(response).toEqual({
+        kind: 'link-preview',
+        path: 'closed-public-target',
+        restricted: true,
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      });
+    });
+  });
+
   describe('resolvePageFromUrl -- permalink detection (Requirement 6.6, 6.8)', () => {
     it('marks a 24-hex-char permalink URL as isPermalink: true when the page is found', async () => {
       const page = await createPageWithRevision({

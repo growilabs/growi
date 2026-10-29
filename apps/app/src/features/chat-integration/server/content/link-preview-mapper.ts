@@ -1,28 +1,22 @@
 // Turning a page resolved from a pasted GROWI URL into `@growi/chat`'s
-// `link-preview` response (design.md `LinkPreviewMapper` -- Requirements
-// 6.2, 6.3).
+// `link-preview` response (chat-integration-app design.md `LinkPreviewMapper`
+// -- Requirements 6.2, 6.3, 6.9-6.12).
 //
-// Requirement 6 draws exactly two states, both independent of WHO pasted the
-// link or who else is in the channel:
-//   6.2 -- the page is one anyone may read: include the body excerpt,
-//          updated-at and comment count.
-//   6.3 -- the page is not one anyone may read: include nothing but the path.
-// Neither acceptance criterion mentions the individual requester's own view
-// permission, unlike Requirement 3 (search, 3.6/3.7) which explicitly does.
-// That is why this mapper takes no `user`/`userGroups` -- there is no
-// actor-shaped question for it to answer, and adding one would invent a rule
-// Requirement 6 does not state (`COMMAND_TRAITS.linkPreview.targeting` is
-// `'url-matched'`, not `'single'`: the URL, not an actor, decides the
-// target).
-//
-// design.md's "PublicPageFilter を呼ぶ側も、閉じた GROWI での扱いを決める" table adds
-// a second, GROWI-wide gate on top of 6.2/6.3's page-level one: in a closed
-// GROWI (`aclService.isGuestAllowedToRead()` false), link expansion is
-// path-only EVEN FOR a GRANT_PUBLIC page -- "本文の冒頭・更新日時・コメント数を出さない
-// ... URL を貼った本人が中身を知っていても、チャンネルの全員がそうとは限らない" does not carve
-// out an exception for a publicly-graned page. So the full summary requires
-// BOTH `isPubliclyReadablePage(page)` AND `isGuestAllowedToRead` -- either one
-// being false collapses to path-only.
+// What is revealed depends on two independent facts -- the page's grant and
+// whether this GROWI lets guests read -- never on WHO pasted the link or who
+// else is in the channel (unlike Requirement 3's search, 3.6/3.7). That is
+// why this mapper takes no `user`/`userGroups` (`COMMAND_TRAITS.linkPreview.targeting`
+// is `'url-matched'`: the URL, not an actor, decides the target):
+//   - grant not public (6.3, 6.12): the path only, or for a permalink the
+//     fixed unavailable message -- in an open and a closed GROWI alike;
+//   - grant public, open GROWI (6.2): the full summary;
+//   - grant public, closed GROWI (6.9-6.11): the updated-at plus the path,
+//     or for a permalink only the title (last path segment), never the full
+//     path, excerpt or comment count.
+// The grant is checked first so that no closed-GROWI branch can reach a
+// non-public page. The reasoning (why "public" excludes GRANT_RESTRICTED, why
+// a permalink gets the title rather than the full path) is in
+// chat-integration-app research.md.
 //
 // `excerpt` truncation length: design.md pins Gen 1's 2000-character body
 // truncation (`server/util/slack.js`, referenced at design.md line 415)
@@ -32,10 +26,10 @@
 // authoritative source and both mappers now share the constant
 // (`./excerpt-length.ts`) so they cannot drift apart independently.
 //
-// Requirements 6.6-6.8 add a permalink-specific exception on top of the
+// Requirements 6.6-6.8 and 6.12 add a permalink-specific rule on top of the
 // above: for a URL that names a page by its 24-hex id rather than its path,
-// both "no page has that id" and "a page has that id but is not publicly
-// readable" must produce the exact same response (`PERMALINK_UNAVAILABLE_MESSAGE`),
+// both "no page has that id" and "a page has that id but its grant is not
+// public" must produce the exact same response (`PERMALINK_UNAVAILABLE_MESSAGE`),
 // so that probing permalink ids cannot be used to learn which private page
 // ids exist. A path-form URL's behavior is unchanged: not-found still
 // returns `null` (the caller reports "no such page"), because a path is
@@ -46,6 +40,7 @@ import {
   isPubliclyReadablePage,
   type PublicPageFilterSource,
 } from './public-page-filter';
+import { titleFromPath } from './title-from-path';
 
 /** The fields this mapper reads off a resolved page. */
 export interface LinkPreviewPageSource extends PublicPageFilterSource {
@@ -83,8 +78,8 @@ export interface LinkPreviewUrlTarget {
 
 /**
  * Fixed response text for a permalink that cannot be shown -- either no page
- * matched the id, or one did but is not publicly readable. Requirement 6.8
- * requires these two cases to be indistinguishable to the requester; using
+ * matched the id, or one did but its grant is not public. Requirements 6.8
+ * and 6.12 require these two cases to be indistinguishable to the requester; using
  * one shared constant for both call sites is what keeps them byte-identical
  * as this file changes, rather than relying on two separately-written
  * strings that could drift apart.
@@ -119,13 +114,18 @@ export const buildLinkPreview = (
     return { path: PERMALINK_UNAVAILABLE_MESSAGE, restricted: true };
   }
 
-  const isFullSummaryAllowed =
-    isPubliclyReadablePage(page) && isGuestAllowedToRead;
-
-  if (!isFullSummaryAllowed) {
+  if (!isPubliclyReadablePage(page)) {
     return {
       path: isPermalink ? PERMALINK_UNAVAILABLE_MESSAGE : page.path,
       restricted: true,
+    };
+  }
+
+  if (!isGuestAllowedToRead) {
+    return {
+      path: isPermalink ? titleFromPath(page.path) : page.path,
+      restricted: true,
+      updatedAt: page.updatedAt.toISOString(),
     };
   }
 

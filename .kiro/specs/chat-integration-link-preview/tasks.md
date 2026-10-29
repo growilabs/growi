@@ -11,7 +11,7 @@
   - _Requirements: 6.10_
 
 - [ ] 2. GROWI 側の判定に「題名と更新日時だけ」の状態を足す
-- [ ] 2.1 `buildLinkPreview` に、公開範囲が「公開」でログインが必要な GROWI の場合の応答を足す（振る舞いを変えるタスク）
+- [x] 2.1 `buildLinkPreview` に、公開範囲が「公開」でログインが必要な GROWI の場合の応答を足す（振る舞いを変えるタスク）
   - 先に `link-preview-mapper.spec.ts` に design.md「Testing Strategy」の 1〜4 のテストを足し、失敗することを確かめる
   - 既存のテストのうち 2 つを直す（design.md「Testing Strategy」の 7）: 「gives path-only for a GRANT_PUBLIC page in a CLOSED GROWI」を新しい状態のテストに置き換え、「never includes excerpt/updatedAt/commentCount when restricted」の名前を「公開範囲を絞ったページでは含まない」に変える
   - `command-endpoint.spec.ts` に、閉じた GROWI・紐付いた人・公開ページの固定リンクのテストを 1 つ足す（今の `link-preview` のテストはどれも開いた GROWI なので変えない）
