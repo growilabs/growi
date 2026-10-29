@@ -104,6 +104,9 @@ Read `apps/app/prisma/schema.prisma` and check for the collection entry (use low
    - `v  Int    @map("__v")`
 4. **Relations**: verify each relation field uses `onDelete: NoAction, onUpdate: NoAction`.
    Mongoose has no referential integrity enforcement; this is the Mongoose-compatible default.
+   - **Exception — use `onDelete: SetNull` instead** when the referenced model is hard-deleted **through Prisma** (`prisma.<refModel>.delete(` / `.deleteMany(`) while documents of *this* model may still point at it. Prisma emulates referential actions on MongoDB, and under `NoAction` it rejects that delete outright while a referencing document remains — and a rejected `deleteMany` fails as a whole, not per row. `SetNull` lets the delete through and nulls the reference instead (the relation must therefore be optional — see item 5). Deletes via Mongoose or the raw driver bypass the emulation, so they do not trigger this.
+   - `SetNull` is not free: on every such delete, Prisma also issues an `updateMany` on *this* model filtered by the reference field (`where: { <ref>Id: { in: deletedIds } }`) to null it out. Make sure that field is indexed — in the kept Mongoose schema, per Background — or each delete of the referenced model scans this whole collection.
+   - Precedent: `pagebulkexportjobs.attachment` (see the comment on it in `schema.prisma`).
 5. **Relation optionality** — for each relation, decide `Model` (required) vs `Model?` (optional) by investigating the **referenced** model's deletion lifecycle, not by copying the Mongoose field's `required` flag (which is rarely set either way and proves nothing — see Step 1.7):
    - Search for a hard-delete code path that removes documents of the *referenced* model while documents of *this* model may still point at them: `grep` for `<RefModel>.deleteOne(`, `.deleteMany(`, `.findOneAndDelete(`, `.remove(`, `prisma.<refModel>.delete(`, `prisma.<refModel>.deleteMany(`, and any raw MongoDB driver calls (`$runCommandRaw`, `db.collection(...).deleteMany`) that bypass both ORMs.
    - If such a path exists, check whether it **also** cleans up (deletes/nullifies) the referencing documents in the same operation. If cleanup is guaranteed and atomic with the deletion → `required` is safe. If cleanup is skipped, lazy, eventual, or absent (look for comments like `// Leave <Model>s without deleting`) → the relation **must** be `optional`, or every read that `include`s it will throw `Inconsistent query result: Field <x> is required to return data, got null instead.` the first time an orphan is hit.
@@ -414,4 +417,4 @@ Remaining TODOs:
 - **Do NOT** run `prisma db push` or `pnpm prisma generate`
 - **Do NOT** remove the Mongoose schema block (the `new Schema(...)` definition and field declarations)
 - **Do NOT** handle multiple model files in one invocation — one file per `/mongoose-to-prisma` call
-- **Relation default**: always use `onDelete: NoAction, onUpdate: NoAction`
+- **Relation default**: use `onDelete: NoAction, onUpdate: NoAction`, except where Step 2 item 4 calls for `onDelete: SetNull`
