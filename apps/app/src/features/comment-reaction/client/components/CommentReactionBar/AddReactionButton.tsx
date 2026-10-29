@@ -1,6 +1,9 @@
 import type { JSX } from 'react';
 import { useCallback, useRef, useState } from 'react';
-import { EmojiPicker } from '@growi/editor/dist/client/components/EmojiPicker';
+import {
+  EmojiPicker,
+  type EmojiPickerSelection,
+} from '@growi/editor/dist/client/components/EmojiPicker';
 import { useTranslation } from 'next-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
@@ -42,7 +45,7 @@ export const AddReactionButton = ({
   }, []);
 
   const handleSelect = useCallback(
-    (selection: { id: string; skin?: number }) => {
+    (selection: EmojiPickerSelection) => {
       setIsPickerOpen(false);
       const key = fromPickerSelection(selection);
       if (!key.ok) {

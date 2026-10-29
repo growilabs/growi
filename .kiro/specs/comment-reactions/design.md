@@ -467,8 +467,8 @@ declare function normalizeReactionKey(input: string): Result<ReactionKey, Reacti
 declare function parseReactionKey(key: ReactionKey): ParsedReactionKey;
 /** Strips the namespace: 'unicode:+1::skin-tone-3' -> '+1::skin-tone-3'. */
 declare function toSlackReactionName(key: ReactionKey): string;
-/** Converts the emoji-mart onEmojiSelect payload ({ id, skin? }) to a key. skin 1 or absent = no tone. */
-declare function fromPickerSelection(selection: { readonly id: string; readonly skin?: number }): Result<ReactionKey, ReactionKeyError>;
+/** Converts a picker selection to a key, dispatching on `kind` (which decides the key namespace). For native, skin 1 or absent = no tone. An unsupported kind is `malformed`. */
+declare function fromPickerSelection(selection: { readonly kind: 'native'; readonly id: string; readonly skin?: number }): Result<ReactionKey, ReactionKeyError>;
 /** Native glyph for display; null when the emoji data no longer knows the key. */
 declare function resolveReactionGlyph(key: ReactionKey): string | null;
 ```
@@ -844,7 +844,7 @@ type CommentReactionBarProps = {
   - Popover の対象は、人数ボタンへの ref（`ReactionUsersPopover` の `target` は `RefObject<HTMLElement>`）。`useId()` の文字列はコロンを含み、reactstrap がセレクターとして解決できないため使わない（`apps/app/.claude/rules/ui-pitfalls.md`）。
 - ReactionUsersPopover: reactstrap の `Popover`（`trigger="legacy"`。クリック・タップで開き、外側のクリック・タップで閉じる）で、チップの `users` を `createdAt` の昇順のまま並べる。表示名は、`name` があれば `name`、無ければ `username`、ID 文字列ならそのまま（要件 1.10）。人数が多いときは、高さの上限を決めて中をスクロールさせる。
 - AddReactionButton: `canReact` のときだけ描画する（要件 3.1、5.4、5.6、5.7）。チップの数が `MAX_REACTION_KINDS_PER_COMMENT` 以上なら無効化し、ツールチップで上限に達したことを示す。サーバーの 409 を受けた場合は、`useCommentReactions` が同じ文言のトーストを出して一覧を取り直す（要件 7.2）。ピッカーの `onSelect` は `fromPickerSelection` でキーにし、`setReaction(key, true)` を呼ぶ（要件 3.3、3.4）。閉じたら何もしない（要件 3.6）。
-- EmojiPicker（`packages/editor`）: props は `{ isOpen: boolean; onSelect: (selection: { id: string; skin?: number }) => void; onClose: () => void; theme?: 'light' | 'dark' | 'auto' }`。初めて開いたときに `@emoji-mart/react` と `@emoji-mart/data` を動的 import する（ページ表示時の読み込みを増やさない）。`@emoji-mart/data` の既定の export は `sets/15/native.json` で、`@growi/emoji-mart-data` の抽出元（サーバーの検証の根拠）と同じデータなので、ピッカーで選べる絵文字はすべてサーバーの検証を通る。reactstrap の `Modal`（中央寄せ）で表示し、スマートフォンでも使える。`skinTonePosition` を有効にする（要件 3.5）。
+- EmojiPicker（`packages/editor`）: props は `{ isOpen: boolean; onSelect: (selection: EmojiPickerSelection) => void; onClose: () => void; theme?: 'light' | 'dark' | 'auto' }`。`EmojiPickerSelection` は絵文字の種類を `kind` で見分ける判別ユニオンで、いまのメンバーは `{ kind: 'native'; id: string; skin?: number }` だけ。初めて開いたときに `@emoji-mart/react` と `@emoji-mart/data` を動的 import する（ページ表示時の読み込みを増やさない）。読み込みに失敗したときはエラーを `console.error` に記録して `onClose` を呼ぶ。親の開閉の状態が閉に戻るので、次に開いたときに読み込みをやり直せる（「＋」が効かなくなったままにならない）。`@emoji-mart/data` の既定の export は `sets/15/native.json` で、`@growi/emoji-mart-data` の抽出元（サーバーの検証の根拠）と同じデータなので、ピッカーで選べる絵文字はすべてサーバーの検証を通る。reactstrap の `Modal`（中央寄せ）で表示し、スマートフォンでも使える。`skinTonePosition` を有効にする（要件 3.5）。
 - 文言: `comment_reaction.add_reaction`、`comment_reaction.reacted_by`、`comment_reaction.reacted_count`、`comment_reaction.kind_limit_reached`、`comment_reaction.comment_unavailable`、`comment_reaction.update_failed` を5言語に追加する。
 
 ## Data Models
@@ -892,7 +892,8 @@ type CommentReactionBarProps = {
 ## Testing Strategy
 
 ### Unit Tests
-- `reaction-key`: 別名の正規化（`thumbsup` → `unicode:+1`）、肌の色 2〜6 の受け付けと 1・7 の拒否、肌の色に非対応の絵文字への肌の色の拒否、存在しない絵文字、`unicode` 以外の名前空間、`fromPickerSelection`（`skin` 1 または未指定は肌の色なし）、`toSlackReactionName`、`resolveReactionGlyph` が `skins[n-1]` を返すこと（要件 3.3、4.1〜4.6）。
+- `reaction-key`: 別名の正規化（`thumbsup` → `unicode:+1`）、肌の色 2〜6 の受け付けと 1・7 の拒否、肌の色に非対応の絵文字への肌の色の拒否、存在しない絵文字、`unicode` 以外の名前空間、`fromPickerSelection`（`skin` 1 または未指定は肌の色なし。未対応の `kind` は拒否）、`toSlackReactionName`、`resolveReactionGlyph` が `skins[n-1]` を返すこと（要件 3.3、4.1〜4.6）。
+- `EmojiPicker`（`packages/editor`）: 開くまで読み込まないこと、`{ kind: 'native', id, skin? }` を `onSelect` に渡すこと、選ばずに閉じたら `onClose` だけが呼ばれること、読み込みに失敗したらエラーを記録して `onClose` を呼ぶこと（読み込み中に閉じたときは呼ばない）、閉じてもう一度開くと読み込みをやり直すこと（要件 3.2、3.5、3.6）。
 - `summarizeReactions`: 肌の色違いが別のチップになること、チップの並びが残っている行の最小 `createdAt` の昇順であること（最初の人が外したら並びが変わる場合を含む）、`reactedByMe`、レコードの無い利用者が ID 文字列で人数に含まれること、利用者が渡した整形関数の結果（4項目）であること（要件 1.1〜1.6、1.9、1.10、6.4）。
 - `toCommentListItem`: `reactions` に渡したチップ（`[]` と `null` を含む）がそのまま入ること、`toLegacyCommentListItem` の結果に `reactions` のキーが無いこと。
 - `useCommentReactions`: 一覧のキャッシュから該当コメントのチップを読むこと。PUT の成功で該当する1件だけが置き換わり、再取得しないこと。成功でも応答の `reactions` が `null` なら、置き換えずに一覧を取り直し、エラーを出さないこと。失敗（409、404、それ以外）では、取り直しの前にキャッシュが変わらないこと、種類ごとの文言でトーストが出ること、一覧が取り直されること、`setReaction` が reject しないこと。取り直しも失敗したとき、表示が操作前のまま残ること（要件 2.9、2.10、6.5、7.2）。

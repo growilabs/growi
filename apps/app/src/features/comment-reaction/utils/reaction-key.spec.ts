@@ -130,7 +130,9 @@ describe('normalizeReactionKey', () => {
       const tones = emoji.skins.length === 1 ? [undefined] : [1, 2, 3, 4, 5, 6];
       for (const skin of tones) {
         const selection =
-          skin === undefined ? { id: emoji.id } : { id: emoji.id, skin };
+          skin === undefined
+            ? { kind: 'native' as const, id: emoji.id }
+            : { kind: 'native' as const, id: emoji.id, skin };
         const result = fromPickerSelection(selection);
         if (!result.ok) {
           rejected.push(`${emoji.id}/${skin}`);
@@ -202,21 +204,24 @@ describe('parseReactionKey on invalid keys', () => {
 
 describe('fromPickerSelection', () => {
   it.each([undefined, 1])('treats skin %s as no skin tone', (skin) => {
-    expect(fromPickerSelection({ id: '+1', skin })).toEqual({
+    expect(fromPickerSelection({ kind: 'native', id: '+1', skin })).toEqual({
       ok: true,
       value: 'unicode:+1',
     });
   });
 
   it('maps skin 2..6 to the matching skin-tone suffix', () => {
-    expect(fromPickerSelection({ id: '+1', skin: 3 })).toEqual({
+    expect(fromPickerSelection({ kind: 'native', id: '+1', skin: 3 })).toEqual({
       ok: true,
       value: 'unicode:+1::skin-tone-3',
     });
   });
 
   it('rejects an unknown picker id', () => {
-    const result = fromPickerSelection({ id: 'no_such_emoji_xyz' });
+    const result = fromPickerSelection({
+      kind: 'native',
+      id: 'no_such_emoji_xyz',
+    });
     expect(!result.ok && result.error.kind).toBe('unknown-emoji');
   });
 
@@ -226,17 +231,30 @@ describe('fromPickerSelection', () => {
     -1,
     0,
   ])('rejects the non-tone skin number %s as malformed', (skin) => {
-    const result = fromPickerSelection({ id: '+1', skin });
+    const result = fromPickerSelection({ kind: 'native', id: '+1', skin });
     expect(!result.ok && result.error.kind).toBe('malformed');
   });
 
   it('rejects an out-of-range skin number', () => {
-    expect(fromPickerSelection({ id: '+1', skin: 7 }).ok).toBe(false);
+    expect(fromPickerSelection({ kind: 'native', id: '+1', skin: 7 }).ok).toBe(
+      false,
+    );
   });
 
   it('rejects a skin tone on an emoji without skin tones', () => {
-    const result = fromPickerSelection({ id: '100', skin: 2 });
+    const result = fromPickerSelection({ kind: 'native', id: '100', skin: 2 });
     expect(!result.ok && result.error.kind).toBe('skin-tone-not-supported');
+  });
+
+  it('rejects a selection of an unsupported kind as malformed instead of treating it as a unicode key', () => {
+    // Stands in for a kind added to the picker before fromPickerSelection learns it.
+    const selection = { kind: 'custom', id: '+1' } as unknown as Parameters<
+      typeof fromPickerSelection
+    >[0];
+
+    const result = fromPickerSelection(selection);
+
+    expect(!result.ok && result.error.kind).toBe('malformed');
   });
 });
 

@@ -127,12 +127,17 @@ export const parseReactionKey = (key: ReactionKey): ParsedReactionKey => {
 export const toSlackReactionName = (key: ReactionKey): string =>
   key.slice(SUPPORTED_NAMESPACE.length + 1);
 
-/** Converts the emoji-mart onEmojiSelect payload ({ id, skin? }) to a key. skin 1 or absent = no tone. */
-export const fromPickerSelection = (selection: {
+/** Mirrors the picker's selection; `kind` selects the key namespace. */
+type PickerSelection = {
+  readonly kind: 'native';
   readonly id: string;
   readonly skin?: number;
-}): Result<ReactionKey, ReactionKeyError> => {
-  const { id, skin } = selection;
+};
+
+const fromNativeSelection = (
+  id: string,
+  skin: number | undefined,
+): Result<ReactionKey, ReactionKeyError> => {
   if (id.includes(':')) {
     return malformed();
   }
@@ -146,6 +151,21 @@ export const fromPickerSelection = (selection: {
   return normalizeReactionKey(
     `${SUPPORTED_NAMESPACE}:${id}${SKIN_TONE_SEPARATOR}skin-tone-${skinTone}`,
   );
+};
+
+/** Converts a picker selection to a key, dispatching on `kind`. For native, skin 1 or absent = no tone. */
+export const fromPickerSelection = (
+  selection: PickerSelection,
+): Result<ReactionKey, ReactionKeyError> => {
+  switch (selection.kind) {
+    case 'native':
+      return fromNativeSelection(selection.id, selection.skin);
+    default: {
+      // Fails to compile when a kind is added to PickerSelection without a case above.
+      const _unsupported: never = selection.kind;
+      return malformed();
+    }
+  }
 };
 
 /** Native glyph for display; null when the emoji data no longer knows the key. */

@@ -235,9 +235,11 @@
 - **Alternatives Considered**:
   1. apps/app に emoji-mart を依存として足し、apps/app に直接作る
   2. `packages/editor/src/client/components/` に、エディタに依存しない遅延読み込みのピッカーを作る
-- **Selected Approach**: 2。`EmojiPicker` を新設し、`EmojiButton` と同じ遅延 import の方式を使う。肌の色の選択を有効にして、`{ id, skin? }` を返す。
+- **Selected Approach**: 2。`EmojiPicker` を新設し、`EmojiButton` と同じ遅延 import の方式を使う。肌の色の選択を有効にして、`{ kind: 'native', id, skin? }` を返す。
 - **Rationale**: emoji-mart への依存とバージョンを1か所に保てる。既存の `EmojiButton` に手を入れない（エディタの挙動は変えない）。
 - **Trade-offs**: `EmojiButton` との遅延 import の重複が少し残る。
+- **Selection の形**: 選択結果は `kind` で種類を見分ける判別ユニオンにする。`fromPickerSelection` が `kind` で名前空間を決めるので、カスタム絵文字は `kind` の追加と分岐の追加で済み、`id` の文字列の見た目からの推測に頼らない。外から絵文字を渡す props は使う場所がまだ無いので足さない（カスタム絵文字の spec で足す）。
+- **読み込み失敗**: 動的 import が失敗したら `onClose` を呼ぶ。呼ばないと、親の開いた状態が残ったまま `Modal` も描画されず、再読み込みまで「＋」が効かなくなる。
 - **Follow-up**: 将来、`EmojiButton` を `EmojiPicker` の上に作り直すことは別の作業とする。
 
 ### Decision: 監査ログは正規の `addActivity` ＋ emit で、状態が変わったときだけ記録する

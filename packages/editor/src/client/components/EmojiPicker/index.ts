@@ -1,1 +1,5 @@
-export { EmojiPicker, type EmojiPickerProps } from './EmojiPicker.js';
+export {
+  EmojiPicker,
+  type EmojiPickerProps,
+  type EmojiPickerSelection,
+} from './EmojiPicker.js';

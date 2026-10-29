@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 
 import type { EmojiPicker as EmojiPickerComponent } from './EmojiPicker.js';
 
@@ -64,24 +70,31 @@ describe('EmojiPicker', () => {
     expect(loadCounter).toEqual({ picker: 1, data: 1 });
   });
 
-  it('passes the emoji id and skin tone number to onSelect', async () => {
+  it('passes a native selection with the emoji id and skin tone number to onSelect', async () => {
     const onSelect = vi.fn();
     render(<EmojiPicker isOpen onSelect={onSelect} onClose={vi.fn()} />);
 
     fireEvent.click(await screen.findByText('pick-with-skin'));
 
     expect(onSelect).toHaveBeenCalledTimes(1);
-    expect(onSelect).toHaveBeenCalledWith({ id: 'thumbsup', skin: 3 });
+    expect(onSelect).toHaveBeenCalledWith({
+      kind: 'native',
+      id: 'thumbsup',
+      skin: 3,
+    });
   });
 
-  it('passes only the id when the emoji has no skin tone', async () => {
+  it('passes a native selection with only the id when the emoji has no skin tone', async () => {
     const onSelect = vi.fn();
     render(<EmojiPicker isOpen onSelect={onSelect} onClose={vi.fn()} />);
 
     fireEvent.click(await screen.findByText('pick-without-skin'));
 
     expect(onSelect).toHaveBeenCalledTimes(1);
-    expect(onSelect.mock.calls[0][0]).toMatchObject({ id: 'smile' });
+    expect(onSelect.mock.calls[0][0]).toMatchObject({
+      kind: 'native',
+      id: 'smile',
+    });
     expect(onSelect.mock.calls[0][0].skin).toBeUndefined();
   });
 
@@ -97,5 +110,89 @@ describe('EmojiPicker', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  describe('when loading the picker fails', () => {
+    let failLoading: boolean;
+
+    beforeEach(async () => {
+      failLoading = true;
+      vi.resetModules();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.doMock('@emoji-mart/react', () => {
+        if (failLoading) {
+          throw new Error('chunk load failed');
+        }
+        return { default: () => <div data-testid="fake-picker" /> };
+      });
+      vi.doMock('@emoji-mart/data', () => ({ default: { emojis: {} } }));
+      ({ EmojiPicker } = await import('./EmojiPicker.js'));
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('calls onClose so the parent can reset its open state', async () => {
+      const onClose = vi.fn();
+      render(<EmojiPicker isOpen onSelect={vi.fn()} onClose={onClose} />);
+
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(screen.queryByTestId('fake-picker')).toBeNull();
+    });
+
+    it('records the error instead of swallowing it', async () => {
+      const onClose = vi.fn();
+      render(<EmojiPicker isOpen onSelect={vi.fn()} onClose={onClose} />);
+
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      // biome-ignore lint/suspicious/noConsole: asserting the error is recorded
+      expect(console.error).toHaveBeenCalled();
+    });
+
+    it('retries loading when reopened after a failure', async () => {
+      const onClose = vi.fn();
+      const { rerender } = render(
+        <EmojiPicker isOpen onSelect={vi.fn()} onClose={onClose} />,
+      );
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+
+      rerender(
+        <EmojiPicker isOpen={false} onSelect={vi.fn()} onClose={onClose} />,
+      );
+      failLoading = false;
+      rerender(<EmojiPicker isOpen onSelect={vi.fn()} onClose={onClose} />);
+
+      expect(await screen.findByTestId('fake-picker')).toBeTruthy();
+    });
+
+    it('neither calls onClose nor records an error when closed before the load fails', async () => {
+      let rejectLoad: (reason: Error) => void = () => {};
+      const gate = new Promise<never>((_, reject) => {
+        rejectLoad = reject;
+      });
+      vi.resetModules();
+      vi.doMock('@emoji-mart/react', async () => {
+        await gate;
+        return { default: () => null };
+      });
+      ({ EmojiPicker } = await import('./EmojiPicker.js'));
+
+      const onClose = vi.fn();
+      const { rerender } = render(
+        <EmojiPicker isOpen onSelect={vi.fn()} onClose={onClose} />,
+      );
+      rerender(
+        <EmojiPicker isOpen={false} onSelect={vi.fn()} onClose={onClose} />,
+      );
+      rejectLoad(new Error('chunk load failed'));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+
+      expect(onClose).not.toHaveBeenCalled();
+      // biome-ignore lint/suspicious/noConsole: asserting no error is recorded
+      expect(console.error).not.toHaveBeenCalled();
+    });
   });
 });

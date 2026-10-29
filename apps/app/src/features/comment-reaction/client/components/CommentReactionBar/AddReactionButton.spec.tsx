@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import type { EmojiPickerSelection } from '@growi/editor/dist/client/components/EmojiPicker';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -16,7 +17,7 @@ vi.mock('./CommentReactionBar.module.scss', () => ({ default: {} }));
 
 type MockPickerProps = {
   isOpen: boolean;
-  onSelect: (selection: { id: string; skin?: number }) => void;
+  onSelect: (selection: EmojiPickerSelection) => void;
   onClose: () => void;
 };
 
@@ -25,13 +26,22 @@ vi.mock('@growi/editor/dist/client/components/EmojiPicker', () => ({
   EmojiPicker: ({ isOpen, onSelect, onClose }: MockPickerProps) =>
     isOpen ? (
       <div role="dialog">
-        <button type="button" onClick={() => onSelect({ id: '+1' })}>
+        <button
+          type="button"
+          onClick={() => onSelect({ kind: 'native', id: '+1' })}
+        >
           pick-thumbs-up
         </button>
-        <button type="button" onClick={() => onSelect({ id: '+1', skin: 3 })}>
+        <button
+          type="button"
+          onClick={() => onSelect({ kind: 'native', id: '+1', skin: 3 })}
+        >
           pick-thumbs-up-tone-3
         </button>
-        <button type="button" onClick={() => onSelect({ id: 'no-such-emoji' })}>
+        <button
+          type="button"
+          onClick={() => onSelect({ kind: 'native', id: 'no-such-emoji' })}
+        >
           pick-unknown
         </button>
         <button type="button" onClick={onClose}>

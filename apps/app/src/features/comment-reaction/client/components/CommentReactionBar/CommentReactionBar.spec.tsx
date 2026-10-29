@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import type { EmojiPickerSelection } from '@growi/editor/dist/client/components/EmojiPicker';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -38,14 +39,20 @@ vi.mock('@growi/editor/dist/client/components/EmojiPicker', () => ({
     onSelect,
   }: {
     isOpen: boolean;
-    onSelect: (selection: { id: string; skin?: number }) => void;
+    onSelect: (selection: EmojiPickerSelection) => void;
   }) =>
     isOpen ? (
       <div role="dialog">
-        <button type="button" onClick={() => onSelect({ id: '+1' })}>
+        <button
+          type="button"
+          onClick={() => onSelect({ kind: 'native', id: '+1' })}
+        >
           pick-thumbs-up
         </button>
-        <button type="button" onClick={() => onSelect({ id: '+1', skin: 3 })}>
+        <button
+          type="button"
+          onClick={() => onSelect({ kind: 'native', id: '+1', skin: 3 })}
+        >
           pick-thumbs-up-tone-3
         </button>
       </div>
