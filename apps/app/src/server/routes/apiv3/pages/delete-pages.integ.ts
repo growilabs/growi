@@ -2,10 +2,8 @@
  * Integration test — POST /pages/delete must not soft delete a page whose
  * revisionId is no longer the latest.
  *
- * The route filters the selected pages through `page.isUpdatable(revisionId)`, which
- * is async: before the fix this test ships with, the bare call returned a truthy
- * Promise and every page passed the filter, so the conflict was ignored and the page
- * was deleted anyway.
+ * The route filters the selected pages through `page.isUpdatable(revisionId)`, so a
+ * page updated since the given revision must be left in place.
  *
  * The route also filters them through the deletion authority
  * (`pageService.filterPagesByCanDelete`), so a page the requester is not allowed to
@@ -381,10 +379,8 @@ describe('POST /delete', () => {
 
   it('does not crash when isAnyoneWithTheLink is set and the page cannot be found', async () => {
     // `pageIds.length !== 1` is rejected earlier when isAnyoneWithTheLink is
-    // set, so the viewer-filtered lookup below always resolves for a single
-    // id. Before the fix, a nonexistent (or unreadable) pageId left
-    // `pagesToDelete` empty and `pagesToDelete[0].grant` threw instead of
-    // answering cleanly.
+    // set, so the viewer-filtered lookup below resolves for a single id, and a
+    // nonexistent (or unreadable) pageId leaves `pagesToDelete` empty.
     const missingPageId = new Types.ObjectId();
 
     const response = await request(app)
@@ -398,9 +394,8 @@ describe('POST /delete', () => {
       });
 
     // The same uniform 404 as an unreadable page, so the response does not
-    // reveal whether the page exists. Assert the code too: a naive
-    // `pagesToDelete[0]?.grant` rewrite of the fix would answer through the
-    // sibling "grant of the retrieved page is not restricted" branch instead.
+    // reveal whether the page exists. The code tells this answer apart from the
+    // sibling "grant of the retrieved page is not restricted" error.
     expect(response.status).toBe(404);
     expect(response.body.errors).toEqual([
       expect.objectContaining({ code: 'notfound_or_forbidden' }),
