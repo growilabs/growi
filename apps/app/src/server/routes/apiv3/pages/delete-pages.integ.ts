@@ -9,10 +9,9 @@
  * (`pageService.filterPagesByCanDelete`), so a page the requester is not allowed to
  * delete must be left in place as well.
  *
- * Only the filtered-out cases are covered here. They are the cases the filters exist
- * for, and they are answered before `deleteMultiplePages` — which the route fires without
- * awaiting — is reached, so the test needs no background work to settle. The
- * successful deletion of a page is covered by service/page/v5.public-page.integ.ts.
+ * The route fires `deleteMultiplePages` without awaiting it, so a case that deletes
+ * pages waits for that background work to settle before asserting and cleaning up.
+ * A refused case is answered before `deleteMultiplePages` is reached.
  *
  * The fixture and cleanup conventions are the ones documented at the top of
  * rename.integ.ts: `app:isV5Compatible` is pinned and restored, pages are built

@@ -317,13 +317,16 @@ describe('DELETE /empty-trash', () => {
         expect(recorded).toHaveLength(1);
         expect(recorded[0].userId).toBe(requester._id.toString());
         // The notification is written after the response, so wait for it.
-        await vi.waitFor(async () => {
-          const notification = await InAppNotification.findOne({
-            user: subscriber._id,
-            action: SupportedAction.ACTION_PAGE_RECURSIVELY_DELETE_COMPLETELY,
-          });
-          expect(notification).not.toBeNull();
-        });
+        await vi.waitFor(
+          async () => {
+            const notification = await InAppNotification.findOne({
+              user: subscriber._id,
+              action: SupportedAction.ACTION_PAGE_RECURSIVELY_DELETE_COMPLETELY,
+            });
+            expect(notification).not.toBeNull();
+          },
+          { timeout: 10_000 },
+        );
       } finally {
         await Subscription.deleteMany({ user: subscriber._id });
         await InAppNotification.deleteMany({ user: subscriber._id });

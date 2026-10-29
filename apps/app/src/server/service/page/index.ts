@@ -2764,17 +2764,23 @@ class PageService implements IPageService {
     const activity =
       await this.crowi.activityService.createActivity(parameters);
 
-    const builder = new Page.PageQueryBuilder(Page.find(), true)
-      .addConditionAsRootOrNotOnTree()
-      .addConditionToListOnlyDescendants(trashPage.path)
-      .addConditionToListByPageIdsArray(pageIdsToDelete);
-    await Page.addConditionToFilteringByViewerToEdit(builder, user);
-    const pages = await builder.query.lean().exec();
-
+    // Look each batch up right before deleting it, so a page restored from
+    // the trash meanwhile is no longer matched.
     const subscribedUsers = new Set<Ref<IUser>>();
-    for (let i = 0; i < pages.length; i += BULK_REINDEX_SIZE) {
-      const batch = pages.slice(i, i + BULK_REINDEX_SIZE);
+    let nDeletedNonEmptyPages = 0;
+    for (let i = 0; i < pageIdsToDelete.length; i += BULK_REINDEX_SIZE) {
+      const builder = new Page.PageQueryBuilder(Page.find(), true)
+        .addConditionAsRootOrNotOnTree()
+        .addConditionToListOnlyDescendants(trashPage.path)
+        .addConditionToListByPageIdsArray(
+          pageIdsToDelete.slice(i, i + BULK_REINDEX_SIZE),
+        );
+      await Page.addConditionToFilteringByViewerToEdit(builder, user);
+      const batch = await builder.query.lean().exec();
+      if (batch.length === 0) continue;
+
       await this.deleteMultipleCompletely(batch, user);
+      nDeletedNonEmptyPages += batch.filter((p) => !p.isEmpty).length;
       for (const subscribedUser of await Subscription.getSubscriptions(batch)) {
         subscribedUsers.add(subscribedUser);
       }
@@ -2786,7 +2792,7 @@ class PageService implements IPageService {
 
     this.activityEvent.emit('updated', activity, trashPage, preNotify);
 
-    return pages.filter((p) => !p.isEmpty).length;
+    return nDeletedNonEmptyPages;
   }
 
   /**

@@ -268,8 +268,8 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
       );
 
       // Assert: read the cascade activities back from the real DB. The
-      // stream's write handler swallows batch errors, so a failed record
-      // surfaces only as a missing row — poll via vi.waitFor. Rows are
+      // recorder swallows persistence errors, so a failed record surfaces
+      // only as a missing row — poll via vi.waitFor. Rows are
       // pinned by target (this suite's attachment ids), which keeps the
       // count exact even if this worker's DB held other leftover trash.
       const cascadeActivities = await vi.waitFor(
