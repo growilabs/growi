@@ -38,6 +38,7 @@ GROWI 内のイベントを通知として送り、チャットの利用者を G
 - **`content/`** — GROWI が送り出す中身の組み立てと、公開範囲による絞り込み（要件 2.1–2.3, 3.6, 3.7, 3.9, 5.2, 5.3, 6.2, 6.3, 6.9–6.12, 14.2）
 - **`ProxyClient`** — GROWI から proxy へ送る唯一の口
 - `NotificationOutbox` と `NotificationDispatcher` — Gen 2 の宛先への通知（要件 2, 12.3）
+- `IntegrationPresence` と 2 つの定期処理（通知の送信、解除済みの連携の掃除）— 連携が無い GROWI で問い合わせを飛ばすことと、掃除の頻度（要件 2.7–2.9, 9.8）
 - `DestinationRegistry` — 宛先の集合（Gen 1 / Gen 2 を種類で分岐しない。要件 12.2）
 - `ChatAccountLink` — チャット利用者と GROWI ユーザーの紐付け（要件 7）
 - `KeyStore`（GROWI 側の実装）— 自分の鍵と proxy の公開鍵（要件 9.5, 10.5）
@@ -66,6 +67,9 @@ GROWI 内のイベントを通知として送り、チャットの利用者を G
 - `@growi/chat` の `CommandResponse`（`link-preview` kind）に「見つからない」を独立に表現するフィールド（例: `notFound: boolean`）が将来追加された場合、`buildLinkPreview` が固定文言を `path` に入れて表現している今のやり方は不要になるため見直すこと（下記「LinkPreviewMapper」参照）
 - `resolvePageFromUrl` の固定リンク判定（`PAGE_ID_PATTERN`。末尾セグメントが24桁16進文字列かどうかで判定している）の意味が変わった場合（例: 別の識別子形式を追加する）、`LinkPreviewMapper` 側のロジックも合わせて確認すること
 - GROWI のページの階層と公開範囲の決まり（子のページを親より広く公開できない、という正規化）や、「公開」の意味が変わったとき、`buildLinkPreview` が公開範囲が「公開」のページについてログインが必要な GROWI でも出す題名と更新日時が、何を漏らしうるかを見直すこと。固定リンクでパス全体を出すように変える提案が出たときは、research.md の「固定リンクで出すのは、パス全体ではなく題名だけ」（祖先の名前が漏れうる）を先に読むこと
+- outbox の行を書く場所が `notificationOutbox.enqueue` のほかに増えたとき。その場所でも `IntegrationPresence.markPresent` を呼ばないと、書き留めたプロセスが覚えた「無い」のせいで送信を飛ばし、要件 2.8 が崩れる（下記「連携が無い GROWI では問い合わせない」）
+- proxy へ通知を送る経路が `drain` のほかに増え、その経路が outbox の行を通らないとき。連携があるかの判定が、その経路で送るものを見落としうる
+- `chat_relations` の行を、解除のときに残さず消すように変えたとき。連携があるかの判定は解除済みの行も数えることで掃除の対象を見つけているので、判定と掃除の両方を見直す
 
 ### proxy にまたがる制約 — 「黙って何も投稿しない」判定を復活させない
 
@@ -131,7 +135,9 @@ apps/app/src/features/chat-integration/
 │   ├── notification/
 │   │   ├── notification-outbox.ts     # ★ 送るべき通知を書き留める
 │   │   ├── notification-dispatcher.ts # ★ 書き留めた分を proxy へ送り、結果を書き戻す
+│   │   ├── notification-dispatch-cron.ts # 1 分ごとに、連携があれば drain を呼ぶ（要件 2.7・2.9）
 │   │   └── destination-registry.ts    # 宛先の集合（Gen 1 / Gen 2 を種類で分岐しない）
+│   ├── integration-presence.ts        # 「連携があるか」の判定と、答えを覚える 10 分（要件 2.7–2.9）
 │   ├── account-link/
 │   │   ├── account-link-service.ts    # 紐付けの開始・承認・解除
 │   │   └── models/chat-account-link.ts
@@ -142,6 +148,8 @@ apps/app/src/features/chat-integration/
 │   ├── proxy-client.ts                # GROWI → proxy の唯一の口（署名を付ける）
 │   ├── pairing/
 │   │   ├── pairing-endpoint.ts        # 保留中の登録コードと突き合わせて確認に答える
+│   │   ├── sweep-unpaired-relations.ts # 保持期間を過ぎた解除済みの連携と、その紐付けを消す
+│   │   ├── unpaired-relation-sweep-cron.ts # 1 日 1 回、ランダムに待ってから掃除を呼ぶ（要件 9.8）
 │   │   └── models/pending-pairing.ts
 │   ├── oauth-install-state/           # OAuth 導入 URL の state 発行・照合（task 9.0）
 │   │   ├── oauth-install-state-service.ts
@@ -171,6 +179,7 @@ apps/app/src/features/chat-integration/
 | `apps/app/turbo.json` | **`@growi/chat#build` への依存を宣言する。** 同じリポジトリ内の build を作る依存が増えたら書き足す決まりである（`.claude/rules/project-structure.md`）。書かないと build の順序が狂い `dist/` が無い状態で型エラーになる |
 | `server/crowi/express-init.js` | **`bodyParser.json` より前に** `/peer/` だけ `express.raw` を通し、**`mongoSanitize` を `/peer/` の下から外す**（上記 2 節） |
 | `server/routes/avoid-session-routes.js` | `/peer/` を足して session を張らせない（上記） |
+| `server/crowi/index.ts` | `setupCron` で、通知の定期処理と、その直後に解除済みの連携の掃除の定期処理を起動する（すべての定期処理を起動する 1 か所） |
 | `pages/admin/*.page.tsx`（新規） | 管理画面は feature の外に薄い受け皿が要る（Next.js の Pages Router の決まり） |
 | `components/Admin/Common/AdminNavigation.tsx` | **手作業の追記が 3 か所**（`MenuLabel` の分岐、一覧、スマートフォン用の一覧）。データ駆動になっていないので漏れやすい |
 
@@ -190,8 +199,11 @@ apps/app/src/features/chat-integration/
 | `PublicPageFilter` | `server/content/public-page-filter.ts` | **相手によらない判定** — 誰でも見られるページか | 2.3, 6.3, 6.9, 6.12 |
 | `CommandEndpoint` | `server/command/command-endpoint.ts` | proxy からのコマンドを処理 | 3.6, 3.7, 4.2–4.6, 5.2, 5.3, 6.2, 6.3, 6.6–6.12, 14.2 |
 | `ResolveActor` | `server/command/resolve-actor.ts` | actor → GROWI ユーザー | 3.6, 3.7, 4.3, 4.4, 7.6 |
-| `NotificationOutbox` | `server/notification/notification-outbox.ts` | 送るべき通知を書き留める | 2.1–2.3, 2.5, 2.6 |
+| `NotificationOutbox` | `server/notification/notification-outbox.ts` | 送るべき通知を書き留め、自分のプロセスに「連携がある」の印を付ける | 2.1–2.3, 2.5, 2.6, 2.8 |
 | `NotificationDispatcher` | `server/notification/notification-dispatcher.ts` | 送って結果を書き戻す | 2.4, 10.4, 10.7 |
+| `IntegrationPresence` | `server/integration-presence.ts` | この GROWI に連携があるかを答え、その答えを 10 分覚える | 2.7, 2.8, 2.9 |
+| `ChatNotificationDispatchCronService` | `server/notification/notification-dispatch-cron.ts` | 1 分ごとに、連携があれば `drain` を呼ぶ | 2.7, 2.9 |
+| `UnpairedRelationSweepCronService` | `server/pairing/unpaired-relation-sweep-cron.ts` | 1 日 1 回、ランダムに待ってから、連携があれば保持期間を過ぎた解除済みの連携を消す | 2.7, 9.8 |
 | `ChatAccountLink` | `server/account-link/` | 紐付け | 7.1–7.7 |
 | `KeyStore` | `server/keys/key-store.ts` | 鍵の保持と入れ替え | 9.5, 10.5, 10.6 |
 | `SignatureGuard` | `server/signature-guard.ts` | 届くリクエストの検証 | 10.1–10.4 |
@@ -588,7 +600,11 @@ export interface NotificationDispatcher {
 - **誰が回すか。** GROWI には `state` の列を持つコレクションを定期的に回す形が既に 3 つある
   （`page-bulk-export` / `audit-log-bulk-export` / `growi-vault`。いずれも `server/service/cron.ts` の
   `CronService` を継承し、後者には `resilience/retry-policy.ts` もある）。**4 つ目を新しく起こさず
-  `CronService` を継承する**（既定 1 分間隔）。やり直しの間隔は `growi-vault` の retry-policy に倣う
+  `CronService` を継承する**（`ChatNotificationDispatchCronService`、既定 1 分間隔）。
+  `crowi/index.ts` の `setupCron` から、すべてのプロセスで起動する。各回の最初に、この GROWI に
+  チャット連携があるかを確かめ、無ければ `drain` を呼ばずに戻る（下記「連携が無い GROWI では問い合わせない」）。
+  解除済みの連携の掃除はこの定期処理では行わない（別の定期処理。下記「紐付けの一意性に workspace の軸が要る」）。
+  やり直しの間隔は `growi-vault` の retry-policy に倣う
 - **`requestId` は行を作るときに 1 度だけ採番し、再送しても変えない**（要件 10.4）
 - **やり直しは宛先ごと。** proxy は `(relationId, requestId, platform, channelId)` の単位で記録するので、
   `posted` になった宛先は飛ばされ、失敗した宛先だけが再び試される。
@@ -631,6 +647,58 @@ export interface NotificationDispatcher {
   `generatePathsToMatch`（外へ出していない関数）で `/a/b/c → /a/b/c, /a/b/*, /a/*, /*` を作っている。
   **この関数を外へ出して共有する。振る舞いは変えない** — 置き場所を変えるだけなので、
   「Gen 1 には手を入れない」（上記）との線引きは保たれる
+
+#### 連携が無い GROWI では問い合わせない（要件 2.7〜2.9）
+
+通知の定期処理は、チャット連携を使っているかに関係なく、すべてのプロセスで 1 分ごとに動く。
+GROWI.cloud のように多くの GROWI が 1 つのデータベースを共有する環境では、使っていない GROWI の問い合わせも
+テナントの数に比例してかかり続ける。そこで各回の最初に `IntegrationPresence`（`server/integration-presence.ts`）へ
+「この GROWI に連携があるか」を尋ね、無ければ何もしない。
+
+```typescript
+/** How long a presence answer, either way, is trusted before asking again. */
+export const PRESENCE_ANSWER_TTL_MS = 10 * 60 * 1000;
+
+export interface IntegrationPresence {
+  /** True when at least one `chat_relations` row exists, in any state. */
+  hasAnyIntegration(now: Date): Promise<boolean>;
+  /** Record that this process just wrote an outbox row. Never queries. */
+  markPresent(now: Date): void;
+}
+```
+
+- **判定は `ChatRelation.exists({})`。状態で絞らない。** 解除済みで保持期間中の行も数える。
+  解除済みの行は掃除の対象なので、数えないと掃除が飛ばされる
+- **答えは「ある」も「無い」も、決めた時刻から 10 分覚える。** 覚えている間は問い合わせない。
+  「ある」も期限で切るのは、最後の連携が掃除で消えた後に、問い合わせを飛ばす状態へ戻るため
+- **`notificationOutbox.enqueue` は、行の書き込みに成功した直後に `markPresent` を呼ぶ。**
+  問い合わせはせず、そのプロセスの答えを「ある」にする。書き込みが失敗したら印を付けない。
+  これで、通知を書き留めたプロセスは、覚えた「無い」が残っていても次の回で送る（要件 2.8）。
+  問い合わせをしないので、ページ保存の時間は変わらない（要件 2.5）
+- **書き留めたプロセスが送る前に止まったとき**は、ほかのプロセスが、覚えた答えの期限が切れた後の
+  最初の回で問い合わせ、「ある」を得て送る（要件 2.9）。答えを決めた回の起動の遅れを δ0、k 分後の回の遅れを δk とすると、
+  答えが切れるのは `k × 60 秒 + δk − δ0 ≥ 600 秒` のときなので k = 10 か 11。
+  行はその答えを決めた後に書かれるので、書いてから送るまでは最大およそ 11 分
+- **問い合わせが失敗したら「ある」を返し、答えは覚えない**（警告をログに残す）。
+  判定の失敗で通知を止めるより、問い合わせが 1 回増えるほうがよい。次の回でもう一度問い合わせる
+- **期限切れの答えを同時に見た呼び出しは、問い合わせ中の 1 つの Promise を共有する。**
+  2 つの定期処理が同時に尋ねても問い合わせは 1 回で、「10 分に 1 回以下」（要件 2.7）を守る
+- **問い合わせ中に付いた `markPresent` の印は残す。** 問い合わせの結果は、印より古い時刻で決めた答えなら上書きしない
+- 時刻は呼ぶ側が `now` で渡し、この部品は時計を持たない。定期処理は差し替え口 `clock` から時刻を取る
+- 状態はプロセスの中だけに持ち（`{ present, decidedAt }` を丸ごと置き換える）、再起動で空に戻る。
+  GROWI の 1 プロセスは 1 つのデータベースにだけ接続するので、プロセスの答えがそのテナントの答えになる。
+  `integrationPresence` はプロセスに 1 つで、2 つの定期処理（通知と掃除）と `enqueue` が共有する
+
+#### 書き込んだ直後に送る経路のための余地
+
+今は定期処理が唯一の送り手で、ふつうの通知の最初の送信も担っている。そのため間隔は 1 分のままにしている
+（延ばすと、保存から届くまでが延び、1 分あたりに送れる行も減る。research.md「通知の定期処理の間隔は、直後に送る経路と一緒に延ばす」）。
+通知を書き留めた直後に送る経路は、[chat-integration-agent](../chat-integration-agent/brief.md) が
+「答えをあとから送る口」と同じ経路で作り、そのときに定期処理の間隔も延ばす。この設計は次の 3 点で、その経路を邪魔しない。
+
+1. `drain(now)` は、誰から何度呼ばれても安全（行ごとの条件つき更新）。「定期処理だけが呼ぶ」という前提をコードにも文書にも置かない
+2. 「送るべきものができた」ことを知る場所は `enqueue` の 1 か所だけ。直後に送る処理はここに足せる
+3. 連携があるかの判定は定期処理の中だけで使い、`drain` の中には入れない。直後に送る経路は、行を書いたばかりなので判定が要らない
 
 ---
 
@@ -987,7 +1055,11 @@ protocol spec が「`keyId` を単独で鍵にすると別の関係のものを�
 > **引き継ぎ元が複数あるときは、いちばん新しい解除済みの行から引き継ぐ。**
 > 移す途中で `(relationId, platform, accountId)` がぶつかったら**新しいほうを残す**。
 > **解除済みの `chat_relations` の行そのものも 45 日で消す**（`chat_account_links` と揃える）。
-> 45 日の掃除は `NotificationDispatcher` と同じく**条件つき更新で 1 台だけ**が回す。
+> 45 日の掃除は、通知とは別の定期処理（`UnpairedRelationSweepCronService`）が**1 日 1 回**回す（要件 9.8）。
+> 毎日 2 時（`'0 2 * * *'`）にすべてのプロセスで動き、多くの GROWI が同じ瞬間にデータベースへ問い合わせないよう、
+> 最初に最大 60 分ランダムに待つ。待った後に連携があるかを確かめ（上記「連携が無い GROWI では問い合わせない」）、
+> あるときだけ掃除する。掃除は紐付けを先に消し、関係の行は選んだときと同じ条件で消すので、
+> 複数のプロセスが同じ日に回しても同じ結果に落ち着く。保持期間が過ぎてから消えるまでは最大 1 日と 1 時間。
 > 管理画面の解除済みのカードには、消える日（解除した日 + 45 日）を表示する。いつまで残るのかが画面から分かるようにするためである。
 >
 > **`chat_account_links` を消すのは 2 つの場合だけ** — 利用者が解除したとき（要件 7.5）と、
@@ -1061,6 +1133,25 @@ proxy 側の「`runtime/config.ts` が環境変数から読む」も proxy の�
 10. **書き込みが監査ログに残ること** — `create-page` と `keep` の後に `Activity` が 1 件でき、
     操作した人とチャンネルが残ること（要件 7 の目的文）
 
+時間の経過に関わる 11〜16 は、時刻を引数や差し替え口（`now`、`clock`、`sleep`）で渡して確かめる。実時間の待ちも、vitest の偽のタイマーも使わない（`randomSleep` は差し替え口 `sleep` で置き換える）。
+
+11. `IntegrationPresence` — 覚えた答えを 10 分信じ、ちょうど 10 分で 1 回だけ問い合わせ直すこと。「ある」も 10 分で切れ、
+    切れた後に問い合わせが「無い」を返せば偽になること（2.7）
+12. `IntegrationPresence` — `markPresent` の後は、覚えた「無い」が残っていても問い合わせずに真を返し、その答えを印を付けた時刻から数えること。
+    問い合わせ中に付けた印が、その問い合わせの結果で上書きされないこと（2.8）
+13. `IntegrationPresence` — 問い合わせが失敗したら（同期の例外を含む）真を返し、次の呼び出しでもう一度問い合わせること。
+    期限切れのときの同時の呼び出しが 1 回の問い合わせを共有し、それが終わって答えが切れた後は改めて問い合わせること（2.7）
+14. `ChatNotificationDispatchCronService` — 1 分ごと（`'* * * * *'`）に動き、判定が偽なら `drain` を呼ばず、
+    真なら（判定の失敗で真になったときも）`clock()` の時刻で 1 回呼ぶこと。`drain` が失敗しても job が失敗しないこと。
+    掃除を受け取らず呼ばないこと（差し替え口に `sweep` が無いことを型で確かめ、実際の `sweepUnpairedRelations` が呼ばれないこと）（2.7・9.8）
+15. 要件 2.9 の上限 — 実際の `IntegrationPresence` と 1 分刻みの時刻を使い、ほかのプロセスが「無い」を覚えた回から数えて、
+    最初に `drain` を呼ぶのが 10 分後の回であること。答えを決めた回の起動が遅れた場合は 11 分後の回であること（2.9）
+16. `UnpairedRelationSweepCronService` — 1 日 1 回（`'0 2 * * *'`）動き、最初に `sleep` を 60 分の上限で呼び、
+    待った後に判定し、真なら `clock()` の時刻で掃除を 1 回呼ぶこと。偽なら呼ばないこと。掃除が失敗しても job が失敗しないこと（9.8・2.7）
+17. `createNotificationOutbox` — 行を書いたら、書いた時刻で `markPresent` を 1 回呼ぶこと。書き込みが失敗したら呼ばないこと（2.8）
+18. 起動の配線 — `crowi/index.ts` のソースを読み、通知の定期処理と、その直後に掃除の定期処理を `startCron()` で起動していること。
+    名前の変更や行の削除で定期処理が黙って止まるのを防ぐ
+
 ### Integration Tests
 
 1. **未紐付けの利用者の検索が、誰でも閲覧できるページだけを返すこと**（3.7）。
@@ -1071,3 +1162,4 @@ proxy 側の「`runtime/config.ts` が環境変数から読む」も proxy の�
    やり直しの上限を超えたら運用者が確認できる形で残ること（2.4）
 4. Gen 1 との併存 — Gen 2 を設定しても Gen 1 の通知先と設定が変わらないこと（12.2・12.3）
 5. 署名の検証に失敗したリクエストが処理されず、記録が残ること。**その際 nonce の表が増えないこと**（10.2）
+6. `IntegrationPresence` の既定の問い合わせ — `chat_relations` が空なら偽、`state: 'unpaired'` の行 1 つだけでも真、`active` の行で真（2.7。解除済みを数えないと掃除が飛ばされる）

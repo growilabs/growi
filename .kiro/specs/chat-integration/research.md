@@ -492,6 +492,16 @@ createSlackAdapter({
 - **Follow-up**: 理由の詳細、`GRANT_RESTRICTED` を「公開」に含めない理由、固定リンクで題名だけを出す理由、採らなかった案は
   [chat-integration-app の research.md](../chat-integration-app/research.md)。投稿者に「全員に見せるか」を尋ねる確認フローは roadmap の順 10 で扱う
 
+### 決定 16: チャット連携が無い GROWI では通知の定期処理の問い合わせを飛ばし、解除済みの連携の掃除は 1 日 1 回にする
+
+- **Context**: 通知の定期処理は、チャット連携を使っているかに関係なく、すべてのプロセスで 1 分ごとに 2 回（送信待ちの行と、掃除の対象を探す）データベースへ問い合わせていた。
+  GROWI.cloud のように多くの GROWI が 1 つのデータベースを共有する環境では、使っていない GROWI の分もテナントの数に比例してかかり続ける
+- **Selected Approach**: 「連携があるか」（`chat_relations` に状態を問わず行が 1 つでもあるか）をプロセスの中に 10 分覚え、無ければ問い合わせない。
+  通知を書き留めたプロセスは自分の答えを「ある」にして、次の回で送る。解除済みの連携の掃除は別の定期処理にし、1 日 1 回、ランダムに待ってから行う（要件 2.7〜2.9・9.8）
+- **Rationale**: 覚える時間を長くするほど問い合わせは減るが、書き留めたプロセスが止まったときに、ほかのプロセスが送り始めるまでの時間（要件 2.9）が延びる。10 分なら問い合わせはおよそ 20 分の 1 になり、その時間はおよそ 11 分に収まる
+- **Follow-up**: 通知の定期処理の間隔は 1 分のまま。間隔を延ばすのは、書き込んだ直後に送る経路と一緒に `chat-integration-agent` で行い、要件 2.10・2.11 はそのために空けてある。
+  理由の詳細と採らなかった案は [chat-integration-app の research.md](../chat-integration-app/research.md)、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)「通知を 2 段に分ける」
+
 ## Risks & Mitigations
 
 | リスク | 緩和 |
