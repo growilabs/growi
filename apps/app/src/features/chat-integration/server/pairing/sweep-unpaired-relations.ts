@@ -12,12 +12,11 @@
 // left orphaned with no relation to identify them by. The two have to go in
 // one pass, which means application code.
 //
-// Runs on the same tick, and with the same "only one instance actually does
-// the work" property, as `NotificationDispatcher.drain` (design.md "45 日の
-// 掃除は `NotificationDispatcher` と同じく条件つき更新で 1 台だけが回す"): the
-// links are removed first and the relation row is then deleted under the very
-// condition that selected it, so two instances sweeping at once converge on
-// the same end state and neither can leave an orphan behind.
+// Run once a day by `UnpairedRelationSweepCronService` on every instance.
+// The links are removed first and the relation row
+// is then deleted under the very condition that selected it, so two instances
+// sweeping at once converge on the same end state and neither can leave an
+// orphan behind.
 
 import loggerFactory from '~/utils/logger';
 

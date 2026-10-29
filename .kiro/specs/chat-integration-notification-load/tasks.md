@@ -29,7 +29,7 @@
   - _Depends: 1.1_
 
 - [ ] 3. 掃除を通知の定期処理から切り離す
-- [ ] 3.1 掃除の定期処理を作り、起動につなぐ（振る舞い）
+- [x] 3.1 掃除の定期処理を作り、起動につなぐ（振る舞い）
   - `server/pairing/unpaired-relation-sweep-cron.ts` に `UnpairedRelationSweepCronService` を作る。スケジュールは `'0 2 * * *'`、実行の前に最大 60 分ランダムに待ち、待った後に判定し、「ある」ときだけ `sweepUnpairedRelations(now)` を呼ぶ
   - 差し替え口は `sweep`・`presence`・`clock`・`sleep`
   - `crowi/index.ts` の `setupCron` で、通知の定期処理の起動の直後に `startCron()` を呼ぶ
