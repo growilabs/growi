@@ -79,11 +79,11 @@ export const AddReactionButton = ({
           </span>
         </button>
       </span>
-      {isLimitReached && (
-        <UncontrolledTooltip target={wrapperRef} placement="top">
-          {t('comment_reaction.kind_limit_reached')}
-        </UncontrolledTooltip>
-      )}
+      <UncontrolledTooltip target={wrapperRef} placement="top" fade={false}>
+        {isLimitReached
+          ? t('comment_reaction.kind_limit_reached')
+          : t('comment_reaction.add_reaction')}
+      </UncontrolledTooltip>
       <EmojiPicker
         isOpen={isPickerOpen}
         onSelect={handleSelect}

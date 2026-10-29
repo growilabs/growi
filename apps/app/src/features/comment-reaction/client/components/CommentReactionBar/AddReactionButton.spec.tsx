@@ -129,14 +129,56 @@ describe('AddReactionButton', () => {
     ).toBeTruthy();
   });
 
-  it('shows no limit tooltip below the limit', async () => {
+  it('labels the button in a tooltip on hover below the limit, without the limit reason', async () => {
     render(<AddReactionButton canReact chipCount={1} onAdd={vi.fn()} />);
 
     await userEvent.hover(addButton().parentElement as HTMLElement);
 
+    expect((await screen.findByRole('tooltip')).textContent).toBe(
+      'comment_reaction.add_reaction',
+    );
     expect(
       screen.queryByText('comment_reaction.kind_limit_reached'),
     ).toBeNull();
+  });
+
+  it('labels the button in a tooltip when it receives keyboard focus', async () => {
+    render(<AddReactionButton canReact chipCount={1} onAdd={vi.fn()} />);
+
+    await userEvent.tab();
+
+    expect(document.activeElement).toBe(addButton());
+    expect((await screen.findByRole('tooltip')).textContent).toBe(
+      'comment_reaction.add_reaction',
+    );
+  });
+
+  it('shows only the limit reason, not the add label, at the limit', async () => {
+    render(
+      <AddReactionButton
+        canReact
+        chipCount={MAX_REACTION_KINDS_PER_COMMENT}
+        onAdd={vi.fn()}
+      />,
+    );
+
+    await userEvent.hover(addButton().parentElement as HTMLElement);
+
+    expect(
+      await screen.findByText('comment_reaction.kind_limit_reached'),
+    ).toBeTruthy();
+    expect(screen.getByRole('tooltip').textContent).toBe(
+      'comment_reaction.kind_limit_reached',
+    );
+  });
+
+  it('renders the tooltip without a fade transition, like the other tooltips in the app', async () => {
+    render(<AddReactionButton canReact chipCount={1} onAdd={vi.fn()} />);
+
+    await userEvent.hover(addButton().parentElement as HTMLElement);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip.closest('.fade')).toBeNull();
   });
 
   it('is disabled while a write is in flight', () => {
