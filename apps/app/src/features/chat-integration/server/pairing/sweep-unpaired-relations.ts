@@ -30,8 +30,16 @@ const logger = loggerFactory(
 
 export { UNPAIRED_RETENTION_MS };
 
-/** Bound on one sweep, so a large backlog spreads over several ticks. */
-const MAX_RELATIONS_PER_SWEEP = 100;
+/**
+ * Safety ceiling on the work of one run: the loop drains the whole backlog
+ * (the run is daily, so a smaller cap would break the retention deadline), but
+ * must not become unbounded against the database. The next daily run continues.
+ */
+export const MAX_RELATIONS_PER_SWEEP = 10_000;
+
+export interface UnpairedSweepOptions {
+  readonly maxRelations?: number;
+}
 
 export interface UnpairedSweepSummary {
   readonly relations: number;
@@ -40,12 +48,13 @@ export interface UnpairedSweepSummary {
 
 export const sweepUnpairedRelations = async (
   now: Date,
+  { maxRelations = MAX_RELATIONS_PER_SWEEP }: UnpairedSweepOptions = {},
 ): Promise<UnpairedSweepSummary> => {
   const expiredBefore = new Date(now.getTime() - UNPAIRED_RETENTION_MS);
   let relations = 0;
   let accountLinks = 0;
 
-  for (let i = 0; i < MAX_RELATIONS_PER_SWEEP; i++) {
+  for (let i = 0; i < maxRelations; i++) {
     const expiredCondition = {
       state: 'unpaired',
       unpairedAt: { $lt: expiredBefore },
@@ -58,7 +67,7 @@ export const sweepUnpairedRelations = async (
 
     // Links first: if this process dies between the two deletes, the
     // relation row is still there to identify the remainder on the next
-    // tick. The other order would strand the links permanently.
+    // run. The other order would strand the links permanently.
     const linkDeletion = await ChatAccountLink.deleteMany({
       relationId: candidate.relationId,
     });
