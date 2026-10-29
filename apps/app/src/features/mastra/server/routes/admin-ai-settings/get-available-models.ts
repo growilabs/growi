@@ -142,8 +142,9 @@ export const getAvailableModels = async (
   const { provider } = req.query;
 
   try {
-    // ModelCatalogEntry[] is structurally { id, name }[] = SelectableModel[].
-    const models = await getEffectiveSelectableModels(provider);
+    // Rebuild each item so catalog-only fields such as `pricing` never reach the client.
+    const entries = await getEffectiveSelectableModels(provider);
+    const models = entries.map(({ id, name }) => ({ id, name }));
     const response: SelectableModelsResponse = { models };
     res.apiv3(response);
   } catch (err) {

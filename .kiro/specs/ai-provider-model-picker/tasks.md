@@ -22,7 +22,7 @@
   - _Boundary: chat-model-filter_
 
 - [x] 2.2 models.dev から取り込む vendoring スクリプトとコミット成果物を作成する
-  - `pnpm vendor:models` で `https://models.dev/api.json` を fetch（**取り込みステップ＝リリース前段でのみ／ビルド工程・実行時では fetch しない**）→ 対象プロバイダ選択 → `isSelectableModel` で**生成時フィルタ** → **`{id,name}`**（id と公式表示名。`name` 欠落時は id フォールバック）を `models.<provider> = {id,name}[]` に整形し、`{ _source(MIT帰属), _generatedAt, models }` の形（ヘッダとデータを分離）で決定的（id でソート）に `model-catalog-data.json` を書き出す
+  - `pnpm vendor:models` で `https://models.dev/api.json` を fetch（**取り込みステップ＝リリース前段でのみ／ビルド工程・実行時では fetch しない**）→ 対象プロバイダ選択 → `isSelectableModel` で**生成時フィルタ** → **`{id,name}`**（id と公式表示名。`name` 欠落時は id フォールバック）を `models.<provider> = {id,name,pricing?}[]`（`pricing` は models.dev の単価。無いモデルでは省略）に整形し、`{ _source(MIT帰属), _generatedAt, models }` の形（ヘッダとデータを分離）で決定的（id でソート）に `model-catalog-data.json` を書き出す
   - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。fetch 失敗時は非ゼロ終了し既存成果物を保持
   - **生成時サニティチェック（Issue 2）**: 取得 JSON を境界で最小スキーマ検証（`providers`/`models` 構造・`tool_call`/`modalities.output` の型）し、**各対象プロバイダ（openai/anthropic/google）で選択可能1件以上**を assert。違反（想定外の形・空結果）なら**非ゼロ終了して既存成果物を保持**（上書きしない）＝スキーマドリフトによる「無言の空カタログ」出荷を防止。欠落内容（プロバイダ名・件数）をログ出力
   - 初回生成した `model-catalog-data.json` をコミットする
@@ -33,7 +33,7 @@
 
 - [ ] 3. サーバ実行時の読み取りとエンドポイント
 - [x] 3.1 コミット成果物からモデル一覧を返す読み取りサービスを実装する
-  - `getSelectableModels(provider)` がコミット済み `model-catalog-data.json` を静的 read し `provider` の `{id,name}[]` を返す。**ネットワーク I/O なし**、カタログ非対応プロバイダは空配列
+  - `getSelectableModels(provider)` がコミット済み `model-catalog-data.json` を静的 read し `provider` の `{id,name,pricing?}[]`（カタログの要素。単価は省略可能）を返す。**ネットワーク I/O なし**、カタログ非対応プロバイダは空配列
   - 完了状態: コミット成果物をもとに openai が非空・azure-openai が空を返し、実行時にネットワーク呼び出しが発生しないことを単体テストで確認できる
   - _Requirements: 1.1, 2.1, 2.2, 2.3, 3.1_
   - _Depends: 2.2_
@@ -106,7 +106,7 @@
   - _Requirements: 6.1, 9.1_
   - _Boundary: build-model-catalog, vendor-model-catalog_
 - [x] 9.2 更新済みカタログの永続化と effective read を実装する
-  - `RefreshedModelCatalog` singleton collection（`{ models, fetchedAt, source }`。`models` は `provider→{id,name}[]`）と `getEffectiveSelectableModels(provider)`（更新済み／同梱の**新しい方**を採用。同梱が厳密に新しい場合のみ同梱優先＝イメージ更新後の stale スナップショット覆い隠し防止。無ければ同梱、9.5）を追加し、`get-available-models` を effective read に切替える
+  - `RefreshedModelCatalog` singleton collection（`{ models, fetchedAt, source }`。`models` は `provider→{id,name,pricing?}[]`）と `getEffectiveSelectableModels(provider)`（更新済み／同梱の**新しい方**を採用。同梱が厳密に新しい場合のみ同梱優先＝イメージ更新後の stale スナップショット覆い隠し防止。無ければ同梱、9.5）を追加し、`get-available-models` を effective read に切替える
   - 完了状態: 更新済みが新しければそれを返し、同梱が新しければ同梱を返し、なしで同梱へフォールバック、azure は `[]`、read パスに外部通信がないことを単体テストで確認できる
   - _Requirements: 9.4, 9.5, 2.1, 3.1_
   - _Boundary: refreshed-model-catalog, effective-model-catalog, get-available-models_
@@ -115,9 +115,9 @@
   - 完了状態: 統合テストで admin 200 `{ fetchedAt, counts }`・失敗 500（内部非漏洩）・非 admin/未認証拒否、UI テストでボタン→確認モーダル→POST→invalidate→toast・キャンセル時は通信ゼロ・失敗フォールバック・env-only で enabled を確認できる
   - _Requirements: 9.1, 9.4, 9.7, 7.1_
   - _Boundary: refresh-model-catalog, post-refresh-model-catalog, admin-ai-settings router, AllowedModelsField, locales admin.json_
-- [x] 9.4 起動時・定期リフレッシュの配線を実装する（AI 有効時のみ作動）
-  - 設定キー `ai:modelCatalogRefreshOnStartup`（既定 `false`）/ `ai:modelCatalogRefreshCronSchedule`（**既定 `'0 4 * * *'`**＝日次。空文字で無効化）を追加し、`model-catalog-refresh-jobs`（両トリガとも先頭で `isAiEnabled()` ゲート／cron: AI 有効かつ schedule 設定時のみ・invalid でも boot 非破壊／startup: AI 有効かつ opt-in・fire-and-forget）を crowi の `setupCron()` / `asyncAfterExpressServerReady()` に配線する
-  - 完了状態: **AI 無効なら cron/startup とも no-op（外部通信ゼロ）**、schedule 未設定/空でも no-op、AI 有効かつ設定時に schedule/起動時リフレッシュが発火し、失敗しても boot・稼働を壊さないことを単体テストで確認できる
+- [x] 9.4 起動時・定期リフレッシュの配線を実装する（AI 有効時、または停止理由が `catalog_stale` のときのみ作動）
+  - 設定キー `ai:modelCatalogRefreshOnStartup`（既定 `true`）/ `ai:modelCatalogRefreshCronSchedule`（**既定 `'0 4 * * *'`**＝日次。空文字で無効化）を追加し、`model-catalog-refresh-jobs`（両トリガとも先頭で `isCatalogRefreshAllowed()`＝AI 有効、または停止理由が `catalog_stale` のときだけ通すゲート／cron: リフレッシュが許されていて schedule 設定時のみ・invalid でも boot 非破壊／startup: リフレッシュが許されていて設定が ON（既定）のとき、待たずに取得し、完了を待たずに起動を進める）を crowi の `setupCron()` / `asyncAfterExpressServerReady()` に配線する
+  - 完了状態: **AI 無効で停止理由が `catalog_stale` でなければ cron/startup とも何もしない（外部通信ゼロ）**、schedule 未設定/空でも何もしない、リフレッシュが許されていて設定があるときに schedule/起動時リフレッシュが発火し、失敗しても boot・稼働を壊さないことを単体テストで確認できる
   - _Requirements: 9.2, 9.3, 9.4, 9.6_
   - _Boundary: config-definition, model-catalog-refresh-jobs, crowi/index.ts_
 

@@ -1,6 +1,7 @@
 {
   "backlinks": {
     "failed_to_fetch": "被リンクの取得に失敗しました。",
+    "link_status_unavailable": "リンクの状態を確認できませんでした。",
     "no_backlinks": "被リンクはまだありません。",
     "outgoing_needing_attention": "確認が必要な発リンク",
     "panel": "被リンク",
@@ -1162,6 +1163,48 @@
     "table": {
       "label": "テーブル",
       "description": ""
+    },
+    "plantuml": {
+      "label": "PlantUML",
+      "description": ""
+    },
+    "lsx": {
+      "label": "動的リスト（lsx）",
+      "description": ""
+    },
+    "drawio": {
+      "label": "図表（drawio）",
+      "description": ""
+    },
+    "link": {
+      "label": "リンク",
+      "description": ""
+    },
+    "tableBuilder": {
+      "label": "テーブルビルダー",
+      "description": ""
+    },
+    "callout": {
+      "note": {
+        "label": "コールアウト（Note）",
+        "description": ""
+      },
+      "tip": {
+        "label": "コールアウト（Tip）",
+        "description": ""
+      },
+      "important": {
+        "label": "コールアウト（Important）",
+        "description": ""
+      },
+      "warning": {
+        "label": "コールアウト（Warning）",
+        "description": ""
+      },
+      "caution": {
+        "label": "コールアウト（Caution）",
+        "description": ""
+      }
     }
   }
 }

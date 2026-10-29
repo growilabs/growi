@@ -23,7 +23,7 @@ vi.mock('~/utils/prisma', () => ({
 vi.mock('./target-page-resolution', () => ({
   findPagesById: vi.fn(),
   resolveToPageIds: vi.fn(),
-  REDIRECT_CHAIN_MAX_DEPTH: 50,
+  REDIRECT_CHAIN_MAX_DEPTH: 30,
 }));
 
 const row = (toPage: Types.ObjectId | null, toPath = '/target'): IPageLink => ({

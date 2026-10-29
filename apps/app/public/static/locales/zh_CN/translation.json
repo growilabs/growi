@@ -1,6 +1,7 @@
 {
   "backlinks": {
     "failed_to_fetch": "获取反向链接失败。",
+    "link_status_unavailable": "无法检查链接状态。",
     "no_backlinks": "尚无反向链接。",
     "outgoing_needing_attention": "需要注意的出站链接",
     "panel": "反向链接",
@@ -1158,6 +1159,14 @@
     },
     "table": {
       "label": "表格",
+      "description": ""
+    },
+    "link": {
+      "label": "链接",
+      "description": ""
+    },
+    "tableBuilder": {
+      "label": "表格构建器",
       "description": ""
     }
   }

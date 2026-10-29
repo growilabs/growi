@@ -25,7 +25,8 @@ it, and keeps that information accurate and performant as the wiki changes.
   viewer's read permissions (page grants).
 - Backlink relationships kept in sync as pages are created, edited, and deleted,
   so backlinks are fast and accurate at scale.
-- A one-time process to backfill backlinks for all pre-existing pages.
+- A process, started by an administrator, to backfill backlinks for pre-existing pages (all of
+  them, the newest N, or those edited after a given date).
 - Link integrity when a page is renamed/moved: inbound links must follow the new
   path or be clearly flagged, not silently break.
 - Broken-link handling when a linked page is deleted (shown as broken, not
@@ -52,7 +53,7 @@ soft-delete to trash, restore, and permanent delete), and recognize the link
 forms GROWI supports — standard Markdown links (`[text](/path)`), wiki-links
 (`[[alias>/path]]`, where the link target is the part after `>`), raw HTML anchors,
 page permalinks that identify a page by its ID (`/{pageId}`), and absolute URLs
-whose origin is this wiki. The
+whose host is this wiki's. The
 requirements below describe the complete feature; the
 order of delivery is tracked separately in the implementation backlog.
 
@@ -60,10 +61,10 @@ order of delivery is tracked separately in the implementation backlog.
 
 - **In scope**: presenting incoming links (backlinks) per page; recognizing
   links from a page's rendered content — Markdown links, wiki-links, raw HTML
-  anchors, page permalinks (links by page ID), and absolute URLs whose origin is
-  this wiki — that target internal pages; filtering by the viewer's read permission;
+  anchors, page permalinks (links by page ID), and absolute URLs whose host is
+  this wiki's — that target internal pages; filtering by the viewer's read permission;
   keeping backlinks current as pages are created, updated, moved/renamed,
-  trashed, restored, and permanently deleted; a one-time backfill for
+  trashed, restored, and permanently deleted; an administrator-started backfill for
   pre-existing pages; indicating trashed/broken link targets.
 - **Out of scope**: a wiki-wide health/analytics dashboard; outbound automation or
   webhooks; a visual link-graph; and any change to GROWI's permission model, page
@@ -84,15 +85,15 @@ order of delivery is tracked separately in the implementation backlog.
 #### Acceptance Criteria
 1. When a user views a page, the Backlinks feature shall display the list of other pages that link to it.
 2. The Backlinks feature shall treat as a link any anchor (an `<a>` element) in the page's rendered content that targets an internal page, regardless of whether it was authored as a standard Markdown link (`[text](/path)`), a GROWI wiki-link (`[[alias>/path]]`, where the link target is the part after `>`), or raw HTML (`<a href="/path">`). Criteria 9–11 further define which link targets count as internal pages.
-3. For the purpose of backlinks, the Backlinks feature shall ignore links that do not point to another internal page, namely: external URLs (absolute URLs whose origin differs from this wiki's configured site URL) and same-page jump links (links whose target is only a `#…` fragment within the current page).
+3. For the purpose of backlinks, the Backlinks feature shall ignore links that do not point to another internal page, namely: external URLs (absolute URLs whose host differs from this wiki's configured site URL host; scheme and port are not compared) and same-page jump links (links whose target is only a `#…` fragment within the current page).
 4. Because links are recognized from rendered content rather than source text, the Backlinks feature shall not treat link-like text inside code spans or code blocks as a link.
 5. When a single source page links to the viewed page more than once, the Backlinks feature shall list that source page only once.
 6. The Backlinks feature shall exclude a page's link to itself — whether the link is authored by path or by the page's own permalink (page ID) — from that page's backlinks.
 7. When no other page links to the viewed page, the Backlinks feature shall present an explicit empty state.
-8. For each backlink, the Backlinks feature shall show the linking page's title and path.
+8. For each backlink, the Backlinks feature shall show the linking page's title and path, where the title is the page's title as derived from its path (the last path segment).
 9. The Backlinks feature shall treat a link whose resolved target path is a page permalink — an absolute path of the form `/{pageId}` consisting of a page's ID — as targeting that page by its ID, regardless of the page's current path. Recognition is based on the link's resolved absolute path; because relative links resolve against the linking page's location, a relative form such as `./{pageId}` is recognized only when it resolves to `/{pageId}`.
-10. When a link is an absolute URL whose origin matches this wiki's configured site URL, the Backlinks feature shall treat it as an internal link to the page identified by the URL's path component (query and fragment excluded).
-11. When this wiki's site URL (`app:siteUrl`) is not configured, the Backlinks feature shall not treat any absolute URL as an internal link, because absolute URLs cannot be distinguished from external ones without a configured origin to compare against.
+10. When a link is an absolute URL whose host matches the host of this wiki's configured site URL (scheme and port are not compared), the Backlinks feature shall treat it as an internal link to the page identified by the URL's path component (query and fragment excluded).
+11. When this wiki's site URL (`app:siteUrl`) is not configured, the Backlinks feature shall not treat any absolute URL as an internal link, because absolute URLs cannot be distinguished from external ones without a configured site host to compare against.
 
 ### Requirement 2: Permission-aware backlinks
 **Objective:** As a reader, I want backlinks limited to pages I am allowed to see, so that the feature never reveals restricted content.
@@ -117,9 +118,16 @@ order of delivery is tracked separately in the implementation backlog.
 **Objective:** As an administrator, I want backlinks to cover content that existed before the feature was enabled, so that backlinks are complete rather than only reflecting recent edits.
 
 #### Acceptance Criteria
-1. Where pages existed before the Backlinks feature was enabled, the Backlinks feature shall provide a one-time process that makes the links within those pages discoverable as backlinks.
+1. Where pages existed before the Backlinks feature was enabled, the Backlinks feature shall provide a process, started by an administrator, that makes the links within those pages discoverable as backlinks.
 2. When the one-time process completes, the Backlinks feature shall present backlinks from pre-existing pages equivalently to backlinks created after enablement.
 3. If the one-time process is run more than once, then the Backlinks feature shall not produce duplicate backlinks.
+4. Where an administrator limits the process to pages edited after a given date or to the newest N pages, the Backlinks feature shall make backlinks from the pages within that limit equivalent to backlinks created after enablement, and shall indicate that backlinks from older pages are not included.
+5. The Backlinks feature shall let an administrator, and only an administrator, start the process from the administration settings and choose its scope: all pages, the newest N pages, or the pages edited after a given date.
+6. While the process is running, the administration settings shall show its progress and shall not allow another run to be started.
+7. Where an earlier run covered only part of the pages, the administration settings shall show which pages are covered and shall let an administrator run the process again over a wider scope.
+8. When backlinks have been built for all pages, the administration settings shall say so and shall not offer to start the process again.
+9. While the process is running, the administration settings shall let an administrator stop it, and shall let an administrator continue a stopped run from where it stopped.
+10. The administration settings shall show how many pages a running or stopped run has processed out of how many are in its range, and, where coverage is partial, approximately how many pages are not yet included.
 
 ### Requirement 5: Link integrity when a page is renamed or moved
 **Objective:** As an editor, I want links to a page to survive its rename or move, so that references are not silently broken.

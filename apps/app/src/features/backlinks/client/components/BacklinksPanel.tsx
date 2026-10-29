@@ -54,6 +54,14 @@ export const BacklinksPanel = (): JSX.Element => {
         </div>
       )}
 
+      {linkTargets === null && (
+        <div
+          className="text-muted mt-4"
+          data-testid="backlinks-link-status-unavailable"
+        >
+          {t('backlinks.link_status_unavailable')}
+        </div>
+      )}
       {hasLinkTargets && <LinkTargetsSection linkTargets={linkTargets} />}
     </>
   );

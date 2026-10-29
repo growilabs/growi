@@ -177,7 +177,9 @@ extraction and resolution for all of them as one unit; there is no separable "na
   - Instantiate and initialize the backlinks service in the server setup phase (mirroring the search
     service), subscribing its handlers to create/update only; do not modify the page service
   - **B1 scope:** skip the delete-family subscriptions (delete/deleteCompletely/
-    syncDescendantsDelete) — B5.7
+    syncDescendantsDelete) — B5.7. The service also subscribes `revert` (restore), which re-enqueues
+    an upsert of the restored page (`page-link-service.ts`; unit-covered in `page-link-service.spec.ts`,
+    integration-covered in `page-link-delete-lifecycle.integ.ts`)
   - Done when creating and editing a page through the app changes `PageLink` rows accordingly
     (verified by B1.15's lifecycle integration test)
   - _Requirements: 3.1, 3.2_
@@ -193,6 +195,8 @@ extraction and resolution for all of them as one unit; there is no separable "na
 
 - [x] B1.14 Add the Backlinks tab to the page accessories UI
   - Add a Backlinks entry to the page-accessories tab mapping that renders the panel
+  - The tab is hidden in `PageAccessoriesModal` and the navbar entry that opens it is disabled for
+    share-link views (`shareLinkId != null`); covered in `PageAccessoriesModal.spec.tsx`
   - Done when opening the tab on a page displays the backlinks panel
   - _Requirements: 1.1_
   - _Boundary: PageAccessoriesModal_
@@ -238,11 +242,12 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     hub page** (thousands of inbound sources) — the worst case for the read path and the page you
     actually measure. Use a throwaway/fixture seeding script, **not** the B3 backfill job.
   - **Confirm the indexes exist** on the seeded collection (created by B1.2 `autoIndex`) — a check,
-    not new work. The collection carries exactly two: `{toPage}` (what this benchmark exercises, via
-    `findBacklinkSources`) and the unique `{fromPage, toPath}` compound. The standalone `{fromPage}`
-    and `{toPath}` indexes were dropped in B2.2 as unused, so their absence is expected, not a gap —
-    `{fromPage}` is the compound's prefix, and `toPath`-alone gets its index in B4 with the query
-    that needs it.
+    not new work. The collection carries three, provisioned by `migrations/20260901064500-add-indexes-to-pagelinks.js`
+    (`pagelinks` is Prisma-only): the unique `fromPage_1_toPath_1` compound, `toPage_1` (what this
+    benchmark exercises, via `findBacklinkSources`), and `toPath_1` (serves the B4 query that looks
+    rows up by target path). A standalone `{fromPage}` index is deliberately absent — it is the
+    compound's prefix. (When this benchmark was measured the collection carried only the first two;
+    the `toPath_1` index arrived with B4.)
   - **Measure the real read path** for the hub page **as a viewer**: the full `findBacklinks` →
     `findBacklinkSources` (`distinct` on `{toPage}`) → permission/viewer filter path, not the raw
     Mongo query alone. Confirm it returns in interactive time (<~1s).
@@ -250,7 +255,7 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     they use an index rather than collection-scanning — this is what tells you *why* the number is
     what it is, and *where* to fix it if it is slow.
   - **Confirm the no-rescan guarantee** by inspection/a targeted check: a single create/edit rewrites
-    only that page's rows (the `replaceOutboundLinks` bulkWrite) and never walks all pages.
+    only that page's rows (the `replaceOutboundLinks` writes) and never walks all pages.
   - If the target is missed, the `explain()` output points at the fix (usually a missing/compound
     index or a filter restructure); that fix — an index/query change only — is then part of this task.
   - **Decision made:** an env-gated integ test, not a CI test and not a standalone script —
@@ -354,8 +359,8 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
   - **Plans (all index-backed, no COLLSCAN anywhere):** `distinct` → `FETCH <- IXSCAN` on `toPage_1`;
     viewer filter → `PROJECTION_SIMPLE <- FETCH <- IXSCAN` on `_id_`; the save-path delete filter
     (`{fromPage, toPath: {$nin}}`) → `FETCH <- IXSCAN` on `fromPage_1_toPath_1`.
-  - **No-rescan confirmed:** one `syncOutboundLinks` issues exactly one `bulkWrite` whose every
-    operation filter is scoped to the edited `fromPage`; a sibling page's rows are byte-identical
+  - **No-rescan confirmed:** one `syncOutboundLinks` issues one `replaceOutboundLinks`, whose upsert
+    and delete-prune filters are all scoped to the edited `fromPage`; a sibling page's rows are byte-identical
     afterwards and the collection total moves only by that page's delta.
   - **The `distinct` is not covered, and the fix for that was measured and rejected.** It runs
     `FETCH <- IXSCAN`, not `DISTINCT_SCAN`, because its key (`fromPage`) is not in the index it rides
@@ -400,8 +405,8 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     time and declining to index a page that is now `STATUS_DELETED` — keyed on deleted rather than
     published because a legacy page's `null` status means published. That closes the window
     coalescing opened (a soft delete keeps the `_id`, so the "page is gone" check does not catch it).
-    Routing the delete to `reconcileDeletedPages` and clearing the rows the page already owned needs
-    the reconcile op and the delete-family handlers — deferred to **B5.2**/**B5.3**.
+    Routing the delete to `reconcileDeletedPages` and clearing the rows the page already owned is
+    done by the reconcile op and the delete-family handlers (**B5.2**/**B5.3**, subscribed in B5.7).
   - Best-effort/in-memory by design: a restart drops pending work (self-heals on next edit/backfill);
     the set is per-instance in multi-container deployments (safe because upserts are idempotent).
   - **Accepted limitation (review of B2.2):** a page whose upsert fails is retried on a later drain
@@ -412,28 +417,29 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
     and the instance then stops indexing until it restarts. Not guarded with a timeout, because a
     timeout cannot cancel the abandoned run — it would race it, and a resurrected stale run would
     overwrite a newer link set. Same repair path as any dropped work: the page's next save, or B3.
-  - **Why (MongoDB impact):** every save runs `PageLink.replaceOutboundLinks`, a single `bulkWrite`
-    that upserts one row per extracted link and issues a `deleteMany` for links no longer present —
-    each component write maintaining every `pagelinks` index. This story also cut those from four to
-    the two an actual query uses — unique `{fromPage, toPath}` and `{toPage}`; the standalone
-    `{fromPage}` (already the compound's prefix) and `{toPath}` (no query until B4) were pure write
-    overhead. Without coalescing, N rapid saves of one page = N full
-    `bulkWrite` replaces of which N−1 are immediately obsolete, yet each still re-upserts every row,
+  - **Why (MongoDB impact):** every save runs `PageLink.replaceOutboundLinks`, two raw commands
+    (an upsert of one row per extracted link, then a delete-prune of links no longer present) —
+    each component write maintaining every `pagelinks` index. This story also cut the index set
+    (measured when the model was Mongoose, from four to the two an actual query used — unique
+    `{fromPage, toPath}` and `{toPage}`; the standalone `{fromPage}` is the compound's prefix and
+    `{toPath}` had no query until B4, which later added `toPath_1` back); the three indexes now
+    provisioned are listed under B2.1. Without coalescing, N rapid saves of one page = N full
+    replaces of which N−1 are immediately obsolete, yet each still re-upserts every row,
     re-scans for the `deleteMany`, rewrites every index B-tree, and (under the `rs0` replica set)
     emits oplog entries that replicate to secondaries. A burst across distinct pages runs these
-    `bulkWrite`s concurrently, contending for write tickets and collection locks with the
+    replaces concurrently, contending for write tickets and collection locks with the
     latency-sensitive backlinks read (`findBacklinkSources`, a `distinct` on `{toPage}`) — so the
     write storm is what actually slows reader queries at the storage-engine level. Coalescing
-    collapses same-page saves to **one** `bulkWrite` reflecting only the final link set (safe because
+    collapses same-page saves to **one** replace reflecting only the final link set (safe because
     `replaceOutboundLinks` is idempotent), cutting write volume, index maintenance, and oplog/
-    replication traffic from N to 1; pacing then spreads distinct-page `bulkWrite`s in proportion to
+    replication traffic from N to 1; pacing then spreads distinct-page replaces in proportion to
     each page's extraction cost, converting an unbounded write spike into steady, bounded write QPS
     that coexists with reads. Delete must
     supersede a pending upsert because the upsert path uses `upsert: true` — running a stale upsert
     for a since-deleted page would re-create `pagelinks` rows for a non-existent source (orphan rows
     a reader could surface as phantom backlinks).
   - Done when: repeated saves of the same page within the coalescing window produce exactly one
-    extraction / one `replaceOutboundLinks` `bulkWrite` (asserted via a spy/count on the upsert
+    extraction / one `replaceOutboundLinks` call (asserted via a spy/count on the upsert
     handler); a burst of distinct-page saves is paced by measured extraction cost rather than run as
     one back-to-back spree (a page costing 10x as much to extract earns 10x the rest); a source that
     is `STATUS_DELETED` at drain time is not indexed, even when the event payload still reads as
@@ -447,33 +453,41 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
 
 ## Story B3 — Backfill of pre-existing pages
 
-**Nature:** Online, throttled, resumable, two-phase (recent pages first) job, started by a
-`CronService` poll and run as a self-paced loop (rest proportional to work, per page), that
-populates rows for pages that existed before the feature. It auto-starts on-prem; on GROWI.cloud
-it waits for an infra-set `startRequested` flag on its job document (see the start rule in
-design.md's Delivery decision). Reuses the page-bulk-export scaffolding (`CronService` base,
-`createBatchStream`, cursor→resume skeleton) and the B1 extractor; the new code is the in-memory
-`{path→_id}` map, the per-page upsert sink, the paced loop, and the atomic claim. An
-admin-triggered start was deferred as a one-line future change. Independent of B4/B5.
+**Nature:** Online, throttled, resumable, two-phase (recent pages first) job, started by an
+administrator from the admin settings with a chosen scope (all pages, the newest N, or the pages
+edited after a date), picked up by a `CronService` poll and run as a self-paced loop (rest
+proportional to work, per page), that populates rows for pages that existed before the feature.
+Nothing starts on its own and there are no start environment variables. The GROWI.cloud start policy
+is an open decision (design.md's Delivery decision); the control is the same on cloud for now.
+Reuses the page-bulk-export scaffolding (`CronService` base, `createBatchStream`, cursor→resume
+skeleton) and the B1 extractor; the new code is the in-memory `{path→_id}` map, the per-page upsert
+sink (Prisma raw commands; `pagelinks` has no `Model.bulkWrite`), the paced loop, the atomic claim, the coverage record, and the admin endpoints and section.
+Independent of B4/B5.
 
 - [x] B3.1 Add the backfill job state model
-  - Add a single-document model tracking backfill `status` (`idle` / `running` / `paused` /
-    `complete` / `failed`), the current phase (`recent` / `older`), the `recentCutoff` computed once
-    at the first claim, a progress marker (the last `_id` processed in the current phase, in `_id`
-    order, reset when the phase advances), processed counts per phase, `completedAt`, `lastError`,
-    an infra-owned `startRequested` flag, and an atomic-claim field with `leaseExpiresAt` so only
-    one instance runs the job, it stops once complete, and a claim held by a dead owner can be
-    taken over once its lease expires
-  - Create the document idle at boot with an upsert that uses `$setOnInsert`, so an existing
-    `startRequested: true` is never reset; the app never writes `startRequested` afterwards
-  - Built as a Prisma-only collection (`pagelinkbackfilljobs`, no `v`, like `pagelinks`) with raw
-    commands, addressed by a fixed `_id` so no unique index or migration is needed; lease expiry is
-    judged on the database clock (`$$NOW`). Renewing and releasing the claim belong to B3.2
+  - Add a single-document model tracking backfill `status` (`idle` / `requested` / `running` /
+    `complete` / `failed`; plus `stopped`), the admin's
+    `requestedScope` and `requestedAt` and `stopRequested`, the run's `runCutoff`
+    computed once at the first claim, `coverage` (`none` / `partial` / `all`) with `coveredSince`,
+    the current phase (`recent` / `older`), the `recentCutoff` computed once at the run's first
+    claim, a progress marker (the last `_id` processed in the current phase, in `_id` order, reset
+    when the phase advances and at the start of each run), processed counts per phase, `runTotal` (the pages in the run's range, counted once at the first claim), `completedAt`,
+    `lastError`, and an atomic-claim field with `leaseExpiresAt` so only one instance runs the job and
+    a claim held by a dead owner can be taken over once its lease expires
+  - Create the document idle at boot with an upsert that uses `$setOnInsert` (idle, `coverage:
+    none`), so a restart never resets coverage or progress and a missing document is recreated
+  - Add the two pure functions in `backfill-range.ts`: the run's `updatedAt` range from a scope and
+    the current coverage (the gap only), and the coverage after a completed run
+    (`coveredSince = min(coveredSince, runCutoff)`; `all` when the run had no lower bound)
   - Done when a unit test shows the claim succeeds once, is rejected for a second concurrent
-    claimant while the lease is live, and succeeds for a new claimant after the lease expires, and
-    a second boot leaves an existing `startRequested: true` and the progress fields untouched
-  - _Requirements: 4.3_
-  - _Boundary: PageLinkBackfillJob_
+    claimant while the lease is live, and succeeds for a new claimant after the lease expires, a
+    second boot leaves existing coverage and progress fields untouched, and a deleted document is
+    recreated idle with coverage `none`; and table tests cover the pure functions: all from none
+    gives `all`; `since` from none gives `partial` at that date; a wider `since` after a partial run
+    walks only the gap and lowers `coveredSince`; all after a partial run walks the gap and gives
+    `all`; a scope already covered is a no-op
+  - _Requirements: 4.3, 4.4, 4.7, 4.8_
+  - _Boundary: PageLinkBackfillJob, backfill-range_
   - _Depends: B1.2_
 
 - [ ] B3.2 Implement the throttled, resumable backfill job
@@ -482,48 +496,57 @@ admin-triggered start was deferred as a one-line future change. Independent of B
     links via the B1 extractor (passing the configured site URL), resolve permalink targets via an
     id-existence check against the known page ids (not the path map), upsert that page's rows, then
     rest. Persist the progress marker at each checkpoint and resume from it on restart
-  - Run two phases in order: pages with `updatedAt >= recentCutoff` at the recent duty (default
-    25%), then the remaining pages at the older duty (default 10%); complete only when the second
-    finishes. Window and both duties are config-driven (design.md's Delivery decision)
-  - Pace by resting `restRatio × extractionMs` after each page, with the charged work capped as in
-    the live drain; extract the drain's rest computation into one pure function both call. The rest
+  - Within the run's range, run two phases in order: pages with `updatedAt >= recentCutoff` at the
+    recent duty (default 25%), then the remaining pages at the older duty (default 10%); the run is
+    complete only when the second finishes, and then records its coverage (B3.1). Window and both
+    duties are config-driven (design.md's Delivery decision)
+  - Pace by resting `restRatio × pageCycleMs` after each page, where the page cycle is the body read,
+    parse and writes (not the parse alone), with the charged work capped as in the live drain;
+    extract the drain's rest computation into one pure function both call. Enforce a minimum
+    interval between pages from `backlinks:backfillMaxPagesPerSecond`, so the per-app DB operation
+    rate is bounded whatever the parse time. The rest
     is the yield, so there is no tick budget or slice limit. Checkpoint every N pages or T seconds:
-    save the marker and counts, renew the lease, re-check the start rule. Guard against a second
-    loop with an in-process `isRunning` flag reset in `finally`; skip immediately once the job
-    document is complete
-  - When the start rule stops allowing the run, release the claim, keep the marker and set
-    `status: paused`, so a cleared flag pauses the job and a set flag resumes it from the marker.
-    Record `lastError` and set `status: failed` when the loop fails
+    save the marker and counts, renew the lease. Guard against a second
+    loop with an in-process `isRunning` flag reset in `finally`; skip immediately when no
+    request is pending
+  - Record `lastError` and set `status: failed` when the loop fails; the tick retries a failed job
+    (retry policy settled below with the failing-page policy)
+  - Resolve the requested scope to `runCutoff` once at the first claim (`since`: the date;
+    `maxPages`: the `updatedAt` of the Nth newest page, read from the `updatedAt` index) and restrict
+    the walk to the run's range (design.md); a scope already covered finishes at once. Check `stopRequested` at each checkpoint; when set, save the
+    marker and counts, release the claim, set `stopped`, clear the flag and end the run. A claim clears a
+    stale `stopRequested`. At the first claim also count the pages in the run's range once and store
+    it as `runTotal`, and emit progress as processed / `runTotal`
   - Settle the remaining open questions and record them in design.md: write ordering against the
     live listener on the same page (can a stale backfill write overwrite fresher rows?), whether to
     cap the body size parsed (at what size, and how skipped pages are recorded) since one large page
-    stalls the thread for its whole parse, the checkpoint cadence and lease length (the lease must
-    outlast the checkpoint interval plus the longest single rest), and the policy for a page whose
-    write keeps failing. The pacing shape is decided: the per-page proportional rest
+    stalls the thread for its whole parse, the default for `backfillMaxPagesPerSecond`, whether to batch the body reads and the page-link
+    writes (fewer commands, same documents; judge it from B3.4's DB-side numbers), which pages the walk scans (for example
+    empty or trashed pages), defined once in `backfill-range.ts` and shared by the walk, `runTotal` and
+    the admin counts, the checkpoint cadence and
+    lease length (the lease must outlast the checkpoint interval plus the longest single rest), and
+    the policy for a page whose write keeps failing. The pacing shape is decided: the per-page proportional rest
   - Done when running the job over a seeded dataset (including pages linked by permalink and by
     same-wiki absolute URL) populates rows equivalent to the live path, a re-run/resume adds no
     duplicates, no second loop starts while one is running, and progress is emitted on the admin
-    channel
-  - _Requirements: 4.1, 4.2, 4.3_
+    channel; the page-rate floor is never exceeded on a seeded set of tiny pages, and for each scope (all, newest N, since a date) only the pages in the range are processed, and a
+    second run over a wider scope processes only the gap and ends with the right coverage
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 4.9_
   - _Boundary: PageLinkBackfillCron_
   - _Depends: B3.1, B1.3, B1.2_
 
-- [ ] B3.3 Register the backfill job and gate its start
-  - Register the backfill cron poll in server setup; when the start rule allows, an idle tick starts
-    the paced loop (B3.2). Stop the poll permanently once the job document is marked complete
-  - Implement the start rule as a pure function of `backlinks:backfillAutoStart`,
-    `app:growiCloudUri` and the job document's `startRequested` (explicit env value wins; otherwise
-    a set URI means the job waits for the flag). The tick reads the job document directly from the
-    database, not through `configManager`; the idle interval is chosen here (1 to 5 minutes), and
-    the running loop re-checks the rule at each checkpoint.
-    `complete` unschedules the tick and is not re-scheduled at boot; `failed` keeps the tick so a
-    re-set flag resumes from the marker
+- [ ] B3.3 Register the backfill job and start it from a request
+  - Register the backfill cron poll in server setup; an idle tick claims a pending start request, or
+    a run whose lease has expired, and starts the paced loop (B3.2). Do not schedule the poll at boot
+    when coverage is already `all`. The tick reads the job document directly from the database, not
+    through `configManager`; the idle interval is chosen here (1 to 5 minutes), as is whether the
+    start endpoint (B3.6) also nudges an immediate claim. `failed` keeps the tick so the job is
+    retried from the marker; a finished run returns the document to rest
   - Note: edits the same server-setup file as B1.12 — sequence after it to avoid a merge
-  - Done when a five-row truth-table test covers the start rule, setting `startRequested` on an
-    idle cloud-configured app starts it within one idle interval with no restart, and,
-    after boot with the rule allowing it, the job claims and runs both phases to completion on a
-    fresh dataset and marks itself complete so it does not re-run
-  - _Requirements: 4.1_
+  - Done when a pending request starts within one idle interval, the job claims and runs both phases
+    to completion on a fresh dataset and records its coverage, an idle document with no request
+    starts nothing, and a document with coverage `all` schedules no poll
+  - _Requirements: 4.1, 4.5_
   - _Boundary: crowi setup, PageLinkBackfillCron_
   - _Depends: B3.2, B1.12_
 
@@ -532,14 +555,22 @@ admin-triggered start was deferred as a one-line future change. Independent of B
     produces no duplicates; the atomic claim prevents two instances/ticks double-processing
   - Correctness cases: kill mid-run and resume (no missing or duplicate rows); two instances (only
     one works); owner stopped and lease expires (another takes over); artificially slow write
-    (an idle tick does not start a second loop); backfilled rows equal the live path's for the same pages (4.2)
+    (an idle tick does not start a second loop); backfilled rows equal the live path's for the same pages (4.2); a bounded run followed by an
+    all-pages run ends with the same rows as one all-pages run, and the second walks only the gap (4.7);
+    stop mid-run then resume ends with the same rows as an uninterrupted run, with no duplicates and
+    coverage unchanged by the stop (4.9); a Stop clicked as the run finishes does not stop the next run
   - Done when these pass against a seeded dataset
   - Performance run (not part of CI): seed ~45–50k pages in a separate database (e.g. `growi_perf`)
     with `insertMany`, so the live listener creates no `PageLink` rows, using a realistic spread of
     body sizes and link densities. Measure total duration, throughput, tick duration distribution,
     event-loop delay (`perf_hooks.monitorEventLoopDelay`) and live-request p50/p99 with and without
-    the job. Agree the success numbers before running
-  - _Requirements: 4.1, 4.2, 4.3_
+    the job. Also measure the database side per app, which decides how many apps may run at once:
+    operations per second, bytes written, oplog growth and replication delay, with many small
+    pages as well as typical ones, at the default duty and with the page-rate floor. From the
+    per-app duration across a realistic page-count spread, estimate how many apps may
+    overlap (input to the open GROWI.cloud decision in design.md), and decide whether the fixed limits suffice or the app needs to back
+    off when its own database round trips slow down (design.md's fallback). Agree the success numbers before running
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 4.9_
   - _Depends: B3.2_
 
 - [ ] B3.5 Index the descendants of a recursive duplicate
@@ -560,6 +591,43 @@ admin-triggered start was deferred as a one-line future change. Independent of B
   - _Requirements: 3.1, 3.2_
   - _Boundary: PageService (page events), PageLinkService_
   - _Depends: B1.12_
+
+- [ ] B3.6 Add the admin start, state, stop and resume endpoints
+  - Add apiv3 admin routes behind `loginRequired` and `adminRequired`: GET the job state (status,
+    phase, processed and `runTotal` while a run is active, `coverage`, `coveredSince`, `completedAt`,
+    `lastError`, and, computed on read, the number of pages not yet included and the total page count
+    (the `updatedAt`-index count with the walk's page filter)); POST start with a
+    scope (`all`, `maxPages` N, or `since` date), which writes `requestedScope`, `requestedAt` and
+    status `requested`; POST stop, which cancels an unclaimed request, sets `stopRequested` on a running
+    run, and sets `stopped` directly when the run's lease has expired; and POST resume, valid only in
+    `stopped`, which sets `requested` and keeps the scope, `runCutoff` and the marker. Validate the
+    scope (N a positive integer, the date not in the future). Reject a start while a run is active
+    and when coverage is `all`
+  - Done when a non-admin is refused on every route; a valid start writes the request and returns the
+    state; a start while a run is active, with coverage `all`, or with an invalid scope is rejected
+    without changing the document; two concurrent starts leave exactly one request; after a partial run the not-included count equals
+    the number of seeded pages older than `coveredSince` and excludes pages the walk skips; stop cancels an
+    unclaimed request, flags a running one, and ends an expired-lease run directly; resume is
+    rejected outside `stopped`
+  - _Requirements: 4.5, 4.6, 4.8, 4.9, 4.10_
+  - _Boundary: backlinks-backfill-admin routes_
+  - _Depends: B3.1_
+
+- [ ] B3.7 Add the admin settings section and the panel's partial-index state
+  - Add an SWR hook for the job state and a section in the admin settings with a scope picker (all
+    pages, newest N, edited after a date), progress (processed of `runTotal`, count and percent) over the admin Socket.IO channel, the
+    not-included count in the partial-coverage line, and the states
+    in design.md's table: not started, running, failed, stopping, stopped (Resume or a new scope), partial coverage (the
+    control stays), all pages covered (a status line, no control). Choose where it sits in the admin
+    menu and add the i18n keys for every locale the repo keeps
+  - Make the backlinks panel show an "index still building / partial" state whenever coverage is not
+    `all` or a run is active, saying that pages not edited since `coveredSince` are not included
+  - Done when component tests render each state with the right text and controls (no start control
+    when coverage is `all`, a disabled one while running), a started run's progress updates without a
+    reload, and the panel shows the partial state for a partial index and none for `all`
+  - _Requirements: 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10_
+  - _Boundary: BacklinksBackfillAdmin, BacklinksPanel_
+  - _Depends: B3.6, B1.11_
 
 ---
 
@@ -584,7 +652,7 @@ B3/B5.
     re-implement the existing singular `retrievePageRedirectEndpoints` over it, so the
     `$graphLookup` pipeline and deepest-hop rule exist once and page view cannot disagree with the
     link index about where a chain ends. Keep the depth cap a **parameter**: the save path passes
-    50, page view passes none (a cap there turns a much-renamed page's old URL into a not-found)
+    `REDIRECT_CHAIN_MAX_DEPTH`, page view passes none (a cap there turns a much-renamed page's old URL into a not-found)
   - Done when tests cover single and double redirect chains resolving to the endpoint, a redirect
     winning over a live page at the same path, the unresolved case, several paths resolving in one
     lookup, converging chains keyed by input, a cycle advancing one hop rather than hanging, an
@@ -600,7 +668,7 @@ B3/B5.
   - **Not only exact `toPath` matches.** B4.1 made resolution follow the redirect chain, so a row
     naming `/old` resolves here whenever `/old` redirects here — and it goes stale on the same event.
     Walk back from the path (`PageRedirect.retrieveFromPathsRedirectingTo`) to nominate candidates,
-    then let `resolveToPages` decide where each one lands: a longer chain can carry a candidate past
+    then let `resolveToPageIds` decide where each one lands: a longer chain can carry a candidate past
     this path, so the reverse hop must never supply the target itself
   - Done when tests show inbound rows for a path get their `toPage` repointed when a page resolves
     at that path. The service's forwarding (which target it hands to the write) is unit-tested; the
@@ -627,10 +695,10 @@ B3/B5.
   - _Requirements: 1.9, 5.1, 5.2, 5.4_
   - _Depends: B4.3, B1.12_
 
-- [ ] B4.5 Bound how many chains one redirect lookup walks
+- [x] B4.5 Bound how many chains one redirect lookup walks
   - Deliberately deferred out of B4.1 (judged out of that PR's scope), and independent of
     B4.2–B4.4 — pick it up at any point after B4.1.
-  - B4.1 capped the *depth* of a chain (`maxDepth: 50` from the save path) but nothing caps the
+  - B4.1 capped the *depth* of a chain (`REDIRECT_CHAIN_MAX_DEPTH` from the save path) but nothing caps the
     *width*: `retrievePageRedirectEndpointsBatch` receives every link path on the page, and B4.1's
     precedence decision means it receives them on **every** save rather than only the ones that
     missed. `$graphLookup` is memory-bound at 100MB and cannot spill to disk, so a page carrying
@@ -840,13 +908,15 @@ the restored page's status. Independent of B3/B4.
     `IBacklink[]` to the whole response, so the incoming-list call site changes here too — deliberate
     churn placed in the task that is already rewriting this panel, not an unplanned break of B1.11
   - Done when the panel flags trashed/broken outgoing links; the incoming list and empty state are unchanged.
-    When `linkTargets` is `null` (forward-link lookup failed), display "Couldn't check link status."
+    When `linkTargets` is `null` (forward-link lookup failed), the panel renders "Couldn't check link status." (`data-testid="backlinks-link-status-unavailable"`, i18n key `backlinks.link_status_unavailable` in all five locales); `BacklinksPanel.spec.tsx` covers `null` versus an empty `[]`
   - _Requirements: 6.4_
   - _Boundary: BacklinksPanel_
   - _Depends: B5.9, B5.5, B1.11_
 
 - [x] B5.7 Subscribe the delete-family lifecycle events
-  - Extend the B1.12 subscription with delete/deleteCompletely/syncDescendantsDelete → the B5.3 handlers
+  - Extend the B1.12 subscription with delete/deleteCompletely/syncDescendantsDelete → the B5.3 handlers.
+    The full subscribed set is create/update/revert (upsert) plus the three delete-family events
+    (`revert` re-enqueues an upsert; its spec and integ coverage are noted under B1.12)
   - **Pin each event's payload shape here.** `EventEmitter.on` types its listener `(...args: any[])`,
     so the shape a listener declares is unverified: `syncDescendantsDelete` carries an **array**
     (both `server/service/page/index.ts:2297` and `:2391`) while `delete`/`deleteCompletely` carry a
