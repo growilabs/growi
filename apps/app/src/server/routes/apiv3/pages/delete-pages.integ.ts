@@ -2,15 +2,16 @@
  * Integration test — POST /pages/delete must not soft delete a page whose
  * revisionId is no longer the latest.
  *
- * The route filters the selected pages through `page.isUpdatable(revisionId)`, which
- * is async: before the fix this test ships with, the bare call returned a truthy
- * Promise and every page passed the filter, so the conflict was ignored and the page
- * was deleted anyway.
+ * The route filters the selected pages through `page.isUpdatable(revisionId)`, so a
+ * page updated since the given revision must be left in place.
  *
- * Only the conflict case is covered here. It is the case the filter exists for, and
- * it is answered before `deleteMultiplePages` — which the route fires without
- * awaiting — is reached, so the test needs no background work to settle. The
- * successful deletion of a page is covered by service/page/v5.public-page.integ.ts.
+ * The route also filters them through the deletion authority
+ * (`pageService.filterPagesByCanDelete`), so a page the requester is not allowed to
+ * delete must be left in place as well.
+ *
+ * The route fires `deleteMultiplePages` without awaiting it, so a case that deletes
+ * pages waits for that background work to settle before asserting and cleaning up.
+ * A refused case is answered before `deleteMultiplePages` is reached.
  *
  * The fixture and cleanup conventions are the ones documented at the top of
  * rename.integ.ts: `app:isV5Compatible` is pinned and restored, pages are built
@@ -29,6 +30,7 @@ import request from 'supertest';
 
 import { getInstance } from '^/test/setup/crowi';
 
+import { PageDeleteConfigValue } from '~/interfaces/page-delete-config';
 import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
 import PageOperation from '~/server/models/page-operation';
@@ -263,10 +265,10 @@ describe('POST /delete', () => {
         },
       });
 
-    // Every selected page is filtered out, which the route reports as
-    // "No pages can be deleted." — a 500 for what is really a conflict. The status is
-    // asserted as it is today; a fix that reports 409 instead should update this.
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(409);
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ code: 'outdated' }),
+    ]);
 
     const survivingPage = await crowi.models.Page.findById(page._id);
     expect(survivingPage?.path).toBe(targetPath);
@@ -304,12 +306,117 @@ describe('POST /delete', () => {
     await waitForAncestorCleanupToSettle(parentId);
   }, 20_000);
 
+  it('deletes the selected pages and their descendants under the default settings', async () => {
+    const pageA = await createPage(`${FIXTURE_ROOT}/a`, 'a body');
+    const childOfA = await createPage(`${FIXTURE_ROOT}/a/child`, 'child body');
+    const pageB = await createPage(`${FIXTURE_ROOT}/b`, 'b body');
+    if (pageA.parent == null) {
+      throw new Error('the fixture page must have a parent');
+    }
+    const parentId = getIdStringForRef(pageA.parent);
+
+    const response = await request(app)
+      .post('/delete')
+      .set('X-Forwarded-For', TEST_IP)
+      .send({
+        pageIdToRevisionIdMap: {
+          [pageA._id.toString()]: latestRevisionIdOf(pageA),
+          [pageB._id.toString()]: latestRevisionIdOf(pageB),
+        },
+        isRecursively: true,
+      });
+
+    expect(response.status).toBe(200);
+    for (const page of [pageA, childOfA, pageB]) {
+      const deletedPage = await waitForPageToBeDeleted(page._id);
+      expect(deletedPage.path).toBe(`/trash${page.path}`);
+    }
+
+    await waitForAncestorCleanupToSettle(parentId);
+    await vi.waitFor(
+      async () => {
+        expect(
+          await PageOperation.countDocuments({ fromPath: fixturePathPattern }),
+        ).toBe(0);
+      },
+      { timeout: 10_000 },
+    );
+  }, 30_000);
+
+  it('keeps a page the requester is not allowed to delete', async () => {
+    const page = await createPage(targetPath, 'target body');
+    // The requester authored the page but is not an admin, so AdminOnly
+    // forbids the deletion.
+    await crowi.configManager.updateConfig(
+      'security:pageDeletionAuthority',
+      PageDeleteConfigValue.AdminOnly,
+    );
+
+    try {
+      const response = await request(app)
+        .post('/delete')
+        .set('X-Forwarded-For', TEST_IP)
+        .send({
+          pageIdToRevisionIdMap: {
+            [page._id.toString()]: latestRevisionIdOf(page),
+          },
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.errors).toEqual([
+        expect.objectContaining({ code: 'deletion_not_allowed_for_user' }),
+      ]);
+      const survivingPage = await crowi.models.Page.findById(page._id);
+      expect(survivingPage?.path).toBe(targetPath);
+      expect(survivingPage?.status).toBe('published');
+    } finally {
+      await crowi.configManager.updateConfig(
+        'security:pageDeletionAuthority',
+        undefined,
+        { removeIfUndefined: true },
+      );
+    }
+  });
+
+  it('keeps a page the requester is not allowed to delete completely', async () => {
+    const page = await createPage(targetPath, 'target body');
+    await crowi.configManager.updateConfig(
+      'security:pageCompleteDeletionAuthority',
+      PageDeleteConfigValue.AdminOnly,
+    );
+
+    try {
+      const response = await request(app)
+        .post('/delete')
+        .set('X-Forwarded-For', TEST_IP)
+        .send({
+          pageIdToRevisionIdMap: {
+            [page._id.toString()]: latestRevisionIdOf(page),
+          },
+          isCompletely: true,
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body.errors).toEqual([
+        expect.objectContaining({
+          code: 'complete_deletion_not_allowed_for_user',
+        }),
+      ]);
+      const survivingPage = await crowi.models.Page.findById(page._id);
+      expect(survivingPage?.path).toBe(targetPath);
+    } finally {
+      await crowi.configManager.updateConfig(
+        'security:pageCompleteDeletionAuthority',
+        undefined,
+        { removeIfUndefined: true },
+      );
+    }
+  });
+
   it('does not crash when isAnyoneWithTheLink is set and the page cannot be found', async () => {
     // `pageIds.length !== 1` is rejected earlier when isAnyoneWithTheLink is
-    // set, so the viewer-filtered lookup below always resolves for a single
-    // id. Before the fix, a nonexistent (or unreadable) pageId left
-    // `pagesToDelete` empty and `pagesToDelete[0].grant` threw instead of
-    // answering cleanly.
+    // set, so the viewer-filtered lookup below resolves for a single id, and a
+    // nonexistent (or unreadable) pageId leaves `pagesToDelete` empty.
     const missingPageId = new Types.ObjectId();
 
     const response = await request(app)
@@ -322,16 +429,12 @@ describe('POST /delete', () => {
         isAnyoneWithTheLink: true,
       });
 
-    // Falls through to the same "nothing to delete" response every other
-    // filtered-out case gets (see the 500 comment on the first test above) —
-    // not a crash, and not a distinguishable status for this pageId. Assert
-    // the message too: a naive `pagesToDelete[0]?.grant` rewrite of the fix
-    // would still return 500 here, but via the sibling "grant of the
-    // retrieved page is not restricted" branch instead of this fallthrough —
-    // a status-only assertion would not catch that.
-    expect(response.status).toBe(500);
+    // The same uniform 404 as an unreadable page, so the response does not
+    // reveal whether the page exists. The code tells this answer apart from the
+    // sibling "grant of the retrieved page is not restricted" error.
+    expect(response.status).toBe(404);
     expect(response.body.errors).toEqual([
-      expect.objectContaining({ message: 'No pages can be deleted.' }),
+      expect.objectContaining({ code: 'notfound_or_forbidden' }),
     ]);
   });
 });
