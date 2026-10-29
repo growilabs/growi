@@ -23,24 +23,38 @@ const expireLease = () =>
 
 const readJob = () => prisma.pagelinkbackfilljobs.findFirst({});
 
+// Infra reads this document straight from MongoDB, so the stored field names are the contract.
+// A Prisma read cannot show them: it reports a nullable field that was never written as null.
+const readStoredFieldNames = async (): Promise<string[]> => {
+  const result = await prisma.$runCommandRaw({
+    find: COLLECTION,
+    filter: {},
+  });
+  const [doc] = (result.cursor as { firstBatch: object[] }).firstBatch;
+  return Object.keys(doc).sort();
+};
+
 describe('pagelinkbackfilljobs (integration)', () => {
   beforeEach(async () => {
     await prisma.pagelinkbackfilljobs.deleteMany({});
   });
 
   describe('ensureExists', () => {
-    it('creates one idle document that has not been asked to start', async () => {
+    it('creates one idle document with no coverage and no request', async () => {
       await prisma.pagelinkbackfilljobs.ensureExists();
 
       expect(await prisma.pagelinkbackfilljobs.count()).toBe(1);
       expect(await readJob()).toMatchObject({
         status: 'idle',
-        phase: null,
-        recentCutoff: null,
+        requestedScope: null,
+        requestedAt: null,
+        stopRequested: false,
+        runCutoff: null,
+        runTotal: null,
+        coverage: 'none',
+        coveredSince: null,
         progressMarker: null,
-        recentProcessed: 0,
-        olderProcessed: 0,
-        startRequested: false,
+        processed: 0,
         completedAt: null,
         lastError: null,
         claimedBy: null,
@@ -48,28 +62,50 @@ describe('pagelinkbackfilljobs (integration)', () => {
       });
     });
 
-    it('leaves a start request and the progress fields untouched on a later boot', async () => {
+    it('stores every field of the document contract, including the empty ones', async () => {
+      await prisma.pagelinkbackfilljobs.ensureExists();
+
+      expect(await readStoredFieldNames()).toEqual(
+        [
+          '_id',
+          'status',
+          'requestedScope',
+          'requestedAt',
+          'stopRequested',
+          'runCutoff',
+          'runTotal',
+          'coverage',
+          'coveredSince',
+          'progressMarker',
+          'processed',
+          'completedAt',
+          'lastError',
+          'claimedBy',
+          'leaseExpiresAt',
+        ].sort(),
+      );
+    });
+
+    it('leaves coverage and the progress fields untouched on a later boot', async () => {
       await prisma.pagelinkbackfilljobs.ensureExists();
       const marker = new Types.ObjectId();
       await patchJobDocument({
-        startRequested: true,
-        status: 'paused',
-        phase: 'older',
+        status: 'stopped',
+        coverage: 'partial',
+        coveredSince: { $date: '2026-01-01T00:00:00Z' },
         progressMarker: { $oid: marker.toString() },
-        recentProcessed: 120,
-        olderProcessed: 7,
+        processed: 120,
       });
 
       await prisma.pagelinkbackfilljobs.ensureExists();
 
       expect(await prisma.pagelinkbackfilljobs.count()).toBe(1);
       expect(await readJob()).toMatchObject({
-        startRequested: true,
-        status: 'paused',
-        phase: 'older',
+        status: 'stopped',
+        coverage: 'partial',
+        coveredSince: new Date('2026-01-01T00:00:00Z'),
         progressMarker: marker.toString(),
-        recentProcessed: 120,
-        olderProcessed: 7,
+        processed: 120,
       });
     });
 
@@ -85,8 +121,6 @@ describe('pagelinkbackfilljobs (integration)', () => {
   });
 
   describe('tryClaim', () => {
-    const recentCutoff = new Date('2026-01-01T00:00:00Z');
-
     beforeEach(async () => {
       await prisma.pagelinkbackfilljobs.ensureExists();
     });
@@ -94,11 +128,9 @@ describe('pagelinkbackfilljobs (integration)', () => {
     it('succeeds for the first claimant and rejects a second while the lease is live', async () => {
       const first = await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
         leaseMs: LEASE_MS,
-        recentCutoff,
       });
       const second = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
         leaseMs: LEASE_MS,
-        recentCutoff,
       });
 
       expect(first).toBe(true);
@@ -114,7 +146,6 @@ describe('pagelinkbackfilljobs (integration)', () => {
         Array.from({ length: 5 }, (_, i) =>
           prisma.pagelinkbackfilljobs.tryClaim(`owner-${i}`, {
             leaseMs: LEASE_MS,
-            recentCutoff,
           }),
         ),
       );
@@ -127,13 +158,11 @@ describe('pagelinkbackfilljobs (integration)', () => {
     it('lets a new claimant take over once the owner lease has expired', async () => {
       await prisma.pagelinkbackfilljobs.tryClaim('dead-owner', {
         leaseMs: LEASE_MS,
-        recentCutoff,
       });
       await expireLease();
 
       const takenOver = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
         leaseMs: LEASE_MS,
-        recentCutoff,
       });
 
       expect(takenOver).toBe(true);
@@ -143,14 +172,12 @@ describe('pagelinkbackfilljobs (integration)', () => {
     it('lets the claim lapse on its own once the requested lease length has passed', async () => {
       await prisma.pagelinkbackfilljobs.tryClaim('short-lived', {
         leaseMs: 1,
-        recentCutoff,
       });
 
       await vi.waitFor(
         async () => {
           const claimed = await prisma.pagelinkbackfilljobs.tryClaim('next', {
             leaseMs: LEASE_MS,
-            recentCutoff,
           });
           expect(claimed).toBe(true);
         },
@@ -160,14 +187,14 @@ describe('pagelinkbackfilljobs (integration)', () => {
 
     it.each([
       'idle',
-      'paused',
+      'requested',
+      'stopped',
       'failed',
-    ])('hands out an unclaimed %s job, so a paused or failed run can resume', async (status) => {
+    ])('hands out an unclaimed %s job, so a request, a stopped run or a failed run can be picked up', async (status) => {
       await patchJobDocument({ status });
 
       const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
         leaseMs: LEASE_MS,
-        recentCutoff,
       });
 
       expect(claimed).toBe(true);
@@ -183,7 +210,6 @@ describe('pagelinkbackfilljobs (integration)', () => {
 
       const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
         leaseMs: LEASE_MS,
-        recentCutoff,
       });
 
       expect(claimed).toBe(false);
@@ -193,44 +219,26 @@ describe('pagelinkbackfilljobs (integration)', () => {
       });
     });
 
-    it('fixes the phase and recent cutoff at the first claim and keeps them on takeover', async () => {
-      await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
-        leaseMs: LEASE_MS,
-        recentCutoff,
-      });
-      await expireLease();
-
-      await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
-        leaseMs: LEASE_MS,
-        recentCutoff: new Date('2027-06-01T00:00:00Z'),
-      });
-
-      expect(await readJob()).toMatchObject({
-        phase: 'recent',
-        recentCutoff,
-      });
-    });
-
     it('keeps the progress marker across a takeover', async () => {
       const marker = new Types.ObjectId();
       await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
         leaseMs: LEASE_MS,
-        recentCutoff,
       });
       await patchJobDocument({
         progressMarker: { $oid: marker.toString() },
-        recentProcessed: 42,
+        processed: 42,
       });
       await expireLease();
 
-      await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
+      const takenOver = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
         leaseMs: LEASE_MS,
-        recentCutoff,
       });
 
+      expect(takenOver).toBe(true);
       expect(await readJob()).toMatchObject({
+        claimedBy: 'owner-b',
         progressMarker: marker.toString(),
-        recentProcessed: 42,
+        processed: 42,
       });
     });
 
@@ -239,7 +247,6 @@ describe('pagelinkbackfilljobs (integration)', () => {
 
       const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
         leaseMs: LEASE_MS,
-        recentCutoff,
       });
 
       expect(claimed).toBe(false);
