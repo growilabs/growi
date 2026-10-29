@@ -556,7 +556,7 @@ declare function resolveReactionGlyph(key: ReactionKey): string | null;
 | Requirements | 2.4, 2.5, 2.6, 2.7, 2.8, 7.1, 7.2, 7.3 |
 
 **Responsibilities & Constraints**
-- 呼び出し元（route）で、認証、閲覧判定、キーの検証が済んでいることを前提にする（追加は正規化済みのキーを受け取り、解除は形式だけを確かめた、送られたままのキーを受け取る。解除は今の絵文字データに無いキーでも通す）。投稿者本人かどうかは判定しない（要件 2.6）。
+- 呼び出し元（route）で、認証、閲覧判定、キーの検証が済んでいることを前提にする（追加は正規化済みのキーを受け取り、解除は形式だけを確かめた、送られたままのキーを受け取る。解除は今の絵文字データに無いキーでも、`unicode` 以外の名前空間のキーでも通す）。投稿者本人かどうかは判定しない（要件 2.6）。
 - 上限の判定: そのコメントに現在ある異なる `emoji` の数が `MAX_REACTION_KINDS_PER_COMMENT` 以上で、かつ追加する `emoji` がまだ無い場合だけ拒否する（要件 7.2、7.3）。
 
 **Contracts**: Service [x]
@@ -595,7 +595,7 @@ declare function removeReaction(
 ): Promise<RemoveReactionResult>;
 ```
 - 2つの関数は、`loadReactionChips` と同じく、依存（`{ prisma }`）を先頭の引数に取る。クラスやオブジェクトにまとめない。
-- Preconditions: `target` は閲覧判定済みの実在するコメント。`addReaction` の `emoji` は `normalizeReactionKey` を通ったキー。`removeReaction` の `emoji` は、route が `tryParseReactionKey` で形式だけを確かめた、送られたままのキー。
+- Preconditions: `target` は閲覧判定済みの実在するコメント。`addReaction` の `emoji` は `normalizeReactionKey` を通ったキー。`removeReaction` の `emoji` は、route が `isWellFormedReactionKey` で形式だけを確かめた、送られたままのキー（名前空間は `unicode` に限らない）。
 - Postconditions: `added` / `already-reacted` の後は行がちょうど1つ存在する。`removed` / `not-reacted` の後は行が存在しない。
 - Invariants: 同じ `(commentId, userId, emoji)` の行は高々1つ。
 
@@ -679,7 +679,7 @@ declare function loadReactionChips(
 - 対象の解決: `prisma.comments.findUnique({ where: { id }, select: { id, pageId } })` で存在を確認し、続けて `findPageAndMetaDataByViewer` で閲覧判定をする。どちらで失敗しても、同じ 404 `notfound_or_forbidden` を返す（要件 5.3、`page-write-action-403-404.md`）。
 - 監査ログ: `changed` が true のときだけ、`res.apiv3()` の前に `activityEvent.emit('update', res.locals.activity._id, { action, target: pageId, targetModel: MODEL_PAGE, event: commentId, eventModel: MODEL_COMMENT, snapshot: { username, emoji } })` を呼ぶ。
 - 応答のコメントは `getCommentListItem({ commentId, pageId, viewerId: req.user._id })` で作る。書き込みの後に読み直すので、他の利用者のリアクションも含めた最新の状態になる（要件 2.9）。読み直しの `await` は emit より前に済ませ、emit と `res.apiv3()` の間に `await` を挟まない（Rule 1）。
-- 読み直しが `null`（対象の解決のあと、書き込みか読み直しまでの間にコメントが削除された）のときは、この要求で行を追加していた（`isReacted: true` で `changed: true`）なら、その行を削除してから、emit せずに 404 `notfound_or_forbidden` を返す。削除は、削除済みのコメントに行が孤立して残らないようにするため。利用者から見ると対象がもう無いので、対象の解決で見つからなかったときと同じ応答にそろえる。追加・解除としては記録せず（要件 9.4 の「拒否」と同じ扱い）、`addActivity` の finalizer が `ACTION_UNSETTLED` を残す。コメントの削除そのものは `COMMENT_REMOVE` で記録される。
+- 読み直しが `null`（対象の解決のあと、書き込みか読み直しまでの間にコメントが削除された）のときは、この要求で行を追加していた（`isReacted: true` で `changed: true`）なら、その行を削除してから、emit せずに 404 `notfound_or_forbidden` を返す。削除は、削除済みのコメントに行が孤立して残らないようにするため。削除は努力目標で、失敗しても 404 を返し、失敗はログに残す（500 にしない）。利用者から見ると対象がもう無いので、対象の解決で見つからなかったときと同じ応答にそろえる。追加・解除としては記録せず（要件 9.4 の「拒否」と同じ扱い）、`addActivity` の finalizer が `ACTION_UNSETTLED` を残す。コメントの削除そのものは `COMMENT_REMOVE` で記録される。
 - 読み直しでリアクションの取り込みだけが失敗した（`comment.reactions` が `null`）ときは、書き込みは成功しているので、200 と `changed` の値をそのまま返す。クライアントはこの `comment` で置き換えず、一覧を取り直す（「useCommentReactions」を参照）。
 
 **Contracts**: API [x]
@@ -703,7 +703,7 @@ type UpdateCommentReactionResponseBody = {
 };
 ```
 - 型は `features/comment-reaction/dto/update-comment-reaction.ts` に置く（応答が `comment` の `ICommentListItem` を含み、層 1 の `interfaces` から `comment` を import できないため）。
-- Validation: `id` は `isMongoId()`。`emoji` は `isString()` と長さの上限（64 文字）のあと、handler で、追加は `normalizeReactionKey` を通し、解除は `tryParseReactionKey` で形式だけを確かめる（今の絵文字データに無いキーでも通す）。`isReacted` は `isBoolean({ strict: true })`。
+- Validation: `id` は `isMongoId()`。`emoji` は `isString()` と長さの上限（64 文字）のあと、handler で、追加は `normalizeReactionKey` を通し、解除は `isWellFormedReactionKey` で形式だけを確かめる（今の絵文字データに無いキーでも、`unicode` 以外の名前空間のキーでも通す）。`isReacted` は `isBoolean({ strict: true })`。
 - 追加と解除を1つの PUT の body にまとめるのは、ページの「いいね」（`PUT /_api/v3/page/likes` の `{ pageId, bool }`）と揃えるためと、`emoji` をクエリに載せないため（`unicode:+1` の `+` は、クエリでは手で書いた要求で空白に化ける）。
 - Idempotency: 同じ PUT を何度送っても結果の状態は同じで、2回目以降は `changed: false`（要件 2.7、2.8）。
 - エラーの応答（4xx / 5xx）には `comment` を含めない。クライアントの扱いは「useCommentReactions」の「失敗時の扱い」に従う。
@@ -844,7 +844,7 @@ type CommentReactionBarProps = {
   - 2つの部分は区切り線を引かず、絵文字の右側と人数の左側の余白を 0 にして詰める。絵文字だけのチップを想定して、高さは `min-height: 1.5rem` までにする（押せる部分は2つのまま）。
   - Popover の対象は、人数ボタンへの ref（`ReactionUsersPopover` の `target` は `RefObject<HTMLElement>`）。`useId()` の文字列はコロンを含み、reactstrap がセレクターとして解決できないため使わない（`apps/app/.claude/rules/ui-pitfalls.md`）。
 - ReactionUsersPopover: reactstrap の `Popover`（`trigger="legacy"`。クリック・タップで開き、外側のクリック・タップで閉じる）で、チップの `users` を `createdAt` の昇順のまま並べる。表示名は、`name` があれば `name`、無ければ `username`、ID 文字列ならそのまま（要件 1.10）。人数が多いときは、高さの上限を決めて中をスクロールさせる。
-- AddReactionButton: 見た目は Material Symbols Outlined の `add_reaction`（`material-symbols-outlined fs-5`、`aria-hidden`）で、読み上げ名は `button` の `aria-label`（`comment_reaction.add_reaction`）が担う。高さはチップと同じ `min-height: 1.5rem`。リアクションが 0 件のコメントでは、ふだんは見えなくし、そのコメントにマウスを乗せたとき、またはこのボタンにキーボードでフォーカスしたときに表示する（ホバーできない端末と、1 件以上あるコメントでは常に表示）。隠すのは `opacity: 0` で行い、`display` や `visibility` は使わない（Tab で到達でき、読み上げの名前も変わらない）。0 件のときバーは高さ 0 になり、ボタンはコメントの下端に重ねて置くので、表示してもレイアウトは動かない。バーの直後にエラー文や削除確認が出ているときだけ、バーの下に 1rem の余白（`margin-bottom`。次の要素の余白と重なり、大きいほうだけが効く）を取り、ボタンと重ならないようにする。ホバーの範囲は `.page-comment-main`（ページ末尾のコメント、インラインコメントとその返信）と、ポップオーバーの各項目を包む `.comment-reaction-hover-scope` で、いずれもコメント1件ごとに独立している。`canReact` のときだけ描画する（要件 3.1、5.4、5.6、5.7）。ツールチップは常に表示し（ホバーとキーボードフォーカス）、通常は `comment_reaction.add_reaction` を示す。チップの数が `MAX_REACTION_KINDS_PER_COMMENT` 以上なら無効化し、ツールチップの文言を `comment_reaction.kind_limit_reached` に切り替えて上限に達したことを示す。サーバーの 409 を受けた場合は、`useCommentReactions` が同じ文言のトーストを出して一覧を取り直す（要件 7.2）。ピッカーの `onSelect` は `fromPickerSelection` でキーにし、`setReaction(key, true)` を呼ぶ（要件 3.3、3.4）。閉じたら何もしない（要件 3.6）。
+- AddReactionButton: 見た目は Material Symbols Outlined の `add_reaction`（`material-symbols-outlined fs-5`、`aria-hidden`）で、読み上げ名は `button` の `aria-label`（`comment_reaction.add_reaction`）が担う。高さはチップと同じ `min-height: 1.5rem`。リアクションが 0 件のコメントでは、ふだんは見えなくし、そのコメントにマウスを乗せたとき、またはこのボタンにキーボードでフォーカスしたときに表示する（ホバーできない端末と、1 件以上あるコメントでは常に表示）。隠すのは `opacity: 0` で行い、`display` や `visibility` は使わない（Tab で到達でき、読み上げの名前も変わらない）。隠している間は `pointer-events: none` も付け、コメント本文の最終行に重なっても、クリックや文字の選択を受け取らない（表示したときに戻す）。0 件のときバーは高さ 0 になり、ボタンはコメントの下端に重ねて置くので、表示してもレイアウトは動かない。バーの直後にエラー文や削除確認が出ているときだけ、バーの下に 1rem の余白（`margin-bottom`。次の要素の余白と重なり、大きいほうだけが効く）を取り、ボタンと重ならないようにする。ホバーの範囲は `.page-comment-main`（ページ末尾のコメント、インラインコメントとその返信）と、ポップオーバーの各項目を包む `.comment-reaction-hover-scope` で、いずれもコメント1件ごとに独立している。`canReact` のときだけ描画する（要件 3.1、5.4、5.6、5.7）。ツールチップは常に表示し（ホバーとキーボードフォーカス）、通常は `comment_reaction.add_reaction` を示す。チップの数が `MAX_REACTION_KINDS_PER_COMMENT` 以上なら無効化し、ツールチップの文言を `comment_reaction.kind_limit_reached` に切り替えて上限に達したことを示す。サーバーの 409 を受けた場合は、`useCommentReactions` が同じ文言のトーストを出して一覧を取り直す（要件 7.2）。ピッカーの `onSelect` は `fromPickerSelection` でキーにし、`setReaction(key, true)` を呼ぶ（要件 3.3、3.4）。閉じたら何もしない（要件 3.6）。
 - EmojiPicker（`packages/editor`）: props は `{ isOpen: boolean; onSelect: (selection: EmojiPickerSelection) => void; onClose: () => void; theme?: 'light' | 'dark' | 'auto' }`。`EmojiPickerSelection` は絵文字の種類を `kind` で見分ける判別ユニオンで、いまのメンバーは `{ kind: 'native'; id: string; skin?: number }` だけ。初めて開いたときに `@emoji-mart/react` と `@emoji-mart/data` を動的 import する（ページ表示時の読み込みを増やさない）。読み込みに失敗したときはエラーを `console.error` に記録して `onClose` を呼ぶ。親の開閉の状態が閉に戻るので、次に開いたときに読み込みをやり直せる（「リアクション追加」が効かなくなったままにならない）。`@emoji-mart/data` の既定の export は `sets/15/native.json` で、`@growi/emoji-mart-data` の抽出元（サーバーの検証の根拠）と同じデータなので、ピッカーで選べる絵文字はすべてサーバーの検証を通る。reactstrap の `Modal`（中央寄せ）で表示し、`modal-content` の背景・枠線・影（`box-shadow`）はすべて消して、ピッカーだけが見えるようにし、スマートフォンでも使える。`skinTonePosition` を有効にする（要件 3.5）。
 - 文言: `comment_reaction.add_reaction`、`comment_reaction.reacted_by`、`comment_reaction.reacted_count`、`comment_reaction.kind_limit_reached`、`comment_reaction.comment_unavailable`、`comment_reaction.update_failed` を5言語に追加する。
 

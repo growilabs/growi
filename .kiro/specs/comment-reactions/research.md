@@ -203,7 +203,7 @@
   3. 両方入れる
 - **Selected Approach**: 3。`removeReaction` は送られたままのキーとその正規形の両方を `deleteMany` の対象にし、`overwrite-params/comment-reactions.ts` は `emoji` を正規化する（正規化できない値はそのまま返す）。
 - **Rationale**: インポートの正規化で今後の行を正規の形にそろえ、解除の両方削除で、すでに入った行を外せるようにする。
-- **解除時の検証**: 追加（`isReacted: true`）は `normalizeReactionKey` で確かめるが、解除（`isReacted: false`）は `tryParseReactionKey` で形式だけを確かめ、今の絵文字データにあるかは問わずに `removeReaction` へ渡す。今の絵文字データに無い id のキーで保存された行も外せるようにするため。形式に合わない値は `invalid-reaction-emoji` の 400。監査ログの snapshot の `emoji` は、正規化できれば正規形、できなければ送られたキー。
+- **解除時の検証**: 追加（`isReacted: true`）は `normalizeReactionKey` で確かめるが、解除（`isReacted: false`）は `isWellFormedReactionKey` で形式だけを確かめ、名前空間も今の絵文字データも問わずに `removeReaction` へ渡す。今の絵文字データに無い id のキーや、`unicode` 以外の名前空間のキー（インポートで入った `custom:foo` など）で保存された行も外せるようにするため。形式に合わない値は `invalid-reaction-emoji` の 400。監査ログの snapshot の `emoji` は、正規化できれば正規形、できなければ送られたキー。
 - **Trade-offs**: `removeReaction` の引数が `ReactionKey` から送られたままの文字列に広がり、サービスで再度正規化する。別名と正規のキーの行が同じ `(commentId, userId)` に両方あるとき、別名のチップを押して解除すると、送られたキーと正規形の両方が対象になるので両方の行が消える（同じ絵文字なので意図どおり）。正規のチップを押して解除した場合は、送られたキーが正規形そのものなので正規の行だけが消え、別名の行とそのチップは残る。
 - **Follow-up**: 次の点は未対応で、先送りにする。表示側で正規化してまとめるか、既存の行を移行で正規化するかを別途決める。
   - 別名のキーの行が別のチップとして表示される（要件 4.5）。

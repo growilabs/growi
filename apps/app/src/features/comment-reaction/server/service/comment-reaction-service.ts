@@ -71,7 +71,7 @@ export const addReaction = async (
   return { kind: 'added' };
 };
 
-/** `emoji` is the key as sent; the canonical form is removed too (see research.md, "解除は送られたキーと正規化したキーの両方で削除し…"). */
+/** `emoji` is the key as sent; the canonical form is removed too (see research.md, Decision: removal deletes by both the sent and the normalized key). */
 export const removeReaction = async (
   { prisma: client }: CommentReactionServiceDeps,
   { commentId }: ReactionTarget,

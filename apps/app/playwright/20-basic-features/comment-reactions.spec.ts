@@ -229,15 +229,20 @@ test.describe('Comment reactions', () => {
     const addReaction = addButton.locator('xpath=..');
     await page.mouse.move(0, 0);
     await expect(addReaction).toHaveCSS('opacity', '0');
+    // Hidden, it must not swallow clicks or selection meant for the comment text underneath.
+    await expect(addReaction).toHaveCSS('pointer-events', 'none');
     await comment.hover();
     await expect(addReaction).toHaveCSS('opacity', '1');
+    await expect(addReaction).toHaveCSS('pointer-events', 'auto');
     await page.mouse.move(0, 0);
     await expect(addReaction).toHaveCSS('opacity', '0');
+    await expect(addReaction).toHaveCSS('pointer-events', 'none');
     await addButton.focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     await expect(addButton).toBeFocused();
     await expect(addReaction).toHaveCSS('opacity', '1');
+    await expect(addReaction).toHaveCSS('pointer-events', 'auto');
     await expect(reactionCountButtons(comment)).toHaveCount(0);
   });
 

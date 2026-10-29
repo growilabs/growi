@@ -86,6 +86,8 @@
 
 // With no reaction yet, the add button is revealed by hovering its comment or focusing it.
 // `opacity` (not `visibility`/`display`) keeps it in the tab order and the accessibility tree.
+// `opacity` alone still catches clicks and text selection, so the hidden button also gets
+// `pointer-events: none` (it overlays the comment's last line) and gets them back when revealed.
 // The bar collapses to zero height and the button overlays the comment's bottom edge, so
 // revealing it does not shift the layout. Without hover support (touch) it stays visible.
 @media (hover: hover) {
@@ -97,9 +99,11 @@
       position: absolute;
       top: -0.5rem;
       left: 0;
+      pointer-events: none;
       opacity: 0;
 
       &:has(:focus-visible) {
+        pointer-events: auto;
         opacity: 1;
       }
     }
@@ -119,6 +123,7 @@
 
   :global(.page-comment-main):hover .reaction-bar-empty .add-reaction,
   :global(.comment-reaction-hover-scope):hover .reaction-bar-empty .add-reaction {
+    pointer-events: auto;
     opacity: 1;
   }
 }

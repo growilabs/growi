@@ -15,7 +15,17 @@ import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
 import { prisma } from '~/utils/prisma';
 
 import { MAX_REACTION_KINDS_PER_COMMENT } from '../../interfaces';
+import { removeReaction } from '../service/comment-reaction-service';
 import { updateCommentReactionRouteHandlersFactory } from './update';
+
+// Wraps the real implementation so a test can make the clean-up removal fail once.
+vi.mock('../service/comment-reaction-service', async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import('../service/comment-reaction-service')
+    >();
+  return { ...original, removeReaction: vi.fn(original.removeReaction) };
+});
 
 // Same harness as comment/server/routes/get.integ.ts: the real middleware chain
 // runs unmodified, an upstream middleware injects `req.user`, and the router is
@@ -484,6 +494,7 @@ describe('PUT /_api/v3/comments/:id/reactions', () => {
         'a skin tone on an emoji without skin tones',
         'unicode:100::skin-tone-2',
       ],
+      ['a namespace other than unicode', 'custom:foo'],
     ])('removes a row stored under %s', async (_label, emoji) => {
       currentUser = viewer;
       const commentId = await createComment();
@@ -505,8 +516,8 @@ describe('PUT /_api/v3/comments/:id/reactions', () => {
     });
 
     it.each([
-      ['an unsupported namespace', 'custom:party'],
       ['a value that is not a reaction key', 'thumbsup'],
+      ['a key with an empty shortcode', 'custom:'],
     ])('rejects removing %s with 400 invalid-reaction-emoji', async (_label, emoji) => {
       currentUser = viewer;
       const commentId = await createComment();
@@ -607,6 +618,28 @@ describe('PUT /_api/v3/comments/:id/reactions', () => {
       expect(
         await prisma.commentreactions.count({ where: { commentId } }),
       ).toBe(0);
+    });
+
+    it('answers 404 even when removing the row it added fails after the comment is gone', async () => {
+      currentUser = viewer;
+      const commentId = await createComment();
+      const findByIdAndViewer = Page.findByIdAndViewer.bind(Page);
+      vi.spyOn(Page, 'findByIdAndViewer').mockImplementationOnce(
+        async (...args) => {
+          await prisma.comments.delete({ where: { id: commentId } });
+          return findByIdAndViewer(...args);
+        },
+      );
+      vi.mocked(removeReaction).mockRejectedValueOnce(
+        new Error('SECRET-INTERNAL-DETAIL'),
+      );
+
+      const res = await putReaction(commentId, VALID_BODY);
+
+      expect(res.status).toBe(404);
+      expect(res.body.errors).toEqual([
+        expect.objectContaining({ code: 'notfound_or_forbidden' }),
+      ]);
     });
 
     it('answers 200 with reactions: null when only the reactions cannot be read back', async () => {

@@ -25,6 +25,7 @@ const groupBy = <T>(
     const key = keyOf(item);
     const group = groups.get(key);
     if (group != null) {
+      // Mutates only the array built in this function (never visible to callers); copying per item would be quadratic.
       group.push(item);
     } else {
       groups.set(key, [item]);

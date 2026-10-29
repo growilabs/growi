@@ -28,7 +28,7 @@ import type {
   UpdateCommentReactionResponseBody,
 } from '../../dto';
 import type { ReactionKey } from '../../interfaces';
-import { normalizeReactionKey, tryParseReactionKey } from '../../utils';
+import { isWellFormedReactionKey, normalizeReactionKey } from '../../utils';
 import {
   addReaction,
   removeReaction,
@@ -49,7 +49,7 @@ type Req = Request<
 
 type ReactionTarget = { commentId: string; pageId: string };
 
-// Removal validates shape only (see research.md, "解除は送られたキーと正規化したキーの両方で削除し…").
+// Removal validates shape only (see research.md, Decision: removal deletes by both the sent and the normalized key).
 type ReactionChange =
   | { readonly isReacted: true; readonly emoji: ReactionKey }
   | {
@@ -70,7 +70,7 @@ const resolveReactionChange = (body: {
   if (body.isReacted) {
     return normalized.ok ? { isReacted: true, emoji: normalized.value } : null;
   }
-  if (!normalized.ok && tryParseReactionKey(body.emoji) == null) {
+  if (!normalized.ok && !isWellFormedReactionKey(body.emoji)) {
     return null;
   }
   return {
@@ -145,6 +145,19 @@ const recordReactionActivity = (
       emoji: change.isReacted ? change.emoji : change.loggedEmoji,
     },
   });
+};
+
+// Best effort: the 404 is already the answer, so a failed clean-up is only logged.
+const cleanUpReactionOfDeletedComment = async (
+  target: ReactionTarget,
+  userId: string,
+  emoji: ReactionKey,
+): Promise<void> => {
+  try {
+    await removeReaction({ prisma }, target, userId, emoji);
+  } catch (err) {
+    logger.error('Failed to remove the reaction of a deleted comment', err);
+  }
 };
 
 const invalidReactionEmojiError = (): ErrorV3 =>
@@ -232,10 +245,12 @@ const updateFailedError = (): ErrorV3 =>
  *              `validation_failed`); or, when adding, `emoji` is not a usable
  *              reaction, such as an unknown emoji or a skin tone on an emoji
  *              without skin tones; or, when removing, `emoji` is not shaped
- *              like a reaction key (`unicode:<shortcode>[::skin-tone-N]`)
- *              (error code `invalid-reaction-emoji`). A removal does not check
- *              the emoji against the current emoji data, so a stored reaction
- *              whose emoji is no longer known can still be removed.
+ *              like a reaction key (`<namespace>:<shortcode>[::skin-tone-N]`)
+ *              (error code `invalid-reaction-emoji`). A removal checks only
+ *              the shape: neither the namespace nor the emoji is checked
+ *              against the current emoji data, so a stored reaction whose
+ *              emoji is no longer known, or whose namespace is not `unicode`
+ *              (e.g. imported data), can still be removed.
  *            content:
  *              application/json:
  *                schema:
@@ -313,7 +328,7 @@ export const updateCommentReactionRouteHandlersFactory = (
         if (comment == null) {
           // The comment was deleted after the check; do not leave the row behind.
           if (change.isReacted && result.changed) {
-            await removeReaction({ prisma }, target, userId, change.emoji);
+            await cleanUpReactionOfDeletedComment(target, userId, change.emoji);
           }
           return res.apiv3Err(notFoundOrForbidden(), 404);
         }
