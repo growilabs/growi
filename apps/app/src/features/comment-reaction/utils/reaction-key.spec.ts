@@ -4,7 +4,6 @@ import emojiNativeLookup from '@growi/emoji-mart-data';
 import type { ReactionKey } from '../interfaces';
 import {
   fromPickerSelection,
-  isWellFormedReactionKey,
   normalizeReactionKey,
   parseReactionKey,
   resolveReactionGlyph,
@@ -192,24 +191,6 @@ describe('tryParseReactionKey', () => {
 
   it('returns null for a well-formed key outside the unicode namespace', () => {
     expect(tryParseReactionKey('custom:party')).toBeNull();
-  });
-});
-
-describe('isWellFormedReactionKey', () => {
-  it.each([
-    'unicode:+1',
-    'unicode:+1::skin-tone-3',
-    'unicode:removed_in_new_data',
-    'custom:party',
-    'custom:party::skin-tone-2',
-  ])('accepts "%s", whatever its namespace or emoji data', (key) => {
-    expect(isWellFormedReactionKey(key)).toBe(true);
-  });
-
-  it.each(
-    MALFORMED_KEYS.filter((key) => key !== 'custom:+1'),
-  )('rejects "%s"', (key) => {
-    expect(isWellFormedReactionKey(key)).toBe(false);
   });
 });
 

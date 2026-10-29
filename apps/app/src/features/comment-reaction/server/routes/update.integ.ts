@@ -18,6 +18,18 @@ import { MAX_REACTION_KINDS_PER_COMMENT } from '../../interfaces';
 import { removeReaction } from '../service/comment-reaction-service';
 import { updateCommentReactionRouteHandlersFactory } from './update';
 
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn(),
+  },
+}));
+vi.mock('~/utils/logger', () => ({ default: () => mockLogger }));
+
 // Wraps the real implementation so a test can make the clean-up removal fail once.
 vi.mock('../service/comment-reaction-service', async (importOriginal) => {
   const original =
@@ -495,6 +507,11 @@ describe('PUT /_api/v3/comments/:id/reactions', () => {
         'unicode:100::skin-tone-2',
       ],
       ['a namespace other than unicode', 'custom:foo'],
+      ['a value that is not a reaction key', 'thumbsup'],
+      ['a key with an empty shortcode', 'custom:'],
+      ['a skin tone suffix of 1', 'unicode:+1::skin-tone-1'],
+      ['a key longer than 64 characters', `unicode:${'a'.repeat(80)}`],
+      ['a key of exactly 1024 characters', `unicode:${'a'.repeat(1016)}`],
     ])('removes a row stored under %s', async (_label, emoji) => {
       currentUser = viewer;
       const commentId = await createComment();
@@ -513,21 +530,6 @@ describe('PUT /_api/v3/comments/:id/reactions', () => {
       expect(res.status).toBe(200);
       expect(res.body.changed).toBe(true);
       expect(await countRows(commentId, String(viewer._id), emoji)).toBe(0);
-    });
-
-    it.each([
-      ['a value that is not a reaction key', 'thumbsup'],
-      ['a key with an empty shortcode', 'custom:'],
-    ])('rejects removing %s with 400 invalid-reaction-emoji', async (_label, emoji) => {
-      currentUser = viewer;
-      const commentId = await createComment();
-
-      const res = await putReaction(commentId, { emoji, isReacted: false });
-
-      expect(res.status).toBe(400);
-      expect(res.body.errors).toEqual([
-        expect.objectContaining({ code: 'invalid-reaction-emoji' }),
-      ]);
     });
 
     it('lets the author react to their own comment', async () => {
@@ -633,6 +635,7 @@ describe('PUT /_api/v3/comments/:id/reactions', () => {
       vi.mocked(removeReaction).mockRejectedValueOnce(
         new Error('SECRET-INTERNAL-DETAIL'),
       );
+      mockLogger.error.mockClear();
 
       const res = await putReaction(commentId, VALID_BODY);
 
@@ -640,6 +643,14 @@ describe('PUT /_api/v3/comments/:id/reactions', () => {
       expect(res.body.errors).toEqual([
         expect.objectContaining({ code: 'notfound_or_forbidden' }),
       ]);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          commentId,
+          userId: String(viewer._id),
+          emoji: VALID_BODY.emoji,
+        }),
+        expect.any(String),
+      );
     });
 
     it('answers 200 with reactions: null when only the reactions cannot be read back', async () => {
@@ -704,6 +715,11 @@ describe('PUT /_api/v3/comments/:id/reactions', () => {
         'an emoji longer than 64 characters',
         VALID_ID,
         { emoji: `unicode:${'a'.repeat(57)}`, isReacted: true },
+      ],
+      [
+        'an emoji longer than 1024 characters on removal',
+        VALID_ID,
+        { emoji: `unicode:${'a'.repeat(1017)}`, isReacted: false },
       ],
       [
         'isReacted sent as the string "true"',

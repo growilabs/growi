@@ -1,6 +1,5 @@
 export {
   fromPickerSelection,
-  isWellFormedReactionKey,
   normalizeReactionKey,
   parseReactionKey,
   resolveReactionGlyph,

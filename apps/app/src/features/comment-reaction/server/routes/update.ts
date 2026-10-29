@@ -28,7 +28,7 @@ import type {
   UpdateCommentReactionResponseBody,
 } from '../../dto';
 import type { ReactionKey } from '../../interfaces';
-import { isWellFormedReactionKey, normalizeReactionKey } from '../../utils';
+import { normalizeReactionKey } from '../../utils';
 import {
   addReaction,
   removeReaction,
@@ -36,7 +36,9 @@ import {
 
 const logger = loggerFactory('growi:routes:apiv3:comments:reactions:update');
 
-const MAX_EMOJI_LENGTH = 64;
+const MAX_ADD_EMOJI_LENGTH = 64;
+// Loose on purpose: a removal must still reach long keys that an import stored.
+const MAX_REMOVE_EMOJI_LENGTH = 1024;
 
 type Req = Request<
   { id: string },
@@ -49,7 +51,7 @@ type Req = Request<
 
 type ReactionTarget = { commentId: string; pageId: string };
 
-// Removal validates shape only (see research.md, Decision: removal deletes by both the sent and the normalized key).
+// Removal passes the sent key through unchecked (see research.md, Decision: removal deletes by both the sent and the normalized key).
 type ReactionChange =
   | { readonly isReacted: true; readonly emoji: ReactionKey }
   | {
@@ -69,9 +71,6 @@ const resolveReactionChange = (body: {
   const normalized = normalizeReactionKey(body.emoji);
   if (body.isReacted) {
     return normalized.ok ? { isReacted: true, emoji: normalized.value } : null;
-  }
-  if (!normalized.ok && !isWellFormedReactionKey(body.emoji)) {
-    return null;
   }
   return {
     isReacted: false,
@@ -156,7 +155,10 @@ const cleanUpReactionOfDeletedComment = async (
   try {
     await removeReaction({ prisma }, target, userId, emoji);
   } catch (err) {
-    logger.error('Failed to remove the reaction of a deleted comment', err);
+    logger.error(
+      { err, commentId: target.commentId, userId, emoji },
+      'Failed to remove the reaction of a deleted comment',
+    );
   }
 };
 
@@ -211,14 +213,16 @@ const updateFailedError = (): ErrorV3 =>
  *                properties:
  *                  emoji:
  *                    type: string
- *                    maxLength: 64
  *                    description: >
  *                      Reaction key: `unicode:` followed by the emoji shortcode,
  *                      optionally with a skin tone suffix `::skin-tone-2` to
  *                      `::skin-tone-6` (e.g. `unicode:+1`,
  *                      `unicode:+1::skin-tone-3`). Aliases (e.g.
  *                      `unicode:thumbsup`) are accepted and stored as the
- *                      canonical shortcode.
+ *                      canonical shortcode. When adding, at most 64
+ *                      characters. When removing, at most 1024 characters
+ *                      and no format check: the string is matched against
+ *                      the stored key as sent.
  *                  isReacted:
  *                    type: boolean
  *                    description: true to add the reaction, false to remove it.
@@ -241,16 +245,14 @@ const updateFailedError = (): ErrorV3 =>
  *          400:
  *            description: >
  *              A parameter is missing or malformed, or the requester is a
- *              read-only user who may not comment (error code
- *              `validation_failed`); or, when adding, `emoji` is not a usable
+ *              read-only user who may not comment, or `emoji` is longer than
+ *              the limit (error code `validation_failed`); or, when adding, `emoji` is not a usable
  *              reaction, such as an unknown emoji or a skin tone on an emoji
- *              without skin tones; or, when removing, `emoji` is not shaped
- *              like a reaction key (`<namespace>:<shortcode>[::skin-tone-N]`)
- *              (error code `invalid-reaction-emoji`). A removal checks only
- *              the shape: neither the namespace nor the emoji is checked
- *              against the current emoji data, so a stored reaction whose
+ *              without skin tones (error code `invalid-reaction-emoji`). A
+ *              removal does not check `emoji` against the reaction key
+ *              format, so a stored reaction whose key is malformed, whose
  *              emoji is no longer known, or whose namespace is not `unicode`
- *              (e.g. imported data), can still be removed.
+ *              (e.g. imported data) can still be removed.
  *            content:
  *              application/json:
  *                schema:
@@ -289,7 +291,16 @@ export const updateCommentReactionRouteHandlersFactory = (
 
   const validator = [
     param('id').isMongoId(),
-    body('emoji').isString().bail().isLength({ max: MAX_EMOJI_LENGTH }),
+    body('emoji')
+      .isString()
+      .bail()
+      .custom((value: string, { req }) => {
+        const max =
+          req.body.isReacted === false
+            ? MAX_REMOVE_EMOJI_LENGTH
+            : MAX_ADD_EMOJI_LENGTH;
+        return value.length <= max;
+      }),
     body('isReacted').isBoolean({ strict: true }),
   ];
 

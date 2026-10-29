@@ -39,8 +39,8 @@ describe('prisma.commentreactions', () => {
   });
 
   // Users that still own other relations (e.g. comments.creator) are out of
-  // scope: only the reaction must not block the delete (see design.md
-  // "削除経路の拡張").
+  // scope: only the reaction must not block the delete (see the deletion-path
+  // extension section of design.md).
   it('lets a reacting user be deleted through Prisma without P2014', async () => {
     const userId = new ObjectId().toString();
     await prisma.users.create({

@@ -115,10 +115,6 @@ export const tryParseReactionKey = (key: string): ParsedReactionKey | null => {
   return { namespace: SUPPORTED_NAMESPACE, shortcode, skinTone };
 };
 
-/** Shape-only check for a key to remove: any namespace and any emoji id, since stored rows may come from an import or older emoji data. */
-export const isWellFormedReactionKey = (key: string): boolean =>
-  parseStructure(key).ok;
-
 export const parseReactionKey = (key: ReactionKey): ParsedReactionKey => {
   const parsed = tryParseReactionKey(key);
   if (parsed == null) {

@@ -141,8 +141,8 @@ export const extension = Prisma.defineExtension((client) => {
             where: { replyToId: commentId },
             select: { id: true },
           });
-          // Children first (reactions -> replies -> comment): see design.md
-          // "削除経路の拡張".
+          // Children first (reactions -> replies -> comment): see the
+          // deletion-path extension section of design.md.
           await client.$transaction([
             client.commentreactions.deleteMany({
               where: {

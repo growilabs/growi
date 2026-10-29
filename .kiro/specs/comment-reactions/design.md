@@ -595,7 +595,7 @@ declare function removeReaction(
 ): Promise<RemoveReactionResult>;
 ```
 - 2つの関数は、`loadReactionChips` と同じく、依存（`{ prisma }`）を先頭の引数に取る。クラスやオブジェクトにまとめない。
-- Preconditions: `target` は閲覧判定済みの実在するコメント。`addReaction` の `emoji` は `normalizeReactionKey` を通ったキー。`removeReaction` の `emoji` は、route が `isWellFormedReactionKey` で形式だけを確かめた、送られたままのキー（名前空間は `unicode` に限らない）。
+- Preconditions: `target` は閲覧判定済みの実在するコメント。`addReaction` の `emoji` は `normalizeReactionKey` を通ったキー。`removeReaction` の `emoji` は、形を確かめない、送られたままのキー（名前空間は `unicode` に限らず、形の崩れたキーも含む）。
 - Postconditions: `added` / `already-reacted` の後は行がちょうど1つ存在する。`removed` / `not-reacted` の後は行が存在しない。
 - Invariants: 同じ `(commentId, userId, emoji)` の行は高々1つ。
 
@@ -703,7 +703,7 @@ type UpdateCommentReactionResponseBody = {
 };
 ```
 - 型は `features/comment-reaction/dto/update-comment-reaction.ts` に置く（応答が `comment` の `ICommentListItem` を含み、層 1 の `interfaces` から `comment` を import できないため）。
-- Validation: `id` は `isMongoId()`。`emoji` は `isString()` と長さの上限（64 文字）のあと、handler で、追加は `normalizeReactionKey` を通し、解除は `isWellFormedReactionKey` で形式だけを確かめる（今の絵文字データに無いキーでも、`unicode` 以外の名前空間のキーでも通す）。`isReacted` は `isBoolean({ strict: true })`。
+- Validation: `id` は `isMongoId()`。`emoji` は `isString()`、長さの上限は追加が 64 文字、解除が 1024 文字（インポートで入った長めのキーも外せるよう、解除はゆるくしてある）で、超えれば 400 `validation_failed`。handler で、追加は `normalizeReactionKey` を通し、解除は形を確かめずそのまま渡す（今の絵文字データに無いキーでも、`unicode` 以外の名前空間のキーでも、形の崩れたキーでも通す）。`isReacted` は `isBoolean({ strict: true })`。
 - 追加と解除を1つの PUT の body にまとめるのは、ページの「いいね」（`PUT /_api/v3/page/likes` の `{ pageId, bool }`）と揃えるためと、`emoji` をクエリに載せないため（`unicode:+1` の `+` は、クエリでは手で書いた要求で空白に化ける）。
 - Idempotency: 同じ PUT を何度送っても結果の状態は同じで、2回目以降は `changed: false`（要件 2.7、2.8）。
 - エラーの応答（4xx / 5xx）には `comment` を含めない。クライアントの扱いは「useCommentReactions」の「失敗時の扱い」に従う。
@@ -880,7 +880,7 @@ type CommentReactionBarProps = {
 
 ### Error Strategy
 - 認可の失敗は、ミドルウェアの既存の応答（401/403、閲覧専用ユーザーは 400 `validation_failed`）。対象の不在と閲覧権限の欠如は、同じ 404 `notfound_or_forbidden`（要件 5.3）。単体取得で、コメントが指定したページのものでないときも同じ 404。
-- 業務規則の違反: 不正な絵文字は 400 `invalid-reaction-emoji`（要件 4.2、4.4）。種類数の上限は 409 `reaction-kind-limit-exceeded`（要件 7.2）。
+- 業務規則の違反: 追加時の不正な絵文字は 400 `invalid-reaction-emoji`（要件 4.2、4.4）。種類数の上限は 409 `reaction-kind-limit-exceeded`（要件 7.2）。
 - 読み取りでのリアクションの取り込みの失敗: コメントは返し、`reactions: null` にしてログを残す（要件 6.5）。
 - 予期しない失敗: 500 で、内部の詳細を含まないコード（`comment-get-failed` / `comment-reaction-update-failed`）を返し、サーバーには logger で記録する。
 - 状態を変えない要求（既に付いている、既に外れている）はエラーにしない（要件 2.7、2.8）。
