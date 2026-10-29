@@ -11,7 +11,7 @@
 ---
 
 - [ ] 1. 「連携があるか」の判定を作る
-- [ ] 1.1 連携の有無を答え、その答えを 10 分覚える部品を作る（振る舞い）
+- [x] 1.1 連携の有無を答え、その答えを 10 分覚える部品を作る（振る舞い）
   - `server/integration-presence.ts` に `IntegrationPresence` と `createIntegrationPresence`、プロセスに 1 つの `integrationPresence` を置く
   - 判定は `chat_relations` に行が 1 つでもあるか。状態で絞らない（解除済みも数える）
   - 「ある」も「無い」も、答えを決めた時刻から 10 分覚える。`markPresent(now)` は問い合わせずに「ある」にする。問い合わせが失敗したら「ある」を返し、覚えない
