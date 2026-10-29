@@ -21,7 +21,7 @@
   - _Requirements: 2.7, 2.8_
 
 - [ ] 2. 通知を書き留めたプロセスに「ある」の印を付ける
-- [ ] 2.1 `enqueue` が行を書いた直後に `markPresent` を呼ぶ（振る舞い）
+- [x] 2.1 `enqueue` が行を書いた直後に `markPresent` を呼ぶ（振る舞い）
   - `createNotificationOutbox(deps)` を足し、`notificationOutbox` はその既定の値にする。外から見える型と名前は変えない
   - 行の書き込みが失敗したときは印を付けない
   - 完了の条件: design.md の Unit Tests 12 が通り、既存の `notification-outbox.spec.ts` も通る

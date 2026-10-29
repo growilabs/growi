@@ -1,12 +1,17 @@
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
+import { mock } from 'vitest-mock-extended';
 
 import {
   connectSelfContainedMongo,
   disconnectSelfContainedMongo,
 } from '^/test/setup/mongo/self-contained-connection';
 
+import type { IntegrationPresence } from '../integration-presence';
 import { ChatNotificationOutbox } from './models/chat-notification-outbox';
-import { notificationOutbox } from './notification-outbox';
+import {
+  createNotificationOutbox,
+  notificationOutbox,
+} from './notification-outbox';
 
 describe('notificationOutbox.enqueue', () => {
   let mongod: MongoMemoryServer | undefined;
@@ -84,5 +89,57 @@ describe('notificationOutbox.enqueue', () => {
 
     const [row] = await ChatNotificationOutbox.find({});
     expect(row.containsRestrictedPage).toBe(true);
+  });
+});
+
+describe('createNotificationOutbox presence marking', () => {
+  let mongod: MongoMemoryServer | undefined;
+
+  beforeAll(async () => {
+    ({ mongod } = await connectSelfContainedMongo(
+      'growi_test_unit_notification_outbox_presence',
+    ));
+  });
+
+  beforeEach(async () => {
+    await ChatNotificationOutbox.deleteMany({});
+  });
+
+  afterAll(async () => {
+    await disconnectSelfContainedMongo(mongod);
+  });
+
+  const entry = {
+    relationId: 'rel-1',
+    targets: [{ platform: 'slack' as const, channelId: 'C1' }],
+    markdown: 'someone created [/a](https://growi.example.com/a)',
+    containsRestrictedPage: false,
+  };
+
+  it('marks presence once with the time of the write when the row is persisted', async () => {
+    const presence = mock<IntegrationPresence>();
+    const before = Date.now();
+
+    await createNotificationOutbox({ presence }).enqueue(entry);
+
+    expect(await ChatNotificationOutbox.countDocuments({})).toBe(1);
+    expect(presence.markPresent).toHaveBeenCalledTimes(1);
+    const [markedAt] = presence.markPresent.mock.calls[0];
+    expect(markedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(markedAt.getTime()).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('does not mark presence when the row write fails', async () => {
+    const presence = mock<IntegrationPresence>();
+
+    await expect(
+      createNotificationOutbox({ presence }).enqueue({
+        ...entry,
+        markdown: '',
+      }),
+    ).rejects.toThrow();
+
+    expect(presence.markPresent).not.toHaveBeenCalled();
+    expect(await ChatNotificationOutbox.countDocuments({})).toBe(0);
   });
 });

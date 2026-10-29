@@ -5,6 +5,8 @@
 
 import { randomUUID } from 'node:crypto';
 
+import type { IntegrationPresence } from '../integration-presence';
+import { integrationPresence } from '../integration-presence';
 import type { ChatNotificationOutboxTarget } from './models/chat-notification-outbox';
 import { ChatNotificationOutbox } from './models/chat-notification-outbox';
 
@@ -25,6 +27,10 @@ export interface NotificationOutbox {
   enqueue(entry: NotificationOutboxEntry): Promise<void>;
 }
 
+export interface NotificationOutboxDeps {
+  readonly presence?: IntegrationPresence;
+}
+
 /**
  * The real `NotificationOutbox`, backed by `chat_notification_outbox`
  * (task 1.2's model). `requestId` is minted here, exactly once, with
@@ -33,15 +39,26 @@ export interface NotificationOutbox {
  * it does not call `enqueue` again for a retry (design.md "requestId は行を
  * 作るときに1度だけ採番し、再送しても変えない" -- Requirement 10.4).
  */
-export const notificationOutbox: NotificationOutbox = {
-  async enqueue(entry) {
-    await ChatNotificationOutbox.create({
-      requestId: randomUUID(),
-      relationId: entry.relationId,
-      targets: entry.targets,
-      markdown: entry.markdown,
-      containsRestrictedPage: entry.containsRestrictedPage,
-      state: 'pending',
-    });
-  },
+export const createNotificationOutbox = (
+  deps: NotificationOutboxDeps = {},
+): NotificationOutbox => {
+  const presence = deps.presence ?? integrationPresence;
+
+  return {
+    async enqueue(entry) {
+      await ChatNotificationOutbox.create({
+        requestId: randomUUID(),
+        relationId: entry.relationId,
+        targets: entry.targets,
+        markdown: entry.markdown,
+        containsRestrictedPage: entry.containsRestrictedPage,
+        state: 'pending',
+      });
+      // Lets this process's dispatch job skip its existence check right away.
+      presence.markPresent(new Date());
+    },
+  };
 };
+
+export const notificationOutbox: NotificationOutbox =
+  createNotificationOutbox();
