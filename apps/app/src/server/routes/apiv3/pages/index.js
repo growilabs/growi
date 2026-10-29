@@ -559,8 +559,6 @@ export const setup = (crowi) => {
     addActivity,
     apiV3FormValidator,
     async (req, res) => {
-      const options = {};
-
       const pagesInTrash = await crowi.pageService.findAllTrashPages(req.user);
 
       // Each trashed page is deleted on its own, not together with its
@@ -590,11 +588,12 @@ export const setup = (crowi) => {
           ip: req.ip,
           endpoint: req.originalUrl,
         };
+        // Pass the judged pages, not the whole trash: a page trashed after the
+        // judgement above must not be deleted without its own authority check.
         const pages = await crowi.pageService.emptyTrashPage(
           req.user,
-          options,
           activityParameters,
-          isAllDeletable ? undefined : deletablePages.map((p) => p._id),
+          deletablePages.map((p) => p._id),
         );
 
         activityEvent.emit('update', res.locals.activity._id, parameters);

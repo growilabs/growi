@@ -560,12 +560,10 @@ class PageService implements IPageService {
    * Generate read stream to operate descendants of the specified page path
    * @param {string} targetPagePath
    * @param {User} viewer
-   * @param pageIds when given, only these descendants are read
    */
   private async generateReadStreamToOperateOnlyDescendants(
     targetPagePath,
     userToOperate,
-    pageIds?: ObjectIdLike[],
   ) {
     const Page = mongoose.model<IPage, PageModel>('Page');
     const { PageQueryBuilder } = Page;
@@ -573,9 +571,6 @@ class PageService implements IPageService {
     const builder = new PageQueryBuilder(Page.find(), true)
       .addConditionAsRootOrNotOnTree() // to avoid affecting v5 pages
       .addConditionToListOnlyDescendants(targetPagePath);
-    if (pageIds != null) {
-      builder.addConditionToListByPageIdsArray(pageIds);
-    }
 
     await Page.addConditionToFilteringByViewerToEdit(builder, userToOperate);
     return builder.query.lean().cursor({ batchSize: BULK_REINDEX_SIZE });
@@ -2744,15 +2739,17 @@ class PageService implements IPageService {
   }
 
   /**
-   * @param pageIdsToDelete when given, only these trashed pages are deleted
+   * Completely delete the given trashed pages. The caller judges the deletion
+   * authority; a page that is no longer in the trash or not editable by the
+   * user is left as it is.
    */
   async emptyTrashPage(
     user,
-    options = {},
     activityParameters,
-    pageIdsToDelete?: ObjectIdLike[],
-  ) {
-    const page = { path: '/trash' };
+    pageIdsToDelete: ObjectIdLike[],
+  ): Promise<number> {
+    const Page = mongoose.model<IPage, PageModel>('Page');
+    const trashPage = { path: '/trash' };
 
     const parameters = {
       ...activityParameters,
@@ -2767,26 +2764,29 @@ class PageService implements IPageService {
     const activity =
       await this.crowi.activityService.createActivity(parameters);
 
-    const descendantsSubscribedSets = new Set();
-    const pages = await this.deleteCompletelyDescendantsWithStream(
-      page,
-      user,
-      options,
-      true,
-      descendantsSubscribedSets,
-      pageIdsToDelete,
-    );
-    const descendantsSubscribedUsers = Array.from(
-      descendantsSubscribedSets,
-    ) as Ref<IUser>[];
+    const builder = new Page.PageQueryBuilder(Page.find(), true)
+      .addConditionAsRootOrNotOnTree()
+      .addConditionToListOnlyDescendants(trashPage.path)
+      .addConditionToListByPageIdsArray(pageIdsToDelete);
+    await Page.addConditionToFilteringByViewerToEdit(builder, user);
+    const pages = await builder.query.lean().exec();
+
+    const subscribedUsers = new Set<Ref<IUser>>();
+    for (let i = 0; i < pages.length; i += BULK_REINDEX_SIZE) {
+      const batch = pages.slice(i, i + BULK_REINDEX_SIZE);
+      await this.deleteMultipleCompletely(batch, user);
+      for (const subscribedUser of await Subscription.getSubscriptions(batch)) {
+        subscribedUsers.add(subscribedUser);
+      }
+    }
 
     const preNotify = preNotifyService.generatePreNotify(activity, async () => {
-      return descendantsSubscribedUsers;
+      return Array.from(subscribedUsers);
     });
 
-    this.activityEvent.emit('updated', activity, page, preNotify);
+    this.activityEvent.emit('updated', activity, trashPage, preNotify);
 
-    return pages;
+    return pages.filter((p) => !p.isEmpty).length;
   }
 
   /**
@@ -2798,13 +2798,11 @@ class PageService implements IPageService {
     options = {},
     shouldUseV4Process = true,
     descendantsSubscribedSets?,
-    pageIds?: ObjectIdLike[],
   ): Promise<number> {
     const readStream = shouldUseV4Process // pages don't have parents
       ? await this.generateReadStreamToOperateOnlyDescendants(
           targetPage.path,
           user,
-          pageIds,
         )
       : await new PageCursorsForDescendantsFactory(
           user,
