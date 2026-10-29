@@ -443,7 +443,7 @@ export class InvalidSearchHistoryKeywordError extends Error {}
 | Method | Endpoint | Scope | Request | Response | Errors |
 |--------|----------|-------|---------|----------|--------|
 | GET | `/_api/v3/search-history` | `SCOPE.READ.FEATURES.PAGE` | — | 200 `ListSearchHistoriesResponseBody` | 未ログイン（`loginRequired` による拒否） |
-| POST | `/_api/v3/search-history` | `SCOPE.WRITE.FEATURES.PAGE` | `RecordSearchHistoryRequestBody`（`keyword`: string） | 200 `RecordSearchHistoryResponseBody` | 400 `invalid-search-history-keyword`、未ログイン、500 |
+| POST | `/_api/v3/search-history` | `SCOPE.WRITE.FEATURES.PAGE` | `RecordSearchHistoryRequestBody`（`keyword`: string） | 200 `RecordSearchHistoryResponseBody` | 400 `validation_failed`、未ログイン、500 |
 | DELETE | `/_api/v3/search-history/:id` | `SCOPE.WRITE.FEATURES.PAGE` | `:id`: MongoId | 200 `{}` | 400（`:id` の形式が不正）、404 `search-history-not-found`、未ログイン |
 
 - 404 は、存在しない ID と他人の ID で、メッセージ・コード・ステータスを完全に同じにする（11.2）。
@@ -646,7 +646,7 @@ model searchhistories {
 - 削除: 楽観的に消した後、失敗したら SWR が巻き戻し、`toastError` で知らせる（10.6）。
 
 ### Error Categories and Responses
-- 400: POST の `keyword` が文字列でない、空、または 200 コードポイントを超える（`invalid-search-history-keyword`）。DELETE の `:id` が MongoId の形式でない。
+- 400: POST の `keyword` が文字列でない、空、または 200 コードポイントを超える（`validation_failed`。共通の `apiV3FormValidator` が返す。サービスが防御的に投げる `InvalidSearchHistoryKeywordError` は `invalid-search-history-keyword` の 400 に変換するが、validator が先に弾くため通常は到達しない）。DELETE の `:id` が MongoId の形式でない。
 - 未ログイン: `loginRequiredFactory(crowi, false)` の既存の拒否応答に従う（5.3, 11.3）。
 - 404: DELETE で、ID とユーザーの両方に合うものが無い（`search-history-not-found`。存在しない ID と他人の ID を区別しない）。
 - 500: Prisma の想定外の失敗（P2002 の再試行にも失敗した場合を含む）。
