@@ -64,6 +64,25 @@ describe('redact-access-token-from-activity-endpoints', () => {
     expect(await endpointOf(otherQuery)).toBe('/_api/v3/pages?limit=10');
   });
 
+  it('fails instead of completing when a batch reports write errors', async () => {
+    await insertActivity('/_search?access_token=secret');
+    await mongoose.connection.db?.command({
+      collMod: 'activities',
+      validator: { endpoint: { $not: /REDACTED/ } },
+    });
+
+    try {
+      await expect(migrate.up()).rejects.toThrow(
+        'Failed to redact access_token from activities.endpoint',
+      );
+    } finally {
+      await mongoose.connection.db?.command({
+        collMod: 'activities',
+        validator: {},
+      });
+    }
+  });
+
   it('is a no-op when re-run', async () => {
     const id = await insertActivity('/_search?access_token=secret');
 

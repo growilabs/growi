@@ -41,7 +41,19 @@ export async function up() {
         : [{ q: { _id: { $oid: id } }, u: { $set: { endpoint: redacted } } }];
     });
     if (updates.length > 0) {
-      await prisma.$runCommandRaw({ update: 'activities', updates });
+      // The update command reports per-document failures with ok: 1, and an
+      // ordered batch silently skips the rest after the first one.
+      const result = await prisma.$runCommandRaw({
+        update: 'activities',
+        updates,
+      });
+      if (result.writeErrors != null || result.writeConcernError != null) {
+        throw new Error(
+          `Failed to redact access_token from activities.endpoint: ${JSON.stringify(
+            result.writeErrors ?? result.writeConcernError,
+          )}`,
+        );
+      }
       redactedCount += updates.length;
     }
 
