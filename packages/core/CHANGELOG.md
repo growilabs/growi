@@ -1,5 +1,11 @@
 # @growi/core
 
+## 3.1.3
+
+### Patch Changes
+
+- [#12176](https://github.com/growilabs/growi/pull/12176) [`2f37b50`](https://github.com/growilabs/growi/commit/2f37b50bfbdc475db2c8644a545e57881b909863) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Make `omitDuplicateAreaPathFromPaths` and `omitDuplicateAreaPageFromPages` treat each path literally. They used to build a regular expression from the raw path, so a path containing a character such as `+` or `(` threw a `SyntaxError`, and a `.` in a path matched any character, which could drop an unrelated path.
+
 ## 3.1.2
 
 ### Patch Changes
