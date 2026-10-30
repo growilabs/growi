@@ -12,7 +12,7 @@ import { prisma } from '~/utils/prisma';
 import type SearchService from './search';
 import { sanitizeEndpointForIndex } from './search-delegator/sanitize-endpoint-for-index';
 
-const logger = loggerFactory('growi:service:search');
+const logger = loggerFactory('growi:service:search-auditlog-suggestions');
 
 type AuditlogSuggestionBackend = Pick<
   SearchService,
@@ -26,15 +26,23 @@ const AUDITLOG_SUGGESTION_FALLBACK_MIN_QUERY_LENGTH: {
   readonly [K in AuditlogSuggestionField]: number;
 } = {
   username: 2,
-  // Every endpoint starts with '/', which narrows nothing.
+  // Rejects only '/' and '/x'. Nearly every endpoint shares the `/_api/`
+  // prefix, so queries up to `/_api/v3/` still group almost every row; that is
+  // accepted for the ES-down fallback, bounded by maxTimeMS.
   endpoint: 3,
 };
 
-// `endpoint` is stored as `req.originalUrl`, which has no scheme or host.
+// `endpoint` is stored as `req.originalUrl`, which for an ordinary
+// (origin-form) request has no scheme or host and starts with '/'.
 const URL_ORIGIN_PATTERN = /^[a-z][a-z\d+.-]*:\/\/[^/?#]*/i;
 
-const toEndpointSearchPath = (q: string): string =>
-  sanitizeEndpointForIndex(q.replace(URL_ORIGIN_PATTERN, '')).trim();
+const toEndpointSearchPath = (q: string): string => {
+  const path = sanitizeEndpointForIndex(
+    q.replace(URL_ORIGIN_PATTERN, ''),
+  ).trim();
+  if (path === '' || path.startsWith('/')) return path;
+  return `/${path}`;
+};
 
 async function searchAuditlogFieldValues(
   backend: AuditlogSuggestionBackend,

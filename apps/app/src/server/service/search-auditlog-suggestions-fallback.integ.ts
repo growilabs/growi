@@ -40,7 +40,7 @@ function makeActivityData(overrides: { username?: string; endpoint?: string }) {
     v: 0,
     action: 'PAGE_CREATE',
     createdAt: new Date(),
-    endpoint: overrides.endpoint ?? '/test/suggestions-fallback',
+    endpoint: overrides.endpoint ?? '/_api/v3/pages',
     ip: TEST_IP,
     snapshot: {
       id: new Types.ObjectId().toHexString(),
@@ -82,16 +82,19 @@ describe('SearchService.searchAuditlogSuggestions() MongoDB fallback (real Prism
 
   it('resolves endpoint suggestions through the real Prisma extension', async () => {
     await prisma.activities.createMany({
-      data: [makeActivityData({ endpoint: '/api/v3/pages' })],
+      data: [
+        makeActivityData({ endpoint: '/_api/v3/pages' }),
+        makeActivityData({ endpoint: '/_api/v3/users' }),
+      ],
     });
 
     const result = await searchService.searchAuditlogSuggestions(
       ['endpoint'],
-      '/api',
+      '/_api/v3/p',
       10,
     );
 
-    expect(result.endpoint?.endpoints).toContain('/api/v3/pages');
+    expect(result.endpoint?.endpoints).toEqual(['/_api/v3/pages']);
   });
 
   it('answers a pasted URL by its path alone, whether or not its query string prefixes a stored token', async () => {

@@ -350,6 +350,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     '/_api/search?q=foo',
     'https://wiki.example.com/_api/search?q=foo',
     'http://localhost:3000/_api/search',
+    '_api/search?q=foo',
   ];
 
   it.each(
@@ -459,7 +460,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
 
   it.each([
     { field: 'username', q: 'a', hit: 'alice' },
-    { field: 'endpoint', q: '/a', hit: '/api/v3/pages' },
+    { field: 'endpoint', q: '/a', hit: '/_api/v3/pages' },
   ] as const)('should answer a $field q shorter than the fallback minimum from Elasticsearch', async ({
     field,
     q,

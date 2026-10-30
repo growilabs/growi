@@ -618,7 +618,7 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
 describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
   /**
    * Plain (no total count) variant used by the MongoDB fallback path
-   * (SearchService.searchAuditlogUsernames — invoked only when Elasticsearch
+   * (the username handler in search-auditlog-suggestions.ts — invoked only when Elasticsearch
    * is unreachable/unconfigured). Unlike the WithTotalCount variant, it
    * orders by hit count and matches by prefix (`^`-anchored) rather than
    * substring — WithTotalCount's substring match is

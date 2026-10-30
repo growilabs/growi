@@ -36,58 +36,74 @@ describe('findEndpointsByEndpointRegex', () => {
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
   });
 
-  it('returns distinct, case-insensitive prefix-matched endpoints', async () => {
+  it('returns distinct, prefix-matched endpoints', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/api/v3/pages' }),
-        makeActivityData({ endpoint: '/api/v3/pages' }), // duplicate — should count once
-        makeActivityData({ endpoint: '/api/v3/pages/revert' }),
-        makeActivityData({ endpoint: '/api/v3/users' }),
+        makeActivityData({ endpoint: '/_api/v3/pages' }),
+        makeActivityData({ endpoint: '/_api/v3/pages' }), // duplicate — should count once
+        makeActivityData({ endpoint: '/_api/v3/pages/revert' }),
+        makeActivityData({ endpoint: '/_api/v3/users' }),
       ],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/api/v3/pages',
+      '/_api/v3/pages',
       { offset: 0, limit: 10 },
     );
 
     expect(result).toHaveLength(2);
     expect(result).toEqual(
-      expect.arrayContaining(['/api/v3/pages', '/api/v3/pages/revert']),
+      expect.arrayContaining(['/_api/v3/pages', '/_api/v3/pages/revert']),
     );
-    expect(result).not.toContain('/api/v3/users');
+    expect(result).not.toContain('/_api/v3/users');
   });
 
   it('matches only a prefix, not any substring', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/api/v3/pages' }),
-        makeActivityData({ endpoint: '/api/v3/not-pages' }),
+        makeActivityData({ endpoint: '/_api/v3/pages' }),
+        makeActivityData({ endpoint: '/_api/v3/not-pages' }),
       ],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/api/v3/pages',
+      '/_api/v3/pages',
       { offset: 0, limit: 10 },
     );
 
-    expect(result).toEqual(['/api/v3/pages']);
+    expect(result).toEqual(['/_api/v3/pages']);
+  });
+
+  it('matches case-sensitively', async () => {
+    await prisma.activities.createMany({
+      data: [
+        makeActivityData({ endpoint: '/_api/v3/pages' }),
+        makeActivityData({ endpoint: '/_API/v3/pages' }),
+      ],
+    });
+
+    const result = await prisma.activities.findEndpointsByEndpointRegex(
+      '/_api/v3/pages',
+      { offset: 0, limit: 10 },
+    );
+
+    expect(result).toEqual(['/_api/v3/pages']);
   });
 
   it('treats regex metacharacters in q as literal text, not as regex syntax', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/api/v3/a.b' }),
-        makeActivityData({ endpoint: '/api/v3/axb' }), // would match '/api/v3/a.b' if '.' were a wildcard
+        makeActivityData({ endpoint: '/_api/v3/a.b' }),
+        makeActivityData({ endpoint: '/_api/v3/axb' }), // would match '/_api/v3/a.b' if '.' were a wildcard
       ],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/api/v3/a.b',
+      '/_api/v3/a.b',
       { offset: 0, limit: 10 },
     );
 
-    expect(result).toEqual(['/api/v3/a.b']);
+    expect(result).toEqual(['/_api/v3/a.b']);
   });
 
   it('returns path-only endpoints, never exposing or splitting on the query string', async () => {
@@ -152,7 +168,7 @@ describe('findEndpointsByEndpointRegex', () => {
 
   it('returns [] when no endpoint matches the query', async () => {
     await prisma.activities.createMany({
-      data: [makeActivityData({ endpoint: '/api/v3/pages' })],
+      data: [makeActivityData({ endpoint: '/_api/v3/pages' })],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
@@ -166,42 +182,42 @@ describe('findEndpointsByEndpointRegex', () => {
   it('orders paths by hit count, then alphabetically, like the ES terms aggregation', async () => {
     await prisma.activities.createMany({
       data: [
-        '/api/v3/d',
-        '/api/v3/c',
-        '/api/v3/a',
-        '/api/v3/a?limit=10',
-        '/api/v3/b',
-        '/api/v3/b',
-        '/api/v3/b',
+        '/_api/v3/d',
+        '/_api/v3/c',
+        '/_api/v3/a',
+        '/_api/v3/a?limit=10',
+        '/_api/v3/b',
+        '/_api/v3/b',
+        '/_api/v3/b',
       ].map((endpoint) => makeActivityData({ endpoint })),
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/api/v3/',
+      '/_api/v3/',
       { offset: 0, limit: 10 },
     );
 
     expect(result).toEqual([
-      '/api/v3/b',
-      '/api/v3/a',
-      '/api/v3/c',
-      '/api/v3/d',
+      '/_api/v3/b',
+      '/_api/v3/a',
+      '/_api/v3/c',
+      '/_api/v3/d',
     ]);
   });
 
   it('matches by prefix even with incidental surrounding whitespace in q', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/api/v3/pages' }),
-        makeActivityData({ endpoint: '/api/v3/not-pages' }),
+        makeActivityData({ endpoint: '/_api/v3/pages' }),
+        makeActivityData({ endpoint: '/_api/v3/not-pages' }),
       ],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '  /api/v3/pages  ',
+      '  /_api/v3/pages  ',
       { offset: 0, limit: 10 },
     );
 
-    expect(result).toEqual(['/api/v3/pages']);
+    expect(result).toEqual(['/_api/v3/pages']);
   });
 });

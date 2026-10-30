@@ -299,6 +299,9 @@ const buildSnapshotUsernameSubstringMatchStage = (q: string) => ({
 type SuggestionFieldSpec = {
   readonly fieldPath: string;
   readonly groupKey: Prisma.InputJsonValue;
+  // A case-insensitive regex can't be turned into index bounds, so it scans
+  // every key of the field's index.
+  readonly caseInsensitive: boolean;
   // A query that would match into the raw stored value's credential-bearing
   // part; answering it would let a caller probe that part by prefix.
   readonly isUnmatchableQuery?: (q: string) => boolean;
@@ -307,6 +310,7 @@ type SuggestionFieldSpec = {
 const SNAPSHOT_USERNAME_SUGGESTION: SuggestionFieldSpec = {
   fieldPath: 'snapshot.username',
   groupKey: '$snapshot.username',
+  caseInsensitive: true,
 };
 
 const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
@@ -314,6 +318,7 @@ const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
   // Mongo-side equivalent of sanitizeEndpointForIndex: the stored endpoint
   // keeps its query string, the ES index does not.
   groupKey: { $arrayElemAt: [{ $split: ['$endpoint', '?'] }, 0] },
+  caseInsensitive: false,
   // The stored endpoint may still carry e.g. `access_token` after the '?'.
   isUnmatchableQuery: (q) => q.includes('?'),
 };
@@ -324,11 +329,11 @@ const SNAPSHOT_USERNAME_GROUP_STAGE = {
 
 // Prefix-only, unlike ES's fuzzy match for username: MongoDB has no native
 // fuzzy match.
-const buildFieldPrefixMatchStage = (fieldPath: string, q: string) => ({
+const buildFieldPrefixMatchStage = (spec: SuggestionFieldSpec, q: string) => ({
   $match: {
-    [fieldPath]: {
+    [spec.fieldPath]: {
       $regex: `^${escapeSuggestionQuery(q)}`,
-      $options: 'i',
+      ...(spec.caseInsensitive ? { $options: 'i' } : {}),
     },
   },
 });
@@ -341,7 +346,7 @@ const buildFieldSuggestionPipeline = (
   if (spec.isUnmatchableQuery?.(q)) return null;
 
   return [
-    buildFieldPrefixMatchStage(spec.fieldPath, q),
+    buildFieldPrefixMatchStage(spec, q),
     { $group: { _id: spec.groupKey, count: { $sum: 1 } } },
     // ES's terms aggregation order: doc_count desc, then key asc.
     { $sort: { count: -1, _id: 1 } },
@@ -355,7 +360,9 @@ const buildFieldSuggestionPipeline = (
 const AGGREGATE_MAX_TIME_MS = 5000;
 
 // Shared by every suggestion field's ES-fallback method. A new field (e.g.
-// `ip`) declares a SuggestionFieldSpec plus its own extension method below.
+// `ip`) also needs entries in the per-field maps keyed by
+// AuditlogSuggestionField (ES fuzzy flag, fallback min length, handler); the
+// type checker flags each one that is missing.
 const findSuggestionValuesByPrefix = async (
   context: Pick<typeof prisma.activities, 'aggregateRaw'>,
   spec: SuggestionFieldSpec,
@@ -535,7 +542,9 @@ export const extension = Prisma.defineExtension((client) => {
          * Find snapshot usernames matching a case-insensitive prefix, unbounded
          * (no total count). Used by the MongoDB fallback path (ES unreachable/
          * unconfigured) — intentionally prefix-only, unlike the substring match
-         * used by the WithTotalCount variant below.
+         * used by the WithTotalCount variant below. Does not reject short
+         * queries itself — the caller enforces the minimum length, since an
+         * empty `q` matches every row.
          *
          * Requirements: 3.4 — design.md: ActivityExtension Contracts (findSnapshotUsernames).
          */

@@ -108,14 +108,19 @@ const isPermanentMappingRejection = (err: unknown): boolean =>
     (err as { statusCode: unknown }).statusCode,
   );
 
-// Fuzzy compares q against the whole stored value, so it only helps a fully
+// fuzzy: compares q against the whole stored value, so it only helps a fully
 // typed value. Endpoints are looked up by partial path, where it just adds
 // near-miss paths (e.g. `/_api/v3/tags` for `/_api/v3/page`).
-const AUDITLOG_SUGGESTION_FUZZY: {
-  readonly [K in AuditlogSuggestionField]: boolean;
+// caseInsensitive: kept equal to the MongoDB fallback's SuggestionFieldSpec
+// so both backends return the same suggestions.
+const AUDITLOG_SUGGESTION_QUERY_OPTIONS: {
+  readonly [K in AuditlogSuggestionField]: {
+    readonly fuzzy: boolean;
+    readonly caseInsensitive: boolean;
+  };
 } = {
-  username: true,
-  endpoint: false,
+  username: { fuzzy: true, caseInsensitive: true },
+  endpoint: { fuzzy: false, caseInsensitive: false },
 };
 
 class ElasticsearchDelegator
@@ -970,15 +975,19 @@ class ElasticsearchDelegator
     limit: number,
   ): Promise<string[]> {
     const escaped = q.replace(/([*?\\])/g, '\\$1');
+    const { fuzzy, caseInsensitive } = AUDITLOG_SUGGESTION_QUERY_OPTIONS[field];
     const query = {
       bool: {
         should: [
           {
             wildcard: {
-              [field]: { value: `${escaped}*`, case_insensitive: true },
+              [field]: {
+                value: `${escaped}*`,
+                case_insensitive: caseInsensitive,
+              },
             },
           },
-          ...(AUDITLOG_SUGGESTION_FUZZY[field]
+          ...(fuzzy
             ? [{ fuzzy: { [field]: { value: escaped, fuzziness: 'AUTO' } } }]
             : []),
         ],

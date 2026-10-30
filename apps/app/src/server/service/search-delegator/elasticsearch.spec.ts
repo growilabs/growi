@@ -400,7 +400,7 @@ describe('ElasticsearchDelegator', () => {
         );
       });
 
-      it('should match endpoint by prefix only, without fuzzy', async () => {
+      it('should match endpoint by case-sensitive prefix only, without fuzzy', async () => {
         await delegator.searchAuditlogByFuzzyWildcard(
           'endpoint',
           '/_api/v3/page',
@@ -416,7 +416,7 @@ describe('ElasticsearchDelegator', () => {
                     wildcard: {
                       endpoint: {
                         value: '/_api/v3/page*',
-                        case_insensitive: true,
+                        case_insensitive: false,
                       },
                     },
                   },
