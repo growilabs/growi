@@ -6,6 +6,7 @@ import mongoosePaginate from 'mongoose-paginate-v2';
 
 import type {
   AttachmentRemoveSnapshot,
+  AuditlogSuggestionField,
   IActivity,
   ISnapshot,
   SupportedActionType,
@@ -324,22 +325,25 @@ type SuggestionFieldSpec = {
   readonly caseInsensitive: boolean;
 };
 
-const SNAPSHOT_USERNAME_SUGGESTION: SuggestionFieldSpec = {
-  fieldPath: 'snapshot.username',
-  groupKey: '$snapshot.username',
-  caseInsensitive: AUDITLOG_SUGGESTION_CASE_INSENSITIVE.username,
-};
-
-const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
-  fieldPath: 'endpoint',
-  // Mongo-side equivalent of sanitizeEndpointForIndex: the stored endpoint
-  // keeps its query string, the ES index does not.
-  groupKey: { $arrayElemAt: [{ $split: ['$endpoint', '?'] }, 0] },
-  caseInsensitive: AUDITLOG_SUGGESTION_CASE_INSENSITIVE.endpoint,
+const SUGGESTION_FIELD_SPECS: {
+  readonly [K in AuditlogSuggestionField]: SuggestionFieldSpec;
+} = {
+  username: {
+    fieldPath: 'snapshot.username',
+    groupKey: '$snapshot.username',
+    caseInsensitive: AUDITLOG_SUGGESTION_CASE_INSENSITIVE.username,
+  },
+  endpoint: {
+    fieldPath: 'endpoint',
+    // Mongo-side equivalent of sanitizeEndpointForIndex: the stored endpoint
+    // keeps its query string, the ES index does not.
+    groupKey: { $arrayElemAt: [{ $split: ['$endpoint', '?'] }, 0] },
+    caseInsensitive: AUDITLOG_SUGGESTION_CASE_INSENSITIVE.endpoint,
+  },
 };
 
 const SNAPSHOT_USERNAME_GROUP_STAGE = {
-  $group: { _id: SNAPSHOT_USERNAME_SUGGESTION.groupKey },
+  $group: { _id: SUGGESTION_FIELD_SPECS.username.groupKey },
 };
 
 // Prefix-only, unlike ES's fuzzy match for username: MongoDB has no native
@@ -375,7 +379,8 @@ const AGGREGATE_MAX_TIME_MS = 5000;
 // Shared by every suggestion field's ES-fallback method. A new field (e.g.
 // `ip`) also needs entries in the per-field maps keyed by
 // AuditlogSuggestionField (case sensitivity, ES fuzzy flag, fallback min
-// length, handler); the type checker flags each one that is missing.
+// length, handler, SUGGESTION_FIELD_SPECS); the type checker flags each one
+// that is missing.
 const findSuggestionValuesByPrefix = async (
   context: Pick<typeof prisma.activities, 'aggregateRaw'>,
   spec: SuggestionFieldSpec,
@@ -565,7 +570,7 @@ export const extension = Prisma.defineExtension((client) => {
         ): Promise<string[]> {
           return findSuggestionValuesByPrefix(
             Prisma.getExtensionContext<typeof prisma.activities>(this),
-            SNAPSHOT_USERNAME_SUGGESTION,
+            SUGGESTION_FIELD_SPECS.username,
             q,
             option,
           );
@@ -573,16 +578,15 @@ export const extension = Prisma.defineExtension((client) => {
 
         // MongoDB fallback for the `endpoint` suggestion field. Unlike
         // username, no Active/Inactive classification applies here. `q` must
-        // be a path without a query string: a q reaching past '?' would let a
-        // caller probe a stored `access_token` by prefix. The caller
-        // (toEndpointSearchPath) strips it.
+        // be a path without a query string, as the ES index stores it; the
+        // caller (toEndpointSearchPath) strips it.
         findEndpointsByEndpointRegex(
           q: string,
           option: { offset: number; limit: number },
         ): Promise<string[]> {
           return findSuggestionValuesByPrefix(
             Prisma.getExtensionContext<typeof prisma.activities>(this),
-            ENDPOINT_SUGGESTION,
+            SUGGESTION_FIELD_SPECS.endpoint,
             q,
             option,
           );
