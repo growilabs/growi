@@ -320,7 +320,8 @@ Before marking work complete:
 ## Reviewing for Design Quality (「筋の良い実装」)
 
 A change can pass its tests and match the spec and still be the *wrong shape*.
-When reviewing (in `/review`, `kiro-review`, or `kiro-validate-impl`), do not stop
+When reviewing — in any form: `/code-review`, `/review`, `kiro-review`,
+`kiro-validate-impl`, or a review asked for in plain words — do not stop
 at "does it work?" and "does it match the spec?" — also ask **"is this a sound,
 well-shaped implementation (筋の良い実装)?"**
 
@@ -355,8 +356,37 @@ default and the tradeoff judgment conflict, the judgment wins and the default is
 thing to revisit — not the code. This section anchors the question; it does not cap
 the answer.
 
+### Scope and shape before defects
+
+A bug-hunting recipe (such as `/code-review`'s) or the requester's stated priority
+("regressions first, then performance") sets where to look hardest. It does not
+replace the question above. Hunting defects first anchors the review on the code
+as written: every finding turns into a patch to that code, and a part that should
+not exist gets polished instead of removed. So work in this order:
+
+1. **Scope** — map each change in the diff to the requirement it serves (the spec;
+   without a spec, the ticket or PR description). A change that serves none is out
+   of scope. Recommend splitting it into its own PR. For functionality nobody
+   specified, recommend removing it, or adding it to the spec first if it is truly
+   needed. Do not review its details as if it belonged.
+2. **Shape** — for what remains: is it the least code that meets the requirement,
+   type-safe and robust, and does it follow the framework's and the repo's
+   conventions?
+3. **Defects** — only then hunt for bugs in what is left.
+
+**Prefer fixes that remove code.** When a finding can be fixed either by deleting
+the code that causes it or by adding code around it, recommend the deletion. Hold
+your own suggested fixes to the same bar as the author's code before reporting
+them: a new helper, guard, upgrade note, or abstraction that compensates for a part
+that need not exist is the wrong fix.
+
+**Following a repo rule is not, by itself, a justification.** When an author's
+stated reason is "the rule says so" and the rule leads to a fragile shape, say so,
+and name the rule as the thing to revisit.
+
 **Severity discipline.** A spec-compliant change with a poor shape is normally a
 `Suggestion` or `Important` finding, not an automatic rejection — reserve blocking
 for a shape that is genuinely hard to maintain, hides coupling, or will force a
-rewrite. Design-quality review sharpens the result; it is not a license to loop on
+rewrite. An out-of-scope change or unspecified functionality is at least
+`Important`. Design-quality review sharpens the result; it is not a license to loop on
 taste. (See `kiro-review` for the task-local severity model.)
