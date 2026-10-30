@@ -7,7 +7,10 @@ import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
 import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
-import type { AuditlogSuggestionField } from '~/interfaces/activity';
+import {
+  AUDITLOG_SUGGESTION_CASE_INSENSITIVE,
+  type AuditlogSuggestionField,
+} from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
@@ -107,6 +110,16 @@ const isPermanentMappingRejection = (err: unknown): boolean =>
   PERMANENT_MAPPING_REJECTION_STATUSES.includes(
     (err as { statusCode: unknown }).statusCode,
   );
+
+// fuzzy: compares q against the whole stored value, so it only helps a fully
+// typed value. Endpoints are looked up by partial path, where it just adds
+// near-miss paths (e.g. `/_api/v3/tags` for `/_api/v3/page`).
+const AUDITLOG_SUGGESTION_FUZZY: {
+  readonly [K in AuditlogSuggestionField]: boolean;
+} = {
+  username: true,
+  endpoint: false,
+};
 
 class ElasticsearchDelegator
   implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
@@ -960,15 +973,22 @@ class ElasticsearchDelegator
     limit: number,
   ): Promise<string[]> {
     const escaped = q.replace(/([*?\\])/g, '\\$1');
+    const fuzzy = AUDITLOG_SUGGESTION_FUZZY[field];
+    const caseInsensitive = AUDITLOG_SUGGESTION_CASE_INSENSITIVE[field];
     const query = {
       bool: {
         should: [
           {
             wildcard: {
-              [field]: { value: `${escaped}*`, case_insensitive: true },
+              [field]: {
+                value: `${escaped}*`,
+                case_insensitive: caseInsensitive,
+              },
             },
           },
-          { fuzzy: { [field]: { value: escaped, fuzziness: 'AUTO' } } },
+          ...(fuzzy
+            ? [{ fuzzy: { [field]: { value: escaped, fuzziness: 'AUTO' } } }]
+            : []),
         ],
       },
     };

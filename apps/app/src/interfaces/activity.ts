@@ -883,7 +883,7 @@ export type ISearchFilter = {
   actions?: SupportedActionType[];
 };
 
-export const AUDITLOG_SUGGESTION_FIELDS = ['username'] as const;
+export const AUDITLOG_SUGGESTION_FIELDS = ['username', 'endpoint'] as const;
 
 export type AuditlogSuggestionField =
   (typeof AUDITLOG_SUGGESTION_FIELDS)[number];
@@ -894,6 +894,16 @@ export const isAuditlogSuggestionField = (
   typeof value === 'string' &&
   (AUDITLOG_SUGGESTION_FIELDS as readonly string[]).includes(value);
 
+// Read by both suggestion backends (Elasticsearch and the MongoDB fallback) so
+// they match each field with the same case sensitivity.
+export const AUDITLOG_SUGGESTION_CASE_INSENSITIVE: {
+  readonly [K in AuditlogSuggestionField]: boolean;
+} = {
+  username: true,
+  endpoint: false,
+};
+
 export type AuditlogSuggestionsResponse = {
   username?: { activeUsernames: string[]; inactiveUsernames: string[] };
+  endpoint?: { endpoints: string[] };
 };

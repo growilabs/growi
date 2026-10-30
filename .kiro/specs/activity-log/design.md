@@ -366,7 +366,7 @@ export function clear(activityId: string): void;
 
 **Responsibilities & Constraints**
 
-- 非 GET リクエストで文脈 `{ ip: req.ip, endpoint: req.originalUrl, userId: req.user?._id, username: req.user?.username, createdAt: new Date() }` を1つ組み立てる（`req.user` は Passport で同期的に確定済み。`createdAt` は到着時刻＝Issue 3）。
+- 非 GET リクエストで文脈 `{ ip: req.ip, endpoint: req.originalUrl, userId: req.user?._id, username: req.user?.username, createdAt: new Date() }` を1つ組み立てる（`req.user` は Passport で同期的に確定済み。`createdAt` は到着時刻＝Issue 3）。`endpoint` に含まれる `access_token` クエリの値は、保存口（`ActivityExtension` の `createByParameters` / `updateByParameters`）が `redactAccessTokenFromEndpoint` で `[REDACTED]` に置き換えてから保存する。middleware 自体は加工しない。
 - `const { activityId } = beginActivity(context)` で id 採番＋stash（共有ヘルパ。復元フローと同じ）。`res.locals.activity = { _id: activityId }`（37 箇所の emit と `getIdStringForRef` を無改修で温存）。
 - `registerFailsafeFinalizer(res, activityId, context)` を呼ぶ。失敗判定（`statusCode >= 400`／中断は `writableFinished === false`）と `res.on('finish'|'close')` 配線・`clear` はこのモジュールが持ち、**middleware は判断ロジックを持たない**。beginActivity と registerFailsafeFinalizer は隣接する同期呼び出しで間に throw が無いため、掃除役の付かない窓は生じない。
 - **DB には書かない**（事前作成廃止）。ここが現行との最大差分。

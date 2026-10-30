@@ -189,6 +189,21 @@ describe('ActivityExtension.createByParameters - data-building contract', () => 
     expect(data.userId).toBeUndefined();
     expect(data.target).toBeUndefined();
   });
+
+  it('redacts an access_token in the endpoint before it is stored', async () => {
+    const { client, createSpy } = buildClient();
+
+    await client.activities.createByParameters({
+      endpoint: '/_search?q=foo&access_token=secret',
+      action: 'SEARCH_PAGE',
+    });
+
+    expect(createSpy).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        endpoint: '/_search?q=foo&access_token=[REDACTED]',
+      }),
+    });
+  });
 });
 
 describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () => {
@@ -364,6 +379,23 @@ describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () =
     });
   });
 
+  it.each([
+    ['a plain string', '/_api/v3/pages?access_token=secret'],
+    ['a `{ set }` operation', { set: '/_api/v3/pages?access_token=secret' }],
+  ])('redacts an access_token in an endpoint passed as %s', async (_label, endpoint) => {
+    const { client, updateSpy } = buildUpdateClient();
+
+    await client.activities.updateByParameters('activity-id-1', {
+      action: 'PAGE_UPDATE',
+      endpoint,
+    });
+
+    const data = updateSpy.mock.calls[0]?.[0]?.data;
+    const stored =
+      typeof data?.endpoint === 'string' ? data.endpoint : data?.endpoint?.set;
+    expect(stored).toBe('/_api/v3/pages?access_token=[REDACTED]');
+  });
+
   it('returns null (does NOT throw) when Prisma throws P2025 (record not found, C1)', async () => {
     // Arrange: simulate Prisma "Record to update not found" error
     const { client, updateSpy } = buildUpdateClient();
@@ -421,7 +453,7 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
    *     plain findSnapshotUsernamesByUsernameRegex variant below)
    *   - Both aggregateRaw calls pass `options: { maxTimeMS: 5000 }`
    *   - Empty aggregateRaw results → { usernames: [], totalCount: 0 }
-   *   - No MIN_QUERY_LENGTH short-circuit — an empty `q` legitimately matches
+   *   - No minimum-length short-circuit — an empty `q` legitimately matches
    *     every username for the `/usernames` admin listing caller
    */
   const buildAggregateClient = () => {
@@ -586,8 +618,7 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
         { sortOpt: 1, offset: 0, limit: 10 },
       );
 
-    // Assert: aggregateRaw was actually invoked (no short-circuit), unlike the
-    // plain findSnapshotUsernamesByUsernameRegex variant below
+    // Assert: aggregateRaw was actually invoked (no short-circuit)
     expect(aggregateRawSpy).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ usernames: ['alice'], totalCount: 1 });
   });
@@ -619,14 +650,12 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount',
 describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
   /**
    * Plain (no total count) variant used by the MongoDB fallback path
-   * (SearchService.searchAuditlogUsernames — invoked only when Elasticsearch
-   * is unreachable/unconfigured). Shares the $group stage with the
-   * WithTotalCount variant's usernames pipeline, but matches by prefix
-   * (`^`-anchored) rather than substring — WithTotalCount's substring match is
+   * (the username handler in search-auditlog-suggestions.ts — invoked only when Elasticsearch
+   * is unreachable/unconfigured). Unlike the WithTotalCount variant, it
+   * orders by hit count and matches by prefix (`^`-anchored) rather than
+   * substring — WithTotalCount's substring match is
    * specific to its own production caller (the `/usernames` admin API) and
-   * must not leak here or vice versa. Also additionally
-   * short-circuits below MIN_QUERY_LENGTH so a whitespace/single-char query
-   * never reaches MongoDB (design.md; req 3.4).
+   * must not leak here or vice versa.
    */
   const buildAggregateClient = () => {
     const base = new PrismaClient({
@@ -677,8 +706,8 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
             'snapshot.username': { $regex: '^a\\.b', $options: 'i' },
           },
         },
-        { $group: { _id: '$snapshot.username' } },
-        { $sort: { _id: 1 } },
+        { $group: { _id: '$snapshot.username', count: { $sum: 1 } } },
+        { $sort: { count: -1, _id: 1 } },
         { $skip: 3 },
         { $limit: 15 },
       ],
@@ -702,33 +731,34 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
       $match: { 'snapshot.username': { $regex: '^ali', $options: 'i' } },
     });
   });
+});
 
-  it.each([
-    '',
-    ' ',
-    'a',
-  ])('short-circuits to [] without querying MongoDB when q=%j (below MIN_QUERY_LENGTH)', async (q) => {
+describe('ActivityExtension.findEndpointsByEndpointRegex', () => {
+  const buildAggregateClient = () => {
+    const base = new PrismaClient({
+      datasourceUrl: 'mongodb://localhost:27017/test',
+    });
+    const client = base.$extends(extension);
+    const aggregateRawSpy = vi.spyOn(client.activities, 'aggregateRaw');
+    return { client, aggregateRawSpy };
+  };
+
+  // MongoDB derives index bounds only up to an escaped letter, so `\x2d`
+  // would cut the endpoint_1 range at the first hyphen.
+  it('keeps hyphens unescaped so the endpoint prefix stays index-bounded', async () => {
     const { client, aggregateRawSpy } = buildAggregateClient();
+    aggregateRawSpy.mockResolvedValueOnce([] as never);
 
-    const result = await client.activities.findSnapshotUsernamesByUsernameRegex(
-      q,
+    await client.activities.findEndpointsByEndpointRegex(
+      '/_api/v3/share-links.x',
       { offset: 0, limit: 10 },
     );
 
-    expect(result).toEqual([]);
-    expect(aggregateRawSpy).not.toHaveBeenCalled();
-  });
-
-  it('queries MongoDB once q reaches MIN_QUERY_LENGTH (2 chars)', async () => {
-    const { client, aggregateRawSpy } = buildAggregateClient();
-    aggregateRawSpy.mockResolvedValueOnce([{ _id: 'al' }] as never);
-
-    const result = await client.activities.findSnapshotUsernamesByUsernameRegex(
-      'al',
-      { offset: 0, limit: 10 },
-    );
-
-    expect(aggregateRawSpy).toHaveBeenCalledTimes(1);
-    expect(result).toEqual(['al']);
+    const callArgs = aggregateRawSpy.mock.calls[0]?.[0] as {
+      pipeline: unknown[];
+    };
+    expect(callArgs.pipeline[0]).toEqual({
+      $match: { endpoint: { $regex: '^/_api/v3/share-links\\.x' } },
+    });
   });
 });

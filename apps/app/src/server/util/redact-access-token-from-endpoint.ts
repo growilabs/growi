@@ -19,7 +19,8 @@ const isSensitiveKey = (rawKey: string): boolean => {
 
 /**
  * Redact sensitive query parameter values from a request URL before it is persisted
- * (Activity.endpoint stores req.originalUrl verbatim otherwise). Only the sensitive
+ * as Activity.endpoint. Applied by the activity model's save ports, so every caller
+ * that passes req.originalUrl is covered. Only the sensitive
  * values are replaced; every other part of the URL is kept byte-for-byte, since the
  * endpoint is used for forensic audit purposes beyond just the path.
  */
