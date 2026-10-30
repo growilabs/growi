@@ -5,13 +5,11 @@
  * The route filters the selected pages through `page.isUpdatable(revisionId)`, so a
  * page updated since the given revision must be left in place.
  *
- * The route also filters them through the deletion authority
- * (`pageService.filterPagesByCanDelete`), so a page the requester is not allowed to
- * delete must be left in place as well.
+ * The deletion authority (`pageService.deletePagesWithAuthority`) must leave a page
+ * the requester is not allowed to delete in place as well.
  *
- * The route fires `deleteMultiplePages` without awaiting it, so a case that deletes
- * pages waits for that background work to settle before asserting and cleaning up.
- * A refused case is answered before `deleteMultiplePages` is reached.
+ * The deletion runs in the background after the route answers, so a case that
+ * deletes pages waits for that work to settle before asserting and cleaning up.
  *
  * The fixture and cleanup conventions are the ones documented at the top of
  * rename.integ.ts: `app:isV5Compatible` is pinned and restored, pages are built
