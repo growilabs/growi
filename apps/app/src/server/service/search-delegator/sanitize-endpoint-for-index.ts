@@ -1,13 +1,11 @@
 /**
  * Drop the query string from an `Activity.endpoint` before it is indexed.
  *
- * `endpoint` is `req.originalUrl`. Only activities recorded through add-activity.ts
- * have the credential-bearing `access_token` query parameter redacted before they
- * reach MongoDB; routes that call createActivity directly with `req.originalUrl`
- * (e.g. search, page export) still store it raw. The index is only used for path
- * aggregation and wildcard search, where the query string is noise anyway, so it
- * is dropped wholesale here instead of keeping a denylist of secret-bearing
- * parameter names in sync.
+ * `endpoint` is `req.originalUrl`. The activity model redacts `access_token` on
+ * save, but rows stored before that redaction existed may still carry it raw. The
+ * index is only used for path aggregation and wildcard search, where the query
+ * string is noise anyway, so it is dropped wholesale here instead of keeping a
+ * denylist of secret-bearing parameter names in sync.
  *
  * As a result the indexed value is path-only and deliberately diverges from the
  * `endpoint` stored in MongoDB. The endpoint suggestion handler passes its query

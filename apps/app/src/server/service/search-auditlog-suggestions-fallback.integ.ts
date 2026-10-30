@@ -34,13 +34,17 @@ class UnreachableSearchService extends SearchService {
 
 const TEST_IP = '10.0.0.90';
 
+// Every seeded endpoint and query lives under this prefix, so rows other integ
+// files leave in the same worker DB never match.
+const P = '/__auditlog-suggestions-fallback-integ';
+
 function makeActivityData(overrides: { username?: string; endpoint?: string }) {
   return {
     id: new Types.ObjectId().toHexString(),
     v: 0,
     action: 'PAGE_CREATE',
     createdAt: new Date(),
-    endpoint: overrides.endpoint ?? '/_api/v3/pages',
+    endpoint: overrides.endpoint ?? `${P}/_api/v3/pages`,
     ip: TEST_IP,
     snapshot: {
       id: new Types.ObjectId().toHexString(),
@@ -56,13 +60,11 @@ describe('SearchService.searchAuditlogSuggestions() MongoDB fallback (real Prism
   beforeEach(async () => {
     searchService = new UnreachableSearchService();
     searchService.fullTextSearchDelegator = mock<ElasticsearchDelegator>();
-    // Clears every row: the endpoint assertions are exact, and other integ
-    // files in the same worker DB leave `/_api/...` activities behind.
-    await prisma.activities.deleteMany({});
+    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
   });
 
   afterAll(async () => {
-    await prisma.activities.deleteMany({});
+    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
   });
 
   it('resolves username suggestions through the real Prisma extension', async () => {
@@ -85,40 +87,35 @@ describe('SearchService.searchAuditlogSuggestions() MongoDB fallback (real Prism
   it('resolves endpoint suggestions through the real Prisma extension', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/_api/v3/pages' }),
-        makeActivityData({ endpoint: '/_api/v3/users' }),
+        makeActivityData({ endpoint: `${P}/_api/v3/pages` }),
+        makeActivityData({ endpoint: `${P}/_api/v3/users` }),
       ],
     });
 
     const result = await searchService.searchAuditlogSuggestions(
       ['endpoint'],
-      '/_api/v3/p',
+      `${P}/_api/v3/p`,
       10,
     );
 
-    expect(result.endpoint?.endpoints).toEqual(['/_api/v3/pages']);
+    expect(result.endpoint?.endpoints).toEqual([`${P}/_api/v3/pages`]);
   });
 
   it('answers a pasted URL by its path alone, whether or not its query string prefixes a stored token', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/_api/search?access_token=abc123' }),
+        makeActivityData({ endpoint: `${P}/_api/search?access_token=abc123` }),
       ],
     });
 
     const search = (q: string) =>
       searchService.searchAuditlogSuggestions(['endpoint'], q, 10);
+    const expected = { endpoint: { endpoints: [`${P}/_api/search`] } };
 
-    expect(await search('/_api/search?access_token=ab')).toEqual({
-      endpoint: { endpoints: ['/_api/search'] },
-    });
-    expect(await search('/_api/search?access_token=zz')).toEqual({
-      endpoint: { endpoints: ['/_api/search'] },
-    });
+    expect(await search(`${P}/_api/search?access_token=ab`)).toEqual(expected);
+    expect(await search(`${P}/_api/search?access_token=zz`)).toEqual(expected);
     expect(
-      await search('https://wiki.example.com/_api/search?access_token=zz'),
-    ).toEqual({
-      endpoint: { endpoints: ['/_api/search'] },
-    });
+      await search(`https://wiki.example.com${P}/_api/search?access_token=zz`),
+    ).toEqual(expected);
   });
 });

@@ -21,6 +21,7 @@ import {
 
 import loggerFactory from '../../utils/logger';
 import { getOrCreateModel } from '../util/mongoose-utils';
+import { redactAccessTokenFromEndpoint } from '../util/redact-access-token-from-endpoint';
 
 const logger = loggerFactory('growi:models:activity');
 
@@ -186,6 +187,22 @@ function normalizeUpdateIdField(
   return normalizeToId(value);
 }
 
+type EndpointUpdateField =
+  | Prisma.NullableStringFieldUpdateOperationsInput
+  | string
+  | null
+  | undefined;
+
+function redactEndpointUpdateField(
+  value: EndpointUpdateField,
+): EndpointUpdateField {
+  if (value == null) return value;
+  if (typeof value === 'string') return redactAccessTokenFromEndpoint(value);
+  return value.set == null
+    ? value
+    : { ...value, set: redactAccessTokenFromEndpoint(value.set) };
+}
+
 /**
  * Parameters accepted by createByParameters — mirrors the Mongoose static's
  * caller interface.  `user` and `target` may be either a bare ID string or a
@@ -279,9 +296,11 @@ function buildSnapshotUpdateEnvelope(
 
 // escapeStringForMongoRegex, not RegExp.escape (mongodb-regex rule — PCRE2
 // rejects RegExp.escape's \uXXXX output). Trims `q` so stray leading/trailing
-// space characters never end up in the pattern.
+// space characters never end up in the pattern. '-' is left unescaped: it is
+// literal outside a character class, and MongoDB stops deriving index bounds
+// at the helper's `\x2d`.
 const escapeSuggestionQuery = (q: string): string =>
-  escapeStringForMongoRegex(q.trim());
+  q.trim().split('-').map(escapeStringForMongoRegex).join('-');
 
 // Substring match — used by findSnapshotUsernamesByUsernameRegexWithTotalCount,
 // whose only production caller is the `/usernames` admin listing API. This
@@ -303,9 +322,6 @@ type SuggestionFieldSpec = {
   // A case-insensitive regex can't be turned into index bounds, so it scans
   // every key of the field's index.
   readonly caseInsensitive: boolean;
-  // A query that would match into the raw stored value's credential-bearing
-  // part; answering it would let a caller probe that part by prefix.
-  readonly isUnmatchableQuery?: (q: string) => boolean;
 };
 
 const SNAPSHOT_USERNAME_SUGGESTION: SuggestionFieldSpec = {
@@ -320,8 +336,6 @@ const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
   // keeps its query string, the ES index does not.
   groupKey: { $arrayElemAt: [{ $split: ['$endpoint', '?'] }, 0] },
   caseInsensitive: AUDITLOG_SUGGESTION_CASE_INSENSITIVE.endpoint,
-  // The stored endpoint may still carry e.g. `access_token` after the '?'.
-  isUnmatchableQuery: (q) => q.includes('?'),
 };
 
 const SNAPSHOT_USERNAME_GROUP_STAGE = {
@@ -344,8 +358,6 @@ const buildFieldSuggestionPipeline = (
   q: string,
   { offset, limit }: { offset: number; limit: number },
 ) => {
-  if (spec.isUnmatchableQuery?.(q)) return null;
-
   return [
     buildFieldPrefixMatchStage(spec, q),
     { $group: { _id: spec.groupKey, count: { $sum: 1 } } },
@@ -370,11 +382,8 @@ const findSuggestionValuesByPrefix = async (
   q: string,
   option: { offset: number; limit: number },
 ): Promise<string[]> => {
-  const pipeline = buildFieldSuggestionPipeline(spec, q, option);
-  if (pipeline == null) return [];
-
   const raw = await context.aggregateRaw({
-    pipeline,
+    pipeline: buildFieldSuggestionPipeline(spec, q, option),
     options: { maxTimeMS: AGGREGATE_MAX_TIME_MS },
   });
 
@@ -444,6 +453,7 @@ export const extension = Prisma.defineExtension((client) => {
             userId: normalizeUpdateIdField(rest.userId),
             target: normalizeUpdateIdField(rest.target),
             event: normalizeUpdateIdField(rest.event),
+            endpoint: redactEndpointUpdateField(rest.endpoint),
             snapshot: buildSnapshotUpdateEnvelope(snapshot),
           };
 
@@ -528,7 +538,7 @@ export const extension = Prisma.defineExtension((client) => {
             v: 0,
             createdAt: createdAt ?? new Date(),
             ip: rest.ip ?? '',
-            endpoint: rest.endpoint ?? '',
+            endpoint: redactAccessTokenFromEndpoint(rest.endpoint ?? ''),
             userId: normalizeToId(user) ?? undefined,
             target: normalizeToId(target) ?? undefined,
             event: normalizeToId(event) ?? undefined,
@@ -562,7 +572,10 @@ export const extension = Prisma.defineExtension((client) => {
         },
 
         // MongoDB fallback for the `endpoint` suggestion field. Unlike
-        // username, no Active/Inactive classification applies here.
+        // username, no Active/Inactive classification applies here. `q` must
+        // be a path without a query string: a q reaching past '?' would let a
+        // caller probe a stored `access_token` by prefix. The caller
+        // (toEndpointSearchPath) strips it.
         findEndpointsByEndpointRegex(
           q: string,
           option: { offset: number; limit: number },

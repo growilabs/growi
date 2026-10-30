@@ -189,6 +189,21 @@ describe('ActivityExtension.createByParameters - data-building contract', () => 
     expect(data.userId).toBeUndefined();
     expect(data.target).toBeUndefined();
   });
+
+  it('redacts an access_token in the endpoint before it is stored', async () => {
+    const { client, createSpy } = buildClient();
+
+    await client.activities.createByParameters({
+      endpoint: '/_search?q=foo&access_token=secret',
+      action: 'SEARCH_PAGE',
+    });
+
+    expect(createSpy).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        endpoint: '/_search?q=foo&access_token=[REDACTED]',
+      }),
+    });
+  });
 });
 
 describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () => {
@@ -362,6 +377,23 @@ describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () =
       },
       include: { user: true },
     });
+  });
+
+  it.each([
+    ['a plain string', '/_api/v3/pages?access_token=secret'],
+    ['a `{ set }` operation', { set: '/_api/v3/pages?access_token=secret' }],
+  ])('redacts an access_token in an endpoint passed as %s', async (_label, endpoint) => {
+    const { client, updateSpy } = buildUpdateClient();
+
+    await client.activities.updateByParameters('activity-id-1', {
+      action: 'PAGE_UPDATE',
+      endpoint,
+    });
+
+    const data = updateSpy.mock.calls[0]?.[0]?.data;
+    const stored =
+      typeof data?.endpoint === 'string' ? data.endpoint : data?.endpoint?.set;
+    expect(stored).toBe('/_api/v3/pages?access_token=[REDACTED]');
   });
 
   it('returns null (does NOT throw) when Prisma throws P2025 (record not found, C1)', async () => {
@@ -697,6 +729,36 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
     };
     expect(callArgs.pipeline[0]).toEqual({
       $match: { 'snapshot.username': { $regex: '^ali', $options: 'i' } },
+    });
+  });
+});
+
+describe('ActivityExtension.findEndpointsByEndpointRegex', () => {
+  const buildAggregateClient = () => {
+    const base = new PrismaClient({
+      datasourceUrl: 'mongodb://localhost:27017/test',
+    });
+    const client = base.$extends(extension);
+    const aggregateRawSpy = vi.spyOn(client.activities, 'aggregateRaw');
+    return { client, aggregateRawSpy };
+  };
+
+  // MongoDB derives index bounds only up to an escaped letter, so `\x2d`
+  // would cut the endpoint_1 range at the first hyphen.
+  it('keeps hyphens unescaped so the endpoint prefix stays index-bounded', async () => {
+    const { client, aggregateRawSpy } = buildAggregateClient();
+    aggregateRawSpy.mockResolvedValueOnce([] as never);
+
+    await client.activities.findEndpointsByEndpointRegex(
+      '/_api/v3/share-links.x',
+      { offset: 0, limit: 10 },
+    );
+
+    const callArgs = aggregateRawSpy.mock.calls[0]?.[0] as {
+      pipeline: unknown[];
+    };
+    expect(callArgs.pipeline[0]).toEqual({
+      $match: { endpoint: { $regex: '^/_api/v3/share-links\\.x' } },
     });
   });
 });

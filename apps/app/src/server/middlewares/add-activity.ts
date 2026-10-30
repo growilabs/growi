@@ -8,8 +8,6 @@ import {
 } from '~/server/service/activity/index';
 import loggerFactory from '~/utils/logger';
 
-import { redactAccessTokenFromEndpoint } from './redact-access-token-from-endpoint';
-
 const logger = loggerFactory('growi:middlewares:add-activity');
 
 interface AuthorizedRequest extends Request {
@@ -37,7 +35,7 @@ export const generateAddActivityMiddleware = () =>
     // and what createByParameters later expects.
     const context: PendingActivityContext = {
       ip: req.ip,
-      endpoint: redactAccessTokenFromEndpoint(req.originalUrl),
+      endpoint: req.originalUrl,
       userId: req.user?._id?.toString(),
       username: req.user?.username,
       createdAt: new Date(),

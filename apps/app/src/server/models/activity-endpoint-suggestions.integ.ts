@@ -8,7 +8,11 @@ import { Types } from 'mongoose';
 import { sanitizeEndpointForIndex } from '~/server/service/search-delegator/sanitize-endpoint-for-index';
 import { prisma } from '~/utils/prisma';
 
-const TEST_IP = '10.0.0.73';
+const TEST_IP = '10.0.0.93';
+
+// Every seeded endpoint and query lives under this prefix, so rows other integ
+// files leave in the same worker DB never match.
+const P = '/__endpoint-suggestions-integ';
 
 /** Build a minimal activities record for seeding via prisma.activities.createMany. */
 function makeActivityData(overrides: { endpoint: string }) {
@@ -27,132 +31,117 @@ function makeActivityData(overrides: { endpoint: string }) {
 }
 
 describe('findEndpointsByEndpointRegex', () => {
-  // Clears every row, not just this suite's: the assertions cover the whole
-  // collection, and other integ files in the same worker DB leave activities
-  // with `/_api/v3/...` endpoints behind.
   beforeEach(async () => {
-    await prisma.activities.deleteMany({});
+    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
   });
 
   afterAll(async () => {
-    await prisma.activities.deleteMany({});
+    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
   });
 
   it('returns distinct, prefix-matched endpoints', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/_api/v3/pages' }),
-        makeActivityData({ endpoint: '/_api/v3/pages' }), // duplicate — should count once
-        makeActivityData({ endpoint: '/_api/v3/pages/revert' }),
-        makeActivityData({ endpoint: '/_api/v3/users' }),
+        makeActivityData({ endpoint: `${P}/_api/v3/pages` }),
+        makeActivityData({ endpoint: `${P}/_api/v3/pages` }), // duplicate — should count once
+        makeActivityData({ endpoint: `${P}/_api/v3/pages/revert` }),
+        makeActivityData({ endpoint: `${P}/_api/v3/users` }),
       ],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/_api/v3/pages',
+      `${P}/_api/v3/pages`,
       { offset: 0, limit: 10 },
     );
 
     expect(result).toHaveLength(2);
     expect(result).toEqual(
-      expect.arrayContaining(['/_api/v3/pages', '/_api/v3/pages/revert']),
+      expect.arrayContaining([
+        `${P}/_api/v3/pages`,
+        `${P}/_api/v3/pages/revert`,
+      ]),
     );
-    expect(result).not.toContain('/_api/v3/users');
+    expect(result).not.toContain(`${P}/_api/v3/users`);
   });
 
   it('matches only a prefix, not any substring', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/_api/v3/pages' }),
-        makeActivityData({ endpoint: '/_api/v3/not-pages' }),
+        makeActivityData({ endpoint: `${P}/_api/v3/pages` }),
+        makeActivityData({ endpoint: `${P}/_api/v3/not-pages` }),
       ],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/_api/v3/pages',
+      `${P}/_api/v3/pages`,
       { offset: 0, limit: 10 },
     );
 
-    expect(result).toEqual(['/_api/v3/pages']);
+    expect(result).toEqual([`${P}/_api/v3/pages`]);
   });
 
   it('matches case-sensitively', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/_api/v3/pages' }),
-        makeActivityData({ endpoint: '/_API/v3/pages' }),
+        makeActivityData({ endpoint: `${P}/_api/v3/pages` }),
+        makeActivityData({ endpoint: `${P}/_API/v3/pages` }),
       ],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/_api/v3/pages',
+      `${P}/_api/v3/pages`,
       { offset: 0, limit: 10 },
     );
 
-    expect(result).toEqual(['/_api/v3/pages']);
+    expect(result).toEqual([`${P}/_api/v3/pages`]);
   });
 
   it('treats regex metacharacters in q as literal text, not as regex syntax', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/_api/v3/a.b' }),
-        makeActivityData({ endpoint: '/_api/v3/axb' }), // would match '/_api/v3/a.b' if '.' were a wildcard
+        makeActivityData({ endpoint: `${P}/_api/v3/a.b` }),
+        makeActivityData({ endpoint: `${P}/_api/v3/axb` }), // would match '.../a.b' if '.' were a wildcard
       ],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/_api/v3/a.b',
+      `${P}/_api/v3/a.b`,
       { offset: 0, limit: 10 },
     );
 
-    expect(result).toEqual(['/_api/v3/a.b']);
+    expect(result).toEqual([`${P}/_api/v3/a.b`]);
   });
 
   it('returns path-only endpoints, never exposing or splitting on the query string', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/_api/search?q=secret-a' }),
-        makeActivityData({ endpoint: '/_api/search?q=secret-b' }),
-        makeActivityData({ endpoint: '/_api/search' }),
+        makeActivityData({ endpoint: `${P}/_api/search?q=secret-a` }),
+        makeActivityData({ endpoint: `${P}/_api/search?q=secret-b` }),
+        makeActivityData({ endpoint: `${P}/_api/search` }),
       ],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/_api/search',
+      `${P}/_api/search`,
       { offset: 0, limit: 10 },
     );
 
-    expect(result).toEqual(['/_api/search']);
-  });
-
-  it('returns [] for a q that reaches into the query string, so a stored token cannot be probed by prefix', async () => {
-    await prisma.activities.createMany({
-      data: [
-        makeActivityData({ endpoint: '/_api/search?access_token=abc123' }),
-      ],
-    });
-
-    const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/_api/search?access_token=ab',
-      { offset: 0, limit: 10 },
-    );
-
-    expect(result).toEqual([]);
+    expect(result).toEqual([`${P}/_api/search`]);
   });
 
   it('groups by the same path that sanitizeEndpointForIndex indexes into ES', async () => {
     const seeded = [
-      '/_api/v3/pages',
-      '/_api/v3/pages?limit=10',
-      '/_api/v3/pages/list?path=%2F&page=2',
-      '/_api/v3/pages/rename?access_token=abc',
-      '/_api/v3/pages?',
-      '/_api/v3/users',
+      `${P}/_api/v3/pages`,
+      `${P}/_api/v3/pages?limit=10`,
+      `${P}/_api/v3/pages/list?path=%2F&page=2`,
+      `${P}/_api/v3/pages/rename?access_token=abc`,
+      `${P}/_api/v3/pages?`,
+      `${P}/_api/v3/users`,
     ];
     await prisma.activities.createMany({
       data: seeded.map((endpoint) => makeActivityData({ endpoint })),
     });
-    const q = '/_api/v3/pages';
+    const q = `${P}/_api/v3/pages`;
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(q, {
       offset: 0,
@@ -170,11 +159,11 @@ describe('findEndpointsByEndpointRegex', () => {
 
   it('returns [] when no endpoint matches the query', async () => {
     await prisma.activities.createMany({
-      data: [makeActivityData({ endpoint: '/_api/v3/pages' })],
+      data: [makeActivityData({ endpoint: `${P}/_api/v3/pages` })],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/xyz_nomatch_zzz',
+      `${P}/xyz_nomatch_zzz`,
       { offset: 0, limit: 10 },
     );
 
@@ -184,42 +173,42 @@ describe('findEndpointsByEndpointRegex', () => {
   it('orders paths by hit count, then alphabetically, like the ES terms aggregation', async () => {
     await prisma.activities.createMany({
       data: [
-        '/_api/v3/d',
-        '/_api/v3/c',
-        '/_api/v3/a',
-        '/_api/v3/a?limit=10',
-        '/_api/v3/b',
-        '/_api/v3/b',
-        '/_api/v3/b',
+        `${P}/_api/v3/d`,
+        `${P}/_api/v3/c`,
+        `${P}/_api/v3/a`,
+        `${P}/_api/v3/a?limit=10`,
+        `${P}/_api/v3/b`,
+        `${P}/_api/v3/b`,
+        `${P}/_api/v3/b`,
       ].map((endpoint) => makeActivityData({ endpoint })),
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '/_api/v3/',
+      `${P}/_api/v3/`,
       { offset: 0, limit: 10 },
     );
 
     expect(result).toEqual([
-      '/_api/v3/b',
-      '/_api/v3/a',
-      '/_api/v3/c',
-      '/_api/v3/d',
+      `${P}/_api/v3/b`,
+      `${P}/_api/v3/a`,
+      `${P}/_api/v3/c`,
+      `${P}/_api/v3/d`,
     ]);
   });
 
   it('matches by prefix even with incidental surrounding whitespace in q', async () => {
     await prisma.activities.createMany({
       data: [
-        makeActivityData({ endpoint: '/_api/v3/pages' }),
-        makeActivityData({ endpoint: '/_api/v3/not-pages' }),
+        makeActivityData({ endpoint: `${P}/_api/v3/pages` }),
+        makeActivityData({ endpoint: `${P}/_api/v3/not-pages` }),
       ],
     });
 
     const result = await prisma.activities.findEndpointsByEndpointRegex(
-      '  /_api/v3/pages  ',
+      `  ${P}/_api/v3/pages  `,
       { offset: 0, limit: 10 },
     );
 
-    expect(result).toEqual(['/_api/v3/pages']);
+    expect(result).toEqual([`${P}/_api/v3/pages`]);
   });
 });
