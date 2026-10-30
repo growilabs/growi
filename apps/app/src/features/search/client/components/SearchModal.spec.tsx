@@ -16,14 +16,14 @@ import { mock } from 'vitest-mock-extended';
 import { isSearchScopeChildrenAsDefaultAtom } from '~/states/server-configurations';
 
 import {
-  type OpenSearchModalOptions,
   useSearchModalActions,
   useSearchModalStatus,
 } from '../states/modal/search';
 
 const mocks = vi.hoisted(() => ({
-  apiv3Post: vi.fn(),
+  postSearchHistory: vi.fn(),
   routerPush: vi.fn(),
+  routerPathname: { value: '/[[...path]]' },
   setSearchKeyword: vi.fn(),
   currentUser: { value: undefined as IUserHasId | undefined },
 }));
@@ -32,10 +32,13 @@ vi.mock('next-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 vi.mock('next/router', () => ({
-  useRouter: () => ({ push: mocks.routerPush }),
+  useRouter: () => ({
+    push: mocks.routerPush,
+    pathname: mocks.routerPathname.value,
+  }),
 }));
-vi.mock('~/client/util/apiv3-client', () => ({
-  apiv3Post: mocks.apiv3Post,
+vi.mock('../services/search-history-api', () => ({
+  postSearchHistory: mocks.postSearchHistory,
 }));
 vi.mock('~/states/global', async (importOriginal) => ({
   ...(await importOriginal<typeof import('~/states/global')>()),
@@ -72,14 +75,14 @@ vi.mock('@growi/ui/dist/components', () => ({
 import SearchModal from './SearchModal';
 
 type OpenArgs = {
+  keywordOnInit?: string;
   onSearchOverride?: (keyword: string) => void;
-  options?: OpenSearchModalOptions;
   isSearchScopeChildrenAsDefault?: boolean;
 };
 
 const renderOpenedModal = ({
+  keywordOnInit,
   onSearchOverride,
-  options,
   isSearchScopeChildrenAsDefault = false,
 }: OpenArgs = {}) => {
   const store = createStore();
@@ -95,7 +98,7 @@ const renderOpenedModal = ({
     }),
     { wrapper },
   );
-  act(() => result.current.actions.open(undefined, onSearchOverride, options));
+  act(() => result.current.actions.open(keywordOnInit, onSearchOverride));
 
   render(<SearchModal />, { wrapper });
 
@@ -103,9 +106,7 @@ const renderOpenedModal = ({
 };
 
 const recordedKeywords = (): unknown[] =>
-  mocks.apiv3Post.mock.calls
-    .filter(([url]) => url === '/search-history')
-    .map(([, body]) => body.keyword);
+  mocks.postSearchHistory.mock.calls.map(([keyword]) => keyword);
 
 const getInput = (): HTMLInputElement =>
   screen.getByPlaceholderText('Search...');
@@ -130,14 +131,11 @@ describe('SearchModal search history recording', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.currentUser.value = mock<IUserHasId>({ _id: 'user-id' });
-    mocks.apiv3Post.mockResolvedValue({
-      data: {
-        searchHistory: {
-          _id: 'history-id',
-          keyword: 'k',
-          lastSearchedAt: new Date(),
-        },
-      },
+    mocks.routerPathname.value = '/[[...path]]';
+    mocks.postSearchHistory.mockResolvedValue({
+      _id: 'history-id',
+      keyword: 'k',
+      lastSearchedAt: new Date(),
     });
     mocks.routerPush.mockResolvedValue(true);
   });
@@ -161,6 +159,7 @@ describe('SearchModal search history recording', () => {
     });
 
     it('records the keyword when the modal was opened with a search override (from /_search)', async () => {
+      mocks.routerPathname.value = '/_search';
       const onSearchOverride = vi.fn();
       renderOpenedModal({ onSearchOverride });
 
@@ -171,18 +170,43 @@ describe('SearchModal search history recording', () => {
       expect(onSearchOverride).toHaveBeenCalledWith('hello');
     });
 
-    it('does not record when search history is disabled for the modal, but still searches', async () => {
+    it('records a prefix: shown in the input on /_search as typed, since the user kept it', async () => {
+      mocks.routerPathname.value = '/_search';
       const onSearchOverride = vi.fn();
       renderOpenedModal({
+        keywordOnInit: 'prefix:/foo bar',
         onSearchOverride,
-        options: { isSearchHistoryEnabled: false },
+        isSearchScopeChildrenAsDefault: true,
       });
+      expect(getInput().value).toBe('prefix:/foo bar');
+
+      await pressEnter();
+
+      expect(recordedKeywords()).toEqual(['prefix:/foo bar']);
+      expect(onSearchOverride).toHaveBeenCalledWith('prefix:/foo bar');
+    });
+
+    it('does not record on /_private-legacy-pages, but still searches', async () => {
+      mocks.routerPathname.value = '/_private-legacy-pages';
+      const onSearchOverride = vi.fn();
+      renderOpenedModal({ onSearchOverride });
 
       typeKeyword('hello');
       await pressEnter();
 
       expect(recordedKeywords()).toEqual([]);
       expect(onSearchOverride).toHaveBeenCalledWith('hello');
+    });
+
+    it('does not record on /_private-legacy-pages when opened without a search override (e.g. the / shortcut)', async () => {
+      mocks.routerPathname.value = '/_private-legacy-pages';
+      renderOpenedModal();
+
+      typeKeyword('hello');
+      await pressEnter();
+
+      expect(recordedKeywords()).toEqual([]);
+      expect(mocks.setSearchKeyword).toHaveBeenCalledWith('hello');
     });
 
     it('does not record for a guest, but still searches', async () => {
@@ -208,7 +232,7 @@ describe('SearchModal search history recording', () => {
     });
 
     it('searches and closes the modal without waiting for the record to complete', async () => {
-      mocks.apiv3Post.mockReturnValue(new Promise(() => {}));
+      mocks.postSearchHistory.mockReturnValue(new Promise(() => {}));
       const { status } = renderOpenedModal();
 
       typeKeyword('hello');
@@ -282,8 +306,9 @@ describe('SearchModal search history recording', () => {
       expect(recordedKeywords()).toEqual([]);
     });
 
-    it('does not record a method item when search history is disabled for the modal', () => {
-      renderOpenedModal({ options: { isSearchHistoryEnabled: false } });
+    it('does not record a method item on /_private-legacy-pages', () => {
+      mocks.routerPathname.value = '/_private-legacy-pages';
+      renderOpenedModal();
 
       typeKeyword('hello');
       fireEvent.click(getMenuItem('search_method_menu_item.search_in_all'));
@@ -304,7 +329,7 @@ describe('SearchModal search history recording', () => {
     });
 
     it('navigates without waiting for the record to complete', () => {
-      mocks.apiv3Post.mockReturnValue(new Promise(() => {}));
+      mocks.postSearchHistory.mockReturnValue(new Promise(() => {}));
       renderOpenedModal();
 
       typeKeyword('hello');

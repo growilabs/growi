@@ -25,7 +25,7 @@
 - `searchhistories` コレクションのデータ契約（1 件の形・同一キーワードの判定・保持の上限 50 件・並び順）と、そのインデックス
 - 保存するキーワードの正規化規則（前後の空白の除去・空の除外・200 コードポイントの上限・完全一致の引用符）
 - `/_api/v3/search-history` の `GET /`・`POST /`・`DELETE /:id` と、その認可
-- 検索モーダルにおける「検索の実行」の判定（記録点）と、`isSearchHistoryEnabled` フラグ
+- 検索モーダルにおける「検索の実行」の判定（記録点）と、表示中のページから決める履歴の有効・無効（`isSearchHistoryEnabled`）
 - 検索モーダルの履歴セクション（表示・選択・削除）と、Downshift の項目型
 - ユーザー削除時・インポート時・g2g における検索履歴の扱い
 
@@ -38,7 +38,7 @@
 
 ### Allowed Dependencies
 - サーバ: `~/utils/prisma`（Prisma クライアント）、`loginRequiredFactory`、`accessTokenParser`、`apiV3FormValidator`、`express-validator`、`@growi/core`（`SCOPE`、`ErrorV3`）、`~/utils/logger`
-- クライアント: `downshift`、`swr`、`@growi/core/dist/swr`、`~/client/util/apiv3-client`、`~/client/util/toastr`、`~/states/global`（`useCurrentUser`）、`next-i18next`
+- クライアント: `downshift`、`swr`、`@growi/core/dist/swr`、`~/utils/axios`（keyword を含む応答を受け取る GET・POST は `search-history-api` 経由）、`~/client/util/apiv3-client`（応答に keyword を含まない DELETE）、`~/client/util/toastr`、`~/states/global`（`useCurrentUser`）、`next-i18next`
 - 依存の向き: `features/search/interfaces` と `features/search/utils` → `features/search/server` / `features/search/client`。サーバとクライアントは互いに import しない。`server/routes/apiv3/users.js` と `server/service/import/` は、`features/search/server/services/search-history` だけを import する
 
 ### Revalidation Triggers
@@ -46,13 +46,13 @@
 - 保持の上限（50）を大きく引き上げるとき（一覧と切り詰め用のインデックスの追加が必要になる）
 - Mongo 上のフィールド名（`user` / `keyword` / `lastSearchedAt`）やインデックス名（`user_1_keyword_1`）が変わるとき（migration・overwrite-params・`schema.prisma` の 3 か所を揃える必要がある）
 - `SearchMethodMenuItem` の空入力時の項目数が変わるとき（履歴の起点 index が変わる）
-- `open()` の引数の形が変わるとき（`isSearchHistoryEnabled` の受け渡しに影響する）
+- `/_private-legacy-pages` のルート（Next.js の `pathname`）が変わるとき、または履歴を無効にするページが増えるとき（`SearchModal` の `SEARCH_HISTORY_DISABLED_PATHNAMES` を揃える必要がある）
 
 ## Architecture
 
 ### Existing Architecture Analysis
 - 検索の入力は `SearchModal`（Downshift）に集約されている。Enter は `searchHandler` に、項目の選択は `onSelect` → `router.push(item.url)` に流れる。
-- `/_search` と `/_private-legacy-pages` は、どちらも `SearchControl` → `SearchModalTriggerinput` → `open(keyword, onSearchOverride)` でモーダルを開く。
+- `/_search` と `/_private-legacy-pages` は、どちらも `SearchControl` → `SearchModalTriggerinput` → `open(keyword, onSearchOverride)` でモーダルを開く。ほかに、ショートカットキー `/`（`FocusToGlobalSearch`）やナビゲーションの検索欄も `open()` でモーダルを開く。開く経路は複数あるため、履歴の有効・無効は経路ごとに受け渡さず、モーダルを表示しているページから `SearchModal` が決める。
 - `features/search/` には `client/` と `utils/` しかない。本 spec で `interfaces/` と `server/` を新設する。
 - Prisma だけのコレクションの前例として `auditlog_es_sync_status` がある（関数のモジュール、migrate-mongo でインデックスを作成）。
 
@@ -69,6 +69,7 @@ graph TB
         HistoryItems[SearchHistoryMenuItems]
         Store[useSWRxSearchHistories]
         Recorder[recordSearchHistory]
+        SearchHistoryApi[search history api client]
     end
     subgraph Shared
         Keyword[search history keyword utils]
@@ -92,8 +93,9 @@ graph TB
     Modal --> Recorder
     HistoryItems --> Store
     Modal --> Store
-    Recorder --> Router
-    Store --> Router
+    Recorder --> SearchHistoryApi
+    Store --> SearchHistoryApi
+    SearchHistoryApi --> Router
     Router --> Service
     Users --> Service
     Service --> Prisma
@@ -147,6 +149,7 @@ apps/app/src/features/search/
 └── client/
     ├── interfaces/downshift.ts        # [保存] 変更: DownshiftItem を union に（下記 Modified Files）
     ├── services/
+    │   ├── search-history-api.ts      # [保存] 検索履歴 API の要求。keyword を Date に変換しない応答の解釈（[再検索] 一覧の取得もここに置く）
     │   ├── record-search-history.ts   # [保存] 記録 API を投げっぱなしで呼び、失敗はログに残す
     │   └── record-search-history.spec.ts
     ├── stores/
@@ -166,7 +169,7 @@ apps/app/src/migrations/
     20261021120000-add-unique-index-to-searchhistories.integ.ts
 
 apps/app/src/server/service/import/overwrite-params/
-├── searchhistories.ts                 # [保存] user を ObjectId に戻す
+├── searchhistories.ts                 # [保存] user を ObjectId に戻し、keyword は文字列のまま通す
 └── searchhistories.spec.ts
 
 apps/app/src/server/service/import/
@@ -176,7 +179,7 @@ apps/app/src/server/service/import/
 ### Modified Files
 - `apps/app/prisma/schema.prisma` — [保存] `model searchhistories` を追加する（Data Models を参照）。
 - `apps/app/src/server/routes/apiv3/index.js` — [保存] `router.use('/search-history', createSearchHistoryRouter(crowi))` を 1 行追加する。
-- `apps/app/src/server/routes/apiv3/users.js` — [保存] `statusDelete()` と `externalaccounts.deleteMany` の直後で、`removeAllSearchHistoriesOfUser(user._id.toString())` を呼ぶ。
+- `apps/app/src/server/routes/apiv3/users.js` — [保存] `statusDelete()` と `externalaccounts.deleteMany` の直後で、`removeAllSearchHistoriesOfUser(user._id.toString())` を呼ぶ。失敗は `logger.error` に残し、後続の処理を続ける。
 - `apps/app/src/server/service/import/overwrite-params/index.ts` — [保存] `case 'searchhistories'` を追加する。
 - `apps/app/src/server/service/import/non-transferable-collections.ts` — [保存] `TRANSFERABLE_COLLECTIONS` に `'searchhistories'` を追加する。
 - `apps/app/src/client/components/Admin/ExportArchiveData/SelectCollectionsModal.tsx` — [保存] `GROUPS_USER` に `'searchhistories'` を追加する。これがないと「その他」に分類され、ユーザーデータ向けの警告（パスワードシードの注意）が出ない。
@@ -184,12 +187,8 @@ apps/app/src/server/service/import/
 - `apps/app/src/features/search/client/components/SearchMenuItem.tsx` — [保存] `url` の代わりに `item: DownshiftItem` を受け取る。
 - `apps/app/src/features/search/client/components/SearchMethodMenuItem.tsx` — [保存] 各項目に `historyKeyword` を付ける。
 - `apps/app/src/features/search/client/components/SearchResultMenuItem.tsx` — [保存] `{ type: 'navigate', url }` の項目を渡す（`historyKeyword` は付けない）。[再検索] 起点 index を `getSearchMethodMenuItemCount()` で求める。
-- `apps/app/src/features/search/client/components/SearchModal.tsx` — [保存] `recordSearch` と、項目の種類による選択の振り分け。[再検索] 履歴セクションの配置。[削除] Delete キーの処理。
+- `apps/app/src/features/search/client/components/SearchModal.tsx` — [保存] 表示中のページによる履歴の有効・無効の判定、`recordSearch`、項目の種類による選択の振り分け。[再検索] 履歴セクションの配置。[削除] Delete キーの処理。
 - `apps/app/src/features/search/client/components/SearchForm.tsx` — [削除] 親から `onKeyDown` を受け取り、既存の Home/End の処理の後に呼ぶ。
-- `apps/app/src/features/search/client/states/modal/search.ts` — [保存] `open()` の第 3 引数 `options` と `SearchModalStatus.isSearchHistoryEnabled` を追加する。
-- `apps/app/src/features/search/client/components/SearchPage/SearchModalTriggerinput.tsx` — [保存] `isSearchHistoryEnabled` prop を `open()` に渡す。
-- `apps/app/src/features/search/client/components/SearchPage/SearchControl.tsx` — [保存] `isSearchHistoryEnabled?: boolean` prop を `SearchModalTriggerinput` に渡す。
-- `apps/app/src/features/search/client/components/PrivateLegacyPages.tsx` — [保存] `SearchControl` に `isSearchHistoryEnabled={false}` を渡す。
 - `apps/app/public/static/locales/{en_US,ja_JP,zh_CN,ko_KR,fr_FR}/commons.json` — [再検索・削除] `search_history` 名前空間のキーを追加する。
 
 ## System Flows
@@ -224,8 +223,9 @@ sequenceDiagram
     Note over Recorder: failure is logged only
 ```
 
-- `recordSearch(keyword)` は、`currentUser == null` または `isSearchHistoryEnabled === false` のとき何もしない。`toSearchHistoryKeyword(keyword)` が `null`（空、または 200 コードポイント超）のときも何もしない。
+- `recordSearch(keyword)` は、`currentUser == null` または `isSearchHistoryEnabled === false`（表示中のページが `/_private-legacy-pages`）のとき何もしない。`toSearchHistoryKeyword(keyword)` が `null`（空、または 200 コードポイント超）のときも何もしない。
 - `searchHandler` の中では、`onSearchOverride` の分岐と `prefix:` の付与の **前** に `recordSearch` を呼ぶ。そのため、`/_search` 上での Enter も記録され（1.2）、`prefix:` は保存されない（2.3）。
+- 一方、`/_search` から開いたモーダルの入力欄には、`/_search` の検索欄の値（前回の検索で自動付与された `prefix:<ページ>` を含むことがある）が初期値として入る。この `prefix:` は、ユーザーが入力欄で見たうえで残したものとみなし、入力どおりに記録する（2.8）。入力欄に表示されない、Enter の処理の中で付与される `prefix:`（2.3）とは区別する。
 - 記録の Promise は待たない（6.1）。
 
 ### 削除
@@ -262,7 +262,7 @@ sequenceDiagram
 | 1.5 | ページ候補の選択では記録しない | SearchResultMenuItem | `historyKeyword` を付けない | 記録 |
 | 1.6 | モーダルを経由しない `/_search` では記録しない | SearchModal（記録点を限定） | — | — |
 | 1.7 | タグのクリックでは記録しない | SearchModal（記録点を限定） | — | — |
-| 1.8 | `/_private-legacy-pages` では記録しない | PrivateLegacyPages, SearchControl, modal state | `isSearchHistoryEnabled` | 記録 |
+| 1.8 | `/_private-legacy-pages` では記録しない | SearchModal | `isSearchHistoryEnabled`（表示中のページから判定） | 記録 |
 | 1.9 | 再検索にも同じ規則を適用する | SearchModal | `SearchItem` → `searchHandler` | 記録 |
 | 2.1 | 前後の空白を除く | search-history-keyword, Service | `toSearchHistoryKeyword` | — |
 | 2.2 | 演算子トークンを書き換えない | search-history-keyword | 正規化は trim だけ | — |
@@ -271,6 +271,7 @@ sequenceDiagram
 | 2.5 | 完全一致は引用符付き | SearchMethodMenuItem, search-history-keyword | `toExactMatchKeyword` | — |
 | 2.6 | 空のキーワードは記録しない | search-history-keyword, SearchModal, Service | `null` を返す／400 | — |
 | 2.7 | 200 文字超は記録しないが検索は実行する | search-history-keyword, SearchModal, Service | `SEARCH_HISTORY_KEYWORD_MAX_LENGTH` | 記録 |
+| 2.8 | `/_search` の入力欄に表示された `prefix:` は入力どおり | SearchModal | `recordSearch` は入力欄の値をそのまま受け取る | 記録 |
 | 3.1 | 同一キーワードは繰り上げる | Service | `record` の upsert | 記録 |
 | 3.2 | 完全一致のときだけ同一とみなす | Service, Data Model | 一意キー (user, keyword) | — |
 | 3.3 | 繰り上げても識別子を変えない | Service | upsert の update 側 | — |
@@ -300,7 +301,7 @@ sequenceDiagram
 | 8.4 | 入力があれば出さない | SearchModal | 空入力のときだけ描画 | — |
 | 8.5 | 0 件なら出さない | SearchHistoryMenuItems | 空なら何も描画しない | — |
 | 8.6 | ゲストには出さない | Store | SWR のキーを `null` | — |
-| 8.7 | `/_private-legacy-pages` では出さない | Store, modal state | `isSearchHistoryEnabled` | — |
+| 8.7 | `/_private-legacy-pages` では出さない | Store, SearchModal | `isSearchHistoryEnabled`（表示中のページから判定） | — |
 | 8.8 | 取得に失敗しても妨げない | SearchHistoryMenuItems | `error` のときは何も描画しない | — |
 | 9.1 | マウスでもキーボードでも選べる | SearchHistoryMenuItems | `SearchMenuItem` + `getItemProps` | — |
 | 9.2 | 選ぶと検索を実行する | SearchModal, recordSearchHistory | `SearchItem` → `onSearch`。直前の検索が先頭に来るよう、キャッシュを記録の応答で更新 | 記録 |
@@ -327,12 +328,12 @@ sequenceDiagram
 | SearchHistoryService | Server | データの規則（重複・上限・本人限定） | 3.1–3.5, 4.1, 4.2, 7.1, 10.5, 11.1, 11.2 | Prisma (P0) | Service |
 | search-history router | Server | 認可・入力検証・応答 | 4.1–4.4, 5.1–5.3, 5.5, 11.1–11.4 | SearchHistoryService (P0), loginRequired (P0), accessTokenParser (P0) | API |
 | searchhistories migration | Infra | 一意インデックスの作成 | 3.2 | migrate-mongo (P0) | Batch |
-| overwrite-params/searchhistories | Server import | インポート時の `user` の型を戻す | 7.4, 7.5 | import service (P0) | Service |
+| overwrite-params/searchhistories | Server import | インポート時に `user` の型を戻し、`keyword` を文字列のまま保つ | 7.4, 7.5 | import service (P0) | Service |
 | users route（変更） | Server | ユーザー削除時に履歴を消す | 7.1, 7.2 | SearchHistoryService (P0) | — |
-| Search modal state（変更） | Client state | `isSearchHistoryEnabled` を持つ | 1.8, 8.7 | jotai (P0) | State |
 | DownshiftItem（変更） | Client interfaces | 項目の種類を表す | 1.3, 1.5, 9.2 | downshift (P0) | — |
-| SearchModal（変更） | Client UI | 記録点・選択の振り分け・Delete キー | 1.1–1.9, 2.3, 5.4, 6.1, 8.2, 8.4, 9.2–9.4, 10.3, 10.4, 10.6 | recordSearchHistory (P0), Store (P0) | State |
-| recordSearchHistory | Client service | 記録 API を投げっぱなしで呼ぶ | 6.1–6.3 | apiv3-client (P0) | Service |
+| SearchModal（変更） | Client UI | 履歴の有効・無効の判定・記録点・選択の振り分け・Delete キー | 1.1–1.9, 2.3, 2.8, 5.4, 6.1, 8.2, 8.4, 9.2–9.4, 10.3, 10.4, 10.6 | recordSearchHistory (P0), Store (P0) | State |
+| search-history-api | Client service | 検索履歴 API の要求と、keyword を変換しない応答の解釈 | 4.2, 4.3 | `~/utils/axios` (P0) | Service |
+| recordSearchHistory | Client service | 記録 API を投げっぱなしで呼ぶ | 6.1–6.3 | search-history-api (P0) | Service |
 | useSWRxSearchHistories | Client store | 一覧の取得と楽観的な削除 | 8.1, 8.3, 8.6, 8.7, 10.5, 10.6 | swr (P0) | State |
 | search-menu-index | Client utils | index の計算（起点・ハイライト・削除後） | 8.2, 10.3 | — | Service |
 | SearchHistoryMenuItems | Client UI | 履歴セクションと削除ボタン | 8.1, 8.5, 8.8, 9.1, 10.1, 10.2, 10.4, 10.7 | SearchMenuItem (P0) | — |
@@ -368,7 +369,7 @@ export const toExactMatchKeyword: (input: string) => string;
 export type ISearchHistory = {
   _id: string;
   keyword: string;
-  lastSearchedAt: Date; // the shared apiv3 axios client revives ISO strings into Date; the client relies on server-side ordering only
+  lastSearchedAt: Date; // revived into a Date by the client's search-history API; the client relies on server-side ordering only
 };
 
 export type RecordSearchHistoryRequestBody = { keyword: string };
@@ -464,38 +465,16 @@ export class InvalidSearchHistoryKeywordError extends Error {}
 #### overwrite-params/searchhistories
 
 ```typescript
-export const overwriteParams: OverwriteParams; // { user: (value) => new ObjectId(value) }
+export const overwriteParams: OverwriteParams; // { user: (value) => new ObjectId(value), keyword: (value) => value }
 ```
 - `generateOverwriteParams` の switch に `case 'searchhistories'` を追加する。`_id` と日付は、既存の仕組みで変換される。
+- 既存の仕組みは、指定の無いフィールドのうち ISO 日時の形の文字列を Date に変える。`2024-10-30T00:00:00Z` のようなキーワードが Date で保存されると、Prisma の `keyword String` と型が合わず、そのユーザーの一覧取得が失敗し続ける。そのため `keyword` は変換せずに文字列のまま通す（7.4）。
 
 #### users route（変更）
 - ユーザー削除 API で `statusDelete()`・`prisma.externalaccounts.deleteMany` の直後に、`removeAllSearchHistoriesOfUser(user._id.toString())` を呼ぶ（7.1）。一時停止などほかの状態遷移には追加しない（7.2）。
-- 履歴の削除が失敗した場合は、`externalaccounts` の削除と同じく、既存の `catch` が `logger.error` に残して 500 を返す。ユーザーは削除済みの状態になっているため、履歴が残ったことを運用者がログから追えるようにする。履歴は画面から参照できないので、この失敗はユーザーに影響しない。
+- 履歴の削除は `try`/`catch` で囲み、失敗は `logger.error`（対象のユーザー ID を含める）に残して、後続の処理（応答のための直列化、`ACTION_ADMIN_USERS_REMOVE` の activity の更新、ホームページの削除）を続け、200 を返す。この時点でユーザーは削除済み（username も書き換え済み）で、削除をやり直せない。失敗をユーザー削除全体の失敗として返すと、管理画面には失敗と出るのにユーザーは消えており、activity も更新されず、強制削除の設定があってもホームページが残る。残った履歴は画面から参照できず、運用者がログから追える。
 
 ### Client
-
-#### Search modal state（変更、`states/modal/search.ts`）
-
-**Contracts**: State [x]
-
-```typescript
-export type OpenSearchModalOptions = { isSearchHistoryEnabled?: boolean };
-
-export type SearchModalStatus = {
-  isOpened: boolean;
-  searchKeyword?: string;
-  onSearchOverride?: OnSearch;
-  isSearchHistoryEnabled: boolean; // defaults to true
-};
-
-type OpenSearchModal = (
-  keywordOnInit?: string,
-  onSearchOverride?: OnSearch,
-  options?: OpenSearchModalOptions,
-) => void;
-```
-- `open` は `options?.isSearchHistoryEnabled ?? true` を持たせる。`close` は `true` に戻す。
-- `SearchControl`（`isSearchHistoryEnabled?: boolean`、既定 true）→ `SearchModalTriggerinput` → `open(..., { isSearchHistoryEnabled })` と受け渡す。`PrivateLegacyPages` だけが `false` を渡す（1.8, 8.7）。
 
 #### DownshiftItem（変更、`client/interfaces/downshift.ts`）
 
@@ -515,9 +494,10 @@ export type DownshiftItem = NavigateItem | SearchItem;
 | Field | Detail |
 |-------|--------|
 | Intent | 記録点の判定、選択の振り分け、履歴セクションの配置、Delete キー |
-| Requirements | 1.1–1.9, 2.3, 5.4, 6.1, 8.2, 8.4, 9.2, 9.3, 9.4, 10.3, 10.4, 10.6 |
+| Requirements | 1.1–1.9, 2.3, 2.8, 5.4, 6.1, 8.2, 8.4, 9.2, 9.3, 9.4, 10.3, 10.4, 10.6 |
 
 **Responsibilities & Constraints**
+- 履歴の有効・無効: `isSearchHistoryEnabled = !SEARCH_HISTORY_DISABLED_PATHNAMES.includes(router.pathname)`。`SEARCH_HISTORY_DISABLED_PATHNAMES` は `['/_private-legacy-pages']` で、`SearchModal.tsx` に置く（1.8, 8.7）。モーダルを開く経路（`SearchControl`、ショートカットキー `/`、ナビゲーションの検索欄など）には依存しないため、モーダルの状態（`states/modal/search.ts`）や `open()` の引数は変えない。入口が増えても判定が漏れない。
 - `recordSearch(keyword: string): void` — `currentUser != null && isSearchHistoryEnabled` で、かつ `toSearchHistoryKeyword(keyword) != null` のときだけ、`recordSearchHistory(normalized)` を呼ぶ。待たない。外側の `SearchModal` で 1 つだけ `useCallback` で作り、`searchHandler` から直接呼ぶ。`SearchModalSubstance`（`onSelect` を持つ側）には `onRecordSearch` prop として渡し、記録の判定が 2 か所に複製されないようにする。
 - `searchHandler(keyword)` — 先頭で `recordSearch(keyword)` を呼んでから、既存の処理（`onSearchOverride` の呼び出し、または `prefix:` を付けて `setSearchKeyword`）を行う。
 - `onSelect(item)`:
@@ -535,9 +515,23 @@ export type DownshiftItem = NavigateItem | SearchItem;
 /** Fire-and-forget: never rejects; failures are logged. */
 export const recordSearchHistory: (keyword: string) => void;
 ```
-- `apiv3Post('/search-history', { keyword })` を呼び、`catch` で `logger.error` に残す。トーストは出さない（6.2, 6.3）。
+- `search-history-api` の `postSearchHistory(keyword)` を呼び、`catch` で `logger.error` に残す。トーストは出さない（6.2, 6.3）。
 - 成功したら、応答の `searchHistory` を使って SWR のグローバル `mutate` で `/search-history` のキャッシュを更新する（`revalidate: false`）。キャッシュ内の同じ `_id` の項目を取り除いたうえで、その項目を先頭に置く。キャッシュが未取得（`undefined`）のときは何もしない。サービスはフックではないので、フック経由の `mutate` ではなくグローバルの `mutate` を使う。
 - これにより、モーダルを開き直した直後に SWR が前回のキャッシュを表示しても、直前の検索が先頭に来る。再検証が終わる前に「↓ + Enter」で再検索しても、別の履歴を選ばない（8.3, 9.2）。キャッシュの更新に失敗しても、`catch` でログに残すだけで検索は妨げない（6.2）。
+
+#### search-history-api（`client/services/search-history-api.ts`）
+
+**Contracts**: Service [x]
+
+```typescript
+export const postSearchHistory: (keyword: string) => Promise<ISearchHistory>;
+// [再検索] 一覧の取得（7.1）も同じモジュールに足す
+export const getSearchHistories: () => Promise<ISearchHistory[]>;
+```
+- 共通の apiv3 クライアント（`~/client/util/apiv3-client`）は、応答の中の ISO 日時の形の文字列を、キーを問わずすべて Date に変える。そのまま使うと `2024-10-30T00:00:00Z` のようなキーワードが Date になり、`keyword: string` の型と食い違う（描画すると React がエラーになる）。
+- そこで検索履歴 API の要求は、`~/utils/axios` に要求ごとの `transformResponse` を渡して行い、共通の変換を通さない。応答は `JSON.parse` の reviver で `lastSearchedAt` だけを Date に戻し、`keyword` は文字列のまま受け取る。JSON として解釈できない応答（エラーの HTML など）はそのまま返す。
+- Date を文字列に戻す方法（`String(date)` や `toISOString()`）は使わない。元の入力と形が変わる（`Z` が `.000Z` になるなど）ため。
+- [削除] DELETE の応答は `{}` で keyword を含まないため、この制約は無い。共通の apiv3 クライアントを使ってよい。
 
 #### useSWRxSearchHistories（`client/stores/search-history.ts`）
 
@@ -555,7 +549,8 @@ export const useSWRxSearchHistories: (
   isEnabled: boolean,
 ) => SWRResponseWithUtils<SearchHistoriesUtils, ISearchHistory[], Error>;
 ```
-- キーは `isEnabled ? '/search-history' : null`。`isEnabled = currentUser != null && isSearchHistoryEnabled`（8.6, 8.7）。
+- キーは `isEnabled ? '/search-history' : null`。`isEnabled = currentUser != null && isSearchHistoryEnabled`（`SearchModal` が表示中のページから決めた値、8.6, 8.7）。
+- fetcher は `search-history-api` の `getSearchHistories()` を使い、keyword が Date に変換されない経路で一覧を受け取る。
 - `SearchModalSubstance` はモーダルを開くたびにマウントされる。SWR のオプションに `revalidateOnMount: true` を明示し、グローバルの SWR 設定に左右されずに、開いた時点の最新を取得する（8.3）。
 - `remove(id)` は `mutate(deleteFn, { optimisticData: (current) => (current ?? []).filter((h) => h._id !== id), rollbackOnError: true, populateCache: false, revalidate: false })` を使う（10.5, 10.6）。`optimisticData` は関数の形にし、呼び出し時点のキャッシュを基準にする（続けて削除したときに、前の削除が巻き戻らないように）。
 
@@ -661,8 +656,8 @@ model searchhistories {
 ### Unit Tests
 - `search-history-keyword.spec.ts`: 前後の空白の除去と内部の空白の保持、演算子トークンの保持、空白のみ → `null`、200 コードポイントちょうどは保存し 201 は `null`（サロゲートペアを 1 文字と数える）、完全一致の引用符込みでの長さ判定（2.1, 2.2, 2.5〜2.7）。
 - `search-menu-index.spec.ts`: 空入力で 1・入力ありで 3、ハイライトが履歴の範囲外なら `null`、削除後は同じ index を保ち・末尾なら 1 つ前へ・0 件なら `null`（8.2, 10.3）。
-- `overwrite-params/searchhistories.spec.ts`: 文字列の `user` が ObjectId に変換される（7.4）。
-- `record-search-history.spec.ts`（追加）: 記録の成功で、SWR のキャッシュの先頭にその項目が置かれ、同じ `_id` の既存項目は重複しない。キャッシュが未取得のときは何もしない（8.3, 9.2）。
+- `overwrite-params/searchhistories.spec.ts`: 文字列の `user` が ObjectId に変換される。ISO 日時の形の `keyword` は元の文字列のまま通る（7.4）。
+- `record-search-history.spec.ts`（追加）: 記録の成功で、SWR のキャッシュの先頭にその項目が置かれ、同じ `_id` の既存項目は重複しない。キャッシュが未取得のときは何もしない。ISO 日時の形のキーワードも、キャッシュには文字列のまま入る（8.3, 9.2）。HTTP の層（axios の adapter）だけを差し替え、応答の解釈は本物を通す。
 - `record-search-history.spec.ts`: API の失敗で reject せず、ログに残す（6.2, 6.3）。
 
 ### Integration Tests（実 MongoDB）
@@ -674,12 +669,13 @@ model searchhistories {
   - `user` が ObjectId で保存され、`listSearchHistories(userId)` がその行を返す。`lastSearchedAt` は Date になっている。
   - 同じキーワードで `recordSearchHistory(userId, keyword)` を呼ぶと、新しい行は増えず、その行の `lastSearchedAt` が更新され、`_id` は変わらない。`user` が文字列のまま保存されると、`@db.ObjectId` の条件に合わず、一意インデックスも重複を防げないため、この確認が必要。
   - インポートした履歴が 50 件を超えて繰り上がり・切り詰めの対象になる（新しい記録で最も古い 1 件が消える）。
-- ユーザー削除 API の統合テスト: 削除済みにしたユーザーの履歴が消え、ほかのユーザーの履歴は残る（7.1）。
+  - ISO 日時の形のキーワード（`2024-10-30T00:00:00Z`）が文字列のまま保存され、一覧取得でそのまま返る（7.4）。
+- ユーザー削除 API の統合テスト: 削除済みにしたユーザーの履歴が消え、ほかのユーザーの履歴は残る（7.1）。履歴の削除が失敗しても、ユーザーは削除済みになり、200 が返り、`ACTION_ADMIN_USERS_REMOVE` の activity の更新が行われる。
 
 ### Component Tests（RTL）
 - `SearchModal.spec.tsx`:
   - Enter で入力どおり（前後の空白を除いた形）が記録される。「子ページのみ検索」が有効でも `prefix:` を含まない（1.1, 2.3）。
-  - `onSearchOverride` がある場合も記録される。`isSearchHistoryEnabled: false` では記録されず、履歴も出ない（1.2, 1.8, 8.7）。
+  - `onSearchOverride` がある場合（`/_search`）も記録される。表示中のページが `/_private-legacy-pages` なら、開いた経路（`onSearchOverride` の有無）によらず記録されず、履歴も出ない（1.2, 1.8, 8.7）。
   - 検索方法の 3 項目でそれぞれ、入力・入力・`"入力"` が記録される。ページ候補では記録されない（1.3, 1.5, 2.4, 2.5）。
   - ゲストでは記録も表示もされない（5.4, 8.6）。
   - 記録の Promise が未解決でも遷移が進む（6.1）。

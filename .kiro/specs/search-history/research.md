@@ -6,7 +6,7 @@
 - **Key Findings**:
   - 検索モーダルが空入力のとき、`SearchMethodMenuItem` は 1 項目（index 0）だけを出し、`SearchResultMenuItem` は何も出さない。履歴は空入力のときだけ出すため、履歴の index は常に 1 から始まり、既存項目の index 計算（`isEmptyKeyword ? 1 : 3`）には手を入れずに済む。
   - Downshift の項目は `{ url }` だけで、`SearchMenuItem` が `item: { url }` を内部で組み立てている。履歴項目（URL 遷移ではなく「検索の実行」）と、記録用のキーワードを持つ検索方法項目を表すには、項目型を判別可能な union に拡張し、`SearchMenuItem` が項目そのものを受け取る形に変える必要がある。
-  - `/_private-legacy-pages` と `/_search` はどちらも `SearchControl` → `SearchModalTriggerinput` → `open(keyword, onSearchOverride)` という同じ経路でモーダルを開くため、`onSearchOverride` の有無では区別できない。モーダルを開く側が「履歴を使うか」を宣言する必要がある。
+  - `/_private-legacy-pages` と `/_search` はどちらも `SearchControl` → `SearchModalTriggerinput` → `open(keyword, onSearchOverride)` という同じ経路でモーダルを開くため、`onSearchOverride` の有無では区別できない。さらに、ショートカットキー `/`（`FocusToGlobalSearch`）など、ページ上のどこからでもモーダルを開く経路がある。履歴を使うかは、開く経路ではなく、モーダルを表示しているページから決める必要がある。
 
 ## Research Log
 
@@ -30,9 +30,9 @@
 
 ### `/_private-legacy-pages` の除外
 - **Context**: 要件 1.8、8.7。brief で「除く方法は設計で考える」とされていた。
-- **Sources Consulted**: `PrivateLegacyPages.tsx`, `SearchPage/SearchPage.tsx`, `SearchPage/SearchControl.tsx`, `SearchPage/SearchModalTriggerinput.tsx`, `states/modal/search.ts`
-- **Findings**: 両ページは同じ `SearchControl` を使い、`onSearchInvoked` を `onSearchOverride` として渡している。
-- **Implications**: 下記 Decision「履歴を使うかはモーダルを開く側が宣言する」を参照。
+- **Sources Consulted**: `PrivateLegacyPages.tsx`, `SearchPage/SearchPage.tsx`, `SearchPage/SearchControl.tsx`, `SearchPage/SearchModalTriggerinput.tsx`, `states/modal/search.ts`, `client/components/Hotkeys/Subscribers/FocusToGlobalSearch.tsx`
+- **Findings**: 両ページは同じ `SearchControl` を使い、`onSearchInvoked` を `onSearchOverride` として渡している。`/_private-legacy-pages` 上でもショートカットキー `/` で `open()` が引数なしで呼ばれ、`SearchControl` を通らない。
+- **Implications**: 下記 Decision「履歴を使うかはモーダルが表示中のページから決める」を参照。
 
 ### Prisma だけのコレクションとインデックス
 - **Context**: brief の Constraints（Mongoose を持たない、インデックスは migrate-mongo で作る）。
@@ -47,7 +47,7 @@
 - **Context**: 要件 7.3〜7.5。
 - **Sources Consulted**: `server/service/import/overwrite-params/index.ts`、`revisions.ts`、`attachmentFiles.chunks.ts`、`non-transferable-collections.ts`、`construct-convert-map.ts`
 - **Findings**: `generateOverwriteParams` はコレクション名で分岐し、該当しないものは `{}` を返す。`attachmentFiles.chunks` は ObjectId への変換を `OverwriteParams` の関数として持っている。Mongoose のモデルが無いコレクションは、`constructConvertMap` の対象外になる。
-- **Implications**: `overwrite-params/searchhistories.ts` に `user` を ObjectId に戻す関数を置き、`index.ts` の switch に 1 件追加する。
+- **Implications**: `overwrite-params/searchhistories.ts` に `user` を ObjectId に戻す関数を置き、`index.ts` の switch に 1 件追加する。指定の無いフィールドは既定の変換で ISO 日時の形の文字列が Date になるため、`keyword` も文字列のまま通す指定を置く（下記 Decision）。
 
 ### 読み取り専用ユーザーとアクセストークン
 - **Context**: 要件 5.5、11.4（書き込みスコープ）。
@@ -64,21 +64,20 @@
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
-| 宣言フラグ（採用） | `open()` のオプションで `isSearchHistoryEnabled` を受け取り、モーダルの状態に持たせる | モーダルが呼び出し元のページを知らずに済む。記録と表示を 1 つのフラグで制御できる | `SearchControl` → `SearchModalTriggerinput` に prop を 1 つ通す必要がある | coding-style の「データ駆動の制御」に沿う |
-| パスで判定 | モーダル内で `router.pathname === '/_private-legacy-pages'` を見る | 変更箇所が最小 | モードをハードコードで判定することになり、画面が増えるたびにモーダルを直す必要がある | 不採用 |
+| ページで判定（採用） | モーダル内で、無効にするページの一覧（`SEARCH_HISTORY_DISABLED_PATHNAMES`）に `router.pathname` が含まれるかを見る | 開く経路によらず 1 か所で決まり、入口が増えても漏れない。変更箇所が最小 | 無効にするページが増えたら、一覧に 1 行足す必要がある | ページの一覧はデータとして持ち、判定は汎用にする |
+| 宣言フラグ | `open()` のオプションで `isSearchHistoryEnabled` を受け取り、モーダルの状態に持たせる | モーダルが呼び出し元のページを知らずに済む | 開く経路ごとに受け渡しが要り、ショートカットキー `/` のように `SearchControl` を通らない経路で漏れる | 不採用 |
 | `onSearchOverride` を包む | `PrivateLegacyPages` 側で、記録を打ち消す関数を渡す | — | 記録はモーダル内で行うため打ち消せない。表示の抑止もできない | 不採用 |
 
 ## Design Decisions
 
-### Decision: 履歴を使うかはモーダルを開く側が宣言する
-- **Context**: `/_private-legacy-pages` から開いたモーダルでは、記録も表示もしない（1.8, 8.7）。
+### Decision: 履歴を使うかはモーダルが表示中のページから決める
+- **Context**: `/_private-legacy-pages` 上で開いたモーダルでは、記録も表示もしない（1.8, 8.7）。
 - **Alternatives Considered**:
-  1. モーダル内でパスを判定する
-  2. `open()` のオプションで宣言する
-- **Selected Approach**: `open(keywordOnInit?, onSearchOverride?, options?: { isSearchHistoryEnabled?: boolean })` とし、`SearchModalStatus.isSearchHistoryEnabled`（省略時 true）に持たせる。`SearchControl` に `isSearchHistoryEnabled?: boolean` prop を足し、`PrivateLegacyPages` だけが `false` を渡す。
-- **Rationale**: 例外となる画面は自分で宣言するので、モーダルは呼び出し元のページを知らずに済む。既定は有効なので、ヘッダーなど既存の呼び出し元は変更しなくてよい。
-- **Trade-offs**: `SearchControl` と `SearchModalTriggerinput` に prop が 1 つずつ増える。
-- **Follow-up**: `close()` で既定値に戻すこと（次に開いたとき、前の値が残らないように）。
+  1. モーダル内でページ（`router.pathname`）から判定する
+  2. `open()` のオプションで、開く側が宣言する
+- **Selected Approach**: 1。`SearchModal.tsx` に `SEARCH_HISTORY_DISABLED_PATHNAMES = ['/_private-legacy-pages']` を置き、`isSearchHistoryEnabled = !SEARCH_HISTORY_DISABLED_PATHNAMES.includes(router.pathname)` とする。モーダルの状態と `open()` の引数は変えない。
+- **Rationale**: モーダルを開く経路は `SearchControl` だけではなく、ショートカットキー `/` などもある。開く側の宣言では、宣言を通さない経路（`/_private-legacy-pages` 上でのショートカットキー）で履歴が有効のままになる。ページから決めれば、入口が増えても判定が漏れない。
+- **Trade-offs**: 無効にするページが増えたら一覧に足す必要がある。`/_private-legacy-pages` のルートが変わると判定が外れる（Revalidation Triggers に記載）。
 
 ### Decision: Downshift の項目を判別可能な union にする
 - **Context**: 履歴項目は URL 遷移ではなく「その文字列で検索を実行する」アクション（brief）。検索方法項目は、URL とは別に記録用のキーワードを持つ必要がある。
@@ -88,8 +87,36 @@
 
 ### Decision: 記録の判定は 1 か所に集める
 - **Context**: Enter、検索方法項目、履歴からの再検索の 3 つの入口がある（1.1〜1.3, 1.9）。
-- **Selected Approach**: `SearchModal` 内の `recordSearch(keyword)` だけが記録 API を呼ぶ。ゲスト、または `isSearchHistoryEnabled === false` のときは何もしない。キーワードの正規化と長さの判定は、共有の純粋関数 `toSearchHistoryKeyword()` で行う。
+- **Selected Approach**: `SearchModal` 内の `recordSearch(keyword)` だけが記録 API を呼ぶ。ゲスト、または `isSearchHistoryEnabled === false`（表示中のページが `/_private-legacy-pages`）のときは何もしない。キーワードの正規化と長さの判定は、共有の純粋関数 `toSearchHistoryKeyword()` で行う。
 - **Rationale**: 記録の可否が 1 か所で決まるので、入口が増えても判定が漏れない。
+
+### Decision: `/_search` の入力欄に表示された `prefix:` は入力どおりに記録する
+- **Context**: 要件 2.3（自動付与の `prefix:` を含めない）と 2.8。`/_search` から開いたモーダルの入力欄には、前回の検索で自動付与された `prefix:<ページ>` を含む `/_search` の検索欄の値が初期値として入る。
+- **Alternatives Considered**:
+  1. 入力欄に表示されているものは、ユーザーが見て残したものとして入力どおりに記録する
+  2. `/_search` に渡すキーワードと、表示・記録に使う入力を分けて持ち、自動付与の `prefix:` を記録から除く
+- **Selected Approach**: 1。コードは変えない。
+- **Rationale**: 2.3 が除くのは、Enter の処理の中で付与され、入力欄に表示されない `prefix:` である。入力欄に表示されている `prefix:` は、ユーザーが消すこともできたのに残したものなので、ユーザーの入力として扱う。2 は `/_search` の状態の持ち方を変えることになり、本 spec の範囲（検索の実行そのものは変えない）を超える。
+
+### Decision: クライアントは keyword を Date に変換しない経路で検索履歴 API の応答を受け取る
+- **Context**: 共通の apiv3 クライアント（`~/utils/axios` の既定の `transformResponse`）は、応答の中の ISO 日時の形の文字列を、キーを問わず Date に変える。`2024-10-30T00:00:00Z` のようなキーワードが Date になり、描画すると React がエラーになる。
+- **Alternatives Considered**:
+  1. 受け取った Date を文字列に戻す
+  2. サーバの応答で keyword を変換されない形に包む
+  3. 検索履歴 API だけ、要求ごとの `transformResponse` で応答を自前で解釈する
+- **Selected Approach**: 3。`client/services/search-history-api.ts` で `~/utils/axios` に `transformResponse` を渡し、`JSON.parse` の reviver で `lastSearchedAt` だけを Date に戻す。記録（4.1）と一覧の取得（7.1）が同じモジュールを使う。
+- **Rationale**: 1 は元の文字列に戻らない（`Z` が `.000Z` になる）。2 は API の応答の形（一覧の 1 件と同じ形）を崩す。3 は共通の変換を変えずに、検索履歴だけを正しく受け取れる。
+- **Trade-offs**: 共通の apiv3 クライアントのエラーのログ出力（`apiv3ErrorHandler`）を通らない。記録の失敗は `recordSearchHistory` がログに残す。
+
+### Decision: インポートでは keyword を文字列のまま通す
+- **Context**: 要件 7.4。インポートの既定の変換は、`overwriteParams` に指定の無いフィールドのうち ISO 日時の形の文字列を Date に変える。
+- **Selected Approach**: `overwrite-params/searchhistories.ts` に `keyword: (value) => value` を置く。
+- **Rationale**: keyword が Date で保存されると、Prisma の `keyword String` と型が合わず、そのユーザーの一覧取得が失敗し続ける。同じキーワードを記録し直しても、一意キーが一致しないので修復されない。
+
+### Decision: ユーザー削除で履歴の削除が失敗しても、ユーザー削除の後続の処理を続ける
+- **Context**: 要件 7.1。履歴の削除は `statusDelete()` の後に行うため、この時点でユーザーは削除済み（username も書き換え済み）になっている。
+- **Selected Approach**: 履歴の削除を `try`/`catch` で囲み、失敗は `logger.error` に残して、activity の更新・ホームページの削除を続け、200 を返す。
+- **Rationale**: 失敗をユーザー削除全体の失敗として返すと、ユーザーは消えているのに管理画面には失敗と出て、やり直しもできない。activity も更新されず、強制削除の設定があってもホームページが残る。残った履歴は画面から参照されず、運用者がログから追える。
 
 ### Decision: 一覧は全件（最大 50 件）を返し、表示はクライアントで 10 件に絞る
 - **Context**: 要件 4.1（本人の履歴を新しい順に返す）、8.1（最大 10 件表示）、10.5（削除後すぐ消える）。

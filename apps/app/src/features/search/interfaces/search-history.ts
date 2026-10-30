@@ -1,7 +1,7 @@
 export type ISearchHistory = {
   _id: string;
   keyword: string;
-  // The shared apiv3 axios client revives ISO strings into Date; the client relies on server-side ordering only
+  // Revived into a Date by the client's search-history API; the client relies on server-side ordering only
   lastSearchedAt: Date;
 };
 

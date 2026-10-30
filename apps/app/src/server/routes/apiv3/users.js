@@ -1038,7 +1038,15 @@ export const setup = (crowi) => {
           },
         });
 
-        await removeAllSearchHistoriesOfUser(user._id.toString());
+        // The user is already deleted at this point, so a failure here must not abort the rest
+        try {
+          await removeAllSearchHistoriesOfUser(user._id.toString());
+        } catch (err) {
+          logger.error('Failed to remove the search histories of the user', {
+            err,
+            userId: user._id.toString(),
+          });
+        }
 
         const serializedUser = serializeUserSecurely(user);
 

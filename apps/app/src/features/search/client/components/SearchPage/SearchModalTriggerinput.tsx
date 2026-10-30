@@ -5,7 +5,6 @@ import { useSearchModalActions } from '../../states/modal/search';
 type Props = {
   keywordOnInit: string;
   onSearchInvoked?: (keyword: string) => void;
-  isSearchHistoryEnabled?: boolean;
 };
 
 // forwardRef exposes the inner <input> so callers can move keyboard focus here
@@ -14,13 +13,13 @@ export const SearchModalTriggerinput = React.forwardRef<
   HTMLInputElement,
   Props
 >((props, ref) => {
-  const { keywordOnInit, onSearchInvoked, isSearchHistoryEnabled } = props;
+  const { keywordOnInit, onSearchInvoked } = props;
 
   const { open: openSearchModal } = useSearchModalActions();
 
   const inputClickHandler = useCallback(() => {
-    openSearchModal(keywordOnInit, onSearchInvoked, { isSearchHistoryEnabled });
-  }, [openSearchModal, keywordOnInit, onSearchInvoked, isSearchHistoryEnabled]);
+    openSearchModal(keywordOnInit, onSearchInvoked);
+  }, [openSearchModal, keywordOnInit, onSearchInvoked]);
 
   return (
     <div className="d-flex align-items-center">

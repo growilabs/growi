@@ -525,7 +525,6 @@ const PrivateLegacyPages = (): JSX.Element => {
         initialSearchConditions={{ keyword: initQ, limit: INITIAL_PAGING_SIZE }}
         onSearchInvoked={searchInvokedHandler}
         extraControls={extraControls}
-        isSearchHistoryEnabled={false}
       />
     );
   }, [searchInvokedHandler, extraControls, disableUserPages]);

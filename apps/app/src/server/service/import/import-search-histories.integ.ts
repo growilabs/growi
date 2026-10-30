@@ -135,6 +135,22 @@ describe('ImportService.import — searchhistories round trip', () => {
     ]);
   });
 
+  it('keeps a keyword shaped like an ISO date as a string and lists the row', async () => {
+    const userId = newUserId();
+    const keyword = '2024-10-30T00:00:00Z';
+    const exported = toExported(userId, keyword, minutesAgo(5));
+
+    await importSearchHistories([exported]);
+
+    const stored = await mongoose.connection
+      .collection(COLLECTION_NAME)
+      .findOne({ _id: new ObjectId(exported._id) });
+    expect(stored?.keyword).toBe(keyword);
+    expect(
+      (await listSearchHistories(userId)).map((item) => item.keyword),
+    ).toEqual([keyword]);
+  });
+
   it('re-recording an imported keyword bumps that row instead of adding one', async () => {
     const userId = newUserId();
     const imported = toExported(userId, 'imported keyword', minutesAgo(10));

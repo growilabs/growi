@@ -24,6 +24,11 @@ import { SearchHelp } from './SearchHelp';
 import { SearchMethodMenuItem } from './SearchMethodMenuItem';
 import { SearchResultMenuItem } from './SearchResultMenuItem';
 
+// Pages whose search modal neither records nor shows search history
+const SEARCH_HISTORY_DISABLED_PATHNAMES: readonly string[] = [
+  '/_private-legacy-pages',
+];
+
 type Props = {
   onSearch: (keyword: string) => void;
   onRecordSearch: (keyword: string) => void;
@@ -150,8 +155,7 @@ const SearchModalSubstance = (props: Props): JSX.Element => {
 };
 
 const SearchModal = (): JSX.Element => {
-  const { isOpened, onSearchOverride, isSearchHistoryEnabled } =
-    useSearchModalStatus();
+  const { isOpened, onSearchOverride } = useSearchModalStatus();
   const { close: closeSearchModal } = useSearchModalActions();
 
   const setSearchKeyword = useSetSearchKeyword();
@@ -160,6 +164,10 @@ const SearchModal = (): JSX.Element => {
   );
   const currentPagePath = useCurrentPagePath();
   const currentUser = useCurrentUser();
+  const router = useRouter();
+  const isSearchHistoryEnabled = !SEARCH_HISTORY_DISABLED_PATHNAMES.includes(
+    router.pathname,
+  );
 
   const recordSearch = useCallback(
     (keyword: string) => {

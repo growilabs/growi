@@ -8,28 +8,36 @@ import { generateOverwriteParams } from '.';
 const { ObjectId } = Types;
 
 describe('overwrite-params for searchhistories', () => {
-  const resolveUser = (value: unknown): unknown => {
+  const resolve = (propertyName: string, value: unknown): unknown => {
     const params = generateOverwriteParams(
       'searchhistories',
       new ObjectId().toString(),
       mock<GrowiArchiveImportOption>(),
     );
-    const convert = params.user;
+    const convert = params[propertyName];
     if (typeof convert !== 'function') {
-      throw new Error('overwrite function for user is not registered');
+      throw new Error(
+        `overwrite function for ${propertyName} is not registered`,
+      );
     }
     return convert(value, {
       document: mock<Document>(),
-      propertyName: 'user',
+      propertyName,
     });
   };
 
   it('converts the exported string user back to an ObjectId', () => {
     const userId = new ObjectId();
 
-    const converted = resolveUser(userId.toString());
+    const converted = resolve('user', userId.toString());
 
     expect(converted).toBeInstanceOf(ObjectId);
     expect(converted).toEqual(userId);
+  });
+
+  it('keeps a keyword shaped like an ISO date as the original string', () => {
+    const keyword = '2024-10-30T00:00:00Z';
+
+    expect(resolve('keyword', keyword)).toBe(keyword);
   });
 });

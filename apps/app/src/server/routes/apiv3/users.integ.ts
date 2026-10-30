@@ -7,6 +7,7 @@ import request from 'supertest';
 
 import { getInstance } from '^/test/setup/crowi';
 
+import { removeAllSearchHistoriesOfUser } from '~/features/search/server/services/search-history';
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import Activity from '~/server/models/activity';
@@ -26,6 +27,23 @@ const passthroughMiddleware = (
 
 // Lets each test set req.user for the hoisted login-required mock below.
 const currentUser = vi.hoisted<{ value: unknown }>(() => ({ value: null }));
+
+// Wraps the real service so a test can make the history removal fail once.
+vi.mock(
+  '~/features/search/server/services/search-history',
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import('~/features/search/server/services/search-history')
+      >();
+    return {
+      ...actual,
+      removeAllSearchHistoriesOfUser: vi.fn(
+        actual.removeAllSearchHistoriesOfUser,
+      ),
+    };
+  },
+);
 
 vi.mock('~/server/middlewares/access-token-parser', () => ({
   accessTokenParser: () => passthroughMiddleware,
@@ -656,5 +674,31 @@ describe('search histories on PUT /:id/deactivate and DELETE /:id/remove', () =>
         where: { userId: bystander._id.toString() },
       }),
     ).toBe(1);
+  });
+
+  it('still deletes the user and settles the activity when removing the search histories fails', async () => {
+    const admin = await createUser('remove-fail-admin', { admin: true });
+    const target = await createUser('remove-fail-target');
+    currentUser.value = admin;
+    await seedHistory(target._id.toString(), ['alpha']);
+    vi.mocked(removeAllSearchHistoriesOfUser).mockRejectedValueOnce(
+      new Error('prisma is down'),
+    );
+    const emitSpy = vi.spyOn(crowi.events.activity, 'emit');
+
+    try {
+      const response = await request(app).delete(`/${target._id}/remove`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.user.status).toBe(UserStatus.STATUS_DELETED);
+      expect((await User.findById(target._id))?.status).toBe(
+        UserStatus.STATUS_DELETED,
+      );
+      expect(emitSpy).toHaveBeenCalledWith('update', expect.anything(), {
+        action: SupportedAction.ACTION_ADMIN_USERS_REMOVE,
+      });
+    } finally {
+      emitSpy.mockRestore();
+    }
   });
 });

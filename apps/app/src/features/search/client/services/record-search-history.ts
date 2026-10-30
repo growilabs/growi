@@ -1,14 +1,10 @@
 import { mutate } from 'swr';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
-import type {
-  ISearchHistory,
-  RecordSearchHistoryRequestBody,
-  RecordSearchHistoryResponseBody,
-} from '~/features/search/interfaces/search-history';
+import type { ISearchHistory } from '~/features/search/interfaces/search-history';
 import loggerFactory from '~/utils/logger';
 
 import { SEARCH_HISTORIES_CACHE_KEY } from '../stores/search-history-cache-key';
+import { postSearchHistory } from './search-history-api';
 
 const logger = loggerFactory('growi:features:search:record-search-history');
 
@@ -21,14 +17,10 @@ const moveToTop = (
     : [recorded, ...current.filter((h) => h._id !== recorded._id)];
 
 const record = async (keyword: string): Promise<void> => {
-  const body: RecordSearchHistoryRequestBody = { keyword };
-  const { data } = await apiv3Post<RecordSearchHistoryResponseBody>(
-    '/search-history',
-    body,
-  );
+  const recorded = await postSearchHistory(keyword);
   await mutate<ISearchHistory[]>(
     SEARCH_HISTORIES_CACHE_KEY,
-    (current) => moveToTop(current, data.searchHistory),
+    (current) => moveToTop(current, recorded),
     { revalidate: false },
   );
 };
