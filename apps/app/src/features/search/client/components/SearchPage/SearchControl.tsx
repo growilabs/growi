@@ -39,6 +39,7 @@ type Props = {
 
   collapseContents?: React.ReactNode;
   isCollapsed?: boolean;
+  isSearchHistoryEnabled?: boolean;
 };
 
 const SearchControl = React.memo((props: Props): JSX.Element => {
@@ -51,6 +52,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
     extraControls,
     collapseContents,
     isCollapsed,
+    isSearchHistoryEnabled = true,
   } = props;
 
   const keywordOnInit = initialSearchConditions.keyword ?? '';
@@ -175,6 +177,7 @@ const SearchControl = React.memo((props: Props): JSX.Element => {
             ref={searchInputRef}
             keywordOnInit={keyword}
             onSearchInvoked={searchBySearchControlHandler}
+            isSearchHistoryEnabled={isSearchHistoryEnabled}
           />
         </div>
       </div>
