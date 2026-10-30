@@ -9,6 +9,7 @@ import { AuditLogBulkExportFormat } from '~/features/audit-log-bulk-export/inter
 import type { SupportedActionType } from '~/interfaces/activity';
 import { AllSupportedActions } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
@@ -20,8 +21,6 @@ import {
 } from '../../service/audit-log-bulk-export';
 
 const logger = loggerFactory('growi:routes:apiv3:audit-log-bulk-export');
-
-const router = Router();
 
 interface AuditLogExportReqBody {
   filters: {
@@ -39,8 +38,10 @@ interface AuthorizedRequest
 }
 
 export const factory = (crowi: Crowi): Router => {
+  const router = Router();
   const accessTokenParser = crowi.accessTokenParser;
   const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
 
   const validators = {
     auditLogBulkExport: [
@@ -68,6 +69,7 @@ export const factory = (crowi: Crowi): Router => {
     '/',
     accessTokenParser([SCOPE.WRITE.ADMIN.AUDIT_LOG]),
     loginRequiredStrictly,
+    adminRequired,
     validators.auditLogBulkExport,
     apiV3FormValidator,
     async (req: AuthorizedRequest, res: ApiV3Response) => {

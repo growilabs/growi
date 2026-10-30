@@ -410,7 +410,7 @@ export const setup = (crowi: Crowi): Router => {
    */
   router.delete(
     '/all',
-    accessTokenParser([SCOPE.WRITE.FEATURES.SHARE_LINK]),
+    accessTokenParser([SCOPE.WRITE.ADMIN.SECURITY]),
     loginRequired,
     adminRequired,
     addActivity,

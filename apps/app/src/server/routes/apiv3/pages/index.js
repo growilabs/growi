@@ -1207,7 +1207,7 @@ export const setup = (crowi) => {
    */
   router.post(
     '/convert-pages-by-path',
-    accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP], { acceptLegacy: true }),
     loginRequiredStrictly,
     excludeReadOnlyUser,
     adminRequired,

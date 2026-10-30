@@ -4,6 +4,7 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Response } from 'express';
 
 import { AccessToken } from '~/server/models/access-token';
+import { includesAdminScope } from '~/server/util/scope-utils';
 import loggerFactory from '~/utils/logger';
 
 import { extractAccessToken } from './extract-access-token';
@@ -40,6 +41,14 @@ export const parserForAccessToken = (scopes: Scope[]) => {
 
     if (userByAccessToken.readOnly) {
       logger.debug("The access token's associated user is read-only");
+      return;
+    }
+
+    // Judged by the route's required scopes, not the token's stored ones, so
+    // tokens issued before the user lost (or never had) admin rights stop
+    // working on admin routes while still working on feature routes.
+    if (includesAdminScope(scopes) && !userByAccessToken.admin) {
+      logger.debug("The access token's associated user is not admin");
       return;
     }
 
