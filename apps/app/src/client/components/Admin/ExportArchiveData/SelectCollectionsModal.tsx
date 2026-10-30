@@ -27,6 +27,7 @@ const GROUPS_USER = [
   'bookmarkfolders',
   'subscriptions',
   'inappnotificationsettings',
+  'searchhistories',
 ];
 const GROUPS_CONFIG = [
   'configs',

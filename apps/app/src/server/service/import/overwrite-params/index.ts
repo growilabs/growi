@@ -5,6 +5,7 @@ import type { OverwriteParams } from '../import-settings';
 import { overwriteParams as overwriteParamsForAttachmentFilesChunks } from './attachmentFiles.chunks';
 import { generateOverwriteParams as generateForPages } from './pages';
 import { generateOverwriteParams as generateForRevisions } from './revisions';
+import { overwriteParams as overwriteParamsForSearchHistories } from './searchhistories';
 
 /**
  * generate overwrite params with overwrite-params/* modules
@@ -27,6 +28,8 @@ export const generateOverwriteParams = <OPT extends GrowiArchiveImportOption>(
       return generateForRevisions(operatorUserId, option);
     case 'attachmentFiles.chunks':
       return overwriteParamsForAttachmentFilesChunks;
+    case 'searchhistories':
+      return overwriteParamsForSearchHistories;
     default:
       return {};
   }
