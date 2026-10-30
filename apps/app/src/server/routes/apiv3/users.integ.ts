@@ -1,7 +1,7 @@
 import type { IUser } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
-import type { Model } from 'mongoose';
+import type { HydratedDocument, Model } from 'mongoose';
 import mongoose, { Types } from 'mongoose';
 import request from 'supertest';
 
@@ -11,6 +11,7 @@ import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import Activity from '~/server/models/activity';
 import { UserStatus } from '~/server/models/user/conts';
+import { prisma } from '~/utils/prisma';
 
 interface TestRequest extends Request {
   user?: unknown;
@@ -544,5 +545,116 @@ describe('GET /usernames', () => {
     expect(new Set(response.body.mixedUsernames)).toEqual(
       new Set(['somejohnson']),
     );
+  });
+});
+
+describe('search histories on PUT /:id/deactivate and DELETE /:id/remove', () => {
+  let app: express.Application;
+  let crowi: Crowi;
+  let User: Model<IUser>;
+  const createdUserIds: Types.ObjectId[] = [];
+
+  beforeAll(async () => {
+    crowi = await getInstance();
+    User = mongoose.model<IUser>('User');
+    const responseModule = await import('./response');
+    const addCustomFunctionToResponse =
+      'default' in responseModule ? responseModule.default : responseModule;
+    if (typeof addCustomFunctionToResponse !== 'function') {
+      throw new Error('Module does not export a function');
+    }
+    addCustomFunctionToResponse(express);
+  });
+
+  beforeEach(async () => {
+    app = express();
+    app.use(express.json());
+    app.use((req: TestRequest, _res, next) => {
+      req.crowi = crowi;
+      next();
+    });
+    const { setup } = await import('./users');
+    app.use('/', setup(crowi));
+  });
+
+  afterEach(async () => {
+    currentUser.value = null;
+    const userIdStrings = createdUserIds.map((id) => id.toString());
+    await Promise.all([
+      User.deleteMany({ _id: { $in: createdUserIds } }),
+      Activity.deleteMany({ user: { $in: createdUserIds } }),
+      prisma.searchhistories.deleteMany({
+        where: { userId: { in: userIdStrings } },
+      }),
+    ]);
+    createdUserIds.length = 0;
+  });
+
+  const createUser = async (
+    username: string,
+    extra: { admin?: boolean } = {},
+  ): Promise<HydratedDocument<IUser>> => {
+    const user = await User.create({
+      name: username,
+      username,
+      email: `${username}@example.com`,
+      status: UserStatus.STATUS_ACTIVE,
+      ...extra,
+    });
+    createdUserIds.push(user._id);
+    return user;
+  };
+
+  const seedHistory = async (
+    userId: string,
+    keywords: string[],
+  ): Promise<void> => {
+    await prisma.searchhistories.createMany({
+      data: keywords.map((keyword) => ({
+        userId,
+        keyword,
+        lastSearchedAt: new Date(),
+      })),
+    });
+  };
+
+  it("keeps a suspended user's search histories", async () => {
+    const admin = await createUser('suspend-admin', { admin: true });
+    const target = await createUser('suspend-target');
+    currentUser.value = admin;
+    await seedHistory(target._id.toString(), ['alpha', 'beta']);
+
+    const response = await request(app).put(`/${target._id}/deactivate`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.userData.status).toBe(UserStatus.STATUS_SUSPENDED);
+    expect(
+      await prisma.searchhistories.count({
+        where: { userId: target._id.toString() },
+      }),
+    ).toBe(2);
+  });
+
+  it("removes the deleted user's search histories and leaves other users untouched", async () => {
+    const admin = await createUser('remove-admin', { admin: true });
+    const target = await createUser('remove-target');
+    const bystander = await createUser('remove-bystander');
+    currentUser.value = admin;
+    await seedHistory(target._id.toString(), ['alpha', 'beta']);
+    await seedHistory(bystander._id.toString(), ['gamma']);
+
+    const response = await request(app).delete(`/${target._id}/remove`);
+
+    expect(response.status).toBe(200);
+    expect(
+      await prisma.searchhistories.count({
+        where: { userId: target._id.toString() },
+      }),
+    ).toBe(0);
+    expect(
+      await prisma.searchhistories.count({
+        where: { userId: bystander._id.toString() },
+      }),
+    ).toBe(1);
   });
 });
