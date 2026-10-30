@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { useTranslation } from 'next-i18next';
 
+import { toExactMatchKeyword } from '~/features/search/utils/search-history-keyword';
 import { useCurrentPagePath } from '~/states/page';
 
 import type { GetItemProps } from '../interfaces/downshift';
@@ -35,7 +36,11 @@ export const SearchMethodMenuItem = (props: Props): JSX.Element => {
             index={0}
             isActive={activeIndex === 0}
             getItemProps={getItemProps}
-            url={`/_search?q=${searchKeyword}`}
+            item={{
+              type: 'navigate',
+              url: `/_search?q=${searchKeyword}`,
+              historyKeyword: searchKeyword,
+            }}
           >
             <span className="material-symbols-outlined fs-4 me-3 p-0">
               search
@@ -54,7 +59,11 @@ export const SearchMethodMenuItem = (props: Props): JSX.Element => {
           index={shouldShowMenuItem ? 1 : 0}
           isActive={activeIndex === (shouldShowMenuItem ? 1 : 0)}
           getItemProps={getItemProps}
-          url={`/_search?q=prefix:${currentPagePath} ${searchKeyword}`}
+          item={{
+            type: 'navigate',
+            url: `/_search?q=prefix:${currentPagePath} ${searchKeyword}`,
+            historyKeyword: searchKeyword,
+          }}
         >
           <span className="material-symbols-outlined fs-4 me-3 p-0">
             search
@@ -74,7 +83,11 @@ export const SearchMethodMenuItem = (props: Props): JSX.Element => {
           index={2}
           isActive={activeIndex === 2}
           getItemProps={getItemProps}
-          url={`/_search?q="${searchKeyword}"`}
+          item={{
+            type: 'navigate',
+            url: `/_search?q="${searchKeyword}"`,
+            historyKeyword: toExactMatchKeyword(searchKeyword),
+          }}
         >
           <span className="material-symbols-outlined fs-4 me-3 p-0">
             search

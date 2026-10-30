@@ -40,6 +40,9 @@ const SearchModalSubstance = (props: Props): JSX.Element => {
 
   const selectSearchMenuItemHandler = useCallback(
     async (selectedItem: DownshiftItem) => {
+      if (selectedItem.type !== 'navigate') {
+        return;
+      }
       await router.push(selectedItem.url);
       closeSearchModal();
     },

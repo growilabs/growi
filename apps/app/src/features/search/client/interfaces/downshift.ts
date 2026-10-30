@@ -9,7 +9,14 @@ declare global {
   }
 }
 
-export type DownshiftItem = { url: string };
+export type NavigateItem = {
+  type: 'navigate';
+  url: string;
+  /** Keyword to record when selected; absent for items that are not a search execution (page results). */
+  historyKeyword?: string;
+};
+export type SearchItem = { type: 'search'; keyword: string };
+export type DownshiftItem = NavigateItem | SearchItem;
 
 export type GetItemProps =
   ControllerStateAndHelpers<DownshiftItem>['getItemProps'];

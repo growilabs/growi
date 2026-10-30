@@ -63,7 +63,7 @@ export const SearchResultMenuItem = (props: Props): JSX.Element => {
           index={getFiexdIndex(index)}
           isActive={getFiexdIndex(index) === activeIndex}
           getItemProps={getItemProps}
-          url={item.data._id}
+          item={{ type: 'navigate', url: item.data._id }}
         >
           <UserPicture user={item.data.creator} />
 
