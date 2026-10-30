@@ -150,6 +150,7 @@ apps/app/src/features/search/
     │   ├── record-search-history.ts   # [保存] 記録 API を投げっぱなしで呼び、失敗はログに残す
     │   └── record-search-history.spec.ts
     ├── stores/
+    │   ├── search-history-cache-key.ts # [保存] SEARCH_HISTORIES_CACHE_KEY：一覧の SWR キャッシュのキーを 1 か所で定義（記録処理と useSWRxSearchHistories が共有）
     │   ├── search-history.ts          # [再検索・削除] useSWRxSearchHistories（一覧、remove の楽観的更新）
     │   └── search-history.spec.tsx
     ├── utils/
