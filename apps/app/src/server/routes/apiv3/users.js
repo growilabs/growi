@@ -1029,6 +1029,9 @@ export const setup = (crowi) => {
         // catch username before delete user because username will be change to deleted_at_*
         const homepagePath = userHomepagePath(user);
 
+        // Before any irreversible step: a failure here leaves the user intact so the admin can retry
+        await removeAllSearchHistoriesOfUser(user._id.toString());
+
         await UserGroupRelation.remove({ relatedUser: user });
         await ExternalUserGroupRelation.remove({ relatedUser: user });
         await user.statusDelete();
@@ -1037,16 +1040,6 @@ export const setup = (crowi) => {
             userId: user._id.toString(),
           },
         });
-
-        // The user is already deleted at this point, so a failure here must not abort the rest
-        try {
-          await removeAllSearchHistoriesOfUser(user._id.toString());
-        } catch (err) {
-          logger.error('Failed to remove the search histories of the user', {
-            err,
-            userId: user._id.toString(),
-          });
-        }
 
         const serializedUser = serializeUserSecurely(user);
 
@@ -1063,7 +1056,7 @@ export const setup = (crowi) => {
 
         return res.apiv3({ user: serializedUser });
       } catch (err) {
-        logger.error('Error', err);
+        logger.error({ err, userId: id }, 'Failed to remove the user');
         return res.apiv3Err(new ErrorV3(err));
       }
     },

@@ -95,7 +95,7 @@ export const recordSearchHistoryHandlersFactory = (
             400,
           );
         }
-        logger.error('Error in POST /search-history', err);
+        logger.error({ err }, 'Error in POST /search-history');
         return res.apiv3Err(
           new ErrorV3(
             'Failed to record search history',

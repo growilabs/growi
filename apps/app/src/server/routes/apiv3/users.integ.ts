@@ -12,6 +12,7 @@ import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import Activity from '~/server/models/activity';
 import { UserStatus } from '~/server/models/user/conts';
+import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 interface TestRequest extends Request {
@@ -676,29 +677,53 @@ describe('search histories on PUT /:id/deactivate and DELETE /:id/remove', () =>
     ).toBe(1);
   });
 
-  it('still deletes the user and settles the activity when removing the search histories fails', async () => {
+  it('fails the whole deletion and keeps the user when removing the search histories fails, so the admin can retry', async () => {
     const admin = await createUser('remove-fail-admin', { admin: true });
     const target = await createUser('remove-fail-target');
     currentUser.value = admin;
     await seedHistory(target._id.toString(), ['alpha']);
-    vi.mocked(removeAllSearchHistoriesOfUser).mockRejectedValueOnce(
-      new Error('prisma is down'),
-    );
+    const failure = new Error('prisma is down');
+    vi.mocked(removeAllSearchHistoriesOfUser).mockRejectedValueOnce(failure);
     const emitSpy = vi.spyOn(crowi.events.activity, 'emit');
+    const errorSpy = vi
+      .spyOn(loggerFactory('growi:routes:apiv3:users'), 'error')
+      .mockImplementation(() => {});
 
     try {
-      const response = await request(app).delete(`/${target._id}/remove`);
+      const failed = await request(app).delete(`/${target._id}/remove`);
 
-      expect(response.status).toBe(200);
-      expect(response.body.user.status).toBe(UserStatus.STATUS_DELETED);
+      expect(failed.status).toBeGreaterThanOrEqual(400);
       expect((await User.findById(target._id))?.status).toBe(
-        UserStatus.STATUS_DELETED,
+        UserStatus.STATUS_ACTIVE,
       );
+      expect(
+        await prisma.searchhistories.count({
+          where: { userId: target._id.toString() },
+        }),
+      ).toBe(1);
+      expect(emitSpy).not.toHaveBeenCalledWith('update', expect.anything(), {
+        action: SupportedAction.ACTION_ADMIN_USERS_REMOVE,
+      });
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ err: failure }),
+        expect.any(String),
+      );
+
+      const retried = await request(app).delete(`/${target._id}/remove`);
+
+      expect(retried.status).toBe(200);
+      expect(retried.body.user.status).toBe(UserStatus.STATUS_DELETED);
+      expect(
+        await prisma.searchhistories.count({
+          where: { userId: target._id.toString() },
+        }),
+      ).toBe(0);
       expect(emitSpy).toHaveBeenCalledWith('update', expect.anything(), {
         action: SupportedAction.ACTION_ADMIN_USERS_REMOVE,
       });
     } finally {
       emitSpy.mockRestore();
+      errorSpy.mockRestore();
     }
   });
 });

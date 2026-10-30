@@ -13,10 +13,26 @@ import { getInstance } from '^/test/setup/crowi';
 import type Crowi from '~/server/crowi';
 import { AccessToken } from '~/server/models/access-token';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { SEARCH_HISTORY_KEYWORD_MAX_LENGTH } from '../../../utils/search-history-keyword';
+import {
+  listSearchHistories,
+  recordSearchHistory,
+} from '../../services/search-history';
 import { createSearchHistoryRouter } from '.';
+
+// Wraps the real service so a test can make it fail once.
+vi.mock('../../services/search-history', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../services/search-history')>();
+  return {
+    ...actual,
+    listSearchHistories: vi.fn(actual.listSearchHistories),
+    recordSearchHistory: vi.fn(actual.recordSearchHistory),
+  };
+});
 
 const WORKER_ID = process.env.VITEST_WORKER_ID ?? '1';
 
@@ -201,6 +217,51 @@ describe('search-history routes (integration)', () => {
         .set('Authorization', bearer(writeToken))
         .send({ keyword });
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe('unexpected failures', () => {
+    const logger = loggerFactory('growi:features:search:search-history');
+
+    it('answers GET with 500 and logs the error object', async () => {
+      const failure = new Error('prisma is down');
+      vi.mocked(listSearchHistories).mockRejectedValueOnce(failure);
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      try {
+        const response = await request(app)
+          .get('/search-history')
+          .set('Authorization', bearer(readToken));
+
+        expect(response.status).toBe(500);
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ err: failure }),
+          expect.any(String),
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('answers POST with 500 and logs the error object', async () => {
+      const failure = new Error('prisma is down');
+      vi.mocked(recordSearchHistory).mockRejectedValueOnce(failure);
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      try {
+        const response = await request(app)
+          .post('/search-history')
+          .set('Authorization', bearer(writeToken))
+          .send({ keyword: 'alpha' });
+
+        expect(response.status).toBe(500);
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ err: failure }),
+          expect.any(String),
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
   });
 

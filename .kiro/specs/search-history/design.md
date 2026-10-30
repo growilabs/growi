@@ -179,7 +179,7 @@ apps/app/src/server/service/import/
 ### Modified Files
 - `apps/app/prisma/schema.prisma` — [保存] `model searchhistories` を追加する（Data Models を参照）。
 - `apps/app/src/server/routes/apiv3/index.js` — [保存] `router.use('/search-history', createSearchHistoryRouter(crowi))` を 1 行追加する。
-- `apps/app/src/server/routes/apiv3/users.js` — [保存] `statusDelete()` と `externalaccounts.deleteMany` の直後で、`removeAllSearchHistoriesOfUser(user._id.toString())` を呼ぶ。失敗は `logger.error` に残し、後続の処理を続ける。
+- `apps/app/src/server/routes/apiv3/users.js` — [保存] `statusDelete()` より前（グループ関係の削除より前）で、`removeAllSearchHistoriesOfUser(user._id.toString())` を呼ぶ。失敗は既存の `catch` に任せ、ユーザー削除全体の失敗として返す。
 - `apps/app/src/server/service/import/overwrite-params/index.ts` — [保存] `case 'searchhistories'` を追加する。
 - `apps/app/src/server/service/import/non-transferable-collections.ts` — [保存] `TRANSFERABLE_COLLECTIONS` に `'searchhistories'` を追加する。
 - `apps/app/src/client/components/Admin/ExportArchiveData/SelectCollectionsModal.tsx` — [保存] `GROUPS_USER` に `'searchhistories'` を追加する。これがないと「その他」に分類され、ユーザーデータ向けの警告（パスワードシードの注意）が出ない。
@@ -471,8 +471,8 @@ export const overwriteParams: OverwriteParams; // { user: (value) => new ObjectI
 - 既存の仕組みは、指定の無いフィールドのうち ISO 日時の形の文字列を Date に変える。`2024-10-30T00:00:00Z` のようなキーワードが Date で保存されると、Prisma の `keyword String` と型が合わず、そのユーザーの一覧取得が失敗し続ける。そのため `keyword` は変換せずに文字列のまま通す（7.4）。
 
 #### users route（変更）
-- ユーザー削除 API で `statusDelete()`・`prisma.externalaccounts.deleteMany` の直後に、`removeAllSearchHistoriesOfUser(user._id.toString())` を呼ぶ（7.1）。一時停止などほかの状態遷移には追加しない（7.2）。
-- 履歴の削除は `try`/`catch` で囲み、失敗は `logger.error`（対象のユーザー ID を含める）に残して、後続の処理（応答のための直列化、`ACTION_ADMIN_USERS_REMOVE` の activity の更新、ホームページの削除）を続け、200 を返す。この時点でユーザーは削除済み（username も書き換え済み）で、削除をやり直せない。失敗をユーザー削除全体の失敗として返すと、管理画面には失敗と出るのにユーザーは消えており、activity も更新されず、強制削除の設定があってもホームページが残る。残った履歴は画面から参照できず、運用者がログから追える。
+- ユーザー削除 API で `statusDelete()` より前（グループ関係の削除より前）に、`removeAllSearchHistoriesOfUser(user._id.toString())` を呼ぶ（7.1）。一時停止などほかの状態遷移には追加しない（7.2）。
+- 履歴の削除は不可逆な手順（グループ関係の削除・`statusDelete()`・外部アカウントの削除）より前に行う。失敗した場合は既存の `catch` がエラーをログに残し（対象のユーザー ID を含める）、ユーザー削除全体の失敗として返す。ユーザーは削除されず、activity も更新されないため、管理者は削除をやり直せる。履歴の削除は冪等で、やり直しで残りの履歴が消える。
 
 ### Client
 
@@ -670,7 +670,7 @@ model searchhistories {
   - 同じキーワードで `recordSearchHistory(userId, keyword)` を呼ぶと、新しい行は増えず、その行の `lastSearchedAt` が更新され、`_id` は変わらない。`user` が文字列のまま保存されると、`@db.ObjectId` の条件に合わず、一意インデックスも重複を防げないため、この確認が必要。
   - インポートした履歴が 50 件を超えて繰り上がり・切り詰めの対象になる（新しい記録で最も古い 1 件が消える）。
   - ISO 日時の形のキーワード（`2024-10-30T00:00:00Z`）が文字列のまま保存され、一覧取得でそのまま返る（7.4）。
-- ユーザー削除 API の統合テスト: 削除済みにしたユーザーの履歴が消え、ほかのユーザーの履歴は残る（7.1）。履歴の削除が失敗しても、ユーザーは削除済みになり、200 が返り、`ACTION_ADMIN_USERS_REMOVE` の activity の更新が行われる。
+- ユーザー削除 API の統合テスト: 削除済みにしたユーザーの履歴が消え、ほかのユーザーの履歴は残る（7.1）。履歴の削除が失敗すると、削除は失敗として返り、ユーザーは削除済みにならず、履歴は残り、`ACTION_ADMIN_USERS_REMOVE` の activity は更新されない。同じ削除をやり直すと成功し、履歴が消える。
 
 ### Component Tests（RTL）
 - `SearchModal.spec.tsx`:

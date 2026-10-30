@@ -50,7 +50,7 @@ export const listSearchHistoriesHandlersFactory = (
         const body: ListSearchHistoriesResponseBody = { searchHistories };
         return res.apiv3(body);
       } catch (err) {
-        logger.error('Error in GET /search-history', err);
+        logger.error({ err }, 'Error in GET /search-history');
         return res.apiv3Err(
           new ErrorV3(
             'Failed to list search histories',
