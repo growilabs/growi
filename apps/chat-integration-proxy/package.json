@@ -1,0 +1,38 @@
+{
+  "name": "@growi/chat-integration-proxy",
+  "version": "0.0.1",
+  "description": "Chat-integration hub (Gen 2) that connects Slack, Discord, Microsoft Teams, and Mattermost to GROWI",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "rimraf dist",
+    "lint:biome": "biome check",
+    "lint:typecheck": "tsgo --noEmit",
+    "lint": "run-p lint:*",
+    "test": "vitest run",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "start": "node dist/runtime/server.js"
+  },
+  "dependencies": {
+    "@chat-adapter/discord": "4.38.1",
+    "@chat-adapter/slack": "4.38.1",
+    "@chat-adapter/state-pg": "4.38.1",
+    "@chat-adapter/teams": "4.38.1",
+    "@growi/chat": "workspace:^",
+    "@hono/node-server": "^1.19.14",
+    "@prisma/client": "6.19.2",
+    "chat": "4.38.1",
+    "chat-adapter-mattermost": "1.1.3",
+    "hono": "^4.13.5",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "prisma": "6.19.2"
+  }
+}

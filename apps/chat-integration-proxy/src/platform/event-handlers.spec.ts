@@ -1,0 +1,434 @@
+// Task 3.8: the half of 「この層の入口」 that hands SDK events to the sink.
+//
+// `event-mapping.ts` already proves that each SDK event becomes the right
+// `PlatformEvent`, so nothing is re-asserted here. What is asserted is what
+// only this file can decide: which SDK handler each mapping is reached from,
+// that the bot's own posts are dropped before any of it, and that a modal
+// handle is minted from the event that can actually open one.
+import type {
+  ActionEvent,
+  Adapter,
+  Author,
+  Channel,
+  MemberJoinedChannelEvent,
+  Message,
+  ModalSubmitEvent,
+  SlashCommandEvent,
+  Thread,
+} from 'chat';
+import { describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
+
+import type { PlatformEvent } from '../types/index.js';
+import {
+  type EventHandlerDeps,
+  type HandlerHost,
+  registerEventHandlers,
+} from './event-handlers.js';
+import { encodeActionId } from './event-mapping.js';
+import { createModalTriggerRegistry, MODAL_CALLBACK_ID } from './prompt.js';
+
+const author = (overrides: Partial<Author> = {}): Author => ({
+  userId: 'U0001',
+  userName: 'alice',
+  fullName: 'Alice Example',
+  isBot: false,
+  isMe: false,
+  ...overrides,
+});
+
+const thread = (): Thread =>
+  mock<Thread>({
+    adapter: mock({ name: 'slack' }),
+    channelId: 'slack:C0001',
+    isDM: false,
+    channelVisibility: 'workspace',
+    channel: mock<Channel>({ id: 'slack:C0001', name: 'general' }),
+  });
+
+const message = (overrides: Partial<Message> = {}): Message =>
+  mock<Message>({
+    id: 'M0001',
+    threadId: 'slack:C0001:1.0',
+    text: '@growi search foo',
+    author: author(),
+    links: [],
+    isMention: true,
+    ...overrides,
+  });
+
+interface Registered {
+  mention?: (thread: Thread, message: Message) => Promise<void>;
+  messagePattern?: RegExp;
+  message?: (thread: Thread, message: Message) => Promise<void>;
+  action?: (event: ActionEvent) => Promise<void>;
+  modalCallbackId?: string;
+  modalSubmit?: (event: ModalSubmitEvent) => Promise<void>;
+  slashCommand?: (event: SlashCommandEvent) => Promise<void>;
+  memberJoined?: (event: MemberJoinedChannelEvent) => Promise<void>;
+}
+
+const fakeHost = (): { host: HandlerHost; registered: Registered } => {
+  const registered: Registered = {};
+  return {
+    registered,
+    host: {
+      onNewMention(handler) {
+        registered.mention = handler;
+      },
+      onNewMessage(pattern, handler) {
+        registered.messagePattern = pattern;
+        registered.message = handler;
+      },
+      onAction(handler) {
+        registered.action = handler;
+      },
+      onModalSubmit(callbackId, handler) {
+        registered.modalCallbackId = callbackId;
+        registered.modalSubmit = handler;
+      },
+      onSlashCommand(handler) {
+        registered.slashCommand = handler;
+      },
+      onMemberJoinedChannel(handler) {
+        registered.memberJoined = handler;
+      },
+    },
+  };
+};
+
+const setUp = (
+  identifyInstallation?: EventHandlerDeps['identifyInstallation'],
+) => {
+  const handled: PlatformEvent[] = [];
+  const botJoinedThrough: Array<{ adapter: Adapter; channelId: string }> = [];
+  const { host, registered } = fakeHost();
+  const modals = createModalTriggerRegistry();
+
+  registerEventHandlers(host, {
+    sink: {
+      handle: (event) => {
+        handled.push(event);
+        return Promise.resolve();
+      },
+    },
+    modals,
+    onBotJoinedChannel: (adapter, channelId) => {
+      botJoinedThrough.push({ adapter, channelId });
+      return Promise.resolve();
+    },
+    ...(identifyInstallation == null ? {} : { identifyInstallation }),
+  });
+
+  return { handled, botJoinedThrough, registered, modals };
+};
+
+describe('messages', () => {
+  it('turns a message addressed to the bot into a mention', async () => {
+    const { handled, registered } = setUp();
+
+    await registered.mention?.(thread(), message());
+
+    expect(handled).toMatchObject([
+      { kind: 'mention', text: '@growi search foo' },
+    ]);
+  });
+
+  it("drops the bot's own posts before mapping them", async () => {
+    // A link this bot posted would otherwise arrive back as `link-posted` and
+    // make the bot preview its own preview, without end.
+    const { handled, registered } = setUp();
+
+    await registered.mention?.(
+      thread(),
+      message({ author: author({ isMe: true }) }),
+    );
+    await registered.message?.(
+      thread(),
+      message({
+        author: author({ isMe: true }),
+        isMention: false,
+        text: 'see https://example.com/page',
+        links: [{ url: 'https://example.com/page', title: 'Page' }],
+      }),
+    );
+
+    expect(handled).toEqual([]);
+  });
+
+  it('turns an unaddressed message carrying links into link-posted', async () => {
+    const { handled, registered } = setUp();
+
+    await registered.message?.(
+      thread(),
+      message({
+        isMention: false,
+        text: 'see https://example.com/page',
+        links: [{ url: 'https://example.com/page', title: 'Page' }],
+      }),
+    );
+
+    expect(handled).toMatchObject([
+      { kind: 'link-posted', urls: ['https://example.com/page'] },
+    ]);
+  });
+
+  it('reaches the link handler even when the text shows only a link label', async () => {
+    // Slack sends a long URL as `<url|label>`, and the SDK builds
+    // `Message.text` from the label (`localhost/…`); the URL is only in
+    // `Message.links`, so the text cannot be what decides.
+    const { handled, registered } = setUp();
+    const shown = 'localhost/…';
+
+    expect(registered.messagePattern?.test(shown)).toBe(true);
+    await registered.message?.(
+      thread(),
+      message({
+        isMention: false,
+        text: shown,
+        links: [{ url: 'http://localhost:3000/6adf11e2de5add813a048114' }],
+      }),
+    );
+
+    expect(handled).toMatchObject([
+      {
+        kind: 'link-posted',
+        urls: ['http://localhost:3000/6adf11e2de5add813a048114'],
+      },
+    ]);
+  });
+
+  it('dispatches nothing for an unaddressed message that carries no link', async () => {
+    const { handled, registered } = setUp();
+
+    await registered.message?.(
+      thread(),
+      message({ isMention: false, text: 'no link here', links: [] }),
+    );
+
+    expect(handled).toEqual([]);
+  });
+
+  it('does not dispatch an addressed message a second time from the link handler', async () => {
+    // The SDK stops at the mention handler, so this can only happen if that
+    // routing changes -- and it would answer the same command twice.
+    const { handled, registered } = setUp();
+
+    await registered.message?.(
+      thread(),
+      message({
+        isMention: true,
+        text: '@growi see https://example.com/page',
+        links: [{ url: 'https://example.com/page', title: 'Page' }],
+      }),
+    );
+
+    expect(handled).toEqual([]);
+  });
+});
+
+describe('modal handles', () => {
+  it("hands a slash command a handle that opens that very event's modal", async () => {
+    // design.md: the handle is not a platform trigger id but a name for this
+    // event's own `openModal()`, which is the only mechanism that works on
+    // every service whose `modal` capability is `full`.
+    const { handled, registered, modals } = setUp();
+    const openModal = vi.fn(async () => ({ viewId: 'V1' }));
+
+    await registered.slashCommand?.(
+      mock<SlashCommandEvent>({
+        adapter: mock({ name: 'slack' }),
+        channel: mock<Channel>({ id: 'slack:C0001', name: 'general' }),
+        user: author(),
+        command: '/growi',
+        text: 'search foo',
+        openModal,
+      }),
+    );
+
+    const event = handled[0];
+    expect(event).toMatchObject({ kind: 'slash-command', command: '/growi' });
+    const interaction =
+      event?.kind === 'slash-command' ? event.interaction : null;
+    expect(interaction).not.toBeNull();
+
+    // The handle names the event's own opener, so taking it out and calling it
+    // must reach that event.
+    await (interaction != null ? modals.take(interaction) : null)?.(mock());
+    expect(openModal).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands a button press the same kind of handle', async () => {
+    const { handled, registered, modals } = setUp();
+    const openModal = vi.fn(async () => ({ viewId: 'V1' }));
+
+    await registered.action?.(
+      mock<ActionEvent>({
+        adapter: mock({ name: 'slack' }),
+        actionId: encodeActionId('corr-1', 'choose'),
+        value: '2',
+        user: author(),
+        thread: thread(),
+        openModal,
+      }),
+    );
+
+    const event = handled[0];
+    expect(event).toMatchObject({ kind: 'action', correlationId: 'corr-1' });
+    const interaction = event?.kind === 'action' ? event.interaction : null;
+    await (interaction != null ? modals.take(interaction) : null)?.(mock());
+    expect(openModal).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches nothing for a button this proxy did not render', async () => {
+    const { handled, registered } = setUp();
+
+    await registered.action?.(
+      mock<ActionEvent>({
+        adapter: mock({ name: 'slack' }),
+        actionId: 'someone-elses-button',
+        user: author(),
+        thread: thread(),
+        openModal: async () => undefined,
+      }),
+    );
+
+    expect(handled).toEqual([]);
+  });
+});
+
+describe('modal submissions', () => {
+  it('listens under the one callback id this proxy opens modals with', () => {
+    const { registered } = setUp();
+
+    expect(registered.modalCallbackId).toBe(MODAL_CALLBACK_ID);
+  });
+
+  it('dispatches a submission by the correlation id carried in its metadata', async () => {
+    const { handled, registered } = setUp();
+
+    await registered.modalSubmit?.(
+      mock<ModalSubmitEvent>({
+        adapter: mock({ name: 'slack' }),
+        user: author(),
+        privateMetadata: 'corr-1',
+        relatedChannel: mock<Channel>({ id: 'slack:C0001', name: 'general' }),
+        // Absent, not stubbed: a submission from a modal opened over a
+        // channel carries no thread, and an auto-stubbed one would be taken
+        // as a real conversation.
+        relatedThread: undefined,
+        values: { path: '/memo' },
+      }),
+    );
+
+    expect(handled).toMatchObject([
+      {
+        kind: 'modal-submit',
+        correlationId: 'corr-1',
+        values: { path: '/memo' },
+      },
+    ]);
+  });
+});
+
+describe('someone joining a channel', () => {
+  const joined = (
+    userId: string,
+    adapter: Adapter,
+  ): MemberJoinedChannelEvent => ({
+    userId,
+    // The SDK form, `slack:<channel>:` with an empty thread part.
+    channelId: 'slack:C0009:',
+    inviterId: 'U0001',
+    adapter,
+  });
+
+  it('reports the bot itself being added, with the adapter that is serving the event', async () => {
+    const { botJoinedThrough, handled, registered } = setUp();
+    const adapter = mock<Adapter>({ name: 'slack', botUserId: 'UBOT' });
+
+    await registered.memberJoined?.(joined('UBOT', adapter));
+
+    expect(botJoinedThrough).toHaveLength(1);
+    expect(botJoinedThrough[0]?.adapter).toBe(adapter);
+    expect(botJoinedThrough[0]?.channelId).toBe('slack:C0009:');
+    // Not a conversation: nothing reaches the command side.
+    expect(handled).toEqual([]);
+  });
+
+  it('ignores a person joining', async () => {
+    const { botJoinedThrough, registered } = setUp();
+    expect(registered.memberJoined).toBeDefined();
+
+    await registered.memberJoined?.(
+      joined('U0002', mock<Adapter>({ name: 'slack', botUserId: 'UBOT' })),
+    );
+
+    expect(botJoinedThrough).toEqual([]);
+  });
+});
+
+describe('which installation an event belongs to', () => {
+  it('hands the sink a mention carrying the installation its adapter names', async () => {
+    const identify = vi.fn(async () => ({
+      kind: 'identified' as const,
+      installationId: 'inst-dm',
+    }));
+    const { handled, registered } = setUp(identify);
+    const asked = thread();
+
+    await registered.mention?.(asked, message());
+
+    expect(handled).toMatchObject([
+      {
+        kind: 'mention',
+        installation: { kind: 'identified', installationId: 'inst-dm' },
+      },
+    ]);
+    expect(identify).toHaveBeenCalledWith(asked.adapter, 'slack:C0001');
+  });
+
+  it('hands a slash command the installation as well', async () => {
+    const { handled, registered } = setUp(async () => ({
+      kind: 'no-workspace',
+    }));
+
+    await registered.slashCommand?.(
+      mock<SlashCommandEvent>({
+        adapter: mock({ name: 'slack' }),
+        channel: mock<Channel>({ id: 'slack:C0001', name: 'general' }),
+        user: author(),
+        command: '/growi',
+        text: 'search foo',
+        openModal: async () => undefined,
+      }),
+    );
+
+    expect(handled).toMatchObject([
+      { kind: 'slash-command', installation: { kind: 'no-workspace' } },
+    ]);
+  });
+
+  it('leaves the installation off an event whose adapter cannot name one', async () => {
+    const { handled, registered } = setUp(async () => undefined);
+
+    await registered.mention?.(thread(), message());
+
+    expect(handled).toHaveLength(1);
+    expect(handled[0]).not.toHaveProperty('installation');
+  });
+
+  it('asks nothing for a message that becomes no event', async () => {
+    // Every unaddressed message reaches the handler; asking the service about
+    // each would cost a lookup per message the bot can see.
+    const identify = vi.fn(async () => undefined);
+    const { registered } = setUp(identify);
+
+    await registered.message?.(
+      thread(),
+      message({ isMention: false, text: 'no link here', links: [] }),
+    );
+
+    expect(identify).not.toHaveBeenCalled();
+  });
+});

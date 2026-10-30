@@ -105,6 +105,13 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('slack_integration_legacy.slack_integration_legacy')}
         </>
       );
+    case 'chat-integration':
+      return (
+        <>
+          <span className="material-symbols-outlined me-1">forum</span>
+          Chat Integration
+        </>
+      );
     case 'users':
       return (
         <>
@@ -344,6 +351,11 @@ export const AdminNavigation = (): JSX.Element => {
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/slack-integration-legacy')}
           />
+          <MenuLink
+            menu="chat-integration"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/chat-integration')}
+          />
         </>
       );
     },
@@ -382,6 +394,9 @@ export const AdminNavigation = (): JSX.Element => {
             )}
             {isActiveMenu('/slack-integration') && (
               <MenuLabel menu="slack-integration" />
+            )}
+            {isActiveMenu('/chat-integration') && (
+              <MenuLabel menu="chat-integration" />
             )}
             {isActiveMenu('/users') && <MenuLabel menu="users" />}
             {isActiveMenu(['/user-groups', 'user-group-detail']) && (

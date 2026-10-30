@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts",
+    "**/*.integ.ts",
+    "src/db/repositories/test-cipher.ts",
+    "src/capabilities/test-channels.ts",
+    "src/platform/chat-service-stand-in.ts",
+    "src/platform/discord-gateway-stand-in.ts",
+    "src/testing"
+  ]
+}

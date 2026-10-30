@@ -6,7 +6,7 @@ import { createRedirectToForUnauthenticated } from '~/server/util/createRedirect
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
-import { UserStatus } from '../models/user/conts';
+import { isActiveUserStatus } from '../models/user/predicates';
 
 const logger = loggerFactory('growi:middleware:login-required');
 
@@ -22,13 +22,6 @@ type FallbackFunction = (
   res: Response,
   next: NextFunction,
 ) => void;
-
-/**
- * Whether a logged-in user may pass loginRequired. Also used by paths that
- * cannot run the middleware itself (e.g. the Yjs WebSocket upgrade).
- */
-export const isActiveUser = (user: Pick<IUser, 'status'>): boolean =>
-  user.status === UserStatus.STATUS_ACTIVE;
 
 /**
  * require login handler
@@ -50,7 +43,7 @@ const loginRequiredFactory = (
   ) {
     // check the user logged in
     if (req.user != null && req.user instanceof Object && '_id' in req.user) {
-      if (isActiveUser(req.user)) {
+      if (isActiveUserStatus(req.user.status)) {
         // Active の人だけ先に進める
         return next();
       }
