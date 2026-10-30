@@ -38,11 +38,12 @@ export type ChildListingBudget = {
 
 /**
  * Extension of the shared Mastra request-context shape for the
- * suggest-path agent. The shared shape (`MastraRequestContextShape`)
- * stays unmodified: this type only ADDS the `searchBudget` and
- * `childListingBudget` keys, so shared tools (getPageContentTool,
+ * suggest-path agent. This type only ADDS the `searchBudget` and
+ * `childListingBudget` keys on top of the shared shape
+ * (`MastraRequestContextShape`), so shared tools (getPageContentTool,
  * fullTextSearchTool) keep reading `user` / `searchService` as before
- * (Requirement 1.5).
+ * (Requirement 1.5). `modelKey` and `usageMeter` come from the shared
+ * shape; the agentic engine sets both for every proposal.
  */
 export type SuggestPathRequestContextShape = MastraRequestContextShape & {
   searchBudget: SearchBudget;

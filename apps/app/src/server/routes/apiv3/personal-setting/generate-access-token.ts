@@ -9,7 +9,7 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { AccessToken } from '~/server/models/access-token';
-import { isValidScope } from '~/server/util/scope-utils';
+import { includesAdminScope, isValidScope } from '~/server/util/scope-utils';
 import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
@@ -65,12 +65,19 @@ const validator = [
     .custom((scopes: Scope[]) => {
       scopes.forEach((scope) => {
         if (!isValidScope(scope)) {
-          throw new Error(`Invalid scope: ${scope}}`);
+          throw new Error(`Invalid scope: ${scope}`);
         }
       });
       return true;
     })
-    .withMessage('Invalid scope'),
+    .withMessage('Invalid scope')
+    .bail()
+    .custom((scopes: Scope[], { req }) => {
+      if (req.user?.admin !== true && includesAdminScope(scopes)) {
+        throw new Error('Admin scopes are only available to administrators');
+      }
+      return true;
+    }),
 ];
 
 export const generateAccessTokenHandlerFactory = (

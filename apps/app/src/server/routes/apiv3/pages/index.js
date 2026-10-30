@@ -548,6 +548,8 @@ export const setup = (crowi) => {
    *                      type: array
    *                      items:
    *                        $ref: '#/components/schemas/Page'
+   *          403:
+   *            description: The requester is not allowed to delete any of the trashed pages completely.
    */
   router.delete(
     '/empty-trash',
@@ -557,67 +559,52 @@ export const setup = (crowi) => {
     addActivity,
     apiV3FormValidator,
     async (req, res) => {
-      const options = {};
-
       const pagesInTrash = await crowi.pageService.findAllTrashPages(req.user);
 
-      const deletablePages = crowi.pageService.filterPagesByCanDeleteCompletely(
-        pagesInTrash,
-        req.user,
-        true,
-      );
+      // Each trashed page is deleted on its own, not together with its
+      // descendants, so it is judged by the single-page authority.
+      const deletablePages =
+        await crowi.pageService.filterPagesByCanDeleteCompletely(
+          pagesInTrash,
+          req.user,
+          false,
+        );
 
-      if (deletablePages.length === 0) {
-        const msg = 'No pages can be deleted.';
-        return res.apiv3Err(new ErrorV3(msg), 500);
+      if (pagesInTrash.length > 0 && deletablePages.length === 0) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'You are not allowed to delete the trashed pages completely.',
+            'complete_deletion_not_allowed_for_user',
+          ),
+          403,
+        );
       }
 
+      const isAllDeletable = deletablePages.length === pagesInTrash.length;
       const parameters = { action: SupportedAction.ACTION_PAGE_EMPTY_TRASH };
 
-      // when some pages are not deletable
-      if (deletablePages.length < pagesInTrash.length) {
-        try {
-          const options = { isCompletely: true, isRecursively: true };
-          await crowi.pageService.deleteMultiplePages(
-            deletablePages,
-            req.user,
-            options,
-          );
+      try {
+        const activityParameters = {
+          ip: req.ip,
+          endpoint: req.originalUrl,
+        };
+        // Pass the judged pages, not the whole trash: a page trashed after the
+        // judgement above must not be deleted without its own authority check.
+        const pages = await crowi.pageService.emptyTrashPage(
+          req.user,
+          activityParameters,
+          deletablePages.map((p) => p._id),
+        );
 
-          activityEvent.emit('update', res.locals.activity._id, parameters);
+        activityEvent.emit('update', res.locals.activity._id, parameters);
 
-          return res.apiv3({ deletablePages });
-        } catch (err) {
-          logger.error(err);
-          return res.apiv3Err(
-            new ErrorV3('Failed to update page.', 'unknown'),
-            500,
-          );
-        }
-      }
-      // when all pages are deletable
-      else {
-        try {
-          const activityParameters = {
-            ip: req.ip,
-            endpoint: req.originalUrl,
-          };
-          const pages = await crowi.pageService.emptyTrashPage(
-            req.user,
-            options,
-            activityParameters,
-          );
-
-          activityEvent.emit('update', res.locals.activity._id, parameters);
-
-          return res.apiv3({ pages });
-        } catch (err) {
-          logger.error(err);
-          return res.apiv3Err(
-            new ErrorV3('Failed to update page.', 'unknown'),
-            500,
-          );
-        }
+        return res.apiv3(isAllDeletable ? { pages } : { deletablePages });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(
+          new ErrorV3('Failed to update page.', 'unknown'),
+          500,
+        );
       }
     },
   );
@@ -1017,6 +1004,12 @@ export const setup = (crowi) => {
    *                    isCompletely:
    *                      type: boolean
    *                      description: Whether pages were deleted completely
+   *          403:
+   *            description: The requester is not allowed to delete any of the selected pages.
+   *          404:
+   *            description: None of the selected pages is found or readable.
+   *          409:
+   *            description: Every selected page has been updated since its given revisionId.
    */
   router.post(
     '/delete',
@@ -1073,14 +1066,20 @@ export const setup = (crowi) => {
         logger.error('Failed to find pages to delete.', err);
         return res.apiv3Err(new ErrorV3('Failed to find pages to delete.'));
       }
-      // `findByIdsAndViewer` is viewer-filtered, so the requested page can come
-      // back missing from `pagesToDelete` (already deleted, or not readable by
-      // this user) — guard the length before indexing, or a nonexistent/
-      // unreadable pageId throws here instead of falling through to the
-      // generic "No pages can be deleted." response below.
+      // `findByIdsAndViewer` is viewer-filtered, so a page that does not exist
+      // and a page this user cannot read both come back missing. Answer them
+      // with the same 404 — see rules/page-write-action-403-404.md.
+      if (pagesToDelete.length === 0) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'The pages are not found or forbidden',
+            'notfound_or_forbidden',
+          ),
+          404,
+        );
+      }
       if (
         isAnyoneWithTheLink &&
-        pagesToDelete.length > 0 &&
         pagesToDelete[0].grant !== PageGrant.GRANT_RESTRICTED
       ) {
         return res.apiv3Err(
@@ -1097,6 +1096,15 @@ export const setup = (crowi) => {
             req.user,
             isRecursively,
           );
+        if (pagesCanBeDeleted.length === 0) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'You are not allowed to delete these pages completely.',
+              'complete_deletion_not_allowed_for_user',
+            ),
+            403,
+          );
+        }
       } else {
         // isUpdatable is async, so it has to be awaited before the result is used as
         // a predicate: a bare call returns a Promise, which is always truthy, and
@@ -1126,16 +1134,29 @@ export const setup = (crowi) => {
         const filteredPages = pagesToDelete.filter(
           (_p, index) => isUpdatableFlags[index],
         );
+        if (filteredPages.length === 0) {
+          return res.apiv3Err(
+            new ErrorV3(
+              "Someone could update these pages, so couldn't delete.",
+              'outdated',
+            ),
+            409,
+          );
+        }
         pagesCanBeDeleted = await crowi.pageService.filterPagesByCanDelete(
           filteredPages,
           req.user,
           isRecursively,
         );
-      }
-
-      if (pagesCanBeDeleted.length === 0) {
-        const msg = 'No pages can be deleted.';
-        return res.apiv3Err(new ErrorV3(msg), 500);
+        if (pagesCanBeDeleted.length === 0) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'You are not allowed to delete these pages.',
+              'deletion_not_allowed_for_user',
+            ),
+            403,
+          );
+        }
       }
 
       // run delete
@@ -1186,7 +1207,7 @@ export const setup = (crowi) => {
    */
   router.post(
     '/convert-pages-by-path',
-    accessTokenParser([SCOPE.WRITE.FEATURES.PAGE], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP], { acceptLegacy: true }),
     loginRequiredStrictly,
     excludeReadOnlyUser,
     adminRequired,

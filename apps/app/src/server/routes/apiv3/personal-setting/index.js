@@ -480,7 +480,6 @@ export const setup = (crowi) => {
    */
   router.put(
     '/api-token',
-    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.API_TOKEN]),
     loginRequiredStrictly,
     addActivity,
     async (req, res) => {
@@ -532,6 +531,8 @@ export const setup = (crowi) => {
    *   /personal-setting/access-token:
    *     post:
    *       tags: [GeneralSetting]
+   *       security:
+   *         - cookieAuth: []
    *       operationId: generateccessToken
    *       summary: /personal-setting/access-token
    *       description: Generate access token
@@ -560,11 +561,7 @@ export const setup = (crowi) => {
    *                     items:
    *                      type: string
    */
-  router.post(
-    '/access-token',
-    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.API.ACCESS_TOKEN]),
-    generateAccessTokenHandlerFactory(crowi),
-  );
+  router.post('/access-token', generateAccessTokenHandlerFactory(crowi));
 
   /**
    * @swagger
