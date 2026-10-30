@@ -7,11 +7,14 @@ import Downshift, {
 import { useAtomValue } from 'jotai';
 import { Modal, ModalBody } from 'reactstrap';
 
+import { toSearchHistoryKeyword } from '~/features/search/utils/search-history-keyword';
+import { useCurrentUser } from '~/states/global';
 import { useCurrentPagePath } from '~/states/page';
 import { useSetSearchKeyword } from '~/states/search';
 import { isSearchScopeChildrenAsDefaultAtom } from '~/states/server-configurations';
 
 import type { DownshiftItem } from '../interfaces/downshift';
+import { recordSearchHistory } from '../services/record-search-history';
 import {
   useSearchModalActions,
   useSearchModalStatus,
@@ -23,10 +26,11 @@ import { SearchResultMenuItem } from './SearchResultMenuItem';
 
 type Props = {
   onSearch: (keyword: string) => void;
+  onRecordSearch: (keyword: string) => void;
 };
 
 const SearchModalSubstance = (props: Props): JSX.Element => {
-  const { onSearch } = props;
+  const { onSearch, onRecordSearch } = props;
 
   const [searchInput, setSearchInput] = useState('');
 
@@ -43,10 +47,13 @@ const SearchModalSubstance = (props: Props): JSX.Element => {
       if (selectedItem.type !== 'navigate') {
         return;
       }
+      if (selectedItem.historyKeyword != null) {
+        onRecordSearch(selectedItem.historyKeyword);
+      }
       await router.push(selectedItem.url);
       closeSearchModal();
     },
-    [closeSearchModal, router],
+    [closeSearchModal, onRecordSearch, router],
   );
 
   const submitHandler = useCallback(() => {
@@ -143,7 +150,8 @@ const SearchModalSubstance = (props: Props): JSX.Element => {
 };
 
 const SearchModal = (): JSX.Element => {
-  const { isOpened, onSearchOverride } = useSearchModalStatus();
+  const { isOpened, onSearchOverride, isSearchHistoryEnabled } =
+    useSearchModalStatus();
   const { close: closeSearchModal } = useSearchModalActions();
 
   const setSearchKeyword = useSetSearchKeyword();
@@ -151,9 +159,27 @@ const SearchModal = (): JSX.Element => {
     isSearchScopeChildrenAsDefaultAtom,
   );
   const currentPagePath = useCurrentPagePath();
+  const currentUser = useCurrentUser();
+
+  const recordSearch = useCallback(
+    (keyword: string) => {
+      if (currentUser == null || !isSearchHistoryEnabled) {
+        return;
+      }
+      const historyKeyword = toSearchHistoryKeyword(keyword);
+      if (historyKeyword == null) {
+        return;
+      }
+      recordSearchHistory(historyKeyword);
+    },
+    [currentUser, isSearchHistoryEnabled],
+  );
 
   const searchHandler = useCallback(
     (keyword: string) => {
+      // Record before the override and the prefix: below so neither affects the saved keyword
+      recordSearch(keyword);
+
       // invoke override function if exists
       if (onSearchOverride != null) {
         onSearchOverride(keyword);
@@ -170,6 +196,7 @@ const SearchModal = (): JSX.Element => {
       setSearchKeyword(finalKeyword);
     },
     [
+      recordSearch,
       onSearchOverride,
       setSearchKeyword,
       isSearchScopeChildrenAsDefault,
@@ -184,7 +211,12 @@ const SearchModal = (): JSX.Element => {
       toggle={closeSearchModal}
       data-testid="search-modal"
     >
-      {isOpened && <SearchModalSubstance onSearch={searchHandler} />}
+      {isOpened && (
+        <SearchModalSubstance
+          onSearch={searchHandler}
+          onRecordSearch={recordSearch}
+        />
+      )}
     </Modal>
   );
 };
