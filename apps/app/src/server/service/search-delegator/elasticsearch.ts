@@ -7,7 +7,10 @@ import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
 import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
-import type { AuditlogSuggestionField } from '~/interfaces/activity';
+import {
+  AUDITLOG_SUGGESTION_CASE_INSENSITIVE,
+  type AuditlogSuggestionField,
+} from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
@@ -111,16 +114,11 @@ const isPermanentMappingRejection = (err: unknown): boolean =>
 // fuzzy: compares q against the whole stored value, so it only helps a fully
 // typed value. Endpoints are looked up by partial path, where it just adds
 // near-miss paths (e.g. `/_api/v3/tags` for `/_api/v3/page`).
-// caseInsensitive: kept equal to the MongoDB fallback's SuggestionFieldSpec
-// so both backends return the same suggestions.
-const AUDITLOG_SUGGESTION_QUERY_OPTIONS: {
-  readonly [K in AuditlogSuggestionField]: {
-    readonly fuzzy: boolean;
-    readonly caseInsensitive: boolean;
-  };
+const AUDITLOG_SUGGESTION_FUZZY: {
+  readonly [K in AuditlogSuggestionField]: boolean;
 } = {
-  username: { fuzzy: true, caseInsensitive: true },
-  endpoint: { fuzzy: false, caseInsensitive: false },
+  username: true,
+  endpoint: false,
 };
 
 class ElasticsearchDelegator
@@ -975,7 +973,8 @@ class ElasticsearchDelegator
     limit: number,
   ): Promise<string[]> {
     const escaped = q.replace(/([*?\\])/g, '\\$1');
-    const { fuzzy, caseInsensitive } = AUDITLOG_SUGGESTION_QUERY_OPTIONS[field];
+    const fuzzy = AUDITLOG_SUGGESTION_FUZZY[field];
+    const caseInsensitive = AUDITLOG_SUGGESTION_CASE_INSENSITIVE[field];
     const query = {
       bool: {
         should: [

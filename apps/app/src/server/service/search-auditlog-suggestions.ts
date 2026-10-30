@@ -26,10 +26,10 @@ const AUDITLOG_SUGGESTION_FALLBACK_MIN_QUERY_LENGTH: {
   readonly [K in AuditlogSuggestionField]: number;
 } = {
   username: 2,
-  // Rejects only '/' and '/x'. Nearly every endpoint shares the `/_api/`
-  // prefix, so queries up to `/_api/v3/` still group almost every row; that is
-  // accepted for the ES-down fallback, bounded by maxTimeMS.
-  endpoint: 3,
+  // Nearly every endpoint shares the `/_api/` prefix, so no length short of
+  // `/_api/v3/` narrows the scan; the fallback's load is bounded by maxTimeMS
+  // instead, and '/' answers like ES does.
+  endpoint: 1,
 };
 
 // `endpoint` is stored as `req.originalUrl`, which for an ordinary
@@ -37,8 +37,9 @@ const AUDITLOG_SUGGESTION_FALLBACK_MIN_QUERY_LENGTH: {
 const URL_ORIGIN_PATTERN = /^[a-z][a-z\d+.-]*:\/\/[^/?#]*/i;
 
 const toEndpointSearchPath = (q: string): string => {
+  // A fragment never reaches the server, so no stored endpoint contains '#'.
   const path = sanitizeEndpointForIndex(
-    q.replace(URL_ORIGIN_PATTERN, ''),
+    q.replace(URL_ORIGIN_PATTERN, '').split('#')[0],
   ).trim();
   if (path === '' || path.startsWith('/')) return path;
   return `/${path}`;

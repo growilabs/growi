@@ -351,6 +351,8 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     'https://wiki.example.com/_api/search?q=foo',
     'http://localhost:3000/_api/search',
     '_api/search?q=foo',
+    'https://wiki.example.com/_api/search#foo',
+    '/_api/search?q=foo#bar',
   ];
 
   it.each(
@@ -391,6 +393,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     '?',
     'https://wiki.example.com',
     'https://wiki.example.com?q=foo',
+    '#foo',
   ])('should return no endpoints without querying either backend when q=%j has no path', async (q) => {
     const result = await searchService.searchAuditlogSuggestions(
       ['endpoint'],
@@ -411,32 +414,17 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
       setupUserModelMock(mockUserModel, []);
     });
 
-    it.each([
-      {
-        field: 'username',
-        q: 'a',
-        expected: { username: { activeUsernames: [], inactiveUsernames: [] } },
-      },
-      { field: 'endpoint', q: '/a', expected: { endpoint: { endpoints: [] } } },
-      {
-        field: 'endpoint',
-        q: '/a?q=foo',
-        expected: { endpoint: { endpoints: [] } },
-      },
-    ] as const)('should return no $field suggestions for q=$q without querying MongoDB', async ({
-      field,
-      q,
-      expected,
-    }) => {
+    it('should return no username suggestions for q=a without querying MongoDB', async () => {
       const result = await searchService.searchAuditlogSuggestions(
-        [field],
-        q,
+        ['username'],
+        'a',
         10,
       );
 
-      expect(result).toEqual(expected);
+      expect(result).toEqual({
+        username: { activeUsernames: [], inactiveUsernames: [] },
+      });
       expect(mockFindSnapshotUsernamesByUsernameRegex).not.toHaveBeenCalled();
-      expect(mockFindEndpointsByEndpointRegex).not.toHaveBeenCalled();
     });
 
     it('should not fall back to MongoDB for a short q when Elasticsearch fails', async () => {
@@ -458,35 +446,48 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     });
   });
 
-  it.each([
-    { field: 'username', q: 'a', hit: 'alice' },
-    { field: 'endpoint', q: '/a', hit: '/_api/v3/pages' },
-  ] as const)('should answer a $field q shorter than the fallback minimum from Elasticsearch', async ({
-    field,
-    q,
-    hit,
-  }) => {
+  it('should answer a username q shorter than the fallback minimum from Elasticsearch', async () => {
     vi.mocked(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
-    ).mockResolvedValueOnce([hit]);
+    ).mockResolvedValueOnce(['alice']);
     setupUserModelMock(mockUserModel, [
       { username: 'alice', status: UserStatus.STATUS_ACTIVE },
     ]);
 
     const result = await searchService.searchAuditlogSuggestions(
-      [field],
+      ['username'],
+      'a',
+      10,
+    );
+
+    expect(result.username?.activeUsernames).toEqual(['alice']);
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).toHaveBeenCalledWith('username', 'a', 10);
+  });
+
+  it.each([
+    { q: '/', pathQ: '/' },
+    { q: '/a', pathQ: '/a' },
+    { q: '/a?q=foo', pathQ: '/a' },
+  ])('should answer a short endpoint q=$q from the MongoDB fallback', async ({
+    q,
+    pathQ,
+  }) => {
+    searchService.isConfiguredOverride = false;
+    mockFindEndpointsByEndpointRegex.mockResolvedValueOnce(['/_api/v3/pages']);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['endpoint'],
       q,
       10,
     );
 
-    expect(
-      field === 'username'
-        ? result.username?.activeUsernames
-        : result.endpoint?.endpoints,
-    ).toEqual([hit]);
-    expect(
-      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
-    ).toHaveBeenCalledWith(field, q, 10);
+    expect(result).toEqual({ endpoint: { endpoints: ['/_api/v3/pages'] } });
+    expect(mockFindEndpointsByEndpointRegex).toHaveBeenCalledWith(pathQ, {
+      offset: 0,
+      limit: 10,
+    });
   });
 
   it('should return {} without calling ES when q is whitespace only', async () => {

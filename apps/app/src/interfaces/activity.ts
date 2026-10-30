@@ -894,6 +894,15 @@ export const isAuditlogSuggestionField = (
   typeof value === 'string' &&
   (AUDITLOG_SUGGESTION_FIELDS as readonly string[]).includes(value);
 
+// Read by both suggestion backends (Elasticsearch and the MongoDB fallback) so
+// they match each field with the same case sensitivity.
+export const AUDITLOG_SUGGESTION_CASE_INSENSITIVE: {
+  readonly [K in AuditlogSuggestionField]: boolean;
+} = {
+  username: true,
+  endpoint: false,
+};
+
 export type AuditlogSuggestionsResponse = {
   username?: { activeUsernames: string[]; inactiveUsernames: string[] };
   endpoint?: { endpoints: string[] };

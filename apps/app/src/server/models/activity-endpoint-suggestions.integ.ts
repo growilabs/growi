@@ -8,7 +8,6 @@ import { Types } from 'mongoose';
 import { sanitizeEndpointForIndex } from '~/server/service/search-delegator/sanitize-endpoint-for-index';
 import { prisma } from '~/utils/prisma';
 
-// A sentinel ip value so cleanup deletes only this suite's rows.
 const TEST_IP = '10.0.0.73';
 
 /** Build a minimal activities record for seeding via prisma.activities.createMany. */
@@ -28,12 +27,15 @@ function makeActivityData(overrides: { endpoint: string }) {
 }
 
 describe('findEndpointsByEndpointRegex', () => {
+  // Clears every row, not just this suite's: the assertions cover the whole
+  // collection, and other integ files in the same worker DB leave activities
+  // with `/_api/v3/...` endpoints behind.
   beforeEach(async () => {
-    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
+    await prisma.activities.deleteMany({});
   });
 
   afterAll(async () => {
-    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
+    await prisma.activities.deleteMany({});
   });
 
   it('returns distinct, prefix-matched endpoints', async () => {

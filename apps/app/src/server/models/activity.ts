@@ -16,6 +16,7 @@ import {
   AllSupportedActions,
   AllSupportedEventModels,
   AllSupportedTargetModels,
+  AUDITLOG_SUGGESTION_CASE_INSENSITIVE,
 } from '~/interfaces/activity';
 
 import loggerFactory from '../../utils/logger';
@@ -310,7 +311,7 @@ type SuggestionFieldSpec = {
 const SNAPSHOT_USERNAME_SUGGESTION: SuggestionFieldSpec = {
   fieldPath: 'snapshot.username',
   groupKey: '$snapshot.username',
-  caseInsensitive: true,
+  caseInsensitive: AUDITLOG_SUGGESTION_CASE_INSENSITIVE.username,
 };
 
 const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
@@ -318,7 +319,7 @@ const ENDPOINT_SUGGESTION: SuggestionFieldSpec = {
   // Mongo-side equivalent of sanitizeEndpointForIndex: the stored endpoint
   // keeps its query string, the ES index does not.
   groupKey: { $arrayElemAt: [{ $split: ['$endpoint', '?'] }, 0] },
-  caseInsensitive: false,
+  caseInsensitive: AUDITLOG_SUGGESTION_CASE_INSENSITIVE.endpoint,
   // The stored endpoint may still carry e.g. `access_token` after the '?'.
   isUnmatchableQuery: (q) => q.includes('?'),
 };
@@ -361,8 +362,8 @@ const AGGREGATE_MAX_TIME_MS = 5000;
 
 // Shared by every suggestion field's ES-fallback method. A new field (e.g.
 // `ip`) also needs entries in the per-field maps keyed by
-// AuditlogSuggestionField (ES fuzzy flag, fallback min length, handler); the
-// type checker flags each one that is missing.
+// AuditlogSuggestionField (case sensitivity, ES fuzzy flag, fallback min
+// length, handler); the type checker flags each one that is missing.
 const findSuggestionValuesByPrefix = async (
   context: Pick<typeof prisma.activities, 'aggregateRaw'>,
   spec: SuggestionFieldSpec,

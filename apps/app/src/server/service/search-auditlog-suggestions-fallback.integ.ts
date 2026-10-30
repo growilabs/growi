@@ -56,11 +56,13 @@ describe('SearchService.searchAuditlogSuggestions() MongoDB fallback (real Prism
   beforeEach(async () => {
     searchService = new UnreachableSearchService();
     searchService.fullTextSearchDelegator = mock<ElasticsearchDelegator>();
-    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
+    // Clears every row: the endpoint assertions are exact, and other integ
+    // files in the same worker DB leave `/_api/...` activities behind.
+    await prisma.activities.deleteMany({});
   });
 
   afterAll(async () => {
-    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
+    await prisma.activities.deleteMany({});
   });
 
   it('resolves username suggestions through the real Prisma extension', async () => {
