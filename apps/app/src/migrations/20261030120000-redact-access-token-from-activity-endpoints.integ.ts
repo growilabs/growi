@@ -64,6 +64,31 @@ describe('redact-access-token-from-activity-endpoints', () => {
     expect(await endpointOf(otherQuery)).toBe('/_api/v3/pages?limit=10');
   });
 
+  it('redacts rows beyond the first batch', async () => {
+    const now = Date.now();
+    // Distinct createdAt: rows share user/target/action, which are unique together with it.
+    const docs = Array.from({ length: 1001 }, (_, i) => ({
+      _id: new ObjectId(),
+      __v: 0,
+      action: 'PAGE_CREATE',
+      createdAt: new Date(now + i),
+      endpoint: '/_search?access_token=secret',
+      ip: '10.0.0.94',
+      snapshot: { _id: new ObjectId() },
+    }));
+    createdIds.push(...docs.map((doc) => doc._id));
+    await collection.insertMany(docs);
+
+    await migrate.up();
+
+    expect(
+      await collection.countDocuments({
+        _id: { $in: createdIds },
+        endpoint: '/_search?access_token=secret',
+      }),
+    ).toBe(0);
+  });
+
   it('fails instead of completing when a batch reports write errors', async () => {
     await insertActivity('/_search?access_token=secret');
     await mongoose.connection.db?.command({

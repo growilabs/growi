@@ -25,12 +25,17 @@ export async function up() {
   let redactedCount = 0;
 
   for (;;) {
+    // A `gt` filter rather than a Prisma cursor: the TTL index can delete the
+    // last row read (the oldest rows go first), and a missing cursor row
+    // would end the loop early.
     const rows = await prisma.activities.findMany({
-      where: { endpoint: { contains: '?' } },
+      where: {
+        endpoint: { contains: '?' },
+        ...(cursorId == null ? {} : { id: { gt: cursorId } }),
+      },
       select: { id: true, endpoint: true },
       orderBy: { id: 'asc' },
       take: BATCH_SIZE,
-      ...(cursorId == null ? {} : { cursor: { id: cursorId }, skip: 1 }),
     });
     if (rows.length === 0) break;
 

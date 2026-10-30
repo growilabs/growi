@@ -14,7 +14,7 @@ import { sanitizeEndpointForIndex } from './search-delegator/sanitize-endpoint-f
 
 const logger = loggerFactory('growi:service:search-auditlog-suggestions');
 
-type AuditlogSuggestionBackend = Pick<
+export type AuditlogSuggestionBackend = Pick<
   SearchService,
   'isReachable' | 'fullTextSearchDelegator'
 >;
@@ -28,7 +28,8 @@ const AUDITLOG_SUGGESTION_FALLBACK_MIN_QUERY_LENGTH: {
   username: 2,
   // Nearly every endpoint shares the `/_api/` prefix, so no length short of
   // `/_api/v3/` narrows the scan; the fallback's load is bounded by maxTimeMS
-  // instead, and '/' answers like ES does.
+  // instead, and '/' answers like ES does. Never rejects anything: the
+  // endpoint handler already returns early on an empty path.
   endpoint: 1,
 };
 

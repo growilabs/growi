@@ -320,9 +320,6 @@ const buildSnapshotUsernameSubstringMatchStage = (q: string) => ({
 type SuggestionFieldSpec = {
   readonly fieldPath: string;
   readonly groupKey: Prisma.InputJsonValue;
-  // A case-insensitive regex can't be turned into index bounds, so it scans
-  // every key of the field's index.
-  readonly caseInsensitive: boolean;
 };
 
 const SUGGESTION_FIELD_SPECS: {
@@ -331,14 +328,12 @@ const SUGGESTION_FIELD_SPECS: {
   username: {
     fieldPath: 'snapshot.username',
     groupKey: '$snapshot.username',
-    caseInsensitive: AUDITLOG_SUGGESTION_CASE_INSENSITIVE.username,
   },
   endpoint: {
     fieldPath: 'endpoint',
     // Mongo-side equivalent of sanitizeEndpointForIndex: the stored endpoint
     // keeps its query string, the ES index does not.
     groupKey: { $arrayElemAt: [{ $split: ['$endpoint', '?'] }, 0] },
-    caseInsensitive: AUDITLOG_SUGGESTION_CASE_INSENSITIVE.endpoint,
   },
 };
 
@@ -347,24 +342,33 @@ const SNAPSHOT_USERNAME_GROUP_STAGE = {
 };
 
 // Prefix-only, unlike ES's fuzzy match for username: MongoDB has no native
-// fuzzy match.
-const buildFieldPrefixMatchStage = (spec: SuggestionFieldSpec, q: string) => ({
+// fuzzy match. A case-insensitive regex can't be turned into index bounds, so
+// it scans every key of the field's index.
+const buildFieldPrefixMatchStage = (
+  field: AuditlogSuggestionField,
+  q: string,
+) => ({
   $match: {
-    [spec.fieldPath]: {
+    [SUGGESTION_FIELD_SPECS[field].fieldPath]: {
       $regex: `^${escapeSuggestionQuery(q)}`,
-      ...(spec.caseInsensitive ? { $options: 'i' } : {}),
+      ...(AUDITLOG_SUGGESTION_CASE_INSENSITIVE[field] ? { $options: 'i' } : {}),
     },
   },
 });
 
 const buildFieldSuggestionPipeline = (
-  spec: SuggestionFieldSpec,
+  field: AuditlogSuggestionField,
   q: string,
   { offset, limit }: { offset: number; limit: number },
 ) => {
   return [
-    buildFieldPrefixMatchStage(spec, q),
-    { $group: { _id: spec.groupKey, count: { $sum: 1 } } },
+    buildFieldPrefixMatchStage(field, q),
+    {
+      $group: {
+        _id: SUGGESTION_FIELD_SPECS[field].groupKey,
+        count: { $sum: 1 },
+      },
+    },
     // ES's terms aggregation order: doc_count desc, then key asc.
     { $sort: { count: -1, _id: 1 } },
     { $skip: offset },
@@ -377,18 +381,16 @@ const buildFieldSuggestionPipeline = (
 const AGGREGATE_MAX_TIME_MS = 5000;
 
 // Shared by every suggestion field's ES-fallback method. A new field (e.g.
-// `ip`) also needs entries in the per-field maps keyed by
-// AuditlogSuggestionField (case sensitivity, ES fuzzy flag, fallback min
-// length, handler, SUGGESTION_FIELD_SPECS); the type checker flags each one
-// that is missing.
+// `ip`) needs an entry in every map keyed by AuditlogSuggestionField; the type
+// checker flags each one that is missing.
 const findSuggestionValuesByPrefix = async (
   context: Pick<typeof prisma.activities, 'aggregateRaw'>,
-  spec: SuggestionFieldSpec,
+  field: AuditlogSuggestionField,
   q: string,
   option: { offset: number; limit: number },
 ): Promise<string[]> => {
   const raw = await context.aggregateRaw({
-    pipeline: buildFieldSuggestionPipeline(spec, q, option),
+    pipeline: buildFieldSuggestionPipeline(field, q, option),
     options: { maxTimeMS: AGGREGATE_MAX_TIME_MS },
   });
 
@@ -570,7 +572,7 @@ export const extension = Prisma.defineExtension((client) => {
         ): Promise<string[]> {
           return findSuggestionValuesByPrefix(
             Prisma.getExtensionContext<typeof prisma.activities>(this),
-            SUGGESTION_FIELD_SPECS.username,
+            'username',
             q,
             option,
           );
@@ -586,7 +588,7 @@ export const extension = Prisma.defineExtension((client) => {
         ): Promise<string[]> {
           return findSuggestionValuesByPrefix(
             Prisma.getExtensionContext<typeof prisma.activities>(this),
-            SUGGESTION_FIELD_SPECS.endpoint,
+            'endpoint',
             q,
             option,
           );
