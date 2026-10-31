@@ -119,6 +119,7 @@ function makePageSnapshot(
   markdownBody: string,
 ): PageBulkExportPageSnapshotWithRevision {
   return mock<PageBulkExportPageSnapshotWithRevision>({
+    id: `id:${pagePath}`,
     path: pagePath,
     revision: mock<revisions>({ body: markdownBody }),
   });
@@ -311,7 +312,7 @@ describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3
           },
         },
       ],
-      [{ where: { path: { gt: '/new/page' } } }],
+      [{ cursor: { id: 'id:/new/page' }, skip: 1 }],
     ]);
     expect(fs.readFileSync(path.join(tmpDir, 'new/page.md'), 'utf8')).toBe(
       '# new',
@@ -333,7 +334,8 @@ describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3
       ],
       [
         expect.objectContaining({
-          where: expect.objectContaining({ path: { gt: '/first' } }),
+          cursor: { id: 'id:/first' },
+          skip: 1,
         }),
       ],
     ]);
@@ -353,8 +355,8 @@ describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3
 
     expect(findManySnapshots.mock.calls).toMatchObject([
       [{ take: 2 }],
-      [{ take: 2, where: { path: { gt: '/b' } } }],
-      [{ take: 2, where: { path: { gt: '/c' } } }],
+      [{ take: 2, cursor: { id: 'id:/b' }, skip: 1 }],
+      [{ take: 2, cursor: { id: 'id:/c' }, skip: 1 }],
     ]);
     expect(fs.readdirSync(tmpDir).sort()).toEqual(['a.md', 'b.md', 'c.md']);
   });

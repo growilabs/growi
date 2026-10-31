@@ -37,26 +37,32 @@ type PageSnapshot = Prisma.pagebulkexportpagesnapshotsGetPayload<{
   include: { revision: true };
 }>;
 
-// Keyset pagination keeps memory bounded by batchSize.
+// Keyset pagination keeps memory bounded by batchSize. `id` breaks ties between
+// snapshots sharing a path (`pages.path` is not unique), so a batch boundary
+// that splits them never skips one.
 async function* streamPageSnapshots(
   jobId: string,
   lastExportedPagePath: string | null,
   batchSize: number,
 ): AsyncGenerator<PageSnapshot> {
-  let cursorPath = lastExportedPagePath;
+  let cursorId: string | null = null;
   for (;;) {
-    const batch = await prisma.pagebulkexportpagesnapshots.findMany({
-      where: {
-        pageBulkExportJobId: jobId,
-        ...(cursorPath != null && { path: { gt: cursorPath } }),
-      },
-      include: { revision: true },
-      orderBy: { path: 'asc' },
-      take: batchSize,
-    });
+    const batch: PageSnapshot[] =
+      await prisma.pagebulkexportpagesnapshots.findMany({
+        where: {
+          pageBulkExportJobId: jobId,
+          ...(lastExportedPagePath != null && {
+            path: { gt: lastExportedPagePath },
+          }),
+        },
+        include: { revision: true },
+        orderBy: [{ path: 'asc' }, { id: 'asc' }],
+        take: batchSize,
+        ...(cursorId != null && { cursor: { id: cursorId }, skip: 1 }),
+      });
     if (batch.length === 0) return;
     yield* batch;
-    cursorPath = batch[batch.length - 1].path;
+    cursorId = batch[batch.length - 1].id;
   }
 }
 
