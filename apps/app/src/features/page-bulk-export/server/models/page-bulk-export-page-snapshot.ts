@@ -6,17 +6,9 @@ import { getOrCreateModel } from '~/server/util/mongoose-utils';
 // TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
 // Until then, use mongoose to automatically create collections and indexes when connected.
 const pageBulkExportPageSnapshotSchema = new Schema({
-  pageBulkExportJob: {
-    type: Schema.Types.ObjectId,
-    ref: 'PageBulkExportJob',
-    required: true,
-  },
+  pageBulkExportJob: { type: Schema.Types.ObjectId, ref: 'PageBulkExportJob' },
   path: { type: String, required: true },
-  revision: {
-    type: Schema.Types.ObjectId,
-    ref: 'Revision',
-    required: true,
-  },
+  revision: { type: Schema.Types.ObjectId, ref: 'Revision' },
 });
 
 getOrCreateModel(

@@ -408,10 +408,14 @@ model pagebulkexportpagesnapshots {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  pageBulkExportJob pagebulkexportjobs? @relation(fields: [pageBulkExportJobId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // SetNull (not NoAction): Prisma would otherwise reject the job hard-delete while
+  // a snapshot still references it; a leftover snapshot is orphaned instead
+  pageBulkExportJob pagebulkexportjobs? @relation(fields: [pageBulkExportJobId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   // SetNull (not NoAction): Prisma would otherwise reject the revision hard-delete
   // while a snapshot still references it; the export skips snapshots whose revision is gone
   revision          revisions?          @relation(fields: [revisionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([pageBulkExportJobId, path, id], map: "pageBulkExportJob_1_path_1__id_1")
 }
 
 model pageoperations {

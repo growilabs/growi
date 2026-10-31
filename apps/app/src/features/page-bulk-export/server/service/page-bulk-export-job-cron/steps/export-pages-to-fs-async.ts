@@ -37,7 +37,7 @@ type PageSnapshot = Prisma.pagebulkexportpagesnapshotsGetPayload<{
   include: { revision: true };
 }>;
 
-// Keyset pagination keeps memory bounded by batchSize, like the cursor it replaces.
+// Keyset pagination keeps memory bounded by batchSize.
 async function* streamPageSnapshots(
   jobId: string,
   lastExportedPagePath: string | null,
