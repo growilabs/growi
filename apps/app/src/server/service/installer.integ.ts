@@ -35,6 +35,10 @@ describe('InstallerService.install', () => {
     }, 10_000);
   });
 
+  // install() runs its own DB-config update, a page create, a user create,
+  // an admin grant, and five more page creates in series (InstallerService
+  // #createInitialPages) -- that many real round-trips can exceed the
+  // project's default 5000ms testTimeout under CI load (#12193).
   it('has created the first admin user and their homepage by the time install resolves', async () => {
     const adminUser = await installer.install(ADMIN, 'en_US');
 
@@ -49,5 +53,5 @@ describe('InstallerService.install', () => {
       .model<IPage>('Page')
       .findOne({ path: `/user/${ADMIN.username}` });
     expect(homepage).not.toBeNull();
-  });
+  }, 15_000);
 });
