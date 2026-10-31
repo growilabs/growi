@@ -384,18 +384,38 @@ model pagebulkexportjobs {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
-  user       users        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  page       pages?       @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user                        users                         @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page                        pages?                        @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   // SetNull (not NoAction): the cleanup removes the attachment before deleting the
   // job so that a failed removal leaves the job row for the next cron to retry.
   // NoAction would make Prisma reject deleting an attachment a job still references.
-  attachment attachments? @relation(fields: [attachmentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  attachment                  attachments?                  @relation(fields: [attachmentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  pagebulkexportpagesnapshots pagebulkexportpagesnapshots[]
 
   @@index([attachmentId], map: "attachment_1")
 }
 
 model pagebulkexportpagesnapshots {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  v                   Int      @default(0) @map("__v")
+  // optional: a job row is hard-deleted by PageBulkExportJobCleanUpCronService
+  // after its snapshots are deleted, but the two steps are not atomic
+  pageBulkExportJobId String?  @map("pageBulkExportJob") @db.ObjectId
+  path                String
+  // optional: revisions are hard-deleted on page complete-deletion
+  // (see deleteCompletelyOperation) without cleaning up snapshots
+  revisionId          String?  @map("revision") @db.ObjectId
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // SetNull (not NoAction): Prisma would otherwise reject the job hard-delete while
+  // a snapshot still references it; a leftover snapshot is orphaned instead
+  pageBulkExportJob pagebulkexportjobs? @relation(fields: [pageBulkExportJobId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  // SetNull (not NoAction): Prisma would otherwise reject the revision hard-delete
+  // while a snapshot still references it; the export skips snapshots whose revision is gone
+  revision          revisions?          @relation(fields: [revisionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([pageBulkExportJobId, path, id], map: "pageBulkExportJob_1_path_1__id_1")
 }
 
 model pageoperations {
@@ -520,6 +540,8 @@ model revisions {
   author   users?     @relation(fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   comments comments[]
+
+  pagebulkexportpagesnapshots pagebulkexportpagesnapshots[]
 
   @@index([pageId], map: "pageId_1")
   @@index([authorId, createdAt(sort: Desc)], map: "author_1_createdAt_-1")
