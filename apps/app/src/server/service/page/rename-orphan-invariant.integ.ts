@@ -222,6 +222,9 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     }
   });
 
+  // Builds two five-page trees (one control, one subject) and renames each
+  // -- around a dozen real page-create/rename round-trips in series -- which
+  // can exceed the project's default 5000ms testTimeout under CI load (#12194).
   it('completes the rename, children included, when the final write commits but its acknowledgement is lost', async () => {
     await create(base, 'base body');
     const createTree = async (root: string) => {
@@ -275,7 +278,7 @@ describe('a failed rename must not orphan the page (#9755)', () => {
     expect(await descendantCountsUnder(subject)).toEqual(
       await descendantCountsUnder(control),
     );
-  });
+  }, 20_000);
 
   it('restores the tree unchanged, new empty ancestors included, when renaming to a new location fails', async () => {
     await create(base, 'base body');
