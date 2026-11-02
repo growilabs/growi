@@ -535,7 +535,8 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:attachmentFullTextSearch:timeoutMs': defineConfig<number>({
     envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_TIMEOUT_MS',
-    defaultValue: 60000,
+    // Worst case on the extractor side is upload (15s) + conversion (55s) + cleanup (~4s); stay above it.
+    defaultValue: 90000,
   }),
   'app:attachmentFullTextSearch:maxFileSizeBytes': defineConfig<number>({
     envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_MAX_FILE_SIZE_BYTES',

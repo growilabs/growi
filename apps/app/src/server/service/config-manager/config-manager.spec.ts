@@ -291,10 +291,10 @@ describe('ConfigManager test', () => {
       ).toBeUndefined();
     });
 
-    test('timeoutMs returns 60000 by default', () => {
+    test('timeoutMs returns 90000 by default', () => {
       expect(
         configManager.getConfig('app:attachmentFullTextSearch:timeoutMs'),
-      ).toBe(60000);
+      ).toBe(90000);
     });
 
     test('maxFileSizeBytes returns 52428800 by default', () => {
