@@ -49,10 +49,7 @@ export const factory = (crowi: Crowi): Router => {
       body('filters.usernames').optional({ nullable: true }).isArray(),
       body('filters.usernames.*').optional({ nullable: true }).isString(),
       body('filters.actions').optional({ nullable: true }).isArray(),
-      body('filters.actions.*')
-        .optional({ nullable: true })
-        .isString()
-        .isIn(AllSupportedActions),
+      body('filters.actions.*').isString().isIn(AllSupportedActions),
       body('filters.dateFrom')
         .optional({ nullable: true })
         .isISO8601()
