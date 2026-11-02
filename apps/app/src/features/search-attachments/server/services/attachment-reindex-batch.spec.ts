@@ -15,8 +15,8 @@ import { prisma } from '~/utils/prisma';
 import {
   AttachmentReindexBatch,
   type AttachmentReindexBatchInterface,
-  type FetchAttachmentPage,
-  iterateAllAttachments,
+  type FetchAttachmentIdPage,
+  iterateAllAttachmentIds,
   type ProgressCallback,
   REINDEX_PAGE_SIZE,
 } from './attachment-reindex-batch';
@@ -109,31 +109,51 @@ function makeSocketIoServiceStub() {
   };
 }
 
-/**
- * Backs `prisma.attachments.count` / `findMany` with the given rows. Fixtures
- * stay below one page, so a single `findMany` call returns them all; paging
- * across pages is covered by the `iterateAllAttachments` tests.
- */
-function setupAttachmentMock(attachments: AttachmentWithComputed[]): void {
-  vi.spyOn(prisma.attachments, 'count').mockResolvedValue(attachments.length);
-  vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue(attachments);
-}
-
-/** In-memory keyset page source: rows with id > afterId, ascending, up to take. */
-function makeFetchPage(
+/** In-memory keyset id-page source: ids > afterId, ascending, up to take. */
+function makeFetchIdPage(
   attachments: AttachmentWithComputed[],
-): FetchAttachmentPage {
-  const table = [...attachments].sort((x, y) => x.id.localeCompare(y.id));
+): FetchAttachmentIdPage {
+  const ids = attachments.map((a) => a.id).sort((x, y) => x.localeCompare(y));
   return async (afterId, take) =>
-    table.filter((a) => afterId == null || a.id > afterId).slice(0, take);
+    ids.filter((id) => afterId == null || id > afterId).slice(0, take);
 }
 
-async function collectIds(
-  iterable: AsyncIterable<AttachmentWithComputed>,
-): Promise<string[]> {
+/**
+ * Backs `prisma.attachments.count` / `findMany` (id paging, honouring
+ * `where.id.gt` and `take`) / `findUnique` with the given rows. Ids listed in
+ * `unloadable` make `findUnique` reject, like a row that violates the schema.
+ */
+function setupAttachmentMock(
+  attachments: AttachmentWithComputed[],
+  unloadable: string[] = [],
+): void {
+  vi.spyOn(prisma.attachments, 'count').mockResolvedValue(attachments.length);
+  vi.spyOn(prisma.attachments, 'findMany').mockImplementation((async (args: {
+    where?: { id?: { gt?: string } };
+    take?: number;
+  }) => {
+    const ids = await makeFetchIdPage(attachments)(
+      args.where?.id?.gt ?? null,
+      args.take ?? attachments.length,
+    );
+    return ids.map((id) => ({ id }));
+    // biome-ignore lint/suspicious/noExplicitAny: Prisma's generic return type cannot be satisfied by a plain stub
+  }) as any);
+  vi.spyOn(prisma.attachments, 'findUnique').mockImplementation(((args: {
+    where: { id: string };
+  }) =>
+    unloadable.includes(args.where.id)
+      ? Promise.reject(new Error('Error converting field "createdAt"'))
+      : Promise.resolve(
+          attachments.find((a) => a.id === args.where.id) ?? null,
+          // biome-ignore lint/suspicious/noExplicitAny: Prisma's generic return type cannot be satisfied by a plain stub
+        )) as any);
+}
+
+async function collectIds(iterable: AsyncIterable<string>): Promise<string[]> {
   const ids: string[] = [];
-  for await (const a of iterable) {
-    ids.push(a.id);
+  for await (const id of iterable) {
+    ids.push(id);
   }
   return ids;
 }
@@ -266,7 +286,63 @@ describe('AttachmentReindexBatch', () => {
       ]);
     });
 
-    it('drops and recreates the target index before walking the cursor', async () => {
+    it('indexes every row of a multi-page collection exactly once', async () => {
+      const attachments = Array.from(
+        { length: REINDEX_PAGE_SIZE * 2 + 5 },
+        (_, i) =>
+          makeAttachment({ id: `attach-${String(i).padStart(5, '0')}` }),
+      );
+      setupAttachmentMock(attachments);
+      extractor.extractAttachment.mockResolvedValue({
+        kind: 'success',
+        pages: [{ pageNumber: 1, label: 'Page 1', content: 'x' }],
+        mimeType: 'application/pdf',
+      });
+      const progress = vi.fn();
+
+      await batch.addAllAttachments('attachments-tmp', progress);
+
+      const extractedIds = extractor.extractAttachment.mock.calls.map(
+        ([id]) => id,
+      );
+      expect(extractedIds).toEqual(attachments.map((a) => a.id));
+      expect(progress).toHaveBeenLastCalledWith(
+        attachments.length,
+        attachments.length,
+      );
+    });
+
+    it('keeps indexing later rows when one row cannot be loaded', async () => {
+      const attachments = ['attach-001', 'attach-002', 'attach-003'].map((id) =>
+        makeAttachment({ id }),
+      );
+      setupAttachmentMock(attachments, ['attach-002']);
+      extractor.extractAttachment.mockResolvedValue({
+        kind: 'success',
+        pages: [{ pageNumber: 1, label: 'Page 1', content: 'x' }],
+        mimeType: 'application/pdf',
+      });
+      const progress = vi.fn();
+
+      await batch.addAllAttachments('attachments-tmp', progress);
+
+      expect(extractor.extractAttachment.mock.calls.map(([id]) => id)).toEqual([
+        'attach-001',
+        'attach-003',
+      ]);
+      expect(delegatorExt.syncAttachmentIndexed).toHaveBeenCalledTimes(2);
+      expect(progress).toHaveBeenLastCalledWith(3, 3);
+      expect(socketIoService._emit).not.toHaveBeenCalledWith(
+        SocketEventName.RebuildingFailed,
+        expect.anything(),
+      );
+      expect(socketIoService._emit).toHaveBeenCalledWith(
+        SocketEventName.FinishAddAttachment,
+        { totalCount: 3, count: 3 },
+      );
+    });
+
+    it('drops and recreates the target index before paging through attachments', async () => {
       setupAttachmentMock([]);
 
       await batch.addAllAttachments('attachments-tmp', vi.fn());
@@ -281,7 +357,7 @@ describe('AttachmentReindexBatch', () => {
   // -------------------------------------------------------------------------
   // 3b. iterateAllAttachments — walks every row across page boundaries
   // -------------------------------------------------------------------------
-  describe('iterateAllAttachments', () => {
+  describe('iterateAllAttachmentIds', () => {
     const makeAttachments = (count: number): AttachmentWithComputed[] =>
       Array.from({ length: count }, (_, i) =>
         makeAttachment({ id: `attach-${String(i).padStart(5, '0')}` }),
@@ -297,28 +373,30 @@ describe('AttachmentReindexBatch', () => {
       const attachments = makeAttachments(count);
 
       const ids = await collectIds(
-        iterateAllAttachments(makeFetchPage([...attachments].reverse()), 2),
+        iterateAllAttachmentIds(makeFetchIdPage([...attachments].reverse()), 2),
       );
 
       expect(ids).toEqual(attachments.map((a) => a.id));
     });
 
-    it('asks prisma for the rows after the last id of the previous page', async () => {
+    it('asks prisma for the ids after the last id of the previous page', async () => {
       const firstPage = makeAttachments(REINDEX_PAGE_SIZE);
       const findMany = vi
         .spyOn(prisma.attachments, 'findMany')
-        .mockResolvedValueOnce(firstPage)
+        .mockResolvedValueOnce(firstPage.map(({ id }) => ({ id })) as never)
         .mockResolvedValueOnce([]);
 
-      const ids = await collectIds(iterateAllAttachments());
+      const ids = await collectIds(iterateAllAttachmentIds());
 
       expect(ids).toHaveLength(REINDEX_PAGE_SIZE);
       expect(findMany).toHaveBeenNthCalledWith(1, {
+        select: { id: true },
         where: {},
         orderBy: { id: 'asc' },
         take: REINDEX_PAGE_SIZE,
       });
       expect(findMany).toHaveBeenNthCalledWith(2, {
+        select: { id: true },
         where: { id: { gt: firstPage.at(-1)?.id } },
         orderBy: { id: 'asc' },
         take: REINDEX_PAGE_SIZE,

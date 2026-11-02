@@ -3,7 +3,7 @@
  *
  * Lifecycle (managed by the API route, task 8.6):
  *   1. API route calls `begin(tmpIndexName)` → sets rebuilding flag
- *   2. API route calls `addAllAttachments(tmpIndexName, progress)` → streams MongoDB cursor
+ *   2. API route calls `addAllAttachments(tmpIndexName, progress)` → pages through MongoDB attachment ids
  *   3. API route calls `end()` → clears flag
  *
  * Design constraints:
@@ -56,30 +56,36 @@ export const REINDEX_PAGE_SIZE = 100;
 // ---- Internal helpers -------------------------------------------------------
 
 /**
- * Fetches up to `take` attachment rows whose `_id` is greater than `afterId`
- * (or from the start when null), in ascending `_id` order.
+ * Fetches up to `take` attachment ids greater than `afterId` (or from the
+ * start when null), in ascending order.
  */
-export type FetchAttachmentPage = (
+export type FetchAttachmentIdPage = (
   afterId: string | null,
   take: number,
-) => Promise<AttachmentWithComputed[]>;
+) => Promise<string[]>;
 
-const fetchAttachmentPage: FetchAttachmentPage = (afterId, take) =>
-  prisma.attachments.findMany({
+// Only ids are paged: Prisma rejects a whole `findMany` result when any single
+// row violates the schema, so full rows are loaded one by one inside the
+// per-row try/catch and a malformed row can only fail itself.
+const fetchAttachmentIdPage: FetchAttachmentIdPage = async (afterId, take) => {
+  const rows = await prisma.attachments.findMany({
+    select: { id: true },
     where: afterId != null ? { id: { gt: afterId } } : {},
     orderBy: { id: 'asc' },
     take,
   });
+  return rows.map((row) => row.id);
+};
 
 /**
- * Yields every attachment row once, in ascending `_id` order, one page at a
- * time. Pages by `_id > lastId` (keyset) rather than by offset so concurrent
+ * Yields every attachment id once, in ascending order, one page at a time.
+ * Pages by `id > lastId` (keyset) rather than by offset so concurrent
  * inserts/deletes cannot shift rows between pages.
  */
-export async function* iterateAllAttachments(
-  fetchPage: FetchAttachmentPage = fetchAttachmentPage,
+export async function* iterateAllAttachmentIds(
+  fetchPage: FetchAttachmentIdPage = fetchAttachmentIdPage,
   pageSize: number = REINDEX_PAGE_SIZE,
-): AsyncGenerator<AttachmentWithComputed> {
+): AsyncGenerator<string> {
   let lastId: string | null = null;
   while (true) {
     // biome-ignore lint/performance/noAwaitInLoops: pagination is inherently sequential — each page needs the previous page's last id
@@ -88,7 +94,7 @@ export async function* iterateAllAttachments(
     if (page.length < pageSize) {
       return;
     }
-    lastId = page[page.length - 1].id;
+    lastId = page[page.length - 1];
   }
 }
 
@@ -175,7 +181,7 @@ function buildDocs(
 
 /**
  * Orchestrates a full rebuild of the attachment ES index by:
- * 1. Walking the full MongoDB Attachment cursor.
+ * 1. Paging through every MongoDB Attachment id.
  * 2. Calling the text extractor for each attachment.
  * 3. Writing ES docs via `syncAttachmentIndexed`.
  * 4. Recording failures via `failureLogService`.
@@ -239,6 +245,49 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
     return this._tmpIndexName;
   }
 
+  /** Loads one attachment, extracts its text and upserts its ES docs. */
+  private async indexAttachment(
+    attachmentId: string,
+    targetIndex: string,
+  ): Promise<void> {
+    const attachment = await prisma.attachments.findUnique({
+      where: { id: attachmentId },
+    });
+    if (attachment == null) {
+      // Deleted after its id was paged
+      return;
+    }
+
+    const outcome = await this.extractor.extractAttachment(attachmentId);
+    const docs = buildDocs(attachment, outcome);
+
+    // Upsert ES docs (success and failure alike get a metadata doc)
+    await this.delegatorExt.syncAttachmentIndexed(
+      attachmentId,
+      docs[0]?.pageId ?? '',
+      docs,
+      [targetIndex],
+    );
+
+    // Record failure for non-success outcomes
+    if (outcome.kind !== 'success') {
+      const reasonCode = outcomeToReasonCode(outcome.kind);
+      if (reasonCode != null) {
+        const message = outcome.kind === 'failed' ? outcome.message : null;
+        await this.failureLogService.record({
+          attachmentId,
+          pageId: attachment.pageId,
+          fileName: attachment.fileName,
+          fileFormat: attachment.fileFormat,
+          fileSize: attachment.fileSize,
+          reasonCode,
+          message,
+          occurredAt: new Date(),
+        });
+      }
+    }
+  }
+
   // ---- Bulk indexing ---------------------------------------------------------
 
   /**
@@ -247,8 +296,8 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
    *
    * Algorithm:
    * 1. Drop and recreate `targetIndex` (idempotent fresh start).
-   * 2. Walk the cursor — for each attachment:
-   *    a. Call extractor.
+   * 2. Page through all attachment ids — for each attachment:
+   *    a. Load the row, then call extractor.
    *    b. On success: build docs → `syncAttachmentIndexed`.
    *    c. On failure: build metadata-only doc → `syncAttachmentIndexed` +
    *       `failureLogService.record`. Log and continue.
@@ -276,45 +325,15 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
 
       logger.info(
         { targetIndex, total },
-        'addAllAttachments: starting cursor walk',
+        'addAllAttachments: starting paged walk',
       );
 
       let processed = 0;
 
-      // Step 3: Walk every attachment page by page
-      for await (const attachment of iterateAllAttachments()) {
-        const attachmentId = attachment.id;
-
+      // Step 3: Page through every attachment id
+      for await (const attachmentId of iterateAllAttachmentIds()) {
         try {
-          const outcome = await this.extractor.extractAttachment(attachmentId);
-          const docs = buildDocs(attachment, outcome);
-
-          // Upsert ES docs (success and failure alike get a metadata doc)
-          await this.delegatorExt.syncAttachmentIndexed(
-            attachmentId,
-            docs[0]?.pageId ?? '',
-            docs,
-            [targetIndex],
-          );
-
-          // Record failure for non-success outcomes
-          if (outcome.kind !== 'success') {
-            const reasonCode = outcomeToReasonCode(outcome.kind);
-            if (reasonCode != null) {
-              const message =
-                outcome.kind === 'failed' ? outcome.message : null;
-              await this.failureLogService.record({
-                attachmentId,
-                pageId: attachment.pageId,
-                fileName: attachment.fileName,
-                fileFormat: attachment.fileFormat,
-                fileSize: attachment.fileSize,
-                reasonCode,
-                message,
-                occurredAt: new Date(),
-              });
-            }
-          }
+          await this.indexAttachment(attachmentId, targetIndex);
         } catch (err) {
           // Individual failure — log and continue
           logger.error(
