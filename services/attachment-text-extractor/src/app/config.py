@@ -49,6 +49,12 @@ class Settings(BaseSettings):
             PPTX / XLSX (Req 2.6).
         MAX_ARCHIVE_UNCOMPRESSED_MB (int, default 512): Maximum declared
             uncompressed size of a ZIP archive (Req 2.6).
+        MAX_CSV_BYTES (int, default 8 MiB): Maximum size of a CSV / TSV file,
+            checked before a conversion child is started (Req 2.6).  anydoc
+            needs about 36x the input, so a larger CSV would not fit under the
+            default MAX_CHILD_RSS_MB anyway.
+        MAX_HTML_BYTES (int, default 20 MiB): Maximum size of an HTML file,
+            checked before a conversion child is started (Req 2.6).
         LOG_LEVEL (str, default "INFO"): Python ``logging`` level name for the
             ``app`` loggers; an unknown name fails at startup.
     """
@@ -64,6 +70,8 @@ class Settings(BaseSettings):
     MAX_PDF_PAGES: int = 5000
     MAX_ARCHIVE_ENTRIES: int = 10_000
     MAX_ARCHIVE_UNCOMPRESSED_MB: int = 512
+    MAX_CSV_BYTES: int = Field(default=8 * 1024 * 1024, gt=0)
+    MAX_HTML_BYTES: int = Field(default=20 * 1024 * 1024, gt=0)
 
     # --- Observability ---
     LOG_LEVEL: str = "INFO"

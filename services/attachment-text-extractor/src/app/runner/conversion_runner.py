@@ -24,7 +24,9 @@ from multiprocessing.connection import Connection
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Final
 
-from app.conversion.limits import ConversionLimits
+from app.conversion.errors import ConversionError, ConversionFailure
+from app.conversion.formats import resolve_format
+from app.conversion.limits import ConversionLimits, check_input_size
 from app.conversion.results import ConversionOutcome
 from app.runner.child_entry import ChildParams, child_main
 from app.runner.child_supervision import ChildTarget, SupervisionTimings, run_child
@@ -153,12 +155,17 @@ class ConversionRunner:
         """Convert in a fresh child; never raises for anything the child does.
 
         Preconditions (the caller's job): a concurrency slot is held and the size is checked.
+        An input over its format's size cap (CSV / TSV, HTML) is answered with `limit_exceeded`
+        without starting a child.
         Postcondition: the child is killed and reaped when this returns, and also when the
         awaiting task is cancelled (the CancelledError propagates). The outcome carries the
         child's peak RSS in `child_peak_rss_mb` (None when it could not be sampled).
         """
         if self._run_limits is None:
             raise RuntimeError("ConversionRunner was built without request limits; use from_settings()")
+        rejected = _reject_before_spawn(request, self._run_limits.limits)
+        if rejected is not None:
+            return rejected
         params = ChildParams(
             filename=request.filename,
             mime_hint=request.mime_hint,
@@ -289,6 +296,19 @@ class ConversionRunner:
         if self._forkserver_pidfd is not None:
             os.close(self._forkserver_pidfd)
             self._forkserver_pidfd = None
+
+
+def _reject_before_spawn(request: ConversionRequest, limits: ConversionLimits) -> ConversionFailure | None:
+    try:
+        resolved = resolve_format(request.filename, request.mime_hint)
+    except ConversionError:
+        # An unsupported format is still reported by the child, as before; only the size caps move here.
+        return None
+    try:
+        check_input_size(resolved, len(request.data), limits)
+    except ConversionError as exc:
+        return ConversionFailure(kind=exc.kind, detail=exc.detail)
+    return None
 
 
 class _ProbeAttempt:

@@ -10,7 +10,9 @@ Processing order:
   4. Body received under the slot (app.routers.extract_upload): capped while it streams in
      (413), deadlined (408), held in memory only
   5. ConversionRunner.run() in a child process; the outcome is mapped per
-     app.routers.extract_errors. No conversion library is called here.
+     app.routers.extract_errors. No conversion library is called here. A client that
+     disconnects meanwhile has its conversion cancelled (the runner kills and reaps the
+     child) before the slot is released.
 
 Requirements: 1.1, 1.6, 1.10, 1.11, 2.1, 2.2, 2.3, 2.6, 2.7, 4.2
 """
@@ -30,6 +32,7 @@ from starlette.requests import ClientDisconnect
 from app.conversion.errors import ConversionFailure
 from app.conversion.results import ConversionSuccess
 from app.limits import FileTooLargeError, Limits, ServiceBusyError
+from app.routers.client_disconnect import run_while_connected
 from app.routers.extract_errors import FAILURE_RESPONSES
 from app.routers.extract_upload import (
     FILE_FIELD,
@@ -70,6 +73,7 @@ FORM_SCHEMA: Final[dict[str, Any]] = {
 _INVALID_UPLOAD_MESSAGE: Final = "The request must be a multipart/form-data body with one 'file' part"
 _UPLOAD_TIMEOUT_MESSAGE: Final = "upload_timeout: the request body was not received in time"
 _DISCONNECTED_MESSAGE: Final = "client_disconnected: the request body ended early"
+_ABANDONED_MESSAGE: Final = "client_disconnected: the client went away before the conversion finished"
 
 
 def get_runner(request: Request) -> ConversionRunner:
@@ -158,7 +162,7 @@ async def post_extract(request: Request) -> JSONResponse | ExtractResponse:
         async with limits.acquire_slot():
             upload = await receive_upload(request, limits)
             log.fmt, log.size = _format_of(upload.filename), len(upload.data)
-            return await _convert(get_runner(request), upload, log)
+            return await _convert(request, upload, log)
     except ServiceBusyError as exc:
         log.write("service_busy")
         return _error_response(ErrorCode.service_busy, str(exc), 503)
@@ -177,17 +181,21 @@ async def post_extract(request: Request) -> JSONResponse | ExtractResponse:
         return _error_response(ErrorCode.extraction_failed, _DISCONNECTED_MESSAGE, 422)
 
 
-async def _convert(runner: ConversionRunner, upload: Upload, log: _RequestLog) -> JSONResponse | ExtractResponse:
+async def _convert(request: Request, upload: Upload, log: _RequestLog) -> JSONResponse | ExtractResponse:
+    conversion = ConversionRequest(data=upload.data, filename=upload.filename, mime_hint=upload.mime_hint)
     try:
-        outcome = await runner.run(
-            ConversionRequest(data=upload.data, filename=upload.filename, mime_hint=upload.mime_hint)
-        )
+        outcome = await run_while_connected(request.receive, get_runner(request).run(conversion))
     except Exception:
         # The runner is not meant to raise; anything that does is an unexpected failure of this request only.
         logger.exception("extract runner raised format=%s size=%d", log.fmt, log.size)
         log.write("internal")
         code, status, message = FAILURE_RESPONSES["internal"]
         return _error_response(code, message, status)
+
+    if outcome is None:
+        # Nobody is left to read a response; the child is already killed and reaped.
+        log.write("client_disconnected")
+        return _error_response(ErrorCode.extraction_failed, _ABANDONED_MESSAGE, 422)
 
     if isinstance(outcome, ConversionSuccess):
         log.fmt = outcome.mime_type

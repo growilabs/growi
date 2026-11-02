@@ -26,6 +26,8 @@ import httpx
 TOKEN = "live-server-token-5d1e"  # noqa: S105 — test credential
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 SERVICE_DIR = Path(__file__).parents[1]
+PRODUCTION_APP = "app.main:app"
+_TEST_PATHS = (SERVICE_DIR / "tests", SERVICE_DIR / "tests" / "runner")
 _READY_TIMEOUT_S = 30.0
 _STOP_TIMEOUT_S = 20.0
 
@@ -77,11 +79,15 @@ def _wait_ready(server: LiveServer) -> None:
 
 
 @contextmanager
-def live_server(env: Mapping[str, object] | None = None, *, tmp_root: str | None = None) -> Iterator[LiveServer]:
+def live_server(
+    env: Mapping[str, object] | None = None, *, tmp_root: str | None = None, app: str = PRODUCTION_APP
+) -> Iterator[LiveServer]:
     """Start uvicorn with `env` on top of the current environment and a private, short TMPDIR.
 
     `tmp_root` is where TMPDIR is created (it must stay short: the forkserver socket path is
-    limited to 108 bytes). The whole process group is killed on exit, so nothing outlives the test.
+    limited to 108 bytes). `app` other than the production entry (e.g. `live_apps:app`) is
+    imported with tests/ and tests/runner/ on PYTHONPATH. The whole process group is killed on
+    exit, so nothing outlives the test.
     """
     tmpdir = Path(tempfile.mkdtemp(prefix="ate-", dir=tmp_root))
     stderr_path = tmpdir.parent / f"{tmpdir.name}.stderr"
@@ -93,9 +99,13 @@ def live_server(env: Mapping[str, object] | None = None, *, tmp_root: str | None
         "PYTHONUNBUFFERED": "1",
         **{key: str(value) for key, value in (env or {}).items()},
     }
+    if app != PRODUCTION_APP:
+        child_env["PYTHONPATH"] = os.pathsep.join(
+            [*map(str, _TEST_PATHS), *filter(None, [os.environ.get("PYTHONPATH")])]
+        )
     with stderr_path.open("wb") as stderr:
         process = subprocess.Popen(  # noqa: S603 — fixed argv
-            [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port)],
+            [sys.executable, "-m", "uvicorn", app, "--host", "127.0.0.1", "--port", str(port)],
             cwd=SERVICE_DIR,
             env=child_env,
             stdout=subprocess.DEVNULL,

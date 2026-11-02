@@ -445,9 +445,10 @@ def _csv_20mb() -> bytes:
     ],
 )
 async def test_text_inputs_that_blow_up_in_memory_are_stopped_and_the_next_run_succeeds(
-    make_runner: RunnerFactory, build: Callable[[], bytes], filename: str, kind: str
+    make_runner: RunnerFactory, default_settings: Settings, build: Callable[[], bytes], filename: str, kind: str
 ):
-    runner = await make_runner()
+    # The size caps are lifted so these show the RSS limit itself; the pathological HTML is far below the cap anyway.
+    runner = await make_runner(limits=_without_input_size_caps(default_settings))
     outcome = await _run(runner, build(), filename)
     after = await _run(runner, b"plain text after", "after.txt")
 
@@ -459,14 +460,35 @@ async def test_text_inputs_that_blow_up_in_memory_are_stopped_and_the_next_run_s
 
 @pytest.mark.parametrize(("filename", "kind"), [("big.csv", "memory_exceeded"), ("big.html", "result_too_large")])
 async def test_a_large_docx_sent_as_text_is_stopped_by_the_child_limits(
-    make_runner: RunnerFactory, docx_large_images_path: Path, filename: str, kind: str
+    make_runner: RunnerFactory, default_settings: Settings, docx_large_images_path: Path, filename: str, kind: str
 ):
-    runner = await make_runner()
+    runner = await make_runner(limits=_without_input_size_caps(default_settings))
     outcome = await _run(runner, docx_large_images_path.read_bytes(), filename)
 
     assert isinstance(outcome, ConversionFailure)
     assert outcome.kind == kind
     _assert_nothing_left()
+
+
+@pytest.mark.parametrize("filename", ["big.csv", "big.tsv", "big.html"])
+async def test_with_the_default_caps_large_csv_and_html_never_reach_a_child(
+    make_runner: RunnerFactory, docx_large_images_path: Path, filename: str
+):
+    runner = await make_runner()
+    # The DOCX is larger than both caps; the 20 MiB CSV is larger than the CSV cap only.
+    inputs = [docx_large_images_path.read_bytes()] + ([_csv_20mb()] if filename != "big.html" else [])
+    for data in inputs:
+        outcome = await _run(runner, data, filename)
+
+        assert isinstance(outcome, ConversionFailure)
+        assert outcome.kind == "limit_exceeded"
+        assert outcome.child_peak_rss_mb is None
+    _assert_nothing_left()
+
+
+def _without_input_size_caps(settings: Settings) -> ConversionLimits:
+    any_upload = settings.MAX_FILE_SIZE_MB * MIB
+    return replace(ConversionLimits.from_settings(settings), max_csv_bytes=any_upload, max_html_bytes=any_upload)
 
 
 def _pdf_page_with_four_million_characters() -> bytes:

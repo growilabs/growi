@@ -494,6 +494,58 @@ class TestSizeAndLimitRowsOverHttp:
         _assert_no_stray_children()
 
 
+class TestInputSizeCapsOverHttp:
+    """CSV / TSV and HTML over their size cap are refused before any child process starts."""
+
+    CSV = b"name,qty\napple,3\nbanana,5\n"
+
+    @pytest.mark.parametrize(
+        ("filename", "mime", "env_name"),
+        [
+            ("a.csv", None, "MAX_CSV_BYTES"),
+            ("a.tsv", None, "MAX_CSV_BYTES"),
+            ("a.html", None, "MAX_HTML_BYTES"),
+            ("a.htm", None, "MAX_HTML_BYTES"),
+            ("data", "text/csv", "MAX_CSV_BYTES"),
+        ],
+    )
+    def test_over_the_cap_is_422_without_a_child_and_at_the_cap_reaches_one(
+        self, filename: str, mime: str | None, env_name: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # echo_target answers 200 for whatever reaches it: a 422 can only come from the parent.
+        with _serve({env_name: 1000}, child_target=child_targets.echo_target) as client:
+            with caplog.at_level(logging.INFO, logger="app"):
+                response = _post(client, filename, b"x" * 1001, mime)
+            _assert_error(response, 422, "resource_limit_exceeded", "limit_exceeded")
+            assert response.json()["message"] == "limit_exceeded: the document exceeds a processing limit"
+            lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("extract ")]
+            assert lines[-1].endswith("result=limit_exceeded child_peak_rss_mb=unknown")
+
+            at_cap = _post(client, filename, b"x" * 1000, mime)
+            assert at_cap.status_code == 200
+            assert at_cap.json()["pages"][0]["content"] == "received 1000 bytes"
+            _assert_no_stray_children()
+
+    def test_formats_without_a_cap_are_unaffected(self) -> None:
+        with _serve({"MAX_CSV_BYTES": 10, "MAX_HTML_BYTES": 10}, child_target=child_targets.echo_target) as client:
+            for name in ("a.xml", "a.txt", "a.ipynb", "a.json"):
+                assert _post(client, name, b"x" * 1000).status_code == 200, name
+
+    def test_the_same_file_converts_once_it_fits_the_cap(self) -> None:
+        with _serve({"MAX_CSV_BYTES": len(self.CSV) - 1}) as client:
+            _assert_error(_post(client, "a.csv", self.CSV), 422, "resource_limit_exceeded", "limit_exceeded")
+        with _serve({"MAX_CSV_BYTES": len(self.CSV)}) as client:
+            response = _post(client, "a.csv", self.CSV)
+            assert response.status_code == 200, response.text
+            assert "| banana | 5 |" in response.json()["pages"][0]["content"]
+
+    def test_default_cap_refuses_a_csv_one_byte_over_8_mib(self) -> None:
+        with _serve(child_target=child_targets.echo_target) as client:
+            _assert_error(
+                _post(client, "big.csv", b"a,b\n" * (2 * MIB) + b"x"), 422, "resource_limit_exceeded", "limit_exceeded"
+            )
+
+
 class TestTimeoutRowOverHttp:
     def test_deadline_exceeded_is_408_and_the_next_request_succeeds(self, xlsx_large_for_timeout_path: Path) -> None:
         data = xlsx_large_for_timeout_path.read_bytes()

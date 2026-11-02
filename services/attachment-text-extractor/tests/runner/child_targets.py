@@ -187,6 +187,22 @@ def report_pid_then_hang_target(
     os._exit(0)
 
 
+def pid_file_then_delayed_echo_target(
+    input_conn: Connection, result_conn: Connection, liveness_conn: Connection, params: ChildParams
+) -> None:
+    # filename is "<seconds>" or "<seconds>:<pid file>". Sleeps without watching the liveness
+    # pipe, so the child only goes away early when the parent kills it.
+    seconds, _, pid_file = params.filename.partition(":")
+    if pid_file:
+        with open(pid_file, "w") as f:
+            f.write(str(os.getpid()))
+    data = _read_input(input_conn, params)
+    time.sleep(float(seconds))
+    page = PageInfo(pageNumber=None, label=None, content=f"received {len(data)} bytes")
+    _write_body(result_conn, wire.encode_success(ConversionSuccess(pages=[page], mime_type="text/plain")))
+    os._exit(0)
+
+
 def params_echo_target(
     input_conn: Connection, result_conn: Connection, liveness_conn: Connection, params: ChildParams
 ) -> None:

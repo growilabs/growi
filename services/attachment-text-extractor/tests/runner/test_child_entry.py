@@ -37,6 +37,8 @@ DEFAULT_LIMITS = ConversionLimits(
     max_archive_uncompressed_mb=512,
     max_xlsx_cells=70_000,
     ipynb_output_max_chars=10_000,
+    max_csv_bytes=8 * 1024 * 1024,
+    max_html_bytes=20 * 1024 * 1024,
 )
 
 

@@ -39,6 +39,8 @@ def _limits(entries: int = 10_000, uncompressed_mb: int = 512) -> ConversionLimi
         max_archive_uncompressed_mb=uncompressed_mb,
         max_xlsx_cells=1000,
         ipynb_output_max_chars=100,
+        max_csv_bytes=8 * 1024 * 1024,
+        max_html_bytes=20 * 1024 * 1024,
     )
 
 

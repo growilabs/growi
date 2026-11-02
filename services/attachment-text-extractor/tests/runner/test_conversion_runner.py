@@ -44,6 +44,8 @@ LIMITS = ConversionLimits(
     max_archive_uncompressed_mb=512,
     max_xlsx_cells=70_000,
     ipynb_output_max_chars=10_000,
+    max_csv_bytes=8 * 1024 * 1024,
+    max_html_bytes=20 * 1024 * 1024,
 )
 # Every awaited run() is wrapped in this so a supervision bug fails the test instead of hanging it.
 RUN_GUARD_S = 20.0
@@ -283,6 +285,43 @@ async def test_a_child_that_cannot_be_started_is_crashed(make_runner: RunnerFact
     # The next request gets a fresh forkserver.
     after = await _run(runner, make_text_pdf(["again"]), "doc.pdf", "application/pdf")
     assert isinstance(after, ConversionSuccess)
+
+
+# --- input size caps checked before a child is started -------------------------
+
+
+SMALL_CAPS = replace(LIMITS, max_csv_bytes=100, max_html_bytes=200)
+
+
+@pytest.mark.parametrize(
+    ("filename", "mime_hint", "size"),
+    [("a.csv", None, 101), ("a.tsv", None, 101), ("a.html", None, 201), ("noext", "text/html", 201)],
+)
+async def test_input_over_its_size_cap_is_rejected_without_starting_a_child(
+    make_runner: RunnerFactory, filename: str, mime_hint: str | None, size: int
+):
+    # echo_target would answer success for anything it is given, so limit_exceeded proves no child ran.
+    runner = await make_runner(limits=SMALL_CAPS, child_target=child_targets.echo_target)
+    outcome = await _run(runner, b"x" * size, filename, mime_hint)
+
+    assert isinstance(outcome, ConversionFailure)
+    assert outcome.kind == "limit_exceeded"
+    assert outcome.child_peak_rss_mb is None
+    _assert_nothing_left()
+
+
+@pytest.mark.parametrize(
+    ("filename", "mime_hint", "size"),
+    [("a.csv", None, 100), ("a.html", None, 200), ("a.xml", None, 10_000), ("unknown-format", None, 10_000)],
+)
+async def test_input_within_its_cap_or_without_a_cap_reaches_the_child(
+    make_runner: RunnerFactory, filename: str, mime_hint: str | None, size: int
+):
+    runner = await make_runner(limits=SMALL_CAPS, child_target=child_targets.echo_target)
+    outcome = await _run(runner, b"x" * size, filename, mime_hint)
+
+    assert isinstance(outcome, ConversionSuccess)
+    assert outcome.pages[0].content == f"received {size} bytes"
 
 
 # --- cancellation, event loop, leaks ---------------------------------------------

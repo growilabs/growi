@@ -2,7 +2,7 @@
 
 from app.conversion.errors import ConversionError
 from app.conversion.formats import ResolvedFormat, resolve_format
-from app.conversion.limits import ConversionLimits
+from app.conversion.limits import ConversionLimits, check_input_size
 from app.conversion.normalize import normalize_newlines
 from app.conversion.office import convert_office
 from app.conversion.pdf import convert_pdf
@@ -19,6 +19,7 @@ def convert(data: bytes, filename: str, mime_hint: str | None, limits: Conversio
     SystemExit / KeyboardInterrupt (BaseException) propagate: the child entry owns that policy (design: ChildEntry).
     """
     resolved = resolve_format(filename, mime_hint)
+    check_input_size(resolved, len(data), limits)
     try:
         pages = _convert_by_route(data, resolved, limits)
     except ConversionError:

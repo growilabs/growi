@@ -15,6 +15,8 @@ NEW_KEYS = (
     "MAX_PDF_PAGES",
     "MAX_ARCHIVE_ENTRIES",
     "MAX_ARCHIVE_UNCOMPRESSED_MB",
+    "MAX_CSV_BYTES",
+    "MAX_HTML_BYTES",
 )
 
 
@@ -97,6 +99,8 @@ class TestSettingsDefaults:
             ("MAX_PDF_PAGES", 5000),
             ("MAX_ARCHIVE_ENTRIES", 10000),
             ("MAX_ARCHIVE_UNCOMPRESSED_MB", 512),
+            ("MAX_CSV_BYTES", 8 * 1024 * 1024),
+            ("MAX_HTML_BYTES", 20 * 1024 * 1024),
         ],
     )
     def test_new_limit_defaults(self, settings: object, name: str, expected: int) -> None:
@@ -230,5 +234,23 @@ class TestIntakeAndLoggingSettings:
         from app.config import Settings
 
         monkeypatch.setenv("LOG_LEVEL", "LOUD")
+        with pytest.raises(ValidationError):
+            Settings()
+
+
+class TestInputSizeCapSettings:
+    @pytest.mark.parametrize("name", ["MAX_CSV_BYTES", "MAX_HTML_BYTES"])
+    def test_env_overrides_the_cap(self, monkeypatch: pytest.MonkeyPatch, name: str) -> None:
+        from app.config import Settings
+
+        monkeypatch.setenv(name, "1000")
+        assert getattr(Settings(), name) == 1000
+
+    @pytest.mark.parametrize("name", ["MAX_CSV_BYTES", "MAX_HTML_BYTES"])
+    @pytest.mark.parametrize("value", ["0", "-1", "abc"])
+    def test_cap_must_be_a_positive_integer(self, monkeypatch: pytest.MonkeyPatch, name: str, value: str) -> None:
+        from app.config import Settings
+
+        monkeypatch.setenv(name, value)
         with pytest.raises(ValidationError):
             Settings()
