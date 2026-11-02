@@ -5,7 +5,7 @@ and the concurrency slot comes back as soon as the caller closes its connection.
 the real one with a stand-in child (`live_apps:app`) whose file name says how long it works
 and where it writes its pid.
 
-Requirements: 2.3, 2.5
+Requirements: 2.9
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Abandon a conversion once the client that asked for it has gone away (Req 2.3, 2.5).
+"""Abandon a conversion once the client that asked for it has gone away (Req 2.9).
 
 After the body has been read, the ASGI server's receive() only answers with `http.disconnect`,
 and it does so when the connection closes. A task blocked on receive() therefore sees the

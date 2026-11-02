@@ -50,11 +50,13 @@ class Settings(BaseSettings):
         MAX_ARCHIVE_UNCOMPRESSED_MB (int, default 512): Maximum declared
             uncompressed size of a ZIP archive (Req 2.6).
         MAX_CSV_BYTES (int, default 8 MiB): Maximum size of a CSV / TSV file,
-            checked before a conversion child is started (Req 2.6).  anydoc
-            needs about 36x the input, so a larger CSV would not fit under the
-            default MAX_CHILD_RSS_MB anyway.
+            checked before a conversion child is started (Req 2.8).  This is
+            an early refusal, not a guarantee: anydoc's memory follows the
+            number of cells (about one million cells exceed the default
+            MAX_CHILD_RSS_MB), so a smaller CSV of tiny cells can still be
+            stopped by the RSS limit.
         MAX_HTML_BYTES (int, default 20 MiB): Maximum size of an HTML file,
-            checked before a conversion child is started (Req 2.6).
+            checked before a conversion child is started (Req 2.8).
         LOG_LEVEL (str, default "INFO"): Python ``logging`` level name for the
             ``app`` loggers; an unknown name fails at startup.
     """
