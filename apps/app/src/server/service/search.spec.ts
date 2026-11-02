@@ -290,3 +290,33 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     ).not.toHaveBeenCalled();
   });
 });
+
+describe('SearchService.canShowSnippet()', () => {
+  const groupId = new mongoose.Types.ObjectId();
+  const groupPage = {
+    grant: 5,
+    grantedUsers: [],
+    // the Mongo shape: one { item, type } entry per granted group
+    grantedGroups: [{ item: groupId, type: 'UserGroup' }],
+  };
+
+  it('shows the snippet of a group page to a member of the group', () => {
+    const service = new TestSearchService();
+
+    expect(
+      service.canShowSnippet(groupPage, mock<IUser>(), [
+        new mongoose.Types.ObjectId(groupId.toString()),
+      ]),
+    ).toBe(true);
+  });
+
+  it('hides the snippet of a group page from a user outside the group', () => {
+    const service = new TestSearchService();
+
+    expect(
+      service.canShowSnippet(groupPage, mock<IUser>(), [
+        new mongoose.Types.ObjectId(),
+      ]),
+    ).toBe(false);
+  });
+});

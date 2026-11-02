@@ -18,6 +18,11 @@ import {
 } from '~/server/service/search-delegator/elasticsearch-client-delegator';
 import loggerFactory from '~/utils/logger';
 
+import {
+  type MgetPagesParams,
+  mgetPagesForPermissionBody,
+} from '../queries/mget-pages-for-permission-body';
+
 const logger = loggerFactory(
   'growi:service:search-attachments:delegator-extension',
 );
@@ -84,7 +89,7 @@ export interface AttachmentIndexOperations {
     pageIds: string[],
     options?: SearchOptions,
   ): Record<string, unknown>;
-  mgetPagesForPermissionBody(pageIds: string[]): Record<string, unknown>;
+  mgetPagesForPermissionBody(pageIds: string[]): MgetPagesParams;
   /**
    * Bulk-write stub for task 4.1. The full implementation (MongoDB cursor walk +
    * text extraction) is provided by AttachmentReindexBatch (task 6.3), which
@@ -493,27 +498,11 @@ export class AttachmentSearchDelegatorExtension
   }
 
   /**
-   * Builds the mget request body for fetching page permission fields from page_index.
-   * Only the minimum set of fields required for viewer permission resolution is fetched;
-   * the page body (revision content) is intentionally excluded.
-   *
-   * Used by: `AttachmentSearchResultAggregator` when `facet=attachments` primary needs
-   * to determine which parent pages the current viewer may access.
+   * Builds lightweight mget request parameters for the page index.
+   * The result is never used as an authorization decision.
    */
-  mgetPagesForPermissionBody(pageIds: string[]): Record<string, unknown> {
-    return {
-      ids: pageIds,
-      _source_includes: [
-        '_id',
-        'grant',
-        'grantedUsers',
-        'grantedGroups',
-        'creator',
-        'path',
-        'title',
-        'updatedAt',
-      ],
-    };
+  mgetPagesForPermissionBody(pageIds: string[]): MgetPagesParams {
+    return mgetPagesForPermissionBody(pageIds);
   }
 
   // ----------------------------------------------------------------

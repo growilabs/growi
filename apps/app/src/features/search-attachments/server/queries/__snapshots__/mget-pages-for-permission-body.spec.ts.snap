@@ -2,18 +2,13 @@
 
 exports[`mgetPagesForPermissionBody > matches snapshot 1`] = `
 {
-  "_source": {
-    "includes": [
-      "_id",
-      "grant",
-      "grantedUsers",
-      "grantedGroups",
-      "creator",
-      "path",
-      "title",
-      "updatedAt",
-    ],
-  },
+  "_source_includes": [
+    "path",
+    "grant",
+    "granted_users",
+    "granted_groups",
+    "updated_at",
+  ],
   "ids": [
     "id1",
     "id2",

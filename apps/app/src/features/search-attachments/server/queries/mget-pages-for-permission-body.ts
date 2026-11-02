@@ -1,41 +1,32 @@
 /**
- * Pure function that builds the request body for an Elasticsearch mget call
- * against the page index, fetching only the fields needed to evaluate page
- * access permissions.
+ * Builds the parameters of an Elasticsearch `mget` request against the page
+ * index that fetches only lightweight page fields (never the page body).
  *
- * The returned object is a body-only mget payload; the caller is responsible
- * for specifying the index when invoking the ES client.
+ * The fields are passed as the `_source_includes` request parameter. A
+ * top-level `_source` object in the request body is rejected by Elasticsearch
+ * with a `parsing_exception`.
+ *
+ * An `mget` result is NOT an authorization decision: `found: true` only means
+ * the page is indexed. Viewer access is decided by `searchAccessiblePages`.
  */
 
-/**
- * Fields required for permission evaluation and display.
- * Restricted to the minimum set to avoid over-fetching large page bodies.
- */
-const PERMISSION_SOURCE_INCLUDES = [
-  '_id',
-  'grant',
-  'grantedUsers',
-  'grantedGroups',
-  'creator',
+/** Field names as stored in the page index (see the page index mappings). */
+const PAGE_SOURCE_INCLUDES = [
   'path',
-  'title',
-  'updatedAt',
+  'grant',
+  'granted_users',
+  'granted_groups',
+  'updated_at',
 ] as const;
 
-/**
- * Build the body for an Elasticsearch mget request that fetches permission-relevant
- * fields for a set of page IDs.
- *
- * @param pageIds - Array of page document IDs to fetch
- * @returns ES mget request body with _source restricted to permission fields
- */
-export function mgetPagesForPermissionBody(
-  pageIds: string[],
-): Record<string, unknown> {
+export type MgetPagesParams = {
+  ids: string[];
+  _source_includes: string[];
+};
+
+export function mgetPagesForPermissionBody(pageIds: string[]): MgetPagesParams {
   return {
-    ids: pageIds,
-    _source: {
-      includes: [...PERMISSION_SOURCE_INCLUDES],
-    },
+    ids: [...pageIds],
+    _source_includes: [...PAGE_SOURCE_INCLUDES],
   };
 }

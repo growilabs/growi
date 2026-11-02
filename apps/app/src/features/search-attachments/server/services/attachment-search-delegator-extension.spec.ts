@@ -305,42 +305,15 @@ describe('AttachmentSearchDelegatorExtension', () => {
   // mgetPagesForPermissionBody
   // ----------------------------------------------------------------
   describe('mgetPagesForPermissionBody', () => {
-    it('returns an object', () => {
-      const body = ext.mgetPagesForPermissionBody(['page1', 'page2']);
-      expect(typeof body).toBe('object');
-    });
+    it('returns mget request parameters using the page index field names', () => {
+      const params = ext.mgetPagesForPermissionBody(['page-abc', 'page-def']);
 
-    it('includes the required permission-check fields in _source_includes', () => {
-      // biome-ignore lint/suspicious/noExplicitAny: inspecting serialised body
-      const body = ext.mgetPagesForPermissionBody(['page1']) as any;
-      const serialized = JSON.stringify(body);
-      // Must include minimal permission fields
-      expect(serialized).toContain('grant');
-      expect(serialized).toContain('grantedUsers');
-      expect(serialized).toContain('grantedGroups');
-      expect(serialized).toContain('creator');
-      expect(serialized).toContain('path');
-      expect(serialized).toContain('title');
-      expect(serialized).toContain('updatedAt');
-    });
-
-    it('does NOT fetch the page body content', () => {
-      // biome-ignore lint/suspicious/noExplicitAny: inspecting serialised body
-      const body = ext.mgetPagesForPermissionBody(['page1']) as any;
-      const serialized = JSON.stringify(body);
-      // Page body (revision body) should NOT be included
-      expect(serialized).not.toContain('"body"');
-    });
-
-    it('includes pageIds in the ids list', () => {
-      const body = ext.mgetPagesForPermissionBody([
-        'page-abc',
-        'page-def',
-        // biome-ignore lint/suspicious/noExplicitAny: inspecting serialised body
-      ]) as any;
-      const serialized = JSON.stringify(body);
-      expect(serialized).toContain('page-abc');
-      expect(serialized).toContain('page-def');
+      expect(params.ids).toEqual(['page-abc', 'page-def']);
+      expect(params).not.toHaveProperty('_source');
+      expect(params._source_includes).toEqual(
+        expect.arrayContaining(['grant', 'granted_users', 'granted_groups']),
+      );
+      expect(params._source_includes).not.toContain('body');
     });
   });
 });

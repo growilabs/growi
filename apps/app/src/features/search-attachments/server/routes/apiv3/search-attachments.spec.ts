@@ -7,11 +7,15 @@
  *  3. 400 when pageIds has more than 20 elements
  *  4. 200 with enrichments when valid q and pageIds provided
  *  5. 503 when feature is disabled (middleware blocks before handler)
+ *  8. the requesting user (or guest) is resolved and passed to resolveSecondary
+ *  9. duplicated pageIds are counted once
  */
 
+import type { IUserHasId } from '@growi/core';
 import express from 'express';
 import supertest from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type MockProxy, mock } from 'vitest-mock-extended';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -31,6 +35,7 @@ vi.mock('~/utils/logger', () => ({
 // ---------------------------------------------------------------------------
 
 import type { AttachmentSearchResultAggregator } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
+import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
 
 import { createSearchAttachmentsRouter } from './search-attachments';
 
@@ -38,13 +43,28 @@ import { createSearchAttachmentsRouter } from './search-attachments';
 // Helpers
 // ---------------------------------------------------------------------------
 
+const guestViewer: AttachmentSearchViewer = { user: null, userGroups: null };
+const resolveViewer = vi.fn(
+  async (
+    user: IUserHasId | null | undefined,
+  ): Promise<AttachmentSearchViewer> =>
+    user == null ? guestViewer : { user, userGroups: ['group-1'] },
+);
+
 function buildApp(
-  aggregator: Partial<AttachmentSearchResultAggregator>,
+  aggregator: AttachmentSearchResultAggregator,
   isSearchServiceConfigured: () => boolean,
   withFeatureDisabled = false,
+  loggedInUser?: IUserHasId,
 ) {
   const app = express();
   app.use(express.json());
+  if (loggedInUser != null) {
+    app.use((req: express.Request & { user?: IUserHasId }, _res, next) => {
+      req.user = loggedInUser;
+      next();
+    });
+  }
 
   // Simulate apiv3 response helper (matches ApiV3Response interface)
   app.use(
@@ -74,8 +94,9 @@ function buildApp(
     });
   } else {
     const router = createSearchAttachmentsRouter(
-      aggregator as AttachmentSearchResultAggregator,
+      aggregator,
       isSearchServiceConfigured,
+      resolveViewer,
     );
     app.use('/', router);
   }
@@ -88,13 +109,13 @@ function buildApp(
 // ---------------------------------------------------------------------------
 
 describe('GET / (search-attachments route)', () => {
-  let mockResolveSecondary: ReturnType<typeof vi.fn>;
-  let aggregator: Partial<AttachmentSearchResultAggregator>;
+  let aggregator: MockProxy<AttachmentSearchResultAggregator>;
+  let mockResolveSecondary: MockProxy<AttachmentSearchResultAggregator>['resolveSecondary'];
   let isSearchServiceConfigured: () => boolean;
 
   beforeEach(() => {
-    mockResolveSecondary = vi.fn();
-    aggregator = { resolveSecondary: mockResolveSecondary };
+    aggregator = mock<AttachmentSearchResultAggregator>();
+    mockResolveSecondary = aggregator.resolveSecondary;
     isSearchServiceConfigured = vi.fn().mockReturnValue(true);
   });
 
@@ -171,6 +192,7 @@ describe('GET / (search-attachments route)', () => {
     expect(res.status).toBe(200);
     expect(mockResolveSecondary).toHaveBeenCalledWith(
       'keyword',
+      guestViewer,
       expect.objectContaining({
         facet: 'all',
         primaryIds: ['page1', 'page2'],
@@ -226,10 +248,48 @@ describe('GET / (search-attachments route)', () => {
     expect(res.status).toBe(200);
     expect(mockResolveSecondary).toHaveBeenCalledWith(
       'keyword',
+      guestViewer,
       expect.objectContaining({
         facet: 'all',
         primaryIds: expect.arrayContaining(['id0', 'id19']),
       }),
     );
+  });
+
+  it('8. resolves the logged-in user and passes that viewer to resolveSecondary', async () => {
+    mockResolveSecondary.mockResolvedValue({ facet: 'all', enrichments: {} });
+    const user = mock<IUserHasId>({ _id: 'user-1' });
+
+    const app = buildApp(aggregator, isSearchServiceConfigured, false, user);
+    const res = await supertest(app)
+      .get('/')
+      .query({ q: 'keyword', pageIds: 'page1' });
+
+    expect(res.status).toBe(200);
+    expect(resolveViewer).toHaveBeenCalledWith(user);
+    expect(mockResolveSecondary).toHaveBeenCalledWith(
+      'keyword',
+      { user, userGroups: ['group-1'] },
+      { facet: 'all', primaryIds: ['page1'] },
+    );
+  });
+
+  it('9. counts duplicated pageIds once against the 20-id limit', async () => {
+    mockResolveSecondary.mockResolvedValue({ facet: 'all', enrichments: {} });
+    const ids = [
+      ...Array.from({ length: 20 }, (_, i) => `id${i}`),
+      'id0',
+      'id1',
+    ].join(',');
+
+    const app = buildApp(aggregator, isSearchServiceConfigured);
+    const res = await supertest(app)
+      .get('/')
+      .query({ q: 'keyword', pageIds: ids });
+
+    expect(res.status).toBe(200);
+    const primaryIds = mockResolveSecondary.mock.calls[0][2].primaryIds;
+    expect(primaryIds).toHaveLength(20);
+    expect(new Set(primaryIds).size).toBe(20);
   });
 });

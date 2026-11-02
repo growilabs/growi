@@ -4,13 +4,13 @@ import loggerFactory from '~/utils/logger';
 
 import { createAttachmentOrphanSweeper } from './services/attachment-orphan-sweeper';
 import { AttachmentReindexBatch } from './services/attachment-reindex-batch';
-import { AttachmentSearchDelegatorExtension } from './services/attachment-search-delegator-extension';
-import { AttachmentSearchIndexer } from './services/attachment-search-indexer';
 import {
-  AttachmentSearchResultAggregator,
-  createAttachmentIndexClient,
-} from './services/attachment-search-result-aggregator';
+  AttachmentSearchDelegatorExtension,
+  DEFAULT_ATTACHMENT_INDEX_NAME,
+} from './services/attachment-search-delegator-extension';
+import { AttachmentSearchIndexer } from './services/attachment-search-indexer';
 import { AttachmentTextExtractorService } from './services/attachment-text-extractor';
+import { createAttachmentSearchResultAggregator } from './services/create-attachment-search-result-aggregator';
 import { ExtractionFailureLogService } from './services/extraction-failure-log-service';
 
 const logger = loggerFactory('growi:features:search-attachments:init');
@@ -134,58 +134,11 @@ export function initAttachmentFullTextSearch(crowi: Crowi): void {
   // ----------------------------------------------------------------
   // Build and inject AttachmentSearchResultAggregator into SearchService
   // ----------------------------------------------------------------
-  const pageIndexAlias = `${searchService.fullTextSearchDelegator?.aliasName ?? 'crowi-alias'}`;
-
-  // Build a version-agnostic rawSearch wrapping the ES client
-  const rawSearch = async (
-    index: string,
-    body: Record<string, unknown>,
-  ): Promise<unknown> => {
-    const result = await esClient.search({ index, body });
-    return result;
-  };
-
-  // Build a version-agnostic rawMget wrapping the ES client
-  const rawMget = async (
-    index: string,
-    body: Record<string, unknown>,
-  ): Promise<unknown> => {
-    const result = await esClient.mget({ index, body });
-    return result;
-  };
-
-  const attachmentClient = createAttachmentIndexClient(
-    'attachments',
-    pageIndexAlias,
-    // biome-ignore lint/suspicious/noExplicitAny: RawEsSearchFn/RawEsMgetFn accept any-typed returns
-    rawSearch as any,
-    // biome-ignore lint/suspicious/noExplicitAny: RawEsSearchFn/RawEsMgetFn accept any-typed returns
-    rawMget as any,
-  );
-
-  /**
-   * PageSearchFn — delegates to the existing ES search pipeline without
-   * touching the attachment index.  Reads the query through parseSearchQuery
-   * + resolve so Named-Query aliasing is applied normally.
-   */
-  const pageSearchFn = async (
-    keyword: string,
-    options: { from: number; size: number },
-  ) => {
-    const parsedQuery = await searchService.parseSearchQuery(keyword, null);
-    const [delegator, data] = await searchService.resolve(parsedQuery);
-    return delegator.search(
-      data,
-      undefined,
-      undefined,
-      options,
-    ) as Promise<any>;
-  };
-
-  const aggregator = new AttachmentSearchResultAggregator(
-    pageSearchFn,
-    attachmentClient,
-  );
+  const aggregator = createAttachmentSearchResultAggregator({
+    searchService,
+    esClient,
+    attachmentIndexName: DEFAULT_ATTACHMENT_INDEX_NAME,
+  });
 
   searchService.setAttachmentSearchResultAggregator(aggregator);
 

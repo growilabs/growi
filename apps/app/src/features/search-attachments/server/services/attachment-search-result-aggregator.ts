@@ -4,7 +4,10 @@
  * Implements the priority-slot-driven search model:
  * - facet=pages  : existing page search only (attachments_index not touched)
  * - facet=all    : msearch pages+attachments in parallel (from==0 only); fall back to pages-only for from>0
- * - facet=attachments: attachment index primary, mget page_index for permission filter
+ * - facet=attachments: attachment index primary, then searchAccessiblePages on page_index
+ *
+ * Every attachment hit, on every path, passes searchAccessiblePages for the
+ * viewer before it is returned; any failure there drops the hits (fail-close).
  *
  * Safety net: if primary latency > PRIMARY_TIMEOUT_MS, degrade gracefully.
  */
@@ -23,7 +26,10 @@ import {
   DEFAULT_PAGE_SIZE,
 } from '../queries/build-attachments-by-page-ids-query';
 import { buildSnippetSegments } from '../queries/build-snippet-segments';
-import { mgetPagesForPermissionBody } from '../queries/mget-pages-for-permission-body';
+import type {
+  AttachmentSearchViewer,
+  SearchAccessiblePagesFn,
+} from './search-accessible-pages';
 
 const logger = loggerFactory('growi:service:search-attachments:aggregator');
 
@@ -37,6 +43,7 @@ const logger = loggerFactory('growi:service:search-attachments:aggregator');
  */
 export type PageSearchFn = (
   keyword: string,
+  viewer: AttachmentSearchViewer,
   options: { from: number; size: number },
 ) => Promise<ISearchResult<ISearchResultData>>;
 
@@ -77,23 +84,6 @@ export interface AttachmentSearchResponse {
 }
 
 /**
- * Single mget doc entry (simplified — covers found/not-found/error shapes).
- * `error` is present when ES returns a per-doc error (e.g. shard failure).
- */
-export interface MgetDoc {
-  _id: string;
-  found: boolean;
-  error?: unknown;
-}
-
-/**
- * Result of a mget call for page permission checking.
- */
-export interface MgetPagesResponse {
-  docs: MgetDoc[];
-}
-
-/**
  * Abstraction over attachment index ES operations.
  * Injected into the aggregator; can be mocked in unit tests.
  */
@@ -102,8 +92,8 @@ export interface AttachmentIndexClient {
   searchAttachments(
     body: Record<string, unknown>,
   ): Promise<AttachmentSearchResponse>;
-  /** Fetches permission-relevant fields for page IDs from the page alias. */
-  mgetPages(pageIds: string[]): Promise<MgetPagesResponse>;
+  /** The ids (among pageIds) whose content the viewer may see. */
+  searchAccessiblePages: SearchAccessiblePagesFn;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +131,7 @@ export interface IResolvedSecondaryResult {
 const OVER_FETCH_MULTIPLIER = 1.5;
 
 // Secondary enrichment timeout (ms)
-const SECONDARY_TIMEOUT_MS = 500;
+const DEFAULT_SECONDARY_TIMEOUT_MS = 500;
 
 // ---------------------------------------------------------------------------
 // Helper: resolve ES total count
@@ -200,42 +190,63 @@ const groupHitsByPageId = (
 // ---------------------------------------------------------------------------
 // Helper: timeout race
 // ---------------------------------------------------------------------------
-const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      // Use setTimeout to give the actual promise a chance first
-      setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms),
-    ),
-  ]);
+export class AttachmentSearchTimeoutError extends Error {
+  constructor(ms: number) {
+    super(`Timeout after ${ms}ms`);
+    this.name = 'AttachmentSearchTimeoutError';
+  }
+}
+
+const withTimeout = async <T>(promise: Promise<T>, ms: number): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new AttachmentSearchTimeoutError(ms)),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 };
 
-// ---------------------------------------------------------------------------
-// Helper: fail-close mget filter
-// Includes ONLY docs where found===true AND no error field is present.
-// This is the single authoritative fail-close gate used by both searchPrimary
-// (facet=attachments) and resolveSecondary (facet=all).
-// ---------------------------------------------------------------------------
-export const filterMgetDocs = (docs: MgetDoc[]): string[] =>
-  docs.filter((d) => d.found === true && !('error' in d)).map((d) => d._id);
+const failureKind = (err: unknown): 'timeout' | 'error' =>
+  err instanceof AttachmentSearchTimeoutError ? 'timeout' : 'error';
 
 // ---------------------------------------------------------------------------
 // AttachmentSearchResultAggregator
 // ---------------------------------------------------------------------------
 
+const toPageItem = (d: ISearchResultData): IPageWithSearchMeta => ({
+  data: { _id: d._id, ...d._source } as IPageWithSearchMeta['data'],
+  meta: {
+    elasticSearchResult: {
+      snippet: d._highlight?.body?.[0] ?? null,
+      highlightedPath: d._highlight?.path?.[0] ?? null,
+    },
+  },
+});
+
 export class AttachmentSearchResultAggregator {
   private readonly pageSearchFn: PageSearchFn;
   private readonly attachmentClient: AttachmentIndexClient;
   private readonly PRIMARY_TIMEOUT_MS: number;
+  private readonly SECONDARY_TIMEOUT_MS: number;
 
   constructor(
     pageSearchFn: PageSearchFn,
     attachmentClient: AttachmentIndexClient,
     PRIMARY_TIMEOUT_MS = 800,
+    SECONDARY_TIMEOUT_MS = DEFAULT_SECONDARY_TIMEOUT_MS,
   ) {
     this.pageSearchFn = pageSearchFn;
     this.attachmentClient = attachmentClient;
     this.PRIMARY_TIMEOUT_MS = PRIMARY_TIMEOUT_MS;
+    this.SECONDARY_TIMEOUT_MS = SECONDARY_TIMEOUT_MS;
   }
 
   // --------------------------------------------------------------------------
@@ -244,6 +255,7 @@ export class AttachmentSearchResultAggregator {
 
   async searchPrimary(
     query: string,
+    viewer: AttachmentSearchViewer,
     options: {
       facet: 'all' | 'pages' | 'attachments';
       from: number;
@@ -254,24 +266,47 @@ export class AttachmentSearchResultAggregator {
 
     // facet=pages: MUST NOT touch attachments_index at all
     if (facet === 'pages') {
-      return await this.searchPrimaryPages(query, from, size);
+      return await this.searchPrimaryPages(query, viewer, from, size);
     }
 
     if (facet === 'all') {
       // from>0: only page search (same as facet=pages), no attachment query
       if (from > 0) {
-        return await this.searchPrimaryPages(query, from, size);
+        return await this.searchPrimaryPages(query, viewer, from, size);
       }
-      // from==0: parallel msearch pages+attachments with 800ms safety net
-      return await this.searchPrimaryAll(query, size);
+      // from==0: parallel pages+attachments with 800ms safety net
+      return await this.searchPrimaryAll(query, viewer, size);
     }
 
     if (facet === 'attachments') {
-      return await this.searchPrimaryAttachments(query, size);
+      return await this.searchPrimaryAttachments(query, viewer, size);
     }
 
     // Should never reach here given TypeScript exhaustive check, but handle defensively
     throw new Error(`Unknown facet: ${facet}`);
+  }
+
+  // --------------------------------------------------------------------------
+  // Permission gate shared by every path
+  // --------------------------------------------------------------------------
+
+  /**
+   * The subset of pageIds whose attachment hits the viewer may see.
+   * Throws on any failure; callers must then drop the hits (fail-close).
+   */
+  private async findVisiblePageIds(
+    pageIds: string[],
+    viewer: AttachmentSearchViewer,
+    timeoutMs: number,
+  ): Promise<Set<string>> {
+    if (pageIds.length === 0) {
+      return new Set();
+    }
+    const pages = await withTimeout(
+      this.attachmentClient.searchAccessiblePages(pageIds, viewer),
+      timeoutMs,
+    );
+    return new Set(pages.map((p) => p.pageId));
   }
 
   // --------------------------------------------------------------------------
@@ -280,28 +315,16 @@ export class AttachmentSearchResultAggregator {
 
   private async searchPrimaryPages(
     query: string,
+    viewer: AttachmentSearchViewer,
     from: number,
     size: number,
   ): Promise<IPrimarySearchResult> {
-    const result = await this.pageSearchFn(query, { from, size });
-
-    const items: IPageWithSearchMeta[] = result.data.map((d) => ({
-      data: {
-        _id: d._id,
-        ...d._source,
-      } as IPageWithSearchMeta['data'],
-      meta: {
-        elasticSearchResult: {
-          snippet: d._highlight?.body?.[0] ?? null,
-          highlightedPath: d._highlight?.path?.[0] ?? null,
-        },
-      },
-    }));
+    const result = await this.pageSearchFn(query, viewer, { from, size });
 
     return {
       facet: 'pages',
       primarySlot: 'pages',
-      items,
+      items: result.data.map(toPageItem),
       meta: {
         total: result.meta.total,
       },
@@ -314,9 +337,13 @@ export class AttachmentSearchResultAggregator {
 
   private async searchPrimaryAll(
     query: string,
+    viewer: AttachmentSearchViewer,
     size: number,
   ): Promise<IPrimarySearchResult> {
-    const pageSearchPromise = this.pageSearchFn(query, { from: 0, size });
+    const pageSearchPromise = this.pageSearchFn(query, viewer, {
+      from: 0,
+      size,
+    });
     const attachmentSearchBody = buildAttachmentSearchQuery(query, {
       highlight: true,
       size,
@@ -325,71 +352,63 @@ export class AttachmentSearchResultAggregator {
     const attachmentSearchPromise =
       this.attachmentClient.searchAttachments(attachmentSearchBody);
 
-    // Both run in parallel; race against the safety net timeout
-    const bothPromise = Promise.all([
-      pageSearchPromise,
-      attachmentSearchPromise,
-    ]);
-
     let pageResult: ISearchResult<ISearchResultData>;
     let attachmentResponse: AttachmentSearchResponse;
 
     try {
       [pageResult, attachmentResponse] = await withTimeout(
-        bothPromise,
+        Promise.all([pageSearchPromise, attachmentSearchPromise]),
         this.PRIMARY_TIMEOUT_MS,
       );
     } catch (err) {
-      // Safety net: degrade to pages-only result on timeout
+      // Safety net: degrade to pages-only result
       logger.warn(
-        { err, querySnippet: query.slice(0, 50) },
-        'searchPrimaryAll: primary timeout — degrading to pages-only',
+        { err, failure: failureKind(err), querySnippet: query.slice(0, 50) },
+        'searchPrimaryAll: primary search failed — degrading to pages-only',
       );
-      // Attempt to get pages result alone (it may already be done)
-      // We can't recover the page promise since it's in bothPromise; fall back to a new call
-      const degradedResult = await this.pageSearchFn(query, { from: 0, size });
-      const items: IPageWithSearchMeta[] = degradedResult.data.map((d) => ({
-        data: { _id: d._id, ...d._source } as IPageWithSearchMeta['data'],
-        meta: {
-          elasticSearchResult: {
-            snippet: d._highlight?.body?.[0] ?? null,
-            highlightedPath: d._highlight?.path?.[0] ?? null,
-          },
-        },
-      }));
+      const degradedResult = await this.pageSearchFn(query, viewer, {
+        from: 0,
+        size,
+      });
       return {
         facet: 'all',
         primarySlot: 'pages',
-        items,
+        items: degradedResult.data.map(toPageItem),
         meta: { total: degradedResult.meta.total },
       };
     }
 
-    // Build a set of pageIds from the top page results (Interpretation A)
+    // Interpretation A: only attachment hits on pages of the primary page result
     const pageIdSet = new Set(pageResult.data.map((d) => d._id));
-
-    // Group attachment hits by pageId
-    const attachmentHitsByPageId = groupHitsByPageId(
-      attachmentResponse.hits.hits,
+    const candidateHits = attachmentResponse.hits.hits.filter((h) =>
+      pageIdSet.has(h._source.pageId),
     );
 
-    // Build result items — embed only attachment hits for pageIds that appear in page results
-    const items: IPageWithSearchMeta[] = pageResult.data.map((d) => {
-      const pageId = d._id;
-      const attachmentHits = pageIdSet.has(pageId)
-        ? (attachmentHitsByPageId[pageId] ?? [])
-        : [];
+    let visiblePageIds = new Set<string>();
+    try {
+      visiblePageIds = await this.findVisiblePageIds(
+        [...new Set(candidateHits.map((h) => h._source.pageId))],
+        viewer,
+        this.PRIMARY_TIMEOUT_MS,
+      );
+    } catch (err) {
+      // fail-close: keep the page results, embed no attachment hits
+      logger.warn(
+        { err, failure: failureKind(err), querySnippet: query.slice(0, 50) },
+        'searchPrimaryAll: permission check failed — dropping attachment hits (fail-close)',
+      );
+    }
 
-      return {
-        data: { _id: pageId, ...d._source } as IPageWithSearchMeta['data'],
-        meta: {
-          elasticSearchResult: {
-            snippet: d._highlight?.body?.[0] ?? null,
-            highlightedPath: d._highlight?.path?.[0] ?? null,
-          },
-          ...(attachmentHits.length > 0 ? { attachmentHits } : {}),
-        },
-      };
+    const attachmentHitsByPageId = groupHitsByPageId(
+      candidateHits.filter((h) => visiblePageIds.has(h._source.pageId)),
+    );
+
+    const items: IPageWithSearchMeta[] = pageResult.data.map((d) => {
+      const item = toPageItem(d);
+      const attachmentHits = attachmentHitsByPageId[d._id] ?? [];
+      return attachmentHits.length > 0
+        ? { ...item, meta: { ...item.meta, attachmentHits } }
+        : item;
     });
 
     return {
@@ -401,14 +420,24 @@ export class AttachmentSearchResultAggregator {
   }
 
   // --------------------------------------------------------------------------
-  // facet=attachments — attachment index primary + mget permission filter
+  // facet=attachments — attachment index primary + permission gate
   // --------------------------------------------------------------------------
 
   private async searchPrimaryAttachments(
     query: string,
+    viewer: AttachmentSearchViewer,
     size: number,
   ): Promise<IPrimarySearchResult> {
     const overFetchSize = Math.ceil(size * OVER_FETCH_MULTIPLIER);
+    const incomplete: IPrimarySearchResult = {
+      facet: 'attachments',
+      primarySlot: 'attachments',
+      items: [],
+      meta: {
+        total: null,
+        primaryResultIncomplete: true,
+      },
+    };
 
     const attachmentSearchBody = buildAttachmentSearchQuery(query, {
       highlight: true,
@@ -423,20 +452,11 @@ export class AttachmentSearchResultAggregator {
         this.PRIMARY_TIMEOUT_MS,
       );
     } catch (err) {
-      // Safety net: return empty + incomplete on timeout
       logger.warn(
-        { err, querySnippet: query.slice(0, 50) },
-        'searchPrimaryAttachments: primary timeout — returning empty + incomplete',
+        { err, failure: failureKind(err), querySnippet: query.slice(0, 50) },
+        'searchPrimaryAttachments: attachment search failed — returning empty + incomplete',
       );
-      return {
-        facet: 'attachments',
-        primarySlot: 'attachments',
-        items: [],
-        meta: {
-          total: null,
-          primaryResultIncomplete: true,
-        },
-      };
+      return incomplete;
     }
 
     const esHits = attachmentResponse.hits.hits;
@@ -453,47 +473,27 @@ export class AttachmentSearchResultAggregator {
       };
     }
 
-    // Collect unique pageIds from attachment hits
-    const uniquePageIds = [...new Set(esHits.map((h) => h._source.pageId))];
-
-    // mget page_index for permission filtering
-    let mgetResponse: MgetPagesResponse;
+    let visiblePageIds: Set<string>;
     try {
-      mgetResponse = await withTimeout(
-        this.attachmentClient.mgetPages(uniquePageIds),
+      visiblePageIds = await this.findVisiblePageIds(
+        [...new Set(esHits.map((h) => h._source.pageId))],
+        viewer,
         this.PRIMARY_TIMEOUT_MS,
       );
     } catch (err) {
-      // fail-close: if mget fails, return empty + incomplete
       logger.warn(
-        { err, querySnippet: query.slice(0, 50) },
-        'searchPrimaryAttachments: mget timeout — returning empty + incomplete (fail-close)',
+        { err, failure: failureKind(err), querySnippet: query.slice(0, 50) },
+        'searchPrimaryAttachments: permission check failed — returning empty + incomplete (fail-close)',
       );
-      return {
-        facet: 'attachments',
-        primarySlot: 'attachments',
-        items: [],
-        meta: {
-          total: null,
-          primaryResultIncomplete: true,
-        },
-      };
+      return incomplete;
     }
 
-    // Build set of authorized pageIds — fail-close: only found:true AND no error
-    const authorizedPageIds = new Set<string>(
-      filterMgetDocs(mgetResponse.docs),
-    );
-
-    // Filter attachment hits to only those whose pageId is authorized
     const authorizedHits = esHits.filter((h) =>
-      authorizedPageIds.has(h._source.pageId),
+      visiblePageIds.has(h._source.pageId),
     );
-
-    // Group authorized hits by pageId
     const hitsByPageId = groupHitsByPageId(authorizedHits);
 
-    // Build one IPageWithSearchMeta per unique pageId (up to `size` items)
+    // One IPageWithSearchMeta per unique pageId (up to `size` items)
     const authorizedPageIdList = [
       ...new Set(authorizedHits.map((h) => h._source.pageId)),
     ].slice(0, size);
@@ -524,23 +524,21 @@ export class AttachmentSearchResultAggregator {
   // --------------------------------------------------------------------------
 
   /**
-   * Resolves secondary enrichment data for a set of primary page IDs.
+   * Resolves secondary enrichment data for page IDs supplied by the client.
    *
-   * facet=attachments: primary already performed mget permission filtering,
-   *   so there is nothing additional to do — returns empty enrichments.
+   * facet=attachments: primary already applied the permission gate — no-op.
    *
-   * facet=all: performs a time-lag defense mget to verify pages still exist,
-   *   then searches the attachments index filtered by the surviving page IDs.
-   *   Results are grouped by pageId and returned as enrichments.
+   * facet=all: the client-supplied ids are re-checked against the viewer with
+   * searchAccessiblePages, then the attachments index is searched for the
+   * surviving ids only. Any failure or a latency above 500ms returns empty
+   * enrichments.
    *
-   * If secondary latency exceeds 500ms, returns empty enrichments (graceful
-   * degradation — the primary result is still usable).
-   *
-   * @throws {RangeError} when primaryIds.length > DEFAULT_PAGE_SIZE (guard
-   *   against unbounded terms queries; callers must split large batches)
+   * @throws {RangeError} when the number of distinct primaryIds exceeds
+   *   DEFAULT_PAGE_SIZE
    */
   async resolveSecondary(
     query: string,
+    viewer: AttachmentSearchViewer,
     options: {
       facet: 'all' | 'attachments';
       primaryIds: string[];
@@ -548,20 +546,18 @@ export class AttachmentSearchResultAggregator {
   ): Promise<IResolvedSecondaryResult> {
     const { facet, primaryIds } = options;
 
-    // facet=attachments: primary already did mget permission check — no-op
     if (facet === 'attachments') {
       return { facet: 'attachments', enrichments: {} };
     }
 
-    // facet=all: enrich with attachment hits grouped by pageId
-    return this.resolveSecondaryAll(query, primaryIds);
+    return this.resolveSecondaryAll(query, viewer, [...new Set(primaryIds)]);
   }
 
   private async resolveSecondaryAll(
     query: string,
+    viewer: AttachmentSearchViewer,
     primaryIds: string[],
   ): Promise<IResolvedSecondaryResult> {
-    // Guard: primaryIds must not exceed the maximum page size
     if (primaryIds.length > DEFAULT_PAGE_SIZE) {
       throw new RangeError(
         `primaryIds.length (${primaryIds.length}) exceeds the maximum allowed page size (${DEFAULT_PAGE_SIZE}). ` +
@@ -569,90 +565,56 @@ export class AttachmentSearchResultAggregator {
       );
     }
 
-    const enrichments: IResolvedSecondaryResult['enrichments'] = {};
-
     try {
-      const result = await withTimeout(
-        this.doResolveSecondaryAll(query, primaryIds),
-        SECONDARY_TIMEOUT_MS,
-      );
-      return { facet: 'all', enrichments: result };
-    } catch (err) {
-      // Safety net: secondary timeout → return empty enrichments, primary result still usable
-      logger.warn(
-        { err, querySnippet: query.slice(0, 50) },
-        'resolveSecondaryAll: secondary timeout — returning empty enrichments',
+      const enrichments = await withTimeout(
+        this.doResolveSecondaryAll(query, viewer, primaryIds),
+        this.SECONDARY_TIMEOUT_MS,
       );
       return { facet: 'all', enrichments };
+    } catch (err) {
+      logger.warn(
+        { err, failure: failureKind(err), querySnippet: query.slice(0, 50) },
+        'resolveSecondaryAll: secondary enrichment failed — returning empty enrichments',
+      );
+      return { facet: 'all', enrichments: {} };
     }
   }
 
   private async doResolveSecondaryAll(
     query: string,
+    viewer: AttachmentSearchViewer,
     primaryIds: string[],
   ): Promise<IResolvedSecondaryResult['enrichments']> {
-    // Time-lag defense: mget to verify pages still exist and are accessible
-    const mgetResponse = await this.attachmentClient.mgetPages(primaryIds);
-
-    // Fail-close: only include pages where found===true AND no error
-    const validIds = filterMgetDocs(mgetResponse.docs);
+    // The ids come from the client: re-check them for this viewer
+    const visiblePageIds = await this.findVisiblePageIds(
+      primaryIds,
+      viewer,
+      this.SECONDARY_TIMEOUT_MS,
+    );
+    const validIds = primaryIds.filter((id) => visiblePageIds.has(id));
 
     if (validIds.length === 0) {
       return {};
     }
 
-    // Search attachments filtered to the valid page IDs
     const searchBody = buildAttachmentsByPageIdsQuery(query, validIds, {
       highlight: true,
     });
     const attachmentResponse =
       await this.attachmentClient.searchAttachments(searchBody);
 
-    // Group hits by pageId
     const enrichments: IResolvedSecondaryResult['enrichments'] = {};
     for (const hit of attachmentResponse.hits.hits) {
       const pageId = hit._source.pageId;
-      if (enrichments[pageId] == null) {
-        enrichments[pageId] = { attachmentHits: [] };
-      }
-      enrichments[pageId].attachmentHits?.push(toAttachmentHit(hit));
+      // The attachments query filters by validIds; this re-check keeps the
+      // gate independent of that query being correct.
+      if (!visiblePageIds.has(pageId)) continue;
+      const current = enrichments[pageId]?.attachmentHits ?? [];
+      enrichments[pageId] = {
+        attachmentHits: [...current, toAttachmentHit(hit)],
+      };
     }
 
     return enrichments;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Factory: builds an AttachmentIndexClient from a raw ES search function
-// ---------------------------------------------------------------------------
-
-/**
- * Raw ES search function type — accepts an index name and body, returns ES response.
- */
-export type RawEsSearchFn = (
-  index: string,
-  body: Record<string, unknown>,
-) => Promise<AttachmentSearchResponse>;
-
-/**
- * Raw ES mget function type — accepts an index name and body, returns mget response.
- */
-export type RawEsMgetFn = (
-  index: string,
-  body: Record<string, unknown>,
-) => Promise<MgetPagesResponse>;
-
-/**
- * Creates an AttachmentIndexClient from raw ES search + mget functions.
- * Use this in production wiring; inject a mock in unit tests.
- */
-export const createAttachmentIndexClient = (
-  attachmentIndexAlias: string,
-  pageIndexAlias: string,
-  rawSearch: RawEsSearchFn,
-  rawMget: RawEsMgetFn,
-): AttachmentIndexClient => ({
-  searchAttachments: (body) => rawSearch(attachmentIndexAlias, body),
-  mgetPages: (pageIds) =>
-    rawMget(pageIndexAlias, mgetPagesForPermissionBody(pageIds)),
-});

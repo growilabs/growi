@@ -1,4 +1,9 @@
-import type { IPage, IPageHasId, IUser } from '@growi/core';
+import {
+  getIdStringForRef,
+  type IPage,
+  type IPageHasId,
+  type IUser,
+} from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
@@ -14,6 +19,7 @@ import type {
   AttachmentSearchResultAggregator,
   IPrimarySearchResult,
 } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
+import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
 import type {
   AuditlogSuggestionField,
   AuditlogSuggestionsResponse,
@@ -47,8 +53,8 @@ import type {
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
-import { hasIntersection } from '../util/compare-objectId';
 import { configManager } from './config-manager';
+import { canShowSnippetForGrant } from './search/can-show-snippet';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
@@ -582,9 +588,13 @@ class SearchService implements SearchQueryParser, SearchResolver {
    * facet=pages (default): existing page-only path — no attachment index touched.
    * facet=all | facet=attachments: routed through AttachmentSearchResultAggregator.
    * Falls back to page-only when the aggregator is not yet initialised.
+   *
+   * `viewer` is resolved the same way the page search route resolves it; a
+   * null user means guest.
    */
   async searchByFacet(
     keyword: string,
+    viewer: AttachmentSearchViewer,
     options: {
       facet?: 'pages' | 'all' | 'attachments';
       from?: number;
@@ -596,21 +606,21 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const size = options.size ?? 20;
 
     if (facet !== 'pages' && this.attachmentSearchResultAggregator != null) {
-      return this.attachmentSearchResultAggregator.searchPrimary(keyword, {
-        facet,
-        from,
-        size,
-      });
+      return this.attachmentSearchResultAggregator.searchPrimary(
+        keyword,
+        viewer,
+        { facet, from, size },
+      );
     }
 
-    // Page-only fallback: delegate to the existing full-text search delegator
-    const parsedQuery = await this.parseSearchQuery(keyword, null);
-    const [delegator, data] = await this.resolve(parsedQuery);
-    this.validateSearchableData(delegator, data);
-    const result = await delegator.search(data, undefined, undefined, {
-      from,
-      size,
-    });
+    // Page-only fallback: the regular page search for the same viewer
+    const [result] = await this.searchKeyword(
+      keyword,
+      null,
+      viewer.user,
+      viewer.userGroups,
+      { offset: from, limit: size },
+    );
 
     return {
       facet: 'pages',
@@ -935,32 +945,21 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   canShowSnippet(pageData, user, userGroups): boolean {
-    const Page = mongoose.model('Page') as unknown as PageModel;
-
-    const testGrant = pageData.grant;
-    const testGrantedUser = pageData.grantedUsers?.[0];
-    const testGrantedGroups = pageData.grantedGroups;
-
-    if (testGrant === Page.GRANT_RESTRICTED) {
-      return false;
-    }
-
-    if (testGrant === Page.GRANT_OWNER) {
-      if (user == null) return false;
-
-      return user._id.toString() === testGrantedUser.toString();
-    }
-
-    if (testGrant === Page.GRANT_USER_GROUP) {
-      if (userGroups == null) return false;
-
-      return hasIntersection(
-        userGroups.map((id) => id.toString()),
-        testGrantedGroups,
-      );
-    }
-
-    return true;
+    return canShowSnippetForGrant(
+      {
+        grant: pageData.grant,
+        grantedUserIds: (pageData.grantedUsers ?? []).map((ref) =>
+          getIdStringForRef(ref),
+        ),
+        grantedGroupIds: (pageData.grantedGroups ?? []).map((group) =>
+          getIdStringForRef(group.item),
+        ),
+      },
+      {
+        userId: user?._id?.toString() ?? null,
+        userGroupIds: userGroups?.map((id) => id.toString()) ?? null,
+      },
+    );
   }
 }
 
