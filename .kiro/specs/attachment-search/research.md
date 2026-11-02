@@ -12,7 +12,7 @@ _Generated: 2026-04-17_
 
 #### 既存資産
 - [apps/app/src/server/service/search.ts](apps/app/src/server/service/search.ts) — `SearchService` 本体。ES/named-query 委譲、イベント登録 (`registerUpdateEvent()`)、検索パイプライン
-- [apps/app/src/server/service/search-delegator/elasticsearch.ts](apps/app/src/server/service/search-delegator/elasticsearch.ts) — `ElasticsearchDelegator`。ES 7/8/9 の互換レイヤ、bulkWrite ベースの同期、`filterPagesByViewer()` による権限フィルタリング、`rebuildIndex()` (tmp index → alias swap)
+- [apps/app/src/server/service/search-delegator/elasticsearch.ts](apps/app/src/server/service/search-delegator/elasticsearch.ts) — `ElasticsearchDelegator`。ES 8/9 の互換レイヤ、bulkWrite ベースの同期、`filterPagesByViewer()` による権限フィルタリング、`rebuildIndex()` (tmp index → alias swap)
 - [mappings-es9.ts](apps/app/src/server/service/search-delegator/mappings/mappings-es9.ts) — Page ドキュメントの mapping 定義。`path` / `body` / `comments` / `grant` / `granted_users` / `granted_groups` / `created_at` 等
 - [aggregate-to-index.ts](apps/app/src/server/service/search-delegator/aggregate-to-index.ts) — MongoDB aggregation パイプラインで Page + Revision + Comment + Bookmark + Tag を join して ES に供給
 - API: `PUT /api/v3/search/indices` (operation=rebuild/normalize)、`GET /api/v3/search/indices`
@@ -34,7 +34,7 @@ ES 側は `grant` (enum) / `granted_users` (keyword array) / `granted_groups` (k
 - [apps/app/src/server/models/attachment.ts](apps/app/src/server/models/attachment.ts) — Schema: `page`, `creator`, `fileName` (unique/hashed), `fileFormat` (MIME), `fileSize`, `originalName`, `attachmentType`
 - [apps/app/src/server/service/attachment.ts](apps/app/src/server/service/attachment.ts) — `AttachmentService`。以下が重要な**既存の拡張ポイント**:
   ```typescript
-  type AttachHandler = (pageId: string | null, attachment: IAttachmentDocument, file: Express.Multer.File) => Promise<void>;
+  type AttachHandler = (pageId: string | null, attachment: AttachmentWithComputed, file: Express.Multer.File) => Promise<void>;
   type DetachHandler = (attachmentId: string) => Promise<void>;
   addAttachHandler(h: AttachHandler): void;
   addDetachHandler(h: DetachHandler): void;
@@ -191,7 +191,7 @@ ES 側は `grant` (enum) / `granted_users` (keyword array) / `granted_groups` (k
 |---|---|---|---|
 | services/attachment-text-extractor (新規、FastAPI) | M | Medium | FastAPI 標準構成だが Python 言語追加で CI/配布系に新規導入が必要 |
 | packages/attachment-text-extractor-client (orval 生成) | S | Low | pdf-converter-client の orval 設定を模倣できる |
-| ES attachments index + mapping + delegator 拡張 | M | Medium | 既存 delegator パターンを踏襲、ES 7/8/9 三版対応の mapping 追加 |
+| ES attachments index + mapping + delegator 拡張 | M | Medium | 既存 delegator パターンを踏襲、ES 8/9 二版対応の mapping 追加 |
 | AttachmentService ハンドラ登録 + 抽出→index 連携 | M | Medium | 既存 hook は fire-and-forget、失敗可視化の配線を追加 |
 | 権限変更時の追従 (R4.3) | S | Medium | 現状 Page 権限変更時のハンドラ連携が弱い → 対応箇所特定が要調査 |
 | 検索クエリ multi-index 集約 + IPageWithSearchMeta 拡張 | M | Medium | 既存検索 API を保ったまま応答拡張、性能要注意 |
@@ -222,7 +222,7 @@ ES 側は `grant` (enum) / `granted_users` (keyword array) / `granted_groups` (k
 ### Research Needed (design phase でさらなる調査)
 
 - **markitdown PR #1263 マージ状況の継続確認** — 現状 OPEN (2026-03-28 更新、1 件の APPROVAL review)。未マージでの本機能リリース時は抽出サービス内部で `pdfminer.six` を直接呼ぶフォールバック (数十行規模) が必要
-- **ES 7/8/9 の mapping 実機検証** — 日本語 analyzer (kuromoji) / 英語 analyzer の添付テキストに対する挙動、body との整合
+- **ES 8/9 の mapping 実機検証** — 日本語 analyzer (kuromoji) / 英語 analyzer の添付テキストに対する挙動、body との整合
 - **Python FastAPI OpenAPI → orval** の統合手順の実例 (GROWI monorepo での類似事例は pdf-converter のみ、あれは Ts.ED が Swagger を直接出す構成)
 - **添付ファイル一覧モーダルのコンポーネント特定** — `PageAttachment` / `AttachmentList` 系のクライアントコンポーネントの正確な場所と拡張スロット
 - **親ページ権限変更のイベントフック** — 既存実装のどの箇所に hook 点があるか、または新規追加が必要か
@@ -306,7 +306,7 @@ _Generated: 2026-04-17 (during `/kiro-spec-design`)_
 - **構築**: `AttachmentSearchIndexer`、添付 ES mapping、UI コンポーネント (`AttachmentHitCard`, `AttachmentSubEntry`, `SearchResultFacetTabs`, `ReextractButton`, `AttachmentSearchSettings`, `AttachmentExtractionFailures`)、抽出サービス本体
 
 ### Simplification
-- **独立 delegator は作らない**: 既存 `ElasticsearchDelegator` に添付向けメソッドを追加する (ES 7/8/9 の互換処理を再利用)
+- **独立 delegator は作らない**: 既存 `ElasticsearchDelegator` に添付向けメソッドを追加する (ES 8/9 の互換処理を再利用)
 - **独立 job queue は作らない**: 既存 Socket.io progress + fire-and-forget ハンドラパターンを再利用
 - **独立 admin ページは作らない**: 既存 `ElasticsearchManagement` に添付セクションと rebuild チェックボックスを追加
 - **検索 API を破壊的変更しない**: `IPageWithSearchMeta` に optional `attachmentHits[]` を追加するだけで新機能を表現

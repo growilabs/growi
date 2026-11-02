@@ -56,7 +56,7 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
 
 | 観点 | 既存 delegator 拡張 (composition) | 独立 attachment-delegator |
 |---|---|---|
-| ES 7/8/9 互換レイヤ | 既存コードを再利用 | 複製が必要 |
+| ES 8/9 互換レイヤ | 既存コードを再利用 | 複製が必要 |
 | alias swap ライフサイクル | Page と同時 atomic swap 可能 | 独立 swap だと Page と一貫性が取れない |
 | 再インデックス時の連携 | `rebuildIndex()` に checkbox で合流可能 | 独立 API / 独立 UI 導線が必要 |
 | テスト面 | 既存 integration test 構造に乗せられる | 新規テストハーネスが必要 |
@@ -157,7 +157,7 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
 
 - 観察: Attachment は `prisma.attachments` (Prisma 拡張) で読み書きされるようになり、Mongoose の `Attachment` / `IAttachmentDocument` は export されない。`AttachHandler` の引数は `AttachmentWithComputed`。id は 24 桁の 16 進文字列で、ObjectId を文字列化した値と同じ形
 - 判断: indexer / reindex batch / 抽出サービス / 管理 API は `prisma.attachments` を使う。ES 文書 ID (`${attachmentId}_${pageNumber ?? 0}`) と `attachmentId` keyword の値は以前と同じ文字列になるため、既存の添付 index を作り直す必要はない
-- 一括走査: Mongoose の stream cursor の代わりに `findMany` の id 順ページング (`take` + `cursor`) を使う
+- 一括走査: Mongoose の stream cursor の代わりに `findMany` の id 順ページング (`where: { id: { gt: 直前の id } }` + `take`。基準にした行が走査中に消えても影響されない) を使う。1 件の行が壊れていても全体が止まらないよう、ページングは id だけを読み、各行は 1 件ずつ `findUnique` で読む
 
 ### 8.3 抽出失敗ログを Prisma-only のモデルにする
 

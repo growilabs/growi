@@ -124,7 +124,7 @@ _Generated: 2026-04-17_
 // 擬似コード
 async function computeRequiresReindex(): Promise<boolean> {
   if (!isAttachmentFullTextSearchEnabled) return false;
-  const mongoCount = await Attachment.countDocuments();
+  const mongoCount = await prisma.attachments.count();
   if (mongoCount === 0) return false;
   const esUniqueCount = /* ES cardinality aggregation on attachmentId */;
   return mongoCount > esUniqueCount;

@@ -23,7 +23,6 @@
 - 画像の OCR、LLM による補助、音声・動画の文字起こし
 - Outlook MSG、ZIP の中身の再帰展開
 - 表の構造を保った高精度な PDF 抽出 (Docling 等)
-- クライアントが接続を切ったときの即時中止 (時間切れの上限で止まるため必須にしない。§Open Questions)
 
 ## Boundary Commitments
 
@@ -173,6 +172,7 @@ services/attachment-text-extractor/
 │   ├── routers/
 │   │   ├── extract.py                     # [Modified] ConversionRunner を呼び、結果をエラー表に従って応答に変える
 │   │   ├── extract_upload.py              # [New] 本文の受信 (枠の後・メモリだけ・届いたバイト数の上限と期限・不正な本文の判定)
+│   │   ├── client_disconnect.py           # [New] 変換中の切断を見張り、切断したら変換を取り消す
 │   │   ├── extract_errors.py              # [New] FailureKind → ErrorCode / HTTP ステータスの表 (全 FailureKind をキーに持つ)
 │   │   └── health.py                      # [Modified] pdf_strategy を削除、readyz で forkserver と依存の読み込みを確認
 │   ├── runner/                            # [New] 親プロセス側: 子プロセスの起動・監視・停止
@@ -702,10 +702,12 @@ class ConversionError(Exception):    # 変換層の中だけで使い、Conversi
 | `MAX_CONCURRENCY` | 3 | ワーカーごとの同時変換の数。ワーカー 1 つなら全体の上限 | 既定を 4 から 3 に。説明の「`max(2, workers×2)` に設定」を「全体の上限はワーカー数 × この値」に直す |
 | `MAX_FILE_SIZE_MB` | 50 | 受け付けるファイルの大きさの上限 | 既存 |
 | `UPLOAD_TIMEOUT_S` | 15 | 本文を受け取り終えるまでの時間の上限。超えたら 408 (`extraction_timeout`)。50MiB なら毎秒約 3.4MB 以上の転送が要る。変換の `TIMEOUT_S` とは別に数える | 新規 |
-| `TIMEOUT_S` | 55 | 1 件の変換の時間の上限。apps/app の `timeoutMs` (既定 60000) より 5 秒以上短くする | 既定を 60 から 55 に (実際に止まるようになる) |
+| `TIMEOUT_S` | 55 | 1 件の変換の時間の上限。ファイルの受け取り (`UPLOAD_TIMEOUT_S` 15 秒) と後始末 (最大約 4 秒) を足した最悪の合計 (約 74 秒) が、apps/app の `timeoutMs` (既定 90000) に収まるようにする | 既定を 60 から 55 に (実際に止まるようになる) |
 | `MAX_CHILD_RSS_MB` | 320 | 1 件の変換に許す RSS の上限。XLSX 以外の最悪値 (画像の多い 40MB の DOCX / PPTX で 188MB、50MB なら約 225MB の見込み) に余裕を持たせた値 | 新規 |
 | `MAX_XLSX_CELLS` | 70000 | XLSX の全シートのセル数の合計の上限。anydoc で 1 シート 7 万セルは約 285MB で、`MAX_CHILD_RSS_MB` に収まる (10 万セルは 328〜357MB で収まらない) | 新規 |
 | `MAX_RESULT_BYTES` | 16777216 (16MiB) | 1 件の結果 (全要素の合計) の上限 | 新規。使われていなかった `MAX_EXTRACTED_BYTES` (500MiB) を置き換える |
+| `MAX_CSV_BYTES` | 8388608 (8MiB) | CSV / TSV のファイルサイズの上限。子を作る前に判定する。バイト数だけを見る早めの拒否で、通ることの保証ではない | 新規 |
+| `MAX_HTML_BYTES` | 20971520 (20MiB) | HTML のファイルサイズの上限。子を作る前に判定する | 新規 |
 | `MAX_PDF_PAGES` | 5000 | PDF のページ数の上限 | 新規 |
 | `MAX_ARCHIVE_ENTRIES` | 10000 | PPTX / XLSX の ZIP のエントリ数の上限 | 新規 |
 | `MAX_ARCHIVE_UNCOMPRESSED_MB` | 512 | ZIP の申告された展開後サイズの合計の上限 (anydoc の組み込み上限と同じ値) | 新規 |
@@ -715,7 +717,7 @@ Dockerfile で固定する環境変数:
 - `RAYON_NUM_THREADS=1`: anydoc 内部のスレッドプールを 1 本にする。設定しないとコア数ぶんのスレッドが立ち、仮想メモリのピークが 1.2GB に達した
 - `TMPDIR=/tmp`: forkserver は `$TMPDIR` の下に UNIX ソケットを作る。パスは 108 バイト未満でなければならない
 
-**メモリの守り方**: ファイルの大きさで形式ごとに上限を決めるのではなく、子が実際に使ったメモリ (RSS) を `MAX_CHILD_RSS_MB` で止める。入力の大きさとメモリの関係は形式と中身でばらつくため。ただし XLSX だけは、anydoc がセル数に比例してメモリを使い (1 セルあたり約 2.5KB)、小さなファイルでも上限を大きく超えるので、変換の前に `MAX_XLSX_CELLS` でセル数を検査して、上限に当たる前に分かりやすいエラーにする。旧形式の XLS と ODS はセル数を数えずに anydoc に渡し、大きなものは RSS の上限で止まる。
+**メモリの守り方**: 主な守りは、子が実際に使ったメモリ (RSS) を `MAX_CHILD_RSS_MB` で止めること。入力の大きさとメモリの関係は形式と中身でばらつくため。そのうえで、メモリの使い方が極端に重い形式だけ、変換の前に早く断る。CSV / TSV は `MAX_CSV_BYTES` (8MiB)、HTML は `MAX_HTML_BYTES` (20MiB) を超えたら、子プロセスを作らずに `limit_exceeded` を返す (`check_input_size`。親の `ConversionRunner.run()` と変換層の両方で同じ判定を使う)。ただしこれはバイト数だけを見る早めの拒否で、通ることの保証ではない: anydoc のメモリはバイト数でなくセルの数で決まり (約 100 万セルで 320MB を超える)、1 文字のセルだけの CSV は 2MiB でも上限を超えて RSS 監視で止まる。HTML も、属性が異常に多いタグなどの 4MB で数百 MB を使うことがあり、サイズ上限では防げないので RSS 監視は残す。ただし XLSX だけは、anydoc がセル数に比例してメモリを使い (1 セルあたり約 2.5KB)、小さなファイルでも上限を大きく超えるので、変換の前に `MAX_XLSX_CELLS` でセル数を検査して、上限に当たる前に分かりやすいエラーにする。旧形式の XLS と ODS はセル数を数えずに anydoc に渡し、大きなものは RSS の上限で止まる。
 
 **メモリ上限の目安**: コンテナのメモリ上限 ≒ ワーカー数 × 120MB + ワーカー数 × `MAX_CONCURRENCY` × (`MAX_CHILD_RSS_MB` + 100MB + アップロード 2 × `MAX_FILE_SIZE_MB` + 結果 16MiB × 3)。アップロードは一時ファイルを作らずメモリにだけ置き、解析中だけ約 2 倍の大きさになる。既定 (ワーカー 1・枠 3・RSS 320MB) で 120 + 3 × (320 + 100 + 100 + 48) ≒ 約 1.8GB (3 件 × 50MB を同時に送ったときのワーカーの最大 RSS の実測は 263MiB)。k8s の例では requests 512Mi / limits 2Gi とする。
 
@@ -737,7 +739,7 @@ Dockerfile で固定する環境変数:
 | 対応表にない形式、anydoc の `UnsupportedError` | `unsupported` | `unsupported_format` | 400 |
 | anydoc の `EncryptedError`、pypdfium2 の `PdfiumError` (err_code 4 / 5) | `encrypted` | `file_encrypted` (新規) | 422 |
 | anydoc の `MalformedError` / `MissingPartError`、pypdfium2 の `PdfiumError` (err_code 0 / 1 / 2 / 3) | `malformed` | `extraction_failed` | 422 |
-| anydoc の `ResourceLimitError`、ArchiveGuard の上限、`MAX_PDF_PAGES` の超過、`MAX_XLSX_CELLS` の超過 | `limit_exceeded` | `resource_limit_exceeded` (新規) | 422 |
+| anydoc の `ResourceLimitError`、ArchiveGuard の上限、`MAX_PDF_PAGES` の超過、`MAX_XLSX_CELLS` の超過、`MAX_CSV_BYTES` / `MAX_HTML_BYTES` の超過 (子を起動する前に親が判定) | `limit_exceeded` | `resource_limit_exceeded` (新規) | 422 |
 | 親の RSS 監視で止めた | `memory_exceeded` | `resource_limit_exceeded` | 422 |
 | 結果が `MAX_RESULT_BYTES` を超えた | `result_too_large` | `resource_limit_exceeded` | 422 |
 | 期限を過ぎて親が止めた、子が `RLIMIT_CPU` を超えて SIGXCPU で終わった | `timeout` | `extraction_timeout` | 408 |
@@ -819,7 +821,7 @@ Dockerfile で固定する環境変数:
 
 ## Open Questions / Risks
 
-- **接続が切れたときの中止**: 既存のミドルウェア (`BaseHTTPMiddleware` を使った認証とログ) を挟むと、クライアントの切断を検知できず、子は時間の上限まで動き続ける。時間の上限で止まるので要件は満たす。即時に止めたくなったら、ミドルウェアを純粋な ASGI ミドルウェアに書き換える
+- **接続が切れたときの中止の限界**: 変換中に呼び出し側が切断すると、ASGI の `receive()` で `http.disconnect` を待つタスクが検知し、変換を取り消して子を kill・回収し、枠を返す (`routers/client_disconnect.py`。`Request.is_disconnected()` は `BaseHTTPMiddleware` を 2 層通すと切断を報告しない)。1 つの接続に 2 件続けて送ってから切断すると、uvicorn は最新の 1 件にだけ切断の印を付けるので、先の 1 件は最後まで動く (切断を検知できない従来の動きと同じ)。
 - **OS のメモリ不足と異常終了の区別**: cgroup のメモリ上限で子が止められると、`crashed` と区別できない。`oom_score_adj` で子が先に止められるようにし、親の RSS 監視で上限の手前で止めることで起こりにくくする
 - **ワーカーが複数のときの偏り**: ワーカーを 2 つ以上にすると、OS が接続を振り分けるため、片方が 503 を返しているのにもう片方に空きがあることがありうる。既定をワーカー 1 つにする理由の 1 つ
 - **anydoc の文書化されていない挙動**: PPTX の分割 (参照を外したスライドを含むパッケージの受け付け) と XLSX の目印方式は、anydoc の現在の挙動に頼る。版を固定し、契約テストで検知する。通らなくなったときの予備は python-pptx (PPTX) と、XLSX を 1 要素で返すこと

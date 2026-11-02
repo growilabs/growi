@@ -28,8 +28,8 @@
   - _Requirements: 5.1, 5.2_
   - _Boundary: ConfigManager / config-definition_
 
-- [x] 2.2 (P) ES 添付 index mapping を ES 7/8/9 変種ごとに作成する
-  - `attachments-mappings-es7.ts` / `es8.ts` / `es9.ts` を追加し、`attachmentId` / `pageId` / `pageNumber` / `label` / `fileName` / `originalName` (text+keyword) / `fileFormat` / `fileSize` / `content` (kuromoji + ngram) / `attachmentType` / `created_at` / `updated_at` を定義する
+- [x] 2.2 (P) ES 添付 index mapping を ES 8/9 変種ごとに作成する
+  - `attachments-mappings-es8.ts` / `es9.ts` を追加し、`attachmentId` / `pageId` / `pageNumber` / `label` / `fileName` / `originalName` (text+keyword) / `fileFormat` / `fileSize` / `content` (kuromoji + ngram) / `attachmentType` / `created_at` / `updated_at` を定義する
   - **権限フィールド (`grant` / `granted_users` / `granted_groups` / `creator`) を含めない** ことを mapping snapshot test で固定する (Option D の構造的担保)
   - ES バージョン別 delegator が version-aware に正しい mapping を選択できること
   - _Requirements: 2.2, 2.5, 9.2_
@@ -213,7 +213,7 @@
 - [x] 8.4 (P) admin config エンドポイントと `requiresReindex` 算出サービスを実装する
   - `GET /_api/v3/admin/attachment-search/config`: `extractorUri` / `hasExtractorToken` (存在判定のみ、値は返さない) / `timeoutMs` / `maxFileSizeBytes` / `isAttachmentFullTextSearchEnabled` / `requiresReindex` を返す
   - `PUT /_api/v3/admin/attachment-search/config`: `extractorUri` (null / 空文字で soft-disable、allowlist 検証 400) / `extractorToken` (write-only、null で削除、encrypted storage 経由で save) / `timeoutMs` / `maxFileSizeBytes` を受理
-  - `requiresReindex` は `Attachment.countDocuments()` > ES `attachments` cardinality 集計の算出、**Config collection に persist しない**、30 秒 TTL in-memory cache + `PUT config` 成功時 invalidate
+  - `requiresReindex` は `prisma.attachments.count()` > ES `attachments` cardinality 集計の算出、**Config collection に persist しない**、30 秒 TTL in-memory cache + `PUT config` 成功時 invalidate
   - `extractorToken` の値が GET 応答に絶対含まれないことを unit test で固定 (encrypted field の値漏出防止)
   - _Requirements: 5.1, 5.2, 5.3_
   - _Boundary: features/search-attachments/server/routes/apiv3, Config service_

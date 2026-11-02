@@ -571,7 +571,7 @@ Key decisions:
 - **Bearer auth 失敗**: 上流 401 `unauthorized` は `extraction_failed` ではなく**`serviceUnreachable` に正規化** (機能を soft-disable 相当に degrade、admin が token 不整合に気付くよう pino ERROR ログ + ExtractionFailureLog 記録)。token 回転中の一時的な不一致も自動的に failing open せず、新 token が伝搬するまで抽出は停止。**pino ログ出力時は `Authorization` ヘッダ値をログオブジェクトに含めない** (request オブジェクトや headers をそのまま渡さない。token が共有リソースである extractor へのアクセス権そのものであるため、ログ経由の漏洩を防ぐ)
 - ネットワーク層エラーと抽出サービスエラーコードを `ExtractionOutcome` に統一正規化。抽出サービスのエラーコードとの対応: `unsupported_format` → `unsupported`、`file_too_large` → `tooLarge`、`extraction_timeout` → `timeout`、`service_busy` → `serviceBusy`、`file_encrypted` → `encrypted`、`resource_limit_exceeded` → `resourceLimit`、`extraction_failed` → `failed`、`unauthorized` → `serviceUnreachable`。`extraction_failed` は抽出サービス側で 422 (壊れたファイル) と 500 (想定外の異常) の 2 つのステータスを持つが、分岐はコードで行う
 - 到達不可時に catch-all し `serviceUnreachable` を返す (throw しない)
-- **タイムアウトの順序**: `app:attachmentFullTextSearch:timeoutMs` は抽出サービスの `TIMEOUT_S` より 5 秒以上長くする。抽出サービスの既定は 55 秒なので、こちらの既定 60000ms と合う (こちらが先に諦めると、抽出サービス側の変換が無駄に続く)
+- **タイムアウトの順序**: `app:attachmentFullTextSearch:timeoutMs` は、抽出サービスが 1 件に使いうる最長の時間より長くする。抽出サービスは、ファイルの受け取りに最大 `UPLOAD_TIMEOUT_S` (既定 15 秒)、変換に最大 `TIMEOUT_S` (既定 55 秒)、止めた後の後始末に最大約 4 秒を使うので、合計は最悪で約 74 秒になる。そのためこちらの既定は 90000ms にしている (こちらが先に諦めると、抽出サービス側の変換が無駄に続き、同時に処理できる枠を 1 つふさぎ続ける)。抽出サービスは「状態を持たない同期の呼び出し」とし、非同期の受け付け方式 (依頼 ID と結果の保存場所が要る) は採らない。呼び出し元は画面を待たせない裏の索引作成処理なので、待ち時間を長くしても利用者には影響しない
 
 **Contracts**: **Service [x]**
 
