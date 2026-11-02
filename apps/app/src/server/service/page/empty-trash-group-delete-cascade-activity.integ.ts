@@ -3,9 +3,8 @@
  * bulk-deletion paths that reach deleteCompletelyOperation through the
  * deleteMultipleCompletely seam (task 7.3; read-back-from-real-DB style):
  *
- *   A. Empty trash: the REAL pageService.emptyTrashPage →
- *      deleteCompletelyDescendantsWithStream (batch stream over /trash
- *      descendants) → deleteMultipleCompletely(batch, user) →
+ *   A. Empty trash: the REAL pageService.emptyTrashPage (batches of the
+ *      given trashed pages) → deleteMultipleCompletely(batch, user) →
  *      deleteCompletelyOperation(ids, paths, { user }) →
  *      recordCascadeAttachmentRemovals (BEFORE removeAllAttachments).
  *   B. Group deletion: the REAL
@@ -21,8 +20,7 @@
  * to the seam's `user` argument (a creator-derived value would fail).
  *
  * Every assertion READS THE ACTIVITIES BACK FROM THE REAL DATABASE: the
- * recorder and createActivity swallow persistence errors, and the trash
- * stream's write handler additionally swallows whole-batch errors — a
+ * recorder and createActivity swallow persistence errors — a
  * silently-failing record surfaces only as a MISSING row.
  *
  * Recording gate: injected through the explicit configManager API
@@ -262,16 +260,16 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
       // do not survive the deleteMultipleCompletely seam.
       await pageService.emptyTrashPage(
         trashOperator,
-        {},
         {
           ip: TRASH_ENTRY_IP,
           endpoint: TRASH_ENTRY_ENDPOINT,
         },
+        [trashedPage._id],
       );
 
       // Assert: read the cascade activities back from the real DB. The
-      // stream's write handler swallows batch errors, so a failed record
-      // surfaces only as a missing row — poll via vi.waitFor. Rows are
+      // recorder swallows persistence errors, so a failed record surfaces
+      // only as a missing row — poll via vi.waitFor. Rows are
       // pinned by target (this suite's attachment ids), which keeps the
       // count exact even if this worker's DB held other leftover trash.
       const cascadeActivities = await vi.waitFor(

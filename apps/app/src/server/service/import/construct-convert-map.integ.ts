@@ -32,6 +32,6 @@ describe('constructConvertMap', () => {
 
     // assert
     expect(result).not.toBeNull();
-    expect(Object.keys(result).length).toEqual(35);
+    expect(Object.keys(result).length).toEqual(36);
   });
 });

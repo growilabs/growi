@@ -2,7 +2,7 @@
 
 ## Introduction
 
-GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を **メンテナンスするための大局的な仕様**。SDK ライフサイクル、Resource Attribute、Custom Metric、HTTP Anonymization の 4 レイヤがそれぞれ「何を担い、何を担わないか」を明文化し、新規メトリクスや anonymization handler の追加、SDK のバージョンアップ、設定キーの追加・改名といった将来のメンテナンス時に、本 spec を 1 か所の参照点として運用できる状態を目標とする。
+GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を **メンテナンスするための大局的な仕様**。SDK ライフサイクル、Resource Attribute、Custom Metric の各レイヤがそれぞれ「何を担い、何を担わないか」を明文化し（HTTP の匿名化は別 spec `opentelemetry-anonymization` が担う）、新規メトリクスの追加、SDK のバージョンアップ、設定キーの追加・改名といった将来のメンテナンス時に、本 spec を 1 か所の参照点として運用できる状態を目標とする。
 
 本 spec は新規実装 spec ではなく、既に実装・稼働している `features/opentelemetry/` の **現状の責務境界をスナップショットとして固定化する** 性格を持つ。個別機能の追加・変更は原則として本 spec の Boundary Commitments の範囲内で行われ、境界をまたぐ変更が必要なときは Revalidation Triggers として再評価される。
 
@@ -14,9 +14,10 @@ GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を **�
   - SemConv の不安定 attribute のローカルコピー (`semconv.ts`)。
   - identity 専用の Resource Attribute 供給 (`custom-resource-attributes/`)。
   - Custom Metric の emit と合成 (`custom-metrics/`、合計 4 モジュール: application / user-counts / page-counts / system)。
-  - HTTP リクエストの best-effort anonymization (`anonymization/`、4 個の handler + utility)。
+  - `otel:anonymizeInBestEffort` に応じた匿名化 hook の受け渡し（要件 1.5）。匿名化の中身は対象外。
   - `otel:*` 設定キー 4 種の利用ポリシー。
 - **Out of scope**:
+  - HTTP の匿名化（`anonymization/`）。`opentelemetry-anonymization` を参照。
   - `growiInfoService` / `configManager` / `loggerFactory` などの上流サービスの設計や API 変更。
   - 既存メトリクス（`growi.users.total` / `growi.users.active` / `growi.pages.total` / `growi.configs` / `system.*` / `process.*`）の名称変更や再構成。
   - OpenTelemetry のログシグナル統合（log signal は現状未使用）。
@@ -40,6 +41,7 @@ GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を **�
 2. The GROWI server shall `otel:enabled` 設定値と `OTEL_SDK_DISABLED` 環境変数の値が矛盾している場合、`OTEL_SDK_DISABLED` を上書きして整合性を取り、その旨を warn ログとして出力する。
 3. The GROWI server shall NodeSDK 初期化を「SDK 構築・Resource 静的部分のセット」「DB 初期化後の Resource 追加注入」「`start()` 呼び出しと Custom Metric 登録」の 3 段階で行う。各段階は `otel:enabled` を再確認した上で実行する。
 4. The GROWI server shall 同一プロセス内で `initInstrumentation()` を二重に呼ばれても、SDK インスタンスを重複生成しない（再初期化は警告を出してスキップする）。
+5. The GROWI server shall `otel:anonymizeInBestEffort` が `true` のときのみ、匿名化 hook（`httpInstrumentationConfig`）を HTTP instrumentation に渡す。`false` のときは hook を渡さず、HTTP instrumentation の標準動作のみを行う。
 
 ### Requirement 2: identity 専用 Resource Attribute
 
@@ -87,17 +89,9 @@ GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を **�
 4. The GROWI server shall `process.runtime.v8.heap.used` / `process.runtime.v8.heap.total` / `process.runtime.v8.heap.external` を `v8.getHeapStatistics()` および `process.memoryUsage().external` から観測する。
 5. The GROWI server shall 上記すべてのメトリクスを単位 `By`（bytes）で emit する。
 
-### Requirement 6: HTTP リクエストの best-effort anonymization
+### Requirement 6: （欠番）HTTP の匿名化
 
-**Objective:** プライバシ保護担当者として、`otel:anonymizeInBestEffort` が `true` のとき、ユーザーが入力した検索キーワード・ページパス・ユーザー名がトレース span の `http.target` に平文で残らないことを保証したい。
-
-#### Acceptance Criteria
-
-1. The GROWI server shall `otel:anonymizeInBestEffort` が `true` のとき、HTTP instrumentation の `startIncomingSpanHook` で `anonymizationModules` を順次評価し、`canHandle(url)` が `true` を返した module の `handle()` 結果を span attribute としてマージする。
-2. The GROWI server shall 検索 API (`/_api/search`, `/_search`) の `q` クエリパラメータを `[ANONYMIZED]` に置換する。
-3. The GROWI server shall page-listing API (`/_api/v3/page-listing/{ancestors-children,children,item}`) および page API (`/_api/v3/pages/list`, `/_api/v3/pages/subordinated-list`, `/_api/v3/page/check-page-existence`, `/_api/v3/page/get-page-paths-with-descendant-count`) の `path` / `paths` パラメータを匿名化する。
-4. The GROWI server shall ページアクセス（非 API、permalink でない、創出可能なページパス）に対し、ユーザー名およびページパスを SHA-256 prefix（16 文字）でハッシュし `[USERNAME_HASHED:...]` / `[HASHED:...]` プレースホルダで置換する。permalink（ObjectId）と users top page（`/user`）はそのまま残す。
-5. If `otel:anonymizeInBestEffort` が `false`, the GROWI server shall `startIncomingSpanHook` を渡さず、HTTP instrumentation の標準動作のみを行う。
+HTTP の匿名化は `opentelemetry-anonymization` を参照する。
 
 ### Requirement 7: Diag Logger と pino の統合
 
@@ -130,10 +124,10 @@ GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を **�
 
 ### Requirement 10: 拡張・追加時の境界遵守
 
-**Objective:** 機能を追加・変更するエンジニアとして、新規 Custom Metric や新規 Anonymization Handler を本 spec の境界に従って実装し、レイヤ責務の汚染を回避したい。
+**Objective:** 機能を追加・変更するエンジニアとして、新規 Custom Metric を本 spec の境界に従って実装し、レイヤ責務の汚染を回避したい。
 
 #### Acceptance Criteria
 
 1. When 新規 Custom Metric モジュールを追加する, the GROWI server shall `custom-metrics/` 配下にファイルを追加し、`addXxxMetrics(): void` をエクスポートし、`custom-metrics/index.ts` の `setupCustomMetrics()` から呼び出す。
-2. When 新規 Anonymization Handler を追加する, the GROWI server shall `anonymization/handlers/` 配下に `AnonymizationModule` 実装ファイルを追加し、`handlers/index.ts` の `anonymizationModules` 配列に登録する。
+2. 匿名化の対象や規則を追加・変更する場合は `opentelemetry-anonymization` を参照する。
 3. The GROWI server shall identity 情報を Resource Attribute 経由で、設定値を `growi.configs` ラベル経由で、観測値を `growi.*` / `system.*` / `process.*` メトリクス経由でそれぞれ emit する責務分離を維持する。
