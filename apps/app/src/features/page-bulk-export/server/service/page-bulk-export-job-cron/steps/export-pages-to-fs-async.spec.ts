@@ -8,42 +8,31 @@
  *  - MD format: output file is written as-is (no HTML rendering applied).
  *  - Error handling: when renderToHtml rejects, the Writable write callback
  *    receives the error (job is not silently completed). (Req 3.2)
- *  - Resume: exportPagesToFsAsync queries only pages after lastExportedPagePath
- *    when that field is set on the job. (Req 5.3)
- *  - Resume (no prior export): full scan when lastExportedPagePath is unset.
  *
- * Requirements: 3.2, 5.1, 5.2, 5.3
+ * Resume and batching (Req 5.3) are covered against a real database in
+ * export-pages-to-fs-async.integ.ts.
+ *
+ * Requirements: 3.2, 5.1, 5.2
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Writable } from 'node:stream';
-import { Readable } from 'node:stream';
-import type { IRevisionHasId } from '@growi/core';
 import { mock } from 'vitest-mock-extended';
 
 import {
   PageBulkExportFormat,
   PageBulkExportJobStatus,
 } from '~/features/page-bulk-export/interfaces/page-bulk-export';
-import type { pagebulkexportjobs } from '~/generated/prisma/client';
+import type {
+  Prisma,
+  pagebulkexportjobs,
+  revisions,
+} from '~/generated/prisma/client';
 
-import type { PageBulkExportPageSnapshotDocument } from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
 import * as RendererModule from '../markdown';
-import {
-  exportPagesToFsAsync,
-  getPageWritable,
-} from './export-pages-to-fs-async';
-
-// ---------------------------------------------------------------------------
-// Module-level mock for PageBulkExportPageSnapshot (resume tests).
-// The model registers with Mongoose at init time; mocking avoids the need for
-// a live MongoDB connection in unit tests.
-// ---------------------------------------------------------------------------
-vi.mock('../../../models/page-bulk-export-page-snapshot', () => {
-  return { default: { find: vi.fn() } };
-});
+import { getPageWritable } from './export-pages-to-fs-async';
 
 // The job's progress writes (lastExportedPagePath / status) go through prisma.
 // Stub the client so this unit test needs no database.
@@ -56,6 +45,11 @@ vi.mock('~/utils/prisma', () => {
     },
   };
 });
+
+type PageBulkExportPageSnapshotWithRevision =
+  Prisma.pagebulkexportpagesnapshotsGetPayload<{
+    include: { revision: true };
+  }>;
 
 // ---------------------------------------------------------------------------
 // getPageWritable resolves the exporting user once per job via
@@ -109,16 +103,16 @@ function makeJob(
 }
 
 /**
- * Build a minimal PageBulkExportPageSnapshotDocument mock with inline revision.
+ * Build a minimal page snapshot mock with its revision included.
  */
 function makePageSnapshot(
   pagePath: string,
   markdownBody: string,
-): PageBulkExportPageSnapshotDocument {
-  return mock<PageBulkExportPageSnapshotDocument>({
+): PageBulkExportPageSnapshotWithRevision {
+  return mock<PageBulkExportPageSnapshotWithRevision>({
+    id: `id:${pagePath}`,
     path: pagePath,
-    // isPopulated() returns true when revision is an object (not an ObjectId).
-    revision: mock<IRevisionHasId>({ body: markdownBody }),
+    revision: mock<revisions>({ body: markdownBody }),
   });
 }
 
@@ -128,7 +122,7 @@ function makePageSnapshot(
  */
 function writeOneChunk(
   writable: Writable,
-  snapshot: PageBulkExportPageSnapshotDocument,
+  snapshot: PageBulkExportPageSnapshotWithRevision,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     writable.write(snapshot, (err) => {
@@ -252,102 +246,6 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
 
       spy.mockRestore();
     });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Requirement 5.3: exportPagesToFsAsync resume behaviour.
-//
-// The resume contract is implemented at the query level: when
-// lastExportedPagePath is set on the job, the MongoDB find query includes
-// { path: { $gt: lastExportedPagePath } } so that already-exported pages are
-// excluded from the cursor without in-stream filtering.
-// ---------------------------------------------------------------------------
-describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3)', () => {
-  /**
-   * Build a minimal cursor chain mock that Readable.from() can consume.
-   * find() → { populate, sort, lean, cursor } → async iterable of []
-   */
-  function makeCursorChain(): ReturnType<typeof vi.fn> {
-    const cursor = Readable.from([]);
-    // Each chained method returns an object that ultimately yields cursor
-    const chain = {
-      populate: vi.fn().mockReturnThis(),
-      sort: vi.fn().mockReturnThis(),
-      lean: vi.fn().mockReturnThis(),
-      cursor: vi.fn().mockReturnValue(cursor),
-    };
-    return vi.fn().mockReturnValue(chain);
-  }
-
-  it('queries pages with $gt filter when lastExportedPagePath is set', async () => {
-    // Import the mocked model (vi.mock hoists this to module scope).
-    const { default: PageBulkExportPageSnapshot } = await import(
-      '../../../models/page-bulk-export-page-snapshot'
-    );
-
-    const findSpy = vi
-      .spyOn(PageBulkExportPageSnapshot, 'find')
-      .mockImplementation(makeCursorChain());
-
-    const lastPath = '/already/exported';
-    const job = makeJob(PageBulkExportFormat.pdf, lastPath);
-
-    const tmpDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'bulk-export-resume-'),
-    );
-    const svc = mock<IPageBulkExportJobCronService>();
-    svc.getTmpOutputDir.mockReturnValue(tmpDir);
-    // setStreamsInExecution and handleError are called by exportPagesToFsAsync
-    svc.setStreamsInExecution.mockReturnValue(undefined);
-    svc.handleError.mockReturnValue(undefined);
-
-    try {
-      await exportPagesToFsAsync.call(svc, job);
-
-      // Observable: find() was called with a query that includes $gt on path
-      expect(findSpy).toHaveBeenCalledOnce();
-      const [queryArg] = findSpy.mock.calls[0];
-      expect(queryArg).toMatchObject({
-        pageBulkExportJob: job.id,
-        path: { $gt: lastPath },
-      });
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-      findSpy.mockRestore();
-    }
-  });
-
-  it('queries all pages (no $gt filter) when lastExportedPagePath is not set', async () => {
-    const { default: PageBulkExportPageSnapshot } = await import(
-      '../../../models/page-bulk-export-page-snapshot'
-    );
-
-    const findSpy = vi
-      .spyOn(PageBulkExportPageSnapshot, 'find')
-      .mockImplementation(makeCursorChain());
-
-    const job = makeJob(PageBulkExportFormat.pdf); // lastExportedPagePath = null
-
-    const tmpDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'bulk-export-resume-full-'),
-    );
-    const svc = mock<IPageBulkExportJobCronService>();
-    svc.getTmpOutputDir.mockReturnValue(tmpDir);
-    svc.setStreamsInExecution.mockReturnValue(undefined);
-    svc.handleError.mockReturnValue(undefined);
-
-    try {
-      await exportPagesToFsAsync.call(svc, job);
-
-      // Observable: find() was called with only the job filter (no path $gt)
-      expect(findSpy).toHaveBeenCalledOnce();
-      const [queryArg] = findSpy.mock.calls[0];
-      expect(queryArg).toEqual({ pageBulkExportJob: job.id });
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-      findSpy.mockRestore();
-    }
   });
 });
 
