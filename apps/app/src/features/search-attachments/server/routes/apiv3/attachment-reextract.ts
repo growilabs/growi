@@ -26,10 +26,10 @@ import type { AttachmentSearchIndexer } from '~/features/search-attachments/serv
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { Attachment } from '~/server/models/attachment';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { createRequireSearchAttachmentsEnabled } from '../../middlewares/require-search-attachments-enabled';
 
@@ -109,7 +109,9 @@ export function createAttachmentReextractRouter(
 
       try {
         // Step 1: load attachment
-        const attachment = await Attachment.findById(attachmentId);
+        const attachment = await prisma.attachments.findUnique({
+          where: { id: attachmentId },
+        });
         if (attachment == null) {
           return res.apiv3Err(
             new ErrorV3('Attachment not found', 'attachment_not_found'),
@@ -118,8 +120,7 @@ export function createAttachmentReextractRouter(
         }
 
         // Step 2: load parent page
-        const pageId =
-          attachment.page != null ? attachment.page.toString() : null;
+        const { pageId } = attachment;
         if (pageId == null) {
           // Orphan attachment (not linked to a page) — no editor, deny access
           return res.apiv3Err(

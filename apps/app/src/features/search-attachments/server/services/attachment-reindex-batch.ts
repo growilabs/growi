@@ -14,17 +14,16 @@
  *   is performed by the API route after `addAllAttachments` resolves).
  */
 
-import type { IAttachment } from '@growi/core';
-
 import type {
   ExtractionFailureEntry,
   ExtractionOutcome,
   IAttachmentEsDoc,
 } from '~/features/search-attachments/interfaces/attachment-search';
 import { SocketEventName } from '~/interfaces/websocket';
-import { Attachment } from '~/server/models/attachment';
+import type { AttachmentWithComputed } from '~/server/models/attachment';
 import type { SocketIoService } from '~/server/service/socket-io/socket-io';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type { AttachmentOrphanSweeper } from './attachment-orphan-sweeper';
 import type { AttachmentIndexOperations } from './attachment-search-delegator-extension';
@@ -51,7 +50,47 @@ export interface AttachmentReindexBatchInterface {
   getTmpIndexName(): string | null;
 }
 
+/** Number of attachment rows fetched from MongoDB per page during a rebuild. */
+export const REINDEX_PAGE_SIZE = 100;
+
 // ---- Internal helpers -------------------------------------------------------
+
+/**
+ * Fetches up to `take` attachment rows whose `_id` is greater than `afterId`
+ * (or from the start when null), in ascending `_id` order.
+ */
+export type FetchAttachmentPage = (
+  afterId: string | null,
+  take: number,
+) => Promise<AttachmentWithComputed[]>;
+
+const fetchAttachmentPage: FetchAttachmentPage = (afterId, take) =>
+  prisma.attachments.findMany({
+    where: afterId != null ? { id: { gt: afterId } } : {},
+    orderBy: { id: 'asc' },
+    take,
+  });
+
+/**
+ * Yields every attachment row once, in ascending `_id` order, one page at a
+ * time. Pages by `_id > lastId` (keyset) rather than by offset so concurrent
+ * inserts/deletes cannot shift rows between pages.
+ */
+export async function* iterateAllAttachments(
+  fetchPage: FetchAttachmentPage = fetchAttachmentPage,
+  pageSize: number = REINDEX_PAGE_SIZE,
+): AsyncGenerator<AttachmentWithComputed> {
+  let lastId: string | null = null;
+  while (true) {
+    // biome-ignore lint/performance/noAwaitInLoops: pagination is inherently sequential — each page needs the previous page's last id
+    const page = await fetchPage(lastId, pageSize);
+    yield* page;
+    if (page.length < pageSize) {
+      return;
+    }
+    lastId = page[page.length - 1].id;
+  }
+}
 
 /**
  * Maps an ExtractionOutcome.kind to the reasonCode string expected by
@@ -88,16 +127,16 @@ function outcomeToReasonCode(
  * NO permission fields are included in any returned doc.
  */
 function buildDocs(
-  attachment: IAttachment & { _id: { toString(): string } },
+  attachment: AttachmentWithComputed,
   outcome: ExtractionOutcome,
 ): IAttachmentEsDoc[] {
-  const attachmentId = attachment._id.toString();
-  const pageId = attachment.page != null ? String(attachment.page) : '';
+  const attachmentId = attachment.id;
+  const pageId = attachment.pageId ?? '';
   const createdAt =
     attachment.createdAt != null
       ? attachment.createdAt.toISOString()
       : new Date().toISOString();
-  // IAttachment has no updatedAt — use createdAt as fallback
+  // Attachments have no updatedAt — use createdAt as fallback
   const updatedAt = createdAt;
 
   const baseFields = {
@@ -146,14 +185,26 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
   private _isRebuilding = false;
   private _tmpIndexName: string | null = null;
 
+  private readonly extractor: AttachmentTextExtractorService;
+  private readonly delegatorExt: AttachmentIndexOperations;
+  private readonly failureLogService: ExtractionFailureLogServiceInterface;
+  private readonly orphanSweeper: AttachmentOrphanSweeper;
+  private readonly socketIoService: SocketIoService;
+
   // biome-ignore lint/complexity/useMaxParams: all 5 dependencies are required by the interface contract (task 6.3)
   constructor(
-    private readonly extractor: AttachmentTextExtractorService,
-    private readonly delegatorExt: AttachmentIndexOperations,
-    private readonly failureLogService: ExtractionFailureLogServiceInterface,
-    private readonly orphanSweeper: AttachmentOrphanSweeper,
-    private readonly socketIoService: SocketIoService,
-  ) {}
+    extractor: AttachmentTextExtractorService,
+    delegatorExt: AttachmentIndexOperations,
+    failureLogService: ExtractionFailureLogServiceInterface,
+    orphanSweeper: AttachmentOrphanSweeper,
+    socketIoService: SocketIoService,
+  ) {
+    this.extractor = extractor;
+    this.delegatorExt = delegatorExt;
+    this.failureLogService = failureLogService;
+    this.orphanSweeper = orphanSweeper;
+    this.socketIoService = socketIoService;
+  }
 
   // ---- Lifecycle state -------------------------------------------------------
 
@@ -221,7 +272,7 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
       await this.delegatorExt.createAttachmentIndex(targetIndex);
 
       // Step 2: Count total for progress reporting
-      const total = await Attachment.countDocuments();
+      const total = await prisma.attachments.count();
 
       logger.info(
         { targetIndex, total },
@@ -230,14 +281,9 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
 
       let processed = 0;
 
-      // Step 3: Walk MongoDB cursor
-      const cursor = Attachment.find().lean().cursor();
-
-      for await (const rawDoc of cursor) {
-        const attachment = rawDoc as unknown as IAttachment & {
-          _id: { toString(): string };
-        };
-        const attachmentId = attachment._id.toString();
+      // Step 3: Walk every attachment page by page
+      for await (const attachment of iterateAllAttachments()) {
+        const attachmentId = attachment.id;
 
         try {
           const outcome = await this.extractor.extractAttachment(attachmentId);
@@ -259,8 +305,7 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
                 outcome.kind === 'failed' ? outcome.message : null;
               await this.failureLogService.record({
                 attachmentId,
-                pageId:
-                  attachment.page != null ? String(attachment.page) : null,
+                pageId: attachment.pageId,
                 fileName: attachment.fileName,
                 fileFormat: attachment.fileFormat,
                 fileSize: attachment.fileSize,

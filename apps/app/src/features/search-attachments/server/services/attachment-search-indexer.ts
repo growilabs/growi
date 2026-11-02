@@ -18,10 +18,10 @@ import type {
   ExtractionOutcome,
   IAttachmentEsDoc,
 } from '~/features/search-attachments/interfaces/attachment-search';
-import type { IAttachmentDocument } from '~/server/models/attachment';
-import { Attachment } from '~/server/models/attachment';
+import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type { AttachmentIndexOperations } from './attachment-search-delegator-extension';
 import type { AttachmentTextExtractorService } from './attachment-text-extractor';
@@ -39,7 +39,7 @@ export interface ReindexBatchRef {
 export interface AttachmentSearchIndexerInterface {
   onAttach(
     pageId: string | null,
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
     file: Express.Multer.File,
   ): Promise<void>;
   onDetach(attachmentId: string): Promise<void>;
@@ -95,7 +95,7 @@ function outcomeToMessage(
  * NO permission fields (grant/granted_users/granted_groups/creator) are included.
  */
 function buildSuccessDocs(
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
   pageId: string | null,
   outcome: Extract<ExtractionOutcome, { kind: 'success' }>,
 ): IAttachmentEsDoc[] {
@@ -124,7 +124,7 @@ function buildSuccessDocs(
  * NO permission fields are included.
  */
 function buildFailureDoc(
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
   pageId: string | null,
 ): IAttachmentEsDoc {
   const now = new Date().toISOString();
@@ -295,7 +295,7 @@ export class AttachmentSearchIndexer
    * Returns the ExtractionOutcome for the caller to surface.
    */
   private async extractAndIndex(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
     pageId: string | null,
   ): Promise<ExtractionOutcome> {
     const attachmentId = attachment._id.toString();
@@ -353,7 +353,7 @@ export class AttachmentSearchIndexer
    */
   async onAttach(
     pageId: string | null,
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
     _file: Express.Multer.File,
   ): Promise<void> {
     try {
@@ -440,7 +440,9 @@ export class AttachmentSearchIndexer
         return { ok: false, outcome: { kind: 'serviceUnreachable' } };
       }
 
-      const attachment = await Attachment.findById(attachmentId);
+      const attachment = await prisma.attachments.findUnique({
+        where: { id: attachmentId },
+      });
       if (attachment == null) {
         logger.warn(
           { attachmentId },
@@ -449,8 +451,7 @@ export class AttachmentSearchIndexer
         return { ok: false, outcome: { kind: 'serviceUnreachable' } };
       }
 
-      const pageId =
-        attachment.page != null ? attachment.page.toString() : null;
+      const pageId = attachment.pageId;
 
       const outcome = await this.extractAndIndex(attachment, pageId);
 

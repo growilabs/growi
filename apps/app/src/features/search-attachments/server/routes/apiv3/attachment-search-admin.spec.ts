@@ -16,7 +16,8 @@
  * 12. GET /failures: non-admin → 403
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Module-level mocks (must be hoisted before dynamic imports)
@@ -40,13 +41,6 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-// Mock Attachment model (used inside computeRequiresReindex dynamic import)
-vi.mock('~/server/models/attachment', () => ({
-  Attachment: {
-    countDocuments: vi.fn(),
-  },
-}));
-
 // Mock ExtractionFailureLogService
 const mockListRecent = vi.fn();
 const mockTotalRecent = vi.fn();
@@ -65,6 +59,7 @@ vi.mock(
 // ---------------------------------------------------------------------------
 
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 import {
   type AttachmentSearchConfig,
@@ -274,9 +269,18 @@ describe('attachment-search-admin', () => {
   // -------------------------------------------------------------------------
 
   describe('computeRequiresReindex', () => {
+    let countAttachments: MockInstance<typeof prisma.attachments.count>;
+
+    beforeEach(() => {
+      countAttachments = vi.spyOn(prisma.attachments, 'count');
+    });
+
+    afterEach(() => {
+      countAttachments.mockRestore();
+    });
+
     it('7. returns true when mongoCount > esCount', async () => {
-      const { Attachment } = await import('~/server/models/attachment');
-      vi.mocked(Attachment.countDocuments).mockResolvedValue(10 as never);
+      countAttachments.mockResolvedValue(10);
 
       const esClient = buildEsClientWithCardinality(5);
       const crowi = buildCrowiWithEsClient(esClient);
@@ -292,8 +296,7 @@ describe('attachment-search-admin', () => {
     });
 
     it('returns false when mongoCount === esCount', async () => {
-      const { Attachment } = await import('~/server/models/attachment');
-      vi.mocked(Attachment.countDocuments).mockResolvedValue(5 as never);
+      countAttachments.mockResolvedValue(5);
 
       const esClient = buildEsClientWithCardinality(5);
       const crowi = buildCrowiWithEsClient(esClient);
@@ -305,8 +308,7 @@ describe('attachment-search-admin', () => {
     });
 
     it('returns false when mongoCount < esCount (stale ES docs)', async () => {
-      const { Attachment } = await import('~/server/models/attachment');
-      vi.mocked(Attachment.countDocuments).mockResolvedValue(3 as never);
+      countAttachments.mockResolvedValue(3);
 
       const esClient = buildEsClientWithCardinality(7);
       const crowi = buildCrowiWithEsClient(esClient);
@@ -318,10 +320,6 @@ describe('attachment-search-admin', () => {
     });
 
     it('8. returns false when isEnabled=false (search not enabled)', async () => {
-      const { Attachment } = await import('~/server/models/attachment');
-      const mockCountDocuments = vi.mocked(Attachment.countDocuments);
-      mockCountDocuments.mockClear();
-
       const esClient = buildEsClientWithCardinality(5);
       const crowi = buildCrowiWithEsClient(esClient);
 
@@ -330,13 +328,12 @@ describe('attachment-search-admin', () => {
 
       expect(result).toBe(false);
       // Should not even query MongoDB or ES when disabled
-      expect(mockCountDocuments).not.toHaveBeenCalled();
+      expect(countAttachments).not.toHaveBeenCalled();
       expect(esClient.search).not.toHaveBeenCalled();
     });
 
     it('returns false when mongoCount is 0 (nothing to index)', async () => {
-      const { Attachment } = await import('~/server/models/attachment');
-      vi.mocked(Attachment.countDocuments).mockResolvedValue(0 as never);
+      countAttachments.mockResolvedValue(0);
 
       const esClient = buildEsClientWithCardinality(0);
       const crowi = buildCrowiWithEsClient(esClient);
@@ -350,16 +347,13 @@ describe('attachment-search-admin', () => {
     });
 
     it('9. cache: invalidateRequiresReindexCache causes next call to recompute', async () => {
-      const { Attachment } = await import('~/server/models/attachment');
-      const mockCountDocuments = vi.mocked(Attachment.countDocuments);
-
       const esClient = {
         search: vi.fn(),
       };
       const crowi = buildCrowiWithEsClient(esClient);
 
       // First call: mongoCount=10, esCount=5 → requiresReindex=true
-      mockCountDocuments.mockResolvedValueOnce(10 as never);
+      countAttachments.mockResolvedValueOnce(10);
       esClient.search.mockResolvedValueOnce({
         aggregations: { unique_attachments: { value: 5 } },
       });
@@ -378,7 +372,7 @@ describe('attachment-search-admin', () => {
       invalidateRequiresReindexCache();
 
       // Third call AFTER invalidation: mongoCount=10, esCount=10 → requiresReindex=false
-      mockCountDocuments.mockResolvedValueOnce(10 as never);
+      countAttachments.mockResolvedValueOnce(10);
       esClient.search.mockResolvedValueOnce({
         aggregations: { unique_attachments: { value: 10 } },
       });

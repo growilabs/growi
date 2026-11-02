@@ -8,10 +8,10 @@ import type {
   ExtractedPage,
   ExtractionOutcome,
 } from '~/features/search-attachments/interfaces/attachment-search';
-import type { IAttachmentDocument } from '~/server/models/attachment';
-import { Attachment } from '~/server/models/attachment';
+import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory('growi:service:search-attachments:extractor');
 
@@ -58,7 +58,7 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
  */
 function mapAxiosErrorToOutcome(
   error: unknown,
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
 ): ExtractionOutcome | null {
   if (!isAxiosError(error) || error.response == null) {
     return null;
@@ -111,7 +111,7 @@ function isAxiosError(
 }
 
 type CallExtractorOptions = {
-  attachment: IAttachmentDocument;
+  attachment: AttachmentWithComputed;
   buffer: Buffer;
   extractorUri: string;
   token: string;
@@ -175,14 +175,18 @@ async function callExtractor(
  * - Retries 503 service_busy exactly once with exponential backoff + jitter
  * - Never logs the Bearer token value
  */
+type DeliveryFileFinder = {
+  findDeliveryFile(
+    attachment: AttachmentWithComputed,
+  ): Promise<NodeJS.ReadableStream>;
+};
+
 export class AttachmentTextExtractorService {
-  constructor(
-    private readonly fileUploader: {
-      findDeliveryFile(
-        attachment: IAttachmentDocument,
-      ): Promise<NodeJS.ReadableStream>;
-    },
-  ) {}
+  private readonly fileUploader: DeliveryFileFinder;
+
+  constructor(fileUploader: DeliveryFileFinder) {
+    this.fileUploader = fileUploader;
+  }
 
   async extractAttachment(attachmentId: string): Promise<ExtractionOutcome> {
     try {
@@ -231,7 +235,9 @@ export class AttachmentTextExtractorService {
       }
 
       // --- Step 4: Load attachment document ---
-      const attachment = await Attachment.findById(attachmentId);
+      const attachment = await prisma.attachments.findUnique({
+        where: { id: attachmentId },
+      });
       if (attachment == null) {
         return {
           kind: 'failed',

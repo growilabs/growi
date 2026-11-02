@@ -19,15 +19,15 @@
 import express from 'express';
 import supertest from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 // vi.mock calls below are hoisted by Vite before any imports execute.
 // search.js creates a fresh express.Router() inside the factory, so each
 // searchRouterFactory(crowi) call produces an independent router per test.
+import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
 
-// search.js uses module.exports — TS sees no default export but CJS interop works at runtime.
-// @ts-expect-error: CJS module.exports interop
-import searchRouterFactory from './search.js';
+import { setup as searchRouterFactory } from './search';
 
 // ---------------------------------------------------------------------------
 // Module-level mocks — hoisted by Vite before any code runs.
@@ -129,13 +129,17 @@ interface CrowiStubOptions {
   attachmentReindexBatch?: MockBatch | null;
 }
 
-function buildCrowiStub(opts: CrowiStubOptions = {}) {
+// attachmentReindexBatch is attached to crowi at runtime by initAttachmentFullTextSearch
+// and is not part of the Crowi type.
+function buildCrowiStub(
+  opts: CrowiStubOptions = {},
+): Crowi & { attachmentReindexBatch: MockBatch | null } {
   const {
     isConfigured = true,
     isReachable = true,
     attachmentReindexBatch = null,
   } = opts;
-  return {
+  const crowi = mock<Crowi>({
     searchService: {
       isConfigured,
       isReachable,
@@ -143,8 +147,8 @@ function buildCrowiStub(opts: CrowiStubOptions = {}) {
       normalizeIndices: vi.fn().mockResolvedValue(undefined),
     },
     events: { activity: { emit: vi.fn() } },
-    attachmentReindexBatch,
-  };
+  });
+  return Object.assign(crowi, { attachmentReindexBatch });
 }
 
 /**
@@ -267,7 +271,7 @@ describe('PUT /search/indices — includeAttachments extension', () => {
     batch.begin.mockImplementation(() => {
       callOrder.push('begin');
     });
-    crowi.searchService.rebuildIndex.mockImplementation(() => {
+    vi.mocked(crowi.searchService.rebuildIndex).mockImplementation(() => {
       callOrder.push('rebuildIndex');
       return Promise.resolve();
     });

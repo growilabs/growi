@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ExtractionOutcome } from '~/features/search-attachments/interfaces/attachment-search';
-import type { IAttachmentDocument } from '~/server/models/attachment';
-import { Attachment } from '~/server/models/attachment';
+import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 import type { AttachmentIndexOperations } from './attachment-search-delegator-extension';
 import {
@@ -21,30 +21,32 @@ vi.mock('~/server/service/config-manager', () => ({
   },
 }));
 
-// Mock Attachment model
-vi.mock('~/server/models/attachment', () => ({
-  Attachment: {
-    findById: vi.fn(),
-  },
-}));
-
 // ---- Helpers ----
 
 function makeAttachment(
-  overrides: Partial<IAttachmentDocument> = {},
-): IAttachmentDocument {
+  overrides: Partial<AttachmentWithComputed> = {},
+): AttachmentWithComputed {
   return {
-    _id: { toString: () => 'att-001' },
+    id: 'att-001',
+    _id: 'att-001',
+    v: 0,
+    __v: 0,
+    pageId: null,
+    creatorId: null,
+    filePath: null,
     fileName: 'doc.pdf',
     originalName: 'document.pdf',
     fileFormat: 'application/pdf',
     fileSize: 2048,
     attachmentType: 'attachment',
-    page: null,
+    temporaryUrlCached: null,
+    temporaryUrlExpiredAt: null,
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
-    updatedAt: new Date('2024-01-02T00:00:00.000Z'),
+    filePathProxied: '/attachment/att-001',
+    downloadPathProxied: '/download/att-001',
+    getValidTemporaryUrl: () => null,
     ...overrides,
-  } as unknown as IAttachmentDocument;
+  };
 }
 
 function makeMullerFile(): Express.Multer.File {
@@ -151,6 +153,10 @@ function disableFeature(): void {
 describe('AttachmentSearchIndexer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   // ----------------------------------------------------------------
@@ -562,9 +568,9 @@ describe('AttachmentSearchIndexer', () => {
   // ----------------------------------------------------------------
 
   describe('reindex — attachment not found', () => {
-    it('returns { ok: false } when Attachment.findById returns null', async () => {
+    it('returns { ok: false } when the attachment row does not exist', async () => {
       enableFeature();
-      vi.mocked(Attachment.findById).mockResolvedValue(null);
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(null);
 
       const extractor = makeExtractor();
       const delegator = makeDelegator();
@@ -594,12 +600,8 @@ describe('AttachmentSearchIndexer', () => {
     it('returns { ok: true, outcome } on successful extraction', async () => {
       enableFeature();
 
-      const attachment = makeAttachment({
-        page: {
-          toString: () => 'page-77',
-        } as unknown as IAttachmentDocument['page'],
-      });
-      vi.mocked(Attachment.findById).mockResolvedValue(attachment);
+      const attachment = makeAttachment({ pageId: 'page-77' });
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
 
       const successOutcome: ExtractionOutcome = {
         kind: 'success',
@@ -627,9 +629,13 @@ describe('AttachmentSearchIndexer', () => {
       expect(extractor.extractAttachment).toHaveBeenCalledWith('att-001');
       expect(delegator.syncAttachmentIndexed).toHaveBeenCalledOnce();
 
+      // pageId is read from the attachment row and propagated to the ES docs
+      const [, syncedPageId, docs] = vi.mocked(delegator.syncAttachmentIndexed)
+        .mock.calls[0];
+      expect(syncedPageId).toBe('page-77');
+      expect(docs[0].pageId).toBe('page-77');
+
       // Verify no permission fields
-      const [, , docs] = vi.mocked(delegator.syncAttachmentIndexed).mock
-        .calls[0];
       for (const doc of docs) {
         expect(doc).not.toHaveProperty('grant');
         expect(doc).not.toHaveProperty('creator');
@@ -642,7 +648,7 @@ describe('AttachmentSearchIndexer', () => {
       enableFeature();
 
       const attachment = makeAttachment();
-      vi.mocked(Attachment.findById).mockResolvedValue(attachment);
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
 
       const failureOutcome: ExtractionOutcome = { kind: 'timeout' };
       const extractor = makeExtractor(failureOutcome);

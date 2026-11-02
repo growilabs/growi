@@ -142,8 +142,7 @@ export function initAttachmentFullTextSearch(crowi: Crowi): void {
     body: Record<string, unknown>,
   ): Promise<unknown> => {
     const result = await esClient.search({ index, body });
-    // ES7 returns result.body; ES8/ES9 return result directly
-    return result?.hits != null ? result : (result?.body ?? result);
+    return result;
   };
 
   // Build a version-agnostic rawMget wrapping the ES client
@@ -152,8 +151,7 @@ export function initAttachmentFullTextSearch(crowi: Crowi): void {
     body: Record<string, unknown>,
   ): Promise<unknown> => {
     const result = await esClient.mget({ index, body });
-    // ES7 returns result.body; ES8/ES9 return result directly
-    return result?.docs != null ? result : (result?.body ?? result);
+    return result;
   };
 
   const attachmentClient = createAttachmentIndexClient(

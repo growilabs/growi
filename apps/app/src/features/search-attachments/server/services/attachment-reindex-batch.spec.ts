@@ -2,30 +2,24 @@
  * Tests for AttachmentReindexBatch (task 6.3).
  *
  * All external dependencies (extractor, delegatorExt, failureLogService,
- * orphanSweeper, socketIoService, and the Attachment Mongoose model) are fully
+ * orphanSweeper, socketIoService, and the prisma attachments queries) are fully
  * stubbed — no live services are required.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SocketEventName } from '~/interfaces/websocket';
+import type { AttachmentWithComputed } from '~/server/models/attachment';
+import { prisma } from '~/utils/prisma';
 
 import {
   AttachmentReindexBatch,
   type AttachmentReindexBatchInterface,
+  type FetchAttachmentPage,
+  iterateAllAttachments,
   type ProgressCallback,
+  REINDEX_PAGE_SIZE,
 } from './attachment-reindex-batch';
-
-// ---------------------------------------------------------------------------
-// Mock the Attachment model (used for countDocuments + cursor)
-// ---------------------------------------------------------------------------
-
-vi.mock('~/server/models/attachment', () => ({
-  Attachment: {
-    countDocuments: vi.fn(),
-    find: vi.fn(),
-  },
-}));
 
 // Mock logger to silence output
 vi.mock('~/utils/logger', () => ({
@@ -41,17 +35,30 @@ vi.mock('~/utils/logger', () => ({
 // Test helpers
 // ---------------------------------------------------------------------------
 
-/** Minimal IAttachment-compatible lean document. */
-function makeAttachment(overrides: Record<string, unknown> = {}) {
+/** An attachment row as returned by the extended prisma client. */
+function makeAttachment(
+  overrides: Partial<AttachmentWithComputed> = {},
+): AttachmentWithComputed {
+  const id = overrides.id ?? 'attach-001';
   return {
-    _id: { toString: () => 'attach-001' },
-    page: 'page-abc',
+    id,
+    _id: id,
+    v: 0,
+    __v: 0,
+    pageId: 'page-abc',
+    creatorId: null,
+    filePath: null,
     fileName: 'document.pdf',
     fileFormat: 'application/pdf',
     fileSize: 204800,
     originalName: 'My Document.pdf',
     attachmentType: 'attachment',
+    temporaryUrlCached: null,
+    temporaryUrlExpiredAt: null,
     createdAt: new Date('2024-01-15T10:00:00Z'),
+    filePathProxied: `/attachment/${id}`,
+    downloadPathProxied: `/download/${id}`,
+    getValidTemporaryUrl: () => null,
     ...overrides,
   };
 }
@@ -103,33 +110,32 @@ function makeSocketIoServiceStub() {
 }
 
 /**
- * Configures the Attachment model mock to expose `total` documents as a
- * cursor, each created from `makeAttachment()` with a unique _id.
+ * Backs `prisma.attachments.count` / `findMany` with the given rows. Fixtures
+ * stay below one page, so a single `findMany` call returns them all; paging
+ * across pages is covered by the `iterateAllAttachments` tests.
  */
-async function setupAttachmentMock(
-  attachments: ReturnType<typeof makeAttachment>[],
-) {
-  const { Attachment } = await import('~/server/models/attachment');
-  const mockedAttachment = Attachment as unknown as {
-    countDocuments: ReturnType<typeof vi.fn>;
-    find: ReturnType<typeof vi.fn>;
-  };
+function setupAttachmentMock(attachments: AttachmentWithComputed[]): void {
+  vi.spyOn(prisma.attachments, 'count').mockResolvedValue(attachments.length);
+  vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue(attachments);
+}
 
-  mockedAttachment.countDocuments.mockResolvedValue(attachments.length);
+/** In-memory keyset page source: rows with id > afterId, ascending, up to take. */
+function makeFetchPage(
+  attachments: AttachmentWithComputed[],
+): FetchAttachmentPage {
+  const table = [...attachments].sort((x, y) => x.id.localeCompare(y.id));
+  return async (afterId, take) =>
+    table.filter((a) => afterId == null || a.id > afterId).slice(0, take);
+}
 
-  // Create an async iterable cursor from the provided attachments array
-  mockedAttachment.find.mockReturnValue({
-    lean: vi.fn().mockReturnValue({
-      cursor: vi.fn().mockReturnValue(
-        // A sync generator is a valid async iterable (for-await-of works on it)
-        (function* () {
-          for (const a of attachments) {
-            yield a;
-          }
-        })(),
-      ),
-    }),
-  });
+async function collectIds(
+  iterable: AsyncIterable<AttachmentWithComputed>,
+): Promise<string[]> {
+  const ids: string[] = [];
+  for await (const a of iterable) {
+    ids.push(a.id);
+  }
+  return ids;
 }
 
 // ---------------------------------------------------------------------------
@@ -165,6 +171,10 @@ describe('AttachmentReindexBatch', () => {
       // biome-ignore lint/suspicious/noExplicitAny: test stubs
       socketIoService as any,
     );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   // -------------------------------------------------------------------------
@@ -218,14 +228,10 @@ describe('AttachmentReindexBatch', () => {
   // -------------------------------------------------------------------------
   describe('addAllAttachments — success path', () => {
     it('iterates all attachments, calls extractor, and indexes success docs', async () => {
-      const attachment1 = makeAttachment({
-        _id: { toString: () => 'attach-001' },
-      });
-      const attachment2 = makeAttachment({
-        _id: { toString: () => 'attach-002' },
-      });
+      const attachment1 = makeAttachment({ id: 'attach-001' });
+      const attachment2 = makeAttachment({ id: 'attach-002' });
 
-      await setupAttachmentMock([attachment1, attachment2]);
+      setupAttachmentMock([attachment1, attachment2]);
 
       const successOutcome = {
         kind: 'success' as const,
@@ -261,7 +267,7 @@ describe('AttachmentReindexBatch', () => {
     });
 
     it('drops and recreates the target index before walking the cursor', async () => {
-      await setupAttachmentMock([]);
+      setupAttachmentMock([]);
 
       await batch.addAllAttachments('attachments-tmp', vi.fn());
 
@@ -273,12 +279,60 @@ describe('AttachmentReindexBatch', () => {
   });
 
   // -------------------------------------------------------------------------
+  // 3b. iterateAllAttachments — walks every row across page boundaries
+  // -------------------------------------------------------------------------
+  describe('iterateAllAttachments', () => {
+    const makeAttachments = (count: number): AttachmentWithComputed[] =>
+      Array.from({ length: count }, (_, i) =>
+        makeAttachment({ id: `attach-${String(i).padStart(5, '0')}` }),
+      );
+
+    it.each([
+      { label: 'a partial last page', count: 5 },
+      { label: 'an exact multiple of the page size', count: 4 },
+      { label: 'an empty collection', count: 0 },
+    ])('yields every row exactly once, in id order, with $label', async ({
+      count,
+    }) => {
+      const attachments = makeAttachments(count);
+
+      const ids = await collectIds(
+        iterateAllAttachments(makeFetchPage([...attachments].reverse()), 2),
+      );
+
+      expect(ids).toEqual(attachments.map((a) => a.id));
+    });
+
+    it('asks prisma for the rows after the last id of the previous page', async () => {
+      const firstPage = makeAttachments(REINDEX_PAGE_SIZE);
+      const findMany = vi
+        .spyOn(prisma.attachments, 'findMany')
+        .mockResolvedValueOnce(firstPage)
+        .mockResolvedValueOnce([]);
+
+      const ids = await collectIds(iterateAllAttachments());
+
+      expect(ids).toHaveLength(REINDEX_PAGE_SIZE);
+      expect(findMany).toHaveBeenNthCalledWith(1, {
+        where: {},
+        orderBy: { id: 'asc' },
+        take: REINDEX_PAGE_SIZE,
+      });
+      expect(findMany).toHaveBeenNthCalledWith(2, {
+        where: { id: { gt: firstPage.at(-1)?.id } },
+        orderBy: { id: 'asc' },
+        take: REINDEX_PAGE_SIZE,
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // 4. addAllAttachments — failure path (batch continues)
   // -------------------------------------------------------------------------
   describe('addAllAttachments — failure path', () => {
     it('records metadata-only doc + failureLog when extraction fails, and continues batch', async () => {
       const attachment = makeAttachment();
-      await setupAttachmentMock([attachment]);
+      setupAttachmentMock([attachment]);
 
       const failureOutcome = {
         kind: 'failed' as const,
@@ -343,11 +397,8 @@ describe('AttachmentReindexBatch', () => {
       for (const { outcome, expectedCode } of failureKinds) {
         vi.clearAllMocks();
 
-        const attachment = makeAttachment({
-          _id: { toString: () => 'attach-kind-test' },
-        });
-        // biome-ignore lint/performance/noAwaitInLoops: sequential iteration is intentional in this test
-        await setupAttachmentMock([attachment]);
+        const attachment = makeAttachment({ id: 'attach-kind-test' });
+        setupAttachmentMock([attachment]);
 
         extractor.extractAttachment.mockResolvedValueOnce(outcome);
 
@@ -362,13 +413,9 @@ describe('AttachmentReindexBatch', () => {
     });
 
     it('skips the attachment and continues when an unexpected error is thrown', async () => {
-      const attachment1 = makeAttachment({
-        _id: { toString: () => 'attach-err' },
-      });
-      const attachment2 = makeAttachment({
-        _id: { toString: () => 'attach-ok' },
-      });
-      await setupAttachmentMock([attachment1, attachment2]);
+      const attachment1 = makeAttachment({ id: 'attach-err' });
+      const attachment2 = makeAttachment({ id: 'attach-ok' });
+      setupAttachmentMock([attachment1, attachment2]);
 
       // First attachment throws unexpectedly
       extractor.extractAttachment
@@ -393,7 +440,7 @@ describe('AttachmentReindexBatch', () => {
   // -------------------------------------------------------------------------
   describe('addAllAttachments — orphan sweep', () => {
     it('runs orphan sweep on targetIndex after all docs are indexed', async () => {
-      await setupAttachmentMock([]);
+      setupAttachmentMock([]);
 
       await batch.addAllAttachments('attachments-tmp', vi.fn());
 
@@ -408,11 +455,11 @@ describe('AttachmentReindexBatch', () => {
   describe('addAllAttachments — socket events', () => {
     it('emits AddAttachmentProgress for each processed attachment', async () => {
       const attachments = [
-        makeAttachment({ _id: { toString: () => 'a1' } }),
-        makeAttachment({ _id: { toString: () => 'a2' } }),
-        makeAttachment({ _id: { toString: () => 'a3' } }),
+        makeAttachment({ id: 'a1' }),
+        makeAttachment({ id: 'a2' }),
+        makeAttachment({ id: 'a3' }),
       ];
-      await setupAttachmentMock(attachments);
+      setupAttachmentMock(attachments);
 
       extractor.extractAttachment.mockResolvedValue({
         kind: 'success' as const,
@@ -435,7 +482,7 @@ describe('AttachmentReindexBatch', () => {
     });
 
     it('emits FinishAddAttachment after all attachments are indexed', async () => {
-      await setupAttachmentMock([makeAttachment()]);
+      setupAttachmentMock([makeAttachment()]);
 
       extractor.extractAttachment.mockResolvedValue({
         kind: 'success' as const,
@@ -456,19 +503,13 @@ describe('AttachmentReindexBatch', () => {
     });
 
     it('emits RebuildingFailed and rethrows when a fatal error occurs', async () => {
-      const { Attachment } = await import('~/server/models/attachment');
-      const mockedAttachment = Attachment as unknown as {
-        countDocuments: ReturnType<typeof vi.fn>;
-        find: ReturnType<typeof vi.fn>;
-      };
-
       // Simulate createAttachmentIndex throwing
       delegatorExt.createAttachmentIndex.mockRejectedValueOnce(
         new Error('ES is down'),
       );
 
-      // countDocuments won't even be reached, but mock anyway
-      mockedAttachment.countDocuments.mockResolvedValue(0);
+      // count won't even be reached, but mock anyway
+      setupAttachmentMock([]);
 
       await expect(
         batch.addAllAttachments('attachments-tmp', vi.fn()),

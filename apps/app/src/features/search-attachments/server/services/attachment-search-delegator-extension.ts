@@ -13,7 +13,6 @@
 import type { IAttachmentEsDoc } from '~/features/search-attachments/interfaces/attachment-search';
 import type { ElasticsearchClientDelegator } from '~/server/service/search-delegator/elasticsearch-client-delegator';
 import {
-  isES7ClientDelegator,
   isES8ClientDelegator,
   isES9ClientDelegator,
 } from '~/server/service/search-delegator/elasticsearch-client-delegator';
@@ -184,13 +183,6 @@ const deleteByQueryForIndex = (
 ): Promise<unknown> => {
   const deleteQuery = { term: { attachmentId } };
 
-  if (isES7ClientDelegator(client)) {
-    return client.deleteByQuery({
-      index: indexName,
-      body: { query: deleteQuery },
-      conflicts: 'proceed',
-    });
-  }
   if (isES8ClientDelegator(client)) {
     return client.deleteByQuery({
       index: indexName,
@@ -218,7 +210,11 @@ const deleteByQueryForIndex = (
 export class AttachmentSearchDelegatorExtension
   implements AttachmentIndexOperations
 {
-  constructor(private readonly client: ElasticsearchClientDelegator) {}
+  private readonly client: ElasticsearchClientDelegator;
+
+  constructor(client: ElasticsearchClientDelegator) {
+    this.client = client;
+  }
 
   // ----------------------------------------------------------------
   // Index lifecycle
@@ -227,17 +223,6 @@ export class AttachmentSearchDelegatorExtension
   async createAttachmentIndex(
     indexName: string = DEFAULT_ATTACHMENT_INDEX_NAME,
   ): Promise<void> {
-    if (isES7ClientDelegator(this.client)) {
-      const { mappings } = await import(
-        '~/features/search-attachments/server/mappings/attachments-mappings-es7'
-      );
-      await this.client.indices.create({
-        index: indexName,
-        body: { ...mappings },
-      });
-      return;
-    }
-
     if (isES8ClientDelegator(this.client)) {
       const { mappings } = await import(
         '~/features/search-attachments/server/mappings/attachments-mappings-es8'
@@ -397,16 +382,13 @@ export class AttachmentSearchDelegatorExtension
       }
     }
 
-    // ES7 uses `body`, ES8/ES9 use `operations` in BulkRequest.
-    // We must call bulk through the narrowed type guard so TypeScript resolves the correct overload.
+    // Call bulk through the narrowed type guard so TypeScript resolves the correct overload.
     let response: {
       errors: boolean;
       items?: Array<{ index?: { error?: unknown } }>;
     };
 
-    if (isES7ClientDelegator(this.client)) {
-      response = await this.client.bulk({ body: operations });
-    } else if (isES8ClientDelegator(this.client)) {
+    if (isES8ClientDelegator(this.client)) {
       response = await this.client.bulk({ operations });
     } else if (isES9ClientDelegator(this.client)) {
       response = await this.client.bulk({ operations });

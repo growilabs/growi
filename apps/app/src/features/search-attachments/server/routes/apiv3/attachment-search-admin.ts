@@ -56,7 +56,7 @@ export const invalidateRequiresReindexCache = (): void => {
  * - MongoDB has 0 attachments (nothing to index)
  *
  * Otherwise runs a cardinality aggregation on the `attachments` ES index and
- * compares the unique-attachmentId count against `Attachment.countDocuments()`.
+ * compares the unique-attachmentId count against `prisma.attachments.count()`.
  *
  * Result is cached for CACHE_TTL_MS milliseconds.
  */
@@ -76,8 +76,8 @@ export const computeRequiresReindex = async (
 
   if (isEnabled) {
     try {
-      const { Attachment } = await import('~/server/models/attachment');
-      const mongoCount = await Attachment.countDocuments();
+      const { prisma } = await import('~/utils/prisma');
+      const mongoCount = await prisma.attachments.count();
 
       if (mongoCount > 0) {
         // Access the ES client via the search service delegator.
@@ -100,8 +100,7 @@ export const computeRequiresReindex = async (
             },
           });
 
-          // ES7 returns `result.body.aggregations`, ES8/ES9 return `result.aggregations`
-          const aggs = result?.aggregations ?? result?.body?.aggregations;
+          const aggs = result?.aggregations;
           const esCount: number =
             (aggs?.unique_attachments?.value as number) ?? 0;
           value = mongoCount > esCount;

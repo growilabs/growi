@@ -224,11 +224,19 @@ export const filterMgetDocs = (docs: MgetDoc[]): string[] =>
 // ---------------------------------------------------------------------------
 
 export class AttachmentSearchResultAggregator {
+  private readonly pageSearchFn: PageSearchFn;
+  private readonly attachmentClient: AttachmentIndexClient;
+  private readonly PRIMARY_TIMEOUT_MS: number;
+
   constructor(
-    private readonly pageSearchFn: PageSearchFn,
-    private readonly attachmentClient: AttachmentIndexClient,
-    private readonly PRIMARY_TIMEOUT_MS: number = 800,
-  ) {}
+    pageSearchFn: PageSearchFn,
+    attachmentClient: AttachmentIndexClient,
+    PRIMARY_TIMEOUT_MS = 800,
+  ) {
+    this.pageSearchFn = pageSearchFn;
+    this.attachmentClient = attachmentClient;
+    this.PRIMARY_TIMEOUT_MS = PRIMARY_TIMEOUT_MS;
+  }
 
   // --------------------------------------------------------------------------
   // Public API

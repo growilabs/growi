@@ -9,10 +9,11 @@ import {
   type MockInstance,
   vi,
 } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
-import type { IAttachmentDocument } from '~/server/models/attachment';
-import { Attachment } from '~/server/models/attachment';
+import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 // Mock the generated attachment-text-extractor-client function
 vi.mock('@growi/attachment-text-extractor-client', () => ({
@@ -34,13 +35,6 @@ vi.mock('~/server/service/config-manager', () => ({
   },
 }));
 
-// Mock Attachment model
-vi.mock('~/server/models/attachment', () => ({
-  Attachment: {
-    findById: vi.fn(),
-  },
-}));
-
 // Helper to create axios error responses
 function makeAxiosError(status: number, code: string, message = 'error') {
   const error = Object.assign(new Error(message), {
@@ -53,18 +47,16 @@ function makeAxiosError(status: number, code: string, message = 'error') {
   return error;
 }
 
-// Helper to create a minimal IAttachmentDocument stub
-function makeAttachmentStub(
-  overrides: Partial<IAttachmentDocument> = {},
-): IAttachmentDocument {
-  return {
+// Helper to create a minimal attachment row stub
+function makeAttachmentStub(): AttachmentWithComputed {
+  return mock<AttachmentWithComputed>({
+    id: 'attachment-id-1',
     _id: 'attachment-id-1',
     fileFormat: 'application/pdf',
     fileSize: 1024,
     fileName: 'test.pdf',
     originalName: 'test.pdf',
-    ...overrides,
-  } as unknown as IAttachmentDocument;
+  });
 }
 
 // Helper to create a readable stream from a Buffer
@@ -106,8 +98,8 @@ describe('AttachmentTextExtractorService', () => {
     });
 
     // Default attachment stub
-    vi.mocked(Attachment.findById).mockResolvedValue(
-      makeAttachmentStub() as any,
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+      makeAttachmentStub(),
     );
 
     // Default DNS lookup (safe)
@@ -486,15 +478,16 @@ describe('AttachmentTextExtractorService', () => {
     expect(result.kind).toBeDefined();
   });
 
-  it('never throws when Attachment.findById returns null', async () => {
-    vi.mocked(Attachment.findById).mockResolvedValue(null as any);
+  it('returns attachment_not_found when the attachment row does not exist', async () => {
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(null);
 
     const service = await getService();
     const result = await service.extractAttachment('nonexistent-id');
 
-    // Should return a meaningful outcome (failed or serviceUnreachable), not throw
-    expect(result.kind).toBeDefined();
-    expect(typeof result.kind).toBe('string');
+    expect(result).toMatchObject({
+      kind: 'failed',
+      reasonCode: 'attachment_not_found',
+    });
   });
 
   it('never throws when fileUploader throws', async () => {

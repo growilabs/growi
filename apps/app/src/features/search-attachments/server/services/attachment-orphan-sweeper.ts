@@ -51,17 +51,17 @@ interface AggregationResult {
  * @param runSearch           — wraps the version-specific `client.search()`
  * @param runDeleteByPageId   — wraps `client.deleteByQuery()` filtered by pageId
  */
+type RunSearch = (indexName: string, body: unknown) => Promise<unknown>;
+type RunDeleteByPageId = (targetIndex: string, pageId: string) => Promise<void>;
+
 class AttachmentOrphanSweeperImpl implements AttachmentOrphanSweeper {
-  constructor(
-    private readonly runSearch: (
-      indexName: string,
-      body: unknown,
-    ) => Promise<unknown>,
-    private readonly runDeleteByPageId: (
-      targetIndex: string,
-      pageId: string,
-    ) => Promise<void>,
-  ) {}
+  private readonly runSearch: RunSearch;
+  private readonly runDeleteByPageId: RunDeleteByPageId;
+
+  constructor(runSearch: RunSearch, runDeleteByPageId: RunDeleteByPageId) {
+    this.runSearch = runSearch;
+    this.runDeleteByPageId = runDeleteByPageId;
+  }
 
   /**
    * Sweeps orphan attachment documents from `targetIndex`.

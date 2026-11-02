@@ -19,8 +19,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Hoisted stubs — must use vi.hoisted() so they exist before vi.mock factories
 // ---------------------------------------------------------------------------
 
-const { mockAttachmentFindById, mockPageFindById } = vi.hoisted(() => ({
-  mockAttachmentFindById: vi.fn(),
+const { mockAttachmentFindUnique, mockPageFindById } = vi.hoisted(() => ({
+  mockAttachmentFindUnique: vi.fn(),
   mockPageFindById: vi.fn(),
 }));
 
@@ -41,8 +41,8 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-vi.mock('~/server/models/attachment', () => ({
-  Attachment: { findById: mockAttachmentFindById },
+vi.mock('~/utils/prisma', () => ({
+  prisma: { attachments: { findUnique: mockAttachmentFindUnique } },
 }));
 
 vi.mock('mongoose', () => ({
@@ -155,7 +155,7 @@ describe('createAttachmentReextractRouter', () => {
   beforeEach(() => {
     mockGetConfig = vi.mocked(configManager.getConfig);
     mockGetConfig.mockReset();
-    mockAttachmentFindById.mockReset();
+    mockAttachmentFindUnique.mockReset();
     mockPageFindById.mockReset();
     isSearchServiceConfigured = vi.fn().mockReturnValue(true);
 
@@ -170,7 +170,7 @@ describe('createAttachmentReextractRouter', () => {
   });
 
   it('1. returns 404 when attachment not found', async () => {
-    mockAttachmentFindById.mockResolvedValue(null);
+    mockAttachmentFindUnique.mockResolvedValue(null);
 
     const indexer = buildIndexer();
     const router = createAttachmentReextractRouter(
@@ -193,7 +193,10 @@ describe('createAttachmentReextractRouter', () => {
   });
 
   it('2. returns 403 when attachment has no parent page (orphan)', async () => {
-    mockAttachmentFindById.mockResolvedValue({ _id: 'attach-1', page: null });
+    mockAttachmentFindUnique.mockResolvedValue({
+      id: 'attach-1',
+      pageId: null,
+    });
 
     const indexer = buildIndexer();
     const router = createAttachmentReextractRouter(
@@ -216,9 +219,9 @@ describe('createAttachmentReextractRouter', () => {
   });
 
   it('3. returns 403 when parent page is not found in DB', async () => {
-    mockAttachmentFindById.mockResolvedValue({
-      _id: 'attach-1',
-      page: { toString: () => 'page-id-1' },
+    mockAttachmentFindUnique.mockResolvedValue({
+      id: 'attach-1',
+      pageId: 'page-id-1',
     });
     mockPageFindById.mockResolvedValue(null);
 
@@ -236,6 +239,7 @@ describe('createAttachmentReextractRouter', () => {
 
     await invokeRouteHandler(router, req as never, res);
 
+    expect(mockPageFindById).toHaveBeenCalledWith('page-id-1');
     expect(res.apiv3Err).toHaveBeenCalledOnce();
     const [err, statusCode] = res.apiv3Err.mock.calls[0];
     expect(statusCode).toBe(403);
@@ -243,9 +247,9 @@ describe('createAttachmentReextractRouter', () => {
   });
 
   it('4. returns 403 when user is not admin and not in page grantedUsers (GRANT_OWNER)', async () => {
-    mockAttachmentFindById.mockResolvedValue({
-      _id: 'attach-1',
-      page: { toString: () => 'page-id-1' },
+    mockAttachmentFindUnique.mockResolvedValue({
+      id: 'attach-1',
+      pageId: 'page-id-1',
     });
     mockPageFindById.mockResolvedValue({
       _id: 'page-id-1',
@@ -275,9 +279,9 @@ describe('createAttachmentReextractRouter', () => {
   });
 
   it('5. returns 200 with outcome when admin calls it (even if not in grantedUsers)', async () => {
-    mockAttachmentFindById.mockResolvedValue({
-      _id: 'attach-1',
-      page: { toString: () => 'page-id-1' },
+    mockAttachmentFindUnique.mockResolvedValue({
+      id: 'attach-1',
+      pageId: 'page-id-1',
     });
     mockPageFindById.mockResolvedValue({
       _id: 'page-id-1',
@@ -312,9 +316,9 @@ describe('createAttachmentReextractRouter', () => {
   });
 
   it('6. returns 200 with outcome when page editor (in grantedUsers) calls it', async () => {
-    mockAttachmentFindById.mockResolvedValue({
-      _id: 'attach-1',
-      page: { toString: () => 'page-id-1' },
+    mockAttachmentFindUnique.mockResolvedValue({
+      id: 'attach-1',
+      pageId: 'page-id-1',
     });
     mockPageFindById.mockResolvedValue({
       _id: 'page-id-1',
@@ -348,9 +352,9 @@ describe('createAttachmentReextractRouter', () => {
   });
 
   it('7. returns 200 for any logged-in user when page grant is GRANT_PUBLIC (1)', async () => {
-    mockAttachmentFindById.mockResolvedValue({
-      _id: 'attach-public',
-      page: { toString: () => 'page-pub' },
+    mockAttachmentFindUnique.mockResolvedValue({
+      id: 'attach-public',
+      pageId: 'page-pub',
     });
     mockPageFindById.mockResolvedValue({
       _id: 'page-pub',

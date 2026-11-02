@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { mappings as mappingsEs7 } from './attachments-mappings-es7';
 import { mappings as mappingsEs8 } from './attachments-mappings-es8';
 import { mappings as mappingsEs9 } from './attachments-mappings-es9';
 
@@ -29,7 +28,6 @@ const REQUIRED_FIELDS = [
 ];
 
 describe.each([
-  { name: 'ES7', mappings: mappingsEs7 },
   { name: 'ES8', mappings: mappingsEs8 },
   { name: 'ES9', mappings: mappingsEs9 },
 ])('attachments mappings ($name)', ({ name: _name, mappings }) => {
