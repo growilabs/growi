@@ -1,25 +1,24 @@
 /**
- * Tests for GET /_api/v3/search/attachments
- *
- * Test cases:
- *  1. 400 when pageIds query param is missing entirely
- *  2. 400 when pageIds is an empty array (after split)
- *  3. 400 when pageIds has more than 20 elements
- *  4. 200 with enrichments when valid q and pageIds provided
- *  5. 503 when feature is disabled (middleware blocks before handler)
- *  8. the requesting user (or guest) is resolved and passed to resolveAttachmentSecondary
- *  9. duplicated pageIds are counted once
+ * GET /_api/v3/search/attachments, through the factory's real auth chain
+ * (accessTokenParser -> guest-allowed loginRequired -> feature gate).
  */
 
 import type { IUserHasId } from '@growi/core';
 import express from 'express';
 import supertest from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
+import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
+import type Crowi from '~/server/crowi';
+import addCustomFunctionToResponse from '~/server/routes/apiv3/response';
+import type { AclService } from '~/server/service/acl';
+import type SearchService from '~/server/service/search';
+
+import { createSearchAttachmentsRouter } from './search-attachments';
+
+const { featureEnabled } = vi.hoisted(() => ({
+  featureEnabled: { value: true },
+}));
 
 vi.mock('~/utils/logger', () => ({
   default: () => ({
@@ -29,259 +28,199 @@ vi.mock('~/utils/logger', () => ({
     warn: vi.fn(),
   }),
 }));
+vi.mock('../../services/is-attachment-full-text-search-enabled', () => ({
+  isAttachmentFullTextSearchEnabled: (isSearchServiceConfigured: boolean) =>
+    isSearchServiceConfigured && featureEnabled.value,
+}));
 
-// ---------------------------------------------------------------------------
-// Imports (after mocks)
-// ---------------------------------------------------------------------------
+addCustomFunctionToResponse(express);
 
-import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
-import type SearchService from '~/server/service/search';
-
-type SecondaryResolver = Pick<SearchService, 'resolveAttachmentSecondary'>;
-
-import { createSearchAttachmentsRouter } from './search-attachments';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const MOUNT = '/_api/v3/search/attachments';
+const oid = (i: number): string => i.toString(16).padStart(24, '0');
 
 const guestViewer: AttachmentSearchViewer = { user: null, userGroups: null };
-const resolveViewer = vi.fn(
-  async (
-    user: IUserHasId | null | undefined,
-  ): Promise<AttachmentSearchViewer> =>
-    user == null ? guestViewer : { user, userGroups: ['group-1'] },
-);
 
-function buildApp(
-  searchService: SecondaryResolver,
-  isSearchServiceConfigured: () => boolean,
-  withFeatureDisabled = false,
-  loggedInUser?: IUserHasId,
-) {
-  const app = express();
-  app.use(express.json());
-  if (loggedInUser != null) {
-    app.use((req: express.Request & { user?: IUserHasId }, _res, next) => {
-      req.user = loggedInUser;
-      next();
-    });
-  }
-
-  // Simulate apiv3 response helper (matches ApiV3Response interface)
-  app.use(
-    (
-      _req,
-      res: express.Response & { apiv3?: unknown; apiv3Err?: unknown },
-      next,
-    ) => {
-      res.apiv3 = (obj?: unknown) => res.status(200).json(obj ?? {});
-      res.apiv3Err = (err: unknown, status = 500) =>
-        res.status(status).json({ errors: [{ message: String(err) }] });
-      next();
-    },
-  );
-
-  if (withFeatureDisabled) {
-    // Inject a middleware that always returns 503 (simulates requireSearchAttachmentsEnabled)
-    app.use((_req, res) => {
-      return res.status(503).json({
-        errors: [
-          {
-            message: 'Attachment full-text search feature is disabled',
-            code: 'feature_disabled',
-          },
-        ],
-      });
-    });
-  } else {
-    const router = createSearchAttachmentsRouter(
-      searchService,
-      isSearchServiceConfigured,
-      resolveViewer,
-    );
-    app.use('/', router);
-  }
-
-  return app;
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-describe('GET / (search-attachments route)', () => {
-  let searchService: MockProxy<SecondaryResolver>;
-  let mockResolveSecondary: MockProxy<SecondaryResolver>['resolveAttachmentSecondary'];
-  let isSearchServiceConfigured: () => boolean;
+describe('GET /_api/v3/search/attachments', () => {
+  let searchService: MockProxy<SearchService>;
+  let aclService: MockProxy<AclService>;
+  let resolveViewer: ReturnType<
+    typeof vi.fn<
+      (user: IUserHasId | null | undefined) => Promise<AttachmentSearchViewer>
+    >
+  >;
+  let currentUser: IUserHasId | undefined;
+  let app: express.Express;
 
   beforeEach(() => {
-    searchService = mock<SecondaryResolver>();
-    mockResolveSecondary = searchService.resolveAttachmentSecondary;
-    isSearchServiceConfigured = vi.fn().mockReturnValue(true);
-  });
-
-  // -------------------------------------------------------------------------
-  // 1. Missing pageIds
-  // -------------------------------------------------------------------------
-  it('1. returns 400 when pageIds is missing', async () => {
-    const app = buildApp(searchService, isSearchServiceConfigured);
-    const res = await supertest(app).get('/').query({ q: 'keyword' });
-
-    expect(res.status).toBe(400);
-    expect(mockResolveSecondary).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------------------------
-  // 2. Empty pageIds
-  // -------------------------------------------------------------------------
-  it('2. returns 400 when pageIds is an empty string', async () => {
-    const app = buildApp(searchService, isSearchServiceConfigured);
-    const res = await supertest(app)
-      .get('/')
-      .query({ q: 'keyword', pageIds: '' });
-
-    expect(res.status).toBe(400);
-    expect(mockResolveSecondary).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------------------------
-  // 3. pageIds > 20 elements
-  // -------------------------------------------------------------------------
-  it('3. returns 400 when pageIds has more than 20 elements', async () => {
-    const app = buildApp(searchService, isSearchServiceConfigured);
-    const ids = Array.from({ length: 21 }, (_, i) => `id${i}`).join(',');
-    const res = await supertest(app)
-      .get('/')
-      .query({ q: 'keyword', pageIds: ids });
-
-    expect(res.status).toBe(400);
-    expect(mockResolveSecondary).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------------------------
-  // 4. Valid request → 200 with enrichments
-  // -------------------------------------------------------------------------
-  it('4. returns 200 with enrichments when valid q and pageIds provided', async () => {
-    const enrichments = {
-      page1: {
-        attachmentHits: [
-          {
-            attachmentId: 'att1',
-            pageId: 'page1',
-            fileName: 'doc.pdf',
-            originalName: 'doc.pdf',
-            fileFormat: 'application/pdf',
-            fileSize: 1024,
-            snippets: [],
-            pageNumber: 1,
-            label: null,
-          },
-        ],
-      },
-    };
-
-    mockResolveSecondary.mockResolvedValue({
+    featureEnabled.value = true;
+    currentUser = undefined;
+    searchService = mock<SearchService>({ isConfigured: true });
+    searchService.resolveAttachmentSecondary.mockResolvedValue({
       facet: 'all',
-      enrichments,
+      enrichments: {},
     });
-
-    const app = buildApp(searchService, isSearchServiceConfigured);
-    const res = await supertest(app)
-      .get('/')
-      .query({ q: 'keyword', pageIds: 'page1,page2' });
-
-    expect(res.status).toBe(200);
-    expect(mockResolveSecondary).toHaveBeenCalledWith('keyword', guestViewer, {
-      primaryIds: ['page1', 'page2'],
-    });
-    expect(res.body).toMatchObject({ enrichments });
-  });
-
-  // -------------------------------------------------------------------------
-  // 5. 503 when feature is disabled
-  // -------------------------------------------------------------------------
-  it('5. returns 503 when feature is disabled (middleware blocks)', async () => {
-    const app = buildApp(searchService, isSearchServiceConfigured, true);
-    const res = await supertest(app)
-      .get('/')
-      .query({ q: 'keyword', pageIds: 'page1' });
-
-    expect(res.status).toBe(503);
-    expect(res.body.errors[0].code).toBe('feature_disabled');
-    expect(mockResolveSecondary).not.toHaveBeenCalled();
-  });
-
-  // -------------------------------------------------------------------------
-  // 6. pageIds as array query param (e.g., ?pageIds[]=id1&pageIds[]=id2)
-  // -------------------------------------------------------------------------
-  it('6. handles pageIds as repeated query array params', async () => {
-    mockResolveSecondary.mockResolvedValue({ facet: 'all', enrichments: {} });
-
-    const app = buildApp(searchService, isSearchServiceConfigured);
-
-    // supertest encodes array as pageIds[]=id1&pageIds[]=id2 with { pageIds: ['id1', 'id2'] }
-    const res = await supertest(app)
-      .get('/')
-      .query({ q: 'kw', 'pageIds[]': ['id1', 'id2'] });
-
-    // The handler may or may not support this form; if it returns 400, that is also acceptable
-    // but the canonical form (comma-separated) must work. This test just ensures no crash.
-    expect([200, 400]).toContain(res.status);
-  });
-
-  // -------------------------------------------------------------------------
-  // 7. Exactly 20 pageIds → valid
-  // -------------------------------------------------------------------------
-  it('7. accepts exactly 20 pageIds', async () => {
-    mockResolveSecondary.mockResolvedValue({ facet: 'all', enrichments: {} });
-
-    const app = buildApp(searchService, isSearchServiceConfigured);
-    const ids = Array.from({ length: 20 }, (_, i) => `id${i}`).join(',');
-    const res = await supertest(app)
-      .get('/')
-      .query({ q: 'keyword', pageIds: ids });
-
-    expect(res.status).toBe(200);
-    expect(mockResolveSecondary).toHaveBeenCalledWith('keyword', guestViewer, {
-      primaryIds: expect.arrayContaining(['id0', 'id19']),
-    });
-  });
-
-  it('8. resolves the logged-in user and passes that viewer to resolveAttachmentSecondary', async () => {
-    mockResolveSecondary.mockResolvedValue({ facet: 'all', enrichments: {} });
-    const user = mock<IUserHasId>({ _id: 'user-1' });
-
-    const app = buildApp(searchService, isSearchServiceConfigured, false, user);
-    const res = await supertest(app)
-      .get('/')
-      .query({ q: 'keyword', pageIds: 'page1' });
-
-    expect(res.status).toBe(200);
-    expect(resolveViewer).toHaveBeenCalledWith(user);
-    expect(mockResolveSecondary).toHaveBeenCalledWith(
-      'keyword',
-      { user, userGroups: ['group-1'] },
-      { primaryIds: ['page1'] },
+    aclService = mock<AclService>();
+    aclService.isGuestAllowedToRead.mockReturnValue(false);
+    resolveViewer = vi.fn(async (user) =>
+      user == null ? guestViewer : { user, userGroups: ['group-1'] },
     );
+
+    const crowi = mock<Crowi>({ searchService, aclService });
+
+    app = express();
+    // the real app's body parser always sets req.body, which the token parser reads
+    app.use(express.json());
+    app.use((req: express.Request & { user?: IUserHasId }, _res, next) => {
+      req.user = currentUser;
+      next();
+    });
+    app.use(MOUNT, createSearchAttachmentsRouter(crowi, resolveViewer));
   });
 
-  it('9. counts duplicated pageIds once against the 20-id limit', async () => {
-    mockResolveSecondary.mockResolvedValue({ facet: 'all', enrichments: {} });
-    const ids = [
-      ...Array.from({ length: 20 }, (_, i) => `id${i}`),
-      'id0',
-      'id1',
-    ].join(',');
+  const get = (query: Record<string, unknown> | string) =>
+    supertest(app).get(MOUNT).query(query);
 
-    const app = buildApp(searchService, isSearchServiceConfigured);
-    const res = await supertest(app)
-      .get('/')
-      .query({ q: 'keyword', pageIds: ids });
+  describe('authentication', () => {
+    it('rejects a guest when guests may not read', async () => {
+      const res = await get({ q: 'kw', pageIds: oid(1) });
 
-    expect(res.status).toBe(200);
-    const primaryIds = mockResolveSecondary.mock.calls[0][2].primaryIds;
-    expect(primaryIds).toHaveLength(20);
-    expect(new Set(primaryIds).size).toBe(20);
+      expect(res.status).toBe(403);
+      expect(searchService.resolveAttachmentSecondary).not.toHaveBeenCalled();
+    });
+
+    it('rejects a guest before revealing whether the feature is enabled', async () => {
+      featureEnabled.value = false;
+
+      const res = await get({ q: 'kw', pageIds: oid(1) });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('searches as a guest when guests may read', async () => {
+      aclService.isGuestAllowedToRead.mockReturnValue(true);
+
+      const res = await get({ q: 'kw', pageIds: oid(1) });
+
+      expect(res.status).toBe(200);
+      expect(searchService.resolveAttachmentSecondary).toHaveBeenCalledWith(
+        'kw',
+        guestViewer,
+        { primaryIds: [oid(1)] },
+      );
+    });
+
+    it('searches as the logged-in user', async () => {
+      currentUser = mock<IUserHasId>({ _id: 'user-1', status: 2 });
+
+      const res = await get({ q: 'kw', pageIds: oid(1) });
+
+      expect(res.status).toBe(200);
+      expect(searchService.resolveAttachmentSecondary).toHaveBeenCalledWith(
+        'kw',
+        { user: currentUser, userGroups: ['group-1'] },
+        { primaryIds: [oid(1)] },
+      );
+    });
+  });
+
+  describe('as a logged-in user', () => {
+    beforeEach(() => {
+      currentUser = mock<IUserHasId>({ _id: 'user-1', status: 2 });
+    });
+
+    it('answers 503 feature_disabled while the feature is disabled', async () => {
+      featureEnabled.value = false;
+
+      const res = await get({ q: 'kw', pageIds: oid(1) });
+
+      expect(res.status).toBe(503);
+      expect(res.body.errors[0].code).toBe('feature_disabled');
+      expect(searchService.resolveAttachmentSecondary).not.toHaveBeenCalled();
+    });
+
+    it('returns the enrichments', async () => {
+      const enrichments = { [oid(1)]: { attachmentHits: [] } };
+      searchService.resolveAttachmentSecondary.mockResolvedValue({
+        facet: 'all',
+        enrichments,
+      });
+
+      const res = await get({ q: 'kw', pageIds: `${oid(1)},${oid(2)}` });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ facet: 'all', enrichments });
+    });
+
+    it('accepts repeated pageIds params and counts duplicates once', async () => {
+      const ids = Array.from({ length: 20 }, (_, i) => oid(i));
+      const query = [...ids, oid(0), oid(1)]
+        .map((id) => `pageIds=${id}`)
+        .join('&');
+
+      const res = await get(`q=kw&${query}`);
+
+      expect(res.status).toBe(200);
+      expect(searchService.resolveAttachmentSecondary).toHaveBeenCalledWith(
+        'kw',
+        expect.anything(),
+        { primaryIds: ids },
+      );
+    });
+
+    it('searches with an empty keyword when q is omitted', async () => {
+      const res = await get({ pageIds: oid(1) });
+
+      expect(res.status).toBe(200);
+      expect(searchService.resolveAttachmentSecondary).toHaveBeenCalledWith(
+        '',
+        expect.anything(),
+        { primaryIds: [oid(1)] },
+      );
+    });
+
+    it.each([
+      { name: 'missing pageIds', query: { q: 'kw' } },
+      { name: 'empty pageIds', query: { q: 'kw', pageIds: '' } },
+      { name: 'only separators', query: { q: 'kw', pageIds: ',,' } },
+      {
+        name: 'more than 20 distinct ids',
+        query: {
+          q: 'kw',
+          pageIds: Array.from({ length: 21 }, (_, i) => oid(i)).join(','),
+        },
+      },
+      {
+        name: 'an id that is not an ObjectId',
+        query: { q: 'kw', pageIds: `${oid(1)},secret<script>` },
+      },
+      { name: 'an operator-shaped pageIds', query: 'q=kw&pageIds[$ne]=secret' },
+      { name: 'an object-shaped pageIds', query: 'q=kw&pageIds[a]=secret' },
+      {
+        name: 'a repeated q',
+        query: `q=secret&q=other&pageIds=${oid(1)}`,
+      },
+      {
+        name: 'an object-shaped q',
+        query: `q[$ne]=secret&pageIds=${oid(1)}`,
+      },
+    ])('rejects $name with 400 and a fixed message', async ({ query }) => {
+      const res = await get(query);
+
+      expect(res.status).toBe(400);
+      expect(res.body.errors[0].code).toMatch(/^invalid_/);
+      expect(res.text).not.toContain('secret');
+      expect(searchService.resolveAttachmentSecondary).not.toHaveBeenCalled();
+    });
+
+    it('answers 500 with a fixed message when the search fails', async () => {
+      searchService.resolveAttachmentSecondary.mockRejectedValue(
+        new Error('secret internals'),
+      );
+
+      const res = await get({ q: 'kw', pageIds: oid(1) });
+
+      expect(res.status).toBe(500);
+      expect(res.text).not.toContain('secret');
+    });
   });
 });

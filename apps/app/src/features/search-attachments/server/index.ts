@@ -126,10 +126,8 @@ export function initAttachmentFullTextSearch(crowi: Crowi): void {
   // ----------------------------------------------------------------
   // Store on crowi for route access
   // ----------------------------------------------------------------
-  // biome-ignore lint/suspicious/noExplicitAny: Crowi is typed via declaration merging in task 9.1
-  (crowi as any).attachmentSearchIndexer = indexer;
-  // biome-ignore lint/suspicious/noExplicitAny: Crowi is typed via declaration merging in task 9.1
-  (crowi as any).attachmentReindexBatch = reindexBatch;
+  crowi.attachmentSearchIndexer = indexer;
+  crowi.attachmentReindexBatch = reindexBatch;
 
   // ----------------------------------------------------------------
   // Build and inject AttachmentSearchResultAggregator into SearchService

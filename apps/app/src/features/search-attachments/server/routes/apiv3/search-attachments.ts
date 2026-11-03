@@ -6,121 +6,135 @@
  *
  * Query params:
  *   q        — keyword (optional; empty string is accepted)
- *   pageIds  — comma-separated page IDs (required, 1–20 distinct elements)
+ *   pageIds  — page IDs, comma-separated and/or repeated (1–20 distinct ObjectIds)
+ *
+ * Middleware chain (same reader rule as `GET /_api/search`):
+ *   accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true })
+ *   + guest-allowed loginRequired (guests only when `isGuestAllowedToRead`)
+ *   + requireSearchAttachmentsEnabled
  *
  * The ids come from the client, so each one is re-checked against the
  * requesting user (guest when not logged in) and the query's operators; ids
  * the user cannot read, that the query excludes, or that do not exist produce
  * no enrichment.
  *
- * Error responses:
- *   400  — pageIds missing, empty, or more than 20 distinct elements
- *   503  — feature disabled (injected by requireSearchAttachmentsEnabled middleware)
+ * Error responses (fixed messages, the input is never echoed):
+ *   400  — invalid_query / invalid_page_ids
+ *   403  — not logged in and guests may not read
+ *   503  — feature_disabled
  */
 
 import type { IUserHasId } from '@growi/core';
+import { SCOPE } from '@growi/core/dist/interfaces';
+import { isValidObjectId } from '@growi/core/dist/utils/objectid-utils';
 import express from 'express';
 
 import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import type SearchService from '~/server/service/search';
 import loggerFactory from '~/utils/logger';
 
+import { createRequireSearchAttachmentsEnabled } from '../../middlewares/require-search-attachments-enabled';
+import { DEFAULT_PAGE_SIZE as MAX_PAGE_IDS } from '../../queries';
 import { resolveAttachmentSearchViewer } from '../../services/resolve-attachment-search-viewer';
 
 const logger = loggerFactory(
   'growi:features:search-attachments:routes:apiv3:search-attachments',
 );
 
-/** Maximum number of pageIds accepted per request. */
-const MAX_PAGE_IDS = 20;
+type ParsedQuery =
+  | { ok: true; q: string; pageIds: string[] }
+  | { ok: false; code: string; message: string };
+
+const invalidPageIds = (message: string): ParsedQuery => ({
+  ok: false,
+  code: 'invalid_page_ids',
+  message,
+});
 
 /**
- * Parses the `pageIds` query parameter.
- *
- * Supports two forms:
- *  - Comma-separated string:  `?pageIds=id1,id2,id3`
- *  - Array (single value):   `?pageIds=id1` (still becomes a string)
- *
- * Returns an empty array when the param is absent or the resulting list
- * is empty after splitting and filtering blank segments.
+ * Accepts `q` as one string, and `pageIds` as one string or repeated strings,
+ * each holding comma-separated ObjectIds. Any other shape (objects from
+ * `pageIds[$ne]=`, nested arrays) is rejected rather than coerced.
  */
-function parsePageIds(raw: unknown): string[] {
-  if (raw == null || raw === '') {
-    return [];
+function parseQuery(query: express.Request['query']): ParsedQuery {
+  const { q = '', pageIds: rawPageIds } = query;
+  if (typeof q !== 'string') {
+    return {
+      ok: false,
+      code: 'invalid_query',
+      message: 'q must be a single string',
+    };
   }
 
-  // Express may deliver a string or an array of strings
-  const joined = Array.isArray(raw) ? raw.join(',') : String(raw);
+  const parts = Array.isArray(rawPageIds) ? rawPageIds : [rawPageIds ?? ''];
+  if (!parts.every((part) => typeof part === 'string')) {
+    return invalidPageIds('pageIds must be a list of page ids');
+  }
 
-  const ids = joined
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  return [...new Set(ids)];
+  const ids = [
+    ...new Set(
+      parts
+        .flatMap((part) => part.split(','))
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    ),
+  ];
+  if (ids.length === 0) {
+    return invalidPageIds(
+      'pageIds query parameter is required and must not be empty',
+    );
+  }
+  if (ids.length > MAX_PAGE_IDS) {
+    return invalidPageIds(
+      `pageIds must not exceed ${MAX_PAGE_IDS} distinct elements`,
+    );
+  }
+  if (!ids.every((id) => isValidObjectId(id))) {
+    return invalidPageIds('pageIds must be a list of page ids');
+  }
+  return { ok: true, q, pageIds: ids };
 }
 
 /**
- * Creates an Express router for the search-attachments secondary enrichment
- * endpoint.
- *
- * @param searchService             — parses the query and resolves the enrichment
- * @param isSearchServiceConfigured — returns true when Elasticsearch is configured
- * @param resolveViewer             — resolves the requesting user and their groups
+ * @param crowi         — supplies the search service and the guest-read setting, read per request
+ * @param resolveViewer — resolves the requesting user and their groups
  */
 export function createSearchAttachmentsRouter(
-  searchService: Pick<SearchService, 'resolveAttachmentSecondary'>,
-  _isSearchServiceConfigured: () => boolean,
+  crowi: Crowi,
   resolveViewer: (
     user: IUserHasId | null | undefined,
   ) => Promise<AttachmentSearchViewer> = resolveAttachmentSearchViewer,
 ): express.Router {
   const router = express.Router();
 
-  /**
-   * GET /
-   *
-   * Delegates to SearchService.resolveAttachmentSecondary and
-   * returns enrichment data keyed by pageId.
-   */
+  const loginRequired = loginRequiredFactory(crowi, true);
+  const requireSearchAttachmentsEnabled = createRequireSearchAttachmentsEnabled(
+    () => crowi.searchService?.isConfigured === true,
+  );
+
   router.get(
     '/',
+    accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    loginRequired,
+    requireSearchAttachmentsEnabled,
     async (
       req: express.Request & { user?: IUserHasId },
       res: ApiV3Response,
     ) => {
-      const q = String(req.query.q ?? '');
-
-      const pageIds = parsePageIds(req.query.pageIds);
-
-      // Validate: pageIds must be present and non-empty
-      if (pageIds.length === 0) {
+      const parsed = parseQuery(req.query);
+      if (!parsed.ok) {
         return res.status(400).json({
-          errors: [
-            {
-              message:
-                'pageIds query parameter is required and must not be empty',
-              code: 'invalid_page_ids',
-            },
-          ],
+          errors: [{ message: parsed.message, code: parsed.code }],
         });
       }
-
-      // Validate: pageIds must not exceed the maximum allowed
-      if (pageIds.length > MAX_PAGE_IDS) {
-        return res.status(400).json({
-          errors: [
-            {
-              message: `pageIds must not exceed ${MAX_PAGE_IDS} elements (received ${pageIds.length})`,
-              code: 'too_many_page_ids',
-            },
-          ],
-        });
-      }
+      const { q, pageIds } = parsed;
 
       try {
         const viewer = await resolveViewer(req.user);
-        const result = await searchService.resolveAttachmentSecondary(
+        const result = await crowi.searchService.resolveAttachmentSecondary(
           q,
           viewer,
           { primaryIds: pageIds },
@@ -129,7 +143,7 @@ export function createSearchAttachmentsRouter(
         return res.apiv3(result);
       } catch (err) {
         logger.error(
-          { err, q, pageIdCount: pageIds.length },
+          { err, pageIdCount: pageIds.length },
           'resolveSecondary failed',
         );
         return res.status(500).json({

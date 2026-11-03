@@ -462,7 +462,7 @@ function buildTestApp(isAdmin: boolean) {
       // biome-ignore lint/suspicious/noExplicitAny: test-only response helper
       (res as any).apiv3 = (data: unknown) => res.status(200).json(data);
       // biome-ignore lint/suspicious/noExplicitAny: test-only response helper
-      (res as any).apiv3Err = (err: unknown, status: number) =>
+      (res as any).apiv3Err = (err: unknown, status = 400) =>
         res.status(status).json({ error: err });
       next();
     },
@@ -539,6 +539,23 @@ describe('GET /failures', () => {
       since: new Date(sinceIso),
     });
     expect(mockTotalRecent).toHaveBeenCalledWith(new Date(sinceIso));
+  });
+
+  it.each([
+    { name: 'a non-numeric limit', qs: 'limit=secret' },
+    { name: 'a zero limit', qs: 'limit=0' },
+    { name: 'a limit above 200', qs: 'limit=201' },
+    { name: 'an operator-shaped limit', qs: 'limit[$gt]=0' },
+    { name: 'a since that is not a date', qs: 'since=secret' },
+  ])('rejects $name with 400 without querying the log', async ({ qs }) => {
+    const app = buildTestApp(true);
+    const res = await supertest(app).get(
+      `/admin/attachment-search/failures?${qs}`,
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.text).not.toContain('secret');
+    expect(mockListRecent).not.toHaveBeenCalled();
   });
 
   it('12. returns 403 when user is not an admin', async () => {

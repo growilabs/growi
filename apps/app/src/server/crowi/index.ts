@@ -23,6 +23,8 @@ import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bul
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
 import { initAttachmentFullTextSearch } from '~/features/search-attachments/server';
+import type { AttachmentReindexBatchInterface } from '~/features/search-attachments/server/services/attachment-reindex-batch';
+import type { AttachmentSearchIndexerInterface } from '~/features/search-attachments/server/services/attachment-search-indexer';
 import type { SessionConfig } from '~/interfaces/session-config';
 import { startCron as startAccessTokenCron } from '~/server/service/access-token';
 import { projectRoot } from '~/server/util/project-dir-utils';
@@ -155,6 +157,11 @@ class Crowi {
   passportService!: PassportService;
 
   searchService!: SearchService;
+
+  /** Set by initAttachmentFullTextSearch only when the feature is enabled at boot. */
+  attachmentSearchIndexer?: AttachmentSearchIndexerInterface;
+
+  attachmentReindexBatch?: AttachmentReindexBatchInterface;
 
   auditlogChangeStreamService: AuditlogChangeStreamService | null = null;
 

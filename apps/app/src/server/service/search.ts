@@ -15,6 +15,7 @@ import {
   FILTER_FIELDS,
   SEARCH_FILTER_PREFIXES,
 } from '~/features/search/utils/filter-fields';
+import { DEFAULT_PAGE_SIZE as MAX_SECONDARY_PAGE_IDS } from '~/features/search-attachments/server/queries';
 import type {
   AttachmentSearchInput,
   AttachmentSearchResultAggregator,
@@ -654,6 +655,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
    *
    * `viewer` is resolved the same way the page search route resolves it; a
    * null user means guest.
+   *
+   * resolve=full (facet=all): pages that came back without attachment hits
+   * (every page after the first result page) are enriched in the same call,
+   * as the secondary endpoint would.
    */
   async searchByFacet(
     keyword: string,
@@ -662,6 +667,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
       facet?: 'pages' | 'all' | 'attachments';
       from?: number;
       size?: number;
+      resolve?: 'primary' | 'full';
     },
   ): Promise<IPrimarySearchResult> {
     const facet = options.facet ?? 'pages';
@@ -670,12 +676,20 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
     const input = await this.createAttachmentSearchInput(keyword, viewer);
 
-    if (facet !== 'pages' && this.attachmentSearchResultAggregator != null) {
-      return this.attachmentSearchResultAggregator.searchPrimary(input, {
+    const aggregator = this.attachmentSearchResultAggregator;
+    if (facet !== 'pages' && aggregator != null) {
+      const primary = await aggregator.searchPrimary(input, {
         facet,
         from,
         size,
       });
+      if (facet !== 'all' || options.resolve !== 'full') {
+        return primary;
+      }
+      return {
+        ...primary,
+        items: await this.attachSecondaryHits(aggregator, input, primary.items),
+      };
     }
 
     // Page-only fallback: the regular page search for the same viewer
@@ -686,6 +700,36 @@ class SearchService implements SearchQueryParser, SearchResolver {
       items: result.data,
       meta: { total: result.meta.total },
     };
+  }
+
+  private async attachSecondaryHits(
+    aggregator: AttachmentSearchResultAggregator,
+    input: AttachmentSearchInput,
+    items: IPrimarySearchResult['items'],
+  ): Promise<IPrimarySearchResult['items']> {
+    const missing = items
+      .filter((item) => item.meta?.attachmentHits == null)
+      .map((item) => item.data._id.toString());
+    const chunks: string[][] = [];
+    for (let i = 0; i < missing.length; i += MAX_SECONDARY_PAGE_IDS) {
+      chunks.push(missing.slice(i, i + MAX_SECONDARY_PAGE_IDS));
+    }
+    const results = await Promise.all(
+      chunks.map((primaryIds) =>
+        aggregator.resolveSecondary(input, { facet: 'all', primaryIds }),
+      ),
+    );
+    const enrichments = Object.assign(
+      {},
+      ...results.map((r) => r.enrichments),
+    ) as IResolvedSecondaryResult['enrichments'];
+
+    return items.map((item) => {
+      const hits = enrichments[item.data._id.toString()]?.attachmentHits;
+      return hits == null || item.meta?.attachmentHits != null
+        ? item
+        : { ...item, meta: { ...item.meta, attachmentHits: hits } };
+    });
   }
 
   /**

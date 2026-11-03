@@ -1,43 +1,28 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 
-import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+
+import { isAttachmentFullTextSearchEnabled } from '../services/is-attachment-full-text-search-enabled';
 
 const logger = loggerFactory('growi:features:search-attachments:middleware');
 
 /**
- * Creates middleware that returns 503 feature_disabled when attachment full-text search is not configured.
+ * Creates middleware that returns 503 feature_disabled when attachment
+ * full-text search is not enabled (see isAttachmentFullTextSearchEnabled).
  *
- * isAttachmentFullTextSearchEnabled =
- *   isSearchServiceConfigured() &&
- *   extractorUri != null && extractorUri !== '' &&
- *   extractorToken != null && extractorToken !== ''
+ * It does not authenticate: mount it after the route's auth chain.
  */
 export function createRequireSearchAttachmentsEnabled(
   isSearchServiceConfigured: () => boolean,
 ): RequestHandler {
-  return (_req: Request, res: Response, next: NextFunction) => {
-    const extractorUri = configManager.getConfig(
-      'app:attachmentFullTextSearch:extractorUri',
-    );
-    const extractorToken = configManager.getConfig(
-      'app:attachmentFullTextSearch:extractorToken',
-    );
-
-    const isEnabled =
-      isSearchServiceConfigured() &&
-      extractorUri != null &&
-      extractorUri !== '' &&
-      extractorToken != null &&
-      extractorToken !== '';
-
-    if (!isEnabled) {
-      logger.warn(
-        'Attachment full-text search feature is disabled: ' +
-          `searchConfigured=${isSearchServiceConfigured()}, ` +
-          `extractorUri=${extractorUri != null ? '"set"' : 'null'}, ` +
-          `extractorToken=${extractorToken != null ? '"set"' : 'null'}`,
-      );
+  // Named so the route-middleware snapshot tool can identify it.
+  return function requireSearchAttachmentsEnabled(
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
+    if (!isAttachmentFullTextSearchEnabled(isSearchServiceConfigured())) {
+      logger.debug('Attachment full-text search feature is disabled');
       return res.status(503).json({
         errors: [
           {

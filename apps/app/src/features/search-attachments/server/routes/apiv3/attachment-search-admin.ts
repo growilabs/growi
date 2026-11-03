@@ -5,6 +5,10 @@
  * PUT  /_api/v3/admin/attachment-search/config    — update config values
  * GET  /_api/v3/admin/attachment-search/failures  — list recent extraction failures
  *
+ * Every route: accessTokenParser([SCOPE.*.ADMIN.FULL_TEXT_SEARCH]) +
+ * loginRequiredStrictly + adminRequired. Not behind the feature gate: these
+ * are how an admin turns the feature on.
+ *
  * Security note: `extractorToken` is WRITE-ONLY and must never appear in
  * GET responses.  Only `hasExtractorToken: boolean` is exposed.
  */
@@ -12,7 +16,7 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
-import { body } from 'express-validator';
+import { body, query } from 'express-validator';
 
 import { ExtractionFailureLogService } from '~/features/search-attachments/server/services/extraction-failure-log-service';
 import { validateExtractorUri } from '~/features/search-attachments/server/services/validate-extractor-uri';
@@ -149,6 +153,21 @@ const putConfigValidator = [
   body('extractorToken').optional({ nullable: true }),
   body('timeoutMs').optional({ nullable: true }).isInt({ min: 1 }),
   body('maxFileSizeBytes').optional({ nullable: true }).isInt({ min: 1 }),
+];
+
+/** Upper bound of GET /failures `limit`. */
+const MAX_FAILURES_LIMIT = 200;
+
+const listFailuresValidator = [
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: MAX_FAILURES_LIMIT })
+    .withMessage(`limit must be an integer between 1 and ${MAX_FAILURES_LIMIT}`)
+    .toInt(),
+  query('since')
+    .optional()
+    .isISO8601()
+    .withMessage('since must be an ISO 8601 date'),
 ];
 
 // ---------------------------------------------------------------------------
@@ -305,8 +324,11 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
   // -------------------------------------------------------------------------
   router.get(
     '/failures',
+    accessTokenParser([SCOPE.READ.ADMIN.FULL_TEXT_SEARCH]),
     loginRequiredStrictly,
     adminRequired,
+    listFailuresValidator,
+    apiV3FormValidator,
     async (req, res: ApiV3Response) => {
       try {
         const limit = Number(req.query.limit ?? 50);
