@@ -1,6 +1,6 @@
 # Research: attachment-search-text-extractor
 
-_最終更新: 2026-10-28_
+_最終更新: 2026-11-03_
 
 この文書は、`services/attachment-text-extractor` (添付ファイルからテキストを取り出す Python サービス) の技術選定について、調べたことと決めたことをまとめたものである。下流 spec (apps/app への組み込み、UI) に関わる調査は含めない。
 
@@ -9,7 +9,7 @@ _最終更新: 2026-10-28_
 1. **決定事項** — いま決まっていること。実装はここに従う
 2. **採用理由と根拠** — なぜそう決めたか。予備案と、判断に使った計測値
 3. **不採用にした選択肢** — 検討して採らなかったものと、その理由の一覧
-4. **既存実装とのギャップ分析** — design フェーズの入力。design に入る前の未決事項は §4.5 (すべて確定済み)
+4. **実装で分かったこと** — 実装と検証で初めて分かった、ライブラリと実行環境の挙動
 5. **経緯** — 判断が変わってきた流れの要約と、参考にした外部記事
 
 umbrella 側の資料: [../attachment-search/research.md](../attachment-search/research.md) (末尾の「抽出アーキテクチャ選択の根拠」)、[../attachment-search/research-docker-image.md](../attachment-search/research-docker-image.md) (既製の Docker image の調査)。
@@ -28,8 +28,8 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 | 旧形式 PPT | 分けられない (ZIP ではない) ので、丸ごと anydoc に渡す | 1 要素 |
 | 旧形式 DOC / XLS、OpenDocument (ODT / ODS / ODP) | anydoc (XLS は anydoc の形式名 `xlsx` を明示して渡す) | 1 要素 |
 | PDF | pypdfium2 でページごとに取り出す。開くのにパスワードが要らない (オーナーパスワードのみの) PDF は抽出する | ページごと |
-| CSV / TSV | 文字コードを判定して UTF-8 にしてから、anydoc に形式 `csv` を明示して渡す (区切り文字は anydoc が判定する) | 1 要素 |
-| HTML | サービス自身で処理する。Python 標準の `html.parser` で script / style を除き、タグを取り除く | 1 要素 |
+| CSV / TSV | 文字コードを判定して UTF-8 にしてから、anydoc に形式 `csv` を明示して渡す (区切り文字は anydoc が判定する)。8MiB (`MAX_CSV_BYTES`) を超えるものは、子プロセスを作る前に上限超過にする | 1 要素 |
+| HTML | サービス自身で処理する。Python 標準の `html.parser` で script / style を除き、タグを取り除く。20MiB (`MAX_HTML_BYTES`) を超えるものは、子プロセスを作る前に上限超過にする | 1 要素 |
 | TXT / MD / LOG / JSON / YAML | サービス自身で処理する。文字コードを判定してデコードしたテキストをそのまま返す (JSON / YAML は解析しない) | 1 要素 |
 | XML | サービス自身で処理する。DOCTYPE を取り除き、タグを取り除いたテキストを返す (エンティティは展開しない) | 1 要素 |
 | ipynb | サービス自身で処理する。セルの source と、テキストの出力 (stream、text/plain) を取り出す。画像の base64 は捨て、出力ごとに文字数の上限を設ける | 1 要素 |
@@ -95,6 +95,8 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
   - 親と子のやり取りは Pipe だけで行い、子から親へは JSON を 1 回送る (pickle は使わない)。共有メモリ (`/dev/shm`) は使わない。
   - uvicorn のワーカーが落ちたときに子が残らないよう、子は「依頼元のワーカーだけが書き込み側を持つパイプ」を見張り、それが閉じたら自分で終了する。CPython の非公開属性には頼らない。
   - 全体の同時実行数は「uvicorn のワーカー数 × ワーカーごとの枠の数」になる。既定はワーカー 1 つとし、`MAX_CONCURRENCY` がそのまま全体の上限になるようにする。
+  - 呼び出し側が変換中に接続を切ったら、変換を止めて枠とメモリを返す (Req 2.9)。
+  - 呼び出しは「状態を持たない同期の HTTP 呼び出し」のままにする。非同期の受け付け方式は採らない (§3.8、2026-11-02 ユーザー判断)。
 - **HTTP フレームワーク**: Python 3.12 + FastAPI + Uvicorn。
 - **ビルドツール**: uv。`uv.lock` で依存を固定し、`uv sync --locked --no-dev` で入れる。
 - **Dockerfile**: `python:3.12-slim-bookworm` をベースにした multi-stage 構成 (ビルド用の段と実行用の段を分け、実行用には成果物だけをコピーする構成)。ビルド用の段で uv を使って `.venv` を作り、実行用の段には `.venv` だけをコピーする。ffmpeg や exiftool などの外部バイナリは入れない。
@@ -131,7 +133,7 @@ anydoc・pypdfium2・charset-normalizer は、いずれも linux x86_64 / aarch6
 
 ### 1.6 未決事項
 
-なし。§4.5 の各項目は design で確定した (確定先を §4.5 の各項目に書いてある)。エラーコードの対応、設定の既定値、配備の条件は design.md に書く。
+なし。エラーコードの対応、設定の既定値、配備の条件は design.md に書く。
 
 ---
 
@@ -193,7 +195,7 @@ anydoc・pypdfium2・charset-normalizer は、いずれも linux x86_64 / aarch6
 - XLSX の雑音 (`NaN` が 340 個、`Unnamed: N` という列名など) は markitdown のほうが多い。
 - markitdown は PPTX の改行コード (垂直タブ `\x0b`) を出力にそのまま残す。
 - anydoc は PPTX の一部で行の順番を入れ替える (表紙の日付と組織名が逆になった)。
-- anydoc は、シートが 1 枚だけのブックではシート名を出さない。非表示のシートと空のシートは出力しない (§4.5 の 2 で扱う)。
+- anydoc は、シートが 1 枚だけのブックではシート名を出さない。非表示のシートと空のシートは出力しない (§1.2 の「XLSX のシート分割」で扱う)。
 
 **機能の違い**:
 
@@ -280,8 +282,8 @@ anydoc の出力にはスライドの区切りが無い。見出しを手がか�
 - 6MB の XLSX (5 シート × 2 万行) で、どちらのライブラリも約 620MB まで膨らむ。4 並列で変換すると anydoc 2.4GB / markitdown 1.9GB に達した。
 - アップロードの上限 (`maxFileSizeBytes`、既定 50MB) ではこのメモリを抑えられない。コンテナのメモリ上限は「入力に対するメモリの倍率 × 同時に変換する数」で決まり、ライブラリを替えても解決しない。
 - 対策として、形式ごとのサイズ上限ではなく、子プロセスの RSS の上限で止める方式にした。入力の大きさとメモリの関係は形式や中身でばらつくため、実際に使ったメモリで止めるほうが確実だから。RSS の上限 300MB に対して、実際に止まったのは 309〜315MB だった。既定の上限は 320MB にした (2026-10-28 ユーザー判断)。XLSX 以外の最悪値は、画像の多い 40MB の DOCX / PPTX で 188MB / 184MB (50MB なら約 225MB の見込み)、実物のファイル 29 件で最大 69MB、PDF 116 ページで 34MB だった。
-- XLSX は anydoc がセル数に比例してメモリを使う (1 セルあたり約 2.5KB。待機中の子が約 80MB。子の最大 RSS の実測: 1 シート 2 万行 × 1 列 140MB、7 万行 × 1 列 285MB、10 万行 × 1 列 328〜357MB、1 万行 × 10 列 292MB。1 シート 50 万セル以上は anydoc の `max_xml_nodes` の上限でエラー)。そこで、anydoc に渡す前に全シートのセル数を数え、7 万セルを超えるものは上限超過のエラーにする (2026-10-28 ユーザー判断: 当初は 10 万セルで、最初の見積もり 214MB が実測と合わなかったため、実装の検証 (6.4) の結果を見て 7 万に下げた。RSS の上限 320MB と同時実行 3 件のメモリの予算は変えない)。大きな XLSX は検索の対象にならない。
-- 同時実行は 3 件にし、コンテナのメモリを節約する (2026-10-28 ユーザー判断)。目安は 120MB + 3 × (320 + 100 + 50 + 48) MB ≒ 1.7GB。
+- XLSX は anydoc がセル数に比例してメモリを使う (1 セルあたり約 2.5KB。待機中の子が約 80MB。子の最大 RSS の実測: 1 シート 2 万行 × 1 列 140MB、7 万行 × 1 列 285MB、10 万行 × 1 列 328〜357MB、1 万行 × 10 列 292MB。1 シート 50 万セル以上は anydoc の `max_xml_nodes` の上限でエラー)。そこで、anydoc に渡す前に全シートのセル数を数え、7 万セルを超えるものは上限超過のエラーにする (2026-10-28 ユーザー判断。1 シート 10 万セルは子の最大 RSS が 328〜357MB で、RSS の上限 320MB を超える。7 万セルは 285MB で収まる。RSS の上限と同時実行 3 件は変えない)。大きな XLSX は検索の対象にならない。
+- 同時実行は 3 件にし、コンテナのメモリを節約する (2026-10-28 ユーザー判断)。目安は 120MB + 3 × (320 + 100 + 2 × 50 + 48) MB ≒ 1.8GB (アップロードは一時ファイルに書かずメモリだけで受け取り、解析中だけ約 2 倍の大きさになる。式は design.md の「メモリ上限の目安」)。
 
 ### 2.9 サービスの構成を選んだ理由
 
@@ -334,7 +336,7 @@ anydoc の出力にはスライドの区切りが無い。見出しを手がか�
 - 品質は文字の一致で見ており、表の構造や読み順が正しいかは、目で少し確かめただけ。
 - 計測は開発コンテナ 1 台で行った。本番のコンテナでの値ではない。
 - 遅い側の処理時間 (p95) とコンテナ image の大きさは測っていない。
-- pypdfium2 については、細工した PDF への耐性と、文字のない PDF での挙動をまだ確かめていない (§4.5 の 5)。
+- pypdfium2 の細工した PDF への耐性は、ページ数の上限と RSS の上限に任せている (1 ページに 400 万文字の PDF は最大 RSS 約 540MB になり、RSS の上限で止まる)。暗号化・画像だけ・壊れた PDF の挙動は §1.2 のとおり確かめた。
 
 ---
 
@@ -384,18 +386,6 @@ anydoc の出力にはスライドの区切りが無い。見出しを手がか�
 |---|---|---|
 | Outlook MSG を扱う | anydoc が MSG に対応していない。対象から外すことをユーザーが了承し、Req 1.5 から外した | 本 spec |
 | HTML だけ markitdown で処理する | 待機時のメモリが markitdown 構成の水準に戻る。標準の `html.parser` で足りる (§2.3) | 本 spec |
-
-### 3.5 markitdown の extras (2026-04 の構成で外したもの)
-
-markitdown 自体を外したので、いまは参考の記録である。PyPI の markitdown の extras は `all / audio-transcription / az-doc-intel / docx / outlook / pdf / pptx / xls / xlsx / youtube-transcription` の 10 種。当時は `[pdf,docx,xlsx,pptx,outlook]` だけを選んだ。
-
-| extra | 外した理由 |
-|---|---|
-| `xls` | 当時の要件の対象外 (旧形式の XLS)。いまは anydoc で XLS を扱う |
-| `audio-transcription` | ffmpeg を引き込み、image が 600MB を超える。音声は対象外で、外部バイナリを使わない方針にも反する |
-| `youtube-transcription` | 外部の URL から取り込むので、外向き通信を遮断する要件に合わない |
-| `az-doc-intel` | Azure Document Intelligence (外部 API) を呼ぶので、外向き通信の要件に反する |
-| `all` | 上のすべてを引き込む。image が 600MB〜1GB に膨らむ |
 
 ### 3.6 既製の Docker image
 
@@ -451,132 +441,31 @@ umbrella の [research-docker-image.md](../attachment-search/research-docker-ima
 | XLSX を少しずつ読む自前の処理 (シートの XML を先頭から順に読み、セルの文字を取り出す。約 100 行) | 実測ではメモリが小さく (100 万セルで 54MB、6MB の大きな XLSX で 43MB)、速さは anydoc と同程度、日本語の文字数も一致した (ふりがな `<rPh>` を除く処理が要る)。ユーザー判断 (2026-10-28) で、自前の XLSX 解析を持たずに anydoc とセル数の上限で扱う案 (大きな XLSX は検索の対象外) を選んだ。大きな XLSX も検索したくなったときの第一候補 |
 | XLSX を対象外にする | Excel の添付が一切検索できなくなる |
 | 1 件のメモリ上限を 768MB にする (6MB の大きな XLSX が通る値) | 大きすぎる。XLSX 以外は 320MB で足りる |
-| 同時実行を 2 件にする / 4 件にする | 2 件 (上限 768MB) ではコンテナに約 2.1GB 要る。4 件 (上限 320MB) では約 2.2GB。3 件で約 1.7GB に抑える |
+| 同時実行を 2 件にする / 4 件にする | 2 件 (上限 768MB) では約 2.2GB、4 件 (上限 320MB) では約 2.4GB になる (式は design.md)。3 件なら約 1.8GB に抑えられる |
+| 非同期の受け付け方式 (依頼 ID を返し、後で結果を取りに来る) | 呼び出し元は画面を待たせない裏の索引作成処理なので、同期で足りる。非同期にすると、依頼 ID・結果の保存場所・期限切れの掃除・Pod の再起動で消えた依頼への対処が要る (2026-11-02 ユーザー判断。代わりに apps/app 側の待ち時間の既定を 90 秒にした) |
+| FastAPI の `UploadFile` 引数で本文を受け取る | 枠を取る前に本文をすべて受信し、1MB を超える部分を `TMPDIR` に書き出す。64MiB の tmpfs では、25MB の DOCX を 3 件同時に送ると全部 400 になった |
+| `Request.is_disconnected()` で切断を見る | `BaseHTTPMiddleware` を 2 層通すと切断を報告しない。ASGI の `receive()` で `http.disconnect` を待つ |
+| CSV のセル数を変換の前に数える (`,` `\t` `\n` の数) | 効果が小さい。バイト数の上限 (8MiB) と RSS の監視で足りる |
+| image に tini を入れて孤児になった子を回収させる | slim の image に無く、apt で入れると image が大きくなり、ビルドにネットワークが要る。compose は `init: true`、k8s は Pod ごと `/tmp` が捨てられることに頼る |
+| `MemoryError` をメモリ超過 (`resource_limit_exceeded`) として扱う | 親の RSS 監視 (320MB) が `RLIMIT_AS` (832MB) より先に効くので、`MemoryError` は想定外 (internal) のままでよい |
+| 既存の変換をその場で直す (ギャップ分析の案 A) | 子プロセスでの実行・正規化・形式別の変換が既存のモジュールに入り込み、`extraction_service.py` と `limits.py` の責務がぼやける |
+| サービスを一から作り直す (案 B) | 完成済みで問題のない受け口 (認証・設定・型・OpenAPI の書き出し・Dockerfile・compose) と、そのテスト約 150 件を捨てることになる。受け口を残して変換だけを作り直す案 C を採った |
 
 ---
+## 4. 実装で分かったこと
 
-## 4. 既存実装とのギャップ分析 (2026-10-28)
+実装と検証で初めて分かった、ライブラリと実行環境の挙動。詳しい計測と経緯は tasks.md の Implementation Notes の該当タスクにある。設計への反映は design.md にある。
 
-承認済みの requirements.md と §1 の決定に対して、`services/attachment-text-extractor/` の既存実装 (旧 tasks.md 28 件中 17 件が完了した時点のコード) がどこまで使えるかを調べた。
-
-### 4.1 既存実装の現状
-
-旧設計は「HTTP の受け口」と「変換の中身」がはっきり分かれた構成で、受け口側はほぼ完成している。変換の中身は、単純な形式を markitdown に通す仮の実装だけ。
-
-| 部品 | ファイル | 状態 | 刷新後の扱い |
-|---|---|---|---|
-| 設定の読み込み | `src/app/config.py` | 完成 (`MAX_FILE_SIZE_MB` / `TIMEOUT_S` / `MAX_CONCURRENCY` / `ATTACHMENT_EXTRACTOR_SERVICE_TOKEN` / `MAX_EXTRACTED_BYTES`、トークン未設定で起動失敗) | 流用。形式別のサイズ上限などを足す可能性あり |
-| API の型 | `src/app/schemas.py` | 完成 (`PageInfo` / `ExtractResponse` / `ErrorCode` / `ErrorResponse`) | 流用。`ErrorCode` に暗号化と上限超過を追加 (Req 1.10 / 2.6) |
-| Bearer 認証 | `src/app/middleware/bearer_auth.py` | 完成 (`hmac.compare_digest`) | そのまま流用 |
-| XXE 対策の起動処理 | `src/app/security.py` | 完成 (`defusedxml.defuse_stdlib()` + lxml の API 確認) | 流用。lxml は markitdown 経由の依存なので、外れた後は lxml の確認部分が空振りになる。整理が要る |
-| リソース制限 | `src/app/limits.py` | サイズ上限と同時実行数は機能する。**タイムアウトは機能しない** (§2.4) | 同時実行数とサイズ上限は流用。タイムアウトは作り直し |
-| 抽出の振り分け | `src/app/services/extraction_service.py`、`extractors/__init__.py` | MIME の解決と、MIME → 抽出関数の対応表 (whitelist) は完成 | 振り分けの仕組みは流用。対応表の中身は入れ替え (MSG を外し、旧形式 Office / OpenDocument を足す) |
-| 単純形式の抽出 | `extractors/simple_extractor.py` | markitdown で全形式を 1 要素に変換。リクエストごとに `MarkItDown()` を作り直している | 作り直し (Office 系は anydoc、テキスト系は自前) |
-| PDF / PPTX / XLSX の抽出 | (なし) | 未着手。対応表では仮に simple_extractor に流している | 新規 |
-| ルーター | `routers/extract.py`、`routers/health.py` | 完成。health は markitdown のページ抽出の有無を返す `pdf_strategy` を持つ | extract は流用 (呼び出し先の変更のみ)。health は markitdown を前提にした項目を外す |
-| アプリの組み立て | `src/app/main.py` | 完成。起動時に markitdown の PDF 対応を調べる `_probe_pdf_strategy()` がある | 流用。markitdown を前提にした処理を外す |
-| OpenAPI の出力 | `scripts/export_openapi.py` | 完成 | そのまま流用 |
-| Dockerfile | `Dockerfile` | 完成 (multi-stage、uid 10001、`--workers ${WORKERS:-2}`)。uv の image が `latest` 指定 | 流用。uv の版の固定は §4.5 の 10 |
-| docker-compose | `infra/docker/compose.yaml` | 完成 (read-only rootfs、tmpfs `/tmp` 512MB、uid 10001) | 流用 |
-| k8s manifest | (なし) | 未着手 | 新規 (Req 3.2 / 3.3) |
-| Python 用 CI | (なし) | 未着手。Node 側の CI に orval の差分検知だけはある | 新規 |
-| 構造化ログ | (なし) | 未着手 (旧タスク 4.4) | 新規 |
-| 展開量の上限 (`MAX_EXTRACTED_BYTES`) | 設定値だけある | 未実装 (旧タスク 2.4) | Req 2.6 で作り直し |
-| テスト | `tests/` 15 ファイル、229 件成功 | 認証・設定・スキーマ・制限・ルーター・OpenAPI 出力は有効。markitdown を前提にしたテスト (`test_extract_simple.py` など) がある | 前者は流用、後者は作り直し |
-
-**タイムアウトが機能しない理由**: `extraction_service.extract()` は `async def` だが、中で同期の抽出関数を直接呼んでいる。変換中はワーカーのイベントループが止まるため、`asyncio.wait_for` は変換が終わるまで発火しない。スレッドへ逃がしても、スレッド上の変換は止められないので、Req 2.5 (処理そのものを止めて枠とメモリを解放する) は満たせない (§2.4)。
-
-### 4.2 要件と既存資産の対応
-
-| 要件 | 既存資産 | ギャップ |
-|---|---|---|
-| 1.1 `pages[]` で返す | schemas / extract ルーター | なし |
-| 1.2 PPTX をスライド単位で | なし | **新規**: スライドごとに分けて anydoc に渡す処理 |
-| 1.3 XLSX をシート単位で | なし | **新規**。anydoc はシートが 1 枚だとシート名を出さず、非表示シートと空シートを出力しない。シートの区切りとシート名の取り方は §4.5 の 2 |
-| 1.4 PDF をページ単位で | なし | **新規**: pypdfium2 でページごとに抽出 |
-| 1.5 単純形式を 1 要素で | simple_extractor (markitdown) | **作り直し**: DOCX / RTF / EPUB / CSV は anydoc、HTML / TXT / JSON / XML / YAML / MD / LOG / ipynb は自前 |
-| 1.6 対象外の形式を拒否 | 対応表 + `UnsupportedFormatError` | 対応表から MSG を外すだけ |
-| 1.7 外部バイナリ・egress 不要 | — | 新しい依存 (anydoc / pypdfium2) は wheel で入る。anydoc の `ocr='hosted'` を使わないことの保証が要る |
-| 1.8 旧形式 Office / OpenDocument | なし | **新規**: 対応表への追加と anydoc での変換 |
-| 1.9 日本語の正規化 | なし | **新規**: 改行コードの統一と、日本語の間の空白・改行の除去 (純粋関数) |
-| 1.10 暗号化ファイル | なし | **新規**: エラーコード追加と、anydoc の `EncryptedError` / pypdfium2 のパスワード例外の変換 |
-| 1.11 壊れたファイル | `extraction_failed` | anydoc の `MalformedError` / `MissingPartError` などの対応づけ |
-| 2.1 サイズ上限 | `Limits.enforce_size` | なし。形式別の上限 (大きな XLSX 対策) を足すかは §4.5 の 9 |
-| 2.2 タイムアウト | `Limits.with_timeout` | **作り直し** (4.1 のとおり機能していない) |
-| 2.3 同時実行上限 | `Limits.acquire_slot` | 流用。ただし枠はワーカー (プロセス) ごとなので、全体の上限は「ワーカー数 × 枠」になる |
-| 2.4 egress 遮断下で動く | compose の network 設定 | k8s の NetworkPolicy が未作成 |
-| 2.5 タイムアウト時に処理を止める | なし | **新規**: kill できる子プロセスで変換する仕組み |
-| 2.6 細工ファイルの上限 | `MAX_EXTRACTED_BYTES` (未実装) | **新規**: anydoc の組み込み上限 + PPTX 分割処理での展開量上限 + 子プロセスのメモリ上限 |
-| 2.7 1 件の異常終了を波及させない | `except Exception` のみ | **新規**: 子プロセスでの隔離。`PanicException` (`BaseException` 系) を捕まえる |
-| 3.1 compose 同梱 | compose.yaml | なし |
-| 3.2 / 3.3 k8s での配布と安全設定 | なし | **新規**: k8s manifest 例 |
-| 3.4 ステートレス | 設計上そうなっている | なし |
-| 4.1 / 4.2 マルチテナント隔離 | 同時実行上限 | なし |
-
-下流 (indexing spec) への影響: apps/app の `attachment-text-extractor.ts` は `ErrorCode` で `switch` し、知らないコードは `null` を返す。暗号化・上限超過のコードを足すと、orval で再生成したうえで apps/app 側に対応を足す必要がある。
-
-### 4.3 実装方針の選択肢
-
-**A. 既存コードをその場で直す**
-- 変更箇所: `simple_extractor.py` の書き換え、`extractors/` への PDF / PPTX / XLSX / テキスト系の追加、`limits.py` のタイムアウトの書き換え、`extraction_service.py` への子プロセス実行の組み込み
-- ✅ 変更が最小で、既存テストの多くがそのまま効く
-- ❌ 子プロセス実行・正規化・形式別抽出が既存のモジュールに入り込み、`extraction_service.py` と `limits.py` の責務がぼやける
-
-**B. サービスを一から作り直す**
-- ✅ 新方針に完全に合わせた構成にできる
-- ❌ 完成済みで問題のない受け口側 (認証・設定・スキーマ・OpenAPI 出力・Dockerfile・compose) と、そのテスト約 150 件を捨てることになる。作り直す理由がない
-
-**C. 受け口は残し、変換の中身を新しいモジュールとして作る (組み合わせ)**
-- 残す: `main.py` / `config.py` / `schemas.py` / `middleware/` / `security.py` / `routers/` / `scripts/` / Dockerfile / compose と、それらのテスト
-- 新しく作る: 形式別の抽出、日本語の正規化、子プロセスでの実行 (タイムアウト・メモリ上限・異常終了の隔離) を、受け口から独立した変換モジュールとしてまとめる。ルーターは今の `extract()` の代わりにこのモジュールを呼ぶ
-- 消す: markitdown を前提にしたコード (`simple_extractor.py`、`_probe_pdf_strategy()`、health の `pdf_strategy`) とそのテスト
-- ✅ 受け口の資産を活かしつつ、変換側を新方針で素直に組める。子プロセスとの境界は「バイト列と形式を渡し、`pages[]` かエラー種別を受け取る」形にでき、単体テストしやすい
-- ❌ 受け口と変換モジュールの間の取り決め (渡すもの、返すもの、エラーの種類) を design で決める必要がある
-
-### 4.4 規模とリスク
-
-- 規模: **M (3〜7 日)**。受け口側はほぼ完成しているが、子プロセスでの実行、形式別の抽出 4 種、正規化、k8s manifest、Python 用 CI が新規
-- リスク: **中**
-  - 子プロセスでの実行は、read-only rootfs、tmpfs、uvicorn のワーカー数、同時実行の枠と組み合わさるため、未知の点がある
-  - PPTX の分割は anydoc の文書化されていない挙動に頼る (§1.2)
-
-### 4.5 design で調べること (Research Needed)
-
-この節は、design に入る前に未決だった事項の一覧である。すべて design で確定した (各項目の末尾に確定先を書いてある)。
-
-1. **子プロセスでの実行方式**
-   - リクエストごとに子プロセスを作るか、あらかじめ作ったプロセスの集まりを使い、止めたら作り直すか
-   - fork と spawn のどちらを使うか
-   - uvicorn のワーカー数・同時実行の枠との関係
-   - read-only rootfs の下で multiprocessing が使う共有メモリ (`/dev/shm`) と一時領域が足りるか
-   - 子プロセスのメモリ上限 (`RLIMIT_AS`) が anydoc (Rust) と PDFium の下で期待どおり効くか
-   - 補足: 子プロセスのタイムアウト管理によく使われる `pebble` は LGPL なので使えない (§3.7)
-   - → 確定: forkserver で 1 リクエスト 1 子プロセス (§1.3、§3.8)
-2. **XLSX のシート単位の分割**: シート名と区切りの取り方。案は 2 つ。
-   - `xl/workbook.xml` からシート名を読み、anydoc の見出しと突き合わせる
-   - PPTX と同じく、シートごとに分けて anydoc に渡す
-   - あわせて、非表示シートを対象にするかを決める
-   - → 確定: シート名を目印に置き換えて 1 回だけ変換する。非表示シートは含め、空のシートは除く (§1.1、§1.2)
-3. **テキスト系の扱い**: 文字コード判定に使うライブラリ (charset-normalizer は MIT)、ipynb で何を取り出すか (セルのソースだけか、出力も含むか)、JSON / XML / YAML をそのまま返すか
-   - → 確定 (§1.1、§1.2、§3.8)
-4. **エラーの対応づけ**: anydoc の例外 (`EncryptedError` / `MalformedError` / `MissingPartError` / `ResourceLimitError` / `UnsupportedError` / `PanicException`) と pypdfium2 の例外を `ErrorCode` に対応づける。追加するコードの名前と HTTP ステータス
-   - → 確定: `file_encrypted` / `resource_limit_exceeded` を追加 (design.md のエラー処理の節)
-5. **pypdfium2 の挙動**: 暗号化された PDF、文字のない (画像だけの) PDF、細工した PDF での振る舞い
-   - → 確定 (§1.2)
-6. **health と readiness の中身**: markitdown を前提にした項目を外した後に何を返すか (OpenAPI の変更を伴う)
-   - → 確定: `pdf_strategy` を外す。apps/app は health / readiness を呼んでいない (design.md)
-7. **image の大きさと arm64**: anydoc と pypdfium2 の linux arm64 用 wheel の有無と、実際の image の大きさ
-   - → 確定: arm64 用 wheel はある (§1.4)。image の大きさは CI で上限を検査する (design.md)
-8. **抽出の失敗を下流でどう扱うか**: anydoc は暗号化・破損などで文書全体を失敗にし、部分的な結果を返さない (§1.2)。pypdfium2 でも、暗号化された PDF ではパスワードの例外が上がる (詳しい挙動は 5 で確かめる)。これらの失敗を、indexing spec の Req 2.4 (失敗時はメタデータだけの文書を登録する) にどう対応づけるか。下流 spec と合わせて決める
-   - → 確定: エラーとして返し、下流がメタデータだけの文書を作る。成功時は最低 1 要素を返す (§1.1)。下流で直す箇所は design.md の「再検証が必要になる条件」に書く
-9. **大きな XLSX のメモリ対策**: XLSX だけ受け付けるサイズの上限を下げるか、同時に変換する数を絞るか。コンテナのメモリ上限をどう決めるか (§2.8)
-   - → 確定: 子プロセスの RSS の上限で止める (§1.3、§2.8)。メモリ上限の式は design.md
-10. **uv の image の版の固定**: Dockerfile で uv の image が `latest` 指定になっている
-    - → 確定: 版を固定する (design.md)
-11. **CI の具体的なコマンド**: `uv sync --locked` / `uv run pytest` / `uv run ruff check` / `docker build` を、どの順でどう組むか
-    - → 確定 (design.md)
-12. **TSV の扱い**: Req 1.5 は TSV を対象に含むが、§1.1 の表には TSV の経路が無い。CSV と同じく anydoc に形式を明示して渡すのか、テキストとして返すのかを決める
-    - → 確定: CSV と同じく、デコードしてから anydoc に `csv` を明示して渡す (§1.1)
+- **Python 3.12 の forkserver**: `__main__` を先読みさせる指定が効かず、子を作るたびに起動スクリプトを読み直す (約 29ms)。標準ライブラリには forkserver に環境変数を渡す口が無いので、`RAYON_NUM_THREADS` は forkserver の起動前に `os.environ` に書く。forkserver が死んだ直後の最初の `Process.start()` は `EOFError` になる (6.2)
+- **zipfile**: 部品を読むときに出る例外は `BadZipFile` だけではない (`zlib.error` / `EOFError` / `OSError` / `lzma.LZMAError` / `NotImplementedError` / `ValueError` / `UnicodeDecodeError`)。未対応の圧縮方式 (method 9) は `RuntimeError` になる。暗号化と破損は、ZIP の暗号化フラグ (bit 0) で分ける。XML 宣言の文字コードが不正なとき、XML のパーサーは `LookupError` / `ValueError` を投げる (2.4、4.1)
+- **anydoc の XLSX**: シートは `workbook.xml.rels` のリンク先で探す (パス名で絞ったセル数の検査はすり抜けられる、4.2)。空の `<row>` を大量に並べた入力 (50 万行で約 268MB) はセル数の指標に現れない (4.2)。ピボットキャッシュなどの大きな部品を丸ごと読むと、メモリが入力の何十倍にもなる (4.3)
+- **anydoc の CSV と標準の html.parser**: CSV のメモリはバイト数ではなくセル数で決まる (約 100 万セルで 320MB を超える。1 文字のセルだけなら 2MiB で超える)。`html.parser` は、属性の異常に多いタグなど 4MB の入力で 450〜700MB を使う (4.4、2026-11-02 の決定)
+- **PowerPoint の自動代替テキスト**: anydoc の出力では「説明 + 半角空白 2 つ + 決まり文」の 1 行になる。作者が同じ形で打った行は見分けられない (4.1)
+- **子の監視スレッドと GIL**: 監視スレッドは GIL を取れる間しか動かない。時間のかかる Python の正規表現が GIL を持ち続けると、パイプが閉じても子が終わるまで 25 秒かかった (anydoc の変換中は 0.01〜0.02 秒) (6.1)
+- **`RLIMIT_AS` と `RLIMIT_CPU`**: `RLIMIT_AS` に当たると anydoc (Rust) は abort する (結果なし、異常終了に分類)。CPU 時間の hard 上限が環境側で低いと、SIGXCPU より先に SIGKILL が届く (6.1)
+- **pidfd**: pidfd が使えず、かつ forkserver が落ちた環境では、動いている子が exitcode 255 と読まれ、短い間残ることがある (6.3)
+- **k8s (cgroup v2) の `memory.oom.group`**: 既定で有効で、`oom_score_adj` を付けてもコンテナが上限に達すると uvicorn ごと止まる (最終検証 2 回目 I-1)
+- **FastAPI / Starlette / python-multipart / uvicorn**: `UploadFile` は 1MB を超える部分を `TMPDIR` に書き出す (メモリだけで受け取るには `spool_max_size` を変える。Starlette は直接の依存ではなく `uv.lock` でしか版が固定されていない)。python-multipart は部品のヘッダーを約 4KiB で打ち切る (長いファイル名は 422)。uvicorn は 1 つの接続で 2 件続けて送ってから切断すると、新しい方にだけ切断の印を付ける。uvicorn は正常な停止の後に SIGTERM を出し直すので、終了時の処理が動かず `TMPDIR` に `pymp-*` が残る (最終検証 1 回目、2026-11-02 の決定)
 
 ---
 
@@ -588,7 +477,8 @@ umbrella の [research-docker-image.md](../attachment-search/research-docker-ima
 - **2026-08**: Firecrawl が Rust 製の変換ライブラリ firecrawl/anydoc (MIT) を公開した ([gihyo.jp の紹介記事](https://gihyo.jp/article/2026/08/anydoc))。Node / Python / Rust から使え、自社の計測では markitdown より速く品質も高いとされた。
 - **2026-10-27**: 抽出エンジンを再評価した。外部の比較記事を調べ (§5.2)、自分たちで計測し (§2)、観点の異なる 5 者 (SRE / 検索品質 / セキュリティ / 長期保守 / 再検証) に、A (markitdown を続ける) / B (anydoc に全面的に切り替える) / C (Office 系は anydoc、PPTX は別の方法でスライド単位、markitdown は外す) の 3 案を独立に判定させた。5 者中 4 者が C を選び、長期保守の担当だけが A を選んだ。長期保守の担当は「anydoc は実質停止している」と述べたが、これは言い過ぎだった。主作者は 2026-08-27 以降コミットがなく v0.2.4 以降のリリースも無いが、10 月にも別の 3 人が main にコミットしている。この時点の状況は、anydoc が v0.2.4・貢献者 9 人、markitdown が v0.1.9 で PR #1263 は未マージ (最終更新 2026-06)。この後、PDF と PPTX の取り出し方を別に比べ (§2.5 / §2.6)、ユーザーが §1 の内容に決めた。MSG を対象から外すこと、anydoc を apps/app のプロセス内で動かさないことも、このときユーザーが決めた。
 - **2026-10-27**: markitdown 固有の名前を、エンジンに依存しない名前に変えた (spec 名 `attachment-search-markitdown-extractor` → `attachment-search-text-extractor`、`services/markitdown-extractor` → `services/attachment-text-extractor`、`@growi/markitdown-client` → `@growi/attachment-text-extractor-client`、環境変数 `GROWI_MARKITDOWN_*` → `GROWI_ATTACHMENT_EXTRACTOR_*` など)。あわせて、新しい方針で作り直すために spec をリセットした。
-- **2026-10-28**: 新しい requirements.md を承認した (MSG を外し、旧形式 Office / OpenDocument、日本語の正規化、暗号化、壊れたファイル、処理の停止、細工ファイルの上限、異常終了の隔離を追加)。既存実装とのギャップ分析 (§4) を行った。
+- **2026-10-28**: 新しい requirements.md を承認した (MSG を外し、旧形式 Office / OpenDocument、日本語の正規化、暗号化、壊れたファイル、処理の停止、細工ファイルの上限、異常終了の隔離を追加)。既存実装とのギャップ分析を行い、受け口を残して変換だけを作り直す案を採った (§3.8)。
+- **2026-11-02**: apps/app 側の待ち時間の既定を 90 秒に変え、同期の呼び出しのままにした。CSV / HTML の変換前のサイズ上限と、切断時の停止を Req 2.8 / 2.9 として加えた (§1、§3.8)。
 
 ### 5.2 外部の比較記事 (2026-10-27 時点)
 

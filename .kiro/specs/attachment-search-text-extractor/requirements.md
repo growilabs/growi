@@ -54,7 +54,7 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
 
 ## Boundary Context
 
-- **In scope (feature responsibility)**:
+- **In scope**:
   - `services/attachment-text-extractor/` 配下の FastAPI アプリケーション実装
   - PDF / DOCX / XLSX / PPTX / HTML / CSV / TSV / JSON / XML / YAML / プレーンテキスト / RTF / EPub / Jupyter Notebook / 旧形式 Office (DOC / XLS / PPT) / OpenDocument (ODT / ODS / ODP) に対応する形式別 extractor
   - 位置情報付き `pages[]` 構造の返却 (PDF = ページ / PPTX = スライド / XLSX = シート、その他は単一要素)
@@ -68,13 +68,13 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
   - OpenAPI export script (`scripts/export_openapi.py`) — 下流 spec への成果物インタフェース
   - Python 用 CI job (ruff lint / pytest / image build)
   - サービス単体テスト
-- **Out of scope (explicitly not owned)**:
+- **Out of scope**:
   - apps/app 側の統合実装 (AttachmentService ハンドラ登録、抽出結果の ES 取り込み、失敗ログ Mongo 永続化、検索クエリの multi-index 集約、admin API、検索結果 UI、添付ファイル一覧モーダル、管理画面拡張)
   - `packages/attachment-text-extractor-client` の生成 / 配布パイプライン (OpenAPI spec の export のみ本 spec が行い、orval 設定と生成成果物の消費は下流 spec)
   - 画像 OCR / 音声動画文字起こし / YouTube 取り込み / Azure Document Intelligence / ZIP 再帰展開 / Docling 等の高精度抽出
   - Outlook MSG
   - Elasticsearch / MongoDB への直接アクセス (サービスはステートレス、DB 依存ゼロ)
-- **Adjacent expectations (this feature relies on these)**:
+- **Adjacent expectations**:
   - 採用する抽出ライブラリ (research.md §1「決定事項」) が、対象プラットフォーム (linux x64 / arm64) 向けの wheel として PyPI から取得可能である
   - Docker / Kubernetes のランタイム (cgroups / seccomp / NetworkPolicy 対応 CNI) が前提
   - 下流 spec (`attachment-search-indexing`) は本 spec が export する OpenAPI spec を入力として orval で TS クライアントを生成し、HTTP multipart で `POST /extract` を呼ぶ
@@ -85,7 +85,7 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
 
 <!-- derived from umbrella Requirement 1 -->
 
-**Objective:** As a 抽出サービス利用者 (下流の GROWI apps/app および将来のクライアント), I want 対応形式の添付ファイルから構造化されたテキスト抽出結果を取得する, so that 全文検索インデックスへの投入と位置情報表示 (ページ / スライド / シート単位) を可能にする
+**Objective:** 抽出サービスの利用者 (下流の GROWI apps/app と将来のクライアント) として、対応形式の添付ファイルから構造化されたテキストを取り出したい。なぜなら、全文検索のインデックスへの投入と、ページ / スライド / シート単位の位置の表示を可能にするから。
 
 #### Acceptance Criteria
 
@@ -102,11 +102,13 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
 11. If 構造が壊れていて意味のあるテキストを取り出せないファイルが抽出サービスに渡される, the 抽出サービス shall 抽出失敗を示すエラーコードを返却する
 12. When 編集や印刷の権限だけが制限され、開くのにパスワードを必要としない PDF (オーナーパスワードのみ設定された PDF) が抽出サービスに渡される, the 抽出サービス shall これを 1.10 の暗号化ファイルとして扱わず、1.4 のとおりページ単位で抽出する
 
+**自動テストで検証できない残存ギャップ**: 抽出の質 (表の構造、読み順) は文字の一致でしか見ておらず、PPTX の一部で anydoc が行の順番を入れ替えることは自動では捕まえられない。anydoc の文書化されていない挙動 (PPTX の分割、XLSX の目印) は、版を固定した契約テストでしか守られていない。既知の制約: PowerPoint の自動代替テキストと同じ形 (半角空白ちょうど 2 つ + 決まり文) で作者が打った行は消える。`.csv` に `application/vnd.ms-excel` の MIME が付くと XLS として扱われ、1.11 のエラーになる。BOM のない UTF-16 は判定できない。1.2 と 1.4 の「番号表示文字列」は番号だけの文字列 (例: `"3"`) で、「スライド」「p.」などの文言は UI 側で付ける。1.7 の「外部バイナリと外向き通信なしで動く」ことは、`--network none` のコンテナでの確認 (タスク 8.1 / 8.3) が人の確認待ち。
+
 ### Requirement 2: 抽出処理のリソース保護と隔離
 
 <!-- derived from umbrella Requirement 2 (AC 2.1, 2.2, 2.3, 2.6 のみ。2.4/2.5 は apps/app 側責務として attachment-search-indexing spec へ) -->
 
-**Objective:** As a SRE / 抽出サービス運用者, I want 悪意ある大容量添付や破損ファイルが抽出サービスを不安定化させないよう、抽出処理に上限と隔離を設ける, so that サービス全体の可用性とマルチテナント公平性を保つ
+**Objective:** SRE / 抽出サービスの運用者として、悪意ある大容量の添付や壊れたファイルが抽出サービスを不安定にしないよう、抽出処理に上限と隔離を設けたい。なぜなら、サービス全体の可用性と、テナント間の公平さを保つから。
 
 #### Acceptance Criteria
 
@@ -120,11 +122,13 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
 8. If CSV / TSV または HTML のファイルサイズが、形式ごとに設定された上限を超える, the 抽出サービス shall 変換用の子プロセスを起動せず、上限超過を示すエラーコードを返却する
 9. When 呼び出し側が抽出処理の途中で接続を切る, the 抽出サービス shall 当該抽出処理の実行そのものを停止し、使っていた同時実行の枠とメモリを解放する
 
+**自動テストで検証できない残存ギャップ**: k8s (cgroup v2) の既定では、コンテナがメモリの上限に達すると抽出サービス全体が止まり、2.7 の「他のリクエストを継続する」は成り立たない。これは親の RSS 監視で上限の手前で止めることに頼っており、実際のクラスタでは確かめていない。2.8 の大きさの上限は早めに断るためのもので、通ることの保証ではない (小さな CSV や異常な HTML でも RSS の上限で止まる)。2.9 は、1 つの接続に 2 件続けて送ってから切断すると、先の 1 件は最後まで動く。2.4 は、外向き通信を遮断したコンテナでの確認 (8.1 / 8.3) が人の確認待ち。
+
 ### Requirement 3: デプロイメントとセキュリティハードニング
 
 <!-- derived from umbrella Requirement 13 (AC 13.1, 13.2, 13.3, 13.5 のみ。13.4 は apps/app 側責務として attachment-search-indexing spec へ) -->
 
-**Objective:** As a GROWI 配布者 (OSS / GROWI.cloud), I want 抽出サービスを既存の配布体系 (docker-compose / k8s) に合流させ、セキュリティ強制された形で運用する, so that 既存運用者の導入負担を抑えつつ、コンテナエスケープや外部通信による情報漏洩リスクを低減する
+**Objective:** GROWI の配布者 (OSS / GROWI.cloud) として、抽出サービスを既存の配布の仕組み (docker-compose / k8s) に加え、セキュリティの設定を強制した形で運用したい。なぜなら、既存の運用者が導入する手間を抑えつつ、コンテナからの脱出や外部通信による情報漏洩の危険を減らすから。
 
 #### Acceptance Criteria
 
@@ -133,13 +137,17 @@ GROWI 本体 (apps/app) との統合、TS クライアント消費、Elasticsear
 3. The 抽出サービスのデプロイ構成 shall read-only root filesystem、非 root 実行、capabilities drop、network egress 遮断、tmpfs ベースの一時領域を推奨設定として提供する <!-- derived from umbrella R13.3 -->
 4. The 抽出サービス shall 状態を持たず (ステートレス)、任意のレプリカ数でスケール可能である <!-- derived from umbrella R13.5 -->
 
+**自動テストで検証できない残存ギャップ**: docker-compose と k8s の manifest は YAML を読んで中身を確かめただけで、image のビルド、read-only rootfs・uid 10001 での起動、クラスタへの適用はしていない (8.1 / 8.3 が人の確認待ち)。CI の workflow は GitHub 上で一度も実行しておらず、マージの必須チェックにも入っていない。
+
 ### Requirement 4: マルチテナント隔離
 
 <!-- derived from umbrella Requirement 14 (AC 14.2, 14.3 のみ。14.1/14.4/14.5 は apps/app / ES index 側責務として attachment-search-indexing / attachment-search-ui spec へ) -->
 
-**Objective:** As a GROWI.cloud 運用者, I want 抽出処理がマルチテナント共有基盤の他テナントに波及しないよう分離する, so that 共有 ES クラスタへの抽出負荷集中と、特定テナントによる他テナント抽出の停止を防ぐ
+**Objective:** GROWI.cloud の運用者として、抽出処理が共有基盤の他のテナントに影響しないよう分離したい。なぜなら、共有の ES クラスタに抽出の負荷が集中することと、特定のテナントが他のテナントの抽出を止めてしまうことを防ぐから。
 
 #### Acceptance Criteria
 
 1. The 添付テキスト抽出処理 shall 共有 Elasticsearch クラスタの ingest ノード上では実行しない <!-- derived from umbrella R14.2 -->
 2. While あるテナントからの抽出要求が集中している, the 抽出サービス shall 設定された全体同時実行上限により、他テナントの抽出要求を完全停止させない <!-- derived from umbrella R14.3 -->
+
+**自動テストで検証できない残存ギャップ**: 4.1 は、抽出が独立したサービスとして配備されることを静的に確かめるだけで、振る舞いのテストは無い。4.2 は全体の同時実行の上限で守るが、ワーカーを 2 つ以上にすると OS の接続の振り分けが偏り、空きがあっても 503 が返ることがある (既定はワーカー 1 つ)。

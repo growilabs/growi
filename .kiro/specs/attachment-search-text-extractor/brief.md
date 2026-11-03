@@ -1,5 +1,7 @@
 # Brief: attachment-search-text-extractor
 
+> 本ファイルは discovery 時点の記録である。以降の内容は策定当時の理解・提案であり、design.md / requirements.md の記述と相違がある場合はそちらを優先する (特に「Boundary Candidates」のファイル名は、今の構成 `conversion/` / `runner/` / `routers/` と異なる)。
+
 > 3-way split の第 1 spec。詳細背景・既存コード調査は [../attachment-search/research.md](../attachment-search/research.md) を参照。
 
 ## Problem
