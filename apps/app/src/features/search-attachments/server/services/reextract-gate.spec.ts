@@ -1,4 +1,4 @@
-import { createReextractGate } from './reextract-gate';
+import { createReextractGate, ReextractDeadlineError } from './reextract-gate';
 
 const deferred = <T>() => {
   let resolve: (value: T) => void = () => {};
@@ -89,5 +89,94 @@ describe('createReextractGate', () => {
     await expect(first).rejects.toThrow('failed');
 
     await expect(gate.run('b', async () => 'b')).resolves.toBe('b');
+  });
+
+  describe('total deadline', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('rejects the caller of a run that never settles and frees its slot', async () => {
+      const gate = createReextractGate<string>(1, 1000);
+      const hung = gate.run('a', () => new Promise<string>(() => {}));
+      const assertion = expect(hung).rejects.toBeInstanceOf(
+        ReextractDeadlineError,
+      );
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await assertion;
+
+      await expect(gate.run('b', async () => 'free')).resolves.toBe('free');
+    });
+
+    it('starts a fresh run for the same key after the deadline', async () => {
+      const gate = createReextractGate<string>(3, 1000);
+      const hung = gate.run('a', () => new Promise<string>(() => {}));
+      const assertion = expect(hung).rejects.toBeInstanceOf(
+        ReextractDeadlineError,
+      );
+      await vi.advanceTimersByTimeAsync(1000);
+      await assertion;
+
+      const task = vi.fn(async () => 'fresh');
+      await expect(gate.run('a', task)).resolves.toBe('fresh');
+      expect(task).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not remove a newer entry when an abandoned run settles late', async () => {
+      const gate = createReextractGate<string>(3, 1000);
+      const old = deferred<string>();
+      const abandoned = gate.run('a', () => old.promise);
+      const assertion = expect(abandoned).rejects.toBeInstanceOf(
+        ReextractDeadlineError,
+      );
+      await vi.advanceTimersByTimeAsync(1000);
+      await assertion;
+
+      const newer = deferred<string>();
+      const newerRun = gate.run('a', () => newer.promise);
+      old.resolve('late');
+      await vi.advanceTimersByTimeAsync(0);
+
+      const joiner = vi.fn(async () => 'never');
+      const joined = gate.run('a', joiner);
+      newer.resolve('newer');
+      await expect(newerRun).resolves.toBe('newer');
+      await expect(joined).resolves.toBe('newer');
+      expect(joiner).not.toHaveBeenCalled();
+    });
+
+    it('keeps cap accounting correct across abandoned runs', async () => {
+      const gate = createReextractGate<string>(2, 1000);
+      const hung = ['a', 'b'].map((k) =>
+        gate.run(k, () => new Promise<string>(() => {})),
+      );
+      const assertions = hung.map((h) =>
+        expect(h).rejects.toBeInstanceOf(ReextractDeadlineError),
+      );
+      expect(gate.run('c', async () => 'c')).toBeNull();
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await Promise.all(assertions);
+
+      const running = deferred<string>();
+      gate.run('c', () => running.promise);
+      gate.run('d', () => running.promise);
+      expect(gate.run('e', async () => 'e')).toBeNull();
+    });
+
+    it('does not time out a run that settles before the deadline', async () => {
+      const gate = createReextractGate<string>(1, 1000);
+      const running = deferred<string>();
+      const run = gate.run('a', () => running.promise);
+      await vi.advanceTimersByTimeAsync(999);
+      running.resolve('ok');
+
+      await expect(run).resolves.toBe('ok');
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 });

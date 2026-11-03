@@ -408,6 +408,25 @@ describe('POST /_api/v3/attachments/:id/reextract', () => {
       expect(indexer.reindex).toHaveBeenCalledTimes(2);
     });
 
+    it('shares one extraction between ids that differ only in hex case', async () => {
+      const running = deferred();
+      indexer.reindex.mockReturnValue(running.promise);
+      const lower = attachmentIds.public.toLowerCase();
+      const upper = attachmentIds.public.toUpperCase();
+      expect(upper).not.toBe(lower);
+
+      const first = reextract(lower, users.admin).then((r) => r);
+      const second = reextract(upper, users.admin).then((r) => r);
+      await vi.waitFor(() => expect(indexer.reindex).toHaveBeenCalled());
+      await new Promise((r) => setTimeout(r, 200));
+      running.resolve({ ...done, outcome: { ...done.outcome, pages: [] } });
+      const responses = await Promise.all([first, second]);
+
+      expect(responses.map((r) => r.status)).toEqual([200, 200]);
+      expect(indexer.reindex).toHaveBeenCalledTimes(1);
+      expect(indexer.reindex).toHaveBeenCalledWith(lower);
+    });
+
     it('refuses a new attachment with 503 while the concurrency cap is reached', async () => {
       const running = deferred();
       indexer.reindex.mockReturnValue(running.promise);

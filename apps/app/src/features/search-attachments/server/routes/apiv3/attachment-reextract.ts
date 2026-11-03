@@ -40,6 +40,7 @@ import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { PageModel } from '~/server/models/page';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -48,7 +49,10 @@ import type {
   ReextractResponse,
 } from '../../../interfaces/attachment-search';
 import { createRequireSearchAttachmentsEnabled } from '../../middlewares/require-search-attachments-enabled';
-import { createReextractGate } from '../../services/reextract-gate';
+import {
+  createReextractGate,
+  ReextractDeadlineError,
+} from '../../services/reextract-gate';
 
 const logger = loggerFactory(
   'growi:features:search-attachments:routes:apiv3:attachment-reextract',
@@ -57,6 +61,13 @@ const logger = loggerFactory(
 type Req = Request<{ id: string }, ApiV3Response, void> & {
   user?: IUserHasId;
 };
+
+/**
+ * One run may read the file, call the extractor and, on a busy answer, call
+ * it once more, each call bounded by timeoutMs; this adds the time for the
+ * storage read and the retry delay.
+ */
+const REEXTRACT_DEADLINE_MARGIN_MS = 30 * 1000;
 
 /** Each run reads the whole file into memory and has it converted. */
 const MAX_CONCURRENT_REEXTRACTIONS = 3;
@@ -142,8 +153,16 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
           return notFoundOrForbidden(res);
         }
 
-        const running = gate.run(attachmentId, () =>
-          indexer.reindex(attachmentId),
+        // The id as stored: the URL id may differ in hex case but names the
+        // same attachment, and the gate must see one key for it.
+        const canonicalId = attachment.id;
+        const timeoutMs = configManager.getConfig(
+          'app:attachmentFullTextSearch:timeoutMs',
+        );
+        const running = gate.run(
+          canonicalId,
+          () => indexer.reindex(canonicalId),
+          timeoutMs * 2 + REEXTRACT_DEADLINE_MARGIN_MS,
         );
         if (running == null) {
           return res.apiv3Err(
@@ -171,6 +190,16 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
         };
         return res.apiv3(body);
       } catch (err) {
+        if (err instanceof ReextractDeadlineError) {
+          logger.error({ attachmentId }, 'Attachment reextraction timed out');
+          return res.apiv3Err(
+            new ErrorV3(
+              'Re-extraction did not finish in time; try again later',
+              'reextract_timeout',
+            ),
+            503,
+          );
+        }
         logger.error(
           { err, attachmentId },
           'POST /:id/reextract: unexpected error',

@@ -125,6 +125,8 @@ async function callExtractor(
         baseURL: extractorUri,
         headers: { Authorization: `Bearer ${token}` },
         timeout: timeoutMs,
+        // A redirect could point the request at an internal address (SSRF)
+        maxRedirects: 0,
       },
     );
 
