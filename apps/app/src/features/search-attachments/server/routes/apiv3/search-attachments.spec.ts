@@ -7,7 +7,7 @@
  *  3. 400 when pageIds has more than 20 elements
  *  4. 200 with enrichments when valid q and pageIds provided
  *  5. 503 when feature is disabled (middleware blocks before handler)
- *  8. the requesting user (or guest) is resolved and passed to resolveSecondary
+ *  8. the requesting user (or guest) is resolved and passed to resolveAttachmentSecondary
  *  9. duplicated pageIds are counted once
  */
 
@@ -34,8 +34,10 @@ vi.mock('~/utils/logger', () => ({
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
-import type { AttachmentSearchResultAggregator } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
+import type SearchService from '~/server/service/search';
+
+type SecondaryResolver = Pick<SearchService, 'resolveAttachmentSecondary'>;
 
 import { createSearchAttachmentsRouter } from './search-attachments';
 
@@ -52,7 +54,7 @@ const resolveViewer = vi.fn(
 );
 
 function buildApp(
-  aggregator: AttachmentSearchResultAggregator,
+  searchService: SecondaryResolver,
   isSearchServiceConfigured: () => boolean,
   withFeatureDisabled = false,
   loggedInUser?: IUserHasId,
@@ -94,7 +96,7 @@ function buildApp(
     });
   } else {
     const router = createSearchAttachmentsRouter(
-      aggregator,
+      searchService,
       isSearchServiceConfigured,
       resolveViewer,
     );
@@ -109,13 +111,13 @@ function buildApp(
 // ---------------------------------------------------------------------------
 
 describe('GET / (search-attachments route)', () => {
-  let aggregator: MockProxy<AttachmentSearchResultAggregator>;
-  let mockResolveSecondary: MockProxy<AttachmentSearchResultAggregator>['resolveSecondary'];
+  let searchService: MockProxy<SecondaryResolver>;
+  let mockResolveSecondary: MockProxy<SecondaryResolver>['resolveAttachmentSecondary'];
   let isSearchServiceConfigured: () => boolean;
 
   beforeEach(() => {
-    aggregator = mock<AttachmentSearchResultAggregator>();
-    mockResolveSecondary = aggregator.resolveSecondary;
+    searchService = mock<SecondaryResolver>();
+    mockResolveSecondary = searchService.resolveAttachmentSecondary;
     isSearchServiceConfigured = vi.fn().mockReturnValue(true);
   });
 
@@ -123,7 +125,7 @@ describe('GET / (search-attachments route)', () => {
   // 1. Missing pageIds
   // -------------------------------------------------------------------------
   it('1. returns 400 when pageIds is missing', async () => {
-    const app = buildApp(aggregator, isSearchServiceConfigured);
+    const app = buildApp(searchService, isSearchServiceConfigured);
     const res = await supertest(app).get('/').query({ q: 'keyword' });
 
     expect(res.status).toBe(400);
@@ -134,7 +136,7 @@ describe('GET / (search-attachments route)', () => {
   // 2. Empty pageIds
   // -------------------------------------------------------------------------
   it('2. returns 400 when pageIds is an empty string', async () => {
-    const app = buildApp(aggregator, isSearchServiceConfigured);
+    const app = buildApp(searchService, isSearchServiceConfigured);
     const res = await supertest(app)
       .get('/')
       .query({ q: 'keyword', pageIds: '' });
@@ -147,7 +149,7 @@ describe('GET / (search-attachments route)', () => {
   // 3. pageIds > 20 elements
   // -------------------------------------------------------------------------
   it('3. returns 400 when pageIds has more than 20 elements', async () => {
-    const app = buildApp(aggregator, isSearchServiceConfigured);
+    const app = buildApp(searchService, isSearchServiceConfigured);
     const ids = Array.from({ length: 21 }, (_, i) => `id${i}`).join(',');
     const res = await supertest(app)
       .get('/')
@@ -184,20 +186,15 @@ describe('GET / (search-attachments route)', () => {
       enrichments,
     });
 
-    const app = buildApp(aggregator, isSearchServiceConfigured);
+    const app = buildApp(searchService, isSearchServiceConfigured);
     const res = await supertest(app)
       .get('/')
       .query({ q: 'keyword', pageIds: 'page1,page2' });
 
     expect(res.status).toBe(200);
-    expect(mockResolveSecondary).toHaveBeenCalledWith(
-      'keyword',
-      guestViewer,
-      expect.objectContaining({
-        facet: 'all',
-        primaryIds: ['page1', 'page2'],
-      }),
-    );
+    expect(mockResolveSecondary).toHaveBeenCalledWith('keyword', guestViewer, {
+      primaryIds: ['page1', 'page2'],
+    });
     expect(res.body).toMatchObject({ enrichments });
   });
 
@@ -205,7 +202,7 @@ describe('GET / (search-attachments route)', () => {
   // 5. 503 when feature is disabled
   // -------------------------------------------------------------------------
   it('5. returns 503 when feature is disabled (middleware blocks)', async () => {
-    const app = buildApp(aggregator, isSearchServiceConfigured, true);
+    const app = buildApp(searchService, isSearchServiceConfigured, true);
     const res = await supertest(app)
       .get('/')
       .query({ q: 'keyword', pageIds: 'page1' });
@@ -221,7 +218,7 @@ describe('GET / (search-attachments route)', () => {
   it('6. handles pageIds as repeated query array params', async () => {
     mockResolveSecondary.mockResolvedValue({ facet: 'all', enrichments: {} });
 
-    const app = buildApp(aggregator, isSearchServiceConfigured);
+    const app = buildApp(searchService, isSearchServiceConfigured);
 
     // supertest encodes array as pageIds[]=id1&pageIds[]=id2 with { pageIds: ['id1', 'id2'] }
     const res = await supertest(app)
@@ -239,28 +236,23 @@ describe('GET / (search-attachments route)', () => {
   it('7. accepts exactly 20 pageIds', async () => {
     mockResolveSecondary.mockResolvedValue({ facet: 'all', enrichments: {} });
 
-    const app = buildApp(aggregator, isSearchServiceConfigured);
+    const app = buildApp(searchService, isSearchServiceConfigured);
     const ids = Array.from({ length: 20 }, (_, i) => `id${i}`).join(',');
     const res = await supertest(app)
       .get('/')
       .query({ q: 'keyword', pageIds: ids });
 
     expect(res.status).toBe(200);
-    expect(mockResolveSecondary).toHaveBeenCalledWith(
-      'keyword',
-      guestViewer,
-      expect.objectContaining({
-        facet: 'all',
-        primaryIds: expect.arrayContaining(['id0', 'id19']),
-      }),
-    );
+    expect(mockResolveSecondary).toHaveBeenCalledWith('keyword', guestViewer, {
+      primaryIds: expect.arrayContaining(['id0', 'id19']),
+    });
   });
 
-  it('8. resolves the logged-in user and passes that viewer to resolveSecondary', async () => {
+  it('8. resolves the logged-in user and passes that viewer to resolveAttachmentSecondary', async () => {
     mockResolveSecondary.mockResolvedValue({ facet: 'all', enrichments: {} });
     const user = mock<IUserHasId>({ _id: 'user-1' });
 
-    const app = buildApp(aggregator, isSearchServiceConfigured, false, user);
+    const app = buildApp(searchService, isSearchServiceConfigured, false, user);
     const res = await supertest(app)
       .get('/')
       .query({ q: 'keyword', pageIds: 'page1' });
@@ -270,7 +262,7 @@ describe('GET / (search-attachments route)', () => {
     expect(mockResolveSecondary).toHaveBeenCalledWith(
       'keyword',
       { user, userGroups: ['group-1'] },
-      { facet: 'all', primaryIds: ['page1'] },
+      { primaryIds: ['page1'] },
     );
   });
 
@@ -282,7 +274,7 @@ describe('GET / (search-attachments route)', () => {
       'id1',
     ].join(',');
 
-    const app = buildApp(aggregator, isSearchServiceConfigured);
+    const app = buildApp(searchService, isSearchServiceConfigured);
     const res = await supertest(app)
       .get('/')
       .query({ q: 'keyword', pageIds: ids });

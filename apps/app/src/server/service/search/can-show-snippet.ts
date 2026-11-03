@@ -21,7 +21,9 @@ export type SnippetViewer = {
  * fragment) of the page. The list policy (`security:list-policy:*`) only
  * decides whether the page itself is listed; content always follows this rule,
  * which grants the same readers as `generateGrantCondition` in models/page.ts
- * (link-only pages excepted: they are never shown by search).
+ * (link-only pages excepted: they are never shown by search). Like that
+ * condition, a missing grant (legacy page) is public and any other value is
+ * unreadable.
  */
 export const canShowSnippetForGrant = (
   page: SnippetGrantFields,
@@ -29,8 +31,8 @@ export const canShowSnippetForGrant = (
 ): boolean => {
   const { grant } = page;
 
-  if (grant === PageGrant.GRANT_RESTRICTED) {
-    return false;
+  if (grant == null || grant === PageGrant.GRANT_PUBLIC) {
+    return true;
   }
 
   if (grant === PageGrant.GRANT_OWNER || grant === PageGrant.GRANT_SPECIFIED) {
@@ -43,5 +45,5 @@ export const canShowSnippetForGrant = (
     return page.grantedGroupIds.some((id) => userGroupIds.includes(id));
   }
 
-  return true;
+  return false;
 };

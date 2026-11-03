@@ -66,7 +66,8 @@ export interface IPrimarySearchResult {
     readonly attachmentHits: IAttachmentHit[];
   }>;
   readonly meta: {
-    readonly total: number;
+    /** null: no count is reported (it would count hits the viewer cannot see) */
+    readonly total: number | null;
     readonly hitsCount: number;
     readonly took: number;
     readonly primaryResultIncomplete: boolean;

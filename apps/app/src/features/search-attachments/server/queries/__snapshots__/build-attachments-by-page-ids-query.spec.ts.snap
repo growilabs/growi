@@ -30,9 +30,11 @@ exports[`buildAttachmentsByPageIdsQuery > matches snapshot 1`] = `
           },
         },
       ],
+      "must_not": [],
     },
   },
   "size": 20,
+  "track_total_hits": false,
 }
 `;
 
@@ -62,7 +64,7 @@ exports[`buildAttachmentsByPageIdsQuery > matches snapshot with highlight 1`] = 
       "</em>",
     ],
     "pre_tags": [
-      "<em class='highlighted-keyword'>",
+      "<em>",
     ],
   },
   "query": {
@@ -93,8 +95,10 @@ exports[`buildAttachmentsByPageIdsQuery > matches snapshot with highlight 1`] = 
           },
         },
       ],
+      "must_not": [],
     },
   },
   "size": 10,
+  "track_total_hits": false,
 }
 `;

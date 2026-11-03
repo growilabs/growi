@@ -16,8 +16,10 @@ import {
   SEARCH_FILTER_PREFIXES,
 } from '~/features/search/utils/filter-fields';
 import type {
+  AttachmentSearchInput,
   AttachmentSearchResultAggregator,
   IPrimarySearchResult,
+  IResolvedSecondaryResult,
 } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
 import type {
@@ -29,7 +31,6 @@ import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
   ISearchResult,
-  ISearchResultData,
 } from '~/interfaces/search';
 import {
   USER_FIELDS_EXCEPT_CONFIDENTIAL,
@@ -533,13 +534,15 @@ class SearchService implements SearchQueryParser, SearchResolver {
     );
   }
 
-  async searchKeyword(
+  /**
+   * Parses and resolves a query string once: the delegator to run it with and
+   * the searchable data (terms, resolved filter data) to run.
+   */
+  private async prepareSearch(
     keyword: string,
     nqName: string | null,
-    user,
     userGroups: ObjectIdLike[] | null,
-    searchOpts,
-  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
+  ): Promise<[SearchDelegator, SearchableData]> {
     let parsedQuery: ParsedQuery;
     // parse
     try {
@@ -566,10 +569,70 @@ class SearchService implements SearchQueryParser, SearchResolver {
       userGroups,
     );
 
+    return [delegator, data];
+  }
+
+  async searchKeyword(
+    keyword: string,
+    nqName: string | null,
+    user,
+    userGroups: ObjectIdLike[] | null,
+    searchOpts,
+  ): Promise<[ISearchResult<unknown>, SearchDelegatorName | null]> {
+    const [delegator, data] = await this.prepareSearch(
+      keyword,
+      nqName,
+      userGroups,
+    );
+
     return [
       await delegator.search(data, user, userGroups, searchOpts),
       delegator.name ?? null,
     ];
+  }
+
+  /**
+   * Parses a query for the full-text search delegator, once, into what both
+   * the page side and the attachment side of a faceted search run with.
+   */
+  async createAttachmentSearchInput(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+  ): Promise<AttachmentSearchInput> {
+    const [, data] = await this.prepareSearch(keyword, null, viewer.userGroups);
+    return {
+      queryString: data.queryString,
+      terms: data.terms as QueryTerms,
+      resolvedFilterData: data.resolvedFilterData ?? {
+        groupIds: [],
+        notGroupIds: [],
+      },
+      viewer,
+    };
+  }
+
+  /**
+   * Page search for a parsed query, formatted exactly as `/_api/search`
+   * formats it (snippet rule, XSS filtering, page data from MongoDB).
+   */
+  async searchFormattedPages(
+    input: AttachmentSearchInput,
+    { from, size }: { from: number; size: number },
+  ): Promise<IFormattedSearchResult> {
+    const { queryString, terms, resolvedFilterData, viewer } = input;
+    const delegator = this.fullTextSearchDelegator;
+    const result = await delegator.search(
+      { queryString, terms, resolvedFilterData },
+      viewer.user,
+      viewer.userGroups,
+      { offset: from, limit: size },
+    );
+    return this.formatSearchResult(
+      result,
+      delegator.name ?? null,
+      viewer.user,
+      viewer.userGroups,
+    );
   }
 
   /**
@@ -605,37 +668,43 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const from = options.from ?? 0;
     const size = options.size ?? 20;
 
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+
     if (facet !== 'pages' && this.attachmentSearchResultAggregator != null) {
-      return this.attachmentSearchResultAggregator.searchPrimary(
-        keyword,
-        viewer,
-        { facet, from, size },
-      );
+      return this.attachmentSearchResultAggregator.searchPrimary(input, {
+        facet,
+        from,
+        size,
+      });
     }
 
     // Page-only fallback: the regular page search for the same viewer
-    const [result] = await this.searchKeyword(
-      keyword,
-      null,
-      viewer.user,
-      viewer.userGroups,
-      { offset: from, limit: size },
-    );
-
+    const result = await this.searchFormattedPages(input, { from, size });
     return {
       facet: 'pages',
       primarySlot: 'pages',
-      items: (result.data as ISearchResultData[]).map((d) => ({
-        data: { _id: d._id, ...d._source } as IPageWithSearchMeta['data'],
-        meta: {
-          elasticSearchResult: {
-            snippet: d._highlight?.body?.[0] ?? null,
-            highlightedPath: d._highlight?.path?.[0] ?? null,
-          },
-        },
-      })),
+      items: result.data,
       meta: { total: result.meta.total },
     };
+  }
+
+  /**
+   * Attachment hits for page ids the client got from a facet=all primary
+   * result. Empty when the attachment search is not initialized.
+   *
+   * @throws {RangeError} when more than 20 distinct ids are given
+   */
+  async resolveAttachmentSecondary(
+    keyword: string,
+    viewer: AttachmentSearchViewer,
+    { primaryIds }: { primaryIds: string[] },
+  ): Promise<IResolvedSecondaryResult> {
+    const aggregator = this.attachmentSearchResultAggregator;
+    if (aggregator == null) {
+      return { facet: 'all', enrichments: {} };
+    }
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    return aggregator.resolveSecondary(input, { facet: 'all', primaryIds });
   }
 
   async resolveFilterData(

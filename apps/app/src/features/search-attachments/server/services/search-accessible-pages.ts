@@ -1,8 +1,14 @@
 import type { IUserHasId } from '@growi/core';
 
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import type { ResolvedFilterData } from '~/server/interfaces/search';
 import { canShowSnippetForGrant } from '~/server/service/search/can-show-snippet';
 import type ElasticsearchDelegator from '~/server/service/search-delegator/elasticsearch';
+
+import {
+  EMPTY_ATTACHMENT_KEYWORD_TERMS,
+  type PageFilterTerms,
+} from '../queries/split-query-terms';
 
 /**
  * The viewer of a search, resolved exactly as page search resolves it
@@ -45,10 +51,26 @@ export type PageIndexSearchFn = (
   params: PageIndexSearchParams,
 ) => Promise<PageIndexSearchResponse>;
 
+/** The operator part of the query, applied to the parent page. */
+export type PageSearchFilter = {
+  readonly terms: PageFilterTerms;
+  readonly resolvedFilterData: ResolvedFilterData;
+};
+
 export type SearchAccessiblePagesFn = (
   pageIds: readonly string[],
   viewer: AttachmentSearchViewer,
+  filter: PageSearchFilter,
 ) => Promise<AccessiblePage[]>;
+
+/**
+ * The ids (among pageIds) whose MongoDB page document lets the viewer see
+ * content, judged as page search judges snippets. Must throw on failure.
+ */
+export type FindSnippetVisiblePageIdsFn = (
+  pageIds: readonly string[],
+  viewer: AttachmentSearchViewer,
+) => Promise<Set<string>>;
 
 const PAGE_SOURCE_FIELDS = [
   'path',
@@ -60,20 +82,27 @@ const PAGE_SOURCE_FIELDS = [
 
 /**
  * Returns the subset of `pageIds` whose content page search would show to
- * `viewer`: the page must pass page search's own viewer filter
- * (`filterPagesByViewer`) and page search's snippet rule
- * (`canShowSnippetForGrant`). Only pages present in the response are allowed;
- * an incomplete response (timed out or failed shards) is rejected as a whole.
+ * `viewer` for the same query: the page must match the query's operators and
+ * page search's own viewer filter on the page index (built with the same
+ * query builders page search uses), and page search's snippet rule
+ * (`canShowSnippetForGrant`) must allow it both on the page index and on the
+ * MongoDB page document, which is what page search judges snippets by. Only
+ * pages present in both answers are allowed; an incomplete page index response
+ * (timed out or failed shards) or a failed MongoDB lookup rejects the call.
  */
 export const createSearchAccessiblePages =
   (
     delegator: Pick<
       ElasticsearchDelegator,
-      'createSearchQuery' | 'filterPagesByViewer'
+      | 'createSearchQuery'
+      | 'appendCriteriaForQueryString'
+      | 'appendCriteriaForGroupFilter'
+      | 'filterPagesByViewer'
     >,
     searchPageIndex: PageIndexSearchFn,
+    findSnippetVisiblePageIds: FindSnippetVisiblePageIdsFn,
   ): SearchAccessiblePagesFn =>
-  async (pageIds, viewer) => {
+  async (pageIds, viewer, filter) => {
     const uniqueIds = [...new Set(pageIds)];
     if (uniqueIds.length === 0) {
       return [];
@@ -83,6 +112,13 @@ export const createSearchAccessiblePages =
     const userGroups = user == null ? null : viewer.userGroups;
 
     const query = delegator.createSearchQuery();
+    const terms = { ...filter.terms, ...EMPTY_ATTACHMENT_KEYWORD_TERMS };
+    delegator.appendCriteriaForQueryString(query, terms);
+    delegator.appendCriteriaForGroupFilter(
+      query,
+      terms,
+      filter.resolvedFilterData,
+    );
     delegator.filterPagesByViewer(query, user, userGroups);
 
     const bool = query.body?.query?.bool;
@@ -117,7 +153,7 @@ export const createSearchAccessiblePages =
     };
     const requested = new Set(uniqueIds);
 
-    return response.hits.hits.flatMap((hit): AccessiblePage[] => {
+    const indexed = response.hits.hits.flatMap((hit): AccessiblePage[] => {
       const pageId = hit._id;
       const source = hit._source;
       if (pageId == null || source == null || !requested.has(pageId)) {
@@ -142,4 +178,13 @@ export const createSearchAccessiblePages =
         },
       ];
     });
+    if (indexed.length === 0) {
+      return [];
+    }
+
+    const visibleInMongo = await findSnippetVisiblePageIds(
+      indexed.map((page) => page.pageId),
+      { user, userGroups },
+    );
+    return indexed.filter((page) => visibleInMongo.has(page.pageId));
   };

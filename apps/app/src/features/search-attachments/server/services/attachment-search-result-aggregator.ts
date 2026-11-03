@@ -6,18 +6,25 @@
  * - facet=all    : msearch pages+attachments in parallel (from==0 only); fall back to pages-only for from>0
  * - facet=attachments: attachment index primary, then searchAccessiblePages on page_index
  *
+ * Page items always come from the regular page search pipeline (search +
+ * result formatting), so they carry exactly what `/_api/search` returns.
  * Every attachment hit, on every path, passes searchAccessiblePages for the
- * viewer before it is returned; any failure there drops the hits (fail-close).
+ * viewer and the query's operators before it is returned; any failure there
+ * drops the hits (fail-close). Only the keyword part of the query is matched
+ * against attachment content.
  *
  * Safety net: if primary latency > PRIMARY_TIMEOUT_MS, degrade gracefully.
  */
 
 import type { IAttachmentHit } from '~/features/search-attachments/interfaces/attachment-search';
 import type {
+  IFormattedSearchResult,
   IPageWithSearchMeta,
-  ISearchResult,
-  ISearchResultData,
 } from '~/interfaces/search';
+import type {
+  QueryTerms,
+  ResolvedFilterData,
+} from '~/server/interfaces/search';
 import loggerFactory from '~/utils/logger';
 
 import { buildAttachmentSearchQuery } from '../queries/build-attachment-search-query';
@@ -26,8 +33,15 @@ import {
   DEFAULT_PAGE_SIZE,
 } from '../queries/build-attachments-by-page-ids-query';
 import { buildSnippetSegments } from '../queries/build-snippet-segments';
+import {
+  type AttachmentKeywordTerms,
+  hasPositiveKeyword,
+  splitQueryTerms,
+} from '../queries/split-query-terms';
+import { collectVisibleAttachmentHits } from './collect-visible-attachment-hits';
 import type {
   AttachmentSearchViewer,
+  PageSearchFilter,
   SearchAccessiblePagesFn,
 } from './search-accessible-pages';
 
@@ -38,14 +52,25 @@ const logger = loggerFactory('growi:service:search-attachments:aggregator');
 // ---------------------------------------------------------------------------
 
 /**
- * Callback signature for the existing page search pipeline.
- * The aggregator delegates all page search logic to this function.
+ * A query parsed once by SearchService (parseSearchQuery → resolve →
+ * resolveFilterData), together with the viewer it runs for. The aggregator
+ * never re-parses the query string.
+ */
+export type AttachmentSearchInput = {
+  readonly queryString: string;
+  readonly terms: QueryTerms;
+  readonly resolvedFilterData: ResolvedFilterData;
+  readonly viewer: AttachmentSearchViewer;
+};
+
+/**
+ * Callback for the existing page search pipeline, returning the formatted
+ * result exactly as `/_api/search` would.
  */
 export type PageSearchFn = (
-  keyword: string,
-  viewer: AttachmentSearchViewer,
+  input: AttachmentSearchInput,
   options: { from: number; size: number },
-) => Promise<ISearchResult<ISearchResultData>>;
+) => Promise<IFormattedSearchResult>;
 
 /**
  * Raw ES hit shape returned from the attachments index.
@@ -74,11 +99,11 @@ export interface AttachmentEsHit {
 }
 
 /**
- * Raw ES hits wrapper from an attachment search.
+ * Raw ES hits wrapper from an attachment search. The hit count is never
+ * requested (it would count hits before the permission check).
  */
 export interface AttachmentSearchResponse {
   hits: {
-    total: { value: number } | number;
     hits: AttachmentEsHit[];
   };
 }
@@ -92,7 +117,7 @@ export interface AttachmentIndexClient {
   searchAttachments(
     body: Record<string, unknown>,
   ): Promise<AttachmentSearchResponse>;
-  /** The ids (among pageIds) whose content the viewer may see. */
+  /** The ids (among pageIds) whose content the viewer may see for the query. */
   searchAccessiblePages: SearchAccessiblePagesFn;
 }
 
@@ -105,8 +130,10 @@ export interface IPrimarySearchResult {
   primarySlot: 'pages' | 'attachments';
   items: IPageWithSearchMeta[];
   meta: {
+    /** The page search total for a page-primary result; always null for facet=attachments. */
     total: number | null;
     nextCursor?: string;
+    /** facet=attachments: the attachment search or the permission check failed. */
     primaryResultIncomplete?: boolean;
   };
   secondary?: ISecondarySearchResult;
@@ -124,25 +151,8 @@ export interface IResolvedSecondaryResult {
   enrichments: Record<string, { attachmentHits?: IAttachmentHit[] }>;
 }
 
-// ---------------------------------------------------------------------------
-// Over-fetch multiplier for facet=attachments
-// ---------------------------------------------------------------------------
-
-const OVER_FETCH_MULTIPLIER = 1.5;
-
 // Secondary enrichment timeout (ms)
 const DEFAULT_SECONDARY_TIMEOUT_MS = 500;
-
-// ---------------------------------------------------------------------------
-// Helper: resolve ES total count
-// ---------------------------------------------------------------------------
-const resolveTotal = (
-  total: { value: number } | number | undefined,
-): number => {
-  if (total == null) return 0;
-  if (typeof total === 'number') return total;
-  return total.value;
-};
 
 // ---------------------------------------------------------------------------
 // Helper: map a single ES attachment hit to IAttachmentHit
@@ -168,23 +178,6 @@ const toAttachmentHit = (esHit: AttachmentEsHit): IAttachmentHit => {
     pageNumber: _source.pageNumber,
     label: _source.label,
   };
-};
-
-// ---------------------------------------------------------------------------
-// Helper: build attachment hits grouped by pageId
-// ---------------------------------------------------------------------------
-const groupHitsByPageId = (
-  hits: AttachmentEsHit[],
-): Record<string, IAttachmentHit[]> => {
-  const byPageId: Record<string, IAttachmentHit[]> = {};
-  for (const hit of hits) {
-    const pageId = hit._source.pageId;
-    if (byPageId[pageId] == null) {
-      byPageId[pageId] = [];
-    }
-    byPageId[pageId].push(toAttachmentHit(hit));
-  }
-  return byPageId;
 };
 
 // ---------------------------------------------------------------------------
@@ -217,19 +210,27 @@ const withTimeout = async <T>(promise: Promise<T>, ms: number): Promise<T> => {
 const failureKind = (err: unknown): 'timeout' | 'error' =>
   err instanceof AttachmentSearchTimeoutError ? 'timeout' : 'error';
 
+const pageIdOf = (item: IPageWithSearchMeta): string =>
+  item.data._id.toString();
+
+type SplitInput = {
+  keywords: AttachmentKeywordTerms;
+  filter: PageSearchFilter;
+  viewer: AttachmentSearchViewer;
+};
+
+const splitInput = (input: AttachmentSearchInput): SplitInput => {
+  const { keywords, filters } = splitQueryTerms(input.terms);
+  return {
+    keywords,
+    filter: { terms: filters, resolvedFilterData: input.resolvedFilterData },
+    viewer: input.viewer,
+  };
+};
+
 // ---------------------------------------------------------------------------
 // AttachmentSearchResultAggregator
 // ---------------------------------------------------------------------------
-
-const toPageItem = (d: ISearchResultData): IPageWithSearchMeta => ({
-  data: { _id: d._id, ...d._source } as IPageWithSearchMeta['data'],
-  meta: {
-    elasticSearchResult: {
-      snippet: d._highlight?.body?.[0] ?? null,
-      highlightedPath: d._highlight?.path?.[0] ?? null,
-    },
-  },
-});
 
 export class AttachmentSearchResultAggregator {
   private readonly pageSearchFn: PageSearchFn;
@@ -254,8 +255,7 @@ export class AttachmentSearchResultAggregator {
   // --------------------------------------------------------------------------
 
   async searchPrimary(
-    query: string,
-    viewer: AttachmentSearchViewer,
+    input: AttachmentSearchInput,
     options: {
       facet: 'all' | 'pages' | 'attachments';
       from: number;
@@ -266,20 +266,20 @@ export class AttachmentSearchResultAggregator {
 
     // facet=pages: MUST NOT touch attachments_index at all
     if (facet === 'pages') {
-      return await this.searchPrimaryPages(query, viewer, from, size);
+      return await this.searchPrimaryPages(input, from, size);
     }
 
     if (facet === 'all') {
       // from>0: only page search (same as facet=pages), no attachment query
       if (from > 0) {
-        return await this.searchPrimaryPages(query, viewer, from, size);
+        return await this.searchPrimaryPages(input, from, size);
       }
       // from==0: parallel pages+attachments with 800ms safety net
-      return await this.searchPrimaryAll(query, viewer, size);
+      return await this.searchPrimaryAll(input, size);
     }
 
     if (facet === 'attachments') {
-      return await this.searchPrimaryAttachments(query, viewer, size);
+      return await this.searchPrimaryAttachments(input, from, size);
     }
 
     // Should never reach here given TypeScript exhaustive check, but handle defensively
@@ -291,19 +291,19 @@ export class AttachmentSearchResultAggregator {
   // --------------------------------------------------------------------------
 
   /**
-   * The subset of pageIds whose attachment hits the viewer may see.
-   * Throws on any failure; callers must then drop the hits (fail-close).
+   * The subset of pageIds whose attachment hits the viewer may see for the
+   * query. Throws on any failure; callers must then drop the hits (fail-close).
    */
   private async findVisiblePageIds(
     pageIds: string[],
-    viewer: AttachmentSearchViewer,
+    { viewer, filter }: SplitInput,
     timeoutMs: number,
   ): Promise<Set<string>> {
     if (pageIds.length === 0) {
       return new Set();
     }
     const pages = await withTimeout(
-      this.attachmentClient.searchAccessiblePages(pageIds, viewer),
+      this.attachmentClient.searchAccessiblePages(pageIds, viewer, filter),
       timeoutMs,
     );
     return new Set(pages.map((p) => p.pageId));
@@ -314,17 +314,16 @@ export class AttachmentSearchResultAggregator {
   // --------------------------------------------------------------------------
 
   private async searchPrimaryPages(
-    query: string,
-    viewer: AttachmentSearchViewer,
+    input: AttachmentSearchInput,
     from: number,
     size: number,
   ): Promise<IPrimarySearchResult> {
-    const result = await this.pageSearchFn(query, viewer, { from, size });
+    const result = await this.pageSearchFn(input, { from, size });
 
     return {
       facet: 'pages',
       primarySlot: 'pages',
-      items: result.data.map(toPageItem),
+      items: result.data,
       meta: {
         total: result.meta.total,
       },
@@ -336,23 +335,24 @@ export class AttachmentSearchResultAggregator {
   // --------------------------------------------------------------------------
 
   private async searchPrimaryAll(
-    query: string,
-    viewer: AttachmentSearchViewer,
+    input: AttachmentSearchInput,
     size: number,
   ): Promise<IPrimarySearchResult> {
-    const pageSearchPromise = this.pageSearchFn(query, viewer, {
-      from: 0,
-      size,
-    });
-    const attachmentSearchBody = buildAttachmentSearchQuery(query, {
-      highlight: true,
-      size,
-      from: 0,
-    });
-    const attachmentSearchPromise =
-      this.attachmentClient.searchAttachments(attachmentSearchBody);
+    const split = splitInput(input);
+    const pageSearchPromise = this.pageSearchFn(input, { from: 0, size });
+    // No keyword to match attachment content with (e.g. an operator-only query)
+    const attachmentSearchPromise: Promise<AttachmentSearchResponse> =
+      hasPositiveKeyword(split.keywords)
+        ? this.attachmentClient.searchAttachments(
+            buildAttachmentSearchQuery(split.keywords, {
+              highlight: true,
+              size,
+              from: 0,
+            }),
+          )
+        : Promise.resolve({ hits: { hits: [] } });
 
-    let pageResult: ISearchResult<ISearchResultData>;
+    let pageResult: IFormattedSearchResult;
     let attachmentResponse: AttachmentSearchResponse;
 
     try {
@@ -363,23 +363,20 @@ export class AttachmentSearchResultAggregator {
     } catch (err) {
       // Safety net: degrade to pages-only result
       logger.warn(
-        { err, failure: failureKind(err), querySnippet: query.slice(0, 50) },
+        { err, failure: failureKind(err) },
         'searchPrimaryAll: primary search failed — degrading to pages-only',
       );
-      const degradedResult = await this.pageSearchFn(query, viewer, {
-        from: 0,
-        size,
-      });
+      const degradedResult = await this.pageSearchFn(input, { from: 0, size });
       return {
         facet: 'all',
         primarySlot: 'pages',
-        items: degradedResult.data.map(toPageItem),
+        items: degradedResult.data,
         meta: { total: degradedResult.meta.total },
       };
     }
 
     // Interpretation A: only attachment hits on pages of the primary page result
-    const pageIdSet = new Set(pageResult.data.map((d) => d._id));
+    const pageIdSet = new Set(pageResult.data.map(pageIdOf));
     const candidateHits = attachmentResponse.hits.hits.filter((h) =>
       pageIdSet.has(h._source.pageId),
     );
@@ -388,27 +385,32 @@ export class AttachmentSearchResultAggregator {
     try {
       visiblePageIds = await this.findVisiblePageIds(
         [...new Set(candidateHits.map((h) => h._source.pageId))],
-        viewer,
+        split,
         this.PRIMARY_TIMEOUT_MS,
       );
     } catch (err) {
       // fail-close: keep the page results, embed no attachment hits
       logger.warn(
-        { err, failure: failureKind(err), querySnippet: query.slice(0, 50) },
+        { err, failure: failureKind(err) },
         'searchPrimaryAll: permission check failed — dropping attachment hits (fail-close)',
       );
     }
 
-    const attachmentHitsByPageId = groupHitsByPageId(
-      candidateHits.filter((h) => visiblePageIds.has(h._source.pageId)),
-    );
+    const attachmentHitsByPageId = new Map<string, IAttachmentHit[]>();
+    for (const hit of candidateHits) {
+      const pageId = hit._source.pageId;
+      if (!visiblePageIds.has(pageId)) continue;
+      attachmentHitsByPageId.set(pageId, [
+        ...(attachmentHitsByPageId.get(pageId) ?? []),
+        toAttachmentHit(hit),
+      ]);
+    }
 
-    const items: IPageWithSearchMeta[] = pageResult.data.map((d) => {
-      const item = toPageItem(d);
-      const attachmentHits = attachmentHitsByPageId[d._id] ?? [];
-      return attachmentHits.length > 0
-        ? { ...item, meta: { ...item.meta, attachmentHits } }
-        : item;
+    const items: IPageWithSearchMeta[] = pageResult.data.map((item) => {
+      const attachmentHits = attachmentHitsByPageId.get(pageIdOf(item));
+      return attachmentHits == null
+        ? item
+        : { ...item, meta: { ...item.meta, attachmentHits } };
     });
 
     return {
@@ -423,100 +425,68 @@ export class AttachmentSearchResultAggregator {
   // facet=attachments — attachment index primary + permission gate
   // --------------------------------------------------------------------------
 
+  /**
+   * Nothing in the response may depend on hits the viewer cannot see: no
+   * total is reported (`total: null`), and `primaryResultIncomplete` is set
+   * only when the attachment search or the permission check failed. Paging
+   * follows collectVisibleAttachmentHits.
+   */
   private async searchPrimaryAttachments(
-    query: string,
-    viewer: AttachmentSearchViewer,
+    input: AttachmentSearchInput,
+    from: number,
     size: number,
   ): Promise<IPrimarySearchResult> {
-    const overFetchSize = Math.ceil(size * OVER_FETCH_MULTIPLIER);
-    const incomplete: IPrimarySearchResult = {
-      facet: 'attachments',
-      primarySlot: 'attachments',
-      items: [],
-      meta: {
-        total: null,
-        primaryResultIncomplete: true,
-      },
-    };
-
-    const attachmentSearchBody = buildAttachmentSearchQuery(query, {
-      highlight: true,
-      size: overFetchSize,
-      from: 0,
-    });
-
-    let attachmentResponse: AttachmentSearchResponse;
-    try {
-      attachmentResponse = await withTimeout(
-        this.attachmentClient.searchAttachments(attachmentSearchBody),
-        this.PRIMARY_TIMEOUT_MS,
-      );
-    } catch (err) {
-      logger.warn(
-        { err, failure: failureKind(err), querySnippet: query.slice(0, 50) },
-        'searchPrimaryAttachments: attachment search failed — returning empty + incomplete',
-      );
-      return incomplete;
-    }
-
-    const esHits = attachmentResponse.hits.hits;
-
-    if (esHits.length === 0) {
-      return {
-        facet: 'attachments',
-        primarySlot: 'attachments',
-        items: [],
-        meta: {
-          total: resolveTotal(attachmentResponse.hits.total),
-          primaryResultIncomplete: false,
-        },
-      };
-    }
-
-    let visiblePageIds: Set<string>;
-    try {
-      visiblePageIds = await this.findVisiblePageIds(
-        [...new Set(esHits.map((h) => h._source.pageId))],
-        viewer,
-        this.PRIMARY_TIMEOUT_MS,
-      );
-    } catch (err) {
-      logger.warn(
-        { err, failure: failureKind(err), querySnippet: query.slice(0, 50) },
-        'searchPrimaryAttachments: permission check failed — returning empty + incomplete (fail-close)',
-      );
-      return incomplete;
-    }
-
-    const authorizedHits = esHits.filter((h) =>
-      visiblePageIds.has(h._source.pageId),
-    );
-    const hitsByPageId = groupHitsByPageId(authorizedHits);
-
-    // One IPageWithSearchMeta per unique pageId (up to `size` items)
-    const authorizedPageIdList = [
-      ...new Set(authorizedHits.map((h) => h._source.pageId)),
-    ].slice(0, size);
-
-    const items: IPageWithSearchMeta[] = authorizedPageIdList.map((pageId) => ({
-      data: { _id: pageId } as IPageWithSearchMeta['data'],
-      meta: {
-        attachmentHits: hitsByPageId[pageId] ?? [],
-      },
-    }));
-
-    const primaryResultIncomplete =
-      items.length < size && esHits.length >= overFetchSize;
-
-    return {
+    const result = (
+      items: IPageWithSearchMeta[],
+      primaryResultIncomplete: boolean,
+    ): IPrimarySearchResult => ({
       facet: 'attachments',
       primarySlot: 'attachments',
       items,
-      meta: {
-        total: resolveTotal(attachmentResponse.hits.total),
-        primaryResultIncomplete,
-      },
-    };
+      meta: { total: null, primaryResultIncomplete },
+    });
+
+    const split = splitInput(input);
+    if (!hasPositiveKeyword(split.keywords)) {
+      return result([], false);
+    }
+
+    try {
+      const pages = await withTimeout(
+        collectVisibleAttachmentHits(
+          {
+            searchHits: async (hitsFrom, hitsSize) =>
+              (
+                await this.attachmentClient.searchAttachments(
+                  buildAttachmentSearchQuery(split.keywords, {
+                    highlight: true,
+                    from: hitsFrom,
+                    size: hitsSize,
+                  }),
+                )
+              ).hits.hits,
+            findVisiblePageIds: (pageIds) =>
+              this.findVisiblePageIds(pageIds, split, this.PRIMARY_TIMEOUT_MS),
+          },
+          { from, size },
+        ),
+        this.PRIMARY_TIMEOUT_MS,
+      );
+
+      return result(
+        pages.map(({ pageId, hits }) => ({
+          data: { _id: pageId } as IPageWithSearchMeta['data'],
+          meta: { attachmentHits: hits.map(toAttachmentHit) },
+        })),
+        false,
+      );
+    } catch (err) {
+      logger.warn(
+        { err, failure: failureKind(err) },
+        'searchPrimaryAttachments: attachment search or permission check failed — returning empty + incomplete (fail-close)',
+      );
+      return result([], true);
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -528,17 +498,16 @@ export class AttachmentSearchResultAggregator {
    *
    * facet=attachments: primary already applied the permission gate — no-op.
    *
-   * facet=all: the client-supplied ids are re-checked against the viewer with
-   * searchAccessiblePages, then the attachments index is searched for the
-   * surviving ids only. Any failure or a latency above 500ms returns empty
-   * enrichments.
+   * facet=all: the client-supplied ids are re-checked against the viewer and
+   * the query's operators with searchAccessiblePages, then the attachments
+   * index is searched for the surviving ids only. Any failure or a latency
+   * above 500ms returns empty enrichments.
    *
    * @throws {RangeError} when the number of distinct primaryIds exceeds
    *   DEFAULT_PAGE_SIZE
    */
   async resolveSecondary(
-    query: string,
-    viewer: AttachmentSearchViewer,
+    input: AttachmentSearchInput,
     options: {
       facet: 'all' | 'attachments';
       primaryIds: string[];
@@ -550,12 +519,11 @@ export class AttachmentSearchResultAggregator {
       return { facet: 'attachments', enrichments: {} };
     }
 
-    return this.resolveSecondaryAll(query, viewer, [...new Set(primaryIds)]);
+    return this.resolveSecondaryAll(input, [...new Set(primaryIds)]);
   }
 
   private async resolveSecondaryAll(
-    query: string,
-    viewer: AttachmentSearchViewer,
+    input: AttachmentSearchInput,
     primaryIds: string[],
   ): Promise<IResolvedSecondaryResult> {
     if (primaryIds.length > DEFAULT_PAGE_SIZE) {
@@ -567,13 +535,13 @@ export class AttachmentSearchResultAggregator {
 
     try {
       const enrichments = await withTimeout(
-        this.doResolveSecondaryAll(query, viewer, primaryIds),
+        this.doResolveSecondaryAll(splitInput(input), primaryIds),
         this.SECONDARY_TIMEOUT_MS,
       );
       return { facet: 'all', enrichments };
     } catch (err) {
       logger.warn(
-        { err, failure: failureKind(err), querySnippet: query.slice(0, 50) },
+        { err, failure: failureKind(err) },
         'resolveSecondaryAll: secondary enrichment failed — returning empty enrichments',
       );
       return { facet: 'all', enrichments: {} };
@@ -581,14 +549,17 @@ export class AttachmentSearchResultAggregator {
   }
 
   private async doResolveSecondaryAll(
-    query: string,
-    viewer: AttachmentSearchViewer,
+    split: SplitInput,
     primaryIds: string[],
   ): Promise<IResolvedSecondaryResult['enrichments']> {
-    // The ids come from the client: re-check them for this viewer
+    if (!hasPositiveKeyword(split.keywords)) {
+      return {};
+    }
+
+    // The ids come from the client: re-check them for this viewer and query
     const visiblePageIds = await this.findVisiblePageIds(
       primaryIds,
-      viewer,
+      split,
       this.SECONDARY_TIMEOUT_MS,
     );
     const validIds = primaryIds.filter((id) => visiblePageIds.has(id));
@@ -597,9 +568,11 @@ export class AttachmentSearchResultAggregator {
       return {};
     }
 
-    const searchBody = buildAttachmentsByPageIdsQuery(query, validIds, {
-      highlight: true,
-    });
+    const searchBody = buildAttachmentsByPageIdsQuery(
+      split.keywords,
+      validIds,
+      { highlight: true },
+    );
     const attachmentResponse =
       await this.attachmentClient.searchAttachments(searchBody);
 

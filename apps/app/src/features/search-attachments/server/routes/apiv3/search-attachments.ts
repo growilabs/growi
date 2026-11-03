@@ -9,8 +9,9 @@
  *   pageIds  — comma-separated page IDs (required, 1–20 distinct elements)
  *
  * The ids come from the client, so each one is re-checked against the
- * requesting user (guest when not logged in); ids the user cannot read, or
- * that do not exist, produce no enrichment.
+ * requesting user (guest when not logged in) and the query's operators; ids
+ * the user cannot read, that the query excludes, or that do not exist produce
+ * no enrichment.
  *
  * Error responses:
  *   400  — pageIds missing, empty, or more than 20 distinct elements
@@ -20,9 +21,9 @@
 import type { IUserHasId } from '@growi/core';
 import express from 'express';
 
-import type { AttachmentSearchResultAggregator } from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import type { AttachmentSearchViewer } from '~/features/search-attachments/server/services/search-accessible-pages';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import type SearchService from '~/server/service/search';
 import loggerFactory from '~/utils/logger';
 
 import { resolveAttachmentSearchViewer } from '../../services/resolve-attachment-search-viewer';
@@ -63,12 +64,12 @@ function parsePageIds(raw: unknown): string[] {
  * Creates an Express router for the search-attachments secondary enrichment
  * endpoint.
  *
- * @param aggregator                — AttachmentSearchResultAggregator instance
+ * @param searchService             — parses the query and resolves the enrichment
  * @param isSearchServiceConfigured — returns true when Elasticsearch is configured
  * @param resolveViewer             — resolves the requesting user and their groups
  */
 export function createSearchAttachmentsRouter(
-  aggregator: AttachmentSearchResultAggregator,
+  searchService: Pick<SearchService, 'resolveAttachmentSecondary'>,
   _isSearchServiceConfigured: () => boolean,
   resolveViewer: (
     user: IUserHasId | null | undefined,
@@ -79,7 +80,7 @@ export function createSearchAttachmentsRouter(
   /**
    * GET /
    *
-   * Delegates to AttachmentSearchResultAggregator.resolveSecondary and
+   * Delegates to SearchService.resolveAttachmentSecondary and
    * returns enrichment data keyed by pageId.
    */
   router.get(
@@ -119,10 +120,11 @@ export function createSearchAttachmentsRouter(
 
       try {
         const viewer = await resolveViewer(req.user);
-        const result = await aggregator.resolveSecondary(q, viewer, {
-          facet: 'all',
-          primaryIds: pageIds,
-        });
+        const result = await searchService.resolveAttachmentSecondary(
+          q,
+          viewer,
+          { primaryIds: pageIds },
+        );
 
         return res.apiv3(result);
       } catch (err) {

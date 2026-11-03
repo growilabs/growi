@@ -8,8 +8,10 @@ import type { SearchQuery } from '~/server/service/search-delegator/elasticsearc
 
 import {
   createSearchAccessiblePages,
+  type FindSnippetVisiblePageIdsFn,
   type PageIndexSearchFn,
   type PageIndexSearchResponse,
+  type PageSearchFilter,
 } from './search-accessible-pages';
 
 const ownerId = new mongoose.Types.ObjectId().toString();
@@ -44,10 +46,35 @@ const response = (
   ...extra,
 });
 
+const NO_FILTER: PageSearchFilter = {
+  terms: {
+    prefix: [],
+    not_prefix: [],
+    tag: [],
+    not_tag: [],
+    author: [],
+    not_author: [],
+    editor: [],
+    not_editor: [],
+    group: [],
+    not_group: [],
+  },
+  resolvedFilterData: { groupIds: [], notGroupIds: [] },
+};
+
+// MongoDB agrees with the page index unless a test says otherwise.
+const mongoAllowsAll: FindSnippetVisiblePageIdsFn = async (ids) => new Set(ids);
+
 const makeDelegator = () => {
   const delegator =
     mock<
-      Pick<ElasticsearchDelegator, 'createSearchQuery' | 'filterPagesByViewer'>
+      Pick<
+        ElasticsearchDelegator,
+        | 'createSearchQuery'
+        | 'appendCriteriaForQueryString'
+        | 'appendCriteriaForGroupFilter'
+        | 'filterPagesByViewer'
+      >
     >();
   delegator.createSearchQuery.mockImplementation(
     (): SearchQuery => ({
@@ -56,14 +83,29 @@ const makeDelegator = () => {
       body: { query: { bool: {} } },
     }),
   );
-  delegator.filterPagesByViewer.mockImplementation((query) => {
+  delegator.appendCriteriaForQueryString.mockImplementation((query, terms) => {
     const bool = query.body?.query?.bool;
     if (bool != null) {
-      Object.assign(bool, { filter: [{ term: { viewer: 'filter' } }] });
+      Object.assign(bool, {
+        filter: [{ term: { operators: terms.prefix.join(',') } }],
+        must_not: [{ term: { not_prefix: terms.not_prefix.join(',') } }],
+      });
+    }
+  });
+  delegator.filterPagesByViewer.mockImplementation((query) => {
+    const bool = query.body?.query?.bool;
+    if (bool != null && Array.isArray(bool.filter)) {
+      bool.filter.push({ term: { viewer: 'filter' } });
     }
   });
   return delegator;
 };
+
+const gate = (
+  delegator: ReturnType<typeof makeDelegator>,
+  search: PageIndexSearchFn,
+  findSnippetVisiblePageIds: FindSnippetVisiblePageIdsFn = mongoAllowsAll,
+) => createSearchAccessiblePages(delegator, search, findSnippetVisiblePageIds);
 
 describe('createSearchAccessiblePages', () => {
   it('applies the shared page-search viewer filter and restricts to the requested ids', async () => {
@@ -71,10 +113,14 @@ describe('createSearchAccessiblePages', () => {
     const search = vi.fn<PageIndexSearchFn>().mockResolvedValue(response([]));
     const userGroups = [groupId];
 
-    await createSearchAccessiblePages(delegator, search)(['p1', 'p2', 'p1'], {
-      user: owner,
-      userGroups,
-    });
+    await gate(delegator, search)(
+      ['p1', 'p2', 'p1'],
+      {
+        user: owner,
+        userGroups,
+      },
+      NO_FILTER,
+    );
 
     expect(delegator.filterPagesByViewer).toHaveBeenCalledWith(
       expect.anything(),
@@ -96,10 +142,14 @@ describe('createSearchAccessiblePages', () => {
     const delegator = makeDelegator();
     const search = vi.fn<PageIndexSearchFn>().mockResolvedValue(response([]));
 
-    await createSearchAccessiblePages(delegator, search)(['p1'], {
-      user: null,
-      userGroups: null,
-    });
+    await gate(delegator, search)(
+      ['p1'],
+      {
+        user: null,
+        userGroups: null,
+      },
+      NO_FILTER,
+    );
 
     expect(delegator.filterPagesByViewer).toHaveBeenCalledWith(
       expect.anything(),
@@ -111,9 +161,10 @@ describe('createSearchAccessiblePages', () => {
   it('does not query when no ids are given', async () => {
     const search = vi.fn<PageIndexSearchFn>();
 
-    const result = await createSearchAccessiblePages(makeDelegator(), search)(
+    const result = await gate(makeDelegator(), search)(
       [],
       { user: null, userGroups: null },
+      NO_FILTER,
     );
 
     expect(result).toEqual([]);
@@ -134,9 +185,10 @@ describe('createSearchAccessiblePages', () => {
         ]),
       );
 
-    const result = await createSearchAccessiblePages(makeDelegator(), search)(
+    const result = await gate(makeDelegator(), search)(
       ['public', 'mine', 'others', 'my-group', 'other-group', 'link-only'],
       { user: owner, userGroups: [groupId] },
+      NO_FILTER,
     );
 
     expect(result.map((p) => p.pageId)).toEqual(['public', 'mine', 'my-group']);
@@ -152,9 +204,10 @@ describe('createSearchAccessiblePages', () => {
       .fn<PageIndexSearchFn>()
       .mockResolvedValue(response([hit('p1', PageGrant.GRANT_PUBLIC)]));
 
-    const result = await createSearchAccessiblePages(makeDelegator(), search)(
+    const result = await gate(makeDelegator(), search)(
       ['p1', 'missing'],
       { user: null, userGroups: null },
+      NO_FILTER,
     );
 
     expect(result.map((p) => p.pageId)).toEqual(['p1']);
@@ -168,10 +221,14 @@ describe('createSearchAccessiblePages', () => {
     );
 
     await expect(
-      createSearchAccessiblePages(makeDelegator(), search)(['p1'], {
-        user: null,
-        userGroups: null,
-      }),
+      gate(makeDelegator(), search)(
+        ['p1'],
+        {
+          user: null,
+          userGroups: null,
+        },
+        NO_FILTER,
+      ),
     ).rejects.toThrow(/shard/);
   });
 
@@ -183,10 +240,14 @@ describe('createSearchAccessiblePages', () => {
       );
 
     await expect(
-      createSearchAccessiblePages(makeDelegator(), search)(['p1'], {
-        user: null,
-        userGroups: null,
-      }),
+      gate(makeDelegator(), search)(
+        ['p1'],
+        {
+          user: null,
+          userGroups: null,
+        },
+        NO_FILTER,
+      ),
     ).rejects.toThrow(/timed out/);
   });
 
@@ -196,10 +257,117 @@ describe('createSearchAccessiblePages', () => {
       .mockRejectedValue(new Error('connection refused'));
 
     await expect(
-      createSearchAccessiblePages(makeDelegator(), search)(['p1'], {
+      gate(makeDelegator(), search)(
+        ['p1'],
+        {
+          user: null,
+          userGroups: null,
+        },
+        NO_FILTER,
+      ),
+    ).rejects.toThrow('connection refused');
+  });
+
+  it('narrows with the query operators through the page-search builders, never with keyword terms', async () => {
+    const delegator = makeDelegator();
+    const search = vi.fn<PageIndexSearchFn>().mockResolvedValue(response([]));
+    const filter: PageSearchFilter = {
+      terms: { ...NO_FILTER.terms, prefix: ['/team/'], not_prefix: ['/user'] },
+      resolvedFilterData: { groupIds: ['g1'], notGroupIds: [] },
+    };
+
+    await gate(delegator, search)(
+      ['p1'],
+      { user: owner, userGroups: [groupId] },
+      filter,
+    );
+
+    const appliedTerms =
+      delegator.appendCriteriaForQueryString.mock.calls[0][1];
+    expect(appliedTerms).toMatchObject({
+      match: [],
+      not_match: [],
+      phrase: [],
+      not_phrase: [],
+      prefix: ['/team/'],
+      not_prefix: ['/user'],
+    });
+    expect(delegator.appendCriteriaForGroupFilter).toHaveBeenCalledWith(
+      expect.anything(),
+      appliedTerms,
+      filter.resolvedFilterData,
+    );
+    const sent = JSON.stringify(search.mock.calls[0][0].query);
+    expect(sent).toContain('"operators":"/team/"');
+    expect(sent).toContain('"not_prefix":"/user"');
+    expect(sent).toContain('"viewer":"filter"');
+  });
+
+  describe('MongoDB check', () => {
+    it('drops a page the page index allows but whose MongoDB document does not', async () => {
+      const search = vi
+        .fn<PageIndexSearchFn>()
+        .mockResolvedValue(
+          response([
+            hit('fresh', PageGrant.GRANT_PUBLIC),
+            hit('stale', PageGrant.GRANT_PUBLIC),
+          ]),
+        );
+      const findInMongo = vi
+        .fn<FindSnippetVisiblePageIdsFn>()
+        .mockResolvedValue(new Set(['fresh']));
+
+      const result = await gate(makeDelegator(), search, findInMongo)(
+        ['fresh', 'stale'],
+        { user: owner, userGroups: [groupId] },
+        NO_FILTER,
+      );
+
+      expect(result.map((p) => p.pageId)).toEqual(['fresh']);
+      expect(findInMongo).toHaveBeenCalledWith(['fresh', 'stale'], {
+        user: owner,
+        userGroups: [groupId],
+      });
+    });
+
+    it('asks MongoDB only about pages the page index allowed', async () => {
+      const search = vi
+        .fn<PageIndexSearchFn>()
+        .mockResolvedValue(
+          response([
+            hit('public', PageGrant.GRANT_PUBLIC),
+            hit('link-only', PageGrant.GRANT_RESTRICTED),
+          ]),
+        );
+      const findInMongo = vi.fn<FindSnippetVisiblePageIdsFn>(mongoAllowsAll);
+
+      await gate(makeDelegator(), search, findInMongo)(
+        ['public', 'link-only', '*'],
+        { user: null, userGroups: null },
+        NO_FILTER,
+      );
+
+      expect(findInMongo).toHaveBeenCalledWith(['public'], {
         user: null,
         userGroups: null,
-      }),
-    ).rejects.toThrow('connection refused');
+      });
+    });
+
+    it('rejects when the MongoDB lookup fails', async () => {
+      const search = vi
+        .fn<PageIndexSearchFn>()
+        .mockResolvedValue(response([hit('p1', PageGrant.GRANT_PUBLIC)]));
+      const findInMongo = vi
+        .fn<FindSnippetVisiblePageIdsFn>()
+        .mockRejectedValue(new Error('mongo down'));
+
+      await expect(
+        gate(makeDelegator(), search, findInMongo)(
+          ['p1'],
+          { user: null, userGroups: null },
+          NO_FILTER,
+        ),
+      ).rejects.toThrow('mongo down');
+    });
   });
 });

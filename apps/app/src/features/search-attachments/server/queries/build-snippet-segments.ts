@@ -1,9 +1,14 @@
 import type { ISnippetSegment } from '../../interfaces/attachment-search';
+import {
+  ATTACHMENT_HIGHLIGHT_POST_TAG as CLOSE,
+  ATTACHMENT_HIGHLIGHT_PRE_TAG as OPEN,
+} from './attachment-keyword-query';
 
 /**
  * Parses an ES highlighter fragment string into ISnippetSegment[].
  *
- * Only lowercase `<em>...</em>` tags mark highlighted text; everything else
+ * Only the markers the attachment search requests from the ES highlighter
+ * (lowercase `<em>...</em>`) mark highlighted text; everything else
  * (including `<script>`, `<img onerror=...>`, uppercase `<EM>`) is kept as
  * verbatim text in a plain segment. React text nodes auto-escape this content,
  * so consumers are XSS-safe as long as they never pass the text through
@@ -23,7 +28,7 @@ export function buildSnippetSegments(fragment: string): ISnippetSegment[] {
   let remaining = fragment;
 
   while (remaining.length > 0) {
-    const emStart = remaining.indexOf('<em>');
+    const emStart = remaining.indexOf(OPEN);
 
     if (emStart === -1) {
       // No more <em> tags — everything left is plain text.
@@ -36,15 +41,14 @@ export function buildSnippetSegments(fragment: string): ISnippetSegment[] {
       segments.push({ text: remaining.slice(0, emStart), highlighted: false });
     }
 
-    // Advance past the opening `<em>` (4 characters).
-    const afterOpen = remaining.slice(emStart + 4);
+    const afterOpen = remaining.slice(emStart + OPEN.length);
 
-    const emEnd = afterOpen.indexOf('</em>');
+    const emEnd = afterOpen.indexOf(CLOSE);
 
     if (emEnd === -1) {
       // No closing `</em>` — treat the whole `<em>...` as plain text.
       // Re-include the `<em>` tag so the content is not silently dropped.
-      segments.push({ text: '<em>' + afterOpen, highlighted: false });
+      segments.push({ text: OPEN + afterOpen, highlighted: false });
       break;
     }
 
@@ -52,8 +56,7 @@ export function buildSnippetSegments(fragment: string): ISnippetSegment[] {
     const highlightedText = afterOpen.slice(0, emEnd);
     segments.push({ text: highlightedText, highlighted: true });
 
-    // Advance past `</em>` (5 characters) and continue.
-    remaining = afterOpen.slice(emEnd + 5);
+    remaining = afterOpen.slice(emEnd + CLOSE.length);
   }
 
   // Drop zero-length segments that arise from adjacent <em> tags or boundary conditions.

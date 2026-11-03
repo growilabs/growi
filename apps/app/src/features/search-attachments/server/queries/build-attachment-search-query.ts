@@ -4,20 +4,14 @@
  * via the page index lookup in the aggregator layer.
  */
 
+import {
+  buildAttachmentHighlight,
+  buildAttachmentKeywordClauses,
+} from './attachment-keyword-query';
+import type { AttachmentKeywordTerms } from './split-query-terms';
+
 const DEFAULT_SIZE = 20;
 const DEFAULT_FROM = 0;
-
-/**
- * Fields to search in the attachments index.
- * Includes multi-language sub-fields for content and name fields.
- */
-const ATTACHMENT_SEARCH_FIELDS = [
-  'content',
-  'content.ja',
-  'content.en',
-  'fileName',
-  'originalName',
-];
 
 export type BuildAttachmentSearchQueryOptions = {
   highlight?: boolean;
@@ -27,13 +21,14 @@ export type BuildAttachmentSearchQueryOptions = {
 
 /**
  * Build an Elasticsearch request body for a full-text search against the attachments index.
+ * The hit count is not tracked: it counts hits before the permission check.
  *
- * @param keyword - The search keyword string
+ * @param keywords - The keyword part of the parsed query (operators excluded)
  * @param options - Optional: highlight, size, from
  * @returns A full ES request body (query, highlight, size, from)
  */
 export function buildAttachmentSearchQuery(
-  keyword: string,
+  keywords: AttachmentKeywordTerms,
   options: BuildAttachmentSearchQueryOptions = {},
 ): Record<string, unknown> {
   const {
@@ -43,47 +38,14 @@ export function buildAttachmentSearchQuery(
   } = options;
 
   const body: Record<string, unknown> = {
-    query: {
-      bool: {
-        must: [
-          {
-            multi_match: {
-              query: keyword,
-              type: 'most_fields',
-              fields: ATTACHMENT_SEARCH_FIELDS,
-            },
-          },
-        ],
-      },
-    },
+    query: { bool: buildAttachmentKeywordClauses(keywords) },
     size,
     from,
+    track_total_hits: false,
   };
 
   if (highlight) {
-    body.highlight = {
-      fragmenter: 'simple',
-      pre_tags: ["<em class='highlighted-keyword'>"],
-      post_tags: ['</em>'],
-      fields: {
-        content: {
-          fragment_size: 40,
-        },
-        'content.ja': {
-          fragment_size: 40,
-        },
-        'content.en': {
-          fragment_size: 40,
-        },
-        fileName: {
-          fragment_size: 80,
-        },
-        originalName: {
-          fragment_size: 80,
-        },
-      },
-      max_analyzed_offset: 1000000 - 1,
-    };
+    body.highlight = buildAttachmentHighlight();
   }
 
   return body;

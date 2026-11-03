@@ -1,7 +1,6 @@
 import type { estypes as ES8types } from '@elastic/elasticsearch8';
 import type { estypes as ES9types } from '@elastic/elasticsearch9';
 
-import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import type SearchService from '~/server/service/search';
 import {
   type ElasticsearchClientDelegator,
@@ -12,8 +11,8 @@ import {
 import {
   type AttachmentSearchResponse,
   AttachmentSearchResultAggregator,
-  type PageSearchFn,
 } from './attachment-search-result-aggregator';
+import { createFindSnippetVisiblePageIds } from './find-snippet-visible-page-ids';
 import {
   createSearchAccessiblePages,
   type PageIndexSearchResponse,
@@ -40,7 +39,7 @@ const searchWithTopLevelParams = (
 export type CreateAttachmentSearchResultAggregatorArgs = {
   searchService: Pick<
     SearchService,
-    'searchKeyword' | 'fullTextSearchDelegator'
+    'searchFormattedPages' | 'fullTextSearchDelegator' | 'canShowSnippet'
   >;
   esClient: ElasticsearchClientDelegator;
   attachmentIndexName: string;
@@ -55,22 +54,6 @@ export const createAttachmentSearchResultAggregator = ({
   primaryTimeoutMs,
   secondaryTimeoutMs,
 }: CreateAttachmentSearchResultAggregatorArgs): AttachmentSearchResultAggregator => {
-  // The page list comes from the regular page search pipeline for the same viewer.
-  const pageSearchFn: PageSearchFn = async (
-    keyword,
-    viewer,
-    { from, size },
-  ) => {
-    const [result] = await searchService.searchKeyword(
-      keyword,
-      null,
-      viewer.user,
-      viewer.userGroups,
-      { offset: from, limit: size },
-    );
-    return result as ISearchResult<ISearchResultData>;
-  };
-
   const searchAccessiblePages = createSearchAccessiblePages(
     searchService.fullTextSearchDelegator,
     async (params) =>
@@ -78,10 +61,12 @@ export const createAttachmentSearchResultAggregator = ({
         esClient,
         params,
       )) as PageIndexSearchResponse,
+    createFindSnippetVisiblePageIds(searchService),
   );
 
+  // The page list comes from the regular page search pipeline for the same viewer.
   return new AttachmentSearchResultAggregator(
-    pageSearchFn,
+    (input, options) => searchService.searchFormattedPages(input, options),
     {
       searchAttachments: async (body) =>
         (await searchWithTopLevelParams(esClient, {

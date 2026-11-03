@@ -1,14 +1,23 @@
 import type { IUserHasId } from '@growi/core';
+import mongoose from 'mongoose';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
-import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
+import type {
+  IFormattedSearchResult,
+  IPageWithSearchMeta,
+} from '~/interfaces/search';
+import type { QueryTerms } from '~/server/interfaces/search';
 
 import {
+  type AttachmentEsHit,
   type AttachmentIndexClient,
+  type AttachmentSearchInput,
   type AttachmentSearchResponse,
   AttachmentSearchResultAggregator,
+  type IPrimarySearchResult,
   type PageSearchFn,
 } from './attachment-search-result-aggregator';
+import { WINDOW_CAP } from './collect-visible-attachment-hits';
 import type {
   AccessiblePage,
   AttachmentSearchViewer,
@@ -34,43 +43,116 @@ const viewer: AttachmentSearchViewer = {
 };
 const guest: AttachmentSearchViewer = { user: null, userGroups: null };
 
-const makePageSearchResult = (
-  pageIds: string[],
-): ISearchResult<ISearchResultData> => ({
-  meta: { total: pageIds.length, took: 5, hitsCount: pageIds.length },
-  data: pageIds.map((id) => ({
-    _id: id,
-    _score: 1.0,
-    _source: { path: `/page/${id}` },
-    _highlight: { body: [`snippet for ${id}`], path: [`/page/${id}`] },
-  })),
+const EMPTY_TERMS: QueryTerms = {
+  match: [],
+  not_match: [],
+  phrase: [],
+  not_phrase: [],
+  prefix: [],
+  not_prefix: [],
+  tag: [],
+  not_tag: [],
+  author: [],
+  not_author: [],
+  editor: [],
+  not_editor: [],
+  group: [],
+  not_group: [],
+};
+
+const inputFor = (
+  who: AttachmentSearchViewer,
+  terms: Partial<QueryTerms> = { match: ['keyword'] },
+): AttachmentSearchInput => ({
+  queryString: 'keyword',
+  terms: { ...EMPTY_TERMS, ...terms },
+  resolvedFilterData: { groupIds: [], notGroupIds: [] },
+  viewer: who,
+});
+
+const NO_FILTER = {
+  terms: {
+    prefix: [],
+    not_prefix: [],
+    tag: [],
+    not_tag: [],
+    author: [],
+    not_author: [],
+    editor: [],
+    not_editor: [],
+    group: [],
+    not_group: [],
+  },
+  resolvedFilterData: { groupIds: [], notGroupIds: [] },
+};
+
+// Formatted page items carry Mongo ids (ObjectId), as formatSearchResult returns them.
+const objectIds: Record<string, mongoose.Types.ObjectId> = {};
+const oid = (name: string): mongoose.Types.ObjectId => {
+  objectIds[name] ??= new mongoose.Types.ObjectId();
+  return objectIds[name];
+};
+const idOf = (name: string): string => oid(name).toString();
+const nameOf = (id: unknown): string =>
+  Object.entries(objectIds).find(([, o]) => o.toString() === String(id))?.[0] ??
+  String(id);
+
+const makePageSearchResult = (names: string[]): IFormattedSearchResult => ({
+  meta: { total: 42, took: 5, hitsCount: names.length },
+  data: names.map(
+    (name): IPageWithSearchMeta => ({
+      data: { _id: oid(name), path: `/${name}` } as never,
+      meta: {
+        bookmarkCount: 0,
+        elasticSearchResult: {
+          snippet: `formatted snippet of ${name}`,
+          highlightedPath: null,
+        },
+      },
+    }),
+  ),
+});
+
+const esHit = (pageId: string, attachmentId: string): AttachmentEsHit => ({
+  _id: `${attachmentId}_1`,
+  _score: 0.9,
+  _source: {
+    attachmentId,
+    pageId,
+    fileName: `${attachmentId}.pdf`,
+    originalName: `${attachmentId}.pdf`,
+    fileFormat: 'application/pdf',
+    fileSize: 1024,
+    pageNumber: 1,
+    label: null,
+  },
+  highlight: { content: ['<em>matching</em> content'] },
 });
 
 const makeAttachmentResponse = (
   hits: Array<{ pageId: string; attachmentId: string }>,
 ): AttachmentSearchResponse => ({
   hits: {
-    total: { value: hits.length },
-    hits: hits.map(({ pageId, attachmentId }) => ({
-      _id: `${attachmentId}_1`,
-      _score: 0.9,
-      _source: {
-        attachmentId,
-        pageId,
-        fileName: `${attachmentId}.pdf`,
-        originalName: `${attachmentId}.pdf`,
-        fileFormat: 'application/pdf',
-        fileSize: 1024,
-        pageNumber: 1,
-        label: null,
-      },
-      highlight: { content: ['<em>matching</em> content'] },
-    })),
+    hits: hits.map(({ pageId, attachmentId }) => esHit(pageId, attachmentId)),
   },
 });
 
+// Serves the requested from/size slice of the hits, like Elasticsearch.
+const serveHits =
+  (hits: AttachmentEsHit[]) =>
+  async (body: Record<string, unknown>): Promise<AttachmentSearchResponse> => {
+    const from = Number(body.from ?? 0);
+    const size = Number(body.size ?? 20);
+    return { hits: { hits: hits.slice(from, from + size) } };
+  };
+
 const accessible = (...pageIds: string[]): AccessiblePage[] =>
   pageIds.map((pageId) => ({ pageId, path: `/${pageId}`, updatedAt: null }));
+
+const accessibleAmong =
+  (visible: (pageId: string) => boolean) =>
+  async (pageIds: readonly string[]): Promise<AccessiblePage[]> =>
+    accessible(...pageIds.filter(visible));
 
 const delayed = <T>(value: T, ms: number): Promise<T> =>
   new Promise((resolve) => {
@@ -78,15 +160,13 @@ const delayed = <T>(value: T, ms: number): Promise<T> =>
   });
 
 const attachmentIdsOf = (
-  items: Awaited<
-    ReturnType<AttachmentSearchResultAggregator['searchPrimary']>
-  >['items'],
+  items: IPageWithSearchMeta[],
 ): Record<string, string[]> =>
   Object.fromEntries(
     items
       .filter((i) => i.meta?.attachmentHits != null)
       .map((i) => [
-        i.data._id,
+        nameOf(i.data._id),
         (i.meta?.attachmentHits ?? []).map((h) => h.attachmentId),
       ]),
   );
@@ -108,75 +188,121 @@ describe('AttachmentSearchResultAggregator', () => {
   });
 
   describe('searchPrimary facet=pages', () => {
-    it('runs only the page search for the viewer and never touches attachments', async () => {
-      pageSearchFn.mockResolvedValue(makePageSearchResult(['page1', 'page2']));
+    it('returns the formatted page search result as is and never touches attachments', async () => {
+      const pageResult = makePageSearchResult(['page1', 'page2']);
+      pageSearchFn.mockResolvedValue(pageResult);
+      const input = inputFor(viewer);
 
-      const result = await makeAggregator().searchPrimary('keyword', viewer, {
+      const result = await makeAggregator().searchPrimary(input, {
         facet: 'pages',
         from: 0,
         size: 20,
       });
 
-      expect(pageSearchFn).toHaveBeenCalledWith('keyword', viewer, {
-        from: 0,
-        size: 20,
-      });
+      expect(pageSearchFn).toHaveBeenCalledWith(input, { from: 0, size: 20 });
       expect(client.searchAttachments).not.toHaveBeenCalled();
       expect(client.searchAccessiblePages).not.toHaveBeenCalled();
       expect(result.primarySlot).toBe('pages');
-      expect(result.items.map((i) => i.data._id)).toEqual(['page1', 'page2']);
-      expect(result.meta.total).toBe(2);
+      expect(result.items).toEqual(pageResult.data);
+      expect(result.meta.total).toBe(42);
     });
   });
 
   describe('searchPrimary facet=all, from=0', () => {
-    it('embeds attachment hits only for primary pages the viewer may see', async () => {
-      pageSearchFn.mockResolvedValue(
-        makePageSearchResult(['page1', 'page2', 'listed-but-hidden']),
-      );
+    it('embeds attachment hits only for primary pages the viewer may see, keeping the formatted page items', async () => {
+      const pageResult = makePageSearchResult([
+        'page1',
+        'page2',
+        'listed-but-hidden',
+      ]);
+      pageSearchFn.mockResolvedValue(pageResult);
       client.searchAttachments.mockResolvedValue(
         makeAttachmentResponse([
-          { pageId: 'page1', attachmentId: 'att1' },
-          { pageId: 'listed-but-hidden', attachmentId: 'att-hidden' },
-          { pageId: 'not-in-primary', attachmentId: 'att-other' },
+          { pageId: idOf('page1'), attachmentId: 'att1' },
+          { pageId: idOf('listed-but-hidden'), attachmentId: 'att-hidden' },
+          { pageId: idOf('not-in-primary'), attachmentId: 'att-other' },
         ]),
       );
-      client.searchAccessiblePages.mockResolvedValue(accessible('page1'));
+      client.searchAccessiblePages.mockResolvedValue(accessible(idOf('page1')));
 
-      const result = await makeAggregator().searchPrimary('keyword', viewer, {
+      const result = await makeAggregator().searchPrimary(inputFor(viewer), {
         facet: 'all',
         from: 0,
         size: 20,
       });
 
       expect(client.searchAccessiblePages).toHaveBeenCalledWith(
-        ['page1', 'listed-but-hidden'],
+        [idOf('page1'), idOf('listed-but-hidden')],
         viewer,
+        NO_FILTER,
       );
-      expect(result.items.map((i) => i.data._id)).toEqual([
-        'page1',
-        'page2',
-        'listed-but-hidden',
-      ]);
+      expect(result.items.map((i) => i.data)).toEqual(
+        pageResult.data.map((i) => i.data),
+      );
+      expect(result.items.map((i) => i.meta?.elasticSearchResult)).toEqual(
+        pageResult.data.map((i) => i.meta?.elasticSearchResult),
+      );
       expect(attachmentIdsOf(result.items)).toEqual({ page1: ['att1'] });
+      expect(result.meta.total).toBe(42);
       expect(result.facet).toBe('all');
       expect(result.primarySlot).toBe('pages');
     });
 
-    it('keeps the page results but drops every attachment hit when the permission check fails', async () => {
+    it('matches attachment content with the keyword terms only and checks the operators on the parent page', async () => {
       pageSearchFn.mockResolvedValue(makePageSearchResult(['page1']));
       client.searchAttachments.mockResolvedValue(
-        makeAttachmentResponse([{ pageId: 'page1', attachmentId: 'att1' }]),
+        makeAttachmentResponse([{ pageId: idOf('page1'), attachmentId: 'a' }]),
       );
-      client.searchAccessiblePages.mockRejectedValue(new Error('es down'));
+      client.searchAccessiblePages.mockResolvedValue(accessible(idOf('page1')));
+      const input = inputFor(viewer, {
+        match: ['minutes'],
+        author: ['jim'],
+        not_prefix: ['/user'],
+      });
 
-      const result = await makeAggregator().searchPrimary('keyword', viewer, {
+      await makeAggregator().searchPrimary(input, {
         facet: 'all',
         from: 0,
         size: 20,
       });
 
-      expect(result.items.map((i) => i.data._id)).toEqual(['page1']);
+      const body = JSON.stringify(client.searchAttachments.mock.calls[0][0]);
+      expect(body).toContain('"query":"minutes"');
+      expect(body).not.toContain('jim');
+      expect(body).not.toContain('/user');
+      expect(client.searchAccessiblePages.mock.calls[0][2]).toEqual({
+        terms: { ...NO_FILTER.terms, author: ['jim'], not_prefix: ['/user'] },
+        resolvedFilterData: input.resolvedFilterData,
+      });
+    });
+
+    it('does not search attachments for an operator-only query', async () => {
+      pageSearchFn.mockResolvedValue(makePageSearchResult(['page1']));
+
+      const result = await makeAggregator().searchPrimary(
+        inputFor(viewer, { author: ['jim'] }),
+        { facet: 'all', from: 0, size: 20 },
+      );
+
+      expect(client.searchAttachments).not.toHaveBeenCalled();
+      expect(result.items.map((i) => nameOf(i.data._id))).toEqual(['page1']);
+      expect(attachmentIdsOf(result.items)).toEqual({});
+    });
+
+    it('keeps the page results but drops every attachment hit when the permission check fails', async () => {
+      pageSearchFn.mockResolvedValue(makePageSearchResult(['page1']));
+      client.searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([{ pageId: idOf('page1'), attachmentId: 'a' }]),
+      );
+      client.searchAccessiblePages.mockRejectedValue(new Error('es down'));
+
+      const result = await makeAggregator().searchPrimary(inputFor(viewer), {
+        facet: 'all',
+        from: 0,
+        size: 20,
+      });
+
+      expect(result.items.map((i) => nameOf(i.data._id))).toEqual(['page1']);
       expect(attachmentIdsOf(result.items)).toEqual({});
     });
 
@@ -189,17 +315,18 @@ describe('AttachmentSearchResultAggregator', () => {
       client.searchAttachments.mockImplementation(() =>
         delayed(makeAttachmentResponse([]), 200),
       );
+      const input = inputFor(viewer);
 
-      const result = await makeAggregator(50).searchPrimary('keyword', viewer, {
+      const result = await makeAggregator(50).searchPrimary(input, {
         facet: 'all',
         from: 0,
         size: 20,
       });
 
       expect(result.primarySlot).toBe('pages');
-      expect(result.items.map((i) => i.data._id)).toEqual(['page2']);
+      expect(result.items.map((i) => nameOf(i.data._id))).toEqual(['page2']);
       expect(attachmentIdsOf(result.items)).toEqual({});
-      expect(pageSearchFn).toHaveBeenLastCalledWith('keyword', viewer, {
+      expect(pageSearchFn).toHaveBeenLastCalledWith(input, {
         from: 0,
         size: 20,
       });
@@ -210,39 +337,48 @@ describe('AttachmentSearchResultAggregator', () => {
     it('runs only the page search', async () => {
       pageSearchFn.mockResolvedValue(makePageSearchResult(['page3']));
 
-      const result = await makeAggregator().searchPrimary('keyword', viewer, {
+      const result = await makeAggregator().searchPrimary(inputFor(viewer), {
         facet: 'all',
         from: 20,
         size: 20,
       });
 
       expect(client.searchAttachments).not.toHaveBeenCalled();
-      expect(result.items.map((i) => i.data._id)).toEqual(['page3']);
+      expect(result.items.map((i) => nameOf(i.data._id))).toEqual(['page3']);
       expect(attachmentIdsOf(result.items)).toEqual({});
     });
   });
 
   describe('searchPrimary facet=attachments', () => {
+    const primary = (
+      input: AttachmentSearchInput,
+      from = 0,
+      size = 20,
+      timeoutMs?: number,
+    ) =>
+      makeAggregator(timeoutMs).searchPrimary(input, {
+        facet: 'attachments',
+        from,
+        size,
+      });
+
     it('returns hits only for pages the permission check returned, deduplicating the ids it asks about', async () => {
-      client.searchAttachments.mockResolvedValue(
-        makeAttachmentResponse([
-          { pageId: 'page1', attachmentId: 'att1' },
-          { pageId: 'page1', attachmentId: 'att2' },
-          { pageId: 'hidden', attachmentId: 'att3' },
-          { pageId: 'deleted', attachmentId: 'att4' },
+      client.searchAttachments.mockImplementation(
+        serveHits([
+          esHit('page1', 'att1'),
+          esHit('page1', 'att2'),
+          esHit('hidden', 'att3'),
+          esHit('deleted', 'att4'),
         ]),
       );
       client.searchAccessiblePages.mockResolvedValue(accessible('page1'));
 
-      const result = await makeAggregator().searchPrimary('keyword', guest, {
-        facet: 'attachments',
-        from: 0,
-        size: 20,
-      });
+      const result = await primary(inputFor(guest));
 
       expect(client.searchAccessiblePages).toHaveBeenCalledWith(
         ['page1', 'hidden', 'deleted'],
         guest,
+        NO_FILTER,
       );
       expect(attachmentIdsOf(result.items)).toEqual({
         page1: ['att1', 'att2'],
@@ -251,53 +387,147 @@ describe('AttachmentSearchResultAggregator', () => {
       expect(pageSearchFn).not.toHaveBeenCalled();
     });
 
-    it('does not run the permission check when nothing matched', async () => {
-      client.searchAttachments.mockResolvedValue(makeAttachmentResponse([]));
+    it('never reports a hit count and never asks Elasticsearch for one', async () => {
+      client.searchAttachments.mockImplementation(
+        serveHits([esHit('page1', 'a'), esHit('hidden', 'b')]),
+      );
+      client.searchAccessiblePages.mockResolvedValue(accessible('page1'));
 
-      const result = await makeAggregator().searchPrimary('keyword', viewer, {
+      const result = await primary(inputFor(viewer));
+
+      expect(result.meta.total).toBeNull();
+      for (const [body] of client.searchAttachments.mock.calls) {
+        expect(body.track_total_hits).toBe(false);
+      }
+    });
+
+    it('answers a term matching only hidden attachments exactly like a term matching nothing', async () => {
+      const hidden = Array.from({ length: 50 }, (_, i) =>
+        esHit(`hidden${i % 7}`, `att${i}`),
+      );
+      client.searchAccessiblePages.mockImplementation(
+        accessibleAmong(() => false),
+      );
+
+      client.searchAttachments.mockImplementation(serveHits(hidden));
+      const onlyHidden = await primary(inputFor(guest), 0, 2);
+      client.searchAttachments.mockImplementation(serveHits([]));
+      const nothing = await primary(inputFor(guest), 0, 2);
+
+      expect(onlyHidden).toEqual(nothing);
+      expect(onlyHidden).toEqual({
         facet: 'attachments',
-        from: 0,
-        size: 20,
+        primarySlot: 'attachments',
+        items: [],
+        meta: { total: null, primaryResultIncomplete: false },
       });
+    });
+
+    it('returns the same page of visible hits however many hidden hits outrank them', async () => {
+      const visible = Array.from({ length: 6 }, (_, i) =>
+        esHit(`visible${i}`, `v${i}`),
+      );
+      const hiddenFirst = (n: number) => [
+        ...Array.from({ length: n }, (_, i) => esHit(`hidden${i}`, `h${i}`)),
+        ...visible,
+      ];
+      client.searchAccessiblePages.mockImplementation(
+        accessibleAmong((id) => id.startsWith('visible')),
+      );
+
+      const responses: IPrimarySearchResult[] = [];
+      for (const n of [0, 3, 40]) {
+        client.searchAttachments.mockImplementation(serveHits(hiddenFirst(n)));
+        // biome-ignore lint/performance/noAwaitInLoops: responses are compared afterwards
+        responses.push(await primary(inputFor(viewer), 2, 2));
+      }
+
+      expect(responses[0].items.map((i) => i.data._id)).toEqual([
+        'visible2',
+        'visible3',
+      ]);
+      expect(responses[1]).toEqual(responses[0]);
+      expect(responses[2]).toEqual(responses[0]);
+    });
+
+    it('pages through the visible pages disjointly and in score order', async () => {
+      const hits = [
+        esHit('p0', 'a0'),
+        esHit('hidden', 'h0'),
+        esHit('p1', 'a1'),
+        esHit('p0', 'a2'),
+        esHit('p2', 'a3'),
+        esHit('hidden', 'h1'),
+        esHit('p3', 'a4'),
+        esHit('p4', 'a5'),
+      ];
+      client.searchAttachments.mockImplementation(serveHits(hits));
+      client.searchAccessiblePages.mockImplementation(
+        accessibleAmong((id) => id !== 'hidden'),
+      );
+
+      const pages: string[][] = [];
+      for (const from of [0, 2, 4, 6]) {
+        // biome-ignore lint/performance/noAwaitInLoops: pages are requested one after another
+        const result = await primary(inputFor(viewer), from, 2);
+        pages.push(result.items.map((i) => i.data._id));
+      }
+
+      expect(pages).toEqual([['p0', 'p1'], ['p2', 'p3'], ['p4'], []]);
+    });
+
+    it('stops widening the window at the cap', async () => {
+      const hidden = Array.from({ length: WINDOW_CAP + 50 }, (_, i) =>
+        esHit(`hidden${i}`, `h${i}`),
+      );
+      client.searchAttachments.mockImplementation(
+        serveHits([...hidden, esHit('visible', 'v')]),
+      );
+      client.searchAccessiblePages.mockImplementation(
+        accessibleAmong((id) => id === 'visible'),
+      );
+
+      const result = await primary(inputFor(viewer), 0, 2);
+
+      expect(result.items).toEqual([]);
+      const fetched = client.searchAttachments.mock.calls.reduce(
+        (sum, [body]) => sum + Number(body.size),
+        0,
+      );
+      expect(fetched).toBe(WINDOW_CAP);
+    });
+
+    it('does not search attachments for an operator-only query', async () => {
+      const result = await primary(inputFor(viewer, { tag: ['draft'] }));
+
+      expect(client.searchAttachments).not.toHaveBeenCalled();
+      expect(result.items).toEqual([]);
+      expect(result.meta).toEqual({
+        total: null,
+        primaryResultIncomplete: false,
+      });
+    });
+
+    it('does not run the permission check when nothing matched', async () => {
+      client.searchAttachments.mockImplementation(serveHits([]));
+
+      const result = await primary(inputFor(viewer));
 
       expect(client.searchAccessiblePages).not.toHaveBeenCalled();
       expect(result.items).toEqual([]);
       expect(result.meta.primaryResultIncomplete).toBe(false);
     });
 
-    it('reports primaryResultIncomplete when drops leave fewer than size items after a full over-fetch', async () => {
-      const hits = Array.from({ length: 3 }, (_, i) => ({
-        pageId: `page${i}`,
-        attachmentId: `att${i}`,
-      }));
-      client.searchAttachments.mockResolvedValue(makeAttachmentResponse(hits));
-      client.searchAccessiblePages.mockResolvedValue(accessible('page0'));
-
-      const result = await makeAggregator().searchPrimary('keyword', viewer, {
-        facet: 'attachments',
-        from: 0,
-        size: 2,
-      });
-
-      expect(result.items).toHaveLength(1);
-      expect(result.meta.primaryResultIncomplete).toBe(true);
-    });
-
     it('builds snippet segments from the highlight fragment', async () => {
-      const response = makeAttachmentResponse([
-        { pageId: 'page1', attachmentId: 'att1' },
-      ]);
-      response.hits.hits[0].highlight = {
-        content: ['hello <em>world</em> foo'],
-      };
-      client.searchAttachments.mockResolvedValue(response);
+      const hit = esHit('page1', 'att1');
+      client.searchAttachments.mockImplementation(
+        serveHits([
+          { ...hit, highlight: { content: ['hello <em>world</em> foo'] } },
+        ]),
+      );
       client.searchAccessiblePages.mockResolvedValue(accessible('page1'));
 
-      const result = await makeAggregator().searchPrimary('keyword', viewer, {
-        facet: 'attachments',
-        from: 0,
-        size: 20,
-      });
+      const result = await primary(inputFor(viewer));
 
       expect(result.items[0].meta?.attachmentHits?.[0].snippets).toEqual([
         { text: 'hello ', highlighted: false },
@@ -309,25 +539,24 @@ describe('AttachmentSearchResultAggregator', () => {
     it('returns empty + incomplete when the attachment search times out', async () => {
       client.searchAttachments.mockImplementation(() =>
         delayed(
-          makeAttachmentResponse([{ pageId: 'p1', attachmentId: 'a1' }]),
+          makeAttachmentResponse([{ pageId: 'p1', attachmentId: 'a' }]),
           200,
         ),
       );
 
-      const result = await makeAggregator(50).searchPrimary('keyword', viewer, {
-        facet: 'attachments',
-        from: 0,
-        size: 20,
-      });
+      const result = await primary(inputFor(viewer), 0, 20, 50);
 
       expect(result.items).toEqual([]);
-      expect(result.meta.primaryResultIncomplete).toBe(true);
+      expect(result.meta).toEqual({
+        total: null,
+        primaryResultIncomplete: true,
+      });
     });
 
     describe('fail-close when the permission check does not succeed', () => {
       beforeEach(() => {
-        client.searchAttachments.mockResolvedValue(
-          makeAttachmentResponse([{ pageId: 'page1', attachmentId: 'att1' }]),
+        client.searchAttachments.mockImplementation(
+          serveHits([esHit('page1', 'att1')]),
         );
       });
 
@@ -336,11 +565,7 @@ describe('AttachmentSearchResultAggregator', () => {
           new Error('The page index search had 1 failed shard(s)'),
         );
 
-        const result = await makeAggregator().searchPrimary('keyword', viewer, {
-          facet: 'attachments',
-          from: 0,
-          size: 20,
-        });
+        const result = await primary(inputFor(viewer));
 
         expect(result.items).toEqual([]);
         expect(result.meta.primaryResultIncomplete).toBe(true);
@@ -355,11 +580,7 @@ describe('AttachmentSearchResultAggregator', () => {
           delayed(accessible('page1'), 200),
         );
 
-        const result = await makeAggregator(50).searchPrimary(
-          'keyword',
-          viewer,
-          { facet: 'attachments', from: 0, size: 20 },
-        );
+        const result = await primary(inputFor(viewer), 0, 20, 50);
 
         expect(result.items).toEqual([]);
         expect(loggerWarn).toHaveBeenCalledWith(
@@ -369,19 +590,12 @@ describe('AttachmentSearchResultAggregator', () => {
       });
 
       it('keeps only the pages that a partial answer returned', async () => {
-        client.searchAttachments.mockResolvedValue(
-          makeAttachmentResponse([
-            { pageId: 'page1', attachmentId: 'att1' },
-            { pageId: 'page2', attachmentId: 'att2' },
-          ]),
+        client.searchAttachments.mockImplementation(
+          serveHits([esHit('page1', 'att1'), esHit('page2', 'att2')]),
         );
         client.searchAccessiblePages.mockResolvedValue(accessible('page2'));
 
-        const result = await makeAggregator().searchPrimary('keyword', viewer, {
-          facet: 'attachments',
-          from: 0,
-          size: 20,
-        });
+        const result = await primary(inputFor(viewer));
 
         expect(attachmentIdsOf(result.items)).toEqual({ page2: ['att2'] });
       });
@@ -390,7 +604,7 @@ describe('AttachmentSearchResultAggregator', () => {
 
   describe('resolveSecondary', () => {
     it('is a no-op for facet=attachments', async () => {
-      const result = await makeAggregator().resolveSecondary('kw', viewer, {
+      const result = await makeAggregator().resolveSecondary(inputFor(viewer), {
         facet: 'attachments',
         primaryIds: ['page1'],
       });
@@ -400,7 +614,7 @@ describe('AttachmentSearchResultAggregator', () => {
       expect(client.searchAttachments).not.toHaveBeenCalled();
     });
 
-    it('re-checks the client-supplied ids for the viewer and searches attachments only for the visible ones', async () => {
+    it('re-checks the client-supplied ids for the viewer and the operators, and searches attachments only for the visible ones', async () => {
       client.searchAccessiblePages.mockResolvedValue(accessible('page1'));
       client.searchAttachments.mockResolvedValue(
         makeAttachmentResponse([
@@ -408,8 +622,9 @@ describe('AttachmentSearchResultAggregator', () => {
           { pageId: 'page1', attachmentId: 'att2' },
         ]),
       );
+      const input = inputFor(guest, { match: ['kw'], tag: ['spec'] });
 
-      const result = await makeAggregator().resolveSecondary('kw', guest, {
+      const result = await makeAggregator().resolveSecondary(input, {
         facet: 'all',
         primaryIds: ['page1', 'forbidden', 'page1', 'no-such-page'],
       });
@@ -417,15 +632,27 @@ describe('AttachmentSearchResultAggregator', () => {
       expect(client.searchAccessiblePages).toHaveBeenCalledWith(
         ['page1', 'forbidden', 'no-such-page'],
         guest,
+        { ...NO_FILTER, terms: { ...NO_FILTER.terms, tag: ['spec'] } },
       );
       const searchBody = JSON.stringify(
         client.searchAttachments.mock.calls[0][0],
       );
       expect(searchBody).toContain('"pageId":["page1"]');
+      expect(searchBody).not.toContain('spec');
       expect(
         result.enrichments.page1?.attachmentHits?.map((h) => h.attachmentId),
       ).toEqual(['att1', 'att2']);
       expect(Object.keys(result.enrichments)).toEqual(['page1']);
+    });
+
+    it('returns nothing for an operator-only query without searching', async () => {
+      const result = await makeAggregator().resolveSecondary(
+        inputFor(viewer, { tag: ['spec'] }),
+        { facet: 'all', primaryIds: ['page1'] },
+      );
+
+      expect(result).toEqual({ facet: 'all', enrichments: {} });
+      expect(client.searchAttachments).not.toHaveBeenCalled();
     });
 
     it('drops a hit for a page the permission check did not return even if the attachment search returns it', async () => {
@@ -437,7 +664,7 @@ describe('AttachmentSearchResultAggregator', () => {
         ]),
       );
 
-      const result = await makeAggregator().resolveSecondary('kw', viewer, {
+      const result = await makeAggregator().resolveSecondary(inputFor(viewer), {
         facet: 'all',
         primaryIds: ['page1', 'forbidden'],
       });
@@ -448,7 +675,7 @@ describe('AttachmentSearchResultAggregator', () => {
     it('returns no enrichments and skips the attachment search when no id is visible', async () => {
       client.searchAccessiblePages.mockResolvedValue([]);
 
-      const result = await makeAggregator().resolveSecondary('kw', viewer, {
+      const result = await makeAggregator().resolveSecondary(inputFor(viewer), {
         facet: 'all',
         primaryIds: ['forbidden'],
       });
@@ -463,7 +690,7 @@ describe('AttachmentSearchResultAggregator', () => {
         makeAttachmentResponse([{ pageId: 'page1', attachmentId: 'att1' }]),
       );
 
-      const result = await makeAggregator().resolveSecondary('kw', viewer, {
+      const result = await makeAggregator().resolveSecondary(inputFor(viewer), {
         facet: 'all',
         primaryIds: ['page1'],
       });
@@ -477,7 +704,7 @@ describe('AttachmentSearchResultAggregator', () => {
         delayed(accessible('page1'), 700),
       );
 
-      const result = await makeAggregator().resolveSecondary('kw', viewer, {
+      const result = await makeAggregator().resolveSecondary(inputFor(viewer), {
         facet: 'all',
         primaryIds: ['page1'],
       });
@@ -494,13 +721,13 @@ describe('AttachmentSearchResultAggregator', () => {
       client.searchAccessiblePages.mockResolvedValue([]);
 
       await expect(
-        makeAggregator().resolveSecondary('kw', viewer, {
+        makeAggregator().resolveSecondary(inputFor(viewer), {
           facet: 'all',
           primaryIds: many,
         }),
       ).rejects.toThrow(RangeError);
       await expect(
-        makeAggregator().resolveSecondary('kw', viewer, {
+        makeAggregator().resolveSecondary(inputFor(viewer), {
           facet: 'all',
           primaryIds: [...many.slice(0, 20), 'page0'],
         }),

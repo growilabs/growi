@@ -3,7 +3,7 @@ import { PageGrant } from '@growi/core';
 import { canShowSnippetForGrant } from './can-show-snippet';
 
 const page = (
-  grant: number,
+  grant: number | null | undefined,
   grantedUserIds: string[] = [],
   grantedGroupIds: string[] = [],
 ) => ({ grant, grantedUserIds, grantedGroupIds });
@@ -14,7 +14,11 @@ const alice = { userId: 'alice', userGroupIds: ['g1'] };
 describe('canShowSnippetForGrant', () => {
   it.each([
     ['public', page(PageGrant.GRANT_PUBLIC), guest, true],
-    ['no grant (legacy)', page(Number.NaN), guest, true],
+    ['no grant (legacy null)', page(null), guest, true],
+    ['no grant (legacy, field missing)', page(undefined), guest, true],
+    ['unknown grant value', page(9), alice, false],
+    ['unknown grant value, guest', page(9), guest, false],
+    ['NaN grant', page(Number.NaN), alice, false],
     ['link-only', page(PageGrant.GRANT_RESTRICTED), alice, false],
     ['owner page, owner', page(PageGrant.GRANT_OWNER, ['alice']), alice, true],
     ['owner page, other', page(PageGrant.GRANT_OWNER, ['bob']), alice, false],
