@@ -25,7 +25,7 @@ const logger = loggerFactory('growi:routes:apiv3:audit-log-bulk-export');
 interface AuditLogExportReqBody {
   filters: {
     usernames?: string[];
-    actions?: SupportedActionType[];
+    actions?: SupportedActionType[] | null;
     dateFrom?: Date;
     dateTo?: Date;
   };
@@ -71,10 +71,18 @@ export const factory = (crowi: Crowi): Router => {
     apiV3FormValidator,
     async (req: AuthorizedRequest, res: ApiV3Response) => {
       const {
-        filters,
+        filters: requestFilters,
         format = AuditLogBulkExportFormat.json,
         restartJob,
       } = req.body;
+
+      // The validator accepts `actions: null`, but Prisma rejects null for the
+      // `actions String[]` composite field (create fails with "Unknown argument
+      // `actions`"). Normalize it to [] before the service.
+      const filters = {
+        ...requestFilters,
+        actions: requestFilters.actions ?? [],
+      };
 
       try {
         const jobId = await auditLogBulkExportService.createOrResetExportJob(

@@ -295,6 +295,30 @@ describe('POST /_api/v3/audit-log-bulk-export', () => {
       expect(res.body?.errors).toBeDefined();
     });
 
+    it.each([
+      ['null', { actions: null }],
+      ['omitted', {}],
+    ])('passes an empty actions array to the service when filters.actions is %s', async (_label, filters) => {
+      createOrReset.mockResolvedValueOnce('job-789');
+
+      const app = buildApp();
+      const res = await request(app)
+        .post('/_api/v3/audit-log-bulk-export')
+        .send({ filters });
+
+      expect(res.status).toBe(201);
+      expect(createOrReset.mock.calls[0][0]).toMatchObject({ actions: [] });
+    });
+
+    it('returns 400 when actions is not an array', async () => {
+      const app = buildApp();
+      const res = await request(app)
+        .post('/_api/v3/audit-log-bulk-export')
+        .send({ filters: { actions: 'PAGE_VIEW' } });
+
+      expect(res.status).toBe(400);
+    });
+
     it('accepts valid request with all optional fields', async () => {
       createOrReset.mockResolvedValueOnce('job-456');
 
