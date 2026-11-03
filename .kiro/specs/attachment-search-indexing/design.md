@@ -392,7 +392,7 @@ sequenceDiagram
 
 **Key decisions**:
 - `primaryIds` (= primary 結果の pageId 配列、常に ≤ ページサイズ 20 件) を caller から受け取る (client 側で保持、API は stateless)
-- secondary の permission 再チェック不要: `primaryIds` は既に viewer filter を通過済みのため
+- secondary も毎回 permission を再確認する: `pageIds` はクライアントが送る値なので、`searchAccessiblePages` (viewer filter と `canShowSnippetForGrant`、MongoDB での確認) を必ず通す
 - terms クエリは常に ≤ 20 件 → `max_terms_count` / `max_clause_count` 懸念なし
 - facet=`pages` は secondary を呼ばない (attachments_index を一切参照しない従来通りの経路)
 
@@ -525,7 +525,7 @@ Key decisions:
 | 7.1 | 再抽出エンドポイント | AttachmentSearchIndexer.reindex | `POST /attachments/:id/reextract` | Flow 4 |
 | 7.2 | 権限ガード | apiv3 middleware (admin OR page editor) | — | — |
 | 7.3 | 無効時 503 | require-search-attachments-enabled middleware | — | — |
-| 7.4 | Outcome レスポンス | apiv3 response shape | `{ outcome: ExtractionOutcome }` | — |
+| 7.4 | Outcome レスポンス | apiv3 response shape | `{ outcome: { kind } }` (抽出テキストは含めない) | — |
 | 8.1 | 失敗ログ pino | AttachmentSearchIndexer + FailureLogService | — | — |
 | 8.2 | 監視メトリクス | OpenTelemetry 既存パイプライン | — | — |
 | 8.3 | Mongo 永続化 + TTL | `extractionfailurelogs` Prisma モデル + TTL index migration | — | — |
@@ -809,7 +809,7 @@ interface IPrimarySearchResult {
   primarySlot: 'pages' | 'attachments';
   items: IPageWithSearchMeta[];            // 優先 slot 駆動、ページサイズに従う
   meta: {
-    total: number | null;                   // null で track_total_hits=false
+    total: number | null;                   // facet=attachments では常に null (権限判定の前の件数を見せない。track_total_hits=false)。primaryResultIncomplete は検索または権限確認が失敗したときだけ true
     nextCursor?: string;                    // search_after カーソル
     primaryResultIncomplete?: boolean;      // facet=attachments で権限・絞り込みによる drop により size 未達
   };
@@ -860,9 +860,9 @@ interface ISecondarySearchResult {
 
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=all\|pages\|attachments&offset=&limit=&resolve=primary\|full` (`facet` 省略時は `pages` = 従来どおり) | 既存の `IFormattedSearchResult` (items に optional `attachmentHits`、meta に optional `facet` / `primaryResultIncomplete` / `nextCursor`) | 既存どおり |
+| GET | /_api/search (既存 apiv1 の拡張) | `?q=&facet=all\|pages\|attachments&offset=&limit=&resolve=primary\|full` (`facet` 省略時は `pages` = 従来どおり。facet を処理するのは機能が有効で `nq` が無いときだけ) | `facet` 省略時は既存の `IFormattedSearchResult`。facet 指定時は `IFacetedSearchResult` (items に optional `attachmentHits`、meta に optional `facet` / `primaryResultIncomplete`。`facet=attachments` の `meta.total` は null) | 既存どおり。facet 指定時は `limit` が 1〜200 の整数、`offset` が 0 以上の整数でなければ `{ ok: false, code: 400 }` (apiv1 の慣習どおり HTTP 200) |
 | GET | /_api/v3/search/attachments | `?q=&pageIds=id1,id2,...` (pageIds は primary 結果の pageId 配列、≤ ページサイズ) | `ISecondarySearchResult` | 400 invalid (pageIds 超過等), 503 feature_disabled |
-| POST | /_api/v3/attachments/:id/reextract | — | `{ outcome: ExtractionOutcome }` | 400 invalid, 403 forbidden, 404 not_found, 503 feature_disabled |
+| POST | /_api/v3/attachments/:id/reextract | — | `{ outcome: { kind } }` (`ReextractResponse`。抽出テキストは返さない) | 400 invalid id, 404 `notfound_or_forbidden` (添付なし・親ページなし・admin でもページ編集者でもない、を区別しない同一応答), 429 (回数制限: 1 分あたり 5 回), 503 `feature_disabled` / `reextract_busy` / `reextract_timeout` (処理が `timeoutMs × 2 + 30 秒` を超えたら枠を解放して返す) |
 | GET | /_api/v3/admin/attachment-search/failures | `?limit=N&since=iso` | `{ items: ExtractionFailure[], total: number }` | 403 forbidden |
 | GET | /_api/v3/admin/attachment-search/config | — | `AttachmentSearchConfig` | 403 forbidden |
 | PUT | /_api/v3/admin/attachment-search/config | `AttachmentSearchConfigUpdate` | `AttachmentSearchConfig` | 400 validation, 403 forbidden |
@@ -874,7 +874,7 @@ interface ISecondarySearchResult {
 
 **`GET /_api/v3/search/attachments` の制約**:
 - `pageIds` は **必須**、要素数の上限はページサイズ (default 20、admin 設定で可変) と一致。超過は 400
-- viewer は session から取得。`pageIds` に対し **permission 再チェックしない** (primary 検索経路で既に viewer filter を通過済み前提)。ただし **pageId 単位で当該ページが現在も存在し viewer が参照可能か** を `searchAccessiblePages` (ids + viewer filter) で検証し、消失/権限失効ページは enrichment 対象から除外 (primary 発行から secondary 発行までの時間差対策)
+- viewer は session から取得する (クライアントから受け取らない)。`pageIds` はクライアントが送る値なので、**毎回** `searchAccessiblePages` (ids + viewer filter + `canShowSnippetForGrant` + MongoDB での確認) で、ページが現在も存在し viewer が見てよいことを検証し、消失・権限のないページは enrichment 対象から除外する
 - 添付検索が無効の場合は 503 feature_disabled (UI が secondary を呼ばない運用が正だが、保険)
 
 `AttachmentSearchConfig` / `AttachmentSearchConfigUpdate` DTO shape (ともに `enabled` / `maxConcurrency` は含まない):
@@ -1205,7 +1205,7 @@ interface IAttachmentHit {
 
 ### Error Strategy
 
-- **User Errors (4xx)**: 再抽出 API の権限不足 (403)、存在しない添付 (404)、機能無効 (503 feature_disabled)、admin config バリデーション (400)
+- **User Errors (4xx)**: 再抽出 API の拒否 (権限不足・存在しない添付・親ページなしは区別のつかない 404 `notfound_or_forbidden`)、機能が無効または同時実行の上限 (503 `feature_disabled` / `reextract_busy`)、admin config バリデーション (400)
 - **System Errors (5xx)**: 抽出サービス到達不可 / ES エラーは apps/app 側で握りつぶし、「検索対象外」として保存を継続 (Req 1)
 - **Extraction-specific errors**: 上流が返す `unsupported_format` / `file_too_large` / `extraction_timeout` / `service_busy` / `file_encrypted` / `resource_limit_exceeded` / `extraction_failed` を `AttachmentTextExtractorService` で `ExtractionOutcome` に統一正規化。`encrypted` と `resourceLimit` も他の失敗と同じく、メタデータだけの文書を登録し ExtractionFailureLog に記録する (Req 2.4 / 8.3)。上流は成功時に `pages[]` を最低 1 要素返す (中身が空の場合あり) ので、画像だけの PDF なども成功として 1 文書が登録される
 - **到達不可**: ネットワーク層 throw を catch して `serviceUnreachable` に畳み込む
@@ -1306,7 +1306,9 @@ interface IAttachmentHit {
 
 - **権限継承 (Option D の核心メリット)**: **添付 ES 文書に権限情報を一切保持しない**。検索時に page_index を viewer filter 付きで lookup して親 Page のアクセス可否を判定し、アクセス不可なページの添付ヒットを app 側で必ず除外する。**権限は単一の真実の源 (page_index) のみから参照されるため、sync drift による snippet 漏洩は構造的に発生しない**。既存 `filterPagesByViewer` と同じ権限モデルを ES 側 (page_index lookup) で適用するため Page 検索との整合も担保される
 - **query-time permission filter の信頼性**: permission lookup が失敗した場合は添付ヒットを全て除外する fail-close 設計 (Error Handling 参照)。閾値超過時 safety net も添付ヒット除外側に倒れるため、レイテンシ悪化が漏洩を生むことはない
-- **admin API アクセス制御**: `/_api/v3/admin/attachment-search/*` は既存 admin middleware に準拠。reextract は admin OR page editor
+- **admin API アクセス制御**: `/_api/v3/admin/attachment-search/*` は `accessTokenParser` + `loginRequiredStrictly` + `adminRequired`。reextract は `accessTokenParser` + `loginRequiredStrictly` + `excludeReadOnlyUser` で、admin またはページを閲覧できる人だけが実行でき (`Page.isAccessiblePageByViewer`)、拒否は区別のつかない 404 に揃える。応答は `kind` だけで抽出テキストを返さない。同じ添付の同時実行 (ID の綴りの大文字小文字を区別せず、DB に保存された ID を鍵にする) はまとめ、同時に実行できる添付は 3 件まで、1 件ごとに総時間の上限があり、回数制限は 1 分あたり 5 回
+- **添付検索のルートの認証**: `GET /_api/search` と `GET /_api/v3/search/attachments` は同じ認証の順 (`accessTokenParser([READ.FEATURES.PAGE], { acceptLegacy: true })` → ゲストの読み取りを許す設定のときだけゲストを通す `loginRequired`) にし、viewer は常にサーバー側で `req.user` から決める。権限判定そのものはゲストの読み取り設定を見ないので、この認証の順に依存する
+- **残存リスク (受け入れ済み、2026-11-03)**: 添付の索引に権限情報を持たせない方式 (Option D) のため、`facet=attachments` の応答時間から、閲覧者に見えない添付の中身に特定の語があるか (語が見えない添付にだけある場合は ES と権限確認の往復が増える。実測の中央値は約 9ms 対 約 32〜38ms) を、多数の検索を送って推測できる。件数 (`total`) と `primaryResultIncomplete` は権限判定の後の情報だけで決めて隠してあり、全体の回数制限 (1 分あたり 500 回) が歩止めになる。対策案 (毎回同じ回数を回す: ES 負荷が約 9 倍、最低応答時間を設ける、`facet=attachments` 専用の回数制限) は採らなかった
 - **extractorUri allowlist (SSRF 防御、最小限)**: admin PUT での URI 受理時に (1) スキーム検証 (`http`/`https` のみ) と (2) クラウドメタデータ endpoint IP literal のピンポイント拒否 (`169.254.169.254` / `fd00:ec2::254` / `100.100.100.200` / `192.0.0.192`) のみを適用。k8s 内部 DNS / loopback / RFC1918 は許可する (正当な k8s / docker-compose デプロイで頻用)。DNS rebinding 対策として実呼び出し時に名前解決結果を再検証し、metadata IP literal に解決された場合のみ reject。admin 乗っ取り時の任意 URL (attacker.com) への添付流出リスクは admin アカウント保護の責務として切り分け、allowlist ではなく Bearer auth + NetworkPolicy で多層防御する設計
 - **Bearer auth (extractorToken)**: 上流抽出サービスへの全リクエストに `Authorization: Bearer` を付与。token は encrypted Config storage に保存し、admin GET API では `hasExtractorToken: boolean` のみ返却 (値は露出しない)。SSR props にも token 値は含めない。401 応答は `serviceUnreachable` に正規化して機能を自動 soft-disable、admin が token 不整合に気付くよう pino ERROR + FailureLog に記録
 - **fire-and-forget 下の可視性**: ハンドラが例外を握りつぶす特性を前提とし、FailureLog 永続化と pino ログを確実に呼ぶ二重経路で失敗を補足

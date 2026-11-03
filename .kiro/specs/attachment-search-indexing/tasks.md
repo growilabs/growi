@@ -160,7 +160,7 @@
   - facet=`pages` は既存 Page 検索経路のみを呼び attachments_index を一切叩かない (完全互換)
   - facet=`all` かつ `from==0` で `_msearch` により page_index (viewer filter 付き) と attachments_index (content only) を並列取得し、解釈 A (primary 20 件と pageId 一致する添付のみを埋め込み、不一致は破棄) を適用する
   - facet=`all` かつ `from>0` では attachments_index を叩かない
-  - facet=`attachments` では attachments_index を優先検索 (over-fetch `size * k`、k=1.5) し、unique pageIds を `mget` permission filter にかけ drop 発生時 `primaryResultIncomplete: true` をメタに返す
+  - facet=`attachments` では attachments_index を優先検索 (over-fetch `size * k`、k=1.5) し、unique pageIds を `searchAccessiblePages` (page_index の viewer filter + 検索演算子 + `canShowSnippetForGrant` + MongoDB での権限確認) にかけ、見てよいページの添付ヒットだけを点数順に並べる。窓は `ceil((from+size)×1.5)` 件から始め、足りなければ倍に広げて最大 200 件・最大 9 回まで。`meta.total` は常に null、`primaryResultIncomplete` は検索または権限確認が失敗したときだけ true
   - primary レイテンシ閾値超過時 (例: 800ms) の safety net: facet=`all` は facet=`pages` 相当に degrade、facet=`attachments` は空 items + `primaryResultIncomplete: true` を返す
   - 返却 `IPrimarySearchResult` の `items[].attachmentHits[]` / `meta.primaryResultIncomplete` / `meta.nextCursor` が上記仕様どおりに埋まる
   - _Requirements: 3.3, 4.1, 4.2, 4.3, 4.4, 9.1, 9.3_
@@ -177,9 +177,9 @@
   - _Boundary: SearchService extension (AttachmentSearchResultAggregator)_
   - _Depends: 4.3, 7.1_
 
-- [x] 7.3 permission mget の fail-close 分岐を実装・固定する
-  - partial failure (一部 `found:false` / 一部 `errors` 配列) の挙動として、**成功分のみを許可、残りは一律除外**する fail-close 実装を `searchPrimary` / `resolveSecondary` 両方に適用する
-  - 一部成功で全件許可する fail-open 分岐が存在しないことを unit test で明示的に固定 (3 ケース: 全 200 / 一部 404 / errors 配列)
+- [x] 7.3 permission 判定の fail-close 分岐を実装・固定する
+  - 権限判定 (`searchAccessiblePages`) が失敗・タイムアウト・一部の shard の失敗になった場合は、**添付ヒットを全て除外**する (facet=`attachments` は空 + `primaryResultIncomplete`、facet=`all` はページを残して添付ヒットだけ除外、secondary は空)。ログではタイムアウトとそれ以外のエラーを区別する
+  - 判定は ES の viewer filter とページ検索の本文抜粋の判定 (`canShowSnippetForGrant`) を単一の判定元にし、失敗を許可として扱う分岐が存在しないことを unit test で固定する。閲覧者が無い場合はゲストとして扱い、判定を飛ばさない
   - _Requirements: 4.1, 4.2, 4.4_
   - _Boundary: SearchService extension (AttachmentSearchResultAggregator)_
   - _Depends: 7.1, 7.2_
@@ -226,7 +226,7 @@
   - _Boundary: features/search-attachments/server/routes/apiv3_
   - _Depends: 5.2_
 
-- [x] 8.6 `PUT /_api/v3/search/indices` の `includeAttachments` フラグ受理を追加する
+- [ ] 8.6 `PUT /_api/v3/search/indices` の `includeAttachments` フラグ受理を追加する (一部のみ。フラグの受理と、機能が無効なときの 503 はできている。残り: 作り直した `attachments-tmp` を本番の index に切り替える alias の付け替え (`putAlias` は初回作成のときにしか呼ばれない)、作り直しをリクエストの中で待たず開始だけして即座に応答すること (`startRebuild`)、同時に走ったときに 503 でなく 409 を返すこと)
   - 既存 route に `includeAttachments?: boolean` を受理するよう最小差分で拡張する
   - `includeAttachments=true` かつ 機能有効時に `AttachmentReindexBatch.begin()` → Page 再インデックス (既存) → `addAllAttachments(tmp)` → orphan sweep → alias swap → `Batch.end()` を **try/finally で** 実行する経路を組み立てる
   - `includeAttachments=false` のときは従来どおり Page/Comment のみ処理し `attachments` alias は据え置き、機能無効時は 503
@@ -270,11 +270,11 @@
   - _Requirements: 2.1, 2.2, 2.5, 3.1, 9.1_
   - _Boundary: integration_
 
-- [ ] 10.2 query-time permission lookup (facet=all secondary / facet=attachments primary) を integ test で固定する
-  - 親ページ権限変更直後に ES を触らずに次回検索で添付ヒット可視性が更新されること
-  - 親ページ削除後 rebuildIndex 前でも添付ヒットが primary の mget permission filter により除外されること
+- [x] 10.2 query-time permission lookup (facet=all secondary / facet=attachments primary) を integ test で固定する (`attachment-search-permission.integ.ts`: 本物の ES と MongoDB で、7 種類の閲覧者 × 公開範囲 × 一覧ポリシー 4 通り × 3 経路を、ページ検索そのものを正解として比較)
+  - 親ページ権限変更直後に ES を触らずに次回検索で添付ヒット可視性が更新されること (MongoDB の権限確認で、page_index の同期が遅れていても即座に反映される)
+  - 親ページ削除後 rebuildIndex 前でも添付ヒットが primary の権限判定により除外されること
   - rebuildIndex 実行後に `AttachmentOrphanSweeper` が親 Page 不在の doc を実削除していること
-  - `GET /search/attachments?q=...&pageIds=...` (secondary endpoint) が `pageIds.length` 超過で 400、消失/権限失効ページを軽量 mget で除外すること
+  - `GET /search/attachments?q=...&pageIds=...` (secondary endpoint) が `pageIds.length` 超過で 400、消失/権限失効ページを権限判定で除外すること
   - _Requirements: 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 9.1, 9.3_
   - _Boundary: integration_
 

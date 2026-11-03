@@ -286,7 +286,7 @@ sequenceDiagram
     User->>ReBtn: click
     ReBtn->>Hook: trigger(attachmentId)
     Hook->>API: POST
-    API-->>Hook: { outcome: ExtractionOutcome }
+    API-->>Hook: { outcome: { kind } }
     alt success
         Hook->>SWRCache: mutate attachment list key
         Hook-->>ReBtn: resolved
@@ -299,7 +299,7 @@ sequenceDiagram
 
 Key decisions:
 - 再抽出結果は toast で通知し、UI リストは SWR mutate で最新化
-- `ExtractionOutcome` は上流 spec で確定する型。本 spec は `outcome.kind` の分岐を i18n キーにマッピングするだけ
+- 再抽出の応答は上流 spec の `ReextractResponse` (`{ outcome: { kind } }`。抽出テキストは含まれない)。本 spec は `outcome.kind` の分岐を i18n キーにマッピングするだけ。拒否は status ではなくエラーの code で扱う: 404 `notfound_or_forbidden` (添付なし・親ページなし・権限なしを区別しない)、503 `feature_disabled` / `reextract_busy`、429 (回数制限)
 - 機能無効時は `ReextractButton` 自体が render されない
 
 ### 3. 管理画面 rebuild with attachments
@@ -650,7 +650,7 @@ export function useAttachmentFullTextSearchEnabled(): boolean {
 ```typescript
 interface ReextractResult {
   readonly ok: boolean;
-  readonly outcome: ExtractionOutcome; // 型は上流定義を import
+  readonly outcome: ReextractOutcomeSummary; // 型は上流定義を import (kind のみ)
 }
 interface UseAttachmentReextractResult {
   readonly trigger: (attachmentId: string) => Promise<ReextractResult>;

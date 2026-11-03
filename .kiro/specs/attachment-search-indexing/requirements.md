@@ -142,9 +142,9 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 
 #### Acceptance Criteria
 
-1. When 検索クエリが実行される, the apps/app shall **query-time に page_index を viewer filter 付きで参照** して実行ユーザが閲覧可能な親ページを特定し、その親ページに紐づく添付ヒットのみを返却する。添付文書に権限スナップショットを保持しないため、判定の源は常に page_index 側の最新権限となる <!-- derived from umbrella R8.1 -->
+1. When 検索クエリが実行される, the apps/app shall **query-time に page_index を viewer filter 付きで参照** して実行ユーザが閲覧可能な親ページを特定し、その親ページに紐づく添付ヒットのみを返却する。添付文書に権限スナップショットを保持しないため、判定の源は常に page_index 側の最新権限となる。さらに、page_index の権限が古い場合に備え、判定を通ったページの権限を MongoDB でも確認し、両方を満たすものだけを返す <!-- derived from umbrella R8.1 -->
 2. When 親ページの権限が変更された後に検索クエリが実行される, the apps/app shall 次回検索時の permission lookup が更新後の page_index を参照するため、追加の sync 処理なしに更新後の権限に基づいて添付ヒットの可視性を制御する <!-- derived from umbrella R8.2 -->
-3. The 添付検索の権限判定 shall 既存 `filterPagesByViewer` と**同一の権限モデル (grant 種別・granted users・granted groups) を page_index 側で (ES 上で) 適用**する。添付側に独自の権限実装を持たない <!-- derived from umbrella R8.3 -->
+3. The 添付検索の権限判定 shall 既存 `filterPagesByViewer` と**同一の権限モデル (grant 種別・granted users・granted groups) を page_index 側で (ES 上で) 適用**し、さらにページ検索が本文の抜粋を見せる条件 (`canShowSnippetForGrant`) も満たすページに限る。添付側に独自の権限実装を持たない。検索演算子 (`prefix:` など) と `security:disableUserPages` も親ページへの条件として同じ判定に含める <!-- derived from umbrella R8.3 -->
 4. If 親ページが既に削除されている添付が ES に残存する, the apps/app shall query-time permission lookup において当該 pageId が page_index に存在しない → アクセス不可と判定し、当該添付ヒットを検索結果から除外する (orphan sweeper による eventual cleanup が実行されるまでの間も漏洩は発生しない) <!-- derived from umbrella R8.4 -->
 5. When 検索クエリに検索演算子 (`prefix:` / `-prefix:` / `tag:` / `-tag:` / `author:` / `-author:` / `editor:` / `-editor:` / `group:` / `-group:`) が含まれる, the apps/app shall どの facet でも、添付ヒットを「同じ演算子で通常のページ検索をしたときに返りうるページ」に属するものに限定する
 6. The apps/app shall 検索演算子のトークンを添付本文 (`content`) の検索語として使わず、添付本文には演算子を除いた検索語 (通常語・否定語・フレーズ) だけを当てる
@@ -181,9 +181,9 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 #### Acceptance Criteria
 
 1. When `POST /_api/v3/attachments/:id/reextract` が呼ばれる, the apps/app shall 当該添付を抽出サービスに再送し、成功した場合は ES 文書を更新する <!-- derived from umbrella R11.2 -->
-2. If 呼び出し元が admin でもページ編集権限者でもない, the apps/app shall 403 Forbidden を返却する
+2. If 呼び出し元が admin でもページ編集権限者でもない、または添付もしくは親ページが存在しない, the apps/app shall これらを区別できない同一の 404 (`notfound_or_forbidden`、ID を含まない固定文言) を返却する (リポジトリの規約 `page-write-action-403-404.md` に従う)
 3. Where `extractorUri` が未設定または空である (算出値 `isAttachmentFullTextSearchEnabled` が false), the apps/app shall 503 feature_disabled を返却する
-4. The apps/app shall 再抽出結果の `ExtractionOutcome` を含むレスポンスを返却する
+4. The apps/app shall 再抽出結果の種別 (`kind`) だけをレスポンスに含め、抽出テキスト・ファイル情報・エラーメッセージは含めない
 
 ### Requirement 8: 抽出失敗の永続化と監視 <!-- derived from umbrella R12.1, R12.4 -->
 
