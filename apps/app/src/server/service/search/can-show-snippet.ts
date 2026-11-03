@@ -47,3 +47,46 @@ export const canShowSnippetForGrant = (
 
   return false;
 };
+
+/** The grant fields as a Mongo page document (lean or not) carries them. */
+export type PageGrantDocumentFields = {
+  readonly grant?: number | null;
+  readonly grantedUsers?: readonly unknown[] | null;
+  readonly grantedGroups?: readonly unknown[] | null;
+};
+
+/** null when the ref holds no id (a missing or malformed entry). */
+const idStringOfRef = (ref: unknown): string | null => {
+  if (ref == null) return null;
+  if (typeof ref === 'string') return ref;
+  if (typeof ref !== 'object') return null;
+  // a populated document carries its id in _id; an ObjectId stringifies to it
+  const id = '_id' in ref && ref._id != null ? ref._id : ref;
+  return String(id);
+};
+
+const groupItemOf = (entry: unknown): unknown =>
+  entry != null && typeof entry === 'object' && 'item' in entry
+    ? entry.item
+    : undefined;
+
+const nonNullIds = (ids: readonly (string | null)[]): string[] =>
+  ids.filter((id): id is string => id != null);
+
+/**
+ * Normalizes a page document's grant fields to SnippetGrantFields. A granted
+ * group counts only through its `{ item, type }` entry, as in
+ * `generateGrantCondition`; entries without an id (legacy or malformed) grant
+ * no one instead of failing the search.
+ */
+export const snippetGrantFieldsOf = (
+  page: PageGrantDocumentFields,
+): SnippetGrantFields => ({
+  grant: page.grant,
+  grantedUserIds: nonNullIds((page.grantedUsers ?? []).map(idStringOfRef)),
+  grantedGroupIds: nonNullIds(
+    (page.grantedGroups ?? []).map((entry) =>
+      idStringOfRef(groupItemOf(entry)),
+    ),
+  ),
+});

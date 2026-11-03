@@ -249,6 +249,20 @@ describe('AttachmentTextExtractorService', () => {
     expect(postExtractExtractPost).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { address: '169.254.1.1', family: 4 },
+    { address: '::ffff:169.254.169.254', family: 6 },
+    { address: 'fd00:ec2:0:0:0:0:0:254', family: 6 },
+  ])('blocks a resolved address the URI check also blocks: $address', async (resolved) => {
+    vi.spyOn(dns, 'lookup').mockResolvedValue(resolved);
+
+    const service = await getService();
+    const result = await service.extractAttachment('attachment-id-1');
+
+    expect(result).toEqual({ kind: 'serviceUnreachable' });
+    expect(postExtractExtractPost).not.toHaveBeenCalled();
+  });
+
   // -----------------------------------------------------------------------
   // 4. success — 200 ExtractResponse → ExtractionOutcome kind='success'
   // -----------------------------------------------------------------------

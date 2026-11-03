@@ -451,6 +451,8 @@ export class AttachmentSearchResultAggregator {
       return result([], false);
     }
 
+    // Stops the collector once this request has its answer (or timed out)
+    const collecting = new AbortController();
     try {
       const pages = await withTimeout(
         collectVisibleAttachmentHits(
@@ -468,7 +470,7 @@ export class AttachmentSearchResultAggregator {
             findVisiblePageIds: (pageIds) =>
               this.findVisiblePageIds(pageIds, split, this.PRIMARY_TIMEOUT_MS),
           },
-          { from, size },
+          { from, size, signal: collecting.signal },
         ),
         this.PRIMARY_TIMEOUT_MS,
       );
@@ -486,6 +488,8 @@ export class AttachmentSearchResultAggregator {
         'searchPrimaryAttachments: attachment search or permission check failed — returning empty + incomplete (fail-close)',
       );
       return result([], true);
+    } finally {
+      collecting.abort();
     }
   }
 

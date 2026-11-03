@@ -1,6 +1,6 @@
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import {
-  FACET_SEARCH_MAX_LIMIT,
+  parseFacetPagination,
   parseFacetSearchParams,
   toFacetedSearchResult,
 } from '~/features/search-attachments/server/routes/apiv1/facet-search-contract';
@@ -71,7 +71,10 @@ export const setup = (crowi: Crowi, app) => {
   /**
    * facet=all|attachments while attachment search is enabled. The viewer is
    * always the requesting user (guest when not logged in); `sort` / `order`
-   * / `type` are not applied (relevance order only).
+   * / `type` are not applied (relevance order only). `limit` / `offset`
+   * are re-read from the raw query (parseFacetPagination); an invalid value
+   * is answered like the other parameter errors of this route:
+   * `{ ok: false, code: 400 }` with HTTP 200.
    */
   const searchByFacet = async (
     req,
@@ -80,21 +83,15 @@ export const setup = (crowi: Crowi, app) => {
       q,
       facet,
       resolve,
-      paginateOpts,
     }: {
       q: string;
       facet: 'all' | 'attachments';
       resolve: 'primary' | 'full';
-      paginateOpts: { limit: number; offset: number };
     },
   ) => {
-    if (paginateOpts.limit > FACET_SEARCH_MAX_LIMIT) {
-      return res.json(
-        ApiResponse.error(
-          `The param "limit" must not exceed ${FACET_SEARCH_MAX_LIMIT} when "facet" is all or attachments.`,
-          400,
-        ),
-      );
+    const pagination = parseFacetPagination(req.query);
+    if (!pagination.ok) {
+      return res.json(ApiResponse.error(pagination.message, 400));
     }
 
     let result: IFacetedSearchResult;
@@ -105,8 +102,8 @@ export const setup = (crowi: Crowi, app) => {
         viewer,
         {
           facet,
-          from: paginateOpts.offset,
-          size: paginateOpts.limit,
+          from: pagination.from,
+          size: pagination.size,
           resolve,
         },
       );
@@ -162,9 +159,11 @@ export const setup = (crowi: Crowi, app) => {
    *             Optional. `all` / `attachments` include attachment hits while
    *             attachment full-text search is enabled; the response meta then
    *             carries `facet`, a nullable `total` and optional
-   *             `primaryResultIncomplete` / `nextCursor`, and `limit` must not
-   *             exceed 200. Omitted, `pages`, combined with `nq`, or with the
-   *             feature disabled, the response is the plain page search.
+   *             `primaryResultIncomplete` / `nextCursor`; `limit` must then be
+   *             an integer from 1 to 200 and `offset` a non-negative integer,
+   *             otherwise the answer is `{ ok: false, code: 400 }`. Omitted,
+   *             `pages`, combined with `nq`, or with the feature disabled, the
+   *             response is the plain page search.
    *           schema:
    *             type: string
    *             enum: [all, pages, attachments]
@@ -248,7 +247,7 @@ export const setup = (crowi: Crowi, app) => {
       nq == null &&
       isAttachmentFullTextSearchEnabled(searchService.isConfigured)
     ) {
-      return searchByFacet(req, res, { q, facet, resolve, paginateOpts });
+      return searchByFacet(req, res, { q, facet, resolve });
     }
 
     const userGroups =

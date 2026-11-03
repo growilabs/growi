@@ -24,6 +24,19 @@ export type ExtractionOutcome =
   | { kind: 'serviceUnreachable' }
   | { kind: 'failed'; reasonCode: string; message: string };
 
+/**
+ * What POST /_api/v3/attachments/:id/reextract answers: the outcome kind
+ * only. The extracted text, file details and error messages stay on the
+ * server (the caller may be an admin who cannot read the page).
+ */
+export type ReextractOutcomeSummary = {
+  readonly kind: ExtractionOutcome['kind'];
+};
+
+export interface ReextractResponse {
+  readonly outcome: ReextractOutcomeSummary;
+}
+
 // ---- Elasticsearch document shape ----
 
 export interface IAttachmentEsDoc {

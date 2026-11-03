@@ -316,6 +316,21 @@ describe('SearchService.canShowSnippet()', () => {
     ).toBe(true);
   });
 
+  it.each([
+    ['an entry without item', [{ type: 'UserGroup' }]],
+    ['a null entry', [null]],
+    ['a bare group id', [groupId]],
+  ])('hides the snippet, without throwing, when grantedGroups holds %s', (_label, grantedGroups) => {
+    const service = new TestSearchService();
+    const legacyPage = { ...groupPage, grantedGroups };
+
+    expect(
+      service.canShowSnippet(legacyPage, mock<IUser>(), [
+        new mongoose.Types.ObjectId(groupId.toString()),
+      ]),
+    ).toBe(false);
+  });
+
   it('hides the snippet of a group page from a user outside the group', () => {
     const service = new TestSearchService();
 

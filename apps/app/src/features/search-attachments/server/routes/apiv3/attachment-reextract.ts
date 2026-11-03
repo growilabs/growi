@@ -12,12 +12,17 @@
  *
  * Permission check (re-checked from the current Page grant on every request):
  *   - 400 if the id is not an ObjectId
- *   - 404 if attachment not found
- *   - 403 if the attachment has no page, the page is gone, or the caller is
- *     neither admin nor able to edit the page (= can view it, the same rule
- *     the attachment upload route applies)
- *   - 503 if the feature is disabled, or was enabled after boot (no indexer yet)
- *   - 200 { outcome } on success
+ *   - 404 notfound_or_forbidden (one identical answer, see
+ *     rules/page-write-action-403-404.md) if the attachment does not exist,
+ *     has no page, the page is gone, or the caller is neither admin nor able
+ *     to edit the page (= can view it, the same rule the attachment upload
+ *     route applies)
+ *   - 503 if the feature is disabled, or was enabled after boot (no indexer
+ *     yet), or MAX_CONCURRENT_REEXTRACTIONS other attachments are being
+ *     re-extracted
+ *   - 200 { outcome: { kind } } otherwise (ReextractResponse)
+ *
+ * Concurrent authorized requests for one attachment share one extraction.
  */
 
 import type { IPage, IUserHasId } from '@growi/core';
@@ -38,7 +43,12 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
+import type {
+  ExtractionOutcome,
+  ReextractResponse,
+} from '../../../interfaces/attachment-search';
 import { createRequireSearchAttachmentsEnabled } from '../../middlewares/require-search-attachments-enabled';
+import { createReextractGate } from '../../services/reextract-gate';
 
 const logger = loggerFactory(
   'growi:features:search-attachments:routes:apiv3:attachment-reextract',
@@ -48,11 +58,18 @@ type Req = Request<{ id: string }, ApiV3Response, void> & {
   user?: IUserHasId;
 };
 
-// One answer for every denial, so it does not tell whether the page still exists.
-const forbidden = (res: ApiV3Response) =>
+/** Each run reads the whole file into memory and has it converted. */
+const MAX_CONCURRENT_REEXTRACTIONS = 3;
+
+// One answer for every denial, so it tells neither whether the attachment
+// nor whether its page exists.
+const notFoundOrForbidden = (res: ApiV3Response) =>
   res.apiv3Err(
-    new ErrorV3('Forbidden: insufficient permission', 'forbidden'),
-    403,
+    new ErrorV3(
+      'Attachment is not found or forbidden',
+      'notfound_or_forbidden',
+    ),
+    404,
   );
 
 /**
@@ -61,6 +78,9 @@ const forbidden = (res: ApiV3Response) =>
  */
 export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
   const router = express.Router();
+  const gate = createReextractGate<{ ok: boolean; outcome: ExtractionOutcome }>(
+    MAX_CONCURRENT_REEXTRACTIONS,
+  );
 
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const requireSearchAttachmentsEnabled = createRequireSearchAttachmentsEnabled(
@@ -100,21 +120,18 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
           where: { id: attachmentId },
         });
         if (attachment == null) {
-          return res.apiv3Err(
-            new ErrorV3('Attachment not found', 'attachment_not_found'),
-            404,
-          );
+          return notFoundOrForbidden(res);
         }
 
         const { pageId } = attachment;
         if (pageId == null) {
-          return forbidden(res);
+          return notFoundOrForbidden(res);
         }
 
         const Page = mongoose.model<IPage, PageModel>('Page');
         const pageExists = (await Page.exists({ _id: pageId })) != null;
         if (!pageExists) {
-          return forbidden(res);
+          return notFoundOrForbidden(res);
         }
 
         // Evaluated against the page's grant as stored right now
@@ -122,10 +139,22 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
           user.admin === true ||
           (await Page.isAccessiblePageByViewer(pageId, user));
         if (!canEdit) {
-          return forbidden(res);
+          return notFoundOrForbidden(res);
         }
 
-        const result = await indexer.reindex(attachmentId);
+        const running = gate.run(attachmentId, () =>
+          indexer.reindex(attachmentId),
+        );
+        if (running == null) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Too many attachments are being re-extracted; try again later',
+              'reextract_busy',
+            ),
+            503,
+          );
+        }
+        const result = await running;
 
         logger.info(
           {
@@ -137,7 +166,10 @@ export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
           'Attachment reextraction completed',
         );
 
-        return res.apiv3({ outcome: result.outcome });
+        const body: ReextractResponse = {
+          outcome: { kind: result.outcome.kind },
+        };
+        return res.apiv3(body);
       } catch (err) {
         logger.error(
           { err, attachmentId },

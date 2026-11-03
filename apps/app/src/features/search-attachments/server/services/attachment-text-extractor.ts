@@ -13,19 +13,9 @@ import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
-const logger = loggerFactory('growi:service:search-attachments:extractor');
+import { isCloudMetadataAddress } from './validate-extractor-uri';
 
-/**
- * Cloud metadata IP literals blocked at DNS resolution time.
- * These addresses target cloud instance metadata services and must never
- * receive requests (SSRF prevention).
- */
-const METADATA_IPS = new Set([
-  '169.254.169.254', // AWS/GCP/Azure link-local metadata
-  'fd00:ec2::254', // AWS IPv6 metadata
-  '100.100.100.200', // Alibaba Cloud metadata
-  '192.0.0.192', // GCP internal metadata
-]);
+const logger = loggerFactory('growi:service:search-attachments:extractor');
 
 // Retry configuration — exported for testability
 export const RETRY_BASE_DELAY_MS = 500;
@@ -222,7 +212,7 @@ export class AttachmentTextExtractorService {
 
       try {
         const resolved = await dns.lookup(hostname);
-        if (METADATA_IPS.has(resolved.address)) {
+        if (isCloudMetadataAddress(resolved.address)) {
           logger.warn(
             { hostname, resolvedAddress: resolved.address },
             'Blocked request to metadata IP via DNS rebinding',

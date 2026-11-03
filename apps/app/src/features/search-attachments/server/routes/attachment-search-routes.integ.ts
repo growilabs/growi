@@ -29,6 +29,7 @@ import { prisma } from '~/utils/prisma';
 
 import { AttachmentSearchDelegatorExtension } from '../services/attachment-search-delegator-extension';
 import type { AttachmentSearchIndexerInterface } from '../services/attachment-search-indexer';
+import { MAX_ROUNDS } from '../services/collect-visible-attachment-hits';
 import { createAttachmentSearchResultAggregator } from '../services/create-attachment-search-result-aggregator';
 
 vi.mock('~/utils/logger', () => ({
@@ -92,6 +93,7 @@ describe.skipIf(esUri == null)(
   () => {
     let crowi: Crowi;
     let esHost: string;
+    let esClient: ReturnType<typeof getClient>;
     let guestAllowed = true;
     let featureEnabled = true;
     const users = {} as Record<UserName, IUserHasId>;
@@ -179,7 +181,7 @@ describe.skipIf(esUri == null)(
       await delegator.initClient();
       setIndexName(delegator, PAGE_INDEX);
       await delegator.createIndex(PAGE_INDEX);
-      const esClient = getClient(delegator);
+      esClient = getClient(delegator);
       await esClient.indices.putAlias({
         index: PAGE_INDEX,
         name: delegator.aliasName,
@@ -581,6 +583,88 @@ describe.skipIf(esUri == null)(
         expect(res.text).not.toContain('secret');
       });
 
+      describe('pagination of facet=attachments', () => {
+        const settle = (ms: number) =>
+          new Promise((resolve) => {
+            setTimeout(resolve, ms);
+          });
+
+        it.each<Record<string, string>>([
+          { limit: '0' },
+          { limit: '-5' },
+          { limit: '1.5' },
+          { limit: 'NaN' },
+          { limit: '1e9' },
+          { limit: '201' },
+          { limit: '10', offset: '-1' },
+          { limit: '10', offset: 'NaN' },
+          { limit: '10', offset: '1.5' },
+        ])('rejects %o without reaching Elasticsearch, then and later', async (params) => {
+          const esSearch = vi.spyOn(esClient, 'search');
+          try {
+            const startedAt = Date.now();
+            const res = await search('creator', {
+              q: TOKEN,
+              facet: 'attachments',
+              ...params,
+            });
+            const elapsed = Date.now() - startedAt;
+            const callsAtResponse = esSearch.mock.calls.length;
+            await settle(1500);
+
+            expect(res.body).toMatchObject({ ok: false, code: 400 });
+            expect(elapsed).toBeLessThan(2000);
+            expect(callsAtResponse).toBe(0);
+            expect(esSearch.mock.calls.length).toBe(0);
+          } finally {
+            esSearch.mockRestore();
+          }
+        }, 10_000);
+
+        it('refuses a huge offset before searching (ApiPaginate result window)', async () => {
+          const esSearch = vi.spyOn(esClient, 'search');
+          try {
+            const res = await search('creator', {
+              q: TOKEN,
+              facet: 'attachments',
+              limit: '10',
+              offset: '99999999999999999999',
+            });
+
+            expect(res.body.ok).toBe(false);
+            expect(esSearch).not.toHaveBeenCalled();
+          } finally {
+            esSearch.mockRestore();
+          }
+        });
+
+        it('treats an empty limit as the default and searches a bounded number of times', async () => {
+          const esSearch = vi.spyOn(esClient, 'search');
+          try {
+            const res = await search('creator', {
+              q: TOKEN,
+              facet: 'attachments',
+              limit: '',
+            });
+            const callsAtResponse = esSearch.mock.calls.length;
+            await settle(1500);
+
+            expect(res.body).toMatchObject({ ok: true });
+            expect(
+              kinds(
+                (res.body as SearchBody).data?.map((i) => i.data._id) ?? [],
+              ),
+            ).toEqual(['owner', 'public']);
+            // attachment windows plus the page index permission check per window
+            expect(callsAtResponse).toBeGreaterThan(0);
+            expect(callsAtResponse).toBeLessThanOrEqual(2 * MAX_ROUNDS);
+            expect(esSearch.mock.calls.length).toBe(callsAtResponse);
+          } finally {
+            esSearch.mockRestore();
+          }
+        }, 10_000);
+      });
+
       it.each<Record<string, string>>([
         { facet: 'secret' },
         { facet: 'all', resolve: 'secret' },
@@ -602,10 +686,14 @@ describe.skipIf(esUri == null)(
         );
 
       it('re-extraction rejects guests and read-only users before the handler', async () => {
-        expect((await reextract('guest')).status).toBe(403);
+        const guest = await reextract('guest');
+        expect(guest.status).toBe(403);
+        expect(guest.body.errors).toBeUndefined();
         expect((await reextract('readOnly')).status).toBe(400);
-        // reaching the handler: an unknown attachment
-        expect((await reextract('other')).status).toBe(404);
+        // reaching the handler: an unknown attachment gets its uniform refusal
+        const other = await reextract('other');
+        expect(other.status).toBe(404);
+        expect(other.body.errors[0].code).toBe('notfound_or_forbidden');
       });
 
       it('admin endpoints answer an admin only', async () => {

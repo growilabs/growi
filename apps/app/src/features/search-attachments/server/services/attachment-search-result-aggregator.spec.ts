@@ -401,6 +401,27 @@ describe('AttachmentSearchResultAggregator', () => {
       }
     });
 
+    it('stops searching attachments once the primary timeout has answered the request', async () => {
+      const hidden = Array.from({ length: 1000 }, (_, i) =>
+        esHit(`hidden${i}`, `att${i}`),
+      );
+      const serve = serveHits(hidden);
+      client.searchAttachments.mockImplementation(async (body) =>
+        delayed(await serve(body), 30),
+      );
+      client.searchAccessiblePages.mockImplementation(
+        accessibleAmong(() => false),
+      );
+
+      const result = await primary(inputFor(guest), 0, 1, 40);
+      const callsAtAnswer = client.searchAttachments.mock.calls.length;
+      await delayed(null, 300);
+
+      expect(result.meta.primaryResultIncomplete).toBe(true);
+      // at most the round in flight when the timeout fired finishes
+      expect(client.searchAttachments.mock.calls.length).toBe(callsAtAnswer);
+    });
+
     it('answers a term matching only hidden attachments exactly like a term matching nothing', async () => {
       const hidden = Array.from({ length: 50 }, (_, i) =>
         esHit(`hidden${i % 7}`, `att${i}`),

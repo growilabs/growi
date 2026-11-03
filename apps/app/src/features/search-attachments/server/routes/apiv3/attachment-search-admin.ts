@@ -138,6 +138,12 @@ export interface AttachmentSearchConfig {
 // Validators
 // ---------------------------------------------------------------------------
 
+/** Bounds of PUT /config; the defaults are 90 s and 50 MiB (config-definition). */
+const TIMEOUT_MS_MIN = 1_000;
+const TIMEOUT_MS_MAX = 600_000;
+const MAX_FILE_SIZE_BYTES_MAX = 500 * 1024 * 1024;
+const EXTRACTOR_TOKEN_MAX_LENGTH = 1024;
+
 const putConfigValidator = [
   body('extractorUri')
     .optional({ nullable: true })
@@ -150,9 +156,29 @@ const putConfigValidator = [
       }
       return true;
     }),
-  body('extractorToken').optional({ nullable: true }),
-  body('timeoutMs').optional({ nullable: true }).isInt({ min: 1 }),
-  body('maxFileSizeBytes').optional({ nullable: true }).isInt({ min: 1 }),
+  body('extractorToken')
+    .optional({ nullable: true })
+    .isString()
+    .withMessage('extractorToken must be a string or null')
+    .bail()
+    .isLength({ max: EXTRACTOR_TOKEN_MAX_LENGTH })
+    .withMessage(
+      `extractorToken must be at most ${EXTRACTOR_TOKEN_MAX_LENGTH} characters`,
+    ),
+  body('timeoutMs')
+    .optional({ nullable: true })
+    .isInt({ min: TIMEOUT_MS_MIN, max: TIMEOUT_MS_MAX })
+    .withMessage(
+      `timeoutMs must be an integer between ${TIMEOUT_MS_MIN} and ${TIMEOUT_MS_MAX}`,
+    )
+    .toInt(),
+  body('maxFileSizeBytes')
+    .optional({ nullable: true })
+    .isInt({ min: 1, max: MAX_FILE_SIZE_BYTES_MAX })
+    .withMessage(
+      `maxFileSizeBytes must be an integer between 1 and ${MAX_FILE_SIZE_BYTES_MAX}`,
+    )
+    .toInt(),
 ];
 
 /** Upper bound of GET /failures `limit`. */

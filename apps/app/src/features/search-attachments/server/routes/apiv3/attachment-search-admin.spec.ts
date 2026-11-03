@@ -568,3 +568,75 @@ describe('GET /failures', () => {
     expect(mockTotalRecent).not.toHaveBeenCalled();
   });
 });
+
+describe('PUT /config validation', () => {
+  const put = (body: Record<string, unknown>) =>
+    supertest(buildTestApp(true))
+      .put('/admin/attachment-search/config')
+      .send(body);
+  const storedUpdates = () =>
+    vi.mocked(configManager.updateConfigs).mock.calls[0]?.[0];
+
+  beforeEach(() => {
+    vi.mocked(configManager.updateConfigs).mockReset();
+    vi.mocked(configManager.updateConfigs).mockResolvedValue(undefined);
+  });
+
+  it.each([
+    { timeoutMs: 999 },
+    { timeoutMs: 600_001 },
+    { timeoutMs: 1.5 },
+    { timeoutMs: 'secret' },
+    { maxFileSizeBytes: 0 },
+    { maxFileSizeBytes: 500 * 1024 * 1024 + 1 },
+    { maxFileSizeBytes: 'secret' },
+    { extractorToken: 12345 },
+    { extractorToken: { $ne: 'secret' } },
+    { extractorToken: 'x'.repeat(1025) },
+    { extractorUri: 'http://[::ffff:169.254.169.254]/' },
+    { extractorUri: 'http://169.254.1.1/' },
+    { extractorUri: 'http://metadata.google.internal/' },
+  ])('rejects %o with 400 without storing anything', async (body) => {
+    const res = await put(body);
+
+    expect(res.status).toBe(400);
+    expect(res.text).not.toContain('secret');
+    expect(configManager.updateConfigs).not.toHaveBeenCalled();
+  });
+
+  it('stores the numbers as numbers, also when sent as strings', async () => {
+    const res = await put({ timeoutMs: '30000', maxFileSizeBytes: '1048576' });
+
+    expect(res.status).toBe(200);
+    expect(storedUpdates()).toEqual({
+      'app:attachmentFullTextSearch:timeoutMs': 30000,
+      'app:attachmentFullTextSearch:maxFileSizeBytes': 1048576,
+    });
+  });
+
+  it.each([
+    { timeoutMs: 1000, maxFileSizeBytes: 1 },
+    { timeoutMs: 600_000, maxFileSizeBytes: 500 * 1024 * 1024 },
+  ])('accepts the bounds %o', async (body) => {
+    const res = await put(body);
+
+    expect(res.status).toBe(200);
+    expect(storedUpdates()).toEqual({
+      'app:attachmentFullTextSearch:timeoutMs': body.timeoutMs,
+      'app:attachmentFullTextSearch:maxFileSizeBytes': body.maxFileSizeBytes,
+    });
+  });
+
+  it('stores a token string and clears it with null', async () => {
+    expect((await put({ extractorToken: 'token-value' })).status).toBe(200);
+    expect(storedUpdates()).toEqual({
+      'app:attachmentFullTextSearch:extractorToken': 'token-value',
+    });
+
+    vi.mocked(configManager.updateConfigs).mockClear();
+    expect((await put({ extractorToken: null })).status).toBe(200);
+    expect(storedUpdates()).toEqual({
+      'app:attachmentFullTextSearch:extractorToken': undefined,
+    });
+  });
+});

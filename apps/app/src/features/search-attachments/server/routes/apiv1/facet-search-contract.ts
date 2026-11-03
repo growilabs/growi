@@ -8,6 +8,8 @@ import type { IPrimarySearchResult } from '../../services/attachment-search-resu
 
 /** Bounds the attachment and permission queries one facet search can issue. */
 export const FACET_SEARCH_MAX_LIMIT = 200;
+/** The default page size of /_api/search (ApiPaginate), kept for facet searches. */
+const FACET_SEARCH_DEFAULT_LIMIT = 50;
 
 const FACETS: readonly SearchFacet[] = ['all', 'pages', 'attachments'];
 const RESOLVE_MODES = ['primary', 'full'] as const;
@@ -55,6 +57,55 @@ export const parseFacetSearchParams = (
     };
   }
   return { ok: true, facet, resolve };
+};
+
+export type FacetPagination =
+  | { ok: true; from: number; size: number }
+  | { ok: false; message: string };
+
+const DIGITS = /^\d+$/;
+
+/** undefined: absent or empty (the default applies); null: not a decimal integer */
+const readNonNegativeInteger = (raw: unknown): number | null | undefined => {
+  if (raw === undefined || raw === '') return undefined;
+  if (typeof raw !== 'string' || !DIGITS.test(raw)) return null;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) ? value : null;
+};
+
+/**
+ * Reads `limit` / `offset` of a facet search from the raw query, so that
+ * values parseInt would silently truncate (`1.5`, `1e9`) or turn into NaN
+ * are refused rather than reaching the attachment search. Absent or empty
+ * values take the same defaults as the page search. Error messages are fixed
+ * strings and never echo the input.
+ */
+export const parseFacetPagination = (
+  query: Record<string, unknown>,
+): FacetPagination => {
+  const size = readNonNegativeInteger(query.limit);
+  if (
+    size === null ||
+    (size !== undefined && (size < 1 || size > FACET_SEARCH_MAX_LIMIT))
+  ) {
+    return {
+      ok: false,
+      message: `The param "limit" must be an integer between 1 and ${FACET_SEARCH_MAX_LIMIT} when "facet" is all or attachments.`,
+    };
+  }
+  const from = readNonNegativeInteger(query.offset);
+  if (from === null) {
+    return {
+      ok: false,
+      message:
+        'The param "offset" must be a non-negative integer when "facet" is all or attachments.',
+    };
+  }
+  return {
+    ok: true,
+    from: from ?? 0,
+    size: size ?? FACET_SEARCH_DEFAULT_LIMIT,
+  };
 };
 
 export const toFacetedSearchResult = (

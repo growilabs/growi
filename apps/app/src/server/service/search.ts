@@ -1,9 +1,4 @@
-import {
-  getIdStringForRef,
-  type IPage,
-  type IPageHasId,
-  type IUser,
-} from '@growi/core';
+import type { IPage, IPageHasId, IUser } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
@@ -56,7 +51,10 @@ import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
 import { configManager } from './config-manager';
-import { canShowSnippetForGrant } from './search/can-show-snippet';
+import {
+  canShowSnippetForGrant,
+  snippetGrantFieldsOf,
+} from './search/can-show-snippet';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
@@ -1058,21 +1056,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   canShowSnippet(pageData, user, userGroups): boolean {
-    return canShowSnippetForGrant(
-      {
-        grant: pageData.grant,
-        grantedUserIds: (pageData.grantedUsers ?? []).map((ref) =>
-          getIdStringForRef(ref),
-        ),
-        grantedGroupIds: (pageData.grantedGroups ?? []).map((group) =>
-          getIdStringForRef(group.item),
-        ),
-      },
-      {
-        userId: user?._id?.toString() ?? null,
-        userGroupIds: userGroups?.map((id) => id.toString()) ?? null,
-      },
-    );
+    return canShowSnippetForGrant(snippetGrantFieldsOf(pageData), {
+      userId: user?._id?.toString() ?? null,
+      userGroupIds: userGroups?.map((id) => id.toString()) ?? null,
+    });
   }
 }
 

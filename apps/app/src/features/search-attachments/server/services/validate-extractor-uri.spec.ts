@@ -84,7 +84,51 @@ describe('validateExtractorUri', () => {
     });
   });
 
+  describe('should REJECT other spellings of a metadata address', () => {
+    it.each([
+      ['the IPv4-mapped IPv6 form', 'http://[::ffff:169.254.169.254]/'],
+      ['the IPv4-mapped IPv6 form in hex', 'http://[::ffff:a9fe:a9fe]/'],
+      ['an IPv4-mapped Alibaba address', 'http://[::ffff:100.100.100.200]/'],
+      ['a decimal IPv4 literal', 'http://2852039166/'],
+      ['a hexadecimal IPv4 literal', 'http://0xa9fea9fe/'],
+      ['another link-local IPv4 address', 'http://169.254.1.1:8000/'],
+      ['the start of the link-local range', 'http://169.254.0.0/'],
+      ['the end of the link-local range', 'http://169.254.255.255/'],
+      ['an expanded AWS IPv6 address', 'http://[fd00:ec2:0:0:0:0:0:254]/'],
+      [
+        'the GCP metadata host name',
+        'http://metadata.google.internal/computeMetadata/v1',
+      ],
+      [
+        'the GCP metadata host name in upper case',
+        'http://METADATA.GOOGLE.INTERNAL/',
+      ],
+      [
+        'the GCP metadata host name with a trailing dot',
+        'http://metadata.google.internal./',
+      ],
+    ])('rejects %s', (_label, uri) => {
+      expect(validateExtractorUri(uri)).toEqual({
+        ok: false,
+        reason: 'metadata_ip',
+      });
+    });
+  });
+
   describe('should ACCEPT (ok: true)', () => {
+    it.each([
+      ['an address next to the link-local range', 'http://169.253.255.255/'],
+      ['an address after the link-local range', 'http://169.255.0.1/'],
+      ['an IPv4-mapped private address', 'http://[::ffff:10.0.0.1]/'],
+      ['IPv6 loopback', 'http://[::1]:8000/'],
+      [
+        'a host name that only contains the metadata name',
+        'http://metadata.google.internal.example.com/',
+      ],
+    ])('accepts %s', (_label, uri) => {
+      expect(validateExtractorUri(uri)).toEqual({ ok: true });
+    });
+
     it('accepts docker-compose service name', () => {
       expect(
         validateExtractorUri('http://attachment-text-extractor:8000'),
