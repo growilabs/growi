@@ -316,6 +316,17 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       return;
     }
 
+    // Drop selections whose rows left the list (a row deleted from its menu,
+    // with its descendants on a recursive delete) so the count matches what
+    // can still be acted on (Req 11.6). The Set is pruned in place because
+    // the list keeps reading this same instance.
+    const loadedPageIds = new Set(pages.map((page) => page.data._id));
+    selectedPageIdsByCheckboxes.forEach((pageId) => {
+      if (!loadedPageIds.has(pageId)) {
+        selectedPageIdsByCheckboxes.delete(pageId);
+      }
+    });
+
     onSelectedChangedRef.current?.(
       selectedPageIdsByCheckboxes.size,
       pages.length,

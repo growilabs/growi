@@ -653,6 +653,89 @@ describe('SearchPageBase select-all header follows appended pages (append re-not
   });
 });
 
+describe('SearchPageBase drops selections of rows removed from the list (Req 11.6)', () => {
+  beforeEach(() => {
+    searchResultListSpy.lastProps = undefined;
+    vi.clearAllMocks();
+  });
+
+  it('stops counting a selected row once it is deleted from the list', () => {
+    const ref = createRef<SelectableRef>();
+    const onChanged = vi.fn();
+    const pages = [createPage('a'), createPage('b'), createPage('c')];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    act(() => {
+      ref.current?.selectAll();
+    });
+
+    // a row deleted from its menu leaves the list under the same search
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={[pages[0], pages[2]]}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    // the remaining rows are still all selected => header stays checked
+    expect(onChanged).toHaveBeenLastCalledWith(2, 2);
+    expect([...(ref.current?.getSelectedPageIds?.() ?? [])]).toEqual([
+      'a',
+      'c',
+    ]);
+  });
+
+  it('drops every removed row at once (a recursive delete also removes descendants)', () => {
+    const ref = createRef<SelectableRef>();
+    const onChanged = vi.fn();
+    const pages = [
+      createPage('parent'),
+      createPage('child'),
+      createPage('other'),
+    ];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    act(() => {
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'parent');
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'child');
+    });
+
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={[pages[2]]}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    expect(onChanged).toHaveBeenLastCalledWith(0, 1);
+    expect(ref.current?.getSelectedPageIds?.().size).toBe(0);
+  });
+});
+
 const createInfiniteScrollProps = (overrides?: {
   isReachingEnd?: boolean;
   hasError?: boolean;
