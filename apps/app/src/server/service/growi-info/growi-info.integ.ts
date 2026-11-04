@@ -23,6 +23,7 @@ describe('GrowiInfoService', () => {
 
   beforeAll(async () => {
     process.env.APP_SITE_URL = 'http://growi.test.jp';
+    process.env.SERVICE_TYPE = 'on-premise';
     process.env.DEPLOYMENT_TYPE = 'growi-docker-compose';
     process.env.SAML_ENABLED = 'true';
 
