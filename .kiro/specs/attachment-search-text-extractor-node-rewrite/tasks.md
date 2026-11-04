@@ -1,0 +1,297 @@
+# Implementation Plan
+
+> Node 版は `apps/attachment-text-extractor/` (`@growi/attachment-text-extractor`) に新しく作る (design.md の D4)。Python 版は撤去 (タスク 8) まで `services/attachment-text-extractor/` にそのまま残し、コードは直さない。Python 版は、ベンチマークの基準 (ベースライン)、比較、黒箱のテストの確認に使う。
+>
+> 順序はユーザーが決めた進め方 (requirements の Req 6) に従う: ベンチマークとテスト用のファイルの生成器 → 試作 → テストの書き換え → テストのレビュー → 実装 → 実装のレビュー → 撤去 → 取り込みと自己削除。
+>
+> 「ユーザー判断」と書いたタスクは、ユーザーの答えを受けて記録した時点で完了になる。答えが出るまで、そのタスクに依存するタスクには進まない。
+>
+> pnpm の install は、ほかの pnpm / turbo / vitest の実行と並行させない (`.claude/rules/devcontainer.md`)。並行の印 (P) が付いたタスクを同時に進めるときも、install だけは順番に行う。
+
+- [ ] 1. 土台: Node の package と CI のジョブを用意する
+- [ ] 1.1 抽出サービスの Node の package を作り、workspace に入れる
+  - `apps/pdf-converter` に倣って、package の設定、TypeScript の設定、vitest の設定、package ごとの turbo の設定を置く。Node 24 だけを対象にし、Bun / Deno 向けの設定は置かない
+  - `hono`、`@hono/node-server`、`@firecrawl/anydoc` (=0.2.4) を本番の依存に、vitest と `vitest-mock-extended` をテスト専用の依存に入れる。ライセンスが許容的なものであることを確かめる
+  - ルートの `pnpm install` の後、`turbo run lint test --filter @growi/attachment-text-extractor` が、中身が空のテスト 1 件で成功する
+  - ルートの `pnpm-workspace.yaml`、`turbo.json`、`vitest.workspace.mts` を変えずに、新しい package が lint とテストの対象に入っている
+  - _Requirements: 4.1, 4.2, 4.4, 4.7, 9.4, 11.8_
+- [ ] 1.2 Node 版の CI のジョブを、Python 版のジョブと並べて足す
+  - `.github/workflows/attachment-text-extractor.yml` に、Node 版の lint・型の検査・vitest を動かすジョブを足す。Python 版のジョブは撤去 (8.2) まで残す。`paths` に `apps/attachment-text-extractor/**` を足す
+  - ジョブの `if:` の中にコメントを書かない (`.claude/rules/github-actions-workflows.md`)
+  - 既存の Node 用の CI (`ci-app.yml` などの turbo を通すジョブ) が新しい package のテストも拾うかを確かめ、同じテストを 2 つのジョブで二重に動かさない形にする。拾う場合は、他の package のテストと競合しないことを確かめる
+  - ローカルで workflow の YAML が読めることを確かめ、Node 版のジョブが 1.1 の空のテストで成功する形になっている
+  - _Requirements: 9.1, 9.4_
+- [ ] 1.3 比較のために Python 版を devcontainer で起動できるようにする
+  - Python 版の依存を uv で入れ、トークンを渡して決めたポートで起動する手順を、Python 版のコードを変えずに用意する (devcontainer の python3 に json モジュールが欠けている問題などがあれば回避の方法も書く)
+  - Python 版を起動して `/readyz` が 200 を返し、止められることを確かめ、手順が research.md にある
+  - _Requirements: 2.11, 6.3, 10.5_
+
+- [ ] 2. ベンチマークとテスト用のファイルの生成器 (段階 0)
+- [ ] 2.1 テスト用のファイルを Node で作れるかを試作で確かめる (T7)
+  - Python 版の `tests/fixture_files.py` の fixture ごとに、Node で同じ性質のファイルを作る方法 (部品を使う、ZIP と XML の文字列から組み立てる、自前で書く) を決める
+  - 特に、暗号化した DOCX / XLSX / PPTX、暗号化した PDF (ユーザーパスワードと所有者パスワードだけの 2 種類)、XLS、申告サイズを偽った ZIP、壊れた ZIP を、実際に作ってみる
+  - fixture ごとに「作れる (方法)」「作れない (理由)」の一覧が research.md にある
+  - _Requirements: 10.5, 11.1_
+  - _Boundary: テスト用のファイルの生成器_
+- [ ] 2.2 ユーザー判断: Node で作れなかったテスト用のファイルの扱いを決める
+  - 2.1 で作れないものが残った場合、ファイルごとに扱い (別の確かめ方に替える、出所を記録して commit する、など) をユーザーに諮る。作れないものが無ければ、その旨を research.md に書いて完了にする
+  - ユーザーの判断が research.md に記録されている
+  - _Requirements: 10.5, 11.10_
+  - _Depends: 2.1_
+- [ ] 2.3 普通の文書のテスト用のファイルを Node で作る生成器を実装する
+  - DOCX、XLSX (複数シート・1 シート・非表示のシート・グラフだけのシート)、PPTX (複数スライド)、文字入りの PDF、画像だけの PDF、OpenDocument、RTF、EPUB、XLS、文字コード別のテキスト (Shift_JIS、EUC-JP、BOM 付き UTF-8 など) を作る
+  - 旧形式の DOC / PPT は、Python 版で commit 済みのファイル (Apache POI 由来) を、出所の記録と一緒に新しい場所へ移す
+  - ZIP と XML を組み立てる共通の関数はこのタスクが持ち、2.4 はそれを使う
+  - 生成器ごとに、作ったファイルが名前のとおりの性質を持つことを確かめるテストが通る
+  - _Requirements: 6.2, 10.5_
+  - _Depends: 2.2_
+- [ ] 2.4 細工したテスト用のファイルを Node で作る生成器を実装する
+  - ZIP 爆弾、深い入れ子の XML、非標準の場所にあるシート (サブディレクトリ、`..`、大文字の拡張子、パッケージ直下)、壊れた ZIP、暗号化した Office と PDF、壊れた PDF、セル数の上限を超える大きな XLSX、時間切れ用の大きな XLSX、画像の多い大きな DOCX / PPTX を作る
+  - 2.3 の ZIP と XML を組み立てる共通の関数を使う。2.2 でユーザーが決めた扱いに従い、作れないものは決めた方法で用意する
+  - 生成器ごとに、作ったファイルが名前のとおりの性質を持つことを確かめるテストが通る
+  - _Requirements: 6.2, 10.5_
+  - _Depends: 2.3_
+- [ ] 2.5 Node で作ったファイルを Python 版のテストの入力に差し替えて確かめる
+  - 作業ブランチの中だけで、Python 版のテストの fixture を Node で作ったファイルを読む形に一時的に差し替えて、Python 版のテストを実行する。Python 版のコードは変えない
+  - 差し替えは commit に残さない (確かめた後に元に戻す)。戻したことを `git status` で確かめる
+  - Python 版のテストが差し替えの前と同じ結果になること、同じにならなかったものとその原因が research.md に記録されている
+  - _Requirements: 10.5_
+- [ ] 2.6 ベンチマークのコーパスと正解を作る
+  - 形式ごと (少なくとも PDF / DOCX / XLSX / PPTX / XLS / CSV / HTML / TXT) に日本語を含む文書を、Python 版でも読める普通の形式で作る。2.3 の生成器を使ってよい
+  - 日本語の PDF (横書き、縦書き、語の途中の改行) は、HTML から Chromium と再配布できるフォント (Noto CJK など) で作る。Chromium (Puppeteer) とフォントの入れ方、フォントのライセンスと入手先を確かめ、research.md に書く。生成器はテスト専用の依存にし、本番の image に入れない。Shift_JIS / EUC-JP / ISO-2022-JP / BOM 付き UTF-8 / UTF-16 のテキストと、`<meta charset>` と script / style を含む HTML を入れる
+  - 文書ごとに、検索で必ず見つかるべき語句と、現れるべき位置 (ページ・スライド・シートの番号と名前)、期待する `pages[]` の要素の数を正解として書いてある
+  - _Requirements: 2.4, 2.7, 2.8_
+- [ ] 2.7 ベンチマークを測る道具を作る
+  - 抽出サービスの URL とトークンを受け取って `POST /extract` を呼び、形式ごと・指標ごとに、正解の語句の再現率、位置の正しさ、日本語の文字化けと語の分断の数を表にして出す
+  - devcontainer の Elasticsearch で kuromoji の解析器が使えるかを確かめ、使える場合は正解の語句で検索して見つかる割合も測る。使えない場合はその旨を research.md に書く
+  - 正解と出力を手で合わせた小さな例で、道具の採点が正しいことを確かめるテストが通る
+  - _Requirements: 2.9, 2.10, 2.15_
+- [ ] 2.8 Python 版でベースラインを測る
+  - いまの Python 版を devcontainer で起動し、2.7 の道具を向けて測る
+  - 形式ごと・指標ごとのベースラインが research.md にある
+  - _Requirements: 2.11, 6.8_
+- [ ] 2.9 ユーザー判断: ベンチマークの絶対値の合格の基準を決める
+  - 2.8 の結果を示し、ベースラインに加えて絶対値の下限を置くかどうかと、その値をユーザーに諮る
+  - ユーザーの判断が research.md に記録されている
+  - _Requirements: 2.13_
+
+- [ ] 3. 試作で未決の技術的な選択を決める (T1〜T6)
+- [ ] 3.1 PDF の部品を選ぶ (T1) (P)
+  - 候補 (`@hyzyla/pdfium`、pdfjs-dist、pdfium-native など) ごとに、ベンチマークの PDF の指標、パスワード付きと所有者パスワードだけの区別、壊れた PDF と画像だけの PDF の扱い、ページ数の上限の掛け方、子の最大 RSS と必要な仮想メモリ、ライセンス、部品の大きさを比べる
+  - 試作は使い捨ての場所 (scratchpad など) で行い、抽出サービスの package と lockfile には触らない。採用した部品は 3.8 で順番に入れる
+  - 選んだ部品とその実名、比べた結果が research.md にある。指標がベースラインを下回る候補しか無い場合は、その旨を示してユーザーに諮り、答えが research.md に記録されるまで 3.6 に進まない
+  - _Requirements: 2.12, 11.1, 11.3_
+  - _Boundary: 変換の層 (PDF) の試作_
+  - _Depends: 2.9_
+- [ ] 3.2 子プロセスの作り方を決める (T2) (P)
+  - `prlimit` で包んだ `spawn` と、`fork` の後に上限を掛ける方法などを比べる。上限 (仮想メモリ、CPU 時間の soft / hard、コアダンプ) が変換の開始の前に掛かること、結果を送る追加のパイプと親を見張るパイプが `prlimit` を通った後も子に引き継がれること、親が SIGKILL されたときに子が 1 秒以内に終わること、起動の時間を確かめる
+  - 試作は使い捨ての場所 (scratchpad など) で行い、抽出サービスの package と lockfile には触らない。採用した部品は 3.8 で順番に入れる
+  - 選んだ方法と計測の結果が research.md にある
+  - _Requirements: 3.11, 3.12, 4.8, 11.1, 11.4_
+  - _Boundary: 実行管理の層の試作_
+- [ ] 3.3 本文の受け取り方と multipart の分解の方法を決める (T4) (P)
+  - 上限つきでメモリに読み込んでから分解する方法と、少しずつ分解する部品を使う方法などを比べる。宣言なしで上限を超える本文、遅い本文、途中での切断、`file` が無い・2 つある、部品のヘッダーが大きすぎる、の各場合の振る舞いと、50MB を 3 件同時に送ったときの親の最大 RSS を測る
+  - 試作は使い捨ての場所 (scratchpad など) で行い、抽出サービスの package と lockfile には触らない。採用した部品は 3.8 で順番に入れる
+  - 選んだ方法と計測の結果が research.md にある
+  - _Requirements: 3.1, 3.3, 3.5, 11.1, 11.6_
+  - _Boundary: HTTP の層の試作_
+- [ ] 3.4 OpenAPI の作り方を決める (T5) (P)
+  - commit 済みの文書を正とする方法と、コードから作る方法を比べる。説明文以外が JSON として同じになるか、orval で作り直して型・関数・引数に差分が出ないか、名前を合わせるのに要るコードの量を確かめる
+  - 試作は使い捨ての場所 (scratchpad など) で行い、抽出サービスの package と lockfile には触らない。採用した部品は 3.8 で順番に入れる
+  - 選んだ方法と理由が research.md にある。名前を合わせると複雑になる場合は、Req 1.10 の手続きで崩すかどうかの判断も記録されている
+  - _Requirements: 1.9, 1.10, 7.1, 7.2, 7.3, 7.6, 11.1, 11.7_
+  - _Boundary: OpenAPI の試作_
+- [ ] 3.5 テキスト系の部品を選ぶ (T6) (P)
+  - HTML の解析、文字コードの判定とデコード、ZIP の読み書き、DTD とエンティティを展開しない XML の解析の部品を、ベンチマークのテキスト系の指標、2.4 の文字コードのファイル、ZIP 爆弾と XXE の試験、ライセンスで比べる
+  - 試作は使い捨ての場所 (scratchpad など) で行い、抽出サービスの package と lockfile には触らない。採用した部品は 3.8 で順番に入れる
+  - 選んだ部品とその実名、比べた結果が research.md にある
+  - _Requirements: 2.2, 2.4, 4.4, 11.1_
+  - _Boundary: 変換の層 (テキスト系と OOXML) の試作_
+  - _Depends: 2.9_
+- [ ] 3.6 仮想メモリの上限の値を決める (T3)
+  - 3.1 と 3.5 で選んだ部品と anydoc について、形式ごとに普通のファイルと大きなファイルで子が必要とする仮想メモリを測る
+  - 上限の値と、その値ですべての正常な変換が失敗しないこと、RSS の監視が主な守りであることが research.md にある
+  - _Requirements: 11.1, 11.5_
+  - _Depends: 3.1, 3.2, 3.5_
+- [ ] 3.7 子の最大 RSS の基準値とメモリの予算を取り直し、既定値を決める
+  - 対象 spec の基準のファイル (7 万セル 1 シートの XLSX、画像 12 枚の 48MB の DOCX) で、子の最大 RSS を対象 spec と同じ方法で測る。research.md 2 節の数字の食い違いの原因も確かめる
+  - 親の待機時の RSS と 3.3 の結果を合わせて、メモリの予算を計算し直す。タイムアウトの最悪の合計 (本文の受信 + 変換 + 停止と回収) の内訳も見積もる
+  - `MAX_CHILD_RSS_MB` 320 と `MAX_XLSX_CELLS` 70,000 が成り立たなければ下げ、下げた値、根拠の計測、検索の対象になる XLSX の範囲の変化を research.md に書き、design.md の Revalidation Triggers に足す。上げない。2Gi を超えない
+  - 計測の結果と、使う既定値が research.md にある。対象 spec の AC や不変条件を満たせないことが分かったら、ユーザーに諮り、答えが research.md に記録されるまで 3.8 と 4.x に進まない
+  - _Requirements: 3.13, 3.14, 11.1, 11.2, 11.10, 11.11_
+  - _Depends: 3.3, 3.6_
+- [ ] 3.8 採用した部品を抽出サービスの package に入れる
+  - 3.1〜3.5 で採用した部品 (PDF、テキスト系、OpenAPI、multipart など) を、1 回ずつ順番に install して package に入れる。ライセンスを確かめ、research.md の部品の一覧と合わせる
+  - `turbo run lint test --filter @growi/attachment-text-extractor` が通り、lockfile の差分が採用した部品だけになっている
+  - _Requirements: 4.4_
+  - _Depends: 3.7_
+
+- [ ] 4. テストを Node (vitest) へ先に書き換える (段階 1)
+- [ ] 4.1 Python のテストと Node のテストの対応表を作る
+  - Python のテストファイルごとに、対応する Node のテストファイル、または対応させない理由 (forkserver・pickle・`BaseException` など Python に固有の仕組み) を書く
+  - Python 版に向けて動かすときに外すテスト (直した OpenAPI の説明文、`/readyz` の `dependencies` の実名、`/docs` と `/redoc` が無いこと、`WORKERS` を読まないこと、崩した契約) の目印の付け方を決め、外すテストとその根拠を一覧にする
+  - 対応表がこの spec の research.md にある
+  - _Requirements: 6.2_
+- [ ] 4.2 共有層・設定・変換の層の単体テストを書く (P)
+  - 形式の判定の表、CSV / HTML の大きさの事前判定、長さを先に付けた JSON、設定の読み込み (トークンが無いと起動しない、`WORKERS` を読まない、既定値)、正規化 (改行はすべての経路、日本語の詰めは PDF だけ)、各形式の変換、空の要素の規則、既知の制約、ZIP の事前検査、XLSX のセル数の上限、PDF のページ数の上限、結果の大きさの上限
+  - anydoc の文書化されていない挙動 (PPTX の分割、XLSX の目印、XLS の形式名、例外の分類) の契約テストを、版を固定して書く
+  - `essential-test-design` と `essential-test-patterns` に従う。テストは実装が無いため失敗する
+  - _Requirements: 1.4, 1.5, 2.5, 2.6, 3.6, 3.7, 4.2, 4.5, 5.2_
+  - _Boundary: 共有層、設定、変換の層のテスト_
+  - _Depends: 2.4, 3.8, 4.1_
+- [ ] 4.3 実行管理の結合テストを書く (P)
+  - 本物の子プロセスで、時間切れ、RSS の超過、異常終了 (abort / segfault)、親の消失、結果の上限、取り消し (中止の合図) で子が止まって回収されること、上限 (仮想メモリ・CPU 時間・コアダンプ) が掛かっていること、子の環境変数にトークンが無いこと、子が送ったデータをコードとして扱わないこと、`prlimit` が無いときに準備完了にならないことを確かめる
+  - テストは実装が無いため失敗する
+  - _Requirements: 3.4, 3.5, 3.8, 3.9, 3.10, 3.11, 3.12, 8.8_
+  - _Boundary: 実行管理の層のテスト_
+  - _Depends: 2.4, 3.8, 4.1_
+- [ ] 4.4 HTTP の層のテストと、外から確かめる黒箱のテストを書く (P)
+  - 認証 (認証なしで呼べるのは 3 つのパスだけ、存在しないパスも 401)、宣言された大きさでの早期の 413、枠が空いていないときの 503、届いたバイト数での 413、受信の時間切れの 408、不正な本文の 422、切断で変換が止まること、エラー表のすべての行、ログの 1 行に出す項目と出さない項目、`/healthz` と `/readyz` (部品の実名と `prlimit`)、`/openapi.json`、`/docs` と `/redoc` が無いこと
+  - 黒箱のテストは URL を受け取って外のサービスにも向けられる形にし、4.1 の目印を付ける
+  - テストは実装が無いため失敗する
+  - _Requirements: 1.1, 1.2, 1.3, 1.6, 1.7, 1.8, 3.1, 3.2, 3.3, 3.5, 4.3, 7.1_
+  - _Boundary: HTTP の層のテスト、黒箱のテスト_
+  - _Depends: 2.4, 3.8, 4.1_
+- [ ] 4.5 配備物のテストを書く (P)
+  - Dockerfile (Node 24 の slim、最終の段で `prlimit` を実行する、本番に不要なものを含まない)、compose のエントリ (`WORKERS` が無い、安全設定)、k8s の例 (推奨の安全設定、メモリの requests / limits が 3.7 の予算に合う、`WORKERS` が無い)、共有メモリを使わないことを、ファイルを読んで確かめる
+  - テストは配備物がまだ Node 版になっていないため失敗する
+  - _Requirements: 8.3, 8.4, 8.5, 8.6, 8.7_
+  - _Boundary: 配備物のテスト_
+  - _Depends: 3.8, 4.1_
+- [ ] 4.6 黒箱のテストを Python 版に向けて通す
+  - devcontainer で Python 版を起動し、4.4 の黒箱のテストを、目印の付いたテストを外して向ける
+  - 目印の無いテストがすべて Python 版で通る。通らないものは、テストの間違いか、意図した変更 (目印を付け忘れたもの) かを調べて直す。結果が research.md にある
+  - _Requirements: 6.3_
+- [ ] 4.7 Node 版に向けて失敗すること (RED) を記録する
+  - import の失敗だけで落ちる形を避けるため、共有層の型と、各層の入口の空の実装 (常に失敗を返すもの) を先に置いてよい。テストが確かめている中身が食い違うことで失敗する形にする
+  - 4.2〜4.5 のテストを Node 版に向けて動かし、実装が無いために失敗する出力を記録する
+  - 失敗の出力 (RED) が research.md か作業の記録にある
+  - _Requirements: 6.1, 6.4_
+
+- [ ] 5. テストのレビューを通す
+- [ ] 5.1 テストを書いた担当とは別の担当が、テストをレビューし、承認まで直す
+  - レビューの担当は、テストを書いた担当とは別に新しく立てる。`essential-test-design` (観察できる結果を確かめているか) と `essential-test-patterns` (vitest、`mock<T>()`、型の主張を避ける) を使う
+  - 指摘を直し、同じレビューを通し直す。直すべき指摘が残っていない状態でレビューの担当が承認する
+  - レビューの指摘でテストを直した場合は、4.6 (Python 版で通ること) と 4.7 (RED の記録) をやり直して記録を更新する
+  - 承認の記録 (担当、指摘と直したこと) が残っている
+  - _Requirements: 6.1, 6.5, 6.7_
+
+- [ ] 6. 実装を書き換える (段階 3)
+- [ ] 6.1 共有層と設定を実装する
+  - 型と `ErrorCode`、失敗の種類、形式の判定の表、CSV / HTML の大きさの事前判定、長さを先に付けた JSON、設定の読み込み (トークンが無いと起動しない、`WORKERS` を読まない) を、外部の部品を import しない純粋な層として作る
+  - 4.2 のうち共有層と設定のテストが通る
+  - _Requirements: 1.4, 1.5, 5.1, 5.4, 5.6_
+- [ ] 6.2 変換の層の正規化とテキスト系の処理を実装する (P)
+  - 改行の統一、日本語の詰め (PDF だけ)、文字コードの判定とデコード、HTML、XML、ipynb、プレーンテキスト、CSV / TSV の前処理を、3.5 で選んだ部品で作る
+  - XML のテキスト化は解析せずにタグを取り除く (design のとおり)。安全な XML の解析の関数は 6.3 が持ち、このタスクでは作らない
+  - 4.2 のうち該当するテストが通る
+  - _Requirements: 2.5, 2.6, 5.2_
+  - _Boundary: 変換の層 (正規化とテキスト系)_
+- [ ] 6.3 変換の層の OOXML の処理を実装する (P)
+  - ZIP の事前検査、安全な XML の解析、PPTX のスライドごとの分割、XLSX のセル数の数え方とシートごとの分割を作る
+  - 4.2 のうち ZIP の事前検査、安全な XML の解析、分割、セル数の数え方のテストが通る (anydoc を呼ぶ部分は 6.4)
+  - _Requirements: 3.7, 5.2_
+  - _Boundary: 変換の層 (OOXML)_
+- [ ] 6.4 変換の層の anydoc と PDF の呼び出しを実装する (P)
+  - anydoc を形式を明示して呼び、OCR を使わず、例外を失敗の種類に分ける。PDF は 3.1 で選んだ部品でページごとに取り出し、ページ数の上限とパスワードの区別を扱う
+  - 4.2 のうち該当するテストと、anydoc の契約テストのうち anydoc を直接呼ぶものが通る (PPTX と XLSX の分割を通す契約テストは 6.5 で通る)
+  - _Requirements: 4.2, 4.5, 5.2_
+  - _Boundary: 変換の層 (anydoc と PDF)_
+- [ ] 6.5 変換の層の入口をまとめる
+  - 形式の判定 → 大きさの判定 → 経路ごとの変換 → 正規化 → 空の要素を除く → 結果の大きさの判定を 1 つの入口にまとめ、例外を外に投げない形にする。外に見せるのは入口だけにする
+  - 4.2 のテストと anydoc の契約テストがすべて通る
+  - _Requirements: 1.1, 2.5, 5.2, 5.4_
+- [ ] 6.6 子プロセスの入口を実装する
+  - 見出しと本体を受け取り、`oom_score_adj` を設定し、親を見張り、変換を呼び、結果を追加のパイプに 1 回だけ送る
+  - 4.3 のうち子の側に関するテストが通る
+  - _Requirements: 3.9, 3.10, 3.11_
+- [ ] 6.7 実行管理の層を実装する
+  - 3.2 で決めた方法で、`prlimit` を絶対パスで使って子を起動し、トークンを含まない明示した環境変数を渡し、RSS と期限を見張り、中止の合図で子を止め、必ず回収してから戻る。終了のしかたを失敗の種類に分け、`prlimit` と確認用の子で準備完了を判定する
+  - Linux に固有の処理は 1 か所にまとめ、Linux 以外では何もしない
+  - 4.3 のテストがすべて通る
+  - _Requirements: 3.4, 3.5, 3.6, 3.8, 3.10, 3.12, 4.3, 4.8, 8.8_
+- [ ] 6.8 HTTP の層を実装する
+  - 認証、同時実行の枠、本文の受け取り (3.3 で決めた方法)、multipart の分解、抽出の経路、エラーの対応表 (失敗の種類のすべてを持つ 1 か所の表)、`/healthz` と `/readyz` (部品の実名と `prlimit`、内部のモジュールは `converter`)、`/openapi.json` (3.4 で決めた方法)、1 件ごとのログを作る。`/docs` と `/redoc` は出さない
+  - 4.4 のうち HTTP の層のテストが通る (黒箱のテストは 6.9 で通る)
+  - _Requirements: 1.2, 1.3, 1.6, 1.7, 1.8, 3.1, 3.2, 3.3, 5.5, 11.9_
+- [ ] 6.9 組み立てと OpenAPI の書き出しを実装する
+  - 設定 → 実行管理 → アプリ → 待ち受けを 1 か所で組み立てる。OpenAPI の書き出しの手順を作る
+  - 撤去 (8.2) までは、Node 版が出す文書と commit 済みの `openapi.json` を、説明文を除いて JSON として比べるテストが通る
+  - 4.4 の黒箱のテストがすべて通る。Node 版をローカルで起動し、PDF と DOCX の `POST /extract` が 200 を返す
+  - _Requirements: 4.3, 7.1, 7.3_
+- [ ] 6.10 層の依存の向きを機械的に確かめる
+  - 変換の層と子の入口が、実行管理の層と HTTP の層を import しないこと、実行管理の層が HTTP の層と変換の層を import しないこと、HTTP の層が変換の層を import しないことを、lint の規則か依存を調べるテストで確かめる
+  - 逆向きの import を 1 つ足すと検査が失敗し、元に戻すと通る
+  - _Requirements: 5.1, 5.3_
+- [ ] 6.11 Dockerfile と k8s の例を Node 版で作る
+  - `apps/pdf-converter` に倣い、Node 24 の slim を元にし、`pnpm deploy --prod` で本番の依存だけを取り出す multi-stage の Dockerfile を作る。最終の段で `prlimit` を実行し、無ければビルドを失敗させる。`RAYON_NUM_THREADS=1` を設定する
+  - k8s の例 (deployment、service、hpa、networkpolicy) を新しい場所に作り、`WORKERS` を消し、メモリの requests / limits を 3.7 の予算に合わせる
+  - 4.5 のテストが通る (compose のテストは 8.2 で通る)
+  - _Requirements: 8.1, 8.3, 8.5, 8.6, 8.7_
+- [ ] 6.12 Node 版の CI のジョブに image の確認を足す
+  - image のビルド、大きさが 400MB 以下であることの検査、read-only rootfs・uid 10001・ネットワークなしでの起動、コンテナの中での `/readyz` の確認と PDF / DOCX の `POST /extract`、本番と同じ条件での `prlimit` の実行、OpenAPI の比較 (説明文を除く) を足す
+  - ローカルの docker で同じ手順が成功する
+  - _Requirements: 8.1, 8.2, 9.1, 9.5_
+- [ ] 6.13 Node 版でベンチマークを測り、Python 版と比べる
+  - 2.7 の道具を Node 版に向けて測り、2.8 のベースラインと形式ごと・指標ごとに比べる。2.9 で決めた絶対値の基準も確かめる
+  - Node 版と Python 版の `pages[]` の違いを、比較用のファイルの集まりについて記録する
+  - 結果の表と違いの記録が research.md にある。下回った形式と指標があれば、原因を調べて書いてある
+  - _Requirements: 2.1, 2.2, 2.3, 2.12, 2.15_
+- [ ] 6.14 ユーザー判断: ベンチマークで下回った形式の扱いを決める
+  - 6.13 で下回った形式と指標、原因を示し、直すか受け入れるかをユーザーに諮る。下回ったものが無ければ、その旨を research.md に書いて完了にする
+  - 直すと決まったものは直して 6.13 を測り直す。ユーザーの判断が research.md に記録されている
+  - _Requirements: 2.14, 11.12_
+
+- [ ] 7. 実装のレビューを通す
+- [ ] 7.1 実装した担当とは別の担当が、Opus で、欠陥を探す立場でレビューし、承認まで直す
+  - レビューの担当は新しく立て、Opus の model を明示して使い、`kiro-review` の手順で、範囲 → 形 → 欠陥の順に見る (`.claude/rules/coding-style.md` の「筋の良い実装」)
+  - 不変条件 (認証、トークンを子に渡さない、隔離、入力を返さないエラー、メモリの予算 2Gi、対応形式、位置情報) が守られていることと、崩した契約がすべて research.md の 7 節に記録されていることを確かめる
+  - 指摘を直し、同じレビューを通し直す。変換の層を直した場合は 6.13 を測り直し、下回った形式があれば 6.14 の手続きに戻る。直すべき指摘が残っていない状態でレビューの担当が承認する
+  - _Requirements: 1.9, 1.10, 1.11, 1.12, 1.13, 5.1, 5.3, 5.4, 5.5, 5.6, 6.1, 6.6, 6.7_
+
+- [ ] 8. Python 版を撤去し、配布物と CI を切り替える
+- [ ] 8.1 撤去の前提がそろっていることを確かめる
+  - ベースライン (2.8)、比較 (6.13)、黒箱のテストの Python 版での確認 (4.6)、Node で作ったファイルの Python 版での確認 (2.5)、ベンチマークの判断 (2.9、6.14)、実装のレビューの承認 (7.1) が、すべて research.md かレビューの記録にある。7.1 で変換の層を直した場合は、その後に測り直した 6.13 の結果と判断がある
+  - そろっていない項目があれば、撤去に進まない
+  - _Requirements: 10.4, 10.5_
+  - _Depends: 2.5, 2.9, 4.6, 6.14, 7.1_
+- [ ] 8.2 撤去と切り替えを 1 つの変更として行う
+  - compose の build の `context` を Node 版に切り替え、`WORKERS` を消す。CI の `paths` を切り替え、Python 版のジョブを消す。`services/attachment-text-extractor/` をディレクトリごと消す
+  - OpenAPI の説明文から Python に固有の言葉を取り除き、orval で生成クライアントを作り直す。直した説明文ごとに直す前と後の文を research.md に書く。CI の OpenAPI の比較を、説明文も含めた完全な比較に切り替える
+  - 生成クライアントの差分がコメントだけであること、apps/app と下流 spec のファイルに変更が無いこと、`services/attachment-text-extractor/` が無く、`apps/attachment-text-extractor/` の下と抽出サービスの CI workflow に `.py` のファイルと uv / ruff / pytest / poe を使う記述が無いことを確かめる (`.kiro/` と steering の古い記述は 9.4 で扱うので、ここでは確かめない)
+  - 4.5 の compose のテストを含むすべてのテストが通り、`turbo run lint test --filter @growi/attachment-text-extractor` と生成クライアントの package の lint / build が通る
+  - _Requirements: 4.6, 7.1, 7.2, 7.3, 7.4, 7.5, 8.4, 9.1, 9.2, 10.1, 10.2, 10.3_
+- [ ] 8.3 配布物と CI を、CI でできる確認と人の確認に分けて確かめる
+  - GitHub に push するのは外に向けた操作なので、push する前にユーザーの承認を得る。この workflow は master 以外のブランチへの push でも trigger の条件 (`paths`) に合えば動くので、作業ブランチへの push を第一の方法にする
+  - CI で確かめること (8.2 の変更を、trigger の条件に合うブランチに push して動かす): image のビルド、400MB 以下、read-only rootfs・uid 10001・ネットワークなしでの起動、`/readyz` が準備完了、PDF と DOCX の `POST /extract` が 200、`prlimit` の実行、OpenAPI の比較、lint・型の検査・テスト
+  - 人が確かめること (CI ではできない): GitHub 上の workflow の実行を `gh api repos/<org>/<repo>/actions/runs/<id>/jobs` で見て、ジョブの数が 0 より多く、すべてのステップが成功していること (ジョブが 0 件の実行は成功とみなさない)。arm64 の image がビルドできること (CI が x64 だけの場合)。k8s への適用は範囲外
+  - CI の結果と、人が確かめた結果 (実行の id、ジョブの数) が research.md にある
+  - _Requirements: 8.1, 8.2, 9.3, 9.5_
+
+- [ ] 9. 対象 spec に取り込み、この spec を消す
+- [ ] 9.1 ユーザー判断: Follow-ups のうち直すものを決める
+  - brief.md の Follow-ups の一覧 (steering の `structure.md` と `tech.md`、root の `AGENTS.md` と `project-structure.md`、umbrella と下流 spec に残る Python や古いパスの記述) を示し、どれを直すかをユーザーに諮る
+  - ユーザーの判断が記録されている
+  - _Requirements: 12.6_
+- [ ] 9.2 対象 spec の requirements.md と design.md を書き直す
+  - 対象 spec の design.md を、Node 版が最初からそうだったように書き直す (実行基盤、層の分け方の判断、子プロセスの作り方、`WORKERS` の無い設定の表とメモリの目安、`/readyz` の `dependencies`、Revalidation Triggers、下げた既定値があればその値)。以前の Python 版の経緯は本文に残さない
+  - 対象 spec の design.md の配布物と CI の記述を、この spec の Req 8 と Req 9 の中身 (Node 版の Dockerfile、compose、k8s の例、CI) に合わせて書き直す
+  - 対象 spec の requirements.md は、既存の番号 (Req 1〜4、AC 1.1〜4.2) を変えない。brief.md の「Port-back の前提」の番号の対応 (この spec の Req 4 → 対象 spec の Req 5、Req 5 → Req 6、Req 7 → Req 7。AC の番号は新しい要件の中でそのまま使う) に従って、対象 spec の末尾に追加する。崩した契約に当たる AC があれば、番号を変えずに文言だけを直す
+  - 書き直した 2 つの文書に「Python」「FastAPI」「forkserver」などの経緯の言葉が残っていない (Node 版の判断の根拠として要るものを除く)
+  - _Requirements: 1.12, 12.1, 12.2_
+- [ ] 9.3 設計の根拠を対象 spec の research.md に移す
+  - この spec の research.md の計測の結果、試作の決定と理由、ベンチマークの結果、崩した契約の記録 (7 節) を、対象 spec の research.md に移す。Node 版で意味を失った Python に固有の知見は消し、まだ判断の材料になるもの (別コンテナで動かす理由など) は残す
+  - この spec のディレクトリを消しても失われる根拠が無いことを確かめる
+  - _Requirements: 12.3_
+- [ ] 9.4 Follow-ups のうち、ユーザーが直すと決めたものを直す
+  - 9.1 の判断のとおりに直す。決めていないものは直さない
+  - 直したファイルの一覧が記録されている
+  - _Requirements: 12.6_
+  - _Depends: 9.1_
+- [ ] 9.5 対象 spec の spec.json を更新し、この spec を削除する
+  - 消す前に、steering (`.kiro/steering/`) と他の spec からこの spec のファイルを名前で参照している箇所を grep で探す。参照があれば、中身を対象 spec の research.md か steering の custom ファイルに移し、参照先を書き換える
+  - 対象 spec の `spec.json` の `updated_at` だけを更新し、`phase` と `approvals` は変えない
+  - `roadmap.md` にこの spec の行があれば消す (いまは無い)
+  - `.kiro/specs/attachment-search-text-extractor-node-rewrite/` を削除し、steering と他の spec からこの spec への参照が残っていないことを grep で確かめる
+  - 完了の報告で、崩した契約 (`WORKERS`、`/docs` と `/redoc`、`/readyz` の名前、ほかに崩したもの) と、下げた既定値があればその値をユーザーに示す
+  - _Requirements: 1.12, 11.11, 12.4, 12.5_

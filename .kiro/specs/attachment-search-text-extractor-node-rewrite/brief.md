@@ -123,7 +123,7 @@
 
 この spec の tasks.md の最後のタスクは、spec-lifecycle.md の手順どおり「対象 spec に取り込み、この spec を自己削除する」ものにする。取り込み方は次のとおり。
 
-- **requirements.md**: 対象 spec の既存の番号 (Req 1〜4、AC 1.1〜4.2) は一切変えない。この spec の要件のうち、書き換えの後も成り立ち続けるもの (Req 4: 実行基盤の制約、Req 5: コードの構成、Req 7: OpenAPI と生成クライアント) は、対象 spec の末尾に **Req 5 以降として追加** する。番号の対応は design フェーズで確定し、この brief に追記する。
+- **requirements.md**: 対象 spec の既存の番号 (Req 1〜4、AC 1.1〜4.2) は一切変えない。この spec の要件のうち、書き換えの後も成り立ち続けるもの (Req 4: 実行基盤の制約、Req 5: コードの構成、Req 7: OpenAPI と生成クライアント) は、対象 spec の末尾に **Req 5 以降として追加** する。番号の対応は次のとおり (design フェーズで確定): この spec の Req 4 → 対象 spec の Req 5、Req 5 → Req 6、Req 7 → Req 7。この spec の AC の番号は、対象 spec の新しい要件の中でそのまま使う (例: この spec の 4.8 → 対象 spec の 5.8)。
 - **既定の方針を崩した場合**: 崩した契約に当たる対象 spec の AC は、番号を振り直さずに文言を更新する。design.md の該当箇所も書き直す。以前の文言や崩した経緯は本文に残さない (Req 1.12)。
 - **取り込まない要件**: 書き換えの間だけ意味を持つもの (Req 6: 進め方、Req 10: Python 資産の撤去、Req 11: 未決事項の決め方、Req 12: 取り込みと自己削除) は対象 spec に移さない。Req 1〜3 (Python 版との同等性) は、対象 spec の既存の AC がすでに同じことを言っているので移さない。Req 2 のベンチマークの結果 (ベースラインと Node 版の値) は research.md に移す。Req 8 / Req 9 (配備物と CI) の中身は、対象 spec の design.md の配布物と CI の記述を書き直す形で取り込む。
 - **research.md**: Req 11 で計測した結果と決定の理由は、対象 spec の research.md に移す。Python に固有の知見 (forkserver が `__main__` を先読みできない、`UploadFile` が本文を `TMPDIR` に書き出す、など) は、Node 版で意味を失うものを消し、まだ判断の材料になるもの (なぜ別コンテナで動かすか、など) は残す。
