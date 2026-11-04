@@ -6,6 +6,6 @@
     "strict": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["./src/**/*"],
+  "include": ["./src/**/*", "./test/**/*"],
   "exclude": ["node_modules", "dist"]
 }

@@ -38,7 +38,7 @@
   - ユーザーの判断が research.md に記録されている
   - _Requirements: 10.5, 11.10_
   - _Depends: 2.1_
-- [ ] 2.3 普通の文書のテスト用のファイルを Node で作る生成器を実装する
+- [x] 2.3 普通の文書のテスト用のファイルを Node で作る生成器を実装する
   - DOCX、XLSX (複数シート・1 シート・非表示のシート・グラフだけのシート)、PPTX (複数スライド)、文字入りの PDF、画像だけの PDF、OpenDocument、RTF、EPUB、XLS、文字コード別のテキスト (Shift_JIS、EUC-JP、BOM 付き UTF-8 など) を作る
   - 旧形式の DOC / PPT は、Python 版で commit 済みのファイル (Apache POI 由来) を、出所の記録と一緒に新しい場所へ移す
   - ZIP と XML を組み立てる共通の関数はこのタスクが持ち、2.4 はそれを使う

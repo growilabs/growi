@@ -685,3 +685,4 @@ node src/bmp-iso.mjs out/bmp-iso-node.json && $PY py/bmp_iso.py out/bmp-iso-node
 - 9.1 のとおり、Node で作れないテスト用のファイルは無かったので、ファイルごとに扱いを決める必要はなかった。
 - 残っていた判断は、暗号化した Office (DOCX / XLSX / PPTX) の作り方だけだった。ユーザーは **`officecrypto-tool` (0.0.19、MIT、作者 1 人) を採る** と決めた。テスト専用の依存にして、本番の image には入れない。`cfb` が OLE の FAT の未使用欄を埋める問題は、9.7 の 11 行の修正で直す (2.3 / 2.4 で必ず入れる)。選ばなかった案: 暗号化を自前で実装する (150〜250 行、未検証)、作ったファイルを出所つきで commit する。
 - ISO-2022-JP の 13 字 (9.7) は、判断を求めずに「2.6 のコーパスでは使わない」と扱う (〜 U+301C と ～ U+FF5E のどちらも使わない)。使う必要が出たら、そのときにユーザーに諮る。
+- 〜 (U+301C) は、iconv-lite の Shift_JIS と EUC-JP でも書けない (実測。iconv-lite の Shift_JIS は cp932 の表を使い、① 髙 ㈱ ～ は書けて 〜 − ¥ ‾ は書けない。EUC-JP も 〜 は書けない)。2.6 のコーパスでは、Shift_JIS・EUC-JP・ISO-2022-JP のどの文書でも 〜 を使わない。
