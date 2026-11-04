@@ -489,12 +489,12 @@ describe('SearchPage selected-count display (Req 4.4/4.7)', () => {
 
   const COUNT_KEY = 'search_result.selected_count_of_loaded';
 
-  it('shows no selection out of the loaded results initially', () => {
-    const { getByText } = render(<SearchPage />);
+  it('shows no selection out of the loaded results initially, as a live status for screen readers', () => {
+    const { getByRole } = render(<SearchPage />);
 
-    expect(
-      getByText(`${COUNT_KEY} selectedCount=0 loadedCount=2`),
-    ).toBeInTheDocument();
+    expect(getByRole('status')).toHaveTextContent(
+      `${COUNT_KEY} selectedCount=0 loadedCount=2`,
+    );
   });
 
   it('updates the selected count when the selection changes', () => {

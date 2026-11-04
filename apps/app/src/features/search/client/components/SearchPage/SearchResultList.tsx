@@ -268,6 +268,10 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
 
   const listContainerRef = useRef<HTMLDivElement>(null);
   // Where the list starts inside the scroll element (below the result header).
+  // Re-measured after every render (no deps) because the header above the list
+  // can change height on any parent render; React skips the re-render when the
+  // value is unchanged. A ResizeObserver on the header would couple this list
+  // to the parent's DOM structure instead.
   const [scrollMargin, setScrollMargin] = useState(0);
   useLayoutEffect(() => {
     setScrollMargin(listContainerRef.current?.offsetTop ?? 0);

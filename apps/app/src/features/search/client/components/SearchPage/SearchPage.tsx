@@ -343,7 +343,7 @@ export const SearchPage = (): JSX.Element => {
 
             {/* Pair the selected count with the loaded count: select-all covers
                 only the loaded results, not every hit (Req 4.7). */}
-            <span className="ms-3 text-muted text-nowrap">
+            <span role="status" className="ms-3 text-muted text-nowrap">
               {t('search_result.selected_count_of_loaded', {
                 selectedCount,
                 loadedCount: merged.pages.length,
