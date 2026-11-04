@@ -10,7 +10,13 @@ import {
 import { escapeXml } from './xml-text';
 import { buildZip } from './zip';
 
-export type XlsxCell = string | number;
+/** A formula with the string value Excel cached for it, as openpyxl writes it. */
+export interface XlsxFormulaCell {
+  readonly formula: string;
+  readonly cached: string;
+}
+
+export type XlsxCell = string | number | XlsxFormulaCell;
 export type XlsxSheetState = 'visible' | 'hidden' | 'veryHidden';
 
 export interface XlsxWorksheet {
@@ -35,6 +41,18 @@ export interface XlsxChartsheet {
 
 export type XlsxSheet = XlsxWorksheet | XlsxChartsheet;
 
+export interface XlsxDefinedName {
+  readonly name: string;
+  /** The formula text, e.g. `'Alpha'!$1:$1`. */
+  readonly text: string;
+  /** Scopes the name to the sheet at this 0-based position. */
+  readonly localSheetId?: number;
+}
+
+export interface XlsxOptions {
+  readonly definedNames?: readonly XlsxDefinedName[];
+}
+
 const SML_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const CHART_NS = 'http://schemas.openxmlformats.org/drawingml/2006/chart';
 const SML = 'application/vnd.openxmlformats-officedocument.spreadsheetml';
@@ -53,10 +71,15 @@ const columnName = (index: number): string => {
 };
 
 // Strings are written inline (t="inlineStr"), so no sharedStrings part is needed.
-const cellXml = (value: XlsxCell, ref: string): string =>
-  typeof value === 'number'
-    ? `<c r="${ref}"><v>${value}</v></c>`
-    : `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+const cellXml = (value: XlsxCell, ref: string): string => {
+  if (typeof value === 'number') {
+    return `<c r="${ref}"><v>${value}</v></c>`;
+  }
+  if (typeof value === 'string') {
+    return `<c r="${ref}" t="inlineStr"><is><t>${escapeXml(value)}</t></is></c>`;
+  }
+  return `<c r="${ref}" t="str"><f>${escapeXml(value.formula)}</f><v>${escapeXml(value.cached)}</v></c>`;
+};
 
 const worksheetXml = (rows: readonly (readonly XlsxCell[])[]): string => {
   const body = rows
@@ -141,18 +164,35 @@ const sheetPartsInOrder = (sheets: readonly XlsxSheet[]): SheetParts[] =>
 
 // Every <sheet .../> is self-closing and carries `state`, as openpyxl writes it;
 // the Python split tests rewrite these attributes with regexes (research.md 9.5.4).
-const workbookXml = (sheets: readonly XlsxSheet[]): string => {
+const definedNamesXml = (names: readonly XlsxDefinedName[]): string => {
+  if (names.length === 0) {
+    return '';
+  }
+  const items = names.map(({ name, text, localSheetId }) => {
+    const scope = localSheetId == null ? '' : ` localSheetId="${localSheetId}"`;
+    return `<definedName name="${escapeXml(name)}"${scope}>${escapeXml(text)}</definedName>`;
+  });
+  return `<definedNames>${items.join('')}</definedNames>`;
+};
+
+const workbookXml = (
+  sheets: readonly XlsxSheet[],
+  definedNames: readonly XlsxDefinedName[],
+): string => {
   const entries = sheets
     .map(
       (sheet, i) =>
         `<sheet name="${escapeXml(sheet.name)}" sheetId="${i + 1}" state="${sheet.state ?? 'visible'}" r:id="rId${i + 1}"/>`,
     )
     .join('');
-  return `${XML_DECLARATION}<workbook xmlns="${SML_NS}" xmlns:r="${RELATIONSHIPS_NS}"><sheets>${entries}</sheets></workbook>`;
+  return `${XML_DECLARATION}<workbook xmlns="${SML_NS}" xmlns:r="${RELATIONSHIPS_NS}"><sheets>${entries}</sheets>${definedNamesXml(definedNames)}</workbook>`;
 };
 
 /** The parts of an XLSX workbook with the sheets in the given order. */
-export const xlsxParts = (sheets: readonly XlsxSheet[]): OoxmlPart[] => {
+export const xlsxParts = (
+  sheets: readonly XlsxSheet[],
+  { definedNames = [] }: XlsxOptions = {},
+): OoxmlPart[] => {
   const perSheet = sheetPartsInOrder(sheets);
   return [
     {
@@ -165,7 +205,7 @@ export const xlsxParts = (sheets: readonly XlsxSheet[]): OoxmlPart[] => {
       }),
     },
     packageRelationshipsPart('xl/workbook.xml'),
-    { name: 'xl/workbook.xml', data: workbookXml(sheets) },
+    { name: 'xl/workbook.xml', data: workbookXml(sheets, definedNames) },
     {
       name: 'xl/_rels/workbook.xml.rels',
       data: relationshipsXml(
@@ -180,5 +220,7 @@ export const xlsxParts = (sheets: readonly XlsxSheet[]): OoxmlPart[] => {
   ];
 };
 
-export const buildXlsx = (sheets: readonly XlsxSheet[]): Buffer =>
-  buildZip(xlsxParts(sheets));
+export const buildXlsx = (
+  sheets: readonly XlsxSheet[],
+  options: XlsxOptions = {},
+): Buffer => buildZip(xlsxParts(sheets, options));

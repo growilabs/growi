@@ -1,4 +1,9 @@
 import { startOffsets } from './offsets';
+import {
+  type PdfEncryption,
+  type StandardSecurityHandler,
+  standardSecurityHandler,
+} from './pdf-security';
 
 // A hand-assembled PDF, ported from `_build_pdf` in the Python service's
 // tests/fixture_files.py so the bytes stay identical (research.md 9.4).
@@ -23,33 +28,50 @@ const HELVETICA_RESOURCES = '<< /Font << /F1 3 0 R >> >>';
 
 const latin1 = (text: string): Buffer => Buffer.from(text, 'latin1');
 
-const objectBody = (object: PdfObject): Buffer =>
-  typeof object === 'string'
-    ? latin1(object)
-    : Buffer.concat([
-        latin1(
-          `<< ${object.dictionary} /Length ${object.data.length} >>\nstream\n`,
-        ),
-        object.data,
-        latin1('\nendstream'),
-      ]);
+// Only streams are encrypted: the objects written here hold no literal strings.
+const objectBody = (
+  object: PdfObject,
+  objectNumber: number,
+  security?: StandardSecurityHandler,
+): Buffer => {
+  if (typeof object === 'string') {
+    return latin1(object);
+  }
+  const data =
+    security == null
+      ? object.data
+      : security.encryptStream(objectNumber, object.data);
+  return Buffer.concat([
+    latin1(`<< ${object.dictionary} /Length ${data.length} >>\nstream\n`),
+    data,
+    latin1('\nendstream'),
+  ]);
+};
 
-const xrefAndTrailer = (offsets: readonly number[], xrefAt: number): Buffer => {
+const xrefAndTrailer = (
+  offsets: readonly number[],
+  xrefAt: number,
+  trailerExtra: string,
+): Buffer => {
   const size = offsets.length + 1;
   const rows = offsets
     .map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`)
     .join('');
   return latin1(
     `xref\n0 ${size}\n0000000000 65535 f \n${rows}` +
-      `trailer\n<< /Size ${size} /Root 1 0 R >>\nstartxref\n${xrefAt}\n%%EOF\n`,
+      `trailer\n<< /Size ${size} /Root 1 0 R${trailerExtra} >>\nstartxref\n${xrefAt}\n%%EOF\n`,
   );
 };
 
-const serialize = (objects: readonly PdfObject[]): Buffer => {
+const serialize = (
+  objects: readonly PdfObject[],
+  security?: StandardSecurityHandler,
+  trailerExtra = '',
+): Buffer => {
   const bodies = objects.map((object, i) =>
     Buffer.concat([
       latin1(`${i + 1} 0 obj\n`),
-      objectBody(object),
+      objectBody(object, i + 1, security),
       latin1('\nendobj\n'),
     ]),
   );
@@ -58,7 +80,25 @@ const serialize = (objects: readonly PdfObject[]): Buffer => {
     bodies.map((body) => body.length),
   );
   const head = Buffer.concat([HEADER, ...bodies]);
-  return Buffer.concat([head, xrefAndTrailer(offsets, head.length)]);
+  return Buffer.concat([
+    head,
+    xrefAndTrailer(offsets, head.length, trailerExtra),
+  ]);
+};
+
+// The /Encrypt dictionary goes last, so the other object numbers stay as in
+// the unencrypted file.
+const serializeEncrypted = (
+  objects: readonly PdfObject[],
+  encryption: PdfEncryption,
+): Buffer => {
+  const security = standardSecurityHandler(encryption);
+  const id = encryption.fileId.toString('hex');
+  return serialize(
+    [...objects, security.dictionary],
+    security,
+    ` /Encrypt ${objects.length + 1} 0 R /ID [<${id}> <${id}>]`,
+  );
 };
 
 /**
@@ -68,6 +108,7 @@ const serialize = (objects: readonly PdfObject[]): Buffer => {
 export const buildPdf = (
   pages: readonly PdfPage[],
   extraObjects: readonly PdfObject[] = [],
+  encryption?: PdfEncryption,
 ): Buffer => {
   const firstPage = 4 + extraObjects.length;
   const kids = pages.map((_, i) => `${firstPage + 2 * i} 0 R`).join(' ');
@@ -75,13 +116,16 @@ export const buildPdf = (
     `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources ${page.resources} /Contents ${firstPage + 2 * i + 1} 0 R >>`,
     { dictionary: '', data: latin1(page.content) },
   ]);
-  return serialize([
+  const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     `<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>`,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
     ...extraObjects,
     ...pageObjects,
-  ]);
+  ];
+  return encryption == null
+    ? serialize(objects)
+    : serializeEncrypted(objects, encryption);
 };
 
 const assertPrintableAscii = (text: string): void => {
@@ -98,13 +142,18 @@ const assertPrintableAscii = (text: string): void => {
 const pdfString = (text: string): string => text.replace(/[\\()]/g, '\\$&');
 
 /** One page per text, each drawn in Helvetica. */
-export const buildTextPdf = (pageTexts: readonly string[]): Buffer => {
+export const buildTextPdf = (
+  pageTexts: readonly string[],
+  encryption?: PdfEncryption,
+): Buffer => {
   pageTexts.forEach(assertPrintableAscii);
   return buildPdf(
     pageTexts.map((text) => ({
       resources: HELVETICA_RESOURCES,
       content: `BT /F1 24 Tf 72 700 Td (${pdfString(text)}) Tj ET`,
     })),
+    [],
+    encryption,
   );
 };
 

@@ -120,3 +120,36 @@ describe('buildXlsx', () => {
     expect(await anydocMarkdown(xlsx, 'xlsx')).toContain('| Jan | 10 |');
   });
 });
+
+describe('buildXlsx formulas and defined names', () => {
+  it('writes a formula cell with its cached string value, as openpyxl does', async () => {
+    const xlsx = buildXlsx([
+      {
+        name: 'Alpha',
+        rows: [
+          ['alpha value', { formula: 'Beta!A1', cached: 'cached from beta' }],
+        ],
+      },
+      { name: 'Beta', rows: [['beta value']] },
+    ]);
+
+    expect(readZipText(xlsx, 'xl/worksheets/sheet1.xml')).toContain(
+      '<c r="B1" t="str"><f>Beta!A1</f><v>cached from beta</v></c></row>',
+    );
+    expect(await anydocMarkdown(xlsx, 'xlsx')).toContain('cached from beta');
+  });
+
+  it('writes defined names after the sheet list, scoped to a sheet when asked', () => {
+    const xlsx = buildXlsx([{ name: 'Alpha' }, { name: 'Beta' }], {
+      definedNames: [
+        { name: 'named_cell', text: 'Beta!$A$1' },
+        { name: '_xlnm.Print_Titles', text: "'Alpha'!$1:$1", localSheetId: 0 },
+      ],
+    });
+
+    expect(readZipText(xlsx, 'xl/workbook.xml')).toContain(
+      '</sheets><definedNames><definedName name="named_cell">Beta!$A$1</definedName>' +
+        `<definedName name="_xlnm.Print_Titles" localSheetId="0">'Alpha'!$1:$1</definedName></definedNames>`,
+    );
+  });
+});

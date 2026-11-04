@@ -13,6 +13,13 @@ import { buildXlsx } from './xlsx';
 export const JAPANESE_SAMPLE =
   '障害対応メモ\n本番環境で発生した情報システムの障害';
 
+/** The page texts of `pdf_text`, one per page. */
+export const PDF_PAGE_TEXTS: readonly string[] = [
+  'PDF page 1',
+  'PDF page 2',
+  'PDF page 3',
+];
+
 export interface PlainDocument {
   /** The Python fixture name plus an extension, for dumping to disk. */
   readonly fileName: string;
@@ -97,7 +104,7 @@ export const PLAIN_DOCUMENTS = {
   },
   pdfText: {
     fileName: 'pdf_text.pdf',
-    build: () => buildTextPdf(['PDF page 1', 'PDF page 2', 'PDF page 3']),
+    build: () => buildTextPdf(PDF_PAGE_TEXTS),
   },
   pdfImageOnly: { fileName: 'pdf_image_only.pdf', build: buildImageOnlyPdf },
   textShiftJis: {

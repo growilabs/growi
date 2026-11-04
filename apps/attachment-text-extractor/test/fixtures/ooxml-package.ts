@@ -65,3 +65,42 @@ export const packageRelationshipsPart = (mainPart: string): OoxmlPart => ({
     { id: 'rId1', type: 'officeDocument', target: mainPart },
   ]),
 });
+
+const partText = (part: OoxmlPart): string =>
+  typeof part.data === 'string'
+    ? part.data
+    : Buffer.from(part.data).toString('utf8');
+
+/**
+ * Returns the parts with the named part's text rewritten. A missing part
+ * throws, so a crafted variant can never silently equal the original.
+ */
+export const editPart = (
+  parts: readonly OoxmlPart[],
+  name: string,
+  edit: (text: string) => string,
+): OoxmlPart[] => {
+  if (!parts.some((part) => part.name === name)) {
+    throw new Error(`no part named ${name}`);
+  }
+  return parts.map((part) =>
+    part.name === name ? { ...part, data: edit(partText(part)) } : part,
+  );
+};
+
+/**
+ * `String.prototype.replace` that throws when nothing matches: a rewrite that
+ * misses leaves the input unchanged and the test checking nothing
+ * (research.md 9.5.4).
+ */
+export const replaceOrThrow = (
+  text: string,
+  pattern: string | RegExp,
+  replacement: string,
+): string => {
+  const replaced = text.replace(pattern, replacement);
+  if (replaced === text) {
+    throw new Error(`pattern ${String(pattern)} did not match`);
+  }
+  return replaced;
+};

@@ -1,6 +1,11 @@
 import { crc32, deflateRawSync, inflateRawSync } from 'node:zlib';
 
-import { readZipEntries } from './spec-support';
+import {
+  readLocalBody,
+  readLocalHeader,
+  readZipDirectory,
+  readZipEntries,
+} from './spec-support';
 import { buildMimetypeFirstZip, buildZip } from './zip';
 
 const LOCAL_HEADER_SIZE = 30;
@@ -116,6 +121,52 @@ describe('buildZip', () => {
     const header = localHeaderAt(zip, 0);
     expect(header.flags & 0x0800).toBe(0x0800);
     expect(header.name).toBe('シート.xml');
+  });
+});
+
+describe('buildZip with zip64 entries', () => {
+  it('moves the sizes of a zip64 entry into its extra field, even when they are small', () => {
+    const data = Buffer.from('<x/>');
+
+    const zip = buildZip([
+      { name: 'ppt/presentation.xml', data, zip64: true },
+      { name: 'plain.xml', data: 'plain' },
+    ]);
+
+    const [forced, plain] = readZipDirectory(zip) ?? [];
+    expect(forced).toMatchObject({
+      versionNeeded: 45,
+      headerCompressedSize: 0xffffffff,
+      headerUncompressedSize: 0xffffffff,
+      hasZip64Extra: true,
+      uncompressedSize: data.length,
+    });
+    expect(readLocalHeader(zip, forced)).toMatchObject({
+      compressedSize: 0xffffffff,
+      uncompressedSize: 0xffffffff,
+      extraLength: 20,
+    });
+    expect(inflateRawSync(readLocalBody(zip, forced))).toEqual(data);
+    expect(plain).toMatchObject({ versionNeeded: 20, hasZip64Extra: false });
+  });
+
+  it('writes a pre-deflated zip64 entry with its declared sizes', () => {
+    const data = Buffer.alloc(100_000);
+    const deflated = {
+      body: deflateRawSync(data),
+      crc32: crc32(data),
+      uncompressedSize: data.length,
+    };
+
+    const zip = buildZip([{ name: 'big.bin', deflated, zip64: true }]);
+
+    const [entry] = readZipDirectory(zip) ?? [];
+    expect(entry).toMatchObject({
+      hasZip64Extra: true,
+      uncompressedSize: 100_000,
+      compressedSize: deflated.body.length,
+    });
+    expect(inflateRawSync(readLocalBody(zip, entry))).toEqual(data);
   });
 });
 

@@ -1,5 +1,6 @@
 import { buildDocx, docxParts } from './docx';
-import { anydocMarkdown, readZipText } from './spec-support';
+import { buildGrayPng } from './png';
+import { anydocMarkdown, readZipEntries, readZipText } from './spec-support';
 import { buildZip } from './zip';
 
 describe('buildDocx', () => {
@@ -50,5 +51,34 @@ describe('docxParts', () => {
 
     expect(markdown).toContain('replacement text');
     expect(markdown).not.toContain('original text');
+  });
+});
+
+describe('buildDocx with images', () => {
+  it('adds one picture paragraph per image after the text, each pointing at its media part', async () => {
+    const images = [
+      buildGrayPng(4, Buffer.alloc(16, 0)),
+      buildGrayPng(4, Buffer.alloc(16, 255)),
+    ];
+
+    const docx = buildDocx(['text before images'], images);
+
+    const document = readZipText(docx, 'word/document.xml');
+    const rels = readZipText(docx, 'word/_rels/document.xml.rels');
+    const entries = readZipEntries(docx);
+    expect(entries.get('word/media/image1.png')).toEqual(images[0]);
+    expect(entries.get('word/media/image2.png')).toEqual(images[1]);
+    const embedded = [...document.matchAll(/r:embed="([^"]+)"/g)].map(
+      (match) =>
+        new RegExp(`Id="${match[1]}"[^>]*Target="([^"]+)"`).exec(rels)?.[1],
+    );
+    expect(embedded).toEqual(['media/image1.png', 'media/image2.png']);
+    expect(document.indexOf('text before images')).toBeLessThan(
+      document.indexOf('<w:drawing>'),
+    );
+    expect(readZipText(docx, '[Content_Types].xml')).toContain(
+      'Extension="png" ContentType="image/png"',
+    );
+    expect(await anydocMarkdown(docx, 'docx')).toContain('text before images');
   });
 });
