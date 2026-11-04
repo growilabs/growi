@@ -84,10 +84,10 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 
 | 項目 | 状態 | 決め方 |
 |---|---|---|
-| `WORKERS` の Node での意味 | 未決 | design でユーザーが決める (Req 11.9) |
-| `/readyz` の `dependencies` に出す名前 | 未決 | 同上 |
-| `/docs` と `/redoc` を残すかどうか | 未決 | 同上 |
-| 配置 (pnpm workspace に入れるか) | 未決 | 試作で比べ (Req 11.8)、design でユーザーが決める (Req 11.9) |
+| `WORKERS` の Node での意味 | 決定 (廃止。7 節) | ユーザー判断 (design.md の D1) |
+| `/readyz` の `dependencies` に出す名前 | **未回答** (暫定の既定は役割の名前) | design の承認の前にユーザーが決める (design.md の D2) |
+| `/docs` と `/redoc` を残すかどうか | 決定 (出さない。7 節) | ユーザー判断 (design.md の D3) |
+| 配置 (pnpm workspace に入れるか) | 決定 (`apps/attachment-text-extractor/` に移して workspace に入れる) | ユーザー判断 (design.md の D4) |
 | PDF のライブラリ | 未決 | 試作と計測 (Req 11.3) |
 | 子プロセスの作り方 | 未決 (`prlimit` は使ってよいと決まった) | 試作と計測 (Req 11.4) |
 | `RLIMIT_AS` の値と、緩めた分の守り | 未決 | 試作と計測 (Req 11.5) |
@@ -99,7 +99,8 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 | 実際の Elasticsearch (kuromoji) で検索を測れるか | 未検証 | ベンチマークを作るときに確かめる (Req 2.10) |
 | 日本語 PDF の検索の品質 (pypdfium2 と WASM の PDFium の差) | 未検証 | ベンチマークと PDF のライブラリの選定で測る (Req 2.12、11.3) |
 | Follow-ups のどれを直すか | 未決 | 取り込みの前にユーザーが決める (Req 12.6) |
-| テスト用のファイルの作り方 (Python の生成器が撤去で使えなくなる) | 未決 | design.md の D5 でユーザーが決める (推奨: 小さなものは Python 版で一度作って commit、大きなものは Node で組み立てる) |
+| テスト用のファイルの作り方 | 決定 (すべて Node で作り直す。旧形式の DOC / PPT だけは commit 済みのものを使う) | ユーザー判断 (design.md の D5) |
+| Node で作れないテスト用のファイル (暗号化した Office と PDF、XLS、細工した ZIP) | 未検証 | 試作 (design.md の T7)。作れないものが残ったらユーザーに諮る |
 
 ## 6. 計測の結果 (design フェーズ)
 
@@ -140,4 +141,27 @@ design を書くために、小さな試作で次のことを確かめた。**�
 ### 6.4 テスト用のファイルの作り方 (コードの確認)
 
 - Python 版のテスト用のファイルは、テストの実行中に Python のテスト専用のライブラリ (openpyxl、python-pptx、python-docx、msoffcrypto-tool、xlwt、pypdf) で作っている (`tests/fixture_files.py`)。リポジトリに入れているのは小さなテキスト 2 つと、旧形式の DOC / PPT (Apache POI 由来) だけ。
-- Python を撤去すると、この作り方は使えなくなる。暗号化した Office ファイルや XLS を Node で作る部品は調べていない (**未検証**)。この扱いはユーザーの判断が要る (design.md の「ユーザーの判断を待つ項目」)。
+- Python を撤去すると、この作り方は使えなくなる。暗号化した Office ファイルや XLS を Node で作る部品は調べていない (**未検証**)。
+- **決定 (2026-11-04、ユーザー判断)**: すべて Node で作り直す (design.md の D5)。作り直しの難しさと確かめ方は design.md の T7 にある。
+
+### 6.5 anydoc のネイティブ部品の大きさ (実測)
+
+- npm で `@firecrawl/anydoc@0.2.4` を入れると、本体 (76KB) と、環境に合ったネイティブ部品の package (devcontainer では `@firecrawl/anydoc-linux-x64-gnu`、7.9MB) が入る。D4 で workspace に入れると、全開発者の `pnpm install` にこの大きさが加わる。arm64 などほかの環境の部品の大きさは測っていない。
+
+## 7. 崩した契約 (requirements の Req 1.10 の記録)
+
+既定の方針 (Req 1、Req 7) のうち、ユーザーの判断で崩したもの。判断の基準は「シンプルさ (保守性) が上がるか」。
+
+### 7.1 `WORKERS` の廃止 (design.md の D1、2026-11-04)
+
+- **(a) 何を崩すか**: 対象 spec の design.md §Configuration の `WORKERS` (uvicorn のワーカー数、既定 1)。Req 1.4 の「同じ名前・同じ意味で受け付ける」を崩す。Node 版はこの環境変数を読まない。
+- **(b) 守ると何がどう複雑になるか**: Node には uvicorn のワーカーに当たる仕組みが無い。同じ意味を保つには、node:cluster で親を N 個に分け、それぞれが同時実行の枠と子の監視を持つ形にする必要があり、プロセスの管理が 1 段増える。さらに、Python 版で分かっていた弱点 (ワーカーが 2 つ以上だと OS の接続の振り分けが偏り、空きがあっても 503 が返る) も引き継ぐ。既定は 1 で、スケールは k8s の HPA で Pod を増やすのが本来の方法なので、ワーカーの数を持つ利点は小さい。
+- **(c) 下流の変更の範囲**: `infra/docker/compose.yaml` と `deploy/k8s/deployment.yaml` から `WORKERS` を消し、メモリの予算の式からワーカー数の項を消す (この spec の中)。apps/app のコード、生成クライアント、下流 spec の契約は変わらない。運用者から見える変化: `WORKERS` を設定していても無視される。2 以上にしていた場合は、同時実行の全体の上限が `MAX_CONCURRENCY` だけになる。
+- **反映先**: design.md の Revalidation Triggers。取り込みのときに対象 spec の design.md §Configuration から `WORKERS` を消し、メモリの目安の式を書き直す (対象 spec の AC には `WORKERS` が出てこないので、AC の文言の変更は要らない)。完了の報告でユーザーに示す。
+
+### 7.2 `/docs` と `/redoc` の廃止 (design.md の D3、2026-11-04)
+
+- **(a) 何を崩すか**: FastAPI が既定で出していた API の説明画面 `/docs` (Swagger UI) と `/redoc`。どちらも認証が要るパスだった。Req 1.2 の 4 つのエンドポイントと `/openapi.json` は変わらない。
+- **(b) 守ると何がどう複雑になるか**: Hono で同じ画面を出すには、Swagger UI と ReDoc を配る部品 (またはその HTML と JS) を本番の依存に足す必要がある。apps/app はこの画面を使っておらず、テストも無いので、足す部品は保守の手間だけを増やす。`/openapi.json` が残るので、画面が要る人はそれを手元の道具で開ける。
+- **(c) 下流の変更の範囲**: なし。apps/app も生成クライアントも、この 2 つのパスを使っていない (apps/app と生成クライアントのコードを検索し、`/docs` と `/redoc` を呼ぶ箇所が無いことを確かめた)。運用者から見える変化: この 2 つのパスは 401 (トークンなし) か 404 (トークンあり) になる。
+- **反映先**: design.md の Revalidation Triggers。対象 spec の requirements と design には `/docs` と `/redoc` の記述が無いので、取り込みで直す本文は無い。完了の報告でユーザーに示す。

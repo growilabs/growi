@@ -35,10 +35,10 @@
 ## Boundary Context
 
 - **In scope**:
-  - `services/attachment-text-extractor/` の中身を Node 版に置き換えること (src、tests、Dockerfile、`deploy/k8s/`、CLAUDE.md、scripts)
+  - 抽出サービスを Node 版として `apps/attachment-text-extractor/` に作り直し (src、tests、Dockerfile、`deploy/k8s/`、CLAUDE.md、scripts)、`services/attachment-text-extractor/` の Python 版を消すこと (置き場所は design.md の D4 でユーザーが決めた)
   - OpenAPI の書き出し手順の置き換えと、書き出した文書がいまと同じであることの検査
   - CI workflow と docker-compose のエントリの追従
-  - 配置の決定に伴う workspace と turbo の設定の変更 (workspace に入れると決めた場合だけ)
+  - 置き場所を `apps/` に移して pnpm workspace に入れることに伴う設定の変更 (lockfile、package ごとの turbo の設定、compose、CI の `paths`)
   - Python の資産の撤去
   - 未決事項を試作と計測で決めること
 - **Out of scope**:
@@ -90,7 +90,7 @@
 4. The 比較用のファイルの集まり shall 日本語の PDF (横書き・縦書き・語の途中で改行が入るものを含む)、Shift_JIS / EUC-JP / ISO-2022-JP / BOM 付き UTF-8 / UTF-16 のテキスト、`<meta charset>` を持つ HTML、script / style を含む HTML を含む
 5. The 抽出サービス (Node 版) shall 改行コードの統一をすべての経路にかけ、日本語の間の 1 文字分の空白・改行の詰めを PDF の経路だけにかける (対象 spec の AC 1.9 と同じ範囲)
 6. The 抽出サービス (Node 版) shall 対象 spec の残存ギャップに書かれた既知の制約 (PowerPoint の自動代替テキストと同じ形の行が消える、`.csv` に `application/vnd.ms-excel` が付くと XLS として扱われる、BOM のない UTF-16 は判定できない、`label` は番号だけの文字列) を、既定では Python 版と同じ振る舞いのまま保ち、変わった場合は research.md に記録する
-7. The 書き換え作業 shall 検索の品質を測る評価用の文書の集まり (以下「ベンチマーク」) を作る。ベンチマークは、形式ごと (少なくとも PDF / DOCX / XLSX / PPTX / XLS / CSV / HTML / TXT) に日本語を含む文書を持ち、日本語の PDF を必ず含み、2.4 のファイルを含む。文書は既存のテスト用のファイルと、テスト用のファイルを作る仕組みを使って作ってよい
+7. The 書き換え作業 shall 検索の品質を測る評価用の文書の集まり (以下「ベンチマーク」) を作る。ベンチマークは、形式ごと (少なくとも PDF / DOCX / XLSX / PPTX / XLS / CSV / HTML / TXT) に日本語を含む文書を持ち、日本語の PDF を必ず含み、2.4 のファイルを含む。文書は Node の生成器で作り (design.md の D5)、Python 版でも読める普通の形式のファイルにする
 8. The ベンチマーク shall 各文書に、検索で必ず見つかるべき語句・フレーズと、それが現れるべき位置 (PDF はページ、PPTX はスライド、XLSX はシートの番号と名前) を正解として付ける
 9. The ベンチマーク shall 形式ごとに次の指標を測る: (a) 正解の語句が抽出したテキストに現れる割合 (再現率)、(b) 位置の正しさ (`pages[]` の要素の数と、各要素の `pageNumber` と `label` が正解と合っているか、正解の語句が正しい位置の要素に現れるか)、(c) 日本語の文字化けと、語の途中に空白や改行が入る分断が無いこと
 10. Where ベンチマークを動かす環境で実際の Elasticsearch (kuromoji の解析器を使う設定) が使える, the ベンチマーク shall 抽出したテキストを投入し、正解の語句で検索したときにその文書 (と位置) が見つかる割合も測る
@@ -210,10 +210,11 @@
 
 #### Acceptance Criteria
 
-1. When Node 版が Req 1〜9 を満たす, the 書き換え作業 shall `services/attachment-text-extractor/` から `pyproject.toml`、`uv.lock`、`.python-version`、Python のソースとテスト、`scripts/*.py`、ruff と pytest の設定を削除する
+1. When Node 版が Req 1〜9 を満たす, the 書き換え作業 shall `services/attachment-text-extractor/` をディレクトリごと削除する (`pyproject.toml`、`uv.lock`、`.python-version`、Python のソースとテスト、`scripts/*.py`、ruff と pytest の設定を含む)
 2. The 書き換え作業 shall Python 版と Node 版を並べて動かす期間、配備物、設定を作らない
-3. When 撤去が終わる, the リポジトリ shall `services/attachment-text-extractor/` の下と、抽出サービス用の CI workflow に、`.py` のファイルと Python の道具 (uv、ruff、pytest、poe) を使う記述を含まない
+3. When 撤去が終わる, the リポジトリ shall `services/attachment-text-extractor/` を含まず、`apps/attachment-text-extractor/` の下と抽出サービス用の CI workflow に、`.py` のファイルと Python の道具 (uv、ruff、pytest、poe) を使う記述を含まない
 4. The 書き換え作業 shall 撤去の前に、Python 版でしか確かめられない作業 (Req 2.11 のベースラインの計測、Req 2.1 / 2.2 の比較、Req 6.3) をすべて終え、Req 2.14 でユーザーに諮った項目の判断を受けている
+5. When テスト用のファイルの Node の生成器ができる, the 書き換え作業 shall 撤去の前に、Node で作ったファイルを Python 版のテストの入力に差し替えて実行し、Python 版のテストが同じ結果になることを確かめ、同じにならないものは原因を research.md に記録する
 
 ### Requirement 11: 未決事項の決め方
 
