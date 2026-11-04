@@ -14,6 +14,7 @@ import {
   type GeneratedDocument,
   MIME_TYPES,
   SINGLE_PAGE,
+  sourceCharactersOf,
 } from './corpus-document';
 
 // Office documents with Japanese text, built with the test fixture generators
@@ -29,7 +30,22 @@ const numberedPages = (count: number): ExpectedPage[] =>
     label: String(i + 1),
   }));
 
-const XLSX_SHEETS = [
+type Sheet = {
+  readonly name: string;
+  readonly rows: readonly (readonly (string | number)[])[];
+};
+
+const sheetsText = (sheets: readonly Sheet[]): string[] =>
+  sheets.flatMap((sheet) => [sheet.name, ...sheet.rows.flat().map(String)]);
+
+const DOCX_PARAGRAPHS = [
+  '就業規則の改定について',
+  '第1条（目的）\nこの規則は、従業員の労働条件および服務規律を定める。',
+  '第2条（テレワーク勤務）\nテレワーク勤務制度を新設し、在宅勤務手当を月額3000円支給する。',
+  '附則\nこの規則は2025年10月1日から施行する。',
+];
+
+const XLSX_SHEETS: readonly Sheet[] = [
   {
     name: '売上実績',
     rows: [
@@ -48,6 +64,35 @@ const XLSX_SHEETS = [
   },
   { name: '備考', rows: [['来期は北海道エリアへの展開を予定している。']] },
 ];
+
+const XLS_SHEETS: readonly Sheet[] = [
+  {
+    name: '出張旅費',
+    rows: [
+      ['行き先', '交通費', '宿泊費'],
+      ['名古屋営業所', 22000, 9800],
+    ],
+  },
+  { name: '承認', rows: [['承認者', '営業部長 伊藤']] },
+];
+
+const ODT_CONTENT =
+  '<office:text><text:h>社内報 第12号</text:h>' +
+  '<text:p>新しい福利厚生制度のご紹介</text:p>' +
+  '<text:p>育児休業の取得率が向上しました。</text:p></office:text>';
+
+const ODS_CONTENT =
+  '<office:spreadsheet>' +
+  '<table:table table:name="勤怠"><table:table-row><table:table-cell office:value-type="string">' +
+  '<text:p>出勤日数</text:p></table:table-cell></table:table-row></table:table>' +
+  '<table:table table:name="休暇"><table:table-row><table:table-cell office:value-type="string">' +
+  '<text:p>有給休暇の残日数</text:p></table:table-cell></table:table-row></table:table>' +
+  '</office:spreadsheet>';
+
+const ODP_CONTENT =
+  '<office:presentation><draw:page draw:name="page1"><draw:frame svg:x="1cm" svg:y="1cm" ' +
+  'svg:width="10cm" svg:height="2cm"><draw:text-box><text:p>新製品発表会と記者会見</text:p>' +
+  '</draw:text-box></draw:frame></draw:page></office:presentation>';
 
 const PPTX_SLIDES = [
   { title: '事業計画説明会', body: '2025年度 中期経営計画\n代表取締役 加藤誠' },
@@ -79,14 +124,9 @@ export const OFFICE_DOCUMENTS: readonly GeneratedDocument[] = [
         '在宅勤務手当',
         '施行',
       ]),
+      sourceCharacters: sourceCharactersOf(...DOCX_PARAGRAPHS),
     },
-    build: () =>
-      buildDocx([
-        '就業規則の改定について',
-        '第1条（目的）\nこの規則は、従業員の労働条件および服務規律を定める。',
-        '第2条（テレワーク勤務）\nテレワーク勤務制度を新設し、在宅勤務手当を月額3000円支給する。',
-        '附則\nこの規則は2025年10月1日から施行する。',
-      ]),
+    build: () => buildDocx(DOCX_PARAGRAPHS),
   },
   {
     answer: {
@@ -107,6 +147,7 @@ export const OFFICE_DOCUMENTS: readonly GeneratedDocument[] = [
         ...onPage(2, ['株式会社サンプル商事', '中村健太', 'みどり農園']),
         ...onPage(3, ['北海道エリア']),
       ],
+      sourceCharacters: sourceCharactersOf(...sheetsText(XLSX_SHEETS)),
     },
     build: () => buildXlsx(XLSX_SHEETS),
   },
@@ -124,6 +165,9 @@ export const OFFICE_DOCUMENTS: readonly GeneratedDocument[] = [
         ...onPage(2, ['クラウドサービス市場', '差別化']),
         ...onPage(3, ['人材育成', 'デジタルトランスフォーメーション']),
       ],
+      sourceCharacters: sourceCharactersOf(
+        ...PPTX_SLIDES.flatMap((slide) => [slide.title, slide.body]),
+      ),
     },
     build: () => buildPptx(PPTX_SLIDES),
   },
@@ -136,18 +180,9 @@ export const OFFICE_DOCUMENTS: readonly GeneratedDocument[] = [
       features: [],
       expectedPages: SINGLE_PAGE,
       phrases: onPage(1, ['名古屋営業所', '交通費', '宿泊費', '承認者']),
+      sourceCharacters: sourceCharactersOf(...sheetsText(XLS_SHEETS)),
     },
-    build: () =>
-      buildXls([
-        {
-          name: '出張旅費',
-          rows: [
-            ['行き先', '交通費', '宿泊費'],
-            ['名古屋営業所', 22000, 9800],
-          ],
-        },
-        { name: '承認', rows: [['承認者', '営業部長 伊藤']] },
-      ]),
+    build: () => buildXls(XLS_SHEETS),
   },
   {
     answer: {
@@ -159,14 +194,9 @@ export const OFFICE_DOCUMENTS: readonly GeneratedDocument[] = [
       features: [],
       expectedPages: SINGLE_PAGE,
       phrases: onPage(1, ['社内報', '福利厚生制度', '育児休業']),
+      sourceCharacters: sourceCharactersOf(ODT_CONTENT),
     },
-    build: () =>
-      buildOpenDocument(
-        'text',
-        '<office:text><text:h>社内報 第12号</text:h>' +
-          '<text:p>新しい福利厚生制度のご紹介</text:p>' +
-          '<text:p>育児休業の取得率が向上しました。</text:p></office:text>',
-      ),
+    build: () => buildOpenDocument('text', ODT_CONTENT),
   },
   {
     answer: {
@@ -178,17 +208,9 @@ export const OFFICE_DOCUMENTS: readonly GeneratedDocument[] = [
       features: [],
       expectedPages: SINGLE_PAGE,
       phrases: onPage(1, ['出勤日数', '有給休暇']),
+      sourceCharacters: sourceCharactersOf(ODS_CONTENT),
     },
-    build: () =>
-      buildOpenDocument(
-        'spreadsheet',
-        '<office:spreadsheet>' +
-          '<table:table table:name="勤怠"><table:table-row><table:table-cell office:value-type="string">' +
-          '<text:p>出勤日数</text:p></table:table-cell></table:table-row></table:table>' +
-          '<table:table table:name="休暇"><table:table-row><table:table-cell office:value-type="string">' +
-          '<text:p>有給休暇の残日数</text:p></table:table-cell></table:table-row></table:table>' +
-          '</office:spreadsheet>',
-      ),
+    build: () => buildOpenDocument('spreadsheet', ODS_CONTENT),
   },
   {
     answer: {
@@ -200,14 +222,9 @@ export const OFFICE_DOCUMENTS: readonly GeneratedDocument[] = [
       features: [],
       expectedPages: SINGLE_PAGE,
       phrases: onPage(1, ['新製品発表会', '記者会見']),
+      sourceCharacters: sourceCharactersOf(ODP_CONTENT),
     },
-    build: () =>
-      buildOpenDocument(
-        'presentation',
-        '<office:presentation><draw:page draw:name="page1"><draw:frame svg:x="1cm" svg:y="1cm" ' +
-          'svg:width="10cm" svg:height="2cm"><draw:text-box><text:p>新製品発表会と記者会見</text:p>' +
-          '</draw:text-box></draw:frame></draw:page></office:presentation>',
-      ),
+    build: () => buildOpenDocument('presentation', ODP_CONTENT),
   },
   {
     answer: {

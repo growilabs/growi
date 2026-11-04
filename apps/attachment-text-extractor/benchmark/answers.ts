@@ -65,7 +65,10 @@ export interface ExpectedPage {
 }
 
 export interface ExpectedPhrase {
-  /** Text a search must find; matched without normalization. */
+  /**
+   * Text a search must find. The benchmark matches it as written, and again
+   * with whitespace removed (research.md 12).
+   */
   readonly text: string;
   /** 1-based index into `expectedPages`: the PDF page, slide or sheet. */
   readonly page: number;
@@ -90,6 +93,13 @@ export interface DocumentAnswer {
   readonly phrases: readonly ExpectedPhrase[];
   /** Text in the file that must not reach the extracted text (script, style). */
   readonly absentPhrases?: readonly string[];
+  /**
+   * Every character of the document's source text that is neither printable
+   * ASCII nor whitespace, in code point order. An extracted character outside
+   * this set counts as mojibake (research.md 12). Absent when the source text
+   * is not declared in benchmark/ (the Apache POI files).
+   */
+  readonly sourceCharacters?: string;
 }
 
 export interface BenchmarkAnswers {
@@ -210,6 +220,11 @@ const parseDocument = (value: unknown, path: string): DocumentAnswer => {
     `${path}.absentPhrases`,
     (item, at) => listAt(item, at, stringAt),
   );
+  const sourceCharacters = optional(
+    fields.sourceCharacters,
+    `${path}.sourceCharacters`,
+    stringAt,
+  );
   return {
     fileName,
     format: oneOf(BENCHMARK_FORMATS, fields.format, `${path}.format`),
@@ -222,6 +237,7 @@ const parseDocument = (value: unknown, path: string): DocumentAnswer => {
     expectedPages,
     phrases,
     ...(absentPhrases === undefined ? {} : { absentPhrases }),
+    ...(sourceCharacters === undefined ? {} : { sourceCharacters }),
   };
 };
 

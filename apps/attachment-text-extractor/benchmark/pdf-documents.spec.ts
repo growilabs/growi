@@ -6,6 +6,7 @@ import { BENCHMARK_CORPUS_DIR } from './answers';
 import { isBenchmarkFontSubset } from './benchmark-font';
 import { CHROMIUM_PDF_DOCUMENTS } from './pdf-documents';
 import { pdfFontNames, pdfPageCount, pdfType3FontCount } from './pdf-structure';
+import { isPlainCharacter } from './plain-character';
 import { pdfPageTexts } from './spec-support';
 
 // The PDFs need Chromium to build, so the specs read the committed files
@@ -50,6 +51,17 @@ describe.each(cases)('%s', (_fileName, answer, pdf) => {
         pages: [phrase.page],
       });
     }
+  });
+});
+
+describe.each(cases)('%s source characters', (_fileName, answer, pdf) => {
+  it('declare every character the PDF holds beyond printable ASCII and whitespace', () => {
+    const declared = new Set(answer.sourceCharacters ?? '');
+    const undeclared = [...new Set(pdfPageTexts(pdf).join('\n'))].filter(
+      (char) => !isPlainCharacter(char) && !declared.has(char),
+    );
+
+    expect(undeclared).toEqual([]);
   });
 });
 

@@ -1,5 +1,9 @@
 import type { ExpectedPage } from './answers';
-import { type ChromiumPdfDocument, MIME_TYPES } from './corpus-document';
+import {
+  type ChromiumPdfDocument,
+  MIME_TYPES,
+  sourceCharactersOf,
+} from './corpus-document';
 
 // Japanese PDFs printed by Chromium from HTML with BIZ UDGothic embedded
 // (design.md "Benchmark"). Each `pages` entry is one printed page; every line
@@ -28,7 +32,7 @@ const LINE_BREAK_PARAGRAPHS: readonly (readonly string[])[] = [
   ['問い合わせは情報シス', 'テム部の窓口で受け付', 'ける。'],
 ];
 
-export const CHROMIUM_PDF_DOCUMENTS: readonly ChromiumPdfDocument[] = [
+const DECLARED: readonly ChromiumPdfDocument[] = [
   {
     answer: {
       fileName: 'pdf-ja-horizontal.pdf',
@@ -125,3 +129,12 @@ export const CHROMIUM_PDF_DOCUMENTS: readonly ChromiumPdfDocument[] = [
     pages: [paragraphs(LINE_BREAK_PARAGRAPHS.map((lines) => lines.join('')))],
   },
 ];
+
+export const CHROMIUM_PDF_DOCUMENTS: readonly ChromiumPdfDocument[] =
+  DECLARED.map((document) => ({
+    ...document,
+    answer: {
+      ...document.answer,
+      sourceCharacters: sourceCharactersOf(...document.pages),
+    },
+  }));

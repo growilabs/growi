@@ -12,6 +12,7 @@
     "lint:typecheck": "tsgo --noEmit",
     "lint": "run-p lint:**",
     "test": "vitest run",
+    "benchmark": "node --import @swc-node/register/esm-register benchmark/run-benchmark.ts",
     "benchmark:generate": "node --import @swc-node/register/esm-register benchmark/generate-corpus.ts"
   },
   "dependencies": {

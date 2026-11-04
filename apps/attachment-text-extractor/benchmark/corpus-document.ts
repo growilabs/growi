@@ -1,4 +1,5 @@
 import type { BenchmarkFormat, DocumentAnswer, ExpectedPage } from './answers';
+import { isPlainCharacter } from './plain-character';
 
 /** A corpus document built in-process, with the answer it is scored against. */
 export interface GeneratedDocument {
@@ -14,6 +15,17 @@ export interface ChromiumPdfDocument {
   /** The body HTML of each printed page, in order. */
   readonly pages: readonly string[];
 }
+
+/**
+ * The `sourceCharacters` of an answer: each distinct character of the given
+ * source texts that is neither printable ASCII nor whitespace, in code point
+ * order. Markup may be passed whole; its syntax is ASCII.
+ */
+export const sourceCharactersOf = (...texts: readonly string[]): string =>
+  [...new Set(texts.join('\n'))]
+    .filter((char) => !isPlainCharacter(char))
+    .sort((a, b) => (a.codePointAt(0) ?? 0) - (b.codePointAt(0) ?? 0))
+    .join('');
 
 /** The `pages[]` of a format the service returns as one element. */
 export const SINGLE_PAGE: readonly ExpectedPage[] = [

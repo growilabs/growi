@@ -61,7 +61,7 @@
   - 日本語の PDF (横書き、縦書き、語の途中の改行) は、HTML から Chromium と再配布できるフォント (Noto CJK など。実際は BIZ UDゴシック。research.md 11.3) で作る。Chromium (Puppeteer。実際は playwright-core。research.md 11.2) とフォントの入れ方、フォントのライセンスと入手先を確かめ、research.md に書く。生成器はテスト専用の依存にし、本番の image に入れない。Shift_JIS / EUC-JP / ISO-2022-JP / BOM 付き UTF-8 / UTF-16 のテキストと、`<meta charset>` と script / style を含む HTML を入れる
   - 文書ごとに、検索で必ず見つかるべき語句と、現れるべき位置 (ページ・スライド・シートの番号と名前)、期待する `pages[]` の要素の数を正解として書いてある
   - _Requirements: 2.4, 2.7, 2.8_
-- [ ] 2.7 ベンチマークを測る道具を作る
+- [x] 2.7 ベンチマークを測る道具を作る
   - 抽出サービスの URL とトークンを受け取って `POST /extract` を呼び、形式ごと・指標ごとに、正解の語句の再現率、位置の正しさ、日本語の文字化けと語の分断の数を表にして出す
   - devcontainer の Elasticsearch で kuromoji の解析器が使えるかを確かめ、使える場合は正解の語句で検索して見つかる割合も測る。使えない場合はその旨を research.md に書く
   - 正解と出力を手で合わせた小さな例で、道具の採点が正しいことを確かめるテストが通る

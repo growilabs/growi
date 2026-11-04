@@ -8,6 +8,7 @@ import {
   type GeneratedDocument,
   MIME_TYPES,
   SINGLE_PAGE,
+  sourceCharactersOf,
 } from './corpus-document';
 
 // Plain text, CSV and HTML documents in the encodings of Req 2.4. Shift_JIS,
@@ -44,6 +45,7 @@ const textDocument = (spec: TextDocumentSpec): GeneratedDocument => {
       ...(spec.absentPhrases == null
         ? {}
         : { absentPhrases: spec.absentPhrases }),
+      sourceCharacters: sourceCharactersOf(text),
     },
     build: () => encode(text, spec.encoding),
   };

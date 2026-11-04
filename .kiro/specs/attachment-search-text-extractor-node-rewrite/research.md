@@ -968,7 +968,7 @@ crafted 版は 4 回、edit 版は直した後に 3 回動かし、どれも `12
 
 - 型と検証の関数は `benchmark/answers.ts` の 1 ファイルで公開する (`BenchmarkAnswers`、`DocumentAnswer`、`ExpectedPage`、`ExpectedPhrase`、`parseBenchmarkAnswers`、`loadBenchmarkAnswers`、`BENCHMARK_CORPUS_DIR`)。2.7 の `run-benchmark.ts` はこれを import して使う。検証の関数は `unknown` から型を絞る自前の関数で、型の主張 (`as`) を使わない。
 - 文書ごとの欄: `fileName` (corpus/ の直下のファイル名)、`format`、`mimeType` (`POST /extract` に付けて送る MIME。たとえば CSV は `text/csv` を送る。`.csv` に `application/vnd.ms-excel` が付くと XLS として扱われる既知の制約 (Req 2.6) を避けるため)、`source` (作り方の出所)、`encoding` (テキスト系だけ)、`features` (横書き・縦書き・語の途中の改行・`<meta charset>`・script / style・段落の中の改行。2.7 の表を特徴ごとにまとめるのに使える)、`expectedPages` (期待する `pages[]` の各要素の `pageNumber` と `label`。XLSX はシート名 `sheetName` も)、`phrases` (語句 `text`、位置 `page` (`expectedPages` の 1 始まりの番号)、語の途中の改行の位置 `lineBreakAfter` (PDF の段組で、語句の何文字目の後で行が変わるか。文字は Unicode のコードポイントで数える))、`absentPhrases` (script / style の中にあって、抽出に出てはいけない語句)。
-- 文字化けと語の分断を数えるための情報: 分断は「正解の語句の文字の間に空白や改行が入ったもの」で、2.7 の道具が語句ごとに一般的に数えられる。`lineBreakAfter` は、元の文書で行が変わる場所を示すので、分断がどこで起きやすいかを報告に出せる。文字化けは置き換え文字 (U+FFFD) と、語句が取れないこと (再現率) で測れる。`encoding` で、どの文字コードの文書かを報告に出せる。
+- 文字化けと語の分断を数えるための情報: 分断は「正解の語句の文字の間に空白や改行が入ったもの」で、2.7 の道具が語句ごとに一般的に数えられる。`lineBreakAfter` は、元の文書で行が変わる場所を示すので、分断がどこで起きやすいかを報告に出せる。文字化けは置き換え文字 (U+FFFD) と、語句が取れないこと (再現率) で測れる。語句の外の字の文字化けを数えるため、2.7 で文書ごとの `sourceCharacters` を足した (12.4)。`encoding` で、どの文字コードの文書かを報告に出せる。
 - **正のもの (single source of truth) は `benchmark/*-documents.ts` の宣言** (文書の中身と正解を 1 か所に並べて書く)。`pnpm benchmark:generate` が宣言からコーパスと `answers.json` を書き出す。`answers.json` は生成物なので biome の対象から外した (`benchmark/biome.json`。コーパスも、Shift_JIS などの HTML を biome が UTF-8 として読めずに失敗するので外した。このリポジトリで初めての入れ子の biome の設定。commit の前に lefthook が呼ぶ形 (ルートから、ファイルのパスを並べて `pnpm biome check --write ...`) でも、`answers.json` とコーパスのファイルが対象から外れることを確かめた)。
 - 依存の向き: `benchmark/` は `test/fixtures/` の生成器を import する。どちらもテスト・開発専用で、本番の `src/` からは import しない (`src/` に `benchmark` と `test/fixtures` への import が無いことを確かめた)。design の D5 (「生成器はテストからだけ使い、本番のコードからは import しない」) に反しない。
 
@@ -1039,3 +1039,119 @@ pnpm vitest run benchmark               # 確かめる
 - cp932 の 髙 は iconv-lite が `0xFBFC` (IBM 拡張の側) で書く。Python の cp932 は `0xEEE0` (NEC 選定 IBM 拡張の側) で書く (9.5.5)。どちらも Python 版のサービスと `TextDecoder` で 髙 に戻る。
 - Elasticsearch (kuromoji) での確認 (2.7 の仕事)。ベースラインの数値 (2.8 の仕事)。
 - `pnpm install` で lockfile のうち、新しく足した 3 つの依存のほかに、`vitest-mock-extended` の peer の書き方 (`@vitest/ui@3.2.4(vitest@3.2.6)` → `@vitest/ui@3.2.4`) が 3 か所変わった (ルートの importer、この package の importer、snapshots のキー)。pnpm が書き方をそろえただけで、入る版は変わらない。
+
+## 12. ベンチマークを測る道具 (タスク 2.7)
+
+2026-11-04 に devcontainer (Node 24.21.0、Elasticsearch 9.3.3) で作り、Python 版 (8 節の手順、ポート 18000) とテストのためのスタブに向けて動かした。置き場所は `apps/attachment-text-extractor/benchmark/`。ベースラインの数値は 2.8 で記録するので、ここには書かない。
+
+### 12.1 使い方
+
+```bash
+cd apps/attachment-text-extractor
+# トークンは引数では受け取らない (ps やシェルの履歴に残るため)。環境変数か --token-file で渡す
+BENCHMARK_TOKEN=$(cat "$TOKENFILE") pnpm benchmark \
+  --url http://127.0.0.1:18000 --label python \
+  --es-url http://elasticsearch:9200 --json /path/to/report.json > report.md
+```
+
+- `--url` (または `BENCHMARK_URL`): 抽出サービスの URL。`--label`: 結果の見出しに付ける名前 (`python` / `node` など。必須)。`--es-url` (または `BENCHMARK_ES_URL`): Elasticsearch。無ければ Elasticsearch の段は飛ばす。`--json`: 結果の全部を JSON でも書く。`--timeout-ms`: 1 文書あたりの待ち時間 (既定 120000)。
+- 標準出力に Markdown の表を出す。中身は、実行の日時・ラベル・サービスの URL、形式ごとの (a)〜(c) の表 (最後の行が全体)、(d) Elasticsearch の表と、正しい位置だけで見つかったのではない語句の一覧、文書ごとの表、コーパスの PDF の SHA-256。JSON はこれに加えて、全ファイルの SHA-256 と、語句ごとの判定を持つ。
+- 文書は 1 つずつ順に送る。並行して送ると、サービスの同時実行数の上限で 429 / 503 が返り、計測がぶれるため。
+- **利用者名やパスワードを含む URL (`http://user:pass@host/` の形) は、`--url` / `--es-url` / 環境変数のどれで渡しても受け付けない** (エラーのメッセージにも URL を出さない)。Node の `fetch` はこの形の URL を拒み、その拒否のメッセージに URL がそのまま入るため、受け付けると失敗の理由の欄から認証情報が表や JSON に漏れる。
+- 同じ道具を Python 版と Node 版の両方に向ける。比べる条件は「同じコーパスのファイルを、`answers.json` の MIME を付けて `POST /extract` に送る」で揃う。
+
+### 12.2 ファイル構成
+
+`benchmark/` の中に、責務ごとに分けて置いた。
+
+| ファイル | 責務 |
+|---|---|
+| `run-benchmark.ts` | CLI の入口 (引数を読み、実行し、表を出す)。`pnpm benchmark` |
+| `run-options.ts` | 引数と環境変数の解釈 |
+| `benchmark-run.ts` | 1 回の計測の流れ (ファイルを読む → 送る → 採点 → 集計 → Elasticsearch) |
+| `extract-client.ts` | `POST /extract` の呼び出し。失敗はすべて「失敗」という結果として返し、例外にしない |
+| `extraction.ts` | 応答の型 (`pages[]` の要素と、成功・失敗の結果) |
+| `scoring/` | 採点 (`phrase-match.ts` 語句の照合、`character-problems.ts` 文字化け、`score-document.ts` 文書 1 つの採点、`summarize.ts` 形式ごとの集計) |
+| `elasticsearch/` | `es-queries.ts` (index の設定・クエリ・recall の計算。純関数)、`es-client.ts` (REST の呼び出し)、`measure-es-recall.ts` (一時 index を作って測り、消す) |
+| `report-markdown.ts` | Markdown の表の組み立て |
+
+### 12.3 指標の定義 (Req 2.9)
+
+語句の照合は、`pages[]` の要素ごとに行う (GROWI は要素ごとに Elasticsearch の文書を作るので、要素をまたいだ語句は検索で見つからない)。文書全体での判定は、要素ごとの判定のうち最もよいもの。これとは別に、**正解の要素だけでの判定**も記録する (正解の要素では分断されているが、別の要素ではそのまま出ている、という場合を見逃さないため)。
+
+**語句の照合の方針 (正規化)**: 次の 5 段階のどれかに判定する。
+
+| 判定 | 意味 |
+|---|---|
+| `exact` | 抽出したテキストに、語句がそのまま (何も変えずに) ある |
+| `whitespace-differs` | 語句の中に元からある空白の場所だけが違う (`ISO/IEC 27001` が `ISO/IEC\n27001` や `ISO/IEC27001` になった)。分断ではない |
+| `split-at-line-break` | 語句の字の間に空白や改行が入っている。その場所が、`lineBreakAfter` (元の文書で行が変わった位置) だけ |
+| `split-elsewhere` | 語句の字の間に空白や改行が入っている。`lineBreakAfter` 以外の場所にもある |
+| `missing` | 空白を無視しても見つからない |
+
+- 空白とは JavaScript の `\s` (半角の空白、タブ、改行、全角の空白 U+3000 などを含む)。空白のほかは何も変えない。**NFKC (全角・半角や互換文字をそろえる正規化) はかけない**。理由: 正解の語句とコーパスは元の字のまま書いてあり、抽出で字が別の字 (全角と半角の違い、部首の字 `⽇` など) に替わったら、それは抽出の違いとして表に出したい。検索のときの正規化 (GROWI の `japanese` analyzer は `icu_normalizer` で NFKC をかける) が効くかどうかは、(d) の Elasticsearch の段で別に測る。字が替わったことは、(c) の「元の文に無い文字」にも数として出る。
+- 照合は、語句の字を順に並べ、字と字の間に「空白が 0 個以上」を許す正規表現で行う (語句の中の記号は文字どおりに扱う)。字と字の間に空白が入ったかどうかを、その場所ごとに記録して判定に使う。字の位置は Unicode のコードポイントで数える (`lineBreakAfter` と同じ数え方)。
+
+**(a) 再現率**: 2 つ出す。
+- 「そのまま」: `exact` の語句の割合。
+- 「空白を除く」: `missing` 以外の語句の割合。
+
+Node 版で PDF の部品が替わると、語の途中の改行が空白として出ることがある (11.8 の anydoc の例 `基幹シス テム`)。2 つを並べると、「字は取れているが空白で切れている」のか「字が取れていない」のかが分かる。
+
+**(b) 位置の正しさ**:
+- 要素の数が正しい文書: `pages[]` の要素の数が、正解の数と同じ文書の数。
+- 番号とラベルが正しい要素: 正解の要素と、応答の要素を先頭から順に組にし (数が違うときは短い方まで)、`pageNumber` と `label` の両方が正解と同じものの数。分母は正解の要素の数。
+- シート名がある要素 (XLSX だけ): 正解の `sheetName` が、その要素の `label` と同じか、`content` の中にあるもの。応答には `sheetName` という欄が無い。シート名を `label` に入れるかどうかはサービスの選び方なので、`label` が番号に変わっても、シート名が本文から分かれば検索では見つかる。そのため `label` の正しさとは別に数える。
+- 正しい位置にある語句: 語句が、正解の位置 (`page` 番目の要素) で `missing` 以外に判定されたもの。要素の番号やラベルが正しいかは、ここでは見ない (上の 2 つの数で別に測る)。
+- 別の位置にだけある語句: 見つかったが、正解の位置には無いもの。
+- 正しい位置と別の位置の両方にある語句: 正解の位置で見つかり、ほかの要素でも見つかったもの。ページやシートの境目がずれて本文が別の要素にも入ると、検索で別のページやシートも当たる。これは位置の劣化だが、「正しい位置にある語句」の数は下がらないので、別に数える。コーパスは、各語句が正解の要素にだけ現れるように作ってある (11.4) ので、正しい抽出ではこの数は 0 になる。
+
+**(c) 文字化けと語の分断**:
+- U+FFFD: 置き換え文字の数 (出てきた回数)。
+- 元の文に無い文字: 抽出したテキストの字のうち、空白・印字できる ASCII・U+FFFD のどれでもなく (ただし U+FEFF (BOM) は、JavaScript の `\s` には入るが、ここでは空白とみなさずに数える。BOM を取り除き忘れた出力を見逃さないため)、文書の元の文 (`sourceCharacters`。12.4) にも無いものの数 (出てきた回数)。ASCII の制御文字 (タブ・改行などの空白を除く) はここに数える。文書ごとの表に、その字の見本 (最大 20 種類) を出す。
+- 分断 (改行の位置) と分断 (それ以外): 文書全体での判定 (最もよい要素での判定) が `split-at-line-break` と `split-elsewhere` の語句の数。
+- 正しい位置での分断 (改行の位置 / それ以外): 正解の要素だけでの判定が `split-at-line-break` と `split-elsewhere` の語句の数。
+- 出てはいけない語句の混入: `absentPhrases` (HTML の script / style の中の語句) のうち、空白を無視して出力に見つかったものの数 / 全体の数。
+
+**失敗した文書**: HTTP の 4xx / 5xx、通信の失敗、時間切れ、200 でも形がおかしい応答は「失敗」とし、理由 (`HTTP 500 (internal_error)` など。トークンは含めない) を記録して次の文書へ進む。失敗した文書の語句は、再現率の分母に残し、見つからなかったものとして数える。分母から外すと、失敗が多いほど再現率が上がって見えるため。失敗した文書の数は (a) の表に別の列で出す。
+
+### 12.4 「正解に無い文字の混入」の数え方 (2.6 のレビューの宿題 (i))
+
+- **決めたこと**: `answers.json` の文書ごとに、任意の欄 **`sourceCharacters`** を足した。文書の元の文 (宣言 `benchmark/*-documents.ts` に書いてある中身) の字のうち、空白でも印字できる ASCII でもないものを、重ねずにコードポイント順に並べた文字列。抽出結果のうち、この集合に無い字を「元の文に無い文字」として数える。
+- 作り方: 宣言から `pnpm benchmark:generate` が書き出す (`sourceCharactersOf`、`benchmark/corpus-document.ts`)。テキスト・CSV・HTML はファイルにする前の文全体、DOCX は段落、XLSX と XLS はシート名とセル、PPTX はスライドのタイトルと本文、OpenDocument は `content.xml` の文字列、PDF は各ページの HTML から作る。タグなどの記法は ASCII なので、そのまま渡してよい。
+- Apache POI の DOC / PPT は、元の文が宣言に無いので、この欄を持たない。この 2 つは「元の文に無い文字」を数えず、表では `—` とする (日本語を含まない文書なので、文字化けを測る意味も小さい)。日本語の語句を持つ文書がすべてこの欄を持つことを `answers.spec.ts` で確かめる。
+- 宣言とファイルの食い違いを防ぐため、`corpus-documents.spec.ts` と `pdf-documents.spec.ts` で、「コーパスのファイルを生成器と別の読み方で読んだときの字が、すべて `sourceCharacters` に入っている」ことを確かめる。PDF は 11.8 の関数 (ToUnicode の表から字を取る) で読む。
+- **理由**: (1) answers.json は語句しか持っていなかったので、語句の外の字 (語句に入っていない本文) の文字化けを数えられなかった。(2) 「想定外の文字種 (ラテン文字の補助など) だけを数える」案も考えたが、どの文字種を想定外とするかの線引きが恣意的になる。シフト JIS を別の文字コードとして読むと、もっともらしい漢字に化けることもある。文書ごとの「元の文にある字」との比較なら、線引きが要らず、別の漢字に化けたものも数えられる。(3) 計測の道具は、生成器を使わずに `answers.json` とコーパスのファイルだけで動く (11.6)。字の集合を `answers.json` に入れておけば、この形を崩さない。(4) Node 版の anydoc で読んだ結果から字の集合を作る案は採らなかった。Node 版の出力を、同じ Node 版の部品から作った基準で採点することになり、違いが出ないのが当然の比べ方になるため。
+- 限界: HTML の `sourceCharacters` は script / style の中の字も含む (元の文全体から作るため)。script / style の中身が出力に漏れたことはこの数では分からないが、`absentPhrases` の混入の数で別に測る。また、元の文にある字に化けた場合 (別の位置の字に入れ替わるなど) は数えられない。その場合は (a) の再現率で見つける。
+
+### 12.5 HTML の「出てはいけない語句」が本文に無いこと (2.6 のレビューの宿題 (ii))
+
+`corpus-documents.spec.ts` に、script / style を持つ HTML について「script / style の部分を取り除いた残り (本文とタグ) に、`absentPhrases` が空白を無視しても無い」ことを確かめるテストを足した。本文にも同じ語句があると、正しい抽出 (本文は残し、script / style は捨てる) が「混入」として減点されてしまうため。わざと本文に `<p>スタイル 定義</p>` を足して生成し直すと、このテストが失敗することを確かめた (その後、元に戻して生成し直し、コーパスのファイルが元と同じバイト列であることを確かめた)。
+
+### 12.6 Elasticsearch での計測 (Req 2.10)
+
+- **kuromoji は使える (実測)**。devcontainer の Elasticsearch は 9.3.3。`GET /_cat/plugins?format=json` に `analysis-kuromoji` 9.3.3 と `analysis-icu` 9.3.3 がある。`_analyze` (tokenizer `kuromoji_tokenizer`、char_filter `icu_normalizer`) で `基幹システムの本格稼働` は `基幹 / システム / の / 本格 / 稼働` に分かれた。道具は実行のたびに同じ確認をして、結果を表に出す。`analysis-kuromoji` が無いときは、Elasticsearch の段を飛ばし、「(a)〜(c) だけで判定する」と表に書く。`analysis-icu` だけが無いときは、`icu_normalizer` を外して測り、その旨を表に書く。
+- **index の設定**: GROWI の添付ファイルの index (`apps/app/src/features/search-attachments/server/mappings/attachments-mappings-es9.ts`) の `japanese` analyzer (`kuromoji_tokenizer` + `icu_normalizer`) と、`content` / `content.ja` の定義を写して使う (`elasticsearch/es-queries.ts`)。apps/app はこの package の外なので import できない。写したことは、そのファイルのコメントにも書いた。GROWI の側を変えたら、ここも合わせる。`content.en` (英語の edge n-gram) は日本語の語句の計測に関係しないので写していない。
+- **文書の単位**: `pages[]` の要素ごとに 1 つの Elasticsearch の文書を作る (GROWI の `buildDocId` と同じ単位)。欄は `fileName` (keyword)、要素の番号 `elementIndex`、`content`。`_bulk` は `refresh=true` で入れる (直後の検索で見えるようにするため)。
+- **クエリ** (語句ごと、文書の `fileName` で絞り込む):
+  - `kuromoji-phrase`: `content.ja` への `match_phrase`。kuromoji で分けた語が、同じ順で並んでいるか。Req 2.10 の「kuromoji の解析器を使う設定で検索したとき」にあたる主な指標。
+  - `growi-quoted-phrase`: `content` (標準の解析器) への `match_phrase`。GROWI で利用者が語句を `"…"` で囲んで検索したときのクエリ (`attachment-keyword-query.ts` の phrase の扱い) と同じ。ただし標準の解析器は漢字を 1 字ずつに分け、空白を捨てるので、漢字の間の分断には反応しない (レビューで、語の途中に空白を入れた出力でも 101/118 が見つかった)。**Python 版と Node 版を比べるときは、このクエリを主な判定にせず、(a)〜(c) と `kuromoji-phrase` を主にする**。
+  - GROWI の通常の検索 (`multi_match` の `most_fields`、既定の OR) は採らなかった。語のどれか 1 つが合えば当たるので、どんな出力でも recall がほぼ 100% になり、違いを測れないため。
+- **数えるもの**: 形式ごと・クエリごとに、語句のうち「その文書が見つかった」(どれかの要素に当たった) 割合、「正しい位置で見つかった」(正解の要素に当たった) 割合、「正解以外の位置に当たった」(正解の要素以外のどれかに当たった) 語句の数。最後の数は、正解の要素にも当たったかどうかを問わない (正しい抽出では 0)。(b) の表の「正しい位置と別の位置の両方にある語句」は正解の位置でも見つかったものだけを数えるが、この列は正解の位置に当たらず別の位置にだけ当たったものも含めて数える。失敗した文書は index に入れないので、その語句は見つからなかったものとして数える。正解の要素だけに当たったのではない語句 (正解の要素に当たらなかった、または別の要素にも当たった) は、一覧にして出す。
+- **index の後始末**: index の名前は `benchmark-<時刻>-<乱数>` (小文字だけ。`--label` からは作らない)。計測の後は、成功しても失敗しても削除する。計測が失敗し、削除も失敗したときは、計測の失敗を主な理由とし、削除の失敗をその後ろに書き足す (削除の失敗で元の原因が隠れないようにするため)。Ctrl-C (SIGINT) のときも、削除を試みてから終わる (この経路は手で止めて確かめてはいない)。Python 版に向けた動作確認の後、`_cat/indices/benchmark-*` が空であることを確かめた。
+- **テスト**: クエリの組み立て、応答の読み取り、recall の計算は純関数としてテストする。実際の Elasticsearch に当てるテスト (`measure-es-recall.spec.ts`) は、環境変数 `BENCHMARK_ES_URL` があるときだけ動く (CI には Elasticsearch が無いので飛ばす)。devcontainer で `BENCHMARK_ES_URL=http://elasticsearch:9200` を付けて動かし、kuromoji の確認、正しい位置での検索、空白で切れた語句が見つからないこと、index が消えたことを確かめた。
+
+### 12.7 テストで確かめていること
+
+`pnpm test` (vitest) で動く。
+
+- 採点 (`scoring/*.spec.ts`): 正解と出力を手で合わせた小さな例で、完全に一致すれば全部 `exact`・位置も正しいこと、語句が 1 つ欠けること、語句の途中に空白が入ったもの (改行の位置とそれ以外を分けて数える)、語句に元からある空白の違いは分断としないこと、記号を文字どおりに扱うこと、U+FFFD を元の文に無い文字と別に数えること、元の文に無い文字 (部首の字 `⽇`、`ã`、制御文字、出力に残った BOM) を数え、ASCII と空白は数えないこと、正解の語句が別のページに出たもの、正解のページと別のページの両方に出たもの、正解の要素では分断され別の要素ではそのまま出たもの (正解の要素だけでの判定で分断として数える)、要素の数の違い、`pageNumber` や `label` の違い、XLSX のシート名、空の抽出、失敗した文書、HTML の出てはいけない語句の混入 (空白で切れていても数える)、形式ごとの集計 (失敗した文書の語句が分母に残ること)。期待値は例を読んで手で数えた値で、採点の関数を動かして作ったものではない。
+- `POST /extract` の呼び出し (`extract-client.spec.ts`): テストの中で `node:http` の小さなサーバーを立て、multipart の欄 `file` にファイル名・MIME・中身が入ること、`Authorization: Bearer`、4xx / 5xx を「失敗」にして状態コードとエラーコードを理由に残すこと、JSON でない 500、形のおかしい 200、時間切れ、つながらないサーバー (理由にトークンが入らないこと) を確かめる。
+- 計測の流れ (`benchmark-run.spec.ts`): 同じスタブに、コーパスの 3 文書を送り、各文書が 1 回ずつ `answers.json` の MIME で送られること、1 つが 500 でも残りを採点すること、PDF の SHA-256 が 11.6 の値と同じであること、Elasticsearch の URL が無いとき・つながらないとき・`analysis-kuromoji` が無いときは、その段を飛ばして理由を残し、抽出の採点はふだんどおり行うこと、結果にトークンが入らないことを確かめる。
+- 表 (`report-markdown.spec.ts`)、引数 (`run-options.spec.ts`。トークンを引数で渡すと拒否する。利用者名やパスワードを含む URL と読めない URL を、URL を繰り返さずに拒否する)、Elasticsearch の純関数 (`elasticsearch/es-queries.spec.ts`。別の要素にも当たった語句の数え方を含む)、index の作成も削除も失敗したときに、作成の失敗が理由の先頭にあり `cause` に入ること、計測が成功して削除だけが失敗したときもエラーになること (`measure-es-recall.spec.ts`。`node:http` の偽の Elasticsearch を使う)。
+
+### 12.8 確かめなかったこと
+
+- Node 版にはまだ向けていない (段階 3 以降)。Python 版とスタブでだけ動かした。
+- 数値の意味づけ (ベースライン) は 2.8 で行う。
+- `sourceCharacters` は、元の文にある字への化け (字の入れ替わり) を数えられない (12.4 の限界)。

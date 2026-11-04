@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { BENCHMARK_CORPUS_DIR, type DocumentAnswer } from './answers';
 import { GENERATED_DOCUMENTS } from './corpus';
+import { isPlainCharacter } from './plain-character';
 import {
   decodeText,
   pageTexts,
@@ -148,5 +149,36 @@ describe.each(
     for (const phrase of answer.absentPhrases ?? []) {
       expect(hidden).toContain(phrase);
     }
+  });
+
+  // Otherwise a correct extraction, which keeps the body, would be marked
+  // down for leaking them.
+  it('leave none of those phrases in the body, even with whitespace ignored', () => {
+    const body = decodeText(committedBytes(answer), answer.encoding ?? 'utf-8')
+      .replace(SCRIPT_OR_STYLE, '')
+      .replace(/\s+/gu, '');
+
+    expect(answer.absentPhrases?.length ?? 0).toBeGreaterThan(0);
+    for (const phrase of answer.absentPhrases ?? []) {
+      expect(body).not.toContain(phrase.replace(/\s+/gu, ''));
+    }
+  });
+});
+
+// Documents without declared source characters (the Apache POI copies) are
+// not scored for mojibake; answers.spec checks which documents declare them.
+describe.each(
+  cases.filter(([, { answer }]) => answer.sourceCharacters != null),
+)('%s source characters', (_fileName, { answer }) => {
+  it('declare every character the file holds beyond printable ASCII and whitespace', async () => {
+    const held = new Set(
+      (await pageTexts(committedBytes(answer), answer)).join('\n'),
+    );
+    const declared = new Set(answer.sourceCharacters ?? '');
+    const undeclared = [...held].filter(
+      (char) => !isPlainCharacter(char) && !declared.has(char),
+    );
+
+    expect(undeclared).toEqual([]);
   });
 });

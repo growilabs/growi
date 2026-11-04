@@ -99,6 +99,17 @@ describe('answers.json', () => {
     ).toBe(true);
   });
 
+  it('declares the source characters of every document with Japanese phrases, so mojibake can be counted', () => {
+    const undeclared = committed.documents
+      .filter((document) =>
+        document.phrases.some((phrase) => JAPANESE.test(phrase.text)),
+      )
+      .filter((document) => !document.sourceCharacters)
+      .map((document) => document.fileName);
+
+    expect(undeclared).toEqual([]);
+  });
+
   it('marks where a line break falls inside a word in the line-break PDF', () => {
     const broken = committed.documents
       .filter((document) =>
@@ -161,6 +172,11 @@ describe('parseBenchmarkAnswers', () => {
       'a file name with a directory',
       withDocument({ ...validDocument(), fileName: '../a.txt' }),
       /documents\[0\]\.fileName/,
+    ],
+    [
+      'empty source characters',
+      withDocument({ ...validDocument(), sourceCharacters: '' }),
+      /documents\[0\]\.sourceCharacters/,
     ],
     [
       'two answers for one file',
