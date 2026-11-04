@@ -55,6 +55,9 @@ export const NON_TRANSFERABLE_COLLECTIONS: ReadonlySet<string> = new Set([
   // A cache of the model catalogue this environment last fetched from the AI providers.
   'mastra_refreshed_model_catalog',
 
+  // The AI usage of this environment's users, reported for this GrowiApp alone.
+  'aiusagelogs',
+
   // GROWI Vault state. Every one of these points into the destination's own git
   // repository (commit OIDs, composed view refs) or is a queue that this environment's
   // vault-manager is working through.

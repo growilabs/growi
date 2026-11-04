@@ -5,7 +5,7 @@ import { subDays } from 'date-fns/subDays';
 import type { FilterQuery, Types, UpdateQuery } from 'mongoose';
 
 import type { IAuditLogBulkExportJob } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
-import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
 import {
   AllEssentialActions,
   SupportedAction,
@@ -66,7 +66,7 @@ export class InAppNotificationService {
       'updated',
       async (
         activity: ActivityDocument,
-        target: IUser | IPage | IPageBulkExportJob | IAuditLogBulkExportJob,
+        target: IUser | IPage | pagebulkexportjobs | IAuditLogBulkExportJob,
         preNotify: PreNotify,
       ) => {
         try {
@@ -330,7 +330,7 @@ export class InAppNotificationService {
 
   createInAppNotification = async function (
     activity: ActivityDocument,
-    target: IUser | IPage | IPageBulkExportJob | IAuditLogBulkExportJob,
+    target: IUser | IPage | pagebulkexportjobs | IAuditLogBulkExportJob,
     preNotify: PreNotify,
   ): Promise<void> {
     const shouldNotification =

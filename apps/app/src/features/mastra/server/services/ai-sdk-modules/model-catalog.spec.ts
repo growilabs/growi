@@ -88,5 +88,38 @@ describe('getSelectableModels', () => {
         ).toBe(true);
       }
     });
+
+    it('carries unit prices for models that models.dev prices', () => {
+      for (const provider of ['openai', 'anthropic', 'google'] as const) {
+        const priced = getSelectableModels(provider).filter(
+          (m) => m.pricing?.input != null && m.pricing?.output != null,
+        );
+        // Most chat models are priced upstream; a fully unpriced provider means
+        // the catalog was generated without pricing.
+        expect(priced.length).toBeGreaterThan(0);
+        expect(priced.length).toBeGreaterThan(
+          getSelectableModels(provider).length / 2,
+        );
+      }
+    });
+
+    it('stores prices as non-negative numbers in USD per 1M tokens', () => {
+      for (const provider of ['openai', 'anthropic', 'google'] as const) {
+        for (const { pricing } of getSelectableModels(provider)) {
+          if (pricing === undefined) continue;
+          for (const v of [
+            pricing.input,
+            pricing.output,
+            pricing.cacheRead,
+            pricing.cacheWrite,
+          ]) {
+            if (v !== undefined) {
+              expect(typeof v).toBe('number');
+              expect(v).toBeGreaterThanOrEqual(0);
+            }
+          }
+        }
+      }
+    });
   });
 });

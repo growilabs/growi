@@ -96,6 +96,22 @@ describe('getAvailableModels (Req 1.1, 3.1, 7.1)', () => {
     expect(Object.keys(responseBody(res))).toEqual(['models']);
   });
 
+  it('does not expose pricing carried by catalog entries (Req 1.5)', async () => {
+    getEffectiveSelectableModels.mockResolvedValue([
+      {
+        id: 'gpt-4o',
+        name: 'GPT-4o',
+        pricing: { input: 2.5, output: 10 },
+      },
+    ]);
+
+    const { res } = await invoke({ provider: 'openai' });
+
+    expect(responseBody(res)).toEqual({
+      models: [{ id: 'gpt-4o', name: 'GPT-4o' }],
+    });
+  });
+
   it('responds with a generic 500 when the catalog read fails (no internal leak)', async () => {
     getEffectiveSelectableModels.mockRejectedValue(
       new Error('boom: mongo down at 10.0.0.1'),

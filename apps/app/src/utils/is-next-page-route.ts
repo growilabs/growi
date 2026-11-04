@@ -1,3 +1,5 @@
+import { exceedsMaxPageDepth } from '@growi/core/dist/utils/page-path-utils';
+
 import { DRAWIO_ASSET_PROXY_PATH } from '~/features/drawio/consts';
 
 /**
@@ -36,12 +38,11 @@ const UNSAFE_PATH_PATTERNS: readonly RegExp[] = [
   /^\/-\/.*/,
   /^\/?https?:\/\/.+$/,
   /\/{2,}/,
-  /\s+\/\s+/,
+  /\s\/\s/,
   /\\/,
   /^(\.\.)$/,
   /(\/\.\.)\/?/,
   /\/edit$/,
-  /^(\/.+){130,}$/,
 ];
 
 const NON_NEXT_PAGE_PATTERNS: readonly RegExp[] = [
@@ -57,5 +58,8 @@ const NON_NEXT_PAGE_PATTERNS: readonly RegExp[] = [
  * to a full page load.
  */
 export const isNextPageRoute = (pathname: string): boolean => {
-  return !NON_NEXT_PAGE_PATTERNS.some((pattern) => pattern.test(pathname));
+  return (
+    !NON_NEXT_PAGE_PATTERNS.some((pattern) => pattern.test(pathname)) &&
+    !exceedsMaxPageDepth(pathname)
+  );
 };

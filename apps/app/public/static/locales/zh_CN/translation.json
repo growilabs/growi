@@ -427,7 +427,8 @@
     "invalid_body": "请求中未包含操作对象页面的版本信息。",
     "user_not_admin": "仅管理员用户可以删除",
     "single_deletion_empty_pages": "空的页面不能被单一删除",
-    "complete_deletion_not_allowed_for_user": "您无权永久删除该页面"
+    "complete_deletion_not_allowed_for_user": "您无权永久删除该页面",
+    "deletion_not_allowed_for_user": "您无权删除该页面"
   },
   "page_history": {
     "revision_list": "修订清单",

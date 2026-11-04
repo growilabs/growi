@@ -1,7 +1,12 @@
 import type { MastraModelConfig } from '@mastra/core/llm';
-import type { RequestContext } from '@mastra/core/request-context';
+import { RequestContext } from '@mastra/core/request-context';
+import { MockLanguageModelV3 } from 'ai/test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
+import type { UsageMeter } from '~/features/ai-usage/server';
+
+import type { LanguageModelV3 } from '../../usage-metering/from-language-model-usage';
 import type { MastraRequestContextShape } from '../types/request-context';
 
 // Mock heavy collaborators that the agent module pulls in transitively.
@@ -58,6 +63,9 @@ vi.mock('~/utils/logger', () => ({
     info: vi.fn(),
   }),
 }));
+
+// The real barrel also loads the public route and Prisma models.
+vi.mock('~/features/ai-usage/server', () => ({ recordAiUsage: vi.fn() }));
 
 // Replace memory with an inert stub so we don't spin up MongoDBStore.
 vi.mock('../memory', () => ({
@@ -161,6 +169,71 @@ describe('growiAgent', () => {
       // 5.1) — a single provider's single model, resolved (asynchronously, since
       // the resolver lazily imports the provider SDK) at use time.
       await expect(modelFn(makeModelFnArg())).resolves.toBe(sentinelModel);
+    });
+  });
+
+  describe('usage metering (requirements 2.1, 2.6)', () => {
+    const isV3Model = (model: MastraModelConfig): model is LanguageModelV3 =>
+      typeof model === 'object' &&
+      'specificationVersion' in model &&
+      model.specificationVersion === 'v3';
+
+    const generateOnce = (model: LanguageModelV3) =>
+      model.doGenerate({
+        prompt: [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }],
+      });
+
+    const createProviderModel = () =>
+      new MockLanguageModelV3({
+        doGenerate: {
+          content: [{ type: 'text', text: 'ok' }],
+          finishReason: { unified: 'stop', raw: 'stop' },
+          usage: {
+            inputTokens: {
+              total: 30,
+              noCache: 30,
+              cacheRead: undefined,
+              cacheWrite: undefined,
+            },
+            outputTokens: { total: 7, text: 7, reasoning: undefined },
+          },
+          warnings: [],
+        },
+      });
+
+    it('reports each call of the resolved model to the usage meter of the request', async () => {
+      resolverMock.fn.mockReturnValue(createProviderModel());
+      const usageMeter = mock<UsageMeter>();
+      const requestContext = new RequestContext<MastraRequestContextShape>();
+      requestContext.set('usageMeter', usageMeter);
+
+      const model = await getModelFn()({ requestContext });
+      if (!isV3Model(model)) {
+        throw new Error('Expected a v3 language model');
+      }
+      await generateOnce(model);
+
+      expect(usageMeter.add).toHaveBeenCalledTimes(1);
+      expect(usageMeter.add).toHaveBeenCalledWith({
+        inputTokens: 30,
+        outputTokens: 7,
+        reasoningTokens: null,
+        cacheReadTokens: null,
+        cacheWriteTokens: null,
+      });
+    });
+
+    it('leaves the resolved (cached) model unwrapped, so other requests are not reported to this meter', async () => {
+      const providerModel = createProviderModel();
+      resolverMock.fn.mockReturnValue(providerModel);
+      const usageMeter = mock<UsageMeter>();
+      const requestContext = new RequestContext<MastraRequestContextShape>();
+      requestContext.set('usageMeter', usageMeter);
+
+      await getModelFn()({ requestContext });
+      await generateOnce(providerModel);
+
+      expect(usageMeter.add).not.toHaveBeenCalled();
     });
   });
 
