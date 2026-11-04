@@ -59,7 +59,7 @@ const subscriberUsername = 'empty-trash-route-integ-subscriber';
 
 // Sentinel ip (reached via X-Forwarded-For) so cleanup removes only the activity rows
 // this suite created. Keep it distinct from the sentinels sibling suites use.
-const TEST_IP = '10.0.0.116';
+const TEST_IP = '10.0.0.118';
 
 const COMPLETE_DELETION_AUTHORITY_KEYS = [
   'security:pageCompleteDeletionAuthority',
