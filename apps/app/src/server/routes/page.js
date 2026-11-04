@@ -1,4 +1,3 @@
-import { pagePathUtils } from '@growi/core/dist/utils';
 import { body } from 'express-validator';
 
 import loggerFactory from '~/utils/logger';
@@ -381,22 +380,21 @@ export const setup = (crowi, _app) => {
       );
     }
 
-    const creatorId = await crowi.pageService.getCreatorIdForCanDelete(page);
+    const judgeDeletion = (deletionOptions) =>
+      crowi.pageService.judgeDeletion(page, req.user, {
+        ...deletionOptions,
+        isRecursively: Boolean(isRecursively),
+      });
+    const userHomepageError = ApiResponse.error(
+      'Could not delete user homepage',
+    );
 
     logger.debug('Delete page', page._id, page.path);
 
     try {
       if (isCompletely) {
-        const userRelatedGroups =
-          await crowi.pageGrantService.getUserRelatedGroups(req.user);
-        const canDeleteCompletely = crowi.pageService.canDeleteCompletely(
-          page,
-          creatorId,
-          req.user,
-          isRecursively,
-          userRelatedGroups,
-        );
-        if (!canDeleteCompletely) {
+        const verdict = await judgeDeletion({ isCompletely: true });
+        if (verdict === 'forbidden') {
           return res.json(
             ApiResponse.error(
               'You cannot delete this page completely',
@@ -404,20 +402,8 @@ export const setup = (crowi, _app) => {
             ),
           );
         }
-
-        if (pagePathUtils.isUsersHomepage(page.path)) {
-          if (!crowi.pageService.canDeleteUserHomepageByConfig()) {
-            return res.json(
-              ApiResponse.error('Could not delete user homepage'),
-            );
-          }
-          if (
-            !(await crowi.pageService.isUsersHomepageOwnerAbsent(page.path))
-          ) {
-            return res.json(
-              ApiResponse.error('Could not delete user homepage'),
-            );
-          }
+        if (verdict === 'protected_user_homepage') {
+          return res.json(userHomepageError);
         }
 
         await crowi.pageService.deleteCompletely(
@@ -458,27 +444,14 @@ export const setup = (crowi, _app) => {
           );
         }
 
-        if (
-          !crowi.pageService.canDelete(page, creatorId, req.user, isRecursively)
-        ) {
+        const verdict = await judgeDeletion({ isCompletely: false });
+        if (verdict === 'forbidden') {
           return res.json(
             ApiResponse.error('You cannot delete this page', 'user_not_admin'),
           );
         }
-
-        if (pagePathUtils.isUsersHomepage(page.path)) {
-          if (!crowi.pageService.canDeleteUserHomepageByConfig()) {
-            return res.json(
-              ApiResponse.error('Could not delete user homepage'),
-            );
-          }
-          if (
-            !(await crowi.pageService.isUsersHomepageOwnerAbsent(page.path))
-          ) {
-            return res.json(
-              ApiResponse.error('Could not delete user homepage'),
-            );
-          }
+        if (verdict === 'protected_user_homepage') {
+          return res.json(userHomepageError);
         }
 
         await crowi.pageService.deletePage(
