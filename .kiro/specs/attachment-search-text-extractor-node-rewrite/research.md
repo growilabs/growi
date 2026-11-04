@@ -172,3 +172,124 @@ design を書くために、小さな試作で次のことを確かめた。**�
 - **(b) 守ると何がどう複雑になるか**: 今の名前のままにすると、使っていない部品 (`pypdfium2` など) の名前で、別の部品が読み込めたかどうかを表すことになり、見た人を誤らせる。名前と中身を合わせるほうが単純で、保守の手間も増えない。役割の名前 (`pdf` など) にする案もあったが、ユーザーは「正しい部品の名前を入れる」ことを選んだ。
 - **(c) 下流の変更の範囲**: なし。OpenAPI のスキーマは `{}` なので生成クライアントは変わらない。apps/app は `/readyz` を呼んでいない。k8s と compose の health の確認は HTTP のステータスだけを見て本文を見ないので影響しない。運用者から見える変化: curl などで本文を見たときの表示が変わる。
 - **反映先**: design.md の Revalidation Triggers と、6.3 で Python 版に向けるときに外すテスト。取り込みのときに対象 spec の design.md §HealthRouter の `dependencies` の記述を書き直す。完了の報告でユーザーに示す。
+
+## 8. Python 版を devcontainer で起動する手順 (タスク 1.3)
+
+後続タスク (2.5 の差し替え確認、2.8 のベンチマーク基準の計測、4.x の黒箱テスト) が、そのままコピーして実行するための手順。Python 版のコードは変えない。2026-11-04 に devcontainer で実際に実行して確かめた (Python 3.12.15、uv 0.12.24、ネットワーク取得は不要だった)。サービスの既存の説明は `services/attachment-text-extractor/CLAUDE.md` にある。ここはその「起動して試す」部分だけを、Node 版との比較に使える形にまとめたもの。
+
+**使い方**: 8.2〜8.5 は同じシェルで続けて実行するのが基本。別のシェルで 8.3 以降だけを貼っても、各ブロックの先頭の既定値 (`PORT` `PIDFILE` `LOG` `TOKENFILE`) が同じなので動く。8.3・8.4・8.5 は cwd に依存しない (どのディレクトリからでも実行できる)。8.2 だけは git のリポジトリ内のどこかで実行する (スクリプトが `git rev-parse` でルートを探して `services/attachment-text-extractor` へ移動する)。ポートやファイルの場所を変えるときは、4 つの変数を全てのブロックで同じ値にする。
+
+### 8.1 前提と依存の入れ方
+
+- `services/attachment-text-extractor/.venv` が既にあれば何もしなくてよい。無い、または壊れたときは次を実行する。`uv.lock` どおりに入れる (`--frozen` はロックを書き換えない)。テスト用の部品 (pytest など) も `--extra dev` で入る。
+
+  ```bash
+  cd services/attachment-text-extractor
+  uv sync --frozen --extra dev     # 既に揃っていれば数 ms で終わる
+  ```
+
+- このサービスは pnpm の workspace の外にある。`pnpm install` は要らず、Node の PATH にも依存しない。
+- devcontainer の `python3` (3.14) は使わない。必ず `.venv/bin/python` (3.12) を使う。この確認の時点では `python3 -c "import json"` は通ったので、メモリの「json モジュール欠落」は再現しなかったが、`.venv` の Python を使えば関係ない。
+
+### 8.2 起動 (バックグラウンド、PID の取り方、ログ)
+
+トークンは `ATTACHMENT_EXTRACTOR_SERVICE_TOKEN` の環境変数で渡す。無いと起動時に `ValidationError ... ATTACHMENT_EXTRACTOR_SERVICE_TOKEN Field required` で落ちる (Python 版の「起動時に必ず落ちる」設計。Node 版でも同じ振る舞いを比べられる)。トークンは毎回作る使い捨ての値で、リポジトリには置かない。後のブロックが別シェルでも読めるように、`/tmp` の 600 権限のファイル (`TOKENFILE`) に書く。使い終わったら 8.5 で消える。
+
+次のブロックは**スクリプトとして実行する** (`bash <<'SCRIPT'` で包んであるので、そのまま貼ってよい。対話シェルに `exit` を直接貼ると端末が閉じるため、この形にしている)。
+
+```bash
+bash <<'SCRIPT'
+PORT=${PORT:-18000}                              # 3000 は使わない
+PIDFILE=${PIDFILE:-/tmp/py-extractor.pid}
+LOG=${LOG:-/tmp/py-extractor.log}
+TOKENFILE=${TOKENFILE:-/tmp/py-extractor.token}
+
+cd "$(git rev-parse --show-toplevel)/services/attachment-text-extractor" || exit 1
+if ss -ltn | grep -q ":$PORT "; then echo "port $PORT in use; set another PORT"; exit 1; fi
+if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then echo "already running (pid $(cat "$PIDFILE"))"; exit 1; fi
+
+umask 077
+echo "dummy-$(head -c8 /dev/urandom | od -An -tx1 | tr -d ' \n')" > "$TOKENFILE"
+ATTACHMENT_EXTRACTOR_SERVICE_TOKEN=$(cat "$TOKENFILE") \
+  setsid nohup .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$PORT" \
+  >"$LOG" 2>&1 < /dev/null &
+echo $! > "$PIDFILE"
+echo "started pid=$(cat "$PIDFILE") port=$PORT log=$LOG"
+SCRIPT
+```
+
+- `.venv/bin/uvicorn` を直接起動する (`uv run` を挟むと、`$!` が uv の PID になり、止めるべき PID が分からなくなる)。`src` は venv の editable install で path に入るので、`--app-dir` も `PYTHONPATH` も要らない。`.env` は cwd から読まれるので、スクリプトは必ずサービスのディレクトリに移動してから起動する。
+- `setsid` で新しいプロセスグループを作るので、`$!` がそのまま uvicorn の PID かつグループ ID になる。uvicorn の下に、`multiprocessing` の resource_tracker と forkserver (どちらも同じグループ) がぶら下がる。
+- `--workers` は付けない (既定は 1。Dockerfile の `WORKERS` の既定と同じ)。`--reload` (poe の `dev`) も付けない (ファイル監視のプロセスが増えて、止めたときの確認が面倒になる)。
+- 設定の上限 (`MAX_CONCURRENCY` など) を変えたいときは、`ATTACHMENT_EXTRACTOR_SERVICE_TOKEN=...` と同じ行に環境変数を足す。
+
+### 8.3 ready の待ち方 (ポーリング)
+
+forkserver の起動を待つので、起動の直後は 503 または接続拒否になる。実測では約 1 秒で 200 になった。
+
+```bash
+PORT=${PORT:-18000}; PIDFILE=${PIDFILE:-/tmp/py-extractor.pid}; LOG=${LOG:-/tmp/py-extractor.log}
+for i in $(seq 1 60); do
+  c=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/readyz)
+  [ "$c" = 200 ] && break
+  kill -0 "$(cat "$PIDFILE")" 2>/dev/null || { echo "process died"; tail -20 "$LOG"; break; }
+  sleep 0.5
+done
+echo "readyz=$c"
+```
+
+### 8.4 動作確認 (実測した出力)
+
+```bash
+PORT=${PORT:-18000}; TOKENFILE=${TOKENFILE:-/tmp/py-extractor.token}
+[ -r "$TOKENFILE" ] || echo "token file $TOKENFILE not found: run 8.2 first"
+TOKEN=$(cat "$TOKENFILE")
+curl -s http://127.0.0.1:$PORT/healthz        # {"status":"ok"}
+curl -s http://127.0.0.1:$PORT/readyz         # {"status":"ready","dependencies":{"anydoc":"ok","pypdfium2":"ok","charset-normalizer":"ok","converter":"ok"}}
+printf 'hello extractor\n' > /tmp/py-extractor-sample.txt
+curl -s -w ' [%{http_code}]\n' -H "Authorization: Bearer $TOKEN" \
+  -F 'file=@/tmp/py-extractor-sample.txt;type=text/plain' http://127.0.0.1:$PORT/extract
+# {"pages":[{"pageNumber":null,"label":null,"content":"hello extractor\n"}],"mimeType":"text/plain","extractedCharacters":16} [200]
+curl -s -w ' [%{http_code}]\n' -F 'file=@/tmp/py-extractor-sample.txt' http://127.0.0.1:$PORT/extract
+# {"code": "unauthorized", "message": "Missing or invalid Bearer token"} [401]
+```
+
+`/healthz` と `/readyz` はトークン無しで 200。`/extract` はトークンが要る。
+
+### 8.5 停止の仕方 (自分で起動した PID だけを止める)
+
+```bash
+PORT=${PORT:-18000}; PIDFILE=${PIDFILE:-/tmp/py-extractor.pid}; TOKENFILE=${TOKENFILE:-/tmp/py-extractor.token}
+PID=$(cat "$PIDFILE")
+kill -TERM "$PID"                                      # uvicorn が forkserver 等も後始末して終わる (実測 約 1 秒)
+for i in $(seq 1 20); do kill -0 "$PID" 2>/dev/null || break; sleep 0.5; done
+pgrep -g "$PID"; echo "pgrep rc=$? (1 なら残りなし)"    # 同じグループに残りが無いこと
+ss -ltnp | grep ":$PORT " || echo "port released"
+rm -f "$PIDFILE" "$TOKENFILE" /tmp/py-extractor-sample.txt
+```
+
+- `pkill uvicorn` のような名前での広い停止はしない。ほかの作業の uvicorn も巻き込むため。
+- TERM で止まらないときだけ `kill -KILL -- -"$PID"` (グループ全体)。
+- 実測では、停止後に `pgrep -g` は何も返さず、ポートも解放された。
+
+### 8.6 Python 版のテストを実行する
+
+```bash
+cd services/attachment-text-extractor
+.venv/bin/python -m pytest -q          # 約 85 秒
+.venv/bin/python -m pytest -q tests/test_extract_router.py   # 個別 (部分名で一致)
+```
+
+- ネットワーク不要で動く (テスト用のファイルは pytest の fixture が実行時に生成する)。トークンは `tests/conftest.py` の autouse fixture が入れるので、環境変数は要らない。`uv run pytest` でも同じだが、`.venv/bin/python -m pytest` のほうが uv の再同期が走らず速い。
+- 2026-11-04 (コミット `9cf01c716d` の後) の結果: `1222 passed` (失敗 0、エラー 0、約 84 秒)。
+- 注意: Node 版の CI ジョブは、Python 用の workflow (`.github/workflows/attachment-text-extractor.yml`) の外にある別の workflow (`.github/workflows/ci-attachment-text-extractor.yml`) に置いてある。Python 版の `tests/test_ci_workflow.py` が「Python 用 workflow のジョブは 1 つだけで、全ジョブに `permissions` がある」ことを前提にしているため、Python 用 workflow に Node のジョブを足すとこのテストが壊れる。Python 版を撤去するタスクで、この workflow とテストを一緒に消すときの手掛かりにする。
+
+### 8.7 はまりどころ
+
+- **トークン未設定**: 起動時に `ValidationError` で落ちる。ログ (`$LOG`) の末尾に `ATTACHMENT_EXTRACTOR_SERVICE_TOKEN  Field required` と出る。
+- **cwd**: `.env` と相対パスは cwd 基準。8.2 は自分でサービスのディレクトリへ移動する。
+- **`/tmp/pymp-*`**: SIGTERM で止めると、multiprocessing が作る空の `/tmp/pymp-*` ディレクトリが残る (サービスの CLAUDE.md の Known Limits にある既知の挙動)。害は無い。残りの確認には使わない (`pgrep -g` と `ss` で確認する)。
+- **ポート**: 3000 は GROWI 本体の開発サーバーが使うので、18000 などを使う。8.2 が `ss` で空きを確かめる。
+- **`uv run` で起動しない**: `$!` が uv の PID になり、止めるときに uvicorn が残る恐れがある。
+- **`--reload` を付けない**: 監視用の子プロセスが増え、グループ単位で止めない限り残る。
+- **`/docs` `/redoc`**: Python 版は 401 (トークン無し) を返し、トークンを付けると画面が出る。Node 版は 7.2 のとおり無くなる (差し替え確認で差として出る)。

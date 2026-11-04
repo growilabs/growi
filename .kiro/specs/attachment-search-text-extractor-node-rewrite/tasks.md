@@ -21,7 +21,7 @@
   - 既存の Node 用の CI (`ci-app.yml` などの turbo を通すジョブ) が新しい package のテストも拾うかを確かめ、同じテストを 2 つのジョブで二重に動かさない形にする。拾う場合は、他の package のテストと競合しないことを確かめる
   - ローカルで workflow の YAML が読めることを確かめ、Node 版のジョブが 1.1 の空のテストで成功する形になっている
   - _Requirements: 9.1, 9.4_
-- [ ] 1.3 比較のために Python 版を devcontainer で起動できるようにする
+- [x] 1.3 比較のために Python 版を devcontainer で起動できるようにする
   - Python 版の依存を uv で入れ、トークンを渡して決めたポートで起動する手順を、Python 版のコードを変えずに用意する (devcontainer の python3 に json モジュールが欠けている問題などがあれば回避の方法も書く)
   - Python 版を起動して `/readyz` が 200 を返し、止められることを確かめ、手順が research.md にある
   - _Requirements: 2.11, 6.3, 10.5_
