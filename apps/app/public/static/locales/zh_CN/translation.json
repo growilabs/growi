@@ -272,7 +272,7 @@
     "password_is_not_set": "密码未设置"
   },
   "share_links": {
-    "Shere this page link to public": "Shere this page link to public",
+    "Share this page link to public": "Share this page link to public",
     "share_link_list": "Share link list",
     "share_link_management": "Share Link Management",
     "delete_all_share_links": "Delete all share links",
