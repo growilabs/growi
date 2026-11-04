@@ -1,8 +1,8 @@
-import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job';
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
 
 export class BulkExportJobExpiredError extends Error {
-  constructor(pageBulkExportJob: PageBulkExportJobDocument) {
-    super(`Bulk export job has expired: ${pageBulkExportJob._id.toString()}`);
+  constructor(pageBulkExportJob: pagebulkexportjobs) {
+    super(`Bulk export job has expired: ${pageBulkExportJob.id}`);
   }
 }
 

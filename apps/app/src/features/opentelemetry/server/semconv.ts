@@ -37,3 +37,4 @@ Occasionally, one should review changes to `@opentelemetry/semantic-conventions`
 
 export const ATTR_SERVICE_INSTANCE_ID = 'service.instance.id';
 export const ATTR_HTTP_TARGET = 'http.target';
+export const ATTR_HTTP_URL = 'http.url';

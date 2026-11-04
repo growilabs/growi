@@ -175,6 +175,7 @@ services:
 `AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS=true`(config キー `env:useOnlyEnvVars:ai`)を設定すると:
 
 - **env からのみ受け付け、管理画面では読み取り専用**になる対象キー: `app:aiEnabled`(`AI_ENABLED`)・`ai:providers`(`AI_PROVIDERS`)・`ai:providerApiKeys`(`AI_PROVIDER_API_KEYS`)— つまり接続設定(有効/無効・資格情報・Azure 接続先)。
+- 同じグループには、利用量計測の基準モデル `ai:usageBaseModel`(`AI_USAGE_BASE_MODEL`)と AI の停止理由 `ai:disabledReason`(`AI_DISABLED_REASON`)も入っている。この 2 つはデプロイ側が注入する値で、管理画面に項目そのものがなく、モードの ON/OFF にかかわらず env からだけ読まれる。
 - **`ai:allowedModels` は意図的に対象外**(R5.2 / R5.3): 許可モデル(provider / modelId / providerOptions / isDefault)は env-only モード中も管理画面から編集できる。`AI_ALLOWED_MODELS` は初期値として与えられ、管理画面で保存すると DB 値が優先される(§1 のシャドーイング規則どおり)。
 
 例(接続設定は env 固定、モデルは管理画面で運用):

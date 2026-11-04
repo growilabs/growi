@@ -1,9 +1,9 @@
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { PageBulkExportJobInProgressStatus } from '../../interfaces/page-bulk-export';
-import PageBulkExportJob from '../models/page-bulk-export-job';
 import { pageBulkExportJobCronService } from './page-bulk-export-job-cron';
 
 const logger = loggerFactory(
@@ -27,11 +27,12 @@ class CheckPageBulkExportJobInProgressCronService extends CronService {
     );
     if (!isBulkExportPagesEnabled) return;
 
-    const pageBulkExportJobInProgress = await PageBulkExportJob.findOne({
-      $or: Object.values(PageBulkExportJobInProgressStatus).map((status) => ({
-        status,
-      })),
-    });
+    const pageBulkExportJobInProgress =
+      await prisma.pagebulkexportjobs.findFirst({
+        where: {
+          status: { in: Object.values(PageBulkExportJobInProgressStatus) },
+        },
+      });
     const pageBulkExportInProgressExists = pageBulkExportJobInProgress != null;
 
     if (

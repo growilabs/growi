@@ -28,7 +28,7 @@
 ### Goals
 - カタログを持つプロバイダ（openai / anthropic / google）で選択のみの登録を提供（1.x）。
 - モデル一覧の**提供（read パス）を外部通信ゼロ**にする（2.x）。一覧提供はローカル保存済みカタログ（同梱、または更新済み）の read のみで、リクエスト都度の外部取得は行わない。
-- **カタログのリフレッシュ手段を提供**（9.x）: 管理画面からの手動更新／起動時更新オプション／定期自動更新。起動時・定期の更新は **AI 機能が有効（`app:aiEnabled`）な場合に限り**作動する。AI 機能は既定 OFF のため既定構成は外部通信ゼロ。起動時更新は既定 OFF（opt-in）、定期自動更新は既定で日次スケジュール（AI 有効化時に自動最新化。空文字で無効化可）。更新は同梱カタログと**同一のフィルタ・検証**を経て永続化され、以後の一覧提供に反映される（解決: 更新済み／同梱の**新しい方**。更新済みが無ければ同梱）。
+- **カタログのリフレッシュ手段を提供**（9.x）: 管理画面からの手動更新／起動時更新オプション／定期自動更新。起動時・定期の更新は、**AI 機能が有効（`app:aiEnabled`）な場合、または AI 機能が無効で停止理由（`ai:disabledReason`）が `catalog_stale` の場合に限り**作動する。AI 機能は既定で無効、停止理由は既定で未設定のため、既定構成は外部通信ゼロ。起動時更新は既定 ON（起動のたびにすぐ取得）、定期自動更新は既定で日次スケジュール（取得時刻は 0〜1 時間のランダムな待ちでずらす。空文字で無効化可）。AI を有効にしたまま外部通信を避けるには、スケジュールを空文字にし、かつ起動時更新を OFF にする。更新は同梱カタログと**同一のフィルタ・検証**を経て永続化され、以後の一覧提供に反映される（解決: 更新済み／同梱の**新しい方**。更新済みが無ければ同梱）。
 - カタログを持たないプロバイダ（azure-openai）・一覧が空の場合は自由入力を維持（3.x）。
 - **`tool_call` かつ text 出力のモデルだけ**を選択肢にする（生成時フィルタ、6.x）。GROWI エージェントのツール呼び出し要件を担保。
 - 既存の許可リスト挙動・認可・推論・チャット UI を不変に保つ（4.x）。
@@ -47,7 +47,7 @@
 ### This Spec Owns
 - **models.dev → コミット済みモデルカタログの vendoring**（取り込みステップ＝リリース前段の取り込みスクリプト、生成時フィルタ、コミット成果物）。
 - provider スコープの「選択可能モデル一覧」を返す admin 読み取り経路（サーバ read サービス + エンドポイント + client フック）。
-- **カタログのリフレッシュ経路（Req 9・追補 R）**: 共有純変換（`build-model-catalog`）、runtime refresh サービス、更新済みカタログの永続化（`RefreshedModelCatalog` singleton collection）、`POST /ai-settings/refresh-model-catalog`、管理画面の更新ボタン、設定キー（`ai:modelCatalogRefreshOnStartup`＝既定 OFF / `ai:modelCatalogRefreshCronSchedule`＝既定日次）と起動時/cron 配線（起動時・定期とも AI 有効時のみ作動）。
+- **カタログのリフレッシュ経路（Req 9・追補 R）**: 共有純変換（`build-model-catalog`）、runtime refresh サービス、更新済みカタログの永続化（`RefreshedModelCatalog` singleton collection）、`POST /ai-settings/refresh-model-catalog`、管理画面の更新ボタン、設定キー（`ai:modelCatalogRefreshOnStartup`＝既定 ON / `ai:modelCatalogRefreshCronSchedule`＝既定日次）と起動時/cron 配線（起動時・定期とも、AI 有効時、または停止理由が `catalog_stale` のときだけ作動。定期は取得時刻をランダムにずらす）。
 - `AllowedModelsField` の modelId 入力コントロールの出し分け（`<select>` ↔ 自由入力）。
 - 新規 wire DTO `SelectableModelsResponse` / `RefreshModelCatalogResponse`。
 - 既存スペック（`ai-provider-multi-model` / `ai-provider-selection`）のモデル入力方式に関する記述の整合更新。
@@ -57,13 +57,15 @@
 - 推論のモデル生成（[resolve-mastra-model.ts](../../../apps/app/src/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model.ts) / `llm-providers/*`）と allow-list 検証（`resolveEffectiveModelId`）。
 - チャット側モデル一覧（[get-models.ts](../../../apps/app/src/features/mastra/server/routes/get-models.ts)）・`PromptInputModelSelect`・`UserUISettings.aiChatSelectedModelId`。
 - `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` の意味。
+- カタログの要素が持つ単価（`pricing`）の使い道（使用量の重み付け）と、停止理由 `ai:disabledReason`（`AI_DISABLED_REASON`）の定義・コード値。どちらも AI 利用量計測の機能（`features/ai-usage`）が持つ。本 spec のカタログはその単価を運び、リフレッシュの作動条件で停止理由を読むだけである。
 
 ### Allowed Dependencies
-- **models.dev api.json**（`https://models.dev/api.json`, MIT）— fetch するのは **(a) 取り込みステップ（リリース前段）の取り込みスクリプト**と **(b) runtime refresh サービス（Req 9・AI 有効時のリフレッシュ時のみ: 手動/起動時/定期）** の 2 箇所に限る（ビルド工程・一覧提供 read パスは触れない）。URL はビルトイン定数（要求側から指定不可、9.7）。
+- **models.dev api.json**（`https://models.dev/api.json`, MIT）— fetch するのは **(a) 取り込みステップ（リリース前段）の取り込みスクリプト**と **(b) runtime refresh サービス（Req 9 のリフレッシュ時のみ: 管理者の手動操作、および AI 有効時または停止理由が `catalog_stale` のときの起動時/定期）** の 2 箇所に限る（ビルド工程・一覧提供 read パスは触れない）。URL はビルトイン定数（要求側から指定不可、9.7）。
 - **コミット済み vendored 成果物**（`model-catalog-data.json`）— 実行時に静的 import して read（基線）。
 - **更新済みカタログの永続化** — MongoDB の専用 singleton collection（`RefreshedModelCatalog`）。多インスタンス共有・再起動耐性のため（追補 R）。
 - **zod `^4.1.9`**（既存 dep）— 共有純変換 `build-model-catalog` の**境界検証**（api.json の想定形チェック）。取り込みステップと refresh サービスの両方が同一検証を通る。
-- **node-cron（既存 `CronService` 基盤）** — 定期リフレッシュ（AI 有効時・既定日次、Req 9.3）。
+- **node-cron（既存 `CronService` 基盤）** — 定期リフレッシュ（AI 有効時または停止理由が `catalog_stale` のとき・既定日次、Req 9.3）。ランダムな待ちには既存の `randomSleep`（`server/util/random-sleep.ts`）を使う。
+- **停止理由の読み取り（`readAiDisabledReason` と定数 `AI_DISABLED_REASON_CATALOG_STALE`（値は `catalog_stale`））** — 停止理由の設定キー `ai:disabledReason` を定義・所有する利用量計測の機能（`features/ai-usage`）の入口から import する。
 - 既存 admin 認可チェーン（`accessTokenParser([SCOPE.READ.ADMIN.AI])`／書き込みは `[SCOPE.WRITE.ADMIN.AI]` → `loginRequiredFactory` → `adminRequiredFactory`）。
 - 既存 client 資産（`apiv3-client`、`useSWRImmutable`、reactstrap `Input`/`Button`、react-hook-form `register`、`toastr`）。
 - `interfaces/ai-provider` — サーバ（route）は runtime の `isAiProvider` で query を検証し、**client は型のみ `import type { AiProvider }`** を参照する（ビルド時に erase されるため server-only モジュールへの実行時結合は生じない。同モジュール冒頭の「Do NOT add client imports here」は"モジュール内へ client 依存を持ち込むな"の意で、型の被参照は禁じていない）。`interfaces/allowed-model`。
@@ -71,10 +73,12 @@
 
 ### Revalidation Triggers
 - `SelectableModelsResponse` の形状変更 → client フック／UI の再検証。
-- vendored 成果物のスキーマ（`provider → {id,name}[]`）変更 → model-catalog／取り込みスクリプトの再確認。
+- vendored 成果物のスキーマ（`provider → {id,name,pricing?}[]`）変更 → model-catalog／取り込みスクリプトの再確認、同梱カタログの再生成。
 - 生成時フィルタ条件（`tool_call && text 出力`）変更 → 提示一覧が変わるため UX/テスト再確認。
 - models.dev api.json のスキーマ変更（`tool_call`/`modalities` フィールド） → 取り込みスクリプトの再確認。
 - リリースパイプラインへの vendoring ステップ配置変更 → 鮮度運用の再確認。
+- 単価（`pricing`）の形（項目名・単位・段階単価の表し方）の変更 → 同梱カタログの再生成と、単価を読む使用量の重み付け（`features/ai-usage`）の再確認。
+- リフレッシュの作動条件（AI 有効、または停止理由が `catalog_stale`）や停止理由のコード値の変更 → 停止理由を注入するデプロイ側（GROWI.cloud）の運用の再確認。
 
 ## Architecture
 
@@ -154,7 +158,8 @@ sequenceDiagram
         API->>API: isAiProvider 検証（不正=400）
         API->>Cat: getSelectableModels(provider)
         Cat->>Repo: 成果物を static read（通信なし）
-        Cat-->>API: {id,name}[]（azure 等は []）
+        Cat-->>API: {id,name,pricing?}[]（azure 等は []）
+        API->>API: 各要素を {id,name} に詰め直す（単価は返さない）
         API-->>Hook: { models }
         alt models 非空
             Hook-->>Field: <select> で選択のみ (1.4)
@@ -227,7 +232,9 @@ export interface SelectableModelsResponse {
 }
 ```
 
-- 実行時の read 元 `model-catalog-data.json`（コミット済み）は `provider → {id,name}[]` の shape（`{ _source, _generatedAt, models }`）。`id` と `name` は models.dev の**同一スナップショットから同時に取り込む**ため相互に drift しない（`name` 欠落時は `id` をフォールバック）。同梱 JSON と永続スナップショット（`RefreshedModelCatalog.models`）の双方に同じ shape を適用する。
+- 実行時の read 元 `model-catalog-data.json`（コミット済み）は `provider → {id,name,pricing?}[]` の shape（`{ _source, _generatedAt, models }`、要素の型は `ModelCatalogEntry`）。`id`・`name`・`pricing` は models.dev の**同一スナップショットから同時に取り込む**ため相互に drift しない（`name` 欠落時は `id` をフォールバック）。同梱 JSON と永続スナップショット（`RefreshedModelCatalog.models`）の双方に同じ shape を適用する。
+- **単価 `pricing`（省略可能）**: models.dev の `cost` から取り込む、100 万トークンあたりの米ドル単価。`input` / `output` / `cacheRead` / `cacheWrite` の 4 項目はそれぞれ省略可能（models.dev に無い項目は「不明」として省く）。入力トークン数に応じた段階単価は `tiers`（各段階は 4 項目と境目 `inputTokensAbove` を持ち、境目の昇順。models.dev の `tier.type` が `context` のものだけを取り込み、知らない種類は無視する）。単価をまったく持たないモデルも選択肢から外さず、`pricing` なしで残す。永続スナップショットを読むときの検証は、`pricing` が無い・壊れている要素でも要素自体は残し、単価だけを「不明」として捨てる（カタログ全体を不正として捨てない）。
+- **応答には単価を出さない**: get-available-models はカタログの要素を `{id,name}` に詰め直して返す（7.1）。`SelectableModel` の形は `{id,name}` のまま。
 - 許可リスト（config, `ai:allowedModels`）は modelId のみを保持する（不変）。表示名は**保存しない**——読み取り時に共有ヘルパー `buildModelDisplayNameResolver`（[resolve-model-display-name.ts](../../../apps/app/src/features/mastra/server/services/ai-sdk-modules/resolve-model-display-name.ts)）が (provider, modelId) を実効カタログと join して解決する（id フォールバック）。保存しない理由: カタログ側の `name` が将来変わっても許可リストのリライトが要らないようにするため。
 - 既存 `AllowedModel` / `AiSettingsResponse` / `AiSettingsUpdateRequest` の形は変更しない（4.x）。
 
@@ -241,20 +248,23 @@ export interface SelectableModelsResponse {
 
 ## 追補 R: カタログのリフレッシュ（Req 9 — PR #11383 レビューFB 対応）
 
-同梱カタログは公式イメージに焼き込まれた後は変化しないため、イメージ更新なしにカタログを最新化するリフレッシュ経路を追加する。起動時・定期のリフレッシュは **AI 機能が有効（`app:aiEnabled`）な場合に限り**作動し（AI 既定 OFF のため既定構成は外部通信ゼロ）。**一覧提供（read パス）の通信ゼロは不変**であり、外部通信は AI 有効時のリフレッシュ操作（手動/起動時/定期）に限る（9.6）。
+同梱カタログは公式イメージに焼き込まれた後は変化しないため、イメージ更新なしにカタログを最新化するリフレッシュ経路を追加する。起動時・定期のリフレッシュは、**リフレッシュが許されている状態**（AI 機能が有効（`app:aiEnabled`）、または AI 機能が無効で停止理由（`ai:disabledReason`）が `catalog_stale`）に限り作動する。AI 機能は既定で無効、停止理由は既定で未設定のため、既定構成は外部通信ゼロ。**一覧提供（read パス）の通信ゼロは不変**であり、外部通信はリフレッシュ操作（管理者の手動操作と、リフレッシュが許されている状態での起動時/定期）に限る（9.6）。
 
 ### アーキテクチャ
 
 ```mermaid
 graph LR
-    subgraph Triggers[トリガ（起動時/定期は AI 有効時のみ作動）]
+    subgraph Triggers[トリガ（起動時/定期はリフレッシュが許されている状態でのみ作動）]
         Btn[管理画面ボタン<br/>POST refresh-model-catalog]
-        Boot[起動時 opt-in・既定OFF<br/>ai:modelCatalogRefreshOnStartup]
+        Boot[起動時・既定ON<br/>ai:modelCatalogRefreshOnStartup]
         Cron[定期・既定日次<br/>ai:modelCatalogRefreshCronSchedule]
     end
-    Btn --> Svc[refresh-model-catalog]
-    Boot -->|isAiEnabled ゲート| Jobs[model-catalog-refresh-jobs] --> Svc
-    Cron -->|isAiEnabled ゲート| Jobs
+    Btn -->|待たずにすぐ| Svc[refresh-model-catalog]
+    Boot -->|isCatalogRefreshAllowed ゲート| Jobs[model-catalog-refresh-jobs]
+    Cron -->|isCatalogRefreshAllowed ゲート| Jobs
+    Jobs -->|起動時は待たずにすぐ| Svc
+    Jobs -->|定期| Wait[0〜1時間のランダム待ち<br/>次の契機が来たら打ち切り]
+    Wait --> Svc
     Svc -->|fetch 固定URL| MD[models.dev api.json]
     Svc -->|共有純変換+検証| BMC[build-model-catalog]
     Svc -->|成功時のみ upsert| DB[(RefreshedModelCatalog<br/>singleton)]
@@ -267,24 +277,26 @@ graph LR
 
 | Component | Layer | Intent |
 |-----------|-------|--------|
-| build-model-catalog | 共有 (pure) | api.json → zod 境界検証 → chat＋tool フィルタ → `ModelCatalog`。ingest script と refresh サービスの**単一ソース**（同一フィルタ・同一サニティチェック） |
+| build-model-catalog | 共有 (pure) | api.json → zod 境界検証 → chat＋tool フィルタ → `ModelCatalog`（要素は `{id,name,pricing?}`。単価は `cost` から寛容に取り込み、壊れた単価でもモデルは落とさない）。ingest script と refresh サービスの**単一ソース**（同一フィルタ・同一サニティチェック・同一の単価の取り込み） |
 | refresh-model-catalog | Server (runtime) | 固定 URL fetch（30s timeout）→ 共有変換 → `RefreshedModelCatalog.upsertSingleton`。**失敗時は永続化前に throw**（last-good 維持） |
 | RefreshedModelCatalog | Server (model) | `{ _id:'singleton', models, fetchedAt, supersededBundledGeneratedAt, source }` の専用 collection（`mastra_refreshed_model_catalog`）。**Prisma-first**（schema.prisma の `mastrarefreshedmodelcatalogs` + `@@map`、`getSingleton`/`upsertSingleton` は Prisma extension。新規 collection のため Mongoose schema は持たない）。多インスタンス共有・再起動耐性。config-manager には置かない（設定ではなくキャッシュ） |
 | effective-model-catalog | Server (runtime) | `getEffectiveSelectableModels(provider)` = 更新済み／同梱の**新しい方**（比較は**同梱 `_generatedAt` 同士**: refresh 時点で同梱されていた世代 `supersededBundledGeneratedAt` vs 現在の同梱 `_generatedAt`。両辺とも vendoring 実行機のクロック由来なので、サーバ時計の遅れが成功した refresh を同梱で覆い隠すことがない。同梱世代が**厳密に**新しい場合のみ同梱＝イメージ更新後の古いスナップショットの覆い隠しを防止。tie（同一イメージ上での refresh）・タイムスタンプ不正・ロールバックは更新済み優先。無ければ同梱。`?? []` フェイルソフトは従来どおり）。get-available-models はこれを await する |
 | post-refresh-model-catalog | Server (route) | `POST /_api/v3/ai-settings/refresh-model-catalog`。`[accessTokenParser([SCOPE.WRITE.ADMIN.AI]) → login → admin]`。成功 200 `{ fetchedAt, counts }`／失敗は generic 500（内部情報を漏らさない） |
-| model-catalog-refresh-jobs | Server (boot) | `startModelCatalogRefreshCronIfEnabled()`（**AI 無効なら no-op**、schedule 未設定/空でも no-op、invalid でも boot を壊さない）＋ `triggerModelCatalogRefreshOnStartupIfEnabled()`（**AI 無効なら no-op**、fire-and-forget）。両者とも先頭で `isAiEnabled()` をチェック（Req 9.6）。crowi の `setupCron()` / `asyncAfterExpressServerReady()` から呼ぶ |
+| model-catalog-refresh-jobs | Server (boot) | 両トリガとも先頭で `isCatalogRefreshAllowed()`（`isAiEnabled() \|\| readAiDisabledReason() === catalog_stale`）を評価し、許されていなければ何もしない（Req 9.6）。`startModelCatalogRefreshCronIfEnabled()` は、schedule 未設定/空でも何もせず、invalid な式でも boot を壊さない。契機ごとに 0〜1 時間のランダムな時間だけ待ってから取得し、待ちの途中で次の契機が来たら前の待ちを打ち切ってすぐ取得する（Req 9.3）。`triggerModelCatalogRefreshOnStartupIfEnabled()` は、起動時更新オプションが ON（既定）なら待たずにすぐ取得し、完了を待たずに起動を進める。crowi の `setupCron()` / `asyncAfterExpressServerReady()` から呼ぶ |
 | AllowedModelsField 更新ボタン | Client (UI) | Models セクション見出しの「カタログを更新」→ **確認モーダル（ConfirmModal 再利用。外部サービス models.dev への通信が発生する旨を明示し、確認後にのみ実行 — 9.6）** → apiv3Post → 成功で全 provider キャッシュ invalidate＋toast。**env-only モードでも有効**（カタログは設定ではなく公開メタデータのサーバ側キャッシュであり、env-only 運用の GROWI.cloud がこの機能の主対象のため） |
 
-### 設定キー（デプロイオプション。作動はいずれも AI 有効時のみ）
+### 設定キー（デプロイオプション。作動はいずれもリフレッシュが許されている状態でのみ）
 
 | Key | env | 型/既定 | 意味 |
 |-----|-----|---------|------|
-| `ai:modelCatalogRefreshOnStartup` | `AI_MODEL_CATALOG_REFRESH_ON_STARTUP` | boolean / `false` | サーバ起動後に一度リフレッシュを試行（growi-docker-compose 等の焼き込みイメージ向け）。既定 OFF。AI 有効時のみ作動 |
-| `ai:modelCatalogRefreshCronSchedule` | `AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE` | string / **`'0 4 * * *'`** | node-cron 式。**既定は日次**（AI 有効化で自動最新化）。空文字 = 無効。AI 有効時のみ作動 |
+| `ai:modelCatalogRefreshOnStartup` | `AI_MODEL_CATALOG_REFRESH_ON_STARTUP` | boolean / **`true`** | サーバ起動後、待たずにすぐ一度リフレッシュを試行（焼き込みイメージ運用・リリース更新後・停止からの再開時に、起動直後からカタログを新しくするため）。既定 ON。`false` で OFF。AI 有効時、または停止理由が `catalog_stale` のときのみ作動 |
+| `ai:modelCatalogRefreshCronSchedule` | `AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE` | string / **`'0 4 * * *'`** | node-cron 式。**既定は日次**（AI 有効化で自動最新化）。取得は契機から 0〜1 時間のランダムな待ちのあと。空文字 = 無効。AI 有効時、または停止理由が `catalog_stale` のときのみ作動 |
 
-env-only（`env:useOnlyEnvVars:ai`）の targetKeys には**含めない**: これらは設定フォーム項目ではなく env 駆動のデプロイオプションであり、PUT 経路にも現れない。
+AI 機能を有効にしたまま外部通信を避けたい場合（エアギャップでの AI 運用等）は、`AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE` を空文字にし、かつ `AI_MODEL_CATALOG_REFRESH_ON_STARTUP=false` にする（片方だけでは、もう片方の経路で通信する）。
+
+env-only（`env:useOnlyEnvVars:ai`）の固定対象には**含めない**: この 2 つのキーは、運用者が自分で調整するデプロイ設定である。デプロイ側が注入し、GROWI の管理者に変更させたくない基準モデル（`ai:usageBaseModel`）や停止理由（`ai:disabledReason`）とは性質が違う。そのため通常の読み方（DB に値があればそれを、無ければ env の値を使う）で読み、PUT 経路にも現れない。
 
 ### Error Handling（追加分）
 - **リフレッシュ失敗（fetch 不達 / HTTP エラー / スキーマドリフト / 空プロバイダ）**: `refreshModelCatalog` は**永続化の前に throw** → last-good（更新済み or 同梱）が有効なまま（9.4）。エンドポイントは generic 500、起動時/cron は warn ログのみで稼働継続。
-- **起動時/cron の boot 安全性**: invalid cron 式は捕捉してログ（boot を壊さない）。起動時リフレッシュは fire-and-forget（await しない）。
-- **AI-有効ゲート（9.6）**: 起動時・定期の両トリガは先頭で `isAiEnabled()` を評価し、AI 無効なら即 no-op（cron も登録しない）。定期スケジュールは既定で日次のため、この AI-有効ゲートが「既定構成（AI 無効）＝外部通信ゼロ」を担保する。
+- **起動時/cron の boot 安全性**: invalid cron 式は捕捉してログ（boot を壊さない）。起動時リフレッシュは完了を待たずに起動を進める（await しない）。
+- **リフレッシュ可否のゲート（9.6）**: 起動時・定期の両トリガは先頭で `isCatalogRefreshAllowed()` を評価し、AI 機能が無効で停止理由が `catalog_stale` でなければ（未設定を含む）何もしない（cron も登録しない）。起動時更新は既定 ON、定期スケジュールは既定で日次のため、このゲートが「既定構成（AI 無効・停止理由なし）＝外部通信ゼロ」を担保する。停止理由は起動時に読むので、停止理由や AI の有効・無効を変えたときは再起動で反映される。

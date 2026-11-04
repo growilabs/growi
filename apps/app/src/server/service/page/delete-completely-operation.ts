@@ -89,6 +89,12 @@ export const deleteCompletelyOperation = async (
   // reliably reproducible when the two run concurrently, never when run
   // sequentially). At that point, move pagetagrelations/revisions
   // deletion ahead of the pages delete.
+  //
+  // `pagebulkexportjobs.page` is an optional `onDelete: NoAction` relation too,
+  // but it is deliberately not deleted here: jobs may outlive their page. After
+  // the move to `prisma.pages.deleteMany`, a page still referenced by a job
+  // would be rejected with P2014, so decide then whether to delete those jobs
+  // or switch the relation to SetNull.
   await Promise.all([
     prisma.pagetagrelations.deleteMany({
       where: { relatedPageId: { in: pageIdStrings } },
