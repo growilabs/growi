@@ -100,7 +100,7 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 | 日本語 PDF の検索の品質 (pypdfium2 と WASM の PDFium の差) | 未検証 | ベンチマークと PDF のライブラリの選定で測る (Req 2.12、11.3) |
 | Follow-ups のどれを直すか | 未決 | 取り込みの前にユーザーが決める (Req 12.6) |
 | テスト用のファイルの作り方 | 決定 (すべて Node で作り直す。旧形式の DOC / PPT だけは commit 済みのものを使う) | ユーザー判断 (design.md の D5) |
-| Node で作れないテスト用のファイル (暗号化した Office と PDF、XLS、細工した ZIP) | 未検証 | 試作 (design.md の T7)。作れないものが残ったらユーザーに諮る |
+| Node で作れないテスト用のファイル (暗号化した Office と PDF、XLS、細工した ZIP) | 実測済み: 作れないものは無い (9 節)。部品の採用はユーザー判断を待つ (9.8) | 試作 (design.md の T7)。扱いはタスク 2.2 でユーザーが決める |
 
 ## 6. 計測の結果 (design フェーズ)
 
@@ -293,3 +293,389 @@ cd services/attachment-text-extractor
 - **`uv run` で起動しない**: `$!` が uv の PID になり、止めるときに uvicorn が残る恐れがある。
 - **`--reload` を付けない**: 監視用の子プロセスが増え、グループ単位で止めない限り残る。
 - **`/docs` `/redoc`**: Python 版は 401 (トークン無し) を返し、トークンを付けると画面が出る。Node 版は 7.2 のとおり無くなる (差し替え確認で差として出る)。
+
+## 9. テスト用のファイルを Node で作れるか (T7、タスク 2.1)
+
+2026-11-04 に devcontainer (Node 24.21.0) で試作した結果。試作は使い捨ての場所 (リポジトリの外の scratchpad) で、独自の `package.json` に `npm install` して行った。リポジトリの workspace・lockfile・`apps/attachment-text-extractor` には何も足していない。生成器の本実装はタスク 2.3 / 2.4 で行う。
+
+### 9.1 結論 (実測)
+
+- **Node で作れないものは無い**。`tests/fixture_files.py` のうちファイルを作る fixture 28 個 (旧形式の DOC / PPT の 2 個は対象外)、テストのファイルの中で作っている細工したファイル 37 個、追加で数え直して作ったファイル 15 個の **計 80 ファイル**と、文字コードの入力 20 個のバイト列を、Node で作れた。ほかに、`test_xlsx_split.py` と `test_pptx_split.py` が openpyxl / python-pptx で作っているブック・デッキの全部 (9.5.3) も Node で作り直し、テスト本体を変えずに通した。
+- 確かめ方は 5 つあり (9.2)、どれも Python 版のファイルと同じ結果になった。
+  - `fixture_files.py` の分で anydoc に通す 25 個、細工したファイル 37 個、追加のファイル 15 個は、Node 版と Python 版の両方の anydoc で、Python 版のファイルと **判定が同じで、成功するものは Markdown 全文の SHA-256 も同じ**だった (4 通りすべて同じ)。
+  - Python 版の `tests/test_fixture_files.py` は Node のファイルで 30 件すべて通った。
+  - Python 版の `tests/conversion/` の全体 (599 件) は、ファイルから読む fixture を Node のものに差し替えて、すべて通った。`test_xlsx_split.py` (50 件) と `test_pptx_split.py` (65 件) は、ブック・デッキを作る関数も Node のものに差し替えて、すべて通った。
+  - 文字コードの 20 個は、1 個 (cp932 の「髙」) を除いてバイト列まで同じで、Python 版のサービスの `decode()` の結果は 20 個とも同じだった。
+- 部品で作れないところは自前で書いた。書いた量は ZIP の書き出しが約 50 行、OOXML (XLSX / DOCX) が約 90 行、PPTX が約 60 行、PDF の組み立てと暗号化が約 70 行、XLS (BIFF8) が約 30 行、ISO-2022-JP が約 15 行。
+- ただし次の 6 つは、そのままでは動かず、手当てが要った (9.4・9.5・9.7 に詳しく書く)。
+  1. 暗号化した Office と XLS は、部品 (`officecrypto-tool`、SheetJS) が書き出す OLE のファイル (Office の古い入れ物の形式) を、anydoc が「壊れている」と判定した。原因は、両方の部品が使っている `cfb` (OLE を書く部品) の書き方にある。書き出した後に 11 行の修正をかけると直る。
+  2. XLS は、SheetJS で書くと、Python 版の性質のテスト (`test_xls_is_an_ole_biff8_workbook_with_two_sheets`) のうち、ファイルの中から ASCII の `First` などを探す部分だけが通らなかった。SheetJS が文字列を UTF-16 で書くため。そこで、文字列を 1 バイトで書く最小の BIFF8 の書き出しを自前で書いた (約 30 行。OLE の入れ物は `cfb` と上の修正)。これで Python 版のテストは変えずに通り、anydoc の出力も Python 版のファイルと同じになった。SheetJS は使わない。
+  3. bzip2 / LZMA で圧縮した部品が壊れている ZIP は、Node の標準に bzip2 / LZMA の圧縮が無い。そこで、圧縮の方式の番号だけを書き、本体には壊れたバイト列を置く方法に替えた。判定 (`malformed`) は Python 版と同じになった。
+  4. **ISO-2022-JP のテキストは `iconv-lite` で書けない** (`Encoding not recognized: 'iso-2022-jp'`)。`test_charset.py` と Req 2.4 が求める入力なので、EUC-JP の出力から作る自前の関数を書いた。`test_charset.py` の入力と、10 通りの例、BMP (U+0000〜U+FFFF、サロゲートを除く) の 1 字ごとの比較では、**Python の `iso2022_jp` と同じバイト列**になった。ただし BMP のうち 13 字は同じにならない (Node だけが拒否する 8 字、Python だけが拒否する 5 字)。`test_charset.py` の入力には含まれない (9.7)。
+  5. **PPTX の関係の ID は `rId<数字>` にする**。最初の Node の PPTX は `rIdS1` と書いており、Python 版の `test_slide_entry_pointing_at_no_relationship_is_malformed` (正規表現 `r:id="rId\d+"/></p:sldIdLst>` で `presentation.xml` を書き換える) が通らなかった (`1 failed, 64 passed`)。ID を `rId<数字>` にすると 65 件すべて通った。この種の「正規表現やバイト置換で書き換える」テストの入力は、Node 側の書き方を openpyxl / python-pptx と同じにそろえる必要がある (9.5.4)。
+  6. 最初の試作では、判定の比較だけを見て「同じ」としていた。Markdown の全文を比べると、細工したファイル 11 個で違っていた。Node 側の中身を Python 版と同じに直して、全文の SHA-256 が一致するようにした (9.5)。あわせて、DOCX の段落の中の改行を `<w:br/>` にしないと python-docx と違うこと、シートに `state="visible"` が要ること、cp932 の「髙」の符号が iconv-lite と Python で違うことも見つかった (9.5、9.7)。
+
+### 9.2 確かめ方
+
+anydoc の判定が同じでも、テストが確かめたい性質を持っているとは限らない。たとえばセル数の上限の検査、ZIP の申告サイズの検査、展開後の大きさの検査は、anydoc ではなくサービスが自分で行う。そこで、次の 5 つの判定役で確かめた。
+
+| 判定役 | 対象 | やり方 |
+|---|---|---|
+| (a) anydoc の判定 | anydoc に渡す fixture 25 個 | Python 版のファイル (Python 版の `fixture_files.py` の関数をそのまま呼んで作ったもの) と Node のファイルのそれぞれを、Node 版の anydoc (`@firecrawl/anydoc@0.2.4` の `toMarkdownBytes`) と Python 版の anydoc (`.venv` の `anydoc.to_markdown_bytes`) に通す。4 通りの判定 (失敗の種類、または成功) を比べ、成功したものは **Markdown 全文の SHA-256 (と UTF-8 の長さ)** も比べる。XLS は両方とも形式 `xlsx` で渡す (Python 版のサービスと同じ) |
+| (b) 性質のテスト | 同じ 25 個と、テキスト 3 個、`*_path` の大きなファイル | Python 版の `tests/test_fixture_files.py` (30 件) を使い捨ての場所に写し、fixture を「Node で作ったファイルを読む」形に差し替えた `conftest.py` で動かす。Python 版のコードは変えていない。openpyxl・python-docx・python-pptx・msoffcrypto (パスワードでの復号)・pypdf・pypdfium2 で開いて確かめる |
+| (c) Python 版の守りの関数 | テストのファイルの中で作っている細工したファイル (37 個のうち 32 個) | Python 版のサービスの関数 (`inspect_archive`、`read_part`、`enforce_cell_limit`、`convert_xlsx`、`convert_pptx`) に、Python 版のテストの関数で作ったものと Node で作ったものの両方を通し、結果 (`ConversionError` の種類、ページの中身) を比べる |
+| (d) 文字コード | 20 個のバイト列 | Python の `str.encode(...)` と Node の符号化 (`iconv-lite` ほか) の結果を 16 進で比べ、Python 版のサービスの `decode()` に両方を通して結果を比べる |
+| (e) Python 版のテスト本体 | `tests/conversion/` の全体、`test_xlsx_split.py`、`test_pptx_split.py` | (1) `conversion/` の 599 件を、fixture の読み込みだけ Node のファイルに替えて動かす。(2) `test_xlsx_split.py` と `test_pptx_split.py` は、ブックやデッキを作る関数 (`_book`、`_stale_reference_book`、`Presentation()` を使う関数と、テストの中の `Presentation()`) を、Node で作ったものを返す関数に替えた写しを動かす。テストの本体 (assert) は変えない |
+
+### 9.3 RED (作る前の一覧と、最初に失敗した試作)
+
+作る前は、9.4 と 9.5 の一覧にあるものが **すべて「Node ではまだ作れていない・確かめていない」状態** だった。最初の試作で失敗したもの:
+
+| 試したこと | 結果 |
+|---|---|
+| pdf-lib (1.17.1、MIT) で PDF を暗号化する | `PDFDocument` に暗号化の関数が無い (`typeof doc.encrypt` は `undefined`)。`save({ userPassword, ownerPassword })` と渡しても出力に `/Encrypt` が無い。pdf-lib では暗号化できない |
+| `officecrypto-tool` (0.0.19) で DOCX / XLSX / PPTX を暗号化する | 両方の anydoc が `encrypted` ではなく `malformed` を返した (Python 版のファイルは `encrypted`)。ただし msoffcrypto ではパスワードで復号でき、中身も正しかった |
+| SheetJS (0.20.3) で XLS (BIFF8) を書く | 両方の anydoc が `malformed`。Node 版の anydoc のメッセージは `not an OLE2 compound file: Malformed FAT (FAT has 128 entries, but file has only 12 sectors)` |
+| pptxgenjs (4.0.1、MIT) で PPTX を作る | anydoc では読めたが、python-pptx の `slide.shapes.title` が `None` になり、Python 版の性質のテストが 3 件失敗した。pptxgenjs はタイトルの placeholder を `idx="100"` で書き、python-pptx はタイトルを `idx` が 0 の placeholder として探すため |
+| 最初の ISO-2022-JP の自前の関数 (EUC-JP の出力から作る。書けない字の検査なし) | BMP の 1 字ごとに Python の `iso2022_jp` と比べると、同じは 7,001 字だけで、**50,349 字は Python が拒否するのに Node は黙って `?` を書き**、8 字はバイト列が違った。iconv-lite は EUC-JP に無い字を例外にせず `?` (0x3F) に置き換えるため。修正は、1 字ごとに EUC-JP へ符号化し、復号して元の字に戻ることを確かめ、2 バイトの先頭が JIS X 0208 の範囲 (0xA1〜0xA8、0xB0〜0xF4) のときだけ JIS として書く (9.7) |
+| `iconv-lite` で ISO-2022-JP を符号化する | `Encoding not recognized: 'iso-2022-jp'` (searched as: `iso2022jp`)。iconv-lite は ISO-2022-JP を書けない (読むこともできない) |
+| 細工したファイルを、判定だけで比べる | 判定は 37 個すべて同じだったが、Markdown の全文を比べると 11 個が違った (ノート用のデッキの本文の placeholder と、`xs_stored` のセルの値。9.5)。判定だけの比較は見落としが出る |
+| Node の PPTX の関係の ID を `rIdS1` のまま、Python 版の `test_pptx_split.py` を通す | `1 failed, 64 passed` (`test_slide_entry_pointing_at_no_relationship_is_malformed`。正規表現 `r:id="rId\d+"/></p:sldIdLst>` が `rIdS1` に当たらない)。`rId<数字>` に直すと `65 passed` |
+| 最初の Node のファイルに (b) の性質のテストを通す | `4 failed, 26 passed` (PPTX の 3 件と XLS の 1 件)。PPTX は XML から組み立てる方法に、XLS は自前の BIFF8 に替えて `30 passed` |
+
+### 9.4 `fixture_files.py` の fixture ごとの結果 (実測)
+
+「方法」の列で、**自前** は自分で書いたコード (Node の標準の `node:zlib` / `node:crypto` だけを使う)、**部品** は npm の package を使ったもの。「判定」は (a) の 4 通り (Python 版・Node のファイル × Node 版・Python 版の anydoc) で、失敗の種類、または成功した出力の全文の SHA-256 がすべて同じだったかどうか。「性質」は (b) のテストの結果。
+
+| fixture | 方法 | 判定 (a) | 性質 (b) |
+|---|---|---|---|
+| `xlsx_multi_sheet` / `xlsx_single_sheet` / `xlsx_hidden_sheet` | 自前: XML の文字列から組み立てて自前の ZIP に入れる。文字列はセルの中に直接書く (`t="inlineStr"`)。非表示は `<sheet state="hidden">` | 同じ (成功。全文の SHA-256 も同じ) | 通る |
+| `xlsx_chart_sheet` | 自前: グラフだけのシート (`xl/chartsheets/`)、drawing、グラフ (`xl/charts/chart1.xml`) を XML で書く。SheetJS と exceljs はグラフだけのシートを書けない | 同じ (成功。全文の SHA-256 も同じ) | 通る (openpyxl が `chartsheets` を見つける) |
+| `xlsx_over_cell_limit_path` (70,001 セル) / `xlsx_large_for_timeout_path` (5 シート × 14,000 行) | 自前 (上と同じ) | 同じ (成功。全文の SHA-256 も同じ) | 通る (セル数がちょうど一致) |
+| `pptx_multi_slide` | 自前: マスター・レイアウト・テーマ各 1 つと、タイトル (`idx` 0) と本文の placeholder を持つスライドを XML で書く。本文を箇条書きにするため、マスターの `bodyStyle` に行頭の記号を置く (置かないと Markdown の `- ` が付かず、Python 版と違う出力になる) | 同じ (成功。全文の SHA-256 も同じ) | 通る |
+| `docx_large_images_path` / `pptx_large_images_path` | 自前: PNG (画素が乱数で圧縮が効かないもの) を `node:zlib` で書き、DOCX / PPTX に 11 枚入れる。乱数は種を固定した自前の関数 (mulberry32)。Python の `random` と同じ並びは作れないが、テストが要るのは「圧縮が効かない」「40MiB 以上 50MB 未満」だけ。PPTX の画像には代替テキスト `descr="image.png"` を付ける (python-pptx と同じ出力にするため) | 同じ (成功。全文の SHA-256 も同じ) | 通る (44MiB 前後) |
+| `docx_zip_bomb_path` | 自前: `word/document.xml` (約 520MiB) を `createDeflateRaw` に少しずつ流して圧縮し、圧縮後の 0.7MB だけをメモリに持つ。CRC も少しずつ計算する | 同じ (`resourceLimit`) | 通る (申告サイズが上限を超える) |
+| `docx_deeply_nested` | 自前: `<w:sdt><w:sdtContent>` を 10 万段重ねた XML を文字列で作る | 同じ (`resourceLimit`) | 通る |
+| `docx_encrypted` / `xlsx_encrypted` / `pptx_encrypted` | 部品: `officecrypto-tool` で ECMA-376 の agile encryption (`EncryptionInfo` の版が 4.4) をかけ、その後に自前の FAT の修正 (9.7) をかける | 同じ (`encrypted`) | 通る (msoffcrypto が `office-test-password` で復号でき、中から `encrypted marker` が出る) |
+| `pdf_text` / `pdf_image_only` | 自前: Python 版の `_build_pdf` をそのまま移した | 同じ (成功 / `needsOcr`) | 通る。**Python 版とバイト列まで同じ** |
+| `pdf_user_password` / `pdf_owner_password_only` | 自前: PDF の Standard security handler (revision 3、RC4 128bit。pypdf の `RC4-128` と同じ方式) を書いた。Node 24 の OpenSSL 3 は `rc4` を使えない (`ERR_OSSL_EVP_UNSUPPORTED`) ので RC4 も自前 (10 行) | 同じ (`encrypted` / 成功) | 通る。pypdf でも Python 版と同じ: ユーザーパスワード付きは空のパスワードで開けず (`NOT_DECRYPTED`)、所有者パスワードだけのものは空のパスワードで開ける (`USER_PASSWORD`)。どちらも所有者パスワードで `OWNER_PASSWORD` になる |
+| `pdf_corrupt` | 自前: `pdf_text` の先頭 + 乱数 512 バイト | 同じ (`malformed`) | 通る |
+| `text_shift_jis` / `text_euc_jp` | 部品: `iconv-lite` で符号化する (Node の標準は Shift_JIS / EUC-JP の符号化ができない。復号は `TextDecoder` でできる。ISO-2022-JP は iconv-lite でも書けないので 9.7 の自前の関数) | 対象外 (anydoc に渡さない) | 通る。Python 版とバイト列まで同じ |
+| `text_utf8_bom` | 自前: BOM + UTF-8 | 対象外 | 通る。バイト列まで同じ |
+| `odt` / `ods` / `odp` / `epub` | 自前: Python 版の文字列をそのまま移し、`mimetype` を先頭に無圧縮で入れる | 同じ (成功。全文の SHA-256 も同じ) | 通る |
+| `rtf` | 自前: Python 版の `_rtf_escape` を移した | 同じ (成功。全文の SHA-256 も同じ) | 通る。バイト列まで同じ |
+| `xls` | 自前: BIFF8 のレコード (BOF、CODEPAGE、FONT、XF、BOUNDSHEET、DIMENSIONS、LABEL、NUMBER、EOF) を書き、文字列は 1 バイトの文字で書く (xlwt と同じ)。OLE の入れ物は部品 `cfb` で書き、9.7 の FAT の修正をかける。先に試した SheetJS (`bookType: 'biff8'`) は、FAT の修正で anydoc は通ったが、文字列を UTF-16 で書くため Python 版のテストが 1 件通らなかった | 同じ (成功。全文の SHA-256 も同じ) | 通る (OLE の印、`Workbook` のストリーム名、BIFF8 の BOF レコード、ASCII の `First` / `Second` / `XLS cell marker`) |
+| `office_password` / `pdf_password` | 定数 | — | — |
+| `legacy_doc` / `legacy_ppt` / `legacy_fixture_sha256` | 対象外 (D5 の例外。commit 済みのファイルを出所の記録と一緒に移す: タスク 2.3) | — | 移したファイルで通る見込み (ファイルは同じもの) |
+
+### 9.5 テストのファイルの中で作っているファイルの結果 (実測)
+
+#### 9.5.1 一覧の作り方
+
+`fixture_files.py` の外で、テストのファイルの中で作っているファイルは、`tests/` を grep して数えた。次のコマンドで、ファイルを作る道具 (openpyxl、python-pptx、python-docx、xlwt、pypdf、msoffcrypto、`zipfile` の書き込み、`struct.pack`、手組みの PDF、文字コードの符号化、BOM、バイト置換、`make_docx` などの fixture の関数) を使っている行を、ファイルごとに数える。出た 16 ファイルを 1 つずつ読み、作っているものをすべて下の表に入れた。
+
+```bash
+cd services/attachment-text-extractor/tests   # bash で実行する
+grep -rnE 'Presentation\(\)|openpyxl\.Workbook|Document\(\)|xlwt|PdfWriter|msoffcrypto\.|zipfile\.ZipFile\(.*"[wa]"|struct\.pack|_build_pdf\(|_pdf_stream\(|\.encode\("(cp932|euc_jp|iso2022_jp|cp1252|koi8-r|shift_jis|utf-16|utf-32)|codecs\.BOM|re\.(sub|compile|findall|search)\(rb|\.replace\(b|make_docx\(|make_pptx\(|make_text_pdf\(|write_xlsx_cells\(|_random_images\(' \
+  --include='*.py' . | grep -v __pycache__ | grep -v fixture_files.py | cut -d: -f1 | sort | uniq -c
+```
+
+結果 (2026-11-04): `conversion/` の `test_archive_guard` 9、`test_charset` 18、`test_core` 2、`test_office` 5、`test_pdf` 3、`test_pptx_split` 20、`test_text` 4、`test_xlsx_split` 18、`test_xlsx_split_precheck` 5 行。`runner/` の `test_child_entry` 3、`test_child_isolation` 10、`test_conversion_runner` 5、`test_wire` 1 行。ほかに `test_dependencies` 1、`test_e2e_http` 4、`test_live_server` 1 行。`test_core`、`test_conversion_runner`、`test_child_entry`、`test_e2e_http` の `make_docx(...)` と `make_text_pdf(...)` の呼び出しは、下の DOCX と PDF の行と同じ作り方 (段落の文字列だけ違う)。`test_wire` の `struct.pack` は、ファイルではなく通信の枠。`test_live_server` と `test_dependencies` の行は、ファイルの生成ではない。
+
+文字列やバイト列を書くだけで済むもの (HTML、XML、ipynb、CSV、TSV、JSON、YAML の短い文字列、`b"x" * N` の埋め草、アップロード用の 1MiB〜70MiB の本文など) は、Node でも同じ文字列を書くだけなので、ファイルとしては作っていない。
+
+分類:
+
+| 組 | 数 | どこで確かめたか |
+|---|---|---|
+| 細工したファイル (`ag_` / `pc_` / `ps_` / `xs_` / `ci_`) | 37 ファイル | 9.5.2 の前半の表 |
+| 追加で作ったファイル (`of_` / `rx_` / `rp_` / `hy_`) | 15 ファイル | 9.5.2 の後半の表 |
+| ブック・デッキ (`test_xlsx_split.py` と `test_pptx_split.py` の中の関数が作るもの) | 関数と、テストの中での作成 | 9.5.3 |
+| 文字コードの入力 | 20 個のバイト列 | 9.5.5 |
+
+`fixture_files.py` の 28 ファイルと合わせて、**ファイルとして 80 個**と、文字コードのバイト列 20 個を Node で作った。
+
+判定の確かめ方:
+- 「判定 (c)」: Python 版のサービスの守りの関数に、Python 版のテストの関数で作ったものと Node で作ったものを通した結果。
+- 「両 anydoc」: 同じファイルを、Python 版のファイル・Node のファイルのそれぞれで、Node 版と Python 版の anydoc に通した 4 通りの結果。**判定の一致に加えて、成功したものは Markdown 全文の SHA-256 も比べた**。形式は名前の先頭で決めた (`ag_` と `ps_` は pptx、`pc_` と `xs_` と `rx_` は xlsx、`ci_` と `of_` は docx、`rp_` と `hy_` は pdf)。
+
+結果: 前半の 37 個と後半の 15 個は、**どれも 4 通りの結果が同じ** (判定が同じで、成功する 15 + 9 個は全文の SHA-256 も同じ)。(c) の判定は前半の 32 個すべてで同じ。
+
+最初の試作では、細工したファイル 11 個 (`ps_notes_deck` 系の 10 個と `xs_stored`) で判定は同じなのに Markdown が違った。原因は、Node 版のノート用のデッキに本文の placeholder (`body`) を入れていたこと (Python 版はタイトルだけ) と、`xs_stored` のセルの値が `a` ではなく `first copy` だったこと。判定だけの比較では見えなかったので、全文を比べる形に替え、Node 側を Python 版と同じ中身に直した。
+
+anydoc 自身の判定は、`test_archive_guard.py` と `test_xlsx_split_precheck.py` の分は `malformed` / `missingPart` / `resourceLimit` (中身が本物の PPTX / XLSX ではないため)、`test_pptx_split.py` の分はすべて成功だった。後者のうち、関係の XML のエンティティの展開と `encoding="UTF-9"` は、Python 版のサービスの守りでは `malformed` になるが、anydoc 自身は変換に成功する。これらを拒否するのは anydoc ではなくサービスの守りだということで、Node 版でも同じ守りを自分で持つ必要がある (T6 の材料)。
+
+#### 9.5.2 細工したファイルと追加のファイル
+
+| 元のテスト | 作るもの | 方法 | 判定 (Python 版 = Node) |
+|---|---|---|---|
+| `test_archive_guard.py` | deflate のブロックの種類を壊す / 圧縮の方式を 9 にする / ZIP の暗号化の印を立てる / UTF-8 の印付きで UTF-8 でない名前 / 必要な版を 10.0 にする | 自前の ZIP にバイトの書き換え (Python 版と同じ位置) | `malformed` / `malformed` / `encrypted` / 素通し / 素通し |
+| 同上 | 申告サイズを偽った ZIP | 自前: 無圧縮の部品の local header と central directory の「5000, 5000」を「10, 10」に書き換える (Python 版と同じ手) | `malformed` |
+| 同上 | 名前の重複 / `../../evil.txt` と `/abs/evil.txt` の名前 / zip64 の部品 / 展開すると 200MiB になる部品 (zip64) | 自前の ZIP (重複も書ける)。zip64 は 0x0001 の追加欄を自前で書く (約 15 行) | 素通し / 読める / 読める / `limit_exceeded` |
+| 同上 | bzip2 / LZMA の部品が壊れている | 自前: 方式の番号 (12 / 14) と壊れた本体を書く (9.1 の 3) | `malformed` / `malformed` |
+| 同上 | 開いた後に中身が切り詰められる | ファイルではなく、メモリ上の入力を開いた後で短くするテスト。Node 版の ZIP の読み方 (T6) に合わせて書き直す | 対象外 (ファイルとしての fixture ではない) |
+| `test_xlsx_split_precheck.py` | 非標準の場所のシート: `xl/worksheets/sub/sheet1.xml`、`xl/custom/sheet1.xml`、大文字の拡張子 `sheet1.XML`、パッケージ直下の `sheet1.xml`、`.bin`、拡張子なし | 自前の ZIP | 150 セルで通り、上限 149 で `limit_exceeded` (6 個とも) |
+| 同上 | UTF-16 (LE / BE) のシート / 同じ名前のシートが 2 つ / 圧縮の流れを壊したシート | 自前 (UTF-16 BE は `Buffer.swap16()`) | `malformed` / `limit_exceeded` / `malformed` |
+| `test_xlsx_split.py` | 部品の重複 (後ろの方だけ別の値) / すべて無圧縮 / 150MiB の pivot cache (セルではない大きな部品) | 自前 (pivot cache は流しながら圧縮。ファイルは 0.15MB) | `second copy` が読まれる / 無圧縮のまま 2 シート / 2 シート |
+| 同上 | シート名・`state` の書き換え (`_renamed`、`_with_states`) | 自前: `buildXlsx` が `workbook.xml` に `state="visible"` をシートごとに書く (openpyxl と同じ。最初は書いていなかったので、`_with_states` の正規表現が当たらなかった)。名前は XML の特殊文字 (`"`、`&`、`<`) を含むものを含めて Python 版の関数 `_renamed` で書き換えた | `convert_xlsx` のページの番号とラベルが Python 版のファイルと同じ (実測) |
+| `test_pptx_split.py` | 契約の確認用のデッキ (ノート、表、画像、グループ、非表示のスライド、空のスライド、並べ替えたスライドの一覧) | 自前の PPTX に、表 (`a:tbl`) とグループ (`p:grpSp`) の XML を足し、`presentation.xml` のスライドの並びを書き換える | `convert_pptx` のページ 6 枚の中身が Python 版と同じ |
+| 同上 | 関係 (relationship) の行き先: `../../../outside.xml`、`/../outside.xml`、外部の URL、存在しない部品、絶対パス `/ppt/...` | 自前: `slide1.xml.rels` を書き換え、パッケージ直下に `outside.xml` を足す | 5 個とも Python 版と同じ (ノートは読まれ、`outside marker` は入らない) |
+| 同上 | 関係の XML でのエンティティの展開 / XML 宣言の `encoding="UTF-9"` (3 か所) | 自前の書き換え | `malformed` (4 個とも) |
+| `runner/test_child_isolation.py` | 画像 12 枚の 48MB の DOCX (RSS の基準のファイル) | 9.4 の大きな DOCX と同じ方法 (`ci_docx_12_images.docx`) | 48.0MiB で、4 通りの結果が同じ (成功、全文の SHA-256 も同じ)。RSS の計測はタスク 3.x の仕事 |
+| 同上 | `_write_xlsx(dest, 7000, 10)` (7 万セルの 10 列)、`one_sheet_at_the_cell_limit_path` (7 万行 1 列。Req 11.2 の RSS の基準の「7 万セル 1 シートの XLSX」)、`_pivot_workbook` (150MiB の pivot cache を含む) | 自前の XLSX (シート名 `Data`、セルの値 `r{行}c{列}`)。pivot は `xs_pivot_150mb` と同じ方法 | 実測: 3 個とも両 anydoc の判定が同じ (成功)、全文の SHA-256 も同じ。**ただし ZIP の中身は同じではない** (9.7) |
+| `conversion/test_office.py` | 途中で切った DOCX / XML が壊れた DOCX (`<w:document <<<`) / `word/document.xml` の無い DOCX | 自前: 普通の DOCX のバイト列の前半だけ / `word/document.xml` を置き換え / その部品を除いて作り直す (`of_truncated`、`of_broken_xml`、`of_no_document_part`) | 実測: `malformed` / `malformed` / `missingPart`。両 anydoc とも Python 版のファイルと同じ |
+| `test_office.py`、`test_e2e_http.py`、`test_child_entry.py` | 日本語の DOCX (`障害対応メモ ...`)、`docx marker 日本語`、改行を含む DOCX (`情報シス\nテム`) | 自前の DOCX。**段落の中の `\n` は `<w:br/>` に変える** (python-docx と同じ。最初は `<w:t>` の中に改行をそのまま書いていた) | 実測: 3 個とも両 anydoc の判定が同じ (成功)、全文の SHA-256 も同じ |
+| `test_e2e_http.py`、`runner/test_child_entry.py` | 壊れた入力: `PK\x03\x04` + 文字列 (DOCX / XLSX として)、`%PDF-1.4\n` + 文字列、`%PDF-1.7\n` + `\x00garbage` の繰り返し | バイト列の連結 (`of_hygiene_corrupt.docx`、`hy_corrupt_pdf`、`hy_garbage.pdf`) | 実測: 3 個とも `malformed`。両 anydoc とも Python 版と同じ |
+| `conversion/test_pdf.py`、`test_e2e_http.py` | 日本語の行を Type0 のフォントと ToUnicode で書いた PDF (2 種類) | Python 版の `_japanese_lines_pdf` を移した (Node の `buildPdf` に Type0 / CIDFontType2 / ToUnicode の部品を渡す) | 実測: 2 個とも両 anydoc の判定が同じ (成功)、全文の SHA-256 も同じ |
+| `runner/test_child_isolation.py` | 1 ページに 400 万字を書いた PDF | `(aaaa…1000字) Tj 0 -1 Td` を 4000 回 | 実測: 両 anydoc の判定が同じ (成功、707,707 字)、全文の SHA-256 も同じ |
+| `runner/test_child_isolation.py` | 20MB の CSV | `a,b,c,d\n` の繰り返し | 文字列の繰り返しだけ (ファイル形式の生成は要らない)。ファイルとしては作っていない |
+
+#### 9.5.3 `test_xlsx_split.py` と `test_pptx_split.py` のブックとデッキ (実測)
+
+この 2 つのテストファイルは、openpyxl と python-pptx で作ったブックとデッキを、ZIP の中で書き換える形のテストが多い。Python 版のテストの写しを作り、ブックとデッキを作る関数だけを Node で作ったものに替えて、テストの本体は変えずに動かした。
+
+| 元の関数・テスト | 作るもの | Node での作り方 |
+|---|---|---|
+| `test_xlsx_split.py` の `_book(sheets)` | シートごとの A 列の値。値が無いシートはセルを持たない (空のシート、すべて空のブック) | `buildXlsx` (XML から組み立てる)。空のシートは `<sheetData>` だけ |
+| 同 `_stale_reference_book` | `definedNames` (印刷タイトル `'Alpha'!$1:$1` と `named_cell` → `Beta!$A$1`)、キャッシュ付きの別シート参照の式セル | `buildXlsx` に `definedNames` と `{ formula, cached }` のセルを足した (openpyxl と同じ書き方: `<definedName name="_xlnm.Print_Titles" localSheetId="0">`) |
+| 同 `_renamed`・`_with_states`・`_awkward_book`・`_plain_book`・`_secret_book` | シート名・state の書き換え (正規表現)、変わった名前、日本語名 | `_book` の結果を Python 版の書き換え関数にそのまま通す |
+| 同 `<sheet\b[^>]*/>` の並べ替えと 50,000 個の複製、`<sheets>` の前の 1.2MB のコメント、workbook.xml の途中切断・不明な符号化・エンティティの展開、workbook の無い ZIP、Excel 風の workbook.xml | ZIP の中の書き換え | Python 版の書き換え関数にそのまま通す (Node の `workbook.xml` が `<sheet …/>` の自己終了タグ、属性なしの `<sheets>`、先頭の XML 宣言を持つので当たる) |
+| `test_pptx_split.py` の `_contract_deck`・`_notes_deck` | ノート、表、画像、グループ、非表示、空のスライド、並べ替えたスライドの並び / ノートだけのデッキ | `buildPptxXml` と、表・グループ・並べ替えの XML の追加 (9.5.2 の契約デッキ) |
+| 同 `_artefact_deck`・`_deck_with_pictures`・`_deck_with_text` | 自動の代替テキスト、著者の行、スライドをまたぐ改行 (`\v`)、グループの中の画像と文字 | `buildPptxXml` に、段落 (`\n`)・改行 (`\v` → `<a:br/>`)・テキストボックス・画像の `descr`・`<p:grpSp>` を足した。図形の並びは python-pptx と同じ (画像、グループ、テキストボックスの順) にする必要があった (最初は逆にしていて 1 件失敗) |
+| 同 テストの中の `Presentation()` | タイトルだけのスライド 2 枚 (ハイパーリンクのデッキ)、1 枚 (スライド一覧の複製)、40 万字のテキストボックス (読み取りの上限)、ノートの定型文、スライドの無いデッキ | 写しの中で、`Presentation()`・`_title_slide`・`_save` を Node のデッキを作る小さな代用品に替えた |
+
+結果: `test_xlsx_split.py` は **50 件すべて通った** (Python で作ったもので 50 件、Node で作ったもので 50 件)。`test_pptx_split.py` は **65 件すべて通った** (同じく 65 件と 65 件)。`tests/conversion/` の全体 (599 件) も、ファイルから読む fixture を Node のものにして 599 件すべて通った。
+
+#### 9.5.4 正規表現・バイト置換で書き換えるテストの入力 (Node 側の書き方をそろえる印)
+
+Python 版のテストの helper が、openpyxl / python-pptx の XML を正規表現やバイト置換で書き換えるものは、Node で作る XML の書き方が違うと当たらない (当たらなくても例外にならず、テストが別の理由で落ちたり、何も確かめない形で通ったりする)。次のものが該当する。**印を付けた項目は、Node 側の生成器を同じ書き方にそろえる必要がある**。
+
+| 書き換え | Node 側で必要な書き方 | 結果 |
+|---|---|---|
+| **`re.sub(rb'r:id="rId\d+"/></p:sldIdLst>', …)`** (`test_pptx_split.py`) | `presentation.xml` の `<p:sldId>` の `r:id` が `rId<数字>`。最後の要素の直後が `</p:sldIdLst>` | `rIdS1` では 1 件失敗、`rId<数字>` で通る (実測) |
+| **`re.search(rb"<p:sldId [^>]*/>", …)`** の複製 | スペースの直後に属性が続く自己終了タグ | 通る (実測) |
+| **`re.findall(rb"<sheet\b[^>]*/>", …)`** と **`re.search`** (`test_xlsx_split.py`) | `<sheet …/>` の自己終了タグ | 通る (実測) |
+| **`_SHEET_NAME_ATTR`・`_SHEET_STATE_ATTR`** (`(<sheet\b[^>]*?\bname=)"…"`) | `name=` と **`state=` を全シートに書く** (openpyxl は `state="visible"` を書く) | `state` を書かないと `_with_states` が何も変えない (実測。`buildXlsx` を直した) |
+| **`body.replace(b"</c></row>", …)`** (`_stale_reference_book`) | セルが `</c>` で閉じ、その直後に `</row>` | 通る (実測。インライン文字列のセルでも成り立つ) |
+| **`b"'Alpha'!$1:$1" in workbook_xml`** | `definedNames` の印刷タイトルを、openpyxl と同じ `'Alpha'!$1:$1` で書く | 通る (実測) |
+| `body.replace(b"<sheets>", …)` | 属性の無い `<sheets>` | 通る (実測) |
+| `re.sub(rb"^<\?xml[^>]*\?>", …)`、`re.compile(rb"encoding=…")` | XML 宣言が先頭にあり、`encoding="UTF-8"` を持つ | 通る (実測) |
+| `body.replace(b'Target="../', b'Target="/ppt/')`、`_with_relationship` (`</Relationships>` の直前に挿入) | rels の `Target="../…"` と `</Relationships>` で終わる書き方 | 通る (実測) |
+| `honest.replace(struct.pack("<II", 5000, 5000), …)` (`test_archive_guard.py`) | local header と central directory の両方に、圧縮後・展開後のサイズを書く | 通る (実測。自前の ZIP) |
+
+#### 9.5.5 文字コード (`conversion/test_charset.py`、`test_text.py`)
+
+Node で符号化したバイト列を、Python で符号化したバイト列と比べ、さらに Python 版のサービスの `decode()` に通して同じ結果になるかを確かめた (20 個、実測)。
+
+| 入力 | Node での作り方 | バイト列 | `decode()` の結果 |
+|---|---|---|---|
+| UTF-16 LE / BE の BOM 付き、UTF-32 LE / BE の BOM 付き | `Buffer.from(…, 'utf16le')` と `swap16()`、UTF-32 は 4 バイトずつ自前 | 4 個とも同じ | 同じ |
+| cp932 (長い文、短い語、短い文) / EUC-JP (同じ 3 つ) / cp1252 (2 種類) / koi8-r / Shift_JIS の CSV / UTF-8 BOM 付きの CSV / HTML の `<meta charset="shift_jis">` | `iconv-lite` | 同じ (13 個) | 同じ |
+| cp932 の拡張文字 (`①②③ ㈱テスト 髙橋`) | `iconv-lite` | **違う**: 「髙」を iconv-lite は `0xFBFC`、Python は `0xEEE0` で書く (cp932 には同じ字の符号が 2 つある)。他の字は同じ | 同じ (どちらも「髙」に戻る) |
+| ISO-2022-JP (長い文、短い語、短い文) | **iconv-lite は書けない** (`Encoding not recognized: 'iso-2022-jp'`)。自前の関数 (9.7) | 同じ (3 個。9.7 に、ほかの 7 つの例と、BMP の全部の字での比較) | 同じ |
+
+
+### 9.6 部品とライセンス
+
+| 部品 | 版 | ライセンス | 使い道 | 付いてくる依存 (ライセンス) |
+|---|---|---|---|---|
+| `officecrypto-tool` | 0.0.19 | MIT | 暗号化した DOCX / XLSX / PPTX (agile encryption) | `cfb` 1.2.2 (Apache-2.0)、`adler-32` / `crc-32` (Apache-2.0)、`crypto-js` 4.2.0 (MIT)、`xml2js` 0.6.2 (MIT)、`sax` 1.6.1 (BlueOak-1.0.0、許容的)、`xmlbuilder` (MIT) |
+| `cfb` | 1.2.2 | Apache-2.0 | XLS の OLE の入れ物 (自前の BIFF8 を入れる)。`officecrypto-tool` の依存としても入る | `adler-32` / `crc-32` (Apache-2.0) |
+| `iconv-lite` | 0.7.3 | MIT | Shift_JIS / cp932 / EUC-JP / cp1252 / koi8-r の符号化。**ISO-2022-JP は書けない (実測: `Encoding not recognized: 'iso-2022-jp'`)**。ISO-2022-JP は 9.7 の自前の関数で作る | `safer-buffer` (MIT) |
+| `fflate` | 0.8.3 | MIT | 試作で ZIP を読み直すのに使った (書き出しは自前)。本実装では、T6 で選ぶ ZIP の部品か自前の読み取りで足りれば要らない | なし |
+| (使わない候補) `xlsx` (SheetJS Community Edition) | 0.20.3 (配布先の tarball `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`) | Apache-2.0 | XLS は書けたが、文字列を UTF-16 で書き、Python 版のテストが 1 件通らない (9.4)。npm の registry の最後の版は 0.18.5 で古い (脆弱性の修正を含まないとされるが、`npm audit` などで確かめてはいない: **未検証**) | なし |
+| (使わない候補) `pdfkit` | 0.20.2 | MIT | PDF の暗号化はできた (ユーザーパスワード付きは両方の anydoc で `encrypted`、所有者パスワードだけは成功)。ただし依存が多く (fontkit など 15 個)、自前の 70 行で Python 版と同じ形の PDF が作れるので採らない | `png-js` は package.json にライセンスの記載が無いが、LICENSE ファイルは MIT |
+| (使わない候補) `pptxgenjs` | 4.0.1 | MIT | タイトルの `idx` が python-pptx と合わず (9.3)、グループの図形も書けない | `jszip` は `(MIT OR GPL-3.0-or-later)` (MIT を選べる) |
+| (使わない候補) `pdf-lib` | 1.17.1 | MIT | 暗号化できない (9.3) | — |
+
+- `officecrypto-tool` は版が 0.0.x で、作者は 1 人。テストの専用の依存なので本番には入らない。
+- 暗号化した Office を部品に頼らず自前で書く場合の見積り (**未検証**): agile encryption (鍵の導出、AES-CBC での暗号化、`EncryptionInfo` の XML、HMAC) が 150〜250 行、OLE の入れ物は `cfb` を使う。部品で動いたので、試作では書いていない。
+
+### 9.7 気を付けること (タスク 2.3 / 2.4 への引き継ぎ)
+
+- **`cfb` の FAT の修正が要る**。`officecrypto-tool` と自前の XLS (と、試した SheetJS) はどれも `cfb` で OLE を書く。`cfb` は、OLE の中の割り当て表 (FAT) の使っていない欄を「鎖の終わり」(0xFFFFFFFE) で埋める。仕様では「空き」(0xFFFFFFFF) で、Python の xlwt / olefile が書くファイルはそうなっている。anydoc の OLE の読み取りは、ファイルの末尾より先を指す欄が「空き」でないと拒否する。書き出した後に次の修正をかけると、両方の anydoc が期待どおりに判定した。暗号化したファイルには `cfb` が自分で入れる `\u0001Sh33tJ5` という空のストリームが残るが、anydoc の判定と msoffcrypto の復号に影響は無い。Python 版のファイルにある `\u0006DataSpaces` のストリームは無くても判定は変わらなかった。
+
+```js
+// cfb.js pads unused FAT entries with ENDOFCHAIN (0xFFFFFFFE); strict readers
+// (anydoc) want FREESECT (0xFFFFFFFF) past the last real sector.
+export function fixCfbFat(input) {
+  const b = Buffer.from(input); const sectorSize = 1 << b.readUInt16LE(0x1e);
+  const sectors = (b.length - sectorSize) / sectorSize; const nFat = b.readUInt32LE(0x2c);
+  for (let k = 0; k < Math.min(nFat, 109); k++) {
+    const off = sectorSize + b.readUInt32LE(0x4c + 4 * k) * sectorSize;
+    for (let i = 0; i < sectorSize / 4; i++) if (k * (sectorSize / 4) + i >= sectors) b.writeUInt32LE(0xffffffff, off + 4 * i);
+  }
+  return b;
+}
+```
+
+- **PDF の暗号化は自前で 30 行ほど**。鍵の作り方は ISO 32000-1 の 7.6.3 (Standard security handler、revision 3) のとおり。
+
+```js
+// OpenSSL 3 in Node 24 refuses 'rc4' without the legacy provider, so RC4 is written out.
+function rc4(key, data) {
+  const s = [...Array(256).keys()]; let j = 0;
+  for (let i = 0; i < 256; i++) { j = (j + s[i] + key[i % key.length]) & 255; [s[i], s[j]] = [s[j], s[i]]; }
+  const out = Buffer.alloc(data.length); let i = 0; j = 0;
+  for (let k = 0; k < data.length; k++) {
+    i = (i + 1) & 255; j = (j + s[i]) & 255; [s[i], s[j]] = [s[j], s[i]];
+    out[k] = data[k] ^ s[(s[i] + s[j]) & 255];
+  }
+  return out;
+}
+const PAD = Buffer.from('28bf4e5e4e758a4164004e56fffa01082e2e00b6d0683e802f0ca9fe6453697a', 'hex');
+const md5 = (...b) => createHash('md5').update(Buffer.concat(b)).digest();
+const padPw = (pw) => Buffer.concat([Buffer.from(pw, 'latin1'), PAD]).subarray(0, 32);
+const rc4x20 = (key, data) => { let d = rc4(key, data); for (let i = 1; i <= 19; i++) d = rc4(key.map((b) => b ^ i), d); return d; };
+export function standardSecurity({ user, owner, id, P = -3904 }) {
+  let ok = md5(padPw(owner || user)); for (let i = 0; i < 50; i++) ok = md5(ok);
+  const O = rc4x20(ok, padPw(user));
+  const p = Buffer.alloc(4); p.writeInt32LE(P);
+  let key = md5(padPw(user), O, p, id); for (let i = 0; i < 50; i++) key = md5(key);
+  const U = Buffer.concat([rc4x20(key, md5(PAD, id)), Buffer.alloc(16)]);
+  const objKey = (num) => md5(key, Buffer.from([num & 255, (num >> 8) & 255, (num >> 16) & 255, 0, 0])).subarray(0, 16);
+  const dict = `<< /Filter /Standard /V 2 /R 3 /Length 128 /P ${P} /O <${O.toString('hex')}> /U <${U.toString('hex')}> >>`;
+  return { dict, encrypt: (num, data) => rc4(objKey(num), data) }; // each stream is encrypted with its object key
+}
+// trailer gets: /Encrypt <n> 0 R /ID [<id> <id>]
+```
+
+- **ISO-2022-JP は自前の関数で作る** (約 15 行)。iconv-lite の EUC-JP の出力から、各バイトの最上位ビットを落とし、`ESC $ B` ... `ESC ( B` で挟む。**iconv-lite は EUC-JP に無い字を例外にせず `?` に置き換える**ので、1 字ごとに EUC-JP へ符号化して復号し、元の字に戻らなければ例外にする。さらに、2 バイトの先頭が JIS X 0208 の範囲 (0xA1〜0xA8、0xB0〜0xF4) のものだけを JIS として書く (NEC 13 区や IBM 拡張の符号 (①㈱髙 など) は 0xAD や 0xFA 以降の先頭なので例外になる)。
+
+```js
+import iconv from 'iconv-lite';
+
+// iconv-lite cannot write ISO-2022-JP; derive it from its EUC-JP output, JIS X 0208 only.
+// iconv-lite turns unmappable characters into '?', so every character is round-tripped.
+export function encodeIso2022jp(text) {
+  const out = [];
+  let inJis = false;
+  for (const ch of text) {
+    const euc = iconv.encode(ch, 'EUC-JP');
+    if (iconv.decode(euc, 'EUC-JP') !== ch) throw new Error(`not representable in ISO-2022-JP: ${ch}`);
+    const jis = euc.length === 2 && ((euc[0] >= 0xa1 && euc[0] <= 0xa8) || (euc[0] >= 0xb0 && euc[0] <= 0xf4)) && euc[1] >= 0xa1 && euc[1] <= 0xfe;
+    if (euc.length !== (jis ? 2 : 1) || (!jis && euc[0] >= 0x80)) throw new Error(`not in JIS X 0208 or ASCII: ${ch}`);
+    if (jis !== inJis) { out.push(...(jis ? [0x1b, 0x24, 0x42] : [0x1b, 0x28, 0x42])); inJis = jis; }
+    out.push(...(jis ? [euc[0] & 0x7f, euc[1] & 0x7f] : [euc[0]]));
+  }
+  if (inJis) out.push(0x1b, 0x28, 0x42);
+  return Buffer.from(out);
+}
+```
+
+Python の `iso2022_jp` との比較 (実測):
+- `test_charset.py` の 3 つの入力 (長い文・短い語・短い文) と、ほかの 7 つの例 (日本語と ASCII の混在 4 通り、ASCII だけ、改行 (`\n`、`\r\n`) を含む文、空文字列) は、**10 / 10 が同じバイト列**。
+- BMP (U+0000〜U+FFFF、サロゲートの 2,048 字を除く 63,488 字) の **全部の字を 1 字ずつ** Python の `iso2022_jp` と比べた結果:
+
+| 結果 | 字数 |
+|---|---|
+| 同じバイト列 | 7,001 |
+| 両方が拒否 | 56,474 |
+| Node だけが拒否 | 8 |
+| Python だけが拒否 | 5 |
+| 違うバイト列 | 0 |
+
+- 残る差の 13 字 (**`test_charset.py` の入力には含まれない。2.6 のコーパスでも使わない字として扱う**。使うときは、この表を見て写像を足す)。
+  - Node だけが拒否する 8 字: `U+00A2` ¢、`U+00A3` £、`U+00A5` ¥、`U+00AC` ¬、`U+2016` ‖、`U+203E` ‾、`U+2212` −、`U+301C` 〜。Python は ¢ £ ¬ ‖ − 〜 を JIS X 0208 の符号で書き、¥ と ‾ は JIS ローマ字 (`ESC ( J`) で書く。iconv-lite の EUC-JP は、これらの字を別の符号 (全角形の ￠ ￡ ￢ ∥ － ～ に当たるもの) に対応づけているため、書けない。**〜 (U+301C) は日本語の文書でよく使う字だが、全角チルダ ～ (U+FF5E) も iconv-lite では JIS X 0212 の符号 (`8fa2b7`) になり、自前の関数が例外にする (Python も ～ を拒否する)。つまり 〜 を ～ に替えて避けることはできず、2.6 のコーパスの ISO-2022-JP の文書では 〜 と ～ のどちらも使わない**。なお ¥ と ‾ は iconv-lite が ASCII の 0x5C / 0x7E に対応づけるため、上の「全角形」の括弧書きには当たらない。どの字も例外で止まるので、黙って別の字に化けることはない。
+  - Python だけが拒否する 5 字: `U+2225` ∥、`U+FF0D` －、`U+FFE0` ￠、`U+FFE1` ￡、`U+FFE2` ￢。Node はこの 5 字を、Python が ¢ £ ¬ ‖ − に使う符号で書いてしまう。
+
+- **cp932 の「髙」は符号が違う** (実測)。iconv-lite は `0xFBFC`、Python は `0xEEE0` で書く。どちらも cp932 の正しい符号で、Python 版のサービスの `decode()` は同じ「髙」に戻す。`test_charset.py` の `test_shift_jis_with_cp932_extension_characters` を Node で書き直すときは、バイト列を固定して比べず、復号した結果を比べる。
+- **DOCX の段落の中の改行は `<w:br/>` にする**。`<w:t>` の中に `\n` をそのまま書くと python-docx と違う文書になる。`test_e2e_http.py` の「日本語の途中の改行が残る」テストの入力に影響する。`buildXlsx` は、シートごとに `state="visible"` を書く (openpyxl と同じ。`test_xlsx_split.py` の `_with_states` の正規表現がこの属性に当たる)。
+- **Req 11.2 の RSS の基準ファイルは、Node で作ったものと同じではない**。基準は Python 版の `tests/fixture_files.py` と同じ関数で作ったファイルで取っている。
+  - 7 万セル 1 シートの XLSX: `write_xlsx_cells(dest, [("Data", 70000, 1)])` (openpyxl の write-only モード。285MB)。
+  - 画像 12 枚の 48MB の DOCX: `make_docx("docx with twelve images", _random_images(12, 2048, seed=48))` (python-docx。281MB)。
+  - Node で作った XLSX は、ZIP の部品が 5 個で、openpyxl が作るもの (9 個) にある `docProps/app.xml`、`docProps/core.xml`、`xl/theme/theme1.xml`、`xl/styles.xml` が無い。セルの数、シートの名前、セルの値は同じで、圧縮後の大きさも同程度 (0.54MB 前後)。
+  - 12 枚の画像の DOCX も同じで、python-docx のものは ZIP の部品が 29 個 (画像を除くと 17 個: `docProps`、`styles`、`stylesWithEffects`、`settings`、`webSettings`、`fontTable`、`theme`、`customXml`、`numbering`、サムネイルなど)、Node のものは 17 個 (画像を除くと 5 個) で、画像の合計の大きさ (約 48MiB) は同じ。
+  - anydoc の出力は同じだが、**子プロセスの RSS は同じ値になるとは限らない**。タスク 3.x で Node 版の RSS を測るときは、上の 2 つの関数をそのまま呼んで作ったファイル (Python 版の `fixture_files.py` を使うので、Python 版が残っているうちに作って置いておく) を Node 版に渡した値を、基準との比較に使う。Node で作ったファイルの値は参考として別に取る。
+
+- **ZIP は書き出しを自前にする**。部品 (fflate など) は、名前の重複、申告サイズの偽り、zip64 の強制、展開すると大きくなる部品を少しずつ書くこと、をそのままではできない。自前なら、ヘッダーの欄をすべて自分で決められ、細工はバイトの書き換えで済む。展開すると大きくなる部品は、`createDeflateRaw` に流しながら `zlib.crc32(chunk, prev)` で CRC を足していく。
+- **PPTX と XLSX は部品を使わず XML から組み立てる**。部品 (pptxgenjs、exceljs、SheetJS) は、テストが要る形 (タイトルの `idx` 0、グラフだけのシート、グループの図形、シートのファイル名と順序) を書けないか、書き方を細かく決められない。XML から組み立てても、Markdown は Python 版のファイルと同じになった。
+- **乱数**: Python の `random.Random(seed)` と同じ並びは Node では作れない。テストが要るのは「圧縮が効かない」ことと大きさだけなので、種を固定した自前の乱数で足りる。
+- **作る時間**: 9.4 の 28 個 (大きなファイルを含む) を作るのに約 6 秒 (Python 版で同じものを作ると約 4 秒)。
+- **XLS の文字列は 1 バイトの文字だけ**。自前の BIFF8 は Latin-1 の範囲の文字だけを書く (範囲の外は例外にする)。日本語のシート名や値が要るときは、文字列の印 (`fHighByte`) を 1 にして UTF-16 で書く形に広げる (タスク 2.3)。
+
+### 9.8 作れなかったもの (タスク 2.2 への材料)
+
+作れなかったファイルは無い。Python 版のテストは、次の範囲では **テストを変えずに** Node で作った入力で通る (実測。9.1 の 5 つの確かめ方): `test_fixture_files.py` の 30 件、`tests/conversion/` の 599 件 (fixture の読み込みを替えたもの)、`test_xlsx_split.py` の 50 件と `test_pptx_split.py` の 65 件 (ブック・デッキを作る関数も替えたもの)。ただし、通るためには Node 側の生成器が Python 版の XML の書き方 (PPTX の関係の ID が `rId<数字>`、全シートの `state`、`<sheet …/>` の自己終了タグなど。9.5.4) にそろっている必要があり、最初の試作では PPTX の ID が違って 1 件通らなかった。**`runner/` と `test_e2e_http.py` などの、サーバーや子プロセスを動かすテストは、この確認の範囲に入れていない** (入力の作り方は 9.5.2 の表で確かめたが、テスト本体は 2.5 で通す)。タスク 2.2 で扱いを決める必要があるファイルは無い。ただし次の 2 つは判断の対象になるので、ユーザーの判断を記録しておくとよい。
+
+| 項目 | いまの案 | 代わりの案 (採らない場合) |
+|---|---|---|
+| 暗号化した Office を `officecrypto-tool` (0.0.x、作者 1 人) と FAT の修正で作る | テスト専用の依存として採る | 自前で agile encryption を書く (150〜250 行、未検証)。または Python 版で作ったファイルを出所の記録つきで commit する (D5 の例外を増やす) |
+| ISO-2022-JP のテキストの一部の字 (〜 U+301C など 13 字、9.7) が、Node の自前の関数と Python で違う | `test_charset.py` の入力には含まれないので、2.6 のコーパスでこれらの字を避ける。使うなら写像を足す | iconv-lite の代わりに、JIS X 0208 の表を持つ部品を探す (未調査) |
+
+### 9.9 試作の再現手順 (試作時の実行記録)
+
+試作のコードはリポジトリに残さない (後続タスク 2.3 / 2.4 で本実装する) ので、この手順は後からそのまま再実行できない。記録として、使った部品・比べ方・期待した出力を残している。
+
+**bash で実行する** (zsh では `$PY` が 1 つの語として扱われ、動かない)。次の手順を、空の `out/` と `res/` から順に実行して、下の「期待する出力」のとおりになることを確かめた (2026-11-04)。試作のコード (`src/*.mjs`、`py/*.py`、`pycheck*/`) は使い捨ての場所にだけあり、残さない (リポジトリにも入れていない)。作り方は 9.4〜9.7 に書いたとおりで、キーとなる部分のコードは 9.7 に載せた。
+
+```bash
+export PATH=/usr/local/share/nvm/versions/node/v24.21.0/bin:$PATH   # Node 24
+SCRATCH=<リポジトリの外の使い捨ての場所>; mkdir -p "$SCRATCH/t7" && cd "$SCRATCH/t7"
+echo '{ "name": "t7-proto", "private": true, "type": "module" }' > package.json
+npm install --no-audit --no-fund @firecrawl/anydoc@0.2.4 fflate officecrypto-tool iconv-lite \
+  https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz pdf-lib pdfkit pptxgenjs exceljs docx   # 最後の 6 つは採らなかった候補
+# (cfb は officecrypto-tool の依存として入る)
+
+SVC=<repo>/services/attachment-text-extractor; PY="$SVC/.venv/bin/python -I"; T7=$PWD
+mkdir -p out res
+
+# (a) fixture_files.py の 28 ファイルを Node と Python で作り、両方の anydoc に通す
+node src/gen-node.mjs out/node
+$PY py/dump_py.py "$SVC" out/py                       # Python 版の関数でそのまま作る
+for s in py node; do
+  node src/verdict-node.mjs out/$s > res/$s-on-node.json                 # Node 版の anydoc: 判定と Markdown 全文の SHA-256
+  $PY py/verdict_py.py out/$s > res/$s-on-py.json                        # Python 版の anydoc: 同じ
+done
+node src/compare.mjs res/py-on-node.json res/py-on-py.json res/node-on-node.json res/node-on-py.json
+
+# (b) Python 版の性質のテスト (test_fixture_files.py と、fixture を FIXTURE_DIR のファイルに差し替える conftest.py を pycheck/ に置く)
+(cd pycheck && SVC=$SVC FIXTURE_DIR=$T7/out/node $SVC/.venv/bin/python -m pytest -q -p no:cacheprovider --rootdir=$T7/pycheck test_fixture_files.py)
+
+# (c) 細工したファイル 37 個: Python 版のサービスの守りで判定し (32 個)、Python 版の同名のファイルと両方の anydoc で比べる
+node src/gen-crafted.mjs out/crafted-node
+node src/gen-contract-deck.mjs out/crafted-node/ps_contract_deck.pptx
+node src/gen-xlsx-crafted.mjs out/crafted-node
+$PY py/crafted_oracle.py "$SVC" out/crafted-node      # out/crafted-py も書き出す
+for s in crafted-py crafted-node; do node src/verdict-node.mjs out/$s > res/$s-on-node.json; $PY py/verdict_py.py out/$s > res/$s-on-py.json; done
+node src/compare.mjs res/crafted-py-on-node.json res/crafted-py-on-py.json res/crafted-node-on-node.json res/crafted-node-on-py.json
+
+# (d) 追加の 15 ファイルと文字コードの 20 個
+node src/gen-extra.mjs out/extra-node
+$PY py/dump_extra.py "$SVC" out/extra-py
+$PY py/charset_oracle.py "$SVC" out                   # バイト列と decode() の結果を比べる
+for s in extra-py extra-node; do                       # charsets.json は anydoc の入力ではないので除く
+  mv out/$s/charsets.json out/$s.charsets.json
+  node src/verdict-node.mjs out/$s > res/$s-on-node.json; $PY py/verdict_py.py out/$s > res/$s-on-py.json
+  mv out/$s.charsets.json out/$s/charsets.json
+done
+node src/compare.mjs res/extra-py-on-node.json res/extra-py-on-py.json res/extra-node-on-node.json res/extra-node-on-py.json
+
+# (e) ISO-2022-JP: 10 例と、BMP の全部の字
+node src/try-iso.mjs out/iso-node.json               # iconv-lite の失敗を出し、自前の関数の 10 例を書く
+$PY -c "import json; d=json.load(open('out/iso-node.json')); print(sum(v.encode('iso2022_jp').hex()==d['hex'][k] for k,v in d['samples'].items()), '/', len(d['samples']))"
+node src/bmp-iso.mjs out/bmp-iso-node.json && $PY py/bmp_iso.py out/bmp-iso-node.json out/bmp-iso-diff.json
+
+# (f) Python 版のテスト本体を、Node で作った入力で動かす
+#   pycheck2/: test_xlsx_split.py と test_pptx_split.py の写し。ブック・デッキを作る関数を、src/book.mjs と src/deck.mjs (stdin の JSON から作る) を呼ぶ関数に替える
+#   pycheck3/: tests/conversion/ の全体の写しと、(b) と同じ conftest.py
+(cd pycheck2 && $PY make_xlsx_split_node.py && $PY make_pptx_split_node.py \
+ && BOOK_MJS=$T7/src/book.mjs SVC=$SVC FIXTURE_DIR=$T7/out/node $SVC/.venv/bin/python -m pytest -q -p no:cacheprovider --rootdir=$T7/pycheck2 test_xlsx_split_node.py \
+ && DECK_MJS=$T7/src/deck.mjs CONTRACT_MJS=$T7/src/gen-contract-deck.mjs SVC=$SVC FIXTURE_DIR=$T7/out/node $SVC/.venv/bin/python -m pytest -q -p no:cacheprovider --rootdir=$T7/pycheck2 test_pptx_split_node.py)
+(cd pycheck3 && SVC=$SVC FIXTURE_DIR=$T7/out/node $SVC/.venv/bin/python -m pytest -q -p no:cacheprovider --rootdir=$T7/pycheck3 .)
+```
+
+`compare.mjs` は、4 通りの結果 (失敗の種類、または成功した出力の UTF-8 の長さと **Markdown 全文の SHA-256 の先頭 8 文字**) がすべて同じなら `SAME` とする (3 回目のレビューで全桁でも比べ直し、同じ結果だった)。`verdict-node.mjs` と `verdict_py.py` が、それぞれの anydoc の出力全文の SHA-256 を計算する (Node は `crypto`、Python は `hashlib`)。
+
+期待する出力 (実測):
+
+| 手順 | 出力 |
+|---|---|
+| (a) | `25 SAME` (判定と全文の SHA-256 が 4 通りで同じ) |
+| (b) | `30 passed` (SheetJS で作った XLS だと `29 passed, 1 failed`。9.4) |
+| (c) `crafted_oracle.py` | `32 SAME` |
+| (c) 両 anydoc | `37 SAME` |
+| (d) `charset_oracle.py` | 19 個が `SAME-BYTES SAME-DECODE`、1 個 (cp932 の拡張文字) が `DIFF-BYTES SAME-DECODE` |
+| (d) 両 anydoc | `15 SAME` |
+| (e) | `iconv-lite iso-2022-jp: Encoding not recognized`、`10 / 10`、`{'same': 7001, 'both_reject': 56474, 'node_only_reject': 8, 'python_only_reject': 5, 'different_bytes': 0}` |
+| (f) | `50 passed` (xlsx_split)、`65 passed` (pptx_split)、`599 passed` (conversion の全体) |
