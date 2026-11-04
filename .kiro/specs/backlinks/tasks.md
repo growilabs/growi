@@ -475,18 +475,12 @@ Independent of B4/B5.
     a claim held by a dead owner can be taken over once its lease expires
   - Create the document idle at boot with an upsert that uses `$setOnInsert` (idle, `coverage:
     none`), so a restart never resets coverage or progress and a missing document is recreated
-  - Add the two pure functions in `backfill-range.ts`: the run's `updatedAt` range from a scope and
-    the current coverage (the gap only), and the coverage after a completed run
-    (`coveredSince = min(coveredSince, runCutoff)`; `all` when the run had no lower bound)
   - Done when a unit test shows the claim succeeds once, is rejected for a second concurrent
     claimant while the lease is live, and succeeds for a new claimant after the lease expires, a
     second boot leaves existing coverage and progress fields untouched, and a deleted document is
-    recreated idle with coverage `none`; and table tests cover the pure functions: all from none
-    gives `all`; `since` from none gives `partial` at that date; a wider `since` after a partial run
-    walks only the gap and lowers `coveredSince`; all after a partial run walks the gap and gives
-    `all`; a scope already covered is a no-op
+    recreated idle with coverage `none`
   - _Requirements: 4.3, 4.4, 4.7, 4.8_
-  - _Boundary: PageLinkBackfillJob, backfill-range_
+  - _Boundary: PageLinkBackfillJob_
   - _Depends: B1.2_
 
 - [ ] B3.2 Implement the throttled, resumable backfill job
@@ -495,8 +489,11 @@ Independent of B4/B5.
     links via the B1 extractor (passing the configured site URL), resolve permalink targets via an
     id-existence check against the known page ids (not the path map), upsert that page's rows, then
     rest. Persist the progress marker at each checkpoint and resume from it on restart
+  - Add the two pure functions in `backfill-range.ts`: the run's `updatedAt` range from a scope and
+    the current coverage (the gap only), and the coverage after a completed run
+    (`coveredSince = min(coveredSince, runCutoff)`; `all` when the run had no lower bound)
   - Walk the run's range in one pass at the backfill duty (default 25%); the run is complete when
-    the cursor is exhausted, and then records its coverage (B3.1). The duty is config-driven
+    the cursor is exhausted, and then records its coverage (`backfill-range.ts`). The duty is config-driven
     (design.md's Delivery decision)
   - Pace by resting `restRatio × pageCycleMs` after each page, where the page cycle is the body read,
     parse and writes (not the parse alone), with the charged work capped as in the live drain;
@@ -528,9 +525,12 @@ Independent of B4/B5.
     same-wiki absolute URL) populates rows equivalent to the live path, a re-run/resume adds no
     duplicates, no second loop starts while one is running, and progress is emitted on the admin
     channel; the page-rate floor is never exceeded on a seeded set of tiny pages, and for each scope (all, newest N, since a date) only the pages in the range are processed, and a
-    second run over a wider scope processes only the gap and ends with the right coverage
+    second run over a wider scope processes only the gap and ends with the right coverage; and table
+    tests cover the pure functions: all from none gives `all`; `since` from none gives `partial` at
+    that date; a wider `since` after a partial run walks only the gap and lowers `coveredSince`; all
+    after a partial run walks the gap and gives `all`; a scope already covered is a no-op
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.6, 4.7, 4.9_
-  - _Boundary: PageLinkBackfillCron_
+  - _Boundary: PageLinkBackfillCron, backfill-range_
   - _Depends: B3.1, B1.3, B1.2_
 
 - [ ] B3.3 Register the backfill job and start it from a request
