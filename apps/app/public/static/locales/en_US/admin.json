@@ -53,7 +53,7 @@
     "comment_manage_rights": "Comment management rights",
     "other_options": "Other options",
     "deletion_explanation": "Restricts users who can trash the selected single page.",
-    "complete_deletion_explanation": "Restricts users who can completely delete  selected single page.",
+    "complete_deletion_explanation": "Restricts users who can completely delete a selected single page.",
     "recursive_deletion_explanation": "Restricts users who can trash pages including descendants.",
     "recursive_complete_deletion_explanation": "Restricts users who can completely delete pages including descendants.",
     "is_all_group_membership_required_for_page_complete_deletion": "Users other than admin and page author are required to belong to all groups that are granted page access",
@@ -344,7 +344,7 @@
   "admin_top": {
     "management_wiki": "Management Wiki",
     "system_information": "System information",
-    "wiki_administrator": "Only wiki administrator can access this page",
+    "wiki_administrator": "Only wiki administrators can access this page",
     "assign_administrator": "You can assign the selected user to be a wiki administrator on the User Management page using the 'Grant admin access' button",
     "package_name": "Package name",
     "specified_version": "Specified version",
@@ -705,7 +705,7 @@
             "desc": "Recommended <span class=\"text-danger\">NOT</span> to check this when users will also be restored."
           },
           "set_public_to_page": {
-            "label": "Set 'Public' to the pages that is '{{from}}'",
+            "label": "Set 'Public' to the pages that are '{{from}}'",
             "desc": "Make sure that this configuration makes all <b>'{{from}}'</b> pages readable from <span class=\"text-danger\">ANY users</span>."
           },
           "initialize_meta_datas": {
@@ -1121,7 +1121,7 @@
     "USER_REGISTRATION_APPROVAL_REQUEST": "User registration request for ID/Password authentication",
     "PAGE_VIEW": "Page view",
     "PAGE_USER_HOME_VIEW": "Page view (User home)",
-    "PAGE_FORBIDDEN": "Page view (Fobidden page)",
+    "PAGE_FORBIDDEN": "Page view (Forbidden page)",
     "PAGE_NOT_FOUND": "Page view (Not found page)",
     "PAGE_NOT_CREATABLE": "Page view（Not Creatable page）",
     "PAGE_LIKE": "Like",
