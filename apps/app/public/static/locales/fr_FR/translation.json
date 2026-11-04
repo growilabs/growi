@@ -695,6 +695,7 @@
     "delete_all_selected_page": "Tout supprimer",
     "select_all": "Tout sélectionner",
     "delete_selected_pages": "Supprimer les pages sélectionnées",
+    "selected_count_of_loaded": "{{selectedCount}} sélectionnée(s) ({{loadedCount}} chargée(s))",
     "currently_not_implemented": "Non implémenté",
     "search_again": "Rechercher",
     "number_of_list_to_display": "Afficher",

@@ -130,8 +130,16 @@ vi.mock('~/client/components/NotAvailableForReadOnlyUser', () => ({
     children?: React.ReactNode;
   }) => <>{children}</>,
 }));
+// Echo interpolation values after the key so displayed counts are observable.
 vi.mock('next-i18next', () => ({
-  useTranslation: vi.fn(() => ({ t: (key: string) => key })),
+  useTranslation: vi.fn(() => ({
+    t: (key: string, values?: Record<string, unknown>) =>
+      values == null
+        ? key
+        : `${key} ${Object.entries(values)
+            .map(([name, value]) => `${name}=${value}`)
+            .join(' ')}`,
+  })),
 }));
 
 import { SearchPage } from './SearchPage';
@@ -466,5 +474,56 @@ describe('SearchPage bulk-delete disabling (Req 5.2)', () => {
     });
 
     expect(getDeleteButton(container)).toBeEnabled();
+  });
+});
+
+describe('SearchPage selected-count display (Req 4.4/4.7)', () => {
+  beforeEach(() => {
+    searchPageBaseSpy.lastProps = undefined;
+    keywordSpy.keyword = 'initial-keyword';
+    searchStoreSpy.infiniteResponse = createInfiniteResponse([
+      createChunk(['a', 'b']),
+    ]);
+    vi.clearAllMocks();
+  });
+
+  const COUNT_KEY = 'search_result.selected_count_of_loaded';
+
+  it('shows no selection out of the loaded results initially', () => {
+    const { getByText } = render(<SearchPage />);
+
+    expect(
+      getByText(`${COUNT_KEY} selectedCount=0 loadedCount=2`),
+    ).toBeInTheDocument();
+  });
+
+  it('updates the selected count when the selection changes', () => {
+    const { getByText } = render(<SearchPage />);
+
+    act(() => {
+      searchPageBaseSpy.lastProps?.onSelectedPagesByCheckboxesChanged?.(1, 2);
+    });
+
+    expect(
+      getByText(`${COUNT_KEY} selectedCount=1 loadedCount=2`),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the selected count and grows the loaded count on append', () => {
+    const { getByText, rerender } = render(<SearchPage />);
+
+    act(() => {
+      searchPageBaseSpy.lastProps?.onSelectedPagesByCheckboxesChanged?.(2, 2);
+    });
+
+    searchStoreSpy.infiniteResponse = createInfiniteResponse([
+      createChunk(['a', 'b']),
+      createChunk(['c', 'd']),
+    ]);
+    rerender(<SearchPage />);
+
+    expect(
+      getByText(`${COUNT_KEY} selectedCount=2 loadedCount=4`),
+    ).toBeInTheDocument();
   });
 });
