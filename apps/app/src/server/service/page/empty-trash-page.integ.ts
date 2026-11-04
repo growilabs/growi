@@ -15,9 +15,9 @@ const TEST_IP = '10.0.0.117';
 
 const fixturePathPattern = new RegExp(`^(/trash)?/${FIXTURE_NAME}(/|$)`);
 
-describe('PageService.emptyTrashPage', () => {
+describe('PageService#deleteTrashedPagesCompletely', () => {
   let crowi: Crowi;
-  // emptyTrashPage is not part of the IPageService interface
+  // The concrete class: the method under test is private to it
   let pageService: PageService;
   let operator: HydratedDocument<IUserHasId>;
 
@@ -68,7 +68,11 @@ describe('PageService.emptyTrashPage', () => {
       'deleted',
     );
 
-    await pageService.emptyTrashPage(operator, { ip: TEST_IP }, [listed._id]);
+    await pageService['deleteTrashedPagesCompletely'](
+      operator,
+      { ip: TEST_IP },
+      [listed],
+    );
 
     expect(await crowi.models.Page.findById(listed._id)).toBeNull();
     expect((await crowi.models.Page.findById(notListed._id))?.path).toBe(
@@ -79,7 +83,11 @@ describe('PageService.emptyTrashPage', () => {
   it('keeps a given page that is no longer in the trash', async () => {
     const restored = await createPage(`/${FIXTURE_NAME}/restored`, 'published');
 
-    await pageService.emptyTrashPage(operator, { ip: TEST_IP }, [restored._id]);
+    await pageService['deleteTrashedPagesCompletely'](
+      operator,
+      { ip: TEST_IP },
+      [restored],
+    );
 
     expect((await crowi.models.Page.findById(restored._id))?.path).toBe(
       restored.path,
