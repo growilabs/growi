@@ -26,6 +26,10 @@
 
 **技術名を要件に書いている理由**: 通常の requirements では、言語やフレームワークの名前は design に回す。この spec は実行基盤を Node.js + Hono + `@firecrawl/anydoc` に替えること自体が目的なので、これらの名前を要件 (主に Req 4) にそのまま書く。後のレビューでこれらを「実装の詳細」として取り除かないこと。一方、まだ決まっていない選択 (PDF のライブラリ、子プロセスの作り方、OpenAPI の作り方、配置) は要件では決めず、「何を測って、誰が決めるか」だけを Req 11 に書く。
 
+**契約の維持は「既定の方針」である**: Req 1 と Req 7 が求める契約の維持 (API・エラー・設定・OpenAPI・生成クライアントを変えないこと) は、書き換えの作業を単純にするために置いた既定の方針である。守ろうとすると apps/app や書き換えた後の抽出サービスが複雑になる場合は、Req 1.9〜1.13 の手続きに従って崩してよい。判断の基準は「シンプルさ (保守性) が上がるか」である。ただし Req 1.13 に挙げた不変条件 (セキュリティ上の性質、メモリの予算 2Gi、対応形式と位置情報つきの抽出) は崩さない。
+
+**検索の品質はベンチマークで守る**: Req 2 は、Python 版と一字一句同じ出力を求めない。代わりに、検索で見つかるべき語句と位置の正解を付けた評価用の文書の集まり (ベンチマーク) で、Node 版が Python 版を下回らないことを求める。
+
 **この spec の要件の性質**: Req 1〜3 は「Python 版と同じであること」を確かめる要件で、比べる相手の Python 版が消えた後は意味を持たない。Req 6、10、11、12 は書き換えの作業の間だけ意味を持つ。書き換えの後も成り立ち続けるのは Req 4、5、7〜9 で、取り込みの扱いは brief.md の「Port-back の前提」に従う。
 
 ## Boundary Context
@@ -38,14 +42,15 @@
   - Python の資産の撤去
   - 未決事項を試作と計測で決めること
 - **Out of scope**:
-  - HTTP の契約の変更と、機能の追加 (新しい形式、新しい設定項目、新しいエンドポイント)
+  - 機能の追加 (新しい形式、新しい設定項目、新しいエンドポイント)
+  - HTTP の契約の変更 (ただし既定の方針として。守ると複雑になる場合は Req 1.9〜1.13 の手続きで崩してよい)
   - Python 版と Node 版の並行運用
   - Bun / Deno / Rust での実装
-  - 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) と apps/app の変更
+  - 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) と apps/app の変更 (ただし既定の方針として。Req 1.9 で契約を崩した場合は、その結果として要る下流の変更を Req 1.11 の範囲で同じ作業に含める)
   - 抽出サービスを apps/app のプロセスの中で動かすこと
-  - 性能や抽出の質を上げるための変更
+  - 性能や抽出の質を上げるための変更 (検索の品質を Python 版より下げないことは Req 2 で求める)
 - **Adjacent expectations**:
-  - 下流の apps/app は、いまと同じ `openapi.json` から orval で作った生成クライアントで `POST /extract` を呼び続ける。この spec はその生成クライアントが変わらないことを保証する
+  - 下流の apps/app は、`openapi.json` から orval で作った生成クライアントで `POST /extract` を呼ぶ。既定では、この spec は生成クライアントの型・関数・引数が変わらないことを保証する。契約を崩した場合は、生成クライアントと apps/app の呼び出し側を同じ作業で直す (Req 1.11)
   - `@firecrawl/anydoc@0.2.4` が linux x64 / arm64 向けのビルド済みのネイティブ部品として npm から取れることを前提にする
   - Docker / Kubernetes の実行環境 (cgroup、seccomp、NetworkPolicy に対応した CNI) は対象 spec と同じものを前提にする
 
@@ -53,7 +58,9 @@
 
 ### Requirement 1: 外から見える契約の維持
 
-**Objective:** 抽出サービスの利用者 (apps/app) と運用者として、実行基盤が替わっても API とエラーの扱いがまったく同じであってほしい。なぜなら、下流のコードと運用の手順を一切変えずに済ませたいから。
+**Objective:** 抽出サービスの利用者 (apps/app) と運用者として、実行基盤が替わっても API とエラーの扱いが、既定では同じであってほしい。なぜなら、下流のコードと運用の手順を変えずに済ませれば書き換えの作業が単純になるから。ただし、守ることでかえって apps/app や抽出サービスが複雑になるなら崩してよい。シンプルさは保守性を上げるから。
+
+1.1〜1.8 は既定の方針である。崩してよい条件と手続きは 1.9〜1.12、崩せない不変条件は 1.13 に書く。
 
 #### Acceptance Criteria
 
@@ -65,19 +72,33 @@
 6. The 抽出サービス (Node 版) shall 認証なしで呼べるパスを `/healthz`、`/readyz`、`/openapi.json` の 3 つだけにし、それ以外のパス (存在しないパスを含む) へのトークンのない要求には 401 `unauthorized` を返す
 7. When 1 件の `POST /extract` が終わる, the 抽出サービス (Node 版) shall 形式・大きさ・所要時間・結果・子プロセスの最大 RSS を 1 行のログに出し、ファイル名・ファイルの中身・Authorization ヘッダはログに出さない
 8. The 抽出サービス (Node 版) shall エラー応答の `message` にファイルの中身と内部の例外の文字列を含めない
+9. Where 1.1〜1.8 または Req 7.1〜7.4 の既定の方針を守ることで、apps/app または書き換えた後の抽出サービスが複雑になる, the 書き換え作業 shall その方針を崩してよい。崩すかどうかはこの spec の作業者が「シンプルさ (保守性) が上がるか」を基準に判断し、判断は 1.10 のとおり記録する
+10. When 既定の方針を崩すと判断する, the 書き換え作業 shall 崩す前に、(a) 何を崩すか、(b) それを守ると何がどう複雑になるか、(c) 崩した結果として要る下流の変更の範囲、を research.md に記録する
+11. When 既定の方針を崩す, the 書き換え作業 shall 崩した結果として要る下流の変更 (apps/app の抽出サービスのクライアントの呼び出し側、`packages/attachment-text-extractor-client` の `openapi.json` と生成クライアント、`attachment-search-indexing` などの下流 spec の記述) を同じ作業に含め、下流 spec を変える場合はその spec をこの spec の Amend target に加える
+12. When 既定の方針を崩す, the 書き換え作業 shall 崩した内容を design.md の Revalidation Triggers に書き、取り込み (Req 12) で対象 spec の AC と design.md を更新し (AC は番号を振り直さず文言を更新する。以前の文言や経緯は本文に残さない)、完了の報告でユーザーに明示する
+13. The 書き換え作業 shall 次のものを 1.9 の例外の対象にせず、崩さない: 認証 (1.5、1.6)、サービスのトークンを子プロセスに渡さないこと (Req 3.8)、子プロセスでの隔離 (Req 3.4、3.5、3.9〜3.12)、ファイルの中身や入力を返さないエラー応答とログ (1.7 のうち出さない項目、1.8)、メモリの予算 2Gi (Req 3.14)、対象 spec の対応形式 (対象 spec の AC 1.1〜1.8)、位置情報つきの抽出 (対象 spec の AC 1.2〜1.4)
 
 ### Requirement 2: 変換結果の同等性
 
-**Objective:** 全文検索の利用者として、同じ添付ファイルからは書き換えの前と同じテキストが取り出されてほしい。なぜなら、書き換えによって検索で見つかる添付が変わってはならないから。
+**Objective:** 全文検索の利用者として、書き換えの後も、添付ファイルが書き換えの前と同じかそれ以上に検索で見つかってほしい。なぜなら、書き換えによって検索の品質が落ちてはならないから。出力が Python 版と一字一句同じである必要はない (anydoc を使った結果として自然な出力ならよい)。
 
 #### Acceptance Criteria
 
-1. When anydoc を使う形式 (DOCX / XLSX / PPTX / RTF / EPUB / UTF-8 の CSV・TSV / 旧形式 DOC・XLS・PPT / OpenDocument) のファイルが渡される, the 抽出サービス (Node 版) shall Python 版と文字単位で同じ `pages[]` (各要素の `pageNumber`、`label`、`content`) を返す
-2. When PDF、HTML、XML、ipynb、UTF-8 以外の CSV・TSV (文字コードの判定の部品が替わるため)、またはその他のテキスト系のファイルが渡される, the 書き換え作業 shall 比較用のファイルの集まりについて Node 版と Python 版の `pages[]` を比べ、違いをすべて一覧にして記録する
-3. If 2.2 の比較で違いが見つかる, the 書き換え作業 shall 違いをユーザーに示し、受け入れるか直すかの判断を受けてから次に進む (合格とする基準をこの spec の側で決めない)
+1. When anydoc を使う形式 (DOCX / XLSX / PPTX / RTF / EPUB / CSV・TSV / 旧形式 DOC・XLS・PPT / OpenDocument) のファイルが渡される, the 書き換え作業 shall Python 版と文字単位で同じであることは求めず、比較用のファイルの集まりについて Node 版と Python 版の `pages[]` の違いを記録する
+2. When PDF、HTML、XML、ipynb、またはその他のテキスト系のファイルが渡される, the 書き換え作業 shall 比較用のファイルの集まりについて Node 版と Python 版の `pages[]` を比べ、違いを記録する (合否は 2.12 のベンチマークで決め、この記録は原因を調べるための材料とする)
+3. If 2.1 または 2.2 で違いが見つかっても 2.12 のベンチマークで退行していない, the 書き換え作業 shall 違いを記録するだけにし、ユーザーに判断を求めない (退行した場合の扱いは 2.14)
 4. The 比較用のファイルの集まり shall 日本語の PDF (横書き・縦書き・語の途中で改行が入るものを含む)、Shift_JIS / EUC-JP / ISO-2022-JP / BOM 付き UTF-8 / UTF-16 のテキスト、`<meta charset>` を持つ HTML、script / style を含む HTML を含む
 5. The 抽出サービス (Node 版) shall 改行コードの統一をすべての経路にかけ、日本語の間の 1 文字分の空白・改行の詰めを PDF の経路だけにかける (対象 spec の AC 1.9 と同じ範囲)
-6. The 抽出サービス (Node 版) shall 対象 spec の残存ギャップに書かれた既知の制約 (PowerPoint の自動代替テキストと同じ形の行が消える、`.csv` に `application/vnd.ms-excel` が付くと XLS として扱われる、BOM のない UTF-16 は判定できない、`label` は番号だけの文字列) を、Python 版と同じ振る舞いのまま保つ
+6. The 抽出サービス (Node 版) shall 対象 spec の残存ギャップに書かれた既知の制約 (PowerPoint の自動代替テキストと同じ形の行が消える、`.csv` に `application/vnd.ms-excel` が付くと XLS として扱われる、BOM のない UTF-16 は判定できない、`label` は番号だけの文字列) を、既定では Python 版と同じ振る舞いのまま保ち、変わった場合は research.md に記録する
+7. The 書き換え作業 shall 検索の品質を測る評価用の文書の集まり (以下「ベンチマーク」) を作る。ベンチマークは、形式ごと (少なくとも PDF / DOCX / XLSX / PPTX / XLS / CSV / HTML / TXT) に日本語を含む文書を持ち、日本語の PDF を必ず含み、2.4 のファイルを含む。文書は既存のテスト用のファイルと、テスト用のファイルを作る仕組みを使って作ってよい
+8. The ベンチマーク shall 各文書に、検索で必ず見つかるべき語句・フレーズと、それが現れるべき位置 (PDF はページ、PPTX はスライド、XLSX はシートの番号と名前) を正解として付ける
+9. The ベンチマーク shall 形式ごとに次の指標を測る: (a) 正解の語句が抽出したテキストに現れる割合 (再現率)、(b) 位置の正しさ (`pages[]` の要素の数と、各要素の `pageNumber` と `label` が正解と合っているか、正解の語句が正しい位置の要素に現れるか)、(c) 日本語の文字化けと、語の途中に空白や改行が入る分断が無いこと
+10. Where ベンチマークを動かす環境で実際の Elasticsearch (kuromoji の解析器を使う設定) が使える, the ベンチマーク shall 抽出したテキストを投入し、正解の語句で検索したときにその文書 (と位置) が見つかる割合も測る
+11. The 書き換え作業 shall Node 版を測る前に、同じベンチマークで Python 版を測り、その結果を基準 (ベースライン) として research.md に記録する
+12. The 抽出サービス (Node 版) shall ベンチマークのすべての形式とすべての指標で、Python 版のベースラインを下回らない
+13. When ベースラインを測り終える, the 書き換え作業 shall ベースラインに加えて絶対値の合格の基準 (下限) を置くかどうかと、その値を、ユーザーの判断を受けて research.md に記録する
+14. If ある形式のある指標で Node 版がベースラインを下回る, the 書き換え作業 shall 原因 (部品の違い。たとえば PDF の部品が pypdfium2 から WASM の PDFium に替わったこと) を調べて research.md に記録し、直すか受け入れるかをユーザーに諮り、ユーザーの判断なしに受け入れない
+15. The 抽出サービス (Node 版) shall 位置情報 (PDF のページ、PPTX のスライド、XLSX のシート) を、検索の品質の一部として 2.9 (b) の指標でベースラインを下回らずに保つ
 
 ### Requirement 3: リソースの保護と隔離の同等性
 
@@ -141,10 +162,11 @@
 5. The テストのレビュー shall テストを書いた担当とは別の担当が行い、`essential-test-design` と `essential-test-patterns` の 2 つの skill を使う
 6. The 実装のレビュー shall 実装した担当とは別の、新しく立てた担当が、Opus の model で、欠陥を探す立場 (敵対的) で行う
 7. If いずれかのレビューで修正が必要な指摘が出る, the 書き換え作業 shall 指摘を直して同じレビューを通し直すまで次の段階に入らない
+8. The 書き換え作業 shall ベンチマークの作成と Python 版でのベースラインの計測 (Req 2.7〜2.11) を、6.1 の最初の段階 (テストの書き換え) より前か、それと同時に行い、実装の書き換え (6.1 の 3 番目の段階) に入る前に終える (Python 版が残っているうちに測る必要があるため)
 
 ### Requirement 7: OpenAPI と生成クライアントの維持
 
-**Objective:** 下流の apps/app の開発者として、抽出サービスが書き換わっても生成クライアントを作り直す必要がないでほしい。なぜなら、契約が同じなら下流には何の変更も起こしてはならないから。
+**Objective:** 下流の apps/app の開発者として、既定では、抽出サービスが書き換わっても生成クライアントの型・関数・引数が変わらないでほしい。なぜなら、下流を変えずに済ませれば書き換えの作業が単純になるから。ただし、守ることでかえって複雑になるなら崩してよい (7.6)。
 
 #### Acceptance Criteria
 
@@ -153,6 +175,7 @@
 3. The CI shall 抽出サービスが出力する OpenAPI の文書と、commit 済みの `openapi.json` が JSON として食い違ったら失敗する (いまの drift 検知と同じ働きを保つ)
 4. The 書き換え作業 shall 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) と apps/app のファイルを変更しない。`packages/attachment-text-extractor-client/` の中で変えてよいのは、7.1 の説明文の修正を反映した `openapi.json` と、作り直した生成クライアントのコメントだけとする
 5. When 説明文を直す, the 書き換え作業 shall 直した説明文ごとに直す前と直した後の文を research.md に記録する
+6. Where 7.1、7.2、7.4 の既定の方針 (たとえば FastAPI が自動で付けた名前を Hono で同じに作ること) を守ることで、apps/app または抽出サービスが複雑になる, the 書き換え作業 shall Req 1.9〜1.12 と同じ手続きでその方針を崩してよい。崩した場合も 7.3 の drift 検知は保つ
 
 ### Requirement 8: 配備物
 
@@ -190,7 +213,7 @@
 1. When Node 版が Req 1〜9 を満たす, the 書き換え作業 shall `services/attachment-text-extractor/` から `pyproject.toml`、`uv.lock`、`.python-version`、Python のソースとテスト、`scripts/*.py`、ruff と pytest の設定を削除する
 2. The 書き換え作業 shall Python 版と Node 版を並べて動かす期間、配備物、設定を作らない
 3. When 撤去が終わる, the リポジトリ shall `services/attachment-text-extractor/` の下と、抽出サービス用の CI workflow に、`.py` のファイルと Python の道具 (uv、ruff、pytest、poe) を使う記述を含まない
-4. The 書き換え作業 shall 撤去の前に、Python 版でしか確かめられない比較 (Req 2.1〜2.3、Req 6.3) をすべて終えている
+4. The 書き換え作業 shall 撤去の前に、Python 版でしか確かめられない作業 (Req 2.11 のベースラインの計測、Req 2.1 / 2.2 の比較、Req 6.3) をすべて終え、Req 2.14 でユーザーに諮った項目の判断を受けている
 
 ### Requirement 11: 未決事項の決め方
 
@@ -204,12 +227,12 @@
 4. The 子プロセスの作り方の選定 (Node の `fork` か、`prlimit` で包んだ `spawn` か、その他) shall 子の起動にかかる時間、仮想メモリ上限・CPU 時間上限・コアダンプの禁止・`oom_score_adj` を掛けられるか、親が先に終わったときに子が残らないか、を比べた結果に基づく
 5. The 仮想メモリの上限 (`RLIMIT_AS`) の扱い shall Node と使うライブラリが必要とする仮想メモリの実測 (何もしない状態で 1,200MB、anydoc の XLSX で 2,000MB、PDFium WASM で 3,000MB 以上という調べ) を確かめ直し、上限を緩める値と、緩めた分を補う守り (RSS の監視など) を決めた結果に基づく
 6. The 本文の受け取りと切断の検知の方法 shall Hono と `@hono/node-server` で、枠を取る前の `Content-Length` の検査、メモリだけでの受け取り、実際に届いたバイト数での上限、切断による変換の停止が、Req 3.1〜3.5 のとおりに働くことを試作で確かめた結果に基づく
-7. The OpenAPI の作り方の選定 shall Req 7.1〜7.3 を満たせるかどうか (コードから作る方法と、commit 済みの文書を正とする方法の両方を含む) を確かめた結果に基づく
+7. The OpenAPI の作り方の選定 shall Req 7.1〜7.3 を満たせるかどうかと、満たすためにどれだけ複雑になるか (Req 7.6 で崩すかどうかの判断材料。コードから作る方法と、commit 済みの文書を正とする方法の両方を含む) を確かめた結果に基づく
 8. The 配置の選定 (`services/attachment-text-extractor/` を pnpm workspace に入れるか、外に置くか) shall turbo の build / test / lint への影響、CI の時間、`pnpm install` と lockfile への影響、Docker のビルドのしやすさを比べた結果に基づく (対象 spec が workspace の外に置いた理由は Python に固有のものだったので、そのままでは根拠にしない)
 9. When design フェーズで次の未決の項目を扱う, the 書き換え作業 shall 選択肢ごとの利点と欠点 (計測できるものは計測の結果) を design.md に示し、ユーザーの判断を受けてから design の承認を求める: `WORKERS` の Node での意味 (無視する、Node の cluster の数にする、廃止する)、`/readyz` の `dependencies` に出す名前、FastAPI が既定で出している `/docs` と `/redoc` (どちらも認証が要る) を残すかどうか、11.8 の比較に基づく配置の選択
-10. If 計測の結果、対象 spec のいずれかの AC を Node 版で満たせないことが分かる, the 書き換え作業 shall 書き換えを先に進めず、満たせない AC と理由をユーザーに示して判断を受ける
+10. If 計測の結果、Req 1.13 の不変条件、または Req 1.9 で崩すと判断していない対象 spec の AC を Node 版で満たせないことが分かる, the 書き換え作業 shall 書き換えを先に進めず、満たせない AC と理由をユーザーに示して判断を受ける
 11. If 計測の結果、`MAX_CHILD_RSS_MB` 320 または `MAX_XLSX_CELLS` 70,000 が Node 版では成り立たない (基準のファイルの子プロセスの最大 RSS が上限の 0.95 倍を超える、または Req 3.14 のメモリの予算 2Gi を超える) ことが分かる, the 書き換え作業 shall その既定値を下げてよい。ただし、下げた値、根拠にした計測 (ファイル・方法・結果)、検索の対象になる XLSX の範囲がどう変わるかを research.md に記録し、対象 spec の Revalidation Triggers に当たることを design.md に書き、取り込み (Req 12) で対象 spec の design.md と requirements.md に反映し、完了の報告でユーザーに明示する。既定値を上げることと、Req 3.14 のメモリの予算 (2Gi) を超えることは認めない
-12. When Req 2.2 の比較で違いが見つかる, the 書き換え作業 shall Req 2.3 のとおり違いの一覧をユーザーに示し、受け入れるか直すかの判断を受けてから Python 資産の撤去 (Req 10) に入る
+12. When Req 2.14 でベンチマークの退行が見つかる, the 書き換え作業 shall その形式と指標、原因をユーザーに示し、直すか受け入れるかの判断を受けてから Python 資産の撤去 (Req 10) に入る
 
 ### Requirement 12: 対象 spec への取り込みと自己削除
 
