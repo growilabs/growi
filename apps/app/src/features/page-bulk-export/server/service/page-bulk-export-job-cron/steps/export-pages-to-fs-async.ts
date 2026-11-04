@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline, Readable, Writable } from 'node:stream';
-import { isPopulated } from '@growi/core';
 import {
   getParentPath,
   normalizePath,
@@ -13,12 +12,10 @@ import {
   PageBulkExportFormat,
   PageBulkExportJobStatus,
 } from '~/features/page-bulk-export/interfaces/page-bulk-export';
-import type { pagebulkexportjobs } from '~/generated/prisma/client';
+import type { Prisma, pagebulkexportjobs } from '~/generated/prisma/client';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
-import type { PageBulkExportPageSnapshotDocument } from '../../../models/page-bulk-export-page-snapshot';
-import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
 import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
 import { createBulkExportMarkdownRenderer } from '../markdown';
@@ -35,6 +32,39 @@ const logger = loggerFactory(
  * scans `*.html`, so this file is never mistaken for a page to convert.
  */
 const SHARED_CSS_FILENAME = '_bulk-export.css';
+
+type PageSnapshot = Prisma.pagebulkexportpagesnapshotsGetPayload<{
+  include: { revision: true };
+}>;
+
+// Keyset pagination keeps memory bounded by batchSize. `id` breaks ties between
+// snapshots sharing a path (`pages.path` is not unique), so a batch boundary
+// that splits them never skips one.
+async function* streamPageSnapshots(
+  jobId: string,
+  lastExportedPagePath: string | null,
+  batchSize: number,
+): AsyncGenerator<PageSnapshot> {
+  let cursorId: string | null = null;
+  for (;;) {
+    const batch: PageSnapshot[] =
+      await prisma.pagebulkexportpagesnapshots.findMany({
+        where: {
+          pageBulkExportJobId: jobId,
+          ...(lastExportedPagePath != null && {
+            path: { gt: lastExportedPagePath },
+          }),
+        },
+        include: { revision: true },
+        orderBy: [{ path: 'asc' }, { id: 'asc' }],
+        take: batchSize,
+        ...(cursorId != null && { cursor: { id: cursorId }, skip: 1 }),
+      });
+    if (batch.length === 0) return;
+    yield* batch;
+    cursorId = batch[batch.length - 1].id;
+  }
+}
 
 /**
  * Compute the `<link href>` for the shared stylesheet, relative to the page's
@@ -97,15 +127,11 @@ export async function getPageWritable(
 
   return new Writable({
     objectMode: true,
-    write: async (
-      page: PageBulkExportPageSnapshotDocument,
-      _encoding,
-      callback,
-    ) => {
+    write: async (page: PageSnapshot, _encoding, callback) => {
       try {
         const revision = page.revision;
 
-        if (revision != null && isPopulated(revision)) {
+        if (revision != null) {
           const markdownBody = revision.body;
           const pathNormalized = `${normalizePath(page.path)}.${format}`;
           const fileOutputPath = path.join(outputDir, pathNormalized);
@@ -177,20 +203,13 @@ export async function exportPagesToFsAsync(
   this: IPageBulkExportJobCronService,
   pageBulkExportJob: pagebulkexportjobs,
 ): Promise<void> {
-  const findQuery =
-    pageBulkExportJob.lastExportedPagePath != null
-      ? {
-          pageBulkExportJob: pageBulkExportJob.id,
-          path: { $gt: pageBulkExportJob.lastExportedPagePath },
-        }
-      : { pageBulkExportJob: pageBulkExportJob.id };
-  const pageSnapshotsCursor = PageBulkExportPageSnapshot.find(findQuery)
-    .populate('revision')
-    .sort({ path: 1 })
-    .lean()
-    .cursor({ batchSize: this.pageBatchSize });
-  // Wrap Mongoose Cursor with Readable.from() for proper type compatibility
-  const pageSnapshotsReadable = Readable.from(pageSnapshotsCursor);
+  const pageSnapshotsReadable = Readable.from(
+    streamPageSnapshots(
+      pageBulkExportJob.id,
+      pageBulkExportJob.lastExportedPagePath,
+      this.pageBatchSize,
+    ),
+  );
 
   const pagesWritable = await getPageWritable.bind(this)(pageBulkExportJob);
 

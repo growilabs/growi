@@ -108,3 +108,17 @@ export const extractScopes = (scopes?: Scope[]): Scope[] => {
   });
   return Array.from(result);
 };
+
+const ADMIN_SCOPE_PREFIXES = [SCOPE.READ.ADMIN.ALL, SCOPE.WRITE.ADMIN.ALL].map(
+  (scope) => scope.slice(0, -ALL_SIGN.length),
+);
+
+/**
+ * Returns true if the scopes grant any admin scope, including via wildcards
+ * such as 'read:*' or 'write:admin:*'
+ */
+export const includesAdminScope = (scopes: Scope[]): boolean => {
+  return extractScopes(scopes).some((scope) =>
+    ADMIN_SCOPE_PREFIXES.some((prefix) => scope.startsWith(prefix)),
+  );
+};
