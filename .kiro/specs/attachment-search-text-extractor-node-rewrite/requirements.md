@@ -60,7 +60,7 @@
 1. The 抽出サービス (Node 版) shall 対象 spec の requirements.md の AC 1.1〜4.2 をすべて、番号と文言を変えずに満たす
 2. The 抽出サービス (Node 版) shall `POST /extract` (multipart の `file` と任意の `mimeType`)、`GET /healthz`、`GET /readyz`、`GET /openapi.json` を提供し、それぞれの成功時の応答の形を Python 版と同じにする (FastAPI が既定で出している `/docs` と `/redoc` の画面を残すかどうかは Req 11.9 で決める)
 3. When 対象 spec の design.md §Error Handling の表のいずれかの行の条件が起きる, the 抽出サービス (Node 版) shall その行と同じ `ErrorCode` と同じ HTTP ステータスを返す (たとえば、呼び出し側の切断は 422 `extraction_failed`、結果を送る前に子プロセスが終わった場合は 500 `extraction_failed`)
-4. The 抽出サービス (Node 版) shall 対象 spec の design.md §Configuration の表にある環境変数を、同じ名前・同じ既定値・同じ意味で受け付ける (`WORKERS` の扱いと、Req 11.11 で変えると決めた既定値だけは、その決定に従う)
+4. The 抽出サービス (Node 版) shall 対象 spec の design.md §Configuration の表にある環境変数を、同じ名前・同じ既定値・同じ意味で受け付ける (`WORKERS` の扱いは Req 11.9 の決定に従い、`MAX_CHILD_RSS_MB` と `MAX_XLSX_CELLS` の既定値は Req 11.11 に従って下げた場合だけその値にする)
 5. If `ATTACHMENT_EXTRACTOR_SERVICE_TOKEN` が設定されていない、または空白だけである, the 抽出サービス (Node 版) shall 起動せずに終了する
 6. The 抽出サービス (Node 版) shall 認証なしで呼べるパスを `/healthz`、`/readyz`、`/openapi.json` の 3 つだけにし、それ以外のパス (存在しないパスを含む) へのトークンのない要求には 401 `unauthorized` を返す
 7. When 1 件の `POST /extract` が終わる, the 抽出サービス (Node 版) shall 形式・大きさ・所要時間・結果・子プロセスの最大 RSS を 1 行のログに出し、ファイル名・ファイルの中身・Authorization ヘッダはログに出さない
@@ -98,7 +98,7 @@
 11. If 親プロセス (HTTP を受けるプロセス) が子プロセスより先に終わる, the 子プロセス shall 自分で終了し、変換を続けない
 12. The 抽出サービス (Node 版) shall 子プロセスのコアダンプを出さない
 13. The 抽出サービス (Node 版) shall 最悪の合計時間 (本文の受信 `UPLOAD_TIMEOUT_S` + 変換 `TIMEOUT_S` + 子プロセスの停止と回収) を、apps/app の既定 `timeoutMs` (90,000ms) より短く保ち、その合計の内訳を計測で示す
-14. While 既定の設定 (枠 3、`MAX_CHILD_RSS_MB` 320) で 3 件の変換が同時に動いている, the 抽出サービス (Node 版) shall コンテナ全体の実メモリを k8s の例の limits (2Gi) 以内に収める (計測の方法は Req 11.2 に従う)
+14. While 既定の設定 (枠 3、`MAX_CHILD_RSS_MB` は 320 または Req 11.11 で下げた値) で 3 件の変換が同時に動いている, the 抽出サービス (Node 版) shall コンテナ全体の実メモリを k8s の例の limits (2Gi) 以内に収める (計測の方法は Req 11.2 に従う)
 
 ### Requirement 4: 実行基盤の制約
 
@@ -113,6 +113,7 @@
 5. The 抽出サービス shall anydoc の OCR を使わず (文書を外部に送る `hosted` を指定しない)、外向き通信なしで動く
 6. The 抽出サービス shall Python のコードと Python の実行環境を含まない
 7. The 抽出サービス shall Bun / Deno では動かすことを前提にしない (Node.js だけを対応する実行環境とする)
+8. The 抽出サービス shall 子プロセスに上限を掛けるために、util-linux の標準コマンド `prlimit` を使ってよい。それ以外の外部コマンドは使わない (対象 spec の AC 1.7 の解釈。brief.md の「Amend target」を参照)
 
 ### Requirement 5: コードの構成
 
@@ -147,10 +148,11 @@
 
 #### Acceptance Criteria
 
-1. The 抽出サービス (Node 版) shall `GET /openapi.json` と書き出しの手順で、いまの `packages/attachment-text-extractor-client/openapi.json` と同じ型・同じ名前・同じ操作を持つ文書を出力する (`operationId` の `post_extract_extract_post`、スキーマ名の `Body_post_extract_extract_post`、`title` の `Pagenumber` のように、FastAPI が自動で付けた名前も含めて同じにする)。説明文 (`description`) については Req 11.9 の決定に従う
-2. When 書き換えの後に orval で生成クライアントを作り直す, the 生成クライアント shall `packages/attachment-text-extractor-client/src/generated/` の型・関数・引数に差分を出さない (説明文から作られるコメントの差分は、Req 11.9 で説明文を変えると決めた場合だけ認める)
+1. The 抽出サービス (Node 版) shall `GET /openapi.json` と書き出しの手順で、いまの `packages/attachment-text-extractor-client/openapi.json` と同じ型・同じ名前・同じ操作を持つ文書を出力する (`operationId` の `post_extract_extract_post`、スキーマ名の `Body_post_extract_extract_post`、`title` の `Pagenumber` のように、FastAPI が自動で付けた名前も含めて同じにする)。説明文 (`description`) だけは、Python 版に固有の言葉 (`/readyz` の説明の「forkserver」「fork」、`PageInfo` の説明の「None」など) を取り除いて Node 版に合う文に直す
+2. When 書き換えの後に orval で生成クライアントを作り直す, the 生成クライアント shall `packages/attachment-text-extractor-client/src/generated/` の型・関数・引数に差分を出さない (7.1 で直した説明文から作られるコメントの差分だけは認める)
 3. The CI shall 抽出サービスが出力する OpenAPI の文書と、commit 済みの `openapi.json` が JSON として食い違ったら失敗する (いまの drift 検知と同じ働きを保つ)
-4. The 書き換え作業 shall 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) と apps/app のファイルを変更しない
+4. The 書き換え作業 shall 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) と apps/app のファイルを変更しない。`packages/attachment-text-extractor-client/` の中で変えてよいのは、7.1 の説明文の修正を反映した `openapi.json` と、作り直した生成クライアントのコメントだけとする
+5. When 説明文を直す, the 書き換え作業 shall 直した説明文ごとに直す前と直した後の文を research.md に記録する
 
 ### Requirement 8: 配備物
 
@@ -164,6 +166,8 @@
 4. The docker-compose のエントリ shall Node 版の image を使い、ほかの設定 (環境変数、tmpfs、安全設定) を Python 版と同じにする
 5. The `deploy/k8s/` の例 shall Node 版の image を使い、対象 spec の AC 3.3 の推奨設定 (read-only rootfs、非 root、capabilities の削除、外向き通信の遮断、tmpfs の一時領域) を保ち、メモリの requests / limits を Req 3.14 の計測に合わせて見直す
 6. The 抽出サービス shall 共有メモリ (`/dev/shm`) を使わない
+7. When Docker image をビルドする, the Dockerfile shall 最終の段 (実行用の段) で `prlimit` を実行して版を表示させ、`prlimit` が無いか動かなければビルドを失敗させる
+8. If 起動時に `prlimit` が見つからない、または実行できない, the 抽出サービス shall `/readyz` で 503 `not_ready` を返し、`/healthz` は 200 のままにする (k8s がコンテナの再起動を繰り返さないようにするため)
 
 ### Requirement 9: CI の置き換え
 
@@ -175,6 +179,7 @@
 2. The CI の workflow shall Python の道具 (uv、ruff、pytest) を使わない
 3. When CI の変更を確かめる, the 書き換え作業 shall trigger の条件 (`paths` など) に合うブランチで workflow を動かし、`gh api repos/<org>/<repo>/actions/runs/<id>/jobs` でジョブの数が 0 より多く、すべてのステップが成功したことを確かめる (ジョブが 0 件の実行は成功とみなさない)
 4. Where 抽出サービスを pnpm workspace に入れると決めた場合, the 既存の Node 用の CI shall 抽出サービスのテストが他の package のテストと競合せずに動くことを確かめる
+5. When CI が image を確認する, the CI の workflow shall ビルドした image の中で、本番と同じ条件 (uid 10001、read-only rootfs、ネットワークなし) で `prlimit` を実行できることを確かめ、できなければ失敗する
 
 ### Requirement 10: Python 資産の撤去
 
@@ -201,9 +206,10 @@
 6. The 本文の受け取りと切断の検知の方法 shall Hono と `@hono/node-server` で、枠を取る前の `Content-Length` の検査、メモリだけでの受け取り、実際に届いたバイト数での上限、切断による変換の停止が、Req 3.1〜3.5 のとおりに働くことを試作で確かめた結果に基づく
 7. The OpenAPI の作り方の選定 shall Req 7.1〜7.3 を満たせるかどうか (コードから作る方法と、commit 済みの文書を正とする方法の両方を含む) を確かめた結果に基づく
 8. The 配置の選定 (`services/attachment-text-extractor/` を pnpm workspace に入れるか、外に置くか) shall turbo の build / test / lint への影響、CI の時間、`pnpm install` と lockfile への影響、Docker のビルドのしやすさを比べた結果に基づく (対象 spec が workspace の外に置いた理由は Python に固有のものだったので、そのままでは根拠にしない)
-9. When 次の項目を決める必要が生じる, the 書き換え作業 shall 選択肢と計測の結果を示してユーザーの判断を受ける: `WORKERS` の Node での意味、`/readyz` の `dependencies` に出す名前、FastAPI が既定で出している `/docs` と `/redoc` (どちらも認証が要る) を残すかどうか、`prlimit` を使うことが対象 spec の AC 1.7 (外部バイナリを要求しない) に反しないか、Req 2.3 の比較の違いの受け入れ、OpenAPI の説明文に残る Python 版の言葉 (`/readyz` の説明の「forkserver」、`PageInfo` の説明の「None」。生成クライアントのコメントにも写っている) をそのまま残すか、説明文だけを直すことを認めるか
+9. When design フェーズで次の未決の項目を扱う, the 書き換え作業 shall 選択肢ごとの利点と欠点 (計測できるものは計測の結果) を design.md に示し、ユーザーの判断を受けてから design の承認を求める: `WORKERS` の Node での意味 (無視する、Node の cluster の数にする、廃止する)、`/readyz` の `dependencies` に出す名前、FastAPI が既定で出している `/docs` と `/redoc` (どちらも認証が要る) を残すかどうか、11.8 の比較に基づく配置の選択
 10. If 計測の結果、対象 spec のいずれかの AC を Node 版で満たせないことが分かる, the 書き換え作業 shall 書き換えを先に進めず、満たせない AC と理由をユーザーに示して判断を受ける
-11. If 計測の結果、Req 1.4 の既定値 (特に `MAX_CHILD_RSS_MB` 320 と `MAX_XLSX_CELLS` 70,000) が Node 版では成り立たないことが分かる, the 書き換え作業 shall 書き換えを先に進めず、変える既定値と、変えたときの影響 (検索の対象になる XLSX の範囲、apps/app 側の上限との食い違い、対象 spec の Revalidation Triggers に当たること) をユーザーに示して判断を受ける
+11. If 計測の結果、`MAX_CHILD_RSS_MB` 320 または `MAX_XLSX_CELLS` 70,000 が Node 版では成り立たない (基準のファイルの子プロセスの最大 RSS が上限の 0.95 倍を超える、または Req 3.14 のメモリの予算 2Gi を超える) ことが分かる, the 書き換え作業 shall その既定値を下げてよい。ただし、下げた値、根拠にした計測 (ファイル・方法・結果)、検索の対象になる XLSX の範囲がどう変わるかを research.md に記録し、対象 spec の Revalidation Triggers に当たることを design.md に書き、取り込み (Req 12) で対象 spec の design.md と requirements.md に反映し、完了の報告でユーザーに明示する。既定値を上げることと、Req 3.14 のメモリの予算 (2Gi) を超えることは認めない
+12. When Req 2.2 の比較で違いが見つかる, the 書き換え作業 shall Req 2.3 のとおり違いの一覧をユーザーに示し、受け入れるか直すかの判断を受けてから Python 資産の撤去 (Req 10) に入る
 
 ### Requirement 12: 対象 spec への取り込みと自己削除
 
@@ -216,4 +222,4 @@
 3. The 取り込み shall Req 11 の計測の結果と決定の理由を、この spec のディレクトリを消す前に対象 spec の research.md に移す
 4. The 取り込み shall 対象 spec の spec.json の `updated_at` だけを更新し、`phase` と `approvals` は変えない
 5. When 取り込みが終わる, the 書き換え作業 shall `.kiro/specs/attachment-search-text-extractor-node-rewrite/` を削除し、steering や他の spec からこの spec への参照が残っていないことを確かめる
-6. The 取り込み shall brief.md の「Follow-ups」に挙げたファイルのうち、ユーザーが直すと決めたものだけを直す
+6. The 取り込み shall brief.md の「Follow-ups」に挙げたファイルのうち、ユーザーが直すと決めたものだけを直す (どれを直すかは、取り込みのタスクを始める前に一覧をユーザーに示して決めてもらう)

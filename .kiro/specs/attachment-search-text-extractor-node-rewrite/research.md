@@ -27,7 +27,8 @@ _最終更新: 2026-11-04 (requirements フェーズ)_
 - **実測**: Node には `setrlimit` (プロセスが自分に資源の上限を掛ける仕組み) が無い。
 - **実測**: util-linux の `prlimit` (上限を掛けてから別のコマンドを起動するコマンド) は slim image に最初から入っており、これで子プロセスを包める。
 - **実測**: RSS (プロセスが実際に使っている物理メモリ) の監視と `oom_score_adj` の設定は、Python 版と同じく `/proc` を読み書きして行える。
-- **未検証**: `prlimit` を使うことが、対象 spec の AC 1.7 の「外部バイナリを要求しない」に当たるかどうか。AC 1.7 は ffmpeg や exiftool のような変換用の外部ツールを入れないことが元の意図だったが、判断はユーザーに仰ぐ (requirements の Req 11.9)。
+- **決定 (2026-11-04、ユーザー判断)**: `prlimit` は対象 spec の AC 1.7 の「外部バイナリ」に当たらない。AC 1.7 は ffmpeg や exiftool のような変換用の外部ツールを入れないことが元の意図だったため。ただし「slim image に入っている」という前提は、Dockerfile のビルド時、CI の image の確認、起動時の `/readyz` の 3 か所で確かめる (requirements の Req 8.7、8.8、9.5)。
+- **未検証**: 採用する Node の slim image の版で `prlimit` が入っていること。上の調べはある版の slim image で確かめたもので、版を固定したうえで Req 8.7 のビルド時の検査で守る。
 
 ### 1.4 仮想メモリの上限 (`RLIMIT_AS`)
 
@@ -64,9 +65,32 @@ _最終更新: 2026-11-04 (requirements フェーズ)_
 
 ## 4. 対象 spec に入っていない、運用者から見える振る舞い
 
-requirements を書く途中で、対象 spec の AC と OpenAPI の文書では決まっていないが、運用者から見えるものが見つかった。どれも requirements の Req 11.9 でユーザーの判断を仰ぐ。
+requirements を書く途中で、対象 spec の AC と OpenAPI の文書では決まっていないが、運用者から見えるものが見つかった。`WORKERS`、`/readyz` の `dependencies`、`/docs` と `/redoc` は **未決** で、design で選択肢を示してユーザーが決める (requirements の Req 11.9)。
 
 - **`WORKERS`**: uvicorn のワーカー数を指す環境変数。Node には同じ仕組みが無いので、意味をどうするか (無視する、Node の cluster の数にする、廃止する) を決める必要がある。
 - **`/readyz` の `dependencies`**: いまは `anydoc` / `pypdfium2` / `charset-normalizer` / `converter` の名前を出している。OpenAPI の文書ではこの応答の形を決めていない (スキーマが `{}`) ので、名前を変えても生成クライアントは変わらない。
 - **`/docs` と `/redoc`**: FastAPI が既定で出している API の説明画面。認証が要るパスとして出ており、テストでは確かめていない。
 - **1 件ごとのログ**: `extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…` の形の 1 行。requirements の Req 1.7 で、出す項目と出さない項目を保つことを求めている。
+
+## 5. ユーザーの決定 (2026-11-04)
+
+- **既定値を下げてよい**: Node 版で `MAX_CHILD_RSS_MB` 320 や `MAX_XLSX_CELLS` 70,000 が成り立たない場合は、既定値を下げてよい。下げた場合は、下げた値・根拠の計測・検索の対象になる XLSX の範囲の変化を、この文書の「6. 計測の結果」(design フェーズで作る) に記録する。メモリの予算 (2Gi) を超えることと、既定値を上げることは認めない (requirements の Req 11.11)。
+- **OpenAPI の説明文を直す**: Python 版に固有の言葉 (forkserver、fork、None など) を説明文から取り除く。型・名前・関数・引数は変えない。直した説明文ごとに、直す前と後の文をこの文書に記録する (requirements の Req 7.1、7.5)。
+- **`prlimit` を使ってよい**: 上の 1.3 を参照。
+
+## 未決事項
+
+| 項目 | 状態 | 決め方 |
+|---|---|---|
+| `WORKERS` の Node での意味 | 未決 | design でユーザーが決める (Req 11.9) |
+| `/readyz` の `dependencies` に出す名前 | 未決 | 同上 |
+| `/docs` と `/redoc` を残すかどうか | 未決 | 同上 |
+| 配置 (pnpm workspace に入れるか) | 未決 | 試作で比べ (Req 11.8)、design でユーザーが決める (Req 11.9) |
+| PDF のライブラリ | 未決 | 試作と計測 (Req 11.3) |
+| 子プロセスの作り方 | 未決 (`prlimit` は使ってよいと決まった) | 試作と計測 (Req 11.4) |
+| `RLIMIT_AS` の値と、緩めた分の守り | 未決 | 試作と計測 (Req 11.5) |
+| 本文の受け取りと切断の検知の方法 | 未決 | 試作 (Req 11.6) |
+| OpenAPI の作り方 | 未決 | 試作 (Req 11.7) |
+| 7 万セルの XLSX の RSS の食い違い (2 節) | 未解決 | 同じファイル・同じ方法で測り直す (Req 11.2) |
+| Python 版との比較で出る違いの扱い | 未決 | 違いの一覧を示してユーザーが決める (Req 2.3、11.12) |
+| Follow-ups のどれを直すか | 未決 | 取り込みの前にユーザーが決める (Req 12.6) |

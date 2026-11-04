@@ -32,19 +32,25 @@
 - `ErrorCode` の 8 つの値と、対象 spec の design.md §Error Handling の表 (どの失敗がどのコードとどの HTTP ステータスになるか)
 - `pages[]` の規則 (単位、`pageNumber` / `label` の付け方、空の要素を除き最低 1 要素を返すこと)
 - 対象 spec の requirements.md の Acceptance Criteria 1.1〜4.2 のすべて (番号もそのまま)
-- 対象 spec の design.md §Configuration の環境変数の名前と既定値 (ただし `WORKERS` は uvicorn のワーカー数を指すので、Node での意味は未決。また、メモリの計測で既定値が成り立たないと分かった場合は、ユーザーの判断で変える。Req 11)
-- 書き出し済みの `packages/attachment-text-extractor-client/openapi.json` の型・名前・操作と、そこから orval が作る生成クライアント (`src/generated/`) の型・関数・引数 (説明文の扱いは Req 11 で決める)
+- 対象 spec の design.md §Configuration の環境変数の名前と既定値。例外は次の 2 つ: `WORKERS` は uvicorn のワーカー数を指すので、Node での意味は未決 (Req 11.9)。`MAX_CHILD_RSS_MB` と `MAX_XLSX_CELLS` は、Node 版の計測で成り立たないと分かった場合に限り **下げてよい** (ユーザー判断。Req 11.11)
+- 書き出し済みの `packages/attachment-text-extractor-client/openapi.json` の型・名前・操作と、そこから orval が作る生成クライアント (`src/generated/`) の型・関数・引数。説明文 (`description`) だけは、Python 版に固有の言葉 (forkserver、None など) を取り除いて直す。そのため生成クライアントのコメントには差分が出るが、これは認める (ユーザー判断。Req 7)
+
+### 対象 spec の AC 1.7 の解釈 (ユーザー承認済み)
+
+対象 spec の AC 1.7 は「運用環境で外部バイナリおよびネットワーク egress を要求せずに動作する」と定めている。Node には `setrlimit` が無いので、子プロセスに上限を掛けるために util-linux の標準コマンド `prlimit` で子を包む。**`prlimit` は追加の外部バイナリに当たらない、という解釈をユーザーが承認した** (2026-11-04)。AC 1.7 が防ぎたかったのは、ffmpeg や exiftool のような変換用の外部ツールを image に足すことだからである。
+
+この解釈は「`prlimit` が元の image に入っている」ことを前提にしている。前提が崩れたら黙って守りが外れないよう、次の 3 か所で確かめる: Dockerfile の最終の段で `prlimit` を実行してビルドを失敗させる (Req 8.7)、CI で本番と同じ条件で `prlimit` を実行する (Req 9.5)、起動時に `prlimit` が使えなければ `/readyz` を not-ready にする (Req 8.8)。`prlimit` 以外の外部コマンドは使わない (Req 4.8)。
 
 ### Revalidation Triggers (下流の見直しが要る条件) への影響
 
 対象 spec の design.md §Revalidation Triggers に挙がっている項目 (`ErrorCode`、同じコードが複数の HTTP ステータスを持つこと、`pages[]` の規則、health / readiness の応答の形、`label` の中身、タイムアウトの順序、サイズと時間の上限の既定値) は、**変えないことを前提にする**。前提どおりなら、この spec は下流 (`attachment-search-indexing`、apps/app) の見直しを起こさない。
 
-ただし次の 4 点は、この書き換えで触れる可能性がある。触れると分かった時点で、進める前にユーザーの判断を仰ぐ (requirements の Req 11.9〜11.11)。
+ただし次の 4 点は、この書き換えで触れる可能性がある。
 
 - **タイムアウトの順序**: 子プロセスの起動と停止にかかる時間が Python 版 (forkserver で約 29ms、停止と回収に最大約 4 秒) と変わる。最悪の合計 (本文の受信 15 秒 + 変換 55 秒 + 停止と回収) が apps/app の既定 `timeoutMs` 90000ms より短いことを、Node 版でも確かめる (Req 3)。
-- **サイズ・時間の上限の既定値**: Node 版の子プロセスは Python 版より RSS が大きい (1.5 の計測で 70,000 セルの XLSX が約 26MB 多い)。対象 spec の基準値 (7 万セルで 285MB、上限 320MB) にこの比率を当てはめると上限を超える見込みがあり、`MAX_CHILD_RSS_MB` か `MAX_XLSX_CELLS` の既定値を変える必要が出るかもしれない。`MAX_XLSX_CELLS` を変えると、検索の対象になる XLSX の範囲も変わる。
-- **OpenAPI の説明文**: commit 済みの `openapi.json` の説明文には Python 版の言葉 (`/readyz` の「forkserver」、`PageInfo` の「None」) が入っており、orval はこれを生成クライアントのコメントに写している。説明文を直すと、型は変わらなくてもクライアントのコメントに差分が出る。
-- **health / readiness の応答**: `/readyz` の `dependencies` に出す名前 (`pypdfium2` / `charset-normalizer` など) はライブラリの名前なので、そのままでは残せない。OpenAPI の文書ではこの応答の形を決めていない (中身は `{}`) ため生成クライアントは変わらないが、名前を変えるかどうかは決める必要がある (Req 11)。
+- **サイズ・時間の上限の既定値**: Node 版の子プロセスは Python 版より RSS が大きい (1.5 の計測で 70,000 セルの XLSX が約 26MB 多い)。対象 spec の基準値 (7 万セルで 285MB、上限 320MB) にこの比率を当てはめると上限を超える見込みがあり、`MAX_CHILD_RSS_MB` か `MAX_XLSX_CELLS` の既定値を下げる必要が出るかもしれない。**ユーザーは、成り立たない場合に既定値を下げることを認めた** (Req 11.11)。下げた場合は Revalidation Trigger に当たる。`MAX_XLSX_CELLS` を下げると、検索の対象になる XLSX の範囲が狭くなる。下げた値、根拠の計測、範囲の変化を research.md と design.md の Revalidation Triggers に記録し、取り込みで対象 spec に反映し、完了の報告でユーザーに明示する。上げることと、メモリの予算 (2Gi) を超えることは認めない。
+- **OpenAPI の説明文**: commit 済みの `openapi.json` の説明文には Python 版の言葉 (`/readyz` の「forkserver」、`PageInfo` の「None」) が入っており、orval はこれを生成クライアントのコメントに写している。**ユーザーは説明文だけを直すことを決めた** (Req 7.1)。型は変わらないが、クライアントのコメントには差分が出る。apps/app のコードには影響しない。
+- **health / readiness の応答**: `/readyz` の `dependencies` に出す名前 (`pypdfium2` / `charset-normalizer` など) はライブラリの名前なので、そのままでは残せない。OpenAPI の文書ではこの応答の形を決めていない (中身は `{}`) ため生成クライアントは変わらないが、名前を変えるかどうかは未決 (Req 11.9)。
 
 ## Problem
 
@@ -116,6 +122,27 @@ spec-lifecycle.md の手順 2 に従い、実装の途中では対象 spec の�
 
 - **ライセンス**: 依存は MIT / Apache-2.0 / BSD などの許容的なライセンスに限る (GPL / AGPL / LGPL は使わない)。対象 spec と同じ。
 - **image の大きさ**: 400MB 以下。
-- **外部バイナリと外向き通信**: 対象 spec の AC 1.7 を守る。ただし `prlimit` (util-linux に含まれ、slim image に最初から入っているコマンド) で子プロセスを包む案は、AC 1.7 の「外部バイナリを要求しない」に当たるかどうかの判断が要る (Req 11)。
+- **外部バイナリと外向き通信**: 対象 spec の AC 1.7 を守る。util-linux の標準コマンド `prlimit` で子プロセスを包むことは、AC 1.7 に反しないとユーザーが認めた (上の「対象 spec の AC 1.7 の解釈」)。
+
+## ユーザーの決定と、残っている未決事項
+
+### 決まったこと (2026-11-04)
+
+- spec の名前は `attachment-search-text-extractor-node-rewrite` のままにする
+- `prlimit` で子プロセスを包んでよい。元の image に入っていることを、ビルド・CI・起動時の 3 か所で確かめる (Req 8.7、8.8、9.5)
+- `MAX_CHILD_RSS_MB` と `MAX_XLSX_CELLS` は、Node 版で成り立たなければ下げてよい。メモリの予算 (2Gi) は変えない (Req 11.11)
+- OpenAPI の説明文だけを直し、生成クライアントのコメントの差分を認める。型・名前・関数・引数は変えない (Req 7)
+
+### 未決 (決め方は requirements に書いてある)
+
+| 項目 | 決め方 |
+|---|---|
+| `WORKERS` の Node での意味 | design で選択肢を示してユーザーが決める (Req 11.9) |
+| `/readyz` の `dependencies` に出す名前 | 同上 (Req 11.9) |
+| `/docs` と `/redoc` を残すかどうか | 同上 (Req 11.9) |
+| 配置 (pnpm workspace に入れるか) | 試作で比べ (Req 11.8)、design でユーザーが決める (Req 11.9) |
+| PDF のライブラリ、子プロセスの作り方、仮想メモリ上限の値、本文の受け取り方、OpenAPI の作り方 | design の承認の前に試作と計測で決める (Req 11.2〜11.7) |
+| Python 版との比較で出る違いの扱い | 違いの一覧を示してユーザーが決め、決まるまで Python 資産を撤去しない (Req 2.3、11.12) |
+| Follow-ups のどれを直すか | 取り込みのタスクの前に一覧を示してユーザーが決める (Req 12.6) |
 - **メモリ**: Node は Python より仮想メモリの予約が大きい (何もしなくても 1,200MB、anydoc の XLSX で 2,000MB、PDFium WASM で 3,000MB 以上の `RLIMIT_AS` が要る)。仮想メモリは k8s の limits (実メモリで数える) には影響しないが、Python 版で最後の歯止めにしていた `RLIMIT_AS` は同じ値では使えない。実メモリ (RSS) の監視が主な守りになる。
 - **upstream の依存**: anydoc は 0.x 系なので版を 0.2.4 に固定する。PPTX の分割と XLSX の目印は文書化されていない挙動に頼るので、対象 spec と同じく版を固定した契約テストで変化を検知する。
