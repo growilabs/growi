@@ -99,3 +99,45 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 | 実際の Elasticsearch (kuromoji) で検索を測れるか | 未検証 | ベンチマークを作るときに確かめる (Req 2.10) |
 | 日本語 PDF の検索の品質 (pypdfium2 と WASM の PDFium の差) | 未検証 | ベンチマークと PDF のライブラリの選定で測る (Req 2.12、11.3) |
 | Follow-ups のどれを直すか | 未決 | 取り込みの前にユーザーが決める (Req 12.6) |
+| テスト用のファイルの作り方 (Python の生成器が撤去で使えなくなる) | 未決 | design.md の D5 でユーザーが決める (推奨: 小さなものは Python 版で一度作って commit、大きなものは Node で組み立てる) |
+
+## 6. 計測の結果 (design フェーズ)
+
+design を書くために、小さな試作で次のことを確かめた。**どれも devcontainer (Node 24.21.0、16 コア、Linux) で測ったもので、Node の slim image の中では測っていない**。image の中での値は、タスクの試作で取り直す。
+
+### 6.1 Hono での本文の受け取りと切断の検知 (実測)
+
+版: `hono` 4.13.16、`@hono/node-server` 2.1.6。生の TCP で要求を送って確かめた。
+
+| 試したこと | 結果 |
+|---|---|
+| `Content-Length` が上限を超える要求を、本文を送らずに投げる | ハンドラーは本文を読む前にヘッダーを見て 413 を返せた |
+| `Transfer-Encoding: chunked` で、宣言なしに上限を超える本文を送る | `c.req.raw.body` を少しずつ読み、届いたバイト数を数えて、上限を超えた時点で読むのをやめて 413 を返せた |
+| 本文を送り終えた後、変換中 (ハンドラーが待っている間) に接続を切る | `c.req.raw.signal` の `abort` が発火した。これを使って変換の取り消しにつなげられる |
+| 本文の途中で接続を切る | `abort` が発火し、本文の読み取りが例外で終わった |
+
+分かったこと: Python 版で必要だった「FastAPI の `UploadFile` を使わず自分で本文を読む」「ASGI の `receive()` で切断を待つ」といった回り道は、Hono では標準の `Request` の `body` と `signal` だけで書ける見込みが高い。
+
+**未検証**: multipart の分解の仕方。Hono の `c.req.parseBody()` は標準の `Request.formData()` を使うので、本文を全部受け取ってから分解すると考えられ、大きさの上限を自分で掛けられない (確かめていない)。上限つきでメモリに読み込んだ後に分解する方法と、少しずつ分解する部品 (busboy など) を使う方法を、タスクの試作で比べる。
+
+### 6.2 `prlimit` で包んだ子プロセス (実測)
+
+- slim ではない devcontainer の `prlimit` は util-linux 2.41.3。
+- `spawn('prlimit', ['--as=…', '--cpu=60:65', '--core=0', '--', node, child])` で起動した子の `/proc/self/limits` は、仮想メモリ・CPU 時間 (soft 60 / hard 65 に分けられた)・コアダンプの上限が設定どおりになった。対象 spec の research にある「soft と hard が同じだと SIGXCPU より先に SIGKILL が届く」問題は、`--cpu=soft:hard` の書式で避けられる。
+- `--as=300000000` (300MB) では、Node は起動できずに SIGTRAP で終わった (1.4 の調べと合う)。
+- 子の起動から終了までの時間 (中央値、7〜10 回): `fork` 22.9ms、`spawn` 22.6ms、`prlimit` で包んだ `spawn` 21.8ms。`prlimit` を挟んでも時間はほとんど変わらなかった。
+- anydoc を読み込む子を `prlimit` で包んで起動したとき: 中央値 26.8ms、anydoc の import は 2.7ms、読み込んだ直後の RSS は 51MB。
+
+**未検証**: 変換の部品をすべて読み込んだ子の起動時間 (PDF の部品を含む)、image の中での値、1 件の変換の最大 RSS。
+
+### 6.3 既存の Node のマイクロサービスの前例 (コードの確認)
+
+- `apps/pdf-converter` は Node のマイクロサービスで、pnpm workspace の中 (`apps/*`) にあり、専用の CI (`ci-pdf-converter.yml`) と Dockerfile (`node:24-slim` を元にし、`pnpm deploy --prod` で本番の依存だけを取り出す multi-stage) を持つ。生成クライアント `packages/pdf-converter-client` も orval で作っている。
+- ルートの `vitest.workspace.mts` は `apps/*/vitest.config.ts` と `packages/*/vitest.config.ts` を自動で拾う。`services/*` は拾わない。
+- ルートの `biome.json` は `**` を対象にしているので、`services/` の下の TypeScript も、workspace に入れるかどうかにかかわらず biome の対象になる。
+- ルートの `package.json` の `engines.node` は `^24`。
+
+### 6.4 テスト用のファイルの作り方 (コードの確認)
+
+- Python 版のテスト用のファイルは、テストの実行中に Python のテスト専用のライブラリ (openpyxl、python-pptx、python-docx、msoffcrypto-tool、xlwt、pypdf) で作っている (`tests/fixture_files.py`)。リポジトリに入れているのは小さなテキスト 2 つと、旧形式の DOC / PPT (Apache POI 由来) だけ。
+- Python を撤去すると、この作り方は使えなくなる。暗号化した Office ファイルや XLS を Node で作る部品は調べていない (**未検証**)。この扱いはユーザーの判断が要る (design.md の「ユーザーの判断を待つ項目」)。
