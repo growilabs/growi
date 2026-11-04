@@ -58,14 +58,14 @@
 
 対象 spec の design.md §Revalidation Triggers に挙がっている項目 (`ErrorCode`、同じコードが複数の HTTP ステータスを持つこと、`pages[]` の規則、health / readiness の応答の形、`label` の中身、タイムアウトの順序、サイズと時間の上限の既定値) は、**既定では変えない**。既定のままなら、この spec は下流 (`attachment-search-indexing`、apps/app) の見直しを起こさない。既定の方針を崩した場合は、崩した項目を design.md の Revalidation Triggers に書き、下流の変更を同じ作業で行う (Req 1.11、1.12)。
 
-既定の方針を崩したもの (ユーザー判断): `WORKERS` の廃止 (compose と k8s の例から `WORKERS` を消す。運用者が設定していても無視される) と、`/docs` と `/redoc` の廃止 (2 つのパスが 401 か 404 になる)。どちらも apps/app と生成クライアントには影響しない。記録は research.md の 7 節。
+既定の方針を崩したもの (ユーザー判断): `/readyz` の `dependencies` の名前の変更 (部品の実名に変える。本文を見る運用者の表示が変わる)、`WORKERS` の廃止 (compose と k8s の例から `WORKERS` を消す。運用者が設定していても無視される) と、`/docs` と `/redoc` の廃止 (2 つのパスが 401 か 404 になる)。どちらも apps/app と生成クライアントには影響しない。記録は research.md の 7 節。
 
 このほか、次の 4 点は、この書き換えで触れる可能性がある。
 
 - **タイムアウトの順序**: 子プロセスの起動と停止にかかる時間が Python 版 (forkserver で約 29ms、停止と回収に最大約 4 秒) と変わる。最悪の合計 (本文の受信 15 秒 + 変換 55 秒 + 停止と回収) が apps/app の既定 `timeoutMs` 90000ms より短いことを、Node 版でも確かめる (Req 3)。
 - **サイズ・時間の上限の既定値**: Node 版の子プロセスは Python 版より RSS が大きい (1.5 の計測で 70,000 セルの XLSX が約 26MB 多い)。対象 spec の基準値 (7 万セルで 285MB、上限 320MB) にこの比率を当てはめると上限を超える見込みがあり、`MAX_CHILD_RSS_MB` か `MAX_XLSX_CELLS` の既定値を下げる必要が出るかもしれない。**ユーザーは、成り立たない場合に既定値を下げることを認めた** (Req 11.11)。下げた場合は Revalidation Trigger に当たる。`MAX_XLSX_CELLS` を下げると、検索の対象になる XLSX の範囲が狭くなる。下げた値、根拠の計測、範囲の変化を research.md と design.md の Revalidation Triggers に記録し、取り込みで対象 spec に反映し、完了の報告でユーザーに明示する。上げることと、メモリの予算 (2Gi) を超えることは認めない。
 - **OpenAPI の説明文**: commit 済みの `openapi.json` の説明文には Python 版の言葉 (`/readyz` の「forkserver」、`PageInfo` の「None」) が入っており、orval はこれを生成クライアントのコメントに写している。**ユーザーは説明文だけを直すことを決めた** (Req 7.1)。型は変わらないが、クライアントのコメントには差分が出る。apps/app のコードには影響しない。
-- **health / readiness の応答**: `/readyz` の `dependencies` に出す名前 (`pypdfium2` / `charset-normalizer` など) はライブラリの名前なので、そのままでは残せない。OpenAPI の文書ではこの応答の形を決めていない (中身は `{}`) ため生成クライアントは変わらないが、名前は **未回答** で、暫定の既定は役割の名前 (`anydoc`、`pdf`、`converter`、`prlimit`) (design.md の D2)。
+- **health / readiness の応答**: `/readyz` の `dependencies` に出す名前 (`pypdfium2` / `charset-normalizer` など) はライブラリの名前なので、そのままでは残せない。OpenAPI の文書ではこの応答の形を決めていない (中身は `{}`) ため生成クライアントは変わらないが、名前は **決定: 実名** (ユーザー判断。design.md の D2)。Node 版が実際に使う部品の npm の package 名 (`@firecrawl/anydoc`、T1 で決まる PDF の部品の実名など) と `prlimit` を出し、Python 版の名前は出さない。内部のモジュールは `converter` の 1 つにまとめる。
 
 ## Problem
 
@@ -153,6 +153,7 @@ spec-lifecycle.md の手順 2 に従い、実装の途中では対象 spec の�
 ### 決まったこと (2026-11-04)
 
 - spec の名前は `attachment-search-text-extractor-node-rewrite` のままにする
+- `/readyz` の `dependencies` には部品の実名 (npm の package 名) と `prlimit` を出す (D2)。PDF などの名前は試作で採用が決まった時点で確定する
 - `WORKERS` を廃止する (D1)。`/docs` と `/redoc` を出さず、`/openapi.json` は残す (D3)。どちらも既定の方針を崩すので、1.10 の記録を research.md の 7 節に置いた
 - 置き場所を `apps/attachment-text-extractor/` に移し、pnpm workspace に入れる (D4)。全開発者の `pnpm install` に anydoc のネイティブ部品 (linux x64 で約 8MB) が入る
 - テスト用のファイルはすべて Node で作り直す (D5)。撤去の前に、Node で作ったファイルを Python 版のテストでも使えることを確かめる (Req 10.5)
@@ -166,7 +167,7 @@ spec-lifecycle.md の手順 2 に従い、実装の途中では対象 spec の�
 
 | 項目 | 決め方 |
 |---|---|
-| `/readyz` の `dependencies` に出す名前 | **未回答**。暫定の既定は役割の名前 (`anydoc`、`pdf`、`converter`、`prlimit`)。design の承認の前に答えをもらう (design.md の D2、Req 11.9) |
+| `/readyz` の `dependencies` に出す PDF などの部品の実名 | 名前の付け方は決定 (実名。D2)。PDF と文字コードの判定などの部品の実名は、T1・T6 の試作で採用が決まった時点で確定する |
 | テスト用のファイルのうち Node で作れないものが残った場合の扱い | 試作 (design.md の T7) で分かったらユーザーに諮る |
 | PDF のライブラリ、子プロセスの作り方、仮想メモリ上限の値、本文の受け取り方、OpenAPI の作り方 | design の承認の前に試作と計測で決める (Req 11.2〜11.7) |
 | ベンチマークで Python 版を下回った形式の扱い | 原因を調べて示し、直すか受け入れるかをユーザーが決める。決まるまで Python 資産を撤去しない (Req 2.14、11.12)。下回らない違いは記録するだけ (Req 2.3) |

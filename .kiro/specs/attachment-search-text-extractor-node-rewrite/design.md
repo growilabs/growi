@@ -98,8 +98,9 @@
 - **対象 spec から引き継ぐもの**: `ErrorCode` の追加・変更、同じコードが複数の HTTP ステータスを持つこと、`pages[]` の規則、health / readiness の応答の形、`label` の中身、タイムアウトの順序、サイズと時間の上限の既定値。この書き換えは既定ではどれも変えない
 - **既定値を下げたとき (11.11)**: `MAX_CHILD_RSS_MB` を下げると、いまは通る大きなファイルが `resource_limit_exceeded` になる。`MAX_XLSX_CELLS` を下げると、検索の対象になる XLSX の範囲が狭くなる。どちらも apps/app 側の `maxFileSizeBytes` とは独立なので apps/app のコードは変わらないが、運用者に知らせる必要がある
 - **タイムアウトの合計 (3.13)**: 子プロセスの停止と回収にかかる時間が Python 版と変わる。最悪の合計が apps/app の既定 `timeoutMs` 90,000ms を超えたら、apps/app 側の既定を見直す
-- **契約を崩したとき (1.12)**: 崩した項目をここに書き足す。いま崩したものは次の 2 つで、記録は research.md の 7 節にある
+- **契約を崩したとき (1.12)**: 崩した項目をここに書き足す。いま崩したものは次の 3 つで、記録は research.md の 7 節にある
   - **`WORKERS` の廃止 (D1)**: compose と k8s の例から `WORKERS` を消す。運用者が `WORKERS` を設定していても無視される (起動は失敗しない)。2 以上を設定していた運用者は、同時実行の全体の上限が「ワーカー数 × `MAX_CONCURRENCY`」から `MAX_CONCURRENCY` だけに変わるので、必要なら `MAX_CONCURRENCY` を上げるか Pod を増やす。apps/app のコードと生成クライアントには影響しない
+  - **`/readyz` の `dependencies` の名前の変更 (D2)**: キーが Node 版の部品の実名と `prlimit` に変わり、`pypdfium2` と `charset-normalizer` は出なくなる。運用者が curl などで本文を見たときの表示が変わる。k8s と compose の health の確認は HTTP のステータスだけを見て本文を見ないので影響しない。OpenAPI のスキーマは `{}` なので、生成クライアントにも影響しない
   - **`/docs` と `/redoc` の廃止 (D3)**: この 2 つのパスは 401 (トークンなし) か 404 (トークンあり) になる。apps/app は使っていない。生成クライアントには影響しない
 - **OpenAPI の説明文の修正**: 生成クライアントのコメントだけが変わる。型が変わらないので apps/app の見直しは要らない
 
@@ -366,7 +367,7 @@ graph LR
 | 段階 | 中身 | 終わりの条件 |
 |---|---|---|
 | 0. ベンチマーク | Node の生成器でコーパスを作り (Python 版でも読める形式にする。D5)、正解を付け (2.7、2.8)、いまの Python 版に `run-benchmark.ts` を向けてベースラインを測る (2.11)。1 と同時に進めてよいが、3 より前に終える (6.8) | ベースラインが research.md にある。絶対値の基準を置くかをユーザーが決めた (2.13) |
-| 試作 | T1〜T7 の試作と計測。結果を research.md に記録する (11.1) | 結果と選んだ案が research.md にある。D2 のユーザーの判断が出ている |
+| 試作 | T1〜T7 の試作と計測。結果を research.md に記録する (11.1) | 結果と選んだ案が research.md にある。`/readyz` の `dependencies` に出す部品の実名が確定している (D2) |
 | 1. テスト | テスト用のファイルの Node の生成器を作り (D5、T7)、Python のテストを vitest に書き換え、Python のテストファイルごとの対応表を作る (6.2)。Node で作ったファイルを Python 版のテストの入力に差し替えて通ることを確かめる (D5)。HTTP の黒箱のテストを Python 版に向けて動かし、すべて通ることを確かめる (6.3)。Node 版に向けて失敗すること (RED) を記録する (6.4) | 対応表、Python 版で通った記録、RED の出力がある |
 | 2. テストのレビュー | 書いた人とは別の担当が `essential-test-design` と `essential-test-patterns` を使ってレビューする (6.5) | 直すべき指摘が残っていない (6.7) |
 | 3. 実装 | 層ごとに実装する。作業の単位は File Structure Plan のディレクトリに合わせる | すべてのテストが通る。ベンチマークで退行がない、または退行についてユーザーの判断が出ている (2.12、2.14) |
@@ -385,12 +386,12 @@ graph LR
 
 ## ユーザーの決定と、判断を待つ項目
 
-D1・D3・D4・D5 はユーザーが決めた (2026-11-04)。D2 だけは **未回答** で、推奨の (b) を暫定の既定として設計を進める。design の承認の前に D2 の答えをもらう (11.9)。
+D1〜D5 はすべてユーザーが決めた (2026-11-04)。
 
 | # | 項目 | 決定 | 理由と影響 |
 |---|---|---|---|
 | D1 | `WORKERS` の意味 | **(a) 廃止する** (決定)。サービスは読まず、compose と k8s の例から消す | 既定は 1 で、2 以上は接続の偏りで空きがあっても 503 が返る弱点があった (対象 spec の design.md §Open Questions)。スケールは HPA で Pod を増やす。Node では 1 プロセスでも受け口は止まらない (変換は子プロセス)。**契約を崩す** (1.4 の環境変数) ので、1.10 の記録を research.md の 7 節に置いた |
-| D2 | `/readyz` の `dependencies` に出す名前 | **未回答**。暫定の既定は (b) 役割の名前 (`anydoc`、`pdf`、`converter`、`prlimit`)。ほかの選択肢: (a) いまの名前のまま (`pypdfium2` など。中身と合わない)、(c) `dependencies` をやめて `status` だけにする | OpenAPI ではこの応答の形を決めていない (スキーマが `{}`) ので、どれを選んでも生成クライアントは変わらない。役割の名前なら PDF の部品を替えても名前が変わらない。`prlimit` は 8.8 で準備完了の条件になるので足す |
+| D2 | `/readyz` の `dependencies` に出す名前 | **決定: 実名**。Node 版が実際に使っている部品の実名 (npm の package 名) と `prlimit`。いま決まっているのは `@firecrawl/anydoc` と `prlimit` で、PDF の部品は「T1 の結果の実名」、文字コードの判定などに部品を使う場合は「T6 の結果の実名」になる。内部のモジュールをまとめた `converter` は今と同じく 1 つの名前で出す (認証なしの口に内部の名前を出さないため)。Python 版の名前 (`pypdfium2`、`charset-normalizer`) は Node 版で使わないので出さない | 運用者が見て、実際に何が読み込めているかが分かる名前にする。名前は T1・T6 の試作で採用が決まった時点で確定する。OpenAPI ではこの応答の形を決めていない (スキーマが `{}`) ので、生成クライアントは変わらない。`prlimit` は 8.8 で準備完了の条件になるので出す。名前が変わるので、1.10 の記録を research.md の 7 節に置いた |
 | D3 | `/docs` と `/redoc` | **(a) 出さない** (決定)。`/openapi.json` は残す | apps/app は使っておらず、テストもない。出すには部品が 1 つ増える。**契約を崩す** (FastAPI が既定で出していた画面が消える) ので、1.10 の記録を research.md の 7 節に置いた |
 | D4 | 配置 | **(C) `apps/attachment-text-extractor/` に移し、pnpm workspace に入れる** (決定)。package の名前は `apps/pdf-converter` (`@growi/pdf-converter`) に倣って `@growi/attachment-text-extractor` | 下の「D4 の判断と影響」 |
 | D5 | テスト用のファイルの作り方 | **すべて Node で作り直す** (決定)。DOCX / XLSX / PPTX / PDF / XLS などを Node で生成する | 下の「D5 の判断と影響」 |
@@ -541,7 +542,7 @@ export interface ConversionRunner {
 - `createApp(deps: { settings: Settings; runner: ConversionRunner })` で Hono のアプリを作る。設定を自分で読まない (判断 5)
 - 認証は、`/healthz`、`/readyz`、`/openapi.json` 以外のすべてのパス (存在しないパスを含む) で先に行う (1.6)。比較は長さに左右されない比べ方 (`crypto.timingSafeEqual`) にする
 - `/docs` と `/redoc` は出さない (D3)。`/openapi.json` は残す
-- `/readyz` は `runner.readiness()` を呼ぶ。`prlimit` を起動できないとき、または確認用の子が起動できないときは 503 `not_ready` を返し、`/healthz` は 200 のままにする (8.8)。応答の `dependencies` の名前は D2 で決める (未回答。暫定の既定は役割の名前)
+- `/readyz` は `runner.readiness()` を呼ぶ。`prlimit` を起動できないとき、または確認用の子が起動できないときは 503 `not_ready` を返し、`/healthz` は 200 のままにする (8.8)。応答の `dependencies` には、D2 のとおり部品の実名 (`@firecrawl/anydoc`、T1 の結果の実名、使う場合は T6 の結果の実名) と `prlimit`、内部のモジュールをまとめた `converter` を出す
 - 1 件ごとのログは対象 spec と同じ形の 1 行 (`extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…`) にする (1.7)
 
 ## Data Models
@@ -610,7 +611,7 @@ export interface ConversionRunner {
 - **共有層の単体テスト**: `formats/`、`wire/`、`config/`、`http/error-table.ts` (すべての `FailureKind` が表にあることは型で守り、テストでは値を確かめる)
 - **実行管理の結合テスト** (`runner/**/*.integ.ts`、Linux): 本物の子プロセスで、時間切れ、RSS の超過、異常終了 (abort / segfault を起こす子)、親の消失、結果の上限、`prlimit` の上限が掛かっていることを確かめる。時間の期限は小数の引数で渡して短くする (対象 spec と同じ)
 - **HTTP の黒箱のテスト** (`apps/attachment-text-extractor/test/http/`): 抽出サービスの URL を受け取り、外から HTTP だけで確かめる。既定では Node 版をテストの中で起動するが、URL を環境変数で渡すと外のサービスに向けられる。6.3 では、これを Python 版に向けて動かす。内部の偽物 (遅い子など) を必要とするテストはここに入れず、HTTP の層のテストとして別に置く
-- **6.3 で Python 版に向けるときに外すテスト**: 意図して振る舞いを変える点を確かめるテストは、Python 版では通らないのが正しい。たとえば、直した OpenAPI の説明文 (7.1)、`/readyz` の `dependencies` の名前 (D2)、`/docs` と `/redoc` が無いこと (D3)、`WORKERS` を読まないこと (D1)、1.9 で崩した契約。こうしたテストには目印 (vitest のタグ、またはファイル名の決まり) を付け、6.3 の実行では外す。外したテストの一覧と、それぞれの根拠 (要件の番号か D の決定) をテストの対応表 (6.2) に書く。目印のないテストは、すべて Python 版で通らなければならない
+- **6.3 で Python 版に向けるときに外すテスト**: 意図して振る舞いを変える点を確かめるテストは、Python 版では通らないのが正しい。たとえば、直した OpenAPI の説明文 (7.1)、`/readyz` の `dependencies` の名前 (D2。Python 版は `pypdfium2` などを出すので、実名の検査は Python 版では通らない)、`/docs` と `/redoc` が無いこと (D3)、`WORKERS` を読まないこと (D1)、1.9 で崩した契約。こうしたテストには目印 (vitest のタグ、またはファイル名の決まり) を付け、6.3 の実行では外す。外したテストの一覧と、それぞれの根拠 (要件の番号か D の決定) をテストの対応表 (6.2) に書く。目印のないテストは、すべて Python 版で通らなければならない
 - **配備物のテスト**: Dockerfile、compose、k8s の例を読んで中身を確かめる (Python 版の `test_deploy_config.py` などに対応)
 - **既定の上限での余裕**: 対象 spec と同じく、基準のファイル (7 万セル 1 シートの XLSX、画像 12 枚の 48MB の DOCX) の子の最大 RSS が上限の 0.95 倍までに収まることを確かめる。基準値は 11.2 で取り直す
 - **テストの書き方**: `essential-test-design` (観察できる結果を確かめ、仕組みを確かめない) と `essential-test-patterns` (vitest、`mock<T>()` を使い、型の主張 `as` を避ける) に従う

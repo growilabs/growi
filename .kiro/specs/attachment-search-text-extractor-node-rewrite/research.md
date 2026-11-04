@@ -65,7 +65,7 @@ _最終更新: 2026-11-04 (requirements フェーズ)_
 
 ## 4. 対象 spec に入っていない、運用者から見える振る舞い
 
-requirements を書く途中で、対象 spec の AC と OpenAPI の文書では決まっていないが、運用者から見えるものが見つかった。`WORKERS`、`/readyz` の `dependencies`、`/docs` と `/redoc` は **未決** で、design で選択肢を示してユーザーが決める (requirements の Req 11.9)。
+requirements を書く途中で、対象 spec の AC と OpenAPI の文書では決まっていないが、運用者から見えるものが見つかった。`WORKERS`、`/readyz` の `dependencies`、`/docs` と `/redoc` は、design でユーザーが決めた (design.md の D1〜D3。決定の記録は 7 節)。
 
 - **`WORKERS`**: uvicorn のワーカー数を指す環境変数。Node には同じ仕組みが無いので、意味をどうするか (無視する、Node の cluster の数にする、廃止する) を決める必要がある。
 - **`/readyz` の `dependencies`**: いまは `anydoc` / `pypdfium2` / `charset-normalizer` / `converter` の名前を出している。OpenAPI の文書ではこの応答の形を決めていない (スキーマが `{}`) ので、名前を変えても生成クライアントは変わらない。
@@ -85,7 +85,7 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 | 項目 | 状態 | 決め方 |
 |---|---|---|
 | `WORKERS` の Node での意味 | 決定 (廃止。7 節) | ユーザー判断 (design.md の D1) |
-| `/readyz` の `dependencies` に出す名前 | **未回答** (暫定の既定は役割の名前) | design の承認の前にユーザーが決める (design.md の D2) |
+| `/readyz` の `dependencies` に出す名前 | 決定 (部品の実名と `prlimit`。7.3 節) | ユーザー判断 (design.md の D2)。PDF などの実名は T1・T6 の試作で確定する |
 | `/docs` と `/redoc` を残すかどうか | 決定 (出さない。7 節) | ユーザー判断 (design.md の D3) |
 | 配置 (pnpm workspace に入れるか) | 決定 (`apps/attachment-text-extractor/` に移して workspace に入れる) | ユーザー判断 (design.md の D4) |
 | PDF のライブラリ | 未決 | 試作と計測 (Req 11.3) |
@@ -165,3 +165,10 @@ design を書くために、小さな試作で次のことを確かめた。**�
 - **(b) 守ると何がどう複雑になるか**: Hono で同じ画面を出すには、Swagger UI と ReDoc を配る部品 (またはその HTML と JS) を本番の依存に足す必要がある。apps/app はこの画面を使っておらず、テストも無いので、足す部品は保守の手間だけを増やす。`/openapi.json` が残るので、画面が要る人はそれを手元の道具で開ける。
 - **(c) 下流の変更の範囲**: なし。apps/app も生成クライアントも、この 2 つのパスを使っていない (apps/app と生成クライアントのコードを検索し、`/docs` と `/redoc` を呼ぶ箇所が無いことを確かめた)。運用者から見える変化: この 2 つのパスは 401 (トークンなし) か 404 (トークンあり) になる。
 - **反映先**: design.md の Revalidation Triggers。対象 spec の requirements と design には `/docs` と `/redoc` の記述が無いので、取り込みで直す本文は無い。完了の報告でユーザーに示す。
+
+### 7.3 `/readyz` の `dependencies` の名前の変更 (design.md の D2、2026-11-04)
+
+- **(a) 何を崩すか**: `/readyz` の応答の `dependencies` のキー。いまの `anydoc` / `pypdfium2` / `charset-normalizer` / `converter` を、Node 版が実際に使う部品の実名 (npm の package 名。`@firecrawl/anydoc`、T1 で決まる PDF の部品、T6 で部品を使う場合はその名前) と `prlimit`、内部のモジュールをまとめた `converter` に変える。Python 版の名前は、Node 版で使わないので出さない。
+- **(b) 守ると何がどう複雑になるか**: 今の名前のままにすると、使っていない部品 (`pypdfium2` など) の名前で、別の部品が読み込めたかどうかを表すことになり、見た人を誤らせる。名前と中身を合わせるほうが単純で、保守の手間も増えない。役割の名前 (`pdf` など) にする案もあったが、ユーザーは「正しい部品の名前を入れる」ことを選んだ。
+- **(c) 下流の変更の範囲**: なし。OpenAPI のスキーマは `{}` なので生成クライアントは変わらない。apps/app は `/readyz` を呼んでいない。k8s と compose の health の確認は HTTP のステータスだけを見て本文を見ないので影響しない。運用者から見える変化: curl などで本文を見たときの表示が変わる。
+- **反映先**: design.md の Revalidation Triggers と、6.3 で Python 版に向けるときに外すテスト。取り込みのときに対象 spec の design.md §HealthRouter の `dependencies` の記述を書き直す。完了の報告でユーザーに示す。
