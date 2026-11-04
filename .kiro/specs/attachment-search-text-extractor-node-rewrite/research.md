@@ -883,3 +883,159 @@ crafted 版は 4 回、edit 版は直した後に 3 回動かし、どれも `12
 ### 10.8 リポジトリの状態
 
 確かめた後、`git status` で変わっているのはこの research.md だけだった。Python 版のテストとコード、Node の生成器は変えていない。gen-server と pytest のプロセスは残っていない (`pgrep -f gen-server.mjs` で 0 件)。
+
+## 11. ベンチマークのコーパスと正解 (タスク 2.6)
+
+2026-11-04 に devcontainer (Node 24.21.0) で作り、Python 版のサービス (8 節の手順、ポート 18000) の応答と突き合わせた結果。置き場所は `apps/attachment-text-extractor/benchmark/`。測る道具 (`run-benchmark.ts`) とベースラインの測定は 2.7 / 2.8 の仕事で、ここでは作っていない。
+
+### 11.1 結論
+
+- 形式ごとに日本語を含む文書 **23 個** (PDF 3、TXT 7、CSV 2、HTML 2、DOCX・XLSX・PPTX・XLS 各 1、ODT・ODS・ODP 各 1、旧形式の DOC・PPT 各 1) と、正解 (`answers.json`、語句は合計 118 個) を作った。Req 2.4 が求める日本語の PDF (横書き・縦書き・語の途中の改行)、Shift_JIS / EUC-JP / ISO-2022-JP / BOM 付き UTF-8 / UTF-16 (LE と BE) のテキスト、`<meta charset>` を持つ HTML、script / style を含む HTML をすべて含む。旧形式の DOC / PPT は Apache POI 由来のファイル (2.3 で `test/fixtures/legacy/` に移したもの) をそのまま写したもので、日本語は含まない。
+- **Python 版のサービスの実際の応答で、23 個すべての `pages[]` の要素の数・`pageNumber`・`label` が正解と一致し、正解の語句 118 個すべてが、正解の位置の要素 (だけ) に現れた**。HTML の script / style の中の語句は、Python 版の出力に現れなかった。
+- 日本語の PDF の作り方は design の想定 (Chromium + Noto CJK) から 1 点だけ変えた。**フォントは Noto CJK ではなく BIZ UDゴシック** (同じく SIL Open Font License 1.1) にした。Noto CJK で作ると、Chromium が文字を「Type3」(字の形を図形として描く方式) で書き出したため (実測、11.3)。Office などが書き出す PDF は、TrueType のフォントを CIDFontType2 (字の番号で引く普通の埋め込み方) で埋め込むことが多いと見込み (未検証)、それに近い形にした。**design の「Noto CJK」の記述を直すかどうかは、ユーザーの判断に任せる**。
+- PDF は Chromium の版とフォントで中身が変わりうるので、**生成した PDF を commit する** (11.6)。PDF 以外の文書は生成器が決定的 (同じバイト列) なので、テストが「生成器の出力と commit したファイルが同じ」ことを確かめる。
+
+### 11.2 Chromium の選び方と入れ方
+
+- **使うもの: `playwright-core` 1.64.1** (Apache-2.0)。`apps/attachment-text-extractor` のテスト・開発専用の依存 (devDependency) に入れた。本番の依存には入れない。Dockerfile (6.11) は `pnpm deploy --prod` で本番の依存だけを取り出す予定 (design の D4) なので、image には入らない。
+- 理由:
+  - ルートの `@playwright/test` が同じ 1.64.1 で、そのブラウザ (Chromium の revision 1248) がすでに devcontainer に入っている。版をそろえれば、新しくブラウザを取得しなくて済む。版は `^` ではなく `1.64.1` に固定した (ルートと版がずれると、別の revision のブラウザが要る)。
+  - `playwright-core` はブラウザを操作する部分だけを持つ package で、install のときの処理 (scripts) を持たない (`playwright` 1.64.1 も同じ。どちらもブラウザは `playwright install` で別に入れる)。
+  - `apps/pdf-converter` の `puppeteer ^23` は、install の後の処理 (`postinstall: node install.mjs`) で自分用の Chrome を取りに行く作り。ただしこのリポジトリでは `pnpm-workspace.yaml` の `allowBuilds` で `puppeteer: false` になっていて、その処理は動かない。実際に `~/.cache/puppeteer` は無く、puppeteer 用の Chrome は devcontainer に入っていない。`puppeteer-core` に Playwright のブラウザの場所を渡す方法もあるが、ブラウザの場所を手で書くことになるので採らなかった。
+- ブラウザの場所 (実測): 指示にあった `/opt/pw-browsers` は存在しなかった。実際は `~/.cache/ms-playwright/` の `chromium-1248` (Chrome for Testing 156.0.8078.4) と `chromium_headless_shell-1248`。`chromium.launch()` は headless shell の方を使う。PDF の Producer は `Skia/PDF m156`。
+- ブラウザが無い環境では、リポジトリのルートで `pnpm exec playwright install chromium` を実行する (ルートの `@playwright/test` が `playwright` のコマンドを持つ)。
+- TypeScript の生成スクリプトは `node --import @swc-node/register/esm-register` で動かす (`apps/pdf-converter` と `apps/growi-vault-manager` の前例と同じ)。`test/fixtures/` は拡張子なしで import しているが、この方法で解決できることを確かめた。`@swc-node/register` と `@swc/core` も devDependency に入れた (`apps/pdf-converter` と `apps/growi-vault-manager` と同じ指定の `^1.10.9` / `^1.9.2`。ルートの `@swc/core` は `^1.5.25` だが、lockfile ではどれも既存の 1.10.9 / 1.16.1 になり、入る版は変わらない)。
+
+### 11.3 フォントの選び方・ライセンス・入手先
+
+**比べた結果 (実測、同じ HTML を Chromium で PDF にした)**:
+
+| フォント | 形式 | PDF の中のフォントの形 | 採否 |
+|---|---|---|---|
+| Noto Sans JP (noto-cjk の `Sans2.004`、`SubsetOTF/JP/NotoSansJP-Regular.otf`、OFL 1.1) | OpenType (CFF) | **Type3 が 25 個** (字の形を図形で描く) | 採らない |
+| Noto Sans JP の可変フォント (`Variable/TTF/Subset/NotoSansJP-VF.ttf`) | TrueType (可変) | **Type3 が 25 個** | 採らない |
+| BIZ UDゴシック Regular (google/fonts、OFL 1.1) | TrueType (静的) | `Type0` + `CIDFontType2` (字の番号で引く普通の埋め込み方) | **採る** |
+| IPAゴシック (システムの `fonts-ipafont-gothic`) | TrueType (静的) | `Type0` + `CIDFontType2` | 採らない (IPA フォントライセンスで OFL ではない。システムに入っているかどうかに左右される) |
+
+- noto-cjk の配布物のうち試したのは、CFF の OpenType と可変の TrueType の 2 つで、どちらも Chromium (Skia) は PDF に埋め込めず、Type3 で書き出した (noto-cjk の `Sans2.004` には静的な TrueType は見当たらなかったが、ほかの配布元までは探していない)。Type3 の PDF からも文字は取れる (ToUnicode の表が付く)。ただ、Office などが書き出す PDF は TrueType を CIDFontType2 で埋め込むことが多いと見込まれ (未検証)、Type3 だけの PDF は利用者の PDF と形が違う可能性が高いので、ベンチマークの PDF としてはふさわしくないと判断した。design の「Noto CJK など」の「など」の範囲で、同じ OFL の静的な TrueType のフォントに替えた。
+- 見出しの太字も、太字のフォントを読み込まないと Chromium が太らせた字を Type3 で書き出す (実測で 5 個)。そこで、標準の太さだけを読み込み、見出しも標準の太さにし、`font-synthesis: none` を付けた。
+- **採ったフォント**:
+  - 名前: BIZ UDゴシック (BIZ UDGothic) Regular、版 1.05 (`fontversion` 68813)
+  - 入手先: `https://raw.githubusercontent.com/google/fonts/01ac47e0b1cddbc298334c69a5dfafb0205ffa28/ofl/bizudgothic/BIZUDGothic-Regular.ttf` (google/fonts のコミットで固定。そのファイルの最後の変更のコミット、2022-05-11)
+  - SHA-256: `709fcd41e3209fb765da750472f55ccdf925653e9fa7e1eb007cb65c8f749c75` (4,667,376 バイト)
+  - ライセンス: SIL Open Font License 1.1。全文は同じコミットの `ofl/bizudgothic/OFL.txt` (`https://raw.githubusercontent.com/google/fonts/01ac47e0b1cddbc298334c69a5dfafb0205ffa28/ofl/bizudgothic/OFL.txt`、SHA-256 `e753d7155d53c747d037a445e584c8ecfca6dd79846db610417e282a736b28bc`)。著作権表示は、フォント本体の name テーブル (nameID 0) の "Copyright 2022 The BIZ UDGothic Project Authors (https://github.com/googlefonts/morisawa-biz-ud-gothic)"。(同じコミットの `OFL.txt` の先頭行は元の配布の書き間違いで `morisawa-biz-ud-mincho` になっているが、字体は BIZ UDゴシック。)OFL は、文書に埋め込むこと (PDF に字の一部を入れること) を制限しない。
+- フォント本体 (約 4.5MB) は **commit しない**。生成器 (`benchmark/benchmark-font.ts`) が初回に上の URL から取得し、SHA-256 を確かめて `apps/attachment-text-extractor/node_modules/.cache/attachment-text-extractor-benchmark/` に置く。2 回目からはそれを使う。
+- 生成器は、PDF にした後で「埋め込まれたフォントが BIZ UDゴシックの部分集合 (`ABCDEF+BIZUDGothic-Regular` の形の名前) だけで、Type3 が 0 個」であることを確かめ、違えば失敗する。フォントの読み込みに失敗すると Chromium がシステムのフォント (IPAゴシックなど) で黙って描くので、それを捕まえるため。同じことをテストでも確かめる。
+- `fc-list` にある日本語のフォントは、IPAゴシック / IPA Pゴシック、WenQuanYi Zen Hei (中国語向け)、Unifont (ビットマップ由来) だけで、Noto CJK は入っていない (`fonts-noto-color-emoji` だけ)。生成器はシステムのフォントを使わない。
+
+### 11.4 コーパスの一覧
+
+作り方の欄の「生成器」は `test/fixtures/` の関数。サイズはバイト。「位置」は期待する `pages[]` の要素の数。
+
+| ファイル | 形式 | 文字コード | 特徴 | サイズ | 位置 | 語句 | 作り方 |
+|---|---|---|---|---|---|---|---|
+| `pdf-ja-horizontal.pdf` | pdf | — | 横書き、3 ページ、英数字の混在 (`ISO/IEC 27001`、`CSIRT`) | 26012 | 3 | 9 | HTML を Chromium で PDF に (`benchmark/pdf-documents.ts`) |
+| `pdf-ja-vertical.pdf` | pdf | — | 縦書き (`writing-mode: vertical-rl`)、2 ページ | 20313 | 2 | 6 | 同上 |
+| `pdf-ja-line-break.pdf` | pdf | — | 横書き、10 字幅の段で語の途中で改行 (4 語) | 18389 | 1 | 6 | 同上 |
+| `txt-shift-jis.txt` | txt | shift_jis (CRLF) | 議事録 | 260 | 1 | 7 | `encodeText` |
+| `txt-euc-jp.txt` | txt | euc-jp | 障害報告書 | 261 | 1 | 7 | 同上 |
+| `txt-iso-2022-jp.txt` | txt | iso-2022-jp | メールの本文 | 255 | 1 | 5 | 同上 (9.7 の自前の関数) |
+| `txt-utf-8-bom.txt` | txt | utf-8-bom | 〜 (U+301C) を含む | 194 | 1 | 6 | 同上 |
+| `txt-utf-16le-bom.txt` | txt | utf-16le-bom | | 160 | 1 | 5 | 同上 |
+| `txt-utf-16be-bom.txt` | txt | utf-16be-bom | | 160 | 1 | 6 | 同上 |
+| `txt-utf-8.txt` | txt | utf-8 (BOM なし) | 英語の固有名詞の混在 | 195 | 1 | 5 | `Buffer.from` |
+| `csv-utf-8.csv` | csv | utf-8 | 社員名簿 | 154 | 1 | 6 | 同上 |
+| `csv-cp932.csv` | csv | cp932 (CRLF) | ㈱ と 髙 (cp932 の拡張文字) | 143 | 1 | 6 | `encodeText` |
+| `html-shift-jis-script-style.html` | html | shift_jis | `<meta charset="Shift_JIS">`、script と style | 421 | 1 | 5 (+出てはいけない語句 2) | 同上 |
+| `html-euc-jp-http-equiv.html` | html | euc-jp | `<meta http-equiv="Content-Type" content="...; charset=EUC-JP">`、表 | 355 | 1 | 4 | 同上 |
+| `docx-ja.docx` | docx | — | 段落の中の改行 (`<w:br/>`) | 1820 | 1 | 6 | `buildDocx` |
+| `xlsx-ja-multi-sheet.xlsx` | xlsx | — | 日本語のシート名 3 枚 | 2644 | 3 | 6 | `buildXlsx` |
+| `pptx-ja-multi-slide.pptx` | pptx | — | 3 スライド | 6409 | 3 | 7 | `buildPptx` |
+| `xls-ja.xls` | xls | — | 日本語のシート名 2 枚、文字列は UTF-16 (fHighByte=1) | 3072 | 1 | 4 | `buildXls` |
+| `odt-ja.odt` | odt | — | | 875 | 1 | 3 | `buildOpenDocument` |
+| `ods-ja.ods` | ods | — | 日本語のシート名 2 枚 | 873 | 1 | 2 | 同上 |
+| `odp-ja.odp` | odp | — | | 882 | 1 | 2 | 同上 |
+| `doc-legacy.doc` | doc | — | 日本語なし (Apache POI) | 19456 | 1 | 2 | `test/fixtures/legacy/simple-table.doc` の写し |
+| `ppt-legacy.ppt` | ppt | — | 日本語なし (Apache POI) | 11264 | 1 | 3 | `test/fixtures/legacy/text_shapes.ppt` の写し |
+
+- 合計: コーパス 23 ファイルで **114,567 バイト** (うち PDF 3 個で 64,714 バイト、Apache POI の写し 2 個で 30,720 バイト)。`answers.json` は 19,701 バイト。大きなバイナリは無い。
+- Shift_JIS・cp932・EUC-JP・ISO-2022-JP の文書には 〜 (U+301C) と ～ (U+FF5E) を入れていない (9.10 のユーザーの決定)。テストでも確かめる。〜 は BOM 付き UTF-8 の文書にだけ入れた (`9時〜18時` を語句にした)。
+- 語句は、文書の中身から、検索に実際に使う語 (複合語、固有名詞、カタカナ語、人名、英数字の混じった語) を選んで手で書いた。生成器の定数から作っていない。
+- 複数ページ・スライド・シートの文書では、各語句がその位置の要素に **だけ** 現れるように選んだ (位置の正しさを測れるようにするため。テストで確かめる)。
+- Apache POI の 2 ファイルは Apache License 2.0。ライセンスと NOTICE は `test/fixtures/legacy/` にあり、`answers.json` の `source` にその場所を書いた。コーパスの中に写しを置いたのは、「コーパスのファイルをそのまま送って測る」形を全部の文書でそろえるため。
+
+### 11.5 正解 (`answers.json`) の形と、作り方
+
+- 型と検証の関数は `benchmark/answers.ts` の 1 ファイルで公開する (`BenchmarkAnswers`、`DocumentAnswer`、`ExpectedPage`、`ExpectedPhrase`、`parseBenchmarkAnswers`、`loadBenchmarkAnswers`、`BENCHMARK_CORPUS_DIR`)。2.7 の `run-benchmark.ts` はこれを import して使う。検証の関数は `unknown` から型を絞る自前の関数で、型の主張 (`as`) を使わない。
+- 文書ごとの欄: `fileName` (corpus/ の直下のファイル名)、`format`、`mimeType` (`POST /extract` に付けて送る MIME。たとえば CSV は `text/csv` を送る。`.csv` に `application/vnd.ms-excel` が付くと XLS として扱われる既知の制約 (Req 2.6) を避けるため)、`source` (作り方の出所)、`encoding` (テキスト系だけ)、`features` (横書き・縦書き・語の途中の改行・`<meta charset>`・script / style・段落の中の改行。2.7 の表を特徴ごとにまとめるのに使える)、`expectedPages` (期待する `pages[]` の各要素の `pageNumber` と `label`。XLSX はシート名 `sheetName` も)、`phrases` (語句 `text`、位置 `page` (`expectedPages` の 1 始まりの番号)、語の途中の改行の位置 `lineBreakAfter` (PDF の段組で、語句の何文字目の後で行が変わるか。文字は Unicode のコードポイントで数える))、`absentPhrases` (script / style の中にあって、抽出に出てはいけない語句)。
+- 文字化けと語の分断を数えるための情報: 分断は「正解の語句の文字の間に空白や改行が入ったもの」で、2.7 の道具が語句ごとに一般的に数えられる。`lineBreakAfter` は、元の文書で行が変わる場所を示すので、分断がどこで起きやすいかを報告に出せる。文字化けは置き換え文字 (U+FFFD) と、語句が取れないこと (再現率) で測れる。`encoding` で、どの文字コードの文書かを報告に出せる。
+- **正のもの (single source of truth) は `benchmark/*-documents.ts` の宣言** (文書の中身と正解を 1 か所に並べて書く)。`pnpm benchmark:generate` が宣言からコーパスと `answers.json` を書き出す。`answers.json` は生成物なので biome の対象から外した (`benchmark/biome.json`。コーパスも、Shift_JIS などの HTML を biome が UTF-8 として読めずに失敗するので外した。このリポジトリで初めての入れ子の biome の設定。commit の前に lefthook が呼ぶ形 (ルートから、ファイルのパスを並べて `pnpm biome check --write ...`) でも、`answers.json` とコーパスのファイルが対象から外れることを確かめた)。
+- 依存の向き: `benchmark/` は `test/fixtures/` の生成器を import する。どちらもテスト・開発専用で、本番の `src/` からは import しない (`src/` に `benchmark` と `test/fixtures` への import が無いことを確かめた)。design の D5 (「生成器はテストからだけ使い、本番のコードからは import しない」) に反しない。
+
+### 11.6 PDF を commit する理由
+
+- 2.8 (Python 版のベースライン) と 6.13 (Node 版の測定) で **同じファイル** を測る必要がある。PDF は Chromium の版 (今は m156) とフォントで中身 (字の配置、埋め込み方) が変わりうるので、作り直すと比べる条件がずれる。
+- PDF には作った日時 (`/CreationDate`) が入るので、同じ Chromium でも作るたびにバイト列が変わる。
+- 3 個で 64,714 バイトと小さい (フォントは使った字だけが埋め込まれる)。
+- 今の PDF の SHA-256: `pdf-ja-horizontal.pdf` `8a757369271d0348202f5df3c9822d41a74ab3603a46752715d4628f49411a13`、`pdf-ja-vertical.pdf` `28d642ad0fc0217f55b26fc1b1b1c6cd98dbcbae6f63ed2c4752a5f38c188892`、`pdf-ja-line-break.pdf` `9c9a4f216fd43a0fa2748f004b44ebb65577c1a7be9de1b76974871f1d4ab1b7`。
+- PDF 以外は生成器が決定的なので、作り直しても同じバイト列になる。それでもコーパスに置くのは、2.7 の道具が生成器なしにファイルだけで測れるようにするため。
+- `benchmark/corpus/.gitattributes` に `* binary` を置いた。Shift_JIS・UTF-16・CRLF のファイルを、git の改行の変換 (`core.autocrlf` など) が書き換えないようにするため。`git check-attr` で `text: unset` になることを確かめた。
+
+### 11.7 `pages[]` の約束の確認 (Python 版の実際の応答)
+
+8 節の手順で Python 版を起動し (PID・トークン・ログのファイルは scratchpad に置き、終わったら止めた。`pgrep -g` で残りが無く、ポートが空いたことを確かめた)、コーパスの 23 ファイルを `answers.json` の `mimeType` を付けて `POST /extract` に送った。最後の生成の後にもう一度送り、同じ結果だった。
+
+| 形式 | `pages[]` (実際の応答) |
+|---|---|
+| PDF | ページごとに 1 要素。`pageNumber` は 1 始まりの番号、`label` は番号の文字列 (`"1"`、`"2"`…) |
+| PPTX | スライドごとに 1 要素。`pageNumber` と `label` は PDF と同じ形 |
+| XLSX | シートごとに 1 要素。`pageNumber` は 1 始まりの番号、**`label` はシート名** (`"売上実績"` など)。最初は番号の文字列と見込んでいたが、実際の応答に合わせて正解を直した |
+| それ以外 (TXT、CSV、HTML、DOCX、XLS、ODT、ODS、ODP、DOC、PPT) | 1 要素。`pageNumber` も `label` も `null`。複数のシートを持つ XLS と ODS も 1 要素 |
+
+- 正解の語句 118 個は、すべて、正解の位置の要素に (そしてその要素だけに) 現れた。縦書きの PDF も、Python 版 (pypdfium2) は正しい順で読めた。語の途中の改行は、Python 版の正規化 (PDF だけにかける、日本語の間の改行の詰め) でつながっていた。
+- HTML の script / style の中の語句 (`スタイル定義`、`スクリプト内部の文字列`) は、Python 版の出力に現れなかった。
+- 気付いたこと (2.8 の材料): Python 版の PDF の出力では、見出しと次の段落が改行なしでつながる (`情報セキュリティ基本方針当社は…`)。日本語の間の改行を詰める正規化の結果。語句の検索には影響しないが、見出しの末尾と本文の先頭がつながった語ができる。
+- これはベースラインの測定ではない (2.8 で行う)。ここで確かめたのは、正解の位置と要素の数が実際の応答と矛盾しないことだけ。
+
+### 11.8 Node 版の anydoc (0.2.4) で PDF を読んだ結果
+
+テスト (d) の材料として、Node 版の anydoc (`toMarkdownBytes(bytes, 'pdf')`、中身は pdf-inspector) でも読んだ (実測)。
+
+- 横書き: 語句はすべて取れた。ページの区切りは出力に無い。
+- 語の途中の改行: 行の境目に **空白が入る** (`基幹シス テム`)。分断として数えられる形で、ベンチマークが測りたいことそのもの。
+- 縦書き: **字の順が崩れる** (複数の列を横に読んで、`当 皆 創 社 様 業…` のように字の間に空白が入る)。語句はほとんど取れない。Node 版で PDF の部品を選ぶ (T1、3.1) ときの重要な材料になる。
+- このため、テストで PDF の語句と位置を確かめるのには anydoc を使わず、Chromium が書く PDF の中身 (ページごとの描画の命令と、フォントの ToUnicode の表) を直接読む小さな関数 (`benchmark/spec-support/pdf-text.ts`) を使った。Chromium は、1 行 (縦書きでは 1 列) を 1 つのテキストの塊として、読む順に字を書くので、ページごとの文字列と、行の変わり目が取れる。anydoc は横書きの PDF で語句が取れることだけを確かめる。
+
+### 11.9 テストで確かめていること
+
+`pnpm test` (vitest) で動く。Chromium は使わない (PDF は commit したものを読むだけ)。
+
+- `benchmark/answers.spec.ts`: `answers.json` がスキーマに合う。コーパスのファイルと正解が 1 対 1 で、正解はコーパスの外を指さない。`answers.json` が宣言から書き出したものと同じ (古いままになっていない)。Req 2.7 の 8 形式それぞれに日本語の語句を持つ文書がある。Req 2.4 の文字コードと特徴 (縦書き・語の途中の改行・`<meta charset>`・script / style など) がそろっている。検証の関数が、おかしな入力 (知らない形式、位置がページの数を超える、語句が空、改行の位置が語句の外、ファイル名にディレクトリが入る、同じファイルの正解が 2 つ など) を、どの欄が悪いかを示して拒否する。
+- `benchmark/corpus-documents.spec.ts` (PDF 以外の 20 個): 生成器が 2 回とも同じバイト列を作り、それが commit したファイルと同じ。正解の語句が、生成器と独立した読み方 (テキストは `TextDecoder` で厳密に復号、OOXML / OpenDocument は cfb の ZIP の読み取りと、パッケージの関係の表からシート・スライドの順を求めて XML の文字を取り出す、XLS・DOC・PPT は anydoc) で、正解の位置にだけある。XLSX のシート名と順が正解どおり。テキストの文字コードどおりに復号でき、BOM の有無が正しい。Shift_JIS などの文書を UTF-8 として読むと語句が取れない (文字コードの判定が必要な文書になっている)。Shift_JIS などに 〜 ～ が無い。`<meta charset>` が実際の文字コードを指す。script / style の中に「出てはいけない語句」が実際にある。
+- `benchmark/pdf-documents.spec.ts` (PDF 3 個): `%PDF-` で始まり、ページ数が正解どおり。埋め込まれたフォントが BIZ UDゴシックの部分集合だけで、Type3 が無い。正解の語句が、正解のページにだけある (11.8 の関数で読む)。語の途中の改行が、正解の `lineBreakAfter` の位置に実際にある。横書きの PDF では Node 版の anydoc でも語句が取れる。
+- わざと壊して失敗することを確かめた (その後戻した): 語句を文書に無いものに替える、PDF の語句のページを替える、改行の位置を 1 字ずらす、コーパスに余分なファイルを置く。どれも該当のテストが失敗した。
+
+### 11.10 再現の手順
+
+```bash
+export PATH=/usr/local/share/nvm/versions/node/v24.21.0/bin:$PATH
+# Chromium が無ければ (リポジトリのルートで。ルートの @playwright/test と同じ 1.64.1 の revision 1248)
+pnpm exec playwright install chromium
+cd apps/attachment-text-extractor
+pnpm benchmark:generate                 # コーパス (PDF を含む) と answers.json を書き出す。初回はフォントを取得する
+pnpm benchmark:generate --without-pdf   # Chromium が無いとき: commit 済みの PDF を残し、ほかだけを作り直す
+pnpm vitest run benchmark               # 確かめる
+```
+
+- 生成の出力をパイプで `head` などに渡さない。途中で読み手が終わると、書き出しの途中でプロセスが止まり、ファイルが空のまま残ることがあった (実測。テストが失敗して気付く)。
+- 宣言 (`benchmark/*-documents.ts`) を変えたら、必ず生成し直して `answers.json` とコーパスを一緒に commit する (テストが食い違いを捕まえる)。PDF を作り直したら、2.8 のベースラインを測り直す必要がある。
+
+### 11.11 確かめなかったこと
+
+- Word や PowerPoint が実際に書き出した日本語の PDF は加えていない (design の「ライセンスの問題がない公開の日本語の PDF を 1 つ以上加えることも検討する」)。Chromium の PDF と同じ癖を持つかは分からない。BIZ UDゴシックで `CIDFontType2` の形にそろえたが、字の配置の仕方 (1 字ずつの位置の指定など) は Office と違いうる。
+- Chromium の版を上げたときに PDF の中身がどう変わるか。Windows・macOS で生成を動かすこと。
+- 太字のフォントを読み込んだ PDF (見出しを太字にした場合) は作っていない。
+- 縦書きの PDF の中で、Chromium は横書きと同じ `Identity-H` で字を書いている (縦書き用の `Identity-V` ではない)。縦書き用の字形 (句読点の位置など) が使われているかは確かめていない。
+- cp932 の 髙 は iconv-lite が `0xFBFC` (IBM 拡張の側) で書く。Python の cp932 は `0xEEE0` (NEC 選定 IBM 拡張の側) で書く (9.5.5)。どちらも Python 版のサービスと `TextDecoder` で 髙 に戻る。
+- Elasticsearch (kuromoji) での確認 (2.7 の仕事)。ベースラインの数値 (2.8 の仕事)。
+- `pnpm install` で lockfile のうち、新しく足した 3 つの依存のほかに、`vitest-mock-extended` の peer の書き方 (`@vitest/ui@3.2.4(vitest@3.2.6)` → `@vitest/ui@3.2.4`) が 3 か所変わった (ルートの importer、この package の importer、snapshots のキー)。pnpm が書き方をそろえただけで、入る版は変わらない。

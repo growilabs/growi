@@ -56,9 +56,9 @@
   - 差し替えは commit に残さない (確かめた後に元に戻す)。戻したことを `git status` で確かめる
   - Python 版のテストが差し替えの前と同じ結果になること、同じにならなかったものとその原因が research.md に記録されている
   - _Requirements: 10.5_
-- [ ] 2.6 ベンチマークのコーパスと正解を作る
+- [x] 2.6 ベンチマークのコーパスと正解を作る
   - 形式ごと (少なくとも PDF / DOCX / XLSX / PPTX / XLS / CSV / HTML / TXT) に日本語を含む文書を、Python 版でも読める普通の形式で作る。2.3 の生成器を使ってよい
-  - 日本語の PDF (横書き、縦書き、語の途中の改行) は、HTML から Chromium と再配布できるフォント (Noto CJK など) で作る。Chromium (Puppeteer) とフォントの入れ方、フォントのライセンスと入手先を確かめ、research.md に書く。生成器はテスト専用の依存にし、本番の image に入れない。Shift_JIS / EUC-JP / ISO-2022-JP / BOM 付き UTF-8 / UTF-16 のテキストと、`<meta charset>` と script / style を含む HTML を入れる
+  - 日本語の PDF (横書き、縦書き、語の途中の改行) は、HTML から Chromium と再配布できるフォント (Noto CJK など。実際は BIZ UDゴシック。research.md 11.3) で作る。Chromium (Puppeteer。実際は playwright-core。research.md 11.2) とフォントの入れ方、フォントのライセンスと入手先を確かめ、research.md に書く。生成器はテスト専用の依存にし、本番の image に入れない。Shift_JIS / EUC-JP / ISO-2022-JP / BOM 付き UTF-8 / UTF-16 のテキストと、`<meta charset>` と script / style を含む HTML を入れる
   - 文書ごとに、検索で必ず見つかるべき語句と、現れるべき位置 (ページ・スライド・シートの番号と名前)、期待する `pages[]` の要素の数を正解として書いてある
   - _Requirements: 2.4, 2.7, 2.8_
 - [ ] 2.7 ベンチマークを測る道具を作る

@@ -11,7 +11,8 @@
     "lint:biome": "biome check",
     "lint:typecheck": "tsgo --noEmit",
     "lint": "run-p lint:**",
-    "test": "vitest run"
+    "test": "vitest run",
+    "benchmark:generate": "node --import @swc-node/register/esm-register benchmark/generate-corpus.ts"
   },
   "dependencies": {
     "@firecrawl/anydoc": "=0.2.4",
@@ -19,10 +20,13 @@
     "hono": "^4.13.16"
   },
   "devDependencies": {
+    "@swc-node/register": "^1.10.9",
+    "@swc/core": "^1.9.2",
     "@types/node": "^24.0.0",
     "cfb": "^1.2.2",
     "iconv-lite": "^0.7.3",
     "officecrypto-tool": "0.0.19",
+    "playwright-core": "1.64.1",
     "vitest": "^3.2.6",
     "vitest-mock-extended": "^3.1.0"
   }

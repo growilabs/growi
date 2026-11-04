@@ -88,7 +88,7 @@
 - 実行環境: Node.js 24 (ルートの `engines.node` と、`apps/pdf-converter` の `node:24-slim` に合わせる)
 - 本番の依存: `hono`、`@hono/node-server`、`@firecrawl/anydoc` (=0.2.4)、PDF の部品 1 つ (T1 で選ぶ)、テキスト系の部品 (HTML の解析、文字コードの判定とデコード、ZIP の読み書き、安全な XML の解析。T6 で選ぶ)、OpenAPI の作り方によってはその部品 (T5)。いずれも MIT / Apache-2.0 / BSD / ISC のもの (4.4)。選ぶときに npm の `license` と、同梱されたネイティブ部品のライセンスを確かめる
 - OS のコマンド: util-linux の `prlimit` だけ (4.8)
-- テスト専用 (本番の image に入れない): vitest、`vitest-mock-extended`、テスト用のファイルを作る部品 (T7 で選ぶ。許容的なライセンスのもの)、ベンチマークの日本語の PDF を作る Chromium (monorepo で `apps/pdf-converter` が使う Puppeteer) と、再配布できるフォント (Noto CJK など)
+- テスト専用 (本番の image に入れない): vitest、`vitest-mock-extended`、テスト用のファイルを作る部品 (T7 で選ぶ。許容的なライセンスのもの)、ベンチマークの日本語の PDF を作る Chromium (`playwright-core` で、ルートの `@playwright/test` と同じ版の Chromium を動かす。Puppeteer は `pnpm-workspace.yaml` の `allowBuilds` で無効なため使わない。research.md 11.2) と、再配布できるフォント (BIZ UDゴシック、SIL OFL 1.1。Noto Sans JP は Chromium が Type3 で書き出すため採らなかった。research.md 11.3)
 - 使わないもの: Python と Python の実行環境 (4.6)、Bun / Deno (4.7)、LGPL / GPL / AGPL の部品、anydoc の `hosted` の OCR (4.5)、外向き通信、共有メモリ `/dev/shm` (8.6)
 
 ### Revalidation Triggers
@@ -217,7 +217,7 @@ apps/attachment-text-extractor/
 │   └── export-openapi.ts         # writes the OpenAPI document for packages/attachment-text-extractor-client (7.1)
 ├── benchmark/                    # search-quality benchmark (2.7–2.15); see "Benchmark"
 │   ├── corpus/                   # generated documents readable by both the Python and the Node service (D5)
-│   ├── generate-corpus.ts        # builds the corpus, including Japanese PDFs via Chromium + Noto CJK
+│   ├── generate-corpus.ts        # builds the corpus, including Japanese PDFs via Chromium + BIZ UDゴシック
 │   ├── answers.json              # expected phrases and positions per document
 │   └── run-benchmark.ts          # calls POST /extract on a base URL, scores, prints a report
 └── src/
@@ -432,7 +432,7 @@ D1〜D5 はすべてユーザーが決めた (2026-11-04)。
 | PDF (文字入り、パスワード付き、所有者パスワードだけ、画像だけ、壊れたもの) | 手で組み立てた PDF と pypdf の暗号化 | 文字入りと壊れたものは手で組み立てられる (Python 版も同じ方法)。暗号化は PDF の部品 (pdf-lib などの対応の有無は未検証) か自前の実装が要る |
 | XLS (旧形式の Excel) | xlwt | Node で XLS (BIFF8) を書ける部品は限られる。ライセンスと配布の形を確かめる必要がある (未検証) |
 | 文字コード別のテキスト (Shift_JIS、EUC-JP など) | Python の標準のエンコード | iconv-lite などでエンコードできる見込み (未検証) |
-| 日本語の PDF (ベンチマーク用) | なし (新しく作る) | Chromium + Noto CJK で HTML から作る (「ベンチマーク」を参照)。テスト用の生成器とは別で、作った PDF はベンチマークのコーパスとして使う |
+| 日本語の PDF (ベンチマーク用) | なし (新しく作る) | Chromium + BIZ UDゴシック (OFL) で HTML から作る (「ベンチマーク」を参照)。テスト用の生成器とは別で、作った PDF はベンチマークのコーパスとして使う |
 
 **Python 版との整合**:
 - ベンチマークのコーパスは Node で作るが、**Python 版でも読める普通の形式のファイル** (PDF、DOCX など) にする。生成器は Node のものでも、出来上がるファイルは形式として Python 版と Node 版で同じものを読む。ベースラインは、このファイルを Python 版に `run-benchmark.ts` で送って測る (2.11)。Python 版が残っているうちに測る必要があるので、生成器のうちベンチマークに要るものは、段階 0 で最初に作る
