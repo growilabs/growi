@@ -25,7 +25,8 @@ it, and keeps that information accurate and performant as the wiki changes.
   viewer's read permissions (page grants).
 - Backlink relationships kept in sync as pages are created, edited, and deleted,
   so backlinks are fast and accurate at scale.
-- A one-time process to backfill backlinks for all pre-existing pages.
+- A process, started by an administrator, to backfill backlinks for pre-existing pages (all of
+  them, the newest N, or those edited after a given date).
 - Link integrity when a page is renamed/moved: inbound links must follow the new
   path or be clearly flagged, not silently break.
 - Broken-link handling when a linked page is deleted (shown as broken, not
@@ -63,7 +64,7 @@ order of delivery is tracked separately in the implementation backlog.
   anchors, page permalinks (links by page ID), and absolute URLs whose host is
   this wiki's — that target internal pages; filtering by the viewer's read permission;
   keeping backlinks current as pages are created, updated, moved/renamed,
-  trashed, restored, and permanently deleted; a one-time backfill for
+  trashed, restored, and permanently deleted; an administrator-started backfill for
   pre-existing pages; indicating trashed/broken link targets.
 - **Out of scope**: a wiki-wide health/analytics dashboard; outbound automation or
   webhooks; a visual link-graph; and any change to GROWI's permission model, page
@@ -117,9 +118,16 @@ order of delivery is tracked separately in the implementation backlog.
 **Objective:** As an administrator, I want backlinks to cover content that existed before the feature was enabled, so that backlinks are complete rather than only reflecting recent edits.
 
 #### Acceptance Criteria
-1. Where pages existed before the Backlinks feature was enabled, the Backlinks feature shall provide a one-time process that makes the links within those pages discoverable as backlinks.
+1. Where pages existed before the Backlinks feature was enabled, the Backlinks feature shall provide a process, started by an administrator, that makes the links within those pages discoverable as backlinks.
 2. When the one-time process completes, the Backlinks feature shall present backlinks from pre-existing pages equivalently to backlinks created after enablement.
 3. If the one-time process is run more than once, then the Backlinks feature shall not produce duplicate backlinks.
+4. Where an administrator limits the process to pages edited after a given date or to the newest N pages, the Backlinks feature shall make backlinks from the pages within that limit equivalent to backlinks created after enablement, and shall indicate that backlinks from older pages are not included.
+5. The Backlinks feature shall let an administrator, and only an administrator, start the process from the administration settings and choose its scope: all pages, the newest N pages, or the pages edited after a given date.
+6. While the process is running, the administration settings shall show its progress and shall not allow another run to be started.
+7. Where an earlier run covered only part of the pages, the administration settings shall show which pages are covered and shall let an administrator run the process again over a wider scope.
+8. When backlinks have been built for all pages, the administration settings shall say so and shall not offer to start the process again.
+9. While the process is running, the administration settings shall let an administrator stop it, and shall let an administrator continue a stopped run from where it stopped.
+10. The administration settings shall show how many pages a running or stopped run has processed out of how many are in its range, and, where coverage is partial, approximately how many pages are not yet included.
 
 ### Requirement 5: Link integrity when a page is renamed or moved
 **Objective:** As an editor, I want links to a page to survive its rename or move, so that references are not silently broken.

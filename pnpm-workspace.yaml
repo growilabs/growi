@@ -48,6 +48,11 @@ overrides:
   '@lezer/common': ^1.5.2
   '@lezer/lr': ^1.4.10
   '@codemirror/language': ^6.12.3
+  # Quadratic parse time on table-heavy markdown: <= 2.1.1 scans the whole edit list on every
+  # edit, so extraction of a page with a few thousand table cells takes seconds to minutes
+  # (fixed in 2.1.2). remark-gfm reaches this package through micromark-extension-gfm, which
+  # only asks for ^2.0.0 and would otherwise stay on the locked 2.1.0 next to our direct 2.1.2.
+  micromark-extension-gfm-table: ^2.1.2
 
 packageExtensions:
   # @orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime,
