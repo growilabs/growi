@@ -475,16 +475,25 @@ class PageService implements IPageService {
   ): Promise<PageDocument[]> {
     const userRelatedGroups =
       await this.pageGrantService.getUserRelatedGroups(user);
-    const filteredPages = pages.filter(async (p) => {
-      if (p.isEmpty) return true;
-      const canDelete = canDeleteFunction(
+    // An empty page is skipped by a non-recursive deletion, but deleting it
+    // recursively deletes everything under it, so it is judged then.
+    const shouldJudge = (p: PageDocument) => !p.isEmpty || isRecursively;
+    // Resolved up front: filter() treats a returned Promise as truthy and
+    // keeps every page, so the predicate below must stay synchronous.
+    const creatorIds = await Promise.all(
+      pages.map((p) =>
+        shouldJudge(p) ? this.getCreatorIdForCanDelete(p) : null,
+      ),
+    );
+    const filteredPages = pages.filter((p, index) => {
+      if (!shouldJudge(p)) return true;
+      return canDeleteFunction(
         p,
-        p.creator == null ? null : getIdForRef(p.creator),
+        creatorIds[index],
         user,
         isRecursively,
         userRelatedGroups,
       );
-      return canDelete;
     });
 
     if (!this.canDeleteUserHomepageByConfig()) {
@@ -2729,8 +2738,18 @@ class PageService implements IPageService {
     return;
   }
 
-  async emptyTrashPage(user, options = {}, activityParameters) {
-    const page = { path: '/trash' };
+  /**
+   * Completely delete the given trashed pages. The caller judges the deletion
+   * authority; a page that is no longer in the trash or not editable by the
+   * user is left as it is.
+   */
+  async emptyTrashPage(
+    user,
+    activityParameters,
+    pageIdsToDelete: ObjectIdLike[],
+  ): Promise<number> {
+    const Page = mongoose.model<IPage, PageModel>('Page');
+    const trashPage = { path: '/trash' };
 
     const parameters = {
       ...activityParameters,
@@ -2745,25 +2764,35 @@ class PageService implements IPageService {
     const activity =
       await this.crowi.activityService.createActivity(parameters);
 
-    const descendantsSubscribedSets = new Set();
-    const pages = await this.deleteCompletelyDescendantsWithStream(
-      page,
-      user,
-      options,
-      true,
-      descendantsSubscribedSets,
-    );
-    const descendantsSubscribedUsers = Array.from(
-      descendantsSubscribedSets,
-    ) as Ref<IUser>[];
+    // Look each batch up right before deleting it, so a page restored from
+    // the trash meanwhile is no longer matched.
+    const subscribedUsers = new Set<Ref<IUser>>();
+    let nDeletedNonEmptyPages = 0;
+    for (let i = 0; i < pageIdsToDelete.length; i += BULK_REINDEX_SIZE) {
+      const builder = new Page.PageQueryBuilder(Page.find(), true)
+        .addConditionAsRootOrNotOnTree()
+        .addConditionToListOnlyDescendants(trashPage.path)
+        .addConditionToListByPageIdsArray(
+          pageIdsToDelete.slice(i, i + BULK_REINDEX_SIZE),
+        );
+      await Page.addConditionToFilteringByViewerToEdit(builder, user);
+      const batch = await builder.query.lean().exec();
+      if (batch.length === 0) continue;
+
+      await this.deleteMultipleCompletely(batch, user);
+      nDeletedNonEmptyPages += batch.filter((p) => !p.isEmpty).length;
+      for (const subscribedUser of await Subscription.getSubscriptions(batch)) {
+        subscribedUsers.add(subscribedUser);
+      }
+    }
 
     const preNotify = preNotifyService.generatePreNotify(activity, async () => {
-      return descendantsSubscribedUsers;
+      return Array.from(subscribedUsers);
     });
 
-    this.activityEvent.emit('updated', activity, page, preNotify);
+    this.activityEvent.emit('updated', activity, trashPage, preNotify);
 
-    return pages;
+    return nDeletedNonEmptyPages;
   }
 
   /**

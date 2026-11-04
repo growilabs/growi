@@ -3,6 +3,7 @@ import { extension as PageLinkExtension } from '~/features/backlinks/server/mode
 import { extension as CommentExtension } from '~/features/comment/server';
 import { extension as MastraRefreshedModelCatalogExtension } from '~/features/mastra/server/models/refreshed-model-catalog';
 import { extension as PageBulkExportJobExtension } from '~/features/page-bulk-export/server/models/page-bulk-export-job';
+import { extension as PageBulkExportPageSnapshotExtension } from '~/features/page-bulk-export/server/models/page-bulk-export-page-snapshot';
 import {
   PrismaClient as OriginalPrismaClient,
   Prisma,
@@ -227,6 +228,7 @@ export const createPrisma = (datasourceUrl?: string) =>
     .$extends(ExternalAccountExtension)
     .$extends(MastraRefreshedModelCatalogExtension)
     .$extends(PageBulkExportJobExtension)
+    .$extends(PageBulkExportPageSnapshotExtension)
     .$extends(PageLinkExtension)
     .$extends(PageRedirectExtension)
     .$extends(RevisionExtension)
