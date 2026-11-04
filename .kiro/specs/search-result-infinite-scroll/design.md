@@ -233,6 +233,7 @@ stateDiagram-v2
 | 4.4 | 選択件数更新（checkbox 変更時＋append 時） | SearchPageBase, SearchPage | onSelectedPagesByCheckboxesChanged | 追加読込 |
 | 4.5 | 一部選択で indeterminate（append 追従） | SearchPageBase, SearchPage, OperateAllControl | loaded 件数変化で再通知 → setIndeterminate | 追加読込 |
 | 4.6 | 全選択で checked（append 追従） | SearchPageBase, SearchPage, OperateAllControl | loaded 件数変化で再通知 → select | 追加読込 |
+| 4.7 | 選択件数を読み込み済み件数と並べて表示 | SearchPage | selectedCount / 累積 pages の件数 | 追加読込 |
 | 5.1 | 選択済み読込分のみ削除対象 | usePageDeleteModalForBulkDeletion | pages 引数一般化 | リセット |
 | 5.2 | 0件時は削除無効 | SearchPage | disabled=selectedCount===0 | — |
 | 5.3 | 削除後は先頭から再取得 | SearchPage | setSize(1)+mutate | リセット |
@@ -257,6 +258,7 @@ stateDiagram-v2
 | 11.3 | 削除行（と配下）を除去 | SearchResultList, SearchPage | onItemMutated → applySearchItemMutation | — |
 | 11.4 | プレビュー中の削除でプレビュークリア | SearchResultList, SearchPageBase | onPreviewedPageDeleted | — |
 | 11.5 | 先頭から取り直さない | SearchPage | mutateSearchInfiniteChunks（revalidate: false） | — |
+| 11.6 | 削除した選択済みの行を選択件数から除く | SearchPageBase | pages 変化時に Set を pages に揃えてから再通知 | — |
 
 ## Components and Interfaces
 
@@ -361,12 +363,13 @@ export const mergeInfiniteSearchResult = (
 | Field | Detail |
 |-------|--------|
 | Intent | 累積 `pages` と `resetKey` を受け、選択・全選択・右ペインプレビューを提供。infinite/legacy 両経路をデータ駆動で描き分ける |
-| Requirements | 2.1, 4.1–4.6, 6.1–6.3, 7.2 |
+| Requirements | 2.1, 4.1–4.6, 6.1–6.3, 7.2, 11.6 |
 
 **Responsibilities & Constraints**
 - **選択クリア effect**（現 L157-172）の依存を `[pages]` → **`[resetKey]`** に変更する。選択クリアはデータ非依存（空 Set 化＋件数0通知）なので resetKey 一本で足りる。append（`resetKey` 不変）では発火せず選択を維持（4.3）、新規検索/条件変更（`resetKey` 変化）でのみクリア（7.2）。
 - **プレビュー初期選択 effect**（現 L147-154）は `pages[0]` を読む**データ依存**処理のため、`[resetKey]` 単純付け替えは不可（resetKey 変化時点で新 `pages` は未到着）。**2段構成**にする: (a) `resetKey` 変化で即座にプレビューをクリア、(b) 「当該 `resetKey` に対する最初のデータ到着時に一度だけ」`pages[0]` を選択する。実装は直近適用済み `resetKey` を `ref` で記録し、未適用かつ `pages.length > 0` のとき先頭を選択して ref を更新する。これにより新規検索で先頭表示（6.1）、append でプレビュー維持（6.3）を両立する。
 - **全選択ヘッダ状態の append 追従**: select-all の checked/indeterminate は現状 checkbox 変更時にのみ `onSelectedPagesByCheckboxesChanged` 経由で再計算される。append では checkbox イベントが発火しないため、全件選択済み状態でスクロール追記すると実態は「一部選択」でもヘッダが checked のまま残る。これを防ぐため、**累積件数（`pages.length`）変化を契機に、現在の選択件数と累積件数を親へ再通知する effect を追加**する（`resetKey` 不変でも loaded 件数変化時は再計算）。これにより 4.5（一部選択→indeterminate）/4.6（全選択→checked）を append 後も満たす。
+- この再通知の前に、`pages` から消えた ID を選択 Set から除く。行メニューの削除（配下を含む）で一覧から消えた結果が、選択件数に残らないようにするため（11.6）
 - `infiniteScroll` prop が渡された場合は `SearchResultList` を `InfiniteScroll` でラップして描画（`searchPager` は描画しない）。渡されない場合は従来どおり `searchPager`（番号ページャ）を描画（legacy 非回帰）
 - `selectAll` は与えられた `pages`（infinite では累積）を走査するため、実装変更なしで「読み込み済み全件」を選択する
 - pages が空/未取得の場合のプレビュークリアは維持
@@ -497,7 +500,7 @@ export const usePageDeleteModalForBulkDeletion: (
 | Field | Detail |
 |-------|--------|
 | Intent | infinite scroll 状態（`useSWRINFxSearch` の `size`/`error`）を統括し、`SearchPageBase` へ配線する |
-| Requirements | 1.1–1.6, 2.1–2.2, 3.2, 5.2–5.3, 7.1 |
+| Requirements | 1.1–1.6, 2.1–2.2, 3.2, 4.7, 5.2–5.3, 7.1 |
 
 **Responsibilities & Constraints**
 - `useSWRINFxSearch` を用い、`mergeInfiniteSearchResult(data)` で累積 `pages`/`isReachingEnd`/`isEmpty` を導出
@@ -507,6 +510,7 @@ export const usePageDeleteModalForBulkDeletion: (
 - 検索実行/条件変更時: `setSize(1)` + `mutate()`（累積破棄・先頭再読込。同じ条件での再検索でも取り直す）
 - 一括削除完了時: `setSize(1)` + `mutate()` + `resetAfterMutation()`（選択クリア**かつ右ペインプレビューのクリア**）
 - 削除ボタンは `selectedCount === 0` で無効
+- 一括削除エリアに、選択件数と読み込み済み件数を並べて表示する。「全選択」が読み込み済みの結果だけを対象にすることを示すため（4.7）
 - 行単位のリネーム/削除（`SearchResultList` 経由）は `mutateSearching()` に加え、`onItemMutated` で変更内容（`SearchItemMutation`）を受け取り、**再取得せず**読込済みチャンクのキャッシュを直接書き換える（`mutateSearchInfiniteChunks` + `applySearchItemMutation`、`revalidate: false`）。`mutateSearching()` のフィルタ付き `mutate` は `$inf$` 接頭辞キーを対象外とするため単独では効かず、引数なし `mutate()` での再検証は読込済み全チャンクを再取得してしまう（A-1）
   - 削除: 該当行を除去。再帰削除では子孫（`path + '/'` 前方一致）も除去
   - リネーム: 該当行と子孫の `path` を新パスへ置換し、旧パス由来の `highlightedPath` を破棄（新パスは `OnRenamedFunction` の第 2 引数で受け取る）
