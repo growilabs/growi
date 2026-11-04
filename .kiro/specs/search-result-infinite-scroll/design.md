@@ -53,6 +53,7 @@
 - 既存 `InfiniteScroll`（`src/client/components/InfiniteScroll.tsx`）: `SWRInfiniteResponse` を受けて IntersectionObserver で `setSize` を駆動
 - `swr/infinite` の `useSWRInfinite`
 - `@tanstack/react-virtual` の `useVirtualizer`（既存依存。`ItemsTree` と同じ使い方）
+- 検索フィルタ機能（#11597）: URL の `?q=` を検索条件の唯一の情報源とし、フィルタは `author:` 等の演算子として `?q=` に入る。フィルタ UI・`?q=` の組み立て・履歴の扱いはこの機能に従い、本スペックでは変更しない
 - `SearchResultContent` / `OperateAllControl`（既存、変更なし）
 - `SearchResultList`（既存。行ごとのリネーム/削除を親へ伝える `onItemMutated` と、プレビュー中の行削除を伝える `onPreviewedPageDeleted` の任意 props を追加。追補 #190441 で描画を仮想化）
 - `PageListItemL`（既存。追補 #190441 で任意 props のみ追加）
@@ -207,7 +208,7 @@ stateDiagram-v2
     Loading --> Accumulating: 先頭チャンク取得
     Accumulating --> Accumulating: スクロールで追記 (resetKey 不変 → 選択/プレビュー維持)
     Accumulating --> Reset: 条件変更 (resetKey 変化)
-    Reset --> Loading: 累積破棄 setSize(1) / 選択クリア / 先頭プレビュー
+    Reset --> Loading: 累積破棄 setSize(1) + mutate / 選択クリア / 先頭プレビュー
     Accumulating --> Reset: 一括削除完了 (setSize(1) + mutate + resetAfterMutation)
 ```
 
@@ -238,7 +239,7 @@ stateDiagram-v2
 | 6.1 | 新規検索で先頭プレビュー | SearchPageBase | 2段構成: resetKey 変化でクリア＋初回データ到着で先頭選択 | リセット |
 | 6.2 | 選択結果をプレビュー | SearchPageBase | onPageSelected | — |
 | 6.3 | 追記でプレビュー維持 | SearchPageBase | 適用済み resetKey 記録で再選択を抑止 | 追加読込 |
-| 7.1 | 条件変更で累積破棄・先頭再読込 | SearchPage | setSize(1) | リセット |
+| 7.1 | 条件変更で累積破棄・先頭再読込 | SearchPage | setSize(1) + mutate | リセット |
 | 7.2 | 条件変更で選択クリア | SearchPageBase | resetKey 変化で選択リセット | リセット |
 | 8.1 | 表示領域＋前後のみ描画 | SearchResultList | useVirtualizer（overscan） | 仮想化 |
 | 8.2 | 描画行数を一定に保つ | SearchResultList | getVirtualItems | 仮想化 |
@@ -282,6 +283,7 @@ stateDiagram-v2
 - SWR key の名前空間を `useSWRxSearch`（`'/search'`）と衝突させないため `'/search/infinite'` を用いる
 - チャンクサイズは `showPageLimitationL > 0 ? showPageLimitationL : DEFAULT_SEARCH_CHUNK_SIZE(20)` の固定値（`SearchPage` で算出し、フック側も `limit > 0 ? limit : 20` で防御）（セッション内一定・ユーザー変更手段なし）。`showPageLimitationL` の atom は `number` 非 nullable・config 既定 **50** のため、admin 未設定でも実効チャンクは 50。`DEFAULT_SEARCH_CHUNK_SIZE(20)` は `limit <= 0` に対する防御的既定で、現行 config では未到達。定数は `stores/search.tsx` に集約し SearchPage と共有（R-1）
 - SWR key には `limit`（チャンクサイズ）と `nqName` を含める（fetcher が参照する値はすべて key に入れ、異なる値がキャッシュを共有しないようにする。`offset` はページごとに導出するため除外）
+- `SearchPage` は構造化フィルタ（`filters`）に空を渡す（フィルタは `?q=` に入っているため、渡すと同じ条件が二重に付く）
 - offset は `pageIndex * chunkSize`。前ページの `meta.hitsCount`（ES が返した件数。MongoDB 側で欠落したページを除外する前の件数）が `chunkSize` 未満なら以降の key を `null` にして過剰取得を止める（`data.length` は除外後の件数なので途中で `chunkSize` を下回り得るため使わない）
 
 **Contracts**: State [x] / Service [x]（pure key 関数）
@@ -312,7 +314,7 @@ export const useSWRINFxSearch = (
   configurations: Omit<ISearchConfigurations, 'offset'>,
 ): SWRInfiniteResponse<IFormattedSearchResult, Error>;
 ```
-- Preconditions: `keyword` が null/空なら SWR は無効（fetch しない）
+- Preconditions: `keyword` が null/空なら、`filters` の有無にかかわらず SWR は無効（fetch しない）。フィルタは `?q=` に入れて渡す前提
 - Postconditions: `data` は取得済みページの配列（各要素が 1 チャンク分の `IFormattedSearchResult`）
 - Invariants: `data[0].meta.total` は全ページで一貫（検索条件が同じ間）
 
@@ -499,9 +501,10 @@ export const usePageDeleteModalForBulkDeletion: (
 
 **Responsibilities & Constraints**
 - `useSWRINFxSearch` を用い、`mergeInfiniteSearchResult(data)` で累積 `pages`/`isReachingEnd`/`isEmpty` を導出
-- `resetKey` を検索アイデンティティ（`keyword` + `sort` + `order` + フィルタ）から生成（offset を含めない＝append で不変）
+- `resetKey` を検索アイデンティティ（`?q=` そのままの `keyword` + 並び替え等の条件）から生成（offset を含めない＝append で不変）。フィルタも `?q=` に含まれるため、フィルタだけの変更でもリセットされる（7.1/7.2）
+- 一覧のハイライトには演算子を除いたキーワードを渡す（演算子をハイライトしないため）
 - `PaginationWrapper`/`searchPager` を撤去し、`infiniteScroll` prop（`isReachingEnd = merged.isReachingEnd || hasError || reachedResultWindowLimit`）を渡す。`reachedResultWindowLimit` は次チャンクの `(読込済みチャンク数 + 1) * chunkSize` が Elasticsearch の `max_result_window`（既定 10000、`ES_MAX_RESULT_WINDOW`）を超えるときに true とし、上限到達後に毎回失敗する追加読込を防ぐ（P2-4）
-- 検索実行/条件変更時: `setSize(1)`（累積破棄・先頭再読込）
+- 検索実行/条件変更時: `setSize(1)` + `mutate()`（累積破棄・先頭再読込。同じ条件での再検索でも取り直す）
 - 一括削除完了時: `setSize(1)` + `mutate()` + `resetAfterMutation()`（選択クリア**かつ右ペインプレビューのクリア**）
 - 削除ボタンは `selectedCount === 0` で無効
 - 行単位のリネーム/削除（`SearchResultList` 経由）は `mutateSearching()` に加え、`onItemMutated` で変更内容（`SearchItemMutation`）を受け取り、**再取得せず**読込済みチャンクのキャッシュを直接書き換える（`mutateSearchInfiniteChunks` + `applySearchItemMutation`、`revalidate: false`）。`mutateSearching()` のフィルタ付き `mutate` は `$inf$` 接頭辞キーを対象外とするため単独では効かず、引数なし `mutate()` での再検証は読込済み全チャンクを再取得してしまう（A-1）
