@@ -100,7 +100,7 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 | 日本語 PDF の検索の品質 (pypdfium2 と WASM の PDFium の差) | 未検証 | ベンチマークと PDF のライブラリの選定で測る (Req 2.12、11.3) |
 | Follow-ups のどれを直すか | 未決 | 取り込みの前にユーザーが決める (Req 12.6) |
 | テスト用のファイルの作り方 | 決定 (すべて Node で作り直す。旧形式の DOC / PPT だけは commit 済みのものを使う) | ユーザー判断 (design.md の D5) |
-| Node で作れないテスト用のファイル (暗号化した Office と PDF、XLS、細工した ZIP) | 実測済み: 作れないものは無い (9 節)。部品の採用はユーザー判断を待つ (9.8) | 試作 (design.md の T7)。扱いはタスク 2.2 でユーザーが決める |
+| Node で作れないテスト用のファイル (暗号化した Office と PDF、XLS、細工した ZIP) | 決定: 作れないものは無い (9 節)。暗号化した Office は `officecrypto-tool` を採る (9.10、2026-11-04) | なし |
 
 ## 6. 計測の結果 (design フェーズ)
 
@@ -679,3 +679,9 @@ node src/bmp-iso.mjs out/bmp-iso-node.json && $PY py/bmp_iso.py out/bmp-iso-node
 | (d) 両 anydoc | `15 SAME` |
 | (e) | `iconv-lite iso-2022-jp: Encoding not recognized`、`10 / 10`、`{'same': 7001, 'both_reject': 56474, 'node_only_reject': 8, 'python_only_reject': 5, 'different_bytes': 0}` |
 | (f) | `50 passed` (xlsx_split)、`65 passed` (pptx_split)、`599 passed` (conversion の全体) |
+
+### 9.10 ユーザーの判断 (タスク 2.2、2026-11-04)
+
+- 9.1 のとおり、Node で作れないテスト用のファイルは無かったので、ファイルごとに扱いを決める必要はなかった。
+- 残っていた判断は、暗号化した Office (DOCX / XLSX / PPTX) の作り方だけだった。ユーザーは **`officecrypto-tool` (0.0.19、MIT、作者 1 人) を採る** と決めた。テスト専用の依存にして、本番の image には入れない。`cfb` が OLE の FAT の未使用欄を埋める問題は、9.7 の 11 行の修正で直す (2.3 / 2.4 で必ず入れる)。選ばなかった案: 暗号化を自前で実装する (150〜250 行、未検証)、作ったファイルを出所つきで commit する。
+- ISO-2022-JP の 13 字 (9.7) は、判断を求めずに「2.6 のコーパスでは使わない」と扱う (〜 U+301C と ～ U+FF5E のどちらも使わない)。使う必要が出たら、そのときにユーザーに諮る。
