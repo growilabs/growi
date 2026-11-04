@@ -457,8 +457,8 @@ confirms B1's index choice. (Not a hard dependency — either order is correct.)
 administrator from the admin settings with a chosen scope (all pages, the newest N, or the pages
 edited after a date), picked up by a `CronService` poll and run as a self-paced loop (rest
 proportional to work, per page), that populates rows for pages that existed before the feature.
-Nothing starts on its own and there are no start environment variables. The GROWI.cloud start policy
-is an open decision (design.md's Delivery decision); the control is the same on cloud for now.
+Nothing starts on its own and there are no start environment variables. The control is the same on GROWI.cloud
+as on-prem, bounded by the per-app limits only (design.md's Delivery decision).
 Reuses the page-bulk-export scaffolding (`CronService` base, `createBatchStream`, cursor→resume
 skeleton) and the B1 extractor; the new code is the in-memory `{path→_id}` map, the per-page upsert
 sink (Prisma raw commands; `pagelinks` has no `Model.bulkWrite`), the paced loop, the atomic claim, the coverage record, and the admin endpoints and section.
@@ -529,7 +529,7 @@ Independent of B4/B5.
     duplicates, no second loop starts while one is running, and progress is emitted on the admin
     channel; the page-rate floor is never exceeded on a seeded set of tiny pages, and for each scope (all, newest N, since a date) only the pages in the range are processed, and a
     second run over a wider scope processes only the gap and ends with the right coverage
-  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 4.9_
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.6, 4.7, 4.9_
   - _Boundary: PageLinkBackfillCron_
   - _Depends: B3.1, B1.3, B1.2_
 
@@ -566,7 +566,7 @@ Independent of B4/B5.
     operations per second, bytes written, oplog growth and replication delay, with many small
     pages as well as typical ones, at the default duty and with the page-rate floor. From the
     per-app duration across a realistic page-count spread, estimate how many apps may
-    overlap (input to the open GROWI.cloud decision in design.md), and decide whether the fixed limits suffice or the app needs to back
+    overlap (the cloud control has no other bound, design.md), and decide whether the fixed limits suffice or the app needs to back
     off when its own database round trips slow down (design.md's fallback). Agree the success numbers before running
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7, 4.9_
   - _Depends: B3.2_

@@ -373,7 +373,7 @@ other upsert.
 | 4.3 | Re-run / restart produces no duplicates | unique `{fromPage,toPath}` + upsert; resumable progress marker | Backfill flow |
 | 4.4 | Limited backfill is complete for the pages in scope and says so | run scope resolved to a cutoff (`since` / newest N); `coverage` / `coveredSince` on the job; backlinks panel shows a partial-index state | Backfill flow |
 | 4.5 | Admin starts it from the admin settings and picks the scope | admin start endpoint (`adminRequired`) writes `requestedScope`; `BacklinksBackfillAdmin` scope picker | Backfill flow |
-| 4.6 | Progress shown while running; no second run | admin Socket.IO progress; start rejected while a run is active (atomic claim) | Backfill flow |
+| 4.6 | Progress shown while running; no second run | admin Socket.IO progress; start endpoint rejects while a run is active (status check); the atomic claim keeps one loop running | Backfill flow |
 | 4.7 | Partial coverage shown; wider re-run possible | `coverage` / `coveredSince` on the job; a run walks only the uncovered gap | Backfill flow |
 | 4.8 | Full coverage stated; no start offered | `coverage: all` -> status line only; start endpoint rejects | Backfill flow |
 | 4.9 | Admin can stop a run and continue it | `stopRequested` checked at each checkpoint; `stopped` status keeps the marker; resume re-requests the stored run | Backfill flow |
@@ -398,7 +398,7 @@ other upsert.
 | getBacklinksHandlerFactory (routes/backlinks.ts) | API | Read endpoint — viewed-page gate, incoming backlinks **+ forward-link health** | 1.1,1.7,2.x,6.4 | apiv3 middleware (P0), PageLinkService (P0), isPageReadableByViewer (P0) | API |
 | useSWRxBacklinks | Client store | Fetch backlinks **+ link targets** | 1.1,6.4 | apiv3Get (P0) | Service |
 | BacklinksPanel / LinkTargetsSection / BacklinkListItem | UI | Render list, empty state, link-status notice, target-state badge | 1.1,1.7,1.8,6.4 | useSWRxBacklinks, PagePathLabel (P1) | — |
-| PageLinkBackfillCron | Batch | Populate pre-existing pages (self-paced, resumable, throttled, online) | 4.1,4.2,4.3,4.4 | CronService (P0), extractInternalLinkPaths (P0), Revision, in-memory path→id map (P0) | Batch, State |
+| PageLinkBackfillCron | Batch | Populate pre-existing pages (self-paced, resumable, throttled, online) | 4.1,4.2,4.3,4.4,4.6,4.7,4.9 | CronService (P0), extractInternalLinkPaths (P0), Revision, in-memory path→id map (P0) | Batch, State |
 | backlinks-backfill-admin (routes) / BacklinksBackfillAdmin | API / UI | Start, observe, stop and resume the backfill from the admin settings | 4.5,4.6,4.7,4.8,4.9,4.10 | apiv3 middleware incl. `adminRequired` (P0), PageLinkBackfillJob (P0), admin Socket.IO channel (P1) | API |
 
 ### Data / Server logic
@@ -869,7 +869,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 | Field | Detail |
 |-------|--------|
 | Intent | Online, administrator-started backfill of `PageLink` rows for pre-existing pages | 
-| Requirements | 4.1, 4.2, 4.3, 4.4 |
+| Requirements | 4.1, 4.2, 4.3, 4.4, 4.6, 4.7, 4.9 |
 
 **Responsibilities & Constraints**
 - Runs as a **self-paced loop**, not a chunk per cron tick. The `CronService` (node-cron) poll only
@@ -898,7 +898,7 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   duty cycle.
 - **Single-page overshoot (open — settle in B3.2)**: the per-page rest cannot interrupt a parse, so one
   large body stalls the thread for its whole parse time (measured on the B2.2 pipeline: ~88 ms at
-  32.6 KiB, ~1.1 s at 333 KiB — a single stall, however low the configured duty). The rest that follows a large page (about 2.7 s at 25% after an 850 ms parse) is harmless: the
+  32.6 KiB, ~1.1 s at 333 KiB — a single stall, however low the configured duty). The rest that follows a large page (about 2.6 s at 25% after an 850 ms parse) is harmless: the
   stall is the problem, and only a check made **before parsing** bounds it, and body size is that check: parse time is
   linear in size (≈1.5 ms/KiB for text, ≈2.5 ms/KiB for table-dense bodies, ≈0.4 ms/KiB for code
   and draw.io blocks), so 1 s is about 700 KiB of text or about 400 KiB of tables (see research.md). The
@@ -972,13 +972,12 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
 - Progress/observability: emit processed / `runTotal` over the existing admin Socket.IO channel (as the
   Elasticsearch reindex does).
 
-**Delivery decision (proposed): throttled, started by an administrator from the admin settings, with the scope chosen at start.**
+**Delivery decision: throttled, started by an administrator from the admin settings, with the scope chosen at start.**
 - **Started by an administrator, on-prem and GROWI.cloud alike.** The admin settings offer a start
   control with a scope: all pages, the newest N pages (`maxPages`), or the pages edited after a
   given date (`since`). Nothing starts on its own: an upgrade has never run a heavy job and admins do
   not expect one, so a wiki reads "not started" until someone starts it. There are no start-flag,
-  start-window or scope-limit environment variables. For now the control is the same on GROWI.cloud;
-  that decision is open (below).
+  start-window or scope-limit environment variables. The control is the same on GROWI.cloud (below).
 - **Start request.** The start endpoint (apiv3, `loginRequired` + `adminRequired`) writes the request
   to the job document (`requestedScope`, `requestedAt`, status `requested`) and does not run the loop
   itself. The poll's next idle tick claims it atomically, so the same path also serves resume after a
@@ -1052,15 +1051,13 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     checkpoint interval (idempotent upserts), the same path as crash recovery. A new start with a
     scope resets the marker instead. A `stopped` document is not picked up by the poll.
   - Stopping never changes coverage: `coveredSince` moves only on completion.
-- **GROWI.cloud (open — decision pending).** The control is available on GROWI.cloud as on-prem for
-  now. GROWI.cloud apps share a MongoDB, and a duty cycle bounds one app's busy share, not the total:
-  many customer admins starting a full backfill at about the same time would load the shared cluster
-  at (apps × duty). The candidates are (1) hide the control on cloud and keep an infra-driven start
-  there (a start flag and a uniform start window with a derived per-app offset, plus a bounded scope
-  set by infra), (2) show the control with a scope bounded by infra config, (3) show it unbounded and
-  rely on the per-app limits below and the latency-backoff fallback. Nothing in the job depends on
-  the choice: the request and the scope live in the same document either way. The earlier proposal
-  for (1) is recorded in research.md.
+- **GROWI.cloud: the same control as on-prem, bounded by the per-app limits only.** GROWI.cloud apps
+  share a MongoDB, and a duty cycle bounds one app's busy share, not the total: many customer admins
+  starting a full backfill at about the same time would load the shared cluster at (apps × duty).
+  The start control is shown on cloud exactly as on-prem, with no cloud-specific scope bound, start
+  window or infra-driven start. The load is bounded by each app's own limits (below) and, if B3.4
+  shows they are not enough, by the latency-backoff fallback. Nothing in the job depends on this
+  choice: the request and the scope live in the same document either way.
 - **Fallback if the fixed limits are not enough: latency backoff in the app.** The loop already
   times each page's database round trips; when they rise above a baseline it lengthens its rest,
   and shortens it again as they recover. It uses only the tenant's own connection, so it needs
