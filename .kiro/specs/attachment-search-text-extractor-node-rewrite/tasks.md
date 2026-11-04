@@ -66,7 +66,7 @@
   - devcontainer の Elasticsearch で kuromoji の解析器が使えるかを確かめ、使える場合は正解の語句で検索して見つかる割合も測る。使えない場合はその旨を research.md に書く
   - 正解と出力を手で合わせた小さな例で、道具の採点が正しいことを確かめるテストが通る
   - _Requirements: 2.9, 2.10, 2.15_
-- [ ] 2.8 Python 版でベースラインを測る
+- [x] 2.8 Python 版でベースラインを測る
   - いまの Python 版を devcontainer で起動し、2.7 の道具を向けて測る
   - 形式ごと・指標ごとのベースラインが research.md にある
   - _Requirements: 2.11, 6.8_

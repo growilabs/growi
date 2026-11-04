@@ -1,0 +1,2328 @@
+{
+  "label": "python-baseline",
+  "service": "http://127.0.0.1:18000",
+  "startedAt": "2026-11-04T17:19:57.474Z",
+  "finishedAt": "2026-11-04T17:19:58.960Z",
+  "corpus": [
+    {
+      "fileName": "pdf-ja-horizontal.pdf",
+      "format": "pdf",
+      "bytes": 26012,
+      "sha256": "8a757369271d0348202f5df3c9822d41a74ab3603a46752715d4628f49411a13"
+    },
+    {
+      "fileName": "pdf-ja-vertical.pdf",
+      "format": "pdf",
+      "bytes": 20313,
+      "sha256": "28d642ad0fc0217f55b26fc1b1b1c6cd98dbcbae6f63ed2c4752a5f38c188892"
+    },
+    {
+      "fileName": "pdf-ja-line-break.pdf",
+      "format": "pdf",
+      "bytes": 18389,
+      "sha256": "9c9a4f216fd43a0fa2748f004b44ebb65577c1a7be9de1b76974871f1d4ab1b7"
+    },
+    {
+      "fileName": "txt-shift-jis.txt",
+      "format": "txt",
+      "bytes": 260,
+      "sha256": "8dcb4f2535a10f08abbc4b122a56099fec0948a21d10884ef4a775f5fe1ab79b"
+    },
+    {
+      "fileName": "txt-euc-jp.txt",
+      "format": "txt",
+      "bytes": 261,
+      "sha256": "552b57d0f8fba221171d3854e369130556bd115cb2c8ba1f9aeea76a7891f468"
+    },
+    {
+      "fileName": "txt-iso-2022-jp.txt",
+      "format": "txt",
+      "bytes": 255,
+      "sha256": "6288943109ef5447f52ed226dfe7314910534de5157c19835ff49adefaf30cd8"
+    },
+    {
+      "fileName": "txt-utf-8-bom.txt",
+      "format": "txt",
+      "bytes": 194,
+      "sha256": "c12a69432490aaa7b375c5170d149497a8edc2d3a9265b3c5b9920316b48b507"
+    },
+    {
+      "fileName": "txt-utf-16le-bom.txt",
+      "format": "txt",
+      "bytes": 160,
+      "sha256": "665e82c8384d48538b1733e38e4c9b9d3f708dfbffe590e5d5a14d757ded3a2b"
+    },
+    {
+      "fileName": "txt-utf-16be-bom.txt",
+      "format": "txt",
+      "bytes": 160,
+      "sha256": "297c6c9cfcd926ecf221e53a996a83de0e6eac5c7b0eec1a5f9066102700cc20"
+    },
+    {
+      "fileName": "txt-utf-8.txt",
+      "format": "txt",
+      "bytes": 195,
+      "sha256": "968d50a62e9d6b162e5839e75cb27481d305fe954e505758e2c0acbfd7a9135e"
+    },
+    {
+      "fileName": "csv-utf-8.csv",
+      "format": "csv",
+      "bytes": 154,
+      "sha256": "7dc310081490ce34dbeb6c2576d5ceaab6931c907d6046c5344693caa7dc1140"
+    },
+    {
+      "fileName": "csv-cp932.csv",
+      "format": "csv",
+      "bytes": 143,
+      "sha256": "9fb61d3dd64c78395eaae3911b1058ec6c2056ac5917fc08be8d137833ee1906"
+    },
+    {
+      "fileName": "html-shift-jis-script-style.html",
+      "format": "html",
+      "bytes": 421,
+      "sha256": "7d4fdb5ee5374ca0e152282d87aae2d14d56c68e420b5ca55b8426b67b97c611"
+    },
+    {
+      "fileName": "html-euc-jp-http-equiv.html",
+      "format": "html",
+      "bytes": 355,
+      "sha256": "b7d221d6f191f282f384b9fb825895c56f9d0f577be7817ddeb38b94ccd57d99"
+    },
+    {
+      "fileName": "docx-ja.docx",
+      "format": "docx",
+      "bytes": 1820,
+      "sha256": "7e61b1722f4a3e39267688c5ea425376ef9852261e9741761e37b4b976275461"
+    },
+    {
+      "fileName": "xlsx-ja-multi-sheet.xlsx",
+      "format": "xlsx",
+      "bytes": 2644,
+      "sha256": "fc2dabeab39d68b4e6a431deef8b6e90d66dec54ae58e0f69bcf9c202f56c010"
+    },
+    {
+      "fileName": "pptx-ja-multi-slide.pptx",
+      "format": "pptx",
+      "bytes": 6409,
+      "sha256": "c3f7bff5b30476fb2ccfef0af5dc551d5165f2f385e699e7d3939cc954cda3c6"
+    },
+    {
+      "fileName": "xls-ja.xls",
+      "format": "xls",
+      "bytes": 3072,
+      "sha256": "f0fab1d53d8699c64e77af6665d9802e388393b6a0daeeb9b0fd013ca45f2139"
+    },
+    {
+      "fileName": "odt-ja.odt",
+      "format": "odt",
+      "bytes": 875,
+      "sha256": "cfba3b575119d3f6309a3140af6e39a4f05f13b6d4b94ffc9690200914eaf477"
+    },
+    {
+      "fileName": "ods-ja.ods",
+      "format": "ods",
+      "bytes": 873,
+      "sha256": "8f1dbb5d976b628bbbe60ccc36d035176e3f2c5331ee50270391678179940665"
+    },
+    {
+      "fileName": "odp-ja.odp",
+      "format": "odp",
+      "bytes": 882,
+      "sha256": "606e8346fba09213ae708bdf18a8d35f73fe158ab2cdddd7f6a0281d893ee8ea"
+    },
+    {
+      "fileName": "doc-legacy.doc",
+      "format": "doc",
+      "bytes": 19456,
+      "sha256": "67d7fe8e0555c16516354498a5935f24eeef90beb5efbf526f93a1d6c734da43"
+    },
+    {
+      "fileName": "ppt-legacy.ppt",
+      "format": "ppt",
+      "bytes": 11264,
+      "sha256": "70c63540abc705da64764a9bcb5380bde9655264c2c3f047c3ee4b7dded3de3f"
+    }
+  ],
+  "formats": [
+    {
+      "format": "pdf",
+      "documents": 3,
+      "failed": 0,
+      "phrases": 21,
+      "exact": 21,
+      "found": 21,
+      "pageCountCorrect": 3,
+      "pageElements": 6,
+      "pageElementsCorrect": 6,
+      "sheetNames": null,
+      "atExpectedPosition": 21,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "docx",
+      "documents": 1,
+      "failed": 0,
+      "phrases": 6,
+      "exact": 6,
+      "found": 6,
+      "pageCountCorrect": 1,
+      "pageElements": 1,
+      "pageElementsCorrect": 1,
+      "sheetNames": null,
+      "atExpectedPosition": 6,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "xlsx",
+      "documents": 1,
+      "failed": 0,
+      "phrases": 6,
+      "exact": 6,
+      "found": 6,
+      "pageCountCorrect": 1,
+      "pageElements": 3,
+      "pageElementsCorrect": 3,
+      "sheetNames": {
+        "correct": 3,
+        "total": 3
+      },
+      "atExpectedPosition": 6,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "pptx",
+      "documents": 1,
+      "failed": 0,
+      "phrases": 7,
+      "exact": 7,
+      "found": 7,
+      "pageCountCorrect": 1,
+      "pageElements": 3,
+      "pageElementsCorrect": 3,
+      "sheetNames": null,
+      "atExpectedPosition": 7,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "xls",
+      "documents": 1,
+      "failed": 0,
+      "phrases": 4,
+      "exact": 4,
+      "found": 4,
+      "pageCountCorrect": 1,
+      "pageElements": 1,
+      "pageElementsCorrect": 1,
+      "sheetNames": null,
+      "atExpectedPosition": 4,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "csv",
+      "documents": 2,
+      "failed": 0,
+      "phrases": 12,
+      "exact": 12,
+      "found": 12,
+      "pageCountCorrect": 2,
+      "pageElements": 2,
+      "pageElementsCorrect": 2,
+      "sheetNames": null,
+      "atExpectedPosition": 12,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "html",
+      "documents": 2,
+      "failed": 0,
+      "phrases": 9,
+      "exact": 9,
+      "found": 9,
+      "pageCountCorrect": 2,
+      "pageElements": 2,
+      "pageElementsCorrect": 2,
+      "sheetNames": null,
+      "atExpectedPosition": 9,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 2,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "txt",
+      "documents": 7,
+      "failed": 0,
+      "phrases": 41,
+      "exact": 41,
+      "found": 41,
+      "pageCountCorrect": 7,
+      "pageElements": 7,
+      "pageElementsCorrect": 7,
+      "sheetNames": null,
+      "atExpectedPosition": 41,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "doc",
+      "documents": 1,
+      "failed": 0,
+      "phrases": 2,
+      "exact": 2,
+      "found": 2,
+      "pageCountCorrect": 1,
+      "pageElements": 1,
+      "pageElementsCorrect": 1,
+      "sheetNames": null,
+      "atExpectedPosition": 2,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": null,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "ppt",
+      "documents": 1,
+      "failed": 0,
+      "phrases": 3,
+      "exact": 3,
+      "found": 3,
+      "pageCountCorrect": 1,
+      "pageElements": 1,
+      "pageElementsCorrect": 1,
+      "sheetNames": null,
+      "atExpectedPosition": 3,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": null,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "odt",
+      "documents": 1,
+      "failed": 0,
+      "phrases": 3,
+      "exact": 3,
+      "found": 3,
+      "pageCountCorrect": 1,
+      "pageElements": 1,
+      "pageElementsCorrect": 1,
+      "sheetNames": null,
+      "atExpectedPosition": 3,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "ods",
+      "documents": 1,
+      "failed": 0,
+      "phrases": 2,
+      "exact": 2,
+      "found": 2,
+      "pageCountCorrect": 1,
+      "pageElements": 1,
+      "pageElementsCorrect": 1,
+      "sheetNames": null,
+      "atExpectedPosition": 2,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    },
+    {
+      "format": "odp",
+      "documents": 1,
+      "failed": 0,
+      "phrases": 2,
+      "exact": 2,
+      "found": 2,
+      "pageCountCorrect": 1,
+      "pageElements": 1,
+      "pageElementsCorrect": 1,
+      "sheetNames": null,
+      "atExpectedPosition": 2,
+      "foundOnlyElsewhere": 0,
+      "alsoFoundElsewhere": 0,
+      "splitAtLineBreak": 0,
+      "splitElsewhere": 0,
+      "splitAtLineBreakAtPosition": 0,
+      "splitElsewhereAtPosition": 0,
+      "replacementCharacters": 0,
+      "unexpectedCharacters": 0,
+      "absentPhrases": 0,
+      "absentPhrasesLeaked": 0
+    }
+  ],
+  "total": {
+    "format": "all",
+    "documents": 23,
+    "failed": 0,
+    "phrases": 118,
+    "exact": 118,
+    "found": 118,
+    "pageCountCorrect": 23,
+    "pageElements": 30,
+    "pageElementsCorrect": 30,
+    "sheetNames": {
+      "correct": 3,
+      "total": 3
+    },
+    "atExpectedPosition": 118,
+    "foundOnlyElsewhere": 0,
+    "alsoFoundElsewhere": 0,
+    "splitAtLineBreak": 0,
+    "splitElsewhere": 0,
+    "splitAtLineBreakAtPosition": 0,
+    "splitElsewhereAtPosition": 0,
+    "replacementCharacters": 0,
+    "unexpectedCharacters": 0,
+    "absentPhrases": 2,
+    "absentPhrasesLeaked": 0
+  },
+  "documents": [
+    {
+      "fileName": "pdf-ja-horizontal.pdf",
+      "format": "pdf",
+      "features": ["horizontal-writing"],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "情報セキュリティ基本方針",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "ISO/IEC 27001",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "機密情報",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "個人情報保護",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "利用目的",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "委託先の監督",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "インシデント対応手順",
+          "page": 3,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [3],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "不正アクセス",
+          "page": 3,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [3],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "CSIRT",
+          "page": 3,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [3],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 3,
+        "actual": 3,
+        "elementsCorrect": 3,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "pdf-ja-vertical.pdf",
+      "format": "pdf",
+      "features": ["vertical-writing"],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "社長挨拶",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "創業五十周年",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "地域社会",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "横浜市",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "株式会社に改組",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "本社を川崎市へ移転",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 2,
+        "actual": 2,
+        "elementsCorrect": 2,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "pdf-ja-line-break.pdf",
+      "format": "pdf",
+      "features": ["horizontal-writing", "line-break-inside-word"],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "基幹システム",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "本格稼働",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "顧客管理データベース",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "整合性",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "情報システム部",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "窓口",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "txt-shift-jis.txt",
+      "format": "txt",
+      "encoding": "shift_jis",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "経営企画会議",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "山田太郎",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "ソラリス",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "販売戦略",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "大阪支店",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "先行販売",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "販売促進キャンペーン",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "txt-euc-jp.txt",
+      "format": "txt",
+      "encoding": "euc-jp",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "障害報告書",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "社内ポータルサイト",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "ファイルサーバー",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "データベース",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "アプリケーションサーバー",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "接続プール",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "再発防止策",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "txt-iso-2022-jp.txt",
+      "format": "txt",
+      "encoding": "iso-2022-jp",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "年末年始休業",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "関係者各位",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "緊急連絡先",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "情報システム部",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "営業開始",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "txt-utf-8-bom.txt",
+      "format": "txt",
+      "encoding": "utf-8-bom",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "新入社員研修",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "研修期間",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "9時〜18時",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "ノートパソコン",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "社員証",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "小林由美子",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "txt-utf-16le-bom.txt",
+      "format": "txt",
+      "encoding": "utf-16le-bom",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "品質管理マニュアル",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "受入検査",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "抜き取り検査",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "不適合品",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "品質保証課",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "txt-utf-16be-bom.txt",
+      "format": "txt",
+      "encoding": "utf-16be-bom",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "プロジェクト計画書",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "基幹システム刷新",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "結合テスト",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "本番移行",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "高橋一郎",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "プロジェクトマネージャー",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "txt-utf-8.txt",
+      "format": "txt",
+      "encoding": "utf-8",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "運用手順書",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "バックアップ",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "全文検索",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "Elasticsearch",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "オンコール担当者",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "csv-utf-8.csv",
+      "format": "csv",
+      "encoding": "utf-8",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "社員番号",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "所属部署",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "渡辺美咲",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "経理部",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "松本さくら",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "営業企画部",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "csv-cp932.csv",
+      "format": "csv",
+      "encoding": "cp932",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "商品コード",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "ボールペン",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "㈱文具センター",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "クリアファイル",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "髙田商店",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "東都紙業",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "html-shift-jis-script-style.html",
+      "format": "html",
+      "encoding": "shift_jis",
+      "features": ["meta-charset", "script-style"],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "価格改定",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "お客様各位",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "標準プラン",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "月額料金",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "営業担当者",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 2,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "html-euc-jp-http-equiv.html",
+      "format": "html",
+      "encoding": "euc-jp",
+      "features": ["meta-charset"],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "秋季運動会",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "多摩川河川敷グラウンド",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "申込方法",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "総務部",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "docx-ja.docx",
+      "format": "docx",
+      "features": ["paragraph-line-break"],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "就業規則",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "労働条件",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "服務規律",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "テレワーク勤務制度",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "在宅勤務手当",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "施行",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "xlsx-ja-multi-sheet.xlsx",
+      "format": "xlsx",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "売上高",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "前年比",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "株式会社サンプル商事",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "中村健太",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "みどり農園",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "北海道エリア",
+          "page": 3,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [3],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 3,
+        "actual": 3,
+        "elementsCorrect": 3,
+        "sheetNames": {
+          "correct": 3,
+          "total": 3
+        }
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "pptx-ja-multi-slide.pptx",
+      "format": "pptx",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "事業計画説明会",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "中期経営計画",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "加藤誠",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "クラウドサービス市場",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "差別化",
+          "page": 2,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [2],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "人材育成",
+          "page": 3,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [3],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "デジタルトランスフォーメーション",
+          "page": 3,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [3],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 3,
+        "actual": 3,
+        "elementsCorrect": 3,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "xls-ja.xls",
+      "format": "xls",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "名古屋営業所",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "交通費",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "宿泊費",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "承認者",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "odt-ja.odt",
+      "format": "odt",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "社内報",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "福利厚生制度",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "育児休業",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "ods-ja.ods",
+      "format": "ods",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "出勤日数",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "有給休暇",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "odp-ja.odp",
+      "format": "odp",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "新製品発表会",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "記者会見",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": 0,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "doc-legacy.doc",
+      "format": "doc",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "Cell 2,3",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "This text is below the table.",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": null,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    },
+    {
+      "fileName": "ppt-legacy.ppt",
+      "format": "ppt",
+      "features": [],
+      "failure": null,
+      "phrases": [
+        {
+          "text": "Title Placeholder",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "Text in a TextBox",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        },
+        {
+          "text": "Octagon",
+          "page": 1,
+          "match": "exact",
+          "matchAtExpectedPosition": "exact",
+          "foundOnPages": [1],
+          "atExpectedPosition": true,
+          "foundOnOtherElements": false
+        }
+      ],
+      "pages": {
+        "expected": 1,
+        "actual": 1,
+        "elementsCorrect": 1,
+        "sheetNames": null
+      },
+      "characters": {
+        "replacementCharacters": 0,
+        "unexpectedCharacters": null,
+        "unexpectedSample": []
+      },
+      "absentPhrases": {
+        "total": 0,
+        "leaked": []
+      }
+    }
+  ],
+  "elasticsearch": {
+    "status": "measured",
+    "url": "http://elasticsearch:9200",
+    "plugins": {
+      "kuromoji": true,
+      "icu": true
+    },
+    "analyzeSample": ["基幹", "システム", "の", "本格", "稼働"],
+    "indexName": "benchmark-1793812797472-8f428f60",
+    "recall": [
+      {
+        "format": "pdf",
+        "variant": "kuromoji-phrase",
+        "phrases": 21,
+        "documentFound": 21,
+        "positionFound": 21,
+        "extraElementHits": 0
+      },
+      {
+        "format": "docx",
+        "variant": "kuromoji-phrase",
+        "phrases": 6,
+        "documentFound": 5,
+        "positionFound": 5,
+        "extraElementHits": 0
+      },
+      {
+        "format": "xlsx",
+        "variant": "kuromoji-phrase",
+        "phrases": 6,
+        "documentFound": 6,
+        "positionFound": 6,
+        "extraElementHits": 0
+      },
+      {
+        "format": "pptx",
+        "variant": "kuromoji-phrase",
+        "phrases": 7,
+        "documentFound": 7,
+        "positionFound": 7,
+        "extraElementHits": 0
+      },
+      {
+        "format": "xls",
+        "variant": "kuromoji-phrase",
+        "phrases": 4,
+        "documentFound": 4,
+        "positionFound": 4,
+        "extraElementHits": 0
+      },
+      {
+        "format": "csv",
+        "variant": "kuromoji-phrase",
+        "phrases": 12,
+        "documentFound": 12,
+        "positionFound": 12,
+        "extraElementHits": 0
+      },
+      {
+        "format": "html",
+        "variant": "kuromoji-phrase",
+        "phrases": 9,
+        "documentFound": 9,
+        "positionFound": 9,
+        "extraElementHits": 0
+      },
+      {
+        "format": "txt",
+        "variant": "kuromoji-phrase",
+        "phrases": 41,
+        "documentFound": 41,
+        "positionFound": 41,
+        "extraElementHits": 0
+      },
+      {
+        "format": "doc",
+        "variant": "kuromoji-phrase",
+        "phrases": 2,
+        "documentFound": 2,
+        "positionFound": 2,
+        "extraElementHits": 0
+      },
+      {
+        "format": "ppt",
+        "variant": "kuromoji-phrase",
+        "phrases": 3,
+        "documentFound": 3,
+        "positionFound": 3,
+        "extraElementHits": 0
+      },
+      {
+        "format": "odt",
+        "variant": "kuromoji-phrase",
+        "phrases": 3,
+        "documentFound": 3,
+        "positionFound": 3,
+        "extraElementHits": 0
+      },
+      {
+        "format": "ods",
+        "variant": "kuromoji-phrase",
+        "phrases": 2,
+        "documentFound": 2,
+        "positionFound": 2,
+        "extraElementHits": 0
+      },
+      {
+        "format": "odp",
+        "variant": "kuromoji-phrase",
+        "phrases": 2,
+        "documentFound": 2,
+        "positionFound": 2,
+        "extraElementHits": 0
+      },
+      {
+        "format": "pdf",
+        "variant": "growi-quoted-phrase",
+        "phrases": 21,
+        "documentFound": 21,
+        "positionFound": 21,
+        "extraElementHits": 0
+      },
+      {
+        "format": "docx",
+        "variant": "growi-quoted-phrase",
+        "phrases": 6,
+        "documentFound": 6,
+        "positionFound": 6,
+        "extraElementHits": 0
+      },
+      {
+        "format": "xlsx",
+        "variant": "growi-quoted-phrase",
+        "phrases": 6,
+        "documentFound": 6,
+        "positionFound": 6,
+        "extraElementHits": 0
+      },
+      {
+        "format": "pptx",
+        "variant": "growi-quoted-phrase",
+        "phrases": 7,
+        "documentFound": 7,
+        "positionFound": 7,
+        "extraElementHits": 0
+      },
+      {
+        "format": "xls",
+        "variant": "growi-quoted-phrase",
+        "phrases": 4,
+        "documentFound": 4,
+        "positionFound": 4,
+        "extraElementHits": 0
+      },
+      {
+        "format": "csv",
+        "variant": "growi-quoted-phrase",
+        "phrases": 12,
+        "documentFound": 12,
+        "positionFound": 12,
+        "extraElementHits": 0
+      },
+      {
+        "format": "html",
+        "variant": "growi-quoted-phrase",
+        "phrases": 9,
+        "documentFound": 9,
+        "positionFound": 9,
+        "extraElementHits": 0
+      },
+      {
+        "format": "txt",
+        "variant": "growi-quoted-phrase",
+        "phrases": 41,
+        "documentFound": 41,
+        "positionFound": 41,
+        "extraElementHits": 0
+      },
+      {
+        "format": "doc",
+        "variant": "growi-quoted-phrase",
+        "phrases": 2,
+        "documentFound": 2,
+        "positionFound": 2,
+        "extraElementHits": 0
+      },
+      {
+        "format": "ppt",
+        "variant": "growi-quoted-phrase",
+        "phrases": 3,
+        "documentFound": 3,
+        "positionFound": 3,
+        "extraElementHits": 0
+      },
+      {
+        "format": "odt",
+        "variant": "growi-quoted-phrase",
+        "phrases": 3,
+        "documentFound": 3,
+        "positionFound": 3,
+        "extraElementHits": 0
+      },
+      {
+        "format": "ods",
+        "variant": "growi-quoted-phrase",
+        "phrases": 2,
+        "documentFound": 2,
+        "positionFound": 2,
+        "extraElementHits": 0
+      },
+      {
+        "format": "odp",
+        "variant": "growi-quoted-phrase",
+        "phrases": 2,
+        "documentFound": 2,
+        "positionFound": 2,
+        "extraElementHits": 0
+      },
+      {
+        "format": "all",
+        "variant": "kuromoji-phrase",
+        "phrases": 118,
+        "documentFound": 117,
+        "positionFound": 117,
+        "extraElementHits": 0
+      },
+      {
+        "format": "all",
+        "variant": "growi-quoted-phrase",
+        "phrases": 118,
+        "documentFound": 118,
+        "positionFound": 118,
+        "extraElementHits": 0
+      }
+    ],
+    "positionProblems": [
+      {
+        "fileName": "docx-ja.docx",
+        "text": "テレワーク勤務制度",
+        "variant": "kuromoji-phrase",
+        "page": 1,
+        "elementIndexes": []
+      }
+    ]
+  }
+}
