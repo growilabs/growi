@@ -686,3 +686,200 @@ node src/bmp-iso.mjs out/bmp-iso-node.json && $PY py/bmp_iso.py out/bmp-iso-node
 - 残っていた判断は、暗号化した Office (DOCX / XLSX / PPTX) の作り方だけだった。ユーザーは **`officecrypto-tool` (0.0.19、MIT、作者 1 人) を採る** と決めた。テスト専用の依存にして、本番の image には入れない。`cfb` が OLE の FAT の未使用欄を埋める問題は、9.7 の 11 行の修正で直す (2.3 / 2.4 で必ず入れる)。選ばなかった案: 暗号化を自前で実装する (150〜250 行、未検証)、作ったファイルを出所つきで commit する。
 - ISO-2022-JP の 13 字 (9.7) は、判断を求めずに「2.6 のコーパスでは使わない」と扱う (〜 U+301C と ～ U+FF5E のどちらも使わない)。使う必要が出たら、そのときにユーザーに諮る。
 - 〜 (U+301C) は、iconv-lite の Shift_JIS と EUC-JP でも書けない (実測。iconv-lite の Shift_JIS は cp932 の表を使い、① 髙 ㈱ ～ は書けて 〜 − ¥ ‾ は書けない。EUC-JP も 〜 は書けない)。2.6 のコーパスでは、Shift_JIS・EUC-JP・ISO-2022-JP のどの文書でも 〜 を使わない。
+
+## 10. Node で作ったファイルを Python 版のテストに差し替えた結果 (タスク 2.5)
+
+2026-11-04 に devcontainer (Node 24.21.0、Python 3.12 の `.venv`) で確かめた結果 (Req 10.5、design.md の D5)。Python 版のコード (`src/app/**`) とテストのファイルは変えていない。差し替えは使い捨ての場所 (scratchpad) に作ったテストの写しの上だけで行い、リポジトリには何も足していない。Node の生成器 (`apps/attachment-text-extractor/test/fixtures/`) も直していない (直す必要が無かった)。
+
+### 10.1 結論 (実測)
+
+- **Python 版のテスト全体 (1222 件) が、Node で作ったファイルを入力にしても、差し替えの前と同じ結果になった**。差し替え前は `1222 passed`、差し替え後も `1222 passed` で、通ったテストの ID の集まりも同じだった (どちらにも無いテストも、片方にだけあるテストも 0 件)。
+- テスト本体 (assert) は変えていない。変えたのは「入力を作るところ」だけで、例外は 2 か所 (10.5 の「テストから外した部分」)。
+- 1222 件のうち、Node で作ったファイル・バイト列を実際に入力として使ったテストは **385 件** (10.4)。残りはファイルを入力にしないテスト (設定、認証、子プロセスの制御、通信の枠、HTML・CSV などの短い文字列だけを送るものなど) で、差し替えの対象が無い。
+- 次の 2 通りの差し替え方 (10.2) の **どちらでも 1222 件すべて通った**。
+  - **crafted 版**: Node の生成器が「テストの細工」まで含んでいるところは、式ごと Node の生成器に置き換える。
+  - **edit 版**: 同じところで、土台のファイルだけを Node で作り、テスト自身の細工 (バイトの書き換え、正規表現、zipfile での作り直し) は Python のまま掛ける。9.5.4 の「Python のテストが openpyxl / python-pptx / zipfile の書き方を前提にしている」心配を確かめるためのもの。
+- 差し替えたつもりで Python のファイルが使われていないことを、仕組みで確かめた (10.2 の「見張り」)。Python の文書の書き出しを止めた状態で、**差し替えていない元のテスト** を動かすと `161 failed, 846 passed, 61 errors` (と、収集の段階のエラー 3 件) になった。差し替えたテストでは 0 件。
+- Node の生成器を直す必要は無かった。(a) 生成器の不具合 は 0 件、(c) 意図した違い で通らないもの も 0 件。通らなかったテストの原因は (b) 差し替えの仕組みの不備 の 1 種類 (5 件) だけで、仕組みを直して通った (10.6)。ほかに (b) として、テストの一部 (Python の zipfile が書くときに出す警告の確認) を外したところが 2 か所ある (10.5)。この 2 か所の扱いは、親タスクの判断を待つ。
+
+### 10.2 方法 (再現できる粒度)
+
+確認に使ったスクリプト (写しを作る `make_copy.py`、見張りの `node_guard.py`、Node の常駐プロセス `gen-server.mjs` など) はリポジトリに残していない。やり直すときは、この節 (10.2) と 10.5 の表から作り直す。
+
+**置き場所** (`$S` は scratchpad。どれも使い捨てで、リポジトリには入れていない):
+
+| もの | 中身 |
+|---|---|
+| `$S/mirror/` | テストを動かす場所。リポジトリの `.github`・`packages`・`infra` への symlink と、`services/attachment-text-extractor/` (中の `src`・`scripts`・`deploy`・`Dockerfile`・`pyproject.toml`・`uv.lock`・`.venv` などは元への symlink、`tests/` だけは写し)。テストが `Path(__file__).parents[1]` や `parents[3]` で `Dockerfile`・`.github/workflows`・`packages/.../openapi.json` を読むので、同じ深さに置く。`app` は `.venv` の editable install でリポジトリの `src/app` を読む |
+| `$S/node/gen-server.mjs` | Node の常駐プロセス。jiti (`node_modules/.pnpm/jiti@2.7.0`) で `test/fixtures/index.ts` (と、`buildPdf` のために `pdf.ts`) を読み込み、標準入力の 1 行 1 件の JSON `{"fn": 名前, "args": [...], "out": 書き出し先?}` を受けて、その export を呼ぶ。バイト列は `{"$b64": ...}` でやり取りする。`"plain:<キー>"` は `PLAIN_DOCUMENTS[キー].build()` を呼ぶ。`out` があれば結果をファイルに書く (40MB を超える画像入りの文書など) |
+| `$S/py/nodegen.py` | Python から gen-server を呼ぶ関数 `call(fn, *args, out=None)`。pytest のプロセスで最初に呼んだときに 1 つだけ起動し、終わるときに止める。返したバイト列を覚えておき、「このテストは Node の入力を使ったか」の記録に使う |
+| `$S/py/fixture_files_node.py` | Python 版の `tests/fixture_files.py` と同じ名前の関数・fixture・定数を持つ写し。中身はすべて gen-server を呼ぶ。写しの `tests/fixture_files.py` をこれで上書きする。パスワードや印の文字列は、Node 側の定数と同じであることを読み込み時に確かめる |
+| `$S/py/pptx_shim.py` | `test_pptx_split.py` がテストの中で使う `Presentation()` の代わり。タイトルだけのスライド・テキストボックス・ノートを記録し、保存のときに Node の `buildPptx` で作る。それ以外の使い方をすると例外にする |
+| `$S/py/make_copy.py` | `tests/` を写し、次の表のとおりに書き換える。置き換えは「元の文字列がちょうど n 回現れる」ことを確かめてから行う (元のテストが変わっていたら止まる)。関数をまるごと替えるところは `ast` で関数の範囲を求める |
+| `$S/py/node_guard.py` | pytest のプラグイン (`-p node_guard`)。見張りと記録 (下) |
+| `$S/run.sh` | 写しを作って実行する。`bash run.sh <crafted\|edit\|none> <名前>` |
+
+**実行** (bash):
+
+```bash
+# S は scratchpad。差し替えの前 (リポジトリそのまま) — ベースライン
+cd services/attachment-text-extractor && .venv/bin/python -m pytest -q -p no:cacheprovider -rA
+# 差し替え後 — run.sh の中身
+python -I $S/py/make_copy.py <repo>/services/attachment-text-extractor/tests $S/mirror/services/attachment-text-extractor/tests crafted   # または edit
+cd $S/mirror/services/attachment-text-extractor && env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=$S/py \
+  NODE_GEN_SERVER=$S/node/gen-server.mjs NODE_GUARD_TESTS_DIR=$PWD/tests NODE_GUARD_LOG=$S/res/<名前>.calls.jsonl \
+  NODE_GUARD_ALLOWED_ZIP_WRITERS=_rewrite,_add_member \
+  .venv/bin/python -m pytest -q -p no:cacheprovider -p node_guard -rA
+```
+
+- `PYTHONDONTWRITEBYTECODE=1` を付ける (`src` はリポジトリへの symlink なので、付けないと `__pycache__` がリポジトリ側に書かれる)。
+- 比べ方: `-rA` の出力の `PASSED` 行からテストの ID を取り出して並べ、ベースラインと `comm -3` で比べる。件数だけでは比べない。
+- 鏡の場所そのものが結果を変えないことを、先に確かめた: 差し替えずに写しただけのテストを鏡で動かすと `1222 passed` で、ID の集まりもベースラインと同じ。
+
+**見張り** (`node_guard.py`。差し替え漏れが黙って通らないようにする):
+
+- Python の文書の書き出しを例外にする: `openpyxl.Workbook.save`、`docx.document.Document.save`、`pptx.presentation.Presentation.save`、`xlwt.Workbook.save`、`msoffcrypto.format.ooxml.OOXMLFile.encrypt`、`pypdf.PdfWriter.write`。読む側 (`openpyxl.load_workbook`、msoffcrypto での復号、`PdfReader` など) は止めない。`test_fixture_files.py` が確かめ役として使うため。
+- `zipfile.ZipFile` を書き込み (`w` / `a` / `x`) で開くのは、Python 版のサービスのコードと、テスト自身の編集の手順 (`_rewrite`、`_add_member`。edit 版ではほかに 2 つ、10.5) からだけ許す。テストのファイルの中のそれ以外の場所から開くと例外にする。
+- 対照実験: 差し替えていない元のテストに見張りだけを掛けると、`161 failed, 846 passed, 61 errors` と収集のエラー 3 件 (`--continue-on-collection-errors` を付けて実行)。見張りが Python で作るファイルを確かに止めることが分かる。
+- 見張れないもの: `str.encode(...)` での文字コードの変換と、`b"%PDF-..."` のようなバイト列の書き方。これらは写しを grep して、残っているものを 10.7 に挙げた。
+
+**記録**: テストごとに「そのテストの間に呼んだ Node の生成器」「使った fixture (`request.getfixturevalue` で取ったものを含む)」「Node で作ったバイト列がパラメータ (または、パラメータの名前で引くモジュールの表の行) に入っているか」を JSON で書き出す。どれかがあれば「Node の入力を使った」と数える。
+
+### 10.3 件数
+
+| 実行 | 結果 | ベースラインと ID が違うテスト |
+|---|---|---|
+| ベースライン (リポジトリのまま) | `1222 passed` (84 秒) | — |
+| 鏡で、差し替えずに写しただけ | `1222 passed` | 0 |
+| 鏡で、差し替えずに写しただけ + 見張り (対照実験) | `161 failed, 846 passed, 61 errors` (+ 収集のエラー 3) | — |
+| crafted 版 (最初の実行) | `1222 passed` | 0 |
+| edit 版 (最初の実行) | `5 failed, 1217 passed` (原因は 10.6。差し替えの仕組みの不備) | 5 |
+| crafted 版 (最後の実行) | `1222 passed` (83 秒) | 0 |
+| edit 版 (最後の実行) | `1222 passed` (83 秒) | 0 |
+
+crafted 版は 4 回、edit 版は直した後に 3 回動かし、どれも `1222 passed` だった (子プロセスの RSS や時間で判定するテストを含む)。
+
+### 10.4 テストファイルごとの結果
+
+「Node の入力」は、Node で作ったファイル・バイト列を入力に使ったテストの数 (10.2 の記録)。edit 版で数が少ないファイルは、テストがバイト列を書き換えた写しを使うため、記録が追えなかった分 (`test_archive_guard.py` の 8 件。テスト自体は Node の ZIP を書き換えた入力で通っている)。
+
+| テストファイル | ベースライン | crafted 版 | edit 版 | Node の入力 (crafted) | Node の入力 (edit) |
+|---|---|---|---|---|---|
+| `conversion/test_archive_guard.py` | 46 | 46 | 46 | 44 | 36 |
+| `conversion/test_charset.py` | 42 | 42 | 42 | 33 | 33 |
+| `conversion/test_core.py` | 54 | 54 | 54 | 20 | 20 |
+| `conversion/test_formats.py` | 119 | 119 | 119 | 0 | 0 |
+| `conversion/test_input_size.py` | 32 | 32 | 32 | 0 | 0 |
+| `conversion/test_normalize.py` | 29 | 29 | 29 | 0 | 0 |
+| `conversion/test_office.py` | 32 | 32 | 32 | 21 | 21 |
+| `conversion/test_ooxml_xml.py` | 10 | 10 | 10 | 0 | 0 |
+| `conversion/test_pdf.py` | 14 | 14 | 14 | 12 | 12 |
+| `conversion/test_pptx_split.py` | 65 | 65 | 65 | 63 | 63 |
+| `conversion/test_text.py` | 67 | 67 | 67 | 8 | 8 |
+| `conversion/test_types.py` | 8 | 8 | 8 | 0 | 0 |
+| `conversion/test_xlsx_split.py` | 50 | 50 | 50 | 49 | 49 |
+| `conversion/test_xlsx_split_precheck.py` | 31 | 31 | 31 | 31 | 31 |
+| `runner/test_child_entry.py` | 17 | 17 | 17 | 4 | 4 |
+| `runner/test_child_isolation.py` | 27 | 27 | 27 | 20 | 20 |
+| `runner/test_conversion_runner.py` | 48 | 48 | 48 | 6 | 6 |
+| `runner/test_extract_with_real_runner.py` | 2 | 2 | 2 | 0 | 0 |
+| `runner/test_forkserver.py` | 19 | 19 | 19 | 0 | 0 |
+| `runner/test_platform_guards.py` | 8 | 8 | 8 | 0 | 0 |
+| `runner/test_wire.py` | 53 | 53 | 53 | 0 | 0 |
+| `test_bearer_auth.py` | 13 | 13 | 13 | 0 | 0 |
+| `test_ci_workflow.py` | 17 | 17 | 17 | 0 | 0 |
+| `test_client_disconnect.py` | 6 | 6 | 6 | 0 | 0 |
+| `test_config.py` | 48 | 48 | 48 | 0 | 0 |
+| `test_dependencies.py` | 14 | 14 | 14 | 0 | 0 |
+| `test_deploy_config.py` | 14 | 14 | 14 | 0 | 0 |
+| `test_e2e_http.py` | 94 | 94 | 94 | 42 | 42 |
+| `test_export_openapi.py` | 9 | 9 | 9 | 0 | 0 |
+| `test_extract_router.py` | 35 | 35 | 35 | 0 | 0 |
+| `test_fixture_files.py` | 30 | 30 | 30 | 30 | 30 |
+| `test_health.py` | 11 | 11 | 11 | 0 | 0 |
+| `test_infrastructure.py` | 10 | 10 | 10 | 0 | 0 |
+| `test_integration_auth.py` | 7 | 7 | 7 | 0 | 0 |
+| `test_k8s_manifests.py` | 27 | 27 | 27 | 0 | 0 |
+| `test_limits.py` | 18 | 18 | 18 | 0 | 0 |
+| `test_live_disconnect.py` | 4 | 4 | 4 | 0 | 0 |
+| `test_live_server.py` | 11 | 11 | 11 | 0 | 0 |
+| `test_main.py` | 27 | 27 | 27 | 0 | 0 |
+| `test_schemas.py` | 39 | 39 | 39 | 0 | 0 |
+| `test_security.py` | 7 | 7 | 7 | 0 | 0 |
+| `test_smoke_extract.py` | 8 | 8 | 8 | 2 | 2 |
+| 合計 | 1222 | 1222 | 1222 | 385 | 377 |
+
+- `test_smoke_extract.py` の 2 件は、`scripts/smoke_extract.py` の `generate` が `fixture_files` の `make_docx` / `make_text_pdf` を import するので、写しの Node 版が使われた。
+- `test_fixture_files.py` の 30 件 (fixture の性質を openpyxl・python-docx・python-pptx・msoffcrypto・pypdf・pypdfium2 で確かめるテスト) は 2.1 の (b) と同じく通った。旧形式の DOC / PPT は Node 側に移したファイル (`test/fixtures/legacy/`) を使い、Python 版の README の SHA-256 と同じだった。
+
+### 10.5 差し替えた場所
+
+**`tests/fixture_files.py` (ファイルごと)**: `conftest.py` が読み込む fixture 33 個 (うちファイルを作るものは 28 個。残りはパスワード 2 個、旧形式の DOC / PPT のパス 2 個、その SHA-256 の表) と、テストが import する関数を、すべて Node で作る形にした。
+
+| Python 版 | Node 版 |
+|---|---|
+| `xlsx_*`・`pptx_multi_slide`・`pdf_text`・`pdf_image_only`・`text_*`・`odt`・`ods`・`odp`・`epub`・`rtf`・`xls` | `PLAIN_DOCUMENTS` の同じ名前のもの |
+| `docx_deeply_nested`、`docx_encrypted` / `xlsx_encrypted` / `pptx_encrypted`、`pdf_user_password`、`pdf_owner_password_only`、`pdf_corrupt` | `buildDeeplyNestedDocx`、`buildEncrypted{Docx,Xlsx,Pptx}`、`buildUserPasswordPdf`、`buildOwnerPasswordOnlyPdf`、`buildCorruptPdf` |
+| `*_path` の 5 個 | `buildOverCellLimitXlsx`、`buildLargeForTimeoutXlsx`、`buildLargeImagesDocx`、`buildLargeImagesPptx`、`buildZipBombDocx` (ファイルに直接書く) |
+| `legacy_doc` / `legacy_ppt` | `LEGACY_DOC_PATH` / `LEGACY_PPT_PATH` (SHA-256 の表は Python 版の README のまま) |
+| `make_docx`・`make_pptx`・`make_text_pdf`・`write_xlsx_cells`・`_random_images`・`_build_pdf`・`_pdf_stream` | `buildDocx`・`buildPptx`・`buildTextPdf`・`buildXlsxCells`・`randomGrayPngs`・`buildPdf` (`_pdf_stream` は `buildPdf` に渡す形を持たせたバイト列を返す) |
+
+**テストのファイルの中** (「両方」は crafted 版と edit 版の両方。「crafted」は crafted 版だけで、edit 版では土台を Node で作ってテスト自身の細工を Python のまま掛けた):
+
+| テストファイル | 元の作り方 | Node 版 | 版 |
+|---|---|---|---|
+| `test_archive_guard.py` | `_zip` (zipfile) | `buildZip` (圧縮の有無は同じ) | 両方 |
+| 同 | `b"PK\x03\x04" + b"\x00" * 10` | `zipSignatureFollowedBy` | 両方 |
+| 同 | `_craft_zip` + 位置での書き換え 5 種 (deflate を壊す、圧縮の方式 9、暗号化の印、UTF-8 の印、必要な版 10.0) | `buildCorruptDeflateZip` など 5 個 | crafted (edit 版は `_craft_zip` の ZIP だけを Node で作り、Python の `_patch_u16` / `_central_header_offset` で書き換えた) |
+| 同 | 名前の重複 (zipfile が書く)、`force_zip64` の ZIP、200MiB に展開される部品 (2 か所)、bzip2 / LZMA の部品を壊す | `buildDuplicateNameZip`、`buildZip64Zip`、`buildZip64BombPartZip`、`buildCorruptBzip2Zip` / `buildCorruptLzmaZip` | 両方 (zipfile でしか書けない形なので) |
+| 同 | 切り詰めた ZIP、`..` などの名前、申告サイズを偽る (2 か所) | `buildTruncatedZip`、`buildTraversalNamesZip`、`buildLyingSizesZip` | crafted (edit 版は Node の `_zip` に Python の切り詰め・`struct.pack` の置換を掛けた) |
+| `test_xlsx_split_precheck.py` | `_package` (zipfile) | `buildCellCountPackage` | 両方 |
+| 同 | 同じ名前のシートを 2 つ (zipfile が書く) | `buildDuplicateSheetPartsPackage` | 両方 |
+| 同 | UTF-16 のシート、シートの圧縮の流れを位置で壊す | `buildUtf16SheetPackage`、`buildCorruptSheetStreamPackage` | crafted (edit 版は Node の `_package` に Python の符号化・位置での書き換え) |
+| `test_xlsx_split.py` | `_book` (openpyxl) | `buildXlsx` | 両方 |
+| 同 | `_stale_reference_book` | `buildStaleReferenceXlsx` | crafted (edit 版は `buildXlsx` に `definedNames` を渡し、式のセルは Python の `_rewrite` で `</c></row>` を置換) |
+| 同 | 部品の重複、150MiB の pivot cache、すべて無圧縮、workbook の無い ZIP | `buildDuplicatedEntryXlsx`、`buildLargePivotCacheXlsx`、`buildStoredEntriesXlsx`、`buildZip` | 両方 |
+| `test_pptx_split.py` | `_contract_deck`・`_artefact_deck`・`_deck_with_pictures`・`_deck_with_text`・`_notes_deck` (python-pptx) | `buildContractDeck`・`buildArtefactDeck`・`buildDeckWithPictures`・`buildDeckWithText`・`buildNotesDeck` | 両方 |
+| 同 | テストの中の `Presentation()` (タイトルだけのスライド、40 万字のテキストボックス、ノート、スライドの無いデッキ) | `pptx_shim.Presentation` → `buildPptx` | 両方 |
+| 同 | 絶対パスの関係、危ない行き先 (4 種) と `outside.xml`、関係でのエンティティの展開、XML 宣言の `UTF-9` (3 部品) | `buildAbsoluteTargetDeck`、`buildUnsafeTargetDeck`、`buildEntityExpansionRelationshipsDeck`、`buildUnknownEncodingDeck` | crafted (edit 版は `buildNotesDeck` に Python の `_rewrite` / `_with_relationship` / `_add_member`) |
+| `test_office.py` | 半分に切った DOCX、XML が壊れた DOCX、`word/document.xml` の無い DOCX | `buildTruncatedDocx`、`buildBrokenXmlDocx`、`buildDocxWithoutDocumentPart` | crafted (edit 版は Node の `make_docx` に Python の切り詰め・zipfile での作り直し) |
+| `test_pdf.py`・`test_e2e_http.py` | `_japanese_lines_pdf` | `buildJapaneseLinesPdf` | crafted (edit 版は Node の `_build_pdf` / `_pdf_stream` で同じ PDF を組む) |
+| `test_pdf.py` | `b"%PDF-1.4\n" + secret + b"\n garbage"` | `pdfHeaderFollowedBy` | 両方 |
+| `test_charset.py`・`test_text.py` | `.encode("cp932" / "shift_jis" / "euc_jp" / "iso2022_jp" / "cp1252" / "koi8-r" / "utf-8-sig")` (14 + 5 か所)、`codecs.BOM_UTF8 + ….encode("utf-8")` (2)、`bom + ….encode("utf-16-le" など)` (2) | `encodeText` (`utf-16le-bom` などは、先頭がテストの BOM と同じことも確かめる) | 両方 |
+| `runner/test_child_isolation.py` | `_write_xlsx`・`_pivot_workbook` (openpyxl)、画像 12 枚の DOCX、400 万字の PDF | `buildXlsxCells`・`buildLargePivotCacheXlsx`、`buildTwelveImagesDocx`、`buildLongPagePdf` | 両方 (400 万字の PDF だけ crafted。edit 版は Node の `_build_pdf`) |
+| `runner/test_child_entry.py`・`runner/test_conversion_runner.py`・`test_e2e_http.py` | `b"%PDF-1.7\n" + b"\x00garbage" * 100`、`b"%PDF-1.4\n…"`、`b"PK\x03\x04…"` (3 か所) | `buildGarbagePdf`、`pdfHeaderFollowedBy`、`zipSignatureFollowedBy` | 両方 |
+
+**外した `pytest.warns` の根拠 (独立レビューで確認)**: この警告は Python の `zipfile.ZipFile._writecheck` が ZIP を**書くとき**に出す `Duplicate name` で、Node 製の ZIP を zipfile で読んでも出ない。サービスの契約 (Req 2.x / 4.x) とは無関係。「入力に同名の部品がある」ことの確認は、Node の生成器の spec (`crafted-zip.spec.ts` の重複名のテスト、`crafted-xlsx.spec.ts` の重複シートのテスト) が持っている。段階 1 の vitest では警告の確認は持ち込まず、サービスの振る舞い (素通しになる、`ConversionError` になる) の確認だけを残す。なお `test_duplicate_part_names_are_all_scanned` は、上限 5・10 セルの片方だけでも上限を超えるので、元から「両方を数えた」ことまでは証明していない。書き換えるときは、1 つずつなら通り、合計だと超える上限にする。
+
+**テストから外した部分 (2 か所)**: `test_archive_guard.py::test_duplicate_required_part_passes_through` の `pytest.warns(UserWarning, match="Duplicate name")` と、`test_xlsx_split_precheck.py::test_duplicate_part_names_are_all_scanned` の `pytest.warns(UserWarning)`。この警告は、Python の zipfile が **書くときに** 出すもので、サービスのコードの振る舞いでもファイルの性質でもない。Node で書くと出ないので外した。サービスの振る舞いを確かめる assert (`inspect_archive(...) is None`、`ConversionError` になる) はそのまま残し、通った。分類は (b) 差し替えの方法に伴うもの。この 2 か所を外してよいかは、まだ判断を受けていない (タスク 2.5 の報告で確認を求めた)。Node 版のテストに書き直すときに、この警告の確認を持ち込まなくてよいかを、書き直すタスクで判断する。
+
+**Python のまま残したテスト自身の編集の手順** (両方の版): `test_xlsx_split.py` の `_rewrite`・`_renamed`・`_with_states`・`<sheet …/>` の並べ替えや複製など、`test_pptx_split.py` の `_rewrite`・`_add_member`・`_with_relationship`・`_repeat_slide_entries`、edit 版の `test_office.py` の `_docx_with_document_xml` と `test_docx_without_its_document_part_is_malformed` の中の作り直し。どれも 2.1 と同じ線引きで、Node で作った文書を読み、正規表現やバイトの置換で書き換え、zipfile で ZIP に戻す。このため、これらのテストでは **ZIP の外側は Python の zipfile が書き、中の部品は Node が書いたもの** になっている。書き換えの正規表現が Node の XML に当たること (9.5.4 の印の付いた項目) は、これで確かめられた。
+
+### 10.6 通らなかったものと原因
+
+最後の実行では、どちらの版でも通らなかったテストは無い。途中で通らなかったものは次の 1 種類だけ。
+
+| 実行 | 通らなかったテスト | 原因 | 分類 | 対応 |
+|---|---|---|---|---|
+| edit 版の最初の実行 | `test_pdf.py` の 2 件、`test_e2e_http.py` の 2 件 (日本語の行の PDF)、`runner/test_child_isolation.py` の 1 件 (400 万字の PDF) | 写しの `_build_pdf` が呼ぶ Node の `buildPdf` が、`test/fixtures/index.ts` から export されていない (`no such export: buildPdf`)。テスト用の生成器の公開の範囲として正しく、生成器の不具合ではない | (b) 差し替えの方法の不備 | gen-server が `pdf.ts` も直接読むようにした。生成器は変えていない。その後は 5 件とも通った |
+
+- (a) Node の生成器の不具合: 0 件。生成器は変えていないので、2.3 / 2.4 の出力と spec に影響は無い。
+- (c) Node の生成器の性質が意図して違うために通らないもの: 0 件。9.7 に書いた違い (Node の XLSX は openpyxl より ZIP の部品が少ない、12 枚の画像の DOCX は python-docx より部品が少ない、cp932 の「髙」の符号が違う、乱数の並びが違う) は、どれも Python 版のテストの結果を変えなかった。RSS で判定する子プロセスのテスト (`test_child_isolation.py`。7 万セルの XLSX、12 枚の画像の DOCX、セル数の上限を超える XLSX、400 万字の PDF、150MiB の pivot cache) も、Node のファイルで通った。
+
+### 10.7 確かめなかった範囲
+
+- **「Node の入力を使ったテスト」の数 (385 件・377 件) は少なめ**: module 単位で使い回す fixture `pivot_workbook` (`runner/test_child_isolation.py`) は見張りの対象に入っておらず、最初に使う 1 件だけが数えられている。同じ値を使い回す 2 件 (`test_a_crashing_child_is_crashed_while_a_concurrent_conversion_succeeds[segfault]`、`test_the_default_limits_let_large_legitimate_files_through[pivot_workbook]`) は 0 と記録されている。実際は 387 件以上。テストの合否には関係しない。
+- **差し替えずに残した入力 (追加)**: `test_e2e_http.py` の `b"\xd0\xcf\x11\xe0 outlook message"` (OLE の先頭の印に文字列をつないだ、MSG が対応外と判定されることを確かめる入力)。commit 済みの `tests/fixtures/sample.txt` と `sample.json` (`test_extract_router.py` と `test_infrastructure.py` が直接読む)。
+
+- **見張りで止められない入力**: 次のものは Python のまま残した。
+  - UTF-8 (BOM なし) の `.encode("utf-8")`・`.encode()`。文字列のバイト列そのもので、Node でも `Buffer.from(text)` で同じになる。`test_charset.py` の 5 か所、HTML・ipynb・JSON の本文など。
+  - HTML・XML・CSV・TSV・JSON・YAML・ipynb の短い文字列、`b"x" * N` などの埋め草、アップロードの大きさを試すだけの本文。9.5.1 と同じく、Node でも同じ文字列を書くだけなので差し替えの対象にしていない。
+  - `test_xlsx_split_precheck.py` の `_sheet` / `_cells` (シートの XML の文字列。ZIP の外側は Node の `buildCellCountPackage`)。
+  - `test_pptx_split.py` の `_png` (crafted 版・edit 版とも、もう呼ばれない) と `runner/test_wire.py` の `struct.pack` (通信の枠で、ファイルではない)。
+- **Python 版のテストに対応する入力が無い Node の生成器**: `buildDotDotTargetSheetXlsx` と `buildZipWithoutCentralDirectory` は、Python 版のテストに同じ入力が無いので、この方法では確かめられない (Node 版のテストで使うときに確かめる)。`buildOneSheetAtCellLimitXlsx` / `buildOneSheetOverCellLimitXlsx` は直接は呼んでいないが、同じ中身を `buildXlsxCells` (`write_xlsx_cells` の差し替え) で作って使った。
+- **テスト自身の編集の手順** は 10.5 のとおり Python のまま。Node 版のテストでは、この手順を `editPart` と `buildZip` で書き直すことになる。その形での確かめは、テストの書き換えのタスクで行う。
+- **記録の数え方の限界**: 「Node の入力を使ったテスト」は、Node が返したバイト列そのもの (同じオブジェクト) を追って数えている。テストがそれを書き換えた写しを使うと追えない (edit 版の `test_archive_guard.py` の 8 件)。テストが通ったかどうかには関係しない。
+
+### 10.8 リポジトリの状態
+
+確かめた後、`git status` で変わっているのはこの research.md だけだった。Python 版のテストとコード、Node の生成器は変えていない。gen-server と pytest のプロセスは残っていない (`pgrep -f gen-server.mjs` で 0 件)。
