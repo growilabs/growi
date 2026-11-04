@@ -12,9 +12,9 @@ import path from 'path';
 
 import { projectRoot } from '~/server/util/project-dir-utils';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
-import { Attachment } from '../models/attachment';
 import type { PageDocument, PageModel } from '../models/page';
 import { configManager } from '../service/config-manager';
 import { convertStreamToBuffer } from '../util/stream';
@@ -48,7 +48,9 @@ export const setup = (crowi: Crowi) => {
 
     if (isUserImageAttachment(userImageUrlCached)) {
       const { fileUploadService } = crowi;
-      const attachment = await Attachment.findById(userImageUrlCached);
+      const attachment = await prisma.attachments.findUnique({
+        where: { id: userImageUrlCached },
+      });
 
       if (attachment == null) {
         return null;

@@ -1,5 +1,59 @@
 # @growi/vault-manager
 
+## 1.1.6
+
+### Patch Changes
+
+- Updated dependencies [[`2f37b50`](https://github.com/growilabs/growi/commit/2f37b50bfbdc475db2c8644a545e57881b909863)]:
+  - @growi/core@3.1.3
+
+## 1.1.5
+
+### Patch Changes
+
+- Updated dependencies [[`c0e2f63`](https://github.com/growilabs/growi/commit/c0e2f63b0d5c5993362ee74a8a4b21873900494f)]:
+  - @growi/core@3.1.2
+
+## 1.1.4
+
+### Patch Changes
+
+- Updated dependencies [[`7d3c061`](https://github.com/growilabs/growi/commit/7d3c06199d8267bcf651b167b3bfbcdc6752d02d)]:
+  - @growi/core@3.1.1
+
+## 1.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`e50350f`](https://github.com/growilabs/growi/commit/e50350fc349e14ff6f8984d753676e62bac73920)]:
+  - @growi/core@3.1.0
+
+## 1.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`fd3a693`](https://github.com/growilabs/growi/commit/fd3a69339f65a4062fab8852b02e8a5c7110f751)]:
+  - @growi/core@3.0.1
+
+## 1.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`211f493`](https://github.com/growilabs/growi/commit/211f49330240ecac27442790416ab20e5ea4e2ab)]:
+  - @growi/core@3.0.0
+
+## 1.1.0
+
+### Minor Changes
+
+- A clone can now be made smaller. `git clone --filter=sparse:oid=<published spec>` makes the server apply a published sparse-checkout pattern set before it builds the pack, so the excluded page bodies are never sent — measured 6.3 MB → 4.8 MB on a 20,000-page view with a quarter of the pages under `user/`, in a single request. One pattern set is published in this release: exclude `user/`. Any other filter (`blob:none`, `blob:limit`, `tree:<n>`, `object:type`, `combine:`, or a `sparse:oid` naming some other object) is refused when the clone starts, because each of them leaves the client fetching objects by name afterwards and the server does not serve those requests. See the README for the exact commands and for the limitation that a filtered clone cannot obtain the excluded pages later.
+
+### Patch Changes
+
+- Objects outside the requester's view are no longer served. `GIT_NAMESPACE` scopes ref advertisement but not the shared object store, and git's own reachability check for an unadvertised request assumes the requested object is a commit — so page bodies and directory listings were handed to any authenticated client that named them by object ID, whether or not that client's view contained them. Requests are now authorised against the view ref before `git upload-pack` runs, and the work a single request can demand is bounded.
+- Pages whose name maps to a tree entry longer than 255 bytes no longer break the checkout of a clone.
+- The documented way to exclude `user/` from a checkout now works. The previous recipe was rejected by git (cone mode cannot express an exclusion) and left an empty working tree.
+
 ## 1.0.0
 
 ### Major Changes

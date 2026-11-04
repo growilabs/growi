@@ -1,6 +1,7 @@
 import { GrowiPluginType } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import { toLegacyAttachmentShape } from '@growi/core/dist/models/serializers';
 import express from 'express';
 import { body } from 'express-validator';
 import multer from 'multer';
@@ -11,9 +12,9 @@ import { AttachmentType } from '~/server/interfaces/attachment';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { Attachment } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -445,6 +446,9 @@ export const setup = (crowi) => {
    *                      items:
    *                        $ref: '#/components/schemas/ThemesMetadata'
    */
+  // Intentionally not adminRequired: RevisionDiff (page history) reads this for
+  // non-admin viewers too, and the response holds nothing secret — the current
+  // theme is already exposed to every page via its stylesheet and forcedColorScheme.
   router.get(
     '/theme',
     accessTokenParser([SCOPE.READ.ADMIN.CUSTOMIZE]),
@@ -1191,6 +1195,7 @@ export const setup = (crowi) => {
     uploads.single('file'),
     accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]),
     loginRequiredStrictly,
+    adminRequired,
     uploads.single('file'),
     validator.logo,
     apiV3FormValidator,
@@ -1217,8 +1222,8 @@ export const setup = (crowi) => {
       }
 
       // Check if previous attachment exists and remove it
-      const attachments = await Attachment.find({
-        attachmentType: AttachmentType.BRAND_LOGO,
+      const attachments = await prisma.attachments.findMany({
+        where: { attachmentType: AttachmentType.BRAND_LOGO },
       });
       if (attachments != null) {
         await attachmentService.removeAllAttachments(attachments);
@@ -1238,8 +1243,9 @@ export const setup = (crowi) => {
           new ErrorV3(err.message, 'upload-brand-logo-failed'),
         );
       }
-      attachment.toObject({ virtuals: true });
-      return res.apiv3({ attachment });
+      return res.apiv3({
+        attachment: toLegacyAttachmentShape(attachment),
+      });
     },
   );
 
@@ -1267,8 +1273,8 @@ export const setup = (crowi) => {
     loginRequiredStrictly,
     adminRequired,
     async (req, res) => {
-      const attachments = await Attachment.find({
-        attachmentType: AttachmentType.BRAND_LOGO,
+      const attachments = await prisma.attachments.findMany({
+        where: { attachmentType: AttachmentType.BRAND_LOGO },
       });
 
       if (attachments == null) {

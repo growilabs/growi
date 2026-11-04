@@ -1,7 +1,5 @@
-import { getIdStringForRef, type IPage, type IUser } from '@growi/core';
 import type { NextFunction, Request, Response, Router } from 'express';
 import express from 'express';
-import mongoose from 'mongoose';
 
 import type { CrowiProperties, CrowiRequest } from '~/interfaces/crowi-request';
 import {
@@ -17,25 +15,23 @@ import {
   toExpressHttpHeaders,
 } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../../crowi';
-import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
-import { Attachment, type IAttachmentDocument } from '../../models/attachment';
+import {
+  certifySharedPageAttachmentMiddleware,
+  type RequestToAllowShareLink,
+} from '../../middlewares/certify-shared-page-attachment';
+import type { AttachmentWithComputed } from '../../models/attachment';
+import { resolveAccessibleAttachment } from '../../service/attachment/resolve-accessible-attachment';
 import ApiResponse from '../../util/apiResponse';
 
 const logger = loggerFactory('growi:routes:attachment:get');
 
-// TODO: remove this local interface when models/page has typescriptized
-interface PageModel {
-  isAccessiblePageByViewer: (
-    pageId: string,
-    user: IUser | undefined,
-  ) => Promise<boolean>;
-}
-
-type LocalsAfterDataInjection = { attachment: IAttachmentDocument };
+type LocalsAfterDataInjection = { attachment: AttachmentWithComputed };
 
 type RetrieveAttachmentFromIdParamRequest = CrowiProperties &
+  RequestToAllowShareLink &
   Request<{ id: string }, any, any, any, LocalsAfterDataInjection>;
 
 type RetrieveAttachmentFromIdParamResponse = Response<
@@ -49,39 +45,33 @@ export const retrieveAttachmentFromIdParam = async (
   next: NextFunction,
 ): Promise<void> => {
   const id = req.params.id;
-  const attachment = await Attachment.findById(id);
 
-  if (attachment == null) {
-    res.json(ApiResponse.error('attachment not found'));
+  // Skip the viewer check only when the request is already certified via a
+  // valid share link: certifySharedPageAttachmentMiddleware binds the fileId
+  // to that share link's page (see validateAttachment), so re-running the
+  // viewer check here would incorrectly reject a non-member share-link viewer.
+  const result = await resolveAccessibleAttachment(
+    id,
+    req.user,
+    req.isSharedPage ?? false,
+  );
+
+  if ('errorCode' in result) {
+    const message =
+      result.errorCode === 'not_found'
+        ? 'attachment not found'
+        : `Forbidden to access to the attachment '${id}'. This attachment might belong to other pages.`;
+    res.json(ApiResponse.error(message));
     return;
   }
 
-  const user = req.user;
-
-  // check viewer has permission
-  if (user != null && attachment.page != null) {
-    const Page = mongoose.model<IPage, PageModel>('Page');
-    const isAccessible = await Page.isAccessiblePageByViewer(
-      getIdStringForRef(attachment.page),
-      user,
-    );
-    if (!isAccessible) {
-      res.json(
-        ApiResponse.error(
-          `Forbidden to access to the attachment '${attachment.id}'. This attachment might belong to other pages.`,
-        ),
-      );
-      return;
-    }
-  }
-
-  res.locals.attachment = attachment;
+  res.locals.attachment = result.attachment;
 
   return next();
 };
 
 export const generateHeadersForFresh = (
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
 ): ExpressHttpHeader[] => {
   return toExpressHttpHeaders({
     ETag: `Attachment-${attachment._id}`,
@@ -92,7 +82,7 @@ export const generateHeadersForFresh = (
 const respondForRedirectMode = async (
   res: Response,
   fileUploadService: FileUploader,
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
   opts?: RespondOptions,
 ): Promise<void> => {
   const isDownload = opts?.download ?? false;
@@ -115,7 +105,8 @@ const respondForRedirectMode = async (
   // persist temporaryUrl
   if (!isDownload) {
     try {
-      attachment.cashTemporaryUrlByProvideSec(
+      await prisma.attachments.cashTemporaryUrlByProvideSec(
+        attachment.id,
         temporaryUrl.url,
         temporaryUrl.lifetimeSec,
       );
@@ -129,7 +120,7 @@ const respondForRedirectMode = async (
 const respondForRelayMode = async (
   res: Response,
   fileUploadService: FileUploader,
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
   opts?: RespondOptions,
 ): Promise<void> => {
   // apply content-* headers before response
@@ -151,7 +142,7 @@ const respondForRelayMode = async (
 
 export const getActionFactory = (
   crowi: Crowi,
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
 ) => {
   return async (
     req: CrowiRequest,

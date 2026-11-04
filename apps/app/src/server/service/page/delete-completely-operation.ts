@@ -4,13 +4,8 @@ import mongoose from 'mongoose';
 import type Crowi from '~/server/crowi';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import { prisma } from '~/utils/prisma';
 
-import { Attachment } from '../../models/attachment';
-import PageRedirect from '../../models/page-redirect';
-import { Revision } from '../../models/revision';
-import ShareLink from '../../models/share-link';
 import {
   type ActivityActor,
   recordCascadeAttachmentRemovals,
@@ -48,7 +43,12 @@ export const deleteCompletelyOperation = async (
   const Page = mongoose.model<IPage, PageModel>('Page');
 
   const { attachmentService } = crowi;
-  const attachments = await Attachment.find({ page: { $in: pageIds } });
+
+  const pageIdStrings = pageIds.map((pageId) => pageId.toString());
+
+  const attachments = await prisma.attachments.findMany({
+    where: { pageId: { in: pageIdStrings } },
+  });
 
   if (actor != null) {
     await recordCascadeAttachmentRemovals(
@@ -59,38 +59,58 @@ export const deleteCompletelyOperation = async (
     );
   }
 
-  // prisma's `comments.pageId` (String @db.ObjectId) filter expects hex strings,
-  // whereas the mongoose `$in` queries below accept ObjectIdLike as-is. Normalize
-  // to strings for the prisma side only (same ObjectId-stringify convention as
-  // cascade-attachment-removal-inputs); no-op for ids already in string form.
-  const pageIdStrings = pageIds.map((pageId) => pageId.toString());
+  // Delete reply comments first, then top-level comments, to avoid foreign key constraint violations.
+  await prisma.$transaction([
+    prisma.comments.deleteMany({
+      where: {
+        pageId: {
+          in: pageIdStrings,
+        },
+        replyToId: {
+          not: null,
+        },
+      },
+    }),
+    prisma.comments.deleteMany({
+      where: {
+        pageId: {
+          in: pageIdStrings,
+        },
+      },
+    }),
+  ]);
+
+  // `pagetagrelations.relatedPage`, `sharelinks.relatedPage` and `revisions.page` are required relations
+  // to `pages` with `onDelete: NoAction`. Running their deleteMany() concurrently
+  // with the page delete below is safe only because `Page.deleteMany` here still
+  // goes through Mongoose, so Prisma's relation check never runs against it.
+  // Once `Page.deleteMany` is replaced with `prisma.pages.deleteMany`/`delete`,
+  // this Promise.all will start throwing P2014 (empirically confirmed:
+  // reliably reproducible when the two run concurrently, never when run
+  // sequentially). At that point, move pagetagrelations/revisions
+  // deletion ahead of the pages delete.
+  //
+  // `pagebulkexportjobs.page` is an optional `onDelete: NoAction` relation too,
+  // but it is deliberately not deleted here: jobs may outlive their page. After
+  // the move to `prisma.pages.deleteMany`, a page still referenced by a job
+  // would be rejected with P2014, so decide then whether to delete those jobs
+  // or switch the relation to SetNull.
+  await Promise.all([
+    prisma.pagetagrelations.deleteMany({
+      where: { relatedPageId: { in: pageIdStrings } },
+    }),
+    prisma.sharelinks.deleteMany({
+      where: { relatedPageId: { in: pageIdStrings } },
+    }),
+    prisma.revisions.deleteMany({ where: { pageId: { in: pageIdStrings } } }),
+  ]);
 
   await Promise.all([
-    prisma.$transaction([
-      prisma.comments.deleteMany({
-        where: {
-          pageId: {
-            in: pageIdStrings,
-          },
-          replyToId: {
-            not: null,
-          },
-        },
-      }),
-      prisma.comments.deleteMany({
-        where: {
-          pageId: {
-            in: pageIdStrings,
-          },
-        },
-      }),
-    ]),
-    PageTagRelation.deleteMany({ relatedPage: { $in: pageIds } }),
-    ShareLink.deleteMany({ relatedPage: { $in: pageIds } }),
-    Revision.deleteMany({ pageId: { $in: pageIds } }),
     Page.deleteMany({ _id: { $in: pageIds } }),
-    PageRedirect.deleteMany({
-      $or: [{ fromPath: { $in: pagePaths } }, { toPath: { $in: pagePaths } }],
+    prisma.pageredirects.deleteMany({
+      where: {
+        OR: [{ fromPath: { in: pagePaths } }, { toPath: { in: pagePaths } }],
+      },
     }),
     attachmentService.removeAllAttachments(attachments),
 

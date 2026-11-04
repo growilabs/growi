@@ -71,3 +71,37 @@ describe('boot-time import boundary for heavy AI packages', () => {
     }
   });
 });
+
+// The public usage API is mounted ahead of aiReadyGuard (apiv3/index.js), so
+// it must stay loadable without the AI stack even if the boot entrypoint list
+// changes. Roots are traced on their own, independent of BOOT_ENTRYPOINTS.
+const AI_USAGE_PUBLIC_API_ROOTS = [
+  'features/ai-usage/server/index.ts',
+  'features/ai-usage/server/routes/apiv3/ai-usage.ts',
+] as const;
+
+describe('import boundary for the public AI usage API', () => {
+  it('has no static import chain from the public usage API to heavy AI packages', () => {
+    const violations = traceStaticImportChains({
+      srcRoot: SRC_ROOT,
+      entrypoints: AI_USAGE_PUBLIC_API_ROOTS,
+      bannedPattern: HEAVY_PACKAGE,
+    });
+    const formatted = violations.map(formatViolation);
+
+    expect(
+      formatted,
+      `The public usage API must not statically reach heavy AI packages.\n\n` +
+        `${formatted.join('\n\n')}`,
+    ).toEqual([]);
+  });
+
+  it('still finds every public usage API root it traces from', () => {
+    for (const root of AI_USAGE_PUBLIC_API_ROOTS) {
+      expect(
+        fs.existsSync(path.join(SRC_ROOT, root)),
+        `public usage API root disappeared: ${root} — update AI_USAGE_PUBLIC_API_ROOTS`,
+      ).toBe(true);
+    }
+  });
+});

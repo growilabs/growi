@@ -13,7 +13,6 @@ import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import ShareLink from '~/server/models/share-link';
 import { configManager } from '~/server/service/config-manager';
 import { isValidWhitelistEntry } from '~/utils/email-whitelist';
 import loggerFactory from '~/utils/logger';
@@ -21,6 +20,7 @@ import {
   prepareDeleteConfigValuesForCalc,
   validateDeleteConfigs,
 } from '~/utils/page-delete-config';
+import { prisma } from '~/utils/prisma';
 
 import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin';
 import { handleSamlUpdate, samlAuthValidator } from './saml';
@@ -1199,14 +1199,18 @@ export const setup = (crowi) => {
     async (req, res) => {
       const page = parseInt(req.query.page) || 1;
       const limit = 10;
-      const linkQuery = {};
       try {
-        const paginateResult = await ShareLink.paginate(linkQuery, {
-          page,
+        const paginateResult = await prisma.sharelinks.paginate({
+          offset: (page - 1) * limit,
           limit,
-          populate: {
-            path: 'relatedPage',
-            select: 'path',
+          include: {
+            relatedPage: {
+              select: {
+                _id: true,
+                id: true,
+                path: true,
+              },
+            },
           },
         });
         return res.apiv3({ paginateResult });
@@ -1246,8 +1250,8 @@ export const setup = (crowi) => {
     adminRequired,
     async (req, res) => {
       try {
-        const removedAct = await ShareLink.remove({});
-        const removeTotal = await removedAct.n;
+        const removedAct = await prisma.sharelinks.deleteMany({});
+        const removeTotal = removedAct.count;
         return res.apiv3({ removeTotal });
       } catch (err) {
         const msg = 'Error occured in delete all share links';

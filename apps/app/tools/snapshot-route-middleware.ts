@@ -32,6 +32,10 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import Crowi from '../src/server/crowi';
+import {
+  listRegisteredRoutes,
+  type RegisteredRoute,
+} from '../src/test-utils/express-route-walker';
 
 const APIV3_MOUNT_PREFIX = '/_api/v3';
 const DEFAULT_OUTPUT = 'tools/authz-matrix/baselines/route-middleware.json';
@@ -57,113 +61,38 @@ type SnapshotEnvelope = {
   entries: RouteEntry[];
 };
 
-/**
- * Extract the static prefix that a mount Layer's regexp matches.
- * Express 4 stores the `regexp` source for `app.use('/prefix', router)` as
- * `/^\/prefix\/?(?=\/|$)/i`; `fast_slash` is true for unprefixed `app.use(router)`.
- */
-function extractMountPrefix(layer: ExpressLayer): string {
-  if (layer.path != null && typeof layer.path === 'string') {
-    return layer.path;
-  }
-  if (layer.regexp?.fast_slash) {
-    return '';
-  }
-  const source = layer.regexp?.source ?? '';
-  // Source shape: "^\/foo\/?(?=\/|$)" — strip anchors and look-ahead.
-  const match = source.match(/^\^\\\/(.*)\\\/\?\(\?=\\\/\|\$\)$/);
-  if (match != null) {
-    return `/${match[1].replace(/\\\//g, '/')}`;
-  }
-  // Parameterized mounts (`/users/:id`) include ([^\/]+?). Preserve the
-  // source so diff is still stable, but mark it so reviewers can spot it.
-  return `<regexp:${source}>`;
-}
-
 function isAnonymous(name: string): boolean {
   return name === '' || name === 'anonymous' || name === '<anonymous>';
 }
 
-type ExpressLayer = {
-  name?: string;
-  path?: string;
-  regexp?: { source: string; fast_slash?: boolean };
-  route?: {
-    path: string | RegExp | Array<string | RegExp>;
-    methods: Record<string, boolean>;
-    stack: Array<{ handle: { name?: string }; name?: string; method?: string }>;
-  };
-  handle:
-    | { stack?: ExpressLayer[]; name?: string }
-    | ((...args: unknown[]) => unknown);
-};
-
-function walkStack(
-  stack: ExpressLayer[],
-  prefix: string,
+function collectApiv3Entries(
+  routes: readonly RegisteredRoute[],
   entries: RouteEntry[],
   violations: AnonymousViolation[],
 ): void {
-  for (const layer of stack) {
-    if (layer.route != null) {
-      // Leaf route. The route.stack entries are per-handler Layer records.
-      const routePath = Array.isArray(layer.route.path)
-        ? layer.route.path.map(String).join('|')
-        : String(layer.route.path);
-      const fullPath = `${prefix}${routePath}`;
+  for (const route of routes) {
+    if (!route.path.startsWith(APIV3_MOUNT_PREFIX)) continue;
 
-      const methods = Object.keys(layer.route.methods)
-        .filter((k) => layer.route?.methods[k])
-        .sort();
-
-      for (const method of methods) {
-        const middlewares: string[] = [];
-        const routeLayers = layer.route.stack.filter(
-          (l) =>
-            l.method == null || l.method.toLowerCase() === method.toLowerCase(),
-        );
-        // The last layer is the route body (handler) itself. Middlewares in
-        // the auth chain must have stable names for diff reliability, but
-        // route bodies are inherently tied to their (path, method) slot and
-        // are allowed to be anonymous inline arrow functions.
-        const lastIndex = routeLayers.length - 1;
-        routeLayers.forEach((rl, index) => {
-          const handleName = (rl.handle?.name ?? '').trim();
-          const layerName = (rl.name ?? '').trim();
-          const effective = handleName !== '' ? handleName : layerName;
-          middlewares.push(effective === '' ? '' : effective);
-
-          const isMiddlewareSlot = index !== lastIndex;
-          if (
-            fullPath.startsWith(APIV3_MOUNT_PREFIX) &&
-            isMiddlewareSlot &&
-            isAnonymous(effective)
-          ) {
-            violations.push({
-              method: method.toUpperCase(),
-              path: fullPath,
-              position: index,
-            });
-          }
+    // The last layer is the route body (handler) itself. Middlewares in
+    // the auth chain must have stable names for diff reliability, but
+    // route bodies are inherently tied to their (path, method) slot and
+    // are allowed to be anonymous inline arrow functions.
+    const lastIndex = route.middlewareNames.length - 1;
+    route.middlewareNames.forEach((name, index) => {
+      if (index !== lastIndex && isAnonymous(name)) {
+        violations.push({
+          method: route.method,
+          path: route.path,
+          position: index,
         });
-
-        if (fullPath.startsWith(APIV3_MOUNT_PREFIX)) {
-          entries.push({
-            method: method.toUpperCase(),
-            path: fullPath,
-            middlewares,
-          });
-        }
       }
-      continue;
-    }
+    });
 
-    // Mount layer: recurse if the handle exposes its own router stack.
-    const handle = layer.handle as { stack?: ExpressLayer[] } | undefined;
-    if (handle?.stack != null && Array.isArray(handle.stack)) {
-      const nestedPrefix = extractMountPrefix(layer);
-      walkStack(handle.stack, `${prefix}${nestedPrefix}`, entries, violations);
-    }
+    entries.push({
+      method: route.method,
+      path: route.path,
+      middlewares: [...route.middlewareNames],
+    });
   }
 }
 
@@ -234,19 +163,13 @@ async function main(): Promise<void> {
   await growi.setupRoutesAtLast();
 
   try {
-    // biome-ignore lint/suspicious/noExplicitAny: Express internal router typing.
-    const router = (growi.express as any)._router as
-      | { stack: ExpressLayer[] }
-      | undefined;
-    if (router == null || !Array.isArray(router.stack)) {
-      throw new Error(
-        'Express _router.stack is not available. Routes may not be attached.',
-      );
-    }
-
+    const routes = listRegisteredRoutes(
+      // biome-ignore lint/suspicious/noExplicitAny: Express internal router access.
+      growi.express as any,
+    );
     const entries: RouteEntry[] = [];
     const violations: AnonymousViolation[] = [];
-    walkStack(router.stack, '', entries, violations);
+    collectApiv3Entries(routes, entries, violations);
 
     if (violations.length > 0) {
       // biome-ignore lint/suspicious/noConsole: Tool script surfaces diagnostics.

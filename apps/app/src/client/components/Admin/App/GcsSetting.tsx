@@ -45,6 +45,7 @@ export const GcsSettingMolecule = (
               data-bs-toggle="dropdown"
               aria-haspopup="true"
               aria-expanded="true"
+              disabled={gcsUseOnlyEnvVars}
             >
               {gcsReferenceFileWithRelayMode &&
                 t('admin:app_setting.file_delivery_method_relay')}
@@ -55,6 +56,7 @@ export const GcsSettingMolecule = (
               <button
                 className="dropdown-item"
                 type="button"
+                disabled={gcsUseOnlyEnvVars}
                 onClick={() => {
                   props.onChangeGcsReferenceFileWithRelayMode(true);
                 }}
@@ -64,6 +66,7 @@ export const GcsSettingMolecule = (
               <button
                 className="dropdown-item"
                 type="button"
+                disabled={gcsUseOnlyEnvVars}
                 onClick={() => {
                   props.onChangeGcsReferenceFileWithRelayMode(false);
                 }}

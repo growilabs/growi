@@ -8,7 +8,7 @@ import type {
   IUserHasId,
   PageGrant,
 } from '@growi/core/dist/interfaces';
-import type { HydratedDocument, Types } from 'mongoose';
+import type { Cursor, HydratedDocument, Types } from 'mongoose';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import type { SupportedActionType } from '~/interfaces/activity';
@@ -21,6 +21,25 @@ import type { PageDocument } from '~/server/models/page';
 import type { PageOperationDocument } from '~/server/models/page-operation';
 import type { UserGroupDocument } from '~/server/models/user-group';
 import type { ActivityActor } from '~/server/service/attachment/attachment-removal-snapshot';
+
+export type DeletionOptions = {
+  isCompletely: boolean;
+  isRecursively: boolean;
+};
+
+export type DeletionVerdict =
+  | 'permitted'
+  | 'forbidden'
+  | 'protected_user_homepage';
+
+export type EmptyTrashResult =
+  | { isForbidden: true }
+  | {
+      isForbidden: false;
+      isAllDeletable: boolean;
+      deletablePages: PageDocument[];
+      nDeletedNonEmptyPages: number;
+    };
 
 export interface IPageService {
   // Page event emitter
@@ -110,6 +129,10 @@ export interface IPageService {
     revisionBody?: string,
   ): Promise<CurrentPageYjsData>;
   updateDescendantCountOfPagesWithPaths(paths: string[]): Promise<void>;
+  recountAndUpdateDescendantCountOfPages(
+    pageCursor: Cursor<unknown>,
+    batchSize: number,
+  ): Promise<void>;
   revertRecursivelyMainOperation(
     page,
     user,
@@ -147,6 +170,24 @@ export interface IPageService {
     activity?,
   ): Promise<void>;
   deletePage(page, user, options, isRecursively: boolean, activityParameters);
+  // Deletion requested by a user: judge the deletion authority before deleting
+  judgeDeletion(
+    page: PageDocument,
+    user: IUserHasId,
+    options: DeletionOptions,
+  ): Promise<DeletionVerdict>;
+  filterPagesByDeletionAuthority(
+    pages: PageDocument[],
+    user: IUserHasId,
+    options: DeletionOptions,
+  ): Promise<PageDocument[]>;
+  deletePagesWithAuthority(
+    pages: PageDocument[],
+    user: IUserHasId,
+    options: DeletionOptions,
+    activityParameters,
+  ): Promise<PageDocument[]>;
+  emptyTrash(user: IUserHasId, activityParameters): Promise<EmptyTrashResult>;
   duplicateRecursivelyMainOperation(
     page: PageDocument,
     newPagePath: string,
@@ -204,8 +245,6 @@ export interface IPageService {
   canDeleteUserHomepageByConfig(): boolean;
 
   isUsersHomepageOwnerAbsent(path: string): Promise<boolean>;
-
-  createTtlIndex(): Promise<void>;
 
   // Normalize parent operations
   getParentAndFillAncestorsByUser(

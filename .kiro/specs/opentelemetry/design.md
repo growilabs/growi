@@ -2,19 +2,19 @@
 
 ## Overview
 
-**Purpose**: GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を、SDK ライフサイクル / Resource Attribute / Custom Metric / HTTP Anonymization の 4 レイヤに分けて責務境界を明文化する大局的なメンテナンス spec。
+**Purpose**: GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を、SDK ライフサイクル / Resource Attribute / Custom Metric の各レイヤに分けて責務境界を明文化する大局的なメンテナンス spec（HTTP の匿名化は `opentelemetry-anonymization` が担う）。
 
 **Users**:
-- GROWI 開発者（メトリクス追加・anonymization handler 追加・SDK バージョンアップを行う）。
+- GROWI 開発者（メトリクス追加・SDK バージョンアップを行う）。
 - OpenTelemetry 受信側インフラ管理者（Prometheus / Grafana / Collector を運用する）。
 
 **Impact**: 既に稼働している実装の現状をスナップショットとして固定化する。新規実装はゼロで、コード変更は伴わない。将来の機能追加・変更は本 spec の Boundary Commitments に従って境界の中で行われる。
 
 ### Goals
 
-- 4 レイヤそれぞれの責務・境界・依存関係を明文化する。
+- 各レイヤ（匿名化を除く）の責務・境界・依存関係を明文化する。
 - Resource Attribute は identity 専用、設定値は `growi.configs` ラベル、観測値は `growi.*` / `system.*` / `process.*` メトリクスへ、というレイヤ分離を維持する。
-- 新規 Custom Metric / Anonymization Handler の追加手順を「テンプレート化」して、追加時のレビュー差分を最小化する。
+- 新規 Custom Metric の追加手順を「テンプレート化」して、追加時のレビュー差分を最小化する。
 - Resource Attribute / Metric / Span Attribute の責務分離（identity / 設定値 / 観測値 / span attribute）を Design Decisions として固定する。
 
 ### Non-Goals
@@ -37,6 +37,7 @@
 - `node-sdk-resource.ts` の `getResource()` / `setResource()`（NodeSDK private `_resource` への reflective アクセサ）。
 - `logger.ts` の `DiagLoggerPinoAdapter` と `initLogger()`。
 - 同一プロセス内の SDK インスタンス二重生成防止（`sdkInstance` モジュール変数）。
+- `otel:anonymizeInBestEffort` が `true` のときのみ、`opentelemetry-anonymization` の `httpInstrumentationConfig` を HTTP instrumentation の constructor 引数に渡す判断。
 
 #### Layer 2: Resource Attribute（identity 専用）
 
@@ -58,13 +59,7 @@
 
 #### Layer 4: HTTP Anonymization
 
-- `anonymization/index.ts` のバレル（`httpInstrumentationConfig` のエクスポート）。
-- `anonymization/anonymize-http-requests.ts` の `startIncomingSpanHook` 実装（module discovery loop）。
-- `anonymization/interfaces/anonymization-module.ts` の `AnonymizationModule` インターフェース。
-- `anonymization/handlers/index.ts` の `anonymizationModules` 配列（4 module の登録順）。
-- 4 つの handler 実装: `search-api-handler.ts`, `page-listing-api-handler.ts`, `page-api-handler.ts`, `page-access-handler.ts`。
-- `anonymization/utils/anonymize-query-params.ts` の `anonymizeQueryParams(target, paramNames)`。
-- `http.target` への匿名化 URL 出力。
+HTTP の匿名化（`anonymization/`）は `opentelemetry-anonymization` が担う。本 spec は Layer 1 で `httpInstrumentationConfig` を渡すかどうかの判断のみを持つ。
 
 #### Layer 5: SemConv ローカルコピー
 
@@ -77,9 +72,8 @@
 - `~/server/service/config-manager` — `otel:*` config 4 種を読み取るのみ。config 定義の追加・改名は config-manager 側の責務。
 - `~/utils/growi-version` — `service.version` の供給元。
 - `~/utils/logger` — pino logger ファクトリ。
-- `@growi/core/dist/utils/page-path-utils` — anonymization で利用する path helper（`isPermalink` / `isUserPage` / `getUsernameByPath` 等）。
 - 各 `@opentelemetry/*` パッケージの内部実装。Auto-instrumentation の挙動チューニング（HTTP / Express / Mongoose 等の挙動は instrumentation の責務）。
-- Trace span への独自 attribute 付与（`http.target` 以外）。
+- Trace span への独自 attribute 付与（HTTP の匿名化は `opentelemetry-anonymization`）。
 - OpenTelemetry Log Signal、ブラウザ telemetry。
 - OTLP wire 仕様および受信側ダッシュボード／アラート。
 
@@ -100,7 +94,7 @@
 - `growiInfoService.getGrowiInfo()` の API 変更（追加フラグ削除、返り値型変更）→ 該当する `application-metrics.ts` / `user-counts-metrics.ts` / `page-counts-metrics.ts` / `application-resource-attributes.ts` の参照を再確認。
 - `@opentelemetry/semantic-conventions` の `service.instance.id` / `http.target` の stable 化 → `semconv.ts` のローカル定数を撤去し、stable import に切り替える。
 - Node.js ランタイム要件のダウングレード（`engines.node` が `^24` 未満）→ `process.constrainedMemory()` / `v8.getHeapStatistics()` の互換性再確認。
-- 新規 anonymization 対象パス／パラメータ追加要望 → handler の登録順と canHandle 衝突の再評価。
+- 新規 anonymization 対象パス／パラメータ追加要望 → `opentelemetry-anonymization` を参照する。
 - 受信側ダッシュボード／クエリの参照更新が未完了の状態でメトリクス／ラベル変更を行う → ロールアウト順序の再調整。
 - 4 instrumentation（HTTP / Express / MongoDB / Mongoose）に新たな instrumentation を追加・削除する場合 → `generateNodeSDKConfiguration` の `instrumentations` 配列と `apps/app/package.json` の `dependencies` を同時に更新し、Turbopack bundling および `.next/server/chunks/` 配下への取り込みを `pnpm run build` 後に検証する。
 - `@opentelemetry/auto-instrumentations-node` への切り戻し提案が出た場合 → research.md の "Decision: 4 instrumentation の direct import 採用" の rationale（`enabled: false` でも 31 instrumentation 全件が instantiate される仕様 / ≈ 11 MB の RSS オーバーヘッド）を再確認し、isolated benchmark での再計測が無い限り採用しない。
@@ -109,15 +103,15 @@
 
 ### Existing Architecture Analysis
 
-`features/opentelemetry/server/` は以下の 5 レイヤを下流方向の単方向依存で構成する:
+`features/opentelemetry/server/` は以下のレイヤを下流方向の単方向依存で構成する:
 
 1. **SDK ライフサイクル** — `node-sdk.ts` が `node-sdk-configuration.ts` / `node-sdk-resource.ts` / `logger.ts` および `custom-metrics/index.ts` を統括する。
 2. **Resource Attribute** — `custom-resource-attributes/` を `node-sdk-configuration.ts` の 2 段階目（`generateAdditionalResourceAttributes`）が consumer として呼ぶ。
 3. **Custom Metric** — `custom-metrics/index.ts` の `setupCustomMetrics()` が起動時に 4 モジュールを順次登録。各モジュールは `growiInfoService` または Node.js stdlib を参照。
-4. **HTTP Anonymization** — `anonymization/index.ts` から export される `httpInstrumentationConfig` が `node-sdk-configuration.ts` の auto-instrumentation 構築時に注入される。
-5. **SemConv** — `semconv.ts` は Layer 1, 2, 4 から参照される葉ノード。
+4. **HTTP Anonymization** — `opentelemetry-anonymization` が担う。`node-sdk-configuration.ts` が `otel:anonymizeInBestEffort` に応じて、その `httpInstrumentationConfig` を auto-instrumentation 構築時に注入する。
+5. **SemConv** — `semconv.ts` は Layer 1, 2 から参照される葉ノード。
 
-各レイヤは独立に拡張可能で、横断的な相互依存（Custom Metric が Anonymization に依存する等）は存在しない。
+各レイヤは独立に拡張可能で、横断的な相互依存は存在しない。
 
 ### Architecture Pattern & Boundary Map
 
@@ -140,16 +134,7 @@ graph TB
         PageMet[page-counts-metrics.ts]
         SysMet[system-metrics.ts]
     end
-    subgraph Layer4["Layer 4: HTTP Anonymization"]
-        AnonIdx[anonymization/index.ts]
-        AnonHook[anonymize-http-requests.ts]
-        AnonHandlers[handlers/index.ts]
-        SearchH[search-api-handler.ts]
-        PageH[page-api-handler.ts]
-        PageListH[page-listing-api-handler.ts]
-        PageAccH[page-access-handler.ts]
-        QPUtil[utils/anonymize-query-params.ts]
-    end
+    AnonIdx[anonymization/index.ts - opentelemetry-anonymization]
     SemConv[semconv.ts]
     GrowiInfo[~/server/service/growi-info]
     ConfigMgr[~/server/service/config-manager]
@@ -170,19 +155,6 @@ graph TB
     AppMet --> ConfigMgr
     UserMet --> GrowiInfo
     PageMet --> GrowiInfo
-    AnonIdx --> AnonHook
-    AnonHook --> AnonHandlers
-    AnonHandlers --> SearchH
-    AnonHandlers --> PageH
-    AnonHandlers --> PageListH
-    AnonHandlers --> PageAccH
-    SearchH --> QPUtil
-    PageH --> QPUtil
-    PageListH --> QPUtil
-    SearchH --> SemConv
-    PageH --> SemConv
-    PageListH --> SemConv
-    PageAccH --> SemConv
 ```
 
 ### Bootstrap Sequence
@@ -264,24 +236,7 @@ apps/app/src/features/opentelemetry/server/
 │   ├── page-counts-metrics.spec.ts
 │   ├── system-metrics.ts                 # Layer 3: system.* / process.* memory metrics
 │   └── system-metrics.spec.ts
-└── anonymization/
-    ├── index.ts                          # Layer 4: barrel
-    ├── anonymize-http-requests.ts        # Layer 4: startIncomingSpanHook + module loop
-    ├── interfaces/
-    │   └── anonymization-module.ts       # Layer 4: AnonymizationModule interface
-    ├── handlers/
-    │   ├── index.ts                      # Layer 4: anonymizationModules[] registration
-    │   ├── search-api-handler.ts
-    │   ├── search-api-handler.spec.ts
-    │   ├── page-listing-api-handler.ts
-    │   ├── page-listing-api-handler.spec.ts
-    │   ├── page-api-handler.ts
-    │   ├── page-api-handler.spec.ts
-    │   ├── page-access-handler.ts
-    │   └── page-access-handler.spec.ts
-    └── utils/
-        ├── anonymize-query-params.ts
-        └── anonymize-query-params.spec.ts
+└── anonymization/                        # Layer 4: `opentelemetry-anonymization` が所有
 ```
 
 ### Extension Templates
@@ -296,28 +251,20 @@ apps/app/src/features/opentelemetry/server/
 6. `custom-metrics/index.ts` の barrel に `export { addXxxMetrics } from './<scope>-metrics';` を追加し、`setupCustomMetrics()` 内で dynamic import + 呼び出し。
 7. `*.spec.ts` を co-locate し、`vi.mock('@opentelemetry/api')` + `mock<Meter>()` パターンで unit test を書く。
 
-#### 新規 Anonymization Handler の追加
-
-1. `anonymization/handlers/<scope>-handler.ts` を新規作成し、`AnonymizationModule` 型の object を export する。
-2. `canHandle(url): boolean` で対象 URL を判別する。先頭一致 / `URL` parser / 正規表現を適宜使用。
-3. `handle(request, url): Record<string, string> | null` で `anonymizeQueryParams()` または独自ロジックを適用し、`{ [ATTR_HTTP_TARGET]: anonymizedUrl }` を返す。何も匿名化しない場合は `null`。
-4. `handlers/index.ts` の `anonymizationModules` 配列に追加。**順序が重要**: より具体的なパスを先に置く（API > 静的 page access）。
-5. `*.spec.ts` を co-locate し、`canHandle` の境界条件と `handle` の URL 変換を網羅する。
-
 ## Requirements Traceability
 
 | Requirement | Summary | Components | Interfaces |
 |-------------|---------|------------|------------|
-| 1.1–1.4 | SDK ライフサイクルと有効化制御 | NodeSdkLifecycle, OverwriteSdkDisabled | `initInstrumentation()`, `setupAdditionalResourceAttributes()`, `startOpenTelemetry()` |
+| 1.1–1.5 | SDK ライフサイクルと有効化制御 | NodeSdkLifecycle, OverwriteSdkDisabled | `initInstrumentation()`, `setupAdditionalResourceAttributes()`, `startOpenTelemetry()` |
 | 2.1–2.4 | identity 専用 Resource Attribute | OsResourceAttributes, ApplicationResourceAttributes, NodeSdkConfiguration | `getOsResourceAttributes()`, `getApplicationResourceAttributes()`, `generateAdditionalResourceAttributes()` |
 | 3.1–3.5 | GROWI 設定情報の info-gauge ラベル統合 | ApplicationMetrics | `addApplicationMetrics()` の observe ラベル |
 | 4.1–4.4 | 業務カウントメトリクス | UserCountsMetrics, PageCountsMetrics | `addUserCountsMetrics()`, `addPageCountsMetrics()` |
 | 5.1–5.5 | コンテナ運用に対応したメモリ系メトリクス | SystemMetrics | `addSystemMetrics()` |
-| 6.1–6.5 | HTTP リクエストの best-effort anonymization | HttpInstrumentationConfig, AnonymizationModules | `httpInstrumentationConfig.startIncomingSpanHook`, 各 `AnonymizationModule.{canHandle,handle}` |
+| 6.x | （欠番）HTTP の匿名化 | — | `opentelemetry-anonymization` を参照 |
 | 7.1–7.3 | Diag Logger と pino の統合 | DiagLoggerPinoAdapter | `initLogger()` |
 | 8.1–8.3 | メトリクスエクスポートと SDK 設定 | NodeSdkConfiguration | `generateNodeSDKConfiguration()` の reader / exporter / instrumentation 設定 |
 | 9.1–9.2 | SemConv の不安定 attribute のローカルコピー | SemConv | `semconv.ts` の文字列定数 |
-| 10.1–10.3 | 拡張・追加時の境界遵守 | CustomMetricsIndex, AnonymizationHandlersIndex | 拡張テンプレート（File Structure Plan 参照） |
+| 10.1–10.3 | 拡張・追加時の境界遵守 | CustomMetricsIndex | 拡張テンプレート（File Structure Plan 参照） |
 
 ## Components and Interfaces
 
@@ -570,102 +517,7 @@ export { addApplicationMetrics, addPageCountsMetrics, addSystemMetrics, addUserC
 
 ### Layer 4: HTTP Anonymization
 
-#### HttpInstrumentationConfig
-
-| Field | Detail |
-|-------|--------|
-| Intent | `@opentelemetry/instrumentation-http` の `startIncomingSpanHook` に注入し、登録された anonymization module を順次評価する |
-| Requirements | 6.1, 6.5 |
-
-**Responsibilities & Constraints**
-- `startIncomingSpanHook(request)` で URL を取り出し、`anonymizationModules` を `canHandle(url)` で順次フィルタ、マッチした module の `handle(request, url)` の戻り値（`{ [ATTR_HTTP_TARGET]: <anonymized> }` または `null`）を `Object.assign` で集約。
-- 注入は `node-sdk-configuration.ts` 経由で、`otel:anonymizeInBestEffort` が `true` のときのみ行う。
-
-##### Service Interface
-```typescript
-export const httpInstrumentationConfig: InstrumentationConfigMap['@opentelemetry/instrumentation-http'];
-```
-
-#### AnonymizationModule（interface）
-
-| Field | Detail |
-|-------|--------|
-| Intent | 個別 anonymization handler の共通契約 |
-| Requirements | 6.1, 6.2, 6.3, 6.4, 10.2 |
-
-##### Interface
-```typescript
-export interface AnonymizationModule {
-  canHandle(url: string): boolean;
-  handle(request: IncomingMessage, url: string): Record<string, string> | null;
-}
-```
-
-#### AnonymizationHandlersIndex
-
-| Field | Detail |
-|-------|--------|
-| Intent | 登録済み handler のコレクション。**配列順 = 評価順**で、より具体的なパスから書く。 |
-| Requirements | 6.2, 6.3, 6.4, 10.2 |
-
-**Registration Order**
-1. `searchApiModule` — 検索 API
-2. `pageListingApiModule` — page-listing API
-3. `pageApiModule` — pages/list 系 API
-4. `pageAccessModule` — 非 API ページアクセス（最も汎用的なため最後）
-
-#### SearchApiModule
-
-| Field | Detail |
-|-------|--------|
-| Intent | `/_api/search`, `/_search` の `q` クエリパラメータを匿名化 |
-| Requirements | 6.2 |
-
-**canHandle**: `/\/_api\/search(\?|$)/` または `/\/_search(\?|$)/` または `'/_api/search/'` / `'/_search/'` を含む。
-**handle**: `q` パラメータが含まれていれば `anonymizeQueryParams(url, ['q'])`。
-
-#### PageListingApiModule
-
-| Field | Detail |
-|-------|--------|
-| Intent | `/_api/v3/page-listing/{ancestors-children,children,item}` の `path` パラメータを匿名化 |
-| Requirements | 6.3 |
-
-#### PageApiModule
-
-| Field | Detail |
-|-------|--------|
-| Intent | `/_api/v3/pages/{list,subordinated-list}` および `/_api/v3/page/{check-page-existence,get-page-paths-with-descendant-count}` の `path` / `paths` パラメータを匿名化 |
-| Requirements | 6.3 |
-
-#### PageAccessModule
-
-| Field | Detail |
-|-------|--------|
-| Intent | API 以外のページアクセスのうち、`isCreatablePage` を満たすパスのみ匿名化。permalink（ObjectId）は素通し、user ページはユーザー名と残りパスを別々にハッシュ。 |
-| Requirements | 6.4 |
-
-**Behavior**:
-- ルート `/`、静的リソース（`/static/`, `/_next/`, `/favicon`, `/assets/`, 拡張子付き）、`/user`（users top page）、permalink を除外。
-- user page (`/user/<name>/...`) はユーザー名と残りパスを SHA-256 prefix（16 文字）で別々にハッシュ → `/user/[USERNAME_HASHED:<hash>][/?][HASHED:<hash>]`。
-- それ以外の通常 page はパス全体を SHA-256 prefix で 1 ハッシュ → `[HASHED:<hash>]`。
-
-#### AnonymizeQueryParams（utility）
-
-| Field | Detail |
-|-------|--------|
-| Intent | クエリパラメータの値を `[ANONYMIZED]` リテラルに置換する純粋関数 |
-| Requirements | 6.2, 6.3 |
-
-##### Service Interface
-```typescript
-export function anonymizeQueryParams(target: string, paramNames: string[]): string;
-```
-
-**Behavior**:
-- 通常パラメータは `[ANONYMIZED]` で置換。値が JSON 配列フォーマットなら `["[ANONYMIZED]"]` を返す。
-- `paramName[]` 形式の配列パラメータには `[ANONYMIZED]` を 1 つだけ残す。
-- 変更が無ければ入力をそのまま返す（無駄な URL 再構築を避ける）。
+`opentelemetry-anonymization` を参照。
 
 ### Layer 5: SemConv ローカルコピー
 
@@ -694,7 +546,6 @@ export const ATTR_HTTP_TARGET = 'http.target';
 - **Layer 1（SDK lifecycle）**: SDK 構築失敗時のみ throw を許容（起動を継続できないため）。Resource 取得失敗は warn ログでスキップ。
 - **Layer 2（Resource Attribute）**: `growiInfoService` 失敗時は try/catch で空 `Attributes` を返す（SDK 起動は継続可能）。
 - **Layer 3（Custom Metric）**: 各 `addBatchObservableCallback` 内で try/catch。例外時は `diag.createComponentLogger(...).error(...)` を呼び、その collection cycle では observe を 1 回も呼ばない。次の cycle で再試行。
-- **Layer 4（Anonymization）**: 各 handler の `handle` / `canHandle` で try/catch、失敗時は anonymization をスキップし元の URL のまま span 属性に乗せる（または何もしない）。
 
 ### Error Categories and Responses
 
@@ -703,7 +554,6 @@ export const ATTR_HTTP_TARGET = 'http.target';
 | 起動時 SDK 構築失敗 | `OTLPTraceExporter()` のコンストラクタ例外 | プロセス起動継続不可。throw を上位に伝播。 |
 | Resource 取得失敗 | `growiInfoService.getGrowiInfo()` 例外 | `logger.error` で記録し空 `Attributes` 返却。 |
 | Metric collection 例外 | `growiInfoService` 失敗、stdlib 失敗（理論上発生しない） | `loggerDiag.error` で記録、当該 cycle の observe をスキップ。 |
-| Anonymization 失敗 | URL parse 失敗、handler 内部例外 | `diag` logger に warn / debug、URL は元のまま。 |
 | `process.constrainedMemory()` の戻り値が 0 | 非コンテナ環境 | `system.memory.limit` のみスキップ。他 5 メトリクスは observe。 |
 
 ### Monitoring
@@ -713,7 +563,6 @@ export const ATTR_HTTP_TARGET = 'http.target';
   - `growi:custom-metrics:user-counts`
   - `growi:custom-metrics:page-counts`
   - `growi:custom-metrics:system`
-  - `growi:anonymization:<handler-name>`
 - アプリケーションログ（pino）: `loggerFactory('growi:opentelemetry:<sub-namespace>')` で起動完了メッセージを info ログ出力。
 
 ## Testing Strategy
@@ -724,7 +573,6 @@ export const ATTR_HTTP_TARGET = 'http.target';
 
 - **Layer 2 spec**（`os-resource-attributes.spec.ts`, `application-resource-attributes.spec.ts`）: `vi.mock('node:os')` で stdlib を、`vi.mock` で `growiInfoService` をモックし、戻り値 attributes のキー集合を assert。
 - **Layer 3 spec**: `vi.mock('@opentelemetry/api')` で `metrics`, `diag` をモック、`vitest-mock-extended` の `mock<Meter>()` / `mock<ObservableGauge>()` で gauge を取得し、`meter.addBatchObservableCallback.mock.calls[0][0]` でコールバックを取り出して直接実行する。`result.observe` のモックを assert する。
-- **Layer 4 spec**: handler ごとに `canHandle` の境界条件（先頭一致 / クエリ有無 / 静的リソース除外 / permalink 除外）と `handle` の URL 変換を網羅。`anonymize-query-params.spec.ts` で JSON 配列 / `paramName[]` フォーマットを網羅。
 - **SystemMetrics spec**: `vi.mock('node:os')`, `vi.mock('node:v8')`, `vi.spyOn(process, 'constrainedMemory')`, `vi.spyOn(process, 'memoryUsage')` を組み合わせる。
 
 ### Integration Tests
@@ -739,4 +587,4 @@ export const ATTR_HTTP_TARGET = 'http.target';
   - `growi.configs` の `attachment_type` ラベルが期待値（`aws` / `gcs` / `gridfs` / `local` / `mongodb` / `azure` 等）または空文字であること。
   - `system.host.memory.total` / `process.memory.usage` / `process.runtime.v8.heap.*` が約 5 分間隔で届くこと。
   - Docker container で `--memory=512m` を指定した場合に `system.memory.limit` が約 `536870912`、未指定時は emit されないこと。
-- `OPENTELEMETRY_ANONYMIZE_IN_BEST_EFFORT=true` のとき、検索 / 編集等の操作後 span の `http.target` が `[ANONYMIZED]` / `[HASHED:...]` で置換されていること。
+- 匿名化の確認手順は `opentelemetry-anonymization` を参照。

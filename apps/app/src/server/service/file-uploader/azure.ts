@@ -25,7 +25,10 @@ import {
   type RespondOptions,
   ResponseMode,
 } from '~/server/interfaces/attachment';
-import type { IAttachmentDocument } from '~/server/models/attachment';
+import type {
+  AttachmentDraft,
+  AttachmentWithComputed,
+} from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
 import { configManager } from '../config-manager';
@@ -140,9 +143,9 @@ async function getContainerClient(): Promise<ContainerClient> {
   return client;
 }
 
-function getFilePathOnStorage(attachment: IAttachmentDocument) {
+function getFilePathOnStorage(attachment: AttachmentDraft) {
   const dirName =
-    attachment.page != null
+    attachment.pageId != null
       ? FilePathOnStoragePrefix.attachment
       : FilePathOnStoragePrefix.user;
   return urljoin(dirName, attachment.fileName);
@@ -179,7 +182,7 @@ class AzureFileUploader extends AbstractFileUploader {
   /**
    * @inheritdoc
    */
-  override async deleteFile(attachment: IAttachmentDocument): Promise<void> {
+  override async deleteFile(attachment: AttachmentWithComputed): Promise<void> {
     const filePath = getFilePathOnStorage(attachment);
     const containerClient = await getContainerClient();
     const blockBlobClient = await containerClient.getBlockBlobClient(filePath);
@@ -195,7 +198,7 @@ class AzureFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override async deleteFiles(
-    attachments: IAttachmentDocument[],
+    attachments: AttachmentWithComputed[],
   ): Promise<void> {
     if (!this.getIsUploadable()) {
       throw new Error('Azure is not configured.');
@@ -210,7 +213,7 @@ class AzureFileUploader extends AbstractFileUploader {
    */
   override async uploadAttachment(
     readable: Readable,
-    attachment: IAttachmentDocument,
+    attachment: AttachmentDraft,
   ): Promise<void> {
     if (!this.getIsUploadable()) {
       throw new Error('Azure is not configured.');
@@ -282,7 +285,7 @@ class AzureFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override async findDeliveryFile(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
   ): Promise<NodeJS.ReadableStream> {
     if (!this.getIsReadable()) {
       throw new Error('Azure is not configured.');
@@ -310,7 +313,7 @@ class AzureFileUploader extends AbstractFileUploader {
    * @see https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-create-user-delegation-sas-javascript
    */
   override async generateTemporaryUrl(
-    attachment: IAttachmentDocument,
+    attachment: AttachmentWithComputed,
     opts?: RespondOptions,
   ): Promise<TemporaryUrl> {
     if (!this.getIsUploadable()) {

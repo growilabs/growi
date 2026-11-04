@@ -55,19 +55,57 @@ These rules are versioned (v1) and are **immutable after the first release**.
 
 ---
 
-## Excluding `/user` pages with git sparse-checkout
+## Excluding `/user` pages from a clone
 
-To clone a vault while excluding all personal pages stored under `user/`, use git sparse-checkout:
+To clone a vault without the personal pages stored under `user/`:
 
 ```bash
-git clone --no-checkout <url> my-growi-vault
+git clone --filter=sparse:oid=ab678fd8055db49e954e61acfdb76add2a6291b9 --no-checkout <url> my-growi-vault
 cd my-growi-vault
-git sparse-checkout init --cone
-git sparse-checkout set '/*' '!/user'
+git sparse-checkout init --no-cone
+printf '/*\n!/user\n' | git sparse-checkout set --stdin
 git checkout HEAD
 ```
 
-> **Important**: sparse-checkout only controls which files are materialized in your **working tree**. It does not affect the objects transferred from the server — the full history is still fetched. To limit server-side object delivery, a partial-clone filter (e.g. `--filter=blob:none`) is needed in addition to sparse-checkout.
+Both halves are needed, and they do different jobs:
+
+- **`--filter=sparse:oid=<object name>` is what shrinks the transfer.** It names a blob in the repository holding the pattern set `/*` and `!/user`, and the server applies those patterns before building the pack — the excluded page bodies are never sent. Measured on a 20,000-page view with a quarter of the pages under `user/`: 6.3 MB → 4.8 MB, in a single request.
+- **`git sparse-checkout` decides what lands in your working tree.** On its own it transfers nothing less; combined with the filter it also has to be set to the *same* patterns, so your checkout never asks for a page body the server left out.
+
+The object name is fixed: it is the content address of those exact patterns, so it only changes if the published pattern set does. The server keeps the blob anchored to a ref of its own so garbage collection cannot remove it.
+
+Two details of the sparse-checkout call are easy to get wrong:
+
+- **`--no-cone` is required.** Cone mode cannot express an exclusion, so `git sparse-checkout set '/*' '!/user'` fails with `fatal: specify directories rather than patterns (no leading slash)`, and the `git checkout` that follows then leaves you with an *empty* working tree rather than one without `user/`.
+- **Pass the patterns on stdin.** On Git Bash (MSYS) an argument that looks like an absolute path is rewritten before git ever sees it, which mangles `!/user`. Reading from `--stdin` sidesteps that, and also avoids per-shell quoting differences.
+
+### What the filtered clone can and cannot do afterwards
+
+The clone is a partial clone: git records `remote.origin.promisor=true` and `remote.origin.partialclonefilter` locally. Ordinary work inside it (`git status`, `git log`, `git pull`, grepping the checked-out files) behaves normally.
+
+What it cannot do is obtain the excluded pages later. The server never lets a client ask for an object by name, so a command that needs one of those bodies stops at:
+
+```console
+error: Server does not allow request for unadvertised object <object name>
+fatal: could not fetch <object name> from promisor remote
+```
+
+If you need the personal pages, take a fresh clone without the filter.
+
+### Other filters are refused
+
+`sparse:oid` with a published pattern set is the only filter this server serves. Anything else — `blob:none`, `blob:limit`, `tree:<n>`, `object:type`, `combine:`, or a `sparse:oid` naming some other object — is refused when the clone starts:
+
+```console
+$ git clone --filter=blob:none <url> my-growi-vault
+fatal: remote error: vault: unsupported partial-clone filter; this server serves only --filter=sparse:oid=<published spec> (see the vault-manager README)
+```
+
+Those filters all work the same way: the server sends a pack with the file bodies left out, and the client then fetches each missing object **by name** as it needs it. Naming objects is exactly what a client is not allowed to do here (a view scopes which refs it can see, not which objects exist), so such a clone would break at its first checkout rather than at the clone. It is refused up front instead.
+
+### `--depth=1`
+
+A shallow clone works but saves little: each view's history is squashed to a single parentless commit whenever it exceeds `VAULT_SQUASH_COMMIT_THRESHOLD` commits (default 1000) or `VAULT_SQUASH_AGE_HOURS` (default 1), so there is not much history to omit in the first place. What dominates the transfer is the current snapshot, not the history.
 
 ---
 
@@ -80,6 +118,9 @@ The following items are **not supported** in the current MVP:
 - **Per-page metadata** — comments, likes, bookmarks, tags, and similar social/annotation metadata are not exported.
 - **Revision history before feature activation** — only revisions created after the vault feature is enabled are captured; pre-existing history is not back-filled.
 - **Drafts and unpublished pages** — only published pages are exported to the vault.
+- **Partial-clone filters other than the published `sparse:oid` specs** — `blob:none`, `blob:limit`, `tree:<n>`, `object:type` and `combine:` are refused when the clone starts, because each of them leaves the client to fetch objects by name afterwards and the server does not serve those requests (see above).
+- **Client-chosen exclusion patterns** — the transfer can only be narrowed by a pattern set the server publishes; there is currently one (`user/` excluded).
+- **Fetching an excluded page into a filtered clone** — the server never serves a request for an object by name, so the pages a filter left out cannot be obtained later. Take a fresh clone without the filter instead.
 
 ### Known limitation: long paths on Windows
 
@@ -102,6 +143,16 @@ Highlights of the refactor:
 - A dedicated `Dockerfile.dockerignore` to shrink the build context.
 - OCI standard labels (`org.opencontainers.image.source`, `title`, `description`, `vendor`, `authors`) on the release stage.
 - **Non-root runtime**: `docker/docker-entrypoint.ts` (run via Node 24 type stripping) creates and chowns the bare repo on the shared `/data` volume as root, then drops to the `node` user (uid/gid 1000) via native `process.setuid/setgid` before exec'ing the app. This keeps `vault-manager` and `apps/app` on a single uid so they can share the `/data` volume (Requirement 10.3); no `gosu`/`setpriv` binary is needed.
+
+### Releasing
+
+The image is released through changesets, the same flow `@growi/core` and `@growi/pluginkit` use — there is no release branch and no RC version marker.
+
+1. In the PR that changes `apps/growi-vault-manager/**` (or `packages/core` / `packages/logger`, which are compiled into the image), run `npx changeset` and give `@growi/vault-manager` a `patch` / `minor` / `major` bump. Update the "Supported tags" list in `docker/README.md` in the same PR — changesets does not manage that file.
+2. Merging that PR makes changesets open or update a **Release Subpackages** PR against `master`, which bumps `package.json` and writes `CHANGELOG.md`.
+3. Merging the Release Subpackages PR publishes the image. `.github/workflows/release-vault.yml` watches pushes to `master` that touch `apps/growi-vault-manager/package.json`, publishes when the version is a stable one with no `vault-manager/v<version>` tag yet, and creates that tag afterwards.
+
+Because the gate is "stable version, not tagged yet", a push that edits `package.json` without releasing does nothing, and the same version can never be published twice.
 
 ### Cross-repository impact: `growi-docker-compose`
 

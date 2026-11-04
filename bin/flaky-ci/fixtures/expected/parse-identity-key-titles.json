@@ -1,0 +1,652 @@
+[
+  {
+    "title": "flaky: playwright:chromium:playwright/20-basic-features/click-page-icons.spec.ts:Successfully display list of \"seen by user\"",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/20-basic-features/click-page-icons.spec.ts",
+      "testTitle": "Successfully display list of \"seen by user\""
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/20-basic-features/comments.spec.ts:Successfully add comments",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/20-basic-features/comments.spec.ts",
+      "testTitle": "Successfully add comments"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/20-basic-features/create-page-button.spec.ts:click and autofocus to title text input",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/20-basic-features/create-page-button.spec.ts",
+      "testTitle": "click and autofocus to title text input"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/20-basic-features/create-page-button.spec.ts:open and create today page",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/20-basic-features/create-page-button.spec.ts",
+      "testTitle": "open and create today page"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/20-basic-features/inline-comment.spec.ts:Inline comment - hover/click/tap on a saved body highlight opens a preview popover with simple reply (Req 2.1-2.5) > Requirement 2.3: submitting a reply from the popover posts it, and it appears nested under the origin item in the bottom list",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/20-basic-features/inline-comment.spec.ts",
+      "testTitle": "Inline comment - hover/click/tap on a saved body highlight opens a preview popover with simple reply (Req 2.1-2.5) > Requirement 2.3: submitting a reply from the popover posts it, and it appears nested under the origin item in the bottom list"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/20-basic-features/inline-comment.spec.ts:Inline comment - visual refresh: mockup cross-check captures > Capture popover states 5 (normal) and 6 (edit mode) in DARK mode (Req 4.4)",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/20-basic-features/inline-comment.spec.ts",
+      "testTitle": "Inline comment - visual refresh: mockup cross-check captures > Capture popover states 5 (normal) and 6 (edit mode) in DARK mode (Req 4.4)"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/20-basic-features/sticky-features.spec.ts:Subnavigation displays changes on scroll down and up",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/20-basic-features/sticky-features.spec.ts",
+      "testTitle": "Subnavigation displays changes on scroll down and up"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/20-basic-features/sticky-features.spec.ts:Subnavigation is not displayed when move to other pages",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/20-basic-features/sticky-features.spec.ts",
+      "testTitle": "Subnavigation is not displayed when move to other pages"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/20-basic-features/sticky-features.spec.ts:Subnavigation is sticky when on small window",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/20-basic-features/sticky-features.spec.ts",
+      "testTitle": "Subnavigation is sticky when on small window"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/20-basic-features/use-tools.spec.ts:Successfully add new tag",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/20-basic-features/use-tools.spec.ts",
+      "testTitle": "Successfully add new tag"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/21-basic-features-for-guest/sticky-for-guest.spec.ts:Sub navigation sticky changes when scrolling down and up",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/21-basic-features-for-guest/sticky-for-guest.spec.ts",
+      "testTitle": "Sub navigation sticky changes when scrolling down and up"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/23-editor/emacs-keymap.spec.ts:C-c C-s b should wrap text in bold markdown markers (Req 4.1)",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/23-editor/emacs-keymap.spec.ts",
+      "testTitle": "C-c C-s b should wrap text in bold markdown markers (Req 4.1)"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/23-editor/vim-keymap.spec.ts:Write command (:w) should save the page successfully",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/23-editor/vim-keymap.spec.ts",
+      "testTitle": "Write command (:w) should save the page successfully"
+    }
+  },
+  {
+    "title": "flaky: playwright:chromium:playwright/60-home/home.spec.ts:Visit User home",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "chromium",
+      "specPath": "playwright/60-home/home.spec.ts",
+      "testTitle": "Visit User home"
+    }
+  },
+  {
+    "title": "flaky: playwright:firefox:playwright/20-basic-features/comments.spec.ts:Successfully reply comments",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "firefox",
+      "specPath": "playwright/20-basic-features/comments.spec.ts",
+      "testTitle": "Successfully reply comments"
+    }
+  },
+  {
+    "title": "flaky: playwright:firefox:playwright/20-basic-features/create-page-button.spec.ts:open and create today page",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "firefox",
+      "specPath": "playwright/20-basic-features/create-page-button.spec.ts",
+      "testTitle": "open and create today page"
+    }
+  },
+  {
+    "title": "flaky: playwright:firefox:playwright/20-basic-features/sticky-features.spec.ts:Able to click buttons on subnavigation switcher when sticky",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "firefox",
+      "specPath": "playwright/20-basic-features/sticky-features.spec.ts",
+      "testTitle": "Able to click buttons on subnavigation switcher when sticky"
+    }
+  },
+  {
+    "title": "flaky: playwright:firefox:playwright/20-basic-features/sticky-features.spec.ts:Subnavigation is not displayed when move to other pages",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "firefox",
+      "specPath": "playwright/20-basic-features/sticky-features.spec.ts",
+      "testTitle": "Subnavigation is not displayed when move to other pages"
+    }
+  },
+  {
+    "title": "flaky: playwright:firefox:playwright/20-basic-features/sticky-features.spec.ts:Subnavigation is sticky when on small window",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "firefox",
+      "specPath": "playwright/20-basic-features/sticky-features.spec.ts",
+      "testTitle": "Subnavigation is sticky when on small window"
+    }
+  },
+  {
+    "title": "flaky: playwright:firefox:playwright/22-sharelink/access-to-sharelink.spec.ts:The sharelink page is successfully loaded",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "firefox",
+      "specPath": "playwright/22-sharelink/access-to-sharelink.spec.ts",
+      "testTitle": "The sharelink page is successfully loaded"
+    }
+  },
+  {
+    "title": "flaky: playwright:firefox:playwright/23-editor/emacs-keymap.spec.ts:C-c C-n should navigate cursor to the next heading (Req 9.3)",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "firefox",
+      "specPath": "playwright/23-editor/emacs-keymap.spec.ts",
+      "testTitle": "C-c C-n should navigate cursor to the next heading (Req 9.3)"
+    }
+  },
+  {
+    "title": "flaky: playwright:firefox:playwright/23-editor/vim-keymap.spec.ts:Write command (:w) should save the page successfully",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "firefox",
+      "specPath": "playwright/23-editor/vim-keymap.spec.ts",
+      "testTitle": "Write command (:w) should save the page successfully"
+    }
+  },
+  {
+    "title": "flaky: playwright:playwright/20-basic-features/comments.spec.ts:Successfully add comments",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": null,
+      "specPath": "playwright/20-basic-features/comments.spec.ts",
+      "testTitle": "Successfully add comments"
+    }
+  },
+  {
+    "title": "flaky: playwright:webkit:playwright/20-basic-features/comments.spec.ts:Successfully add comments",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "webkit",
+      "specPath": "playwright/20-basic-features/comments.spec.ts",
+      "testTitle": "Successfully add comments"
+    }
+  },
+  {
+    "title": "flaky: playwright:webkit:playwright/20-basic-features/comments.spec.ts:Successfully reply comments",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "webkit",
+      "specPath": "playwright/20-basic-features/comments.spec.ts",
+      "testTitle": "Successfully reply comments"
+    }
+  },
+  {
+    "title": "flaky: playwright:webkit:playwright/20-basic-features/sticky-features.spec.ts:Able to click buttons on subnavigation switcher when sticky",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "webkit",
+      "specPath": "playwright/20-basic-features/sticky-features.spec.ts",
+      "testTitle": "Able to click buttons on subnavigation switcher when sticky"
+    }
+  },
+  {
+    "title": "flaky: playwright:webkit:playwright/20-basic-features/sticky-features.spec.ts:Subnavigation displays changes on scroll down and up",
+    "parsed": {
+      "shape": "precise",
+      "kind": "playwright",
+      "browser": "webkit",
+      "specPath": "playwright/20-basic-features/sticky-features.spec.ts",
+      "testTitle": "Subnavigation displays changes on scroll down and up"
+    }
+  },
+  {
+    "title": "flaky: vitest:packages/logger/src/logger-factory.spec.ts:unhandled exception - Cannot find module dev/bunyan-format.js (thread-stream worker)",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "packages/logger/src/logger-factory.spec.ts",
+      "testTitle": "unhandled exception - Cannot find module dev/bunyan-format.js (thread-stream worker)"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/client/components/Admin/App/FileUploadSetting.spec.tsx:FileUploadSetting > renders the update button when not on GROWI.cloud",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/client/components/Admin/App/FileUploadSetting.spec.tsx",
+      "testTitle": "FileUploadSetting > renders the update button when not on GROWI.cloud"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/client/components/Admin/App/FileUploadSetting.spec.tsx:FileUploadSetting > still renders the update button on GROWI.cloud, so cloud-editable fields (e.g. relay mode) can be saved",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/client/components/Admin/App/FileUploadSetting.spec.tsx",
+      "testTitle": "FileUploadSetting > still renders the update button on GROWI.cloud, so cloud-editable fields (e.g. relay mode) can be saved"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/client/components/Admin/Common/AdminCodeEditor.spec.tsx:AdminCodeEditor > accessible label > puts aria-label on the focusable content region, not the outer wrapper",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/client/components/Admin/Common/AdminCodeEditor.spec.tsx",
+      "testTitle": "AdminCodeEditor > accessible label > puts aria-label on the focusable content region, not the outer wrapper"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/client/components/Admin/Common/AdminCodeEditor.spec.tsx:AdminCodeEditor > controlled value > reflects an external value update (e.g. react-hook-form reset) into the editor",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/client/components/Admin/Common/AdminCodeEditor.spec.tsx",
+      "testTitle": "AdminCodeEditor > controlled value > reflects an external value update (e.g. react-hook-form reset) into the editor"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/client/components/Admin/Common/AdminCodeEditor.spec.tsx:AdminCodeEditor > editing aids > renders the line-number gutter",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/client/components/Admin/Common/AdminCodeEditor.spec.tsx",
+      "testTitle": "AdminCodeEditor > editing aids > renders the line-number gutter"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/client/components/Admin/Common/AdminCodeEditor.spec.tsx:AdminCodeEditor > theme following > applies the dark theme when in dark mode",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/client/components/Admin/Common/AdminCodeEditor.spec.tsx",
+      "testTitle": "AdminCodeEditor > theme following > applies the dark theme when in dark mode"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/client/components/PageComment/CommentEditor.spec.tsx:unhandled exception - Failed to resolve import \"../GrowiEditor.vendor-styles.prebuilt\"",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/client/components/PageComment/CommentEditor.spec.tsx",
+      "testTitle": "unhandled exception - Failed to resolve import \"../GrowiEditor.vendor-styles.prebuilt\""
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/backlinks/server/services/page-link-lifecycle.integ.ts:unhandled rejection - Target not found",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/backlinks/server/services/page-link-lifecycle.integ.ts",
+      "testTitle": "unhandled rejection - Target not found"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/contribution-graph/server/routes/get-contributions.spec.ts:getContributionsHandler",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/contribution-graph/server/routes/get-contributions.spec.ts",
+      "testTitle": "getContributionsHandler"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/external-user-group/server/service/external-user-group-sync.integ.ts:syncs groups and deletes groups that do not exist externally",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/external-user-group/server/service/external-user-group-sync.integ.ts",
+      "testTitle": "syncs groups and deletes groups that do not exist externally"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/external-user-group/server/service/external-user-group-sync.integ.ts:unhandled rejection - MongoNotConnectedError (Client must be connected before running operations)",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/external-user-group/server/service/external-user-group-sync.integ.ts",
+      "testTitle": "unhandled rejection - MongoNotConnectedError (Client must be connected before running operations)"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/growi-plugin/server/services/growi-plugin/growi-plugin.integ.ts:findThemePlugin() should return data with metadata and manifest",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/growi-plugin/server/services/growi-plugin/growi-plugin.integ.ts",
+      "testTitle": "findThemePlugin() should return data with metadata and manifest"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/growi-plugin/server/services/growi-plugin/growi-plugin.integ.ts:install() should success",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/growi-plugin/server/services/growi-plugin/growi-plugin.integ.ts",
+      "testTitle": "install() should success"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/growi-plugin/server/services/growi-plugin/growi-plugin.integ.ts:install() should success (re-install)",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/growi-plugin/server/services/growi-plugin/growi-plugin.integ.ts",
+      "testTitle": "install() should success (re-install)"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/growi-vault/server/services/reconcile/__tests__/reconcile-flow.integ.ts:emits partial-acl-filtered audit event when ACL restricts eligible pages",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/growi-vault/server/services/reconcile/__tests__/reconcile-flow.integ.ts",
+      "testTitle": "emits partial-acl-filtered audit event when ACL restricts eligible pages"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/growi-vault/server/services/reconcile/__tests__/reconcile-orchestrator-overhead.integ.ts:accept gate resolves within 200ms for a normal request",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/growi-vault/server/services/reconcile/__tests__/reconcile-orchestrator-overhead.integ.ts",
+      "testTitle": "accept gate resolves within 200ms for a normal request"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/growi-vault/server/services/reconcile/__tests__/reconcile-orchestrator-overhead.integ.ts:resolves while the reconcile it scheduled is still in flight",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/growi-vault/server/services/reconcile/__tests__/reconcile-orchestrator-overhead.integ.ts",
+      "testTitle": "resolves while the reconcile it scheduled is still in flight"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/growi-vault/server/services/reconcile/__tests__/reconcile-orchestrator-overhead.integ.ts:vault_instructions count equals N when each page has a unique namespace",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/growi-vault/server/services/reconcile/__tests__/reconcile-orchestrator-overhead.integ.ts",
+      "testTitle": "vault_instructions count equals N when each page has a unique namespace"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/features/rate-limiter/middleware/consume-points.integ.ts:Should trigger a rate limit error when maxRequest is exceeded (maxRequest: 500)",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/features/rate-limiter/middleware/consume-points.integ.ts",
+      "testTitle": "Should trigger a rate limit error when maxRequest is exceeded (maxRequest: 500)"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/models/v5.page.integ.ts:Page > updatePage with overwriteScopesOfDescendants false > Changing grant to GRANT_OWNER(onlyme) > successfully change to GRANT_OWNER from GRANT_RESTRICTED",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/models/v5.page.integ.ts",
+      "testTitle": "Page > updatePage with overwriteScopesOfDescendants false > Changing grant to GRANT_OWNER(onlyme) > successfully change to GRANT_OWNER from GRANT_RESTRICTED"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/models/v5.page.integ.ts:beforeAll hook timeout (10000ms) — getInstance()",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/models/v5.page.integ.ts",
+      "testTitle": "beforeAll hook timeout (10000ms) — getInstance()"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/routes/apiv3/g2g-transfer-import-concurrency.integ.ts:receive route POST / — the import claim and the received archive > keeps refusing while an abandoned request's import is still running, and accepts again once it ends",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/routes/apiv3/g2g-transfer-import-concurrency.integ.ts",
+      "testTitle": "receive route POST / — the import claim and the received archive > keeps refusing while an abandoned request's import is still running, and accepts again once it ends"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/routes/apiv3/g2g-transfer-key-keep-alive.integ.ts:receive route — transfer key keep-alive > while the source builds the archive > the source keeps the destination's key alive, and stops once the archive is ready",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/routes/apiv3/g2g-transfer-key-keep-alive.integ.ts",
+      "testTitle": "receive route — transfer key keep-alive > while the source builds the archive > the source keeps the destination's key alive, and stops once the archive is ready"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/routes/apiv3/g2g-transfer-mixed-import-methods.exclusive.integ.ts:receive route POST / — the ordinary merge-preset shape (configs replaced, users appended) — is not refused as a mixed assignment, and the transfer actually completes",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/routes/apiv3/g2g-transfer-mixed-import-methods.exclusive.integ.ts",
+      "testTitle": "receive route POST / — the ordinary merge-preset shape (configs replaced, users appended) — is not refused as a mixed assignment, and the transfer actually completes"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/routes/apiv3/g2g-transfer-non-transferable.integ.ts:refuses a request naming a protected collection and leaves the destination alone",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/routes/apiv3/g2g-transfer-non-transferable.integ.ts",
+      "testTitle": "refuses a request naming a protected collection and leaves the destination alone"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/routes/apiv3/g2g-transfer-replace-procedure.exclusive.integ.ts:puts the maintenance-mode flag back to what it was before the transfer (true)",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/routes/apiv3/g2g-transfer-replace-procedure.exclusive.integ.ts",
+      "testTitle": "puts the maintenance-mode flag back to what it was before the transfer (true)"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/routes/apiv3/g2g-transfer-replace-procedure.exclusive.integ.ts:receive route POST / — the replace procedure around the import > keeps the destination closed when the rescue could not be written back",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/routes/apiv3/g2g-transfer-replace-procedure.exclusive.integ.ts",
+      "testTitle": "receive route POST / — the replace procedure around the import > keeps the destination closed when the rescue could not be written back"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/routes/apiv3/g2g-transfer-replace-targets.exclusive.integ.ts:imports the archive's group over a same-named existing one when the collection is replaced",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/routes/apiv3/g2g-transfer-replace-targets.exclusive.integ.ts",
+      "testTitle": "imports the archive's group over a same-named existing one when the collection is replaced"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/routes/apiv3/pages/delete-pages.integ.ts:deletes a page whose revisionId is the latest revision",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/routes/apiv3/pages/delete-pages.integ.ts",
+      "testTitle": "deletes a page whose revisionId is the latest revision"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/service/import/import-failed-collections.integ.ts:ImportService.import — what a finished run reports > names the collection that failed and still imports the others",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/service/import/import-failed-collections.integ.ts",
+      "testTitle": "ImportService.import — what a finished run reports > names the collection that failed and still imports the others"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/service/page/grant-preserve-on-update.integ.ts:PageService.updatePage grant preservation > keeps GRANT_OWNER when the update omits a grant",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/service/page/grant-preserve-on-update.integ.ts",
+      "testTitle": "PageService.updatePage grant preservation > keeps GRANT_OWNER when the update omits a grant"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/service/page/v5.non-public-page.integ.ts:PageService page operations with non-public pages > Duplicate > Should duplicate multiple pages. Page with GRANT_RESTRICTED should NOT be duplicated",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/service/page/v5.non-public-page.integ.ts",
+      "testTitle": "PageService page operations with non-public pages > Duplicate > Should duplicate multiple pages. Page with GRANT_RESTRICTED should NOT be duplicated"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/service/page/v5.non-public-page.integ.ts:beforeAll hook timeout (10000ms) — getInstance()",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/service/page/v5.non-public-page.integ.ts",
+      "testTitle": "beforeAll hook timeout (10000ms) — getInstance()"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/service/page/v5.public-page.integ.ts:PageService page operations with only public pages > Rename > Should rename/move to the path that exists as an empty page",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/service/page/v5.public-page.integ.ts",
+      "testTitle": "PageService page operations with only public pages > Rename > Should rename/move to the path that exists as an empty page"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/service/page/v5.public-page.integ.ts:beforeAll hook timeout (10000ms) — getInstance()",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/service/page/v5.public-page.integ.ts",
+      "testTitle": "beforeAll hook timeout (10000ms) — getInstance()"
+    }
+  },
+  {
+    "title": "flaky: vitest:src/server/service/user-group.integ.ts:beforeAll hook timeout (10000ms) — getInstance()",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "src/server/service/user-group.integ.ts",
+      "testTitle": "beforeAll hook timeout (10000ms) — getInstance()"
+    }
+  },
+  {
+    "title": "flaky: vitest:test/setup/migrate-mongo.ts:beforeAll migration setup hook timeout (20000ms) during ci-app-test-integration",
+    "parsed": {
+      "shape": "precise",
+      "kind": "vitest",
+      "browser": null,
+      "specPath": "test/setup/migrate-mongo.ts",
+      "testTitle": "beforeAll migration setup hook timeout (20000ms) during ci-app-test-integration"
+    }
+  }
+]

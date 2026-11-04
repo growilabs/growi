@@ -1,3 +1,4 @@
+import type { Lang } from '@growi/core';
 import { atom, useAtomValue } from 'jotai';
 
 import type { SupportedActionType } from '~/interfaces/activity';
@@ -162,6 +163,13 @@ export const activityExpirationSecondsAtom = atom<number>(0);
  * Audit Log Available Actions atom
  */
 export const auditLogAvailableActionsAtom = atom<SupportedActionType[]>([]);
+
+/**
+ * Atom for the display name of each language, keyed by Lang.
+ * Hydrated from server-computed data instead of preloading every i18n
+ * namespace for every language into the client bundle.
+ */
+export const langDisplayNamesAtom = atom<Partial<Record<Lang, string>>>({});
 
 /**
  * Atom for renderer config

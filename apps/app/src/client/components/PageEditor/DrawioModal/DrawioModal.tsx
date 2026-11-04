@@ -20,10 +20,9 @@ import {
 import { useSWRxPersonalSettings } from '~/stores/personal-settings';
 import loggerFactory from '~/utils/logger';
 
-import {
-  DrawioCommunicationHelper,
-  type DrawioConfig,
-} from './DrawioCommunicationHelper';
+import { buildDrawioEditorUrl } from './build-drawio-editor-url';
+import { DrawioCommunicationHelper } from './DrawioCommunicationHelper';
+import { drawioConfig } from './drawio-config';
 
 const logger = loggerFactory('growi:components:DrawioModal');
 
@@ -37,24 +36,6 @@ const DIAGRAMS_NET_LANG_MAP = {
 
 export const getDiagramsNetLangCode = (lang: Lang): string => {
   return DIAGRAMS_NET_LANG_MAP[lang];
-};
-
-const headerColor = '#334455';
-const fontFamily =
-  "-apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif";
-
-const drawioConfig: DrawioConfig = {
-  css: `
-  .geMenubarContainer { background-color: ${headerColor} !important; }
-  .geMenubar { background-color: ${headerColor} !important; }
-  .geEditor { font-family: ${fontFamily} !important; }
-  html td.mxPopupMenuItem {
-    font-family: ${fontFamily} !important;
-    font-size: 8pt !important;
-  }
-  `,
-  customFonts: ['Charter'],
-  compressXml: true,
 };
 
 const DrawioModalSubstance = (): JSX.Element => {
@@ -84,25 +65,15 @@ const DrawioModalSubstance = (): JSX.Element => {
       return undefined;
     }
 
-    let url: URL;
     try {
-      url = new URL(drawioUri);
+      return buildDrawioEditorUrl(
+        drawioUri,
+        getDiagramsNetLangCode(personalSettingsInfo?.lang ?? Lang.en_US),
+      );
     } catch (err) {
       logger.debug(err);
       return undefined;
     }
-
-    // refs: https://desk.draw.io/support/solutions/articles/16000042546-what-url-parameters-are-supported-
-    url.searchParams.append('spin', '1');
-    url.searchParams.append('embed', '1');
-    url.searchParams.append(
-      'lang',
-      getDiagramsNetLangCode(personalSettingsInfo?.lang ?? Lang.en_US),
-    );
-    url.searchParams.append('ui', 'atlas');
-    url.searchParams.append('configure', '1');
-
-    return url;
   }, [drawioUri, personalSettingsInfo?.lang]);
 
   // Memoize communication helper with inline handlers to avoid dependency issues

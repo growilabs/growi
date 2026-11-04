@@ -9,22 +9,18 @@ import { computeDiffForPair, MAX_PAIRS } from './revision-diff-service';
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function makeId(): Types.ObjectId {
-  return new Types.ObjectId();
+function makeId(): string {
+  return new Types.ObjectId().toString();
 }
 
-function makeRev(
-  id: Types.ObjectId,
-  pageId: Types.ObjectId,
-  body: string,
-): RevisionDoc {
+function makeRev(id: string, pageId: string, body: string): RevisionDoc {
   return { _id: id, pageId, body };
 }
 
 function makePair(
-  pageId: Types.ObjectId,
-  fromRevisionId: Types.ObjectId | null,
-  toRevisionId: Types.ObjectId,
+  pageId: string,
+  fromRevisionId: string | null,
+  toRevisionId: string,
 ): RevisionDiffRequestPair {
   return {
     pageId: pageId.toString(),

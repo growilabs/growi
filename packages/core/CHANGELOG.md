@@ -1,5 +1,48 @@
 # @growi/core
 
+## 3.1.3
+
+### Patch Changes
+
+- [#12176](https://github.com/growilabs/growi/pull/12176) [`2f37b50`](https://github.com/growilabs/growi/commit/2f37b50bfbdc475db2c8644a545e57881b909863) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Make `omitDuplicateAreaPathFromPaths` and `omitDuplicateAreaPageFromPages` treat each path literally. They used to build a regular expression from the raw path, so a path containing a character such as `+` or `(` threw a `SyntaxError`, and a `.` in a path matched any character, which could drop an unrelated path.
+
+## 3.1.2
+
+### Patch Changes
+
+- [#12159](https://github.com/growilabs/growi/pull/12159) [`c0e2f63`](https://github.com/growilabs/growi/commit/c0e2f63b0d5c5993362ee74a8a4b21873900494f) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Make `isCreatablePage` run in linear time. The page depth limit (130 levels) is now checked by counting path segments instead of a regular expression whose time grew exponentially with the number of slashes, and the trailing `/edit` / `.md` and spaces-around-slash checks no longer slow down quadratically on long paths. The depth check is exported from `page-path-utils` as `exceedsMaxPageDepth`.
+
+## 3.1.1
+
+### Patch Changes
+
+- [#11893](https://github.com/growilabs/growi/pull/11893) [`7d3c061`](https://github.com/growilabs/growi/commit/7d3c06199d8267bcf651b167b3bfbcdc6752d02d) Thanks [@Ryosei-Fukushima](https://github.com/Ryosei-Fukushima)! - Add callout variant constants (`AllCallout` / `Callout`) to `@growi/core` as the single source of truth, shared by the callout renderer and the editor slash commands.
+
+## 3.1.0
+
+### Minor Changes
+
+- [#11961](https://github.com/growilabs/growi/pull/11961) [`e50350f`](https://github.com/growilabs/growi/commit/e50350fc349e14ff6f8984d753676e62bac73920) Thanks [@mizozobu](https://github.com/mizozobu)! - Add `toLegacyAttachmentShape` and `toLegacyUserShape` to `@growi/core/dist/models/serializers`. They restore the Mongoose-era field names on Prisma rows.
+
+## 3.0.1
+
+### Patch Changes
+
+- [#12081](https://github.com/growilabs/growi/pull/12081) [`fd3a693`](https://github.com/growilabs/growi/commit/fd3a69339f65a4062fab8852b02e8a5c7110f751) Thanks [@yotatameguchi-boop](https://github.com/yotatameguchi-boop)! - Fix deep equality incorrectly treating objects with different own keys as equal when their values are undefined or inherited.
+
+## 3.0.0
+
+### Major Changes
+
+- [#11513](https://github.com/growilabs/growi/pull/11513) [`211f493`](https://github.com/growilabs/growi/commit/211f49330240ecac27442790416ab20e5ea4e2ab) Thanks [@arvid-e](https://github.com/arvid-e)! - Rename `IPage.ttlTimestamp` to `IPage.wipExpiredAt` and change its meaning
+
+  WIP page expiry is no longer enforced by a MongoDB TTL index (which deleted pages without running application code, leaving `descendantCount` inflated and empty placeholder pages orphaned). It is now application-driven, so the stored value changed meaning as well as name:
+
+  - old `ttlTimestamp` — the instant the page was made WIP; the TTL index supplied the duration via `expireAfterSeconds`.
+  - new `wipExpiredAt` — the absolute instant the page expires, computed up front.
+
+  BREAKING: consumers reading or writing `IPage.ttlTimestamp` must switch to `wipExpiredAt` and must not treat it as "when the page became WIP". A GROWI-side migration converts existing stored values.
+
 ## 2.5.0
 
 ### Minor Changes

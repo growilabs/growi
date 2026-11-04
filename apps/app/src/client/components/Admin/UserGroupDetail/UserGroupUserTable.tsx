@@ -20,9 +20,9 @@ export const UserGroupUserTable = (props: Props): JSX.Element => {
       <thead>
         <tr>
           <th style={{ width: '100px' }}>#</th>
-          <th>{t('username')}</th>
-          <th>{t('Name')}</th>
-          <th style={{ width: '100px' }}>{t('Created')}</th>
+          <th>{t('commons:username')}</th>
+          <th>{t('commons:Name')}</th>
+          <th style={{ width: '100px' }}>{t('commons:Created')}</th>
           <th style={{ width: '160px' }}>{t('last_login')}</th>
           {!props.isExternalGroup && <th style={{ width: '70px' }}></th>}
         </tr>

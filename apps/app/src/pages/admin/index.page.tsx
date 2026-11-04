@@ -43,7 +43,7 @@ const AdminHomepage: NextPageWithLayout<Props> = ({
 };
 
 AdminHomepage.getLayout = createAdminPageLayout<Props>({
-  title: (_p, t) => t('wiki_management_homepage'),
+  title: (_p, t) => t('admin:wiki_management_homepage'),
 });
 
 export const getServerSideProps: GetServerSideProps<Props> = async (

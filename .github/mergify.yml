@@ -30,14 +30,53 @@ queue_rules:
       - -check-failure ~= test-prod-node24 / run-playwright
       - -check-failure ~= test-prod-node24 / report-playwright
 
+  # Content-only pull requests from the i18n sync bot (translation-only
+  # branch, see pull-translations.ts's TRANSLATION_ONLY_BRANCH): the diff is
+  # always a subset of `apps/app/public/static/locales/**` values already
+  # validated by `pnpm run lint:i18n` inside the pull workflow before this
+  # pull request was even opened (Requirement 3.3/3.4), so the full app
+  # test/build/Playwright matrix verifies nothing this diff could break.
+  # ci-app-lint alone still catches a malformed-JSON regression.
+  - name: i18n-sync-translation-only
+    queue_conditions:
+      - check-success ~= ci-app-lint
+      - -check-failure ~= ci-app-lint
+      # Enforces the "diff is always a subset of locale JSON" assumption
+      # this queue relies on, rather than just asserting it in the comment
+      # above: a PR containing any file outside that path cannot enter this
+      # queue, regardless of who authored it or how the branch was made.
+      - -files~=^(?!apps/app/public/static/locales/)
+    merge_conditions:
+      - check-success ~= ci-app-lint
+      - -check-failure ~= ci-app-lint
+      - -files~=^(?!apps/app/public/static/locales/)
+
 pull_request_rules:
   - name: Automatic queue to merge
     conditions:
       - '#approved-reviews-by >= 1'
       - '#changes-requested-reviews-by = 0'
       - '#review-requested = 0'
+      # Routed to the lightweight queue below instead.
+      - -head = i18n-sync/translation-only
     actions:
       queue:
+
+  - name: Automatic queue to merge (i18n-sync translation-only)
+    conditions:
+      - head = i18n-sync/translation-only
+      # Restricts the lightweight queue to PRs actually authored by the sync
+      # bot. Without this, any PR opened from a branch named
+      # i18n-sync/translation-only -- by anyone with push access, not just
+      # the bot -- would qualify for merge on ci-app-lint alone instead of
+      # the full test/build/Playwright matrix.
+      - author = growi-i18n-pr-publisher[bot]
+      - '#approved-reviews-by >= 1'
+      - '#changes-requested-reviews-by = 0'
+      - '#review-requested = 0'
+    actions:
+      queue:
+        name: i18n-sync-translation-only
 
   - name: Automatic merge for Preparing next version
     conditions:

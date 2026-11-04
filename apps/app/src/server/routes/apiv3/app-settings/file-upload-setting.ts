@@ -155,7 +155,19 @@ export const setup = (crowi: Crowi): Router => {
     async (req, res) => {
       const { fileUploadType } = req.body;
 
-      if (fileUploadType === 'local' || fileUploadType === 'gridfs') {
+      const isEnvOnlyStorage =
+        (fileUploadType === 'aws' &&
+          configManager.getConfig('env:useOnlyEnvVars:aws')) ||
+        (fileUploadType === 'gcs' &&
+          configManager.getConfig('env:useOnlyEnvVars:gcs')) ||
+        (fileUploadType === 'azure' &&
+          configManager.getConfig('env:useOnlyEnvVars:azure'));
+
+      if (
+        fileUploadType === 'local' ||
+        fileUploadType === 'gridfs' ||
+        isEnvOnlyStorage
+      ) {
         try {
           await configManager.updateConfigs(
             {
@@ -170,7 +182,7 @@ export const setup = (crowi: Crowi): Router => {
         }
       }
 
-      if (fileUploadType === 'aws') {
+      if (fileUploadType === 'aws' && !isEnvOnlyStorage) {
         try {
           try {
             toNonBlankString(req.body.s3Bucket);
@@ -241,7 +253,7 @@ export const setup = (crowi: Crowi): Router => {
         }
       }
 
-      if (fileUploadType === 'gcs') {
+      if (fileUploadType === 'gcs' && !isEnvOnlyStorage) {
         try {
           await configManager.updateConfigs(
             {
@@ -281,7 +293,7 @@ export const setup = (crowi: Crowi): Router => {
         }
       }
 
-      if (fileUploadType === 'azure') {
+      if (fileUploadType === 'azure' && !isEnvOnlyStorage) {
         try {
           await configManager.updateConfigs(
             {

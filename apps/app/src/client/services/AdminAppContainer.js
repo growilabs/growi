@@ -334,6 +334,16 @@ export default class AdminAppContainer extends Container {
     return { isV5Compatible };
   }
 
+  /**
+   * Start the page tree repair (removes orphaned empty pages, recounts descendantCount)
+   * @memberOf AdminAppContainer
+   */
+  async repairPageTreeHandler() {
+    const response = await apiv3Post('/app-settings/repair-page-tree');
+    const { isStarted } = response.data;
+    return { isStarted };
+  }
+
   async startMaintenanceMode() {
     await apiv3Post('/app-settings/maintenance-mode', { flag: true });
   }

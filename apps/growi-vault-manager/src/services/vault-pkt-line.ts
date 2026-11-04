@@ -12,13 +12,13 @@
  *
  * `parseWantSection` reads only up to the first flush packet, which is all the
  * guard in vault-want-guard.ts needs in order to decide whether the request may
- * reach upload-pack (requirement 5.4 / 追補 A). Everything here is pure so the
+ * reach upload-pack (requirement 5.4 / 5.6). Everything here is pure so the
  * parsing can be tested without a stream or a git process.
  *
  * Only protocol v0 is covered, which is the only version reachable today: the
  * gateway does not forward the client's `Git-Protocol` header, so upload-pack
  * never negotiates v2. A v2 body is reported as invalid rather than guessed at
- * — see the note on the same subject in design.md 追補 A.
+ * — see the note on the same subject in the vault-manager research.md.
  */
 
 /** Largest want section the parser will buffer before giving up (bytes). */
@@ -26,8 +26,15 @@ export const MAX_WANT_SECTION_BYTES = 64 * 1024;
 
 /** Outcome of parsing the head of an upload-pack request body. */
 export type WantSectionParseResult =
-  /** The flush packet was reached; `wants` lists every OID the client asked for. */
-  | { readonly status: 'complete'; readonly wants: readonly string[] }
+  /**
+   * The flush packet was reached; `wants` lists every OID the client asked for
+   * and `filters` every partial-clone filter spec it asked to be applied.
+   */
+  | {
+      readonly status: 'complete';
+      readonly wants: readonly string[];
+      readonly filters: readonly string[];
+    }
   /** More bytes are needed before the section can be judged. */
   | { readonly status: 'need-more' }
   /** The bytes cannot be a v0 want section; the request must not be forwarded. */
@@ -58,14 +65,16 @@ export function encodePktLine(payload: string): Buffer {
 /**
  * Reads the want section at the head of an upload-pack request body.
  *
- * Lines other than `want` (`shallow`, `deepen`, `filter`, …) are skipped: they
- * carry no OID the guard has to authorise, and they must survive untouched.
+ * `want` and `filter` lines are collected because the guard decides on both.
+ * Everything else (`shallow`, `deepen`, …) is skipped: those carry nothing to
+ * authorise. No line is altered — the body is handed to upload-pack unchanged.
  *
  * @param buf - Bytes received so far, from the start of the request body.
- * @returns Whether the section is complete, and the OIDs it requests.
+ * @returns Whether the section is complete, and what it requests.
  */
 export function parseWantSection(buf: Buffer): WantSectionParseResult {
   const wants: string[] = [];
+  const filters: string[] = [];
   let offset = 0;
 
   for (;;) {
@@ -90,7 +99,7 @@ export function parseWantSection(buf: Buffer): WantSectionParseResult {
 
     // Flush packet: the want section ends here.
     if (length === 0) {
-      return { status: 'complete', wants };
+      return { status: 'complete', wants, filters };
     }
     // 0001 (delim) and 0002 (response-end) only appear in protocol v2.
     if (length < LENGTH_PREFIX_BYTES) {
@@ -117,6 +126,8 @@ export function parseWantSection(buf: Buffer): WantSectionParseResult {
         };
       }
       wants.push(oid);
+    } else if (line.startsWith('filter ')) {
+      filters.push(line.slice('filter '.length).trim());
     }
 
     offset += length;

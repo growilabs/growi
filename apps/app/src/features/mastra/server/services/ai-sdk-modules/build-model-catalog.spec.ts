@@ -229,6 +229,122 @@ describe('buildModelCatalog', () => {
   });
 });
 
+describe('buildModelCatalog pricing (Req 1.1, 1.3, 1.6)', () => {
+  const withCost = (id: string, cost: unknown) => ({
+    ...selectable(id),
+    cost,
+  });
+
+  const buildOpenai = (models: readonly { id: string }[]) =>
+    buildModelCatalog({
+      openai: provider('openai', models),
+      anthropic: provider('anthropic', [selectable('claude')]),
+      google: provider('google', [selectable('gemini-2.5-pro')]),
+    }).openai;
+
+  it('ingests the four unit prices per model', () => {
+    const [entry] = buildOpenai([
+      withCost('gpt-4o', {
+        input: 2.5,
+        output: 10,
+        cache_read: 1.25,
+        cache_write: 3,
+      }),
+    ]);
+
+    expect(entry.pricing).toEqual({
+      input: 2.5,
+      output: 10,
+      cacheRead: 1.25,
+      cacheWrite: 3,
+    });
+  });
+
+  it('keeps a model with partially missing prices and leaves the missing ones unknown', () => {
+    const [entry] = buildOpenai([
+      withCost('gpt-4o', { input: 2.5, output: 10 }),
+    ]);
+
+    expect(entry).toMatchObject({ id: 'gpt-4o', name: 'gpt-4o' });
+    expect(entry.pricing).toEqual({ input: 2.5, output: 10 });
+  });
+
+  it('keeps a model that has no cost at all, without pricing', () => {
+    const [entry] = buildOpenai([selectable('gpt-4o')]);
+
+    expect(entry).toEqual({ id: 'gpt-4o', name: 'gpt-4o' });
+  });
+
+  it.each([
+    ['a negative number', -1],
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['a string', '2.5'],
+    ['null', null],
+  ])('treats %s as unknown for that field only', (_label, bad) => {
+    const [entry] = buildOpenai([
+      withCost('gpt-4o', { input: bad, output: 10 }),
+    ]);
+
+    expect(entry.pricing).toEqual({ output: 10 });
+  });
+
+  it.each([
+    ['not an object', 'free'],
+    ['an array', [1, 2]],
+    ['null', null],
+    ['an object with no usable price', { input: -1, output: 'x' }],
+  ])('keeps the model without pricing when cost is %s', (_label, cost) => {
+    const entries = buildOpenai([withCost('gpt-4o', cost)]);
+
+    expect(entries).toEqual([{ id: 'gpt-4o', name: 'gpt-4o' }]);
+  });
+
+  it('ingests context tiers sorted by threshold ascending and ignores other tier types', () => {
+    const [entry] = buildOpenai([
+      withCost('gpt-5', {
+        input: 1,
+        output: 8,
+        tiers: [
+          {
+            input: 4,
+            output: 24,
+            cache_read: 0.4,
+            tier: { type: 'context', size: 400000 },
+          },
+          { input: 9, output: 99, tier: { type: 'other', size: 1 } },
+          { input: 2, output: 16, tier: { type: 'context', size: 200000 } },
+        ],
+      }),
+    ]);
+
+    expect(entry.pricing).toEqual({
+      input: 1,
+      output: 8,
+      tiers: [
+        { inputTokensAbove: 200000, input: 2, output: 16 },
+        { inputTokensAbove: 400000, input: 4, output: 24, cacheRead: 0.4 },
+      ],
+    });
+  });
+
+  it('skips a tier whose threshold is not a non-negative finite number', () => {
+    const [entry] = buildOpenai([
+      withCost('gpt-5', {
+        input: 1,
+        output: 8,
+        tiers: [
+          { input: 2, output: 16, tier: { type: 'context', size: -5 } },
+          { input: 2, output: 16, tier: { type: 'context' } },
+          { input: 2, output: 16 },
+        ],
+      }),
+    ]);
+
+    expect(entry.pricing).toEqual({ input: 1, output: 8 });
+  });
+});
+
 describe('persistedModelCatalogSchema (read-side validation)', () => {
   const validCatalog = {
     openai: [{ id: 'gpt-4o', name: 'GPT-4o' }],
@@ -241,6 +357,60 @@ describe('persistedModelCatalogSchema (read-side validation)', () => {
 
     expect(parsed.success).toBe(true);
     expect(parsed.data).toEqual(validCatalog);
+  });
+
+  it('accepts an entry that carries pricing, including tiers', () => {
+    const withPricing = {
+      ...validCatalog,
+      openai: [
+        {
+          id: 'gpt-5',
+          name: 'GPT-5',
+          pricing: {
+            input: 1,
+            output: 8,
+            cacheRead: 0.1,
+            tiers: [{ inputTokensAbove: 200000, input: 2, output: 16 }],
+          },
+        },
+      ],
+    };
+
+    const parsed = persistedModelCatalogSchema.safeParse(withPricing);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toEqual(withPricing);
+  });
+
+  it('accepts an old-shape entry without pricing as-is (Req 1.4)', () => {
+    const parsed = persistedModelCatalogSchema.safeParse(validCatalog);
+
+    expect(parsed.data?.openai).toEqual([{ id: 'gpt-4o', name: 'GPT-4o' }]);
+  });
+
+  it.each([
+    ['a negative price', { input: -1, output: 8 }],
+    ['a string price', { input: '1', output: 8 }],
+    ['a non-object pricing', 'free'],
+    ['null pricing', null],
+    [
+      'a malformed tier',
+      { input: 1, tiers: [{ inputTokensAbove: 'x', input: 2 }] },
+    ],
+  ])('accepts an entry with %s by dropping its pricing, keeping the whole catalog (Req 1.4)', (_label, pricing) => {
+    const parsed = persistedModelCatalogSchema.safeParse({
+      ...validCatalog,
+      openai: [
+        { id: 'gpt-4o', name: 'GPT-4o', pricing },
+        { id: 'gpt-4.1', name: 'GPT-4.1', pricing: { input: 2, output: 8 } },
+      ],
+    });
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.openai).toEqual([
+      { id: 'gpt-4o', name: 'GPT-4o' },
+      { id: 'gpt-4.1', name: 'GPT-4.1', pricing: { input: 2, output: 8 } },
+    ]);
   });
 
   // Each rejection below represents a document a DIFFERENT code version (or an

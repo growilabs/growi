@@ -22,7 +22,7 @@
  * crowi.events.activity.emit('update') -> the REAL ActivityService listener ->
  * pendingActivityContext.take -> settleActivityRecord ->
  * prisma.activities.createByParameters. Only the page-persistence collaborators
- * (pageService.create / PageTagRelation) are stubbed so the test does not depend
+ * (pageService.create / prisma.pagetagrelations) are stubbed so the test does not depend
  * on the v5 page-tree setup.
  *
  * Requires a real MongoDB (wired by vitest.workspace.mts integ setup).
@@ -38,7 +38,6 @@ import { getInstance } from '^/test/setup/crowi';
 import { ActionGroupSize, SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
@@ -126,11 +125,13 @@ describe('create-page — emits the create activity before the response (PR #115
     // Stub page-persistence collaborators; the activity lifecycle stays real.
     // biome-ignore lint/suspicious/noExplicitAny: minimal stub for the page create
     vi.spyOn(crowi.pageService, 'create').mockResolvedValue(createdPage as any);
-    vi.spyOn(PageTagRelation, 'updatePageTags').mockResolvedValue(
+    vi.spyOn(prisma.pagetagrelations, 'updatePageTags').mockResolvedValue(
       // biome-ignore lint/suspicious/noExplicitAny: return value is unused by the handler
       undefined as any,
     );
-    vi.spyOn(PageTagRelation, 'listTagNamesByPage').mockResolvedValue([]);
+    vi.spyOn(prisma.pagetagrelations, 'listTagNamesByPage').mockResolvedValue(
+      [],
+    );
 
     // Fake response: apiv3() fires 'finish' synchronously to reproduce the
     // context-clearing race the ordering must survive.

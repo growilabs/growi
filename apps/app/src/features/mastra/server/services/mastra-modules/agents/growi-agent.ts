@@ -2,6 +2,7 @@ import { Agent } from '@mastra/core/agent';
 import type { RequestContext } from '@mastra/core/request-context';
 
 import { resolveMastraModel } from '../../ai-sdk-modules/resolve-mastra-model';
+import { meterModelForRequest } from '../../usage-metering';
 import { memory } from '../memory';
 import { fullTextSearchTool } from '../tools/full-text-search-tool';
 import { getPageContentTool } from '../tools/get-page-content-tool';
@@ -31,7 +32,7 @@ export const growiAgent = new Agent({
   // an idempotent defense-in-depth pass (the client value was rounded upstream, so
   // it is never trusted here either). resolveMastraModel is async (it lazily
   // imports only the selected provider's `@ai-sdk/*` SDK), and DynamicArgument
-  // permits a Promise return, so the Promise is handed straight through. On
+  // permits a Promise return, so the model function is async as well. On
   // misconfiguration it rejects; the rejection surfaces at request time when the
   // agent awaits the model and is handled by the post-message route's existing
   // try/catch (Req 4.3). Its message carries only the provider name / missing-var
@@ -40,11 +41,19 @@ export const growiAgent = new Agent({
   // The parameter is annotated with the shared shape so `get('modelKey')` is
   // typed as `string | undefined` (the agent is constructed without an explicit
   // TRequestContext, so it would otherwise be `RequestContext<unknown>`).
-  model: ({
+  //
+  // The resolved model is wrapped per request, after resolveMastraModel's cache,
+  // so the cache keeps the unwrapped model shared by every request.
+  model: async ({
     requestContext,
   }: {
     requestContext: RequestContext<MastraRequestContextShape>;
-  }) => resolveMastraModel(requestContext.get('modelKey')),
+  }) =>
+    meterModelForRequest(
+      requestContext,
+      'chat',
+      await resolveMastraModel(requestContext.get('modelKey')),
+    ),
   tools: {
     fullTextSearchTool,
     getPageContentTool,

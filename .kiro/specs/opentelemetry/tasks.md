@@ -6,7 +6,7 @@
 
 ### 拡張時のテンプレート参照
 
-新規 Custom Metric / Anonymization Handler の追加手順は [design.md](./design.md) の **File Structure Plan → Extension Templates** を参照する。テンプレートに沿って実装することで、レビューでの差分が局所化され、本 spec の Boundary Commitments を逸脱しない。
+新規 Custom Metric の追加手順は [design.md](./design.md) の **File Structure Plan → Extension Templates** を参照する（匿名化の追加手順は `opentelemetry-anonymization` を参照）。テンプレートに沿って実装することで、レビューでの差分が局所化され、本 spec の Boundary Commitments を逸脱しない。
 
 ### Revalidation 必要時の対応フロー
 

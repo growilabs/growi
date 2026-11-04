@@ -3,7 +3,10 @@ import { Types } from 'mongoose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
+import {
+  type IInAppNotification,
+  InAppNotificationStatuses,
+} from '~/interfaces/in-app-notification';
 import { InAppNotification } from '~/server/models/in-app-notification';
 
 import type Crowi from '../crowi';
@@ -35,6 +38,14 @@ vi.mock('~/server/models/subscription', () => ({
 
 vi.mock('./in-app-notification/in-app-notification-utils', () => ({
   generateSnapshot: vi.fn().mockResolvedValue('{"path":"/test-page"}'),
+}));
+
+const { mockFindManyAttachments } = vi.hoisted(() => ({
+  mockFindManyAttachments: vi.fn(),
+}));
+
+vi.mock('~/utils/prisma', () => ({
+  prisma: { attachments: { findMany: mockFindManyAttachments } },
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -180,5 +191,78 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
     );
 
     expect(crowi.socketIoService.getDefaultSocket).not.toHaveBeenCalled();
+  });
+});
+
+describe('InAppNotificationService.populateTargetAttachments', () => {
+  let service: InAppNotificationService;
+
+  const attachmentId1 = new Types.ObjectId().toString();
+  const attachmentId2 = new Types.ObjectId().toString();
+  const pageId = new Types.ObjectId().toString();
+
+  const buildAttachmentRow = (id: string) => ({
+    id,
+    originalName: `${id}.png`,
+    pageId,
+    creatorId: null,
+    downloadPathProxied: `/download/${id}`,
+  });
+
+  const buildLegacyAttachment = (id: string) => ({
+    ...buildAttachmentRow(id),
+    page: pageId,
+    creator: null,
+  });
+
+  const buildNotification = (target: unknown) =>
+    ({
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+      action: SupportedAction.ACTION_COMMENT_CREATE,
+      target,
+    }) as unknown as IInAppNotification;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service = new InAppNotificationService(
+      buildMockCrowi() as unknown as Crowi,
+    );
+  });
+
+  it('replaces target.attachment with the attachment carrying downloadPathProxied', async () => {
+    mockFindManyAttachments.mockResolvedValue([
+      buildAttachmentRow(attachmentId1),
+      buildAttachmentRow(attachmentId2),
+    ]);
+
+    const result = await service.populateTargetAttachments([
+      buildNotification({ attachment: attachmentId1 }),
+      buildNotification({ attachment: attachmentId2 }),
+    ]);
+
+    expect(result.map(({ target }) => target)).toEqual([
+      {
+        attachment: buildLegacyAttachment(attachmentId1),
+      },
+      {
+        attachment: buildLegacyAttachment(attachmentId2),
+      },
+    ]);
+  });
+
+  it('sets target.attachment to null when the attachment is not found', async () => {
+    mockFindManyAttachments.mockResolvedValue([
+      buildAttachmentRow(attachmentId1),
+    ]);
+
+    const result = await service.populateTargetAttachments([
+      buildNotification({ attachment: attachmentId1 }),
+      buildNotification({ attachment: attachmentId2 }),
+    ]);
+
+    expect(result[0].target).toEqual({
+      attachment: buildLegacyAttachment(attachmentId1),
+    });
+    expect(result[1].target).toEqual({ attachment: null });
   });
 });
