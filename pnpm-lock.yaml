@@ -151,7 +151,7 @@ importers:
         version: 3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.0)
       vitest-mock-extended:
         specifier: ^3.1.0
-        version: 3.1.0(typescript@5.9.3)(vitest@3.2.6)
+        version: 3.1.0(typescript@5.9.3)(vitest@3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.0))
 
   apps/app:
     dependencies:
@@ -1140,6 +1140,28 @@ importers:
       unist-util-visit-parents:
         specifier: ^6.0.0
         version: 6.0.1
+
+  apps/attachment-text-extractor:
+    dependencies:
+      '@firecrawl/anydoc':
+        specifier: '=0.2.4'
+        version: 0.2.4
+      '@hono/node-server':
+        specifier: ^2.1.6
+        version: 2.1.6(hono@4.13.16)
+      hono:
+        specifier: ^4.13.16
+        version: 4.13.16
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.0)
+      vitest-mock-extended:
+        specifier: ^3.1.0
+        version: 3.1.0(typescript@5.9.3)(vitest@3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.0))
 
   apps/growi-vault-manager:
     dependencies:
@@ -3588,6 +3610,57 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=9.0.0'}
     deprecated: Please update to a newer version
 
+  '@firecrawl/anydoc-darwin-arm64@0.2.4':
+    resolution: {integrity: sha512-1Eg0rPGVMN052E7Y2+zswANS0KLaWhXvYb9CPgO8HEtclzu3hKAIJ00lIu5PF+DXafZ10ZS4fmrcP+9Ifct9qw==}
+    engines: {node: '>= 20'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@firecrawl/anydoc-darwin-x64@0.2.4':
+    resolution: {integrity: sha512-fTM8y6COu+jBqWRJ0Je0OqaDDt7YxJ8LU4ISoypO5eOBNXI3+l6tK1ZRwUclYWXGBr/6JaUWEgdyJVFfd/fpJg==}
+    engines: {node: '>= 20'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@firecrawl/anydoc-linux-arm64-gnu@0.2.4':
+    resolution: {integrity: sha512-gRrrjluTfQCjOO6wBefEP1QumYlUcGWKP7secVIO+ly8U/+DDQ70bOHW2lOGu19hA/23j7bc7bb3oLPAaBY82A==}
+    engines: {node: '>= 20'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@firecrawl/anydoc-linux-arm64-musl@0.2.4':
+    resolution: {integrity: sha512-fpzby6xqD709GmYUpnrWh7/2Csa6lwGrZrYPNGyn4KMEuJ1ibsNv6I3kdZAotMUKZ8nlNdPp32v964eBpsijcw==}
+    engines: {node: '>= 20'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@firecrawl/anydoc-linux-x64-gnu@0.2.4':
+    resolution: {integrity: sha512-yfvx+iGo2CvZH0TB9MeyNjkrd5/psNFEuxkl2Jah/VNFesPRASqjjCkDRY7tKw7fPij1u/UyFVxI6bsu6Iow9Q==}
+    engines: {node: '>= 20'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@firecrawl/anydoc-linux-x64-musl@0.2.4':
+    resolution: {integrity: sha512-9OWpM84c5SA/2wjfFxgfhupxziapus+7DERWmcOvkVxNp2H5Qj/9Y74c9leP2i03SjmBDl9tYWMVd3k/S3rY6w==}
+    engines: {node: '>= 20'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@firecrawl/anydoc-win32-x64-msvc@0.2.4':
+    resolution: {integrity: sha512-E7d14hy5kZNsMNnHiutU6r9yr53LrKXSsMSFtl0QhU/1KWuvRnjhQEuMiuW4YbsMcPlEaK10WtBVF86g9OMW6A==}
+    engines: {node: '>= 20'}
+    cpu: [x64]
+    os: [win32]
+
+  '@firecrawl/anydoc@0.2.4':
+    resolution: {integrity: sha512-rfJxa5L+nhoqR5yodcRZoGDLaSfxMTpBuhVj1gSacfW4ZGjBt4cjfErXwaKjPYrpWRTPIBye2sh36UhqgOP1Og==}
+    engines: {node: '>= 20'}
+    hasBin: true
+
   '@floating-ui/core@1.6.9':
     resolution: {integrity: sha512-uMXCuQ3BItDUbAMhIXw7UPXRfAlOAvZzdK9BWpE60MCn+Svt3aLn9jsPTi/WNGlRUu2uI0v5S7JiIUsbsvh3fw==}
 
@@ -3661,6 +3734,12 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@hono/node-server@2.1.6':
+    resolution: {integrity: sha512-p/KH9MnfNcsm3sR6x4lNgm5j+QN4Et8srKredl9DZfXiyZ1UQ3aQ2YVpFLbqktYN5JI+DB+VZFKM2PqE5hLKjQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: ^4 || ^5.0.0-0
 
   '@ibm-cloud/openapi-ruleset-utilities@1.4.0':
     resolution: {integrity: sha512-m033WjdlX3k5aSpK2iNX61hS4INEJXUpAxr1l1wBamRQklZpXE2EZKcDQ5AuqVMyz4VV9e46RTp6MAcwXh0gbA==}
@@ -10357,6 +10436,10 @@ packages:
 
   hono@4.12.23:
     resolution: {integrity: sha512-eIaZ9qDgu7XV0pxOCrg7/WhnQ6Ivm22UcxhXx/A3dcbqbbYgBEkc6e/J/s7j2tS96zoB0S9VBdLwQNCWwUo4LA==}
+    engines: {node: '>=16.9.0'}
+
+  hono@4.13.16:
+    resolution: {integrity: sha512-AOLOEhvrV+iH92xXCnFr/5+3KjPKcI3xP63XJtX5spAnkznPdHijlIsUTpi7/9EhWqrTCekw5c5zh1K+YsVw7A==}
     engines: {node: '>=16.9.0'}
 
   hosted-git-info@2.8.9:
@@ -18495,6 +18578,37 @@ snapshots:
 
   '@faker-js/faker@9.0.1': {}
 
+  '@firecrawl/anydoc-darwin-arm64@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-darwin-x64@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-linux-arm64-gnu@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-linux-arm64-musl@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-linux-x64-gnu@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-linux-x64-musl@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-win32-x64-msvc@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc@0.2.4':
+    optionalDependencies:
+      '@firecrawl/anydoc-darwin-arm64': 0.2.4
+      '@firecrawl/anydoc-darwin-x64': 0.2.4
+      '@firecrawl/anydoc-linux-arm64-gnu': 0.2.4
+      '@firecrawl/anydoc-linux-arm64-musl': 0.2.4
+      '@firecrawl/anydoc-linux-x64-gnu': 0.2.4
+      '@firecrawl/anydoc-linux-x64-musl': 0.2.4
+      '@firecrawl/anydoc-win32-x64-msvc': 0.2.4
+
   '@floating-ui/core@1.6.9':
     dependencies:
       '@floating-ui/utils': 0.2.9
@@ -18591,6 +18705,10 @@ snapshots:
   '@hono/node-server@1.19.14(hono@4.12.23)':
     dependencies:
       hono: 4.12.23
+
+  '@hono/node-server@2.1.6(hono@4.13.16)':
+    dependencies:
+      hono: 4.13.16
 
   '@ibm-cloud/openapi-ruleset-utilities@1.4.0': {}
 
@@ -26527,6 +26645,8 @@ snapshots:
 
   hono@4.12.23: {}
 
+  hono@4.13.16: {}
+
   hosted-git-info@2.8.9: {}
 
   hosted-git-info@7.0.2:
@@ -32765,7 +32885,7 @@ snapshots:
       sass: 1.77.6
       yaml: 2.9.0
 
-  vitest-mock-extended@3.1.0(typescript@5.9.3)(vitest@3.2.6):
+  vitest-mock-extended@3.1.0(typescript@5.9.3)(vitest@3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.0)):
     dependencies:
       ts-essentials: 10.0.2(typescript@5.9.3)
       typescript: 5.9.3

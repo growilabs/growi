@@ -9,7 +9,7 @@
 > pnpm の install は、ほかの pnpm / turbo / vitest の実行と並行させない (`.claude/rules/devcontainer.md`)。並行の印 (P) が付いたタスクを同時に進めるときも、install だけは順番に行う。
 
 - [ ] 1. 土台: Node の package と CI のジョブを用意する
-- [ ] 1.1 抽出サービスの Node の package を作り、workspace に入れる
+- [x] 1.1 抽出サービスの Node の package を作り、workspace に入れる
   - `apps/pdf-converter` に倣って、package の設定、TypeScript の設定、vitest の設定、package ごとの turbo の設定を置く。Node 24 だけを対象にし、Bun / Deno 向けの設定は置かない
   - `hono`、`@hono/node-server`、`@firecrawl/anydoc` (=0.2.4) を本番の依存に、vitest と `vitest-mock-extended` をテスト専用の依存に入れる。ライセンスが許容的なものであることを確かめる
   - ルートの `pnpm install` の後、`turbo run lint test --filter @growi/attachment-text-extractor` が、中身が空のテスト 1 件で成功する
