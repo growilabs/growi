@@ -380,7 +380,7 @@ graph LR
 - 段階 0 から撤去まで、Python 版はいまの場所にそのまま残し、いまの Python 用の CI もそのまま動かす。比較 (2.1、2.2)、ベースライン (2.11)、黒箱のテストの確認 (6.3) に使うためである。Python 版のコードは直さない (直すと比べる相手が変わる)
 - Node 版は最初から `apps/attachment-text-extractor/` で作る (D4)。Python 版は `services/attachment-text-extractor/` に残るので、作業の間は 2 つが別の場所に並ぶ。compose の `context` は、撤去のときまで Python 版を指したままにする (配布物を途中で切り替えない)
 - 撤去の手順: (1) compose の `context` と CI の `paths` を Node 版に切り替える、(2) `services/attachment-text-extractor/` をディレクトリごと消す、(3) Python 用の CI のジョブを消す、(4) OpenAPI の説明文を直して生成クライアントを作り直す (下の項目)。これを 1 つの変更にまとめる
-- Node 版の CI は、作業の間は Python 用の CI とは別のジョブとして足し、撤去のときに 1 つの workflow にまとめる (9.1)
+- Node 版の CI は、作業の間は Python 用の workflow とは別のファイル (`.github/workflows/ci-attachment-text-extractor.yml`) として足す。Python 版のテスト (`tests/test_ci_workflow.py`) が「Python 用の workflow のジョブは 1 つだけ」を前提にしているため、同じファイルには足せない。撤去のときに Python 用の workflow (`attachment-text-extractor.yml`) を消し、Node 用の workflow に image の確認と OpenAPI の drift 検知のジョブを足す (9.1)
 - **OpenAPI の説明文の修正は、撤去と同じ変更で行う**。いまの Python 用の CI は、Python 版が書き出す文書と commit 済みの `openapi.json` を JSON として完全に比べている。作業の途中で説明文だけを直すと、Python 版の文書 (「forkserver」「None」を含む) と合わなくなり、Python 用の CI が失敗する。また `attachment-search-indexing` の CI は orval で作り直した `src/generated/` の差分を `git diff --exit-code` で見ているので、作り直したコメントも同じ変更に入れる必要がある。そのため、(1) 説明文の修正、(2) orval での生成クライアントの作り直し、(3) Node 版の drift 検知を「完全に同じ」比べ方に切り替えること、(4) Python 用の CI の撤去、の 4 つを 1 つの変更にまとめる。それまでの間、Node 版の OpenAPI のテストは説明文 (`description`) を除いて比べる
 - 撤去してよい条件 (10.4、10.5): ベースラインを測り終えた、比較 (2.1、2.2) を記録した、黒箱のテストが Python 版で通った (6.3)、Node で作ったテスト用のファイルを Python 版のテストでも使えることを確かめた (D5)、ベンチマークの退行についてユーザーの判断が出た (2.14、11.12)、段階 4 のレビューを通った
 

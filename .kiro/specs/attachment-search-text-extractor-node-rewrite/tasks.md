@@ -16,7 +16,7 @@
   - ルートの `pnpm-workspace.yaml`、`turbo.json`、`vitest.workspace.mts` を変えずに、新しい package が lint とテストの対象に入っている
   - _Requirements: 4.1, 4.2, 4.4, 4.7, 9.4, 11.8_
 - [x] 1.2 Node 版の CI のジョブを、Python 版のジョブと並べて足す
-  - `.github/workflows/attachment-text-extractor.yml` に、Node 版の lint・型の検査・vitest を動かすジョブを足す。Python 版のジョブは撤去 (8.2) まで残す。`paths` に `apps/attachment-text-extractor/**` を足す
+  - Node 版の lint・型の検査・vitest を動かすジョブを、新しい workflow `.github/workflows/ci-attachment-text-extractor.yml` に置く。Python 版の workflow (`attachment-text-extractor.yml`) は、撤去 (8.2) まで一字も変えずに残す (Python 版のテスト `tests/test_ci_workflow.py` が、その workflow のジョブは 1 つだけであることを確かめているため、同じファイルには足せない)。`paths` は `apps/attachment-text-extractor/**` を中心にする
   - ジョブの `if:` の中にコメントを書かない (`.claude/rules/github-actions-workflows.md`)
   - 既存の Node 用の CI (`ci-app.yml` などの turbo を通すジョブ) が新しい package のテストも拾うかを確かめ、同じテストを 2 つのジョブで二重に動かさない形にする。拾う場合は、他の package のテストと競合しないことを確かめる
   - ローカルで workflow の YAML が読めることを確かめ、Node 版のジョブが 1.1 の空のテストで成功する形になっている

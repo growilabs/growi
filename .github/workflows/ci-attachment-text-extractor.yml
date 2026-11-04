@@ -1,0 +1,52 @@
+name: Node CI for attachment-text-extractor
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - release/**
+      - rc/**
+      - changeset-release/**
+      - mergify/merge-queue/**
+      - tmp-mergify/merge-queue/**
+    paths:
+      - apps/attachment-text-extractor/**
+      - .github/workflows/ci-attachment-text-extractor.yml
+      - biome.json
+      - tsconfig.base.json
+      - turbo.json
+      - pnpm-lock.yaml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# ci-app.yml selects ./packages/* and @growi/app only, so it does not run this package's tests a second time.
+jobs:
+  ci-attachment-text-extractor:
+    name: Node CI for attachment-text-extractor
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: |
+          pnpm add turbo --global
+          pnpm install --frozen-lockfile
+
+      - name: Lint and test
+        run: turbo run lint test --filter=@growi/attachment-text-extractor --env-mode=loose

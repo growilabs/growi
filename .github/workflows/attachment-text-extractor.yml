@@ -15,12 +15,6 @@ on:
       - packages/attachment-text-extractor-client/openapi.json
       - infra/docker/compose.yaml
       - .github/workflows/attachment-text-extractor.yml
-      # Node rewrite: the package and the root files that change how it is linted or resolved.
-      - apps/attachment-text-extractor/**
-      - biome.json
-      - tsconfig.base.json
-      - turbo.json
-      - pnpm-lock.yaml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -36,31 +30,6 @@ env:
   CONTAINER_NAME: ate-smoke
 
 jobs:
-  # Runs beside the Python job until the Python version is removed. ci-app.yml selects
-  # ./packages/* and @growi/app only, so it does not run this package's tests a second time.
-  ci-attachment-text-extractor-node:
-    name: Node CI for attachment-text-extractor
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24.x
-          cache: pnpm
-
-      - name: Install dependencies
-        run: |
-          pnpm add turbo --global
-          pnpm install --frozen-lockfile
-
-      - name: Lint and test
-        run: turbo run lint test --filter=@growi/attachment-text-extractor --env-mode=loose
-
   ci-attachment-text-extractor:
     name: Python CI for attachment-text-extractor
     runs-on: ubuntu-latest
