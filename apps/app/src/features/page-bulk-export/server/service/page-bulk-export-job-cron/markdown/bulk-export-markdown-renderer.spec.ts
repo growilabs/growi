@@ -10,7 +10,7 @@ describe('BulkExportMarkdownRenderer', () => {
   let renderer: BulkExportMarkdownRenderer;
 
   beforeAll(() => {
-    renderer = createBulkExportMarkdownRenderer(__dirname);
+    renderer = createBulkExportMarkdownRenderer();
   });
 
   describe('GFM table rendering (Requirement 1.1)', () => {

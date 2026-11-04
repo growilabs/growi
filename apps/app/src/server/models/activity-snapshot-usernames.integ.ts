@@ -16,8 +16,12 @@
  *   - Descending sort order (sortOpt: -1) is respected.
  *   - Offset/limit pagination on the returned `usernames` slice works correctly.
  *   - The regex is case-insensitive ($options: 'i') — matches regardless of case.
- *   - R6 (design.md): `q` is passed raw into $regex (no escaping) — a pattern
- *     like 'alice' also matches 'Alice' (case-insensitive).
+ *   - `q` is escaped (escapeStringForMongoRegex). `WithTotalCount`'s only
+ *     production caller is the `/usernames` admin listing API, so it stays a
+ *     substring match (matching the pre-Prisma Mongoose behavior): 'ali'
+ *     matches both 'alice' and 'notalice'. The plain (no-total-count) variant
+ *     tested further below is prefix-only (`^`-anchored) instead, since it
+ *     backs the Elasticsearch fallback path — see its own describe block.
  *   - Returns empty result when no usernames match the query.
  *   - Usernames are deduplicated: multiple activities with the same snapshot.username
  *     are counted/returned only once.
@@ -27,8 +31,8 @@
  * The local bar is: type-checks cleanly; CI (external MONGO_URI) exercises actual DB.
  *
  * Requirements: 3.4
- * Design: ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount;
- *   "ユーザー名補完同一 (req 3.4)"; "R6 (スコープ外) — q は raw で渡す (エスケープ改善は別変更)".
+ * Design: ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount /
+ *   .findSnapshotUsernamesByUsernameRegex; "ユーザー名補完同一 (req 3.4)".
  */
 
 import { Types } from 'mongoose';
@@ -246,5 +250,164 @@ describe('findSnapshotUsernamesByUsernameRegexWithTotalCount', () => {
     // Assert: totalCount = 1 (distinct); usernames = ['repeated_user']
     expect(result.totalCount).toBe(1);
     expect(result.usernames).toEqual(['repeated_user']);
+  });
+
+  it('matches substrings, not only prefixes (parity with the `/usernames` admin API pre-Prisma behavior)', async () => {
+    // Arrange: 'notalice' contains 'ali' as a substring but does not start with it.
+    // This method must keep matching it — its only production caller is the
+    // `/usernames` admin listing API, which relied on substring matching before
+    // the Prisma migration. (Prefix-only matching is exclusive to the plain
+    // findSnapshotUsernamesByUsernameRegex variant tested in the next describe
+    // block, which backs the Elasticsearch fallback path instead.)
+    await prisma.activities.createMany({
+      data: [
+        makeActivityData({ username: 'alice' }),
+        makeActivityData({ username: 'notalice' }),
+      ],
+    });
+
+    // Act
+    const result =
+      await prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+        'ali',
+        { sortOpt: 1, offset: 0, limit: 10 },
+      );
+
+    // Assert: substring match — both usernames matched
+    expect(result.usernames).toEqual(
+      expect.arrayContaining(['alice', 'notalice']),
+    );
+    expect(result.totalCount).toBe(2);
+  });
+});
+
+describe('findSnapshotUsernamesByUsernameRegex', () => {
+  beforeEach(async () => {
+    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
+  });
+
+  afterAll(async () => {
+    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
+  });
+
+  it('req 3.4 — returns distinct, case-insensitive prefix-matched usernames', async () => {
+    await prisma.activities.createMany({
+      data: [
+        makeActivityData({ username: 'Alice' }),
+        makeActivityData({ username: 'Alice' }), // duplicate — should count once
+        makeActivityData({ username: 'alicia' }),
+        makeActivityData({ username: 'bob' }),
+      ],
+    });
+
+    const result = await prisma.activities.findSnapshotUsernamesByUsernameRegex(
+      'ali',
+      { offset: 0, limit: 10 },
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result).toEqual(expect.arrayContaining(['Alice', 'alicia']));
+    expect(result).not.toContain('bob');
+  });
+
+  it('matches only a prefix, not any substring', async () => {
+    // Regression guard for the yuki-takei PR #11377 review fix: the previous
+    // Prisma extension implementation matched 'ali' anywhere in the username.
+    await prisma.activities.createMany({
+      data: [
+        makeActivityData({ username: 'alice' }),
+        makeActivityData({ username: 'notalice' }),
+      ],
+    });
+
+    const result = await prisma.activities.findSnapshotUsernamesByUsernameRegex(
+      'ali',
+      { offset: 0, limit: 10 },
+    );
+
+    expect(result).toEqual(['alice']);
+  });
+
+  it('treats regex metacharacters in q as literal text, not as regex syntax', async () => {
+    // A username containing characters that are regex metacharacters
+    // (escapeStringForMongoRegex must neutralize them, or this either throws
+    // an invalid-regex error or silently matches far more than intended).
+    await prisma.activities.createMany({
+      data: [
+        makeActivityData({ username: 'a.b' }),
+        makeActivityData({ username: 'axb' }), // would match 'a.b' if '.' were a wildcard
+      ],
+    });
+
+    const result = await prisma.activities.findSnapshotUsernamesByUsernameRegex(
+      'a.b',
+      { offset: 0, limit: 10 },
+    );
+
+    expect(result).toEqual(['a.b']);
+  });
+
+  it('returns [] when no username matches the query', async () => {
+    await prisma.activities.createMany({
+      data: [makeActivityData({ username: 'user1' })],
+    });
+
+    const result = await prisma.activities.findSnapshotUsernamesByUsernameRegex(
+      'xyz_nomatch_zzz',
+      { offset: 0, limit: 10 },
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it.each([
+    '',
+    ' ',
+    'a',
+  ])('short-circuits to [] for q=%j even when a matching username exists (MIN_QUERY_LENGTH guard)', async (q) => {
+    // A username that WOULD match every one of these queries if the guard
+    // were absent (empty/whitespace/single-char all prefix-match 'a...').
+    await prisma.activities.createMany({
+      data: [makeActivityData({ username: 'aaaaaaaaaa' })],
+    });
+
+    const result = await prisma.activities.findSnapshotUsernamesByUsernameRegex(
+      q,
+      {
+        offset: 0,
+        limit: 10,
+      },
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it('queries normally once q reaches MIN_QUERY_LENGTH (2 chars)', async () => {
+    await prisma.activities.createMany({
+      data: [makeActivityData({ username: 'aaaaaaaaaa' })],
+    });
+
+    const result = await prisma.activities.findSnapshotUsernamesByUsernameRegex(
+      'aa',
+      { offset: 0, limit: 10 },
+    );
+
+    expect(result).toEqual(['aaaaaaaaaa']);
+  });
+
+  it('matches by prefix even with incidental surrounding whitespace in q', async () => {
+    await prisma.activities.createMany({
+      data: [
+        makeActivityData({ username: 'alice' }),
+        makeActivityData({ username: 'notalice' }),
+      ],
+    });
+
+    const result = await prisma.activities.findSnapshotUsernamesByUsernameRegex(
+      '  ali  ',
+      { offset: 0, limit: 10 },
+    );
+
+    expect(result).toEqual(['alice']);
   });
 });

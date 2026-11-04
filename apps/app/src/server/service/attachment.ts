@@ -1,15 +1,14 @@
 import type { ReadStream } from 'node:fs';
 import fs from 'node:fs';
+import { getIdStringForRef } from '@growi/core';
 import type { IAttachment, Ref } from '@growi/core/dist/interfaces';
-import type { HydratedDocument } from 'mongoose';
-import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
 import { AttachmentType } from '../interfaces/attachment';
-import type { IAttachmentDocument } from '../models/attachment';
-import { Attachment } from '../models/attachment';
+import type { AttachmentWithComputed } from '../models/attachment';
 
 const logger = loggerFactory('growi:service:AttachmentService');
 
@@ -23,7 +22,7 @@ const createReadStream = (filePath: string): ReadStream => {
 
 type AttachHandler = (
   pageId: string | null,
-  attachment: IAttachmentDocument,
+  attachment: AttachmentWithComputed,
   file: Express.Multer.File,
 ) => Promise<void>;
 
@@ -36,8 +35,8 @@ type IAttachmentService = {
     pageId: string | null,
     attachmentType: AttachmentType,
     disposeTmpFileCallback?: (file: Express.Multer.File) => void,
-  ): Promise<IAttachmentDocument>;
-  removeAllAttachments(attachments: IAttachmentDocument[]): Promise<void>;
+  ): Promise<AttachmentWithComputed>;
+  removeAllAttachments(attachments: AttachmentWithComputed[]): Promise<void>;
   removeAttachment(attachmentId: Ref<IAttachment> | undefined): Promise<void>;
   isBrandLogoExist(): Promise<boolean>;
   addAttachHandler(handler: AttachHandler): void;
@@ -64,7 +63,7 @@ export class AttachmentService implements IAttachmentService {
     pageId: string | null | undefined = null,
     attachmentType,
     disposeTmpFileCallback,
-  ): Promise<IAttachmentDocument> {
+  ): Promise<AttachmentWithComputed> {
     const { fileUploadService } = this.crowi;
 
     // check limit
@@ -74,12 +73,12 @@ export class AttachmentService implements IAttachmentService {
     }
 
     // create an Attachment document and upload file
-    let attachment: IAttachmentDocument;
+    let attachment: AttachmentWithComputed;
     let readStreamForCreateAttachmentDocument: ReadStream | null = null;
     try {
       readStreamForCreateAttachmentDocument = createReadStream(file.path);
-      attachment = Attachment.createWithoutSave(
-        pageId,
+      const draft = prisma.attachments.createWithoutSave(
+        pageId ?? null,
         user,
         file.originalname,
         file.mimetype,
@@ -88,9 +87,9 @@ export class AttachmentService implements IAttachmentService {
       );
       await fileUploadService.uploadAttachment(
         readStreamForCreateAttachmentDocument,
-        attachment,
+        draft,
       );
-      await attachment.save();
+      attachment = await prisma.attachments.create({ data: draft });
 
       const attachHandlerPromises = this.attachHandlers.map((handler) => {
         return handler(pageId, attachment, file);
@@ -116,21 +115,21 @@ export class AttachmentService implements IAttachmentService {
   }
 
   async removeAllAttachments(
-    attachments: HydratedDocument<IAttachmentDocument>[],
+    attachments: AttachmentWithComputed[],
   ): Promise<void> {
     const { fileUploadService } = this.crowi;
-    const attachmentsCollection = mongoose.connection.collection('attachments');
-    const unorderAttachmentsBulkOp =
-      attachmentsCollection.initializeUnorderedBulkOp();
 
     if (attachments.length === 0) {
       return;
     }
 
-    attachments.forEach((attachment) => {
-      unorderAttachmentsBulkOp.find({ _id: attachment._id }).delete();
+    await prisma.attachments.deleteMany({
+      where: {
+        id: {
+          in: attachments.map((attachment) => attachment._id),
+        },
+      },
     });
-    await unorderAttachmentsBulkOp.execute();
 
     fileUploadService.deleteFiles(attachments);
 
@@ -141,7 +140,12 @@ export class AttachmentService implements IAttachmentService {
     attachmentId: Ref<IAttachment> | undefined,
   ): Promise<void> {
     const { fileUploadService } = this.crowi;
-    const attachment = await Attachment.findById(attachmentId);
+    const id =
+      attachmentId != null ? getIdStringForRef(attachmentId) : undefined;
+    const attachment =
+      id != null
+        ? await prisma.attachments.findUnique({ where: { id } })
+        : null;
 
     // No-op when the metadata doc is already gone. The bulk-export cleanup cron
     // relies on this to self-heal: a job whose attachment was already removed by
@@ -162,10 +166,10 @@ export class AttachmentService implements IAttachmentService {
     // gone" is not an error path here: the underlying stores already no-op it
     // (see gridfs deleteFile, which warns and returns when the file is missing).
     await fileUploadService.deleteFile(attachment);
-    await attachment.remove();
+    await prisma.attachments.delete({ where: { id: attachment.id } });
 
     const detachedHandlerPromises = this.detachHandlers.map((handler) => {
-      return handler(attachment._id);
+      return handler(attachment.id);
     });
 
     // Do not await, run in background
@@ -177,8 +181,9 @@ export class AttachmentService implements IAttachmentService {
   }
 
   async isBrandLogoExist(): Promise<boolean> {
-    const query = { attachmentType: AttachmentType.BRAND_LOGO };
-    const count = await Attachment.countDocuments(query);
+    const count = await prisma.attachments.count({
+      where: { attachmentType: AttachmentType.BRAND_LOGO },
+    });
 
     return count >= 1;
   }

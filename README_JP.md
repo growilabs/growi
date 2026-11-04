@@ -7,7 +7,7 @@
 </p>
 <p align="center">
   <a href="https://github.com/growilabs/growi/releases/latest"><img src="https://img.shields.io/github/release/growilabs/growi.svg" alt="Latest version"></a>
-  <a href="https://communityinviter.com/apps/wsgrowi/invite/"><img src="https://img.shields.io/badge/Slack-Join%20Us-4A154B?style=flat&logo=slack&logoColor=white" alt="Slack - Join US"></a>
+  <a href="https://docs.growi.org/slack"><img src="https://img.shields.io/badge/Slack-Join%20Us-4A154B?style=flat&logo=slack&logoColor=white" alt="Slack - Join US"></a>
 </p>
 
 <p align="center">
@@ -77,12 +77,14 @@ Crowi からの移行は **[こちら](https://docs.growi.org/en/admin-guide/mig
 
 [GROWI Docs: 環境変数](https://docs.growi.org/ja/admin-guide/admin-cookbook/env-vars.html) ([en](https://docs.growi.org/en/admin-guide/admin-cookbook/env-vars.html)/[ja](https://docs.growi.org/ja/admin-guide/admin-cookbook/env-vars.html)) をご覧ください。
 
+AWS S3・GCS・Azureの設定を環境変数で固定する方法は、[ストレージの環境変数設定](docs/storage-env-only.md)を参照してください。
+
 # 開発環境
 
 ## 依存関係
 
 - Node.js v24.x
-- pnpm 10.x
+- pnpm 11.x（正確なバージョンは[package.json](./package.json)の`packageManager`を参照）
 - [Turborepo](https://turbo.build/repo)
 - MongoDB v6.x or v8.x
 
@@ -130,7 +132,7 @@ Issue と Pull requests の作成は英語・日本語どちらでも受け付�
 
 ## GROWI について話し合いましょう！
 
-質問や提案があれば、私たちの [Slack team](https://communityinviter.com/apps/wsgrowi/invite/) にぜひご参加ください。
+質問や提案があれば、私たちの [Slack team](https://docs.growi.org/slack) にぜひご参加ください。
 いつでも、どこでも GROWI について議論しましょう！
 
 # ライセンス

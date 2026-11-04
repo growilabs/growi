@@ -1,0 +1,19 @@
+{
+  "total_count": 2,
+  "check_runs": [
+    {
+      "id": 100000000001,
+      "name": "ci-app-test (24.x, 6.0)",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-09-16T09:19:17Z"
+    },
+    {
+      "id": 100000000002,
+      "name": "ci-app-test (24.x, 6.0)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-16T09:19:17Z"
+    }
+  ]
+}

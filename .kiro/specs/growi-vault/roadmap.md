@@ -1,6 +1,6 @@
 # growi-vault Sub-spec Roadmap
 
-> 本ファイルは umbrella spec `growi-vault` 内の sub-spec 進行管理。リポジトリ全体の roadmap は `.kiro/steering/roadmap.md`（現在 stub）を参照すること。
+> 本ファイルは umbrella spec `growi-vault` 内の sub-spec 進行管理。リポジトリ全体の roadmap は `.kiro/steering/roadmap.md` を参照すること。
 
 ## Overview
 

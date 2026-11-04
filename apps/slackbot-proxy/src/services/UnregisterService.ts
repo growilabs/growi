@@ -45,12 +45,10 @@ export class UnregisterService
     authorizeResult: AuthorizeResult,
   ): Promise<void> {
     // get growi urls
-    const installationId =
-      authorizeResult.enterpriseId || authorizeResult.teamId;
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
-        // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
-        installationId!,
+        authorizeResult.teamId,
+        authorizeResult.enterpriseId,
       );
     const relations = await this.relationRepository
       .createQueryBuilder('relation')
@@ -187,14 +185,12 @@ export class UnregisterService
       (selectedOption) => selectedOption.value,
     );
 
-    const installationId =
-      authorizeResult.enterpriseId || authorizeResult.teamId;
     let installation: Installation | undefined;
     try {
       installation =
         await this.installationRepository.findByTeamIdOrEnterpriseId(
-          // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
-          installationId!,
+          authorizeResult.teamId,
+          authorizeResult.enterpriseId,
         );
     } catch (err) {
       logger.error('Unregisteration failed:\n', err);

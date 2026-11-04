@@ -1,16 +1,16 @@
 import type React from 'react';
+import { useTranslation } from 'next-i18next';
 
 import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 
 type Props = {
   adminGeneralSecurityContainer: AdminGeneralSecurityContainer;
-  t: (key: string, options?: Record<string, unknown>) => string;
 };
 
 export const PageAccessRightsSettings: React.FC<Props> = ({
   adminGeneralSecurityContainer,
-  t,
 }) => {
+  const { t } = useTranslation('admin');
   const { currentRestrictGuestMode } = adminGeneralSecurityContainer.state;
 
   return (

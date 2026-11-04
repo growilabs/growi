@@ -70,7 +70,9 @@ const TableWithEditButtonNoMemorized = (
           className="handsontable-modal-trigger"
           onClick={editButtonClickHandler}
         >
-          <span className="material-symbols-outlined">edit_square</span>
+          <span className="material-symbols-outlined" aria-hidden="true">
+            edit_square
+          </span>
         </button>
       )}
       <table className={className}>{children}</table>

@@ -1,12 +1,36 @@
 {
   "Show": "Show",
+  "View": "View",
   "Hide": "Hide",
   "Add": "Add",
   "Insert": "Insert",
   "Reset": "Reset",
   "Sign out": "Logout",
   "New": "New",
+  "Send": "Send",
+  "Clear": "Clear",
   "Delete": "Delete",
+  "Cancel": "Cancel",
+  "Close": "Close",
+  "Confirm": "Confirm",
+  "Create": "Create",
+  "Created": "Created",
+  "Description": "Description",
+  "Done": "Done",
+  "Edit": "Edit",
+  "Email": "Email",
+  "Error occurred": "Error occurred",
+  "Help": "Help",
+  "Name": "Name",
+  "Password": "Password",
+  "Update": "Update",
+  "User": "User",
+  "UserGroup": "UserGroup",
+  "V5 Page Migration": "Convert To V5 Compatibility",
+  "Warning": "Warning",
+  "add": "Add",
+  "eg": "e.g.",
+  "username": "Username",
   "meta": {
     "display_name": "English"
   },
@@ -128,7 +152,7 @@
     "publish_transfer_key": "Publish transfer key",
     "transfer_key_limit": "Transfer keys are valid for 1 hour after issuance.",
     "once_transfer_key_used": "Once the transfer key is used for transfer, it cannot be used for any other transfer.",
-    "transfer_to_growi_cloud": "For more details, please click <a href='{{documentationUrl}}en/admin-guide/management-cookbook/g2g-transfer.html'>here.</a>"
+    "transfer_to_growi_cloud": "For more details, please click <a href='{{documentationUrl}}/en/admin-guide/management-cookbook/g2g-transfer.html'>here.</a>"
   },
   "accesstoken_scopes_desc": {
     "read": {
@@ -258,5 +282,12 @@
       },
       "cancel": "Cancel"
     }
+  },
+  "username_suggestion": {
+    "active_user": "Active User",
+    "inactive_user": "Inactive User"
+  },
+  "table_action": {
+    "edit": "Edit"
   }
 }

@@ -27,6 +27,12 @@ import {
   type SearchItemMutation,
 } from '../../util/apply-search-item-mutation';
 import { mergeInfiniteSearchResult } from '../../util/infinite-search-result';
+import {
+  buildSearchQuery,
+  createEmptyFilterState,
+  normalizeKeyword,
+  parseSearchQuery,
+} from '../../utils/search-query';
 import { OperateAllControl } from './OperateAllControl';
 import SearchControl from './SearchControl';
 import type {
@@ -43,6 +49,10 @@ import styles from './SearchPage.module.scss';
 // Elasticsearch `index.max_result_window` default. A query is rejected once
 // `limit + offset` exceeds it, so infinite scroll must stop before that point.
 const ES_MAX_RESULT_WINDOW = 10000;
+
+// The search runs off the raw `?q=` (which already carries the operators), so the
+// structured filters are always empty here. Shared to keep the SWR key stable.
+const EMPTY_FILTER_STATE = createEmptyFilterState();
 
 /**
  * SearchResultListHead
@@ -97,7 +107,11 @@ export const SearchPage = (): JSX.Element => {
   const { t } = useTranslation();
   const showPageLimitationL = useAtomValue(showPageLimitationLAtom);
 
+  // The URL `?q=` is the single source of truth (free text + inline operators).
+  // Parse it to hydrate the keyword box and the filter chips/panel;
+  // searchInvokedHandler does the reverse.
   const keyword = useSearchKeyword();
+  const parsedQuery = useMemo(() => parseSearchQuery(keyword), [keyword]);
   const setSearchKeyword = useSetSearchKeyword();
 
   const disableUserPages = useAtomValue(disableUserPagesAtom);
@@ -125,6 +139,7 @@ export const SearchPage = (): JSX.Element => {
 
   const swr = useSWRINFxSearch(keyword ?? '', null, {
     ...configurationsByControl,
+    filters: EMPTY_FILTER_STATE,
     limit: chunkSize,
   });
   // useSWRInfinite returns a fresh object every render; destructure its stable
@@ -184,8 +199,21 @@ export const SearchPage = (): JSX.Element => {
 
   const searchInvokedHandler = useCallback(
     (newKeyword: string, newConfigurations: Partial<ISearchConfigurations>) => {
-      setConfigurationsByControl(newConfigurations);
-      setSearchKeyword(newKeyword);
+      // Filters travel via the URL (`?q=`), not this filters config — the SWR call always
+      // sources them from the parsed query, so we don't retain them here.
+      const { filters: _filters, ...configWithoutFilters } = newConfigurations;
+      setConfigurationsByControl(configWithoutFilters);
+
+      // Serialize free text + filters into `?q=`. A new keyword pushes (a fresh
+      // search in history); a filter/sort-only change replaces (no history spam).
+      const q = buildSearchQuery(
+        newKeyword,
+        newConfigurations.filters ?? createEmptyFilterState(),
+      );
+      // Normalize both sides so an internal-whitespace-only difference is not
+      // misread as a new keyword.
+      const isNewKeyword = normalizeKeyword(newKeyword) !== parsedQuery.keyword;
+      setSearchKeyword(q, { replace: !isNewKeyword });
 
       // Discard the accumulation and reload from the first chunk (Req 7.1).
       // `mutate()` forces a refetch even when the SWR key is unchanged, so
@@ -193,7 +221,7 @@ export const SearchPage = (): JSX.Element => {
       setSize(1);
       mutate();
     },
-    [setSearchKeyword, setSize, mutate],
+    [setSearchKeyword, setSize, mutate, parsedQuery.keyword],
   );
 
   const selectAllCheckboxChangedHandler = useCallback((isChecked: boolean) => {
@@ -238,10 +266,12 @@ export const SearchPage = (): JSX.Element => {
 
   const initialSearchConditions: Partial<ISearchConditions> = useMemo(() => {
     return {
-      keyword,
+      // Box shows free text only; the panel/chips hydrate from the parsed filters.
+      keyword: parsedQuery.keyword,
+      filters: parsedQuery.filters,
       limit: DEFAULT_SEARCH_CHUNK_SIZE,
     };
-  }, [keyword]);
+  }, [parsedQuery]);
 
   // Post-delete reset (Req 5.3 / 7.2): discard the accumulation and reload from
   // the first chunk, then clear the selection AND the right-pane preview.
@@ -368,7 +398,7 @@ export const SearchPage = (): JSX.Element => {
       className={styles['search-page']}
       ref={searchPageBaseRef}
       pages={merged.pages}
-      searchingKeyword={keyword}
+      searchingKeyword={parsedQuery.keyword}
       resetKey={resetKey}
       onSelectedPagesByCheckboxesChanged={
         selectedPagesByCheckboxesChangedHandler

@@ -156,6 +156,7 @@ export class NewsService {
               externalId: item.id,
               title: item.title,
               body: item.body,
+              bodyFormat: item.bodyFormat,
               emoji: item.emoji,
               url: item.url,
               publishedAt: new Date(item.publishedAt),

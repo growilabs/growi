@@ -5,6 +5,19 @@ test('Sub navigation sticky changes when scrolling down and up', async ({
 }) => {
   await page.goto('/Sandbox');
 
+  // react-stickynode measures the wrapper's initial offset at mount time.
+  // Scrolling immediately after goto() races that measurement against
+  // client-side hydration and any post-load data fetches that affect
+  // layout, which intermittently leaves the very first scroll event
+  // checked against a stale/not-yet-computed trigger point. Waiting for
+  // the network to settle and the wrapper to actually be visible before
+  // scrolling lets that initial measurement complete first. Same
+  // mechanism as growilabs/growi#11780/#11797/#11798 in the sibling
+  // sticky-features.spec.ts (see PR #11801) — this spec has its own
+  // instance of the same race. See growilabs/growi#11782.
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('.sticky-outer-wrapper').first()).toBeVisible();
+
   // Wait until the page is scrollable
   await expect
     .poll(async () => {

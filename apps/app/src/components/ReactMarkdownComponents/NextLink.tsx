@@ -1,9 +1,11 @@
 import type { AnchorHTMLAttributes, JSX } from 'react';
 import type { LinkProps } from 'next/link';
 import Link from 'next/link';
-import { pagePathUtils } from '@growi/core/dist/utils';
 
 import { useSiteUrl } from '~/states/global';
+// isNextPageRoute's Express-exclusive path list can drift from server/routes/index.js --
+// see the next-express-route-consistency skill (apps/app/.claude/skills).
+import { isNextPageRoute } from '~/utils/is-next-page-route';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:components:NextLink');
@@ -23,11 +25,15 @@ const isExternalLink = (href: string, siteUrl: string | undefined): boolean => {
   }
 };
 
-const isCreatablePage = (href: string) => {
+const isRoutableByNext = (href: string) => {
   try {
     const url = new URL(href, 'http://example.com');
-    const pathName = url.pathname;
-    return pagePathUtils.isCreatablePage(pathName);
+    // URL.pathname is percent-encoded, and '%' itself is one of the characters
+    // isNextPageRoute() treats as unsafe -- so every path holding a non-ASCII
+    // character or a space would be misjudged unless it is decoded back first.
+    // Same treatment as getServerSideCommonProps().
+    const pathName = decodeURIComponent(url.pathname);
+    return isNextPageRoute(pathName);
   } catch (err) {
     logger.debug(err);
     return false;
@@ -79,8 +85,8 @@ export const NextLink = (props: Props): JSX.Element => {
     );
   }
 
-  // when href is an anchor link or not-creatable path
-  if (hasAnchorLink(href) || !isCreatablePage(href) || target != null) {
+  // when href is an anchor link or not routable by Next's page router
+  if (hasAnchorLink(href) || !isRoutableByNext(href) || target != null) {
     return (
       <a
         id={id}
@@ -98,6 +104,7 @@ export const NextLink = (props: Props): JSX.Element => {
   return (
     <Link
       {...rest}
+      id={id}
       href={href}
       prefetch={false}
       className={className}

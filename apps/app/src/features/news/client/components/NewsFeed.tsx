@@ -13,6 +13,7 @@ import { NEWS_PER_PAGE, newsItemAnchorId } from '../consts';
 import { useSWRxNewsPage } from '../hooks/use-news';
 import { parsePageQuery } from '../utils/parse-page-query';
 import { resolveLocaleText } from '../utils/resolve-locale-text';
+import { NewsMarkdownBody } from './NewsMarkdownBody';
 
 import styles from './NewsFeed.module.scss';
 
@@ -140,11 +141,16 @@ export const NewsFeed = (): JSX.Element => {
 
               <div className="text-muted small mb-2 ms-5">{formattedDate}</div>
 
-              {body !== '' && (
-                <div className="ms-5" style={{ whiteSpace: 'pre-wrap' }}>
-                  {body}
-                </div>
-              )}
+              {body !== '' &&
+                (item.bodyFormat === 'markdown' ? (
+                  <div className="ms-5">
+                    <NewsMarkdownBody body={body} />
+                  </div>
+                ) : (
+                  <div className="ms-5" style={{ whiteSpace: 'pre-wrap' }}>
+                    {body}
+                  </div>
+                ))}
 
               {item.url != null && isSafeHttpUrl(item.url) && (
                 <div className="ms-5 mt-3">

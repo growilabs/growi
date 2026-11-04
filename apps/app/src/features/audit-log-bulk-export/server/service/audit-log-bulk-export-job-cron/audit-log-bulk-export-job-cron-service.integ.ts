@@ -20,11 +20,11 @@ import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { ResponseMode } from '~/server/interfaces/attachment';
 import Activity, { type ActivityDocument } from '~/server/models/activity';
-import type { IAttachmentDocument } from '~/server/models/attachment';
-import { Attachment } from '~/server/models/attachment';
+import type { AttachmentDraft } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import type { FileUploader } from '~/server/service/file-uploader/file-uploader';
 import { MultipartUploader } from '~/server/service/file-uploader/multipart-uploader';
+import { prisma } from '~/utils/prisma';
 
 import {
   AuditLogBulkExportFormat,
@@ -168,7 +168,7 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
   let uploadAttachmentSpy: MockedFunction<
     (
       readable: NodeJS.ReadableStream,
-      attachment: IAttachmentDocument,
+      attachment: AttachmentDraft,
     ) => Promise<void>
   >;
 
@@ -236,7 +236,7 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
       .mockImplementation(
         async (
           readable: NodeJS.ReadableStream,
-          attachment: IAttachmentDocument,
+          attachment: AttachmentDraft,
         ) => {
           const passThrough = new PassThrough();
           let totalSize = 0;
@@ -258,7 +258,7 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
   afterEach(async () => {
     await Activity.deleteMany({});
     await AuditLogBulkExportJob.deleteMany({});
-    await Attachment.deleteMany({});
+    await prisma.attachments.deleteMany({});
 
     if (fs.existsSync(testTmpDir)) {
       fs.rmSync(testTmpDir, { recursive: true, force: true });

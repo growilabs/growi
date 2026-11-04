@@ -5,6 +5,8 @@ import type {
   PathItemObject,
 } from 'openapi-typescript';
 
+import { HTTP_METHODS } from '../http-methods';
+
 const toPascal = (s: string): string =>
   s
     .split('-')
@@ -55,18 +57,7 @@ export async function generateOperationIds(
 
   Object.entries(api.paths || {}).forEach(([path, pathItem]) => {
     const item = pathItem as PathItemObject;
-    (
-      [
-        'get',
-        'post',
-        'put',
-        'delete',
-        'patch',
-        'options',
-        'head',
-        'trace',
-      ] as const
-    ).forEach((method) => {
+    HTTP_METHODS.forEach((method) => {
       const operation = item[method] as OperationObject | undefined;
       if (
         operation == null ||

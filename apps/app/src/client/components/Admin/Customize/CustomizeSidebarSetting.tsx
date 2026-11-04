@@ -85,7 +85,7 @@ const CustomizeSidebarsetting = (): JSX.Element => {
               onClick={onClickSubmit}
               className="btn btn-primary"
             >
-              {t('Update')}
+              {t('commons:Update')}
             </button>
           </div>
         </div>

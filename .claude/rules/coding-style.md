@@ -237,7 +237,27 @@ Prefer `async/await` over `.then()` chains.
 
 ## Comments
 
-**Write comments in English.** Only comment when the WHY is non-obvious (hidden constraints, invariants, workarounds). Do not restate what the code does — let naming do that work.
+**Write comments in English.** Only comment when the WHY is non-obvious (hidden constraints, invariants, workarounds). Do not restate what the code does — let naming do that work. If a reader can already tell what a module or function does from its name and shape, spelling that out again in a comment only adds a second thing to keep in sync with the code; the extra comment always drifts out of date first.
+
+**Don't duplicate a spec's WHY in code.** When the reasoning behind a piece of code is already recorded in a spec (`design.md`/`research.md`'s Decisions, Findings, or an incident writeup), point to it instead of re-explaining it in the comment. Two copies of the same rationale means one of them goes stale silently.
+
+```typescript
+// ❌ WRONG: re-explains a decision already written out in research.md
+// POEditor exports an untranslated term as an empty string (once the
+// project's Fallback Language is unset) rather than omitting it. An
+// empty string here means "no translation yet", not "translation is
+// now blank" or "key removed" -- skip it so a run with many
+// still-untranslated terms never overwrites or deletes existing
+// content based on their absence of a translation.
+if (afterValue === '') { continue; }
+
+// ✅ CORRECT: one line, points to the spec for the full reasoning
+// '' means "not yet translated in POEditor", never a real value (see
+// research.md's fallback-language Decision).
+if (afterValue === '') { continue; }
+```
+
+**Don't narrate the task, review, or incident that produced the code.** "Regression for the incident where..." or "found in review" belongs in the commit message and PR description — that history is already in git, and restating it as standing prose in the file just rots once a reader lacks that context. A test name that already states the behavior under test needs no comment restating it on top.
 
 ## Test File Placement
 
@@ -287,7 +307,7 @@ Before marking work complete:
 - [ ] No `console.log` (use logger)
 - [ ] No mutation (immutable patterns used)
 - [ ] Named exports (except Next.js pages)
-- [ ] English comments
+- [ ] English comments, none restating WHAT the code does, none duplicating a WHY already written in a spec's design.md/research.md, none narrating the task/review/incident that produced the change
 - [ ] Co-located tests
 - [ ] Non-trivial logic extracted as pure functions from framework wrappers
 - [ ] No hard-coded mode/variant checks in consumers (use declared metadata)
@@ -296,3 +316,77 @@ Before marking work complete:
 - [ ] **Module public surface is minimal** — `index.ts` re-exports only what external callers need; internals stay unexported
 - [ ] **Cohesive internals are grouped in subdirectories** with their own barrel, not flattened into the parent
 - [ ] *(apps/app)* Import specifiers follow the no-extension convention — see `apps/app/.claude/rules/import-convention.md`
+
+## Reviewing for Design Quality (「筋の良い実装」)
+
+A change can pass its tests and match the spec and still be the *wrong shape*.
+When reviewing — in any form: `/code-review`, `/review`, `kiro-review`,
+`kiro-validate-impl`, or a review asked for in plain words — do not stop
+at "does it work?" and "does it match the spec?" — also ask **"is this a sound,
+well-shaped implementation (筋の良い実装)?"**
+
+**"筋が良い" is not conformance to a fixed checklist.** It is the shape that best
+fits *what this particular feature and location need*: first judge which qualities
+matter most here — correctness, latency, memory footprint, security, readability,
+maintainability — and how they trade off against each other, then check that the
+implementation resolves that tradeoff well and executes it cleanly. The right call
+is context-dependent: a hot path may earn complexity a CRUD handler never should; a
+security boundary may justify verbosity that would be noise elsewhere. Reason about
+the tradeoff from first principles and state it — the stronger the reviewing model,
+the more this judgment should drive the verdict rather than rule-matching.
+
+The rest of this file is the repo's **usual defaults** — what good normally looks
+like here — a floor, not a ceiling. Treat the markers below as the common case, and
+expect a well-reasoned deviation to be *itself* 筋が良い when the reviewer names the
+tradeoff that justifies it:
+
+- **Right seams** — logic sits in the layer that owns it; non-trivial logic is a
+  pure function, not buried in a framework wrapper; no needless coupling introduced.
+- **No needless complexity** — the simplest shape that meets the requirement; no
+  speculative abstraction, no over-engineering, no dead branches.
+- **Idiomatic and consistent** — reads like the surrounding code (naming, exports,
+  immutability, error handling), not a foreign transplant.
+- **Single source of truth** — no drift-prone duplication; mode/variant behavior is
+  data-driven; executors take their work-set as input rather than hard-coding it.
+- **Not a workaround in disguise** — it addresses the actual cause, rather than
+  papering over a symptom in a way a maintainer would have to unwind later.
+
+These defaults must never veto a sound, explicitly-argued context judgment. If a
+default and the tradeoff judgment conflict, the judgment wins and the default is the
+thing to revisit — not the code. This section anchors the question; it does not cap
+the answer.
+
+### Scope and shape before defects
+
+A bug-hunting recipe (such as `/code-review`'s) or the requester's stated priority
+("regressions first, then performance") sets where to look hardest. It does not
+replace the question above. Hunting defects first anchors the review on the code
+as written: every finding turns into a patch to that code, and a part that should
+not exist gets polished instead of removed. So work in this order:
+
+1. **Scope** — map each change in the diff to the requirement it serves (the spec;
+   without a spec, the ticket or PR description). A change that serves none is out
+   of scope. Recommend splitting it into its own PR. For functionality nobody
+   specified, recommend removing it, or adding it to the spec first if it is truly
+   needed. Do not review its details as if it belonged.
+2. **Shape** — for what remains: is it the least code that meets the requirement,
+   type-safe and robust, and does it follow the framework's and the repo's
+   conventions?
+3. **Defects** — only then hunt for bugs in what is left.
+
+**Prefer fixes that remove code.** When a finding can be fixed either by deleting
+the code that causes it or by adding code around it, recommend the deletion. Hold
+your own suggested fixes to the same bar as the author's code before reporting
+them: a new helper, guard, upgrade note, or abstraction that compensates for a part
+that need not exist is the wrong fix.
+
+**Following a repo rule is not, by itself, a justification.** When an author's
+stated reason is "the rule says so" and the rule leads to a fragile shape, say so,
+and name the rule as the thing to revisit.
+
+**Severity discipline.** A spec-compliant change with a poor shape is normally a
+`Suggestion` or `Important` finding, not an automatic rejection — reserve blocking
+for a shape that is genuinely hard to maintain, hides coupling, or will force a
+rewrite. An out-of-scope change or unspecified functionality is at least
+`Important`. Design-quality review sharpens the result; it is not a license to loop on
+taste. (See `kiro-review` for the task-local severity model.)

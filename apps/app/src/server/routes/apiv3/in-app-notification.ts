@@ -179,8 +179,8 @@ export const setup = (crowi: Crowi): Router => {
           .filter((user) => user != null)
           .filter((user, i, self) => self.indexOf(user) === i);
 
-      const serializedDocs: Array<IInAppNotification> =
-        paginationResult.docs.map((doc) => {
+      const docObjs: Array<IInAppNotification> = paginationResult.docs.map(
+        (doc) => {
           if (doc.user != null && doc.user instanceof User) {
             doc.user = serializeUserSecurely(doc.user);
           }
@@ -194,7 +194,10 @@ export const setup = (crowi: Crowi): Router => {
 
           docObj.actionUsers = serializedActionUsers;
           return docObj;
-        });
+        },
+      );
+      const serializedDocs =
+        await inAppNotificationService.populateTargetAttachments(docObjs);
 
       const serializedPaginationResult = {
         ...paginationResult,
