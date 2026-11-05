@@ -1,8 +1,49 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.8...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.9...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.9](https://github.com/growilabs/compare/v8.0.8...v8.0.9) - 2026-11-04
+
+### 💎 Features
+
+* feat(ai-chat): make the AI chat sidebar resizable (#12082) @miya
+* feat(ai-usage): record AI usage for chat, suggest-path and title generation and expose it through a public API (#12089) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv(page): Judge page deletion authority in one place for every user request (#12182) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(page): Respect page deletion permission settings when deleting pages and emptying the trash (#12163) @yuki-takei
+* fix(share-links): validate expiredAt against the current time per request (#12118) @yuki-takei
+* fix(share-links): read the real admin field in the DELETE /:id bypass (#12122) @yuki-takei
+* fix(rate-limiter): match auth route paths consistently (#12127) @yuki-takei
+* fix: Page path checks hang on paths with many slashes (#12159) @yuki-takei
+* fix(opentelemetry): anonymize http.url as well as http.target (#12151) @yuki-takei
+* fix(opentelemetry): anonymize non-ASCII page paths (#12123) @jay23606
+* fix(opentelemetry): rule-driven HTTP anonymization with a coverage table kept in sync by tests (#12158) @yuki-takei
+* fix(page): keep a page on the tree when a rename fails midway (#11917) @arvid-e
+* fix(page): close the remaining gaps in the failed-rename rollback (#12150) @yuki-takei
+* fix(core): Treat page paths literally when omitting pages under other selected pages (#12176) @yuki-takei
+* fix: Bookmark listings return 500 for users whose folders contain null bookmark ids (#12167) @yuki-takei
+* fix(share): Show the shared page when navigating to a share link from another page (#12142) @yuki-takei
+* fix(math): Prevent live preview from breaking due to incomplete math blocks (#12075) @yotatameguchi-boop
+* fix(presentation): disable Marp CSS minification to avoid a crash on … (#12157) @y-oda-nipponrick
+* fix(editor): Rename the PlantUML slash command label (#12174) @Ryosei-Fukushima
+
+### 🧰 Maintenance
+
+* support: prisma page bulk export job model  (#12096) @mizozobu
+* support: page bulk export page snapshot model (#12170) @mizozobu
+* chore(deps): bump @playwright/test to 1.64.1 for Ubuntu 26.04 support (#12129) @yuki-takei
+* ci(deps): Bump qs from 6.13.0 to 6.17.0 (#12164) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump body-parser from 1.20.6 to 1.20.9 (#12130) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump zod from 4.4.3 to 4.6.6 (#12135) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): Bump vite from 6.4.3 to 6.4.4 (#12109) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): Bump vite from 6.4.4 to 6.4.5 (#12190) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v8.0.8](https://github.com/growilabs/compare/v8.0.7...v8.0.8) - 2026-10-22
 

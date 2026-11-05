@@ -272,7 +272,7 @@
     "password_is_not_set": "パスワードが設定されていません"
   },
   "share_links": {
-    "Shere this page link to public": "外部に共有するリンクを発行する",
+    "Share this page link to public": "外部に共有するリンクを発行する",
     "share_link_list": "共有リンクリスト",
     "share_link_management": "共有リンク管理",
     "delete_all_share_links": "全ての共有リンクを削除します",
