@@ -268,7 +268,7 @@ apps/attachment-text-extractor/
     │   ├── readiness.ts          # prlimit present + probe child (8.8)
     │   └── linux/
     │       ├── index.ts
-    │       ├── prlimit-args.ts   # RLIMIT_AS / CPU soft:hard / core 0 -> argv
+    │       ├── prlimit-args.ts   # RLIMIT_AS / CPU soft:hard / core 1 -> argv
     │       ├── proc-rss.ts       # /proc/<pid>/status VmRSS
     │       └── platform.ts       # no-op wrappers on non-Linux
     └── http/                     # parent only: Hono app
@@ -623,7 +623,7 @@ export interface ConversionRunner {
 - トークンは子の `env` に入れない。子の `env` は明示したものだけにする (3.8)
 - XML の書き換えは、DTD とエンティティを展開しない解析で行う。XML のテキスト化は解析せずにタグを取り除く (対象 spec と同じ方針。部品は T6)
 - `prlimit` は `PATH` から探さず、絶対パス (`/usr/bin/prlimit`) で起動する。探し方によって別のコマンドを起動する余地をなくすため。パスは Dockerfile の検査 (8.7) で確かめる
-- 子のコアダンプは `prlimit --core=0` で禁止する (3.12)
+- 子のコアダンプは `prlimit --core=1` で禁止する (3.12)。`--core=0` は、コアダンプをプログラム (apport など) に渡す `core_pattern` の環境で無視される。上限が 1 だと、カーネルは渡し先を起動せずコアを作らずに終わる (Linux v3.10〜v6.12 の `fs/coredump.c`。man には無く、ソースのコメントだけの挙動。ユーザー承認済み。research.md 15.1 (d)・15.11)。対象 spec の ChildEntry の「`RLIMIT_CORE` を 0 にする」の説明は、取り込みのとき (Req 12) に合わせて直す
 
 ## Performance & Scalability
 
