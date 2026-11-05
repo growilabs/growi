@@ -89,7 +89,7 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 | `/docs` と `/redoc` を残すかどうか | 決定 (出さない。7 節) | ユーザー判断 (design.md の D3) |
 | 配置 (pnpm workspace に入れるか) | 決定 (`apps/attachment-text-extractor/` に移して workspace に入れる) | ユーザー判断 (design.md の D4) |
 | PDF のライブラリ | 決定 (`@embedpdf/pdfium` 2.15.1。14 節) | 試作と計測 (Req 11.3) |
-| 子プロセスの作り方 | 未決 (`prlimit` は使ってよいと決まった) | 試作と計測 (Req 11.4) |
+| 子プロセスの作り方 | 決定 (`/usr/bin/prlimit` で包んだ `spawn` と、子の中の見張り専用の worker thread。15 節)。コアダンプの上限を `--core=1` にするかはユーザーの判断待ち (15.1 の (d)) | 試作と計測 (Req 11.4) |
 | `RLIMIT_AS` の値と、緩めた分の守り | 未決 | 試作と計測 (Req 11.5) |
 | 本文の受け取りと切断の検知の方法 | 未決 | 試作 (Req 11.6) |
 | OpenAPI の作り方 | 未決 | 試作 (Req 11.7) |
@@ -1687,4 +1687,349 @@ export const extractPdf = (m, data, maxPages) => {
 ### 14.12 3.7 への補足 (3.1 の 2 回目のレビュー)
 
 - 外挿の「1 ページ約 235 万〜250 万字」は、実際に子を止める閾値 (`MAX_CHILD_RSS_MB` 320MB) で見たもの。design の余裕の基準 (0.95 倍 = 304MB) で見ると、範囲は約 220 万〜238 万字に下がる。3.7 で測り直すときに、この両方の基準で記録する。
+
+## 15. 子プロセスの作り方 (T2、タスク 3.2)
+
+2026-11-05 に devcontainer (Node 24.21.0、16 コア、Linux、util-linux 2.41.3 の `/usr/bin/prlimit`) で、使い捨ての場所 (scratchpad) に試作を作って確かめた結果。子の中身には `@firecrawl/anydoc@0.2.4` と `@embedpdf/pdfium@2.15.1` を npm で入れて使った。抽出サービスの package、lockfile、`pnpm-lock.yaml`、本番の `src/`、Python 版は変えていない。数字はすべて **実測** (書いていないものは「未検証」と明記)。Node の slim image の中では測っていない。
+
+### 15.1 結論
+
+- **採る方法: (A) `/usr/bin/prlimit` で包んだ `child_process.spawn`** (`spawn('/usr/bin/prlimit', ['--as=…', '--cpu=<soft>:<hard>', '--core=1', '--', process.execPath, <子の入口>], { stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'], env: <明示したもの> })`)。fd 3 を結果の専用のパイプ、fd 4 を親を見張るパイプにする。コアダンプの上限は 0 ではなく 1 にする (理由は (d))。
+- **親が先に終わったら子も終わる仕組みは、子の中に見張り専用の worker thread (Node のスレッド) を 1 つ立て、その worker 自身のイベントループで fd 4 を `net.Socket` として読み (止まる読み方の `fs.readSync` は使わない)、読み終わり (EOF) で `process.kill(process.pid, 'SIGKILL')` を呼ぶ形にする**。子のメインのスレッドが同期の処理 (PDFium の WASM、長い文字列の処理など) で止まっていても働く。Python 版の「見張りのスレッドから `os._exit`」と同じ考え方である。worker の中で止まる読み方 (`fs.readSync`) を使うと、子の `process.exit()` と捕まえていない例外による終了が返らなくなる (15.3)。
+- 確かめた項目 (1)〜(9) はすべて満たした (15.4)。親を SIGKILL したとき、同期の処理で止まっている子 3 つが **3〜10ms で終わり**、孤児は残らなかった (基準は 1 秒)。
+- **Python 版の振る舞いと違いが出る点** (対象 spec の AC を満たせなくなるものは無い。ただし (d) はユーザーの判断が要る):
+  - (a) **見張りのスレッドの分だけ、子の RSS が約 12MB、必要な仮想メモリが約 64MiB 増える** (15.4 の (3)、(4))。worker の設定で `resourceLimits.codeRangeSizeMb: 4` を渡さないと、PDF の部品を読み込んだ子で必要な仮想メモリが約 576MiB 増える (1,472MiB → 2,048MiB)。3.6 と 3.7 の材料。
+  - (b) **`RLIMIT_AS` に当たったときの失敗の種類が、場合によって変わる**。Python 版では `MemoryError` を捕まえて `internal` になった。Node 版では、`Buffer` や WASM のメモリを増やせない場合は例外 (`RangeError`) で `internal` になるが、JavaScript のヒープを増やせない場合と V8 の内部の予約が失敗した場合はプロセスが SIGABRT / SIGTRAP で終わり、`crashed` になる。どちらも HTTP の応答は 500 `extraction_failed` で同じ (対象 spec の表で `internal` と `crashed` は同じ行き先)。違うのは 1 件ごとのログの `result=` の値だけ。
+  - (c) **`@embedpdf/pdfium` を読み込んだ子は、何もしないと `RLIMIT_AS` 3GiB でも JavaScript のヒープが RSS 約 126MB までしか増えない** (15.4 の (4))。原因は、`pdfium.wasm` が WASM のメモリの上限を 32,768 ページ (2,048MiB) と宣言しており、V8 がその分と範囲外の読み書きを捕まえる領域を、`RLIMIT_AS` の残りのほぼ全部を使って予約することにある。子の node の引数に `--wasm-max-mem-pages=8192` (512MiB) を渡すと、上限 3GiB でヒープが約 1,136MB まで増え、1 ページ 400 万字の PDF も変換できた。値は 3.6 で決める。T2 の選定は変えない。Python 版にはこの制約は無かった。
+  - (d) **コアダンプの上限は `--core=0` ではなく `--core=1` にする (実測)**。この devcontainer の `/proc/sys/kernel/core_pattern` は `|/usr/share/apport/apport -p%p … -- %E` (コアをプログラムに渡す設定)、`core_pipe_limit` は 10 だった。この設定では `RLIMIT_CORE` の 0 は無視され、コアは渡し先のプログラムに送られる (man7.org の core(5): 「However, RLIMIT_CORE will be ignored if the system is configured to pipe core dumps to a program.」)。実測では、`--core=0` の子に SIGABRT / SIGSEGV / SIGXCPU を送ると、回収まで 73〜77ms かかった (コアを書かない SIGTERM は 2.4〜2.9ms)。`--core=1` では SIGABRT / SIGSEGV / SIGXCPU とも 2.7〜3.2ms で、SIGTERM と同じだった (15.4 の (1') の表)。カーネル (Linux v6.8 の `fs/coredump.c` の `do_coredump`) は、渡し先がプログラムのとき `cprm.limit == 1` を「再帰したクラッシュを止めるための特別な値」として扱い、警告を 2 行ログに出してコアを作らずに終わる (ソースの引用は 15.4 の (1'))。ファイルに書く設定のときは、`cprm.limit < binfmt->min_coredump` (ELF では `ELF_EXEC_PAGESIZE`、4,096 バイト) で書かない (ソースを読んだ。実測していない)。Python 版は `RLIMIT_CORE` を (0, 0) にするだけなので、プログラムに渡す設定ではコアが渡っていた見込みが高い (Python 版では測っていない)。**`--core=1` を採れば、Python 版より守りが強くなる。採るかどうかをユーザーに諮る**。代わりの方法として、コアダンプそのものを止める `prctl(PR_SET_DUMPABLE, 0)` は、Node の標準の機能には無い (ネイティブの追加部品を足せば呼べる)。`--core=1` で足りるなら追加部品は要らない。
+
+### 15.2 比べた方法
+
+| | (A) `prlimit` で包んだ `spawn` | (B) `fork` (または `spawn`) の後に親から `prlimit --pid` | (C) `sh -c 'ulimit …; exec node …'` |
+|---|---|---|---|
+| 上限が掛かる時点 | `prlimit` が自分に上限を掛けてから node を exec する (同じ PID)。node の起動の前 | 子が動き出した後。間に隙がある | 起動の前 |
+| 子の自己確認で見えた上限 (15.4 の (1)) | 設定どおり (`prlimit` が node の exec の前に掛けるので、順序が仕組みで保証される) | 10 回すべて設定どおり (node の起動に約 18ms かかり、`prlimit --pid` は約 1.5ms で終わるため)。ただし順序の保証は無い | 試していない |
+| 追加の部品・プロセス | `prlimit` の exec だけ (要求ごとに 1 プロセス) | 要求ごとに `prlimit --pid` のプロセスがもう 1 つ。隙を確実に塞ぐには、子が「上限を掛けた」の合図を待つ手順が要る。`fork` は IPC の通り道 (追加の fd と直列化) も作る | `sh` という別の外部コマンドが要る |
+| Req 4.8 (外部コマンドは `prlimit` だけ) | 満たす | 満たす | **満たさない** |
+| 起動の時間 | 15.4 の (4) | (A) とほぼ同じ + 約 1.5ms | 測っていない |
+
+**(A) を選んだ理由**: 上限が node の起動の前に必ず掛かり (順序が仕組みで保証される)、要求ごとのプロセスと手順が最も少ない。`prlimit` を挟んでも起動の時間は変わらなかった (15.4 の (4))。
+
+**選ばなかった理由**:
+- **(B)**: 今回の 10 回では隙は表に出なかったが、それは node の起動が `prlimit --pid` より遅いという偶然の順序に頼っている。親のイベントループが混んで `prlimit --pid` の起動が遅れると、上限の無いまま子が変換を始めうる。塞ぐには子が合図を待つ手順と、その失敗の扱いが要り、(A) より複雑になる。利点は無い。
+- **(C)**: Req 4.8 に反する (`sh` を使う)。
+- 参考: util-linux の `setpriv --pdeathsig KILL` を使えば、親が終わったときに OS が子を止める (`PR_SET_PDEATHSIG`) ので見張りのスレッドが要らなくなる。ただし `prlimit` 以外の外部コマンドを使うことになり Req 4.8 に反するので、試していない。採る場合はユーザーの判断が要る。
+
+### 15.3 親が終わったときの見張りの方法の比較
+
+| 方法 | 親を SIGKILL してから子が終わるまで | 備考 |
+|---|---|---|
+| 子のメインのスレッドで fd 4 を `net.Socket` として読み、`'end'` で自分を止める | **子が同期の処理をしている間は終わらない** (3 秒待っても 3 つとも動き続けた。PDFium の WASM を回し続ける子も同じ) | 最初に失敗した試作 (15.8)。何もしていない子なら終わる |
+| 見張りなし | 終わらない (3 秒以上) | 対照 |
+| 子の中の worker thread で fd 4 を止まる読み方 (`fs.readSync`) で読み、EOF で `process.kill(process.pid, 'SIGKILL')` | 3〜10ms (同期の処理で止まっている子 3 つを同時に、計 14 回。PDFium の WASM を回し続ける子、`RLIMIT_AS` 1,600MiB の下でも同じ) | **採らない**。worker が読み取りで止まった後は、子の `process.exit()` が返らない (下の表) |
+| **子の中の worker thread で、worker 自身のイベントループで fd 4 を `net.Socket` として読み、`'end'` / `'close'` / `'error'` で `process.kill(process.pid, 'SIGKILL')`** | **3〜7ms** (同じ条件で計 6 回。うち 3 回は PDFium の WASM を回し続ける子と `RLIMIT_AS` 1,600MiB) | **採る**。worker の中の `process.exit()` は worker だけを終わらせるので使わない |
+
+- anydoc の `toMarkdownBytes` は Promise を返す (変換は Node の裏のスレッドで動き、メインのスレッドは空く)。一方 `@embedpdf/pdfium` は同期の WASM で、1 ページ 400 万字の変換は約 1 秒メインのスレッドを止める (14.5 の (3))。T6 の部品や結果の JSON 化も同期で動く。どの部品を使っても働くように、見張りは常に worker で行う。
+- **止まる読み方の worker では、子の `process.exit()` が返らない**。worker が `fs.readSync(4)` で止まった後にメインのスレッドが `process.exit()` を呼ぶと、子は自分では終わらなくなる。結果を送ってから `process.exit(0)` するまでの待ちを変え、親は 3 秒たったら SIGKILL する形で測った (`--core=1`、`RLIMIT_AS` 3GiB、各 1 回):
+
+  | 子の中身と終わり方 | 止まる読み方 (`fs.readSync`) の worker | `net.Socket` の worker |
+  |---|---|---|
+  | 結果の直後に `process.exit(0)` | 6.9ms で `(0, null)` | 6.8ms で `(0, null)` |
+  | 結果の 20ms 後に `process.exit(0)` | **3 秒を超えて止まる** | 30.2ms で `(0, null)` |
+  | 結果の 100ms 後に `process.exit(0)` | **3 秒を超えて止まる** | 109ms で `(0, null)` |
+  | 結果の 300ms 後に `process.exit(0)` | **3 秒を超えて止まる** | 310.7ms で `(0, null)` |
+  | anydoc を読み込み、結果の直後に `process.exit(0)` | 4.4ms で `(0, null)` | 4.6ms で `(0, null)` |
+  | anydoc と `@embedpdf/pdfium` を読み込み、結果の直後に `process.exit(0)` | **3 秒を超えて止まる** | 3.4ms で `(0, null)` |
+  | 読み込みの 300ms 後に、結果なしで `process.exit(0)` / `process.exit(1)` / 捕まらない例外 / 捕まらない Promise の失敗 / 見出しだけ送って `process.exit(0)` | **すべて 3 秒を超えて止まる** | `(0, null)` / `(1, null)` / `(1, null)` / `(1, null)` / `(0, null)` で、すべて約 330〜340ms で終わる |
+
+  - 止まったときの子のスレッドの状態 (`/proc/<pid>/task/*/wchan`): メインのスレッドは `futex_wait_queue` (ほかのスレッドを待っている)、worker のスレッド (`WorkerThread`) は `unix_stream_data_wait` (ソケットの読み取りでカーネルの中で待っている)。
+  - 理由: Node の `src/api/environment.cc` の `DefaultProcessExitHandlerInternal` (`process.exit()` と捕まらない例外による終了が通る処理) は、`env->stop_sub_worker_contexts();` を呼んでから終わる (ソースを読んだ。v24.x)。`src/env.cc` の `stop_sub_worker_contexts` は、worker ごとに終了を頼んでからそのスレッドの終わりを待つ (join) (取得の道具が本文の引用を返さなかったので、要約で読んだ)。worker の終了の依頼は JavaScript の実行を止めるもので、カーネルの中の読み取りで止まっているスレッドは起こせない。そのため、メインのスレッドが worker を待ち続ける。`net.Socket` の worker はイベントループの待ちにいるだけなので、終了の依頼で止まる。
+  - 結果の直後なら止まらなかったのは、worker が起動を終えて読み取りに入る前だったため (worker の起動から準備完了まで約 23ms。15.4 の (4))。レビューの再現では待ち 20ms でも終わったが、この試作では 20ms で止まった。worker の起動の時間による差と見られる。
+  - 親の分類への影響 (試作の `runChild`、期限 3 秒、anydoc と `@embedpdf/pdfium` を読み込んだ子、読み込みの 300ms 後に終わる): 止まる読み方の worker では、結果なしの `process.exit(0)` / `process.exit(1)` / 捕まらない例外 / 見出しだけ送って `process.exit(0)` が、**すべて期限まで待ってから `timeout`** (`(null, 'SIGKILL')`、3,007〜3,013ms) になった。`net.Socket` の worker では、すべて `crashed` (`(0, null)` か `(1, null)`、380〜390ms) になった。`net.Socket` の worker で `process.exit(1)`、捕まらない例外、`process.exit(0)` をそれぞれ 20 回繰り返しても、すべて `crashed` で、止まった回は無かった (最大 260ms。`'close'` の処理が SIGKILL に変えることも無かった)。
+  - 試作の `e9-exit.mjs` は子の起動の直後に `process.exit` するので、worker が読み取りに入った後の条件は測れない。この確かめには `e19-exit.mjs` を使う。
+- **別の直し方として、子が自分で終わるときに必ず `process.kill(process.pid, 'SIGKILL')` を使う形も試した** (止まる読み方の worker のまま、結果を書いた後と、`uncaughtException` / `unhandledRejection` の処理で自分に SIGKILL を送る)。その経路はすべて 330〜385ms で `(null, 'SIGKILL')` → `crashed` になり、30MiB の結果も壊れずに届いた。ただし、その処理を通らない `process.exit()` の直接の呼び出し (部品の中の呼び出しを含む) は止まったままで、`@embedpdf/pdfium` を読み込んだ子では期限まで待って `timeout` (`(null, 'SIGKILL')`、3,004ms) になった。原因 (止まる読み方) を取り除く `net.Socket` の worker のほうが、補う処理を足さずに済み、すべての終わり方で正しく分類されるので、こちらを採る。
+- `net.Socket` の worker の費用は止まる読み方の worker と同じだった: 起動から結果まで anydoc で 27.6ms 対 26.7ms、anydoc と `@embedpdf/pdfium` で 70.6ms 対 70.1ms (11 回の中央値)、worker の準備完了の後の RSS は 65MB 対 64MB、80MB 対 79MB (8 回の中央値)、anydoc と `@embedpdf/pdfium` を読み込んだ子の仮想メモリの最小値はどちらも 1,536MiB。
+- 親が消えたことを検知できるのは worker の準備完了 (起動から約 23ms) の後からである。それより前に親が消えた場合は、worker が準備完了したときに fd 4 の EOF をすぐに受け取って子を止める。また、入力の読み取り (fd 0) も EOF で失敗する。
+- 15.4 の数字のうち、親の消失、終わり方、仮想メモリの最小値、RSS、起動の時間は `net.Socket` の worker でも測り直した (上の数字)。そのほかの計測 (コアダンプ、RSS の見張りの遅れ、15.6 の多くの行) は止まる読み方の worker で測ったが、見張りの形に関係しない (子が自分で終わる経路を含まない) ので測り直していない。
+- 子 3 つを同時に動かしても 3 つとも終わったので、ある子の見張りのパイプの書き込み側を、別の子が受け継いでしまうことは無い (実測: 親の側のソケットの fd 5 つは、`/proc/<親>/fdinfo` の flags がすべて `02004002` で、`O_CLOEXEC` (exec のときに閉じる設定) が付いていた。レビューでも確認された)。
+
+### 15.4 確かめた項目の結果
+
+**(1) 上限が変換の開始の前に掛かること**: 子の入口の最初の文で `/proc/self/limits` を読んだ結果は、`--as=3221225472 --cpu=60:65 --core=0` に対して `Max address space` 3221225472 / 3221225472、`Max cpu time` 60 / 65、`Max core file size` 0 / 0 だった (soft と hard を分けられる)。子の `process.pid` は `spawn` が返した PID と同じ (`prlimit` は子を作らずに node を exec する)、`process.ppid` は親の PID だった。
+
+- CPU 時間の上限 `--cpu=1:3` で同期の処理を回し続けると、約 1.0 秒で **SIGXCPU** で終わった (→ `timeout`)。`--cpu=1:1` (soft と hard が同じ) では **SIGKILL** で終わった (→ `crashed` と区別できない)。soft < hard を必ず守る。
+- **親の hard の上限より大きい hard を頼むと `prlimit` が失敗する**: 親を `--cpu=100:100` の下で動かし、子に `--cpu=60:200` を頼むと、`prlimit: failed to set the CPU resource limit: Operation not permitted` を出して exit code 1 で終わった (→ 結果なしで `crashed`)。Python 版の `clamp_to_hard_limit` と同じく、親は自分の `/proc/self/limits` の hard を読んで、仮想メモリ (`--as`) と CPU 時間 (`--cpu`) の両方を、それを超えない値に切り詰めてから渡す (仮想メモリの hard を下げた環境では試していないが、同じ仕組みで失敗する見込み)。devcontainer では hard はすべて unlimited。
+
+**(1') コアダンプの上限の値** (`core_pattern` は `|/usr/share/apport/apport …`、`core_pipe_limit` は 10。各 3 回)
+
+| 子の `--core` (子の `/proc/<pid>/limits`) | 外から送った合図 | 合図から `'exit'` まで | 子の中で起こした異常 | `spawn` から `'exit'` まで (起動の約 25ms を含む) |
+|---|---|---|---|---|
+| `--core=0` (`0 0 bytes`) | SIGABRT | 74.0〜76.9ms | `process.abort()` | 99.6〜100.3ms |
+| `--core=0` | SIGSEGV | 72.9〜73.6ms | 本物のスタックのあふれ (`--stack-size=60000` と `--stack=8388608` で V8 の上限を OS の上限より大きくし、再帰させた。SIGSEGV で終わる) | 111.3〜115.1ms |
+| `--core=0` | SIGXCPU | 74.9〜77.0ms | — | — |
+| `--core=0` | SIGTERM (コアを作らない合図) | 2.4〜2.9ms | 自分に SIGTERM | 22.9〜24.6ms |
+| `--core=1` (`1 1 bytes`) | SIGABRT | 2.8〜3.2ms | `process.abort()` | 23.8〜28.5ms |
+| `--core=1` | SIGSEGV | 2.7〜3.1ms | 本物のスタックのあふれ | 35.5〜36.7ms |
+| `--core=1` | SIGXCPU | 3.0〜3.2ms | — | — |
+| `--core=1` | SIGTERM | 2.8〜2.9ms | 自分に SIGTERM | 22.3〜28.0ms |
+
+- `--core=0` だけ約 70ms 長いのは、カーネルがコアを渡し先のプログラム (apport) に送り終えるまで回収できないため (`core_pipe_limit` が 0 でないと、カーネルは渡し先が終わるのを待つ。core(5))。`--core=1` は SIGTERM と同じ時間で、コアを作っていない。終わり方 (`(null, 'SIGABRT')` など) と失敗の種類 (`crashed`) は `--core` の値で変わらない。
+- 根拠 (Linux v6.8 の `fs/coredump.c`、`do_coredump` の中。GitHub の torvalds/linux で読んだ): `.limit = rlimit(RLIMIT_CORE),` で上限を取り、渡し先がプログラムのとき (`ispipe`) は `if (cprm.limit == 1) {` の中に「Normally core limits are irrelevant to pipes, since we're not writing to the file system, but we use cprm.limit of 1 here as a special value, this is a consistent way to catch recursive crashes.」とあり、`printk(KERN_WARNING "Process %d(%s) has RLIMIT_CORE set to 1\n", …)` と `printk(KERN_WARNING "Aborting core\n")` の後に `goto fail_unlock;` する。1 以外の値なら `cprm.limit = RLIM_INFINITY;` に置き換えて送る (だから 0 は効かない)。ファイルに書く場合は `if (cprm.limit < binfmt->min_coredump) goto fail_unlock;` で、`fs/binfmt_elf.c` の `elf_format` は `.min_coredump = ELF_EXEC_PAGESIZE`。
+- 上の `printk` の 2 行は v6.8 の文言で、v6.12 では `coredump_report_failure("RLIMIT_CORE is set to 1, aborting core");` の 1 行に変わっている (v6.12 のソースも読んだ。`goto fail_unlock;` は同じで、動作は変わらない)。
+- `--core=1` の副作用: 異常終了のたびに、ホストのカーネルのログに警告が出る見込み (この devcontainer では `dmesg` が `Operation not permitted` で、確かめられなかった)。
+
+**(2) 追加のパイプが `prlimit` を通った後も子に引き継がれること**: `stdio` の 4 番目 (fd 3) と 5 番目 (fd 4) は、`prlimit` → node の 2 回の exec の後も子に残り、fd 3 で 30MiB の結果を壊れずに受け取れ、fd 4 の EOF で子が終わった。子の側の fd 0 / 3 / 4 は止まる読み書きの設定 (`/proc/self/fdinfo` の flags に `O_NONBLOCK` が無い) だったので、`fs.readSync` / `fs.writeSync` がそのまま使える。Node の `'pipe'` は実際には UNIX ドメインのソケットの組で、どちら向きにも使える。flags には `O_CLOEXEC` も付いていた (子がさらに別のプロセスを起動しても、これらの fd は渡らない。誰が付けたかは確かめていない)。
+
+**(3) 親が SIGKILL されたときに子が 1 秒以内に終わること**: 15.3 のとおり 3〜10ms。終わった後に、子の起動の引数に付けた目印で `/proc` を探し、残った子が無いことを確かめた。
+
+**(4) 起動の時間** (11 回の中央値。`RLIMIT_AS` 3GiB。「結果まで」は `spawn` を呼んでから fd 3 で結果を受け取るまで、「回収まで」は SIGKILL を送って `'exit'` を受け取るまで)
+
+| 子の中身 | 結果まで | 回収まで | 部品の読み込み | 子の RSS (結果の時点) |
+|---|---|---|---|---|
+| node を直接 `spawn` (prlimit なし)、見張りなし | 21.5ms | 23.1ms | — | 49MB |
+| `prlimit` で包む、見張りなし | 21.0ms | 22.0ms | — | 49MB |
+| `prlimit` + 見張りの worker | 24.5ms | 26.0ms | — | 50MB (※) |
+| `prlimit` + worker + anydoc | 28.3ms | 30.1ms | 2.5ms | 56MB (※) |
+| `prlimit` + worker + anydoc + `@embedpdf/pdfium` の初期化 | 71.2ms | 73.9ms | 45.7ms | 82MB |
+| 同上、`RLIMIT_AS` 2GiB | 89.0ms | 91.7ms | 64.3ms | 83MB |
+| 見張りなし + anydoc + `@embedpdf/pdfium`、`RLIMIT_AS` 2GiB | 87.1ms | 89.6ms | 63.0ms | 70MB |
+
+- research.md 6.2 の「anydoc を読み込む子を `prlimit` で包んで 26.8ms」と、上の「`prlimit` + worker + anydoc」28.3ms はほぼ合う。見張りの worker の上乗せは約 3.5ms。
+- `@embedpdf/pdfium` の読み込み (WASM のファイルを読む + `init` + `PDFiumExt_Init`) は上の表で 45.7ms で、14.5 の (3) の 27.4ms より長かった。**原因は `RLIMIT_AS` そのもの**で、上限を絞るほど遅くなる (anydoc を先に読み込むかどうかは関係ない)。9 回の中央値 (worker あり):
+
+  | `RLIMIT_AS` | `@embedpdf/pdfium` だけ | anydoc の後に `@embedpdf/pdfium` |
+  |---|---|---|
+  | 上限なし (`--as=unlimited`) | 27.8ms | 29.1ms |
+  | 3GiB | 43.7ms | 43.4ms |
+  | 2GiB | 61.7ms | 65.1ms |
+  | 3GiB + 子の node に `--wasm-max-mem-pages=8192` | 26.8ms | 26.9ms |
+
+  上限を掛けると、V8 は WASM のメモリの予約を上限の残りに合わせて作り直すと見られる (仕組みは確かめていない)。WASM のメモリの上限を `--wasm-max-mem-pages` で小さくすると、上限なしと同じ速さに戻った。PDF の部品は PDF の要求のときだけ読み込めば、ほかの形式の起動は約 30ms で済む (読み込み方は 6.x で決める)。
+- (※) この 2 行は、worker の起動が終わる前に結果を返している。worker の起動を待ってから測ると (8 回の中央値)、子の RSS は見張りなし 49MB → worker あり 62MB、anydoc + `@embedpdf/pdfium` で 68MB → 79MB だった。**見張りの worker の分、子 1 つにつき約 11〜13MB 増える** (同時に 3 件で約 36MB)。3.7 のメモリの予算に入れる。
+- `spawn()` の呼び出しが親のイベントループを止める時間は約 1.0ms だった。
+
+**仮想メモリの最小値** (`prlimit --as` で 3 回続けて結果を返す最小値。64MiB 刻み)
+
+| 子の中身 | 最小値 |
+|---|---|
+| 見張りなし | 1,152MiB |
+| worker (設定なし) | 1,152MiB |
+| 見張りなし + anydoc + `@embedpdf/pdfium` | 1,472MiB (14.5 の (2) と同じ) |
+| worker (設定なし) + anydoc + `@embedpdf/pdfium` | **2,048MiB** |
+| worker (`resourceLimits: { codeRangeSizeMb: 4 }`) + anydoc + `@embedpdf/pdfium` | **1,536MiB** |
+| worker (`maxOldGenerationSizeMb: 8, maxYoungGenerationSizeMb: 2` だけ) + anydoc + `@embedpdf/pdfium` | 2,048MiB |
+
+- 足りないときは、worker の V8 の初期化 (`v8::Isolate::Initialize`) が `FatalOOM` で失敗し、子全体が **SIGTRAP** で終わった。worker の起動を待ってから部品を読み込む順にしても、最小値は 2,048MiB のままだった。効いたのは、worker の機械語を置く領域の予約を小さくする `codeRangeSizeMb: 4` だった。見張りの worker は数行のコードしか動かさないので、この設定で困ることは無い (15.3 の計測はこの設定で行った)。
+- 上の値は「読み込むだけ」のもの。変換の入力ごとの値は 3.6 で、この worker を含めた子で測り直す。
+- **起動できる最小値の近くでは、JavaScript のヒープがほとんど増やせない**。子に配列を増やし続けさせ (V8 のメモリ不足で SIGABRT になるまで)、そのときの最大 RSS を測った (worker は `codeRangeSizeMb: 4` の設定、起動を待ってから。各 1 回):
+
+  | `RLIMIT_AS` | 何も読み込まない | anydoc だけ | anydoc + `@embedpdf/pdfium` |
+  |---|---|---|---|
+  | 1,536MiB | 139MB | — | 111MB |
+  | 2,048MiB | 651MB | 646MB | 111MB |
+  | 3,072MiB | 1,599MB | 1,602MB | 126MB |
+  | 4,096MiB | — | — | 626MB |
+  | 8,192MiB | — | — | 2,130MB |
+
+  `@embedpdf/pdfium` を読み込むと、上限 3GiB でもヒープは RSS 約 126MB までしか増えなかった。**原因**: `pdfium.wasm` のメモリの節は、最初 284 ページ・上限 32,768 ページ (2,048MiB。1 ページ 64KiB) と宣言している (WASM のファイルを読んで確かめた)。`RLIMIT_AS` を掛けずに初期化すると、`VmSize` が約 8,216〜8,280MB 増えた (範囲外の読み書きを捕まえるための見張りの領域の予約)。上限を掛けると、V8 は上限の残りのほぼ全部をこの予約に使う (`VmSize` は上限 3GiB で 2,946〜3,025MB、2GiB で 1,930〜2,009MB)。そのため JavaScript のヒープの余地が残らない。
+
+  **使える手: 子の node に `--wasm-max-mem-pages=<ページ数>` を渡して、WASM のメモリの上限を小さくする**。worker あり、anydoc と `@embedpdf/pdfium` を読み込んだ子で、ヒープを増やし続けたときの最大 RSS と、1 ページ 400 万字の PDF (0.1pt の字で全部の行をページの内側に置いたもの。子の中で全文を取り出して `JSON.stringify` まで行う) の結果 (各 1 回):
+
+  | `--wasm-max-mem-pages` | `RLIMIT_AS` | ヒープの余地 (最大 RSS) | 400 万字の 1 ページ |
+  |---|---|---|---|
+  | 指定なし (32,768 = 2GiB) | 3GiB | 126MB | **SIGABRT** (確保に失敗して abort。RSS 488MB) |
+  | 指定なし | 2GiB | 111MB | **SIGABRT** (RSS 488MB) |
+  | 16,384 (1GiB) | 3GiB | 625MB | 変換できた (4,000,000 字、最大 RSS 516MB、`VmSize` 2,534MB) |
+  | 16,384 | 2GiB | 119MB | **SIGABRT** |
+  | 12,288 (768MiB) | 3GiB | 900MB | 変換できた (最大 RSS 504MB) |
+  | 12,288 | 2GiB | 234MB | **`RuntimeError`** (WASM のメモリを増やせない → `internal`) |
+  | 8,192 (512MiB) | 3GiB | 1,136MB | 変換できた (最大 RSS 503MB、`VmSize` 2,022MB) |
+  | 8,192 | 2GiB | 115MB | **SIGABRT** |
+  | 4,096 (256MiB) | 3GiB | 1,403MB | **`RuntimeError`** (PDFium に 256MiB では足りない → `internal`) |
+  | 4,096 | 2GiB | 372MB | **`RuntimeError`** |
+
+  - 指定なしの SIGABRT は、レビューの再現では標準エラーに `node::Realloc ... Assertion failed` (`TextDecoder` が文字列のための領域を確保できなかった) と出た。同じく、`@embedpdf/pdfium` を読み込んだ指定なしの子で 30MiB の結果を作ると、3 回とも SIGABRT で終わり、`--wasm-max-mem-pages=8192` では 3 回とも結果が届いた。`MAX_RESULT_BYTES` に近い大きさの結果を作るには、PDF の部品を読み込んだ子にこの設定が実際上必要になる。
+  - 注意 (a): 値は、400 万字の 1 ページを変換できるかを測って決める。4,096 (256MiB) ではヒープは増えるが、400 万字の 1 ページが `RuntimeError` で失敗した。上の表では 8,192 と `RLIMIT_AS` 3GiB の組み合わせが、ヒープの余地と変換の両方を満たした。上限 2GiB では、どの値でも 400 万字の 1 ページは失敗した (どれも 1 回だけの計測)。実際のサービスでは、400 万字の 1 ページは RSS が 320MB を超えるので、その前に RSS の見張りが `memory_exceeded` で止める (14.5 の (1))。それでも、上限を超えない入力が 確保に失敗して abort (`crashed`) にならないことを、3.6 で入力ごとに確かめる必要がある。
+  - 注意 (b): 子の `env` には `NODE_OPTIONS` を入れない (15.4 の (6))。この設定は、`prlimit` の引数の `process.execPath` の後ろ (子の入口のパスの前) に置く。PDF の部品を読み込んだ子で JavaScript の側の処理 (結果の文字列や JSON) が大きくなると、RSS の上限 (320MB) より手前で確保に失敗して abort (`crashed`) しうる。何も読み込まない子と anydoc だけの子では、ヒープは「上限 − 約 1.4GB」まで増やせた (2GiB で約 650MB、3GiB で約 1,600MB)。設定なしの worker で同じことをした最初の試作でも、上限 2GiB で RSS 約 140MB で SIGABRT になった。
+
+**(5) `oom_score_adj` の設定**: 子の入口の最初の文で `/proc/self/oom_score_adj` に 1000 を書くと成功し、読み直すと 1000 だった (入力を読む前、つまり変換の前)。親からも同じ uid の子の `/proc/<pid>/oom_score_adj` に書けた (0 → 500 に上げられ、500 → 0 に戻すこともできた。0 より下には自分のものでも下げられなかった)。ただし親から書くと、子が動き出した後になる (順序の保証が無い) ので、**子が自分で書く形にする** (design.md の「子プロセスの中の流れ」のとおり)。`prlimit` には `oom_score_adj` を設定する機能が無い。
+
+**(6) 子の環境変数と標準出力**:
+- 親を `EXTRACTOR_TOKEN=secret-xyz NODE_OPTIONS=--max-old-space-size=123` で起動し、子に `env: { RAYON_NUM_THREADS: '1' }` を渡すと、子の `process.env` のキーは `RAYON_NUM_THREADS` だけで、トークンも `NODE_OPTIONS` も入らなかった。子の `process.execArgv` も空だった。`PATH` は要らない (`prlimit` も node も絶対パスで起動するため)。
+- 子が結果の前に標準出力と標準エラーへ 1MiB ずつ書いても、親が上限つきで読み捨てていれば、fd 3 の結果は壊れずに届いた。親が標準出力と標準エラーの読み取りを止めた (`pause()`) ままでも、1MiB では子は止まらずに結果を返した (Node の側の読み込みの単位か、ソケットの組の送り側の領域が吸収したと見られるが、どこまで吸収するかは確かめていない)。ただ、どこかで溜まりきれば子の書き込みが止まり、時間切れと誤って分類されうるので、本番では必ず読み捨てる。
+- 子が異常終了して読まないまま、親が標準入力に 50MB を書いても、親に `'error'` の処理を付けておけば親は落ちなかった (結果は `crashed`)。**標準入力・標準出力・標準エラー・fd 3・fd 4 のすべてに `'error'` の処理を付ける**。付けないと EPIPE (読み手のいないパイプへの書き込み) の例外で HTTP のプロセスごと落ちる。`prlimit` が無いとき (パスの誤り) は `spawn` の `'error'` が `ENOENT` で届く (→ `crashed`)。
+
+**(7) 子の停止と回収**:
+- 同期の処理で止まっている子に `child.kill('SIGKILL')` を送ってから `'exit'` を受け取るまで、中央値 2.31ms、最大 2.75ms (11 回)。対象 spec の「2 秒を上限に回収」に十分収まる。回収の後、目印で探して残った子もゾンビ (終わったが回収されていないプロセス) も無かった。
+- 中止の合図 (`AbortSignal`) を 300ms で送ると、303ms で子を止めて回収して戻った。
+- `detached` は既定 (false) のままにする。子は親と同じプロセスグループに入り (実測: 親のプロセスグループ 2937862、子のプロセスグループ 2937862)、端末の Ctrl+C などグループへの合図は子にも届く。親が終わったときに子を止めるのは見張りの worker の役目で、グループには頼らない。
+- 親のイベントループは止まらない: RSS が約 300MB の子 3 つを同時に見張った間の遅れは、中央値 1.08ms、99 パーセンタイル 1.48ms、最大 2.05ms だった。
+- **PID の取り違えの防ぎ方** (コードの読みによる。実測ではない): Node には pidfd (PID の使い回しに影響されないプロセスの手がかり) が無い。代わりに、libuv (Node のイベントループの部品) は子の回収 (`waitpid`) をイベントループの中でだけ行い、同じ処理の中で `child.exitCode` / `child.signalCode` を設定する。そこで、`child.exitCode === null && child.signalCode === null` を確かめてから **同期で** (`readFileSync`) `/proc/<pid>/status` を読めば、その間に回収と PID の使い回しが起きることは無い (回収されていないゾンビなら `VmRSS` の行が無いので読み飛ばす)。非同期で読む場合は、読み終わった後に終了を確かめ直して、終わっていれば値を捨てる (試作はこの形にした)。
+
+**(8) 終わり方と失敗の種類の対応**: 子の終わり方は `'exit'` の `(code, signal)` で取れる。Python 版の `classify_exit` と同じ順で分類した結果が次の表 (15.6)。
+
+**(9) RSS の監視**:
+- `/proc/<pid>/status` を 1 回読んで `VmRSS` と `VmHWM` を取り出す時間は、`readFileSync` で 8.2µs、`fs.promises.readFile` で 47.8µs (2,000 回の平均)。50ms ごと × 3 件でも負荷は無視できる。
+- **一気に確保する子がどこまで上限を超えるか**: 上限 320MB で、子が 1GiB を 16 / 64 / 256 / 1,024MiB ずつ (`Buffer.alloc(…, 1)` で中身も書いて) 確保すると、20 回すべて `memory_exceeded` で止まり、止めた時点に親が見た RSS は 419〜465MB だった (**上限を最大 145MB 超えた**)。50ms の間に書き込める量 (約 3GB/秒) の分だけ超える。Python 版も同じ 50ms の見張りなので、この性質は変わらない。違うのは最後の歯止めで、Python 版は `RLIMIT_AS` が「RSS の上限 + 512MB」(832MB) だったが、Node 版は 1,536MiB 以上にしかできない (3.6 で決める)。
+- 1 回で 1.5GiB を確保しようとした子は、`RLIMIT_AS` 2GiB の下で `RangeError: Array buffer allocation failed` の例外になり、RSS はほとんど増えなかった (歯止めは例外として働き、プロセスは生きている)。
+
+### 15.5 再現の手順と、試作のコードの要点
+
+使い捨ての場所 (以下 `$T`) で行う。リポジトリの中では install しない。
+
+```bash
+export PATH=/usr/local/share/nvm/versions/node/v24.21.0/bin:$PATH
+mkdir -p "$T" && cd "$T"
+echo '{"name":"t2","private":true,"type":"module"}' > package.json
+npm install --save-exact @firecrawl/anydoc@0.2.4 @embedpdf/pdfium@2.15.1
+```
+
+試作は `child.mjs` (子の入口)、`supervise.mjs` (親の見張り)、計測ごとの小さなスクリプト (上限と環境変数、親の消失、終わり方、仮想メモリの最小値、起動の時間、RSS、`fork` + `prlimit --pid`、`oom_score_adj`、EPIPE と中止と回収、hard の上限) からなる。子の起動の引数には `--t2-tag=<目印>` を付け、後片付けでは目印の付いた自分の子の PID だけを止めた。親の消失の計測は、HTTP のプロセスの代わりの親を別のプロセスとして起動し、その親を SIGKILL して、子の `/proc/<pid>/stat` が消えるかゾンビになるまでの時間を 2ms ごとに見た。
+
+**親: 子の起動** (6.7 の実装の手本)
+
+```js
+const PRLIMIT = '/usr/bin/prlimit'; // never looked up through PATH
+const child = spawn(
+  PRLIMIT,
+  [
+    `--as=${asBytes}`,
+    `--cpu=${cpuSoft}:${cpuHard}`, // soft < hard: SIGXCPU (timeout) before SIGKILL; both clamped to our own hard limits
+    '--core=1', // not 0: with a piped core_pattern the kernel ignores 0 but treats 1 as "no core"
+    '--',
+    process.execPath,
+    '--wasm-max-mem-pages=8192', // node flags go here: the child env never carries NODE_OPTIONS (value decided in 3.6)
+    childEntryPath,
+  ],
+  {
+    // 0: input frames, 1/2: logs (read and discard, capped), 3: result frame, 4: liveness (never written)
+    stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+    env: { RAYON_NUM_THREADS: '1' }, // explicit: no token, no NODE_OPTIONS
+  },
+);
+for (const s of child.stdio) s?.on('error', () => {}); // EPIPE must not crash the HTTP process
+child.on('error', onSpawnError); // ENOENT when prlimit is missing -> crashed
+child.on('exit', (code, signal) => onExit(code, signal));
+child.stdin.write(frame(headerJson));
+child.stdin.end(frame(fileBytes));
+```
+
+**親: 見張りの骨格**
+
+```js
+// Parent decisions are recorded before the kill, so our own SIGKILL is never read back as a crash.
+const decide = (kind) => { decided ??= kind; if (exit === null) child.kill('SIGKILL'); };
+const deadline = setTimeout(() => decide('timeout'), timeoutMs);
+const poll = setInterval(() => {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  let text;
+  try { text = readFileSync(`/proc/${child.pid}/status`, 'utf8'); } catch { return; } // same tick: pid not yet reaped
+  const rss = matchKib(text, 'VmRSS');
+  peakKib = Math.max(peakKib, rss ?? 0, matchKib(text, 'VmHWM') ?? 0);
+  if (rss !== null && rss > maxRssMb * 1024) decide('memory_exceeded');
+}, 50);
+signal.addEventListener('abort', () => decide('aborted'), { once: true });
+// fd 3: read the 4-byte length first; over the ceiling -> decide('result_too_large') without buffering.
+// On a complete frame: keep it, then SIGKILL anyway. Finish only after 'exit' AND (frame complete or fd 3 ended),
+// with a 2 s cap on waiting for 'exit' after the kill. Then destroy stdio[1..4] and clear the timers.
+```
+
+**子: 入口の最初の部分** (6.6 の実装の手本)
+
+```js
+// 1. Self-check before reading any input: limits are already in place (prlimit set them before exec).
+const limits = readFileSync('/proc/self/limits', 'utf8'); // prototype only: see the note below
+writeFileSync('/proc/self/oom_score_adj', '1000'); // raising needs no privilege; throw vs warn-and-continue: decided in 6.6
+
+// 2. Liveness: a dedicated thread with its own event loop, so it works while the main thread is stuck in synchronous code.
+const watcher = new Worker(
+  `const { Socket } = require('node:net');
+   const die = () => process.kill(process.pid, 'SIGKILL'); // process.exit() here would end only the worker
+   const s = new Socket({ fd: 4, readable: true, writable: false });
+   s.on('data', () => {});
+   s.on('end', die);
+   s.on('close', die);
+   s.on('error', die);`, // never a blocking readSync: the main thread's process.exit() would wait on it forever
+  { eval: true, resourceLimits: { maxOldGenerationSizeMb: 8, maxYoungGenerationSizeMb: 2, codeRangeSizeMb: 4 } },
+);
+watcher.on('error', () => process.kill(process.pid, 'SIGKILL')); // no watcher -> do not convert (this path was not exercised)
+watcher.unref();
+
+// 3. Read the framed input from fd 0 with readSync (blocking), convert, write one frame to fd 3 with writeSync.
+```
+
+- 子の入口では、見張りの worker を入力を読む前に立てる (試作では見出しを読んだ直後に立てたが、本番では最初に立てる)。親が入力を送る前に消えた場合は、fd 0 の読み取りが EOF で失敗して子が終わる。
+- `oom_score_adj` の書き込みが失敗したときの扱いは 6.6 で決める。上の断片のままだと例外で子が終わり、すべての要求が `crashed` になる。Python 版は警告を出して変換を続けていた (`platform_guards.py` の `GuardResult`)。
+- `/proc/self/limits` の自己確認は試作の計測のためのもので、値が合わないときの動作は決めていない。`prlimit` は上限を掛けられないと exit code 1 で終わり、node を起動しない (15.4 の (1)) ので、子が起動した時点で上限は掛かっている。本番では省くか、テストの側で `/proc/<pid>/limits` を外から確かめる形にできる。
+
+### 15.6 終わり方と失敗の種類 (`FailureKind`) の対応
+
+`--core` の値 (0 か 1 か) は、どの行の終わり方と種類も変えない (15.4 の (1'))。子が自分で終わる行 (`exit(0)`、`process.exit(1)`、捕まらない例外、見出しだけ送る) は、採った `net.Socket` の見張りの worker での結果である。止まる読み方の worker では、worker が読み取りに入った後 (PDF の部品を読み込んだ後など) は、これらがすべて止まって期限切れの `timeout` になる (15.3)。分類の順は Python 版の `child_supervision.py` と同じ: (1) 結果を最後まで受け取った → 結果のとおり、(2) 親が決めて止めた → その種類、(3) 結果なしで終わった → SIGXCPU なら `timeout`、それ以外は `crashed`。
+
+| 起きたこと (試作で起こしたもの) | 親から見える `(code, signal)` | 種類 | Python 版 |
+|---|---|---|---|
+| `process.abort()` (Rust の panic による abort の代わり) | `(null, 'SIGABRT')` | `crashed` | 同じ |
+| 自分に SIGSEGV を送る | `(null, 'SIGSEGV')` | `crashed` | 同じ |
+| 本物の segfault (V8 の上限を OS のスタックより大きくしてスタックをあふれさせる) | `(null, 'SIGSEGV')` | `crashed` | 同じ |
+| 結果を送らずに `exit(0)` (読み込みの直後と、`@embedpdf/pdfium` を読み込んで 300ms 後) | `(0, null)` | `crashed` | 同じ |
+| 結果を送らずに `process.exit(1)` (`@embedpdf/pdfium` を読み込んで 150〜300ms 後) | `(1, null)` | `crashed` | 同じ |
+| 捕まらない例外 / 捕まらない Promise の失敗 (同上) | `(1, null)` | `crashed` | 同じ |
+| 長さは正しいが、中身が JSON として読めない結果 (`{not json`) | `(null, 'SIGKILL')` (結果を受け取った後に親が止めた) | `crashed` | 同じ (`_BAD_RESULT`) |
+| 長さの見出し (100 バイト) の後に 10 バイトだけ送って `exit(0)` (読み込みの直後と、`@embedpdf/pdfium` を読み込んで 300ms 後) | `(0, null)` | `crashed` | 同じ (`classify_exit`) |
+| 外からの SIGKILL (OS のメモリ不足による強制終了の代わり) | `(null, 'SIGKILL')` | `crashed` | 同じ |
+| CPU 時間の soft の上限 (`--cpu=1:3`) | `(null, 'SIGXCPU')` (約 1.0 秒) | `timeout` | 同じ |
+| CPU 時間の soft = hard (`--cpu=1:1`) | `(null, 'SIGKILL')` | `crashed` | 同じ (だから soft < hard にする) |
+| 親の期限 (500ms) | `(null, 'SIGKILL')`、親が先に決めた | `timeout` | 同じ |
+| RSS の上限 (200MB で 1GiB を確保) | `(null, 'SIGKILL')`、親が先に決めた | `memory_exceeded` | 同じ |
+| 結果の長さが上限を超える (上限 1MiB に 2MiB) | `(null, 'SIGKILL')`、親が先に決めた | `result_too_large` | 同じ |
+| 中止の合図 | `(null, 'SIGKILL')`、親が先に決めた | (HTTP の層が応答しない。切断) | 同じ |
+| JavaScript のヒープが増やせない (`RLIMIT_AS` 2GiB の下で配列を増やし続ける) | `(null, 'SIGABRT')` (V8 の致命的なメモリ不足) | `crashed` | **違う** (Python 版は `MemoryError` → `internal`)。応答は同じ 500 |
+| `Buffer.alloc(3e9)` / `Buffer.alloc(1.5GiB)` が `RLIMIT_AS` に当たる | 例外 `RangeError: Array buffer allocation failed`。子は生きていて、捕まえて結果を返せる | `internal` | 同じ |
+| WASM のメモリを増やせない (`WebAssembly.Memory.grow`) | 例外 `RangeError: … Unable to grow instance memory`。PDFium の中なら `RuntimeError: Aborted` (14.5 の (2)) | `internal` | 同じ |
+| node が起動できない (`--as=300MB`) / 見張りの worker の V8 の初期化が失敗 | `(null, 'SIGTRAP')` | `crashed` | — (Python 版には無い) |
+| `prlimit` が上限を掛けられない (hard を上げようとした) | `(1, null)`、標準エラーに `prlimit: failed to set …` | `crashed` | — |
+| `prlimit` が無い | `spawn` の `'error'` (`ENOENT`) | `crashed` | — |
+| 結果の前に標準出力・標準エラーへ 1MiB ずつ | 結果は壊れずに届く | 結果のとおり | 同じ |
+
+### 15.7 後のタスクへの引き継ぎ
+
+- **3.6 (`RLIMIT_AS` の値)**: 子は見張りの worker を必ず持つので、仮想メモリは worker を含めて測る。worker には `resourceLimits: { codeRangeSizeMb: 4 }` (と小さなヒープ) を渡す。この設定で、anydoc と `@embedpdf/pdfium` を読み込んだ子の最小値は 1,536MiB (worker なしより 64MiB 多い)。足りないと worker の初期化で子全体が SIGTRAP で終わる (`crashed`) ので、上限には余裕を持たせる。`RLIMIT_AS` を絞ると `@embedpdf/pdfium` の読み込みが遅くなる (上限なし 27.8ms、3GiB 43.7ms、2GiB 61.7ms。`--wasm-max-mem-pages=8192` なら 3GiB で 26.8ms。15.4 の (4))。RSS の見張りは一気に確保する子に対して最大約 145MB 遅れる (15.4 の (9))。**`@embedpdf/pdfium` を読み込んだ子は、上限 3GiB でも JavaScript のヒープが RSS 約 126MB までしか増えない** (15.4 の (4) の表)。原因は WASM のメモリの予約で、子の node に `--wasm-max-mem-pages` を渡すと直る (8,192 と上限 3GiB で、ヒープ約 1,136MB、400 万字の 1 ページも変換できた。15.4 の (4) の表)。`RLIMIT_AS` の値、`--wasm-max-mem-pages` の値 (400 万字の 1 ページを変換できる値。4,096 では足りない)、PDF の部品を PDF の要求のときだけ読み込むかどうかを、合わせて決める。`--wasm-max-mem-pages` は `NODE_OPTIONS` ではなく、`prlimit` の引数の `process.execPath` の後ろに置く。
+- **設計への波及 (design.md は書き換えていない)**: この spec の design.md の Security Considerations の「子のコアダンプは `prlimit --core=0` で禁止する (3.12)」と、File Structure Plan の `runner/linux/prlimit-args.ts` の説明「RLIMIT_AS / CPU soft:hard / core 0 -> argv」と、対象 spec の design.md の ChildEntry の「`RLIMIT_CORE` を 0 にする。… コンテナの rootfs を読み取り専用にしても防げず、利用者のファイルの中身がホストのディスクに残るため」は、コアをプログラムに渡す設定では 0 が無視されるという事実と合わない。ユーザーが `--core=1` を採ると決めた後に、この spec の design.md を改めるか、取り込み (Req 12) で対象 spec に反映する。
+- **3.7 (RSS の基準とメモリの予算)**: 見張りの worker の分、子 1 つにつき約 11〜13MB 増える。基準のファイルは worker を含めた子で測る。予算の式の「子の最大 RSS」にこの分が入る。
+- **6.6 (子の入口)**: 15.5 の「子: 入口の最初の部分」の順 (上限の自己確認 → `oom_score_adj` → 見張りの worker → 入力 → 変換 → fd 3 に 1 回書く → `process.exit(0)`) で書く。fd 0 / 3 は止まる読み書きの設定なので、メインのスレッドでは `readSync` / `writeSync` でよい。**見張りの worker の中では止まる読み方 (`fs.readSync`) を使わず、`net.Socket` で fd 4 を読む** (止まる読み方にすると、`process.exit(0)` も捕まらない例外による終了も返らず、結果なしで終わる経路がすべて期限まで待って `timeout` に分類される。15.3)。worker の中で `process.exit()` を使わない。worker の `'error'` で自分を止める。`oom_score_adj` の書き込みに失敗したときに止めるか続けるか、`/proc/self/limits` の自己確認を残すかを決める (15.5 の注)。
+- **6.7 (実行管理)**: 15.5 の「親」の 2 つの断片の形で書く。必ず守ること: (a) `/usr/bin/prlimit` を絶対パスで起動し、コアダンプの上限は `--core=1` にする (ユーザーが採ると決めた場合。0 はコアをプログラムに渡す設定で無視される。15.4 の (1'))、(b) CPU の soft < hard にし、仮想メモリと CPU 時間の両方を親の hard の上限で切り詰める (`/proc/self/limits` を読む)、(c) `env` を明示する、(d) すべての stdio に `'error'` の処理を付け、標準出力と標準エラーは上限つきで読み捨てる、(e) 結果の受け取りと `'exit'` の両方がそろってから分類する (`'exit'` が fd 3 の読み終わりより先に来ることがある)、(f) `/proc/<pid>/status` は終了していないことを確かめてから同期で読む、(g) 結果を受け取った後も必ず SIGKILL して回収する。`TMPDIR` は要らない (Node 版は名前の付いたソケットのファイルを作らない)。準備完了の判定 (8.8) は、同じ起動の仕方で部品を読み込むだけの子を起動して、結果が返るかで行える (起動から結果まで、anydoc と PDF の部品を読み込んで約 70〜90ms)。
+- **4.3 (実行管理の結合テスト)**: 15.6 の表の各行が、そのままテストの場合になる。子が自分で終わる行は、見張りの worker が準備完了した後 (起動から 100ms 以上、または PDF の部品を読み込んだ後) に終わらせる形で書く (起動の直後に終わらせると、止まる読み方の worker でも通ってしまう)。`--core=1` を採るなら、`/proc/<pid>/limits` の `Max core file size` が `1 1` であることと、abort した子の回収が SIGTERM と同じ速さで終わることを確かめるテストを置ける (時間で確かめるテストは揺れやすいので、置くかどうかは 4.3 で決める)。親の消失は「同期の処理で止まっている子」で確かめる (何もしていない子では、見張りが壊れていても通ってしまう)。Python 版の `test_force_killing_the_worker_ends_its_converting_child_within_2s` の 2 秒は、Node 版の実測 (3〜10ms) なら 1 秒にしても余裕がある。
+
+### 15.8 RED (選定の前の状態と、最初に失敗した試作)
+
+- 選定の記録が無かった: `grep -c "^## 15\." research.md` は `0`。未決事項の表の「子プロセスの作り方」は「未決」だった。
+- 最初に失敗した試作は、子のメインのスレッドで見張る方法。親を SIGKILL した後の結果: `{"watcher":"eventloop","modes":["busy","busy","busy"],"endedAfterMs":["ALIVE>3000","ALIVE>3000","ALIVE>3000"],"leftAliveWithTag":[{"pid":2921802,"state":"R"},…]}`、PDFium の WASM を回し続ける子も `["ALIVE>3000"]`。子は親の消失に気付かずに動き続けた (試作の後片付けで、目印の付いた自分の子だけを止めた)。
+- コアダンプ: RED は `--core=0` の子が SIGABRT で 74.0〜76.9ms、SIGSEGV で 72.9〜73.6ms (コアが apport に送られている)。GREEN は `--core=1` で 2.8〜3.2ms / 2.7〜3.1ms、SIGTERM (2.4〜2.9ms) と同じ (15.4 の (1'))。
+- 子が自分で終わる経路: RED は止まる読み方の worker で、結果の 100ms 後の `process.exit(0)` が `{"case":"echo, exit 100ms after result","result":true,"endedBy":"HUNG>3000ms (parent SIGKILL)",…,"stuckThreads":["MainThread:S:futex_wait_queue",…,"WorkerThread:S:unix_stream_data_wait"]}`、`@embedpdf/pdfium` を読み込んだ子の結果なしの `exit(0)` が `{"mode":"late-exit0","load":"anydoc+pdfium","kind":"timeout","exit":{"code":null,"signal":"SIGKILL"},"totalMs":3013}`。GREEN は `net.Socket` の worker で、前者が 109ms で `(0, null)`、後者が `{"kind":"crashed","exit":{"code":0,"signal":null},"totalMs":382}` (15.3)。
+- 次に失敗したのは、設定なしの worker で見張る子に PDF の部品を読み込んだ場合で、`RLIMIT_AS` 1,600MiB で `FatalOOM` → SIGTRAP で子全体が終わった (15.4 の (4))。`codeRangeSizeMb: 4` で解消した。
+
+### 15.9 確かめなかったこと
+
+- Node の slim image の中での値 (時間、RSS、仮想メモリ、`prlimit` の版)。
+- anydoc の中の Rust の panic による abort (`process.abort()` で代わりにした)。ネイティブの部品の中の segfault (スタックのあふれによる本物の SIGSEGV で代わりにした)。
+- `--core=1` の扱いは core(5) の man ページには書かれておらず、カーネルのソースのコメント (v6.8、v6.12 で読んだ。レビューでは v3.10 から v6.12 まで確認された) だけに頼っている。将来のカーネルで変わる可能性は否定できない。
+- コアをファイルに書く設定の `core_pattern` で、`--core=1` のときにコアが作られないこと (カーネルのソースでは 4,096 バイトより小さい上限では書かない。実測していない)。
+- `--core=1` のときにホストのカーネルのログに警告 (`has RLIMIT_CORE set to 1` / `Aborting core`) が出るかどうか (`dmesg` が許されなかった)。
+- Python 版で、プログラムに渡す設定のときに実際にコアが渡っていたか。
+- 本物の変換 (大きな XLSX や PDF) の途中で親を消した場合 (同期の処理で止まっている子で確かめた。anydoc の変換はメインのスレッドを止めないので、それより条件は易しい)。
+- apport が `--core=0` の子から受け取ったコアをどう扱ったか (ホストの側を見られない)。
+- PID の取り違えが起きないこと (15.4 の (7) はコードの読みによる)。
+- k8s の上で親が PID 1 として動き、親が終わったときにコンテナの中のプロセスがまとめて止まること (見張りの worker とは別の守りになる見込み。確かめていない)。
+- JavaScript のヒープの余地と 400 万字の 1 ページの変換 (15.4 の (4) の表) は各 1 回だけ測った。V8 が WASM の予約を上限の残りに合わせる仕組みと、`RLIMIT_AS` で読み込みが遅くなる仕組みは確かめていない。`--wasm-max-mem-pages` を付けたときに、ほかの PDF (ベンチマークのもの、48MiB の PDF) が今までどおり変換できるか。
+- `net.Socket` の見張りの worker で、子が自分で終わる経路は 20 回ずつ繰り返したが、本物の変換 (大きな XLSX や PDF) の途中で `process.exit` が呼ばれる場合は確かめていない。
+- `codeRangeSizeMb: 4` の worker が長い時間 (数十秒) 動いたときの振る舞い (計測は最大 60 秒の同期の処理の途中で親を消すもので、問題は出なかった)。
+
+### 15.10 3.2 の 3 回目のレビューでの補足
+
+- `process.exit()` が worker の終了を待つことは、Node v24.21.0 のソースで確かめた。`src/env.cc` の `stop_sub_worker_contexts` は、worker ごとに `Exit()` を呼んだ後 `JoinThread()` (`uv_thread_join`) で終わりを待つ。`Exit()` は、そのスレッドで JavaScript の実行を止め、イベントループを起こして `uv_stop` を頼む。カーネルの中で読み取りを待っているスレッドには、どちらも届かない。
+- worker が fd 4 を `net.Socket` として開くと、fd 4 に `O_NONBLOCK` が付く (実測: `02000002` → `02004002`)。fd 0 と fd 3 は変わらない。メインのスレッドでは fd 4 を `readSync` しない。
+- worker 自身のヒープが足りなくなると (`ERR_WORKER_OUT_OF_MEMORY`)、子全体は落ちず、メインのスレッドに `'error'` が届く。ただしメインが同期の処理をしている間は届かない (メインを 1,500ms 止めたら 1,502ms に届いた)。その間は親の消失を検知できない。何もしない小さな worker なので起こる見込みは低い。**既知の限界**として、6.6 の実装とテストで扱う。
+- 手本の worker は、`eval: true` の素の JavaScript の文字列。TypeScript にしても変わらない。子の入口は `process.execPath` で直接起動するので、ビルド後の JavaScript (または Node 24 の型の取り除き) を指すパスの解決を 6.6 で決める。
+- 15.3 の表の「結果の 20ms 後」の行は、実行によって止まる場合と止まらない場合がある (worker の起動に約 23ms かかり、どちらが先かで変わる)。再現では 23.5ms で終わった回があった。
+- worker の準備ができる前に親が消えた場合、子は 46〜50ms で終わった (5 回)。
 
