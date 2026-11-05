@@ -10,6 +10,8 @@ import { isAttachmentAccessibleToViewer } from '~/server/service/attachment/reso
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
+import { toRelativeHref } from './to-relative-href';
+
 const logger = loggerFactory('growi:features:page-bulk-export:embed-images');
 
 /**
@@ -139,12 +141,7 @@ export async function embedAttachmentImages(
           }
         }
 
-        const relativeHref = path
-          .relative(path.dirname(fileOutputPath), assetFilePath)
-          .split(path.sep)
-          .map(encodeURIComponent)
-          .join('/');
-        replacements.set(id, relativeHref);
+        replacements.set(id, toRelativeHref(fileOutputPath, assetFilePath));
       } catch (err) {
         logger.warn(
           'Failed to embed attachment image %s for bulk export: %o',

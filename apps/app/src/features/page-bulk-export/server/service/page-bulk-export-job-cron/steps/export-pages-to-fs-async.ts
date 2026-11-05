@@ -20,6 +20,7 @@ import type { IPageBulkExportJobCronService } from '..';
 import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
 import { createBulkExportMarkdownRenderer } from '../markdown';
 import { embedAttachmentImages } from './embed-images';
+import { toRelativeHref } from './to-relative-href';
 
 const logger = loggerFactory(
   'growi:features:page-bulk-export:export-pages-to-fs-async',
@@ -64,16 +65,6 @@ async function* streamPageSnapshots(
     yield* batch;
     cursorId = batch[batch.length - 1].id;
   }
-}
-
-/**
- * Compute the `<link href>` for the shared stylesheet, relative to the page's
- * own HTML file. A page at `html/{jobId}/a/b.html` links to `../_bulk-export.css`.
- * Path segments are URL-encoded so the href is valid even on deeply nested pages.
- */
-function toCssHref(pageFilePath: string, cssFilePath: string): string {
-  const relativePath = path.relative(path.dirname(pageFilePath), cssFilePath);
-  return relativePath.split(path.sep).map(encodeURIComponent).join('/');
 }
 
 /**
@@ -145,7 +136,7 @@ export async function getPageWritable(
             // stylesheet (relative to this page) and wrapped in a .wiki container.
             // If renderToHtml rejects, the error propagates to callback(err) below,
             // letting the existing error-handling path update the job state (Req 3.2).
-            const cssHref = toCssHref(fileOutputPath, cssFilePath);
+            const cssHref = toRelativeHref(fileOutputPath, cssFilePath);
             let htmlString: string;
             try {
               htmlString = await renderer.renderToHtml(markdownBody, cssHref);
