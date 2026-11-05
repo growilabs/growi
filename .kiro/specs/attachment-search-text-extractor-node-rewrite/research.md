@@ -88,7 +88,7 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 | `/readyz` の `dependencies` に出す名前 | 決定 (部品の実名と `prlimit`。7.3 節) | ユーザー判断 (design.md の D2)。PDF などの実名は T1・T6 の試作で確定する |
 | `/docs` と `/redoc` を残すかどうか | 決定 (出さない。7 節) | ユーザー判断 (design.md の D3) |
 | 配置 (pnpm workspace に入れるか) | 決定 (`apps/attachment-text-extractor/` に移して workspace に入れる) | ユーザー判断 (design.md の D4) |
-| PDF のライブラリ | 未決 | 試作と計測 (Req 11.3) |
+| PDF のライブラリ | 決定 (`@embedpdf/pdfium` 2.15.1。14 節) | 試作と計測 (Req 11.3) |
 | 子プロセスの作り方 | 未決 (`prlimit` は使ってよいと決まった) | 試作と計測 (Req 11.4) |
 | `RLIMIT_AS` の値と、緩めた分の守り | 未決 | 試作と計測 (Req 11.5) |
 | 本文の受け取りと切断の検知の方法 | 未決 | 試作 (Req 11.6) |
@@ -97,7 +97,7 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 | ベンチマークで Python 版を下回った形式の扱い | 未決 (下回ったときだけ) | 原因を示し、ユーザーが直すか受け入れるかを決める (Req 2.14、11.12) |
 | ベンチマークの絶対値の合格の基準 | 未決 | ベースラインを測った後にユーザーが決める (Req 2.13) |
 | 実際の Elasticsearch (kuromoji) で検索を測れるか | 未検証 | ベンチマークを作るときに確かめる (Req 2.10) |
-| 日本語 PDF の検索の品質 (pypdfium2 と WASM の PDFium の差) | 未検証 | ベンチマークと PDF のライブラリの選定で測る (Req 2.12、11.3) |
+| 日本語 PDF の検索の品質 (pypdfium2 と WASM の PDFium の差) | 確かめた (コーパスの PDF 3 個では差なし。14 節。サービス全体での測定は 6.13) | ベンチマークと PDF のライブラリの選定で測る (Req 2.12、11.3) |
 | Follow-ups のどれを直すか | 未決 | 取り込みの前にユーザーが決める (Req 12.6) |
 | テスト用のファイルの作り方 | 決定 (すべて Node で作り直す。旧形式の DOC / PPT だけは commit 済みのものを使う) | ユーザー判断 (design.md の D5) |
 | Node で作れないテスト用のファイル (暗号化した Office と PDF、XLS、細工した ZIP) | 決定: 作れないものは無い (9 節)。暗号化した Office は `officecrypto-tool` を採る (9.10、2026-11-04) | なし |
@@ -1381,4 +1381,310 @@ Req 2.13 のとおり、ベースラインに加えて、絶対値の下限を�
 - ベンチマークの合格の基準に、絶対値の下限は**置かない**。合格は Req 2.12 の「すべての形式・すべての指標で Python 版のベースライン以上」だけとする (13.5 の扱い。ベースラインが 0 の「悪い方の数」は Node 版も 0。docx の `kuromoji-phrase` は、見つからない語句の集合がベースラインの集合 (`テレワーク勤務制度` だけ) に含まれることを条件にする)。
 - 理由 (13.8): ベースラインがほぼ天井のため、「ベースライン以上」は実質「全指標で今の水準を保つ」になる。95% のような下限は意味がなく、100% の下限は docx の `kuromoji-phrase` で抽出が正しくても落ちる。
 - ベンチマークで Python 版を下回った形式が出た場合は、Req 2.14 のとおり、原因を調べて記録し、直すか受け入れるかをユーザーに諮る (勝手に受け入れない)。
+
+## 14. PDF の部品の選定 (T1、タスク 3.1)
+
+2026-11-05 に devcontainer (Node 24.21.0、Intel i7-12650H 16 コア、Linux) で、使い捨ての場所 (scratchpad) に候補を入れて試した結果。抽出サービスの package、lockfile、`pnpm-lock.yaml`、本番の `src/`、Python 版は変えていない。数字はすべて **実測** (書いていないものは「未検証」と明記)。Node の slim image の中では測っていない。
+
+### 14.1 結論
+
+- **採る部品: `@embedpdf/pdfium` 2.15.1** (npm の package 名。PDFium を WebAssembly (WASM) にしたもの。MIT。中の PDFium は BSD-3-Clause)。`/readyz` の `dependencies` に出す実名 (design.md の D2) もこの名前にする。
+- ベンチマークの PDF 3 個で、(a)〜(d) のすべての指標が Python 版のベースライン (13 節) と同じ (語句 21/21 が `exact`、位置 6/6、文字化け・分断・混入 0、kuromoji-phrase 21/21)。**ベースラインを下回る指標は無い**ので、ユーザーに諮る必要は無い (Req 2.12、2.14)。
+- 対象 spec の PDF の AC (1.4、1.9、1.10、1.11、1.12) と、ページ数の上限の扱いを、Python 版のテスト (`tests/conversion/test_pdf.py`) と同じ入力で確かめ、**すべて Python 版と同じ結果**になった (14.4)。
+- 同じ水準を満たした候補は、ほかに `@hyzyla/pdfium` 3.0.0 (WASM) と `pdfium-native` 0.10.0 (ネイティブ) があった。選んだ理由と選ばなかった理由は 14.6。
+
+### 14.2 比べた候補
+
+ライセンスは npm の `license` の欄と、同梱のライセンスのファイルで確かめた。GPL / AGPL の部品は候補にしていない。
+
+| 候補 (版) | 中身 | ライセンス | 扱い |
+|---|---|---|---|
+| `@embedpdf/pdfium` 2.15.1 | PDFium の WASM。PDFium の C の関数 (`FPDF_*`) をそのまま呼ぶ形 | MIT (同梱の `LICENSE`)。PDFium は `LICENSE.pdfium` (BSD-3-Clause と Apache-2.0 の本文) | 測った。**採る** |
+| `@hyzyla/pdfium` 3.0.0 | PDFium の WASM。ページや文書のクラスで包んだ形 | MIT | 測った |
+| `pdfium-native` 0.10.0 | PDFium (chromium/7749) のネイティブの共有ライブラリと、N-API (Node のネイティブ部品の仕組み) の部品 | MIT。PDFium は BSD-3-Clause (`THIRD-PARTY-NOTICES.md`) | 測った |
+| `pdfjs-dist` 6.5.438 | Mozilla の pdf.js (JavaScript だけで書かれている)。Node では `legacy/build/pdf.mjs` を使う | Apache-2.0 | 測った |
+| `@firecrawl/anydoc` 0.2.4 の PDF | Rust の pdf-inspector。`toMarkdownBytes(bytes, 'pdf')` | MIT | 測った (11.8 の観察の取り直し) |
+| `pdfium-node` 1.2.1 | PDFium のネイティブ部品 | MIT | 測らずに外した。README の Known Limitations に「テキストの取り出しは対象外」「パスワード付きの PDF は拒否」とある。部品は linux x64 と macOS arm64 だけ |
+| `unpdf` 2.1.0、`pdf-parse` 2.4.5 | 中身は pdf.js | MIT / Apache-2.0 | `pdfjs-dist` と同じ中身なので、別には測っていない |
+| `mupdf` 1.28.1 | MuPDF の WASM | AGPL-3.0-or-later | ライセンスが許容的でないので対象外 |
+
+Python 版の `pypdfium2` 5.14.0 が使っている PDFium は `156.0.8076.0` (chromium/8076)。`pdfium-native` は chromium/7749。**WASM の 2 つの中の PDFium の版は、package の中に書かれておらず、分からなかった (未検証)**。
+
+### 14.3 比べ方
+
+- 各候補を同じ形の小さな関数 (文書を開く → ページ数を見る → ページごとにテキストを取る → 閉じる) で包み、その後ろに **Python 版と同じ正規化** をかけた。正規化は `services/attachment-text-extractor/src/app/conversion/normalize.py` を 1 字も変えずに写した: 改行を LF にそろえる (`normalize_newlines`)、日本語の字の間の 1 字分の空白または改行を取り除く (`join_broken_japanese`。字の範囲は `ぁ-ゖゝ-ゟァ-ヺー-ヿ㐀-䶿一-鿿々`、`u` フラグ付きの正規表現で同じ先読み・後読み)。そのうえで `core.py` の `_assemble` と同じく、空のページは捨て、全部が空なら `pageNumber` / `label` が null の要素を 1 つだけ返す。
+- **正解の文字列**: Python 版の `convert_pdf` と `_assemble` を、サービスを起動せずに `.venv/bin/python -I` から直接呼んだ出力。候補の出力を、ファイルごと・ページごとにこれと比べた。Python 版の出力をベンチマークで採点すると、13 節のベースラインの PDF の行と同じ値になった (比べ方が正しいことの確認)。
+- **ベンチマーク**: 候補ごとの `pages[]` を、`apps/attachment-text-extractor/benchmark/` の採点の関数 (`scoreDocument`、`summarizeByFormat`) と `answers.json` で採点し、`baseline/python-baseline.json` の PDF の行と比べた。Elasticsearch の段 (d) は、同じ道具の `measureEsRecall` を `http://elasticsearch:9200` (9.3.3、kuromoji と ICU あり) に向けて測った。測った後、`_cat/indices/benchmark-*` が空であることを確かめた。
+- **AC の確認の入力**: 2.4 の生成器 (`test/fixtures/`) で作った。3 ページの英字の PDF、ユーザーパスワード付き (`buildUserPasswordPdf`)、所有者パスワードだけ (`buildOwnerPasswordOnlyPdf`)、壊れた PDF (`buildCorruptPdf`)、ゴミの PDF (`buildGarbagePdf`)、ヘッダーの後に `TOPSECRET-BODY` を書いたもの (`pdfHeaderFollowedBy`)、空のバイト列、`not a pdf at all`、画像だけの PDF (`buildImageOnlyPdf`)、日本語の 2 行 (`buildJapaneseLinesPdf(['日本','語です'])` と `(['日本','ABC'])`)、`Hello world`、4 百万字の 1 ページ (`buildLongPagePdf`)。
+- **最大 RSS**: 子の最後に自分の `/proc/self/status` の `VmHWM` (そのプロセスの実メモリの最大値) を読んだ。Python は `getrusage` の `ru_maxrss`。Python の値はサービスの子ではなく、取り出しの関数 (`convert_pdf` と `_assemble`) **だけ**を、1 つの入力ごとに新しいプロセスで呼んだときの値 (2 回測って同じ値)。正解の文字列を作るときは、比べるために同じプロセスで PDFium の生の出力ももう一度取り出しているので、そのプロセスの RSS は取り出し 2 回分になり、ここには使わない。
+- **必要な仮想メモリ**: `/usr/bin/prlimit --as=N -- node …` で子を動かし、上限なしのときと同じ結果で正常に終わる最小の N を、64MiB 刻みの二分探索で求めた。見つけた値で 3 回続けて動くことも確かめた。
+- **時間**: 子を起動してから終わるまでの時間 (親から見た時間) の中央値 (11 回)。中身の内訳として、部品の読み込み (WASM の準備を含む) と、変換だけの時間も子の中で測った。
+
+### 14.4 結果: ベンチマークと AC
+
+**(1) ベンチマークの PDF の指標** (コーパスの 3 個、語句 21 個。列の意味は 12.3)
+
+| 候補 | 再現率 (そのまま / 空白を除く) | 要素の数が正しい文書 | 番号とラベルが正しい要素 | 正しい位置にある語句 | 別の位置に出た語句 | U+FFFD / 元の文に無い文字 | 分断 (4 列の合計) | kuromoji-phrase (正しい位置) | 判定 |
+|---|---|---|---|---|---|---|---|---|---|
+| Python 版 (ベースライン) | 21 / 21 | 3/3 | 6/6 | 21/21 | 0 | 0 / 0 | 0 | 21/21 | — |
+| `@embedpdf/pdfium` | 21 / 21 | 3/3 | 6/6 | 21/21 | 0 | 0 / 0 | 0 | 21/21 | 下回らない |
+| `@hyzyla/pdfium` | 21 / 21 | 3/3 | 6/6 | 21/21 | 0 | 0 / 0 | 0 | 21/21 | 下回らない |
+| `pdfium-native` | 21 / 21 | 3/3 | 6/6 | 21/21 | 0 | 0 / 0 | 0 | 21/21 | 下回らない |
+| `pdfjs-dist` | 21 / 21 | 3/3 | 6/6 | 21/21 | 0 | 0 / 0 | 0 | 21/21 | 下回らない |
+| anydoc | 15 / 15 | 1/3 | 0/6 | 9/21 | 6 (別の位置にだけ) | 0 / 0 | 0 | 9/21 | **下回る** |
+
+growi-quoted-phrase も、anydoc 以外は 21/21 (正解以外の位置に当たった語句 0)。
+
+文字列として Python 版と比べると:
+
+- `@hyzyla/pdfium` と `pdfium-native` は、すべての入力で Python 版と **1 字も違わなかった**。
+- `@embedpdf/pdfium` は、縦書きの PDF の 2 ページ目だけが違った。`昭和五十年　横浜市にて創業` のように、**元の文にある全角の空白 (U+3000) が残る** (Python 版は消える)。元の HTML にはこの全角の空白があるので、元の文に近いのは `@embedpdf/pdfium` の方。採点では空白として扱われ (12.3)、語句の判定にも Elasticsearch の検索にも影響しなかった。PDFium の版の違い (14.2 のとおり版は未検証) によると考えられる。
+- `pdfjs-dist` は、縦書きの 1 ページ目で句点 `。` の前に改行が入った (`…感謝申し上げます\n。`)。語句には影響しなかった。
+
+**正規化の効き方 (正規化をかけない場合の確認)**: 正規化をかけずに採点すると、PDFium の 3 つと Python 版は、語の途中で改行する PDF の 4 語句がすべて「分断 (改行の位置)」になる (語句そのままの再現率 17/21)。つまり語の途中の改行は、部品ではなく、Python 版から写した正規化でつながっている。`pdfjs-dist` は、これに加えて縦書きの 6 語句も分断になる (縦書きを **1 字ずつ改行で区切って** 返し、正規化で日本語の字の間の改行が消えてつながる)。
+
+**(2) 対象 spec の AC と、ページ数の上限** (Python 版の `test_pdf.py` と同じ入力)
+
+| 確かめたこと (対象 spec の AC) | Python 版 | `@embedpdf/pdfium` | `@hyzyla/pdfium` | `pdfium-native` | `pdfjs-dist` | anydoc |
+|---|---|---|---|---|---|---|
+| 3 ページ → ページごとに 1 要素、`pageNumber` 1〜3、`label` "1"〜"3" (1.4) | 通る | 通る | 通る | 通る | 通る | **ページに分かれない** (1 要素) |
+| 改行が LF だけ、日本語の間の改行を詰める・日本語と ASCII の間は残す・ASCII だけの文は変えない (1.9) | 通る | 通る | 通る | 通る | 通る | 見出しの記号 (`## `) と空行が入る |
+| ユーザーパスワード付き → `encrypted` (1.10) | 通る | 通る (`FPDF_GetLastError` が 4) | 通る | 通る (`PDFiumPasswordError`) | 通る (`PasswordException`) | 通る (`encrypted`) |
+| 所有者パスワードだけ → 3 ページ読める (1.12) | 通る | 通る | 通る | 通る | 通る | 読めるがページに分かれない |
+| 壊れた PDF・ゴミ・ヘッダーの後がゴミ・空・PDF でないもの → `malformed` (1.11) | 通る | 通る | 通る | 通る | 通る | 通る |
+| 画像だけ → 中身が空の 1 要素 (`pageNumber` と `label` は null) | 通る | 通る | 通る | 通る | 通る | **失敗** (`needsOcr` のエラー) |
+| ページ数が上限ちょうど (3 ページで上限 3) は通り、上限 2 は `limit_exceeded` | 通る | 通る | 通る | 通る | 通る | ページ数が取れない |
+| ページを読む前にページ数が取れる (細工した巨大なページの木で時間とメモリを使わせないため) | `len(document)` | `FPDF_GetPageCount` | `getPageCount()` | `doc.pageCount` | `doc.numPages` | 取れない |
+| ToUnicode の表で字を U+0000 に対応づけた PDF (`buildJapaneseLinesPdf(['日本\u0000語です'])`) で、後ろの字が落ちない | `日本` + U+FFFE + `語です` | 同じ | 同じ | 同じ | 測っていない | 測っていない |
+
+- 失敗の詳細の文には、決まった文だけを入れる (Python 版と同じ方針)。部品が出す文は使わない。`TOPSECRET-BODY` を書いた入力でも、詳細に中身は入らなかった。
+- `@embedpdf/pdfium` で開けなかったときの `FPDF_GetLastError` の値は、ユーザーパスワード付きが 4 (`FPDF_ERR_PASSWORD`)、壊れた PDF・ゴミ・PDF でないもの・空のバイト列が 3 (`FPDF_ERR_FORMAT`) だった。空のバイト列も特別扱いなしで `malformed` になる。`@hyzyla/pdfium` は空の入力に PDFium に渡す前に独自の文で例外を投げるので、自分で `malformed` に対応づける必要がある。
+
+### 14.5 結果: メモリ・時間・大きさ
+
+**(1) 子の最大 RSS** (`VmHWM`。Python は `ru_maxrss`)
+
+| 入力 | Python 版 | `@embedpdf/pdfium` | `@hyzyla/pdfium` | `pdfium-native` | `pdfjs-dist` | anydoc |
+|---|---|---|---|---|---|---|
+| 読み込むだけ (変換しない) | — | 73MB | 71MB | 52MB | 83MB | 51MB |
+| 横書きの PDF (`pdf-ja-horizontal.pdf`) | 43MB | 80MB | 72MB | 55MB | 107MB | 56MB |
+| 100 万字の 1 ページ | 152MB | 179MB | **249MB** | 165MB | — | — |
+| 200 万字の 1 ページ (3 回とも同じ値) | 263MB | 284MB | **424MB** | 278MB | — | — |
+| 4 百万字の 1 ページ (`buildLongPagePdf`) | 484MB | 491MB | **778MB** | 502MB | 135MB (※) | 94MB (※) |
+| 4 百万字の 1 ページ (全部の行をページの内側に置いたもの。※) | 483MB | 490MB | — | — | 162MB | 123MB |
+| 8,000 字 × 500 ページ (合計 4 百万字) | 56MB | 104MB | 102MB | 82MB | — | — |
+| 48MiB の PDF (12 ページ、各ページに 4MiB の無圧縮の画像と 1 行の文。2 回とも同じ値) | 138MB | 222MB | 236MB | 246MB | — | — |
+
+- 普通のファイル (横書きの PDF) では、どの候補も `MAX_CHILD_RSS_MB` 320 の 0.95 倍 (304MB) に十分収まる (design の T1 の基準)。
+- **ファイルが大きい PDF では、Node の候補はどれも Python 版より 85〜110MB ほど多い**。48MiB の PDF (`MAX_FILE_SIZE_MB` 50 の内側。対象 spec の基準の「画像 12 枚の 48MB の DOCX」と同じ性格の入力として作った) で、Python 版 138MB に対し、`@embedpdf/pdfium` 222MB、`@hyzyla/pdfium` 236MB、`pdfium-native` 246MB。Node 側でファイルを読んだ Buffer と、部品に渡す写し (WASM のメモリへの写し、または `Buffer.from` の写し) が同時にあるためと見られる (内訳は未検証)。どれも 304MB の内側で、`@embedpdf/pdfium` が Node の候補の中で最も少ないので、選定は変わらない。ただし余裕は 82MB で、実際のサービスでは本文の受け取りのしかた (3.3) で写しが増えうるので、3.7 で子に anydoc も読み込んだ状態で測り直す。
+- **`@hyzyla/pdfium` は、字の多い 1 ページで Python 版の約 1.6 倍のメモリを使う** (100 万字で 249MB 対 152MB、200 万字で 424MB 対 263MB)。200 万字の 1 ページは、Python 版なら 320MB の上限の内側で読めるが、`@hyzyla/pdfium` では上限を超えて `memory_exceeded` になる。Python 版で読めていた PDF が読めなくなる。原因 (WASM の作り方の違い。メモリの確保の仕方など) は調べていない (未検証)。
+- **`@embedpdf/pdfium` も、字の多い 1 ページで Python 版より約 20〜27MB (約 8〜18%) 多い** (100 万字で 179MB 対 152MB、200 万字で 284MB 対 263MB)。`pdfium-native` も同じくらい多い (165MB、278MB)。2 点から直線で外挿すると (外挿で、実測ではない)、320MB に達するのは Python 版が 1 ページ約 250 万字、`@embedpdf/pdfium` が約 235 万字、`pdfium-native` が約 237 万字。つまり **1 ページ約 235 万〜250 万字の狭い範囲では、Python 版は読めるが `@embedpdf/pdfium` は `memory_exceeded` になる**。これはベンチマークの指標 (Req 2.12) でも対象 spec の AC でもない (AC は上限を超えたら止めることを求めるだけ) ので、ユーザーには諮らず、3.7 への引き継ぎにする (14.8)。`pdfium-native` もほぼ同じなので、候補の順位は変わらない。
+- 4 百万字の 1 ページは、Python 版も含めて PDFium の 3 つはどれも 320MB を超える。Python 版のテスト (`test_child_isolation.py` の `test_a_pdf_page_with_four_million_characters_is_stopped_and_the_next_run_succeeds`) が期待する `memory_exceeded` は、`@embedpdf/pdfium` でも変わらない見込み (4.x でテストを写すときに、子に anydoc も読み込んだ状態で確かめる)。
+- (※) `buildLongPagePdf` は 1 行ごとに 1pt ずつ下へずらして 4,000 行を書くので、y=0 より下の約 3,300 行は **ページの外** に置かれている。`pdfjs-dist` はこのページで (空白以外) 681,372 字、anydoc は (空白以外) 707,000 字 (総文字数は 682,072 字と 707,707 字) しか返さなかったが、これはページの内側 (y=700〜0) の行だけを返し、ページの外の字を返さないため。同じ 400 万字をすべてページの内側に置いた PDF (0.1pt の字で、行の間を 0.17pt にしたもの) では、`pdfjs-dist` も anydoc も空白以外の字を 4,000,000 字すべて返した (`@embedpdf/pdfium` と Python 版も同じ)。つまり「ページの外に置かれた字を返さない (PDFium と Python 版は返す)」という振る舞いの違いで、字を黙って落とす不具合ではない。`buildLongPagePdf` の行の `pdfjs-dist` と anydoc の RSS は、取り出した量が違うので他の候補と比べられない。
+
+**(2) 必要な仮想メモリ** (`prlimit --as` で正常に動く最小値。64MiB 刻み。3 回続けて動くことを確かめた)
+
+| 入力 | `@embedpdf/pdfium` | `@hyzyla/pdfium` | `pdfium-native` | `pdfjs-dist` | anydoc |
+|---|---|---|---|---|---|
+| 読み込むだけ | 1,472MiB | 1,472MiB | 1,152MiB | 2,560MiB (この値では 3 回のうち失敗あり) | 1,152MiB |
+| 横書きの PDF | 1,472MiB | 1,472MiB | 1,472MiB | 3,712MiB | 1,472MiB |
+| 4 百万字の 1 ページ | 2,048MiB | 2,560MiB | 2,176MiB | 3,712MiB | 1,600MiB |
+| 48MiB の画像の多い PDF | 1,664MiB (1,600MiB では abort) | — | — | — | — |
+
+- 何もしない Node は 1,150MiB で動き、1,100MiB では動かなかった (1.4 の「1,200MB」とほぼ合う)。
+- **1.4 の「PDFium の WASM は 3,000MB 以上が要る」は再現しなかった**。上限を掛けないと、WASM の 2 つは仮想メモリの予約が約 9.6GB (`VmPeak`) になる (V8 が WASM のメモリの前後に、範囲外の読み書きを捕まえるための大きな領域を予約する)。上限を掛けると V8 は予約を小さくして動き、普通のファイルは 1,472MiB、4 百万字の 1 ページは `@embedpdf/pdfium` で 2,048MiB で動いた。上限 3GiB で動かしたときの変換の時間は、上限なしに比べて約 1 割遅かった (横書きの PDF 10.1ms → 11.6ms、4 百万字 938ms → 1,019ms)。予約を小さくしたときに V8 が範囲の確認をどう行っているか (遅くなる理由) は確かめていない (未検証)。
+- Node の `--disable-wasm-trap-handler` (範囲外の読み書きを、予約した領域ではなく命令で確かめる設定) を付けても、最小値は変わらなかった。付ける必要は無い。
+- **上限が足りないときの落ち方**: `RLIMIT_AS` の下で WASM のメモリを増やせないとき、プロセスが OS に殺されるのではなく、JavaScript の例外になる。48MiB の PDF を上限 1,600MiB で読むと、PDFium の中で `RuntimeError: Aborted(native code called abort())` が投げられた。標準エラーには `growMemory: … Unable to grow instance memory` の行が出る。また、埋め込まれた `malloc` は失敗しても例外を投げずに **0 を返す** (上限 1,472MiB で `malloc(1.5e9)` が 0)。0 を確かめずに使うと、入力が WASM のメモリより大きければ `RangeError: offset is out of bounds` で落ち、小さければ 0 番地から書き込んで PDFium の内部のデータを壊したまま動き続ける (上限 1,472MiB で、`malloc` が 0 を返した後に 0 番地へ短いバイト列を書くと、例外なしに先頭の 16 バイトが書き換わることを確かめた)。14.10 の関数は 0 を確かめて内部の失敗にする。
+- 上限の値そのものは 3.6 で、anydoc と T6 の部品も合わせて決める。
+
+**(3) 時間** (中央値、11 回)
+
+| | 子の起動から終了まで (読み込むだけ) | 同 (横書きの PDF を変換) | うち部品の読み込み | うち変換 |
+|---|---|---|---|---|
+| 何もしない Node | 20.1ms | — | — | — |
+| `@embedpdf/pdfium` | 51.7ms | 69.1ms | 27.4ms | 9.8ms |
+| `@hyzyla/pdfium` | 53.0ms | 69.3ms | 28.3ms | 10.2ms |
+| `pdfium-native` | 28.5ms | 34.2ms | 4.3ms | 3.1ms |
+| `pdfjs-dist` | 84.0ms | 148.9ms | 58.5ms | 61.9ms |
+| anydoc | 28.1ms | 31.8ms | 2.6ms | 3.9ms |
+
+- WASM の 2 つは、読み込み (WASM の翻訳と準備) に約 27ms かかる。子は 1 件ごとに作り直す (design の判断。常駐させない) ので、**PDF の要求 1 件ごとに約 35ms 上乗せ**される (`pdfium-native` との差)。PDF の部品は PDF のときだけ読み込むようにすれば、ほかの形式には上乗せされない (読み込み方は 6.x の実装で決める)。
+- 4 百万字の 1 ページの変換は、PDFium の 3 つと Python 版で約 0.9〜1.0 秒とほぼ同じ。
+
+**(4) 大きさ** (`du`。依存を含む)
+
+| 候補 | node_modules の大きさ | 主なもの |
+|---|---|---|
+| `@embedpdf/pdfium` | 7.2MB | `pdfium.wasm` 4.6MB。依存なし |
+| `@hyzyla/pdfium` | 13.5MB | `pdfium.wasm` 5.3MB と、同じものを base64 にした JS 7.1MB の二重持ち。依存なし |
+| `pdfium-native` | 9.3MB + 依存 0.4MB | `libpdfium.so` 6.7MB、`pdfium.node` 0.5MB。依存は `node-addon-api` (ソースから作るときの部品)、`p-limit` |
+| `pdfjs-dist` | 35.9MB | CMap、標準フォント、画像の復号の部品など |
+| anydoc (参考。すでに依存にある) | 7.8MB (linux x64 の部品) | |
+
+### 14.6 選んだ理由と、選ばなかった理由
+
+PDFium を使う 3 つ (`@embedpdf/pdfium`、`@hyzyla/pdfium`、`pdfium-native`) は、ベンチマークと AC の両方で Python 版と同じだった。そこで、品質以外の点で比べた。
+
+**`@embedpdf/pdfium` を選んだ理由**
+
+1. **メモリ**: Node の候補の中では、`pdfium-native` と並んで少ない。字の多い 1 ページでは Python 版より約 20〜27MB 多く (200 万字で 284MB 対 263MB)、1 ページ約 235 万〜250 万字の狭い範囲だけは Python 版が読めて `@embedpdf/pdfium` が上限を超える (外挿。14.5 の (1))。`@hyzyla/pdfium` (約 1.6 倍) のように 200 万字のページで上限を超えることはない。ファイルの大きい PDF (48MiB) では Python 版より多いが、Node の候補の中では最も少ない (222MB)。
+2. **install の時の処理が無い**: npm の package に WASM の本体が入っているだけで、install の時にファイルを取りに行く処理も、ソースから作る処理も無い。このリポジトリは `pnpm-workspace.yaml` の `allowBuilds` で install の時の処理を許可制にし、`sharp` のように「CPU ごとの完成品を optional の依存で配る」部品は処理を止めて使っている。`@embedpdf/pdfium` ならこの方針のままで入れられ、開発者全員の `pnpm install` と CI にも、ネットワークやコンパイラの条件が増えない。
+3. **CPU を選ばない**: WASM なので、linux の x64 でも arm64 でも同じファイルが動く。
+4. **守りが 1 段増える**: PDFium は C++ で書かれていて、細工した PDF で PDFium の中のメモリが壊れる種類の不具合が起きうる。WASM の中で動くと、壊れるのは WASM の中のメモリだけで、子のプロセスのほかの部分には届かない。子プロセスで隔離する守り (Req 3 の上限) はそのまま残る。
+5. **エラーの種類を公開の関数で取れる**: `FPDF_GetLastError` を直接呼べるので、パスワード (4) とセキュリティ (5) を Python 版と同じ数値で区別できる。
+6. **小さい**: 7.2MB で、測った候補の中で最も小さい。
+7. **使われている量**: `npm view` と npm の downloads API (2026-11-05 に確認) で、`@embedpdf/pdfium` は 2025-03-19 に作られ、89 版あり、直近 1 週間のダウンロードは 1,428,509 回。PDF の表示の部品 (embed-pdf-viewer) の一部として作られている。npm の maintainer は 1 人 (bobsingor)。比べると `pdfium-native` は 2026-03-28 に作られたばかりで 25 版、1 週間 3,390 回 (maintainer 1 人、xonaman)。`@hyzyla/pdfium` は 2023-06-09 から 25 版、1 週間 911,253 回 (maintainer 1 人、hyzyla)。どれも maintainer は 1 人なので、版は固定し、上げるときはベンチマークを回す。
+
+代わりに受け入れること:
+
+- PDF の要求 1 件ごとに約 35ms 遅くなる (14.5 の (3))。design の Risks の「WASM の読み込みで起動が遅くなる」にあたり、常駐する子は隔離の理由で採らない方針どおり受け入れる。
+- PDFium の C の関数をそのまま呼ぶので、WASM のメモリの確保と解放 (入力の PDF を WASM のメモリに写す、テキストの受け取りの領域を取る) を自分のコードで書く必要がある (試作では約 40 行)。PDF の入力のメモリは、文書を閉じるまで解放してはいけない (`FPDF_LoadMemDocument` はそのメモリを読み続ける)。
+- 中の PDFium の版が分からない (14.2)。版を上げたときに出力が変わったかは、ベンチマークを回して確かめる (13.8 の 5 の運用の基準)。
+- 本来はブラウザ向けの package。Node では WASM のファイルを自分で読んで `init({ wasmBinary })` に渡す形で動いた。渡さない場合でも、Node では package の中の `pdfium.wasm` をファイルとして読むコードになっている (コードを読んで確認。ネットワークを止めた状態では確かめていない)。外向きの通信を起こさないよう、本番では必ず `wasmBinary` を渡す。
+
+**選ばなかった理由**
+
+- **`@hyzyla/pdfium` 3.0.0**: 字の多い 1 ページで Python 版の約 1.6 倍のメモリを使い、200 万字の 1 ページが 320MB の上限を超える (14.5 の (1))。Python 版で読めていた PDF が読めなくなる。ほかに、エラーの種類を取るには公開されていない `module` の欄 (`library.module._FPDF_GetLastError()`) を使うか、例外の文で見分けるしかない。WASM の本体を二重に持つので大きい (13.5MB)。出力の文字列は Python 版と完全に同じで、API も扱いやすかった。
+- **`pdfium-native` 0.10.0**: 最も速く (PDF の要求 1 件で約 35ms 速い)、メモリも少なく、出力も Python 版と完全に同じだった。選ばなかったのは、**install の時に GitHub の release から完成品を取りに行く処理 (`scripts/install.mjs`) を持ち、無ければソースからコンパイルする** ため。採ると `allowBuilds` で許可する必要があり、許可すると開発者全員の `pnpm install` と、この package を含む CI のすべてが GitHub の release に依存する。許可しなければ部品が入らず動かない。Docker のビルドでも外への通信が要る (動いている間の外向き通信は要らないので、AC 1.7 には反しない)。また、ネイティブの PDFium が子のプロセスの中で直接動く (Python 版と同じ危険の度合い)。採る場合は `allowBuilds` の判断をユーザーに諮ることになる。
+- **`pdfjs-dist` 6.5.438**: ベンチマークは満点だった。ページの外に置かれた字は返さない (PDFium と Python 版は返す。14.5 の (1) の ※)。縦書きを 1 字ずつ改行で区切って返すため、縦書きの中の数字や英字 (例: `年1回`) は、日本語の字の間だけを詰める正規化ではつながらず、分断になると見込まれる (コーパスに例が無く、未検証)。部品の読み込みと変換が遅く (子 1 件 149ms)、仮想メモリも多く要り (3,712MiB)、package も大きい (35.9MB)。採る場合は、フォントの中の命令を `eval` で動かす機能を切る設定 (`isEvalSupported: false`。pdf.js の任意のコードを動かせる脆弱性 CVE-2024-4367 の対策) と、フォントを埋め込まない日本語の PDF のための CMap の場所 (`cMapUrl`) を必ず渡す必要がある。
+- **anydoc の PDF**: ページに分かれない (AC 1.4 を満たせない)、縦書きの字の順が崩れる (縦書きの語句 0/6)、画像だけの PDF をエラーにする (`needsOcr`)。ベンチマークで下回る (14.4 の (1))。正規化をかける前の出力では、語の途中の改行に空白が入る (`基幹シス テム`。11.8 と同じ)。
+- **`pdfium-node` 1.2.1**: テキストを取り出す API が無い (14.2)。
+
+### 14.7 縦書きなど、どの候補でも取れないもの
+
+- コーパスの縦書きの PDF は、PDFium の 3 つと `pdfjs-dist` で正しい順に読めた。**どの候補でも取れない、または Python 版より劣る PDF は、このコーパスには無かった**。前処理や別の読み方は要らない。
+- 縦書きで劣るのは anydoc だけ。anydoc は PDF には使わない (design のとおり、PDF は T1 の部品でページごとに読む)。
+- 確かめていないこと: 縦書きの中に数字や英字が混じる PDF、Word や PowerPoint が書き出した日本語の PDF、フォントを埋め込まない日本語の PDF (11.11、13.10 と同じく、コーパスの外)。PDFium の 3 つは同じ PDFium なので同じ傾向と見込むが、版の違い (U+3000 の扱いの違いのように) はありうる。
+
+### 14.8 後のタスクへの引き継ぎ
+
+- **3.6 (仮想メモリの上限)**: `@embedpdf/pdfium` は普通の PDF で 1,472MiB、48MiB の画像の多い PDF で 1,664MiB、4 百万字の 1 ページで 2,048MiB あれば動く (14.5 の (2)。最大は 4 百万字の 2,048MiB)。上限を掛けると V8 は WASM の予約を小さくするので、上限は「3GB 以上」にしなくてよい。上限を掛けたときの約 1 割の遅れも 3.6 の材料にする。上限が足りないと、WASM のメモリを増やせないことが `RuntimeError: Aborted` や `RangeError` の **例外** として出て、プロセスは殺されない (`malloc` は 0 を返す)。子はこれを捕まえて内部の失敗として返すことになるので、`RLIMIT_AS` を最後の歯止めとして見るときは「例外で終わる」前提で考える。
+- **3.7 (RSS の基準値)**: 200 万字の 1 ページで 284MB (Python 版は 263MB)、4 百万字で 491MB、48MiB の画像の多い PDF で 222MB (Python 版は 138MB)。PDF は文字の多さとファイルの大きさでメモリが増えるので、PDF の基準のファイル (48MiB 級の PDF と、字の多い 1 ページ) を足すかどうかを 3.7 で考える。どちらも、子に anydoc も読み込み、本文を 3.3 で選ぶ方法で受け取った状態で測り直す。1 ページ約 235 万〜250 万字の範囲で Python 版は上限の内側、`@embedpdf/pdfium` は外になる見込み (外挿) なので、測り直した値でこの範囲を確かめ、検索の対象になる PDF の範囲の変化として記録する。
+- **3.8 (package に入れる)**: `@embedpdf/pdfium@2.15.1` を版を固定して入れる。package の中のライセンスのファイルは `LICENSE` (MIT) と `LICENSE.pdfium` (PDFium の BSD-3-Clause と Apache-2.0) だけで、WASM の中に入っている FreeType・OpenJPEG・zlib・libpng などの第三者のライセンスの文は同梱されていない (WASM の中の文字列に名前がある)。3.8 でライセンスを確かめるときに、これらがすべて許容的なライセンス (FreeType は FTL を選べる) であることと、表示の要否を確かめる (未検証)。
+- **6.x (PDF の変換の実装)**: 使う関数は `init({ wasmBinary })`、`PDFiumExt_Init`、`FPDF_LoadMemDocument(ptr, size, '')`、`FPDF_GetLastError`、`FPDF_GetPageCount`、`FPDF_LoadPage`、`FPDFText_LoadPage`、`FPDFText_CountChars`、`FPDFText_GetText`、`FPDFText_ClosePage`、`FPDF_ClosePage`、`FPDF_CloseDocument`、`pdfium.wasmExports.malloc` / `free`、`pdfium.HEAPU8`。`malloc` は失敗すると 0 を返す (例外にならない) ので、必ず 0 を確かめて内部の失敗 (`internal`。Python 版で `MemoryError` が `internal` になるのと同じ扱い) にする。PDFium の中の `abort` は `RuntimeError` として投げられるので、これも `internal` になる。WASM のメモリを増やせなかったときの `growMemory: …` の行は標準エラーに出る (ファイルの中身は含まない)。`FPDF_GetLastError` が 4 (`FPDF_ERR_PASSWORD`) と 5 (`FPDF_ERR_SECURITY`) なら `encrypted`、それ以外で開けなければ `malformed`。WASM のファイルの場所は `require.resolve('@embedpdf/pdfium/pdfium.wasm')` (package の `exports` にある)。試作の取り出しの関数は 14.10 にある。
+  - テキストの復号: 候補を比べた試作では emscripten の `UTF16ToString` を使ったが、この関数は U+0000 の字で読むのをやめる。U+0000 に対応づけた字は PDFium が U+FFFE に置き換えて返したので、試作の入力では字は落ちなかった (14.4 の (2))。ただ、PDFium がほかの経路で U+0000 を返さないとは確かめていないので、14.10 の関数は `FPDFText_GetText` が返した長さ (終わりの NUL を含む UTF-16 の単位の数) で `HEAPU8` の範囲を切り、`TextDecoder('utf-16le')` で復号する形にした (`@hyzyla/pdfium` と同じ形)。本番もこの形にする。
+- **4.x (テストの書き換え)**: Python 版の `test_pdf.py` の期待値は、`@embedpdf/pdfium` でもそのまま成り立つ (14.4 の (2))。縦書きの全角の空白 (14.4 の (1)) は、ベンチマークの合否には影響しないが、Python 版との出力の比較 (Req 2.2) では違いとして記録する。
+
+### 14.9 RED (選定の前の状態と、最初に失敗した試作)
+
+- 選定の記録が無かった: `grep -c "^## 14\." research.md` は `0`。未決事項の表の「PDF のライブラリ」は「未決」だった。
+- 最初に失敗した試作は anydoc の PDF。コーパスの縦書きの PDF の出力 (正規化の後) は `当皆創社様業社はの五地ご十長域支周社援年挨会にをと心迎拶とよえもりてに感歩謝ん申でしま上いげりまますし 。 た 。` で、採点は語句 `社長挨拶`・`創業五十周年`・`地域社会`・`横浜市`・`株式会社に改組`・`本社を川崎市へ移転` がすべて `missing`、要素の数は 1/2、PDF 全体で再現率 15/21・番号とラベルが正しい要素 0/6 (ベースラインはすべて満点)。画像だけの PDF は `needsOcr` のエラーになった。
+
+### 14.10 再現の手順
+
+使い捨ての場所 (以下 `$T`) で行う。リポジトリの中では `pnpm` 以外の install をしない。
+
+```bash
+export PATH=/usr/local/share/nvm/versions/node/v24.21.0/bin:$PATH
+mkdir -p "$T/candidates" "$T/inputs" "$T/out" && cd "$T/candidates"
+echo '{"name":"t1","private":true,"type":"module"}' > package.json
+npm install --save-exact @embedpdf/pdfium@2.15.1 @hyzyla/pdfium@3.0.0 pdfjs-dist@6.5.438 @firecrawl/anydoc@0.2.4
+npm install --save-exact pdfium-native@0.10.0   # install の処理で GitHub から完成品を取る
+```
+
+1. 入力を作る: `apps/attachment-text-extractor` で `node --import @swc-node/register/esm-register <スクリプト> "$T/inputs"`。スクリプトは `test/fixtures/index.ts` の生成器 (14.3 の一覧) で PDF を書き、`benchmark/corpus/` の PDF 3 個を写す。字の多いページは `test/fixtures/pdf.ts` の `buildPdf` で、`(aaa…1000 字) Tj 0 -1 Td` を 1,000 行 (100 万字)・2,000 行 (200 万字) 並べた 1 ページと、8 行のページを 500 枚並べたものを作る。
+2. 候補ごとの取り出し: 14.3 の形 (開く → `pageCount` → ページごとにテキスト → 閉じる) の関数を候補ごとに書き、正規化と `_assemble` の動きを足し、ファイルごとの `{ok, pages}` または `{ok:false, kind}` と、最後に `/proc/self/status` の `VmHWM` を JSON で出す (`node extract.mjs <候補> <ファイル,…> [ページ数の上限]`)。
+3. Python 版の正解: `services/attachment-text-extractor/.venv/bin/python -I <スクリプト>`。スクリプトは `sys.path` に `services/attachment-text-extractor/src` を足し、`app.conversion.pdf.convert_pdf` と `app.conversion.core._assemble` を呼んで同じ形の JSON を出す。Python 版の RSS は、これとは別に、この 2 つの関数だけを 1 つの入力ごとに新しいプロセスで呼び、`ru_maxrss` を読んで測る (比べるための生の出力の取り出しを同じプロセスでしない)。
+4. 採点: `apps/attachment-text-extractor` で `node --import @swc-node/register/esm-register <スクリプト>`。スクリプトは `benchmark/answers.ts` の `loadBenchmarkAnswers`、`benchmark/scoring/index.ts` の `scoreDocument` / `summarizeByFormat`、`benchmark/elasticsearch/measure-es-recall.ts` の `probeElasticsearch` / `measureEsRecall` を import し、`baseline/python-baseline.json` の PDF の行と比べる。
+5. 仮想メモリ: `/usr/bin/prlimit --as=<バイト> -- node extract.mjs …` を、上限なしと同じ結果になるかで二分探索する (64MiB 刻み)。
+6. 後片付け: Elasticsearch の一時 index が残っていないこと (`curl http://elasticsearch:9200/_cat/indices/benchmark-*` が空) と、`git status` に変更が無いことを確かめる。
+
+**採った部品の取り出しの関数 (試作)**: 6.x の実装の出発点として残す。この形のまま、14.4 の (2) のすべての入力で Python 版と同じ結果 (縦書きの全角の空白だけが違う) になり、ページ数の上限 2 で `limit_exceeded`、U+0000 の字の PDF でも後ろの字が落ちないこと、`malloc` が 0 を返す状況 (上限 1,472MiB の下で 48MiB の PDF を読む) で `RangeError` ではなく `internal` の失敗になること (上限なしでは 12 要素を読める) を確かめた。本番では TypeScript にし、失敗の種類は対象 spec の `ConversionError` の種類に合わせる。
+
+```js
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { init } from '@embedpdf/pdfium';
+
+// Same character class as normalize.py's _JA (do not edit the ranges by hand).
+const JA = 'ぁ-ゖゝ-ゟァ-ヺー-ヿ㐀-䶿一-鿿々';
+const JA_GAP = new RegExp(`(?<=[${JA}])[ \\n](?=[${JA}])`, 'gu');
+const toLf = (text) => text.replace(/\r\n?/g, '\n');
+const normalize = (text) => toLf(text).replace(JA_GAP, '');
+
+const FPDF_ERR_PASSWORD = 4;
+const FPDF_ERR_SECURITY = 5;
+
+// The embedded malloc returns 0 instead of throwing when WASM memory cannot grow
+// (e.g. under RLIMIT_AS); writing through address 0 would corrupt PDFium state.
+const allocate = (pdfium, size) => {
+  const ptr = pdfium.wasmExports.malloc(size);
+  if (ptr === 0) throw new PdfFailure('internal');
+  return ptr;
+};
+
+export class PdfFailure extends Error {
+  constructor(kind) { super(kind); this.kind = kind; }
+}
+
+export const loadPdfium = async () => {
+  const require = createRequire(import.meta.url);
+  // Always pass the binary: never let the loader look for it elsewhere.
+  const m = await init({ wasmBinary: readFileSync(require.resolve('@embedpdf/pdfium/pdfium.wasm')) });
+  m.PDFiumExt_Init();
+  return m;
+};
+
+const pageText = (m, doc, index) => {
+  const { pdfium } = m;
+  const page = m.FPDF_LoadPage(doc, index);
+  if (!page) throw new PdfFailure('malformed');
+  const textPage = m.FPDFText_LoadPage(page);
+  try {
+    const count = m.FPDFText_CountChars(textPage);
+    if (count <= 0) return '';
+    const ptr = allocate(pdfium, (count + 1) * 2);
+    try {
+      // Returns UTF-16 units written, including the terminating NUL.
+      const units = m.FPDFText_GetText(textPage, 0, count, ptr);
+      if (units <= 1) return '';
+      return new TextDecoder('utf-16le').decode(pdfium.HEAPU8.subarray(ptr, ptr + (units - 1) * 2));
+    } finally { pdfium.wasmExports.free(ptr); }
+  } finally {
+    m.FPDFText_ClosePage(textPage);
+    m.FPDF_ClosePage(page);
+  }
+};
+
+/** One element per page, as the Python service's convert_pdf + _assemble. */
+export const extractPdf = (m, data, maxPages) => {
+  const { pdfium } = m;
+  const ptr = allocate(pdfium, data.length);
+  pdfium.HEAPU8.set(data, ptr);
+  try {
+    // PDFium reads from ptr until the document is closed.
+    const doc = m.FPDF_LoadMemDocument(ptr, data.length, '');
+    if (!doc) {
+      const code = m.FPDF_GetLastError();
+      throw new PdfFailure(code === FPDF_ERR_PASSWORD || code === FPDF_ERR_SECURITY ? 'encrypted' : 'malformed');
+    }
+    try {
+      const count = m.FPDF_GetPageCount(doc);
+      if (count > maxPages) throw new PdfFailure('limit_exceeded');
+      const pages = [];
+      for (let i = 0; i < count; i++) {
+        const content = normalize(pageText(m, doc, i));
+        if (content !== '') pages.push({ pageNumber: i + 1, label: String(i + 1), content });
+      }
+      return pages.length > 0 ? pages : [{ pageNumber: null, label: null, content: '' }];
+    } finally { m.FPDF_CloseDocument(doc); }
+  } finally { pdfium.wasmExports.free(ptr); }
+};
+```
+
+- 結果の合計の大きさの上限 (`MAX_RESULT_BYTES`) は、Python 版と同じく変換の層の外 (結果をまとめる所) で掛ける。この関数には入れていない。
+
+### 14.11 確かめなかったこと
+
+- Node の slim image の中での値 (時間、RSS、仮想メモリ)。
+- サービス全体 (`POST /extract`) を通したベンチマーク (6.13 で行う)。ここでは変換の層だけを比べた。
+- 子に anydoc と PDF の部品の両方を読み込んだときの RSS と起動の時間。
+- WASM の 2 つの中の PDFium の版。`@hyzyla/pdfium` のメモリが多い原因。上限を掛けたときに WASM の変換が約 1 割遅くなる原因。
+- ネットワークを止めた状態での `@embedpdf/pdfium` の初期化 (`unshare -n` が devcontainer で許されなかった)。
+- Type3 のフォント (字の形を図形で描く方式) の PDF と、ToUnicode の表が欠けている・不完全な PDF での取り出し (11.3 のとおりコーパスは CIDFontType2 で作った)。
+- 縦書きの中の数字・英字、Office が書き出した PDF、フォントを埋め込まない日本語の PDF、スキャンした画像の PDF (コーパスの外)。
+
+### 14.12 3.7 への補足 (3.1 の 2 回目のレビュー)
+
+- 外挿の「1 ページ約 235 万〜250 万字」は、実際に子を止める閾値 (`MAX_CHILD_RSS_MB` 320MB) で見たもの。design の余裕の基準 (0.95 倍 = 304MB) で見ると、範囲は約 220 万〜238 万字に下がる。3.7 で測り直すときに、この両方の基準で記録する。
 
