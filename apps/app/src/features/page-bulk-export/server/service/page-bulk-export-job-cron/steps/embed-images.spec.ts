@@ -7,8 +7,10 @@
  *  - A stream error while downloading an attachment does not leave a
  *    truncated asset file behind that a later reference would treat as
  *    "already downloaded".
- *  - Non-RELAY response modes and html with no attachment references are
- *    left untouched.
+ *  - Attachments are embedded regardless of the storage's response mode
+ *    (RELAY / REDIRECT / DELEGATE only govern how the HTTP route answers a
+ *    browser, not whether the server can read the file).
+ *  - Html with no attachment references is left untouched.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -69,22 +71,41 @@ describe('embedAttachmentImages', () => {
     expect(prisma.attachments.findMany).not.toHaveBeenCalled();
   });
 
-  it('leaves the html unchanged for non-RELAY response modes', async () => {
+  it.each(
+    Object.values(ResponseMode),
+  )('embeds an accessible attachment when the response mode is %s', async (responseMode) => {
+    const attachment = mock<AttachmentWithComputed>({
+      id: attachmentId,
+      fileName: 'photo.png',
+      pageId: '000000000000000000000099',
+    });
+    vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([attachment]);
+    vi.mocked(isAttachmentAccessibleToViewer).mockResolvedValue(true);
     const fileUploadService = mock<FileUploader>({
-      determineResponseMode: vi.fn().mockReturnValue(ResponseMode.REDIRECT),
+      determineResponseMode: vi.fn().mockReturnValue(responseMode),
+      findDeliveryFile: vi
+        .fn()
+        .mockResolvedValue(Readable.from(Buffer.from('binary-image-data'))),
     });
     const crowi = buildCrowi(fileUploadService);
-    const html = htmlWithAttachment(attachmentId);
+    const fileOutputPath = path.join(outputDir, 'page.html');
 
-    const result = await embedAttachmentImages(html, {
-      fileOutputPath: path.join(outputDir, 'page.html'),
+    const result = await embedAttachmentImages(
+      htmlWithAttachment(attachmentId),
+      { fileOutputPath, outputDir, crowi, exportingUser },
+    );
+
+    expect(result).toBe(
+      `<p><img src="_bulk-export-assets/${attachmentId}.png" alt=""></p>`,
+    );
+    const assetFilePath = path.join(
       outputDir,
-      crowi,
-      exportingUser,
-    });
-
-    expect(result).toBe(html);
-    expect(prisma.attachments.findMany).not.toHaveBeenCalled();
+      '_bulk-export-assets',
+      `${attachmentId}.png`,
+    );
+    await expect(fs.promises.readFile(assetFilePath, 'utf-8')).resolves.toBe(
+      'binary-image-data',
+    );
   });
 
   it('does not embed an attachment the exporting user cannot access', async () => {
@@ -97,7 +118,6 @@ describe('embedAttachmentImages', () => {
     vi.mocked(isAttachmentAccessibleToViewer).mockResolvedValue(false);
     const findDeliveryFile = vi.fn();
     const fileUploadService = mock<FileUploader>({
-      determineResponseMode: vi.fn().mockReturnValue(ResponseMode.RELAY),
       findDeliveryFile,
     });
     const crowi = buildCrowi(fileUploadService);
@@ -119,42 +139,6 @@ describe('embedAttachmentImages', () => {
     );
   });
 
-  it('downloads and rewrites the src for an accessible attachment', async () => {
-    const attachment = mock<AttachmentWithComputed>({
-      id: attachmentId,
-      fileName: 'photo.png',
-      pageId: '000000000000000000000099',
-    });
-    vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([attachment]);
-    vi.mocked(isAttachmentAccessibleToViewer).mockResolvedValue(true);
-    const fileUploadService = mock<FileUploader>({
-      determineResponseMode: vi.fn().mockReturnValue(ResponseMode.RELAY),
-      findDeliveryFile: vi
-        .fn()
-        .mockResolvedValue(Readable.from(Buffer.from('binary-image-data'))),
-    });
-    const crowi = buildCrowi(fileUploadService);
-    const fileOutputPath = path.join(outputDir, 'page.html');
-
-    const result = await embedAttachmentImages(
-      htmlWithAttachment(attachmentId),
-      { fileOutputPath, outputDir, crowi, exportingUser },
-    );
-
-    expect(result).not.toContain(`/attachment/${attachmentId}`);
-    expect(prisma.attachments.findMany).toHaveBeenCalledWith({
-      where: { id: { in: [attachmentId] } },
-    });
-    const assetFilePath = path.join(
-      outputDir,
-      '_bulk-export-assets',
-      `${attachmentId}.png`,
-    );
-    await expect(fs.promises.readFile(assetFilePath, 'utf-8')).resolves.toBe(
-      'binary-image-data',
-    );
-  });
-
   it('does not leave a truncated asset file behind when the download stream errors', async () => {
     const attachment = mock<AttachmentWithComputed>({
       id: attachmentId,
@@ -170,7 +154,6 @@ describe('embedAttachmentImages', () => {
       },
     });
     const fileUploadService = mock<FileUploader>({
-      determineResponseMode: vi.fn().mockReturnValue(ResponseMode.RELAY),
       findDeliveryFile: vi.fn().mockResolvedValue(failingReadable),
     });
     const crowi = buildCrowi(fileUploadService);

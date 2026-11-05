@@ -5,7 +5,6 @@ import type { IUser } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
-import { ResponseMode } from '~/server/interfaces/attachment';
 import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { isAttachmentAccessibleToViewer } from '~/server/service/attachment/resolve-accessible-attachment';
 import loggerFactory from '~/utils/logger';
@@ -36,19 +35,19 @@ const ASSETS_DIRNAME = '_bulk-export-assets';
 
 /**
  * Rewrite `/attachment/<id>` image sources in `htmlString` to something
- * `pdf-converter`'s `file://` navigation can actually load. Only handles
- * RELAY-mode storage (the local filesystem and GridFS `fileUploadService`
- * implementations): the attachment's bytes are fetched server-side (this
- * runs inside the `app` process, which already has full access to
+ * `pdf-converter`'s `file://` navigation can actually load: the attachment's
+ * bytes are fetched server-side via `fileUploadService.findDeliveryFile()`
+ * (this runs inside the `app` process, which already has full access to
  * fileUploadService — no HTTP round-trip or session cookie needed) and
  * saved once per job into `ASSETS_DIRNAME` on the shared
  * `page_bulk_export_tmp` volume; the `src` becomes a relative path to that
  * local copy, same pattern as the shared CSS file.
  *
- * REDIRECT-mode (S3/GCS) and DELEGATE-mode storage are not handled here and
- * are left as-is (best effort — the image will be missing from the PDF,
- * but the page still converts). See growilabs/growi#<ISSUE_NUMBER> for
- * background and follow-up on those modes.
+ * This is independent of the storage's response mode: RELAY / REDIRECT /
+ * DELEGATE only decide how the `/attachment/:id` route answers a browser,
+ * while `findDeliveryFile()` reads with the app's own credentials in every
+ * mode. Signed URLs are deliberately not used, since they can expire before
+ * pdf-converter loads the HTML (see growilabs/growi#11830).
  *
  * Reuses `isAttachmentAccessibleToViewer` — the same page-viewer permission
  * check the `/attachment/:id` route enforces via `resolveAccessibleAttachment`
@@ -85,12 +84,6 @@ export async function embedAttachmentImages(
   }
 
   const { fileUploadService } = crowi;
-  if (fileUploadService.determineResponseMode() !== ResponseMode.RELAY) {
-    // REDIRECT (S3/GCS) and DELEGATE modes aren't handled yet; leave the
-    // HTML untouched rather than guess.
-    return htmlString;
-  }
-
   const assetsDir = path.join(outputDir, ASSETS_DIRNAME);
 
   // De-dupe: the same attachment can appear more than once on a page.
