@@ -3099,3 +3099,595 @@ server.on('checkContinue', (req, res) => server.emit('request', req, res));
 - HTTP/2。
 - python-multipart の、前置きが断片の切れ目をまたぐ場合の振る舞い (ソースから読んだもので、Python 版に断片を分けて送って確かめてはいない)。
 - Python の `email` の処理のうち、`fuzz_params.mjs` の断片で作れない形 (たとえば latin-1 の外の文字。部品のヘッダーは latin-1 として読むので、届くことはない)。
+
+## 17. OpenAPI の作り方 (T5、タスク 3.4)
+
+2026-11-05 に devcontainer (Node 24.21.0、Linux) で、使い捨ての場所 (scratchpad) に試作を作って確かめた結果。
+
+- 版: `hono` 4.13.16、`@hono/node-server` 2.1.6、`@hono/zod-openapi` 1.6.3 (`@asteasolutions/zod-to-openapi` 9.1.0 を中で使う)、`hono-openapi` 1.5.0、`zod` 4.6.7、`ajv` 8.18.0 と 8.20.0、`orval` 7.2.0 (`packages/attachment-text-extractor-client` と同じ版)、biome 2.4.12 (リポジトリと同じ版)、TypeScript 5.9.3。
+- 比べる相手: commit 済みの `packages/attachment-text-extractor-client/openapi.json` (Python 版の FastAPI が書き出し、biome で整えたもの) と、そこから作った `src/generated/index.ts`。
+- 変えていないもの: 抽出サービスの package、lockfile、`pnpm-lock.yaml`、本番の `src/`、Python 版、`packages/attachment-text-extractor-client`。
+- 数字と結果は、とくに書いていなければ **実測**。測っていないものは「未検証」、コードや文書を読んで考えたものは「推論」と書いた。
+
+### 17.1 結論
+
+**採る方法**: design.md の T5 の候補 (a)「commit 済みの文書を正とする」。具体的には次の形にする。
+
+1. **文書は抽出サービスが持つ JSON のファイル** (`apps/attachment-text-extractor/src/http/openapi.json`)。中身は commit 済みの `openapi.json` に、17.6 の説明文の修正 5 件を当てたもの。説明文以外は commit 済みのものと 1 字も変えない (FastAPI が自動で付けた名前もそのまま残る)。
+2. **`GET /openapi.json` はこのファイルをそのまま返す**。読み込みは `import openApiDocument from './openapi.json' with { type: 'json' };` の 1 行。コードから文書を作らないので、OpenAPI のための本番の依存は **0 個**。
+3. **書き出しの手順** (`scripts/export-openapi.ts`) は、このファイルの中身を `--output` の場所に書く。
+4. **drift 検知** (Req 7.3) は vitest のテストで行う。
+   - 「サービスの文書と、commit 済みの `openapi.json` が JSON として同じ」を確かめる。撤去 (8.2) までは説明文を除いて比べ、8.2 で説明文を除く処理を消して完全な比較にする (17.7)。
+   - 文書を手で持つので、「**コードが文書から外れていないか**」を別のテストで確かめる。対象は 4 つ: 経路の一覧、`ErrorCode` の値、エラー表の HTTP ステータス、実際の応答の形 (`ajv` を開発用の依存だけに入れて、文書のスキーマで検査する)。
+
+**確かめた結果** (17.4):
+
+- 説明文以外の差分は 0 件。
+- orval で作り直した生成クライアントは、コメントを除くと差分 0 行。コメントの差分は 20 行で、すべて 17.6 の 5 件の説明文に当たる。
+- 名前を合わせるためのコードは 0 行。
+- drift と、コードが文書から外れることは、どちらもテストが失敗して分かる。わざと 7 種類の壊し方をして確かめた。
+
+**契約は崩さない**。FastAPI の自動の名前 (`readyz_readyz_get`、`Body_post_extract_extract_post`、`Pagenumber` など) を守るのに、追加のコードが要らないためである (Req 1.9 / 7.6 の「守ると複雑になる」に当たらない)。research.md の 7 節には何も足さない。
+
+### 17.2 比べた候補
+
+| # | 方法 | 文書の出どころ | 試作 |
+|---|---|---|---|
+| (a) | 文書を正とする。サービスが JSON のファイルを持ち、そのまま返す。コードとの一致はテストで確かめる | 手で持つ JSON | した (`a/`) |
+| (b1) | コードから作る: `@hono/zod-openapi` (`createRoute` と zod のスキーマ) | zod のスキーマと経路の定義 | した (`b1/`) |
+| (b2) | コードから作る: `hono-openapi` (`describeRoute` と `resolver`。zod 4 自身の JSON Schema の変換を使う) | zod のスキーマと経路の定義 | した (`b2/`) |
+| (c) | 文書を正とし、サービスの型を生成する (`@growi/attachment-text-extractor-client` の生成済みの型を type だけ import する、または openapi-typescript などで作る) | 手で持つ JSON | していない (17.5 で理由を書いた) |
+
+`@asteasolutions/zod-to-openapi` だけを使う案 (Hono と結び付けず、登録簿だけで文書を作る案) は、(b1) の合わせた書き方で `/extract` に使った形 (`openAPIRegistry.registerPath` で文書だけに書く) と同じ部品なので、(b1) の結果に含めた。
+
+### 17.3 比べ方
+
+1. **orval の作り直しの再現を先に確かめた** (較正)。
+   - 試作の場所で、commit 済みの `openapi.json` から orval 7.2.0 で作り直し、biome 2.4.12 で整えた。
+   - 結果は、commit 済みの `src/generated/index.ts` と **1 バイトも違わなかった**。
+   - 以後の「生成クライアントの差分」は、この手順で作ったものどうしを比べている。整形の違いは入っていない。
+   - 試作の場所には、リポジトリの `biome.json` を写し、`vcs` を切り、`apps/app` 用の grit の plugin を外して置いた。外さないと biome が plugin のファイルを読めずに止まり、整形がされない。
+2. **文書の比較** (`tools/doc-diff.mjs`、Req 7.1):
+   - JSON として比べる。オブジェクトのキーの順は無視し (Python 版の `!=` と同じ)、配列の順は区別する (`required`・`enum`・`tags`)。
+   - 違う所をすべて JSON Pointer で一覧にする。
+   - 説明文を除くときは、注釈としての `description` だけを除く。`properties` の中の、`description` という名前の項目は除かない。いまの文書にこの名前の項目は無いが、将来その名前の項目が足されたときに、drift 検知が黙って見逃さないようにするためである。
+3. **生成クライアントの比較** (`tools/client-diff.mjs`、Req 7.2):
+   - 両方のファイルを TypeScript の printer に `removeComments: true` で通してから `diff -u` で比べる。
+   - 差分が 0 行なら「コメントだけの差分」、1 行でもあれば「型・関数・引数の差分」と判定する。
+   - 正規表現でコメントを消す方法は、文字列の中の `/*` などで誤るので使わなかった。
+4. **名前を合わせるのに要るコードの量**: FastAPI の出力に合わせるために書いた指定と後処理を、種類ごとに数えた。
+5. **drift 検知とコードとの一致の検査が働くか**: わざとコードか文書を壊し、テストが失敗するかを見た (17.4 の表 3)。
+
+### 17.4 結果
+
+**表 1: 文書と生成クライアント**
+
+| 候補 | 説明文以外の差分 (件) | 生成クライアントの差分 (コメントを除く) | 名前を合わせるための指定と後処理 | 本番の依存 (足すもの) |
+|---|---|---|---|---|
+| (a) | **0** | **0 行** | **0** | **なし** |
+| (b1) 何も合わせない書き方 | 26 | あり (`file: string` が `file?: unknown` になり、`formData.append('file', …)` が `if (… !== undefined)` で囲まれる) | 5 (スキーマ名) と 3 (`operationId`) | `@hono/zod-openapi`、`zod` (と下の 4 つ) |
+| (b1) 合わせた書き方、スキーマの順を並べ替える前 | 0 | **あり** (宣言の順が入れ替わる。下の (ii)) | 下の行の 31 から並べ替えを除いた 30 | 同上 |
+| (b1) 合わせた書き方 | **0** | **0 行** | **31** (`title` 15、スキーマ名 5、`operationId` 3、null を許す項目を `z.union([…, z.null()])` で書く 3、`contentMediaType` 1、`/extract` を登録簿だけに書く 1、生成された文書の後処理 3 (`webhooks` と空の `components.parameters` を消す、`components.schemas` を名前の順に並べる)) | 同上 |
+| (b2) 1 回目 | 12 | 比べていない | `title` 15 ほか | `hono-openapi`、`zod` (と下の 4 つ) |
+| (b2) 2 回目 | 7 | 0 行 (並べ替えた後) | 上と、`z.looseObject`、`z.union`、`minimum`・`maximum` の打ち消し。残りの 7 件 (`additionalProperties: false` が 3 件、null を許す項目が `anyOf` でなく `type: [..., "null"]` になる 4 件) は、スキーマの指定では消せなかった。消すには、生成された文書を書き換える後処理が要る | 同上 |
+
+分かったこと:
+
+- **(i) (b1) で `/extract` の本文のスキーマを zod で書くと、本文を検査する部品が付き、本文を先に読んでしまう** (`b1/validator-conflict.mjs`)。
+  - `@hono/zod-openapi` 1.6.3 は、`createRoute` の本文のスキーマが **zod のときに限り**、本文を検査する部品 (と、Content-Type が違えば 415 を返す門番) を経路に付ける。スキーマが zod でなければ飛ばす (`dist/index.mjs` の 113〜130 行の `if (!isZod(schema)) continue;` など。コードを読んだ結果)。
+  - zod で書いた試作では、この部品が本文を読み終えてしまった。2MiB のファイルを送ると、ハンドラーが `c.env.incoming` から読めたのは **0 バイト**だった。同じ本文を、検査の部品の無い経路に送ると 2,097,333 バイト読めた。`file` の無い本文には、部品が自分で `400` と `ZodError` を返した。エラー表の「422 `extraction_failed`」(Req 1.3) にならない。16 節の自前の解析器 (本文を少しずつ読み、上限・期限・切断を見る) と両立しない。
+  - **本文のスキーマを zod でなく `$ref` (登録簿に素の JSON Schema として登録したもの) で書くと、検査の部品は付かない** (独立レビューの試作 `rev-probe/ref-body.mjs` を自分でも実行して再現した)。ハンドラーは `c.env.incoming` から 2,097,333 バイトを読め、`file` の無い本文も `ZodError` にならずにハンドラーまで届いた (200)。文書の `requestBody` は `"required": true` と `$ref` のまま出た。同じ書き方を TypeScript 5.9.3 の `tsc --noEmit` (strict) にかけると、型の誤りは出なかった (`ref-typecheck/ref-body.ts`。ハンドラーに型の誤りをわざと入れると `tsc` が失敗することも確かめた)。
+  - ただしこの書き方では、`/extract` の本文のスキーマは zod から作られず、手で書いた JSON になる。(a) と同じ手間で、(b1) の利点である「コードの型から文書を作る」が、いちばん大事な `/extract` の本文では失われる。合わせた書き方 (表 1) で `/extract` を `registerPath` で文書だけに書いたのは、zod のスキーマを使い続けるためで、`$ref` で書けば経路の定義と文書は 1 か所にまとめられる。
+- **(ii) JSON として同じでも、生成クライアントが変わることがある**。
+  - orval は、`components.schemas` のキーの順に型の宣言を並べる。
+  - (b1) が出す順 (`ExtractResponse`, `PageInfo`, …) は、FastAPI の順 (名前の順: `Body_…`, `ErrorCode`, …) と違う。そのため、JSON の比較では差分 0 件なのに、生成クライアントの宣言の順が入れ替わった。
+  - コードから作る方法では、キーの順まで合わせる後処理が要る。(a) は文書をそのまま持つので、順も変わらない。
+- **(iii) orval 7.2.0 は、型には影響しない違いを区別しない**。
+  - null を許す項目を `anyOf: [{type}, {type: null}]` で書いても `type: [..., "null"]` で書いても、同じ `number | null` を作る。
+  - `additionalProperties: false` の有無でも型は変わらない ((b2) の 2 回目の文書を並べ替えて作り直し、コメントを除いて差分 0 行)。
+  - つまり Req 7.1 (説明文以外が JSON として同じ) は、Req 7.2 (型・関数・引数が同じ) より厳しい。(b) で 7.1 まで合わせるための指定のかなりの部分は、7.2 のためには要らない。7.1 を緩める判断 (7.6) をするときの材料になる。今回は (a) で 7.1 をそのまま満たせるので、緩めない。
+
+**表 2: (a) の試作のコードの量** (空行とコメントを除いた行数)
+
+| ファイル | 行数 | 中身 |
+|---|---|---|
+| `src/openapi.json` | 258 | 文書 (commit 済みのものと同じ行数。違うのは説明文 5 か所) |
+| `src/openapi-route.ts` | 6 | JSON を import して `GET /openapi.json` で返す |
+| `scripts/export-openapi.ts` | 6 | 文書を `--output` に書く |
+| `src/contract.ts` | 25 | `ERROR_CODES` と `ExtractResponse`・`PageInfo`・`ErrorResponse` の型 (design.md の `contract/` に当たる) |
+| `test/contract.test.ts` | 77 | drift 検知と、コードと文書の一致の検査 (17.7) |
+
+比べると、(b1) の合わせた書き方は 56 行で、その中に上の 31 の指定と後処理がある。そのうえで `/extract` の本物のハンドラーと、`ajv` などの検査のテストは別に要る (文書がコードから作られても、`/extract` の応答が文書に合うことは、(b1) でもテストでしか分からない)。
+
+**表 3: (a) の検査がコードと文書のずれを見つけるか** (`mut/` で 1 か所ずつ壊して、`node --test` を実行した)
+
+| 壊し方 | 失敗したテスト |
+|---|---|
+| コードの `ERROR_CODES` に `new_code` を足す | `ErrorCode values in the code equal the documented enum` |
+| `/extract` の 200 の応答に、文書に無い項目 `engine` を足す | `POST /extract matches the documented schema` |
+| `pageNumber` を文字列 `'1'` で返す | `POST /extract matches the documented schema` |
+| 文書に無い経路 `GET /metrics` を足す | `the routes the app serves are exactly the documented operations plus /openapi.json` |
+| サービスの文書だけ `title` を `PageNumber` に変える | `exported document matches the committed client document (drift, 7.3)` |
+| `/extract` のエラーの状態を、文書に無い 418 にする | `POST /extract?fail=1 matches the documented schema` |
+| `/healthz` を 503 にする (503 を通すのが `/readyz` だけであることの確認) | `GET /healthz matches the documented schema` |
+| (壊さない) | 10 件すべて通る (`/readyz` の 503 の場合を足した後。足す前は 9 件) |
+
+- 最初の版のテストは、文書に無いステータスのエラーを `ErrorResponse` として通してしまっていた (418 にしても失敗しなかった)。
+- 文書に書いていない応答のうち、通してよいのは次の 2 つである。どちらも Python 版の文書にも書いていない。文書 (契約) の中身は変えない。
+  - 認証の部品が返す 401 (どのパスでも)。`ErrorResponse` で検査する。
+  - 準備ができていないときの `/readyz` の 503 (`not_ready`。Python 版の `health.py` も返す)。文書の 200 のスキーマが `{}` なので、503 も形を問わない (`{}` で検査する)。
+  - トークン付きで存在しないパスを呼んだときの 404 は、検査の関数が文書にあるパスにしか使われないので、ここには入れない。
+- そこでこの 2 つだけを上のとおり検査し、それ以外の書いていないステータスは失敗にするよう直した。直した後で、`/readyz` の 503 の場合 (`/readyz?down=1`) を足して 10 件が通ること、「401 だけ」の決まりに戻すとこの 1 件が `not documented` で失敗すること、`/healthz` を 503 にすると失敗すること (503 を通すのは `/readyz` だけであること) を確かめた。
+
+**完全な比較 (8.2 の後の形) で比べた結果**:
+
+- 試作の文書と、いまの commit 済みの文書 (Python 版の説明文) を完全に比べると、説明文の 5 件だけが違い、drift のテストは失敗した。8.2 の前に完全な比較にしてはいけない理由がこれである。
+- 8.2 の手順を試作の場所でなぞった。
+  1. 書き出しの手順で書き出し、biome で整えた。結果は、サービスの `src/openapi.json` と **1 バイトも違わなかった**。
+  2. それを commit 済みの文書として完全な比較のテストを流すと、すべて通った (`/readyz` の 503 の場合を足した後の 10 件でも確かめた)。
+  3. そこから orval で作り直した生成クライアントは、コメントを除いて差分 0 行。コメントの差分は 20 行で、17.6 の 5 件だけだった。
+
+### 17.5 選んだ理由と、選ばなかった理由
+
+判断の基準は design.md の T5 の合否の基準と、Req 1 の「シンプルさ (保守性)」である。
+
+**(a) を選んだ理由**:
+
+- **Req 7.1 と 7.2 を、名前を合わせるコードなしで満たす**。文書がもともと FastAPI の名前を持っているので、守るための手間が 0 である。
+- **本番の依存が増えない** (Req 4.4 の確認の手間も、image の大きさも増えない)。足すのは、テストだけで使う `ajv` 1 つである。`ajv` 8.18.0 は、すでに `pnpm-lock.yaml` に入っている (ほかの部品の依存として)。
+- **16 節の自前の解析器と衝突しない**。経路は普通の `app.get` / `app.post` のまま書ける。
+- **契約は凍結に近い**。経路は 4 つ、スキーマは 6 つで、apps/app が使うのは `postExtractExtractPost` と `ErrorCode` だけである。めったに変わらない小さな文書は、手で持つほうが読みやすく、直しやすい。
+- **コードが文書から外れることは、テストで見つかる** (表 3)。手で持つ方法の弱点は、文書とコードが黙ってずれることである。応答と経路の側は 4 つの検査 (17.7 の 2) で埋めた。要求の側 (`file` と `mimeType` というフィールド名、`file` が必須であること、`mimeType` を省けること) は、この 4 つでは見ていない。4.4 の黒箱のテストで守る (17.10 の 4.4 / 4.6)。`mimeType` は形式を決めるヒントで、読めなくても拡張子で形式が決まる。そのため、拡張子とヒントが同じ形式を指す要求 (`a.pdf` に `application/pdf` を付けるなど) は、名前を取り違えていても通ってしまう。ヒントの有る無しで結果が変わる要求で確かめる。
+
+**(b1) `@hono/zod-openapi` を選ばなかった理由**:
+
+- 合わせるのに 31 の指定と後処理が要った。中身は FastAPI の出力を書き写すことと変わらない (たとえば `title: 'Extractedcharacters'`)。
+- `/extract` の本文のスキーマを zod で書くと、検査の部品が本文を先に読む。`$ref` (素の JSON Schema) で書けば検査は付かないが、その場合 `/extract` の本文のスキーマは手で書いた JSON になり、(b1) の利点が `/extract` で失われる (17.4 の (i))。
+- 本番の依存が 6 つ増える: `@hono/zod-openapi` と `zod`、それが引く `@asteasolutions/zod-to-openapi`・`openapi3-ts`・`yaml`・`@hono/zod-validator`。`zod` だけで約 8MB ある。
+- スキーマの順を合わせる後処理も要る (17.4 の (ii))。
+
+**(b2) `hono-openapi` を選ばなかった理由**:
+
+- 本文を読まずに文書だけを書けるのは (b1) より良い (検査は別の部品で、付けなければ動かない)。
+- しかし zod 4 の JSON Schema の変換が、`additionalProperties: false`、`type: [..., "null"]`、`minimum`・`maximum` (安全な整数の範囲)、`propertyNames` を足す。2 回直しても 7 件の差分が残った。
+- 残りを消すには、生成された文書を書き換える後処理が要る。
+- `hono-openapi` 1.5.0 は 2026-10-18 に出たばかりである (版の変化の速さは、公開日を見ただけの推論)。
+
+**(c) を試作しなかった理由** (どれも推論。試作はしていない):
+
+- サービスの型を生成クライアントの型から取る方法は、次の手間が増える。
+  - 生成クライアントの `dist` を先に作る必要があり、turbo のビルドの順の指定が増える。
+  - `ErrorCode` の値はエラー表で実行時に使う。クライアントの package から値も取るなら、それを本番の依存にする必要が出て axios が image に入る。型だけを取るなら、値の一覧は (a) と同じく自前の `ERROR_CODES` で別に持ち、テストで照合することになる (その形なら本番の依存は増えない)。
+- openapi-typescript などで型を生成する方法は、生成の道具と生成物が 1 つずつ増える。
+- 型の食い違いは、(a) では表 3 の検査で見つかる。(c) の利点は「型の食い違いを、テストを流す前の型の検査で見つける」ことだけで、手間に見合わない。
+
+**名前を合わせることと、契約を崩すことの判断** (Req 1.9、1.10、7.6):
+
+- (a) では、FastAPI の自動の名前を守るのに追加のコードが要らない。守っても複雑にならないので、**崩さない**。
+- (b) を選んでいたら、31 の指定と後処理が「守ると複雑になる」に当たり、7.6 の手続きで名前を崩すかを判断することになっていた。崩した場合の下流の変更は、次のとおりだった (推論。apps/app と生成クライアントの import を grep で確かめた範囲)。
+  - 生成クライアントの関数名と型名が変わる (例: `postExtractExtractPost` → `postExtract`)。
+  - apps/app の `attachment-text-extractor.ts` とその spec の import を直す。
+  - `attachment-search-indexing` spec の記述を直し、その spec を Amend target に加える。
+- (a) を選んだので、この変更はどれも起きない。
+
+### 17.6 説明文の修正の一覧 (Req 7.1、7.5)
+
+commit 済みの文書には、注釈としての `description` が 19 か所ある。そのうち Python に固有の言葉か、Node 版に合わない内容を含む **5 か所**を直す。
+
+| # | 場所 (JSON Pointer) | 直す前 | 直した後 | 直す理由 |
+|---|---|---|---|---|
+| 1 | `/paths/~1readyz/get/description` | ```200 ``ready`` when the forkserver runs and has loaded the conversion dependencies, else 503.```<br><br>`A not-ready cached state is re-verified (in a thread: it forks a probe child), so a pod that was taken out of service gets the call that brings it back. The body never carries paths or exception text.` | ``200 `ready` when `prlimit` can be run and a probe child process starts, else 503 `not_ready`.``<br><br>`The body never carries paths or exception text.` | forkserver・fork・thread は Python 版の仕組み。二重の逆引用符は Python の docstring (reStructuredText) の書き方。Node 版の準備完了の条件 (design.md の HTTP の層の「`prlimit` を起動できないとき、または確認用の子が起動できないときは 503」、Req 8.8) だけを書いた。部品を読み込めたかを条件にするか、キャッシュと再確認をするかは 6.x で決まるので書かない |
+| 2 | `/paths/~1extract/post/description` | `Receive a multipart upload, enforce the slot and size limits, then convert.`<br><br>`Authentication is handled upstream by BearerAuthMiddleware; this handler will only be reached by authenticated requests.` | `Receive a multipart upload, enforce the slot and size limits, then convert it in a child process.`<br><br>`The Bearer token is checked before this operation runs; only authenticated requests reach it.` | `BearerAuthMiddleware` は Python 版のクラスの名前 |
+| 3 | `/components/schemas/ErrorCode/description` | `Machine-readable error codes for all defined failure modes.`<br><br>`Extends str so that values serialize as plain JSON strings rather than enum objects, ensuring compatibility with FastAPI's OpenAPI generation.` | `Machine-readable error codes for all defined failure modes.` | 2 段落目は Python の `str` の Enum と FastAPI の説明で、API の利用者には関係がない |
+| 4 | `/components/schemas/ExtractResponse/description` | `Successful extraction response returned by POST /extract.`<br><br>`extractedCharacters is the sum of len(page.content) across all pages and is provided for audit logging and metrics purposes (Req 1.1).` | `Successful extraction response returned by POST /extract.`<br><br>`extractedCharacters is the total number of characters (Unicode code points) in content across all pages and is provided for audit logging and metrics purposes.` | `len(...)` は Python の書き方。Python の `len` は文字 (コードポイント) の数を数えるので、意味を変えずに言葉で書いた。`(Req 1.1)` は対象 spec の要件の番号で、API の利用者には意味が無い |
+| 5 | `/components/schemas/PageInfo/description` | `Information extracted from a single logical page or section of a document.`<br><br>`pageNumber and label are None when the source format has no positional page concept (e.g. plain text files).` | `Information extracted from a single logical page or section of a document.`<br><br>`pageNumber and label are null when the source format has no positional page concept (e.g. plain text files).` | `None` は Python の値。JSON では `null` |
+
+- 表の文は読みやすさのために段落の中の改行を 1 行につないだ。**次の JSON を正とする** (改行の位置も含めて、文書の中の文字列そのもの)。`pointer` は直す場所、`before` は commit 済みの文書の文、`after` は直した後の文である。8.2 で文を変えた場合は、この JSON と上の表を直す。
+
+```json
+[
+  {
+    "pointer": "/paths/~1readyz/get/description",
+    "before": "200 ``ready`` when the forkserver runs and has loaded the conversion dependencies, else 503.\n\nA not-ready cached state is re-verified (in a thread: it forks a probe child), so a pod that was\ntaken out of service gets the call that brings it back. The body never carries paths or\nexception text.",
+    "after": "200 `ready` when `prlimit` can be run and a probe child process starts, else 503 `not_ready`.\n\nThe body never carries paths or exception text."
+  },
+  {
+    "pointer": "/paths/~1extract/post/description",
+    "before": "Receive a multipart upload, enforce the slot and size limits, then convert.\n\nAuthentication is handled upstream by BearerAuthMiddleware; this handler\nwill only be reached by authenticated requests.",
+    "after": "Receive a multipart upload, enforce the slot and size limits, then convert it in a child process.\n\nThe Bearer token is checked before this operation runs; only authenticated requests reach it."
+  },
+  {
+    "pointer": "/components/schemas/ErrorCode/description",
+    "before": "Machine-readable error codes for all defined failure modes.\n\nExtends str so that values serialize as plain JSON strings rather than\nenum objects, ensuring compatibility with FastAPI's OpenAPI generation.",
+    "after": "Machine-readable error codes for all defined failure modes."
+  },
+  {
+    "pointer": "/components/schemas/ExtractResponse/description",
+    "before": "Successful extraction response returned by POST /extract.\n\nextractedCharacters is the sum of len(page.content) across all pages and\nis provided for audit logging and metrics purposes (Req 1.1).",
+    "after": "Successful extraction response returned by POST /extract.\n\nextractedCharacters is the total number of characters (Unicode code points) in content\nacross all pages and is provided for audit logging and metrics purposes."
+  },
+  {
+    "pointer": "/components/schemas/PageInfo/description",
+    "before": "Information extracted from a single logical page or section of a document.\n\npageNumber and label are None when the source format has no positional\npage concept (e.g. plain text files).",
+    "after": "Information extracted from a single logical page or section of a document.\n\npageNumber and label are null when the source format has no positional\npage concept (e.g. plain text files)."
+  }
+]
+```
+
+- 試作は、この JSON の `before` が commit 済みの文書と 1 字も違わないことを確かめてから置き換えた (`a/apply-fixes.mjs`)。
+- 直した後の文書に、`forkserver`・`fork`・`None`・`len(`・`BearerAuthMiddleware`・`FastAPI`・`Extends str`・二重の逆引用符が残っていないことを grep で確かめた (0 件)。
+
+**直さない 14 か所**: 次の 14 か所は、Python に固有の言葉を含まないので直さない。
+
+- `info.description`
+- `/healthz` の説明
+- 応答の説明 9 つ (3 つの経路の 200 の `Successful Response`、`/extract` の `Unsupported file format`・`Extraction timed out`・`File too large`・`Encrypted, malformed or over-limit document`・`Extraction process failed`・`All concurrency slots are busy`)
+- `file` と `mimeType` の説明
+- `ErrorResponse` の説明
+
+`summary` (`Liveness probe` など) は `description` ではないので、Req 7.1 のとおり変えない。
+
+**直す時期**:
+
+- サービスの文書 (`src/http/openapi.json`) には、作るとき (6.8。tasks.md の 6.8 が `/openapi.json` を作る) から直した後の文を入れる。
+- commit 済みの `packages/attachment-text-extractor-client/openapi.json` と生成クライアントは、8.2 で直す (design.md の「Python 版の残し方と、撤去の条件」)。
+- それまでの間、drift のテストは説明文を除いて比べる。
+
+### 17.7 drift 検知の作り方 (Req 7.3)
+
+Python 版の CI は、`export_openapi.py` で書き出した文書と commit 済みの文書を `check_openapi_drift.py` で JSON として比べている。Node 版では、次のものを vitest のテストにする。Node 版の CI の `turbo run lint test` で一緒に動く。
+
+1. **サービスの文書と commit 済みの文書の比較** (drift 検知そのもの):
+   - サービスが返す文書 (`openApiDocument`) と、`../../packages/attachment-text-extractor-client/openapi.json` を、`assert.deepStrictEqual` (vitest なら `toStrictEqual`) で比べる。キーの順は無視され、配列の順は区別される。
+   - **撤去 (8.2) まで**は、両方から注釈としての `description` を除いて比べる (17.3 の 2)。
+   - **8.2 で**、説明文を除く処理 (約 10 行) を消して完全な比較にする。切り替えは、設定の旗で行わず、コードを消して行う。
+   - 試作では、書き出しの手順 (`scripts/export-openapi.ts`) を子プロセスで実行して比べた。書き出しの手順が壊れていないことも同時に確かめられる。
+2. **コードと文書の一致の検査** (文書を手で持つ方法の弱点を埋める):
+   - **(i) 経路の一覧**: Hono の `app.routes` (`ALL` の、ミドルウェアの行を除く) が、文書の `paths` の「メソッド + パス」と `GET /openapi.json` に等しい。
+   - **(ii) `ErrorCode` の値**: コードの `ERROR_CODES` が、文書の `components.schemas.ErrorCode.enum` と同じ順で同じ。
+   - **(iii) エラー表のステータス**: 6.8 のエラー表 (`error-table.ts`) のすべての HTTP ステータスが、文書の `/extract` の `responses` にあるか 401 である。試作にはエラー表が無いので、(iv) の 418 の検査で代わりに確かめた。6.9 で表から直接確かめる形にする。
+   - **(iv) 応答の形**: 実際に返した応答の本文を、文書のスキーマで `ajv` (2020-12 の方言、strict モード) にかける。
+     - スキーマの中の `#/components/schemas/` を `#/$defs/` に置き換えて渡す。
+     - テストの中だけで、`properties` を持つオブジェクトに `additionalProperties: false` を足した「厳しい見方」を使う。こうしないと、文書に無い項目をコードが足しても通ってしまう (文書そのものは変えない)。
+     - 文書に書いていないステータスは失敗にする。ただし次の 2 つは通す (17.4 の表 3 の注)。認証の部品の 401 は `ErrorResponse` で検査する。準備ができていないときの `/readyz` の 503 は、200 と同じく `{}` (形を問わない) で検査する。トークン付きで存在しないパスへの 404 は、文書に無いパスなので、この検査の対象にならない。
+     - `/readyz` のスキーマは `{}` なので、`dependencies` の実名 (D2) はどれでも通る。生成クライアントにも影響しない。
+3. **CI の起動の条件**: `.github/workflows/ci-attachment-text-extractor.yml` の `paths:` に、`packages/attachment-text-extractor-client/openapi.json` を足す (6.12。tasks.md の 6.12 が Node 版の CI に OpenAPI の比較を足す)。Python 版の workflow と同じく、commit 済みの文書だけを変えた push でも drift 検知が動くようにするためである。
+4. **turbo のキャッシュ**:
+   - drift のテストは、package の外のファイル (クライアントの `openapi.json`) を読む。turbo はこのファイルをキャッシュの鍵に入れない。そのためローカルや、キャッシュを持ち越す CI では、クライアントの文書だけを変えたときにテストが飛ばされうる。
+   - サービスの `turbo.json` の `test` に `inputs` (`$TURBO_DEFAULT$` と、クライアントの `openapi.json`) を足す。ルートの外のファイルの書き方 (`$TURBO_ROOT$/...`) が turbo 2.9 で使えるかは **未検証**で、6.9 で確かめる。
+   - いまの Node 版の CI は turbo のキャッシュを持ち越していない (`actions/cache` が無い) ので、CI では起きない。
+5. **生成クライアントの drift** は、今と同じく `ci-app.yml` の「Check attachment-text-extractor-client orval drift」(orval で作り直して `git diff --exit-code`) が見る。変えない。
+
+image の中で返る文書の比較 (6.12 の「OpenAPI の比較 (説明文を除く)」) は、コンテナの `/openapi.json` を取ってきて、上の 1 と同じ比べ方で比べる。比べる処理を 1 つの関数にして、vitest のテストと、6.12 の CI の手順の両方から呼ぶ (Python 版の `check_openapi_drift.py` に当たる小さな CLI)。
+
+### 17.8 部品とライセンス
+
+| 部品 | 版と公開日 | ライセンス | install の時に動く処理 (`allowBuilds` への影響) | 保守の状況 | 採否 |
+|---|---|---|---|---|---|
+| `ajv` | 8.18.0 (2026-02-14、`pnpm-lock.yaml` に既にある)。最新は 8.20.0 (2026-04-24) | MIT | なし (`preinstall`・`install`・`postinstall` が無い)。依存の `fast-deep-equal` (MIT)、`fast-uri` (BSD-3-Clause)、`json-schema-traverse` (MIT)、`require-from-string` (MIT) にも無い | 広く使われ、更新が続いている | **採る** (開発用の依存だけ) |
+| `@hono/zod-openapi` | 1.6.3 (2026-09-04) | MIT | なし | honojs/middleware の中の公式の部品 | 採らない |
+| `@asteasolutions/zod-to-openapi` | 9.1.0 (2026-07-19) | MIT | なし (`prepare` はあるが、npm の登録簿から入れるときは動かない) | 更新が続いている | 採らない |
+| `hono-openapi` | 1.5.0 (2026-10-18) | MIT | なし | rhinobase の部品 (1.5.0 は公開から 3 週間未満) | 採らない |
+| `zod` | 4.6.7 (2026-10-12)。apps/app は 4.6.6 | MIT | なし | 更新が続いている | 採らない |
+| `openapi3-ts` 4.6.2、`yaml` 2.9.1、`@hono/zod-validator` 0.9.1 ((b1) が引く) | — | MIT、ISC、MIT | なし | — | 採らない |
+
+試作の場所の `npm install` は、`esbuild` と `@scarf/scarf` の install の時の処理について警告を出した。どちらも orval (開発の道具。リポジトリでは既にクライアントの package に入っている) が引くもので、上の候補とは関係がない。
+
+### 17.9 再現の手順と、試作のコードの要点
+
+試作の場所: `/tmp/claude-1000/-workspace-growi--claude-worktrees-bridge-cse-01FKZr5pM7xXdNyvSTYf1mR4/1f99ff8a-c248-52fe-bb9c-21f36680853c/scratchpad/t5/` (以下 `$S`、使い捨て)。
+
+```sh
+export PATH=/usr/local/share/nvm/versions/node/v24.21.0/bin:$PATH
+cd $S
+# package.json: hono 4.13.16, @hono/node-server 2.1.6, @hono/zod-openapi 1.6.3, zod 4.6.7,
+# hono-openapi 1.5.0, @hono/standard-validator 0.4.1, @asteasolutions/zod-to-openapi 9.1.0,
+# ajv 8.18.0, orval 7.2.0, @biomejs/biome 2.4.12, typescript 5.9.3
+npm install
+cp <repo>/packages/attachment-text-extractor-client/openapi.json committed-openapi.json
+# biome.json: repo の設定から vcs を切り、files.includes を ["**"] にし、overrides の plugins (apps/app 用の grit) を外す
+node -e "const b=JSON.parse(require('fs').readFileSync('<repo>/biome.json','utf8'));b.vcs={enabled:false};delete b['\$schema'];b.files={includes:['**']};b.overrides=b.overrides.map(({plugins,...o})=>o);require('fs').writeFileSync('biome.json',JSON.stringify(b,null,2))"
+
+# 較正: commit 済みの文書から作り直し、commit 済みの生成クライアントと 1 バイトも違わないこと
+gen/gen.sh committed-openapi.json gen/baseline     # orval 7.2.0 + biome check --write
+diff <repo>/packages/attachment-text-extractor-client/src/generated/index.ts gen/baseline/src/generated/index.ts
+
+# (a)
+node a/apply-fixes.mjs committed-openapi.json a/description-fixes.json a/src/openapi.json
+node_modules/.bin/biome format --write --config-path=$S/biome.json a/src/openapi.json
+node tools/doc-diff.mjs a/src/openapi.json committed-openapi.json                      # 0 difference(s)
+node tools/doc-diff.mjs a/src/openapi.json committed-openapi.json --keep-description   # 5 difference(s)
+COMMITTED_OPENAPI=$S/committed-openapi.json TMPDIR=$S node --test a/test/contract.test.ts   # pass 10
+# 8.2 のなぞり: 書き出し → biome → それを commit 済みとして完全な比較 → orval
+node a/scripts/export-openapi.ts --output sim82/openapi.json
+node_modules/.bin/biome format --write --config-path=$S/biome.json sim82/openapi.json
+cmp sim82/openapi.json a/src/openapi.json                                             # 同じ
+OPENAPI_DRIFT=exact COMMITTED_OPENAPI=$S/sim82/openapi.json TMPDIR=$S node --test a/test/contract.test.ts
+gen/gen.sh sim82/openapi.json gen/sim82
+node tools/client-diff.mjs gen/baseline/src/generated/index.ts gen/sim82/src/generated/index.ts   # コメントだけ
+
+# (b1) / (b2)
+node b1/naive.mjs b1/naive.json && node tools/doc-diff.mjs b1/naive.json committed-openapi.json        # 26
+node b1/matched.mjs b1/matched.json && node tools/doc-diff.mjs b1/matched.json committed-openapi.json  # 0
+gen/gen.sh b1/matched.json gen/b1 && node tools/client-diff.mjs gen/baseline/src/generated/index.ts gen/b1/src/generated/index.ts
+node b1/validator-conflict.mjs        # zod の本文: /extract の本文がハンドラーに 0 バイトしか届かない
+node rev-probe/ref-body.mjs           # $ref の本文: 2097333 バイト届き、file が無くても 200 (検査が付かない)
+(cd ref-typecheck && ln -sfn ../node_modules node_modules && ../node_modules/.bin/tsc -p tsconfig.json)   # 型の誤りなし
+node b2/matched2.mjs b2/matched2.json && node tools/doc-diff.mjs b2/matched2.json committed-openapi.json # 7
+```
+
+`OPENAPI_DRIFT` は、試作で 2 つの段階を切り替えるための環境変数である。本番では使わない (17.7 の 1 のとおり、8.2 でコードを消して切り替える)。結果の記録は `$S/logs/` にある。
+
+**比べるための道具** (この 4 つと上の `biome.json` があれば、17.4 の数字を作り直せる):
+
+```sh
+# gen/gen.sh
+# usage: gen.sh <input openapi.json> <output dir>
+# Regenerates the client exactly like packages/attachment-text-extractor-client (orval 7.2.0 + biome --write)
+set -e
+S=$(cd "$(dirname "$0")/.." && pwd)
+IN=$(realpath "$1"); OUT=$2
+mkdir -p "$OUT"
+cat > "$OUT/orval.config.cjs" <<CFG
+module.exports = {
+  'attachment-text-extractor-client': {
+    input: '$IN',
+    output: { target: './src/generated/index.ts' },
+    hooks: { afterAllFilesWrite: '$S/node_modules/.bin/biome check --write --config-path=$S/biome.json src/generated/' },
+  },
+};
+CFG
+cd "$OUT" && "$S/node_modules/.bin/orval" --config ./orval.config.cjs >/dev/null 2>&1
+```
+
+```js
+// tools/doc-diff.mjs
+// usage: node doc-diff.mjs A.json B.json [--keep-description]
+// Lists every JSON difference between two OpenAPI documents.
+// Object key order is ignored (same as Python's dict !=); array order is significant.
+// Unless --keep-description, `description` is ignored where it is an annotation
+// keyword, but NOT where it is a property name inside a `properties` map.
+import { readFileSync } from 'node:fs';
+
+const [a, b, flag] = process.argv.slice(2);
+const keepDescription = flag === '--keep-description';
+
+export const stripDescriptions = (node, parentKey) => {
+  if (Array.isArray(node)) return node.map((v) => stripDescriptions(v, undefined));
+  if (node === null || typeof node !== 'object') return node;
+  return Object.fromEntries(
+    Object.entries(node)
+      .filter(([k]) => parentKey === 'properties' || k !== 'description')
+      .map(([k, v]) => [k, stripDescriptions(v, k)]),
+  );
+};
+
+const diffs = [];
+const walk = (x, y, path) => {
+  if (Array.isArray(x) || Array.isArray(y)) {
+    if (!Array.isArray(x) || !Array.isArray(y) || x.length !== y.length) {
+      diffs.push([path, x, y]);
+      return;
+    }
+    x.forEach((v, i) => walk(v, y[i], `${path}/${i}`));
+    return;
+  }
+  if (x && y && typeof x === 'object' && typeof y === 'object') {
+    for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
+      walk(x[k], y[k], `${path}/${k.replaceAll('~', '~0').replaceAll('/', '~1')}`);
+    }
+    return;
+  }
+  if (x !== y) diffs.push([path, x, y]);
+};
+
+const load = (p) => {
+  const doc = JSON.parse(readFileSync(p, 'utf8'));
+  return keepDescription ? doc : stripDescriptions(doc, undefined);
+};
+walk(load(a), load(b), '');
+for (const [p, x, y] of diffs) {
+  console.log(`${p || '/'}\n   A: ${JSON.stringify(x)}\n   B: ${JSON.stringify(y)}`);
+}
+console.log(`${diffs.length} difference(s)${keepDescription ? '' : ' (description ignored)'}`);
+process.exitCode = diffs.length === 0 ? 0 : 1;
+```
+
+```js
+// tools/client-diff.mjs
+// usage: node client-diff.mjs A.ts B.ts
+// Prints both generated clients with comments removed (TypeScript printer) and diffs them.
+// A comment-only difference therefore reports 0 lines; any type/function/argument change shows up.
+import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import ts from 'typescript';
+
+const printer = ts.createPrinter({ removeComments: true });
+const normalize = (p) =>
+  printer.printFile(ts.createSourceFile(p, readFileSync(p, 'utf8'), ts.ScriptTarget.Latest, true));
+
+const [a, b] = process.argv.slice(2);
+const dir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), 'client-diff-'));
+writeFileSync(join(dir, 'A.ts'), normalize(a));
+writeFileSync(join(dir, 'B.ts'), normalize(b));
+try {
+  execFileSync('diff', ['-u', join(dir, 'A.ts'), join(dir, 'B.ts')], { stdio: 'inherit' });
+  console.log('client: no difference except comments');
+} catch {
+  console.log('client: DIFFERENT outside comments');
+  process.exitCode = 1;
+}
+```
+
+```js
+// a/apply-fixes.mjs
+// Builds the service-owned document: the committed doc with the 7.1 description fixes applied.
+import { readFileSync, writeFileSync } from 'node:fs';
+const [committed, fixesPath, out] = process.argv.slice(2);
+const doc = JSON.parse(readFileSync(committed, 'utf8'));
+const fixes = JSON.parse(readFileSync(fixesPath, 'utf8'));
+for (const { pointer, before, after } of fixes) {
+  const keys = pointer.slice(1).split('/').map((k) => k.replaceAll('~1', '/').replaceAll('~0', '~'));
+  const last = keys.pop();
+  const parent = keys.reduce((n, k) => n[k], doc);
+  if (parent[last] !== before) throw new Error(`unexpected text at ${pointer}`);
+  parent[last] = after;
+}
+writeFileSync(out, `${JSON.stringify(doc, null, 2)}\n`);
+```
+
+`a/apply-fixes.mjs` に渡す `description-fixes.json` は、17.6 の JSON そのものである。
+
+**(a) の要点** (6.8 / 6.9 の手本。import の拡張子はリポジトリの決まり (拡張子を書かない) に合わせて読み替える):
+
+```ts
+// src/http/openapi-route.ts
+import type { Hono } from 'hono';
+
+import openApiDocument from './openapi.json' with { type: 'json' };
+
+export { openApiDocument };
+
+export const registerOpenApiRoute = (app: Hono): void => {
+  app.get('/openapi.json', (c) => c.json(openApiDocument));
+};
+```
+
+```ts
+// scripts/export-openapi.ts — usage: export-openapi --output <path>; then format the file with biome
+import { writeFileSync } from 'node:fs';
+import { parseArgs } from 'node:util';
+
+import { openApiDocument } from '../src/http/openapi-route';
+
+const { values } = parseArgs({ options: { output: { type: 'string' } } });
+if (values.output == null) throw new Error('--output is required');
+writeFileSync(values.output, `${JSON.stringify(openApiDocument, null, 2)}\n`);
+```
+
+```ts
+// drift and contract checks (excerpt of $S/a/test/contract.test.ts)
+// `description` is dropped where it is an annotation, never where it names a property.
+// Delete this helper and its call at 8.2 to compare exactly.
+const stripDescriptions = (node: Json, parentKey?: string): Json => {
+  if (Array.isArray(node)) return node.map((v) => stripDescriptions(v));
+  if (node === null || typeof node !== 'object') return node;
+  return Object.fromEntries(
+    Object.entries(node)
+      .filter(([k]) => parentKey === 'properties' || k !== 'description')
+      .map(([k, v]) => [k, stripDescriptions(v, k)]),
+  );
+};
+
+// routes == documented operations + GET /openapi.json
+const served = app.routes.filter((r) => r.method !== 'ALL').map((r) => `${r.method} ${r.path}`);
+const documented = Object.entries(doc.paths).flatMap(([path, ops]) =>
+  Object.keys(ops).map((m) => `${m.toUpperCase()} ${path}`));
+assert.deepEqual(new Set(served), new Set([...documented, 'GET /openapi.json']));
+
+// Test-only stricter view: undocumented response fields fail too.
+const closeObjects = (node: Json): Json => {
+  if (Array.isArray(node)) return node.map(closeObjects);
+  if (node === null || typeof node !== 'object') return node;
+  const out = Object.fromEntries(Object.entries(node).map(([k, v]) => [k, closeObjects(v)]));
+  return 'properties' in node ? { ...out, additionalProperties: false } : out;
+};
+const toDefs = (s: Json) =>
+  JSON.parse(JSON.stringify(closeObjects(s)).replaceAll('#/components/schemas/', '#/$defs/'));
+const ajv = new Ajv2020({ strict: true }); // import { Ajv2020 } from 'ajv/dist/2020'
+// Responses the document leaves out on purpose, as the FastAPI version did.
+const undocumentedSchema = (path: string, status: number): Json | undefined => {
+  if (status === 401) return { $ref: '#/components/schemas/ErrorResponse' }; // auth middleware
+  if (path === '/readyz' && status === 503) return {}; // not_ready; the 200 schema is {} as well
+  return undefined;
+};
+const validatorFor = (path: string, method: string, status: number) => {
+  const documented = doc.paths[path]?.[method]?.responses?.[String(status)];
+  const schema = documented?.content?.['application/json']?.schema ?? undocumentedSchema(path, status);
+  assert.ok(schema, `${method} ${path} ${status} is not documented`);
+  return ajv.compile({ $defs: toDefs(doc.components.schemas), ...toDefs(schema) });
+};
+```
+
+- `ajv` の strict モードは、OpenAPI 3.1 のスキーマに出てくる `title`・`contentMediaType`・`anyOf`・`additionalProperties` を受け付けた (8.18.0 と 8.20.0 の両方で、10 件が通り、表 3 のうち応答の形に関わる壊し方 (項目の追加、型の違い、文書に無いステータス、`/healthz` の 503) と、「401 だけ」の決まりに戻した版で失敗した)。
+- JSON を `with { type: 'json' }` で import する書き方は、次の 4 つで動いた。どれも `src/` に JSON を置いた小さな試作 (`$S/a-build/`) で確かめた。
+  - `tsc` 5.9.3 (`module: ESNext`、`moduleResolution: Bundler`、`resolveJsonModule`。リポジトリの `tsconfig.base.json` と同じ): `dist/` に `openapi.json` が写され、`node dist/main.js` で読めた。
+  - `tsgo --noEmit`
+  - リポジトリの `@swc-node/register/esm-register`
+  - リポジトリの vitest 3
+- 本番の起動のしかた (6.11) はまだ決まっていない。Docker の image の中で読めるかは、6.11 / 6.12 で確かめる。
+
+### 17.10 後のタスクへの引き継ぎ
+
+- **3.8 (部品を入れる)**:
+  - OpenAPI のための本番の依存は入れない。
+  - `ajv` を開発用の依存に入れる。8.18.0 (`pnpm-lock.yaml` に既にある版) と 8.20.0 の両方で試作が動いた。`^8.18.0` と書いたときに pnpm が既存の 8.18.0 を選ぶか、8.20.0 を新しく入れるかは **未検証**。lockfile の変化を小さくしたいなら、3.8 で入れた後の lockfile の差分を見て決める。
+  - `zod` と OpenAPI の部品は入れない。
+- **6.8 (HTTP の層)**:
+  - `src/http/openapi.json` に、commit 済みの文書に 17.6 の JSON の置き換えを当て、biome で整えたものを置く (17.9 の `apply-fixes.mjs` で作れる)。
+  - `http/openapi-route.ts` は 17.9 の形にする。
+  - `/openapi.json` は認証なしで呼べる 3 つのパスの 1 つにする (1.6)。`/docs` と `/redoc` は作らない (D3)。
+- **6.9 (組み立てと書き出し)**:
+  - `scripts/export-openapi.ts` と、17.7 の 1 と 2 のテストを作る。(iii) はエラー表から直接確かめる。
+  - (iv) の検査で文書に書かなくても通す応答は、認証の 401 と、準備ができていないときの `/readyz` の 503 の 2 つにする (17.9 の `undocumentedSchema`)。
+  - 要求の側 (`file` と `mimeType` というフィールド名など) は 17.7 の 2 の検査では見ていない。4.4 の黒箱のテストで守る。送る要求は 17.10 の 4.4 / 4.6 の表にある。
+  - package の script `export-openapi` を足す。書き出した後に biome で整える。
+  - turbo の `inputs` を確かめる (17.7 の 4)。
+- **6.x (変換の層とレスポンス)**:
+  - `extractedCharacters` は、JavaScript の `string.length` (UTF-16 の単位の数) ではなく、**コードポイントの数** (たとえば `[...content].length` の合計) で数える。
+  - Python 版の `len(str)` はコードポイントを数える。17.6 の 4 の説明文もそう書いた。`.length` で数えると、絵文字や、サロゲートペアになる漢字 (例: 𠮷) を含むページで数が増える。
+  - 試作の `/extract` の代わりの応答には `こんにちは😀` を入れ、コードポイントで 6 と数えた (応答の検査は数の値までは見ない)。黒箱のテスト (4.4) に、サロゲートペアを含むページの `extractedCharacters` を入れる。
+- **4.4 / 4.6 (黒箱のテスト。4.6 は Python 版に向けて流すタスクで、Req 6.3 に当たる)**:
+  - 要求の側 (`file` と `mimeType` というフィールド名、`file` が必須であること、`mimeType` を省けること) は、17.7 の 2 の検査では見ていない。4.4 の黒箱のテストで、次の要求を送って守る。
+  - 下の表の Python 版の応答は実測である (2026-11-05。research.md 8 節の手順で Python 版を起動し、curl で送った。ファイルの中身はどれも `hello extractor\n`)。Python 版の `formats.py` の `resolve_format` は「`mimeType` が表にあればそれ、無ければ拡張子」で形式を決め、どちらも無ければ `unsupported` を出し、`extract_errors.py` がそれを 400 `unsupported_format` にする (コードも読んで確かめた)。
+
+    | 要求 | Python 版の応答 (実測) | 守るもの |
+    |---|---|---|
+    | `blob.unknown` (拡張子が表に無い) と `mimeType=text/plain` | 200。応答の `mimeType` は `text/plain` | `mimeType` という名前でヒントを読んでいること |
+    | `blob.unknown`、`mimeType` なし | 400 `unsupported_format` | 上の 200 が、ヒントを読んだおかげであること (比べるための対照) |
+    | `blob.unknown` と `mime_type=text/plain`、または `mimetype=text/plain` (名前を違えた) | 400 `unsupported_format` | 違う名前の項目をヒントとして読まないこと |
+    | `a.txt`、`mimeType` なし | 200 (`text/plain`) | `mimeType` を省けること |
+    | `file` の無い本文 | 422 `extraction_failed` (16.4 の 12〜17 番で実測済み) | `file` が必須であること |
+
+  - `mimeType` の名前を確かめるのは、表の 1 行目と 2 行目の組である。`a.pdf` に `mimeType=application/pdf` を付けるように、拡張子とヒントが同じ形式を指す要求は、名前を取り違えても拡張子で同じ結果になるので、この確認には使わない。
+  - `mimeType` が null を許すこと: 生成クライアントは `mimeType` が null のときに送らない (`src/generated/index.ts` の `!== undefined && !== null`)。サービスから見ると「`mimeType` の無い要求」になるので、表の 4 行目 (省いても拡張子で 200) で確かめる。この行は名前の取り違えは見つけない。
+  - 参考 (実測): `a.txt` に `mimeType=application/pdf` を付けると 422 `extraction_failed` (ヒントが拡張子より優先される)。空の `mimeType=` は 400 `unsupported_format` (ヒントとして使われず、拡張子も表に無い)。
+  - tasks.md の 4.4 (「不正な本文の 422」「エラー表のすべての行」、黒箱のテストを外のサービスにも向けられる形) と食い違わない。どれも Python 版で上の結果になるので、4.6 で Python 版に向けるときに外す目印 (付け方は 4.1 で決める) は要らない。Node 版で同じ結果になるかは、Node 版の実装 (6.x) の後で確かめる (未検証)。
+  - 応答を文書のスキーマで検査する 17.7 の 2 (iv) の関数は、Python 版に向けても通ると推論している (Python 版の応答は文書に合うはずだが、測っていない)。黒箱のテストに入れるなら、外す目印は要らない。
+  - 直した説明文 (17.6) の文言を確かめるテストを書く場合は、Python 版では通らないので、4.6 で外す目印 (付け方は 4.1 で決める) を付ける。
+- **6.12 (Node 版の CI の image の確認)**:
+  - コンテナの `/openapi.json` と commit 済みの文書を、説明文を除いて比べる (17.7 の最後の段落)。
+  - `paths:` にクライアントの `openapi.json` を足す。
+- **8.2 (撤去と切り替え)**: 次の 4 つを、ほかの撤去の作業と同じ 1 つの変更にする。
+  1. `export-openapi` で `packages/attachment-text-extractor-client/openapi.json` を書き、biome で整える (試作では、サービスの文書と 1 バイトも違わない結果になった)。
+  2. `pnpm -F @growi/attachment-text-extractor-client gen` で生成クライアントを作り直す (コメントだけが変わる。試作では 20 行)。
+  3. drift のテストから説明文を除く処理を消し、完全な比較にする。
+  4. Python 版の workflow の「Export OpenAPI」「Check OpenAPI drift」を workflow ごと消す。
+  - 直した説明文ごとの「直す前と後」は 17.6 の表にある (Req 7.5)。8.2 で文を変えた場合は、この表を直す。
+- **7.1 (実装のレビュー)**: 文書を手で持つので、文書を変える変更では、表 3 の検査が働いていることをレビューで確かめる。
+
+### 17.11 RED (選定の前の状態と、最初に失敗した試作)
+
+- **選定の記録が無い状態**: 作業の前に `grep -n "^## 17" research.md` の結果が 0 件 (終了コード 1) だった。
+- **最初に失敗した試作**:
+  - (b1) を何も合わせずに書いた文書: 説明文以外の差分が 26 件 (`title` の欠落 15 件、null を許す項目が `type: [..., "null"]` になる 3 件 × 2 (`type` と `anyOf`)、`file` の `type`・`contentMediaType`・`required`、`components.parameters` と `webhooks` の空の入れ物)。
+  - そこから作り直した生成クライアント: `file: string` が `file?: unknown` になった (型・関数・引数の差分)。
+  - (b1) で `/extract` を `createRoute` と zod の本文のスキーマで書いた試作: ハンドラーに本文が 0 バイトしか届かなかった。`file` の無い本文には `400` と `ZodError` を返した (17.4 の (i)。`$ref` で書けば検査は付かない)。
+  - (a) のテストを「文書に書いていない応答で通すのは 401 だけ」で作った版: 準備ができていないときの `/readyz` の 503 を `not documented` で失敗にした (独立レビューの指摘。17.4 の表 3 の注で直した)。
+  - (b1) を合わせた後、スキーマの順を並べる前: JSON の差分は 0 件なのに、生成クライアントの宣言の順が入れ替わった (17.4 の (ii))。
+  - (b2): 1 回目 12 件、2 回目 7 件の差分が残った。
+  - (a) の最初のテスト: 文書に無いステータス (418) のエラーを通してしまった (表 3 の注)。
+  - (a) をいまの commit 済みの文書と完全な比較で比べた場合: 説明文の 5 件で失敗する (8.2 の前は説明文を除いて比べる理由)。
+- **GREEN**: (a) で説明文以外の差分 0 件、生成クライアントの差分はコメントだけ、テスト 10 件が通り、表 3 の 7 つの壊し方でそれぞれ該当するテストが失敗した。「401 だけ」の決まりに戻すと `/readyz` の 503 の 1 件が失敗した。
+
+### 17.12 確かめなかったこと
+
+- Node の slim image の中で、`with { type: 'json' }` で import した JSON が読めること (6.11 / 6.12 で確かめる。`tsc` の出力と、swc-node・vitest では確かめた)。
+- turbo 2.9 で、package の外のファイルをテストの `inputs` に書けるか (`$TURBO_ROOT$`) (17.7 の 4)。
+- `@growi/attachment-text-extractor-client` の型を type だけ import する方法 ((c)) の試作。
+- `$ref` で本文を書いた `createRoute` を、リポジトリの `tsgo` と biome で検査すること (`tsc` 5.9.3 の strict だけで確かめた)。また、その形で FastAPI の出力に合わせた文書全体を作り直すこと (`/extract` の部分だけを確かめた)。
+- `hono-openapi` の残り 7 件を、後処理なしで消せる設定 (2 回の調整で消えなかった所で止めた)。
+- orval 7.2.0 以外の版で作り直した場合の生成クライアント。
+- 説明文の英語の文そのものの良し悪しを、英語を読む人に確かめること。
