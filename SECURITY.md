@@ -4,8 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 4.4.x   | :white_check_mark: |
-| < 4.3   | :x:                |
+| >= 8.0  | :white_check_mark: |
+| < 8.0   | :x:                |
 
 ## Reporting Security Issues
 
@@ -13,6 +13,7 @@
 
 If you believe you have found a security vulnerability in any GROWI related repository, please report it to us using one of the methods described below.
 
+  * Email the lead developer at [yuki@weseek.co.jp](mailto:yuki@weseek.co.jp)
   * [Join our Slack team](https://docs.growi.org/slack) and send DM to `@yuki` who is the lead developer
   * Report to JPCERT/CC[^jpcertcc]
     * [[PDF] JPCERT/CC Vulnerability Coordination and Disclosure Policy](https://www.jpcert.or.jp/english/vh/vul-coordination-disclosure-policy_2019.pdf)
@@ -21,11 +22,6 @@ If you believe you have found a security vulnerability in any GROWI related repo
 
 Communication in English and Japanese is possible.  
 In Japanese, we can reply more quickly. 
-
-
-
-
-Some long sentence. 
 
 [^jpcertcc]: JPCERT/CC is a National CSIRT in Japan and a coordination center
 who coordinates cyber security incidents and products vulnerabilities

@@ -1,7 +1,6 @@
 {
   "Show": "Afficher",
   "View": "Lecture",
-  "Edit": "Écriture",
   "Hide": "Cacher",
   "Add": "Ajouter",
   "Insert": "Insérer",
@@ -18,6 +17,7 @@
   "Created": "Crée le",
   "Description": "Description",
   "Done": "Terminer",
+  "Edit": "Écriture",
   "Email": "Adresse courriel",
   "Error occurred": "Une erreur est survenue",
   "Help": "Aide",

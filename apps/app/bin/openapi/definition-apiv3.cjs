@@ -130,7 +130,7 @@ module.exports = {
     },
     {
       name: 'Public API',
-      tags: ['Healthcheck', 'Statistics', '', '', '', '', '', ''],
+      tags: ['Healthcheck', 'Statistics', 'AiUsage', '', '', '', '', '', ''],
     },
   ],
 };

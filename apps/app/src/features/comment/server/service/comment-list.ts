@@ -1,3 +1,4 @@
+import { isRevisionOfPage } from '~/server/util/is-revision-of-page';
 import type { PrismaClient } from '~/utils/prisma';
 
 import type { CommentListRow } from '../serializers/to-comment-list-item';
@@ -34,7 +35,7 @@ const resolveCreatedBefore = async (
     where: { id: revisionId },
     select: { pageId: true, createdAt: true },
   });
-  if (revision == null || revision.pageId !== pageId) {
+  if (!isRevisionOfPage(revision, pageId)) {
     return { kind: 'revision-not-found' };
   }
 

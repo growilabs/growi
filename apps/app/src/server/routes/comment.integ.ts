@@ -411,7 +411,21 @@ describe('/comments.get share-link authorization (integration)', () => {
       expect(res.body.comments[0]._id).toBe(commentAId.toString());
     });
 
-    it('still honors revision_id outside a share context', async () => {
+    it('honors revision_id outside a share context when the revision belongs to the page', async () => {
+      currentUser = { _id: new ObjectId() };
+      accessSpy.mockResolvedValue(true);
+
+      const res = await request(app)
+        .get('/comments.get')
+        .query({ page_id: pageAId.toString(), revision_id: revAId.toString() });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.comments).toHaveLength(1);
+      expect(res.body.comments[0]._id).toBe(commentAId.toString());
+    });
+
+    it('does not return another page comments when revision_id belongs to a different page', async () => {
       currentUser = { _id: new ObjectId() };
       accessSpy.mockResolvedValue(true);
 
@@ -421,9 +435,8 @@ describe('/comments.get share-link authorization (integration)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.ok).toBe(true);
-      // non-shared revision_id path is preserved -> resolves page B's comment
       expect(res.body.comments).toHaveLength(1);
-      expect(res.body.comments[0]._id).toBe(commentBId.toString());
+      expect(res.body.comments[0]._id).toBe(commentAId.toString());
     });
 
     it('denies an authenticated viewer who cannot access the page', async () => {

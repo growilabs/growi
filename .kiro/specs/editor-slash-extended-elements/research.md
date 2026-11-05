@@ -84,16 +84,16 @@ Research Needed の各項目を設計で次のとおり確定した（詳細は 
 - **結論**: `$lsx()` は「現在ページ配下の一覧」として正常にレンダリングされる。設計の既定雛形 `$lsx()`（カーソル括弧内）は妥当で、**`$lsx(/)` 等への変更は不要**。
 - **影響**: `$lsx()`（引数なし）の描画妥当性は確認済み。
 
-> **注（スコープ拡張後の位置づけ）**: 当初は lsx を静的ビルダー `lsxInsertion`（`$lsx()` 雛形挿入）で実装する設計だったが、スコープ拡張により **lsx は設定モーダル**へ変更された（下記「スコープ拡張に伴う追加調査」参照）。本検証結果は引き続き有効で、**lsx モーダルでオプション未指定（全空）時に出力する `$lsx()` が現在ページ配下一覧として正常描画される**ことの裏付けとなる（Req 3.4）。静的 `lsxInsertion` ビルダーは廃止。
+> **注**: lsx はスコープ拡張時に一度「設定モーダル」案になったが、**最終的に静的挿入（`$lsx()` を挿入しカーソルをカッコ内に置く `lsxInsertion`）に戻した** — `$lsx()` はインライン可の growi ディレクティブで、専用モーダルは過剰と判断したため（オプションはユーザーがカッコ内に手入力）。本検証結果（引数なし `$lsx()` が現在ページ配下一覧として正常描画される）は引き続き有効。
 
 ## 状態
-- 本スペックの残ギャップ・確認事項は解消。残る前提は **基盤 `editor-slash-command` のインタフェース凍結**（design.md「着手前提条件」）のみ。設計修正は不要。
+- 本スペックの残ギャップ・確認事項は解消。基盤 `editor-slash-command` は実装済みで、そのインタフェース（`insert | run`）を消費する。
 
 ---
 
-# スコープ拡張に伴う追加調査（モーダル起動・callout 初期スコープ化・lsx 設定モーダル）
+# スコープ拡張に伴う追加調査（モーダル起動・callout 初期スコープ化・lsx）
 
-ステークホルダー要望により、本スペックのスコープを次のとおり拡張した（要望: drawio 等のモーダル起動を含める／callout を初期スコープに入れ tip・warning 等を選べるように／lsx も詳細設定可能なモーダルを作る）。これに伴い実コードを再調査した。
+ステークホルダー要望により、本スペックのスコープを次のとおり拡張した（要望: drawio 等のモーダル起動を含める／callout を初期スコープに入れ tip・warning 等を選べるように／lsx を扱えるように）。lsx は当初「設定モーダル」案としたが、後述のとおり最終的に `$lsx()` の静的挿入に落ち着いた。これに伴い実コードを再調査した。
 
 ## 追加で検証した事実（コードベース実機確認）
 
@@ -103,8 +103,8 @@ Research Needed の各項目を設計で次のとおり確定した（詳細は 
 - 書き戻し: `replaceFocusedDrawioWithEditor(editor, xml)`（`apps/app/src/client/components/PageEditor/markdown-drawio-util-for-editor.ts`）が ` ```drawio ` フェンスを `editor.dispatch`。既存ブロック内なら置換、なければカーソル位置に挿入。
 - **結論**: packages/editor から `open(editorKey)` を呼べばモーダルが起動し挿入もモーダルが行う。**apps/app への逆依存なし**で `/drawio` をモーダル起動にできる。ツールバー `DiagramButton` は `editorKey` を prop で受けて同フックを呼ぶ（合成点の `editorKey` 取得経路の参考）。
 
-### lsx（設定モーダルは新規。オプション仕様は確定）
-- 設定 UI は**存在しない**（記法のみ）。drawio パターンに倣い新規作成する。
+### lsx（静的 `$lsx()` 挿入。オプション仕様は確定）
+- 専用 UI は設けない。`$lsx()` はインライン可の growi ディレクティブなので、`$lsx()` を静的挿入してカーソルをカッコ内に置くだけでよい（オプションはユーザーが手入力）。以下のオプション仕様は手入力時の参考。
 - オプション（`packages/remark-lsx`）:
   - `prefix`（位置指定パス。`prefix=` 明示も可）。既定は現在ページパス（renderer フォールバック）。
   - `num`: 整数 or 範囲（`10` / `2-5`）。
@@ -113,7 +113,7 @@ Research Needed の各項目を設計で次のとおり確定した（詳細は 
   - `reverse`: `true`/`false`（既定 false）。
   - `filter` / `except`: 正規表現文字列。
 - 文字列形式: `$lsx(/path, num=10, depth=1-2, sort=createdAt, reverse=true, filter=^x, except=y)`。全空は `$lsx()`。
-- 不正値の検出はサーバ側 list-pages のバリデーションが担う（本スペックはフォーム→文字列生成のみ）。
+- 不正値の検出はサーバ側 list-pages のバリデーションが担う（本スペックは `$lsx()` の静的挿入のみで、オプション文字列の組み立ては行わない）。
 
 ### callout（対応済み・初期スコープへ）
 - 記法: `:::type[label]` … `:::`（remark-directive、`apps/app/src/features/callout/services/callout.ts`）。GitHub 風 `> [!NOTE]` も `remark-github-admonitions-to-directives` で同等に変換。
@@ -122,17 +122,16 @@ Research Needed の各項目を設計で次のとおり確定した（詳細は 
 - 変種の真実源は当初 apps/app（`features/callout/services/consts.ts` の `AllCallout`）にあり、packages/editor は apps/app を import できない。
   - **設計判断（レビュー後に採用）**: 真実源 `AllCallout` / `Callout` を **`@growi/core` へ移動**し、apps/app 描画側と packages/editor スラッシュコマンド側が同一定義を import する（二重管理・drift を解消）。consts.ts は @growi/core からの再エクスポートに置換（既存 import は無修正）。import 元は2ファイルのみ（`callout.ts` / `CalloutViewer.tsx`）で影響範囲は小さい。@growi/core は公開パッケージのため changeset が必要。
 
-## 設計上の重要な帰結: 基盤アクションモデルの一般化（前提ゲート）
-- 基盤の `SlashCommand` は `buildInsertion`（静的テキスト挿入）専用で、**モーダル起動という副作用を表現できない**。
-- → 基盤のアクションを `SlashCommandAction = insert | run` の判別共用体へ一般化する必要がある（基盤の所有。本スペックの実装前提ゲート）。`run` は基盤 `apply` が `/query` 削除後に呼ぶ汎用副作用フックで、基盤は drawio/lsx を知らない。
-- drawio/lsx の `run` は React フックでモーダルオープナー + `editorKey` を束縛して生成するため、コマンド集合の**合成点が静的配列から React フック合成へ変わる**（基盤の合成点も React レイヤである前提）。
+## 設計上の重要な帰結: 基盤アクションモデルの一般化（実装済み・消費するのみ）
+- 基盤の `SlashCommand` が `buildInsertion`（静的テキスト挿入）専用だと**モーダル起動という副作用を表現できない**ため、基盤のアクションは `SlashCommandAction = insert | run` の判別共用体へ一般化された。これは**実装済み基盤が既に提供**しており、本スペックは消費するのみ（`run` は基盤 `apply` が `/query` 削除後に呼ぶ汎用副作用フックで、基盤は drawio を知らない）。
+- drawio の `run` は React フックでモーダルオープナー + `editorKey` を束縛して生成するため、コマンド集合の**合成点が静的配列から React フック合成へ変わる**（基盤の合成点も React レイヤである前提）。lsx はモーダルを持たず `$lsx()` を静的挿入する insert コマンドなので run/`editorKey` は不要。
 
 ## 実装アプローチの更新
 - **drawio**: 既存モーダルを再利用（`run` → `open(editorKey)`）。プレーンフェンス即挿入は廃止（モーダル起動が要望）。
-- **lsx**: 新規設定モーダル（`run` → 新規 `open(editorKey)`）。editor 側トリガーフック + apps/app 側 UI + `$lsx` ビルダー + 書き戻しユーティリティ。
+- **lsx**: `$lsx()` を静的挿入する insert コマンド（カーソルはカッコ内）。`$lsx()` はインライン可の `@growi/remark-growi-directive` ディレクティブなので、モーダル・行頭正規化・`disallowedIn` はいずれも不要。オプションはユーザーがカッコ内に手入力する。
 - **plantuml**: 変更なし（`insert`、フェンス雛形）。
 - **callout**: `insert`、`CALLOUT_VARIANTS` から7コマンドをデータ駆動生成（`:::type` 記法、カーソルは本文行）。
 
 ## Effort / Risk（更新）
-- **Effort: M（lsx 設定モーダル新規 + 基盤アクションモデル一般化を含むため S→M）**。drawio は既存再利用で小、plantuml/callout は静的挿入で小、lsx モーダルが最大の新規。
-- **Risk: 中**。基盤アクションモデル変更（基盤スペックにも反映が必要）と合成点の `editorKey` 配線が主リスク。callout 変種の真実源 drift は drift テスト/コメントで緩和。
+- **Effort: S〜M**。基盤アクションモデル（`insert | run`）は実装済みで消費するのみ。drawio は既存モーダル再利用、plantuml/callout/lsx は静的挿入でいずれも小。合成点への注入配線と（drawio 用の）`editorKey` 配線が主な作業。
+- **Risk: 低〜中**。基盤アクションモデルは実装済みのため変更リスクはなく、主リスクは合成点の `editorKey` 配線（drawio 用）。callout 変種の真実源 drift は `Record<Callout,…>` の型チェックで緩和。

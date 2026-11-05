@@ -9,7 +9,7 @@ export const getEditorTheme = async (
     case 'eclipse':
       return (await import('./eclipse.js')).eclipse;
     case 'basic':
-      return (await import('cm6-theme-basic-light')).basicLight;
+      return (await import('./basic-light.js')).basicLight;
     case 'ayu':
       return (await import('./ayu.js')).ayu;
     case 'rosepine':

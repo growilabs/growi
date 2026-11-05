@@ -91,7 +91,7 @@ export const CodeMirrorEditor = (props: Props): JSX.Element => {
     cmProps,
   );
 
-  useDefaultExtensions(codeMirrorEditor);
+  useDefaultExtensions(codeMirrorEditor, editorKey);
   useEditorSettings(codeMirrorEditor, editorSettings, onSave);
 
   useShowTableIcon(codeMirrorEditor);

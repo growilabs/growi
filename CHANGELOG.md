@@ -1,8 +1,98 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.6...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.9...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.9](https://github.com/growilabs/compare/v8.0.8...v8.0.9) - 2026-11-04
+
+### 💎 Features
+
+* feat(ai-chat): make the AI chat sidebar resizable (#12082) @miya
+* feat(ai-usage): record AI usage for chat, suggest-path and title generation and expose it through a public API (#12089) @yuki-takei
+
+### 🚀 Improvement
+
+* imprv(page): Judge page deletion authority in one place for every user request (#12182) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(page): Respect page deletion permission settings when deleting pages and emptying the trash (#12163) @yuki-takei
+* fix(share-links): validate expiredAt against the current time per request (#12118) @yuki-takei
+* fix(share-links): read the real admin field in the DELETE /:id bypass (#12122) @yuki-takei
+* fix(rate-limiter): match auth route paths consistently (#12127) @yuki-takei
+* fix: Page path checks hang on paths with many slashes (#12159) @yuki-takei
+* fix(opentelemetry): anonymize http.url as well as http.target (#12151) @yuki-takei
+* fix(opentelemetry): anonymize non-ASCII page paths (#12123) @jay23606
+* fix(opentelemetry): rule-driven HTTP anonymization with a coverage table kept in sync by tests (#12158) @yuki-takei
+* fix(page): keep a page on the tree when a rename fails midway (#11917) @arvid-e
+* fix(page): close the remaining gaps in the failed-rename rollback (#12150) @yuki-takei
+* fix(core): Treat page paths literally when omitting pages under other selected pages (#12176) @yuki-takei
+* fix: Bookmark listings return 500 for users whose folders contain null bookmark ids (#12167) @yuki-takei
+* fix(share): Show the shared page when navigating to a share link from another page (#12142) @yuki-takei
+* fix(math): Prevent live preview from breaking due to incomplete math blocks (#12075) @yotatameguchi-boop
+* fix(presentation): disable Marp CSS minification to avoid a crash on … (#12157) @y-oda-nipponrick
+* fix(editor): Rename the PlantUML slash command label (#12174) @Ryosei-Fukushima
+
+### 🧰 Maintenance
+
+* support: prisma page bulk export job model  (#12096) @mizozobu
+* support: page bulk export page snapshot model (#12170) @mizozobu
+* chore(deps): bump @playwright/test to 1.64.1 for Ubuntu 26.04 support (#12129) @yuki-takei
+* ci(deps): Bump qs from 6.13.0 to 6.17.0 (#12164) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump body-parser from 1.20.6 to 1.20.9 (#12130) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump zod from 4.4.3 to 4.6.6 (#12135) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): Bump vite from 6.4.3 to 6.4.4 (#12109) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): Bump vite from 6.4.4 to 6.4.5 (#12190) @[dependabot[bot]](https://github.com/apps/dependabot)
+
+## [v8.0.8](https://github.com/growilabs/compare/v8.0.7...v8.0.8) - 2026-10-22
+
+### 🔒 Security
+
+* Rebuild the Docker image on Node.js 24.22.1, which fixes 10 vulnerabilities including a Brotli decoder RCE (CVE-2026-111497) and TLS hostname verification bypasses (CVE-2026-105483, CVE-2026-106069). Users running the official Docker image should pull the new image and redeploy. See https://nodejs.org/en/blog/vulnerability/october-2026-security-releases
+
+### 🧰 Maintenance
+
+### 💎 Features
+
+* feat(ai): Enable Anthropic prompt caching (#12087) @yuki-takei
+* feat: Add GROWI extended elements to the slash command (#12062) @Ryosei-Fukushima
+
+### 🚀 Improvement
+
+* imprv: Unify env-var-only storage settings across AWS, GCS and Azure (#12074) @yotatameguchi-boop
+
+### 🐛 Bug Fixes
+
+* fix(core): compare own keys in deep equality (#12081) @yotatameguchi-boop
+* fix: prevent Mermaid swimlane rendering race (#12065) @krishgera
+
+### 🧰 Maintenance
+
+* fix(test): deliver selectionchange asynchronously in component tests (#12088) @yuki-takei
+* chore(test): Bump local MongoMemoryServer binary to 8.0.13 (#12078) @yuki-takei
+* ci(deps): Bump next from 16.3.3 to 16.4.1 (#12069) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci: pass GLIBC_TUNABLES rseq=1 to MongoDB for the Linux 7.0 runner kernel (#12091) @yuki-takei
+
+## [v8.0.7](https://github.com/growilabs/compare/v8.0.6...v8.0.7) - 2026-10-07
+
+### 🚀 Improvement
+
+* imprv: Use isRevisionOfPage for the existing revision/page checks (#12054) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix(page): Reject empty or non-member user groups when creating or updating group-restricted pages (#12050) @yuki-takei
+* fix(page): Keep /user and the top page public even when changed through the grant API (#12051) @yuki-takei
+* fix(app): Ensure the user home page exists when user creation/activation completes (#12017) @yuki-takei
+
+### 🧰 Maintenance
+
+* support(ci): push slackbot-proxy release image to Artifact Registry (#12033) @yuki-takei
+* ci(slackbot-proxy): use Workload Identity Federation for Google Cloud auth (#12039) @yuki-takei
+* ci(deps): Bump @opentelemetry/instrumentation-mongoose from 0.63.0 to 0.67.0 (#12038) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump compression from 1.7.4 to 1.8.2 (#12037) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): Bump katex from 0.16.47 to 0.18.2 (#12036) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v8.0.6](https://github.com/growilabs/compare/v8.0.5...v8.0.6) - 2026-10-05
 
@@ -70,7 +160,7 @@
 ### 🐛 Bug Fixes
 
 * fix: Clean pages automatically using cron job (#11513) @arvid-e
-* fix(page-bulk-export): Embed attachment images in exported PDFs (RELAY mode) (#11859) @yuki-takei
+* fix(page-bulk-export): Embed attachment images in exported PDFs (RELAY mode) (#11859) @yuki-takei @gucchy55
 * fix: Enforce access control on revision-by-id and attachment-by-id apiv3 routes (#11810) @yuki-takei
 
 ## [v8.0.2](https://github.com/growilabs/compare/v8.0.1...v8.0.2) - 2026-08-25
@@ -97,6 +187,8 @@
 * fix: Report a conflict when renaming a page with a stale revisionId (#11680) @yuki-takei
 * fix: Links to pages with non-ASCII paths reload the whole document (#11687) @yuki-takei
 * fix: Page created at a path with a leftover redirect was not reachable at that path (#11683) @yuki-takei
+* fix: Handle unavailable source pages when duplicating (#11753) @krishgera
+* fix: return canonical errors when renaming unavailable pages (#11615) @krishgera
 
 ### 🧰 Maintenance
 
@@ -193,6 +285,8 @@
 * fix(import): Harden admin data import (re-enable button on failure, await import) (#11474) @yuki-takei
 * fix: Prevent blank screen when Next.js falls back to the error page (#11423) @yuki-takei
 * fix: Prevent PageSelectModal infinite render loop (#11422) (#11428) @yuki-takei
+* fix(auth): LDAP login stays on login page until manual reload (#11386) @hamataku
+* fix(i18n): Pass user locale to FormattedDistanceDate (#11376) @mahirhir
 
 ## [v7.5.6](https://github.com/growilabs/compare/v7.5.5...v7.5.6) - 2026-06-25
 
@@ -214,7 +308,7 @@
 * fix: Suppress modifier shortcuts in editable elements (#11340) @yuki-takei
 * fix: escape </style> breakout in renderCustomCss (#11298) @yuki-takei
 * fix: Use req.user.username in LDAP Execute Sync instead of req.user.name (#11356) @yuki-takei
-* feat(page-bulk-export): Rework bulk PDF/HTML export to render Markdown like the web (tables, math, emoji, directives) (#11288) @yuki-takei
+* feat(page-bulk-export): Rework bulk PDF/HTML export to render Markdown like the web (tables, math, emoji, directives) (#11288) @yuki-takei @bondICha
 
 ### 🧰 Maintenance
 

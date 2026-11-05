@@ -17,6 +17,7 @@
 |---|---|---|
 | [growi-vault](../specs/growi-vault/) | resilience / reconcile 完了、ha は brief 段階 | [roadmap.md](../specs/growi-vault/roadmap.md) |
 | [editor-commands](../specs/editor-commands/) | spec 整備中（slash-command は tasks 生成済み、extended-elements / selection-palette は WIP） | [roadmap.md](../specs/editor-commands/roadmap.md) |
+| [ai-usage](../specs/ai-usage/) | sub-spec 3 本（計測の中核・GROWI.cloud 連携・fair-use 上限）に分割。計測の中核は spec-init 済み | [roadmap.md](../specs/ai-usage/roadmap.md) |
 | [i18n](../specs/i18n/) | sub-spec 2 本（検出ゲート・コミュニティ翻訳導線）は実装完了。翻訳ファイル構成の整理方式（namespace 再編かコンパイラ移行か）が未決のまま残っており、umbrella はその判断待ちで継続中 | [roadmap.md](../specs/i18n/roadmap.md) |
 
 ---

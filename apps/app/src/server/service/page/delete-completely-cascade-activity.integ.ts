@@ -47,7 +47,6 @@ import {
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type Crowi from '~/server/crowi';
 import { AttachmentType } from '~/server/interfaces/attachment';
-import { Attachment } from '~/server/models/attachment';
 import type { PageModel } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
@@ -119,8 +118,10 @@ describe('deleteCompletely — cascade attachment removal activities (read back 
 
   afterAll(async () => {
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
-    await Attachment.deleteMany({
-      originalName: { $in: ATTACHMENT_FIXTURES.map((f) => f.originalName) },
+    await prisma.attachments.deleteMany({
+      where: {
+        originalName: { in: ATTACHMENT_FIXTURES.map((f) => f.originalName) },
+      },
     });
     await Page.deleteMany({ path: PAGE_PATH });
     await crowi.models.User.deleteMany({ username: TEST_USERNAME });
@@ -155,17 +156,21 @@ describe('deleteCompletely — cascade attachment removal activities (read back 
         status: Page.STATUS_PUBLISHED,
       },
     ]);
-    const attachments = await Attachment.insertMany(
-      ATTACHMENT_FIXTURES.map((fixture) => ({
-        page: page._id,
-        creator: testUserId,
-        // fileName is globally unique — suffix with a fresh ObjectId
-        fileName: `delete-completely-cascade-integ-${new Types.ObjectId().toHexString()}.dat`,
-        fileFormat: 'application/octet-stream',
-        fileSize: fixture.fileSize,
-        originalName: fixture.originalName,
-        attachmentType: AttachmentType.WIKI_PAGE,
-      })),
+    const attachments = await Promise.all(
+      ATTACHMENT_FIXTURES.map((fixture) =>
+        prisma.attachments.create({
+          data: {
+            pageId: page._id.toString(),
+            creatorId: testUserId.toString(),
+            // fileName is globally unique — suffix with a fresh ObjectId
+            fileName: `delete-completely-cascade-integ-${new Types.ObjectId().toHexString()}.dat`,
+            fileFormat: 'application/octet-stream',
+            fileSize: fixture.fileSize,
+            originalName: fixture.originalName,
+            attachmentType: AttachmentType.WIKI_PAGE,
+          },
+        }),
+      ),
     );
 
     // Act: the REAL complete-deletion path. Non-recursive v5 deleteCompletely
@@ -228,8 +233,8 @@ describe('deleteCompletely — cascade attachment removal activities (read back 
     // back above still hold the pre-deletion data — the only way that holds
     // is if the snapshot was taken before removal.
     expect(
-      await Attachment.countDocuments({
-        _id: { $in: attachments.map((attachment) => attachment._id) },
+      await prisma.attachments.count({
+        where: { id: { in: attachments.map((attachment) => attachment._id) } },
       }),
     ).toBe(0);
     expect(await Page.findById(page._id)).toBeNull();

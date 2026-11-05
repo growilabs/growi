@@ -296,6 +296,35 @@ describe('POST /_api/v3/inline-comments', () => {
     }
   });
 
+  it('returns 400 and stores nothing when anchorOriginRevisionId is a revision of another page', async () => {
+    const otherPageId = new Types.ObjectId().toString();
+    const otherRevision = await prisma.revisions.create({
+      data: {
+        id: String(new Types.ObjectId()),
+        pageId: otherPageId,
+        body: 'other page body',
+        format: 'markdown',
+        authorId: String(owner._id),
+      },
+    });
+    const before = await prisma.comments.count({
+      where: { anchorOriginRevisionId: otherRevision.id },
+    });
+
+    const res = await request(app)
+      .post('/_api/v3/inline-comments')
+      .send({ ...validBody(), anchorOriginRevisionId: otherRevision.id });
+
+    expect(res.status).toBe(400);
+    expect(
+      await prisma.comments.count({
+        where: { anchorOriginRevisionId: otherRevision.id },
+      }),
+    ).toBe(before);
+
+    await prisma.revisions.deleteMany({ where: { id: otherRevision.id } });
+  });
+
   it('returns 400 when anchor.quote is empty (service precondition)', async () => {
     const res = await request(app)
       .post('/_api/v3/inline-comments')

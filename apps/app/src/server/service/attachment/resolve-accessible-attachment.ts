@@ -1,7 +1,9 @@
-import { getIdStringForRef, type IPage, type IUser } from '@growi/core';
+import type { IPage, IUser } from '@growi/core';
+import { objectIdUtils } from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 
-import { Attachment, type IAttachmentDocument } from '../../models/attachment';
+import type { attachments, Prisma } from '~/generated/prisma/client';
+import { prisma } from '~/utils/prisma';
 
 // TODO: remove this local interface when models/page has typescriptized
 export interface PageModel {
@@ -11,8 +13,31 @@ export interface PageModel {
   ) => Promise<boolean>;
 }
 
-export type ResolveAccessibleAttachmentResult =
-  | { attachment: IAttachmentDocument }
+/**
+ * Derived via an instantiation expression (`typeof prisma.attachments
+ * .findUnique<...>`) against the real extended client method, rather than
+ * hand-reconstructed from `Prisma.attachmentsGetPayload`: the latter is
+ * bound to the pre-extension `$attachmentsPayload` and does not know about
+ * the `result.attachments` extension's computed fields (`_id`, `__v`,
+ * `filePathProxied`, ...) added in `models/attachment.ts`.
+ */
+export type AttachmentWithInclude<
+  T extends Prisma.attachmentsInclude | undefined,
+> = NonNullable<
+  Awaited<
+    ReturnType<
+      typeof prisma.attachments.findUnique<{
+        where: { id: string };
+        include: T;
+      }>
+    >
+  >
+>;
+
+export type ResolveAccessibleAttachmentResult<
+  T extends Prisma.attachmentsInclude | undefined = undefined,
+> =
+  | { attachment: AttachmentWithInclude<T> }
   | { errorCode: 'not_found' | 'forbidden' };
 
 /**
@@ -27,35 +52,44 @@ export type ResolveAccessibleAttachmentResult =
  * the same permission check without a second per-id `findById`.
  */
 export const isAttachmentAccessibleToViewer = async (
-  attachment: IAttachmentDocument,
+  attachment: attachments,
   user: IUser | undefined,
   isSharedPage: boolean,
 ): Promise<boolean> => {
-  if (isSharedPage || attachment.page == null) {
+  if (isSharedPage || attachment.pageId == null) {
     return true;
   }
 
   const Page = mongoose.model<IPage, PageModel>('Page');
-  return Page.isAccessiblePageByViewer(
-    getIdStringForRef(attachment.page),
-    user,
-  );
+  return Page.isAccessiblePageByViewer(attachment.pageId, user);
 };
 
 /**
  * Fetches an attachment by id and checks whether the viewer may access it.
  */
-export const resolveAccessibleAttachment = async (
+export const resolveAccessibleAttachment = async <
+  T extends Prisma.attachmentsInclude | undefined = undefined,
+>(
   attachmentId: string,
   user: IUser | undefined,
   isSharedPage: boolean,
-  populate?: string,
-): Promise<ResolveAccessibleAttachmentResult> => {
-  const attachment = await Attachment.findById(
-    attachmentId,
-    undefined,
-    populate != null ? { populate } : undefined,
-  );
+  include?: T,
+): Promise<ResolveAccessibleAttachmentResult<T>> => {
+  // Prisma throws on a non-24-hex ObjectId instead of returning null
+  if (!objectIdUtils.isValidObjectId(attachmentId)) {
+    return { errorCode: 'not_found' };
+  }
+
+  // This call's own inferred return type and `AttachmentWithInclude<T>` are
+  // two separate instantiations of the same distributive conditional type
+  // (Prisma's payload type) and are not structurally unified by the compiler
+  // while `T` stays abstract inside this generic function body. The cast
+  // bridges that TS limitation; the runtime value is unaffected — it is the
+  // same object either way.
+  const attachment = (await prisma.attachments.findUnique({
+    where: { id: attachmentId },
+    include,
+  })) as AttachmentWithInclude<T> | null;
 
   if (attachment == null) {
     return { errorCode: 'not_found' };
