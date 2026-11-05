@@ -25,7 +25,7 @@ export type AuditLogBulkExportJobStatus =
 
 export interface IAuditLogBulkExportRequestFilters {
   usernames?: string[];
-  actions?: SupportedActionType[];
+  actions?: SupportedActionType[] | null;
   dateFrom?: Date;
   dateTo?: Date;
 }
