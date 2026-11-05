@@ -77,7 +77,7 @@
   "in_app_notification": {
     "notification_list": "In-App Notification List",
     "see_all": "See All",
-    "no_notification": "You don't have any notificatios.",
+    "no_notification": "You don't have any notifications.",
     "all": "All",
     "unopend": "Unread",
     "mark_all_as_read": "Mark all as read",

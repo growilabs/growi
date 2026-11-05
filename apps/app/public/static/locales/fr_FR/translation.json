@@ -277,7 +277,7 @@
     "password_is_not_set": "Mot de passe non saisi"
   },
   "share_links": {
-    "Shere this page link to public": "Partager cette page publiquement",
+    "Share this page link to public": "Partager cette page publiquement",
     "share_link_list": "Liens de partage",
     "share_link_management": "Liens de partage",
     "delete_all_share_links": "Supprimer tout les liens de partage",
