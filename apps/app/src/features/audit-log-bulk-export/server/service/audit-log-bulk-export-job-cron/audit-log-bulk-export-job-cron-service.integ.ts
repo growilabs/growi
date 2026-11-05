@@ -512,7 +512,7 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
           AuditLogBulkExportJobStatus.uploading,
         );
         expect(updatedJob?.totalExportedCount).toBeGreaterThan(initialCount);
-        expect(updatedJob?.lastExportedId).toBeDefined();
+        expect(updatedJob?.lastExportedId).not.toBeNull();
 
         const totalActivities = await Activity.countDocuments({});
         expect(updatedJob?.totalExportedCount).toBeLessThanOrEqual(
@@ -737,6 +737,21 @@ describe('AuditLogBulkExportJobCronService Integration Test', () => {
           where: { id: job.id },
         });
         expect(finalJob?.status).toBe(AuditLogBulkExportJobStatus.completed);
+
+        // The completion notice must reach the job owner.
+        expect(mockActivityService.createActivity).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: SupportedAction.ACTION_AUDIT_LOG_BULK_EXPORT_COMPLETED,
+            user: testUser._id.toString(),
+            target: expect.objectContaining({ id: job.id }),
+          }),
+        );
+        expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+          'updated',
+          expect.anything(),
+          expect.objectContaining({ id: job.id }),
+          expect.anything(),
+        );
       });
     });
 

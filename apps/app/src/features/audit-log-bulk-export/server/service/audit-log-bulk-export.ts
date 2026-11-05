@@ -82,7 +82,8 @@ class AuditLogBulkExportService implements IAuditLogBulkExportService {
     restartJob?: boolean,
   ): Promise<string> {
     const filters: IAuditLogBulkExportFilters = {
-      actions: requestFilters.actions,
+      // Prisma rejects null for the `actions String[]` composite field.
+      actions: requestFilters.actions ?? [],
       dateFrom: requestFilters.dateFrom,
       dateTo: requestFilters.dateTo,
     };

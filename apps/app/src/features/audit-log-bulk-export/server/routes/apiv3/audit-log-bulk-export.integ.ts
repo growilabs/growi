@@ -298,7 +298,7 @@ describe('POST /_api/v3/audit-log-bulk-export', () => {
     it.each([
       ['null', { actions: null }],
       ['omitted', {}],
-    ])('passes an empty actions array to the service when filters.actions is %s', async (_label, filters) => {
+    ])('accepts a request whose filters.actions is %s', async (_label, filters) => {
       createOrReset.mockResolvedValueOnce('job-789');
 
       const app = buildApp();
@@ -307,7 +307,7 @@ describe('POST /_api/v3/audit-log-bulk-export', () => {
         .send({ filters });
 
       expect(res.status).toBe(201);
-      expect(createOrReset.mock.calls[0][0]).toMatchObject({ actions: [] });
+      expect(res.body.jobId).toBe('job-789');
     });
 
     it('returns 400 when actions is not an array', async () => {

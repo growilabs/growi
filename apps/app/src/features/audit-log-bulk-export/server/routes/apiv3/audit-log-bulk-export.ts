@@ -76,17 +76,9 @@ export const factory = (crowi: Crowi): Router => {
         restartJob,
       } = req.body;
 
-      // The validator accepts `actions: null`, but Prisma rejects null for the
-      // `actions String[]` composite field (create fails with "Unknown argument
-      // `actions`"). Normalize it to [] before the service.
-      const filters = {
-        ...requestFilters,
-        actions: requestFilters.actions ?? [],
-      };
-
       try {
         const jobId = await auditLogBulkExportService.createOrResetExportJob(
-          filters,
+          requestFilters,
           format,
           req.user?._id,
           restartJob,

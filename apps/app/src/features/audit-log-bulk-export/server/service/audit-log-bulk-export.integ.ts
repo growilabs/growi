@@ -103,6 +103,22 @@ describe('AuditLogBulkExportService', () => {
         });
       });
 
+      it.each([
+        ['null', null],
+        ['omitted', undefined],
+      ])('should create a job with no action filter when actions is %s', async (_label, actions) => {
+        const jobId = await auditLogBulkExportService.createOrResetExportJob(
+          { actions },
+          AuditLogBulkExportFormat.json,
+          user._id,
+        );
+
+        const createdJob = await prisma.auditlogbulkexportjobs.findUnique({
+          where: { id: jobId },
+        });
+        expect(createdJob?.filters.actions).toEqual([]);
+      });
+
       it('should create a job with user filters', async () => {
         const filters: { usernames: string[]; actions: SupportedActionType[] } =
           {
