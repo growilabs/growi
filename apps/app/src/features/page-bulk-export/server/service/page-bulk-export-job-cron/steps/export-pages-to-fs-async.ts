@@ -120,57 +120,70 @@ export async function getPageWritable(
     await fs.promises.writeFile(cssFilePath, renderer.getCss());
   }
 
+  const exportPage = async (page: PageSnapshot): Promise<void> => {
+    const revision = page.revision;
+    if (revision == null) {
+      return;
+    }
+
+    const markdownBody = revision.body;
+    const pathNormalized = `${normalizePath(page.path)}.${format}`;
+    const fileOutputPath = path.join(outputDir, pathNormalized);
+    const fileOutputParentPath = getParentPath(fileOutputPath);
+
+    await fs.promises.mkdir(fileOutputParentPath, { recursive: true });
+    if (pageBulkExportJob.format === PageBulkExportFormat.md) {
+      await fs.promises.writeFile(fileOutputPath, markdownBody);
+    } else {
+      // Render Markdown → sanitized HTML document linking the shared
+      // stylesheet (relative to this page) and wrapped in a .wiki container.
+      // If renderToHtml rejects, the error propagates to the write callback,
+      // letting the existing error-handling path update the job state (Req 3.2).
+      const cssHref = toRelativeHref(fileOutputPath, cssFilePath);
+      let htmlString: string;
+      try {
+        htmlString = await renderer.renderToHtml(markdownBody, cssHref);
+      } catch (renderErr) {
+        logger.warn(
+          'BulkExportMarkdownRenderer failed for page %s: %o',
+          page.path,
+          renderErr,
+        );
+        throw renderErr;
+      }
+      htmlString = await embedAttachmentImages(htmlString, {
+        fileOutputPath,
+        outputDir,
+        crowi: this.crowi,
+        exportingUser,
+        downloadTimeoutMs,
+        signal: abortController.signal,
+      });
+      await fs.promises.writeFile(fileOutputPath, htmlString);
+    }
+    await prisma.pagebulkexportjobs.update({
+      where: { id: pageBulkExportJob.id },
+      data: { lastExportedPagePath: page.path },
+    });
+  };
+
+  // Aborted when the Writable is destroyed (job cleanup), so a page still
+  // downloading attachment images stops instead of running on.
+  const abortController = new AbortController();
+  let pageInProgress: Promise<void> = Promise.resolve();
+
   return new Writable({
     objectMode: true,
-    write: async (page: PageSnapshot, _encoding, callback) => {
-      try {
-        const revision = page.revision;
-
-        if (revision != null) {
-          const markdownBody = revision.body;
-          const pathNormalized = `${normalizePath(page.path)}.${format}`;
-          const fileOutputPath = path.join(outputDir, pathNormalized);
-          const fileOutputParentPath = getParentPath(fileOutputPath);
-
-          await fs.promises.mkdir(fileOutputParentPath, { recursive: true });
-          if (pageBulkExportJob.format === PageBulkExportFormat.md) {
-            await fs.promises.writeFile(fileOutputPath, markdownBody);
-          } else {
-            // Render Markdown → sanitized HTML document linking the shared
-            // stylesheet (relative to this page) and wrapped in a .wiki container.
-            // If renderToHtml rejects, the error propagates to callback(err) below,
-            // letting the existing error-handling path update the job state (Req 3.2).
-            const cssHref = toRelativeHref(fileOutputPath, cssFilePath);
-            let htmlString: string;
-            try {
-              htmlString = await renderer.renderToHtml(markdownBody, cssHref);
-              htmlString = await embedAttachmentImages(htmlString, {
-                fileOutputPath,
-                outputDir,
-                crowi: this.crowi,
-                exportingUser,
-                downloadTimeoutMs,
-              });
-            } catch (renderErr) {
-              logger.warn(
-                'BulkExportMarkdownRenderer failed for page %s: %o',
-                page.path,
-                renderErr,
-              );
-              throw renderErr;
-            }
-            await fs.promises.writeFile(fileOutputPath, htmlString);
-          }
-          await prisma.pagebulkexportjobs.update({
-            where: { id: pageBulkExportJob.id },
-            data: { lastExportedPagePath: page.path },
-          });
-        }
-      } catch (err) {
-        callback(err);
-        return;
-      }
-      callback();
+    write: (page: PageSnapshot, _encoding, callback) => {
+      pageInProgress = exportPage(page);
+      pageInProgress.then(() => callback(), callback);
+    },
+    destroy: (err, callback) => {
+      abortController.abort(err ?? undefined);
+      // cleanUpExportJobResources removes the output dir once this stream
+      // emits 'close'; holding 'close' until the page in progress settles
+      // keeps a download that is winding down from writing into it again.
+      Promise.allSettled([pageInProgress]).then(() => callback(err));
     },
     final: async (callback) => {
       try {

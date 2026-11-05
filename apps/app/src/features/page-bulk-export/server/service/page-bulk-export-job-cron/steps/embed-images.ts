@@ -98,6 +98,7 @@ export async function embedAttachmentImages(
     crowi,
     exportingUser,
     downloadTimeoutMs,
+    signal,
   }: {
     /** absolute path the HTML will be written to (used to compute the
      * relative href to ASSETS_DIRNAME) */
@@ -113,6 +114,9 @@ export async function embedAttachmentImages(
     /** upper bound for downloading a single attachment, storage request
      * included; an image that takes longer is left out of the PDF */
     downloadTimeoutMs: number;
+    /** aborts when the export job is cleaned up; embedding then stops and
+     * rejects with `signal.reason` instead of skipping the image */
+    signal: AbortSignal;
   },
 ): Promise<string> {
   const matches = [...htmlString.matchAll(ATTACHMENT_IMG_SRC)];
@@ -133,11 +137,13 @@ export async function embedAttachmentImages(
     fileUploadService: crowi.fileUploadService,
     exportingUser,
     downloadTimeoutMs,
+    signal,
   };
   const replacements = new Map<string, string>();
   // One download at a time: with cloud storage every download is a network
   // request, and a page may reference hundreds of images.
   for (const attachment of attachments) {
+    signal.throwIfAborted();
     // biome-ignore lint/performance/noAwaitInLoops: downloads are deliberately sequential (see above)
     const assetFilePath = await prepareAsset(attachment, assetOptions);
     if (assetFilePath != null) {
@@ -163,13 +169,14 @@ type AssetOptions = {
   fileUploadService: Crowi['fileUploadService'];
   exportingUser: HydratedDocument<IUser> | undefined;
   downloadTimeoutMs: number;
+  signal: AbortSignal;
 };
 
 /**
  * Make sure the job has a local copy of `attachment` and return its path, or
  * `undefined` when the image is to be left out of the PDF (no access, not an
  * image, or the download failed). Best effort: a failure only drops this
- * image, never the page.
+ * image, never the page — unless the job itself is cancelled.
  */
 async function prepareAsset(
   attachment: AttachmentWithComputed,
@@ -178,6 +185,7 @@ async function prepareAsset(
     fileUploadService,
     exportingUser,
     downloadTimeoutMs,
+    signal,
   }: AssetOptions,
 ): Promise<string | undefined> {
   try {
@@ -213,11 +221,14 @@ async function prepareAsset(
         fileUploadService,
         attachment,
         assetFilePath,
-        AbortSignal.timeout(downloadTimeoutMs),
+        AbortSignal.any([signal, AbortSignal.timeout(downloadTimeoutMs)]),
       );
     }
     return assetFilePath;
   } catch (err) {
+    if (signal.aborted) {
+      throw signal.reason;
+    }
     logger.warn(
       'Failed to embed attachment image %s for bulk export: %o',
       attachment.id,

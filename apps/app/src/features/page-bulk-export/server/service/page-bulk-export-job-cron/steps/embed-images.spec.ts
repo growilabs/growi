@@ -18,6 +18,9 @@
  *  - A download that fails, or does not finish within `downloadTimeoutMs`,
  *    leaves that image's src untouched and no file behind; the page still
  *    exports.
+ *  - When the export job is cancelled (`signal` aborts), embedding stops:
+ *    the call rejects with the abort reason instead of skipping the image,
+ *    and no partial asset file is left behind.
  *  - Html with no attachment references is left untouched.
  */
 import fs from 'node:fs';
@@ -91,7 +94,10 @@ describe('embedAttachmentImages', () => {
   const embed = (
     html: string,
     fileUploadService: FileUploader,
-    { downloadTimeoutMs = 10_000 }: { downloadTimeoutMs?: number } = {},
+    {
+      downloadTimeoutMs = 10_000,
+      signal = new AbortController().signal,
+    }: { downloadTimeoutMs?: number; signal?: AbortSignal } = {},
   ) =>
     embedAttachmentImages(html, {
       fileOutputPath: path.join(outputDir, 'page.html'),
@@ -99,6 +105,7 @@ describe('embedAttachmentImages', () => {
       crowi: buildCrowi(fileUploadService),
       exportingUser,
       downloadTimeoutMs,
+      signal,
     });
 
   it('returns the html unchanged when it has no attachment image references', async () => {
@@ -352,6 +359,54 @@ describe('embedAttachmentImages', () => {
 
       expect(result).toBe(html);
       expect(fs.existsSync(assetPath(`${attachmentId}.png`))).toBe(false);
+    });
+  });
+
+  describe('job cancellation', () => {
+    beforeEach(() => {
+      vi.mocked(isAttachmentAccessibleToViewer).mockResolvedValue(true);
+      vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([
+        buildAttachment(),
+      ]);
+    });
+
+    it('stops a download in progress and rejects with the abort reason', async () => {
+      const controller = new AbortController();
+      const stalledReadable = new Readable({ read() {} });
+      const findDeliveryFile = vi.fn(() => {
+        setTimeout(() => controller.abort(new Error('job cleaned up')), 10);
+        return Promise.resolve(stalledReadable);
+      });
+
+      await expect(
+        embed(
+          htmlWithAttachment(attachmentId),
+          mock<FileUploader>({ findDeliveryFile }),
+          { signal: controller.signal },
+        ),
+      ).rejects.toThrow('job cleaned up');
+
+      expect(stalledReadable.destroyed).toBe(true);
+      expect(fs.existsSync(assetPath(`${attachmentId}.png`))).toBe(false);
+    });
+
+    it('does not start a download once the job has been cancelled', async () => {
+      const controller = new AbortController();
+      controller.abort(new Error('job cleaned up'));
+      const findDeliveryFile = vi.fn();
+
+      await expect(
+        embed(
+          htmlWithAttachment(attachmentId),
+          mock<FileUploader>({ findDeliveryFile }),
+          { signal: controller.signal },
+        ),
+      ).rejects.toThrow('job cleaned up');
+
+      expect(findDeliveryFile).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(outputDir, '_bulk-export-assets'))).toBe(
+        false,
+      );
     });
   });
 });
