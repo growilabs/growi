@@ -46,6 +46,11 @@ vi.mock('~/utils/prisma', () => {
   };
 });
 
+// getPageWritable reads the attachment download timeout once per job.
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: { getConfig: vi.fn().mockReturnValue(10_000) },
+}));
+
 type PageBulkExportPageSnapshotWithRevision =
   Prisma.pagebulkexportpagesnapshotsGetPayload<{
     include: { revision: true };

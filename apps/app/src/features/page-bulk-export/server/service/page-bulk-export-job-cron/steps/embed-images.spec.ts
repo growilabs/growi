@@ -13,6 +13,11 @@
  *  - Attachments are embedded regardless of the storage's response mode
  *    (RELAY / REDIRECT / DELEGATE only govern how the HTTP route answers a
  *    browser, not whether the server can read the file).
+ *  - Each attachment is looked up in one batched query and downloaded once,
+ *    one download at a time.
+ *  - A download that fails, or does not finish within `downloadTimeoutMs`,
+ *    leaves that image's src untouched and no file behind; the page still
+ *    exports.
  *  - Html with no attachment references is left untouched.
  */
 import fs from 'node:fs';
@@ -83,12 +88,17 @@ describe('embedAttachmentImages', () => {
   const assetPath = (fileName: string) =>
     path.join(outputDir, '_bulk-export-assets', fileName);
 
-  const embed = (html: string, fileUploadService: FileUploader) =>
+  const embed = (
+    html: string,
+    fileUploadService: FileUploader,
+    { downloadTimeoutMs = 10_000 }: { downloadTimeoutMs?: number } = {},
+  ) =>
     embedAttachmentImages(html, {
       fileOutputPath: path.join(outputDir, 'page.html'),
       outputDir,
       crowi: buildCrowi(fileUploadService),
       exportingUser,
+      downloadTimeoutMs,
     });
 
   it('returns the html unchanged when it has no attachment image references', async () => {
@@ -224,5 +234,124 @@ describe('embedAttachmentImages', () => {
     // The failure is caught and logged; the src is left untouched (best effort).
     expect(result).toBe(html);
     expect(fs.existsSync(assetPath(`${attachmentId}.png`))).toBe(false);
+  });
+
+  describe('downloads', () => {
+    const otherId = '000000000000000000000002';
+
+    beforeEach(() => {
+      vi.mocked(isAttachmentAccessibleToViewer).mockResolvedValue(true);
+    });
+
+    it('looks attachments up in one query and downloads each one once, one at a time', async () => {
+      vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([
+        buildAttachment(),
+        buildAttachment({ id: otherId }),
+      ]);
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const findDeliveryFile = vi.fn(async () => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        const readable = Readable.from(Buffer.from('binary-image-data'));
+        readable.once('end', () => {
+          inFlight -= 1;
+        });
+        return readable;
+      });
+      const html = `${htmlWithAttachment(attachmentId)}${htmlWithAttachment(otherId)}${htmlWithAttachment(attachmentId)}`;
+
+      const result = await embed(
+        html,
+        mock<FileUploader>({ findDeliveryFile }),
+      );
+
+      expect(result).not.toContain('/attachment/');
+      expect(prisma.attachments.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.attachments.findMany).toHaveBeenCalledWith({
+        where: { id: { in: [attachmentId, otherId] } },
+      });
+      expect(findDeliveryFile).toHaveBeenCalledTimes(2);
+      expect(maxInFlight).toBe(1);
+    });
+
+    it('leaves the src untouched when the storage cannot find the file', async () => {
+      vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([
+        buildAttachment(),
+      ]);
+      const html = htmlWithAttachment(attachmentId);
+
+      const result = await embed(
+        html,
+        mock<FileUploader>({
+          findDeliveryFile: vi
+            .fn()
+            .mockRejectedValue(new Error('does not exist in AWS S3')),
+        }),
+      );
+
+      expect(result).toBe(html);
+      expect(fs.existsSync(assetPath(`${attachmentId}.png`))).toBe(false);
+    });
+
+    it('still embeds the other images when one of them fails', async () => {
+      vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([
+        buildAttachment(),
+        buildAttachment({ id: otherId }),
+      ]);
+      const findDeliveryFile = vi.fn(async (attachment) =>
+        attachment.id === attachmentId
+          ? Promise.reject(new Error('does not exist in GCS'))
+          : Readable.from(Buffer.from('binary-image-data')),
+      );
+
+      const result = await embed(
+        `${htmlWithAttachment(attachmentId)}${htmlWithAttachment(otherId)}`,
+        mock<FileUploader>({ findDeliveryFile }),
+      );
+
+      expect(result).toBe(
+        `${htmlWithAttachment(attachmentId)}<p><img src="_bulk-export-assets/${otherId}.png" alt=""></p>`,
+      );
+    });
+
+    it('gives up on a download whose stream stalls past the timeout', async () => {
+      vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([
+        buildAttachment(),
+      ]);
+      const stalledReadable = new Readable({ read() {} });
+      const html = htmlWithAttachment(attachmentId);
+
+      const result = await embed(
+        html,
+        mock<FileUploader>({
+          findDeliveryFile: vi.fn().mockResolvedValue(stalledReadable),
+        }),
+        { downloadTimeoutMs: 50 },
+      );
+
+      expect(result).toBe(html);
+      expect(fs.existsSync(assetPath(`${attachmentId}.png`))).toBe(false);
+      expect(stalledReadable.destroyed).toBe(true);
+    });
+
+    it('gives up on a storage request that never answers within the timeout', async () => {
+      vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([
+        buildAttachment(),
+      ]);
+      const html = htmlWithAttachment(attachmentId);
+
+      const result = await embed(
+        html,
+        mock<FileUploader>({
+          findDeliveryFile: vi.fn(() => new Promise<never>(() => {})),
+        }),
+        { downloadTimeoutMs: 50 },
+      );
+
+      expect(result).toBe(html);
+      expect(fs.existsSync(assetPath(`${attachmentId}.png`))).toBe(false);
+    });
   });
 });

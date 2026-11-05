@@ -13,6 +13,7 @@ import {
   PageBulkExportJobStatus,
 } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import type { Prisma, pagebulkexportjobs } from '~/generated/prisma/client';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -107,6 +108,9 @@ export async function getPageWritable(
   // runs its per-attachment permission check as.
   const User = mongoose.model('User');
   const exportingUser = await User.findById(pageBulkExportJob.userId);
+  // Downloading an attachment is the read-side counterpart of uploading it,
+  // so it shares the storage transfer timeout operators already tune.
+  const downloadTimeoutMs = configManager.getConfig('app:fileUploadTimeout');
 
   // For pdf format, write the shared stylesheet once per job. Every page links
   // to it relatively, so the (~MB) CSS is not duplicated into each page's HTML.
@@ -145,6 +149,7 @@ export async function getPageWritable(
                 outputDir,
                 crowi: this.crowi,
                 exportingUser,
+                downloadTimeoutMs,
               });
             } catch (renderErr) {
               logger.warn(

@@ -97,6 +97,7 @@ export async function embedAttachmentImages(
     outputDir,
     crowi,
     exportingUser,
+    downloadTimeoutMs,
   }: {
     /** absolute path the HTML will be written to (used to compute the
      * relative href to ASSETS_DIRNAME) */
@@ -109,15 +110,15 @@ export async function embedAttachmentImages(
     /** the user who requested the export (pageBulkExportJob.user, resolved
      * once per job by the caller) — permission checks run as this user */
     exportingUser: HydratedDocument<IUser> | undefined;
+    /** upper bound for downloading a single attachment, storage request
+     * included; an image that takes longer is left out of the PDF */
+    downloadTimeoutMs: number;
   },
 ): Promise<string> {
   const matches = [...htmlString.matchAll(ATTACHMENT_IMG_SRC)];
   if (matches.length === 0) {
     return htmlString;
   }
-
-  const { fileUploadService } = crowi;
-  const assetsDir = path.join(outputDir, ASSETS_DIRNAME);
 
   // De-dupe: the same attachment can appear more than once on a page.
   const uniqueIds = [...new Set(matches.map((m) => m[1]))];
@@ -126,70 +127,26 @@ export async function embedAttachmentImages(
   const attachments = await prisma.attachments.findMany({
     where: { id: { in: uniqueIds } },
   });
-  const attachmentById = new Map<string, AttachmentWithComputed>(
-    attachments.map((a) => [a.id, a]),
-  );
 
+  const assetOptions: AssetOptions = {
+    assetsDir: path.join(outputDir, ASSETS_DIRNAME),
+    fileUploadService: crowi.fileUploadService,
+    exportingUser,
+    downloadTimeoutMs,
+  };
   const replacements = new Map<string, string>();
-
-  await Promise.all(
-    uniqueIds.map(async (id) => {
-      try {
-        const attachment = attachmentById.get(id);
-        if (attachment == null) return;
-
-        const isAccessible = await isAttachmentAccessibleToViewer(
-          attachment,
-          exportingUser,
-          false,
-        );
-        if (!isAccessible) {
-          logger.warn(
-            "Skipping attachment %s for bulk export: exporting user can't access the page it belongs to.",
-            id,
-          );
-          return;
-        }
-
-        const assetFileName = toAssetFileName(attachment);
-        if (assetFileName == null) {
-          logger.warn(
-            'Skipping attachment %s for bulk export: content type %s is not an image.',
-            id,
-            attachment.fileFormat,
-          );
-          return;
-        }
-        const assetFilePath = path.join(assetsDir, assetFileName);
-
-        // Written once per job; subsequent pages reusing the same
-        // attachment just reference the already-written file.
-        if (!fs.existsSync(assetFilePath)) {
-          await fs.promises.mkdir(assetsDir, { recursive: true });
-          const readable = await fileUploadService.findDeliveryFile(attachment);
-          const writeStream = fs.createWriteStream(assetFilePath);
-          try {
-            await pipeline(readable, writeStream);
-          } catch (streamErr) {
-            // Don't leave a truncated file behind — a later reference to the
-            // same attachment in this job would otherwise treat it as
-            // "already downloaded" via the fs.existsSync check above, and
-            // silently embed a corrupted image.
-            await fs.promises.rm(assetFilePath, { force: true });
-            throw streamErr;
-          }
-        }
-
-        replacements.set(id, toRelativeHref(fileOutputPath, assetFilePath));
-      } catch (err) {
-        logger.warn(
-          'Failed to embed attachment image %s for bulk export: %o',
-          id,
-          err,
-        );
-      }
-    }),
-  );
+  // One download at a time: with cloud storage every download is a network
+  // request, and a page may reference hundreds of images.
+  for (const attachment of attachments) {
+    // biome-ignore lint/performance/noAwaitInLoops: downloads are deliberately sequential (see above)
+    const assetFilePath = await prepareAsset(attachment, assetOptions);
+    if (assetFilePath != null) {
+      replacements.set(
+        attachment.id,
+        toRelativeHref(fileOutputPath, assetFilePath),
+      );
+    }
+  }
 
   if (replacements.size === 0) {
     return htmlString;
@@ -198,5 +155,132 @@ export async function embedAttachmentImages(
   return htmlString.replace(ATTACHMENT_IMG_SRC, (fullMatch, id) => {
     const replacement = replacements.get(id);
     return replacement != null ? `src="${replacement}"` : fullMatch;
+  });
+}
+
+type AssetOptions = {
+  assetsDir: string;
+  fileUploadService: Crowi['fileUploadService'];
+  exportingUser: HydratedDocument<IUser> | undefined;
+  downloadTimeoutMs: number;
+};
+
+/**
+ * Make sure the job has a local copy of `attachment` and return its path, or
+ * `undefined` when the image is to be left out of the PDF (no access, not an
+ * image, or the download failed). Best effort: a failure only drops this
+ * image, never the page.
+ */
+async function prepareAsset(
+  attachment: AttachmentWithComputed,
+  {
+    assetsDir,
+    fileUploadService,
+    exportingUser,
+    downloadTimeoutMs,
+  }: AssetOptions,
+): Promise<string | undefined> {
+  try {
+    const isAccessible = await isAttachmentAccessibleToViewer(
+      attachment,
+      exportingUser,
+      false,
+    );
+    if (!isAccessible) {
+      logger.warn(
+        "Skipping attachment %s for bulk export: exporting user can't access the page it belongs to.",
+        attachment.id,
+      );
+      return undefined;
+    }
+
+    const assetFileName = toAssetFileName(attachment);
+    if (assetFileName == null) {
+      logger.warn(
+        'Skipping attachment %s for bulk export: content type %s is not an image.',
+        attachment.id,
+        attachment.fileFormat,
+      );
+      return undefined;
+    }
+    const assetFilePath = path.join(assetsDir, assetFileName);
+
+    // Written once per job; subsequent pages reusing the same
+    // attachment just reference the already-written file.
+    if (!fs.existsSync(assetFilePath)) {
+      await fs.promises.mkdir(assetsDir, { recursive: true });
+      await downloadAsset(
+        fileUploadService,
+        attachment,
+        assetFilePath,
+        AbortSignal.timeout(downloadTimeoutMs),
+      );
+    }
+    return assetFilePath;
+  } catch (err) {
+    logger.warn(
+      'Failed to embed attachment image %s for bulk export: %o',
+      attachment.id,
+      err,
+    );
+    return undefined;
+  }
+}
+
+async function downloadAsset(
+  fileUploadService: Crowi['fileUploadService'],
+  attachment: AttachmentWithComputed,
+  assetFilePath: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const readable = await untilAborted(
+    fileUploadService.findDeliveryFile(attachment),
+    signal,
+  );
+  try {
+    await pipeline(readable, fs.createWriteStream(assetFilePath), { signal });
+  } catch (err) {
+    // Don't leave a truncated file behind — a later reference to the same
+    // attachment in this job would otherwise treat it as "already
+    // downloaded" via the fs.existsSync check in prepareAsset, and silently
+    // embed a corrupted image.
+    await fs.promises.rm(assetFilePath, { force: true });
+    throw err;
+  }
+}
+
+/**
+ * Settle with `readablePromise`, or reject with `signal.reason` as soon as
+ * `signal` aborts — `findDeliveryFile()` takes no signal of its own, and the
+ * storage request behind it can hang. A stream that arrives after the abort
+ * is destroyed so its connection is not left open.
+ */
+function untilAborted(
+  readablePromise: Promise<NodeJS.ReadableStream>,
+  signal: AbortSignal,
+): Promise<NodeJS.ReadableStream> {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    if (signal.aborted) {
+      onAbort();
+    } else {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+    readablePromise.then(
+      (readable) => {
+        signal.removeEventListener('abort', onAbort);
+        if (signal.aborted) {
+          if ('destroy' in readable && typeof readable.destroy === 'function') {
+            readable.destroy();
+          }
+          return;
+        }
+        resolve(readable);
+      },
+      (err) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(err);
+      },
+    );
   });
 }
