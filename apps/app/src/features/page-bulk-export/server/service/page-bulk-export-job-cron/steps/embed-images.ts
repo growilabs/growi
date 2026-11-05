@@ -28,12 +28,43 @@ const logger = loggerFactory('growi:features:page-bulk-export:embed-images');
 const ATTACHMENT_IMG_SRC = /src="\/attachment\/([0-9a-z]{24})"/g;
 
 /**
- * Directory (relative to a job's html output dir) that downloaded/relayed
- * attachment images are written into. Mirrors `_bulk-export.css`'s
- * leading-underscore convention so pdf-converter's `*.html`-only scan never
- * mistakes these for pages.
+ * Directory (relative to a job's html output dir) that downloaded attachment
+ * images are written into, once per job. pdf-converter scans the job dir
+ * recursively for `*.html`, so the directory name does not keep assets out
+ * of that scan — the extensions chosen by `toAssetFileName` do.
  */
 const ASSETS_DIRNAME = '_bulk-export-assets';
+
+/**
+ * File extensions for image content types whose rendering in pdf-converter's
+ * Chromium depends on the extension (SVG renders only as `.svg`). Other
+ * `image/*` types are saved without an extension: Chromium sniffs raster
+ * images from their bytes.
+ */
+const IMAGE_EXTENSIONS: Readonly<Record<string, string>> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'image/avif': '.avif',
+  'image/bmp': '.bmp',
+  'image/svg+xml': '.svg',
+};
+
+/**
+ * Name of the local copy of an attachment, or `undefined` when it must not be
+ * embedded. Only image content types qualify, and the extension is never
+ * taken from the uploaded file name: a `.html` asset would be converted by
+ * pdf-converter as if it were a page.
+ */
+function toAssetFileName(
+  attachment: AttachmentWithComputed,
+): string | undefined {
+  if (!attachment.fileFormat.startsWith('image/')) {
+    return undefined;
+  }
+  return `${attachment.id}${IMAGE_EXTENSIONS[attachment.fileFormat] ?? ''}`;
+}
 
 /**
  * Rewrite `/attachment/<id>` image sources in `htmlString` to something
@@ -120,7 +151,15 @@ export async function embedAttachmentImages(
           return;
         }
 
-        const assetFileName = `${id}${path.extname(attachment.fileName ?? '')}`;
+        const assetFileName = toAssetFileName(attachment);
+        if (assetFileName == null) {
+          logger.warn(
+            'Skipping attachment %s for bulk export: content type %s is not an image.',
+            id,
+            attachment.fileFormat,
+          );
+          return;
+        }
         const assetFilePath = path.join(assetsDir, assetFileName);
 
         // Written once per job; subsequent pages reusing the same
