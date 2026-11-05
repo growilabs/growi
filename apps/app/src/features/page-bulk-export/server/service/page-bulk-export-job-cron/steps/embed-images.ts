@@ -52,18 +52,36 @@ const IMAGE_EXTENSIONS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * Image file-name extensions accepted for an `application/octet-stream`
+ * upload, i.e. one whose type the uploading client could not tell.
+ */
+const IMAGE_FILE_NAME_EXTENSIONS: ReadonlySet<string> = new Set([
+  ...Object.values(IMAGE_EXTENSIONS),
+  '.jpeg',
+]);
+
+/**
  * Name of the local copy of an attachment, or `undefined` when it must not be
- * embedded. Only image content types qualify, and the extension is never
- * taken from the uploaded file name: a `.html` asset would be converted by
- * pdf-converter as if it were a page.
+ * embedded. Image content types qualify, with the extension taken from the
+ * content type. An `application/octet-stream` upload qualifies only when its
+ * file name has an extension in `IMAGE_FILE_NAME_EXTENSIONS`. Any other
+ * extension from the uploaded file name is never used: a `.html` asset would
+ * be converted by pdf-converter as if it were a page.
  */
 function toAssetFileName(
   attachment: AttachmentWithComputed,
 ): string | undefined {
-  if (!attachment.fileFormat.startsWith('image/')) {
-    return undefined;
+  const { id, fileFormat, fileName } = attachment;
+  if (fileFormat.startsWith('image/')) {
+    return `${id}${IMAGE_EXTENSIONS[fileFormat] ?? ''}`;
   }
-  return `${attachment.id}${IMAGE_EXTENSIONS[attachment.fileFormat] ?? ''}`;
+  if (fileFormat === 'application/octet-stream') {
+    const extension = path.extname(fileName).toLowerCase();
+    if (IMAGE_FILE_NAME_EXTENSIONS.has(extension)) {
+      return `${id}${extension}`;
+    }
+  }
+  return undefined;
 }
 
 /**

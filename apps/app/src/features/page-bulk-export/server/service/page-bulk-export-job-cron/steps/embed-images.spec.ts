@@ -7,6 +7,9 @@
  *  - Only attachments whose content type is an image are embedded, and the
  *    asset's file extension comes from that content type, never from the
  *    uploaded file name (pdf-converter converts every `*.html` it finds).
+ *    The one exception is `application/octet-stream` (an upload whose type
+ *    the client could not tell): it is embedded when the file name has an
+ *    image extension, which then becomes the asset's extension.
  *  - A stream error while downloading an attachment does not leave a
  *    truncated asset file behind that a later reference would treat as
  *    "already downloaded".
@@ -216,6 +219,47 @@ describe('embedAttachmentImages', () => {
       await expect(
         fs.promises.readFile(assetPath(attachmentId), 'utf-8'),
       ).resolves.toBe('binary-image-data');
+    });
+
+    it('embeds an application/octet-stream upload whose file name has an image extension', async () => {
+      vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([
+        buildAttachment({
+          fileName: 'Screenshot.PNG',
+          fileFormat: 'application/octet-stream',
+        }),
+      ]);
+
+      const result = await embed(
+        htmlWithAttachment(attachmentId),
+        imageUploader(),
+      );
+
+      expect(result).toBe(
+        `<p><img src="_bulk-export-assets/${attachmentId}.png" alt=""></p>`,
+      );
+      await expect(
+        fs.promises.readFile(assetPath(`${attachmentId}.png`), 'utf-8'),
+      ).resolves.toBe('binary-image-data');
+    });
+
+    it.each([
+      'page.html',
+      'archive.zip',
+      'no-extension',
+    ])('does not embed an application/octet-stream upload named %s', async (fileName) => {
+      vi.spyOn(prisma.attachments, 'findMany').mockResolvedValue([
+        buildAttachment({ fileName, fileFormat: 'application/octet-stream' }),
+      ]);
+      const findDeliveryFile = vi.fn();
+      const html = htmlWithAttachment(attachmentId);
+
+      const result = await embed(
+        html,
+        mock<FileUploader>({ findDeliveryFile }),
+      );
+
+      expect(result).toBe(html);
+      expect(findDeliveryFile).not.toHaveBeenCalled();
     });
   });
 
