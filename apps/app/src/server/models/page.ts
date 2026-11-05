@@ -541,7 +541,7 @@ export class PageQueryBuilder {
   // add viewer condition to PageQueryBuilder instance
   async addViewerCondition(
     user,
-    userGroups = null,
+    userGroups: ObjectIdLike[] | null = null,
     includeAnyoneWithTheLink = false,
     showPagesRestrictedByOwner = false,
     showPagesRestrictedByGroup = false,
