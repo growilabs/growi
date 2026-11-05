@@ -415,7 +415,8 @@ Remaining TODOs:
 ## Constraints
 
 - **Do NOT** modify frontend code
-- **Do NOT** run `prisma db push` or `pnpm prisma generate`
+- **Do NOT** run `prisma db push`
 - **Do NOT** remove the Mongoose schema block (the `new Schema(...)` definition and field declarations)
 - **Do NOT** handle multiple model files in one invocation — one file per `/mongoose-to-prisma` call
 - **Relation default**: use `onDelete: NoAction, onUpdate: NoAction`, except where Step 2 item 4 calls for `onDelete: SetNull`
+｀
