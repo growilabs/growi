@@ -69,6 +69,7 @@ export const CONFIG_KEYS = [
   'app:elasticsearchMaxBodyLengthToIndex',
   'app:elasticsearchReindexBulkSize',
   'app:elasticsearchReindexOnBoot',
+  'app:elasticsearchAuditlogReindexOnBoot',
   'app:growiCloudUri',
   'app:growiAppIdForCloud',
   'app:ogpUri',
@@ -83,6 +84,7 @@ export const CONFIG_KEYS = [
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
   'app:wipPageExpirationSeconds',
+  'app:wipPageCleanupCronSchedule',
   'app:isReadOnlyForNewUser',
   'app:vaultEnabled',
   'app:vaultManagerEndpoint',
@@ -288,10 +290,6 @@ export const CONFIG_KEYS = [
   'slackbot:withProxy:saltForGtoP',
   'slackbot:withProxy:saltForPtoG',
 
-  // OpenAI Settings
-  'openai:serviceType',
-  'openai:apiKey',
-
   // AI Tools Settings
   'aiTools:suggestPathAgenticSearchLimit',
   'aiTools:suggestPathAgenticChildListingLimit',
@@ -311,7 +309,9 @@ export const CONFIG_KEYS = [
   // Suggest-path-specific providerOptions overlay (provider-agnostic),
   // deep-merged onto the effective model's catalog-declared providerOptions.
   'ai:providerOptions:suggestPathAgent',
-  // Opt-in refresh paths for the vendored model catalog (both default OFF)
+  'ai:usageBaseModel',
+  'ai:disabledReason',
+  // Refresh paths for the vendored model catalog (startup refresh defaults ON)
   'ai:modelCatalogRefreshOnStartup',
   'ai:modelCatalogRefreshCronSchedule',
 
@@ -362,6 +362,7 @@ export const CONFIG_KEYS = [
   'env:useOnlyEnvVars:app:fileUploadType',
   'env:useOnlyEnvVars:security:passport-local',
   'env:useOnlyEnvVars:security:passport-saml',
+  'env:useOnlyEnvVars:aws',
   'env:useOnlyEnvVars:gcs',
   'env:useOnlyEnvVars:azure',
   'env:useOnlyEnvVars:ai',
@@ -508,6 +509,10 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'ELASTICSEARCH_REINDEX_ON_BOOT',
     defaultValue: false,
   }),
+  'app:elasticsearchAuditlogReindexOnBoot': defineConfig<boolean>({
+    envVarName: 'ELASTICSEARCH_AUDITLOG_REINDEX_ON_BOOT',
+    defaultValue: false,
+  }),
   'app:growiCloudUri': defineConfig<string | undefined>({
     envVarName: 'GROWI_CLOUD_URI',
     defaultValue: undefined,
@@ -566,6 +571,13 @@ export const CONFIG_DEFINITIONS = {
   'app:wipPageExpirationSeconds': defineConfig<number>({
     envVarName: 'WIP_PAGE_EXPIRATION_SECONDS',
     defaultValue: 172800,
+  }),
+  // Sweep that deletes expired WIP pages. An empty value disables it, which an
+  // operator needs when the sweep is too heavy for their wiki or must be run
+  // out-of-band; the pages then simply keep their (unenforced) expiry.
+  'app:wipPageCleanupCronSchedule': defineConfig<string>({
+    envVarName: 'WIP_PAGE_CLEANUP_CRON_SCHEDULE',
+    defaultValue: '0 3 * * *',
   }),
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',
@@ -1013,19 +1025,24 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
   }),
   'aws:s3Bucket': defineConfig<NonBlankString>({
+    envVarName: 'S3_BUCKET',
     defaultValue: toNonBlankString('growi'),
   }),
   'aws:s3Region': defineConfig<NonBlankString>({
+    envVarName: 'S3_REGION',
     defaultValue: toNonBlankString('ap-northeast-1'),
   }),
   'aws:s3AccessKeyId': defineConfig<NonBlankString | undefined>({
+    envVarName: 'S3_ACCESS_KEY_ID',
     defaultValue: undefined,
   }),
   'aws:s3SecretAccessKey': defineConfig<NonBlankString | undefined>({
+    envVarName: 'S3_SECRET_ACCESS_KEY',
     defaultValue: undefined,
     isSecret: true,
   }),
   'aws:s3CustomEndpoint': defineConfig<NonBlankString | undefined>({
+    envVarName: 'S3_CUSTOM_ENDPOINT',
     defaultValue: undefined,
   }),
 
@@ -1281,17 +1298,6 @@ export const CONFIG_DEFINITIONS = {
     isSecret: true,
   }),
 
-  // OpenAI Settings
-  'openai:serviceType': defineConfig<'openai' | 'azure-openai'>({
-    envVarName: 'OPENAI_SERVICE_TYPE',
-    defaultValue: 'openai',
-  }),
-  'openai:apiKey': defineConfig<string | undefined>({
-    envVarName: 'OPENAI_API_KEY',
-    defaultValue: undefined,
-    isSecret: true,
-  }),
-
   // AI chat (Mastra) Settings — multi-provider: several providers can be
   // configured at once, one fixed slot per supported provider.
   //
@@ -1366,20 +1372,34 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: 60_000,
   }),
 
+  // Usage-metering inputs injected by the deployment (e.g. GROWI.cloud). Both
+  // are in the env:useOnlyEnvVars:ai group and are read with ConfigSource.env,
+  // so a DB value is never used. They have no admin-form counterpart.
+  // ai:usageBaseModel is a model key (`provider/modelId`); ai:disabledReason is
+  // an opaque reason code.
+  'ai:usageBaseModel': defineConfig<string | undefined>({
+    envVarName: 'AI_USAGE_BASE_MODEL',
+    defaultValue: undefined,
+  }),
+  'ai:disabledReason': defineConfig<string | undefined>({
+    envVarName: 'AI_DISABLED_REASON',
+    defaultValue: undefined,
+  }),
+
   // Refresh paths for the vendored model catalog (Req 9). These are deployment
   // options (env-driven), not admin-form settings, so they are intentionally NOT
   // part of the env:useOnlyEnvVars:ai target keys. The refresh jobs run ONLY when
-  // the AI feature itself is enabled (app:aiEnabled) — since that defaults OFF, a
-  // default GROWI install still performs zero external communication (the bundled
-  // catalog is the baseline; air-gapped installs are unaffected).
+  // the AI feature is enabled (app:aiEnabled) or ai:disabledReason is
+  // catalog_stale, so a default (AI-off) install still performs zero external
+  // communication.
   'ai:modelCatalogRefreshOnStartup': defineConfig<boolean>({
     envVarName: 'AI_MODEL_CATALOG_REFRESH_ON_STARTUP',
-    defaultValue: false,
+    defaultValue: true,
   }),
   // node-cron schedule expression. Defaults to a daily refresh so that once an
   // admin enables AI the catalog stays fresh automatically; set the env var to an
-  // empty string to opt back out (e.g. air-gapped AI deployments). Gated by
-  // app:aiEnabled, so this default never fires in a default (AI-off) install.
+  // empty string to opt back out (e.g. air-gapped AI deployments). Gated like
+  // the startup refresh, so this default never fires in a default (AI-off) install.
   'ai:modelCatalogRefreshCronSchedule': defineConfig<string>({
     envVarName: 'AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE',
     defaultValue: '0 4 * * *',
@@ -1537,6 +1557,10 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'SAML_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
   }),
+  'env:useOnlyEnvVars:aws': defineConfig<boolean>({
+    envVarName: 'AWS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+    defaultValue: false,
+  }),
   'env:useOnlyEnvVars:gcs': defineConfig<boolean>({
     envVarName: 'GCS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
@@ -1630,8 +1654,27 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
     ],
   },
   {
+    controlKey: 'env:useOnlyEnvVars:aws',
+    targetKeys: [
+      'aws:s3Bucket',
+      'aws:s3Region',
+      'aws:s3AccessKeyId',
+      'aws:s3SecretAccessKey',
+      'aws:s3CustomEndpoint',
+      'aws:referenceFileWithRelayMode',
+      'aws:lifetimeSecForTemporaryUrl',
+      'aws:s3ObjectCannedACL',
+    ],
+  },
+  {
     controlKey: 'env:useOnlyEnvVars:gcs',
-    targetKeys: ['gcs:apiKeyJsonPath', 'gcs:bucket', 'gcs:uploadNamespace'],
+    targetKeys: [
+      'gcs:apiKeyJsonPath',
+      'gcs:bucket',
+      'gcs:uploadNamespace',
+      'gcs:referenceFileWithRelayMode',
+      'gcs:lifetimeSecForTemporaryUrl',
+    ],
   },
   {
     controlKey: 'env:useOnlyEnvVars:azure',
@@ -1641,17 +1684,25 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
       'azure:clientSecret',
       'azure:storageAccountName',
       'azure:storageContainerName',
+      'azure:referenceFileWithRelayMode',
+      'azure:lifetimeSecForTemporaryUrl',
     ],
   },
   {
-    // AI settings: the enable toggle + the two provider connection keys.
-    // app:aiEnabled uses the app: prefix but is fixed together with the ai:*
-    // connection keys as a single AI configuration unit.
+    // AI settings: the enable toggle, the two provider connection keys and the
+    // two usage-metering keys. app:aiEnabled uses the app: prefix but is fixed
+    // together with the ai:* keys as a single AI configuration unit.
     //
     // ai:allowedModels is deliberately NOT in this group: env-only mode locks
     // only the connection settings (credentials / endpoints / enable state),
     // while model settings stay editable from the admin UI (R5.2 / R5.3).
     controlKey: 'env:useOnlyEnvVars:ai',
-    targetKeys: ['app:aiEnabled', 'ai:providers', 'ai:providerApiKeys'],
+    targetKeys: [
+      'app:aiEnabled',
+      'ai:providers',
+      'ai:providerApiKeys',
+      'ai:usageBaseModel',
+      'ai:disabledReason',
+    ],
   },
 ];

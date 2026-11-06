@@ -13,7 +13,7 @@ export const useToastrOnError = <P, R>(
       try {
         return await method?.(param);
       } catch (err) {
-        toastError(t('toaster.create_failed', { target: 'a page' }));
+        toastError(t('commons:toaster.create_failed', { target: 'a page' }));
       }
     },
     [method, t],

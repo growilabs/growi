@@ -2,6 +2,7 @@ import type { IPageHasId } from '@growi/core';
 import { mutate as swrMutate } from 'swr';
 import { mock } from 'vitest-mock-extended';
 
+import { createEmptyFilterState } from '~/features/search/client/utils/search-query';
 import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
@@ -50,6 +51,7 @@ const configurations = {
   order: SORT_ORDER.DESC,
   includeTrashPages: false,
   includeUserPages: false,
+  filters: createEmptyFilterState(),
   nqName: null,
 };
 

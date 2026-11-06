@@ -25,6 +25,7 @@ const SUPPORTED_ATTRIBUTES = [
   'reverse',
   'filter',
   'except',
+  'tag',
   'isSharedPage',
   GROWI_IS_CONTENT_RENDERING_ATTR,
 ];

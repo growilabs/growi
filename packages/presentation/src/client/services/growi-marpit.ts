@@ -48,6 +48,10 @@ const marpitOption: MarpOptions = {
   emoji: undefined,
   html: false,
   math: false,
+  // Next.js >= 16.4 drops "use strict" from minified client chunks, and the
+  // CSS minifier bundled in marp-core throws in sloppy mode.
+  // See https://github.com/vercel/next.js/issues/100617
+  minifyCSS: false,
 };
 
 const slideMarpitOption = marpitOption;

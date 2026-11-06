@@ -104,7 +104,7 @@ describe('useSWRxLsx integration tests', () => {
     };
 
     // Import and setup the LSX middleware
-    lsxMiddleware(mockCrowi, app);
+    lsxMiddleware(mockCrowi, app, { resolveTagPageIds: vi.fn() });
 
     // Start test server
     return new Promise<void>((resolve) => {

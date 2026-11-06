@@ -68,7 +68,7 @@ const GoogleSecurityManagementContents = (props: Props) => {
       {retrieveError != null && (
         <div className="alert alert-danger">
           <p>
-            {t('Error occurred')} : {retrieveError}
+            {t('commons:Error occurred')} : {retrieveError}
           </p>
         </div>
       )}
@@ -249,7 +249,7 @@ const GoogleSecurityManagementContents = (props: Props) => {
                 className="btn btn-primary"
                 disabled={retrieveError != null}
               >
-                {t('Update')}
+                {t('commons:Update')}
               </button>
             </div>
           </div>

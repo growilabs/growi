@@ -134,6 +134,10 @@ These checks apply at the feature level. Use command output as the primary signa
 - Identify new hidden dependencies or shared ownership that were not declared in the design
 - If a revalidation trigger fired, verify the affected adjacent specs or integration points were actually re-checked
 
+**G.6 Design Quality (筋の良い実装)**
+- Beyond spec coverage and boundary integrity, judge whether the feature — **viewed whole** — is a sound, well-shaped implementation per `.claude/rules/coding-style.md` (Reviewing for Design Quality). Judge the feature's overall shape against what it actually needs (its correctness/latency/memory/security profile as a whole), reasoning about the tradeoff from first principles — not against a fixed checklist; the repo's default markers are a floor, and a deliberate, well-argued deviation is itself 筋が良い. This is the feature-level counterpart to `kiro-review`'s per-task check: each task can be locally fine yet, taken together, accrete needless complexity, drift-prone duplication across task seams, or an abstraction that fights the surrounding code.
+- Apply the same severity discipline: a spec-compliant feature with a poor emergent shape is normally a Warning to record, not a `NO-GO`. Reserve `NO-GO` for a shape that is genuinely hard to maintain, hides coupling, or will force a rewrite. Do not turn this into a taste loop.
+
 **H. Blocked Tasks & Implementation Notes**
 - Check for any tasks still marked `_Blocked:_` — report why and assess impact on feature completeness
 - Review `## Implementation Notes` in tasks.md for cross-cutting insights that need attention

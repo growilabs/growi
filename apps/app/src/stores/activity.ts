@@ -2,10 +2,28 @@ import { useAtomValue } from 'jotai';
 import type { SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
-import type { IActivityHasId, ISearchFilter } from '~/interfaces/activity';
+import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+  IActivityHasId,
+  ISearchFilter,
+} from '~/interfaces/activity';
 import type { PaginateResult } from '~/interfaces/mongoose-utils';
 import { auditLogEnabledAtom } from '~/states/server-configurations';
+
+export const useSWRxAuditlogSuggestions = (
+  field: AuditlogSuggestionField,
+  q: string,
+  limit = 5,
+): SWRResponse<AuditlogSuggestionsResponse, Error> => {
+  const trimmedQ = q.trim();
+  return useSWRImmutable(
+    trimmedQ !== '' ? ['/activity/suggestions', field, trimmedQ, limit] : null,
+    ([endpoint, field, q, limit]) =>
+      apiv3Get(endpoint, { field, q, limit }).then((r) => r.data),
+  );
+};
 
 export const useSWRxActivity = (
   limit?: number,

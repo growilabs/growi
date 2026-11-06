@@ -203,14 +203,12 @@ export class SelectGrowiService
       ],
     });
 
-    const installationId =
-      authorizeResult.enterpriseId || authorizeResult.teamId;
     let installation: Installation | undefined;
     try {
       installation =
         await this.installationRepository.findByTeamIdOrEnterpriseId(
-          // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
-          installationId!,
+          authorizeResult.teamId,
+          authorizeResult.enterpriseId,
         );
     } catch (err) {
       logger.error('GROWI command failed: No installation found.\n', err);

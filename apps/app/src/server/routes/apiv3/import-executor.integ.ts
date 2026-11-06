@@ -113,7 +113,11 @@ describe('executeImport — settles the import activity with the operator captur
       createdAt: new Date(),
     };
 
-    const importService = { import: vi.fn().mockResolvedValue(undefined) };
+    // A clean run: nothing in failedCollections, which is the only outcome that settles
+    // the audit row (see executeImport).
+    const importService = {
+      import: vi.fn().mockResolvedValue({ failedCollections: [] }),
+    };
     const adminEvent = new EventEmitter();
 
     await executeImport({

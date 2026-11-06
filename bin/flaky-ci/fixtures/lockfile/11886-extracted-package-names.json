@@ -1,0 +1,39 @@
+{
+  "packages": [
+    "@codemirror/state",
+    "@codemirror/view",
+    "@inquirer/checkbox",
+    "@inquirer/confirm",
+    "@inquirer/core",
+    "@inquirer/editor",
+    "@inquirer/expand",
+    "@inquirer/external-editor",
+    "@inquirer/input",
+    "@inquirer/number",
+    "@inquirer/password",
+    "@inquirer/prompts",
+    "@inquirer/rawlist",
+    "@inquirer/search",
+    "@inquirer/select",
+    "@inquirer/type",
+    "@marijn/find-cluster-break",
+    "@marijn/find-cluster-break@1.0.4",
+    "@rushstack/node-core-library",
+    "@rushstack/terminal",
+    "@rushstack/ts-command-line",
+    "@tsed/platform-express",
+    "@types/chai",
+    "@types/node",
+    "@vitest/expect",
+    "@vitest/mocker",
+    "@vitest/pretty-format",
+    "@vitest/runner",
+    "@vitest/snapshot",
+    "@vitest/spy",
+    "@vitest/ui",
+    "@vitest/utils"
+  ],
+  "known_issues": [
+    "'@marijn/find-cluster-break@1.0.4': {} is pnpm's leaf-package header shape (no dependencies). It matches this extractor's dependency-entry rule ('name': value with value={} treated as non-empty) instead of the header rule, so the version stays attached and both '@marijn/find-cluster-break' (from the header rule, correctly) and '@marijn/find-cluster-break@1.0.4' (from the dependency-entry rule, incorrectly) appear above. Does not affect the @codemirror/state intersection this fixture set is for; left unresolved for task 2.4 to decide how lib/lockfile.ts should handle this shape."
+  ]
+}

@@ -74,6 +74,23 @@ describe('peekWantSection', () => {
     expect(Buffer.concat([result.prefix, rest])).toEqual(body);
   });
 
+  it('reports the partial-clone filter alongside the wants', async () => {
+    const filtered = Buffer.concat([
+      encodePktLine(`want ${OID} side-band-64k filter\n`),
+      encodePktLine('filter blob:none\n'),
+      FLUSH,
+    ]);
+    const stream = Readable.from([filtered, remainder]);
+
+    const result = await peekWantSection(stream);
+
+    expect(result).toMatchObject({
+      status: 'complete',
+      wants: [OID],
+      filters: ['blob:none'],
+    });
+  });
+
   it('reports the request as invalid when it ends before the want section does', async () => {
     const stream = Readable.from([encodePktLine(`want ${OID}\n`)]);
 

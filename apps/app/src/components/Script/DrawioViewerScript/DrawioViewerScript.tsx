@@ -2,19 +2,23 @@ import { type JSX, useCallback } from 'react';
 import Script from 'next/script';
 import type { IGraphViewerGlobal } from '@growi/remark-drawio';
 
-import { patchStencilRegistryUrls } from './patch-stencil-registry-urls';
+// biome-ignore-start lint/style/noRestrictedImports: both entry points only touch browser globals and no-op during server rendering
+import {
+  adoptSelfHostedDrawio,
+  prepareSelfHostedDrawio,
+} from '~/features/drawio/client/self-hosted';
+
+// biome-ignore-end lint/style/noRestrictedImports: both entry points only touch browser globals and no-op during server rendering
+
 import { generateViewerMinJsUrl } from './use-viewer-min-js-url';
 
 declare global {
   var GraphViewer: IGraphViewerGlobal;
-  var mxStencilRegistry: { libraries: Record<string, string[]> } | undefined;
 }
 
 type Props = {
   drawioUri: string;
 };
-
-const DEFAULT_DRAWIO_ORIGIN = 'https://embed.diagrams.net';
 
 export const DrawioViewerScript = ({ drawioUri }: Props): JSX.Element => {
   const loadedHandler = useCallback(() => {
@@ -33,14 +37,10 @@ export const DrawioViewerScript = ({ drawioUri }: Props): JSX.Element => {
     GraphViewer.prototype.lightboxZIndex = 1200;
     GraphViewer.prototype.toolbarZIndex = 1200;
 
-    try {
-      const origin = new URL(drawioUri).origin;
-      if (origin !== DEFAULT_DRAWIO_ORIGIN) {
-        patchStencilRegistryUrls(mxStencilRegistry?.libraries, origin);
-      }
-    } catch {
-      // skip patching if drawioUri cannot be parsed
-    }
+    // Must precede processElements(): this re-runs Editor.initMath(), which is also what
+    // installs the listeners that ask for typesetting, so a diagram rendered before it
+    // would never get any.
+    adoptSelfHostedDrawio(drawioUri);
 
     GraphViewer.processElements();
   }, [drawioUri]);
@@ -49,6 +49,11 @@ export const DrawioViewerScript = ({ drawioUri }: Props): JSX.Element => {
   if (!drawioUri) {
     return <></>;
   }
+
+  // Deliberately during render rather than in an effect: the globals this writes are read
+  // by viewer-static.min.js while it evaluates, and <Script> inserts it as soon as this
+  // renders. Writing the same values again is harmless, so repeated renders are fine.
+  prepareSelfHostedDrawio(drawioUri);
 
   const viewerMinJsSrc = generateViewerMinJsUrl(drawioUri);
 

@@ -1,0 +1,37 @@
+  1) [chromium] › playwright/20-basic-features/inline-comment.spec.ts:2077:3 › Inline comment - hover/click/tap on a saved body highlight opens a preview popover with simple reply (Req 2.1-2.5) › Requirement 2.3: submitting a reply from the popover posts it, and it appears nested under the origin item in the bottom list 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('inline-comment-preview-popover')
+    Expected: visible
+    Timeout: 7000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 7000ms
+      - waiting for getByTestId('inline-comment-preview-popover')
+
+
+      2083 |     const popover = page.getByTestId('inline-comment-preview-popover');
+      2084 |     await clickText(page, targetSentence);
+    > 2085 |     await expect(popover).toBeVisible();
+           |                           ^
+      2086 |
+      2087 |     const replyText = 'a reply posted through the body popover';
+      2088 |     // 2026-09-11 その4: the popover's reply composer is `MentionAwareCommentInput`
+        at /home/runner/work/growi/growi/apps/app/playwright/20-basic-features/inline-comment.spec.ts:2085:27
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    playwright/output/20-basic-features-inline-c-e420c-gin-item-in-the-bottom-list-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: playwright/output/20-basic-features-inline-c-e420c-gin-item-in-the-bottom-list-chromium/error-context.md
+
+    Error Context: playwright/output/20-basic-features-inline-c-e420c-gin-item-in-the-bottom-list-chromium/error-context.md
+
+  1 flaky
+    [chromium] › playwright/20-basic-features/inline-comment.spec.ts:2077:3 › Inline comment - hover/click/tap on a saved body highlight opens a preview popover with simple reply (Req 2.1-2.5) › Requirement 2.3: submitting a reply from the popover posts it, and it appears nested under the origin item in the bottom list 
+  106 passed (5.5m)
+##[notice]  1 flaky
+    [chromium] › playwright/20-basic-features/inline-comment.spec.ts:2077:3 › Inline comment - hover/click/tap on a saved body highlight opens a preview popover with simple reply (Req 2.1-2.5) › Requirement 2.3: submitting a reply from the popover posts it, and it appears nested under the origin item in the bottom list 
+  106 passed (5.5m)

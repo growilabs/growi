@@ -1,7 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-import { login } from '../utils/login';
-
 test.describe
   .serial('Access to sharelink by guest', () => {
     let createdSharelink: string | null;
@@ -27,27 +25,29 @@ test.describe
       expect(createdSharelink).toHaveLength(24);
     });
 
-    test('The sharelink page is successfully loaded', async ({ page }) => {
-      await page.goto('/');
+    test('The sharelink page is successfully loaded', async ({ browser }) => {
+      // A fresh context without storageState is a guest viewer. Logging the
+      // shared admin session out instead would invalidate it for every other
+      // worker that reuses the same admin cookie.
+      const guestContext = await browser.newContext();
+      const guestPage = await guestContext.newPage();
 
-      // Logout
-      await page.getByTestId('personal-dropdown-button').click();
-      await expect(page.getByTestId('logout-button')).toBeVisible();
-      await page.getByTestId('logout-button').click();
-      await page.waitForURL('http://localhost:3000/login');
+      try {
+        // Access sharelink
+        await guestPage.goto(`/share/${createdSharelink}`);
+        await expect(guestPage.locator('.page-meta')).toBeVisible();
 
-      // Access sharelink
-      await page.goto(`/share/${createdSharelink}`);
-      await expect(page.locator('.page-meta')).toBeVisible();
-
-      // Comments are shown read-only on the share link page:
-      // - the comments area is rendered
-      // - no comment posting form is offered to the guest (read-only)
-      // - with no comments, an empty-state message is shown (not a bare heading)
-      await expect(page.locator('.page-comments-row')).toBeVisible();
-      await expect(page.locator('#page-comment-write')).toHaveCount(0);
-      await expect(page.getByTestId('comments-empty-state')).toBeVisible();
-
-      await login(page);
+        // Comments are shown read-only on the share link page:
+        // - the comments area is rendered
+        // - no comment posting form is offered to the guest (read-only)
+        // - with no comments, an empty-state message is shown (not a bare heading)
+        await expect(guestPage.locator('.page-comments-row')).toBeVisible();
+        await expect(guestPage.locator('#page-comment-write')).toHaveCount(0);
+        await expect(
+          guestPage.getByTestId('comments-empty-state'),
+        ).toBeVisible();
+      } finally {
+        await guestContext.close();
+      }
     });
   });

@@ -191,12 +191,10 @@ export class RegisterService
       throw new InvalidUrlError(growiUrl);
     }
 
-    const installationId =
-      authorizeResult.enterpriseId || authorizeResult.teamId;
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
-        // biome-ignore lint/style/noNonNullAssertion: installationId must be set --- IGNORE ---
-        installationId!,
+        authorizeResult.teamId,
+        authorizeResult.enterpriseId,
       );
 
     this.orderRepository.save({

@@ -1,12 +1,13 @@
 import type React from 'react';
+import { useTranslation } from 'next-i18next';
 import type { UseFormRegister } from 'react-hook-form';
 
 type Props = {
   register: UseFormRegister<{ sessionMaxAge: string }>;
-  t: (key: string, options?: Record<string, unknown>) => string;
 };
 
-export const SessionMaxAgeSettings: React.FC<Props> = ({ register, t }) => {
+export const SessionMaxAgeSettings: React.FC<Props> = ({ register }) => {
+  const { t } = useTranslation('admin');
   return (
     <>
       <h4>{t('security_settings.session')}</h4>

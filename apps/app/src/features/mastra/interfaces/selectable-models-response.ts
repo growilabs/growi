@@ -1,9 +1,9 @@
 /**
  * One selectable model on the wire: the bare model id plus its official display
- * name (from the catalog; the id itself when models.dev carried no name). Kept
- * structurally identical to the server-side ModelCatalogEntry so the route can
- * return catalog entries directly, but declared here (not imported from server
- * code) so the shared interface stays server-free for the client bundle.
+ * name (from the catalog; the id itself when models.dev carried no name).
+ * Mirrors the server-side ModelCatalogEntry minus its pricing, which must never
+ * reach the client; declared here (not imported from server code) so the shared
+ * interface stays server-free for the client bundle.
  */
 export interface SelectableModel {
   id: string;

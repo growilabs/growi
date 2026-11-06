@@ -4,6 +4,12 @@ import type { SWRInfiniteResponse } from 'swr/infinite';
 import useSWRInfinite from 'swr/infinite';
 
 import { apiGet } from '~/client/util/apiv1-client';
+import {
+  buildSearchQuery,
+  createEmptyFilterState,
+  isFilterStateEmpty,
+  type SearchFilterState,
+} from '~/features/search/client/utils/search-query';
 import type { IFormattedSearchResult } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 
@@ -14,6 +20,7 @@ export type ISearchConfigurations = {
   order?: SORT_ORDER;
   includeTrashPages?: boolean;
   includeUserPages?: boolean;
+  filters?: SearchFilterState;
 };
 
 type ISearchConfigurationsFixed = {
@@ -23,6 +30,7 @@ type ISearchConfigurationsFixed = {
   order: SORT_ORDER;
   includeTrashPages: boolean;
   includeUserPages: boolean;
+  filters: SearchFilterState;
 };
 
 export type ISearchConditions = ISearchConfigurationsFixed & {
@@ -32,10 +40,13 @@ export type ISearchConditions = ISearchConfigurationsFixed & {
 
 const createSearchQuery = (
   keyword: string,
+  filters: SearchFilterState,
   includeTrashPages: boolean,
   includeUserPages: boolean,
 ): string => {
-  let query = keyword;
+  // Negations are appended below rather than via buildSearchQuery, which owns
+  // only the positive filter operators (author/editor/group/tag), not negation.
+  let query = buildSearchQuery(keyword, filters);
 
   // pages included in specific path are not retrived when prefix is added
   if (!includeTrashPages) {
@@ -63,8 +74,15 @@ export const useSWRxSearch = (
 ): SWRResponse<IFormattedSearchResult, Error> & {
   conditions: ISearchConditions;
 } => {
-  const { limit, offset, sort, order, includeTrashPages, includeUserPages } =
-    configurations;
+  const {
+    limit,
+    offset,
+    sort,
+    order,
+    includeTrashPages,
+    includeUserPages,
+    filters,
+  } = configurations;
 
   const fixedConfigurations: ISearchConfigurationsFixed = {
     limit,
@@ -73,17 +91,23 @@ export const useSWRxSearch = (
     order: order ?? SORT_ORDER.DESC,
     includeTrashPages: includeTrashPages ?? false,
     includeUserPages: includeUserPages ?? false,
+    filters: filters ?? createEmptyFilterState(),
   };
   const rawQuery = createSearchQuery(
     keyword ?? '',
+    fixedConfigurations.filters,
     fixedConfigurations.includeTrashPages,
     fixedConfigurations.includeUserPages,
   );
 
-  const isKeywordValid = keyword != null && keyword.length > 0;
+  const hasKeyword = keyword != null && keyword.length > 0;
+  // A filter-only query (author/editor/group/tag with no keyword) is still a
+  // valid search, so run it whenever the keyword OR any filter is present.
+  const shouldSearch =
+    hasKeyword || !isFilterStateEmpty(fixedConfigurations.filters);
 
   const swrResult = useSWR(
-    isKeywordValid ? ['/search', keyword, fixedConfigurations] : null,
+    shouldSearch ? ['/search', keyword, fixedConfigurations] : null,
     ([endpoint, , fixedConfigurations]) => {
       const { limit, offset, sort, order } = fixedConfigurations;
 
@@ -104,6 +128,11 @@ export const useSWRxSearch = (
 
   return {
     ...swrResult,
+    // When there is nothing to search the SWR key is null; `keepPreviousData`
+    // would otherwise retain the last results, leaving the list out of sync with
+    // the now-empty query (a cleared keyword, or cleared filter chips). Drop the
+    // retained data so results always reflect the current query.
+    data: shouldSearch ? swrResult.data : undefined,
     conditions: {
       keyword,
       rawQuery,
@@ -191,7 +220,7 @@ export const useSWRINFxSearch = (
   nqName: string | null,
   configurations: Omit<ISearchConfigurations, 'offset'>,
 ): SWRInfiniteResponse<IFormattedSearchResult, Error> => {
-  const { limit, sort, order, includeTrashPages, includeUserPages } =
+  const { limit, sort, order, includeTrashPages, includeUserPages, filters } =
     configurations;
 
   // Chunk size is fixed for the whole search session (no user-facing selector).
@@ -205,11 +234,13 @@ export const useSWRINFxSearch = (
     order: order ?? SORT_ORDER.DESC,
     includeTrashPages: includeTrashPages ?? false,
     includeUserPages: includeUserPages ?? false,
+    filters: filters ?? createEmptyFilterState(),
     nqName,
   };
 
   const rawQuery = createSearchQuery(
     keyword ?? '',
+    fixedConfigurations.filters,
     fixedConfigurations.includeTrashPages,
     fixedConfigurations.includeUserPages,
   );

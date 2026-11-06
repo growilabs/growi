@@ -122,13 +122,20 @@ export const deletePagesCompletely = async (
       expect
         .poll(
           async () => {
-            const existRes = await request.get('/_api/v3/page/exist', {
-              params: { path },
-            });
-            // Keep polling through transient errors rather than asserting here.
-            if (!existRes.ok()) return true;
-            const { isExist } = await existRes.json();
-            return isExist;
+            try {
+              const existRes = await request.get('/_api/v3/page/exist', {
+                params: { path },
+              });
+              // Keep polling through transient errors rather than asserting here.
+              if (!existRes.ok()) return true;
+              const { isExist } = await existRes.json();
+              return isExist;
+            } catch {
+              // request.get() throws on a transient network error (e.g.
+              // ECONNRESET) instead of returning a non-ok response — treat it
+              // the same as the non-ok case above and keep polling.
+              return true;
+            }
           },
           {
             message: `page still exists after delete (operation not finished): ${path}`,

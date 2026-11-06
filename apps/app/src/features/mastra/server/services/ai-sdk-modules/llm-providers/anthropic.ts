@@ -1,5 +1,6 @@
 import type { MastraModelConfig } from '@mastra/core/llm';
 
+import { anthropicCacheControlMiddleware } from './anthropic-cache-control';
 import { requireApiKey } from './config';
 
 // Resolve the Anthropic chat model: explicit apiKey injection only (never the
@@ -18,5 +19,9 @@ export const resolveAnthropicModel = async (
 ): Promise<MastraModelConfig> => {
   const apiKey = requireApiKey('anthropic');
   const { createAnthropic } = await import('@ai-sdk/anthropic');
-  return createAnthropic({ apiKey })(modelId);
+  const { wrapLanguageModel } = await import('ai');
+  return wrapLanguageModel({
+    model: createAnthropic({ apiKey })(modelId),
+    middleware: anthropicCacheControlMiddleware,
+  });
 };

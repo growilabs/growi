@@ -6,6 +6,10 @@ import { Server } from './server.js';
 import { createVaultInstructionWatcher } from './services/vault-instruction-watcher.js';
 import { getSchedulerInstance } from './services/vault-maintenance-scheduler-instance.js';
 import { init as initRepo } from './services/vault-repo-storage.js';
+import {
+  installSparseFilters,
+  PUBLISHED_SPARSE_FILTERS,
+} from './services/vault-sparse-filter.js';
 
 /**
  * Handle for a running vault-manager runtime. `stop()` tears everything down
@@ -33,6 +37,11 @@ export async function startServer(): Promise<VaultManagerServer> {
 
   // Bare repo path is derived from VAULT_REPO_PATH at first call.
   await initRepo();
+
+  // The published partial-clone filter specs have to be present before the
+  // first clone can name one, and re-anchored on every boot so a gc between
+  // boots cannot leave a published object name unresolvable.
+  await installSparseFilters(PUBLISHED_SPARSE_FILTERS);
 
   const watcher = createVaultInstructionWatcher();
   await watcher.start();

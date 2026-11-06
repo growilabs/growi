@@ -1,0 +1,32 @@
+// Shared 32px-square icon-button sizing and hover-opacity, used by every
+// comment surface's edit/delete pair (normal comment via `CommentControl.tsx`,
+// inline comment origin/reply via `InlineCommentItem.tsx`/
+// `InlineCommentReplies.tsx`) and by `CommentRevisionLink.tsx`, so the
+// history icon's hover interaction can't drift from edit/delete's. The
+// popover keeps its own separate copy
+// (`InlineCommentPreviewPopover.module.scss`'s
+// `.inline-comment-preview-popover-icon-button`) -- its buttons are always
+// visible rather than hover-revealed, a genuinely different behavior, not
+// merely a styling duplicate (see that file's own comment for why it accepts
+// the small duplication).
+//
+// 32px, no rounding: the mockup's ~26px circle rendered too small at
+// Bootstrap's default `btn-link` padding, and a plain square (not
+// `rounded-circle`) is this feature's established shape (design.md 方針転換
+// その2-1). Opacity matches Bootstrap's own `.btn-close`
+// ($btn-close-opacity: .5 / $btn-close-hover-opacity: .75) -- owned here
+// rather than the `opacity-50` utility class, which is `!important` and
+// would otherwise fight a plain `:hover` rule for the cascade.
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  opacity: 0.5;
+
+  &:hover {
+    opacity: 0.75;
+  }
+}

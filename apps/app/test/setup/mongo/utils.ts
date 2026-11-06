@@ -20,22 +20,3 @@ export function replaceMongoDbName(uri: string, newDbName: string): string {
   cs.pathname = `/${newDbName}`;
   return cs.href;
 }
-
-/**
- * Get test database configuration for the current Vitest worker.
- * Each worker gets a unique database name to avoid conflicts in parallel execution.
- */
-export function getTestDbConfig(): {
-  workerId: string;
-  dbName: string;
-  mongoUri: string | null;
-} {
-  // VITEST_WORKER_ID is provided by Vitest (e.g., "1", "2", "3"...)
-  const workerId = process.env.VITEST_WORKER_ID || '1';
-  const dbName = `growi_test_${workerId}`;
-  const mongoUri = process.env.MONGO_URI
-    ? replaceMongoDbName(process.env.MONGO_URI, dbName)
-    : null;
-
-  return { workerId, dbName, mongoUri };
-}

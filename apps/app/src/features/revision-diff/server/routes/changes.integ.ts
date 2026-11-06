@@ -22,9 +22,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type Crowi from '~/server/crowi';
 import type { PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
+import { prisma } from '~/utils/prisma';
 
 import { changesRouteHandlersFactory } from './changes';
 
@@ -82,10 +82,8 @@ const makeId = (): Types.ObjectId => new Types.ObjectId();
 /**
  * Create a Revision document in the test database with a precise `createdAt`.
  *
- * Uses `Revision.collection.insertOne()` to bypass Mongoose's automatic
- * timestamps so the `createdAt` we specify is persisted as-is.  Mongoose's
- * `timestamps: { createdAt: true }` would otherwise overwrite any value
- * passed to `create()` / `save()`.
+ * Passes `createdAt` explicitly so it is persisted as-is instead of the
+ * schema default.
  */
 async function createRevision(props: {
   pageId: Types.ObjectId;
@@ -94,13 +92,15 @@ async function createRevision(props: {
   body?: string;
 }): Promise<{ _id: Types.ObjectId }> {
   const id = makeId();
-  await Revision.collection.insertOne({
-    _id: id,
-    pageId: props.pageId,
-    author: props.author,
-    body: props.body ?? 'content',
-    format: 'markdown',
-    createdAt: props.createdAt,
+  await prisma.revisions.create({
+    data: {
+      id: id.toString(),
+      pageId: props.pageId.toString(),
+      authorId: props.author.toString(),
+      body: props.body ?? 'content',
+      format: 'markdown',
+      createdAt: props.createdAt,
+    },
   });
   return { _id: id };
 }
@@ -215,7 +215,7 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
 
   beforeEach(async () => {
     userId = makeId();
-    await Revision.deleteMany({});
+    await prisma.revisions.deleteMany();
     vi.mocked(configManager.getConfig).mockReturnValue(HUGE_LOOKBACK_SECONDS);
   });
 

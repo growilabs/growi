@@ -6,7 +6,9 @@
 
 **Users**: 共有リンクを受け取ったゲスト／外部協力者が、ページ本文に加えてコメントの議論文脈を把握できるようになる。
 
-**Impact**: 現在 `ShareLinkPageView` にはコメント領域が存在しない。本機能は (1) UI にコメント領域を read-only で追加し、(2) クライアントの取得フックに共有リンク文脈を伝播させ、(3) サーバーの `/comments.get` を共有リンク閲覧者に開放する。書き込み（投稿・更新・削除）は従来どおりゲスト不可のまま据え置く。
+**Impact**: 本機能は (1) `ShareLinkPageView` にコメント領域を read-only で置き、(2) 取得フックが共有リンクの ID（`shareLinkId`）を付けてコメントを取得するようにし、(3) 旧式のコメント取得 API `/_api/comments.get` を共有リンク閲覧者に開放する。書き込み（投稿・更新・削除）は従来どおりゲスト不可のまま据え置く。
+
+共有リンクの画面が実際にコメントを取得する先は、`comment` スペックのコメント一覧 API（`GET /_api/v3/comments`）である。この API が共有リンク経由で返すコメントの範囲（通常コメントとインラインコメントの両方を読み取り専用で返す）と、取得フックのキーは `comment` スペックが定める（`comment` 要件 3.3、3.4、2.5）。共有リンクの画面に表示するのは通常コメントだけで、インラインコメントは表示しない（`comment` スペックの要件 6.5）。
 
 実装は Redmine チケットに対応する 3 タスク群に整理する:
 1. Comments コンポーネントの有効化（read-only 描画）
@@ -29,26 +31,28 @@
 ### This Spec Owns
 - `ShareLinkPageView` におけるコメント領域の描画（read-only）。
 - `Comments` コンポーネントの `isReadOnly` 入口（投稿フォーム抑止と `PageComment` への伝播）。
-- `useSWRxPageComment` における共有リンク文脈（`shareLinkId` / `pageId`）のリクエスト伝播と SWR キャッシュキー。
-- `/comments.get`（`comment.api.get`）の共有リンク閲覧者に対するアクセス判定の分岐、および共有文脈での取得対象の単一 ID 化（`revision_id` 分岐の抑止を含む）。
-- `certify-shared-page.js` の **additive な一般化**（`req.query.pageId` に加えて `req.query.page_id` も検証対象として読む。既存呼び出し元は `pageId` 送信のため後方互換）。
+- 旧式の `/comments.get`（`comment.api.get`）の共有リンク閲覧者に対するアクセス判定の分岐、および共有文脈での取得対象の単一 ID 化（`revision_id` 分岐の抑止を含む）。
+- `certify-shared-page.js` が `req.query.pageId` に加えて `req.query.page_id` も検証対象として読むこと、および両方があって値が違うときに共有リンクとして認めないこと（`pageId` を送る他のルートの挙動は変わらない）。
 
 ### Out of Boundary
 - `comments.add` / `comments.update` / `comments.remove`（書き込み系は不変）。
 - 共有ページ本文取得・`ShareLink` モデル・期限判定（既存基盤に依存）。
 - 通常ページの `PageView` / コメント描画経路。
+- コメント一覧の取得。`GET /_api/v3/comments` の契約（共有リンク経由で返すコメントの範囲を含む）、各画面が共通で使うコメント一覧の取得フック `useSWRxCommentList` とそのキー `['/comments', pageId, shareLinkId]`、その上に作られた `useSWRxPageComment` が通常コメントだけを返すこと。いずれも `comment` スペックが持つ。
+- コメント1件の応答の整形（投稿者情報の安全化を含む）。旧式の `/comments.get` は `comment` スペックの旧 API 用の整形（`toLegacyCommentListItem`）を使う（`comment` 要件 5.4）。
 
 ### Allowed Dependencies
-- ミドルウェア `certify-shared-page.js`（query の `pageId`／`page_id` + `shareLinkId` を検証し `req.isSharedPage` を設定。本 spec で `page_id` も読むよう additive に一般化）。
+- ミドルウェア `certify-shared-page.js`（query の `pageId`／`page_id` + `shareLinkId` を検証し `req.isSharedPage` を設定する）。
 - 既存 `login-required.ts`（`isGuestAllowed && req.isSharedPage` でゲスト通過）。
-- 既存クライアントフック `useShareLinkId()`（hydrate 済み atom）。
+- `comment` スペックの取得フック `useSWRxPageComment`（通常コメントの一覧を返す。共有リンクの ID は、内部の `useSWRxCommentList` が `useShareLinkId()` から読んで取得に付ける）。
 - 既存 `PageComment` の `isReadOnly` プロパティ。
 
 ### Revalidation Triggers
 - `certify-shared-page.js` が読むクエリパラメータ名（`pageId` / `page_id` / `shareLinkId`）の変更。
 - `comment.api.get` のレスポンス形（`ApiResponse.success/error`）の変更。
 - `comment.api.get` の取得経路（`page_id` / `revision_id` 分岐）の変更 — 共有文脈の単一 ID 不変条件に影響。
-- `useSWRxPageComment` の戻り値型・SWR キー構造の変更（`PageComment` / `Comments` 両呼び出し元に影響）。
+- `comment` スペックの取得フックの変更。`useSWRxPageComment` の戻り値の型や、各画面が共通で使うコメント一覧の取得フック `useSWRxCommentList` のキー `['/comments', pageId, shareLinkId]` が変わったときは、共有リンクの画面が `shareLinkId` を付けて取得できること、`Comments` / `PageComment` の両方が同じ一覧を使うこと、画面に通常コメントだけが出ることを確かめ直す。契約の持ち主は `comment` スペック。
+- `comment` スペックが共有リンク経由で返すコメントの範囲（`comment` 要件 3.3）や、`useSWRxPageComment` がインラインコメントの行を除くこと（`comment` 要件 6.5）の変更 — 共有リンクの画面にインラインコメントが出るかどうかに影響する。
 
 ## Architecture
 
@@ -56,35 +60,37 @@
 
 GROWI には共有リンク認可の確立パターンが 2 系統あり、本設計は **query ベース**を採用する（`research.md` 参照）:
 
-- **採用（query ベース）**: `certify-shared-page.js` が共有対象ページ ID + `req.query.shareLinkId` を読み、`ShareLink.findOne({ _id: shareLinkId, relatedPage: pageId })` と `isExpired()` を検証して `req.isSharedPage = true` を設定。`/page/info`（`get-page-info.ts`）・`/revisions/list`（`revisions.js`）が採用。`comments.get` も JS 駆動 API のため同型に乗せられる。
+- **採用（query ベース）**: `certify-shared-page.js` が共有対象ページ ID（`pageId` または `page_id`）と `shareLinkId` を読み、`prisma.sharelinks.findFirst({ where: { id: shareLinkId, relatedPageId: pageId } })` で見つかった共有リンクが `isExpired()` でなければ `req.isSharedPage = true` を設定する。管理設定で共有リンクが無効（`security:disableLinkSharing`）なら何もしない。`/page/info`（`get-page-info.ts`）・`/revisions/list`（`revisions.js`）・旧式の `/comments.get`・`comment` スペックの `GET /_api/v3/comments` がこの方式を使う。
 - **不採用（referer ベース）**: `certify-shared-page-attachment/` は `<img src>` 等で query を制御できない添付ファイル向け。コメント取得には不要。
 
 ハンドラ側のアクセス判定は `revisions.js` の `!isSharedPage && !isAccessiblePageByViewer` 形に統一する。
 
+共有リンクの画面が使う `comment` スペックの `GET /_api/v3/comments` も、同じ `certifySharedPage` を通して共有リンクを判定する（`pageId` と `shareLinkId` を受ける）。
+
 #### 認可境界の単一 ID 不変条件（CRITICAL — 必読）
 
-手本の `revisions.js`（検証 L128・バイパス L146・取得 L134 すべて `req.query.pageId`）と `get-page-info.ts`（すべて `pageId`）は **「検証したページ」と「取得するページ」が同一の単一識別子**であり、取り違えが起きない。comments.get もこの不変条件を必ず守る。
+手本の `revisions.js`（検証・バイパス・取得のすべてで `req.query.pageId`）と `get-page-info.ts`（すべて `pageId`）は **「検証したページ」と「取得するページ」が同一の単一識別子**であり、取り違えが起きない。comments.get もこの不変条件を必ず守る。
 
-comments.get の素朴な再利用には罠がある: ハンドラ `comment.api.get` は取得に `req.query.page_id`（snake_case）を、ミドルウェア `certify-shared-page.js` は検証に `req.query.pageId`（camelCase）を使う。**この 2 つを別パラメータのまま放置すると IDOR（認可バイパス）になる**（`research.md` の CRITICAL-1 / CRITICAL-2 参照）。本設計は以下で単一 ID 化する:
+comments.get には罠がある: ハンドラ `comment.api.get` は取得に `req.query.page_id`（snake_case）を使い、他のルートの検証は `req.query.pageId`（camelCase）を使う。**検証と取得が別のパラメータを見ると IDOR（認可バイパス）になる**（`research.md` の CRITICAL-1 / CRITICAL-2 参照）。本設計は次の2点で検証と取得を1つの ID にそろえる:
 
-1. `certify-shared-page.js` を `pageId`（camelCase）と `page_id`（snake_case）の両方を読むよう additive に一般化（既存呼び出し元は `pageId` 送信で後方互換）。**ただし precedence による片寄せでは不十分**: `pageId || page_id` のように一方を優先すると、攻撃者が両方を異なる値で送ることで「ミドルウェアは `pageId`=A を検証・ハンドラは `page_id`=B を取得」という verify/fetch split を作れてしまう（A への有効な共有リンク＋`page_id`=B で B のコメントを窃取できる IDOR）。**そのため、両方が存在し値が異なるリクエストは ambiguous として `isSharedPage` を立てずに通す（拒否）**。正当な呼び出し元は片方しか送らないため後方互換で、これにより全ルートで「検証対象 ＝ 取得対象」の単一 ID 不変条件をサーバ側で強制できる（クライアントの善意に依存しない）。
+1. `certify-shared-page.js` は `pageId`（camelCase）と `page_id`（snake_case）の両方を読む（`pageId` を送る他のルートの挙動は変わらない）。**ただし一方を優先して読むだけでは不十分**: `pageId || page_id` のように一方を優先すると、攻撃者が両方を異なる値で送ることで「ミドルウェアは `pageId`=A を検証・ハンドラは `page_id`=B を取得」という、検証と取得のずれを作れてしまう（A への有効な共有リンク＋`page_id`=B で B のコメントを盗める IDOR）。**そのため、両方があって値が違うリクエストは、どちらを指すか決められないものとして `isSharedPage` を立てずに通す（共有リンクとして認めない）**。正当な呼び出し元は片方しか送らないので影響は無く、これにより全ルートで「検証対象 ＝ 取得対象」の単一 ID 不変条件をサーバ側で強制できる（クライアントの善意に依存しない）。
 2. 共有文脈（`isSharedPage === true`）では `revision_id` 分岐を使わず、検証済み `page_id` でのみ取得する。`revision_id` 経由で別ページの comment を取れる経路を閉じる。
 
 ### Dependency Direction
 
 ```
 States/atoms (useShareLinkId)
-  → Stores (useSWRxPageComment)
+  → Stores (useSWRxCommentList → useSWRxPageComment, owned by the comment spec)
     → Client components (Comments → PageComment / CommentEditorPre)
       → View (ShareLinkPageView)
 
-Server: routes/index.js (route wiring)
+Server (legacy /_api/comments.get): routes/index.js (route wiring)
   → middlewares (certify-shared-page, login-required)
     → comment.api.get (handler)
       → Page.isAccessiblePageByViewer (model)
 ```
 
-各層は左の層のみに依存する。クライアントとサーバーは `/_api/comments.get` の契約でのみ結合する。
+各層は左の層のみに依存する。共有リンクの画面とサーバーは、`comment` スペックの `GET /_api/v3/comments` の契約でのみ結合する。旧式の `/_api/comments.get` は、画面からは呼ばず、外部の API 利用者が使う。
 
 ### Architecture Pattern & Boundary Map
 
@@ -96,9 +102,11 @@ graph TB
         Comments --> CommentEditorPre
         Comments --> useSWRxPageComment
         PageComment --> useSWRxPageComment
-        useSWRxPageComment --> useShareLinkId
+        useSWRxPageComment --> useSWRxCommentList
+        useSWRxCommentList --> useShareLinkId
     end
-    useSWRxPageComment -->|GET comments.get page_id shareLinkId| CommentsGetRoute
+    useSWRxCommentList -->|GET v3 comments pageId shareLinkId| CommentListRoute[comment spec list route]
+    ApiCaller[external API caller] -->|GET comments.get page_id shareLinkId| CommentsGetRoute
     subgraph Server
         CommentsGetRoute --> certifySharedPage
         certifySharedPage --> loginRequired
@@ -110,17 +118,17 @@ graph TB
 
 **Key Decisions**:
 - `Comments` は read-only 時に `CommentEditorPre` を描画せず、`isReadOnly` を `PageComment` へ伝播する（投稿・返信・削除導線が全て消える）。
-- `useSWRxPageComment` は内部で `useShareLinkId()` を呼び、`Comments` / `PageComment` 双方の呼び出しで同一 SWR キーを共有する。共有時は既存の `page_id` に `shareLinkId` を併送する（**別 `pageId` は送らない** — 単一 ID 不変条件のため）。
-- 認可検証は `certify-shared-page.js` に委譲し、`comment.api.get` は `isSharedPage` を尊重する分岐を追加（ページ一致・期限はミドルウェアが担保）。**取得対象＝検証対象を単一 `page_id` に揃え**、共有文脈では `revision_id` 分岐を使わない（取り違えによる IDOR の排除）。
+- 取得は `comment` スペックの `useSWRxPageComment` に任せる。このフックは各画面が共通で使うコメント一覧の取得フック `useSWRxCommentList` を通して `GET /_api/v3/comments` に `pageId` と、共有時は `shareLinkId` を送る（`page_id` は送らない。検証する ID と取得する ID を1つにするため）。`Comments` / `PageComment` 双方の呼び出しは同じキー `['/comments', pageId, shareLinkId]` を共有し、インラインコメントの行を除いた通常コメントだけを受け取る。
+- 旧式の `/comments.get` では、認可検証は `certify-shared-page.js` に委譲し、`comment.api.get` は `isSharedPage` を尊重する分岐を追加（ページ一致・期限はミドルウェアが担保）。**取得対象＝検証対象を単一 `page_id` に揃え**、共有文脈では `revision_id` 分岐を使わない（取り違えによる IDOR の排除）。
 
 ### Technology Stack
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Frontend | React 18 + SWR | コメント領域の描画と取得 | 既存 `Comments` / `useSWRxPageComment` を拡張 |
-| Frontend State | Jotai (`useShareLinkId`) | 共有リンクID の供給 | hydrate 済み atom、無改修 |
+| Frontend | React 18 + SWR | コメント領域の描画と取得 | `Comments` を拡張。取得は `comment` スペックの `useSWRxPageComment` を使う |
+| Frontend State | Jotai (`useShareLinkId`) | 共有リンクID の供給 | hydrate 済み atom、無改修。`comment` スペックの `useSWRxCommentList` が読む |
 | Backend | Express (apiv1Router) | `/comments.get` のルーティングと認可 | 既存 `certify-shared-page.js` を挿入 |
-| Data | Mongoose (`ShareLink`, `Comment`, `Page`) | 共有リンク検証・コメント取得 | 既存モデル、無改修 |
+| Data | Prisma（`sharelinks`, `comments`）、Mongoose（`Page`） | 共有リンク検証・コメント取得・閲覧権限の確認 | 共有リンクの照合は `prisma.sharelinks`、旧式の `/comments.get` のコメント取得は `prisma.comments`、閲覧権限の確認は Mongoose の `Page.isAccessiblePageByViewer`。スキーマ変更なし |
 
 ## File Structure Plan
 
@@ -131,35 +139,35 @@ graph TB
 - `apps/app/src/components/ShareLinkPageView/ShareLinkPageView.tsx` — `next/dynamic`（`ssr: false`）で `Comments` を読み込み、`!isNotFound` かつ `page.revision != null` の分岐内（本文の直後・footer の前）に read-only で描画。
 
 **Task 2 — useSWRxPageComment 改善**
-- `apps/app/src/stores/comment.tsx` — `useSWRxPageComment` 内で `useShareLinkId()` を取得。SWR キーに `shareLinkId` を含め、取得時のクエリに（存在時のみ）`shareLinkId` を付与する。既存 `page_id` は維持し、**別 `pageId` は送らない**（単一 ID 不変条件）。`update` / `post` は不変。
+- `apps/app/src/stores/comment.tsx` — `useSWRxPageComment` は、`comment` スペックの各画面が共通で使うコメント一覧の取得フック `useSWRxCommentList`（`apps/app/src/features/comment/client/stores/comment-list.ts`）を通して取得する。`useSWRxCommentList` が `useShareLinkId()` を読み、SWR のキー `['/comments', pageId, shareLinkId]` と取得のクエリ（`pageId`、共有時のみ `shareLinkId`。`page_id` は送らない）に共有リンクの ID を載せる。キーと取得の契約は `comment` スペックが持つ。`update` / `post`（`/comments.update` / `/comments.add`）は不変。
 
 **Task 3 — isAccessiblePageByViewer 問題の解決（認可）**
-- `apps/app/src/server/middlewares/certify-shared-page.js` — 検証対象 ID の読み取りを `pageId`（camelCase）と `page_id`（snake_case）の両方に対応させる **additive 一般化**。既存呼び出し元（`/page/info`・`/revisions/list`）は `pageId` を送るため挙動不変。**precedence による片寄せ（`pageId || page_id`）は採らず、両方が存在し値が異なる ambiguous リクエストは `isSharedPage` を立てずに通す（拒否）**（verify/fetch split IDOR の封鎖、L70 参照）。これにより comments.get でも「検証対象＝取得対象」が単一 `page_id` に揃う。
-- `apps/app/src/server/routes/index.js` — `certifySharedPage`（`require('../middlewares/certify-shared-page')(crowi)`）を生成し、`/comments.get` ルートの `loginRequired` の**前**に挿入。あわせて MongoId バリデータ（`comment.api.validators.get()`）を結線。
+- `apps/app/src/server/middlewares/certify-shared-page.js` — 検証対象 ID の読み取りを `pageId`（camelCase）と `page_id`（snake_case）の両方から読む（`pageId` だけを読む形に `page_id` を足す）。`pageId` を送る他の呼び出し元（`/page/info`・`/revisions/list`）の挙動は変わらない。**一方を優先して読む形（`pageId || page_id`）は採らず、両方があって値が違うリクエストは `isSharedPage` を立てずに通す（共有リンクとして認めない）**（検証と取得のずれによる IDOR を防ぐ。上の「認可境界の単一 ID 不変条件」参照）。これにより comments.get でも「検証対象＝取得対象」が単一 `page_id` に揃う。
+- `apps/app/src/server/routes/index.js` — `certifySharedPage`（`setupCertifySharedPage(crowi)`。`certify-shared-page.js` の `setup` を import したもの）を生成し、`/comments.get` ルートの `loginRequired` の**前**に挿入。あわせて MongoId バリデータ（`comment.api.validators.get()`）を結線。
 - `apps/app/src/server/routes/comment.js` —
-  - `comment.api.get` のアクセス判定を `if (!req.isSharedPage && !(await Page.isAccessiblePageByViewer(pageId, req.user)))` に変更。
+  - `comment.api.get` は `req.isSharedPage` が真でなく、かつ `Page.isAccessiblePageByViewer(pageId, req.user)` が偽のときに拒否する。
   - 共有文脈では `revision_id` 分岐を使わず検証済み `page_id` で取得（CRITICAL-2 の閉塞）。
-  - `comment.api.validators.get()` を追加（`query('page_id').isString().bail().isMongoId()` / `query('shareLinkId').optional({ checkFalsy: true }).isString().bail().isMongoId()` / `query('revision_id').optional({ checkFalsy: true }).isString().bail().isMongoId()`）。scalar 強制（`.isString().bail()`）で配列注入面を閉じる。検証は**ルート段の `apiV1FormValidator` が短絡**するため、ハンドラ内に重複した `validationResult` チェックは置かない（L310 と一致）。
+  - `comment.api.validators.get()` を追加（`query('page_id').isString().bail().isMongoId()` / `query('shareLinkId').optional({ checkFalsy: true }).isString().bail().isMongoId()` / `query('revision_id').optional({ checkFalsy: true }).isString().bail().isMongoId()`）。scalar 強制（`.isString().bail()`）で配列注入面を閉じる。検証は**ルート段の `apiV1FormValidator` が短絡**するため、ハンドラ内に重複した `validationResult` チェックは置かない。
 
 ### New Files (tests)
 - `apps/app/src/server/routes/comment.integ.ts`（または既存 integ への追記）— `/comments.get` の共有リンク認可に対する統合テスト（下記 Testing Strategy）。
 
-> `certify-shared-page.js` は `page_id` も検証対象として読むよう additive に一般化する（後方互換）。正当なクライアントは `page_id` ＋ `shareLinkId` のみ送り別 `pageId` は併送しないが、**`pageId` と `page_id` が両方存在し値が異なる ambiguous リクエストはサーバ側で `isSharedPage` を立てず拒否する**（クライアントの善意に依存しない）。これにより「ミドルウェアが検証したページ」と「ハンドラが取得するページ」が単一 ID で一致し、取り違えによる IDOR を構造的に排除する。
+> `certify-shared-page.js` は `page_id` も検証対象として読む（`pageId` を送る呼び出し元の挙動は変わらない）。`/comments.get` を呼ぶ正当なクライアントは `page_id` ＋ `shareLinkId` のみ送り別 `pageId` は併送しないが、**`pageId` と `page_id` が両方あって値が違うリクエストは、サーバ側で `isSharedPage` を立てず、共有リンクとして認めない**（クライアントの善意に依存しない）。これにより「ミドルウェアが検証したページ」と「ハンドラが取得するページ」が単一 ID で一致し、取り違えによる IDOR を構造的に排除する。
 
 ## System Flows
 
-共有リンク経由ゲストのコメント取得フロー（非共有経路との分岐を含む）:
+共有リンクの画面は、`comment` スペックの `useSWRxPageComment` を通して `GET /_api/v3/comments?pageId&shareLinkId` から取得する。この API は同じ `certifySharedPage` で共有リンクを判定し、有効なら閲覧権限の確認を省いて、指定された版（`revisionId`）を無視してページ全体のコメントを返す。応答には通常コメントとインラインコメントの両方が入り、`useSWRxPageComment` がインラインコメントの行を除くので、画面には通常コメントだけが出る（流れの詳細は `comment` スペックの design.md「System Flows」）。
+
+旧式の `/_api/comments.get` を共有リンク経由で呼んだときの取得フロー（非共有経路との分岐を含む）:
 
 ```mermaid
 sequenceDiagram
-    participant Guest as Guest browser
-    participant Hook as useSWRxPageComment
+    participant Guest as API caller (guest)
     participant Route as comments.get route
     participant Certify as certifySharedPage
     participant Login as loginRequired
     participant Handler as comment.api.get
-    Guest->>Hook: render Comments (shareLinkId from useShareLinkId)
-    Hook->>Route: GET comments.get?page_id&shareLinkId
+    Guest->>Route: GET comments.get?page_id&shareLinkId
     Route->>Certify: verify ShareLink(_id=shareLinkId, relatedPage=page_id)
     alt valid and not expired
         Certify->>Certify: req.isSharedPage = true
@@ -183,7 +191,7 @@ sequenceDiagram
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1 | 共有ページでコメント一覧表示 | ShareLinkPageView, Comments | `CommentsProps` | comments.get フロー |
+| 1.1 | 共有ページでコメント一覧表示 | ShareLinkPageView, Comments（取得は `comment` スペックの `useSWRxPageComment`） | `CommentsProps` | 画面の取得（`GET /_api/v3/comments`） |
 | 1.2 | コメント0件でも非エラーで空状態案内を表示（read-only 時は投稿フォームが無く見出しのみだと空に見えるため、`page_comment.no_comments` メッセージを表示） | Comments | `CommentsProps.isReadOnly` | — |
 | 1.3 | トップページは非表示 | Comments（既存 `isTopPage` ガード） | — | — |
 | 1.4 | 取得失敗が本文表示を阻害しない | ShareLinkPageView | SWR error 分離 | — |
@@ -191,9 +199,9 @@ sequenceDiagram
 | 2.1 | 投稿フォーム非表示 | Comments（`isReadOnly`） | `CommentsProps.isReadOnly` | — |
 | 2.2–2.4 | 投稿/更新/削除拒否 | 既存 add/update/remove（無改修） | — | — |
 | 2.5 | 書き込み認証要件の維持 | routes/index.js（無改修部分） | — | — |
-| 3.1 | 共有文脈での取得許可 | comment.api.get, certifySharedPage | `comments.get` API | comments.get フロー |
+| 3.1 | 共有文脈での取得許可 | comment.api.get, certifySharedPage（画面が使う `GET /_api/v3/comments` の共有リンク対応は `comment` 要件 3.3） | `comments.get` API | comments.get フロー |
 | 3.2 | 権限不可ページでも許可 | comment.api.get（バイパス） | — | comments.get フロー |
-| 3.3 | 投稿者情報の安全化 | comment.api.get（既存 `serializeUserSecurely`） | — | — |
+| 3.3 | 投稿者情報の安全化 | comment.api.get（`comment` スペックの旧 API 用の整形 `toLegacyCommentListItem`。`comment` 要件 5.4）。画面が使う `GET /_api/v3/comments` は `toCommentListItem`（`comment` 要件 1.9） | — | — |
 | 4.1 | 共有文脈なしは拒否 | comment.api.get（`!isSharedPage` 分岐） | — | comments.get フロー |
 | 4.2 | ページ不一致は不許可 | certifySharedPage（`relatedPage` 一致検証）＋ **単一 ID 化**（検証 `page_id` ＝ 取得 `page_id`、共有文脈で `revision_id` 不使用） | — | comments.get フロー |
 | 4.3 | 期限切れ/無効は不許可 | certifySharedPage（`isExpired()`） | — | comments.get フロー |
@@ -206,7 +214,7 @@ sequenceDiagram
 |-----------|--------------|--------|--------------|------------------|-----------|
 | Comments | Client UI | コメント領域の描画と read-only 制御 | 1.1, 2.1 | useSWRxPageComment (P0), PageComment (P0) | State |
 | ShareLinkPageView | Client View | 共有ページに Comments を配置 | 1.1, 1.4, 1.5 | Comments (P0), useCurrentPageData (P0) | — |
-| useSWRxPageComment | Client Store | 共有リンク文脈を伴うコメント取得 | 3.1 | useShareLinkId (P0), apiGet (P0) | Service, API |
+| useSWRxPageComment（`comment` スペック） | Client Store | 通常コメントの一覧を返す（共有リンクの ID はコメント一覧の取得フックが付ける） | 3.1, 5.2 | useSWRxCommentList (P0) | State（契約は `comment` スペック） |
 | comments.get route | Server Routing | 認可ミドルウェアの結線 | 3.1, 4.1 | certify-shared-page (P0), login-required (P0) | API |
 | comment.api.get | Server Handler | isSharedPage を尊重した取得判定 | 3.1, 3.2, 4.1 | Page model (P0) | Service |
 
@@ -260,6 +268,8 @@ type CommentsProps = {
 
 ### Server Layer
 
+この節は旧式の `/_api/comments.get` を扱う。この API は外部の API 利用者のために残っていて、非推奨であり、入力・応答・認可の挙動を変えない（`comment` 要件 5.1、5.3）。共有リンクの画面は呼ばない。画面が使う `GET /_api/v3/comments` の入力・応答・認可は `comment` スペックの design.md「list route」が定める。
+
 #### comments.get route（routes/index.js）
 
 **Contracts**: API [x]
@@ -272,7 +282,7 @@ type CommentsProps = {
 > **別 `pageId` パラメータは受けない。** 検証・取得とも単一の `page_id` を使う（単一 ID 不変条件）。
 
 **Implementation Notes**
-- Integration: `const certifySharedPage = require('../middlewares/certify-shared-page')(crowi);` を生成し、`/comments.get` の `accessTokenParser → comment.api.validators.get() → apiV1FormValidator → certifySharedPage → loginRequired → comment.api.get` の順に挿入。
+- Integration: `const certifySharedPage = setupCertifySharedPage(crowi);` を生成し、`/comments.get` の `accessTokenParser → comment.api.validators.get() → apiV1FormValidator → certifySharedPage → loginRequired → comment.api.get` の順に挿入。
 - Validation: `comment.api.validators.get()` で `page_id`（必須）/ `shareLinkId` / `revision_id`（任意）を MongoId 検証し、**既存の `apiV1FormValidator` ミドルウェアで短絡**する（`revisions.js` の `apiV3FormValidator` と同型の apiv1 版）。これを `certifySharedPage` の**前段**に置くことで、不正入力（`page_id[$gt]=` 等）が共有リンク DB クエリにもハンドラにも到達せず、非キャスト ID による 500 も防ぐ（NoSQL injection 面の閉塞、HIGH 指摘対応）。`certifySharedPage` は `page_id`/`shareLinkId` が揃わない通常リクエストでは何もせず `next()`（非共有経路は不変、5.2）。
 - Risks: 既存 `accessTokenParser` / `loginRequired` の順序を保持する。`certifySharedPage` は `loginRequired` の前段でなければならない（ゲスト通過が `req.isSharedPage` に依存するため）。
 
@@ -283,7 +293,7 @@ type CommentsProps = {
 **Responsibilities & Constraints**
 - `req.isSharedPage` が真のときは viewer アクセスチェックをバイパスする。
 - ページ一致・期限はミドルウェアが担保済み。**ただしバイパスの適用対象は「検証された `page_id`」に限定する** — 共有文脈では `revision_id` 分岐を使わず、検証済み `page_id` でのみコメントを取得する（CRITICAL-2 の閉塞）。
-- 投稿者情報は既存 `serializeUserSecurely` で安全化（3.3）。
+- 投稿者情報は `comment` スペックの旧 API 用の整形（`toLegacyCommentListItem`）で、パスワード・API トークン・非公開のメールアドレスを除いた形にする（3.3。`comment` 要件 5.4）。
 
 ```typescript
 const pageId = req.query.page_id;
@@ -300,20 +310,22 @@ if (!isAccessible) {
 
 // revision_id は別ページの revision を指しうる。共有文脈では参照せず、
 // 検証済み page_id でのみ取得する（取り違えによる漏洩を防ぐ）。
-// （ローカル変数名は express-validator の `query` と衝突しないよう `commentQuery`）
-const commentQuery = (revisionId && !isSharedPage)
-  ? Comment.findCommentsByRevisionId(revisionId)
-  : Comment.findCommentsByPageId(pageId);
+const comments =
+  revisionId && !isSharedPage
+    ? await prisma.comments.findCommentsByRevisionId(revisionId, { include: { creator: true } })
+    : await prisma.comments.findCommentsByPageId(pageId, { include: { creator: true } });
+
+res.json(ApiResponse.success({ comments: comments.map(toLegacyCommentListItem) }));
 ```
 
 **Implementation Notes**
 - Integration: viewer バイパス分岐は `revisions.js` と同形。加えて共有文脈の `revision_id` 抑止を追加。入力検証は `apiV1FormValidator` がルート段で短絡するため、ハンドラ内に重複した `validationResult` チェックは置かない。
-- Risks: `isSharedPage` は `certify-shared-page.js` のみが設定するため、他経路で誤って真にならない。非共有（通常ログイン）経路の `revision_id` 取得は従来どおり維持される（5.2）。
+- Risks: `req.isSharedPage = true` を設定するミドルウェアは2つある。`certify-shared-page.js` と、添付ファイル用の `certify-shared-page-attachment.ts` である。`/comments.get` のミドルウェアの並び（`routes/index.js` の `accessTokenParser` → 入力の検証 → `apiV1FormValidator` → `certifySharedPage` → `loginRequired` → `comment.api.get`）には添付ファイル用のミドルウェアが入っていないので、この並びの中でフラグを立てるのは `certify-shared-page.js` だけである。そのため、共有リンクの検証を通らずにフラグが真になることは無い。非共有（通常ログイン）経路の `revision_id` 取得は従来どおり維持される（5.2）。
 
 ## Error Handling
 
 ### Error Strategy
-- **取得不可（4.1）**: `isSharedPage` false かつ viewer アクセス不可のとき、既存どおり `ApiResponse.error(...)`（HTTP 200, `ok:false`）を返す。クライアントは SWR エラーとして扱い、本文表示は阻害しない（1.4）。
+- **取得不可（4.1）**: `isSharedPage` false かつ viewer アクセス不可のとき、既存どおり `ApiResponse.error(...)`（HTTP 200, `ok:false`）を返す。
 - **無効/期限切れ/不一致（4.2, 4.3）**: `certify-shared-page.js` が `isSharedPage` を立てないため、上記の取得不可経路に合流して拒否される。
 - **クライアント取得失敗（1.4）**: `Comments` 描画は本文（`PageContentRenderer`）と独立しているため、コメント取得エラーが本文表示に波及しない。
 
@@ -326,8 +338,10 @@ const commentQuery = (revisionId && !isSharedPage)
 1. `Comments`：`isReadOnly` 省略時は `CommentEditorPre` を描画、`isReadOnly=true` で非描画（2.1）。
 2. `Comments`：`isReadOnly` を `PageComment` に伝播すること（2.1）。
 3. `Comments`：`isReadOnly=true` かつコメント0件時に `page_comment.no_comments` を表示し、コメントありの時・編集可能ビュー（`isReadOnly` 省略）時は表示しないこと（1.2）。
-4. `useSWRxPageComment`：`shareLinkId` 非null時、クエリに `page_id` と `shareLinkId` を含み（**別 `pageId` は含まない**）、SWR キーが `shareLinkId` で分離される（3.1）。
-5. `useSWRxPageComment`：`shareLinkId` null時は従来クエリ（`page_id` のみ）で `shareLinkId` を送らない（5.2）。
+4. `useSWRxPageComment`：共有リンクのページでは `pageId` と `shareLinkId` を送り、インラインコメントの行を返さない（3.1）。
+5. `useSWRxPageComment`：通常ページでは `pageId` だけを送り、`shareLinkId` を送らない。旧式の `/comments.get` は呼ばない（5.2）。
+
+4 と 5 は `apps/app/src/stores/comment.spec.tsx` にある。キーと取得の契約は `comment` スペックが持つ。
 
 ### Integration Tests（`/comments.get`）
 1. 有効な共有リンク（`page_id`+`shareLinkId` 一致）でゲストがコメントを取得できる（3.1, 3.2）。
@@ -339,6 +353,8 @@ const commentQuery = (revisionId && !isSharedPage)
 5. **入力バリデーション（負のテスト）**: `page_id` が MongoId でない（例 `page_id[$gt]=`）リクエストはバリデータで弾かれる（HIGH）。
 6. **書き込みの非開放（負のテスト）**: 有効な `shareLinkId` を伴っても未ログインの `comments.add` は拒否される（2.2）。`comments.update` / `comments.remove` も同様にゲスト拒否のまま（2.3, 2.4）。read-only 境界がサーバー側で保持されることを保証する。
 
+上記は `apps/app/src/server/routes/comment.integ.ts` にある。画面が使う `GET /_api/v3/comments` の共有リンクの結合テスト（ゲストに通常コメントとインラインコメントが返る、別ページの共有リンクは無効扱い、`revisionId` を無視する）は `comment` スペック側の `apps/app/src/features/comment/server/routes/list.integ.ts` にある。
+
 ### E2E/UI Tests
 1. 共有リンクページを未ログインで開き、既存コメントが表示され、投稿フォームが存在しない（1.1, 2.1）。
 2. コメント0件の共有リンクページを開くと、エラーではなく空状態案内（「コメントはありません」）が表示される（1.2）。
@@ -346,10 +362,10 @@ const commentQuery = (revisionId && !isSharedPage)
 
 ## Security Considerations
 
-- **単一 ID 不変条件（最重要 / IDOR 防止）**: 「ミドルウェアが検証するページ」と「ハンドラが取得するページ」を同一の単一 `page_id` に揃える。別 `pageId` を併送しない（クライアント・API 契約とも）。これにより、有効な共有リンクを 1 つ持つだけで別ページのコメントを読む取り違え攻撃（CRITICAL-1）を構造的に排除する。手本の `revisions.js` / `get-page-info.ts` と同じ不変条件。
+- **単一 ID 不変条件（最重要 / IDOR 防止）**: 「ミドルウェアが検証するページ」と「ハンドラが取得するページ」を同一の単一 `page_id` に揃える。旧式の `/comments.get` の API 契約は別の `pageId` を受けない。画面は `comment` スペックの `GET /_api/v3/comments` に `pageId` だけを送り、`page_id` を併送しない。これにより、有効な共有リンクを 1 つ持つだけで別ページのコメントを読む取り違え攻撃（CRITICAL-1）を構造的に排除する。手本の `revisions.js` / `get-page-info.ts` と同じ不変条件。
 - **`revision_id` 経路の閉塞（CRITICAL-2）**: `revision_id` はページと独立にコメントを取得しうるため、共有文脈（`isSharedPage`）では参照せず検証済み `page_id` でのみ取得する。非共有（ログイン済み）経路の `revision_id` 取得は従来どおり。
 - **入力バリデーション**: `comments.get` に `page_id` / `shareLinkId` / `revision_id` の MongoId バリデータを付与し、`?page_id[$gt]=` 等のオブジェクト注入面を閉じる（手本と同等）。
-- **情報露出の限定**: コメント取得許可は `certify-shared-page.js` が `{ _id: shareLinkId, relatedPage: page_id }` の一致と `isExpired()` を検証した場合のみ。共有リンクの対象ページ以外のコメントは取得できない（4.2）。
+- **情報露出の限定**: コメント取得許可は `certify-shared-page.js` が `{ id: shareLinkId, relatedPageId: page_id }` に一致する共有リンクを見つけ、それが `isExpired()` でない場合のみ。共有リンクの対象ページ以外のコメントは取得できない（4.2）。
 - **書き込みの非開放**: `comments.add/update/remove` は `loginRequiredStrictly` のまま。本機能は読み取りのみを開放する（2.2–2.5）。
-- **投稿者個人情報**: `serializeUserSecurely` により安全な形でのみ返す（3.3）。
-- **`isSharedPage` の単一供給源**: `certify-shared-page.js` 以外がこのフラグを設定しないことを前提に、ハンドラのバイパスは安全。`certify-shared-page.js` の一般化は検証対象 ID の読み取り元を増やすだけで、検証ロジック（`relatedPage` 一致 ＋ `isExpired()`）は不変。
+- **投稿者個人情報**: 旧式の `/comments.get` は `comment` スペックの `toLegacyCommentListItem` で、パスワード・API トークン・非公開のメールアドレスを除いた形で返す。画面が使う `GET /_api/v3/comments` は `toCommentListItem` で、ID・ユーザー名・表示名・プロフィール画像の URL の4項目だけを返す（3.3。`comment` 要件 1.9、5.4）。
+- **`isSharedPage` を立てる場所**: このフラグは `certify-shared-page.js` のほかに、添付ファイル用の `certify-shared-page-attachment.ts` も設定する。ただし添付ファイル用のミドルウェアは添付ファイルのルートだけに付いていて、`/comments.get`（`routes/index.js`）と `GET /_api/v3/comments` のミドルウェアの並びには入っていない。これらの並びの中でフラグを立てるのは `certify-shared-page.js` だけなので、ハンドラのバイパスは安全である。`certify-shared-page.js` は検証対象 ID を `pageId` と `page_id` の両方から読むが、検証の中身（`relatedPageId` の一致 ＋ `isExpired()`）はどちらでも同じ。
