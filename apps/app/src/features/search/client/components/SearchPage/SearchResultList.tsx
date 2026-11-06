@@ -111,12 +111,9 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     true,
   );
 
-  // Mounted rows keyed by pageId. Each row gets a ref callback created once per
-  // pageId: PageListItemL is `memo(forwardRef(...))`, and React compares `ref`
-  // identity too, so an inline callback would re-render every row every time.
-  // The callback must outlive null calls: PageListItemL's no-deps
-  // useImperativeHandle detaches (null) and re-attaches the ref on every
-  // re-render of the row, not only on unmount.
+  // One stable ref callback per pageId (see design.md, SearchResultList). It
+  // must outlive null calls: PageListItemL's no-deps useImperativeHandle
+  // detaches and re-attaches the ref on every re-render of the row.
   const itemsRef = useRef(new Map<string, ISelectable>());
   const itemRefCallbacksRef = useRef(
     new Map<string, (item: ISelectable | null) => void>(),
@@ -227,8 +224,7 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
     [t, onItemMutated],
   );
 
-  // Read by deletedHandler instead of listing them as deps: otherwise every
-  // preview switch would hand a new handler to (and so re-render) every row.
+  // Read via refs to keep deletedHandler stable (see design.md, SearchResultList).
   const latestPagesRef = useRef(pages);
   latestPagesRef.current = pages;
   const latestSelectedPageIdRef = useRef(selectedPageId);

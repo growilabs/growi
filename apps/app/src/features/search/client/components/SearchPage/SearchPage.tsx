@@ -341,8 +341,7 @@ export const SearchPage = (): JSX.Element => {
               </OperateAllControl>
             </div>
 
-            {/* Pair the selected count with the loaded count: select-all covers
-                only the loaded results, not every hit (Req 4.7). */}
+            {/* Select-all covers only the loaded results (Req 4.7). */}
             <span role="status" className="ms-3 text-muted text-nowrap">
               {t('search_result.selected_count_of_loaded', {
                 selectedCount,
