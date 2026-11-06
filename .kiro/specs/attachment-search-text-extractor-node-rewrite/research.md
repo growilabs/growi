@@ -3691,3 +3691,2155 @@ const validatorFor = (path: string, method: string, status: number) => {
 - `hono-openapi` の残り 7 件を、後処理なしで消せる設定 (2 回の調整で消えなかった所で止めた)。
 - orval 7.2.0 以外の版で作り直した場合の生成クライアント。
 - 説明文の英語の文そのものの良し悪しを、英語を読む人に確かめること。
+
+## 18. テキスト系の部品 (T6、タスク 3.5)
+
+2026-11-05 に devcontainer (Node 24.21.0、ICU 78.3、Linux) で、使い捨ての場所 (scratchpad の `t6/`) に候補を入れて試した結果。
+
+- 変えていないもの: 抽出サービスの package、`pnpm-lock.yaml`、本番の `src/`、`test/`、`benchmark/`、Python 版 (`.venv` は読むだけ。Python 版の関数を、サービスを起動せずに直接呼んだ)。
+- 数字と結果は、とくに書いていなければ **実測**。測っていないものは「未検証」、コードや文書を読んで考えたものは「推論」と書いた。
+- 「ベンチマークのテキスト系の指標」は、12・13 節の指標 (a)〜(d) のうち、テキスト系の形式 (txt・csv・html) の行と、ZIP と XML の部品が結果を左右する OOXML の形式 (xlsx・pptx) の行を指す。docx などの anydoc にそのまま渡す形式と、PDF (T1 の範囲) は、T6 の部品を通らない。
+
+### 18.1 結論
+
+| 分野 | 採るもの (npm の実名と版) | 一言で |
+|---|---|---|
+| HTML の解析 | **`htmlparser2` 12.0.0 の `Tokenizer`** (`Parser` は使わない) | タグの切り出しだけに使う。`Parser` は開いた要素の一覧を持ち、閉じない要素が多い HTML で 2 乗の時間になるので使わない (18.5.1)。読み飛ばす要素・改行・セルの空白・空白のまとめ方は、Python 版の `_TextExtractor` と `_LineJoiner` を写した自前の層で行う。`recognizeSelfClosing: true` を渡し (無いと `<script src="a.js"/>` の後ろの本文が消える)、Python 版の `HTMLParser` と違う 4 つの点 (`<x / >`、`<title>` の中の `<&`、Python が捨てる数値の文字参照、終わりのタグの引用符の中の `>`) を adapter で合わせる (18.5.1) |
+| 文字コードの判定とデコード | **部品を使わない** | デコードは Node 標準の `TextDecoder` (full ICU)。判定は自前の関数 (空行を除いて 44 行)。UTF-32 も自前 (15 行)。Shift_JIS は、Python の cp932 と同じく単独の 0x80・0xA0・0xFD〜0xFF も読む自前の関数で読む。Python の codec のほうが狭い宣言 (`gb2312`・`euc-kr`・`big5`) は、Python が受け付けるバイトの範囲を先に見る (18.5.2) |
+| ZIP の読み | **`yauzl` 3.4.0** | CRC-32 は yauzl が確かめないので、自前で `zlib.crc32` で確かめる |
+| ZIP の書き | **`yazl` 3.3.1** | PPTX のスライドごとの package (無圧縮) と、XLSX の書き直し (圧縮方式を保って流しながら書く) の両方に使う。yauzl の読みの流れを yazl に直接つなぎ、200MiB の要素をピークの RSS +21MiB で書き直せた |
+| DTD とエンティティを展開しない XML の解析 | **`@xmldom/xmldom` 0.9.12** (これより古い版は使わない。18.8) | xmldom の誤りの報告は `warning` も含めてすべて例外にする。xmldom が通してしまう壊れた XML を拒む検査 (裸の `&`、本文の `]]>`、XML で使えない字、それを指す数値の参照、名前空間の予約の誤り)、DOCTYPE の `<!ENTITY` を拒む検査、書き戻すときに DOCTYPE を消して XML 宣言を UTF-8 にする処理、バイト列から文字列への変換は自前 (18.9 に全文)。CDATA・コメント・処理命令を除く前処理は、入力の 2 乗の時間にならない 1 回の走査で行う。xmldom 自身が名前空間の宣言の深い入れ子で 2 乗の時間になるので、名前空間の宣言が 1,000 個を超える部品は `limit_exceeded` で拒む (除く前の本文で数える)。Python 版と通す / 拒むを比べると、自分で作った 93 件では 1 件、別に作った 92 件 (2 回目のレビューのレビュアーの入力) では 4 件が違い、どれも壊れた XML かまれな文字コードの宣言だった (18.5.4、18.7 の 9) |
+
+確かめた結果:
+
+- **ベンチマーク**: 採った部品で作った試作のスタブ (18.4 の 5) に、2.7 の道具 (`run-benchmark.ts`) を書き換えずに向けた。
+  - PDF を除くすべての形式・すべての文書で、(a)〜(c) の表と文書ごとの判定が、Python 版のベースライン (`python-baseline.json`) と **1 字も違わなかった**。
+  - さらに、PDF を除く 20 文書の `pages[]` を、Python 版の `convert()` の出力と文字単位で比べた。**20/20 が同じ** だった。
+  - (d) Elasticsearch の段は、最初の回は devcontainer のディスクの使用率が 92% で測れなかった。6 回目のレビューの後の回 (`bench-r7.json`。ディスクの使用率 45%) では動き、PDF を含まない 24 行の検索の行と、PDF 以外の位置の問題 (`docx-ja.docx` の 1 件) がベースラインと同じだった。PDF の行と、PDF を含む「all」の行だけが違う (スタブが PDF を 500 にするため)。6 回目のレビューのレビュアーの回でも同じ結果だった。ただ、抽出した文字列が Python 版と同じなので、(d) も同じ結果になると推論する。
+- **Python 版の単体テストから写した検査**: 採った部品は、HTML 33/33 (htmlparser2 の `Tokenizer` の形。4 回目のレビューの後で 4 件、5 回目のレビューの後で 6 件、6 回目のレビューの後で 2 件を足した)、文字コード 46/46 (5 回目のレビューの後で 2 件を足した)、ZIP の読み 27/27、ZIP の書き 5/5、XML 23/23 がすべて通った。
+- **2.4 の文字コードのファイル** (コーパスの txt 7・csv 2・html 2): 採った自前の判定で 11/11 が、語句をすべて取れ U+FFFD が 0 だった。ほかの候補も 11/11 で、差は自分で作った 3 つの集まりで出た (18.5.2)。
+- **ZIP 爆弾と XXE**: どちらも Python 版と同じ線で止まった (18.5.3、18.5.4)。XML の **エンティティ・DTD・XXE の線** は defusedxml の既定と同じにした (DTD そのものは通し、エンティティの宣言は使われていなくても拒み、外部の資源を読みに行かない)。
+- **壊れた XML とまれな文字コードの扱い** は、エンティティの線とは別に Python 版 (expat) と比べた。自分で作った 93 件では 1 件、2 回目のレビューのレビュアーが別に作った 92 件では 4 件で、通す / 拒むが違った。違いは、展開した名前が同じ属性を持つ壊れた XML、WHATWG にだけある文字コードの名前 (`x-cp1252` など)、Python にだけある文字コードの名前 (`cp437`) である。どれも Req 2.3 のとおり記録だけにした (18.7 の 9)。実際の XLSX / PPTX に仕込んで Python 版の `convert()` と比べた 9 つのファイルでは、8 つが同じ結果だった。
+- **悪意のある入力での時間**: XML の解析 (自前の前処理と xmldom の両方) を 30 種類の悪意のある形で、また HTML・文字コード・ZIP・XML の部品ごとに 39 種類の悪意のある形で、N・2N・4N の大きさで測った (18.5.4、18.5.8)。ZIP の書き直しだけは、yazl の中で要素の数の 2 乗の時間になる (4 万個で 3 秒。要素の数の上限で先に断る。18.5.3)。HTML を `Tokenizer` にし、名前空間の宣言を除く前の本文で数えるようにした後は、試した形ではどれも時間が入力にほぼ比例した。部品の中に、試していない形で 2 乗になる処理が残っていないかは未検証である。PPTX の分割の前処理も、スライドの数に対して Python 版より速く伸びが小さかった。
+- **Python 版との出力の比べ直し** (5 回目のレビューの後。自分で作った 1,403 件と、レビュアーの 720 件。特殊なタグの自己終了の形、文字参照、宣言や処理命令、`<meta>` の書き方と宣言・中身の食い違い、壊れたバイトを中心にした): HTML は 1,380/1,403・714/720 が同じになり、6 回目のレビューの後に直した終わりのタグの読み方では、終わりのタグの集まり 2,000 件が 2,000/2,000 同じで、時間も比例した。試した集まりでは、本文が消える・語が割れる・文字参照が壊れる違いは残っていない (試していない形に残っていないかは未検証。18.12)。OOXML の構造を変えた 33 個 (欠けた要素・順序・空のシートとスライド・同じ名前の要素とシート) は 33/33 が同じだった。残る違いは 18.7 の 8 に記録した。
+- **悪意のある入力でのメモリ**: xmldom の DOM は、入力の 100〜600 倍のメモリを使うことがある (閉じていない開始タグ 0.6MB で +361MiB、兄弟の要素の並び 2.7MB で +453MiB)。PPTX の分割のピークの RSS も Python 版の約 6 倍 (4,000 スライドで 370MiB 対 62MiB) である。子の RSS の上限で止まる (`memory_exceeded`) が、どこまでを受け付けるかは 3.7 で子の中で測る (18.10)。
+- **ZIP の読みから書きへ流してつなぐ形**: 壊れた要素 (deflate の破損、大きさの偽り、方式 9・bzip2・LZMA) で誤りの受け手が無くプロセスが落ちる形だったので、受け手を付けて、どれも `malformed` (暗号化の flag は `encrypted`) で止まるようにした (18.5.3)。ZIP の書きの adapter も、元の流れが途中で失敗するとプロセスが落ちる形だったので直した。5 回目のレビューの後に、yazl が拒む名前 (`../x` など) の前に CRC の誤った要素がある約 300 バイトの XLSX でも落ちることが分かり、直した。直した後は、ZIP のバイト単位のファジング 8,000 件でプロセスが落ちなかった。6 回目のレビューの後に、ディレクトリの要素 (`xl/` など) を持つ正しい XLSX が 500 になることが分かり、書き直しでディレクトリの要素を飛ばすように直した (ディレクトリの要素を混ぜた 326 個で、末尾が `\` の決まりから外れた名前の 1 個と、スタブの限りの 4 個のほかは Python 版と同じ。18.5.3)。
+
+**契約は崩さない。ユーザーの判断が要る事項もない** (6 回目のレビューの後に、ディレクトリの要素を持つ正しい XLSX が 500 になる反例が見つかり、直した。名前の末尾が `\` の要素は ZIP の名前の決まりから外れた形で、6.x で決める名前の扱いに残した。18.5.3)。ベンチマークに退行が無く (Req 2.14 に当たらない)、エンティティ・DTD・XXE の線は Python 版と同じだからである。Python 版との違い (18.7) は、Req 2.3 のとおり記録だけにする。どれも、正しい文書の抽出の結果を変えるものではなく、契約 (API・エラー・設定) を崩すものでもない (18.7 の各項目に影響を書いた)。
+
+### 18.2 比べる元: Python 版が使っているもの
+
+コードを読んで確かめた。defusedxml の既定は `.venv` で実測した。
+
+| 分野 | Python 版 | 振る舞いの要点 |
+|---|---|---|
+| HTML | 標準の `html.parser` (`HTMLParser`、`convert_charrefs=True`) と自前の `_TextExtractor` | トークンを切り出すだけで、HTML5 の木は組まない。script / style / template / noscript / svg の中を捨てる。ブロック要素で改行し、td / th は空白でつなぐ。ASCII の空白だけをまとめる |
+| 文字コード | `charset-normalizer` 3.5.2 (候補を cp932・euc_jp・iso2022_jp・cp1252 に絞る) と、Python 標準の codec | 順は BOM → 宣言 (HTML の `<meta>`、XML 宣言) → ISO-2022-JP のエスケープ → 厳密な UTF-8 → 絞った判定 → cp932 → latin-1 |
+| ZIP | 標準の `zipfile` | 申告サイズの合計とエントリ数で先に断る。実際に展開したバイト数で上限を見る。CRC と長さが合わなければ `malformed` |
+| OOXML の XML | `defusedxml` 0.7.1 (`xml.etree` と expat) | 既定は `forbid_dtd=False, forbid_entities=True, forbid_external=True`。名前空間の接頭辞を保って書き戻す (`register_prefixes`) |
+| `.xml` のテキスト化 | 部品なし (正規表現でタグを除く) | 解析しないので、エンティティは展開しようがない。Node 版も同じ方針 (design.md の Security の節)。T6 の部品は要らない |
+
+defusedxml の既定で、実際にどう振る舞うか (実測):
+
+| 入力 | 結果 |
+|---|---|
+| `<!DOCTYPE r SYSTEM "x.dtd">`、`<!ELEMENT>` だけの DOCTYPE | 通る |
+| 内部のエンティティの宣言 (使っていない宣言も)、外部のエンティティ (`SYSTEM "file:///etc/passwd"`)、パラメーターのエンティティ | `EntitiesForbidden` で拒む |
+| 宣言の無いエンティティ (`&nope;`) | `ParseError` で拒む |
+| `encoding="UTF-9"` | `LookupError` で拒む |
+| UTF-8 のバイト列に `encoding="UTF-16"` が付いたもの | `ParseError` で拒む |
+| `encoding="Shift_JIS"` | `ValueError` (multi-byte encodings are not supported) で拒む |
+| BOM 付きの UTF-16 | 通る |
+| `&amp;`・`&#x41;`・`&#12354;` (属性の中も) | 読める |
+
+ipynb (`JSON.parse`) と CSV (anydoc) は部品が要らないので、T6 の範囲外とした。
+
+### 18.3 比べた候補
+
+版・ライセンス・依存の数・型定義・ESM は、npm の registry と、`npm install --ignore-scripts` で入れた中身 (`package.json` と LICENSE ファイル) の両方で確かめた。install のときに動く処理 (`preinstall`・`install`・`postinstall`・`binding.gyp`) は、推移的な依存も含めて **1 つも無かった** (18.8)。
+
+| 分野 | 候補 | 版 (公開日) | ライセンス | 直接の依存 | 型 / ESM | 採否 |
+|---|---|---|---|---|---|---|
+| HTML | `htmlparser2` | 12.0.0 (2026-03-20) | MIT (推移的な依存 5 個は BSD-2-Clause 4 個と MIT 1 個。18.8) | 4 | 型あり / ESM だけ | **採る** |
+| HTML | `parse5` | 8.1.0 | MIT | 1 | 型あり / ESM | 採らない |
+| HTML | `node-html-parser` | 9.0.6 | MIT | 2 | 型あり / CJS | 採らない |
+| 文字コード | 自前 (`TextDecoder` と点数づけ) | — | — | 0 | — | **採る** |
+| 文字コード | `chardet` | 2.2.0 | MIT | 0 | 型あり / CJS | 採らない |
+| 文字コード | `encoding-japanese` | 2.5.0 | MIT | 0 | 型あり / CJS | 採らない |
+| 文字コード | `chardetng-wasm` (Firefox の chardetng の WASM 版) | 1.0.2 (2022-04) | Apache-2.0 | 0 | 型あり / WASM の ESM | 採らない |
+| 文字コード | `jschardet` | 4.1.0 | 0BSD (3.x までは LGPL-2.1+) | 0 | — | 試さずに外した (18.8) |
+| 文字コード | `iconv-lite` | 0.7.3 | MIT | 1 | — | 判定はできない。デコードでも要らない (18.5.2) |
+| ZIP の読み | 自前 (中央ディレクトリ + `zlib.inflateRaw`) | — | — | 0 | — | 採らない (通ったが 18.6) |
+| ZIP の読み | `yauzl` | 3.4.0 (2026-06-07) | MIT | 1 (`pend`) | `@types/yauzl` 3.4.0 / CJS | **採る** |
+| ZIP の読み | `fflate` | 0.8.3 | MIT | 0 | 型あり / 両方 | 採らない |
+| ZIP の読み | `adm-zip` | 0.6.1 | MIT | 0 | 型あり / CJS | 採らない |
+| ZIP の読み | `jszip` | 3.10.2 | MIT または GPL-3.0 (選べる) | 4 | 型あり / CJS | 採らない |
+| ZIP の書き | 自前 (`zlib.createDeflateRaw` + `crc32`) | — | — | 0 | — | 採らない (通ったが 18.6) |
+| ZIP の書き | `yazl` | 3.3.1 (2024-11-23) | MIT | 1 (`buffer-crc32`) | `@types/yazl` 3.3.1 / CJS | **採る** |
+| ZIP の書き | `fflate` (`Zip`) | 0.8.3 | MIT | 0 | 型あり | 採らない |
+| XML | `@xmldom/xmldom` | 0.9.12 (2026-08-21) | MIT | 0 | 型あり / CJS | **採る** |
+| XML | `saxes` | 6.0.0 (2022-05) | ISC | 1 | 型あり / CJS | 採らない (通ったが 18.6) |
+| XML | `sax` | 1.6.1 | BlueOak-1.0.0 | 0 | — | 採らない |
+| XML | `fast-xml-parser` | 5.12.0 | MIT | 6 | 型あり / 両方 | 採らない |
+
+`htmlparser2`・`@xmldom/xmldom`・`yauzl` は、`pnpm-lock.yaml` にほかの package の依存として別の版 (`htmlparser2@8.0.2`、`@xmldom/xmldom@0.7.13`、`yauzl@2.10.0` / `3.1.3`) がすでにある。採る版とは違う。
+
+### 18.4 比べ方
+
+1. **検査を先に書いた (RED)**。Python 版の単体テストの入力と期待値を写した。
+   - 4 分野の検査 (`probe/checks/{html,charset,zip,xml}.mjs`)。ZIP の書きの検査 (`zip-writer.mjs`) は後から足した。
+   - 候補を 1 つも書いていない状態で動かし、全部が失敗することを確かめた (18.11)。
+   - 写した元: `test_text.py` の HTML の部分、`test_charset.py` の全件、`test_archive_guard.py`、`test_ooxml_xml.py`、`test_xlsx_split.py` / `test_pptx_split.py` のエンティティ・未知の encoding・UTF-16 宣言の件。
+   - 細工した ZIP は、リポジトリの `test/fixtures/crafted-zip.ts`・`crafted-docx.ts`・`crafted-pptx.ts`・`crafted-xlsx.ts`・`encrypted-office.ts` の生成器で作った。読むだけで変えていない。swc-node で一度ファイルに書き出し、そのファイルを検査が読む。
+2. **候補ごとに違うのは部品の部分だけにした**。Python 版のコードを写した自前の層を、すべての候補で共通に使った。違いが部品から出ていると分かるようにするため。
+   - `line-joiner.mjs`: `_LineJoiner` と、読み飛ばす要素・改行・セルの規則を写したもの。
+   - `decode-pipeline.mjs`: `charset.decode` の順と `<meta>` / XML 宣言の読み取りを写したもの。判定の段だけを差し替えられる。
+   - `archive-guard.mjs`: `archive_guard.py` を写したもの。候補は「エントリの一覧」と「1 つのエントリを上限つきで読む」だけを受け持つ。
+   - `xml-bytes.mjs`: バイト列から文字列への変換を、expat が受け付けるものと同じ線にした関数。
+3. **文字コードの正解率は 3 つの集まりで測った**。どれも Python の codec で符号化し、同じバイト列を Python 版の `decode()` にも通して比べた。
+   - (i) 自分で書いた短文と長文 (184 件)。
+   - (ii) GROWI の `ja_JP` / `fr_FR` の locale の文字列 (7,074 件)。
+   - (iii) 調整に使わない **取り置きの集まり** (15,577 件)。自前の判定の重みは (ii) の結果を見て 1 回直したので、(iii) を作った。中身は、ほかの package の fr / de / es / it / pt / ja の locale (`@emoji-mart/data`・`yargs`・`speech-rule-engine`) と、このリポジトリの `.kiro/specs/*/requirements.md` の日本語の行。
+4. **ベンチマーク**: 試作の部品で `POST /extract` を真似る小さなスタブ (`probe/bench/stub.mjs`、`split.mjs`) を作った。
+   - txt・csv・html は採った文字コードと HTML の部品で処理する。
+   - xlsx・pptx は `pptx_split.py` / `xlsx_split.py` を写したものを、yauzl・yazl・XML の候補と anydoc 0.2.4 で処理する。
+   - docx などは anydoc にそのまま渡す。PDF は範囲外として 500 を返す。
+   - スタブに `run-benchmark.ts` を `--es-url` 付きで向け (道具は書き換えていない)、`python-baseline.json` と形式ごと・文書ごとに機械で比べた。
+   - そのうえで、Python 版の `convert()` の出力と `pages[]` を文字単位で比べた。
+5. **大きな入力**: 20MiB の HTML (`MAX_HTML_BYTES` の既定)、20MiB の EUC-JP、200MiB の ZIP の要素で、時間とピークの RSS (`/proc/self/status` の `VmHWM`) を測った。
+6. **読み込みの重さ**: 部品ごとに新しいプロセスで読み込み、`VmRSS`・`VmSize`・`VmPeak` の増え方を測った。3.6 の仮想メモリの上限の材料にする。
+
+### 18.5 結果
+
+#### 18.5.1 HTML
+
+| 候補 | 検査 (33 件。6 回目のレビューの後) | Python 版と同じ出力 (32 件の追加の入力) | 20MiB の HTML の文字列の解析だけ: 時間 / ピークの RSS | 開いた要素を積む形 (下の表) |
+|---|---|---|---|---|
+| **htmlparser2 の `Tokenizer`** (採る形) | **33/33** | **32/32** | **約 720ms / 293〜295MiB** (読み・デコードを含む実際の流れは下の表) | 比例 |
+| htmlparser2 の `Parser` | 23/33 | 32/32 | 842ms / 295MiB | **2 乗** |
+| node-html-parser | 26/33 | 27/32 | 1,704ms / 1,139MiB | **2 乗** |
+| parse5 | 27/33 | 31/32 | 1,270ms / 701MiB | **2 乗** (10 万段の入れ子に 44 秒) |
+| (Python 版の html.parser) | — | — | 3,807ms / 138MiB (`ru_maxrss`) | — |
+
+- 32 件の追加の入力は、表のセル・`<br>`・閉じていない `<p>`・`<pre>`・セミコロンの無い `&nbsp`・`<textarea>`・`<iframe>`・大文字のタグ・`</scr' + 'ipt>` を含む script・`--!>` で閉じるコメント・DOCTYPE と処理命令・`<math>`・属性の中の `>`・閉じていないコメントなど。Python 版の `_html_to_text` の出力と文字単位で比べた (`probe/html/inputs.json`)。
+- node-html-parser が Python 版と違った 5 件: `<textarea>` と `<iframe>` の中のタグを捨てる。`<!-- c --!>`・`<!DOCTYPE html><?xml …?>`・閉じていないコメントを **本文として出す**。最後の 3 件は、タグの断片が検索の対象に混ざる形である。
+- parse5 が違った点:
+  - `<svg>SECRET <b>inner</b></svg>` の `inner` が本文に出た。HTML5 の木の組み立てでは、svg の中の `<b>` が svg の外に出されるため。
+  - `<td>c1<td>c2` が `c1c2` になった。
+  - いずれも、木を組む部品と、トークンを切り出すだけの Python 版との違いである。
+- htmlparser2 の 20MiB のピークの RSS は、Python 版の 2 倍以上ある。
+- 検査は 25 件にした (4 回目のレビューの後)。前の 21 件のうち「10 万段の入れ子を 10 秒未満」を「1 秒未満」に締め (10 秒では緩く、2 乗を見逃した)、開いた要素を積む 4 つの形 (下の表) で N=2 万と 8 万の時間の比が 6 倍未満、8 万で 1 秒未満、という 4 件を足した (21 + 4 = 25)。
+
+**`Parser` か `Tokenizer` か** (4 回目のレビューの指摘。ソースと実測で確かめた):
+
+- htmlparser2 12.0.0 の `Parser` (`dist/Parser.js`) は、開いた要素の一覧を `stack.unshift` で積み (299 行)、閉じタグごとに `indexOf` で探し (346 行)、`shift` で外す (391 行)。開いたままの要素の数に比例する手間が 1 つのタグごとにかかるので、閉じない要素の多い HTML では全体が 2 乗の時間になる。Python 版の `HTMLParser` は、開いた要素の一覧を持たない。
+- `Tokenizer` は、タグ・本文・文字参照を切り出して callback に渡すだけで、一覧を持たない。`Callbacks` (`dist/Tokenizer.d.ts`) は `onopentagname`・`onselfclosingtag`・`onclosetag`・`ontext`・`ontextentity` (文字参照をコードポイントで渡す) と、属性・コメント・CDATA・宣言・処理命令の callback である。採る形は前の 5 つだけを使い、ほかは何もしない (18.9)。`<script>`・`<style>`・`<title>`・`<textarea>`・`<xmp>`・`<iframe>`・`<noembed>`・`<noframes>`・`<plaintext>` の中身は、`Tokenizer` 自身が本文として扱う (`Sequences` と `specialStartSequences`)。
+- 開いた要素を積む形 (`probe/html/shapes-time.mjs`、`py-shapes.py`。N = 2.5 万 / 5 万 / 10 万):
+
+  | 形 | `Tokenizer` (採る形) | `Parser` | Python 版 |
+  |---|---|---|---|
+  | 閉じない `<div>` の後に対応しない `</svg>` (最大 1.05MB) | 11 / 18 / 26ms | 1,267 / 5,391 / 19,440ms | 72 / 145 / 288ms |
+  | 閉じない `<font>x` (古い HTML によくある形。最大 0.67MB) | 6 / 10 / 20ms | 198 / 254 / 637ms | 48 / 95 / 189ms |
+  | 閉じた `<div>` の入れ子 (最大 1.05MB) | 11 / 19 / 38ms | 520 / 2,631 / 9,739ms | 83 / 165 / 327ms |
+  | 閉じない `<span>` の入れ子 (最大 0.57MB) | 4 / 5 / 9ms | 38 / 1,360 / 596ms | 31 / 63 / 127ms |
+
+  4 回目のレビューのレビュアーの実測では、`Parser` の形は 990KB の `stray-1m.html` で 20.9 秒 (Python 版 316ms)、HTML とデコードの流れのファジング 1,000 件強で 28 件が 1.5 秒を超え、最悪は 4.6MB で 188 秒だった。
+- **出力の違い**: Python 版の `_html_to_text` と比べた。
+  - 32 件の追加の入力: `Tokenizer` 32/32、`Parser` 32/32。
+  - 4 回目のレビューのレビュアーのタグの崩れた HTML 602 件 (コーパスの HTML 2 件を含む。`$S/out/tagsoup-rv6.json`): **`Tokenizer` 602/602**、`Parser` 490/602。`Parser` は暗黙の閉じタグや開いた要素の扱いで Python 版と違い、本文がまるごと消える例もあった (Python 版 `"あ"` に対し `""`)。
+  - 自分で作った別のタグの崩れた HTML 1,000 件 (`probe/html/gen-tagsoup.mjs`。種と断片をレビュアーのものと変え、`<textarea>`・`<title>`・`<iframe>`・`<xmp>`・`<plaintext>`・`<noembed>`、壊れたタグ `<p<`・`</p<`・`< p>`、閉じない引用符、文字参照を足した。`$S/out/tagsoup.json`): `Tokenizer` 982/1,000 (4 回目のレビューの後の形。5 回目のレビューの後の直しで 1,000/1,000。下の「自己終了の形の特殊なタグと…」)、`Parser` 839/1,000。
+
+**自己終了の形の特殊なタグと、Python 版に合わせた 3 つの点** (5 回目のレビューの指摘。自分で再現してから直した):
+
+- **直す前の形の誤り**: `Tokenizer` に `{ decodeEntities: true }` だけを渡していた。この設定では `recognizeSelfClosing` が false のままで、`Tokenizer` は `<script src="a.js"/>` の `/>` を無視し、`</script` が来るまでを中身を生で読む領域にした (`dist/Tokenizer.js` の `stateInSelfClosingTag`。callback の `onselfclosingtag` を呼んだ後で、その領域に入る)。`<title/>`・`<iframe …/>`・`<style/>`・`<textarea/>`・`<xmp/>`・`<noembed/>`・`<plaintext/>` も同じだった。Python 3.12.15 の `HTMLParser` は、`/>` で閉じたタグでは特殊な読み方に入らない (`html/parser.py` の `parse_starttag`。470〜481 行)。
+- **再現** (`$S/r6/red-loss.txt`。直す前の形と Python 版の `_html_to_text` の出力):
+
+  | 入力 | Python 版 | 直す前の Node 版 |
+  |---|---|---|
+  | `<noscript><iframe src="https://www.googletagmanager.com/…" height="0" width="0"/></noscript><p>会議の議事録</p><p>来期の計画</p>` (タグ管理の部品が埋め込む形) | `会議の議事録` / `来期の計画` | `""` (本文がまるごと消える) |
+  | `<template><script src="a.js"/></template><h1>見出し</h1><p>本文</p>` | `見出し` / `本文` | `""` |
+  | `<svg><style/></svg><p>本文が消える</p>` | `本文が消える` | `""` |
+  | `<script src="a.js" /><p>Hello</p><script>var secret=1;</script><p>World</p>` | `Hello` / `World` | `<p>Hello</p><script>var secret=1;` / `World` (タグの断片と script のコードが本文に入る) |
+  | `<p>前</p><textarea/><p>後 &amp; 続き</p>` | `前` / `後 & 続き` | `前` / `<p>後 & 続き</p>` |
+
+  5 回目のレビューのレビュアーの 720 件 (手書き約 150 件・乱数の組み合わせ 500 件・文字コードの組み合わせ。バイト列からデコードして比べた) では、直す前の形は 498 件だけが (レビュアーの実測) Python 版と同じだった。それまでの 32 件・602 件・1,000 件には `<script/>` のような形が無かったので見つからなかった。
+- **直したこと** (18.9 の `html/htmlparser2.mjs`):
+  1. `recognizeSelfClosing: true` を渡す。`<script/>` などは特殊な読み方に入らない。
+  2. **`/` と `>` の間に空白がある形** (`<script / >`・`<title/ >`): Python 版 (と WHATWG) では自己終了ではなく、ふつうの開始タグである。htmlparser2 は空白を飛ばして自己終了として扱う。`onselfclosingtag` に渡る `>` の位置の 1 つ前が `/` でなければ、閉じたことにせず、その 1 つのタグに限って `tokenizer.recognizeSelfClosing` を false にする。`Tokenizer` は、続く処理でこの値を見て、`>` の後と同じく中身を生で読む領域に入る (`stateInSelfClosingTag` が callback の後にこの値を読む)。次の開始タグの `onopentagname` で true に戻す。`recognizeSelfClosing` は型定義では `private readonly` だが、JavaScript では書き換えられる。htmlparser2 の版を上げたときに壊れうるので、6.x の検査にこの形を入れる (18.10)。
+  3. **`<title>`・`<textarea>` の中で `<` の直後に来る文字参照** (`<title>a<&amp;b</title>`): `Tokenizer` は `<` の後で終わりのタグを探す状態になり、その間の `&` を文字参照として扱わない (`stateInSpecialTag`)。そのため `&amp;` が残った。この 2 つの要素の中の本文に `&` が残っていれば、`entities` の `decodeHTML` (htmlparser2 の依存。8.1.0、BSD-2-Clause) でもう一度直す。ほかの文字参照はすでに `ontextentity` で渡っているので、二重に直すことは無い。
+  4. **Python が捨てる数値の文字参照**: Python の `html.unescape` は、`&#1;` などの制御文字と `&#xFFFF;`・`&#x10FFFF;` などの非文字を空にする (`html/__init__.py` の `_invalid_codepoints`)。htmlparser2 は残す。Python と同じ範囲 (U+0001〜U+0008、U+000B、U+000E〜U+001F、U+007F、U+FDD0〜U+FDEF、各面の U+xFFFE / U+xFFFF) を捨てるようにした。
+  5. **終わりのタグの、`>` を含む引用符つきの属性** (6 回目のレビューの後に、読み方を下の「終わりのタグの読み方の直し」の形に替えた) (`</p a="><script>">本文`、`</p<<input value="<b>">`): Python 版は終わりのタグの属性も引用符を考えて読み、引用符の中の `>` を飛ばす (`locatetagend`)。htmlparser2 は名前の後を最初の `>` まで飛ばす (`stateAfterClosingTagName`)。そのため Node 版は `">` などの断片を本文に出し、引用符の中の `<script>` から後ろを script の中として読んで本文を落とした (`<p>前</p></p a="><script>">本文<p>後</p>` が Python 版 `前` / `本文` / `後`、直す前の Node 版 `前` だけ)。`onclosetag` で、Python 版の文法の正規表現 (`END_TAG_REST`。名前の後から、引用符つきの値を 1 つの塊として読む) を名前の後ろに当て、Python 版の終わりの `>` が最初の `>` より後ろなら、`Tokenizer` の位置 (`tokenizer.index`) をその手前に動かす。`Tokenizer` は続けてその `>` まで飛ばす。`index` も型定義では `private` で、2 と同じく htmlparser2 の版を上げたときに壊れうる (18.10)。正規表現は、名前の後ろから引用符の外の最初の `>` までしか読まないので、悪意のある形でも入力に比例した (18.5.8 の 3 つの形)。
+- 検査は 31 件にした。5 回目のレビューのレビュアーが挙げた 2 件 (`<script src="a"/><p>x</p>` と `<noscript><iframe src="x" height="0"/></noscript><p>本文</p>`) と、上の 2〜5 の 4 件 (`<title / >`・`<&amp;`・`&#1;`・終わりのタグの引用符) を足した。期待値はどれも Python 版の出力で確かめた。採る形は 31/31。`Parser` の形は 22/31、parse5 は 26/31、node-html-parser は 25/31 (`$S/out/green-r6.txt`)。
+- **出力の比べ直し** (直した後。Python 版の `_html_to_text` と、文字コードの組み合わせはバイト列から `decode` を通して比べた):
+
+  | 集まり | 直す前 (`Tokenizer`、`decodeEntities` だけ) | 直した後 |
+  |---|---|---|
+  | 32 件の追加の入力 (`inputs.json`) | 32/32 | 32/32 |
+  | 4 回目のレビューのレビュアーの 602 件 | 602/602 | 602/602 |
+  | 自分の 1,000 件 (`tagsoup.json`) | 982/1,000 | **1,000/1,000** |
+  | 5 回目のレビューのレビュアーの 720 件 (`rv7/html/mine.json`) | 499/720 (デコードの層は直した後のもの。レビュアーの数えでは 498) | **713/720** |
+  | 同じレビュアーの本文が消える 6 件と、手書きの 19 件 | 0/6、9/19 | 6/6、19/19 |
+  | **自分で作った 1,403 件** (`$S/r6/gen-html.py`。下の表) | 1,020/1,403 | **1,380/1,403** |
+
+  自分で作った 1,403 件の内訳 (Python で作り、バイト列にした):
+
+  | 中身 | 件数 | 直す前 | 直した後 |
+  |---|---|---|---|
+  | 特殊なタグ 13 種 (script・style・textarea・title・iframe・xmp・noembed・noframes・noscript・plaintext・template・svg・math) × 自己終了の書き方 12 種 (`/>`・` />`・`/ >`・` / >`・属性の中の `/`・引用符の無い属性値の後の `/`・大文字・改行の後の `/` など) × 2 種の前後 | 312 | 184 | **312** |
+  | 特殊なタグを、svg・template・noscript・表のセル・head・title・textarea の中に入れた形 | 273 | 228 | **273** |
+  | ふつうのタグの自己終了 (`<br/>`・`<p/>`・`<td/>` など 12 種) | 24 | 24 | 24 |
+  | 文字参照 30 種 (`;` の欠けたもの、`&#1;`・`&#x10FFFF;`・`&#128;`・`&#xD800;`・`&#99999999;`、大文字の名前、`&amp;amp;` など) を本文・title・textarea・属性・`<` の直後に置いた形 | 120 | 89 | **120** |
+  | `<![CDATA[`・`<?php ?>`・`<?xml ?>`・`<!DOCTYPE>`・`<!x>`・`<!-->`・`--!>`・`a < b`・`</ p>`・`</>`・文書の末尾の `<p` など 35 種 | 105 | 104 | 104 |
+  | 上の断片の乱数の組み合わせ | 320 | 168 | **320** |
+  | 文字コード (`<meta>` の書き方 9 種 × 宣言 18 種 × 実際のバイト列 4 種から選んだもの、BOM と宣言の食い違い、4096 バイトより後の `<meta>`、コメントの中の `<meta>`、末尾の壊れたバイト) | 249 | 223 | 227 |
+
+  1,403 件の残る 23 件と、720 件の残る 7 件は 18.7 の 8 に記録した。本文がまるごと消える違いは、どの集まりでも残っていない。
+- 直した後の時間は、開いた要素を積む 4 つの形と、新しく足した形 (`<title>` の中の `<&amp;` のくり返し、`<title / >` のくり返し、捨てる文字参照のくり返し) のどれも入力に比例した (18.5.8)。開いた要素を積む 4 つの形は、N = 2.5 万 / 5 万 / 10 万で 12 / 17 / 28ms、7 / 11 / 18ms、11 / 20 / 39ms、4 / 4 / 9ms (`$S/out/html-shapes-r6.txt`。下の表の `Tokenizer` の列とほぼ同じ)。20MiB の HTML (`$S/out/html20-r6.txt`。3 回ずつ): 実際の流れ (2) は 310 / 307 / 314MiB・801〜812ms、`--max-semi-space-size=4` で 203 / 215 / 204MiB、コピーしない形 (2'') は 304 / 303 / 296MiB、文字列の解析だけ (1) は 293MiB・約 778ms で、直す前 (下の表) とほぼ同じだった。
+
+**終わりのタグの読み方の直し** (6 回目のレビューの指摘。レビュアーが試した形 `$SP/rv8fix/probe/html/htmlparser2.mjs` をそのまま取り入れた。`$SP` は scratchpad):
+
+- **直す前の誤り** (5 回目のレビューの後に足した 5 つ目の点): 終わりのタグの名前の後ろを、1 本の正規表現 (`END_TAG_REST`) で Python 版の文法どおりに読んでいた。2 つの誤りがあった。
+  1. Python 版の文法で `>` で閉じない終わりのタグ (`</a x=">"` など) では、正規表現が文書の最後まで読み、`Tokenizer` の位置は動かさない。`Tokenizer` は引用符の中の `>` から先を読み続け、次の終わりのタグで、また文書の最後まで読み直す。そのため時間が入力の 2 乗になった。
+  2. 1 本の正規表現は、属性 1 つごとに戻り位置を積む。属性が約 220 万個ある 1 つの終わりのタグ (4.4MB) で `RangeError: Maximum call stack size exceeded` を投げた。本番では 500 になる見込みである。
+- **再現** (`$S/r7/red-endtag.txt`。直す前の形は `$S/probe/html/htmlparser2-r6.mjs`):
+
+  | 入力 | 直す前 | 直した後 | Python 版 (レビュアーの実測) |
+  |---|---|---|---|
+  | `</a x=">"` を 5 千 / 1 万 / 2 万 / 4 万個 (最大 360KB) | 363 / 1,440 / 5,593ms / 22.3 秒 (4 万個はレビュアーの実測) | 1 / 1 / 2 / 3ms | 4 万個で約 25ms |
+  | 同じ形を 20 万個 (1.8MB) | (測っていない) | 15ms | — |
+  | `<script>` の後ろに `</script x=">"` を 1 万 / 2 万個 | 1,587 / 6,255ms | 5 万 / 10 万 / 20 万個で 5 / 9 / 17ms | 5 万個で 74ms |
+  | 属性が約 220 万個の終わりのタグ (`$SP/rv8/html/bigattr.html`、4.4MB) | `RangeError` | 62ms、出力は `本文の前` / `本文の後` | 385ms、同じ出力 |
+
+- **直し方** (18.9 の `html/htmlparser2.mjs` の `endTagGt` と `onclosetag`):
+  - 名前の後ろの区切り (`END_TAG_SEP`) と、属性 1 つ (`END_TAG_ATTR`) を、それぞれ sticky な正規表現にし、属性を 1 つずつ読む繰り返しにした (`endTagGt`)。読む文法は前の 1 本の正規表現と同じで、戻り位置が積み上がらない。
+  - Python 版の文法で `>` で閉じない終わりのタグでは、`tokenizer.pause()` を呼んで残りを捨てる。Python 版も、閉じない終わりのタグから後ろを捨てる (`html/parser.py` の `goahead` は、`parse_endtag` が -1 を返し、文書の終わりなら残りを本文にしない)。
+- **直した後の比べ直し** (Python 版の `_html_to_text` と):
+  - 自分で作った終わりのタグの集まり (`$S/r7/gen-endtag.py`。種 7 と 8 で 1,000 件ずつ。引用符・`>`・`<`・`=`・改行・タブを混ぜた属性、属性が 60 個までの終わりのタグ、`<script>`・`<style>`・`<textarea>`・`<title>`・`<svg>`・`<p>`・`<td>` の中、`>` で閉じない終わりのタグ、それらの並び): **2,000/2,000**。直す前の形は 1,906/2,000 だった。
+  - 時間の形 4 種 (レビュアーの `perf2.mjs` の形) と 4.4MB の入力の 13 件: 13/13。
+  - 前の集まりは変わらないか、よくなった: 32/32、602/602、1,000/1,000、1,380/1,403、6/6、19/19、終わりのタグの引用符の 3 件 3/3。レビュアーの 720 件は 713 → 714/720 になった (文書の末尾の `</p<` の 1 件が、閉じない終わりのタグとして Python 版と同じく捨てられるようになった)。
+  - 検査に 2 件を足した: 「`</a x=">"` を 4 万個並べても 1 秒未満」と「属性が 200 万個の終わりのタグで例外を出さない」。期待値は Python 版の出力 (`a`、`before` / `after`) で確かめた。
+  - 18.5.8 に、この 2 つの形 (`</a x=">"` の並び、属性の多い終わりのタグ) を足した。N・2N・4N で比例した。
+  - 開いた要素を積む 4 つの形 (`$S/out/html-shapes-r7.txt`) と 20MiB の HTML (`$S/out/html20-r7.txt`) も測り直し、直す前と同じだった (実際の流れは 313 / 314 / 306MiB・801〜819ms、`--max-semi-space-size=4` で 203 / 213 / 215MiB)。
+
+**20MiB の HTML のピークの RSS (htmlparser2 の `Tokenizer`。4 回目のレビューの後に測り直した値)**:
+
+ふつうの Node のプロセスで、それぞれ 3 回ずつ測った (`VmHWM`。開始時は約 58MiB。子プロセスと `prlimit` の下では測っていない)。入力は、`<meta charset="utf-8">`・script・style と、日本語の表の行をくり返した 20.0MiB の HTML。
+
+| 形 | 中身 | V8 のオプション無し | `--max-semi-space-size=4` |
+|---|---|---|---|
+| (1) 文字列の解析だけ (`probe/bench/html-big.mjs`) | 組み立てた文字列を `htmlToText` に渡す | 293 / 295 / 293MiB (約 720ms) | 205 / 206 / 206MiB |
+| (2) **実際の流れ** (`probe/bench/html-file.mjs`) | ファイルのバイト列を読み、`<meta>` を見てデコードし、解析する | **315 / 306 / 306MiB** (約 740ms) | **214 / 215 / 214MiB** |
+| (2'') 同じ流れで、読み込んだバイト列をコピーしない形 (`probe/bench/html-file-nocopy.mjs`) | 同上 | 296 / 305 / 296MiB | 219 / 219 / 218MiB |
+| (3) 64KiB ずつデコードして流し込む (`probe/bench/html-big-chunked.mjs`。先に `gc()` を呼ぶ。`Parser` の形で測った) | 文書全体の文字列を作らない | 268 / 282 / 284MiB | 178 / 180 / 181MiB |
+
+- `MAX_CHILD_RSS_MB` 320 の 0.95 倍は 304MiB である (11.2 の余裕の基準)。**実際の流れ (2) は、V8 のオプションが無いと、この境に当たるか超える** (296〜315MiB)。`Tokenizer` にしても、`Parser` の形 (308〜316MiB) とほぼ同じだった。時間は少し短くなった (約 850ms → 約 740ms)。
+- (2) と (2'') の差は、読み込んだバイト列を `new Uint8Array(readFileSync(…))` で 1 回多くコピーするかどうかの違いである (実測)。ただし `--max-semi-space-size=4` では、コピーを除いた形のほうが少し高かった。V8 の新しい世代の大きさと、コピーで早く起きる回収の兼ね合いと推論するが、確かめていない。1 回目のレビューのレビュアーの `rev/htmlfile.mjs` (コピーしない形) は、`Parser` の形で 296〜297MiB だった。
+- どの形でも、オプション無しのピークは 296〜315MiB で、0.95 倍の境の前後にある。
+- 子の中では、ここに anydoc などの読み込みの分が加わる (未検証)。3.7 で、HTML の最大の入力を基準のファイルに加えて、子の中で測る必要がある (18.10)。
+
+#### 18.5.2 文字コード
+
+**検査 (`test_charset.py` の全件などから 44 件。5 回目のレビューの後に 2 件を足して 46 件)**: 自前 46/46、chardetng-wasm 43/46、encoding-japanese 41/46、chardet 27/46。足した 2 件は、1 バイトの壊れた Shift_JIS と、`gb2312` の宣言の付いた Shift_JIS (下の見直し)。候補の部品の数は、共通の層 (`decode-pipeline.mjs`) を直した後の値である。
+
+- chardet は、短い Shift_JIS (`日本語のテスト`、`①②③ ㈱テスト 髙橋`) と短い EUC-JP を取り違えた。
+- encoding-japanese は、cp1252 を判定できない (候補に無い) うえに、長い EUC-JP を取り違えた。
+- chardetng-wasm と encoding-japanese は、8 バイトの EUC-JP (`会議資料`) を取り違えた。
+
+**2.4 の文字コードのファイル** (ベンチマークのコーパスの txt・csv・html の 11 ファイル。共通のデコードの順に候補の判定を差し込み、HTML は `<meta>` の宣言も渡した。各欄は「正解の語句のうち取れた数、U+FFFD の数」。Python 版は 13 節のベースラインの値):
+
+| ファイル | 文字コード | Python 版 | 自前 | chardet | encoding-japanese | chardetng-wasm |
+|---|---|---|---|---|---|---|
+| `txt-shift-jis.txt` | shift_jis | 7/7、0 | 7/7、0 | 7/7、0 | 7/7、0 | 7/7、0 |
+| `txt-euc-jp.txt` | euc-jp | 7/7、0 | 7/7、0 | 7/7、0 | 7/7、0 | 7/7、0 |
+| `txt-iso-2022-jp.txt` | iso-2022-jp | 5/5、0 | 5/5、0 | 5/5、0 | 5/5、0 | 5/5、0 |
+| `txt-utf-8-bom.txt` | utf-8-bom | 6/6、0 | 6/6、0 | 6/6、0 | 6/6、0 | 6/6、0 |
+| `txt-utf-16le-bom.txt` | utf-16le-bom | 5/5、0 | 5/5、0 | 5/5、0 | 5/5、0 | 5/5、0 |
+| `txt-utf-16be-bom.txt` | utf-16be-bom | 6/6、0 | 6/6、0 | 6/6、0 | 6/6、0 | 6/6、0 |
+| `txt-utf-8.txt` | utf-8 | 5/5、0 | 5/5、0 | 5/5、0 | 5/5、0 | 5/5、0 |
+| `csv-utf-8.csv` | utf-8 | 6/6、0 | 6/6、0 | 6/6、0 | 6/6、0 | 6/6、0 |
+| `csv-cp932.csv` | cp932 | 6/6、0 | 6/6、0 | 6/6、0 | 6/6、0 | 6/6、0 |
+| `html-shift-jis-script-style.html` | shift_jis | 5/5、0 | 5/5、0 | 5/5、0 | 5/5、0 | 5/5、0 |
+| `html-euc-jp-http-equiv.html` | euc-jp | 4/4、0 | 4/4、0 | 4/4、0 | 4/4、0 | 4/4、0 |
+| すべて取れたファイル | | 11/11 | 11/11 | 11/11 | 11/11 | 11/11 |
+
+コーパスの文書は、どの候補でも差が出ないくらい判定しやすい (文が長く、日本語の割合が高い)。そのため、候補の差は次の 3 つの集まりで測った。
+
+**正解率** (Python の codec で符号化した元の文字列に戻った割合。表の「Python 版」は Python 版の `decode()`):
+
+| 集まり | Python 版 | 自前 | chardet | encoding-japanese | chardetng-wasm |
+|---|---|---|---|---|---|
+| (i) 自分で書いた文 | 182/184 (98.9%) | **184/184 (100%)** | 153/184 | 154/184 | 171/184 |
+| (ii) GROWI の locale | 7,023/7,074 (99.3%) | **7,069/7,074 (99.9%)** | 6,097 (86.2%) | 5,209 (73.6%) | 6,902 (97.6%) |
+| (iii) 取り置き | 15,054/15,577 (96.6%) | **15,481/15,577 (99.4%)** | 15,005 (96.3%) | 11,602 (74.5%) | 15,193 (97.5%) |
+
+(iii) の文字コードごとの内訳:
+
+| 文字コード | 件数 | Python 版 | 自前 | chardet | encoding-japanese | chardetng-wasm |
+|---|---|---|---|---|---|---|
+| cp1252 | 3,859 | 3,732 | **3,856** | 3,768 | 1,006 | 3,628 |
+| cp932 | 3,908 | 3,862 | **3,876** | 3,807 | 3,876 | 3,864 |
+| euc_jp | 3,905 | 3,555 | **3,873** | 3,556 | 2,846 | 3,827 |
+| iso2022_jp | 3,905 | **3,905** | 3,874 | 3,874 | 3,874 | 3,874 |
+
+- Node のどの候補でも残った 31〜34 件の取りこぼしは、判定の誤りではない。**デコードの対応表の違い** (`〜`→`～`、`−`→`－`) である (18.7)。ISO-2022-JP は判定を通らないので、Node の 4 つが同じ数になる。
+- 自前の判定の 1 回目は、(ii) の fr_FR の cp1252 で 397/1,092 だった。原因は、`é` (0xE9) と次の英字が Shift_JIS の 1 文字の漢字として読めてしまうこと (`autorisées` → `autoris馥s`)。「漢字・かなが ASCII の小文字に隣り合っていたら減点」を足して直した。直した後の数字は、調整に使っていない (iii) で確かめた。
+- 自前の判定の 1 回目は、`[...text]` で配列を作っていた。そのため、20MiB の入力でピークの RSS が 819MiB になった。先頭の 64KiB だけで判定し (`stream: true` で、切れ目の字を誤りにしない)、文字列を添字で走査する形に直した。直した後は、判定 6ms、デコード全体 66ms、ピークの RSS 121MiB。chardet は 20MiB で 4,051ms、125MiB。
+
+**重さ** (新しいプロセスで測った。1MiB の EUC-JP を判定した時間):
+
+| 候補 | 判定の時間 | `VmSize` の増分 |
+|---|---|---|
+| 自前 | 86ms (全体を見たとき。64KiB の標本なら 6ms) | — |
+| chardet | 232ms | +2MiB |
+| encoding-japanese | 2ms | +3MiB |
+| chardetng-wasm | 122ms | **+8,194MiB** (1,375MiB → 9,569MiB) |
+
+- **chardetng-wasm は、読み込んだだけで仮想メモリを約 8GiB 予約する**。WASM のメモリの確保の仕方による。`RLIMIT_AS` の上限 (Req 11.5) と両立しない。
+- また、Node 24 で読み込むと `ExperimentalWarning` (WASM を ES モジュールとして import する機能が実験的) が出る。
+
+**`iconv-lite` 0.7.3**:
+
+- `encodingExists('iso-2022-jp')` は false。`decode(…, 'iso-2022-jp')` は `Encoding not recognized` で失敗した。**ISO-2022-JP は読みもできない**。
+- UTF-32 は読める。ただ、BOM の付いた UTF-32 だけのために足す価値は無い。UTF-32 は自前の 15 行で読める。
+- iconv-lite はすでにテスト用の依存 (devDependency) にあるが、本番には入れない。
+
+**`TextDecoder` (Node 24.21.0)**: `process.config.variables.icu_small` が false の full ICU だった。shift_jis・euc-jp・iso-2022-jp・utf-16le / be・windows-1252・koi8-r・gb18030・big5 のデコーダーがある。utf-32 は無い (`ERR_ENCODING_NOT_SUPPORTED`)。WHATWG の Encoding Standard に UTF-32 が無いため。
+
+**1 バイトだけ壊れたファイル** (長い日本語の途中に 1 バイトを入れた。実測):
+
+| ファイル | Python 版 | Node 版 (どの候補も) |
+|---|---|---|
+| Shift_JIS に 0xFF | 読める (Python の cp932 は 0xFF を私用領域の U+F8F3 にする) | 直す前は化けた (WHATWG の shift_jis が 0xFF を誤りにし、判定が windows-1252 を選んだ)。**5 回目のレビューの後に直し、Python 版と同じ出力になった** (下の見直し) |
+| EUC-JP に 0x80 | 化ける | 読める (WHATWG の euc-jp が 0x80 を通す) |
+| UTF-8 に 0xFF、最後の字を切った Shift_JIS | 化ける | 化ける |
+
+どちらの版も、壊れたバイトに強いわけではない。違いは 18.7 に記録した。
+
+**宣言と中身の食い違い、壊れたバイトを、自分で作った入力で見直した** (5 回目のレビューの後。上の 1,403 件のうち文字コードの 249 件と、`$S/out/corrupt.json`):
+
+- **Shift_JIS の文書に、WHATWG の shift_jis が拒むバイトがある** (`<meta charset="shift_jis">` の Shift_JIS の本文の末尾に `0xFF 0xFE 0x80`、または途中に 0xFF): 直す前の Node 版は、文書全体が化けた。宣言の shift_jis が厳密に読めず、判定では厳密に読めるのが windows-1252 だけだったので、windows-1252 が選ばれた。Python 版は、charset-normalizer が何も選ばず、最後の cp932 で読む。Python の cp932 は、単独の 0x80・0xA0・0xFD〜0xFF を 1 字 (U+0080・U+F8F0〜U+F8F3) として読むからである (18.7 の 1 の表の「Python だけ読める 5 バイト」)。
+  - 直し方 (18.9 の `decode-pipeline.mjs` の `cp932` と `own.mjs`): この 5 バイトを Python と同じ字にし、残りを WHATWG の shift_jis で厳密に読む関数を作った。壊れたバイトが多いときのメモリを抑えるため、1 つの `TextDecoder` を使い回し、区切った部分を 4,096 個ずつまとめてつなぐ (最初の形は 21MB で +577MiB。直した後は +116MiB・1.0 秒。18.10 の表)。判定の Shift_JIS の候補と、最後の段 (Python の cp932 の段) の両方で、この関数を使う。判定では、本文の大部分が読める Shift_JIS の点数が windows-1252 を上回り、Shift_JIS が選ばれる。
+  - 正解率の 3 つの集まりは変わらなかった (184/184、7,069/7,074、15,481/15,577)。文字コードの検査 44 件も変わらない。
+  - 試した別の直し方: 「windows-1252 の点数が負なら選ばない」は、`größer` (`ö` と `ß` が並ぶ) や `N°`・`« »` のような正しい cp1252 の文を落とし、(iii) が 15,481 → 15,429 になったので採らなかった。
+- **宣言された文字コードが、Python の codec では狭く、WHATWG では広い**: `<meta charset="gb2312">` に Shift_JIS のバイト列。Python の gb2312 は厳密な GB2312 (EUC-CN) で、Shift_JIS の先頭のバイト (0x81〜0x9F) を拒み、判定に進んで正しく読む。WHATWG は `gb2312` を GBK として扱い、拒まずに読むので化けた (`擔杮岅偺…`)。`euc-kr` (WHATWG では windows-949)、`big5` (WHATWG では Big5-HKSCS を含む) も同じ関係にある。
+  - 直し方: Python の codec が gb2312・euc_kr・big5 になる宣言の名前 (`gb2312`・`chinese`・`csiso58gb231280`・`iso-ir-58`、`euc-kr`・`korean`・`ks_c_5601-1987`・`ksc5601`、`big5`・`csbig5`。Python の `codecs.lookup` で確かめた) では、Python の codec が受け付ける先頭・後ろのバイトの範囲を先に見て、外れていれば宣言を使わない。範囲で見るだけなので、範囲の中の定義の無い符号までは合わせていない (推論。試していない)。
+  - コメントの中の `<meta charset="gb2312">` も、Python 版と同じく宣言として読む (Python 版も先頭 4096 バイトをバイト列の正規表現で探す)。直した後は、どちらも判定に進み同じ結果になった。
+- **見直した後の 1 バイトだけ壊れたファイル**: Shift_JIS に 0xFF は、Python 版と同じく読めるようになった (出力が 1 字も違わない)。EUC-JP に 0x80 は、Node 版だけが読める (WHATWG の euc-jp が 0x80 を通す)。UTF-8 に 0xFF と、最後の字を切った Shift_JIS は、どちらの版も同じに化ける。
+- 文字コードの 249 件で残った違い (227/249 が同じ。どれも 18.7 に記録した):
+  - `iso-8859-1`・`latin1` の宣言に日本語のバイト列 (16 件): Python 版は宣言どおり latin-1 で読んで化ける。Node 版は WHATWG のとおり windows-1252 として厳密に読み、未定義の 5 バイトがあれば失敗して判定に進むので、正しく読めることがある。未定義のバイトが無ければ、Node 版も化ける (18.7 の 2)。
+  - `big5` の宣言に EUC-JP のバイト列 (5 件): どちらの版も化ける。先頭の 1 字の読み方だけが違う (Python 版 `ゥ呿賄…`、Node 版 `呿賄…`)。
+  - EUC-JP の末尾に `0xFF 0xFE 0x80` (1 件): どちらの版も latin-1 / windows-1252 に落ちて化ける。最後の 1 字 (0x80) だけが違う。
+
+#### 18.5.3 ZIP
+
+**読み (`test_archive_guard.py` などから 27 件)**: 自前 27/27、**yauzl 27/27**、fflate 25/27、adm-zip 25/27、jszip 18/27。
+
+主な検査:
+
+- 必要な要素が無い・ZIP でない・途中で切れた・中央ディレクトリが無い・空・暗号化した OOXML (CFB) は、そのまま anydoc に渡す (`null`)。
+- エントリの数と申告サイズの合計の上限は、必要な要素を探す前に見る。
+- 520MiB の DOCX の爆弾 (zip64) は、申告サイズで `limit_exceeded` にする。
+- 同じ名前の要素は、両方見えて、そのまま渡す。
+- `../`・`/abs` の名前でも開ける。zip64 の要素を読める。
+- 上限ちょうどは読め、1 バイト超えると `limit_exceeded` にする。
+- 申告サイズを偽ったもの (5,000 バイトを 10 と申告) は、黙って切り詰めず `malformed` にする。
+- 壊れた deflate・方式 9・bzip2・LZMA は `malformed`、暗号化の flag は `encrypted`。
+- version-needed が 10.0 のもの、UTF-8 の flag があるのに名前が UTF-8 でないものは、Python の zipfile が開けないので、そのまま渡す (自前の層で再現した。18.10 の 6.x)。
+
+200MiB の zip64 の爆弾を、1MiB の上限で読んだ結果:
+
+| 候補 | 結果 | RSS の増分 | 時間 |
+|---|---|---|---|
+| 自前 | `limit_exceeded` | +0.5MiB | 4ms |
+| **yauzl** | `limit_exceeded` | +0.0MiB | 2ms |
+| adm-zip | `limit_exceeded` | **+328MiB** (全部を展開してから大きさを見る) | 508ms |
+| jszip | `limit_exceeded` | 測れなかった (前の検査の解放と重なった) | 714ms |
+
+- fflate が落ちた 2 件: `unzipSync` の `filter` に渡る zip64 の要素の大きさが `4294967295` (0xFFFFFFFF) のままで、zip64 の拡張の欄を読んでいない。また、flag も要素の位置も渡さない。読むには、自前の中央ディレクトリの読み取りが結局要る。`unzipSync` そのものは 200MiB の爆弾を上限なしで全部展開した (306ms、RSS 256MiB)。
+- adm-zip が落ちた 2 件: 同じ名前の要素があると、`Duplicate entry name` で ZIP 全体を開けない。流しながら読む口が無い。
+- jszip が落ちた 9 件: 壊れた deflate・方式 9・bzip2・LZMA・暗号化の flag の ZIP を、読み込みの時点で丸ごと拒む。そのため `malformed` と `encrypted` の区別も、そのまま渡すことも作れない。申告サイズの偽りを見つけない。同じ名前の要素を 1 つにまとめる。version と flag の欄を出さない。
+- yauzl について (README とコードを読んだ結果と実測):
+  - CRC-32 を確かめない (README の "No CRC-32 Checking")。adapter で `zlib.crc32` を使って確かめた。
+  - 既定の `decodeStrings: true` では、`../` や絶対パスの名前を誤りにして、ZIP 全体を開けない。`decodeStrings: false` にして、名前は自前でデコードした。
+  - 申告サイズの偽りは、yauzl 自身の `validateEntrySizes` でも捕まった。
+
+**書き (5 件)**: 自前・**yazl**・fflate のどれも 5/5。
+
+- XLSX と PPTX のコーパスを読んで書き直すと、anydoc の出力が元と同じだった。圧縮方式 (無圧縮か deflate か) も元と同じに保たれた。
+- Python の zipfile の `testzip()` が `None` (壊れていない) を返した。日本語の名前には UTF-8 の flag が付いた。
+- 200MiB の要素を 1MiB ずつ流して書いたときの RSS の増分と時間: 自前 +0.3MiB / 365ms、yazl +0.3MiB / 396ms、fflate +0.0MiB / 1,706ms。
+
+**読みから書きへ流してつなぐ経路** (XLSX の書き直しの形。`probe/bench/pipe-repackage.mjs`):
+
+- yauzl の `openReadStream` を、バイト数の予算を数え CRC-32 を積み上げる `Transform` を通して、yazl の `addReadStreamLazy` に直接つないだ。要素を丸ごとメモリに持たない形である。
+- `bomb64.bin` の 200MiB の要素 (中身は 0):
+  - 予算 512MiB: 書き直せた (出力 204,005 バイト、804ms、ピークの RSS 52MiB → 73MiB)。
+  - 予算 100MiB: `limit_exceeded` で止まった (424ms、ピークの RSS 52MiB → 74MiB)。
+- **最初の版は、予算を超えたときに止まらなかった**。`Transform` の誤りが yazl の `outputStream` に伝わらず、出力が終わらないまま待ち続けた (Node の終了コード 13 = 最上位の `await` が終わらなかった)。誤りのときに読みの流れと `outputStream` の両方を `destroy` するようにして直した。6.x の実装で必ず入れること (18.10)。
+- ベンチマークのスタブは、簡単のため各要素を一度メモリに読んでから書いた。結果 (コーパスでの一致) は流してつないでも変わらないと推論する。
+
+**壊れた要素での止まり方** (`pipe-repackage.mjs` を関数 `repackage` にした 3 回目のレビューの後の形。5 回目のレビューの後の直しは下の続き。予算 512MiB。3 回目のレビューのレビュアーの `scratchpad/rv5/pipe/*` と、細工した ZIP):
+
+| 入力 | 前の形 (レビュアーの `pipe-any.mjs` と同じ作り) | 3 回目のレビューの後の形 |
+|---|---|---|
+| `bad-rels.xlsx` (`.rels` の要素の deflate を壊した XLSX。Python 版は 422 `malformed`) | **プロセスが落ちた** (終了コード 1、`invalid block type`) | `malformed` |
+| `size-lie.zip` (中央ディレクトリが展開後の大きさを小さく偽る) | **落ちた** (`too many bytes in the stream`) | `malformed` |
+| `method9` (方式 9) | **落ちた** (`unsupported compression method`) | `malformed` |
+| `bad-deflate.zip` | `malformed` | `malformed` |
+| `bad-btype.zip`、`corruptDeflate`、`bzip2`、`lzma`、`lying`、`truncated` | (試していない) | `malformed` |
+| `encFlag` (暗号化の flag) | (試していない) | `encrypted` |
+| `good.zip`、`storedXlsx` | — | 書き直せた |
+| `bomb64.bin` の 200MiB の要素 | 予算 512MiB で書き直し、100MiB で `limit_exceeded` | 同じ (837ms・419ms、ピークの RSS 50MiB → 73MiB) |
+
+- 落ちた原因は 2 つ: (a) `openReadStream` の誤り (方式 9 など) は、yazl の `ZipFile` が `'error'` として出す。しかもそれは最初の `addReadStreamLazy` の呼び出しの中で同期的に起きるので、受け手はその前に付ける必要がある。(b) `rs.pipe(guard)` の `pipe` は、読みの流れの誤り (deflate の破損、yauzl の大きさの検査) を `guard` に伝えない。最終の形は、(a) の受け手を最初の `addReadStreamLazy` の前に付け、(b) 読みの流れの誤りを `guard.destroy` に渡し、暗号化の flag を開く前に見る (18.9 に全文)。
+- ZIP の書きの adapter (`zipw/yazl.mjs`) も、元の流れが途中で失敗すると `'error'` の受け手が無くプロセスが落ちた (終了コード 1。`probe/lin/writer-error.mjs`)。同じく受け手を付け、失敗は `writeZip` の拒否 (reject) として返すように直した。直した後も、書きの検査 5 件は通った。
+- **4 回目のレビューの後の形にも、プロセスが落ちる道が残っていた** (5 回目のレビューの指摘。自分で再現してから直した):
+  - `repackage` は要素を 1 つずつ `addReadStreamLazy` に渡す。yazl は、渡された時点で前の要素の読み取りを始める。途中の要素の名前が `../x`・`/abs`・`C:/x` だと、yazl が `addReadStreamLazy` の中から同期的に例外を投げ、`repackage` は `out.end()` と `outputStream` の読み取りに進む前に抜けていた。
+  - すでに読み始めていた前の要素が、その後で CRC の誤りなどを出すと、`fail` が `outputStream.destroy(err)` を呼ぶ。`outputStream` を読む側がまだいないので `'error'` の受け手が無く、プロセスが終了コード 1 で落ちた。
+  - 再現 (`$S/r6/red-zip.txt`): CRC の誤った要素の後ろに `../evil.txt` を置いた約 300 バイトの ZIP (`badcrc-then-dotdot.zip`)、`[Content_Types].xml` の CRC を誤らせ `C:/x.txt` を置いた ZIP (`badcrc-then-drive.zip`)。どちらも 3 回とも `Error: CRC mismatch` の `Unhandled 'error' event` で落ちた。CRC が正しい要素の後ろの `../evil.txt` (`good-then-dotdot.zip`) は落ちなかった。Python 版なら 422 `malformed` を返す入力で、本番では子プロセスが落ちて `crashed` (500) になる。
+  - バイト単位のファジング (5 回目のレビューのレビュアーの `fuzz-zip-fix.mjs` の写し。下の 18.5.8 にコード): 直す前の形では、種 2000〜2999 の束が終了コード 1 で止まった (種 2586。`xl/` の 1 バイトが壊れて名前が `x:/worksheets/sheet2.xml` になった XLSX。`$S/r6/zf/red-2000.txt`)。
+- **直し方** (18.9 の `pipe-repackage.mjs`): 要素を足す繰り返しを `try { … } catch` で囲み、例外が出ても `outputStream` を壊し、`out.end()` と `for await` で最後まで読む。読む側がいるので、後から出る前の要素の誤りにも受け手がある。
+  - **名前の誤りには `kind` を付けない**。yazl の `Error` (`invalid relative path: ../evil.txt`・`absolute path: C:/x.txt`) のまま拒否として返す。`malformed` などに分類すると、18.10 で 6.x に残した (a)/(b)/(c) のうち 1 つを黙って選ぶことになるからである。
+  - ZIP の書きの adapter (`zipw/yazl.mjs` の `writeZip`) も同じ形の繰り返しなので、同じ `try` / `catch` の形にそろえた。こちらは元のデータがメモリにあり、後から誤りが出ないので落ちはしなかったが、例外で抜けたときに `outputStream` が読まれずに残っていた。直した後は、`../evil.xml`・`/abs.xml`・`C:/x.xml` のどれも `kind` の無い拒否として返った。
+- **直した後** (`$S/r6/green-zip.txt`、`$S/out/fuzz-zip-0.txt`、`$S/out/fuzz-zip-10000.txt`):
+  - 再現の 3 つは、どれも 3 回とも拒否として返り、終了コード 0 だった (`badcrc-then-dotdot`・`good-then-dotdot` は `invalid relative path: ../evil.txt`、`badcrc-then-drive` は `absolute path: C:/x.txt`)。
+  - 前の表の入力は同じ結果だった: `bad-rels.xlsx` は `malformed`、`corruptDeflate`・`bzip2` は `malformed`、`encFlag` は `encrypted`、`bomb64.bin` の 200MiB の要素は予算 512MiB で書き直せ (874ms、ピークの RSS 51MiB → 74MiB)、予算 100MiB で `limit_exceeded`。
+  - バイト単位のファジング: 種 0〜3,999 と、種を変えた 10,000〜13,999 の 8,000 件 (1,000 件ずつ 8 つのプロセス) で、**8 つの束のすべてが終了コード 0** で終わった。1 件の最長は 25ms。分割 (`split`) の結果は `ok` 2,536・`malformed` 5,391・`limit_exceeded` 71・`encrypted` 2、書き直し (`pipe`) は `ok` 178・`malformed` 7,820・`encrypted` 1・`kind` の無い名前の誤り 1 (種 2586) だった。
+- **書き直しの時間は、要素の数に対して比例より速く伸びる** (`$S/out/repack-entries.jsonl`。要素が空でない小さな XML の ZIP。新しいプロセスで 2 回ずつ):
+
+  | 要素の数 | 5,000 | 10,000 | 20,000 | 40,000 |
+  |---|---|---|---|---|
+  | 時間 | 219 / 211ms | 418 / 428ms | 980 / 975ms | 2,886 / 3,003ms |
+  | 増えたピークの RSS | 67 / 65MiB | 138 / 141MiB | 182 / 183MiB | 212 / 246MiB |
+
+  - 倍ごとの時間の伸びは 1.9〜2.0 → 2.3 → 2.9〜3.1 倍である。CPU のプロファイル (`--cpu-prof`、4 万個) では、時間の 2,281ms が yazl の `pumpEntries` (`index.js` の 205 行) だった。`pumpEntries` は、1 つの要素を書き進めるたびに、まだ終わっていない最初の要素を一覧の先頭から探す (`getFirstNotDoneEntry`)。そのため要素の数の 2 乗の手間になる (コードを読んだ結果と、プロファイルの実測)。
+  - 4 回目のレビューの後に「比例している」と書いたのは誤りだった (25,000 個から 100,000 個で 4.6 倍)。
+  - 本番では、要素の数を `MAX_ARCHIVE_ENTRIES` (既定 10,000) で、書き直しの前に断る (archive_guard の写し)。既定の上限では 418〜428ms・+138〜141MiB に収まる。上限を大きくすると 2 乗で伸びる (18.10)。
+
+- **ディレクトリの要素 (名前の末尾が `/`) で、正しい XLSX が 500 になっていた** (6 回目のレビューの指摘。自分で再現してから直した):
+  - yazl は、名前の末尾が `/` の要素を `file path cannot end with '/'` で拒む。Office の外の道具で作り直した XLSX には、`xl/`・`xl/worksheets/` のようなディレクトリの要素が入ることがある (レビュアーの例: 展開して `zip -r` で作り直しただけの `$SP/rv8/dir/ziprx.xlsx`)。
+  - 再現 (`$S/r7/red-dir.txt`): `ziprx.xlsx` と `withdirs.xlsx` は、分割の写し (`writeZip` を通る) と `repackage` の両方で、`kind` の無い誤り (本番では 500 の見込み) になった。`withdirs.pptx` は、分割は通ったが `repackage` が同じ誤りになった。Python 版はどれも 3 シート・3 スライドを返す (200)。
+  - レビュアーが試した直し方は、ディレクトリの要素を yazl の `addEmptyDirectory` で書く形だった (`$SP/rv8fix/probe/zipw/yazl.mjs`、`pipe-repackage.mjs`)。**この形を取り入れて大量のディレクトリの要素を試すと、5,000 個でプロセスが落ちた** (`RangeError: Maximum call stack size exceeded`、終了コード 1。3,000 個は通った。要素の数の上限 `MAX_ARCHIVE_ENTRIES` (既定 1 万) の内側である。Python 版は 9,000 個でも 3 シートを返した)。yazl は、中身の無い要素 (`addEmptyDirectory`) を、前の要素を書き終えた callback の中から同期的に、再帰で続けて書くため (`pumpEntries` → `doFileDataPump` → `pumpEntries`。スタックの跡で確かめた)。
+  - **そのため、レビュアーの形から 1 か所だけ変えた**: ディレクトリの要素は書かずに飛ばす (`continue`)。書き直した ZIP は anydoc だけが読み、anydoc はディレクトリの要素を使わない。コードは、レビュアーの形より短い 1 行である (18.9)。
+- **直した後** (`$S/r7/green-dir.txt`、`$S/r7/dirs-cmp.txt`):
+  - `ziprx.xlsx`・`withdirs.xlsx` は分割で 3 シート、`withdirs.pptx` は 3 スライドで、`repackage` もどれも書き直せた。
+  - ディレクトリの要素の形を自分で作り (`$S/r7/gen-dirs.py`)、Python 版の `convert()` とスタブの結果を比べた: XLSX と PPTX のそれぞれで、ディレクトリの要素を前に置く・後ろに置く、関係の無い空のディレクトリ、200 段の深い階層、`xl/` (`ppt/`) だけを足す、ファイルと同じ名前のディレクトリ (`xl/workbook.xml/`)、末尾が `\` の名前、2,000 個と 9,000 個のディレクトリ、中身のあるディレクトリの要素、`./`、ディレクトリだけの ZIP、`[Content_Types].xml` とディレクトリだけの ZIP。**26 個のうち 21 個が同じ** だった。
+  - 違った 5 個:
+    - 末尾が `\` の名前 (`xl\`) を持つ XLSX 1 個: yazl は名前の `\` を `/` に変えてから拒むので、`kind` の無い誤りのままである。ZIP の名前は `/` で区切る決まりで、`\` を使うのは決まりから外れた ZIP である。6.x で決める名前の扱い (18.10 の (a)/(b)/(c)) に入れた。PPTX の同じ形は、分割が XML の部品だけを書くので Python 版と同じだった。
+    - ディレクトリだけの ZIP と、`[Content_Types].xml` とディレクトリだけの ZIP (XLSX・PPTX で 4 個): 必要な部品が無いので、どちらの版も anydoc にそのまま渡し、anydoc が失敗する。Python 版は `malformed` (422)、スタブは anydoc の例外を分類しないので `internal_error` になった。anydoc の誤りの `code` は XLSX が `malformed`、PPTX が `missingPart` で、本番の `office.ts` が分類すれば同じになる見込み (18.7 の 9 の「途中で切れた ZIP」と同じスタブの限り)。
+  - さらに、ディレクトリの要素を乱数で混ぜた 300 個 (`$S/r7/gen-dirs-random.py`。名前に日本語・空白・`.`・50 字の段・途中の `\`・`[Content_Types].xml` などを使い、深さ 1〜60 段、1〜200 個を前後に散らし、1 割は中身を持たせた): **300/300 が Python 版と同じ** で、分割と `repackage` を通す `real.mjs` はどれも終了コード 0 だった。
+  - 9,000 個のディレクトリの要素でも、分割と `repackage` の両方で終了コード 0 だった。
+  - ディレクトリの要素の数を N・2N・4N にした時間とピークの RSS の増分 (`$S/r7/dir-perf.jsonl`): `repackage` は 5,000 / 1 万 / 2 万 / 4 万個で 27 / 44 / 72 / 129ms・+17 / 30 / 44 / 69MiB、`writeZip` は 5 / 7 / 9 / 13ms・+2 / 6 / 13 / 20MiB で、比例した (要素を書かないので、yazl の要素の数の 2 乗にも当たらない)。
+  - ZIP のバイト単位のファジング 8,000 件と前の表の入力は、下の 18.11 の GREEN のとおり。レビュアーが逆斜線の名前を見つけた種 30,000〜30,999 の束も、直した形で終了コード 0 だった (`kind` の無い誤りは、`\` を `/` に変えた名前の 1 件だけ。`$S/out/fuzz-zip-r7-30000.txt`)。
+  - yazl が中身の無い要素を再帰で書くことが、ディレクトリでない中身の無いファイルの要素でも起きないかを確かめた (`$S/r7/empty-perf.txt`): 0 バイトの `f<i>.xml` を 5,000 / 1 万 / 2 万個、`writeZip` (中身は空の流れ) と `repackage` に通し、どれも終了コード 0 だった (時間は 139 / 271 / 756ms と 159 / 352 / 949ms で、要素の数の 2 乗の伸び。18.5.3 の上の表と同じ yazl の性質)。中身が流れで渡る要素は、空でも同期の再帰にならない (推論。yazl の `addReadStreamLazy` は流れの終わりを待つ)。
+
+#### 18.5.4 XML
+
+**検査 (`test_ooxml_xml.py` と分割のテストから 23 件)**: **@xmldom/xmldom 23/23**、saxes 23/23、sax 23/23、fast-xml-parser 20/23。
+
+主な検査:
+
+- 不正な XML、空、未知の encoding・`UTF-9`、UTF-8 のバイト列に UTF-16 の宣言が付いたもの、Shift_JIS の宣言は拒む。BOM 付きの UTF-16 は読める。
+- 内部のエンティティの宣言 (使っていなくても)、billion laughs (1 秒未満で拒む)、外部のエンティティ (XXE)、パラメーターのエンティティ、宣言の無いエンティティは拒む。
+  - XXE の検査では、指したファイルの中身の目印が、結果にも誤りの文にも出ないことを確かめた。
+- `SYSTEM` だけの DOCTYPE と `<!ELEMENT>` だけの DOCTYPE は通す (defusedxml と同じ)。
+- 属性の中の `&amp;`・`&lt;`・`&#x41;`・`&#12354;`・`&quot;`・`&apos;` を読める。
+- Excel が書く形の workbook (`mc:Ignorable`、`x15ac:absPath`、`xr6:coherentId`、`definedName` の中の `'売上'!$A$1`) のシート名を目印に替えて `state` を visible にし、書き戻す。接頭辞・`mc:Ignorable`・ほかの中身が残り、`ns0` 風の接頭辞にならない。
+- 書き換えた結果を、もう一度解析できる (サロゲートペアの字 `𠮷` をシート名に含めた)。
+- 10 万段の入れ子、40 万個の属性、10MB の属性の値を、時間内に処理する。
+
+fast-xml-parser が落ちた 3 件:
+
+- 宣言の無いエンティティ (`&nope;`) を通した。
+- 属性の中の数値の参照 (`&#x41;`) をデコードしなかった。
+- 書き戻しで、`definedName` の `'` が `&apos;` になるなど、中身の書き方が変わった。
+
+saxes と sax は木も書き出しの機能も持たない。そのため、元の文字列の位置を記録して、書き換える開始タグだけを差し替える自前の層 (`xml-splice.mjs`、27 行) を書いた。この層の最初の版は、saxes の位置が 1 字ずれていて (`<` の次から数えていた)、書き戻した XML が壊れた。検査を「書き戻した結果をもう一度解析する」形に強めて見つけ、直した。
+
+**expat より緩く通す入力** (defusedxml の `fromstring` と xmldom の両方に通した。実測):
+
+| 入力 | defusedxml | xmldom (`warning` を無視) | xmldom (すべて例外) | 採る形 (すべて例外 + 自前の検査) |
+|---|---|---|---|---|
+| `<a b=c/>` (引用符の無い属性の値) | 拒む | **通す** | 拒む | 拒む |
+| `<a b="1"c="2"/>` (属性の間の空白が無い) | 拒む | **通す** | 拒む | 拒む |
+| `<a>&</a>` (裸の `&`) | 拒む | **通す** | **通す** | 拒む |
+| `<a>]]></a>` (本文の `]]>`) | 拒む | **通す** | **通す** | 拒む |
+| `<a>\u0001</a>` (XML で使えない字) | 拒む | **通す** | **通す** | 拒む |
+| `<a>&#0;</a>` (使えない字を指す数値の参照) | 拒む | **通す** | **通す** | 拒む |
+| 同じ名前の属性 2 つ、宣言の無い接頭辞、ルートが 2 つ、ルートの後ろの文字、属性の値の中の `<`、XML 宣言が 2 つ、先頭に空白のある XML 宣言、空の名前空間に結んだ接頭辞、数字で始まる名前、閉じタグの大文字小文字の違い、コメントの中の `--` | 拒む | 拒む | 拒む | 拒む |
+| コメント・処理命令・CDATA の中の `&` と `]]>`、属性の中の `&amp;`、`&#x1F600;`、`<!ELEMENT>` だけの DOCTYPE、CDATA | 通す | 通す | 通す | 通す |
+
+- この表の 25 件 (`$S/out/strict-inputs.json`) では、採る形の通す / 拒むが defusedxml とすべて同じだった。23 件の検査も通ったまま。
+
+**Python 版の `ooxml_xml.parse` と、さらに 2 つの入力の集まりで比べた** (どちらにも同じバイト列を渡し、Node は `xml-bytes.mjs` で文字列にしてから解析した。Python 版の判定は `.venv` で自分で出した):
+
+| 集まり | 件数 | 通す / 拒むが Python 版と同じ | 違ったもの |
+|---|---|---|---|
+| 上の表の入力 (`$S/out/strict-inputs.json`) | 25 | 25 | — |
+| 1 回目のレビューのレビュアーの 60 件に 8 件を足したもの (`$S/out/xml-inputs.json`、`$S/probe/xml60/`) | 68 | 67 | 展開した名前が同じ属性 |
+| 2 回目のレビューのレビュアーが別に作った 92 件 (`$S/out/xml-inputs-rv2.json`。元は `scratchpad/rv2/xml/gen.mjs`) | 92 | 88 | `x-cp1252` と `x-mac-cyrillic` の宣言 (Node だけ通す)、`cp437` の宣言 (Node だけ拒む)、入れ子の要素の展開した名前が同じ属性 (Node だけ通す) |
+| 2 回目のレビューのレビュアーの、引用符の中の印の 4 件 (`$S/out/xml-inputs-lit.json`) | 4 | 4 | — |
+
+- 入力の内容: 内部・外部・パラメーターのエンティティ、外部の DTD (`file:`・`http:`)、ATTLIST・NOTATION・解析されないエンティティ、DOCTYPE の中のコメント・処理命令・引用符・離れた引用符に隠した `<!ENTITY`、範囲外・サロゲート・U+FFFE を指す数値の参照、UTF-8 として壊れたバイト列、ISO-8859-1・windows-1252・US-ASCII・`l1` などの宣言、BOM と宣言の食い違い、BOM の無い UTF-16、`standalone`・版の誤り、`<?xml` という名前の処理命令、宣言の無い接頭辞、同じ接頭辞の 2 回の宣言、展開した名前が同じ属性、`xmlns:xmlns`、`xml` の接頭辞の付け替え、DOCTYPE が 2 つ・ルートの後ろの DOCTYPE、閉じていない CDATA、ルートの外の文字、属性の値の中の `&`・`<`・`]]>`・`>`、NUL バイト、名前の中のタブ、`:` で始まる名前、本文の U+0085 / U+2028 など。
+- 判定は同じで中身が違うもの: DOCTYPE の `<!ATTLIST>` の既定の属性を、expat は要素に付け、xmldom は付けない (4 件)。比べ方 (Python は最初の子の前の文字だけ、Node は子孫の文字すべて) による見かけの違いが 1 件あり、部品の違いではない。
+- 残した違いと、その扱いは 18.7 の 9 の表にある。直したものも、そこに分けて書いた。
+
+**実際の XLSX / PPTX に仕込んで、Python 版の `convert()` とスタブで比べた** (2 回目のレビューのレビュアーの 9 つ。`scratchpad/rv2/ooxml/build.py` で作ったもの。ほかに自分で作った DOCTYPE・rels の 3 つと、細工した 6 つ):
+
+| ファイル | 中身 | 結果 |
+|---|---|---|
+| `x_utf8bom_latin1decl` | workbook.xml が UTF-8 の BOM に `encoding="ISO-8859-1"` の宣言 | 同じ (Python 版は BOM の後を latin-1 で読み、シート名が化けた 3 シートを返す。Node も同じにした) |
+| `x_utf16le_nobom` | workbook.xml が BOM の無い UTF-16LE | 同じ (3 シート) |
+| `x_cp1252_undefined` | windows-1252 の宣言で、cp1252 に定義の無い 0x81 | 同じ (`malformed`) |
+| `x_whatwg_only_label` | `encoding="x-cp1252"` (WHATWG にだけある名前) | **違う** (Python 版は `malformed`、Node 版は 200 でシート名が化ける。18.7 の 9 に記録) |
+| `x_many_comment_opens_closed_once` | `<!--` を 6 万個並べ、最後に 1 回だけ閉じる | 同じ (4ms) |
+| `p_unclosed_comment_opens` | presentation.xml に閉じていない `<!--` を 10 万個 | 同じ (`malformed`、15ms) |
+| `p_rels_quote_cdata_end`、`x_doctype_attlist_cdata_end`、`p_doctype_stray_quote_entity` | rels の `Target` の `'` と `]]>`、ATTLIST の値の `]]>`、離れた引用符の中の `<!ENTITY` | 同じ |
+| 自分で作った 3 つ (`dtdAttlistXlsx`、`dtdExternalPptx`、`relsCdataEndPptx`) | ATTLIST の既定の `state="hidden"`、外部の DTD、rels の `]]>` | 同じ |
+| 細工した 6 つ (`entityDeck`、`notesDeck`、`contractDeck`、`dupXlsx`、`storedXlsx`、`u16Pptx`) | 18.5.5 のもの | 同じ |
+| `manySlides1000` | 1,000 スライドの PPTX (anydoc を含む実際の変換) | 同じ (1,000 要素) |
+
+**書き戻すときの DOCTYPE と XML 宣言**:
+
+- xmldom の `XMLSerializer` は DOCTYPE (外部の DTD の URL や ATTLIST を含む) と元の XML 宣言 (`encoding="UTF-16"` など) を書き戻す。Python の `tostring(encoding="UTF-8", xml_declaration=True)` は DOCTYPE を書かず、UTF-8 の宣言を新しく書く。試作は、解析の直後に DOCTYPE の節を消し、書き戻すときに XML 宣言を `<?xml version='1.0' encoding='UTF-8'?>` に置き換える。
+- DOCTYPE は、解析の直後に 1 回だけ消す。xmldom は、DOCTYPE の節を消した後も `doc.doctype` が消した節を指したままで、もう一度消そうとすると例外になる (実測)。
+- UTF-16 の部品を持つ PPTX (`u16Pptx`) は、宣言を置き換えないと anydoc が読めずに失敗した (Python 版は 3 スライドとも読めた)。置き換えた後は同じになった。
+- 同じ細工の XLSX は、Python 版がセル数の事前の検査 (バイト列の走査。UTF-16 の BOM で始まる部品を `malformed` にする) で拒む。スタブはその検査を写していない (T6 の部品ではない) ので、比べていない。
+
+**悪意のある入力での時間** (`$S/probe/lin/perf.mjs`。ふつうのプロセスで、入力の大きさ N と 2N を測った。比が 2 前後なら入力に比例、4 前後なら 2 乗):
+
+| 入力 | N=10 万 | N=20 万 | 比 | 判定 |
+|---|---|---|---|---|
+| XML: 本文に閉じていない `<!--` | 15ms | 20ms | 1.3 | 拒む |
+| XML: 本文に閉じていない `<?` | 5ms | 10ms | 1.9 | 拒む |
+| XML: 本文に閉じていない `<![CDATA[` | 12ms | 25ms | 2.1 | 拒む |
+| XML: 属性の値の中の `<!--` | 25ms | 41ms | 1.6 | 拒む |
+| XML: SYSTEM の引用符の中の `<!--` (正しい XML) | 8ms | 15ms | 1.8 | 通す |
+| XML: ATTLIST の既定の値の中の `<!--` | 8ms | 17ms | 2.1 | 拒む |
+| XML: DOCTYPE の中の閉じていない `<!--` | 8ms | 15ms | 1.9 | 拒む |
+| XML: DOCTYPE の中の引用符 (ATTLIST を N 個) | 674ms | 1,366ms | 2.0 | 通す |
+| XML: 深い入れ子 | 367ms | 660ms | 1.8 | 通す |
+| XML: 1 つのタグの属性 N 個 | 126ms | 291ms | 2.3 | 通す |
+| XML: `;` の無い `&` を N 個 | 1ms | 3ms | 2.0 | 拒む |
+| XML: 本文の `]]` を N 個 | 3ms | 6ms | 1.8 | 通す |
+| XML: タグの中の閉じていない引用符 (4N 字) | 4ms | 8ms | 1.9 | 拒む |
+| HTML: 閉じていない `<!--` を N 個 | 6ms | 8ms | 1.4 | — |
+| HTML: 1 つのタグの属性 N 個 | 4ms | 6ms | 1.4 | — |
+| HTML: `<a////…` (4N 字) | 6ms | 10ms | 1.7 | — |
+| HTML: 空白と改行の並び | 4ms | 8ms | 2.1 | — |
+| 文字コード: ESC のバイトを 4N 個 | 25ms | 42ms | 1.7 | — |
+| 文字コード: UTF-32 の文 | 5ms | 8ms | 1.6 | — |
+
+- 4MiB の入力 (2 回目のレビューのレビュアーが「数 KB の圧縮で作れる」と示した大きさ): 閉じていない `<!--` 100 万個 90ms、閉じていない `<?` 200 万個 109ms、閉じていない `<![CDATA[` 50 万個 69ms、SYSTEM の引用符の中の `<!--` 100 万個 87ms (正しい XML)、閉じた `<!--a-->` 50 万個 535ms。
+- 前処理の、CDATA・コメント・処理命令 (と DOCTYPE の中の引用符) を除く部分は、正規表現の置き換え (`text.replace(/<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>/g, '')`) だと、閉じていない開始の印ごとに文書の終わりまで探すので 2 乗の時間になる (実測: 閉じていない `<!--` 5 万個で 1,355ms、10 万個で 5,427ms)。試作は、同じ結果を返す 1 回の走査 (`probe/lib/strip-spans.mjs`) に置き換えた。終わりの印を `indexOf` で探し、終わりの印が見つからなかった種類は以後探さない (それより後の開始の印も閉じられないため)。
+- 置き換えた走査と元の正規表現が同じ結果を返すことを、次で確かめた: 印の断片 (`<`・`!`・`--`・`<![CDATA[`・`]]>`・`?>`・引用符など) を並べた乱数の文字列 30 万個 × 2 種類 (本文用と DOCTYPE 用) で違いは 0 件 (`$S/probe/lin/fuzz.mjs`)。上の 4 つの集まりの判定も、置き換えの前と同じだった。
+- XML の前処理のほかの部分 (`xml-bytes.mjs` の宣言の読み取りは先頭 200 字だけ、XML で使えない字・裸の `&`・数値の参照の正規表現は先読みが 1 つの参照の長さまで、本文の `]]>` の走査と名前空間の検査は 1 回の走査) と、文字コードのデコードの順 (`decode-pipeline.mjs`。`<meta>` と XML 宣言の読み取りは先頭 4096 / 256 バイト、判定は先頭 64KiB、ESC の探し方は `indexOf`)、HTML の共通の層 (`line-joiner.mjs`。空白は先にまとめるので、`[ \n]+$` のような正規表現は短い並びにしか当たらない) は、ソースを読んで 2 乗になる繰り返しが無いことを確かめ、上の表で測った。
+- 「DOCTYPE の中の引用符」(ATTLIST を 20 万個、5MB) の 1.4 秒と、深い入れ子 (20 万段) の 0.7 秒は、入力に比例しているが、xmldom の中で使う時間である。OOXML の部品の大きさは ZIP の上限 (`MAX_ARCHIVE_UNCOMPRESSED_MB`) と子の時間の上限で抑えられる。
+
+**名前空間を入れ子にした文書と、xmldom の中の時間** (3 回目のレビューの指摘):
+
+- xmldom 0.9.12 は、要素ごとの名前空間の表を、親の表を継ぐ形で作る。各段で `xmlns:x="…"` を宣言する要素を深く入れ子にし、内側で祖先の接頭辞を使うと、名前を引くたびに継いだ表を根元まで辿るので、解析が深さの 2 乗の時間になる (自前の前処理ではなく、xmldom の `parseFromString` の中で時間を使う)。
+- 実測 (自分で再現した。`nsDeepRootPrefix`): 深さ 2,500 / 5,000 / 10,000 で 75 / 266 / 975ms (倍ごとに約 3.6 倍)。Python 版 (defusedxml) は 3 / 5 / 10ms で通した。3 回目のレビューのレビュアーの実測では、1.6MB の XML で Node 32,446ms 対 Python 70ms、7.5KB の PPTX (`_rels/.rels` に 3 万段) で 4,742ms (RSS 246MiB)、workbook.xml に同じ形を入れた 5KB の XLSX は書き戻しで V8 のメモリが約 4GB に達してメモリ不足になった。
+- 直し方: 解析の前に、**除く前の本文** で名前空間の宣言 (`xmlns` と `xmlns:…` の属性にあたる文字の並び) を数え、1,000 個を超えたら `limit_exceeded` で拒む (18.9 の `xmldom.mjs` の `tooManyDeclarations`。見つけた時点で止まる繰り返し)。上の例は、どの深さでも 2ms で拒むようになった。
+- **除いた文字列で数えた形の抜け道** (4 回目のレビューの指摘。自分で再現した): CDATA・コメント・処理命令を除く処理 (`stripSpans`) は、DOCTYPE の SYSTEM / PUBLIC の文字列や ATTLIST の既定の値の中の `<!--`・`<?`・`<![CDATA[` も開始の印と取り違える。`<!DOCTYPE r SYSTEM "<!--">…本体…<!-- -->` と書くと本体がまるごと除かれ、宣言は 0 個と数えられる。xmldom は本体をそのまま解析するので、2 乗の時間が戻った (深さ 2,500 / 5,000 / 10,000 で 60 / 234 / 1,061ms)。レビュアーは 8KB の PPTX で 16.9 秒・335MiB、3.4KB の XLSX で RSS 2.6GiB を示した。除く前の本文で数える形にして、レビュアーの 7 つの形 (SYSTEM・PUBLIC の文字列の `<!--`・`<?`・`<![CDATA[`、ATTLIST の値と属性の値の `<!--`、空白の無い `z="1"xmlns:…`) は、深さ 4 万でも 1〜17ms で拒むようになった (`probe/lin/bypass-shapes.mjs`)。数え方の正規表現も、前に空白を求めない形にした。
+- 数えすぎの影響: 本文やコメントに `xmlns=` という文字の並びが 1,000 回を超えて現れる部品も拒む。xmldom が読む部品 (rels・workbook.xml・presentation.xml・`[Content_Types].xml`) には利用者の文がほぼ入らない。コーパスと細工した OOXML の 2,261 部品では、除く前の本文で数えても 1 部品で多くて 5 個だった (18.7 の 9)。
+- **前処理の検査の役割分担** (除く処理の取り違えで、ほかの検査が見る範囲もずれるかをソースで確かめた):
+  - 安全のための検査 (除く前の本文で行う。抜け道を作らない): XML で使えない字 (`INVALID_CHAR`)、名前空間の宣言の数 (`tooManyDeclarations`)。エンティティの宣言の検査は、xmldom が切り出した DOCTYPE の内部サブセットに対して行うので、本文の除く処理の影響を受けない (内部サブセットの中の引用符・コメント・処理命令は、`SUBSET_VERBATIM` で正しく除く)。
+  - Python 版と判定を合わせるだけの検査 (除いた後の文字列で行う): 裸の `&` (`BARE_AMPERSAND`)、使えない字を指す数値の参照 (`badReference`)、本文の `]]>` (`cdataEndInText`)。DOCTYPE の文字列に開始の印を書くと、これらは本体を見なくなり、壊れた XML を Node 版だけが通す (5 件を Python 版と比べた。18.7 の 9)。xmldom はそのまま解析するだけで、時間とメモリには影響しない。Python 版の `text.py` の `_skip_doctype` のように DOCTYPE を引用符と括弧を数えて読み飛ばす処理を足せば直せる (推論。試していない) が、Office は DOCTYPE を書かないので記録だけにした。
+- 「宣言の総数」と「宣言の入れ子の深さ」のどちらで数えるか: 2 乗になるのは深さ (祖先の宣言の数) によるので、深さで数えるほうが正確で、平らな位置に宣言を多く持つ文書も受け付けられる。ただ深さを数えるには、開始タグと終了タグを対にして辿る処理が要る。総数は深さ以上になるので、総数で抑えれば深さも抑えられ、正規表現の数え方 1 つで済む。そのため、より小さい総数のほうを選んだ。
+- 上限 1,000 で正しい文書を拒まないこと: ベンチマークのコーパスと細工した OOXML の 34 ファイル、2,261 個の XML の部品で、1 つの部品の宣言の数は多くて 5 個 (分割が読む workbook.xml・presentation.xml・rels・`[Content_Types].xml` では多くて 3 個) だった。Excel が書く workbook.xml の例 (18.5.4 の検査の `EXCEL_WB`) は 7 個である。上限との間に 100 倍以上の余裕がある。
+- 上限ちょうどの悪意のある入力 (宣言を 1,000 段入れ子にし、その下に祖先の接頭辞を使う要素を N 個) は、下の表のとおり大きさに比例した (4.6MB で 1.8 秒)。名前を引くたびに辿る表の長さが 1,000 で抑えられるため。
+- 失敗の種類: 3 回目のレビューのレビュアーが作った PPTX 3 つ (`ns30000`・`ns15000`・`nsall15000`) は、Python 版も anydoc の XML の深さの上限で `limit_exceeded` になり、Node 版の `limit_exceeded` と同じだった。XLSX (`ns40k`) は、Python 版が `internal` (500。書き戻しの再帰が深すぎると推論)、Node 版が `limit_exceeded` (422) で違った (18.7 の 9)。
+
+**悪意のある入力の時間とメモリ (N・2N・4N。xmldom を含む XML の解析全体)** (`$S/probe/lin/gen.mjs`・`run1.mjs`。3 回目のレビューのレビュアーの生成器に 4 種類を足した。形ごと・大きさごとに新しいプロセスで、`decodeXmlPart` と `parse` (シートの例は書き戻しも) の時間と、ピークの RSS の増え方を測った):
+
+| 入力 | N | 時間 (N / 2N / 4N) | 増えた RSS (N / 2N / 4N) | 4N の大きさ | 判定 |
+|---|---|---|---|---|---|
+| 各段で名前空間を宣言する深い入れ子 (祖先の接頭辞を使う) | 2,500 | 3 / 5 / 7ms | 6 / 12 / 11MiB | 0.3MB | 拒む |
+| 同上 (各段の属性で祖先の接頭辞を使う) | 2,500 | 3 / 5 / 8ms | 6 / 12 / 12MiB | 0.3MB | 拒む |
+| 1 つの要素に名前空間の宣言を N 個 | 2,500 | 1 / 2 / 3ms | 5 / 6 / 7MiB | 0.3MB | 拒む |
+| 1 つのタグの属性 N 個 | 50,000 | 71 / 154 / 275ms | 46 / 98 / 185MiB | 2.2MB | 通す |
+| 同上、最後に同じ名前の属性 | 50,000 | 35 / 78 / 154ms | 16 / 31 / 43MiB | 2.2MB | 拒む |
+| 本文の数値の参照 N 個 | 50,000 | 17 / 32 / 62ms | 13 / 22 / 29MiB | 1.0MB | 通す |
+| 属性の値の数値の参照 N 個 | 50,000 | 18 / 33 / 71ms | 14 / 23 / 28MiB | 1.1MB | 通す |
+| `&amp;` N 個 | 50,000 | 13 / 26 / 48ms | 12 / 19 / 28MiB | 1.0MB | 通す |
+| 長さ N の要素名 | 50,000 | 3 / 4 / 6ms | 6 / 7 / 7MiB | 0.2MB | 通す |
+| 長さ 5N の本文 | 50,000 | 4 / 6 / 9ms | 7 / 6 / 7MiB | 1.0MB | 通す |
+| 兄弟の要素 N 個 | 50,000 | 273 / 492 / 904ms | 203 / 293 / 453MiB | 2.7MB | 通す |
+| 閉じたコメント N 個 | 50,000 | 67 / 123 / 210ms | 44 / 66 / 108MiB | 1.5MB | 通す |
+| 閉じた処理命令 N 個 | 50,000 | 36 / 62 / 124ms | 38 / 55 / 121MiB | 1.3MB | 通す |
+| CDATA N 個 | 50,000 | 60 / 108 / 191ms | 47 / 70 / 112MiB | 2.5MB | 通す |
+| DOCTYPE の ATTLIST N 個 | 50,000 | 357 / 699 / 1373ms | 15 / 28 / 44MiB | 5.6MB | 通す |
+| DOCTYPE の中のコメントの引用符 N 個 | 50,000 | 44 / 75 / 132ms | 23 / 24 / 24MiB | 2.3MB | 通す |
+| DOCTYPE の ELEMENT N 個 | 50,000 | 271 / 542 / 1063ms | 14 / 25 / 16MiB | 4.1MB | 通す |
+| `\r\n` N 個 | 50,000 | 5 / 10 / 31ms | 8 / 14 / 28MiB | 0.6MB | 通す |
+| 属性の値の `<` N 個 | 50,000 | 9 / 9 / 14ms | 12 / 12 / 12MiB | 0.2MB | 拒む |
+| 閉じていない開始タグ N 個 | 50,000 | 72 / 125 / 250ms | 102 / 194 / 361MiB | 0.6MB | 拒む |
+| 対応しない閉じタグ N 個 | 50,000 | 11 / 16 / 28ms | 12 / 12 / 13MiB | 1.3MB | 拒む |
+| タグの中の閉じていない引用符 (4N 字) | 50,000 | 3 / 4 / 7ms | 7 / 7 / 7MiB | 0.8MB | 拒む |
+| 本文の `>` 4N 個 | 50,000 | 4 / 5 / 7ms | 7 / 7 / 7MiB | 0.8MB | 通す |
+| `;` の無い `&a` N 個 | 50,000 | 1 / 2 / 3ms | 4 / 6 / 6MiB | 0.4MB | 拒む |
+| workbook.xml のシート N 枚 (書き戻しも含む) | 50,000 | 379 / 723 / 1244ms | 273 / 450 / 660MiB | 13.4MB | 通す |
+| rels の Relationship N 個 | 50,000 | 232 / 396 / 710ms | 201 / 272 / 393MiB | 11.2MB | 通す |
+| 上限ちょうど (宣言 1,000 段の下に、祖先の接頭辞を使う要素を N 個) | 100,000 | 420 / 847 / 1785ms | 232 / 363 / 610MiB | 4.6MB | 通す |
+| 名前空間なしの深い入れ子 N 段 | 50,000 | 228 / 397 / 723ms | 185 / 267 / 383MiB | 1.3MB | 通す |
+| `xml:` の接頭辞の属性 N 個 | 50,000 | 120 / 233 / 501ms | 61 / 119 / 247MiB | 2.9MB | 通す |
+| 定義済みの参照 5 種類を N 回 | 50,000 | 57 / 114 / 229ms | 39 / 58 / 114MiB | 4.8MB | 通す |
+
+- 時間はどの形も倍ごとに 1.5〜2.4 倍で、入力にほぼ比例した。名前空間の 3 つの形は上限で拒むので、大きさに関係なく数 ms である。
+- メモリは入力の何倍にもなる形がある: 閉じていない開始タグ (0.6MB で +361MiB。xmldom は誤りを返す前に DOM を作る)、兄弟の要素 (2.7MB で +453MiB)、深い入れ子 (1.3MB で +383MiB)、シート 20 万枚の workbook.xml (13.4MB で +660MiB)、上限ちょうどの名前空間 (4.6MB で +610MiB)。子の中では RSS の上限 (`MAX_CHILD_RSS_MB`) で止まり、`memory_exceeded` (422 `resource_limit_exceeded`) になる。分割が読む部品の大きさの目安は 3.7 で測る (18.10)。
+- 数値の参照だけの 4MB の部品で、前処理の `badReference` が照合の結果をすべて配列にしていたため、ピークの RSS が 377MiB になった (`probe/lin/refmem.mjs`)。見つけた時点で止まる繰り返しに直し、161MiB になった (3 回目のレビューのレビュアーの指摘)。
+
+**PPTX の分割の前処理の時間** (`$S/probe/lin/split-perf.mjs`。anydoc を、すぐに `'x'` を返す代わりの関数にして、分割の前処理だけを測った。スライドの数を変えた PPTX を作った。Python 版も同じく `convert_office` を差し替えて測った):
+
+| スライドの数 (ZIP のエントリの数) | Python 版 | Node の試作 (直す前) | Node の試作 (直した後) |
+|---|---|---|---|
+| 1,000 (2,009) | 588ms | 7,794ms | 685ms |
+| 2,000 (4,009) | 1,949ms | 38,516ms | 1,168ms |
+| 4,000 (8,009) | 6,727ms | (2 分で打ち切った) | 2,793ms |
+
+- 直す前の試作は、スライドごとに presentation.xml を解析し直し (1,000 スライドで 3.1 秒)、スライドの一覧が全部入った文書を書き戻していた (3.2 秒)。どちらもスライドの数の 2 乗になる。
+- 直した点: presentation.xml は 1 回だけ解析し、スライドの一覧を 1 回だけ空にして、スライドごとにその 1 つを入れて書き戻し、取り出す (Python 版の `_presentation_with_only` と同じ形。`xmldom.mjs` の `keepOnlySlide`)。ZIP の要素は名前の `Map` で引く (`archive-guard.mjs`。前は読むたびにエントリの一覧を全部見ていた)。スタブの分割の写し (`split.mjs`) では、除く部品の集まりをスライドごとに作り直すのをやめ、`[Content_Types].xml` の `Default` を 1 回だけ組み立てた。
+- 直した後も、スライドの数が 2 倍で時間は 2〜2.4 倍で、Python 版 (3.3〜3.5 倍) より伸びが小さい。残る伸びは、スライドごとに `[Content_Types].xml` の `Override` を全部見る処理などで、Python 版も同じ形である (推論)。
+- 直した後で、1,000 スライドの PPTX を anydoc を含めて変換し、Python 版の `convert()` と同じ 1,000 要素になった (Node のスタブで 882ms)。
+- ピークの RSS (`probe/lin/split-hwm.mjs`。分割の前処理だけ、新しいプロセスで測った): Node は 1,000 / 2,000 / 4,000 スライドで 199 / 280 / 370MiB、Python 版は 46 / 51 / 62MiB で、Node は約 4〜6 倍だった。原因は切り分けていない。xmldom の DOM と、スタブの写しが各スライドの package を作るたびに部品のバイト列とパッケージを作り直すこと、V8 の外のメモリ (ZIP の書きの出力) が関わると推論する。3 回目のレビューのレビュアーは、8,000 シートの XLSX の分割でも 352MiB 対 61MiB と測った。
+
+**ベンチマークでの比較** (18.5.5): xmldom と saxes の両方で、PPTX と XLSX の結果が Python 版と同じになった。xmldom は、上の修正をすべて入れた後でもう一度測り (`$S/out/bench-xmldom-r3.json`)、同じ結果だった。
+
+#### 18.5.5 ベンチマークと、Python 版の出力との比較
+
+- `run-benchmark.ts` をスタブに向けた (XML の部品を xmldom にしたものと saxes にしたものの 2 つ)。PDF を除く 12 形式の (a)〜(c) の行と、20 文書の文書ごとの判定が、`python-baseline.json` と完全に一致した (`probe/bench/compare-baseline.mjs` で比べ、違いは Elasticsearch の段だけ)。
+  - PDF の 3 文書は、スタブが 500 を返すので「失敗」になる (T6 の範囲外)。比べるのは形式ごとの行だけにした。
+- Elasticsearch の段は、`The operation was aborted due to timeout` で飛ばされた。
+  - 原因を調べた。`_cluster/allocation/explain` が `can_allocate: no` を返した。`_cat/allocation` ではディスクの使用率が 92% (39GB の空き) で、Elasticsearch のディスクの上限 (既定 90%) を超えていた。新しい index を置けず、作成の要求が 30 秒の期限に達した。
+  - devcontainer の Elasticsearch は共有の環境なので、設定は変えていない。
+  - 6 回目のレビューの後の回 (`$S/out/bench-r7.json`) ではディスクの使用率が 45% に下がっていて、Elasticsearch の段が動いた。PDF を含まない 24 行の検索の行 (kuromoji と GROWI の引用符つきの 2 通り) と、PDF 以外の位置の問題 (`docx-ja.docx` の `テレワーク勤務制度` の 1 件。ベースラインにも同じ 1 件がある) が、ベースラインと同じだった。違うのは PDF の行と PDF を含む「all」の行だけで、スタブが PDF を 500 にするためである。
+- 20 文書の `pages[]` (`pageNumber`・`label`・`content`) を、Python 版の `convert()` (サービスを起動せずに `.venv` で呼んだ) と文字単位で比べた。xmldom と saxes の **どちらも 20/20 が同じ** だった。
+- Python 版のテストの細工したファイルでも、Python 版の `convert()` と比べた。
+  - エンティティの展開を仕込んだ rels の PPTX (`malformed`)、ノートのある PPTX、`_contract_deck` の PPTX (ノート・表・画像・グループ・非表示のスライド・空のスライド・スライドの順の入れ替え)、同じ名前の要素を持つ XLSX、無圧縮の要素の XLSX の 5 つは、結果が同じ。
+  - DOCX の爆弾と暗号化した PPTX の 2 つは、Python 版が `limit_exceeded` / `encrypted` を返した。スタブは `internal_error` を返した。どちらも anydoc が出す例外の分類 (`office.ts` の仕事) をスタブが持たないためで、T6 の部品の違いではない。
+  - UTF-16 の部品を持つ PPTX は同じ。UTF-16 の部品を持つ XLSX は、上の 18.5.4 のとおりスタブがセル数の検査を持たないため比べられなかった。
+- xmldom・`xml-bytes.mjs`・`archive-guard.mjs`・スタブの分割を最終の形にした後で、ベンチマーク (Elasticsearch なし、`$S/out/bench-xmldom-r3.json`) と `pages[]` の比較、細工したファイルの比較をもう一度行った。PDF 以外はベースラインと一致し、`pages[]` は 20/20 が同じ、細工したファイルは 18.5.4 の表のとおり (`x_whatwg_only_label` のほかは Python 版と同じ) だった。
+
+#### 18.5.6 読み込みの重さ
+
+| 部品 | 読み込み (ms) | RSS の増分 (MiB) | VmSize の増分 (MiB) |
+|---|---|---|---|
+| **htmlparser2** | 11.6 | 12 | 5 |
+| node-html-parser | 5.2 | 9 | 1 |
+| parse5 | 11.6 | 11 | 5 |
+| **yauzl** | 2.0 | 2 | 1 |
+| **yazl** | 2.3 | 3 | 1 |
+| fflate | 4.1 | 7 | 1 |
+| adm-zip | 6.7 | 5 | 2 |
+| jszip | 21.1 | 12 | 5 |
+| **@xmldom/xmldom** | 13.8 | 7 | 10 |
+| saxes | 1.8 | 2 | 1 |
+| sax | 1.3 | 2 | 1 |
+| fast-xml-parser | 18.6 | 13 | 6 |
+| chardet | 3.4 | 3 | 1 |
+| encoding-japanese | 4.2 | 4 | 2 |
+| chardetng-wasm | 2.2 | 3 | **8,194** |
+
+素の Node の `VmSize` は約 1,375MiB、`VmPeak` は 1,375〜1,438MiB だった (同じプロセスでも、実行のたびに 60MiB ほど揺れた)。採った 4 つを合わせても、`VmSize` の増分は約 17MiB である (足し算による推論。まとめて読み込んでは測っていない)。
+
+#### 18.5.7 コード量
+
+試作のコードを、空行を除いた行数で数えた (`grep -cv '^\s*$'`)。本番のコードの行数ではなく、候補ごとの手間を比べるための目安である。
+
+候補ごとの adapter (部品を共通の形に合わせるためのコード):
+
+| 分野 | 候補 | 行数 | 中身 |
+|---|---|---|---|
+| HTML | **htmlparser2 (`Tokenizer`)** | 64 | `Tokenizer` に 6 つの callback を渡し、ほかは何もしない。うち約 40 行は、5 回目と 6 回目のレビューの後に足した Python 版と合わせる処理 (自己終了の形、`<title>` の中の `<&`、捨てる数値の文字参照、終わりのタグの引用符。18.5.1)。4 回目のレビューの後の形は 24 行、`Parser` の形は 15 行だった |
+| HTML | parse5 | 18 | 木を再帰なしで辿る |
+| HTML | node-html-parser | 21 | 木を再帰なしで辿る |
+| 文字コード | **自前** | 44 | 点数づけと判定 (18.9 に全文。Shift_JIS の候補は `decode-pipeline.mjs` の `cp932` で読む) |
+| 文字コード | chardet / encoding-japanese / chardetng-wasm | 6 / 6 / 9 | 名前の対応だけ |
+| ZIP の読み | 自前 | 79 | 中央ディレクトリの読み取り 47 + 読み 32 |
+| ZIP の読み | **yauzl** | 28 | 名前のデコードと CRC-32 の確認を含む |
+| ZIP の読み | fflate | 25 (+ 自前の中央ディレクトリの読み取り 47) | 一覧と位置に自前の読み取りが要る |
+| ZIP の読み | adm-zip / jszip | 19 / 15 | — |
+| ZIP の書き | 自前 | 33 | — |
+| ZIP の書き | **yazl** | 31 | 元の流れと yazl の誤り、yazl が名前を拒む例外を、拒否 (reject) として返す処理と、ディレクトリの要素を飛ばす処理を含む |
+| ZIP の書き | fflate | 17 | — |
+| XML | **@xmldom/xmldom** | 115 | 壊れた XML を拒む自前の検査、名前空間の宣言の数の上限、名前空間の予約の検査、エンティティの宣言の検査、DOCTYPE の削除と宣言の置き換え、スライドの一覧を 1 回だけ空にする処理を含む。このうち部品を呼ぶ部分 (`parse` の本体) と書き戻し・OOXML の操作は 47 行、残りの 68 行が自前の検査 |
+| XML | saxes / sax | 24 / 21 (+ 位置で書き換える自前の層 27) | — |
+| XML | fast-xml-parser | 30 | — |
+
+候補に依らない共通の自前の層 (Python 版を写したもの。本番でも同じものが要る):
+
+| ファイル | 行数 | 中身 |
+|---|---|---|
+| `line-joiner.mjs` | 30 | `_LineJoiner` と、HTML の読み飛ばし・改行・セルの規則 |
+| `decode-pipeline.mjs` | 104 | `charset.decode` の順、UTF-32、Python の厳密さに合わせる点 (Python の cp932 の読み方 19 行と、狭い codec の宣言の検査 16 行を含む)、`<meta>` と XML 宣言の読み取り |
+| `archive-guard.mjs` | 34 | `archive_guard.py` の写し (要素は名前の `Map` で引く) |
+| `strip-spans.mjs` | 20 | CDATA・コメント・処理命令・引用符で囲まれた部分を除く 1 回の走査 (正規表現の置き換えと同じ結果。除いた所に区切りの字を置くこともできる) |
+| `bench/pipe-repackage.mjs` | 61 | ZIP の読みから書きへ流してつなぐ形 (関数 `repackage` と、試すためのコマンド) |
+| `xml-bytes.mjs` | 38 | XML の部品のバイト列から文字列への変換 (BOM と宣言の食い違い、BOM の無い UTF-16、1 バイトの文字コード、cp125x の未定義のバイト) |
+| `bench/split.mjs` | 98 | `pptx_split.py` と `xlsx_split.py` の写し (セル数の検査と予算の細かな扱いは除く) |
+
+#### 18.5.8 部品ごとの悪意のある入力のファジング (4 回目のレビューの後。5 回目のレビューの後に形を足し、測り直した)
+
+使うすべての部品 (htmlparser2 の `Tokenizer`・`TextDecoder` と自前の判定・yauzl・yazl・xmldom) について、悪意のある形を N・2N・4N の大きさで作り、形・大きさごとに新しいプロセスで、時間とピークの RSS (`VmHWM`) の増え方を測った。入力の生成器は `$S/probe/fuzz/shapes.mjs`、1 回の実行は `run.mjs`、全部を回すのは `sweep.sh` (結果は `$S/out/fuzz-sweep.jsonl`、5 回目のレビューの後は `fuzz-sweep-r6.jsonl`)。表は `table.mjs` で作る。通る道は 18.9 のコードそのもの (HTML は `decodeWith(detect)` と `htmlToText`、文字コードは `decodeWith(detect)`、ZIP は `inspectArchive` と yauzl の adapter と `repackage`、XML は `decodeXmlPart` と `parse`)。ZIP は、細工のために extra field も書ける小さな ZIP の書き手を生成器の中に持つ (テスト用の `test/fixtures/zip.ts` は使わない)。N は、名前空間の形は 2,500、ZIP のエントリの数は 2.5 万、ほかは 5 万。
+
+生成器と測り方のコードは次のとおり (試作のファイルと同じもの)。
+
+`probe/fuzz/shapes.mjs`:
+
+```js
+// Hostile inputs per component, built at size n. Each returns { kind, input } where kind picks the code path.
+import { crc32 } from 'node:zlib';
+const rep = (s, n) => s.repeat(n);
+const u16 = (v) => { const b = Buffer.alloc(2); b.writeUInt16LE(v); return b; };
+const u32 = (v) => { const b = Buffer.alloc(4); b.writeUInt32LE(v >>> 0); return b; };
+// Minimal stored-entry ZIP writer with an optional extra field (the repo's fixture writer is test-only).
+const zip = (entries) => {
+  const out = []; const cen = []; let off = 0;
+  for (const { name, data = Buffer.from('<x/>'), extra = Buffer.alloc(0) } of entries) {
+    const nm = Buffer.from(name); const crc = crc32(data);
+    const common = Buffer.concat([u16(20), u16(0x800), u16(0), u16(0), u16(0x21), u32(crc), u32(data.length), u32(data.length), u16(nm.length), u16(extra.length)]);
+    const local = Buffer.concat([u32(0x04034b50), common, nm, extra]);
+    out.push(local, data);
+    cen.push(Buffer.concat([u32(0x02014b50), u16(20), common, u16(0), u16(0), u16(0), u32(0), u32(off), nm, extra]));
+    off += local.length + data.length;
+  }
+  const cd = Buffer.concat(cen);
+  return Buffer.concat([...out, cd, u32(0x06054b50), u16(0), u16(0), u16(Math.min(entries.length, 0xffff)), u16(Math.min(entries.length, 0xffff)), u32(cd.length), u32(off), u16(0)]);
+};
+const ns = (n) => `<a:r xmlns:a="u">${Array.from({ length: n }, (_, i) => `<a:e xmlns:p${i}="x${i}">`).join('')}${rep('</a:e>', n)}</a:r>`;
+export const SHAPES = {
+  // HTML (decode + htmlToText)
+  'html: unclosed <div>': ['html', (n) => rep('<div>', n)],
+  'html: open <div> then stray </svg>': ['html', (n) => rep('<div>', n) + rep('</svg>', n)],
+  'html: unclosed <font>x': ['html', (n) => rep('<font>x', n)],
+  'html: nested <div> closed': ['html', (n) => rep('<div>', n) + 'x' + rep('</div>', n)],
+  'html: attributes in one tag': ['html', (n) => '<a' + rep(' b="c"', n) + '>t</a>'],
+  'html: character references': ['html', (n) => '<p>' + rep('&#12354;&amp;&nbsp;', n) + '</p>'],
+  'html: one huge line': ['html', (n) => '<p>' + rep('word ', n * 4) + '</p>'],
+  'html: huge <script> body': ['html', (n) => '<script>' + rep('var x = "<p>";', n) + '</script><p>after</p>'],
+  'html: many <': ['html', (n) => rep('<', n * 4)],
+  'html: unclosed comments': ['html', (n) => rep('<!--', n)],
+  'html: "<&" references in <title>': ['html', (n) => '<title>' + rep('<&amp;&#12354;', n) + '</title>'],
+  'html: "<x / >" start tags': ['html', (n) => rep('<title / >t</title><p / >', n)],
+  'html: end tags with ">" in a quoted attribute': ['html', (n) => rep('</p a=">">x', n)],
+  'html: one end tag full of quotes': ['html', (n) => '</a ' + rep('"\'= x/', n) + '>t'],
+  'html: end tags with quotes that pair across tags': ['html', (n) => rep('</a b="x></a c=\'y>', n)],
+  'html: end tags not closed by ">" (</a x=">">)': ['html', (n) => rep('</a x=">"', n)],
+  'html: one end tag with many attributes': ['html', (n) => '<p>before</p></a' + rep(' x', n * 10) + '><p>after</p>'],
+  'html: numeric references Python drops': ['html', (n) => '<p>' + rep('&#1;&#xFFFF;', n) + '</p>'],
+  // charset (decodeWith(detect))
+  'charset: huge <meta charset> value': ['html', (n) => `<meta charset="${rep('a', n * 4)}"><p>x</p>`],
+  'charset: BOM repeated': ['text', (n) => Buffer.concat([Buffer.alloc(n * 3, Buffer.from([0xef, 0xbb, 0xbf])), Buffer.from('x')])],
+  'charset: huge <meta> tag': ['html', (n) => `<meta ${rep('a="b" ', n)} charset="utf-8"><p>x</p>`],
+  'charset: ESC bytes': ['text', (n) => Buffer.alloc(n * 4, 0x1b)],
+  'charset: Shift_JIS with one bad byte at the end': ['text', (n) => Buffer.concat([Buffer.alloc(n * 4, Buffer.from([0x82, 0xa0])), Buffer.from([0xff])])],
+  'charset: Shift_JIS with 0xFF after every character': ['text', (n) => Buffer.alloc(n * 3, Buffer.from([0x82, 0xa0, 0xff]))],
+  'charset: gb2312 declared over Shift_JIS bytes': ['html', (n) => Buffer.concat([Buffer.from('<meta charset="gb2312"><p>'), Buffer.alloc(n * 4, Buffer.from([0x93, 0xfa, 0x96, 0x7b]))])],
+  // ZIP (inspectArchive with yauzl: list, then read the required part)
+  'zip: many entries': ['zip', (n) => zip([{ name: 'xl/workbook.xml' }, ...Array.from({ length: n }, (_, i) => ({ name: `f${i}.xml`, data: Buffer.alloc(0) }))])],
+  'zip: long names': ['zip', (n) => zip([{ name: 'xl/workbook.xml' }, ...Array.from({ length: Math.max(1, n / 1000) }, (_, i) => ({ name: `${i}${rep('a', 60000)}`, data: Buffer.alloc(0) }))])],
+  'zip: deep paths': ['zip', (n) => zip([{ name: 'xl/workbook.xml' }, ...Array.from({ length: Math.max(1, n / 1000) }, (_, i) => ({ name: `${rep('d/', 30000)}${i}`, data: Buffer.alloc(0) }))])],
+  'zip: huge extra fields': ['zip', (n) => zip([{ name: 'xl/workbook.xml' }, ...Array.from({ length: Math.max(1, n / 1000) }, (_, i) => ({ name: `e${i}`, data: Buffer.alloc(0), extra: Buffer.concat([u16(0xcafe), u16(65000), Buffer.alloc(65000)]) }))])],
+  'zip: many entries, repackaged (stream)': ['repack', (n) => zip([{ name: 'xl/workbook.xml' }, ...Array.from({ length: n }, (_, i) => ({ name: `f${i}.xml` }))])],
+  // XML (decodeXmlPart + parse)
+  'xml: namespace nesting': ['xml', (n) => ns(n)],
+  'xml: namespace nesting behind a DOCTYPE literal': ['xml', (n) => `<!DOCTYPE a:r SYSTEM "<!--">${ns(n)}<!-- -->`],
+  'xml: ENTITY declarations': ['xml', (n) => `<!DOCTYPE r [${Array.from({ length: n }, (_, i) => `<!ENTITY e${i} "v">`).join('')}]><r/>`],
+  'xml: ATTLIST declarations': ['xml', (n) => `<!DOCTYPE r [${Array.from({ length: n }, (_, i) => `<!ATTLIST r a${i} CDATA "v">`).join('')}]><r/>`],
+  'xml: quotes in the subset': ['xml', (n) => `<!DOCTYPE r [${rep('<!-- " \' -->', n)}]><r/>`],
+  'xml: attributes': ['xml', (n) => `<r ${Array.from({ length: n }, (_, i) => `a${i}="v"`).join(' ')}/>`],
+  'xml: depth': ['xml', (n) => rep('<a>', n) + rep('</a>', n)],
+  'xml: siblings': ['xml', (n) => `<r>${rep('<e a="1">t</e>', n)}</r>`],
+  'xml: unclosed start tags': ['xml', (n) => `<r>${rep('<a>', n)}`],
+};
+```
+
+`probe/fuzz/run.mjs`:
+
+```js
+// One shape at one size in this process: time and VmHWM growth. Prints one JSON line.
+import { readFileSync } from 'node:fs';
+import { SHAPES } from './shapes.mjs';
+const [name, nStr] = [process.argv[2], Number(process.argv[3])];
+const hwm = () => Math.round(parseInt(/VmHWM:\s+(\d+)/.exec(readFileSync('/proc/self/status', 'utf8'))[1]) / 1024);
+const [kind, make] = SHAPES[name]; const raw = make(nStr); const input = typeof raw === 'string' ? Buffer.from(raw) : raw;
+const { decodeWith, htmlDeclared } = await import('../lib/decode-pipeline.mjs'); const { detect } = await import('../charset/own.mjs');
+const { htmlToText } = await import('../html/htmlparser2.mjs'); const { decodeXmlPart } = await import('../lib/xml-bytes.mjs');
+const X = await import('../xml/xmldom.mjs'); const reader = await import('../zip/yauzl.mjs'); const { inspectArchive } = await import('../lib/archive-guard.mjs');
+const { repackage } = await import('../bench/pipe-repackage.mjs');
+const LIM = { entries: 10_000_000, uncompressedBytes: 512 * 1024 * 1024 };
+const data = new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+const before = hwm(); const t = performance.now(); let result;
+try {
+  if (kind === 'html') { htmlToText(decodeWith(detect)(data, htmlDeclared(data))); result = 'ok'; }
+  else if (kind === 'text') { decodeWith(detect)(data); result = 'ok'; }
+  else if (kind === 'xml') { X.parse(decodeXmlPart(data)); result = 'accept'; }
+  else if (kind === 'zip') { const a = await inspectArchive(reader, data, 'xl/workbook.xml', LIM); result = a ? `opened, read ${(await a.read('xl/workbook.xml', 1 << 20)).length}B` : 'pass-through'; }
+  else if (kind === 'repack') { result = `repackaged ${(await repackage(Buffer.from(data), 512 << 20)).length}B`; }
+} catch (e) { result = `refused (${e.kind ?? e.constructor.name})`; }
+console.log(JSON.stringify({ name, n: nStr, bytes: input.length, ms: Math.round(performance.now() - t), mib: hwm() - before, result }));
+```
+
+`probe/fuzz/sweep.sh`:
+
+```sh
+#!/bin/sh
+# Every shape at N, 2N, 4N, one process each; a run over 120 s is recorded as a timeout.
+OUT=$1; : > "$OUT"
+node --input-type=module -e "import { SHAPES } from './shapes.mjs'; for (const k of Object.keys(SHAPES)) console.log(k)" | while IFS= read -r name; do
+  case "$name" in "xml: namespace nesting"*) n0=2500;; "zip: many entries"*) n0=25000;; *) n0=50000;; esac
+  for k in 1 2 4; do
+    timeout 120 node --no-warnings --stack-size=984 run.mjs "$name" $((n0 * k)) >> "$OUT" 2>/dev/null || echo "{\"name\":\"$name\",\"n\":$((n0 * k)),\"result\":\"timeout or crash (exit $?)\"}" >> "$OUT"
+  done
+done
+```
+
+`probe/fuzz/table.mjs`:
+
+```js
+// Markdown table for research.md 18.5.8 from a sweep.sh result (one JSON line per shape and size).
+import { readFileSync } from 'node:fs';
+const rows = readFileSync(process.argv[2], 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+const label = (r) => r.startsWith('ok') ? '完了' : r === 'accept' ? '通す' : r.startsWith('opened') ? '開いて読めた' : r.startsWith('repackaged') ? '書き直せた'
+  : r.startsWith('refused') ? `拒む (${r.slice(9, -1)})` : r === 'pass-through' ? 'そのまま渡す' : r;
+const esc = (s) => s.replace(/</g, '\\<').replace(/\|/g, '\\|');
+const byName = new Map();
+for (const r of rows) byName.set(r.name, [...(byName.get(r.name) ?? []), r]);
+console.log('| 部品 / 入力 | N | 大きさ (4N) | 時間 (N / 2N / 4N) | 4N / N | 増えた RSS (N / 2N / 4N) | 結果 |');
+console.log('|---|---|---|---|---|---|---|');
+for (const [name, rs] of byName) {
+  const [a, , c] = rs;
+  const ratio = c.ms == null ? '—' : (c.ms / Math.max(a.ms, 1)).toFixed(1);
+  const res = [...new Set(rs.map((r) => label(r.result)))].join(' / ');
+  console.log(`| ${esc(name)} | ${a.n.toLocaleString('en')} | ${c.bytes == null ? '—' : `${(c.bytes / 1048576).toFixed(1)}MiB`} | ${rs.map((r) => r.ms ?? '—').join(' / ')}ms | ${ratio} | ${rs.map((r) => r.mib ?? '—').join(' / ')}MiB | ${res} |`);
+}
+```
+
+ZIP のバイト単位のファジング (5 回目のレビューのレビュアーの `fuzz-zip-fix.mjs` の写し。入力はコーパスと細工した XLSX / PPTX の 9 個 (`$S/out/zin`)。種ごとに 1〜12 バイトを書き換え、10 件に 1 件は途中で切る。分割の写し (`split.mjs`) と流してつなぐ書き直し (`repackage`) の両方に通す):
+
+`probe/fuzz/fuzz-zip.mjs`:
+
+```js
+// Byte-level fuzzing of the OOXML flow (split.mjs over the 18.9 parts) and of repackage() (pipe-repackage.mjs). Copy of the 5th-round reviewer's script.
+// A crash ends the batch before the 'done' line; cur-<pid>.txt names the case in progress.
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { makeSplitters } from '../bench/split.mjs';
+import { repackage } from '../bench/pipe-repackage.mjs';
+const X = await import('../xml/xmldom.mjs');
+const { convertPptx, convertXlsx } = makeSplitters(X, async () => 'x');
+const dir = process.argv[4];
+const files = readdirSync(dir).filter((f) => /\.(pptx|xlsx)$/.test(f)).map((f) => ({ f, b: readFileSync(`${dir}/${f}`) }));
+const mulberry = (a) => () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const [from, to] = [Number(process.argv[2]), Number(process.argv[3])];
+const kinds = {}; let maxMs = 0; let slow = 0;
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('HANG'), { kind: 'HANG' })), ms).unref())]);
+for (let seed = from; seed < to; seed++) {
+  const r = mulberry(seed * 40503 + 7); const rnd = (n) => Math.floor(r() * n);
+  const { f, b } = files[rnd(files.length)]; const m = Buffer.from(b);
+  const flips = 1 + rnd(12);
+  for (let i = 0; i < flips; i++) { const at = rnd(m.length); m[at] = rnd(3) === 0 ? 0xff : rnd(256); }
+  const data = rnd(10) === 0 ? m.subarray(0, rnd(m.length)) : m;
+  writeFileSync(`curz-${process.pid}.txt`, `${seed} ${f}`);
+  for (const [label, run] of [['split', () => (f.endsWith('xlsx') ? convertXlsx : convertPptx)(new Uint8Array(data))], ['pipe', () => repackage(Buffer.from(data), 512 * 1048576)]]) {
+    const t = performance.now(); let k;
+    try { await withTimeout(run(), 5000); k = 'ok'; } catch (e) { k = e?.kind ?? `unkinded:${String(e?.message).slice(0, 40)}`; }
+    const ms = performance.now() - t; maxMs = Math.max(maxMs, ms);
+    if (ms > 1000 || k === 'HANG') { slow++; writeFileSync(`slowz-${seed}.${f.split('.').pop()}`, data); console.log(`SLOW/HANG ${label} seed=${seed} ${f} ${ms.toFixed(0)}ms ${k}`); }
+    kinds[`${label}:${k}`] = (kinds[`${label}:${k}`] ?? 0) + 1;
+  }
+}
+console.log(`done ${from}-${to}: max ${maxMs.toFixed(0)}ms slow ${slow}`, JSON.stringify(kinds));
+```
+
+`probe/fuzz/fuzz-zip.sh`:
+
+```sh
+#!/bin/sh
+# Byte-level ZIP fuzzing in batches of 1,000 seeds, one process per batch; records each batch's exit code.
+# usage: fuzz-zip.sh <first seed> <last seed (exclusive)> <dir of .pptx/.xlsx> <log>
+FROM=$1; TO=$2; DIR=$3; LOG=$4; : > "$LOG"
+s=$FROM
+while [ "$s" -lt "$TO" ]; do
+  e=$((s + 1000))
+  node --no-warnings "$(dirname "$0")/fuzz-zip.mjs" $s $e "$DIR" >> "$LOG" 2>&1
+  echo "batch $s-$e exit $?" >> "$LOG"
+  s=$e
+done
+```
+
+結果 (`$S/out/fuzz-sweep-r7.jsonl` から `table.mjs` で作った表。5 回目のレビューの後に HTML の 6 つの形と文字コードの 2 つの形を、6 回目のレビューの後に HTML の終わりのタグの 2 つの形を足した。39 種類):
+
+| 部品 / 入力 | N | 大きさ (4N) | 時間 (N / 2N / 4N) | 4N / N | 増えた RSS (N / 2N / 4N) | 結果 |
+|---|---|---|---|---|---|---|
+| html: unclosed \<div> | 50,000 | 1.0MiB | 14 / 22 / 40ms | 2.9 | 5 / 6 / 6MiB | 完了 |
+| html: open \<div> then stray \</svg> | 50,000 | 2.1MiB | 21 / 36 / 69ms | 3.3 | 6 / 6 / 8MiB | 完了 |
+| html: unclosed \<font>x | 50,000 | 1.3MiB | 13 / 24 / 43ms | 3.3 | 4 / 6 / 10MiB | 完了 |
+| html: nested \<div> closed | 50,000 | 2.1MiB | 27 / 49 / 93ms | 3.4 | 5 / 7 / 8MiB | 完了 |
+| html: attributes in one tag | 50,000 | 1.1MiB | 5 / 7 / 13ms | 2.6 | 1 / 3 / 2MiB | 完了 |
+| html: character references | 50,000 | 3.6MiB | 32 / 62 / 119ms | 3.7 | 12 / 22 / 41MiB | 完了 |
+| html: one huge line | 50,000 | 3.8MiB | 32 / 87 / 140ms | 4.4 | 24 / 61 / 110MiB | 完了 |
+| html: huge \<script> body | 50,000 | 2.7MiB | 4 / 8 / 12ms | 3.0 | 2 / 3 / 4MiB | 完了 |
+| html: many \< | 50,000 | 0.8MiB | 22 / 41 / 80ms | 3.6 | 7 / 15 / 18MiB | 完了 |
+| html: unclosed comments | 50,000 | 0.8MiB | 3 / 5 / 8ms | 2.7 | 2 / 2 / 2MiB | 完了 |
+| html: "\<&" references in \<title> | 50,000 | 2.7MiB | 32 / 64 / 121ms | 3.8 | 12 / 24 / 41MiB | 完了 |
+| html: "\<x / >" start tags | 50,000 | 4.8MiB | 50 / 98 / 191ms | 3.8 | 11 / 20 / 38MiB | 完了 |
+| html: end tags with ">" in a quoted attribute | 50,000 | 2.1MiB | 23 / 46 / 89ms | 3.9 | 9 / 16 / 24MiB | 完了 |
+| html: one end tag full of quotes | 50,000 | 1.1MiB | 4 / 6 / 11ms | 2.8 | 1 / 1 / 2MiB | 完了 |
+| html: end tags with quotes that pair across tags | 50,000 | 3.4MiB | 10 / 17 / 26ms | 2.6 | 5 / 5 / 8MiB | 完了 |
+| html: end tags not closed by ">" (\</a x=">">) | 50,000 | 1.7MiB | 5 / 9 / 14ms | 2.8 | 1 / 2 / 3MiB | 完了 |
+| html: one end tag with many attributes | 50,000 | 3.8MiB | 17 / 27 / 53ms | 3.1 | 2 / 3 / 5MiB | 完了 |
+| html: numeric references Python drops | 50,000 | 2.3MiB | 8 / 13 / 22ms | 2.8 | 4 / 4 / 5MiB | 完了 |
+| charset: huge \<meta charset> value | 50,000 | 0.8MiB | 4 / 5 / 8ms | 2.0 | 1 / 2 / 2MiB | 完了 |
+| charset: BOM repeated | 50,000 | 0.6MiB | 0 / 0 / 1ms | 1.0 | 0 / 0 / 1MiB | 完了 |
+| charset: huge \<meta> tag | 50,000 | 1.1MiB | 5 / 7 / 12ms | 2.4 | 1 / 2 / 2MiB | 完了 |
+| charset: ESC bytes | 50,000 | 0.8MiB | 12 / 22 / 40ms | 3.3 | 4 / 4 / 5MiB | 完了 |
+| charset: Shift_JIS with one bad byte at the end | 50,000 | 0.8MiB | 7 / 8 / 13ms | 1.9 | 4 / 3 / 5MiB | 完了 |
+| charset: Shift_JIS with 0xFF after every character | 50,000 | 0.6MiB | 19 / 26 / 40ms | 2.1 | 6 / 7 / 8MiB | 完了 |
+| charset: gb2312 declared over Shift_JIS bytes | 50,000 | 0.8MiB | 10 / 12 / 14ms | 1.4 | 3 / 4 / 4MiB | 完了 |
+| zip: many entries | 25,000 | 9.1MiB | 90 / 156 / 196ms | 2.2 | 41 / 55 / 45MiB | 開いて読めた |
+| zip: long names | 50,000 | 22.9MiB | 10 / 15 / 19ms | 1.9 | 6 / 11 / 8MiB | 開いて読めた |
+| zip: deep paths | 50,000 | 22.9MiB | 10 / 20 / 42ms | 4.2 | 7 / 8 / 8MiB | 開いて読めた |
+| zip: huge extra fields | 50,000 | 24.8MiB | 6 / 7 / 7ms | 1.2 | 1 / 0 / 0MiB | 開いて読めた |
+| zip: many entries, repackaged (stream) | 25,000 | 9.5MiB | 1308 / 3727 / 5875ms | 4.5 | 234 / 289 / 249MiB | 書き直せた |
+| xml: namespace nesting | 2,500 | 0.3MiB | 3 / 5 / 6ms | 2.0 | 3 / 6 / 4MiB | 拒む (limit_exceeded) |
+| xml: namespace nesting behind a DOCTYPE literal | 2,500 | 0.3MiB | 1 / 1 / 1ms | 1.0 | 1 / 1 / 1MiB | 拒む (limit_exceeded) |
+| xml: ENTITY declarations | 50,000 | 3.9MiB | 503 / 1028 / 2057ms | 4.1 | 13 / 26 / 17MiB | 拒む (Error) |
+| xml: ATTLIST declarations | 50,000 | 5.6MiB | 345 / 688 / 1386ms | 4.0 | 13 / 30 / 58MiB | 通す |
+| xml: quotes in the subset | 50,000 | 2.3MiB | 41 / 76 / 133ms | 3.2 | 7 / 16 / 17MiB | 通す |
+| xml: attributes | 50,000 | 2.2MiB | 74 / 155 / 302ms | 4.1 | 40 / 96 / 186MiB | 通す |
+| xml: depth | 50,000 | 1.3MiB | 220 / 397 / 730ms | 3.3 | 178 / 251 / 377MiB | 通す |
+| xml: siblings | 50,000 | 2.7MiB | 262 / 499 / 901ms | 3.4 | 196 / 289 / 452MiB | 通す |
+| xml: unclosed start tags | 50,000 | 0.6MiB | 66 / 140 / 247ms | 3.7 | 94 / 188 / 305MiB | 拒む (ParseError) |
+
+- 時間は、ZIP の書き直しを除き、4N / N の比がどの形も 1.0〜4.4 で、入力に比例する場合の 4 倍の前後にある (2 乗なら 16 倍)。ZIP の書き直しは 4.5 で、要素の数を細かく変えて測ると yazl の中で 2 乗に伸びていた (18.5.3)。それ以外に **2 乗になる形は見つからなかった**。
+- ただし、比が 1.0〜2.0 の行のうち次のものは、部品が比例することを示していない。名前空間の 2 つの形は、宣言の数の上限で xmldom に渡す前に拒むので、測ったのは拒むまでの時間である (xmldom 自身の 2 乗は 18.5.4 のとおりで、上限で止めている)。「BOM repeated」(0ms) と「huge extra fields」(7ms) は時間が短すぎて、固定の手間と区別できない。「Shift_JIS with one bad byte at the end」(比 1.9)・「gb2312 declared over Shift_JIS bytes」(比 1.4)・「zip: many entries」(比 2.2) も、時間の大半が入力の大きさに依らない固定の手間 (プロセスの中の読み込みと、最初の `TextDecoder` の用意など。推論) で、比が小さいことは比例の証拠にならない。この 3 つは、比が 16 倍に届かないので 2 乗ではないとだけ言える。
+- 重いもの:
+  - ZIP のエントリ 10 万個を流してつなぐ書き直し (`repackage`) は、5.8 秒・+228〜293MiB。4 回目のレビューの後は「比例している」と書いたが、要素の数の 2 乗だった (18.5.3)。本番ではエントリの数を `MAX_ARCHIVE_ENTRIES` (既定 10,000) で先に断るので、この大きさは届かない (推論)。
+  - XML の ENTITY の宣言 (3.9MB で 2.1 秒) は、xmldom が文書全体を解析した後でエンティティの宣言の検査が拒むので、拒むまでに時間がかかる。比例している。
+  - XML の DOM のメモリ (深さ・兄弟・属性・閉じていない開始タグで、入力の 100〜600 倍) は 18.5.4 のとおり。
+- HTML の「巨大な 1 行」(3.8MiB) の比は 4.4 で (5 回目のレビューの後の回では 5.2)、少し比例より大きいことがある。V8 のごみ集めの影響と推論する。
+- 5 回目のレビューの後に足した HTML の形 (`<title>` の中の `<&`、`<x / >`、終わりのタグの引用符の 3 つ、捨てる数値の文字参照) と、文字コードの形 (0xFF を 1 字おきに置いた Shift_JIS、`gb2312` の宣言) は、どれも比 1.3〜3.9 で比例した。
+- 6 回目のレビューの後に足した HTML の終わりのタグの 2 つの形 (`</a x=">"` の並びと、属性の多い終わりのタグ。どちらも 5 回目のレビューの後の形では 2 乗の時間か `RangeError` だった。18.5.1) は、比 2.8・3.1 で比例した。
+- ZIP のバイト単位のファジング (`fuzz-zip.sh`。種 0〜3,999 と 10,000〜13,999 の 8,000 件): 8 つの束のすべてが終了コード 0 で終わった。1 件の最長は 25ms (18.5.3 に内訳)。直す前の `repackage` (`$S/out/pipe-repackage-r5.mjs`) では、種 2,000〜2,999 の束が終了コード 1 で止まった。
+
+### 18.6 選んだ理由と、選ばなかった理由
+
+判断の基準は、design.md の T6 の合否の基準 (指標がベースラインを下回らない、XXE と膨張を起こさない、許容的なライセンス) と、Req 1 の「シンプルさ (保守性)」である。
+
+**HTML: htmlparser2 を採る。使うのは `Tokenizer` だけで、`Parser` は使わない**
+
+- `Tokenizer` は、Python 版の `HTMLParser` と同じく「トークンを切り出すだけで、木も開いた要素の一覧も持たない」。そのため、Python 版の規則 (読み飛ばし・改行・セル) をそのまま写せる。32 件の追加の入力で Python 版と 1 字も違わず、タグの崩れた HTML では 602/602 (レビュアーの入力) と 1,000/1,000 (自分の入力)、5 回目のレビューの後の集まりでは 1,380/1,403 (自分) と 713/720 (レビュアー) が同じだった (18.5.1)。
+- 代わりに背負うもの: Python 版と合わせるために、`Tokenizer` の `private` の値 (`recognizeSelfClosing` と `index`) を callback の中で書き換える所が 2 つある。htmlparser2 の版を上げたときに壊れうるので、その 2 つの形をテストで見張る (18.10)。htmlparser2 を使わずに Python の `HTMLParser` を写す案も考えられるが、試していない。
+- 開いた要素を積む形でも、時間が入力に比例する (18.5.1。閉じない `<div>` と対応しない `</svg>` の 1MB で 26ms)。
+- `Parser` は採らない。開いた要素の一覧を配列の先頭に積んで探すので、閉じない要素の多い HTML で 2 乗の時間になる (1MB で 19 秒)。また、暗黙の閉じタグを出すので、タグの崩れた HTML で Python 版と出力が違う (602 件中 112 件)。
+- parse5 は採らない。HTML5 の木を組むので、svg の中の要素が外に出され、読み飛ばすべき文字が本文に出た。開いた要素を積む形で 2 乗の時間になる (10 万段の入れ子に 44 秒)。
+- node-html-parser は採らない。閉じていないコメントや DOCTYPE をタグごと本文に出す。20MiB でピークの RSS が 1.1GiB になる。開いた要素を積む形で 2 乗の時間になる (閉じない `<font>x` 8 万個で 54 秒)。
+- 3 つの候補の比較は `Parser` の形で行い、`Tokenizer` の形は 4 回目のレビューの後に足した。木を組む候補 (parse5・node-html-parser) と `Parser` は、どれも開いた要素の一覧を持つので、同じ 2 乗の形に弱い。
+
+**文字コード: 部品を使わない (自前の判定 + `TextDecoder`)**
+
+- 3 つの集まりのすべてで、Python 版と候補の部品のどれよりも正解率が高かった。(iii) の取り置きでは 99.4% (Python 版 96.6%)。
+- 本番の依存とライセンスの確認が増えない。D2 の `/readyz` に出す「文字コードの判定の部品の名前」の枠も要らなくなる (Python 版の `charset-normalizer` に当たるものが無い)。
+- 代わりに、点数づけの重み (40 行) を自分で持つ。重みは 1 回直した。直した後の数字は、調整に使っていない (iii) で確かめた。
+- 5 回目のレビューの後に、WHATWG と Python の codec の違いで本文が化ける 2 つの形 (1 バイトの壊れた Shift_JIS、Python では狭い codec の宣言) を、共通の層で Python 版に合わせた (18.5.2)。正解率の 3 つの集まりの数は変わらなかった。
+- 将来の誤判定に備える仕組み: 判定は「候補を厳密にデコードできたものの中から、それらしさの点数が高いもの」を選ぶだけである。点数を誤っても、厳密にデコードできないものは選ばれない (Python 版と同じく cp932 → latin-1 に落ちる)。
+- chardet は採らない。短い Shift_JIS と EUC-JP に弱い ((ii) で 86%)。20MiB で 4 秒かかる。
+- encoding-japanese は採らない。cp1252 を判定できない。EUC-JP の取り違えが多い ((iii) で 74.5%)。
+- chardetng-wasm は採らない。仮想メモリを 8GiB 予約し、`RLIMIT_AS` と両立しない。2022 年から更新が無い。候補を絞れない。8 バイトの EUC-JP を取り違える。
+- jschardet は採らない。ライセンスの経緯に争いがある (18.8)。
+- iconv-lite は要らない。ISO-2022-JP を読めず、ほかは `TextDecoder` で足りる。
+
+**ZIP の読み: yauzl を採る**
+
+- 27 件すべてを、自前の CRC の確認と名前のデコードだけを足した 28 行の adapter で通した。
+- 爆弾を 1MiB の上限で 2ms、RSS +0MiB で止める (流しながら読み、途中でやめられる)。
+- 敵意のあるバイト列を読む部分なので、手で書いた解析 (自前は中央ディレクトリの読み取り 47 行 + 読み 32 行) より、広く使われ保守が続いている部品のほうが、見落としが少ないと判断した (推論)。自前は 27/27 を通したので、yauzl に問題が出たときの代わりにはなる。
+- fflate は採らない。zip64 の大きさを読まない。flag を出さない。`unzipSync` は上限なしに展開する。結局、自前の中央ディレクトリの読み取りが要る。
+- adm-zip は採らない。全部を展開してから大きさを見る (爆弾で RSS +328MiB)。同じ名前の要素で開けない。
+- jszip は採らない。壊れた要素や暗号化の flag の ZIP を丸ごと拒み、`malformed` と `encrypted` の区別やそのまま渡す振る舞いを作れない。申告サイズの偽りを見つけない。
+
+**ZIP の書き: yazl を採る**
+
+- 3 つとも 5 件を通した。yauzl と同じ作者の対の部品で、流しながら書く API (`addReadStreamLazy`) が 10 行で使える。
+- 自前の書き (33 行) も通ったが、ZIP の形式を本番のコードで手書きする量を増やさないことを優先した。テスト用の `test/fixtures/zip.ts` は D5 により本番から import できない。
+- fflate の `Zip` は、200MiB を書くのに 4 倍の時間がかかった。
+- yazl の弱み (5 回目のレビューの後に分かった): 書き直しの時間が要素の数の 2 乗で伸びる (4 万個で 3 秒。18.5.3)。名前を拒むときに同期的に例外を投げるので、受け手の付け方を誤るとプロセスが落ちる (18.5.3)。どちらも、要素の数の上限を先に見ることと、`try` / `catch` の後で `outputStream` を読み切ることで抑えられる。採る判断は変えない。
+
+**XML: @xmldom/xmldom を採る**
+
+- DOM で解析し、要素を書き換え、`XMLSerializer` で書き戻す。Python 版の ElementTree (`fromstring` → 書き換え → `tostring`) と同じ形である。adapter は 115 行で、そのうち部品を呼ぶ部分と OOXML の操作は 47 行、残りの 68 行は Python 版 (expat) と判定を合わせ、悪意のある入力を止めるための自前の検査である (18.5.7)。
+- 23 件とベンチマーク・細工したファイルの比較を、すべて Python 版と同じ結果で通した。
+- エンティティの宣言を拒む線は、自前の 1 行 (DOCTYPE の内部サブセットからコメント・処理命令・引用した文字列を除いた後に `<!ENTITY` があれば拒む) で defusedxml に合わせた。xmldom は外部の資源を読みに行かない (XXE の検査で、ファイルの中身が出ないことを確かめた)。billion laughs でも展開しなかった。
+- xmldom は expat より緩い。誤りの報告をすべて例外にしても、壊れた XML を通すことがある (18.5.4)。自前の検査で、Python 版と通す / 拒むを比べた結果は、自分で作った 93 件のうち 92 件、2 回目のレビューのレビュアーが別に作った 92 件のうち 88 件が同じになった (18.5.4)。違いは壊れた XML とまれな文字コードの名前だけである (18.7 の 9)。この検査を持ち続けることが、xmldom を選ぶ代わりに背負う手間である。展開した名前が同じ属性は、xmldom の中で属性が上書きされるため、外からは見分けられない。
+- 前処理は、悪意のある入力でも入力に比例する時間で終わるように書く必要がある。正規表現の `[\s\S]*?` で閉じていない開始の印を探す形は 2 乗の時間になった (18.5.4)。
+- xmldom 自身にも、名前空間の宣言の深い入れ子で解析が 2 乗の時間になる処理がある (2026-11-06 の時点で、この形を扱う勧告は無い)。宣言の数の上限 (1,000) で止めた。xmldom の DOM は入力の 100〜600 倍のメモリを使うことがあり、子の RSS の上限で止まる (18.5.4)。この 2 つは、xmldom を選ぶ代わりに背負う手間と危うさである。それでも採るのは、Python 版の ElementTree と同じ「解析・書き換え・書き戻し」の形で、23 件の検査・判定の比較・ベンチマークをすべて同じ結果で通したからである。saxes の位置で書き換える方式なら DOM を作らないのでメモリは小さいと推論するが、試していない (18.12)。
+- 書き戻しでは、DOCTYPE を消し、元の XML 宣言を UTF-8 のものに置き換える必要がある (18.5.4。saxes の位置で書き換える方式でも、元の宣言と DOCTYPE が残るので同じ処理が要る)。
+- **保守と脆弱性** (GitHub Advisory Database を `gh api "/advisories?ecosystem=npm&affects=@xmldom/xmldom"` で調べた。2026-11-05):
+  - xmldom への勧告は 23 件あり、そのうち 20 件は 2026 年に公開された。
+  - 2026-09-08 に 14 件 (high 13・medium 1) がまとめて公開され、そのうち 0.9 系に当たるものは 0.9.11 または 0.9.12 で直っている。0.9.12 の公開は 2026-08-21 で、勧告の公開より前に直した版が出ていた。
+  - 壊れた入力で時間やメモリが入力の 2 乗で増える勧告が 5 件ある (属性の重複を除く処理の 2 乗の時間 GHSA-8344-3jmq-59r6、2 乗のメモリ GHSA-965w-775f-mr7g、壊れた入力からの回復の処理の 2 乗の時間 GHSA-93r5-fhx6-vmg9、処理命令の正規表現の ReDoS GHSA-g53g-w8rj-fmg7、HTML の閉じタグによる出力の膨張 GHSA-6mj3-qw4j-hgrw)。また、書き戻しの再帰が深すぎて止まる勧告 (GHSA-2v35-w6hq-6mfw) は 0.9.10 で直っている。
+  - **0.9.12 で直っていない勧告は無かった** (どの勧告の影響を受ける版の範囲も 0.9.11 以下)。
+  - 勧告の多くは、DOM を組み立てて書き出す API (`createElement`・`setAttribute` など) での検査のすり抜けである。この使い方では、書き換える値は自分で作る目印 (英数字) と `visible` だけなので、当たらないと推論する。
+  - 勧告がこの 1 年で多いことは、今後も版を上げる手間がかかることを意味する。3.8 では 0.9.12 より古い版を入れないこと、その後も勧告を見て上げることを引き継ぐ (18.10)。
+- saxes は採らない。結果は同じだったが、元の文字列の位置で書き換える自前の層 (27 行) が要る。その層は位置の 1 字のずれで壊れた実例を作った。2022 年から更新が無い。expat より緩い点が saxes にもあるかは試していない。
+- sax は採らない。saxes と同じ自前の層が要り、ライセンスの BlueOak-1.0.0 は Req 4.4 の列挙 (MIT / Apache-2.0 / BSD / ISC) に無い。
+- fast-xml-parser は採らない。宣言の無いエンティティを通し、属性の中の数値の参照を読まず、書き戻しで中身の書き方が変わる。
+
+### 18.7 Python 版との違い (Req 2.2 / 2.3 の記録)
+
+ベンチマーク (PDF 以外) では違いが出なかった。次は、コーパスに無い入力で見つけた違いである。Req 2.3 のとおり、記録だけにする。
+
+1. **デコードの対応表** (Python の codec と WHATWG の `TextDecoder` で、すべての 1〜3 バイトの符号を比べた。実測):
+
+   | Python の codec | WHATWG | 同じ | Node だけ読める | Python だけ読める | 違う字になる |
+   |---|---|---|---|---|---|
+   | cp932 (判定のとき) | shift_jis | 11,528 | 0 | 5 (単独の 0x80・0xA0・0xFD〜0xFF) | 3 (単独の 0x1A・0x1C・0x7F の入れ替え) |
+   | shift_jis (`<meta>` で宣言されたとき) | shift_jis | 8,802 | 2,725 (NEC / IBM の拡張文字) | 0 | 9 |
+   | euc_jp | euc-jp | 17,378 | 478 | 0 | 7 |
+   | iso2022_jp | iso-2022-jp | 8,373 | 457 | 0 | 6 |
+   | cp1252 | windows-1252 | 251 | 5 (未定義の 5 バイト) | 0 | 0 |
+
+   - 違う字になるのは、EUC-JP・ISO-2022-JP・宣言された Shift_JIS で、次の 6 字。
+     - `〜` (U+301C) → `～` (U+FF5E)
+     - `‖` (U+2016) → `∥` (U+2225)
+     - `−` (U+2212) → `－` (U+FF0D)
+     - `¢` → `￠`、`£` → `￡`、`¬` → `￢`
+     - EUC-JP の JIS X 0212 のチルダ (U+007E) → `～`
+   - 判定で選ばれた cp932 (Shift_JIS) では、Python も同じ `～` などになる。違いが出るのは「EUC-JP の文書」「ISO-2022-JP の文書」「`<meta charset="Shift_JIS">` の付いた HTML」である。
+   - **検索への影響は無い (実測)**: devcontainer の Elasticsearch 9.3.3 の `_analyze` (index を作らないので、ディスクの上限の影響を受けずに動いた) で、GROWI の `japanese` analyzer と同じ組み合わせ (`kuromoji_tokenizer` + `icu_normalizer`) と `standard` の両方に通した。`9時〜18時`・`9時～18時`・`9時~18時` はどれも `9 / 時 / 18 / 時` になり、`A‖B` と `A∥B` は `a / b`、`5−3` と `5－3` は `5 / 3` になった。`¢£¬` と `￠￡￢`、`〜` と `～` だけの文はトークンが 0 個だった。つまり 6 字はどちらの字でも捨てられ、検索の結果は変わらない。1 回目のレビューのレビュアーも同じ結果を得ている。
+   - 抽出した本文の字そのものは違うので、検索の結果の抜粋に出る字は変わる。Python 版と同じ字にしたければ、デコードした後にこの 6 字を戻す表を足せば済む (推論。試していない)。どちらが正しいかは文書を書いた道具による (JIS の規格では U+301C、Microsoft の対応表では U+FF5E)。検索に影響しないので、戻さないことを勧める。9.10 の決定で、コーパスにはこれらの字が無い。
+2. **宣言された `iso-8859-1` / `latin1`**: WHATWG はこれらのラベルを windows-1252 として扱う。0x80〜0x9F が `€` などになる (Python の latin-1 は制御文字)。ブラウザと同じ振る舞いである。
+3. **宣言された `ascii`**: WHATWG は `ascii` を windows-1252 のラベルとして扱い、決して失敗しない。そのままだと、`<meta charset="ascii">` の UTF-8 の日本語が化ける。Python では厳密な ascii が失敗し、判定に進む。**共通の層で Python と同じにした** (0x80 以上があれば宣言を使わない)。同じく、windows-1252 の厳密なデコードで、Python の cp1252 が拒む未定義の 5 バイト (0x81・0x8D・0x8F・0x90・0x9D) を拒むようにした。
+4. **敵意のある宣言**: WHATWG の Encoding Standard には、どんな入力も 1 つの U+FFFD にする `replacement` デコーダーがあり、`iso-2022-kr`・`hz-gb-2312`・`csiso2022kr`・`iso-2022-cn`・`iso-2022-cn-ext`・`replacement` のラベルで選ばれる。ただし Node 24.21.0 の `TextDecoder` は、この 6 つのラベルをすべて知らない名前として例外にした (WHATWG の `encodings.json` のラベル 228 個を `TextDecoder` に通して確かめた。ほかのラベルは WHATWG のとおりの文字コードになった)。そのため Node では、これらの宣言は `resolveDeclared` で使われず、判定に進む。`x-user-defined` (0x80 以上を私用領域に写す) は Node でも使えるので、UTF-16 と合わせて、共通の層で宣言として使わないようにした (検査で確かめた)。
+5. **1 バイトだけ壊れたファイル**: 18.5.2 の表のとおり。Shift_JIS に 0xFF は、5 回目のレビューの後に直して Python 版と同じになった。EUC-JP に 0x80 は Node 版だけが読める (Node 版のほうが読める向きの違い)。
+6. **判定の標本**: Node の自前の判定は先頭の 64KiB だけを見る。charset-normalizer も標本で判定するが、取り方は違う。先頭と後ろで文字コードが違うファイルでは、結果が違いうる (未検証)。
+7. **ZIP の名前**: UTF-8 の flag が無い名前は、Python の zipfile は cp437 で読む。試作は latin-1 で読んだ。OOXML の名前は ASCII なので、コーパスでは違いが出ない。`TextDecoder` に cp437 が無いので、どうするかは 6.x で決める (18.10)。
+8. **HTML** (`Tokenizer` の形に、18.5.1 の 5 回目のレビューの後の直しを入れたもの): 32 件の追加の入力、レビュアーの 602 件、レビュアーの本文が消える 6 件と手書きの 19 件では違いが無かった。自分の 1,000 件と終わりのタグの 2,000 件では違いが無く、レビュアーの 720 件で 6 件 (6 回目のレビューの後。前は 7 件)、自分の 1,403 件で 23 件が違った。違いを、検索への影響で分けた (試した集まりでは、本文が消える・語が割れる・文字参照が壊れる違いは無く、Node 版だけが化けるものも無い。どちらの版も化ける違いは下の表に残る):
+
+   | 違いの形 | 例 | Python 版 | Node 版 | 検索への影響 |
+   |---|---|---|---|---|
+   | 文書の末尾で閉じていない開始タグ (`…<p`。終わりのタグ `…</p<` は 6 回目のレビューの後に Python 版と同じになった) | 1,403 件と 720 件の 1 件ずつ | 何も出さない | タグの名前 (`p`) や `<` を本文の最後に出す | 本文の最後に 1 語増える。途中で切れたファイルだけで起きる |
+   | `<!-->`・`<!--->` の後ろに `-->` がある形 (`<p>a</p><!-->本文--><p>b</p>`。6 回目のレビューの指摘。`$S/r7/cmt.json` で確かめた) | 6 回目のレビューの集まり | `<!-->` から後ろの `-->` までをコメントとして捨てる | `<!-->` で空のコメントとして閉じ (WHATWG と同じ)、`本文-->` を本文に出す | Node 版のほうが語が多い向きで、検索の再現率は下がらない。後ろに `-->` が無いとき (`<!-->本文`) は同じ出力 |
+   | 宣言された `iso-8859-1`・`latin1` の文書の日本語 (文字コードの違い) | 1,403 件の 16 件、720 件の 5 件 | latin-1 で読んで化ける | 18.7 の 2 のとおり windows-1252 として読む。未定義の 5 バイトがあれば判定に進んで正しく読める。0x80〜0x9F は `€` などになる | Node 版のほうが読めることがある。逆 (Node 版だけが化ける) は、未定義のバイト (0x81・0x8D・0x9D) を入れた latin-1 のフランス語の HTML 4 件 (`$S/r6/latin1.json`) では起きず、4 件とも Python 版と同じ出力だった。ほかの組み合わせは試していない |
+   | `big5` の宣言に EUC-JP のバイト列 | 1,403 件の 5 件 | 化ける | 化ける (先頭の 1 字だけ違う) | どちらも化ける。宣言が嘘の文書だけ |
+   | EUC-JP の末尾に `0xFF 0xFE 0x80` | 1,403 件の 1 件 | latin-1 で化ける | windows-1252 で化ける (最後の 1 字だけ違う) | どちらも化ける |
+
+   - 直したもの (直した後は、上の集まりで Python 版と同じ。18.5.1): 自己終了の形の特殊なタグ (`<script/>`・`<title/>`・`<iframe …/>` など。直す前は本文がまるごと消えた)、`/` と `>` の間に空白がある開始タグ (`<script / >`)、`<title>`・`<textarea>` の中で `<` の直後に来る文字参照 (直す前は `&amp;` が残り、`<&#12354;&#12356;` の `あい` が `&#12354;い` に割れた)、Python が捨てる数値の文字参照 (`&#1;`・`&#x10FFFF;`。直す前は制御文字が語の間に入り、`a&#1;b` の `ab` が割れた)、終わりのタグの `>` を含む引用符つきの属性 (直す前は `">` などの断片が本文に入り、引用符の中の `<script>` で後ろの本文が消えた)。
+   - 4 回目のレビューの後に「残る違いは崩れたタグの中か、まれな要素の中だけ」と書いたのは誤りだった。`<script src="a.js"/>` のような、ふつうの道具が書く形で本文がまるごと消えていた (18.5.1)。
+   - `Parser` の形から `Tokenizer` の形に替え、さらに 5 回目のレビューの後で直したことで、Python 版との違いは減った (Req 2.2 の記録。602 件で 112 件 → 0 件、自分の 1,000 件で 161 件 → 18 件 → 0 件、レビュアーの 720 件で 221 件 → 7 件)。Req 2.3 のとおり、退行ではないので記録だけにする。
+9. **OOXML の XML** (18.5.4 で、Python 版の `ooxml_xml.parse` と 25 + 68 + 92 + 4 件、実際の XLSX / PPTX 19 個で比べた結果):
+
+   直さずに記録だけにした違い:
+
+   | 入力 | Python 版 | Node 版 | 影響 |
+   |---|---|---|---|
+   | 展開した名前が同じ属性を 2 つ持つ XML (`<r xmlns:a="u" xmlns:b="u" a:x="1" b:x="2"/>`。入れ子の要素の中にあっても同じ) | 拒む (422 `extraction_failed`) | 通す。後の属性の値だけが残る | XML として壊れた部品なので、正しく作られた文書では起きない。Python 版で 422 になる壊れたファイルが、Node 版では書き換えて anydoc に渡され、200 になりうる (どうなるかは anydoc の読み方による。試していない) |
+   | WHATWG にだけある 1 バイトの文字コードの名前の宣言 (`x-cp1252`・`x-mac-cyrillic`・`windows-874`・`iso88592`・`koi8-ru`・`mac` など。WHATWG の 1 バイトの文字コードのラベルのうち 55 個を expat が拒んだ) | 拒む (`malformed`) | 通す | XLSX (`x_whatwg_only_label`) で確かめた: Python 版は 422、Node 版は 200 で、UTF-8 のシート名を windows-1252 として読むので化ける。OOXML の部品を書く道具は UTF-8 か UTF-16 で書くのがふつうで、この名前を宣言することはまれである (推論) |
+   | 同じ名前で、WHATWG と Python が別の表を指す宣言 (`iso-8859-9` 系の 7 個は WHATWG では windows-1254、Python では ISO-8859-9。`iso-8859-11`・`tis-620` は WHATWG では windows-874) | その表で読む | WHATWG の表で読む | 0x80〜0x9F のバイトの読み方だけが違う (推論。表を比べていない)。まれな宣言 |
+   | 表の細かな違い (windows-1255 の 0xCA、koi8-u の 0xAE・0xBE) | 0xCA は拒む。0xAE・0xBE は別の字 | 0xCA を読む。別の字 | 1 バイトずつ全 256 バイトを比べた (`$S/out/sb-py.json`)。ほかの 1 バイトの文字コードは、下の cp125x の直しの後で全バイトが同じ |
+   | Python に codec があるが WHATWG に無い 1 バイトの文字コードの宣言 (`cp437`・`mac-roman` など) | 読む | 拒む (`malformed`) | Python 版で読めるまれな部品が、Node 版で 422 になる。OOXML の部品でこの宣言を使うことはまれである (推論) |
+   | DOCTYPE の `<!ATTLIST>` の既定の属性 | 要素に付く | 付かない (DOCTYPE も書き戻さない) | `state` の既定を `hidden` にした XLSX で確かめ、どちらも 3 シートが同じに出た。ほかの属性の既定で結果が変わるかは試していない。DTD に既定の属性を書く Office の文書は見たことがない (推論) |
+   | 書き戻した XML のバイト列 | ElementTree の書き方 (属性の引用符は `"`、接頭辞は `register_prefixes` で保つ) | xmldom の書き方 (属性の順と元の名前空間の宣言を保つ) | バイト列は違いうる (比べていない)。anydoc を通した結果は、コーパスと細工したファイルで同じだった |
+   | 名前空間の宣言が 1,000 個を超える部品 (たとえば各段で宣言する 2,500 段の入れ子) | 通す (2,500 段で 3ms) | 拒む (`limit_exceeded`) | xmldom の解析が 2 乗の時間になるのを止めるための上限 (18.5.4)。正しい OOXML の部品の宣言は多くて数個である。3 回目のレビューのレビュアーの PPTX 3 つは Python 版も anydoc の深さの上限で `limit_exceeded` になり同じだったが、XLSX (`ns40k`) は Python 版が `internal` (500)、Node 版が `limit_exceeded` (422) で違った |
+   | DOCTYPE の SYSTEM の引用符の中の `&` や `&#0;` (`<!DOCTYPE r SYSTEM "a&b"><r/>`) | 通す | 拒む | 自前の検査が引用符の中も見るため。Office は DOCTYPE を書かないので記録だけにした |
+   | 空要素のタグの `/` と `>` の間の空白 (`<r/ >`) | 拒む | 通す (xmldom が受け付ける) | 壊れた XML。記録だけにした |
+   | DOCTYPE の SYSTEM / PUBLIC の文字列に `<!--`・`<?`・`<![CDATA[` を書き、本体に裸の `&`・本文の `]]>`・`&#0;` を持つ壊れた XML (`<!DOCTYPE r SYSTEM "<!--"><r>&</r><!-- -->` など 5 件) | 拒む (`malformed`) | 通す | Python 版と判定を合わせるための検査が、除く処理の取り違えで本体を見なくなる (18.5.4)。名前空間の数え方は除く前の本文で行うので、この手口で時間やメモリは増えない。Office は DOCTYPE を書かないので記録だけにした |
+   | 本文やコメントに `xmlns=` という文字の並びが 1,000 回を超えて現れる部品 | 通す | 拒む (`limit_exceeded`) | 名前空間の宣言を除く前の本文で数えるための数えすぎ。xmldom が読む部品には利用者の文がほぼ入らず、コーパスと細工した OOXML の 2,261 部品では多くて 5 個だった |
+   | 子の RSS の上限を超えるほど大きい DOM を作る壊れた XML (閉じていない開始タグの並びなど) | 拒む (`malformed`、422 `extraction_failed`) | 子の RSS の上限で止まる (`memory_exceeded`、422 `resource_limit_exceeded`) | HTTP の状態は同じ 422 で、エラーコードが違う。どの大きさから起きるかは子の中で測っていない (3.7) |
+
+   直したもの (直した後は、上の集まりと実際のファイルで Python 版と同じ):
+
+   | 入力 | 直す前の Node 版 | 直し方 |
+   |---|---|---|
+   | UTF-8 の BOM に `encoding="ISO-8859-1"` などの宣言 | 拒む | BOM の後のバイト列を、宣言の文字コードで読む (expat と同じ。Python 版は latin-1 で読むのでシート名が化け、Node 版も同じになる) |
+   | UTF-8 の BOM に `encoding="US-ASCII"` の宣言 (中身は ASCII だけ) | 拒む (BOM の 3 バイトを 0x80 以上として数えた) | BOM の後のバイト列だけを見る |
+   | BOM の無い UTF-16 (LE / BE。宣言が無い、`UTF-16`、または同じ向きの `UTF-16LE` / `UTF-16BE`) | 拒む | 最初の 2 バイトが `<` と 0 (または 0 と `<`) なら UTF-16 として読む。`UTF-8` の宣言は拒む (expat と同じ) |
+   | windows-1250〜1258 の宣言で、Python の cp125x に定義の無いバイト (windows-1252 の 0x81 など) | 通す (WHATWG は C1 の制御文字にする) | デコードした結果に U+0080〜U+009F があれば拒む (1 バイトずつ全バイトを比べ、windows-1255 の 0xCA のほかは Python と同じになった) |
+   | `l1`・`cp819`・`ibm819`・`csisolatin1`・`iso-ir-100`・`iso_8859-1` の宣言 | windows-1252 で読む | Python と同じく latin-1 で読む (WHATWG の windows-1252 のラベルのうち、Python が latin-1 にする名前をすべて並べた。`ansi_x3.4-1968` は ASCII として扱う) |
+   | 本文の U+0085 (NEL) と U+2028 | `\n` に変える (xmldom の既定は XML 1.1 の改行の規則) | xmldom の `normalizeLineEndings` を、XML 1.0 の規則 (`\r\n` と `\r` だけを `\n` にする) に替える |
+   | コメント・CDATA・処理命令や子の要素をまたいだ `]]` と `>` (`<r>]]<b/>></r>`、`<r>]]<!--c-->></r>`、`<r>]<b/>]></r>`) | 拒む (本文を全部つないでから `]]>` を探したため) | 本文の連続した部分ごとに探す。CDATA・コメント・処理命令を除いた所には区切りの字 (NUL) を置き、両側をつながない |
+
+   ZIP の読み (スタブの分割の写しを通して、Python 版の `convert()` と比べた。4 回目のレビューのレビュアーの生成器 `probe/fuzz/corrupt.py` で、コーパスの PPTX と XLSX を壊した 50 個。30 個は同じ):
+
+   | 入力 | Python 版 | Node 版 | 影響 |
+   |---|---|---|---|
+   | ローカルの見出しと中央ディレクトリで名前が違う要素 (`lhname`。PPTX・XLSX) | 拒む (`malformed`) | 通す (中央ディレクトリの名前で読む) | 壊れた ZIP。yauzl はローカルの見出しの名前を確かめない |
+   | PPTX の中央ディレクトリの圧縮後の大きさを大きく偽る (`csize-big`) | 拒む | 通す | 壊れた ZIP。deflate の流れの終わりで読み終えるので、偽りに気づかない |
+   | 中央ディレクトリの終わりの記録で、エントリの数 (`eocd-count`) や大きさ (`eocd-cdsize`) を偽る | 片方は分割、片方は 1 要素 | その逆 | どちらも文字は取れる。位置の情報 (ページ・シートの分け方) だけが違う |
+   | XLSX の圧縮の方式 1・6・95・98・99 | `internal` (500。`NotImplementedError`) | `malformed` (422) | Node 版のほうが妥当な分類である |
+   | 途中で切れた ZIP、データの途中を削った ZIP (8 個) | `malformed` | スタブは `internal_error` | スタブが anydoc の例外を分類しないため。anydoc の `code` は `malformed` で、本番の `office.ts` が分類すれば同じになる (確かめた) |
+   | XLSX の要素の名前が `../../evil.txt`・`/abs/evil.txt`・`C:/x.txt` (4 回目のレビューのレビュアーの `add-entry.py`) | 3 シートを返す (200) | yazl が書き直しのときに `invalid relative path` / `absolute path` の `Error` を投げる。`kind` が無いので本番では `internal` (500) になる見込み。4 回目のレビューの後は「プロセスは落ちない」と書いたが、この名前の前に CRC の誤った要素があると落ちた (18.5.3)。直した後は、落ちずに拒否として返る (再現の 3 つと、ファジング 8,000 件で確かめた) | PPTX は、分割が XML の部品だけを集めて書くので、こうした名前の要素は書かず、Python 版と同じ 3 スライドになった。XLSX の扱いは 6.x で決める (18.10) |
+   | 名前の末尾が `\` の要素 (`xl\`、`docs\sub\`) を持つ XLSX (`$S/r7/dirs/x-backslash-dir.bin`) | 3 シートを返す (200) | yazl が `\` を `/` に変えてから `file path cannot end with '/'` で拒み、`kind` の無い誤り (本番では 500 の見込み)。プロセスは落ちない | ZIP の名前の決まり (区切りは `/`) から外れた形。上の行と同じく 6.x の (a)/(b)/(c) で決める (18.10)。PPTX は分割が XML の部品だけを書くので同じ |
+   | 中身を持つディレクトリの要素 (`data/` に `x`) の CRC-32 を偽った XLSX (`$S/r7/dirs/x-dir-with-data-badcrc.bin`) | 拒む (`malformed`、422) | 流してつなぐ書き直し (`repackage`) はディレクトリの要素を読まずに飛ばすので、CRC を確かめず書き直せる (200 の見込み)。スタブの分割の写し (要素をすべてメモリに読む) では `malformed` | 壊れた ZIP。上の `lhname`・`csize-big` と同じく Node 版が緩い向き。ディレクトリの要素に中身を持たせる道具はふつう無い (推論) |
+
+   - 名前の末尾が `/` のディレクトリの要素 (`xl/` など) は、直す前は yazl が拒み、ディレクトリの要素を持つ正しい XLSX が 500 になった (Python 版は 200)。6 回目のレビューの後に、書き直しで飛ばすように直し、Python 版と同じ結果になった (18.5.3)。
+   - 記録だけにした理由: Req 2.3 のとおり、ベンチマークに退行が無い違いは記録だけにする。上の表の違いは、どれも壊れた XML か、OOXML の部品ではまれな文字コードの名前の宣言で、正しく作られた文書の抽出の結果を変えない。WHATWG と Python の名前の対応を完全に合わせるには、200 個ほどの名前の表が要り、見合わない。展開した名前が同じ属性を見分けるには、xmldom の前に名前空間を自前で解く処理が要る。どれも契約 (API・エラーの表・設定) を変えるものではなく、Req 1.10 の手続き (契約を崩す判断) には当たらないと判断した。
+10. **Python には codec があるが WHATWG にラベルが無い宣言** (HTML の `<meta charset>` と、`.xml` の XML 宣言。1 回目のレビューのレビュアーの指摘を受けて確かめた):
+   - Python の codec の登録簿で、Python 版の `decode()` が宣言として使う名前は 586 個あった (別名と綴りの違いを含む)。そのうち、Node の `resolveDeclared` (18.9) が使えるのは 195 個で、101 個の codec の名前が使えなかった (`$S/probe/charset/py-labels.py`)。
+   - 使えない名前の多くは綴りの違いで、判定で同じ結果に戻る。使えない名前の宣言を付けた HTML を、Python 版と Node 版に通した (実測。`$S/probe/charset/py-declared.py`):
+
+     | 宣言 | 元の文 | Python 版 | Node 版 |
+     |---|---|---|---|
+     | `cp437` (DOS の米国) | Grüße aus München, café, naïve | 同じ | `Gráe aus Mnchen, caf, nave` (化ける) |
+     | `cp850` (DOS の西欧) | 同上 / `Größe ÿ ñ` | 同じ | 化ける (`Gr”áe ˜ ¤`) |
+     | `mac-roman` (古い Mac) | 同上 | 同じ | `GrŸ§e aus MŸnchen, cafŽ, na•ve` (化ける) |
+     | `1252`、`latin9` | 同上 | 同じ | 同じ (判定で windows-1252 に戻った) |
+     | `shiftjis`、`s-jis`、`ms-kanji`、`x-mac-japanese`、`u-jis`、`euc_jis_2004`、`shift_jis_2004`、`iso2022_jp_2` | 経営企画会議の議事録を共有します。 | 同じ | 同じ (判定で戻った) |
+     | `cp500` (EBCDIC) | EBCDIC text | 化ける | 化ける (宣言そのものが EBCDIC で、どちらも読めない) |
+
+   - **影響**: 化けるのは、DOS (cp437・cp850 など) と古い Mac (mac-roman など) の 1 バイトの文字コードを宣言した文書の、ASCII 以外の字だけである。ブラウザ (WHATWG) もこれらの名前を知らないので、ウェブで公開されてきた HTML にこの宣言が使われることはまれである (推論)。日本語の別名は判定で戻るので、日本語の文書には影響しない (JIS X 0213 の拡張の字を含む文書は、Shift_JIS / EUC-JP として厳密に読めず、判定の後の段に落ちる。試していない)。
+   - **iconv-lite を足すかどうかの材料**: `iconv-lite` 0.7.3 (MIT。いまはテスト用の依存) は `cp437`・`cp850`・`macroman`・`mac-roman` を読める。`cp500`・`euc-jis-2004`・`shift_jis_2004`・`iso-2022-jp-2` は読めない (`encodingExists` で確かめた)。足せば DOS と Mac の文字コードは Python 版と同じになるが、本番の依存が 1 つ (`safer-buffer` を含めて 2 つ) 増える。
+   - **判断**: 足さない。理由は、(1) 影響がまれな文書の ASCII 以外の字に限られ、ベンチマークには退行が無い (Req 2.3 の記録で足りる)、(2) ブラウザと同じ振る舞いである、(3) WHATWG に同じ文字コードが別名である `mac-roman` (WHATWG の `macintosh`) などは、`resolveDeclared` の別名の表に足せば部品なしで直せる (推論。試していない。6.x に引き継ぐ)。選ぶ部品を変えるものではないので、ユーザーの判断は要らないとした。
+
+### 18.8 ライセンスと install のときに動く処理
+
+採る部品と、その推移的な依存のすべて (`npm view <名前>@<版> dependencies` を順に辿り、入れた中身の `package.json` と LICENSE ファイルと突き合わせた。本番に入るのは 11 個。そのうち直接の依存は `htmlparser2`・`entities`・`@xmldom/xmldom`・`yauzl`・`yazl` の 5 個):
+
+| 部品 | 何から入るか | ライセンス (registry / LICENSE ファイル) | install のときに動く処理 |
+|---|---|---|---|
+| `htmlparser2` 12.0.0 | 直接 | MIT / MIT | なし |
+| `domhandler` 6.0.1 | htmlparser2、domutils、dom-serializer | BSD-2-Clause / BSD-2-Clause | なし |
+| `domutils` 4.0.2 | htmlparser2 | BSD-2-Clause / BSD-2-Clause | なし |
+| `dom-serializer` 3.1.1 | domutils | MIT / MIT | なし |
+| `domelementtype` 3.0.0 | htmlparser2、domhandler、domutils、dom-serializer | BSD-2-Clause / BSD-2-Clause | なし |
+| `entities` 8.1.0 | 直接 (HTML の adapter が `decodeHTML` を使う)、htmlparser2、dom-serializer | BSD-2-Clause / BSD-2-Clause | なし |
+| `@xmldom/xmldom` 0.9.12 | 直接 (依存なし) | MIT / MIT | なし |
+| `yauzl` 3.4.0 | 直接 | MIT / MIT | なし |
+| `pend` 1.2.0 | yauzl | MIT / MIT (Expat) | なし |
+| `yazl` 3.3.1 | 直接 | MIT / MIT | なし |
+| `buffer-crc32` 1.0.0 | yazl | MIT / MIT | なし |
+| `@types/yauzl` 3.4.0、`@types/yazl` 3.3.1 (開発用だけ) | 直接 | MIT (registry で確かめた。中身は入れていない) | — |
+
+- 3.8 で lockfile と突き合わせるときは、この 11 個 (と開発用の 2 個) を使う。`dom-serializer` は htmlparser2 から直接ではなく domutils 4.0.2 を通して入るので、見落としやすい。
+- `@xmldom/xmldom` は 0.9.12 を使い、これより古い版は使わない。0.9.11 以下には、壊れた入力で時間やメモリが 2 乗で増える勧告などが当たる (18.6)。
+
+- 試した候補すべて (推移的な依存を含む 49 個) の `package.json` に `preinstall` / `install` / `postinstall` は無く、`binding.gyp` も無かった (`probe/audit.mjs`)。`allowBuilds` を足す必要は無い。
+- **jschardet 4.x を試さずに外した理由**:
+  - jschardet 4 は、Python の chardet 7 を TypeScript に移したものである (README に明記)。
+  - chardet は 6.x まで LGPL-2.1 で、7.0.0 (2026 年 3 月) で書き直したとして MIT、のちに 0BSD に変えた。元の作者が「ライセンスを変える権利は無い」と異議を出している (GitHub の chardet の issue #327)。法的な結論は出ていない。
+  - jschardet も 3.1.4 までは LGPL-2.1+ だった (registry で確かめた)。
+  - 0BSD の表示は許容的だが、LGPL が及ぶおそれが残る。design.md の T6 の「LGPL のもの (たとえば文字コードの判定でよく使われる部品の一部) は除く」に当たると判断した。
+  - 出典: [Chardet Maintainers Relicense Project Under MIT](https://letsdatascience.com/news/chardet-maintainers-relicense-project-under-mit-f0996a95)、[The chardet relicensing dispute](https://lilting.ch/en/articles/chardet-relicense-react-foundation-oss-governance)、[LWN の記事](https://lwn.net/Articles/1061466/)、[Heather Meeker の解説](https://heathermeeker.com/tag/lgpl/)。
+- `sax` 1.6.1 は BlueOak-1.0.0 (許容的だが、Req 4.4 の列挙に無い)。`jszip` は「MIT または GPL-3.0」を選べる。どちらも採らないので判断は要らない。
+- `chardetng-wasm` は Apache-2.0 (元の chardetng は Apache-2.0 または MIT)。採らない。
+
+### 18.9 再現の手順と、試作のコードの要点
+
+試作の場所: `/tmp/claude-1000/-workspace-growi--claude-worktrees-bridge-cse-01FKZr5pM7xXdNyvSTYf1mR4/1f99ff8a-c248-52fe-bb9c-21f36680853c/scratchpad/t6/` (以下 `$S`、使い捨て)。
+
+ファイル構成:
+
+| 場所 | 中身 |
+|---|---|
+| `$S/deps/` | 候補を入れた場所 (リポジトリの外。workspace に入らない) |
+| `$S/probe/lib/` | 共通の自前の層 (`line-joiner.mjs`、`decode-pipeline.mjs`、`archive-guard.mjs`、`xml-bytes.mjs`、`xml-splice.mjs`、`harness.mjs`、`deps.mjs`) |
+| `$S/probe/{html,charset,zip,zipw,xml}/` | 候補ごとの adapter |
+| `$S/probe/checks/` | 検査 (`html`・`charset`・`zip`・`zip-writer`・`xml`) |
+| `$S/probe/charset/` | 正解率の集まりを作る Python の script (`make-set.py`、`make-locale-set.py`、`make-holdout-set.py`)、`accuracy.mjs`、`corpus-table.mjs` (2.4 のファイルの表)、`table-py.py` / `table-compare.mjs` (対応表の比較)、`corrupt-py.py` (1 バイト壊れたファイル)、`cost.mjs` |
+| `$S/probe/xml/strictness.py` | defusedxml に入力の一覧 (`$S/out/strict-inputs.json`、25 件) を通し、通す / 拒むを記録する |
+| `$S/probe/xml60/` | Python 版の `ooxml_xml.parse` との 68 件の比較 (`gen-inputs.mjs` が入力を作り、`py-verdicts.py` が Python 版の判定を、`compare.mjs` が Node の判定と突き合わせる) |
+| `$S/probe/fuzz/` | 部品ごとの悪意のある入力のファジング (`shapes.mjs` が入力を作り、`run.mjs` が 1 つを測り、`sweep.sh` が N・2N・4N を回し、`table.mjs` が表にする)、ZIP のバイト単位のファジング (`fuzz-zip.mjs`・`fuzz-zip.sh`。5 回目のレビューのレビュアーの写し。直す前の `repackage` に向けた `fuzz-zip-r5.mjs`)、壊れた ZIP の生成器 (`corrupt.py`。4 回目のレビューのレビュアーの写し) |
+| `$S/probe/html/` の比較の道具 | タグの崩れた HTML の生成器 (`gen-tagsoup.mjs`)、Python 版の出力 (`py-batch.py`)、`Parser` の形と `Tokenizer` の形の比較 (`cmp-sets.mjs`)、開いた要素を積む形の時間 (`shapes-time.mjs`・`py-shapes.py`)、直す前の `Parser` の形 (`htmlparser2-parser.mjs`) |
+| `$S/probe/lin/` | 悪意のある入力での時間 (`perf.mjs`、N・2N)、悪意のある XML の生成器と 1 つずつ測る道具 (`gen.mjs`・`run1.mjs`、N・2N・4N、`$S/out/sweep.jsonl`)、CDATA・コメントなどを除く走査と元の正規表現の突き合わせ (`fuzz.mjs`)、PPTX の分割の前処理の時間とピークの RSS (`split-perf.mjs`・`split-prof.mjs`・`split-hwm.mjs`)、数値の参照の多い部品のピークの RSS (`refmem.mjs`)、ZIP の書きの adapter が元の流れの失敗で落ちないこと (`writer-error.mjs`) |
+| `$S/probe/charset/py-labels.py`、`py-declared.py` | Python が宣言として使える名前の一覧と、WHATWG に無い宣言を付けた HTML の Python 版の結果 |
+| `$S/probe/bench/` | `stub.mjs`、`split.mjs` (PPTX / XLSX の分割の写し)、`compare-baseline.mjs`、`py-convert.py` / `diff-pages.mjs`、`py-crafted.py`、`pipe-repackage.mjs` (読みから書きへ流してつなぐ)、`html-big*.{mjs,py}`・`html-file.mjs`・`html-file-nocopy.mjs` (20MiB の HTML のピークの RSS)、`compare-crafted.mjs` (細工したファイルを Python 版の結果と比べる)、`pipe-old-structure.mjs` (直す前の流してつなぐ形。3 回目のレビューのレビュアーの `pipe-any.mjs` の写し)、`load-cost.mjs` |
+| `$S/r6/` | 5 回目のレビューの後の比べ直し: HTML の 1,403 件の生成器 (`gen-html.py`)、バイト列からの比べ方 (`py-bytes.py`・`js-bytes.mjs`)、文字列の比べ方 (`str-cmp.mjs`)、違いの表示と分け方 (`show.mjs`・`classify.mjs`・`why.mjs`)、OOXML の構造を変えた 33 個の生成器 (`gen-ooxml.py`)、リポジトリの `buildZip` で CRC の誤った ZIP を作る `make-badcrc.cjs`、直す前の再現 (`red-loss.txt`・`red-zip.txt`・`red-charset.txt`)、まとめて測り直す `final.sh` |
+| `$S/r7/` | 6 回目のレビューの後の比べ直し: 終わりのタグの集まりの生成器 (`gen-endtag.py`)、ディレクトリの要素の形の生成器 (`gen-dirs.py`)、時間の形 (`perf2.mjs`。レビュアーの写し)、分割と書き直しを通す `real.mjs` (レビュアーの写し)、ディレクトリの要素の時間 (`dir-perf.mjs`)、直す前の再現 (`red-endtag.txt`・`red-dir.txt`・`red-dir-rvform.txt`)、レビュアーの形を試した場所 (`rvform/`)、まとめて測り直す `final.sh` |
+| 直す前の形 (6 回目のレビューの前) | `$S/probe/html/htmlparser2-r6.mjs`、`$S/probe/bench/pipe-repackage-r6.mjs`、`$S/r7/*-r6.mjs`、レビュアーの形 `$S/r7/yazl-rv8fix.mjs`・`pipe-repackage-rv8fix.mjs` |
+| 直す前の形 (5 回目のレビューの前) | `$S/probe/html/htmlparser2-r5.mjs`、`$S/probe/lib/decode-pipeline-r5.mjs`、`$S/probe/charset/own-r5.mjs`、`$S/probe/bench/pipe-repackage-r5.mjs` (同じものを `$S/out/*-r5.mjs` にも置いた) |
+| `$S/probe/make-fixtures.cjs` | リポジトリの細工した ZIP の生成器を swc-node で呼び、`$S/out/fixtures/*.bin` に書く |
+| `$S/out/` | 結果 (`red.txt`、`green.txt`、`bench-*.{md,json}`、`py-*.json`、正解率の集まり) |
+
+手順:
+
+```sh
+export PATH=/usr/local/share/nvm/versions/node/v24.21.0/bin:$PATH
+S=<上の場所>; R=<リポジトリ>; PY=$R/services/attachment-text-extractor/.venv/bin/python
+# 1. 候補を入れる (install のときの処理を動かさない。ほかの pnpm / turbo と同時に動かさない)
+cd $S/deps && echo '{"name":"t6-deps","private":true}' > package.json
+npm install --ignore-scripts --save-exact htmlparser2@12.0.0 parse5@8.1.0 node-html-parser@9.0.6 \
+  chardet@2.2.0 jschardet@4.1.0 encoding-japanese@2.5.0 iconv-lite@0.7.3 chardetng-wasm@1.0.2 \
+  yauzl@3.4.0 yazl@3.3.1 fflate@0.8.3 adm-zip@0.6.1 jszip@3.10.2 \
+  fast-xml-parser@5.12.0 saxes@6.0.0 sax@1.6.1 @xmldom/xmldom@0.9.12
+node $S/probe/audit.mjs $S/deps          # licenses + install scripts of every installed package
+# 2. crafted archives from the repo generators (swc-node; --import takes an absolute file URL)
+REG=file://$(readlink -f $R/apps/attachment-text-extractor/node_modules/@swc-node/register)/esm/esm-register.mjs
+(cd $R/apps/attachment-text-extractor && node --import $REG $S/probe/make-fixtures.cjs $S/out/fixtures)
+# 3. charset sets, encoded and decoded by the Python service's own decode() (-I: PYTHONPATH ignored; path given as an argument)
+$PY -I $S/probe/charset/py-bytes.py $R/services/attachment-text-extractor/src > $S/out/charset-py-bytes.json
+$PY -I $S/probe/charset/make-set.py $R/services/attachment-text-extractor/src > $S/out/charset-set.json
+$PY -I $S/probe/charset/make-locale-set.py $R/services/attachment-text-extractor/src $R/apps/app/public/static/locales > $S/out/charset-locale-set.json
+$PY -I $S/probe/charset/make-holdout-set.py $R/services/attachment-text-extractor/src "<fr/de/es/it/pt の JSON をカンマで>" "<ja の JSON をカンマで>" "$R/.kiro/specs/*/requirements.md" > $S/out/charset-holdout-set.json
+# 4. checks (each prints a PASS/FAIL matrix per candidate)
+cd $S/probe/checks && for c in html charset zip zip-writer xml; do node --expose-gc --no-warnings $c.mjs; done
+cd $S/probe/charset && node --no-warnings accuracy.mjs $S/out/charset-holdout-set.json
+node --no-warnings corpus-table.mjs                       # Req 2.4 corpus files x detector
+$PY -I $S/probe/xml/strictness.py $S/out/strict-inputs.json > $S/out/strict-py.json   # defusedxml verdicts to compare with xmldom.mjs
+(cd $S/probe/bench && node --expose-gc --no-warnings pipe-repackage.mjs 512 && node --expose-gc --no-warnings pipe-repackage.mjs 100)
+# XML: 68 inputs, Python's ooxml_xml.parse vs xmldom.mjs
+(cd $S/probe/xml60 && node gen-inputs.mjs $S/out/xml-inputs.json && $PY -I py-verdicts.py $S/out/xml-inputs.json $R/services/attachment-text-extractor/src > $S/out/xml-py.json && node --no-warnings compare.mjs)
+# hostile inputs at N and 2N, the linear stripper vs the regex it replaces, PPTX split preprocessing with 1,000-4,000 slides
+(cd $S/probe/lin && node --no-warnings --stack-size=984 perf.mjs 100000 200000 && node fuzz.mjs 300000 && node --no-warnings split-perf.mjs)
+# hostile inputs per component (HTML, charset, ZIP, XML) at N, 2N, 4N, one process each -> out/fuzz-sweep.jsonl
+(cd $S/probe/fuzz && ./sweep.sh $S/out/fuzz-sweep.jsonl)
+# HTML: Parser form vs Tokenizer form vs Python on tag soup, and the open-element shapes
+(cd $S/probe/html && node gen-tagsoup.mjs $S/out/tagsoup.json && $PY -I py-batch.py $S/out/tagsoup.json $R/services/attachment-text-extractor/src > $S/out/tagsoup-py.json && node --no-warnings cmp-sets.mjs html32 tagsoup-rv6 tagsoup && node --no-warnings shapes-time.mjs htmlparser2)
+# every hostile XML shape at N, 2N, 4N, one process each (N: 2,500 for the namespace shapes, 100,000 for the cap-saturating one, else 50,000)
+(cd $S/probe/lin && node --no-warnings --stack-size=984 run1.mjs nsDeepRootPrefix 2500)
+# corrupt ZIPs through the streaming repackage: every one must end as malformed / encrypted, never exit code 1
+(cd $S/probe/bench && for f in <corrupt zips>; do node --no-warnings pipe-repackage.mjs 512 $f; done)
+# 20 MiB HTML peak RSS, three times each, with and without --max-semi-space-size=4 (big.html: the html-big.mjs document written to a file)
+(cd $S/probe/bench && node --no-warnings html-big.mjs htmlparser2 && node --no-warnings html-file.mjs $S/out/big.html && node --no-warnings --max-semi-space-size=4 html-file.mjs $S/out/big.html)
+# hostile-shape table, and ZIP byte-level fuzzing in batches of 1,000 seeds (each batch must exit 0)
+node $S/probe/fuzz/table.mjs $S/out/fuzz-sweep-r6.jsonl
+(mkdir -p $S/r6/zf && cd $S/r6/zf && $S/probe/fuzz/fuzz-zip.sh 0 4000 $S/out/zin $S/out/fuzz-zip-0.txt && $S/probe/fuzz/fuzz-zip.sh 10000 14000 $S/out/zin $S/out/fuzz-zip-10000.txt)
+# 5th-review HTML / charset sets: generated in Python, decoded and converted by both sides, compared
+(cd $S/r6 && $PY -I gen-html.py 6 > mine6.json && $PY -I py-bytes.py mine6.json $R/services/attachment-text-extractor/src > mine6-py.json && node js-bytes.mjs mine6.json > mine6-js.json && node classify.mjs mine6.json mine6-py.json mine6-js.json && node why.mjs mine6.json mine6-py.json mine6-js.json)
+# OOXML structure variants (missing parts, order, empty sheets / slides, duplicate names): Python convert() vs the stub
+(cd $S/r6 && $PY -I gen-ooxml.py $S/out/zin $S/r6/ooxml > ooxml-specs.txt && $PY -I $S/probe/bench/py-crafted.py $R/services/attachment-text-extractor/src $S/r6/ooxml $(cat ooxml-specs.txt) > ooxml-py.json)
+# (with the stub running) node $S/probe/bench/compare-crafted.mjs $S/r6/ooxml-py.json $S/r6/ooxml ${=$(cat $S/r6/ooxml-specs.txt)}
+# 5. benchmark: stub on 18731, the unchanged runner pointed at it, compared with the baseline
+XMLC=xmldom PORT=18731 node --no-warnings $S/probe/bench/stub.mjs &   # remember $! and kill only that PID afterwards
+(cd $R/apps/attachment-text-extractor && node --import $REG benchmark/run-benchmark.ts --url http://127.0.0.1:18731 \
+  --label t6-xmldom --token-file <600 権限のダミーのトークン> --es-url http://elasticsearch:9200 --json $S/out/bench-xmldom.json)
+node $S/probe/bench/compare-baseline.mjs $S/out/bench-xmldom.json
+$PY -I $S/probe/bench/py-convert.py $R/services/attachment-text-extractor/src $R/apps/attachment-text-extractor/benchmark > $S/out/py-pages.json
+node $S/probe/bench/diff-pages.mjs $S/out/py-pages.json http://127.0.0.1:18731/extract
+```
+
+- 取り置きの集まりの元にした JSON: `node_modules/.pnpm/@emoji-mart+data@1.2.1/node_modules/@emoji-mart/data/i18n/{fr,de,es,it,pt,ja}.json`、`node_modules/.pnpm/yargs@17.7.3/node_modules/yargs/locales/{fr,de,es,it,pt,ja}.json`、`node_modules/.pnpm/speech-rule-engine@4.0.7/node_modules/speech-rule-engine/lib/mathmaps/{fr,de,es}.json`。
+- `pnpm benchmark` ではなく `node --import …` で道具を呼んだ。pnpm が裏で install の確認を走らせないようにするため。
+- swc-node は、`--import` で読み込むと scratchpad の `.mjs` まで CommonJS に変換する (名前つきの import が壊れる)。そのため、リポジトリの TypeScript の生成器は一度ファイルに書き出す形にし、検査は swc-node なしで動かした。
+
+**採る形の全文 (6.x の実装の手本。試作のファイルをそのまま写した。コメントは英語)**
+
+試作は `$S/deps` の部品を、次の小さな関数 (`probe/lib/deps.mjs`) を通して読む。本番では、ふつうの `import` に替える。
+
+```js
+import { createRequire } from 'node:module';
+export const DEPS = new URL('../../deps/node_modules/', import.meta.url);
+export const req = createRequire(new URL('../../deps/package.json', import.meta.url));
+// ESM-only packages: import by absolute path of their entry.
+export const esm = async (name) => import(req.resolve(name));
+```
+
+HTML の共通の層 (`probe/lib/line-joiner.mjs`。Python 版の `_LineJoiner` と `_TextExtractor` の規則の写し):
+
+```js
+// Port of the Python service's _LineJoiner (text.py): service-side code shared by every HTML candidate.
+const LINE_BREAK = /\r\n?/g;
+const BLANKS = /[ \t\f\v]+/g;
+const LINE_EDGES = / ?\n[ \n]*/g;
+export class LineJoiner {
+  #out = []; #last = '\n';
+  add(part) {
+    let folded = part.replace(LINE_BREAK, '\n').replace(BLANKS, ' ').replace(LINE_EDGES, '\n');
+    if (!folded) return;
+    if (folded[0] === '\n' && this.#last === ' ') { this.#out[this.#out.length - 1] = this.#out.at(-1).replace(/ +$/, ''); this.#last = 'x'; }
+    if (this.#last === '\n') folded = folded.replace(/^[ \n]+/, '');
+    else if (this.#last === ' ') folded = folded.replace(/^ +/, '');
+    if (!folded) return;
+    this.#out.push(folded);
+    const end = folded.at(-1);
+    this.#last = end === '\n' || end === ' ' ? end : 'x';
+  }
+  result() { return this.#out.join('').replace(/[ \n]+$/, ''); }
+}
+export const SKIPPED = new Set(['script', 'style', 'template', 'noscript', 'svg']);
+export const BLOCKS = new Set(['address', 'article', 'aside', 'blockquote', 'body', 'br', 'dd', 'details', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'html', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'summary', 'table', 'tbody', 'tfoot', 'thead', 'title', 'tr', 'ul']);
+export const CELLS = new Set(['td', 'th']);
+// Event sink with the Python handler's semantics (skip depth, block newline, cell space).
+export class TextSink {
+  lines = new LineJoiner(); #skip = 0;
+  start(tag) { if (SKIPPED.has(tag)) this.#skip++; else this.#sep(tag); }
+  end(tag) { if (SKIPPED.has(tag)) this.#skip = Math.max(0, this.#skip - 1); else this.#sep(tag); }
+  text(t) { if (this.#skip === 0) this.lines.add(t); }
+  #sep(tag) { if (this.#skip) return; if (BLOCKS.has(tag)) this.lines.add('\n'); else if (CELLS.has(tag)) this.lines.add(' '); }
+}
+```
+
+HTML の adapter (`probe/html/htmlparser2.mjs`。htmlparser2 の `Tokenizer` だけを使う。`Parser` は使わない。Python 版の `HTMLParser` と合わせる処理を含む。18.5.1):
+
+```js
+// htmlparser2's Tokenizer alone: no open-element stack (the Parser's stack makes stray close tags cost
+// O(open elements) each, quadratic overall). Python's HTMLParser keeps no stack either.
+// recognizeSelfClosing: like Python, "<script/>" (and title, textarea, iframe, ...) opens no raw-text region;
+// without it the rest of the document up to the next </script> is read as script.
+import { esm } from '../lib/deps.mjs';
+import { TextSink } from '../lib/line-joiner.mjs';
+const { Tokenizer } = await esm('htmlparser2');
+const { decodeHTML } = await esm('entities');
+export const NAME = 'htmlparser2';
+const ignore = () => {};
+const RCDATA = new Set(['title', 'textarea']);
+// Code points Python's html.unescape turns into '' when written as a numeric reference.
+const droppedByPython = (cp) => cp <= 0x10ffff && ((cp >= 1 && cp <= 8) || cp === 0xb || (cp >= 0xe && cp <= 0x1f) || cp === 0x7f || (cp >= 0xfdd0 && cp <= 0xfdef) || (cp & 0xfffe) === 0xfffe);
+const NUMERIC_REFERENCE = /&#(?:([0-9]+)|[xX]([0-9a-fA-F]+));?/g;
+// The rest of an end tag after its name, in Python's grammar (html.parser.locatetagend): a quoted attribute value may
+// hold ">", which htmlparser2 takes as the end of the tag.
+const END_TAG_SEP = /[\t\n\r\f \/]*/y;
+const END_TAG_ATTR = /(?<=['"\t\n\r\f \/])[^\t\n\r\f \/>][^\t\n\r\f \/=>]*(?:[\t\n\r\f ]*=[\t\n\r\f ]*(?:'[^']*'|"[^"]*"|(?!['"])[^>\t\n\r\f ]*))?[\t\n\r\f \/]*/y;
+// Same match as one regex (sep attr* >?), one attribute per exec: a single regex keeps a backtrack entry per
+// attribute and throws RangeError on an end tag with ~2M attributes (4 MB).
+const endTagGt = (markup, end) => {
+  END_TAG_SEP.lastIndex = end; END_TAG_SEP.test(markup);
+  let at = END_TAG_SEP.lastIndex;
+  for (END_TAG_ATTR.lastIndex = at; END_TAG_ATTR.test(markup); END_TAG_ATTR.lastIndex = at) at = END_TAG_ATTR.lastIndex;
+  return markup.charCodeAt(at) === 0x3e ? at : -1;
+};
+// The Tokenizer leaves a reference right after "<" inside title / textarea undecoded ("<&amp;"); every other
+// reference there has already gone to ontextentity, so decoding the remaining text once is safe.
+const decodeRcdataText = (text) => decodeHTML(text.replace(NUMERIC_REFERENCE, (ref, dec, hex) => (droppedByPython(dec ? Number(dec) : parseInt(hex, 16)) ? '' : ref)));
+export const htmlToText = (markup) => {
+  const sink = new TextSink();
+  let tag = '';
+  let rcdata = false;
+  const tokenizer = new Tokenizer({ decodeEntities: true, recognizeSelfClosing: true }, {
+    onopentagname: (start, end) => { tokenizer.recognizeSelfClosing = true; tag = markup.slice(start, end).toLowerCase(); sink.start(tag); },
+    onopentagend: () => { rcdata = RCDATA.has(tag); },
+    // "<br/>": the start tag above, then this end; "<svg/>" thus opens and closes its skipped region.
+    // "<x / >" is a plain start tag for Python (and WHATWG); htmlparser2 alone calls it self-closing. Turning
+    // recognizeSelfClosing off for this one tag makes the Tokenizer enter the raw-text region as after ">"; the
+    // next start tag turns it back on.
+    onselfclosingtag: (gt) => {
+      if (markup.charCodeAt(gt - 1) === 0x2f) { sink.end(tag); return; }
+      tokenizer.recognizeSelfClosing = false;
+      rcdata = RCDATA.has(tag);
+    },
+    onclosetag: (start, end) => {
+      const gt = endTagGt(markup, end);
+      // An end tag Python's grammar does not close with ">": Python drops the rest of the document, and
+      // continuing here would rescan the same tail at every later end tag (quadratic).
+      if (gt < 0) { tokenizer.pause(); return; }
+      rcdata = false;
+      sink.end(markup.slice(start, end).toLowerCase());
+      // Where Python ends this tag is past the first ">": move the Tokenizer there; it then skips to that ">".
+      if (markup.indexOf('>', end) < gt) tokenizer.index = gt - 1;
+    },
+    ontext: (start, end) => { const text = markup.slice(start, end); sink.text(rcdata && text.includes('&') ? decodeRcdataText(text) : text); },
+    ontextentity: (codePoint) => { if (!droppedByPython(codePoint)) sink.text(String.fromCodePoint(codePoint)); },
+    onattribname: ignore, onattribdata: ignore, onattribentity: ignore, onattribend: ignore,
+    oncomment: ignore, oncdata: ignore, ondeclaration: ignore, onprocessinginstruction: ignore, onend: ignore,
+  });
+  tokenizer.write(markup);
+  tokenizer.end();
+  return sink.lines.result();
+};
+```
+
+文字コードのデコードの順 (`probe/lib/decode-pipeline.mjs`。Python 版の `charset.decode` と、`text.py` の `<meta>` / XML 宣言の読み取りの写し。判定の段は `detect` を差し込む):
+
+```js
+// Port of the Python service's charset.decode order; only the detection step is pluggable.
+// BOM -> declared -> ISO-2022-JP escapes -> strict UTF-8 -> detect(restricted) -> strict cp932 -> latin-1.
+// Python-strict semantics on top of WHATWG decoders: WHATWG windows-1252 never fails, Python's cp1252 rejects
+// the five undefined bytes; 'ascii' is a WHATWG label for windows-1252, Python's ascii rejects bytes >= 0x80.
+const CP1252_UNDEFINED = [0x81, 0x8d, 0x8f, 0x90, 0x9d];
+const strict = (label, data) => {
+  if (label === 'windows-1252' && CP1252_UNDEFINED.some((b) => data.includes(b))) return null;
+  if (label === 'x-ascii') return data.every((b) => b < 0x80) ? new TextDecoder().decode(data) : null;
+  try { return new TextDecoder(label, { fatal: true, ignoreBOM: false }).decode(data); } catch { return null; }
+};
+// Python's cp932 maps five single bytes that WHATWG Shift_JIS rejects (0x80, 0xA0, 0xFD-0xFF).
+const CP932_SINGLE = new Map([[0x80, '\u0080'], [0xa0, '\uf8f0'], [0xfd, '\uf8f1'], [0xfe, '\uf8f2'], [0xff, '\uf8f3']]);
+const isSjisLead = (b) => (b >= 0x81 && b <= 0x9f) || (b >= 0xe0 && b <= 0xfc);
+// stream: the detector's sample may end inside a character. One decoder for every run, and the runs joined in
+// batches: a decoder, a concatenation or one array entry per stray byte cost 40-70 MiB per MB of input.
+export const cp932 = (data, stream = false) => {
+  const decoder = new TextDecoder('shift_jis', { fatal: true });
+  const joined = []; let batch = []; let start = 0;
+  try {
+    for (let i = 0; i < data.length;) {
+      const single = CP932_SINGLE.get(data[i]);
+      if (single === undefined) { i += isSjisLead(data[i]) ? 2 : 1; continue; }
+      batch.push(decoder.decode(data.subarray(start, i)), single); start = ++i;
+      if (batch.length >= 4096) { joined.push(batch.join('')); batch = []; }
+    }
+    batch.push(decoder.decode(data.subarray(start), { stream }));
+  } catch { return null; }
+  joined.push(batch.join(''));
+  return joined.join('');
+};
+const startsWith = (data, bytes) => bytes.every((b, i) => data[i] === b);
+const utf32 = (data, le) => {
+  if ((data.length - 4) % 4 !== 0) return null;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let out = '';
+  for (let i = 4; i < data.length; i += 4) {
+    const cp = view.getUint32(i, le);
+    if (cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) return null;
+    out += String.fromCodePoint(cp);
+  }
+  return out;
+};
+const BOMS = [
+  [[0xef, 0xbb, 0xbf], (d) => strict('utf-8', d)],
+  [[0xff, 0xfe, 0x00, 0x00], (d) => utf32(d, true)],
+  [[0x00, 0x00, 0xfe, 0xff], (d) => utf32(d, false)],
+  [[0xff, 0xfe], (d) => strict('utf-16le', d)],
+  [[0xfe, 0xff], (d) => strict('utf-16be', d)],
+];
+// Python codec names that are not WHATWG labels.
+const ALIASES = { cp932: 'shift_jis', ms932: 'shift_jis', windows_31j: 'shift_jis', euc_jp: 'euc-jp', eucjp: 'euc-jp', ujis: 'euc-jp', iso2022_jp: 'iso-2022-jp', cp1252: 'windows-1252' };
+// Decoders a hostile <meta> must not select: 'replacement' turns the whole input into one U+FFFD.
+const UNUSABLE = new Set(['replacement', 'x-user-defined', 'utf-16le', 'utf-16be']);
+const ASCII_LABELS = new Set(['ascii', 'us-ascii', 'ansi_x3.4-1968', 'us', 'iso646-us', 'cp367', 'csascii']);
+export const resolveDeclared = (name) => {
+  const raw = name.trim().toLowerCase();
+  if (ASCII_LABELS.has(raw)) return 'x-ascii';
+  for (const label of [raw, ALIASES[raw.replaceAll('-', '_')], raw.replaceAll('_', '-')]) {
+    if (!label) continue;
+    try { const enc = new TextDecoder(label).encoding; return UNUSABLE.has(enc) ? null : enc; } catch { /* not a label */ }
+  }
+  return null;
+};
+// Python's codecs behind these labels are narrower than the WHATWG decoders (gb2312 -> GBK, euc-kr -> windows-949,
+// big5 -> Big5-HKSCS): a byte pair outside Python's lead / trail ranges makes Python reject the declaration.
+const GB2312 = [[0xa1, 0xf7], [[0xa1, 0xfe]]];
+const EUC_KR = [[0xa1, 0xfe], [[0xa1, 0xfe]]];
+const BIG5 = [[0xa1, 0xf9], [[0x40, 0x7e], [0xa1, 0xfe]]];
+const PYTHON_NARROWER = new Map([['chinese', GB2312], ['csiso58gb231280', GB2312], ['gb2312', GB2312], ['iso-ir-58', GB2312], ['euc-kr', EUC_KR], ['korean', EUC_KR], ['ks-c-5601-1987', EUC_KR], ['ksc5601', EUC_KR], ['big5', BIG5], ['csbig5', BIG5]]);
+const inRange = (b, [lo, hi]) => b >= lo && b <= hi;
+const fitsPythonCodec = (name, data) => {
+  const ranges = PYTHON_NARROWER.get(name.trim().toLowerCase().replaceAll('_', '-'));
+  if (!ranges) return true;
+  const [lead, trails] = ranges;
+  for (let i = 0; i < data.length; i++) {
+    if (data[i] < 0x80) continue;
+    if (!inRange(data[i], lead) || i + 1 >= data.length || !trails.some((t) => inRange(data[i + 1], t))) return false;
+    i++;
+  }
+  return true;
+};
+const ISO2022JP_ESCAPES = [[0x1b, 0x24, 0x42], [0x1b, 0x24, 0x40], [0x1b, 0x28, 0x4a]];
+const hasSeq = (data, seq) => { for (let i = data.indexOf(seq[0]); i >= 0 && i <= data.length - seq.length; i = data.indexOf(seq[0], i + 1)) if (seq.every((b, j) => data[i + j] === b)) return true; return false; };
+
+export const CANDIDATES = ['shift_jis', 'euc-jp', 'iso-2022-jp', 'windows-1252'];
+
+export const decodeWith = (detect) => (data, declared = null) => {
+  for (const [bom, dec] of BOMS) if (startsWith(data, bom)) { const r = dec(data); if (r != null) return r.replace(/^﻿/, ''); }
+  if (declared && fitsPythonCodec(declared, data)) { const enc = resolveDeclared(declared); if (enc) { const r = strict(enc, data); if (r != null) return r; } }
+  if (ISO2022JP_ESCAPES.some((s) => hasSeq(data, s))) { const r = strict('iso-2022-jp', data); if (r != null) return r; }
+  const u = strict('utf-8', data); if (u != null) return u.replace(/^﻿/, '');
+  const guess = detect(data);
+  if (guess && CANDIDATES.includes(guess)) { const r = strict(guess, data); if (r != null) return r; }
+  const sj = cp932(data); if (sj != null) return sj;
+  return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('latin1');
+};
+
+// Ports of text.py's head scans (first 4096 / 256 bytes, ASCII regex on bytes).
+const META = /<meta\b[^>]*?charset\s*=\s*["']?\s*([A-Za-z0-9_.:-]{1,64})/i;
+const XMLDECL = /^\s*<\?xml\b[^>]*?encoding\s*=\s*["']([A-Za-z0-9_.:-]{1,64})["']/i;
+const declaredIn = (head, re) => {
+  const m = re.exec(Buffer.from(head).toString('latin1'));
+  if (!m) return null;
+  return /^(utf-16|utf-32|ucs-)/.test(m[1].toLowerCase().replaceAll('_', '-')) ? 'utf-8' : m[1];
+};
+export const htmlDeclared = (data) => declaredIn(data.subarray(0, 4096), META);
+export const xmlDeclared = (data) => declaredIn(data.subarray(0, 256), XMLDECL);
+```
+
+文字コードの判定 (自前。`probe/charset/own.mjs`):
+
+```js
+// No dependency: strict-decode a sample with each candidate (TextDecoder) and score how much it looks like text.
+import { cp932 } from '../lib/decode-pipeline.mjs';
+export const NAME = 'own';
+const CANDS = ['shift_jis', 'euc-jp', 'windows-1252'];
+const SAMPLE_BYTES = 64 * 1024;
+const isLower = (cp) => cp >= 0x61 && cp <= 0x7a;
+const charScore = (cp, prevCp) => {
+  if (cp < 0x80) return cp < 0x20 && cp !== 0x0a && cp !== 0x0d && cp !== 0x09 ? -5 : 0;
+  if (cp >= 0x3041 && cp <= 0x30ff) return 3; // hiragana / katakana
+  if (cp >= 0x4e00 && cp <= 0x9fff) return 2; // CJK ideographs
+  if ((cp >= 0x3000 && cp <= 0x303f) || (cp >= 0xff01 && cp <= 0xff5e)) return 1; // CJK punctuation / fullwidth
+  if (cp >= 0xff61 && cp <= 0xff9f) return -2; // halfwidth katakana: typical of EUC-JP read as Shift_JIS
+  if (cp >= 0xe000 && cp <= 0xf8ff) return -3; // private use (user-defined Shift_JIS rows)
+  if (cp >= 0x80 && cp <= 0x9f) return -5; // C1 controls
+  const runPenalty = prevCp >= 0x80 ? -1.5 : 0; // Latin-1 / cp1252 symbols are suspicious in runs (mojibake)
+  if ((cp >= 0xc0 && cp <= 0xff) || '€‚„…†‡‰‹›‘’“”•–—™'.includes(String.fromCodePoint(cp))) return 0.5 + runPenalty;
+  return -1 + runPenalty;
+};
+const score = (text, latin) => {
+  let total = 0; let prev = 0; let prevPrev = 0;
+  for (let i = 0; i < text.length;) {
+    const cp = text.codePointAt(i); i += cp > 0xffff ? 2 : 1;
+    total += charScore(cp, prev);
+    // A kanji / kana glued to a lowercase ASCII letter is a Latin word read as a double-byte code.
+    if (!latin && ((prev >= 0x3041 && (isLower(cp) || isLower(prevPrev))) || (cp >= 0x3041 && isLower(prev)))) total -= 4;
+    prevPrev = prev; prev = cp;
+  }
+  return total;
+};
+export const detect = (data) => {
+  const sample = data.subarray(0, SAMPLE_BYTES);
+  let best = null; let bestScore = -Infinity;
+  for (const label of CANDS) {
+    let text;
+    // stream: true so a character cut at the sample edge is not an error; the caller re-decodes all bytes strictly.
+    const stream = sample.length < data.length;
+    // Shift_JIS is read the way Python's cp932 reads it, so a few stray bytes do not hand the text to windows-1252.
+    if (label === 'shift_jis') { text = cp932(sample, stream); if (text == null) continue; }
+    else try { text = new TextDecoder(label, { fatal: true }).decode(sample, { stream }); } catch { continue; }
+    const s = score(text, label === 'windows-1252');
+    if (s > bestScore) { bestScore = s; best = label; }
+  }
+  return best;
+};
+```
+
+ZIP の事前の検査 (`probe/lib/archive-guard.mjs`。`archive_guard.py` の写し。読み手は差し替えられる):
+
+```js
+// Port of archive_guard.py on top of a pluggable ZIP reader (the candidate).
+// Reader contract: list(data) -> Promise<Entry[]> (throws when the bytes are not a readable ZIP);
+// read(data, entry, maxBytes) -> Promise<Uint8Array> counting bytes actually inflated, throwing ConversionError.
+export class ConversionError extends Error { constructor(kind, msg) { super(msg); this.kind = kind; } }
+const utf8Ok = (raw) => { try { new TextDecoder('utf-8', { fatal: true }).decode(raw); return true; } catch { return false; } };
+// CPython's zipfile refuses entries needing version > 6.3 and UTF-8-flagged names that do not decode.
+const PY_MAX_EXTRACT_VERSION = 63;
+
+export const inspectArchive = async (reader, data, requiredPart, limits) => {
+  let entries;
+  try { entries = await reader.list(data); } catch { return null; }
+  if (entries.some((e) => e.versionNeeded != null && e.versionNeeded > PY_MAX_EXTRACT_VERSION)) return null;
+  if (entries.some((e) => e.utf8Flag && e.nameRaw && !utf8Ok(e.nameRaw))) return null;
+  if (entries.length > limits.entries) throw new ConversionError('limit_exceeded', 'archive has too many entries');
+  const declared = entries.reduce((n, e) => n + e.uncompressedSize, 0);
+  if (declared > limits.uncompressedBytes) throw new ConversionError('limit_exceeded', 'archive expands beyond the size limit');
+  if (entries.filter((e) => e.name === requiredPart).length !== 1) return null;
+  // Built once: a per-read scan of the entry list makes splitting a deck of many slides quadratic.
+  // Of duplicated names the last entry wins, as in CPython's zipfile.
+  const byName = new Map(entries.map((e) => [e.name, e]));
+  return {
+    entries,
+    read: async (name, maxBytes) => {
+      const entry = byName.get(name);
+      if (entry == null) throw new ConversionError('malformed', 'missing part');
+      if (entry.flags != null && entry.flags & 1) throw new ConversionError('encrypted', 'archive part is encrypted');
+      try {
+        return await reader.read(data, entry, maxBytes);
+      } catch (e) {
+        if (e instanceof ConversionError) throw e;
+        throw new ConversionError('malformed', `archive part could not be read (${e?.message?.slice(0, 60)})`);
+      }
+    },
+  };
+};
+```
+
+ZIP の読みの adapter (`probe/zip/yauzl.mjs`):
+
+```js
+import { crc32 } from 'node:zlib';
+import { req } from '../lib/deps.mjs';
+import { ConversionError } from '../lib/archive-guard.mjs';
+const yauzl = req('yauzl');
+export const NAME = 'yauzl';
+const openZip = (data) => new Promise((res, rej) => yauzl.fromBuffer(Buffer.from(data.buffer, data.byteOffset, data.byteLength), { lazyEntries: true, decodeStrings: false, validateEntrySizes: true, strictFileNames: false }, (e, z) => (e ? rej(e) : res(z))));
+export const list = async (data) => {
+  const zip = await openZip(data);
+  return new Promise((res, rej) => {
+    const out = [];
+    zip.on('entry', (e) => {
+      const utf8Flag = (e.generalPurposeBitFlag & 0x800) !== 0;
+      out.push({ index: out.length, name: new TextDecoder(utf8Flag ? 'utf-8' : 'latin1').decode(e.fileName), nameRaw: e.fileName, utf8Flag, flags: e.generalPurposeBitFlag, versionNeeded: e.versionNeededToExtract & 0xff, method: e.compressionMethod, crc: e.crc32, compressedSize: e.compressedSize, uncompressedSize: e.uncompressedSize, raw: e, zip });
+      zip.readEntry();
+    });
+    zip.on('end', () => res(out)); zip.on('error', rej); zip.readEntry();
+  });
+};
+export const read = (data, entry, maxBytes) => new Promise((resolve, reject) => {
+  entry.zip.openReadStream(entry.raw, (err, stream) => {
+    if (err) return reject(new ConversionError('malformed', err.message));
+    const chunks = []; let n = 0; let done = false;
+    stream.on('data', (c) => { n += c.length; if (n > maxBytes) { done = true; stream.destroy(); reject(new ConversionError('limit_exceeded', 'over cap')); } else chunks.push(c); });
+    stream.on('error', (e) => { if (!done) { done = true; reject(new ConversionError('malformed', e.message)); } });
+    // yauzl does not check CRC-32 (its README); checked here.
+    stream.on('end', () => { if (done) return; const out = Buffer.concat(chunks); if (crc32(out) !== entry.crc) reject(new ConversionError('malformed', 'CRC mismatch')); else resolve(out); });
+  });
+});
+```
+
+ZIP の書きの adapter (`probe/zipw/yazl.mjs`。元の流れと yazl の誤り、yazl が名前を拒む例外を、拒否として返す。ディレクトリの要素は飛ばす):
+
+```js
+import { Readable } from 'node:stream';
+import { req } from '../lib/deps.mjs';
+const yazl = req('yazl');
+export const NAME = 'yazl';
+// Every failure rejects: a source stream's error is not forwarded by yazl, and yazl's own 'error' event
+// needs a listener before the first entry is added.
+export const writeZip = async (entries) => {
+  const z = new yazl.ZipFile(); let failed = null;
+  const fail = (e) => { failed ??= e; z.outputStream.destroy(e); };
+  z.on('error', fail);
+  try {
+    for (const e of entries) {
+      // A directory entry ("xl/") holds nothing anydoc reads, and yazl refuses the name. Not addEmptyDirectory: yazl
+      // writes those synchronously and recursively, and ~5,000 of them overflow the stack.
+      if (e.name.endsWith('/')) continue;
+      z.addReadStreamLazy(e.name, { compress: e.method !== 'stored', mtime: new Date(1980, 0, 1) }, (cb) => {
+        const source = Readable.from(e.chunks);
+        source.on('error', fail);
+        cb(null, source);
+      });
+    }
+  } catch (x) {
+    // A name yazl refuses ("../x", "/abs", "C:/x") throws here; drain outputStream all the same.
+    fail(x);
+  }
+  z.end();
+  const chunks = [];
+  try { for await (const c of z.outputStream) chunks.push(c); } catch (e) { failed ??= e; }
+  if (failed) throw failed;
+  return Buffer.concat(chunks);
+};
+```
+
+ZIP の読みから書きへ流してつなぐ形 (`probe/bench/pipe-repackage.mjs`。XLSX の書き直しの手本。どの壊れ方でもプロセスを落とさず拒否として返す。読み書きの誤りは `kind` を持ち、yazl が拒む名前は `kind` の無い yazl の誤りのまま返す):
+
+```js
+// yauzl openReadStream piped straight into yazl addReadStreamLazy: bytes counted against a budget and CRC-32
+// accumulated on the way, so no part is ever held whole. Every failure rejects (never an unhandled 'error' event):
+// read and write failures with { kind }, an entry name yazl refuses ("../x", "/abs", "C:/x") with yazl's plain Error,
+// whose kind is left to the caller (research.md 18.10). CLI `node pipe-repackage.mjs <budget MiB> [zip]`, defaulting to the
+// 200 MiB part of bomb64.bin.
+import { readFileSync } from 'node:fs';
+import { Transform } from 'node:stream';
+import { crc32 } from 'node:zlib';
+import { req } from '../lib/deps.mjs';
+const yauzl = req('yauzl'); const yazl = req('yazl');
+const failure = (kind, message) => Object.assign(new Error(message), { kind });
+
+export const repackage = async (src, budgetBytes) => {
+  const zip = await new Promise((res, rej) => yauzl.fromBuffer(src, { lazyEntries: true, decodeStrings: false }, (e, z) => (e ? rej(failure('malformed', e.message)) : res(z))));
+  // Listing collects every entry before any limit is checked; production stops at the entry limit (research.md 18.10).
+  const entries = await new Promise((res, rej) => { const out = []; zip.on('entry', (e) => { out.push(e); zip.readEntry(); }); zip.on('end', () => res(out)); zip.on('error', (e) => rej(failure('malformed', e.message))); zip.readEntry(); });
+  const out = new yazl.ZipFile(); let budget = budgetBytes; let first = null;
+  const stop = (e) => { first ??= e; out.outputStream.destroy(first); };
+  const fail = (e) => stop(e.kind ? e : failure('malformed', e.message));
+  // Before the first addReadStreamLazy: an openReadStream error (method 9, bzip2, ...) is emitted by yazl as an
+  // 'error' event synchronously from inside that call.
+  out.on('error', fail);
+  try {
+    for (const e of entries) {
+      // Directory entries are dropped as in zipw/yazl.mjs (yazl refuses the name; addEmptyDirectory recurses).
+      if (Buffer.from(e.fileName).toString().endsWith('/')) continue;
+      out.addReadStreamLazy(Buffer.from(e.fileName).toString(), { compress: e.compressionMethod !== 0 }, (cb) => {
+        if (e.generalPurposeBitFlag & 1) return cb(failure('encrypted', 'archive part is encrypted'));
+        zip.openReadStream(e, (err, rs) => {
+          if (err) return cb(failure('malformed', err.message));
+          let crc = 0;
+          const guard = new Transform({
+            transform(chunk, _enc, next) { budget -= chunk.length; if (budget < 0) return next(failure('limit_exceeded', 'over budget')); crc = crc32(chunk, crc); next(null, chunk); },
+            flush(next) { next(crc === e.crc32 ? null : failure('malformed', 'CRC mismatch')); },
+          });
+          // pipe() does not forward source errors (corrupt deflate, yauzl's size checks): hand them to the guard.
+          rs.on('error', (x) => guard.destroy(failure('malformed', x.message)));
+          // yazl does not forward a source error to outputStream either; without this the output never ends.
+          guard.on('error', (x) => { rs.destroy(); fail(x); });
+          cb(null, rs.pipe(guard));
+        });
+      });
+    }
+  } catch (x) {
+    // yazl throws on a name it refuses while earlier entries are already being read: still end and drain
+    // outputStream below, so their later errors have a listener.
+    stop(x);
+  }
+  out.end();
+  const chunks = [];
+  try { for await (const c of out.outputStream) chunks.push(c); } catch (x) { first ??= x; }
+  if (first) throw first;
+  return Buffer.concat(chunks);
+};
+
+if (process.argv[1] === new URL(import.meta.url).pathname) {
+  const hwm = () => Math.round(parseInt(/VmHWM:\s+(\d+)/.exec(readFileSync('/proc/self/status', 'utf8'))[1]) / 1024);
+  const budget = Number(process.argv[2] ?? 512) * 1024 * 1024;
+  const src = readFileSync(process.argv[3] ?? new URL('../../out/fixtures/bomb64.bin', import.meta.url));
+  const before = hwm(); const t = performance.now(); let result;
+  try { result = `ok, ${(await repackage(src, budget)).length} bytes out`; } catch (e) { result = `failed (${e.kind ?? `unclassified: ${e.message}`})`; }
+  console.log(`budget ${budget / 1048576} MiB: ${result}, ${(performance.now() - t).toFixed(0)} ms, VmHWM ${before} -> ${hwm()} MiB`);
+}
+```
+
+XML の部品のバイト列から文字列への変換 (`probe/lib/xml-bytes.mjs`):
+
+```js
+// Bytes -> string for OOXML parts, matching what expat (behind defusedxml) accepts:
+// UTF-16 (BOM, or "<" as the first code unit), UTF-8, US-ASCII, ISO-8859-1 and the other single-byte code
+// pages; multi-byte code pages and unknown names are malformed, and so is a declaration contradicting UTF-16.
+import { ConversionError } from './archive-guard.mjs';
+const DECL = /^<\?xml\b[^>]*?\bencoding\s*=\s*(["'])([^"']*)\1/;
+// WHATWG single-byte decoders (Python's expat takes any single-byte codec; multi-byte ones fail there).
+const SINGLE_BYTE = new Set(['ibm866', 'iso-8859-2', 'iso-8859-3', 'iso-8859-4', 'iso-8859-5', 'iso-8859-6', 'iso-8859-7', 'iso-8859-8', 'iso-8859-10', 'iso-8859-13', 'iso-8859-14', 'iso-8859-15', 'iso-8859-16', 'koi8-r', 'koi8-u', 'macintosh', 'windows-874', 'windows-1250', 'windows-1251', 'windows-1252', 'windows-1253', 'windows-1254', 'windows-1255', 'windows-1256', 'windows-1257', 'windows-1258', 'x-mac-cyrillic']);
+// WHATWG decodes the bytes Python's cp125x leaves undefined as C1 controls; expat refuses those bytes.
+const UNDEFINED_IN_PYTHON = /[\u0080-\u009f]/;
+const HEAD_CHARS = 200;
+const malformed = (why) => new ConversionError('malformed', why);
+const strict = (label, bytes) => { try { return new TextDecoder(label, { fatal: true }).decode(bytes); } catch { throw malformed(`XML part is not valid ${label}`); } };
+const declaredIn = (head) => DECL.exec(head)?.[2].toLowerCase() ?? null;
+const utf16Of = (b) => (b[0] === 0xff && b[1] === 0xfe) || (b[0] === 0x3c && b[1] === 0x00) ? 'utf-16le'
+  : (b[0] === 0xfe && b[1] === 0xff) || (b[0] === 0x00 && b[1] === 0x3c) ? 'utf-16be' : null;
+
+export const decodeXmlPart = (bytes) => {
+  const utf16 = utf16Of(bytes);
+  if (utf16) {
+    const text = strict(utf16, bytes);
+    const enc = declaredIn(text.slice(0, HEAD_CHARS));
+    if (enc != null && enc !== 'utf-16' && enc !== utf16) throw malformed('declaration contradicts UTF-16');
+    return text;
+  }
+  // After a UTF-8 BOM expat still decodes the rest with the declared encoding.
+  const body = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? bytes.subarray(3) : bytes;
+  const enc = declaredIn(Buffer.from(body.subarray(0, HEAD_CHARS)).toString('latin1')) ?? 'utf-8';
+  if (enc === 'utf-8' || enc === 'utf8') return strict('utf-8', body);
+  // Python's ascii and latin-1, not WHATWG's (both labels mean windows-1252 there).
+  if (['us-ascii', 'ascii', 'ansi_x3.4-1968'].includes(enc)) { if (body.some((b) => b >= 0x80)) throw malformed('non-ASCII byte'); return strict('utf-8', body); }
+  // Every WHATWG label of windows-1252 that Python resolves to latin-1 (checked against the WHATWG label list).
+  if (['iso-8859-1', 'iso8859-1', 'iso_8859-1', 'latin1', 'latin-1', 'l1', 'cp819', 'ibm819', 'csisolatin1', 'iso-ir-100'].includes(enc)) return Buffer.from(body).toString('latin1');
+  let label = null;
+  try { label = new TextDecoder(enc).encoding; } catch { /* not a WHATWG label */ }
+  if (label == null || !SINGLE_BYTE.has(label)) throw malformed(`unsupported XML encoding ${enc.slice(0, 20)}`);
+  const text = strict(label, body);
+  if (label.startsWith('windows-125') && UNDEFINED_IN_PYTHON.test(text)) throw malformed(`byte undefined in ${label}`);
+  return text;
+};
+```
+
+CDATA・コメント・処理命令・引用符で囲まれた部分を除く 1 回の走査 (`probe/lib/strip-spans.mjs`。正規表現の置き換えと同じ結果を、入力に比例する時間で返す):
+
+```js
+// Same output as text.replace(/<o1>[\s\S]*?<c1>|<o2>[\s\S]*?<c2>|.../g, gap) for literal open/close pairs,
+// in linear time: closers are found with indexOf, and a kind whose closer is missing is never searched
+// again (no later opener of that kind can be closed either).
+export const stripSpans = (text, kinds, gap = '') => {
+  const firstChars = new Set(kinds.map(([open]) => open[0]));
+  const dead = new Set(); let out = ''; let from = 0;
+  for (let i = 0; i < text.length;) {
+    if (!firstChars.has(text[i])) { i++; continue; }
+    let next = -1;
+    for (const [open, close] of kinds) {
+      if (dead.has(open) || !text.startsWith(open, i)) continue;
+      const end = text.indexOf(close, i + open.length);
+      if (end < 0) { dead.add(open); continue; }
+      next = end + close.length; break;
+    }
+    if (next < 0) { i++; continue; }
+    out += text.slice(from, i) + gap; from = next; i = next;
+  }
+  return out + text.slice(from);
+};
+```
+
+XML の adapter (`probe/xml/xmldom.mjs`。壊れた XML を拒む自前の検査、名前空間の宣言の数の上限、名前空間の予約の検査、エンティティの宣言の検査、DOCTYPE の削除と宣言の置き換え、スライドの一覧を 1 回だけ空にする処理を含む):
+
+```js
+import { req } from '../lib/deps.mjs';
+import { stripSpans } from '../lib/strip-spans.mjs';
+import { ConversionError } from '../lib/archive-guard.mjs';
+const { DOMParser, XMLSerializer } = req('@xmldom/xmldom');
+export const NAME = 'xmldom';
+// What expat refuses but xmldom lets through even with every report thrown (measured: research.md 18.5.4).
+const INVALID_CHAR = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/;
+const BARE_AMPERSAND = /&(?!(?:[A-Za-z_:][\w.:-]*|#[0-9]+|#x[0-9A-Fa-f]+);)/;
+// CDATA sections, comments and processing instructions may hold '&' and ']]>' legally.
+const VERBATIM = [['<![CDATA[', ']]>'], ['<!--', '-->'], ['<?', '?>']];
+const NUMERIC_REF = /&#(?:x([0-9A-Fa-f]+)|([0-9]+));/g;
+const isXmlChar = (cp) => cp === 0x9 || cp === 0xa || cp === 0xd || (cp >= 0x20 && cp <= 0xd7ff) || (cp >= 0xe000 && cp <= 0xfffd) || (cp >= 0x10000 && cp <= 0x10ffff);
+const badReference = (markup) => {
+  NUMERIC_REF.lastIndex = 0;
+  for (let m; (m = NUMERIC_REF.exec(markup));) if (!isXmlChar(m[1] ? parseInt(m[1], 16) : Number(m[2]))) return true;
+  return false;
+};
+// Where stripSpans removed a CDATA section, comment or PI: NUL cannot occur in XML text (INVALID_CHAR), and
+// the text on both sides of the gap stays separate, as it is for expat.
+const GAP = '\u0000';
+// ']]>' inside one run of character data. Tags are skipped with their quoted attribute values (']]>' is legal
+// there). One pass; the next ']]>' position only moves forward, so hostile markup stays linear.
+const cdataEndInText = (markup) => {
+  let next = markup.indexOf(']]>');
+  if (next < 0) return false;
+  let from = 0; let inTag = false; let quote = '';
+  const inRun = (end) => { while (next >= 0 && next < from) next = markup.indexOf(']]>', next + 1); return next >= 0 && next + 3 <= end; };
+  for (let i = 0; i < markup.length; i++) {
+    const c = markup[i];
+    if (quote) { if (c === quote) quote = ''; } else if (inTag) { if (c === '"' || c === "'") quote = c; else if (c === '>') { inTag = false; from = i + 1; } } else if (c === '<' || c === GAP) { if (inRun(i)) return true; inTag = c === '<'; from = i + 1; }
+  }
+  return !inTag && inRun(markup.length);
+};
+// xmldom chains each element's namespace map to its parent's, so every name lookup walks the declaring
+// ancestors: deeply nested declarations make parsing quadratic. OOXML parts carry a handful of declarations.
+// Counted on the raw text, not on the stripped markup: a '<!--' inside a DOCTYPE literal would make stripSpans
+// drop the whole body while xmldom still parses it. Over-counting (text, comments) only errs toward refusing.
+const MAX_NAMESPACE_DECLARATIONS = 1000;
+const NAMESPACE_DECLARATION = /xmlns(?::[^\s=>/]*)?\s*=/g;
+const tooManyDeclarations = (markup) => {
+  NAMESPACE_DECLARATION.lastIndex = 0;
+  for (let n = 0; NAMESPACE_DECLARATION.exec(markup);) if (++n > MAX_NAMESPACE_DECLARATIONS) return true;
+  return false;
+};
+// Comments, processing instructions and quoted literals of the internal subset may mention '<!ENTITY'.
+const SUBSET_VERBATIM = [['<!--', '-->'], ['<?', '?>'], ['"', '"'], ["'", "'"]];
+const XML_NS = 'http://www.w3.org/XML/1998/namespace';
+const XMLNS_NS = 'http://www.w3.org/2000/xmlns/';
+// Namespace rules expat enforces and xmldom does not: reserved prefixes and duplicate expanded attribute names.
+const namespaceError = (root) => {
+  for (const stack = [root]; stack.length;) {
+    const el = stack.pop(); const seen = new Set();
+    for (const a of Array.from(el.attributes)) {
+      const isDecl = a.name === 'xmlns' || a.name.startsWith('xmlns:');
+      if (isDecl) {
+        if (a.name === 'xmlns:xmlns' || a.value === XMLNS_NS) return true;
+        if ((a.name === 'xmlns:xml') !== (a.value === XML_NS)) return true;
+        continue;
+      }
+      const key = `${a.namespaceURI ?? ''} ${a.localName}`;
+      if (seen.has(key)) return true;
+      seen.add(key);
+    }
+    for (const n of Array.from(el.childNodes)) if (n.nodeType === 1) stack.push(n);
+  }
+  return false;
+};
+export const parse = (text) => {
+  const markup = stripSpans(text, VERBATIM, GAP);
+  if (INVALID_CHAR.test(text) || BARE_AMPERSAND.test(markup) || cdataEndInText(markup) || badReference(markup)) throw new Error('not well-formed');
+  // A limit, not malformed XML: the same files fail in the Python service on anydoc's XML depth limit.
+  if (tooManyDeclarations(text)) throw new ConversionError('limit_exceeded', 'too many namespace declarations');
+  const doc = new DOMParser({
+    onError: (level, msg) => { throw new Error(`${level}: ${msg}`); },
+    // XML 1.0 line ends only; xmldom's default also turns U+0085 / U+2028 into '\n' (XML 1.1), expat does not.
+    normalizeLineEndings: (s) => s.replace(/\r\n?/g, '\n'),
+  }).parseFromString(text, 'text/xml');
+  if (doc.doctype && /<!ENTITY/i.test(stripSpans(doc.doctype.internalSubset ?? '', SUBSET_VERBATIM))) throw new Error('entity declarations are refused');
+  if (!doc.documentElement) throw new Error('no element');
+  if (namespaceError(doc.documentElement)) throw new Error('namespace error');
+  // Removed once here (xmldom keeps doc.doctype pointing at the removed node, so a second removal throws).
+  if (doc.doctype) doc.removeChild(doc.doctype);
+  return doc;
+};
+// Written back as UTF-8 without the DOCTYPE (removed by parse), as Python's tostring(encoding="UTF-8", xml_declaration=True) does.
+const serialize = (doc) => {
+  return `<?xml version='1.0' encoding='UTF-8'?>\n${new XMLSerializer().serializeToString(doc).replace(/^<\?xml[^>]*\?>\s*/, '')}`;
+};
+const kids = (el, local) => Array.from(el?.childNodes ?? []).filter((n) => n.nodeType === 1 && n.localName === local);
+export const rootLocalName = (doc) => doc.documentElement.localName;
+export const relationships = (doc) => kids(doc.documentElement, 'Relationship').map((e) => ({ Id: e.getAttribute('Id') ?? '', Type: e.getAttribute('Type') ?? '', Target: e.getAttribute('Target') ?? '', TargetMode: e.getAttribute('TargetMode') || 'Internal' }));
+export const markSheets = (doc, token) => {
+  const sheets = kids(kids(doc.documentElement, 'sheets')[0], 'sheet');
+  const names = sheets.map((s) => (s.hasAttribute('name') ? s.getAttribute('name') : null));
+  sheets.forEach((s, i) => { s.setAttribute('name', `ZZ${token}${i + 1}ZZ`); if (s.hasAttribute('state')) s.setAttribute('state', 'visible'); });
+  return { xml: serialize(doc), names };
+};
+// The slide list is emptied once per document; each call puts one entry back, writes, and takes it out again,
+// so one presentation is parsed once and each package costs only its own (small) serialization.
+const emptiedSlideLists = new WeakMap();
+export const keepOnlySlide = (doc, keep) => {
+  let state = emptiedSlideLists.get(doc);
+  if (state == null) {
+    const list = kids(doc.documentElement, 'sldIdLst')[0];
+    const ids = kids(list, 'sldId');
+    ids.forEach((n) => list.removeChild(n));
+    state = { list, ids };
+    emptiedSlideLists.set(doc, state);
+  }
+  const entry = state.ids[keep];
+  state.list.appendChild(entry);
+  try { return serialize(doc); } finally { state.list.removeChild(entry); }
+};
+export const rootChildren = (doc) => Array.from(doc.documentElement.childNodes).filter((n) => n.nodeType === 1).map((n) => ({ local: n.localName, attrs: Object.fromEntries(Array.from(n.attributes).map((a) => [a.name, a.value])) }));
+export const slideIds = (doc) => kids(kids(doc.documentElement, 'sldIdLst')[0], 'sldId').map((n) => Array.from(n.attributes).find((a) => a.namespaceURI?.endsWith('relationships') && a.localName === 'id')?.value ?? null);
+```
+
+正解率の集まり (i) を作った script (`probe/charset/make-set.py`。元の文を含む。Python 版の `decode()` の結果も同時に記録する):
+
+```python
+# Builds the charset accuracy set: texts encoded with Python's codecs, plus what the Python
+# service's decode() returns for each (the reference behaviour).
+import json, sys
+sys.path.insert(0, sys.argv[1])
+from app.conversion.charset import decode
+
+JA = [
+    "経営企画会議の議事録を共有します。来期の販売戦略について大阪支店から提案がありました。",
+    "システム障害が発生したため、データベースサーバーを再起動しました。原因は調査中です。",
+    "ご注文いただいた商品は、明日の午前中に発送いたします。お届けまで少々お待ちください。",
+    "テレワーク勤務制度を新設し、セキュリティポリシーを改定する。",
+    "ひらがなばかりのぶんしょうでもただしくよめるかをたしかめます。",
+    "株式会社サンプル　総務部　山田太郎（内線１２３４）",
+    "第３四半期の売上高は前年同期比１２％増の４５億円となった。",
+    "会議資料", "日本語のテスト", "東京都", "ありがとう", "カタカナ", "了解", "議事録",
+]
+EU = [
+    "Price: €5 – “quoted” café résumé naïve",
+    "The “quarterly” report shows revenue of €1,250,000 – up 12% – and the café’s résumé.",
+    "Grüße aus München – Straße, Größe, Übermaß.",
+    "Très élégant, déjà vu, à la carte.",
+]
+MIXED = [
+    "id,name,dept\n1,山田太郎,営業\n2,佐藤花子,総務\n",
+    "ERROR 2026-11-05 12:00:00 接続失敗 host=db01 port=5432\n",
+]
+LENGTHS = [2, 4, 8, 16, 32, 64]
+items = []
+def add(text, enc, kind):
+    try:
+        data = text.encode(enc)
+    except UnicodeEncodeError:
+        return
+    try:
+        py = decode(data)
+    except Exception as e:  # noqa: BLE001
+        py = f"<error {e}>"
+    items.append({"kind": kind, "encoding": enc, "text": text, "hex": data.hex(), "python": py})
+for base in JA:
+    for n in LENGTHS:
+        t = base[:n]
+        if len(t) < n and n != LENGTHS[0] and len(base) < n:
+            continue
+        for enc in ["cp932", "euc_jp", "iso2022_jp", "utf-8"]:
+            add(t, enc, f"ja{len(t)}")
+for t in EU:
+    for enc in ["cp1252", "utf-8"]:
+        add(t, enc, "eu")
+for t in MIXED:
+    for enc in ["cp932", "euc_jp", "iso2022_jp", "utf-8"]:
+        add(t, enc, "mixed")
+# de-duplicate identical (text, enc)
+seen = set(); uniq = []
+for it in items:
+    k = (it["text"], it["encoding"])
+    if k in seen: continue
+    seen.add(k); uniq.append(it)
+json.dump(uniq, sys.stdout, ensure_ascii=False)
+```
+
+集まり (iii) を作った script (`probe/charset/make-holdout-set.py`。(ii) の `make-locale-set.py` も同じ作りで、`apps/app/public/static/locales` の `ja_JP` を cp932・euc_jp・iso2022_jp に、`fr_FR` を cp1252 にした):
+
+```python
+# Hold-out set (never used to tune the own detector): strings of third-party fr/de/ja JSON
+# locales, plus Japanese lines of this repo's .kiro/specs requirements.md files.
+import glob, json, sys
+sys.path.insert(0, sys.argv[1])
+from app.conversion.charset import decode
+def strings(o):
+    if isinstance(o, str): yield o
+    elif isinstance(o, dict):
+        for v in o.values(): yield from strings(v)
+    elif isinstance(o, list):
+        for v in o: yield from strings(v)
+latin, ja = set(), set()
+for f in sys.argv[2].split(","):
+    latin.update(s for s in strings(json.load(open(f, encoding="utf-8"))) if any(ord(c) > 127 for c in s))
+for f in sys.argv[3].split(","):
+    ja.update(s for s in strings(json.load(open(f, encoding="utf-8"))) if any(ord(c) > 127 for c in s))
+for f in glob.glob(sys.argv[4]):
+    ja.update(line.strip()[:120] for line in open(f, encoding="utf-8") if any(ord(c) > 0x3000 for c in line))
+items = []
+for group, encs in ((sorted(latin), ["cp1252"]), (sorted(ja), ["cp932", "euc_jp", "iso2022_jp"])):
+    for s in group:
+        for enc in encs:
+            try: data = s.encode(enc)
+            except UnicodeEncodeError: continue
+            items.append({"encoding": enc, "text": s, "hex": data.hex(), "python": decode(data)})
+json.dump(items, sys.stdout, ensure_ascii=False)
+```
+
+
+**この節のコードだけから作り直せることの確認** (2026-11-06、6 回目のレビューの後で直した版で行った):
+
+- 1 回目のレビューのレビュアーが作った `extract.mjs` (この節のコードの囲みを順にファイルへ書き出す小さな script) で書き出し、試作と同じ置き場所の形 (`$S/rebuild7/probe/…`) に並べた。12 個の JS のファイルは、試作のファイルと 1 バイトも違わなかった。18.5.8 の 6 つの囲み (`shapes.mjs`・`run.mjs`・`sweep.sh`・`table.mjs`・`fuzz-zip.mjs`・`fuzz-zip.sh`) も同じように書き出し、1 バイトも違わなかった。
+- 作り直した置き場所で動かした結果は、試作と同じだった:
+  - HTML: 終わりのタグの集まり 1,000/1,000・1,000/1,000、時間の形と 4.4MB の入力の 13/13、自分のタグの崩れた 1,000 件で 1,000/1,000。`</a x=">"` を 5 万 / 10 万 / 20 万個並べた入力で 5 / 8 / 15ms。
+  - ZIP: `ziprx.xlsx` とディレクトリの要素を 9,000 個持つ XLSX は、分割と `repackage` の両方で 3 シート・書き直しができ、終了コード 0。CRC の誤った要素の後に `../evil.txt` を置いた ZIP 2 つは `kind` の無い拒否で、終了コード 0。
+- 検査の `checks/*.mjs`、比べる道具 (`r7/*.mjs`)、スタブの分割の写し (`bench/split.mjs`) はこの節に載せていないので、試作から写して使った。部品は `$S/deps` (18.9 の手順の 1 で入れたもの) を使った。
+
+### 18.10 後のタスクへの引き継ぎ
+
+- **3.6 (仮想メモリの上限)**:
+  - 採った 4 つの部品は、読み込んでも `VmSize` が合わせて約 17MiB しか増えない (18.5.6。足し算の推論)。仮想メモリの上限を決める主な要因にはならない見込み。
+  - chardetng-wasm のような WASM の部品は、8GiB を予約する。採らないが、将来 WASM の部品 (PDF の部品を含む) を足すときは、この増え方を測ること。
+  - 20MiB の HTML の文字列を解析したときの `VmPeak` は 1,645MiB だった (htmlparser2、ふつうのプロセスで測った。素の Node から +約 270MiB。`--max-semi-space-size=4` を付けると 1,522MiB)。
+- **3.7 (子の RSS と既定値)**:
+  - **20MiB の HTML (`MAX_HTML_BYTES` の既定) は、`MAX_CHILD_RSS_MB` 320 の 0.95 倍 (304MiB) の境に当たる**。ファイルを読み、デコードし、解析する実際の流れのピークの RSS は、`Tokenizer` の形で、V8 のオプション無しで 296〜315MiB だった (18.5.1 の表。ふつうのプロセスで 3 回ずつ測った。`Parser` の形でも 296〜316MiB で、ほぼ同じ)。Python 版は 138MiB。子の中では anydoc などの読み込みの分がさらに加わる (未検証)。
+  - V8 の新しい世代の領域を小さくする (`--max-semi-space-size=4`) と、同じ流れで 214〜219MiB (`Tokenizer` の形) に下がった。入力を 64KiB ずつデコードして流し込む形にも変えると 178〜181MiB になった (`Parser` の形で測った)。流し込むだけ (オプション無し) では 268〜284MiB で、あまり下がらなかった。
+  - 3.7 では、**HTML の最大の入力 (20MiB) を基準のファイルに加え**、子の中で、`prlimit` の上限の下で測ること。子の Node に付ける V8 のオプション (`--max-semi-space-size` など) と、流し込む形にするかどうかも、そこで決める。
+  - 流し込む形 ((3)。64KiB ずつデコードして `Tokenizer` に渡す) は、`Parser` の形で、5 回目のレビューの後に足した Python 版と合わせる 5 つの点 (18.5.1) が無い状態で測った。いまの adapter は、デコードした文書全体の文字列を前提にしている (`markup.slice`、`onselfclosingtag` の位置の 1 つ前の字、`endTagGt` が最初の `>` より先を読むこと、`tokenizer.index` を文書の中の位置として書き換えること)。流し込む形を選ぶときは、この 5 つの点を作り直し、18.5.1 の集まりで Python 版との比べ直しをやり直す必要がある。
+  - ZIP を一覧できない XLSX (たとえば、中身の無い無圧縮の要素 1 つの申告サイズを偽ったもの) は、yauzl の一覧で失敗するので `inspectArchive` が `null` を返し、ZIP がそのまま anydoc に渡る。このときセル数・要素数・申告サイズの上限は通らない (7 回目のレビュアーの実測: 約 1MB の XLSX・30 万セルで 864ms・ピークの RSS 686MiB、200 万セルで 944ms・1,029MiB。Python 版は同じ XLSX を 20ms で `limit_exceeded` にするが、version-needed を 64 にした要素を 1 つ足すと Python 版も同じ XLSX を anydoc に渡して 764ms・676MiB を使った)。新しい種類の危険ではなく、どちらも子の RSS の上限が最後の守りになる。3.7 の測定と 6.x の分割では、「ZIP をそのまま anydoc に渡す経路はセル数の上限を通らず、RSS の上限で止まる」ことを前提にする。
+  - それでも 0.95 倍の余裕が取れない場合に当たる手続き (requirements.md と tasks.md の 3.7 を読んで確かめた):
+    - Req 11.11 と tasks.md の 3.7 が下げてよいとするのは、`MAX_CHILD_RSS_MB` と `MAX_XLSX_CELLS` の既定値だけで、上げることは認めない。RSS の上限を下げると、20MiB の HTML はかえって早く止められるので、この手続きでは余裕は取れない。
+    - (i) 普通の 20MiB の HTML が RSS の上限で止められるなら、対象 spec の対応形式 (HTML) の AC を満たせないおそれがある。Req 11.10 と tasks.md の 3.7 の「対象 spec の AC や不変条件を満たせないことが分かったら、ユーザーに諮り、答えが research.md に記録されるまで 3.8 と 4.x に進まない」に当たる。
+    - (ii) 解決の案として `MAX_HTML_BYTES` の既定値 (20MiB) を下げる場合は、Req 1.4 (環境変数を同じ名前・同じ既定値で受け付ける) を崩すことになり、Req 1.9 / 1.10 の手続き (崩すかの判断と research.md への記録) が要る。
+    - 参考 (Python 版の `services/attachment-text-extractor/CLAUDE.md` の Known Limits): Python 版でも、普通の 20MiB の HTML のピークは約 245MB、属性の多い病的な HTML は 4MB で数百 MB を使い、RSS の上限で止められる (`resource_limit_exceeded`) と書いてある。
+  - 文字コードの判定とデコードは、20MiB の EUC-JP でピークの RSS 121MiB。
+  - **OOXML の分割と XML の解析のメモリも、子の中で測ること**。ふつうのプロセスでの実測 (18.5.4): PPTX の分割のピークの RSS は 1,000 / 2,000 / 4,000 スライドで 199 / 280 / 370MiB (Python 版は 46 / 51 / 62MiB)。3 回目のレビューのレビュアーは 8,000 シートの XLSX の分割で 352MiB (Python 版 61MiB) と測った。xmldom の DOM は入力の 100〜600 倍になることがある (兄弟の要素 2.7MB で +453MiB、閉じていない開始タグ 0.6MB で +263〜361MiB。4 回目のレビューのレビュアーは閉じていない開始タグ 1.2MB で +616MiB と測った)。ZIP のエントリ 10 万個を流してつなぐ書き直しは +231〜286MiB (18.5.8)。原因は切り分けておらず、xmldom の DOM、スタブの写しがスライドごとに部品とパッケージを作り直すこと、V8 の外のメモリが関わると推論する。
+  - 3.7 では、大きなデッキ (数千スライド)、シートの多いブック (数千シート)、兄弟の要素の多い XML の部品を基準のファイルに加え、子の中で最大 RSS を測る。分割の流れを 1 つずつ開く形 (スライドごとの package を作って anydoc に渡したら、すぐに手放す。XLSX は流してつなぐ形) にできるかも確かめる。正しい文書が `MAX_CHILD_RSS_MB` で止められる大きさが分かれば、上の HTML と同じく Req 11.10 の手続きに当たる。
+- **3.8 (部品を入れる)**: 次を 1 つずつ入れ、lockfile の差分がこれだけであることを確かめる。`allowBuilds` の変更は要らない。
+  - 本番の依存: `htmlparser2@12.0.0`、`entities@8.1.0` (HTML の adapter が `decodeHTML` を直接使う。pnpm では直接の依存にしないと `import` できない)、`@xmldom/xmldom@0.9.12`、`yauzl@3.4.0`、`yazl@3.3.1` の 5 個。
+  - 開発用の依存: `@types/yauzl@3.4.0`、`@types/yazl@3.3.1`。
+  - lockfile には別の版 (htmlparser2 8.0.2 など) がすでにあるので、新しい版として加わる。推移的な依存を含めて本番に入る 11 個は 18.8 の表にある。
+  - `@xmldom/xmldom` は 0.9.12 より古い版を入れない (`^0.9.12` のように下限を 0.9.12 にする)。0.9.11 以下には 2026-09-08 に公開された勧告が当たる (18.6)。入れた後も、勧告が出たら版を上げる。
+  - 文字コードの部品は入れない。`iconv-lite` は今のままテスト用の依存に留める。
+  - htmlparser2 12 は ESM だけで、`engines` は `node >=20.19.0`。
+- **4.x (テスト)**: 18.4 の 1 の検査の入力と期待値 (Python 版のテストからの写し。`$S/probe/checks/*.mjs`) を、`conversion/text/*.spec.ts` と `conversion/ooxml/*.spec.ts` の手本に使える。
+  - 次も加える: 敵意のある宣言 (`replacement` になるラベル、`ascii`)、WHATWG と Python の違い (cp1252 の未定義のバイト、latin-1 への落ち方)、書き戻した XML をもう一度解析する検査、yauzl の CRC の確認。6 回目のレビューの後に見つけた形 (`</a x=">"` の並び、属性が 200 万個の終わりのタグ、ディレクトリの要素を持つ XLSX、ディレクトリの要素を 9,000 個持つ XLSX) と、5 回目のレビューの後に見つけた形 (自己終了の形の特殊なタグ、`<x / >`、`<title>` の中の `<&`、捨てる数値の文字参照、終わりのタグの引用符の中の `>`、0xFF を含む Shift_JIS、`gb2312` の宣言の付いた Shift_JIS、CRC の誤った要素の後に yazl が拒む名前を置いた ZIP) も、Python 版の出力を期待値にして加える。
+  - 文字コードの判定には、18.4 の 3 の (iii) の一部を固定のテスト素材として持つと、重みを変えたときの退行を捕まえられる (推論)。
+- **6.x (変換の層の実装)**:
+  - `conversion/text/charset.ts`: 18.9 の判定とデコードの順で作る。共通の層で直した点 (`ascii`、windows-1252 の未定義の 5 バイト、使わないラベル、UTF-32、`Buffer#toString('latin1')`) を落とさない。
+    - Shift_JIS は、Python の cp932 と同じく単独の 0x80・0xA0・0xFD〜0xFF を 1 字として読む関数 (`cp932`) で、判定の候補と最後の段の両方を読む。WHATWG の shift_jis だけで読むと、この 5 バイトが 1 つあるだけで文書全体が windows-1252 として化ける (18.5.2)。
+    - 宣言の名前が Python で gb2312・euc_kr・big5 の codec になるときは、Python の codec が受け付けるバイトの範囲を先に見て、外れていれば宣言を使わない (`fitsPythonCodec`。WHATWG はより広い GBK・windows-949・Big5-HKSCS で読んでしまう。18.5.2)。
+  - 18.7 の 1 の 6 字 (`〜` など) は戻さないことを勧める (検索のトークンに影響しないと実測した)。戻さない場合は Req 2.3 の記録として残す。
+  - `resolveDeclared` の別名の表に、WHATWG に同じ文字コードが別名であるもの (`mac-roman`・`macroman` → `macintosh`、`1252` などの番号だけの名前) を足すかどうかを決める (18.7 の 10。試していない)。DOS の文字コード (cp437・cp850 など) は WHATWG に無く、iconv-lite を足さない判断をした。
+  - `conversion/text/html.ts`: htmlparser2 の **`Tokenizer` を直接使う** (18.9 の `html/htmlparser2.mjs`)。`Parser` は使わない (開いた要素の一覧で 2 乗の時間になる。18.5.1)。`onopentagname`・`onopentagend`・`onselfclosingtag`・`onclosetag`・`ontext`・`ontextentity` を自前の層 (`TextSink`) につなぎ、ほかの callback は何もしない。タグの名前は、渡された範囲を本文から切り出して小文字にする。次の 5 つを必ず入れる (どれかが欠けると、Python 版と出力が違い、1 つ目は本文がまるごと消える。5 つ目の読み方を誤ると、時間が入力の 2 乗になるか、例外で 500 になる。18.5.1):
+    - `new Tokenizer({ decodeEntities: true, recognizeSelfClosing: true }, …)`。`recognizeSelfClosing` が無いと、`<script src="a.js"/>`・`<iframe …/>`・`<title/>` の後ろを特殊な要素の中として読む。
+    - `<x / >` (`/` と `>` の間に空白) は自己終了にしない。`onselfclosingtag` に渡る位置の 1 つ前が `/` でなければ、閉じたことにせず、その 1 つのタグに限って `recognizeSelfClosing` を false にし、次の `onopentagname` で true に戻す。
+    - `<title>`・`<textarea>` の中の本文に `&` が残っていれば、`entities` の `decodeHTML` でもう一度直す (`entities` は htmlparser2 の依存。本番では直接の依存に足す。8.1.0、BSD-2-Clause、install のときに動く処理は無い。18.8)。
+    - Python の `html.unescape` が捨てる数値の文字参照 (`droppedByPython`) を捨てる。
+    - 終わりのタグの後ろを Python 版の文法で読み (18.9 の `endTagGt`)、Python 版の終わりが最初の `>` より後ろなら、`Tokenizer` の位置を動かす。**属性は 1 つずつ sticky な正規表現で読む** (1 本の正規表現で読むと、属性が約 220 万個の終わりのタグでスタックが溢れる)。**Python 版の文法で `>` で閉じない終わりのタグでは、`tokenizer.pause()` を呼んで残りを捨てる** (Python 版と同じ。続けると、終わりのタグごとに文書の最後まで読み直し、時間が入力の 2 乗になる)。
+    - 2 つ目と 5 つ目は、型定義では `private` の `recognizeSelfClosing` と `index` を書き換える。TypeScript では型の主張が要り、htmlparser2 の版を上げたときに壊れうる。**この 2 つの形 (`<title / >` と、終わりのタグの引用符の中の `>`) をテストに入れ、版を上げたときに気づけるようにする**。代わりの案 (htmlparser2 を使わず、Python の `HTMLParser` の状態の遷移を自前で写す) は試していない (推論では 300 行前後)。
+    - テストには、18.5.1 の検査 33 件 (`</a x=">"` を 4 万個並べた入力を 1 秒未満、属性が 200 万個の終わりのタグで例外を出さない、の 2 件を含む) と、開いた要素を積む 4 つの形を、N と 4N の時間の比 (6 倍未満) と上限 (8 万で 1 秒未満) で入れる。18.5.1 の HTML の集まり (`$S/out/tagsoup-rv6.json`・`tagsoup.json`、`$S/r6/mine6.json`、5 回目のレビューのレビュアーの `rv7/html/mine.json` と、それぞれの Python 版の出力 `*-py.json`) も素材に使える。終わりのタグの集まり (`$S/r7/gen-endtag.py`) と、その Python 版の出力 (`$S/r7/end7-py.json`・`end8-py.json`) も使える。残る違い (18.7 の 8) は、Python 版と違う期待値として明記する。
+  - `conversion/ooxml/archive-guard.ts`: Python 版と同じ振る舞いのために、次を自前で持つ。
+    - version-needed が 63 より大きい要素、または UTF-8 の flag があるのに名前が UTF-8 でない要素があれば、ZIP をそのまま anydoc に渡す。
+    - 暗号化の flag (bit 0) を `encrypted` にする。
+    - CRC-32 を確かめる。
+    - UTF-8 の flag の無い名前を cp437 で読むかどうかを決める。`TextDecoder` に cp437 は無いので、表を持つか、ASCII 以外を含む名前は一致しないものとして扱うかを選ぶ。
+  - `conversion/ooxml/safe-xml.ts`: 18.9 の `xmldom.mjs` の形にする。
+    - `onError` は `warning` も含めてすべて例外にする。`normalizeLineEndings` は XML 1.0 の規則 (`\r\n` と `\r` だけ) にする。
+    - 解析の前に、XML で使えない字、裸の `&`、使えない字を指す数値の参照を見る。`&` と数値の参照は、CDATA・コメント・処理命令を除いてから見る。
+    - CDATA・コメント・処理命令 (と DOCTYPE の中の引用符) を除く処理は、`strip-spans.mjs` の 1 回の走査で行う。`[\s\S]*?` を使う正規表現の置き換えは、閉じていない開始の印で 2 乗の時間になるので使わない (18.5.4)。
+    - `]]>` は、引用符を考慮して開始タグを除いた本文だけで探す (属性の値の中の `]]>` は正しい XML)。
+    - DOCTYPE の `<!ENTITY` は、内部サブセットからコメント・処理命令・引用した文字列を除いてから探す。
+    - 解析の前に、**除く前の本文** で名前空間の宣言 (`xmlns` と `xmlns:…` の属性にあたる文字の並び) を数え、1,000 個を超えたら `limit_exceeded` で拒む (xmldom の解析が宣言の深い入れ子で 2 乗の時間になるため。18.5.4)。CDATA・コメントなどを除いた後の文字列で数えると、DOCTYPE の文字列の `<!--` で本体ごと除かれて抜け道になる。数えるのも、見つけた時点で止まる繰り返しで行う。
+    - 安全のための検査 (使えない字、名前空間の宣言の数) は除く前の本文で、Python 版と判定を合わせるだけの検査 (裸の `&`、数値の参照、本文の `]]>`) は除いた後の文字列で行う (18.5.4 の役割分担)。後者を DOCTYPE の文字列で外せる違いは 18.7 の 9 に記録した。
+    - 数値の参照の検査は、照合の結果を配列にせず、見つけた時点で止まる繰り返しで行う (配列にすると、4MB の部品でピークの RSS が 377MiB になった)。
+    - `]]>` は本文の連続した部分ごとに探し、CDATA・コメント・処理命令を除いた所には区切りの字 (NUL) を置く (子の要素やコメントをまたいでつなぐと、正しい XML を拒む)。
+    - 解析の後に、名前空間の予約の誤りを拒み、DOCTYPE の節を 1 回だけ消す。
+    - 書き戻すときは、XML 宣言を `<?xml version='1.0' encoding='UTF-8'?>` に置き換える。
+    - バイト列から文字列への変換は `xml-bytes.mjs` の線にする (BOM の無い UTF-16、UTF-8 の BOM の後の宣言、1 バイトの文字コード、cp125x の未定義のバイト)。
+    - 18.5.4 の入力の集まり (`$S/out/strict-inputs.json`、`xml-inputs.json`、`xml-inputs-rv2.json`、`xml-inputs-lit.json`) と、Python 版の判定 (`strict-py.json`、`xml-py.json`、`xml-py-rv2.json`、`xml-py-lit.json`) をテストの素材に使える。残した違い (18.7 の 9) は、Python 版と違う期待値として明記する。
+    - 18.5.4 の「悪意のある入力での時間」の表の入力を、時間の上限つきのテスト (N と 2N の比を見るか、4MiB で 1 秒未満など) にすることを勧める (推論。上限の値は試していない)。
+  - XLSX の書き直し: yauzl の読みの流れを yazl に直接つなぐ (18.9 の `pipe-repackage.mjs` の `repackage`)。次の 6 つを必ず入れる (どれかが欠けると、壊れた要素で変換が終わらないか、子のプロセスが落ちて `crashed` (500) になる。18.5.3):
+    - yazl の `ZipFile` の `'error'` の受け手を、**最初の `addReadStreamLazy` より前に**付ける (`openReadStream` の誤りは、その呼び出しの中で同期的に `'error'` として出る)。
+    - 読みの流れ (`rs`) の `'error'` を `guard.destroy` に渡す (`pipe` は読みの流れの誤りを伝えない)。
+    - 予算を超えたときや CRC が合わないときは、読みの流れと yazl の `outputStream` の両方を `destroy` する (yazl は入力の流れの誤りを `outputStream` に伝えない)。
+    - 暗号化の flag は開く前に見て `encrypted` にする。
+    - **要素を足す繰り返し (`addReadStreamLazy`) を `try` / `catch` で囲み、例外が出ても `outputStream` を壊したうえで `out.end()` と `for await` で最後まで読む**。yazl は名前を拒むとき (`../x`・`/abs`・`C:/x`) に同期的に例外を投げる。そのとき前の要素の読み取りはもう始まっていて、その後で CRC の誤りなどが出ると、読む側のいない `outputStream` の `'error'` でプロセスが落ちる (約 300 バイトの XLSX で再現した。18.5.3)。PPTX のスライドごとの package を書く `writeZip` も同じ形にする。
+    - **名前の末尾が `/` の要素 (ディレクトリの要素) は書かずに飛ばす**。yazl はこの名前を拒むので、そのまま渡すと、ディレクトリの要素を持つ正しい XLSX が 500 になる。`addEmptyDirectory` で書く形は、ディレクトリの要素が 5,000 個あるとスタックが溢れてプロセスが落ちる (18.5.3)。PPTX のスライドごとの package を書く `writeZip` も同じにする。テストには、`xl/`・`xl/worksheets/` を持つ XLSX (Python の `zipfile.ZipInfo("xl/")` で作れる。`$S/r7/gen-dirs.py`) と、ディレクトリの要素を 9,000 個持つ XLSX を入れる。
+  - ZIP の書き (PPTX のスライドごとの package): 18.9 の `zipw/yazl.mjs` のとおり、yazl の `'error'` と元の流れの `'error'` に受け手を付け、拒否として返す。
+  - ZIP の要素の名前: yazl は `../`・`/` で始まる・`C:/` のような名前を書かずに `Error` を投げる。XLSX の書き直し (全部の要素を写す) で、こうした名前の要素があると `kind` の無い誤りになり、本番では `internal` (500) になる見込み (Python 版は 200。18.7 の 9)。名前の末尾が `\` の要素 (`xl\`) も、yazl が `\` を `/` に変えてから拒むので、同じく `kind` の無い誤りになる (Python 版は 200。ZIP の名前の決まりから外れた形。18.5.3)。名前の末尾が `/` の要素は、上の 6 つ目のとおり飛ばすので、ここには入らない。扱い方は 6.x で次から選ぶ: (a) 名前を確かめて、こうした要素は書き直しで読み飛ばす (anydoc は workbook.xml からたどれる部品しか読まないので、結果は変わらない見込み。推論)、(b) `malformed` として拒む、(c) `kind` を付けて投げる。Python 版に近いのは (a) である。PPTX の分割は XML の部品だけを書くので、この問題は起きない (確かめた)。
+    - 試作 (18.9) は、名前の誤りに `kind` を付けずに yazl の `Error` のまま拒否として返す。どの `kind` にするかは決めていない。
+    - **(b) か (c) を選ぶと、Python 版で 200 だった XLSX が 422 か 500 になるので、Req 1.9 / 1.10 の手続き (契約を崩すかの判断と research.md への記録) が要る**。(a) なら Python 版と同じ 200 になる見込み (推論)。
+    - どれを選んでも、プロセスが落ちないことをテストで確かめる。素材は、リポジトリのテスト用の生成器 `test/fixtures/zip.ts` の `buildZip` で作れる (`$S/r6/make-badcrc.cjs`): 1 つ目の要素は `xl/workbook.xml` (中身は `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets/></workbook>`) を `deflated: { body: deflateRawSync(wb), crc32: crc32(wb) ^ 1, uncompressedSize: wb.length }` で渡して CRC-32 を 1 ビット違え、2 つ目は名前が `../evil.txt`・中身 `x` の無圧縮の要素にする。この 312 バイトの ZIP で、直す前の形は 3 回とも終了コード 1 で落ち、直した後は 3 回とも拒否として返った (実測)。2 つ目を `C:/x.txt` にしたものと、1 つ目の CRC を正しくしたものも足す。
+  - ZIP の一覧: yauzl の一覧は、試作ではエントリをすべて集めてから数の上限を見る。本番では、エントリの数が `MAX_ARCHIVE_ENTRIES` を超えた時点で読みをやめる (3 回目のレビューのレビュアーの実測: 20 万エントリで 317MiB、Python 版 171MiB)。
+  - yazl の書き直しの時間は、要素の数の 2 乗で伸びる (`pumpEntries` が、まだ終わっていない最初の要素を一覧の先頭から探すため。4 万個で 2.9〜3.0 秒。18.5.3)。**要素の数の上限 (`MAX_ARCHIVE_ENTRIES`、既定 10,000) は、書き直しより前に見る** (既定の上限では 0.4 秒・+140MiB)。上限の既定を上げるときは、この伸び方を測り直す。
+  - **18.9 のコードのファイルごとの見直し** (3 回目のレビューの後、(i) 悪意のある入力で 2 乗の時間になる所、(ii) 受け手の無い `'error'` や捕まえていない例外、(iii) メモリが入力の何倍になるか、をソースを読んで洗い出し、測れるものは測った):
+
+    | ファイル | (i) 2 乗の時間 | (ii) 誤りの扱い | (iii) メモリ | 対応 |
+    |---|---|---|---|---|
+    | `line-joiner.mjs` | 無し (空白は先にまとめる。HTML の悪意のある形で比例を実測) | 例外を出さない | 出力の 2〜3 倍 (部品の配列と最後の `join`。推論) | そのまま |
+    | `html/htmlparser2.mjs` | **`Parser` の形は開いた要素の一覧で 2 乗だった。`Tokenizer` の形に直した**。**5 回目のレビューの後に足した終わりのタグの読み方が、`>` で閉じない終わりのタグの並びで 2 乗だった (4 万個で 22 秒)。6 回目のレビューの後に、閉じないタグで残りを捨てる形に直した**。開いた要素を積む形、終わりのタグの 5 つの形、`<title>` の中の `<&`、`<x / >` を含め 18 種類の形で比例 (実測。18.5.1、18.5.8) | **1 本の正規表現で終わりのタグを読む形は、属性が約 220 万個のタグで `RangeError` を投げた。属性を 1 つずつ読む形に直した**。いまの形で例外は見つかっていない (試した形の中で) | 20MiB で約 250MiB 増 (18.5.1) | 3.7 で子の中で測る。`private` の 2 つの値を書き換えるので、版を上げたときにテストで確かめる |
+    | `decode-pipeline.mjs` | 無し (宣言の読み取りは先頭だけ、ESC は `indexOf`、`cp932` と `fitsPythonCodec` は 1 回の走査。実測) | `TextDecoder` の例外は捕まえる | 文字コードを試すたびに文字列を作る (入力の 2 倍程度を数回。推論)。20MiB で 121MiB。`cp932` は、壊れたバイトで区切った部分を 4,096 個ずつまとめてつなぐ。最初の形 (区切りごとに `TextDecoder` を作り、文字列を `+=` でつなぐ) は、0xFF を 1 字おきに置いた Shift_JIS で入力 1MB あたり約 70MiB を使い、21MB で +577MiB・4.7 秒だった。1 つの `TextDecoder` を使い回し、部分を配列に集めて 1 回でつなぐ形でも +869MiB (小さな文字列が 1,400 万個残る)。まとめてつなぐ形で +116MiB・1.0 秒になった (20MiB の EUC-JP の 121MiB と同じ程度。実測) | 1 バイトの壊れた Shift_JIS と、狭い codec の宣言を、5 回目のレビューの後に Python 版に合わせた |
+    | `charset/own.mjs` | 無し (先頭 64KiB だけ) | 捕まえる | 64KiB 分だけ | Shift_JIS の候補を `cp932` で読むように直した |
+    | `archive-guard.mjs` | 無し (名前の `Map`) | 読みの誤りは `ConversionError` に包む | エントリの一覧 | そのまま |
+    | `zip/yauzl.mjs` | 無し | 一覧と読みの誤りは拒否に、読みの流れの `'error'` は受け止める | 一覧はエントリを全部集める。読みは要素を上限までメモリに持つ (Python 版の `read_part` と同じ) | 6.x で上限を超えた時点で一覧をやめる |
+    | `zipw/yazl.mjs` | yazl の中で要素の数の 2 乗 (`pumpEntries`。PPTX のスライドごとの package は要素が少ないので当たらない) | **直した** (受け手が無く落ちていた。5 回目のレビューの後に、名前の例外でも `outputStream` を読み切る形にそろえた。6 回目のレビューの後に、ディレクトリの要素を飛ばすようにした。`addEmptyDirectory` は yazl の中の再帰で 5,000 個からスタックが溢れる) | 出力の ZIP をメモリに持つ (Python 版と同じ) | — |
+    | `bench/pipe-repackage.mjs` | **yazl の中で要素の数の 2 乗** (4 万個で 3 秒。要素の数の上限で先に断る。18.5.3)。ディレクトリの要素は書かないので当たらない (4 万個で 129ms) | **直した** (受け手が無く落ちていた。5 回目のレビューの後に、名前の例外の後で前の要素の誤りが出る形も直した。6 回目のレビューの後に、ディレクトリの要素で正しい XLSX が 500 になる形を直した) | 要素を持たず流す (200MiB の要素で +23MiB)。要素 1 万個で +140MiB | 6.x で要素の数の上限を書き直しの前に見る |
+    | `xml-bytes.mjs` | 無し (宣言は先頭 200 字だけ) | `ConversionError` を出す | 文字列を 1 つ作る | そのまま |
+    | `strip-spans.mjs` | 無し (乱数の文字列で正規表現と同じ結果、悪意のある形で比例を実測) | 例外を出さない | 出力の文字列 1 つ | そのまま |
+    | `xml/xmldom.mjs` | **名前空間の深い入れ子で 2 乗 (xmldom の中)。宣言の数の上限で止めた。数えるのは除く前の本文で、DOCTYPE の文字列の抜け道も塞いだ**。ほかの 30 種類と、部品ごとのファジングの 9 種類の形は比例 (実測) | 解析の誤りは `Error` (名前空間の上限は `limit_exceeded`)。書き戻し (`markSheets`・`keepOnlySlide`) の例外は、呼び出し側が `internal` にする (Python 版で予期しない例外が `internal` になるのと同じ) | DOM が入力の 100〜600 倍になることがある (実測)。数値の参照の検査は直した | 3.7 で子の中で測る |
+  - XLSX のセル数の数え方と `.xml` のテキスト化は、Python 版と同じくバイト列 / 文字列の走査で行い、XML の部品は使わない。
+  - 試作の `pptx_split` / `xlsx_split` の写し (`$S/probe/bench/split.mjs`) は、コーパスと細工したファイルで Python 版と同じ結果になった。ただし、セル数の事前の検査、予算の細かな扱い、例外の分類は入っていない。
+  - PPTX の分割は、スライドの数の 2 乗にならない形で書く (18.5.4 の表)。presentation.xml は 1 回だけ解析し、スライドの一覧を 1 回だけ空にして、スライドごとに 1 つを入れて書き戻す。ZIP の要素は名前の `Map` で引く (`archive-guard.mjs`)。除く部品の集まりをスライドごとに作り直さない。Python 版の写しをそのまま書くと、Python では速い集まりの演算が Node では遅く、1,000 スライドで 7.8 秒かかった (直す前の試作)。
+- **D2 (`/readyz` の `dependencies`) の T6 の分: ユーザーが決めた (2026-11-06)。T6 の部品の名前は出さない (「出さない: 重い部品だけ」)**。
+  - 決定: `dependencies` に出す名前は `@firecrawl/anydoc`、PDF の部品 (T1 の結果の実名。14 節の `@embedpdf/pdfium`)、`prlimit`、`converter` の 4 つ。T6 の部品 (`htmlparser2`・`@xmldom/xmldom`・`yauzl`・`yazl`) は名前で出さず、`converter` にまとめる。これらが子で読み込めなかったときは `converter` を `missing` にする。
+  - ユーザーが挙げた理由:
+    - 4 つとも純 JavaScript で、サーバーが起動していれば必ず読み込めている。名前で出しても、運用者に新しい情報にならない。
+    - Python 版も、重い部品 (`anydoc`・`pypdfium2`・`charset-normalizer`) だけを名前で出し、子が読み込むそのほかの部品 (`defusedxml` を含む) は `converter` にまとめていた (Python 版の `routers/health.py` の `_PUBLIC_NAMES`)。
+    - 認証なしで呼べる口 (`/readyz`) に出す情報が増えない。
+  - T6 では文字コードの判定に部品を使わないので、design.md の D2 の「文字コードの判定などに部品を使う場合は『T6 の結果の実名』」に当たる名前も無い。Python 版の `charset-normalizer` が出なくなることは、research.md の 7.3 の記録と合う。
+  - 引き継ぎ: 6.x の `/readyz` の実装と、port-back (Req 12) で、この決定を design.md の D2 (と §HealthRouter の `dependencies` の記述) に反映する。この作業では design.md を変えていない。
+- **6.11 / 6.12 (image)**:
+  - `node:24-slim` の Node が full ICU かどうかは、devcontainer に docker が無く確かめていない。
+  - 公式の Node のビルドは full ICU が既定なので同じと推論するが、image の中で `new TextDecoder('euc-jp')` と `new TextDecoder('iso-2022-jp')` が例外にならないことを確かめること。small ICU だと、Shift_JIS などのデコーダーが無いおそれがある。
+
+### 18.11 RED (選定の前の状態と、最初に失敗した試作)
+
+- **選定の記録が無い状態**: 作業の前に `grep -n "^## 18" research.md` の結果は 0 件 (終了コード 1)。
+- **検査を先に書き、候補が 1 つも無い状態で動かした** (`$S/out/red.txt`): HTML 3 候補 0/21、文字コード 4 候補 0/44、ZIP 5 候補 0/27、XML 4 候補 0/22 (すべて `not implemented`)。
+- **最初に失敗した試作**:
+  - 文字コードの共通の層の最初の版: `ascii` の宣言で UTF-8 の日本語が化けた。未定義のバイトを含む入力が latin-1 に落ちなかった。WHATWG と Python の厳密さの違いで、直した (18.7 の 3)。
+  - 自前の判定の 1 回目: fr_FR の cp1252 で 397/1,092 (18.5.2)。20MiB でピークの RSS 819MiB。
+  - saxes の位置の 1 字のずれで、書き戻した XLSX と PPTX がベンチマークで全滅した (xlsx の語句 0/6、pptx は失敗)。XML の検査に「書き戻した結果をもう一度解析する」件を足すと、この検査が saxes で失敗した。直した後は通った。
+  - parse5 の svg と 10 万段の入れ子、node-html-parser のタグの漏れ、fflate の zip64、adm-zip の同じ名前と爆弾、jszip の 9 件、fast-xml-parser の 3 件 (18.5)。
+  - xmldom の最初の adapter (`warning` を無視): defusedxml が拒む 25 件の入力のうち 6 件を通した (18.5.4 の表)。すべて例外にすると 4 件、自前の検査を足すと 0 件になった。検査のうち `&` と `]]>` は、最初はコメントと処理命令の中まで見て、正しい XML を拒んでいた (入力を足して見つけ、直した)。
+  - xmldom の最初の書き戻し: UTF-16 の部品を持つ PPTX で、宣言が `encoding="UTF-16"` のまま中身が UTF-8 になり、anydoc が失敗した (Python 版は読めた)。宣言を置き換えて直した。
+  - 読みから書きへ流してつなぐ最初の版: 予算を超えても止まらず、出力を待ち続けた (18.5.3)。
+- **1 回目の独立レビュー (Opus) の差し戻しで見つかった誤り** (どれも、この節の該当する所を直した):
+  - xmldom の adapter (`$S/out/xmldom-v2.mjs`) は、Python 版との 68 件の比較で 12 件の判定が違った (うち 6 件は正しい XML を拒むもの)。レビュアーの入力に 8 件を足して自分でも再現し、直した後は 67/68 になった (18.5.4)。
+  - 20MiB の HTML のピークの RSS の「`--max-semi-space-size=4` で 177MiB」は、測った形 (64KiB ずつ流し込む形) を書いていなかった。実際の流れでは 205〜223MiB で、オプション無しでは 296〜316MiB と 0.95 倍の境に当たる (18.5.1)。
+  - 6 字の対応表の違いが検索に影響するという推論は誤りだった (`_analyze` で確かめた。18.7 の 1)。
+  - WHATWG にラベルが無い宣言 (cp437 など) の違いを書き漏らしていた (18.7 の 10)。
+  - 依存の表に `dom-serializer` が抜けていた (18.8)。
+- **2 回目の独立レビュー (Opus) の差し戻しで見つかった誤り** (どれも、この節の該当する所を直した):
+  - **CDATA・コメント・処理命令を除く正規表現の置き換えが、入力の 2 乗の時間だった** (`$S/out/xmldom-v3.mjs`)。閉じていない `<!--` 5 万個で 1,355ms、10 万個で 5,427ms (自分で再現した)。レビュアーは、presentation.xml に閉じていない `<!--` を 10 万個入れた 6.8KB の PPTX で、Python 版 1ms に対しスタブが 4,418ms かかることを示した。18.5.4 で測った性能の入力は、この正規表現に当たる形を含んでいなかった。1 回の走査に置き換え、同じ PPTX は 15ms になった。
+  - ソースを読み直して、**PPTX の分割の前処理がスライドの数の 2 乗だった** ことを自分で見つけた。1,000 スライドで 7,794ms、2,000 スライドで 38,516ms (Python 版は 588ms・1,949ms)。直した後は 685ms・1,168ms。
+  - XML の判定の違いは、1 回目の後に書いた「93 件中 1 件」だけではなかった。レビュアーが別に作った 92 件では 9 件が違った (直す前)。そのうち、UTF-8 の BOM と宣言、BOM の無い UTF-16、cp125x の未定義のバイト、`l1` などの名前、本文の U+0085 / U+2028 を直し、4 件の違いが残った (18.7 の 9)。
+  - DOCTYPE を消す処理を書き戻しのたびに行う形は、presentation.xml を 1 回だけ解析する形に直した後、DOCTYPE を持つ PPTX で例外になった (xmldom は消した後も `doc.doctype` が消した節を指したまま)。23 件の XML の検査は通っていて、実際のファイルを Python 版と比べる手順 (`compare-crafted.mjs`) で見つけた。消す処理を解析の直後の 1 回に移して直した。
+  - 3.7 への引き継ぎが、当てはまらない手続き (Req 11.11) を指していた (18.10 の 3.7)。
+  - xmldom の勧告の内訳を「high 12・medium 2」と書いていた。正しくは high 13・medium 1 (18.6)。
+  - 20MiB の HTML の (2) と (2') の差の原因を推論のままにしていた。コピーの有無で測り、実測にした (18.5.1)。
+  - Node 24.21.0 の `TextDecoder` は WHATWG の `replacement` のラベルを知らない (例外にする) のに、18.7 の 4 で「`replacement` デコーダーで選ばれる」と書いていた。
+  - 18.1・18.5.1・18.7 に、直す前の値や推論の経緯を書いていた。この節 (18.11) に寄せた。前の版の 18.5.1 は「`--max-semi-space-size=4` で 177MiB」と、測った形 ((3) の流し込む形) を書かずに載せていた。18.7 の 1 は「Python 版は `〜` で、Node 版は `~` で検索に当たる」と推論していたが、`_analyze` で誤りと分かった。
+- **3 回目の独立レビュー (Opus) の差し戻しで見つかった誤り** (どれも、この節の該当する所を直した):
+  - **xmldom 0.9.12 自身が、名前空間の宣言を深く入れ子にした文書で解析が 2 乗の時間になる**。直す前の形 (`$S/out/xmldom-v4.mjs`) は、深さ 2,500 / 5,000 / 10,000 で 75 / 266 / 975ms (自分で再現した。Python 版は 3 / 5 / 10ms)。レビュアーは 14KB の PPTX で 32,848ms、5KB の XLSX の書き戻しでメモリ不足を示した。2 回目の後に書いた「悪意のある入力は、どれも入力の大きさに比例」は、自前の前処理だけを測った結果で、xmldom の中の 2 乗を見ていなかった。宣言の数の上限を入れ、30 種類の形を N・2N・4N で測り直した (18.5.4)。
+  - **ZIP の読みから書きへ流してつなぐ形が、壊れた要素で子のプロセスを落とした**。直す前の作り (`$S/probe/bench/pipe-old-structure.mjs`) は、`bad-rels.xlsx`・`size-lie.zip`・方式 9 で終了コード 1 だった (自分で再現した)。予算を超えたときと CRC の違いしか試していなかった。受け手を付けて直した (18.5.3)。
+  - 自分で見つけた同じ種類の誤り: ZIP の書きの adapter も、元の流れが失敗するとプロセスが落ちた (`writer-error.mjs` で終了コード 1)。本文の `]]>` の検査が、子の要素やコメントをまたいで本文をつないでいたため、正しい XML (`<r>]]<b/>></r>` など 3 件) を拒んでいた (Python 版はどれも通す)。数値の参照の検査が照合の結果を全部配列にしていた (4MB で 377MiB)。
+  - 18.6 と 18.5.7 で xmldom の adapter の行数が食い違っていた。直した後の行数 (113 行、うち 47 行が部品を呼ぶ部分と OOXML の操作) にそろえた。
+- **4 回目の独立レビュー (Opus) の差し戻しで見つかった誤り** (どれも、この節の該当する所を直した):
+  - **名前空間の宣言の数え方が、DOCTYPE の文字列ですり抜けられた**。CDATA・コメント・処理命令を除いた後の文字列で数えていたので、DOCTYPE の SYSTEM の文字列に `<!--` を書くと本体ごと除かれ、深さ 2,500 / 5,000 / 10,000 で 60 / 234 / 1,061ms と 2 乗の時間が戻った (直す前の形は `$S/out/xmldom-v5.mjs`。自分で再現した)。3 回目の後に書いた「数える処理で止めた」は、この取り違えを見ていなかった。除く前の本文で数える形に直した (18.5.4)。
+  - **htmlparser2 の `Parser` が、開いた要素の数の 2 乗の時間だった**。閉じない `<div>` と対応しない `</svg>` で、2.5 万 / 5 万 / 10 万個に 1,267 / 5,391 / 19,440ms (自分で再現した。直す前の形は `probe/html/htmlparser2-parser.mjs`)。前の検査の「10 万段の入れ子を 10 秒未満」は緩すぎて見逃した。`Tokenizer` を直接使う形に直し、検査を時間の比と 1 秒の上限で見る形に強めた (18.5.1)。前の 18.10 の表の htmlparser2 の行は「2 乗 無し (実測)」と書いていたが、その実測は閉じた入れ子と 1 行の大きな文だけで、開いた要素を積む形を測っていなかった。
+  - タグの崩れた HTML で、`Parser` の形は Python 版と出力が違っていた (レビュアーの 602 件で 112 件) のに、記録していなかった。`Tokenizer` の形で 602/602 になった (18.5.1、18.7 の 8)。
+  - `pipe-repackage.mjs` の注釈「どの壊れ方でも `kind` を持つ誤りで終わる」は誤りだった。yazl が名前を拒むときは `kind` の無い `Error` になる (18.7 の 9 に記録し、注釈を直した)。
+  - ZIP の判定の違い (名前の食い違い、大きさの偽り、方式の分類) と、DOCTYPE の文字列で外れる検査の違い (Node 版が通す向き) を記録していなかった (18.7 の 9)。
+- **5 回目の独立レビュー (Opus) の差し戻しで見つかった誤り** (どれも、この節の該当する所を直した):
+  - **自己終了の形の特殊なタグで、HTML の本文がまるごと消えた**。`Tokenizer` に `recognizeSelfClosing` を渡していなかったので、`<script src="a.js"/>`・`<noscript><iframe …/></noscript>` の後ろを特殊な要素の中として読んだ (自分で再現した。`$S/r6/red-loss.txt` で 8 件すべてが Python 版と違い、4 件は本文が空、残りはタグの断片や script のコードが本文に入った)。それまでの比べる入力に、この形が無かった。直す前の形は `$S/out/htmlparser2-r5.mjs`。
+  - 自分で作った 1,403 件 (`$S/r6/gen-html.py`) で、同じ種類の違いをさらに 4 つ見つけて直した: `/` と `>` の間に空白がある開始タグ、`<title>`・`<textarea>` の中で `<` の直後の文字参照、Python が捨てる数値の文字参照、終わりのタグの `>` を含む引用符つきの属性 (直す前は 1,020/1,403、直した後は 1,380/1,403。18.5.1)。最後のものは、4 回目のレビューの後に「本文に断片が出るだけ」と記録していたが、引用符の中の `<script>` で後ろの本文が消える形があった。
+  - **約 300 バイトの XLSX で、ZIP の書き直しのプロセスが落ちた**。名前を yazl が拒む要素の前に CRC の誤った要素を置くと、`outputStream` を読む前に抜けて、後から出た誤りの受け手が無くなった (自分で再現した。`$S/r6/red-zip.txt`、ファジングの種 2586 は `$S/r6/zf/red-2000.txt`。直す前の形は `$S/out/pipe-repackage-r5.mjs`)。4 回目の後に書いた「どの壊れ方でもプロセスが落ちなかった」は、名前の誤りと CRC の誤りの組み合わせを試していなかった (18.5.3)。
+  - **Shift_JIS に 1 バイトの壊れがあると、文書全体が化けた**。WHATWG の shift_jis が拒む 0xFF などがあると、判定が windows-1252 を選んだ (`$S/r6/red-charset.txt`。直す前の形は `$S/out/decode-pipeline-r5.mjs`・`own-r5.mjs`)。18.5.2 では「Node 版は化ける」と記録だけにしていたが、本文が化ける違いなので直した。同じく、`gb2312` の宣言の付いた Shift_JIS の文書が化けた。
+  - ZIP の書き直しの時間を「比例している」と書いていたが、yazl の中で要素の数の 2 乗だった (18.5.3)。18.5.8 の「Shift_JIS with one bad byte at the end」の行は、比が小さいのは時間の大半が固定の手間だからで、比例を示していない (18.5.8 の注意書きに足した)。
+- **6 回目の独立レビュー (Opus) の差し戻しで見つかった誤り** (どれも、この節の該当する所を直した):
+  - **5 回目のレビューの後に足した終わりのタグの読み方が、時間を入力の 2 乗にし、例外も出した**。`>` で閉じない終わりのタグ (`</a x=">"`) の並びで 5 千 / 1 万 / 2 万個に 363 / 1,440 / 5,593ms、属性が約 220 万個の終わりのタグで `RangeError` (自分で再現した。`$S/r7/red-endtag.txt`)。18.5.8 で足した終わりのタグの 3 つの形は、どれも `>` で閉じる形だった。レビュアーの形 (属性を 1 つずつ読み、閉じないタグで残りを捨てる) をそのまま取り入れた (18.5.1)。
+  - **ディレクトリの要素を持つ正しい XLSX が 500 になった**。yazl が名前の末尾の `/` を拒むことを、`../` などの名前の問題と同じ「6.x で決めること」に入れていて、正しい文書が当たることを見ていなかった (`$S/r7/red-dir.txt`)。レビュアーの形 (`addEmptyDirectory`) は、ディレクトリの要素が 5,000 個でプロセスが落ちることを自分で見つけた (`$S/r7/red-dir-rvform.txt`) ので、1 か所だけ変えて、ディレクトリの要素を飛ばす形にした (18.5.3)。
+  - 3.8 の本番の依存の一覧に `entities` が抜けていた (18.8 と 6.x では足すと書いていた)。5 個にそろえた (18.10)。
+  - `<!-->` の後ろに `-->` がある形の違いを記録していなかった (18.7 の 8)。
+- **GREEN** (`$S/out/green.txt`、4 回目のレビューの後は `green-r5.txt`、5 回目のレビューの後は `green-r6.txt`、6 回目のレビューの後は `$S/out/green-r7.txt`): 採った部品は、HTML 33/33 (`Tokenizer` の形。自己終了の形、終わりのタグの 2 つの悪意のある形、開いた要素を積む 4 つの形の比例を含む)、文字コード 46/46、ZIP の読み 27/27、書き 5/5、XML 23/23。ベンチマーク (`bench-r7.json`) は PDF を除くすべての形式・文書でベースラインと同じで、今回は Elasticsearch の段 (d) も動き、PDF を含まない行が同じだった。`pages[]` は 20/20 が Python 版と同じ。HTML は Python 版と 32/32・602/602・1,000/1,000・714/720・1,380/1,403・終わりのタグの 2,000/2,000 で同じ出力 (違いは 18.7 の 8)。OOXML の構造を変えた 33 個は 33/33、ディレクトリの要素の形 26 個は 21/26 (違いは 18.5.3)、ディレクトリの要素を乱数で混ぜた 300 個は 300/300 が Python 版と同じ。xmldom の最終の形は、Python 版と 25/25・67/68・88/92・4/4 で同じ判定 (3 回目と 4 回目のレビューで足した 12 件・9 件は 9/12・4/9。違いは 18.7 の 9 に記録)。悪意のある入力は、XML の 30 種類 (18.5.4) と部品ごとの 39 種類 (18.5.8) の形で、N・2N・4N の時間が入力にほぼ比例した (ZIP の書き直しの要素の数を除く)。ZIP のバイト単位のファジング 8,000 件 (`$S/out/fuzz-zip-r7-*.txt`) で、流してつなぐ形と分割のプロセスは落ちなかった (yazl が拒む名前は `kind` の無い誤りになる)。
+
+### 18.12 確かめなかったこと
+
+- **(d) Elasticsearch での検索**: ディスクの空きによって回せる時と回せない時があった。回せた回 (`bench-r7.json`) では PDF を含まない行がベースラインと同じだった (18.1)。PDF の行は T1 の範囲で、ここでは測っていない。
+- `node:24-slim` の image の中の ICU (18.10 の 6.11)。
+- 子プロセスの中、`prlimit` の上限の下で動かすこと (3.6・3.7 の仕事)。ここでの数字は、ふつうの Node のプロセスで測った。
+- 自前の判定の、ここで使った 3 つの集まり以外の文書 (長い業務文書、Shift_JIS と EUC-JP が混ざったもの、先頭 64KiB と後ろで文字コードが違うもの) での正解率。
+- 18.7 の 1 の 6 字を戻す表と、18.7 の 10 の別名の表の試作。
+- Python 版の `test_archive_guard.py` の「開いた後でデータが切れた」2 件。Node ではバイト列を後から縮められないので、写していない。
+- HTML の部品に `<meta charset>` を任せる案。Python 版と同じく、先頭 4096 バイトへの正規表現で行う形だけを試した。
+- yauzl・yazl・xmldom の版を上げたときの振る舞い。xmldom の勧告は GitHub Advisory Database で、どの版で直ったかまで確かめた (18.6)。勧告の中身がこの使い方に当たらないことは、勧告の題名と範囲を読んだ推論で、それぞれを試してはいない。yauzl・yazl・htmlparser2 の勧告は調べていない。
+- XML: 18.5.4 の 4 つの集まり (189 件) の外に、xmldom (最終の形) と expat で通す / 拒むが違う入力が残っていないか。WHATWG と Python で同じ名前が別の表を指す宣言の、表の違い (18.7 の 9)。saxes が expat より緩いか。xmldom と Python の ElementTree の書き戻しのバイト列の違い (anydoc を通した結果だけを比べた)。展開した名前が同じ属性を持つ壊れた部品を、anydoc がどう扱うか。
+- UTF-16 の部品を持つ XLSX の比較 (スタブにセル数の検査が無いため。18.5.4)。
+- ベンチマークのスタブで、XLSX の書き直しを流してつなぐ形にしたときの結果 (スタブは要素を一度メモリに読んだ。流してつなぐ形は 200MiB の要素だけで確かめた)。
+- 20MiB の HTML のピークの RSS の、子の中・`prlimit` の下での値。`--max-semi-space-size=4` を付けたときに、コピーを除いた形のほうがピークが高くなる理由。
+- 悪意のある入力の時間を、子の中・CPU の時間の上限の下で測ること。ここで試した形 (XML の 30 種類、部品ごとの 39 種類、HTML の開いた要素を積む 4 種類) の外で、xmldom・htmlparser2 の `Tokenizer`・yauzl・yazl の中に時間が入力の 2 乗になる処理が残っていないか (試した形では比例したが、部品の中のすべてを確かめてはいない)。
+- 本番の `office.ts` が anydoc の例外を分類したときに、途中で切れた ZIP などが Python 版と同じ `malformed` になること (スタブでは確かめられない。anydoc の `code` が `malformed` であることだけを確かめた)。
+- DOCTYPE を読み飛ばして Python 版と XML の判定を合わせる直し (18.5.4。試していない)。
+- HTML: 5 回目のレビューの後の直しは、自分の 1,403 件とレビュアーの集まりで確かめた。Python の `HTMLParser` の状態の遷移をすべて写したわけではないので、ここで作った形 (特殊なタグ 13 種・自己終了の書き方 12 種・文字参照 30 種・宣言や処理命令 35 種と、その組み合わせ) の外に違いが残っていないかは未検証である。`recognizeSelfClosing` と `index` を書き換える形が、htmlparser2 の次の版でも同じに動くか (12.0.0 だけで確かめた)。
+- HTML の終わりのタグ: Python 版の文法で `>` で閉じない終わりのタグの後ろを捨てる振る舞いは、文書の終わりまで閉じない場合だけを Python 版と比べた (終わりのタグの集まり 2,000 件)。yazl の `addEmptyDirectory` の再帰のほかに、中身の無い要素を続けて書く形 (`addBuffer` の空の要素など) で同じ再帰が起きるかは確かめていない (いまの形は使っていない)。
+- 文字コード: `fitsPythonCodec` は、Python の gb2312・euc_kr・big5 の受け付けるバイトの範囲だけを見る。範囲の中の定義の無い符号、ほかの狭い codec (Python の `iso2022_jp` の別名など) は比べていない。`big5` の宣言に EUC-JP のバイト列の先頭の 1 字の違い (18.7 の 8) の原因は調べていない。
+- yazl の書き直しが要素の数の 2 乗になることを、yazl に報告するかどうか (調べただけで、報告していない)。
+- 分割と XML の解析のメモリを、子の中で測ること (3.7)。xmldom の DOM の代わりに、DOM を作らない読み方 (saxes の位置で書き換える方式など) にした場合のメモリ。
+- yauzl の一覧を上限で打ち切る形と、そのときのメモリ (試作では打ち切っていない)。
+- XLSX の分割の前処理を、シートの数や要素の数を増やして測ること (PPTX だけを測った)。
+- Windows / macOS での動作。
