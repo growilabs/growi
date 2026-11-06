@@ -250,7 +250,7 @@
     "password_is_not_set": "비밀번호가 설정되지 않았습니다."
   },
   "share_links": {
-    "Shere this page link to public": "이 페이지 링크를 공개적으로 공유",
+    "Share this page link to public": "이 페이지 링크를 공개적으로 공유",
     "share_link_list": "공유 링크 목록",
     "share_link_management": "공유 링크 관리",
     "delete_all_share_links": "모든 공유 링크 삭제",
