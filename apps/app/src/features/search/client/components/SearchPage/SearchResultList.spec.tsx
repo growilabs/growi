@@ -631,7 +631,7 @@ describe('SearchResultList state of rows re-rendered by scrolling', () => {
     expect(checkboxOf('p2')).not.toBeChecked();
   });
 
-  it('keeps a checked row checked and an unchecked row unchecked after scrolling out and back', () => {
+  it('keeps a checked row checked and an unchecked row unchecked after scrolling out and back', async () => {
     render(
       <SearchResultList
         scrollElement={layout.scrollElement}
@@ -640,15 +640,15 @@ describe('SearchResultList state of rows re-rendered by scrolling', () => {
       />,
     );
 
-    layout.scrollTo(FAR_SCROLL_TOP);
+    await layout.scrollTo(FAR_SCROLL_TOP);
     expect(screen.queryByRole('checkbox', { name: 'p1' })).toBeNull();
-    layout.scrollTo(0);
+    await layout.scrollTo(0);
 
     expect(checkboxOf('p1')).toBeChecked();
     expect(checkboxOf('p2')).not.toBeChecked();
   });
 
-  it('keeps the preview highlight on the previewed row after scrolling out and back', () => {
+  it('keeps the preview highlight on the previewed row after scrolling out and back', async () => {
     render(
       <SearchResultList
         scrollElement={layout.scrollElement}
@@ -657,15 +657,15 @@ describe('SearchResultList state of rows re-rendered by scrolling', () => {
       />,
     );
 
-    layout.scrollTo(FAR_SCROLL_TOP);
+    await layout.scrollTo(FAR_SCROLL_TOP);
     expect(screen.queryByRole('checkbox', { name: 'p1' })).toBeNull();
-    layout.scrollTo(0);
+    await layout.scrollTo(0);
 
     expect(listItemOf('p1')).toHaveClass('active');
     expect(listItemOf('p2')).not.toHaveClass('active');
   });
 
-  it('renders rows checked that are first rendered by scrolling after selectAll', () => {
+  it('renders rows checked that are first rendered by scrolling after selectAll', async () => {
     const ref = React.createRef<ISelectableAll>();
     // Kept as the same instance and updated by the caller, as SearchPageBase does.
     const selectedPageIds = new Set<string>();
@@ -687,7 +687,7 @@ describe('SearchResultList state of rows re-rendered by scrolling', () => {
     pages.forEach((page) => {
       selectedPageIds.add(page.data._id);
     });
-    layout.scrollTo(FAR_SCROLL_TOP);
+    await layout.scrollTo(FAR_SCROLL_TOP);
 
     const newlyRenderedPageIds = renderedPageIds().filter(
       (pageId) => !initiallyRenderedPageIds.has(pageId),

@@ -13,6 +13,12 @@ import { vi } from 'vitest';
 const SCROLL_ELEMENT_CLASS = 'overflow-y-scroll';
 const LIST_SELECTOR = '[data-testid="search-result-list"]';
 
+// @tanstack/virtual-core resets its "is scrolling" state with a debounced timer
+// (isScrollingResetDelay, 150ms by default) that unmounting does not cancel. If
+// it fires after the test environment is torn down, React reaches for the
+// removed `window` and Vitest reports an unhandled error, so wait it out.
+const SCROLL_END_WAIT_MS = 200;
+
 type VirtualListLayout = {
   viewportHeight: number;
   rowHeight: number;
@@ -23,8 +29,9 @@ type VirtualListLayout = {
 export type VirtualListLayoutStub = {
   // Attached to document.body; pass it to SearchResultList as `scrollElement`.
   scrollElement: HTMLDivElement;
-  // Scrolls the scroll element as a user would, letting the list re-render.
-  scrollTo: (scrollTop: number) => void;
+  // Scrolls the scroll element as a user would, letting the list re-render,
+  // and resolves once the virtualizer's scroll-end timer has fired.
+  scrollTo: (scrollTop: number) => Promise<void>;
   restore: () => void;
 };
 
@@ -54,10 +61,18 @@ export const stubVirtualListLayout = ({
 
   return {
     scrollElement,
-    scrollTo: (scrollTop) => {
+    scrollTo: async (scrollTop) => {
       act(() => {
         scrollElement.scrollTop = scrollTop;
         scrollElement.dispatchEvent(new Event('scroll'));
+      });
+      // Same timer queue as the virtualizer (its targetWindow), so this fires
+      // after the scroll-end timer scheduled above.
+      const targetWindow = scrollElement.ownerDocument.defaultView ?? window;
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          targetWindow.setTimeout(resolve, SCROLL_END_WAIT_MS);
+        });
       });
     },
     restore: () => {
