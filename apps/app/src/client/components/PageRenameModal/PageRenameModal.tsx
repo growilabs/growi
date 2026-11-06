@@ -149,7 +149,7 @@ const PageRenameModalSubstance: React.FC = () => {
 
       const onRenamed = opts?.onRenamed;
       if (onRenamed != null) {
-        onRenamed(path);
+        onRenamed(path, page.path);
       }
       closeRenameModal();
     } catch (err) {
