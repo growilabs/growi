@@ -90,7 +90,7 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 | 配置 (pnpm workspace に入れるか) | 決定 (`apps/attachment-text-extractor/` に移して workspace に入れる) | ユーザー判断 (design.md の D4) |
 | PDF のライブラリ | 決定 (`@embedpdf/pdfium` 2.15.1。14 節) | 試作と計測 (Req 11.3) |
 | 子プロセスの作り方 | 決定 (`/usr/bin/prlimit` で包んだ `spawn` と、子の中の見張り専用の worker thread。15 節)。コアダンプの上限を `--core=1` にするかはユーザーの判断待ち (15.1 の (d)) | 試作と計測 (Req 11.4) |
-| `RLIMIT_AS` の値と、緩めた分の守り | 未決 | 試作と計測 (Req 11.5) |
+| `RLIMIT_AS` の値と、緩めた分の守り | 決定 (`MAX_CHILD_RSS_MB` + 2,304MiB、既定で 2,624MiB。子の `env` に `MALLOC_ARENA_MAX=2` を足す。主な守りは RSS の監視。19 節) | 試作と計測 (Req 11.5) |
 | 本文の受け取りと切断の検知の方法 | 決定 (`c.env.incoming` を上限と期限つきで直接読み、python-multipart と Starlette の文法と引数の解析を移した自前の解析器 1 つで分解する。ファイルは断片のまま連結しない。切断は `incoming` の `close` と `c.req.raw.signal`。16 節)。本文の形の例外 3 件 (37・d37・要求の `charset`) は、ユーザーの判断待ち (7.4) | 試作 (Req 11.6) |
 | OpenAPI の作り方 | 未決 | 試作 (Req 11.7) |
 | 7 万セルの XLSX の RSS の食い違い (2 節) | 未解決 | 同じファイル・同じ方法で測り直す (Req 11.2) |
@@ -5843,3 +5843,365 @@ json.dump(items, sys.stdout, ensure_ascii=False)
 - yauzl の一覧を上限で打ち切る形と、そのときのメモリ (試作では打ち切っていない)。
 - XLSX の分割の前処理を、シートの数や要素の数を増やして測ること (PPTX だけを測った)。
 - Windows / macOS での動作。
+
+## 19. 仮想メモリの上限 (T3、タスク 3.6)
+
+2026-11-06 に devcontainer (Node 24.21.0、16 コア、Linux 6.8、util-linux 2.41.3 の `/usr/bin/prlimit`、glibc) で、使い捨ての場所 (scratchpad の `t3/`) に試作を作って測った結果。
+
+- 変えていないもの: 抽出サービスの package、`pnpm-lock.yaml`、本番の `src/`、`test/`、`benchmark/`、Python 版、design.md。
+- 数字は、とくに書いていなければ **実測**。測っていないものは「未検証」、コードや文書を読んで考えたものは「推論」と書いた。
+- 「必要な仮想メモリ」は、`prlimit --as` の値を 64MiB 刻みで二分探索し、上限なしのときと同じ結果 (成功なら `pages` の JSON の SHA-256、失敗なら失敗の種類) が **3 回続けて** 出る最小の値とした。この探索を入力ごとに 3 回くり返した。`VmPeak` は使わない。V8 は上限に合わせて予約の大きさを変えるので、上限なしの `VmPeak` (PDFium を読み込んだ子で約 9.4GB) は必要量を表さないためである。
+
+### 19.1 結論
+
+- **上限の値: `RLIMIT_AS` = `MAX_CHILD_RSS_MB` + 2,304MiB (既定の `MAX_CHILD_RSS_MB` 320 で 2,624MiB)**。Python 版と同じ「RSS の上限 + コードの定数」の形にする (Python 版は `ADDRESS_SPACE_HEADROOM_MB` = 512 で 832MB)。新しい環境変数は足さない (design.md の Configuration の決定のとおり)。親は、この値を自分の hard の上限で切り詰めてから `prlimit` に渡す (15.7 の (b))。
+- **子の `env` に `MALLOC_ARENA_MAX=2` を足す** (`RAYON_NUM_THREADS=1` と同じ扱い。運用者向けの設定ではない)。glibc の malloc は、スレッドごとに 64MiB の予約 (arena) を作る。Node の子は 10 前後のスレッドを持つので、予約が 6〜10 個でき (19.4)、必要な仮想メモリが 300〜800MiB 増え、しかも実行ごとに揺れた (同じ PPTX で 1,600 / 2,240 / 1,856MiB)。`MALLOC_ARENA_MAX=2` で、出力 (81 入力のハッシュ) も、子の最大 RSS も、変換の時間も変わらず、必要量が下がって揺れがほぼ消えた (19.3、19.4)。変わる点は 1 つで、上限に当たったときの `Buffer` の確保の失敗が、例外 (`RangeError` → `internal`) ではなく SIGABRT (`crashed`) になることが多くなった (19.8)。HTTP の応答はどちらも 500 で、違うのはログの `result=` だけである。
+- **すべての正常な変換が、この値で失敗しない** (実測): 子の最大 RSS が 320MB 以下の 71 入力を各 5 回 (計 355 回)、上限なしと同じ結果になった。正常な入力で必要量が最も大きかったのは 1,984MiB (7 万セル 1 シートの XLSX と、50MiB の cp932 の TXT。後者は結果が 16MiB を超えて正しく `limit_exceeded` になる入力) で、2,624MiB まで 640MiB (64MiB 刻みで 10 段) の余地がある。
+- **RSS の監視が主な守りで、`RLIMIT_AS` は最後の歯止め** であることを実測で確かめた: 2,624MiB の下で、触れながらメモリを増やす 6 つの合成の形 (JavaScript のヒープ・文字列・`Buffer`・PDFium の中の `malloc`) と、上限を超える 9 つの本物の入力が、各 3 回すべて RSS の監視 (`memory_exceeded`、止めた時点の RSS 321〜442MB) で止まった。逆に、`RLIMIT_AS` が先に効くのは「予約するが触らない」確保で、1.5GiB / 3GiB の `Buffer.allocUnsafeSlow` は上限なしなら RSS を増やさずに成功し (VmSize 11〜12GB)、2,624MiB の下では `RangeError` (`internal`) になった。この形を起こす本物の入力は、試した中には無かった (19.6)。
+- **k8s のメモリの上限には影響しない** (実測、cgroup v2): PDF の部品まで読み込んだ子 3 つを止めておいたとき、`memory.current` の増え方は、上限なしで VmSize の合計 28,128MiB のときも、2,624MiB で 5,088MiB のときも、約 169MiB で同じだった (19.7)。
+- **契約は崩さない**。`RLIMIT_AS` は Python 版でも環境変数ではなく、`MAX_CHILD_RSS_MB` から計算するコードの定数だった (`platform_guards.py`)。子の `env` は Req 1.4 の環境変数の契約の外にある。ただし design.md の書き換えが 2 か所要る (19.10)。
+- **`MALLOC_ARENA_MAX=2` を採らない場合の値**: `MAX_CHILD_RSS_MB` + 3,072MiB (既定で 3,392MiB)。同じ決め方 (19.5) で出した値で、確かめた結果は 19.5 の最後に書いた。
+
+### 19.2 測り方
+
+子は 15.5 の形にそろえた (`t3/child.mjs`、`t3/supervise.mjs`)。
+
+| 項目 | 試作の値 | 本物 (design と 15 節) との関係 |
+|---|---|---|
+| 起動 | `/usr/bin/prlimit --as=<値> --cpu=60:65 --core=1 -- node --wasm-max-mem-pages=8192 child.mjs` | 15.5 と同じ。CPU は `TIMEOUT_S` 55 + 5 と、さらに + 5 (Python 版の `cpu_time_limits`) |
+| `env` | `{ RAYON_NUM_THREADS: '1' }`、比べる側は `MALLOC_ARENA_MAX: '2'` を足したもの | トークンと `NODE_OPTIONS` は入れない (15.4 の (6)) |
+| fd | 0: 入力 (長さを先に付けた見出しと本文)、3: 結果 (1 回だけ書く)、4: 親の見張り | 15.5 と同じ |
+| 見張りの worker | 入力を読む前に立てる。`net.Socket` で fd 4 を読む。`resourceLimits: { maxOldGenerationSizeMb: 8, maxYoungGenerationSizeMb: 2, codeRangeSizeMb: 4 }` | 15.5 と同じ |
+| `oom_score_adj` | 最初に 1000 を書く | 15.5 と同じ |
+| 部品の読み込み | (1) **all**: anydoc・`@embedpdf/pdfium`・テキスト系の部品をすべての子で読み込む。(2) **pdf-only**: PDF の要求のときだけ PDFium を読み込む | どちらにするかは 3.7 で決める (19.10)。上限は、多く要る all で決めたので、どちらを選んでも足りる |
+| 変換 | PDF は 14.10 の関数、OOXML の分割と書き直しは 18.9 の試作 (`t6/rebuild7/probe`)、HTML・文字コードは 18 節の部品、XML と ipynb は `text.py` を写したもの (XML は DOCTYPE の内部の部分を普通のタグとして飛ばす近似)、ほかは anydoc | 本番の層 (6.2〜6.5) はまだ無い。XLSX のセル数の事前の検査は入れていない (19.9) |
+| 結果 | `pages` の UTF-8 の合計が 16MiB を超えたら `limit_exceeded`、そうでなければ `JSON.stringify` して fd 3 に書く | Python 版の `ConversionCore` と同じ順 |
+| 親 | 15.5 の見張り (50ms ごとに `/proc/<pid>/status`、期限 55 秒、結果の枠の上限 32MiB + 64KiB)。分類は (1) 結果あり (2) 親が決めた (3) SIGXCPU なら `timeout`、ほかは `crashed` | 本番の親 (6.7) はまだ無い。分類は **T2 の試作の親** で行った |
+
+入力 (85 個。`t3/gen.ts`・`gen2.ts` が 2.3 / 2.4 の生成器で作る):
+
+- 普通のファイル: ベンチマークのコーパス 23 文書、旧形式の DOC / PPT の fixture 2 つ、小さな EPUB・TSV・MD・LOG・JSON・YAML・XML・ipynb。
+- 大きなファイル: 7 万セル 1 シートの XLSX (`buildOneSheetAtCellLimitXlsx`)、7 万セル 5 シート、7 万 1 セル、200 シート、画像 12 枚の 48MB の DOCX (`buildTwelveImagesDocx`)、画像の多い DOCX / PPTX (各約 46MB)、15MiB の文字の DOCX (結果が `MAX_RESULT_BYTES` に近い)、3,000 スライドの PPTX、5,000 ページの PDF (`MAX_PDF_PAGES`)、48MiB の画像の PDF・1 ページ 100 万 / 200 万 / 400 万字の PDF・8,000 字 × 500 ページの PDF (14 節の入力)、7 万 / 30 万セルの XLS、2MiB の文の RTF (5.5MB)、10 万段落の ODT、7 万セルの ODS、1,000 ページの ODP、200 章の EPUB、20MiB の HTML (`MAX_HTML_BYTES` の直前) と 190 万段の入れ子の HTML、8MiB の CSV (`MAX_CSV_BYTES` の直前。日本語のものと、小さなセルが約 420 万個のもの)、50MiB 近い cp932 の TXT (52,287,500 バイト)、15MiB の UTF-8 の TXT、48MiB の XML、16MB の ipynb、150MiB の pivot cache を持つ XLSX (`buildLargePivotCacheXlsx`)、30 万セルの XLSX を anydoc に直接渡すもの (ZIP を一覧できない XLSX が anydoc に直接渡る経路。18.10)。
+- 悪意のある形: ZIP 爆弾の DOCX、10 万段の入れ子の DOCX、エンティティを展開させる PPTX、暗号化した DOCX / XLSX / PPTX / PDF、所有者パスワードだけの PDF、壊れた PDF、展開すると 256MiB / 1GiB になる FlateDecode の PDF (デコンプレッション爆弾)、zip64 の 200MiB 要素、大きさを偽った ZIP、`\bin2000000000` を宣言する RTF、対角の 2 セルだけで巨大な範囲を宣言する XLSX 3 つ (Z1000000、ZZ1048576、XFD1048576) と ODS (100 万行 × 1,000 列の繰り返し)。
+
+### 19.3 結果: 入力ごとに必要な仮想メモリ
+
+列の意味: 「最大 RSS」は上限なしの子の最大 RSS (MB。左が arena の制限なし、右が `MALLOC_ARENA_MAX=2`。各 1 回)。「必要量」は 19 節の頭の定義の値 (MiB。3 回の探索の結果を並べた)。「pdf-only」は部品の読み込みを (2) にしたときの必要量 (`MALLOC_ARENA_MAX=2`、探索 1 回) と、そのときの最大 RSS。この表の最大 RSS は上限なしで測った値で、上限の下では下がることがある (3,000 スライドの PPTX で 363〜365MB → 338〜340MB、1,000 スライドの PPTX で 264〜268MB → 231〜239MB。`t3/timing-as.mjs`、各 5 回)。「2,624MiB の下」は、19.1 の値と `MALLOC_ARENA_MAX=2` と RSS の監視 320MB の下で 3 回動かした結果 (3 回とも同じだった)。
+
+| 入力 | 最大 RSS | 必要量 (arena 制限なし) | 必要量 (`MALLOC_ARENA_MAX=2`) | pdf-only (最大 RSS) | 2,624MiB の下 |
+|---|---|---|---|---|---|
+| (コーパス) pdf-ja-horizontal.pdf | 102 / 82 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (81) | ok |
+| (コーパス) pdf-ja-line-break.pdf | 101 / 101 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (81) | ok |
+| (コーパス) pdf-ja-vertical.pdf | 102 / 101 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (74) | ok |
+| pdf-4m-long-page.pdf | 523 / 517 | 2112 / 2112 / 2112 | 1728 / 1728 / 1728 | 1728 (510) | memory_exceeded |
+| pdf-5000-pages.pdf | 127 / 123 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (113) | ok |
+| pdf-corrupt.pdf | 82 / 81 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (72) | failed:malformed |
+| pdf-flate-bomb-1g.pdf | 559 / 542 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (556) | memory_exceeded |
+| pdf-flate-bomb-256m.pdf | 300 / 359 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (308) | memory_exceeded |
+| pdf-image-only.pdf | 81 / 100 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (78) | ok |
+| pdf-owner-only.pdf | 102 / 100 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (69) | ok |
+| pdf-t1-big-12-images.pdf | 183 / 171 | 1728 / 1728 / 1728 | 1408 / 1408 / 1408 | 1408 (213) | ok |
+| pdf-t1-long-page-inside.pdf | 512 / 509 | 2112 / 2112 / 2112 | 1728 / 1728 / 1728 | 1728 (502) | memory_exceeded |
+| pdf-t1-one-page-1m.pdf | 185 / 203 | 1664 / 1664 / 1664 | 1344 / 1344 / 1344 | 1344 (181) | ok |
+| pdf-t1-one-page-2m.pdf | 296 / 298 | 1792 / 1792 / 1792 | 1472 / 1472 / 1472 | 1472 (305) | ok |
+| pdf-t1-pages-500x8k.pdf | 126 / 122 | 1536 / 1536 / 1536 | 1280 / 1280 / 1280 | 1216 (114) | ok |
+| pdf-user-password.pdf | 71 / 80 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (59) | failed:encrypted |
+| (コーパス) docx-ja.docx | 77 / 76 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (72) | ok |
+| docx-12-images-48mb.docx | 287 / 288 | 2176 / 2176 / 2176 | 1920 / 1920 / 1920 | 1344 (244) | ok |
+| docx-deep-nested.docx | 106 / 109 | 1984 / 1984 / 1984 | 1408 / 1408 / 1408 | 1216 (69) | failed:anydoc:resourceLimit |
+| docx-encrypted.docx | 81 / 72 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (73) | failed:anydoc:encrypted |
+| docx-large-images.docx | 190 / 194 | 2176 / 2176 / 2176 | 1920 / 1920 / 1920 | 1280 (240) | ok |
+| docx-text-15m.docx | 380 / 379 | 2432 / 2432 / 2432 | 1984 / 1984 / 1984 | 1472 (382) | memory_exceeded |
+| docx-zip-bomb.docx | 73 / 81 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (74) | failed:anydoc:resourceLimit |
+| (コーパス) xlsx-ja-multi-sheet.xlsx | 100 / 99 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (73) | ok |
+| xlsx-200-sheets.xlsx | 148 / 146 | 2368 / 2368 / 2368 | 1408 / 1408 / 1408 | 1280 (131) | ok |
+| xlsx-300k-raw.xlsx | 735 / 733 | 2816 / 2816 / 2816 | 2368 / 2368 / 2368 | 1856 (717) | memory_exceeded |
+| xlsx-70k-five-sheets.xlsx | 179 / 177 | 2304 / 2240 / 2304 | 1408 / 1536 / 1536 | 1280 (159) | ok |
+| xlsx-70k-one-sheet.xlsx | 317 / 313 | 2496 / 2496 / 2496 | 1984 / 1984 / 1984 | 1408 (297) | ok |
+| xlsx-encrypted.xlsx | 76 / 100 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (71) | failed:anydoc:encrypted |
+| xlsx-lying-sizes.xlsx | 80 / 99 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (73) | failed:anydoc:malformed |
+| xlsx-over-cell-limit.xlsx | 260 / 258 | 2496 / 2496 / 2496 | 1856 / 1920 / 1856 | 1344 (240) | ok |
+| xlsx-pivot-cache.xlsx | 405 / 404 | 2624 / 2624 / 2624 | 2048 / 2048 / 2048 | 1536 (387) | memory_exceeded |
+| xlsx-zip64-bomb-part.xlsx | 76 / 80 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (68) | failed:anydoc:malformed |
+| (コーパス) pptx-ja-multi-slide.pptx | 101 / 100 | 2240 / 1600 / 1856 | 1408 / 1408 / 1408 | 1216 (72) | ok |
+| pptx-3000-slides.pptx | 365 / 366 | 2688 / 2624 / 2624 | 2048 / 2048 / 2048 | 1472 (351) | memory_exceeded |
+| pptx-encrypted.pptx | 81 / 82 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (72) | failed:anydoc:encrypted |
+| pptx-entity-expansion.pptx | 101 / 99 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (72) | failed:malformed |
+| pptx-large-images.pptx | 151 / 152 | 1984 / 1984 / 1984 | 1280 / 1280 / 1280 | 1216 (152) | ok |
+| (コーパス) xls-ja.xls | 82 / 101 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (71) | ok |
+| xls-300k.xls | 216 / 214 | 2240 / 2240 / 2240 | 1920 / 1920 / 1856 | 1344 (196) | ok |
+| xls-70k.xls | 129 / 129 | 2176 / 2176 / 2176 | 1408 / 1408 / 1408 | 1216 (109) | ok |
+| (コーパス) doc-legacy.doc | 82 / 82 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (73) | ok |
+| fixture-simple-table.doc | 74 / 81 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (73) | ok |
+| (コーパス) ppt-legacy.ppt | 102 / 75 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (71) | ok |
+| fixture-text-shapes.ppt | 73 / 98 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (72) | ok |
+| rtf-10m.rtf | 193 / 190 | 2240 / 2240 / 2240 | 1920 / 1920 / 1856 | 1344 (175) | ok |
+| rtf-bin-2g.rtf | 81 / 75 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (73) | ok |
+| (コーパス) odt-ja.odt | 83 / 82 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (75) | ok |
+| odt-10m.odt | 204 / 201 | 2304 / 2240 / 2304 | 1920 / 1920 / 1920 | 1344 (184) | ok |
+| (コーパス) ods-ja.ods | 81 / 81 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (72) | ok |
+| ods-70k.ods | 188 / 186 | 2240 / 2240 / 2240 | 1856 / 1856 / 1920 | 1344 (167) | ok |
+| (コーパス) odp-ja.odp | 73 / 81 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (72) | ok |
+| odp-1000-pages.odp | 79 / 82 | 1984 / 1984 / 1984 | 1408 / 1408 / 1408 | 1216 (70) | ok |
+| epub-200-chapters.epub | 147 / 145 | 2176 / 2176 / 2176 | 1408 / 1408 / 1408 | 1280 (114) | ok |
+| epub-small.epub | 81 / 72 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (72) | ok |
+| (コーパス) html-euc-jp-http-equiv.html | 82 / 82 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (72) | ok |
+| (コーパス) html-shift-jis-script-style.html | 82 / 82 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (74) | ok |
+| html-20m.html | 230 / 243 | 2240 / 2240 / 2240 | 1856 / 1920 / 1920 | 1280 (223) | ok |
+| html-deep-nesting.html | 148 / 145 | 1856 / 1856 / 1856 | 1216 / 1280 / 1280 | 1216 (127) | ok |
+| (コーパス) csv-cp932.csv | 81 / 76 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (74) | ok |
+| (コーパス) csv-utf-8.csv | 82 / 77 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (72) | ok |
+| csv-8m-japanese.csv | 200 / 197 | 2176 / 2240 / 2176 | 1792 / 1856 / 1408 | 1344 (179) | ok |
+| csv-8m-tiny-cells.csv | 1295 / 1289 | 3328 / 3328 / 3328 | 2944 / 2944 / 2944 | 2368 (1274) | memory_exceeded |
+| tsv-small.tsv | 71 / 79 | 1600 / 1600 / 1600 | 1408 / 1408 / 1408 | 1216 (75) | ok |
+| (コーパス) txt-euc-jp.txt | 72 / 82 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (71) | ok |
+| (コーパス) txt-iso-2022-jp.txt | 83 / 71 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (73) | ok |
+| (コーパス) txt-shift-jis.txt | 73 / 81 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (72) | ok |
+| (コーパス) txt-utf-16be-bom.txt | 76 / 76 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (72) | ok |
+| (コーパス) txt-utf-16le-bom.txt | 74 / 82 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (63) | ok |
+| (コーパス) txt-utf-8-bom.txt | 72 / 81 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (69) | ok |
+| (コーパス) txt-utf-8.txt | 81 / 82 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (66) | ok |
+| txt-15m-utf8.txt | 153 / 154 | 1984 / 1984 / 1984 | 1280 / 1280 / 1280 | 1216 (157) | ok |
+| txt-50m-cp932.txt | 250 / 249 | 2304 / 2304 / 2304 | 1984 / 1984 / 1984 | 1408 (226) | failed:limit_exceeded |
+| md-small.md | 78 / 78 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (73) | ok |
+| log-small.log | 72 / 82 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (72) | ok |
+| json-small.json | 75 / 82 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (71) | ok |
+| yaml-small.yaml | 75 / 81 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (66) | ok |
+| xml-50m.xml | 354 / 336 | 2304 / 2304 / 2304 | 1920 / 1920 / 1920 | 1408 (305) | memory_exceeded |
+| xml-small.xml | 101 / 78 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (70) | ok |
+| ipynb-10m.ipynb | 241 / 242 | 2240 / 2240 / 2240 | 1856 / 1920 / 1920 | 1344 (227) | ok |
+| ipynb-small.ipynb | 99 / 82 | 1536 / 1536 / 1536 | 1216 / 1216 / 1216 | 1216 (72) | ok |
+
+読み方:
+
+- **arena の制限なしでは、必要量が入力の大きさにあまり関係なく 1,536〜2,688MiB に散らばり、揺れる**。コーパスの PPTX (最大 RSS 101MB) が 1,600 / 2,240 / 1,856MiB、`xlsx-200-sheets` (148MB) が 2,368MiB を要した。探索で見つけた値の 1 段下で通る回もあった (コーパスの PPTX、3,000 スライドの PPTX)。「3 回の最大」はこの揺れを押さえきれない。
+- **`MALLOC_ARENA_MAX=2` では揺れがほぼ消えた**。81 入力のうち、3 回の値が違ったのは 9 入力で、7 入力は 1 段 (64MiB)、残りは `xlsx-70k-five-sheets.xlsx` (1,408 / 1,536 / 1,536MiB) と `csv-8m-japanese.csv` (1,792 / 1,856 / 1,408MiB) だった。出力のハッシュは 81 入力すべて arena の制限なしと同じだった。
+- **「必要量 − 最大 RSS」(以下「土台」)** は、arena の制限なしで最大 2,323MiB (3,000 スライドの PPTX)、`MALLOC_ARENA_MAX=2` で最大 1,735MiB (50MiB の cp932 の TXT)。上限はこの土台の上に RSS の上限を足した値を下回ってはいけない (19.5)。
+- **PDF の部品を読み込むかどうかで、PDF 以外の必要量が約 200〜600MiB 変わる** (pdf-only の列)。PDFium の WASM のメモリ (`--wasm-max-mem-pages=8192` で 512MiB) の予約の分と見られる (推論)。pdf-only を採れば PDF 以外の子は軽くなるが、上限は PDF の子にも掛かるので、値は all で決めた。pdf-only の結果のハッシュは all と同じだった。
+- 1.4 の調べ (何もしない 1,200MB、anydoc の XLSX 2,000MB、PDFium の WASM 3,000MB 以上) との対応: 何もしない Node は 1,150MiB (14.5 の (2))、7 万セル 1 シートの XLSX は arena の制限なしで 2,496MiB / `MALLOC_ARENA_MAX=2` で 1,984MiB、PDF の最大は 400 万字の 1 ページの 2,112 / 1,728MiB。「3,000MB 以上」は、14.5 の (2) と同じく再現しなかった (`--wasm-max-mem-pages=8192` で WASM の予約が小さいため)。15.9 に残っていた「`--wasm-max-mem-pages=8192` を付けたときに、48MiB の PDF とベンチマークの PDF が今までどおり変換できるか」は、PDF の 16 入力をこの引数なし・上限なしで 1 回ずつ動かして比べた (`t3/nowasm.mjs`)。15 入力は種類もハッシュも同じだった。違ったのは 256MiB に展開する FlateDecode の PDF だけで、引数なしでは RSS 622MB まで伸びて変換を終え、引数ありでは RSS 300MB で WASM のメモリを増やせず `internal` になった。どちらにしても本番では RSS の上限 (320MB) を超える入力なので、扱いは変わらない (19.6)。1GiB の爆弾は引数なしでも同じ失敗 (RSS 1,088MB)。
+
+### 19.4 arena の数を数えた結果と、時間・RSS への影響
+
+**仕組みの裏づけ** (実測): 変換の終わりに子の `/proc/self/maps` を読み、「64MiB の境目で終わる、読み書きできない名前の無い領域」(glibc のスレッドごとの arena の予約の形) を数えた (`t3/arenas.mjs`。上限なし、各 3 回、3 回とも同じ値)。
+
+| 入力 | arena の制限なし | `MALLOC_ARENA_MAX=2` |
+|---|---|---|
+| コーパスの UTF-8 の TXT | 6 | 1 |
+| コーパスの PPTX | 10 | 1 |
+| `xlsx-200-sheets` | 10 | 1 |
+| 7 万セル 1 シートの XLSX | 9 | 1 |
+| 3,000 スライドの PPTX | 10 | 1 |
+| 20MiB の HTML | 6 | 1 |
+
+コーパスの TXT の必要量の差 (1,536 → 1,216MiB = 320MiB) は 5 個 × 64MiB と合う。どのスレッドがいつ malloc するかで予約の数と時期が変わるので、必要量が揺れると見られる (揺れの原因の細部は推論)。
+
+**上限を掛けたときの遅れ** (14.8 で 3.6 に引き継がれた「上限を掛けたときの約 1 割の遅れ」への答え。`MALLOC_ARENA_MAX=2`、RSS の監視なし、各 5 回の中央値と範囲。`t3/timing-as.mjs`):
+
+| 入力 | 上限なし | 2,624MiB | 差 |
+|---|---|---|---|
+| 3,000 スライドの PPTX | 2,799ms (2,546〜2,837) | 3,128ms (2,987〜3,165) | +12% |
+| 8,000 字 × 500 ページの PDF | 919ms (910〜933) | 1,008ms (1,000〜1,022) | +10% |
+| 1 ページ 200 万字の PDF | 621ms (605〜630) | 668ms (656〜674) | +8% |
+| 1,000 スライドの PPTX | 971ms (962〜985) | 1,037ms (1,033〜1,056) | +7% |
+| 7 万セル 1 シートの XLSX | 423ms (388〜435) | 423ms (412〜432) | 0% |
+
+子の V8 のヒープの上限 (`heap_size_limit`) は、上限なしで 4,288MiB、2,624MiB の下で 1,504MiB だった (実測)。ヒープの上限が小さいと、V8 がごみ集めを早めに行うので遅くなると見られる (推論。ごみ集めの回数は測っていない)。長い変換ほど遅れ、独立のレビューでも 3,000 スライドの PPTX で 2,735ms → 3,093ms、2,000 ページの PDF で 2,413ms → 2,767ms (約 11〜13%) だった。
+
+**時間と RSS** (上限なし、RSS の監視なし、各 5 回の中央値と範囲。`t3/timing.mjs`):
+
+| 入力 | 時間: 制限なし | 時間: `MALLOC_ARENA_MAX=2` | 最大 RSS: 制限なし | 最大 RSS: `MALLOC_ARENA_MAX=2` |
+|---|---|---|---|---|
+| 7 万セル 1 シートの XLSX | 421ms (416〜449) | 418ms (409〜425) | 317MB (316〜317) | 314MB (313〜315) |
+| 画像 12 枚の 48MB の DOCX | 216ms (215〜221) | 219ms (211〜228) | 299MB (298〜301) | 291MB (280〜302) |
+| 3,000 スライドの PPTX | 2,759ms (2,676〜2,899) | 2,822ms (2,750〜2,942) | 363MB | 363MB |
+| 20MiB の HTML | 785ms (778〜793) | 779ms (769〜782) | 234MB (223〜242) | 240MB (231〜251) |
+| 1 ページ 200 万字の PDF | 611ms (597〜635) | 610ms (603〜623) | 309MB (287〜311) | 294MB (284〜298) |
+| コーパスの PPTX | 125ms | 125ms | 101MB | 100MB |
+| 8MiB の日本語の CSV | 364ms | 366ms | 199MB | 197MB |
+
+時間の差は範囲が重なる程度 (3,000 スライドの PPTX で中央値 +2%)。RSS は変わらないか少し下がった。anydoc の中は `RAYON_NUM_THREADS=1` で 1 本なので、arena を絞っても malloc の取り合いはほとんど起きないと見られる (推論)。
+
+### 19.5 値の決め方と余裕の根拠
+
+**式の形**: 上限で止まるまでに RSS がどこまで増やせるか (以下「伸びしろ」) を、上限の値を変えて測った (RSS の監視なし、各 3 回。`t3/room.mjs`、all、`MALLOC_ARENA_MAX=2`)。数字は止まったときの最大 RSS (MB)。
+
+| 増やし方 | 2,304MiB | 2,624MiB | 3,136MiB | 3,648MiB |
+|---|---|---|---|---|
+| JavaScript のヒープ (16MiB ずつ) | 618〜682 | 1,018〜1,019 | 1,468〜1,480 | 1,852〜1,899 |
+| JavaScript のヒープ (1MiB ずつ) | 638〜647 | 1,007〜1,017 | 1,534〜1,538 | 1,862〜1,919 |
+| 文字列 | 689〜706 | 1,009〜1,025 | 1,419〜1,420 | 1,875〜1,907 |
+| `Buffer.alloc` (16MiB ずつ) | 693〜761 | 986〜1,081 | 1,548〜1,570 | 2,034〜2,086 |
+| PDFium の中の `malloc` (16MiB ずつ) | 548〜562 | 520〜532 | 536〜552 | 513〜547 |
+| 30 万セルの XLSX を anydoc に直接 | 716〜738 | 731 (変換できた) | 731 (変換できた) | 731 (変換できた) |
+| 小さなセル 420 万個の CSV (anydoc) | 735〜739 | 1,038〜1,058 | 1,290 (結果が 16MiB を超えて `limit_exceeded`) | 1,290 (同) |
+
+- 伸びしろは上限とほぼ同じだけ増える (2,624MiB から 3,648MiB に 1,024MiB 上げると、増やし方ごとに約 860〜1,000MB 増えた)。つまり「上限 − 伸びしろ」は上限によらずほぼ一定 (約 1,550〜1,800MiB) で、**運用者が `MAX_CHILD_RSS_MB` を変えたときも、上限を同じだけ動かせば同じ余裕が保てる**。そのため、固定の値ではなく「`MAX_CHILD_RSS_MB` + 定数」の形にした。固定の値にすると、`MAX_CHILD_RSS_MB` を大きくした環境で `RLIMIT_AS` が RSS の監視より先に効き、`memory_exceeded` (422) になるはずのものが `crashed` (500) になる。
+- PDFium の中の `malloc` は、上限によらず 513〜562MB で止まる。`--wasm-max-mem-pages=8192` の 512MiB に当たり、PDFium が `RuntimeError: Aborted` (`internal`) か `malloc` の 0 (14.10 の関数で `internal`) になるためである。PDF の経路には、`RLIMIT_AS` と RSS の監視とは別の 3 つ目の歯止めがある。
+**`check-rss-first` の 15 の形** (19.5 の検査、19.9 の道具で使う。どれも RSS を実際に増やす):
+
+| 名前 | 何をする形か |
+|---|---|
+| JavaScript のヒープ (16MiB ずつ / 1MiB ずつ) | 数値の配列を作り続けて保持する (2 つ) |
+| 文字列 | 文字列をつなげて長くし続ける |
+| `Buffer.alloc` (16MiB ずつ / 256MiB ずつ) | 中身を書いた `Buffer` を作り続けて保持する (2 つ) |
+| PDFium の中の `malloc` (16MiB ずつ) | WASM のメモリの中で確保して書き込み続ける |
+| 400 万字の 1 ページの PDF (2 つ) | `buildLongPagePdf` と、全部の行をページの内側に置いたもの (14 節) |
+| 1GiB に展開する FlateDecode の PDF | PDFium が展開した内容の流れを読む |
+| 30 万セルの XLSX を anydoc に直接 | anydoc の中で表を作る |
+| 小さなセル 420 万個の 8MiB の CSV | anydoc の中で表を作り、16MiB を超える結果を作る |
+| 15MiB の文字の DOCX | anydoc の結果と、それを `JSON.stringify` した文字列 |
+| 3,000 スライドの PPTX | 18.9 の分割で、スライドごとに package を作って anydoc に渡す |
+| 150MiB の pivot cache の XLSX | 18.9 の書き直しで要素をメモリに読む |
+| 48MiB の XML | デコードと `text.py` を写したタグの除去 |
+
+- arena の制限なし (all) では、上限 2,560 / 3,072 / 3,584 / 4,096MiB でヒープの伸びしろが 604〜653 / 1,101〜1,152 / 1,624〜1,670 / 2,095〜2,148MB だった (`t3/out/room-all.txt`)。15.4 の (4) の「8,192 ページ・3GiB でヒープ約 1,136MB」と合う。
+
+**定数 2,304MiB の内訳**: 定数 = 正常な入力と大きな入力の土台の最大 (1,735MiB、19.3) + 512MiB を、256MiB 単位に切り上げた値 (2,247 → 2,304)。512MiB は、Python 版の `ADDRESS_SPACE_HEADROOM_MB` (RSS の上限の上に残す幅) を引き継いで切り上げた目安である。値が足りていることの根拠は、512 の内訳ではなく、決めた値で実際に確かめた次の 2 つの余裕に置く。
+
+- 正常な入力の必要量の最大 (1,984MiB) との差が 640MiB ある (64MiB 刻みで 10 段)。3 回の探索で見えた残りの揺れの最大 (`csv-8m-japanese.csv` の 1,408〜1,856MiB、448MiB) も、その最大の 1,856MiB から 2,624MiB まで 768MiB 残る。
+- 伸びしろの最小 (PDFium を除く) が 986MB ある。RSS の監視が止めるのに要るのは、上限 320MB と監視の遅れ (一気に確保する子で最大 145MB。15.4 の (9)) を足した 465MB で、それを 521MB 上回る。この節の計測では、監視が止めた時点の RSS は最大 442MB (上限 + 122MB) だった。
+
+Python 版の 512 は Python 自身の土台 (Python は `RLIMIT_AS` 300MB でも動く。1.4) を含んだ値なので、RSS の上限の上に実際に残る幅は Python 版より Node 版のほうが広い (推論。Python 版の土台は測っていない)。
+
+**決めた値で確かめたこと** (`MALLOC_ARENA_MAX=2`、all):
+
+| 検査 | 結果 |
+|---|---|
+| `check-all-pass 2624` (子の最大 RSS が 320MB 以下の 71 入力 × 5 回。RSS の監視なし) | **PASS** (355 回。すべて上限なしと同じ結果とハッシュ) |
+| `check-rss-first 2624` (6 つの合成の形 + 9 つの本物の入力 × 3 回。RSS の監視 320MB) | **PASS** (45 回すべて `memory_exceeded`。止めた時点の RSS 321〜442MB) |
+| 本番の条件 (`prod.mjs 2624`。85 入力 × 3 回。RSS の監視 320MB) | `ok` 180、`memory_exceeded` 30、`failed:anydoc:resourceLimit` 18、`failed:anydoc:encrypted` 9、`failed:anydoc:malformed` 6、`failed:malformed` 6、`failed:encrypted` 3、`failed:limit_exceeded` 3。**`crashed` と `internal` は 0**。入力ごとに 3 回とも同じ結果 (19.3 の表の右の列) |
+| 正常な入力の必要量の最大 (1,984MiB) との差 | 640MiB |
+| 伸びしろの最小 (PDFium を除く) | 986MB (= RSS の上限 320 + 666MB) |
+
+`MAX_CHILD_RSS_MB` を下げた場合も、上限は 2,304MiB を下回らず、正常な入力の必要量の最大 (1,984MiB) を超える。
+
+**`MALLOC_ARENA_MAX=2` を採らない場合**: 同じ決め方で、土台の最大 2,323MiB + 512MiB = 2,835MiB を 256MiB 単位に切り上げて、定数は 3,072MiB (既定で 3,392MiB)。`check-all-pass 3392` (arena の制限なしの最大 RSS が 320MB 以下の 72 入力 × 3 回、216 回) と `check-rss-first 3392` (45 回すべて `memory_exceeded`) は **PASS** だった。より低い 2,880MiB でも、`check-all-pass` は PASS (216 回)、`check-rss-first` は 45 回のうち 44 回が `memory_exceeded` で、残りの 1 回は 48MiB の XML が RSS 305MB で `limit_exceeded` を返した (上限なしと同じ種類の結果で、`RLIMIT_AS` によるものではない)。ただし arena の揺れは「malloc するスレッドの数 × 64MiB」まで広がりうるので (19.4)、3 回の探索では最悪を見ていない可能性が残る。
+
+### 19.6 悪意のある入力での挙動
+
+RSS の監視 320MB の下で、上限なしと 2,624MiB で 1 回ずつ動かした (`t3/hostile.mjs`、`MALLOC_ARENA_MAX=2`)。`check-rss-first` の 9 入力は 19.5 の表のとおり。
+
+| 入力 | 上限なし | 2,624MiB | どの守りが止めたか |
+|---|---|---|---|
+| 対角の 2 セルの XLSX (Z1000000 / ZZ1048576 / XFD1048576) | `anydoc:resourceLimit` (RSS 99〜100MB) | 同じ | anydoc 自身の上限 |
+| 100 万行 × 1,000 列を繰り返す ODS | `anydoc:resourceLimit` (78MB) | 同じ | anydoc 自身の上限 |
+| `\bin2000000000` の RTF | `ok` (72MB) | 同じ | 確保しない (宣言の大きさで予約しない) |
+| ZIP 爆弾の DOCX、10 万段の入れ子の DOCX | `anydoc:resourceLimit` | 同じ | anydoc 自身の上限 |
+| 190 万段の入れ子の HTML | `ok` (144MB、約 950ms) | 同じ | — (`Tokenizer` は段を積まない。18.5.1) |
+| エンティティを展開させる PPTX | `malformed` | 同じ | XML の検査 (18.5.4) |
+| zip64 の 200MiB 要素 (XLSX として) | `anydoc:malformed` | 同じ | anydoc |
+| 256MiB に展開する FlateDecode の PDF | `internal` (WASM のメモリを増やせない。RSS 301MB) | `memory_exceeded` (326MB) | RSS の監視か WASM の上限 (時期による) |
+| 1GiB に展開する FlateDecode の PDF | `memory_exceeded` (356MB) | `memory_exceeded` (327MB) | RSS の監視 |
+| `Buffer.allocUnsafeSlow` で 1.5GiB / 3GiB を予約 (合成) | 成功 (RSS 82MB のまま、VmSize 11〜12GB) | `RangeError` → `internal` | **`RLIMIT_AS`** |
+
+- **`RLIMIT_AS` が RSS の監視より先に効く本物の入力は、試した中には無かった**。宣言の大きさで一気に確保させる形 (XLSX・ODS の巨大な範囲、RTF の `\bin`) は、anydoc 自身の上限で止まるか、確保されなかった。「予約するが触らない」確保は合成の形でだけ示した。
+- 画像のデコンプレッション爆弾は、試した部品では効かないと見られる。anydoc は 46MB の画像を含む DOCX / PPTX で RSS 190 / 151MB、PDFium は 48MiB の画像の PDF で 183MB で、画像を展開していない (推論。部品のコードは読んでいない)。
+
+### 19.7 k8s のメモリの上限との関係
+
+`RLIMIT_AS` は 1 つのプロセスの「アドレスの範囲の予約」の上限で、k8s の `limits.memory` は cgroup が数える「実際に使っているメモリ」の上限である。別物であることを、cgroup v2 の `memory.current` で確かめた (`t3/cgroup.mjs`。PDF の部品まで読み込んだ子 3 つを 3 秒止めておき、前後の `memory.current` の中央値の差を取った。各 5 回):
+
+| 上限 | 3 つの VmSize の合計 | 3 つの VmRSS の合計 | `memory.current` の増え方 |
+|---|---|---|---|
+| なし | 28,126〜28,128MiB | 321〜322MiB | 162〜171MiB |
+| 2,624MiB | 5,087〜5,090MiB | 315〜316MiB | 168〜173MiB |
+
+予約が 23GB 違っても cgroup の数え方は変わらず、増え方は RSS の合計より小さかった (node の実行ファイルなど、共有されるページが一度しか数えられないためと見られる。推論)。したがって **`RLIMIT_AS` を上げても k8s の OOMKill は起きやすくならない**。ただし、k8s の上そのもので確かめたわけではない (推論)。メモリの予算 (Req 3.14) は RSS の監視と子の最大 RSS で決まり、3.7 の仕事である。
+
+### 19.8 失敗の分類 (`RLIMIT_AS` に当たったときに子の中で起きること)
+
+上限が足りないときに実際に起きたこと。分類は **T2 の試作の親** (15.5、15.6 の順) で行った。
+
+| 起きたこと | 親から見える `(code, signal)` と結果の有無 | 種類 | HTTP (対象 spec の design.md の表) |
+|---|---|---|---|
+| anydoc (Rust) の確保の失敗。標準エラーに `memory allocation of N bytes failed` | `(null, 'SIGABRT')`、結果なし | `crashed` | 500 |
+| C++ の確保の失敗 (`std::bad_alloc`。V8・Node の内部) | `(null, 'SIGABRT')`、結果なし | `crashed` | 500 |
+| V8 のヒープを増やせない、V8 の内部の予約の失敗 | `(null, 'SIGABRT')` / `(null, 'SIGTRAP')`、結果なし | `crashed` | 500 |
+| Node の `ERR_MEMORY_ALLOCATION_FAILED`、入力の `Buffer` を作れない (上限 1,536MiB 以下で 48MB の入力) | `(1, null)`、結果なし | `crashed` | 500 |
+| `Buffer.alloc` / `allocUnsafeSlow` の失敗 | 例外 `RangeError` を捕まえて結果を返す → 親が SIGKILL | `internal` | 500 |
+| 同上、`MALLOC_ARENA_MAX=2` で少しずつ増やした場合 | 多くは `(null, 'SIGABRT')`、結果なし | `crashed` | 500 |
+| PDFium の WASM のメモリを増やせない | 例外 `RuntimeError: Aborted` (標準エラーに `growMemory: … Unable to grow`) → 結果を返す | `internal` | 500 |
+| **anydoc が確保の失敗を「壊れたファイル」として返す** (上限 2,048MiB・arena の制限なしで、10 万段の入れ子の DOCX、15MiB の文字の DOCX、7 万セルの ODS、10 万段落の ODT、7 万セル 1 シートの XLSX) | 例外 `code: malformed` → 結果を返す | `malformed` | **422** (`extraction_failed`) |
+
+- 1 行目で、15.9 の未検証 (anydoc の中の Rust の abort を `process.abort()` で代わりにしていた) を閉じた。本物の abort も SIGABRT で、15.6 の分類と合う。
+- **最後の行は 15.6 に無い経路**。上限がきついと、利用者からは「壊れたファイル」(422) に見え、運用者は資源の不足に気付けない。上限を必要量ぎりぎりにしてはいけない理由の 1 つである。2,624MiB と `MALLOC_ARENA_MAX=2` では、355 回 + 本番の条件の 255 回で一度も起きなかった (`anydoc:malformed` 6 回は、上限なしでも同じ結果になる壊れた入力)。
+- Python 版は `MemoryError` を捕まえて `internal` にしていた (15.1 の (b))。Node 版では大半が `crashed` になるが、HTTP の応答は同じ 500 で、違うのはログの `result=` だけである。
+
+### 19.9 再現の手順
+
+使い捨ての場所 (以下 `$T`) で行う。リポジトリの中では install しない。T6 の試作 (`$T/../t6/rebuild7/probe` と `$T/../t6/deps`。18.9 の手順で作る) を子から読み込む。
+
+```bash
+export PATH=/usr/local/share/nvm/versions/node/v24.21.0/bin:$PATH
+mkdir -p "$T"/{inputs,inputs-hostile,out} && cd "$T"
+echo '{"name":"t3","private":true,"type":"module"}' > package.json
+npm install --ignore-scripts --save-exact @firecrawl/anydoc@0.2.4 @embedpdf/pdfium@2.15.1
+# inputs: the repo generators through swc-node (REG = file URL of @swc-node/register/esm/esm-register.mjs)
+(cd <repo>/apps/attachment-text-extractor && node --import $REG $T/gen.ts $T/inputs && node --import $REG $T/gen2.ts $T/inputs-hostile)
+for f in big-12-images long-page-inside one-page-1m one-page-2m pages-500x8k; do cp $T/../t1/inputs/$f.pdf $T/inputs/pdf-t1-$f.pdf; done   # 14.10 の入力
+A='{"RAYON_NUM_THREADS":"1","MALLOC_ARENA_MAX":"2"}'
+node ref.mjs all out/ref-all.json; CHILD_ENV=$A node ref.mjs all out/ref-all-arena2.json        # 上限なしの正解
+node minas.mjs all out/ref-all.json out/minas-all.json . 3 4                                      # 必要量 (arena の制限なし)
+CHILD_ENV=$A node minas.mjs all out/ref-all-arena2.json out/minas-all-arena2.json . 3 4          # 必要量 (MALLOC_ARENA_MAX=2)
+CHILD_ENV=$A node check-all-pass.mjs 2624 all out/ref-all-arena2.json 5
+CHILD_ENV=$A node check-rss-first.mjs 2624 all 3
+CHILD_ENV=$A node prod.mjs 2624 3 out/prod-2624-arena2.json
+CHILD_ENV=$A node room.mjs all 2304,2624,3136,3648 3; CHILD_ENV=$A node hostile.mjs unlimited,2624 1
+CHILD_ENV=$A node cgroup.mjs unlimited 5; node arenas.mjs; node timing.mjs 5; node nowasm.mjs
+```
+
+道具の要点:
+
+- `gen.ts` / `gen2.ts`: 19.2 の入力を `test/fixtures/index.ts` の生成器で書く。FlateDecode の爆弾は、`buildPdf` の追加の object に `/Type /XObject /Subtype /Form … /Filter /FlateDecode` の流れ (PDF のコメントの行を 256MiB / 1GiB 並べて `deflateSync`) を置き、ページの内容から `/Fm0 Do` で呼ぶ。対角の 2 セルの XLSX は、`xlsxParts` の `xl/worksheets/sheet1.xml` の `<sheetData>` を `editPart` で A1 と対角のセルの 2 つだけに書き換える。
+- `child.mjs`: 15.5 の子の入口 (`oom_score_adj` → 見張りの worker → fd 0 から入力 → 変換 → fd 3 に 1 回 → `process.exit(0)`) に、19.2 の変換をつないだもの。`header.mode` で、変換のほかに合成の増やし方 (`grow-heap`・`grow-string`・`grow-buffer`・`grow-wasm`・`reserve-buffer`・`hold`) を選ぶ。結果には `/proc/self/status` と arena の数 (19.4) を足すが、親は `pages` (または失敗の種類) だけをハッシュにする。
+- `supervise.mjs`: 15.5 の親。`prlimit` の引数、`env`、`--wasm-max-mem-pages=8192` を 19.2 の表のとおりに明示する。
+- `minas.mjs`: 1,024〜4,096MiB を 64MiB 刻みで二分探索し、見つけた値で 3 回続けて同じ結果になるまで 1 段ずつ上げる。これを 3 回くり返す。
+- `check-all-pass.mjs <値>`: 上限なしの最大 RSS が 320MB 以下の入力を、RSS の監視なしで N 回ずつ動かし、上限なしと同じ結果とハッシュかを見る。`check-rss-first.mjs <値>`: 19.5 の 15 の形を RSS の監視 320MB の下で N 回ずつ動かし、すべて `memory_exceeded` かを見る。
+
+### 19.10 後のタスクへの引き継ぎ
+
+- **design.md の書き換えが要る (この作業では書き換えていない)**:
+  - Configuration の「`RLIMIT_AS` の値は環境変数にせず、T3 で決めた値をコードの定数にする」→ 「`MAX_CHILD_RSS_MB` + 2,304MiB (コードの定数) にする」。
+  - 同じ節の `RAYON_NUM_THREADS=1` の行に、`MALLOC_ARENA_MAX=2` を子の `env` に足すことを並べる (Dockerfile には要らない。HTTP のプロセスでは測っていない)。
+  - 未決事項の表 (5 節の後) の「`RLIMIT_AS` の値と、緩めた分の守り」の行は、更新した。
+- **取り込み (Req 12) で対象 spec (`attachment-search-text-extractor`) を直す先**: design.md 289 行の「`RLIMIT_AS` (仮想メモリの上限) を「RSS の上限 + 512MB」にする」、tasks.md 134 行の「仮想メモリの上限 (RSS の上限 + 512MB)」、design.md 440 行の `RAYON_NUM_THREADS=1` の説明 (`MALLOC_ARENA_MAX=2` を並べる)。行番号は 2026-11-06 に grep で確かめたもの。
+- **6.13 (ベンチマーク)**: Node 版の時間は、上限 (2,624MiB) を掛けた子で測る。上限なしより 7〜12% 遅い (19.4)。
+- **3.7 (子の最大 RSS の基準とメモリの予算)**:
+  - **7 万セル 1 シートの XLSX は、all の子で最大 RSS 313〜317MB だった** (19.3、19.4。0.95 倍の 304MB を超える)。pdf-only の子では 297MB (1 回)。部品をいつも読み込むか (all / pdf-only) で基準を満たすかどうかが変わる。ただしこの子は XLSX の書き直しに 18.9 の試作を使い、セル数の事前の検査を持たない。本番の形で測り直すこと。
+  - 画像 12 枚の 48MB の DOCX は all で 287〜299MB、pdf-only で 244MB。
+  - 結果が `MAX_RESULT_BYTES` に近い 15MiB の文字の DOCX は 379〜382MB で `memory_exceeded` になる。同じ大きさの結果でも、TXT (15MiB) は 154MB で通る。
+  - 小さなセルの 8MiB の CSV は 1,289〜1,295MB まで伸び、`MAX_CSV_BYTES` の事前の判定は通ったうえで `memory_exceeded` になる (Python 版の config.py の説明と同じ性質)。
+  - 150MiB の pivot cache の XLSX が 404MB になったのは、18.9 の試作が要素を一度メモリに読むため。本番は流してつなぐ形 (18.10) で測り直す。
+  - `MALLOC_ARENA_MAX=2` は子の最大 RSS を変えない (19.4)。
+  - 19.3 の最大 RSS は上限なしで測った値で、上限の下では下がることがある (19.3 の注)。基準の値は、18.10 にあるとおり、子の中で `prlimit` の上限の下で測ること。
+  - 普通の PPTX でも、スライドの数が多いと 320MB に近づく。独立のレビューでは、1.8MB・1,000 スライドの PPTX が all の子で 316〜320MB だった。この節の 0.9MB・1,000 スライドの PPTX (`gen3.ts`。1 枚に題と 2 行) は 264〜268MB だった。
+  - **部品の読み込み方 (all か pdf-only か) は 3.7 で決める**。上限の値は all で決めたので、どちらを選んでも足りる。一方、7 万セル 1 シートの XLSX の最大 RSS が 0.95 倍 (304MB) を超えるかは、この選び方で変わる (all 313〜317MB 対 pdf-only 297MB)。tasks.md の 3.7 は「基準のファイルで子の最大 RSS を測り、既定値を決める」で、この判断はその一部になる。15.7 の「3.6 で合わせて決める」と、14.5 の (3) と 15.4 の (4) の「6.x で決める」の食い違いは、この決め方で置き換える。
+  - 上限を掛けると長い変換が 7〜12% 遅くなる (19.4)。タイムアウトの最悪の合計の見積もりに入れる。
+- **6.6 / 6.7 (子の入口と実行管理)**:
+  - `prlimit-args.ts`: `--as=<(MAX_CHILD_RSS_MB + 2,304) × 1MiB を、親の /proc/self/limits の Max address space の hard で切り詰めた値>`。
+  - 子の `env`: `{ RAYON_NUM_THREADS: '1', MALLOC_ARENA_MAX: '2' }`。
+  - `--wasm-max-mem-pages=8192` はそのまま (19.5 で、PDF の経路の 3 つ目の歯止めとして働くことを確かめた)。
+  - anydoc の `malformed` は、上限が足りないときにも返る (19.8)。上限の値を変えるときは、19.9 の `check-all-pass` をやり直す。
+- **4.3 (実行管理の結合テスト)**: `/proc/<pid>/limits` の `Max address space` が `(MAX_CHILD_RSS_MB + 2,304) MiB` であること、子の `env` に `MALLOC_ARENA_MAX` があること、`reserve-buffer` のような「予約するが触らない」確保が `internal` で返ることをテストにできる。RSS の監視が先に効くことは、`check-rss-first` の合成の形 (JavaScript のヒープを 16MiB ずつ増やす子) で確かめられる。
+- **6.11 / 6.12 (Dockerfile と image の確認)**: 値は devcontainer の glibc で測った。`node:24-slim` の image の中で、本物の実行管理と変換の層に対して、19.5 と同じ合格の条件 (すべての入力が上限なしと同じ種類とハッシュになる。メモリを増やす 15 の形がすべて RSS の監視で止まる) で 1 回ずつ流すこと。musl を使う image (alpine など) では `MALLOC_ARENA_MAX` は効かない (推論)。
+- **18.10 から 3.6 への引き継ぎの 3 項目**: 「採った 4 つの部品の `VmSize` は合わせて約 17MiB」と「20MiB の HTML の `VmPeak` 1,645MiB」は、子の中で `prlimit` の上限の下で測った必要量 (19.3。20MiB の HTML は 1,856〜1,920MiB) で置き換えた。残る「WASM の部品は大きな予約をする」は、将来 WASM の部品を足すときに、19.9 の `check-all-pass` と `check-rss-first` を流し直し、必要量が上がっていないかを確かめること (chardetng-wasm は読み込むだけで約 8GiB を予約した。18.5)。
+- **8.x (配布物)**: 運用者が `MAX_CHILD_RSS_MB` を変えても、上限は同じだけ動くので、別の設定は要らない。コンテナの `ulimit -v` (hard) を 2,624MiB より低くすると、親が切り詰めた値で子が起動し、19.8 の失敗 (とくに 422 の `malformed`) が起きうる。
+
+### 19.11 RED (値を決める前の状態と、先に書いた検査)
+
+- 記録が無かった: `grep -n "^## 19" research.md` は何も出さなかった (exit 1)。5 節の後の未決事項の表で「`RLIMIT_AS` の値と、緩めた分の守り」は「未決」だった。
+- 先に `check-all-pass.mjs` と `check-rss-first.mjs` を書き、低い値で落ちることを確かめた。
+  - arena の制限なし・1,536MiB: `check-all-pass ... FAIL (81 runs, 55 inputs differ from the unlimited reference)`。コーパスの DOCX などが `crashed {"signal":"SIGABRT"}`、PDF が `failed:internal:RuntimeError:Aborted`、48MB の入力が `crashed {"code":1}`。
+  - arena の制限なし・2,048MiB: `check-all-pass ... FAIL (81 runs, 30 inputs differ ...)` (コーパスの PPTX が `memory allocation of 7 bytes failed` の SIGABRT、7 万セル 1 シートの XLSX などが `failed:anydoc:malformed`)、`check-rss-first ... FAIL (11 runs stopped by something other than the RSS monitor)` (JavaScript のヒープが RSS 104〜134MB で SIGABRT、`Buffer` が `RangeError`)。
+  - `MALLOC_ARENA_MAX=2`・1,856MiB: `check-all-pass ... FAIL (71 runs, 4 inputs differ ...)` (20MiB の HTML が `std::bad_alloc`、7 万セル 1 シートの XLSX が `memory allocation of 352 bytes failed`)、`check-rss-first ... FAIL (11 runs ...)`。
+- GREEN は 19.5 の表 (2,624MiB で両方 PASS)。
+
+### 19.12 確かめなかったこと
+
+- `node:24-slim` の image の中での値。devcontainer の glibc は 2.43 (Ubuntu。`ldd --version`) で、image の glibc の版は確かめていない。版が違えば arena の扱いが変わりうる。スレッドの数が違えば arena の数も変わる。k8s の上での cgroup の数え方 (19.7 は devcontainer の cgroup v2)。
+- 本番の変換の層 (6.2〜6.5) と本番の親 (6.7) での値。XML の経路は `text.py` を写した近似で、XLSX のセル数の事前の検査は入れていない。
+- `RLIMIT_AS` が RSS の監視より先に効く本物の入力 (合成の形でだけ示した)。anydoc と PDFium の中のすべての確保の形を試したわけではない。
+- arena の揺れの原因の細部 (どのスレッドがいつ予約を作るか)。`MALLOC_ARENA_MAX=2` で残った揺れ (`csv-8m-japanese.csv` の 1,408〜1,856MiB) の原因。
+- 子を同時に 3 つ動かしたときの必要量 (計測は 4 つ並べて動かしたが、互いの影響は見ていない)。
+- 大きな DOC と PPT (旧形式は生成器が無く、commit 済みの小さなファイルだけ)。大きな TSV・MD・LOG・JSON・YAML (TXT・CSV と同じ経路なので、50MiB の TXT と 8MiB の CSV で代わりにした)。
+- 2,624MiB で `MALLOC_ARENA_MAX` を付けない場合 (採らない場合の値は 3,392MiB とした)。
