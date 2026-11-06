@@ -145,6 +145,8 @@ apps/app/src/features/search/client/util/
 ├── infinite-search-result.spec.ts     # 上記のユニットテスト
 ├── apply-search-item-mutation.ts      # 行単位リネーム/削除を 1 チャンクへ適用する純粋関数（SearchItemMutation）
 └── apply-search-item-mutation.spec.ts # 上記のユニットテスト
+apps/app/src/features/search/client/components/SearchPage/test-utils/
+└── virtual-list-layout-stub.ts        # （追補 #190441）happy-dom で仮想化を検証するためのスクロール要素・行サイズのスタブ
 apps/app/src/stores/
 └── search.infinite-cache.spec.tsx     # mutateSearchInfiniteChunks が結合/チャンク別キャッシュ双方を書き換えることの検証
 ```
@@ -152,12 +154,13 @@ apps/app/src/stores/
 ### Modified Files
 - `apps/app/src/stores/search.tsx` — `useSWRINFxSearch`（新規フック）と `getSearchInfiniteKey`（純粋な getKey、テスト用に export）、`mutateSearchInfiniteChunks`（読込済みチャンクのキャッシュ直接書き換え）を追加。`useSWRxSearch` は**変更しない**。チャンクサイズ定数 `DEFAULT_SEARCH_CHUNK_SIZE` を共有化。
 - `apps/app/src/stores/search.spec.ts` — `getSearchInfiniteKey` のユニットテスト。
-- `apps/app/src/features/search/client/components/SearchPage/SearchPage.tsx` — `useSWRINFxSearch` に切替。`searchPager`/`PaginationWrapper` を廃止し `InfiniteScroll` を配線。累積 `pages` と `resetKey` を `SearchPageBase` へ渡す。追加読込失敗時の `hasError`/`onRetry`（`setSize(size)`）、削除完了時の `setSize(1)+mutate`+選択クリア、行単位リネーム/削除のキャッシュ直接更新（`onItemMutated`）、Elasticsearch `max_result_window` 手前での追加読込停止（P2-4）を実装。
+- `apps/app/src/features/search/client/components/SearchPage/SearchPage.tsx` — `useSWRINFxSearch` に切替。`searchPager`/`PaginationWrapper` を廃止し `InfiniteScroll` を配線。累積 `pages` と `resetKey` を `SearchPageBase` へ渡す。追加読込失敗時の `hasError`/`onRetry`（`setSize(size)`）、削除完了時の `setSize(1)+mutate`+選択クリア、行単位リネーム/削除のキャッシュ直接更新（`onItemMutated`）、Elasticsearch `max_result_window` 手前での追加読込停止（P2-4）を実装。一括削除エリアに選択件数と読み込み済み件数を表示する（4.7）。
 - `apps/app/src/features/search/client/components/SearchPage/SearchPageBase.tsx` — props に `resetKey`（必須）と `infiniteScroll`（任意）を追加。リセット系 `useEffect` の依存を `[pages]` から `resetKey` へ変更。同一検索内の変更後リセット用に `resetAfterMutation()`（`IResettableAfterMutation`）を公開。`onItemMutated` を `SearchResultList` へ中継し、プレビュー中の行が削除されたらプレビューをクリアする。`infiniteScroll` 指定時は `SearchResultList` を `InfiniteScroll` でラップ、未指定時は従来どおり `searchPager` を描画。`usePageDeleteModalForBulkDeletion` の第1引数を `IPageWithSearchMeta[] | undefined`（累積リスト）へ一般化。
 - `apps/app/src/features/search/client/components/PrivateLegacyPages.tsx` — `SearchPageBase` の新 props に追随（`resetKey = keyword|offset|limit` を渡す — レガシーは並び替え/フィルタを無効化しているため sort/order は含めない／削除フックへ `data?.data` を渡す／一括削除完了時・変換完了時は `resetAfterMutation()` で選択とプレビューをクリア）。番号ページャ挙動は維持。
 - `apps/app/src/features/search/client/components/SearchPage/SearchResultList.tsx` — 行単位リネーム/削除時に `onItemMutated`（`SearchItemMutation`）を、プレビュー中の行が削除されたとき `onPreviewedPageDeleted` を呼ぶ任意 props を追加。**（追補 #190441）** `useVirtualizer` で表示領域とその前後だけを描画する。`injectedPages` を `useMemo` 化し、行 ref を `pageId` ごとの安定したコールバックに、`deletedHandler` の `pages`/`selectedPageId` 参照を最新値 ref 経由にして、行へ渡す props を安定させる。
 - `apps/app/src/client/components/PageList/PageListItemL.tsx` — **（追補 #190441）** 任意 props（`isInitiallyChecked`、`listItemRef`、`listItemIndex`、`listSize`）を追加。未指定時は従来と同じ DOM を出力する。
-- `apps/app/src/features/search/client/components/SearchPage/SearchPageBase.tsx`（追補 #190441）— スクロールコンテナ要素を state で保持して `SearchResultList` へ渡す。`onPageSelected` に `setSelectedPageWithMeta` をそのまま渡し、`checkboxChangedHandler` / `onPreviewedPageDeleted` を `useCallback` で安定させる。選択 `Set` を `SearchResultList` へ渡す。
+- `apps/app/src/features/search/client/components/SearchPage/SearchPageBase.tsx`（追補 #190441）— スクロールコンテナ要素を state で保持して `SearchResultList` へ渡す。`onPageSelected` に `setSelectedPageWithMeta` をそのまま渡し、`checkboxChangedHandler` / `onPreviewedPageDeleted` を `useCallback` で安定させる。選択 `Set` を `SearchResultList` へ渡す。`pages` から消えた ID を選択 `Set` から除く（11.6）。
+- `apps/app/public/static/locales/*/translation.json`（5 言語）— 追加読込失敗の文言（`search_result.failed_to_load_more`）と、選択件数・読み込み済み件数の表示文言（`search_result.selected_count_of_loaded`）を追加。
 - `apps/app/src/features/search/client/components/SearchPage/SearchPage.spec.tsx` / `SearchPageBase.spec.tsx` / `SearchResultList.spec.tsx` — 主要ふるまいのコンポーネントテスト。
 - `apps/app/src/client/components/PageList/PageListItemL.spec.tsx`（追補 #190441、新規）— 追加した任意 props のテスト。
 - `apps/app/src/features/search/client/components/SearchPage/SearchPageBase.rerender.spec.tsx`（追補 #190441、新規）— `SearchPageBase` と実際の `SearchResultList` を組み合わせた再描画抑制の検証（`SearchPageBase.spec.tsx` は `SearchResultList` をファイル単位でモックしているため別ファイルにする）。
@@ -549,6 +552,7 @@ export const usePageDeleteModalForBulkDeletion: (
 - IntersectionObserver をモックし、センチネル交差で `setSize(size+1)` が呼ばれる（1.2）。
 - **（追補 #190441）`SearchResultList` 仮想化**（スクロール要素と行の大きさをスタブ）: (1) 数百件を渡しても描画される行数が表示領域＋overscan 分に収まり、件数を増やしても増えない（8.1/8.2）、(2) 入れ物の高さが全件分になる（8.4）、(3) `selectedPageIds` に含まれる行はマウント時にチェック済み、含まれない行は未チェック（9.1）、(4) スクロールで範囲外に出して戻した行が、チェック状態とプレビューの強調表示を保つ（9.1/9.4）、(5) 全選択後にスクロールで新たに描画された行もチェック済みになる（9.2）。
 - **（追補 #190441）再描画抑制**（`SearchPageBase` ＋ 実 `SearchResultList`、行は `memo` 付きで描画回数を数えるテスト用部品に差し替え）: プレビュー切替で描画されるのは切替前後の 2 行だけ（10.1）、チェック変更で他の行は描画されない（10.2）。
+- 選択件数の表示: 選択の変化・追加読み込みのあとで、表示される選択件数と読み込み済み件数が実際と一致する（4.4/4.7）。選択済みの行が一覧から消えると（配下を含む削除）、選択件数と一括削除の対象から除かれる（11.6）。
 - **（追補 #190441）`PageListItemL`**: `isInitiallyChecked` でチェックボックスの初期値が決まる。新しい props を渡さない場合は従来と同じ出力（`data-index` / `aria-*` を付けない）になる。
 
 ### 非回帰（Regression）
