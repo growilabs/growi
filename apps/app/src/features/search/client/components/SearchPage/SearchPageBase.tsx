@@ -138,6 +138,11 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   const [selectedPageIdsByCheckboxes] = useState<Set<string>>(new Set());
   // const [allPageIds] = useState<Set<string>>(new Set());
 
+  // Held in state (not a ref) so SearchResultList re-renders once it is set.
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(
+    null,
+  );
+
   const [selectedPageWithMeta, setSelectedPageWithMeta] = useState<
     IPageWithSearchMeta | undefined
   >();
@@ -213,24 +218,30 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     },
   }));
 
-  const checkboxChangedHandler = (isChecked: boolean, pageId: string) => {
-    if (pages == null || pages.length === 0) {
-      return;
-    }
+  // Stable across checkbox changes: the parent callback is read via a ref (Req 10.2).
+  const checkboxChangedHandler = useCallback(
+    (isChecked: boolean, pageId: string) => {
+      if (pages == null || pages.length === 0) {
+        return;
+      }
 
-    if (isChecked) {
-      selectedPageIdsByCheckboxes.add(pageId);
-    } else {
-      selectedPageIdsByCheckboxes.delete(pageId);
-    }
+      if (isChecked) {
+        selectedPageIdsByCheckboxes.add(pageId);
+      } else {
+        selectedPageIdsByCheckboxes.delete(pageId);
+      }
 
-    if (onSelectedPagesByCheckboxesChanged != null) {
-      onSelectedPagesByCheckboxesChanged(
+      onSelectedChangedRef.current?.(
         selectedPageIdsByCheckboxes.size,
         pages.length,
       );
-    }
-  };
+    },
+    [pages, selectedPageIdsByCheckboxes],
+  );
+
+  const previewedPageDeletedHandler = useCallback(() => {
+    setSelectedPageWithMeta(undefined);
+  }, []);
 
   // The last `pages` reference effect (b) below has actually processed. Used to
   // detect a `keepPreviousData` (legacy number-pager) holdover: when `resetKey`
@@ -304,6 +315,15 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       return;
     }
 
+    // Drop selections whose rows left the list (Req 11.6). Pruned in place
+    // because the list keeps reading this same Set instance.
+    const loadedPageIds = new Set(pages.map((page) => page.data._id));
+    selectedPageIdsByCheckboxes.forEach((pageId) => {
+      if (!loadedPageIds.has(pageId)) {
+        selectedPageIdsByCheckboxes.delete(pageId);
+      }
+    });
+
     onSelectedChangedRef.current?.(
       selectedPageIdsByCheckboxes.size,
       pages.length,
@@ -346,6 +366,12 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
           ?.map((keyword) => keyword.replace(/^"(.*)"$/, '$1')) ?? undefined)
       : undefined;
 
+  // -1 while more results can still be loaded (see design.md, PageListItemL).
+  const listSize =
+    infiniteScroll != null && !infiniteScroll.isReachingEnd
+      ? -1
+      : pages?.length;
+
   // Selection wiring on SearchResultList is IDENTICAL across the infinite-scroll
   // and legacy branches; only the wrapping (InfiniteScroll vs. numbered pager)
   // differs (P3-5: computed here instead of an IIFE inside the JSX below).
@@ -354,12 +380,15 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       <SearchResultList
         ref={searchResultListRef}
         pages={pages}
+        scrollElement={scrollElement}
         selectedPageId={selectedPageWithMeta?.data._id}
+        selectedPageIds={selectedPageIdsByCheckboxes}
+        listSize={listSize}
         forceHideMenuItems={forceHideMenuItems}
-        onPageSelected={(page) => setSelectedPageWithMeta(page)}
+        onPageSelected={setSelectedPageWithMeta}
         onCheckboxChanged={checkboxChangedHandler}
         onItemMutated={onItemMutated}
-        onPreviewedPageDeleted={() => setSelectedPageWithMeta(undefined)}
+        onPreviewedPageDeleted={previewedPageDeletedHandler}
       />
     </div>
   );
@@ -406,7 +435,10 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       >
         {searchControl}
 
-        <div className="overflow-y-scroll">
+        <div
+          ref={setScrollElement}
+          className="overflow-y-scroll position-relative"
+        >
           {/* Loading */}
           {pages == null && (
             <div className="mw-0 flex-grow-1 flex-basis-0 m-5 text-muted text-center">

@@ -341,6 +341,14 @@ export const SearchPage = (): JSX.Element => {
               </OperateAllControl>
             </div>
 
+            {/* Select-all covers only the loaded results (Req 4.7). */}
+            <span role="status" className="ms-3 text-muted text-nowrap">
+              {t('search_result.selected_count_of_loaded', {
+                selectedCount,
+                loadedCount: merged.pages.length,
+              })}
+            </span>
+
             <button
               type="button"
               className="ms-3 open-delete-modal-button btn btn-outline-danger d-flex align-items-center"
@@ -357,6 +365,7 @@ export const SearchPage = (): JSX.Element => {
   }, [
     deleteAllButtonClickedHandler,
     merged.isEmpty,
+    merged.pages.length,
     selectAllCheckboxChangedHandler,
     selectedCount,
     t,

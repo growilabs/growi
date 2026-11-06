@@ -694,6 +694,7 @@
     "delete_all_selected_page": "一括削除",
     "select_all": "全件選択",
     "delete_selected_pages": "選択したページを削除",
+    "selected_count_of_loaded": "{{selectedCount}} 件選択中（読み込み済み {{loadedCount}} 件）",
     "currently_not_implemented": "現在未実装の機能です",
     "search_again": "再検索",
     "number_of_list_to_display": "表示件数",
