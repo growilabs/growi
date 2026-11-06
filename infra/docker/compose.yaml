@@ -1,0 +1,50 @@
+services:
+  attachment-text-extractor:
+    build:
+      context: ../../services/attachment-text-extractor
+      dockerfile: Dockerfile
+    image: attachment-text-extractor:local
+    env_file:
+      - .env
+    environment:
+      # Recommended sizing: mem_limit ~= WORKERS*120MB +
+      # WORKERS*MAX_CONCURRENCY*(MAX_CHILD_RSS_MB+100+2*MAX_FILE_SIZE_MB+48) ~= 1.8GB
+      # for these values (an upload stays in memory, about twice its size while parsed).
+      WORKERS: "1"
+      MAX_CONCURRENCY: "3"
+    ports:
+      - "8000:8000"
+    networks:
+      - internal
+    healthcheck:
+      # /readyz also fails when the conversion forkserver is down. Its timeout
+      # must exceed the runner's probe timeout (10s + reaping).
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/readyz', timeout=14)"
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      # Holds only the forkserver socket directory (uploads are never spooled here);
+      # counts against mem_limit.
+      - /tmp:size=64m,mode=1777
+    user: "10001:10001"
+    mem_limit: 2g
+    memswap_limit: 2g
+    pids_limit: 256
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Reaps orphaned conversion children; uvicorn (PID 1 otherwise) does not.
+    init: true
+
+networks:
+  internal:
+    driver: bridge
+    internal: true  # egress blocked: outbound traffic from containers is disallowed

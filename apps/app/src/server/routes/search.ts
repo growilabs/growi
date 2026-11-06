@@ -1,7 +1,15 @@
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import {
+  parseFacetPagination,
+  parseFacetSearchParams,
+  toFacetedSearchResult,
+} from '~/features/search-attachments/server/routes/apiv1/facet-search-contract';
+import { isAttachmentFullTextSearchEnabled } from '~/features/search-attachments/server/services/is-attachment-full-text-search-enabled';
+import { resolveAttachmentSearchViewer } from '~/features/search-attachments/server/services/resolve-attachment-search-viewer';
 import { SupportedAction } from '~/interfaces/activity';
 import type { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
+  IFacetedSearchResult,
   IFormattedSearchResult,
   ISearchResult,
 } from '~/interfaces/search';
@@ -47,6 +55,75 @@ export const setup = (crowi: Crowi, app) => {
   const actions: any = {};
   const api: any = {};
 
+  const recordSearchActivity = async (req): Promise<void> => {
+    const parameters = {
+      ip: req.ip,
+      endpoint: req.originalUrl,
+      action: SupportedAction.ACTION_SEARCH_PAGE,
+      user: req.user?._id,
+      snapshot: {
+        username: req.user?.username,
+      },
+    };
+    await crowi.activityService.createActivity(parameters);
+  };
+
+  /**
+   * facet=all|attachments while attachment search is enabled. The viewer is
+   * always the requesting user (guest when not logged in); `sort` / `order`
+   * / `type` are not applied (relevance order only). `limit` / `offset`
+   * are re-read from the raw query (parseFacetPagination); an invalid value
+   * is answered like the other parameter errors of this route:
+   * `{ ok: false, code: 400 }` with HTTP 200.
+   */
+  const searchByFacet = async (
+    req,
+    res,
+    {
+      q,
+      facet,
+      resolve,
+    }: {
+      q: string;
+      facet: 'all' | 'attachments';
+      resolve: 'primary' | 'full';
+    },
+  ) => {
+    const pagination = parseFacetPagination(req.query);
+    if (!pagination.ok) {
+      return res.json(ApiResponse.error(pagination.message, 400));
+    }
+
+    let result: IFacetedSearchResult;
+    try {
+      const viewer = await resolveAttachmentSearchViewer(req.user);
+      const primary = await crowi.searchService.searchByFacet(
+        decodeURIComponent(q),
+        viewer,
+        {
+          facet,
+          from: pagination.from,
+          size: pagination.size,
+          resolve,
+        },
+      );
+      result = toFacetedSearchResult(facet, primary);
+    } catch (err) {
+      logger.error('Failed to search by facet', err);
+
+      if (isSearchError(err)) {
+        const { unavailableTermsKeys } = err;
+        return res.json(ApiResponse.error(err, 400, { unavailableTermsKeys }));
+      }
+
+      return res.json(ApiResponse.error(err));
+    }
+
+    await recordSearchActivity(req);
+
+    return res.json(ApiResponse.success(result));
+  };
+
   /**
    * @swagger
    *
@@ -76,6 +153,26 @@ export const setup = (crowi: Crowi, app) => {
    *           name: limit
    *           schema:
    *             $ref: '#/components/schemas/Limit'
+   *         - in: query
+   *           name: facet
+   *           description: |
+   *             Optional. `all` / `attachments` include attachment hits while
+   *             attachment full-text search is enabled; the response meta then
+   *             carries `facet`, a nullable `total` and optional
+   *             `primaryResultIncomplete` / `nextCursor`; `limit` must then be
+   *             an integer from 1 to 200 and `offset` a non-negative integer,
+   *             otherwise the answer is `{ ok: false, code: 400 }`. Omitted,
+   *             `pages`, combined with `nq`, or with the feature disabled, the
+   *             response is the plain page search.
+   *           schema:
+   *             type: string
+   *             enum: [all, pages, attachments]
+   *         - in: query
+   *           name: resolve
+   *           description: Optional, only read with `facet`. `full` also attaches attachment hits to pages after the first result page.
+   *           schema:
+   *             type: string
+   *             enum: [primary, full]
    *       responses:
    *         200:
    *           description: Succeeded to get list of pages.
@@ -139,6 +236,20 @@ export const setup = (crowi: Crowi, app) => {
       return res.json(ApiResponse.error('SearchService is not reachable.'));
     }
 
+    const facetParams = parseFacetSearchParams(req.query);
+    if (!facetParams.ok) {
+      return res.json(ApiResponse.error(facetParams.message, 400));
+    }
+    const { facet, resolve } = facetParams;
+    // A named query runs on another delegator, which has no attachment index.
+    if (
+      (facet === 'all' || facet === 'attachments') &&
+      nq == null &&
+      isAttachmentFullTextSearchEnabled(searchService.isConfigured)
+    ) {
+      return searchByFacet(req, res, { q, facet, resolve });
+    }
+
     const userGroups =
       user != null
         ? [
@@ -192,16 +303,7 @@ export const setup = (crowi: Crowi, app) => {
       return res.json(ApiResponse.error(err));
     }
 
-    const parameters = {
-      ip: req.ip,
-      endpoint: req.originalUrl,
-      action: SupportedAction.ACTION_SEARCH_PAGE,
-      user: req.user?._id,
-      snapshot: {
-        username: req.user?.username,
-      },
-    };
-    await crowi.activityService.createActivity(parameters);
+    await recordSearchActivity(req);
 
     return res.json(ApiResponse.success(result));
   };

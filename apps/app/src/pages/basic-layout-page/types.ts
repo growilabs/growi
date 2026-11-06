@@ -14,6 +14,7 @@ export type SearchConfigurationProps = {
     isSearchServiceConfigured: boolean;
     isSearchServiceReachable: boolean;
     isSearchScopeChildrenAsDefault: boolean;
+    isAttachmentFullTextSearchEnabled?: boolean;
   };
 };
 

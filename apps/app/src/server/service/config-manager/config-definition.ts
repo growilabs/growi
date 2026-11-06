@@ -69,6 +69,10 @@ export const CONFIG_KEYS = [
   'app:elasticsearchMaxBodyLengthToIndex',
   'app:elasticsearchReindexBulkSize',
   'app:elasticsearchReindexOnBoot',
+  'app:attachmentFullTextSearch:extractorUri',
+  'app:attachmentFullTextSearch:extractorToken',
+  'app:attachmentFullTextSearch:timeoutMs',
+  'app:attachmentFullTextSearch:maxFileSizeBytes',
   'app:elasticsearchAuditlogReindexOnBoot',
   'app:growiCloudUri',
   'app:growiAppIdForCloud',
@@ -358,6 +362,7 @@ export const CONFIG_KEYS = [
   'external-user-group:keycloak:groupDescriptionAttribute',
 
   // Control Flags for using only env vars
+  'env:useOnlyEnvVars:app:attachmentFullTextSearch',
   'env:useOnlyEnvVars:app:siteUrl',
   'env:useOnlyEnvVars:app:fileUploadType',
   'env:useOnlyEnvVars:security:passport-local',
@@ -513,6 +518,31 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'ELASTICSEARCH_AUDITLOG_REINDEX_ON_BOOT',
     defaultValue: false,
   }),
+
+  // Attachment Full-Text Search Settings
+  'app:attachmentFullTextSearch:extractorUri': defineConfig<string | undefined>(
+    {
+      envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_URI',
+      defaultValue: undefined,
+    },
+  ),
+  'app:attachmentFullTextSearch:extractorToken': defineConfig<
+    string | undefined
+  >({
+    envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_SERVICE_TOKEN',
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'app:attachmentFullTextSearch:timeoutMs': defineConfig<number>({
+    envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_TIMEOUT_MS',
+    // Worst case on the extractor side is upload (15s) + conversion (55s) + cleanup (~4s); stay above it.
+    defaultValue: 90000,
+  }),
+  'app:attachmentFullTextSearch:maxFileSizeBytes': defineConfig<number>({
+    envVarName: 'GROWI_ATTACHMENT_EXTRACTOR_MAX_FILE_SIZE_BYTES',
+    defaultValue: 52428800, // 50 MB
+  }),
+
   'app:growiCloudUri': defineConfig<string | undefined>({
     envVarName: 'GROWI_CLOUD_URI',
     defaultValue: undefined,
@@ -1541,6 +1571,10 @@ export const CONFIG_DEFINITIONS = {
   }),
 
   // Control Flags for Env Vars
+  'env:useOnlyEnvVars:app:attachmentFullTextSearch': defineConfig<boolean>({
+    envVarName: 'ATTACHMENT_EXTRACTOR_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+    defaultValue: false,
+  }),
   'env:useOnlyEnvVars:app:siteUrl': defineConfig<boolean>({
     envVarName: 'APP_SITE_URL_USES_ONLY_ENV_VARS',
     defaultValue: false,
@@ -1632,6 +1666,15 @@ export interface EnvOnlyGroup {
 }
 
 export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
+  {
+    controlKey: 'env:useOnlyEnvVars:app:attachmentFullTextSearch',
+    targetKeys: [
+      'app:attachmentFullTextSearch:extractorUri',
+      'app:attachmentFullTextSearch:extractorToken',
+      'app:attachmentFullTextSearch:timeoutMs',
+      'app:attachmentFullTextSearch:maxFileSizeBytes',
+    ],
+  },
   {
     controlKey: 'env:useOnlyEnvVars:app:siteUrl',
     targetKeys: ['app:siteUrl'],

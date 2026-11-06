@@ -70,6 +70,12 @@ export class ES9ClientDelegator {
       this.client.indices.stats(params),
   };
 
+  mget<TDocument = unknown>(
+    params: estypes.MgetRequest,
+  ): Promise<estypes.MgetResponse<TDocument>> {
+    return this.client.mget<TDocument>(params);
+  }
+
   nodes = {
     info: (): Promise<estypes.NodesInfoResponse> => this.client.nodes.info(),
   };
@@ -91,5 +97,11 @@ export class ES9ClientDelegator {
 
   search(params: estypes.SearchRequest): Promise<estypes.SearchResponse> {
     return this.client.search(params);
+  }
+
+  deleteByQuery(
+    params: estypes.DeleteByQueryRequest,
+  ): Promise<estypes.DeleteByQueryResponse> {
+    return this.client.deleteByQuery(params);
   }
 }
