@@ -8,12 +8,17 @@
  *  - MD format: output file is written as-is (no HTML rendering applied).
  *  - Error handling: when renderToHtml rejects, the Writable write callback
  *    receives the error (job is not silently completed). (Req 3.2)
+ *  - Destroying the Writable (job cleanup) aborts the page's attachment
+ *    embedding and emits 'close' only after that work has settled, so
+ *    cleanup's removal of the output dir cannot race a running download.
  *
  * Resume and batching (Req 5.3) are covered against a real database in
  * export-pages-to-fs-async.integ.ts.
  *
  * Requirements: 3.2, 5.1, 5.2
  */
+
+import { once } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -32,7 +37,16 @@ import type {
 
 import type { IPageBulkExportJobCronService } from '..';
 import * as RendererModule from '../markdown';
+import { embedAttachmentImages } from './embed-images';
 import { getPageWritable } from './export-pages-to-fs-async';
+
+vi.mock('./embed-images', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./embed-images')>();
+  return {
+    ...actual,
+    embedAttachmentImages: vi.fn(actual.embedAttachmentImages),
+  };
+});
 
 // The job's progress writes (lastExportedPagePath / status) go through prisma.
 // Stub the client so this unit test needs no database.
@@ -45,6 +59,11 @@ vi.mock('~/utils/prisma', () => {
     },
   };
 });
+
+// getPageWritable reads the attachment download timeout once per job.
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: { getConfig: vi.fn().mockReturnValue(10_000) },
+}));
 
 type PageBulkExportPageSnapshotWithRevision =
   Prisma.pagebulkexportpagesnapshotsGetPayload<{
@@ -247,6 +266,46 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
       spy.mockRestore();
     });
   });
+});
+
+describe('export-pages-to-fs-async: destroy during attachment embedding', () => {
+  it('aborts the embedding and emits close only after it has settled', async () => {
+    const tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'bulk-export-destroy-'),
+    );
+    let receivedSignal: AbortSignal | undefined;
+    let embeddingSettled = false;
+    vi.mocked(embedAttachmentImages).mockImplementationOnce(
+      async (_html, { signal }) => {
+        receivedSignal = signal;
+        await once(signal, 'abort');
+        // Simulates a download that takes a moment to wind down.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        embeddingSettled = true;
+        throw signal.reason;
+      },
+    );
+
+    try {
+      const writable = await getPageWritable.call(
+        makeService(tmpDir),
+        makeJob(PageBulkExportFormat.pdf),
+      );
+      // destroy(err) emits 'error' before 'close'; only 'close' is awaited.
+      writable.on('error', () => {});
+      writable.write(makePageSnapshot('/destroy/page', '# Page'));
+      await vi.waitFor(() => expect(receivedSignal).toBeDefined());
+
+      const closed = new Promise((resolve) => writable.once('close', resolve));
+      writable.destroy(new Error('job cleaned up'));
+      await closed;
+
+      expect(receivedSignal?.aborted).toBe(true);
+      expect(embeddingSettled).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  }, 30_000);
 });
 
 describe('export-pages-to-fs-async: unsupported format', () => {
