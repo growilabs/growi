@@ -6911,6 +6911,10 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 - 18.7 の 1 (デコードの表: `〜` → `～` など 6 字)、2・3・4 (宣言 `iso-8859-1`・`ascii`、`replacement` のラベル)、7 (ZIP の名前は latin-1)、8 (HTML: 末尾の閉じていない開始タグ、`<!-->`)、9 (OOXML の XML: 同名の属性、WHATWG にだけある文字コード名、名前空間の宣言 1,000 個の上限、DOCTYPE の引用符、`ATTLIST`)、10 (`cp437` などの宣言) → `charset.spec.ts` `html.spec.ts` `safe-xml.spec.ts`。**Python 版で失敗する期待は、理由を付けた名前にする。Python 版と同じ振る舞いに戻すテストは書かない** (Req 2.3 の記録だけ)。
 - ZIP の読み (18.7 の 9 の表): ローカルの見出しと中央ディレクトリの名前の違い、圧縮後の大きさの偽り → Node 版のほうが緩い向き。テストは「落ちずに結果を返す」を確かめる。
 - 結果が上限を超えたときの種類は `result_too_large` (20.12。試作の `limit_exceeded` ではない)。
+- wire (タスク 4.2 で決めた): 片割れのサロゲートを含む結果は、`encodeResult` が送る前に `WireProtocolError` で拒む (22.3 では「6.1 が決める」としていた)。Node のまま書くと、`JSON.stringify` は `\ud800` の形で出して親の側で拒まれ、`TextEncoder` は黙って U+FFFD に置き換えるので、どちらも原因が見えなくなる。Python 版の厳密な UTF-8 と同じく、子の側で止める。
+- wire (タスク 4.2 で決めた): `pageNumber` が小数の行は、Python のテストの `1.0` を Node では `1.5` に替えた。`JSON.parse` は `1.0` と `1` を区別せず、`1.0` は正しいページ番号の 1 として通る (害は無い)。
+- 変換の層はログを出さない (タスク 4.2 で決めた)。Python 版の XLSX の分割の「目印で説明できない出力のときに警告をちょうど 1 回出し、シート名をログに出さない」(`test_xlsx_split.py` 504〜506 行) と `test_well_formed_output_is_not_logged` (524 行) は移していない。Node 版の子の標準出力と標準エラーは、親が大きさの上限を付けて読み捨てる設計 (design.md 554 行) なので、変換の層のログは運用者に届かない。XLSX の分割が全体を 1 要素で返すことは、ログではなく結果 (`xlsx-split.spec.ts` の fallback の 7 件) で確かめる。
+- 設定の読み方 (タスク 4.2 で決めた。Req 1.9 の作業者の判断で、7 節の崩した契約には入れない): Python 版 (pydantic-settings) は環境変数の名前の大文字・小文字を区別せず、作業ディレクトリの `.env` も読む (`config.py` の `model_config`)。Node 版の `loadSettings(env)` は、渡された環境変数を大文字の名前でだけ読み、`.env` も `process.env` も自分では読まない。運用者は壊れない: この 2 つは公開された契約 (対象 spec の design.md の Configuration の表) に無い。compose の `env_file: .env` は compose 自身が読んで環境変数に入れる仕組みで、image に `/app/.env` は無い。k8s の例と `.env.example` は大文字の名前だけを使う。7.4 の d36・m21 と同じ「崩したことにはしないが、理由つきで Python 版と違うもの」として、取り込み (Req 12) のときに運用者に知らせる。
 
 ### 22.7 担当ごとの「書くテスト」の一覧
 
@@ -6930,6 +6934,7 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 **4.3 実行管理 (子プロセス)** (`src/runner/**`、`src/child/**`、Linux のみ。`describe.skipIf(process.platform !== 'linux')`)
 - 単体: `child-exit.spec.ts` (終わり方 → 失敗の種類。15.6 の表)、`linux/prlimit-args.spec.ts` (仮想メモリ = RSS + 2,304MiB を親の hard で切る、CPU の soft < hard、コア 1)、`linux/proc-rss.spec.ts`、`child-env.spec.ts` (トークンなし、`RAYON_NUM_THREADS=1`、`MALLOC_ARENA_MAX=2`)
 - 結合 (本物の子): 時間切れ・RSS 超過・abort / segfault・結果なしの終了・SIGXCPU・親の消失 (1 秒以内)・結果の上限・中止で子が止まり回収される・200 回で漏れない・一時ファイルが残らない・`/proc/<pid>/limits` と `oom_score_adj`・トークンが子の環境に無い・子が送ったデータをコードとして扱わない・`prlimit` が無いと準備未完了・確認用の子が固まっても期限内に答える・基準のファイル (7 万セル XLSX、画像 12 枚の 48MB DOCX) の子の最大 RSS が 0.95 倍以内・同時に動かしてすべて成功する・入力の大きい子を見張る間も親のイベントループが応答する (Node の親は 1 本のスレッドで、見張りが止まると `/healthz` も止まる。Python 版の `test_concurrent_runs_all_succeed` と `test_supervising_a_slow_child_with_a_large_input_keeps_the_event_loop_responsive`)・変換の途中で切断された後も子と fd が残らない (黒箱の「失敗が次を壊さない」では見えない部分。200 回の漏れのテストが守る)
+- 結合 (本物の子、タスク 4.2 のレビューで足した): 上限 (`MAX_ARCHIVE_UNCOMPRESSED_MB` 512MiB) を超えて展開される部品を持つ PPTX / XLSX (申告の大きさを偽った ZIP 爆弾) を本物の子に通すと、`limit_exceeded` で返り、`memory_exceeded` にならない。部品を全部展開してから大きさを比べる実装は RSS の上限に当たるので、失敗の種類で見分けられる。Python 版は `test_archive_guard.py` 289〜297 行で、読み出しの最大のメモリを `tracemalloc` で 10MiB 未満と確かめていた。単体の側では、`archive-guard.spec.ts` が「上限の手前で読みをやめる」ことを、4MiB の後ろに壊れた deflate のブロックを置いた部品で確かめる (上限で止まれば `limit_exceeded`、全部を展開すれば `malformed`)。tasks.md の 4.3 の「RSS の超過」「結果の上限」と同じ子の失敗の分類の範囲で、4.3 の記述と矛盾しない。
 
 **4.4 HTTP の層と黒箱**
 - `src/http/` 単体: `bearer-auth` (3 パスだけ認証なし、存在しないパスも 401)、`concurrency-slots`、`receive-upload` (届いたバイト数で上限)、`parse-multipart` + `header-params` (16.9 の固定データ)、`extract-route` (偽の runner。失敗の対応・枠の解放・中止の合図・`extractedCharacters` はコードポイント)、`error-table` (全失敗の種類)、`health-routes` (200 / 503 `not_ready`、`/healthz` は 200 のまま、**未完了の後に準備完了になれば `/readyz` が 200 に戻る**)、`request-log` (出す項目と出さない項目)、`openapi-route`
@@ -6957,3 +6962,66 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 - 確かめた (実測): Python のテストの全ファイルと件数 (49 ファイル、1222 件、`pytest --collect-only`)。vitest 3.2.6 に `tags` が無いこと。(b)(c)(d) の 3 つの方法が動くこと。(d) が実際の Python 版 (`/readyz` `/docs` `/redoc`) に対して、目印なしで失敗し、目印ありで通ること。現在の `vitest.config.ts` が `*.integ.ts` を拾わないこと。
 - 確かめなかった: Node 版のテストの本体 (この 4.1 は表と方法を決めただけ)。黒箱のテストの中身が Python 版で通るか (4.6)。`test_dependencies.py` の「本番の依存に外部コマンドを使う部品が無い」の Node 版の許可・禁止の一覧の中身 (4.5 が決める)。16.9 の 9 通りが、実際に Python 版と何が違うかの再測定 (16.9 の記述を写した)。
 - RED (対応表の作成前): `grep -n "^## 22" research.md` は出力なし (終了コード 1) だった。
+
+## 23. テストが決めた実装の名前と形 (タスク 4.2)
+
+2026-11-09 に、4.2 の単体テスト (`apps/attachment-text-extractor/src/**/*.spec.ts` の 22 ファイル、981 件) が import する名前と型をまとめた。**テストが import する名前が、4.7 (空の実装) と 6.x (実装) の仕様になる**。design.md の File Structure Plan と Components and Interfaces に無いものは (新) と書いた。下の一覧は、テストファイルの import を読んで確かめた。
+
+### 23.1 モジュールごとの export
+
+- `contract/` (型だけを持つ末端の層。`index.ts` は型だけを export する)
+  - `failure-kind.ts`: `FailureKind` (9 つの値。design.md のとおり)
+  - `extract-response.ts`: `PageInfo { readonly pageNumber: number | null; readonly label: string | null; readonly content: string }`、`ConversionOutcome` (`{ kind: 'ok'; mimeType; pages }` か `{ kind: 'failed'; failure: FailureKind; detail }`)
+  - `conversion-limits.ts` (新しい置き場所): `ConversionLimits` (`maxXlsxCells`、`maxPdfPages`、`maxArchiveEntries`、`maxArchiveUncompressedBytes`、`maxResultBytes`、`maxCsvBytes`、`maxHtmlBytes`。すべて readonly の number。項目は design.md の 7 つのまま)
+- `formats/`
+  - `format-table.ts`: `resolveFormat(fileName: string, mimeHint: string | null): ResolvedFormat | null` (null は非対応)。型 `Route`、`AnydocFormat` (11 の値)、`TextKind = 'plain' | 'html' | 'xml' | 'ipynb' | 'csv'` (新)。`ResolvedFormat { route; mimeType; anydocFormat: AnydocFormat | null; textKind: TextKind | null }` (`textKind` は新)
+  - `input-size.ts`: `checkInputSize(format: ResolvedFormat, size: number, limits: Pick<ConversionLimits, 'maxCsvBytes' | 'maxHtmlBytes'>): InputSizeViolation | null` (新)。`InputSizeViolation = { readonly failure: 'limit_exceeded'; readonly detail: string }` (新)
+- `config/load-settings.ts`
+  - `loadSettings(env: Readonly<Record<string, string | undefined>>): Settings`。不正な値は `Error` を投げ、メッセージに環境変数の名前を含める。整数は前後の空白を除いて読み、`abc` と `1.5` は拒む。`WORKERS` と `IPYNB_OUTPUT_MAX_CHARS` は読まない。`process.env` と `.env` を自分では読まない (22.6)
+  - `Settings` (すべて readonly): `serviceToken`、`maxFileSizeMb`、`timeoutS`、`uploadTimeoutS`、`maxConcurrency`、`maxChildRssMb`、`maxXlsxCells`、`maxResultBytes`、`maxPdfPages`、`maxArchiveEntries`、`maxArchiveUncompressedMb`、`maxCsvBytes`、`maxHtmlBytes`、`logLevel`。`logLevel` は Python の logging の名前を大文字にしたもの (`CRITICAL` `FATAL` `ERROR` `WARN` `WARNING` `INFO` `DEBUG` `NOTSET`)。Node のロガーの段階への読み替えは `request-log` が受け持つ
+  - `toConversionLimits(settings: Settings): ConversionLimits` (新)。`maxArchiveUncompressedBytes` は `MAX_ARCHIVE_UNCOMPRESSED_MB` × 1MiB
+- `wire/length-prefixed-json.ts` (Python の `runner/wire.py` の写し)
+  - `class WireProtocolError extends Error`
+  - `encodeFrameHeader(length: number): Buffer` (4 バイトの big-endian。範囲の外は `RangeError`)
+  - `readFrame(stream: Readable, maxLength: number): Promise<Buffer>` (枠を 1 つだけ読み、続きのバイトは流れに残す。上限を超える長さと切れた枠は `WireProtocolError`)
+  - `writeFrame(stream: Writable, body: Uint8Array): Promise<void>`
+  - `maxResultFrameBytes(maxResultBytes: number): number`
+  - `encodeResult(outcome: ConversionOutcome): Buffer` (片割れのサロゲートは `WireProtocolError`。22.6)、`decodeResult(body: Uint8Array): ConversionOutcome` (形の違反・重複したキー・`__proto__` などのキー・`NaN` / `Infinity` は `WireProtocolError`)
+  - 送る JSON の形は Python と同じ `{ ok: true, pages, mimeType }` / `{ ok: false, kind, detail }`。親が自分で決める種類 (`timeout` など) は子から受け付けない
+- `conversion/`
+  - `conversion-error.ts` (新): `class ConversionError extends Error { readonly kind: FailureKind; readonly detail: string; constructor(kind, detail) }`。内部の変換の関数はこれを投げ、`convert` だけが結果の値に変える
+  - `convert.ts`: `convert(bytes, fileName, mimeHint, limits): Promise<ConversionOutcome>` (例外を投げない。想定外の例外は `internal` で、detail は例外の `name` だけ。文字列やただのオブジェクトが投げられても `internal`)
+  - `normalize.ts`: `normalizeNewlines(text: string): string`、`joinBrokenJapanese(text: string): string`
+  - `pdf.ts`: `convertPdf(bytes: Uint8Array, limits: ConversionLimits): Promise<PageInfo[]>`。`malloc` が 0 を返したときと、PDFium の `abort` (`RuntimeError`) は `internal` (14.8)
+  - `office.ts`: `convertOffice(bytes: Uint8Array, format: AnydocFormat): Promise<string>`。`ConvertErrorCode` から失敗の種類へ: `encrypted` → `encrypted`、`resourceLimit` → `limit_exceeded` (detail には `(max_…)` の名前だけを残す)、`malformed` と `missingPart` → `malformed`、`unsupported` → `unsupported`、そのほか (`needsOcr`・`hosted`・`io`、`code` の無い Error、Error でない値) → `internal`
+- `conversion/text/`
+  - `charset.ts`: `decodeText(bytes: Uint8Array, declared?: string | null): string`
+  - `plain-text.ts`: `plainToText(bytes)`、`html.ts`: `htmlToText(bytes)` (`<meta charset>` を自分で読む)、`xml-text.ts`: `xmlToText(bytes)` (XML 宣言の encoding を自分で読む)。どれも `string` を返す
+  - `ipynb.ts`: `ipynbToText(bytes: Uint8Array, outputMaxChars: number): string` と定数 `IPYNB_OUTPUT_MAX_CHARS = 10_000` (新)。1 出力の上限は `ConversionLimits` に入れず、`convert` がこの定数を渡す (`convert.spec.ts` で確かめる)
+  - `csv.ts` (新しいファイル。22.3 のとおり): `csvToText(bytes: Uint8Array): Promise<string>`
+- `conversion/ooxml/`
+  - `archive-guard.ts`: `inspectArchive(bytes: Uint8Array, requiredPart: string, limits: ArchiveLimits): Promise<OoxmlArchive | null>`。`ArchiveLimits = Pick<ConversionLimits, 'maxArchiveEntries' | 'maxArchiveUncompressedBytes'>`。`ArchiveEntry { readonly name: string; readonly declaredSize: number; readonly isDirectory: boolean }` (名前は、UTF-8 の印があれば UTF-8、無ければ latin-1 で読む)。`OoxmlArchive { readonly entries: readonly ArchiveEntry[]; readPart(name: string, maxBytes: number): Promise<Buffer>; openEntry(entry: ArchiveEntry): Promise<Readable>; close(): void }` (`entries` は中央ディレクトリの順で、同じ名前もすべて残す。`readPart` の失敗は、上限を超えると `limit_exceeded`、暗号化の印 (bit 0) は `encrypted`、部品が無い・CRC-32 が合わない・展開できない・閉じた後は `malformed`。上限の手前で読みをやめる)
+  - `safe-xml.ts`: `parseXmlPart(bytes: Uint8Array, label: string): Document` (`Document` は `@xmldom/xmldom` のもの。壊れた XML は `malformed`、名前空間の宣言が 1,000 個を超えると `limit_exceeded`)、`serializeXmlPart(document: Document): Buffer` (XML 宣言を `<?xml version='1.0' encoding='UTF-8'?>` にし、DOCTYPE を書き戻さない)
+  - `xlsx-cell-count.ts`: `enforceCellLimit(archive: OoxmlArchive, limits: Pick<ConversionLimits, 'maxXlsxCells' | 'maxArchiveUncompressedBytes'>): Promise<void>`
+  - `pptx-split.ts`: `convertPptx(bytes, limits): Promise<PageInfo[]>`、`xlsx-split.ts`: `convertXlsx(bytes, limits): Promise<PageInfo[]>`
+  - `index.ts` は `convertPptx` と `convertXlsx` だけを export する
+- テスト用の補助 (`src/conversion/spec-support/`、本番から import しない): `conversionLimits(overrides)` (本番の既定値に上書きを重ねる)、`conversionErrorOf(run)` (投げられた `ConversionError` を返し、それ以外ならテストを失敗させる)
+
+### 23.2 design.md の File Structure Plan と違う点
+
+- `ConversionLimits` を `contract/` に置いた。formats/ (大きさの事前判定) と runner/ (子への見出し) も使い、この 2 つは conversion/ を import できない (判断 1・2)。`contract/` は型だけを持つ末端の層で、6.10 の依存の検査が禁じる向きに当たらない。
+- 足したファイル: `conversion/conversion-error.ts`、`conversion/text/csv.ts`、`conversion/spec-support/`。テストのファイルは、800 行を超えないように `text/html-adversarial.spec.ts` (18.10 の悪意のある入力・自己終了・終わりのタグの読み方) と `ooxml/xlsx-split-repackage.spec.ts` (Python の `copy_part` 系と、ZIP の名前・ディレクトリの要素) に分けた。
+- `anydoc-contract.spec.ts` は src を何も import せず、anydoc 0.2.4 そのものの性質だけを確かめる (今すぐ通る)。「分割して足すと全体を一度に変換した結果と同じ」の 8 件は、`convertPptx` / `convertXlsx` を呼ぶので `pptx-split.spec.ts` / `xlsx-split.spec.ts` に置いた (6.5 で通る)。22.3 では契約テストに置く予定だった。
+
+### 23.3 実装が守ること (守らないとテストが黙って意味を失うか、落ちる)
+
+- `vi.mock` は import の指定子で差し替える。実装は次の場所から import すること。
+  - `convert.ts` は経路の関数を `./pdf` の `convertPdf`、`./ooxml/pptx-split` の `convertPptx`、`./ooxml/xlsx-split` の `convertXlsx` から呼ぶ (barrel の `./ooxml` 経由でも、同じファイルが読まれるので差し替えは効く見込み。未確認)。`convert.spec.ts` の 13 件がここを差し替える。
+  - anydoc の `toMarkdownBytes` は `'@firecrawl/anydoc'` から import する (`office.spec.ts` と split のテストが、本物を包んで呼び出しを記録する)。
+  - PDFium は `'@embedpdf/pdfium'` の `init` で読み込み、`malloc` / `free` は `init` が返した値の `pdfium.wasmExports` から呼び、PDFium の関数 (`FPDF…`) は `init` が返した値から呼ぶ (`pdf.spec.ts` が `init` を包んで、`malloc` の 0 と `abort` を起こす。14.8 の試作の形で通ることを確かめた)。
+- `inspectArchive` は中央ディレクトリだけを読んで archive を返し、部品のデータは `readPart` のときに読む (「データが申告より早く終わる部品は `readPart` で `malformed`」の件の前提)。
+- 変換の層はログを出さない (22.6)。
+
+### 23.4 取り込み (Req 12) のとき
+
+- design.md の Components and Interfaces の節 (共有層・変換の層の型の素案) を、この節の名前と形に合わせて直す。File Structure Plan は design.md の冒頭の注のとおり実装の後に削るので移さないが、`ConversionLimits` の置き場所の理由 (23.2) は「層の分け方の判断」に移す。
