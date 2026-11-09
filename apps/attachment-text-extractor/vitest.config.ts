@@ -4,5 +4,6 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
+    include: ['**/*.{test,spec,integ}.?(c|m)[jt]s?(x)'],
   },
 });
