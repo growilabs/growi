@@ -25,7 +25,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "minimatch": "^9.0.0",
+    "minimatch": "^11.0.1",
     "pino": "^9.0.0",
     "pino-http": "^11.0.0"
   },
