@@ -7237,3 +7237,83 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - **Python 版の撤去 (8.2) の前に、もう一度流す必要がある**。6.x で Node 版の実装が入った後に目印が増減していないかを、24.4 の検査で確かめる。撤去後は、この向け先が使えなくなる。
 - 6.12 でコンテナに向けるときも同じ環境変数で流す (`BLACKBOX_URL=http://<コンテナ>:<port> BLACKBOX_TOKEN=<トークン>`。`BLACKBOX_TARGET` は付けない)。
 - 黒箱のテストが確かめているのは、HTTP から見える振る舞いだけである。`/openapi.json` の drift の比較 (`test/openapi/`) や、本物のサーバーを起動する `src/http/*.integ.ts` は、Python 版には向けていない。
+
+## 25. Node 版に向けた RED の記録 (タスク 4.7)
+
+2026-11-09 に、テストが import するモジュールの空の実装を `apps/attachment-text-extractor/src/` と `scripts/` に置き (44 ファイル、合わせて 618 行)、4.2〜4.5 のテストを Node 版に向けて流した。**テストは変えていない**。空の実装は、6.x がそのまま本物に置き換える出発点である (名前・型・ファイルの置き場所は 23 節とテストの import のとおり)。import の一覧は、テストのファイルと補助 (`spec-support/`、`test/http/`、`test/openapi/`) の import・`vi.mock`・起動するファイルのパスを TypeScript の構文解析で抜き出して作った。
+
+### 25.1 空の実装の方針
+
+- **型、値の定数、例外のクラスは本物で書いた**: `contract/` の型、`ERROR_CODES`、`ERROR_TABLE` (中身は `error-table.spec.ts` のとおり)、`PRLIMIT_PATH`、`IPYNB_OUTPUT_MAX_CHARS`、`ConversionError`、`WireProtocolError`、`InvalidMultipart`・`UnreadableParams` (`parse-multipart.ts` は `header-params.ts` のものを export し直す。別のクラスにすると `instanceof` が合わない)。
+- **関数の本体はすべて `Error('not implemented: <場所>.<名前>')` で失敗する**。同期の関数は投げ、Promise を返す関数は拒否する。`convert` と `run()` も結果の値 (`internal` や `crashed`) を返さず拒否し、`readiness()` も `{ ready: false }` を返さず拒否する。結果の値で返すと、その値を期待する件 (`convert.spec.ts` の `internal` の 2 件、読めない子の入口が `crashed` の件、準備未完了の件) を偶然通してしまうためである。
+- `openApiDocument` は空のオブジェクト `{}` にした。`openapi-document.integ.ts` がファイルの読み込みのときに `responseChecker(openApiDocument)` を呼ぶので、投げるとファイルごと読み込みで落ちる。
+- 起動される script (`child/child-entry.ts`、`scripts/export-openapi.ts`) は、読み込むとすぐに例外で終わる (結果の枠も文書も書かない)。
+- 置かなかったもの: `main.ts`、`contract/` と `http/` 以外の barrel、`runner/readiness.ts`、HTTP の層の内部のファイル (`bearer-auth.ts` など)。テストが import しないので、6.x が作る。`package.json` の `build` は 6.6 が足す (変えていない)。`dist/` は無い。
+
+### 25.2 置き換える担当
+
+| 担当 | 空の実装のファイル |
+|---|---|
+| 6.1 | `contract/` (4 ファイル + `index.ts`。型と `ERROR_CODES` は本物)、`formats/format-table.ts`・`input-size.ts`、`wire/length-prefixed-json.ts`、`config/load-settings.ts` |
+| 6.2 | `conversion/normalize.ts`、`conversion/text/` の `charset`・`plain-text`・`html`・`xml-text`・`ipynb`・`csv` |
+| 6.3 | `conversion/ooxml/` の `archive-guard`・`safe-xml`・`xlsx-cell-count`・`pptx-split`・`xlsx-split` |
+| 6.4 | `conversion/office.ts`、`conversion/pdf.ts` |
+| 6.5 | `conversion/convert.ts` (`conversion-error.ts` は本物で、6.2〜6.5 が使う) |
+| 6.6 | `child/child-entry.ts`・`parent-watch.ts`・`child-result.ts` |
+| 6.7 | `runner/conversion-runner.ts`・`child-exit.ts`・`child-env.ts`、`runner/linux/` の `prlimit-args` (`PRLIMIT_PATH` は本物)・`platform`・`proc-rss` |
+| 6.8 | `http/` の `index`・`create-app`・`start-server`・`concurrency-slots`・`parse-multipart`・`header-params`・`openapi-route` (`{}` を手書きの文書に)。`error-table.ts` は本物 |
+| 6.9 | `scripts/export-openapi.ts`、`scripts/check-openapi-drift.ts` |
+
+### 25.3 結果 (`BLACKBOX_URL` なし。黒箱のテストはファイルごとに自分で Node 版を起動する形)
+
+| 範囲 | ファイル | 通った | 落ちた | 実行されず | 所要 |
+|---|---|---|---|---|---|
+| 4.2 `src/formats src/wire src/config src/conversion` | 22 | 47 | 934 | 0 | 4.1 秒 |
+| 4.3 `src/runner src/child` | 12 | 2 | 140 | 0 | 20.8 秒 |
+| 4.4 `src/http test/http test/openapi` | 27 | 5 | 2,465 | 312 | 2.4 秒 |
+| 4.5 `test/deploy` | 6 | 27 | 51 | 0 | 0.4 秒 |
+
+件数は 4.2〜4.4 のテストを書いたときの数 (981・142・黒箱 312) と 4.5 の 78 に一致する。package 全体を 1 回で流した結果 (`vitest run`) と、範囲ごとに流した結果は、4 つの範囲とも件数が完全に一致した。
+
+ファイルごと (通った / 落ちた):
+- 4.2: `load-settings` 0/75、`anydoc-contract` 47/0、`convert` 0/60、`normalize` 0/29、`office` 0/37、`archive-guard` 0/46、`pptx-split` 0/64、`safe-xml` 0/51、`xlsx-cell-count` 0/35、`xlsx-split-repackage` 0/22、`xlsx-split` 0/47、`pdf` 0/16、`charset` 0/103、`csv` 0/7、`html-adversarial` 0/32、`html` 0/49、`ipynb` 0/12、`plain-text` 0/7、`xml-text` 0/33、`format-table` 0/121、`input-size` 0/27、`length-prefixed-json` 0/61
+- 4.3: `child-entry` 0/4、`child-result` 0/9、`parent-watch` 1/6、`child-env` 0/1、`child-exit` 0/10、`child-isolation` 0/31、`conversion-runner` 0/45、`platform` 0/4、`prlimit-args` 1/11、`proc-rss` 0/8、`process-limits` 0/5、`readiness` 0/6
+- 4.4: `bearer-auth` 0/19、`client-disconnect` 0/4、`concurrency-slots` 0/5、`early-answer` 0/12、`error-table` 2/0、`extract-limits` 0/19、`extract-route` 0/24、`header-params` 1/2,012、`health-routes` 0/10、`openapi-route` 0/5、`parse-multipart` 1/294、`receive-upload` 0/12、`request-log` 0/17、`slot-return` 0/4、`export-openapi` 1/5、`openapi-document` 0/16、`openapi-drift` 0/7。黒箱の 10 ファイル (312 件) は、`beforeAll` でサービスを起動するときに `loadSettings` が失敗し、ファイルが失敗として報告され、312 件は実行されなかった (vitest の数え方では skipped)
+- 4.5: `compose` 12/3、`dockerfile-model` 7/0、`dockerfile` 0/19、`k8s-manifests` 0/29、`production-dependencies` 4/0、`yaml-parse` 4/0
+
+### 25.4 失敗の理由
+
+| 理由 | 4.2 | 4.3 | 4.4 | 4.5 |
+|---|---|---|---|---|
+| A. 空の実装の `not implemented` がそのまま出た (拒否された Promise、起動した script の終了を含む) | 848 | 129 | 2,309 | 0 |
+| B1. 期待した例外 (`WireProtocolError`・`RangeError`・`UnreadableParams`・`InvalidMultipart`・環境変数の名前を含む文) の代わりに `not implemented` が投げられた | 85 | 0 | 154 | 0 |
+| B2. そのほかの値の食い違い (空の実装が原因: `csvToText` が `ConversionError` でない例外、子の入口が `oom_score_adj` を上げない (4)、見張りが動かないので親が消えても子が止まらない (1)、別のプロセスの親 (`runner-host.ts`) が `loadSettings` で終わり子の印が書かれない (1)、`openApiDocument` が空 (2)。配備物: compose の `WORKERS`・healthcheck・build の `context` (3)、`build` スクリプトが無い (1)) | 1 | 6 | 2 | 4 |
+| C. 子の側の補助の script が `startParentWatch` の拒否で 1 行目を書く前に終わった | 0 | 5 | 0 | 0 |
+| D. 配備物のファイルが無い (`docker/Dockerfile`、`deploy/k8s/`。6.11 で作る) | 0 | 0 | 0 | 47 |
+| import の失敗 (`Cannot find module`・`Failed to load url`・`is not a function`・`is not exported`・`does not provide an export`・`ERR_MODULE_NOT_FOUND`・`ReferenceError`) | 0 | 0 | 0 | 0 |
+
+- テストが別のプロセスとして起動する script (`child-entry.ts`、`watch-then.ts`、`runner-host.ts`、`export-openapi.ts`) の標準エラーは捨てられるので、別に起動して確かめた。どれも空の実装の `not implemented` (`child/child-entry`、`child/parent-watch.startParentWatch`、`config/load-settings.loadSettings`、`scripts/export-openapi`) で終わり、読み込みの失敗は無かった。
+- **先に `loadSettings` で止まる件**: 実行管理の結合テスト (`conversion-runner`・`child-isolation`・`process-limits`・`readiness` など、4.3 の 87 件。別のプロセスの親の中で止まる 3 件を含む) と HTTP の層の結合テスト (4.4 の 140 件と黒箱の 10 ファイル) は、準備の段階で `loadSettings` (6.1) の空の実装に当たって落ちる。自分の層の空の実装 (`createConversionRunner`・`createApp`・`startServer`) にはまだ届いていない。6.1 が入ると、それぞれの層の空の実装で落ちるようになる。既定の子の入口 (`dist/child/child-entry.js`) が無いことで落ちる件 (23.5 の決定 5) は、今回はまだ出ていない。
+- テストの書き方の誤り (未定義の関数を呼ぶ、型が合わない、期待値の書き間違い) による失敗は見つからなかった。すべての失敗は、空の実装か配備物が無いことに帰着する。型検査もテストのファイルを含めて通る (空の実装を置く前は 146 件の誤りで、ほとんどが `TS2307`。`openapi-document.integ.ts` の `TS2677` も `ERROR_TABLE` の型が決まって消えた)。
+
+### 25.5 空の実装で通った件 (4.2〜4.5 の 81 件)
+
+| 件数 | テスト | 通る理由 | 組の相手 |
+|---|---|---|---|
+| 47 | `anydoc-contract.spec.ts` | src を import せず anydoc 0.2.4 だけを確かめる (23.2) | — |
+| 1 | `parent-watch.integ.ts` の「見張りの無い子は回り続ける」 | 対照の件 (否定) | 見張りのある子が終わる件 6 件が落ちる |
+| 1 | `prlimit-args.spec.ts` の「絶対パスで起動する」 | 本物の定数 `PRLIMIT_PATH` | ほかの 11 件が落ちる |
+| 2 | `error-table.spec.ts` | 本物の定数 `ERROR_TABLE`・`ERROR_CODES` | — |
+| 2 | `header-params.spec.ts`・`parse-multipart.spec.ts` の「どの例にも記録した結果がある」 | 固定データの点検 (実装を呼ばない) | 2,012 件・294 件が落ちる |
+| 1 | `export-openapi.integ.ts` の「`--output` が無ければ失敗する」 | 否定の件 (script がすぐ例外で終わる) | 書き出しの 5 件が落ちる |
+| 12 | `compose.spec.ts` の安全設定 | 今の compose がすでに満たす (23.7) | 3 件が落ちる (8.2 で通る) |
+| 4 | `production-dependencies.spec.ts` | 3.8 で入れた依存の記録 (23.7) | — |
+| 11 | `dockerfile-model.spec.ts`・`yaml-parse.spec.ts` | テスト用の読み手の単体テスト | — |
+
+4.2〜4.5 の外 (`benchmark/`、`test/fixtures/`、`src/smoke.spec.ts`。src の実装を import しない) は、444 件が通り 12 件が飛ばされた (ベンチマークの条件付きの件)。
+
+### 25.6 型検査・lint・後始末
+
+- `tsgo --noEmit` (package 全体): 誤り 0。`biome check` (package 全体): 誤り 0、警告 24 件 (すべて既存のテストのファイルの `noAwaitInLoops`。空の実装のファイルは 0)。`scripts/` は `tsconfig.json` の `include` に無いので、`export-openapi.ts` は型検査の対象外 (`check-openapi-drift.ts` はテストから import されるので検査される)。
+- 層の依存の向き: `conversion/` は `contract/`・`formats/` だけ、`runner/` は `contract/`・`config/` だけ、`http/` は `contract/`・`config/`・`runner/` (型だけ) を import する。逆向きの import は無い。
+- 後始末: テストの前後で、プロセスの一覧 (`ps`)、待ち受けのポート (`ss -ltn`)、`/tmp` の項目を比べ、増えたものは無かった。
