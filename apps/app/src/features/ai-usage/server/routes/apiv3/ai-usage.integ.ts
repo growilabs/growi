@@ -109,7 +109,7 @@ describe('GET /_api/v3/ai-usage behind the real middleware order', () => {
   });
 
   beforeEach(async () => {
-    crowi.appService.isMaintenanceMode.mockReturnValue(false);
+    vi.mocked(crowi.appService.isMaintenanceMode).mockReturnValue(false);
     vi.mocked(buildAiUsageReport).mockClear();
     await prisma.mastrarefreshedmodelcatalogs.deleteMany();
     // Every case shares the loopback address, hence one rate-limit bucket.
@@ -135,7 +135,7 @@ describe('GET /_api/v3/ai-usage behind the real middleware order', () => {
   });
 
   it('answers 200 while maintenance mode is on', async () => {
-    crowi.appService.isMaintenanceMode.mockReturnValue(true);
+    vi.mocked(crowi.appService.isMaintenanceMode).mockReturnValue(true);
 
     const blocked = await request(app).get(PATH_BEHIND_MAINTENANCE_CHECK);
     const res = await request(app)
