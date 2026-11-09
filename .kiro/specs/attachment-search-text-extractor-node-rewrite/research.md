@@ -225,6 +225,7 @@ design を書くために、小さな試作で次のことを確かめた。**�
 - Req 1.10 (a) 何を崩すか、(b) 守ると何が複雑になるか、(c) 下流の変更の範囲: 上の表と 7.4 のとおり。下流の変更は無い。
 - 引き継ぎ: この spec の design.md の Revalidation Triggers に、「本文の形の例外 3 件 (`Content-Length` が小さい要求、boundary の CR、`charset` を使わないこと)」を足す。取り込み (Req 12) のとき、対象 spec の design.md の Error Handling の表と requirements に反映する。6.x の固定データ (16.9 (a)) には、この 3 件に当たる要求を「期待を分ける」ものとして入れる。
 - 12 番 (`Connection: close` を付けて 2 件目を続けた場合に 422 が捨てられて 400 だけ届くことがある) は、1 と同じ仕組みで、同じ決定の範囲とする。
+- **項目 1 への訂正の注記 (タスク 4.4 とそのレビュー、2026-11-09)**: 表の「Python 版: 422」は、測り直すと再現しなかった。Python 版 (uvicorn 0.46.0 + httptools、research.md 8 節の既定の設定) に、`Content-Length` を本文より 5・10・20・21・40・60・80・100 バイト小さくした multipart の要求を送ると、一度に送っても、見出しと本文を分けて送っても、毎回 `code` の無い 400 (本文は `Invalid HTTP request received.`) だった (4.4 の作業で 30 回、レビューで 8 通り)。1・2 バイトの差は終わりの区切りが削れないので 200。余りのバイトを 0.7 秒遅らせて送ると、Python 版も Node (Hono) も 200 の後に 400 を返した。httptools も、余りのバイトをすぐ「次の要求」として読んで 400 を返し、接続を閉じる (7.4 の (b) が Node について書いた仕組みと同じ)。つまり、この要求への状態は Python 版と Node 版で同じで、ユーザーが許容した Node 版の振る舞い (`code` の無い 400) は変わらず、契約は何も崩れていない。誤っていたのは「Python 版は 422」という前提だけである。ほかの送り方 (たとえば別の HTTP の実装の uvicorn、より大きな本文) は確かめていない。黒箱のテストに理由の id `7.5-1` は無い (22.5)。完了の報告 (Req 1.12) で、ユーザーに「7.5 の 1 は実際には差が無かった」と伝える。
 
 ## 8. Python 版を devcontainer で起動する手順 (タスク 1.3)
 
@@ -6826,7 +6827,7 @@ node timeout37.mjs 7                                                            
 ```typescript
 export type BlackboxTarget = 'node' | 'python';
 export type NodeOnlyReason =
-  '17.6' | 'D2' | 'D3' | '7.5-1' | '7.5-2' | '7.5-3' | '16.1' | '16.9';
+  '17.6' | 'D2' | 'D3' | '7.5-2' | '7.5-3' | '16.1' | '16.9';
 
 export const readTarget = (env: Readonly<Record<string, string | undefined>>): BlackboxTarget => {
   const raw = env.BLACKBOX_TARGET ?? 'node';
@@ -6865,11 +6866,11 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 
 **4.6 の手順**:
 1. Python 版を research.md 8 節の既定の設定で 1 回起動する。
-2. **`BLACKBOX_TARGET` を付けずに (`node` のまま)**、`BLACKBOX_URL=http://127.0.0.1:<port> BLACKBOX_TOKEN=<起動のトークン> ./node_modules/.bin/vitest run test/http` を Python 版に向けて 1 回流す。
+2. **`BLACKBOX_TARGET` を付けずに (`node` のまま)**、`BLACKBOX_URL=http://127.0.0.1:<port> BLACKBOX_TOKEN=<起動のトークン> ./node_modules/.bin/vitest run test/http` を Python 版に向けて 1 回流す。`BLACKBOX_URL` を設定すると、`vitest.config.ts` の `fileParallelism` がファイルの並列を切る (枠 3 つのサービスに 10 ファイルが同時に要求を送ると、偶然の 503 で落ちるため。タスク 4.4)。`--no-file-parallelism` を付ける必要は無い。6.12 がコンテナに向けるときも同じ。`BLACKBOX_URL` なし (Node 版をファイルごとに自分で起動する) の通常の実行は、従来どおりファイルを並べて動かす。
 3. **落ちたテストの集まりが、目印の付いたテストの集まり (`BLACKBOX_URL` なしで `vitest list test/http` が出す `[node-only:<id>]` の名前) と完全に一致する**ことを確かめる。
    - 目印が付いているのに通ったテストは、目印を外す (**付けすぎ**。`BLACKBOX_TARGET=python` で流すと飛ばされ、何も警告が出ないので、この手順でしか見つからない)。
    - 目印が無いのに落ちたテストは調べる (付け忘れ、またはテストの間違い)。
-4. 理由の id が 22.5 の表と 1 対 1 であること (`vitest list` の id の集合 = 22.5 の id の集合) を確かめる。
+4. 理由の id が 22.5 の表と 1 対 1 であること (`vitest list` の id の集合 = 22.5 の id の集合。7 つ: `17.6`・`D2`・`D3`・`7.5-2`・`7.5-3`・`16.1`・`16.9`) を確かめる。
 5. 最後に `BLACKBOX_TARGET=python` で流し、目印の付いたテストだけが飛ばされ、残りが通ることを確かめる。
 
 **手順 3 を動かした結果** (scratchpad の `check-markers.mjs`。`vitest list --json` と `vitest run --reporter=json` の結果を突き合わせる約 20 行の script。Python 版は 127.0.0.1:18010 に起動し、起動した PID だけを止めた。ポートの解放を確認した):
@@ -6894,9 +6895,8 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 | `17.6` | `/openapi.json` の説明文 5 か所が直した後の文であること (`/readyz` `/extract` `ErrorCode` `ExtractResponse` `PageInfo`) | 直す前の文 (forkserver、`None` など) | Req 7.1 / 7.5、17.6 の JSON。説明文を除いた比較 (drift) は両方で通るので目印は付けない |
 | `D2` | `/readyz` の `dependencies` の名前が `@firecrawl/anydoc` `@embedpdf/pdfium` `prlimit` `converter` の 4 つであること | `anydoc` `pypdfium2` `charset-normalizer` `converter` | D2、7.3、18.10 (T6 の部品は名前で出さない)。`converter` が `ok`、内部の名前が出ない、`pdf_strategy` が無い、は両方で通る (目印なし) |
 | `D3` | トークンありの `GET /docs` `GET /redoc` が 404 | 200 (画面が出る)。トークンなしは両方 401 (目印なし) | D3、7.2 |
-| `7.5-1` | `Content-Length` が本文より小さい要求 (37 番と、同じ仕組みの 12 番。7.5 の最後の項目) が、`code` の無い 400 で接続を閉じる | 422 `extraction_failed` | 7.4 の 1、7.5 の 1 (ユーザーが許容) |
 | `7.5-2` | boundary に CR を含む要求 (d37 番) が 422 | 200 | 7.4 の 2、7.5 の 2 |
-| `7.5-3` | 要求の `charset` で**状態が変わる**もの: m58・m61・v11・v18 (Python 422、Node 200)、v01・v02・v16 (Python 200、Node 422)、v10 (Python 500、Node 200)、v07 (拡張子が変わり、変換すれば Node 400 `unsupported_format` の見込み) | 左の列のとおり | 7.4 の 3、7.5 の 3。**状態が同じ 200 でファイル名の読み方だけが違うもの (m59・m60・d12・v03・v06・v15・v19・v20) は目印を付けない** (拡張子が同じで、状態から見えない。形式の判定を確かめるテストを置くときだけ付ける) |
+| `7.5-3` | 要求の `charset` で**状態が変わる**もの: m58・m61・v11・v18 (Python 422、Node 200)、v01・v02・v16 (Python 200、Node 422)、v10 (Python 500、Node 200)。v07 (拡張子が変わる) は、4.4 で作り直した要求に `mimeType=text/plain` を付けたので、どちらも 200 になり目印を付けない (実際に目印が付くのはこの 8 通り) | 左の列のとおり | 7.4 の 3、7.5 の 3。**状態が同じ 200 でファイル名の読み方だけが違うもの (m59・m60・d12・v03・v06・v15・v19・v20) は目印を付けない** (拡張子が同じで、状態から見えない。形式の判定を確かめるテストを置くときだけ付ける) |
 | `16.1` | `filename*=` と `filename*0=` を混ぜた要求 (d36・m21 番) が 422 `extraction_failed` | 500 (`code` なし) | 16.1 と 7.4 の「崩したことにはしないが、理由つきで Python 版と違うもの」(208 行)。**決定済み**: Node 版がエラー表に合わせ、4.x / 6.x のテストは Python 版と期待を分ける (212 行) |
 | `16.9` | HTTP の層の細かい違い 9 通り (y01・y04・y12・y14・y15・y16・y22・y37・y38): `GET`/`PUT`/`OPTIONS`/`HEAD /extract` が 404 (Python 405)、`POST /extract/` が 404 (Python 307)、`Expect: foo` が 417 (Python 200)、`Host` なしが 400 (Python 200)、`Authorization` の末尾の空白が 200 (Python 401) | 括弧のとおり | 16.9 の「HTTP の層の細かい違い」。**7 節の記録が無く、扱いは 6.8 が決める** (22.8 の 3)。黒箱に置くときだけ付ける |
 
@@ -6956,6 +6956,7 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 3. **16.9 の HTTP 層の 9 通り** (405 → 404、307 → 404、`Expect: foo` の 417、`Host` なしの 400、末尾の空白の `Authorization` の 200): Python 版と状態が違うのに 7 節 (Req 1.10) に記録が無い。16.9 は「7.4 には諮らない」とし、Req 1.2 / 1.3 / 1.6 / 7.x の約束の外で、Req 1.9 は崩すかを作業者が判断するとしている。(a) 7 節に足して崩した契約として扱う、(b) Node 版も Python 版に合わせる、のどちらかを 6.8 で決める。決まるまで、黒箱に置くときは目印 `16.9` を付ける。**d36・m21 は決定済み** (7.4 の 208・212 行、16.1): Python 版は `code` の無い 500 を返すので、(b) で合わせると Req 1.3 とエラー表に反する。Node 版は表どおりの 422 で、目印 `16.1` を付けて外す。また 16.9 の (a) の固定データ (312 通り) を作る担当が tasks.md に無い。Python 版を撤去 (8.2) する前に作る必要があるので、4.4 に含めるのが自然 (推論)。
 4. **Node 版の CI の workflow の静的テスト**: 22.3 の `test_ci_workflow.py` のとおり、書く 4.x のタスクが無い。既定は「対応させない」。足すなら 4.5 に約 10 項目。4.5 の範囲は広げていない。
 5. **環境の注意 (4.6 の担当へ)**: リポジトリの `services/attachment-text-extractor/.venv/bin/python` は、存在しない uv の Python (`/home/vscode/.local/share/uv/python/`) を指す壊れたリンクで、research.md 8 節の `.venv/bin/uvicorn` の起動は、そのままでは動かない。この作業では scratchpad に `UV_PYTHON_INSTALL_DIR` と `UV_PROJECT_ENVIRONMENT` を向けて `uv sync --frozen --extra dev` した (Python 3.12 をネットワークから取得した。リポジトリの `.venv` と `git status` は変わっていない)。`pytest --collect-only` は 0.59 秒で 1222 件。4.6 も同じ手順を使える。
+6. **7.5 の 1 は実際には差が無かった (タスク 4.4)**: 7.5 の項目 1 の訂正の注記のとおり、`Content-Length` が本文より小さい要求には Python 版も `code` の無い 400 を返す。理由の id `7.5-1` は外した (22.5)。完了の報告 (Req 1.12) で、ユーザーにこのことを伝える。
 
 ### 22.9 確かめたこと・確かめなかったこと
 
@@ -7086,3 +7087,39 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
   - 親のメモリ (大きな入力で 3 回時間切れにした後の RSS の増加): 66MB 未満。Python 版は 24MB 未満。レビューの実測では、同じ入力を使い回す形 (このテストの形) では増加はほぼ 0MiB。入力を毎回作る形では、正しい実装でも 44〜132MiB 増えた (V8 が片付ける時期の都合)。66MB は、まだ片付いていない入力の写しを 1 つ (44MB) だけ許す余裕で、毎回の写しを持ち続ける実装 (3 回で 132MB) は落ちる。
 - 「子が残らない」の判定は、テストのプロセスの子 (`/proc/<pid>/task/*/children`) を見る。これは、vitest がテストのファイルごとにプロセスを分ける既定の設定 (`pool` の既定) に頼っている。`pool` を threads などに変えると、他のファイルの子が混ざって成り立たなくなる。
 - 準備完了のテストが確かめるのは `ready` の真偽だけで、確認用の子が anydoc と PDFium を本当に読み込むこと (20.12) は 4.3 では確かめない。最後の守りは、6.12 の image の中での `/readyz` と `POST /extract` (PDF と DOCX) の確認である。
+
+### 23.6 タスク 4.4 のテストが決めた HTTP の層の名前と形
+
+2026-11-09 に、4.4 のテスト (`src/http/**` と `test/http/**`、`test/openapi/**`) が import する名前と、テストが前提にする振る舞いをまとめた。design.md の File Structure Plan の `http/` のファイル名はそのまま使った。(新) は design.md に無い名前。
+
+- `contract/error-code.ts`: `ERROR_CODES` (17.7 の 2 (ii) の名前。8 つの値の読み取り専用の配列で、OpenAPI の `ErrorCode.enum` と同じ順) と `ErrorCode = (typeof ERROR_CODES)[number]`。`contract/` の中で唯一の値になる。`contract/index.ts` は型だけを export したままにし、値はファイルから直接 import する。Suggestion (決めなくてよい): 値の置き場所を `http/error-table.ts` にする案もある (`contract/` を型だけの層に保てる)。
+- `http/index.ts`: `createApp` と `startServer` (新) を export する。
+- `http/create-app.ts`: `createApp(deps: AppDeps)`。`AppDeps { settings: Settings; runner: ConversionRunner; writeLog?: (line: string) => void }`。`writeLog` (新) は 1 件ごとのログの 1 行の書き先で、省くと標準エラーに書く。テストは `process.env` も標準出力も触らずに、ここでログを受け取る。
+- `http/start-server.ts` (新しいファイル): `startServer(app, { port, hostname }): Promise<StartedServer>`、`StartedServer { readonly port: number; close(): Promise<void> }`。`@hono/node-server` の `serve` を包み、本番と同じ配線 (`checkContinue` の受け手、`headersTimeout` / `requestTimeout` など。16.9) をここで行う。`main.ts` もテストもこれを使う。ポート 0 を渡すと OS が選んだポートを `port` に返す。`close()` は待機中の接続も閉じて解決する。
+- `http/error-table.ts`: `ERROR_TABLE: Readonly<Record<FailureKind, { code: ErrorCode; status: number; message: string }>>`。design.md の `{ code, status }` に、Python 版の決まった文 (`extract_errors.py`。`<kind>: <決まった文>` の形) の `message` を足した。
+- `http/concurrency-slots.ts`: `createConcurrencySlots(max: number)` が返すもの (`tryAcquire(): (() => void) | null`) (新)。空きが無ければ待たずに `null`。返す関数を 2 回呼んでも 1 つしか戻さない。
+- `http/parse-multipart.ts`: `boundaryOf(contentType: string): string`、`createMultipartParser(boundary: string)` (`write(chunk: Buffer): void` と `end(): { chunks: readonly Buffer[]; size: number; filename: string; mimeHint: string | null }`)、`InvalidMultipart` (16.8 の名前のまま)。不正な本文はすべて `InvalidMultipart` を投げる (`boundaryOf`・`write`・`end` のどれから投げてもよい)。
+- `http/header-params.ts`: `parseHeaderParams(value: string): { type: string; params: Record<string, string> }`、`InvalidMultipart`、`UnreadableParams extends InvalidMultipart` (16.8 の名前のまま)。
+- `http/openapi-route.ts`: `openApiDocument` (17.9 の名前のまま)。`/openapi.json` はこれをそのまま返す。
+- `scripts/export-openapi.ts`: `--output <path>` に文書を書き、親のディレクトリが無ければ作る。`--output` が無ければ 0 でない終了コードで終わる。テストは `node --import <swc の register>` で別のプロセスとして起動する。
+- `scripts/check-openapi-drift.ts` (新しいファイル。17.7 の「比べる処理を 1 つの関数にした小さな CLI」): `openApiDrift(actual: unknown, committed: unknown): readonly string[]`。違う所の JSON Pointer の一覧を返す (オブジェクトのキーの順は無視し、配列の順は区別する。注釈としての `description` を除く。`properties` の中の `description` という名前の項目は除かない)。import しただけで CLI の処理が動かないようにする (6.12 の CI の手順は CLI として呼ぶ)。
+- `/readyz`: 200 の本文は `{ status: 'ready', dependencies: { '@firecrawl/anydoc': 'ok', '@embedpdf/pdfium': 'ok', prlimit: 'ok', converter: 'ok' } }` ちょうど (D2)。準備未完了は 503 で `status: 'not_ready'` (このときの `dependencies` の値はテストで決めていない。`Readiness` は `{ ready: boolean }` のまま)。要求のたびに `runner.readiness()` を呼び、結果を覚えて使い回さない (未完了から戻れること。22.3 の `test_health.py` の行)。
+- 1 件ごとのログ: `writeLog` に渡す行の末尾が `extract format=<f> size=<n> duration_ms=<n> result=<r> child_peak_rss_mb=<n|unknown>` (行の頭に時刻などを付けてもよい)。`format` は成功なら応答の `mimeType`、それ以外はファイル名の拡張子を小文字にして英数字以外を除き 10 字までにしたもの (無ければ `unknown`。Python 版の `_format_of`)。`result` は `ok`、失敗の種類、HTTP の層が自分で返した `file_too_large`・`service_busy`・`invalid_upload` (`upload_timeout`・`client_disconnected`・`internal` も Python 版と同じ名前)。`LOG_LEVEL` が `INFO`・`DEBUG`・`NOTSET` なら書き、`WARNING`・`ERROR`・`CRITICAL` なら書かない。行は応答の後に書いてもよい (テストは行が現れるのを待つ)。
+- 413 の `message` は上限の MiB の数を含む (`50 MiB` など。Python 版の文と同じ)。
+- `RunInput`: テストは偽の runner が受け取った中身を `Buffer.from(input.bytes)` で読む (`http/spec-support/fake-runner.ts` の `forwardedBytes` の 1 か所)。16.9 の「断片のまま渡す」に合わせて 6.7 / 6.8 が `RunInput` の形を変えるなら、この関数と 4.3 のテストを一緒に直す。
+
+**design.md・22.7 と違う点**:
+- `/extract` を通るテストは、本物のサーバーをポート 0 で起こす (要求の本文を `c.env.incoming` から読むので、Hono の `app.request()` では確かめられない)。22.2 の決まりのとおり `*.integ.ts` にした: `bearer-auth`・`health-routes`・`openapi-route`・`extract-route`・`request-log` (22.7 では「単体」の一覧にあった)。子プロセスも本物の HTTP も使わない純関数 (`error-table`・`concurrency-slots`・`parse-multipart`・`header-params`) は `*.spec.ts`。
+- 足したテストのファイル: `src/http/early-answer.integ.ts` (16.9 の (e)〜(g))、`src/http/slot-return.integ.ts` (16.9 の (c))、`test/openapi/openapi-document.integ.ts` (17.7 の 2。(iv) で本物のサーバーを使う)、`test/openapi/export-openapi.integ.ts` (書き出しの手順を別のプロセスで動かす)。
+- 固定データ: `test/http/multipart-oracle.json` (生の要求 179 通りへの Python 版の応答と、解析器だけの結果。d33・d33b・d33c は undici の `FormData` が書く本文そのもので、固定の boundary を使う。Node 24 の `FormData` の出力と 1 バイトも違わないことを確かめた。d33 は Python 版で 422 `extraction_failed`)、`test/http/header-param-oracle.json` (引数の解析 2,000 件)。要求の中身は生成器 (`test/http/multipart-builders.ts`・`multipart-cases*.ts`・`header-param-samples.ts`) が作り、固定データには結果と要求の sha1 だけを置く。
+- 生の要求の番号 (`01`・`e07a`・`d37`・`v01` など) は 16.3 / 16.4 の名前を借りたもので、元のバイト列は残っていなかったので説明から作り直した。中身は元のものと同じではない (たとえば 07・r08・v07 は `mimeType` を付けたので Python 版も 200、37 は Python 版も 400)。m 系のうち研究記録に説明の無いものは作っていない。期待は、この作り直した要求に Python 版が返した結果 (2026-11-09 に実測) で、16.4 の表の値ではない。
+
+**引数の解析の固定データの中身 (レビューを受けて作り直した)**: 生成器は `form-data` の後に `; key=value` の組を 1〜4 個つなぐ。キーは `name`・`filename`・`filename*`・`filename*N`・`filename*N*`・`filename*00`・2^53 前後の番号・`name*`・ASCII でない名前 (`xé*`・`naïve`)・`__proto__` など、値は 16.3 の断片 (ときどき引用符つき)。2,000 件の内訳 (Python 版の結果を 2026-11-09 に取得): ファイル名つき 1,573 件、値の入った引数を持つもの 1,471 件、例外 (TypeError。番号の付いた引数と付かない引数が混ざったもの) 149 件、ASCII でない名前を含むもの 444 件、2^53 前後の番号を含むもの 630 件。16.8 の手本の解析器は 2,000 件すべて一致した。手本を 1 か所ずつ壊すと、番号の比べ方 (`BigInt` を `Number`) で 6 件 + 個別の 1 件、空白の削り方 (`\s` にする) で 768 件、引用符の数え方 (`\"` を引かない) で 163 件のテストが落ちた。個別の 2^53 の件は、壊しても通ってしまう形だったので、倍精度で同じ値になる 2 つの番号の値の並び順で区別する形に直した。
+
+**ほかに決めたこと (タスク 4.4 のレビューを受けて)**:
+- 理由の id は 7 つ (`17.6`・`D2`・`D3`・`7.5-2`・`7.5-3`・`16.1`・`16.9`)。`7.5-1` は外した。7.5 の項目 1 の訂正の注記のとおり、`Content-Length` が本文より小さい要求には Python 版も `code` の無い 400 を返し、差が無い。完了の報告 (Req 1.12) で、ユーザーに「7.5 の 1 は実際には差が無かった」と伝える。
+- `vitest.config.ts` に `fileParallelism: (process.env.BLACKBOX_URL ?? '') === ''` を足した。`BLACKBOX_URL` で外のサービス (Python 版や 6.12 のコンテナ) に向けるときだけ、ファイルの並列を切る。枠 3 つのサービスに 10 ファイルが同時に要求を送ると、偶然の 503 で落ちるためである。Node 版に向けるとき (`BLACKBOX_URL` なし) は、ファイルごとに自分でサービスを起動するので、従来どおり並べて動かす。
+- 応答の後に閉じる接続への 413 を 30 回送るテスト (HTTP/1.0、`Connection: close`、chunked) は、クライアントを別のプロセス (`src/http/spec-support/repeat-upload-client.mjs`。16.5 の `rep30.mjs` の形) で動かす。サーバーと同じプロセスでは、案 0 (`destroySoon` を差し替えない形) でも 413 が先に読み取られ、後戻りを見つけられない (レビューの実測)。参考実装 (scratchpad) を案 0 に壊すと 3 件とも落ち、壊さなければ 3 回続けて通った (1 回 約 2.5 秒)。
+- 一時ファイルを作らないこと (Req 3.3) は、`receive-upload.integ.ts` の Linux 限定の件で確かめる。25MiB の 3 件の同時のアップロードを、本文の途中 (20MiB まで送った時点) と変換の途中 (`holdingRunner` で止めた時点) で止め、このプロセスの `/proc/self/fd` が `os.tmpdir()` の下の新しい通常のファイルを指さないことを 500ms の間見る (`/tmp` の一覧は他のプロセスと共有するので比べない)。参考実装を「受け取りながら本文を一時ファイルに書く」形に壊すと落ちた。書いてすぐ閉じる形 (開いている時間が見回りの間隔より短い) は、この方法では見つからない。
+- 16.9 の HTTP の層の 9 通り (y01・y04・y12・y14・y15・y16・y22・y37・y38) の Node の期待は、試作の値 (Hono と Node の既定の振る舞い) で固定している。Hono / Node の版が上がると落ちることはありうる。目印 `16.9` で Python 版には向けない。6.8 が Python 版に合わせる (22.8 の 3 の (b)) と決めたら、`multipart-raw.integ.ts` の `NODE_ANSWERS` の y の行を消せば足りる。
+- 20.12 の 2 件 (応答のバイト列が一括で組んだ場合と同じこと、33MB の結果 3 件での親の最大 RSS) と、16.9 (d) のメモリの回帰テストは 6.8 の担当 (20.12 の決定)。4.4 では書いていない。親が tasks.md の 6.8 に一文を足す。

@@ -5,5 +5,6 @@ export default defineConfig({
     globals: true,
     root: './',
     include: ['**/*.{test,spec,integ}.?(c|m)[jt]s?(x)'],
+    fileParallelism: (process.env.BLACKBOX_URL ?? '') === '',
   },
 });
