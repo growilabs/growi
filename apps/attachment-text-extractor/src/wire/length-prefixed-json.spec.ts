@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { PassThrough, Readable, Writable } from 'node:stream';
 
 import type { ConversionOutcome, FailureKind } from '../contract';
@@ -352,4 +353,65 @@ describe('child-sent data is never treated as code', () => {
     });
     expect(globalThis).not.toHaveProperty('hijacked');
   });
+});
+
+// Req 3.9 / 3.14: a result that fits in the frame must not cost the parent unbounded memory or time.
+// A sync loop or an out-of-memory crash cannot be caught inside the test process, so each case runs
+// in its own process with a hard time limit and a small heap.
+describe('hostile result bodies in an isolated process', () => {
+  const RESULT_JSON_URL = new URL('./result-json.ts', import.meta.url).href;
+  const SMALL_HEAP_MB = 256;
+  const TIME_LIMIT_MS = 20_000;
+
+  // Prints the name of what decodeResult threw, or "decoded".
+  const decodeInChild = (bodyExpression: string) =>
+    spawnSync(
+      process.execPath,
+      [
+        `--max-old-space-size=${SMALL_HEAP_MB}`,
+        '--import',
+        '@swc-node/register/esm-register',
+        '--input-type=module',
+        '--eval',
+        `const { decodeResult } = await import(process.argv[1]);
+         const body = ${bodyExpression};
+         try { decodeResult(body); console.log('decoded'); }
+         catch (error) { console.log(error.name); }`,
+        RESULT_JSON_URL,
+      ],
+      { cwd: process.cwd(), encoding: 'utf8', timeout: TIME_LIMIT_MS },
+    );
+
+  const expectRefused = (bodyExpression: string): void => {
+    const child = decodeInChild(bodyExpression);
+
+    expect(child.error).toBeUndefined();
+    expect(child.signal).toBeNull();
+    expect(child.status).toBe(0);
+    expect(child.stdout.trim()).toBe('WireProtocolError');
+  };
+
+  const DEPTH = 16 * 1024 * 1024;
+
+  it('refuses a 32 MiB array nesting bomb without exhausting a small heap', () => {
+    expectRefused(`Buffer.from('['.repeat(${DEPTH}) + ']'.repeat(${DEPTH}))`);
+  }, 30_000);
+
+  it('refuses a 32 MiB object nesting bomb without exhausting a small heap', () => {
+    expectRefused(
+      `Buffer.from('{"a":'.repeat(${DEPTH / 3}) + '1' + '}'.repeat(${DEPTH / 3}))`,
+    );
+  }, 30_000);
+
+  it.each([
+    ['an array element', '[1,"x\\\\'],
+    ['an object value', '{"a":"b\\\\'],
+    ['an object key', '{"a\\\\'],
+  ])(
+    'refuses %s that ends inside a string cut off at a backslash',
+    (_id, literal) => {
+      expectRefused(`Buffer.from('${literal}')`);
+    },
+    30_000,
+  );
 });
