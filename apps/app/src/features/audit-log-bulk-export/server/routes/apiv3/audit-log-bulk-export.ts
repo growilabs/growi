@@ -25,7 +25,7 @@ const logger = loggerFactory('growi:routes:apiv3:audit-log-bulk-export');
 interface AuditLogExportReqBody {
   filters: {
     usernames?: string[];
-    actions?: SupportedActionType[];
+    actions?: SupportedActionType[] | null;
     dateFrom?: Date;
     dateTo?: Date;
   };
@@ -49,10 +49,7 @@ export const factory = (crowi: Crowi): Router => {
       body('filters.usernames').optional({ nullable: true }).isArray(),
       body('filters.usernames.*').optional({ nullable: true }).isString(),
       body('filters.actions').optional({ nullable: true }).isArray(),
-      body('filters.actions.*')
-        .optional({ nullable: true })
-        .isString()
-        .isIn(AllSupportedActions),
+      body('filters.actions.*').isString().isIn(AllSupportedActions),
       body('filters.dateFrom')
         .optional({ nullable: true })
         .isISO8601()
@@ -74,14 +71,14 @@ export const factory = (crowi: Crowi): Router => {
     apiV3FormValidator,
     async (req: AuthorizedRequest, res: ApiV3Response) => {
       const {
-        filters,
+        filters: requestFilters,
         format = AuditLogBulkExportFormat.json,
         restartJob,
       } = req.body;
 
       try {
         const jobId = await auditLogBulkExportService.createOrResetExportJob(
-          filters,
+          requestFilters,
           format,
           req.user?._id,
           restartJob,

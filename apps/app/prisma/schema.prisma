@@ -39,6 +39,13 @@ type ActivitiesSnapshot {
   fileSize     Int?
 }
 
+type AuditlogbulkexportjobsFilters {
+  users    String[]  @default([]) @db.ObjectId
+  actions  String[]  @default([])
+  dateFrom DateTime?
+  dateTo   DateTime?
+}
+
 type PageoperationsExPage {
   /// Field referred in an index, but found no data to define the type.
   id   Json? @map("_id")
@@ -133,13 +140,43 @@ model attachments {
   attachmentType        String
   createdAt             DateTime  @default(now())
 
-  creator              users?               @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  page                 pages?               @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  userImageAttachments users[]              @relation("UserImageAttachment")
-  pagebulkexportjobs   pagebulkexportjobs[]
+  creator                users?                   @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page                   pages?                   @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userImageAttachments   users[]                  @relation("UserImageAttachment")
+  pagebulkexportjobs     pagebulkexportjobs[]
+  auditlogbulkexportjobs auditlogbulkexportjobs[]
 
   @@index([pageId], map: "page_1")
   @@index([creatorId], map: "creator_1")
+}
+
+model auditlogbulkexportjobs {
+  id                 String                        @id @default(auto()) @map("_id") @db.ObjectId
+  v                  Int                           @default(0) @map("__v")
+  userId             String                        @map("user") @db.ObjectId
+  filters            AuditlogbulkexportjobsFilters
+  filterHash         String
+  format             String                        @default("json")
+  status             String                        @default("exporting")
+  lastExportedId     String?
+  completedAt        DateTime?
+  restartFlag        Boolean                       @default(false)
+  totalExportedCount Int?                          @default(0)
+  // optional: the attachment is hard-deleted by the download-expiration cleanup
+  // (AuditLogBulkExportJobCleanUpCronService) while the job row survives until the
+  // same cron pass deletes it
+  attachmentId       String?                       @map("attachment") @db.ObjectId
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  user       users        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // SetNull (not NoAction): the cleanup removes the attachment before deleting the
+  // job so that a failed removal leaves the job row for the next cron to retry.
+  // NoAction would make Prisma reject deleting an attachment a job still references.
+  attachment attachments? @relation(fields: [attachmentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([filterHash], map: "filterHash_1")
+  @@index([attachmentId], map: "attachment_1")
 }
 
 model bookmarkfolders {
@@ -679,18 +716,19 @@ model users {
   updatedAt               DateTime  @updatedAt
 
   activities             activities[]
-  comments               comments[]           @relation("CommentCreator")
-  resolvedInlineComments comments[]           @relation("InlineCommentResolver")
+  comments               comments[]               @relation("CommentCreator")
+  resolvedInlineComments comments[]               @relation("InlineCommentResolver")
   revisions              revisions[]
-  createdPages           pages[]              @relation("CreatedPages")
-  deletedPages           pages[]              @relation("DeletedPages")
-  lastUpdatedPages       pages[]              @relation("LastUpdatedPages")
-  imageAttachment        attachments?         @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
-  createdAttachments     attachments[]        @relation("CreatedAttachments")
+  createdPages           pages[]                  @relation("CreatedPages")
+  deletedPages           pages[]                  @relation("DeletedPages")
+  lastUpdatedPages       pages[]                  @relation("LastUpdatedPages")
+  imageAttachment        attachments?             @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
+  createdAttachments     attachments[]            @relation("CreatedAttachments")
   externalaccounts       externalaccounts[]
   bookmarks              bookmarks[]
   bookmarkfolders        bookmarkfolders[]
   pagebulkexportjobs     pagebulkexportjobs[]
+  auditlogbulkexportjobs auditlogbulkexportjobs[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")
