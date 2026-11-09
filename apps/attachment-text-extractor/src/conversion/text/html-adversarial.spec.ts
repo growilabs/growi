@@ -71,6 +71,16 @@ describe('htmlToText with "/ >" (a plain start tag for Python and WHATWG)', () =
   it('reads an unknown <x / > as a plain start tag', () => {
     expect(html('<p>a</p><x / ><p>b</p>')).toBe('a\nb');
   });
+
+  it('[guards htmlparser2 private field recognizeSelfClosing] keeps markup inside <title / > as title text', () => {
+    expect(html('<title / ><b>x</b></title><p>after</p>')).toBe(
+      '<b>x</b>\nafter',
+    );
+  });
+
+  it('[guards htmlparser2 private field recognizeSelfClosing] keeps a comment opener inside <script / > as script text', () => {
+    expect(html('<script / ><!--</script>--><p>after</p>')).toBe('-->\nafter');
+  });
 });
 
 describe('htmlToText with references in title and textarea', () => {

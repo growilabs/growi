@@ -1,3 +1,4 @@
-export const plainToText = (_bytes: Uint8Array): string => {
-  throw new Error('not implemented: conversion/text/plain-text.plainToText');
-};
+import { decodeText } from './charset';
+
+/** Decoded text only: JSON, YAML and the like are never parsed. */
+export const plainToText = (bytes: Uint8Array): string => decodeText(bytes);

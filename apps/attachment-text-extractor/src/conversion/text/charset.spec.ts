@@ -350,3 +350,15 @@ describe('decodeText: known limitation, UTF-16 without a BOM is not recognised (
     expect(decodeText(encode(text))).not.toBe(text);
   });
 });
+
+describe('decodeText: half-width katakana, same result as the Python service', () => {
+  it.each([
+    ['ｻﾝﾌﾟﾙﾃﾞｰﾀ', 'shift_jis'],
+    ['ｻﾝﾌﾟﾙﾃﾞｰﾀ 会議 ﾃｽﾄ', 'shift_jis'],
+    ['ﾔﾏﾀﾞ ﾀﾛｳ,ﾄｳｷｮｳ,03-1234-5678\r\n', 'shift_jis'],
+    ['ｶﾀｶﾅです', 'euc-jp'],
+    ['資料ｶﾞ届ｷﾏｼﾀ', 'euc-jp'],
+  ] as const)('reads %j encoded as %s', (text, encoding) => {
+    expect(decodeText(encodeText(text, encoding))).toBe(text);
+  });
+});
