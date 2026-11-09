@@ -6710,3 +6710,250 @@ node timeout37.mjs 7                                                            
 - **6.11 / 6.12**: linux-arm64 の image を作るなら、anydoc の `linux-arm64-gnu` が入ることを確かめる。`node:24-slim` は glibc なので `-gnu` の部品が選ばれる (推論。6.12 の image の中の `/readyz` と抽出の確認で、部品が欠けていれば見つかる)。PDFium は WASM なので CPU を選ばない。
 - **8.x**: 21.5 の表示を配布物にも置くかを決める。
 - **版を上げるとき**: `@embedpdf/pdfium` と `htmlparser2` は固定なので、上げる変更ではベンチマークと 18.5.1 の比べ方をやり直す。`@xmldom/xmldom` は勧告が出たら上げる (18.10)。
+
+## 22. テストの対応表 (タスク 4.1)
+
+2026-11-09 に、Python のテストの全ファイルを読み (`.py` 49 ファイル、`pytest --collect-only` で 1222 件)、対応表と、Python 版に向けるときに外すテストの目印を決めた。数字はとくに書いていなければ実測。測っていないものは「未確認」、読んで考えたものは「推論」と書いた。Python 版のコードと Node 側のファイルは変えていない (research.md への追記だけ)。
+
+### 22.1 結論
+
+- **Python のテスト 49 ファイルのすべて** (テスト 42 ファイル、補助 7 ファイル、テスト用の固定ファイル) の行き先を 22.3 に決めた。「対応させない」には、理由と、その性質を Node 版で守る場所 (または守らなくてよい理由) を書いた。
+- **目印の方法 (推奨は 1 つ)**: 黒箱のテストは `test/http/blackbox-target.ts` の `describeNodeOnly(理由の id, 名前, 本体)` / `itNodeOnly(...)` で包む。環境変数 `BLACKBOX_TARGET=python` のときだけ `skipIf` で飛ばす。vitest 3.2.6 には `tags` が無い (22.4) ので、この包みが design.md 614 行の「vitest のタグ」の代わりをする。
+- **外すテスト**は 22.5 の 8 行。理由の id は表の行と 1 対 1 で、`vitest list test/http` の出力と機械で突き合わせられる。
+- **ユーザー判断が要る事項は無い**。ただし進行役 (親) と 6.x の担当に、決めてほしい点が 4 つと、環境の注意が 1 つある (22.8)。決めてほしい点のうち 2 つは、7 節に記録が無い点である (XLSX の ZIP の `../` 名は未決、16.9 の HTTP 層の 9 通りは未記録)。d36・m21 は 7.4 (research.md 208・212 行) と 16.1 に記録があり決定済みである。
+
+### 22.2 テストの分け方と置き場所の規則
+
+**黒箱のテストの規則** (4.4 が `test/http/*.integ.ts` に置く。4.6 が Python 版に向ける):
+- 黒箱のテストは、外から 1 つのサービスの 1 つの設定 (**既定の設定**) に、HTTP だけで確かめられるものに限る。向け先の URL とトークンは環境変数で渡す。
+- 次のものは黒箱に置かない。**HTTP の層のテスト (4.4、`src/http/`) に置く。これらは Python 版に向けないので目印は要らない**。
+  - 既定でない上限が要るもの (`MAX_FILE_SIZE_MB=1`、`MAX_PDF_PAGES=2` など)
+  - 偽の子プロセスが要るもの (落ちる子、固まる子、メモリを増やす子)
+  - 1 秒未満の期限 (環境変数は整数なので渡せない)
+  - ログの捕捉が要るもの (外のサービスのログは読めない)
+- 向け先の環境変数 (名前をここで決める): `BLACKBOX_URL` (向け先。無ければ Node 版をテストの中で既定の設定で起動する)、`BLACKBOX_TOKEN` (向け先を起動したときのトークン。`BLACKBOX_URL` があるときは必須)、`BLACKBOX_TARGET` (`node` が既定。`python` を選ぶと目印の付いたテストを飛ばす。`python` は `BLACKBOX_URL` が無いと即座に失敗する)。ベンチマークの `BENCHMARK_URL` / `BENCHMARK_TOKEN` と同じ形で、トークンは引数でなく環境変数で渡す。
+- 6.12 は、同じ黒箱のテスト (`/readyz` が準備完了、PDF と DOCX の `POST /extract`) を `BLACKBOX_URL` でコンテナに向けて使える (推論。6.12 の担当が決める)。
+
+**置き場所と名前** (design.md の File Structure Plan と `.claude/rules/testing.md` の「テストは隣に置く」に従う):
+- 単体 (子プロセスも本物の HTTP も使わない): ソースの隣の `*.spec.ts`。
+- 子プロセスや本物の HTTP サーバーを使う: ソースの隣の `*.integ.ts`。黒箱も `*.integ.ts` (`test/http/` に置く。Node 版を自分で起動するときも本物の HTTP と子を使うため)。
+- `vitest.config.ts` の変更 (**4.3 と 4.4 のどちらかが最初に 1 回だけ行う。この 4.1 では変えていない**): 現在の設定は `*.integ.ts` を拾わない (scratchpad に写した設定で `src/runner/x.integ.ts` を置いて確かめた。`vitest run` は `a.spec.ts` の 1 件だけ動かした)。`test.include` を `['**/*.{spec,integ}.ts']` にする (同じ設定で `x.integ.ts` も動いた)。
+- テスト用の補助 (偽の子など) は `spec-support/` に置く (`benchmark/spec-support/` と同じ名前)。
+- 層の依存の向き (6.10) を守るため、`src/conversion/**` のテストは実行管理の層と HTTP の層を import しない。
+
+### 22.3 Python のテストと Node のテストの対応表
+
+担当の略: 4.2 = 共有層・設定・変換の層、4.3 = 実行管理 (子プロセス)、4.4 = HTTP の層と黒箱、4.5 = 配備物、既存 = すでに Node にある、対 = 対応させない。件数は Python 版の `pytest --collect-only` の件数 (合計 1222)。
+
+**変換 (`tests/conversion/`、14 ファイル 599 件)**
+
+| Python のテスト (件数) | 何を確かめるか | 担当 | Node のテスト | 備考 |
+|---|---|---|---|---|
+| `test_archive_guard.py` (46) | ZIP の要素数・申告サイズの上限、zip でない入力はそのまま通す、暗号化、読み出しの上限、壊れた圧縮 | 4.2 | `src/conversion/ooxml/archive-guard.spec.ts` | 流してつなぐ書き直し (`copy_part` 系 8 件) は `xlsx-split.spec.ts` へ。research.md 18.10 の追加項目 (version-needed 64 以上、UTF-8 の flag の不一致、CRC、末尾が `/` の要素は飛ばす、yazl の `'error'`) も足す。ZIP の名前に `../` が入る XLSX は未決 (22.8 の 2) |
+| `test_charset.py` (42) | 文字コードの判定 (UTF-8/16/32、Shift_JIS、EUC-JP、ISO-2022-JP、cp1252)、宣言の扱い、BOM | 4.2 | `src/conversion/text/charset.spec.ts` | 18.10 の追加: 敵意のある宣言、WHATWG と Python の違い。Python と違う期待は 22.6 |
+| `test_core.py` (54) | 入口: 経路の選択、正規化、空の要素の規則、失敗の種類、結果の大きさの上限、想定外の例外は `internal` | 4.2 | `src/conversion/convert.spec.ts` | `process_control_exceptions_propagate` (2、`SystemExit` 系) は対: Node に当たる例外が無い。子の中の `process.exit` は結果なしの終了で、4.3 の「結果なしで終わると `crashed`」(15.6) が守る。`sample.txt` を使う 1 件は、文字列を直接書く |
+| `test_formats.py` (119) | 形式の判定の表 (MIME・拡張子・大文字小文字・`xls` を `xlsx` で渡す・非対応) | 4.2 | `src/formats/format-table.spec.ts` | 表は design.md の対象 spec の §FormatResolver と同じ |
+| `test_input_size.py` (32) | CSV / HTML の大きさの事前判定 (ちょうどは通り、1 バイト超は `limit_exceeded`、他の形式は無制限、detail にサイズと名前を出さない) | 4.2 | `src/formats/input-size.spec.ts` | 最後の class (5) は入口が自分でも上限を守ること → `convert.spec.ts` |
+| `test_normalize.py` (29) | 改行の統一、日本語の間の詰め | 4.2 | `src/conversion/normalize.spec.ts` | 詰めは PDF だけ (Req 2.5) |
+| `test_office.py` (32) | anydoc の呼び出し (形式を明示、OCR なし)、暗号化・壊れた・上限の分類、detail に中身を出さない | 4.2 | `src/conversion/office.spec.ts` | `PanicException` (`BaseException`) の class と `interpreter_exits_are_not_swallowed` (2) は対 (理由は `test_core.py` と同じ)。投げられた値が `Error` でなくても `internal` になること (文字列・オブジェクト) を足す |
+| `test_ooxml_xml.py` (10) | 安全な XML の解析 (DTD・実体の展開を拒む、壊れた XML は `malformed`、接頭辞を保つ) | 4.2 | `src/conversion/ooxml/safe-xml.spec.ts` | 18.10 の項目 (使えない字、名前空間の宣言 1,000 個、書き戻しの XML 宣言) を足す。Python と違う期待は 22.6 |
+| `test_pdf.py` (14) | ページごとの要素、ページ数の上限、パスワード付き・所有者パスワードだけ・画像だけ・壊れた PDF、日本語の詰め | 4.2 | `src/conversion/pdf.spec.ts` | 期待は 14.8 のとおりそのまま成り立つ。`malloc` が 0 を返す、`Aborted` は `internal` (14.8) を足す |
+| `test_pptx_split.py` (65) | スライドごとの分割、自動代替テキストの除去、相対・絶対の参照、安全でない参照、上限、壊れた XML | 4.2 | `src/conversion/ooxml/pptx-split.spec.ts` | 「ピン止めした版」と「分割して足したものは全体を一度に変換した結果と同じ」(計 6) は `anydoc-contract.spec.ts` へ |
+| `test_text.py` (67) | プレーン (6)、HTML (23)、XML (14)、ipynb (11)、CSV / TSV (6)、HTML と XML 共通 (2)、サロゲート (5) | 4.2 | `src/conversion/text/{plain-text,html,xml-text,ipynb,csv}.spec.ts` | `csv.ts` は design.md の File Structure Plan に無い。6.2 が CSV / TSV の前処理のファイルを足し、`csv.spec.ts` を隣に置く。HTML は 18.10 の検査 33 件と時間の比の検査を足す |
+| `test_types.py` (8) | 失敗の種類、値の不変性、経路の型、設定から上限を作る | 4.2 | `src/config/load-settings.spec.ts` | 型の部分は `tsgo --noEmit` (`Record<FailureKind, …>` で漏れを見つける。Req 5.5)。「設定から上限を作る」(2) だけテストにする。ipynb の 1 出力の上限は固定の値 (design.md の `ConversionLimits` に項目が無いので、6.1 が置き場所を決める) |
+| `test_xlsx_split.py` (50) | シートごとの分割、非表示・グラフだけ・空のシート、元の順序、マーカー、書き直し、上限 | 4.2 | `src/conversion/ooxml/xlsx-split.spec.ts` | 契約の 6 件 (ピン止め、本文が元と同じ、マーカー) は `anydoc-contract.spec.ts` へ。ZIP の名前が `../` の要素は 22.8 の 2 |
+| `test_xlsx_split_precheck.py` (31) | セル数の数え方 (70,000 で通り 70,001 で拒む)、ZIP の分割をまたぐタグ、メモリが増えない | 4.2 | `src/conversion/ooxml/xlsx-cell-count.spec.ts` | |
+| 契約テスト (上の行から集める) | 版をピン止めした anydoc の挙動: PPTX の分割、XLSX の目印、XLS を `xlsx` で渡す、例外の分類 | 4.2 | `src/conversion/anydoc-contract.spec.ts` | tasks.md 4.2 の記述どおり。`test_dependencies.py` の「anydoc の版」もここ。anydoc を通す分割の契約は 6.5 で通る |
+
+**実行管理 (`tests/runner/`、7 ファイル 174 件 + 補助 3 ファイル)**
+
+| Python のテスト (件数) | 何を確かめるか | 担当 | Node のテスト | 備考 |
+|---|---|---|---|---|
+| `test_child_entry.py` (17) | 子の入口: 失敗の種類と detail を送る、想定外は `internal`、長すぎる detail は切る、結果が大きすぎる、不正な入力を拒む、親が消えたら 2 秒以内に終わる、上限は入力を読む前に掛かっている | 4.3 | `src/child/child-entry.integ.ts` | `exit_requests_are_re_raised` (2) は対 (`SystemExit`)。親の消失は 1 秒以内 (Req 3.11、15.4)。上限は `/proc/<pid>/limits` で確かめる |
+| `test_child_isolation.py` (27) | 本物の変換で: 時間切れ、RSS 超過、CPU 時間、異常終了、親の強制終了、既定の上限で大きな正常ファイルが通る、セル数の上限、テキストの爆発、巨大な PDF のページ | 4.3 | `src/runner/child-isolation.integ.ts` | 基準 (`child_peak_rss < 0.95 × MAX_CHILD_RSS_MB`) の 7 件は移せる。**`vm_peak < 0.8 × as_limit` は移さない** (V8 は上限に合わせて予約を変える。20.12)。子の `VmHWM` を結果と一緒に返させるか、テストが子の `VmHWM` を読む (見回りは山を取り逃がす。20.12) |
+| `test_conversion_runner.py` (48) | 1 件 1 子: 分類 (結果・時間切れ・RSS・結果の枠・異常終了・プロトコル違反・SIGXCPU)、子の起動失敗、大きさの事前判定、中止、200 回で fd・スレッド・子が漏れない、一時ファイルが残らない | 4.3 | `src/runner/conversion-runner.integ.ts` | `classify_exit` (7) → `src/runner/child-exit.spec.ts`、`parse_status_memory` (1) → `src/runner/linux/proc-rss.spec.ts` (単体)。対: `just_died_forkserver_is_crashed` (1、forkserver)、`from_settings` / `partial_request_limits` / `run_without_request_limits` (3、Python の引数の形で、TypeScript の型が防ぐ)。15.6 の表の各行をそのまま場合にする |
+| `test_extract_with_real_runner.py` (2) | 本物の子で `POST /extract`、トークンが子の環境に無い | 4.3 | `src/runner/child-env.spec.ts` + `conversion-runner.integ.ts` | トークンが子の `env` に無いことは `child-env` の単体と、子が自分の `process.env` を返す偽の子 (結合) の 2 段で確かめる (Req 3.8) |
+| `test_forkserver.py` (19) | forkserver の起動・事前読み込み・再起動・固まったときの時間制限・準備完了 | 4.3 (一部) | `src/runner/readiness.integ.ts`、`src/runner/child-env.spec.ts` | **対 12 件**: forkserver は Node 版に無い (子は 1 件ごとに `prlimit` で起動する。15 節)。起動・停止・再起動・pidfd・事前読み込みの保持など、forkserver の寿命に関する 12 件 (定義の順の 1・3・7・8・9・10・12・13・14) を移さない。**移す 5 件** (定義の順): 準備完了は `prlimit` と確認用の子で決まる (2、8.8)、確認用の子が読み込めないと準備未完了 (11)、確認用の子が固まっても期限内に答える (15・16)、子の `env` は `RAYON_NUM_THREADS=1` と `MALLOC_ARENA_MAX=2` (5、19.10)。**別の担当が守る 2 件**: 「運営者が設定した `RAYON_NUM_THREADS` を尊重する」(6) は 6.7 が決める (子の `env` は明示した値だけにする設計)、「事前読み込みが HTTP の層を読まない」(4) は 6.10 の依存の検査が守る |
+| `test_platform_guards.py` (8) | 子の上限: 仮想メモリ、CPU 時間の soft < hard、既存の hard を超えない、Linux 以外では何もしない、`/proc` で見える | 4.3 | `src/runner/linux/prlimit-args.spec.ts`、`platform.spec.ts`、`process-limits.integ.ts` | **値は変わる**: 仮想メモリの上限は `MAX_CHILD_RSS_MB` + **2,304MiB** (Python 版の +512 ではない。19.10)、親の hard で切り詰める。コアダンプは `--core=1` (15.1)。`oom_score_adj` も確かめる |
+| `test_wire.py` (53) | 長さ付きの枠 (4 バイト big-endian、上限、切れた枠)、結果の JSON の形、不正な本文・形の違反を拒む、部分読み・部分書き | 4.2 | `src/wire/length-prefixed-json.spec.ts` | 全件を移せる。「サロゲートの片割れを符号化できない」(1) は、Node では `JSON.stringify` が例外にしないので、期待は 6.1 が決める (変換の層が片割れを結果に出さないことは `text/*.spec.ts` のサロゲートの 6 件が守る) |
+| `child_targets.py`、`isolation_worker.py`、`conftest.py` (補助) | 偽の子 (abort・segfault・固まる・大きな結果ほか 20 種)、別プロセスの親、forkserver の後始末 | 4.3 | `src/runner/spec-support/child-targets.ts` ほか | 偽の子の差し替え口 (子の実行ファイルの引数) は 4.7 の空の実装で決める (未決)。`conftest.py` は forkserver 用なので対 |
+
+**HTTP・設定・配備物・その他 (`tests/` の直下、21 ファイル 449 件 + 補助 4 ファイル)**
+
+| Python のテスト (件数) | 何を確かめるか | 担当 | Node のテスト | 備考 |
+|---|---|---|---|---|
+| `test_bearer_auth.py` (13) | 認証 (正しい・無い・違う・形の違うトークン)、認証なしの 3 パス、トークンの確認は処理より前 | 4.4 | `src/http/bearer-auth.spec.ts` | `TestMiddlewareImport` (3、import できるか) は対。存在しないパスも 401 (Req 1.6)、比較は `timingSafeEqual` を足す |
+| `test_integration_auth.py` (7) | アプリ全体で認証、大きなファイル + 違うトークンは 401 | 4.4 | `test/http/auth.integ.ts` (黒箱) | |
+| `test_ci_workflow.py` (17) | CI の workflow の静的な検査 (名前・timeout・権限・trigger・手順の順・400MB・read-only/uid/ネットワークなし・`if:` の注釈) | 対 | — | **Node 版の CI の workflow の静的テストを書く 4.x のタスクが無い** (4.5 は Dockerfile・compose・k8s)。守るもの: 6.12 (image の確認の手順)、8.3 (実行の job 数が 0 より多いこと)、`.claude/rules/github-actions-workflows.md` (`if:` の注釈)。足すなら 4.5 に `test/deploy/ci-workflow.spec.ts` (約 10 項目)。**4.5 の範囲は広げていない** (22.8 の 4) |
+| `test_client_disconnect.py` (6) | 切断で変換を止めて後始末を待つ、キャンセル、偽の ASGI の受信 | 4.4 | `src/http/extract-route.spec.ts` (中止の合図の節) | 偽の runner と `AbortController` で、切断 → `signal` の中止 → 後始末を待つ → 枠を返す (3 件)。ASGI の `receive` が壊れる・切断以外のメッセージ (2 件) は対 (Hono には無い。切断は `c.req.raw.signal`) |
+| `test_config.py` (48) | トークンが無い・空・空白で起動しない、既定値、整数、環境変数での上書き、`LOG_LEVEL` の正規化、不正な値は起動時に失敗 | 4.2 | `src/config/load-settings.spec.ts` | 型の確認 (`is_int` など 13 件) は TypeScript の型が守る (対)。`max_extracted_bytes_is_removed` (1) は Python の履歴で対。**`WORKERS` を読まない**を足す (D1) |
+| `test_dependencies.py` (14) | 部品が import できる (11)、anydoc の版、ネットワークなしで CSV を変換、本番の依存に外部コマンドを使う部品が無い | 既存 + 4.2 + 4.5 | `src/smoke.spec.ts` (既存、10 件)、`anydoc-contract.spec.ts`、`test/deploy/production-dependencies.spec.ts` | 本番の依存の一覧が許可した 9 個 (21.2) だけで、禁止の部品 (外部コマンドや OCR) が無いことを 4.5 が確かめる (tasks.md 4.5 の「本番に不要なものを含まない」) |
+| `test_deploy_config.py` (14) | Dockerfile (版のピン止め、uid 10001、ワーカー数)、compose (read-only、tmpfs、メモリ、healthcheck、ネットワーク) | 4.5 | `test/deploy/dockerfile.spec.ts`、`compose.spec.ts` | 逆になるもの: `WORKERS` が**無い** (D1)。Python 固有で対: uv の版・`--extra dev`・`.pyc` の 3 件と、`TMPDIR` の部分 (要るかは T2 の結果で、6.x が決める)。足す: 最終の段で `prlimit` を実行、`RAYON_NUM_THREADS=1`、`/dev/shm` を使わない。compose の `context` は 8.2 で Node 版に切り替わるまで通らない (tasks.md 6.11) |
+| `test_e2e_http.py` (94) | 本物の runner で HTTP: 形式の表、日本語の詰め、エラー表、衛生、リクエストの形、各種の上限、時間切れ、子の失敗、枠 | 4.4 | 黒箱 (既定の設定) と HTTP の層 (設定を変えるもの) に分ける。22.7 | 黒箱: 形式 36、詰め 5、エラー表 17、衛生のうち応答の 5 (ログの側は `request-log.spec.ts`)、リクエストの形 7、既定の上限の CSV 1 = 71 件 (「失敗が次を壊さない」の子が残らない部分は黒箱では見えず、4.3 の 200 回のテストが守る)。HTTP の層 (`src/http/extract-limits.integ.ts` ほか): 上限の行 6、入力の大きさの上限の 7、時間切れ 2、子の失敗 5、枠 1、衛生のうちログの 2 = 23 件 |
+| `test_export_openapi.py` (9) | 書き出しの手順 (ファイルを書く・親ディレクトリを作る・JSON・トップのキー・必須のスキーマ・`$ref`・サブプロセス・エラーのステータス) | 4.4 | `test/openapi/export-openapi.spec.ts` | 手順は `scripts/export-openapi.ts` (6.9)。17.7 の検査 (i)〜(iv) は `test/openapi/openapi-document.spec.ts` |
+| `test_extract_router.py` (35) | 偽の runner で `POST /extract`: 成功、失敗の対応 (9 種)、枠の解放、ログ、認証、入力の上限、不正な multipart | 4.4 | `src/http/extract-route.spec.ts`、`error-table.spec.ts`、`parse-multipart.spec.ts` | 不正な multipart の 8 件は `parse-multipart.spec.ts` へ。16.9 の固定データ (22.7) の一部になる |
+| `test_fixture_files.py` (30) | テスト用ファイルの生成器が名前どおりの性質を持つ | 既存 | `test/fixtures/*.spec.ts` (2.3 / 2.4 で作成済み) | Python 版のテストへの差し替えは 10 節 (1222 件が同じ結果) |
+| `test_health.py` (11) | `/healthz` (200・認証なし)、`/readyz` (準備完了 200、未完了 503、公開する名前、内部の名前を出さない) | 4.4 | `src/http/health-routes.spec.ts` + 黒箱 `test/http/health.integ.ts` | 再確認の 2 件 (未完了のキャッシュを再確認して新しい答えを返す・再確認後も未完了なら 503) は forkserver の仕組みだが、**守りたい性質は残る: `/readyz` は準備未完了から戻れる** (対象 spec の design.md 258 行「準備できていない間は確かめ直す」)。6.7 が判定を覚えて使い回す形にすると、起動時に一度だけ失敗した Pod が 503 のままになり、`/healthz` は 200 なので k8s は再起動もせず、サービスにも戻さない。**4.4 の `health-routes.spec.ts` が、偽の runner の `readiness()` が 1 回目は未完了、2 回目は準備完了を返すとき、2 回目の `/readyz` が 200 を返すこと (503 のままにならない) を確かめる** (再確認の 2 件の Node 版)。名前の実名は D2 (22.5) |
+| `test_infrastructure.py` (10) | pytest の fixture (トークンの注入) と固定ファイルの存在 | 対 | — | pytest 固有。Node は設定を引数で渡し (`process.env` を書き換えない)、固定ファイルは `test/fixtures/*.spec.ts` が守る |
+| `test_k8s_manifests.py` (27) | k8s の例: 安全設定、メモリ・CPU、環境変数、probe、更新、HPA、NetworkPolicy、共有メモリを使わない | 4.5 | `test/deploy/k8s-manifests.spec.ts` | `WORKERS` が無い (D1)、requests / limits は 20.10 (512Mi / 2Gi)、予算の式は 20.7 に合わせる |
+| `test_limits.py` (18) | 同時実行の枠 (空きがなければ待たずに 503、解放)、届いたバイト数で大きさを数える、本文の上限 | 4.4 | `src/http/concurrency-slots.spec.ts`、`receive-upload.spec.ts` | 例外 class の 2 件は対。`file_too_large_message_contains_limit` (1) は応答の文言が同じであること |
+| `test_live_disconnect.py` (4) | 本物のサーバーで、変換の途中で切断すると子が止まり枠が戻る、30 回で漏れない | 4.4 | `src/http/client-disconnect.integ.ts` | 偽の子が要るので黒箱ではない |
+| `test_live_server.py` (11) | 本物のサーバーで: 一時ディレクトリを使わない、宣言の大きさで早く 413、chunked の上限、枠、受信の時間切れ、認証が先、ログ | 4.4 | `src/http/receive-upload.integ.ts` | 「一時ファイルを作らない」は、サーバーの `os.tmpdir()` を見るので黒箱にしない。ログの 2 件は `request-log.spec.ts`。宣言の大きさの 413 は既定の上限で足りるので黒箱にも置ける (`test/http/intake.integ.ts`) |
+| `test_main.py` (27) | アプリ全体の `/healthz` `/readyz` `/openapi.json` 認証、lifespan (forkserver の起動と停止)、ログの設定 | 4.4 | `health-routes.spec.ts`、`openapi-route.spec.ts`、黒箱 | **対 (6 件)**: lifespan のうち `app.state.runner`・forkserver の停止・forkserver そのものの自己回復の 3 件 (forkserver は Node 版に無い。守りたい性質 = `/readyz` が戻れることは、上の `test_health.py` の行のとおり 4.4 が守る)、Python の `logging` の設定 3 件 (Node はロガー。`LOG_LEVEL` が効くことは `request-log.spec.ts`)。lifespan の残り 3 件 (部品が読み込めて準備完了・内部の名前を出さない・部品が無いと準備未完了 503) は `runner.readiness()` の結果を 200 / 503 の形にするテストとして `health-routes.spec.ts` に移す |
+| `test_schemas.py` (39) | Pydantic のモデル (`PageInfo` `ExtractResponse` `ErrorCode` 8 値 `ErrorResponse`) | 対 (一部 4.4) | `test/openapi/openapi-document.spec.ts` | Pydantic の型検査 (必須・任意・型) は TypeScript の型 (`tsgo --noEmit`) が守る。`ErrorCode` が 8 値で同じ順 → 17.7 の (ii)、応答の形 → 17.7 の (iv)。`extractedCharacters` はコードポイントの数 (17.10) |
+| `test_security.py` (7) | XXE の対策の bootstrap (標準の XML 解析を `defusedxml` に替える) | 対 | `safe-xml.spec.ts`、`xml-text.spec.ts` | Node には標準の XML 解析が無い。XXE と billion laughs は `safe-xml.spec.ts` (DTD・実体を拒む) と `xml-text.spec.ts` (展開しない) が守る (test_ooxml_xml / test_text の項目) |
+| `test_smoke_extract.py` (8) | CI の補助 script (`smoke_extract.py`、`check_openapi_drift.py`): 応答の確認、multipart の本体、drift の比較 | 4.4 (一部) | `test/openapi/openapi-drift.spec.ts` | 比較の関数 (形の違いは drift でない・内容の違いは drift・commit 済みの文書と同じ) は 17.7 の 1 のとおり 4.4 が書く。smoke の 5 件は、6.12 が黒箱のテストを `BLACKBOX_URL` でコンテナに向ける形にするか、小さな script を書く (6.12 が決める。script を書くなら 6.12 が隣にテストを置く) |
+| `conftest.py`、`fixture_files.py`、`live_apps.py`、`live_server.py` (補助) | トークンと `TestClient`、生成器、偽の子つきのアプリ、uvicorn の起動 | 既存 / 4.4 | `test/fixtures/` (既存)、`src/http/spec-support/` | `fixture_files.py` は `test/fixtures/` が代わる (2 節、10 節)。`live_server.py` / `live_apps.py` は Node では `createApp` + `serve` をポート 0 で起動する補助に替わる |
+| `fixtures/`: `sample.txt`、`sample.json`、`README.md`、`legacy/*` (8 ファイル。`legacy/` は 5) | 固定の入力 | 既存 / 対 | `test/fixtures/legacy/` (既存、出所は `PROVENANCE.md`) | `sample.*` と `README.md` は対 (文字列を直接書く)。`legacy/` は移し済み |
+
+- `__pycache__` に残る `*_tmp`、`test_zz_probe*`、`test_e2e_extract` などは `.py` の元が無い古いキャッシュで、テストではない (`find tests -name '*.py'` は 49 件)。
+
+### 22.4 目印の方法の決め方と、動かして確かめた結果
+
+**候補と結果** (vitest 3.2.6、Node 24.22.2。scratchpad で動かした):
+
+| 方法 | 動いたか | 向かない点 |
+|---|---|---|
+| (a) vitest の `tags` | **使えない**。`vitest run --tags-filter='!node-only'` は `CACError: Unknown option --tagsFilter`。`{ tags: [...] }` は無視され、全件が動く | — |
+| (b) ファイル名 (`*.node-only.integ.ts`) と `--exclude '**/*.node-only.*'` | 動いた (`health.blackbox.spec.ts` だけが動き、`node-only` の側は動かなかった) | 話題ごとに目印の有無でファイルを割る必要がある。ファイル名の書き違いで黙って外れる。外したテストが報告に出ない |
+| (c) テスト名の印と `-t '^(?!.*\[node-only\])'` | 動いた (飛ばした 3 件が `↓` で出た) | 名前の正規表現に頼る。包みを使わずに名前だけ真似ても外れる |
+| **(d) 環境変数 `BLACKBOX_TARGET` と `describe.skipIf` / `it.skipIf` の包み (推奨)** | 動いた (下) | 包み (1 ファイル約 40 行) を 1 つ持つ |
+
+**(d) を選ぶ理由**: (1) 飛ばしたテストが `↓` と `Tests N skipped` で報告に出て、理由の id が名前に入る。(2) 理由の id を型 (`NodeOnlyReason`) にするので、表にない理由を付けるとコンパイルで落ちる。(3) 話題ごとにファイルを割らなくてよい。(4) `vitest list test/http | grep -o '\[node-only:[^]]*\]'` で一覧が取れ、22.5 の表と機械で突き合わせられ、Python 版で落ちたテストの集まりとも突き合わせられる (付けすぎと付け忘れの検出。4.6 の手順)。**期待を向け先で切り替える仕組み (`byTarget` など) は置かない**: 目印のないテストが Python 版でも同じ期待で通ることが 4.6 (Req 6.3) の検査なので、期待を切り替えると検査が空になる。違いは目印を付けて外す。
+
+**最小の例** (scratchpad の `vt/test/http/blackbox-target.ts` と `health.spec.ts`。4.4 がこの形で `test/http/blackbox-target.ts` に置く):
+
+```typescript
+export type BlackboxTarget = 'node' | 'python';
+export type NodeOnlyReason =
+  '17.6' | 'D2' | 'D3' | '7.5-1' | '7.5-2' | '7.5-3' | '16.1' | '16.9';
+
+export const readTarget = (env: Readonly<Record<string, string | undefined>>): BlackboxTarget => {
+  const raw = env.BLACKBOX_TARGET ?? 'node';
+  if (raw !== 'node' && raw !== 'python') throw new Error(`BLACKBOX_TARGET must be node or python, got: ${raw}`);
+  if (raw === 'python' && (env.BLACKBOX_URL ?? '') === '') throw new Error('BLACKBOX_TARGET=python needs BLACKBOX_URL');
+  return raw;
+};
+const target: BlackboxTarget = readTarget(process.env); // not exported: a test must not branch its expectation on the target
+
+export const describeNodeOnly = (reason: NodeOnlyReason, name: string, body: () => void): void => {
+  describe.skipIf(target === 'python')(`[node-only:${reason}] ${name}`, body);
+};
+export const itNodeOnly = (reason: NodeOnlyReason, name: string, body: () => void | Promise<void>): void => {
+  it.skipIf(target === 'python')(`[node-only:${reason}] ${name}`, body);
+};
+```
+
+**実際の Python 版に向けて動かした結果** (research.md 8 節のとおり Python 版を `127.0.0.1:18010` で起動した。起動した PID だけを止め、`pgrep -g` が空でポートが解放されたことを確かめた):
+
+```
+Python 版: GET /readyz -> {"status":"ready","dependencies":{"anydoc":"ok","pypdfium2":"ok","charset-normalizer":"ok","converter":"ok"}}
+Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200、GET /redoc (トークンあり) -> 200
+
+(1) 目印を無視して全部動かした (BLACKBOX_TARGET=node のまま Python 版へ。BLACKBOX_URL=http://127.0.0.1:18010):
+    ✓ /healthz answers ok without a token  ✓ /readyz is ready and lists the converter  ✓ /docs without a token is 401 on both
+    × [node-only:D2] readyz dependency names > lists the real package names   (配列 4 つが期待の 4 つと違う)
+    × [node-only:D3] GET /redoc with a token is not served                     (expected 200 to be 404)
+    Tests  2 failed | 3 passed (5)
+(2) BLACKBOX_TARGET=python BLACKBOX_URL=http://127.0.0.1:18010 vitest run test/http --reporter=verbose:
+    ✓ (上の 3 件)  ↓ [node-only:D2] readyz dependency names  ↓ [node-only:D3] GET /redoc with a token is not served
+    Tests  3 passed | 2 skipped (5)
+(3) BLACKBOX_URL なしで vitest list test/http | grep -o '\[node-only:[^]]*\]' | sort | uniq -c:   1 [node-only:D2]   1 [node-only:D3]  (飛ばした 2 件と一致)
+```
+
+ほかに確かめたこと: `BLACKBOX_TARGET=python` で `BLACKBOX_URL` が無いと `BLACKBOX_TARGET=python needs BLACKBOX_URL` で即座に失敗する。`BLACKBOX_TARGET=pythn` は「node か python のどちらか」と失敗する。`vitest list test/http` は `BLACKBOX_TARGET` を付けない (`node`) 状態で、目印の付いた全テストの名前を出す (`BLACKBOX_TARGET=python` で出すと飛ばすテストは出ないので、突き合わせは付けない状態で行う)。飛ばした件数 (`Tests N skipped`) は、この一覧の件数と一致した (2 件)。この例の `health.spec.ts` は、4.4 が書く本物の黒箱のテストの代わりに置いた最小の例である。
+
+**4.6 の手順**:
+1. Python 版を research.md 8 節の既定の設定で 1 回起動する。
+2. **`BLACKBOX_TARGET` を付けずに (`node` のまま)**、`BLACKBOX_URL=http://127.0.0.1:<port> BLACKBOX_TOKEN=<起動のトークン> ./node_modules/.bin/vitest run test/http` を Python 版に向けて 1 回流す。
+3. **落ちたテストの集まりが、目印の付いたテストの集まり (`BLACKBOX_URL` なしで `vitest list test/http` が出す `[node-only:<id>]` の名前) と完全に一致する**ことを確かめる。
+   - 目印が付いているのに通ったテストは、目印を外す (**付けすぎ**。`BLACKBOX_TARGET=python` で流すと飛ばされ、何も警告が出ないので、この手順でしか見つからない)。
+   - 目印が無いのに落ちたテストは調べる (付け忘れ、またはテストの間違い)。
+4. 理由の id が 22.5 の表と 1 対 1 であること (`vitest list` の id の集合 = 22.5 の id の集合) を確かめる。
+5. 最後に `BLACKBOX_TARGET=python` で流し、目印の付いたテストだけが飛ばされ、残りが通ることを確かめる。
+
+**手順 3 を動かした結果** (scratchpad の `check-markers.mjs`。`vitest list --json` と `vitest run --reporter=json` の結果を突き合わせる約 20 行の script。Python 版は 127.0.0.1:18010 に起動し、起動した PID だけを止めた。ポートの解放を確認した):
+
+```
+付けすぎ (GET /healthz に D3 を付けた) と付け忘れ (/docs のテストに目印なし) を入れた例:
+  marked: [D2 の 1 件, D3 の GET /healthz]    failed: [D2 の 1 件, 目印なしの /docs]
+  OVER-MARKED: [ '[node-only:D3] GET /healthz is 200 (wrongly marked)' ]
+  FORGOTTEN:   [ 'both services > /docs with a token is not served' ]        exit=1
+直した後 (付けすぎを外し、/docs のテストに D3 を付けた):
+  OVER-MARKED: []   FORGOTTEN: []                                           exit=0
+```
+
+付けすぎと付け忘れの両方を検出できた。この script は 4.6 の担当が必要なら `scripts/` か作業の記録に置く (置くかは 4.6 が決める)。
+
+### 22.5 Python 版に向けて動かすときに外すテストと根拠
+
+理由の id は `NodeOnlyReason` の値で、行と 1 対 1。黒箱 (`test/http/*.integ.ts`) の中のテストだけが対象 (黒箱でないテストは Python 版に向けないので、目印は要らない)。
+
+| id | 外すテスト (Node 版の黒箱) | Python 版の振る舞い | 根拠 |
+|---|---|---|---|
+| `17.6` | `/openapi.json` の説明文 5 か所が直した後の文であること (`/readyz` `/extract` `ErrorCode` `ExtractResponse` `PageInfo`) | 直す前の文 (forkserver、`None` など) | Req 7.1 / 7.5、17.6 の JSON。説明文を除いた比較 (drift) は両方で通るので目印は付けない |
+| `D2` | `/readyz` の `dependencies` の名前が `@firecrawl/anydoc` `@embedpdf/pdfium` `prlimit` `converter` の 4 つであること | `anydoc` `pypdfium2` `charset-normalizer` `converter` | D2、7.3、18.10 (T6 の部品は名前で出さない)。`converter` が `ok`、内部の名前が出ない、`pdf_strategy` が無い、は両方で通る (目印なし) |
+| `D3` | トークンありの `GET /docs` `GET /redoc` が 404 | 200 (画面が出る)。トークンなしは両方 401 (目印なし) | D3、7.2 |
+| `7.5-1` | `Content-Length` が本文より小さい要求 (37 番と、同じ仕組みの 12 番。7.5 の最後の項目) が、`code` の無い 400 で接続を閉じる | 422 `extraction_failed` | 7.4 の 1、7.5 の 1 (ユーザーが許容) |
+| `7.5-2` | boundary に CR を含む要求 (d37 番) が 422 | 200 | 7.4 の 2、7.5 の 2 |
+| `7.5-3` | 要求の `charset` で**状態が変わる**もの: m58・m61・v11・v18 (Python 422、Node 200)、v01・v02・v16 (Python 200、Node 422)、v10 (Python 500、Node 200)、v07 (拡張子が変わり、変換すれば Node 400 `unsupported_format` の見込み) | 左の列のとおり | 7.4 の 3、7.5 の 3。**状態が同じ 200 でファイル名の読み方だけが違うもの (m59・m60・d12・v03・v06・v15・v19・v20) は目印を付けない** (拡張子が同じで、状態から見えない。形式の判定を確かめるテストを置くときだけ付ける) |
+| `16.1` | `filename*=` と `filename*0=` を混ぜた要求 (d36・m21 番) が 422 `extraction_failed` | 500 (`code` なし) | 16.1 と 7.4 の「崩したことにはしないが、理由つきで Python 版と違うもの」(208 行)。**決定済み**: Node 版がエラー表に合わせ、4.x / 6.x のテストは Python 版と期待を分ける (212 行) |
+| `16.9` | HTTP の層の細かい違い 9 通り (y01・y04・y12・y14・y15・y16・y22・y37・y38): `GET`/`PUT`/`OPTIONS`/`HEAD /extract` が 404 (Python 405)、`POST /extract/` が 404 (Python 307)、`Expect: foo` が 417 (Python 200)、`Host` なしが 400 (Python 200)、`Authorization` の末尾の空白が 200 (Python 401) | 括弧のとおり | 16.9 の「HTTP の層の細かい違い」。**7 節の記録が無く、扱いは 6.8 が決める** (22.8 の 3)。黒箱に置くときだけ付ける |
+
+**黒箱でないので目印が要らないもの** (参考): `WORKERS` を読まない (D1) は HTTP から見えない。4.2 の設定のテスト (`WORKERS` を設定しても読まない) と 4.5 の配備物のテスト (compose と k8s に `WORKERS` が無い) が守り、どちらも Python 版に向けない。ZIP の名前が `../` の XLSX は 4.2 の単体で、黒箱に置かない (22.8 の 2)。ログの 1 行、設定を変えるもの、偽の子を使うものは HTTP の層のテスト (22.2)。
+
+**黒箱に置かない入力** (Python 版と Node 版で結果が違い、目印を付けても意味が薄いもの): 結果が約 1,310 万字を超える ASCII の DOCX、1 つの要素が約 48MiB の画像を持つ XLSX、1 ページに約 226 万字を超える PDF (どれも Python 版は通り Node 版は `resource_limit_exceeded`。20.9)。HTML は 18.7 の 8 の違い (閉じていない開始タグで終わる文書など) を避ける。
+
+### 22.6 Python と違う期待で書く Node 版の単体テスト (外すのではなく、Node の期待を明記)
+
+単体テストは Python 版に向けないので目印は要らない。期待が Python 版と違う点を、テストの名前か理由の 1 行で書く。
+
+- 18.7 の 1 (デコードの表: `〜` → `～` など 6 字)、2・3・4 (宣言 `iso-8859-1`・`ascii`、`replacement` のラベル)、7 (ZIP の名前は latin-1)、8 (HTML: 末尾の閉じていない開始タグ、`<!-->`)、9 (OOXML の XML: 同名の属性、WHATWG にだけある文字コード名、名前空間の宣言 1,000 個の上限、DOCTYPE の引用符、`ATTLIST`)、10 (`cp437` などの宣言) → `charset.spec.ts` `html.spec.ts` `safe-xml.spec.ts`。**Python 版で失敗する期待は、理由を付けた名前にする。Python 版と同じ振る舞いに戻すテストは書かない** (Req 2.3 の記録だけ)。
+- ZIP の読み (18.7 の 9 の表): ローカルの見出しと中央ディレクトリの名前の違い、圧縮後の大きさの偽り → Node 版のほうが緩い向き。テストは「落ちずに結果を返す」を確かめる。
+- 結果が上限を超えたときの種類は `result_too_large` (20.12。試作の `limit_exceeded` ではない)。
+
+### 22.7 担当ごとの「書くテスト」の一覧
+
+各行は、テストファイルが確かめる項目の見出し。件数の目安は Python 版の件数 (22.3)。
+
+**4.2 共有層・設定・変換の層** (`src/formats/`、`src/wire/`、`src/config/`、`src/conversion/**`)
+- `format-table.spec.ts`: MIME だけ・拡張子だけ・大文字小文字・MIME の引数・総称の MIME から拡張子へ・MIME が表にあれば拡張子より優先・非対応の 8 種・`xls` を `xlsx` で渡す
+- `input-size.spec.ts`: CSV / TSV 8MiB と HTML 20MiB の境 (ちょうど / 1 バイト超)・他の形式は無制限・detail にサイズと名前を出さない
+- `length-prefixed-json.spec.ts`: 4 バイトの長さ・部分読み書き・上限・切れた枠・結果の JSON の形・不正な本文と形を拒む (子が送るデータをコードとして扱わない。Req 3.9)
+- `load-settings.spec.ts`: トークンが無い・空・空白で失敗 (Req 1.5)・12 項目の既定値 (`MAX_CHILD_RSS_MB` 320、`MAX_XLSX_CELLS` 70,000 など)・整数・上書き・`LOG_LEVEL`・不正な値は起動時に失敗・**`WORKERS` を設定しても読まない**・設定から変換の上限を作る
+- `convert.spec.ts`: 経路ごとの要素の数・番号・label・空の要素の規則・最低 1 要素・結果の上限 (UTF-8 のバイト数)・失敗の種類・想定外の例外は `internal` (文字列やオブジェクトを投げても)・入口が CSV / HTML の上限を自分でも守る
+- `normalize.spec.ts` / `pdf.spec.ts` / `office.spec.ts`: 22.3 のとおり
+- `text/*.spec.ts`: `charset` (42)、`plain-text` (6)、`html` (23 + 18.10 の追加)、`xml-text` (14)、`ipynb` (11、サロゲートの 1 件を含む)、`csv` (6)、HTML と XML 共通 (2)、サロゲート (5)
+- `ooxml/*.spec.ts`: ZIP の事前検査、安全な XML、PPTX の分割、XLSX のセル数と分割
+- `anydoc-contract.spec.ts`: 版が 0.2.4 に固定、PPTX の分割 (足したものは全体と同じ)、XLSX の目印、XLS を `xlsx` で渡す、例外の `ConvertErrorCode` から失敗の種類への対応
+
+**4.3 実行管理 (子プロセス)** (`src/runner/**`、`src/child/**`、Linux のみ。`describe.skipIf(process.platform !== 'linux')`)
+- 単体: `child-exit.spec.ts` (終わり方 → 失敗の種類。15.6 の表)、`linux/prlimit-args.spec.ts` (仮想メモリ = RSS + 2,304MiB を親の hard で切る、CPU の soft < hard、コア 1)、`linux/proc-rss.spec.ts`、`child-env.spec.ts` (トークンなし、`RAYON_NUM_THREADS=1`、`MALLOC_ARENA_MAX=2`)
+- 結合 (本物の子): 時間切れ・RSS 超過・abort / segfault・結果なしの終了・SIGXCPU・親の消失 (1 秒以内)・結果の上限・中止で子が止まり回収される・200 回で漏れない・一時ファイルが残らない・`/proc/<pid>/limits` と `oom_score_adj`・トークンが子の環境に無い・子が送ったデータをコードとして扱わない・`prlimit` が無いと準備未完了・確認用の子が固まっても期限内に答える・基準のファイル (7 万セル XLSX、画像 12 枚の 48MB DOCX) の子の最大 RSS が 0.95 倍以内・同時に動かしてすべて成功する・入力の大きい子を見張る間も親のイベントループが応答する (Node の親は 1 本のスレッドで、見張りが止まると `/healthz` も止まる。Python 版の `test_concurrent_runs_all_succeed` と `test_supervising_a_slow_child_with_a_large_input_keeps_the_event_loop_responsive`)・変換の途中で切断された後も子と fd が残らない (黒箱の「失敗が次を壊さない」では見えない部分。200 回の漏れのテストが守る)
+
+**4.4 HTTP の層と黒箱**
+- `src/http/` 単体: `bearer-auth` (3 パスだけ認証なし、存在しないパスも 401)、`concurrency-slots`、`receive-upload` (届いたバイト数で上限)、`parse-multipart` + `header-params` (16.9 の固定データ)、`extract-route` (偽の runner。失敗の対応・枠の解放・中止の合図・`extractedCharacters` はコードポイント)、`error-table` (全失敗の種類)、`health-routes` (200 / 503 `not_ready`、`/healthz` は 200 のまま、**未完了の後に準備完了になれば `/readyz` が 200 に戻る**)、`request-log` (出す項目と出さない項目)、`openapi-route`
+- `src/http/*.integ.ts` (本物のサーバーと子、設定を変える): `extract-limits` (上限の行・入力の大きさの上限・時間切れ・子の失敗・枠)、`receive-upload` (宣言の大きさで早く 413・chunked・枠・受信の時間切れ・一時ファイルを作らない)、`client-disconnect`
+- `test/openapi/`: 17.7 の 1 (説明文を除いた drift) と 2 の (i)〜(iv)、書き出しの手順、比べる関数。17.10 はこれを 6.9 が作ると書くが、TDD の順 (Req 6.1) と tasks.md の 4.4 (`/openapi.json`) に従い 4.4 が先に書き、6.9 で通る。`test/openapi/` と `test/deploy/` はこの表で決めた置き場所 (design.md の File Structure Plan には無い)
+- **multipart の固定データ (16.9 の (a))**: 312 通りの生の要求と、Python 版の結果 (受け付けたか・ファイル名・拡張子・`mimeType`・大きさ・sha1・状態と `code`)。試作の道具 (`cases*`、`py_oracle.py` など) は research.md の 16.8 のコードの断片にしか無く、リポジトリには無い (scratchpad は消えている。未確認だが、この作業では見つからなかった)。作り直しには Python 版が要る。**tasks.md にこの作業の担当が書かれていない** (22.8 の 3)
+- `test/http/*.integ.ts` (黒箱): `auth` (認証)、`health` (`/healthz` `/readyz`、トークンなしの `/docs` `/redoc` は 401、トークンありは 404 (D3))、`formats` (形式の表 36、サロゲートペアを含むページの `extractedCharacters` はコードポイントの数 (17.10。tasks.md の 4.4 の黒箱の範囲と矛盾しない))、`line-breaks` (5)、`errors` (エラー表 13 行 + 401 + 失敗が次を壊さない)、`request-shape` (`file` が無い・空のファイル・ファイル名なし・`mimeType` の名前。17.10 の表)、`hygiene` (応答に中身とファイル名が無い。同じ Python のテストにある「ログにも出ない」の側は外のサービスのログが読めないので `request-log.spec.ts` へ)、`intake` (宣言の大きさで早く 413)、`openapi` (drift、応答の形)、`multipart-raw` (固定データのうち Python 版と同じ状態のもの)
+
+**4.5 配備物**
+- `dockerfile.spec.ts`: Node 24 の slim の版を固定、uid 10001、最終の段で `prlimit` を実行 (Req 8.7)、`RAYON_NUM_THREADS=1`、`pnpm deploy --prod`、`WORKERS` が無い、`/dev/shm` を使わない
+- `compose.spec.ts`: read-only と tmpfs、uid と capabilities、メモリ、healthcheck と init、永続ボリュームなし、外向き通信の遮断、`WORKERS` が無い (`context` は 8.2 まで通らない)
+- `k8s-manifests.spec.ts`: 27 項目 (安全設定、requests 512Mi / limits 2Gi、probe、HPA、NetworkPolicy、共有メモリなし、`WORKERS` なし)
+- `production-dependencies.spec.ts`: 本番の依存が許可した 9 個だけ
+
+### 22.8 親と 6.x の担当に決めてほしい点 (ユーザー判断は要らない)
+
+1. **`vitest.config.ts` の `include`**: 22.2 のとおり `*.integ.ts` を拾う設定に変える必要がある。4.2〜4.5 は並行して進める (P) ので、並行の前に親が 1 回だけ変えるのが安全 (推論)。この 4.1 は変えていない。
+2. **ZIP の名前が `../` などの XLSX の扱い**: 18.10 が 6.x の (a) 読み飛ばす / (b) `malformed` / (c) `kind` を付けて投げる、から選ぶとしていて、**7 節に記録が無く未決**。4.2 のテストは (a) (Python 版と同じ 200。18.10 の推奨) で書く。(b) か (c) を選ぶなら、Req 1.9 / 1.10 の記録 (7 節) と、黒箱に置く場合の目印が要る。
+3. **16.9 の HTTP 層の 9 通り** (405 → 404、307 → 404、`Expect: foo` の 417、`Host` なしの 400、末尾の空白の `Authorization` の 200): Python 版と状態が違うのに 7 節 (Req 1.10) に記録が無い。16.9 は「7.4 には諮らない」とし、Req 1.2 / 1.3 / 1.6 / 7.x の約束の外で、Req 1.9 は崩すかを作業者が判断するとしている。(a) 7 節に足して崩した契約として扱う、(b) Node 版も Python 版に合わせる、のどちらかを 6.8 で決める。決まるまで、黒箱に置くときは目印 `16.9` を付ける。**d36・m21 は決定済み** (7.4 の 208・212 行、16.1): Python 版は `code` の無い 500 を返すので、(b) で合わせると Req 1.3 とエラー表に反する。Node 版は表どおりの 422 で、目印 `16.1` を付けて外す。また 16.9 の (a) の固定データ (312 通り) を作る担当が tasks.md に無い。Python 版を撤去 (8.2) する前に作る必要があるので、4.4 に含めるのが自然 (推論)。
+4. **Node 版の CI の workflow の静的テスト**: 22.3 の `test_ci_workflow.py` のとおり、書く 4.x のタスクが無い。既定は「対応させない」。足すなら 4.5 に約 10 項目。4.5 の範囲は広げていない。
+5. **環境の注意 (4.6 の担当へ)**: リポジトリの `services/attachment-text-extractor/.venv/bin/python` は、存在しない uv の Python (`/home/vscode/.local/share/uv/python/`) を指す壊れたリンクで、research.md 8 節の `.venv/bin/uvicorn` の起動は、そのままでは動かない。この作業では scratchpad に `UV_PYTHON_INSTALL_DIR` と `UV_PROJECT_ENVIRONMENT` を向けて `uv sync --frozen --extra dev` した (Python 3.12 をネットワークから取得した。リポジトリの `.venv` と `git status` は変わっていない)。`pytest --collect-only` は 0.59 秒で 1222 件。4.6 も同じ手順を使える。
+
+### 22.9 確かめたこと・確かめなかったこと
+
+- 確かめた (実測): Python のテストの全ファイルと件数 (49 ファイル、1222 件、`pytest --collect-only`)。vitest 3.2.6 に `tags` が無いこと。(b)(c)(d) の 3 つの方法が動くこと。(d) が実際の Python 版 (`/readyz` `/docs` `/redoc`) に対して、目印なしで失敗し、目印ありで通ること。現在の `vitest.config.ts` が `*.integ.ts` を拾わないこと。
+- 確かめなかった: Node 版のテストの本体 (この 4.1 は表と方法を決めただけ)。黒箱のテストの中身が Python 版で通るか (4.6)。`test_dependencies.py` の「本番の依存に外部コマンドを使う部品が無い」の Node 版の許可・禁止の一覧の中身 (4.5 が決める)。16.9 の 9 通りが、実際に Python 版と何が違うかの再測定 (16.9 の記述を写した)。
+- RED (対応表の作成前): `grep -n "^## 22" research.md` は出力なし (終了コード 1) だった。

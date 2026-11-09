@@ -127,7 +127,7 @@
   - _Depends: 3.7_
 
 - [ ] 4. テストを Node (vitest) へ先に書き換える (段階 1)
-- [ ] 4.1 Python のテストと Node のテストの対応表を作る
+- [x] 4.1 Python のテストと Node のテストの対応表を作る
   - Python のテストファイルごとに、対応する Node のテストファイル、または対応させない理由 (forkserver・pickle・`BaseException` など Python に固有の仕組み) を書く
   - Python 版に向けて動かすときに外すテスト (直した OpenAPI の説明文、`/readyz` の `dependencies` の実名、`/docs` と `/redoc` が無いこと、`WORKERS` を読まないこと、崩した契約) の目印の付け方を決め、外すテストとその根拠を一覧にする
   - 対応表がこの spec の research.md にある
