@@ -39,6 +39,7 @@
     "officecrypto-tool": "0.0.19",
     "playwright-core": "1.64.1",
     "vitest": "^3.2.6",
-    "vitest-mock-extended": "^3.1.0"
+    "vitest-mock-extended": "^3.1.0",
+    "yaml": "^2.9.0"
   }
 }

@@ -152,7 +152,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.6, 1.7, 1.8, 3.1, 3.2, 3.3, 3.5, 4.3, 7.1_
   - _Boundary: HTTP の層のテスト、黒箱のテスト_
   - _Depends: 2.4, 3.8, 4.1_
-- [ ] 4.5 配備物のテストを書く (P)
+- [x] 4.5 配備物のテストを書く (P)
   - Dockerfile (Node 24 の slim、最終の段で `prlimit` を実行する、本番に不要なものを含まない)、compose のエントリ (`WORKERS` が無い、安全設定)、k8s の例 (推奨の安全設定、メモリの requests / limits が 3.7 の予算に合う、`WORKERS` が無い)、共有メモリを使わないことを、ファイルを読んで確かめる
   - テストは配備物がまだ Node 版になっていないため失敗する
   - _Requirements: 8.3, 8.4, 8.5, 8.6, 8.7_
@@ -262,7 +262,7 @@
   - _Requirements: 10.4, 10.5_
   - _Depends: 2.5, 2.9, 4.6, 6.14, 7.1_
 - [ ] 8.2 撤去と切り替えを 1 つの変更として行う
-  - compose の build の `context` を Node 版に切り替え、`WORKERS` を消す。CI の `paths` を切り替え、Python 版のジョブを消す。`services/attachment-text-extractor/` をディレクトリごと消す
+  - compose の build の `context` を Node 版に切り替え (リポジトリのルートを `context` にし、`dockerfile` を `apps/attachment-text-extractor/docker/Dockerfile` にする。research.md 23.7)、`WORKERS` を消し、healthcheck を `node` で `/readyz` を見る形に切り替える (`python`・`curl`・`wget` は slim の image に無い。`timeout` は 15 秒以上。research.md 23.7)。CI の `paths` を切り替え、Python 版のジョブを消す。`services/attachment-text-extractor/` をディレクトリごと消す
   - OpenAPI の説明文から Python に固有の言葉を取り除き、orval で生成クライアントを作り直す。直した説明文ごとに直す前と後の文を research.md に書く。CI の OpenAPI の比較を、説明文も含めた完全な比較に切り替える
   - 生成クライアントの差分がコメントだけであること、apps/app と下流 spec のファイルに変更が無いこと、`services/attachment-text-extractor/` が無く、`apps/attachment-text-extractor/` の下と抽出サービスの CI workflow に `.py` のファイルと uv / ruff / pytest / poe を使う記述が無いことを確かめる (`.kiro/` と steering の古い記述は 9.4 で扱うので、ここでは確かめない)
   - 4.5 の compose のテストを含むすべてのテストが通り、`turbo run lint test --filter @growi/attachment-text-extractor` と生成クライアントの package の lint / build が通る

@@ -7123,3 +7123,41 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 - 一時ファイルを作らないこと (Req 3.3) は、`receive-upload.integ.ts` の Linux 限定の件で確かめる。25MiB の 3 件の同時のアップロードを、本文の途中 (20MiB まで送った時点) と変換の途中 (`holdingRunner` で止めた時点) で止め、このプロセスの `/proc/self/fd` が `os.tmpdir()` の下の新しい通常のファイルを指さないことを 500ms の間見る (`/tmp` の一覧は他のプロセスと共有するので比べない)。参考実装を「受け取りながら本文を一時ファイルに書く」形に壊すと落ちた。書いてすぐ閉じる形 (開いている時間が見回りの間隔より短い) は、この方法では見つからない。
 - 16.9 の HTTP の層の 9 通り (y01・y04・y12・y14・y15・y16・y22・y37・y38) の Node の期待は、試作の値 (Hono と Node の既定の振る舞い) で固定している。Hono / Node の版が上がると落ちることはありうる。目印 `16.9` で Python 版には向けない。6.8 が Python 版に合わせる (22.8 の 3 の (b)) と決めたら、`multipart-raw.integ.ts` の `NODE_ANSWERS` の y の行を消せば足りる。
 - 20.12 の 2 件 (応答のバイト列が一括で組んだ場合と同じこと、33MB の結果 3 件での親の最大 RSS) と、16.9 (d) のメモリの回帰テストは 6.8 の担当 (20.12 の決定)。4.4 では書いていない。親が tasks.md の 6.8 に一文を足す。
+
+### 23.7 タスク 4.5 のテストが決めた配備物の置き場所と形
+
+2026-11-09 に、4.5 の配備物のテスト (`apps/attachment-text-extractor/test/deploy/` の 6 つの spec と補助 4 ファイル) を書いた。テストは配備物のファイルを読むだけで、実装のコードは import しない。配備物はまだ Node 版ではないので、Dockerfile と k8s の例のテストはすべて落ちる (RED)。**テストが読むパスと形が、6.11 (Dockerfile、k8s の例) と 8.2 (compose の切り替え) の仕様になる**。design.md に無い名前・パスは (新) と書いた。
+
+**読むファイルの場所**
+- Dockerfile: `apps/attachment-text-extractor/docker/Dockerfile` (design.md の File Structure Plan と D4 のとおり)。
+- k8s の例: `apps/attachment-text-extractor/deploy/k8s/` の `deployment.yaml`、`service.yaml`、`hpa.yaml`、`networkpolicy.yaml` (新。ファイル名は design.md に無く、Python 版と同じ名前にした。design.md は「deployment / service / hpa / networkpolicy」とだけ書いている)。ディレクトリにこの 4 つが無ければ落ちる (空のディレクトリで通らないため)。
+- compose: `infra/docker/compose.yaml` の `attachment-text-extractor` (Python 版と同じ場所)。
+
+**design.md の食い違いを 1 つ決めた**: 293 行と 412 行は compose の build の `context` を `apps/attachment-text-extractor` に変えると書き、414 行は「ルートを context にして `pnpm deploy --prod` で取り出す」と書く。`pnpm deploy` はルートの `pnpm-lock.yaml` と workspace が要るので、context がサービスのディレクトリでは動かない (`apps/pdf-converter` の Dockerfile も `COPY . .` でルートを使う)。したがってテストは、`context` がリポジトリのルート、`context` と `dockerfile` を合わせたパスが上の Dockerfile であることを確かめる (例: `context: ../..`、`dockerfile: apps/attachment-text-extractor/docker/Dockerfile`)。design.md の 293 行と 412 行の「`context` を `apps/attachment-text-extractor` に変える」は、取り込み (Req 12) か 8.2 で直す。
+
+**Dockerfile のテストが決めた形** (6.11 が守る)
+- すべての `FROM` が `node:24.<minor>.<patch>-slim` (`bookworm-` か `trixie-` を挟んでもよい。`@sha256:` つきでもよい)。`ARG` の既定値は `FROM` の展開に使える。alpine (musl) は不可 (anydoc の `-gnu` の部品が選ばれるため)。
+- 最終の段: 最後の `USER` が `10001` (`10001:10001` も可)、`ENV RAYON_NUM_THREADS=1`、`CMD` か `ENTRYPOINT` が exec 形式で `node` と `dist/main.js` (research.md 23.5)。`MALLOC_ARENA_MAX`、`NODE_OPTIONS`、`--max-semi-space-size`、`--wasm-max-mem-pages` は最終の段に書かない (子の環境と引数で決める。15.7、19.10、20.12)。`TMPDIR` は要るとも要らないとも決めない。
+- 最終の段の最初の `FROM` の image が、段の名前でなく、上の固定した `node:24...-slim` である (`FROM builder` は不可)。
+- 最終の段の `RUN` に、`&&` か `;` か行頭の直後に `/usr/bin/prlimit --version` が絶対パスで有り、その後ろが `&& ...` だけである (`; echo x`、`; exit 0`、`|| true`、`| cat` などで終了コードを隠さない。`set +e` も不可)。`echo /usr/bin/prlimit --version` やコメントの中の記述は数えない。
+- どこにも `WORKERS`、`/dev/shm`、`--shm-size` を書かない (コメントは数えない)。
+- 本番の依存: `node_modules` を取る元の段で `pnpm deploy ... --prod --filter @growi/attachment-text-extractor`。`pnpm install` はすべて `--frozen-lockfile`。`dist` を取る元の段で、`pnpm`・`turbo`・`npm` の `build` を流す。`package.json` に `build` スクリプトが有る。
+- 最終の段の `COPY` は、ライセンス表示を除いて、`--from` つきで、元のパスの最後の名前が `dist`、`node_modules`、`package.json` のどれか (`dist` と `node_modules` は必ず入る)。`COPY . .` や `src`・`test`・`benchmark` は入らない。最終の段で pnpm・npm・yarn・corepack・turbo・tsc、ビルドの道具 (gcc・make・python・git など) を使わない。
+- (新) 第三者のライセンス表示: 最終の段に、コピー先が `licenses` ディレクトリ (例: `/licenses/`) の `COPY` が有る。元のパスの最後の名前は `licen[cs]e`・`notice`・`copying` のどれかを含む (`COPY . /licenses/` や `COPY --from=builder /opt /licenses/` は不可)。ファイルの出どころ (research.md 21.5 が 6.11 に残した宿題) は決めない。
+
+**compose のテストが決めた形** (8.2 が守る。安全設定は Python 版と同じで、いまの compose でも通る)
+- `read_only: true`、`tmpfs` は `/tmp` だけで `size=` が 128MiB 以下、`user` の uid が 10001、`cap_drop: [ALL]`、`security_opt` に `no-new-privileges:true`、`init: true`、`volumes` なし、`mem_limit` が `2g`、`memswap_limit` が `mem_limit` と同じ、`pids_limit` が正の数、`ulimits` に `as` が無い (20.12。親の hard の上限を下げると子の `RLIMIT_AS` が切り詰められるため)、`MAX_CONCURRENCY` が `"3"`、`internal` network が `internal: true` でサービスはそれだけに繋がる、`shm_size`・host の ipc・`/dev/shm` の mount なし。
+- いまの compose で落ちる 3 つ (8.2 で通る): `WORKERS` が無いこと (D1)、healthcheck が `node` で `8000/readyz` を見ること (`python`・`curl`・`wget` は slim の image に無い)、build の `context` と `dockerfile` (上の食い違いのとおり)。
+- healthcheck の `timeout` は 15 秒以上。Node 版の確認用の子の期限の既定値は研究記録に無いので、Python 版の読み方 (子の確認の期限 10 秒 + 余裕) に合わせた。6.7 が別の値にするなら、この値と k8s の readiness の `timeoutSeconds` (15 秒以上) を一緒に直す。
+
+**k8s の例のテストが決めた形** (6.11 が守る。Python 版の 27 項目を移し、`WORKERS` なしと共有メモリなしを足した 29 項目)
+- Python 版と同じもの: 安全設定 (uid 10001、read-only rootfs、capabilities を全部落とす、seccomp `RuntimeDefault`、service account の token なし、host の名前空間なし)、`/tmp` だけの Memory の emptyDir (128MiB 以下)、永続ボリュームなし、requests 512Mi / limits 2Gi (20.10 の決定)、CPU の指定、`MAX_CONCURRENCY` が文字列の `"3"` (数の `3` は k8s が受け付けない)、token は Secret から (`secretKeyRef` に `name` と `key`)、image は版の固定、probe 4 種、grace period 80 秒以上、`maxUnavailable: 0`、ClusterIP の Service、HPA (最小 2 以上、最大 50 以下、CPU 50〜80%、縮小の安定化 300 秒以上)、NetworkPolicy (egress は空、ingress は 8000 番だけで、宛先は中身の有る `namespaceSelector` か `podSelector` で名指しする。`namespaceSelector: {}` は不可)、ラベルと namespace の一致、`TODO` なし。
+- 逆になるもの: `WORKERS` の env が無い。どの manifest のコメントにも `WORKERS` と `forkserver` が無い (20.12 の古い注の掃除)。
+- 予算の式 (新): 研究記録 20.7 の式 `69 + MAX_CONCURRENCY × (MAX_CHILD_RSS_MB + 148 + 157) + /tmp の sizeLimit` (応答を少しずつ書く形の定数) が limits 以下。既定で 69 + 3 × 625 + 64 = 2,008MiB。`MAX_CONCURRENCY` や `MAX_CHILD_RSS_MB` を上げて limits を直さないと落ちる (Python 版の予算のテストと同じ役目)。**20.7a の本物の変換での見積もり (2,089〜2,131MiB) は 2Gi を超えるが、2Gi を守る根拠は見積もりでなく実測 (6.12) と、ユーザーが 20.10 で承認した**ので、このテストは 20.7 の式で書き、「実測で守る」ことは確かめない。
+- 共有メモリ (Req 8.6): Python 版は volume の名前が `dev-shm` でないことだけを見ていた。Node 版は `/dev/shm` の mountPath と、名前に `shm` を含む volume が無いことを見る。
+
+**本番の依存のテスト**: `dependencies` の名前が 21.2 の 9 個 (`@embedpdf/pdfium`・`@firecrawl/anydoc`・`@hono/node-server`・`@xmldom/xmldom`・`entities`・`hono`・`htmlparser2`・`yauzl`・`yazl`) と完全に同じ。開発用の部品と型定義が混ざらない。`@firecrawl/anydoc` が `=0.2.4`、`@embedpdf/pdfium` と `htmlparser2` が `=` の完全固定 (21.3)。install のときに動く script (`preinstall`・`install`・`postinstall`・`prepare`) を持たない。これはすでに通る (3.8 で入れた部品の記録を守る)。
+
+**テスト用の補助 (新)**: YAML は devDependency の `yaml` (`^2.9.0`) で読む。`yaml` を足した記録: lockfile に既にあった版 (2.9.0、ISC ライセンス、依存の package は 0 個) で、lockfile の差分は importers の 1 か所の 3 行だけ。`ajv` など、同じ package にテスト専用の部品を足す前例と同じ扱い。最初は部品を足さず、ブロック形式だけを読む自作の読み手を書いたが、`True`・`0x1F`・`0755` を黙って文字列にし、不正な YAML を通し、正しい YAML の anchor や `>-` を拒んだので、`yaml` に置き換えて自作の読み手は消した。`test/deploy/yaml-parse.ts` は `parseAllDocuments` で読み、構文の誤りが有れば例外にし、文書がちょうど 1 つであることを確かめ、型アサーションなしで値に変換する (約 20 行。anchor・merge key・`|`/`>`・複数行の flow 形式も読める)。単体テストは `yaml-parse.spec.ts` 4 件。Dockerfile の読み手 (`dockerfile-model.ts`) は、行の継続の結合・コメント行の除外・段の分割・`ARG` の展開・`COPY`/`ENV`/`CMD` の読み取りだけを行い、heredoc は例外にする。単体テストは `dockerfile-model.spec.ts` 7 件。
+
+**確かめなかったこと**: image のビルド、コンテナの中の動作 (大きさ 400MB 以下、`prlimit` の実行、`/readyz`、`node:24-slim` の ICU と glibc、linux-arm64 の `-gnu` の部品。6.12 の担当)。compose を実際に `docker compose` で読むこと。k8s を `kubectl --dry-run` で検証すること。lockfile に `linux-arm64-gnu` の部品が有ること (21.4 に記録済み)。Node 版の CI の workflow の静的テスト (22.8 の 4 のとおり対応させない)。

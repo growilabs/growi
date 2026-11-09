@@ -1210,6 +1210,9 @@ importers:
       vitest-mock-extended:
         specifier: ^3.1.0
         version: 3.1.0(typescript@5.9.3)(vitest@3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.0))
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
 
   apps/growi-vault-manager:
     dependencies:
