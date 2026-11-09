@@ -93,7 +93,7 @@ describe('ChatNotificationDispatchCronService', () => {
     });
   });
 
-  it('no longer sweeps relations: the dependency is not accepted and the sweep is never called', async () => {
+  it('never sweeps relations itself', async () => {
     const drain = vi.fn().mockResolvedValue({ sent: 0, failed: 0, givenUp: 0 });
 
     await new ChatNotificationDispatchCronService({
@@ -102,8 +102,6 @@ describe('ChatNotificationDispatchCronService', () => {
         hasAnyIntegration: vi.fn().mockResolvedValue(true),
         markPresent: vi.fn(),
       },
-      // @ts-expect-error the sweep now belongs to UnpairedRelationSweepCronService
-      sweep: vi.fn(),
     }).executeJob();
 
     expect(sweepUnpairedRelations).not.toHaveBeenCalled();

@@ -60,6 +60,7 @@ export const sweepUnpairedRelations = async (
       unpairedAt: { $lt: expiredBefore },
     } as const;
 
+    // biome-ignore lint/performance/noAwaitInLoops: one relation at a time, so a large backlog does not pile deletes onto the database at once
     const candidate = await ChatRelation.findOne(expiredCondition).lean();
     if (candidate == null) {
       break;

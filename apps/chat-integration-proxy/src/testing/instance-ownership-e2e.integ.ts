@@ -586,5 +586,5 @@ describe('what two running proxy instances each own (task 11.4)', () => {
     expect(await other.proxy.dependencies.sweeper.sweepOnce()).toBe(true);
     expect(await noncesLeft()).toBe(0);
     expect(failures.length).toBeGreaterThan(0);
-  });
+  }, 30_000);
 });

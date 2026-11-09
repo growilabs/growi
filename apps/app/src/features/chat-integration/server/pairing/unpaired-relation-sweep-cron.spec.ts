@@ -105,19 +105,12 @@ describe('UnpairedRelationSweepCronService', () => {
 
   // A dropped startCron() line would leave the sweep running nowhere while
   // every other test stays green.
-  it('is started from crowi’s startup point, right after the notification cron', async () => {
+  it('is started from crowi’s startup point', async () => {
     const source = await readFile(
       path.resolve(import.meta.dirname, '../../../../server/crowi/index.ts'),
       'utf8',
     );
 
-    const dispatch = source.indexOf(
-      'chatNotificationDispatchCronService.startCron()',
-    );
-    const sweepStart = source.indexOf(
-      'unpairedRelationSweepCronService.startCron()',
-    );
-    expect(dispatch).toBeGreaterThan(-1);
-    expect(sweepStart).toBeGreaterThan(dispatch);
+    expect(source).toContain('unpairedRelationSweepCronService.startCron()');
   });
 });

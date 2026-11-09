@@ -676,7 +676,7 @@ describe('createCommandEndpoint (task 5.1)', () => {
     });
   });
 
-  describe('link-preview of an empty placeholder parent page (Requirement 6.8)', () => {
+  describe('link-preview of an empty placeholder parent page (Requirement 6.14)', () => {
     // GROWI creates these (`isEmpty: true`, grant public, no revision) when a
     // child page is created under a path that has no page yet.
     const createEmptyParentPage = (path: string) =>
