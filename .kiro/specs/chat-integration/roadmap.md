@@ -138,6 +138,8 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 - **Teams の `email` リアクションが未確認**: Teams が受け付けるかは実機でしか分からない（[proxy の research.md](../chat-integration-proxy/research.md)「既知の問題」3）
 - **依頼のメッセージが無い依頼で、短い知らせが繰り返される**: slash command から始まった依頼など（同 4）。順 9 でスラッシュコマンドを扱うときに、あわせて見直せる
 - **Mattermost で installation が複数あるとき、DM での「入力の期限切れ」の知らせが installation を引けない**（同 5）
+- **通知の書き込み口と定期処理が、同じ「連携があるか」の記憶（IntegrationPresence）を共有していることを確かめる結合試験が無い**: 今は書き込み口が `createNotificationOutbox` の 1 か所だけで、既定で同じインスタンスを使うので壊れていない。書き込み口が増えるときに足す
+- **表示順の待ちの配線と、続けて返した 2 つの返事の順番の試験が無い**: `runtime/dependencies.spec.ts` に `onOrderingWait` の配線を確かめる試験が無く、2 つの返事を続けて返したときの順番も確かめていない。順 1 の作業で扱う
 
 ## Scope
 

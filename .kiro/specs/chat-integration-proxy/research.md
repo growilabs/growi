@@ -283,7 +283,7 @@
 4. **依頼のメッセージが無い依頼では、DM に届くたびにその場に短い文が出る。** slash command から始まった依頼は依頼のメッセージの id（`sourceMessageId`）を持たない（`sourceMessageId` が無い古い保存済みの行から再開した依頼も同じ）ので、リアクションを付けられない。DM に届くたびに「返事を DM で送りました」という内容を含まない文がその場に出る。うるさいが、返事の内容は漏れない
 5. **（解消済み）** Mattermost で installation が複数あるときの、DM の中で届いたイベントへの「入力の期限切れ」の知らせ。`reportExpired`（`orchestration/command-flow.ts`）は、イベントを受けた接続の installation（決定 P16）を `installationId` に渡すので、DM がチャンネル一覧に載らなくても宛先の接続が決まる
 6. **DM に落ちる経路は Slack の実機では起こせない**（上の Research Log）。結合試験と単体試験で守る
-7. **（本機能の外）`src/testing/instance-ownership-e2e.integ.ts` の「runs the periodic sweep on one instance at a time」は、この開発環境で失敗する。** 5 秒の上限に当たるか、試験が `proxy:sweep` のロックを取れずに失敗する。定期処理は起動時には動かない（`runtime/sweeper.ts` の `start`）ので、原因は、同じ試験の前の実行が残したロック（寿命 60 秒）か、同じ DB を使う別のプロセス（開発用に動かしている proxy など）が持つロックと見られる。Discord の Gateway の変更とは関係なく、変更より前のコミット（`59ef6d38d5`）でも同じく失敗した
+7. **（本機能の外）`src/testing/instance-ownership-e2e.integ.ts` の「runs the periodic sweep on one instance at a time」は約 12 秒かかる。** 時間の上限を指定していないと既定の 5 秒で時間切れになり、毎回失敗する。上限を延ばせば通る（実測 約 12 秒）。判定が間違っているのではなく、遅いだけである。
 
 ## References
 
