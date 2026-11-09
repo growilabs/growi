@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import type { IAuditLogBulkExportFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
+import type { IAuditLogBulkExportRequestFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 
 export const useAuditLogExport = (
-  buildFilters: () => IAuditLogBulkExportFilters,
+  buildFilters: () => IAuditLogBulkExportRequestFilters,
   onClose: () => void,
 ) => {
   const { t } = useTranslation('admin');
