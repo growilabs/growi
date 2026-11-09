@@ -322,3 +322,31 @@ describe('decodeText: Node-only expectations, Python differs (research.md 18.7)'
     expect(decoded).toContain('nchen, caf');
   });
 });
+
+// Req 2.6 known limitation, kept on purpose: without a BOM or a declaration,
+// UTF-16 is not recognised, so the text comes back garbled (the Python service
+// too: charset-normalizer returned neither the Japanese nor the ASCII text for
+// LE or BE). The check is "not the original" rather than a fixed garbled
+// string, which depends on the detector. If a change makes this pass no
+// longer, the limitation has changed: record it in research.md (Req 2.6).
+describe('decodeText: known limitation, UTF-16 without a BOM is not recognised (Req 2.6)', () => {
+  const utf16be = (text: string): Buffer =>
+    Buffer.from(text, 'utf16le').swap16();
+
+  it.each([
+    [
+      'Japanese, little-endian',
+      LONG_JA,
+      (text: string) => Buffer.from(text, 'utf16le'),
+    ],
+    ['Japanese, big-endian', LONG_JA, utf16be],
+    [
+      'ASCII, little-endian',
+      'plain ascii text for the known limitation',
+      (text: string) => Buffer.from(text, 'utf16le'),
+    ],
+    ['ASCII, big-endian', 'plain ascii text for the known limitation', utf16be],
+  ])('does not give back the original text: %s', (_case, text, encode) => {
+    expect(decodeText(encode(text))).not.toBe(text);
+  });
+});

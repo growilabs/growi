@@ -16,6 +16,7 @@ import {
   buildTwelveImagesDocx,
   buildXlsxCells,
   MAX_XLSX_CELLS,
+  SPEC_TMP_PREFIX,
 } from '../../test/fixtures';
 import type { FailureKind } from '../contract';
 import {
@@ -51,7 +52,6 @@ import {
 
 const MIB = 1024 * 1024;
 const MAX_CHILD_RSS_MB = 320;
-const OWN_TMP_PREFIX = 'ate-runner-spec-';
 const LONG_PAGE_ROOM: Partial<ConversionRunnerOptions> = {
   maxChildRssMb: 2000,
 };
@@ -112,7 +112,7 @@ const lastingNewTmpEntries = async (
 ): Promise<string[]> => {
   const fresh = (): string[] =>
     readdirSync(tmpdir()).filter(
-      (name) => !before.has(name) && !name.startsWith(OWN_TMP_PREFIX),
+      (name) => !before.has(name) && !name.startsWith(SPEC_TMP_PREFIX),
     );
   await waitUntil(() => fresh().length === 0, 2_000, 50);
   return fresh();
@@ -257,7 +257,9 @@ describe.skipIf(process.platform !== 'linux')(
       });
 
       it('ends a child stuck in synchronous code within 1 s of its parent being killed', async () => {
-        markerDir = await mkdtemp(path.join(tmpdir(), OWN_TMP_PREFIX));
+        markerDir = await mkdtemp(
+          path.join(tmpdir(), `${SPEC_TMP_PREFIX}runner-`),
+        );
         const marker = path.join(markerDir, 'child.pid');
         const { host } = startHost(
           { entry: 'watched-busy', mode: 'spin', argument: marker },

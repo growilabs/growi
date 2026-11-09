@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { buildDocx, buildTextPdf } from '../../test/fixtures';
+import { buildDocx, buildTextPdf, SPEC_TMP_PREFIX } from '../../test/fixtures';
 import type { FailureKind } from '../contract';
 import {
   type ConversionRunner,
@@ -85,7 +85,9 @@ describe.skipIf(process.platform !== 'linux')(
     };
 
     beforeAll(async () => {
-      traceDir = await mkdtemp(path.join(tmpdir(), 'ate-runner-spec-'));
+      traceDir = await mkdtemp(
+        path.join(tmpdir(), `${SPEC_TMP_PREFIX}runner-`),
+      );
     });
 
     afterAll(async () => {

@@ -7161,6 +7161,8 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 **テスト用の補助 (新)**: YAML は devDependency の `yaml` (`^2.9.0`) で読む。`yaml` を足した記録: lockfile に既にあった版 (2.9.0、ISC ライセンス、依存の package は 0 個) で、lockfile の差分は importers の 1 か所の 3 行だけ。`ajv` など、同じ package にテスト専用の部品を足す前例と同じ扱い。最初は部品を足さず、ブロック形式だけを読む自作の読み手を書いたが、`True`・`0x1F`・`0755` を黙って文字列にし、不正な YAML を通し、正しい YAML の anchor や `>-` を拒んだので、`yaml` に置き換えて自作の読み手は消した。`test/deploy/yaml-parse.ts` は `parseAllDocuments` で読み、構文の誤りが有れば例外にし、文書がちょうど 1 つであることを確かめ、型アサーションなしで値に変換する (約 20 行。anchor・merge key・`|`/`>`・複数行の flow 形式も読める)。単体テストは `yaml-parse.spec.ts` 4 件。Dockerfile の読み手 (`dockerfile-model.ts`) は、行の継続の結合・コメント行の除外・段の分割・`ARG` の展開・`COPY`/`ENV`/`CMD` の読み取りだけを行い、heredoc は例外にする。単体テストは `dockerfile-model.spec.ts` 7 件。
 
 **確かめなかったこと**: image のビルド、コンテナの中の動作 (大きさ 400MB 以下、`prlimit` の実行、`/readyz`、`node:24-slim` の ICU と glibc、linux-arm64 の `-gnu` の部品。6.12 の担当)。compose を実際に `docker compose` で読むこと。k8s を `kubectl --dry-run` で検証すること。lockfile に `linux-arm64-gnu` の部品が有ること (21.4 に記録済み)。Node 版の CI の workflow の静的テスト (22.8 の 4 のとおり対応させない)。
+- 一時ディレクトリの接頭辞 (5.1 のレビューで決めた): テストが `os.tmpdir()` に作る一時ディレクトリは、すべて `test/fixtures/tmp-prefix.ts` の `SPEC_TMP_PREFIX` (`ate-spec-`) で始める (`conversion-runner.integ.ts`・`child-isolation.integ.ts`・`safe-xml.spec.ts`・`export-openapi.integ.ts`)。`child-isolation.integ.ts` の「一時ファイルが残らない」の件は、この接頭辞の項目を除いて `/tmp` を比べるので、並行するテストのファイルの一時ディレクトリでは落ちない。テストと関係の無いプロセスが同じ時に `/tmp` に項目を作って残すと誤って落ちる余地は残るが、直さない。
+- `process-limits.integ.ts` の「親の hard の上限で切り詰める」の件は、ホストに `--cpu=30:30` だけを掛けて CPU 時間の切り詰めを確かめる。ホストに `--as=2560MiB` も掛ける形は、2 CPU の機械でホストの起動が `memory allocation of … bytes failed` (SIGABRT) で必ず失敗した (5.1 のレビューと、この作業の再現。必要な仮想メモリは CPU の数で変わり、値を上げる直し方は脆い)。仮想メモリの切り詰めは `prlimit-args.spec.ts` の単体テスト (親の hard 2,048MiB と 4,096MiB の件) が守る。
 
 ## 24. 黒箱のテストを Python 版に向けた結果 (タスク 4.6)
 
@@ -7268,15 +7270,15 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 
 | 範囲 | ファイル | 通った | 落ちた | 実行されず | 所要 |
 |---|---|---|---|---|---|
-| 4.2 `src/formats src/wire src/config src/conversion` | 22 | 47 | 934 | 0 | 4.1 秒 |
-| 4.3 `src/runner src/child` | 12 | 2 | 140 | 0 | 20.8 秒 |
+| 4.2 `src/formats src/wire src/config src/conversion` | 22 | 47 | 938 | 0 | 4.2 秒 |
+| 4.3 `src/runner src/child` | 12 | 2 | 140 | 0 | 20.7 秒 |
 | 4.4 `src/http test/http test/openapi` | 27 | 5 | 2,465 | 312 | 2.4 秒 |
 | 4.5 `test/deploy` | 6 | 27 | 51 | 0 | 0.4 秒 |
 
-件数は 4.2〜4.4 のテストを書いたときの数 (981・142・黒箱 312) と 4.5 の 78 に一致する。package 全体を 1 回で流した結果 (`vitest run`) と、範囲ごとに流した結果は、4 つの範囲とも件数が完全に一致した。
+件数は 4.2〜4.4 のテストを書いたときの数 (981・142・黒箱 312) と 4.5 の 78 に、5.1 のレビューで足した 4.2 の 4 件 (`charset` の Req 2.6 の既知の制約: BOM のない UTF-16 は判定できない) を加えた数に一致する (4.2 は 985 件。package 全体は 4,443 件で、通った 525・落ちた 3,594・実行されず 324)。package 全体を 1 回で流した結果 (`vitest run`) と、範囲ごとに流した結果は、4 つの範囲とも件数が完全に一致した。
 
 ファイルごと (通った / 落ちた):
-- 4.2: `load-settings` 0/75、`anydoc-contract` 47/0、`convert` 0/60、`normalize` 0/29、`office` 0/37、`archive-guard` 0/46、`pptx-split` 0/64、`safe-xml` 0/51、`xlsx-cell-count` 0/35、`xlsx-split-repackage` 0/22、`xlsx-split` 0/47、`pdf` 0/16、`charset` 0/103、`csv` 0/7、`html-adversarial` 0/32、`html` 0/49、`ipynb` 0/12、`plain-text` 0/7、`xml-text` 0/33、`format-table` 0/121、`input-size` 0/27、`length-prefixed-json` 0/61
+- 4.2: `load-settings` 0/75、`anydoc-contract` 47/0、`convert` 0/60、`normalize` 0/29、`office` 0/37、`archive-guard` 0/46、`pptx-split` 0/64、`safe-xml` 0/51、`xlsx-cell-count` 0/35、`xlsx-split-repackage` 0/22、`xlsx-split` 0/47、`pdf` 0/16、`charset` 0/107、`csv` 0/7、`html-adversarial` 0/32、`html` 0/49、`ipynb` 0/12、`plain-text` 0/7、`xml-text` 0/33、`format-table` 0/121、`input-size` 0/27、`length-prefixed-json` 0/61
 - 4.3: `child-entry` 0/4、`child-result` 0/9、`parent-watch` 1/6、`child-env` 0/1、`child-exit` 0/10、`child-isolation` 0/31、`conversion-runner` 0/45、`platform` 0/4、`prlimit-args` 1/11、`proc-rss` 0/8、`process-limits` 0/5、`readiness` 0/6
 - 4.4: `bearer-auth` 0/19、`client-disconnect` 0/4、`concurrency-slots` 0/5、`early-answer` 0/12、`error-table` 2/0、`extract-limits` 0/19、`extract-route` 0/24、`header-params` 1/2,012、`health-routes` 0/10、`openapi-route` 0/5、`parse-multipart` 1/294、`receive-upload` 0/12、`request-log` 0/17、`slot-return` 0/4、`export-openapi` 1/5、`openapi-document` 0/16、`openapi-drift` 0/7。黒箱の 10 ファイル (312 件) は、`beforeAll` でサービスを起動するときに `loadSettings` が失敗し、ファイルが失敗として報告され、312 件は実行されなかった (vitest の数え方では skipped)
 - 4.5: `compose` 12/3、`dockerfile-model` 7/0、`dockerfile` 0/19、`k8s-manifests` 0/29、`production-dependencies` 4/0、`yaml-parse` 4/0
@@ -7285,7 +7287,7 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 
 | 理由 | 4.2 | 4.3 | 4.4 | 4.5 |
 |---|---|---|---|---|
-| A. 空の実装の `not implemented` がそのまま出た (拒否された Promise、起動した script の終了を含む) | 848 | 129 | 2,309 | 0 |
+| A. 空の実装の `not implemented` がそのまま出た (拒否された Promise、起動した script の終了を含む) | 852 | 129 | 2,309 | 0 |
 | B1. 期待した例外 (`WireProtocolError`・`RangeError`・`UnreadableParams`・`InvalidMultipart`・環境変数の名前を含む文) の代わりに `not implemented` が投げられた | 85 | 0 | 154 | 0 |
 | B2. そのほかの値の食い違い (空の実装が原因: `csvToText` が `ConversionError` でない例外、子の入口が `oom_score_adj` を上げない (4)、見張りが動かないので親が消えても子が止まらない (1)、別のプロセスの親 (`runner-host.ts`) が `loadSettings` で終わり子の印が書かれない (1)、`openApiDocument` が空 (2)。配備物: compose の `WORKERS`・healthcheck・build の `context` (3)、`build` スクリプトが無い (1)) | 1 | 6 | 2 | 4 |
 | C. 子の側の補助の script が `startParentWatch` の拒否で 1 行目を書く前に終わった | 0 | 5 | 0 | 0 |
@@ -7317,3 +7319,61 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - `tsgo --noEmit` (package 全体): 誤り 0。`biome check` (package 全体): 誤り 0、警告 24 件 (すべて既存のテストのファイルの `noAwaitInLoops`。空の実装のファイルは 0)。`scripts/` は `tsconfig.json` の `include` に無いので、`export-openapi.ts` は型検査の対象外 (`check-openapi-drift.ts` はテストから import されるので検査される)。
 - 層の依存の向き: `conversion/` は `contract/`・`formats/` だけ、`runner/` は `contract/`・`config/` だけ、`http/` は `contract/`・`config/`・`runner/` (型だけ) を import する。逆向きの import は無い。
 - 後始末: テストの前後で、プロセスの一覧 (`ps`)、待ち受けのポート (`ss -ltn`)、`/tmp` の項目を比べ、増えたものは無かった。
+
+## 26. テストのレビューの承認の記録 (タスク 5.1)
+
+**状態: 承認** (2026-11-09。1 回の差し戻しの後に承認)
+
+**担当**: タスク 5.1 の独立レビュー。テストを書いた担当とは別に新しく立てた担当で、Opus の model を使った。1 回目は全体を通して見て、2 回目は直した部分と、それによる回帰だけを見た。
+
+### 評価に使った 2 つの skill と、その結果
+
+- `essential-test-design` (観察できる結果を確かめているか): 内部の関数を見張るテスト (`vi.spyOn`) は 0 件。呼び出しの回数を確かめるのは、境界の差し替え (`runner.run` と anydoc の `toMarkdownBytes`) だけで、「処理より前に認証する」「子を起動しない」という契約そのものを確かめている。期待値は、状態・コード・本文・`/proc` の値といった、外から観察できる結果に向いている。
+- `essential-test-patterns` (vitest・`mock<T>()`・型の主張を避ける): vitest の globals を使い、型の主張・`any`・`@ts-ignore`・`.skip`・`.only` は 0 件。偽の runner は `mock<T>()` で作っている。`vi.mock` は外部の部品 (anydoc・PDFium) と、`convert.spec.ts` の経路の 3 モジュールに限る (後者は 23.3 に記録済み)。
+
+### 4.2〜4.5 のタスクごとのレビュー
+
+各タスクで、Opus の独立レビューを通った。主な指摘と直したことは、次のとおり。
+
+- 4.2: ZIP 爆弾の結合テストを 4.3 に足した (22.7)。PDF の `malloc` が 0 を返す場合と `Aborted` のテストを足した。
+- 4.3: 本物の子を `dist/` の JavaScript として起動すると決め、許容値を緩めた理由を書いた (23.5)。
+- 4.4: 引数の解析の固定データを作り直した。`7.5-1` を訂正した。`fileParallelism` を足した。30 回の 413 を送るテストで、クライアントを別のプロセスにした (23.6)。
+- 4.5: 自作の YAML の読み手を `yaml` に置き換えた (23.7)。
+
+### 全体のレビューでの指摘と、直したこと
+
+1. `child-isolation.integ.ts` の「一時ファイルが残らない」は、共有の `/tmp` の一覧を比べるので、ほかのテストファイルの一時ディレクトリが同時にあると落ちた。テストが作る一時ディレクトリを、すべて `test/fixtures/tmp-prefix.ts` の `SPEC_TMP_PREFIX` (`ate-spec-`) で始め、確認ではその項目を除く形に直した。同じ負荷の横で 3 回通る。
+2. `process-limits.integ.ts` の切り詰めのテストは、ホストに 2,560MiB の仮想メモリの上限を掛けていたため、2 CPU の機械で必ず落ちた。ホストには CPU 時間の上限 (`--cpu=30:30`) だけを掛け、仮想メモリの切り詰めは `prlimit-args.spec.ts` に任せた。2 CPU と 4 CPU で通り、何も切り詰めない実装では落ちる。
+3. Req 2.6 の既知の制約「BOM のない UTF-16 は判定できない」を守るテストが無かった。`charset.spec.ts` に 4 件 (LE と BE、日本語と ASCII) を足した。化けた文字列そのものには固定せず、「元の文字列に戻らない」ことを確かめる。
+4. 確認用の子が anydoc と PDFium を読み込むことを守るテストも、tasks.md の記述も無かった。tasks.md の 6.7 に、実装の前にテストを書いて RED を確かめる文を足した。あわせて 6.3 (`../` の名前)、6.8 (16.9 の 9 通りを、実装の前に決めて 7 節に記録する)、7.1 (`timingSafeEqual` をコードを読んで確かめる)、8.1 (撤去の前に目印の検査をもう一度流す) にも文を足した。
+
+直した後の RED の記録 (25.3): 全体で 4,443 件 (通過 525 / 失敗 3,594 / 実行されず 324)。import の失敗は 0 件。黒箱のテストは変えていないので、4.6 のやり直しは要らない。
+
+### 残った懸念と引き継ぎ
+
+- 4.2 の単体テストを、本物の変換の層で並列に流したときのメモリは、まだ測っていない (6.5 の後に確かめる)。
+- テストと関係の無いプロセスが同じ時に `/tmp` に項目を作って残すと、誤って落ちる余地は残る (直さないことにした)。
+- `vitest.config.ts` に `pool: 'forks'` を明示していない。「子が残らない」の検査は、vitest の既定 (テストのファイルごとにプロセスを分ける) に頼っている。
+- barrel (`index.ts`) を通さない import (`runner/conversion-runner` を直接指すもの) は、6.7 で `runner/index.ts` ができたら向け直す (6.10 の依存の検査に掛かりうるため)。
+- 参考実装で全体を並列に流したときの所要と最大の合計 RSS は、16 CPU で約 23 秒・約 3.2GiB、4 CPU で 35 秒・1.5GiB、2 CPU で 93 秒・1.0GiB。GitHub の標準 runner に収まる。
+
+### 完了の報告 (Req 1.12) でユーザーに伝える、作業者の判断
+
+1. 設定の読み方: 環境変数の名前は大文字だけで読み、`.env` は読まない (22.6)。
+2. 運用者が設定した `RAYON_NUM_THREADS` を尊重しない。子は常に 1 で動き、`MALLOC_ARENA_MAX=2` も同じく固定 (23.5)。
+3. 病的な HTML の 3 件は、Python 版の `memory_exceeded` から「子の中で収まり、次の変換が成功する」に期待を緩めた (23.5)。
+4. 申告の大きさを偽った ZIP 爆弾は、`limit_exceeded` と `malformed` のどちらも許す (23.5)。
+5. テストの許容値を緩めた: 期限の件は 3.5 秒未満、イベントループの応答は 250ms 未満、fd の増加は 10 未満、親のメモリは 66MB 未満 (23.5)。
+6. 変換の層はログを出さない。そのため、XLSX の分割で 1 回だけ出していた警告を無くした (22.6)。
+7. 片割れのサロゲートを含む結果は、子の側で拒む。`pageNumber` が小数の行のテストは、Python の `1.0` を Node では `1.5` に替えた (22.6)。
+8. Python 版は通すが Node 版は止める入力がある: 結果の字数の多い ASCII の DOCX、約 48MiB の画像を 1 つの要素に持つ XLSX、1 ページの文字の多い PDF (20.9)。
+9. 閉じない開始タグを持つ PPTX は、回によって `memory_exceeded` か `malformed` になる (20.5、18.7)。
+10. d36・m21 は 422 を返す。Python 版は `code` の無い 500 (16.1。決定済み)。
+11. `7.5-1` は、実際には Python 版と差が無かった (訂正。ユーザーが許容した差の前提が違っていた)。
+12. **未決 (6.8 が実装の前に決める)**: 16.9 の HTTP の層の 9 通り (405 → 404、307 → 404、`Expect: foo` の 417、`Host` なしの 400、末尾の空白の `Authorization` が 200)。
+13. **未決 (6.3 が決める)**: ZIP の名前に `../` が入る XLSX の扱い。テストは Python 版と同じ「読み飛ばす」で書いてある。
+14. 文字コードと HTML の解析の違い (18.7。`〜` が `～` になるなど)。
+15. compose の healthcheck の期限を 15 秒以上にした (23.7)。
+16. BOM のない UTF-16 は、Python 版と同じく元の文字列に戻らない (Req 2.6 の既知の制約)。これをテストで固定したので、6.2 で振る舞いが変われば、テストが落ちて研究記録への記録を促す。
+
+ユーザーがすでに決めたもの (D1 の `WORKERS`、D3 の `/docs` と `/redoc`、D2 の `/readyz` の名前、メモリの予算 (A)) も、完了の報告であわせて示す。

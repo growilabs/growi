@@ -118,6 +118,7 @@ export {
 } from './pptx';
 export { buildRtf } from './rtf';
 export { encodeText, type TextEncodingName } from './text-encoding';
+export { SPEC_TMP_PREFIX } from './tmp-prefix';
 export { buildXls } from './xls';
 export {
   buildXlsx,

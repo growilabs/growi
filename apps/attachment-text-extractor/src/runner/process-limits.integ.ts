@@ -147,26 +147,22 @@ describe.skipIf(process.platform !== 'linux')(
 
     // A hard limit above the parent's own makes prlimit fail and every run crash
     // (research.md 15.4 (1)): the runner clamps to what it may ask for.
-    it('clamps the limits to the hard limits of its own process', async () => {
-      const hostAddressSpace = 2560 * MIB;
+    // Only the CPU limit is lowered on the host: an address-space limit on the
+    // host process itself made it fail to start on small machines (research.md
+    // 23.7). The address-space clamp is pinned by prlimit-args.spec.ts.
+    it('clamps the CPU-time limits to the hard limit of its own process', async () => {
       const { report } = startHost(
         { entry: 'stand-in', mode: 'report-self' },
         {
           env: { [SERVICE_TOKEN_NAME]: 'spec-token' },
-          hostLimits: [
-            `--as=${hostAddressSpace}:${hostAddressSpace}`,
-            '--cpu=30:30',
-          ],
+          hostLimits: ['--cpu=30:30'],
         },
       );
 
       const outcome = await within(report);
       const { limits } = selfReportOf(outcome);
 
-      expect(limitRow(limits, 'Max address space')).toEqual([
-        String(hostAddressSpace),
-        String(hostAddressSpace),
-      ]);
+      // Unclamped, the child would ask for 60:65 and prlimit would refuse it.
       expect(limitRow(limits, 'Max cpu time')).toEqual(['30', '30']);
     });
   },

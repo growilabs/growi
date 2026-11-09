@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+import { SPEC_TMP_PREFIX } from '../../../test/fixtures';
 import { conversionErrorOf } from '../spec-support';
 import { parseXmlPart, serializeXmlPart } from './safe-xml';
 
@@ -136,7 +137,9 @@ describe('parseXmlPart refuses what expat refuses', () => {
   });
 
   it('never echoes the file an external entity points at', async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'safe-xml-'));
+    const dir = await mkdtemp(
+      path.join(tmpdir(), `${SPEC_TMP_PREFIX}safe-xml-`),
+    );
     try {
       const marker = 'xxe-marker-6f1c2b';
       const target = path.join(dir, 'secret.txt');

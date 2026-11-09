@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import { openApiDocument } from '../../src/http/openapi-route';
 import { recordOf } from '../../src/http/spec-support/extract-client';
 import { TS_NODE_ARGS } from '../../src/runner/spec-support';
+import { SPEC_TMP_PREFIX } from '../fixtures';
 import {
   readCommittedOpenApi,
   textAt,
@@ -26,7 +27,9 @@ const run = promisify(execFile);
 
 let workDir = '';
 beforeAll(() => {
-  workDir = mkdtempSync(path.join(tmpdir(), 'export-openapi-'));
+  workDir = mkdtempSync(
+    path.join(tmpdir(), `${SPEC_TMP_PREFIX}export-openapi-`),
+  );
 });
 afterAll(() => {
   rmSync(workDir, { recursive: true, force: true });
