@@ -147,6 +147,8 @@ export const zipExtent = (bytes: Uint8Array): ZipExtent | null => {
   const directory =
     prepended >= 0 ? readCentralDirectory(data, at - size, size) : null;
   if (directory == null) {
+    // Unlike CPython, a negative offset passes the bytes through unchecked so
+    // the cell limit still applies (research.md 27.4).
     return prepended < 0 ? unchanged(bytes) : null;
   }
   const { entries, strongRecords } = directory;

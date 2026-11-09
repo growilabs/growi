@@ -7494,3 +7494,16 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - `convert.ts` で経路ごとに動的に import し、PDF の子は PDFium だけを読み込む (anydoc・テキスト系・ooxml を読み込まない)。実測 (本番の引数・JavaScript にコンパイルした形、1 ページ 200 万字): PDFium だけ 302〜303MB、anydoc + PDFium 306MB、全部 315〜316MB。48MiB の画像の PDF は 234〜235 / 238〜239 / 248MB。研究記録 20.1 の「PDF の子は anydoc と PDFium を読み込む」とは文面が違うので、20.1 を直す。`/readyz` の確認用の子が両方を読み込むこと (6.7) は別の話。
 - PDFium は最初の変換のときに動的 import で読み込む (`pdf.ts` の import は +1MB、PDFium の初期化は +17MB・30ms)。WASM は `wasmBinary` を渡す。`tsgo` で出力した JavaScript からも動くことを確かめた。
 - 読み込んだ PDFium はモジュールの変数で持ち、abort の後に捨てる。1 件 1 プロセスの前提で安全 (同期の処理)。`pdfium.FPDF…` を毎回引く形は 23.3 の決定。
+
+### 27.4 タスク 6.5 (変換の層の入口)
+
+入口 (形式の判定 → 大きさの判定 → 経路ごとの変換 → 改行の統一 → 空の要素を除く → 結果の大きさの判定) は、実装者の 242 件 + 壊した 3,000 件、レビュアーの新しい入力 383 件 + 壊した 3,000 件で、本物の Python 版と比べた。入口が原因の違いは 0 件だった。Req 1.9 の作業者の判断として採り、契約 (Req 1.1〜1.8) には触れない。
+
+- **中央ディレクトリの最後の記録の中だけが欠けた ZIP (直さない。18.7 の 9 に書き戻す)**: 中央ディレクトリから k バイトを消した 2,223 通りのうち、Node 版だけが拒んだのが 44 件 (`malformed` 38・`limit_exceeded` 5・`encrypted` 1。Node 版は 422、Python 版は 200)。どちらも 200 でページの形が違うものが 81 件、中身が違うものが 2 件。起きるのは、終わりの記録が残ったまま最後の記録の中だけが欠けた形に限られ、Office はこの形を書かない。原因は `zip-extent.ts` の `prepended < 0` の枝で、CPython と違って中央ディレクトリを確かめずに yauzl に渡すため、壊れた最後の要素が一覧に入る。CPython に合わせる直し (約 4 行) は 44 件を 0 件にするが、中央ディレクトリの大きさを 8 バイト偽っただけの 30 万セルの XLSX が、63ms・102MB の `limit_exceeded` から、セル数の検査を通らずに anydoc で 954MB まで増える形に変わる (応答はどちらも 422)。セル数の上限の抜け道を広げるので採らない。
+- **detail だけの違い**: 壊れた PPTX/XLSX で、Node 版は `document is malformed`、Python 版は `archive part could not be read` など (壊した 3,000 件のうち 125 件)。種類は同じ `malformed` で、detail は HTTP の応答に出ない。
+- **宣言の無い壊れたバイト列を最後にどう読むか**: Python 版は latin-1 (0x80〜0x9F は制御文字)、Node 版は windows-1252 (`€` などになる)。18.7 の 2 は宣言された場合の話で、これは宣言の無い場合。どちらも化けた文字列で状態は同じ 200。27.1 の「半角カナ 1 字の cp932」も同じ集まり。
+- Node 版だけが通す壊れた XLSX/PPTX (使わない部品が壊れている形。4 件)、形式の判定で前後の空白をどう取り除くかの違い (22.6) は、Node 版が受け付ける向きなので記録だけ。
+- **メモリ** (子と同じ条件。`tsgo` で JavaScript に出して拡張子を足した形、見張りの worker あり): 7 万セル 1 シートの XLSX 289〜291MB、画像 12 枚の 48MB の DOCX 264〜265MB、画像の多い 46MB の DOCX 248〜255MB、PPTX 129MB、1 ページ 200 万字の PDF 293〜303MB、48MiB 画像の PDF 234〜235MB、20MiB の HTML 163〜194MB (生成器が違うので 20.3 とは比べない)。入口が足す分は改行の統一の写しだけ (0〜1MB。25MB の CRLF のテキストで +45MB、50MB の `a\r` のテキストで 279MB。Python 版も改行を統一してから数える)。いずれも 304MB 未満。基準のファイルの余裕 (20.12) は、道具が違うので書き換えず、6.12 で測り直す。
+- **経路ごとの動的 import (23.1・20.1・20.12 に書き戻す)**: PDF の子は PDFium と入口に共通の部品 (`normalize`・`replace-batched`) だけを読み込む。DOCX/ODT/RTF/DOC と CSV/TSV は anydoc、TXT/MD/JSON/XML/ipynb/HTML は anydoc も PDFium も読み込まず、XLSX/PPTX は自分の経路の `ooxml/` の部品と anydoc だけを読み込む。`dist/` での指定子はすべてリテラルで、`add-js-extensions` が全部解決する。
+- **`ooxml/index.ts` は作らない (23.1 の「`index.ts` は convertPptx と convertXlsx だけ」と File Structure Plan を直す)**: 入口が `ooxml/` の部品を直接 import する。barrel 経由にすると XLSX の子が PPTX の部品 6 つまで読み込むため。`text/` に barrel を作らないのも同じ理由 (23.3 の `vi.mock` は import の指定子で差し替える)。
+- **6.6 / 6.7 への申し送り**: 子の入口は `import { convert } from '../conversion'` だけにし、部品を前もって読み込まない (`convert` を静的に import してよい。`dist/` では `index.js` に解決される)。6.7 の確認用の子は、`convert` に 1 件流すだけではその経路の部品しか読み込まない (PDFium は最初の変換のときに初期化される) ので、anydoc と PDFium の両方を確かめるには、小さな PDF と DOCX を 1 件ずつ変換するなど、両方を明示して読み込む。
