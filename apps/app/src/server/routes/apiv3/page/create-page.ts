@@ -170,6 +170,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
 
   async function determineBodyAndTags(
     path: string,
+    user: IUserHasId,
     _body: string | null | undefined,
     _tags: string[] | null | undefined,
   ): Promise<{ body: string; tags: string[] }> {
@@ -184,7 +185,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         body += `${attachTitleHeader(path)}\n`;
       }
 
-      const templateData = await Page.findTemplate(path);
+      const templateData = await Page.findTemplate(path, user);
       if (templateData.templateTags != null) {
         tags = templateData.templateTags;
       }
@@ -292,6 +293,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
 
       const { body, tags } = await determineBodyAndTags(
         pathToCreate,
+        req.user,
         bodyByParam,
         tagsByParam,
       );

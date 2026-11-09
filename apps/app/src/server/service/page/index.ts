@@ -87,11 +87,17 @@ import { configManager } from '../config-manager';
 import type { IPageGrantService } from '../page-grant';
 import { preNotifyService } from '../pre-notify';
 import { getYjsService } from '../yjs';
+import { collectEmptyAncestorPaths } from './collect-empty-ancestor-paths';
 import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { deleteCompletelyOperation as deleteCompletelyOperationImpl } from './delete-completely-operation';
 import { onSeen } from './events/seen';
 import { isGrantImmutablePath } from './grant-immutable-path';
-import type { IPageService } from './page-service';
+import type {
+  DeletionOptions,
+  DeletionVerdict,
+  EmptyTrashResult,
+  IPageService,
+} from './page-service';
 import { shouldUseV4Process } from './should-use-v4-process';
 
 export * from './page-service';
@@ -436,98 +442,140 @@ class PageService implements IPageService {
     return false;
   }
 
-  private async getAbsenseUserHomeList(
-    pages: PageDocument[],
-  ): Promise<string[]> {
-    const userHomepages = pages.filter((p) => isUsersHomepage(p.path));
-
-    const User = mongoose.model<IUser>('User');
-    const usernames = userHomepages
-      .map((page) => getUsernameByPath(page.path))
-      // see: https://zenn.dev/kimuson/articles/filter_safety_type_guard
-      .filter(
-        (username): username is Exclude<typeof username, null> =>
-          username !== null,
-      );
-    const existingUsernames = await User.distinct<string>('username', {
-      username: { $in: usernames },
-    });
-
-    return userHomepages
-      .filter((page) => {
-        const username = getUsernameByPath(page.path);
-        if (username == null) {
-          throw new Error('Cannot found username by path');
-        }
-        return !existingUsernames.includes(username);
-      })
-      .map((p) => p.path);
+  private async isProtectedUserHomepage(path: string): Promise<boolean> {
+    if (!isUsersHomepage(path)) {
+      return false;
+    }
+    if (!this.canDeleteUserHomepageByConfig()) {
+      return true;
+    }
+    return !(await this.isUsersHomepageOwnerAbsent(path));
   }
 
-  private async filterPages(
+  private async judgeDeletionWithGroups(
+    page: PageDocument,
+    user: IUserHasId,
+    { isCompletely, isRecursively }: DeletionOptions,
+    userRelatedGroups: PopulatedGrantedGroup[],
+  ): Promise<DeletionVerdict> {
+    const creatorId = await this.getCreatorIdForCanDelete(page);
+    const isPermitted = isCompletely
+      ? this.canDeleteCompletely(
+          page,
+          creatorId,
+          user,
+          isRecursively,
+          userRelatedGroups,
+        )
+      : this.canDelete(page, creatorId, user, isRecursively);
+    if (!isPermitted) {
+      return 'forbidden';
+    }
+    if (await this.isProtectedUserHomepage(page.path)) {
+      return 'protected_user_homepage';
+    }
+    return 'permitted';
+  }
+
+  /**
+   * Whether the user may delete the page. Every request to delete pages is
+   * judged here, directly or through filterPagesByDeletionAuthority.
+   */
+  async judgeDeletion(
+    page: PageDocument,
+    user: IUserHasId,
+    options: DeletionOptions,
+  ): Promise<DeletionVerdict> {
+    const userRelatedGroups = options.isCompletely
+      ? await this.pageGrantService.getUserRelatedGroups(user)
+      : [];
+    return this.judgeDeletionWithGroups(page, user, options, userRelatedGroups);
+  }
+
+  async filterPagesByDeletionAuthority(
     pages: PageDocument[],
     user: IUserHasId,
-    isRecursively: boolean,
-    canDeleteFunction: (
-      page: PageDocument,
-      creatorId: ObjectIdLike | null,
-      operator: any,
-      isRecursively: boolean,
-      userRelatedGroups: PopulatedGrantedGroup[],
-    ) => boolean,
+    options: DeletionOptions,
   ): Promise<PageDocument[]> {
     const userRelatedGroups =
       await this.pageGrantService.getUserRelatedGroups(user);
-    const filteredPages = pages.filter(async (p) => {
-      if (p.isEmpty) return true;
-      const canDelete = canDeleteFunction(
-        p,
-        p.creator == null ? null : getIdForRef(p.creator),
-        user,
-        isRecursively,
-        userRelatedGroups,
-      );
-      return canDelete;
-    });
-
-    if (!this.canDeleteUserHomepageByConfig()) {
-      return filteredPages.filter((p) => !isUsersHomepage(p.path));
-    }
-
-    // Confirmation of deletion of user homepages is an asynchronous process,
-    // so it is processed separately for performance optimization.
-    const absenseUserHomeList =
-      await this.getAbsenseUserHomeList(filteredPages);
-
-    const excludeActiveUserHomepage = (path: string) => {
-      if (!isUsersHomepage(path)) {
-        return true;
-      }
-      return absenseUserHomeList.includes(path);
-    };
-
-    return filteredPages.filter((p) => excludeActiveUserHomepage(p.path));
+    const verdicts = await Promise.all(
+      pages.map(async (page): Promise<DeletionVerdict> => {
+        // A non-recursive deletion skips an empty page, so its authority is
+        // judged only when everything under it is deleted along with it.
+        if (page.isEmpty && !options.isRecursively) {
+          return (await this.isProtectedUserHomepage(page.path))
+            ? 'protected_user_homepage'
+            : 'permitted';
+        }
+        return this.judgeDeletionWithGroups(
+          page,
+          user,
+          options,
+          userRelatedGroups,
+        );
+      }),
+    );
+    return pages.filter((_page, index) => verdicts[index] === 'permitted');
   }
 
-  async filterPagesByCanDeleteCompletely(
+  /**
+   * Delete the pages the user may delete, in the background, and return them.
+   */
+  async deletePagesWithAuthority(
     pages: PageDocument[],
     user: IUserHasId,
-    isRecursively: boolean,
+    options: DeletionOptions,
+    activityParameters,
   ): Promise<PageDocument[]> {
-    return this.filterPages(
+    const permittedPages = await this.filterPagesByDeletionAuthority(
       pages,
       user,
-      isRecursively,
-      this.canDeleteCompletely,
+      options,
     );
+    if (permittedPages.length > 0) {
+      this.deleteMultiplePages(
+        permittedPages,
+        user,
+        options,
+        activityParameters,
+      ).catch((err) => {
+        logger.error('Failed to delete pages.', err);
+      });
+    }
+    return permittedPages;
   }
 
-  async filterPagesByCanDelete(
-    pages: PageDocument[],
+  /**
+   * Completely delete the trashed pages the user may delete.
+   */
+  async emptyTrash(
     user: IUserHasId,
-    isRecursively: boolean,
-  ): Promise<PageDocument[]> {
-    return this.filterPages(pages, user, isRecursively, this.canDelete);
+    activityParameters,
+  ): Promise<EmptyTrashResult> {
+    const pagesInTrash = await this.findAllTrashPages(user);
+    // Each trashed page is deleted on its own, not together with its
+    // descendants, so it is judged by the single-page authority.
+    const deletablePages = await this.filterPagesByDeletionAuthority(
+      pagesInTrash,
+      user,
+      { isCompletely: true, isRecursively: false },
+    );
+    if (pagesInTrash.length > 0 && deletablePages.length === 0) {
+      return { isForbidden: true };
+    }
+
+    const nDeletedNonEmptyPages = await this.deleteTrashedPagesCompletely(
+      user,
+      activityParameters,
+      deletablePages,
+    );
+    return {
+      isForbidden: false,
+      isAllDeletable: deletablePages.length === pagesInTrash.length,
+      deletablePages,
+      nDeletedNonEmptyPages,
+    };
   }
 
   private shouldUseV4ProcessForRevert(page): boolean {
@@ -728,37 +776,76 @@ class PageService implements IPageService {
       }
     }
 
-    // 1. Take target off from tree
-    await Page.takeOffFromTree(page._id);
-
-    // 2. Find new parent
-    let newParent: PageDocument | undefined;
-    // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
-    if (this.isRenamingToUnderTarget(page.path, newPagePathSanitized)) {
-      newParent = await this.getParentAndforceCreateEmptyTree(
-        page,
-        newPagePathSanitized,
-      );
-    } else {
-      newParent = await this.getParentAndFillAncestorsByUser(
-        user,
-        newPagePathSanitized,
-      );
-    }
-
-    // 3. Put back target page to tree (also update the other attrs)
-    const update: Partial<IPage> = {};
-    update.path = newPagePathSanitized;
-    update.parent = newParent?._id;
-    if (updateMetadata) {
-      update.lastUpdateUser = user;
-      update.updatedAt = new Date();
-    }
-    const renamedPage = await Page.findByIdAndUpdate(
-      page._id,
-      { $set: update },
-      { new: true },
+    const exParentId = page.parent;
+    // Computed before step 1, so a destination that cannot be computed (e.g. one
+    // under the page only by case) fails with nothing on the tree to undo. The ids
+    // are fixed before the insert so the rollback can delete a partial insert.
+    const isRenamingToUnderTarget = this.isRenamingToUnderTarget(
+      page.path,
+      newPagePathSanitized,
     );
+    const emptyPagesToInsert = isRenamingToUnderTarget
+      ? collectEmptyAncestorPaths(page.path, newPagePathSanitized).map(
+          (path) => ({ _id: new mongoose.Types.ObjectId(), path }),
+        )
+      : [];
+
+    let newParent: PageDocument | undefined;
+    let renamedPage: PageDocument | null = null;
+    let hasDetachReturned = false;
+    // No session makes steps 1-3 atomic: if any of them throws, the catch below
+    // must reattach the page or it is stranded off the tree.
+    // See https://github.com/growilabs/growi/issues/9755
+    try {
+      // 1. Take target off from tree
+      await Page.takeOffFromTree(page._id);
+      hasDetachReturned = true;
+
+      // 2. Find new parent
+      // If renaming to under target, run getParentAndforceCreateEmptyTree to fill new ancestors
+      if (isRenamingToUnderTarget) {
+        newParent = await this.getParentAndforceCreateEmptyTree(
+          page,
+          newPagePathSanitized,
+          emptyPagesToInsert,
+        );
+      } else {
+        newParent = await this.getParentAndFillAncestorsByUser(
+          user,
+          newPagePathSanitized,
+        );
+      }
+
+      // 3. Put back target page to tree (also update the other attrs)
+      const update: Partial<IPage> = {};
+      update.path = newPagePathSanitized;
+      update.parent = newParent?._id;
+      if (updateMetadata) {
+        update.lastUpdateUser = user;
+        update.updatedAt = new Date();
+      }
+      renamedPage = await Page.findByIdAndUpdate(
+        page._id,
+        { $set: update },
+        { new: true },
+      );
+    } catch (err) {
+      const committedPage = await this.rollbackFailedRename({
+        page,
+        exParentId,
+        hasDetachReturned,
+        newPagePath: newPagePathSanitized,
+        emptyPageIds: emptyPagesToInsert.map((p) => p._id),
+      });
+      if (committedPage == null) {
+        throw err;
+      }
+      logger.warn(
+        `The write that renamed "${page.path}" reported an error but was applied; continuing the rename.`,
+        err,
+      );
+      renamedPage = committedPage;
+    }
 
     // 5.increase parent's descendantCount.
     // see: https://dev.growi.org/62149d019311629d4ecd91cf#Handling%20of%20descendantCount%20in%20case%20of%20unexpected%20process%20interruption
@@ -958,6 +1045,109 @@ class PageService implements IPageService {
     await this.updateDescendantCountOfPagesWithPaths(ancestorsPaths);
   }
 
+  /**
+   * Undo steps 1-2 of a failed rename, but only while the page is still in the state
+   * step 1 left it in. The driver can report an error for a write the server applied
+   * (lost ack, writeConcernError), so the failure itself proves neither that step 1
+   * did not commit nor that step 3 did not.
+   *
+   * @returns the page if step 3 turned out to be committed, otherwise null
+   */
+  private async rollbackFailedRename({
+    page,
+    exParentId,
+    hasDetachReturned,
+    newPagePath,
+    emptyPageIds,
+  }: {
+    page: PageDocument;
+    exParentId: PageDocument['parent'];
+    // false when step 1 threw, even if its write was applied
+    hasDetachReturned: boolean;
+    newPagePath: string;
+    emptyPageIds: PageDocument['_id'][];
+  }): Promise<PageDocument | null> {
+    const Page = mongoose.model<IPage, PageModel>('Page');
+
+    try {
+      // `path` alone catches a committed step 3; `parent: null` guards against a
+      // writer that bypasses the PageOperation lock
+      const { matchedCount } = await Page.updateOne(
+        { _id: page._id, parent: null, path: page.path },
+        { $set: { parent: exParentId } },
+      );
+      if (matchedCount === 0) {
+        // Step 1 threw and the page is not detached at its original path, so its write
+        // most likely never applied; either way there is nothing to undo
+        if (!hasDetachReturned) {
+          return null;
+        }
+        const currentPage = await Page.findById(page._id);
+        if (currentPage?.path === newPagePath) {
+          return currentPage;
+        }
+        logger.warn(
+          `Skipped reattaching "${page.path}" to its original parent after a failed rename: ` +
+            'the page is no longer detached at its original path.',
+        );
+        return null;
+      }
+    } catch (rollbackErr) {
+      // The caller propagates the original error, not this one
+      logger.error(
+        `Failed to roll back the failed rename of "${page.path}" to "${newPagePath}". ` +
+          'Until it is normalized, the page may be off-tree at its original path, ' +
+          'or at the new path with its descendants left at the original path.',
+        rollbackErr,
+      );
+      return null;
+    }
+
+    // Only after a matched rollback: if step 3 committed, these are the page's new ancestors
+    try {
+      if (emptyPageIds.length > 0) {
+        // Ids that were never inserted match nothing
+        await Page.deleteMany({ _id: { $in: emptyPageIds }, isEmpty: true });
+      } else {
+        await this.removeChildlessEmptyAncestors(newPagePath);
+      }
+    } catch (cleanupErr) {
+      logger.error(
+        `Reattached "${page.path}" after its failed rename, but failed to remove the empty pages created for "${newPagePath}". ` +
+          (emptyPageIds.length > 0
+            ? `Empty page ids that may remain: ${emptyPageIds.join(', ')}`
+            : `Empty pages may remain among the ancestors of "${newPagePath}".`),
+        cleanupErr,
+      );
+    }
+    return null;
+  }
+
+  /**
+   * Remove the childless empty ancestors of `path`, nearest first, up to the first
+   * empty ancestor that still has children. Walks by path rather than by `parent`
+   * since a failed getParentAndFillAncestorsByUser can leave the ancestors it created
+   * unlinked, and goes on past a path without an empty page since an off-tree page
+   * there (e.g. a trashed one) does not hold up the empty pages above it.
+   */
+  private async removeChildlessEmptyAncestors(path: string): Promise<void> {
+    const Page = mongoose.model<IPage, PageModel>('Page');
+
+    for (const ancestorPath of collectAncestorPaths(path)) {
+      const emptyPage = await Page.findOne({
+        path: ancestorPath,
+        isEmpty: true,
+      });
+      if (emptyPage == null) {
+        continue;
+      }
+      if (await Page.exists({ parent: emptyPage._id })) {
+        return;
+      }
+      await Page.deleteOne({ _id: emptyPage._id, isEmpty: true });
+    }
+  }
+
   private isRenamingToUnderTarget(fromPath: string, toPath: string): boolean {
     const pathToTest = RegExp.escape(addTrailingSlash(fromPath));
     const pathToBeTested = toPath;
@@ -965,32 +1155,23 @@ class PageService implements IPageService {
     return new RegExp(`^${pathToTest}`, 'i').test(pathToBeTested);
   }
 
-  private async getParentAndforceCreateEmptyTree(originalPage, toPath: string) {
+  private async getParentAndforceCreateEmptyTree(
+    originalPage,
+    toPath: string,
+    emptyPagesToInsert: { _id: PageDocument['_id']; path: string }[],
+  ) {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
-    const fromPath = originalPage.path;
     const newParentPath = pathlib.dirname(toPath);
 
-    // local util
-    const collectAncestorPathsUntilFromPath = (
-      path: string,
-      paths: string[] = [],
-    ): string[] => {
-      if (path === fromPath) return paths;
-
-      const parentPath = pathlib.dirname(path);
-      paths.push(parentPath);
-      return collectAncestorPathsUntilFromPath(parentPath, paths);
-    };
-
-    const pathsToInsert = collectAncestorPathsUntilFromPath(toPath);
     const originalParent = await Page.findById(originalPage.parent);
     if (originalParent == null) {
       throw Error('Original parent not found');
     }
     const insertedPages = await Page.insertMany(
-      pathsToInsert.map((path) => {
+      emptyPagesToInsert.map(({ _id, path }) => {
         return {
+          _id,
           path,
           isEmpty: true,
         };
@@ -1024,8 +1205,7 @@ class PageService implements IPageService {
     });
     await Page.bulkWrite(operations);
 
-    const newParent = ancestorsMap.get(newParentPath);
-    return newParent;
+    return ancestorsMap.get(newParentPath);
   }
 
   private async renamePageV4(page, newPagePath, user, options) {
@@ -2008,13 +2188,8 @@ class PageService implements IPageService {
       throw new Error('Page is not deletable.');
     }
 
-    if (pagePathUtils.isUsersHomepage(page.path)) {
-      if (!this.canDeleteUserHomepageByConfig()) {
-        throw new Error('User Homepage is not deletable.');
-      }
-      if (!(await this.isUsersHomepageOwnerAbsent(page.path))) {
-        throw new Error('User Homepage is not deletable.');
-      }
+    if (await this.isProtectedUserHomepage(page.path)) {
+      throw new Error('User Homepage is not deletable.');
     }
 
     const newPath = Page.getDeletedPageName(page.path);
@@ -2602,8 +2777,19 @@ class PageService implements IPageService {
     return;
   }
 
-  async emptyTrashPage(user, options = {}, activityParameters) {
-    const page = { path: '/trash' };
+  /**
+   * Completely delete the given trashed pages. The caller judges the deletion
+   * authority; a page that is no longer in the trash or not editable by the
+   * user is left as it is.
+   */
+  private async deleteTrashedPagesCompletely(
+    user,
+    activityParameters,
+    pagesToDelete: PageDocument[],
+  ): Promise<number> {
+    const pageIdsToDelete = pagesToDelete.map((p) => p._id);
+    const Page = mongoose.model<IPage, PageModel>('Page');
+    const trashPage = { path: '/trash' };
 
     const parameters = {
       ...activityParameters,
@@ -2618,25 +2804,35 @@ class PageService implements IPageService {
     const activity =
       await this.crowi.activityService.createActivity(parameters);
 
-    const descendantsSubscribedSets = new Set();
-    const pages = await this.deleteCompletelyDescendantsWithStream(
-      page,
-      user,
-      options,
-      true,
-      descendantsSubscribedSets,
-    );
-    const descendantsSubscribedUsers = Array.from(
-      descendantsSubscribedSets,
-    ) as Ref<IUser>[];
+    // Look each batch up right before deleting it, so a page restored from
+    // the trash meanwhile is no longer matched.
+    const subscribedUsers = new Set<Ref<IUser>>();
+    let nDeletedNonEmptyPages = 0;
+    for (let i = 0; i < pageIdsToDelete.length; i += BULK_REINDEX_SIZE) {
+      const builder = new Page.PageQueryBuilder(Page.find(), true)
+        .addConditionAsRootOrNotOnTree()
+        .addConditionToListOnlyDescendants(trashPage.path)
+        .addConditionToListByPageIdsArray(
+          pageIdsToDelete.slice(i, i + BULK_REINDEX_SIZE),
+        );
+      await Page.addConditionToFilteringByViewerToEdit(builder, user);
+      const batch = await builder.query.lean().exec();
+      if (batch.length === 0) continue;
+
+      await this.deleteMultipleCompletely(batch, user);
+      nDeletedNonEmptyPages += batch.filter((p) => !p.isEmpty).length;
+      for (const subscribedUser of await Subscription.getSubscriptions(batch)) {
+        subscribedUsers.add(subscribedUser);
+      }
+    }
 
     const preNotify = preNotifyService.generatePreNotify(activity, async () => {
-      return descendantsSubscribedUsers;
+      return Array.from(subscribedUsers);
     });
 
-    this.activityEvent.emit('updated', activity, page, preNotify);
+    this.activityEvent.emit('updated', activity, trashPage, preNotify);
 
-    return pages;
+    return nDeletedNonEmptyPages;
   }
 
   /**
@@ -2698,7 +2894,7 @@ class PageService implements IPageService {
   }
 
   // no need to separate Main Sub since it is devided into single page operations
-  async deleteMultiplePages(
+  private async deleteMultiplePages(
     pagesToDelete,
     user,
     options,
@@ -5629,7 +5825,7 @@ class PageService implements IPageService {
   async findAllTrashPages(
     user: IUserHasId,
     userGroups = null,
-  ): Promise<HydratedDocument<IPage>[]> {
+  ): Promise<PageDocument[]> {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
     // https://regex101.com/r/KYZWls/1
@@ -5642,7 +5838,7 @@ class PageService implements IPageService {
 
     await queryBuilder.addViewerCondition(user, userGroups);
 
-    const pages: HydratedDocument<IPage>[] = await queryBuilder
+    const pages: PageDocument[] = await queryBuilder
       .addConditionToSortPagesByAscPath()
       .query.lean()
       .exec();

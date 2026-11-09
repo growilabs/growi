@@ -41,6 +41,13 @@ const ApiErrorMessage = (props) => {
             {t('page_api_error.user_not_admin')}
           </strong>
         );
+      case 'deletion_not_allowed_for_user':
+        return (
+          <strong>
+            <span className="material-symbols-outlined me-1">cancel</span>
+            {t('page_api_error.deletion_not_allowed_for_user')}
+          </strong>
+        );
       case 'complete_deletion_not_allowed_for_user':
         return (
           <strong>

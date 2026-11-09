@@ -272,7 +272,7 @@
     "password_is_not_set": "パスワードが設定されていません"
   },
   "share_links": {
-    "Shere this page link to public": "外部に共有するリンクを発行する",
+    "Share this page link to public": "外部に共有するリンクを発行する",
     "share_link_list": "共有リンクリスト",
     "share_link_management": "共有リンク管理",
     "delete_all_share_links": "全ての共有リンクを削除します",
@@ -427,7 +427,8 @@
     "invalid_body": "操作対象のページのバージョンがリクエストに含まれていません。",
     "user_not_admin": "権限のあるユーザーのみが削除できます",
     "single_deletion_empty_pages": "空ページの単体削除はできません",
-    "complete_deletion_not_allowed_for_user": "ページを完全に削除する権限がありません"
+    "complete_deletion_not_allowed_for_user": "ページを完全に削除する権限がありません",
+    "deletion_not_allowed_for_user": "ページを削除する権限がありません"
   },
   "page_history": {
     "revision_list": "更新履歴",
@@ -1154,7 +1155,7 @@
       "description": ""
     },
     "plantuml": {
-      "label": "PlantUML",
+      "label": "UML図（PlantUML）",
       "description": ""
     },
     "lsx": {

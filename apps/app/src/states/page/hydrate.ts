@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import {
   type IPageInfo,
   type IPageNotFoundInfo,
@@ -5,7 +6,8 @@ import {
   isIPageInfoForEmpty,
   isIPageNotFoundInfo,
 } from '@growi/core';
-import { useHydrateAtoms } from 'jotai/utils';
+import type { PrimitiveAtom } from 'jotai';
+import { useAtomCallback, useHydrateAtoms } from 'jotai/utils';
 
 import {
   currentPageDataAtom,
@@ -20,6 +22,30 @@ import {
   templateBodyAtom,
   templateTagsAtom,
 } from './internal-atoms';
+
+type PageAtomWriter = <V>(atom: PrimitiveAtom<V>, value: V) => void;
+
+const writePageAtoms = (
+  write: PageAtomWriter,
+  page: IPagePopulatedToShowRevision | null | undefined,
+  pageMeta: IPageNotFoundInfo | IPageInfo | undefined,
+): void => {
+  // Core page state - automatically extract from page object
+  write(currentPageEntityIdAtom, page?._id);
+  write(currentPageDataAtom, page ?? undefined);
+  write(pageNotFoundAtom, isIPageNotFoundInfo(pageMeta));
+  write(
+    isForbiddenAtom,
+    isIPageNotFoundInfo(pageMeta) ? pageMeta.isForbidden : false,
+  );
+  write(
+    currentPageEmptyIdAtom,
+    isIPageInfoForEmpty(pageMeta) ? pageMeta.emptyPageId : undefined,
+  );
+
+  // Remote revision data - used by ConflictDiffModal
+  write(remoteRevisionBodyAtom, page?.revision?.body);
+};
 
 /**
  * Hook for hydrating page-related atoms with server-side data
@@ -55,23 +81,13 @@ export const useHydratePageAtoms = (
     isIdenticalPath?: boolean;
   },
 ): void => {
-  useHydrateAtoms([
-    // Core page state - automatically extract from page object
-    [currentPageEntityIdAtom, page?._id],
-    [currentPageDataAtom, page ?? undefined],
-    [pageNotFoundAtom, isIPageNotFoundInfo(pageMeta)],
-    [
-      isForbiddenAtom,
-      isIPageNotFoundInfo(pageMeta) ? pageMeta.isForbidden : false,
-    ],
-    [
-      currentPageEmptyIdAtom,
-      isIPageInfoForEmpty(pageMeta) ? pageMeta.emptyPageId : undefined,
-    ],
-
-    // Remote revision data - used by ConflictDiffModal
-    [remoteRevisionBodyAtom, page?.revision?.body],
-  ]);
+  const pageAtomValues = new Map();
+  writePageAtoms(
+    (atom, value) => pageAtomValues.set(atom, value),
+    page,
+    pageMeta,
+  );
+  useHydrateAtoms(pageAtomValues);
 
   // always overwrited
   useHydrateAtoms(
@@ -89,3 +105,20 @@ export const useHydratePageAtoms = (
     { dangerouslyForceHydrate: true },
   );
 };
+
+/**
+ * Returns a setter that overwrites the page atoms with server-side data,
+ * the same values useHydratePageAtoms writes on the first render.
+ *
+ * useHydratePageAtoms writes only once, so a route whose props carry the
+ * navigated-to page uses this to apply it on client-side navigation.
+ */
+export const useSetPageAtoms = (): ((
+  page: IPagePopulatedToShowRevision | null | undefined,
+  pageMeta: IPageNotFoundInfo | IPageInfo | undefined,
+) => void) =>
+  useAtomCallback(
+    useCallback((_get, set, page, pageMeta) => {
+      writePageAtoms((atom, value) => set(atom, value), page, pageMeta);
+    }, []),
+  );

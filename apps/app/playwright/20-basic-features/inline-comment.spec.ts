@@ -2150,7 +2150,7 @@ test.describe('Inline comment - hover/click/tap on a saved body highlight opens 
     // (a CodeMirror `.cm-content` editor, same as everywhere else in this
     // file), not the plain textarea it used to be -- driven the same way.
     await popover.locator('.cm-content').fill(replyText);
-    await popover.getByRole('button', { name: 'Commment' }).click();
+    await popover.getByRole('button', { name: /^Comment$/ }).click();
 
     // The popover clears its draft and keeps itself open on a successful
     // submit (InlineCommentPreviewPopover.tsx has no self-close-on-submit
@@ -2330,8 +2330,11 @@ test.describe('Inline comment - hover-to-popover transit and popover-lock timing
 
     // A short explicit timeout, well under the 150ms hover show-delay, proves
     // the click path genuinely bypasses that debounce rather than merely
-    // happening to resolve within the default 5s expect timeout.
-    await expect(popover).toBeVisible({ timeout: 100 });
+    // happening to resolve within the default 5s expect timeout. 130ms (a
+    // modest safety margin over the render/layout cost the click path
+    // actually pays, which has no hover-debounce-sized delay in it) is still
+    // comfortably under that 150ms boundary (#12171, #12139).
+    await expect(popover).toBeVisible({ timeout: 130 });
     await expect(popover).toContainText(commentText);
 
     // No further interaction (no hover, no pointer move) -- confirms no

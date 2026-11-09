@@ -2,23 +2,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 import type { IUser } from '@growi/core';
-import { getIdForRef, isPopulated } from '@growi/core';
 import type archiver from 'archiver';
 import mongoose from 'mongoose';
 
+import type { auditlogbulkexportjobs } from '~/generated/prisma/client';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import CronService from '~/server/service/cron';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import {
   AuditLogBulkExportJobInProgressJobStatus,
   AuditLogBulkExportJobStatus,
 } from '../../../interfaces/audit-log-bulk-export';
-import type { AuditLogBulkExportJobDocument } from '../../models/audit-log-bulk-export-job';
-import AuditLogBulkExportJob from '../../models/audit-log-bulk-export-job';
 import {
   AuditLogBulkExportJobExpiredError,
   AuditLogBulkExportJobRestartedError,
@@ -35,22 +34,22 @@ export interface IAuditLogBulkExportJobCronService {
   compressFormat: archiver.Format;
   compressLevel: number;
   proceedBulkExportJob(
-    auditLogBulkExportJob: AuditLogBulkExportJobDocument,
+    auditLogBulkExportJob: auditlogbulkexportjobs,
   ): Promise<void>;
-  getTmpOutputDir(auditLogBulkExportJob: AuditLogBulkExportJobDocument): string;
+  getTmpOutputDir(auditLogBulkExportJob: auditlogbulkexportjobs): string;
   getStreamInExecution(jobId: ObjectIdLike): Readable | undefined;
   setStreamInExecution(jobId: ObjectIdLike, stream: Readable): void;
   removeStreamInExecution(jobId: ObjectIdLike): void;
   notifyExportResultAndCleanUp(
     action: SupportedActionType,
-    auditLogBulkExportJob: AuditLogBulkExportJobDocument,
+    auditLogBulkExportJob: auditlogbulkexportjobs,
   ): Promise<void>;
   handleError(
     err: Error | null,
-    auditLogBulkExportJob: AuditLogBulkExportJobDocument,
+    auditLogBulkExportJob: auditlogbulkexportjobs,
   ): Promise<void>;
   cleanUpExportJobResources(
-    auditLogBulkExportJob: AuditLogBulkExportJobDocument,
+    auditLogBulkExportJob: auditlogbulkexportjobs,
     restarted?: boolean,
   ): Promise<void>;
 }
@@ -98,15 +97,16 @@ class AuditLogBulkExportJobCronService
   }
 
   override async executeJob(): Promise<void> {
-    const auditLogBulkExportJobInProgress = await AuditLogBulkExportJob.find({
-      $or: Object.values(AuditLogBulkExportJobInProgressJobStatus).map(
-        (status) => ({
-          status,
-        }),
-      ),
-    })
-      .sort({ createdAt: 1 })
-      .limit(this.parallelExecLimit);
+    const auditLogBulkExportJobInProgress =
+      await prisma.auditlogbulkexportjobs.findMany({
+        where: {
+          status: {
+            in: Object.values(AuditLogBulkExportJobInProgressJobStatus),
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: this.parallelExecLimit,
+      });
     await Promise.all(
       auditLogBulkExportJobInProgress.map((auditLogBulkExportJob) =>
         this.proceedBulkExportJob(auditLogBulkExportJob),
@@ -114,25 +114,27 @@ class AuditLogBulkExportJobCronService
     );
   }
 
-  async proceedBulkExportJob(
-    auditLogBulkExportJob: AuditLogBulkExportJobDocument,
-  ) {
+  async proceedBulkExportJob(auditLogBulkExportJob: auditlogbulkexportjobs) {
     try {
       if (auditLogBulkExportJob.restartFlag) {
         await this.cleanUpExportJobResources(auditLogBulkExportJob, true);
-        auditLogBulkExportJob.restartFlag = false;
-        auditLogBulkExportJob.status = AuditLogBulkExportJobStatus.exporting;
-        auditLogBulkExportJob.lastExportedId = undefined;
-        auditLogBulkExportJob.totalExportedCount = 0;
-        await auditLogBulkExportJob.save();
+        await prisma.auditlogbulkexportjobs.update({
+          where: { id: auditLogBulkExportJob.id },
+          data: {
+            restartFlag: false,
+            status: AuditLogBulkExportJobStatus.exporting,
+            lastExportedId: null,
+            totalExportedCount: 0,
+          },
+        });
         return;
       }
       const User = mongoose.model<IUser>('User');
-      const user = await User.findById(getIdForRef(auditLogBulkExportJob.user));
+      const user = await User.findById(auditLogBulkExportJob.userId);
 
       if (!user) {
         throw new Error(
-          `User not found for audit log export job: ${auditLogBulkExportJob._id}`,
+          `User not found for audit log export job: ${auditLogBulkExportJob.id}`,
         );
       }
 
@@ -150,10 +152,8 @@ class AuditLogBulkExportJobCronService
     }
   }
 
-  getTmpOutputDir(
-    auditLogBulkExportJob: AuditLogBulkExportJobDocument,
-  ): string {
-    const jobId = auditLogBulkExportJob._id.toString();
+  getTmpOutputDir(auditLogBulkExportJob: auditlogbulkexportjobs): string {
+    const jobId = auditLogBulkExportJob.id;
     return path.join(this.tmpOutputRootDir, jobId);
   }
 
@@ -181,16 +181,19 @@ class AuditLogBulkExportJobCronService
 
   async notifyExportResultAndCleanUp(
     action: SupportedActionType,
-    auditLogBulkExportJob: AuditLogBulkExportJobDocument,
+    auditLogBulkExportJob: auditlogbulkexportjobs,
   ): Promise<void> {
-    auditLogBulkExportJob.status =
-      action === SupportedAction.ACTION_AUDIT_LOG_BULK_EXPORT_COMPLETED
-        ? AuditLogBulkExportJobStatus.completed
-        : AuditLogBulkExportJobStatus.failed;
-
     try {
-      await auditLogBulkExportJob.save();
-      await this.notifyExportResult(auditLogBulkExportJob, action);
+      const updatedJob = await prisma.auditlogbulkexportjobs.update({
+        where: { id: auditLogBulkExportJob.id },
+        data: {
+          status:
+            action === SupportedAction.ACTION_AUDIT_LOG_BULK_EXPORT_COMPLETED
+              ? AuditLogBulkExportJobStatus.completed
+              : AuditLogBulkExportJobStatus.failed,
+        },
+      });
+      await this.notifyExportResult(updatedJob, action);
     } catch (err) {
       logger.error(err);
     }
@@ -198,7 +201,7 @@ class AuditLogBulkExportJobCronService
   }
 
   private async notifyExportResult(
-    auditLogBulkExportJob: AuditLogBulkExportJobDocument,
+    auditLogBulkExportJob: auditlogbulkexportjobs,
     action: SupportedActionType,
   ) {
     logger.debug(
@@ -209,11 +212,9 @@ class AuditLogBulkExportJobCronService
       action,
       targetModel: SupportedTargetModel.MODEL_AUDIT_LOG_BULK_EXPORT_JOB,
       target: auditLogBulkExportJob,
-      user: auditLogBulkExportJob.user,
+      user: auditLogBulkExportJob.userId,
       snapshot: {
-        username: isPopulated(auditLogBulkExportJob.user)
-          ? auditLogBulkExportJob.user.username
-          : '',
+        username: '',
       },
     });
     if (activity == null) {
@@ -221,7 +222,7 @@ class AuditLogBulkExportJobCronService
     }
     // createActivity's result never has `user` populated (only `userId`) --
     // reference the acting user we already have on hand instead.
-    const getAdditionalTargetUsers = async () => [auditLogBulkExportJob.user];
+    const getAdditionalTargetUsers = async () => [auditLogBulkExportJob.userId];
     const preNotify = preNotifyService.generatePreNotify(
       activity,
       getAdditionalTargetUsers,
@@ -236,7 +237,7 @@ class AuditLogBulkExportJobCronService
 
   async handleError(
     err: Error | null,
-    auditLogBulkExportJob: AuditLogBulkExportJobDocument,
+    auditLogBulkExportJob: auditlogbulkexportjobs,
   ) {
     if (err == null) return;
 
@@ -259,11 +260,11 @@ class AuditLogBulkExportJobCronService
   }
 
   async cleanUpExportJobResources(
-    auditLogBulkExportJob: AuditLogBulkExportJobDocument,
+    auditLogBulkExportJob: auditlogbulkexportjobs,
     restarted = false,
   ) {
     const streamInExecution = this.getStreamInExecution(
-      auditLogBulkExportJob._id,
+      auditLogBulkExportJob.id,
     );
     if (streamInExecution != null) {
       if (restarted) {
@@ -271,7 +272,7 @@ class AuditLogBulkExportJobCronService
       } else {
         streamInExecution.destroy(new AuditLogBulkExportJobExpiredError());
       }
-      this.removeStreamInExecution(auditLogBulkExportJob._id);
+      this.removeStreamInExecution(auditLogBulkExportJob.id);
     }
 
     const promises = [
