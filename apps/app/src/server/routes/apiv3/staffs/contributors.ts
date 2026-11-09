@@ -183,6 +183,7 @@ export const contributors: ContributorSection[] = [
           },
           { position: 'Waseda University', name: 'Allan Wirth' },
           { name: 'Utkarsh Choudhary' },
+          { name: 'Shohei Kibe' },
         ],
       },
     ],
