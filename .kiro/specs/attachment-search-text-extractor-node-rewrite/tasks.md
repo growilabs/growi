@@ -120,7 +120,7 @@
   - 計測の結果と、使う既定値が research.md にある。対象 spec の AC や不変条件を満たせないことが分かったら、ユーザーに諮り、答えが research.md に記録されるまで 3.8 と 4.x に進まない
   - _Requirements: 3.13, 3.14, 11.1, 11.2, 11.10, 11.11_
   - _Depends: 3.3, 3.6_
-- [ ] 3.8 採用した部品を抽出サービスの package に入れる
+- [x] 3.8 採用した部品を抽出サービスの package に入れる
   - 3.1〜3.5 で採用した部品 (PDF、テキスト系、OpenAPI、multipart など) を、1 回ずつ順番に install して package に入れる。ライセンスを確かめ、research.md の部品の一覧と合わせる
   - `turbo run lint test --filter @growi/attachment-text-extractor` が通り、lockfile の差分が採用した部品だけになっている
   - _Requirements: 4.4_
@@ -226,6 +226,7 @@
 - [ ] 6.11 Dockerfile と k8s の例を Node 版で作る
   - `apps/pdf-converter` に倣い、Node 24 の slim を元にし、`pnpm deploy --prod` で本番の依存だけを取り出す multi-stage の Dockerfile を作る。最終の段で `prlimit` を実行し、無ければビルドを失敗させる。`RAYON_NUM_THREADS=1` を設定する
   - k8s の例 (deployment、service、hpa、networkpolicy) を新しい場所に作り、`WORKERS` を消し、メモリの requests / limits を 3.7 の予算に合わせる
+  - image に、PDFium の WASM に入っている第三者の部品 (FreeType・OpenJPEG・libpng・zlib・libc++ など。JPEG と lcms も入っている見込み) のライセンス表示のファイルを入れる (`@embedpdf/pdfium` の package には `LICENSE` と `LICENSE.pdfium` しか入っておらず、これらの表示が無い。Python 版の pypdfium2 の wheel は `licenses/data/linux_x64/BUILD_LICENSES/` に持っていた)。出どころと入れ方は research.md の 21 節 (PDFium の第三者のライセンス) に従う
   - 4.5 のテストが通る (compose のテストは 8.2 で通る)
   - _Requirements: 8.1, 8.3, 8.5, 8.6, 8.7_
 - [ ] 6.12 Node 版の CI のジョブに image の確認を足す

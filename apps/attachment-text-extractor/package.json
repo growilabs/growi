@@ -16,14 +16,24 @@
     "benchmark:generate": "node --import @swc-node/register/esm-register benchmark/generate-corpus.ts"
   },
   "dependencies": {
+    "@embedpdf/pdfium": "=2.15.1",
     "@firecrawl/anydoc": "=0.2.4",
     "@hono/node-server": "^2.1.6",
-    "hono": "^4.13.16"
+    "@xmldom/xmldom": "^0.9.12",
+    "entities": "^8.1.0",
+    "hono": "^4.13.16",
+    "htmlparser2": "=12.0.0",
+    "yauzl": "^3.4.0",
+    "yazl": "^3.3.1"
   },
   "devDependencies": {
     "@swc-node/register": "^1.10.9",
     "@swc/core": "^1.9.2",
+    "@types/emscripten": "^1.41.6",
     "@types/node": "^24.0.0",
+    "@types/yauzl": "^3.4.0",
+    "@types/yazl": "^3.3.1",
+    "ajv": "^8.18.0",
     "cfb": "^1.2.2",
     "iconv-lite": "^0.7.3",
     "officecrypto-tool": "0.0.19",

@@ -6646,3 +6646,67 @@ node timeout37.mjs 7                                                            
 - `--max-semi-space-size` を 4 より小さくした値、`--max-old-space-size` などのほかの V8 の引数。
 - ASCII の DOCX と 1 ページの文字の多い PDF の境目 (20.9) は、2〜3 点からの外挿。
 - 決めた形 (A) の本番の親 (6.7 / 6.8) での最も重い負荷の値 (試作の `srv/server.mjs` と `supervise37.mjs` の `STREAM_RESPONSE` / `LEAN_RESULT` で測った)。応答を少しずつ書く形の応答の時間。(C) を足した場合の見積もり (外挿のまま)。
+
+## 21. 採用した部品の導入 (タスク 3.8)
+
+2026-11-09 に devcontainer (Node 24.21.0、pnpm 11.1.1) で、3.1〜3.5 で採った部品を `apps/attachment-text-extractor/package.json` に 1 つずつ入れた結果。数字は、とくに書いていなければ **実測**。
+
+### 21.1 入れたもの
+
+| 部品 | 書いた版 | 分類 | ライセンス (registry / 入った LICENSE ファイル) | install のときに動く処理 | lockfile で増えた項目 |
+|---|---|---|---|---|---|
+| `htmlparser2` | `=12.0.0` | 本番 | MIT / MIT | なし | 6 (自分と `domhandler` 6.0.1・`domutils` 4.0.2・`dom-serializer` 3.1.1・`domelementtype` 3.0.0・`entities` 8.1.0) |
+| `entities` | `^8.1.0` | 本番 | BSD-2-Clause / BSD-2-Clause | なし | 0 (htmlparser2 が引いた 8.1.0 と同じもの) |
+| `@xmldom/xmldom` | `^0.9.12` | 本番 | MIT / MIT | なし | 1 |
+| `yauzl` | `^3.4.0` | 本番 | MIT / MIT | なし | 1 (`pend` 1.2.0 は lockfile に既にあった) |
+| `yazl` | `^3.3.1` | 本番 | MIT / MIT | なし | 2 (自分と `buffer-crc32` 1.0.0) |
+| `@embedpdf/pdfium` | `=2.15.1` | 本番 | MIT / `LICENSE` (MIT) と `LICENSE.pdfium` (PDFium の BSD-3-Clause と Apache-2.0) | なし | 1 |
+| `@types/yauzl` | `^3.4.0` | 開発 | MIT / MIT | なし | 1 (`@types/node` は既存の 24.19.2 に解決) |
+| `@types/yazl` | `^3.3.1` | 開発 | MIT / MIT | なし | 1 |
+| `@types/emscripten` | `^1.41.6` | 開発 | MIT / MIT | なし | 1 |
+| `ajv` | `^8.18.0` | 開発 | MIT / MIT | なし | 0 (既存の 8.18.0 に解決。依存の 4 個も既存) |
+
+- 推移的な依存のライセンスと install のときの処理 (入った実物の `package.json` と LICENSE を読んだ): `domhandler`・`domutils`・`domelementtype` は BSD-2-Clause、`dom-serializer`・`pend` (Expat)・`buffer-crc32` は MIT。どれも `preinstall` / `install` / `postinstall` と `binding.gyp` が無い。`ajv` の依存 (`fast-uri` BSD-3-Clause、ほか 3 個 MIT) も同じ。
+- lockfile で増えた項目は合わせて 14 個。消えた行は 0。importer の変更は `apps/attachment-text-extractor` だけで、`apps/app` や `packages/*` の項目、`lockfileVersion`、`settings`、`overrides`、`packageManager` は変わっていない。
+- `pnpm install` は「ignored build scripts」の警告を出さなかった。`pnpm-workspace.yaml` の `allowBuilds` には触っていない。
+- 1.2 で入った `hono`・`@hono/node-server`・`@firecrawl/anydoc` と、テスト専用の `officecrypto-tool`・`cfb`・`iconv-lite` (9.10、18.10) は変えていない。
+
+### 21.2 research.md の部品の一覧との照合
+
+- 本番の直接の依存 (18.10 の 5 個と 14.8 の 1 個)、本番に入るテキスト系の 11 個 (18.8)、開発用の `@types/yauzl`・`@types/yazl` (18.10) と `ajv` (17.10) は、一覧と版まで一致した。却下した部品 (`busboy`・`@fastify/busboy`・`zod`・`@hono/zod-openapi`・`hono-openapi`・`jschardet`・`parse5`・`cheerio` など) は入れていない。
+- **一覧に無かったもの: `@types/emscripten` (開発用)**。`@embedpdf/pdfium` の型定義は `/// <reference types="emscripten" />` を前提にしており (この package 自身も開発用の依存に持つ)、無いと `HEAPU8` などの型が欠けて `tsgo` が通らない。6.x の PDF の変換も `HEAPU8` を使う (14.8) ので足した。依存は 0 個。
+- 17.10 の未検証 (`^8.18.0` のときに pnpm が既存の 8.18.0 を選ぶか) は、**8.18.0 を選んだ** (lockfile の項目は増えなかった)。
+
+### 21.3 版の書き方の方針
+
+- **固定 (`=`) にしたもの**: `@embedpdf/pdfium` (14.6・14.8。保守する人が 1 人で、中の PDFium の版が分からないため、上げるときはベンチマークを回す) と `htmlparser2` (18.10。adapter が `Tokenizer` の位置の値を書き換えるなど、内部の振る舞いに依っている)。書き方は、同じ `dependencies` にある `@firecrawl/anydoc` の `=0.2.4` と `apps/pdf-converter` の `=8.5.0` に合わせた。
+- **`^` にしたもの**: ほかはこの package の慣習 (`^`) に合わせた。`@xmldom/xmldom` は 18.10 のとおり下限を 0.9.12 にした (`^0.9.12` は 0.10 未満まで)。`entities` は htmlparser2 の依存の指定 (`^8.0.0`) と同じ版に解決されるので、重複しない。
+- 入れ方は「`package.json` に 1 つ書いて `pnpm install`」。`pnpm --filter … add` で入れると、関係の無い `vitest-mock-extended` の lockfile の鍵 (循環する peer の `@vitest/ui@3.2.4(vitest@3.2.6)` の書き方) が 2 つの importer で書き換わった。版は同じで、続けて `pnpm install` を流すと元に戻った。後で部品を足すときも、この入れ方にすると差分が部品の分だけになる。
+
+### 21.4 ネイティブと WASM の platform
+
+- `@embedpdf/pdfium` は WASM だけで、platform ごとの部品は無い (`dist/pdfium.wasm` 4.6MB)。
+- `@firecrawl/anydoc` 0.2.4 は napi-rs の optional の依存として 7 つの platform の部品が lockfile にある (既存の状態。3.8 で変わっていない): `darwin-arm64`、`darwin-x64`、`linux-arm64-gnu`、`linux-arm64-musl`、`linux-x64-gnu`、`linux-x64-musl`、`win32-x64-msvc`。devcontainer に入ったのは `linux-x64-gnu` だけ。linux-arm64 の image でも lockfile から入る (未検証。6.11 / 6.12 で確かめる)。
+- テキスト系の部品と `ajv` は JavaScript だけ。
+
+### 21.5 PDFium の WASM の中の第三者の部品 (14.8 の宿題)
+
+- `strings` で WASM の中の文字列を見た結果 (推論。ビルドの構成は読んでいない): FreeType (`FREETYPE_PROPERTIES`)、OpenJPEG (`openjpeg.h`、JPEG 2000 の誤りの文)、libpng (`libpng-`)、zlib (`zlib version`)、libc++ / libc++abi (LLVM)、Adobe のフォントの寸法の表 (`Copyright (c) 1990-1994 Adobe Systems Incorporated`。PDFium の一部)。JPEG と色の管理の部品は文字列からは特定できなかった。pypdfium2 の一覧 (下の libjpeg_turbo の IJG と lcms) から見て、同じ PDFium を作ったものなら入っている見込み (推論)。IJG のライセンスは、文書の中に「Independent JPEG Group の成果に基づく」という表示を求める。
+- これらのライセンスは、どれも許容的なもの (FreeType は FTL を選べる。OpenJPEG は BSD-2-Clause、libpng と zlib はそれぞれの許容的なライセンス、LLVM は Apache-2.0 の LLVM 例外つき) で、コピーレフトは無い。
+- ただし package に入っているのは `LICENSE` と `LICENSE.pdfium` だけで、FreeType の FTL が求める「文書の中で FreeType を使ったことを示す」表示や、OpenJPEG の BSD の著作権の表示の文は同梱されていない。比べると、Python 版の pypdfium2 5.14.0 の wheel は `licenses/data/linux_x64/BUILD_LICENSES/` に freetype・libjpeg_turbo (IJG)・libopenjpeg・libpng・zlib・lcms・agg23・icu・abseil・llvm-libc などの文を持っている (devcontainer の `.venv` で確かめた)。Python 版の image も同じ wheel を入れるので表示を持っていた見込み (推論。image の中は確かめていない) だが、Node 版の image は持たない。この表示は、Req 4.4 ですでに受け入れた許容的なライセンス (BSD の再配布の条件、FreeType の FTL の表示、IJG の表示) に付く条件で、選ぶ余地が無い。したがってユーザー判断は要らず、6.11 の Dockerfile が image に表示のファイルを入れる (tasks.md の 6.11 に足した)。配布物にも置くかは 8.x で決める。表示のファイルの出どころは未決で、6.11 で `@embedpdf/pdfium` 自身のビルド (package の `repository.directory` の packages/pdfium、`wasm:build`) から特定する。Python 版の pypdfium2 の `BUILD_LICENSES` は参考にとどめる (部品の版が違いうるため)。
+
+### 21.6 検証
+
+- RED (部品を入れる前): `pnpm vitest run smoke.spec` は 6 件が `Cannot find package '@embedpdf/pdfium'` (同じく `htmlparser2`・`entities`・`@xmldom/xmldom`・`yazl`・`ajv`) で失敗し、既存の部品の 4 件は通った。
+- GREEN: `src/smoke.spec.ts` の 10 件が通る。部品ごとに、import と最低限の呼び出しを確かめる (Hono の要求、`getRequestListener` で Node の HTTP サーバーにつないだ要求、anydoc の CSV、PDFium の WASM を `wasmBinary` で渡して 2 ページの PDF のページ数、`Tokenizer` の本文、`decodeHTML`、xmldom の解析、yazl で書いた ZIP を yauzl で読み戻す往復、ajv の検査の可否)。
+- `turbo run lint test --filter @growi/attachment-text-extractor`: 2 つのタスクが成功 (biome 109 ファイル、`tsgo --noEmit`、テスト 38 ファイル・444 件が通り、12 件は benchmark の既存の skip)。
+- `pnpm install --frozen-lockfile` は成功した。`git status` で変わったのは `apps/attachment-text-extractor/package.json`・`src/smoke.spec.ts`・`pnpm-lock.yaml` とこの文書だけ。
+- `pnpm --filter @growi/attachment-text-extractor list --prod --depth 0` の本番の依存は 9 個 (`@embedpdf/pdfium`・`@firecrawl/anydoc`・`@hono/node-server`・`@xmldom/xmldom`・`entities`・`hono`・`htmlparser2`・`yauzl`・`yazl`)。型定義と `ajv` は入らない。
+
+### 21.7 後のタスクへの引き継ぎ
+
+- **4.x / 6.x**: 部品はすべて入った。PDFium は `createRequire(import.meta.url).resolve('@embedpdf/pdfium/pdfium.wasm')` で場所を得て、`init({ wasmBinary })` に `ArrayBuffer` を渡す (`@types/emscripten` の型では `Buffer` をそのまま渡せない)。vitest の中では `import.meta.resolve` が使えない。anydoc の形式は `Format` が ambient の const enum なので、`formatFromExtension` で実行時に得る (`test/fixtures/spec-support/anydoc.ts` と同じ)。
+- **6.11 (Dockerfile)**: `pnpm deploy --prod` で入る本番の依存は、直接の 9 個と推移的な 6 個 (`domhandler`・`domutils`・`dom-serializer`・`domelementtype`・`pend`・`buffer-crc32`) と、anydoc の platform の部品 1 つ。install のときに動く処理を持つ部品は無いので、`allowBuilds` も `--ignore-scripts` の扱いも変えなくてよい。21.5 の第三者のライセンス表示のファイルを image に入れる (ユーザー判断は要らない。出どころは 21.5 のとおり 6.11 で特定する)。
+- **6.11 / 6.12**: linux-arm64 の image を作るなら、anydoc の `linux-arm64-gnu` が入ることを確かめる。`node:24-slim` は glibc なので `-gnu` の部品が選ばれる (推論。6.12 の image の中の `/readyz` と抽出の確認で、部品が欠けていれば見つかる)。PDFium は WASM なので CPU を選ばない。
+- **8.x**: 21.5 の表示を配布物にも置くかを決める。
+- **版を上げるとき**: `@embedpdf/pdfium` と `htmlparser2` は固定なので、上げる変更ではベンチマークと 18.5.1 の比べ方をやり直す。`@xmldom/xmldom` は勧告が出たら上げる (18.10)。
