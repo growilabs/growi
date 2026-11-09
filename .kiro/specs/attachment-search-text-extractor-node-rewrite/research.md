@@ -7161,3 +7161,79 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 **テスト用の補助 (新)**: YAML は devDependency の `yaml` (`^2.9.0`) で読む。`yaml` を足した記録: lockfile に既にあった版 (2.9.0、ISC ライセンス、依存の package は 0 個) で、lockfile の差分は importers の 1 か所の 3 行だけ。`ajv` など、同じ package にテスト専用の部品を足す前例と同じ扱い。最初は部品を足さず、ブロック形式だけを読む自作の読み手を書いたが、`True`・`0x1F`・`0755` を黙って文字列にし、不正な YAML を通し、正しい YAML の anchor や `>-` を拒んだので、`yaml` に置き換えて自作の読み手は消した。`test/deploy/yaml-parse.ts` は `parseAllDocuments` で読み、構文の誤りが有れば例外にし、文書がちょうど 1 つであることを確かめ、型アサーションなしで値に変換する (約 20 行。anchor・merge key・`|`/`>`・複数行の flow 形式も読める)。単体テストは `yaml-parse.spec.ts` 4 件。Dockerfile の読み手 (`dockerfile-model.ts`) は、行の継続の結合・コメント行の除外・段の分割・`ARG` の展開・`COPY`/`ENV`/`CMD` の読み取りだけを行い、heredoc は例外にする。単体テストは `dockerfile-model.spec.ts` 7 件。
 
 **確かめなかったこと**: image のビルド、コンテナの中の動作 (大きさ 400MB 以下、`prlimit` の実行、`/readyz`、`node:24-slim` の ICU と glibc、linux-arm64 の `-gnu` の部品。6.12 の担当)。compose を実際に `docker compose` で読むこと。k8s を `kubectl --dry-run` で検証すること。lockfile に `linux-arm64-gnu` の部品が有ること (21.4 に記録済み)。Node 版の CI の workflow の静的テスト (22.8 の 4 のとおり対応させない)。
+
+## 24. 黒箱のテストを Python 版に向けた結果 (タスク 4.6)
+
+2026-11-09 に、4.4 の黒箱のテスト (`apps/attachment-text-extractor/test/http/` の 10 ファイル、312 件) を、devcontainer で起動した Python 版に向けて流した (Req 6.3)。**テストも実装も変えていない**。直すものは無かった。
+
+### 24.1 結論
+
+- 目印の無い 288 件が Python 版でそのまま通った。目印の付いた 24 件は飛ばされた。3 回流して、3 回とも同じ結果だった。
+- 目印を付けずに Python 版へ向けると、落ちたのはちょうど目印の付いた 24 件だった (付けすぎ 0、付け忘れ 0)。落ちた 24 件の理由は、どれも 22.5 の表の「Python 版の振る舞い」どおりの食い違い (D2 の名前、`/docs` が 200、405・307・417 など) で、接続の失敗や時間切れは 1 件も無かった。
+- 目印の理由 id は 7 つで、22.5 の表と一致した: `16.1` (2 件)、`7.5-2` (1)、`7.5-3` (8)、`16.9` (9)、`17.6` (1)、`D2` (1)、`D3` (2)。
+
+### 24.2 結果 (実測)
+
+| 流し方 | 結果 |
+|---|---|
+| `BLACKBOX_TARGET=python` (3 回) | `Test Files 10 passed (10)`、`Tests 288 passed \| 24 skipped (312)`。所要約 10.3 秒。3 回とも同じ |
+| `BLACKBOX_TARGET` なし (`node` のまま) で Python 版へ | 312 件のうち 24 件が失敗。失敗した 24 件は `vitest list` の `[node-only:<id>]` の 24 件と完全に一致 |
+
+### 24.3 Python 版の起動と停止 (scratchpad が消えても、ここから作り直せる)
+
+1. **Python の環境 (pyvenv) を作る** (ネットワークが要る。リポジトリの `services/attachment-text-extractor/.venv` は壊れたリンクなので使わない。22.8 の 5):
+   ```bash
+   cd services/attachment-text-extractor
+   UV_PYTHON_INSTALL_DIR=<作業用>/uvpy UV_PROJECT_ENVIRONMENT=<作業用>/pyvenv uv sync --frozen --extra dev
+   ```
+   今回は、4.4 の作業で作った既存の pyvenv (Python 3.12.16、`pyvenv.cfg` の `uv = 0.13.7`) を使ったので、この手順は再実行していない。この pyvenv は `services/attachment-text-extractor/src` を editable で読むので、作業ツリーの場所を変えたら作り直す。
+2. **起動** (8.2 と同じ。違うのは `uvicorn` の場所だけ。トークンは使い捨て。`18046` は他と衝突しないポート):
+   ```bash
+   cd services/attachment-text-extractor
+   TOKEN="dummy-$(head -c8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+   ATTACHMENT_EXTRACTOR_SERVICE_TOKEN=$TOKEN setsid nohup <作業用>/pyvenv/bin/uvicorn app.main:app --host 127.0.0.1 --port 18046 > py.log 2>&1 < /dev/null &
+   echo $! > py.pid    # setsid なので、この PID がグループ ID にもなる
+   ```
+   `GET /readyz` が 200 になるまで待つ (8.3。今回は約 1 秒): 本文は `{"status":"ready","dependencies":{"anydoc":"ok","pypdfium2":"ok","charset-normalizer":"ok","converter":"ok"}}`。
+3. **流す** (`apps/attachment-text-extractor` で。`pnpm install` は不要。`vitest` は直接呼ぶ):
+   ```bash
+   BLACKBOX_TARGET=python BLACKBOX_URL=http://127.0.0.1:18046 BLACKBOX_TOKEN=$TOKEN ./node_modules/.bin/vitest run test/http
+   ```
+4. **停止** (起動した PID だけ): `kill -TERM $(cat py.pid)`、終わるまで待つ。`pgrep -g <PID>` が空 (終了コード 1) で、`ss -ltn | grep :18046` が空であることを確かめる。今回の停止後は、両方とも空だった。トークンと PID のファイルは消す。
+
+### 24.4 付けすぎ・付け忘れの検査 (22.4 の手順 3〜4)
+
+目印を付けずに流した結果を JSON で取り (`vitest run test/http --reporter=json --outputFile=<f>`)、`vitest list test/http --json > <list>` の `[node-only:<id>]` の集まりと突き合わせる。**注意**: `vitest list` はスイート名を ` > ` でつなぎ、JSON の報告は空白でつなぐので、比べる前に ` > ` を空白にそろえる。そろえないと全件が食い違って見える (最初の試行で起きた)。使った script (22 行。リポジトリには置かない。今回の置き場は作業の scratchpad):
+
+```js
+// check-markers.mjs <list.json> <report.json>: node-only markers vs failures against the Python service
+import { readFileSync } from 'node:fs';
+const [listPath, reportPath] = process.argv.slice(2);
+const list = JSON.parse(readFileSync(listPath, 'utf8'));
+const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+// vitest list joins suite names with ' > ', the json reporter with ' '; normalize both
+const key = (file, name) => `${file.split('/test/http/').pop()} :: ${name.replaceAll(' > ', ' ')}`;
+const marked = new Set(list.filter(t => /\[node-only:[^\]]+\]/.test(t.name)).map(t => key(t.file, t.name)));
+const failed = new Set();
+let total = 0;
+for (const f of report.testResults) for (const a of f.assertionResults) {
+  total++;
+  if (a.status === 'failed') failed.add(key(f.name, a.fullName));
+}
+const overMarked = [...marked].filter(k => !failed.has(k));   // marked but passes on Python
+const forgotten = [...failed].filter(k => !marked.has(k));    // fails on Python but not marked
+const ids = {};
+for (const k of marked) { const id = k.match(/\[node-only:([^\]]+)\]/)[1]; ids[id] = (ids[id] ?? 0) + 1; }
+console.log(JSON.stringify({ listed: list.length, ran: total, marked: marked.size, failed: failed.size, ids, overMarked, forgotten }, null, 2));
+process.exit(overMarked.length || forgotten.length ? 1 : 0);
+```
+
+出力: `listed 312、ran 312、marked 24、failed 24、ids {16.1:2, 7.5-2:1, 7.5-3:8, 16.9:9, 17.6:1, D2:1, D3:2}、overMarked []、forgotten []`、終了コード 0。
+
+### 24.5 既知の注意と、今後の流し方
+
+- `BLACKBOX_URL` を設定すると、`vitest.config.ts` の `fileParallelism` がファイルの並列を切る (枠 3 つのサービスに 10 ファイルが同時に要求を送ると偶然の 503 で落ちるため)。`--no-file-parallelism` は不要。`BLACKBOX_TARGET=python` には `BLACKBOX_URL` が要る (無いと即座に失敗する)。
+- Node 版に向けるときは `BLACKBOX_URL` を設定しない。テストが自分でサービスを起動する (ファイルごとに別のサービスで、並列に動く)。
+- **Python 版の撤去 (8.2) の前に、もう一度流す必要がある**。6.x で Node 版の実装が入った後に目印が増減していないかを、24.4 の検査で確かめる。撤去後は、この向け先が使えなくなる。
+- 6.12 でコンテナに向けるときも同じ環境変数で流す (`BLACKBOX_URL=http://<コンテナ>:<port> BLACKBOX_TOKEN=<トークン>`。`BLACKBOX_TARGET` は付けない)。
+- 黒箱のテストが確かめているのは、HTTP から見える振る舞いだけである。`/openapi.json` の drift の比較 (`test/openapi/`) や、本物のサーバーを起動する `src/http/*.integ.ts` は、Python 版には向けていない。
