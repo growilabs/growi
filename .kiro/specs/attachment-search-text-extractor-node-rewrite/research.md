@@ -7025,3 +7025,64 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 ### 23.4 取り込み (Req 12) のとき
 
 - design.md の Components and Interfaces の節 (共有層・変換の層の型の素案) を、この節の名前と形に合わせて直す。File Structure Plan は design.md の冒頭の注のとおり実装の後に削るので移さないが、`ConversionLimits` の置き場所の理由 (23.2) は「層の分け方の判断」に移す。
+
+### 23.5 タスク 4.3 のテストが決めた実行管理の層と子の側の名前と形
+
+2026-11-09 に、4.3 のテスト (`src/runner/**` と `src/child/**` の 12 ファイル、142 件) が import する名前と、テストが前提にする振る舞いをまとめた。design.md の Components and Interfaces にある名前 (`ConversionRunner`、`RunInput`、`RunOutcome`、`run(input, signal)`、`readiness()`、`createConversionRunner`) はそのまま使った。(新) は design.md に無い名前。
+
+- `runner/conversion-runner.ts`
+  - `ChildEntry { readonly path: string; readonly nodeArgs: readonly string[] }` (新): 子として起動するファイルと、そのファイルの前に置く node の引数。
+  - `ConversionRunnerOptions` (新): `limits: ConversionLimits`、`maxChildRssMb`、`timeoutS` (小数を許す。設定の `TIMEOUT_S` は整数なので、1 秒未満の期限はここで渡す)、`maxInputBytes`、任意の `childEntry` (既定は本物の子の入口)、任意の `prlimitPath` (既定は `/usr/bin/prlimit`)、任意の `probeTimeoutS` (準備完了の確認用の子の期限)。`childEntry` は `run()` と `readiness()` の確認用の子の両方に使う。テストが偽の子を差し込む口はこの 1 つだけ。
+  - `runnerOptionsFromSettings(settings: Settings): ConversionRunnerOptions` (新): 設定から作る。`MAX_CHILD_RSS_MB` と `TIMEOUT_S` が子の上限に、`toConversionLimits` の値が子に渡る。
+  - `Readiness` (新): 4.3 が確かめるのは `ready: boolean` だけ。`dependencies` などの形は 4.4 / 6.8 が決める。
+  - `createConversionRunner(options): ConversionRunner`。
+- 子の起動 (テストが `/proc/self/limits` などで外から確かめる): `prlimitPath --as=… --cpu=<soft>:<hard> --core=1 -- <process.execPath> --wasm-max-mem-pages=8192 --max-semi-space-size=4 <childEntry.nodeArgs…> <childEntry.path>`。子の環境変数は `buildChildEnv()` の値だけ。stdio は 0 入力、1 / 2 ログ (読み捨てる)、3 結果、4 生存管。
+- `run()` が守ること: 戻った時点で (成功でも失敗でも) 子は回収済みで、`/proc/<親>/task/*/children` にゾンビも残らない。CSV / HTML の大きさの事前判定に当たったとき (形式が分からない入力は子まで届く) と `prlimit` を起動できないときの `childPeakRssMb` は `null`。`prlimit` を起動できないときは `crashed`。中止の合図 (`AbortSignal`) では、`run()` が解決しても拒否してもよいが、合図から 2 秒以内に終わり、子は回収済みで、同じ runner で次の変換ができる。すでに中止された合図でもすぐに終わる。子の標準出力と標準エラーは読み捨てる (8MiB ずつ書く子でも結果が届く)。`childPeakRssMb` は、`VmHWM` を含めて見回った最大の値 (結果を受け取った直後、止める前にもう 1 回読むと山を取り逃がしにくい)。
+- 入力の枠の順 (design.md の Data Contracts): 見出しの枠、本体の枠の 2 つ。偽の子は見出しの中身を読まない (見出しの JSON の項目は 6.6 / 6.7 が決める)。
+- `runner/child-exit.ts`: `classifyExit(code: number | null, signal: NodeJS.Signals | null): FailureKind` (新)。結果が届かなかった子だけを分類する (`SIGXCPU` だけが `timeout`、ほかは `crashed`)。結果の有無と、親が決めた種類の優先 (15.6 の順) は結合テストが確かめる。
+- `runner/child-env.ts`: `buildChildEnv(): Readonly<Record<string, string>>` (新)。値は `{ RAYON_NUM_THREADS: '1', MALLOC_ARENA_MAX: '2' }` ちょうど。Python 版のテスト `test_operator_set_rayon_threads_is_respected` (運用者が設定した値を尊重する) は移さない (design.md の「子の `env` は明示した値だけ」に従う)。
+- `runner/linux/prlimit-args.ts` (新): `PRLIMIT_PATH = '/usr/bin/prlimit'`、`addressSpaceLimitBytes(maxChildRssMb)` (= (`maxChildRssMb` + 2,304) MiB)、`cpuTimeLimits(timeoutS): { soft; hard }` (soft = 切り上げた期限 + 5 秒、hard = soft + 5 秒。Python 版の `cpu_time_limits` と同じ。19.2 の表の `--cpu=60:65`)、`HardLimits { addressSpaceBytes; cpuSeconds }` (`unlimited` は `Infinity`)、`parseHardLimits(procLimitsText): HardLimits`、`prlimitArgs({ maxChildRssMb, timeoutS, hardLimits, command }): string[]` (`--` より前に 3 つの上限、後ろに `command`。上限は親の hard で切り詰める)。
+- `runner/linux/platform.ts`: `limitedCommand(input & { prlimitPath }, platform: NodeJS.Platform): SpawnCommand` と `SpawnCommand { file; args }` (新)。Linux では `prlimit` で包み、それ以外では `command` をそのまま起動する。
+- `runner/linux/proc-rss.ts`: `StatusMemory { rssKib: number | null; hwmKib: number | null }`、`parseStatusMemory(statusText)`、`readStatusMemory(pid): StatusMemory | null` (プロセスが無ければ `null`) (新)。
+- `child/parent-watch.ts`: `startParentWatch(): Promise<void>` (新)。見張りのスレッドが fd 4 を読み始めたら解決する。見張りは、子が自分で終わる経路 (`process.exit`、捕まらない例外、捕まらない Promise の失敗) を止めない (15.3)。
+- `child/child-result.ts` (新しいファイル): `encodeChildResult(outcome: ConversionOutcome, maxResultBytes: number): Buffer`。親だけが決める種類 (`timeout`・`crashed`・`memory_exceeded`) と、wire が符号化できない結果 (片割れのサロゲート) は `internal` に、長すぎる `detail` は親が受け付ける長さに切り、枠の上限 (`maxResultFrameBytes`) を超える結果は `result_too_large` にする。Python 版の `child_entry.run_conversion` の単体テストの写し。
+- `child/child-entry.ts`: 読み込むと動き出す入口の script。入力を読む前に `oom_score_adj` を 1000 にし、見張りを立てる。長さが不正な入力と途中で切れた入力では、結果を送らずに終わる。テストは swc の register で直接起動する (`src/child/spec-support/direct-child.ts`)。
+- **本物の子をテストの中でどう起動するか (決定)**: 理由と決めたことは、この節の下の「本物の子の起動のしかたの決定」にある。既定の `childEntry` は、ビルドで作った JavaScript (`dist/child/child-entry.js`) を register なしで起動する形にする。
+- テスト用の補助 (本番から import しない): `src/runner/spec-support/` (偽の子 `stand-in-child.mjs` と `silent-child.mjs`、別のプロセスの親 `runner-host.ts`、ZIP 爆弾 `zip-bombs.ts`、`/proc` の読み取りと後始末)、`src/child/spec-support/` (直接起動 `direct-child.ts`、見張りの確認用の子 `watch-then.ts`、親を消すテスト用の子 `watched-busy-child.ts`)。偽の子の動き方は、ファイルの本体の 1 行目 (`<mode> <argument> <trace>`) で選ぶ。子の側の補助は runner の補助を import しない (層の向きを試験の補助でも守る)。
+
+**本物の子の起動のしかたの決定 (タスク 4.3 のレビューを受けて決めた)**
+
+**理由 (実測)**: テストの中で本物の子の入口 (TypeScript) を swc の register (`--import @swc-node/register/esm-register`) で起動すると、子の RSS が約 100MB 増える。anydoc を読み込んだだけの子で、register なしは 50〜52MB、ありは 150〜160MB だった (この作業で 2 回、レビューで再測定)。register で起動したままだと、基準のファイルの 0.95 倍 (304MB) の検査と、セル数の上限・ZIP 爆弾の 0.4 倍 (128MB) の検査が、起動のしかただけで落ちるか意味を失う。試作では、子の側を JavaScript に変換して起動すると、これらの検査が通った。
+
+**今の状態 (2026-11-09 に実物で確かめた)**:
+- `apps/attachment-text-extractor/package.json` に `build` スクリプトは無い (scripts は `lint:biome`、`lint:typecheck`、`lint`、`test`、`benchmark`、`benchmark:generate`)。design.md の File Structure Plan の package.json の説明には `dev/build/lint/test/export-openapi/benchmark` とあり、`build` を足すことは設計どおり。
+- `tsconfig.json` は `outDir: "dist"`、`rootDir: "."`、`include` に `src`・`test`・`benchmark` を持つ。継承元の `tsconfig.base.json` は `noEmit: true`、`module: "ESNext"`、`moduleResolution: "Bundler"`。このまま `tsc` で出力すると、子の入口は `dist/src/child/child-entry.js` になり、テストの補助も一緒に出力される。
+- src の import は拡張子を書かない (4.2 / 4.3 のテストもそう書いている)。`tsc` は指定子をそのまま出力するので、出力した JavaScript は Node の ESM ではそのまま動かない。リポジトリの前例: `apps/app` は出力の後に `bin/add-js-extensions.ts` (拡張子の無い相対の指定子に `.js` または `/index.js` を足す) を流している。`apps/pdf-converter` は `tsc -p tsconfig.build.json` (`noEmit: false`、`test` を除く) で、指定子に `.js` を書いている。
+- `turbo.json` の `build` の出力は `dist/**`。`vitest.config.ts` は `pool` を指定していない (既定の pool)。design.md には子の JavaScript のパス (`dist/...`) の記述は無い (grep で確かめた)。tasks.md の 6.6・6.7・6.11・6.12 にも、ビルドや子の起動のパスの記述は無い。下の決定は、どれとも矛盾しない。
+
+**決定**:
+1. 既定の `childEntry` は、パッケージ直下の `dist/child/child-entry.js` を、node の追加の引数なし (`nodeArgs: []`) で起動するものにする。本番の image と同じ JavaScript を、テストでも起動する。
+2. `build` スクリプトを足す。`tsconfig.build.json` (`extends: ./tsconfig.json`、`noEmit: false`、`rootDir: "src"`、`outDir: "dist"`、`include: ["src/**/*"]`、`*.spec.ts`・`*.integ.ts`・`spec-support/` を除く) で `tsc` を流し、続けて拡張子の無い相対の指定子に `.js` / `/index.js` を足す手順を流す (`apps/app` の `bin/add-js-extensions.ts` と同じ規則。app をまたいで import はせず、このパッケージに置く)。`rootDir: "src"` なので、出力は `dist/child/child-entry.js`、`dist/main.js` になる。
+3. vitest の `globalSetup` (すべてのテストの前に 1 回だけ動く準備の処理) で、この `build` を流す。`vitest` を直接呼んでも、`turbo run test` から呼んでも、`dist/` がいつも今の src から作り直される。`globalSetup` からは `pnpm run` を呼ばず、`tsc` と拡張子を足す手順を直接起動する (pnpm は依存の確認のために中で `pnpm install` を起動することがあり、並行して動く pnpm と衝突するため。`.claude/rules/devcontainer.md`)。
+4. `dist/child/child-entry.js` が無いときに、swc の register での起動に戻らない。戻ると、メモリの検査が黙って意味を失うか、古い `dist/` で動いてしまうためである。無ければ、`readiness()` は準備未完了、`run()` は `crashed` になる (子の入口を読めない子と同じ扱い。4.3 の「node が読めない入口は `crashed`」「確認用の子が入口を読めないと準備未完了」の件がこの振る舞いを確かめる)。
+5. 受け持ち:
+   - 6.6: `tsconfig.build.json`、`build` スクリプト、拡張子を足す手順。子の入口が `dist/child/child-entry.js` に出力されること。
+   - 6.7: 既定の `childEntry` (決定 1・4) と、`vitest.config.ts` の `globalSetup` (決定 3)。
+   - 4.7: 空の実装の子の入口を `src/child/child-entry.ts` に置く。6.6 より前なので `dist/` はまだ無い。既定の入口で起動できずに落ちるのも、RED として記録してよい (テストの中身の食い違いで落ちる件と区別して書く)。
+   - 6.11: Dockerfile のビルドの段で `build` を流し、`dist/` を image に入れる。起動は `node dist/main.js`。
+   - 6.12: CI の `turbo run lint test` で `globalSetup` のビルドが動き、実行管理の結合テストが register なしの子で通ることを確かめる (CI に別のビルドの手順は無い)。
+6. **tasks.md に足す一文の案** (親が足す。この作業では tasks.md を変えていない):
+   - 6.7 に: 「既定の子の入口は `build` で作った JavaScript (`dist/child/child-entry.js`) で、テストも swc の register を使わずに起動する。vitest の `globalSetup` で `build` を流し、`dist/` が無いときに register の起動に戻らない (research.md 23.5)」
+   - 6.6 に: 「`build` スクリプト (`tsconfig.build.json` の `tsc` と、拡張子の無い相対の指定子に `.js` を足す手順) を足し、子の入口を `dist/child/child-entry.js` に出力する (research.md 23.5)」
+   - 6.11 に: 「ビルドの段で `build` を流し、`dist/` を image に入れる (research.md 23.5)」
+
+**Python 版と違う期待で書いたもの (理由つき)**:
+- 病的な HTML の 3 件 (`<a` の後に `/` が 400 万個、200 万個の属性を持つ終わりのタグ、200 万個の属性を持つ開始タグ): Python 版の期待は `memory_exceeded` (標準の `html.parser` が膨らむため)。Node 版は「子の中で収まる (成功か、422 になる種類のどれか) こと、次の変換が成功すること」に緩めた。htmlparser2 はこれらを膨らまずに処理できる (18.5 の悪意のある入力の比べ方、18.7)。
+- 申告の大きさを偽った ZIP 爆弾 (部品の申告は 4KiB、実際は 520MiB に展開される PPTX / XLSX): `limit_exceeded` と `malformed` のどちらも許す。4.2 の `archive-guard.spec.ts` が「申告の大きさの偽りは、黙って切り詰めずに `malformed`」と決めているためである。どちらの場合も、`memory_exceeded` にならないこと (子の最大 RSS が 0.4 倍の 128MB 未満) を確かめる。申告どおりの大きさの爆弾 (申告の合計が 512MiB を超える) は `limit_exceeded` だけを許す。
+- 許容値を緩めたもの:
+  - 期限の件の経過時間: 3.5 秒未満 (期限 0.5 秒)。Python 版は 2 秒未満 (期限 0.3 秒)。Node の子は起動に約 25〜70ms かかり、CI が混んだときも余裕を残すため。
+  - イベントループの応答: 間隔の最大が 250ms 未満。Python 版は 100ms 未満。実測は最大約 2ms (15.4 の (7))。同期で 50MiB を書く親は約 1 秒止まるので、250ms でも見分けられる。
+  - fd の増加: 200 回で 10 未満。Python 版は 0。1 回に 1 つ漏れれば 200 増えるので、見分ける力は落ちない。vitest 自身が開く fd の揺れを許す。
+  - 親のメモリ (大きな入力で 3 回時間切れにした後の RSS の増加): 66MB 未満。Python 版は 24MB 未満。レビューの実測では、同じ入力を使い回す形 (このテストの形) では増加はほぼ 0MiB。入力を毎回作る形では、正しい実装でも 44〜132MiB 増えた (V8 が片付ける時期の都合)。66MB は、まだ片付いていない入力の写しを 1 つ (44MB) だけ許す余裕で、毎回の写しを持ち続ける実装 (3 回で 132MB) は落ちる。
+- 「子が残らない」の判定は、テストのプロセスの子 (`/proc/<pid>/task/*/children`) を見る。これは、vitest がテストのファイルごとにプロセスを分ける既定の設定 (`pool` の既定) に頼っている。`pool` を threads などに変えると、他のファイルの子が混ざって成り立たなくなる。
+- 準備完了のテストが確かめるのは `ready` の真偽だけで、確認用の子が anydoc と PDFium を本当に読み込むこと (20.12) は 4.3 では確かめない。最後の守りは、6.12 の image の中での `/readyz` と `POST /extract` (PDF と DOCX) の確認である。

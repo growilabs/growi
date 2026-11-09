@@ -139,7 +139,7 @@
   - _Requirements: 1.4, 1.5, 2.5, 2.6, 3.6, 3.7, 4.2, 4.5, 5.2_
   - _Boundary: 共有層、設定、変換の層のテスト_
   - _Depends: 2.4, 3.8, 4.1_
-- [ ] 4.3 実行管理の結合テストを書く (P)
+- [x] 4.3 実行管理の結合テストを書く (P)
   - 本物の子プロセスで、時間切れ、RSS の超過、異常終了 (abort / segfault)、親の消失、結果の上限、取り消し (中止の合図) で子が止まって回収されること、上限 (仮想メモリ・CPU 時間・コアダンプ) が掛かっていること、子の環境変数にトークンが無いこと、子が送ったデータをコードとして扱わないこと、`prlimit` が無いときに準備完了にならないことを確かめる
   - テストは実装が無いため失敗する
   - _Requirements: 3.4, 3.5, 3.8, 3.9, 3.10, 3.11, 3.12, 8.8_
@@ -203,11 +203,13 @@
   - _Requirements: 1.1, 2.5, 5.2, 5.4_
 - [ ] 6.6 子プロセスの入口を実装する
   - 見出しと本体を受け取り、`oom_score_adj` を設定し、親を見張り、変換を呼び、結果を追加のパイプに 1 回だけ送る
+  - `build` スクリプト (`tsconfig.build.json` の `tsc` と、拡張子の無い相対の指定子に `.js` を足す手順) を足し、子の入口を `dist/child/child-entry.js` に出力する (research.md 23.5)
   - 4.3 のうち子の側に関するテストが通る
   - _Requirements: 3.9, 3.10, 3.11_
 - [ ] 6.7 実行管理の層を実装する
   - 3.2 で決めた方法で、`prlimit` を絶対パスで使って子を起動し、トークンを含まない明示した環境変数を渡し、RSS と期限を見張り、中止の合図で子を止め、必ず回収してから戻る。終了のしかたを失敗の種類に分け、`prlimit` と確認用の子で準備完了を判定する
   - Linux に固有の処理は 1 か所にまとめ、Linux 以外では何もしない
+  - 既定の子の入口は `build` で作った JavaScript (`dist/child/child-entry.js`) で、テストも swc の register を使わずに起動する。vitest の `globalSetup` で `build` を流し、`dist/` が無いときに register の起動に戻らない (research.md 23.5)
   - 4.3 のテストがすべて通る
   - _Requirements: 3.4, 3.5, 3.6, 3.8, 3.10, 3.12, 4.3, 4.8, 8.8_
 - [ ] 6.8 HTTP の層を実装する
@@ -226,6 +228,7 @@
 - [ ] 6.11 Dockerfile と k8s の例を Node 版で作る
   - `apps/pdf-converter` に倣い、Node 24 の slim を元にし、`pnpm deploy --prod` で本番の依存だけを取り出す multi-stage の Dockerfile を作る。最終の段で `prlimit` を実行し、無ければビルドを失敗させる。`RAYON_NUM_THREADS=1` を設定する
   - k8s の例 (deployment、service、hpa、networkpolicy) を新しい場所に作り、`WORKERS` を消し、メモリの requests / limits を 3.7 の予算に合わせる
+  - ビルドの段で `build` を流し、`dist/` を image に入れる (research.md 23.5)
   - image に、PDFium の WASM に入っている第三者の部品 (FreeType・OpenJPEG・libpng・zlib・libc++ など。JPEG と lcms も入っている見込み) のライセンス表示のファイルを入れる (`@embedpdf/pdfium` の package には `LICENSE` と `LICENSE.pdfium` しか入っておらず、これらの表示が無い。Python 版の pypdfium2 の wheel は `licenses/data/linux_x64/BUILD_LICENSES/` に持っていた)。出どころと入れ方は research.md の 21 節 (PDFium の第三者のライセンス) に従う
   - 4.5 のテストが通る (compose のテストは 8.2 で通る)
   - _Requirements: 8.1, 8.3, 8.5, 8.6, 8.7_
