@@ -1,8 +1,22 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v8.0.9...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v8.0.10...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v8.0.10](https://github.com/growilabs/compare/v8.0.9...v8.0.10) - 2026-11-09
+
+### 🐛 Bug Fixes
+
+* fix(page-bulk-export): Embed attachment images in PDFs for every storage response mode (#12209) @yuki-takei
+* fix(i18n): correct spelling and grammar mistakes in English translations (#193092) (#12199) @arvid-e
+
+### 🧰 Maintenance
+
+* support: audit log bulk export job model  (#12198) @mizozobu
+* chore(opentelemetry): mark CI and devcontainer runs as service type dev with telemetry off (#12204) @yuki-takei
+* chore(app): Add contributor (#12218) @miya
+* chore(app): Add contributor (#12205) @miya
 
 ## [v8.0.9](https://github.com/growilabs/compare/v8.0.8...v8.0.9) - 2026-11-04
 
