@@ -141,6 +141,39 @@ describe('CommandInvocation.normalize', () => {
     expect(result.commandName).toBe('/add-growi');
     expect(result.argsText).toBe('');
   });
+
+  it('carries the installation the event named, so a later step resolves the same one', () => {
+    const result = CommandInvocation.normalize({
+      kind: 'mention',
+      platform: 'slack',
+      channel,
+      actor,
+      text: 'search foo',
+      inDirectMessage: true,
+      messageId: 'M1',
+      interaction: null,
+      installation: { kind: 'identified', installationId: 'inst-dm' },
+    });
+
+    expect(result.installation).toEqual({
+      kind: 'identified',
+      installationId: 'inst-dm',
+    });
+  });
+
+  it('leaves the installation off when the event named none', () => {
+    const result = CommandInvocation.normalize({
+      kind: 'slash-command',
+      platform: 'slack',
+      channel,
+      actor,
+      command: '/growi',
+      text: 'search foo',
+      interaction: null,
+    });
+
+    expect(result).not.toHaveProperty('installation');
+  });
 });
 
 describe('Invocation', () => {

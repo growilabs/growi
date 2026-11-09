@@ -1,25 +1,21 @@
 // What the bot being added to a channel sets off: the channel inventory of the
-// installation it was added in is taken again right away. Commands resolve a
-// channel to its installation through that inventory
-// (`runtime/dependencies.ts`'s `resolveInstallationId`), so without this a
-// channel the bot was just invited to answers 「workspace がまだ登録されて
-// いません」 until the periodic refresh comes round.
+// installation it was added in is taken again right away. The inventory is
+// what notification destinations are checked against and what a command falls
+// back to when its event names no installation, so a channel the bot was just
+// invited to is usable without waiting for the periodic refresh.
 //
 // The refresh itself is not done here: `refreshChannels` is the same closure
 // `InstallationStore.save()` and the sweeper run, so all three refresh by one
 // rule (a failed listing leaves the saved inventory as it was).
 //
-// Which installation the event belongs to is the only per-service question,
-// and it is answered from declarations, never from the service's name:
-//  - an adapter opened for one installation alone already knows it;
-//  - an adapter serving many workspaces says through its `ADAPTER_FACTORIES`
-//    entry's `workspaceOfEvent`;
-//  - a service that declares neither is reported, and left to the periodic
-//    refresh.
+// Which installation the event belongs to is answered by
+// `lookUpEventInstallation`, the same rule a command is placed by; an event it
+// cannot place is reported and left to the periodic refresh.
 import type { PlatformName } from '@growi/chat';
 import type { Adapter } from 'chat';
 
 import type { AdapterFactory } from './adapter-set.js';
+import { lookUpEventInstallation } from './event-installation.js';
 import type { InstallationProvider } from './installation-provider.js';
 
 export interface BotJoinedChannelDeps {
@@ -38,29 +34,19 @@ class UnidentifiedInstallationError extends Error {}
 const installationOfEvent = async (
   deps: BotJoinedChannelDeps,
   adapter: Adapter,
+  channelId: string,
 ): Promise<string> => {
-  if (deps.installationId != null) return deps.installationId;
-
-  const factory = deps.factories[deps.platform];
-  const workspaceOf =
-    factory.credentialSource === 'app' ? factory.workspaceOfEvent : undefined;
-  if (workspaceOf == null) {
-    throw new UnidentifiedInstallationError(
-      `${deps.platform} declares no way to tell which workspace the event came from`,
-    );
+  const found = await lookUpEventInstallation(deps, adapter, channelId);
+  switch (found.kind) {
+    case 'identified':
+      return found.installationId;
+    case 'no-workspace':
+      throw new UnidentifiedInstallationError(
+        `${deps.platform} says the conversation belongs to no workspace`,
+      );
+    case 'unidentified':
+      throw new UnidentifiedInstallationError(found.reason);
   }
-
-  const workspaceId = await workspaceOf(adapter);
-  const listed = await deps.installations.list(deps.platform);
-  const found = listed.find(
-    (installation) => installation.workspaceId === workspaceId,
-  );
-  if (found == null) {
-    throw new UnidentifiedInstallationError(
-      `no ${deps.platform} installation is held for workspace ${workspaceId}`,
-    );
-  }
-  return found.installationId;
 };
 
 /**
@@ -69,11 +55,13 @@ const installationOfEvent = async (
  * stays the last one actually taken.
  */
 export const refreshOnBotJoin =
-  (deps: BotJoinedChannelDeps): ((adapter: Adapter) => Promise<void>) =>
-  async (adapter) => {
+  (
+    deps: BotJoinedChannelDeps,
+  ): ((adapter: Adapter, channelId: string) => Promise<void>) =>
+  async (adapter, channelId) => {
     let installationId: string;
     try {
-      installationId = await installationOfEvent(deps, adapter);
+      installationId = await installationOfEvent(deps, adapter, channelId);
     } catch (error) {
       const detail =
         error instanceof UnidentifiedInstallationError

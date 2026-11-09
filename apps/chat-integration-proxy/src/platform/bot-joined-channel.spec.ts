@@ -19,7 +19,10 @@ const HELD = [
 
 /** The declared table, with Slack's event-workspace reader replaced. */
 const factoriesReading = (
-  workspaceOfEvent: (adapter: Adapter) => Promise<string>,
+  workspaceOfEvent: (
+    adapter: Adapter,
+    channelId: string,
+  ) => Promise<string | null>,
 ): Readonly<Record<PlatformName, AdapterFactory>> => ({
   ...ADAPTER_FACTORIES,
   slack: { credentialSource: 'app', create: () => null, workspaceOfEvent },
@@ -71,13 +74,13 @@ describe('an adapter serving many workspaces (app-credentialed)', () => {
       installations: installationsHolding(),
       refreshChannels: h.refreshChannels,
       reportOperationalFailure: h.reportOperationalFailure,
-    })(adapter);
+    })(adapter, 'slack:C9');
 
     expect(h.refreshed).toEqual(['inst-2']);
     expect(h.reported).toEqual([]);
     // The workspace is read from the adapter serving the event, which is the
     // only thing that knows whose bot token it is speaking with.
-    expect(workspaceOfEvent).toHaveBeenCalledWith(adapter);
+    expect(workspaceOfEvent).toHaveBeenCalledWith(adapter, 'slack:C9');
   });
 
   it('reports, and refreshes nothing, when the workspace cannot be read', async () => {
@@ -91,7 +94,7 @@ describe('an adapter serving many workspaces (app-credentialed)', () => {
         installations: installationsHolding(),
         refreshChannels: h.refreshChannels,
         reportOperationalFailure: h.reportOperationalFailure,
-      })(mock<Adapter>()),
+      })(mock<Adapter>(), 'slack:C9'),
     ).resolves.toBeUndefined();
 
     expect(h.refreshed).toEqual([]);
@@ -109,7 +112,7 @@ describe('an adapter serving many workspaces (app-credentialed)', () => {
       installations: installationsHolding(),
       refreshChannels: h.refreshChannels,
       reportOperationalFailure: h.reportOperationalFailure,
-    })(mock<Adapter>());
+    })(mock<Adapter>(), 'slack:C9');
 
     expect(h.refreshed).toEqual([]);
     expect(h.reported).toHaveLength(1);
@@ -117,21 +120,21 @@ describe('an adapter serving many workspaces (app-credentialed)', () => {
   });
 
   it('reports, and refreshes nothing, for a service that declares no way to tell the workspace', async () => {
-    // Discord declares no reader today. A join reaching it is not answered
-    // with a guess; the periodic refresh still covers it.
+    // Teams declares no reader. A join reaching it is not answered with a
+    // guess; the periodic refresh still covers it.
     const h = harness();
 
     await refreshOnBotJoin({
-      platform: 'discord',
+      platform: 'teams',
       factories: ADAPTER_FACTORIES,
       installations: installationsHolding(),
       refreshChannels: h.refreshChannels,
       reportOperationalFailure: h.reportOperationalFailure,
-    })(mock<Adapter>());
+    })(mock<Adapter>(), 'slack:C9');
 
     expect(h.refreshed).toEqual([]);
     expect(h.reported).toHaveLength(1);
-    expect(h.reported[0]?.message).toContain('discord');
+    expect(h.reported[0]?.message).toContain('teams');
   });
 });
 
@@ -147,7 +150,7 @@ describe('an adapter opened for one installation alone', () => {
       installations,
       refreshChannels: h.refreshChannels,
       reportOperationalFailure: h.reportOperationalFailure,
-    })(mock<Adapter>());
+    })(mock<Adapter>(), 'slack:C9');
 
     expect(h.refreshed).toEqual(['inst-mm']);
     expect(h.reported).toEqual([]);
@@ -166,7 +169,7 @@ describe('a refresh that fails', () => {
         installations: installationsHolding(),
         refreshChannels: h.refreshChannels,
         reportOperationalFailure: h.reportOperationalFailure,
-      })(mock<Adapter>()),
+      })(mock<Adapter>(), 'slack:C9'),
     ).resolves.toBeUndefined();
 
     expect(h.refreshed).toEqual(['inst-1']);

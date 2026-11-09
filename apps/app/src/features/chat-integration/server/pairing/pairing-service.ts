@@ -330,11 +330,14 @@ export const submitPairingRequest = async (
   });
   await discardPending();
 
-  const inheritance = await inheritAccountLinks({
-    relationId: result.relationId,
-    platform: result.workspace.platform,
-    workspaceId: result.workspace.workspaceId,
-  });
+  const inheritance = await inheritAccountLinks(
+    {
+      relationId: result.relationId,
+      platform: result.workspace.platform,
+      workspaceId: result.workspace.workspaceId,
+    },
+    now,
+  );
 
   return { status: 'paired', relationId: result.relationId, inheritance };
 };

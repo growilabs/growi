@@ -21,14 +21,10 @@
 // (tasks.md 9.2), and the one-off refresh right after `InstallationStore.save()`
 // to that caller. Both call the plain function below.
 //
-// **No pruning.** Nothing here deletes a row for a channel that dropped off a
-// service's answer. design.md does not ask for it, and `installation_channel`
-// is keyed per installation with no cascade of its own, so removing rows would
-// be a new behavior invented at this layer rather than a specified one. The
-// cost is bounded and named: a channel the bot lost access to stays in the
-// saved inventory until someone removes it, and a notification aimed at it is
-// refused at post time with 「bot を招待してください」 instead of
-// `channel-not-in-installation`.
+// **Pruning only follows a complete listing.** `refreshChannelInventory`
+// deletes the rows a listing no longer contains, but not when the listing
+// reports `unlisted` parts: a channel under a part that could not be read looks
+// exactly like a deleted one, so the rows are kept until a full listing.
 //
 // **No adapter is used.** The Chat SDK's `Adapter` has no channel-listing
 // method at all (only `fetchChannelInfo(channelId)`, one channel by id), and
@@ -50,6 +46,7 @@ import type {
   InstallationCredentials,
   InventoryChannel,
   PlatformAppConfig,
+  UnlistedScope,
 } from '../types/index.js';
 
 /**
@@ -70,6 +67,12 @@ export interface ChannelListerContext {
   readonly credentials: InstallationCredentials;
   readonly appConfig: PlatformAppConfig;
   readonly fetch: typeof fetch;
+  /**
+   * Lets a lister that can still answer for most of an installation say which
+   * part it had to leave out, instead of choosing between throwing away what
+   * it has and hiding the gap. Supplied by `listChannels`.
+   */
+  readonly reportUnlisted?: (unlisted: UnlistedScope) => void;
 }
 
 export type ChannelLister = (
@@ -146,12 +149,64 @@ const toSlackChannel = (
   };
 };
 
-const listSlackChannels: ChannelLister = async (context) => {
-  const slack = context.credentials.slack;
-  if (slack == null) {
-    throw new MissingChannelCredentialsError('slack', 'Slack bot token');
+/**
+ * `oauth-callback.ts` saves the enterprise id (`E…`) as `workspace_id` only for
+ * an org-wide install (`is_enterprise_install`); every other install is saved
+ * under a team id (`T…`). `conversations.list` answers `team_access_not_granted`
+ * when an enterprise id is asked about as a team.
+ */
+const isSlackEnterpriseId = (workspaceId: string): boolean =>
+  workspaceId.startsWith('E');
+
+/** `auth.teams.list` allows up to 1000; no need to hold a large page. */
+const SLACK_TEAMS_PAGE_SIZE = 100;
+
+const slackError = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+/**
+ * The workspaces an org-wide installation is allowed in. This is the set
+ * `conversations.list` can be asked about with `team_id`.
+ */
+const listSlackAllowedTeamIds = async (
+  token: string,
+  context: ChannelListerContext,
+): Promise<ReadonlyArray<string>> => {
+  const teamIds: string[] = [];
+  let cursor: string | undefined;
+
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: pagination is cursor-chained
+    const response = await callSlackApi(
+      'auth.teams.list',
+      {
+        limit: SLACK_TEAMS_PAGE_SIZE,
+        ...(cursor == null ? {} : { cursor }),
+      },
+      { token, fetch: context.fetch },
+    );
+    assertSlackOk('auth.teams.list', response);
+
+    const teams = Array.isArray(response.teams)
+      ? (response.teams as Array<{ readonly id?: unknown }>)
+      : [];
+    for (const team of teams) {
+      if (typeof team.id === 'string' && team.id !== '') teamIds.push(team.id);
+    }
+
+    const next = response.response_metadata?.next_cursor;
+    if (typeof next !== 'string' || next === '') return teamIds;
+    cursor = next;
   }
 
+  throw new TooManyPagesError('Slack workspace listing');
+};
+
+const listSlackTeamChannels = async (
+  token: string,
+  teamId: string,
+  context: ChannelListerContext,
+): Promise<ReadonlyArray<InventoryChannel>> => {
   const collected: InventoryChannel[] = [];
   let cursor: string | undefined;
 
@@ -164,13 +219,11 @@ const listSlackChannels: ChannelLister = async (context) => {
         exclude_archived: true,
         types: 'public_channel,private_channel',
         limit: SLACK_PAGE_SIZE,
-        // Required on an Enterprise Grid org-wide token, ignored otherwise --
-        // Slack documents always sending it as safe. Without it an org-wide
-        // token lists the wrong workspaces' channels into this installation.
-        team_id: context.workspaceId,
+        // Required on an Enterprise Grid org-wide token, ignored otherwise.
+        team_id: teamId,
         ...(cursor == null ? {} : { cursor }),
       },
-      { token: slack.botToken, fetch: context.fetch },
+      { token, fetch: context.fetch },
     );
     // `callSlackApi` resolves HTTP 200 carrying `{ok:false, error:…}` -- Slack
     // reports a missing scope that way. Left unchecked it would read as a
@@ -191,6 +244,48 @@ const listSlackChannels: ChannelLister = async (context) => {
   }
 
   throw new TooManyPagesError('Slack channel listing');
+};
+
+const listSlackChannels: ChannelLister = async (context) => {
+  const slack = context.credentials.slack;
+  if (slack == null) {
+    throw new MissingChannelCredentialsError('slack', 'Slack bot token');
+  }
+  const token = slack.botToken;
+
+  if (!isSlackEnterpriseId(context.workspaceId)) {
+    return listSlackTeamChannels(token, context.workspaceId, context);
+  }
+
+  const teamIds = await listSlackAllowedTeamIds(token, context);
+
+  const byId = new Map<string, InventoryChannel>();
+  const failures: UnlistedScope[] = [];
+  for (const teamId of teamIds) {
+    try {
+      // Sequential: Slack rate-limits per method, and a large org has many
+      // workspaces.
+      // biome-ignore lint/performance/noAwaitInLoops: one walk per workspace
+      const channels = await listSlackTeamChannels(token, teamId, context);
+      // A channel shared between workspaces is returned by each of them.
+      for (const channel of channels) {
+        if (!byId.has(channel.channelId)) byId.set(channel.channelId, channel);
+      }
+    } catch (error) {
+      failures.push({ scope: teamId, reason: slackError(error) });
+    }
+  }
+
+  // Every workspace failing is a failure of the whole listing: returning an
+  // empty list would overwrite a good saved inventory with nothing.
+  if (teamIds.length > 0 && failures.length === teamIds.length) {
+    throw new Error(
+      `Could not list the channels of any Slack workspace: ${failures.map((f) => `${f.scope}: ${f.reason}`).join('; ')}`,
+    );
+  }
+  for (const failure of failures) context.reportUnlisted?.(failure);
+
+  return [...byId.values()];
 };
 
 // --------------------------------------------------------------------------
@@ -634,9 +729,14 @@ export const listChannels = async (
   platform: PlatformName,
   context: ChannelListerContext,
   listers: Readonly<Record<PlatformName, ChannelLister>>,
-): Promise<ChannelListing> => ({
-  channels: await listers[platform](context),
-});
+): Promise<ChannelListing> => {
+  const unlisted: UnlistedScope[] = [];
+  const channels = await listers[platform]({
+    ...context,
+    reportUnlisted: (scope) => unlisted.push(scope),
+  });
+  return unlisted.length === 0 ? { channels } : { channels, unlisted };
+};
 
 /** What one refresh needs. See `refreshChannelInventory`. */
 export interface ChannelRefreshDeps {
@@ -650,13 +750,16 @@ export interface ChannelRefreshDeps {
   readonly installations: InstallationRepository;
   /** Injected so the stored timestamps are assertable. */
   readonly now: () => Date;
+  /** Called when a listing left parts of the service out. */
+  readonly onPartialListing?: (unlisted: ReadonlyArray<UnlistedScope>) => void;
 }
 
 /**
  * Takes one installation's channel inventory again and saves it.
  *
- * **Nothing is written unless the listing succeeded in full.** The failure is
- * re-thrown rather than swallowed: the caller that runs this on a schedule
+ * **Nothing is written when the listing itself fails.** When only some
+ * workspaces could not be read, the channels that were read are written and
+ * nothing is deleted. The failure is re-thrown rather than swallowed: the caller that runs this on a schedule
  * (tasks.md 9.2) is the one that can log it or count it, and design.md's rule
  * for a failed refresh is only about the stored state -- 「最後に取れた一覧を
  * そのまま使い続ける」 -- not about hiding the failure.
@@ -687,10 +790,16 @@ export const refreshChannelInventory = async (
   }
   // Only after a complete listing: a channel deleted on the service would
   // otherwise stay offered to GROWI and pass the destination check forever.
-  await deps.channels.deleteAllExcept(
-    installationId,
-    inventory.channels.map((channel) => channel.channelId),
-  );
+  // A listing that left a workspace out cannot tell a deleted channel from an
+  // unread one, so it prunes nothing.
+  if (inventory.unlisted == null || inventory.unlisted.length === 0) {
+    await deps.channels.deleteAllExcept(
+      installationId,
+      inventory.channels.map((channel) => channel.channelId),
+    );
+  } else {
+    deps.onPartialListing?.(inventory.unlisted);
+  }
 
   await deps.installations.markChannelsSynced(installationId, refreshedAt);
 };

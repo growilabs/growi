@@ -91,10 +91,10 @@
 
 - **Upstream**:
   - proxy の `PrivateReplier`（本人にだけ届ける部品。実装済み。`chat-integration-proxy` の design.md「PrivateReplier — 本人宛ての返事の届け方」）。`agent` はその上に、イベントの処理の外からあとで届ける部分と、スレッドの中で本人にだけ見せるためのスレッドの根元を足す
-  - DM やチャンネル一覧にまだ無い場所でのコマンドで installation を特定できない不具合の修正（spec 無しで直す。AI アプリの画面は中身が DM なので、この修正が前提）
+  - DM やチャンネル一覧にまだ無い場所での installation の特定（直した。`chat-integration-proxy` の research.md の決定 P16。AI アプリの画面は中身が DM なので、これが前提）。イベントが名指しする workspace で決めるので、Slack・Mattermost の DM は installation に決まる。Discord の DM はどの workspace にも属さないので決まらない。DM での扱いのうち、権限が「すべてのチャンネル」の関係には DM を含めることは決定済み（proxy の research.md の決定 P16）。Discord の DM は当面断ると決定済み（同じ決定 P16）で、DM で使えるようにする必要が出たら、この spec の要件 11 で決める
   - GROWI の AI Agent（`features/mastra`、実装済み）と、利用者ごとの会話の記録
 - **Downstream**:
-  - 通知の「書き込んだ直後に送る」と、それと同時にやる定期処理の間隔の延長（umbrella の roadmap「リリース前に直すもの」の 6 と 7）は、この spec で作る「あとから送る口」と同じ送り方で作る。送り方を 2 通りにしないためで、この spec の範囲に含める。連携が無いテナントの問い合わせを飛ばす変更は `chat-integration-notification-load` が先に行う
+  - 通知の「書き込んだ直後に送る」と、それと同時にやる定期処理の間隔の延長（umbrella の roadmap「リリース前に直すもの」の 7）は、この spec で作る「あとから送る口」と同じ送り方で作る。送り方を 2 通りにしないためで、この spec の範囲に含める。連携が無いテナントで通知の定期処理の問い合わせを飛ばす仕組みは実装済みで、直後に送る経路を足せる場所は [chat-integration-app の design.md](../chat-integration-app/design.md)「書き込んだ直後に送る経路のための余地」にある。間隔を延ばしたときの時間の変化は [chat-integration-app の research.md](../chat-integration-app/research.md)「複数台での排他と、通知の定期処理の間隔を延ばしたときの時間の変化」。受け入れ条件には、空けてある要件 2.10・2.11 を使ってよい（同 research.md「空けてある要件 ID: 2.10・2.11」）
   - 要件 6 の確認フロー案（共有してよいかを本人に尋ねる。umbrella の roadmap「リリース前に直すもの」の 10。リリースに含めると決めた）は、この spec の本人にだけ見せる届け方と仕組みが近い
 
 ## Existing Spec Touchpoints
@@ -141,5 +141,5 @@
 - 要件 5 を廃止すると、AI を使わない GROWI で会話の取り込みが無くなる。これを受け入れることの最終確認。
 - official proxy（GROWI が運営する 1 つの Slack アプリ）で、会話の要約を提供するか。Marketplace の外では履歴の読み取りが 1 分に 1 回・15 件までになる（実現性の確認の 3）。Marketplace への掲載は umbrella の Out of scope（公式アプリ審査）なので、custom proxy だけの機能とするかを決める。
 - Slack の本人だけの答えが届かない・消える場合の扱い（実現性の確認の 2）。
-- DM や AI アプリの画面で、答えの先頭が `@誰か` で始まると、その語が落ちる（`chat-integration-proxy` の research.md「既知の問題」3）。自由な文章を受け取るこの spec で起きるので、直し方をここで決める。
+- DM や AI アプリの画面で、答えの先頭が `@誰か` で始まると、その語が落ちる（`chat-integration-proxy` の research.md「既知の問題」2）。自由な文章を受け取るこの spec で起きるので、直し方をここで決める。
 - Teams で、1 対 1 の会話で bot に答えるのに、アプリを `personal` の範囲でも入れる必要があるか（実現性の確認の 8 とあわせて確かめる）。

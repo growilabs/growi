@@ -11,12 +11,34 @@ import type { SdkChannelRef, SdkMessageRef } from './channel.js';
 import type { InteractionRef } from './index.js';
 
 /**
+ * Which installation an event came from, as the event and the adapter that
+ * received it say. The saved channel inventory cannot answer this for a DM or
+ * for a channel the bot reached without being invited, so it is read here
+ * first and the inventory only consulted when this is absent.
+ *
+ * - `identified`: the event named a workspace this proxy holds an
+ *   installation for (or arrived on a connection opened for one).
+ * - `no-workspace`: the service says the conversation belongs to no
+ *   workspace at all (a Discord DM), so no installation can be chosen for it.
+ */
+export type EventInstallation =
+  | { readonly kind: 'identified'; readonly installationId: string }
+  | { readonly kind: 'no-workspace' };
+
+/** What an installation is resolved from: the place, and what the event said. */
+export interface InstallationPlace {
+  readonly channel: SdkChannelRef;
+  /** Absent when the event named no workspace this proxy could match. */
+  readonly installation?: EventInstallation;
+}
+
+/**
  * Exactly design.md's declared union. Note `reply` is deliberately absent:
  * "いまは呼びかけ無しの返信を受け付けない...`PlatformEvent` の型からも外す"
  * (design.md, プラットフォーム能力表 section) -- a chat-integration-proxy
  * PlatformEvent handler can only ever see these five kinds.
  */
-export type PlatformEvent =
+export type PlatformEvent = (
   | {
       readonly kind: 'mention';
       readonly platform: PlatformName;
@@ -76,7 +98,11 @@ export type PlatformEvent =
       readonly actor: ChatAccountRef;
       readonly messageRef: SdkMessageRef;
       readonly urls: ReadonlyArray<string>;
-    };
+    }
+) & {
+  /** Set by the handler that received the event; see `EventInstallation`. */
+  readonly installation?: EventInstallation;
+};
 
 /**
  * What `platform/` hands a converted `PlatformEvent` to (design.md declares it

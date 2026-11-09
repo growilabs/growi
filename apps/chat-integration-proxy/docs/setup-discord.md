@@ -106,13 +106,17 @@ bot に必要な権限と、利用者側の条件:
 > DM を許可する設定の影響は Discord の仕様に基づく説明で、実機では確かめて
 > いない。
 
-**既知の制約（この文書の冒頭の説明との食い違い）**: この文書の冒頭は
-Gateway 経由でイベントを受ける前提で書いてあるが、現在の proxy のコードは
-Discord の Gateway を開く処理（アダプタの `startGatewayListener`）を一度も
-呼んでいない。そのため、Discord 利用者の DM やチャンネルでの mention は
-proxy に届かない。本人宛ての返事を DM で送ることはできるが、利用者がその DM に
-書いた答えは proxy に届かず、DM での聞き返しへの答えは Discord では
-現状働かない。これは以前からある食い違いで、ここでは解消していない。
+**Gateway のつながり方**: proxy のインスタンスが何台あっても、Gateway を開くのは
+`app:discord` のロックを持つ 1 台だけである。その台は Gateway を 24 時間ごとに
+開き直す。開き直しのログインの数秒の間に送られたメッセージは proxy に届かない。
+ログインに失敗すると（bot トークンの誤り、Message Content Intent が無効など）、
+proxy の標準エラーに「the discord listener ended after …ms」という報告が出て、
+5 秒から最大 5 分まで間隔を空けて開き直し続ける。失敗の理由は、その直前に
+Discord アダプタが出すログ（「Discord Gateway listener error」）に書いてある。
+
+運用中に bot トークンを作り直したときは、新しいトークンを設定して proxy を
+再起動する。古いトークンのままの接続は Discord に切られ、次に開き直すまで
+（最大 24 時間）Discord のメッセージが届かない。
 
 ## 補足
 

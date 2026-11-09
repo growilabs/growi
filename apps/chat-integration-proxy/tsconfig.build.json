@@ -11,6 +11,7 @@
     "src/db/repositories/test-cipher.ts",
     "src/capabilities/test-channels.ts",
     "src/platform/chat-service-stand-in.ts",
+    "src/platform/discord-gateway-stand-in.ts",
     "src/testing"
   ]
 }

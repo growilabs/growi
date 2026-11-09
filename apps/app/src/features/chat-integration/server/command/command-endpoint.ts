@@ -320,7 +320,7 @@ interface ResolvedLinkPreviewPage {
 export interface ResolvedUrlTarget {
   /** Whether the trailing URL segment was a 24-hex-char permalink identifier, rather than a path. */
   readonly isPermalink: boolean;
-  /** The resolved page, or null if no page matched. */
+  /** The resolved page, or null if no page matched (an empty placeholder page counts as no match). */
   readonly page: ResolvedLinkPreviewPage | null;
 }
 
@@ -345,7 +345,13 @@ export const resolvePageFromUrl = async (
 
   const maybeId = pathname.startsWith('/') ? pathname.slice(1) : pathname;
   const isPermalink = PAGE_ID_PATTERN.test(maybeId);
-  const query = isPermalink ? { _id: maybeId } : { path: pathname };
+  // `$ne: true` keeps pre-v5 pages with no `isEmpty` field, the same set
+  // `PageQueryBuilder` keeps by default. Why empty pages count as missing:
+  // chat-integration-app research.md.
+  const query = {
+    ...(isPermalink ? { _id: maybeId } : { path: pathname }),
+    isEmpty: { $ne: true },
+  };
 
   const Page = mongoose.model<PageDocument>('Page');
   const page = await Page.findOne(query).populate('revision').lean();

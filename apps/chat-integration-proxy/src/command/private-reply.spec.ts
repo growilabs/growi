@@ -509,6 +509,30 @@ describe('privateReplyOriginOf', () => {
     });
   });
 
+  it('speaks as the installation the request event named when the caller knows none', () => {
+    const origin = privateReplyOriginOf(
+      {
+        ...invocationWith('search', 'foo'),
+        installation: { kind: 'identified', installationId: 'inst-dm' },
+      },
+      null,
+    );
+
+    expect(origin.installationId).toBe('inst-dm');
+  });
+
+  it('leaves the installation unknown for a place that belongs to no workspace', () => {
+    const origin = privateReplyOriginOf(
+      {
+        ...invocationWith('search', 'foo'),
+        installation: { kind: 'no-workspace' },
+      },
+      null,
+    );
+
+    expect(origin.installationId).toBeNull();
+  });
+
   it('labels a request with no arguments by its command alone, and reads a missing message id as none', () => {
     const origin = privateReplyOriginOf(invocationWith('help', ''), null);
 

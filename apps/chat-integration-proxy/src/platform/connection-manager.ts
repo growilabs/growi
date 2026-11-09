@@ -259,9 +259,40 @@ export const createConnectionManager = (
     return { units, unreadablePlatforms };
   };
 
+  /** Whether the connection is known to be closed. */
+  const closeQuietly = async (unit: ConnectionUnitRef): Promise<boolean> => {
+    try {
+      await deps.close(unit);
+      return true;
+    } catch {
+      // The caller is already recording a failure; it only needs to know
+      // whether the lock may be released.
+      return false;
+    }
+  };
+
+  const releaseQuietly = async (lockKey: string): Promise<void> => {
+    try {
+      await deps.locks.release(lockKey);
+    } catch {
+      // Best effort: an unreleased lock still lapses on its own.
+    }
+  };
+
   const reconcileUnit = async (record: UnitRecord): Promise<void> => {
     if (record.state === 'connected') {
-      const extended = await deps.locks.renew(record.unit.lockKey, lockTtlMs);
+      let extended: boolean;
+      try {
+        extended = await deps.locks.renew(record.unit.lockKey, lockTtlMs);
+      } catch (error) {
+        // Treat a renewal whose outcome is unknown as a lost lock (research.md
+        // 決定 P14).
+        const closed = await closeQuietly(record.unit);
+        // Releasing while the connection may still be open would hand the lock
+        // to a second instance early.
+        if (closed) await releaseQuietly(record.unit.lockKey);
+        throw error;
+      }
       if (extended) return;
 
       // The lock is gone -- another instance may already hold it -- so this

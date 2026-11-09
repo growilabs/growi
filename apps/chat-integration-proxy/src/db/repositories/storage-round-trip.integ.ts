@@ -526,6 +526,9 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       argsText: '',
       interaction: null,
       sourceMessageId: null,
+      // A collection resumed later must resolve the installation its starting
+      // event named, which no channel inventory may list (a DM).
+      installation: { kind: 'identified', installationId: 'inst-dm' },
     };
 
     const created = await pendingCollections.create({

@@ -9,6 +9,7 @@
 
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { DiscordAdapter } from '@chat-adapter/discord';
 import { createSlackAdapter, type SlackAdapter } from '@chat-adapter/slack';
 import type { PlatformName } from '@growi/chat';
 import type { Adapter } from 'chat';
@@ -233,7 +234,7 @@ describe("Slack's workspace of the event being handled", () => {
       apiUrl,
     });
 
-  const workspaceOfEventAs = (botToken: string): Promise<string> => {
+  const workspaceOfEventAs = (botToken: string): Promise<string | null> => {
     const factory = ADAPTER_FACTORIES.slack;
     if (
       factory.credentialSource !== 'app' ||
@@ -245,7 +246,7 @@ describe("Slack's workspace of the event being handled", () => {
     }
     const read = factory.workspaceOfEvent;
     const adapter = slackAdapter();
-    return adapter.withBotToken(botToken, () => read(adapter));
+    return adapter.withBotToken(botToken, () => read(adapter, 'slack:C1'));
   };
 
   it('answers the team for a workspace install, asked with the bot token of the event', async () => {
@@ -280,5 +281,148 @@ describe("Slack's workspace of the event being handled", () => {
     answers.set('xoxb-odd', { ok: true, user_id: 'UBOT' });
 
     await expect(workspaceOfEventAs('xoxb-odd')).rejects.toThrow();
+  });
+
+  it('asks Slack once per bot token, however many events that workspace sends', async () => {
+    answers.set('xoxb-busy', {
+      ok: true,
+      team_id: 'T3',
+      user_id: 'UBOT',
+      is_enterprise_install: false,
+    });
+
+    await expect(workspaceOfEventAs('xoxb-busy')).resolves.toBe('T3');
+    await expect(workspaceOfEventAs('xoxb-busy')).resolves.toBe('T3');
+    expect(askedWith).toEqual(['Bearer xoxb-busy']);
+  });
+
+  it('asks again after a failed answer, so one refusal is not remembered', async () => {
+    await expect(workspaceOfEventAs('xoxb-late')).rejects.toThrow();
+    answers.set('xoxb-late', {
+      ok: true,
+      team_id: 'T4',
+      user_id: 'UBOT',
+      is_enterprise_install: false,
+    });
+
+    await expect(workspaceOfEventAs('xoxb-late')).resolves.toBe('T4');
+  });
+});
+
+describe("Discord's workspace of the event being handled", () => {
+  // The guild is part of every Discord channel id the adapter hands an event
+  // with, and a DM carries `@me` in its place (`decodeThreadId`).
+  const workspaceOf = (channelId: string): Promise<string | null> => {
+    const factory = ADAPTER_FACTORIES.discord;
+    if (
+      factory.credentialSource !== 'app' ||
+      factory.workspaceOfEvent == null
+    ) {
+      throw new Error(
+        'Discord declares no way to read the workspace of an event',
+      );
+    }
+    const adapter = new DiscordAdapter({
+      applicationId: '900000000000000001',
+      publicKey: 'a'.repeat(64),
+      botToken: 'discord-bot-token',
+    });
+    return factory.workspaceOfEvent(adapter, channelId);
+  };
+
+  it('answers the guild of a server channel, the key the OAuth callback stores it under', async () => {
+    await expect(workspaceOf('discord:G100:C200')).resolves.toBe('G100');
+  });
+
+  it('answers the guild of a thread inside a server channel', async () => {
+    await expect(workspaceOf('discord:G100:C200:T300')).resolves.toBe('G100');
+  });
+
+  it('answers that a DM belongs to no workspace', async () => {
+    await expect(workspaceOf('discord:@me:C900')).resolves.toBeNull();
+  });
+});
+
+describe('listener windows (services that must be told to start listening)', () => {
+  it('only Discord declares one: Slack listens as soon as its adapter is initialized, Teams dials in, Mattermost connects per installation', () => {
+    const declared = Object.fromEntries(
+      Object.entries(ADAPTER_FACTORIES).map(([platform, factory]) => [
+        platform,
+        factory.credentialSource === 'app' &&
+          factory.startListenerWindow != null,
+      ]),
+    );
+
+    expect(declared).toEqual({
+      slack: false,
+      discord: true,
+      teams: false,
+      mattermost: false,
+    });
+  });
+
+  describe("Discord's Gateway window", () => {
+    const discordFactory = ADAPTER_FACTORIES.discord;
+    const startWindow =
+      discordFactory.credentialSource === 'app'
+        ? discordFactory.startListenerWindow
+        : undefined;
+    const buildAdapter = (): Adapter => {
+      const adapter = createAppAdapters(
+        FULL_APP_CONFIG,
+        ADAPTER_FACTORIES,
+        CONTEXT,
+      ).discord;
+      if (adapter == null) throw new Error('discord adapter not built');
+      return adapter;
+    };
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('fails to open when the adapter was never initialized with its Chat instance', async () => {
+      const adapter = buildAdapter();
+
+      await expect(
+        startWindow?.(adapter, 1_000, new AbortController().signal),
+      ).rejects.toThrow(/500/);
+    });
+
+    it('asks the adapter to listen for the window, stoppable by the signal, handling events itself rather than forwarding them', async () => {
+      const adapter = buildAdapter();
+      if (!(adapter instanceof DiscordAdapter)) throw new Error('not discord');
+      let endListening: () => void = () => undefined;
+      const listen = vi
+        .spyOn(adapter, 'startGatewayListener')
+        .mockImplementation((options) => {
+          options.waitUntil?.(
+            new Promise<void>((resolve) => {
+              endListening = resolve;
+            }),
+          );
+          return Promise.resolve(new Response('{}', { status: 200 }));
+        });
+      const controller = new AbortController();
+
+      const window = await startWindow?.(adapter, 1_000, controller.signal);
+
+      expect(listen).toHaveBeenCalledTimes(1);
+      const [, durationMs, signal, webhookUrl] = listen.mock.calls[0] ?? [];
+      expect(durationMs).toBe(1_000);
+      expect(signal).toBe(controller.signal);
+      expect(webhookUrl).toBeUndefined();
+
+      let ended = false;
+      void window?.ended.then(() => {
+        ended = true;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(ended).toBe(false);
+
+      endListening();
+      await window?.ended;
+      expect(ended).toBe(true);
+    });
   });
 });

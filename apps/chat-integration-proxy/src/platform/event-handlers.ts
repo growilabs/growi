@@ -17,7 +17,11 @@ import type {
   Thread,
 } from 'chat';
 
-import type { PlatformEvent, PlatformEventSink } from '../types/index.js';
+import type {
+  EventInstallation,
+  PlatformEvent,
+  PlatformEventSink,
+} from '../types/index.js';
 import {
   fromAction,
   fromMessage,
@@ -60,7 +64,20 @@ export interface EventHandlerDeps {
    * (`bot-joined-channel.ts`). Not a `PlatformEvent`: no user is asking
    * anything, so it has no business in the sink's routing.
    */
-  readonly onBotJoinedChannel?: (adapter: Adapter) => Promise<void>;
+  readonly onBotJoinedChannel?: (
+    adapter: Adapter,
+    channelId: string,
+  ) => Promise<void>;
+  /**
+   * Which installation an event came from, asked of the adapter that received
+   * it while the event is still being handled (`event-installation.ts`);
+   * `undefined` when it cannot say. Without it every event is placed by the
+   * saved channel inventory alone.
+   */
+  readonly identifyInstallation?: (
+    adapter: Adapter,
+    channelId: string,
+  ) => Promise<EventInstallation | undefined>;
 }
 
 /**
@@ -74,13 +91,21 @@ const ANY_MESSAGE = /[\s\S]*/;
 
 const dispatch = async (
   deps: EventHandlerDeps,
+  adapter: Adapter,
   event: PlatformEvent | null,
 ): Promise<void> => {
   // `null` is `event-mapping.ts` refusing to invent an event it cannot build
   // -- an unaddressed message with no links, a button this proxy did not
-  // render, a submission with no conversation behind it.
+  // render, a submission with no conversation behind it. Checked before the
+  // installation is asked for, which may cost a call to the service.
   if (event == null) return;
-  await deps.sink.handle(event);
+  const installation = await deps.identifyInstallation?.(
+    adapter,
+    event.channel.channelId,
+  );
+  await deps.sink.handle(
+    installation == null ? event : { ...event, installation },
+  );
 };
 
 /**
@@ -96,7 +121,7 @@ const handleMessage = async (
   message: Message,
 ): Promise<void> => {
   if (message.author.isMe) return;
-  await dispatch(deps, fromMessage(thread, message));
+  await dispatch(deps, thread.adapter, fromMessage(thread, message));
 };
 
 export const registerEventHandlers = (
@@ -121,6 +146,7 @@ export const registerEventHandlers = (
   host.onSlashCommand((event) =>
     dispatch(
       deps,
+      event.adapter,
       fromSlashCommand(
         event,
         deps.modals.register((modal) => event.openModal(modal)),
@@ -131,6 +157,7 @@ export const registerEventHandlers = (
   host.onAction((event) =>
     dispatch(
       deps,
+      event.adapter,
       fromAction(
         event,
         deps.modals.register((modal) => event.openModal(modal)),
@@ -142,7 +169,7 @@ export const registerEventHandlers = (
   // submission from another is the correlation id on `privateMetadata`, which
   // `fromModalSubmit` reads back (`prompt.ts`, `event-mapping.ts`).
   host.onModalSubmit(MODAL_CALLBACK_ID, (event) =>
-    dispatch(deps, fromModalSubmit(event)),
+    dispatch(deps, event.adapter, fromModalSubmit(event)),
   );
 
   // Anyone joining fires this; only the bot's own join changes what it can
@@ -151,6 +178,6 @@ export const registerEventHandlers = (
   host.onMemberJoinedChannel(async (event) => {
     const botUserId = event.adapter.botUserId;
     if (botUserId == null || event.userId !== botUserId) return;
-    await deps.onBotJoinedChannel?.(event.adapter);
+    await deps.onBotJoinedChannel?.(event.adapter, event.channelId);
   });
 };

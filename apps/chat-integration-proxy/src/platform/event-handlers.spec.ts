@@ -20,7 +20,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
 import type { PlatformEvent } from '../types/index.js';
-import { type HandlerHost, registerEventHandlers } from './event-handlers.js';
+import {
+  type EventHandlerDeps,
+  type HandlerHost,
+  registerEventHandlers,
+} from './event-handlers.js';
 import { encodeActionId } from './event-mapping.js';
 import { createModalTriggerRegistry, MODAL_CALLBACK_ID } from './prompt.js';
 
@@ -93,9 +97,11 @@ const fakeHost = (): { host: HandlerHost; registered: Registered } => {
   };
 };
 
-const setUp = () => {
+const setUp = (
+  identifyInstallation?: EventHandlerDeps['identifyInstallation'],
+) => {
   const handled: PlatformEvent[] = [];
-  const botJoinedThrough: Adapter[] = [];
+  const botJoinedThrough: Array<{ adapter: Adapter; channelId: string }> = [];
   const { host, registered } = fakeHost();
   const modals = createModalTriggerRegistry();
 
@@ -107,10 +113,11 @@ const setUp = () => {
       },
     },
     modals,
-    onBotJoinedChannel: (adapter) => {
-      botJoinedThrough.push(adapter);
+    onBotJoinedChannel: (adapter, channelId) => {
+      botJoinedThrough.push({ adapter, channelId });
       return Promise.resolve();
     },
+    ...(identifyInstallation == null ? {} : { identifyInstallation }),
   });
 
   return { handled, botJoinedThrough, registered, modals };
@@ -343,7 +350,8 @@ describe('someone joining a channel', () => {
     await registered.memberJoined?.(joined('UBOT', adapter));
 
     expect(botJoinedThrough).toHaveLength(1);
-    expect(botJoinedThrough[0]).toBe(adapter);
+    expect(botJoinedThrough[0]?.adapter).toBe(adapter);
+    expect(botJoinedThrough[0]?.channelId).toBe('slack:C0009:');
     // Not a conversation: nothing reaches the command side.
     expect(handled).toEqual([]);
   });
@@ -357,5 +365,70 @@ describe('someone joining a channel', () => {
     );
 
     expect(botJoinedThrough).toEqual([]);
+  });
+});
+
+describe('which installation an event belongs to', () => {
+  it('hands the sink a mention carrying the installation its adapter names', async () => {
+    const identify = vi.fn(async () => ({
+      kind: 'identified' as const,
+      installationId: 'inst-dm',
+    }));
+    const { handled, registered } = setUp(identify);
+    const asked = thread();
+
+    await registered.mention?.(asked, message());
+
+    expect(handled).toMatchObject([
+      {
+        kind: 'mention',
+        installation: { kind: 'identified', installationId: 'inst-dm' },
+      },
+    ]);
+    expect(identify).toHaveBeenCalledWith(asked.adapter, 'slack:C0001');
+  });
+
+  it('hands a slash command the installation as well', async () => {
+    const { handled, registered } = setUp(async () => ({
+      kind: 'no-workspace',
+    }));
+
+    await registered.slashCommand?.(
+      mock<SlashCommandEvent>({
+        adapter: mock({ name: 'slack' }),
+        channel: mock<Channel>({ id: 'slack:C0001', name: 'general' }),
+        user: author(),
+        command: '/growi',
+        text: 'search foo',
+        openModal: async () => undefined,
+      }),
+    );
+
+    expect(handled).toMatchObject([
+      { kind: 'slash-command', installation: { kind: 'no-workspace' } },
+    ]);
+  });
+
+  it('leaves the installation off an event whose adapter cannot name one', async () => {
+    const { handled, registered } = setUp(async () => undefined);
+
+    await registered.mention?.(thread(), message());
+
+    expect(handled).toHaveLength(1);
+    expect(handled[0]).not.toHaveProperty('installation');
+  });
+
+  it('asks nothing for a message that becomes no event', async () => {
+    // Every unaddressed message reaches the handler; asking the service about
+    // each would cost a lookup per message the bot can see.
+    const identify = vi.fn(async () => undefined);
+    const { registered } = setUp(identify);
+
+    await registered.message?.(
+      thread(),
+      message({ isMention: false, text: 'no link here', links: [] }),
+    );
+
+    expect(identify).not.toHaveBeenCalled();
   });
 });

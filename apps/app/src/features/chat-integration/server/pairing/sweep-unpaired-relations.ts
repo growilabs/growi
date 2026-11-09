@@ -12,12 +12,11 @@
 // left orphaned with no relation to identify them by. The two have to go in
 // one pass, which means application code.
 //
-// Runs on the same tick, and with the same "only one instance actually does
-// the work" property, as `NotificationDispatcher.drain` (design.md "45 日の
-// 掃除は `NotificationDispatcher` と同じく条件つき更新で 1 台だけが回す"): the
-// links are removed first and the relation row is then deleted under the very
-// condition that selected it, so two instances sweeping at once converge on
-// the same end state and neither can leave an orphan behind.
+// Run once a day by `UnpairedRelationSweepCronService` on every instance.
+// The links are removed first and the relation row
+// is then deleted under the very condition that selected it, so two instances
+// sweeping at once converge on the same end state and neither can leave an
+// orphan behind.
 
 import loggerFactory from '~/utils/logger';
 
@@ -31,8 +30,16 @@ const logger = loggerFactory(
 
 export { UNPAIRED_RETENTION_MS };
 
-/** Bound on one sweep, so a large backlog spreads over several ticks. */
-const MAX_RELATIONS_PER_SWEEP = 100;
+/**
+ * Safety ceiling on the work of one run: the loop drains the whole backlog
+ * (the run is daily, so a smaller cap would break the retention deadline), but
+ * must not become unbounded against the database. The next daily run continues.
+ */
+export const MAX_RELATIONS_PER_SWEEP = 10_000;
+
+export interface UnpairedSweepOptions {
+  readonly maxRelations?: number;
+}
 
 export interface UnpairedSweepSummary {
   readonly relations: number;
@@ -41,17 +48,19 @@ export interface UnpairedSweepSummary {
 
 export const sweepUnpairedRelations = async (
   now: Date,
+  { maxRelations = MAX_RELATIONS_PER_SWEEP }: UnpairedSweepOptions = {},
 ): Promise<UnpairedSweepSummary> => {
   const expiredBefore = new Date(now.getTime() - UNPAIRED_RETENTION_MS);
   let relations = 0;
   let accountLinks = 0;
 
-  for (let i = 0; i < MAX_RELATIONS_PER_SWEEP; i++) {
+  for (let i = 0; i < maxRelations; i++) {
     const expiredCondition = {
       state: 'unpaired',
       unpairedAt: { $lt: expiredBefore },
     } as const;
 
+    // biome-ignore lint/performance/noAwaitInLoops: one relation at a time, so a large backlog does not pile deletes onto the database at once
     const candidate = await ChatRelation.findOne(expiredCondition).lean();
     if (candidate == null) {
       break;
@@ -59,7 +68,7 @@ export const sweepUnpairedRelations = async (
 
     // Links first: if this process dies between the two deletes, the
     // relation row is still there to identify the remainder on the next
-    // tick. The other order would strand the links permanently.
+    // run. The other order would strand the links permanently.
     const linkDeletion = await ChatAccountLink.deleteMany({
       relationId: candidate.relationId,
     });

@@ -4,9 +4,18 @@ import path from 'node:path';
 import CronService from '~/server/service/cron';
 
 import {
+  createIntegrationPresence,
+  PRESENCE_ANSWER_TTL_MS,
+} from '../integration-presence';
+import { sweepUnpairedRelations } from '../pairing/sweep-unpaired-relations';
+import {
   ChatNotificationDispatchCronService,
   chatNotificationDispatchCronService,
 } from './notification-dispatch-cron';
+
+vi.mock('../pairing/sweep-unpaired-relations', () => ({
+  sweepUnpairedRelations: vi.fn(),
+}));
 
 describe('ChatNotificationDispatchCronService', () => {
   it('is one of GROWI’s CronService jobs rather than a scheduling mechanism of its own', () => {
@@ -19,35 +28,129 @@ describe('ChatNotificationDispatchCronService', () => {
     );
   });
 
-  it('drains the outbox and sweeps expired relations in the same run, at the same instant', async () => {
+  describe('when deciding whether to drain', () => {
+    const NOW = new Date('2026-01-01T00:00:00.000Z');
+    const drainResult = { sent: 0, failed: 0, givenUp: 0 };
+
+    it('does not drain when no integration exists', async () => {
+      const drain = vi.fn().mockResolvedValue(drainResult);
+      const hasAnyIntegration = vi.fn().mockResolvedValue(false);
+
+      await new ChatNotificationDispatchCronService({
+        dispatcher: { drain },
+        presence: { hasAnyIntegration, markPresent: vi.fn() },
+        clock: () => NOW,
+      }).executeJob();
+
+      expect(drain).not.toHaveBeenCalled();
+    });
+
+    it('drains once, at the clock’s instant, when an integration exists', async () => {
+      const drain = vi.fn().mockResolvedValue(drainResult);
+      const hasAnyIntegration = vi.fn().mockResolvedValue(true);
+
+      await new ChatNotificationDispatchCronService({
+        dispatcher: { drain },
+        presence: { hasAnyIntegration, markPresent: vi.fn() },
+        clock: () => NOW,
+      }).executeJob();
+
+      expect(hasAnyIntegration).toHaveBeenCalledWith(NOW);
+      expect(drain).toHaveBeenCalledTimes(1);
+      expect(drain).toHaveBeenCalledWith(NOW);
+    });
+
+    it('drains when the presence check fails open', async () => {
+      const drain = vi.fn().mockResolvedValue(drainResult);
+      const presence = createIntegrationPresence({
+        anyRelationExists: vi.fn().mockRejectedValue(new Error('db down')),
+      });
+
+      await new ChatNotificationDispatchCronService({
+        dispatcher: { drain },
+        presence,
+        clock: () => NOW,
+      }).executeJob();
+
+      expect(drain).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not throw out of the job when draining fails', async () => {
+      const drain = vi.fn().mockRejectedValue(new Error('proxy exploded'));
+
+      await expect(
+        new ChatNotificationDispatchCronService({
+          dispatcher: { drain },
+          presence: {
+            hasAnyIntegration: vi.fn().mockResolvedValue(true),
+            markPresent: vi.fn(),
+          },
+          clock: () => NOW,
+        }).executeJob(),
+      ).resolves.toBeUndefined();
+
+      expect(drain).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('never sweeps relations itself', async () => {
     const drain = vi.fn().mockResolvedValue({ sent: 0, failed: 0, givenUp: 0 });
-    const sweep = vi.fn().mockResolvedValue({ relations: 0, accountLinks: 0 });
 
     await new ChatNotificationDispatchCronService({
       dispatcher: { drain },
-      sweep,
+      presence: {
+        hasAnyIntegration: vi.fn().mockResolvedValue(true),
+        markPresent: vi.fn(),
+      },
     }).executeJob();
 
-    expect(drain).toHaveBeenCalledTimes(1);
-    expect(sweep).toHaveBeenCalledTimes(1);
-    expect(drain.mock.calls[0][0]).toBeInstanceOf(Date);
-    expect(sweep.mock.calls[0][0].getTime()).toBe(
-      drain.mock.calls[0][0].getTime(),
-    );
+    expect(sweepUnpairedRelations).not.toHaveBeenCalled();
   });
 
-  it('still sweeps when draining throws -- neither half may starve the other', async () => {
-    const drain = vi.fn().mockRejectedValue(new Error('proxy exploded'));
-    const sweep = vi.fn().mockResolvedValue({ relations: 0, accountLinks: 0 });
+  // The 10-minute answer lifetime plus the 1-minute tick bound how long
+  // another process takes to deliver a row whose writer stopped (2.9).
+  describe('delivery of a row written by a process that then stopped', () => {
+    const MINUTE = 60 * 1000;
+    const T = new Date('2026-01-01T00:00:00.000Z').getTime();
 
-    await expect(
-      new ChatNotificationDispatchCronService({
+    const firstDrainMinute = async (
+      processBStartsDelayMs: number,
+    ): Promise<number | null> => {
+      let currentTime = T;
+      // B decides "none" first; after the writer's row exists it says "some".
+      const anyRelationExists = vi
+        .fn<() => Promise<boolean>>()
+        .mockResolvedValueOnce(false)
+        .mockResolvedValue(true);
+      const drain = vi
+        .fn()
+        .mockResolvedValue({ sent: 0, failed: 0, givenUp: 0 });
+      const cron = new ChatNotificationDispatchCronService({
         dispatcher: { drain },
-        sweep,
-      }).executeJob(),
-    ).resolves.toBeUndefined();
+        presence: createIntegrationPresence({ anyRelationExists }),
+        clock: () => new Date(currentTime),
+      });
 
-    expect(sweep).toHaveBeenCalledTimes(1);
+      for (let minute = 0; minute <= 15; minute++) {
+        currentTime =
+          T + minute * MINUTE + (minute === 0 ? processBStartsDelayMs : 0);
+        // biome-ignore lint/performance/noAwaitInLoops: ticks must run in order
+        await cron.executeJob();
+        if (drain.mock.calls.length > 0) {
+          return minute;
+        }
+      }
+      return null;
+    };
+
+    it('drains first on the tick where the remembered answer has expired', async () => {
+      expect(PRESENCE_ANSWER_TTL_MS).toBe(10 * MINUTE);
+      expect(await firstDrainMinute(0)).toBe(10);
+    });
+
+    it('drains one tick later when the deciding tick started late', async () => {
+      expect(await firstDrainMinute(30 * 1000)).toBe(11);
+    });
   });
 
   // The job only runs if something starts it, and design.md is explicit that

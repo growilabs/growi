@@ -646,6 +646,166 @@ describe('createCommandEndpoint (task 5.1)', () => {
     });
   });
 
+  describe('link-preview on a CLOSED GROWI (Requirement 6.9, 6.10)', () => {
+    it('returns only the title and updated-at for a linked actor pasting a permalink to a publicly-granted page', async () => {
+      const publicPage = await createPageWithRevision({
+        path: '/team/closed-public-target',
+        grant: PageGrant.GRANT_PUBLIC,
+        body: 'z'.repeat(50),
+        commentCount: 5,
+        updatedAt: new Date('2026-05-01T00:00:00.000Z'),
+      });
+      const user = await createUser();
+      await linkActorTo(user._id);
+      const crowi = buildCrowi({ isGuestAllowedToRead: false });
+      const endpoint = createCommandEndpoint(crowi);
+
+      const response = await endpoint.handle(
+        linkPreviewRequest({
+          requestId: 'req-link-closed-public-permalink',
+          pageUrl: `https://growi.example.test/${publicPage._id.toString()}`,
+        }),
+      );
+
+      expect(response).toStrictEqual({
+        kind: 'link-preview',
+        path: 'closed-public-target',
+        restricted: true,
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      });
+    });
+  });
+
+  describe('link-preview of an empty placeholder parent page (Requirement 6.14)', () => {
+    // GROWI creates these (`isEmpty: true`, grant public, no revision) when a
+    // child page is created under a path that has no page yet.
+    const createEmptyParentPage = (path: string) =>
+      getPageModel().create({
+        path,
+        grant: PageGrant.GRANT_PUBLIC,
+        isEmpty: true,
+        updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+      });
+
+    const previewTwice = async (
+      isGuestAllowedToRead: boolean,
+      emptyPageUrl: string,
+      missingPageUrl: string,
+    ) => {
+      const user = await createUser();
+      await linkActorTo(user._id);
+      const endpoint = createCommandEndpoint(
+        buildCrowi({ isGuestAllowedToRead }),
+      );
+      const emptyResponse = await endpoint.handle(
+        linkPreviewRequest({ requestId: 'req-empty', pageUrl: emptyPageUrl }),
+      );
+      const missingResponse = await endpoint.handle(
+        linkPreviewRequest({
+          requestId: 'req-missing',
+          pageUrl: missingPageUrl,
+        }),
+      );
+      return { emptyResponse, missingResponse };
+    };
+
+    it.each([
+      { growi: 'closed', isGuestAllowedToRead: false },
+      { growi: 'open', isGuestAllowedToRead: true },
+    ])('answers a permalink to an empty page exactly like a permalink to no page, on a $growi GROWI', async ({
+      isGuestAllowedToRead,
+    }) => {
+      const emptyPage = await createEmptyParentPage('/team');
+
+      const { emptyResponse, missingResponse } = await previewTwice(
+        isGuestAllowedToRead,
+        `https://growi.example.test/${emptyPage._id.toString()}`,
+        `https://growi.example.test/${new mongoose.Types.ObjectId().toString()}`,
+      );
+
+      expect(emptyResponse).toStrictEqual(missingResponse);
+      expect(emptyResponse).not.toHaveProperty('updatedAt');
+    });
+
+    it.each([
+      { growi: 'closed', isGuestAllowedToRead: false },
+      { growi: 'open', isGuestAllowedToRead: true },
+    ])('answers a path URL to an empty page exactly like a path URL to no page, on a $growi GROWI', async ({
+      isGuestAllowedToRead,
+    }) => {
+      await createEmptyParentPage('/team');
+
+      const { emptyResponse, missingResponse } = await previewTwice(
+        isGuestAllowedToRead,
+        'https://growi.example.test/team',
+        'https://growi.example.test/no-such-team',
+      );
+
+      expect(emptyResponse).toStrictEqual(missingResponse);
+      expect(emptyResponse.kind).toBe('error');
+    });
+
+    it('still previews a pre-v5 page that has no isEmpty field at all', async () => {
+      const page = await createPageWithRevision({
+        path: '/legacy-page',
+        grant: PageGrant.GRANT_PUBLIC,
+        updatedAt: new Date('2026-07-01T00:00:00.000Z'),
+      });
+      await getPageModel().collection.updateOne(
+        { _id: page._id },
+        { $unset: { isEmpty: '' } },
+      );
+      const user = await createUser();
+      await linkActorTo(user._id);
+      const endpoint = createCommandEndpoint(
+        buildCrowi({ isGuestAllowedToRead: false }),
+      );
+
+      const response = await endpoint.handle(
+        linkPreviewRequest({
+          pageUrl: `https://growi.example.test/${page._id.toString()}`,
+        }),
+      );
+
+      expect(response).toStrictEqual({
+        kind: 'link-preview',
+        path: 'legacy-page',
+        restricted: true,
+        updatedAt: '2026-07-01T00:00:00.000Z',
+      });
+    });
+
+    it('keeps previewing a trashed public page by its title and updated-at on a closed GROWI', async () => {
+      const page = await createPageWithRevision({
+        path: '/trash/old-notes',
+        grant: PageGrant.GRANT_PUBLIC,
+        updatedAt: new Date('2026-08-01T00:00:00.000Z'),
+      });
+      await getPageModel().updateOne(
+        { _id: page._id },
+        { $set: { status: 'deleted' } },
+      );
+      const user = await createUser();
+      await linkActorTo(user._id);
+      const endpoint = createCommandEndpoint(
+        buildCrowi({ isGuestAllowedToRead: false }),
+      );
+
+      const response = await endpoint.handle(
+        linkPreviewRequest({
+          pageUrl: `https://growi.example.test/${page._id.toString()}`,
+        }),
+      );
+
+      expect(response).toStrictEqual({
+        kind: 'link-preview',
+        path: 'old-notes',
+        restricted: true,
+        updatedAt: '2026-08-01T00:00:00.000Z',
+      });
+    });
+  });
+
   describe('resolvePageFromUrl -- permalink detection (Requirement 6.6, 6.8)', () => {
     it('marks a 24-hex-char permalink URL as isPermalink: true when the page is found', async () => {
       const page = await createPageWithRevision({

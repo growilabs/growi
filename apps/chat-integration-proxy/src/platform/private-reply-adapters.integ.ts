@@ -868,12 +868,12 @@ describe('Mattermost, with two installations open', () => {
     });
     // The 403 is an answer, not a throw, and the facade does not turn to a DM
     // by itself.
-    // Known to be misleading (a 403 here means a missing permission, not a
-    // missing invitation); pinned so the classifier's fix shows up here.
     expect(outcome).toEqual({
       ok: false,
-      reason: 'bot-not-in-channel',
-      remedy: expect.any(String),
+      reason: 'platform-error',
+      detail: expect.stringMatching(
+        /may lack the permission to post private messages/,
+      ),
     });
     expect(pathsOf(serverB)).not.toContain('POST /api/v4/channels/direct');
     expect(pathsOf(serverA)).toEqual(['GET /api/v4/users/me']);

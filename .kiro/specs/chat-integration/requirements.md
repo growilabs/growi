@@ -189,7 +189,10 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 4. If 通知先のチャンネルに bot が参加していないために投稿できなかった, then the chat-integration proxy shall 投稿できなかったこと・対象のチャンネル・投稿できるようにするために必要な操作 を運用者が後から確認できる形で記録する
 5. If 通知先のチャットサービスが応答しなかった, then the GROWI application shall ページの作成・編集・削除・移動そのものは完了させる
 6. When 1 つの GROWI に複数のチャットサービスが紐づいている, the GROWI application shall 設定された全ての宛先へ通知を投稿する
-<!-- 2.7〜2.9 は chat-integration-notification-load、2.10・2.11 は chat-integration-agent 用の空き番号。詰めない -->
+7. While GROWI にチャット連携が 1 つも無い（解除済みで保持期間中のものも無い）, the GROWI application shall 通知の定期処理で、送信待ちの通知と掃除の対象を探す問い合わせを行わず、連携の有無を確かめる問い合わせを 1 プロセスあたり 10 分に 1 回以下に抑える
+8. When ある GROWI のプロセスが通知を書き留めた, the GROWI application shall そのプロセスで次に動く通知の定期処理で、連携が無いと覚えている答えが残っていても、送信待ちの通知を探して送る処理を飛ばさない
+9. If 通知を書き留めたプロセスが、その通知を送る前に止まった, then the GROWI application shall ほかのプロセスで、連携の有無について覚えている答えの期限（10 分）が切れた後に最初に動く通知の定期処理で、送信待ちの通知を探して送る（定期処理は 1 分に 1 回なので、書き留めてからおよそ 11 分以内）
+<!-- 2.10・2.11 は chat-integration-agent 用の空き番号。詰めない -->
 12. While 保存時の通知先を選ぶ部品が表示されている, the GROWI application shall 選べるチャンネルの数にかかわらず、保存の操作欄の高さと、ほかの部品の並びを変えない
 13. The GROWI application shall 保存時の通知先を選ぶ部品に、選択中のチャンネルの件数を、選択肢を開かなくても分かる形で示す
 14. When 編集した人が通知先の選択肢を開いた, the GROWI application shall チャンネルを workspace ごとにまとめ、チャンネルの数が多くても選択肢の領域が画面からはみ出さず、中をスクロールして選べるようにする
@@ -202,7 +205,7 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 
 1. When 利用者が検索コマンドを実行した, the chat-integration proxy shall そのチャンネルに紐づく全ての GROWI へ同じ検索語を送る
 2. When 紐づく全ての GROWI から結果が返った, the chat-integration proxy shall 各 GROWI の上位から順に交互に取り出して並べた 1 本のリストとして利用者に示す
-3. The chat-integration proxy shall 結果の各行に、どの GROWI の結果かを示す
+3. The chat-integration proxy shall 結果が複数の GROWI から混ざるときは結果の各行に、どの GROWI の結果かを示し、1 つの GROWI の結果だけのときはその GROWI の名前を一覧に 1 回だけ示す
 4. If 定められた待ち時間の内に応答しなかった GROWI があった, then the chat-integration proxy shall 間に合った GROWI の結果を利用者に示したうえで、応答しなかった GROWI を名前付きで示す
 5. If 紐づく全ての GROWI が待ち時間の内に応答しなかった, then the chat-integration proxy shall 結果が得られなかったことと、応答しなかった GROWI を利用者に示す
 6. The GROWI application shall 検索を実行した利用者に対応する GROWI ユーザーの閲覧権限を適用した結果だけを返す
@@ -245,16 +248,29 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 
 **Objective:** As a チャンネルで GROWI のリンクを共有する人, I want リンクを貼るだけで中身の概要が見えること, so that 相手が開かなくても何の話か分かる
 
+この要件で使う言葉:
+
+- **公開範囲が「公開」のページ**: GROWI のページの公開範囲の設定が「公開」（`GRANT_PUBLIC`）のページ。公開範囲の設定を持たない古いページも含める。**「リンクを知っている人だけ」（`GRANT_RESTRICTED`）は含めない**
+- **ログインが必要な GROWI**: ログインしていない人にページを読ませない設定の GROWI（`aclService.isGuestAllowedToRead()` が偽）。`security:wikiMode` が `private` のとき、および `security:wikiMode` が `public` ではなく、`security:restrictGuestMode` が `Readonly` 以外（`Deny`・未設定を含む）のとき
+- **誰でも閲覧できるページ**: 公開範囲が「公開」で、かつログインが必要な GROWI ではないページ
+- **題名**: ページのパスの最後の部分。ルートのページ（`/`）では `/`。検索の結果の題名（要件 3.9 の `title`）と同じ決め方
+
 #### Acceptance Criteria
 
 1. When 利用者が、紐づく GROWI のページ URL をチャンネルに投稿した, the chat-integration proxy shall そのメッセージに、ページのパスを含む要約を添える
 2. While 対象のページが誰でも閲覧できるページである, the chat-integration proxy shall 要約に本文の冒頭・更新日時・コメント数を含める
-3. While 対象のページが誰でも閲覧できるわけではないページである, the chat-integration proxy shall 要約にパス以外の内容を含めない
+3. While 対象のページが誰でも閲覧できるわけではないページであり、6.9 の状態でもない, the chat-integration proxy shall 要約にパス以外の内容を含めない
 4. If 対象の URL が、そのチャンネルに紐づくどの GROWI のものでもない, then the chat-integration proxy shall 何も添えない
 5. Where あるチャットサービスが、投稿されたリンクを bot に通知する仕組みを持たない, the chat-integration proxy shall そのサービスではこの機能を使えないことを運用者に示す
 6. While 利用者が投稿した URL が対象のページをパス以外の識別子で指す固定リンクであり、かつそのページが誰でも閲覧できるページでない, the GROWI application shall 要約にパスを含めない
 7. While 利用者が投稿した URL がパスで対象のページを指している（固定リンクではない）, the GROWI application shall そのページが誰でも閲覧できるページでない場合であっても、要約にパスを含める
-8. If 利用者が投稿した URL が、対象のページをパス以外の識別子で指す固定リンクであり、その識別子に一致するページがこの GROWI に存在しない, then the GROWI application shall 対象のページは存在するが誰でも閲覧できるページではない場合と、区別できない形の応答を返す
+8. If 利用者が投稿した URL が、対象のページをパス以外の識別子で指す固定リンクであり、その識別子に一致するページがこの GROWI に存在しない, then the GROWI application shall 対象のページは存在するが誰でも閲覧できるページではなく、6.9 の状態でもない場合と、区別できない形の応答を返す
+9. While 対象のページの公開範囲が「公開」であり、かつ紐づく GROWI がログインが必要な GROWI である, the GROWI application shall 要約にページの題名と更新日時を含め、本文の冒頭とコメント数を含めない
+10. While 6.9 の状態であり、かつ利用者が投稿した URL が、対象のページをパス以外の識別子で指す固定リンクである, the GROWI application shall 要約に題名を含め、パス全体を含めない
+11. While 6.9 の状態であり、かつ利用者が投稿した URL がパスで対象のページを指している, the GROWI application shall 要約にパスと更新日時を含める
+12. While 対象のページの公開範囲が「公開」以外（本人だけ・グループだけ・リンクを知っている人だけ・特定のユーザーだけ）である, the GROWI application shall GROWI がログインを必要とするかどうかに関わらず、要約に更新日時を含めず、固定リンクの場合は題名も含めずに対象のページが存在しない場合と区別できない形の応答を返し、パスで指す URL の場合は 6.3・6.7 のとおりパスだけを含める
+13. When the chat-integration proxy が 6.9 の状態の要約を受け取った, the chat-integration proxy shall パス（固定リンクの場合は題名）と更新日時を表示し、本文の冒頭とコメント数を表示しない
+14. While 対象のページが、子ページを作ったときに自動でできる本文の無い親ページ（空のページ）である, the GROWI application shall GROWI がログインを必要とするかどうかに関わらず、ページが存在しない場合と区別できない形の応答を返す
 
 ### Requirement 7: チャットの利用者と GROWI ユーザーの紐付け
 
@@ -301,11 +317,12 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 5. When 紐付けが成立した, the chat-integration proxy shall 以降お互いを確認するために必要な情報を双方に登録する
 6. The chat-integration proxy shall 紐付けの過程で、相手になりすますために使える秘密を通信路に流さない
 7. When 管理者が紐付けを解除した, the chat-integration proxy shall 以降その GROWI との間のリクエストを処理しない
-<!-- 9.8 は chat-integration-notification-load が予約している番号。詰めない -->
-9. If 管理画面が関係の接続の状態を proxy に問い合わせ、proxy が GROWI の署名を受け付けなかった, then the GROWI application shall その関係に「接続が切れている」状態を示し、「active」としては示さない
-10. When 管理画面が関係の「接続が切れている」状態を示した, the GROWI application shall 原因を断定せず、チャット側で解除された可能性があることと、GROWI 側の解除（要件 9.7）で片付けられることを示す
-11. If 接続の状態を、proxy に届かない・proxy が失敗を返したなど、署名の拒否以外の理由で取得できなかった, then the GROWI application shall 「接続が切れている」とは示さず、状態を確認できなかったことだけを示す
-12. While 関係が「接続が切れている」状態として示されている, the GROWI application shall その関係を自動では解除せず、管理者が GROWI 側で解除する操作（要件 9.7）を使えるままにする
+8. When 紐付けを解除してから保持期間（45 日）が過ぎた, the GROWI application shall その連携と、それに属するチャット利用者の紐付けを、保持期間が過ぎてから 1 日と 1 時間以内に消し、この掃除のための問い合わせは通知の定期処理とは別に 1 日 1 回だけ行う
+9. When 同じ workspace が再び紐付けられた, the GROWI application shall 解除から保持期間（45 日）が過ぎた連携からは、まだ消えていなくても、チャット利用者の紐付けを引き継がない
+10. If 管理画面が関係の接続の状態を proxy に問い合わせ、proxy が GROWI の署名を受け付けなかった, then the GROWI application shall その関係に「接続が切れている」状態を示し、「active」としては示さない
+11. When 管理画面が関係の「接続が切れている」状態を示した, the GROWI application shall 原因を断定せず、チャット側で解除された可能性があることと、GROWI 側の解除（要件 9.7）で片付けられることを示す
+12. If 接続の状態を、proxy に届かない・proxy が失敗を返したなど、署名の拒否以外の理由で取得できなかった, then the GROWI application shall 「接続が切れている」とは示さず、状態を確認できなかったことだけを示す
+13. While 関係が「接続が切れている」状態として示されている, the GROWI application shall その関係を自動では解除せず、管理者が GROWI 側で解除する操作（要件 9.7）を使えるままにする
 
 ### Requirement 10: リクエストごとの相手の確認と鍵の入れ替え
 

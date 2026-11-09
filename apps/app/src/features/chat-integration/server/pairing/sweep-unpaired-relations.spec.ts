@@ -143,4 +143,86 @@ describe('sweepUnpairedRelations', () => {
     expect(summary).toEqual({ relations: 3, accountLinks: 0 });
     expect(await ChatRelation.countDocuments({})).toBe(0);
   });
+
+  describe('with a backlog larger than one pass', () => {
+    const seedExpired = async (count: number, now: Date) => {
+      const expired = new Date(now.getTime() - UNPAIRED_RETENTION_MS - DAY_MS);
+      const ids = Array.from({ length: count }, (_, i) => `rel-${i}`);
+      await ChatRelation.insertMany(
+        ids.map((relationId) => ({
+          relationId,
+          proxyUri: 'https://proxy.example.test',
+          platform: 'slack',
+          workspaceId: `W-${relationId}`,
+          workspaceName: 'Acme',
+          label: null,
+          state: 'unpaired',
+          unpairedAt: expired,
+          settingsVersion: 1,
+        })),
+      );
+      await ChatAccountLink.insertMany(
+        ids.map((relationId) => ({
+          relationId,
+          userId: new Types.ObjectId(),
+          platform: 'slack',
+          accountId: `U-${relationId}`,
+        })),
+      );
+    };
+
+    it('removes every expired relation and its links in one call, leaving the rest', async () => {
+      const now = new Date();
+      await seedExpired(250, now);
+      await seedRelation('rel-live', 'active', null);
+      await seedLink('rel-live', 'U-live');
+      await seedRelation(
+        'rel-recent',
+        'unpaired',
+        new Date(now.getTime() - UNPAIRED_RETENTION_MS + DAY_MS),
+      );
+      await seedLink('rel-recent', 'U-recent');
+
+      const summary = await sweepUnpairedRelations(now);
+
+      expect(summary).toEqual({ relations: 250, accountLinks: 250 });
+      const relations = await ChatRelation.find({}).lean();
+      expect(relations.map((r) => r.relationId).sort()).toEqual([
+        'rel-live',
+        'rel-recent',
+      ]);
+      expect(await ChatAccountLink.countDocuments({})).toBe(2);
+    });
+
+    it('stops at the per-call ceiling and leaves the remainder for the next run', async () => {
+      const now = new Date();
+      await seedExpired(12, now);
+
+      const first = await sweepUnpairedRelations(now, { maxRelations: 5 });
+
+      expect(first).toEqual({ relations: 5, accountLinks: 5 });
+      expect(await ChatRelation.countDocuments({})).toBe(7);
+      expect(await ChatAccountLink.countDocuments({})).toBe(7);
+
+      const second = await sweepUnpairedRelations(now, { maxRelations: 100 });
+
+      expect(second).toEqual({ relations: 7, accountLinks: 7 });
+      expect(await ChatRelation.countDocuments({})).toBe(0);
+    });
+
+    it('converges to a consistent result when runs overlap', async () => {
+      const now = new Date();
+      await seedExpired(60, now);
+
+      const summaries = await Promise.all([
+        sweepUnpairedRelations(now),
+        sweepUnpairedRelations(now),
+        sweepUnpairedRelations(now),
+      ]);
+
+      expect(summaries.reduce((sum, s) => sum + s.relations, 0)).toBe(60);
+      expect(await ChatRelation.countDocuments({})).toBe(0);
+      expect(await ChatAccountLink.countDocuments({})).toBe(0);
+    });
+  });
 });

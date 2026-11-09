@@ -320,7 +320,7 @@ describe('AdminChatIntegration', () => {
     ).toHaveTextContent('connected');
   });
 
-  describe('a relation the proxy no longer accepts (Requirements 9.9-9.12)', () => {
+  describe('a relation the proxy no longer accepts (Requirements 9.10-9.13)', () => {
     const REJECTED = [{ code: 'rejected', message: 'rejected' }];
     const LOST_BADGE = 'chat_integration.connection_lost.badge';
     const LOST_DETAIL = 'chat_integration.connection_lost.detail';

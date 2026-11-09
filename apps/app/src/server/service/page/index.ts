@@ -88,7 +88,12 @@ import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { deleteCompletelyOperation as deleteCompletelyOperationImpl } from './delete-completely-operation';
 import { onSeen } from './events/seen';
 import { isGrantImmutablePath } from './grant-immutable-path';
-import type { IPageService } from './page-service';
+import type {
+  DeletionOptions,
+  DeletionVerdict,
+  EmptyTrashResult,
+  IPageService,
+} from './page-service';
 import { shouldUseV4Process } from './should-use-v4-process';
 
 export * from './page-service';
@@ -433,98 +438,140 @@ class PageService implements IPageService {
     return false;
   }
 
-  private async getAbsenseUserHomeList(
-    pages: PageDocument[],
-  ): Promise<string[]> {
-    const userHomepages = pages.filter((p) => isUsersHomepage(p.path));
-
-    const User = mongoose.model<IUser>('User');
-    const usernames = userHomepages
-      .map((page) => getUsernameByPath(page.path))
-      // see: https://zenn.dev/kimuson/articles/filter_safety_type_guard
-      .filter(
-        (username): username is Exclude<typeof username, null> =>
-          username !== null,
-      );
-    const existingUsernames = await User.distinct<string>('username', {
-      username: { $in: usernames },
-    });
-
-    return userHomepages
-      .filter((page) => {
-        const username = getUsernameByPath(page.path);
-        if (username == null) {
-          throw new Error('Cannot found username by path');
-        }
-        return !existingUsernames.includes(username);
-      })
-      .map((p) => p.path);
+  private async isProtectedUserHomepage(path: string): Promise<boolean> {
+    if (!isUsersHomepage(path)) {
+      return false;
+    }
+    if (!this.canDeleteUserHomepageByConfig()) {
+      return true;
+    }
+    return !(await this.isUsersHomepageOwnerAbsent(path));
   }
 
-  private async filterPages(
+  private async judgeDeletionWithGroups(
+    page: PageDocument,
+    user: IUserHasId,
+    { isCompletely, isRecursively }: DeletionOptions,
+    userRelatedGroups: PopulatedGrantedGroup[],
+  ): Promise<DeletionVerdict> {
+    const creatorId = await this.getCreatorIdForCanDelete(page);
+    const isPermitted = isCompletely
+      ? this.canDeleteCompletely(
+          page,
+          creatorId,
+          user,
+          isRecursively,
+          userRelatedGroups,
+        )
+      : this.canDelete(page, creatorId, user, isRecursively);
+    if (!isPermitted) {
+      return 'forbidden';
+    }
+    if (await this.isProtectedUserHomepage(page.path)) {
+      return 'protected_user_homepage';
+    }
+    return 'permitted';
+  }
+
+  /**
+   * Whether the user may delete the page. Every request to delete pages is
+   * judged here, directly or through filterPagesByDeletionAuthority.
+   */
+  async judgeDeletion(
+    page: PageDocument,
+    user: IUserHasId,
+    options: DeletionOptions,
+  ): Promise<DeletionVerdict> {
+    const userRelatedGroups = options.isCompletely
+      ? await this.pageGrantService.getUserRelatedGroups(user)
+      : [];
+    return this.judgeDeletionWithGroups(page, user, options, userRelatedGroups);
+  }
+
+  async filterPagesByDeletionAuthority(
     pages: PageDocument[],
     user: IUserHasId,
-    isRecursively: boolean,
-    canDeleteFunction: (
-      page: PageDocument,
-      creatorId: ObjectIdLike | null,
-      operator: any,
-      isRecursively: boolean,
-      userRelatedGroups: PopulatedGrantedGroup[],
-    ) => boolean,
+    options: DeletionOptions,
   ): Promise<PageDocument[]> {
     const userRelatedGroups =
       await this.pageGrantService.getUserRelatedGroups(user);
-    const filteredPages = pages.filter(async (p) => {
-      if (p.isEmpty) return true;
-      const canDelete = canDeleteFunction(
-        p,
-        p.creator == null ? null : getIdForRef(p.creator),
-        user,
-        isRecursively,
-        userRelatedGroups,
-      );
-      return canDelete;
-    });
-
-    if (!this.canDeleteUserHomepageByConfig()) {
-      return filteredPages.filter((p) => !isUsersHomepage(p.path));
-    }
-
-    // Confirmation of deletion of user homepages is an asynchronous process,
-    // so it is processed separately for performance optimization.
-    const absenseUserHomeList =
-      await this.getAbsenseUserHomeList(filteredPages);
-
-    const excludeActiveUserHomepage = (path: string) => {
-      if (!isUsersHomepage(path)) {
-        return true;
-      }
-      return absenseUserHomeList.includes(path);
-    };
-
-    return filteredPages.filter((p) => excludeActiveUserHomepage(p.path));
+    const verdicts = await Promise.all(
+      pages.map(async (page): Promise<DeletionVerdict> => {
+        // A non-recursive deletion skips an empty page, so its authority is
+        // judged only when everything under it is deleted along with it.
+        if (page.isEmpty && !options.isRecursively) {
+          return (await this.isProtectedUserHomepage(page.path))
+            ? 'protected_user_homepage'
+            : 'permitted';
+        }
+        return this.judgeDeletionWithGroups(
+          page,
+          user,
+          options,
+          userRelatedGroups,
+        );
+      }),
+    );
+    return pages.filter((_page, index) => verdicts[index] === 'permitted');
   }
 
-  async filterPagesByCanDeleteCompletely(
+  /**
+   * Delete the pages the user may delete, in the background, and return them.
+   */
+  async deletePagesWithAuthority(
     pages: PageDocument[],
     user: IUserHasId,
-    isRecursively: boolean,
+    options: DeletionOptions,
+    activityParameters,
   ): Promise<PageDocument[]> {
-    return this.filterPages(
+    const permittedPages = await this.filterPagesByDeletionAuthority(
       pages,
       user,
-      isRecursively,
-      this.canDeleteCompletely,
+      options,
     );
+    if (permittedPages.length > 0) {
+      this.deleteMultiplePages(
+        permittedPages,
+        user,
+        options,
+        activityParameters,
+      ).catch((err) => {
+        logger.error('Failed to delete pages.', err);
+      });
+    }
+    return permittedPages;
   }
 
-  async filterPagesByCanDelete(
-    pages: PageDocument[],
+  /**
+   * Completely delete the trashed pages the user may delete.
+   */
+  async emptyTrash(
     user: IUserHasId,
-    isRecursively: boolean,
-  ): Promise<PageDocument[]> {
-    return this.filterPages(pages, user, isRecursively, this.canDelete);
+    activityParameters,
+  ): Promise<EmptyTrashResult> {
+    const pagesInTrash = await this.findAllTrashPages(user);
+    // Each trashed page is deleted on its own, not together with its
+    // descendants, so it is judged by the single-page authority.
+    const deletablePages = await this.filterPagesByDeletionAuthority(
+      pagesInTrash,
+      user,
+      { isCompletely: true, isRecursively: false },
+    );
+    if (pagesInTrash.length > 0 && deletablePages.length === 0) {
+      return { isForbidden: true };
+    }
+
+    const nDeletedNonEmptyPages = await this.deleteTrashedPagesCompletely(
+      user,
+      activityParameters,
+      deletablePages,
+    );
+    return {
+      isForbidden: false,
+      isAllDeletable: deletablePages.length === pagesInTrash.length,
+      deletablePages,
+      nDeletedNonEmptyPages,
+    };
   }
 
   private shouldUseV4ProcessForRevert(page): boolean {
@@ -2135,13 +2182,8 @@ class PageService implements IPageService {
       throw new Error('Page is not deletable.');
     }
 
-    if (pagePathUtils.isUsersHomepage(page.path)) {
-      if (!this.canDeleteUserHomepageByConfig()) {
-        throw new Error('User Homepage is not deletable.');
-      }
-      if (!(await this.isUsersHomepageOwnerAbsent(page.path))) {
-        throw new Error('User Homepage is not deletable.');
-      }
+    if (await this.isProtectedUserHomepage(page.path)) {
+      throw new Error('User Homepage is not deletable.');
     }
 
     const newPath = Page.getDeletedPageName(page.path);
@@ -2729,8 +2771,19 @@ class PageService implements IPageService {
     return;
   }
 
-  async emptyTrashPage(user, options = {}, activityParameters) {
-    const page = { path: '/trash' };
+  /**
+   * Completely delete the given trashed pages. The caller judges the deletion
+   * authority; a page that is no longer in the trash or not editable by the
+   * user is left as it is.
+   */
+  private async deleteTrashedPagesCompletely(
+    user,
+    activityParameters,
+    pagesToDelete: PageDocument[],
+  ): Promise<number> {
+    const pageIdsToDelete = pagesToDelete.map((p) => p._id);
+    const Page = mongoose.model<IPage, PageModel>('Page');
+    const trashPage = { path: '/trash' };
 
     const parameters = {
       ...activityParameters,
@@ -2745,25 +2798,35 @@ class PageService implements IPageService {
     const activity =
       await this.crowi.activityService.createActivity(parameters);
 
-    const descendantsSubscribedSets = new Set();
-    const pages = await this.deleteCompletelyDescendantsWithStream(
-      page,
-      user,
-      options,
-      true,
-      descendantsSubscribedSets,
-    );
-    const descendantsSubscribedUsers = Array.from(
-      descendantsSubscribedSets,
-    ) as Ref<IUser>[];
+    // Look each batch up right before deleting it, so a page restored from
+    // the trash meanwhile is no longer matched.
+    const subscribedUsers = new Set<Ref<IUser>>();
+    let nDeletedNonEmptyPages = 0;
+    for (let i = 0; i < pageIdsToDelete.length; i += BULK_REINDEX_SIZE) {
+      const builder = new Page.PageQueryBuilder(Page.find(), true)
+        .addConditionAsRootOrNotOnTree()
+        .addConditionToListOnlyDescendants(trashPage.path)
+        .addConditionToListByPageIdsArray(
+          pageIdsToDelete.slice(i, i + BULK_REINDEX_SIZE),
+        );
+      await Page.addConditionToFilteringByViewerToEdit(builder, user);
+      const batch = await builder.query.lean().exec();
+      if (batch.length === 0) continue;
+
+      await this.deleteMultipleCompletely(batch, user);
+      nDeletedNonEmptyPages += batch.filter((p) => !p.isEmpty).length;
+      for (const subscribedUser of await Subscription.getSubscriptions(batch)) {
+        subscribedUsers.add(subscribedUser);
+      }
+    }
 
     const preNotify = preNotifyService.generatePreNotify(activity, async () => {
-      return descendantsSubscribedUsers;
+      return Array.from(subscribedUsers);
     });
 
-    this.activityEvent.emit('updated', activity, page, preNotify);
+    this.activityEvent.emit('updated', activity, trashPage, preNotify);
 
-    return pages;
+    return nDeletedNonEmptyPages;
   }
 
   /**
@@ -2825,7 +2888,7 @@ class PageService implements IPageService {
   }
 
   // no need to separate Main Sub since it is devided into single page operations
-  async deleteMultiplePages(
+  private async deleteMultiplePages(
     pagesToDelete,
     user,
     options,
@@ -5740,7 +5803,7 @@ class PageService implements IPageService {
   async findAllTrashPages(
     user: IUserHasId,
     userGroups = null,
-  ): Promise<HydratedDocument<IPage>[]> {
+  ): Promise<PageDocument[]> {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
     // https://regex101.com/r/KYZWls/1
@@ -5753,7 +5816,7 @@ class PageService implements IPageService {
 
     await queryBuilder.addViewerCondition(user, userGroups);
 
-    const pages: HydratedDocument<IPage>[] = await queryBuilder
+    const pages: PageDocument[] = await queryBuilder
       .addConditionToSortPagesByAscPath()
       .query.lean()
       .exec();

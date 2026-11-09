@@ -23,7 +23,7 @@ GROWI 内のイベントを通知として送り、チャットの利用者を G
 
 固定リンク（ページをパス以外の識別子で指す URL）を貼ったとき、対象が見つからない場合と、見つかったが非公開だった場合を応答の違いから見分けられないようにする（要件 6.8）ため、**固定リンクで対象が見つからない場合もチャンネルへ表示が付くようになる**（今までは何も投稿されなかった）。
 
-表示される内容は「ページが存在しないか、非公開のページです」という、ページの状態に関わらず常に同じ固定文言で、実在パスや個別の識別子は一切含まない。詳細な設計判断とインターフェイスは下記「LinkPreviewMapper（固定リンクの応答）」を参照。
+ページが無い場合と、公開範囲を絞ったページの場合に表示される内容は「ページが存在しないか、非公開のページです」という同じ固定文言で、実在パスや個別の識別子は一切含まない。公開範囲が「公開」のページは、ログインが必要な GROWI なら題名と更新日時だけ（要件 6.9・6.10）、ログインしていない人も読める GROWI なら全部（要件 6.2）を表示する。詳細な設計判断とインターフェイスは下記「LinkPreviewMapper（URL の展開の応答）」を参照。
 
 > **「呼ぶだけ」では済まない。** 検索結果を**返す前の絞り込み**と、ページ作成の**権限判定と重複の事前確認**は
 > **この feature が持つ**（下記「既存の機能を呼ぶだけでは要件を満たせない」）。
@@ -35,9 +35,10 @@ GROWI 内のイベントを通知として送り、チャットの利用者を G
 ### This Spec Owns
 
 - `CommandEndpoint` — proxy から届くコマンドの処理（要件 3.6/3.7, 4, 5, 6, 14.2）
-- **`content/`** — GROWI が送り出す中身の組み立てと、公開範囲による絞り込み（要件 2.1–2.3, 3.6, 3.7, 3.9, 5.2, 5.3, 6.2, 6.3, 14.2）
+- **`content/`** — GROWI が送り出す中身の組み立てと、公開範囲による絞り込み（要件 2.1–2.3, 3.6, 3.7, 3.9, 5.2, 5.3, 6.2, 6.3, 6.9–6.12, 14.2）
 - **`ProxyClient`** — GROWI から proxy へ送る唯一の口
 - `NotificationOutbox` と `NotificationDispatcher` — Gen 2 の宛先への通知（要件 2, 12.3）
+- `IntegrationPresence` と 2 つの定期処理（通知の送信、解除済みの連携の掃除）— 連携が無い GROWI で問い合わせを飛ばすことと、掃除の頻度（要件 2.7–2.9, 9.8）
 - `DestinationRegistry` — 宛先の集合（Gen 1 / Gen 2 を種類で分岐しない。要件 12.2）
 - `ChatAccountLink` — チャット利用者と GROWI ユーザーの紐付け（要件 7）
 - `KeyStore`（GROWI 側の実装）— 自分の鍵と proxy の公開鍵（要件 9.5, 10.5）
@@ -66,6 +67,10 @@ GROWI 内のイベントを通知として送り、チャットの利用者を G
 - `chat-integration-proxy` の能力表・通知契約が変わったとき（下記「OAuth install `state` の発行・照合（task 9.0 で決着）」を参照）
 - `@growi/chat` の `CommandResponse`（`link-preview` kind）に「見つからない」を独立に表現するフィールド（例: `notFound: boolean`）が将来追加された場合、`buildLinkPreview` が固定文言を `path` に入れて表現している今のやり方は不要になるため見直すこと（下記「LinkPreviewMapper」参照）
 - `resolvePageFromUrl` の固定リンク判定（`PAGE_ID_PATTERN`。末尾セグメントが24桁16進文字列かどうかで判定している）の意味が変わった場合（例: 別の識別子形式を追加する）、`LinkPreviewMapper` 側のロジックも合わせて確認すること
+- GROWI のページの階層と公開範囲の決まり（子のページを親より広く公開できない、という正規化）や、「公開」の意味が変わったとき、`buildLinkPreview` が公開範囲が「公開」のページについてログインが必要な GROWI でも出す題名と更新日時が、何を漏らしうるかを見直すこと。固定リンクでパス全体を出すように変える提案が出たときは、research.md の「固定リンクで出すのは、パス全体ではなく題名だけ」（祖先の名前が漏れうる）を先に読むこと
+- outbox の行を書く場所が `notificationOutbox.enqueue` のほかに増えたとき。その場所でも `IntegrationPresence.markPresent` を呼ばないと、書き留めたプロセスが覚えた「無い」のせいで送信を飛ばし、要件 2.8 が崩れる（下記「連携が無い GROWI では問い合わせない」）
+- proxy へ通知を送る経路が `drain` のほかに増え、その経路が outbox の行を通らないとき。連携があるかの判定が、その経路で送るものを見落としうる
+- `chat_relations` の行を、解除のときに残さず消すように変えたとき。連携があるかの判定は解除済みの行も数えることで掃除の対象を見つけているので、判定と掃除の両方を見直す
 
 ### proxy にまたがる制約 — 「黙って何も投稿しない」判定を復活させない
 
@@ -122,15 +127,18 @@ apps/app/src/features/chat-integration/
 │   │   ├── index.ts                   # この層の公開窓口
 │   │   ├── notification-content.ts    # 6 イベントぶんの文面（要件 2.1・2.2）
 │   │   ├── search-result-mapper.ts    # 検索結果 → SearchResultItem（要件 3.9）
-│   │   ├── link-preview-mapper.ts     # ページ → 要約（要件 6.2・6.3）
+│   │   ├── link-preview-mapper.ts     # ページ → 要約（要件 6.2・6.3・6.6–6.12）
+│   │   ├── title-from-path.ts         # ページの題名 = パスの最後の部分（要件 3.9・6.10）
 │   │   ├── help-content.ts            # このバージョンが提供するコマンド（要件 14.2）
 │   │   ├── conversation-page.ts       # ★ 発言列 → ページ本文（要件 5.2・5.3）
 │   │   ├── viewer-page-filter.ts      # ★ 「この利用者が見てよいか」（要件 3.6・3.7）
-│   │   └── public-page-filter.ts      # ★ 「誰でも見られるページか」（要件 2.3・6.3）
+│   │   └── public-page-filter.ts      # ★ 「誰でも見られるページか」（要件 2.3・6.3・6.9・6.12）
 │   ├── notification/
 │   │   ├── notification-outbox.ts     # ★ 送るべき通知を書き留める
 │   │   ├── notification-dispatcher.ts # ★ 書き留めた分を proxy へ送り、結果を書き戻す
+│   │   ├── notification-dispatch-cron.ts # 1 分ごとに、連携があれば drain を呼ぶ（要件 2.7・2.9）
 │   │   └── destination-registry.ts    # 宛先の集合（Gen 1 / Gen 2 を種類で分岐しない）
+│   ├── integration-presence.ts        # 「連携があるか」の判定と、答えを覚える 10 分（要件 2.7–2.9）
 │   ├── account-link/
 │   │   ├── account-link-service.ts    # 紐付けの開始・承認・解除
 │   │   └── models/chat-account-link.ts
@@ -141,6 +149,8 @@ apps/app/src/features/chat-integration/
 │   ├── proxy-client.ts                # GROWI → proxy の唯一の口（署名を付ける）
 │   ├── pairing/
 │   │   ├── pairing-endpoint.ts        # 保留中の登録コードと突き合わせて確認に答える
+│   │   ├── sweep-unpaired-relations.ts # 保持期間を過ぎた解除済みの連携と、その紐付けを消す
+│   │   ├── unpaired-relation-sweep-cron.ts # 1 日 1 回、ランダムに待ってから掃除を呼ぶ（要件 9.8）
 │   │   └── models/pending-pairing.ts
 │   ├── oauth-install-state/           # OAuth 導入 URL の state 発行・照合（task 9.0）
 │   │   ├── oauth-install-state-service.ts
@@ -152,7 +162,7 @@ apps/app/src/features/chat-integration/
 │       ├── chat-processed-request.ts
 │       └── chat-request-nonce.ts
 ├── client/
-│   ├── admin/                         # 要件 1.3, 11, 12.4, 12.5, 9.9–9.12（AdminChatIntegration.tsx。関係の状態の導き方は relation-connection-state.ts）
+│   ├── admin/                         # 要件 1.3, 11, 12.4, 12.5, 9.10–9.13（AdminChatIntegration.tsx。関係の状態の導き方は relation-connection-state.ts）
 │   ├── components/                    # AccountLinkApproval.tsx（要件 7.9–7.12。置き場所は専用ページ）、MyChatAccountLinks.tsx（要件 7.7）
 │   └── notification/                  # ChatIntegrationDestinationSelect.tsx（要件 2.2, 2.12–2.14。保存時の通知先の選択部品）
 └── interfaces/
@@ -174,6 +184,7 @@ apps/app/src/features/chat-integration/
 | `apps/app/turbo.json` | **`@growi/chat#build` への依存を宣言する。** 同じリポジトリ内の build を作る依存が増えたら書き足す決まりである（`.claude/rules/project-structure.md`）。書かないと build の順序が狂い `dist/` が無い状態で型エラーになる |
 | `server/crowi/express-init.js` | **`bodyParser.json` より前に** `/peer/` だけ `express.raw` を通し、**`mongoSanitize` を `/peer/` の下から外す**（上記 2 節） |
 | `server/routes/avoid-session-routes.js` | `/peer/` を足して session を張らせない（上記） |
+| `server/crowi/index.ts` | `setupCron` で、通知の定期処理と、その直後に解除済みの連携の掃除の定期処理を起動する（すべての定期処理を起動する 1 か所） |
 | `pages/admin/*.page.tsx`（新規） | 管理画面は feature の外に薄い受け皿が要る（Next.js の Pages Router の決まり） |
 | `components/Admin/Common/AdminNavigation.tsx` | **手作業の追記が 3 か所**（`MenuLabel` の分岐、一覧、スマートフォン用の一覧）。データ駆動になっていないので漏れやすい |
 
@@ -185,16 +196,19 @@ apps/app/src/features/chat-integration/
 |---|---|---|---|
 | `NotificationContent` | `server/content/notification-content.ts` | 6 イベントぶんの通知の文面 | 2.1, 2.2, 2.3 |
 | `SearchResultMapper` | `server/content/search-result-mapper.ts` | 検索結果を構造化データへ（日時は RFC 3339 の UTC 表記） | **3.9** |
-| `LinkPreviewMapper` | `server/content/link-preview-mapper.ts` | ページを要約へ。固定リンクで対象が見つからない／非公開の場合は見分けられない固定文言を返す | 6.2, 6.3, 6.6–6.8 |
+| `LinkPreviewMapper` | `server/content/link-preview-mapper.ts` | ページを要約へ。公開範囲が「公開」でログインが必要な GROWI なら題名（パスで指す URL ならパス）と更新日時だけを返す。固定リンクで対象が見つからない／公開範囲を絞ったページの場合は見分けられない固定文言を返す | 6.2, 6.3, 6.6–6.12 |
 | `DestinationRegistry` | `server/notification/destination-registry.ts` | 宛先の集合。**種類で分岐しない** | 12.2, 12.3 |
 | `HelpContent` | `server/content/help-content.ts` | このバージョンが提供するコマンド | 14.2 |
 | `ConversationPage` | `server/content/conversation-page.ts` | 発言列をページ本文へ組み立てる | 5.2, 5.3 |
 | `ViewerPageFilter` | `server/content/viewer-page-filter.ts` | **相手による判定** — この利用者が見てよいページだけを残す | 3.6, 3.7 |
-| `PublicPageFilter` | `server/content/public-page-filter.ts` | **相手によらない判定** — 誰でも見られるページか | 2.3, 6.3 |
-| `CommandEndpoint` | `server/command/command-endpoint.ts` | proxy からのコマンドを処理 | 3.6, 3.7, 4.2–4.6, 5.2, 5.3, 6.2, 6.3, 6.6–6.8, 14.2 |
+| `PublicPageFilter` | `server/content/public-page-filter.ts` | **相手によらない判定** — 誰でも見られるページか | 2.3, 6.3, 6.9, 6.12 |
+| `CommandEndpoint` | `server/command/command-endpoint.ts` | proxy からのコマンドを処理 | 3.6, 3.7, 4.2–4.6, 5.2, 5.3, 6.2, 6.3, 6.6–6.12, 14.2 |
 | `ResolveActor` | `server/command/resolve-actor.ts` | actor → GROWI ユーザー | 3.6, 3.7, 4.3, 4.4, 7.6 |
-| `NotificationOutbox` | `server/notification/notification-outbox.ts` | 送るべき通知を書き留める | 2.1–2.3, 2.5, 2.6 |
+| `NotificationOutbox` | `server/notification/notification-outbox.ts` | 送るべき通知を書き留め、自分のプロセスに「連携がある」の印を付ける | 2.1–2.3, 2.5, 2.6, 2.8 |
 | `NotificationDispatcher` | `server/notification/notification-dispatcher.ts` | 送って結果を書き戻す | 2.4, 10.4, 10.7 |
+| `IntegrationPresence` | `server/integration-presence.ts` | この GROWI に連携があるかを答え、その答えを 10 分覚える | 2.7, 2.8, 2.9 |
+| `ChatNotificationDispatchCronService` | `server/notification/notification-dispatch-cron.ts` | 1 分ごとに、連携があれば `drain` を呼ぶ | 2.7, 2.9 |
+| `UnpairedRelationSweepCronService` | `server/pairing/unpaired-relation-sweep-cron.ts` | 1 日 1 回、ランダムに待ってから、連携があれば保持期間を過ぎた解除済みの連携を消す | 2.7, 9.8 |
 | `ChatAccountLink` | `server/account-link/` | 紐付け | 7.1–7.7 |
 | `KeyStore` | `server/keys/key-store.ts` | 鍵の保持と入れ替え | 9.5, 10.5, 10.6 |
 | `SignatureGuard` | `server/signature-guard.ts` | 届くリクエストの検証 | 10.1–10.4 |
@@ -280,7 +294,7 @@ GROWI 自身は、外の相手にページの中身を見せる口ではこの�
 | 呼ぶ側 | 閉じた GROWI ではどうするか |
 |---|---|
 | 通知（要件 2.3） | **そのまま出す。** 宛先は管理者が設定したものなので、運用者が意図して外へ出している |
-| リンクの展開（要件 6.2・6.3） | **パスだけにする。** 本文の冒頭・更新日時・コメント数を出さない。URL を貼った本人が中身を知っていても、チャンネルの全員がそうとは限らない |
+| リンクの展開（要件 6.2・6.3・6.9〜6.12） | **公開範囲が「公開」のページは、題名（パスで指す URL ならパス）と更新日時だけにする。** 本文の冒頭とコメント数は出さない。URL を貼った本人が中身を知っていても、チャンネルの全員がそうとは限らない。題名と更新日時は、その GROWI にログインできる人なら誰でも見られるので出す。**公開範囲を絞ったページはパスだけ**（固定リンクなら固定文言）。理由は research.md の「URL の展開で題名を出すのは、公開範囲が「公開」のページに限る」 |
 
 #### 既存の機能を呼ぶだけでは要件を満たせない（実コードで確認）
 
@@ -427,14 +441,16 @@ proxy は届かなかった要求をやり直すので**失敗は繰り返し届
 
 ---
 
-### LinkPreviewMapper（固定リンクの応答）
+### LinkPreviewMapper（URL の展開の応答）
 
 `link-preview` コマンドの URL 展開は 2 段に分かれている。
 
-1. `resolvePageFromUrl`（`command-endpoint.ts`）— URL からページを解決する。末尾セグメントが24桁16進文字列（Mongo の ObjectId 形式。ページをパス以外の識別子で指す「固定リンク」の形）なら `_id` で、そうでなければ `path` で `Page.findOne` する
-2. `buildLinkPreview`（`content/link-preview-mapper.ts`）— 解決結果（ページの有無・固定リンクかどうか）を受け取り、公開範囲に応じて応答を組み立てる純粋関数
+1. `resolvePageFromUrl`（`command-endpoint.ts`）— URL からページを解決する。末尾セグメントが24桁16進文字列（Mongo の ObjectId 形式。ページをパス以外の識別子で指す「固定リンク」の形）なら `_id` で、そうでなければ `path` で `Page.findOne` する。本文の無い空の親ページ（`isEmpty: true`）は検索で除き、見つからなかったものとして扱う（research.md の「空の親ページは「見つからない」と同じに扱う」）
+2. `buildLinkPreview`（`content/link-preview-mapper.ts`）— 解決結果（ページの有無・固定リンクかどうか）と、GROWI がログインしていない人にも読ませるか（`isGuestAllowedToRead`）を受け取り、応答を組み立てる純粋関数
 
-**固定リンクで対象が見つからない場合と、見つかったが非公開だった場合は、どちらも同じ固定文言の応答に合流させる。** 中身は完全に同じ文字列で、識別子もページの状態も一切反映しない。これにより、対象が存在するかどうかを応答の違いから探れないようにする（要件 6.8）。パス形式 URL（既存の要件 6.1〜6.5）の挙動は変えない（要件 6.7）。「固定リンクが見つからない場合もチャンネルへ表示が付くようになる」という受け入れる変化については、上記 Overview「固定リンクが見つからない場合の表示」と、下記「proxy にまたがる制約」を参照。
+何を出すかは、ページの公開範囲と GROWI の設定の 2 つだけで決まる。URL を貼った人やチャンネルの参加者によらない（`buildLinkPreview` は `user` も `userGroups` も受け取らない）。
+
+**固定リンクで対象が見つからない場合と、見つかったが公開範囲を絞ったページだった場合は、どちらも同じ固定文言の応答に合流させる。** 中身は完全に同じ文字列で、識別子もページの状態も一切反映しない。これにより、対象が存在するかどうかを応答の違いから探れないようにする（要件 6.8・6.12）。パスで指す URL で見つからない場合は `error` を返す（URL 自体にパスが見えているので、存在を探る口にならない）。「固定リンクが見つからない場合もチャンネルへ表示が付く」という受け入れる変化については、上記 Overview「固定リンクが見つからない場合の表示」と、上記「proxy にまたがる制約」を参照。
 
 #### System Flow
 
@@ -445,19 +461,27 @@ flowchart TD
     Parse -->|できる| IsPermalink{末尾が24桁16進か}
     IsPermalink -->|はい 固定リンク| FindById[_idで検索]
     IsPermalink -->|いいえ パス| FindByPath[pathで検索]
-    FindById --> FoundById{見つかった}
     FindByPath --> FoundByPath{見つかった}
+    FindById --> FoundById{見つかった}
     FoundByPath -->|いいえ| ErrInvalid
-    FoundByPath -->|はい| Grant{誰でも閲覧できるか}
-    FoundById -->|いいえ| Unavailable[restricted true 固定文言]
-    FoundById -->|はい| Grant2{誰でも閲覧できるか}
-    Grant -->|はい| Full1[restricted false 実在パスと要約]
-    Grant -->|いいえ| RestrictedReal[restricted true path は実在パス]
-    Grant2 -->|はい| Full2[restricted false 実在パスと要約]
-    Grant2 -->|いいえ| Unavailable
+    FoundById -->|いいえ| Unavailable[restricted true / path は固定文言]
+    FoundByPath -->|はい| Scope{公開範囲が「公開」か}
+    FoundById -->|はい| Scope
+    Scope -->|いいえ| Hidden{固定リンクか}
+    Hidden -->|はい| Unavailable
+    Hidden -->|いいえ| PathOnly[restricted true / path は実在のパス]
+    Scope -->|はい| Guest{ログインしていない人も読める GROWI か}
+    Guest -->|はい| Full[restricted false / 実在のパス・本文の冒頭・更新日時・コメント数]
+    Guest -->|いいえ| TitleOnly{固定リンクか}
+    TitleOnly -->|はい| T1[restricted true / path は題名 / updatedAt]
+    TitleOnly -->|いいえ| T2[restricted true / path は実在のパス / updatedAt]
 ```
 
-**鍵となる分岐**: 「見つからない」（固定リンクの場合）と「見つかったが非公開」（固定リンクの場合）は、どちらも同じ固定文言の応答（図の `Unavailable`）に合流する。パス形式 URL で見つからない場合だけが `error` に分かれたままで、URL の参照先がそのチャンネルに紐づく GROWI かどうかの判定（要件 3.6/3.7 系統）はこの図の外、より手前の段階で決まる。
+**鍵となる分岐**:
+
+- 「見つからない」（固定リンクの場合）と「見つかったが公開範囲を絞ったページ」（固定リンクの場合）は、どちらも同じ固定文言の応答（図の `Unavailable`）に合流する
+- 公開範囲（`Scope`）を GROWI の設定（`Guest`）より先に見る。ログインが必要な GROWI でだけ出す題名と更新日時（`T1`・`T2`）に、公開範囲を絞ったページは届かない
+- パスで指す URL で見つからない場合だけが `error` に分かれる。URL の参照先がそのチャンネルに紐づく GROWI かどうかの判定（要件 3.6/3.7 系統）と、紐付いていない人が貼ったときの `account-link-required`（上記「`resolveActor` の後条件」）は、この図の外、より手前の段階で決まる
 
 #### Service Interface
 
@@ -484,21 +508,40 @@ function buildLinkPreview(
   isGuestAllowedToRead: boolean,
 ): LinkPreviewResult | null;
 ```
-- Preconditions: `target` は `resolvePageFromUrl` の返り値をそのまま渡す（「`isPermalink` と `page` は同じ解決結果から来ている」という前提を、引数を分けて渡すことで壊さないため）
-- Postconditions: `target.page === null && !target.isPermalink`（パス形式 URL で見つからない場合）のときのみ `null` を返す。呼び出し元がこれを受けて `errorResponse('invalid')` にする——ここは変更しない。それ以外は必ず `LinkPreviewResult` を返す
-- Invariants: 返り値の `restricted === true` のとき、`excerpt`/`updatedAt`/`commentCount` は含まれない（既存のまま）。`target.isPermalink === true` かつ `restricted === true` のとき、`path` は常に `PERMALINK_UNAVAILABLE_MESSAGE`（ページが見つからない場合・見つかったが非公開な場合のどちらでも同じ）
+- Preconditions: `target` は `resolvePageFromUrl` の返り値をそのまま渡す（「`isPermalink` と `page` は同じ解決結果から来ている」という前提を、引数を分けて渡すことで壊さないため）。`isGuestAllowedToRead` は呼び出し元（`handleLinkPreview`）が `crowi.aclService.isGuestAllowedToRead()` を渡す
+- Postconditions: `target.page === null && !target.isPermalink`（パスで指す URL で見つからない場合）のときのみ `null` を返す。呼び出し元がこれを受けて `errorResponse('invalid')` にする。それ以外は必ず `LinkPreviewResult` を返す
+- Invariants:
+  - `restricted === true` のとき、`excerpt` と `commentCount` は含まない
+  - `restricted === true` かつ `updatedAt` を含むのは、公開範囲が「公開」で `isGuestAllowedToRead` が偽のとき（下の判定の 3）だけ
+  - `isPermalink === true` かつ `restricted === true` かつ `updatedAt` を含まないとき、`path` は常に `PERMALINK_UNAVAILABLE_MESSAGE`（ページが見つからない場合・公開範囲を絞ったページの場合のどちらでも同じ。要件 6.8・6.12）
+  - `isPermalink === true` のとき、`path` にパス全体を入れるのは判定の 4（全部出す）だけ。判定の 3 では題名（`titleFromPath(page.path)`）を入れる。ルートのページ（`/`）は題名も `/` なので、どちらでも `/` になる
 
-**固定文言**: `PERMALINK_UNAVAILABLE_MESSAGE` は、`errorResponse('invalid', 'This URL does not match any page on this GROWI.')` と同じ英語表記の慣習に合わせた定数。ページの状態にもリクエストにも依存しない定数であることが重要——「見つからない」と「見つかったが非公開」で呼び出しコードが変わっても、同じ定数を参照する限り文字列は必ず一致する。
+**判定**（`buildLinkPreview` が上から順に見る）:
 
-ページが見つかり、公開範囲の判定（`isPubliclyReadablePage(page) && isGuestAllowedToRead`）が真なら、実在パスを使った全文サマリを返す（変更なし）。ページが見つかり、この判定が偽（非公開）なら `restricted: true` を返すが、**このとき `path` に入れる値は、固定リンクなら固定文言、パス形式 URL なら実在パス**（後者は変更しない、6.3/6.7）。
+1. `page == null`: パスで指す URL なら `null`。固定リンクなら `{ path: PERMALINK_UNAVAILABLE_MESSAGE, restricted: true }`
+2. `!isPubliclyReadablePage(page)`（公開範囲を絞ったページ）: `{ path: 固定リンクなら PERMALINK_UNAVAILABLE_MESSAGE、パスで指す URL なら page.path, restricted: true }`。GROWI の設定に関わらず同じ（要件 6.3・6.6・6.7・6.12）
+3. `!isGuestAllowedToRead`（公開範囲が「公開」で、ログインが必要な GROWI）: `{ path: 固定リンクなら titleFromPath(page.path)、パスで指す URL なら page.path, restricted: true, updatedAt }`（要件 6.9〜6.11）
+4. それ以外（公開範囲が「公開」で、ログインしていない人も読める GROWI）: `{ path: page.path, restricted: false, excerpt, updatedAt, commentCount }`（要件 6.2）
+
+公開範囲が「公開」かどうかは `PublicPageFilter`（`isPubliclyReadablePage`）が決める。`GRANT_PUBLIC` と、公開範囲の設定を持たない古いページが当たる。`GRANT_RESTRICTED`（リンクを知っている人だけ）は当たらない（理由は research.md の「「リンクを知っている人だけ」（`GRANT_RESTRICTED`）は「公開」に含めない」）。ゴミ箱に入ったページも、公開範囲だけで同じように扱う（research.md の「ゴミ箱に入ったページも、同じ扱いのままにする」）。空の親ページは、ここに届く前に `resolvePageFromUrl` が「見つからない」にする。
+
+**固定文言**: `PERMALINK_UNAVAILABLE_MESSAGE` は、`errorResponse('invalid', 'This URL does not match any page on this GROWI.')` と同じ英語表記の慣習に合わせた定数。ページの状態にもリクエストにも依存しない定数であることが重要——「見つからない」と「公開範囲を絞ったページ」で呼び出しコードが変わっても、同じ定数を参照する限り文字列は必ず一致する。
+
+**題名**: `titleFromPath`（`content/title-from-path.ts`）が、パスの最後の部分（ルートでは `/`）を返す。検索の結果の題名（`SearchResultMapper`、要件 3.9）と同じ関数を使い、2 か所で決め方がずれないようにする。固定リンクでパス全体ではなく題名だけを出す理由は research.md の「固定リンクで出すのは、パス全体ではなく題名だけ」。
+
+**通信契約の使い方**: `restricted: true` の応答に `updatedAt` を入れ、`path` には「場所として表示する文字列」（実在のパス・題名・固定文言のどれか）を入れる。`@growi/chat` の型の形はそのままで、この意味は protocol の design.md の `CommandResponse` の説明にも書いてある。型を変えずにこう使う理由は research.md の「通信契約の型は変えず、`restricted: true` の応答に `updatedAt` を入れてよいことにする」。
 
 #### Requirements Traceability
 
 | Requirement | Summary | Interfaces | Flow |
 |---|---|---|---|
-| 6.6 | 固定リンク・非公開ならパスを含めない | `ResolvedUrlTarget`, `LinkPreviewResult` | `Grant2` → `Unavailable` |
-| 6.7 | パス形式 URL の既存挙動は無変更 | `LinkPreviewResult` | `Grant` → `Full1` / `RestrictedReal` |
-| 6.8 | 固定リンクの「見つからない」と「見つかったが非公開」を区別できない応答にする | `ResolvedUrlTarget`, `LinkPreviewResult` | `FoundById` いいえ → `Unavailable`、`Grant2` いいえ → `Unavailable` |
+| 6.6 | 固定リンク・公開範囲を絞ったページならパスを含めない | `ResolvedUrlTarget`, `LinkPreviewResult` | `Hidden` はい → `Unavailable` |
+| 6.7 | パスで指す URL ならパスを含める | `LinkPreviewResult` | `FoundByPath` はい → `PathOnly` / `T2` / `Full` |
+| 6.8 | 固定リンクの「見つからない」と「公開範囲を絞ったページ」を区別できない応答にする | `ResolvedUrlTarget`, `LinkPreviewResult` | `FoundById` いいえ → `Unavailable`、`Hidden` はい → `Unavailable` |
+| 6.9 | 公開範囲が「公開」でログインが必要な GROWI なら、題名（パス）と更新日時だけ | `LinkPreviewResult` | `Guest` いいえ → `T1` / `T2` |
+| 6.10 | 6.9 で固定リンクなら題名。パス全体は出さない | `LinkPreviewResult`, `titleFromPath` | `T1` |
+| 6.11 | 6.9 でパスで指す URL ならパスと更新日時 | `LinkPreviewResult` | `T2` |
+| 6.12 | 公開範囲を絞ったページは GROWI の設定に関わらず更新日時を出さない。固定リンクは存在しない場合と同じ応答、パスで指す URL はパスだけ | `LinkPreviewResult`, `PERMALINK_UNAVAILABLE_MESSAGE` | `Scope` いいえ → `Unavailable` / `PathOnly` |
 
 ---
 
@@ -562,7 +605,11 @@ export interface NotificationDispatcher {
 - **誰が回すか。** GROWI には `state` の列を持つコレクションを定期的に回す形が既に 3 つある
   （`page-bulk-export` / `audit-log-bulk-export` / `growi-vault`。いずれも `server/service/cron.ts` の
   `CronService` を継承し、後者には `resilience/retry-policy.ts` もある）。**4 つ目を新しく起こさず
-  `CronService` を継承する**（既定 1 分間隔）。やり直しの間隔は `growi-vault` の retry-policy に倣う
+  `CronService` を継承する**（`ChatNotificationDispatchCronService`、既定 1 分間隔）。
+  `crowi/index.ts` の `setupCron` から、すべてのプロセスで起動する。各回の最初に、この GROWI に
+  チャット連携があるかを確かめ、無ければ `drain` を呼ばずに戻る（下記「連携が無い GROWI では問い合わせない」）。
+  解除済みの連携の掃除はこの定期処理では行わない（別の定期処理。下記「紐付けの一意性に workspace の軸が要る」）。
+  やり直しの間隔は `growi-vault` の retry-policy に倣う
 - **`requestId` は行を作るときに 1 度だけ採番し、再送しても変えない**（要件 10.4）
 - **やり直しは宛先ごと。** proxy は `(relationId, requestId, platform, channelId)` の単位で記録するので、
   `posted` になった宛先は飛ばされ、失敗した宛先だけが再び試される。
@@ -605,6 +652,58 @@ export interface NotificationDispatcher {
   `generatePathsToMatch`（外へ出していない関数）で `/a/b/c → /a/b/c, /a/b/*, /a/*, /*` を作っている。
   **この関数を外へ出して共有する。振る舞いは変えない** — 置き場所を変えるだけなので、
   「Gen 1 には手を入れない」（上記）との線引きは保たれる
+
+#### 連携が無い GROWI では問い合わせない（要件 2.7〜2.9）
+
+通知の定期処理は、チャット連携を使っているかに関係なく、すべてのプロセスで 1 分ごとに動く。
+GROWI.cloud のように多くの GROWI が 1 つのデータベースを共有する環境では、使っていない GROWI の問い合わせも
+テナントの数に比例してかかり続ける。そこで各回の最初に `IntegrationPresence`（`server/integration-presence.ts`）へ
+「この GROWI に連携があるか」を尋ね、無ければ何もしない。
+
+```typescript
+/** How long a presence answer, either way, is trusted before asking again. */
+export const PRESENCE_ANSWER_TTL_MS = 10 * 60 * 1000;
+
+export interface IntegrationPresence {
+  /** True when at least one `chat_relations` row exists, in any state. */
+  hasAnyIntegration(now: Date): Promise<boolean>;
+  /** Record that this process just wrote an outbox row. Never queries. */
+  markPresent(now: Date): void;
+}
+```
+
+- **判定は `ChatRelation.exists({})`。状態で絞らない。** 解除済みで保持期間中の行も数える。
+  解除済みの行は掃除の対象なので、数えないと掃除が飛ばされる
+- **答えは「ある」も「無い」も、決めた時刻から 10 分覚える。** 覚えている間は問い合わせない。
+  「ある」も期限で切るのは、最後の連携が掃除で消えた後に、問い合わせを飛ばす状態へ戻るため
+- **`notificationOutbox.enqueue` は、行の書き込みに成功した直後に `markPresent` を呼ぶ。**
+  問い合わせはせず、そのプロセスの答えを「ある」にする。書き込みが失敗したら印を付けない。
+  これで、通知を書き留めたプロセスは、覚えた「無い」が残っていても次の回で送る（要件 2.8）。
+  問い合わせをしないので、ページ保存の時間は変わらない（要件 2.5）
+- **書き留めたプロセスが送る前に止まったとき**は、ほかのプロセスが、覚えた答えの期限が切れた後の
+  最初の回で問い合わせ、「ある」を得て送る（要件 2.9）。答えを決めた回の起動の遅れを δ0、k 分後の回の遅れを δk とすると、
+  答えが切れるのは `k × 60 秒 + δk − δ0 ≥ 600 秒` のときなので k = 10 か 11。
+  行はその答えを決めた後に書かれるので、書いてから送るまでは最大およそ 11 分
+- **問い合わせが失敗したら「ある」を返し、答えは覚えない**（警告をログに残す）。
+  判定の失敗で通知を止めるより、問い合わせが 1 回増えるほうがよい。次の回でもう一度問い合わせる
+- **期限切れの答えを同時に見た呼び出しは、問い合わせ中の 1 つの Promise を共有する。**
+  2 つの定期処理が同時に尋ねても問い合わせは 1 回で、「10 分に 1 回以下」（要件 2.7）を守る
+- **問い合わせ中に付いた `markPresent` の印は残す。** 問い合わせの結果は、印より古い時刻で決めた答えなら上書きしない
+- 時刻は呼ぶ側が `now` で渡し、この部品は時計を持たない。定期処理は差し替え口 `clock` から時刻を取る
+- 状態はプロセスの中だけに持ち（`{ present, decidedAt }` を丸ごと置き換える）、再起動で空に戻る。
+  GROWI の 1 プロセスは 1 つのデータベースにだけ接続するので、プロセスの答えがそのテナントの答えになる。
+  `integrationPresence` はプロセスに 1 つで、2 つの定期処理（通知と掃除）と `enqueue` が共有する
+
+#### 書き込んだ直後に送る経路のための余地
+
+今は定期処理が唯一の送り手で、ふつうの通知の最初の送信も担っている。そのため間隔は 1 分のままにしている
+（延ばすと、保存から届くまでが延び、1 分あたりに送れる行も減る。research.md「通知の定期処理の間隔は、直後に送る経路と一緒に延ばす」）。
+通知を書き留めた直後に送る経路は、[chat-integration-agent](../chat-integration-agent/brief.md) が
+「答えをあとから送る口」と同じ経路で作り、そのときに定期処理の間隔も延ばす。この設計は次の 3 点で、その経路を邪魔しない。
+
+1. `drain(now)` は、誰から何度呼ばれても安全（行ごとの条件つき更新）。「定期処理だけが呼ぶ」という前提をコードにも文書にも置かない
+2. 「送るべきものができた」ことを知る場所は `enqueue` の 1 か所だけ。直後に送る処理はここに足せる
+3. 連携があるかの判定は定期処理の中だけで使い、`drain` の中には入れない。直後に送る経路は、行を書いたばかりなので判定が要らない
 
 ---
 
@@ -660,7 +759,7 @@ GROWI には同じ形のものが既に 3 つある（`models/password-reset-ord
   ただし行を消す必要は無い — `resolveActor` が状態を見て `user: null` にするので（上記）、
   **紐付けの行は残したままで安全**である。利用者が復帰したときに紐付け直さずに済む
 
-### 管理画面の関係の状態（要件 9.9–9.12）
+### 管理画面の関係の状態（要件 9.10–9.13）
 
 GROWI の記録（`chat_relations.state`）は `active` / `unpaired` の 2 つだけで、チャット側で関係が解除されたことを GROWI は知らない。知る手段を新しく作らず（proxy → GROWI の通知を足すと `@growi/chat` と proxy の契約が変わる）、今ある信号を使う: 鍵を消した関係からの署名付きの呼び出しを、proxy は署名の検査で拒否して**空の 401** を返す。拒否の理由は返さない。
 
@@ -671,13 +770,13 @@ GROWI の記録（`chat_relations.state`）は `active` / `unpaired` の 2 つ�
 |---|---|---|---|
 | `unpaired` | 問い合わせない | `unpaired`（灰色） | 出さない |
 | `active` | 成功 | `active`（緑） | `connected` などの `health` |
-| `active` | 失敗（`rejected`） | **「接続が切れています」（赤）** | 説明文（要件 9.10）。**古い `health` は出さない** |
+| `active` | 失敗（`rejected`） | **「接続が切れています」（赤）** | 説明文（要件 9.11）。**古い `health` は出さない** |
 | `active` | 失敗（それ以外） | `active`（緑のまま） | 「Failed to load connection status」（赤字） |
 | `active` | まだ読み込み中 | `active`（緑） | 何も出さない |
 
-- 「失敗（それ以外）」で緑のバッジを残すのは、GROWI の記録としては関係が `active` であり、切れたと断定できる材料が無いため（要件 9.11）
+- 「失敗（それ以外）」で緑のバッジを残すのは、GROWI の記録としては関係が `active` であり、切れたと断定できる材料が無いため（要件 9.12）
 - **前に成功した値が SWR のキャッシュに残る。** SWR は再取得が失敗しても前の成功値（`data`）を返し続けるので `error` と `data` が同時に入る。`rejected` のときは `data` を出さない（出すと「connected」と「接続が切れています」が並ぶ）
-- 説明文は原因を断定しない。時計のずれや鍵の不一致でも同じ状態になりうるので「チャット側で `unregister` された可能性」と書き、GROWI 側の関係を片付ける「Disconnect」（`UnpairButton`。proxy を呼ばず GROWI 側だけで完結するので、接続が切れていても動く）と、再度ペアリングを試す案内を添える。文言は `admin.json` の `chat_integration.connection_lost.badge` と `.detail`（管理画面は `admin` namespace だけを読み込む）。**自動では解除しない**（要件 9.12）
+- 説明文は原因を断定しない。時計のずれや鍵の不一致でも同じ状態になりうるので「チャット側で `unregister` された可能性」と書き、GROWI 側の関係を片付ける「Disconnect」（`UnpairButton`。proxy を呼ばず GROWI 側だけで完結するので、接続が切れていても動く）と、再度ペアリングを試す案内を添える。文言は `admin.json` の `chat_integration.connection_lost.badge` と `.detail`（管理画面は `admin` namespace だけを読み込む）。**自動では解除しない**（要件 9.13）
 
 ### 保存時の通知先の選択部品が保つ契約（要件 2.2）
 
@@ -695,7 +794,7 @@ GROWI の記録（`chat_relations.state`）は `active` / `unpaired` の 2 つ�
 
 | コレクション | 主な項目 | 索引・寿命 |
 |---|---|---|
-| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsVersion`, `createdAt`, `unpairedAt` | **`relationId` 単独で一意**（複合にしない。理由は下記）。**既にある `relationId` を返す `PairingResult` はペアリングを成立させず、管理者に知らせる**。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にし、`unpairedAt` に解除時刻を持たせる** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。`unpairedAt` は「いちばん新しい解除済みの行から引き継ぐ」（下記）の判定と、45日掃除（task 8.2）が起点にする値で、`createdAt`（最初のペアリング時刻）では代用できない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
+| `chat_relations` | `relationId`, `proxyUri`, `platform`, `workspaceId`, `workspaceName`, `label`, `state`, `settingsVersion`, `createdAt`, `unpairedAt` | **`relationId` 単独で一意**（複合にしない。理由は下記）。**既にある `relationId` を返す `PairingResult` はペアリングを成立させず、管理者に知らせる**。**これが無いと送り先も分からない**（下記）。**紐付け解除（要件 9.7）では削除せず `state: 'unpaired'` にし、`unpairedAt` に解除時刻を持たせる** — `workspaceId` を残さないと繋ぎ直しのときに紐付けを引き継げない。`unpairedAt` は「いちばん新しい解除済みの行から引き継ぐ」（下記）の判定（引き継ぎ元になれる範囲も `unpairedAt` で絞る）と、45日掃除（task 8.2）が起点にする値で、`createdAt`（最初のペアリング時刻）では代用できない。消すのは**鍵・チャンネル権限・宛先**だけ（秘密鍵を残さない目的はこれで満たせる） |
 | `chat_account_links` | `relationId`, `userId`, `platform`, `accountId`, `linkedAt` | **`(relationId, platform, accountId)` 複合ユニーク**（下記）。**利用者が解除するまで残る。** 関係の解除では消さない（下記の再ペアリングを参照） |
 | `chat_integration_keys` | `relationId`, `side`(`own`/`peer`), `keyId`, `key`, `validFrom`, `revokedAt` | `(relationId, side, keyId)` 一意。**紐付け解除で削除**（秘密鍵を残さない） |
 | `chat_notification_outbox` | `requestId`, `relationId`, `targets`, `markdown`, `state`, `attempts`, `claimedAt`, `result`, `createdAt` | **`(state, claimedAt)` に索引**（`drain` が奪うときに引く）、**`(relationId, requestId)` に索引**（結果を書き戻すときに引く）。**送信済みは 30 日で TTL 索引により消す**。`given-up` は運用者が確認するまで残す |
@@ -988,9 +1087,15 @@ protocol spec が「`keyId` を単独で鍵にすると別の関係のものを�
 > 古い行を消す。**行を消してしまうと、古い `relationId` がどの workspace のものだったか分からなくなり、引き継げない。**
 >
 > **引き継ぎ元が複数あるときは、いちばん新しい解除済みの行から引き継ぐ。**
+> 引き継ぎ元は保持期間の内側にある行に限る（`unpairedAt >= now − 45 日`。掃除の `$lt` の条件と境目が同じ）。
+> 保持期間を過ぎた行は、掃除が消すより前でも引き継ぎ元にならない。
 > 移す途中で `(relationId, platform, accountId)` がぶつかったら**新しいほうを残す**。
 > **解除済みの `chat_relations` の行そのものも 45 日で消す**（`chat_account_links` と揃える）。
-> 45 日の掃除は `NotificationDispatcher` と同じく**条件つき更新で 1 台だけ**が回す。
+> 45 日の掃除は、通知とは別の定期処理（`UnpairedRelationSweepCronService`）が**1 日 1 回**回す（要件 9.8）。
+> 毎日 2 時（`'0 2 * * *'`）にすべてのプロセスで動き、多くの GROWI が同じ瞬間にデータベースへ問い合わせないよう、
+> 最初に最大 60 分ランダムに待つ。待った後に連携があるかを確かめ（上記「連携が無い GROWI では問い合わせない」）、
+> あるときだけ掃除する。1 回の実行で期限切れの行をすべて消しきる（1 回の実行の上限は安全のための 10,000 件で、超えた分は翌日の実行が続ける）。掃除は紐付けを先に消し、関係の行は選んだときと同じ条件で消すので、
+> 複数のプロセスが同じ日に回しても同じ結果に落ち着く。保持期間が過ぎてから消えるまでは最大 1 日と 1 時間。
 > 管理画面の解除済みのカードには、消える日（解除した日 + 45 日）を表示する。いつまで残るのかが画面から分かるようにするためである。
 >
 > **`chat_account_links` を消すのは 2 つの場合だけ** — 利用者が解除したとき（要件 7.5）と、
@@ -1064,6 +1169,25 @@ proxy 側の「`runtime/config.ts` が環境変数から読む」も proxy の�
 10. **書き込みが監査ログに残ること** — `create-page` と `keep` の後に `Activity` が 1 件でき、
     操作した人とチャンネルが残ること（要件 7 の目的文）
 
+時間の経過に関わる 11〜16 は、時刻を引数や差し替え口（`now`、`clock`、`sleep`）で渡して確かめる。実時間の待ちも、vitest の偽のタイマーも使わない（`randomSleep` は差し替え口 `sleep` で置き換える）。
+
+11. `IntegrationPresence` — 覚えた答えを 10 分信じ、ちょうど 10 分で 1 回だけ問い合わせ直すこと。「ある」も 10 分で切れ、
+    切れた後に問い合わせが「無い」を返せば偽になること（2.7）
+12. `IntegrationPresence` — `markPresent` の後は、覚えた「無い」が残っていても問い合わせずに真を返し、その答えを印を付けた時刻から数えること。
+    問い合わせ中に付けた印が、その問い合わせの結果で上書きされないこと（2.8）
+13. `IntegrationPresence` — 問い合わせが失敗したら（同期の例外を含む）真を返し、次の呼び出しでもう一度問い合わせること。
+    期限切れのときの同時の呼び出しが 1 回の問い合わせを共有し、それが終わって答えが切れた後は改めて問い合わせること（2.7）
+14. `ChatNotificationDispatchCronService` — 1 分ごと（`'* * * * *'`）に動き、判定が偽なら `drain` を呼ばず、
+    真なら（判定の失敗で真になったときも）`clock()` の時刻で 1 回呼ぶこと。`drain` が失敗しても job が失敗しないこと。
+    掃除を受け取らず呼ばないこと（差し替え口に `sweep` が無いことを型で確かめ、実際の `sweepUnpairedRelations` が呼ばれないこと）（2.7・9.8）
+15. 要件 2.9 の上限 — 実際の `IntegrationPresence` と 1 分刻みの時刻を使い、ほかのプロセスが「無い」を覚えた回から数えて、
+    最初に `drain` を呼ぶのが 10 分後の回であること。答えを決めた回の起動が遅れた場合は 11 分後の回であること（2.9）
+16. `UnpairedRelationSweepCronService` — 1 日 1 回（`'0 2 * * *'`）動き、最初に `sleep` を 60 分の上限で呼び、
+    待った後に判定し、真なら `clock()` の時刻で掃除を 1 回呼ぶこと。偽なら呼ばないこと。掃除が失敗しても job が失敗しないこと（9.8・2.7）
+17. `createNotificationOutbox` — 行を書いたら、書いた時刻で `markPresent` を 1 回呼ぶこと。書き込みが失敗したら呼ばないこと（2.8）
+18. 起動の配線 — `crowi/index.ts` のソースを読み、通知の定期処理と、その直後に掃除の定期処理を `startCron()` で起動していること。
+    名前の変更や行の削除で定期処理が黙って止まるのを防ぐ
+
 ### Integration Tests
 
 1. **未紐付けの利用者の検索が、誰でも閲覧できるページだけを返すこと**（3.7）。
@@ -1074,3 +1198,4 @@ proxy 側の「`runtime/config.ts` が環境変数から読む」も proxy の�
    やり直しの上限を超えたら運用者が確認できる形で残ること（2.4）
 4. Gen 1 との併存 — Gen 2 を設定しても Gen 1 の通知先と設定が変わらないこと（12.2・12.3）
 5. 署名の検証に失敗したリクエストが処理されず、記録が残ること。**その際 nonce の表が増えないこと**（10.2）
+6. `IntegrationPresence` の既定の問い合わせ — `chat_relations` が空なら偽、`state: 'unpaired'` の行 1 つだけでも真、`active` の行で真（2.7。解除済みを数えないと掃除が飛ばされる）

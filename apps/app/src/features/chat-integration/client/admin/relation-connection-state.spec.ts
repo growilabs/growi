@@ -1,5 +1,5 @@
 // The badge on a relation's row must not say "active" for a relation the
-// proxy no longer accepts (Requirements 9.9, 9.11), and must not claim a
+// proxy no longer accepts (Requirements 9.10, 9.12), and must not claim a
 // loss it cannot know about when the check failed for another reason.
 
 import { describe, expect, it } from 'vitest';

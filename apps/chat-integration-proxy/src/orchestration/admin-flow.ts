@@ -50,11 +50,12 @@ import {
 } from '../relation/index.js';
 import type {
   AdminActorRoles,
+  InstallationPlace,
   Invocation,
   OutboundMessage,
   Relation,
-  SdkChannelRef,
 } from '../types/index.js';
+import { NO_WORKSPACE_TEXT } from './no-workspace-wording.js';
 
 /**
  * The one facade operation an operator command uses directly. Narrowed with
@@ -88,9 +89,9 @@ export interface AdminFlowDeps {
     'rotate' | 'rotationStatus' | 'revokeOldIfAllDelivered'
   >;
   readonly growiClient: Pick<GrowiClient, 'registerKey' | 'revokeKey'>;
-  /** See `CommandFlowDeps.resolveInstallationId`: the same gap, filled once. */
+  /** See `CommandFlowDeps.resolveInstallationId`: the same rule, shared. */
   readonly resolveInstallationId: (
-    channel: SdkChannelRef,
+    place: InstallationPlace,
   ) => Promise<string | null>;
   readonly observeActorRoles: ObserveActorRoles;
 }
@@ -341,6 +342,12 @@ export const createAdminFlow = (deps: AdminFlowDeps): AdminFlow => {
 
   return {
     run: async (invocation) => {
+      // Roles are read through the installation, so a place with none would
+      // otherwise be told the proxy is misconfigured.
+      if (invocation.installation?.kind === 'no-workspace') {
+        await say(invocation, null, NO_WORKSPACE_TEXT);
+        return;
+      }
       const roles = await observeActorRoles(invocation);
       if (roles == null) {
         await say(
@@ -372,7 +379,7 @@ export const createAdminFlow = (deps: AdminFlowDeps): AdminFlow => {
         return;
       }
 
-      const installationId = await resolveInstallationId(invocation.channel);
+      const installationId = await resolveInstallationId(invocation);
       if (installationId == null) {
         await say(
           invocation,

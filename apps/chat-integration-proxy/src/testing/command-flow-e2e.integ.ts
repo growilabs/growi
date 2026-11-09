@@ -502,7 +502,7 @@ describe('a command run end to end', () => {
         sourceLabel: row.sourceLabel,
         hasUrl:
           row.primary.kind === 'link' &&
-          row.primary.url.includes(
+          row.primary.url.startsWith(
             row.sourceLabel === 'GROWI A'
               ? 'http://growi-a.test/e2e/minutes'
               : 'http://growi-b.test/e2e/minutes',

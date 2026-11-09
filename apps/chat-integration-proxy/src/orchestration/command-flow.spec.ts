@@ -1116,6 +1116,43 @@ describe('where a private reply says it came from', () => {
     expect(harness.privateOrigins()[0]?.installationId).toBeNull();
   });
 
+  it('says the workspace is not registered for a place in no known installation', async () => {
+    vi.mocked(harness.resolveInstallationId).mockResolvedValue(null);
+
+    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.search, 'foo'));
+
+    expect(harness.ephemeralMessages()).toEqual([
+      expect.objectContaining({
+        markdown: expect.stringContaining('まだ登録されていません'),
+      }),
+    ]);
+  });
+
+  it('asks for a workspace channel, not for registration, in a DM that belongs to no workspace', async () => {
+    vi.mocked(harness.resolveInstallationId).mockResolvedValue(null);
+
+    await harness.flow.startCommand({
+      ...invocationOf(COMMAND_NAMES.search, 'foo'),
+      installation: { kind: 'no-workspace' },
+    });
+
+    const said = harness.ephemeralMessages();
+    expect(said).toHaveLength(1);
+    expect(said[0]).toEqual(
+      expect.objectContaining({
+        markdown: expect.stringContaining(
+          'DM から bot に呼びかけることはできません',
+        ),
+      }),
+    );
+    expect(said[0]).not.toEqual(
+      expect.objectContaining({
+        markdown: expect.stringContaining('登録されていません'),
+      }),
+    );
+    expect(harness.selector.select).not.toHaveBeenCalled();
+  });
+
   it('leaves the installation unknown for a word it does not know', async () => {
     await harness.flow.startCommand(invocationOf('frobnicate'));
 
@@ -1135,6 +1172,24 @@ describe('where a private reply says it came from', () => {
     });
 
     expect(harness.privateOrigins()[0]?.sourceMessageId).toBe('M7');
+  });
+
+  it('speaks as the installation the event named when telling an input expired', async () => {
+    await harness.flow.reportExpired({
+      kind: 'mention',
+      platform: PLATFORM,
+      channel,
+      actor,
+      text: '/memo',
+      inDirectMessage: true,
+      messageId: 'M0001',
+      interaction: null,
+      installation: { kind: 'identified', installationId: 'inst-dm' },
+    });
+
+    expect(harness.privateOrigins()).toEqual([
+      expect.objectContaining({ installationId: 'inst-dm' }),
+    ]);
   });
 
   it('labels an expired input as the continuation of an input, on the message that carried it', async () => {
@@ -1245,6 +1300,61 @@ describe('previewLinks', () => {
     if (preview?.kind !== 'markdown') throw new Error('expected markdown');
     expect(preview.markdown).toContain('/Sandbox');
     expect(harness.privateReplier.reply).not.toHaveBeenCalled();
+  });
+
+  describe('rendering a restricted summary', () => {
+    const previewOf = async (
+      response: Extract<CommandResponse, { kind: 'link-preview' }>,
+    ): Promise<string> => {
+      vi.mocked(harness.selector.select).mockResolvedValue({
+        kind: 'execute',
+        targets: [GROWI_A],
+        excluded: [],
+      });
+      vi.mocked(harness.growiClient.sendCommand).mockResolvedValue({
+        ok: true,
+        response,
+      });
+      await harness.flow.previewLinks(linkEvent);
+      const [, preview] =
+        vi.mocked(harness.platform.attachPreview).mock.calls[0] ?? [];
+      if (preview?.kind !== 'markdown') throw new Error('expected markdown');
+      return preview.markdown;
+    };
+
+    it('shows the path and the update time on two lines', async () => {
+      expect(
+        await previewOf({
+          kind: 'link-preview',
+          path: 'Sandbox',
+          restricted: true,
+          updatedAt: '2026-10-01T00:00:00.000Z',
+        }),
+      ).toBe('GROWI A: Sandbox\n更新: 2026-10-01T00:00:00.000Z');
+    });
+
+    it('never shows the excerpt or the comment count', async () => {
+      const text = await previewOf({
+        kind: 'link-preview',
+        path: '/Sandbox',
+        restricted: true,
+        excerpt: 'secret body',
+        commentCount: 7,
+        updatedAt: '2026-10-01T00:00:00.000Z',
+      });
+      expect(text).not.toContain('secret body');
+      expect(text).not.toContain('コメント');
+    });
+
+    it('shows only the path when there is no update time', async () => {
+      expect(
+        await previewOf({
+          kind: 'link-preview',
+          path: '/Sandbox',
+          restricted: true,
+        }),
+      ).toBe('GROWI A: /Sandbox');
+    });
   });
 
   it('summarises the same link once, however often the message repeats it', async () => {

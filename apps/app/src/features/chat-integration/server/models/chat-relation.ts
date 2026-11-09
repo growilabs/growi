@@ -48,8 +48,8 @@ export interface IChatRelation {
    * unpaired relation for the same workspace (design.md "引き継ぎ元が複数ある
    * ときは、いちばん新しい解除済みの行から引き継ぐ"), and the sweep of
    * unpaired rows needs the instant the retention is counted from. Not a TTL
-   * index: the sweep is the same conditional-update, one-host-only job that
-   * `NotificationDispatcher` runs, because it has to remove the relation's
+   * index: the sweep (`UnpairedRelationSweepCronService`, once a day) is a
+   * conditional-delete job, because it has to remove the relation's
    * `chat_account_links` rows in the same pass.
    */
   unpairedAt: Date | null;

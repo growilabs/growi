@@ -66,4 +66,17 @@ export type InventoryChannel = {
 /** An installation's channels, as a lister takes them from the service. */
 export interface ChannelListing {
   readonly channels: ReadonlyArray<InventoryChannel>;
+  /**
+   * Parts of the service that could not be listed while the rest could (one
+   * Enterprise Grid workspace, say). Absent when the listing is complete.
+   */
+  readonly unlisted?: ReadonlyArray<UnlistedScope>;
+}
+
+/** One part of a service a listing could not read, and why. */
+export interface UnlistedScope {
+  /** The workspace (or equivalent) that was skipped. */
+  readonly scope: string;
+  /** The service's error code or message; never a credential. */
+  readonly reason: string;
 }
