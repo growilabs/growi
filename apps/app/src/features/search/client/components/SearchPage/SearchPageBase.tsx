@@ -99,6 +99,10 @@ type Props = {
   onItemMutated?: (mutation: SearchItemMutation) => void;
 };
 
+// Shared so that clearing an empty selection keeps the same reference and
+// React skips the re-render.
+const EMPTY_SELECTION: ReadonlySet<string> = new Set();
+
 const SearchResultContent = dynamic(
   () => import('./SearchResultContent').then((mod) => mod.SearchResultContent),
   {
@@ -139,7 +143,7 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   // Replaced, never mutated. The ref holds the same Set for readers that run
   // before the re-render (see design.md, SearchPageBase).
   const [selectedPageIdsByCheckboxes, setSelectedPageIdsByCheckboxes] =
-    useState<ReadonlySet<string>>(() => new Set());
+    useState<ReadonlySet<string>>(EMPTY_SELECTION);
   const selectedPageIdsRef = useRef(selectedPageIdsByCheckboxes);
   const commitSelectedPageIds = useCallback((next: ReadonlySet<string>) => {
     selectedPageIdsRef.current = next;
@@ -170,9 +174,7 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   // "clear selection" sequence has exactly one implementation (previously two
   // near-duplicate copies could drift independently).
   const clearSelectionAndNotify = useCallback(() => {
-    if (selectedPageIdsRef.current.size > 0) {
-      commitSelectedPageIds(new Set());
-    }
+    commitSelectedPageIds(EMPTY_SELECTION);
     // Also uncheck the currently rendered rows. With keepPreviousData (the
     // legacy number-pager path), the previous page's rows stay mounted for a
     // moment after a resetKey change, so clearing only the Set would leave
@@ -204,7 +206,7 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
         instance.deselectAll();
       }
 
-      commitSelectedPageIds(new Set());
+      commitSelectedPageIds(EMPTY_SELECTION);
     },
     getSelectedPageIds: () => {
       return selectedPageIdsRef.current;
