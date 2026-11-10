@@ -68,8 +68,6 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 | 順 | まとまり | 含む項目 | 進め方 | 対象 |
 |---|---|---|---|---|
-| 1 | 表示順 | 本人にだけ見える返事が、入力より上に出る | 時刻を測って原因を調べてから直す | proxy |
-| 2 | proxy の見え方 | 検索結果の見せ方、Slack への通知の文面 | spec を作らず直接直す（契約は変えない） | proxy（通知の文面は app の markdown にも及びうる） |
 | 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作り、それと同時に定期処理の間隔を延ばす。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。`brief.md` だけがあり、要件・設計・タスクの承認がこれから | umbrella、protocol、proxy、app |
 | 8 | 管理画面の作り直し | 管理画面のうち、チャンネルの権限と「できること」の表 | amend spec `chat-integration-admin-ui`（名前は仮） | app |
 | 9 | コマンドの表示の締め | スラッシュコマンドの実機確認、`help` の一覧の書き方、Discord のスレッドでの追加入力 | proxy の残タスク 12.4 | proxy |
@@ -80,23 +78,9 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 - 順 5（URL の展開の方針: ログインが必要な GROWI でも、公開範囲が「公開」のページは題名と更新日時を出す）は済んだので表から外した。5 も空き番号のまま残す。決まったことは要件 6.9〜6.13（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)「LinkPreviewMapper（URL の展開の応答）」、理由は [chat-integration-app の research.md](../chat-integration-app/research.md) と本ディレクトリの research.md の決定 15。
 - 順 6（通知の定期処理の負荷: 連携が無いテナントの問い合わせを飛ばす、解除済みの連携の掃除を 1 日 1 回にする）は済んだので表から外した。6 も空き番号のまま残す。決まったことは要件 2.7〜2.9・9.8（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)「通知を 2 段に分ける」、理由は [chat-integration-app の research.md](../chat-integration-app/research.md) と本ディレクトリの research.md の決定 16。定期処理の間隔を延ばすのは順 7 で行う。
 - 順 11（順 5・6 の実装で見つかった小さな直し: 繋ぎ直しの引き継ぎ元の期限、掃除の 1 回の上限、空ページの扱い）は直したので表から外した。11 も空き番号のまま残す。決まったことは要件 6.14・9.9（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)、理由は [chat-integration-app の research.md](../chat-integration-app/research.md)。ゴミ箱に入ったページは、除かないままにした（同 research.md）。
-- 順 1・2 は、順 7 の前提になる（順 7 の前提だった順 3 は済んだ。`agent` の `brief.md` が前提に挙げる installation の特定もその 1 つ）。
-- 順 7 は規模が大きいので、順 1・2 を終えてから要件の承認に入る。
-
-### 1. 表示順
-
-- **Slack で、本人にだけ見えるメッセージが、呼びかけた入力より上に表示されることがある（優先度は高い）**: 実機試験（2026-10-27）で、`@GROWI search` への聞き返しが、入力の投稿より上に出た。内容は正しく本人にだけ見えるが、読む順序が逆になって使い心地が悪い。原因は未特定（Slack の画面が、本人にだけ見えるメッセージを受け取った順に差し込み、入力の表示より返事の受け取りが先になる短い間がある、という推測のみ）。表示位置を指定する手段は Slack の API に見当たらないので、再現したときの時刻を Slack の表示と proxy のログで数回分取って比べ、出すのを少し遅らせる案などが効くかを確かめてから決める。
-- **調べ方**: 時刻を目で比べず、受け取った入力の `ts` と、`chat.postEphemeral` が返す `message_ts` を、ずれたときと普通のときでログに取って比べる。あわせて、[chat-integration-agent の brief](../chat-integration-agent/brief.md)「実現性の確認の結果」2（スレッドの中の本人だけのメッセージは、スレッドが既にあるときだけ出る）も確かめる。`agent` が本人にだけ答える場所の設計が、この結果で決まる
-
-### 2. proxy の見え方
-
-- **検索結果の見せ方を洗練する**: 実機試験（2026-10-27、Slack）で、`search` の結果が次のように見えた。
-  - 各行が `[題名](URL) — パス` の形で、`[…](…)` の記号がそのまま見えて読みにくい（Slack のカードでは markdown のリンクが組み版されず、URL だけがリンクになっている）。
-  - 題名とパスが同じ内容で重複しやすい。行ごとに GROWI の名前（`growi-chat-test`）が付き、1 つの GROWI しか無くても繰り返される。
-  - 直す前に、各サービスで同じ内容がどう見えるかを、サービスごとの組み版（Slack は `<URL|題名>`、他は markdown のリンク）に分けて考える必要がある。
-- **Slack への通知の文面**: メッセージの書式が洗練されていない。ページ名・変更の種類・変更した人・リンクを読みやすく並べる。Slack の Block Kit など、サービスごとの表現を使うかも含めて検討する
-- **想定される影響範囲**: proxy の `outbound.ts`（サービスごとの描き分け）が中心。通知の文面は、GROWI が組み立てる markdown（`chat-integration-app`）にも及びうる。契約は変えないので、spec は作らず直接直し、proxy の design.md の該当節を更新する。`agent` の答えも同じ描き方を通るので、先に直す
-
+- 順 1（表示順: Slack で、本人にだけ見える返事が入力より上に出る）は直したので表から外した。1 も空き番号のまま残す。原因は、`chat.postEphemeral` が返す `message_ts` が合成した値であること。直し方は、Slack だけ依頼の次の秒まで待ってから出すこと。決まったことは [chat-integration-proxy の design.md](../chat-integration-proxy/design.md) と [research.md](../chat-integration-proxy/research.md) の `EPHEMERAL_MUST_FOLLOW_REQUEST_SECOND` の決定にある。
+- 順 2（proxy の見え方: 検索結果のリンクの描き方、Slack への通知の文面）は直したので表から外した。2 も空き番号のまま残す。検索結果はサービスごとの組み版で出し、通知は 1 行の文面にした。決まったことは [chat-integration-proxy の design.md](../chat-integration-proxy/design.md)（`ListRow`）と [chat-integration-app の design.md](../chat-integration-app/design.md)（`NotificationContent`）にある。
+- 順 7 の前提（順 1・2・3）はすべて済んだ。順 7 は、要件の承認に入れる。
 
 ### 7. コマンドの再編（amend spec [chat-integration-agent](../chat-integration-agent/)）
 
@@ -134,7 +118,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 - **依頼のメッセージが無い依頼で、短い知らせが繰り返される**: slash command から始まった依頼など（同 4）。順 9 でスラッシュコマンドを扱うときに、あわせて見直せる
 - **Mattermost で installation が複数あるとき、DM での「入力の期限切れ」の知らせが installation を引けない**（同 5）
 - **通知の書き込み口と定期処理が、同じ「連携があるか」の記憶（IntegrationPresence）を共有していることを確かめる結合試験が無い**: 今は書き込み口が `createNotificationOutbox` の 1 か所だけで、既定で同じインスタンスを使うので壊れていない。書き込み口が増えるときに足す
-- **表示順の待ちの配線と、続けて返した 2 つの返事の順番の試験が無い**: `runtime/dependencies.spec.ts` に `onOrderingWait` の配線を確かめる試験が無く、2 つの返事を続けて返したときの順番も確かめていない。順 1 の作業で扱う
+- **表示順の待ちの配線と、続けて返した 2 つの返事の順番の試験が無い**: `runtime/dependencies.spec.ts` に `onOrderingWait` の配線を確かめる試験が無く、2 つの返事を続けて返したときの順番も確かめていない。順 7 で proxy の返事の経路を触るときに足す
 
 ## Scope
 
