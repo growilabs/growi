@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import request from 'supertest';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock } from 'vitest-mock-extended';
 
 import { GrowiPlugin } from '~/features/growi-plugin/server/models';
 import type Crowi from '~/server/crowi';
@@ -44,7 +44,9 @@ vi.mock('~/features/growi-plugin/server/models', () => ({
 }));
 
 // The router is a module-level singleton, so it is set up only once
-const crowi = mockDeep<Crowi>();
+const crowi = mock<Crowi>({
+  attachmentService: mock<Crowi['attachmentService']>(),
+});
 // multer writes uploads under `${crowi.tmpDir}uploads`, so the trailing separator matters
 const tmpDir = mkdtempSync(path.join(tmpdir(), 'customize-setting-spec-'));
 crowi.tmpDir = `${tmpDir}${path.sep}`;

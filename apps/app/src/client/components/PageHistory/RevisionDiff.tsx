@@ -1,24 +1,22 @@
-import { type JSX, useMemo } from 'react';
+import type { JSX } from 'react';
 import Link from 'next/link';
 import type { IRevisionHasId } from '@growi/core';
-import { GrowiThemeSchemeType } from '@growi/core';
 import { returnPathForURL } from '@growi/core/dist/utils/path-utils';
-import { PresetThemesMetadatas } from '@growi/preset-themes';
 import { createPatch } from 'diff';
-import type { Diff2HtmlConfig } from 'diff2html';
 import { html } from 'diff2html';
-import { ColorSchemeType } from 'diff2html/lib/types';
 import { useTranslation } from 'next-i18next';
 import urljoin from 'url-join';
 
-import { Themes, useNextThemes } from '~/stores-universal/use-next-themes';
+import {
+  buildDiff2HtmlOptions,
+  useDiff2HtmlColorScheme,
+} from '~/features/change-proposal/client/shared';
 
 import UserDate from '../../../components/User/UserDate';
-import { useSWRxGrowiThemeSetting } from '../../../stores/admin/customize';
 
 import styles from './RevisionDiff.module.scss';
 
-import './RevisionDiff.vendor-styles.prebuilt';
+import '~/features/change-proposal/client/shared/diff2html.vendor-styles.prebuilt';
 
 const moduleClass = styles['revision-diff-container'];
 
@@ -43,37 +41,7 @@ export const RevisionDiff = (props: RevisioinDiffProps): JSX.Element => {
     onClose,
   } = props;
 
-  const { theme: userTheme } = useNextThemes();
-  const { data: growiTheme } = useSWRxGrowiThemeSetting();
-
-  const colorScheme: ColorSchemeType = useMemo(() => {
-    if (growiTheme == null) {
-      return ColorSchemeType.AUTO;
-    }
-
-    const growiThemeSchemeType =
-      growiTheme.pluginThemesMetadatas[0]?.schemeType ??
-      PresetThemesMetadatas.find(
-        (theme) => theme.name === growiTheme.currentTheme,
-      )?.schemeType;
-
-    switch (growiThemeSchemeType) {
-      case GrowiThemeSchemeType.DARK:
-        return ColorSchemeType.DARK;
-      case GrowiThemeSchemeType.LIGHT:
-        return ColorSchemeType.LIGHT;
-      default:
-      // growiThemeSchemeType === GrowiThemeSchemeType.BOTH
-    }
-    switch (userTheme) {
-      case Themes.DARK:
-        return ColorSchemeType.DARK;
-      case Themes.LIGHT:
-        return ColorSchemeType.LIGHT;
-      default:
-        return ColorSchemeType.AUTO;
-    }
-  }, [growiTheme, userTheme]);
+  const colorScheme = useDiff2HtmlColorScheme();
 
   const previousText =
     currentRevision._id === previousRevision._id ? '' : previousRevision.body;
@@ -84,13 +52,9 @@ export const RevisionDiff = (props: RevisioinDiffProps): JSX.Element => {
     currentRevision.body,
   );
 
-  const option: Diff2HtmlConfig = {
-    outputFormat: 'side-by-side',
-    drawFileList: false,
-    colorScheme,
-  };
-
-  const diffViewHTML = revisionDiffOpened ? html(patch, option) : '';
+  const diffViewHTML = revisionDiffOpened
+    ? html(patch, buildDiff2HtmlOptions(colorScheme))
+    : '';
 
   const diffView = { __html: diffViewHTML };
 

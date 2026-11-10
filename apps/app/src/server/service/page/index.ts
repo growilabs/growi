@@ -34,7 +34,11 @@ import ExternalUserGroupRelation from '~/features/external-user-group/server/mod
 import type { revisions } from '~/generated/prisma/client';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
-import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
+import type {
+  IOptionsForCreate,
+  IOptionsForInAppNotificationSuppression,
+  IOptionsForUpdate,
+} from '~/interfaces/page';
 import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config';
 import {
   PageDeleteConfigValue,
@@ -704,7 +708,7 @@ class PageService implements IPageService {
 
       throw err;
     }
-    if (page.descendantCount < 1) {
+    if (page.descendantCount < 1 && !options?.isInAppNotificationSuppressed) {
       const preNotify = preNotifyService.generatePreNotify(activity);
 
       this.activityEvent.emit('updated', activity, page, preNotify);
@@ -935,14 +939,16 @@ class PageService implements IPageService {
         descendantsSubscribedSets,
       ) as Ref<IUser>[];
 
-      const preNotify = preNotifyService.generatePreNotify(
-        activity,
-        async () => {
-          return descendantsSubscribedUsers;
-        },
-      );
+      if (!options?.isInAppNotificationSuppressed) {
+        const preNotify = preNotifyService.generatePreNotify(
+          activity,
+          async () => {
+            return descendantsSubscribedUsers;
+          },
+        );
 
-      this.activityEvent.emit('updated', activity, page, preNotify);
+        this.activityEvent.emit('updated', activity, page, preNotify);
+      }
     } catch (err) {
       logger.warn(err);
       throw Error(err);
@@ -2155,7 +2161,7 @@ class PageService implements IPageService {
   async deletePage(
     page,
     user,
-    options = {},
+    options: IOptionsForInAppNotificationSuppression = {},
     isRecursively = false,
     activityParameters,
   ) {
@@ -2285,7 +2291,7 @@ class PageService implements IPageService {
           this.pageEvent.emit('syncDescendantsUpdate', deletedPage, user);
         }
       })();
-    } else {
+    } else if (!options.isInAppNotificationSuppressed) {
       const preNotify = preNotifyService.generatePreNotify(activity);
 
       this.activityEvent.emit('updated', activity, page, preNotify);
@@ -2570,7 +2576,7 @@ class PageService implements IPageService {
   async deleteCompletely(
     page,
     user,
-    options = {},
+    options: IOptionsForInAppNotificationSuppression = {},
     isRecursively = false,
     preventEmitting = false,
     activityParameters,
@@ -2706,7 +2712,7 @@ class PageService implements IPageService {
           throw err;
         }
       })();
-    } else {
+    } else if (!options.isInAppNotificationSuppressed) {
       const preNotify = preNotifyService.generatePreNotify(activity);
 
       this.activityEvent.emit('updated', activity, page, preNotify);
@@ -2974,7 +2980,7 @@ class PageService implements IPageService {
   async revertDeletedPage(
     page,
     user,
-    options = {},
+    options: IOptionsForInAppNotificationSuppression = {},
     isRecursively = false,
     activityParameters?,
   ) {
@@ -3078,13 +3084,22 @@ class PageService implements IPageService {
 
       if (!isRecursively) {
         await this.updateDescendantCountOfAncestors(parent._id, 1, true);
-        this.activityEvent.emit(
-          'update',
-          activityId,
-          activityUpdateParameters,
-          page,
-          preNotifyService.generatePreNotify,
-        );
+        if (options.isInAppNotificationSuppressed) {
+          // Without a target the 'updated' listener creates no notification.
+          this.activityEvent.emit(
+            'update',
+            activityId,
+            activityUpdateParameters,
+          );
+        } else {
+          this.activityEvent.emit(
+            'update',
+            activityId,
+            activityUpdateParameters,
+            page,
+            preNotifyService.generatePreNotify,
+          );
+        }
       } else {
         let pageOp: PageOperationDocument;
         try {
@@ -5151,6 +5166,7 @@ class PageService implements IPageService {
       null,
       user,
       options.origin,
+      { proposalMark: options.proposalMark },
     );
     savedPage = await pushRevision(savedPage, newRevision, user);
     await savedPage.populateDataToShowRevision();
@@ -5253,7 +5269,7 @@ class PageService implements IPageService {
       null,
       user,
       undefined,
-      { format },
+      { format, proposalMark: options.proposalMark },
     );
     savedPage = await pushRevision(savedPage, newRevision, user);
     await savedPage.populateDataToShowRevision();
@@ -5679,8 +5695,11 @@ class PageService implements IPageService {
         previousBody,
         user,
         origin,
+        { proposalMark: options.proposalMark },
       );
-      savedPage = await pushRevision(savedPage, newRevision, user);
+      savedPage = await pushRevision(savedPage, newRevision, user, {
+        expectedRevisionId: options.expectedRevisionId,
+      });
       await savedPage.populateDataToShowRevision();
     }
 
@@ -5782,8 +5801,11 @@ class PageService implements IPageService {
         previousBody,
         user,
         options.origin,
+        { proposalMark: options.proposalMark },
       );
-      savedPage = await pushRevision(savedPage, newRevision, user);
+      savedPage = await pushRevision(savedPage, newRevision, user, {
+        expectedRevisionId: options.expectedRevisionId,
+      });
       await savedPage.populateDataToShowRevision();
     }
 
