@@ -162,6 +162,7 @@ export const SearchPage = (): JSX.Element => {
   const loadedChunks = swrData?.length ?? 0;
   const reachedResultWindowLimit =
     (loadedChunks + 1) * chunkSize > ES_MAX_RESULT_WINDOW;
+  const hasLoadedAll = merged.isReachingEnd || reachedResultWindowLimit;
 
   // Re-request the current size instead of calling `mutate()`: an
   // argument-less `mutate()` force-revalidates EVERY loaded chunk, whereas
@@ -429,8 +430,8 @@ export const SearchPage = (): JSX.Element => {
       searchResultListHead={searchResultListHead}
       infiniteScroll={{
         swrInfiniteResponse: swr,
-        isReachingEnd:
-          merged.isReachingEnd || hasError || reachedResultWindowLimit,
+        isReachingEnd: hasLoadedAll || hasError,
+        hasLoadedAll,
         hasError,
         onRetry,
       }}

@@ -738,12 +738,14 @@ describe('SearchPageBase drops selections of rows removed from the list (Req 11.
 
 const createInfiniteScrollProps = (overrides?: {
   isReachingEnd?: boolean;
+  hasLoadedAll?: boolean;
   hasError?: boolean;
   onRetry?: () => void;
 }) => ({
   swrInfiniteResponse:
     mock<SWRInfiniteResponse<IFormattedSearchResult, Error>>(),
   isReachingEnd: false,
+  hasLoadedAll: false,
   hasError: false,
   onRetry: vi.fn(),
   ...overrides,
@@ -1002,7 +1004,10 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
       <SearchPageBase
         resetKey="search-1"
         pages={createPages(25)}
-        infiniteScroll={createInfiniteScrollProps({ isReachingEnd: true })}
+        infiniteScroll={createInfiniteScrollProps({
+          isReachingEnd: true,
+          hasLoadedAll: true,
+        })}
         {...noopControls}
       />,
     );
@@ -1019,6 +1024,7 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
         pages={createPages(20)}
         infiniteScroll={createInfiniteScrollProps({
           isReachingEnd: true,
+          hasLoadedAll: false,
           hasError: true,
         })}
         {...noopControls}
@@ -1026,6 +1032,23 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
     );
 
     expect(searchResultListSpy.lastProps?.listSize).toBe(-1);
+  });
+
+  it('keeps the loaded count as the list size when a revalidation fails after every result was loaded', () => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(20)}
+        infiniteScroll={createInfiniteScrollProps({
+          isReachingEnd: true,
+          hasLoadedAll: true,
+          hasError: true,
+        })}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.listSize).toBe(20);
   });
 
   it('passes the loaded count as the list size on the legacy pager path', () => {

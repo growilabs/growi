@@ -23,6 +23,7 @@ type CapturedSearchPageBaseProps = {
   infiniteScroll?: {
     swrInfiniteResponse?: unknown;
     isReachingEnd?: unknown;
+    hasLoadedAll?: unknown;
     hasError?: unknown;
     onRetry?: () => void;
   };
@@ -257,10 +258,15 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
   });
 
   it('halts auto-load on error (isReachingEnd forced true) while preserving loaded pages', () => {
-    // A non-terminal result (2 of 42 loaded) that additionally errored: without
+    // A non-terminal result (one of many chunks loaded) that also errored: without
     // the halt, InfiniteScroll would keep calling setSize and tight-loop.
+    // The chunk reports a full hitsCount, so it does not signal the end.
+    const fullChunk = mock<IFormattedSearchResult>({
+      ...createChunk(['a', 'b']),
+      meta: { total: 1000, took: 3, hitsCount: PROD_DEFAULT_CHUNK_SIZE },
+    });
     searchStoreSpy.infiniteResponse = createInfiniteResponse(
-      [createChunk(['a', 'b'])],
+      [fullChunk],
       new Error('load failed'),
     );
 
@@ -269,8 +275,10 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.hasError).toBe(true);
     // isReachingEnd must be forced true so InfiniteScroll stops auto-loading,
-    // even though only 2 of 42 results are loaded (merged.isReachingEnd=false).
+    // although the end is not reached (merged.isReachingEnd=false).
     expect(infiniteScroll?.isReachingEnd).toBe(true);
+    // ...but not every result is loaded, so the list size stays unknown.
+    expect(infiniteScroll?.hasLoadedAll).toBe(false);
 
     // Already-loaded results are still handed down (not discarded on error).
     expect(searchPageBaseSpy.lastProps?.pages).toHaveLength(2);
@@ -325,6 +333,8 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.hasError).toBe(false);
     expect(infiniteScroll?.isReachingEnd).toBe(true);
+    // Nothing more will be loaded, so the loaded results are the whole list.
+    expect(infiniteScroll?.hasLoadedAll).toBe(true);
   });
 
   it('keeps auto-load enabled just below the max_result_window (P2-4 boundary)', () => {

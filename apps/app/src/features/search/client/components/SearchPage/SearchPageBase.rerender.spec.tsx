@@ -152,6 +152,7 @@ const createPage = (id: string): IPageWithSearchMeta =>
 type InfiniteScrollProps = {
   swrInfiniteResponse: SWRInfiniteResponse<IFormattedSearchResult, Error>;
   isReachingEnd: boolean;
+  hasLoadedAll: boolean;
   hasError: boolean;
   onRetry: () => void;
 };
@@ -160,6 +161,7 @@ const createInfiniteScrollProps = (): InfiniteScrollProps => ({
   swrInfiniteResponse:
     mock<SWRInfiniteResponse<IFormattedSearchResult, Error>>(),
   isReachingEnd: false,
+  hasLoadedAll: false,
   hasError: false,
   onRetry: vi.fn(),
 });
