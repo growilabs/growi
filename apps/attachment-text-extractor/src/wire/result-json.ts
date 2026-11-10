@@ -4,7 +4,7 @@ import { WireProtocolError } from './wire-protocol-error';
 
 // Kinds the parent decides on its own (timeout / crashed / memory_exceeded) are not accepted
 // from the child: a child must not be able to impersonate the parent's own classification.
-const CHILD_REPORTABLE_KINDS = [
+export const CHILD_REPORTABLE_KINDS = [
   'unsupported',
   'encrypted',
   'malformed',
@@ -13,7 +13,8 @@ const CHILD_REPORTABLE_KINDS = [
   'internal',
 ] as const satisfies readonly FailureKind[];
 
-const MAX_DETAIL_CHARS = 512;
+/** In code points, as Python's len() counted them. */
+export const MAX_DETAIL_CHARS = 512;
 const MAX_PAGE_NUMBER = 2 ** 31 - 1;
 const SUCCESS_KEYS: readonly string[] = ['ok', 'pages', 'mimeType'];
 const FAILURE_KEYS: readonly string[] = ['ok', 'kind', 'detail'];

@@ -2,7 +2,12 @@ import type { Readable, Writable } from 'node:stream';
 
 import { WireProtocolError } from './wire-protocol-error';
 
-export { decodeResult, encodeResult } from './result-json';
+export {
+  CHILD_REPORTABLE_KINDS,
+  decodeResult,
+  encodeResult,
+  MAX_DETAIL_CHARS,
+} from './result-json';
 
 export { WireProtocolError };
 

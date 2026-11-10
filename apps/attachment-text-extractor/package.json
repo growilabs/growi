@@ -8,6 +8,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "build": "rimraf dist && tsc -p tsconfig.build.json && node scripts/add-js-extensions.ts dist",
     "lint:biome": "biome check",
     "lint:typecheck": "tsgo --noEmit",
     "lint": "run-p lint:**",

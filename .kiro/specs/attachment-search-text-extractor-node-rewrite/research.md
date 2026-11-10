@@ -7507,3 +7507,37 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - **経路ごとの動的 import (23.1・20.1・20.12 に書き戻す)**: PDF の子は PDFium と入口に共通の部品 (`normalize`・`replace-batched`) だけを読み込む。DOCX/ODT/RTF/DOC と CSV/TSV は anydoc、TXT/MD/JSON/XML/ipynb/HTML は anydoc も PDFium も読み込まず、XLSX/PPTX は自分の経路の `ooxml/` の部品と anydoc だけを読み込む。`dist/` での指定子はすべてリテラルで、`add-js-extensions` が全部解決する。
 - **`ooxml/index.ts` は作らない (23.1 の「`index.ts` は convertPptx と convertXlsx だけ」と File Structure Plan を直す)**: 入口が `ooxml/` の部品を直接 import する。barrel 経由にすると XLSX の子が PPTX の部品 6 つまで読み込むため。`text/` に barrel を作らないのも同じ理由 (23.3 の `vi.mock` は import の指定子で差し替える)。
 - **6.6 / 6.7 への申し送り**: 子の入口は `import { convert } from '../conversion'` だけにし、部品を前もって読み込まない (`convert` を静的に import してよい。`dist/` では `index.js` に解決される)。6.7 の確認用の子は、`convert` に 1 件流すだけではその経路の部品しか読み込まない (PDFium は最初の変換のときに初期化される) ので、anydoc と PDFium の両方を確かめるには、小さな PDF と DOCX を 1 件ずつ変換するなど、両方を明示して読み込む。
+
+### 27.5 タスク 6.6 (子プロセスの入口と build)
+
+実装者とレビュアーが、子の条件 (`prlimit --as=2624MiB --cpu=60:65 --core=1`、`--wasm-max-mem-pages=8192 --max-semi-space-size=4`、`MALLOC_ARENA_MAX=2`、`RAYON_NUM_THREADS=1`、環境変数は 2 つだけ) で `dist/child/child-entry.js` を起動して確かめた値。
+
+**決めたこと (23.5 で「6.6 / 6.7 が決める」とされていたもの)**
+
+- **見出しの形**: `{ fileName, mimeHint, limits (7 項目), maxInputBytes }`。置き場所は `wire/child-header.ts` (design の File Structure Plan に無い新しいファイル。`child/` と `runner/` は互いに import できないので、両方が使える `wire/` に置く)。読み取りは決まったキーだけを受け付け、数は 0 以上の安全な整数だけ。`JSON.parse` の例外メッセージは入力を引用するので外へ出さない。見出しは必ず `encodeChildHeader` で作る。
+- **見出しの枠の上限は 8MiB**: 16.8 の手本では、multipart の部品のヘッダーの上限が 4,224 バイト、項目の上限が 1MiB。`fileName` は最大約 4KiB、`mimeHint` は最大 1MiB で JSON にすると最大約 6 倍 (約 6MiB) なので、合わせても 8MiB に収まる。超えうるのは、6.8 が項目の上限を約 1.3MiB より大きくした場合だけ。**6.7 の方針**: `encodeChildHeader` が `WireProtocolError` を投げたら、子を起動する前に `limit_exceeded` (422 `resource_limit_exceeded`) にし、`childPeakRssMb` は `null` にする (クライアントが送った大きすぎる値は 500 ではなく 422。16.1 で d36 を受け入れたのと同じ考え方)。6.8 は「項目の上限 × 6 + ファイル名の上限 < 8MiB」を確かめるテストを置く。
+- **`oom_score_adj` は `child/oom-score.ts` に置く** (design の判断 7 の「`runner/linux/` にまとめる」を直す。取り込み (Req 12) で直す)。承認済みのテスト「入力を読む前に 1000 にする」は runner を通さずに子を直接起動するので、子が自分で設定するしかない。親側で設定する形には 15.2 の (B) と同じ隙間があり、`choom` のような外部コマンドは Req 4.8 に反する。design の File Structure Plan の `child-entry.ts` の説明と 351 行目は、もともと子が設定すると書いている。6.10 の層の検査は、このファイルが `child/` にあることを許す形にする。
+- `oom_score_adj` の書き込みに失敗したら、決まった文の警告 1 行を出して変換を続ける (Python 版と同じ)。`/proc/self/limits` の自己確認はやめた (15.5 の注で許されている。`prlimit` が上限を掛けてから node を起動し、テストが外から確かめるため)。
+- 見張りの worker には `execArgv: []` を渡す。渡さないと親の node の引数を受け継ぎ、親が `--input-type=module` で起動していると worker が `require is not defined` で起動に失敗した。
+- fd 0 は `readSync` で読む (`process.stdin` に触ると fd 0 が O_NONBLOCK に変わるため)。このため、wire の非同期の `readFrame` と、`child/frame-io.ts` の同期の読み書きの 2 つがある。重なっているのは長さの 4 バイトを解く数行だけ。
+- **build**: `rimraf dist && tsc -p tsconfig.build.json && node scripts/add-js-extensions.ts dist`。`apps/app/bin/add-js-extensions.ts` を共有せず新しく書いたのは、23.5 の決定 2 (app をまたいで import しない) のとおり。`dist/` に 93 ファイル、書き換えた指定子 131 個、解決できない指定子 0。`tsc` と `rimraf` はルートの devDependencies から使う (`packages/core`・`apps/pdf-converter` と同じ形)。6.11 では Docker のビルドの段でルートの workspace をインストールする必要がある。`pnpm run build` そのものは流していない (pnpm 11 の install 誘発を避けた)。pnpm 越しに動くことは 6.12 の CI で確かめる。6.7 の `globalSetup` は `pnpm run` を呼ばず、`tsc` と拡張子を足す手順を直接起動する (23.5 の決定 3) ので、build の手順が `package.json` と 2 か所に分かれる。
+- `apps/attachment-text-extractor/.gitignore` に `/dist` を足した (ルートの `.gitignore` は `dist/` を無視しておらず、ほかのアプリも自分のディレクトリに書いている)。
+
+**Python 版との違い (Req 1.9。HTTP の応答は同じ)**: 親が消えたとき、Python 版は終了コード 3、Node 版は自分に SIGKILL (15.1)。想定外の例外のとき、Node 版は `internal` の枠 (detail はクラス名だけ) を送ってから終了コード 1、Python 版は変換の中なら `internal`、ほかは traceback で終了コード 1 (どちらも 500)。入力不正は両方とも終了コード 4・結果なし。結果の書き出し失敗は両方とも終了コード 0 (親は `crashed` に分類する)。親は枠があるかどうかを先に見て、結果が届いていれば終了コードより結果を優先する。
+
+**メモリ (20.12 に書き戻す)**: 待機時 62〜63MB (何も読まない node 41MB + `convert` の静的 import +4MB + 見張りの worker 約 +12〜14MB。worker の分は 15.7 の見積もり 11〜13MB どおりで、基準のファイルの値 (27.4) に最初から含まれている)。
+
+| 対象 | 最大 RSS |
+|---|---|
+| XLSX 7 万セル 1 シート | 290〜293MB |
+| DOCX 画像 12 枚 48MB | 271〜281MB |
+| 画像の DOCX | 263MB |
+| PPTX | 127〜130MB |
+| PDF 200 万字 | 302〜305MB |
+| 制御文字 550 万字 (結果の JSON 約 33MB) | 137〜142MB |
+| 15MiB の ASCII | 126〜129MB |
+
+- 304MB の線までの余裕は XLSX 12〜13MB、DOCX 23〜33MB。PDF 200 万字は 0.95 倍の検査の対象ではない (27.3)。結果の書き出しは、長さと本体を別々に書き、`concat` で写さない。
+- worker の分を減らす作りは、実測でどれも使えなかった: `resourceLimits` を外す・若い世代のヒープとスタックを 1MB に絞っても減らない、`codeRangeSizeMb: 1` は子が SIGTRAP で落ちる、worker の中で `fs` のストリームを使って `net` を避けると `process.exit` が返らない (15.3)、fd 4 を main で読む形は承認済みのテストの「同期の処理で止まっていても見張れる」を満たせない。
+
+**やっていないこと**: 20.12 で 6.6 に挙がっていた変換の層の案 (XLSX の書き直しで画像の要素を外す、DOCX の結果の写しを減らす、`definedName` の DOM) は、6.3・6.5 の commit 済みのコードを変えるので、範囲外として残した。既知の限界 (15.10): メインのスレッドが同期の処理で止まっている間は、worker のメモリ不足を検知できない (worker は起動した後に何も確保しないので、起きる見込みは低い)。

@@ -204,7 +204,7 @@
   - 経路ごとに変換の部品を動的に import し、PDF の子は PDFium だけを読み込む (anydoc・テキスト系・ooxml を読み込まない)。メモリの理由は research.md 27.3
   - 4.2 のテストと anydoc の契約テストがすべて通る
   - _Requirements: 1.1, 2.5, 5.2, 5.4_
-- [ ] 6.6 子プロセスの入口を実装する
+- [x] 6.6 子プロセスの入口を実装する
   - 見出しと本体を受け取り、`oom_score_adj` を設定し、親を見張り、変換を呼び、結果を追加のパイプに 1 回だけ送る
   - `build` スクリプト (`tsconfig.build.json` の `tsc` と、拡張子の無い相対の指定子に `.js` を足す手順) を足し、子の入口を `dist/child/child-entry.js` に出力する (research.md 23.5)
   - 4.3 のうち子の側に関するテストが通る
@@ -214,6 +214,7 @@
   - Linux に固有の処理は 1 か所にまとめ、Linux 以外では何もしない
   - 既定の子の入口は `build` で作った JavaScript (`dist/child/child-entry.js`) で、テストも swc の register を使わずに起動する。vitest の `globalSetup` で `build` を流し、`dist/` が無いときに register の起動に戻らない (research.md 23.5)
   - 確認用の子は、部品の読み込み方に関わらず、anydoc と PDFium を読み込んで確かめる (research.md 20.12)。どちらかを読み込めない確認用の子では準備完了にならないことのテストを、実装の前に書いて RED を確かめてから実装する (Python 版の `test_missing_dependency_boots_not_ready_and_readyz_gives_503` に当たる)
+  - 見出しは `wire/child-header.ts` の `encodeChildHeader` で作る。`encodeChildHeader` が `WireProtocolError` を投げたら、子を起動する前に `limit_exceeded` にし、`childPeakRssMb` は `null` にする (research.md 27.5)
   - 4.3 のテストがすべて通る
   - _Requirements: 3.4, 3.5, 3.6, 3.8, 3.10, 3.12, 4.3, 4.8, 8.8_
 - [ ] 6.8 HTTP の層を実装する
