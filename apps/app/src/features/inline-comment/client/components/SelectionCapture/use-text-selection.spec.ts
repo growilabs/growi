@@ -113,6 +113,15 @@ describe('captureSelection', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null for a selection of only whitespace', () => {
+    const container = mountContainer('hello   world');
+    const selection = selectRange(container, 5, 8);
+
+    const result = captureSelection(selection, container);
+
+    expect(result).toBeNull();
+  });
+
   it('returns null when there is no selection at all', () => {
     const container = mountContainer('hello world');
 

@@ -2,6 +2,7 @@ import type { RefObject } from 'react';
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { imageOutlineSelector } from '../../services/image-in-range';
 import { PendingSelectionHighlight } from './PendingSelectionHighlight';
 
 /**
@@ -79,6 +80,41 @@ describe('PendingSelectionHighlight', () => {
     expect(ranges).toHaveLength(1);
     expect(ranges[0].toString()).toBe('quick brown fox');
     expect(container.hasAttribute(SCOPE_ATTR)).toBe(true);
+  });
+
+  it('paints only the text around an image in the range, and outlines the image instead until unmount', () => {
+    container.innerHTML = 'Before <img alt="pic"> after.';
+    const image = container.querySelector('img') as HTMLImageElement;
+    const range = new Range();
+    range.setStart(container.firstChild as Text, 0);
+    range.setEnd(container.lastChild as Text, ' after'.length);
+
+    const { unmount } = render(
+      <PendingSelectionHighlight range={range} containerRef={containerRef} />,
+    );
+
+    const ranges = rangesOf();
+    expect(ranges.map((r) => r.toString())).toEqual(['Before ', ' after']);
+    expect(ranges.some((r) => r.intersectsNode(image))).toBe(false);
+    expect(image.matches(imageOutlineSelector('pending'))).toBe(true);
+
+    unmount();
+    expect(image.matches(imageOutlineSelector('pending'))).toBe(false);
+  });
+
+  it('does not outline an image at the edge of the selection, matching how the comment is restored once saved', () => {
+    container.innerHTML = 'Before <img alt="pic"> after.';
+    const image = container.querySelector('img') as HTMLImageElement;
+    const range = new Range();
+    range.setStartBefore(image);
+    range.setEnd(container.lastChild as Text, ' after'.length);
+
+    render(
+      <PendingSelectionHighlight range={range} containerRef={containerRef} />,
+    );
+
+    expect(rangesOf().map((r) => r.toString())).toEqual([' after']);
+    expect(image.matches(imageOutlineSelector('pending'))).toBe(false);
   });
 
   it('removes both the CSS highlight and the scope attribute on unmount', () => {

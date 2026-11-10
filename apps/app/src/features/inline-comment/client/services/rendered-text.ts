@@ -10,9 +10,18 @@ export interface RenderedText {
    * part of the normal DOM text.
    */
   text: string;
-  /** Maps an offset into `text` back to a DOM position, or `null` if out of bounds. */
+  /**
+   * Maps an offset into `text` back to a DOM position, or `null` if out of bounds.
+   *
+   * An offset on the border of two text nodes has two DOM positions: the end of
+   * the earlier node and the start of the later one. Anything between them that
+   * has no text (an image) lies inside a Range that uses the wrong one, so the
+   * start of a Range takes the later node (`'start'`, the default) and the end
+   * takes the earlier node (`'end'`).
+   */
   resolveDomPosition: (
     textOffset: number,
+    bias?: BoundaryBias,
   ) => { node: Node; offset: number } | null;
   /**
    * Converts a DOM boundary point — the same kind of boundary that
@@ -23,6 +32,8 @@ export interface RenderedText {
    */
   textOffsetOf: (node: Node, offset: number) => number;
 }
+
+export type BoundaryBias = 'start' | 'end';
 
 /** One text node's contribution to the constructed plain text, as a [start, end) span. */
 interface TextNodeSpan {
@@ -104,6 +115,7 @@ const resolveDomPositionFrom = (
   spans: TextNodeSpan[],
   text: string,
   textOffset: number,
+  bias: BoundaryBias,
 ): { node: Node; offset: number } | null => {
   if (textOffset < 0 || textOffset > text.length || spans.length === 0) {
     return null;
@@ -116,9 +128,19 @@ const resolveDomPositionFrom = (
     return { node: last.node, offset: last.end - last.start };
   }
 
-  const span = spans.find(
-    (candidate) => textOffset >= candidate.start && textOffset < candidate.end,
-  );
+  const endingHere =
+    bias === 'end'
+      ? spans.find(
+          (candidate) =>
+            textOffset > candidate.start && textOffset <= candidate.end,
+        )
+      : undefined;
+  const span =
+    endingHere ??
+    spans.find(
+      (candidate) =>
+        textOffset >= candidate.start && textOffset < candidate.end,
+    );
   return span == null
     ? null
     : { node: span.node, offset: textOffset - span.start };
@@ -156,8 +178,8 @@ export const renderedTextOf = (container: HTMLElement): RenderedText => {
 
   return {
     text,
-    resolveDomPosition: (textOffset) =>
-      resolveDomPositionFrom(spans, text, textOffset),
+    resolveDomPosition: (textOffset, bias = 'start') =>
+      resolveDomPositionFrom(spans, text, textOffset, bias),
     textOffsetOf: (node, offset) =>
       textOffsetOfBoundary(container, node, offset),
   };

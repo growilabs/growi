@@ -247,8 +247,8 @@ export class InlineCommentService {
     input: CreateInlineCommentInput,
     creatorId: string,
   ): Promise<IInlineComment> {
-    if (input.anchor.quote === '') {
-      throw new Error('anchor.quote must not be empty');
+    if (input.anchor.quote.trim() === '') {
+      throw new Error('anchor.quote must not be empty or whitespace-only');
     }
 
     const created = await this.deps.prisma.comments.create({

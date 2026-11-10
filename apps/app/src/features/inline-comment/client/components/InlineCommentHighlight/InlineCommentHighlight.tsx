@@ -2,6 +2,11 @@ import type { RefObject } from 'react';
 import { useEffect } from 'react';
 
 import type { ResolvedRange } from '../../../interfaces';
+import {
+  imageOutlineSelector,
+  markImages,
+  splitRangeAroundImages,
+} from '../../services/image-in-range';
 import { rangesById } from '../../services/resolved-range';
 
 /**
@@ -26,7 +31,9 @@ const supportsCustomHighlightApi = (): boolean =>
 
 /**
  * Draws a highlight for every resolved (non-`not_found`) range, using the
- * CSS Custom Highlight API (`CSS.highlights` + `::highlight()`).
+ * CSS Custom Highlight API (`CSS.highlights` + `::highlight()`). An image
+ * inside a range gets an outline instead of the fill, which would hide it
+ * (see `services/image-in-range`).
  *
  * This technique was chosen over mutating the DOM (e.g. wrapping matched
  * text in `<mark>`) because `containerRef` points at a subtree React (via
@@ -49,17 +56,23 @@ export const InlineCommentHighlight = ({
       return;
     }
 
-    const ranges = Array.from(rangesById(container, resolvedRanges).values());
+    const splits = Array.from(
+      rangesById(container, resolvedRanges).values(),
+    ).map(splitRangeAroundImages);
+    const textRanges = splits.flatMap((split) => split.textRanges);
+    const images = splits.flatMap((split) => split.images);
 
-    if (ranges.length === 0) {
+    if (textRanges.length === 0 && images.length === 0) {
       CSS.highlights.delete(HIGHLIGHT_NAME);
       return;
     }
 
-    CSS.highlights.set(HIGHLIGHT_NAME, new Highlight(...ranges));
+    CSS.highlights.set(HIGHLIGHT_NAME, new Highlight(...textRanges));
+    const unmarkImages = markImages(images, 'saved');
 
     return () => {
       CSS.highlights.delete(HIGHLIGHT_NAME);
+      unmarkImages();
     };
   }, [containerRef, resolvedRanges]);
 
@@ -68,6 +81,9 @@ export const InlineCommentHighlight = ({
       {`
         ::highlight(${HIGHLIGHT_NAME}) {
           background-color: var(--grw-inline-comment-marker-bg);
+        }
+        ${imageOutlineSelector('saved')} {
+          outline: 4px solid var(--grw-inline-comment-marker-bg);
         }
       `}
     </style>

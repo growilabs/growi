@@ -378,6 +378,30 @@ describe('InlineCommentService.create', () => {
     expect(result.anchor.suffix).toBe(decomposedSuffix);
   });
 
+  it('クオートが空白文字だけの場合もエラーとし、永続化を一切呼び出さない', async () => {
+    const deps = makeDeps(makeCreatedRow());
+    const service = new InlineCommentService(deps);
+
+    await expect(
+      service.create(
+        {
+          pageId: makeId(),
+          anchorOriginRevisionId: makeId(),
+          comment: 'x',
+          anchor: {
+            quote: ' \n\u3000 ',
+            prefix: '',
+            suffix: '',
+            approxOffset: 0,
+          },
+        },
+        makeId(),
+      ),
+    ).rejects.toThrow();
+
+    expect(deps.prisma.comments.create).not.toHaveBeenCalled();
+  });
+
   it('クオートが空文字の場合はエラーとし、永続化を一切呼び出さない', async () => {
     const createdRow = makeCreatedRow();
     const deps = makeDeps(createdRow);

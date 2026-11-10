@@ -18,8 +18,14 @@ import { toastError } from '~/client/util/toastr';
 import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
 // biome-ignore lint/style/noRestrictedImports: client-only hook used in client-only component (must run unconditionally, so it cannot go through next/dynamic like the components below)
 import { useAnchorResolver } from '~/features/inline-comment/client/components/AnchorResolver/use-anchor-resolver';
-// biome-ignore lint/style/noRestrictedImports: client-only service used in client-only component
+// biome-ignore-start lint/style/noRestrictedImports: client-only services used in client-only component
+import {
+  imageOutlineSelector,
+  markImages,
+  splitRangeAroundImages,
+} from '~/features/inline-comment/client/services/image-in-range';
 import { rangesById } from '~/features/inline-comment/client/services/resolved-range';
+// biome-ignore-end lint/style/noRestrictedImports: client-only services used in client-only component
 // biome-ignore lint/style/noRestrictedImports: client-only hook used in client-only component (must run unconditionally, so it cannot go through next/dynamic like the components below)
 import { useSWRxInlineComments } from '~/features/inline-comment/client/stores/inline-comment';
 import type { RendererConfig } from '~/interfaces/services/renderer';
@@ -261,11 +267,14 @@ const PageViewComponent = (props: Props): JSX.Element => {
   );
 
   const emphasisTimeoutRef = useRef<number | undefined>(undefined);
+  const unmarkEmphasizedImagesRef = useRef<(() => void) | undefined>(undefined);
   const clearEmphasis = useCallback(() => {
     if (emphasisTimeoutRef.current != null) {
       window.clearTimeout(emphasisTimeoutRef.current);
       emphasisTimeoutRef.current = undefined;
     }
+    unmarkEmphasizedImagesRef.current?.();
+    unmarkEmphasizedImagesRef.current = undefined;
     if (supportsCustomHighlightApi()) {
       CSS.highlights.delete(EMPHASIS_HIGHLIGHT_NAME);
     }
@@ -293,7 +302,12 @@ const PageViewComponent = (props: Props): JSX.Element => {
 
       clearEmphasis();
       if (supportsCustomHighlightApi()) {
-        CSS.highlights.set(EMPHASIS_HIGHLIGHT_NAME, new Highlight(range));
+        const { textRanges, images } = splitRangeAroundImages(range);
+        CSS.highlights.set(
+          EMPHASIS_HIGHLIGHT_NAME,
+          new Highlight(...textRanges),
+        );
+        unmarkEmphasizedImagesRef.current = markImages(images, 'emphasis');
         emphasisTimeoutRef.current = window.setTimeout(
           clearEmphasis,
           EMPHASIS_DURATION_MS,
@@ -465,6 +479,9 @@ const PageViewComponent = (props: Props): JSX.Element => {
         {`
           ::highlight(${EMPHASIS_HIGHLIGHT_NAME}) {
             background-color: var(--grw-marker-bg-red);
+          }
+          ${imageOutlineSelector('emphasis')} {
+            outline: 4px solid var(--grw-marker-bg-red);
           }
         `}
       </style>

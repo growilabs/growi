@@ -15,7 +15,7 @@ export const rangeForResolved = (
   }
 
   const start = renderedText.resolveDomPosition(resolved.startOffset);
-  const end = renderedText.resolveDomPosition(resolved.endOffset);
+  const end = renderedText.resolveDomPosition(resolved.endOffset, 'end');
   if (start == null || end == null) {
     return null;
   }
@@ -47,4 +47,28 @@ export const rangesById = (
     }
   }
   return next;
+};
+
+/**
+ * The Range a comment saved from `selection` will be restored to after a
+ * reload. Only text offsets are saved, so an image at either edge of the
+ * selection is not part of it; painting the pending highlight with this
+ * Range keeps it identical to the saved one.
+ */
+export const savedRangeOf = (
+  container: HTMLElement,
+  selection: Range,
+): Range | null => {
+  const renderedText = renderedTextOf(container);
+  return rangeForResolved(renderedText, {
+    status: 'exact',
+    startOffset: renderedText.textOffsetOf(
+      selection.startContainer,
+      selection.startOffset,
+    ),
+    endOffset: renderedText.textOffsetOf(
+      selection.endContainer,
+      selection.endOffset,
+    ),
+  });
 };

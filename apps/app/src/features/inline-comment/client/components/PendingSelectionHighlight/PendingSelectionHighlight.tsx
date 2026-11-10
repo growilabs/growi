@@ -1,6 +1,13 @@
 import type { RefObject } from 'react';
 import { useEffect } from 'react';
 
+import {
+  imageOutlineSelector,
+  markImages,
+  splitRangeAroundImages,
+} from '../../services/image-in-range';
+import { savedRangeOf } from '../../services/resolved-range';
+
 /**
  * Name registered with `CSS.highlights` (the CSS Custom Highlight API) for the
  * range a comment is currently being composed for. Deliberately distinct from
@@ -59,12 +66,18 @@ export const PendingSelectionHighlight = ({
       return;
     }
 
-    CSS.highlights.set(PENDING_HIGHLIGHT_NAME, new Highlight(range));
+    const container = containerRef.current;
+    const painted =
+      (container != null ? savedRangeOf(container, range) : null) ?? range;
+    const { textRanges, images } = splitRangeAroundImages(painted);
+    CSS.highlights.set(PENDING_HIGHLIGHT_NAME, new Highlight(...textRanges));
+    const unmarkImages = markImages(images, 'pending');
 
     return () => {
       CSS.highlights.delete(PENDING_HIGHLIGHT_NAME);
+      unmarkImages();
     };
-  }, [range]);
+  }, [range, containerRef]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -93,6 +106,14 @@ export const PendingSelectionHighlight = ({
         }
         ::highlight(${PENDING_HIGHLIGHT_NAME}) {
           background-color: color-mix(in srgb, var(--grw-inline-comment-marker-bg-pending) 70%, transparent);
+        }
+        /* Chrome tints a selected image with the ::selection color too; the
+           outline below marks it instead, so the image itself stays as-is. */
+        [${SCOPE_ATTR}] img::selection {
+          background-color: transparent;
+        }
+        ${imageOutlineSelector('pending')} {
+          outline: 4px solid color-mix(in srgb, var(--grw-inline-comment-marker-bg-pending) 70%, transparent);
         }
       `}
     </style>

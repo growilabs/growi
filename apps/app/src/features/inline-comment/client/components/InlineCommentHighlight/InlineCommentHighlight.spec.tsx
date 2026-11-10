@@ -3,6 +3,7 @@ import { cleanup, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ResolvedRange } from '../../../interfaces';
+import { imageOutlineSelector } from '../../services/image-in-range';
 import { InlineCommentHighlight } from './InlineCommentHighlight';
 
 /**
@@ -77,6 +78,36 @@ describe('InlineCommentHighlight', () => {
     const ranges = rangesOf();
     expect(ranges).toHaveLength(1);
     expect(ranges[0].toString()).toBe(quote);
+  });
+
+  it('paints only the text around an image in the range, and outlines the image instead', () => {
+    container.innerHTML = 'Before <img alt="pic"> after.';
+    const image = container.querySelector('img') as HTMLImageElement;
+    const resolvedRanges = new Map<string, ResolvedRange>([
+      [
+        'c1',
+        {
+          status: 'exact',
+          startOffset: 0,
+          endOffset: 'Before  after'.length,
+        },
+      ],
+    ]);
+
+    const { unmount } = render(
+      <InlineCommentHighlight
+        containerRef={containerRef}
+        resolvedRanges={resolvedRanges}
+      />,
+    );
+
+    const ranges = rangesOf();
+    expect(ranges.map((r) => r.toString())).toEqual(['Before ', ' after']);
+    expect(ranges.some((r) => r.intersectsNode(image))).toBe(false);
+    expect(image.matches(imageOutlineSelector('saved'))).toBe(true);
+
+    unmount();
+    expect(image.matches(imageOutlineSelector('saved'))).toBe(false);
   });
 
   it('registers no highlight when the resolved range is not_found', () => {

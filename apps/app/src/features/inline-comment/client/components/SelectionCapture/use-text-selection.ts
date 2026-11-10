@@ -57,8 +57,9 @@ export function captureSelection(
 
   const range = selection.getRangeAt(0);
   const quote = range.toString();
-  if (quote === '') {
-    // Covers both a collapsed selection and a genuinely empty selected string.
+  if (quote.trim() === '') {
+    // Covers a collapsed selection, an empty selected string, and a selection
+    // of only whitespace (e.g. an image plus the spaces around it).
     return null;
   }
 

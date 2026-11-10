@@ -333,6 +333,17 @@ describe('POST /_api/v3/inline-comments', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 when anchor.quote is whitespace-only (service precondition)', async () => {
+    const res = await request(app)
+      .post('/_api/v3/inline-comments')
+      .send({
+        ...validBody(),
+        anchor: { ...validBody().anchor, quote: ' \n ' },
+      });
+
+    expect(res.status).toBe(400);
+  });
+
   it('returns 400 when pageId is not a valid MongoId (express-validator)', async () => {
     const res = await request(app)
       .post('/_api/v3/inline-comments')

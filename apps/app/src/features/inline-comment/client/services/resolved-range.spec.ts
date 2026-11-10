@@ -2,7 +2,7 @@
 
 import type { ResolvedRange } from '../../interfaces';
 import { renderedTextOf } from './rendered-text';
-import { rangeForResolved, rangesById } from './resolved-range';
+import { rangeForResolved, rangesById, savedRangeOf } from './resolved-range';
 
 const createContainer = (): HTMLElement => {
   const container = document.createElement('div');
@@ -52,6 +52,57 @@ describe('rangeForResolved', () => {
     });
 
     expect(range).toBeNull();
+  });
+});
+
+describe('rangeForResolved next to an image', () => {
+  const containerWithImage = (): HTMLElement => {
+    const container = document.createElement('div');
+    container.innerHTML = 'Before <strong>bold</strong><img alt="pic"> after.';
+    return container;
+  };
+
+  it('ends before an image that directly follows the commented text', () => {
+    const container = containerWithImage();
+    const start = 'Before '.length;
+    const range = rangeForResolved(renderedTextOf(container), {
+      status: 'exact',
+      startOffset: start,
+      endOffset: start + 'bold'.length,
+    });
+
+    expect(range?.toString()).toBe('bold');
+    expect(range?.intersectsNode(container.querySelector('img') as Node)).toBe(
+      false,
+    );
+  });
+
+  it('starts after an image that directly precedes the commented text', () => {
+    const container = containerWithImage();
+    const start = 'Before bold'.length;
+    const range = rangeForResolved(renderedTextOf(container), {
+      status: 'exact',
+      startOffset: start,
+      endOffset: start + ' after'.length,
+    });
+
+    expect(range?.toString()).toBe(' after');
+    expect(range?.intersectsNode(container.querySelector('img') as Node)).toBe(
+      false,
+    );
+  });
+
+  it('includes an image that sits between the commented text on both sides', () => {
+    const container = containerWithImage();
+    const range = rangeForResolved(renderedTextOf(container), {
+      status: 'exact',
+      startOffset: 'Before '.length,
+      endOffset: 'Before bold after'.length,
+    });
+
+    expect(range?.intersectsNode(container.querySelector('img') as Node)).toBe(
+      true,
+    );
   });
 });
 
@@ -109,5 +160,55 @@ describe('rangesById', () => {
     const result = rangesById(container, resolvedRanges);
 
     expect(result.size).toBe(0);
+  });
+});
+
+describe('savedRangeOf', () => {
+  const setup = () => {
+    const container = document.createElement('div');
+    container.innerHTML = 'Before <img alt="pic"> after.';
+    document.body.appendChild(container);
+    const image = container.querySelector('img') as HTMLImageElement;
+    return { container, image };
+  };
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('drops an image at the start edge of the selection, as a reload would', () => {
+    const { container, image } = setup();
+    const selection = document.createRange();
+    selection.setStartBefore(image);
+    selection.setEnd(container.lastChild as Node, ' after'.length);
+
+    const saved = savedRangeOf(container, selection);
+
+    expect(saved?.toString()).toBe(' after');
+    expect(saved?.intersectsNode(image)).toBe(false);
+  });
+
+  it('drops an image at the end edge of the selection, as a reload would', () => {
+    const { container, image } = setup();
+    const selection = document.createRange();
+    selection.setStart(container.firstChild as Node, 0);
+    selection.setEndAfter(image);
+
+    const saved = savedRangeOf(container, selection);
+
+    expect(saved?.toString()).toBe('Before ');
+    expect(saved?.intersectsNode(image)).toBe(false);
+  });
+
+  it('keeps an image that has selected text on both sides', () => {
+    const { container, image } = setup();
+    const selection = document.createRange();
+    selection.setStart(container.firstChild as Node, 0);
+    selection.setEnd(container.lastChild as Node, ' after'.length);
+
+    const saved = savedRangeOf(container, selection);
+
+    expect(saved?.toString()).toBe('Before  after');
+    expect(saved?.intersectsNode(image)).toBe(true);
   });
 });
