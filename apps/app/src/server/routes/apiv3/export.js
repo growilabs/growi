@@ -5,6 +5,7 @@ import { body, param } from 'express-validator';
 import mongoose from 'mongoose';
 import sanitize from 'sanitize-filename';
 
+import { recordArchiveOperation } from '~/features/opentelemetry/server';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
@@ -264,7 +265,20 @@ export const setup = (crowi) => {
       try {
         const { collections } = req.body;
 
-        exportService.export(collections);
+        // Not awaited: the response is returned without waiting for the export to finish.
+        // A null result means nothing was produced and counts as a failure.
+        exportService.export(collections).then(
+          (zipFileStat) => {
+            recordArchiveOperation(
+              'create',
+              zipFileStat != null ? 'success' : 'failure',
+            );
+          },
+          (err) => {
+            recordArchiveOperation('create', 'failure');
+            logger.error({ err }, 'Failed to export collections');
+          },
+        );
 
         const parameters = {
           action: SupportedAction.ACTION_ADMIN_ARCHIVE_DATA_CREATE,

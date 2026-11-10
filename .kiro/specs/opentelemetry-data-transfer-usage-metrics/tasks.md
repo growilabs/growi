@@ -14,7 +14,7 @@
   - _Requirements: 3.1, 3.2_
 
 - [ ] 2. データアーカイブ操作の計測
-- [ ] 2.1 (P) アーカイブ作成の成否を記録する
+- [x] 2.1 (P) アーカイブ作成の成否を記録する
   - 作成要求の受付後、バックグラウンドで進む作成処理の完了・失敗を待って記録する。応答は従来どおり処理完了を待たずに返す
   - 作成結果が得られた場合は成功、結果なし・失敗（実行中の重複要求による失敗を含む）は失敗として 1 回記録する
   - 作成処理の失敗は記録後に再送出せず、従来グローバルで出ていた相当のエラーログを残す
@@ -95,3 +95,4 @@
 - `pnpm run lint:typecheck` reports 3 pre-existing errors outside this spec (`features/ai-usage/server/routes/apiv3/ai-usage.integ.ts` L112/L138, `server/routes/apiv3/staffs/index.spec.ts` L38). Not caused by this work; judge typecheck by "no errors in changed files".
 - Routes import the recorders only via `~/features/opentelemetry/server` (top-level barrel). No boot-order/circular hazard: the barrel's other export `node-sdk` is already loaded at boot by `server/app.ts`.
 - Tests that need real metric output use a real `MeterProvider` + `InMemoryMetricExporter` (see `custom-metrics/data-transfer-usage-metrics.spec.ts`); callers' tests mock the record functions from the barrel.
+- Log errors in pino form `logger.error({ err }, 'msg')` — `logger.error('msg', err)` drops the error under @growi/logger. Attach background-promise handlers with two-arg `.then(onOk, onErr)` so a throw in the success path cannot double-record.
