@@ -121,8 +121,10 @@ describe('pagelinkbackfilljobs (integration)', () => {
   });
 
   describe('tryClaim', () => {
+    // A fresh document is `idle`, which is deliberately not claimable; a request is what opens it.
     beforeEach(async () => {
       await prisma.pagelinkbackfilljobs.ensureExists();
+      await patchJobDocument({ status: 'requested' });
     });
 
     it('succeeds for the first claimant and rejects a second while the lease is live', async () => {
@@ -187,25 +189,25 @@ describe('pagelinkbackfilljobs (integration)', () => {
 
     it.each([
       'idle',
-      'requested',
       'stopped',
-      'failed',
-    ])('hands out an unclaimed %s job, so a request, a stopped run or a failed run can be picked up', async (status) => {
+      'complete',
+    ])('never hands out an unclaimed %s job', async (status) => {
       await patchJobDocument({ status });
 
       const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
         leaseMs: LEASE_MS,
       });
 
-      expect(claimed).toBe(true);
-      expect((await readJob())?.status).toBe('running');
+      expect(claimed).toBe(false);
+      expect(await readJob()).toMatchObject({ status, claimedBy: null });
     });
 
-    it('never hands out a completed job, even when its lease has expired', async () => {
-      await patchJobDocument({
-        status: 'complete',
-        claimedBy: 'old-owner',
-      });
+    it.each([
+      'idle',
+      'stopped',
+      'complete',
+    ])('never takes over a %s job, even when its old lease has expired', async (status) => {
+      await patchJobDocument({ status, claimedBy: 'old-owner' });
       await expireLease();
 
       const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
@@ -213,9 +215,71 @@ describe('pagelinkbackfilljobs (integration)', () => {
       });
 
       expect(claimed).toBe(false);
+      expect(await readJob()).toMatchObject({ status, claimedBy: 'old-owner' });
+    });
+
+    it.each([
+      'requested',
+      'running',
+      'failed',
+    ])('hands out an unclaimed %s job, so a request, an interrupted run or a failed run can be picked up', async (status) => {
+      await patchJobDocument({ status });
+
+      const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
+        leaseMs: LEASE_MS,
+      });
+
+      expect(claimed).toBe(true);
       expect(await readJob()).toMatchObject({
-        status: 'complete',
-        claimedBy: 'old-owner',
+        status: 'running',
+        claimedBy: 'owner-a',
+      });
+    });
+
+    it.each([
+      'running',
+      'failed',
+    ])('does not take a %s job from a holder whose lease is still live', async (status) => {
+      await patchJobDocument({
+        status,
+        claimedBy: 'live-owner',
+        leaseExpiresAt: { $date: '2999-01-01T00:00:00Z' },
+      });
+
+      const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
+        leaseMs: LEASE_MS,
+      });
+
+      expect(claimed).toBe(false);
+      expect(await readJob()).toMatchObject({
+        status,
+        claimedBy: 'live-owner',
+      });
+    });
+
+    it('clears a stale stopRequested when claiming', async () => {
+      await patchJobDocument({ stopRequested: true });
+
+      await prisma.pagelinkbackfilljobs.tryClaim('owner-a', {
+        leaseMs: LEASE_MS,
+      });
+
+      expect((await readJob())?.stopRequested).toBe(false);
+    });
+
+    it.each([
+      0,
+      -1,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+    ])('rejects leaseMs=%s without touching the job', async (leaseMs) => {
+      await expect(
+        prisma.pagelinkbackfilljobs.tryClaim('owner-a', { leaseMs }),
+      ).rejects.toThrow(/leaseMs/);
+
+      expect(await readJob()).toMatchObject({
+        status: 'requested',
+        claimedBy: null,
       });
     });
 
