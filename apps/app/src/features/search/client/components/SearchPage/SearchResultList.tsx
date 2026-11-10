@@ -56,7 +56,7 @@ type Props = {
   // Checked pages, including rows outside the rendered range. Rows scrolled
   // back into range remount and take their initial checkbox state from it
   // (selectAll/deselectAll reach mounted rows only).
-  selectedPageIds?: ReadonlySet<string>;
+  selectedPageIds: ReadonlySet<string>;
   // Each row's `aria-setsize`: -1 while the total is still unknown. Defaults to
   // the loaded count.
   listSize?: number;
@@ -326,7 +326,7 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
               isEnableActions={!isGuestUser}
               isReadOnlyUser={!!isReadOnlyUser}
               isSelected={page.data._id === selectedPageId}
-              isInitiallyChecked={selectedPageIds?.has(page.data._id)}
+              isInitiallyChecked={selectedPageIds.has(page.data._id)}
               forceHideMenuItems={forceHideMenuItems}
               onClickItem={clickItemHandler}
               onCheckboxChanged={props.onCheckboxChanged}

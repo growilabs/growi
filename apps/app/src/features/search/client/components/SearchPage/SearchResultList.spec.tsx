@@ -146,6 +146,8 @@ afterEach(() => {
   layout.restore();
 });
 
+const NO_SELECTION: ReadonlySet<string> = new Set();
+
 const createPage = (id: string): IPageWithSearchMeta =>
   mock<IPageWithSearchMeta>({
     data: mock<IPageHasId>({ _id: id, path: `/page/${id}` }),
@@ -166,6 +168,7 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
         onItemMutated={onItemMutated}
@@ -186,6 +189,7 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
         onItemMutated={onItemMutated}
@@ -206,6 +210,7 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
         onItemMutated={onItemMutated}
@@ -225,6 +230,7 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
     const onItemMutated = vi.fn();
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
         onItemMutated={onItemMutated}
@@ -240,6 +246,7 @@ describe('SearchResultList item-mutation wiring (A-1)', () => {
   it('does not throw when onItemMutated is not provided (legacy callers)', () => {
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
       />,
@@ -267,6 +274,7 @@ describe('SearchResultList onPreviewedPageDeleted wiring', () => {
     const onPreviewedPageDeleted = vi.fn();
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={[createPage('a'), createPage('b')]}
         selectedPageId="b"
@@ -285,6 +293,7 @@ describe('SearchResultList onPreviewedPageDeleted wiring', () => {
     const onPreviewedPageDeleted = vi.fn();
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={[createPage('a'), createPage('b')]}
         selectedPageId="b"
@@ -303,6 +312,7 @@ describe('SearchResultList onPreviewedPageDeleted wiring', () => {
     const onPreviewedPageDeleted = vi.fn();
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={[createPage('a')]}
         onPreviewedPageDeleted={onPreviewedPageDeleted}
@@ -332,6 +342,7 @@ describe('SearchResultList row re-render scope on preview switch (Req 10.1)', ()
   const switchPreviewAndCountRenders = (): Record<string, number> => {
     const { rerender } = render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={pages}
         selectedPageId="a"
@@ -341,6 +352,7 @@ describe('SearchResultList row re-render scope on preview switch (Req 10.1)', ()
 
     rerender(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={pages}
         selectedPageId="c"
@@ -371,6 +383,7 @@ describe('SearchResultList row re-render scope on preview switch (Req 10.1)', ()
   it('keeps re-rendering only the two affected rows across repeated switches', () => {
     const { rerender } = render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={pages}
         selectedPageId="a"
@@ -380,6 +393,7 @@ describe('SearchResultList row re-render scope on preview switch (Req 10.1)', ()
       pageListItemLSpy.renderCountByPageId.clear();
       rerender(
         <SearchResultList
+          selectedPageIds={NO_SELECTION}
           scrollElement={layout.scrollElement}
           pages={pages}
           selectedPageId={selectedPageId}
@@ -405,6 +419,7 @@ describe('SearchResultList selectAll / deselectAll', () => {
     const ref = React.createRef<ISelectableAll>();
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         ref={ref}
         pages={['a', 'b', 'c'].map(createPage)}
@@ -428,6 +443,7 @@ describe('SearchResultList selectAll / deselectAll', () => {
     const [a, b, c] = ['a', 'b', 'c'].map(createPage);
     const { rerender } = render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         ref={ref}
         pages={[a, b, c]}
@@ -436,6 +452,7 @@ describe('SearchResultList selectAll / deselectAll', () => {
 
     rerender(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         ref={ref}
         pages={[a, c]}
@@ -476,6 +493,7 @@ describe('SearchResultList virtualization', () => {
   it('renders only the rows around the viewport out of several hundred', () => {
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={createPages(300)}
       />,
@@ -489,6 +507,7 @@ describe('SearchResultList virtualization', () => {
   it('does not render more rows when more pages are loaded', () => {
     const { rerender } = render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={createPages(300)}
       />,
@@ -497,6 +516,7 @@ describe('SearchResultList virtualization', () => {
 
     rerender(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={createPages(600)}
       />,
@@ -531,6 +551,7 @@ describe('SearchResultList virtualization', () => {
     const renderRowCount = (): number => {
       const { unmount } = render(
         <SearchResultList
+          selectedPageIds={NO_SELECTION}
           scrollElement={layout.scrollElement}
           pages={createPages(300)}
         />,
@@ -562,12 +583,17 @@ describe('SearchResultList virtualization', () => {
         .map((row) => row.getAttribute('aria-setsize') ?? '');
 
     const { rerender } = render(
-      <SearchResultList scrollElement={layout.scrollElement} pages={pages} />,
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={pages}
+        selectedPageIds={NO_SELECTION}
+      />,
     );
     expect(new Set(setSizesOfRows())).toEqual(new Set(['30']));
 
     rerender(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={pages}
         listSize={-1}
@@ -579,13 +605,21 @@ describe('SearchResultList virtualization', () => {
   it('renders no rows until the scroll element is available', () => {
     const pages = createPages(3);
     const { rerender } = render(
-      <SearchResultList scrollElement={null} pages={pages} />,
+      <SearchResultList
+        scrollElement={null}
+        pages={pages}
+        selectedPageIds={NO_SELECTION}
+      />,
     );
 
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
 
     rerender(
-      <SearchResultList scrollElement={layout.scrollElement} pages={pages} />,
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        pages={pages}
+        selectedPageIds={NO_SELECTION}
+      />,
     );
 
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
@@ -651,6 +685,7 @@ describe('SearchResultList state of rows re-rendered by scrolling', () => {
   it('keeps the preview highlight on the previewed row after scrolling out and back', async () => {
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={pages}
         selectedPageId="p1"
@@ -667,14 +702,12 @@ describe('SearchResultList state of rows re-rendered by scrolling', () => {
 
   it('renders rows checked that are first rendered by scrolling after selectAll', async () => {
     const ref = React.createRef<ISelectableAll>();
-    // Kept as the same instance and updated by the caller, as SearchPageBase does.
-    const selectedPageIds = new Set<string>();
-    render(
+    const { rerender } = render(
       <SearchResultList
         scrollElement={layout.scrollElement}
         ref={ref}
         pages={pages}
-        selectedPageIds={selectedPageIds}
+        selectedPageIds={NO_SELECTION}
       />,
     );
     const renderedPageIds = (): string[] =>
@@ -683,10 +716,16 @@ describe('SearchResultList state of rows re-rendered by scrolling', () => {
         .map((checkbox) => checkbox.getAttribute('aria-label') ?? '');
     const initiallyRenderedPageIds = new Set(renderedPageIds());
 
+    // As SearchPageBase does: check the mounted rows, then pass the new selection.
     ref.current?.selectAll();
-    pages.forEach((page) => {
-      selectedPageIds.add(page.data._id);
-    });
+    rerender(
+      <SearchResultList
+        scrollElement={layout.scrollElement}
+        ref={ref}
+        pages={pages}
+        selectedPageIds={new Set(pages.map((page) => page.data._id))}
+      />,
+    );
     await layout.scrollTo(FAR_SCROLL_TOP);
 
     const newlyRenderedPageIds = renderedPageIds().filter(
