@@ -15,7 +15,7 @@ describe('add-change-proposal-indexes', () => {
   });
 
   it('gives changeproposals its six indexes, four of them sparse, and no TTL index', async () => {
-    await migrate.up();
+    await migrate.up(mongoose.connection.db);
 
     const byName = await indexesByName('changeproposals');
     const denseNames = ['requester_1_createdAt_-1', 'lifecycle_1_expiresAt_1'];
@@ -40,7 +40,7 @@ describe('add-change-proposal-indexes', () => {
   });
 
   it('gives revisions a sparse index on proposalId and proposalOperationKey', async () => {
-    await migrate.up();
+    await migrate.up(mongoose.connection.db);
 
     const index = (await indexesByName('revisions')).get(
       'proposalId_1_proposalOperationKey_1',
@@ -50,10 +50,10 @@ describe('add-change-proposal-indexes', () => {
   });
 
   it('is a no-op when run again', async () => {
-    await migrate.up();
+    await migrate.up(mongoose.connection.db);
     const before = await indexesByName('changeproposals');
 
-    await migrate.up();
+    await migrate.up(mongoose.connection.db);
 
     expect(await indexesByName('changeproposals')).toEqual(before);
   });

@@ -1,6 +1,3 @@
-import mongoose from 'mongoose';
-
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:add-change-proposal-indexes');
@@ -45,25 +42,21 @@ const INDEXES = [
   },
 ];
 
-export async function up() {
+export async function up(db) {
   logger.info('Apply migration');
-
-  await mongoose.connect(getMongoUri(), mongoOptions);
 
   // createIndex creates the collection if absent and is a no-op when the same index
   // already exists. Sequential, so one collection never builds several indexes at once.
   for (const { collection, key, options } of INDEXES) {
-    await mongoose.connection.collection(collection).createIndex(key, options);
+    await db.collection(collection).createIndex(key, options);
   }
 }
 
-export async function down() {
+export async function down(db) {
   logger.info('Rollback migration');
 
-  await mongoose.connect(getMongoUri(), mongoOptions);
-
   for (const { collection, options } of INDEXES) {
-    const target = mongoose.connection.collection(collection);
+    const target = db.collection(collection);
     if (await target.indexExists(options.name)) {
       await target.dropIndex(options.name);
     }
