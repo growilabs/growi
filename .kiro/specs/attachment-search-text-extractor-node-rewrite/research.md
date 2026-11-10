@@ -245,7 +245,7 @@ design を書くために、小さな試作で次のことを確かめた。**�
 - **(b) 守ると何がどう複雑になるか**: 名前を守ったまま文書をコードから作ると、FastAPI の名前を書き写す指定と後処理が 31 個要る (17.4)。それを避けるために文書を手で持つファイルにすると (17.1 のもとの結論)、258 行の文書をコードとは別に持ち、経路・`ErrorCode`・エラーのステータスが文書と食い違わないことを確かめるテストを持つことになる。
 - **(c) 下流の変更の範囲**: 生成クライアントの関数名と型名が変わる。apps/app で変えるのは `apps/app/src/features/search-attachments/server/services/attachment-text-extractor.ts` とそのテストの 2 ファイルである (使っているのは `postExtractExtractPost` と `ErrorCode`。`ErrorCode` は名前も値も変わらない)。直すのは、関数名の置き換えと、`file` の型の書き方である。いまの生成クライアントは `file` の型が `string` で、apps/app は `{ file: buffer as unknown as string }` と、`Buffer` を `string` と偽って渡している。新しい生成クライアントでは `file` の型が `Blob` になるので、この書き方を新しい型に合わせる。実行時に axios へ渡る値は変えない。`.kiro/specs` の中で FastAPI の名前を書いているのはこの spec だけなので、下流 spec の記述は変えない (grep で確かめた)。
 - **決定 (ユーザー)**: 「FastAPI が付けた名前を変えない」という条件は覆してよい。コードと生成の仕組みは単純であるほど望ましく、設定を書かずに済む形に近いほど望ましい。
-- **名前の対応 (Req 7.5)**: 試作 (17.13) で出た名前。実装 (6.9) の後に、実際の生成クライアントで確かめて、変わっていれば直す。
+- **名前の対応 (Req 7.5)**: 実装 (6.9) の後に、書き出しの手順が出した文書から orval 7.2.0 でクライアントを作り、commit 済みの `src/generated/index.ts` と比べた結果 (実測。実装の担当とレビューの担当が別々に確かめた)。文書の中では、`operationId` が `postExtract`・`getHealthz`・`getReadyz` になり、スキーマ `Body_post_extract_extract_post` は名前の無い埋め込みになる。
 
   | 変わる前 (FastAPI の名前) | 変わった後 (道具の既定) |
   |---|---|
@@ -253,8 +253,12 @@ design を書くために、小さな試作で次のことを確かめた。**�
   | `healthzHealthzGet` | `getHealthz` |
   | `readyzReadyzGet` | `getReadyz` |
   | `BodyPostExtractExtractPost` | `PostExtractBody` |
+  | `BodyPostExtractExtractPostMimeType` | 無くなる (`mimeType?: string`) |
   | `PostExtractExtractPostResult` | `PostExtractResult` |
-  | `ErrorCode`・`ErrorResponse`・`ExtractResponse`・`PageInfo` | 変わらない |
+  | `HealthzHealthzGet200` | `GetHealthz200` |
+  | `HealthzHealthzGetResult`・`ReadyzReadyzGetResult` | `GetHealthzResult`・`GetReadyzResult` |
+  | (無い。`/readyz` の応答は `unknown` だった) | `GetReadyz200`・`GetReadyz200Dependencies`・`GetReadyz503` |
+  | `ErrorCode`・`ErrorResponse`・`ExtractResponse`・`PageInfo`・`PageInfoPageNumber`・`PageInfoLabel` | 変わらない |
 
 ## 8. Python 版を devcontainer で起動する手順 (タスク 1.3)
 
@@ -7660,3 +7664,58 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - 枠を返すのは応答を送り終える前 (Python 版の `async with` と同じ)。遅い読み手が相手だと、親が同時に持つ結果が 3 件を超えうる。トークンなしの `/readyz` を受けるたびに確認用の子が起動する (27.6 の決定どおり)。
 - **6.10**: `http/spec-support/fake-runner.ts`・`test-service.ts` は `runner/conversion-runner` を直接 import し、http の integ テストは `runner/spec-support` を直接 import している (どれも承認済みのテストにもとからある)。層の検査では、テストとテスト用の補助を除外する。
 - **取り込み (Req 12) で直す記述**: design.md 521〜525 行の `RunInput.bytes` を `chunks` と `size` にする (507 行は `convert()` の引数なので変えない)。research.md 23.5 の spec-support の一覧に `wholeFile` を足し `ProbeInput` の形の変更を書く。23.6 の `forwardedBytes` の記述 (今は `Buffer.concat(input.chunks)`)。16.9 (d) か 27 に今回の計測値。親の 1 件あたりのメモリは約 60〜100MiB で予算 (157MiB) に収まる (image の中は 6.12 で測る)。最悪の足し算は約 1,951MiB で 2Gi 以内。
+
+### 27.8 タスク 6.9 (組み立てと、経路の定義から作る OpenAPI の文書)
+
+実装は、途中まで Opus の担当が行い (テストの書き直しと RED の確認まで)、続きを Fable の担当が行った。独立レビュー (Fable。実装の担当とは別) を、1 回目 REJECTED (停止の処理が終わらなくなる点) → 直し → 狭い再レビュー APPROVED で通した。数字と結果は、とくに書いていなければ実測。
+
+**決めた点 (27.7 の申し送りへの答え)**
+
+- **`requestTimeout`**: 起動を拒まず、設定から決める。`serverTimeouts(uploadTimeoutS)` が `max(300 秒, ヘッダーの 60 秒 + UPLOAD_TIMEOUT_S + 30 秒)` を返す。拒むと、Python 版が受け付けていた設定値を新しく弾くことになり、運用者に見える変化になるため。確かめたのは計算の関数だけで、300 秒を超えるアップロードで Node が先に 408 を返さないことは測っていない。テスト用の起動 (`test-service.ts`) は `uploadTimeoutS` を渡さないので、300 秒固定で動く。
+- **停止の合図 (SIGTERM / SIGINT)**: 1 回目で待ち受けをやめ、応答を返し終えていない要求を待ってから終了コード 0 で終わる。2 回目で、すぐ終了コード 1 で終わる。uvicorn も処理中の要求を待つ (Python 版の Dockerfile に `--timeout-graceful-shutdown` の指定は無く、上限なしで待つ)。
+- **トークンが無いとき**: `loadSettings` が待ち受けの前に例外を投げ、`main.ts` は例外の文 (変数名だけで、値は含まない) を標準エラーに出して終了コード 1 で終わる。
+- **待ち受けの場所**: `0.0.0.0:8000` に固定し、設定の項目は増やさない (Python 版の image が `uvicorn --host 0.0.0.0 --port 8000` で、design.md の設定の表にもポートは無い)。
+- **組み立てを 2 つのファイルに分けた**: `src/service.ts` (設定 → 実行管理 → アプリ → 待ち受け。ポート 0 でテストできる) と、`src/main.ts` (プロセスの入口。ポート、シグナル、終了コード)。design.md の判断 5 とディレクトリの図は「`main.ts` だけ」と書いている。`import.meta.main` を使えば 1 つにできるが、Node 24 ではまだ実験的な機能なので使わなかった。
+
+**停止の待ち方 (レビューで直した点)**
+
+- 最初の実装は「接続がすべて無くなるまで待ち、100ms ごとに `closeIdleConnections()` を呼ぶ」形だった。ヘッダーを途中まで送った接続 (終わりの空行を送らない) を、Node は「要求の途中」と数えるので、この呼び出しでは閉じられない。さらに `server.close()` は、Node が内部で行う `headersTimeout` と `requestTimeout` の見張りも止める。そのため、この形の接続が 1 本あると、100 秒待っても停止が終わらなかった。認証の前の段階なので、トークンなしで起こせる。uvicorn は、要求が始まっていない接続を停止のときにその場で閉じるので、Python 版には無い止まり方だった。
+- 直した形 (`start-server.ts` の `trackRequests`): 応答を返し終えていない要求の数を数え (サーバーの `request` で増やし、応答の `close` で減らす)、停止の合図の後に数が 0 になった時点で `closeAllConnections()` を呼ぶ。
+- 直した後の実測:
+  - ヘッダー途中の接続がある状態での停止は、`stop()` が 1ms、`node dist/main.js` は SIGTERM から 5〜15ms で終了コード 0。
+  - アップロードの途中の要求があると、本文を送り終えるまで待ち、200 を返してから約 93ms 後に終了コード 0。
+  - 読まない相手に約 8.49MB の応答を返している最中の停止では、応答は最後まで届き (8,494,902 バイト)、読み終わりの約 45ms 後に停止が終わる。
+  - 送信の途中で相手が切断した要求は、数から外れる。
+- **Python 版 (uvicorn) の停止との残りの違い** (どれも記録で足りるとレビューで判定した):
+  - 処理中の要求を待つ時間に上限が無い (uvicorn も同じ)。応答を読まない相手がいると、猶予時間の後の SIGKILL か 2 回目の合図まで終わらない。
+  - 応答を返し終えていない要求が残っている間は、開いている keep-alive の接続の次の要求にも応える。
+  - 届いた直後で、まだハンドラーに渡っていない要求は、応答なしで切られる (uvicorn も同じ種類の振る舞い)。
+  - 早い段階で返すエラー応答 (413 など) は、停止の瞬間に限り、相手に届く前に切られうる (推論。実験では 413 は届いた)。
+  - 2 回目の合図の `process.exit(1)` は、変換中の子を止めない。コンテナの中では PID 1 の終了で一緒に消えるが、コンテナの外では子が自分の制限時間まで残りうる。
+- 起動と停止の 2 行 (`listening on …`、`SIGTERM received …`) を、`LOG_LEVEL` に関係なく標準エラーに出す (uvicorn も自分の起動と停止の行を、アプリの `LOG_LEVEL` と関係なく出す)。
+
+**OpenAPI の文書 (17.13 の実装)**
+
+- スキーマは `src/http/api-schemas.ts` に置く。`ErrorCode` は `z.enum(ERROR_CODES)` で、`contract/` は zod を読み込まない。`PageInfo` のスキーマは、`contract/` の型と完全に同じ型であることを、型の検査で確かめている (項目を null 可にすると `tsgo` が TS1360 で止まる)。`ExtractResponse` は応答を流して書くので、型では確かめられず、`ajv` のテストだけが文書と照合する。
+- `/extract` のエラーのステータスは、`ERROR_TABLE` と、新しく作った `REFUSAL_TABLE` (変換の前に断る 5 つの理由: `file_too_large` 413、`service_busy` 503、`upload_timeout` 408、`invalid_upload` 422、`client_disconnected` 422) から作る。文書のステータスは 400・408・413・422・500・503 で、Python 版の文書と同じである。401 はどちらの文書にも無い。6.8 の `extract-route.ts` は、この表から状態と `code` を読む形に書き換えた (メッセージは同じ定数で、6.8 のテストはすべて通る)。
+- 応答の `description` は、OpenAPI が必須にしている項目なので書いている: `'OK'`、`'Not ready'`、エラーはその状態のコードを `", "` でつないだもの。題名・説明・版のほかに文書のために書いた文は、これだけである (Req 7.6 の違反ではないとレビューで判定した)。名前を合わせる指定と、作った文書の後処理は無い。
+- `/healthz` と `/readyz` は `describeResponse` で書いた。`tsgo` で、値の間違い (`{status: 'okay'}`)、文書に無いステータス (418、503 の代わりの 500)、`as const` の書き忘れが型のエラーになる。余分な項目を足しても型のエラーにはならず、`ajv` のテストが見つける。
+- `describeRoute` は `await next()` だけの中間処理で、本文にも応答にも触らない (ライブラリのコードを読んで確かめた)。`/openapi.json` 自身と認証の中間処理は、文書に出ない。`generateSpecs` の結果には値が `undefined` のキー (`tags`) が入るので、文書どうしは JSON にしてから比べる。文書はアプリごとに 1 回だけ作って覚える。作るのに失敗すると、失敗を覚えたままになり、以後ずっと 500 になる (作る処理は入力に依存しないので、起動直後に分かる)。
+- Python 版の文書からの違い: 操作の `summary` とスキーマの説明文が無い。応答のオブジェクトに `additionalProperties: false` が付く。整数に最小と最大が付く。`file` が `format: binary` になる。`mimeType` は null 可ではなく、省略できる文字列になる。`/readyz` の 200 に型が付き、503 (`{status: 'not_ready'}`) が文書に載る。
+- **変換の層と子は、文書を作る部品を読み込まない**: `test/openapi/schema-packages-isolation.integ.ts` が、zod と `hono-openapi` の読み込みを止めた状態で、確認用の子が準備完了になることと、`dist` の `child`・`conversion`・`contract`・`formats`・`wire` の各モジュールが読み込めることを確かめる (`conversion/normalize.ts` に `import 'zod'` を足すと失敗することを確かめた)。`child-entry.js` の中の動的な import は対象外で、準備完了の確認が代わりに見る。
+- **本番の依存**: 11 個になった (`hono-openapi` と `zod` を足した。`test/deploy/production-dependencies.spec.ts` の一覧も 9 個から 11 個に変えた)。推移的に入る部品は、17.13 に書いた 5 つのほかに 3 つある: `zod-to-json-schema` 3.25.2 (ISC。任意の peer が自動で解決されたもので、zod 4 のスキーマでは読み込まれない)、`quansync` 0.2.11 (MIT)、`@types/json-schema` 7.0.15 (MIT)。`hono-openapi`・`@hono/standard-validator`・`@standard-community/standard-json`・`@standard-community/standard-openapi`・`@standard-schema/spec`・`openapi-types`・`zod` は MIT (実装の担当が確かめた)。
+- ビルドしたサービス (`node dist/main.js`) の手動の確認: PDF 200 (2 ページ)、DOCX 200、`/healthz` 200、`/readyz` 200、トークンなしの `/extract` 401、`/openapi.json` 200。2 件変換して文書を 1 回作った後の親の RSS は約 86MB。標準エラーと標準出力にトークンは出ない。
+- テスト全体: 4,580 件が通り、50 件が失敗、12 件が skip。失敗はすべて `test/deploy` (`dockerfile.spec.ts` 18、`k8s-manifests.spec.ts` 29、`compose.spec.ts` 3) で、6.11 と 8.2 が作るファイルが無いためである。
+
+**tasks.md の 6.9 の記述と違う点**
+
+- 「文書から orval で作ったクライアントで確かめる」(7.2) は、テストでは文書そのものを見ている。orval はこの package の依存ではないためである。orval 7.2.0 での確認は手で行い、結果は 7.7 の表のとおりだった。8.2 で生成クライアントを作り直すと、差分が git に出る。
+- 文書を比べる道具は、関数 (`openApiDrift`) だけを作った。コマンドとして呼ぶ入口は無い。
+
+**後のタスクへの申し送り**
+
+- **6.10**: `scripts/` と `src/service.ts`・`src/main.ts` を層の検査の対象に入れるかを決める。zod と `hono-openapi` を import してよいのは `http/` だけである。
+- **6.11 / 6.12**: image の大きさ (400MB 以下) を、足した部品を含めて確かめる。image の中の `/openapi.json` を、書き出しの手順の文書と比べるには、比べる関数をコマンドとして呼ぶ入口が要る。
+- **8.2**: commit 済みの `openapi.json` を `scripts/export-openapi.ts` の出力に置き換え、orval で生成クライアントを作り直す。Node 版の文書と commit 済みの文書を比べるテストを足し、`turbo.json` の `test` の `inputs` にクライアントの文書を足す (17.7 の 4)。apps/app の呼び出し側は、関数名と `file` の型の書き方を直す (7.7)。
+- **7.1 で判断する点**: `start-server.ts` の `trackRequests` の上の 6 行のコメントを、この節を指す 1〜2 行に縮めるか。`main.ts` の時刻つきの行の書式が `request-log.ts` と別に書かれている (2 行)。`test/http/blackbox-service.ts` は `startService` を使わず、自分で組み立てている (承認済みのファイルで、切る止め方が要るため)。
+- **取り込み (Req 12) で直す記述**: design.md の判断 5 とディレクトリの図 (組み立ては `service.ts` と `main.ts` の 2 つ)。22.5 の表と 22・23・24・25 節にある理由の id `17.6` (黒箱のテストから消した。OpenAPI の文書に固有の検査は `test/openapi/` に移り、Python 版には向けない。理由の id は 6 つになった)。17.7 の 3 と 4 (CI の起動の条件と turbo のキャッシュは 8.2 で扱う)。27.7 の「`requestTimeout` は 300 秒に固定」と「`close()` は処理中の接続も切る」(`close()` はそのままで、待つ止め方 `drain()` を足した)。
