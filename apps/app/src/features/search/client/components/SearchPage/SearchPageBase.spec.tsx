@@ -1041,6 +1041,24 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
     expect(searchResultListSpy.lastProps?.listSize).toBe(25);
   });
 
+  it('keeps the list size unknown (-1) while loading the next chunk has failed', () => {
+    // SearchPage stops the sentinel on an error, so isReachingEnd is true here
+    // although more results exist.
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(20)}
+        infiniteScroll={createInfiniteScrollProps({
+          isReachingEnd: true,
+          hasError: true,
+        })}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.listSize).toBe(-1);
+  });
+
   it('passes the loaded count as the list size on the legacy pager path', () => {
     render(
       <SearchPageBase

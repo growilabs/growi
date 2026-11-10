@@ -372,8 +372,11 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       : undefined;
 
   // -1 while more results can still be loaded (see design.md, PageListItemL).
+  // A failed load also stops the sentinel (isReachingEnd), but the total is
+  // still unknown then.
   const listSize =
-    infiniteScroll != null && !infiniteScroll.isReachingEnd
+    infiniteScroll != null &&
+    (!infiniteScroll.isReachingEnd || infiniteScroll.hasError)
       ? -1
       : pages?.length;
 
