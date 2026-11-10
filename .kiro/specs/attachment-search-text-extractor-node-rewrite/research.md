@@ -7719,3 +7719,30 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - **8.2**: commit 済みの `openapi.json` を `scripts/export-openapi.ts` の出力に置き換え、orval で生成クライアントを作り直す。Node 版の文書と commit 済みの文書を比べるテストを足し、`turbo.json` の `test` の `inputs` にクライアントの文書を足す (17.7 の 4)。apps/app の呼び出し側は、関数名と `file` の型の書き方を直す (7.7)。
 - **7.1 で判断する点**: `start-server.ts` の `trackRequests` の上の 6 行のコメントを、この節を指す 1〜2 行に縮めるか。`main.ts` の時刻つきの行の書式が `request-log.ts` と別に書かれている (2 行)。`test/http/blackbox-service.ts` は `startService` を使わず、自分で組み立てている (承認済みのファイルで、切る止め方が要るため)。
 - **取り込み (Req 12) で直す記述**: design.md の判断 5 とディレクトリの図 (組み立ては `service.ts` と `main.ts` の 2 つ)。22.5 の表と 22・23・24・25 節にある理由の id `17.6` (黒箱のテストから消した。OpenAPI の文書に固有の検査は `test/openapi/` に移り、Python 版には向けない。理由の id は 6 つになった)。17.7 の 3 と 4 (CI の起動の条件と turbo のキャッシュは 8.2 で扱う)。27.7 の「`requestTimeout` は 300 秒に固定」と「`close()` は処理中の接続も切る」(`close()` はそのままで、待つ止め方 `drain()` を足した)。
+
+### 27.9 タスク 6.10 (層の依存の向きの検査)
+
+実装は Sonnet の担当、独立レビューは Fable の担当 (実装の担当とは別) が行った。1 回目 REJECTED (逆向きの import を見逃す穴が 2 つ) → 直し → 狭い再レビュー APPROVED。
+
+- **作ったもの**: `test/layers/` の 5 ファイル。`src/` と `scripts/` の本番のファイル (116 個) の import を拾い、層と「import してはいけない層」の表 (`layer-rules.ts` の `LAYERS`) と突き合わせるテストである。新しい依存は足していない。いまのコードに違反は無い。
+- **規則の表** (design.md の判断 1・2・5 とディレクトリの図から導いた):
+  - `conversion`・`child` は、`runner`・`http`・`composition` を import しない。
+  - `runner` は、`http`・`conversion`・`child`・`composition` を import しない。`http` は、`conversion`・`child`・`composition` を import しない (親の層は子の入口のパスを渡すだけで、import しない。判断 1)。
+  - `contract`・`formats`・`wire` は、ほかの層を import しない (`formats` と `wire` は `contract` だけ import してよい。判断 2)。tasks.md の 6.10 には無い規則だが、これが無いと「`runner` → `formats` → `conversion`」のように間接的に読み込む形を止められない。
+  - `config` は、`conversion`・`child`・`runner`・`http`・`composition` を import しない (`runner` が `config` を import しているので、`config` が抜け道にならないようにするため)。
+  - `composition` (`src/service.ts`・`src/main.ts`・`scripts/`) は、どの層も import してよい (組み立てをする場所なので。判断 5)。
+  - `zod` と `hono-openapi` を import してよいのは `http` だけ (`composition` と `scripts/` も対象)。
+  - どの層にも入らないファイルは違反にする (新しいディレクトリが検査の外に置かれないようにするため)。
+- **型だけの import** (`import type`・`export type … from`) も、値の import と同じに扱う (判断 1 は「import の向きで分ける」と書いていて、型を除く断りが無い)。いまのコードはこの厳しい読み方でも通る。
+- **検査の対象から外したもの**: テスト (`*.spec.ts`・`*.integ.ts`) と、`spec-support` のディレクトリの下 (27.7 の申し送りのとおり)。
+- **import の拾い方**: TypeScript の `ts.preProcessFile` を使う (`typescript` 5.9.3 は、この package から新しい依存なしで読み込める)。最初は正規表現で拾っていたが、バッククォートで書いた動的な import などを見逃したので替えた (拾う処理は 57 行から 9 行になった)。
+  - 拾えるもの (実測): 静的な import、`import type`、`export … from`、`export type … from`、`import x = require()`、文字列かバッククォート (埋め込みなし) の `import()`、`import()` の型の参照、`require("…")` (`const require = createRequire(...)` を経た呼び出しを含む)。
+  - 拾えないもの (実測): `createRequire(import.meta.url)("…")` と 1 つの式で直接呼ぶ書き方、`require.resolve`、`import.meta.resolve`、triple-slash の参照。
+- **残した穴 (記録だけ。レビューで受け入れた)**:
+  - `createRequire(import.meta.url)("../http")` の形の読み込みは、検査が見つけられない。`createRequire` そのものを禁じる規則は作れない (`src/conversion/pdfium/runtime.ts` が PDFium の WASM のファイルを探すために `.resolve` で使っている)。この package は ESM の TypeScript で、わざと組み立てないと書かれない形である。
+  - 本番のファイルが、自分の層の `spec-support/` のファイルを import し、そのファイルが禁じられた層を import する形は、通ってしまう。
+  - `src/` から `benchmark/` や `test/` への相対の import は、どの層にも当たらないので通る。
+- **確かめ方**: 逆向きの import を本物のファイルに足して検査が失敗すること、元に戻すと通ることを、実装の担当とレビューの担当が別々に確かめた (`conversion` → `http`、`runner` → `conversion` の動的な import、`child` → `zod`、`config` → `conversion`、`child` → `service`、`export * from`、層をまたぐ相対パスなど)。コンパイルできない変更を足すと、テストの前の build (`test/global-setup.ts`) が先に失敗する。
+- テスト全体: 4,598 件が通り、50 件が失敗 (`test/deploy` だけ)、12 件が skip (直しの前の時点。直しは `test/layers/` の中だけで、検査のテストは 24 件が通る)。
+- **7.1 で判断する点**: `test/layers/import-specifiers.ts` の 3〜5 行のコメントは「モジュールを読み込む形はすべて見える」と書いているが、上の `createRequire` の直接の呼び出しは見えない。文を弱めるか、この節を指す形にする。
+- **取り込み (Req 12) で直す記述**: design.md のディレクトリの図は `formats/` と `wire/` に `index.ts` があると書いているが、実物には無い。
