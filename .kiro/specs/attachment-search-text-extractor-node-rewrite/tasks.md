@@ -236,7 +236,7 @@
   - 変換の層と子の入口が、実行管理の層と HTTP の層を import しないこと、実行管理の層が HTTP の層と変換の層を import しないこと、HTTP の層が変換の層を import しないことを、lint の規則か依存を調べるテストで確かめる
   - 逆向きの import を 1 つ足すと検査が失敗し、元に戻すと通る
   - _Requirements: 5.1, 5.3_
-- [ ] 6.11 Dockerfile と k8s の例を Node 版で作る
+- [x] 6.11 Dockerfile と k8s の例を Node 版で作る
   - `apps/pdf-converter` に倣い、Node 24 の slim を元にし、`pnpm deploy --prod` で本番の依存だけを取り出す multi-stage の Dockerfile を作る。最終の段で `prlimit` を実行し、無ければビルドを失敗させる。`RAYON_NUM_THREADS=1` を設定する
   - k8s の例 (deployment、service、hpa、networkpolicy) を新しい場所に作り、`WORKERS` を消し、メモリの requests / limits を 3.7 の予算に合わせる
   - ビルドの段で `build` を流し、`dist/` を image に入れる (research.md 23.5)

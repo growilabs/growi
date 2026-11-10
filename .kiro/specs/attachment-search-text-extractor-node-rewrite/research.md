@@ -7746,3 +7746,49 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - テスト全体: 4,598 件が通り、50 件が失敗 (`test/deploy` だけ)、12 件が skip (直しの前の時点。直しは `test/layers/` の中だけで、検査のテストは 24 件が通る)。
 - **7.1 で判断する点**: `test/layers/import-specifiers.ts` の 3〜5 行のコメントは「モジュールを読み込む形はすべて見える」と書いているが、上の `createRequire` の直接の呼び出しは見えない。文を弱めるか、この節を指す形にする。
 - **取り込み (Req 12) で直す記述**: design.md のディレクトリの図は `formats/` と `wire/` に `index.ts` があると書いているが、実物には無い。
+
+### 27.10 タスク 6.11 (Dockerfile と k8s の例)
+
+実装も独立レビューも Fable の担当 (別々) が行った。レビューは 1 回で APPROVED。止める指摘は無く、「いま直す価値がある」とされた 3 点 (dockerignore の行の順、コメント 2 か所) を直してから commit した。
+
+**この節でいちばん大事な点: image は、まだ一度もビルドしていない。** devcontainer に docker も podman も無いためである。確かめたのは、ファイルの中身の検査 (4.5 のテスト) と、container を使わない確認だけである。下の「最初の本物のビルドで確かめること」が済むまで、image が動くとは言えない。
+
+**作ったもの**
+
+- `docker/Dockerfile`: `node:24.22.2-bookworm-slim` を元にした多段ビルド。build の段で `pnpm install --frozen-lockfile --ignore-scripts`、package の `build`、`pnpm deploy out --prod --legacy`。最終の段は `ENV RAYON_NUM_THREADS=1`、`RUN /usr/bin/prlimit --version`、uid 10001、`CMD ["node", "dist/main.js"]`。細かい版まで固定しているのは、4.5 のテストが `node:24.<minor>.<patch>-slim` の形を求めているためである (Python 版の Dockerfile も同じく固定していた)。20 節のメモリの基準は Node 24.21.0 で測ったものなので、6.12 で image の中で測り直す。
+- `docker/Dockerfile.dockerignore`: build の context はリポジトリのルート (23.7)。ほかの app は除く (`apps/pdf-converter` と同じやり方)。dockerignore は最後に合った行が勝つので、`apps/**` と `!apps/attachment-text-extractor` を先頭に置き、その後に `**/node_modules` と `**/dist` を置いた (逆の順だと、この app 自身の `node_modules` と古い `dist` が context に入る。`apps/pdf-converter` の dockerignore は逆の順のままである)。`services` の行は、8.2 でディレクトリごと消すときに一緒に消す。
+- `deploy/k8s/` (deployment・service・hpa・networkpolicy): Python 版の例から、`WORKERS` の環境変数を消し、コメントを Node 版に合わせた。ほかは引き継いだ。メモリは requests 512Mi、limits 2Gi (20.10・20.12)。`/tmp` は Memory の emptyDir 64Mi (69 + 3 × (320 + 148 + 157) + 64 = 2,008MiB ≤ 2,048MiB。20.7)。`terminationGracePeriodSeconds` は 85 (アップロードの 15 秒 + 変換の 55 秒 + 余裕。`main.ts` は SIGTERM の後、処理中の要求を上限なしで待つ)。readiness は `timeoutSeconds` 15・間隔 20 秒 (確認用の子の制限が 10 秒)。CPU (500m / 2) と HPA (2〜10、CPU 70%) は Python 版の値のままで、spec は値を決めていない。
+
+**PDFium の WASM に入っている第三者の部品のライセンス表示 (21.5 の実施)**
+
+- 出どころを特定した。npm の `@embedpdf/pdfium` 2.15.1 の `dist/pdfium.wasm` は、git の blob `9af0377bd26230ec397c7e418e9a9df38eb43d8f` で、`embedpdf/embed-pdf-viewer` の `v2` ブランチの `packages/pdfium/src/vendor/pdfium.wasm` と同じである (実装の担当とレビューの担当が別々に確かめた)。そのブランチは、fork の `embedpdf/pdfium` の `73a041a5c1aaffa09ebb64f1981ff501cb91a41c` から、XFA・V8・Skia を切って、`emscripten/emsdk:3.1.70` で作る。部品の一覧は fork の `BUILD.gn` から、版は `DEPS` から取った。JPEG と lcms は `core/fxcodec` が必ず依存するので、入っていることが build のファイルから確かめられた (21 節の「見込み」が確定した)。
+- ライセンスの文 19 個 (約 155KB) を、上流から取ってそのまま `docker/licenses/pdfium-wasm/` に置いた: FreeType (FTL を選ぶ)、libjpeg-turbo (IJG・BSD-3-Clause・zlib)、OpenJPEG (BSD-2-Clause)、libpng、zlib、Little CMS (MIT)、AGG 2.3、fast_float、Abseil (Apache-2.0)、ICU (Unicode License v3)、Emscripten の実行時の部品 (musl・libc++・libc++abi・compiler-rt)。image の `/licenses/THIRD-PARTY-NOTICES.md` に、必須の謝辞の文 2 つ (IJG、FreeType) と出どころの表がある。npm の package 自身の `LICENSE` と `LICENSE.pdfium` も image に写す。
+- 一覧は広めに取っている: Abseil と ICU は、バイナリに文字列が残っておらず、リンクのときに落とされた可能性がある。入っていない部品の表示を載せても義務は増えないので、そのままにした。
+- 足りない、または確かでない点: Emscripten の版 (3.1.70) は上流の Dockerfile からの推論で、バイナリからは確かめていない。Chromium が zlib・libpng・libjpeg-turbo の fork に当てた変更の表示は別には無い (それらのリポジトリには上流のライセンスのファイルしか無い)。Emscripten の malloc (パブリックドメイン / CC0) の表示のファイルは無い。置いた文が上流と 1 バイトも違わないことは、レビューでは確かめていない。
+- **ライセンスの文をリポジトリに置くこと**は、ユーザーに伝えて判断を仰ぐ (build のたびに取りに行く形は、外部の 3 つのサイトに依存し、差分をレビューできなくなるので採らなかった。レビューの担当の推奨も「置く」)。`@embedpdf/pdfium` の版を上げるたびに、取り直す必要がある。
+- **anydoc のネイティブのバイナリには、ライセンスの表示が何も入っていない** (package の中身は `README.md`・`.node`・`package.json` だけ)。静的にリンクされた Rust の部品の表示が、image に入らない。21 節にも tasks.md の 6.11 にも無い話で、配布物に載せる表示を決める 8.x でユーザーに諮る。
+
+**container を使わずに確かめたこと**
+
+- 4.5 のテスト: 作る前は `dockerfile.spec` と `k8s-manifests.spec` の 47 件が失敗、作った後は `test/deploy` の 75 件が通り、3 件 (`compose.spec`。8.2 で通る) が失敗。テスト全体は 4,651 件が通り、3 件が失敗、12 件が skip。
+- image の最終の配置をまねた場所 (`package.json`、`dist/` の 113 ファイル、本番の依存 11 個だけの `node_modules`) で、環境変数を `RAYON_NUM_THREADS` とトークンだけにして `node dist/main.js` を起動した (レビューの担当。`strace -f` を付けた): `/healthz` 200、`/readyz` 200 (0.41 秒)、`/openapi.json` 200、PDF・DOCX・XLSX の `POST /extract` が 200、SIGTERM で止まる。書き込みは `/proc/self/oom_score_adj` の 1 か所だけで、一時ファイルもキャッシュも作らない。ただし `node_modules` は workspace の `.pnpm` を指す symlink なので、`pnpm deploy --prod` の結果の確認にはならない。
+- build の出力の import は、本番の依存 11 個と `node:` の組み込みだけ。
+- `node:24.22.2-bookworm-slim` のタグが Docker Hub にある (amd64 と arm64)。bookworm の `util-linux` に `/usr/bin/prlimit` が入っている。
+
+**最初の本物のビルドで確かめること (6.12 と 8.3 への申し送り)**
+
+1. `corepack enable` がこの Node の版で pnpm 11.1.1 を取れること。ほかの app が無い context で `pnpm install --frozen-lockfile --ignore-scripts` が通ること。
+2. `pnpm --filter … run build` が、ルートの `node_modules/.bin` の `rimraf` と `tsc` を見つけること。pnpm の依存の状態の確認が、もう一度 install を始めないこと (始まると、キャッシュの mount も `--ignore-scripts` も無しで動く)。
+3. キャッシュの mount の下での `pnpm deploy` (`apps/pdf-converter` は mount なしで deploy している)。
+4. 本番の依存だけにした後で、container の `/openapi.json` が書き出しの手順の文書と同じであること (`hono-openapi` の任意の peer の `zod-to-json-schema` が落ちうる。zod 4 の経路は使わないので、失敗しない見込み)。
+5. deploy の後に `out/node_modules/@embedpdf/pdfium/LICENSE` と `LICENSE.pdfium` があること。
+6. `--read-only --user 10001 --network none` (tmpfs なし) で、`/readyz` と PDF・DOCX の抽出が通ること。
+7. image の大きさが 400MB 以下であること (見積もりは約 300MB。本番の依存は anydoc 7.9MB、pdfium 7.3MB、zod 8.2MB、hono 3.7MB)。
+8. arm64 の image を作るなら、`anydoc-linux-arm64-gnu` が選ばれること。
+9. dockerignore の行の順が、考えたとおりに働くこと (docker では動かしていない)。
+
+**そのほかの記録**
+
+- `NODE_ENV=production` は設定していない (`apps/pdf-converter` は設定している。`src/` はこれを読まない)。`preStop` の待ちは無い (Python 版の例と同じ)。`main.ts` は `0.0.0.0` だけで待ち受けるので、IPv6 だけのクラスターからは届かない (Python 版と同じ)。
+- 子は親の直接の子で、親がいなくなると自分で終わる (`src/child/parent-watch.ts`)。そのため init のプロセスは要らない、と Dockerfile と deployment のコメントに書いた。一方、4.5 の `compose.spec.ts` は compose の項目に `init: true` を求めている (8.2 で扱う。テストの題名は Python 版の言い方のままである)。
+- `docker/README.md` は作っていない (`apps/pdf-converter` にはある。tasks.md もテストも求めていない)。
