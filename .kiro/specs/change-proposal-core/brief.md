@@ -1,5 +1,7 @@
 # Brief: change-proposal-core
 
+> 発見の時点の記録。今の決定と食い違うところは、requirements.md と design.md を正とする。
+
 **Parent**: umbrella spec `change-proposal`（[roadmap.md](../change-proposal/roadmap.md)、判断の理由とコード上の事実は [research.md](../change-proposal/research.md)）
 
 ## Problem

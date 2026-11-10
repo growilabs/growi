@@ -88,8 +88,6 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Selected Approach**: `pushRevision` に任意の `expectedRevisionId` を足す。渡されたときは条件付きの更新で書き、一致しなければ作ったリビジョンを消して `RevisionConflictError` を投げる。反映では元のリビジョンの ID を渡す。人の保存では、ページを読んだ時点の `page.revision` を渡す。
 - **Rationale**: 人の保存は、エディタ（`origin: editor`）では `revisionId` を送らないことがある。そこで人の保存は「確認を飛ばすかどうか」は今の `isUpdatable` で決め、書き込みは「読んだ時点の最新のままなら」を条件にする。一致しなかったときは、ページを読み直して `isUpdatable` をもう一度通し、通れば決めた回数まで書き直す。通らなければ今と同じ 409 `conflict` を返す。こうすると、エディタどうしの保存は今までどおり確認を飛ばして通り、反映（`origin` 空）が間に入ったときだけ人の保存が 409 になる。
 - **Trade-offs**: `updatePage` は `pushRevision` の前に `save()` で閲覧範囲や WIP の値を書くので、書き込みで負けたときに、その値だけが先に保存される。反映では閲覧範囲を変えないので影響しない。人の保存では書き直しで同じ値が書かれる。
-- **Follow-up**: 書き直しの回数の上限は定数にする。既存の `update-page.integ.ts` が変更なしで通ることを確かめる。
-
 ### Decision: 共同編集の文書を反映の側では置き換えない
 - **Context**: 要件 3.5・3.11・3.12。
 - **Selected Approach**: 接続数と `draft` を確かめて反映するかを決め、反映後は `syncWithTheLatestRevisionForce` を呼ばない。次に開いたときに `outdated` から置き換わるのに任せる。
@@ -98,7 +96,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 
 ### Decision: 取り消しは反映と同じ操作の種類で表す
 - **Context**: umbrella の決定 4。
-- **Selected Approach**: 取り消しの Change Proposal の操作は、編集（元の本文に戻す。元のリビジョンは反映で作ったリビジョン）、移動（元のパスへ戻し、移動元を起点とするリダイレクトを消す）、完全な削除（新規作成で作ったページを完全に削除する）の 3 種類にする。完全な削除は取り消しのときだけ使う。各操作は、どの Change Proposal のどの操作（`key`）を戻すかを持つ。
+- **Selected Approach**: 取り消しの Change Proposal の操作は、編集（元の本文に戻す。元のリビジョンは反映で作ったリビジョン）、移動（元のパスへ戻し、元の移動が作ったリダイレクトだけを消す。決定「移動の取り消しは、元の移動が作ったリダイレクトだけを消す」）、完全な削除（新規作成で作ったページを完全に削除する）の 3 種類にする。完全な削除は取り消しのときだけ使う。各操作は、どの Change Proposal のどの操作（`key`）を戻すかを持つ。
 - **Rationale**: 編集と移動は、通常の操作と同じ処理と同じ確認で戻せる。新規作成をどう戻すかは、次の決定「新規作成の取り消しは完全な削除にする」による。
 - **Trade-offs**: 完全な削除は戻せないので、取り消しの取り消しができるのは編集と移動だけになる。
 
@@ -168,7 +166,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 
 ### Decision: 新しいコレクションは Prisma で読み書きし、索引は Mongoose の schema で作る
 - **Context**: GROWI は Mongoose のモデルを Prisma の拡張（`Prisma.defineExtension`）へ順に移している（`.claude/rules/model.md`）。新しいコレクション `changeproposals` を Mongoose で読み書きすると、あとで移す対象を 1 つ増やすことになる。一方で、このコレクションには疎な索引（値を持つ文書だけが入る索引）が要り、Change Proposal の状態の変化は「今の状態がこうなら書く」という条件付きの更新に頼る。
-- **確かめた事実**（apps/app が使う Prisma は 6.19.2。prisma-engines の 6.19.2 の tag のコードを読んだ。動かしてはいない）:
+- **確かめた事実**（apps/app が使う Prisma は 6.19.2。prisma-engines の 6.19.2 の tag のコードを読んだ）:
   1. 条件を付けた `updateMany` と `update` は、MongoDB の 1 つのコマンドにはならない。クエリエンジンは、まず条件に合う文書の `_id` を読み、次に `{ _id: { $in: 読んだ _id } }` だけを条件にして書く（`write.rs` の `update_records`）。2 回目のコマンドには元の条件が入らない。
   2. ただし、`updateMany` と `update` は、クエリエンジンが MongoDB の transaction の中で実行する（`update.rs` の `flag_transactional`、`execute_operation.rs`）。読んでから書くまでの間に、別の処理が同じ文書を書き換えると、MongoDB は書き込みの衝突（WriteConflict）を返す。クエリエンジンは、その transaction を最初からやり直す（間を 5 ミリ秒空け、合計でおよそ 12 秒まで）。やり直しでは条件を読み直すので、もう条件に合わない文書は書かれず、返る件数は 0 になる。このため、条件付きの `updateMany` は「条件に合えば書く」を 1 回の処理として扱える。結果の件数が 1 なら自分が書いた、0 なら書いていない、と判断できる。
   3. 埋め込みの配列（composite type の list。文書の中に持つ配列）への `updateMany` は、`$map` と `$cond` を使う 1 つの更新になる。配列の要素ごとに、書くときに条件を確かめて書き換える（`into_expression.rs`）。`operations` の中の、`key` と `status` が合う 1 つの要素だけを書き換える更新は、Prisma の通常の書き方で表せる。
@@ -187,6 +185,10 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
   - 1 回の条件付きの更新は、読み・書き・transaction の確定の 3 回の往復になる。書き込みの衝突が続くと、クエリエンジンはおよそ 12 秒でやり直しをやめ、`P2034`（transaction の衝突）の誤りを返す。呼び出し側は、これを「取れなかった（件数 0）」と同じに扱う。
   - transaction を使うので、MongoDB が replica set で動いている必要がある。GROWI は Prisma のためにすでに replica set を前提にしている。
   - Prisma の model は `v` を持つので、Prisma の更新のたびに `__v` が 1 増える（`model.md`）。`__v` の値に頼る処理は作らない。
+- **条件の決め方のうち、コードから読み取りにくいもの**:
+  - 期限切れと取り下げの更新（`closeIfStillOpen`）とその候補の検索は、「待ち」の操作が 1 つ以上あることを条件にする。「待ち」が無い `open` の文書は、完了の書き込みの前で処理が止まったものなので、完了にするほう（`settleIfNoPending`）へ回す（要件 2.11）。
+  - 止まった反映の再開の候補（`findIdsWithInterruptedApply`）には、lease が無い文書も入れる。反映中の処理が最後に対象を読み直したあとで承認が記録され、その承認の側は lease を取れず、そのあとで反映中の処理が lease を手放すと、承認された「待ち」の操作が lease の無い文書に残るためである。
+  - 完了の書き込みが止まった文書の候補（`findIdsOpenWithoutPending`）は、lease を持つ文書も含める。完了は lease と関係なく書けるためである。
 - **Follow-up**: `schema.prisma` の `@@index` には、Mongoose の schema が作る索引と同じ項目・同じ名前（`map`）を書き、疎な索引にはそのことを注記する（`pages.wipExpiredAt` の前例）。将来 `prisma db push` が索引の作成を受け持つときに、疎の指定を付け直すためである。
 
 ### Decision: リビジョンの印の型は `@growi/core` に置く
@@ -224,21 +226,21 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Rationale**: 見直しは、ほかの人がその後に加えた編集をふまえて内容を作り直すものなので、元の案より人の編集とぶつかる見込みが高い。依頼した人が差分を確かめてから反映する。
 
 ### Decision: ページごとの通知は 2 つの切り替えの両方が有効なときだけ出す
-- **Context**: 要件 7.1・7.10–7.19・8.9。design の OQ-5。理由の全体は umbrella の research.md の決定 8。
+- **Context**: 要件 7.1・7.10–7.19・8.9。理由の全体は umbrella の research.md の決定 8。
 - **Selected Approach**: 管理者の設定（初期値は出さない）と、Change Proposal ごとの指定（初期値は出す）の両方が真のときだけ、人の操作と同じページごとの通知を出す。2 つを組み合わせるのは純関数 `shouldSendPerPageNotifications` だけにし、ProposalApplier が操作を書く直前に両方を読み直して決める。取り消しの Change Proposal は元の指定を引き継ぐ。まとめた通知はいつも出す。
 - **追加で確かめた事実**: 人の操作のグローバル通知は、編集・新規作成・移動・削除（ごみ箱へ移すと完全な削除）のどれも route から送られ、`globalNotificationService.fire` の中でページの閲覧範囲から送るかを決めている。編集の購読している人へのアプリ内通知は、route の `generateUpdateActivity` が `PAGE_UPDATE` の activity を `preNotify` つきで知らせて作られる。反映の activity（`CHANGE_PROPOSAL_APPLY`）とは別の action なので、1 つの activity の ID では両方を記録できない。
 - **Rationale**: 編集のアプリ内通知のために、操作ごとに `beginActivity` で `PAGE_UPDATE` の activity を作り、route と同じ処理（`emitPageUpdateActivity`）で知らせる。グローバル通知も route の送り方を `firePageGlobalNotification` に移して共有する。人の保存と同じ処理を通すので、受け取る人の決め方と閲覧範囲の判定がずれない。
 - **Trade-offs**: 両方を有効にすると、購読している人には同じ変更についてページごとの通知とまとめた通知の両方が届く。編集ごとに `PAGE_UPDATE` の activity が監査ログに増える。指定は操作ごとに読み直すので、操作 1 つにつき問い合わせが 1 回増える（本文を読まない小さな問い合わせにする）。
 
 ### Decision: 上限の初期値は操作数 50、1 日の件数は上限なし
-- **Context**: 要件 8.10。design の OQ-2。理由は umbrella の research.md の決定 8。
+- **Context**: 要件 8.10。理由は umbrella の research.md の決定 8。
 - **Selected Approach**: `changeProposal:maxOperationsPerProposal` の初期値を 50、`changeProposal:maxProposalsPerUserPerDay` の初期値を `null`（上限なし）にする。どちらも管理者が変えられる。
 - **Trade-offs**: ai-agent の書き込みの道具は 1 回の呼び出しで 20 個（`MAX_OPERATIONS_PER_CALL`）までしか受けないので、初期値のままでは操作数の上限で断られることは無い。管理者が 20 より小さくしたときは、core が `input-rejected`（`too-many-operations`）を返す。
 
 ### Decision: 承認待ちの期限の初期値は 30 日にする
-- **Context**: 要件 2.5。design の OQ-1 の期限の部分。初期値を `null`（期限なし）にしていたので、初期の状態では承認待ちの Change Proposal がいつまでも残り、要件 2.5 の期限切れが動かなかった。
+- **Context**: 要件 2.5。design の OQ-1 の期限の部分。初期値が `null`（期限なし）だと、初期の状態では承認待ちの Change Proposal がいつまでも残り、要件 2.5 の期限切れが動かない。
 - **Selected Approach**: `changeProposal:pendingExpirationSeconds` の初期値を 30 日（`2592000` 秒）にする（人が決めた）。値の決め方は今までどおり「DB の値があればそれ、無ければ環境変数か初期値」で、読む側の `toLimit` が 0 以下と数字以外を `null`（期限なし）と読む。この設定は画面に出していないので、期限をなくすには環境変数に `0` を入れる。期限は作成のときに `expiresAt` として保存し、保守用の cron はその `expiresAt` だけを見るので、cron の候補の決め方は変えない。
-- **Trade-offs**: 初期値を変える前に作られた Change Proposal には `expiresAt` が無く、期限切れにならない（作り直すか、人が破棄する）。期限の長さを変えても、すでに作られた Change Proposal の期限は変わらない。破棄・期限切れの案の本文をいつ消すかは、まだ決めていない。
+- **Trade-offs**: 期限は作成のときに `expiresAt` として決まるので、期限の長さを変えても、すでに作られた Change Proposal の期限は変わらない。期限なし（`0`）の間に作られた Change Proposal は `expiresAt` を持たず、あとで期限を設けても期限切れにならない。破棄・期限切れの案の本文をいつ消すかは、まだ決めていない。
 
 ### Decision: 取り消しの結果を元の操作に書く処理は、例外のときだけその場で 2 回までやり直す
 - **Context**: 要件 5.9・13.5。取り消しの操作の結果を記録したあと、元の操作に書く `markOriginalOperation` が DB の一時的な障害で例外になると、元の操作は「反映済み」のまま残り、取り消しの Change Proposal は完了になるので、直す処理が無かった。
@@ -248,23 +250,34 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Trade-offs**: 3 回とも失敗したときは、元の操作が「反映済み」のまま残る。もう一度取り消しを求めると判定し直されるが、取り消しで変わったページに対しては、たいてい「取り消しを断られた」になる。
 
 ### Decision: 新規作成の取り消しは完全な削除にする
-- **Context**: 要件 5.6・5.15・5.16。新規作成の取り消しは、はじめは作ったページをごみ箱へ移し、その取り消しをさらに取り消すとごみ箱から戻す形にしていた。
+- **Context**: 要件 5.6・5.15・5.16。
 - **Alternatives Considered**: 1. ごみ箱へ移す（取り消しの取り消しで戻せる）。2. 完全に削除する。
-- **Selected Approach**: 2（人が決めた）。新規作成の取り消しは、作ったページを `pageService.deleteCompletely` で完全に削除し、ごみ箱に残さない。完全な削除の取り消しは `target-unavailable` で断る。ごみ箱へ移す・ごみ箱から戻す操作は作られなくなるので、操作の種類（`trash`・`restore`）、断る理由 `not-in-trash`、その handler と翻訳を消した。
+- **Selected Approach**: 2（人が決めた）。新規作成の取り消しは、作ったページを `pageService.deleteCompletely` で完全に削除し、ごみ箱に残さない。完全な削除の取り消しは `target-unavailable` で断る。
 - **Rationale**: Change Proposal を受け入れる前は、そのページはごみ箱にも無かった。取り消したあとでごみ箱に残るのは、受け入れる前の状態に戻ったとは言えず不自然である。
 - **権限**: 人が画面から完全に削除するときの route（`routes/page.js`）は、`canDeleteCompletely`（`security:pageCompleteDeletionAuthority`。複数のグループに公開されたページで、公開先のすべてのグループに属していることを求める設定も含む）と、ユーザーのホームのページでの `canDeleteUserHomepageByConfig`・`isUsersHomepageOwnerAbsent` を確かめる。取り消しでは、これに加えて route が確かめていない `canDelete`（`security:pageDeletionAuthority`）も求める。人ができる以上のことを取り消しでできないようにするためで、どちらの権限が厳しく設定されていても、それに従う。表示する「戻せるか」（要件 5.14）と、書き込みの直前の判定は、同じ関数（`createCanDeletePageCompletely`）で行う。
 - **やり直しの扱い**: handler の `findExistingResult` は、ページがもう存在しなければ「反映済み」とみなす。`deleteCompletely` のあと、結果を記録する前に処理が止まった場合に、やり直しで同じ操作を記録できるようにするためである。人が同じ間に完全に削除した場合も「反映済み」になるが、ページが無いという結果は同じなので、止まったあとのやり直しを優先する。
 - **見せ方**: 完全に削除したページは、閲覧できるかを判定できない。対象のページがもう存在しない操作は、まだページが無い新規作成と同じく、依頼した人にだけ返す（依頼した人以外には存在も知らせない）。人が後からページを完全に削除した操作も同じ扱いになる。
 - **Trade-offs**: 取り消しの取り消しで、作ったページを戻すことはできない。間違えて取り消したときは、もう一度作り直す。完全な削除の権限を管理者だけにしている GROWI では、管理者でない人は新規作成を取り消せない（`not-deletable`）。依頼した人以外は、新規作成を取り消したあとの元の操作を見られなくなる。
-- **共通の処理の変更**: `deleteCompletely` は、子のページを含めない削除で、アプリ内通知を止める指定（`isInAppNotificationSuppressed`）を見ていなかった。ページごとの通知を出さない設定でも通知が出てしまうので、`deletePage` と同じように、指定が真のときは `updated` を出さないようにした（activity は今のまま記録する）。
+- **共通の処理の変更**: `deleteCompletely` は、子のページを含めない削除で、アプリ内通知を止める指定（`isInAppNotificationSuppressed`）が真のとき、`updated` を出さない（activity は記録する）。`deletePage` と同じ扱いで、ページごとの通知を出さない設定のときに通知が出ないようにするためである。子のページごと消す削除は、指定にかかわらず今のまま通知する。
 
-## Risks & Mitigations
-- 人の保存の route に手が入る — 既存の `update-page.integ.ts` / `create-page.integ.ts` とページの結合テストを変更なしで通すことを、切り出しのタスクの完了条件にする。
-- 複数台のサーバーで、別のプロセスにつながっている編集者を見落とす — 分かっている制約として design に書き、umbrella の未決の論点に残す。
-- 移動の裏の処理と次の操作がぶつかる — 移動は最後に 1 つだけ。編集・作成の後は、重なる `PageOperation` が消えるのを決まった時間だけ待ち、それでも残れば「待ち」のままにする。
-- `revisions` に索引を足すと、大きな collection では起動時の索引作成に時間がかかる — 疎な索引（値を持つリビジョンだけが入る）にする。起動にかかる時間を結合テストの環境で確かめる。
-- 条件付きの更新が 1 回の処理として扱えることは、Prisma のクエリエンジンの作りに頼っている — 同時に 2 つ走らせる結合テストで確かめ、Prisma の版を上げたときに確かめ直す。成り立たなければ、その操作だけを `$runCommandRaw` に置き換える（Design Decisions の「新しいコレクションは Prisma で読み書きし、索引は Mongoose の schema で作る」）。
-- 1 件の Change Proposal が MongoDB の 1 文書の上限（16MB）を超える — 本文の合計の上限を定数で持ち、作成の時点で断る（要件 1.16）。
+### Decision: 移動の取り消しは、元の移動が作ったリダイレクトだけを消す
+- **Context**: 要件 5.7。移動は「移動元 → 移動先」のリダイレクトを、子のページの分も含めて作る。戻したときにこれが残ると、元のパスを開いても移動先へ送られる。
+- **Alternatives Considered**:
+  1. 移動元とその下を起点とするリダイレクトを、行き先を見ずに全部消す。人が前に作った `/A/old → /X` のような、元の移動と関係の無いリダイレクトまで、戻せない形で消えてしまう。
+  2. 元の移動が実際に作る形（移動元+suffix → 移動先+suffix）だけを消す（採用）。
+- **Selected Approach**: 2。`PageRedirect` の Prisma の拡張の `deleteRedirectsCreatedByMove({ fromPath, toPath })` で消す。suffix は空か `/…` で、移動先の側は `renamePage` と同じく、移動先の文字列をそのまま前に付けて作る。完全一致で比べるので、移動が実際に書いた組だけが消える（末尾に `/` が付いた移動先は作成のときに断るが、それより前に保存された提案を取り消すときも、同じ比べ方で正しく消せる）。取り消しの移動の書き込みと、`findExistingResult` で途中の後始末を済ませるときの両方で使う。
+- **進め方**: 1 回の移動で何万件もできることがあるので、候補を `fromPath` の順に 1000 件ずつ読み、消す組を `_id` で 1000 件以下ずつ消す。全件を 1 回のコマンドで消すと、長い日本語のパスでは送るコマンドが MongoDB の 16MB の上限を超えて失敗し、件数が増えると時間も急に延びたためである。移動元そのもののリダイレクト（戻したページを隠す `/A → /B`）を、下のページの分より先に消すので、途中で失敗しても残りうるのは下のページの分だけである。何度呼んでも結果は同じ。
+- **Trade-offs**: 反映の前から人が手で作った、まったく同じ形のリダイレクトは区別できず消える。保存されているデータから判断できる最も狭い条件がこれである。
+
+### Decision: 末尾に `/` が付いたパスは、作成のときに断る
+- **Context**: 要件 1.13・3.8。人の route（作成の `create-page.ts`、移動の `routes/apiv3/pages/index.js`）は、パスを先に `normalizePath` で正規化する。反映ではパスを正規化しないので、末尾に `/` が付いたパスをそのまま受け付けると、既にある `/A` と同じ親の下に `/A/` という中身のある別のページができる、子のあるページを `/B/` へ移すと `/B//child` ができる、既にある `/C` へ別のページを `/C/` として移動できる、といったことが起きる。
+- **Alternatives Considered**: 1. 作成のときに正規化して受け付ける。2. 作成のときに断る（採用。人が決めた）。
+- **Selected Approach**: `isUsablePagePath` は、`path === normalizePath(path)` でないパスを `invalid-path`（操作の番号つき）で断る。新規作成のパスと移動先の両方に当てる。`/` はもともと正規化された形なので扱いを変えない（作成のときは受け付け、反映のときに既にあるページとして `path-occupied` になる）。
+
+### Decision: 反映でも、人の route と同じユーザーページの保護を通す
+- **Context**: 管理者がユーザーページを無効にしている（`security:disableUserPages`）とき、人の route は `/user` の下への書き込みを断る。反映がこれを通らないと、人ができない書き込みを Change Proposal でできてしまう。
+- **Selected Approach**: 作成のときと反映のときの両方で、人の route と同じ `isUsersTopPage` / `isUserPage` を使う共通の判定 `findUserPageWriteRefusal`（`server/service/page/user-page-write-guard.ts`）で確かめ、当たれば `target-unavailable` にする。存在しないユーザーのホームの下への作成も断る。移動は、無効の確認を移動元と移動先の両方で、持ち主がいるかの確認を移動先だけで行う。これは duplicate の route と同じ規則で、rename の route より厳しい。AI には、ページが無いか閲覧できない場合と同じ値で伝わる。
+- **Trade-offs**: `judgeRevertability` はこの規則を知らないので、ユーザーページを無効にしたあと、`/user` に触れる編集・移動の取り消しは、画面で「戻せる」と出ても、反映では `target-unavailable` で断られる。完全な削除の操作は、人の完全な削除と同じく `disableUserPages` を確かめない。
 
 ## References
 - `apps/app/.claude/skills/learned/page-save-origin-semantics/SKILL.md` — `origin` と上書き防止の確認の関係
