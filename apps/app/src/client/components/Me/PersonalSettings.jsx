@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 
+import { MyChatAccountLinks } from '~/features/chat-integration/client/components/MyChatAccountLinks';
+
 import CustomNavAndContents from '../CustomNavigation/CustomNavAndContents';
 import ApiSettings from './ApiSettings';
 // import { EditorSettings } from './EditorSettings';
@@ -64,6 +66,15 @@ const OtherSettingsIcon = () => (
   </span>
 );
 
+const ChatAccountLinksIcon = () => (
+  <span
+    data-testid="chat-account-links-tab-button"
+    className="material-symbols-outlined"
+  >
+    forum
+  </span>
+);
+
 const PersonalSettings = () => {
   const { t } = useTranslation();
 
@@ -103,6 +114,14 @@ const PersonalSettings = () => {
         Icon: OtherSettingsIcon,
         Content: OtherSettings,
         i18n: t('Other Settings'),
+      },
+      chat_account_links: {
+        Icon: ChatAccountLinksIcon,
+        Content: MyChatAccountLinks,
+        // English-first: no locale key added yet for this screen (see
+        // .claude/rules -- i18n is deferred, not a completion gate), same
+        // as task 6.1's AccountLinkApproval.tsx.
+        i18n: 'Chat Account Links',
       },
     };
   }, [t]);

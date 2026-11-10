@@ -1,0 +1,1433 @@
+// Task 3.6: 「チャンネルの一覧を取り直す関数を用意する」.
+//
+// Two contracts are asserted here, and they are independent:
+//
+//  1. **What `refreshChannelInventory` writes, and when.** The write timing is
+//     the security-relevant half (design.md 「通知の宛先の検査」): a refresh
+//     that fails must leave BOTH the saved inventory and `channels_synced_at`
+//     exactly as they were, so 「一度も取れていない」 keeps answering
+//     `inventory-not-ready` instead of the misleading
+//     `channel-not-in-installation`.
+//  2. **What each service's channel listing produces.** Asserted through an
+//     injected `fetch` against the shape each service's real API returns, so
+//     the mapping into inventory rows (id, name, privacy, which channel kinds
+//     count at all) is checked rather than the SDK helper that carries it.
+import { createDiscordAdapter } from '@chat-adapter/discord';
+import { createSlackAdapter } from '@chat-adapter/slack';
+import { createTeamsAdapter } from '@chat-adapter/teams';
+import type { PlatformName } from '@growi/chat';
+import { createMattermostAdapter } from 'chat-adapter-mattermost';
+import { mock } from 'vitest-mock-extended';
+
+import {
+  indexInventory,
+  inventoryChannelIdOfEvent,
+  nativeChannelIdOf,
+  resolveNotificationTarget,
+  toProtocolInventory,
+  toSdkChannelId,
+  toTeamsGraphChannelId,
+} from '../capabilities/index.js';
+import { testSdkChannelId } from '../capabilities/test-channels.js';
+import type {
+  InstallationChannelRecord,
+  InstallationChannelRepository,
+  InstallationRepository,
+} from '../db/index.js';
+import type {
+  ChannelListing,
+  InstallationCredentials,
+  InventoryChannel,
+  PlatformAppConfig,
+} from '../types/index.js';
+import {
+  CHANNEL_LISTERS,
+  type ChannelLister,
+  type ChannelListerContext,
+  type ChannelRefreshDeps,
+  listChannels,
+  refreshChannelInventory,
+} from './channels.js';
+
+// --------------------------------------------------------------------------
+// refreshChannelInventory
+// --------------------------------------------------------------------------
+
+const INSTALLATION_ID = 'inst-1';
+const NOW = new Date('2026-09-03T10:00:00.000Z');
+
+const channelOf = (
+  nativeId: string,
+  overrides: {
+    readonly channelName?: string;
+    readonly isPrivate?: boolean;
+  } = {},
+): InventoryChannel => ({
+  platform: 'slack',
+  channelId: testSdkChannelId('slack', nativeId),
+  channelName: nativeId.replace('C', 'ch-'),
+  isPrivate: false,
+  ...overrides,
+});
+
+interface RefreshHarness {
+  readonly deps: ChannelRefreshDeps;
+  readonly upserted: InstallationChannelRecord[];
+  readonly synced: Array<{ installationId: string; syncedAt: Date }>;
+}
+
+const refreshHarness = (
+  listChannelsImpl: (installationId: string) => Promise<ChannelListing>,
+): RefreshHarness => {
+  const upserted: InstallationChannelRecord[] = [];
+  const synced: Array<{ installationId: string; syncedAt: Date }> = [];
+
+  const channels = mock<InstallationChannelRepository>({
+    upsert: (record) => {
+      upserted.push(record);
+      return Promise.resolve();
+    },
+  });
+  const installations = mock<InstallationRepository>({
+    markChannelsSynced: (installationId, syncedAt) => {
+      synced.push({ installationId, syncedAt });
+      return Promise.resolve();
+    },
+  });
+
+  return {
+    deps: {
+      listChannels: listChannelsImpl,
+      channels,
+      installations,
+      now: () => NOW,
+    },
+    upserted,
+    synced,
+  };
+};
+
+describe('refreshChannelInventory with a partial listing', () => {
+  it('saves what was listed but keeps the rows it could not re-list, and reports why', async () => {
+    const reported: unknown[] = [];
+    const harness = refreshHarness(() =>
+      Promise.resolve({
+        channels: [channelOf('C1')],
+        unlisted: [{ scope: 'T2', reason: 'team_access_not_granted' }],
+      }),
+    );
+    const deps: ChannelRefreshDeps = {
+      ...harness.deps,
+      onPartialListing: (unlisted) => reported.push(unlisted),
+    };
+
+    await refreshChannelInventory(deps, INSTALLATION_ID);
+
+    expect(harness.synced).toHaveLength(1);
+    expect(harness.deps.channels.deleteAllExcept).not.toHaveBeenCalled();
+    expect(reported).toEqual([
+      [{ scope: 'T2', reason: 'team_access_not_granted' }],
+    ]);
+  });
+});
+
+describe('refreshChannelInventory', () => {
+  it('saves every channel it was given and marks the installation synced', async () => {
+    const harness = refreshHarness(async () => ({
+      channels: [
+        channelOf('C1'),
+        channelOf('C2', { isPrivate: true, channelName: 'secret' }),
+      ],
+    }));
+
+    await refreshChannelInventory(harness.deps, INSTALLATION_ID);
+
+    expect(harness.upserted).toEqual([
+      {
+        installationId: INSTALLATION_ID,
+        platform: 'slack',
+        channelId: 'slack:C1',
+        channelName: 'ch-1',
+        isPrivate: false,
+        refreshedAt: NOW,
+      },
+      {
+        installationId: INSTALLATION_ID,
+        platform: 'slack',
+        channelId: 'slack:C2',
+        channelName: 'secret',
+        isPrivate: true,
+        refreshedAt: NOW,
+      },
+    ]);
+    expect(harness.synced).toEqual([
+      { installationId: INSTALLATION_ID, syncedAt: NOW },
+    ]);
+  });
+
+  it('marks the installation synced even when the service reported no channels', async () => {
+    // design.md: 「`channels_synced_at` は…結果によらず（0 件でも）完了するたびに
+    // 現在時刻を書く」. Without this write, an installation whose workspace
+    // genuinely has no usable channel would stay indistinguishable from one
+    // that was never refreshed at all.
+    const harness = refreshHarness(() => Promise.resolve({ channels: [] }));
+
+    await refreshChannelInventory(harness.deps, INSTALLATION_ID);
+
+    expect(harness.upserted).toEqual([]);
+    expect(harness.synced).toEqual([
+      { installationId: INSTALLATION_ID, syncedAt: NOW },
+    ]);
+  });
+
+  it('writes nothing at all when the listing fails, and reports the failure', async () => {
+    // design.md's failure path: 「取り直しの失敗 | 最後に取れた一覧をそのまま
+    // 使い続ける」. Both writes must be skipped -- marking the installation
+    // synced after a failed listing would turn a never-synced installation
+    // into an empty-but-synced one, which answers
+    // `channel-not-in-installation` and sends the operator to re-create a
+    // channel that was never the problem.
+    const failure = new Error('conversations.list failed');
+    const harness = refreshHarness(() => Promise.reject(failure));
+
+    await expect(
+      refreshChannelInventory(harness.deps, INSTALLATION_ID),
+    ).rejects.toBe(failure);
+
+    expect(harness.upserted).toEqual([]);
+    expect(harness.synced).toEqual([]);
+  });
+
+  it('stamps every row and the sync marker with one single timestamp', async () => {
+    const harness = refreshHarness(async () => ({
+      channels: [channelOf('C1'), channelOf('C2')],
+    }));
+
+    await refreshChannelInventory(harness.deps, INSTALLATION_ID);
+
+    const stamps = new Set([
+      ...harness.upserted.map((row) => row.refreshedAt.getTime()),
+      ...harness.synced.map((entry) => entry.syncedAt.getTime()),
+    ]);
+    expect(stamps.size).toBe(1);
+  });
+});
+
+// --------------------------------------------------------------------------
+// listChannels -- dispatch
+// --------------------------------------------------------------------------
+
+const CONTEXT: ChannelListerContext = {
+  workspaceId: 'T123',
+  credentials: {},
+  appConfig: { stateConnectionString: 'postgres://unused' },
+  fetch: async () => new Response('{}'),
+};
+
+describe('listChannels', () => {
+  it('asks the lister declared for the platform, and nothing else', async () => {
+    const called: PlatformName[] = [];
+    const listerFor =
+      (platform: PlatformName): ChannelLister =>
+      () => {
+        called.push(platform);
+        return Promise.resolve([
+          {
+            platform: 'mattermost',
+            channelId: toSdkChannelId('mattermost', 'X'),
+            channelName: `listed for ${platform}`,
+            isPrivate: false,
+          },
+        ]);
+      };
+    const listers: Readonly<Record<PlatformName, ChannelLister>> = {
+      slack: listerFor('slack'),
+      discord: listerFor('discord'),
+      teams: listerFor('teams'),
+      mattermost: listerFor('mattermost'),
+    };
+
+    const inventory = await listChannels('discord', CONTEXT, listers);
+
+    expect(called).toEqual(['discord']);
+    expect(inventory.channels.map((channel) => channel.channelName)).toEqual([
+      'listed for discord',
+    ]);
+  });
+
+  it('declares a lister for every service', () => {
+    expect(Object.keys(CHANNEL_LISTERS).sort()).toEqual([
+      'discord',
+      'mattermost',
+      'slack',
+      'teams',
+    ]);
+  });
+});
+
+// --------------------------------------------------------------------------
+// The four listers
+// --------------------------------------------------------------------------
+
+/**
+ * A `fetch` that answers each call from a queued body and records the request.
+ * Preferred over a module mock because two of the four services are called
+ * over plain HTTP: injecting `fetch` is the only seam all four share.
+ */
+const fetchStub = (bodies: ReadonlyArray<unknown | Error>) => {
+  const requests: Array<{ url: string; init?: RequestInit }> = [];
+  let call = 0;
+
+  const stub: typeof fetch = (input, init) => {
+    requests.push({
+      url: input instanceof URL ? input.toString() : String(input),
+      ...(init == null ? {} : { init }),
+    });
+    const body = bodies[call];
+    call += 1;
+    if (body === undefined) {
+      return Promise.reject(new Error(`unexpected fetch call ${call}`));
+    }
+    if (body instanceof Error) return Promise.reject(body);
+    return Promise.resolve(
+      new Response(JSON.stringify(body), {
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  };
+
+  return { stub, requests };
+};
+
+const contextOf = (
+  overrides: Partial<ChannelListerContext>,
+): ChannelListerContext => ({ ...CONTEXT, ...overrides });
+
+describe('CHANNEL_LISTERS.slack', () => {
+  const credentials: InstallationCredentials = {
+    slack: { botToken: 'xoxb-1' },
+  };
+
+  it('walks conversations.list and maps public and private channels', async () => {
+    const { stub, requests } = fetchStub([
+      {
+        ok: true,
+        channels: [
+          { id: 'C1', name: 'general', is_private: false },
+          { id: 'C2', name: 'secret', is_private: true },
+        ],
+        response_metadata: { next_cursor: 'page2' },
+      },
+      {
+        ok: true,
+        channels: [{ id: 'C3', name: 'random', is_private: false }],
+        response_metadata: { next_cursor: '' },
+      },
+    ]);
+
+    const channels = await CHANNEL_LISTERS.slack(
+      contextOf({ credentials, fetch: stub }),
+    );
+
+    expect(channels).toEqual([
+      {
+        platform: 'slack',
+        channelId: 'slack:C1',
+        channelName: 'general',
+        isPrivate: false,
+      },
+      {
+        platform: 'slack',
+        channelId: 'slack:C2',
+        channelName: 'secret',
+        isPrivate: true,
+      },
+      {
+        platform: 'slack',
+        channelId: 'slack:C3',
+        channelName: 'random',
+        isPrivate: false,
+      },
+    ]);
+    expect(requests).toHaveLength(2);
+    // `team_id` is required for an Enterprise Grid org-wide token, and Slack
+    // documents it as ignored elsewhere -- without it the listing silently
+    // spans the wrong workspaces.
+    expect(String(requests[0]?.init?.body)).toContain('team_id=T123');
+    expect(String(requests[1]?.init?.body)).toContain('cursor=page2');
+  });
+
+  it('fails rather than answering an empty list when Slack refuses the call', async () => {
+    // `callSlackApi` resolves HTTP 200 with `{ok:false}` -- Slack's own way of
+    // reporting a missing scope. Reading that as "this workspace has no
+    // channels" would mark the installation synced and empty, so every
+    // notification would be refused as `channel-not-in-installation`.
+    const { stub } = fetchStub([{ ok: false, error: 'missing_scope' }]);
+
+    await expect(
+      CHANNEL_LISTERS.slack(contextOf({ credentials, fetch: stub })),
+    ).rejects.toThrow(/missing_scope/);
+  });
+
+  it('propagates a mid-pagination failure instead of returning the pages it already had', async () => {
+    // The whole listing resolves or it throws: `refreshChannelInventory` only
+    // starts writing once it has the complete inventory, so a half-walked
+    // listing must never reach it.
+    const { stub } = fetchStub([
+      {
+        ok: true,
+        channels: [{ id: 'C1', name: 'general', is_private: false }],
+        response_metadata: { next_cursor: 'page2' },
+      },
+      new Error('connection reset'),
+    ]);
+
+    await expect(
+      CHANNEL_LISTERS.slack(contextOf({ credentials, fetch: stub })),
+    ).rejects.toThrow('connection reset');
+  });
+
+  it('fails rather than truncating when the workspace has more pages than the bound', async () => {
+    // A truncated inventory is indistinguishable from a smaller workspace once
+    // saved, so every channel past the bound would be refused as
+    // `channel-not-in-installation` with nothing to show it was cut off.
+    const endlessPage = {
+      ok: true,
+      channels: [{ id: 'C1', name: 'general', is_private: false }],
+      response_metadata: { next_cursor: 'more' },
+    };
+    const { stub } = fetchStub(new Array(200).fill(endlessPage));
+
+    await expect(
+      CHANNEL_LISTERS.slack(contextOf({ credentials, fetch: stub })),
+    ).rejects.toThrow(/truncated/i);
+  });
+
+  it('fails when the installation carries no Slack credentials', async () => {
+    await expect(
+      CHANNEL_LISTERS.slack(contextOf({ credentials: {} })),
+    ).rejects.toThrow(/credential/i);
+  });
+});
+
+describe('CHANNEL_LISTERS.slack on an Enterprise Grid org-wide installation', () => {
+  const credentials: InstallationCredentials = {
+    slack: { botToken: 'xoxb-org' },
+  };
+
+  interface SlackCall {
+    readonly method: string;
+    readonly params: URLSearchParams;
+  }
+
+  type SlackAnswer = unknown | Error;
+
+  // Routes by Slack method and (for conversations.list) team_id, so a test
+  // states what each workspace answers instead of the order calls arrive in.
+  const slackRouter = (routes: {
+    readonly teams: ReadonlyArray<SlackAnswer>;
+    readonly channelsOf: Readonly<Record<string, ReadonlyArray<SlackAnswer>>>;
+  }) => {
+    const calls: SlackCall[] = [];
+    const teamsQueue = [...routes.teams];
+    const channelQueues = new Map(
+      Object.entries(routes.channelsOf).map(([team, answers]) => [
+        team,
+        [...answers],
+      ]),
+    );
+    const stub: typeof fetch = (input, init) => {
+      const url = input instanceof URL ? input.toString() : String(input);
+      const method = url.split('/').pop() ?? '';
+      const params = new URLSearchParams(String(init?.body ?? ''));
+      calls.push({ method, params });
+      const answer =
+        method === 'auth.teams.list'
+          ? teamsQueue.shift()
+          : channelQueues.get(params.get('team_id') ?? '')?.shift();
+      if (answer === undefined) {
+        return Promise.reject(new Error(`unexpected ${method} call`));
+      }
+      if (answer instanceof Error) return Promise.reject(answer);
+      return Promise.resolve(
+        new Response(JSON.stringify(answer), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    };
+    return {
+      stub,
+      calls,
+      queriedTeams: () =>
+        calls
+          .filter((call) => call.method === 'conversations.list')
+          .map((call) => call.params.get('team_id')),
+    };
+  };
+
+  const page = (
+    channels: ReadonlyArray<{ id: string; name: string; is_private?: boolean }>,
+    nextCursor = '',
+  ) => ({
+    ok: true,
+    channels,
+    response_metadata: { next_cursor: nextCursor },
+  });
+
+  const run = (
+    stub: typeof fetch,
+    reportUnlisted?: ChannelListerContext['reportUnlisted'],
+  ) =>
+    CHANNEL_LISTERS.slack(
+      contextOf({
+        workspaceId: 'E999',
+        credentials,
+        fetch: stub,
+        ...(reportUnlisted == null ? {} : { reportUnlisted }),
+      }),
+    );
+
+  it('lists each workspace the app is allowed in and merges the channels', async () => {
+    const router = slackRouter({
+      teams: [
+        {
+          ok: true,
+          teams: [{ id: 'T1' }, { id: 'T2' }],
+          response_metadata: { next_cursor: '' },
+        },
+      ],
+      channelsOf: {
+        T1: [page([{ id: 'C1', name: 'general' }])],
+        T2: [page([{ id: 'C2', name: 'secret', is_private: true }])],
+      },
+    });
+
+    const channels = await run(router.stub);
+
+    expect(
+      channels.map((c) => [c.channelId, c.channelName, c.isPrivate]),
+    ).toEqual([
+      ['slack:C1', 'general', false],
+      ['slack:C2', 'secret', true],
+    ]);
+    expect(router.queriedTeams()).toEqual(['T1', 'T2']);
+  });
+
+  it('never passes the organization id as team_id to conversations.list', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }] }],
+      channelsOf: { T1: [page([])] },
+    });
+
+    await run(router.stub);
+
+    expect(router.queriedTeams()).not.toContain('E999');
+  });
+
+  it('follows auth.teams.list pagination to every workspace', async () => {
+    const router = slackRouter({
+      teams: [
+        {
+          ok: true,
+          teams: [{ id: 'T1' }],
+          response_metadata: { next_cursor: 'more-teams' },
+        },
+        {
+          ok: true,
+          teams: [{ id: 'T2' }],
+          response_metadata: { next_cursor: '' },
+        },
+      ],
+      channelsOf: {
+        T1: [page([{ id: 'C1', name: 'a' }])],
+        T2: [page([{ id: 'C2', name: 'b' }])],
+      },
+    });
+
+    const channels = await run(router.stub);
+
+    expect(router.queriedTeams()).toEqual(['T1', 'T2']);
+    expect(channels.map((c) => c.channelId)).toEqual(['slack:C1', 'slack:C2']);
+  });
+
+  it('walks every channel page of each workspace', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }, { id: 'T2' }] }],
+      channelsOf: {
+        T1: [
+          page([{ id: 'C1', name: 'a' }], 'p2'),
+          page([{ id: 'C3', name: 'c' }]),
+        ],
+        T2: [page([{ id: 'C2', name: 'b' }])],
+      },
+    });
+
+    const channels = await run(router.stub);
+
+    expect(channels.map((c) => c.channelId)).toEqual([
+      'slack:C1',
+      'slack:C3',
+      'slack:C2',
+    ]);
+  });
+
+  it('lists a channel shared between two workspaces once', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }, { id: 'T2' }] }],
+      channelsOf: {
+        T1: [page([{ id: 'C9', name: 'shared' }])],
+        T2: [page([{ id: 'C9', name: 'shared' }])],
+      },
+    });
+
+    const channels = await run(router.stub);
+
+    expect(channels.map((c) => c.channelId)).toEqual(['slack:C9']);
+  });
+
+  it('answers with an empty list, not a failure, when the app is allowed in no workspace', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [], response_metadata: { next_cursor: '' } }],
+      channelsOf: {},
+    });
+
+    await expect(run(router.stub)).resolves.toEqual([]);
+    expect(router.queriedTeams()).toEqual([]);
+  });
+
+  it('still returns the other workspaces and reports the one that failed', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }, { id: 'T2' }, { id: 'T3' }] }],
+      channelsOf: {
+        T1: [page([{ id: 'C1', name: 'a' }])],
+        T2: [{ ok: false, error: 'team_access_not_granted' }],
+        T3: [page([{ id: 'C3', name: 'c' }])],
+      },
+    });
+    const unlisted: Array<{ scope: string; reason: string }> = [];
+
+    const channels = await run(router.stub, (entry) => unlisted.push(entry));
+
+    expect(channels.map((c) => c.channelId)).toEqual(['slack:C1', 'slack:C3']);
+    expect(unlisted).toHaveLength(1);
+    expect(unlisted[0]?.scope).toBe('T2');
+    expect(unlisted[0]?.reason).toMatch(/team_access_not_granted/);
+  });
+
+  it('drops the channels of a workspace that fails after its first page rather than keeping half of it', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }, { id: 'T2' }] }],
+      channelsOf: {
+        T1: [
+          page([{ id: 'C1', name: 'a' }], 'p2'),
+          new Error('connection reset'),
+        ],
+        T2: [page([{ id: 'C2', name: 'b' }])],
+      },
+    });
+    const unlisted: Array<{ scope: string; reason: string }> = [];
+
+    const channels = await run(router.stub, (entry) => unlisted.push(entry));
+
+    expect(channels.map((c) => c.channelId)).toEqual(['slack:C2']);
+    expect(unlisted.map((entry) => entry.scope)).toEqual(['T1']);
+  });
+
+  it('fails when every workspace fails, so the last complete inventory is kept', async () => {
+    const router = slackRouter({
+      teams: [{ ok: true, teams: [{ id: 'T1' }, { id: 'T2' }] }],
+      channelsOf: {
+        T1: [{ ok: false, error: 'team_access_not_granted' }],
+        T2: [{ ok: false, error: 'team_access_not_granted' }],
+      },
+    });
+
+    await expect(run(router.stub)).rejects.toThrow(/team_access_not_granted/);
+  });
+
+  it('fails when the workspace list itself cannot be read', async () => {
+    const router = slackRouter({
+      teams: [{ ok: false, error: 'missing_scope' }],
+      channelsOf: {},
+    });
+
+    await expect(run(router.stub)).rejects.toThrow(/missing_scope/);
+  });
+
+  it('keeps asking for the workspace itself when the installation is a single workspace', async () => {
+    const router = slackRouter({
+      teams: [],
+      channelsOf: { T123: [page([{ id: 'C1', name: 'a' }])] },
+    });
+
+    const channels = await CHANNEL_LISTERS.slack(
+      contextOf({ credentials, fetch: router.stub }),
+    );
+
+    expect(channels.map((c) => c.channelId)).toEqual(['slack:C1']);
+    expect(router.calls.map((call) => call.method)).toEqual([
+      'conversations.list',
+    ]);
+    expect(router.queriedTeams()).toEqual(['T123']);
+  });
+});
+
+describe('listChannels reports the scopes a lister could not list', () => {
+  it('carries them on the listing next to the channels it did get', async () => {
+    const lister: ChannelLister = (context) => {
+      context.reportUnlisted?.({
+        scope: 'T2',
+        reason: 'team_access_not_granted',
+      });
+      return Promise.resolve([
+        {
+          platform: 'slack',
+          channelId: testSdkChannelId('slack', 'C1'),
+          channelName: 'a',
+          isPrivate: false,
+        },
+      ]);
+    };
+
+    const listing = await listChannels('slack', CONTEXT, {
+      slack: lister,
+      discord: lister,
+      teams: lister,
+      mattermost: lister,
+    });
+
+    expect(listing.channels.map((c) => c.channelId)).toEqual(['slack:C1']);
+    expect(listing.unlisted).toEqual([
+      { scope: 'T2', reason: 'team_access_not_granted' },
+    ]);
+  });
+});
+
+describe('CHANNEL_LISTERS.discord', () => {
+  const appConfig: PlatformAppConfig = {
+    ...CONTEXT.appConfig,
+    discord: {
+      applicationId: 'app-1',
+      publicKey: 'pk',
+      clientSecret: 'cs',
+      botToken: 'bot-1',
+    },
+  };
+
+  it('lists the guild text channels and reads privacy from the @everyone overwrite', async () => {
+    const { stub, requests } = fetchStub([
+      [
+        { id: '1', name: 'general', type: 0 },
+        { id: '2', name: 'announce', type: 5 },
+        // Voice channel: not a notification target.
+        { id: '3', name: 'lounge', type: 2 },
+        {
+          id: '4',
+          name: 'staff',
+          type: 0,
+          // `@everyone`'s role id equals the guild id, and 1 << 10 is
+          // VIEW_CHANNEL -- denying it there is what makes a Discord channel
+          // private.
+          permission_overwrites: [
+            { id: 'G1', type: 0, allow: '0', deny: String(1 << 10) },
+          ],
+        },
+      ],
+    ]);
+
+    const channels = await CHANNEL_LISTERS.discord(
+      contextOf({ workspaceId: 'G1', appConfig, fetch: stub }),
+    );
+
+    expect(channels).toEqual([
+      {
+        platform: 'discord',
+        channelId: 'discord:G1:1',
+        channelName: 'general',
+        isPrivate: false,
+      },
+      {
+        platform: 'discord',
+        channelId: 'discord:G1:2',
+        channelName: 'announce',
+        isPrivate: false,
+      },
+      {
+        platform: 'discord',
+        channelId: 'discord:G1:4',
+        channelName: 'staff',
+        isPrivate: true,
+      },
+    ]);
+    expect(requests[0]?.url).toContain('/guilds/G1/channels');
+  });
+
+  it('fails when the response is not a success', async () => {
+    const stub: typeof fetch = async () =>
+      new Response('{"message":"Missing Access"}', { status: 403 });
+
+    await expect(
+      CHANNEL_LISTERS.discord(
+        contextOf({ workspaceId: 'G1', appConfig, fetch: stub }),
+      ),
+    ).rejects.toThrow(/403/);
+  });
+
+  it('fails when this deployment configures no Discord app', async () => {
+    await expect(
+      CHANNEL_LISTERS.discord(contextOf({ workspaceId: 'G1' })),
+    ).rejects.toThrow(/credential/i);
+  });
+});
+
+describe('CHANNEL_LISTERS.mattermost', () => {
+  const credentials: InstallationCredentials = {
+    mattermost: { baseUrl: 'https://mm.example.com', botToken: 'mm-1' },
+  };
+
+  // The bot's own team membership only decides which teams get walked at all
+  // (there is no way to list teams the bot is not in via a bot token). Within
+  // a team, the inventory must answer 「その workspace のチャンネルか」, not
+  // 「bot が入っているチャンネルか」 -- so each team is asked for its public
+  // channels (workspace-wide, regardless of bot membership) union its
+  // bot-joined channels (the only way to see a private one).
+  it("answers with the union of a team's public channels and the channels the bot has joined, and keeps only open and private types", async () => {
+    const { stub, requests } = fetchStub([
+      [{ id: 'team-1' }, { id: 'team-2' }],
+      // Team 1's public channels -- includes ch-1, which the bot has NOT
+      // joined.
+      [
+        {
+          id: 'ch-1',
+          name: 'town-square',
+          display_name: 'Town Square',
+          type: 'O',
+        },
+      ],
+      // Team 1's bot-joined channels -- ch-2 is a private channel only
+      // reachable this way; ch-3/ch-4 are a DM and a group message, not
+      // channels an administrator can pick as a notification target.
+      [
+        { id: 'ch-2', name: 'ops', display_name: 'Ops', type: 'P' },
+        { id: 'ch-3', name: 'dm', display_name: '', type: 'D' },
+        { id: 'ch-4', name: 'gm', display_name: '', type: 'G' },
+      ],
+      // Team 2's public channels.
+      [{ id: 'ch-5', name: 'second', display_name: 'Second', type: 'O' }],
+      // Team 2's bot-joined channels -- empty.
+      [],
+    ]);
+
+    const channels = await CHANNEL_LISTERS.mattermost(
+      contextOf({ credentials, fetch: stub }),
+    );
+
+    expect(channels).toEqual([
+      {
+        platform: 'mattermost',
+        channelId: 'ch-1',
+        channelName: 'Town Square',
+        isPrivate: false,
+      },
+      {
+        platform: 'mattermost',
+        channelId: 'ch-2',
+        channelName: 'Ops',
+        isPrivate: true,
+      },
+      {
+        platform: 'mattermost',
+        channelId: 'ch-5',
+        channelName: 'Second',
+        isPrivate: false,
+      },
+    ]);
+    expect(requests[0]?.url).toBe(
+      'https://mm.example.com/api/v4/users/me/teams',
+    );
+    expect(requests[1]?.url).toBe(
+      'https://mm.example.com/api/v4/teams/team-1/channels?page=0&per_page=200',
+    );
+    expect(requests[2]?.url).toBe(
+      'https://mm.example.com/api/v4/users/me/teams/team-1/channels',
+    );
+    expect(requests[3]?.url).toBe(
+      'https://mm.example.com/api/v4/teams/team-2/channels?page=0&per_page=200',
+    );
+    expect(requests[4]?.url).toBe(
+      'https://mm.example.com/api/v4/users/me/teams/team-2/channels',
+    );
+  });
+
+  // Regression test for the bug round 1 shipped: a public channel the bot has
+  // not joined used to be missing entirely from the inventory, because the
+  // lister only ever asked the bot-joined-channels endpoint. If this
+  // assertion ever starts failing, that bug is back.
+  it('includes a public channel the bot has not joined', async () => {
+    const { stub, requests } = fetchStub([
+      [{ id: 'team-1' }],
+      [
+        {
+          id: 'ch-not-joined',
+          name: 'general',
+          display_name: 'General',
+          type: 'O',
+        },
+      ],
+      // The bot-joined-channels response does not carry this channel at all.
+      [],
+    ]);
+
+    const channels = await CHANNEL_LISTERS.mattermost(
+      contextOf({ credentials, fetch: stub }),
+    );
+
+    expect(channels).toEqual([
+      {
+        platform: 'mattermost',
+        channelId: 'ch-not-joined',
+        channelName: 'General',
+        isPrivate: false,
+      },
+    ]);
+    // Pin down that this result came from the PUBLIC-channels endpoint, not
+    // only the bot-joined one -- otherwise a stub that merely answers calls in
+    // order can happen to produce this same result even from a lister that
+    // dropped the public-channels call entirely (the bug round 1 shipped).
+    expect(requests[0]?.url).toBe(
+      'https://mm.example.com/api/v4/users/me/teams',
+    );
+    expect(requests[1]?.url).toBe(
+      'https://mm.example.com/api/v4/teams/team-1/channels?page=0&per_page=200',
+    );
+    expect(requests[2]?.url).toBe(
+      'https://mm.example.com/api/v4/users/me/teams/team-1/channels',
+    );
+  });
+
+  it('lists a channel once when it appears in both the public and bot-joined responses', async () => {
+    const { stub, requests } = fetchStub([
+      [{ id: 'team-1' }],
+      [
+        {
+          id: 'ch-1',
+          name: 'town-square',
+          display_name: 'Town Square',
+          type: 'O',
+        },
+      ],
+      [
+        {
+          id: 'ch-1',
+          name: 'town-square',
+          display_name: 'Town Square',
+          type: 'O',
+        },
+      ],
+    ]);
+
+    const channels = await CHANNEL_LISTERS.mattermost(
+      contextOf({ credentials, fetch: stub }),
+    );
+
+    expect(channels).toEqual([
+      {
+        platform: 'mattermost',
+        channelId: 'ch-1',
+        channelName: 'Town Square',
+        isPrivate: false,
+      },
+    ]);
+    // Confirm the single result really is a merge of two separate responses
+    // (public-channels and bot-joined-channels), not just the bot-joined call
+    // alone -- otherwise a lister that skips the public-channels call could
+    // pass this de-duplication test for the wrong reason.
+    expect(requests[0]?.url).toBe(
+      'https://mm.example.com/api/v4/users/me/teams',
+    );
+    expect(requests[1]?.url).toBe(
+      'https://mm.example.com/api/v4/teams/team-1/channels?page=0&per_page=200',
+    );
+    expect(requests[2]?.url).toBe(
+      'https://mm.example.com/api/v4/users/me/teams/team-1/channels',
+    );
+  });
+
+  // Round 4 regression test: `GET /teams/{team_id}/channels` (the public
+  // channel listing) is itself paginated by Mattermost -- sending no
+  // `page`/`per_page` at all, as this lister used to, silently returns only
+  // the team's first page of public channels. A team with more public
+  // channels than one page would have channel #(pageSize + 1) onward missing
+  // from the inventory entirely, with nothing to show it was cut off.
+  it("walks every page of a team's public channels", async () => {
+    const page0 = Array.from({ length: 200 }, (_, i) => ({
+      id: `ch-${i}`,
+      name: `channel-${i}`,
+      display_name: `Channel ${i}`,
+      type: 'O',
+    }));
+    const page1 = [
+      {
+        id: 'ch-200',
+        name: 'channel-200',
+        display_name: 'Channel 200',
+        type: 'O',
+      },
+      {
+        id: 'ch-201',
+        name: 'channel-201',
+        display_name: 'Channel 201',
+        type: 'O',
+      },
+    ];
+    const { stub, requests } = fetchStub([
+      [{ id: 'team-1' }],
+      page0,
+      page1,
+      // Bot-joined channels for team-1 -- empty; this test is only about the
+      // public-channels pagination.
+      [],
+    ]);
+
+    const channels = await CHANNEL_LISTERS.mattermost(
+      contextOf({ credentials, fetch: stub }),
+    );
+
+    expect(channels).toHaveLength(202);
+    expect(channels.map((channel) => channel.channelId)).toEqual([
+      ...page0.map((row) => row.id),
+      ...page1.map((row) => row.id),
+    ]);
+    // Pin down that BOTH pages were actually requested with the expected
+    // page/per_page parameters, rather than trusting the result count alone
+    // (round 3 established this pattern after a queue-driven stub was found
+    // able to produce a passing count from the wrong call sequence).
+    expect(requests[0]?.url).toBe(
+      'https://mm.example.com/api/v4/users/me/teams',
+    );
+    expect(requests[1]?.url).toBe(
+      'https://mm.example.com/api/v4/teams/team-1/channels?page=0&per_page=200',
+    );
+    expect(requests[2]?.url).toBe(
+      'https://mm.example.com/api/v4/teams/team-1/channels?page=1&per_page=200',
+    );
+    expect(requests[3]?.url).toBe(
+      'https://mm.example.com/api/v4/users/me/teams/team-1/channels',
+    );
+  });
+
+  it('falls back to the url name when a channel has no display name', async () => {
+    const { stub } = fetchStub([
+      [{ id: 'team-1' }],
+      [{ id: 'ch-1', name: 'town-square', display_name: '', type: 'O' }],
+      [],
+    ]);
+
+    const channels = await CHANNEL_LISTERS.mattermost(
+      contextOf({ credentials, fetch: stub }),
+    );
+
+    expect(channels[0]?.channelName).toBe('town-square');
+  });
+
+  it('fails when the installation carries no Mattermost credentials', async () => {
+    await expect(
+      CHANNEL_LISTERS.mattermost(contextOf({ credentials: {} })),
+    ).rejects.toThrow(/credential/i);
+  });
+});
+
+describe('CHANNEL_LISTERS.teams', () => {
+  const appConfig: PlatformAppConfig = {
+    ...CONTEXT.appConfig,
+    teams: { clientId: 'app-1', clientSecret: 'secret' },
+  };
+  const credentials: InstallationCredentials = {
+    teams: { tenantId: 'tenant-1' },
+  };
+
+  /** Graph is reached with a bearer token the helper acquires first. */
+  const TOKEN_RESPONSE = { access_token: 'graph-token', expires_in: 3600 };
+
+  it('lists every team in the tenant and the channels of each', async () => {
+    const { stub, requests } = fetchStub([
+      TOKEN_RESPONSE,
+      {
+        value: [{ id: 'team-1' }],
+        '@odata.nextLink': 'https://graph.microsoft.com/v1.0/teams?$skip=1',
+      },
+      TOKEN_RESPONSE,
+      { value: [{ id: 'team-2' }] },
+      TOKEN_RESPONSE,
+      {
+        value: [
+          { id: 'ch-1', displayName: 'General', membershipType: 'standard' },
+          { id: 'ch-2', displayName: 'Leads', membershipType: 'private' },
+        ],
+      },
+      TOKEN_RESPONSE,
+      {
+        value: [{ id: 'ch-3', displayName: 'Other', membershipType: 'shared' }],
+      },
+    ]);
+
+    const channels = await CHANNEL_LISTERS.teams(
+      contextOf({
+        workspaceId: 'tenant-1',
+        appConfig,
+        credentials,
+        fetch: stub,
+      }),
+    );
+
+    expect(channels).toEqual([
+      {
+        platform: 'teams',
+        channelId: 'ch-1',
+        channelName: 'General',
+        isPrivate: false,
+      },
+      {
+        platform: 'teams',
+        channelId: 'ch-2',
+        channelName: 'Leads',
+        isPrivate: true,
+      },
+      {
+        platform: 'teams',
+        channelId: 'ch-3',
+        channelName: 'Other',
+        isPrivate: false,
+      },
+    ]);
+    // Asserted as the exact ordered sequence, not as membership: the Graph
+    // helper acquires a fresh bearer token before EVERY call (it caches
+    // nothing), so a queue-driven stub that merely "contains" the right URLs
+    // could still be answering each request from the wrong queue slot.
+    expect(requests.map((request) => request.url)).toEqual([
+      'https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token',
+      'https://graph.microsoft.com/v1.0/teams',
+      'https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token',
+      'https://graph.microsoft.com/v1.0/teams?$skip=1',
+      'https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token',
+      'https://graph.microsoft.com/v1.0/teams/team-1/channels',
+      'https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token',
+      'https://graph.microsoft.com/v1.0/teams/team-2/channels',
+    ]);
+  });
+
+  it('fails when the app or the installation carries no Teams credentials', async () => {
+    await expect(
+      CHANNEL_LISTERS.teams(contextOf({ credentials })),
+    ).rejects.toThrow(/credential/i);
+    await expect(
+      CHANNEL_LISTERS.teams(contextOf({ appConfig })),
+    ).rejects.toThrow(/credential/i);
+  });
+});
+
+// --------------------------------------------------------------------------
+// A listed channel is the channel an event in it names
+// --------------------------------------------------------------------------
+
+// The inventory is what a command's channel, a channel permission and a
+// notification target are all matched against, so a listed channel's id must
+// equal the `ChannelRef.channelId` an event in that same channel carries. The
+// event side is taken from the real adapter -- `Thread.channelId` is
+// `adapter.channelIdFromThreadId(threadId)` -- rather than written by hand,
+// because a hand-written id is exactly how both sides came to agree in tests
+// while disagreeing in production.
+describe('a listed channel has the id an event in that channel carries', () => {
+  it('slack', async () => {
+    const adapter = createSlackAdapter({
+      mode: 'socket',
+      appToken: 'xapp-unused',
+      signingSecret: 'unused',
+    });
+    const eventChannelId = adapter.channelIdFromThreadId(
+      adapter.encodeThreadId({ channel: 'C1', threadTs: '1700000000.000100' }),
+    );
+    const { stub } = fetchStub([
+      {
+        ok: true,
+        channels: [{ id: 'C1', name: 'general', is_private: false }],
+        response_metadata: { next_cursor: '' },
+      },
+    ]);
+
+    const [listed] = await CHANNEL_LISTERS.slack(
+      contextOf({
+        credentials: { slack: { botToken: 'xoxb-1' } },
+        fetch: stub,
+      }),
+    );
+
+    expect(listed?.channelId).toBe(eventChannelId);
+  });
+
+  it('discord', async () => {
+    const adapter = createDiscordAdapter({
+      applicationId: 'app-1',
+      publicKey: '0'.repeat(64),
+      botToken: 'bot-1',
+    });
+    const eventChannelId = adapter.channelIdFromThreadId(
+      adapter.encodeThreadId({ guildId: 'G1', channelId: '1', threadId: '9' }),
+    );
+    const { stub } = fetchStub([[{ id: '1', name: 'general', type: 0 }]]);
+
+    const [listed] = await CHANNEL_LISTERS.discord(
+      contextOf({
+        workspaceId: 'G1',
+        appConfig: {
+          stateConnectionString: 'postgres://unused',
+          discord: {
+            applicationId: 'app-1',
+            publicKey: 'pk',
+            clientSecret: 'cs',
+            botToken: 'bot-1',
+          },
+        },
+        fetch: stub,
+      }),
+    );
+
+    expect(listed?.channelId).toBe(eventChannelId);
+  });
+
+  it('mattermost', async () => {
+    const adapter = createMattermostAdapter({
+      baseUrl: 'https://mm.example.com',
+      botToken: 'mm-1',
+    });
+    const eventChannelId = adapter.channelIdFromThreadId(
+      adapter.encodeThreadId({ channelId: 'ch-1', rootPostId: 'post-1' }),
+    );
+    const { stub } = fetchStub([
+      [{ id: 'team-1' }],
+      [{ id: 'ch-1', name: 'town-square', display_name: 'Town', type: 'O' }],
+      [],
+    ]);
+
+    const [listed] = await CHANNEL_LISTERS.mattermost(
+      contextOf({
+        credentials: {
+          mattermost: { baseUrl: 'https://mm.example.com', botToken: 'mm-1' },
+        },
+        fetch: stub,
+      }),
+    );
+
+    expect(listed?.channelId).toBe(eventChannelId);
+  });
+});
+
+// --------------------------------------------------------------------------
+// GROWI sees the id the service shows, and names back the channel events use
+// --------------------------------------------------------------------------
+
+// An administrator picks a channel from the inventory GROWI was served, or
+// types the id the chat service shows; GROWI then names that channel in a
+// permission and in a notification. Both directions are taken from the real
+// adapter and the real lister here, for the reason the block above gives.
+describe('a listed channel, served to GROWI and named back by it, is the channel an event in it carries', () => {
+  it('slack', async () => {
+    const adapter = createSlackAdapter({
+      mode: 'socket',
+      appToken: 'xapp-unused',
+      signingSecret: 'unused',
+    });
+    const eventChannelId = toSdkChannelId(
+      'slack',
+      adapter.channelIdFromThreadId(
+        adapter.encodeThreadId({
+          channel: 'C1',
+          threadTs: '1700000000.000100',
+        }),
+      ),
+    );
+    const { stub } = fetchStub([
+      {
+        ok: true,
+        channels: [{ id: 'C1', name: 'general', is_private: false }],
+        response_metadata: { next_cursor: '' },
+      },
+    ]);
+    const listed = await CHANNEL_LISTERS.slack(
+      contextOf({
+        credentials: { slack: { botToken: 'xoxb-1' } },
+        fetch: stub,
+      }),
+    );
+
+    const served = toProtocolInventory(listed);
+    const named = served.channels[0]?.channelId;
+
+    expect(named).toBe('C1');
+    expect(
+      nativeChannelIdOf({ platform: 'slack', channelId: eventChannelId }),
+    ).toBe(named);
+    expect(
+      resolveNotificationTarget(indexInventory(listed), {
+        platform: 'slack',
+        channelId: named,
+      }),
+    ).toEqual({
+      kind: 'found',
+      channel: {
+        platform: 'slack',
+        channelId: eventChannelId,
+        channelName: 'general',
+        isPrivate: false,
+      },
+    });
+  });
+
+  it('discord', async () => {
+    const adapter = createDiscordAdapter({
+      applicationId: 'app-1',
+      publicKey: '0'.repeat(64),
+      botToken: 'bot-1',
+    });
+    const eventChannelId = toSdkChannelId(
+      'discord',
+      adapter.channelIdFromThreadId(
+        adapter.encodeThreadId({
+          guildId: 'G1',
+          channelId: '1',
+          threadId: '9',
+        }),
+      ),
+    );
+    const { stub } = fetchStub([[{ id: '1', name: 'general', type: 0 }]]);
+    const listed = await CHANNEL_LISTERS.discord(
+      contextOf({
+        workspaceId: 'G1',
+        appConfig: {
+          stateConnectionString: 'postgres://unused',
+          discord: {
+            applicationId: 'app-1',
+            publicKey: 'pk',
+            clientSecret: 'cs',
+            botToken: 'bot-1',
+          },
+        },
+        fetch: stub,
+      }),
+    );
+
+    const served = toProtocolInventory(listed);
+    const named = served.channels[0]?.channelId;
+
+    expect(named).toBe('1');
+    expect(
+      nativeChannelIdOf({ platform: 'discord', channelId: eventChannelId }),
+    ).toBe(named);
+    expect(
+      resolveNotificationTarget(indexInventory(listed), {
+        platform: 'discord',
+        channelId: named,
+      }),
+    ).toMatchObject({ kind: 'found', channel: { channelId: eventChannelId } });
+  });
+
+  it('teams: the id GROWI is served is the id an event in that channel shows, though it cannot be posted to', () => {
+    // The Teams adapter's channel id also carries the conversation's
+    // `serviceUrl`, which no listing has, so a listed Teams channel can be
+    // matched against but not addressed.
+    const adapter = createTeamsAdapter({
+      appId: 'teams-app',
+      appPassword: 'teams-secret',
+    });
+    const eventChannelId = toSdkChannelId(
+      'teams',
+      adapter.channelIdFromThreadId(
+        adapter.encodeThreadId({
+          conversationId: '19:abc@thread.tacv2;messageid=1700000000000',
+          serviceUrl: 'https://smba.trafficmanager.net/teams/',
+        }),
+      ),
+    );
+    const listed = [
+      {
+        platform: 'teams' as const,
+        channelId: toTeamsGraphChannelId('19:abc@thread.tacv2'),
+        channelName: 'General',
+        isPrivate: false,
+      },
+    ];
+
+    const named = toProtocolInventory(listed).channels[0]?.channelId;
+
+    expect(named).toBe('19:abc@thread.tacv2');
+    expect(
+      nativeChannelIdOf({ platform: 'teams', channelId: eventChannelId }),
+    ).toBe(named);
+    expect(
+      resolveNotificationTarget(indexInventory(listed), {
+        platform: 'teams',
+        channelId: named,
+      }),
+    ).toEqual({ kind: 'unaddressable' });
+  });
+
+  it('mattermost', () => {
+    const adapter = createMattermostAdapter({
+      baseUrl: 'https://mm.example.com',
+      botToken: 'mm-1',
+    });
+    const eventChannelId = toSdkChannelId(
+      'mattermost',
+      adapter.channelIdFromThreadId(
+        adapter.encodeThreadId({ channelId: 'ch-1', rootPostId: 'post-1' }),
+      ),
+    );
+
+    expect(
+      nativeChannelIdOf({ platform: 'mattermost', channelId: eventChannelId }),
+    ).toBe('ch-1');
+  });
+});
+
+// A slash command names its channel by `Channel.id`, which the Discord adapter
+// builds with `encodeThreadId` -- so inside a thread it carries the thread as a
+// fourth segment, unlike the `Thread.channelId` of a message there.
+describe('a Discord slash command typed inside a thread', () => {
+  it('is named to GROWI, and found in the inventory, as the channel the thread belongs to', async () => {
+    const adapter = createDiscordAdapter({
+      applicationId: 'app-1',
+      publicKey: '0'.repeat(64),
+      botToken: 'bot-1',
+    });
+    const slashChannelId = toSdkChannelId(
+      'discord',
+      adapter.encodeThreadId({ guildId: 'G1', channelId: '1', threadId: '9' }),
+    );
+    const { stub } = fetchStub([[{ id: '1', name: 'general', type: 0 }]]);
+    const [listed] = await CHANNEL_LISTERS.discord(
+      contextOf({
+        workspaceId: 'G1',
+        appConfig: {
+          stateConnectionString: 'postgres://unused',
+          discord: {
+            applicationId: 'app-1',
+            publicKey: 'pk',
+            clientSecret: 'cs',
+            botToken: 'bot-1',
+          },
+        },
+        fetch: stub,
+      }),
+    );
+
+    expect(
+      nativeChannelIdOf({ platform: 'discord', channelId: slashChannelId }),
+    ).toBe('1');
+    expect(
+      inventoryChannelIdOfEvent({
+        platform: 'discord',
+        channelId: slashChannelId,
+      }),
+    ).toBe(listed?.channelId);
+  });
+});

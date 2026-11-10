@@ -1,8 +1,7 @@
-import nodePath from 'node:path';
-import { pathUtils } from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
+import { generatePathsToMatch } from '~/server/util/generate-paths-to-match';
 
 import type { GlobalNotificationSettingType } from './consts';
 import type {
@@ -24,37 +23,6 @@ const globalNotificationSettingSchema = new mongoose.Schema<
   triggerPath: { type: String, required: true },
   triggerEvents: { type: [String] },
 });
-
-/*
- * e.g. "/a/b/c" => ["/a/b/c", "/a/b", "/a", "/"]
- */
-const generatePathsOnTree = (path: string, pathList: string[]): string[] => {
-  pathList.push(path);
-
-  if (path === '/') {
-    return pathList;
-  }
-
-  const newPath = nodePath.posix.dirname(path);
-
-  return generatePathsOnTree(newPath, pathList);
-};
-
-/*
- * e.g. "/a/b/c" => ["/a/b/c", "/a/b", "/a", "/"]
- */
-const generatePathsToMatch = (originalPath: string): string[] => {
-  const pathList = generatePathsOnTree(originalPath, []);
-  return pathList.map((path) => {
-    // except for the original trigger path ("/a/b/c"), append "*" to find all matches
-    // e.g. ["/a/b/c", "/a/b", "/a", "/"] => ["/a/b/c", "/a/b/*", "/a/*", "/*"]
-    if (path !== originalPath) {
-      return `${pathUtils.addTrailingSlash(path)}*`;
-    }
-
-    return path;
-  });
-};
 
 /**
  * GlobalNotificationSetting Class

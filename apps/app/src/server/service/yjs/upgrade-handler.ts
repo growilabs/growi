@@ -9,9 +9,11 @@ import type { Duplex } from 'stream';
 import type { SessionConfig } from '~/interfaces/session-config';
 import loggerFactory from '~/utils/logger';
 
-import { isReadOnlyUser } from '../../middlewares/exclude-read-only-user';
-import { isActiveUser } from '../../middlewares/login-required';
 import type { PageModel } from '../../models/page';
+import {
+  isActiveUserStatus,
+  isReadOnlyUser,
+} from '../../models/user/predicates';
 
 const logger = loggerFactory('growi:service:yjs:upgrade-handler');
 
@@ -117,7 +119,7 @@ export const createUpgradeHandler = (sessionConfig: SessionConfig) => {
       writeErrorResponse(socket, 401, 'Unauthorized');
       return { authorized: false, statusCode: 401 };
     }
-    if (!isActiveUser(user) || isReadOnlyUser(user)) {
+    if (!isActiveUserStatus(user.status) || isReadOnlyUser(user)) {
       logger.warn(
         { pageId, userId: user._id },
         'Yjs upgrade rejected: user is not allowed to edit',

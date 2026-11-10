@@ -74,20 +74,22 @@ const MePage: NextPageWithLayout<Props> = (props: Props) => {
     };
   }, [t]);
 
+  // Dispatch on the FIRST path segment only. `mePagesMap` is keyed one
+  // level deep.
   const getTargetPageToRender = (
-    pagesMap,
-    keys,
+    pagesMap: typeof mePagesMap,
+    keys: string[],
   ): { title: string; component: JSX.Element } => {
-    return keys.reduce((pagesMap, key) => {
-      const page = pagesMap[key];
-      if (page == null) {
-        return {
-          title: 'NotFoundPage',
-          component: <h2>{t('commons:not_found_page.page_not_exist')}</h2>,
-        };
-      }
-      return pagesMap[key];
-    }, pagesMap);
+    const page = (
+      pagesMap as Record<string, { title: string; component: JSX.Element }>
+    )[keys[0]];
+    if (page == null) {
+      return {
+        title: 'NotFoundPage',
+        component: <h2>{t('commons:not_found_page.page_not_exist')}</h2>,
+      };
+    }
+    return page;
   };
 
   const targetPage = getTargetPageToRender(mePagesMap, pagePathKeys);

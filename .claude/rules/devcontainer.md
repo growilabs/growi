@@ -2,12 +2,23 @@
 
 ## Service Connectivity
 
-This project runs inside a devcontainer defined in `.devcontainer/compose.yml`. The Docker Compose services are **always accessible by hostname** — do NOT run connectivity checks (`ping`, `nc`, `node net.connect`, etc.) before using them.
+This project runs inside a devcontainer defined in `.devcontainer/compose.yml`. The services below marked "always" are **always accessible by hostname** — do NOT run connectivity checks (`ping`, `nc`, `node net.connect`, etc.) before using them.
 
 | Service | Hostname | Port | Notes |
 |---------|----------|------|-------|
-| MongoDB | `mongo` | `27017` | Replica set `rs0`; required for transactions and change streams |
-| Elasticsearch | `elasticsearch` | `9200` | Full-text search |
+| MongoDB | `mongo` | `27017` | Replica set `rs0`; required for transactions and change streams. Always running. |
+| Elasticsearch | `elasticsearch` | `9200` | Full-text search. Always running. |
+| PostgreSQL | `postgres` | `5432` | Used only by `apps/chat-integration-proxy`. **Opt-in, not always running** — see below. |
+
+## PostgreSQL (opt-in, `chat-integration-proxy` only)
+
+`postgres`/`postgres-init` carry `profiles: ["chat-integration-proxy"]` in `.devcontainer/compose.yml`, so a plain `docker compose up` (what every devcontainer in this repo does on start, since `mongo`/`elasticsearch` have no profile and are needed by every app here) does **not** start them. Before working on `chat-integration-proxy` or running its `*.integ.ts` suite, start them from the **docker host** (not from inside this devcontainer — there is no `docker` CLI in here):
+
+```bash
+docker compose --profile chat-integration-proxy up -d postgres postgres-init
+```
+
+If `getent hosts postgres` still fails afterward inside the devcontainer, the running devcontainer's compose project may need `docker compose -p <project-name> ...` instead of the bare `docker compose` above — see `.devcontainer/compose.yml`'s own comment on `postgres` for the full explanation, or `Dev Containers: Rebuild Container` in VS Code as a fallback.
 
 ## MongoDB
 
