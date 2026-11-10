@@ -54,8 +54,8 @@ type Props = {
   scrollElement: HTMLElement | null;
   selectedPageId?: string;
   // Checked pages, including rows outside the rendered range. Rows scrolled
-  // back into range remount and take their initial checkbox state from it, so
-  // the caller must keep it current (selectAll/deselectAll reach mounted rows only).
+  // back into range remount and take their initial checkbox state from it
+  // (selectAll/deselectAll reach mounted rows only).
   selectedPageIds?: ReadonlySet<string>;
   // Each row's `aria-setsize`: -1 while the total is still unknown. Defaults to
   // the loaded count.

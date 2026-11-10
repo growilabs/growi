@@ -869,7 +869,7 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
     expect(scrollElement?.classList.contains('overflow-y-scroll')).toBe(true);
   });
 
-  it('keeps passing the same live selection Set across preview switches, checkbox changes and appends', () => {
+  it('passes the current selection to the list across preview switches, checkbox changes and appends', () => {
     const ref = createRef<SelectableRef>();
     const pages = createPages(3);
 
@@ -881,8 +881,6 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
         {...noopControls}
       />,
     );
-    const initialSet = searchResultListSpy.lastProps?.selectedPageIds;
-    expect(initialSet).toBeDefined();
 
     act(() => {
       searchResultListSpy.lastProps?.onPageSelected?.(pages[1]);
@@ -899,11 +897,11 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
       />,
     );
 
-    const currentSet = searchResultListSpy.lastProps?.selectedPageIds;
-    expect(currentSet).toBe(initialSet);
-    // It is the live selection, so remounted rows see the current state.
-    expect(currentSet?.has('p2')).toBe(true);
-    expect(ref.current?.getSelectedPageIds?.()).toBe(currentSet);
+    // Rows remounted after the append take their checkbox state from this.
+    expect([...(searchResultListSpy.lastProps?.selectedPageIds ?? [])]).toEqual(
+      ['p2'],
+    );
+    expect([...(ref.current?.getSelectedPageIds?.() ?? [])]).toEqual(['p2']);
   });
 
   it('keeps the row handlers identical across a preview switch and a checkbox change', () => {

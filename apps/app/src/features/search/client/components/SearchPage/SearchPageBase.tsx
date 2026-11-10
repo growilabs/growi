@@ -43,7 +43,7 @@ import styles from './SearchPageBase.module.scss';
 const highlightKeywordsSplitter = /"[^"]+"|[^\u{20}\u{3000}]+/gu;
 
 export interface IReturnSelectedPageIds {
-  getSelectedPageIds?: () => Set<string>;
+  getSelectedPageIds?: () => ReadonlySet<string>;
 }
 
 // Imperative reset for a same-search mutation (e.g. bulk delete / convert) that
@@ -135,8 +135,15 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   const isSearchServiceConfigured = useAtomValue(isSearchServiceConfiguredAtom);
   const isSearchServiceReachable = useAtomValue(isSearchServiceReachableAtom);
 
-  const [selectedPageIdsByCheckboxes] = useState<Set<string>>(new Set());
-  // const [allPageIds] = useState<Set<string>>(new Set());
+  // Replaced, never mutated. The ref holds the same Set for readers that run
+  // before the re-render (see design.md, SearchPageBase).
+  const [selectedPageIdsByCheckboxes, setSelectedPageIdsByCheckboxes] =
+    useState<ReadonlySet<string>>(() => new Set());
+  const selectedPageIdsRef = useRef(selectedPageIdsByCheckboxes);
+  const commitSelectedPageIds = useCallback((next: ReadonlySet<string>) => {
+    selectedPageIdsRef.current = next;
+    setSelectedPageIdsByCheckboxes(next);
+  }, []);
 
   // Held in state (not a ref) so SearchResultList re-renders once it is set.
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(
@@ -162,14 +169,16 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   // "clear selection" sequence has exactly one implementation (previously two
   // near-duplicate copies could drift independently).
   const clearSelectionAndNotify = useCallback(() => {
-    selectedPageIdsByCheckboxes.clear();
+    if (selectedPageIdsRef.current.size > 0) {
+      commitSelectedPageIds(new Set());
+    }
     // Also uncheck the currently rendered rows. With keepPreviousData (the
     // legacy number-pager path), the previous page's rows stay mounted for a
     // moment after a resetKey change, so clearing only the Set would leave
     // stale checkmarks visible (P3-7).
     searchResultListRef.current?.deselectAll();
     onSelectedChangedRef.current?.(0, 0);
-  }, [selectedPageIdsByCheckboxes]);
+  }, [commitSelectedPageIds]);
 
   // publish selectAll()
   useImperativeHandle(ref, () => ({
@@ -180,9 +189,12 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       }
 
       if (pages != null) {
-        pages.forEach((page) => {
-          selectedPageIdsByCheckboxes.add(page.data._id);
-        });
+        commitSelectedPageIds(
+          new Set([
+            ...selectedPageIdsRef.current,
+            ...pages.map((page) => page.data._id),
+          ]),
+        );
       }
     },
     deselectAll: () => {
@@ -191,10 +203,10 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
         instance.deselectAll();
       }
 
-      selectedPageIdsByCheckboxes.clear();
+      commitSelectedPageIds(new Set());
     },
     getSelectedPageIds: () => {
-      return selectedPageIdsByCheckboxes;
+      return selectedPageIdsRef.current;
     },
     // Same-search mutation reset (e.g. bulk delete / convert completion). Unlike
     // a `resetKey` change, the search identity does not change here, so this
@@ -225,18 +237,15 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
         return;
       }
 
-      if (isChecked) {
-        selectedPageIdsByCheckboxes.add(pageId);
-      } else {
-        selectedPageIdsByCheckboxes.delete(pageId);
-      }
+      const current = selectedPageIdsRef.current;
+      const next = isChecked
+        ? new Set([...current, pageId])
+        : new Set([...current].filter((id) => id !== pageId));
+      commitSelectedPageIds(next);
 
-      onSelectedChangedRef.current?.(
-        selectedPageIdsByCheckboxes.size,
-        pages.length,
-      );
+      onSelectedChangedRef.current?.(next.size, pages.length);
     },
-    [pages, selectedPageIdsByCheckboxes],
+    [pages, commitSelectedPageIds],
   );
 
   const previewedPageDeletedHandler = useCallback(() => {
@@ -315,20 +324,16 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       return;
     }
 
-    // Drop selections whose rows left the list (Req 11.6). Pruned in place
-    // because the list keeps reading this same Set instance.
+    // Drop selections whose rows left the list (Req 11.6).
     const loadedPageIds = new Set(pages.map((page) => page.data._id));
-    selectedPageIdsByCheckboxes.forEach((pageId) => {
-      if (!loadedPageIds.has(pageId)) {
-        selectedPageIdsByCheckboxes.delete(pageId);
-      }
-    });
+    const current = selectedPageIdsRef.current;
+    const kept = new Set([...current].filter((id) => loadedPageIds.has(id)));
+    if (kept.size !== current.size) {
+      commitSelectedPageIds(kept);
+    }
 
-    onSelectedChangedRef.current?.(
-      selectedPageIdsByCheckboxes.size,
-      pages.length,
-    );
-  }, [pages, resetKey, selectedPageIdsByCheckboxes]);
+    onSelectedChangedRef.current?.(kept.size, pages.length);
+  }, [pages, resetKey, commitSelectedPageIds]);
 
   if (!isSearchServiceConfigured) {
     return (
