@@ -7094,7 +7094,7 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
   - fd の増加: 200 回で 10 未満。Python 版は 0。1 回に 1 つ漏れれば 200 増えるので、見分ける力は落ちない。vitest 自身が開く fd の揺れを許す。
   - 親のメモリ (大きな入力で 3 回時間切れにした後の RSS の増加): 66MB 未満。Python 版は 24MB 未満。レビューの実測では、同じ入力を使い回す形 (このテストの形) では増加はほぼ 0MiB。入力を毎回作る形では、正しい実装でも 44〜132MiB 増えた (V8 が片付ける時期の都合)。66MB は、まだ片付いていない入力の写しを 1 つ (44MB) だけ許す余裕で、毎回の写しを持ち続ける実装 (3 回で 132MB) は落ちる。
 - 「子が残らない」の判定は、テストのプロセスの子 (`/proc/<pid>/task/*/children`) を見る。これは、vitest がテストのファイルごとにプロセスを分ける既定の設定 (`pool` の既定) に頼っている。`pool` を threads などに変えると、他のファイルの子が混ざって成り立たなくなる。
-- 準備完了のテストが確かめるのは `ready` の真偽だけで、確認用の子が anydoc と PDFium を本当に読み込むこと (20.12) は 4.3 では確かめない。最後の守りは、6.12 の image の中での `/readyz` と `POST /extract` (PDF と DOCX) の確認である。
+- 承認済みの 4.3 の準備完了のテストが確かめるのは `ready` の真偽だけで、確認用の子が部品を本当に読み込むこと (20.12) は確かめない。これは 6.7 が足したテスト (`readiness-dependencies.integ.ts`。27.6) が確かめる。最後の守りは、6.12 の image の中での `/readyz` と `POST /extract` (PDF と DOCX) の確認である。
 
 ### 23.6 タスク 4.4 のテストが決めた HTTP の層の名前と形
 
@@ -7541,3 +7541,26 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - worker の分を減らす作りは、実測でどれも使えなかった: `resourceLimits` を外す・若い世代のヒープとスタックを 1MB に絞っても減らない、`codeRangeSizeMb: 1` は子が SIGTRAP で落ちる、worker の中で `fs` のストリームを使って `net` を避けると `process.exit` が返らない (15.3)、fd 4 を main で読む形は承認済みのテストの「同期の処理で止まっていても見張れる」を満たせない。
 
 **やっていないこと**: 20.12 で 6.6 に挙がっていた変換の層の案 (XLSX の書き直しで画像の要素を外す、DOCX の結果の写しを減らす、`definedName` の DOM) は、6.3・6.5 の commit 済みのコードを変えるので、範囲外として残した。既知の限界 (15.10): メインのスレッドが同期の処理で止まっている間は、worker のメモリ不足を検知できない (worker は起動した後に何も確保しないので、起きる見込みは低い)。
+
+### 27.6 タスク 6.7 (実行管理の層)
+
+独立レビュー (Opus) を、1 回目 REJECTED (下の 2 点) → 直し → 狭い再レビュー APPROVED で通した。
+
+**直した 2 点**
+
+- **fd の上限での起動失敗で親が落ちる**: Node 24.22.2 は、起動が EMFILE / ENFILE で失敗すると `child.stdio` を作らずに抜ける。`stdio` を走査する見張りの処理が TypeError を出し、2 回目は捕まらずに親プロセス (HTTP サービス全体) が終わった (`prlimit --nofile=80` で 40 件同時に起動して再現)。直しは、`runChild` が spawn の直後に `child.pid === undefined` なら見張りを作らず、次の tick の `'error'` を待ち、`child.stdio ?? []` を閉じて `not-started` で戻る (`crashed`・detail `conversion process could not be started`・`childPeakRssMb` は `null`)。`run()` は拒否しない。ENOENT・EACCES・ディレクトリ・EAGAIN でも親は落ちず、fd は元に戻り、子は残らない (150〜300 件の同時起動で確認)。
+- **確認用の子が部品 7 つのうち 2 つしか確かめなかった**: 確認用の入力を **PDF・PPTX・HTML の 3 件**にした (PPTX は `probe-pptx.ts` に 4,480 バイトを base64 で埋め込み、`test/fixtures/pptx.ts` の `buildPptx` の出力とバイト単位で一致することを `probe-pptx.spec.ts` が確かめる)。PDF は `@embedpdf/pdfium`、HTML は `htmlparser2` と `entities`、PPTX は `@firecrawl/anydoc`・`yauzl`・`yazl`・`@xmldom/xmldom` を通る。変換の層が import する外部 package はちょうどこの 7 つで、どれを読み込めなくしても `ready=false` になり、関係の無い package では `true` のまま (`readiness-dependencies.integ.ts`)。**確かめられないこと**: 自分たちの内部モジュール (XLSX・ipynb・XML・DOCX の経路の `dist/` のファイル) が欠けた場合は準備完了のまま。`/readyz` の `converter` は Python 版 (`app.conversion` 全体を読み込む) と同じ意味ではない。
+
+**決めたこと・Python 版との違い (Req 1.9。HTTP の応答は同じ)**
+
+- 確認用の子は、運用者の変換の上限ではなく固定の上限 (`PROBE_LIMITS`) で動く (`MAX_PDF_PAGES=0` のような有効な設定で全部の pod が準備未完了にならないように)。RSS の上限と `prlimit` は運用者の値のまま。Python 版の確認は部品を読み込めたかだけを見ていて、上限に左右されなかった。
+- **`readiness()` は結果を覚えない**。呼ぶたびに確認用の子を順に起動する (1 回 333〜354ms・子の CPU 0.38〜0.42 秒・子の最大 64〜80MB)。同時の呼び出しは 1 回の確認を共有する (150 件同時で 204ms・確認用の子は同時に最大 1 つ)。Python 版は準備完了の結果を覚えていた。k8s の readiness probe は 20 秒ごと、compose の healthcheck は 30 秒ごとなので CPU 1 コアの約 2% / 1.3%。`apps/app` は `/readyz` を呼ばない。最悪のメモリは、最も重い負荷の実測 1,285MiB に確認用の子 1 つを足して約 1,365MiB で、2Gi に収まる。前回の結論: 覚えさせずに記録で足りる。立て続けに呼ばれると確認が続けて走る (10 秒で 50 回・1 回 0.24 CPU 秒)。
+- `Readiness` は `{ ready }` だけで、失敗した部品の名前は返さない (23.5・23.6)。6.8 は、503 のときに部品ごとに確かめたかのような `dependencies` を作らない。
+- 中止の合図で止めた実行は、例外にせず `crashed`・detail `conversion was cancelled` で返す (HTTP の層はログで `client_disconnected` として扱う。Python 版と同じ)。
+- 子の終わり方の detail に、Python 版はシグナル番号、Node 版はシグナル名 (`SIGABRT` など)。ログにだけ出る。見出しが大きすぎるとき `limit_exceeded` を返すのは 27.5 のとおり。
+- 起動は `prlimit` の絶対パス。子の環境変数は `RAYON_NUM_THREADS` と `MALLOC_ARENA_MAX=2` の 2 つだけ (トークンは渡らない。子の `/proc/<pid>/environ` で確認)。`prlimit` は node を exec するので孫はできない。`--as` = 2,751,463,424 バイト (320 + 2,304 MiB)、`--cpu` は期限 5 秒のとき 10:15、`--core=1`。子の fd は 0〜4 だけで、親の他の fd は渡らない。
+- **build の手順は 2 か所** (`package.json` の `build` と `test/global-setup.ts`。23.5 の決定 3)。拡張子を足す処理 (`addJsExtensions`) は共有していて、重複は `tsc` の引数だけ。`globalSetup` は `dist/` を作り直すので、vitest を 2 つ同時に動かすと一方の `dist/` が消えて期限のテストが落ちる (watch では `globalSetup` が流れ直さず古い `dist/` のまま動く)。CI は `turbo run test` を 1 本流すだけなので害はないが、ルートの `turbo.json` では `test` が `build` を待たないので、`turbo run build test` を流すと `dist/` の削除が子の起動とぶつかりうる。6.12 の CI で確かめる。
+
+**メモリ・時間**: runner が報告する子の最大 RSS は、子が結果を書く直前に自分で読んだ VmHWM と ±1MB で一致 (XLSX 7 万セル 1 シート 291〜294MB、DOCX 画像 12 枚 267〜281MB、PDF 200 万字 302〜306MB、画像の PDF 142〜143MB)。PDF 200 万字は 0.95 倍 (304MB) の線をわずかに超えるが基準のファイルではない (27.3)。6.12 で image の中で測り直す。親: runner を読むと RSS 44→51MB、親は anydoc・PDFium を読まない、1,000 回以降は RSS 72〜73MB・ヒープ 6MB で一定 (漏れなし)。約 33MB の JSON の結果を 3 件同時に受け取ったときの親の最大 RSS は 276〜349MB (レビュアーの実測 332〜349MB。1 件あたり約 100MB で、予算の 1 件あたり 157MiB に収まる)。起動のオーバーヘッドは小さな TXT 1 件で起動から回収まで中央値 84ms。同時起動と中止 340〜400 回、結果の管への壊れた中身 2,500〜2,700 回で、例外・残った子・fd の増加・一時ファイルは 0。kill から回収までの待ちは 2 秒が上限 (Python 版と同じ)。
+
+**6.8 以降への申し送り**: 同時実行の枠は runner の外 (HTTP の層) にあり、確認用の子は枠の外で動く。`childPeakRssMb` は、子を起動していない・起動できなかったとき `null` で、ログでは `unknown` と書く。6.11 / 6.12 では image の中で `/usr/bin/prlimit --version` を確かめ、PDF 200 万字の子の最大 RSS を測り直す。

@@ -209,7 +209,7 @@
   - `build` スクリプト (`tsconfig.build.json` の `tsc` と、拡張子の無い相対の指定子に `.js` を足す手順) を足し、子の入口を `dist/child/child-entry.js` に出力する (research.md 23.5)
   - 4.3 のうち子の側に関するテストが通る
   - _Requirements: 3.9, 3.10, 3.11_
-- [ ] 6.7 実行管理の層を実装する
+- [x] 6.7 実行管理の層を実装する
   - 3.2 で決めた方法で、`prlimit` を絶対パスで使って子を起動し、トークンを含まない明示した環境変数を渡し、RSS と期限を見張り、中止の合図で子を止め、必ず回収してから戻る。終了のしかたを失敗の種類に分け、`prlimit` と確認用の子で準備完了を判定する
   - Linux に固有の処理は 1 か所にまとめ、Linux 以外では何もしない
   - 既定の子の入口は `build` で作った JavaScript (`dist/child/child-entry.js`) で、テストも swc の register を使わずに起動する。vitest の `globalSetup` で `build` を流し、`dist/` が無いときに register の起動に戻らない (research.md 23.5)

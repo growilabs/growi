@@ -1,5 +1,25 @@
-import type { Settings } from '../config/load-settings';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { type Settings, toConversionLimits } from '../config/load-settings';
 import type { ConversionLimits, ConversionOutcome } from '../contract';
+import { resolveFormat } from '../formats/format-table';
+import { checkInputSize } from '../formats/input-size';
+import { encodeChildHeader } from '../wire/child-header';
+import {
+  maxResultFrameBytes,
+  WireProtocolError,
+} from '../wire/length-prefixed-json';
+import { buildChildEnv } from './child-env';
+import { runChild } from './child-run';
+import { limitedCommand, PRLIMIT_PATH, readOwnHardLimits } from './linux';
+import {
+  PROBE_INPUTS,
+  PROBE_LIMITS,
+  PROBE_MAX_INPUT_BYTES,
+} from './probe-inputs';
+import { probeConversions, sharedWhileRunning } from './readiness';
+import { failed, outcomeOf } from './run-outcome';
 
 /** The file a child runs, and the node flags placed before it. */
 export interface ChildEntry {
@@ -38,18 +58,141 @@ export interface ConversionRunner {
   readiness(): Promise<Readiness>;
 }
 
+const MIB = 1024 * 1024;
+// Python's DEFAULT_PROBE_TIMEOUT_S; the compose / k8s readiness timeouts
+// (15 s and up) leave room above it (research.md 23.7).
+const DEFAULT_PROBE_TIMEOUT_S = 10;
+// research.md 20.6 / 20.12: on the command line, never in NODE_OPTIONS.
+const CHILD_NODE_FLAGS = [
+  '--wasm-max-mem-pages=8192',
+  '--max-semi-space-size=4',
+] as const;
+// The built JavaScript, never the TypeScript through a loader (research.md
+// 23.5). src/runner/ and dist/runner/ both sit two levels below the package.
+const DEFAULT_CHILD_ENTRY: ChildEntry = {
+  path: path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../../dist/child/child-entry.js',
+  ),
+  nodeArgs: [],
+};
+
 export const runnerOptionsFromSettings = (
-  _settings: Settings,
-): ConversionRunnerOptions => {
-  throw new Error(
-    'not implemented: runner/conversion-runner.runnerOptionsFromSettings',
+  settings: Settings,
+): ConversionRunnerOptions => ({
+  limits: toConversionLimits(settings),
+  maxChildRssMb: settings.maxChildRssMb,
+  timeoutS: settings.timeoutS,
+  maxInputBytes: settings.maxFileSizeMb * MIB,
+});
+
+type ChildStart =
+  | { readonly header: Buffer }
+  | { readonly refusal: RunOutcome };
+
+/** The header for the child, or the answer for a run that must not reach one. */
+const prepareChild = (
+  input: RunInput,
+  options: ConversionRunnerOptions,
+): ChildStart => {
+  const format = resolveFormat(input.fileName, input.mimeHint);
+  // An unknown format still goes to the child, which reports it as unsupported.
+  const violation =
+    format === null
+      ? null
+      : checkInputSize(format, input.bytes.length, options.limits);
+  if (violation !== null) {
+    return { refusal: failed(violation.failure, violation.detail, 0) };
+  }
+  try {
+    const header = encodeChildHeader({
+      fileName: input.fileName,
+      mimeHint: input.mimeHint,
+      limits: options.limits,
+      maxInputBytes: options.maxInputBytes,
+    });
+    return { header };
+  } catch (error) {
+    if (!(error instanceof WireProtocolError)) {
+      throw error;
+    }
+    // Only a client-sent name or type can make the header this large: a 422, not a 500 (research.md 27.5).
+    return {
+      refusal: failed(
+        'limit_exceeded',
+        'file name or type exceeds the size limit',
+        0,
+      ),
+    };
+  }
+};
+
+const convertInChild = async (
+  options: ConversionRunnerOptions,
+  input: RunInput,
+  timeoutS: number,
+  signal: AbortSignal,
+): Promise<RunOutcome> => {
+  const start = prepareChild(input, options);
+  if ('refusal' in start) {
+    return start.refusal;
+  }
+  const entry = options.childEntry ?? DEFAULT_CHILD_ENTRY;
+  const command = limitedCommand(
+    {
+      prlimitPath: options.prlimitPath ?? PRLIMIT_PATH,
+      maxChildRssMb: options.maxChildRssMb,
+      timeoutS,
+      hardLimits: readOwnHardLimits(),
+      command: [
+        process.execPath,
+        ...CHILD_NODE_FLAGS,
+        ...entry.nodeArgs,
+        entry.path,
+      ],
+    },
+    process.platform,
   );
+  const report = await runChild(
+    {
+      command,
+      env: buildChildEnv(),
+      frames: [start.header, input.bytes],
+      maxResultFrameBytes: maxResultFrameBytes(options.limits.maxResultBytes),
+      maxRssMb: options.maxChildRssMb,
+      timeoutMs: timeoutS * 1000,
+    },
+    signal,
+  );
+  return outcomeOf(report);
 };
 
 export const createConversionRunner = (
-  _options: ConversionRunnerOptions,
+  options: ConversionRunnerOptions,
 ): ConversionRunner => {
-  throw new Error(
-    'not implemented: runner/conversion-runner.createConversionRunner',
+  const probeTimeoutS = options.probeTimeoutS ?? DEFAULT_PROBE_TIMEOUT_S;
+  // The operator's conversion limits may legitimately refuse even the probe
+  // files (MAX_PDF_PAGES=0, a tiny MAX_CSV_BYTES); that must not make every
+  // pod not ready. The child's RSS limit and prlimit stay as configured.
+  const probeOptions: ConversionRunnerOptions = {
+    ...options,
+    limits: PROBE_LIMITS,
+    maxInputBytes: PROBE_MAX_INPUT_BYTES,
+  };
+  const neverAborted = new AbortController().signal;
+  const checkReadiness = sharedWhileRunning(
+    async (): Promise<Readiness> => ({
+      ready: await probeConversions(
+        (input, timeoutS) =>
+          convertInChild(probeOptions, input, timeoutS, neverAborted),
+        PROBE_INPUTS,
+        probeTimeoutS,
+      ),
+    }),
   );
+  return {
+    run: (input, signal) =>
+      convertInChild(options, input, options.timeoutS, signal),
+    readiness: checkReadiness,
+  };
 };
