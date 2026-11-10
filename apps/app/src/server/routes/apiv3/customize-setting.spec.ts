@@ -4,11 +4,12 @@ import path from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import request from 'supertest';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock } from 'vitest-mock-extended';
 
 import { GrowiPlugin } from '~/features/growi-plugin/server/models';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import type { AttachmentService } from '~/server/service/attachment';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
@@ -44,7 +45,8 @@ vi.mock('~/features/growi-plugin/server/models', () => ({
 }));
 
 // The router is a module-level singleton, so it is set up only once
-const crowi = mockDeep<Crowi>();
+const attachmentService = mock<AttachmentService>();
+const crowi = mock<Crowi>({ attachmentService });
 // multer writes uploads under `${crowi.tmpDir}uploads`, so the trailing separator matters
 const tmpDir = mkdtempSync(path.join(tmpdir(), 'customize-setting-spec-'));
 crowi.tmpDir = `${tmpDir}${path.sep}`;
@@ -99,6 +101,6 @@ describe('customize-setting routes for a non-admin user', () => {
 
     expect(res.status).toBe(302);
     expect(prisma.attachments.findMany).not.toHaveBeenCalled();
-    expect(crowi.attachmentService.createAttachment).not.toHaveBeenCalled();
+    expect(attachmentService.createAttachment).not.toHaveBeenCalled();
   });
 });

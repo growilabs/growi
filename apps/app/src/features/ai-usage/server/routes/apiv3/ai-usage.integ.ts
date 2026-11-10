@@ -2,7 +2,7 @@ import os from 'node:os';
 import express, { type Express } from 'express';
 import mongoose from 'mongoose';
 import request from 'supertest';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock, mockDeep } from 'vitest-mock-extended';
 
 import { BUNDLED_CATALOG_MODELS } from '~/features/mastra/server/services/ai-sdk-modules/model-catalog';
 import { refreshModelCatalog } from '~/features/mastra/server/services/ai-sdk-modules/refresh-model-catalog';
@@ -17,6 +17,7 @@ import {
 } from '~/server/crowi/session-id';
 import { generateUnavailableWhenMaintenanceModeMiddlewareForApi } from '~/server/middlewares/unavailable-when-maintenance-mode';
 import { setup as setupApiV3 } from '~/server/routes/apiv3';
+import type AppService from '~/server/service/app';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
@@ -62,7 +63,11 @@ const sinceOneHourAgo = (): string =>
   new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
 describe('GET /_api/v3/ai-usage behind the real middleware order', () => {
-  const crowi = mockDeep<Crowi>();
+  // The real routers read many nested Crowi members at setup, so this needs runtime deep
+  // auto-stubbing. Typing it as `mockDeep<Crowi>()` makes tsgo walk the whole Prisma client
+  // (TS2589 on this and unrelated specs), so it is typed loosely and cast to Crowi once.
+  const crowi = mockDeep<object>() as Crowi;
+  const appService = mock<AppService>();
   let app: Express;
 
   beforeAll(async () => {
@@ -86,6 +91,7 @@ describe('GET /_api/v3/ai-usage behind the real middleware order', () => {
     };
     // A deep mock types every field as a mock, so plain values go in via assign.
     Object.assign(crowi, {
+      appService,
       node_env: 'test',
       publicDir: os.tmpdir(),
       sessionConfig,
@@ -109,7 +115,7 @@ describe('GET /_api/v3/ai-usage behind the real middleware order', () => {
   });
 
   beforeEach(async () => {
-    crowi.appService.isMaintenanceMode.mockReturnValue(false);
+    appService.isMaintenanceMode.mockReturnValue(false);
     vi.mocked(buildAiUsageReport).mockClear();
     await prisma.mastrarefreshedmodelcatalogs.deleteMany();
     // Every case shares the loopback address, hence one rate-limit bucket.
@@ -135,7 +141,7 @@ describe('GET /_api/v3/ai-usage behind the real middleware order', () => {
   });
 
   it('answers 200 while maintenance mode is on', async () => {
-    crowi.appService.isMaintenanceMode.mockReturnValue(true);
+    appService.isMaintenanceMode.mockReturnValue(true);
 
     const blocked = await request(app).get(PATH_BEHIND_MAINTENANCE_CHECK);
     const res = await request(app)
