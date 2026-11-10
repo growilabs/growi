@@ -357,7 +357,7 @@ export const mergeInfiniteSearchResult = (
 ```
 - Postconditions: `data == null`（ローディング前）なら `pages: []`, `isEmpty: false`, `isReachingEnd: false`
 - 終端判定は post-filter の `pages.length` ではなく pre-filter の `meta.hitsCount` 累計で行う（ES インデックスと MongoDB がずれていると `pages.length` が `total` に永遠に届かずローダーが回り続けるため、A-6）。最終チャンクが `chunkSize` 未満なら `total` に関係なく終端とし、`getSearchInfiniteKey` の停止条件と一致させる
-- Invariants: `pages` は `data.flatMap(r => r.data)`（`data?.flat()` ではない）
+- Invariants: `pages` は `data.flatMap(r => r.data)`（`data?.flat()` ではない）を、ページ ID で重複除去したもの（先に出た方を残す）。offset 方式のページ送りでは、読み込みの合間に結果の順序が変わると（更新日時順でのページ編集など）同じページが 2 つのチャンクに入る。一覧の行は pageId をキーにしているため、重複があると行が消えたりずれたりする。終端判定は `hitsCount` 累計なので重複除去の影響を受けない
 
 ### Components（表示・選択層）
 
@@ -405,7 +405,7 @@ type Props = {
   onItemMutated?: (mutation: SearchItemMutation) => void; // NEW(任意): 行単位リネーム/削除の通知（A-1）
 };
 ```
-- State model: `selectedPageIdsByCheckboxes`（Set）、`selectedPageWithMeta`（プレビュー対象）は現状維持。リセット契機のみ変更
+- State model: `selectedPageIdsByCheckboxes`（`ReadonlySet`、変更のたびに新しい Set に置き換える）、`selectedPageWithMeta`（プレビュー対象）。リセット契機のみ変更
 - Concurrency strategy: 追加読込中も選択状態は保持（`resetKey` 不変のため effect が発火しない）
 
 **Implementation Notes**
@@ -417,7 +417,8 @@ type Props = {
 - スクロールコンテナ（`div.overflow-y-scroll`）を callback ref で state に保持し、`SearchResultList` の `scrollElement` へ渡す。一覧の開始位置（`scrollMargin`）を `offsetTop` で測れるよう、このコンテナに Bootstrap の `position-relative` を付ける
 - 行へ届くハンドラを安定させる: `onPageSelected` には `setSelectedPageWithMeta`（React が同一性を保証）をそのまま渡し、`checkboxChangedHandler` / `onPreviewedPageDeleted` は `useCallback` にする。`checkboxChangedHandler` の依存は `pages` のみ（チェック操作では変わらない）
 - 行の `aria-setsize` 用に `listSize` を算出して `SearchResultList` へ渡す: infinite scroll で終端に届いていない間は `-1`、それ以外（終端到達・legacy の 1 ページ表示）は `pages.length`
-- 選択 `Set`（`selectedPageIdsByCheckboxes`、同一インスタンスを使い続ける）を `SearchResultList` の `selectedPageIds` へ渡す。全選択/解除は今までどおり Set を更新し、マウント中の行だけを命令的に更新する。画面外の行は再マウント時に Set から初期値を得る（9.2）
+- 選択 `Set`（`selectedPageIdsByCheckboxes`）は書き換えず、変更のたびに新しい Set を state に入れて `SearchResultList` の `selectedPageIds` へ渡す。一覧はその再描画で最新の選択を受け取り、画面外の行は再マウント時にそこから初期値を得る（9.2）。全選択/解除は Set を置き換えたうえで、マウント中の行だけを命令的に更新する
+- 同じ Set を ref にも持つ。`selectAll()` の直後に `getSelectedPageIds()` を読む呼び出し元（`SearchPage` の件数更新）が、再描画前でも最新の選択を得るため。`checkboxChangedHandler` は ref から読むので、選択が変わってもハンドラの同一性は変わらない（10.2）。チェックを変えた行自身は `isInitiallyChecked` が変わるので再描画されるが、他の行は再描画されない
 - 選択件数・一括削除は今までどおり Set から導出するので、画面外の選択も含まれる（9.3、変更なし）
 - `InfiniteScroll` のラップは変更しない。仮想化した一覧は全件分の高さを持つため、センチネルは今と同じく一覧の末尾付近で交差する（8.5）
 
@@ -453,7 +454,7 @@ type Props = {
 
 **Implementation Notes**
 - Integration: `ItemsTree`（ページツリー）と同じ `useVirtualizer` の使い方に合わせる
-- Risks: 推定行高と実測の差が大きいと初回スクロールで位置が跳ねる → 典型的な行の高さを推定値にし、`measureElement`（ResizeObserver）で補正する。`Clamp` がマウント後に高さを変えても ResizeObserver が拾う
+- Risks: 推定行高と実測の差が大きいと初回スクロールで位置が跳ねる → 行の CSS の最低の高さ（`packages/ui/scss/molecules/_page_list.scss` の `.list-group-item` の `min-height: 136px`）を推定値にし、`measureElement`（ResizeObserver）で補正する。推定値が最低の高さより小さいと、未描画の行を実測するたびに必ず補正が入り、全体の高さも伸び続ける。`Clamp` がマウント後に高さを変えても ResizeObserver が拾う
 - Validation: happy-dom では要素サイズが 0 のため、テストではスクロール要素と行の大きさをスタブして描画範囲を決定的にする。スクロール要素が未取得（`null`、初回描画直後）の間は行を描画せず、ref が付いた後の再描画で描画する
 - 旧形式ページ一覧は `forceHideMenuItems` をインラインの配列で渡すため、その経路では行の memo が効かない。要件 10 は検索結果ページが対象で、旧形式の一覧は最大 1 ページ分なので許容する
 
