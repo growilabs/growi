@@ -342,11 +342,15 @@ export const SearchPage = (): JSX.Element => {
             </div>
 
             {/* Select-all covers only the loaded results (Req 4.7). */}
-            <span role="status" className="ms-3 text-muted text-nowrap">
+            <span className="ms-3 text-muted text-nowrap">
               {t('search_result.selected_count_of_loaded', {
                 selectedCount,
                 loadedCount: merged.pages.length,
               })}
+            </span>
+            {/* Announces selection changes only, not every append. */}
+            <span role="status" className="visually-hidden">
+              {t('search_result.selected_count', { selectedCount })}
             </span>
 
             <button

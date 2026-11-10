@@ -692,6 +692,7 @@
     "delete_all_selected_page": "删除所有",
     "select_all": "选择所有",
     "delete_selected_pages": "删除选定页面",
+    "selected_count": "已选择 {{selectedCount}} 项",
     "selected_count_of_loaded": "已选择 {{selectedCount}} 项（已加载 {{loadedCount}} 项）",
     "currently_not_implemented": "这是当前未实现的功能",
     "search_again": "再次搜索",

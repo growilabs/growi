@@ -488,13 +488,35 @@ describe('SearchPage selected-count display (Req 4.4/4.7)', () => {
   });
 
   const COUNT_KEY = 'search_result.selected_count_of_loaded';
+  const STATUS_KEY = 'search_result.selected_count';
 
-  it('shows no selection out of the loaded results initially, as a live status for screen readers', () => {
-    const { getByRole } = render(<SearchPage />);
+  it('shows no selection out of the loaded results initially', () => {
+    const { getByText } = render(<SearchPage />);
+
+    expect(
+      getByText(`${COUNT_KEY} selectedCount=0 loadedCount=2`),
+    ).toBeInTheDocument();
+  });
+
+  it('announces only the selected count, so loading more results is not announced', () => {
+    const { getByRole, rerender } = render(<SearchPage />);
+    act(() => {
+      searchPageBaseSpy.lastProps?.onSelectedPagesByCheckboxesChanged?.(1, 2);
+    });
+    expect(getByRole('status')).toHaveTextContent(
+      `${STATUS_KEY} selectedCount=1`,
+    );
+
+    searchStoreSpy.infiniteResponse = createInfiniteResponse([
+      createChunk(['a', 'b']),
+      createChunk(['c', 'd']),
+    ]);
+    rerender(<SearchPage />);
 
     expect(getByRole('status')).toHaveTextContent(
-      `${COUNT_KEY} selectedCount=0 loadedCount=2`,
+      `${STATUS_KEY} selectedCount=1`,
     );
+    expect(getByRole('status')).not.toHaveTextContent('loadedCount');
   });
 
   it('updates the selected count when the selection changes', () => {
