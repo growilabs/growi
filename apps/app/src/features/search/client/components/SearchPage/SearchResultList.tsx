@@ -97,11 +97,16 @@ const SearchResultListSubstance: ForwardRefRenderFunction<
 
   const { t } = useTranslation();
 
-  const pageIdsWithNoSnippet = pages
-    .filter(
-      (page) => (page.meta?.elasticSearchResult?.snippet?.length ?? 0) === 0,
-    )
-    .map((page) => page.data._id);
+  const pageIdsWithNoSnippet = useMemo(
+    () =>
+      pages
+        .filter(
+          (page) =>
+            (page.meta?.elasticSearchResult?.snippet?.length ?? 0) === 0,
+        )
+        .map((page) => page.data._id),
+    [pages],
+  );
 
   const isGuestUser = useIsGuestUser();
   const isReadOnlyUser = useIsReadOnlyUser();
