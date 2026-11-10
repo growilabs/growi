@@ -33,7 +33,19 @@ export const mergeInfiniteSearchResult = (
     };
   }
 
-  const pages = data.flatMap((result) => result.data);
+  // Offset paging can return a page in two chunks when results shift between
+  // fetches (e.g. an edit under updated-at sort). Rows are keyed by page ID,
+  // so keep only the first occurrence.
+  const seenPageIds = new Set<string>();
+  const pages = data
+    .flatMap((result) => result.data)
+    .filter((page) => {
+      if (seenPageIds.has(page.data._id)) {
+        return false;
+      }
+      seenPageIds.add(page.data._id);
+      return true;
+    });
   const total = data[0]?.meta.total ?? 0;
   const took = data[0]?.meta.took;
 
