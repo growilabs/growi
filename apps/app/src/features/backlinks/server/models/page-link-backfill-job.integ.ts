@@ -8,7 +8,7 @@ import { throwOnWriteErrors } from './throw-on-write-errors';
 const COLLECTION = 'pagelinkbackfilljobs';
 const LEASE_MS = 60_000;
 
-// Writes the way the GROWI.cloud wave script (infra) and a crashed owner leave the document:
+// Writes the way an admin endpoint and a crashed owner leave the document:
 // a field-level $set straight into MongoDB, not through the model under test.
 const patchJobDocument = async (set: Prisma.InputJsonObject): Promise<void> => {
   const result = await prisma.$runCommandRaw({
