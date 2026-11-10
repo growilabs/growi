@@ -9,7 +9,7 @@
 Gen 1 には手を入れず、GROWI 本体で両方を同時に有効にできる形で併存させる。
 
 前提・確定済みの決定（決定 1〜10）・調査の記録は、本ディレクトリの `brief.md` と `research.md` にある。
-要件（14 件・受け入れ条件 118 件）は本 umbrella の `requirements.md` が持ち、**sub-spec は要件 ID を参照する。番号は振り直さない。**
+要件（14 件・受け入れ条件 129 件）は本 umbrella の `requirements.md` が持ち、**sub-spec は要件 ID を参照する。番号は振り直さない。**
 
 ## 分割の経緯
 
@@ -70,19 +70,17 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 |---|---|---|---|---|
 | 1 | 表示順 | 本人にだけ見える返事が、入力より上に出る | 時刻を測って原因を調べてから直す | proxy |
 | 2 | proxy の見え方 | 検索結果の見せ方、Slack への通知の文面 | spec を作らず直接直す（契約は変えない） | proxy（通知の文面は app の markdown にも及びうる） |
-| 4 | app の見え方（`agent` と重ならない部分） | 承認画面、ページの編集画面、紐付け解除後のバッジ | 別ブランチ `imprv/chat-integration-app-ui` で実装済み（amend spec は本体に折り込み済み）。このブランチの取り込みで解決する | app |
 | 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作り、それと同時に定期処理の間隔を延ばす。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。`brief.md` だけがあり、要件・設計・タスクの承認がこれから | umbrella、protocol、proxy、app |
 | 8 | 管理画面の作り直し | 管理画面のうち、チャンネルの権限と「できること」の表 | amend spec `chat-integration-admin-ui`（名前は仮） | app |
 | 9 | コマンドの表示の締め | スラッシュコマンドの実機確認、`help` の一覧の書き方、Discord のスレッドでの追加入力 | proxy の残タスク 12.4 | proxy |
 | 10 | URL の展開の確認フロー | 共有してよいかを本人に尋ねてから展開する | `/kiro-discovery` から着手する。`agent` の「本人にだけ届ける」しくみの上に作るので、`agent` の後 | 3 spec すべて |
 
 - 順 3（proxy の不具合の一括修正: Enterprise Grid のチャンネル一覧、installation の特定、Mattermost の 403、接続の更新の失敗）はすべて直したので表から外した。ほかの順の番号を変えないよう、3 は空き番号のまま残す。直した内容は [chat-integration-proxy の research.md](../chat-integration-proxy/research.md) の決定 P14・P15・P16 と「既知の問題」1。
+- 順 4（app の見え方: 承認画面、ページの編集画面、紐付け解除後のバッジ）は済んだので表から外した。4 も空き番号のまま残す。決まったことは要件 2.12〜2.14・7.9〜7.12・9.10〜9.13（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)、理由は [chat-integration-app の research.md](../chat-integration-app/research.md)。
 - 順 5（URL の展開の方針: ログインが必要な GROWI でも、公開範囲が「公開」のページは題名と更新日時を出す）は済んだので表から外した。5 も空き番号のまま残す。決まったことは要件 6.9〜6.13（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)「LinkPreviewMapper（URL の展開の応答）」、理由は [chat-integration-app の research.md](../chat-integration-app/research.md) と本ディレクトリの research.md の決定 15。
 - 順 6（通知の定期処理の負荷: 連携が無いテナントの問い合わせを飛ばす、解除済みの連携の掃除を 1 日 1 回にする）は済んだので表から外した。6 も空き番号のまま残す。決まったことは要件 2.7〜2.9・9.8（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)「通知を 2 段に分ける」、理由は [chat-integration-app の research.md](../chat-integration-app/research.md) と本ディレクトリの research.md の決定 16。定期処理の間隔を延ばすのは順 7 で行う。
 - 順 11（順 5・6 の実装で見つかった小さな直し: 繋ぎ直しの引き継ぎ元の期限、掃除の 1 回の上限、空ページの扱い）は直したので表から外した。11 も空き番号のまま残す。決まったことは要件 6.14・9.9（[requirements.md](./requirements.md)）、設計は [chat-integration-app の design.md](../chat-integration-app/design.md)、理由は [chat-integration-app の research.md](../chat-integration-app/research.md)。ゴミ箱に入ったページは、除かないままにした（同 research.md）。
-- 別ブランチ `imprv/chat-integration-app-ui` を取り込むときの注意（取り込む作業の中で行う）: そのブランチの `requirements.md` に、`chat-integration-notification-load` が 2.7〜2.9 と 9.8 を予約していることを示すコメントがある。この spec はすでに本体へ書き戻して削除したので、コメントを消すか、spec 名を外した形に直す。あわせて、受け入れ条件の総数を数え直す。
 - 順 1・2 は、順 7 の前提になる（順 7 の前提だった順 3 は済んだ。`agent` の `brief.md` が前提に挙げる installation の特定もその 1 つ）。
-- 順 4 は app だけの変更で、順 1・2 とは独立している。ただし、`chat-integration-app/design.md` に書き戻すので、`agent` が書き換える節（権限、能力表）に触れるものを `agent` と同時には進めない。
 - 順 7 は規模が大きいので、順 1・2 を終えてから要件の承認に入る。
 
 ### 1. 表示順
@@ -99,9 +97,6 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 - **Slack への通知の文面**: メッセージの書式が洗練されていない。ページ名・変更の種類・変更した人・リンクを読みやすく並べる。Slack の Block Kit など、サービスごとの表現を使うかも含めて検討する
 - **想定される影響範囲**: proxy の `outbound.ts`（サービスごとの描き分け）が中心。通知の文面は、GROWI が組み立てる markdown（`chat-integration-app`）にも及びうる。契約は変えないので、spec は作らず直接直し、proxy の design.md の該当節を更新する。`agent` の答えも同じ描き方を通るので、先に直す
 
-### 4. app の見え方
-
-別ブランチ `imprv/chat-integration-app-ui` で実装済みで、amend spec は本体の要件（`chat-integration/requirements.md`）と設計（`chat-integration-app/design.md`）に折り込み済み。承認画面、ページの編集画面、紐付け解除後のバッジは、このブランチを取り込むことで解決する。この `feat/slackbot-proxy-gen2` ブランチでは作業しない。
 
 ### 7. コマンドの再編（amend spec [chat-integration-agent](../chat-integration-agent/)）
 

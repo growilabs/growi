@@ -32,6 +32,10 @@ export interface AccountLinkOrderDisplay {
   readonly relationLabel: string | null;
   /** The GROWI user who is ABOUT TO approve -- read from the caller's own session, never guessed. */
   readonly growiUsername: string;
+  /** The approving user's display name (`User.name`); `null` when unset. */
+  readonly growiName: string | null;
+  /** From `chat_account_link_orders.accountDisplayName`; `null` when the chat service gave none. */
+  readonly accountDisplayName: string | null;
   readonly expiresAt: Date;
 }
 
@@ -95,6 +99,8 @@ export const getAccountLinkOrderForApproval = async (
       workspaceName: relation.workspaceName,
       relationLabel: relation.label,
       growiUsername: approvingUser.username,
+      growiName: approvingUser.name || null,
+      accountDisplayName: order.accountDisplayName ?? null,
       expiresAt: order.expiredAt,
     },
   };

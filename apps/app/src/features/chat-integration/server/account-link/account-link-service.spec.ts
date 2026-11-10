@@ -52,6 +52,7 @@ const seedLiveOrder = (
   overrides: Partial<{
     token: string;
     accountId: string;
+    accountDisplayName: string | null;
     expiredAt: Date;
     isRevoked: boolean;
   }> = {},
@@ -61,6 +62,7 @@ const seedLiveOrder = (
     relationId: RELATION_ID,
     platform: 'slack',
     accountId: overrides.accountId ?? 'U-actor',
+    accountDisplayName: overrides.accountDisplayName ?? null,
     isRevoked: overrides.isRevoked ?? false,
     createdAt: new Date(),
     expiredAt: overrides.expiredAt ?? new Date(Date.now() + 10 * 60_000),
@@ -142,6 +144,42 @@ describe('account-link-service', () => {
         relationLabel: 'Our Slack',
         growiUsername: approvingUser.username,
       });
+    });
+
+    it('includes the chat account display name, the approving user name and the expiry', async () => {
+      await seedRelation();
+      const expiredAt = new Date(Date.now() + 5 * 60_000);
+      await seedLiveOrder({
+        token: 'named-token',
+        accountDisplayName: 'Alice A.',
+        expiredAt,
+      });
+      const user = { ...approvingUser, name: 'Approving Person' } as IUserHasId;
+
+      const result = await getAccountLinkOrderForApproval('named-token', user);
+
+      if (result.status !== 'found') {
+        throw new Error('unreachable');
+      }
+      expect(result.display.accountDisplayName).toBe('Alice A.');
+      expect(result.display.growiName).toBe('Approving Person');
+      expect(result.display.expiresAt.getTime()).toBe(expiredAt.getTime());
+    });
+
+    it('returns null for the display name when the order has none, and for the user name when unset', async () => {
+      await seedRelation();
+      await seedLiveOrder({ token: 'plain-token' });
+
+      const result = await getAccountLinkOrderForApproval(
+        'plain-token',
+        approvingUser,
+      );
+
+      if (result.status !== 'found') {
+        throw new Error('unreachable');
+      }
+      expect(result.display.accountDisplayName).toBeNull();
+      expect(result.display.growiName).toBeNull();
     });
   });
 

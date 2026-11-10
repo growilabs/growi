@@ -20,6 +20,8 @@ export interface IChatAccountLinkOrder {
   relationId: string;
   platform: PlatformName;
   accountId: string;
+  /** Display name the chat service reported when the order was created; shown on the approval screen. Never an identity. */
+  accountDisplayName: string | null;
   isRevoked: boolean;
   createdAt: Date;
   expiredAt: Date;
@@ -50,6 +52,7 @@ const chatAccountLinkOrderSchema = new Schema<
       required: true,
     },
     accountId: { type: String, required: true },
+    accountDisplayName: { type: String, default: null },
     isRevoked: { type: Boolean, required: true, default: false },
     createdAt: { type: Date, required: true, default: () => new Date() },
     expiredAt: { type: Date, required: true, default: defaultExpiredAt },

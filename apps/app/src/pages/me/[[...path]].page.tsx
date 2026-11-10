@@ -41,18 +41,6 @@ const InAppNotificationPage = dynamic(
     ),
   { ssr: false },
 );
-// `/me/chat-integration/account-link/:token` (task 6.1's one-time-link
-// approval screen) is a MULTI-segment path under this single first-segment
-// key -- the component itself reads the remaining segments via
-// `useRouter()` (see AccountLinkApproval.tsx), not this dispatcher.
-const AccountLinkApproval = dynamic(
-  () =>
-    import(
-      // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-      '~/features/chat-integration/client/components/AccountLinkApproval'
-    ).then((mod) => mod.AccountLinkApproval),
-  { ssr: false },
-);
 
 type Props = CommonInitialProps &
   CommonEachProps &
@@ -83,24 +71,11 @@ const MePage: NextPageWithLayout<Props> = (props: Props) => {
         title: t('commons:in_app_notification.notification_list'),
         component: <InAppNotificationPage />,
       },
-      'chat-integration': {
-        // English-first: no locale key added yet for this screen (see
-        // .claude/rules -- i18n is deferred, not a completion gate).
-        title: 'Link Chat Account',
-        component: <AccountLinkApproval />,
-      },
     };
   }, [t]);
 
   // Dispatch on the FIRST path segment only. `mePagesMap` is keyed one
-  // level deep -- a page whose own route needs further segments (e.g.
-  // `chat-integration/account-link/:token`) reads the rest itself via
-  // `useRouter()` (see AccountLinkApproval.tsx), instead of this dispatcher
-  // trying to walk the whole `pagePathKeys` array as a nested-map path.
-  // (Previously this used `keys.reduce(...)` over the WHOLE array, which
-  // 404ed on any path with more than one segment: after the first
-  // successful lookup, the accumulator became `{ title, component }` --
-  // not a map -- so the second segment's lookup always missed.)
+  // level deep.
   const getTargetPageToRender = (
     pagesMap: typeof mePagesMap,
     keys: string[],

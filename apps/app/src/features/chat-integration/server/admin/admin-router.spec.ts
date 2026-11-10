@@ -343,6 +343,21 @@ describe('admin-router', () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual(view);
     });
+
+    it('answers 502 with the rejected code when the proxy did not accept the signature -- never 401, which clients read as a lost login', async () => {
+      vi.mocked(proxyClient.fetchConnectionStatus).mockResolvedValue({
+        ok: false,
+        reason: 'rejected',
+      });
+      const app = buildApp(adminUser);
+
+      const response = await request(app).get(
+        `${MOUNT_PATH}/relations/${RELATION_ID}/connection-status`,
+      );
+
+      expect(response.status).toBe(502);
+      expect(response.body.errors[0].code).toBe('rejected');
+    });
   });
 
   describe('channel permission settings (task 9.2)', () => {

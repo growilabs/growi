@@ -192,6 +192,10 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 7. While GROWI にチャット連携が 1 つも無い（解除済みで保持期間中のものも無い）, the GROWI application shall 通知の定期処理で、送信待ちの通知と掃除の対象を探す問い合わせを行わず、連携の有無を確かめる問い合わせを 1 プロセスあたり 10 分に 1 回以下に抑える
 8. When ある GROWI のプロセスが通知を書き留めた, the GROWI application shall そのプロセスで次に動く通知の定期処理で、連携が無いと覚えている答えが残っていても、送信待ちの通知を探して送る処理を飛ばさない
 9. If 通知を書き留めたプロセスが、その通知を送る前に止まった, then the GROWI application shall ほかのプロセスで、連携の有無について覚えている答えの期限（10 分）が切れた後に最初に動く通知の定期処理で、送信待ちの通知を探して送る（定期処理は 1 分に 1 回なので、書き留めてからおよそ 11 分以内）
+<!-- 2.10・2.11 は chat-integration-agent 用の空き番号。詰めない -->
+12. While 保存時の通知先を選ぶ部品が表示されている, the GROWI application shall 選べるチャンネルの数にかかわらず、保存の操作欄の高さと、ほかの部品の並びを変えない
+13. The GROWI application shall 保存時の通知先を選ぶ部品に、選択中のチャンネルの件数を、選択肢を開かなくても分かる形で示す
+14. When 編集した人が通知先の選択肢を開いた, the GROWI application shall チャンネルを workspace ごとにまとめ、チャンネルの数が多くても選択肢の領域が画面からはみ出さず、中をスクロールして選べるようにする
 
 ### Requirement 3: 複数の GROWI をまたぐ検索
 
@@ -282,6 +286,10 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 6. If 紐付いていない利用者が書き込みを伴う操作を実行した, then the GROWI application shall その操作を実行せず、どの GROWI に対する紐付けが必要かが分かる形で手順を返す
 7. The GROWI application shall 利用者が、自分に紐付いているチャットアカウントの一覧を確認して個別に解除できるようにする
 8. The chat-integration proxy shall チャットのアカウントと GROWI ユーザーの対応表を保持しない
+9. The GROWI application shall アカウントの紐付けの承認画面を、GROWI のサイドバーやナビゲーションなど承認に関係しない部品を含まない、承認のためだけの画面として表示する
+10. When 承認画面が表示された, the GROWI application shall 承認の前に次の 3 つを、互いに区別できる形で示す: この GROWI の名前、この GROWI にログインしているユーザー、紐付けるチャットのアカウント（チャットサービス・workspace・アカウントの識別子）
+11. Where 紐付けの開始時にチャットサービスがアカウントの表示名を伝えていた, the GROWI application shall 承認画面に表示名を、アカウントの識別子と併せて示す。表示名を単独では示さず、必ず識別子と併せて示す
+12. When 承認画面が表示された, the GROWI application shall 承認の前に、リンクの有効期限と、心当たりがなければ承認せずに閉じてよいことを示す
 
 ### Requirement 8: 1 つの workspace に複数の GROWI が紐づくときの振る舞い
 
@@ -311,6 +319,10 @@ Slack 専用の中継サーバを、**複数のチャットサービスに対応
 7. When 管理者が紐付けを解除した, the chat-integration proxy shall 以降その GROWI との間のリクエストを処理しない
 8. When 紐付けを解除してから保持期間（45 日）が過ぎた, the GROWI application shall その連携と、それに属するチャット利用者の紐付けを、保持期間が過ぎてから 1 日と 1 時間以内に消し、この掃除のための問い合わせは通知の定期処理とは別に 1 日 1 回だけ行う
 9. When 同じ workspace が再び紐付けられた, the GROWI application shall 解除から保持期間（45 日）が過ぎた連携からは、まだ消えていなくても、チャット利用者の紐付けを引き継がない
+10. If 管理画面が関係の接続の状態を proxy に問い合わせ、proxy が GROWI の署名を受け付けなかった, then the GROWI application shall その関係に「接続が切れている」状態を示し、「active」としては示さない
+11. When 管理画面が関係の「接続が切れている」状態を示した, the GROWI application shall 原因を断定せず、チャット側で解除された可能性があることと、GROWI 側の解除（要件 9.7）で片付けられることを示す
+12. If 接続の状態を、proxy に届かない・proxy が失敗を返したなど、署名の拒否以外の理由で取得できなかった, then the GROWI application shall 「接続が切れている」とは示さず、状態を確認できなかったことだけを示す
+13. While 関係が「接続が切れている」状態として示されている, the GROWI application shall その関係を自動では解除せず、管理者が GROWI 側で解除する操作（要件 9.7）を使えるままにする
 
 ### Requirement 10: リクエストごとの相手の確認と鍵の入れ替え
 

@@ -30,7 +30,8 @@
 //    `apps/chat-integration-proxy/src/routes/notification-routes.ts`), and
 //    `@growi/chat` declares no wire type for "settings push acknowledged" --
 //    there is nothing to check beyond the success status itself, which
-//    `callSignedOp` already turns into `http-error` when it is missing.
+//    `sendSigned` already turns into a failure (`rejected` for a 401,
+//    `http-error` for any other non-2xx) when it is missing.
 //
 // Retrying is the caller's decision (task 8.2's `NotificationDispatcher`,
 // among others): calling the same function again re-signs from scratch --
@@ -83,7 +84,15 @@ export type ProxyCallFailure =
   | 'no-signing-key'
   /** The proxy never finished answering. */
   | 'unreachable'
-  /** A non-2xx status: the transport failed, so the body means nothing. */
+  /**
+   * A signed call was answered 401: the proxy did not accept this GROWI's
+   * signature. The reason is unknown -- the proxy never says why it refuses
+   * (so a caller cannot probe which relations exist). The relation may have
+   * been removed on the proxy's side, but a clock skew or a key mismatch
+   * looks the same.
+   */
+  | 'rejected'
+  /** Any other non-2xx status: the transport failed, so the body means nothing. */
   | 'http-error'
   /** An answer that is not JSON, or does not have the shape it claims. */
   | 'malformed-response';
@@ -219,6 +228,9 @@ const sendSigned = async (
     return { ok: false, reason: 'unreachable' };
   }
 
+  if (response.status === 401) {
+    return { ok: false, reason: 'rejected' };
+  }
   if (response.status < 200 || response.status >= 300) {
     return { ok: false, reason: 'http-error' };
   }
