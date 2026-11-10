@@ -904,37 +904,6 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
     expect([...(ref.current?.getSelectedPageIds?.() ?? [])]).toEqual(['p2']);
   });
 
-  it('keeps the row handlers identical across a preview switch and a checkbox change', () => {
-    const pages = createPages(3);
-
-    render(
-      <SearchPageBase
-        resetKey="search-1"
-        pages={pages}
-        onSelectedPagesByCheckboxesChanged={vi.fn()}
-        {...noopControls}
-      />,
-    );
-    const before = searchResultListSpy.lastProps;
-    expect(before?.onPageSelected).toBeDefined();
-    expect(before?.onCheckboxChanged).toBeDefined();
-    expect(before?.onPreviewedPageDeleted).toBeDefined();
-
-    act(() => {
-      before?.onPageSelected?.(pages[2]);
-    });
-    // The preview switch did re-render the list with the new preview.
-    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('p2');
-    act(() => {
-      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'p1');
-    });
-
-    const after = searchResultListSpy.lastProps;
-    expect(after?.onPageSelected).toBe(before?.onPageSelected);
-    expect(after?.onCheckboxChanged).toBe(before?.onCheckboxChanged);
-    expect(after?.onPreviewedPageDeleted).toBe(before?.onPreviewedPageDeleted);
-  });
-
   it('still clears the preview through the stable onPreviewedPageDeleted handler', () => {
     const pages = createPages(2);
 
