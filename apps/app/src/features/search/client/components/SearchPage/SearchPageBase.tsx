@@ -240,10 +240,12 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
         return;
       }
 
-      const current = selectedPageIdsRef.current;
-      const next = isChecked
-        ? new Set([...current, pageId])
-        : new Set([...current].filter((id) => id !== pageId));
+      const next = new Set(selectedPageIdsRef.current);
+      if (isChecked) {
+        next.add(pageId);
+      } else {
+        next.delete(pageId);
+      }
       commitSelectedPageIds(next);
 
       onSelectedChangedRef.current?.(next.size, pages.length);
@@ -330,7 +332,12 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     // Drop selections whose rows left the list (Req 11.6).
     const loadedPageIds = new Set(pages.map((page) => page.data._id));
     const current = selectedPageIdsRef.current;
-    const kept = new Set([...current].filter((id) => loadedPageIds.has(id)));
+    const kept = new Set<string>();
+    current.forEach((id) => {
+      if (loadedPageIds.has(id)) {
+        kept.add(id);
+      }
+    });
     if (kept.size !== current.size) {
       commitSelectedPageIds(kept);
     }
