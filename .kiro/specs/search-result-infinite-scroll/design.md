@@ -160,7 +160,7 @@ apps/app/src/stores/
 - `apps/app/src/features/search/client/components/SearchPage/SearchResultList.tsx` — 行単位リネーム/削除時に `onItemMutated`（`SearchItemMutation`）を、プレビュー中の行が削除されたとき `onPreviewedPageDeleted` を呼ぶ任意 props を追加。**（追補 #190441）** `useVirtualizer` で表示領域とその前後だけを描画する。`injectedPages` を `useMemo` 化し、行 ref を `pageId` ごとの安定したコールバックに、`deletedHandler` の `pages`/`selectedPageId` 参照を最新値 ref 経由にして、行へ渡す props を安定させる。
 - `apps/app/src/client/components/PageList/PageListItemL.tsx` — **（追補 #190441）** 任意 props（`isInitiallyChecked`、`listItemRef`、`listItemIndex`、`listSize`）を追加。未指定時は従来と同じ DOM を出力する。
 - `apps/app/src/features/search/client/components/SearchPage/SearchPageBase.tsx`（追補 #190441）— スクロールコンテナ要素を state で保持して `SearchResultList` へ渡す。`onPageSelected` に `setSelectedPageWithMeta` をそのまま渡し、`checkboxChangedHandler` / `onPreviewedPageDeleted` を `useCallback` で安定させる。選択 `Set` を `SearchResultList` へ渡す。`pages` から消えた ID を選択 `Set` から除く（11.6）。
-- `apps/app/public/static/locales/*/translation.json`（5 言語）— 追加読込失敗の文言（`search_result.failed_to_load_more`）と、選択件数・読み込み済み件数の表示文言（`search_result.selected_count_of_loaded`）を追加。
+- `apps/app/public/static/locales/*/translation.json`（5 言語）— 追加読込失敗の文言（`search_result.failed_to_load_more`）と、選択件数・読み込み済み件数の表示文言（`search_result.selected_count_of_loaded`）、スクリーンリーダー向けに選択件数だけを読み上げる文言（`search_result.selected_count`）を追加。
 - `apps/app/src/features/search/client/components/SearchPage/SearchPage.spec.tsx` / `SearchPageBase.spec.tsx` / `SearchResultList.spec.tsx` — 主要ふるまいのコンポーネントテスト。
 - `apps/app/src/client/components/PageList/PageListItemL.spec.tsx`（追補 #190441、新規）— 追加した任意 props のテスト。
 - `apps/app/src/features/search/client/components/SearchPage/SearchPageBase.rerender.spec.tsx`（追補 #190441、新規）— `SearchPageBase` と実際の `SearchResultList` を組み合わせた再描画抑制の検証（`SearchPageBase.spec.tsx` は `SearchResultList` をファイル単位でモックしているため別ファイルにする）。
@@ -357,7 +357,7 @@ export const mergeInfiniteSearchResult = (
 ```
 - Postconditions: `data == null`（ローディング前）なら `pages: []`, `isEmpty: false`, `isReachingEnd: false`
 - 終端判定は post-filter の `pages.length` ではなく pre-filter の `meta.hitsCount` 累計で行う（ES インデックスと MongoDB がずれていると `pages.length` が `total` に永遠に届かずローダーが回り続けるため、A-6）。最終チャンクが `chunkSize` 未満なら `total` に関係なく終端とし、`getSearchInfiniteKey` の停止条件と一致させる
-- Invariants: `pages` は `data.flatMap(r => r.data)`（`data?.flat()` ではない）を、ページ ID で重複除去したもの（先に出た方を残す）。offset 方式のページ送りでは、読み込みの合間に結果の順序が変わると（更新日時順でのページ編集など）同じページが 2 つのチャンクに入る。一覧の行は pageId をキーにしているため、重複があると行が消えたりずれたりする。終端判定は `hitsCount` 累計なので重複除去の影響を受けない
+- Invariants: `pages` は `data.flatMap(r => r.data)`（`data?.flat()` ではない）を、ページ ID で重複除去したもの（先に出た方を残す）。offset 方式のページ送りでは、読み込みの合間に結果の順序が変わると（更新日時順でのページ編集など）同じページが 2 つのチャンクに入る。一覧の行は pageId をキーにしているため、重複があると行が消えたりずれたりする。終端判定は `hitsCount` 累計なので重複除去の影響を受けない。既知の制約: 同じずれで、2 つのチャンクの境目を越えて前へ移ったページは読み込まれずに抜け落ちる（offset 方式の限界。重複除去では防げない）
 
 ### Components（表示・選択層）
 
@@ -384,7 +384,8 @@ export const mergeInfiniteSearchResult = (
 // 追加・変更する props（デルタ）
 type SearchPageBaseInfiniteProps = {
   swrInfiniteResponse: SWRInfiniteResponse<IFormattedSearchResult, Error>;
-  isReachingEnd: boolean;   // merged.isReachingEnd || hasError || reachedResultWindowLimit
+  isReachingEnd: boolean;   // センチネルの停止条件: hasLoadedAll || hasError
+  hasLoadedAll: boolean;    // これ以上読み込まない: merged.isReachingEnd || reachedResultWindowLimit（読み込み失敗中は false）
   hasError: boolean;
   onRetry: () => void;      // endingIndicator の再試行ボタン
 };
@@ -416,7 +417,7 @@ type Props = {
 **追補（#190441）— 仮想化と再描画抑制のための変更**（要件 8.5, 9.2, 9.3, 10.1, 10.2）
 - スクロールコンテナ（`div.overflow-y-scroll`）を callback ref で state に保持し、`SearchResultList` の `scrollElement` へ渡す。一覧の開始位置（`scrollMargin`）を `offsetTop` で測れるよう、このコンテナに Bootstrap の `position-relative` を付ける
 - 行へ届くハンドラを安定させる: `onPageSelected` には `setSelectedPageWithMeta`（React が同一性を保証）をそのまま渡し、`checkboxChangedHandler` / `onPreviewedPageDeleted` は `useCallback` にする。`checkboxChangedHandler` の依存は `pages` のみ（チェック操作では変わらない）
-- 行の `aria-setsize` 用に `listSize` を算出して `SearchResultList` へ渡す: infinite scroll で終端に届いていない間と、追加読み込みに失敗している間は `-1`、それ以外（終端到達・legacy の 1 ページ表示）は `pages.length`。失敗中も `isReachingEnd` は true になる（センチネルを止めるため）が、全件数はまだ分からないので `hasError` も見る
+- 行の `aria-setsize` 用に `listSize` を算出して `SearchResultList` へ渡す: infinite scroll で `hasLoadedAll` が false の間（続きがある・追加読み込みに失敗している）は `-1`、それ以外（全件読み込み済み・legacy の 1 ページ表示）は `pages.length`。`isReachingEnd` はエラーでもセンチネルを止めるため true になり、全件数が分かったかどうかとは意味が違うので使わない
 - 選択 `Set`（`selectedPageIdsByCheckboxes`）は書き換えず、変更のたびに新しい Set を state に入れて `SearchResultList` の `selectedPageIds` へ渡す。一覧はその再描画で最新の選択を受け取り、画面外の行は再マウント時にそこから初期値を得る（9.2）。全選択/解除は Set を置き換えたうえで、マウント中の行だけを命令的に更新する
 - 同じ Set を ref にも持つ。`selectAll()` の直後に `getSelectedPageIds()` を読む呼び出し元（`SearchPage` の件数更新）が、再描画前でも最新の選択を得るため。`checkboxChangedHandler` は ref から読むので、選択が変わってもハンドラの同一性は変わらない（10.2）。チェックを変えた行自身は `isInitiallyChecked` が変わるので再描画されるが、他の行は再描画されない
 - 選択件数・一括削除は今までどおり Set から導出するので、画面外の選択も含まれる（9.3、変更なし）
@@ -514,7 +515,7 @@ export const usePageDeleteModalForBulkDeletion: (
 - 検索実行/条件変更時: `setSize(1)` + `mutate()`（累積破棄・先頭再読込。同じ条件での再検索でも取り直す）
 - 一括削除完了時: `setSize(1)` + `mutate()` + `resetAfterMutation()`（選択クリア**かつ右ペインプレビューのクリア**）
 - 削除ボタンは `selectedCount === 0` で無効
-- 一括削除エリアに、選択件数と読み込み済み件数を並べて表示する。「全選択」が読み込み済みの結果だけを対象にすることを示すため（4.7）。スクリーンリーダー向けの `role="status"` は、表示とは別の visually-hidden 要素に選択件数だけを入れる。読み込み済み件数を含めると、追加読み込みのたびに読み上げられ、選択の変化が埋もれるため
+- 一括削除エリアに、選択件数と読み込み済み件数を並べて表示する。「全選択」が読み込み済みの結果だけを対象にすることを示すため（4.7）。スクリーンリーダー向けの `role="status"` は、表示とは別の visually-hidden 要素に選択件数だけを入れる。読み込み済み件数を含めると、追加読み込みのたびに読み上げられ、選択の変化が埋もれるため。この要素は一括削除パネル（`SearchControl` の Collapse）の外に置く。パネルが閉じている間は `display:none` になり、読み上げられないため
 - 行単位のリネーム/削除（`SearchResultList` 経由）は `mutateSearching()` に加え、`onItemMutated` で変更内容（`SearchItemMutation`）を受け取り、**再取得せず**読込済みチャンクのキャッシュを直接書き換える（`mutateSearchInfiniteChunks` + `applySearchItemMutation`、`revalidate: false`）。`mutateSearching()` のフィルタ付き `mutate` は `$inf$` 接頭辞キーを対象外とするため単独では効かず、引数なし `mutate()` での再検証は読込済み全チャンクを再取得してしまう（A-1）
   - 削除: 該当行を除去。再帰削除では子孫（`path + '/'` 前方一致）も除去
   - リネーム: 該当行と子孫の `path` を新パスへ置換し、旧パス由来の `highlightedPath` を破棄（新パスは `OnRenamedFunction` の第 2 引数で受け取る）
