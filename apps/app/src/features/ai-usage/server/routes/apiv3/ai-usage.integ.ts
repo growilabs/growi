@@ -2,7 +2,7 @@ import os from 'node:os';
 import express, { type Express } from 'express';
 import mongoose from 'mongoose';
 import request from 'supertest';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock } from 'vitest-mock-extended';
 
 import { BUNDLED_CATALOG_MODELS } from '~/features/mastra/server/services/ai-sdk-modules/model-catalog';
 import { refreshModelCatalog } from '~/features/mastra/server/services/ai-sdk-modules/refresh-model-catalog';
@@ -62,7 +62,7 @@ const sinceOneHourAgo = (): string =>
   new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
 describe('GET /_api/v3/ai-usage behind the real middleware order', () => {
-  const crowi = mockDeep<Crowi>();
+  const crowi = mock<Crowi>({}, { deep: true });
   let app: Express;
 
   beforeAll(async () => {
