@@ -120,7 +120,7 @@ describe('executeImport — settles the import activity with the operator captur
     };
     const adminEvent = new EventEmitter();
 
-    await executeImport({
+    const result = await executeImport({
       importService,
       adminEvent,
       activityEvent: crowi.events.activity,
@@ -129,6 +129,8 @@ describe('executeImport — settles the import activity with the operator captur
       collections: [],
       importSettingsMap: new Map(),
     });
+
+    expect(result).toBe('success');
 
     const rows = await waitForActivityRows({ id: activityId });
     expect(rows).toHaveLength(1);
