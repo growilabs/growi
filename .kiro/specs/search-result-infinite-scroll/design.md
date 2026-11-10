@@ -416,7 +416,7 @@ type Props = {
 **追補（#190441）— 仮想化と再描画抑制のための変更**（要件 8.5, 9.2, 9.3, 10.1, 10.2）
 - スクロールコンテナ（`div.overflow-y-scroll`）を callback ref で state に保持し、`SearchResultList` の `scrollElement` へ渡す。一覧の開始位置（`scrollMargin`）を `offsetTop` で測れるよう、このコンテナに Bootstrap の `position-relative` を付ける
 - 行へ届くハンドラを安定させる: `onPageSelected` には `setSelectedPageWithMeta`（React が同一性を保証）をそのまま渡し、`checkboxChangedHandler` / `onPreviewedPageDeleted` は `useCallback` にする。`checkboxChangedHandler` の依存は `pages` のみ（チェック操作では変わらない）
-- 行の `aria-setsize` 用に `listSize` を算出して `SearchResultList` へ渡す: infinite scroll で終端に届いていない間は `-1`、それ以外（終端到達・legacy の 1 ページ表示）は `pages.length`
+- 行の `aria-setsize` 用に `listSize` を算出して `SearchResultList` へ渡す: infinite scroll で終端に届いていない間と、追加読み込みに失敗している間は `-1`、それ以外（終端到達・legacy の 1 ページ表示）は `pages.length`。失敗中も `isReachingEnd` は true になる（センチネルを止めるため）が、全件数はまだ分からないので `hasError` も見る
 - 選択 `Set`（`selectedPageIdsByCheckboxes`）は書き換えず、変更のたびに新しい Set を state に入れて `SearchResultList` の `selectedPageIds` へ渡す。一覧はその再描画で最新の選択を受け取り、画面外の行は再マウント時にそこから初期値を得る（9.2）。全選択/解除は Set を置き換えたうえで、マウント中の行だけを命令的に更新する
 - 同じ Set を ref にも持つ。`selectAll()` の直後に `getSelectedPageIds()` を読む呼び出し元（`SearchPage` の件数更新）が、再描画前でも最新の選択を得るため。`checkboxChangedHandler` は ref から読むので、選択が変わってもハンドラの同一性は変わらない（10.2）。チェックを変えた行自身は `isInitiallyChecked` が変わるので再描画されるが、他の行は再描画されない
 - 選択件数・一括削除は今までどおり Set から導出するので、画面外の選択も含まれる（9.3、変更なし）
@@ -447,7 +447,7 @@ type Props = {
   // 既存: pages, selectedPageId, forceHideMenuItems, onPageSelected,
   //       onCheckboxChanged, onItemMutated, onPreviewedPageDeleted
   scrollElement: HTMLElement | null;        // NEW: 仮想化のスクロール要素（SearchPageBase のコンテナ）
-  selectedPageIds?: ReadonlySet<string>;    // NEW: 再マウント時のチェック初期値の参照元
+  selectedPageIds: ReadonlySet<string>;     // NEW(必須): 再マウント時のチェック初期値の参照元。渡し忘れるとチェック状態の復元が黙って壊れるため必須
   listSize?: number;                        // NEW: 行の aria-setsize。未指定時は pages.length
 };
 ```
@@ -514,7 +514,7 @@ export const usePageDeleteModalForBulkDeletion: (
 - 検索実行/条件変更時: `setSize(1)` + `mutate()`（累積破棄・先頭再読込。同じ条件での再検索でも取り直す）
 - 一括削除完了時: `setSize(1)` + `mutate()` + `resetAfterMutation()`（選択クリア**かつ右ペインプレビューのクリア**）
 - 削除ボタンは `selectedCount === 0` で無効
-- 一括削除エリアに、選択件数と読み込み済み件数を並べて表示する。「全選択」が読み込み済みの結果だけを対象にすることを示すため（4.7）
+- 一括削除エリアに、選択件数と読み込み済み件数を並べて表示する。「全選択」が読み込み済みの結果だけを対象にすることを示すため（4.7）。スクリーンリーダー向けの `role="status"` は、表示とは別の visually-hidden 要素に選択件数だけを入れる。読み込み済み件数を含めると、追加読み込みのたびに読み上げられ、選択の変化が埋もれるため
 - 行単位のリネーム/削除（`SearchResultList` 経由）は `mutateSearching()` に加え、`onItemMutated` で変更内容（`SearchItemMutation`）を受け取り、**再取得せず**読込済みチャンクのキャッシュを直接書き換える（`mutateSearchInfiniteChunks` + `applySearchItemMutation`、`revalidate: false`）。`mutateSearching()` のフィルタ付き `mutate` は `$inf$` 接頭辞キーを対象外とするため単独では効かず、引数なし `mutate()` での再検証は読込済み全チャンクを再取得してしまう（A-1）
   - 削除: 該当行を除去。再帰削除では子孫（`path + '/'` 前方一致）も除去
   - リネーム: 該当行と子孫の `path` を新パスへ置換し、旧パス由来の `highlightedPath` を破棄（新パスは `OnRenamedFunction` の第 2 引数で受け取る）
