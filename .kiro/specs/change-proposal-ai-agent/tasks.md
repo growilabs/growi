@@ -16,11 +16,11 @@
   - 型の検査が通り、仮のファイルの関数がすべて 2 つの barrel から import できる
   - _Requirements: 2.1, 3.1, 3.2, 7.2, 7.4_
 - [ ] 1.3 (P) 保留中の案・AI の記録と、読んだページの記録の model を作る
-  - `schema.prisma` に、design の Physical Data Model の `changeproposalairecords` と `aichatreadledgers` の model と composite type を足し、Prisma の client を生成し直す。索引は、Mongoose と同じ項目と名前の `@@index` で書き、TTL 索引と、`proposalId` を持つ文書だけを対象にする一意の索引には注記を付ける（`proposalId` には `@unique` を書かない）
-  - `features/change-proposal-ai/server/models/` の 2 つのファイルに、索引に使う項目だけを持つ Mongoose の schema を置き、索引（記録の ID の一意の索引で `proposalId` に ObjectId の値がある文書だけを対象にするもの、実行の ID、会話の ID、期限の TTL 索引、会話ごとの一意の索引）を宣言して、`ChangeProposalAiRecord` と `AiChatReadLedger` の名前で登録する（export しない）
+  - `schema.prisma` に、design の Physical Data Model の `changeproposalairecords` と `aichatreadledgers` の model と composite type を足し、Prisma の client を生成し直す。索引は、migration と同じ項目と名前の `@@index` で書き、TTL 索引と、`proposalId` を持つ文書だけを対象にする一意の索引には注記を付ける（`proposalId` には `@unique` を書かない）
+  - migrate-mongo の migration に、索引（記録の ID の一意の索引で `proposalId` に ObjectId の値がある文書だけを対象にするもの、実行の ID、会話の ID、期限の TTL 索引、会話ごとの一意の索引）を `createIndex` で作る処理を置く。Mongoose の schema とモデルは作らない
   - 同じファイルに Prisma の拡張を作り、design の ReadLedger Model / AiRecord Model の表の関数を、表のとおりの条件付きの `updateMany` と件数の確認で書く。`_id` と `__v` の互換の項目も宣言する。Prisma の行を `DraftOperation` の union に変える純関数 `toDraftOperation` を作る。2 つの拡張を `utils/prisma.ts` の `createPrisma()` に登録する。2 つのファイルは AI の SDK を import しない
   - `toDraftOperation` の単体試験で、3 つの操作の種類の変換と、項目が欠けた行で例外になることを確かめている
-  - 実際の MongoDB に対する結合試験（`.integ.ts`）で、Mongoose のモデルの `init()` を待ってから索引の名前と指定があること、期限を持たない記録は TTL 索引で消えず期限を持つ記録だけが対象になること（索引の定義で確かめ、TTL の削除は待たない）、`proposalId` を持たない記録が 2 つ以上あっても保存でき同じ `proposalId` の 2 つ目が断られること、後続・見直しの元（`basedOn`）を持つ記録が保存して読めること、同じ記録に対して保留中の案を `proposing` にする更新を 10 個以上同時に呼ぶことを 20 回以上くり返し毎回成功が 1 つだけであること、条件付きの更新のあとで更新日時が新しくなること、読んだページを同じ会話に 10 個以上同時に足しても重ならず上限を超えないことを確かめている
+  - 実際の MongoDB に対する結合試験（`.integ.ts`）で、migration を実行したあとで索引の名前と指定があること、期限を持たない記録は TTL 索引で消えず期限を持つ記録だけが対象になること（索引の定義で確かめ、TTL の削除は待たない）、`proposalId` を持たない記録が 2 つ以上あっても保存でき同じ `proposalId` の 2 つ目が断られること、後続・見直しの元（`basedOn`）を持つ記録が保存して読めること、同じ記録に対して保留中の案を `proposing` にする更新を 10 個以上同時に呼ぶことを 20 回以上くり返し毎回成功が 1 つだけであること、条件付きの更新のあとで更新日時が新しくなること、読んだページを同じ会話に 10 個以上同時に足しても重ならず上限を超えないことを確かめている
   - _Requirements: 5.1, 7.4, 7.7, 7.8, 10.1, 10.4, 13.6_
   - _Boundary: ReadLedger Model, AiRecord Model, schema.prisma, utils/prisma.ts_
 - [ ] 1.4 (P) チャット画面の文言を 5 言語で足す

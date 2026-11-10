@@ -43,7 +43,7 @@ const revisionSchema = new Schema(
     author: { type: Schema.Types.ObjectId, ref: 'User' },
     hasDiffToPrev: { type: Boolean },
     origin: { type: String, enum: allOrigin },
-    // Unset on revisions not made by a Change Proposal, so the index below stays sparse
+    // Unset on revisions not made by a Change Proposal, so their sparse index stays small
     proposalId: { type: Schema.Types.ObjectId },
     proposalOperationKey: { type: String },
   },
@@ -53,10 +53,6 @@ const revisionSchema = new Schema(
 );
 revisionSchema.plugin(mongoosePaginate);
 revisionSchema.index({ author: 1, createdAt: -1 });
-revisionSchema.index(
-  { proposalId: 1, proposalOperationKey: 1 },
-  { sparse: true },
-);
 
 getOrCreateModel('Revision', revisionSchema);
 

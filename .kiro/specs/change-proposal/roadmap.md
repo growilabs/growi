@@ -48,7 +48,7 @@ GROWI の AI 機能は、今は検索と、読んだページをもとにした�
 - **人の保存と黙ってぶつからない**: 反映は「元の版のままなら書く」を1回の操作で行う。
 - **作者は依頼した人間にする**: AI 専用のユーザーは作らない。AI によるものかどうかは `Revision.origin` ではなく別の項目で記録する（`origin` は上書き防止の確認に使われているため）。
 - **i18n**: 新しく足す画面・通知の文言は、各 sub-spec の中で 5 言語すべてを訳す。
-- **モデルの規則**: 新しいコレクションの索引は Mongoose 側で宣言する（`.claude/rules/model.md`）。
+- **モデルの規則**: 新しいコレクションの索引は migration で作り、`schema.prisma` に同じ名前の `@@index` を書く。Mongoose の schema には書かない（`.claude/rules/model.md`）。
 
 ## Boundary Strategy
 

@@ -967,39 +967,4 @@ describe('ChangeProposal model (Prisma extension)', () => {
       expect(ids).not.toContain(dueWithoutPending._id);
     });
   });
-
-  describe('indexes', () => {
-    it('creates the six indexes from the mongoose schema, four of them sparse, and no TTL index', async () => {
-      const ChangeProposal = mongoose.model('ChangeProposal');
-      await ChangeProposal.init();
-
-      const indexes = await ChangeProposal.collection.indexes();
-      const byName = new Map(indexes.map((index) => [index.name, index]));
-
-      expect(ChangeProposal.collection.collectionName).toBe('changeproposals');
-      const denseNames = [
-        'requester_1_createdAt_-1',
-        'lifecycle_1_expiresAt_1',
-      ];
-      const sparseNames = [
-        'applyLease.expiresAt_1',
-        'lastAppliedAt_-1',
-        'revertOf_1',
-        'basedOn.proposalId_1',
-      ];
-      for (const name of [...denseNames, ...sparseNames]) {
-        expect(byName.has(name), name).toBe(true);
-      }
-      for (const name of denseNames) {
-        expect(byName.get(name)?.sparse, name).not.toBe(true);
-      }
-      for (const name of sparseNames) {
-        expect(byName.get(name)?.sparse, name).toBe(true);
-      }
-      expect(indexes.filter((index) => index.name !== '_id_')).toHaveLength(6);
-      expect(indexes.some((index) => index.expireAfterSeconds != null)).toBe(
-        false,
-      );
-    });
-  });
 });

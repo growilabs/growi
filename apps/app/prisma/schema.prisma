@@ -277,8 +277,8 @@ model changeproposals {
 
   @@index([requester, createdAt(sort: Desc)], map: "requester_1_createdAt_-1")
   @@index([lifecycle, expiresAt], map: "lifecycle_1_expiresAt_1")
-  // The next four are sparse in the mongoose schema; Prisma cannot express that,
-  // so the sparse option must be re-applied once `prisma db push` owns index creation.
+  // The next four are sparse, which Prisma cannot express; the migration
+  // 20261110120000-add-change-proposal-indexes creates them.
   @@index([applyLease.expiresAt], map: "applyLease.expiresAt_1")
   @@index([lastAppliedAt(sort: Desc)], map: "lastAppliedAt_-1")
   @@index([revertOf], map: "revertOf_1")
@@ -652,8 +652,8 @@ model revisions {
 
   @@index([pageId], map: "pageId_1")
   @@index([authorId, createdAt(sort: Desc)], map: "author_1_createdAt_-1")
-  // The mongoose schema declares this index as sparse; Prisma cannot express that,
-  // so it has to be re-applied out of band once Prisma takes over index creation.
+  // Sparse, which Prisma cannot express; the migration
+  // 20261110120000-add-change-proposal-indexes creates it.
   @@index([proposalId, proposalOperationKey], map: "proposalId_1_proposalOperationKey_1")
 }
 

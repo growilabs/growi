@@ -99,7 +99,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Selected Approach**: 会話（スレッド）ごとに、AI が読んだページの ID と読んだ時点のパスを記録する。記録を始める前からある会話、記録の書き込みに失敗した実行、記録の件数が上限を超えた会話は「確かめられない」として、確認を求める。
 - **Rationale**: memory が前の 30 件のメッセージを AI に渡すので、前の実行で読んだ本文も AI の文脈に残っている。実行ごとの記録では、前の実行で読んだ非公開のページを見落とす。brief の「その実行で」は、この理由で会話全体に広げて解釈する。
 - **Trade-offs**: 長い会話で一度でも非公開のページを読むと、以後の書き込みで毎回確認が出る。新しい会話を始めれば記録は空から始まる。
-- **記録する期間**: 書き込み機能が有効なときだけ記録する。機能の初期値は無効なので、使わない wiki に、読み取りのたびの書き込みを足さないため（空のコレクションと索引は、機能の有効・無効にかかわらず、起動時に Mongoose の schema が作る）。機能を有効にする前からある会話は「記録を始める前のやり取りがある」として、無効の間に読み取りがあった会話は「欠けている」として、どちらも確認を求める。
+- **記録する期間**: 書き込み機能が有効なときだけ記録する。機能の初期値は無効なので、使わない wiki に、読み取りのたびの書き込みを足さないため（空のコレクションと索引は、機能の有効・無効にかかわらず、migration が作る）。機能を有効にする前からある会話は「記録を始める前のやり取りがある」として、無効の間に読み取りがあった会話は「欠けている」として、どちらも確認を求める。
 
 ### Decision: 閲覧範囲が狭いページを読んだ案は、本人が確かめれば進められる
 - **Context**: brief は「本人が確かめれば進められるかは設計で決める」とした。
@@ -160,15 +160,15 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
   - AI の SDK を使わない部分（本文の組み立て・書き込み先の判断・閲覧範囲の判断の純関数、保留中の案と AI の記録と読んだページの記録の model、REST の API、チャット画面の部品）は新しい `features/change-proposal-ai/` に置く。
 - **Rationale**: REST の API は起動時に登録されるので、AI の SDK を読み込んではいけない（`server-boot-imports.md`）。AI の記録の API は、AI の機能を無効にした後も依頼した人が取得できる必要がある（要件 10.6）ので、`aiReadyGuard` の下に置かない。依存の向きは `features/mastra` → `features/change-proposal-ai` → `features/change-proposal`（core）である。逆向きは、viewer の本人向けの部品の表が、`'ai-chat'` の行から本 spec の `client/record` を `import()` で遅れて読み込む 1 か所だけにする。viewer の詳細ページは入口の種類で分岐せず表を引くだけなので、AI チャットに固有の画面は本 spec が持ち、viewer は場所だけを持つ。
 
-### Decision: 2 つの新しいコレクションは Prisma で読み書きし、索引は Mongoose の schema で作る
+### Decision: 2 つの新しいコレクションは Prisma で読み書きし、索引は migration で作る
 - **Context**: `changeproposalairecords` と `aichatreadledgers` は新しいコレクションで、GROWI は Mongoose のモデルを Prisma の拡張へ順に移している（`.claude/rules/model.md`）。どちらも、Prisma の schema では表せない索引（TTL 索引、`proposalId` を持つ文書だけを対象にする一意の索引）を持つ。保留中の案の状態の変化（`held` → `proposing` など）は、今の状態を条件にした更新に頼る。
-- **確かめた事実**: Prisma 6.19.2 のクエリエンジンが条件付きの `updateMany` をどう実行するかは、core の research.md の「新しいコレクションは Prisma で読み書きし、索引は Mongoose の schema で作る」に書いた（条件に合う `_id` を読んでから `_id` で書く処理を MongoDB の transaction の中で行い、間に別の書き込みが入ると最初からやり直すので、同じ条件で同時に書いても件数 1 になるのは 1 つだけ。埋め込みの配列の要素ごとの条件付きの書き換えも 1 つの更新になる。任意の項目は `unset: true` で消し、`isSet` で有無を確かめる）。本 spec も同じ事実に頼る。加えて次を確かめた。
+- **確かめた事実**: Prisma 6.19.2 のクエリエンジンが条件付きの `updateMany` をどう実行するかは、core の research.md の「新しいコレクションは Prisma で読み書きし、索引は migration で作る」に書いた（条件に合う `_id` を読んでから `_id` で書く処理を MongoDB の transaction の中で行い、間に別の書き込みが入ると最初からやり直すので、同じ条件で同時に書いても件数 1 になるのは 1 つだけ。埋め込みの配列の要素ごとの条件付きの書き換えも 1 つの更新になる。任意の項目は `unset: true` で消し、`isSet` で有無を確かめる）。本 spec も同じ事実に頼る。加えて次を確かめた。
   1. Prisma の schema では、配列の長さを条件にできない（composite type の list の条件は `some` / `every` / `none` / `isEmpty` / `equals` だけ）。
   2. Prisma の `upsert` は、MongoDB の 1 つの upsert のコマンドにならない（読んでから作るか書き換える）。同じ `threadId` の記録を 2 つの処理が同時に作ると、一意の索引で片方が `P2002`（一意の制約の違反）になる。
   3. Prisma の schema に `@unique` を書くと、将来 `prisma db push` が索引を作るときに、項目の無い文書も対象にする普通の一意の索引になる。`proposalId` を持たない記録（`held` と `cancelled`）が多数あるので、その索引は作れない。
 - **Selected Approach**:
   - `schema.prisma` に `changeproposalairecords` と `aichatreadledgers` の model を足し、読み書きはすべて各 model のファイルの Prisma の拡張の関数を通す。拡張は `utils/prisma.ts` の `createPrisma()` に登録する。
-  - 同じファイルに、索引の項目だけを持つ Mongoose の schema を置き、コレクションと索引の作成を任せる（core と同じ形）。`proposalId` の一意の索引は、疎な索引（項目がある文書だけを対象にする索引）ではなく、`partialFilterExpression: { proposalId: { $type: 'objectId' } }` の索引にする。疎な索引は値が null の文書を対象に含めるので、null が書かれた記録が 2 つあると重複とみなされるためである。`schema.prisma` には `@unique` ではなく `@@index` を、注記つきで書く（事実 3）。
+  - 索引は、migrate-mongo の migration が `createIndex` で作る（core と同じ形）。この 2 つのコレクションを名前で `populate` する処理は無いので、Mongoose の schema とモデルは作らない。Mongoose の schema だけが索引を宣言すると、その schema を取り除いたときに索引が作られなくなるので、`.claude/rules/model.md` に従って migration で作る。`proposalId` の一意の索引は、疎な索引（項目がある文書だけを対象にする索引）ではなく、`partialFilterExpression: { proposalId: { $type: 'objectId' } }` の索引にする。疎な索引は値が null の文書を対象に含めるので、null が書かれた記録が 2 つあると重複とみなされるためである。`schema.prisma` には `@unique` ではなく `@@index` を、注記つきで書く（事実 3）。
   - 状態の変化はすべて、今の状態を where に入れた `updateMany` と件数の確認で行う。前の設計が `findOneAndUpdate` に頼っていた `held` → `proposing` も同じ形になる。
   - 読んだページの記録の追加は、読んだ文書の `v`（`__v`）を条件にした `updateMany` で行う（読んだときから誰も書いていなければ書く）。重ねない判断と上限の判断は、読んだ文書をもとにアプリの中で行う。条件に合わなければ読み直して決まった回数までやり直し、それでも書けなければ失敗を返す（呼び出し側は「記録が欠けた」として確認を求める）。
   - 記録の開始は `create` で行い、`P2002` が返ったら、すでに始まっているとみなす（事実 2）。
@@ -176,7 +176,7 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - **Trade-offs**:
   - 1 回の実行の中で読み取りの道具が同時に動くと、記録の追加が同時に起き、やり直しが起きる。やり直しの回数を超えると「記録が欠けた」になり、本人の確認が 1 回増える。確かめられないときは確認を求める、という決まりのとおりの結果なので、そのまま受け入れる。
   - 条件付きの更新が 1 回の処理として扱えることは、Prisma のクエリエンジンの作りに頼る。保留中の案を同時に 2 回進める結合テストと、読んだページの記録を同時に足す結合テストで確かめる。成り立たないと分かった関数だけを `$runCommandRaw` に置き換える。
-  - TTL 索引と一意の索引は、Mongoose の schema で宣言するので、起動時に Mongoose がつながったあとで作られる。結合テストは、Mongoose のモデルの `init()` を待ってから索引を確かめる。
+  - TTL 索引と一意の索引は、migration が作る。migration はアプリが要求を受け付ける前に実行されるので、書き込みが始まる前にそろっている。結合テストは、migration を実行したあとで索引を確かめる。
 
 ### Decision: 後続・見直しの元は、チャットの API の入力で受け取る
 - **Context**: 要件 13・14。umbrella の決定 7。後続・見直しの Change Proposal は、元の Change Proposal と元の操作（`basedOn`）を core に渡して作る。AI の実行の中で作るので、元をどこから受け取るかを決める必要がある。
@@ -215,8 +215,8 @@ umbrella の判断（決定 1〜6）とコード上の事実は [../change-propo
 - `apps/app/.claude/rules/server-boot-imports.md` — 起動時に AI の SDK を読み込まない
 - `apps/app/.claude/rules/activity-recording.md` — REST の API の middleware の順
 - `apps/app/.claude/rules/page-write-action-403-404.md` — 見えないものへの応答をそろえる
-- `.claude/rules/model.md` と `.claude/skills/mongoose-to-prisma/SKILL.md` — 読み書きは Prisma の拡張、コレクションと索引の作成は Mongoose の schema
-- `.kiro/specs/change-proposal-core/research.md` の「新しいコレクションは Prisma で読み書きし、索引は Mongoose の schema で作る」— Prisma の条件付きの更新の実行のしかた（prisma-engines 6.19.2 のコードを読んだ結果）
+- `.claude/rules/model.md` と `.claude/skills/mongoose-to-prisma/SKILL.md` — 読み書きは Prisma の拡張、索引の作成は migration
+- `.kiro/specs/change-proposal-core/research.md` の「新しいコレクションは Prisma で読み書きし、索引は migration で作る」— Prisma の条件付きの更新の実行のしかた（prisma-engines 6.19.2 のコードを読んだ結果）
 - `.kiro/specs/ai-agentic-search/design.md` — 読み取りの道具と指示文の決まり
 - `.kiro/specs/ai-chat-page-mention/requirements.md` — メンションの入り方
 - `.kiro/specs/suggest-path/` — 置き場所の候補

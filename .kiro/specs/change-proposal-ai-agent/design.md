@@ -37,8 +37,8 @@
 - 置き換えの指示を適用する純関数（`@growi/core` の `applyStringEdits`）と、本文の組み立て・改行の書き方をそろえる処理・内容が大きく消える判定
 - 同じページへの編集をまとめる処理と、1 回の呼び出しの中の組み合わせの検査
 - ユーザーが指定したページの判断、AI の提案の判断、閲覧範囲が狭いかの判断（すべて純関数）
-- AI が読んだページの記録（新しいコレクション `aichatreadledgers`。Prisma の model と拡張で読み書きし、コレクションと索引は Mongoose の schema が作る）と、読み取りの道具に足す、読んだページを記録する処理
-- 保留中の案と AI の記録（新しいコレクション `changeproposalairecords`。同じく Prisma で読み書きし、索引は Mongoose の schema が作る）と、その REST の API（`/_api/v3/change-proposal-ai/...`）
+- AI が読んだページの記録（新しいコレクション `aichatreadledgers`。Prisma の model と拡張で読み書きし、索引は migrate-mongo の migration が作る）と、読み取りの道具に足す、読んだページを記録する処理
+- 保留中の案と AI の記録（新しいコレクション `changeproposalairecords`。同じく Prisma で読み書きし、索引は migrate-mongo の migration が作る）と、その REST の API（`/_api/v3/change-proposal-ai/...`）
 - 書き込みのときの AI への指示文
 - チャット画面の部品（案を表す表示、差分、承認・飛ばす・破棄・取り消し・作り直しのボタン、保留中の案の確認の画面）と、チャット画面に固有の文言（`change_proposal_chat.*`、5 言語）
 - viewer の詳細ページで AI の記録を本人に見せる部品 `AiRecordSection` と、viewer の `requester-only-sections.ts` の `'ai-chat'` の行（行を 1 つ足すだけ）
@@ -66,7 +66,7 @@
 - `@growi/core` の型と純関数（`pagePathUtils` など）。本 spec で `applyStringEdits` を足す
 - `features/mastra/` の Agent・memory・request context・model の表示名の処理（AI の SDK を使う部分だけが使う）
 - 画面: `@ai-sdk/react` の `useChat` の部品、SWR、`diff`、`diff2html`、既存の `apiv3Get` / `apiv3Post`、チャット画面を開く既存の処理（`features/mastra/client/status/chat-sidebar.tsx` の `openChat`）
-- 依存の向き: `@growi/core` → `features/change-proposal-ai/interfaces` → `features/change-proposal-ai/server/domain`（純関数）→ `server/models` → `server/services` → `server/routes`。`features/mastra/server` → `features/change-proposal-ai/server/services`（逆は無い）。画面では、viewer の表（`features/change-proposal`）が `features/change-proposal-ai/client/record` の `AiRecordSection` を、`'ai-chat'` の行から `import()` で遅れて読み込む。同じく `requester-action-slots.ts` の `'ai-chat'` の行が `features/change-proposal-ai/client/actions` の 2 つの部品を `import()` で遅れて読み込む。この 2 つが `features/change-proposal` から本機能へ向かう依存のすべてで、どちらも静的な import ではない。`features/change-proposal-ai` は `@mastra/*`・`ai`・`@ai-sdk/*` を import しない。`utils/prisma.ts` は `features/change-proposal-ai/server/models/` の 2 つのファイルを直接 import する（起動時に読み込まれるので、この 2 つのファイルは Prisma・Mongoose・logger のほかに import を持たない）。画面の部品が `features/mastra` から読むのは、`features/mastra/interfaces` の型（`import type`）と、`AiRecordSection` と `client/actions` の部品が使う `features/mastra/client/status/chat-sidebar.tsx` の `openChat` / `openChatAndSend`（React と jotai だけを import する module）だけである
+- 依存の向き: `@growi/core` → `features/change-proposal-ai/interfaces` → `features/change-proposal-ai/server/domain`（純関数）→ `server/models` → `server/services` → `server/routes`。`features/mastra/server` → `features/change-proposal-ai/server/services`（逆は無い）。画面では、viewer の表（`features/change-proposal`）が `features/change-proposal-ai/client/record` の `AiRecordSection` を、`'ai-chat'` の行から `import()` で遅れて読み込む。同じく `requester-action-slots.ts` の `'ai-chat'` の行が `features/change-proposal-ai/client/actions` の 2 つの部品を `import()` で遅れて読み込む。この 2 つが `features/change-proposal` から本機能へ向かう依存のすべてで、どちらも静的な import ではない。`features/change-proposal-ai` は `@mastra/*`・`ai`・`@ai-sdk/*` を import しない。`utils/prisma.ts` は `features/change-proposal-ai/server/models/` の 2 つのファイルを直接 import する（起動時に読み込まれるので、この 2 つのファイルは Prisma・logger のほかに import を持たない）。画面の部品が `features/mastra` から読むのは、`features/mastra/interfaces` の型（`import type`）と、`AiRecordSection` と `client/actions` の部品が使う `features/mastra/client/status/chat-sidebar.tsx` の `openChat` / `openChatAndSend`（React と jotai だけを import する module）だけである
 
 ### Revalidation Triggers
 次の変更をしたときは、結合を確かめ直す。
@@ -84,7 +84,7 @@
 - core の完了・達成度・つながりの形（`RequesterProposalState`、`ProposalLinkView`、`ChangeProposalView.basedOn`）、`BASED_ON_ELIGIBLE_STATUSES` の中身、`selectRemainingOperations` の決め方、`createProposal` の `basedOn` と `based-on-unavailable` / `based-on-operation-not-eligible`（「core の誤りの対応表」が扱う）、見直しを自動反映しない扱い
 - viewer の `requester-action-slots.ts` の部品の props（`ProposalActionSlotProps = { proposal: ChangeProposalView }`、`OperationActionSlotProps = { proposal: ChangeProposalView; operation: OperationView }`）と、場所を出す条件（依頼した人だけ）。`ProposalFollowUpAction` と `OperationReworkAction` はこの形に合わせている
 - チャットの API の入力の `proposalBase` の形と上限（`MAX_PROPOSAL_BASE_KEYS`）、チャットの送信の部品（transport の `prepareSendMessagesRequest`）が呼び出しごとの `body` を残すこと
-- Prisma の版を上げたとき（条件付きの更新を 1 回の処理として扱えることを、保留中の案を同時に 2 回進める結合試験と、読んだページの記録を同時に足す結合試験で確かめ直す。research.md の「2 つの新しいコレクションは Prisma で読み書きし、索引は Mongoose の schema で作る」）
+- Prisma の版を上げたとき（条件付きの更新を 1 回の処理として扱えることを、保留中の案を同時に 2 回進める結合試験と、読んだページの記録を同時に足す結合試験で確かめ直す。research.md の「2 つの新しいコレクションは Prisma で読み書きし、索引は migration で作る」）
 
 ## Architecture
 
@@ -134,7 +134,7 @@ graph TB
 **Architecture Integration**:
 - 採用する形: 確認が要らない案は書き込みの道具がすぐ core に作らせ、確認が要る案は本 spec の保留中の案にして、本人が画面から進めたときに REST の API が core に作らせる（research.md の案 B）。どちらの場合も同じ判断（`decideProposalRoute`）と同じ組み立ての処理を通る。
 - 機能の境界: 判断（本文の組み立て、まとめ方、指定されたページか、閲覧範囲が狭いか、作るか保留にするか）はすべて純関数にする。DB を読むのはサービスだけで、純関数にはその結果を渡す。
-- 変えずに従う既存の決まり: REST の middleware の順（`activity-recording.md`）、見えないものには存在しないものと同じ 404 を返すこと（`page-write-action-403-404.md`）、起動時に AI の SDK を読み込まない（`server-boot-imports.md`）、読み書きは Prisma の拡張、コレクションと索引の作成は Mongoose の schema（`model.md`）。
+- 変えずに従う既存の決まり: REST の middleware の順（`activity-recording.md`）、見えないものには存在しないものと同じ 404 を返すこと（`page-write-action-403-404.md`）、起動時に AI の SDK を読み込まない（`server-boot-imports.md`）、読み書きは Prisma の拡張、索引の作成は migration（`model.md`）。
 - 新しい部品の理由: 保留中の案は、会話を開き直した後や別の日にも進められる必要があるので、サーバーに保存する。
 - 後続・見直しの元（どの Change Proposal のどの操作か）は、本人がボタンで選んだ値だけから決める。値はメッセージの文とは別に、チャットの API の入力の `proposalBase` で送り、その実行の値（`changeProposal.basedOn`）として書き込みの道具の処理に渡す。AI の道具の入力には元を受け取る項目を作らない（要件 13.4。research.md の「後続・見直しの元は、チャットの API の入力で受け取る」）。
 
@@ -145,7 +145,7 @@ graph TB
 | Frontend | React 18、Next.js 16 Pages Router、`@ai-sdk/react` ^3、SWR、`diff` ^5、`diff2html` ^3.4 | チャット画面の案を表す表示と差分、viewer の詳細ページの AI の記録 | diff2html の設定と見た目は core の `client/shared/` のもの（`RevisionDiff.tsx` と同じ）を使う。新しい依存は無い |
 | Agent | `@mastra/core` ^1.32（実体 1.41.0）、`ai` ^6、zod ^4 | 書き込みの道具、実行ごとの道具と指示文の切り替え | `Agent` の `tools` / `instructions` に関数を渡す |
 | Backend | Express（apiv3）、express-validator | 保留中の案と AI の記録の REST の API | 既存の route の形 |
-| Data | MongoDB（replica set）、Prisma ^6.19.2、Mongoose ^6.13.6 | 2 つの新しいコレクション | 読み書きは Prisma の拡張。コレクションと索引（TTL 索引と、`proposalId` を持つ文書だけを対象にする一意の索引を含む）は Mongoose の schema が作る |
+| Data | MongoDB（replica set）、Prisma ^6.19.2 | 2 つの新しいコレクション | 読み書きは Prisma の拡張。索引（TTL 索引と、`proposalId` を持つ文書だけを対象にする一意の索引を含む）は migrate-mongo の migration が作る |
 | Shared | `@growi/core` | `applyStringEdits` の純関数 | changeset が要る |
 
 新しい外部ライブラリは足さない。
@@ -175,8 +175,8 @@ apps/app/src/features/change-proposal-ai/
 │   │   ├── compare-audience.ts             # is a read page narrower than a write target
 │   │   └── decide-proposal-route.ts        # create now, or hold with reasons
 │   ├── models/
-│   │   ├── chat-read-ledger.ts             # Index-only Mongoose schema + Prisma extension (aichatreadledgers)
-│   │   ├── change-proposal-ai-record.ts    # Index-only Mongoose schema + Prisma extension (held drafts and AI records)
+│   │   ├── chat-read-ledger.ts             # Prisma extension (aichatreadledgers)
+│   │   ├── change-proposal-ai-record.ts    # Prisma extension (held drafts and AI records)
 │   │   ├── to-draft-operation.ts           # Pure: Prisma composite row -> DraftOperation union
 │   │   └── to-draft-operation.spec.ts
 │   ├── services/
@@ -407,7 +407,7 @@ stateDiagram-v2
 |-----------|--------------|--------|--------------|------------------|-----------|
 | StringEdits | `@growi/core` | 置き換えの指示を前から順に適用する | 2.2–2.5 | なし | Service |
 | Domain Pure Functions | domain | 本文の組み立て、操作のまとめ方、指定されたページか、閲覧範囲が狭いか、作るか保留にするか、の判断 | 2.2–2.8, 3.3–3.5, 4.1–4.7, 5.3–5.7, 7.6 | StringEdits (P0) | Service |
-| ReadLedger Model / AiRecord Model | data | 2 つの新しいコレクションの読み書き（Prisma の拡張）と、索引を作る Mongoose の schema | 5.1, 7.4, 7.8, 10.1, 10.4, 13.6 | Prisma (P0)、Mongoose（コレクションと索引の作成だけ）(P0) | Service, State |
+| ReadLedger Model / AiRecord Model | data | 2 つの新しいコレクションの読み書き（Prisma の拡張） | 5.1, 7.4, 7.8, 10.1, 10.4, 13.6 | Prisma (P0) | Service, State |
 | WriteCapability | services | 書き込みの道具を渡すか | 1.1–1.3, 12.3 | core settings (P0)、AccessToken (P1) | Service |
 | ReadLedger | services | 読んだページの記録と読み出し | 5.1, 5.2, 5.6 | ReadLedger Model (P0) | Service |
 | AudienceFacts | services | 閲覧範囲の事実の読み込み | 5.3–5.6 | Page、UserGroup (P0) | Service |
@@ -557,8 +557,8 @@ function decideProposalRoute(input: {
 
 **Responsibilities & Constraints**
 - 読み書きは、それぞれの model のファイルの Prisma の拡張の関数（`prisma.changeproposalairecords.<関数>`・`prisma.aichatreadledgers.<関数>`、下の表）だけで行う。サービスは Prisma の `findMany` や `updateMany` を直接呼ばない。Mongoose のモデルでは読み書きしない。
-- コレクションと索引は、同じファイルの、索引に使う項目だけを持つ Mongoose の schema が作る（`model.md`。理由は research.md の「2 つの新しいコレクションは Prisma で読み書きし、索引は Mongoose の schema で作る」）。登録の名前は `ChangeProposalAiRecord` と `AiChatReadLedger` にし、Mongoose がその名前から決めるコレクション名を、Prisma の model の名前（`changeproposalairecords`・`aichatreadledgers`）と同じにする。どちらも export しない。
-- 2 つのファイルは `utils/prisma.ts` から起動時に読み込まれる。Prisma・Mongoose・logger と、同じディレクトリの変換の純関数と、`import type` による型のほかは import しない（`server-boot-imports.md`）。
+- 索引は、migrate-mongo の migration が `createIndex` で作る（`model.md`。理由は research.md の「2 つの新しいコレクションは Prisma で読み書きし、索引は migration で作る」）。この 2 つのコレクションを名前で `populate` する処理は無いので、Mongoose の schema とモデルは作らない。migration はアプリが要求を受け付ける前に実行されるので、TTL 索引と一意の索引は、書き込みが始まる前にそろっている。
+- 2 つのファイルは `utils/prisma.ts` から起動時に読み込まれる。Prisma・logger と、同じディレクトリの変換の純関数と、`import type` による型のほかは import しない（`server-boot-imports.md`）。
 - 読んだページの記録は、会話 1 つに 1 文書。ページは ID で重ねずに持ち、`MAX_LEDGER_ENTRIES`（2000）を超える分は持たずに `isIncomplete` を真にする。
 - 保留中の案と AI の記録は同じ文書で、状態（`state`）で区別する。`held` と `cancelled` だけが `expiresAt` を持つ。
 - 任意の項目を消すときは `unset: true` を使い、null を書かない（特に `proposalId` と `expiresAt`）。項目が無いことを条件にするときは、`isSet: false` と null の両方を条件に含める。`createdAt` は `@default(now())`、`updatedAt` は `@updatedAt` で Prisma が書く。
@@ -1007,8 +1007,8 @@ type ChatReadLedgerDocument = {
 
 ### Physical Data Model
 
-**`changeproposalairecords`（新しいコレクション。読み書きは Prisma、コレクションと索引の作成は Mongoose の schema）**
-- 索引（Mongoose の schema で宣言し、`schema.prisma` にも同じ項目と名前の `@@index` を書く）:
+**`changeproposalairecords`（新しいコレクション。読み書きは Prisma、索引の作成は migration）**
+- 索引（migration の `createIndex` で作り、`schema.prisma` にも同じ項目と名前の `@@index` を書く）:
   - `{ proposalId: 1 }`（`proposalId_1`。一意。`partialFilterExpression: { proposalId: { $type: 'objectId' } }` で、`proposalId` に ObjectId の値がある文書だけを対象にする）— AI の記録の取得。疎な索引（項目がある文書だけを対象にする索引）にしないのは、値が null の文書も対象に入り、null の文書が 2 つあると重複とみなされるためである
   - `{ runId: 1 }`（`runId_1`）— 1 回の実行の案の数
   - `{ threadId: 1 }`（`threadId_1`）— 会話が消えたときの印
@@ -1016,7 +1016,7 @@ type ChatReadLedgerDocument = {
 - 定数: `HELD_DRAFT_TTL_SECONDS`（7 日）、`CANCELLED_TTL_SECONDS`（1 日）、`CONFIRM_LEASE_MS`（2 分）
 - 本文は `operations` の中に持つ。合計は core の `MAX_TOTAL_BODY_BYTES` までで、1 文書の上限（16MB）より十分小さい。
 
-**`aichatreadledgers`（新しいコレクション。読み書きは Prisma、コレクションと索引の作成は Mongoose の schema）**
+**`aichatreadledgers`（新しいコレクション。読み書きは Prisma、索引の作成は migration）**
 - 索引: `{ threadId: 1 }`（`threadId_1`。一意）
 - 定数: `MAX_LEDGER_ENTRIES`（2000）、`LEDGER_APPEND_MAX_ATTEMPTS`（3）
 - TTL 索引は持たない。会話を消したときに `deleteLedger` で消す（`delete-thread.ts`）。
@@ -1076,13 +1076,13 @@ model changeproposalairecords {
   createdAt                       DateTime                            @default(now())
   updatedAt                       DateTime                            @updatedAt
 
-  // Unique + partial ({ proposalId: { $type: 'objectId' } }) in the mongoose schema.
+  // Unique + partial ({ proposalId: { $type: 'objectId' } }) in the migration.
   // Not @unique: `prisma db push` would build a plain unique index on which every
   // record without proposalId collides.
   @@index([proposalId], map: "proposalId_1")
   @@index([runId], map: "runId_1")
   @@index([threadId], map: "threadId_1")
-  // TTL (expireAfterSeconds: 0) in the mongoose schema; Prisma cannot express that.
+  // TTL (expireAfterSeconds: 0) in the migration; Prisma cannot express that.
   @@index([expiresAt], map: "expiresAt_1")
 }
 
@@ -1216,7 +1216,7 @@ type AiRecordView = {
 - 指示文: `changeProposal.basedOn` の関係ごとに `BASED_ON_INSTRUCTIONS` の文が `WRITE_INSTRUCTIONS` のあとに足され、`basedOn` が無い実行の指示文は今と同じであること（要件 13.3・14.3）。
 
 ### Integration Tests
-- ReadLedger Model / AiRecord Model（実際の MongoDB に対して Prisma の拡張を呼ぶ。`.integ.ts` の共通の準備が、Prisma を Mongoose と同じ worker ごとの DB につなぐ）: Mongoose のモデルの `init()` を待ってから、4 つと 1 つの索引の名前と指定（TTL、`proposalId` を持つ文書だけを対象にする一意の索引、`threadId` の一意の索引）があること。`proposalId` を持たない記録が 2 つ以上あっても保存でき、同じ `proposalId` の記録は 2 つ目が断られること。同じ記録に対して `beginConfirm` を 10 個以上同時に呼ぶことを 20 回以上くり返し、毎回、真が 1 つだけであること（2 つだけを同時に呼ぶと、片方が読む前にもう片方が書き終わることが多く、条件と書き込みが分かれていても成功してしまうため）。条件付きの `updateMany` のあとで `updatedAt` が新しくなること。`appendLedgerEntries` を同じ会話に 10 個以上同時に呼んでも、同じページが重ならず、上限を超えないこと（要件 5.1・7.4・7.7・7.8・10.4）。
+- ReadLedger Model / AiRecord Model（実際の MongoDB に対して Prisma の拡張を呼ぶ。`.integ.ts` の共通の準備が、Prisma を Mongoose と同じ worker ごとの DB につなぐ）: migration を実行したあとで、4 つと 1 つの索引の名前と指定（TTL、`proposalId` を持つ文書だけを対象にする一意の索引、`threadId` の一意の索引）があること。`proposalId` を持たない記録が 2 つ以上あっても保存でき、同じ `proposalId` の記録は 2 つ目が断られること。同じ記録に対して `beginConfirm` を 10 個以上同時に呼ぶことを 20 回以上くり返し、毎回、真が 1 つだけであること（2 つだけを同時に呼ぶと、片方が読む前にもう片方が書き終わることが多く、条件と書き込みが分かれていても成功してしまうため）。条件付きの `updateMany` のあとで `updatedAt` が新しくなること。`appendLedgerEntries` を同じ会話に 10 個以上同時に呼んでも、同じページが重ならず、上限を超えないこと（要件 5.1・7.4・7.7・7.8・10.4）。
 - `proposeChanges`: 指定されたページの編集で core が作り、`proposed` の AI の記録ができ、道具の出力の操作に core の `key` が入る。core の `ServiceError` のすべての値が対応表の結果になり、`operationIndex` が AI の送った並びの番号になる。AI の提案・閲覧範囲が狭いページ・記録が欠けた場合に core を呼ばず `held` になる。閲覧できないページと存在しないページで同じ結果になる。1 回の実行の上限。実行の値に `basedOn` があるとき、すぐ作る案と保留中の案の両方に同じ `basedOn` が付き、core の `based-on-unavailable` / `based-on-operation-not-eligible` が対応表の結果になること。道具で作った Change Proposal と保留中の案を進めて作った Change Proposal のページごとの通知の指定が、どちらも core の初期値の「出す」になること。管理者が core の操作数の上限を道具の上限より小さくしたとき、`core-input-rejected`（`too-many-operations`）が返り、Change Proposal が作られないこと（要件 2.10・3.6・4.6・5.7・7.1–7.4・7.11・7.12・10.1・13.2・13.5・13.6）。
 - 保留中の案の API: 本人以外・存在しない ID が同じ 404、選んだ操作だけで作られる、置き場所を選び直したパス、確かめ直しで新しいページが見つかると 409、確かめていないと 400、同時に 2 回進めても 1 つだけ作られる、やめた案は進められない、core の `ServiceError` のすべての値が対応表の HTTP の状態と code になる、作成の activity がこの route の activity として記録され、別の activity が残らない。`basedOn` を持つ保留中の案を進めると、作った Change Proposal に同じ `basedOn` が付き、見直しなら方針にかかわらず承認待ちになる（要件 7.5–7.10・13.6・14.4）。
 - AI の記録の API: 本人だけに返る、会話を消したあとも残り `isDeleted` が真になる、今閲覧できないページは一覧に出ない、AI の機能を無効にしても取得できる（要件 10.2–10.6）。

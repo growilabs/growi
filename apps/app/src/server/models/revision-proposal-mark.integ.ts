@@ -64,20 +64,6 @@ describe('Revision proposal mark fields', () => {
     expect(read.proposalOperationKey).toBe('k-1');
   });
 
-  it('declares a sparse index on proposalId and proposalOperationKey', async () => {
-    const Revision = mongoose.model('Revision');
-    await Revision.init();
-
-    const indexes = await Revision.collection.indexes();
-    const index = indexes.find(
-      (i) =>
-        JSON.stringify(i.key) ===
-        JSON.stringify({ proposalId: 1, proposalOperationKey: 1 }),
-    );
-
-    expect(index?.sparse).toBe(true);
-  });
-
   // A marked revision is the lasting record of what a proposal changed, so it must never expire.
   it('has no TTL index on the revisions collection', async () => {
     const Revision = mongoose.model('Revision');
@@ -85,9 +71,6 @@ describe('Revision proposal mark fields', () => {
 
     const indexes = await Revision.collection.indexes();
 
-    expect(indexes.map((i) => i.name)).toContain(
-      'proposalId_1_proposalOperationKey_1',
-    );
     expect(
       indexes.filter((i) => i.expireAfterSeconds != null).map((i) => i.name),
     ).toEqual([]);

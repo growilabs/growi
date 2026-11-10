@@ -50,27 +50,9 @@ const logger = loggerFactory('growi:features:change-proposal:models');
 export const APPLY_LEASE_MS = 5 * 60 * 1000;
 export const LINKED_PROPOSALS_LIMIT = 50;
 
-// Only the indexed paths: Prisma does every read and write, while mongoose creates the
-// collection and its (partly sparse) indexes, which schema.prisma cannot express.
-// The model name is also the targetModel that notifications and activities populate.
-const schema = new Schema({
-  requester: { type: Schema.Types.ObjectId },
-  createdAt: { type: Date },
-  lifecycle: { type: String },
-  expiresAt: { type: Date },
-  applyLease: { expiresAt: { type: Date } },
-  lastAppliedAt: { type: Date },
-  revertOf: { type: Schema.Types.ObjectId },
-  basedOn: { proposalId: { type: Schema.Types.ObjectId } },
-});
-schema.index({ requester: 1, createdAt: -1 });
-schema.index({ lifecycle: 1, expiresAt: 1 });
-schema.index({ 'applyLease.expiresAt': 1 }, { sparse: true });
-schema.index({ lastAppliedAt: -1 }, { sparse: true });
-schema.index({ revertOf: 1 }, { sparse: true });
-schema.index({ 'basedOn.proposalId': 1 }, { sparse: true });
-
-getOrCreateModel('ChangeProposal', schema);
+// Prisma does every read and write. The mongoose model exists only so that
+// notifications and activities can populate it as their targetModel.
+getOrCreateModel('ChangeProposal', new Schema({}));
 
 // P2034 is the query engine giving up after repeated write conflicts; the caller did not write.
 const runConditionalWrite = async (

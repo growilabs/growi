@@ -20,18 +20,18 @@
   - _Requirements: 1.9, 8.1, 8.2, 8.3, 8.4, 8.9_
 - [x] 1.3 リビジョンに、作った Change Proposal の印の項目を足す
   - `@growi/core` の `interfaces/revision.ts` に、リビジョンの印の型 `IRevisionProposalMark`（`proposalId` と `proposalOperationKey`）を足し、リビジョンの型（`IRevision`）に同じ名前の任意の 2 項目を足して、changeset を作る。ページの型（`IPage`）は変えない。apps/app は `@growi/core` を `dist` から読むので、apps/app の型の検査と結合テストの前に `@growi/core` を build し直す
-  - Prisma の schema のリビジョンに同じ項目と、同じ名前の `@@index`（疎であることの注記つき）を足し、Prisma の client を生成し直す。Mongoose のリビジョンの schema にも項目と、値を持つ文書だけが入る疎な索引 `{ proposalId: 1, proposalOperationKey: 1 }` を宣言する（索引は Mongoose の schema が作る規則に従う）。ページの schema には項目を足さない
+  - Prisma の schema のリビジョンに同じ項目と、同じ名前の `@@index`（疎であることの注記つき）を足し、Prisma の client を生成し直す。Mongoose のリビジョンの schema には項目だけを足す。値を持つ文書だけが入る疎な索引 `{ proposalId: 1, proposalOperationKey: 1 }` は、1.4 の migration が作る（Mongoose の schema には索引を宣言しない）。ページの schema には項目を足さない
   - リビジョンを作るための入力を組み立てる処理が、任意の印（`IRevisionProposalMark`）を受け取ってリビジョンに入れる
   - Change Proposal の純関数のディレクトリに `toRevisionProposalMark`（1.1 の `ProposalMark` を `IRevisionProposalMark` に変える純関数）を作り、barrel から export する。`operationKey` が `proposalOperationKey` になり、ほかの項目が入らないことを単体テストで確かめる
   - 印を渡さずに作ったリビジョンには項目が無く、渡したときは値が保存されることを結合テストで確かめている。既存の「ページに TTL 索引が無い」テストも通る
   - _Requirements: 6.1, 6.2, 6.3, 6.6_
   - _Depends: 1.1_
-- [x] 1.4 Change Proposal のコレクションを Prisma で読み書きし、索引を Mongoose の schema で作る
-  - `schema.prisma` に、design の Physical Data Model の `changeproposals` の model と 4 つの composite type（操作、取り消しの相手、後続・見直しの元、lease）を足し、Prisma の client を生成し直す。依頼した人、入口の種類、表示用のモデル名（100 文字まで）、取り消しの元、後続・見直しの元（`basedOn`）、ページごとの通知の指定（`perPageNotifications`。初期値は真）、段階、操作の配列（操作ごとに並び順の番号と乱数の key）、反映で触れたページの一覧、最後に反映した日時、反映の権利（lease）、期限、作成日時と更新日時、`v`（`__v`）を持つ。6 つの索引（`basedOn.proposalId` を含む）を、Mongoose と同じ項目と名前の `@@index` で書き、疎な索引には注記を付ける
-  - `features/change-proposal/server/models/change-proposal.ts` に、索引に使う項目だけを持つ Mongoose の schema を置き、6 つの索引（4 つは疎）を宣言して `ChangeProposal` の名前で登録する（export しない）。TTL 索引は持たない
+- [x] 1.4 Change Proposal のコレクションを Prisma で読み書きし、索引を migration で作る
+  - `schema.prisma` に、design の Physical Data Model の `changeproposals` の model と 4 つの composite type（操作、取り消しの相手、後続・見直しの元、lease）を足し、Prisma の client を生成し直す。依頼した人、入口の種類、表示用のモデル名（100 文字まで）、取り消しの元、後続・見直しの元（`basedOn`）、ページごとの通知の指定（`perPageNotifications`。初期値は真）、段階、操作の配列（操作ごとに並び順の番号と乱数の key）、反映で触れたページの一覧、最後に反映した日時、反映の権利（lease）、期限、作成日時と更新日時、`v`（`__v`）を持つ。6 つの索引（`basedOn.proposalId` を含む）を、migration と同じ項目と名前の `@@index` で書き、疎な索引には注記を付ける
+  - migration `apps/app/src/migrations/20261110120000-add-change-proposal-indexes.js` に、`changeproposals` の 6 つの索引（4 つは疎）と `revisions` の疎な索引 `{ proposalId: 1, proposalOperationKey: 1 }` を `createIndex` で作る処理を置く。TTL 索引は持たない。`features/change-proposal/server/models/change-proposal.ts` には、項目も索引も持たない空の Mongoose の schema を `ChangeProposal` の名前で登録する（export しない。通知の `target` を読み込むため）
   - 同じファイルに Prisma の拡張を作り、design の ChangeProposal Model の表の関数（完了にする `settleIfNoPending`、完了の書き込みが止まった文書を探す `findIdsOpenWithoutPending`、つながりを読む `findLinkedProposals`、ページごとの通知の指定を変える `setPerPageNotifications` と読む `readPerPageNotifications` を含む）を、表のとおりの条件付きの `updateMany` と件数の確認で書く。期限切れと取り下げの更新と候補の検索は「待ち」があることを条件にする。composite type の list の条件 `some` / `none` が、生成された型で使えることを確かめる。`_id` と `__v` の互換の項目も宣言する。Prisma の行を `OperationRecord` の union に変える純関数 `toChangeProposalDocument` を作る。拡張を `utils/prisma.ts` の `createPrisma()` に登録する
   - `toChangeProposalDocument` の単体テストで、5 つの操作の種類の変換、`basedOn` と段階 `settled` の変換と、項目が欠けた行・知らない状態・段階・関係の値で例外になることを確かめている
-  - 実際の MongoDB に対する結合テスト（`.integ.ts`）で、保存と読み出し、操作の配列の 1 つの要素だけが条件付きで書き換わりほかの要素と本文が変わらないこと、同じ文書に対して同じ条件付きの更新（lease の取得、操作の結果の記録、期限切れ）を 10 個以上同時に呼ぶことを 20 回以上くり返し、毎回、成功が 1 つだけであること、条件付きの更新のあとで更新日時が新しくなること、lease の token が違う結果の記録が書けないこと、最後の 2 つの「待ち」を結果の記録と飛ばす処理で同時に「待ち」でなくしてそれぞれのあとで完了の更新を呼ぶことを 20 回以上くり返し毎回完了で終わること、「待ち」が無い文書が期限切れの更新で閉じられないこと、つながりの読み出しが元の ID で後続・見直しだけを返すこと、ページごとの通知の指定の変更が依頼した人の open の文書だけを書き換えることを確かめている。Mongoose のモデルの `init()` を待ってから、6 つの索引の名前と疎の指定（4 つが疎）があり、TTL 索引が無いことも確かめている
+  - 実際の MongoDB に対する結合テスト（`.integ.ts`）で、保存と読み出し、操作の配列の 1 つの要素だけが条件付きで書き換わりほかの要素と本文が変わらないこと、同じ文書に対して同じ条件付きの更新（lease の取得、操作の結果の記録、期限切れ）を 10 個以上同時に呼ぶことを 20 回以上くり返し、毎回、成功が 1 つだけであること、条件付きの更新のあとで更新日時が新しくなること、lease の token が違う結果の記録が書けないこと、最後の 2 つの「待ち」を結果の記録と飛ばす処理で同時に「待ち」でなくしてそれぞれのあとで完了の更新を呼ぶことを 20 回以上くり返し毎回完了で終わること、「待ち」が無い文書が期限切れの更新で閉じられないこと、つながりの読み出しが元の ID で後続・見直しだけを返すこと、ページごとの通知の指定の変更が依頼した人の open の文書だけを書き換えることを確かめている。migration を実行したあとで、6 つの索引の名前と疎の指定（4 つが疎）があり、TTL 索引が無いことも確かめている
   - _Requirements: 1.1, 1.15, 1.17, 2.6, 2.8, 2.9, 2.11, 6.5, 7.14, 13.1, 14.1_
   - _Depends: 1.1_
 - [x] 1.5 新しい activity の action と、通知の対象の種類を宣言する
