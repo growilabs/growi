@@ -116,7 +116,7 @@ test.describe
         .getByTestId('open-page-item-control-btn')
         .click();
       await page.getByTestId('open-page-template-modal-btn').click();
-      expect(page.getByTestId('page-template-modal')).toBeVisible();
+      await expect(page.getByTestId('page-template-modal')).toBeVisible();
 
       await page.getByTestId('template-button-children').click();
 
@@ -148,7 +148,7 @@ test.describe
         .getByTestId('open-page-item-control-btn')
         .click();
       await page.getByTestId('open-page-template-modal-btn').click();
-      expect(page.getByTestId('page-template-modal')).toBeVisible();
+      await expect(page.getByTestId('page-template-modal')).toBeVisible();
 
       await page.getByTestId('template-button-descendants').click();
 
