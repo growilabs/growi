@@ -33,7 +33,7 @@
 - `pages[]` の規則 (単位、`pageNumber` / `label` の付け方、空の要素を除き最低 1 要素を返すこと)
 - 対象 spec の requirements.md の Acceptance Criteria 1.1〜4.2 のすべて (番号もそのまま)
 - 対象 spec の design.md §Configuration の環境変数の名前と既定値。例外は次の 2 つ: `WORKERS` は uvicorn のワーカー数を指すので、Node 版では廃止する (ユーザー判断。design.md の D1。契約を崩すので research.md の 7 節に記録した)。`MAX_CHILD_RSS_MB` と `MAX_XLSX_CELLS` は、Node 版の計測で成り立たないと分かった場合に限り **下げてよい** (ユーザー判断。Req 11.11)
-- 書き出し済みの `packages/attachment-text-extractor-client/openapi.json` の型・名前・操作と、そこから orval が作る生成クライアント (`src/generated/`) の型・関数・引数。説明文 (`description`) だけは、Python 版に固有の言葉 (forkserver、None など) を取り除いて直す。そのため生成クライアントのコメントには差分が出るが、これは認める (ユーザー判断。Req 7)
+- `POST /extract` に渡す項目 (`file`、`mimeType`)、成功とエラーの応答の型、`ErrorCode` の値。OpenAPI の文書は経路の定義から作り、操作とスキーマの名前は作る道具の既定に従うので、`packages/attachment-text-extractor-client/openapi.json` と、そこから orval が作る生成クライアント (`src/generated/`) の関数名と型名は変わる。apps/app の呼び出し側は、名前と型の書き方だけを直す (ユーザー判断。Req 7)
 - 変換の出力は、Python 版と一字一句同じである必要はない (anydoc を使った結果として自然な出力ならよい)。検索の品質は、正解を付けた評価用の文書の集まり (ベンチマーク) で Python 版を下回らないことで守る (Req 2)
 
 ### 崩せない不変条件
@@ -64,7 +64,7 @@
 
 - **タイムアウトの順序**: 子プロセスの起動と停止にかかる時間が Python 版 (forkserver で約 29ms、停止と回収に最大約 4 秒) と変わる。最悪の合計 (本文の受信 15 秒 + 変換 55 秒 + 停止と回収) が apps/app の既定 `timeoutMs` 90000ms より短いことを、Node 版でも確かめる (Req 3)。
 - **サイズ・時間の上限の既定値**: Node 版の子プロセスは Python 版より RSS が大きい (1.5 の計測で 70,000 セルの XLSX が約 26MB 多い)。対象 spec の基準値 (7 万セルで 285MB、上限 320MB) にこの比率を当てはめると上限を超える見込みがあり、`MAX_CHILD_RSS_MB` か `MAX_XLSX_CELLS` の既定値を下げる必要が出るかもしれない。**ユーザーは、成り立たない場合に既定値を下げることを認めた** (Req 11.11)。下げた場合は Revalidation Trigger に当たる。`MAX_XLSX_CELLS` を下げると、検索の対象になる XLSX の範囲が狭くなる。下げた値、根拠の計測、範囲の変化を research.md と design.md の Revalidation Triggers に記録し、取り込みで対象 spec に反映し、完了の報告でユーザーに明示する。上げることと、メモリの予算 (2Gi) を超えることは認めない。
-- **OpenAPI の説明文**: commit 済みの `openapi.json` の説明文には Python 版の言葉 (`/readyz` の「forkserver」、`PageInfo` の「None」) が入っており、orval はこれを生成クライアントのコメントに写している。**ユーザーは説明文だけを直すことを決めた** (Req 7.1)。型は変わらないが、クライアントのコメントには差分が出る。apps/app のコードには影響しない。
+- **OpenAPI の文書の作り方**: Python 版は FastAPI がコードから文書を作っていた。Node 版も、経路の定義とその横に書いたスキーマから文書を作る。**ユーザーは、FastAPI が自動で付けた名前を守らず、仕組みを単純に保つことを決めた** (Req 7.1、7.6)。生成クライアントの関数名と型名、`file` の型の書き方が変わり、apps/app の呼び出し側をそれに合わせて直す。渡す項目の名前と応答の型は変わらない。
 - **health / readiness の応答**: `/readyz` の `dependencies` に出す名前 (`pypdfium2` / `charset-normalizer` など) はライブラリの名前なので、そのままでは残せない。OpenAPI の文書ではこの応答の形を決めていない (中身は `{}`) ため生成クライアントは変わらないが、名前は **決定: 実名** (ユーザー判断。design.md の D2)。Node 版が実際に使う部品の npm の package 名 (`@firecrawl/anydoc`、T1 で決まる PDF の部品の実名など) と `prlimit` を出し、Python 版の名前は出さない。内部のモジュールは `converter` の 1 つにまとめる。
 
 ## Problem
@@ -116,7 +116,7 @@
 - HTTP の契約の変更。ただしこれは既定の方針で、守るとかえって複雑になる場合は崩してよい (Req 1.9)
 - Python 版と Node 版の並行運用
 - Bun / Deno / Rust での実装 (Bun は挙動が不安定、Deno は仮想メモリ上限 5GB でも動かなかったため不採用)
-- 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) と apps/app の変更。既定では契約が同じなので要らない (生成クライアントの型・関数・引数が変わらないことは Req 7 で確かめる)。既定の方針を崩した場合だけ、その結果として要る変更を同じ作業に含める (Req 1.11)
+- 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) と apps/app の変更。生成クライアントの関数名と型名の変更に合わせる apps/app の呼び出し側の修正 (Req 7.4) のほかは、既定では契約が同じなので要らない。既定の方針を崩した場合だけ、その結果として要る変更を同じ作業に含める (Req 1.11)
 - 抽出サービスを apps/app のプロセスの中で動かすこと (対象 spec の判断を変えない)
 
 ## Port-back (対象 spec への取り込み) の前提
@@ -159,8 +159,8 @@ spec-lifecycle.md の手順 2 に従い、実装の途中では対象 spec の�
 - テスト用のファイルはすべて Node で作り直す (D5)。撤去の前に、Node で作ったファイルを Python 版のテストでも使えることを確かめる (Req 10.5)
 - `prlimit` で子プロセスを包んでよい。元の image に入っていることを、ビルド・CI・起動時の 3 か所で確かめる (Req 8.7、8.8、9.5)
 - `MAX_CHILD_RSS_MB` と `MAX_XLSX_CELLS` は、Node 版で成り立たなければ下げてよい。メモリの予算 (2Gi) は変えない (Req 11.11)
-- OpenAPI の説明文だけを直し、生成クライアントのコメントの差分を認める。型・名前・関数・引数は既定では変えない (Req 7)
-- 契約の維持 (Req 1、Req 7) は既定の方針とし、守ると apps/app や抽出サービスが複雑になるなら崩してよい。判断の基準はシンプルさ (保守性) で、判断するのはこの spec の作業者。不変条件は崩さない (Req 1.9〜1.13、7.6)
+- OpenAPI の文書は経路の定義から作る。FastAPI が自動で付けた名前は守らず、文書を作る仕組みを単純に保つ。生成クライアントの関数名と型名の変更と、apps/app の呼び出し側の修正を認める (Req 7)
+- 契約の維持 (Req 1) は既定の方針とし、守ると apps/app や抽出サービスが複雑になるなら崩してよい。判断の基準はシンプルさ (保守性) で、判断するのはこの spec の作業者。不変条件は崩さない (Req 1.9〜1.13)
 - 変換の出力は Python 版と一字一句同じでなくてよい。代わりに検索の品質のベンチマークで Python 版を下回らないことを確かめる (Req 2.7〜2.15)
 
 ### 未決 (決め方は requirements に書いてある)

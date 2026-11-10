@@ -26,7 +26,7 @@
 
 **技術名を要件に書いている理由**: 通常の requirements では、言語やフレームワークの名前は design に回す。この spec は実行基盤を Node.js + Hono + `@firecrawl/anydoc` に替えること自体が目的なので、これらの名前を要件 (主に Req 4) にそのまま書く。後のレビューでこれらを「実装の詳細」として取り除かないこと。一方、まだ決まっていない選択 (PDF のライブラリ、子プロセスの作り方、OpenAPI の作り方、配置) は要件では決めず、「何を測って、誰が決めるか」だけを Req 11 に書く。
 
-**契約の維持は「既定の方針」である**: Req 1 と Req 7 が求める契約の維持 (API・エラー・設定・OpenAPI・生成クライアントを変えないこと) は、書き換えの作業を単純にするために置いた既定の方針である。守ろうとすると apps/app や書き換えた後の抽出サービスが複雑になる場合は、Req 1.9〜1.13 の手続きに従って崩してよい。判断の基準は「シンプルさ (保守性) が上がるか」である。ただし Req 1.13 に挙げた不変条件 (セキュリティ上の性質、メモリの予算 2Gi、対応形式と位置情報つきの抽出) は崩さない。
+**契約の維持は「既定の方針」である**: Req 1 が求める契約の維持 (API・エラー・設定を変えないこと) は、書き換えの作業を単純にするために置いた既定の方針である。守ろうとすると apps/app や書き換えた後の抽出サービスが複雑になる場合は、Req 1.9〜1.13 の手続きに従って崩してよい。判断の基準は「シンプルさ (保守性) が上がるか」である。ただし Req 1.13 に挙げた不変条件 (セキュリティ上の性質、メモリの予算 2Gi、対応形式と位置情報つきの抽出) は崩さない。OpenAPI の文書と生成クライアントの名前は、維持の対象にしない。文書は経路の定義から作り、名前は作る道具の既定に従う (Req 7)。
 
 **検索の品質はベンチマークで守る**: Req 2 は、Python 版と一字一句同じ出力を求めない。代わりに、検索で見つかるべき語句と位置の正解を付けた評価用の文書の集まり (ベンチマーク) で、Node 版が Python 版を下回らないことを求める。
 
@@ -36,7 +36,7 @@
 
 - **In scope**:
   - 抽出サービスを Node 版として `apps/attachment-text-extractor/` に作り直し (src、tests、Dockerfile、`deploy/k8s/`、CLAUDE.md、scripts)、`services/attachment-text-extractor/` の Python 版を消すこと (置き場所は design.md の D4 でユーザーが決めた)
-  - OpenAPI の書き出し手順の置き換えと、書き出した文書がいまと同じであることの検査
+  - OpenAPI の文書を経路の定義から作る仕組みへの置き換え、書き出した文書と commit 済みの文書の食い違いの検査、名前の変更に伴う生成クライアントと apps/app の呼び出し側の修正
   - CI workflow と docker-compose のエントリの追従
   - 置き場所を `apps/` に移して pnpm workspace に入れることに伴う設定の変更 (lockfile、package ごとの turbo の設定、compose、CI の `paths`)
   - Python の資産の撤去
@@ -50,7 +50,7 @@
   - 抽出サービスを apps/app のプロセスの中で動かすこと
   - 性能や抽出の質を上げるための変更 (検索の品質を Python 版より下げないことは Req 2 で求める)
 - **Adjacent expectations**:
-  - 下流の apps/app は、`openapi.json` から orval で作った生成クライアントで `POST /extract` を呼ぶ。既定では、この spec は生成クライアントの型・関数・引数が変わらないことを保証する。契約を崩した場合は、生成クライアントと apps/app の呼び出し側を同じ作業で直す (Req 1.11)
+  - 下流の apps/app は、`openapi.json` から orval で作った生成クライアントで `POST /extract` を呼ぶ。この spec は、`POST /extract` に渡す項目の名前と応答の型、`ErrorCode` の値が変わらないことを保証する。生成クライアントの関数名と型名、渡す項目の型の書き方は変わるので、生成クライアントと apps/app の呼び出し側を同じ作業で直す (Req 7.2、7.4)
   - `@firecrawl/anydoc@0.2.4` が linux x64 / arm64 向けのビルド済みのネイティブ部品として npm から取れることを前提にする
   - Docker / Kubernetes の実行環境 (cgroup、seccomp、NetworkPolicy に対応した CNI) は対象 spec と同じものを前提にする
 
@@ -72,7 +72,7 @@
 6. The 抽出サービス (Node 版) shall 認証なしで呼べるパスを `/healthz`、`/readyz`、`/openapi.json` の 3 つだけにし、それ以外のパス (存在しないパスを含む) へのトークンのない要求には 401 `unauthorized` を返す
 7. When 1 件の `POST /extract` が終わる, the 抽出サービス (Node 版) shall 形式・大きさ・所要時間・結果・子プロセスの最大 RSS を 1 行のログに出し、ファイル名・ファイルの中身・Authorization ヘッダはログに出さない
 8. The 抽出サービス (Node 版) shall エラー応答の `message` にファイルの中身と内部の例外の文字列を含めない
-9. Where 1.1〜1.8 または Req 7.1〜7.4 の既定の方針を守ることで、apps/app または書き換えた後の抽出サービスが複雑になる, the 書き換え作業 shall その方針を崩してよい。崩すかどうかはこの spec の作業者が「シンプルさ (保守性) が上がるか」を基準に判断し、判断は 1.10 のとおり記録する
+9. Where 1.1〜1.8 の既定の方針を守ることで、apps/app または書き換えた後の抽出サービスが複雑になる, the 書き換え作業 shall その方針を崩してよい。崩すかどうかはこの spec の作業者が「シンプルさ (保守性) が上がるか」を基準に判断し、判断は 1.10 のとおり記録する
 10. When 既定の方針を崩すと判断する, the 書き換え作業 shall 崩す前に、(a) 何を崩すか、(b) それを守ると何がどう複雑になるか、(c) 崩した結果として要る下流の変更の範囲、を research.md に記録する
 11. When 既定の方針を崩す, the 書き換え作業 shall 崩した結果として要る下流の変更 (apps/app の抽出サービスのクライアントの呼び出し側、`packages/attachment-text-extractor-client` の `openapi.json` と生成クライアント、`attachment-search-indexing` などの下流 spec の記述) を同じ作業に含め、下流 spec を変える場合はその spec をこの spec の Amend target に加える
 12. When 既定の方針を崩す, the 書き換え作業 shall 崩した内容を design.md の Revalidation Triggers に書き、取り込み (Req 12) で対象 spec の AC と design.md を更新し (AC は番号を振り直さず文言を更新する。以前の文言や経緯は本文に残さない)、完了の報告でユーザーに明示する
@@ -164,18 +164,18 @@
 7. If いずれかのレビューで修正が必要な指摘が出る, the 書き換え作業 shall 指摘を直して同じレビューを通し直すまで次の段階に入らない
 8. The 書き換え作業 shall ベンチマークの作成と Python 版でのベースラインの計測 (Req 2.7〜2.11) を、6.1 の最初の段階 (テストの書き換え) より前か、それと同時に行い、実装の書き換え (6.1 の 3 番目の段階) に入る前に終える (Python 版が残っているうちに測る必要があるため)
 
-### Requirement 7: OpenAPI と生成クライアントの維持
+### Requirement 7: OpenAPI の文書と生成クライアント
 
-**Objective:** 下流の apps/app の開発者として、既定では、抽出サービスが書き換わっても生成クライアントの型・関数・引数が変わらないでほしい。なぜなら、下流を変えずに済ませれば書き換えの作業が単純になるから。ただし、守ることでかえって複雑になるなら崩してよい (7.6)。
+**Objective:** 抽出サービスと下流の apps/app の開発者として、OpenAPI の文書が経路の定義から自動で作られ、文書のための設定や書き写しを持たずに済んでほしい。なぜなら、文書を作る仕組みが単純で、書く設定が少ないほど、経路と文書が食い違いにくく、保守しやすいから。Python 版 (FastAPI) が自動で付けていた名前は守らない。
 
 #### Acceptance Criteria
 
-1. The 抽出サービス (Node 版) shall `GET /openapi.json` と書き出しの手順で、いまの `packages/attachment-text-extractor-client/openapi.json` と同じ型・同じ名前・同じ操作を持つ文書を出力する (`operationId` の `post_extract_extract_post`、スキーマ名の `Body_post_extract_extract_post`、`title` の `Pagenumber` のように、FastAPI が自動で付けた名前も含めて同じにする)。説明文 (`description`) だけは、Python 版に固有の言葉 (`/readyz` の説明の「forkserver」「fork」、`PageInfo` の説明の「None」など) を取り除いて Node 版に合う文に直す
-2. When 書き換えの後に orval で生成クライアントを作り直す, the 生成クライアント shall `packages/attachment-text-extractor-client/src/generated/` の型・関数・引数に差分を出さない (7.1 で直した説明文から作られるコメントの差分だけは認める)
+1. The 抽出サービス (Node 版) shall `GET /openapi.json` と書き出しの手順で出す OpenAPI の文書を、経路の定義と、その横に書いたスキーマから作る。文書そのものを手で書いたファイルとして持たない。操作の名前 (`operationId`) とスキーマの名前は、文書を作る道具の既定に従う。操作 (`POST /extract`、`GET /healthz`、`GET /readyz`)、`POST /extract` に渡す項目 (`file` は必須、`mimeType` は任意)、`POST /extract` の成功とエラーの応答の項目と型、`ErrorCode` の 8 つの値は、Python 版の文書から変えない
+2. When 書き換えの後に orval で生成クライアントを作り直す, the 生成クライアント shall `POST /extract` に渡す項目の名前と必須かどうか、成功とエラーの応答の型、`ErrorCode` の値を、作り直す前と同じに保つ。関数名と型名が変わること、渡す項目の型の書き方が変わること (`file` が文字列からバイナリになるなど) は認める
 3. The CI shall 抽出サービスが出力する OpenAPI の文書と、commit 済みの `openapi.json` が JSON として食い違ったら失敗する (いまの drift 検知と同じ働きを保つ)
-4. The 書き換え作業 shall 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) と apps/app のファイルを変更しない。`packages/attachment-text-extractor-client/` の中で変えてよいのは、7.1 の説明文の修正を反映した `openapi.json` と、作り直した生成クライアントのコメントだけとする
-5. When 説明文を直す, the 書き換え作業 shall 直した説明文ごとに直す前と直した後の文を research.md に記録する
-6. Where 7.1、7.2、7.4 の既定の方針 (たとえば FastAPI が自動で付けた名前を Hono で同じに作ること) を守ることで、apps/app または抽出サービスが複雑になる, the 書き換え作業 shall Req 1.9〜1.12 と同じ手続きでその方針を崩してよい。崩した場合も 7.3 の drift 検知は保つ
+4. The 書き換え作業 shall 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) を変更しない。apps/app で変えてよいのは、生成クライアントの関数名と型名の変更に合わせる呼び出し側 (`attachment-text-extractor.ts` とそのテスト) の、名前の置き換えと、項目の型の変更 (`file` の型) に合わせる型の書き方の修正だけとし、実行時の振る舞いは変えない。`packages/attachment-text-extractor-client/` の中で変えてよいのは、`openapi.json` と、作り直した生成クライアントだけとする
+5. When 生成クライアントの関数名と型名が変わる, the 書き換え作業 shall 変わる前と変わった後の名前の対応を research.md に記録する
+6. The 文書を作る仕組み shall Python 版の名前や並び順に合わせるための指定と、作った文書を後から書き換える処理を持たない。文書のためだけに書く設定は、文書の題名・説明・版にとどめる
 
 ### Requirement 8: 配備物
 
@@ -228,7 +228,7 @@
 4. The 子プロセスの作り方の選定 (Node の `fork` か、`prlimit` で包んだ `spawn` か、その他) shall 子の起動にかかる時間、仮想メモリ上限・CPU 時間上限・コアダンプの禁止・`oom_score_adj` を掛けられるか、親が先に終わったときに子が残らないか、を比べた結果に基づく
 5. The 仮想メモリの上限 (`RLIMIT_AS`) の扱い shall Node と使うライブラリが必要とする仮想メモリの実測 (何もしない状態で 1,200MB、anydoc の XLSX で 2,000MB、PDFium WASM で 3,000MB 以上という調べ) を確かめ直し、上限を緩める値と、緩めた分を補う守り (RSS の監視など) を決めた結果に基づく
 6. The 本文の受け取りと切断の検知の方法 shall Hono と `@hono/node-server` で、枠を取る前の `Content-Length` の検査、メモリだけでの受け取り、実際に届いたバイト数での上限、切断による変換の停止が、Req 3.1〜3.5 のとおりに働くことを試作で確かめた結果に基づく
-7. The OpenAPI の作り方の選定 shall Req 7.1〜7.3 を満たせるかどうかと、満たすためにどれだけ複雑になるか (Req 7.6 で崩すかどうかの判断材料。コードから作る方法と、commit 済みの文書を正とする方法の両方を含む) を確かめた結果に基づく
+7. The OpenAPI の作り方の選定 shall Req 7.1〜7.3 を満たせるかどうかと、仕組みがどれだけ単純か (Req 7.6。コードから作る方法と、commit 済みの文書を正とする方法の両方を含む) を、試作で確かめた結果に基づく
 8. The 配置の選定 (`services/attachment-text-extractor/` を pnpm workspace に入れるか、外に置くか) shall turbo の build / test / lint への影響、CI の時間、`pnpm install` と lockfile への影響、Docker のビルドのしやすさを比べた結果に基づく (対象 spec が workspace の外に置いた理由は Python に固有のものだったので、そのままでは根拠にしない)
 9. When design フェーズで次の未決の項目を扱う, the 書き換え作業 shall 選択肢ごとの利点と欠点 (計測できるものは計測の結果) を design.md に示し、ユーザーの判断を受けてから design の承認を求める: `WORKERS` の Node での意味 (無視する、Node の cluster の数にする、廃止する)、`/readyz` の `dependencies` に出す名前、FastAPI が既定で出している `/docs` と `/redoc` (どちらも認証が要る) を残すかどうか、11.8 の比較に基づく配置の選択
 10. If 計測の結果、Req 1.13 の不変条件、または Req 1.9 で崩すと判断していない対象 spec の AC を Node 版で満たせないことが分かる, the 書き換え作業 shall 書き換えを先に進めず、満たせない AC と理由をユーザーに示して判断を受ける

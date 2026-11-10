@@ -223,11 +223,15 @@
   - **この層の実装に入る前に**、16.9 の HTTP の層の 9 通り (研究記録 22.8 の 3: 405 → 404、307 → 404、`Expect: foo` の 417、`Host` なしの 400、末尾の空白の `Authorization` の 200) について、7 節に記録して崩すか、Python 版に合わせるかを決める。崩すなら Req 1.10 のとおり実装の前に 7 節に記録する。Python 版に合わせるなら 4.4 の `multipart-raw.integ.ts` の `NODE_ANSWERS` の y の行を消す
   - 4.4 のうち HTTP の層のテストが通る (黒箱のテストは 6.9 で通る)
   - _Requirements: 1.2, 1.3, 1.6, 1.7, 1.8, 3.1, 3.2, 3.3, 5.5, 11.9_
-- [ ] 6.9 組み立てと OpenAPI の書き出しを実装する
-  - 設定 → 実行管理 → アプリ → 待ち受けを 1 か所で組み立てる。OpenAPI の書き出しの手順を作る
-  - 撤去 (8.2) までは、Node 版が出す文書と commit 済みの `openapi.json` を、説明文を除いて JSON として比べるテストが通る
+- [ ] 6.9 組み立てと、経路の定義から作る OpenAPI の文書を実装する
+  - 設定 → 実行管理 → アプリ → 待ち受けを 1 か所で組み立てる
+  - OpenAPI の文書を、経路の定義とその横に書いたスキーマから作る形に替える (`hono-openapi` と `zod`。research.md 17.13)。手で持つ `src/http/openapi.json` を消す。名前を合わせる指定と、作った文書を後から書き換える処理を書かない。文書のためだけの設定は題名・説明・版だけにする (7.6)。`/extract` の本文を先に読む検査の部品は付けない。変換の層と子プロセスは、文書を作る部品を読み込まない
+  - スキーマとコードの定義を 1 つにする: `ErrorCode` の値は `contract/` の `ERROR_CODES` から、`/extract` のエラーのステータスはエラー表から作り、同じ内容を 2 か所に書かない。`/healthz` と `/readyz` は、ハンドラーの戻り値の型を文書のスキーマと照合する書き方にする
+  - 書き出しの手順 (`scripts/export-openapi.ts`) と、2 つの文書を JSON として比べる関数 (`scripts/check-openapi-drift.ts`) を作る。撤去 (8.2) までは commit 済みの文書が Python 版のものなので、Node 版の文書とは比べない
+  - 6.8 までに書いた OpenAPI のテスト (手で持つ文書を前提にしたもの) を、新しい形に合わせて書き直す: 書き出しの手順が `GET /openapi.json` と同じ文書を書くこと、比べる関数が食い違いを見つけること、`POST /extract` の実際の応答 (成功と各エラー) が文書のスキーマに合うこと (`ajv`。`/extract` は応答を自分で組み立てるので、型の照合が効かない)、文書から orval で作ったクライアントで `POST /extract` に渡す項目の名前と必須かどうか、応答の型、`ErrorCode` の値が変わらないこと (7.2)。「経路の一覧が文書と一致する」など、仕組みの上で食い違わなくなった検査は消す。書き直したテストは、実装とは別の担当がレビューする
+  - 生成クライアントの関数名と型名の、変わる前と後の対応を research.md に書く (7.5)
   - 4.4 の黒箱のテストがすべて通る。Node 版をローカルで起動し、PDF と DOCX の `POST /extract` が 200 を返す
-  - _Requirements: 4.3, 7.1, 7.3_
+  - _Requirements: 4.3, 7.1, 7.2, 7.3, 7.5, 7.6_
 - [ ] 6.10 層の依存の向きを機械的に確かめる
   - 変換の層と子の入口が、実行管理の層と HTTP の層を import しないこと、実行管理の層が HTTP の層と変換の層を import しないこと、HTTP の層が変換の層を import しないことを、lint の規則か依存を調べるテストで確かめる
   - 逆向きの import を 1 つ足すと検査が失敗し、元に戻すと通る
@@ -240,7 +244,7 @@
   - 4.5 のテストが通る (compose のテストは 8.2 で通る)
   - _Requirements: 8.1, 8.3, 8.5, 8.6, 8.7_
 - [ ] 6.12 Node 版の CI のジョブに image の確認を足す
-  - image のビルド、大きさが 400MB 以下であることの検査、read-only rootfs・uid 10001・ネットワークなしでの起動、コンテナの中での `/readyz` の確認と PDF / DOCX の `POST /extract`、本番と同じ条件での `prlimit` の実行、OpenAPI の比較 (説明文を除く) を足す
+  - image のビルド、大きさが 400MB 以下であることの検査、read-only rootfs・uid 10001・ネットワークなしでの起動、コンテナの中での `/readyz` の確認と PDF / DOCX の `POST /extract`、本番と同じ条件での `prlimit` の実行、コンテナの `/openapi.json` が書き出しの手順の文書と同じであることの確認を足す
   - 最も重い負荷での 2Gi の確認 (3.7 の決定 (A) の実測の裏づけ。research.md 20.10 / 20.12): (A) の形 (応答を少しずつ書き、結果を一括の入れ物で受け取る) の本物の親で、本番の image の中で、S1 (制御文字だけの 5.5MB の TXT。結果は JSON で約 33MB を 3 件同時に 3 回続けて送る) と S2 (S1 の TXT と、上限まで伸びて止められる 8MiB の CSV を交互に 4 回送る) を、各 3 回以上測る。コンテナの cgroup の `memory.current` の増え方に待機時を足した値が 2Gi (2,048MiB) に収まり、Python 版の実測 (1,230MiB) と同じ程度であることを確かめ、値を research.md に記録する。収まらなければ、3.7 の決定をユーザーに諮り直す。あわせて 3.7 の基準のファイル (7 万セル 1 シートの XLSX、画像 12 枚の 48MB の DOCX) の子の最大 RSS を image の中で測り直し、`MAX_CHILD_RSS_MB` 320 の 0.95 倍 (304MB) 以内であることを確かめる (超えたら research.md 20 節の下げる値 (XLSX は 65,000 セル) を適用し、DOCX が超えたらユーザーに諮る)
   - ローカルの docker で同じ手順が成功する
   - _Requirements: 8.1, 8.2, 9.1, 9.5, 11.2_
@@ -272,8 +276,8 @@
   - _Depends: 2.5, 2.9, 4.6, 6.14, 7.1_
 - [ ] 8.2 撤去と切り替えを 1 つの変更として行う
   - compose の build の `context` を Node 版に切り替え (リポジトリのルートを `context` にし、`dockerfile` を `apps/attachment-text-extractor/docker/Dockerfile` にする。research.md 23.7)、`WORKERS` を消し、healthcheck を `node` で `/readyz` を見る形に切り替える (`python`・`curl`・`wget` は slim の image に無い。`timeout` は 15 秒以上。research.md 23.7)。CI の `paths` を切り替え、Python 版のジョブを消す。`services/attachment-text-extractor/` をディレクトリごと消す
-  - OpenAPI の説明文から Python に固有の言葉を取り除き、orval で生成クライアントを作り直す。直した説明文ごとに直す前と後の文を research.md に書く。CI の OpenAPI の比較を、説明文も含めた完全な比較に切り替える
-  - 生成クライアントの差分がコメントだけであること、apps/app と下流 spec のファイルに変更が無いこと、`services/attachment-text-extractor/` が無く、`apps/attachment-text-extractor/` の下と抽出サービスの CI workflow に `.py` のファイルと uv / ruff / pytest / poe を使う記述が無いことを確かめる (`.kiro/` と steering の古い記述は 9.4 で扱うので、ここでは確かめない)
+  - commit 済みの `packages/attachment-text-extractor-client/openapi.json` を、Node 版が書き出した文書に置き換え、orval で生成クライアントを作り直す。apps/app の呼び出し側 (`attachment-text-extractor.ts` とそのテスト) の関数名と型名を置き換え、`file` の型の書き方 (いまは `Buffer` を `string` と偽っている) を新しい型に合わせる (実行時の振る舞いは変えない。axios に渡る値が変わらないことをテストで確かめる)。Node 版の CI で、Node 版が書き出す文書と commit 済みの文書の完全な比較を動かし始める
+  - 生成クライアントの `POST /extract` に渡す項目・応答の型・`ErrorCode` の値が変わっていないこと、apps/app の変更が呼び出し側の名前と型の書き方の修正だけであること、下流 spec のファイルに変更が無いこと、`services/attachment-text-extractor/` が無く、`apps/attachment-text-extractor/` の下と抽出サービスの CI workflow に `.py` のファイルと uv / ruff / pytest / poe を使う記述が無いことを確かめる (`.kiro/` と steering の古い記述は 9.4 で扱うので、ここでは確かめない)
   - 4.5 の compose のテストを含むすべてのテストが通り、`turbo run lint test --filter @growi/attachment-text-extractor` と生成クライアントの package の lint / build が通る
   - _Requirements: 4.6, 7.1, 7.2, 7.3, 7.4, 7.5, 8.4, 9.1, 9.2, 10.1, 10.2, 10.3_
 - [ ] 8.3 配布物と CI を、CI でできる確認と人の確認に分けて確かめる

@@ -35,7 +35,7 @@
 - 検索の品質のベンチマークで、すべての形式とすべての指標が Python 版のベースラインを下回らない (2.7〜2.15)
 - 凝集度の高い層に分ける。1 ファイル 1 責務で、層の依存は一方向にする (Req 5)
 - 進め方の順序 (ベンチマーク → テスト → テストのレビュー → 実装 → 実装のレビュー) を守る (Req 6)
-- 守ると複雑になる契約は、手続きを踏んで崩し、記録する (1.9〜1.13、7.6)
+- 守ると複雑になる契約は、手続きを踏んで崩し、記録する (1.9〜1.13)
 
 ### Non-Goals
 
@@ -51,7 +51,7 @@
 
 **変わる契約**: 実行基盤の言語とフレームワーク (Python 3.12 + FastAPI + Uvicorn → Node.js + Hono)、anydoc の入手先 (PyPI → npm、版は 0.2.4 のまま)、PDF とテキスト系の部品、配置とツールチェーン、Dockerfile、CI、配備物の中身、OpenAPI の書き出し手順、子プロセスの作り方と上限の掛け方、設計の根拠。
 
-**既定では変えない契約 (複雑になるなら崩してよい)**: HTTP の API (`POST /extract`、`GET /healthz`、`GET /readyz`、`GET /openapi.json`)、`ErrorCode` の 8 つの値と、対象 spec の design.md §Error Handling の表、`pages[]` の規則、対象 spec の AC 1.1〜4.2 (番号もそのまま)、§Configuration の環境変数の名前と既定値、`openapi.json` の型・名前・操作と生成クライアントの型・関数・引数。崩すときの手続きは 1.9〜1.12 と 7.6、記録の場所は research.md の「7. 崩した契約」(崩したときに作る)。
+**既定では変えない契約 (複雑になるなら崩してよい)**: HTTP の API (`POST /extract`、`GET /healthz`、`GET /readyz`、`GET /openapi.json`)、`ErrorCode` の 8 つの値と、対象 spec の design.md §Error Handling の表、`pages[]` の規則、対象 spec の AC 1.1〜4.2 (番号もそのまま)、§Configuration の環境変数の名前と既定値、`POST /extract` に渡す項目と応答の型。崩すときの手続きは 1.9〜1.12、記録の場所は research.md の「7. 崩した契約」(崩したときに作る)。
 
 **崩せない不変条件 (1.13)**: 認証、サービスのトークンを子プロセスに渡さないこと、子プロセスでの隔離、ファイルの中身や入力を返さないエラー応答とログ、メモリの予算 2Gi、対応形式、位置情報つきの抽出。
 
@@ -59,7 +59,7 @@
 - `WORKERS` を廃止し (D1)、`/docs` と `/redoc` を出さない (D3)。どちらも既定の方針を崩すもので、1.10 の記録は research.md の 7 節にある
 - 置き場所を `apps/attachment-text-extractor/` に移し、pnpm workspace に入れる (D4)
 - テスト用のファイルはすべて Node で作り直す (D5)
-- OpenAPI の説明文だけは、Python に固有の言葉 (forkserver、fork、None など) を取り除いて直す。生成クライアントのコメントの差分は認める (7.1、7.2)
+- OpenAPI の文書は経路の定義から作り、操作とスキーマの名前は作る道具の既定に従う。Python 版 (FastAPI) が自動で付けた名前は守らない。生成クライアントの関数名と型名、`file` の型の書き方が変わり、apps/app の呼び出し側をそれに合わせて直す (7.1、7.2、7.4。ユーザー判断、2026-11-10。記録は research.md の 7.7)
 - `MAX_CHILD_RSS_MB` と `MAX_XLSX_CELLS` は、Node 版で成り立たなければ下げてよい (11.11)
 - 対象 spec の AC 1.7 (外部バイナリを要求しない) について、util-linux の標準コマンド `prlimit` は追加の外部バイナリに当たらない (4.8)
 
@@ -72,21 +72,21 @@
 - `apps/attachment-text-extractor/` の中のすべて (D4): Node 版のソースとテスト、Dockerfile、`deploy/k8s/` の例、サービスの CLAUDE.md、ベンチマーク
 - Python 版の撤去 (Req 10)
 - `.github/workflows/attachment-text-extractor.yml` の置き換えと、`infra/docker/compose.yaml` のエントリの追従
-- OpenAPI の文書の作り方と書き出し、`packages/attachment-text-extractor-client/openapi.json` の説明文の修正と、それに伴う生成クライアントのコメントの再生成
+- OpenAPI の文書の作り方と書き出し、`packages/attachment-text-extractor-client/openapi.json` の置き換えと生成クライアントの再生成、それに伴う apps/app の呼び出し側 (`apps/app/src/features/search-attachments/server/services/attachment-text-extractor.ts` とそのテスト) の名前と型の書き方の修正 (7.4)
 - 配置 (D4) に伴う `pnpm-lock.yaml` の変更と `apps/attachment-text-extractor/turbo.json` の追加 (`pnpm-workspace.yaml`、ルートの `turbo.json`、`vitest.workspace.mts` は変えない見込み)
 - 既定の方針を崩した場合に限り、その結果として要る下流の変更 (1.11)
 
 ### Out of Boundary
 
-- apps/app のコード、`attachment-search-indexing` / `attachment-search-ui` の spec (既定では変えない。崩した場合だけ 1.11 の範囲で扱う)
-- `packages/attachment-text-extractor-client` の orval の設定 (`orval.config.js`) と、生成物を使う側
+- apps/app のコード (7.4 の呼び出し側の修正を除く)、`attachment-search-indexing` / `attachment-search-ui` の spec (既定では変えない。崩した場合だけ 1.11 の範囲で扱う)
+- `packages/attachment-text-extractor-client` の orval の設定 (`orval.config.js`)
 - 本番の k8s への適用と運用 (本 spec は例を提供する)
 - steering と root の `AGENTS.md` の書き換え (brief.md の Follow-ups。取り込みのときにユーザーが範囲を決める)
 
 ### Allowed Dependencies
 
 - 実行環境: Node.js 24 (ルートの `engines.node` と、`apps/pdf-converter` の `node:24-slim` に合わせる)
-- 本番の依存: `hono`、`@hono/node-server`、`@firecrawl/anydoc` (=0.2.4)、PDF の部品 1 つ (T1 で選ぶ)、テキスト系の部品 (HTML の解析、文字コードの判定とデコード、ZIP の読み書き、安全な XML の解析。T6 で選ぶ)、OpenAPI の作り方によってはその部品 (T5)。いずれも MIT / Apache-2.0 / BSD / ISC のもの (4.4)。選ぶときに npm の `license` と、同梱されたネイティブ部品のライセンスを確かめる
+- 本番の依存: `hono`、`@hono/node-server`、`@firecrawl/anydoc` (=0.2.4)、PDF の部品 1 つ (T1 で選ぶ)、テキスト系の部品 (HTML の解析、文字コードの判定とデコード、ZIP の読み書き、安全な XML の解析。T6 で選ぶ)、OpenAPI の文書を経路の定義から作る部品 (`hono-openapi` と、スキーマを書く `zod`。T5)。いずれも MIT / Apache-2.0 / BSD / ISC のもの (4.4)。選ぶときに npm の `license` と、同梱されたネイティブ部品のライセンスを確かめる
 - OS のコマンド: util-linux の `prlimit` だけ (4.8)
 - テスト専用 (本番の image に入れない): vitest、`vitest-mock-extended`、テスト用のファイルを作る部品 (T7 で選ぶ。許容的なライセンスのもの)、ベンチマークの日本語の PDF を作る Chromium (`playwright-core` で、ルートの `@playwright/test` と同じ版の Chromium を動かす。Puppeteer は `pnpm-workspace.yaml` の `allowBuilds` で無効なため使わない。research.md 11.2) と、再配布できるフォント (BIZ UDゴシック、SIL OFL 1.1。Noto Sans JP は Chromium が Type3 で書き出すため採らなかった。research.md 11.3)
 - 使わないもの: Python と Python の実行環境 (4.6)、Bun / Deno (4.7)、LGPL / GPL / AGPL の部品、anydoc の `hosted` の OCR (4.5)、外向き通信、共有メモリ `/dev/shm` (8.6)
@@ -102,7 +102,7 @@
   - **`WORKERS` の廃止 (D1)**: compose と k8s の例から `WORKERS` を消す。運用者が `WORKERS` を設定していても無視される (起動は失敗しない)。2 以上を設定していた運用者は、同時実行の全体の上限が「ワーカー数 × `MAX_CONCURRENCY`」から `MAX_CONCURRENCY` だけに変わるので、必要なら `MAX_CONCURRENCY` を上げるか Pod を増やす。apps/app のコードと生成クライアントには影響しない
   - **`/readyz` の `dependencies` の名前の変更 (D2)**: キーが Node 版の部品の実名と `prlimit` に変わり、`pypdfium2` と `charset-normalizer` は出なくなる。運用者が curl などで本文を見たときの表示が変わる。k8s と compose の health の確認は HTTP のステータスだけを見て本文を見ないので影響しない。OpenAPI のスキーマは `{}` なので、生成クライアントにも影響しない
   - **`/docs` と `/redoc` の廃止 (D3)**: この 2 つのパスは 401 (トークンなし) か 404 (トークンあり) になる。apps/app は使っていない。生成クライアントには影響しない
-- **OpenAPI の説明文の修正**: 生成クライアントのコメントだけが変わる。型が変わらないので apps/app の見直しは要らない
+- **生成クライアントの名前の変更 (7.1、7.2)**: OpenAPI の文書を経路の定義から作るので、操作とスキーマの名前が変わり、生成クライアントの関数名と型名が変わる (`postExtractExtractPost` → `postExtract` など。対応は research.md の 7.7)。`file` の型は `string` から `Blob` に変わる (いまの apps/app は `Buffer` を `string` と偽って渡している)。`POST /extract` に渡す項目の名前、応答の型、`ErrorCode` の値は変わらない。apps/app の呼び出し側は、名前と型の書き方の修正だけを撤去と同じ変更で行い、実行時の振る舞いは変えない。以後、経路の定義やスキーマを変えると文書と生成クライアントが変わるので、変えたときは生成クライアントを作り直し、apps/app の呼び出し側を見直す
 
 ## Architecture
 
@@ -193,7 +193,7 @@ RSS の読み取り、`oom_score_adj` の設定、`prlimit` の引数の組み�
 | PDF | 未決 (`@hyzyla/pdfium`、pdfjs-dist、pdfium-native など) | 変換 | T1 で決める |
 | テキスト系の部品 | 未決 | HTML の解析、文字コードの判定、ZIP、XML | T6 で決める |
 | 子プロセス | `child_process.spawn` + `prlimit` (候補) | 隔離と上限 | T2 で決める |
-| OpenAPI | 未決 | 契約の文書 | T5 で決める |
+| OpenAPI | `hono-openapi` 1.x + `zod` 4.x | 経路の定義から契約の文書を作る | 決定 (T5、7.1、7.6。research.md 17.13) |
 | テスト | vitest、`vitest-mock-extended` | テスト | 決定 (testing.md) |
 | lint / 整形 | biome (ルートの `biome.json`) | 品質 | 決定 |
 | image | `node:24-slim` を元にした multi-stage | 配備 | 決定 (8.1)。大きさは未計測 |
@@ -206,7 +206,7 @@ RSS の読み取り、`oom_score_adj` の設定、`prlimit` の引数の組み�
 
 ```
 apps/attachment-text-extractor/
-├── package.json                  # name @growi/attachment-text-extractor, private, scripts (dev/build/lint/test/export-openapi/benchmark)
+├── package.json                  # name @growi/attachment-text-extractor, private, scripts (dev/build/lint/test/benchmark)
 ├── tsconfig.json
 ├── vitest.config.ts
 ├── turbo.json                    # follows apps/pdf-converter/turbo.json
@@ -214,7 +214,8 @@ apps/attachment-text-extractor/
 ├── CLAUDE.md                     # service-local instructions, rewritten for Node
 ├── deploy/k8s/                   # deployment / service / hpa / networkpolicy examples (8.5)
 ├── scripts/
-│   └── export-openapi.ts         # writes the OpenAPI document for packages/attachment-text-extractor-client (7.1)
+│   ├── export-openapi.ts         # writes the document generated from the routes, for packages/attachment-text-extractor-client (7.1)
+│   └── check-openapi-drift.ts    # compares a generated document with the committed one (7.3)
 ├── benchmark/                    # search-quality benchmark (2.7–2.15); see "Benchmark"
 │   ├── corpus/                   # generated documents readable by both the Python and the Node service (D5)
 │   ├── generate-corpus.ts        # builds the corpus, including Japanese PDFs via Chromium + BIZ UDゴシック
@@ -281,7 +282,8 @@ apps/attachment-text-extractor/
         ├── extract-route.ts      # slot -> receive -> runner.run(signal) -> response
         ├── error-table.ts        # Record<FailureKind, {code, status}> (5.5)
         ├── health-routes.ts      # /healthz, /readyz
-        ├── openapi-route.ts      # /openapi.json (T5)
+        ├── api-schemas.ts        # zod schemas of the request and the responses, written next to the routes (7.1)
+        ├── openapi-route.ts      # /openapi.json, generated from the routes (T5)
         └── request-log.ts        # one line per request, no file name / content / auth header (1.7)
 ```
 
@@ -291,7 +293,8 @@ apps/attachment-text-extractor/
 
 - `.github/workflows/attachment-text-extractor.yml` — Node 版の lint・型の検査・テスト・image の確認・OpenAPI の drift 検知に置き換える (Req 9)
 - `infra/docker/compose.yaml` — build の `context` を `apps/attachment-text-extractor` に変え、`WORKERS` を消す (8.4、D1、D4)
-- `packages/attachment-text-extractor-client/openapi.json` と `src/generated/index.ts` — 説明文の修正と再生成 (7.1、7.2)
+- `packages/attachment-text-extractor-client/openapi.json` と `src/generated/index.ts` — Node 版が書き出した文書への置き換えと再生成 (7.1、7.2)
+- `apps/app/src/features/search-attachments/server/services/attachment-text-extractor.ts` とそのテスト — 生成クライアントの関数名と型名の置き換えと、`file` の型の書き方の修正だけ (7.4)
 - `pnpm-lock.yaml` — 新しい package の依存 (D4)
 - Python 版の撤去 (Req 10): `services/attachment-text-extractor/` をディレクトリごと消す (`services/` に他のものが無ければ `services/` も消える)
 
@@ -379,9 +382,9 @@ graph LR
 
 - 段階 0 から撤去まで、Python 版はいまの場所にそのまま残し、いまの Python 用の CI もそのまま動かす。比較 (2.1、2.2)、ベースライン (2.11)、黒箱のテストの確認 (6.3) に使うためである。Python 版のコードは直さない (直すと比べる相手が変わる)
 - Node 版は最初から `apps/attachment-text-extractor/` で作る (D4)。Python 版は `services/attachment-text-extractor/` に残るので、作業の間は 2 つが別の場所に並ぶ。compose の `context` は、撤去のときまで Python 版を指したままにする (配布物を途中で切り替えない)
-- 撤去の手順: (1) compose の `context` と CI の `paths` を Node 版に切り替える、(2) `services/attachment-text-extractor/` をディレクトリごと消す、(3) Python 用の CI のジョブを消す、(4) OpenAPI の説明文を直して生成クライアントを作り直す (下の項目)。これを 1 つの変更にまとめる
+- 撤去の手順: (1) compose の `context` と CI の `paths` を Node 版に切り替える、(2) `services/attachment-text-extractor/` をディレクトリごと消す、(3) Python 用の CI のジョブを消す、(4) commit 済みの OpenAPI の文書を Node 版が書き出したものに置き換え、生成クライアントを作り直し、apps/app の呼び出し側を直す (下の項目)。これを 1 つの変更にまとめる
 - Node 版の CI は、作業の間は Python 用の workflow とは別のファイル (`.github/workflows/ci-attachment-text-extractor.yml`) として足す。Python 版のテスト (`tests/test_ci_workflow.py`) が「Python 用の workflow のジョブは 1 つだけ」を前提にしているため、同じファイルには足せない。撤去のときに Python 用の workflow (`attachment-text-extractor.yml`) を消し、Node 用の workflow に image の確認と OpenAPI の drift 検知のジョブを足す (9.1)
-- **OpenAPI の説明文の修正は、撤去と同じ変更で行う**。いまの Python 用の CI は、Python 版が書き出す文書と commit 済みの `openapi.json` を JSON として完全に比べている。作業の途中で説明文だけを直すと、Python 版の文書 (「forkserver」「None」を含む) と合わなくなり、Python 用の CI が失敗する。また `attachment-search-indexing` の CI は orval で作り直した `src/generated/` の差分を `git diff --exit-code` で見ているので、作り直したコメントも同じ変更に入れる必要がある。そのため、(1) 説明文の修正、(2) orval での生成クライアントの作り直し、(3) Node 版の drift 検知を「完全に同じ」比べ方に切り替えること、(4) Python 用の CI の撤去、の 4 つを 1 つの変更にまとめる。それまでの間、Node 版の OpenAPI のテストは説明文 (`description`) を除いて比べる
+- **commit 済みの OpenAPI の文書の置き換えは、撤去と同じ変更で行う**。いまの Python 用の CI は、Python 版が書き出す文書と commit 済みの `openapi.json` を JSON として完全に比べている。作業の途中で commit 済みの文書を Node 版のものに置き換えると、Python 版の文書と合わなくなり、Python 用の CI が失敗する。また `attachment-search-indexing` の CI は orval で作り直した `src/generated/` の差分を `git diff --exit-code` で見ており、apps/app は生成クライアントの関数名で呼び出しているので、作り直した生成クライアントと apps/app の呼び出し側の修正も同じ変更に入れる必要がある。そのため、(1) commit 済みの文書を Node 版が書き出したものに置き換えること、(2) orval での生成クライアントの作り直し、(3) apps/app の呼び出し側の修正 (名前と型の書き方)、(4) Node 版の drift 検知 (Node 版が書き出す文書と commit 済みの文書の完全な比較) を CI で動かし始めること、(5) Python 用の CI の撤去、の 5 つを 1 つの変更にまとめる。それまでの間、commit 済みの文書は Python 版のもののままなので、Node 版の文書とは比べない。Node 版の OpenAPI のテストは、書き出しの手順が `GET /openapi.json` と同じ文書を書くことと、比べる関数そのものの働きを確かめる
 - 撤去してよい条件 (10.4、10.5): ベースラインを測り終えた、比較 (2.1、2.2) を記録した、黒箱のテストが Python 版で通った (6.3)、Node で作ったテスト用のファイルを Python 版のテストでも使えることを確かめた (D5)、ベンチマークの退行についてユーザーの判断が出た (2.14、11.12)、段階 4 のレビューを通った
 
 ## ユーザーの決定と、判断を待つ項目
@@ -449,7 +452,7 @@ D1〜D5 はすべてユーザーが決めた (2026-11-04)。
 | T2 | 子プロセスの作り方 (11.4) | (a) `spawn('prlimit', [...limits, '--', node, child-entry])`<br>(b) `fork` して、起動の後に親から `prlimit --pid` で上限を掛ける<br>(c) その他 | 上限 (仮想メモリ、CPU 時間 soft / hard、コアダンプ) が子に掛かること、結果を送る追加のパイプと親を見張るパイプが `prlimit` から node への起動の後も子に引き継がれること (research.md 6.2 で確かめたのは上限だけで、パイプは未確認)、親が SIGKILL されたときに子が残らないこと、起動の時間、変換の部品をすべて読み込んだ子の起動の時間を測る | 上限が変換の開始より前に掛かっている ((b) は起動と上限の間に隙がある)。親が消えたら子が 1 秒以内に終わる。起動の時間が数十 ms の範囲 (research.md 6.2 で (a) は約 27ms) |
 | T3 | `RLIMIT_AS` の値 (11.5) | 固定の値 (たとえば 4GB)、または「必要な仮想メモリの実測の最大 + 余裕」 | 形式ごとに、普通のファイルと大きなファイルで子が必要とする仮想メモリを測る (何もしない状態で 1,200MB、anydoc の XLSX で 2,000MB、PDFium WASM で 3,000MB 以上という調べを取り直す) | ベンチマークとテストのすべての正常な変換が、この上限で失敗しない。RSS の監視 (3.4) が主な守りとして働くことをテストで確かめる。上限は「暴走した子が仮想メモリを使い果たすのを止める最後の歯止め」と位置づける |
 | T4 | 本文の受け取り方と multipart の分解 (11.6) | (a) 上限つきでメモリに読み込んだ後、標準の `Response.formData()` で分解する<br>(b) busboy などの部品で少しずつ分解する<br>(c) 自分で境界 (boundary) を探して分解する | 対象 spec の AC 2.1 / 2.3 と、3.1〜3.5 のテスト (宣言なしで上限を超える本文、遅い本文、途中での切断、`file` が無い・2 つある、部品のヘッダーが大きすぎる) を通す。50MB を 3 件同時に送ったときの親の最大 RSS を測る | テストをすべて通す。親の最大 RSS が Python 版の実測 (263MiB) を大きく超えない。本文の受け取りと切断の検知は research.md 6.1 で実測済み |
-| T5 | OpenAPI の作り方 (11.7) | (a) commit 済みの `openapi.json` を正とし、サービスはそれをそのまま返す。応答がスキーマに合うことをテストで確かめる<br>(b) `@hono/zod-openapi` などで、コードの型から文書を作り、FastAPI が付けた名前に合わせる | 7.1 の比較 (説明文以外が JSON として同じ)、7.2 の比較 (orval で作り直して型・関数・引数に差分がない)、7.3 の drift 検知を CI で動かす。名前を合わせるのに要るコードの量を数える | 7.1〜7.3 を満たす。(b) で名前を合わせるための後処理が大きくなるなら、(a) を選ぶか、7.6 の手続きで名前の契約を崩すかを比べる |
+| T5 | OpenAPI の作り方 (11.7) | (a) 文書を手で持つファイルとし、サービスはそれをそのまま返す。応答がスキーマに合うことをテストで確かめる<br>(b) 経路の定義とスキーマから文書を作る (`@hono/zod-openapi`、`hono-openapi`) | 名前を合わせる指定も後処理も書かない素の書き方で文書を作り、orval で作り直した生成クライアントの `POST /extract` の項目と応答の型が変わらないこと (7.2)、`/extract` の本文を先に読まないこと、親のメモリと依存の増え方を確かめる | **決定: (b) の `hono-openapi` + `zod`** (research.md 17.13)。7.1〜7.3 と 7.6 を満たす。`@hono/zod-openapi` は `/extract` の本文を先に読むので採らない。(a) は、文書の書き写しと、経路と文書の一致を確かめるテストを持つことになるので採らない |
 | T6 | テキスト系の部品 (2.2、2.4) | HTML の解析 (htmlparser2、parse5 など)、文字コードの判定とデコード (iconv-lite と、候補を絞った判定の組み合わせなど)、ZIP の読み書き (yauzl / yazl、fflate など)、DTD とエンティティを展開しない XML の解析 | ベンチマークのテキスト系の文書と、2.4 の文字コードのファイルで 2.9 の指標を測る。ZIP 爆弾と XXE (外部のエンティティを読みに行く攻撃) のテストを通す | 指標がベースラインを下回らない。XXE と膨張を起こさない。許容的なライセンス (LGPL のもの、たとえば文字コードの判定でよく使われる部品の一部は除く。ライセンスは選ぶときに確かめる) |
 | T7 | テスト用のファイルの生成器 (D5) | 普通の文書は部品 (候補は試作で探す) か ZIP と XML の文字列の組み立て。細工したファイルは自前の生成器。暗号化した Office と PDF、XLS は、部品の有無を調べてから決める | Python 版の `tests/fixture_files.py` の fixture ごとに、Node で同じ性質のファイルを作り、Python 版のテストの入力に差し替えて通るかを確かめる (D5)。暗号化と XLS は、部品があるか、自前で書くとどれだけの量になるかを数える | Python 版のテストが、Node で作ったファイルで同じ結果になる。作れないものが残ったら、そのテストの扱い (別の確かめ方に替える、Apache POI の DOC / PPT と同じく出所を記録して commit する) をユーザーに諮る (D5 を変えることになるため) |
 
@@ -611,7 +614,7 @@ export interface ConversionRunner {
 - **共有層の単体テスト**: `formats/`、`wire/`、`config/`、`http/error-table.ts` (すべての `FailureKind` が表にあることは型で守り、テストでは値を確かめる)
 - **実行管理の結合テスト** (`runner/**/*.integ.ts`、Linux): 本物の子プロセスで、時間切れ、RSS の超過、異常終了 (abort / segfault を起こす子)、親の消失、結果の上限、`prlimit` の上限が掛かっていることを確かめる。時間の期限は小数の引数で渡して短くする (対象 spec と同じ)
 - **HTTP の黒箱のテスト** (`apps/attachment-text-extractor/test/http/`): 抽出サービスの URL を受け取り、外から HTTP だけで確かめる。既定では Node 版をテストの中で起動するが、URL を環境変数で渡すと外のサービスに向けられる。6.3 では、これを Python 版に向けて動かす。内部の偽物 (遅い子など) を必要とするテストはここに入れず、HTTP の層のテストとして別に置く
-- **6.3 で Python 版に向けるときに外すテスト**: 意図して振る舞いを変える点を確かめるテストは、Python 版では通らないのが正しい。たとえば、直した OpenAPI の説明文 (7.1)、`/readyz` の `dependencies` の名前 (D2。Python 版は `pypdfium2` などを出すので、実名の検査は Python 版では通らない)、`/docs` と `/redoc` が無いこと (D3)、`WORKERS` を読まないこと (D1)、1.9 で崩した契約。こうしたテストには目印 (vitest のタグ、またはファイル名の決まり) を付け、6.3 の実行では外す。外したテストの一覧と、それぞれの根拠 (要件の番号か D の決定) をテストの対応表 (6.2) に書く。目印のないテストは、すべて Python 版で通らなければならない
+- **6.3 で Python 版に向けるときに外すテスト**: 意図して振る舞いを変える点を確かめるテストは、Python 版では通らないのが正しい。たとえば、経路の定義から作った OpenAPI の文書の名前 (7.1)、`/readyz` の `dependencies` の名前 (D2。Python 版は `pypdfium2` などを出すので、実名の検査は Python 版では通らない)、`/docs` と `/redoc` が無いこと (D3)、`WORKERS` を読まないこと (D1)、1.9 で崩した契約。こうしたテストには目印 (vitest のタグ、またはファイル名の決まり) を付け、6.3 の実行では外す。外したテストの一覧と、それぞれの根拠 (要件の番号か D の決定) をテストの対応表 (6.2) に書く。目印のないテストは、すべて Python 版で通らなければならない
 - **配備物のテスト**: Dockerfile、compose、k8s の例を読んで中身を確かめる (Python 版の `test_deploy_config.py` などに対応)
 - **既定の上限での余裕**: 対象 spec と同じく、基準のファイル (7 万セル 1 シートの XLSX、画像 12 枚の 48MB の DOCX) の子の最大 RSS が上限の 0.95 倍までに収まることを確かめる。基準値は 11.2 で取り直す
 - **テストの書き方**: `essential-test-design` (観察できる結果を確かめ、仕組みを確かめない) と `essential-test-patterns` (vitest、`mock<T>()` を使い、型の主張 `as` を避ける) に従う
@@ -643,7 +646,7 @@ export interface ConversionRunner {
 | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8 | Technology Stack、Allowed Dependencies |
 | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6 | 層の分け方の判断 1〜7、File Structure Plan |
 | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8 | 実施の流れ、Testing Strategy (HTTP の黒箱のテスト) |
-| 7.1, 7.2, 7.3, 7.4, 7.5, 7.6 | T5、`scripts/export-openapi.ts`、`http/openapi-route.ts`、Modified Files |
+| 7.1, 7.2, 7.3, 7.4, 7.5, 7.6 | T5、`http/api-schemas.ts`、`http/openapi-route.ts`、`scripts/export-openapi.ts`、`scripts/check-openapi-drift.ts`、Modified Files、Revalidation Triggers |
 | 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8 | Technology Stack、File Structure Plan (Dockerfile、deploy)、HTTP の層 (`/readyz`)、Security Considerations |
 | 9.1, 9.2, 9.3, 9.4, 9.5 | Modified Files、実施の流れ (CI の扱い)、D4 |
 | 10.1, 10.2, 10.3, 10.4, 10.5 | Python 版の残し方と撤去の条件、D5 |

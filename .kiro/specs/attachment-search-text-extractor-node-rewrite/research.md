@@ -239,6 +239,23 @@ design を書くために、小さな試作で次のことを確かめた。**�
 - **(c) 下流の変更の範囲**: 無い。apps/app (axios) は `POST /extract` に、正しい `Host` と `Expect` なしで送るので、9 通りのどれも起きない。生成クライアント・OpenAPI の契約 (Req 1.2・1.3・1.6・7.x) は変わらない。セキュリティ上の性質 (認証が要ること・不正な認証で 401) は変わらない (末尾の空白の `Authorization` が通る件も、トークンそのものは一致が必要)。
 - **決定**: Python 版に合わせない。Node の既定の振る舞いを採る (4.4 の `multipart-raw.integ.ts` の `NODE_ANSWERS` の y の行と目印 `16.9` はそのまま残す)。ユーザーに諮る事項ではない (16.9 の「7.4 には諮らない」のとおり。Req 1.9 の作業者の判断)。完了の報告 (Req 1.12) で、9 通りと理由をユーザーに伝える。`Expect` が 2 行ある要求 (`100-continue` と `foo`) の扱い (Node は `, ` でつなぐので 100 を返さず最終の状態だけ同じ 200) は、6.8 が `checkExpectation` を置くか許容するかを決めて、27 節に記録する。
 
+### 7.7 OpenAPI の文書と生成クライアントの名前 (ユーザーの判断、2026-11-10)
+
+- **(a) 何を崩すか**: 「Python 版 (FastAPI) が自動で付けた名前も含めて、commit 済みの `openapi.json` と同じ文書を出す」「生成クライアントの型・関数・引数に差分を出さない」「apps/app のファイルを変更しない」という、もとの Req 7.1・7.2・7.4。ユーザーの判断を受けて、Req 7 そのものを書き直した (文書は経路の定義から作り、名前は作る道具の既定に従う)。
+- **(b) 守ると何がどう複雑になるか**: 名前を守ったまま文書をコードから作ると、FastAPI の名前を書き写す指定と後処理が 31 個要る (17.4)。それを避けるために文書を手で持つファイルにすると (17.1 のもとの結論)、258 行の文書をコードとは別に持ち、経路・`ErrorCode`・エラーのステータスが文書と食い違わないことを確かめるテストを持つことになる。
+- **(c) 下流の変更の範囲**: 生成クライアントの関数名と型名が変わる。apps/app で変えるのは `apps/app/src/features/search-attachments/server/services/attachment-text-extractor.ts` とそのテストの 2 ファイルである (使っているのは `postExtractExtractPost` と `ErrorCode`。`ErrorCode` は名前も値も変わらない)。直すのは、関数名の置き換えと、`file` の型の書き方である。いまの生成クライアントは `file` の型が `string` で、apps/app は `{ file: buffer as unknown as string }` と、`Buffer` を `string` と偽って渡している。新しい生成クライアントでは `file` の型が `Blob` になるので、この書き方を新しい型に合わせる。実行時に axios へ渡る値は変えない。`.kiro/specs` の中で FastAPI の名前を書いているのはこの spec だけなので、下流 spec の記述は変えない (grep で確かめた)。
+- **決定 (ユーザー)**: 「FastAPI が付けた名前を変えない」という条件は覆してよい。コードと生成の仕組みは単純であるほど望ましく、設定を書かずに済む形に近いほど望ましい。
+- **名前の対応 (Req 7.5)**: 試作 (17.13) で出た名前。実装 (6.9) の後に、実際の生成クライアントで確かめて、変わっていれば直す。
+
+  | 変わる前 (FastAPI の名前) | 変わった後 (道具の既定) |
+  |---|---|
+  | `postExtractExtractPost` | `postExtract` |
+  | `healthzHealthzGet` | `getHealthz` |
+  | `readyzReadyzGet` | `getReadyz` |
+  | `BodyPostExtractExtractPost` | `PostExtractBody` |
+  | `PostExtractExtractPostResult` | `PostExtractResult` |
+  | `ErrorCode`・`ErrorResponse`・`ExtractResponse`・`PageInfo` | 変わらない |
+
 ## 8. Python 版を devcontainer で起動する手順 (タスク 1.3)
 
 後続タスク (2.5 の差し替え確認、2.8 のベンチマーク基準の計測、4.x の黒箱テスト) が、そのままコピーして実行するための手順。Python 版のコードは変えない。2026-11-04 に devcontainer で実際に実行して確かめた (Python 3.12.15、uv 0.12.24、ネットワーク取得は不要だった)。サービスの既存の説明は `services/attachment-text-extractor/CLAUDE.md` にある。ここはその「起動して試す」部分だけを、Node 版との比較に使える形にまとめたもの。
@@ -3124,6 +3141,8 @@ server.on('checkContinue', (req, res) => server.emit('request', req, res));
 
 ### 17.1 結論
 
+> この結論 (文書を手で持つファイルにする) は、2026-11-10 のユーザーの判断で採らないことになった。いまの結論は 17.13 にある。17.1〜17.12 は、名前を守る条件があったときの比較の記録として残す。
+
 **採る方法**: design.md の T5 の候補 (a)「commit 済みの文書を正とする」。具体的には次の形にする。
 
 1. **文書は抽出サービスが持つ JSON のファイル** (`apps/attachment-text-extractor/src/http/openapi.json`)。中身は commit 済みの `openapi.json` に、17.6 の説明文の修正 5 件を当てたもの。説明文以外は commit 済みのものと 1 字も変えない (FastAPI が自動で付けた名前もそのまま残る)。
@@ -3704,6 +3723,41 @@ const validatorFor = (path: string, method: string, status: number) => {
 - `hono-openapi` の残り 7 件を、後処理なしで消せる設定 (2 回の調整で消えなかった所で止めた)。
 - orval 7.2.0 以外の版で作り直した場合の生成クライアント。
 - 説明文の英語の文そのものの良し悪しを、英語を読む人に確かめること。
+
+### 17.13 方針の変更: 経路の定義から文書を作る (2026-11-10、ユーザーの判断)
+
+**17.1 の結論 (文書を手で持つファイルにする) は採らない。** ユーザーが「FastAPI が付けた名前を変えない」という条件を外した (7.7)。17.5 で自動生成を選ばなかった理由の大半は、この条件から来ていた。条件を外した前提で、2026-11-10 に devcontainer (Node 24.22.2) の使い捨ての場所で試作し直した。
+
+- 版: `hono` 4.13.16、`hono-openapi` 1.5.0、`zod` 4.6.7、`orval` 7.2.0、`ajv` 8.18.0。
+- 変えていないもの: 抽出サービスの package、`pnpm-lock.yaml`、本番の `src/`、`packages/attachment-text-extractor-client`。
+- 数字と結果は、とくに書いていなければ **実測**。
+
+**採る方法**: `hono-openapi` の `describeRoute` で、経路の定義の横に zod のスキーマを書き、`generateSpecs` で文書を作る。
+
+**確かめた結果**:
+
+1. **素の書き方で文書が出る**。名前を合わせる指定 (`title`・`operationId`・スキーマ名) と、作った文書を書き換える後処理は、1 つも書かなかった。文書のために書いた設定は `info` の題名・説明・版だけである。操作の名前は自動で `postExtract`・`getHealthz`・`getReadyz` になった。スキーマに名前を付けたい所 (`ErrorCode`・`ErrorResponse`・`PageInfo`・`ExtractResponse`) は、zod の `.meta({ id })` で付けた (付けないと、応答ごとに同じ形が文書の中に展開される)。
+2. **orval が作るクライアントは、いまとほぼ同じ形になる**。`postExtract(body, options)` の `body` は `file` (必須) と `mimeType` (任意) で、`FormData` の組み立ても同じである。`ErrorCode` の値の一覧、`ErrorResponse`・`ExtractResponse`・`PageInfo` の項目と型も同じである。違いは次の 4 つである。apps/app が使うのは `postExtractExtractPost` と `ErrorCode` だけ (grep で確かめた) なので、apps/app に影響するのは最初の 2 つである。
+   - 名前が変わる (7.7 の表)。
+   - `file` の型が `string` から `Blob` になる (zod の `z.file()` は `format: binary` を出す。FastAPI の文書は `contentMediaType` だけを書いていたので、orval は `string` にしていた)。apps/app は `Buffer` を `string` と偽って渡しているので、この書き方を直す (7.7 の (c))。
+   - `mimeType` の型が `string | null` から `string` (省略可) になる。multipart の本文では null を送れないので、実際に送れる値は変わらない。
+   - `/readyz` の応答に型が付く (いまは `unknown`)。200 は `{ status: 'ready', dependencies }`、503 は `{ status: 'not_ready' }`。
+3. **`/extract` の本文を先に読まない**。`describeRoute` に本文のスキーマを書いても、ハンドラーに届いた時点で本文は未読だった (`c.req.raw.bodyUsed` が false で、ハンドラーが 285 バイトを読めた)。16 節の自前の解析器と衝突しない。`@hono/zod-openapi` はここで本文を先に読む (17.4 の (i)) ので採らない。`hono-openapi` の `validator` (要求を検査する部品) は使わない。
+4. **依存とメモリ**。
+   - 親プロセスの RSS は、起動して 1 回応答した後で 69.5MB → 78.5MB (約 9MB 増。3 回測って 78.0〜78.6MB)。文書を 1 回作った後は 78.8〜78.9MB で、ほぼ増えない。親のメモリのテストの上限 (330〜480MiB) に対して小さい。
+   - 部品の大きさは、`zod` が約 8MB (`locales` を除くと約 6MB)、`hono-openapi` と、それが引く 5 つ (`@hono/standard-validator`・`@standard-community/standard-json`・`@standard-community/standard-openapi`・`@standard-schema/spec`・`openapi-types`) が合わせて約 0.6MB。
+   - ライセンスと image の大きさ (400MB 以下) は、部品を入れるとき (6.9) と image を作るとき (6.11 / 6.12) に確かめる (**未検証**)。
+5. **応答が文書どおりかの検査は、一部だけ型の検査に移せる**。`describeResponse` でハンドラーを包むと、`c.json(...)` の戻り値の型が文書のスキーマと照合される。`tsc` 5.9.3 の strict で、項目の型の間違い (`pageNumber` を文字列で返す)、文書に無いステータス (418)、一覧に無いエラーコードの 3 つが型のエラーになった。文書に無い項目を足した場合は、型のエラーにならなかった。
+   - これが効くのは `c.json(...)` で返す経路だけである。`/extract` は応答を `ReadableStream` で自分で組み立てる (`extract-response.ts`) ので効かない。**`/extract` の実際の応答を文書のスキーマで検査するテスト (`ajv`、17.7 の 2 (iv)) は残す**。
+   - リポジトリの `tsgo` で同じ型のエラーが出るかは **未検証** (6.9 で確かめる)。
+
+**17.7 の drift 検知からの変更**:
+
+- 1 (サービスの文書と commit 済みの文書の比較): 比べる関数は作る。ただし撤去 (8.2) までは commit 済みの文書が Python 版のものなので、Node 版の文書とは比べない (「説明文を除いて比べる」形は採らない。名前が違うので合わない)。8.2 で commit 済みの文書を Node 版のものに置き換えたときから、完全な比較を CI で動かす。
+- 2 (コードと文書の一致の検査): (i) 経路の一覧は、文書が経路から作られるので要らない。(ii) `ErrorCode` の値と (iii) エラーのステータスは、スキーマを `ERROR_CODES` とエラー表から作れば要らない。(iv) 応答の形は、`/extract` の分を残す。
+- 生成される文書には、zod の変換が足す項目 (`additionalProperties: false`、整数の `minimum`・`maximum`、null を許す項目の `type: [..., "null"]`) が入る。Python 版の文書に合わせる必要が無くなったので、そのまま契約にする。orval の生成物には、整数の範囲のコメントが足されるだけだった。
+
+**確かめなかったこと**: `tsgo` と biome での検査、image の中での動作、部品のライセンスの確認、`describeRoute` で書いたスキーマと `contract/` の型 (`PageInfo` など) を 1 つの定義にまとめる書き方 (6.9 で決める)、`zod` より小さいスキーマの部品 (valibot など) との比較 (リポジトリがすでに `zod` 4 を使っているので、そろえることを優先した)。
 
 ## 18. テキスト系の部品 (T6、タスク 3.5)
 
