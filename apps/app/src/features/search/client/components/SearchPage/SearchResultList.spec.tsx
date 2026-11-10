@@ -1,4 +1,6 @@
 import React from 'react';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { IPageHasId } from '@growi/core';
 import type { IPageInfoForListing } from '@growi/core/dist/interfaces';
 import { render, screen } from '@testing-library/react';
@@ -10,6 +12,21 @@ import type {
   ISelectableAll,
 } from '~/client/interfaces/selectable-all';
 import type { IPageWithSearchMeta } from '~/interfaces/search';
+
+const readListGroupItemMinHeightFromScss = (): number => {
+  const scssPath = path.resolve(
+    import.meta.dirname,
+    '../../../../../../../../packages/ui/scss/molecules/_page_list.scss',
+  );
+  const scss = fs.readFileSync(scssPath, 'utf-8');
+  const match = scss.match(
+    /:global\(\.list-group-item\)\s*\{[^{}]*?min-height:\s*(\d+)px/,
+  );
+  if (match == null) {
+    throw new Error(`min-height of .list-group-item not found in ${scssPath}`);
+  }
+  return Number(match[1]);
+};
 
 // --- Capture the props PageListItemL receives, and allow invoking its
 // duplicate/rename/delete callbacks from the test (SearchResultList owns the
@@ -527,7 +544,7 @@ describe('SearchResultList virtualization', () => {
 
   it('sizes the list to every loaded row, measured or estimated', () => {
     // Unrendered rows count as the rows' CSS min-height (_page_list.scss).
-    const CSS_MIN_ROW_HEIGHT = 136;
+    const CSS_MIN_ROW_HEIGHT = readListGroupItemMinHeightFromScss();
     const pageCount = 300;
     render(
       <SearchResultList
