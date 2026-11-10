@@ -348,7 +348,7 @@ interface Pusher {
     collections: string[],
     optionsMap: any,
     destGROWIInfo: IDataGROWIInfo,
-  ): Promise<void>;
+  ): Promise<G2GTransferResult>;
 }
 
 /**
@@ -423,6 +423,41 @@ export interface ImportCollectionsResult extends ImportResult {
   /** Labels of the clean-up steps that failed. The response stays a success regardless. */
   readonly postProcessFailures: readonly string[];
   readonly maintenanceModeReleased: boolean;
+}
+
+/**
+ * The parts of a transfer's import outcome that decide whether the destination was left
+ * incomplete. {@link ImportCollectionsResult} satisfies it on the receiving side; the
+ * source reads the same fields back from the response body.
+ */
+export interface TransferImportOutcome {
+  readonly failedCollections: readonly string[];
+  readonly importAborted: boolean;
+  readonly rescue: AdminRescueOutcome | null;
+  readonly rescueApplied: boolean;
+  readonly postProcessFailures: readonly string[];
+}
+
+/**
+ * Whether the admin screen reports this transfer's import as an error.
+ *
+ * A planned rescue that was never written back counts as incomplete even when every
+ * collection imported: nobody can log in as the administrator the destination was
+ * counting on. `rescueApplied` alone cannot say this, because a transfer that never
+ * needed a rescue also reports `rescueApplied: false`; only together with a non-null
+ * `rescue` (a rescue was actually planned) does it mean the rescue failed.
+ */
+export const isTransferImportIncomplete = (
+  outcome: TransferImportOutcome,
+): boolean =>
+  outcome.failedCollections.length > 0 ||
+  outcome.importAborted ||
+  (outcome.rescue != null && !outcome.rescueApplied) ||
+  outcome.postProcessFailures.length > 0;
+
+export interface G2GTransferResult {
+  /** True when the destination reported an incomplete import (the admin screen shows an error). */
+  readonly importIncomplete: boolean;
 }
 
 /**
@@ -1056,7 +1091,7 @@ export class G2GTransferPusherService implements Pusher {
     collections: string[],
     optionsMap: any,
     destGROWIInfo: IDataGROWIInfo,
-  ): Promise<void> {
+  ): Promise<G2GTransferResult> {
     const socket = this.crowi.socketIoService?.getAdminSocket();
 
     socket?.emit('admin:g2gProgress', {
@@ -1148,32 +1183,27 @@ export class G2GTransferPusherService implements Pusher {
     // means "a rescue was planned", not "it succeeded" — see `readRescueApplied`.
     const rescueOutcome = readRescueOutcome(archiveResponseData);
     const rescueApplied = readRescueApplied(archiveResponseData);
-    // A rescue that was planned but never written back leaves the destination with
-    // nobody able to log in as the administrator it was counting on, which is not a
-    // successful transfer even though the collections themselves all imported.
-    // `rescueApplied` alone cannot say this: an ordinary merge transfer that never
-    // needed a rescue also answers `rescueApplied: false` (it is simply never set to
-    // `true`), so this only means "the rescue failed" once combined with `rescueOutcome`
-    // being non-null -- i.e. a rescue was actually planned in the first place.
-    const rescueFailed = rescueOutcome != null && !rescueApplied;
     // Failed clean-up steps (restoring the upload configs, the destination-owned
     // configs, or invalidating sessions) leave the destination silently wrong
     // (requirements 5.3, 5.4, 5.5) with nothing in the response to say so unless this
     // is read: the receive route answers 200 regardless (design.md's Error Strategy),
     // so a caller that ignores this list sees the same success as a clean transfer.
     const postProcessFailures = readPostProcessFailures(archiveResponseData);
-    const isImportIncomplete =
-      failedCollections.length > 0 ||
-      importAborted ||
-      rescueFailed ||
-      postProcessFailures.length > 0;
+    const isImportIncomplete = isTransferImportIncomplete({
+      failedCollections,
+      importAborted,
+      rescue: rescueOutcome,
+      rescueApplied,
+      postProcessFailures,
+    });
 
     if (isImportIncomplete) {
       logger.error(
         {
           failedCollections,
           importAborted,
-          rescueFailed,
+          rescue: rescueOutcome,
+          rescueApplied,
           postProcessFailures,
         },
         'The destination GROWI did not finish importing the transfer data',
@@ -1268,6 +1298,8 @@ export class G2GTransferPusherService implements Pusher {
     if (isImportIncomplete) {
       reportIncompleteImport();
     }
+
+    return { importIncomplete: isImportIncomplete };
   }
 
   /**

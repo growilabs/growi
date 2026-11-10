@@ -43,7 +43,7 @@
   - _Depends: 1.2, 2.3_
 
 - [ ] 3. お引越し（GROWI 間転送）の計測
-- [ ] 3.1 (P) 取り込み完了判定を共通化し、転送処理が結果を返すようにする
+- [x] 3.1 (P) 取り込み完了判定を共通化し、転送処理が結果を返すようにする
   - 送信側の既存の「取り込みが不完全か」の判定を純関数として切り出し、送信側の判定をそれに置き換える
   - 転送処理が、転送先の取り込みが不完全だったかを結果として返すようにする（既存の失敗時の例外送出・画面通知は変えない）
   - 判定関数の各条件が単独で不完全判定になること、正常時は不完全でないこと、救済が計画されていない場合は不完全扱いしないことをテストで確認できる。既存の転送処理のテストが通る
@@ -96,3 +96,4 @@
 - Routes import the recorders only via `~/features/opentelemetry/server` (top-level barrel). No boot-order/circular hazard: the barrel's other export `node-sdk` is already loaded at boot by `server/app.ts`.
 - Tests that need real metric output use a real `MeterProvider` + `InMemoryMetricExporter` (see `custom-metrics/data-transfer-usage-metrics.spec.ts`); callers' tests mock the record functions from the barrel.
 - Log errors in pino form `logger.error({ err }, 'msg')` — `logger.error('msg', err)` drops the error under @growi/logger. Attach background-promise handlers with two-arg `.then(onOk, onErr)` so a throw in the success path cannot double-record.
+- `isTransferImportIncomplete` (service/g2g-transfer.ts) is the single definition of "transfer import incomplete" for both sides; its doc holds the rescue rationale. The receiver service has its own older `rescueFailed` (from `rescuePlan`, ~L1879) — out of scope, leave it.
