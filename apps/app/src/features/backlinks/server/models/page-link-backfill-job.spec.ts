@@ -2,31 +2,15 @@ import { mock } from 'vitest-mock-extended';
 
 import type { Prisma, PrismaClient } from '~/generated/prisma/client';
 
-import { extension } from './page-link-backfill-job';
+import { createPageLinkBackfillJobModel } from './page-link-backfill-job';
 
 // A write-concern failure cannot be provoked on a real single-node test server, so the reply
 // MongoDB would send is canned and handed to the model's real `tryClaim`.
 const claimWithReply = (reply: Prisma.JsonObject): Promise<boolean> => {
   const client = mock<PrismaClient>({
     $runCommandRaw: vi.fn().mockResolvedValue(reply),
-    // `$extends` is typed as a callable carrying an `extArgs` marker; the stub hands the
-    // model definition straight back so the real `tryClaim` can be reached.
-    $extends: Object.assign(
-      vi.fn().mockImplementation((definition) => definition),
-      { extArgs: {} as never },
-    ),
   });
-  const extended = extension(client) as unknown as {
-    model: {
-      pagelinkbackfilljobs: {
-        tryClaim: (
-          owner: string,
-          opts: { leaseMs: number },
-        ) => Promise<boolean>;
-      };
-    };
-  };
-  return extended.model.pagelinkbackfilljobs.tryClaim('owner-a', {
+  return createPageLinkBackfillJobModel(client).tryClaim('owner-a', {
     leaseMs: 60_000,
   });
 };

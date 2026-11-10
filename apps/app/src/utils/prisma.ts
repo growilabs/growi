@@ -1,6 +1,5 @@
 import { extension as AiUsageLogExtension } from '~/features/ai-usage/server/models/ai-usage-log';
 import { extension as PageLinkExtension } from '~/features/backlinks/server/models/page-link';
-import { extension as PageLinkBackfillJobExtension } from '~/features/backlinks/server/models/page-link-backfill-job';
 import { extension as CommentExtension } from '~/features/comment/server';
 import { extension as MastraRefreshedModelCatalogExtension } from '~/features/mastra/server/models/refreshed-model-catalog';
 import { extension as PageBulkExportJobExtension } from '~/features/page-bulk-export/server/models/page-bulk-export-job';
@@ -231,7 +230,6 @@ export const createPrisma = (datasourceUrl?: string) =>
     .$extends(PageBulkExportJobExtension)
     .$extends(PageBulkExportPageSnapshotExtension)
     .$extends(PageLinkExtension)
-    .$extends(PageLinkBackfillJobExtension)
     .$extends(PageRedirectExtension)
     .$extends(RevisionExtension)
     .$extends(ShareLinkExtension)

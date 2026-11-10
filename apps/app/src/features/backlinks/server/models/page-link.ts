@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { Prisma } from '~/generated/prisma/client';
 
 import type { IPageLink } from '../../interfaces/page-link';
+import { createPageLinkBackfillJobModel } from './page-link-backfill-job';
 import { throwOnWriteErrors } from './throw-on-write-errors';
 
 // Prisma-only collection: no mongoose schema, so its indexes are provisioned by
@@ -208,6 +209,7 @@ export const extension = Prisma.defineExtension((client) => {
           throwOnWriteErrors(result, 'repointInboundLinks');
         },
       },
+      pagelinkbackfilljobs: createPageLinkBackfillJobModel(client),
     },
   });
 });
