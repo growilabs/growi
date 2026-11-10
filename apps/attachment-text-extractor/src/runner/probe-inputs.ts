@@ -23,7 +23,8 @@ export const PROBE_LIMITS: ConversionLimits = {
 export const PROBE_MAX_INPUT_BYTES = MIB;
 
 export interface ProbeInput {
-  readonly bytes: Uint8Array;
+  readonly chunks: readonly Uint8Array[];
+  readonly size: number;
   readonly fileName: string;
   readonly mimeHint: string;
   /** Text the conversion must return; any other outcome means not ready. */
@@ -31,6 +32,11 @@ export interface ProbeInput {
 }
 
 const PROBE_TEXT = 'readiness probe';
+
+const whole = (bytes: Uint8Array): Pick<ProbeInput, 'chunks' | 'size'> => ({
+  chunks: [bytes],
+  size: bytes.length,
+});
 
 /** One page with one line of Helvetica text, cross-reference offsets included. */
 const buildProbePdf = (text: string): Buffer => {
@@ -62,13 +68,13 @@ const buildProbePdf = (text: string): Buffer => {
 
 export const PROBE_INPUTS: readonly ProbeInput[] = [
   {
-    bytes: buildProbePdf(PROBE_TEXT),
+    ...whole(buildProbePdf(PROBE_TEXT)),
     fileName: 'probe.pdf',
     mimeHint: 'application/pdf',
     expectedText: PROBE_TEXT,
   },
   {
-    bytes: PROBE_PPTX,
+    ...whole(PROBE_PPTX),
     fileName: 'probe.pptx',
     mimeHint:
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -76,9 +82,11 @@ export const PROBE_INPUTS: readonly ProbeInput[] = [
   },
   {
     // The character reference is decoded through entities.
-    bytes: Buffer.from(
-      `<!doctype html><html><head><title>probe</title></head><body><p>${PROBE_TEXT} &amp; ok</p></body></html>`,
-      'utf8',
+    ...whole(
+      Buffer.from(
+        `<!doctype html><html><head><title>probe</title></head><body><p>${PROBE_TEXT} &amp; ok</p></body></html>`,
+        'utf8',
+      ),
     ),
     fileName: 'probe.html',
     mimeHint: 'text/html',

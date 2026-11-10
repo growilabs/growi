@@ -10,7 +10,12 @@ import {
   createConversionRunner,
   runnerOptionsFromSettings,
 } from '../conversion-runner';
-import { STAND_IN_CHILD, standInInput, WATCHED_BUSY_CHILD } from './stand-in';
+import {
+  STAND_IN_CHILD,
+  standInInput,
+  WATCHED_BUSY_CHILD,
+  wholeFile,
+} from './stand-in';
 
 export interface HostConfig {
   /** 'watched-busy' runs WATCHED_BUSY_CHILD and sends it `argument` as the file. */
@@ -32,7 +37,7 @@ const main = async (config: HostConfig): Promise<void> => {
     config.entry === 'stand-in'
       ? standInInput(config.mode, { argument: config.argument })
       : {
-          bytes: Buffer.from(config.argument ?? ''),
+          ...wholeFile(Buffer.from(config.argument ?? '')),
           fileName: 'marker.bin',
           mimeHint: null,
         };

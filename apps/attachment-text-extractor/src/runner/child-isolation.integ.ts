@@ -36,6 +36,7 @@ import {
   standInInput,
   startHost,
   waitUntil,
+  wholeFile,
   within,
 } from './spec-support';
 import {
@@ -82,7 +83,7 @@ const withoutInputSizeCaps = (): Partial<ConversionRunnerOptions> => ({
 });
 
 const file = (bytes: Buffer, fileName: string): RunInput => ({
-  bytes,
+  ...wholeFile(bytes),
   fileName,
   mimeHint: null,
 });

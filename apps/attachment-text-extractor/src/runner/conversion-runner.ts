@@ -39,8 +39,11 @@ export interface ConversionRunnerOptions {
   readonly probeTimeoutS?: number;
 }
 
+/** The file as the chunks it arrived in, never joined in the parent (research.md 16.9). */
 export interface RunInput {
-  readonly bytes: Uint8Array;
+  readonly chunks: readonly Uint8Array[];
+  /** The chunks' total length in bytes. */
+  readonly size: number;
   readonly fileName: string;
   readonly mimeHint: string | null;
 }
@@ -98,9 +101,7 @@ const prepareChild = (
   const format = resolveFormat(input.fileName, input.mimeHint);
   // An unknown format still goes to the child, which reports it as unsupported.
   const violation =
-    format === null
-      ? null
-      : checkInputSize(format, input.bytes.length, options.limits);
+    format === null ? null : checkInputSize(format, input.size, options.limits);
   if (violation !== null) {
     return { refusal: failed(violation.failure, violation.detail, 0) };
   }
@@ -157,7 +158,7 @@ const convertInChild = async (
     {
       command,
       env: buildChildEnv(),
-      frames: [start.header, input.bytes],
+      frames: [start.header, input.chunks],
       maxResultFrameBytes: maxResultFrameBytes(options.limits.maxResultBytes),
       maxRssMb: options.maxChildRssMb,
       timeoutMs: timeoutS * 1000,

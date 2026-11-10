@@ -46,9 +46,9 @@ export const fakeRunner = (): MockProxy<ConversionRunner> => {
   return runner;
 };
 
-/** The file bytes the runner received. */
+/** The file bytes the runner received, its chunks joined. */
 export const forwardedBytes = (input: RunInput): Buffer =>
-  Buffer.from(input.bytes);
+  Buffer.concat(input.chunks);
 
 export interface HeldRun {
   readonly runner: MockProxy<ConversionRunner>;

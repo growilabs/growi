@@ -298,9 +298,9 @@ describe('large uploads', () => {
     const converted = answers.filter((answer) => answer.status === 200).length;
     expect(converted).toBeGreaterThan(0);
     // Each conversion got the whole file.
-    expect(runner.run.mock.calls.map(([input]) => input.bytes.length)).toEqual(
-      Array(converted).fill(25 * MIB),
-    );
+    expect(
+      runner.run.mock.calls.map(([input]) => forwardedBytes(input).length),
+    ).toEqual(Array(converted).fill(25 * MIB));
     await smallRequestWorks(target);
   });
 
@@ -381,7 +381,7 @@ describe.skipIf(process.platform !== 'linux')(
         }
         // Mid-conversion: the first run holds its whole file.
         const { input } = await held.started;
-        expect(input.bytes.length).toBe(25 * MIB);
+        expect(forwardedBytes(input).length).toBe(25 * MIB);
         expect(await tempFilesOpenedDuring(before, 500)).toEqual([]);
       } finally {
         held.release();

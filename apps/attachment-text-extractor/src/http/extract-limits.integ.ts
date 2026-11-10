@@ -49,7 +49,7 @@ const standInFile = (
   mode: string,
   argument = '-',
   totalBytes?: number,
-): Buffer => Buffer.from(standInInput(mode, { argument, totalBytes }).bytes);
+): Buffer => Buffer.concat(standInInput(mode, { argument, totalBytes }).chunks);
 
 const post = (
   target: TestService,

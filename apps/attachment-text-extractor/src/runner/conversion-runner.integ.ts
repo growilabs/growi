@@ -22,6 +22,7 @@ import {
   settle,
   standInInput,
   waitForOnlyChild,
+  wholeFile,
   within,
 } from './spec-support';
 
@@ -64,9 +65,7 @@ const failureOf = async (
 const contentsOf = (outcome: Awaited<ReturnType<typeof run>>): string[] =>
   outcome.kind === 'ok' ? outcome.pages.map((page) => page.content) : [];
 
-const echoed = (input: RunInput): string[] => [
-  `received ${input.bytes.length} bytes`,
-];
+const echoed = (input: RunInput): string[] => [`received ${input.size} bytes`];
 
 /** The runner reaps before it returns: no child, not even a zombie, may remain. */
 const expectNothingLeft = (): void => {
@@ -101,7 +100,7 @@ describe.skipIf(process.platform !== 'linux')(
         const runner = createConversionRunner(runnerOptions());
 
         const outcome = await run(runner, {
-          bytes: buildTextPdf(['first page', 'second page']),
+          ...wholeFile(buildTextPdf(['first page', 'second page'])),
           fileName: 'doc.pdf',
           mimeHint: PDF_MIME,
         });
@@ -116,7 +115,7 @@ describe.skipIf(process.platform !== 'linux')(
         const runner = createConversionRunner(runnerOptions());
 
         const outcome = await run(runner, {
-          bytes: buildDocx(['社内規程の改定について']),
+          ...wholeFile(buildDocx(['社内規程の改定について'])),
           fileName: 'memo.docx',
           mimeHint: DOCX_MIME,
         });
@@ -137,7 +136,7 @@ describe.skipIf(process.platform !== 'linux')(
         );
 
         const kind = await failureOf(runner, {
-          bytes: buildTextPdf(['one', 'two']),
+          ...wholeFile(buildTextPdf(['one', 'two'])),
           fileName: 'doc.pdf',
           mimeHint: PDF_MIME,
         });
@@ -162,7 +161,7 @@ describe.skipIf(process.platform !== 'linux')(
         const outcomes = await Promise.all(
           [0, 1, 2].map((i) =>
             run(runner, {
-              bytes: buildTextPdf([`page ${i}`]),
+              ...wholeFile(buildTextPdf([`page ${i}`])),
               fileName: `${i}.pdf`,
               mimeHint: PDF_MIME,
             }),
@@ -193,10 +192,12 @@ describe.skipIf(process.platform !== 'linux')(
         const runner = createConversionRunner(runnerOptions());
 
         const outcome = await run(runner, {
-          bytes: Buffer.concat([
-            Buffer.from('%PDF-1.7\n'),
-            Buffer.from('\x00garbage'.repeat(100)),
-          ]),
+          ...wholeFile(
+            Buffer.concat([
+              Buffer.from('%PDF-1.7\n'),
+              Buffer.from('\x00garbage'.repeat(100)),
+            ]),
+          ),
           fileName: 'broken.pdf',
           mimeHint: PDF_MIME,
         });
@@ -214,7 +215,7 @@ describe.skipIf(process.platform !== 'linux')(
         );
 
         const kind = await failureOf(runner, {
-          bytes: Buffer.from('長い本文 '.repeat(1000)),
+          ...wholeFile(Buffer.from('長い本文 '.repeat(1000))),
           fileName: 'long.txt',
           mimeHint: 'text/plain',
         });

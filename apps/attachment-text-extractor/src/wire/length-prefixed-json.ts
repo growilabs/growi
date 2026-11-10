@@ -107,12 +107,18 @@ const writeChunk = (stream: Writable, chunk: Uint8Array): Promise<void> =>
     stream.write(chunk, (error) => (error == null ? resolve() : reject(error)));
   });
 
+/** One frame whose body is `body`, or the pieces of it in order (never joined here). */
 export const writeFrame = async (
   stream: Writable,
-  body: Uint8Array,
+  body: Uint8Array | readonly Uint8Array[],
 ): Promise<void> => {
-  await writeChunk(stream, encodeFrameHeader(body.length));
-  if (body.length > 0) {
-    await writeChunk(stream, body);
+  const pieces = body instanceof Uint8Array ? [body] : body;
+  const length = pieces.reduce((sum, piece) => sum + piece.length, 0);
+  await writeChunk(stream, encodeFrameHeader(length));
+  for (const piece of pieces) {
+    if (piece.length > 0) {
+      // biome-ignore lint/performance/noAwaitInLoops: the pieces must reach the reader in order
+      await writeChunk(stream, piece);
+    }
   }
 };

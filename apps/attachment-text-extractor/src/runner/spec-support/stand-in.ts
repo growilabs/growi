@@ -58,6 +58,14 @@ export interface StandInOptions {
   readonly totalBytes?: number;
 }
 
+/** One file in one chunk, as a RunInput carries it. */
+export const wholeFile = (
+  bytes: Uint8Array,
+): Pick<RunInput, 'chunks' | 'size'> => ({
+  chunks: [bytes],
+  size: bytes.length,
+});
+
 /** The file for stand-in-child.mjs: "<mode> <argument> <trace>\n" then padding. */
 export const standInInput = (
   mode: string,
@@ -73,7 +81,7 @@ export const standInInput = (
   const bytes = Buffer.alloc(total, 'x');
   modeLine.copy(bytes);
   return {
-    bytes,
+    ...wholeFile(bytes),
     fileName: options.fileName ?? 'stand-in.bin',
     mimeHint: options.mimeHint ?? null,
   };

@@ -27,4 +27,5 @@ export {
   TS_NODE_ARGS,
   tsEntry,
   WATCHED_BUSY_CHILD,
+  wholeFile,
 } from './stand-in';

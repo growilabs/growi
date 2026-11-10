@@ -225,7 +225,19 @@ design を書くために、小さな試作で次のことを確かめた。**�
 - Req 1.10 (a) 何を崩すか、(b) 守ると何が複雑になるか、(c) 下流の変更の範囲: 上の表と 7.4 のとおり。下流の変更は無い。
 - 引き継ぎ: この spec の design.md の Revalidation Triggers に、「本文の形の例外 3 件 (`Content-Length` が小さい要求、boundary の CR、`charset` を使わないこと)」を足す。取り込み (Req 12) のとき、対象 spec の design.md の Error Handling の表と requirements に反映する。6.x の固定データ (16.9 (a)) には、この 3 件に当たる要求を「期待を分ける」ものとして入れる。
 - 12 番 (`Connection: close` を付けて 2 件目を続けた場合に 422 が捨てられて 400 だけ届くことがある) は、1 と同じ仕組みで、同じ決定の範囲とする。
-- **項目 1 への訂正の注記 (タスク 4.4 とそのレビュー、2026-11-09)**: 表の「Python 版: 422」は、測り直すと再現しなかった。Python 版 (uvicorn 0.46.0 + httptools、research.md 8 節の既定の設定) に、`Content-Length` を本文より 5・10・20・21・40・60・80・100 バイト小さくした multipart の要求を送ると、一度に送っても、見出しと本文を分けて送っても、毎回 `code` の無い 400 (本文は `Invalid HTTP request received.`) だった (4.4 の作業で 30 回、レビューで 8 通り)。1・2 バイトの差は終わりの区切りが削れないので 200。余りのバイトを 0.7 秒遅らせて送ると、Python 版も Node (Hono) も 200 の後に 400 を返した。httptools も、余りのバイトをすぐ「次の要求」として読んで 400 を返し、接続を閉じる (7.4 の (b) が Node について書いた仕組みと同じ)。つまり、この要求への状態は Python 版と Node 版で同じで、ユーザーが許容した Node 版の振る舞い (`code` の無い 400) は変わらず、契約は何も崩れていない。誤っていたのは「Python 版は 422」という前提だけである。ほかの送り方 (たとえば別の HTTP の実装の uvicorn、より大きな本文) は確かめていない。黒箱のテストに理由の id `7.5-1` は無い (22.5)。完了の報告 (Req 1.12) で、ユーザーに「7.5 の 1 は実際には差が無かった」と伝える。
+- **項目 1 への訂正の注記 (タスク 4.4 とそのレビュー、2026-11-09)**: 表の「Python 版: 422」は、測り直すと再現しなかった。Python 版 (uvicorn 0.46.0 + httptools、research.md 8 節の既定の設定) に、`Content-Length` を本文より 5・10・20・21・40・60・80・100 バイト小さくした multipart の要求を送ると、一度に送っても、見出しと本文を分けて送っても、毎回 `code` の無い 400 (本文は `Invalid HTTP request received.`) だった (4.4 の作業で 30 回、レビューで 8 通り)。1・2 バイトの差は終わりの区切りが削れないので 200。余りのバイトを 0.7 秒遅らせて送ると、Python 版も Node (Hono) も 200 の後に 400 を返した。httptools も、余りのバイトをすぐ「次の要求」として読んで 400 を返し、接続を閉じる (7.4 の (b) が Node について書いた仕組みと同じ)。つまり、この要求への状態は Python 版と Node 版で同じで、ユーザーが許容した Node 版の振る舞い (`code` の無い 400) は変わらず、契約は何も崩れていない。誤っていたのは「Python 版は 422」という前提だけである。ほかの送り方 (たとえば別の HTTP の実装の uvicorn、より大きな本文) は確かめていない。黒箱のテストに理由の id `7.5-1` は無い (22.5)。完了の報告 (Req 1.12) で、ユーザーに「7.5 の 1 は、`Connection: close` を付けない要求では実際には差が無かった (付けた要求では差がある。27.7)」と伝える。
+
+### 7.6 HTTP の層の細かい違い 9 通り (タスク 6.8 の前の決定、2026-11-10。作業者の判断。Req 1.9・1.10)
+
+- **(a) 何を崩すか**: Python 版 (uvicorn + FastAPI) と Node 版 (Hono + Node の HTTP サーバー) の、既定の振る舞いの違い 9 通り (16.9。y01・y04・y12・y14・y15・y16・y22・y37・y38)。
+  - `GET`・`PUT`・`OPTIONS`・`HEAD /extract` は、Python 版が 405、Node 版が 404。
+  - `POST /extract/` (末尾の `/`) は、Python 版が 307 (FastAPI の redirect)、Node 版が 404。
+  - `Expect: foo` (`100-continue` 以外) は、Python 版が無視して 200、Node 版が 417。
+  - `Host` の無い HTTP/1.1 の要求は、Python 版が 200、Node 版が 400。
+  - `Authorization: Bearer <token> ` (末尾に空白) は、Python 版が 401、Node 版は値の末尾の空白を削るので 200 (HTTP の規則 (RFC 9110 の OWS) に合うのは Node 版)。
+- **(b) 守ると何がどう複雑になるか**: 405 は route を method ごとに足すか catch-all を置く必要があり、307 は FastAPI の redirect の再現、`Expect: foo` は `checkExpectation` の受け手、`Host` なしの 200 は Node の HTTP パーサ (`llhttp`) の検査を外す手段が無い (Node の既定の拒否で、公開の設定では変えられない)、末尾の空白は Node が `Authorization` の値を HTTP 層で削る。どれも、実際の利用者のために置くコードではなく、「Python 版の既定の振る舞いを再現するためだけのコード」になる。
+- **(c) 下流の変更の範囲**: 無い。apps/app (axios) は `POST /extract` に、正しい `Host` と `Expect` なしで送るので、9 通りのどれも起きない。生成クライアント・OpenAPI の契約 (Req 1.2・1.3・1.6・7.x) は変わらない。セキュリティ上の性質 (認証が要ること・不正な認証で 401) は変わらない (末尾の空白の `Authorization` が通る件も、トークンそのものは一致が必要)。
+- **決定**: Python 版に合わせない。Node の既定の振る舞いを採る (4.4 の `multipart-raw.integ.ts` の `NODE_ANSWERS` の y の行と目印 `16.9` はそのまま残す)。ユーザーに諮る事項ではない (16.9 の「7.4 には諮らない」のとおり。Req 1.9 の作業者の判断)。完了の報告 (Req 1.12) で、9 通りと理由をユーザーに伝える。`Expect` が 2 行ある要求 (`100-continue` と `foo`) の扱い (Node は `, ` でつなぐので 100 を返さず最終の状態だけ同じ 200) は、6.8 が `checkExpectation` を置くか許容するかを決めて、27 節に記録する。
 
 ## 8. Python 版を devcontainer で起動する手順 (タスク 1.3)
 
@@ -7377,7 +7389,7 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 8. Python 版は通すが Node 版は止める入力がある: 結果の字数の多い ASCII の DOCX、約 48MiB の画像を 1 つの要素に持つ XLSX、1 ページの文字の多い PDF (20.9)。
 9. 閉じない開始タグを持つ PPTX は、回によって `memory_exceeded` か `malformed` になる (20.5、18.7)。
 10. d36・m21 は 422 を返す。Python 版は `code` の無い 500 (16.1。決定済み)。
-11. `7.5-1` は、実際には Python 版と差が無かった (訂正。ユーザーが許容した差の前提が違っていた)。
+11. `7.5-1` は、`Connection: close` を付けない要求では実際には Python 版と差が無かった (ともに `code` の無い 400。訂正。ユーザーが許容した差の前提が違っていた)。`Connection: close` を付けると、`Content-Length` が本文より小さい要求・`Content-Length` も `Transfer-Encoding` も無い要求で、Python 版は 422 `extraction_failed`、Node 版は `code` の無い 400 になる (6.8 のレビューの実測)。7.5 の 12 番として許容された範囲なので契約は崩れていない。
 12. **未決 (6.8 が実装の前に決める)**: 16.9 の HTTP の層の 9 通り (405 → 404、307 → 404、`Expect: foo` の 417、`Host` なしの 400、末尾の空白の `Authorization` が 200)。
 13. **未決 (6.3 が決める)**: ZIP の名前に `../` が入る XLSX の扱い。テストは Python 版と同じ「読み飛ばす」で書いてある。
 14. 文字コードと HTML の解析の違い (18.7。`〜` が `～` になるなど)。
@@ -7564,3 +7576,33 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 **メモリ・時間**: runner が報告する子の最大 RSS は、子が結果を書く直前に自分で読んだ VmHWM と ±1MB で一致 (XLSX 7 万セル 1 シート 291〜294MB、DOCX 画像 12 枚 267〜281MB、PDF 200 万字 302〜306MB、画像の PDF 142〜143MB)。PDF 200 万字は 0.95 倍 (304MB) の線をわずかに超えるが基準のファイルではない (27.3)。6.12 で image の中で測り直す。親: runner を読むと RSS 44→51MB、親は anydoc・PDFium を読まない、1,000 回以降は RSS 72〜73MB・ヒープ 6MB で一定 (漏れなし)。約 33MB の JSON の結果を 3 件同時に受け取ったときの親の最大 RSS は 276〜349MB (レビュアーの実測 332〜349MB。1 件あたり約 100MB で、予算の 1 件あたり 157MiB に収まる)。起動のオーバーヘッドは小さな TXT 1 件で起動から回収まで中央値 84ms。同時起動と中止 340〜400 回、結果の管への壊れた中身 2,500〜2,700 回で、例外・残った子・fd の増加・一時ファイルは 0。kill から回収までの待ちは 2 秒が上限 (Python 版と同じ)。
 
 **6.8 以降への申し送り**: 同時実行の枠は runner の外 (HTTP の層) にあり、確認用の子は枠の外で動く。`childPeakRssMb` は、子を起動していない・起動できなかったとき `null` で、ログでは `unknown` と書く。6.11 / 6.12 では image の中で `/usr/bin/prlimit --version` を確かめ、PDF 200 万字の子の最大 RSS を測り直す。
+
+### 27.7 タスク 6.8 (HTTP の層)
+
+独立レビュー (Opus) を、1 回目 REJECTED (本文を親で連結していた点) → 直し → 狭い再レビュー APPROVED で通した。
+
+**直した点**
+
+- **本文は断片のまま runner に渡す** (16.9 の 6.8 への指示、T4)。`RunInput` は `{ chunks: readonly Uint8Array[]; size: number; fileName; mimeHint }` で、`size` は親が届いたバイトを数えた値 (送り手の申告ではない)。`writeFrame` (6.1 の wire) は 1 つのバイト列か断片の並びを受け取り、見出しの長さは断片の実際の合計で、断片を順に書いて連結しない。50MiB × 3 件の親の最大 RSS: 連結する形 376〜379MiB (内部の `arrayBuffers` 約 300)、断片のまま渡す形 244〜258MiB (`arrayBuffers` 157〜169。Python 版の 263MiB 以下)。承認済みのテストは、`RunInput` を作る所・断片を受け取る所の機械的な直しだけ (`bytes: X` → `...wholeFile(X)`、`input.bytes.length` → `input.size`、`forwardedBytes` は `Buffer.concat(input.chunks)`。assertion の意味は変えていない。直した 9 ファイル: `runner/spec-support/{stand-in,index,runner-host}.ts`、`runner/child-isolation.integ.ts`、`runner/conversion-runner.integ.ts`、`http/spec-support/fake-runner.ts`、`http/receive-upload.integ.ts`、`http/extract-limits.integ.ts`、`http/client-disconnect.integ.ts`)。
+- **認証を外すパスの判定**: 最初の実装は、ルーティングと同じ「URL として整えた後のパス」で判定し、`GET /./healthz`・`GET /%68ealthz` がトークンなしで 200 になった (Python 版は 401)。今は、送られた要求の文字列そのもの (`?` より前) が `/healthz`・`/readyz`・`/openapi.json` と完全に一致したときだけ認証を外す (`open-path-targets.integ.ts`)。トークンなしで `/extract` に着く経路は無い (レビュアーが 100 通り以上で確認)。
+- **メモリの回帰テストの基準**: 50MiB × 3 件は 330 (実測 244〜258)、33MB の結果 × 3 件は 440 (実測 298〜368。応答を 1 つの文字列に組む形は 489〜571)、1 バイトずつの本文は増加 100 以下 (実測 12。小さな断片を塊にまとめない形は 781)、16KiB と 1 バイトの交互は 350 (実測 281〜282)、50MiB と 33MB の交互は 480 (実測 315〜394)。交互の件は予算全体の目安で、形の違いを見分けるものではない (連結する形でも 384〜405 で落ちない。50MiB × 3 件と 33MB の結果の件が両方を捕まえる)。CI の機械での揺れは未確認。届いたバイト数で上限を判定すること (Req 3.3) は `received-bytes-cap.integ.ts` が固定する (1MiB の上限で 20MiB の chunked の本文 → `Request body exceeds the 1 MiB file size limit`)。
+
+**`Expect` が 2 行ある要求の扱い (決めたこと)**: `checkExpectation` の受け手は置かない。本文を読むと決めた時点 (認証と枠の後の 1 か所) で、Node 自身が要求を `checkContinue` に回すときと同じ判定 (HTTP/1.1 で、値に `100-continue` という語を含む) で `writeContinue()` を呼ぶ。y40 (`Expect: 100-continue` と `Expect: foo` の 2 行) は Python 版と同じ「100 の後に 200」。残る違い (最終の状態はどれも同じ): `Expect: foo, 100-continue` を 1 行で送ると Python 版は 100 を返さず Node 版は返す、HTTP/1.0 の `Expect: 100-continue` は Python 版が 100 を返し Node 版は返さない。`Expect: foo` だけは 417 のまま (7.6)。
+
+**Python 版との違い (7.6 の 9 通りのほか。Req 1.9 の作業者の判断。apps/app (axios) は送らない形で、下流への影響は無い)**
+
+- `.` の区切りを含むパス (`POST /./extract`・`/a/../extract`、トークンあり、トークンつきの `GET /./healthz`): Python 版 404、Node 版 200 (Node の URL の解析が `.` を解いてから経路を探す。認証は送られた文字列そのもので判定しているので、トークンなしで `/extract` に着く形は無い)。
+- `HEAD /healthz`: Python 405、Node 200。`POST /healthz`・`PUT /readyz`・`DELETE /openapi.json`・`TRACE`/`DELETE /extract`: Python 405、Node 404 (7.6 の 405 と同じ種類)。`POST /extract%2F`・トークンつきの末尾 `/` のパス: Python 307、Node 404 (y15 と同じ種類)。
+- 16KiB を超えるヘッダー: Python 200、Node は `code` の無い 431 (Node の既定の上限)。細工した `Host`・パスの中の `\`・大文字の `HTTP://`・`*` と `OPTIONS *`: Node は `code` の無い 400。CONNECT は応答せずに接続を閉じる。
+- `Bearer <トークン>\xe9` (ASCII でない文字を足したトークン): Python 版は `compare_digest` の TypeError で `code` の無い 500、Node 版は表どおりの 401 (16.1 と同じ扱い)。`/%68ealthz`・絶対形式 `http://x/healthz`・`/healthz#x` をトークンなしで送ると Python 200 (または 404)、Node 401 (認証が要る側に寄る違いで安全)。末尾がタブの `Authorization` は Node で 200 (7.6 の末尾の空白と同じ仕組み)。
+- 200 の応答: Python 版は `Content-Length` を付け、Node 版は常に chunked (応答を少しずつ書くため)。apps/app の生成クライアントは `maxContentLength` を設定しておらず、axios が chunked を解くので問題ない。404 の本文: Python 版は JSON、Node 版は Hono の既定の文字列。
+- 準備未完了の `/readyz` の 503: 本文は `{"status":"not_ready"}` だけで `dependencies` を出さない (`Readiness` が `{ ready }` だけ。27.6。OpenAPI のスキーマは `{}`。Req 1.2 は成功時の形だけを決める)。
+- `code` を持たない応答が出る経路: Node 自身が返す 400・408・417・431、Hono の既定の 404、CONNECT を黙って閉じる件。apps/app の `mapAxiosErrorToOutcome` は `code` の無い応答をすべて `serviceUnreachable` にする (Python 版の `code` の無い 400・500 と同じ扱い)。apps/app はどの形も送らない。
+- ファジング (2,000 件 × 2 回、3,000 件 × 3 プロセス) と 504 通りの比べで、Python 版との違いは上と 7.6 のものだけ。応答が返らなかった件・エラー応答に入力の目印が出た件は 0。何も送らない接続とヘッダー途中の接続は 60.0 秒で Node が `code` の無い 408 を返して閉じ (Python 版は 75 秒でも閉じない)、ヘッダーを送り終えて本文を少しだけ送る接続は 15.5 秒で表どおりの 408。
+
+**6.9 以降への申し送り**
+
+- `startServer` の `requestTimeout` は 300 秒に固定している。`UPLOAD_TIMEOUT_S` をこれより長くすると、Node が先に `code` の無い 408 を返す (Req 3.13 があるので 300 秒を超える設定は正しい設定の外。6.9 で、設定から決めるか起動時に拒むかを決める)。`close()` は処理中の接続も切る (SIGTERM で処理中の要求を待つかは 6.9 が決める)。`Retry-After` は付けない (Python 版も付けず、OpenAPI にも無い)。401 にログ行を出さない (Python 版と同じ)。runner が想定外の例外を投げたときは `extract runner raised format=… size=… error=<例外の名前>` を ERROR 行で出す (スタック無し)。`parse-multipart.ts` は 405 行 (状態遷移 1 責務なので許容)。
+- 枠を返すのは応答を送り終える前 (Python 版の `async with` と同じ)。遅い読み手が相手だと、親が同時に持つ結果が 3 件を超えうる。トークンなしの `/readyz` を受けるたびに確認用の子が起動する (27.6 の決定どおり)。
+- **6.10**: `http/spec-support/fake-runner.ts`・`test-service.ts` は `runner/conversion-runner` を直接 import し、http の integ テストは `runner/spec-support` を直接 import している (どれも承認済みのテストにもとからある)。層の検査では、テストとテスト用の補助を除外する。
+- **取り込み (Req 12) で直す記述**: design.md 521〜525 行の `RunInput.bytes` を `chunks` と `size` にする (507 行は `convert()` の引数なので変えない)。research.md 23.5 の spec-support の一覧に `wholeFile` を足し `ProbeInput` の形の変更を書く。23.6 の `forwardedBytes` の記述 (今は `Buffer.concat(input.chunks)`)。16.9 (d) か 27 に今回の計測値。親の 1 件あたりのメモリは約 60〜100MiB で予算 (157MiB) に収まる (image の中は 6.12 で測る)。最悪の足し算は約 1,951MiB で 2Gi 以内。

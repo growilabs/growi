@@ -26,7 +26,7 @@ vi.setConfig({ testTimeout: 120_000 });
 const service = useTestService(() => ({ runner: fakeRunner() }));
 
 const standInFile = (mode: string, argument = '-'): Buffer =>
-  Buffer.from(standInInput(mode, { argument }).bytes);
+  Buffer.concat(standInInput(mode, { argument }).chunks);
 
 const startStandIn = (
   env: Readonly<Record<string, string>>,

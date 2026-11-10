@@ -1,7 +1,13 @@
-import type { Hono } from 'hono';
+import { Hono } from 'hono';
 
 import type { Settings } from '../config/load-settings';
-import type { ConversionRunner } from '../runner/conversion-runner';
+import type { ConversionRunner } from '../runner';
+import type { AppEnv } from './app-env';
+import { bearerAuth } from './bearer-auth';
+import { registerExtractRoute } from './extract-route';
+import { registerHealthRoutes } from './health-routes';
+import { registerOpenApiRoute } from './openapi-route';
+import { createRequestLog, writeToStderr } from './request-log';
 
 export interface AppDeps {
   readonly settings: Settings;
@@ -10,6 +16,21 @@ export interface AppDeps {
   readonly writeLog?: (line: string) => void;
 }
 
-export const createApp = (_deps: AppDeps): Hono => {
-  throw new Error('not implemented: http/create-app.createApp');
+// Exactly the documented operations plus GET /openapi.json: no /docs or
+// /redoc (D3), and no extra method routes, so a wrong method is a 404 (7.6).
+export const createApp = ({
+  settings,
+  runner,
+  writeLog = writeToStderr,
+}: AppDeps): Hono<AppEnv> => {
+  const app = new Hono<AppEnv>();
+  app.use('*', bearerAuth(settings.serviceToken));
+  registerHealthRoutes(app, runner);
+  registerOpenApiRoute(app);
+  registerExtractRoute(app, {
+    settings,
+    runner,
+    log: createRequestLog(settings.logLevel, writeLog),
+  });
+  return app;
 };

@@ -217,7 +217,7 @@
   - 見出しは `wire/child-header.ts` の `encodeChildHeader` で作る。`encodeChildHeader` が `WireProtocolError` を投げたら、子を起動する前に `limit_exceeded` にし、`childPeakRssMb` は `null` にする (research.md 27.5)
   - 4.3 のテストがすべて通る
   - _Requirements: 3.4, 3.5, 3.6, 3.8, 3.10, 3.12, 4.3, 4.8, 8.8_
-- [ ] 6.8 HTTP の層を実装する
+- [x] 6.8 HTTP の層を実装する
   - 認証、同時実行の枠、本文の受け取り (3.3 で決めた方法)、multipart の分解、抽出の経路、エラーの対応表 (失敗の種類のすべてを持つ 1 か所の表)、`/healthz` と `/readyz` (部品の実名と `prlimit`、内部のモジュールは `converter`)、`/openapi.json` (3.4 で決めた方法)、1 件ごとのログを作る。`/docs` と `/redoc` は出さない
   - 研究記録 20.12 と 16.9 (d) のとおり、応答のバイト列が一括で組んだ場合と同じであることのテストと、親の最大 RSS のメモリの回帰テスト (50MiB × 3 件の受け取り、1 バイトずつの本文、16KiB と 1 バイトを交互に送る本文、33MB の結果 × 3 件) を、実装の前に書いて RED を確かめてから実装する
   - **この層の実装に入る前に**、16.9 の HTTP の層の 9 通り (研究記録 22.8 の 3: 405 → 404、307 → 404、`Expect: foo` の 417、`Host` なしの 400、末尾の空白の `Authorization` の 200) について、7 節に記録して崩すか、Python 版に合わせるかを決める。崩すなら Req 1.10 のとおり実装の前に 7 節に記録する。Python 版に合わせるなら 4.4 の `multipart-raw.integ.ts` の `NODE_ANSWERS` の y の行を消す

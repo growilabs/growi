@@ -15,8 +15,8 @@ const KIB = 1024;
 export interface ChildRunSpec {
   readonly command: SpawnCommand;
   readonly env: Readonly<Record<string, string>>;
-  /** Written to fd 0 in order, one length-prefixed frame each. */
-  readonly frames: readonly Uint8Array[];
+  /** Written to fd 0 in order, one length-prefixed frame each (a frame may come in pieces). */
+  readonly frames: readonly (Uint8Array | readonly Uint8Array[])[];
   readonly maxResultFrameBytes: number;
   readonly maxRssMb: number;
   readonly timeoutMs: number;
@@ -69,7 +69,7 @@ const isReadable = (stream: unknown): stream is Readable =>
 
 const writeFrames = async (
   stdin: Writable,
-  frames: readonly Uint8Array[],
+  frames: ChildRunSpec['frames'],
 ): Promise<void> => {
   for (const frame of frames) {
     // biome-ignore lint/performance/noAwaitInLoops: frames must reach the child in order
