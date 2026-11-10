@@ -10,6 +10,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import path from 'pathe';
 
+import { recordG2GTransfer } from '~/features/opentelemetry/server';
 import { isCoherentOptionsMap } from '~/models/admin/g2g-transfer-preset';
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -1352,13 +1353,17 @@ export const setup = (crowi: Crowi): Router => {
       // Start transfer
       // DO NOT "await". Let it run in the background.
       // Errors should be emitted through websocket.
-      g2gTransferPusherService.startTransfer(
-        tk,
-        req.user,
-        collections,
-        optionsMap,
-        destGROWIInfo,
-      );
+      // startTransfer has already logged and notified before it rejects, so this only records.
+      g2gTransferPusherService
+        .startTransfer(tk, req.user, collections, optionsMap, destGROWIInfo)
+        .then(
+          ({ importIncomplete }) =>
+            recordG2GTransfer(
+              'source',
+              importIncomplete ? 'failure' : 'success',
+            ),
+          () => recordG2GTransfer('source', 'failure'),
+        );
 
       return res.apiv3({ message: 'Successfully requested auto transfer.' });
     },
