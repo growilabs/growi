@@ -546,6 +546,30 @@
     "azure_api_version_help": "Facultatif. Laissez vide pour utiliser la valeur par défaut. À définir uniquement si un déploiement spécifique nécessite une version d'API particulière.",
     "azure_model_deployment_label": "Nom du déploiement"
   },
+  "change_proposal_settings": {
+    "change_proposal_settings": "Paramètres des Change Proposals",
+    "description": "Paramètres de l'écriture dans le wiki via les Change Proposals, comme les modifications demandées depuis le chat IA.",
+    "env_only_mode_notice": "Les paramètres des Change Proposals sont fixés par des variables d'environnement et ne peuvent pas être modifiés ici.",
+    "is_enabled": "Activer les Change Proposals",
+    "is_enabled_desc": "Une fois désactivé, tous les Change Proposals en attente d'approbation sont retirés.",
+    "enabled_operation_types": "Opérations autorisées",
+    "operation_type_edit": "Modifier des pages",
+    "operation_type_create": "Créer des pages",
+    "operation_type_move": "Déplacer des pages",
+    "auto_apply_policy": "Application automatique",
+    "auto_apply_policy_none": "Ne pas appliquer automatiquement (toujours attendre l'approbation)",
+    "auto_apply_policy_own_pages": "Appliquer automatiquement uniquement les nouvelles pages et les pages créées par le demandeur",
+    "auto_apply_policy_all": "Appliquer automatiquement toutes les opérations",
+    "max_operations_per_proposal": "Nombre maximal d'opérations par Change Proposal",
+    "max_operations_per_proposal_unlimited": "Aucune limite",
+    "max_proposals_per_user_per_day": "Nombre maximal de Change Proposals par utilisateur et par jour",
+    "max_proposals_per_user_per_day_unlimited": "Aucune limite",
+    "limit_invalid": "Saisissez un nombre entier supérieur ou égal à 1, ou laissez vide pour aucune limite.",
+    "per_page_notifications_enabled": "Envoyer des notifications par page lors de l'application",
+    "per_page_notifications_enabled_desc": "Si activé, l'application d'un Change Proposal envoie les mêmes notifications par page qu'un enregistrement manuel (notifications dans l'application aux abonnés de la page et notifications globales). Le demandeur peut les désactiver pour chaque Change Proposal. La notification groupée est toujours envoyée.",
+    "save": "Mettre à jour",
+    "save_success": "Paramètres des Change Proposals mis à jour avec succès."
+  },
   "markdown_settings": {
     "markdown_settings": "Markdown",
     "lineBreak_header": "Saut de ligne",
@@ -1083,7 +1107,8 @@
     "ShareLink": "Lien de partage",
     "Search": "Rechercher",
     "User": "Utilisateur",
-    "Admin": "Administrateur"
+    "Admin": "Administrateur",
+    "ChangeProposal": "Change Proposal"
   },
   "audit_log_action": {
     "USER_REGISTRATION_SUCCESS": "Création d'utilisateur",
@@ -1150,6 +1175,10 @@
     "ADMIN_APP_SETTING_UPDATE": "Modifier les paramètres d'application",
     "ADMIN_AI_SETTING_UPDATE": "Modifier les paramètres d'IA",
     "ADMIN_AI_MODEL_CATALOG_REFRESH": "Actualiser le catalogue de modèles",
+    "CHANGE_PROPOSAL_CREATE": "Créer un Change Proposal",
+    "CHANGE_PROPOSAL_APPLY": "Appliquer un Change Proposal",
+    "CHANGE_PROPOSAL_REVERT": "Annuler un Change Proposal",
+    "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "Mettre à jour les paramètres de Change Proposal",
     "ADMIN_SITE_URL_UPDATE": "Modifier les paramètres d'URL",
     "ADMIN_MAIL_SMTP_UPDATE": "Modifier les paramètres d'e-mail",
     "ADMIN_MAIL_SES_UPDATE": "Modifier les paramètres d'e-mail (SES)",
