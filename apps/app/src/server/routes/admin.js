@@ -1,5 +1,6 @@
 import { param, validationResult } from 'express-validator';
 
+import { recordArchiveOperation } from '~/features/opentelemetry/server';
 import { SupportedAction } from '~/interfaces/activity';
 import loggerFactory from '~/utils/logger';
 
@@ -42,6 +43,7 @@ export const setup = (crowi, app) => {
 
     try {
       const zipFile = exportService.getFile(fileName);
+      recordArchiveOperation('download', 'success');
       const parameters = {
         ip: req.ip,
         endpoint: req.originalUrl,
