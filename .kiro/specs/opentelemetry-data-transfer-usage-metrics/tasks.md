@@ -7,7 +7,7 @@
   - カウンターへの加算で例外が起きても呼び出し元へ伝えず、diag ロガーに記録する
   - 実際の MeterProvider と InMemoryMetricExporter を使ったテストで、記録回数どおりの系列が属性別に出ること、2 つのメトリクスが混ざらないこと、初期化前の記録が送信されないこと、属性キーが設計どおりに限られること、加算の例外が外に出ないことが確認できる
   - _Requirements: 2.6, 3.3, 3.4, 3.5, 4.1, 4.2_
-- [ ] 1.2 記録モジュールをテレメトリの起動処理と公開窓口に組み込む
+- [x] 1.2 記録モジュールをテレメトリの起動処理と公開窓口に組み込む
   - SDK 開始後に実行される独自メトリクスの初期化処理から、カウンターの生成を呼び出す
   - テレメトリ機能の公開窓口から、記録関数と列挙型だけを外部に公開する（内部ファイルは公開しない）
   - テレメトリ有効時はカウンターが生成されて記録が送信対象になり、無効時は生成されず記録が no-op になることがテストで確認できる
@@ -89,3 +89,9 @@
   - steering から本 spec のファイルが参照されていないことを確認する（roadmap.md には掲載なし）
   - `.kiro/specs/opentelemetry-data-transfer-usage-metrics/` を削除し、opentelemetry spec だけで本機能の契約が読める状態になっている
   - _Requirements: 5.1, 5.2, 5.3_
+
+## Implementation Notes
+
+- `pnpm run lint:typecheck` reports 3 pre-existing errors outside this spec (`features/ai-usage/server/routes/apiv3/ai-usage.integ.ts` L112/L138, `server/routes/apiv3/staffs/index.spec.ts` L38). Not caused by this work; judge typecheck by "no errors in changed files".
+- Routes import the recorders only via `~/features/opentelemetry/server` (top-level barrel). No boot-order/circular hazard: the barrel's other export `node-sdk` is already loaded at boot by `server/app.ts`.
+- Tests that need real metric output use a real `MeterProvider` + `InMemoryMetricExporter` (see `custom-metrics/data-transfer-usage-metrics.spec.ts`); callers' tests mock the record functions from the barrel.
