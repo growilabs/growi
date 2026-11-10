@@ -40,9 +40,10 @@ import { mutateSearching } from '~/stores/search';
 
 import type { SearchItemMutation } from '../../util/apply-search-item-mutation';
 
-// A typical row: path, title and a two-line snippet. Rendered rows are
-// re-measured, so this only affects rows that have not been rendered yet.
-export const ESTIMATED_SEARCH_RESULT_ROW_HEIGHT = 100;
+// The rows' CSS min-height (`.list-group-item` in
+// packages/ui/scss/molecules/_page_list.scss), so an estimate never undershoots.
+// Rendered rows are re-measured; this only affects rows not rendered yet.
+export const ESTIMATED_SEARCH_RESULT_ROW_HEIGHT = 136;
 const OVERSCAN_ROW_COUNT = 5;
 
 const estimateRowSize = (): number => ESTIMATED_SEARCH_RESULT_ROW_HEIGHT;
