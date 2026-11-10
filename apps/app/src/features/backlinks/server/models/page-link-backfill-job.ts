@@ -57,13 +57,17 @@ export const extension = Prisma.defineExtension((client) => {
         },
 
         /**
-         * Atomically claim the job for `owner`. Succeeds when nobody holds it or the holder's
-         * lease has expired, and never for a completed job.
+         * Atomically claim the job for `owner`. Succeeds only for a `requested` job, or for a
+         * `running` / `failed` one that nobody holds or whose holder's lease has expired. An
+         * `idle`, `stopped` or `complete` job is never handed out, so an admin's cancel or Stop
+         * that lands between the caller's read and this call is not overridden.
+         *
+         * A claim clears any stale `stopRequested`, in the same write.
          *
          * Expiry is judged on the database clock (`$$NOW`), so instances whose own clocks
          * disagree cannot steal a live claim from each other.
          *
-         * Does not evaluate the start rule — that is the caller's job.
+         * @throws when `leaseMs` is not a positive finite number, or the write is not confirmed
          *
          * @returns whether `owner` now holds the claim
          */
@@ -71,15 +75,28 @@ export const extension = Prisma.defineExtension((client) => {
           owner: string,
           { leaseMs }: BackfillClaimOptions,
         ): Promise<boolean> {
+          if (!Number.isFinite(leaseMs) || leaseMs <= 0) {
+            throw new Error('leaseMs value is invalid');
+          }
+
           const result = await client.$runCommandRaw({
             findAndModify: COLLECTION,
             query: {
               _id: JOB_ID,
-              status: { $ne: 'complete' },
               $expr: {
                 $or: [
-                  { $eq: ['$claimedBy', null] },
-                  { $lt: ['$leaseExpiresAt', '$$NOW'] },
+                  { $eq: ['$status', 'requested'] },
+                  {
+                    $and: [
+                      { $in: ['$status', ['running', 'failed']] },
+                      {
+                        $or: [
+                          { $eq: ['$claimedBy', null] },
+                          { $lt: ['$leaseExpiresAt', '$$NOW'] },
+                        ],
+                      },
+                    ],
+                  },
                 ],
               },
             },
@@ -88,6 +105,7 @@ export const extension = Prisma.defineExtension((client) => {
             update: [
               {
                 $set: {
+                  stopRequested: false,
                   claimedBy: { $literal: owner },
                   status: 'running',
                   leaseExpiresAt: { $add: ['$$NOW', leaseMs] },
@@ -95,6 +113,7 @@ export const extension = Prisma.defineExtension((client) => {
               },
             ],
           });
+          throwOnWriteErrors(result, 'backfill job tryClaim');
           return result.value != null;
         },
       },
