@@ -430,7 +430,6 @@ export const SearchPage = (): JSX.Element => {
       searchResultListHead={searchResultListHead}
       infiniteScroll={{
         swrInfiniteResponse: swr,
-        isReachingEnd: hasLoadedAll || hasError,
         hasLoadedAll,
         hasError,
         onRetry,

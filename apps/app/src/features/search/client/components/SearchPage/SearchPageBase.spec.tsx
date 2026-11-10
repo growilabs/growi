@@ -737,14 +737,12 @@ describe('SearchPageBase drops selections of rows removed from the list (Req 11.
 });
 
 const createInfiniteScrollProps = (overrides?: {
-  isReachingEnd?: boolean;
   hasLoadedAll?: boolean;
   hasError?: boolean;
   onRetry?: () => void;
 }) => ({
   swrInfiniteResponse:
     mock<SWRInfiniteResponse<IFormattedSearchResult, Error>>(),
-  isReachingEnd: false,
   hasLoadedAll: false,
   hasError: false,
   onRetry: vi.fn(),
@@ -768,7 +766,7 @@ describe('SearchPageBase infinite-scroll rendering slot', () => {
   };
 
   it('wraps the list in InfiniteScroll and hides the numbered pager when infiniteScroll is provided', () => {
-    const infiniteScroll = createInfiniteScrollProps({ isReachingEnd: true });
+    const infiniteScroll = createInfiniteScrollProps();
 
     const { queryByTestId } = render(
       <SearchPageBase
@@ -781,10 +779,30 @@ describe('SearchPageBase infinite-scroll rendering slot', () => {
 
     // sentinel/infinite-scroll wrapper is rendered ...
     expect(queryByTestId('infinite-scroll')).not.toBeNull();
-    // ... and it received the computed reaching-end flag
-    expect(infiniteScrollSpy.lastProps?.isReachingEnd).toBe(true);
     // ... while the legacy numbered pager is NOT rendered
     expect(queryByTestId('search-pager')).toBeNull();
+  });
+
+  it.each([
+    { hasLoadedAll: false, hasError: false, stopsSentinel: false },
+    { hasLoadedAll: true, hasError: false, stopsSentinel: true },
+    // Stopping on an error prevents a tight setSize retry loop (Req 1.6).
+    { hasLoadedAll: false, hasError: true, stopsSentinel: true },
+  ])('stops the sentinel ($stopsSentinel) when hasLoadedAll=$hasLoadedAll and hasError=$hasError', ({
+    hasLoadedAll,
+    hasError,
+    stopsSentinel,
+  }) => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={[createPage('a'), createPage('b')]}
+        infiniteScroll={createInfiniteScrollProps({ hasLoadedAll, hasError })}
+        {...pagerControls}
+      />,
+    );
+
+    expect(infiniteScrollSpy.lastProps?.isReachingEnd).toBe(stopsSentinel);
   });
 
   it('renders the numbered pager and no InfiniteScroll when infiniteScroll is not provided (legacy)', () => {
@@ -803,7 +821,6 @@ describe('SearchPageBase infinite-scroll rendering slot', () => {
   it('renders a retry control in the endingIndicator on error and invokes onRetry when clicked', () => {
     const onRetry = vi.fn();
     const infiniteScroll = createInfiniteScrollProps({
-      isReachingEnd: true,
       hasError: true,
       onRetry,
     });
@@ -824,7 +841,7 @@ describe('SearchPageBase infinite-scroll rendering slot', () => {
 
   it('renders no retry control in the endingIndicator when there is no error', () => {
     const infiniteScroll = createInfiniteScrollProps({
-      isReachingEnd: true,
+      hasLoadedAll: true,
       hasError: false,
     });
 
@@ -1003,7 +1020,7 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
       <SearchPageBase
         resetKey="search-1"
         pages={createPages(20)}
-        infiniteScroll={createInfiniteScrollProps({ isReachingEnd: false })}
+        infiniteScroll={createInfiniteScrollProps()}
         {...noopControls}
       />,
     );
@@ -1016,7 +1033,7 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
       <SearchPageBase
         resetKey="search-1"
         pages={createPages(20)}
-        infiniteScroll={createInfiniteScrollProps({ isReachingEnd: false })}
+        infiniteScroll={createInfiniteScrollProps()}
         {...noopControls}
       />,
     );
@@ -1025,10 +1042,7 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
       <SearchPageBase
         resetKey="search-1"
         pages={createPages(25)}
-        infiniteScroll={createInfiniteScrollProps({
-          isReachingEnd: true,
-          hasLoadedAll: true,
-        })}
+        infiniteScroll={createInfiniteScrollProps({ hasLoadedAll: true })}
         {...noopControls}
       />,
     );
@@ -1037,14 +1051,11 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
   });
 
   it('keeps the list size unknown (-1) while loading the next chunk has failed', () => {
-    // SearchPage stops the sentinel on an error, so isReachingEnd is true here
-    // although more results exist.
     render(
       <SearchPageBase
         resetKey="search-1"
         pages={createPages(20)}
         infiniteScroll={createInfiniteScrollProps({
-          isReachingEnd: true,
           hasLoadedAll: false,
           hasError: true,
         })}
@@ -1061,7 +1072,6 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
         resetKey="search-1"
         pages={createPages(20)}
         infiniteScroll={createInfiniteScrollProps({
-          isReachingEnd: true,
           hasLoadedAll: true,
           hasError: true,
         })}

@@ -22,7 +22,6 @@ type CapturedSearchPageBaseProps = {
   searchPager?: unknown;
   infiniteScroll?: {
     swrInfiniteResponse?: unknown;
-    isReachingEnd?: unknown;
     hasLoadedAll?: unknown;
     hasError?: unknown;
     onRetry?: () => void;
@@ -204,9 +203,9 @@ describe('SearchPage infinite-scroll wiring', () => {
     expect(searchPageBaseSpy.lastProps?.searchPager).toBeFalsy();
   });
 
-  it('passes an infiniteScroll prop carrying the SWRInfinite response and a boolean isReachingEnd, plus a string resetKey', () => {
+  it('passes an infiniteScroll prop carrying the SWRInfinite response and a boolean hasLoadedAll, plus a string resetKey', () => {
     // one FULL chunk (hitsCount === chunk size) against a large total => not at
-    // the end, so isReachingEnd is a meaningful false here.
+    // the end, so hasLoadedAll is a meaningful false here.
     searchStoreSpy.infiniteResponse = createInfiniteResponse(
       createFullChunks(1),
     );
@@ -218,7 +217,7 @@ describe('SearchPage infinite-scroll wiring', () => {
     expect(props?.infiniteScroll?.swrInfiniteResponse).toBe(
       searchStoreSpy.infiniteResponse,
     );
-    expect(props?.infiniteScroll?.isReachingEnd).toBe(false);
+    expect(props?.infiniteScroll?.hasLoadedAll).toBe(false);
     expect(typeof props?.resetKey).toBe('string');
   });
 
@@ -257,9 +256,9 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
     vi.clearAllMocks();
   });
 
-  it('halts auto-load on error (isReachingEnd forced true) while preserving loaded pages', () => {
-    // A non-terminal result (one of many chunks loaded) that also errored: without
-    // the halt, InfiniteScroll would keep calling setSize and tight-loop.
+  it('reports the error without claiming every result is loaded, while preserving loaded pages', () => {
+    // A non-terminal result (one of many chunks loaded) that also errored.
+    // SearchPageBase stops the sentinel on hasError (see its spec).
     // The chunk reports a full hitsCount, so it does not signal the end.
     const fullChunk = mock<IFormattedSearchResult>({
       ...createChunk(['a', 'b']),
@@ -274,10 +273,7 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
 
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.hasError).toBe(true);
-    // isReachingEnd must be forced true so InfiniteScroll stops auto-loading,
-    // although the end is not reached (merged.isReachingEnd=false).
-    expect(infiniteScroll?.isReachingEnd).toBe(true);
-    // ...but not every result is loaded, so the list size stays unknown.
+    // Not every result is loaded, so the list size stays unknown.
     expect(infiniteScroll?.hasLoadedAll).toBe(false);
 
     // Already-loaded results are still handed down (not discarded on error).
@@ -317,7 +313,7 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
 
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.hasError).toBe(false);
-    expect(infiniteScroll?.isReachingEnd).toBe(false);
+    expect(infiniteScroll?.hasLoadedAll).toBe(false);
   });
 
   it('stops at the Elasticsearch max_result_window even when the total is not reached (P2-4)', () => {
@@ -332,7 +328,6 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
 
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.hasError).toBe(false);
-    expect(infiniteScroll?.isReachingEnd).toBe(true);
     // Nothing more will be loaded, so the loaded results are the whole list.
     expect(infiniteScroll?.hasLoadedAll).toBe(true);
   });
@@ -347,7 +342,7 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
     render(<SearchPage />);
 
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
-    expect(infiniteScroll?.isReachingEnd).toBe(false);
+    expect(infiniteScroll?.hasLoadedAll).toBe(false);
   });
 });
 

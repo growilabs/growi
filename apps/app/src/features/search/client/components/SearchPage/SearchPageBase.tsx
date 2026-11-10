@@ -58,10 +58,8 @@ export interface IResettableAfterMutation {
 // is wrapped in <InfiniteScroll> instead of the legacy numbered pager.
 type SearchPageBaseInfiniteProps = {
   swrInfiniteResponse: SWRInfiniteResponse<IFormattedSearchResult, Error>;
-  // Stops the sentinel: computed by the caller from the data end or a fetch error.
-  isReachingEnd: boolean;
-  // No more results will be loaded. Unlike isReachingEnd, false while a load
-  // has failed, so the list size is still unknown then.
+  // No more results will be loaded. False while a load has failed, so the list
+  // size is still unknown then.
   hasLoadedAll: boolean;
   hasError: boolean;
   onRetry: () => void;
@@ -410,7 +408,8 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     infiniteScroll != null ? (
       <InfiniteScroll
         swrInifiniteResponse={infiniteScroll.swrInfiniteResponse}
-        isReachingEnd={infiniteScroll.isReachingEnd}
+        // Also stop on an error so the sentinel cannot retry in a tight loop.
+        isReachingEnd={infiniteScroll.hasLoadedAll || infiniteScroll.hasError}
         endingIndicator={
           infiniteScroll.hasError ? (
             <div className="my-4 d-flex flex-column align-items-center">

@@ -199,7 +199,7 @@ sequenceDiagram
 ```
 
 **Key Decisions**:
-- `isReachingEnd` に `hasError` を OR することで、エラー時の `setSize` 連続再発火（タイトなリトライループ）を防ぐ（RN1 の解決）。
+- `SearchPageBase` が `InfiniteScroll` に渡す `isReachingEnd` を `hasLoadedAll || hasError` とし、エラー時の `setSize` 連続再発火（タイトなリトライループ）を防ぐ（RN1 の解決）。
 - 再試行は `endingIndicator` 内の明示ボタン→`setSize(size)`（失敗チャンクのみ再取得。引数なし `mutate()` は読込済み全チャンクを再取得するため使わない、A-4）。復帰後は通常のスクロール追加読込が再開する（要件 1.6 の「再試行できる状態を維持」を満たす）。
 
 ### 検索条件変更・削除後のリセット
@@ -384,7 +384,6 @@ export const mergeInfiniteSearchResult = (
 // 追加・変更する props（デルタ）
 type SearchPageBaseInfiniteProps = {
   swrInfiniteResponse: SWRInfiniteResponse<IFormattedSearchResult, Error>;
-  isReachingEnd: boolean;   // センチネルの停止条件: hasLoadedAll || hasError
   hasLoadedAll: boolean;    // これ以上読み込まない: merged.isReachingEnd || reachedResultWindowLimit（読み込み失敗中は false）
   hasError: boolean;
   onRetry: () => void;      // endingIndicator の再試行ボタン
@@ -410,14 +409,14 @@ type Props = {
 - Concurrency strategy: 追加読込中も選択状態は保持（`resetKey` 不変のため effect が発火しない）
 
 **Implementation Notes**
-- Integration: `InfiniteScroll` へ `swrInifiniteResponse`/`isReachingEnd`/`endingIndicator`（`hasError` 時は再試行 UI）を渡す。センチネルは既存 `overflow-y-scroll` コンテナ内に入る
+- Integration: `InfiniteScroll` へ `swrInifiniteResponse`/`isReachingEnd`（`hasLoadedAll || hasError` から算出する）/`endingIndicator`（`hasError` 時は再試行 UI）を渡す。センチネルは既存 `overflow-y-scroll` コンテナ内に入る
 - Validation: `resetKey` は同一検索中に安定し、条件変更で必ず変化すること（`SearchPage` 側で保証）
 - Risks: IntersectionObserver の root はビューポート（`InfiniteScroll` 既定）。2ペイン+内部スクロール構成での交差は実機確認（RN4）
 
 **追補（#190441）— 仮想化と再描画抑制のための変更**（要件 8.5, 9.2, 9.3, 10.1, 10.2）
 - スクロールコンテナ（`div.overflow-y-scroll`）を callback ref で state に保持し、`SearchResultList` の `scrollElement` へ渡す。一覧の開始位置（`scrollMargin`）を `offsetTop` で測れるよう、このコンテナに Bootstrap の `position-relative` を付ける
 - 行へ届くハンドラを安定させる: `onPageSelected` には `setSelectedPageWithMeta`（React が同一性を保証）をそのまま渡し、`checkboxChangedHandler` / `onPreviewedPageDeleted` は `useCallback` にする。`checkboxChangedHandler` の依存は `pages` のみ（チェック操作では変わらない）
-- 行の `aria-setsize` 用に `listSize` を算出して `SearchResultList` へ渡す: infinite scroll で `hasLoadedAll` が false の間（続きがある・追加読み込みに失敗している）は `-1`、それ以外（全件読み込み済み・legacy の 1 ページ表示）は `pages.length`。`isReachingEnd` はエラーでもセンチネルを止めるため true になり、全件数が分かったかどうかとは意味が違うので使わない
+- 行の `aria-setsize` 用に `listSize` を算出して `SearchResultList` へ渡す: infinite scroll で `hasLoadedAll` が false の間（続きがある・追加読み込みに失敗している）は `-1`、それ以外（全件読み込み済み・legacy の 1 ページ表示）は `pages.length`。センチネルの停止条件（`hasLoadedAll || hasError`）はエラーでも true になり、全件数が分かったかどうかとは意味が違うので使わない
 - 選択 `Set`（`selectedPageIdsByCheckboxes`）は書き換えず、変更のたびに新しい Set を state に入れて `SearchResultList` の `selectedPageIds` へ渡す。一覧はその再描画で最新の選択を受け取り、画面外の行は再マウント時にそこから初期値を得る（9.2）。全選択/解除は Set を置き換えたうえで、マウント中の行だけを命令的に更新する
 - 同じ Set を ref にも持つ。`selectAll()` の直後に `getSelectedPageIds()` を読む呼び出し元（`SearchPage` の件数更新）が、再描画前でも最新の選択を得るため。`checkboxChangedHandler` は ref から読むので、選択が変わってもハンドラの同一性は変わらない（10.2）。チェックを変えた行自身は `isInitiallyChecked` が変わるので再描画されるが、他の行は再描画されない
 - 選択件数・一括削除は今までどおり Set から導出するので、画面外の選択も含まれる（9.3、変更なし）
@@ -511,7 +510,7 @@ export const usePageDeleteModalForBulkDeletion: (
 - `useSWRINFxSearch` を用い、`mergeInfiniteSearchResult(data)` で累積 `pages`/`isReachingEnd`/`isEmpty` を導出
 - `resetKey` を検索アイデンティティ（`?q=` そのままの `keyword` + 並び替え等の条件）から生成（offset を含めない＝append で不変）。フィルタも `?q=` に含まれるため、フィルタだけの変更でもリセットされる（7.1/7.2）
 - 一覧のハイライトには演算子を除いたキーワードを渡す（演算子をハイライトしないため）
-- `PaginationWrapper`/`searchPager` を撤去し、`infiniteScroll` prop（`isReachingEnd = merged.isReachingEnd || hasError || reachedResultWindowLimit`）を渡す。`reachedResultWindowLimit` は次チャンクの `(読込済みチャンク数 + 1) * chunkSize` が Elasticsearch の `max_result_window`（既定 10000、`ES_MAX_RESULT_WINDOW`）を超えるときに true とし、上限到達後に毎回失敗する追加読込を防ぐ（P2-4）
+- `PaginationWrapper`/`searchPager` を撤去し、`infiniteScroll` prop（`hasLoadedAll = merged.isReachingEnd || reachedResultWindowLimit` と `hasError`）を渡す。`reachedResultWindowLimit` は次チャンクの `(読込済みチャンク数 + 1) * chunkSize` が Elasticsearch の `max_result_window`（既定 10000、`ES_MAX_RESULT_WINDOW`）を超えるときに true とし、上限到達後に毎回失敗する追加読込を防ぐ（P2-4）
 - 検索実行/条件変更時: `setSize(1)` + `mutate()`（累積破棄・先頭再読込。同じ条件での再検索でも取り直す）
 - 一括削除完了時: `setSize(1)` + `mutate()` + `resetAfterMutation()`（選択クリア**かつ右ペインプレビューのクリア**）
 - 削除ボタンは `selectedCount === 0` で無効
@@ -533,7 +532,7 @@ export const usePageDeleteModalForBulkDeletion: (
 ## Error Handling
 
 ### Error Strategy
-- **追加読込失敗（システムエラー 5xx/ネットワーク）**: `swrInfiniteResponse.error` を検知し `hasError` を立てる。`isReachingEnd` に OR して自動 `setSize` を停止（リトライループ防止）。`endingIndicator` にエラーメッセージ＋「再試行」ボタンを表示。再試行は現在と同じ size での `setSize(size)` とし、キャッシュを持たない失敗チャンクのみを再取得する（引数なし `mutate()` は読込済み全チャンクを再取得するため使わない、A-4）。成功後はスクロール追加読込が再開する。
+- **追加読込失敗（システムエラー 5xx/ネットワーク）**: `swrInfiniteResponse.error` を検知し `hasError` を立てる。`SearchPageBase` がセンチネルの停止条件に OR して自動 `setSize` を停止（リトライループ防止）。`endingIndicator` にエラーメッセージ＋「再試行」ボタンを表示。再試行は現在と同じ size での `setSize(size)` とし、キャッシュを持たない失敗チャンクのみを再取得する（引数なし `mutate()` は読込済み全チャンクを再取得するため使わない、A-4）。成功後はスクロール追加読込が再開する。
 - **検索サービス未設定/到達不能**: 既存 `SearchPageBase` の案内表示（`isSearchServiceConfigured` / `isSearchServiceReachable`）をそのまま維持。
 - **0 件**: エラーではなく `isEmpty` として 0 件表示（既存 `SearchResultListHead`）。
 
