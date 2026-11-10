@@ -1,0 +1,117 @@
+# Sample Deployment for the attachment text extractor (shared by GROWI apps).
+#
+# Lines marked "EDIT:" are placeholders the operator must change before applying.
+#
+# Memory budget: the worst-case estimate, in MiB, is
+#   69 (idle parent)
+#   + MAX_CONCURRENCY * (MAX_CHILD_RSS_MB + 148 (RSS monitor lag) + 157 (parent, per request))
+#   + the /tmp sizeLimit
+#   = 69 + 3 * (320 + 148 + 157) + 64 = 2008 for the defaults,
+# so limits.memory is 2Gi. An upload is held in the parent's memory only, never
+# spooled to /tmp. requests.memory is 512Mi because an idle Pod holds only ~70MiB
+# and most conversions use far less than the worst case. The /tmp tmpfs counts
+# against the memory limit, hence its small sizeLimit; the service writes nothing there.
+#
+# If you raise MAX_CONCURRENCY or MAX_CHILD_RSS_MB, recompute the budget and raise limits.
+#
+# No init process is needed: conversion children are direct children of the
+# service and end themselves as soon as it disappears.
+#
+# Not included on purpose: a PodDisruptionBudget (not part of the design). Add one
+# (minAvailable: 1) if your cluster drains nodes often.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: attachment-text-extractor
+  namespace: growi # EDIT: namespace shared by all four manifests
+  labels:
+    app.kubernetes.io/name: attachment-text-extractor
+spec:
+  replicas: 2 # The HPA takes over after the first apply.
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: attachment-text-extractor
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: attachment-text-extractor
+    spec:
+      automountServiceAccountToken: false
+      # On SIGTERM the service stops accepting and waits for the requests in flight,
+      # so this must exceed UPLOAD_TIMEOUT_S (15s) + TIMEOUT_S (55s) with some margin.
+      terminationGracePeriodSeconds: 85
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: attachment-text-extractor
+          # EDIT: registry and a pinned version tag (or digest); never "latest".
+          image: registry.example.com/growi/attachment-text-extractor:1.0.0
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: MAX_CONCURRENCY
+              value: "3"
+            - name: ATTACHMENT_EXTRACTOR_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: attachment-text-extractor # EDIT: Secret holding the shared Bearer token
+                  key: service-token
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          # /healthz only reports that the process is alive, so a busy Pod is never restarted.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          # /readyz converts small probe files in a real conversion child on every
+          # call, under a 10s limit, so timeoutSeconds must be longer than that.
+          # Kubelet probes are not affected by the egress-blocking NetworkPolicy.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8000
+            periodSeconds: 20
+            timeoutSeconds: 15
+            failureThreshold: 3
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
