@@ -131,10 +131,7 @@ vi.mock('next-i18next', () => ({
   useTranslation: vi.fn(() => ({ t: translate })),
 }));
 
-import {
-  ESTIMATED_SEARCH_RESULT_ROW_HEIGHT,
-  SearchResultList,
-} from './SearchResultList';
+import { SearchResultList } from './SearchResultList';
 import {
   stubVirtualListLayout,
   type VirtualListLayoutStub,
@@ -509,9 +506,12 @@ describe('SearchResultList virtualization', () => {
   });
 
   it('sizes the list to every loaded row, measured or estimated', () => {
+    // Unrendered rows count as the rows' CSS min-height (_page_list.scss).
+    const CSS_MIN_ROW_HEIGHT = 136;
     const pageCount = 300;
     render(
       <SearchResultList
+        selectedPageIds={NO_SELECTION}
         scrollElement={layout.scrollElement}
         pages={createPages(pageCount)}
       />,
@@ -522,7 +522,7 @@ describe('SearchResultList virtualization', () => {
     expect(container?.style.height).toBe(
       `${
         measuredRowCount * ROW_HEIGHT +
-        (pageCount - measuredRowCount) * ESTIMATED_SEARCH_RESULT_ROW_HEIGHT
+        (pageCount - measuredRowCount) * CSS_MIN_ROW_HEIGHT
       }px`,
     );
   });
