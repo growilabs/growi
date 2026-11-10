@@ -683,7 +683,7 @@ interface ProposalQueryService {
 #### Admin Settings Screen（summary only）
 - `pages/admin/change-proposal.page.tsx` は `pages/admin/ai.page.tsx` と同じ形（`dynamic` で `features/change-proposal/client/admin` の `ChangeProposalSettings` を読み込み、`getServerSideAdminCommonProps` を使う）。
 - 文言は `useTranslation('admin')` と `admin.json` の `change_proposal_settings.*` だけを使う（管理画面は `commons` と `admin` だけを読み込む）。5 言語すべてに同じキーを足す（要件 8.7）。
-- `AdminNavigation.tsx` に 1 項目を足す（表示の分岐・リンク・狭い画面の一覧の 3 か所）。
+- 管理メニュー（`AdminNavigation.tsx`）には項目を足さない。core だけでは Change Proposal を作る入口が無く、設定を変えても何も起きないため。画面には URL（`/admin/change-proposal`）で直接開ける。項目は、最初の入口である `change-proposal-ai-agent` が足す（同 spec の tasks.md 6.8）。
 - ページごとの通知の設定は、1 つの切り替えと説明文で出す。説明文では、有効にすると人の保存と同じページごとの通知（購読している人へのアプリ内通知と、グローバル通知）が出ること、依頼した人が Change Proposal ごとに止められること、まとめた通知は設定にかかわらず出ることを伝える（要件 8.9）。1 日の件数の上限の入力欄は、空のとき「上限なし」と表示する。
 
 #### Client Shared（`features/change-proposal/client/shared/`）

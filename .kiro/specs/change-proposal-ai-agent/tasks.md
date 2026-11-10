@@ -198,6 +198,11 @@
   - _Requirements: 15.1, 15.2, 15.3, 15.4_
   - _Boundary: Requester Actions, chat-sidebar status, ChatSidebar, requester-action-slots_
   - _Depends: 6.1, 6.6（と `change-proposal-viewer` の tasks.md 5.11）_
+- [ ] 6.8 管理メニューに Change Proposal の設定の項目を足す
+  - core が作った設定画面（`/admin/change-proposal`）への項目を、`AdminNavigation.tsx` の 3 か所（表示の分岐・リンク・狭い画面の一覧）に足す。core は、Change Proposal を作る入口が無いうちは項目を出していない（`change-proposal-core` の design の Admin Settings Screen）。文言は既存のキー `admin:change_proposal_settings.change_proposal_settings` を使う
+  - 管理メニューの部品の試験で、設定画面へのリンクが出ることを確かめている
+  - _Requirements: `change-proposal-core` の 8.6_
+  - _Depends: 6.5_
 
 - [ ] 7. 全体の確認
 - [ ] 7.1 チャットから Change Proposal ができるまでを通して確かめる
