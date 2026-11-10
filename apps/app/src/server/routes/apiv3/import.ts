@@ -2,6 +2,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Router } from 'express';
 
+import { recordArchiveOperation } from '~/features/opentelemetry/server';
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
@@ -473,12 +474,23 @@ export default function route(crowi: Crowi): Router {
       } catch (err) {
         // TODO: use ApiV3Error
         logger.error(err);
+        recordArchiveOperation('upload', 'failure');
         return res.status(500).send({ status: 'ERROR' });
       }
       try {
         // validate with meta.json
         importService.validate(data?.meta);
+      } catch {
+        recordArchiveOperation('upload', 'failure');
+        const msg =
+          'The version of this GROWI and the uploaded GROWI data are not the same';
+        const validationErr = 'versions-are-not-met';
+        return res.apiv3Err(new ErrorV3(msg, validationErr), 500);
+      }
 
+      recordArchiveOperation('upload', 'success');
+
+      try {
         const parameters = {
           action: SupportedAction.ACTION_ADMIN_ARCHIVE_DATA_UPLOAD,
         };
