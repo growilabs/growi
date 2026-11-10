@@ -955,6 +955,27 @@ describe('SearchPageBase wiring for the virtualized result list', () => {
     );
   });
 
+  it('returns the whole selection right after selectAll, before re-rendering', () => {
+    // SearchPage reads the selected count this way after the select-all checkbox.
+    const ref = createRef<SelectableRef>();
+    render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={createPages(3)}
+        {...noopControls}
+      />,
+    );
+
+    let sizeRightAfter: number | undefined;
+    act(() => {
+      ref.current?.selectAll();
+      sizeRightAfter = ref.current?.getSelectedPageIds?.().size;
+    });
+
+    expect(sizeRightAfter).toBe(3);
+  });
+
   it('selectAll selects every loaded page even though the list reaches only mounted rows (Req 9.2)', () => {
     const ref = createRef<SelectableRef>();
 
