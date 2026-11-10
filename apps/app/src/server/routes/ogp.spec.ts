@@ -1,6 +1,10 @@
 import type { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import { mock, mockDeep } from 'vitest-mock-extended';
+import { mock } from 'vitest-mock-extended';
+
+import type { AclService } from '~/server/service/acl';
+import type { ConfigManager } from '~/server/service/config-manager/config-manager';
+import type { FileUploader } from '~/server/service/file-uploader';
 
 import type Crowi from '../crowi';
 import type { PageModel } from '../models/page';
@@ -27,11 +31,13 @@ describe('ogpValidator', () => {
   });
 
   const buildCrowi = (): Crowi => {
-    const crowi = mockDeep<Crowi>();
-    crowi.configManager.getConfig.mockReturnValue('http://ogp.example');
-    crowi.fileUploadService.getIsUploadable.mockReturnValue(true);
-    crowi.aclService.isGuestAllowedToRead.mockReturnValue(true);
-    return crowi;
+    const configManager = mock<ConfigManager>();
+    configManager.getConfig.mockReturnValue('http://ogp.example');
+    const fileUploadService = mock<FileUploader>();
+    fileUploadService.getIsUploadable.mockReturnValue(true);
+    const aclService = mock<AclService>();
+    aclService.isGuestAllowedToRead.mockReturnValue(true);
+    return mock<Crowi>({ configManager, fileUploadService, aclService });
   };
 
   it('does not reflect the thrown error text into the 500 response body', async () => {
