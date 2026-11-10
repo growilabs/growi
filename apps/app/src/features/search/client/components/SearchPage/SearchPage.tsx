@@ -348,10 +348,6 @@ export const SearchPage = (): JSX.Element => {
                 loadedCount: merged.pages.length,
               })}
             </span>
-            {/* Announces selection changes only, not every append. */}
-            <span role="status" className="visually-hidden">
-              {t('search_result.selected_count', { selectedCount })}
-            </span>
 
             <button
               type="button"
@@ -377,16 +373,23 @@ export const SearchPage = (): JSX.Element => {
 
   const searchControl = useMemo(() => {
     return (
-      <SearchControl
-        isEnableSort
-        isEnableFilter
-        disableUserPages={disableUserPages}
-        initialSearchConditions={initialSearchConditions}
-        onSearchInvoked={searchInvokedHandler}
-        extraControls={extraControls}
-        collapseContents={collapseContents}
-        isCollapsed={isCollapsed}
-      />
+      <>
+        <SearchControl
+          isEnableSort
+          isEnableFilter
+          disableUserPages={disableUserPages}
+          initialSearchConditions={initialSearchConditions}
+          onSearchInvoked={searchInvokedHandler}
+          extraControls={extraControls}
+          collapseContents={collapseContents}
+          isCollapsed={isCollapsed}
+        />
+        {/* Outside the collapsible panel, which hides it while closed. Holds the
+            selected count only, so loading more results is not announced. */}
+        <span role="status" className="visually-hidden">
+          {t('search_result.selected_count', { selectedCount })}
+        </span>
+      </>
     );
   }, [
     extraControls,
@@ -395,6 +398,8 @@ export const SearchPage = (): JSX.Element => {
     isCollapsed,
     disableUserPages,
     searchInvokedHandler,
+    selectedCount,
+    t,
   ]);
 
   const searchResultListHead = useMemo(() => {

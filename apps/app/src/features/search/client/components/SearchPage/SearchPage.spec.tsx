@@ -96,9 +96,11 @@ vi.mock('./SearchControl', () => ({
   // Render only the collapse body (which contains the bulk-delete button) so the
   // Req 5.2 disabled/enabled contract is observable in the DOM; the rest of
   // SearchControl is exercised by its own spec.
-  default: (props: { collapseContents?: React.ReactNode }) => (
-    <>{props.collapseContents}</>
-  ),
+  // Like reactstrap's Collapse, a closed panel is hidden from assistive tech.
+  default: (props: {
+    collapseContents?: React.ReactNode;
+    isCollapsed?: boolean;
+  }) => <div hidden={!props.isCollapsed}>{props.collapseContents}</div>,
 }));
 vi.mock('./OperateAllControl', () => ({
   // Forward an imperative handle so SearchPage's selectAllControlRef is populated.
@@ -529,6 +531,19 @@ describe('SearchPage selected-count display (Req 4.4/4.7)', () => {
     expect(
       getByText(`${COUNT_KEY} selectedCount=1 loadedCount=2`),
     ).toBeInTheDocument();
+  });
+
+  it('announces a selection change while the bulk-delete panel stays closed', () => {
+    const { getByRole } = render(<SearchPage />);
+
+    // Selecting every loaded result does not open the panel.
+    act(() => {
+      searchPageBaseSpy.lastProps?.onSelectedPagesByCheckboxesChanged?.(2, 2);
+    });
+
+    expect(getByRole('status')).toHaveTextContent(
+      `${STATUS_KEY} selectedCount=2`,
+    );
   });
 
   it('keeps the selected count and grows the loaded count on append', () => {
