@@ -1,13 +1,23 @@
 import type { IncomingMessage } from 'node:http';
 import type { Hono } from 'hono';
+import { describeRoute, resolver } from 'hono-openapi';
 
 import type { Settings } from '../config/load-settings';
-import type { ErrorCode } from '../contract';
 import type { ConversionRunner, RunInput, RunOutcome } from '../runner';
+import {
+  ErrorResponseSchema,
+  ExtractRequestSchema,
+  ExtractResponseSchema,
+} from './api-schemas';
 import type { AppContext, AppEnv } from './app-env';
 import { createConcurrencySlots } from './concurrency-slots';
 import { errorAnswer } from './early-answer';
-import { ERROR_TABLE } from './error-table';
+import {
+  ERROR_TABLE,
+  extractErrorStatuses,
+  REFUSAL_TABLE,
+  type Refusal,
+} from './error-table';
 import { extractResponse } from './extract-response';
 import {
   boundaryOf,
@@ -68,18 +78,28 @@ const intakeOf = (settings: Settings): Intake => ({
   bodyTooLarge: `Request body exceeds the ${settings.maxFileSizeMb} MiB file size limit`,
 });
 
-interface Refusal {
-  readonly result: string;
-  readonly status: number;
-  readonly code: ErrorCode;
+interface Refused {
+  readonly refusal: Refusal;
   readonly message: string;
 }
 
 type Received =
   | { readonly ok: true; readonly input: RunInput }
-  | { readonly ok: false; readonly refusal: Refusal };
+  | ({ readonly ok: false } & Refused);
 
-const refused = (refusal: Refusal): Received => ({ ok: false, refusal });
+const refused = (refusal: Refusal, message: string): Received => ({
+  ok: false,
+  refusal,
+  message,
+});
+
+const refusalAnswer = (
+  c: AppContext,
+  { refusal, message }: Refused,
+): Response => {
+  const { status, code } = REFUSAL_TABLE[refusal];
+  return errorAnswer(c, status, code, message);
+};
 
 /** Only an early refusal: the bytes that arrive are counted all the same. */
 const declaredOverCap = (incoming: IncomingMessage, cap: number): boolean => {
@@ -93,38 +113,18 @@ const wantsContinue = (incoming: IncomingMessage): boolean =>
   incoming.httpVersion === '1.1' &&
   CONTINUE.test(incoming.headers.expect ?? '');
 
-const refusalOf = (error: unknown, intake: Intake): Refusal => {
+const refusalOf = (error: unknown, intake: Intake): Received => {
   if (error instanceof UploadTooLarge) {
-    return {
-      result: 'file_too_large',
-      status: 413,
-      code: 'file_too_large',
-      message: intake.bodyTooLarge,
-    };
+    return refused('file_too_large', intake.bodyTooLarge);
   }
   if (error instanceof UploadTimeout) {
-    return {
-      result: 'upload_timeout',
-      status: 408,
-      code: 'extraction_timeout',
-      message: UPLOAD_TIMEOUT,
-    };
+    return refused('upload_timeout', UPLOAD_TIMEOUT);
   }
   if (error instanceof InvalidMultipart) {
-    return {
-      result: 'invalid_upload',
-      status: 422,
-      code: 'extraction_failed',
-      message: INVALID,
-    };
+    return refused('invalid_upload', INVALID);
   }
   if (error instanceof UploadDisconnected) {
-    return {
-      result: 'client_disconnected',
-      status: 422,
-      code: 'extraction_failed',
-      message: BODY_ENDED,
-    };
+    return refused('client_disconnected', BODY_ENDED);
   }
   throw error;
 };
@@ -144,15 +144,13 @@ const receiveFile = async (
     if (wantsContinue(incoming)) outgoing.writeContinue();
     upload = await receiveUpload(incoming, parser, c.req.raw.signal, intake);
   } catch (error) {
-    return refused(refusalOf(error, intake));
+    return refusalOf(error, intake);
   }
   if (upload.size > intake.maxFileBytes) {
-    return refused({
-      result: 'file_too_large',
-      status: 413,
-      code: 'file_too_large',
-      message: `File size ${upload.size} bytes exceeds the ${intake.maxFileBytes / MIB} MiB limit`,
-    });
+    return refused(
+      'file_too_large',
+      `File size ${upload.size} bytes exceeds the ${intake.maxFileBytes / MIB} MiB limit`,
+    );
   }
   return {
     ok: true,
@@ -196,7 +194,10 @@ const convertAndAnswer = async (
   if (signal.aborted) {
     // Nobody is left to read it; the child is already stopped and reaped.
     line('client_disconnected', facts);
-    return errorAnswer(c, 422, 'extraction_failed', ABANDONED);
+    return refusalAnswer(c, {
+      refusal: 'client_disconnected',
+      message: ABANDONED,
+    });
   }
   if (outcome.kind === 'ok') {
     line('ok', {
@@ -211,29 +212,62 @@ const convertAndAnswer = async (
   return errorAnswer(c, status, code, message);
 };
 
+// No request validator: the body stays unread until receiveUpload reads it
+// (research.md 17.13 3). The answer is built as a stream, so the schemas
+// cannot check it at compile time; the ajv tests check real answers.
+const describeExtract = describeRoute({
+  requestBody: {
+    required: true,
+    content: {
+      'multipart/form-data': { schema: resolver(ExtractRequestSchema) },
+    },
+  },
+  responses: {
+    200: {
+      description: 'OK',
+      content: {
+        'application/json': { schema: resolver(ExtractResponseSchema) },
+      },
+    },
+    ...Object.fromEntries(
+      [...extractErrorStatuses()].map(([status, codes]) => [
+        status,
+        {
+          description: codes.join(', '),
+          content: {
+            'application/json': { schema: resolver(ErrorResponseSchema) },
+          },
+        },
+      ]),
+    ),
+  },
+});
+
 export const registerExtractRoute = (
   app: Hono<AppEnv>,
   deps: ExtractRouteDeps,
 ): void => {
   const slots = createConcurrencySlots(deps.settings.maxConcurrency);
   const intake = intakeOf(deps.settings);
-  app.post('/extract', async (c) => {
+  app.post('/extract', describeExtract, async (c) => {
     const line = deps.log.start();
     if (declaredOverCap(c.env.incoming, intake.maxBodyBytes)) {
       line('file_too_large');
-      return errorAnswer(c, 413, 'file_too_large', intake.bodyTooLarge);
+      return refusalAnswer(c, {
+        refusal: 'file_too_large',
+        message: intake.bodyTooLarge,
+      });
     }
     const release = slots.tryAcquire();
     if (release === null) {
       line('service_busy');
-      return errorAnswer(c, 503, 'service_busy', BUSY);
+      return refusalAnswer(c, { refusal: 'service_busy', message: BUSY });
     }
     try {
       const received = await receiveFile(c, intake);
       if (!received.ok) {
-        const { result, status, code, message } = received.refusal;
-        line(result);
-        return errorAnswer(c, status, code, message);
+        line(received.refusal);
+        return refusalAnswer(c, received);
       }
       return await convertAndAnswer(c, deps, received.input, line);
     } finally {

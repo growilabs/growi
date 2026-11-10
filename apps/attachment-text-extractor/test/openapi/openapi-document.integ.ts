@@ -1,11 +1,8 @@
-import { loadSettings } from '../../src/config/load-settings';
-import { ERROR_CODES } from '../../src/contract/error-code';
-import { createApp } from '../../src/http';
 import { ERROR_TABLE } from '../../src/http/error-table';
-import { openApiDocument } from '../../src/http/openapi-route';
 import {
   type Answer,
   getPath,
+  jsonOf,
   postBody,
   postFile,
   recordOf,
@@ -17,69 +14,156 @@ import {
   succeeded,
 } from '../../src/http/spec-support/fake-runner';
 import { useTestService } from '../../src/http/spec-support/test-service';
-import { responseChecker, textAt } from './openapi-support';
+import { responseChecker, schemaChecker, textAt } from './openapi-support';
 
-// The document is kept by hand (research.md 17.1), so the code must be checked
-// against it (17.7 2): (i) the routes, (ii) the ErrorCode values, (iii) the
-// error table's statuses, (iv) the shape of real answers, checked with ajv
-// against the documented schemas (an undocumented field or status fails;
-// only the auth 401 and /readyz's 503 may go undocumented).
-// Python test_schemas.py (ErrorCode order, response shapes) maps here.
+// The document is generated from the route definitions (research.md 17.13).
+// Checked here: (1) what a client generated from it keeps for POST /extract
+// (Req 7.1, 7.2): the request fields and whether they are required, the
+// answer types, the ErrorCode values; (2) real answers fit the documented
+// schemas, read in the strict view (17.7 2 (iv)): an undocumented field or
+// status fails, and only the authentication 401 may go undocumented.
+// Node only (these are not the FastAPI document's shapes), so not in the
+// black-box tests. Python test_schemas.py maps here.
 
-const check = responseChecker(openApiDocument);
+let runner = fakeRunner();
+const service = useTestService(() => {
+  runner = fakeRunner();
+  return { runner, env: { MAX_FILE_SIZE_MB: '1' } };
+});
 
-describe('the code against the document', () => {
-  it('(i) serves exactly the documented operations plus GET /openapi.json', () => {
-    const app = createApp({
-      settings: loadSettings({
-        ATTACHMENT_EXTRACTOR_SERVICE_TOKEN: 'routes-only',
+const served = async (): Promise<Record<string, unknown>> =>
+  jsonOf(await getPath(service.current().url, '/openapi.json'));
+
+const EXTRACT = ['paths', '/extract', 'post'] as const;
+const PAGE = { pageNumber: 1, label: '1', content: 'x' };
+const EXTRACTED = {
+  pages: [PAGE],
+  mimeType: 'text/plain',
+  extractedCharacters: 1,
+};
+
+describe('what a client generated from the document keeps (Req 7.1, 7.2)', () => {
+  it('documents POST /extract, GET /healthz and GET /readyz', async () => {
+    const doc = await served();
+
+    expect(textAt(doc, EXTRACT)).toBeDefined();
+    expect(textAt(doc, ['paths', '/healthz', 'get'])).toBeDefined();
+    expect(textAt(doc, ['paths', '/readyz', 'get'])).toBeDefined();
+  });
+
+  it('POST /extract takes a multipart body: `file` binary and required, `mimeType` an optional string', async () => {
+    const doc = await served();
+    const body = recordOf(textAt(doc, [...EXTRACT, 'requestBody']));
+    const schema = textAt(body, ['content', 'multipart/form-data', 'schema']);
+    const fits = schemaChecker(doc, schema);
+
+    expect(body.required).toBe(true);
+    expect(Object.keys(recordOf(body.content))).toEqual([
+      'multipart/form-data',
+    ]);
+    expect(textAt(schema, ['properties', 'file', 'format'])).toBe('binary');
+    expect(fits({ file: 'x' })).toEqual([]);
+    expect(fits({ file: 'x', mimeType: 'text/plain' })).toEqual([]);
+    expect(fits({ mimeType: 'text/plain' })).not.toEqual([]);
+    expect(fits({ file: 'x', mimeType: 1 })).not.toEqual([]);
+    expect(fits({ file: 'x', mime_type: 'text/plain' })).not.toEqual([]);
+  });
+
+  it('names the schemas the client and apps/app use', async () => {
+    const schemas = recordOf(textAt(await served(), ['components', 'schemas']));
+
+    expect(Object.keys(schemas)).toEqual(
+      expect.arrayContaining([
+        'ErrorCode',
+        'ErrorResponse',
+        'ExtractResponse',
+        'PageInfo',
+      ]),
+    );
+  });
+
+  it('ErrorCode has the eight values', async () => {
+    expect(
+      textAt(await served(), ['components', 'schemas', 'ErrorCode', 'enum']),
+    ).toEqual([
+      'unauthorized',
+      'unsupported_format',
+      'file_too_large',
+      'extraction_timeout',
+      'service_busy',
+      'extraction_failed',
+      'file_encrypted',
+      'resource_limit_exceeded',
+    ]);
+  });
+
+  it('the 200 of POST /extract is an ExtractResponse of PageInfo items', async () => {
+    const doc = await served();
+    const ok = (body: unknown) =>
+      responseChecker(doc)('/extract', 'post', 200, body);
+
+    expect(ok(EXTRACTED)).toEqual([]);
+    expect(
+      ok({
+        ...EXTRACTED,
+        pages: [{ pageNumber: null, label: null, content: '' }],
       }),
-      runner: fakeRunner(),
-      writeLog: () => {},
-    });
-    const served = app.routes
-      .filter((route) => route.method !== 'ALL')
-      .map((route) => `${route.method} ${route.path}`);
-    const documented = Object.entries(
-      recordOf(textAt(openApiDocument, ['paths'])),
-    ).flatMap(([path, operations]) =>
-      Object.keys(recordOf(operations)).map(
-        (method) => `${method.toUpperCase()} ${path}`,
-      ),
-    );
-
-    expect(new Set(served)).toEqual(
-      new Set([...documented, 'GET /openapi.json']),
-    );
+    ).toEqual([]);
+    expect(
+      ok({ ...EXTRACTED, pages: [{ ...PAGE, pageNumber: '1' }] }),
+    ).not.toEqual([]);
+    expect(
+      ok({ ...EXTRACTED, pages: [{ ...PAGE, pageNumber: 1.5 }] }),
+    ).not.toEqual([]);
+    expect(
+      ok({ ...EXTRACTED, pages: [{ pageNumber: 1, label: '1' }] }),
+    ).not.toEqual([]);
+    expect(ok({ ...EXTRACTED, extractedCharacters: 1.5 })).not.toEqual([]);
+    expect(ok({ pages: [], mimeType: 'text/plain' })).not.toEqual([]);
+    expect(ok({ ...EXTRACTED, engine: 'x' })).not.toEqual([]);
   });
 
-  it('(ii) ERROR_CODES are the documented enum, in order', () => {
-    expect(ERROR_CODES).toEqual(
-      textAt(openApiDocument, ['components', 'schemas', 'ErrorCode', 'enum']),
-    );
-  });
+  it('every error answer of POST /extract is an ErrorResponse, under the statuses the FastAPI document had', async () => {
+    const doc = await served();
+    const statuses = Object.keys(
+      recordOf(textAt(doc, [...EXTRACT, 'responses'])),
+    ).filter((status) => status !== '200');
+    const check = responseChecker(doc);
 
-  it('(iii) every status of the error table is documented for POST /extract', () => {
-    const documented = Object.keys(
-      recordOf(
-        textAt(openApiDocument, ['paths', '/extract', 'post', 'responses']),
-      ),
-    );
-
-    for (const { status } of Object.values(ERROR_TABLE)) {
-      expect(documented).toContain(String(status));
+    expect(statuses.sort()).toEqual(['400', '408', '413', '422', '500', '503']);
+    for (const status of statuses.map(Number)) {
+      const error = (body: unknown) => check('/extract', 'post', status, body);
+      expect(
+        error({ code: 'file_too_large', message: 'x' }),
+        `${status}`,
+      ).toEqual([]);
+      expect(
+        error({ code: 'no_such_code', message: 'x' }),
+        `${status}`,
+      ).not.toEqual([]);
+      expect(error({ code: 'file_too_large' }), `${status}`).not.toEqual([]);
     }
+  });
+
+  it('the check lets only the authentication 401 go undocumented', async () => {
+    const check = responseChecker(await served());
+
+    expect(
+      check('/extract', 'post', 401, { code: 'unauthorized', message: 'x' }),
+    ).toEqual([]);
+    expect(
+      check('/extract', 'post', 418, {
+        code: 'extraction_failed',
+        message: 'x',
+      }),
+    ).not.toEqual([]);
+    expect(check('/healthz', 'get', 503, {})).not.toEqual([]);
   });
 });
 
 describe('(iv) real answers fit the documented schemas', () => {
-  let runner = fakeRunner();
-  const service = useTestService(() => {
-    runner = fakeRunner();
-    return { runner, env: { MAX_FILE_SIZE_MB: '1' } };
-  });
-
-  const fits = (path: string, method: string, answer: Answer): void => {
+  const fits = async (path: string, method: string, answer: Answer) => {
+    const check = responseChecker(await served());
     expect(check(path, method, answer.status, JSON.parse(answer.text))).toEqual(
       [],
     );
@@ -101,7 +185,7 @@ describe('(iv) real answers fit the documented schemas', () => {
     const answer = await post();
 
     expect(answer.status).toBe(200);
-    fits('/extract', 'post', answer);
+    await fits('/extract', 'post', answer);
   });
 
   it.each(Object.keys(ERROR_TABLE))('the %s failure', async (kind) => {
@@ -111,21 +195,23 @@ describe('(iv) real answers fit the documented schemas', () => {
     if (failure === undefined) throw new Error(kind);
     runner.run.mockResolvedValue(failed(failure));
 
-    fits('/extract', 'post', await post());
+    await fits('/extract', 'post', await post());
   });
 
   it('413, 422 and 401 from the HTTP layer', async () => {
-    const { url } = service.current();
+    const { url, token } = service.current();
 
-    fits('/extract', 'post', await post(Buffer.alloc(1024 * 1024 + 1, 0x78)));
-    fits(
+    await fits(
       '/extract',
       'post',
-      await postBody(url, '{}', 'application/json', {
-        token: service.current().token,
-      }),
+      await post(Buffer.alloc(1024 * 1024 + 1, 0x78)),
     );
-    fits(
+    await fits(
+      '/extract',
+      'post',
+      await postBody(url, '{}', 'application/json', { token }),
+    );
+    await fits(
       '/extract',
       'post',
       await postFile(url, 'a.txt', 'x', { token: null }),
@@ -143,7 +229,7 @@ describe('(iv) real answers fit the documented schemas', () => {
     const busy = await postFile(url, 'a.txt', 'probe', { token });
 
     expect(busy.status).toBe(503);
-    fits('/extract', 'post', busy);
+    await fits('/extract', 'post', busy);
     held.release();
     await first;
   });
@@ -154,10 +240,10 @@ describe('(iv) real answers fit the documented schemas', () => {
       .mockResolvedValueOnce({ ready: true })
       .mockResolvedValueOnce({ ready: false });
 
-    fits('/healthz', 'get', await getPath(url, '/healthz'));
-    fits('/readyz', 'get', await getPath(url, '/readyz'));
+    await fits('/healthz', 'get', await getPath(url, '/healthz'));
+    await fits('/readyz', 'get', await getPath(url, '/readyz'));
     const notReady = await getPath(url, '/readyz');
     expect(notReady.status).toBe(503);
-    fits('/readyz', 'get', notReady);
+    await fits('/readyz', 'get', notReady);
   });
 });

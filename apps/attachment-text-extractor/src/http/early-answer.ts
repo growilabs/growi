@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http';
 
 import type { ErrorCode } from '../contract';
+import type { ErrorResponse } from './api-schemas';
 import type { AppContext } from './app-env';
 
 // The most the drain reads of a body nobody wants, and how long it waits for
@@ -62,7 +63,8 @@ export const errorAnswer = (
     const destroySoon = socket.destroySoon;
     socket.destroySoon = () => drainThenClose(incoming, destroySoon);
   }
-  return new Response(JSON.stringify({ code, message }), {
+  const body: ErrorResponse = { code, message };
+  return new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json' },
   });

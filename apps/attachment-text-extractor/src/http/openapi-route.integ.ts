@@ -1,50 +1,42 @@
-import {
-  DESCRIPTION_FIXES,
-  readCommittedOpenApi,
-  textAt,
-  withoutDescriptions,
-} from '../../test/openapi/openapi-support';
-import { openApiDocument } from './openapi-route';
 import { callPath, getPath, jsonOf } from './spec-support/extract-client';
 import { fakeRunner } from './spec-support/fake-runner';
-import { useTestService } from './spec-support/test-service';
+import { startTestService, useTestService } from './spec-support/test-service';
 
-// GET /openapi.json serves the service-owned document as it is (research.md
-// 17.1), and there are no /docs or /redoc pages (D3). Python test_main.py
-// TestOpenApiIntegration. The drift and code-vs-document checks are in
+// GET /openapi.json serves the document generated from the route definitions
+// (research.md 17.13), and there are no /docs or /redoc pages (D3). Python
+// test_main.py TestOpenApiIntegration. What the document says is checked in
 // test/openapi/.
 
 const service = useTestService(() => ({ runner: fakeRunner() }));
 
 describe('GET /openapi.json', () => {
-  it('serves the service document, without a token', async () => {
+  it('serves an OpenAPI 3.1 document as JSON, without a token', async () => {
     const answer = await getPath(service.current().url, '/openapi.json');
 
     expect(answer.status).toBe(200);
     expect(answer.headers.get('content-type')).toMatch(/^application\/json/);
-    expect(jsonOf(answer)).toEqual(JSON.parse(JSON.stringify(openApiDocument)));
-    expect(Object.keys(jsonOf(answer)).sort()).toEqual([
-      'components',
-      'info',
-      'openapi',
-      'paths',
-    ]);
+    expect(jsonOf(answer).openapi).toBe('3.1.0');
   });
 
-  it('is the committed client document with only the 7.1 descriptions rewritten', async () => {
-    const served = jsonOf(
-      await getPath(service.current().url, '/openapi.json'),
-    );
+  // The generator keeps state at module level; apps built in one process
+  // (the tests build many) must not see each other's routes.
+  it('serves the same document on every request and from every app', async () => {
+    const { url } = service.current();
+    const other = await startTestService(fakeRunner(), {
+      MAX_FILE_SIZE_MB: '1',
+    });
+    try {
+      const [first, second, fromOther] = await Promise.all([
+        getPath(url, '/openapi.json'),
+        getPath(url, '/openapi.json'),
+        getPath(other.url, '/openapi.json'),
+      ]);
 
-    expect(withoutDescriptions(served)).toStrictEqual(
-      withoutDescriptions(readCommittedOpenApi()),
-    );
-    for (const { pointer, after } of DESCRIPTION_FIXES) {
-      expect(textAt(served, pointer), pointer.join(' > ')).toBe(after);
+      expect(jsonOf(second)).toStrictEqual(jsonOf(first));
+      expect(jsonOf(fromOther)).toStrictEqual(jsonOf(first));
+    } finally {
+      await other.close();
     }
-    expect(JSON.stringify(served)).not.toMatch(
-      /forkserver|BearerAuthMiddleware|FastAPI|Extends str|len\(|``|\bNone\b/,
-    );
   });
 });
 

@@ -1,7 +1,8 @@
 import { loadPackageManifest } from './deploy-files';
 
-// The production dependencies are exactly the nine adopted libraries
-// (research.md 21.2). Anything else in `dependencies` ends up in the image through
+// The production dependencies are exactly the eleven adopted libraries
+// (research.md 21.2; hono-openapi and zod generate the OpenAPI document,
+// 17.13). Anything else in `dependencies` ends up in the image through
 // `pnpm deploy --prod`, so a new entry must be a deliberate change to this list.
 // This maps Python's test_dependencies.py "production dependencies exclude external
 // binary and removed libraries" (research.md 22.3): the exact list also keeps out
@@ -15,13 +16,15 @@ const ALLOWED_PRODUCTION_DEPENDENCIES = [
   '@xmldom/xmldom',
   'entities',
   'hono',
+  'hono-openapi',
   'htmlparser2',
   'yauzl',
   'yazl',
+  'zod',
 ] as const;
 
 describe('production dependencies', () => {
-  it('are exactly the nine adopted libraries', () => {
+  it('are exactly the eleven adopted libraries', () => {
     expect(Object.keys(loadPackageManifest().dependencies).sort()).toEqual([
       ...ALLOWED_PRODUCTION_DEPENDENCIES,
     ]);

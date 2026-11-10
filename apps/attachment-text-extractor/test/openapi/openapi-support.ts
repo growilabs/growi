@@ -1,19 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { Ajv2020 } from 'ajv/dist/2020';
 
 // Checks an actual answer against the OpenAPI document (research.md 17.7 2 (iv)).
 // Imports nothing from src/: the black-box tests use it against Python too.
-
-export const COMMITTED_OPENAPI_PATH = fileURLToPath(
-  new URL(
-    '../../../../packages/attachment-text-extractor-client/openapi.json',
-    import.meta.url,
-  ),
-);
-
-export const readCommittedOpenApi = (): unknown =>
-  JSON.parse(readFileSync(COMMITTED_OPENAPI_PATH, 'utf8'));
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
@@ -48,12 +36,32 @@ const toDefs = (schema: Json): Json =>
     ),
   );
 
-// Answers the document leaves out on purpose, as the FastAPI service did: the
-// authentication 401 on any path, and /readyz's 503 (its 200 schema is {} too).
-const undocumentedSchema = (path: string, status: number): Json | undefined => {
-  if (status === 401) return { $ref: '#/components/schemas/ErrorResponse' };
-  if (path === '/readyz' && status === 503) return {};
-  return undefined;
+// The authentication 401 answers every path before any route runs, so no
+// operation documents it (nor did the FastAPI document); it is an ErrorResponse.
+const undocumentedSchema = (status: number): Json | undefined =>
+  status === 401 ? { $ref: '#/components/schemas/ErrorResponse' } : undefined;
+
+/** Why `value` does not fit the schema (empty when it fits). */
+export type SchemaCheck = (value: unknown) => readonly string[];
+
+/** A check of values against one schema of the document, in the strict view. */
+export const schemaChecker = (
+  document: unknown,
+  schema: unknown,
+): SchemaCheck => {
+  const defs = toDefs(at(toJson(document), 'components', 'schemas') ?? {});
+  const root = toDefs(toJson(schema));
+  // `binary` is OpenAPI's mark for a file part; any value passes it here.
+  const validate = new Ajv2020({
+    strict: true,
+    formats: { binary: true },
+  }).compile(isJsonObject(root) ? { $defs: defs, ...root } : { $defs: defs });
+  return (value) =>
+    validate(value)
+      ? []
+      : (validate.errors ?? []).map(
+          (error) => `${error.instancePath || '/'} ${error.message ?? ''}`,
+        );
 };
 
 export type ResponseCheck = (
@@ -66,8 +74,6 @@ export type ResponseCheck = (
 /** A checker that lists why an answer does not fit the document (empty when it fits). */
 export const responseChecker = (document: unknown): ResponseCheck => {
   const doc = toJson(document);
-  const schemas = at(doc, 'components', 'schemas') ?? {};
-  const ajv = new Ajv2020({ strict: true });
   return (path, method, status, body) => {
     const documented = at(
       doc,
@@ -80,73 +86,15 @@ export const responseChecker = (document: unknown): ResponseCheck => {
       'application/json',
       'schema',
     );
-    const schema = documented ?? undocumentedSchema(path, status);
+    const schema = documented ?? undocumentedSchema(status);
     if (schema === undefined) {
       return [`${method} ${path} ${status} is not documented`];
     }
-    const defs = toDefs(schemas);
-    const root = toDefs(schema);
-    const validate = ajv.compile(
-      isJsonObject(root) ? { $defs: defs, ...root } : { $defs: defs },
-    );
-    return validate(body)
-      ? []
-      : (validate.errors ?? []).map(
-          (error) => `${error.instancePath || '/'} ${error.message ?? ''}`,
-        );
+    return schemaChecker(doc, schema)(body);
   };
 };
 
-/**
- * The document without its annotation `description`s; a property that is
- * itself named "description" (inside `properties`) is kept (research.md 17.3 2).
- * Comparing exactly replaces this at 8.2.
- */
-export const withoutDescriptions = (value: unknown): unknown => {
-  const strip = (node: Json, parentKey?: string): Json => {
-    if (Array.isArray(node)) return node.map((item) => strip(item));
-    if (!isJsonObject(node)) return node;
-    return Object.fromEntries(
-      Object.entries(node)
-        .filter(([key]) => parentKey === 'properties' || key !== 'description')
-        .map(([key, item]) => [key, strip(item, key)]),
-    );
-  };
-  return strip(toJson(value));
-};
-
-/** The 7.1 description fixes (research.md 17.6): the service's document carries `after`. */
-export const DESCRIPTION_FIXES: readonly {
-  readonly pointer: readonly string[];
-  readonly after: string;
-}[] = [
-  {
-    pointer: ['paths', '/readyz', 'get', 'description'],
-    after:
-      '200 `ready` when `prlimit` can be run and a probe child process starts, else 503 `not_ready`.\n\nThe body never carries paths or exception text.',
-  },
-  {
-    pointer: ['paths', '/extract', 'post', 'description'],
-    after:
-      'Receive a multipart upload, enforce the slot and size limits, then convert it in a child process.\n\nThe Bearer token is checked before this operation runs; only authenticated requests reach it.',
-  },
-  {
-    pointer: ['components', 'schemas', 'ErrorCode', 'description'],
-    after: 'Machine-readable error codes for all defined failure modes.',
-  },
-  {
-    pointer: ['components', 'schemas', 'ExtractResponse', 'description'],
-    after:
-      'Successful extraction response returned by POST /extract.\n\nextractedCharacters is the total number of characters (Unicode code points) in content\nacross all pages and is provided for audit logging and metrics purposes.',
-  },
-  {
-    pointer: ['components', 'schemas', 'PageInfo', 'description'],
-    after:
-      'Information extracted from a single logical page or section of a document.\n\npageNumber and label are null when the source format has no positional\npage concept (e.g. plain text files).',
-  },
-];
-
-/** The string at `pointer` in a JSON document, or undefined. */
+/** The value at `pointer` in a JSON document, or undefined. */
 export const textAt = (
   document: unknown,
   pointer: readonly string[],

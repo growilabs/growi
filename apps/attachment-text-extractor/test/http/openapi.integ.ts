@@ -5,20 +5,14 @@ import {
   postBody,
   postFile,
 } from '../../src/http/spec-support/extract-client';
-import {
-  DESCRIPTION_FIXES,
-  readCommittedOpenApi,
-  responseChecker,
-  textAt,
-  withoutDescriptions,
-} from '../openapi/openapi-support';
+import { responseChecker } from '../openapi/openapi-support';
 import { useBlackboxService } from './blackbox-service';
-import { itNodeOnly } from './blackbox-target';
 
-// Black box (research.md 22.7 `openapi`): Req 7.1 / 7.3 from outside. The
-// served document equals the committed client document except for the
-// `description`s (17.7 1); the 7.1 description fixes are Node only (17.6);
-// real answers fit the documented schemas (17.7 2 (iv)). Python
+// Black box (research.md 22.7 `openapi`): Req 7.1 from outside. The service
+// serves its document without a token, and real answers fit the schemas the
+// served document gives (17.7 2 (iv)). Both hold for the Python service with
+// its own document, so nothing here is Node only; what only the Node
+// document says (the 7.2 facts) is checked in test/openapi/. Python
 // test_main.py TestOpenApiIntegration / TestOpenApiRequestBody.
 
 const service = useBlackboxService();
@@ -33,60 +27,6 @@ describe('GET /openapi.json', () => {
     expect(answer.status).toBe(200);
     expect(String(jsonOf(answer).openapi)).toMatch(/^3\./);
   });
-
-  it('documents POST /extract and the ExtractResponse schema', async () => {
-    const doc = await served();
-
-    expect(textAt(doc, ['paths', '/extract', 'post', 'operationId'])).toBe(
-      'post_extract_extract_post',
-    );
-    expect(
-      textAt(doc, ['components', 'schemas', 'ExtractResponse', 'title']),
-    ).toBe('ExtractResponse');
-  });
-
-  it('documents the multipart form with `file` required', async () => {
-    const doc = await served();
-
-    expect(
-      textAt(doc, [
-        'paths',
-        '/extract',
-        'post',
-        'requestBody',
-        'content',
-        'multipart/form-data',
-        'schema',
-        '$ref',
-      ]),
-    ).toBe('#/components/schemas/Body_post_extract_extract_post');
-    expect(
-      textAt(doc, [
-        'components',
-        'schemas',
-        'Body_post_extract_extract_post',
-        'required',
-      ]),
-    ).toEqual(['file']);
-  });
-
-  it('equals the committed client document apart from descriptions (drift, Req 7.3)', async () => {
-    expect(withoutDescriptions(await served())).toStrictEqual(
-      withoutDescriptions(readCommittedOpenApi()),
-    );
-  });
-
-  itNodeOnly(
-    '17.6',
-    'carries the five rewritten descriptions (Req 7.1)',
-    async () => {
-      const doc = await served();
-
-      for (const { pointer, after } of DESCRIPTION_FIXES) {
-        expect(textAt(doc, pointer), pointer.join(' > ')).toBe(after);
-      }
-    },
-  );
 });
 
 describe('answers fit the documented schemas (17.7 2 (iv))', () => {
@@ -137,41 +77,5 @@ describe('answers fit the documented schemas (17.7 2 (iv))', () => {
 
     expect(answer.status).toBe(200);
     await fits(path, 'get', answer);
-  });
-
-  it('the checker itself rejects an undocumented field and an undocumented status', async () => {
-    const check = responseChecker(await served());
-    const page = { pageNumber: 1, label: '1', content: 'x' };
-
-    expect(
-      check('/extract', 'post', 200, {
-        pages: [page],
-        mimeType: 'text/plain',
-        extractedCharacters: 1,
-      }),
-    ).toEqual([]);
-    expect(
-      check('/extract', 'post', 200, {
-        pages: [page],
-        mimeType: 'text/plain',
-        extractedCharacters: 1,
-        engine: 'x',
-      }),
-    ).not.toEqual([]);
-    expect(
-      check('/extract', 'post', 200, {
-        pages: [{ ...page, pageNumber: '1' }],
-        mimeType: 'text/plain',
-        extractedCharacters: 1,
-      }),
-    ).not.toEqual([]);
-    expect(
-      check('/extract', 'post', 418, {
-        code: 'extraction_failed',
-        message: 'x',
-      }),
-    ).not.toEqual([]);
-    expect(check('/healthz', 'get', 503, {})).not.toEqual([]);
-    expect(check('/readyz', 'get', 503, { status: 'not_ready' })).toEqual([]);
   });
 });

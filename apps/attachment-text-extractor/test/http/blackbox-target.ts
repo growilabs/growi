@@ -8,14 +8,7 @@
 export type BlackboxTarget = 'node' | 'python';
 
 /** One id per row of research.md 22.5. */
-export type NodeOnlyReason =
-  | '17.6'
-  | 'D2'
-  | 'D3'
-  | '7.5-2'
-  | '7.5-3'
-  | '16.1'
-  | '16.9';
+export type NodeOnlyReason = 'D2' | 'D3' | '7.5-2' | '7.5-3' | '16.1' | '16.9';
 
 export const readTarget = (
   env: Readonly<Record<string, string | undefined>>,

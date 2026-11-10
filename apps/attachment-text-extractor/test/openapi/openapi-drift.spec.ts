@@ -1,35 +1,34 @@
 import { openApiDrift } from '../../scripts/check-openapi-drift';
-import { openApiDocument } from '../../src/http/openapi-route';
-import { recordOf } from '../../src/http/spec-support/extract-client';
-import { readCommittedOpenApi } from './openapi-support';
 
-// Req 7.3: the drift check between the service's document and the committed
-// client document (research.md 17.7 1). Object keys compare in any order,
-// arrays in order; until 8.2 the annotation `description`s are left out, but a
-// property that is itself named "description" is not (17.3 2). Python
-// test_smoke_extract.py TestOpenapiDrift (check_openapi_drift.py).
+// Req 7.3: the comparison the drift check runs between the document the
+// service writes and the committed client document (research.md 17.7 1,
+// 17.13). A full JSON comparison: object keys in any order, arrays in order,
+// every difference reported as a JSON Pointer. The committed document is the
+// Python one until 8.2, so the Node document is not compared with it here.
+// Python test_smoke_extract.py TestOpenapiDrift (check_openapi_drift.py).
 
-const clone = (value: unknown): Record<string, unknown> =>
-  recordOf(JSON.parse(JSON.stringify(value)));
-
-/** Sets `value` at `path` in a JSON copy (undefined removes the key). */
-const withValue = (
-  doc: unknown,
-  path: readonly string[],
-  value: unknown,
-): Record<string, unknown> => {
-  const copy = clone(doc);
-  let node: unknown = copy;
-  for (const key of path.slice(0, -1)) {
-    if (typeof node !== 'object' || node === null) throw new Error(`no ${key}`);
-    node = Reflect.get(node, key);
-  }
-  if (typeof node !== 'object' || node === null) throw new Error('no parent');
-  const last = path.at(-1) ?? '';
-  if (value === undefined) Reflect.deleteProperty(node, last);
-  else Reflect.set(node, last, value);
-  return copy;
-};
+const document = () => ({
+  openapi: '3.1.0',
+  info: { title: 'Extractor', version: '1.0.0' },
+  paths: {
+    '/extract': {
+      post: {
+        operationId: 'postExtract',
+        responses: { '200': { description: 'OK' } },
+      },
+    },
+    '/healthz': { get: { operationId: 'getHealthz' } },
+  },
+  components: {
+    schemas: {
+      ExtractResponse: {
+        type: 'object',
+        required: ['pages', 'mimeType', 'extractedCharacters'],
+        description: 'The answer of POST /extract',
+      },
+    },
+  },
+});
 
 /** The same JSON with every object's keys in reverse order. */
 const reordered = (value: unknown): unknown => {
@@ -43,78 +42,101 @@ const reordered = (value: unknown): unknown => {
 };
 
 describe('openApiDrift', () => {
-  const committed = readCommittedOpenApi();
-
-  it('the service document does not drift from the committed client document', () => {
-    expect(openApiDrift(openApiDocument, committed)).toEqual([]);
+  it('finds nothing between equal documents whose keys are in another order', () => {
+    expect(openApiDrift(reordered(document()), document())).toEqual([]);
   });
 
-  it('finds no drift in a copy with its keys reordered', () => {
-    expect(openApiDrift(reordered(committed), committed)).toEqual([]);
-  });
+  it('reports a changed value at its JSON Pointer, escaping "/" in keys', () => {
+    const base = document();
+    const changed = {
+      ...base,
+      paths: {
+        ...base.paths,
+        '/extract': {
+          post: { ...base.paths['/extract'].post, operationId: 'extract' },
+        },
+      },
+    };
 
-  it('ignores a changed annotation description', () => {
-    const changed = withValue(
-      committed,
-      ['paths', '/readyz', 'get', 'description'],
-      'rewritten',
-    );
-
-    expect(openApiDrift(changed, committed)).toEqual([]);
-  });
-
-  it('reports a changed title with its JSON pointer', () => {
-    const changed = withValue(
-      committed,
-      [
-        'components',
-        'schemas',
-        'PageInfo',
-        'properties',
-        'pageNumber',
-        'title',
-      ],
-      'PageNumber',
-    );
-
-    expect(openApiDrift(changed, committed)).toEqual([
-      '/components/schemas/PageInfo/properties/pageNumber/title',
-    ]);
-  });
-
-  it('reports a changed operationId and a removed path', () => {
-    const changed = withValue(
-      committed,
-      ['paths', '/extract', 'post', 'operationId'],
-      'postExtract',
-    );
-    const removed = withValue(committed, ['paths', '/healthz'], undefined);
-
-    expect(openApiDrift(changed, committed)).toEqual([
+    expect(openApiDrift(changed, base)).toEqual([
       '/paths/~1extract/post/operationId',
     ]);
-    expect(openApiDrift(removed, committed)).toEqual(['/paths/~1healthz']);
+  });
+
+  it('reports a changed description like any other value', () => {
+    const base = document();
+    const schema = base.components.schemas.ExtractResponse;
+    const changed = {
+      ...base,
+      components: {
+        schemas: {
+          ExtractResponse: { ...schema, description: 'rewritten' },
+        },
+      },
+    };
+
+    expect(openApiDrift(changed, base)).toEqual([
+      '/components/schemas/ExtractResponse/description',
+    ]);
+  });
+
+  it('reports a key only one side has, in both directions', () => {
+    const base = document();
+    const { '/healthz': _removed, ...withoutHealthz } = base.paths;
+    const withReadyz = {
+      ...base,
+      paths: { ...base.paths, '/readyz': { get: {} } },
+    };
+
+    expect(openApiDrift({ ...base, paths: withoutHealthz }, base)).toEqual([
+      '/paths/~1healthz',
+    ]);
+    expect(openApiDrift(withReadyz, base)).toEqual(['/paths/~1readyz']);
   });
 
   it('compares arrays in order', () => {
-    const swapped = withValue(
-      committed,
-      ['components', 'schemas', 'ExtractResponse', 'required'],
-      ['mimeType', 'pages', 'extractedCharacters'],
-    );
+    const base = document();
+    const swapped = {
+      ...base,
+      components: {
+        schemas: {
+          ExtractResponse: {
+            ...base.components.schemas.ExtractResponse,
+            required: ['mimeType', 'pages', 'extractedCharacters'],
+          },
+        },
+      },
+    };
 
-    expect(openApiDrift(swapped, committed)).not.toEqual([]);
+    expect(openApiDrift(swapped, base)).toEqual([
+      '/components/schemas/ExtractResponse/required/0',
+      '/components/schemas/ExtractResponse/required/1',
+    ]);
   });
 
-  it('keeps a property that is named "description"', () => {
-    const before = withValue(
-      committed,
-      ['components', 'schemas', 'ErrorResponse', 'properties', 'description'],
-      { type: 'string' },
-    );
+  it('reports an array of another length at the array itself', () => {
+    const base = document();
+    const longer = {
+      ...base,
+      components: {
+        schemas: {
+          ExtractResponse: {
+            ...base.components.schemas.ExtractResponse,
+            required: ['pages', 'mimeType', 'extractedCharacters', 'engine'],
+          },
+        },
+      },
+    };
 
-    expect(openApiDrift(committed, before)).toEqual([
-      '/components/schemas/ErrorResponse/properties/description',
+    expect(openApiDrift(longer, base)).toEqual([
+      '/components/schemas/ExtractResponse/required',
     ]);
+  });
+
+  it('tells a value from a value of another type (null, number, string, object)', () => {
+    expect(openApiDrift({ a: null }, { a: {} })).toEqual(['/a']);
+    expect(openApiDrift({ a: 1 }, { a: '1' })).toEqual(['/a']);
+    expect(openApiDrift({ a: [] }, { a: {} })).toEqual(['/a']);
+    expect(openApiDrift([1], { 0: 1 })).toEqual(['']);
   });
 });

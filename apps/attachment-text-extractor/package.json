@@ -14,7 +14,8 @@
     "lint": "run-p lint:**",
     "test": "vitest run",
     "benchmark": "node --import @swc-node/register/esm-register benchmark/run-benchmark.ts",
-    "benchmark:generate": "node --import @swc-node/register/esm-register benchmark/generate-corpus.ts"
+    "benchmark:generate": "node --import @swc-node/register/esm-register benchmark/generate-corpus.ts",
+    "export-openapi": "node --import @swc-node/register/esm-register scripts/export-openapi.ts"
   },
   "dependencies": {
     "@embedpdf/pdfium": "=2.15.1",
@@ -23,9 +24,11 @@
     "@xmldom/xmldom": "^0.9.12",
     "entities": "^8.1.0",
     "hono": "^4.13.16",
+    "hono-openapi": "^1.5.0",
     "htmlparser2": "=12.0.0",
     "yauzl": "^3.4.0",
-    "yazl": "^3.3.1"
+    "yazl": "^3.3.1",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@swc-node/register": "^1.10.9",
