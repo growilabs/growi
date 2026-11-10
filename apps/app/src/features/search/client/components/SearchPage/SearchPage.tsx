@@ -162,6 +162,7 @@ export const SearchPage = (): JSX.Element => {
   const loadedChunks = swrData?.length ?? 0;
   const reachedResultWindowLimit =
     (loadedChunks + 1) * chunkSize > ES_MAX_RESULT_WINDOW;
+  const hasLoadedAll = merged.isReachingEnd || reachedResultWindowLimit;
 
   // Re-request the current size instead of calling `mutate()`: an
   // argument-less `mutate()` force-revalidates EVERY loaded chunk, whereas
@@ -341,6 +342,14 @@ export const SearchPage = (): JSX.Element => {
               </OperateAllControl>
             </div>
 
+            {/* Select-all covers only the loaded results (Req 4.7). */}
+            <span className="ms-3 text-muted text-nowrap">
+              {t('search_result.selected_count_of_loaded', {
+                selectedCount,
+                loadedCount: merged.pages.length,
+              })}
+            </span>
+
             <button
               type="button"
               className="ms-3 open-delete-modal-button btn btn-outline-danger d-flex align-items-center"
@@ -357,6 +366,7 @@ export const SearchPage = (): JSX.Element => {
   }, [
     deleteAllButtonClickedHandler,
     merged.isEmpty,
+    merged.pages.length,
     selectAllCheckboxChangedHandler,
     selectedCount,
     t,
@@ -364,16 +374,23 @@ export const SearchPage = (): JSX.Element => {
 
   const searchControl = useMemo(() => {
     return (
-      <SearchControl
-        isEnableSort
-        isEnableFilter
-        disableUserPages={disableUserPages}
-        initialSearchConditions={initialSearchConditions}
-        onSearchInvoked={searchInvokedHandler}
-        extraControls={extraControls}
-        collapseContents={collapseContents}
-        isCollapsed={isCollapsed}
-      />
+      <>
+        <SearchControl
+          isEnableSort
+          isEnableFilter
+          disableUserPages={disableUserPages}
+          initialSearchConditions={initialSearchConditions}
+          onSearchInvoked={searchInvokedHandler}
+          extraControls={extraControls}
+          collapseContents={collapseContents}
+          isCollapsed={isCollapsed}
+        />
+        {/* Outside the collapsible panel, which hides it while closed. Holds the
+            selected count only, so loading more results is not announced. */}
+        <span role="status" className="visually-hidden">
+          {t('search_result.selected_count', { selectedCount })}
+        </span>
+      </>
     );
   }, [
     extraControls,
@@ -382,6 +399,8 @@ export const SearchPage = (): JSX.Element => {
     isCollapsed,
     disableUserPages,
     searchInvokedHandler,
+    selectedCount,
+    t,
   ]);
 
   const searchResultListHead = useMemo(() => {
@@ -411,8 +430,7 @@ export const SearchPage = (): JSX.Element => {
       searchResultListHead={searchResultListHead}
       infiniteScroll={{
         swrInfiniteResponse: swr,
-        isReachingEnd:
-          merged.isReachingEnd || hasError || reachedResultWindowLimit,
+        hasLoadedAll,
         hasError,
         onRetry,
       }}

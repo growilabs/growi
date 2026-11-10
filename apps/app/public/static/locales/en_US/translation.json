@@ -710,6 +710,8 @@
     "delete_all_selected_page": "Delete All",
     "select_all": "Select all",
     "delete_selected_pages": "Delete selected pages",
+    "selected_count": "{{selectedCount}} selected",
+    "selected_count_of_loaded": "{{selectedCount}} selected ({{loadedCount}} loaded)",
     "currently_not_implemented": "This is not currently implemented",
     "search_again": "Search again",
     "number_of_list_to_display": "Display",

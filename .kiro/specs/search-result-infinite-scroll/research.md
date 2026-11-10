@@ -116,3 +116,37 @@
 - **Issue 1（6.1/6.3）**: プレビュー初期選択は `[resetKey]` 単純付け替え不可（データ依存）。→ 2段構成（resetKey 変化でクリア＋初回データ到着で一度だけ先頭選択、適用済み resetKey を ref 記録）。
 - **Issue 2（4.5/4.6）**: append 後に select-all の checked↔indeterminate が更新されない。→ 累積件数変化を契機に選択件数/累積件数を親へ再通知する effect を追加。
 Strength: 共有資産の非破壊設計（`useSWRxSearch` 温存・名前空間分離）、純粋関数抽出によるテスト容易性。
+
+# 追補: 描画仮想化と再描画抑制（#190441、要件 8〜11）
+
+## 調査で分かった現状
+- **memo が効かない原因は issue 記載の 2 点だけではない**。`SearchResultList` の (a) `ref={(c) => itemsRef.current[i] = c}` が毎レンダー新しい関数（React 18 の `memo(forwardRef)` は ref の一致も比較するため、これだけで memo が無効）、(b) `deletedHandler` が `pages`・`selectedPageId` に依存しプレビュー切替のたびに作り直される、も原因。
+- **チェックボックスは非制御**（`PageListItemL` が `inputRef` で `input.checked` を直接書き換える）。全選択も `itemsRef` に登録された「マウント中の行」だけを走査する。仮想化で行がアンマウントされると再表示時にチェックが消える。
+- 選択件数と一括削除の対象は `SearchPageBase` の選択 `Set` から導出しており、行の DOM に依存しない（要件 9.3 は構造上そのまま満たせる）。
+- スクロールコンテナは `SearchPageBase` の `div.overflow-y-scroll`。一覧の上に `searchResultListHead` があるため、一覧の開始位置はコンテナ先頭からずれている。
+- `use-keyword-rescroll` は右ペイン（`SearchResultContent`）内だけで動作し、一覧の仮想化とは独立。
+- `PageListItemL` は `PageList` / `IdenticalPathPage` でも使われる。変更は任意 props の追加に限る。
+- テスト環境（happy-dom）では要素サイズがすべて 0 になるため、仮想化のテストでは要素サイズのスタブが必要になる。
+
+## ライブラリ比較
+| 候補 | 可変高さ | DOM 構造 | 既存資産 | 評価 |
+|---|---|---|---|---|
+| **@tanstack/react-virtual v3** | `measureElement` で実測 | ヘッドレス（`<ul>/<li>`、Bootstrap のクラスをそのまま使える） | 依存済み。ページツリー（`ItemsTree`）で採用済み | **採用** |
+| react-virtuoso | 内蔵 | 独自のラッパー DOM。`endReached` が既存 `InfiniteScroll` と役割重複 | なし（新規依存） | 不採用 |
+| react-window v2 | 対応するが高さの管理が必要 | 独自のラッパー | なし（新規依存） | 不採用 |
+
+採用理由: 追加の依存がなく、同じ repo に同じ使い方の先例がある。ヘッドレスなので既存の一覧構造と `InfiniteScroll` をそのまま残せる。
+
+## 設計判断
+- **仮想化の置き場所は `SearchResultList`**。一覧の描画を持つ唯一の部品であり、infinite / legacy の両経路が共有する。legacy（最大でも1ページ分）も同じ経路を通す（分岐を作らない＝Simplification）。
+- **`InfiniteScroll` はそのまま使う**。仮想化した一覧は全件分の高さを持つ入れ物になるため、その直後に置かれたセンチネルは今と同じ条件（末尾付近までスクロール）で交差する。
+- **画面外の行のチェック状態は、再マウント時に選択 `Set` から初期値（`defaultChecked`）を与えて復元する**。非制御＋命令的な select/deselect の仕組みは維持する（ユーザー判断: 制御コンポーネント化はしない）。
+- **行ごとの ref は `pageId` ごとに安定したコールバックを使う**。index ベースの配列は仮想化でずれるため、`pageId` をキーにした Map に置き換える。
+- **位置指定は Bootstrap のユーティリティ（`position-relative` / `position-absolute top-0 start-0 w-100`）を使い、インライン style は動的な値（全体の高さ・`translateY`）だけにする**。
+- **スクリーンリーダー向けに `aria-setsize` / `aria-posinset` を付ける**（要件の Out of scope にある「描画範囲外の行はフォーカス移動の対象外」の補助）。
+- **追加読み込み時の再描画は抑えない**（要件 10 の範囲外。仮想化で再描画は表示中の数十行に限られるため）。
+
+## リスク
+- 行の高さの推定値と実測値が大きく違うと、初回スクロールで位置が跳ねる。→ `measureElement`（ResizeObserver）で実測し、推定値は行の CSS の最低の高さ（136px）にする。最低の高さより小さい推定値では、未描画の行を実測するたびに位置の補正が起きる（PR #12216 のレビューで実測）。
+- `Clamp`（react-multiline-clamp）がマウント後に高さを変える。→ `measureElement` の ResizeObserver が高さの変化を拾う。
+- 一覧上部のヘッダの高さを考慮しないと、描画範囲の計算がずれる。→ 一覧の開始位置を `scrollMargin` として測って渡す。

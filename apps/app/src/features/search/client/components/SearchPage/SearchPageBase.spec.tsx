@@ -98,8 +98,12 @@ const searchResultListSpy = vi.hoisted(() => ({
     | {
         selectedPageId?: string;
         pages: IPageWithSearchMeta[];
+        scrollElement: HTMLElement | null;
+        selectedPageIds?: ReadonlySet<string>;
+        listSize?: number;
         onPageSelected?: (page?: IPageWithSearchMeta) => void;
         onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
+        onPreviewedPageDeleted?: () => void;
       }
     | undefined,
 }));
@@ -113,8 +117,12 @@ vi.mock('./SearchResultList', () => ({
     {
       selectedPageId?: string;
       pages: IPageWithSearchMeta[];
+      scrollElement: HTMLElement | null;
+      selectedPageIds?: ReadonlySet<string>;
+      listSize?: number;
       onPageSelected?: (page?: IPageWithSearchMeta) => void;
       onCheckboxChanged?: (isChecked: boolean, pageId: string) => void;
+      onPreviewedPageDeleted?: () => void;
     }
   >((props, ref) => {
     searchResultListSpy.lastProps = props;
@@ -645,14 +653,97 @@ describe('SearchPageBase select-all header follows appended pages (append re-not
   });
 });
 
+describe('SearchPageBase drops selections of rows removed from the list (Req 11.6)', () => {
+  beforeEach(() => {
+    searchResultListSpy.lastProps = undefined;
+    vi.clearAllMocks();
+  });
+
+  it('stops counting a selected row once it is deleted from the list', () => {
+    const ref = createRef<SelectableRef>();
+    const onChanged = vi.fn();
+    const pages = [createPage('a'), createPage('b'), createPage('c')];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    act(() => {
+      ref.current?.selectAll();
+    });
+
+    // a row deleted from its menu leaves the list under the same search
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={[pages[0], pages[2]]}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    // the remaining rows are still all selected => header stays checked
+    expect(onChanged).toHaveBeenLastCalledWith(2, 2);
+    expect([...(ref.current?.getSelectedPageIds?.() ?? [])]).toEqual([
+      'a',
+      'c',
+    ]);
+  });
+
+  it('drops every removed row at once (a recursive delete also removes descendants)', () => {
+    const ref = createRef<SelectableRef>();
+    const onChanged = vi.fn();
+    const pages = [
+      createPage('parent'),
+      createPage('child'),
+      createPage('other'),
+    ];
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    act(() => {
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'parent');
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'child');
+    });
+
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={[pages[2]]}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    expect(onChanged).toHaveBeenLastCalledWith(0, 1);
+    expect(ref.current?.getSelectedPageIds?.().size).toBe(0);
+  });
+});
+
 const createInfiniteScrollProps = (overrides?: {
-  isReachingEnd?: boolean;
+  hasLoadedAll?: boolean;
   hasError?: boolean;
   onRetry?: () => void;
 }) => ({
   swrInfiniteResponse:
     mock<SWRInfiniteResponse<IFormattedSearchResult, Error>>(),
-  isReachingEnd: false,
+  hasLoadedAll: false,
   hasError: false,
   onRetry: vi.fn(),
   ...overrides,
@@ -675,7 +766,7 @@ describe('SearchPageBase infinite-scroll rendering slot', () => {
   };
 
   it('wraps the list in InfiniteScroll and hides the numbered pager when infiniteScroll is provided', () => {
-    const infiniteScroll = createInfiniteScrollProps({ isReachingEnd: true });
+    const infiniteScroll = createInfiniteScrollProps();
 
     const { queryByTestId } = render(
       <SearchPageBase
@@ -688,10 +779,30 @@ describe('SearchPageBase infinite-scroll rendering slot', () => {
 
     // sentinel/infinite-scroll wrapper is rendered ...
     expect(queryByTestId('infinite-scroll')).not.toBeNull();
-    // ... and it received the computed reaching-end flag
-    expect(infiniteScrollSpy.lastProps?.isReachingEnd).toBe(true);
     // ... while the legacy numbered pager is NOT rendered
     expect(queryByTestId('search-pager')).toBeNull();
+  });
+
+  it.each([
+    { hasLoadedAll: false, hasError: false, stopsSentinel: false },
+    { hasLoadedAll: true, hasError: false, stopsSentinel: true },
+    // Stopping on an error prevents a tight setSize retry loop (Req 1.6).
+    { hasLoadedAll: false, hasError: true, stopsSentinel: true },
+  ])('stops the sentinel ($stopsSentinel) when hasLoadedAll=$hasLoadedAll and hasError=$hasError', ({
+    hasLoadedAll,
+    hasError,
+    stopsSentinel,
+  }) => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={[createPage('a'), createPage('b')]}
+        infiniteScroll={createInfiniteScrollProps({ hasLoadedAll, hasError })}
+        {...pagerControls}
+      />,
+    );
+
+    expect(infiniteScrollSpy.lastProps?.isReachingEnd).toBe(stopsSentinel);
   });
 
   it('renders the numbered pager and no InfiniteScroll when infiniteScroll is not provided (legacy)', () => {
@@ -710,7 +821,6 @@ describe('SearchPageBase infinite-scroll rendering slot', () => {
   it('renders a retry control in the endingIndicator on error and invokes onRetry when clicked', () => {
     const onRetry = vi.fn();
     const infiniteScroll = createInfiniteScrollProps({
-      isReachingEnd: true,
       hasError: true,
       onRetry,
     });
@@ -731,7 +841,7 @@ describe('SearchPageBase infinite-scroll rendering slot', () => {
 
   it('renders no retry control in the endingIndicator when there is no error', () => {
     const infiniteScroll = createInfiniteScrollProps({
-      isReachingEnd: true,
+      hasLoadedAll: true,
       hasError: false,
     });
 
@@ -745,6 +855,243 @@ describe('SearchPageBase infinite-scroll rendering slot', () => {
     );
 
     expect(queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+});
+
+// #190441: SearchResultList renders only the rows around the viewport and
+// memoizes each row, so SearchPageBase must hand it stable handlers, the live
+// selection Set and the row count for `aria-setsize`.
+describe('SearchPageBase wiring for the virtualized result list', () => {
+  const createPages = (count: number): IPageWithSearchMeta[] =>
+    Array.from({ length: count }, (_, i) => createPage(`p${i}`));
+
+  beforeEach(() => {
+    searchResultListSpy.lastProps = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('hands the scroll container to the list once mounted', () => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(2)}
+        {...noopControls}
+      />,
+    );
+
+    const scrollElement = searchResultListSpy.lastProps?.scrollElement;
+    expect(scrollElement).toBeInstanceOf(HTMLElement);
+    expect(scrollElement?.classList.contains('overflow-y-scroll')).toBe(true);
+  });
+
+  it('passes the current selection to the list across preview switches, checkbox changes and appends', () => {
+    const ref = createRef<SelectableRef>();
+    const pages = createPages(3);
+
+    const { rerender } = render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        {...noopControls}
+      />,
+    );
+
+    act(() => {
+      searchResultListSpy.lastProps?.onPageSelected?.(pages[1]);
+    });
+    act(() => {
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'p2');
+    });
+    rerender(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={[...pages, createPage('p3')]}
+        {...noopControls}
+      />,
+    );
+
+    // Rows remounted after the append take their checkbox state from this.
+    expect([...(searchResultListSpy.lastProps?.selectedPageIds ?? [])]).toEqual(
+      ['p2'],
+    );
+    expect([...(ref.current?.getSelectedPageIds?.() ?? [])]).toEqual(['p2']);
+  });
+
+  it('still clears the preview through the stable onPreviewedPageDeleted handler', () => {
+    const pages = createPages(2);
+
+    render(
+      <SearchPageBase resetKey="search-1" pages={pages} {...noopControls} />,
+    );
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBe('p0');
+
+    act(() => {
+      searchResultListSpy.lastProps?.onPreviewedPageDeleted?.();
+    });
+
+    expect(searchResultListSpy.lastProps?.selectedPageId).toBeUndefined();
+  });
+
+  it('counts and bulk-deletes selections of rows the list does not render (Req 9.3)', () => {
+    const ref = createRef<SelectableRef>();
+    const onChanged = vi.fn();
+    const pages = createPages(300);
+
+    render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={pages}
+        onSelectedPagesByCheckboxesChanged={onChanged}
+        {...noopControls}
+      />,
+    );
+
+    // A row near the top and one far below any rendered range.
+    act(() => {
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'p0');
+      searchResultListSpy.lastProps?.onCheckboxChanged?.(true, 'p250');
+    });
+    expect(onChanged).toHaveBeenLastCalledWith(2, 300);
+
+    const { result } = renderHook(() =>
+      usePageDeleteModalForBulkDeletion(pages, ref),
+    );
+    act(() => {
+      result.current();
+    });
+    expect(deleteModalSpy.open).toHaveBeenCalledWith(
+      [pages[0], pages[250]],
+      expect.anything(),
+    );
+  });
+
+  it('returns the whole selection right after selectAll, before re-rendering', () => {
+    // SearchPage reads the selected count this way after the select-all checkbox.
+    const ref = createRef<SelectableRef>();
+    render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={createPages(3)}
+        {...noopControls}
+      />,
+    );
+
+    let sizeRightAfter: number | undefined;
+    act(() => {
+      ref.current?.selectAll();
+      sizeRightAfter = ref.current?.getSelectedPageIds?.().size;
+    });
+
+    expect(sizeRightAfter).toBe(3);
+  });
+
+  it('selectAll selects every loaded page even though the list reaches only mounted rows (Req 9.2)', () => {
+    const ref = createRef<SelectableRef>();
+
+    render(
+      <SearchPageBase
+        ref={ref}
+        resetKey="search-1"
+        pages={createPages(300)}
+        {...noopControls}
+      />,
+    );
+
+    act(() => {
+      ref.current?.selectAll();
+    });
+
+    expect(ref.current?.getSelectedPageIds?.().size).toBe(300);
+    expect(searchResultListSpy.lastProps?.selectedPageIds?.has('p299')).toBe(
+      true,
+    );
+  });
+
+  it('passes an unknown list size (-1) while more results can still be loaded', () => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(20)}
+        infiniteScroll={createInfiniteScrollProps()}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.listSize).toBe(-1);
+  });
+
+  it('passes the loaded count as the list size once the end is reached', () => {
+    const { rerender } = render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(20)}
+        infiniteScroll={createInfiniteScrollProps()}
+        {...noopControls}
+      />,
+    );
+
+    rerender(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(25)}
+        infiniteScroll={createInfiniteScrollProps({ hasLoadedAll: true })}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.listSize).toBe(25);
+  });
+
+  it('keeps the list size unknown (-1) while loading the next chunk has failed', () => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(20)}
+        infiniteScroll={createInfiniteScrollProps({
+          hasLoadedAll: false,
+          hasError: true,
+        })}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.listSize).toBe(-1);
+  });
+
+  it('keeps the loaded count as the list size when a revalidation fails after every result was loaded', () => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(20)}
+        infiniteScroll={createInfiniteScrollProps({
+          hasLoadedAll: true,
+          hasError: true,
+        })}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.listSize).toBe(20);
+  });
+
+  it('passes the loaded count as the list size on the legacy pager path', () => {
+    render(
+      <SearchPageBase
+        resetKey="search-1"
+        pages={createPages(20)}
+        {...noopControls}
+      />,
+    );
+
+    expect(searchResultListSpy.lastProps?.listSize).toBe(20);
   });
 });
 

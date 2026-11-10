@@ -124,6 +124,27 @@ describe('mergeInfiniteSearchResult', () => {
     });
   });
 
+  describe('when a page appears in two chunks (offset paging shifted by an edit)', () => {
+    it('keeps only its first occurrence, in order, without changing the end detection', () => {
+      const page1 = createPage('page-1');
+      const page2 = createPage('page-2');
+      const page2Again = createPage('page-2');
+      const page3 = createPage('page-3');
+      const data = [
+        createFormattedResult([page1, page2], { total: 4, hitsCount: 2 }),
+        createFormattedResult([page2Again, page3], { total: 4, hitsCount: 2 }),
+      ];
+
+      const result = mergeInfiniteSearchResult(data, CHUNK_SIZE);
+
+      expect(result.pages).toEqual([page1, page2, page3]);
+      expect(result.pages[1]).toBe(page2);
+      expect(result.total).toBe(4);
+      // 4 hits fetched >= total 4, although only 3 distinct pages remain
+      expect(result.isReachingEnd).toBe(true);
+    });
+  });
+
   describe('when there are zero hits', () => {
     it('marks the result as empty and terminal', () => {
       const data = [

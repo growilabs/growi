@@ -43,7 +43,7 @@ import styles from './SearchPageBase.module.scss';
 const highlightKeywordsSplitter = /"[^"]+"|[^\u{20}\u{3000}]+/gu;
 
 export interface IReturnSelectedPageIds {
-  getSelectedPageIds?: () => Set<string>;
+  getSelectedPageIds?: () => ReadonlySet<string>;
 }
 
 // Imperative reset for a same-search mutation (e.g. bulk delete / convert) that
@@ -58,8 +58,9 @@ export interface IResettableAfterMutation {
 // is wrapped in <InfiniteScroll> instead of the legacy numbered pager.
 type SearchPageBaseInfiniteProps = {
   swrInfiniteResponse: SWRInfiniteResponse<IFormattedSearchResult, Error>;
-  // Computed by the caller: accumulated count >= total, or a fetch error.
-  isReachingEnd: boolean;
+  // No more results will be loaded. False while a load has failed, so the list
+  // size is still unknown then.
+  hasLoadedAll: boolean;
   hasError: boolean;
   onRetry: () => void;
 };
@@ -98,6 +99,10 @@ type Props = {
   onItemMutated?: (mutation: SearchItemMutation) => void;
 };
 
+// Shared so that clearing an empty selection keeps the same reference and
+// React skips the re-render.
+const EMPTY_SELECTION: ReadonlySet<string> = new Set();
+
 const SearchResultContent = dynamic(
   () => import('./SearchResultContent').then((mod) => mod.SearchResultContent),
   {
@@ -135,8 +140,20 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   const isSearchServiceConfigured = useAtomValue(isSearchServiceConfiguredAtom);
   const isSearchServiceReachable = useAtomValue(isSearchServiceReachableAtom);
 
-  const [selectedPageIdsByCheckboxes] = useState<Set<string>>(new Set());
-  // const [allPageIds] = useState<Set<string>>(new Set());
+  // Replaced, never mutated. The ref holds the same Set for readers that run
+  // before the re-render (see design.md, SearchPageBase).
+  const [selectedPageIdsByCheckboxes, setSelectedPageIdsByCheckboxes] =
+    useState<ReadonlySet<string>>(EMPTY_SELECTION);
+  const selectedPageIdsRef = useRef(selectedPageIdsByCheckboxes);
+  const commitSelectedPageIds = useCallback((next: ReadonlySet<string>) => {
+    selectedPageIdsRef.current = next;
+    setSelectedPageIdsByCheckboxes(next);
+  }, []);
+
+  // Held in state (not a ref) so SearchResultList re-renders once it is set.
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(
+    null,
+  );
 
   const [selectedPageWithMeta, setSelectedPageWithMeta] = useState<
     IPageWithSearchMeta | undefined
@@ -157,14 +174,14 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
   // "clear selection" sequence has exactly one implementation (previously two
   // near-duplicate copies could drift independently).
   const clearSelectionAndNotify = useCallback(() => {
-    selectedPageIdsByCheckboxes.clear();
+    commitSelectedPageIds(EMPTY_SELECTION);
     // Also uncheck the currently rendered rows. With keepPreviousData (the
     // legacy number-pager path), the previous page's rows stay mounted for a
     // moment after a resetKey change, so clearing only the Set would leave
     // stale checkmarks visible (P3-7).
     searchResultListRef.current?.deselectAll();
     onSelectedChangedRef.current?.(0, 0);
-  }, [selectedPageIdsByCheckboxes]);
+  }, [commitSelectedPageIds]);
 
   // publish selectAll()
   useImperativeHandle(ref, () => ({
@@ -175,9 +192,12 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       }
 
       if (pages != null) {
-        pages.forEach((page) => {
-          selectedPageIdsByCheckboxes.add(page.data._id);
-        });
+        commitSelectedPageIds(
+          new Set([
+            ...selectedPageIdsRef.current,
+            ...pages.map((page) => page.data._id),
+          ]),
+        );
       }
     },
     deselectAll: () => {
@@ -186,10 +206,10 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
         instance.deselectAll();
       }
 
-      selectedPageIdsByCheckboxes.clear();
+      commitSelectedPageIds(EMPTY_SELECTION);
     },
     getSelectedPageIds: () => {
-      return selectedPageIdsByCheckboxes;
+      return selectedPageIdsRef.current;
     },
     // Same-search mutation reset (e.g. bulk delete / convert completion). Unlike
     // a `resetKey` change, the search identity does not change here, so this
@@ -213,24 +233,29 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     },
   }));
 
-  const checkboxChangedHandler = (isChecked: boolean, pageId: string) => {
-    if (pages == null || pages.length === 0) {
-      return;
-    }
+  // Stable across checkbox changes: the parent callback is read via a ref (Req 10.2).
+  const checkboxChangedHandler = useCallback(
+    (isChecked: boolean, pageId: string) => {
+      if (pages == null || pages.length === 0) {
+        return;
+      }
 
-    if (isChecked) {
-      selectedPageIdsByCheckboxes.add(pageId);
-    } else {
-      selectedPageIdsByCheckboxes.delete(pageId);
-    }
+      const next = new Set(selectedPageIdsRef.current);
+      if (isChecked) {
+        next.add(pageId);
+      } else {
+        next.delete(pageId);
+      }
+      commitSelectedPageIds(next);
 
-    if (onSelectedPagesByCheckboxesChanged != null) {
-      onSelectedPagesByCheckboxesChanged(
-        selectedPageIdsByCheckboxes.size,
-        pages.length,
-      );
-    }
-  };
+      onSelectedChangedRef.current?.(next.size, pages.length);
+    },
+    [pages, commitSelectedPageIds],
+  );
+
+  const previewedPageDeletedHandler = useCallback(() => {
+    setSelectedPageWithMeta(undefined);
+  }, []);
 
   // The last `pages` reference effect (b) below has actually processed. Used to
   // detect a `keepPreviousData` (legacy number-pager) holdover: when `resetKey`
@@ -304,11 +329,21 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       return;
     }
 
-    onSelectedChangedRef.current?.(
-      selectedPageIdsByCheckboxes.size,
-      pages.length,
-    );
-  }, [pages, resetKey, selectedPageIdsByCheckboxes]);
+    // Drop selections whose rows left the list (Req 11.6).
+    const loadedPageIds = new Set(pages.map((page) => page.data._id));
+    const current = selectedPageIdsRef.current;
+    const kept = new Set<string>();
+    current.forEach((id) => {
+      if (loadedPageIds.has(id)) {
+        kept.add(id);
+      }
+    });
+    if (kept.size !== current.size) {
+      commitSelectedPageIds(kept);
+    }
+
+    onSelectedChangedRef.current?.(kept.size, pages.length);
+  }, [pages, resetKey, commitSelectedPageIds]);
 
   if (!isSearchServiceConfigured) {
     return (
@@ -346,6 +381,10 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
           ?.map((keyword) => keyword.replace(/^"(.*)"$/, '$1')) ?? undefined)
       : undefined;
 
+  // -1 while more results can still be loaded (see design.md, PageListItemL).
+  const listSize =
+    infiniteScroll != null && !infiniteScroll.hasLoadedAll ? -1 : pages?.length;
+
   // Selection wiring on SearchResultList is IDENTICAL across the infinite-scroll
   // and legacy branches; only the wrapping (InfiniteScroll vs. numbered pager)
   // differs (P3-5: computed here instead of an IIFE inside the JSX below).
@@ -354,12 +393,15 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       <SearchResultList
         ref={searchResultListRef}
         pages={pages}
+        scrollElement={scrollElement}
         selectedPageId={selectedPageWithMeta?.data._id}
+        selectedPageIds={selectedPageIdsByCheckboxes}
+        listSize={listSize}
         forceHideMenuItems={forceHideMenuItems}
-        onPageSelected={(page) => setSelectedPageWithMeta(page)}
+        onPageSelected={setSelectedPageWithMeta}
         onCheckboxChanged={checkboxChangedHandler}
         onItemMutated={onItemMutated}
-        onPreviewedPageDeleted={() => setSelectedPageWithMeta(undefined)}
+        onPreviewedPageDeleted={previewedPageDeletedHandler}
       />
     </div>
   );
@@ -368,7 +410,8 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
     infiniteScroll != null ? (
       <InfiniteScroll
         swrInifiniteResponse={infiniteScroll.swrInfiniteResponse}
-        isReachingEnd={infiniteScroll.isReachingEnd}
+        // Also stop on an error so the sentinel cannot retry in a tight loop.
+        isReachingEnd={infiniteScroll.hasLoadedAll || infiniteScroll.hasError}
         endingIndicator={
           infiniteScroll.hasError ? (
             <div className="my-4 d-flex flex-column align-items-center">
@@ -406,7 +449,10 @@ const SearchPageBaseSubstance: ForwardRefRenderFunction<
       >
         {searchControl}
 
-        <div className="overflow-y-scroll">
+        <div
+          ref={setScrollElement}
+          className="overflow-y-scroll position-relative"
+        >
           {/* Loading */}
           {pages == null && (
             <div className="mw-0 flex-grow-1 flex-basis-0 m-5 text-muted text-center">

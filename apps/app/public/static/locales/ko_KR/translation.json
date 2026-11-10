@@ -672,6 +672,8 @@
     "delete_all_selected_page": "모두 삭제",
     "select_all": "모두 선택",
     "delete_selected_pages": "선택된 페이지 삭제",
+    "selected_count": "{{selectedCount}}개 선택됨",
+    "selected_count_of_loaded": "{{selectedCount}}개 선택됨 (불러온 항목 {{loadedCount}}개)",
     "currently_not_implemented": "현재 구현되지 않았습니다.",
     "search_again": "다시 검색",
     "number_of_list_to_display": "표시",

@@ -22,7 +22,7 @@ type CapturedSearchPageBaseProps = {
   searchPager?: unknown;
   infiniteScroll?: {
     swrInfiniteResponse?: unknown;
-    isReachingEnd?: unknown;
+    hasLoadedAll?: unknown;
     hasError?: unknown;
     onRetry?: () => void;
   };
@@ -96,9 +96,11 @@ vi.mock('./SearchControl', () => ({
   // Render only the collapse body (which contains the bulk-delete button) so the
   // Req 5.2 disabled/enabled contract is observable in the DOM; the rest of
   // SearchControl is exercised by its own spec.
-  default: (props: { collapseContents?: React.ReactNode }) => (
-    <>{props.collapseContents}</>
-  ),
+  // Like reactstrap's Collapse, a closed panel is hidden from assistive tech.
+  default: (props: {
+    collapseContents?: React.ReactNode;
+    isCollapsed?: boolean;
+  }) => <div hidden={!props.isCollapsed}>{props.collapseContents}</div>,
 }));
 vi.mock('./OperateAllControl', () => ({
   // Forward an imperative handle so SearchPage's selectAllControlRef is populated.
@@ -130,8 +132,16 @@ vi.mock('~/client/components/NotAvailableForReadOnlyUser', () => ({
     children?: React.ReactNode;
   }) => <>{children}</>,
 }));
+// Echo interpolation values after the key so displayed counts are observable.
 vi.mock('next-i18next', () => ({
-  useTranslation: vi.fn(() => ({ t: (key: string) => key })),
+  useTranslation: vi.fn(() => ({
+    t: (key: string, values?: Record<string, unknown>) =>
+      values == null
+        ? key
+        : `${key} ${Object.entries(values)
+            .map(([name, value]) => `${name}=${value}`)
+            .join(' ')}`,
+  })),
 }));
 
 import { SearchPage } from './SearchPage';
@@ -193,9 +203,9 @@ describe('SearchPage infinite-scroll wiring', () => {
     expect(searchPageBaseSpy.lastProps?.searchPager).toBeFalsy();
   });
 
-  it('passes an infiniteScroll prop carrying the SWRInfinite response and a boolean isReachingEnd, plus a string resetKey', () => {
+  it('passes an infiniteScroll prop carrying the SWRInfinite response and a boolean hasLoadedAll, plus a string resetKey', () => {
     // one FULL chunk (hitsCount === chunk size) against a large total => not at
-    // the end, so isReachingEnd is a meaningful false here.
+    // the end, so hasLoadedAll is a meaningful false here.
     searchStoreSpy.infiniteResponse = createInfiniteResponse(
       createFullChunks(1),
     );
@@ -207,7 +217,7 @@ describe('SearchPage infinite-scroll wiring', () => {
     expect(props?.infiniteScroll?.swrInfiniteResponse).toBe(
       searchStoreSpy.infiniteResponse,
     );
-    expect(props?.infiniteScroll?.isReachingEnd).toBe(false);
+    expect(props?.infiniteScroll?.hasLoadedAll).toBe(false);
     expect(typeof props?.resetKey).toBe('string');
   });
 
@@ -246,11 +256,16 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
     vi.clearAllMocks();
   });
 
-  it('halts auto-load on error (isReachingEnd forced true) while preserving loaded pages', () => {
-    // A non-terminal result (2 of 42 loaded) that additionally errored: without
-    // the halt, InfiniteScroll would keep calling setSize and tight-loop.
+  it('reports the error without claiming every result is loaded, while preserving loaded pages', () => {
+    // A non-terminal result (one of many chunks loaded) that also errored.
+    // SearchPageBase stops the sentinel on hasError (see its spec).
+    // The chunk reports a full hitsCount, so it does not signal the end.
+    const fullChunk = mock<IFormattedSearchResult>({
+      ...createChunk(['a', 'b']),
+      meta: { total: 1000, took: 3, hitsCount: PROD_DEFAULT_CHUNK_SIZE },
+    });
     searchStoreSpy.infiniteResponse = createInfiniteResponse(
-      [createChunk(['a', 'b'])],
+      [fullChunk],
       new Error('load failed'),
     );
 
@@ -258,9 +273,8 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
 
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.hasError).toBe(true);
-    // isReachingEnd must be forced true so InfiniteScroll stops auto-loading,
-    // even though only 2 of 42 results are loaded (merged.isReachingEnd=false).
-    expect(infiniteScroll?.isReachingEnd).toBe(true);
+    // Not every result is loaded, so the list size stays unknown.
+    expect(infiniteScroll?.hasLoadedAll).toBe(false);
 
     // Already-loaded results are still handed down (not discarded on error).
     expect(searchPageBaseSpy.lastProps?.pages).toHaveLength(2);
@@ -299,7 +313,7 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
 
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.hasError).toBe(false);
-    expect(infiniteScroll?.isReachingEnd).toBe(false);
+    expect(infiniteScroll?.hasLoadedAll).toBe(false);
   });
 
   it('stops at the Elasticsearch max_result_window even when the total is not reached (P2-4)', () => {
@@ -314,7 +328,8 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
 
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
     expect(infiniteScroll?.hasError).toBe(false);
-    expect(infiniteScroll?.isReachingEnd).toBe(true);
+    // Nothing more will be loaded, so the loaded results are the whole list.
+    expect(infiniteScroll?.hasLoadedAll).toBe(true);
   });
 
   it('keeps auto-load enabled just below the max_result_window (P2-4 boundary)', () => {
@@ -327,7 +342,7 @@ describe('SearchPage additional-load failure handling (Req 1.6)', () => {
     render(<SearchPage />);
 
     const infiniteScroll = searchPageBaseSpy.lastProps?.infiniteScroll;
-    expect(infiniteScroll?.isReachingEnd).toBe(false);
+    expect(infiniteScroll?.hasLoadedAll).toBe(false);
   });
 });
 
@@ -466,5 +481,91 @@ describe('SearchPage bulk-delete disabling (Req 5.2)', () => {
     });
 
     expect(getDeleteButton(container)).toBeEnabled();
+  });
+});
+
+describe('SearchPage selected-count display (Req 4.4/4.7)', () => {
+  beforeEach(() => {
+    searchPageBaseSpy.lastProps = undefined;
+    keywordSpy.keyword = 'initial-keyword';
+    searchStoreSpy.infiniteResponse = createInfiniteResponse([
+      createChunk(['a', 'b']),
+    ]);
+    vi.clearAllMocks();
+  });
+
+  const COUNT_KEY = 'search_result.selected_count_of_loaded';
+  const STATUS_KEY = 'search_result.selected_count';
+
+  it('shows no selection out of the loaded results initially', () => {
+    const { getByText } = render(<SearchPage />);
+
+    expect(
+      getByText(`${COUNT_KEY} selectedCount=0 loadedCount=2`),
+    ).toBeInTheDocument();
+  });
+
+  it('announces only the selected count, so loading more results is not announced', () => {
+    const { getByRole, rerender } = render(<SearchPage />);
+    act(() => {
+      searchPageBaseSpy.lastProps?.onSelectedPagesByCheckboxesChanged?.(1, 2);
+    });
+    expect(getByRole('status')).toHaveTextContent(
+      `${STATUS_KEY} selectedCount=1`,
+    );
+
+    searchStoreSpy.infiniteResponse = createInfiniteResponse([
+      createChunk(['a', 'b']),
+      createChunk(['c', 'd']),
+    ]);
+    rerender(<SearchPage />);
+
+    expect(getByRole('status')).toHaveTextContent(
+      `${STATUS_KEY} selectedCount=1`,
+    );
+    expect(getByRole('status')).not.toHaveTextContent('loadedCount');
+  });
+
+  it('updates the selected count when the selection changes', () => {
+    const { getByText } = render(<SearchPage />);
+
+    act(() => {
+      searchPageBaseSpy.lastProps?.onSelectedPagesByCheckboxesChanged?.(1, 2);
+    });
+
+    expect(
+      getByText(`${COUNT_KEY} selectedCount=1 loadedCount=2`),
+    ).toBeInTheDocument();
+  });
+
+  it('announces a selection change while the bulk-delete panel stays closed', () => {
+    const { getByRole } = render(<SearchPage />);
+
+    // Selecting every loaded result does not open the panel.
+    act(() => {
+      searchPageBaseSpy.lastProps?.onSelectedPagesByCheckboxesChanged?.(2, 2);
+    });
+
+    expect(getByRole('status')).toHaveTextContent(
+      `${STATUS_KEY} selectedCount=2`,
+    );
+  });
+
+  it('keeps the selected count and grows the loaded count on append', () => {
+    const { getByText, rerender } = render(<SearchPage />);
+
+    act(() => {
+      searchPageBaseSpy.lastProps?.onSelectedPagesByCheckboxesChanged?.(2, 2);
+    });
+
+    searchStoreSpy.infiniteResponse = createInfiniteResponse([
+      createChunk(['a', 'b']),
+      createChunk(['c', 'd']),
+    ]);
+    rerender(<SearchPage />);
+
+    expect(
+      getByText(`${COUNT_KEY} selectedCount=2 loadedCount=4`),
+    ).toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import type { ForwardRefRenderFunction, JSX } from 'react';
+import type { ForwardRefRenderFunction, JSX, Ref } from 'react';
 import React, {
   forwardRef,
   memo,
@@ -62,6 +62,12 @@ type Props = {
   onPageRenamed?: OnRenamedFunction;
   onPageDeleted?: OnDeletedFunction;
   onPagePutBacked?: OnPutBackedFunction;
+  // Optional props for virtualized lists: rows are unmounted while off-screen,
+  // so the checkbox state is restored on mount and the <li> is measured/positioned.
+  isInitiallyChecked?: boolean;
+  listItemRef?: Ref<HTMLLIElement>;
+  listItemIndex?: number;
+  listSize?: number; // -1 when the total count is not yet known (WAI-ARIA)
 };
 
 const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
@@ -81,6 +87,10 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
     onPageRenamed,
     onPageDeleted,
     onPagePutBacked,
+    isInitiallyChecked,
+    listItemRef,
+    listItemIndex,
+    listSize,
   } = props;
 
   const { returnPathForURL } = pathUtils;
@@ -237,7 +247,13 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
   const hasBrowsingRights = canRenderESSnippet || canRenderRevisionSnippet;
 
   return (
-    <li key={pageData._id}>
+    <li
+      key={pageData._id}
+      ref={listItemRef}
+      data-index={listItemIndex}
+      aria-posinset={listItemIndex != null ? listItemIndex + 1 : undefined}
+      aria-setsize={listSize}
+    >
       {/* biome-ignore lint/a11y/useSemanticElements: cannot use <button> here because PageItemControl renders a nested <button> (DropdownToggle) */}
       <div
         role="button"
@@ -265,6 +281,7 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
                   id={`cbSelect-${pageData._id}`}
                   data-testid="cb-select"
                   innerRef={inputRef}
+                  defaultChecked={isInitiallyChecked}
                   onChange={(e) => {
                     onCheckboxChanged(e.target.checked, pageData._id);
                   }}
