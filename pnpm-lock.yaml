@@ -651,17 +651,17 @@ importers:
         specifier: ^4.17.2
         version: 4.17.2(@aws-sdk/client-sso-oidc@3.600.0)
       mongoose:
-        specifier: ^6.13.9
-        version: 6.13.9(@aws-sdk/client-sso-oidc@3.600.0)
+        specifier: ^6.13.12
+        version: 6.13.12(@aws-sdk/client-sso-oidc@3.600.0)
       mongoose-gridfs:
         specifier: ^1.3.0
-        version: 1.3.0(@aws-sdk/client-sso-oidc@3.600.0)(mongoose@6.13.9(@aws-sdk/client-sso-oidc@3.600.0))
+        version: 1.3.0(@aws-sdk/client-sso-oidc@3.600.0)(mongoose@6.13.12(@aws-sdk/client-sso-oidc@3.600.0))
       mongoose-paginate-v2:
         specifier: ^1.3.9
         version: 1.8.2
       mongoose-unique-validator:
         specifier: ^2.0.3
-        version: 2.0.3(mongoose@6.13.9(@aws-sdk/client-sso-oidc@3.600.0))
+        version: 2.0.3(mongoose@6.13.12(@aws-sdk/client-sso-oidc@3.600.0))
       motion:
         specifier: ^12.35.0
         version: 12.38.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -1198,8 +1198,8 @@ importers:
         specifier: ^1.38.6
         version: 1.38.6
       mongoose:
-        specifier: ^6.13.6
-        version: 6.13.9(@aws-sdk/client-sso-oidc@3.600.0)
+        specifier: ^6.13.12
+        version: 6.13.12(@aws-sdk/client-sso-oidc@3.600.0)
       tslib:
         specifier: ^2.8.0
         version: 2.8.1
@@ -1449,8 +1449,8 @@ importers:
         specifier: ^4
         version: 4.17.21
       mongoose:
-        specifier: ^6.13.9
-        version: 6.13.9(@aws-sdk/client-sso-oidc@3.600.0)
+        specifier: ^6.13.12
+        version: 6.13.12(@aws-sdk/client-sso-oidc@3.600.0)
       socket.io-client:
         specifier: ^4.7.5
         version: 4.8.4
@@ -1801,8 +1801,8 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2
       mongoose:
-        specifier: ^6.13.9
-        version: 6.13.9(@aws-sdk/client-sso-oidc@3.600.0)
+        specifier: ^6.13.12
+        version: 6.13.12(@aws-sdk/client-sso-oidc@3.600.0)
       react:
         specifier: ^18.2.0
         version: 18.2.0
@@ -1990,8 +1990,8 @@ importers:
         specifier: ^2.0.0
         version: 2.0.1
       mongoose:
-        specifier: ^6.13.9
-        version: 6.13.9(@aws-sdk/client-sso-oidc@3.600.0)
+        specifier: ^6.13.12
+        version: 6.13.12(@aws-sdk/client-sso-oidc@3.600.0)
       next:
         specifier: ^16
         version: 16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.9.0)(@playwright/test@1.64.1)(@types/node@24.19.2)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(sass@1.77.6)
@@ -7526,6 +7526,7 @@ packages:
 
   axios-retry@3.9.1:
     resolution: {integrity: sha512-8PJDLJv7qTTMMwdnbMvrLYuvB47M81wRtxQmEdV5w4rgbTXTt+vtPkXwajOfOdSyv/wZICJOC+/UhXH4aQ/R+w==}
+    deprecated: axios-retry is no longer maintained. See https://github.com/softonic/axios-retry for alternatives.
 
   axios@1.15.0:
     resolution: {integrity: sha512-wWyJDlAatxk30ZJer+GeCWS209sA42X+N5jU2jy6oHTp7ufw8uzUTVFBX9+wTfAlhiJXGS0Bq7X6efruWjuK9Q==}
@@ -7709,8 +7710,8 @@ packages:
     resolution: {integrity: sha512-WIsKqkSC0ABoBJuT1LEX+2HEvNmNKKgnTAyd0fL8qzK4SH2i9NXg+t08YtdZp/V9IZ33cxe3iV4yM0qg8lMQng==}
     engines: {node: '>=16.20.1'}
 
-  bson@7.2.0:
-    resolution: {integrity: sha512-YCEo7KjMlbNlyHhz7zAZNDpIpQbd+wOEHJYezv0nMYTn4x31eIUM2yomNNubclAt63dObUzKHWsBLJ9QcZNSnQ==}
+  bson@7.3.4:
+    resolution: {integrity: sha512-eb33j2Ha6xgygjJ8bhI3sYaI9cLAbSaopZLRJQ5/rxk32XyBSoVVcbeHIzVGJx1SyQpyyoElkoEZgQrg+RVVoA==}
     engines: {node: '>=20.19.0'}
 
   buffer-crc32@0.2.13:
@@ -12339,8 +12340,8 @@ packages:
     peerDependencies:
       mongoose: '>=6.0.7'
 
-  mongoose@6.13.9:
-    resolution: {integrity: sha512-x8XpK0SEDJtAtMoOF2U9aGrGXN6kbu01TqhznGLnA4B1oPXNb4Lye0MgmfxF9J2Dva7wf49VOgClk2fuKQYGHw==}
+  mongoose@6.13.12:
+    resolution: {integrity: sha512-VljZzIHa///LQAwM15y8V3lgpi2+/+AcLmjb98Dsyxe3sCF0yxb3i+10+rxS5Z0QzVM2/p7ibNITfjnQP47Azw==}
     engines: {node: '>=12.0.0'}
 
   motion-dom@12.38.0:
@@ -12371,8 +12372,8 @@ packages:
     resolution: {integrity: sha512-ikJRQTk8hw5DEoFVxHG1Gn9T/xcjtdnOKIU1JTmGjZZlg9LST2mBLmcX3/ICIbgJydT2GOc15RnNy5mHmzfSew==}
     engines: {node: '>=4.0.0'}
 
-  mquery@4.0.3:
-    resolution: {integrity: sha512-J5heI+P08I6VJ2Ky3+33IpCdAvlYGTSUjwTPxkAr8i8EoduPMBX2OY/wa3IKZIQl7MU4SbFk8ndgSKyB/cl1zA==}
+  mquery@4.0.4:
+    resolution: {integrity: sha512-L98XAumGC8qNT/YgxIvlvvMwxW1ZmbFA9RAlNCVF08iouv2ebWoV1Pyo9tQEMInHHxbW0BQ9GfxEjyDd4v/Uww==}
     engines: {node: '>=12.0.0'}
 
   mri@1.2.0:
@@ -19075,8 +19076,8 @@ snapshots:
       '@lykmapipo/mongoose-connection': 0.5.2(@aws-sdk/client-sso-oidc@3.600.0)
       async: 3.2.4
       lodash: 4.18.1
-      mongoose: 6.13.9(@aws-sdk/client-sso-oidc@3.600.0)
-      mongoose-valid8: 1.7.1(mongoose@6.13.9(@aws-sdk/client-sso-oidc@3.600.0))
+      mongoose: 6.13.12(@aws-sdk/client-sso-oidc@3.600.0)
+      mongoose-valid8: 1.7.1(mongoose@6.13.12(@aws-sdk/client-sso-oidc@3.600.0))
     transitivePeerDependencies:
       - '@aws-sdk/client-sso-oidc'
       - aws-crt
@@ -19088,7 +19089,7 @@ snapshots:
       '@lykmapipo/env': 0.17.39
       async: 3.2.4
       lodash: 4.18.1
-      mongoose: 6.13.9(@aws-sdk/client-sso-oidc@3.600.0)
+      mongoose: 6.13.12(@aws-sdk/client-sso-oidc@3.600.0)
     transitivePeerDependencies:
       - '@aws-sdk/client-sso-oidc'
       - aws-crt
@@ -23727,7 +23728,7 @@ snapshots:
 
   bson@6.10.4: {}
 
-  bson@7.2.0: {}
+  bson@7.3.4: {}
 
   buffer-crc32@0.2.13: {}
 
@@ -28689,14 +28690,14 @@ snapshots:
   mongodb@7.2.0:
     dependencies:
       '@mongodb-js/saslprep': 1.4.11
-      bson: 7.2.0
+      bson: 7.3.4
       mongodb-connection-string-url: 7.0.0
 
-  mongoose-gridfs@1.3.0(@aws-sdk/client-sso-oidc@3.600.0)(mongoose@6.13.9(@aws-sdk/client-sso-oidc@3.600.0)):
+  mongoose-gridfs@1.3.0(@aws-sdk/client-sso-oidc@3.600.0)(mongoose@6.13.12(@aws-sdk/client-sso-oidc@3.600.0)):
     dependencies:
       '@lykmapipo/mongoose-common': 0.40.0(@aws-sdk/client-sso-oidc@3.600.0)
       lodash: 4.18.1
-      mongoose: 6.13.9(@aws-sdk/client-sso-oidc@3.600.0)
+      mongoose: 6.13.12(@aws-sdk/client-sso-oidc@3.600.0)
       stream-read: 1.1.2
     transitivePeerDependencies:
       - '@aws-sdk/client-sso-oidc'
@@ -28705,27 +28706,27 @@ snapshots:
 
   mongoose-paginate-v2@1.8.2: {}
 
-  mongoose-unique-validator@2.0.3(mongoose@6.13.9(@aws-sdk/client-sso-oidc@3.600.0)):
+  mongoose-unique-validator@2.0.3(mongoose@6.13.12(@aws-sdk/client-sso-oidc@3.600.0)):
     dependencies:
       lodash.foreach: 4.5.0
       lodash.get: 4.4.2
-      mongoose: 6.13.9(@aws-sdk/client-sso-oidc@3.600.0)
+      mongoose: 6.13.12(@aws-sdk/client-sso-oidc@3.600.0)
 
-  mongoose-valid8@1.7.1(mongoose@6.13.9(@aws-sdk/client-sso-oidc@3.600.0)):
+  mongoose-valid8@1.7.1(mongoose@6.13.12(@aws-sdk/client-sso-oidc@3.600.0)):
     dependencies:
       '@lykmapipo/env': 0.17.39
       '@lykmapipo/phone': 0.7.16
       lodash: 4.18.1
-      mongoose: 6.13.9(@aws-sdk/client-sso-oidc@3.600.0)
+      mongoose: 6.13.12(@aws-sdk/client-sso-oidc@3.600.0)
       validator: 13.15.23
 
-  mongoose@6.13.9(@aws-sdk/client-sso-oidc@3.600.0):
+  mongoose@6.13.12(@aws-sdk/client-sso-oidc@3.600.0):
     dependencies:
       bson: 4.7.2
       kareem: 2.5.1
       mongodb: 4.17.2(@aws-sdk/client-sso-oidc@3.600.0)
       mpath: 0.9.0
-      mquery: 4.0.3
+      mquery: 4.0.4
       ms: 2.1.3
       sift: 16.0.1
     transitivePeerDependencies:
@@ -28753,7 +28754,7 @@ snapshots:
 
   mpath@0.9.0: {}
 
-  mquery@4.0.3:
+  mquery@4.0.4:
     dependencies:
       debug: 4.4.3(supports-color@10.0.0)
     transitivePeerDependencies:
