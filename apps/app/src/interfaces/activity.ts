@@ -877,6 +877,30 @@ export interface PopulatedUserActivitiesResult {
   serializedPaginationResult: PaginateResult<ActivityHasTargetPage>;
 }
 
+export type IUserActivityTargetPage = {
+  _id: string;
+  path: string;
+};
+
+export type IUserActivityUser = {
+  _id: string;
+  username: string;
+  name: string;
+  imageUrlCached: string;
+};
+
+export type IUserActivity = {
+  _id: string;
+  action: SupportedActivityActionType;
+  createdAt: Date;
+  user: IUserActivityUser;
+  target: IUserActivityTargetPage;
+};
+
+export type UserActivitiesResult = {
+  serializedPaginationResult: PaginateResult<IUserActivity>;
+};
+
 export type ISearchFilter = {
   usernames?: string[];
   dates?: { startDate: string | null; endDate: string | null };
