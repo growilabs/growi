@@ -189,21 +189,6 @@ describe('ActivityExtension.createByParameters - data-building contract', () => 
     expect(data.userId).toBeUndefined();
     expect(data.target).toBeUndefined();
   });
-
-  it('redacts an access_token in the endpoint before it is stored', async () => {
-    const { client, createSpy } = buildClient();
-
-    await client.activities.createByParameters({
-      endpoint: '/_search?q=foo&access_token=secret',
-      action: 'SEARCH_PAGE',
-    });
-
-    expect(createSpy).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        endpoint: '/_search?q=foo&access_token=[REDACTED]',
-      }),
-    });
-  });
 });
 
 describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () => {
@@ -377,23 +362,6 @@ describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () =
       },
       include: { user: true },
     });
-  });
-
-  it.each([
-    ['a plain string', '/_api/v3/pages?access_token=secret'],
-    ['a `{ set }` operation', { set: '/_api/v3/pages?access_token=secret' }],
-  ])('redacts an access_token in an endpoint passed as %s', async (_label, endpoint) => {
-    const { client, updateSpy } = buildUpdateClient();
-
-    await client.activities.updateByParameters('activity-id-1', {
-      action: 'PAGE_UPDATE',
-      endpoint,
-    });
-
-    const data = updateSpy.mock.calls[0]?.[0]?.data;
-    const stored =
-      typeof data?.endpoint === 'string' ? data.endpoint : data?.endpoint?.set;
-    expect(stored).toBe('/_api/v3/pages?access_token=[REDACTED]');
   });
 
   it('returns null (does NOT throw) when Prisma throws P2025 (record not found, C1)', async () => {

@@ -22,7 +22,6 @@ import {
 
 import loggerFactory from '../../utils/logger';
 import { getOrCreateModel } from '../util/mongoose-utils';
-import { redactAccessTokenFromEndpoint } from '../util/redact-access-token-from-endpoint';
 
 const logger = loggerFactory('growi:models:activity');
 
@@ -186,22 +185,6 @@ function normalizeUpdateIdField(
   if (value == null || typeof value === 'string') return value;
   if ('set' in value) return value;
   return normalizeToId(value);
-}
-
-type EndpointUpdateField =
-  | Prisma.NullableStringFieldUpdateOperationsInput
-  | string
-  | null
-  | undefined;
-
-function redactEndpointUpdateField(
-  value: EndpointUpdateField,
-): EndpointUpdateField {
-  if (value == null) return value;
-  if (typeof value === 'string') return redactAccessTokenFromEndpoint(value);
-  return value.set == null
-    ? value
-    : { ...value, set: redactAccessTokenFromEndpoint(value.set) };
 }
 
 /**
@@ -458,7 +441,6 @@ export const extension = Prisma.defineExtension((client) => {
             userId: normalizeUpdateIdField(rest.userId),
             target: normalizeUpdateIdField(rest.target),
             event: normalizeUpdateIdField(rest.event),
-            endpoint: redactEndpointUpdateField(rest.endpoint),
             snapshot: buildSnapshotUpdateEnvelope(snapshot),
           };
 
@@ -543,7 +525,7 @@ export const extension = Prisma.defineExtension((client) => {
             v: 0,
             createdAt: createdAt ?? new Date(),
             ip: rest.ip ?? '',
-            endpoint: redactAccessTokenFromEndpoint(rest.endpoint ?? ''),
+            endpoint: rest.endpoint ?? '',
             userId: normalizeToId(user) ?? undefined,
             target: normalizeToId(target) ?? undefined,
             event: normalizeToId(event) ?? undefined,
