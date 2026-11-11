@@ -19,7 +19,7 @@
   - _Boundary: Prisma に渡す形への変換_
 
 - [ ] 2. サーバー側のサービス: 見せてよいページの条件と、3 回の問い合わせ
-- [ ] 2.1 (P) 閲覧者に見せてよいページの条件を作る
+- [x] 2.1 (P) 閲覧者に見せてよいページの条件を作る
   - 一覧向けの管理設定 2 つ（他人の「自分のみ」を隠すか、グループ限定を隠すか）を読み、閲覧者が属するグループを通常のグループと外部グループの両方から集め、既存の閲覧権限の条件を作る関数（`generateGrantCondition`）に渡す。公開範囲の規則をここに書き写さない
   - リンク限定のページを含めない。ごみ箱のページと WIP のページを除外する条件を、既存の一覧と同じ内容で足す
   - 閲覧者が管理者かどうか、対象ユーザー本人かどうかで条件を変えない
@@ -132,3 +132,6 @@
 - (1.2) `RawPageFilter` を `findRaw` の `filter` に渡すときは、既存の `aggregateRaw` の呼び出しと同じく `as Prisma.InputJsonObject` が要る。
 - (1.2) 値が `undefined` の条件（既存の `addConditionToExcludeWipPage` の `{ wip: undefined }` など）が `findRaw` でどう扱われるかは確かめていない。キーごと消えると条件が広がるので、WIP を除外する条件は結合テストで実際の結果を確かめる。
 - (準備) 型検査の前に、生成物を作るため `pnpm run pre:styles-bulk-export` を apps/app で 1 回実行する必要があった。
+- (2.1) `findRaw` に `{ wip: undefined }` を渡すと、値が `undefined` のキーが送信時に消えて全ページに一致する（実測済み）。WIP を除外する条件は `{ wip: null }` の形で書く。`buildListablePageFilter` はこの形で返すので、後続のタスクは返った条件をそのまま使えばよい
+- (2.1) 既存の一覧の条件（`addConditionToFilteringByViewerForList`）の実体は `apps/app/src/server/models/obsolete-page.js` にある。結合テストから既存の一覧を呼ぶときは `test/setup/crowi` の `getInstance()` を使う
+- (2.1) 結合テストで設定を変えるときは `configManager.updateConfigs(..., { skipPubsub: true })` を使い、終了時に戻す
