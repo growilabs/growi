@@ -297,11 +297,9 @@ function buildSnapshotUpdateEnvelope(
 
 // escapeStringForMongoRegex, not RegExp.escape (mongodb-regex rule — PCRE2
 // rejects RegExp.escape's \uXXXX output). Trims `q` so stray leading/trailing
-// space characters never end up in the pattern. '-' is left unescaped: it is
-// literal outside a character class, and MongoDB stops deriving index bounds
-// at the helper's `\x2d`.
+// space characters never end up in the pattern.
 const escapeSuggestionQuery = (q: string): string =>
-  q.trim().split('-').map(escapeStringForMongoRegex).join('-');
+  escapeStringForMongoRegex(q.trim());
 
 // Substring match — used by findSnapshotUsernamesByUsernameRegexWithTotalCount,
 // whose only production caller is the `/usernames` admin listing API. This
@@ -581,7 +579,7 @@ export const extension = Prisma.defineExtension((client) => {
         // MongoDB fallback for the `endpoint` suggestion field. Unlike
         // username, no Active/Inactive classification applies here. `q` must
         // be a path without a query string, as the ES index stores it; the
-        // caller (toEndpointSearchPath) strips it.
+        // caller (the endpoint suggestion handler) strips it.
         findEndpointsByEndpointRegex(
           q: string,
           option: { offset: number; limit: number },

@@ -33,19 +33,6 @@ const AUDITLOG_SUGGESTION_FALLBACK_MIN_QUERY_LENGTH: {
   endpoint: 1,
 };
 
-// `endpoint` is stored as `req.originalUrl`, which for an ordinary
-// (origin-form) request has no scheme or host and starts with '/'.
-const URL_ORIGIN_PATTERN = /^[a-z][a-z\d+.-]*:\/\/[^/?#]*/i;
-
-const toEndpointSearchPath = (q: string): string => {
-  // A fragment never reaches the server, so no stored endpoint contains '#'.
-  const path = sanitizeEndpointForIndex(
-    q.replace(URL_ORIGIN_PATTERN, '').split('#')[0],
-  ).trim();
-  if (path === '' || path.startsWith('/')) return path;
-  return `/${path}`;
-};
-
 async function searchAuditlogFieldValues(
   backend: AuditlogSuggestionBackend,
   field: AuditlogSuggestionField,
@@ -127,9 +114,9 @@ const AUDITLOG_SUGGESTION_HANDLERS: {
   // Unlike username, no User-model classification applies — endpoints have
   // no notion of Active/Inactive.
   async endpoint(backend, q, limit) {
-    // Both backends match against the path-only value, so a pasted URL's
-    // origin and query string are dropped here once rather than in each backend.
-    const pathQ = toEndpointSearchPath(q);
+    // Both backends match against the path-only value, so q's query string is
+    // dropped here once rather than in each backend.
+    const pathQ = sanitizeEndpointForIndex(q).trim();
     if (pathQ === '') return { endpoint: { endpoints: [] } };
 
     const endpoints = await searchAuditlogFieldValues(
@@ -154,36 +141,11 @@ export const searchAuditlogSuggestions = async (
   const trimmedQ = q.trim();
   if (trimmedQ === '') return {};
 
-  const uniqueFields = [...new Set(fields)];
-  const settled = await Promise.allSettled(
-    uniqueFields.map((field) =>
+  const responses = await Promise.all(
+    [...new Set(fields)].map((field) =>
       AUDITLOG_SUGGESTION_HANDLERS[field](backend, trimmedQ, limit),
     ),
   );
-
-  const responses = settled.flatMap((result) =>
-    result.status === 'fulfilled' ? [result.value] : [],
-  );
-  if (settled.length > 0 && responses.length === 0) {
-    // Not logged here: the caller logs this error once, with every cause.
-    throw new AggregateError(
-      settled.flatMap((result) =>
-        result.status === 'rejected' ? [result.reason] : [],
-      ),
-      'Failed to search auditlog suggestions for all fields.',
-    );
-  }
-
-  // A failing field is dropped so it can't take the others down with it, and
-  // logged since the 200 response does not carry its cause.
-  settled.forEach((result, i) => {
-    if (result.status === 'rejected') {
-      logger.error(
-        { err: result.reason },
-        `Failed to search auditlog suggestions (${uniqueFields[i]}).`,
-      );
-    }
-  });
 
   return Object.assign({}, ...responses);
 };

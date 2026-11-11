@@ -282,14 +282,7 @@ describe('searchAuditlogSuggestions()', () => {
     ).toHaveBeenCalledWith('endpoint', '/api/v3/pages', 10);
   });
 
-  const PATH_ONLY_ENDPOINT_QUERIES = [
-    '/_api/search?q=foo',
-    'https://wiki.example.com/_api/search?q=foo',
-    'http://localhost:3000/_api/search',
-    '_api/search?q=foo',
-    'https://wiki.example.com/_api/search#foo',
-    '/_api/search?q=foo#bar',
-  ];
+  const PATH_ONLY_ENDPOINT_QUERIES = ['/_api/search?q=foo', '/_api/search?'];
 
   it.each(
     PATH_ONLY_ENDPOINT_QUERIES,
@@ -328,9 +321,6 @@ describe('searchAuditlogSuggestions()', () => {
   it.each([
     '?q=foo',
     '?',
-    'https://wiki.example.com',
-    'https://wiki.example.com?q=foo',
-    '#foo',
   ])('should return no endpoints without querying either backend when q=%j has no path', async (q) => {
     const result = await searchAuditlogSuggestions(
       backend,
@@ -469,7 +459,7 @@ describe('searchAuditlogSuggestions()', () => {
     });
   });
 
-  it('should still return the other fields when one field fails', async () => {
+  it('should reject when any requested field fails', async () => {
     backend = createBackend(false);
     mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValueOnce(['alice']);
     mockFindEndpointsByEndpointRegex.mockRejectedValueOnce(
@@ -479,45 +469,9 @@ describe('searchAuditlogSuggestions()', () => {
       { username: 'alice', status: UserStatus.STATUS_ACTIVE },
     ]);
 
-    const result = await searchAuditlogSuggestions(
-      backend,
-      ['username', 'endpoint'],
-      'ali',
-      10,
-    );
-
-    expect(result).toEqual({
-      username: { activeUsernames: ['alice'], inactiveUsernames: [] },
-    });
-    expect(mockLoggerError).toHaveBeenCalledWith(
-      {
-        err: expect.objectContaining({
-          message: 'operation exceeded time limit',
-        }),
-      },
-      expect.stringContaining('(endpoint)'),
-    );
-  });
-
-  it('should reject when every requested field fails', async () => {
-    backend = createBackend(false);
-    mockFindSnapshotUsernamesByUsernameRegex.mockRejectedValueOnce(
-      new Error('operation exceeded time limit'),
-    );
-    mockFindEndpointsByEndpointRegex.mockRejectedValueOnce(
-      new Error('endpoint scan failed'),
-    );
-
     await expect(
       searchAuditlogSuggestions(backend, ['username', 'endpoint'], 'ali', 10),
-    ).rejects.toMatchObject({
-      errors: [
-        expect.objectContaining({ message: 'operation exceeded time limit' }),
-        expect.objectContaining({ message: 'endpoint scan failed' }),
-      ],
-    });
-    // The caller logs the AggregateError once; per-field logs would duplicate it.
-    expect(mockLoggerError).not.toHaveBeenCalled();
+    ).rejects.toThrow('operation exceeded time limit');
   });
 
   it('should use the MongoDB fallback for endpoint when ES is unreachable', async () => {

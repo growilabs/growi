@@ -732,33 +732,3 @@ describe('ActivityExtension.findSnapshotUsernamesByUsernameRegex', () => {
     });
   });
 });
-
-describe('ActivityExtension.findEndpointsByEndpointRegex', () => {
-  const buildAggregateClient = () => {
-    const base = new PrismaClient({
-      datasourceUrl: 'mongodb://localhost:27017/test',
-    });
-    const client = base.$extends(extension);
-    const aggregateRawSpy = vi.spyOn(client.activities, 'aggregateRaw');
-    return { client, aggregateRawSpy };
-  };
-
-  // MongoDB derives index bounds only up to an escaped letter, so `\x2d`
-  // would cut the endpoint_1 range at the first hyphen.
-  it('keeps hyphens unescaped so the endpoint prefix stays index-bounded', async () => {
-    const { client, aggregateRawSpy } = buildAggregateClient();
-    aggregateRawSpy.mockResolvedValueOnce([] as never);
-
-    await client.activities.findEndpointsByEndpointRegex(
-      '/_api/v3/share-links.x',
-      { offset: 0, limit: 10 },
-    );
-
-    const callArgs = aggregateRawSpy.mock.calls[0]?.[0] as {
-      pipeline: unknown[];
-    };
-    expect(callArgs.pipeline[0]).toEqual({
-      $match: { endpoint: { $regex: '^/_api/v3/share-links\\.x' } },
-    });
-  });
-});

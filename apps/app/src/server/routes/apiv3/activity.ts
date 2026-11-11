@@ -505,7 +505,7 @@ export const setup = (crowi: Crowi): Router => {
    *           type: integer
    *     responses:
    *       200:
-   *         description: Suggestions fetched successfully. A requested field whose search failed is omitted from the response; the request fails only when every requested field fails.
+   *         description: Suggestions fetched successfully
    */
   router.get(
     '/suggestions',
