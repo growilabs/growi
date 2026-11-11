@@ -1,6 +1,7 @@
 import type { IPage } from '@growi/core';
 import type { Router } from 'express';
 
+import type { PageUpdateEventExtras } from '~/server/events/page';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
@@ -19,6 +20,7 @@ import { isStaleBootstrapRunner } from './services/resilience';
 import { createVaultBootstrapper } from './services/vault-bootstrapper';
 import { createVaultDispatcher } from './services/vault-dispatcher';
 import { vaultNamespaceMapper } from './services/vault-namespace-mapper';
+import { createVaultPageUpdateHandler } from './services/vault-page-update-handler';
 import { vaultSettingsService } from './services/vault-settings-service';
 
 export { createVaultAdminRouter } from './routes/vault-admin';
@@ -301,26 +303,20 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       },
     );
 
+    const handlePageUpdate = createVaultPageUpdateHandler(
+      dispatcher,
+      vaultNamespaceMapper,
+    );
     pageEvent.on(
       'update',
-      (page: IPage & { _id: { toString(): string } }, _user: unknown) => {
-        const revisionId =
-          page.revision != null
-            ? typeof page.revision === 'object' && '_id' in page.revision
-              ? (
-                  page.revision as { _id: { toString(): string } }
-                )._id.toString()
-              : page.revision.toString()
-            : undefined;
-
-        dispatcher
-          .onPageChanged({ type: 'update', page, revisionId })
-          .catch((err) => {
-            logger.warn(
-              { err },
-              'vault-dispatcher: error handling update event',
-            );
-          });
+      (
+        page: IPage & { _id: { toString(): string } },
+        _user: unknown,
+        extras?: PageUpdateEventExtras,
+      ) => {
+        handlePageUpdate(page, extras).catch((err) => {
+          logger.warn({ err }, 'vault-dispatcher: error handling update event');
+        });
       },
     );
 

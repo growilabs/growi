@@ -350,6 +350,8 @@ interface VaultDispatcher {
 - `create` / `update`: `current` 配列の各 namespace に `upsert` 1 件ずつ（pagePath・revisionId・pageId を含む）
 - `delete`: `current` 配列の各 namespace から `remove` 1 件ずつ（pagePath は削除直前の値）
 - ACL 変更: `previous` 配列の各 namespace に `remove` + `current` 配列の各 namespace に `upsert`（各 namespace ごとに 1 件ずつ）
+  - 単一ページ更新での ACL 変更の検出: `PageService.updatePage` / `updatePageV4`（権限だけを変える `updateGrant` もここを通る）は `pageEvent.emit('update', page, user, { previousGrant, previousGrantedGroups, previousGrantedUsers })` の第 3 引数で、更新前の権限状態を渡す。購読側（`vault-page-update-handler.ts`）は更新前と更新後の namespace を計算し、ページが抜けた namespace が 1 つでもあれば ACL 変更として扱い、抜けた namespace に `remove`、`current` の各 namespace に `upsert` を発行する。抜けた namespace が無ければ通常の `update`（coalesce 対象の `upsert`）として扱う
+  - ページが引き続き属する namespace には `remove` を発行しない（同じ namespace への `remove` と `upsert` は順序が保証されないため）
 - 単一ページ rename（`onPageRenamed`）: `current` 配列の各 namespace に `remove`（oldPath）+ `upsert`（newPath）を 1 件ずつ。ページ自身は namespace tree 上で blob（`<name>.md`）として保持されるため、ディレクトリ subtree 移動である `rename-prefix` では再配置できない（`rename-prefix` は `type === 'tree'` のエントリのみ移動する）。remove + upsert で blob を確実に旧パスから削除し新パスに再作成する。grant は rename で不変なので old/new は同一 namespace 集合に属する
 
 **coalesce 挙動**

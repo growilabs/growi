@@ -74,6 +74,7 @@ import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
 import { prisma } from '~/utils/prisma';
 
+import { capturePreviousGrantState } from '../../events/page';
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
@@ -5679,6 +5680,7 @@ class PageService implements IPageService {
       newPageData.descendantCount = 0;
     }
 
+    const updateEventExtras = capturePreviousGrantState(newPageData);
     newPageData.applyScope(user, grant, grantUserGroupIds);
 
     // update existing page
@@ -5703,7 +5705,7 @@ class PageService implements IPageService {
       await savedPage.populateDataToShowRevision();
     }
 
-    this.pageEvent.emit('update', savedPage, user);
+    this.pageEvent.emit('update', savedPage, user, updateEventExtras);
 
     // Update ex children's parent
     if (!wasOnTree && shouldBeOnTree) {
@@ -5786,6 +5788,7 @@ class PageService implements IPageService {
       grant,
       grantUserGroupIds,
     );
+    const updateEventExtras = capturePreviousGrantState(pageData);
     pageData.applyScope(user, grant, grantUserGroupIds);
 
     // update existing page
@@ -5814,7 +5817,7 @@ class PageService implements IPageService {
       this.applyScopesToDescendantsWithStream(savedPage, user, true);
     }
 
-    this.pageEvent.emit('update', savedPage, user);
+    this.pageEvent.emit('update', savedPage, user, updateEventExtras);
 
     return savedPage;
   }

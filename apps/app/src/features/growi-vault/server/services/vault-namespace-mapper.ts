@@ -13,13 +13,19 @@ import UserGroupRelation from '~/server/models/user-group-relation';
  *  2. computePageNamespaces – determines which namespace(s) a single page belongs
  *     to based on its grant settings.
  */
+/** The page fields that decide which namespace(s) a page belongs to. */
+export type PageGrantState = Pick<
+  IPage,
+  'grant' | 'grantedGroups' | 'grantedUsers'
+>;
+
 export interface VaultNamespaceMapper {
   computeAccessibleNamespaces(
     userId: string | null,
     scopes?: ReadonlyArray<string>,
   ): Promise<ReadonlyArray<Namespace>>;
 
-  computePageNamespaces(page: IPage): {
+  computePageNamespaces(page: PageGrantState): {
     current: ReadonlyArray<Namespace>;
     previous?: ReadonlyArray<Namespace>;
   };
@@ -57,7 +63,9 @@ const resolveGroupIds = async (userId: string): Promise<string[]> => {
  * responsibility (via isExcludedFromVault() in op handlers), not the
  * apps/app layer's (req 6.3).
  */
-const derivePageNamespaces = (page: IPage): ReadonlyArray<Namespace> => {
+const derivePageNamespaces = (
+  page: PageGrantState,
+): ReadonlyArray<Namespace> => {
   switch (page.grant) {
     case PageGrant.GRANT_PUBLIC:
       return ['public'];
@@ -140,7 +148,7 @@ export const createVaultNamespaceMapper = (): VaultNamespaceMapper => {
      * with both the old and new page objects and treating the old result as
      * `previous`).
      */
-    computePageNamespaces(page: IPage): {
+    computePageNamespaces(page: PageGrantState): {
       current: ReadonlyArray<Namespace>;
       previous?: ReadonlyArray<Namespace>;
     } {

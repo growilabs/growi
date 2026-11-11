@@ -22,10 +22,14 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { type IPage, PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
 import { afterAll, describe, expect, it } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 import { getVaultE2eHandle } from '../../../../test/setup/vault-e2e';
+import { vaultNamespaceMapper } from '../server/services/vault-namespace-mapper';
+import { createVaultPageUpdateHandler } from '../server/services/vault-page-update-handler';
 import { VAULT_E2E_CONFIG, VAULT_E2E_PAGES } from './fixture-contract';
 
 const execFileAsync = promisify(execFile);
@@ -275,6 +279,91 @@ describe('GROWI Vault — clone E2E contract', () => {
     // The relocated blob must carry the original body unchanged.
     const relocatedBody = await readFile(join(afterDir, newFile), 'utf-8');
     expect(relocatedBody).toBe(body);
+  });
+
+  // ----------------------------------------------------------------------
+  // Contract: when a single public page becomes "only me", it disappears
+  // from the clone of everyone except the granted user — including the
+  // page's creator when someone else was granted.
+  // ----------------------------------------------------------------------
+  it("single-page grant change to only-me removes the file from every clone but the granted user's", async () => {
+    const pageId = new mongoose.Types.ObjectId();
+    const revisionId = new mongoose.Types.ObjectId();
+    const path = '/vault-e2e-grant-change/page';
+    const file = 'vault-e2e-grant-change/page.md';
+    const creatorId = new mongoose.Types.ObjectId(
+      VAULT_E2E_CONFIG.admin.userId,
+    );
+    const grantedUserId = new mongoose.Types.ObjectId(
+      VAULT_E2E_CONFIG.member.userId,
+    );
+
+    await db().collection('revisions').insertOne({
+      _id: revisionId,
+      body: '# grant change target\nsentinel:grant-change\n',
+      pageId,
+    });
+
+    const { dispatcher } = getVaultE2eHandle();
+    const handlePageUpdate = createVaultPageUpdateHandler(
+      dispatcher,
+      vaultNamespaceMapper,
+    );
+    const pageWith = (
+      grantState: Pick<IPage, 'grant' | 'grantedUsers'>,
+    ): Parameters<typeof handlePageUpdate>[0] =>
+      mock<Parameters<typeof handlePageUpdate>[0]>({
+        _id: pageId,
+        path,
+        status: 'published',
+        revision: revisionId,
+        creator: creatorId,
+        grantedGroups: [],
+        ...grantState,
+      });
+    const filesClonedBy = async (pat: string | null): Promise<Set<string>> => {
+      const dir =
+        pat == null ? await cloneAnonymous() : await cloneAuthenticated(pat);
+      tmpDirs.push(dir);
+      return new Set(await listFiles(dir));
+    };
+    const settle = async (): Promise<void> => {
+      // Upserts of a plain update sit in the coalesce buffer first.
+      await new Promise((r) => setTimeout(r, 1500));
+      await waitForInstructionsDrained(30_000);
+      await new Promise((r) => setTimeout(r, 500));
+    };
+
+    await handlePageUpdate(
+      pageWith({ grant: PageGrant.GRANT_PUBLIC, grantedUsers: [] }),
+    );
+    await settle();
+
+    expect((await filesClonedBy(null)).has(file)).toBe(true);
+    expect((await filesClonedBy(VAULT_E2E_CONFIG.admin.pat)).has(file)).toBe(
+      true,
+    );
+
+    await handlePageUpdate(
+      pageWith({
+        grant: PageGrant.GRANT_OWNER,
+        grantedUsers: [grantedUserId],
+      }),
+      {
+        previousGrant: PageGrant.GRANT_PUBLIC,
+        previousGrantedGroups: [],
+        previousGrantedUsers: [],
+      },
+    );
+    await settle();
+
+    expect((await filesClonedBy(null)).has(file)).toBe(false);
+    expect((await filesClonedBy(VAULT_E2E_CONFIG.admin.pat)).has(file)).toBe(
+      false,
+    );
+    expect((await filesClonedBy(VAULT_E2E_CONFIG.member.pat)).has(file)).toBe(
+      true,
+    );
   });
 
   // ----------------------------------------------------------------------
