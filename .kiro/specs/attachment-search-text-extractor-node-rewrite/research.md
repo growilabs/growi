@@ -8698,3 +8698,30 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 **残っている 8.2 の項目**
 
 - 配布物に載せるライセンスの表示 (anydoc のネイティブのバイナリ)。判断の材料は 27.18 の最後にある。ユーザーの決定を待っている。
+
+**追記: 8.2 の変更を push した後の CI の実行 (2026-11-11、commit `bd46875fe4`)**
+
+成否は、ジョブとステップの一覧 (`gh api repos/growilabs/growi/actions/runs/<id>/jobs`) で確かめた。
+
+| workflow (実行) | 結果 |
+|---|---|
+| Node CI for attachment-text-extractor (43109382643、push) | ジョブは 2 つで、どちらも成功 |
+| Node CI for app development (43109382418、push。43109390656、pull_request) | 7 つのジョブがすべて成功 |
+| Node CI for app production (43109392261、pull_request) | build と起動のジョブが成功 (Playwright のジョブは skipped。merge queue でだけ動く) |
+
+- **抽出サービスの「Lint and test」が、初めてすべて通った**: 4,771 件が通り、失敗は 0、12 件が skip (139 ファイル、95 秒)。これで、手元では確かめられなかった次の 3 つが確かめられた。
+  - `apps/attachment-text-extractor/turbo.json` の `test` の `inputs` に書いた `$TURBO_ROOT$/…` を、turbo 2.9.16 が受け付けた (`Tasks: 2 successful, 2 total`)。
+  - `compose.spec.ts` の、これまで失敗していた 3 件が通った。
+  - Node 版が出す文書と commit 済みの文書を比べる drift のテストが通った (Req 7.3)。
+- **image のジョブ**: build、大きさ、中身、起動 (読み取り専用・uid 10001・ネットワークなし)、サービスの確認が成功。「Measure memory in the image」は skipped (人が起動したときだけ動く)。`check-image.sh` から一時的な仕組みを消した後も、CI が動かす手順は働いている。Dockerfile から `RAYON_NUM_THREADS` を消した後の image も、起動して PDF と DOCX を抽出できている。
+- **apps/app の CI**: 「Check attachment-text-extractor-client orval drift」のステップが成功 (作り直した生成クライアントが、commit 済みのものと同じ)。lint、単体のテスト、結合のテスト、開発用の起動、本番用の build と起動が、すべて成功。呼び出し側の関数名と型の書き方の変更で、apps/app は壊れていない。
+- 消した Python 用の workflow (Python CI for attachment-text-extractor) の実行は、出ていない。
+
+**8.3 のうち、CI で確かめることは、これで済んだ** (image の build、400MB 以下、読み取り専用・uid 10001・ネットワークなしでの起動、`/readyz`、PDF と DOCX の抽出、`prlimit`、OpenAPI の比較、lint・型の検査・テスト。実行の id は上の表と 27.17)。
+
+**8.3 のうち、人が確かめる項目で、まだ済んでいないもの** (この開発環境には docker が無く、取りまとめの担当には実行できない)
+
+- linux-arm64 の image の build。
+- `docker compose build` と `up` (`env_file`、container の中での healthcheck、`/tmp` の tmpfs、`pids_limit: 256` が足りること)。
+- 展開した image の大きさ (CI が報告する 89,175,439 バイトは、圧縮した大きさの見込み。27.17)。
+- メモリの計測を、人が workflow を起動して動かすこと (workflow のファイルが既定のブランチに入った後でないと、起動できない)。
