@@ -31,7 +31,7 @@
   - _Boundary: buildListablePageFilter_
   - _Depends: 1.2_
 
-- [ ] 2.2 (P) 3 回の問い合わせを組み立てる純粋関数を作る
+- [x] 2.2 (P) 3 回の問い合わせを組み立てる純粋関数を作る
   - 手順 1: 対象ユーザーの、対象となる操作の履歴から、操作対象のページの ID を重複なく集める問い合わせ
   - 手順 2: 渡された ID のどれかであり、かつ渡されたページの条件に合うページを求める問い合わせ。取り出す項目は ID とパスだけ
   - 手順 3: 対象ユーザーの、対象となる操作の履歴のうち、操作対象が渡された ID のどれかであるものについて、件数の計算と行の切り出しを同じ絞り込みに対して行う問い合わせ。並べ替えは操作の日時の新しい順、同じ日時は履歴の ID の大きい順。取り出す項目は履歴の ID・操作の種類・操作の日時・操作対象のページの ID だけ
@@ -135,3 +135,6 @@
 - (2.1) `findRaw` に `{ wip: undefined }` を渡すと、値が `undefined` のキーが送信時に消えて全ページに一致する（実測済み）。WIP を除外する条件は `{ wip: null }` の形で書く。`buildListablePageFilter` はこの形で返すので、後続のタスクは返った条件をそのまま使えばよい
 - (2.1) 既存の一覧の条件（`addConditionToFilteringByViewerForList`）の実体は `apps/app/src/server/models/obsolete-page.js` にある。結合テストから既存の一覧を呼ぶときは `test/setup/crowi` の `getInstance()` を使う
 - (2.1) 結合テストで設定を変えるときは `configManager.updateConfigs(..., { skipPubsub: true })` を使い、終了時に戻す
+- (2.2) 手順 3 の問い合わせの結果は `[{ totalCount: [{ count }], docs: [...] }]` の形で返る。一致が 0 件のとき `totalCount` は空の配列になるので、実行側で 0 として扱う。手順 1 の結果は `[{ _id: <ページの ID> }]` の形
+- (2.2) `buildVisiblePagesQuery` の戻り値は `{ filter, projection }`。`findRaw` には `{ filter, options: { projection } }` の形で渡す
+- (2.2) 単体テストは「ID の制限とページの条件が『かつ』で結ばれていること」と「件数と行が同じ絞り込みを対象にすること」を確かめていない。タスク 2.3 の結合テストで、閲覧できないページの履歴が返らないことと、総件数が全ページ分の行数と等しいことを必ず確かめる
