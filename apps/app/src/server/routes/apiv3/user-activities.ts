@@ -1,14 +1,22 @@
-import type { IUserHasId } from '@growi/core';
-import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import type { IUser, IUserHasId } from '@growi/core';
 import type { Request, Router } from 'express';
 import express from 'express';
-import { query } from 'express-validator';
-import type { PaginateResult } from 'mongoose';
+import { matchedData, query } from 'express-validator';
+import mongoose from 'mongoose';
 
-import type { IActivity } from '~/interfaces/activity';
+import type {
+  IUserActivity,
+  IUserActivityUser,
+  UserActivitiesResult,
+} from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
+import type { PaginateResult } from '~/interfaces/mongoose-utils';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { aggregateUserActivitiesLegacy } from '~/server/service/activity/aggregate-user-activities';
+import {
+  aggregateUserActivities,
+  type UserActivityRow,
+} from '~/server/service/activity/aggregate-user-activities';
+import { buildListablePageFilter } from '~/server/service/activity/build-listable-page-filter';
 import { configManager } from '~/server/service/config-manager';
 import { toRawObjectId } from '~/server/util/prisma-raw-normalize';
 import loggerFactory from '~/utils/logger';
@@ -20,22 +28,21 @@ import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 
+const MAX_LIMIT = 100;
+const FALLBACK_LIMIT = 10;
+
 const validator = {
   list: [
     query('limit')
       .optional()
-      .isInt({ max: 100 })
-      .withMessage('limit must be a number less than or equal to 100')
+      .isInt({ min: 1, max: MAX_LIMIT })
+      .withMessage(`limit must be an integer between 1 and ${MAX_LIMIT}`)
       .toInt(),
     query('offset')
       .optional()
-      .isInt()
-      .withMessage('page must be a number')
+      .isInt({ min: 0 })
+      .withMessage('offset must be an integer greater than or equal to 0')
       .toInt(),
-    query('searchFilter')
-      .optional()
-      .isString()
-      .withMessage('query must be a string'),
     query('targetUserId')
       .optional()
       .isMongoId()
@@ -43,25 +50,79 @@ const validator = {
   ],
 };
 
-interface StrictActivityQuery {
+type UserActivitiesRequest = Request & { user?: IUserHasId };
+
+type UserActivitiesQuery = {
   limit?: number;
   offset?: number;
-  searchFilter?: string;
   targetUserId?: string;
-}
-
-type CustomRequest<
-  TQuery = Request['query'],
-  TBody = any,
-  TParams = any,
-> = Omit<Request<TParams, any, TBody, TQuery>, 'query'> & {
-  query: TQuery & Request['query'];
-  user?: IUserHasId;
 };
 
-type AuthorizedRequest = CustomRequest<StrictActivityQuery>;
+// req.query is typed as raw strings, so the values converted by the
+// validators are read back through matchedData and narrowed here.
+const readValidatedQuery = (req: Request): UserActivitiesQuery => {
+  const data: Record<string, unknown> = matchedData(req, {
+    locations: ['query'],
+  });
+  const { limit, offset, targetUserId } = data;
+  return {
+    limit: typeof limit === 'number' ? limit : undefined,
+    offset: typeof offset === 'number' ? offset : undefined,
+    targetUserId: typeof targetUserId === 'string' ? targetUserId : undefined,
+  };
+};
 
-type ActivityPaginationResult = PaginateResult<IActivity>;
+type Paging = { totalDocs: number; limit: number; offset: number };
+
+const findActivityUser = async (
+  userId: string,
+): Promise<IUserActivityUser | null> => {
+  const user = await mongoose.model<IUser>('User').findById(userId);
+  if (user == null) {
+    return null;
+  }
+  return {
+    _id: user._id.toString(),
+    username: user.username,
+    name: user.name,
+    imageUrlCached: user.imageUrlCached,
+  };
+};
+
+const buildPaginateResult = (
+  docs: IUserActivity[],
+  { totalDocs, limit, offset }: Paging,
+): PaginateResult<IUserActivity> => {
+  const totalPages = Math.ceil(totalDocs / limit);
+  const page = Math.floor(offset / limit) + 1;
+  const hasPrevPage = page > 1;
+  const hasNextPage = page < totalPages;
+
+  return {
+    docs,
+    totalDocs,
+    limit,
+    offset,
+    page,
+    totalPages,
+    hasPrevPage,
+    hasNextPage,
+    prevPage: hasPrevPage ? page - 1 : null,
+    nextPage: hasNextPage ? page + 1 : null,
+    pagingCounter: offset + 1,
+  };
+};
+
+const toUserActivity = (
+  row: UserActivityRow,
+  user: IUserActivityUser,
+): IUserActivity => ({
+  _id: row._id,
+  action: row.action,
+  createdAt: row.createdAt,
+  user,
+  target: row.target,
+});
 
 /**
  * @swagger
@@ -262,72 +323,52 @@ export const setup = (crowi: Crowi): Router => {
     loginRequiredStrictly,
     validator.list,
     apiV3FormValidator,
-    async (req: AuthorizedRequest, res: ApiV3Response) => {
-      const defaultLimit = configManager.getConfig(
-        'customize:showPageLimitationS',
-      );
-
-      const limit = req.query.limit || defaultLimit || 10;
-      const offset = req.query.offset || 0;
-      let targetUserId = req.query.targetUserId;
-
-      if (typeof targetUserId !== 'string') {
-        targetUserId = req.user?._id;
+    async (req: UserActivitiesRequest, res: ApiV3Response) => {
+      const viewer = req.user;
+      if (viewer == null) {
+        return res.apiv3Err('Login is required.', 401);
       }
 
-      if (!targetUserId) {
-        return res.apiv3Err(
-          'Target user ID is missing and authenticated user ID is unavailable.',
-          400,
-        );
-      }
+      const validated = readValidatedQuery(req);
+      const limit =
+        validated.limit ??
+        (configManager.getConfig('customize:showPageLimitationS') ||
+          FALLBACK_LIMIT);
+      const offset = validated.offset ?? 0;
+      const targetUserId = validated.targetUserId ?? viewer._id.toString();
 
       try {
-        const userActivityPipeline = buildUserActivityPipeline(targetUserId, {
-          limit,
-          offset,
-        });
-
-        const activityResults = await aggregateUserActivitiesLegacy(
-          prisma,
-          userActivityPipeline,
-        );
-
-        const serializedResults = activityResults.docs.map((doc: IActivity) => {
-          const { user, ...rest } = doc;
-          return {
-            user: serializeUserSecurely(user),
-            ...rest,
+        const targetUser = await findActivityUser(targetUserId);
+        if (targetUser == null) {
+          const emptyResult: UserActivitiesResult = {
+            serializedPaginationResult: buildPaginateResult([], {
+              totalDocs: 0,
+              limit,
+              offset,
+            }),
           };
-        });
+          return res.apiv3(emptyResult);
+        }
 
-        const totalDocs = activityResults.totalCount;
-        const totalPages = Math.ceil(totalDocs / limit);
-        const page = Math.floor(offset / limit) + 1;
-
-        const nextPage = page < totalPages ? page + 1 : null;
-        const prevPage = page > 1 ? page - 1 : null;
-        const pagingCounter = offset + 1;
-
-        const serializedPaginationResult: ActivityPaginationResult = {
-          // serializedResults are IActivity docs with their user populated and serialized
-          docs: serializedResults as unknown as IActivity[],
-          totalDocs,
+        const pageFilter = await buildListablePageFilter(viewer);
+        const { docs, totalCount } = await aggregateUserActivities(prisma, {
+          targetUserId,
+          pageFilter,
           limit,
           offset,
-          page,
-          totalPages,
-          hasPrevPage: page > 1,
-          hasNextPage: page < totalPages,
-          nextPage,
-          prevPage,
-          pagingCounter,
-        };
+        });
 
-        return res.apiv3({ serializedPaginationResult });
+        const result: UserActivitiesResult = {
+          serializedPaginationResult: buildPaginateResult(
+            docs.map((row) => toUserActivity(row, targetUser)),
+            { totalDocs: totalCount, limit, offset },
+          ),
+        };
+        return res.apiv3(result);
       } catch (err) {
-        logger.error('Failed to get paginated activity', err);
-        return res.apiv3Err(err, 500);
+        // The cause can carry page ids and paths, so it is logged only.
+        logger.error({ err }, 'Failed to get user activities');
+        return res.apiv3Err('Failed to get user activities.', 500);
       }
     },
   );
