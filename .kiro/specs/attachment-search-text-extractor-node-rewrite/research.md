@@ -7866,3 +7866,53 @@ devcontainer、Node v24.22.2、Linux 6.8。サービスのプロセスと子の 
 - workflow の `paths` に、ルートの `package.json` は入っていない (`packageManager` を上げると、image の中で corepack が取る pnpm が変わるが、この workflow は起動しない)。
 - workflow のファイルそのものの静的なテストは足していない (22.8 の 4)。`shellcheck` と `actionlint` は入っておらず、流していない。
 - テスト全体: 4,692 件が通り、3 件 (`compose.spec`。8.2) が失敗、12 件が skip。
+
+### 27.12 タスク 6.13 と 6.14 (Node 版のベンチマークと、Python 版との比較)
+
+計測は Fable の担当、独立の検証は別の Fable の担当が行った (検証の担当は、自分で書いた比較のコードで保存済みの結果を比べ、自分でも 1 回測り直した)。
+
+**結論: Python 版のベースライン (13.3) を下回った形式・指標は無い。6.14 でユーザーに諮るものは無い** (tasks.md の 6.14 の「下回ったものが無ければ、その旨を research.md に書いて完了にする」に当たる)。
+
+**条件** (13.1 との違いは、Node の版・ポート・ラベルだけ)
+
+- 2026-11-11 (UTC)、HEAD `f4636f66cd`。`dist/` を build し直してから、`ATTACHMENT_EXTRACTOR_SERVICE_TOKEN=… node dist/main.js` (0.0.0.0:8000、ほかの設定は既定) を起動した。
+- 道具は 12.1 のとおり: `node --import @swc-node/register/esm-register benchmark/run-benchmark.ts --label node --url http://127.0.0.1:8000 --token-file … --es-url http://elasticsearch:9200 --json …`。3 回続けて測った。道具・コーパス・正解・ベースラインは変えていない。
+- Node は 24.22.2 (13.1 は 24.21.0。この環境に 24.21.0 が無い)。Elasticsearch は 9.3.3 で、kuromoji と icu があり、状態は `measured`。
+- コーパスは 23 文書・語句 118 個で、作り直していない。ファイルの大きさと SHA-256 は、ベースラインの JSON の `corpus[]` と同じ。
+
+**結果**
+
+- Node 版の結果の JSON は、`benchmark/baseline/python-baseline.json` と、13.7 が比べないと決めた 5 つのキー (`startedAt`・`finishedAt`・`label`・`service`・`elasticsearch.indexName`) を除いて、完全に同じだった。`formats`・`total`・`documents[]` (語句ごとの `match`・`matchAtExpectedPosition`・`foundOnPages`、ページ数、字数)・`elasticsearch.recall[]`・`positionProblems[]` のすべてが同じである。13.5 が求めるより厳しい一致である。
+- 3 回の結果は、時刻と一時的な index の名前を除いて同じ (13.2 と同じく、結果は毎回変わらない)。
+- 形式ごとの表は 13.3 と同じなので、ここには写さない。全体は、失敗 0、(a) そのまま 118/118、(b) 要素の数 23/23・番号とラベル 30/30・シート名 3/3・正しい位置の語句 118/118、(c) と (d) の「少ないほど良い」列はすべて 0、`kuromoji-phrase` は 117/118、`growi-quoted-phrase` は 118/118。
+- docx の `kuromoji-phrase` (13.5 と 13.11 の「割合でなく、当たらなかった語句の集まりで比べる」決まり): 当たらなかったのは `docx-ja.docx` の「テレワーク勤務制度」の 1 つだけで、ベースラインと同じ。Node 版の docx の本文は Python 版と 1 バイトも違わないので、原因も 13.4 と同じである (13.4 の「未確認」への答え)。
+- 13.11 (2.9 の決定): 絶対値の下限は置いていないので、これ以上確かめるものは無い。
+- 位置の指標 (Req 2.15): PDF のページ 6/6、PPTX のスライド 3/3、XLSX のシート 3/3 (ラベルは「売上実績」「顧客一覧」「備考」)。
+
+**`pages[]` の違い (tasks.md の 6.13 の 2 つめ)**
+
+- 23 個のファイルを Node 版と Python 版の両方に送り、応答の本文の全体 (`pages[]` の `pageNumber`・`label`・`content`、`mimeType`、`extractedCharacters`、状態) を比べた。**22 個は 1 バイトも違わない。違うのは 1 個の、本文だけ。**
+- 違う 1 個は `pdf-ja-vertical.pdf` の 2 ページ目。ページの分け方・番号・ラベルは同じ。Node 版は 42 字で、Python 版は 39 字 (ファイルの全体では 97 字と 94 字)。違いは全角の空白 (U+3000) 3 つだけで、Node 版はこれを残す (`昭和五十年　横浜市にて創業…`)。もとの文書にはこの空白があるので、Node 版のほうがもとに近い。
+- 原因: PDFium の版の違い。計測の担当が pypdfium2 5.14.0 (PDFium 156.0.8076.0) をそのページに直接呼び、正規化の前の時点で U+3000 が無いことを確かめた (検証の担当は確かめていない)。どちらの正規化も、日本語の文字の間の ASCII の空白と改行だけを詰めるので、U+3000 は消さない。14.4 (1) に記録済みの違いで、新しいものではない。
+- ベンチマークへの影響は無い (採点は U+3000 を空白として扱う。12.3)。
+- 27.1〜27.4 に記録した違い (文字コードの判定の端の場合、壊れた ZIP、bzip2・LZMA の部品、壊れた PDF など) は、このコーパスには出てこない (普通のファイルだけなので)。
+- Python 版の生の `pages[]` は 2.8 では保存していなかったので、この比較のために Python 版を起動した。**この worktree の Python 版の `.venv` は壊れている** (`.venv/bin/python` が指す uv 管理の CPython が無い)。計測の担当は、別の場所にあった CPython 3.12.16 に `.venv` の site-packages を足して起動し (13.1 は 3.12.15)、その Python 版に道具を向けた結果が `python-baseline.json` と同じになることを確かめてから使った。8 節の手順をもう一度使うには、`uv python install 3.12` か `uv sync` が要る。
+
+**この比較で分からないこと (ユーザーに伝える)**
+
+- ベースラインが天井にある (1 つを除いて、すべて 100% か 0)。このベンチマークで分かるのは「語句の判定か位置が変わるほどの劣化が無い」ことだけで、良くなった点は点数に出ない。
+- コーパスは小さく、作ったものである (23 文書・語句 118 個。PDF は Chromium で作った 3 個)。Word や PowerPoint から書き出した PDF、スキャンした PDF、フォントを埋め込んでいない PDF、大きな文書は入っていない。RTF・EPUB・XML・ipynb・TSV はコーパスにファイルが無いので、`pages[]` の比較も無い。
+- `growi-quoted-phrase` は漢字の間の分断に鈍い (12.6) ので、118/118 の重みは小さい。意味のある根拠は、(a)(b)(c) と `kuromoji-phrase` である。
+- 測ったのは devcontainer の `node dist/main.js` で、本番の image の中ではない。要求は 1 件ずつで、同時の要求や負荷は見ていない。
+
+**点数に出ない違い: 1 件あたりの時間**
+
+- Node 版のサービスのログの `duration_ms` は、1 文書あたり 75〜130ms (テキスト・CSV・HTML・Office が 75〜98ms、PDF が 115〜128ms)。子の最大 RSS は 63〜95MB。検証の担当の測り直しでも 75〜126ms だった。
+- Python 版は、同じ 23 文書の `elapsed_ms` の合計が 184ms (1 文書あたり約 8ms。計測の担当の 1 回の読み取りで、検証の担当は測っていない)。
+- 差は、要求ごとに Node の子を 1 つ起動する作り (15 節の決定) と、Python 版の forkserver の違いから来る。統制した性能の計測ではない。
+- requirements.md に、応答の時間や処理量の要件は無い (17 行と 51 行は、性能の改善を目的にしないと書いている)。時間の決まりは、変換の制限時間 (Req 3.4)、最悪の合計が apps/app の 90,000ms を超えないこと (Req 3.13)、子の起動の時間を考えて作り方を選ぶこと (Req 11.4。決定済み) だけである。違反は無いが、1 文書あたり約 10 倍なので、まとめて index を作り直すときの処理量に効く。**ユーザーに 1 行で伝える。**
+
+**そのほか**
+
+- Node 版の結果の JSON は `benchmark/baseline/` に置いていない (13.7 は「置ける」と書いているだけで、求めていない)。
+- 検証の担当の測り直しで、`dist/` の 113 ファイルの SHA-256 は build し直す前後で同じだった (計測が古い build に向いていたのではない)。サービスのログには、ベンチマークの間に `result=ok` の `extract` の行がちょうど 23 行あった。Elasticsearch の一時的な index は、道具が自分で消した (`_cat/indices/benchmark-*` は前後とも空)。
