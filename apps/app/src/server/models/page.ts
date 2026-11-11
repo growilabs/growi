@@ -1120,7 +1120,32 @@ export async function pushRevision(
   return savedPage.populate<HydratedDocument<PageDocument>>('revision');
 }
 
+// Unsaved field changes on the document, as a Mongo update. They go into the
+// conditional revision write so a lost race leaves none of them behind.
+const pendingChangesOf = (
+  pageData: HydratedDocument<PageDocument>,
+): { $set: Record<string, unknown>; $unset: Record<string, 1> } => {
+  const plain = pageData.toObject({ depopulate: true }) as Record<
+    string,
+    unknown
+  >;
+  const $set: Record<string, unknown> = {};
+  const $unset: Record<string, 1> = {};
+  const fields = new Set(
+    pageData.directModifiedPaths().map((path) => path.split('.')[0]),
+  );
+  for (const field of fields) {
+    if (plain[field] === undefined) {
+      $unset[field] = 1;
+    } else {
+      $set[field] = plain[field];
+    }
+  }
+  return { $set, $unset };
+};
+
 // Check and write in one atomic update so no other save can slip in between.
+// Field changes still pending on pageData (grant, wip, ...) are written by the same update.
 async function writeRevisionIfUnchanged(
   pageData: HydratedDocument<PageDocument>,
   newRevision: { readonly id: string; readonly body: string },
@@ -1128,10 +1153,15 @@ async function writeRevisionIfUnchanged(
   expectedRevisionId: ObjectIdLike,
 ): Promise<HydratedDocument<PageDocument>> {
   const Page = pageData.$model<Model<PageDocument>>('Page');
+  const pending = pendingChangesOf(pageData);
   const updatedPage = await Page.findOneAndUpdate(
     { _id: pageData._id, revision: expectedRevisionId },
     {
+      ...(Object.keys(pending.$unset).length > 0
+        ? { $unset: pending.$unset }
+        : {}),
       $set: {
+        ...pending.$set,
         revision: newRevision.id,
         latestRevisionBodyLength: newRevision.body.length,
         lastUpdateUser: user?._id ?? user,

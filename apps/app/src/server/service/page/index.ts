@@ -5681,12 +5681,15 @@ class PageService implements IPageService {
 
     newPageData.applyScope(user, grant, grantUserGroupIds);
 
-    // update existing page
-    let savedPage = await newPageData.save();
-
     // Update body
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
+
+    // A conditional revision write saves the pending changes itself, so a lost race saves nothing.
+    let savedPage =
+      shouldUpdateBody && options.expectedRevisionId != null
+        ? newPageData
+        : await newPageData.save();
     if (shouldUpdateBody) {
       const origin = options.origin;
       const newRevision = prisma.revisions.prepareRevision(
@@ -5788,12 +5791,15 @@ class PageService implements IPageService {
     );
     pageData.applyScope(user, grant, grantUserGroupIds);
 
-    // update existing page
-    let savedPage = await pageData.save();
-
     // Update revision
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
+
+    // A conditional revision write saves the pending changes itself, so a lost race saves nothing.
+    let savedPage =
+      shouldUpdateBody && options.expectedRevisionId != null
+        ? pageData
+        : await pageData.save();
     if (shouldUpdateBody) {
       const newRevision = prisma.revisions.prepareRevision(
         pageData,
