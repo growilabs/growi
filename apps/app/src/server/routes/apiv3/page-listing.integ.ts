@@ -15,6 +15,7 @@ import addCustomFunctionToResponse from './response';
 
 const WORKER_ID = process.env.VITEST_WORKER_ID ?? '1';
 const PUBLIC_PAGE_PATH = `/page-listing-integ-public-${WORKER_ID}`;
+const USERNAME = `page-listing-integ-user-${WORKER_ID}`;
 const PUBLIC_PAGE_BODY = 'PAGE-LISTING-INTEG-PUBLIC-BODY';
 // loginRequired answers 403 (instead of redirecting) only under /_api/
 const MOUNT_PATH = '/_api/v3/page-listing';
@@ -48,11 +49,12 @@ describe('GET /page-listing/info', () => {
     const { Page, User } = crowi.models;
 
     await Page.deleteMany({ path: PUBLIC_PAGE_PATH });
+    await User.deleteMany({ username: USERNAME });
 
     loggedInUser = await User.create({
       name: 'Page Listing Integ User',
-      username: `page-listing-integ-user-${WORKER_ID}`,
-      email: `page-listing-integ-user-${WORKER_ID}@example.com`,
+      username: USERNAME,
+      email: `${USERNAME}@example.com`,
     });
 
     const publicPage = await Page.create({
@@ -92,14 +94,17 @@ describe('GET /page-listing/info', () => {
     app.use(MOUNT_PATH, routerFactory(crowi));
   }, 60_000);
 
+  // beforeAll may have failed midway, so only clean up what was created.
   afterAll(async () => {
-    const { Page, User } = crowi.models;
-    await prisma.revisions.deleteMany({ where: { pageId: publicPageId } });
-    await Page.deleteMany({ path: PUBLIC_PAGE_PATH });
-    await User.deleteOne({ _id: loggedInUser._id });
     await configManager.removeConfigs(['security:restrictGuestMode'], {
       skipPubsub: true,
     });
+    const { Page, User } = crowi.models;
+    if (publicPageId != null) {
+      await prisma.revisions.deleteMany({ where: { pageId: publicPageId } });
+    }
+    await Page.deleteMany({ path: PUBLIC_PAGE_PATH });
+    await User.deleteMany({ username: USERNAME });
   });
 
   describe('when guest access is denied', () => {
