@@ -64,7 +64,7 @@
   - _Depends: 1.2, 3.1, 3.2_
 
 - [ ] 4. 結合確認
-- [ ] 4.1 二重計上がないことと全体の健全性を確認する
+- [x] 4.1 二重計上がないことと全体の健全性を確認する
   - お引越し 1 回の実行（送信側・受信側）で、アーカイブの利用回数が記録されないことを、お引越しの既存結合テスト（`apps/app/src/server/routes/apiv3/g2g-transfer.integ.ts`）に記録関数をモックしたケースを追加して確認する
   - apps/app の lint・テスト・ビルドがすべて通る
   - _Requirements: 1.9, 2.6_
@@ -97,3 +97,4 @@
 - Tests that need real metric output use a real `MeterProvider` + `InMemoryMetricExporter` (see `custom-metrics/data-transfer-usage-metrics.spec.ts`); callers' tests mock the record functions from the barrel.
 - Log errors in pino form `logger.error({ err }, 'msg')` — `logger.error('msg', err)` drops the error under @growi/logger. Attach background-promise handlers with two-arg `.then(onOk, onErr)` so a throw in the success path cannot double-record.
 - `isTransferImportIncomplete` (service/g2g-transfer.ts) is the single definition of "transfer import incomplete" for both sides; its doc holds the rescue rationale. The receiver service has its own older `rescueFailed` (from `rescuePlan`, ~L1879) — out of scope, leave it.
+- 4.1: the double-count test lives in a new `g2g-transfer-no-archive-double-count.integ.ts` (not `g2g-transfer.integ.ts`, which only drives the receive side). Full `pnpm run test` (2026-11-11): 3 unrelated failures — `tools/i18n-sync/no-runtime-dependency.spec.ts` times out under full-suite load (passes alone) and two growi-vault integ files need `apps/growi-vault-manager/dist` built. `lint:*` and `pnpm run build` pass.
