@@ -5681,12 +5681,12 @@ class PageService implements IPageService {
 
     newPageData.applyScope(user, grant, grantUserGroupIds);
 
-    // update existing page
-    let savedPage = await newPageData.save();
-
     // Update body
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
+
+    // With a body, pushRevision saves the pending field changes together with the revision.
+    let savedPage = newPageData;
     if (shouldUpdateBody) {
       const origin = options.origin;
       const newRevision = prisma.revisions.prepareRevision(
@@ -5701,6 +5701,8 @@ class PageService implements IPageService {
         expectedRevisionId: options.expectedRevisionId,
       });
       await savedPage.populateDataToShowRevision();
+    } else {
+      savedPage = await savedPage.save();
     }
 
     this.pageEvent.emit('update', savedPage, user);
@@ -5788,12 +5790,12 @@ class PageService implements IPageService {
     );
     pageData.applyScope(user, grant, grantUserGroupIds);
 
-    // update existing page
-    let savedPage = await pageData.save();
-
     // Update revision
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
+
+    // With a body, pushRevision saves the pending field changes together with the revision.
+    let savedPage = pageData;
     if (shouldUpdateBody) {
       const newRevision = prisma.revisions.prepareRevision(
         pageData,
@@ -5807,6 +5809,8 @@ class PageService implements IPageService {
         expectedRevisionId: options.expectedRevisionId,
       });
       await savedPage.populateDataToShowRevision();
+    } else {
+      savedPage = await savedPage.save();
     }
 
     // update scopes for descendants

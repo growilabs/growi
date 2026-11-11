@@ -12,14 +12,8 @@ import {
 } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
 import type mongoose from 'mongoose';
-import type {
-  AnyObject,
-  Document,
-  HydratedDocument,
-  Model,
-  Types,
-} from 'mongoose';
-import { Schema } from 'mongoose';
+import type { AnyObject, Document, HydratedDocument, Model } from 'mongoose';
+import { Error as MongooseError, Schema, Types } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 import nodePath from 'path';
@@ -1095,22 +1089,42 @@ export async function pushRevision(
 ) {
   const newRevision = await prisma.revisions.create({ data: newRevisionData });
 
-  const expectedRevisionId = options?.expectedRevisionId;
-  if (expectedRevisionId != null) {
-    return writeRevisionIfUnchanged(
-      pageData,
-      newRevision,
-      user,
-      expectedRevisionId,
-    );
-  }
-
   pageData.revision = newRevision._id;
   pageData.latestRevisionBodyLength = newRevision.body.length;
   pageData.lastUpdateUser = user?._id ?? user;
   pageData.updatedAt = new Date();
 
-  const savedPage = await pageData.save();
+  // `$where` is applied as-is, so it needs the stored type (ObjectId).
+  // One save writes the revision together with any pending field changes
+  // (grant, wip, ...), and matches nothing when another save got there first.
+  const expectedRevisionId = options?.expectedRevisionId;
+  if (expectedRevisionId != null) {
+    pageData.$where = {
+      revision: new Types.ObjectId(expectedRevisionId.toString()),
+    };
+  }
+
+  let savedPage: HydratedDocument<PageDocument>;
+  try {
+    savedPage = await pageData.save();
+  } catch (err) {
+    if (
+      expectedRevisionId != null &&
+      (err instanceof MongooseError.DocumentNotFoundError ||
+        err instanceof MongooseError.VersionError) &&
+      !(await pageStillAtRevision(pageData, expectedRevisionId))
+    ) {
+      await prisma.revisions.delete({ where: { id: newRevision.id } });
+      throw new RevisionConflictError(
+        pageData._id.toString(),
+        expectedRevisionId.toString(),
+      );
+    }
+    throw err;
+  } finally {
+    pageData.$where = {};
+  }
+
   // Setting `revision` to a bare id (above) leaves the path unpopulated.
   // The old Mongoose flow assigned a hydrated Revision document here instead,
   // which Mongoose treats as already-populated; recreate that by populating
@@ -1120,37 +1134,17 @@ export async function pushRevision(
   return savedPage.populate<HydratedDocument<PageDocument>>('revision');
 }
 
-// Check and write in one atomic update so no other save can slip in between.
-async function writeRevisionIfUnchanged(
+// True while the page still points at the expected revision, i.e. a failed
+// save was not caused by another save having moved the page forward.
+async function pageStillAtRevision(
   pageData: HydratedDocument<PageDocument>,
-  newRevision: { readonly id: string; readonly body: string },
-  user,
   expectedRevisionId: ObjectIdLike,
-): Promise<HydratedDocument<PageDocument>> {
+): Promise<boolean> {
   const Page = pageData.$model<Model<PageDocument>>('Page');
-  const updatedPage = await Page.findOneAndUpdate(
-    { _id: pageData._id, revision: expectedRevisionId },
-    {
-      $set: {
-        revision: newRevision.id,
-        latestRevisionBodyLength: newRevision.body.length,
-        lastUpdateUser: user?._id ?? user,
-        updatedAt: new Date(),
-      },
-    },
-    { new: true },
+  return (
+    (await Page.exists({ _id: pageData._id, revision: expectedRevisionId })) !=
+    null
   );
-
-  if (updatedPage == null) {
-    await prisma.revisions.delete({ where: { id: newRevision.id } });
-    throw new RevisionConflictError(
-      pageData._id.toString(),
-      expectedRevisionId.toString(),
-    );
-  }
-
-  // biome-ignore lint/plugin: allow populate for backward compatibility
-  return updatedPage.populate<HydratedDocument<PageDocument>>('revision');
 }
 
 /**
