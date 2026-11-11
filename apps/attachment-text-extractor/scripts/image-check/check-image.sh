@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The image check of the attachment-text-extractor (Req 8.1-8.3, 9.1, 9.5).
-# The CI job runs the steps one by one; with docker, `check-image.sh all`
-# runs the same steps on any machine.
+# The CI job runs the steps one by one (`memory` only when the workflow is
+# started by hand); with docker, `check-image.sh all` runs the same steps on
+# any machine.
 #
 #   check-image.sh <step>...
 #

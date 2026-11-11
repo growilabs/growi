@@ -108,6 +108,11 @@ jobs:
 
       # Req 3.14 and 11.2: the heaviest loads against the 2 Gi limit and the
       # child peak RSS of the baseline files, in containers of their own. The
-      # figures go to the job summary.
+      # figures go to the job summary. Only when the workflow is started by
+      # hand: do that after upgrading the conversion libraries (anydoc,
+      # PDFium) or the Node base image, or after changing memory-related code.
+      # Not on every push, because the path filter includes pnpm-lock.yaml and
+      # unrelated dependency updates would start it.
       - name: Measure memory in the image
+        if: github.event_name == 'workflow_dispatch'
         run: bash "$CHECK_IMAGE" memory
