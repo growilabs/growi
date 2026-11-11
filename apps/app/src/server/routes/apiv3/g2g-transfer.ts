@@ -1374,7 +1374,8 @@ export const setup = (crowi: Crowi): Router => {
       // Start transfer
       // DO NOT "await". Let it run in the background.
       // Errors should be emitted through websocket.
-      // startTransfer has already logged and notified before it rejects, so this only records.
+      // This handler replaces the global unhandledRejection logger for this promise, so it
+      // logs too: not every rejection path inside startTransfer logs before throwing.
       g2gTransferPusherService
         .startTransfer(tk, req.user, collections, optionsMap, destGROWIInfo)
         .then(
@@ -1383,7 +1384,10 @@ export const setup = (crowi: Crowi): Router => {
               'source',
               importIncomplete ? 'failure' : 'success',
             ),
-          () => recordG2GTransfer('source', 'failure'),
+          (err) => {
+            recordG2GTransfer('source', 'failure');
+            logger.error({ err }, 'G2G transfer failed');
+          },
         );
 
       return res.apiv3({ message: 'Successfully requested auto transfer.' });

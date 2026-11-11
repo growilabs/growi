@@ -1,5 +1,10 @@
 export { addApplicationMetrics } from './application-metrics';
-export { addDataTransferUsageMetrics } from './data-transfer-usage-metrics';
+export {
+  addDataTransferUsageMetrics,
+  type OperationResult,
+  recordArchiveOperation,
+  recordG2GTransfer,
+} from './data-transfer-usage-metrics';
 export { addInstalledAtMetrics } from './installed-at-metrics';
 export { addMongooseConnectionPoolMetrics } from './mongoose-connection-pool-metrics';
 export { addPageCountsMetrics } from './page-counts-metrics';

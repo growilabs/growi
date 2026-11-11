@@ -1,8 +1,6 @@
 export {
-  type ArchiveOperation,
-  type G2GTransferRole,
   type OperationResult,
   recordArchiveOperation,
   recordG2GTransfer,
-} from './custom-metrics/data-transfer-usage-metrics';
+} from './custom-metrics';
 export * from './node-sdk';

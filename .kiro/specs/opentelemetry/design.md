@@ -58,7 +58,7 @@
 - `custom-metrics/yjs-metrics.ts` の `addYjsMetrics()`（`growi.yjs.docs.count`）。
 - `custom-metrics/mongoose-connection-pool-metrics.ts` の `addMongooseConnectionPoolMetrics()`（`growi.mongoose.pool.{size,checked_out,available}`）。
 - `custom-metrics/data-transfer-usage-metrics.ts` の `addDataTransferUsageMetrics()`、記録関数 `recordArchiveOperation()` / `recordG2GTransfer()`、属性語彙の型 `ArchiveOperation` / `G2GTransferRole` / `OperationResult`。発生回数型 Counter `growi.archive.operations`（単位 `{operation}`、属性 `operation`: `create` / `download` / `upload` / `import`、`result`: `success` / `failure`）と `growi.g2g_transfer.operations`（単位 `{transfer}`、属性 `role`: `source` / `destination`、`result`: `success` / `failure`）のメトリクス名・属性キー・属性値の唯一の定義元。
-- 外部記録 API: `features/opentelemetry/server/index.ts` の barrel が `recordArchiveOperation` / `recordG2GTransfer` と型 `ArchiveOperation` / `G2GTransferRole` / `OperationResult` のみを re-export する。`addDataTransferUsageMetrics` を含む `custom-metrics/` の他のシンボルは barrel から公開しない。
+- 外部記録 API: `features/opentelemetry/server/index.ts` の barrel が `custom-metrics/` の barrel 経由で `recordArchiveOperation` / `recordG2GTransfer` と型 `OperationResult` のみを re-export する（`custom-metrics/` 内のファイルを直接参照しない）。`addDataTransferUsageMetrics` を含む `custom-metrics/` の他のシンボルは barrel から公開しない。
 - データアーカイブ・お引越しの計測点: 記録呼び出しの位置と、成否との対応（Components「DataTransferUsageMetrics」の計測点表）。成否の判定そのもの（`executeImport()` の戻り値、`isTransferImportIncomplete()`）は業務コード側が持ち、本 spec は入力として使うのみ。
 - Meter 命名規約: `growi-<scope>-metrics`, version `'1.0.0'`。
 - Observation 実装規約（状態値型）: `ObservableGauge` + `addBatchObservableCallback` + try/catch + `diag.createComponentLogger` で例外吸収。
@@ -667,7 +667,7 @@ export const ATTR_HTTP_TARGET = 'http.target';
 - **Layer 1（SDK lifecycle）**: SDK 構築失敗時のみ throw を許容（起動を継続できないため）。Resource 取得失敗は warn ログでスキップ。
 - **Layer 2（Resource Attribute）**: `growiInfoService` 失敗時は try/catch で空 `Attributes` を返す（SDK 起動は継続可能）。
 - **Layer 3（Custom Metric・状態値型）**: 各 `addBatchObservableCallback` 内で try/catch。例外時は `diag.createComponentLogger(...).error(...)` を呼び、その collection cycle では observe を 1 回も呼ばない。次の cycle で再試行。
-- **Layer 3（Custom Metric・発生回数型）**: 記録関数内で `Counter.add()` を try/catch し、例外は `diag.createComponentLogger(...).error(...)` に記録して吸収する。記録関数は例外を投げないため、計測点に try/catch は不要。バックグラウンド処理に付けた rejection ハンドラは記録後に再 throw しない。サービス内でログ済みでない reject（`ExportService.export()`）はハンドラで `logger.error({ err }, ...)` し、`startTransfer()` はログと管理画面への通知を済ませてから reject するためハンドラは記録のみ行う。
+- **Layer 3（Custom Metric・発生回数型）**: 記録関数内で `Counter.add()` を try/catch し、例外は `diag.createComponentLogger(...).error(...)` に記録して吸収する。記録関数は例外を投げないため、計測点に try/catch は不要。バックグラウンド処理に付けた rejection ハンドラは、プロセス全体の `unhandledRejection` ロガーに代わる唯一の受け手になるため、記録したうえで `logger.error({ err }, ...)` し、再 throw しない（`ExportService.export()` / `startTransfer()` とも同じ）。
 
 ### Error Categories and Responses
 

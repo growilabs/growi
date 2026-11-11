@@ -430,13 +430,14 @@ export interface ImportCollectionsResult extends ImportResult {
  * incomplete. {@link ImportCollectionsResult} satisfies it on the receiving side; the
  * source reads the same fields back from the response body.
  */
-export interface TransferImportOutcome {
-  readonly failedCollections: readonly string[];
-  readonly importAborted: boolean;
-  readonly rescue: AdminRescueOutcome | null;
-  readonly rescueApplied: boolean;
-  readonly postProcessFailures: readonly string[];
-}
+export type TransferImportOutcome = Pick<
+  ImportCollectionsResult,
+  | 'failedCollections'
+  | 'importAborted'
+  | 'rescue'
+  | 'rescueApplied'
+  | 'postProcessFailures'
+>;
 
 /**
  * Whether the admin screen reports this transfer's import as an error.
