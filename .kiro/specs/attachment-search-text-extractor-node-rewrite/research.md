@@ -8545,3 +8545,10 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 - `::warning::` の行が GitHub Actions の注釈になること (この実行では、304MB を超えた対象のファイルが無く、警告が出なかった)。
 - 手元の docker での `check-image.sh all` (6.12 の条件から外した。27.16)。
 - 切り替えた後の workflow で、メモリのステップが飛ばされること (次の push の実行で確かめて、下に追記する)。
+
+**追記: 切り替えた後の実行 (2026-11-11、実行 43014076215、commit `8d8277ea57`、push で起動)**
+
+- 「Image check for attachment-text-extractor」のジョブ: 「Measure memory in the image」のステップは skipped で、ほかのステップ (build、大きさ、中身、起動、サービスの確認、後片づけ) はすべて成功した。切り替えは、考えたとおりに働いている。
+- 「Node CI for attachment-text-extractor」のジョブ: 失敗は、前の実行と同じ `test/deploy/compose.spec.ts` の 3 件だけである (4,770 件が通り、12 件が skip)。
+- これで、tasks.md の 6.12 の条件 (最初の本物の実行の数字を記録する。メモリの計測を、人が起動したときだけ動かす形に切り替える。`docker/README.md` の断り書きを書き直す) がそろったので、6.12 と、その親の 6 に完了の印を付けた。
+- 残っている確認は、上の「まだ確かめていないこと」のうち、展開した image の大きさ、linux-arm64、`::warning::` の注釈、の 3 つである (8.3 で人が確かめる項目に入れる)。
