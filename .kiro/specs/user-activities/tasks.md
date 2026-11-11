@@ -97,8 +97,8 @@
   - _Boundary: user-activities ルート_
   - _Depends: 1.1, 3.1_
 
-- [ ] 4. 「最近の活動」画面
-- [ ] 4.1 画面を、応答の行をそのまま表示する形にする
+- [x] 4. 「最近の活動」画面
+- [x] 4.1 画面を、応答の行をそのまま表示する形にする
   - 一覧は、応答の行を 1 件 1 行ですべて表示する。ページの情報を持つ行だけに絞る処理を削除する（サーバーが行ごと返さないので、ページの情報を持たない行は応答に含まれず、そのための表示も持たない）
   - 1 行の表示は、操作の種類、操作からの経過時間、ページのパス（そのページへのリンク）にする。公開範囲や状態を見て表示を変える判定と、そのための型を削除する
   - ページ送りの総ページ数を、応答の総件数から決める。データを取得する hook の戻り値の型を、タスク 1.1 の型にする（引数は変えない）
@@ -147,3 +147,4 @@
 - (3.1) 開発サーバーへ直接呼ぶ確認は、この worktree からポート 3111・使い捨ての DB（`MONGO_URI` を起動コマンドの行だけで渡し、`ELASTICSEARCH_URI` は空にする）で起動して行えた。ユーザーはインストーラー API と登録 API で作り、HTTP でログインしてセッションを得る。終了後は自分が起動したプロセスだけを止め、DB を削除する
 - (3.2) サービスの入口の読み込み元は `~/server/service/activity/index` と書く。同じ階層に `service/activity.ts` があり、`~/server/service/activity` と書くとそちらに解決されるため
 - (3.3) これまで `user-activities.ts` と `activity.ts` の両方が OpenAPI の記述で同じパス `/activity` と同じ名前の定義 `ActivityResponse` を使っていて、生成された文書の中で混ざっていた。3.3 で `/user-activities`（operationId `getUserActivities`）を独立させたので、管理者向け `/activity` の生成結果も `activity.ts` の記述どおりに変わる。PR の説明に書くこと
+- (4.1) 共有の型 `IUserActivity.createdAt` は `Date` だが、通信上は ISO 形式の文字列で届く。画面側は `formatDistanceToNow`（date-fns 3.6.0）に文字列のまま渡していて動く。画面のテストは `JSON.parse(JSON.stringify(...))` で通信上の値を再現している
