@@ -2,6 +2,7 @@ import { Server } from 'node:http';
 import { serve } from '@hono/node-server';
 import type { Hono } from 'hono';
 
+import { toTimerDelayMs } from '../config/timer-delay';
 import type { AppEnv } from './app-env';
 
 export interface StartedServer {
@@ -29,7 +30,9 @@ export const serverTimeouts = (uploadTimeoutS = 0) => ({
   headersTimeout: HEADERS_TIMEOUT_MS,
   requestTimeout: Math.max(
     MIN_REQUEST_TIMEOUT_MS,
-    HEADERS_TIMEOUT_MS + uploadTimeoutS * 1000 + REQUEST_TIMEOUT_MARGIN_MS,
+    HEADERS_TIMEOUT_MS +
+      toTimerDelayMs(uploadTimeoutS) +
+      REQUEST_TIMEOUT_MARGIN_MS,
   ),
   keepAliveTimeout: 5_000,
 });

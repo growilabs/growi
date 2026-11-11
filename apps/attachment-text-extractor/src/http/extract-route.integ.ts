@@ -143,6 +143,17 @@ describe('a failed conversion', () => {
     expect(errorOf(answer).message.split(':', 1)[0]).toBe('internal');
     expect(answer.text).not.toContain('/srv/secret/path');
   });
+
+  it('a runner that throws is logged by its error class, without the error text', async () => {
+    runner.run.mockRejectedValue(new RangeError('/srv/secret/path exploded'));
+
+    await post();
+
+    const lines = service.current().logs.join('\n');
+    expect(lines).toContain('error=RangeError');
+    expect(lines).not.toContain('/srv/secret/path');
+    expect(lines).not.toContain('exploded');
+  });
 });
 
 describe('the concurrency slot (MAX_CONCURRENCY=1)', () => {

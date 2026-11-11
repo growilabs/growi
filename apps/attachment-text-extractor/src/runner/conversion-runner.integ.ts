@@ -236,6 +236,15 @@ describe.skipIf(process.platform !== 'linux')(
         expectNothingLeft();
       });
 
+      // setTimeout turns a delay over 2^31 - 1 ms into 1 ms.
+      it('does not take a deadline too long for a timer as one already past', async () => {
+        const runner = standInRunner({ timeoutS: 3_000_000 });
+        const input = standInInput('echo');
+
+        expect(contentsOf(await run(runner, input))).toEqual(echoed(input));
+        expectNothingLeft();
+      });
+
       it('still applies the deadline to a child sending its result slowly', async () => {
         const runner = standInRunner({ timeoutS: 0.5 });
 

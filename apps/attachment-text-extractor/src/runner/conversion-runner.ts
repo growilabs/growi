@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { type Settings, toConversionLimits } from '../config/load-settings';
+import { toTimerDelayMs } from '../config/timer-delay';
 import type { ConversionLimits, ConversionOutcome } from '../contract';
 import { resolveFormat } from '../formats/format-table';
 import { checkInputSize } from '../formats/input-size';
@@ -161,7 +162,7 @@ const convertInChild = async (
       frames: [start.header, input.chunks],
       maxResultFrameBytes: maxResultFrameBytes(options.limits.maxResultBytes),
       maxRssMb: options.maxChildRssMb,
-      timeoutMs: timeoutS * 1000,
+      timeoutMs: toTimerDelayMs(timeoutS),
     },
     signal,
   );

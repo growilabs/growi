@@ -3,6 +3,7 @@ import type { Hono } from 'hono';
 import { describeRoute, resolver } from 'hono-openapi';
 
 import type { Settings } from '../config/load-settings';
+import { toTimerDelayMs } from '../config/timer-delay';
 import type { ConversionRunner, RunInput, RunOutcome } from '../runner';
 import {
   ErrorResponseSchema,
@@ -74,7 +75,7 @@ interface Intake {
 const intakeOf = (settings: Settings): Intake => ({
   maxFileBytes: settings.maxFileSizeMb * MIB,
   maxBodyBytes: settings.maxFileSizeMb * MIB + FRAMING_BYTES,
-  timeoutMs: settings.uploadTimeoutS * 1000,
+  timeoutMs: toTimerDelayMs(settings.uploadTimeoutS),
   bodyTooLarge: `Request body exceeds the ${settings.maxFileSizeMb} MiB file size limit`,
 });
 

@@ -279,6 +279,17 @@ describe('the upload deadline (UPLOAD_TIMEOUT_S=1)', () => {
     expect(received?.status).toBe(408);
     expect(Date.now() - began).toBeLessThan(5_000);
   });
+
+  // setTimeout turns a delay over 2^31 - 1 ms into 1 ms.
+  it('does not take a deadline too long for a timer as one already past', async () => {
+    const target = await restart({ UPLOAD_TIMEOUT_S: '3000000' });
+    const connection = await openUpload(target, MIB, 10);
+
+    const answer = await connection.response(500);
+    connection.destroy();
+
+    expect(answer).toBeNull();
+  });
 });
 
 describe('large uploads', () => {

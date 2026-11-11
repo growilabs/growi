@@ -1,3 +1,5 @@
+import { createServer } from 'node:http';
+
 import { serverTimeouts } from './start-server';
 
 // Node ends a request that is not fully received within requestTimeout with a
@@ -14,5 +16,17 @@ describe('serverTimeouts', () => {
     expect(requestTimeout).toBeGreaterThan(
       headersTimeout + uploadTimeoutS * 1000,
     );
+  });
+
+  it.each([
+    2_147_484,
+    Number.MAX_SAFE_INTEGER,
+  ])('gives timeouts Node accepts for an upload deadline of %d s', (uploadTimeoutS) => {
+    const timeouts = serverTimeouts(uploadTimeoutS);
+
+    expect(() => createServer(timeouts).close()).not.toThrow();
+    // Above 32 bits the value could wrap into a short one.
+    expect(timeouts.requestTimeout).toBeLessThan(2 ** 32);
+    expect(timeouts.requestTimeout).toBeGreaterThan(2 ** 31);
   });
 });

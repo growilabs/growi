@@ -29,13 +29,25 @@ const count = (s: string, sub: string, from: number, to: number): number => {
 };
 
 // Python's str.strip() whitespace within latin-1 (String#trim() lacks \x1c-\x1f and \x85)
-const WS = '[\\t\\n\\x0b\\x0c\\r\\x1c-\\x1f \\x85\\xa0]+';
-const BOTH_ENDS = new RegExp(`^${WS}|${WS}$`, 'g');
-const LEADING = new RegExp(`^${WS}`);
-const TRAILING = new RegExp(`${WS}$`);
-const strip = (v: string): string => v.replace(BOTH_ENDS, '');
-const lstrip = (v: string): string => v.replace(LEADING, '');
-const rstrip = (v: string): string => v.replace(TRAILING, '');
+const isWhitespace = (code: number): boolean =>
+  (code >= 0x09 && code <= 0x0d) ||
+  (code >= 0x1c && code <= 0x20) ||
+  code === 0x85 ||
+  code === 0xa0;
+
+// Walked from the ends: a regex ending in $ rescans a run of whitespace from
+// each of its characters, which is quadratic for a run in the middle.
+const lstrip = (v: string): string => {
+  let start = 0;
+  while (start < v.length && isWhitespace(v.charCodeAt(start))) start++;
+  return v.slice(start);
+};
+const rstrip = (v: string): string => {
+  let end = v.length;
+  while (end > 0 && isWhitespace(v.charCodeAt(end - 1))) end--;
+  return v.slice(0, end);
+};
+const strip = (v: string): string => lstrip(rstrip(v));
 
 /** The end of the parameter starting at `start`: the next ';' outside double quotes, counted as Python counts them. */
 const paramEnd = (s: string, start: number): number => {

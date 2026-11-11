@@ -1,5 +1,8 @@
 import type { ConversionOutcome, FailureKind, PageInfo } from '../contract';
-import { rejectUnsafeStructure } from './json-structure-guard';
+import {
+  type ResultSkeleton,
+  rejectUnsafeStructure,
+} from './json-structure-guard';
 import { WireProtocolError } from './wire-protocol-error';
 
 // Kinds the parent decides on its own (timeout / crashed / memory_exceeded) are not accepted
@@ -19,6 +22,12 @@ const MAX_PAGE_NUMBER = 2 ** 31 - 1;
 const SUCCESS_KEYS: readonly string[] = ['ok', 'pages', 'mimeType'];
 const FAILURE_KEYS: readonly string[] = ['ok', 'kind', 'detail'];
 const PAGE_KEYS: readonly string[] = ['pageNumber', 'label', 'content'];
+// The guard requires every page to carry all of PAGE_KEYS and refuses a nested object or array as
+// a field value: adding an optional or nested field means changing the guard with it.
+const RESULT_SKELETON: ResultSkeleton = {
+  topKeys: [...SUCCESS_KEYS, ...FAILURE_KEYS],
+  elementKeys: PAGE_KEYS,
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -95,7 +104,7 @@ const parseJson = (body: Uint8Array): unknown => {
       fatal: true,
       ignoreBOM: true,
     }).decode(body);
-    rejectUnsafeStructure(text);
+    rejectUnsafeStructure(text, RESULT_SKELETON);
     return JSON.parse(text);
   } catch (error) {
     if (error instanceof WireProtocolError) {

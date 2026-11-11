@@ -124,3 +124,31 @@ describe('parseHeaderParams', () => {
     expect(parsed('form-data; name=\x1c\x85file\xa0').params.name).toBe('file');
   });
 });
+
+// Trimming takes time linear in the header length (under 10 ms each here),
+// wherever the run of whitespace sits.
+describe('parseHeaderParams on a long run of whitespace stays linear', () => {
+  const RUN = '\t'.repeat(100_000);
+
+  it.each([
+    ['inside a value', `form-data; name="a${RUN}b"`, 'name', `a${RUN}b`],
+    ['inside a name', `form-data; a${RUN}b=x; name="file"`, 'name', 'file'],
+    ['between parameters', `form-data;${RUN}name="file"${RUN}; x=y`, 'x', 'y'],
+  ])('%s', (_id, value, name, expected) => {
+    const began = performance.now();
+    const { params } = parseHeaderParams(value);
+    const ms = performance.now() - began;
+
+    expect(ms).toBeLessThan(1_000);
+    expect(params[name]).toBe(expected);
+  });
+
+  it('inside a value that has no parameter', () => {
+    const began = performance.now();
+    const { type } = parseHeaderParams(`Text/Plain${RUN}x`);
+    const ms = performance.now() - began;
+
+    expect(ms).toBeLessThan(1_000);
+    expect(type).toBe(`text/plain${RUN}x`);
+  });
+});

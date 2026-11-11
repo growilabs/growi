@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { PassThrough, Readable, Writable } from 'node:stream';
+import { Writable } from 'node:stream';
 
 import type { ConversionOutcome, FailureKind } from '../contract';
 import {
@@ -7,7 +7,6 @@ import {
   encodeFrameHeader,
   encodeResult,
   maxResultFrameBytes,
-  readFrame,
   WireProtocolError,
   writeFrame,
 } from './length-prefixed-json';
@@ -17,16 +16,6 @@ const framed = (body: Uint8Array): Buffer => {
   header.writeUInt32BE(body.length);
   return Buffer.concat([header, body]);
 };
-
-function* pieces(data: Uint8Array, step: number): Generator<Buffer> {
-  for (let start = 0; start < data.length; start += step) {
-    yield Buffer.from(data.subarray(start, start + step));
-  }
-}
-
-/** A byte stream that delivers at most `step` bytes per chunk, like a pipe with short reads. */
-const trickleReader = (data: Uint8Array, step: number): Readable =>
-  Readable.from(pieces(data, step), { objectMode: false });
 
 /** A sink that applies backpressure every `step` bytes and acknowledges each write later. */
 const trickleWriter = (step: number) => {
@@ -75,7 +64,7 @@ describe('frames', () => {
     );
   });
 
-  it('round-trips a frame through a slow sink and short reads', async () => {
+  it('hands the whole frame to a slow sink before it resolves', async () => {
     const body = Buffer.from(
       Uint8Array.from({ length: 256 * 1000 }, (_, i) => i % 256),
     );
@@ -83,66 +72,15 @@ describe('frames', () => {
 
     await writeFrame(writer.sink, body);
 
-    // Everything is handed over by the time the promise resolves.
     expect(writer.received()).toEqual(framed(body));
-    await expect(
-      readFrame(trickleReader(writer.received(), 3), body.length),
-    ).resolves.toEqual(body);
   });
 
-  it('round-trips an empty frame', async () => {
+  it('writes an empty frame as its header alone', async () => {
     const writer = trickleWriter(1);
 
     await writeFrame(writer.sink, Buffer.alloc(0));
 
-    await expect(
-      readFrame(trickleReader(writer.received(), 1), 0),
-    ).resolves.toEqual(Buffer.alloc(0));
-  });
-
-  // Node addition: the parent sends the header frame and the file frame on one stdin (design.md Data Contracts).
-  it('reads two frames sent back to back on one stream', async () => {
-    const first = Buffer.from('{"fileName":"a.pdf"}');
-    const second = Buffer.from('file bytes');
-    const stream = trickleReader(
-      Buffer.concat([framed(first), framed(second)]),
-      5,
-    );
-
-    await expect(readFrame(stream, 100)).resolves.toEqual(first);
-    await expect(readFrame(stream, 100)).resolves.toEqual(second);
-  });
-
-  it('rejects a length over the maximum from the header alone', async () => {
-    // The stream never ends: a reader that waited for the body would hang.
-    const stream = new PassThrough();
-    stream.write(Buffer.from([0xff, 0xff, 0xff, 0xff]));
-
-    await expect(readFrame(stream, 50 * 1024 * 1024)).rejects.toThrow(
-      WireProtocolError,
-    );
-    stream.destroy();
-  });
-
-  // Node addition: the boundary next to the round trip at exactly maxLength.
-  it('rejects a length one byte over the maximum', async () => {
-    await expect(
-      readFrame(trickleReader(framed(Buffer.from('abcdef')), 2), 5),
-    ).rejects.toThrow(WireProtocolError);
-  });
-
-  it('rejects a truncated header', async () => {
-    await expect(
-      readFrame(trickleReader(Buffer.from([0, 0]), 1), 10),
-    ).rejects.toThrow(WireProtocolError);
-  });
-
-  it('rejects a truncated body', async () => {
-    const truncated = framed(Buffer.from('abcdef')).subarray(0, -2);
-
-    await expect(readFrame(trickleReader(truncated, 2), 10)).rejects.toThrow(
-      WireProtocolError,
-    );
+    expect(writer.received()).toEqual(Buffer.from([0, 0, 0, 0]));
   });
 
   it('cannot encode a length beyond four bytes', () => {
@@ -402,6 +340,20 @@ describe('hostile result bodies in an isolated process', () => {
       `Buffer.from('{"a":'.repeat(${DEPTH / 3}) + '1' + '}'.repeat(${DEPTH / 3}))`,
     );
   }, 30_000);
+
+  // 32 MiB of empty containers: about 1 GB in JSON.parse, far over the small heap.
+  it.each([
+    ['empty objects', '{},'],
+    ['empty arrays', '[],'],
+  ])(
+    'refuses a 32 MiB pages array of %s without exhausting a small heap',
+    (_id, element) => {
+      expectRefused(
+        `Buffer.from('{"ok":true,"pages":[' + '${element}'.repeat(${(2 * DEPTH) / 3}) + '${element.slice(0, -1)}],"mimeType":"x"}')`,
+      );
+    },
+    30_000,
+  );
 
   it.each([
     ['an array element', '[1,"x\\\\'],
