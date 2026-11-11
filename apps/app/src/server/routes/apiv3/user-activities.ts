@@ -127,7 +127,7 @@ const toUserActivity = (
  *
  * components:
  *   schemas:
- *     ActivityResponse:
+ *     UserActivitiesResponse:
  *       type: object
  *       properties:
  *         serializedPaginationResult:
@@ -141,12 +141,6 @@ const toUserActivity = (
  *                   _id:
  *                     type: string
  *                     example: "67e33da5d97e8d3b53e99f95"
- *                   targetModel:
- *                     type: string
- *                     example: "Page"
- *                   target:
- *                     type: string
- *                     example: "675547e97f208f8050a361d4"
  *                   action:
  *                     type: string
  *                     example: "PAGE_UPDATE"
@@ -160,31 +154,37 @@ const toUserActivity = (
  *                       _id:
  *                         type: string
  *                         example: "669a5aa48d45e62b521d00e4"
- *                       name:
- *                         type: string
- *                         example: "Taro"
  *                       username:
  *                         type: string
  *                         example: "growi"
+ *                       name:
+ *                         type: string
+ *                         example: "Taro"
  *                       imageUrlCached:
  *                         type: string
  *                         example: "/images/icons/user.svg"
+ *                   target:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                         example: "675547e97f208f8050a361d4"
+ *                       path:
+ *                         type: string
+ *                         example: "/Sandbox/page"
  *             totalDocs:
  *               type: integer
  *               example: 3
- *             offset:
- *               type: integer
- *               example: 0
  *             limit:
  *               type: integer
  *               example: 10
- *             totalPages:
+ *             offset:
  *               type: integer
- *               example: 1
+ *               example: 0
  *             page:
  *               type: integer
  *               example: 1
- *             pagingCounter:
+ *             totalPages:
  *               type: integer
  *               example: 1
  *             hasPrevPage:
@@ -201,6 +201,9 @@ const toUserActivity = (
  *               type: integer
  *               nullable: true
  *               example: null
+ *             pagingCounter:
+ *               type: integer
+ *               example: 1
  */
 
 export const setup = (crowi: Crowi): Router => {
@@ -211,38 +214,72 @@ export const setup = (crowi: Crowi): Router => {
   /**
    * @swagger
    *
-   * /activity:
+   * /user-activities:
    *   get:
-   *     summary: /activity
+   *     summary: /user-activities
+   *     description: List the activities a user performed on pages that the requester is allowed to see, newest first
    *     tags: [Activity]
    *     security:
    *       - cookieAuth: []
-   *       - bearer: []
-   *       - accessTokenInQuery: []
-   *       - accessTokenHeaderAuth: []
    *     parameters:
    *       - name: limit
    *         in: query
    *         required: false
+   *         description: Number of rows to return. Defaults to the page-list size configured on the server.
    *         schema:
    *           type: integer
+   *           minimum: 1
+   *           maximum: 100
    *       - name: offset
    *         in: query
    *         required: false
    *         schema:
    *           type: integer
-   *       - name: searchFilter
+   *           minimum: 0
+   *           default: 0
+   *       - name: targetUserId
    *         in: query
    *         required: false
+   *         description: MongoDB ObjectId of the user whose activities are listed. Defaults to the requester.
    *         schema:
    *           type: string
+   *           example: "669a5aa48d45e62b521d00e4"
    *     responses:
    *       200:
-   *         description: Activity fetched successfully
+   *         description: Activities fetched successfully
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/ActivityResponse'
+   *               $ref: '#/components/schemas/UserActivitiesResponse'
+   *       400:
+   *         description: A query parameter is invalid
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 errors:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/ErrorV3'
+   *       403:
+   *         description: The requester is not logged in
+   *         content:
+   *           text/plain:
+   *             schema:
+   *               type: string
+   *               example: Forbidden
+   *       500:
+   *         description: Failed to get user activities
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 errors:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/ErrorV3'
    */
   router.get(
     '/',

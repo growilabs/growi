@@ -65,7 +65,7 @@
   - _Boundary: buildListablePageFilter, aggregateUserActivities_
   - _Depends: 2.1, 2.3_
 
-- [ ] 3. ルートの切り替えと API の文書
+- [x] 3. ルートの切り替えと API の文書
 - [x] 3.1 ルートを新しいサービスに切り替える
   - middleware の順序（ログインの確認 → 引数の検証 → 検証結果の確認 → ハンドラ）は変えない。使っていない引数 `searchFilter` を検証から外す。件数は 1 以上 100 以下、開始位置は 0 以上の整数であることを検証する
   - 対象ユーザーを 1 回だけ取得する（指定が無ければ呼び出した利用者自身）。見つからなければ、履歴の問い合わせを実行せずに 0 件の一覧を返す
@@ -89,7 +89,7 @@
   - _Boundary: user-activities ルート, aggregateUserActivities_
   - _Depends: 3.1_
 
-- [ ] 3.3 OpenAPI の記述を実際の応答に合わせる
+- [x] 3.3 OpenAPI の記述を実際の応答に合わせる
   - パスを実際の呼び出し先にする。引数は、件数・開始位置・対象ユーザーの 3 つだけを書く
   - 応答の各項目を、タスク 1.1 の型のとおりに書く。認証の手段はセッションだけを書く
   - 完了の状態: OpenAPI の生成（apps/app の生成コマンド）が成功し、生成された文書のこの API の項目が、パス・引数・応答の形・認証の手段のすべてで上の内容になっている
@@ -146,3 +146,4 @@
 - (3.1) ルートは 2 つのサービスを各ファイルから直接読み込んでいる。タスク 3.2 で `service/activity/index.ts` から公開し、ルートとテストの読み込み元をそこへ変える。ルートのテストの `vi.mock` に残る `aggregateUserActivitiesLegacy: vi.fn()` も 3.2 で消す。`user-activities.spec.ts` の `describe('GET /user-activities')` は新しいルートのテストなので、3.2 で消さない
 - (3.1) 開発サーバーへ直接呼ぶ確認は、この worktree からポート 3111・使い捨ての DB（`MONGO_URI` を起動コマンドの行だけで渡し、`ELASTICSEARCH_URI` は空にする）で起動して行えた。ユーザーはインストーラー API と登録 API で作り、HTTP でログインしてセッションを得る。終了後は自分が起動したプロセスだけを止め、DB を削除する
 - (3.2) サービスの入口の読み込み元は `~/server/service/activity/index` と書く。同じ階層に `service/activity.ts` があり、`~/server/service/activity` と書くとそちらに解決されるため
+- (3.3) これまで `user-activities.ts` と `activity.ts` の両方が OpenAPI の記述で同じパス `/activity` と同じ名前の定義 `ActivityResponse` を使っていて、生成された文書の中で混ざっていた。3.3 で `/user-activities`（operationId `getUserActivities`）を独立させたので、管理者向け `/activity` の生成結果も `activity.ts` の記述どおりに変わる。PR の説明に書くこと

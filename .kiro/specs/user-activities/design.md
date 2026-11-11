@@ -408,7 +408,7 @@ export const aggregateUserActivities: (
 
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | `/_api/v3/user-activities` | query: `limit`、`offset`、`targetUserId` | `{ serializedPaginationResult: PaginateResult<IUserActivity> }` | 400（引数の誤り）、401（未ログイン）、500 |
+| GET | `/_api/v3/user-activities` | query: `limit`、`offset`、`targetUserId` | `{ serializedPaginationResult: PaginateResult<IUserActivity> }` | 400（引数の誤り）、403（未ログイン。既存の `loginRequiredStrictly` の応答）、500 |
 
 - `limit`: 省略できる整数。100 以下。省略時は設定 `customize:showPageLimitationS` の値、無ければ 10。
 - `offset`: 省略できる 0 以上の整数。省略時は 0。
