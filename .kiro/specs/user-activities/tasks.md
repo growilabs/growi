@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. 土台: 応答の型と、条件を Prisma に渡す形
+- [x] 1. 土台: 応答の型と、条件を Prisma に渡す形
 - [x] 1.1 User Activities API の応答の型を追加する
   - 操作対象のページを ID とパスだけで表す型、操作したユーザーを ID・ユーザー名・表示名・アイコン画像の場所の 4 項目だけで表す型、1 件の履歴の型、応答全体の型を、design.md の Data Models のとおりに追加する
   - 既存の型（ページの全項目を持つ型など）は、この時点では削除しない。ルートと画面が新しい型へ移った後に、タスク 5.1 で削除する
@@ -8,7 +8,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
   - _Boundary: 応答の型_
 
-- [ ] 1.2 ID を含む条件を、pages への `findRaw` に渡せるようにする
+- [x] 1.2 ID を含む条件を、pages への `findRaw` に渡せるようにする
   - apps/app には `findRaw` を使っている箇所がまだ無い。そこで最初に、ID の値を含む条件（入れ子の `$and`・`$or`・`$in`・`$elemMatch` を含むもの）を pages への `findRaw` に渡して、期待したページが返るかを結合テストで確かめる
   - 既存の変換（1 つの ID を変換する `toRawObjectId`）だけで足りない場合は、条件のオブジェクト全体をたどって ID の値を置き換える小さな関数を、既存の変換の置き場所（`prisma-raw-normalize.ts`）に足す。入力を書き換えず、新しいオブジェクトを返す。単体テストを先に書く（入れ子の条件、配列の中の ID、ID でない値がそのまま残ること）
   - 既存の仕組みで足りた場合は、関数を足さず、足りた方法を research.md の「条件を `aggregateRaw` と `findRaw` に渡す形」に 1〜2 行で追記する
@@ -124,3 +124,11 @@
   - _Requirements: 4.2_
   - _Boundary: aggregateUserActivities_
   - _Depends: 3.1_
+
+## Implementation Notes
+
+- (1.2) mongoose の ObjectId をそのまま `prisma.pages.findRaw` に渡すと、エラーにならずに 0 件が返る。条件は `toRawFilter`（`prisma-raw-normalize.ts`）に通してから渡す。
+- (1.2) `toRawFilter` が変換するのは ObjectId のインスタンスだけである。文字列の ID と Date は変換しない。閲覧者の ID やグループの ID は、ObjectId のインスタンスにしてから条件に入れる。
+- (1.2) `RawPageFilter` を `findRaw` の `filter` に渡すときは、既存の `aggregateRaw` の呼び出しと同じく `as Prisma.InputJsonObject` が要る。
+- (1.2) 値が `undefined` の条件（既存の `addConditionToExcludeWipPage` の `{ wip: undefined }` など）が `findRaw` でどう扱われるかは確かめていない。キーごと消えると条件が広がるので、WIP を除外する条件は結合テストで実際の結果を確かめる。
+- (準備) 型検査の前に、生成物を作るため `pnpm run pre:styles-bulk-export` を apps/app で 1 回実行する必要があった。
