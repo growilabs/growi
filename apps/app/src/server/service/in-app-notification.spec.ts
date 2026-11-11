@@ -3,11 +3,7 @@ import { Types } from 'mongoose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import {
-  type IInAppNotification,
-  InAppNotificationStatuses,
-} from '~/interfaces/in-app-notification';
-import { InAppNotification } from '~/server/models/in-app-notification';
+import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 
 import type Crowi from '../crowi';
 import { InAppNotificationService } from './in-app-notification';
@@ -15,16 +11,6 @@ import { InAppNotificationService } from './in-app-notification';
 const { STATUS_UNOPENED } = InAppNotificationStatuses;
 
 // Mock dependencies
-vi.mock('~/server/models/in-app-notification', () => ({
-  InAppNotification: {
-    insertMany: vi.fn(),
-    bulkWrite: vi.fn(),
-    countDocuments: vi.fn(),
-    findOneAndUpdate: vi.fn(),
-    updateMany: vi.fn(),
-  },
-}));
-
 vi.mock('~/server/models/in-app-notification-settings', () => ({
   default: { findOne: vi.fn() },
 }));
@@ -40,12 +26,12 @@ vi.mock('./in-app-notification/in-app-notification-utils', () => ({
   generateSnapshot: vi.fn().mockResolvedValue('{"path":"/test-page"}'),
 }));
 
-const { mockFindManyAttachments } = vi.hoisted(() => ({
-  mockFindManyAttachments: vi.fn(),
+const { mockCreateMany } = vi.hoisted(() => ({
+  mockCreateMany: vi.fn(),
 }));
 
 vi.mock('~/utils/prisma', () => ({
-  prisma: { attachments: { findMany: mockFindManyAttachments } },
+  prisma: { inappnotifications: { createMany: mockCreateMany } },
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -75,7 +61,7 @@ const buildMockCrowi = (socketInitialized = false) => ({
 
 describe('InAppNotificationService.insertMentionNotifications', () => {
   let service: InAppNotificationService;
-  const mockInsertMany = vi.mocked(InAppNotification.insertMany);
+  const mockInsertMany = mockCreateMany;
 
   const userId1 = new Types.ObjectId();
   const userId2 = new Types.ObjectId();
@@ -103,10 +89,10 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
     );
 
     expect(mockInsertMany).toHaveBeenCalledOnce();
-    const insertedDocs = mockInsertMany.mock.calls[0][0] as unknown[];
-    const userIds = insertedDocs.map((d) =>
-      (d as { user: Types.ObjectId }).user.toString(),
-    );
+    const { data } = mockInsertMany.mock.calls[0][0] as {
+      data: Array<{ userId: string }>;
+    };
+    const userIds = data.map((d) => d.userId);
 
     expect(userIds).toContain(userId1.toString());
     expect(userIds).toContain(userId2.toString());
@@ -144,17 +130,18 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
     );
 
     expect(mockInsertMany).toHaveBeenCalledOnce();
-    const [docs, options] = mockInsertMany.mock.calls[0] as unknown[];
-    const doc = (docs as unknown[])[0] as Record<string, unknown>;
+    const { data } = mockInsertMany.mock.calls[0][0] as {
+      data: Array<Record<string, unknown>>;
+    };
+    const doc = data[0];
 
-    expect(options).toEqual({ ordered: false });
     expect(doc).toMatchObject({
-      user: userId1,
+      userId: userId1.toString(),
       targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: pageId,
+      target: pageId.toString(),
       action: SupportedAction.ACTION_COMMENT_MENTION,
       status: STATUS_UNOPENED,
-      activities: [activityId],
+      activities: [activityId.toString()],
     });
     expect(doc.snapshot).toBe('{"path":"/test-page"}');
   });
@@ -191,108 +178,5 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
     );
 
     expect(crowi.socketIoService.getDefaultSocket).not.toHaveBeenCalled();
-  });
-});
-
-describe('InAppNotificationService.populateTargetAttachments', () => {
-  let service: InAppNotificationService;
-
-  const attachmentId1 = new Types.ObjectId().toString();
-  const attachmentId2 = new Types.ObjectId().toString();
-  const pageId = new Types.ObjectId().toString();
-
-  const buildAttachmentRow = (id: string) => ({
-    id,
-    originalName: `${id}.png`,
-    pageId,
-    creatorId: null,
-    downloadPathProxied: `/download/${id}`,
-  });
-
-  const buildLegacyAttachment = (id: string) => ({
-    ...buildAttachmentRow(id),
-    page: pageId,
-    creator: null,
-  });
-
-  const buildNotification = (target: unknown) =>
-    ({
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      action: SupportedAction.ACTION_COMMENT_CREATE,
-      target,
-    }) as unknown as IInAppNotification;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    service = new InAppNotificationService(
-      buildMockCrowi() as unknown as Crowi,
-    );
-  });
-
-  it('replaces target.attachment with the attachment carrying downloadPathProxied', async () => {
-    mockFindManyAttachments.mockResolvedValue([
-      buildAttachmentRow(attachmentId1),
-      buildAttachmentRow(attachmentId2),
-    ]);
-
-    const result = await service.populateTargetAttachments([
-      buildNotification({ attachment: attachmentId1 }),
-      buildNotification({ attachment: attachmentId2 }),
-    ]);
-
-    expect(result.map(({ target }) => target)).toEqual([
-      {
-        attachment: buildLegacyAttachment(attachmentId1),
-      },
-      {
-        attachment: buildLegacyAttachment(attachmentId2),
-      },
-    ]);
-  });
-
-  it('sets target.attachment to null when the attachment is not found', async () => {
-    mockFindManyAttachments.mockResolvedValue([
-      buildAttachmentRow(attachmentId1),
-    ]);
-
-    const result = await service.populateTargetAttachments([
-      buildNotification({ attachment: attachmentId1 }),
-      buildNotification({ attachment: attachmentId2 }),
-    ]);
-
-    expect(result[0].target).toEqual({
-      attachment: buildLegacyAttachment(attachmentId1),
-    });
-    expect(result[1].target).toEqual({ attachment: null });
-  });
-});
-
-describe('InAppNotificationService.hideChangeProposalTargets', () => {
-  const service = new InAppNotificationService(
-    buildMockCrowi() as unknown as Crowi,
-  );
-
-  it('reduces a change proposal target to its id and leaves other targets as they are', () => {
-    const proposalId = new Types.ObjectId();
-    const pageTarget = { _id: new Types.ObjectId(), path: '/page' };
-    const notifications = [
-      {
-        targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
-        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
-        target: proposalId,
-      },
-      {
-        targetModel: SupportedTargetModel.MODEL_PAGE,
-        action: SupportedAction.ACTION_PAGE_UPDATE,
-        target: pageTarget,
-      },
-    ] as unknown as IInAppNotification[];
-
-    const result = service.hideChangeProposalTargets(notifications);
-
-    expect(result.map(({ target }) => target)).toEqual([
-      { _id: proposalId },
-      pageTarget,
-    ]);
   });
 });

@@ -14,21 +14,13 @@ import { extension as AttachmentExtension } from '~/server/models/attachment';
 import { extension as BookmarkExtension } from '~/server/models/bookmark';
 import { extension as BookmarkFolderExtension } from '~/server/models/bookmark-folder';
 import { extension as ExternalAccountExtension } from '~/server/models/external-account';
+import { extension as InAppNotificationExtension } from '~/server/models/in-app-notification';
 import { extension as PageRedirectExtension } from '~/server/models/page-redirect';
 import { extension as PageTagRelationExtension } from '~/server/models/page-tag-relation';
 import { extension as RevisionExtension } from '~/server/models/revision';
 import { extension as ShareLinkExtension } from '~/server/models/share-link';
 import { extension as TagExtension } from '~/server/models/tag';
 import { extension as UserExtension } from '~/server/models/user/index.prisma';
-
-export interface PaginateOptions<TWhere, TOrderBy, TInclude, TSelect> {
-  offset?: number;
-  limit?: number;
-  where?: TWhere;
-  orderBy?: TOrderBy;
-  include?: TInclude;
-  select?: TSelect;
-}
 
 export interface PaginateResult<T> {
   docs: T[];
@@ -199,14 +191,11 @@ export const createPrisma = (datasourceUrl?: string) =>
       model: {
         $allModels: {
           // compatible with mongoose-paginate-v2
-          async paginate<T, A extends Prisma.Args<T, 'findMany'>>(
+          // `options` is typed as `A` itself so TypeScript can infer `A` from the
+          // call site; the result type then reflects `include` / `select`.
+          async paginate<T, const A extends Prisma.Args<T, 'findMany'>>(
             this: T,
-            options: PaginateOptions<
-              A['where'],
-              A['orderBy'],
-              A['include'],
-              A['select']
-            > = {},
+            options: A & { offset?: number; limit?: number },
           ): Promise<PaginateResult<Prisma.Result<T, A, 'findMany'>[number]>> {
             const context = Prisma.getExtensionContext(
               this as PaginatableDelegate,
@@ -229,6 +218,7 @@ export const createPrisma = (datasourceUrl?: string) =>
     .$extends(ChangeProposalExtension)
     .$extends(CommentExtension)
     .$extends(ExternalAccountExtension)
+    .$extends(InAppNotificationExtension)
     .$extends(MastraRefreshedModelCatalogExtension)
     .$extends(PageBulkExportJobExtension)
     .$extends(PageBulkExportPageSnapshotExtension)

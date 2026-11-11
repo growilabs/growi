@@ -8,7 +8,6 @@ import { getInstance } from '^/test/setup/crowi';
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/consts';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument } from '~/server/models/page';
 import { configManager } from '~/server/service/config-manager';
 import { GlobalNotificationService } from '~/server/service/global-notification';
@@ -159,15 +158,17 @@ describe('change proposal flow: create, approve page by page and apply', () => {
   };
 
   const countSubscriberNotifications = (pageId: string, action: string) =>
-    InAppNotification.countDocuments({
-      user: users.subscriber._id,
-      target: pageId,
-      action,
-    }).exec();
+    prisma.inappnotifications.count({
+      where: {
+        userId: String(users.subscriber._id),
+        target: String(pageId),
+        action,
+      },
+    });
 
   const summaryNotificationsOf = async (proposalId: string) =>
     (await kit.aggregatedNotifications(proposalId)).map((n) => ({
-      user: String(n.user),
+      user: n.userId,
       action: n.action,
       pages: kit.snapshotPagesOf(n),
       paths: (
@@ -243,7 +244,9 @@ describe('change proposal flow: create, approve page by page and apply', () => {
 
   afterAll(async () => {
     const ids = (await proposalsOfRequester()).map((p) => p.id);
-    await InAppNotification.deleteMany({ target: { $in: ids } });
+    await prisma.inappnotifications.deleteMany({
+      where: { target: { in: ids.map(String) } },
+    });
     await prisma.activities.deleteMany({ where: { target: { in: ids } } });
     await prisma.changeproposals.deleteMany({ where: { id: { in: ids } } });
     await prisma.pageredirects.deleteMany({

@@ -123,7 +123,10 @@ class Crowi {
 
   // Read lazily: a module-scope `import { prisma }` would resolve before
   // test/setup/prisma.ts has MONGO_URI and cache a broken client.
-  get prisma(): PrismaClient {
+  // Narrowed to the delegates actually used through Crowi: the full client type
+  // grows with every migrated model, and mockDeep<Crowi>() in specs then fails
+  // with TS2589 ("Type instantiation is excessively deep") under tsgo.
+  get prisma(): Pick<PrismaClient, 'pagetagrelations'> {
     return prismaUtils.prisma;
   }
 

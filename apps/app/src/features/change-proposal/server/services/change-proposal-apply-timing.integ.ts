@@ -9,7 +9,6 @@ import { getInstance } from '^/test/setup/crowi';
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/consts';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import type { PageDocument } from '~/server/models/page';
 import Subscription from '~/server/models/subscription';
 import { UserStatus } from '~/server/models/user/conts';
@@ -143,11 +142,13 @@ describe.skipIf(!process.env.CHANGE_PROPOSAL_MEASURE_TIMING)(
     };
 
     const countPerPageNotifications = (pageIds: readonly string[]) =>
-      InAppNotification.countDocuments({
-        user: { $in: subscriberIds() },
-        target: { $in: pageIds },
-        action: SupportedAction.ACTION_PAGE_UPDATE,
-      }).exec();
+      prisma.inappnotifications.count({
+        where: {
+          userId: { in: subscriberIds().map(String) },
+          target: { in: [...pageIds] },
+          action: SupportedAction.ACTION_PAGE_UPDATE,
+        },
+      });
 
     const runOnce = async (mode: Mode, label: string): Promise<Sample> => {
       await configManager.updateConfigs({
@@ -242,7 +243,9 @@ describe.skipIf(!process.env.CHANGE_PROPOSAL_MEASURE_TIMING)(
         select: { id: true },
       });
       const ids = proposals.map((p) => p.id);
-      await InAppNotification.deleteMany({ target: { $in: ids } });
+      await prisma.inappnotifications.deleteMany({
+        where: { target: { in: ids.map(String) } },
+      });
       await prisma.activities.deleteMany({ where: { target: { in: ids } } });
       await prisma.changeproposals.deleteMany({ where: { id: { in: ids } } });
       await crowi.models.GlobalNotificationSetting.deleteMany({

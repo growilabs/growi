@@ -8,7 +8,6 @@ import { docs, getYDoc } from 'y-websocket/bin/utils';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
-import { InAppNotification } from '~/server/models/in-app-notification';
 import { configManager } from '~/server/service/config-manager';
 import { getYjsService, initializeYjsService } from '~/server/service/yjs';
 import { prisma } from '~/utils/prisma';
@@ -101,7 +100,9 @@ describe('change proposal flow: the collaborative document after an apply', () =
         select: { id: true },
       })
     ).map((p) => p.id);
-    await InAppNotification.deleteMany({ target: { $in: ids } });
+    await prisma.inappnotifications.deleteMany({
+      where: { target: { in: ids.map(String) } },
+    });
     await prisma.activities.deleteMany({ where: { target: { in: ids } } });
     await prisma.changeproposals.deleteMany({ where: { id: { in: ids } } });
     await configManager.updateConfigs(
