@@ -18,7 +18,7 @@ import { type RunningService, startService } from './service';
 // The composition root (design.md judgement 5): settings -> runner -> app ->
 // listener, from the environment alone. Req 1.4 / 1.5: no token, no service.
 // Stopping drains like uvicorn on SIGTERM: no new connections, the requests
-// in flight still get their answers (the k8s example gives them 85 s).
+// in flight still get their answers, however long they take.
 
 const TOKEN_NAME = 'ATTACHMENT_EXTRACTOR_SERVICE_TOKEN';
 const LOCAL = { port: 0, hostname: '127.0.0.1' } as const;

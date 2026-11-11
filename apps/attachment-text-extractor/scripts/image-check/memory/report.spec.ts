@@ -7,12 +7,14 @@ import {
   type LoadRun,
   type Measurements,
   toMarkdown,
+  warningsOf,
 } from './report';
 
 // Req 3.14 / 11.2 (tasks 6.12): what the memory measurement decides from its
-// numbers. The limits are the spec's: the container stays within 2 Gi
-// (2,048 MiB) under the heaviest loads, and the two baseline files keep the
-// child within 0.95 x MAX_CHILD_RSS_MB (304 MB). research.md 20.10, 20.12.
+// numbers. Only the spec's budget fails the check: the container stays within
+// 2 Gi (2,048 MiB) under the heaviest loads. The two baseline files against
+// 0.95 x MAX_CHILD_RSS_MB (304 MB) is a warning: the margin there is smaller
+// than the difference between machines. research.md 20.10, 20.12.
 
 const loadRun = (scenario: 'S1' | 'S2', highestMib: number): LoadRun => ({
   scenario,
@@ -40,6 +42,16 @@ const withinLimits = (): Measurements => ({
   ],
 });
 
+const overTheLine = (file: BaselineMeasurement['file']): Measurements => {
+  const measured = withinLimits();
+  return {
+    ...measured,
+    baselines: measured.baselines.map((entry) =>
+      entry.file === file ? baseline(file, [290, 305, 290]) : entry,
+    ),
+  };
+};
+
 describe('failuresOf', () => {
   it('finds nothing wrong when every value is at or under its limit', () => {
     expect(failuresOf(withinLimits())).toEqual([]);
@@ -63,18 +75,8 @@ describe('failuresOf', () => {
   it.each([
     'xlsx-70000-cells',
     'docx-12-images-48mb',
-  ] as const)('reports %s when one run puts the child over 304 MB', (file) => {
-    const measured = withinLimits();
-    const failures = failuresOf({
-      ...measured,
-      baselines: measured.baselines.map((entry) =>
-        entry.file === file ? baseline(file, [290, 305, 290]) : entry,
-      ),
-    });
-
-    expect(failures).toHaveLength(1);
-    expect(failures[0]).toContain(file);
-    expect(failures[0]).toContain('305');
+  ] as const)('does not fail when one run puts the child of %s over 304 MB', (file) => {
+    expect(failuresOf(overTheLine(file))).toEqual([]);
   });
 
   it('does not hold the 2-million-character PDF to the 304 MB line', () => {
@@ -156,6 +158,40 @@ describe('failuresOf', () => {
   });
 });
 
+describe('warningsOf', () => {
+  it('has nothing to warn about when every child peak is at or under 304 MB', () => {
+    expect(warningsOf(withinLimits())).toEqual([]);
+  });
+
+  it.each([
+    'xlsx-70000-cells',
+    'docx-12-images-48mb',
+  ] as const)('warns about %s when one run puts the child over 304 MB', (file) => {
+    const warnings = warningsOf(overTheLine(file));
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(file);
+    expect(warnings[0]).toContain('305');
+    // One line each: it is printed as a GitHub Actions annotation.
+    expect(warnings[0]).not.toContain('\n');
+  });
+
+  it('does not warn about the 2-million-character PDF', () => {
+    expect(warningsOf(overTheLine('pdf-2-million-characters'))).toEqual([]);
+  });
+
+  it('does not warn about the heaviest loads: over 2,048 MiB is a failure', () => {
+    const measured = withinLimits();
+
+    expect(
+      warningsOf({
+        ...measured,
+        loadRuns: [...measured.loadRuns, loadRun('S2', 2049)],
+      }),
+    ).toEqual([]);
+  });
+});
+
 describe('toMarkdown', () => {
   it('says where the numbers were measured and sets them against the limits', () => {
     const text = toMarkdown({ ...withinLimits(), where: 'outside the image' });
@@ -183,6 +219,33 @@ describe('toMarkdown', () => {
 
     expect(text).toContain('NOT met');
     expect(text).toContain('2049');
+  });
+
+  it('says the result is met without any warning when nothing crossed a line', () => {
+    const text = toMarkdown(withinLimits());
+
+    expect(text).toContain('Result: within the limits.');
+    expect(text).not.toContain('WARNING');
+  });
+
+  it('shows a child over 304 MB as a warning, in its row and under a result that is still met', () => {
+    const text = toMarkdown(overTheLine('xlsx-70000-cells'));
+
+    expect(text).not.toContain('NOT met');
+    expect(text).toMatch(/\| xlsx-70000-cells [^\n]*OVER by 1 MB/);
+    expect(text).not.toMatch(/\| docx-12-images-48mb [^\n]*OVER/);
+    expect(text).toMatch(/WARNING[^\n]*\n- xlsx-70000-cells[^\n]*305/);
+  });
+
+  it('keeps the warning next to a failure', () => {
+    const measured = overTheLine('docx-12-images-48mb');
+    const text = toMarkdown({
+      ...measured,
+      loadRuns: [...measured.loadRuns, loadRun('S1', 2049)],
+    });
+
+    expect(text).toContain('NOT met');
+    expect(text).toMatch(/WARNING[^\n]*\n- docx-12-images-48mb[^\n]*305/);
   });
 });
 

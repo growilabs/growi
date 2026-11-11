@@ -1,7 +1,8 @@
 // CLI: measures the memory figures tasks 6.12 asks for and prints them
 // (research.md 20.10, 20.12): the heaviest loads S1 and S2 against the 2 Gi
 // limit and the Python figure, and the child peak RSS of the baseline files
-// against 0.95 x MAX_CHILD_RSS_MB. Exits 1 when a limit is not met.
+// against 0.95 x MAX_CHILD_RSS_MB. Exits 1 when a load goes over the 2 Gi
+// limit or the measurement is not valid; a child over its line is a warning.
 //
 //   measure-memory.ts --target docker --image <tag> [--runs 3] [--port 18000]
 //                     [--container-name ate-memory] [--summary <file>]
@@ -23,6 +24,7 @@ import {
   SCENARIOS,
   type Scenario,
   toMarkdown,
+  warningsOf,
 } from './report';
 import {
   dockerTarget,
@@ -222,4 +224,7 @@ const measurements: Measurements = {
 const report = toMarkdown(measurements);
 process.stdout.write(report);
 if (values.summary !== undefined) appendFileSync(values.summary, `${report}\n`);
+// A GitHub Actions annotation; a plain line anywhere else.
+for (const warning of warningsOf(measurements))
+  process.stdout.write(`::warning::${warning}\n`);
 process.exitCode = failuresOf(measurements).length === 0 ? 0 : 1;

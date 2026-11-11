@@ -1,7 +1,7 @@
 import { parseAllDocuments } from 'yaml';
 
-// Reads the deployment YAML files (compose entry, Kubernetes examples) into plain
-// values with the `yaml` package, failing on any syntax error.
+// Reads a deployment YAML file (the compose entry) into plain values with the
+// `yaml` package, failing on any syntax error.
 
 export type YamlValue =
   | null

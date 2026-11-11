@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,18 +13,9 @@ export const REPO_ROOT = resolve(PACKAGE_DIR, '../..');
 
 export const DOCKERFILE_PATH = resolve(PACKAGE_DIR, 'docker/Dockerfile');
 export const COMPOSE_PATH = resolve(REPO_ROOT, 'infra/docker/compose.yaml');
-export const K8S_DIR = resolve(PACKAGE_DIR, 'deploy/k8s');
 export const PACKAGE_JSON_PATH = resolve(PACKAGE_DIR, 'package.json');
 
 export const COMPOSE_SERVICE = 'attachment-text-extractor';
-export const K8S_MANIFEST_FILES = [
-  'deployment.yaml',
-  'service.yaml',
-  'hpa.yaml',
-  'networkpolicy.yaml',
-] as const;
-
-export const APP_PORT = 8000;
 
 // A missing file fails the test that reads it (never a skip), with the path.
 export const readDeployFile = (path: string): string => {
@@ -46,16 +37,6 @@ export const loadDockerfile = (): DockerfileModel =>
 export const loadYamlFile = (path: string): YamlValue =>
   parseYaml(readDeployFile(path));
 
-export const listK8sFiles = (): readonly string[] => {
-  try {
-    return readdirSync(K8S_DIR).sort();
-  } catch {
-    throw new Error(
-      `${relative(REPO_ROOT, K8S_DIR)} does not exist (the Node k8s examples have not been created yet)`,
-    );
-  }
-};
-
 const MIB_PER_UNIT: Readonly<Record<string, number>> = {
   '': 1 / (1024 * 1024),
   b: 1 / (1024 * 1024),
@@ -69,14 +50,6 @@ export const sizeToMiB = (size: string | number): number => {
   const match = /^(\d+)([bkmg]?)b?$/i.exec(String(size).trim());
   if (match === null) throw new Error(`unreadable size: ${size}`);
   return Number(match[1]) * MIB_PER_UNIT[match[2].toLowerCase()];
-};
-
-// A Kubernetes quantity such as `512Mi` or `2Gi` in MiB.
-export const kubernetesMemoryToMiB = (quantity: string): number => {
-  const match = /^(\d+)(Mi|Gi)$/.exec(quantity);
-  if (match === null)
-    throw new Error(`unsupported memory quantity: ${quantity}`);
-  return Number(match[1]) * (match[2] === 'Gi' ? 1024 : 1);
 };
 
 export interface PackageManifest {

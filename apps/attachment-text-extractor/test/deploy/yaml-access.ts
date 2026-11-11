@@ -63,17 +63,6 @@ export const stringAt = (
   return value;
 };
 
-export const numberAt = (
-  root: YamlValue,
-  ...path: readonly PathSegment[]
-): number => {
-  const value = valueAt(root, ...path);
-  if (typeof value !== 'number') {
-    throw new Error(`expected a number at ${describePath(path)}`);
-  }
-  return value;
-};
-
 // A sequence of strings (for example `cap_drop`, `tmpfs`).
 export const stringsAt = (
   root: YamlValue,

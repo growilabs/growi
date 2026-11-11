@@ -76,8 +76,8 @@ export interface ConversionRunner {
 }
 
 const MIB = 1024 * 1024;
-// Python's DEFAULT_PROBE_TIMEOUT_S; the compose / k8s readiness timeouts
-// (15 s and up) leave room above it (research.md 23.7).
+// Python's DEFAULT_PROBE_TIMEOUT_S; a readiness check must wait longer than
+// this for /readyz (docker/README.md gives 15 s; research.md 23.7).
 const DEFAULT_PROBE_TIMEOUT_S = 10;
 // research.md 20.6 / 20.12: on the command line, never in NODE_OPTIONS.
 const CHILD_NODE_FLAGS = [

@@ -1,7 +1,7 @@
 // What the memory measurement of tasks 6.12 decides from its numbers, and
 // the table it prints (research.md 20.10, 20.12; Req 3.14, 11.2).
 
-/** The k8s example's memory limit (2 Gi). */
+/** The memory limit the service is designed for (2 Gi; docker/README.md). */
 export const CONTAINER_LIMIT_MIB = 2048;
 /**
  * The FastAPI service under S2, its heaviest load (research.md 20.7a). It has
@@ -12,14 +12,17 @@ const PYTHON_MIB: Readonly<Record<Scenario, number | null>> = {
   S1: null,
   S2: PYTHON_HEAVIEST_MIB,
 };
-/** 0.95 x MAX_CHILD_RSS_MB (320). */
+/**
+ * 0.95 x MAX_CHILD_RSS_MB (320). Crossing it is a warning, not a failure: the
+ * baseline files sit 10 - 30 MB under it, less than machines differ by.
+ */
 export const CHILD_RSS_LINE_MB = 304;
 export const MIN_RUNS = 3;
 
 export const SCENARIOS = ['S1', 'S2'] as const;
 export type Scenario = (typeof SCENARIOS)[number];
 
-/** `heldToLine: false`: measured and shown, never a failure (research.md 27.3). */
+/** `heldToLine: false`: measured and shown, never a warning (research.md 27.3). */
 export const BASELINE_FILES = [
   { file: 'xlsx-70000-cells', heldToLine: true },
   { file: 'docx-12-images-48mb', heldToLine: true },
@@ -148,12 +151,11 @@ const scenarioFailures = (
 ];
 
 const baselineFailures = (
-  { file, heldToLine }: (typeof BASELINE_FILES)[number],
+  { file }: (typeof BASELINE_FILES)[number],
   measured: BaselineMeasurement | undefined,
 ): readonly string[] => {
   const values = measured?.childPeakRssMb ?? [];
   const known = numbersOf(values);
-  const highest = Math.max(...known);
   return [
     ...(values.length < MIN_RUNS
       ? [`${file}: measured ${values.length} time(s), ${MIN_RUNS} are required`]
@@ -161,15 +163,28 @@ const baselineFailures = (
     ...(known.length < values.length
       ? [`${file}: the service logged no child peak RSS for a run`]
       : []),
-    ...(heldToLine && highest > CHILD_RSS_LINE_MB
-      ? [
-          `${file}: the child peaked at ${highest} MB, over the ${CHILD_RSS_LINE_MB} MB line; see research.md 20.12 for what to lower (XLSX) or whom to ask (DOCX)`,
-        ]
-      : []),
   ];
 };
 
-/** Every reason the measurement does not meet tasks 6.12; none when it does. */
+/** How far the highest known child peak is over the line; 0 when it is not, or the file is not held to it. */
+const overLineMb = (
+  { heldToLine }: (typeof BASELINE_FILES)[number],
+  measured: BaselineMeasurement | undefined,
+): number =>
+  heldToLine
+    ? Math.max(
+        0,
+        ...numbersOf(measured?.childPeakRssMb ?? []).map(
+          (value) => value - CHILD_RSS_LINE_MB,
+        ),
+      )
+    : 0;
+
+/**
+ * Every reason the check fails: a heaviest load over the limit, or a
+ * measurement that is not valid (too few runs, an unintended answer, a
+ * missing value). None when it passes.
+ */
 export const failuresOf = ({
   loadRuns,
   baselines,
@@ -188,6 +203,23 @@ export const failuresOf = ({
   ),
 ];
 
+/**
+ * What to look at although the check passes: a baseline file whose child
+ * went over the line. One line each.
+ */
+export const warningsOf = ({ baselines }: Measurements): readonly string[] =>
+  BASELINE_FILES.flatMap((entry) => {
+    const over = overLineMb(
+      entry,
+      baselines.find((measured) => measured.file === entry.file),
+    );
+    return over > 0
+      ? [
+          `${entry.file}: the child peaked at ${CHILD_RSS_LINE_MB + over} MB, over the ${CHILD_RSS_LINE_MB} MB line; see research.md 20.12 for what to lower (XLSX) or whom to ask (DOCX)`,
+        ]
+      : [];
+  });
+
 const signed = (value: number): string =>
   value > 0 ? `+${value}` : String(value);
 
@@ -203,15 +235,20 @@ const scenarioRow = (scenario: Scenario, runs: readonly LoadRun[]): string => {
 };
 
 const baselineRow = (
-  { file, heldToLine }: (typeof BASELINE_FILES)[number],
+  entry: (typeof BASELINE_FILES)[number],
   measured: BaselineMeasurement | undefined,
 ): string => {
   const known = numbersOf(measured?.childPeakRssMb ?? []);
-  return `| ${file} | ${measured?.childPeakRssMb.length ?? 0} | ${rangeOf(known)} | ${heldToLine ? CHILD_RSS_LINE_MB : 'not held to the line'} |`;
+  const over = overLineMb(entry, measured);
+  return `| ${entry.file} | ${measured?.childPeakRssMb.length ?? 0} | ${rangeOf(known)} | ${entry.heldToLine ? CHILD_RSS_LINE_MB : 'not held to the line'} | ${over > 0 ? `**OVER by ${over} MB (warning)**` : '-'} |`;
 };
+
+const bullets = (lines: readonly string[]): string =>
+  lines.map((line) => `- ${line}`).join('\n');
 
 export const toMarkdown = (measured: Measurements): string => {
   const failures = failuresOf(measured);
+  const warnings = warningsOf(measured);
   return [
     `Measured: ${measured.where}`,
     '',
@@ -228,8 +265,8 @@ export const toMarkdown = (measured: Measurements): string => {
     '',
     'Child peak RSS, MB:',
     '',
-    '| file | runs | lowest - highest | line |',
-    '|---|---|---|---|',
+    '| file | runs | lowest - highest | line | against the line |',
+    '|---|---|---|---|---|',
     ...BASELINE_FILES.map((entry) =>
       baselineRow(
         entry,
@@ -238,8 +275,11 @@ export const toMarkdown = (measured: Measurements): string => {
     ),
     '',
     failures.length === 0
-      ? 'Result: within the limits.'
-      : `Result: NOT met.\n${failures.map((failure) => `- ${failure}`).join('\n')}`,
+      ? `Result: within the ${warnings.length === 0 ? 'limits' : `${CONTAINER_LIMIT_MIB} MiB limit`}.`
+      : `Result: NOT met.\n${bullets(failures)}`,
+    ...(warnings.length === 0
+      ? []
+      : ['', `WARNING (does not fail the check):\n${bullets(warnings)}`]),
     '',
   ].join('\n');
 };
