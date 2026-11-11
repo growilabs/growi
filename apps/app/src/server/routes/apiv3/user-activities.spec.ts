@@ -1,27 +1,18 @@
-/**
- * Unit tests for buildUserActivityPipeline's pipeline-shape contract.
- *
- * Regression: `user` was previously matched with a raw `mongoose.Types.ObjectId`
- * instance, which serializes to a plain JSON string when sent through
- * `aggregateRaw` -- that does NOT match a stored ObjectId-typed field, so
- * `GET /api/v3/user-activities` silently returned zero results for every
- * user (verified against a real MongoDB replica set). `user` must be
- * wrapped via `toRawObjectId` (the MongoDB Extended JSON `$oid` form)
- * instead.
- */
 import type { IUserHasId } from '@growi/core';
 import express from 'express';
 import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
-import { aggregateUserActivities } from '~/server/service/activity/aggregate-user-activities';
-import { buildListablePageFilter } from '~/server/service/activity/build-listable-page-filter';
+import {
+  aggregateUserActivities,
+  buildListablePageFilter,
+} from '~/server/service/activity/index';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import addCustomFunctionToResponse from './response';
-import { buildUserActivityPipeline, setup } from './user-activities';
+import { setup } from './user-activities';
 
 const mocks = vi.hoisted(() => ({ findUserById: vi.fn() }));
 
@@ -53,13 +44,9 @@ vi.mock('mongoose', async (importOriginal) => {
   };
 });
 
-vi.mock('~/server/service/activity/build-listable-page-filter', () => ({
-  buildListablePageFilter: vi.fn(),
-}));
-
-vi.mock('~/server/service/activity/aggregate-user-activities', () => ({
+vi.mock('~/server/service/activity/index', () => ({
   aggregateUserActivities: vi.fn(),
-  aggregateUserActivitiesLegacy: vi.fn(),
+  buildListablePageFilter: vi.fn(),
 }));
 
 vi.mock('~/server/service/config-manager', () => ({
@@ -67,45 +54,6 @@ vi.mock('~/server/service/config-manager', () => ({
 }));
 
 vi.mock('~/utils/prisma', () => ({ prisma: {} }));
-
-describe('buildUserActivityPipeline', () => {
-  const targetUserId = '507f1f77bcf86cd799439011';
-
-  it('matches `user` with the $oid Extended JSON form, not a raw ObjectId/string', () => {
-    const pipeline = buildUserActivityPipeline(targetUserId, {
-      limit: 10,
-      offset: 0,
-    });
-
-    const matchStage = pipeline[0] as { $match: Record<string, unknown> };
-    expect(matchStage.$match.user).toEqual({ $oid: targetUserId });
-  });
-
-  it('applies the requested limit/offset inside the docs facet', () => {
-    const pipeline = buildUserActivityPipeline(targetUserId, {
-      limit: 5,
-      offset: 15,
-    });
-
-    const facetStage = pipeline[1] as {
-      $facet: { docs: Record<string, unknown>[] };
-    };
-    expect(facetStage.$facet.docs).toContainEqual({ $skip: 15 });
-    expect(facetStage.$facet.docs).toContainEqual({ $limit: 5 });
-  });
-
-  it('produces a totalCount facet via $count', () => {
-    const pipeline = buildUserActivityPipeline(targetUserId, {
-      limit: 10,
-      offset: 0,
-    });
-
-    const facetStage = pipeline[1] as {
-      $facet: { totalCount: Record<string, unknown>[] };
-    };
-    expect(facetStage.$facet.totalCount).toEqual([{ $count: 'count' }]);
-  });
-});
 
 describe('GET /user-activities', () => {
   const VIEWER_ID = '507f1f77bcf86cd799439011';

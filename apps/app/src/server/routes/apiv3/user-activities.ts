@@ -9,16 +9,14 @@ import type {
   IUserActivityUser,
   UserActivitiesResult,
 } from '~/interfaces/activity';
-import { ActivityLogActions } from '~/interfaces/activity';
 import type { PaginateResult } from '~/interfaces/mongoose-utils';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import {
   aggregateUserActivities,
+  buildListablePageFilter,
   type UserActivityRow,
-} from '~/server/service/activity/aggregate-user-activities';
-import { buildListablePageFilter } from '~/server/service/activity/build-listable-page-filter';
+} from '~/server/service/activity/index';
 import { configManager } from '~/server/service/config-manager';
-import { toRawObjectId } from '~/server/util/prisma-raw-normalize';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
@@ -204,78 +202,6 @@ const toUserActivity = (
  *               nullable: true
  *               example: null
  */
-
-/**
- * Builds the $facet aggregation pipeline for a single user's activity list.
- *
- * The pipeline is run via `aggregateRaw` (see `aggregateUserActivitiesLegacy`), so
- * `user` must be matched with `toRawObjectId`'s MongoDB Extended JSON `$oid`
- * form -- a raw ObjectId instance or bare string serializes to a plain JSON
- * string instead, which does not match a stored ObjectId-typed field and
- * silently returns zero results (verified against a real MongoDB replica set).
- */
-export const buildUserActivityPipeline = (
-  targetUserId: string,
-  { limit, offset }: { limit: number; offset: number },
-): Record<string, unknown>[] => [
-  {
-    $match: {
-      user: toRawObjectId(targetUserId),
-      action: { $in: Object.values(ActivityLogActions) },
-    },
-  },
-  {
-    $facet: {
-      totalCount: [{ $count: 'count' }],
-      docs: [
-        { $sort: { createdAt: -1 } },
-        { $skip: offset },
-        { $limit: limit },
-        {
-          $lookup: {
-            from: 'pages',
-            localField: 'target',
-            foreignField: '_id',
-            as: 'target',
-          },
-        },
-        {
-          $unwind: {
-            path: '$target',
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'user',
-            foreignField: '_id',
-            as: 'user',
-          },
-        },
-        {
-          $unwind: {
-            path: '$user',
-            preserveNullAndEmptyArrays: true,
-          },
-        },
-        {
-          $project: {
-            _id: 1,
-            'user._id': 1,
-            'user.username': 1,
-            'user.name': 1,
-            'user.imageUrlCached': 1,
-            action: 1,
-            createdAt: 1,
-            target: 1,
-            targetModel: 1,
-          },
-        },
-      ],
-    },
-  },
-];
 
 export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
