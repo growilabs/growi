@@ -7,6 +7,7 @@ import { mock } from 'vitest-mock-extended';
 
 import { recordArchiveOperation } from '~/features/opentelemetry/server';
 import type Crowi from '~/server/crowi';
+import type { ZipFileStat } from '~/server/service/interfaces/export';
 
 import { setup } from './export';
 import addCustomFunctionToResponse from './response';
@@ -52,7 +53,7 @@ vi.mock('~/features/opentelemetry/server', () => ({
   recordArchiveOperation: vi.fn(),
 }));
 
-const ZIP_FILE_STAT = { fileName: 'growi.zip' };
+const ZIP_FILE_STAT = mock<ZipFileStat>({ fileName: 'growi.zip' });
 
 describe('POST /export — archive create metrics', () => {
   let app: express.Application;
@@ -91,7 +92,7 @@ describe('POST /export — archive create metrics', () => {
   });
 
   it('records create/success once when the export resolves with a zip file stat', async () => {
-    exportMock.mockResolvedValue(ZIP_FILE_STAT as never);
+    exportMock.mockResolvedValue(ZIP_FILE_STAT);
 
     const res = await request(app)
       .post('/export')
@@ -132,9 +133,9 @@ describe('POST /export — archive create metrics', () => {
   });
 
   it('responds before the export finishes and records only after it settles', async () => {
-    let finishExport: (value: never) => void = () => {};
+    let finishExport: (value: ZipFileStat | null) => void = () => {};
     exportMock.mockReturnValue(
-      new Promise((resolve) => {
+      new Promise<ZipFileStat | null>((resolve) => {
         finishExport = resolve;
       }),
     );
@@ -146,7 +147,7 @@ describe('POST /export — archive create metrics', () => {
     expect(res.status).toBe(200);
     expect(recordMock).not.toHaveBeenCalled();
 
-    finishExport(ZIP_FILE_STAT as never);
+    finishExport(ZIP_FILE_STAT);
     await vi.waitFor(() => expect(recordMock).toHaveBeenCalledTimes(1));
     expect(recordMock).toHaveBeenCalledWith('create', 'success');
   });

@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. 利用回数の記録基盤
+- [x] 1. 利用回数の記録基盤
 - [x] 1.1 データアーカイブとお引越しの利用回数を記録するメトリクスモジュールを作る
   - アーカイブ用とお引越し用の 2 つの単調増加カウンターを、設計で定めたメトリクス名・単位・属性語彙（操作種別・役割・結果）で定義する
   - 記録関数は列挙値のみを受け付け、カウンター未生成のあいだは何もしない
@@ -13,7 +13,7 @@
   - テレメトリ有効時はカウンターが生成されて記録が送信対象になり、無効時は生成されず記録が no-op になることがテストで確認できる
   - _Requirements: 3.1, 3.2_
 
-- [ ] 2. データアーカイブ操作の計測
+- [x] 2. データアーカイブ操作の計測
 - [x] 2.1 (P) アーカイブ作成の成否を記録する
   - 作成要求の受付後、バックグラウンドで進む作成処理の完了・失敗を待って記録する。応答は従来どおり処理完了を待たずに返す
   - 作成結果が得られた場合は成功、結果なし・失敗（実行中の重複要求による失敗を含む）は失敗として 1 回記録する
@@ -42,7 +42,7 @@
   - _Requirements: 1.6, 1.7, 1.8, 1.9, 1.10, 1.11_
   - _Depends: 1.2, 2.3_
 
-- [ ] 3. お引越し（GROWI 間転送）の計測
+- [x] 3. お引越し（GROWI 間転送）の計測
 - [x] 3.1 (P) 取り込み完了判定を共通化し、転送処理が結果を返すようにする
   - 送信側の既存の「取り込みが不完全か」の判定を純関数として切り出し、送信側の判定をそれに置き換える
   - 転送処理が、転送先の取り込みが不完全だったかを結果として返すようにする（既存の失敗時の例外送出・画面通知は変えない）
@@ -81,10 +81,14 @@
   - design.md の Custom Metric 層に、発生回数を数えるメトリクスの実装規約、外部の機能から記録する API と依存方向、本 spec で追加した 2 メトリクスを追加する
   - Extension Templates に発生回数型メトリクスの追加手順を、Allowed Dependencies と Revalidation Triggers に本 spec の内容を追加する
   - requirements.md の末尾に発生回数型メトリクスの要件を追加する（既存の要件番号は変えない）。amend の経緯は書かず、現在の事実として記述する
+  - 新しい規約と矛盾する既存箇所も直す: Testing Strategy の Layer 3（発生回数型は `@opentelemetry/api` をモックせず実 MeterProvider + InMemoryMetricExporter で検証する）、Error Handling の Layer 3（`Counter.add` は try/catch + diag で吸収し、記録関数は例外を投げない）、モジュール数と File Structure の一覧（`data-transfer-usage-metrics.ts` を追加）、Components の Layer 3（DataTransferUsageMetrics を追加）
+  - Allowed Dependencies に「業務コードからは barrel 経由でのみ記録関数を呼ぶ」「`import-executor.ts` は型 `OperationResult` のみ参照する」を明記する。ダウンロードの計測点は実コード名（`admin.js` の `actions.export.download`）で書く
+  - 反映後の opentelemetry spec だけを読んで、本 spec で追加した契約と矛盾する記述が残っていないことを確認できる
   - _Requirements: 5.1, 5.2, 5.3_
 - [ ] 5.2 設計判断を移し、この spec を削除する
   - 本 spec の research.md の設計判断（Counter を 2 つに分ける、サービス層で数えない、受付前の拒否は数えない、SDK 開始後に生成する、失敗と部分失敗の扱い）を opentelemetry spec の research.md に移す
   - 本 spec の brief.md のうち残す価値のある内容（問題設定・スコープ外の判断・計測対象の定義）を opentelemetry spec の research.md に移す
+  - 「添付ファイル転送だけが失敗した場合は送信側=失敗・受信側=成功になる（各側の管理画面の表示と一致させるため）」という判断も research.md に残す
   - opentelemetry spec の spec.json の updated_at を更新する（phase と approvals は変えない）
   - steering から本 spec のファイルが参照されていないことを確認する（roadmap.md には掲載なし）
   - `.kiro/specs/opentelemetry-data-transfer-usage-metrics/` を削除し、opentelemetry spec だけで本機能の契約が読める状態になっている
@@ -92,7 +96,7 @@
 
 ## Implementation Notes
 
-- `pnpm run lint:typecheck` reports 3 pre-existing errors outside this spec (`features/ai-usage/server/routes/apiv3/ai-usage.integ.ts` L112/L138, `server/routes/apiv3/staffs/index.spec.ts` L38). Not caused by this work; judge typecheck by "no errors in changed files".
+- `pnpm run lint:typecheck` intermittently reports up to 3 errors outside this spec (seen in `features/ai-usage/server/routes/apiv3/ai-usage.integ.ts` L72/L112/L138 and `server/routes/apiv3/staffs/index.spec.ts` L38; the TS2589 depth-limit error moves between runs). Not caused by this work; judge typecheck by "no errors in changed files".
 - Routes import the recorders only via `~/features/opentelemetry/server` (top-level barrel). No boot-order/circular hazard: the barrel's other export `node-sdk` is already loaded at boot by `server/app.ts`.
 - Tests that need real metric output use a real `MeterProvider` + `InMemoryMetricExporter` (see `custom-metrics/data-transfer-usage-metrics.spec.ts`); callers' tests mock the record functions from the barrel.
 - Log errors in pino form `logger.error({ err }, 'msg')` — `logger.error('msg', err)` drops the error under @growi/logger. Attach background-promise handlers with two-arg `.then(onOk, onErr)` so a throw in the success path cannot double-record.
