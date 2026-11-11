@@ -5685,11 +5685,8 @@ class PageService implements IPageService {
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
 
-    // A conditional revision write saves the pending changes itself, so a lost race saves nothing.
-    let savedPage =
-      shouldUpdateBody && options.expectedRevisionId != null
-        ? newPageData
-        : await newPageData.save();
+    // With a body, pushRevision saves the pending field changes together with the revision.
+    let savedPage = newPageData;
     if (shouldUpdateBody) {
       const origin = options.origin;
       const newRevision = prisma.revisions.prepareRevision(
@@ -5704,6 +5701,8 @@ class PageService implements IPageService {
         expectedRevisionId: options.expectedRevisionId,
       });
       await savedPage.populateDataToShowRevision();
+    } else {
+      savedPage = await savedPage.save();
     }
 
     this.pageEvent.emit('update', savedPage, user);
@@ -5795,11 +5794,8 @@ class PageService implements IPageService {
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
 
-    // A conditional revision write saves the pending changes itself, so a lost race saves nothing.
-    let savedPage =
-      shouldUpdateBody && options.expectedRevisionId != null
-        ? pageData
-        : await pageData.save();
+    // With a body, pushRevision saves the pending field changes together with the revision.
+    let savedPage = pageData;
     if (shouldUpdateBody) {
       const newRevision = prisma.revisions.prepareRevision(
         pageData,
@@ -5813,6 +5809,8 @@ class PageService implements IPageService {
         expectedRevisionId: options.expectedRevisionId,
       });
       await savedPage.populateDataToShowRevision();
+    } else {
+      savedPage = await savedPage.save();
     }
 
     // update scopes for descendants
