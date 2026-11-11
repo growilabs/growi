@@ -858,25 +858,6 @@ export type ActivityHasUserId = IActivityHasId & {
   user: IUserHasId;
 };
 
-export type ActivityHasTargetPage = IActivityHasId & {
-  user: IUserHasId;
-  target: IPopulatedPageTarget;
-};
-
-import type { PageGrant } from '@growi/core';
-export interface IPopulatedPageTarget {
-  _id: string;
-  path: string;
-  status: string;
-  grant?: PageGrant;
-  wip: boolean;
-  deletedAt: Date;
-}
-
-export interface PopulatedUserActivitiesResult {
-  serializedPaginationResult: PaginateResult<ActivityHasTargetPage>;
-}
-
 export type IUserActivityTargetPage = {
   _id: string;
   path: string;

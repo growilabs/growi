@@ -110,7 +110,7 @@
   - _Depends: 1.1, 3.1_
 
 - [ ] 5. 仕上げの確認
-- [ ] 5.1 使われなくなった型を削除し、全体の検査を通す
+- [x] 5.1 使われなくなった型を削除し、全体の検査を通す
   - ページの全項目を持つ型など、新しい型に置き換えた既存の型が、どこからも使われていないことを検索で確認してから削除する
   - 完了の状態: apps/app の lint・型検査・テスト・ビルドがすべて通る。応答に、ページの公開範囲・許可されたユーザーやグループ・ページを見たユーザーの一覧・いいねしたユーザーの一覧、ユーザーのメールアドレス、履歴の接続元の情報が含まれないことを、開発サーバーへの直接の呼び出しで確認する
   - _Requirements: 2.6, 3.2, 3.3, 3.4, 3.5_
@@ -148,3 +148,6 @@
 - (3.2) サービスの入口の読み込み元は `~/server/service/activity/index` と書く。同じ階層に `service/activity.ts` があり、`~/server/service/activity` と書くとそちらに解決されるため
 - (3.3) これまで `user-activities.ts` と `activity.ts` の両方が OpenAPI の記述で同じパス `/activity` と同じ名前の定義 `ActivityResponse` を使っていて、生成された文書の中で混ざっていた。3.3 で `/user-activities`（operationId `getUserActivities`）を独立させたので、管理者向け `/activity` の生成結果も `activity.ts` の記述どおりに変わる。PR の説明に書くこと
 - (4.1) 共有の型 `IUserActivity.createdAt` は `Date` だが、通信上は ISO 形式の文字列で届く。画面側は `formatDistanceToNow`（date-fns 3.6.0）に文字列のまま渡していて動く。画面のテストは `JSON.parse(JSON.stringify(...))` で通信上の値を再現している
+- (5.1) apps/app の全テスト（`pnpm run test`）は、生成物が無いと 4 ファイルが落ちる。`CommentEditor.spec` と `DrawioViewerWithEditButton.spec` は `turbo run build --filter @growi/app` の後に通る。`vault-gateway.integ` は `turbo run build --filter @growi/vault-manager` の後に通る。`clone-e2e.integ` は、さらに環境変数 `VAULT_ENABLED=true` を付けないと通らない（この機能とは無関係の既存の前提）
+- (5.1) 直接の呼び出しで確かめた行は、すべてページの作成の履歴だった（本人による 5 分以内の更新は、既存の処理が記録しないため）。別の種類の行を直接確かめたいときは、別のユーザーが先に更新したページを更新するか、コメントを足す
+- (5.1) 既定の管理設定では、他のユーザーの「自分のみ」のページのパスも、既存の一覧と同じように返る（requirements.md の Adjacent expectations のとおり）。`security:list-policy:hideRestrictedByOwner` を有効にすると返らなくなることを、実際のサーバーで確かめた
