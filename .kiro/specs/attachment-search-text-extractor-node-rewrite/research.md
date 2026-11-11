@@ -7792,3 +7792,77 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - `NODE_ENV=production` は設定していない (`apps/pdf-converter` は設定している。`src/` はこれを読まない)。`preStop` の待ちは無い (Python 版の例と同じ)。`main.ts` は `0.0.0.0` だけで待ち受けるので、IPv6 だけのクラスターからは届かない (Python 版と同じ)。
 - 子は親の直接の子で、親がいなくなると自分で終わる (`src/child/parent-watch.ts`)。そのため init のプロセスは要らない、と Dockerfile と deployment のコメントに書いた。一方、4.5 の `compose.spec.ts` は compose の項目に `init: true` を求めている (8.2 で扱う。テストの題名は Python 版の言い方のままである)。
 - `docker/README.md` は作っていない (`apps/pdf-converter` にはある。tasks.md もテストも求めていない)。
+
+### 27.11 タスク 6.12 (CI の image の確認とメモリの計測) — 書いた部分だけ。タスクは未完了
+
+実装も独立レビューも Fable の担当 (別々) が行った。1 回目 REJECTED (メモリの計測が、正しく測れていなくても成功になる箇所が 3 つ) → 直し → 狭い再レビュー APPROVED。
+
+**tasks.md の 6.12 には完了の印を付けていない。** devcontainer に docker が無く、push もしていないので、docker を使う行と GitHub のジョブは一度も実行していない。「ローカルの docker で同じ手順が成功する」ことと、image の中の実測値の記録は、本物の実行が済むまで満たせない。
+
+**作ったもの**
+
+- `.github/workflows/ci-attachment-text-extractor.yml` に、2 つめのジョブ `ci-attachment-text-extractor-image` を足した (もとの lint とテストのジョブ、起動の条件、`paths` は変えていない。`if:` は 1 行の `failure()` と `always()` だけで、`if: |` は無い)。2 つのジョブに `needs` は無いので、片方が失敗してももう片方は動く。
+- `scripts/image-check/check-image.sh`: `build`・`size`・`contents`・`start`・`service`・`memory`・`logs`・`stop`・`all` の段階。CI は 1 段階ずつ呼ぶ。`all` は docker のある環境で人が流すためのもので、`memory` は含まない。
+- `scripts/image-check/service-client.mjs`: container の中で `node -e` に渡して動かす (Node の組み込みだけ。Python 版の CI が `python -c` でしていたのと同じやり方)。`readyz`・`extract`・`openapi`・`prlimit` の 4 つ。`prlimit` の数字は、いまの既定値を写した見本で、本当の値は `prlimit-args.ts` が決める。
+- `scripts/check-openapi-drift.ts` に、コマンドとして呼ぶ入口を足した (終了コード 0 = 同じ、1 = 違う (違う場所を JSON Pointer で出す)、2 = 比べられない)。container の `/openapi.json` を、`scripts/export-openapi.ts` の出力と比べる。commit 済みのクライアントの文書とは比べない (8.2 で扱う)。
+- `scripts/image-check/memory/`: S1 と S2 を、毎回新しい container で 3 回ずつ流し、基準のファイルを 3 回ずつ流して、表を出す。上限を超えたら終了コード 1。
+
+**27.10 の一覧との対応**
+
+| 27.10 の項目 | 段階 | 確かめられるか |
+|---|---|---|
+| 1. corepack と pnpm、ほかの app 抜きの install | `build` | build が通ることで確かめる |
+| 2. build が `rimraf`・`tsc` を見つける。2 回目の install が始まらない | `build` | 前半は確かめる。2 回目の install は自動では見つけられない (`--progress=plain` のログを人が読む) |
+| 3. キャッシュの mount の下の `pnpm deploy` | `build` と `service` | 確かめる |
+| 4. 本番の依存だけの状態で `/openapi.json` が書き出しと同じ | `service` | 確かめる |
+| 5. pdfium の `LICENSE` と `LICENSE.pdfium` | `contents` | 確かめる (`/licenses/THIRD-PARTY-NOTICES.md` も) |
+| 6. `--read-only --user 10001 --network none` (tmpfs なし) で `/readyz`・PDF・DOCX | `start` と `service` | 確かめる |
+| 7. 400MB 以下 | `size` | 確かめる |
+| 8. arm64 | なし | 確かめない (runner が x64。8.3 で人が確かめる) |
+| 9. dockerignore の行の順 | `build` と `contents` | `node_modules` については確かめる (checkout の `node_modules` に目印のファイルを置き、build の段に入っていないことを見る)。古い `dist` は見つけられないが、build が `rimraf dist` をするので害は無い |
+
+このほか、Req 8.3 (image に `src`・`test`・`benchmark`・`scripts`・開発用の依存が無い)、既定の uid 10001、Req 9.5 (動いている container の中で、runner の既定の上限で `prlimit` を動かし、`/proc/self/limits` で確かめる) も見る。Python 版の CI の確認から弱くした点は無い。`--init` と `/tmp` の tmpfs はわざと外し (27.10 の 6)、`--cap-drop ALL --security-opt no-new-privileges` を足した。
+
+**メモリの計測の決まり**
+
+- S1: 制御文字だけの 5.5MB の TXT を 3 件同時に、3 回続けて送る。S2: その TXT を 3 件同時 → 上限まで伸びて止められる 8MiB の CSV を 3 件同時、を 4 往復 (20.7 と 20.7a の言い方に合わせた読み方)。
+- 合否: container の cgroup の値が 2,048MiB 以下、7 万セルの XLSX と 48MB の DOCX の子の最大 RSS が 304MB 以下。Python 版の 1,230MiB との比較と、200 万字の PDF は、表示するだけで合否に入れない (tasks.md が名前を挙げているのは XLSX と DOCX だけ)。cgroup の値はページキャッシュを含み、container に `--memory` の上限は付けない (厳しいほうの読み方)。
+- 負荷は container の外から掛ける (送る側のメモリを cgroup に入れないため)。そのために、メモリの計測の container だけは `--network none` ではなく、ループバックにポートを公開する。ほかの設定は本番と同じ。
+- 正しく測れていないのに成功にならないための決まり (レビューで直した 3 点):
+  - S2 の CSV は、応答の本文に `memory_exceeded` があることまで確かめる。別の理由の 422 (セル数の上限、結果が大きすぎる、時間切れ) は「意図しない応答」として失敗にする。
+  - 子の最大 RSS は、送る前にログの `extract` の行を数え、ちょうど 1 行増えた行が `result=ok` のときだけ使う。5 秒待っても増えなければ「値なし」で失敗にする (前の要求の値を拾わないため)。
+  - container の `memory.peak` を読めなければ失敗にする (`docker exec` で何度も読む粗いやり方には切り替えない。20 節の 20ms 間隔よりずっと粗く、最大値を低く読むため)。`memory.peak` は kernel 5.19 以降にある。
+- このステップは、push のたびに動かし、上限を超えたらジョブを失敗にする形にした (**ユーザーに伝える**。任意で起動する形は、workflow のファイルが既定のブランチに載るまで起動できないので、マージの前に数字を得る手段にならない。手元では 45〜48 秒で終わる)。
+
+**docker の外で測った、代わりの数字 (image の中の値ではない)**
+
+devcontainer、Node v24.22.2、Linux 6.8。サービスのプロセスと子の RSS の合計で、cgroup の値ではない。実装の担当が 2 回、レビューの担当が 2 回測った範囲。
+
+| 項目 | 範囲 | 上限 |
+|---|---|---|
+| S1 の最大 | 612〜689MiB (待機時 82〜83MiB) | 2,048MiB |
+| S2 の最大 | 1,178〜1,379MiB | 2,048MiB (Python 版は 1,230MiB) |
+| 7 万セルの XLSX の子の最大 RSS | 290〜294MB | 304MB |
+| 画像 12 枚・48MB の DOCX の子の最大 RSS | 271〜282MB | 304MB |
+| 200 万字の PDF の子の最大 RSS | 302〜303MB | 表示だけ (27.3) |
+
+- S2 は、最大で Python 版より 149MiB 多く、上限までは約 670MiB ある (20.7a の「親と子の合計」の範囲 1,216〜1,365MiB とほぼ合う)。
+- XLSX は 304MB の線まで 10〜14MB、PDF は 1〜2MB しかない。image の中で少しでも増えると超える。XLSX が超えたら 20 節の下げる値 (65,000 セル) を適用し、DOCX が超えたらユーザーに諮る (tasks.md の 6.12)。PDF の余裕が 1MB であることは、ユーザーに伝える。
+- S2 の CSV は、422 `resource_limit_exceeded`、ログは `result=memory_exceeded child_peak_rss_mb=349`。S1 の TXT は 200、応答は 33,000,111 バイト、子の最大 RSS は 137MB。
+
+**最初の本物の実行で確かめること (27.10 の一覧に足す)**
+
+1. `gh api repos/<org>/<repo>/actions/runs/<id>/jobs` でジョブが 2 つあり、`ci-attachment-text-extractor-image` のすべてのステップが成功していること。8.2 の前に push すると、1 つめのジョブは `compose.spec` の 3 件で失敗するので、実行全体は赤くなる (image のジョブは動く)。
+2. build のログで、27.10 の 1〜5 を見る。2 回目の install が始まっていないことは、人がログを読んで確かめる。
+3. 大きさの行のバイト数と docker の版を記録する (containerd の image store では、`.Size` が従来の store より大きく出ることがある)。
+4. `service` のステップが、`/readyz` の JSON、`200` の抽出の行 2 つ、上限の 3 行 (`2751463424:2751463424`、`60:65`、`1:1`)、文書が同じである旨を出すこと。
+5. メモリのステップ: S1 と S2 が 3 回ずつ 2,048MiB 以下、XLSX と DOCX の子の最大 RSS が 304MB 以下。数字、kernel の版、かかった時間を research.md に写す。`memory.peak` の `cat` で失敗したら、原因は runner の kernel か cgroup の版である。基準の値が「不明」と出たら、`docker logs` が 5 秒より遅れていないかを、出てきたサービスのログで先に見る。
+6. CI では確かめられないもの: arm64 と、docker のある手元での `check-image.sh all` と `memory` の 1 回の実行 (tasks.md の 6.12 の 3 つめ)。
+
+**そのほかの記録**
+
+- 最初の本物の実行が済んだら消すもの: メモリの計測の `local` の対象と、`check-image.sh` の `IN_SERVICE=` (どちらも docker が無いこの環境で動かすためだけにある)。`--prlimit-path` は 1 つのテストのためだけにある。
+- `loads.ts`・`targets.ts`・`measure-memory.ts` の流れにはテストが無い (判定の関数 `report.ts` には 25 件ある)。docker の対象は、レビューの担当が偽の `docker` コマンドで流れを確かめただけである。
+- workflow の `paths` に、ルートの `package.json` は入っていない (`packageManager` を上げると、image の中で corepack が取る pnpm が変わるが、この workflow は起動しない)。
+- workflow のファイルそのものの静的なテストは足していない (22.8 の 4)。`shellcheck` と `actionlint` は入っておらず、流していない。
+- テスト全体: 4,692 件が通り、3 件 (`compose.spec`。8.2) が失敗、12 件が skip。
