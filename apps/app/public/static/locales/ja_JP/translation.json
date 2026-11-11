@@ -283,7 +283,7 @@
     "password_is_not_set": "パスワードが設定されていません"
   },
   "share_links": {
-    "Shere this page link to public": "外部に共有するリンクを発行する",
+    "Share this page link to public": "外部に共有するリンクを発行する",
     "share_link_list": "共有リンクリスト",
     "share_link_management": "共有リンク管理",
     "delete_all_share_links": "全ての共有リンクを削除します",
@@ -1206,6 +1206,83 @@
         "label": "コールアウト（Caution）",
         "description": ""
       }
+    }
+  },
+  "change_proposal": {
+    "operation_type": {
+      "edit": "ページの編集",
+      "create": "ページの作成",
+      "move": "ページの移動",
+      "delete_completely": "ページの完全削除"
+    },
+    "operation_status": {
+      "pending": "承認待ち",
+      "applied": "反映済み",
+      "failed": "失敗",
+      "stale": "見送り（ページが先に変わっていた）",
+      "skipped": "スキップ",
+      "reverted": "取り消し済み",
+      "revert_refused": "取り消せなかった"
+    },
+    "proposal_status": {
+      "pending": "承認待ち",
+      "applied": "反映済み",
+      "partially_applied": "一部を反映",
+      "reverted": "取り消し済み",
+      "partially_reverted": "一部を取り消し",
+      "not_applied": "反映されなかった",
+      "discarded": "残りを反映せずに閉じた",
+      "expired": "期限切れ",
+      "withdrawn": "取り下げ"
+    },
+    "reason": {
+      "page_being_edited": "ページが編集中",
+      "page_operation_in_progress": "ページに対する別の操作が実行中",
+      "target_unavailable": "対象のページが見つからない",
+      "path_occupied": "そのパスにはすでにページがある",
+      "grant_not_assignable": "ページの公開範囲を設定できない",
+      "feature_disabled": "機能が無効になっている",
+      "operation_type_disabled": "この種類の操作が無効になっている",
+      "requester_not_allowed": "依頼した人にこの操作の権限がない",
+      "write_error": "変更の書き込みに失敗した",
+      "not_revertible_state": "取り消せる状態ではない",
+      "edited_after_apply": "反映のあとにページが編集された",
+      "has_children": "ページに子ページがある",
+      "moved_after_apply": "反映のあとにページが移動された",
+      "original_path_occupied": "元のパスにはすでにページがある",
+      "not_deletable": "ページを削除する権限がない",
+      "apply_failed": "取り消しに失敗した",
+      "base_revision_changed": "反映の前にページが変わっていた",
+      "skipped_by_requester": "依頼した人がスキップした",
+      "discarded": "残りを反映せずに閉じた",
+      "expired": "期限切れ",
+      "withdrawn": "取り下げ"
+    },
+    "revert_refusal_reason": {
+      "not_revertible_state": "取り消せる状態ではない",
+      "target_unavailable": "対象のページが見つからない",
+      "edited_after_apply": "反映のあとにページが編集された",
+      "has_children": "ページに子ページがある",
+      "moved_after_apply": "反映のあとにページが移動された",
+      "original_path_occupied": "元のパスにはすでにページがある",
+      "not_deletable": "ページを削除する権限がない",
+      "page_operation_in_progress": "ページに対する別の操作が実行中",
+      "apply_failed": "取り消しに失敗した"
+    },
+    "lifecycle": {
+      "open": "承認待ち",
+      "settled": "完了",
+      "discarded": "残りを反映せずに閉じた",
+      "expired": "期限切れ",
+      "withdrawn": "取り下げ"
+    },
+    "link": {
+      "follow_up": "後続",
+      "rework": "見直し",
+      "based_on": "元"
+    },
+    "achievement": {
+      "settled_with_percent": "完了（達成度 {{percent}}%）"
     }
   }
 }

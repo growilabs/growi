@@ -39,6 +39,53 @@ type ActivitiesSnapshot {
   fileSize     Int?
 }
 
+type ChangeproposalsOperationsRevertTarget {
+  proposalId   String @db.ObjectId
+  operationKey String
+}
+
+// One shape for every operation type; toChangeProposalDocument maps it onto the OperationRecord union
+type ChangeproposalsOperations {
+  index                Int
+  key                  String
+  type                 String
+  status               String
+  reason               String?
+  pageId               String?                                @db.ObjectId
+  baseRevisionId       String?                                @db.ObjectId
+  expectedRevisionId   String?                                @db.ObjectId
+  body                 String?
+  path                 String?
+  fromPath             String?
+  toPath               String?
+  removeRedirectsFrom  String?
+  approvedAt           DateTime?
+  appliedAt            DateTime?
+  resultPageId         String?                                @db.ObjectId
+  resultRevisionId     String?                                @db.ObjectId
+  revertTarget         ChangeproposalsOperationsRevertTarget?
+  revertedByProposalId String?                                @db.ObjectId
+  revertedAt           DateTime?
+}
+
+type ChangeproposalsBasedOn {
+  proposalId    String   @db.ObjectId
+  relation      String
+  operationKeys String[]
+}
+
+type ChangeproposalsApplyLease {
+  token     String
+  expiresAt DateTime
+}
+
+type AuditlogbulkexportjobsFilters {
+  users    String[]  @default([]) @db.ObjectId
+  actions  String[]  @default([])
+  dateFrom DateTime?
+  dateTo   DateTime?
+}
+
 type PageoperationsExPage {
   /// Field referred in an index, but found no data to define the type.
   id   Json? @map("_id")
@@ -133,13 +180,43 @@ model attachments {
   attachmentType        String
   createdAt             DateTime  @default(now())
 
-  creator              users?               @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  page                 pages?               @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  userImageAttachments users[]              @relation("UserImageAttachment")
-  pagebulkexportjobs   pagebulkexportjobs[]
+  creator                users?                   @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page                   pages?                   @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userImageAttachments   users[]                  @relation("UserImageAttachment")
+  pagebulkexportjobs     pagebulkexportjobs[]
+  auditlogbulkexportjobs auditlogbulkexportjobs[]
 
   @@index([pageId], map: "page_1")
   @@index([creatorId], map: "creator_1")
+}
+
+model auditlogbulkexportjobs {
+  id                 String                        @id @default(auto()) @map("_id") @db.ObjectId
+  v                  Int                           @default(0) @map("__v")
+  userId             String                        @map("user") @db.ObjectId
+  filters            AuditlogbulkexportjobsFilters
+  filterHash         String
+  format             String                        @default("json")
+  status             String                        @default("exporting")
+  lastExportedId     String?
+  completedAt        DateTime?
+  restartFlag        Boolean                       @default(false)
+  totalExportedCount Int?                          @default(0)
+  // optional: the attachment is hard-deleted by the download-expiration cleanup
+  // (AuditLogBulkExportJobCleanUpCronService) while the job row survives until the
+  // same cron pass deletes it
+  attachmentId       String?                       @map("attachment") @db.ObjectId
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  user       users        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // SetNull (not NoAction): the cleanup removes the attachment before deleting the
+  // job so that a failed removal leaves the job row for the next cron to retry.
+  // NoAction would make Prisma reject deleting an attachment a job still references.
+  attachment attachments? @relation(fields: [attachmentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([filterHash], map: "filterHash_1")
+  @@index([attachmentId], map: "attachment_1")
 }
 
 model bookmarkfolders {
@@ -178,6 +255,34 @@ model auditlog_es_sync_status {
   id                String  @id @default(auto()) @map("_id") @db.ObjectId
   key               String  @unique
   hasUnsyncedEvents Boolean @default(false)
+}
+
+model changeproposals {
+  id                   String                      @id @default(auto()) @map("_id") @db.ObjectId
+  v                    Int                         @default(0) @map("__v")
+  requester            String                      @db.ObjectId
+  entry                String
+  modelLabel           String?
+  revertOf             String?                     @db.ObjectId
+  basedOn              ChangeproposalsBasedOn?
+  lifecycle            String
+  operations           ChangeproposalsOperations[]
+  appliedPageIds       String[]                    @db.ObjectId
+  lastAppliedAt        DateTime?
+  applyLease           ChangeproposalsApplyLease?
+  expiresAt            DateTime?
+  perPageNotifications Boolean                     @default(true)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+
+  @@index([requester, createdAt(sort: Desc)], map: "requester_1_createdAt_-1")
+  @@index([lifecycle, expiresAt], map: "lifecycle_1_expiresAt_1")
+  // The next four are sparse, which Prisma cannot express; the migration
+  // 20261110120000-add-change-proposal-indexes creates them.
+  @@index([applyLease.expiresAt], map: "applyLease.expiresAt_1")
+  @@index([lastAppliedAt(sort: Desc)], map: "lastAppliedAt_-1")
+  @@index([revertOf], map: "revertOf_1")
+  @@index([basedOn.proposalId], map: "basedOn.proposalId_1")
 }
 
 model changestream_resume_tokens {
@@ -555,6 +660,8 @@ model revisions {
   format        String   @default("markdown")
   origin        String?
   pageId        String   @db.ObjectId
+  proposalId           String?  @db.ObjectId
+  proposalOperationKey String?
 
   author   users?     @relation(fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -564,6 +671,9 @@ model revisions {
 
   @@index([pageId], map: "pageId_1")
   @@index([authorId, createdAt(sort: Desc)], map: "author_1_createdAt_-1")
+  // Sparse, which Prisma cannot express; the migration
+  // 20261110120000-add-change-proposal-indexes creates it.
+  @@index([proposalId, proposalOperationKey], map: "proposalId_1_proposalOperationKey_1")
 }
 
 model rlflx {
@@ -698,18 +808,19 @@ model users {
   updatedAt               DateTime  @updatedAt
 
   activities             activities[]
-  comments               comments[]           @relation("CommentCreator")
-  resolvedInlineComments comments[]           @relation("InlineCommentResolver")
+  comments               comments[]               @relation("CommentCreator")
+  resolvedInlineComments comments[]               @relation("InlineCommentResolver")
   revisions              revisions[]
-  createdPages           pages[]              @relation("CreatedPages")
-  deletedPages           pages[]              @relation("DeletedPages")
-  lastUpdatedPages       pages[]              @relation("LastUpdatedPages")
-  imageAttachment        attachments?         @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
-  createdAttachments     attachments[]        @relation("CreatedAttachments")
+  createdPages           pages[]                  @relation("CreatedPages")
+  deletedPages           pages[]                  @relation("DeletedPages")
+  lastUpdatedPages       pages[]                  @relation("LastUpdatedPages")
+  imageAttachment        attachments?             @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
+  createdAttachments     attachments[]            @relation("CreatedAttachments")
   externalaccounts       externalaccounts[]
   bookmarks              bookmarks[]
   bookmarkfolders        bookmarkfolders[]
   pagebulkexportjobs     pagebulkexportjobs[]
+  auditlogbulkexportjobs auditlogbulkexportjobs[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")

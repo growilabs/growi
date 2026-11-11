@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 
@@ -26,8 +26,9 @@ const buildApp = async (growiCloudUri: string | undefined) => {
   vi.resetModules();
   const { setup } = await import('./index');
 
-  const crowi = mockDeep<Crowi>();
-  crowi.configManager.getConfig.mockReturnValue(growiCloudUri);
+  const configManager = mock<Crowi['configManager']>();
+  configManager.getConfig.mockReturnValue(growiCloudUri);
+  const crowi = mock<Crowi>({ configManager });
 
   const app = express();
   app.use((_req, res, next) => {

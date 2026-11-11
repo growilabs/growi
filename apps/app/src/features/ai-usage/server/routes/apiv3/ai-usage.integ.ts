@@ -2,7 +2,7 @@ import os from 'node:os';
 import express, { type Express } from 'express';
 import mongoose from 'mongoose';
 import request from 'supertest';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock } from 'vitest-mock-extended';
 
 import { BUNDLED_CATALOG_MODELS } from '~/features/mastra/server/services/ai-sdk-modules/model-catalog';
 import { refreshModelCatalog } from '~/features/mastra/server/services/ai-sdk-modules/refresh-model-catalog';
@@ -62,7 +62,7 @@ const sinceOneHourAgo = (): string =>
   new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
 describe('GET /_api/v3/ai-usage behind the real middleware order', () => {
-  const crowi = mockDeep<Crowi>();
+  const crowi = mock<Crowi>({}, { deep: true });
   let app: Express;
 
   beforeAll(async () => {
@@ -109,7 +109,7 @@ describe('GET /_api/v3/ai-usage behind the real middleware order', () => {
   });
 
   beforeEach(async () => {
-    crowi.appService.isMaintenanceMode.mockReturnValue(false);
+    vi.mocked(crowi.appService.isMaintenanceMode).mockReturnValue(false);
     vi.mocked(buildAiUsageReport).mockClear();
     await prisma.mastrarefreshedmodelcatalogs.deleteMany();
     // Every case shares the loopback address, hence one rate-limit bucket.
@@ -135,7 +135,7 @@ describe('GET /_api/v3/ai-usage behind the real middleware order', () => {
   });
 
   it('answers 200 while maintenance mode is on', async () => {
-    crowi.appService.isMaintenanceMode.mockReturnValue(true);
+    vi.mocked(crowi.appService.isMaintenanceMode).mockReturnValue(true);
 
     const blocked = await request(app).get(PATH_BEHIND_MAINTENANCE_CHECK);
     const res = await request(app)

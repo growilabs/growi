@@ -473,3 +473,43 @@ describe('ActivityService.createTtlIndex (Mongoose path remains intact)', () => 
     collectionSpy.mockRestore();
   });
 });
+
+describe('ActivityService.getAvailableActions(false) for the audit log screen', () => {
+  const availableFor = (groupSize: 'MEDIUM' | 'LARGE') => {
+    const crowi = mock<Crowi>({
+      events: {
+        activity: new EventEmitter() as unknown as Crowi['events']['activity'],
+      },
+      configManager: {
+        getConfig: vi.fn().mockImplementation((key: string) => {
+          if (key === 'app:auditLogEnabled') return true;
+          if (key === 'app:auditLogActionGroupSize') return groupSize;
+          return '';
+        }),
+      },
+    });
+    return new ActivityService(crowi).getAvailableActions(false);
+  };
+
+  it.each([
+    'MEDIUM',
+    'LARGE',
+  ] as const)('lists the Change Proposal actions in the %s group', (size) => {
+    expect(availableFor(size)).toEqual(
+      expect.arrayContaining([
+        SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
+        SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
+        SupportedAction.ACTION_CHANGE_PROPOSAL_REVERT,
+      ]),
+    );
+  });
+
+  it('lists the admin settings action only for the LARGE group', () => {
+    expect(availableFor('MEDIUM')).not.toContain(
+      SupportedAction.ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE,
+    );
+    expect(availableFor('LARGE')).toContain(
+      SupportedAction.ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE,
+    );
+  });
+});

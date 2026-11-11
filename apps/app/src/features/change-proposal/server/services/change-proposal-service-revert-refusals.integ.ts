@@ -1,0 +1,405 @@
+import mongoose from 'mongoose';
+
+import { getInstance } from '^/test/setup/crowi';
+
+import type Crowi from '~/server/crowi';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import { prisma } from '~/utils/prisma';
+
+import type {
+  ChangeProposalDocument,
+  RevertRefusalReason,
+  RevertResult,
+} from '../../interfaces';
+import type { CreateOperationInput } from '../models/change-proposal-types';
+import {
+  type ChangeProposalService,
+  createChangeProposalService,
+} from './change-proposal-service';
+import type { ServiceResult } from './change-proposal-service-types';
+import type { WriteOriginalMark } from './mark-original-operation';
+import { createApplierTestKit } from './proposal-applier.test-kit';
+
+const TEST_IP = '10.0.0.155';
+const PREFIX = '/cp-service-revert-refusals-integ';
+const BACKGROUND = { kind: 'background' } as const;
+
+describe('ChangeProposalService.revert judging each operation against the current page', () => {
+  let crowi: Crowi;
+  let service: ChangeProposalService;
+  const kit = createApplierTestKit({
+    getCrowi: () => crowi,
+    prefix: PREFIX,
+    ip: TEST_IP,
+    usernames: {
+      requester: 'cpServiceRevertRefusalsRequester',
+      subscriber: 'cpServiceRevertRefusalsSubscriber',
+      other: 'cpServiceRevertRefusalsOther',
+    },
+  });
+  const { users } = kit;
+  const Page = () => mongoose.model<PageDocument, PageModel>('Page');
+
+  const applyOriginal = async (
+    operations: readonly CreateOperationInput[],
+    requester = users.requester,
+  ): Promise<ChangeProposalDocument> => {
+    const proposal = await kit.storeProposal(operations, {
+      requester: requester._id.toString(),
+    });
+    await kit.newApplier().apply(proposal._id, BACKGROUND);
+    await kit.waitForPageOperationsToFinish();
+    return kit.reload(proposal._id);
+  };
+
+  const revertAll = async (
+    proposalId: string,
+  ): Promise<ServiceResult<RevertResult>> => {
+    const result = await service.revert(
+      proposalId,
+      users.requester,
+      'all-visible',
+      BACKGROUND,
+    );
+    await kit.waitForPageOperationsToFinish();
+    return result;
+  };
+
+  // Reverts the single operation of a proposal and returns the revert proposal.
+  const revertSingle = async (
+    proposal: ChangeProposalDocument,
+  ): Promise<ChangeProposalDocument> => {
+    const result = await revertAll(proposal._id);
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        operations: [{ key: proposal.operations[0].key, outcome: 'reverted' }],
+      },
+    });
+    if (!result.ok || result.value.revertProposalId == null) {
+      throw new Error('no revert proposal was created');
+    }
+    return kit.reload(result.value.revertProposalId);
+  };
+
+  const expectRefused = async (
+    proposal: ChangeProposalDocument,
+    reason: RevertRefusalReason,
+  ): Promise<void> => {
+    const [key] = proposal.operations.map((op) => op.key);
+    await expect(revertAll(proposal._id)).resolves.toEqual({
+      ok: true,
+      value: { operations: [{ key, outcome: 'revert-refused', reason }] },
+    });
+    expect(kit.operationOf(await kit.reload(proposal._id), key)).toMatchObject({
+      status: 'revert-refused',
+      reason,
+    });
+    expect(
+      await prisma.changeproposals.count({ where: { revertOf: proposal._id } }),
+    ).toBe(0);
+  };
+
+  const createdPageIdOf = (proposal: ChangeProposalDocument): string => {
+    const pageId = proposal.operations[0].resultPageId;
+    if (pageId == null) throw new Error('create was not applied');
+    return pageId;
+  };
+
+  const createPageAt = async (path: string, body = 'human page') => {
+    const page = await crowi.pageService.create(path, body, users.other, {});
+    await kit.waitForPageOperationsToFinish();
+    return kit.findPage(page._id);
+  };
+
+  const latestBodyOf = async (pageId: string): Promise<string | undefined> => {
+    const page = await kit.findPage(pageId);
+    const revision = await prisma.revisions.findUnique({
+      where: { id: page.revision?.toString() },
+    });
+    return revision?.body;
+  };
+
+  const moveInput = (
+    page: Awaited<ReturnType<typeof kit.findPage>>,
+    toPath: string,
+  ): CreateOperationInput => ({
+    type: 'move',
+    pageId: page._id.toString(),
+    fromPath: page.path,
+    toPath,
+  });
+
+  beforeAll(async () => {
+    crowi = await getInstance();
+    await kit.setUp();
+    service = createChangeProposalService(crowi, {
+      applier: kit.newApplier(),
+    });
+  });
+
+  beforeEach(() => {
+    // Page events have async listeners (search, vault) unrelated to this test.
+    vi.spyOn(crowi.pageService.pageEvent, 'emit').mockReturnValue(true);
+  });
+
+  afterEach(async () => {
+    await kit.waitForPageOperationsToFinish();
+    vi.restoreAllMocks();
+  });
+
+  afterAll(async () => {
+    const trashed = await Page().find({
+      path: new RegExp(`^/trash${PREFIX}/`),
+    });
+    await prisma.revisions.deleteMany({
+      where: { pageId: { in: trashed.map((p) => p._id.toString()) } },
+    });
+    await Page().deleteMany({ _id: { $in: trashed.map((p) => p._id) } });
+    await prisma.pageredirects.deleteMany({
+      where: { fromPath: { startsWith: PREFIX } },
+    });
+    await prisma.changeproposals.deleteMany({
+      where: {
+        requester: {
+          in: [users.requester, users.other].map((u) => u._id.toString()),
+        },
+      },
+    });
+    await kit.tearDown();
+  });
+
+  describe('an edit', () => {
+    it('is refused with edited-after-apply once someone saved the page after it', async () => {
+      const page = await kit.createPage('edited');
+      const original = await applyOriginal([kit.editInput(page, '提案の本文')]);
+      await applyOriginal(
+        [kit.editInput(await kit.findPage(page._id), '人が直した本文')],
+        users.other,
+      );
+
+      await expectRefused(original, 'edited-after-apply');
+      expect(await latestBodyOf(page._id.toString())).toBe('人が直した本文');
+    });
+  });
+
+  describe('a create', () => {
+    it('is refused with has-children when a page was created under it', async () => {
+      const original = await applyOriginal([
+        { type: 'create', path: kit.nextPath('parent'), body: 'body' },
+      ]);
+      const created = await kit.findPage(createdPageIdOf(original));
+      await createPageAt(`${created.path}/child`);
+
+      await expectRefused(original, 'has-children');
+    });
+
+    it('is refused with has-children when only an empty page holds a deeper page under it', async () => {
+      const original = await applyOriginal([
+        { type: 'create', path: kit.nextPath('grand-parent'), body: 'body' },
+      ]);
+      const created = await kit.findPage(createdPageIdOf(original));
+      await createPageAt(`${created.path}/empty/grandchild`);
+      expect(
+        await Page().exists({ path: `${created.path}/empty`, isEmpty: true }),
+      ).not.toBeNull();
+
+      await expectRefused(original, 'has-children');
+      expect((await kit.findPage(created._id)).path).toBe(created.path);
+    });
+
+    it('is refused with edited-after-apply once the created page was edited', async () => {
+      const original = await applyOriginal([
+        { type: 'create', path: kit.nextPath('created-edited'), body: 'body' },
+      ]);
+      const created = await kit.findPage(createdPageIdOf(original));
+      await applyOriginal([kit.editInput(created, 'edited')], users.other);
+
+      await expectRefused(original, 'edited-after-apply');
+    });
+  });
+
+  describe('a move', () => {
+    it('is refused with moved-after-apply once the page was moved again', async () => {
+      const page = await kit.createPage('moved');
+      const movedTo = kit.nextPath('moved-to');
+      const original = await applyOriginal([moveInput(page, movedTo)]);
+      await applyOriginal(
+        [moveInput(await kit.findPage(page._id), kit.nextPath('moved-again'))],
+        users.other,
+      );
+
+      await expectRefused(original, 'moved-after-apply');
+    });
+
+    it('is refused with original-path-occupied when a page now sits at the original path', async () => {
+      const page = await kit.createPage('occupied');
+      const originalPath = page.path;
+      const original = await applyOriginal([
+        moveInput(page, kit.nextPath('occupied-to')),
+      ]);
+      await createPageAt(originalPath);
+
+      await expectRefused(original, 'original-path-occupied');
+    });
+
+    it('moves back when only an empty page holds the original path', async () => {
+      const page = await kit.createPage('placeholder');
+      const originalPath = page.path;
+      const original = await applyOriginal([
+        moveInput(page, kit.nextPath('placeholder-to')),
+      ]);
+      await createPageAt(`${originalPath}/child`);
+      expect(
+        await Page().exists({ path: originalPath, isEmpty: true }),
+      ).not.toBeNull();
+
+      await revertSingle(original);
+
+      expect((await kit.findPage(page._id)).path).toBe(originalPath);
+    });
+  });
+
+  describe('a revert proposal', () => {
+    it('deletes the created page completely, leaving nothing in the trash, and refuses to bring it back', async () => {
+      const path = kit.nextPath('日本語/新しい　ページ（仮）');
+      const original = await applyOriginal([
+        { type: 'create', path, body: '作った本文' },
+      ]);
+      const pageId = createdPageIdOf(original);
+
+      const deleting = await revertSingle(original);
+      expect(deleting.operations.map((op) => op.type)).toEqual([
+        'delete-completely',
+      ]);
+      expect(await Page().exists({ _id: pageId })).toBeNull();
+      expect(await Page().exists({ path: `/trash${path}` })).toBeNull();
+      expect(
+        kit.operationOf(
+          await kit.reload(original._id),
+          original.operations[0].key,
+        ),
+      ).toMatchObject({
+        status: 'reverted',
+        revertedByProposalId: deleting._id,
+      });
+
+      await expectRefused(deleting, 'target-unavailable');
+    });
+
+    it('keeps showing the reverted create and the deletion to their requesters only', async () => {
+      const original = await applyOriginal([
+        {
+          type: 'create',
+          path: kit.nextPath('shown-after-deletion'),
+          body: 'b',
+        },
+      ]);
+      const deleting = await revertSingle(original);
+
+      const forRequester = await service.getForViewer(
+        original._id,
+        users.requester,
+      );
+      expect(forRequester).toMatchObject({
+        ok: true,
+        value: {
+          operations: [
+            {
+              key: original.operations[0].key,
+              type: 'create',
+              status: 'reverted',
+            },
+          ],
+        },
+      });
+      await expect(
+        service.getForViewer(deleting._id, users.requester),
+      ).resolves.toMatchObject({
+        ok: true,
+        value: {
+          operations: [
+            {
+              type: 'delete-completely',
+              status: 'applied',
+              revertability: {
+                revertible: false,
+                reason: 'target-unavailable',
+              },
+            },
+          ],
+        },
+      });
+      for (const proposalId of [original._id, deleting._id]) {
+        // biome-ignore lint/performance/noAwaitInLoops: two independent reads
+        await expect(
+          service.getForViewer(proposalId, users.other),
+        ).resolves.toEqual({ ok: false, error: { code: 'not-found' } });
+      }
+    });
+
+    it('puts the proposed body back when the revert of an edit is reverted', async () => {
+      const page = await kit.createPage('編集/戻し');
+      const original = await applyOriginal([
+        kit.editInput(page, '提案の本文 😀'),
+      ]);
+
+      const reverting = await revertSingle(original);
+      expect(await latestBodyOf(page._id.toString())).toBe('base body');
+
+      await revertSingle(reverting);
+      expect(await latestBodyOf(page._id.toString())).toBe('提案の本文 😀');
+    });
+  });
+
+  describe('when recording a refusal on the original operation keeps throwing', () => {
+    it('still answers the refusal and reverts the other operations', async () => {
+      const edited = await kit.createPage('refusal-mark-fails-edited');
+      const untouched = await kit.createPage('refusal-mark-fails-untouched');
+      const original = await applyOriginal([
+        kit.editInput(edited, '提案の本文 1'),
+        kit.editInput(untouched, '提案の本文 2'),
+      ]);
+      await applyOriginal(
+        [kit.editInput(await kit.findPage(edited._id), '人が直した本文')],
+        users.other,
+      );
+      const [editedKey, untouchedKey] = original.operations.map((op) => op.key);
+      const markSpy = vi
+        .fn<WriteOriginalMark>()
+        .mockRejectedValue(new Error('down'));
+      const failingMark = {
+        markRetryWait: () => Promise.resolve(),
+        writeOriginalMark: markSpy,
+      };
+      const noWaitService = createChangeProposalService(crowi, {
+        applier: kit.newApplier(failingMark),
+        ...failingMark,
+      });
+
+      const result = await noWaitService.revert(
+        original._id,
+        users.requester,
+        'all-visible',
+        BACKGROUND,
+      );
+      await kit.waitForPageOperationsToFinish();
+
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          operations: expect.arrayContaining([
+            {
+              key: editedKey,
+              outcome: 'revert-refused',
+              reason: 'edited-after-apply',
+            },
+            { key: untouchedKey, outcome: 'reverted' },
+          ]),
+        },
+      });
+      // Each of the two writes onto the original is tried three times.
+      expect(markSpy).toHaveBeenCalledTimes(6);
+    });
+  });
+});

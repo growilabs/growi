@@ -288,7 +288,7 @@
     "password_is_not_set": "Mot de passe non saisi"
   },
   "share_links": {
-    "Shere this page link to public": "Partager cette page publiquement",
+    "Share this page link to public": "Partager cette page publiquement",
     "share_link_list": "Liens de partage",
     "share_link_management": "Liens de partage",
     "delete_all_share_links": "Supprimer tout les liens de partage",
@@ -1170,6 +1170,83 @@
     "tableBuilder": {
       "label": "Générateur de tableau",
       "description": ""
+    }
+  },
+  "change_proposal": {
+    "operation_type": {
+      "edit": "Modifier la page",
+      "create": "Créer la page",
+      "move": "Déplacer la page",
+      "delete_completely": "Supprimer définitivement la page"
+    },
+    "operation_status": {
+      "pending": "En attente d'approbation",
+      "applied": "Appliqué",
+      "failed": "Échec",
+      "stale": "Non appliqué (la page avait changé)",
+      "skipped": "Ignoré",
+      "reverted": "Annulé",
+      "revert_refused": "Annulation impossible"
+    },
+    "proposal_status": {
+      "pending": "En attente d'approbation",
+      "applied": "Appliqué",
+      "partially_applied": "Partiellement appliqué",
+      "reverted": "Annulé",
+      "partially_reverted": "Partiellement annulé",
+      "not_applied": "Non appliqué",
+      "discarded": "Fermé sans appliquer le reste",
+      "expired": "Expiré",
+      "withdrawn": "Retiré"
+    },
+    "reason": {
+      "page_being_edited": "La page est en cours de modification",
+      "page_operation_in_progress": "Une autre opération sur la page est en cours",
+      "target_unavailable": "La page cible est introuvable",
+      "path_occupied": "Une page existe déjà à ce chemin",
+      "grant_not_assignable": "Les droits de la page ne peuvent pas être définis",
+      "feature_disabled": "La fonctionnalité est désactivée",
+      "operation_type_disabled": "Ce type d'opération est désactivé",
+      "requester_not_allowed": "Le demandeur n'est pas autorisé à effectuer cette opération",
+      "write_error": "Échec de l'écriture de la modification",
+      "not_revertible_state": "Dans un état qui ne permet pas l'annulation",
+      "edited_after_apply": "La page a été modifiée après l'application",
+      "has_children": "La page a des pages enfants",
+      "moved_after_apply": "La page a été déplacée après l'application",
+      "original_path_occupied": "Une page existe déjà au chemin d'origine",
+      "not_deletable": "Vous n'êtes pas autorisé à supprimer la page",
+      "apply_failed": "Échec de l'annulation",
+      "base_revision_changed": "La page avait changé avant l'application",
+      "skipped_by_requester": "Ignoré par le demandeur",
+      "discarded": "Fermé sans appliquer le reste",
+      "expired": "Expiré",
+      "withdrawn": "Retiré"
+    },
+    "revert_refusal_reason": {
+      "not_revertible_state": "Dans un état qui ne permet pas l'annulation",
+      "target_unavailable": "La page cible est introuvable",
+      "edited_after_apply": "La page a été modifiée après l'application",
+      "has_children": "La page a des pages enfants",
+      "moved_after_apply": "La page a été déplacée après l'application",
+      "original_path_occupied": "Une page existe déjà au chemin d'origine",
+      "not_deletable": "Vous n'êtes pas autorisé à supprimer la page",
+      "page_operation_in_progress": "Une autre opération sur la page est en cours",
+      "apply_failed": "Échec de l'annulation"
+    },
+    "lifecycle": {
+      "open": "En attente d'approbation",
+      "settled": "Terminé",
+      "discarded": "Fermé sans appliquer le reste",
+      "expired": "Expiré",
+      "withdrawn": "Retiré"
+    },
+    "link": {
+      "follow_up": "Suite",
+      "rework": "Révision",
+      "based_on": "Basé sur"
+    },
+    "achievement": {
+      "settled_with_percent": "Terminé ({{percent}} % réalisé)"
     }
   }
 }

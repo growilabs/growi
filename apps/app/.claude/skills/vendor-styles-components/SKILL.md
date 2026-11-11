@@ -64,7 +64,7 @@ document.head.appendChild(s);
 | `GrowiEditor.vendor-styles.ts` | `@growi/editor` | PageEditor, CommentEditor |
 | `HandsontableModal.vendor-styles.ts` | `handsontable` (non-full variant) | HandsontableModal |
 | `DateRangePicker.vendor-styles.ts` | `react-datepicker` | DateRangePicker |
-| `RevisionDiff.vendor-styles.ts` | `diff2html` | RevisionDiff |
+| `features/change-proposal/client/shared/diff2html.vendor-styles.ts` | `diff2html` | RevisionDiff |
 | `DrawioViewerWithEditButton.vendor-styles.ts` | `@growi/remark-drawio` | DrawioViewerWithEditButton |
 | `ImageCropModal.vendor-styles.ts` | `react-image-crop` | ImageCropModal |
 | `Presentation.vendor-styles.ts` | `@growi/presentation` | Presentation, Slides |
