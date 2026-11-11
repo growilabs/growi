@@ -24,7 +24,7 @@
 
 **番号の読み方**: この文書で「1.1」のように書いた番号は、この spec の要件の番号である。対象 spec の Acceptance Criteria を指すときは、必ず「対象 spec の AC 1.1」と書く。
 
-**技術名を要件に書いている理由**: 通常の requirements では、言語やフレームワークの名前は design に回す。この spec は実行基盤を Node.js + Hono + `@firecrawl/anydoc` に替えること自体が目的なので、これらの名前を要件 (主に Req 4) にそのまま書く。後のレビューでこれらを「実装の詳細」として取り除かないこと。一方、まだ決まっていない選択 (PDF のライブラリ、子プロセスの作り方、OpenAPI の作り方、配置) は要件では決めず、「何を測って、誰が決めるか」だけを Req 11 に書く。
+**技術名を要件に書いている理由**: 通常の requirements では、言語やフレームワークの名前は design に回す。この spec は実行基盤を Node.js + Hono + `@firecrawl/anydoc` に替えること自体が目的なので、これらの名前を要件 (主に Req 4) にそのまま書く。後のレビューでこれらを「実装の詳細」として取り除かないこと。一方、試作と計測で決める選択 (PDF のライブラリ、子プロセスの作り方、配置など) は要件では決めず、「何を測って、誰が決めるか」だけを Req 11 に書く。OpenAPI の文書の作り方は、ユーザーの判断で方針が決まったので、Req 7 に書く (経路の定義から作る。作る部品の選び方だけを Req 11.7 に書く)。
 
 **契約の維持は「既定の方針」である**: Req 1 が求める契約の維持 (API・エラー・設定を変えないこと) は、書き換えの作業を単純にするために置いた既定の方針である。守ろうとすると apps/app や書き換えた後の抽出サービスが複雑になる場合は、Req 1.9〜1.13 の手続きに従って崩してよい。判断の基準は「シンプルさ (保守性) が上がるか」である。ただし Req 1.13 に挙げた不変条件 (セキュリティ上の性質、メモリの予算 2Gi、対応形式と位置情報つきの抽出) は崩さない。OpenAPI の文書と生成クライアントの名前は、維持の対象にしない。文書は経路の定義から作り、名前は作る道具の既定に従う (Req 7)。
 
@@ -46,7 +46,7 @@
   - HTTP の契約の変更 (ただし既定の方針として。守ると複雑になる場合は Req 1.9〜1.13 の手続きで崩してよい)
   - Python 版と Node 版の並行運用
   - Bun / Deno / Rust での実装
-  - 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) と apps/app の変更 (ただし既定の方針として。Req 1.9 で契約を崩した場合は、その結果として要る下流の変更を Req 1.11 の範囲で同じ作業に含める)
+  - 下流 spec (`attachment-search-indexing`、`attachment-search-ui`) と apps/app の変更。例外は、生成クライアントの関数名と型名の変更に合わせる apps/app の呼び出し側の修正 (Req 7.4) で、これは行う。そのほかは既定の方針として変えず、Req 1.9 で契約を崩した場合に限り、その結果として要る下流の変更を Req 1.11 の範囲で同じ作業に含める
   - 抽出サービスを apps/app のプロセスの中で動かすこと
   - 性能や抽出の質を上げるための変更 (検索の品質を Python 版より下げないことは Req 2 で求める)
 - **Adjacent expectations**:
@@ -65,7 +65,7 @@
 #### Acceptance Criteria
 
 1. The 抽出サービス (Node 版) shall 対象 spec の requirements.md の AC 1.1〜4.2 をすべて、番号と文言を変えずに満たす
-2. The 抽出サービス (Node 版) shall `POST /extract` (multipart の `file` と任意の `mimeType`)、`GET /healthz`、`GET /readyz`、`GET /openapi.json` を提供し、それぞれの成功時の応答の形を Python 版と同じにする (FastAPI が既定で出している `/docs` と `/redoc` の画面を残すかどうかは Req 11.9 で決める)
+2. The 抽出サービス (Node 版) shall `POST /extract` (multipart の `file` と任意の `mimeType`)、`GET /healthz`、`GET /readyz`、`GET /openapi.json` を提供し、`POST /extract`・`GET /healthz`・`GET /readyz` の成功時の応答の形を Python 版と同じにする。`GET /openapi.json` が返す文書は、経路の定義から作るので Python 版の文書と同じにはならない。その文書で Python 版から変えないもの (操作、`POST /extract` に渡す項目、`POST /extract` の成功とエラーの応答の項目と型、`ErrorCode` の値) は Req 7.1 で定める (FastAPI が既定で出している `/docs` と `/redoc` の画面を残すかどうかは Req 11.9 で決める)
 3. When 対象 spec の design.md §Error Handling の表のいずれかの行の条件が起きる, the 抽出サービス (Node 版) shall その行と同じ `ErrorCode` と同じ HTTP ステータスを返す (たとえば、呼び出し側の切断は 422 `extraction_failed`、結果を送る前に子プロセスが終わった場合は 500 `extraction_failed`)
 4. The 抽出サービス (Node 版) shall 対象 spec の design.md §Configuration の表にある環境変数を、同じ名前・同じ既定値・同じ意味で受け付ける (`WORKERS` の扱いは Req 11.9 の決定に従い、`MAX_CHILD_RSS_MB` と `MAX_XLSX_CELLS` の既定値は Req 11.11 に従って下げた場合だけその値にする)
 5. If `ATTACHMENT_EXTRACTOR_SERVICE_TOKEN` が設定されていない、または空白だけである, the 抽出サービス (Node 版) shall 起動せずに終了する
@@ -228,7 +228,7 @@
 4. The 子プロセスの作り方の選定 (Node の `fork` か、`prlimit` で包んだ `spawn` か、その他) shall 子の起動にかかる時間、仮想メモリ上限・CPU 時間上限・コアダンプの禁止・`oom_score_adj` を掛けられるか、親が先に終わったときに子が残らないか、を比べた結果に基づく
 5. The 仮想メモリの上限 (`RLIMIT_AS`) の扱い shall Node と使うライブラリが必要とする仮想メモリの実測 (何もしない状態で 1,200MB、anydoc の XLSX で 2,000MB、PDFium WASM で 3,000MB 以上という調べ) を確かめ直し、上限を緩める値と、緩めた分を補う守り (RSS の監視など) を決めた結果に基づく
 6. The 本文の受け取りと切断の検知の方法 shall Hono と `@hono/node-server` で、枠を取る前の `Content-Length` の検査、メモリだけでの受け取り、実際に届いたバイト数での上限、切断による変換の停止が、Req 3.1〜3.5 のとおりに働くことを試作で確かめた結果に基づく
-7. The OpenAPI の作り方の選定 shall Req 7.1〜7.3 を満たせるかどうかと、仕組みがどれだけ単純か (Req 7.6。コードから作る方法と、commit 済みの文書を正とする方法の両方を含む) を、試作で確かめた結果に基づく
+7. The OpenAPI の作り方の選定 shall 経路の定義から文書を作る方法 (Req 7.1) の候補について、Req 7.1〜7.3 を満たせるかどうかと、仕組みがどれだけ単純か (Req 7.6) を、試作で確かめた結果に基づく
 8. The 配置の選定 (`services/attachment-text-extractor/` を pnpm workspace に入れるか、外に置くか) shall turbo の build / test / lint への影響、CI の時間、`pnpm install` と lockfile への影響、Docker のビルドのしやすさを比べた結果に基づく (対象 spec が workspace の外に置いた理由は Python に固有のものだったので、そのままでは根拠にしない)
 9. When design フェーズで次の未決の項目を扱う, the 書き換え作業 shall 選択肢ごとの利点と欠点 (計測できるものは計測の結果) を design.md に示し、ユーザーの判断を受けてから design の承認を求める: `WORKERS` の Node での意味 (無視する、Node の cluster の数にする、廃止する)、`/readyz` の `dependencies` に出す名前、FastAPI が既定で出している `/docs` と `/redoc` (どちらも認証が要る) を残すかどうか、11.8 の比較に基づく配置の選択
 10. If 計測の結果、Req 1.13 の不変条件、または Req 1.9 で崩すと判断していない対象 spec の AC を Node 版で満たせないことが分かる, the 書き換え作業 shall 書き換えを先に進めず、満たせない AC と理由をユーザーに示して判断を受ける

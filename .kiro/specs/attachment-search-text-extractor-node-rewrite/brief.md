@@ -20,7 +20,7 @@
 | Dockerfile | `python:3.12-slim-bookworm` + uv の multi-stage | Node の slim image を元にした multi-stage (400MB 以下、read-only rootfs、uid 10001、ネットワークなしで動くことは変えない) |
 | CI | `.github/workflows/attachment-text-extractor.yml` の Python 用ジョブ (ruff / pytest / image のビルドと起動確認) | 同じ workflow を Node 用 (lint / vitest / image のビルドと起動確認) に置き換える |
 | 配備物 | docker-compose のエントリ、`deploy/k8s/` の例 | 中身を Node 版に合わせる。推奨する安全設定は変えない |
-| OpenAPI の書き出し手順 | `scripts/export_openapi.py` (FastAPI が自動で作る文書を書き出す) | Hono 用の手順に置き換える。書き出す `openapi.json` の中身は変えない (Req 7) |
+| OpenAPI の書き出し手順 | `scripts/export_openapi.py` (FastAPI が自動で作る文書を書き出す) | 経路の定義から文書を作って書き出す手順に置き換える。操作とスキーマの名前は作る道具の既定に従うので、書き出す `openapi.json` と生成クライアントの関数名・型名は変わる。`POST /extract` に渡す項目、応答の型、`ErrorCode` の値は変えない (Req 7) |
 | 子プロセスの作り方と上限の掛け方 | Python の forkserver、子の中での `setrlimit` | Node では `setrlimit` が使えないため、作り方と仮想メモリ上限の掛け方は未決 (Req 11) |
 | 設計の根拠 (research.md / design.md の理由づけ) | Python のライブラリと実行環境の挙動に基づく | Node 版での計測結果に基づいて書き直す |
 
@@ -58,14 +58,14 @@
 
 対象 spec の design.md §Revalidation Triggers に挙がっている項目 (`ErrorCode`、同じコードが複数の HTTP ステータスを持つこと、`pages[]` の規則、health / readiness の応答の形、`label` の中身、タイムアウトの順序、サイズと時間の上限の既定値) は、**既定では変えない**。既定のままなら、この spec は下流 (`attachment-search-indexing`、apps/app) の見直しを起こさない。既定の方針を崩した場合は、崩した項目を design.md の Revalidation Triggers に書き、下流の変更を同じ作業で行う (Req 1.11、1.12)。
 
-既定の方針を崩したもの (ユーザー判断): `/readyz` の `dependencies` の名前の変更 (部品の実名に変える。本文を見る運用者の表示が変わる)、`WORKERS` の廃止 (compose と k8s の例から `WORKERS` を消す。運用者が設定していても無視される) と、`/docs` と `/redoc` の廃止 (2 つのパスが 401 か 404 になる)。どちらも apps/app と生成クライアントには影響しない。記録は research.md の 7 節。
+既定の方針を崩したもの (ユーザー判断): `/readyz` の `dependencies` の名前の変更 (部品の実名に変える。本文を見る運用者の表示が変わる)、`WORKERS` の廃止 (compose と k8s の例から `WORKERS` を消す。運用者が設定していても無視される) と、`/docs` と `/redoc` の廃止 (2 つのパスが 401 か 404 になる)。どちらも apps/app と生成クライアントには影響しない。記録は research.md の 7 節。このほかに Python 版と違えたもの (本文の形の例外、HTTP の層の細かい違い、ログ、生成クライアントの名前) を含む全体の一覧は、design.md の Revalidation Triggers にある。
 
 このほか、次の 4 点は、この書き換えで触れる可能性がある。
 
 - **タイムアウトの順序**: 子プロセスの起動と停止にかかる時間が Python 版 (forkserver で約 29ms、停止と回収に最大約 4 秒) と変わる。最悪の合計 (本文の受信 15 秒 + 変換 55 秒 + 停止と回収) が apps/app の既定 `timeoutMs` 90000ms より短いことを、Node 版でも確かめる (Req 3)。
 - **サイズ・時間の上限の既定値**: Node 版の子プロセスは Python 版より RSS が大きい (1.5 の計測で 70,000 セルの XLSX が約 26MB 多い)。対象 spec の基準値 (7 万セルで 285MB、上限 320MB) にこの比率を当てはめると上限を超える見込みがあり、`MAX_CHILD_RSS_MB` か `MAX_XLSX_CELLS` の既定値を下げる必要が出るかもしれない。**ユーザーは、成り立たない場合に既定値を下げることを認めた** (Req 11.11)。下げた場合は Revalidation Trigger に当たる。`MAX_XLSX_CELLS` を下げると、検索の対象になる XLSX の範囲が狭くなる。下げた値、根拠の計測、範囲の変化を research.md と design.md の Revalidation Triggers に記録し、取り込みで対象 spec に反映し、完了の報告でユーザーに明示する。上げることと、メモリの予算 (2Gi) を超えることは認めない。
 - **OpenAPI の文書の作り方**: Python 版は FastAPI がコードから文書を作っていた。Node 版も、経路の定義とその横に書いたスキーマから文書を作る。**ユーザーは、FastAPI が自動で付けた名前を守らず、仕組みを単純に保つことを決めた** (Req 7.1、7.6)。生成クライアントの関数名と型名、`file` の型の書き方が変わり、apps/app の呼び出し側をそれに合わせて直す。渡す項目の名前と応答の型は変わらない。
-- **health / readiness の応答**: `/readyz` の `dependencies` に出す名前 (`pypdfium2` / `charset-normalizer` など) はライブラリの名前なので、そのままでは残せない。OpenAPI の文書ではこの応答の形を決めていない (中身は `{}`) ため生成クライアントは変わらないが、名前は **決定: 実名** (ユーザー判断。design.md の D2)。Node 版が実際に使う部品の npm の package 名 (`@firecrawl/anydoc`、T1 で決まる PDF の部品の実名など) と `prlimit` を出し、Python 版の名前は出さない。内部のモジュールは `converter` の 1 つにまとめる。
+- **health / readiness の応答**: `/readyz` の `dependencies` に出す名前 (`pypdfium2` / `charset-normalizer` など) はライブラリの名前なので、そのままでは残せない。OpenAPI の文書は `dependencies` の名前そのものを決めていない (名前から `ok` への対応として型を付けるだけ) ため、名前を変えても生成クライアントは変わらない。名前は **決定: 実名** (ユーザー判断。design.md の D2)。Node 版が実際に使う部品の npm の package 名 (`@firecrawl/anydoc`、T1 で決まる PDF の部品の実名など) と `prlimit` を出し、Python 版の名前は出さない。内部のモジュールは `converter` の 1 つにまとめる。
 
 ## Problem
 
@@ -81,7 +81,7 @@
 ## Desired Outcome
 
 - 抽出サービスが Node.js + Hono + `@firecrawl/anydoc` で動き、monorepo のほかの部分と同じ言語・同じ種類の道具で保守できる。
-- 外から見える振る舞い (HTTP の API、エラーの分類、`pages[]` の規則、上限と隔離の守り方) は、既定では Python 版と同じで、下流の apps/app と生成クライアントには変更が要らない。守るとかえって複雑になる部分は崩してよく、そのときは下流の変更も同じ作業で行う。
+- 外から見える振る舞い (HTTP の API、エラーの分類、`pages[]` の規則、上限と隔離の守り方) は、既定では Python 版と同じにする。守るとかえって複雑になる部分は崩してよく、そのときは下流の変更も同じ作業で行う。下流で変わるのは、生成クライアントの関数名と型名と、それに合わせる apps/app の呼び出し側の書き方だけである (Req 7)。
 - 添付ファイルは、書き換えの前と同じかそれ以上に検索で見つかる (ベンチマークで確かめる)。
 - Python の資産 (pyproject、uv.lock、ruff、pytest、Python 用 CI) はリポジトリから消える。Python 版と Node 版を並べて運用する期間は作らない。
 
@@ -102,9 +102,9 @@
 ### In
 
 - 抽出サービスを Node 版として `apps/attachment-text-extractor/` に作り直し (src、tests、Dockerfile、`deploy/k8s/`、CLAUDE.md、scripts、テスト用のファイルの Node の生成器)、`services/attachment-text-extractor/` の Python 版を消すこと
-- OpenAPI の書き出しと、書き出した文書がいまのものと同じであることの検査
+- OpenAPI の文書を経路の定義から作ること、その書き出し、commit 済みの文書の置き換えと生成クライアントの作り直し、apps/app の呼び出し側の名前と型の書き方の修正、書き出した文書が commit 済みの文書と同じであることの検査 (Req 7)
 - 検索の品質のベンチマーク (評価用の文書と正解) の作成と、Python 版・Node 版での計測
-- 既定の方針を崩した場合に限り、その結果として要る下流 (apps/app の呼び出し側、生成クライアント、下流 spec の記述) の変更
+- 上の Req 7 の変更のほかは、既定の方針を崩した場合に限り、その結果として要る下流 (apps/app の呼び出し側、生成クライアント、下流 spec の記述) の変更
 - `.github/workflows/attachment-text-extractor.yml` の置き換えと、docker-compose のエントリ (`infra/docker/compose.yaml`) の追従
 - `apps/` に移すことに伴う変更 (`pnpm-lock.yaml`、package ごとの `turbo.json`、compose の build の `context`、CI の `paths`)
 - Python の資産の撤去
@@ -169,7 +169,7 @@ spec-lifecycle.md の手順 2 に従い、実装の途中では対象 spec の�
 |---|---|
 | `/readyz` の `dependencies` に出す PDF などの部品の実名 | 名前の付け方は決定 (実名。D2)。PDF と文字コードの判定などの部品の実名は、T1・T6 の試作で採用が決まった時点で確定する |
 | テスト用のファイルのうち Node で作れないものが残った場合の扱い | 試作 (design.md の T7) で分かったらユーザーに諮る |
-| PDF のライブラリ、子プロセスの作り方、仮想メモリ上限の値、本文の受け取り方、OpenAPI の作り方 | design の承認の前に試作と計測で決める (Req 11.2〜11.7) |
+| PDF のライブラリ、子プロセスの作り方、仮想メモリ上限の値、本文の受け取り方、OpenAPI の作り方 | 決定済み (Req 11.2〜11.7 の試作と計測で決めた。決めた内容は research.md の「未決事項」の表と、14・15・19・16 節、17.13 にある) |
 | ベンチマークで Python 版を下回った形式の扱い | 原因を調べて示し、直すか受け入れるかをユーザーが決める。決まるまで Python 資産を撤去しない (Req 2.14、11.12)。下回らない違いは記録するだけ (Req 2.3) |
 | ベンチマークの絶対値の合格の基準を置くか、その値 | ベースラインを測った後にユーザーが決める (Req 2.13) |
 | 実際の Elasticsearch (kuromoji) での検索の計測を行えるか | ベンチマークを作るときに、動かす環境で使えるかを確かめる (Req 2.10) |

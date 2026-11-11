@@ -60,7 +60,7 @@ _最終更新: 2026-11-04 (requirements フェーズ)_
 
 - **配置**: 対象 spec が `services/` を pnpm workspace の外に置いた理由は、「Python を workspace に混ぜると `pnpm install` や `turbo run build` が複雑になる」「`package.json` の無いディレクトリを workspace から外す設定が要る」という Python に固有のものだった (対象 spec の research.md §2.9、§3.7)。Node 版ではこの理由は当てはまらないので、workspace に入れるかどうかは改めて比べる (requirements の Req 11.8)。
 - **anydoc を Node から使わなかった理由**: 対象 spec が不採用にしたのは「anydoc を apps/app のプロセスの中で Node から使う」案で、理由は重い処理と異常終了を apps/app から切り離すためだった (対象 spec の research.md §2.9、§3)。この書き換えでも別のコンテナで動かす形は変えないので、この判断とは矛盾しない。
-- **OpenAPI の名前**: commit 済みの `openapi.json` には、FastAPI が自動で付けた名前 (`operationId` の `post_extract_extract_post`、スキーマ名の `Body_post_extract_extract_post`、`title` の `Pagenumber` など) が入っている。orval の生成物 (`src/generated/index.ts`) の型の名前 (`BodyPostExtractExtractPost` など) はこれから作られるので、Hono 用の仕組みが既定で付ける名前のままだと生成クライアントが変わる。requirements の Req 7.1 で、これらの名前も含めて同じ文書を出すことを既定の方針として求めている。名前を同じに作ることでかえって複雑になる場合は、Req 7.6 の手続きで崩してよい。
+- **OpenAPI の名前**: commit 済みの `openapi.json` には、FastAPI が自動で付けた名前 (`operationId` の `post_extract_extract_post`、スキーマ名の `Body_post_extract_extract_post`、`title` の `Pagenumber` など) が入っている。orval の生成物 (`src/generated/index.ts`) の型の名前 (`BodyPostExtractExtractPost` など) はこれから作られるので、Hono 用の仕組みが既定で付ける名前のままだと生成クライアントが変わる。requirements の Req 7.1 で、これらの名前も含めて同じ文書を出すことを既定の方針として求めている。名前を同じに作ることでかえって複雑になる場合は、Req 7.6 の手続きで崩してよい。 **注記 (タスク 7.1、2026-11-11)**: この項目は、名前を守る方針だったときの記述である。いまの決定は 7.7 と 17.13 にある (名前は守らず、文書を経路の定義から作る。Req 7 も書き直した)。実装の結果は 27.8 にある。
 - **OpenAPI の説明文**: **実測**: 説明文にも Python 版の言葉が入っている (`/readyz` の説明の「forkserver が動き…probe child を fork する」、`PageInfo` の説明の「None」)。orval はこれらを `src/generated/index.ts` の JSDoc コメントに写している。説明文を Node 版に合わせて直すと、型は変わらなくても生成クライアントのコメントに差分が出る。ユーザーは説明文だけを直すことを決めた (5 節)。
 
 ## 4. 対象 spec に入っていない、運用者から見える振る舞い
@@ -75,7 +75,7 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 ## 5. ユーザーの決定 (2026-11-04)
 
 - **既定値を下げてよい**: Node 版で `MAX_CHILD_RSS_MB` 320 や `MAX_XLSX_CELLS` 70,000 が成り立たない場合は、既定値を下げてよい。下げた場合は、下げた値・根拠の計測・検索の対象になる XLSX の範囲の変化を、この文書の「6. 計測の結果」(design フェーズで作る) に記録する。メモリの予算 (2Gi) を超えることと、既定値を上げることは認めない (requirements の Req 11.11)。
-- **OpenAPI の説明文を直す**: Python 版に固有の言葉 (forkserver、fork、None など) を説明文から取り除く。型・名前・関数・引数は変えない。直した説明文ごとに、直す前と後の文をこの文書に記録する (requirements の Req 7.1、7.5)。
+- **OpenAPI の説明文を直す**: Python 版に固有の言葉 (forkserver、fork、None など) を説明文から取り除く。型・名前・関数・引数は変えない。直した説明文ごとに、直す前と後の文をこの文書に記録する (requirements の Req 7.1、7.5)。 **注記 (タスク 7.1、2026-11-11)**: この決定は、2026-11-10 のユーザーの判断で置き換わった。いまは「型・名前は変えない」という条件が無く、操作とスキーマの名前は作る道具の既定に従う。いまの決定は 7.7 と 17.13、実装の結果は 27.8 にある。
 - **`prlimit` を使ってよい**: 上の 1.3 を参照。
 - **契約の維持は既定の方針**: API・エラー・設定・OpenAPI・生成クライアントを変えないこと (requirements の Req 1、Req 7) は、作業を単純にするための既定の方針とする。守ると apps/app や抽出サービスが複雑になるなら崩してよい。判断の基準はシンプルさ (保守性) で、判断するのは作業者。崩したときは、何を崩したか・守ると何がどう複雑になったか・下流の変更の範囲を、この文書の「7. 崩した契約」(崩したときに作る) に記録する。セキュリティ上の性質、メモリの予算 2Gi、対応形式と位置情報つきの抽出は崩さない (requirements の Req 1.9〜1.13)。
 - **出力の同一性は求めず、検索の品質で測る**: anydoc を使った結果として自然な出力なら、Python 版と一字一句同じでなくてよい。代わりに、検索で見つかるべき語句と位置の正解を付けたベンチマークで、Node 版が Python 版のベースラインを下回らないことを求める (requirements の Req 2.7〜2.15)。ベンチマークの結果は、この文書の「6. 計測の結果」に記録する。
@@ -92,7 +92,7 @@ requirements を書く途中で、対象 spec の AC と OpenAPI の文書では
 | 子プロセスの作り方 | 決定 (`/usr/bin/prlimit` で包んだ `spawn` と、子の中の見張り専用の worker thread。15 節)。コアダンプの上限を `--core=1` にするかはユーザーの判断待ち (15.1 の (d)) | 試作と計測 (Req 11.4) |
 | `RLIMIT_AS` の値と、緩めた分の守り | 決定 (`MAX_CHILD_RSS_MB` + 2,304MiB、既定で 2,624MiB。子の `env` に `MALLOC_ARENA_MAX=2` を足す。主な守りは RSS の監視。19 節) | 試作と計測 (Req 11.5) |
 | 本文の受け取りと切断の検知の方法 | 決定 (`c.env.incoming` を上限と期限つきで直接読み、python-multipart と Starlette の文法と引数の解析を移した自前の解析器 1 つで分解する。ファイルは断片のまま連結しない。切断は `incoming` の `close` と `c.req.raw.signal`。16 節)。本文の形の例外 3 件 (37・d37・要求の `charset`) は、ユーザーの判断待ち (7.4) | 試作 (Req 11.6) |
-| OpenAPI の作り方 | 未決 | 試作 (Req 11.7) |
+| OpenAPI の作り方 | 未決 (**注記、タスク 7.1、2026-11-11**: この欄は古い。決定済みで、経路の定義から `hono-openapi` と `zod` で文書を作る。7.7・17.13・27.8) | 試作 (Req 11.7) |
 | 7 万セルの XLSX の RSS の食い違い (2 節) | 未解決 | 同じファイル・同じ方法で測り直す (Req 11.2) |
 | ベンチマークで Python 版を下回った形式の扱い | 未決 (下回ったときだけ) | 原因を示し、ユーザーが直すか受け入れるかを決める (Req 2.14、11.12) |
 | ベンチマークの絶対値の合格の基準 | 未決 | ベースラインを測った後にユーザーが決める (Req 2.13) |
@@ -170,7 +170,7 @@ design を書くために、小さな試作で次のことを確かめた。**�
 
 - **(a) 何を崩すか**: `/readyz` の応答の `dependencies` のキー。いまの `anydoc` / `pypdfium2` / `charset-normalizer` / `converter` を、Node 版が実際に使う部品の実名 (npm の package 名。`@firecrawl/anydoc`、T1 で決まる PDF の部品、T6 で部品を使う場合はその名前) と `prlimit`、内部のモジュールをまとめた `converter` に変える。Python 版の名前は、Node 版で使わないので出さない。
 - **(b) 守ると何がどう複雑になるか**: 今の名前のままにすると、使っていない部品 (`pypdfium2` など) の名前で、別の部品が読み込めたかどうかを表すことになり、見た人を誤らせる。名前と中身を合わせるほうが単純で、保守の手間も増えない。役割の名前 (`pdf` など) にする案もあったが、ユーザーは「正しい部品の名前を入れる」ことを選んだ。
-- **(c) 下流の変更の範囲**: なし。OpenAPI のスキーマは `{}` なので生成クライアントは変わらない。apps/app は `/readyz` を呼んでいない。k8s と compose の health の確認は HTTP のステータスだけを見て本文を見ないので影響しない。運用者から見える変化: curl などで本文を見たときの表示が変わる。
+- **(c) 下流の変更の範囲**: なし。OpenAPI のスキーマは `{}` なので生成クライアントは変わらない (**注記、タスク 7.1、2026-11-11**: 「スキーマは `{}`」は、Python 版の文書の話である。Node 版が経路の定義から作る文書は、`/readyz` の 200 に型を付け、503 も載せる (27.8。`src/http/api-schemas.ts` の `ReadySchema` と `NotReadySchema`)。`dependencies` は「名前から `ok` への対応」という型で、名前そのものは文書に出ないので、名前を変えても生成クライアントが変わらないという結論は同じである。`/readyz` の応答に型が付くことによる生成クライアントの変化は 7.7 の表にある)。apps/app は `/readyz` を呼んでいない。k8s と compose の health の確認は HTTP のステータスだけを見て本文を見ないので影響しない。運用者から見える変化: curl などで本文を見たときの表示が変わる。
 - **反映先**: design.md の Revalidation Triggers と、6.3 で Python 版に向けるときに外すテスト。取り込みのときに対象 spec の design.md §HealthRouter の `dependencies` の記述を書き直す。完了の報告でユーザーに示す。
 
 ### 7.4 本文の形の 3 つの例外の扱い (タスク 3.3、2026-11-05。ユーザーが判断した。7.5 に決定を記録した)
@@ -223,7 +223,7 @@ design を書くために、小さな試作で次のことを確かめた。**�
 | 3 | 要求の `Content-Type` の `charset` (m58〜m61、v01・v02・v07・v10・v11・v16・v18、d12) | 部品の名前・ファイル名・`mimeType` を `charset` で読む | `charset` を使わない (UTF-8 として正しければ UTF-8、そうでなければ latin-1) | **許容する** (ユーザーの指示は「シンプルでコード量が少なく済む解にして」)。`charset` を使うには Python の codec 表を移す必要があり、Node の `TextDecoder` の名前と一致しない |
 
 - Req 1.10 (a) 何を崩すか、(b) 守ると何が複雑になるか、(c) 下流の変更の範囲: 上の表と 7.4 のとおり。下流の変更は無い。
-- 引き継ぎ: この spec の design.md の Revalidation Triggers に、「本文の形の例外 3 件 (`Content-Length` が小さい要求、boundary の CR、`charset` を使わないこと)」を足す。取り込み (Req 12) のとき、対象 spec の design.md の Error Handling の表と requirements に反映する。6.x の固定データ (16.9 (a)) には、この 3 件に当たる要求を「期待を分ける」ものとして入れる。
+- 引き継ぎ: この spec の design.md の Revalidation Triggers に、「本文の形の例外 3 件 (`Content-Length` が小さい要求、boundary の CR、`charset` を使わないこと)」を足す。取り込み (Req 12) のとき、対象 spec の design.md の Error Handling の表と requirements に反映する。6.x の固定データ (16.9 (a)) には、この 3 件に当たる要求を「期待を分ける」ものとして入れる。 **注記 (タスク 7.1、2026-11-11)**: design.md の Revalidation Triggers への追記は、7.1 のレビューで抜けていると指摘されるまで行われていなかった。2026-11-11 に足した (27.13 の B2。項目 1 は、下の訂正の注記に合わせた文にしてある)。
 - 12 番 (`Connection: close` を付けて 2 件目を続けた場合に 422 が捨てられて 400 だけ届くことがある) は、1 と同じ仕組みで、同じ決定の範囲とする。
 - **項目 1 への訂正の注記 (タスク 4.4 とそのレビュー、2026-11-09)**: 表の「Python 版: 422」は、測り直すと再現しなかった。Python 版 (uvicorn 0.46.0 + httptools、research.md 8 節の既定の設定) に、`Content-Length` を本文より 5・10・20・21・40・60・80・100 バイト小さくした multipart の要求を送ると、一度に送っても、見出しと本文を分けて送っても、毎回 `code` の無い 400 (本文は `Invalid HTTP request received.`) だった (4.4 の作業で 30 回、レビューで 8 通り)。1・2 バイトの差は終わりの区切りが削れないので 200。余りのバイトを 0.7 秒遅らせて送ると、Python 版も Node (Hono) も 200 の後に 400 を返した。httptools も、余りのバイトをすぐ「次の要求」として読んで 400 を返し、接続を閉じる (7.4 の (b) が Node について書いた仕組みと同じ)。つまり、この要求への状態は Python 版と Node 版で同じで、ユーザーが許容した Node 版の振る舞い (`code` の無い 400) は変わらず、契約は何も崩れていない。誤っていたのは「Python 版は 422」という前提だけである。ほかの送り方 (たとえば別の HTTP の実装の uvicorn、より大きな本文) は確かめていない。黒箱のテストに理由の id `7.5-1` は無い (22.5)。完了の報告 (Req 1.12) で、ユーザーに「7.5 の 1 は、`Connection: close` を付けない要求では実際には差が無かった (付けた要求では差がある。27.7)」と伝える。
 
@@ -259,6 +259,44 @@ design を書くために、小さな試作で次のことを確かめた。**�
   | `HealthzHealthzGetResult`・`ReadyzReadyzGetResult` | `GetHealthzResult`・`GetReadyzResult` |
   | (無い。`/readyz` の応答は `unknown` だった) | `GetReadyz200`・`GetReadyz200Dependencies`・`GetReadyz503` |
   | `ErrorCode`・`ErrorResponse`・`ExtractResponse`・`PageInfo`・`PageInfoPageNumber`・`PageInfoLabel` | 変わらない |
+
+### 7.8 ログの違い (タスク 7.1 のレビューで見つかった、2026-11-11。ユーザーが (イ) に決めた。Req 1.10・1.12)
+
+7.1〜7.7 は、決めたうえで崩したものである。この項目は違う。実装のレビュー (27.13) で、「Python 版にあって Node 版に無いログ」が、どこにも記録されていないと分かった。Req 1.10 と 1.12 が求める記録として、ここに置く。
+
+下のコードの場所は、この記録を書いた担当が、HEAD `fba405e950` の両方のコードを読んで確かめた (Python 版は `services/attachment-text-extractor/src/app/`、Node 版は `apps/attachment-text-extractor/src/`)。Python 版は動かしていない (27.12 のとおり `.venv` が壊れている)。
+
+- **(a) 何が違うか**
+  1. **要求ごとのログ**
+     - Python 版 (読んだ): 認証を通った要求のすべてについて、`{"method","path","status","elapsed_ms"}` の JSON を 1 行出す (`main.py` 64〜83 行の `_MinimalLoggingMiddleware`。140〜141 行で、認証の中間処理より先に登録している。Starlette は後から登録した中間処理を外側に置くので、認証で 401 になった要求はこの行を通らない)。対象は `/healthz`・`/readyz`・`/openapi.json`、トークンつきの 404、`/extract` である。
+     - Python 版 (読んだ + uvicorn の既定の動作からの推論): このほかに、Web サーバー (uvicorn) 自身のアクセスログが、401 を含むすべての要求に 1 行出る。`Dockerfile` 63 行の起動の命令に、アクセスログを止める指定 (`--no-access-log`) が無いためである。
+     - Node 版 (読んだ): ログを書く場所は 3 つだけである。`/extract` の 1 件ごとの行 (`http/request-log.ts` 58 行)、runner が想定外の例外を投げたときの ERROR の行 (`http/extract-route.ts` 184 行)、起動と停止と設定の誤りの行 (`main.ts` 9 行と 17 行)。401、404、`/healthz` や `/readyz` への要求は、ログに何も残らない。
+  2. **`/extract` の行の先頭の書式**
+     - Python 版 (読んだ): `main.py` 45 行の書式 `%(asctime)s %(levelname)s %(name)s %(message)s`。例は `2026-11-11 12:00:00,123 INFO app.routers.extract extract format=…` (地方時の時刻、重要度、ロガーの名前、本文)。
+     - Node 版 (読んだ): `request-log.ts` 58 行。例は `2026-11-11T12:00:00.123Z INFO extract format=…` (ISO 8601 の UTC の時刻、重要度、本文。ロガーの名前は無い)。
+     - `extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…` の部分は同じである (Python 版は `routers/extract.py` 123 行)。
+  3. **親の側の診断の行と、子の警告**
+     - Python 版 (読んだ): 準備ができない理由と、子を起動できない理由を、親がログに書く。`runner/conversion_runner.py` 204 行 (準備未完了と、読み込めなかった部品)、261 行 (確認の失敗と、読み込めていない部品)、279 行・335 行 (確認用の子を起動できない)。`runner/child_supervision.py` 156 行・162 行 (変換の子を起動できない)、320 行 (SIGKILL の後も子が終わらない)。
+     - Node 版 (読んだ): `runner/readiness.ts`・`runner/conversion-runner.ts`・`runner/child-run.ts` には、ログを書く呼び出しが 1 つも無い。たとえば `/usr/bin/prlimit` が無いとき、運用者に見えるのは `/readyz` の 503 `{"status":"not_ready"}` と、`/extract` の行の `result=crashed` だけで、理由は分からない。
+     - 子の警告 (レビュアー A の N4。読んだ): Node 版の子は、警告を自分の標準エラーに書く (`child/child-entry.ts` 35 行。呼び出しは 67・82・114・119 行)。親は、子の標準出力と標準エラーを読み捨てる (`runner/child-run.ts` 126〜127 行。design.md の「親子の受け渡し」の設計どおり)。そのため、`oom_score_adj` の書き込みに失敗したときの警告 (114 行) は、誰にも届かない。
+     - Python 版の子は、掛けられなかった守り (`oom_score_adj` を含む) を警告として書く (`runner/platform_guards.py` 77 行)。このほかに、親から届いた入力が不正なとき (`runner/child_entry.py` 50 行)、結果を送れないとき (60 行)、想定外の失敗で `internal` を返すとき (104 行。detail を書く) にも、警告を書く (読んだ)。Node 版の子も同じ 3 種類の行を書く (`child/child-entry.ts` 82・119・67 行) が、上のとおり親が読み捨てる。この警告が運用者のログに出ることは、レビュアー A がコードを読んで判断した。この記録を書いた担当は、子のプロセスでログの出力先がどう設定されているかまでは確かめていない (推論)。
+- **(b) 守ると何がどう複雑になるか**: この違いは、複雑さを比べて決めたものではない。27.7 は「401 にログ行を出さない (Python 版と同じ)」と書いたが、同じなのはアプリのロガー (`app.*`) についてだけで、uvicorn のアクセスログを見落としていた。戻すのに要るコードの量は、まだ見積もっていない。レビュアー C の見立ては次のとおり: アクセスログを出さないことは、単純さの点で説明がつく。診断の行を戻すなら、いちばん小さい形は「準備完了が偽になったときに WARNING を 1 行出す」ことである。
+- **(c) 下流の変更の範囲**: 無い。apps/app、生成クライアント、下流 spec は変わらない。崩せない不変条件 (Req 1.13) にも触れない (レビュアー C の判定)。運用者から見える変化は次のとおり。
+  - 認証で断った要求 (401) の記録が、ログに残らない。
+  - `/extract` 以外の要求 (probe の呼び出し、404) が、ログから見えない。
+  - `/extract` の行の先頭を目印に解析している道具は、書式が変わるので合わなくなる。
+  - Pod が準備未完了のとき、理由をログから調べられない。
+  - `oom_score_adj` を上げられなかったことに、気づけない。
+- **決定 (ユーザー、2026-11-11)**: **(イ)**。取りまとめの担当がこの違いを記録し、ユーザーに次の 3 つから選ぶよう諮った。
+  - (ア) このまま受け入れる。
+  - (イ) 3 を戻す。中身は 2 つである。1 つは、親が書く診断の行 (準備未完了の理由、子を起動できない理由) を戻すこと。もう 1 つは、子の警告 (たとえば `oom_score_adj` の書き込みの失敗) を、サービスのログに通すこと。どちらも、障害の原因を運用者がログから調べられるようにするためのものなので、1 つの選択肢にまとめた。
+  - (ウ) (イ) に加えて、1 のうち `/extract` 以外の要求のログも戻す。
+  - 取りまとめの担当の推奨は (イ) だった。
+  - **決まったこと**: 親が書く診断の行 (準備未完了の理由、子を起動できない理由) を戻す。子の警告を、サービスのログに通す。
+  - **戻さないもの**: `/extract` 以外の要求ごとのログと、Web サーバーのアクセスログ。そのため、401 の要求、存在しないパスへの要求、probe の呼び出しは、これからもログに 1 行も残らない。(a) の 2 の、`/extract` の行の先頭の書式の違いも、そのまま残る。この 2 つは、Python 版との違いとして記録に残し、完了の報告でユーザーに示す。
+  - **実装**: 7.1 の直しの一部として、いま行っている。結果は 27.15 に書く。この項目を書いた時点では、実装の結果は分かっていない。
+- **反映先**: design.md の Revalidation Triggers と Monitoring (書いた)。完了の報告でユーザーに示す (27.13 の「取り込みの確認の一覧」)。
+- **この項目に合わせて注記を足した記録**: 27.3、27.5、27.6、27.7 の該当の文 (それぞれの場所に注記がある)。
 
 ## 8. Python 版を devcontainer で起動する手順 (タスク 1.3)
 
@@ -3387,7 +3425,7 @@ Python 版の CI は、`export_openapi.py` で書き出した文書と commit �
      - テストの中だけで、`properties` を持つオブジェクトに `additionalProperties: false` を足した「厳しい見方」を使う。こうしないと、文書に無い項目をコードが足しても通ってしまう (文書そのものは変えない)。
      - 文書に書いていないステータスは失敗にする。ただし次の 2 つは通す (17.4 の表 3 の注)。認証の部品の 401 は `ErrorResponse` で検査する。準備ができていないときの `/readyz` の 503 は、200 と同じく `{}` (形を問わない) で検査する。トークン付きで存在しないパスへの 404 は、文書に無いパスなので、この検査の対象にならない。
      - `/readyz` のスキーマは `{}` なので、`dependencies` の実名 (D2) はどれでも通る。生成クライアントにも影響しない。
-3. **CI の起動の条件**: `.github/workflows/ci-attachment-text-extractor.yml` の `paths:` に、`packages/attachment-text-extractor-client/openapi.json` を足す (6.12。tasks.md の 6.12 が Node 版の CI に OpenAPI の比較を足す)。Python 版の workflow と同じく、commit 済みの文書だけを変えた push でも drift 検知が動くようにするためである。
+3. **CI の起動の条件**: `.github/workflows/ci-attachment-text-extractor.yml` の `paths:` に、`packages/attachment-text-extractor-client/openapi.json` を足す (6.12。tasks.md の 6.12 が Node 版の CI に OpenAPI の比較を足す)。Python 版の workflow と同じく、commit 済みの文書だけを変えた push でも drift 検知が動くようにするためである。 **注記 (タスク 7.1、2026-11-11)**: 6.12 ではこの `paths` を足していない (HEAD `fba405e950` の workflow の `paths` に、クライアントの文書も `infra/docker/compose.yaml` も無いことを読んで確かめた)。8.2 で足す (tasks.md の 8.2 に書いた)。
 4. **turbo のキャッシュ**:
    - drift のテストは、package の外のファイル (クライアントの `openapi.json`) を読む。turbo はこのファイルをキャッシュの鍵に入れない。そのためローカルや、キャッシュを持ち越す CI では、クライアントの文書だけを変えたときにテストが飛ばされうる。
    - サービスの `turbo.json` の `test` に `inputs` (`$TURBO_DEFAULT$` と、クライアントの `openapi.json`) を足す。ルートの外のファイルの書き方 (`$TURBO_ROOT$/...`) が turbo 2.9 で使えるかは **未検証**で、6.9 で確かめる。
@@ -6744,7 +6782,7 @@ node timeout37.mjs 7                                                            
 
 ### 21.2 research.md の部品の一覧との照合
 
-- 本番の直接の依存 (18.10 の 5 個と 14.8 の 1 個)、本番に入るテキスト系の 11 個 (18.8)、開発用の `@types/yauzl`・`@types/yazl` (18.10) と `ajv` (17.10) は、一覧と版まで一致した。却下した部品 (`busboy`・`@fastify/busboy`・`zod`・`@hono/zod-openapi`・`hono-openapi`・`jschardet`・`parse5`・`cheerio` など) は入れていない。
+- 本番の直接の依存 (18.10 の 5 個と 14.8 の 1 個)、本番に入るテキスト系の 11 個 (18.8)、開発用の `@types/yauzl`・`@types/yazl` (18.10) と `ajv` (17.10) は、一覧と版まで一致した。却下した部品 (`busboy`・`@fastify/busboy`・`zod`・`@hono/zod-openapi`・`hono-openapi`・`jschardet`・`parse5`・`cheerio` など) は入れていない。 **注記 (タスク 7.1、2026-11-11)**: `zod` と `hono-openapi` は、この後の 17.13 の決定で採用し、6.9 で本番の依存に足した (本番の依存は 11 個。27.8)。`@hono/zod-openapi` は却下のままである。
 - **一覧に無かったもの: `@types/emscripten` (開発用)**。`@embedpdf/pdfium` の型定義は `/// <reference types="emscripten" />` を前提にしており (この package 自身も開発用の依存に持つ)、無いと `HEAPU8` などの型が欠けて `tsgo` が通らない。6.x の PDF の変換も `HEAPU8` を使う (14.8) ので足した。依存は 0 個。
 - 17.10 の未検証 (`^8.18.0` のときに pnpm が既存の 8.18.0 を選ぶか) は、**8.18.0 を選んだ** (lockfile の項目は増えなかった)。
 
@@ -6991,8 +7029,8 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 - 設定の整数: Python 版 (pydantic) は `1_000`・`1.0`・`1.00`・2^53 以上の整数を受け付ける。Node 版 (`loadSettings`) はこれらを拒み、起動しない。運用者が Python 版のコードの既定値の書き方 (`70_000`) をまねる可能性はあるが、黙って誤動作するのではなく、起動時に環境変数の名前つきで大きく失敗する。
 - 前後の空白の取り除き方: Python の `strip()` は `\x1c`〜`\x1f` と NEL (`\x85`) を取り除き、BOM は残す。JS の `trim()` はその逆。形式の表 (拡張子と MIME)・整数・`LOG_LEVEL`・トークンの 4 か所に出る。トークンは、Python 版が拒む `\x1f` や NEL だけの値を Node 版は受け付ける。multipart の固定データ (`test/http/multipart-oracle.json` の受け付けた 123 件) の形式の判定は、全件 Python 版と一致した。
 - wire の `pageNumber` の指数の形 (`1E2`・`0.1e1`・`2.147483647e9` など): Node 版は整数として受け付ける。22.6 の `1.0` と同じ原因 (`JSON.parse` は数の書き方を区別できない)。
-- wire の入れ子の上限: Python 版は再帰の上限 (約 1000 段) で止まる。Node の `JSON.parse` には深さの上限が無く、33MiB の枠に収まる深い入れ子で親のメモリが約 1.8GB まで増える (実測)。そこで `decodeResult` は `JSON.parse` の前に、深さ 64 と 1 つのオブジェクトのキー 16 個を超える本文を拒む (本物の結果は深さ 3、キーは 3 個)。上限を超える本文は、形の検査でも必ず拒まれるので、受け付ける・拒むの結果は変わらない。
-- キー数の上限 (1 つのオブジェクトに 16 個まで。`json-structure-guard.ts` の `MAX_KEYS_PER_OBJECT`) は、受け付ける結果 (どのオブジェクトもキーがちょうど 3 個) を変えず、キーが多いだけの 32MiB の本文でのメモリを `JSON.parse` の前に抑える (602MB・2.3 秒 → 119MB・13ms)。**この上限を外したときに落ちるテストは無い**: ヒープ 256MB の子プロセスで約 240 万個の別のキーを持つ本文を decode するテストを試したが、上限を外しても通った (`JSON.parse` が収めてしまう) ので、守っていないテストを残さないように足さなかった。表に「キーが 17 個」の行を足しても、形の検査が同じく拒むので上限を守れない。7.1 のレビューで、コードを読んで上限が残っていることを確かめる。
+- wire の入れ子の上限: Python 版は再帰の上限 (約 1000 段) で止まる。Node の `JSON.parse` には深さの上限が無く、33MiB の枠に収まる深い入れ子で親のメモリが約 1.8GB まで増える (実測)。そこで `decodeResult` は `JSON.parse` の前に、深さ 64 と 1 つのオブジェクトのキー 16 個を超える本文を拒む (本物の結果は深さ 3、キーは 3 個)。上限を超える本文は、形の検査でも必ず拒まれるので、受け付ける・拒むの結果は変わらない。 **注記 (タスク 7.1、2026-11-11)**: 深さ 64 とキー 16 個の上限は、7.1 の直しで消した。いまの検査は、正しい結果には出てこないオブジェクトと配列を、`JSON.parse` の前に拒む (27.14 の 1)。
+- キー数の上限 (1 つのオブジェクトに 16 個まで。`json-structure-guard.ts` の `MAX_KEYS_PER_OBJECT`) は、受け付ける結果 (どのオブジェクトもキーがちょうど 3 個) を変えず、キーが多いだけの 32MiB の本文でのメモリを `JSON.parse` の前に抑える (602MB・2.3 秒 → 119MB・13ms)。**この上限を外したときに落ちるテストは無い**: ヒープ 256MB の子プロセスで約 240 万個の別のキーを持つ本文を decode するテストを試したが、上限を外しても通った (`JSON.parse` が収めてしまう) ので、守っていないテストを残さないように足さなかった。表に「キーが 17 個」の行を足しても、形の検査が同じく拒むので上限を守れない。7.1 のレビューで、コードを読んで上限が残っていることを確かめる。 **注記 (タスク 7.1、2026-11-11)**: 「落ちるテストは無い」は、`decodeResult` を通すテストに限った話だった。`rejectUnsafeStructure` を直接呼ぶ境界のテスト (上限ちょうどは通り、1 つ超えると拒む) なら、上限を外しても緩めても落ちる。7.1 の直しで足す、と 1 回目のレビューの時点では考えた。最終の直しでは、上限を確かめるテストを足すのではなく、上限そのものを消して決まりを替えた (正しい結果には出てこないオブジェクトと配列を拒む)。結果は 27.14 の 1 にある。また、この節の「メモリを `JSON.parse` の前に抑える」は言いすぎだった。深さとキーの数の上限は、要素の多い平らな配列を止めない (33MiB の結果の本文で、親の最大 RSS が 1,302MB になるものがある。レビュアー A の実測)。どちらも 27.13 に書いた。
 
 ### 22.7 担当ごとの「書くテスト」の一覧
 
@@ -7178,7 +7216,7 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 - `http/concurrency-slots.ts`: `createConcurrencySlots(max: number)` が返すもの (`tryAcquire(): (() => void) | null`) (新)。空きが無ければ待たずに `null`。返す関数を 2 回呼んでも 1 つしか戻さない。
 - `http/parse-multipart.ts`: `boundaryOf(contentType: string): string`、`createMultipartParser(boundary: string)` (`write(chunk: Buffer): void` と `end(): { chunks: readonly Buffer[]; size: number; filename: string; mimeHint: string | null }`)、`InvalidMultipart` (16.8 の名前のまま)。不正な本文はすべて `InvalidMultipart` を投げる (`boundaryOf`・`write`・`end` のどれから投げてもよい)。
 - `http/header-params.ts`: `parseHeaderParams(value: string): { type: string; params: Record<string, string> }`、`InvalidMultipart`、`UnreadableParams extends InvalidMultipart` (16.8 の名前のまま)。
-- `http/openapi-route.ts`: `openApiDocument` (17.9 の名前のまま)。`/openapi.json` はこれをそのまま返す。
+- `http/openapi-route.ts`: `openApiDocument` (17.9 の名前のまま)。`/openapi.json` はこれをそのまま返す。 **注記 (タスク 7.1、2026-11-11)**: これは、文書を手で持つファイルにしていたときの形である。いまは経路の定義から文書を作る (17.13 の決定、27.8 の実装)。
 - `scripts/export-openapi.ts`: `--output <path>` に文書を書き、親のディレクトリが無ければ作る。`--output` が無ければ 0 でない終了コードで終わる。テストは `node --import <swc の register>` で別のプロセスとして起動する。
 - `scripts/check-openapi-drift.ts` (新しいファイル。17.7 の「比べる処理を 1 つの関数にした小さな CLI」): `openApiDrift(actual: unknown, committed: unknown): readonly string[]`。違う所の JSON Pointer の一覧を返す (オブジェクトのキーの順は無視し、配列の順は区別する。注釈としての `description` を除く。`properties` の中の `description` という名前の項目は除かない)。import しただけで CLI の処理が動かないようにする (6.12 の CI の手順は CLI として呼ぶ)。
 - `/readyz`: 200 の本文は `{ status: 'ready', dependencies: { '@firecrawl/anydoc': 'ok', '@embedpdf/pdfium': 'ok', prlimit: 'ok', converter: 'ok' } }` ちょうど (D2)。準備未完了は 503 で `status: 'not_ready'` (このときの `dependencies` の値はテストで決めていない。`Readiness` は `{ ready: boolean }` のまま)。要求のたびに `runner.readiness()` を呼び、結果を覚えて使い回さない (未完了から戻れること。22.3 の `test_health.py` の行)。
@@ -7211,7 +7249,7 @@ Python 版: GET /docs (トークンなし) -> 401、(トークンあり) -> 200�
 - k8s の例: `apps/attachment-text-extractor/deploy/k8s/` の `deployment.yaml`、`service.yaml`、`hpa.yaml`、`networkpolicy.yaml` (新。ファイル名は design.md に無く、Python 版と同じ名前にした。design.md は「deployment / service / hpa / networkpolicy」とだけ書いている)。ディレクトリにこの 4 つが無ければ落ちる (空のディレクトリで通らないため)。
 - compose: `infra/docker/compose.yaml` の `attachment-text-extractor` (Python 版と同じ場所)。
 
-**design.md の食い違いを 1 つ決めた**: 293 行と 412 行は compose の build の `context` を `apps/attachment-text-extractor` に変えると書き、414 行は「ルートを context にして `pnpm deploy --prod` で取り出す」と書く。`pnpm deploy` はルートの `pnpm-lock.yaml` と workspace が要るので、context がサービスのディレクトリでは動かない (`apps/pdf-converter` の Dockerfile も `COPY . .` でルートを使う)。したがってテストは、`context` がリポジトリのルート、`context` と `dockerfile` を合わせたパスが上の Dockerfile であることを確かめる (例: `context: ../..`、`dockerfile: apps/attachment-text-extractor/docker/Dockerfile`)。design.md の 293 行と 412 行の「`context` を `apps/attachment-text-extractor` に変える」は、取り込み (Req 12) か 8.2 で直す。
+**design.md の食い違いを 1 つ決めた**: 293 行と 412 行は compose の build の `context` を `apps/attachment-text-extractor` に変えると書き、414 行は「ルートを context にして `pnpm deploy --prod` で取り出す」と書く。`pnpm deploy` はルートの `pnpm-lock.yaml` と workspace が要るので、context がサービスのディレクトリでは動かない (`apps/pdf-converter` の Dockerfile も `COPY . .` でルートを使う)。したがってテストは、`context` がリポジトリのルート、`context` と `dockerfile` を合わせたパスが上の Dockerfile であることを確かめる (例: `context: ../..`、`dockerfile: apps/attachment-text-extractor/docker/Dockerfile`)。design.md の 293 行と 412 行の「`context` を `apps/attachment-text-extractor` に変える」は、取り込み (Req 12) か 8.2 で直す。 **注記 (タスク 7.1、2026-11-11)**: この段落の design.md の行番号は、Req 7 の書き直しと 7.1 の直しでずれた。指しているのは、design.md の「Modified Files」の `infra/docker/compose.yaml` の項目と、「D4 の判断と影響」の表の `infra/docker/compose.yaml` の行と Dockerfile の行である。
 
 **Dockerfile のテストが決めた形** (6.11 が守る)
 - すべての `FROM` が `node:24.<minor>.<patch>-slim` (`bookworm-` か `trixie-` を挟んでもよい。`@sha256:` つきでもよい)。`ARG` の既定値は `FROM` の展開に使える。alpine (musl) は不可 (anydoc の `-gnu` の部品が選ばれるため)。
@@ -7341,7 +7379,7 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 | 6.5 | `conversion/convert.ts` (`conversion-error.ts` は本物で、6.2〜6.5 が使う) |
 | 6.6 | `child/child-entry.ts`・`parent-watch.ts`・`child-result.ts` |
 | 6.7 | `runner/conversion-runner.ts`・`child-exit.ts`・`child-env.ts`、`runner/linux/` の `prlimit-args` (`PRLIMIT_PATH` は本物)・`platform`・`proc-rss` |
-| 6.8 | `http/` の `index`・`create-app`・`start-server`・`concurrency-slots`・`parse-multipart`・`header-params`・`openapi-route` (`{}` を手書きの文書に)。`error-table.ts` は本物 |
+| 6.8 | `http/` の `index`・`create-app`・`start-server`・`concurrency-slots`・`parse-multipart`・`header-params`・`openapi-route` (`{}` を手書きの文書に。**注記、タスク 7.1、2026-11-11**: 手書きの文書は 6.9 で無くなった。17.13・27.8)。`error-table.ts` は本物 |
 | 6.9 | `scripts/export-openapi.ts`、`scripts/check-openapi-drift.ts` |
 
 ### 25.3 結果 (`BLACKBOX_URL` なし。黒箱のテストはファイルごとに自分で Node 版を起動する形)
@@ -7542,6 +7580,7 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - 作った PDF のうち、実装者の 157 件で 13 件、レビュアーの 219 件で 11 件が違った。どれも Node 版が Python 版と同じかそれ以上に文字を返す向き。Python 版だけが空や行の欠けた文字列を返すもの (縦書き Identity-V、1 字だけの行、BMP の外の字だけのページ、大きさ 0 のフォント、BOM だけ、大きな数の Tf)、空白だけのページと長い行の末尾の空白の違い、U+FFFE の行の間の改行が Node 版にだけ出るもの。
 - 壊した PDF 3,000 件では、Python 版は「ページが読めない」で `malformed` (422)、Node 版は読めて 200 になるものが 40〜47 件 (レビュアーの数では空のページ 32・文字列あり 8。文字列ありの中身は化けていない)。Python 版だけが空になるものが 29〜37 件、両方に文字列があり中身が違うものが 6〜16 件 (復号とは無関係と確認)。**Node 版が拒み Python 版が通す入力は 0 件**。design.md 362 行は「PDFium が修復して読める場合はそのまま抽出する」とあり、Req 1.3 の対応表の条件 (PDFium がページを読めない) が Node 版では起きないだけなので、表は崩れていない。Req 2.2・2.3 の「出力の違いを記録する」類。
 - 暗号化 (RC4-40/128・AES-128/256・ユーザーパスワード/オーナーのみ・壊れた暗号辞書) とページ数の境界 (4,999 / 5,000 / 5,001) は全件一致した。パスワードの区別は、エラー番号 4・5 だけを `encrypted` にする。
+- **注記 (タスク 7.1、2026-11-11)**: 次の項目の「ログにしか出ない」は誤りだった。Node 版は detail を HTTP の応答にもログにも出さない (`http/extract-route.ts` と `http/request-log.ts` が書くのは失敗の種類だけ。読んで確かめた)。Python 版の経路の処理も、ログに書くのは種類だけである (`routers/extract.py` 123 行)。Python 版では、子が `internal` の detail を自分の警告に書いていた (`runner/child_entry.py` 104 行)。Node 版の子も同じ種類の行を書く (`child/child-entry.ts` 67 行。書くのは例外の名前) が、親が読み捨てるので運用者に届かない。つまり、下の detail の違いは、7.8 の (a) の 3 の「子の警告」の一部である。ログの違いの全体は 7.8 にある。
 - ログにしか出ない違い: `internal` の detail は、Node 版が `unexpected <code> error from anydoc` / `unexpected <name> from PDFium`、Python 版は例外のクラス名。Python 版には、同じプロセスで連続して変換すると前の件のエラー番号が残り、壊れた PDF を `encrypted` と誤って分ける性質がある (本番は 1 件 1 プロセスなので起きない。Node 版にはこの性質が無い)。
 
 **メモリ (20.9・20.12 に書き戻す)**: 子と同じ条件 (`prlimit --as=(320+2304)MiB`、`--wasm-max-mem-pages=8192 --max-semi-space-size=4`、`MALLOC_ARENA_MAX=2`、`RAYON_NUM_THREADS=1`、見張りの worker あり)。
@@ -7586,10 +7625,10 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 
 - **見出しの形**: `{ fileName, mimeHint, limits (7 項目), maxInputBytes }`。置き場所は `wire/child-header.ts` (design の File Structure Plan に無い新しいファイル。`child/` と `runner/` は互いに import できないので、両方が使える `wire/` に置く)。読み取りは決まったキーだけを受け付け、数は 0 以上の安全な整数だけ。`JSON.parse` の例外メッセージは入力を引用するので外へ出さない。見出しは必ず `encodeChildHeader` で作る。
 - **見出しの枠の上限は 8MiB**: 16.8 の手本では、multipart の部品のヘッダーの上限が 4,224 バイト、項目の上限が 1MiB。`fileName` は最大約 4KiB、`mimeHint` は最大 1MiB で JSON にすると最大約 6 倍 (約 6MiB) なので、合わせても 8MiB に収まる。超えうるのは、6.8 が項目の上限を約 1.3MiB より大きくした場合だけ。**6.7 の方針**: `encodeChildHeader` が `WireProtocolError` を投げたら、子を起動する前に `limit_exceeded` (422 `resource_limit_exceeded`) にし、`childPeakRssMb` は `null` にする (クライアントが送った大きすぎる値は 500 ではなく 422。16.1 で d36 を受け入れたのと同じ考え方)。6.8 は「項目の上限 × 6 + ファイル名の上限 < 8MiB」を確かめるテストを置く。
-- **`oom_score_adj` は `child/oom-score.ts` に置く** (design の判断 7 の「`runner/linux/` にまとめる」を直す。取り込み (Req 12) で直す)。承認済みのテスト「入力を読む前に 1000 にする」は runner を通さずに子を直接起動するので、子が自分で設定するしかない。親側で設定する形には 15.2 の (B) と同じ隙間があり、`choom` のような外部コマンドは Req 4.8 に反する。design の File Structure Plan の `child-entry.ts` の説明と 351 行目は、もともと子が設定すると書いている。6.10 の層の検査は、このファイルが `child/` にあることを許す形にする。
-- `oom_score_adj` の書き込みに失敗したら、決まった文の警告 1 行を出して変換を続ける (Python 版と同じ)。`/proc/self/limits` の自己確認はやめた (15.5 の注で許されている。`prlimit` が上限を掛けてから node を起動し、テストが外から確かめるため)。
+- **`oom_score_adj` は `child/oom-score.ts` に置く** (design の判断 7 の「`runner/linux/` にまとめる」を直す。取り込み (Req 12) で直す)。承認済みのテスト「入力を読む前に 1000 にする」は runner を通さずに子を直接起動するので、子が自分で設定するしかない。親側で設定する形には 15.2 の (B) と同じ隙間があり、`choom` のような外部コマンドは Req 4.8 に反する。design の File Structure Plan の `child-entry.ts` の説明と 351 行目は、もともと子が設定すると書いている (**注記、タスク 7.1、2026-11-11**: 行番号はずれた。指しているのは、design.md の「子プロセスの中の流れ」の 1 つめの項目「起動直後に `/proc/self/oom_score_adj` に 1000 を書く」である)。6.10 の層の検査は、このファイルが `child/` にあることを許す形にする。
+- `oom_score_adj` の書き込みに失敗したら、決まった文の警告 1 行を出して変換を続ける (Python 版と同じ)。 **注記 (タスク 7.1、2026-11-11)**: 「Python 版と同じ」なのは、警告を書いて変換を続けるところまでである。Node 版の子の標準エラーは親が読み捨てるので (`runner/child-run.ts` 126〜127 行)、この警告は運用者に届かない。Python 版では運用者のログに出ていた (レビュアー A の読み)。記録は 7.8 の (a) の 3 にある。`/proc/self/limits` の自己確認はやめた (15.5 の注で許されている。`prlimit` が上限を掛けてから node を起動し、テストが外から確かめるため)。
 - 見張りの worker には `execArgv: []` を渡す。渡さないと親の node の引数を受け継ぎ、親が `--input-type=module` で起動していると worker が `require is not defined` で起動に失敗した。
-- fd 0 は `readSync` で読む (`process.stdin` に触ると fd 0 が O_NONBLOCK に変わるため)。このため、wire の非同期の `readFrame` と、`child/frame-io.ts` の同期の読み書きの 2 つがある。重なっているのは長さの 4 バイトを解く数行だけ。
+- fd 0 は `readSync` で読む (`process.stdin` に触ると fd 0 が O_NONBLOCK に変わるため)。このため、wire の非同期の `readFrame` と、`child/frame-io.ts` の同期の読み書きの 2 つがある (**注記、タスク 7.1、2026-11-11**: 本番で結果や入力のひとかたまり (frame) を読むのは `runner/result-frame.ts` (親) と `child/frame-io.ts` (子) で、wire の `readFrame` を呼ぶ本番のコードは無かった。7.1 の直しで `readFrame` を消した。27.13 の N2、27.14 の 2)。重なっているのは長さの 4 バイトを解く数行だけ。
 - **build**: `rimraf dist && tsc -p tsconfig.build.json && node scripts/add-js-extensions.ts dist`。`apps/app/bin/add-js-extensions.ts` を共有せず新しく書いたのは、23.5 の決定 2 (app をまたいで import しない) のとおり。`dist/` に 93 ファイル、書き換えた指定子 131 個、解決できない指定子 0。`tsc` と `rimraf` はルートの devDependencies から使う (`packages/core`・`apps/pdf-converter` と同じ形)。6.11 では Docker のビルドの段でルートの workspace をインストールする必要がある。`pnpm run build` そのものは流していない (pnpm 11 の install 誘発を避けた)。pnpm 越しに動くことは 6.12 の CI で確かめる。6.7 の `globalSetup` は `pnpm run` を呼ばず、`tsc` と拡張子を足す手順を直接起動する (23.5 の決定 3) ので、build の手順が `package.json` と 2 か所に分かれる。
 - `apps/attachment-text-extractor/.gitignore` に `/dist` を足した (ルートの `.gitignore` は `dist/` を無視しておらず、ほかのアプリも自分のディレクトリに書いている)。
 
@@ -7627,7 +7666,7 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - **`readiness()` は結果を覚えない**。呼ぶたびに確認用の子を順に起動する (1 回 333〜354ms・子の CPU 0.38〜0.42 秒・子の最大 64〜80MB)。同時の呼び出しは 1 回の確認を共有する (150 件同時で 204ms・確認用の子は同時に最大 1 つ)。Python 版は準備完了の結果を覚えていた。k8s の readiness probe は 20 秒ごと、compose の healthcheck は 30 秒ごとなので CPU 1 コアの約 2% / 1.3%。`apps/app` は `/readyz` を呼ばない。最悪のメモリは、最も重い負荷の実測 1,285MiB に確認用の子 1 つを足して約 1,365MiB で、2Gi に収まる。前回の結論: 覚えさせずに記録で足りる。立て続けに呼ばれると確認が続けて走る (10 秒で 50 回・1 回 0.24 CPU 秒)。
 - `Readiness` は `{ ready }` だけで、失敗した部品の名前は返さない (23.5・23.6)。6.8 は、503 のときに部品ごとに確かめたかのような `dependencies` を作らない。
 - 中止の合図で止めた実行は、例外にせず `crashed`・detail `conversion was cancelled` で返す (HTTP の層はログで `client_disconnected` として扱う。Python 版と同じ)。
-- 子の終わり方の detail に、Python 版はシグナル番号、Node 版はシグナル名 (`SIGABRT` など)。ログにだけ出る。見出しが大きすぎるとき `limit_exceeded` を返すのは 27.5 のとおり。
+- 子の終わり方の detail に、Python 版はシグナル番号、Node 版はシグナル名 (`SIGABRT` など)。ログにだけ出る (**注記、タスク 7.1、2026-11-11**: 「ログにだけ出る」は誤りだった。Node 版は detail をログにも出さない。27.3 の注記と 7.8 を参照)。見出しが大きすぎるとき `limit_exceeded` を返すのは 27.5 のとおり。
 - 起動は `prlimit` の絶対パス。子の環境変数は `RAYON_NUM_THREADS` と `MALLOC_ARENA_MAX=2` の 2 つだけ (トークンは渡らない。子の `/proc/<pid>/environ` で確認)。`prlimit` は node を exec するので孫はできない。`--as` = 2,751,463,424 バイト (320 + 2,304 MiB)、`--cpu` は期限 5 秒のとき 10:15、`--core=1`。子の fd は 0〜4 だけで、親の他の fd は渡らない。
 - **build の手順は 2 か所** (`package.json` の `build` と `test/global-setup.ts`。23.5 の決定 3)。拡張子を足す処理 (`addJsExtensions`) は共有していて、重複は `tsc` の引数だけ。`globalSetup` は `dist/` を作り直すので、vitest を 2 つ同時に動かすと一方の `dist/` が消えて期限のテストが落ちる (watch では `globalSetup` が流れ直さず古い `dist/` のまま動く)。CI は `turbo run test` を 1 本流すだけなので害はないが、ルートの `turbo.json` では `test` が `build` を待たないので、`turbo run build test` を流すと `dist/` の削除が子の起動とぶつかりうる。6.12 の CI で確かめる。
 
@@ -7654,16 +7693,16 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - 16KiB を超えるヘッダー: Python 200、Node は `code` の無い 431 (Node の既定の上限)。細工した `Host`・パスの中の `\`・大文字の `HTTP://`・`*` と `OPTIONS *`: Node は `code` の無い 400。CONNECT は応答せずに接続を閉じる。
 - `Bearer <トークン>\xe9` (ASCII でない文字を足したトークン): Python 版は `compare_digest` の TypeError で `code` の無い 500、Node 版は表どおりの 401 (16.1 と同じ扱い)。`/%68ealthz`・絶対形式 `http://x/healthz`・`/healthz#x` をトークンなしで送ると Python 200 (または 404)、Node 401 (認証が要る側に寄る違いで安全)。末尾がタブの `Authorization` は Node で 200 (7.6 の末尾の空白と同じ仕組み)。
 - 200 の応答: Python 版は `Content-Length` を付け、Node 版は常に chunked (応答を少しずつ書くため)。apps/app の生成クライアントは `maxContentLength` を設定しておらず、axios が chunked を解くので問題ない。404 の本文: Python 版は JSON、Node 版は Hono の既定の文字列。
-- 準備未完了の `/readyz` の 503: 本文は `{"status":"not_ready"}` だけで `dependencies` を出さない (`Readiness` が `{ ready }` だけ。27.6。OpenAPI のスキーマは `{}`。Req 1.2 は成功時の形だけを決める)。
+- 準備未完了の `/readyz` の 503: 本文は `{"status":"not_ready"}` だけで `dependencies` を出さない (`Readiness` が `{ ready }` だけ。27.6。OpenAPI のスキーマは `{}`。Req 1.2 は成功時の形だけを決める)。 (**注記、タスク 7.1、2026-11-11**: 6.9 の後は、文書が 503 を `{"status":"not_ready"}` の型で載せる。27.8)
 - `code` を持たない応答が出る経路: Node 自身が返す 400・408・417・431、Hono の既定の 404、CONNECT を黙って閉じる件。apps/app の `mapAxiosErrorToOutcome` は `code` の無い応答をすべて `serviceUnreachable` にする (Python 版の `code` の無い 400・500 と同じ扱い)。apps/app はどの形も送らない。
 - ファジング (2,000 件 × 2 回、3,000 件 × 3 プロセス) と 504 通りの比べで、Python 版との違いは上と 7.6 のものだけ。応答が返らなかった件・エラー応答に入力の目印が出た件は 0。何も送らない接続とヘッダー途中の接続は 60.0 秒で Node が `code` の無い 408 を返して閉じ (Python 版は 75 秒でも閉じない)、ヘッダーを送り終えて本文を少しだけ送る接続は 15.5 秒で表どおりの 408。
 
 **6.9 以降への申し送り**
 
-- `startServer` の `requestTimeout` は 300 秒に固定している。`UPLOAD_TIMEOUT_S` をこれより長くすると、Node が先に `code` の無い 408 を返す (Req 3.13 があるので 300 秒を超える設定は正しい設定の外。6.9 で、設定から決めるか起動時に拒むかを決める)。`close()` は処理中の接続も切る (SIGTERM で処理中の要求を待つかは 6.9 が決める)。`Retry-After` は付けない (Python 版も付けず、OpenAPI にも無い)。401 にログ行を出さない (Python 版と同じ)。runner が想定外の例外を投げたときは `extract runner raised format=… size=… error=<例外の名前>` を ERROR 行で出す (スタック無し)。`parse-multipart.ts` は 405 行 (状態遷移 1 責務なので許容)。
+- `startServer` の `requestTimeout` は 300 秒に固定している。`UPLOAD_TIMEOUT_S` をこれより長くすると、Node が先に `code` の無い 408 を返す (Req 3.13 があるので 300 秒を超える設定は正しい設定の外。6.9 で、設定から決めるか起動時に拒むかを決める)。`close()` は処理中の接続も切る (SIGTERM で処理中の要求を待つかは 6.9 が決める)。`Retry-After` は付けない (Python 版も付けず、OpenAPI にも無い)。401 にログ行を出さない (Python 版と同じ)。 **注記 (タスク 7.1、2026-11-11)**: 「Python 版と同じ」は、アプリのロガー (`app.*`) についてだけ正しい。Python 版では、uvicorn のアクセスログが 401 の要求にも 1 行出ていた。Node 版では 401 は何も残らない。記録と、ユーザーの決定 (401 のログは戻さない) は 7.8 にある。runner が想定外の例外を投げたときは `extract runner raised format=… size=… error=<例外の名前>` を ERROR 行で出す (スタック無し)。`parse-multipart.ts` は 405 行 (状態遷移 1 責務なので許容)。
 - 枠を返すのは応答を送り終える前 (Python 版の `async with` と同じ)。遅い読み手が相手だと、親が同時に持つ結果が 3 件を超えうる。トークンなしの `/readyz` を受けるたびに確認用の子が起動する (27.6 の決定どおり)。
 - **6.10**: `http/spec-support/fake-runner.ts`・`test-service.ts` は `runner/conversion-runner` を直接 import し、http の integ テストは `runner/spec-support` を直接 import している (どれも承認済みのテストにもとからある)。層の検査では、テストとテスト用の補助を除外する。
-- **取り込み (Req 12) で直す記述**: design.md 521〜525 行の `RunInput.bytes` を `chunks` と `size` にする (507 行は `convert()` の引数なので変えない)。research.md 23.5 の spec-support の一覧に `wholeFile` を足し `ProbeInput` の形の変更を書く。23.6 の `forwardedBytes` の記述 (今は `Buffer.concat(input.chunks)`)。16.9 (d) か 27 に今回の計測値。親の 1 件あたりのメモリは約 60〜100MiB で予算 (157MiB) に収まる (image の中は 6.12 で測る)。最悪の足し算は約 1,951MiB で 2Gi 以内。
+- **取り込み (Req 12) で直す記述**: design.md 521〜525 行の `RunInput.bytes` を `chunks` と `size` にする (507 行は `convert()` の引数なので変えない)。 **注記 (タスク 7.1、2026-11-11)**: 行番号はずれた。指しているのは、design.md の「実行管理の層 (`runner/`)」の `RunInput` の定義と、「変換の層 (`conversion/`)」の `convert()` の引数である。research.md 23.5 の spec-support の一覧に `wholeFile` を足し `ProbeInput` の形の変更を書く。23.6 の `forwardedBytes` の記述 (今は `Buffer.concat(input.chunks)`)。16.9 (d) か 27 に今回の計測値。親の 1 件あたりのメモリは約 60〜100MiB で予算 (157MiB) に収まる (image の中は 6.12 で測る)。最悪の足し算は約 1,951MiB で 2Gi 以内。
 
 ### 27.8 タスク 6.9 (組み立てと、経路の定義から作る OpenAPI の文書)
 
@@ -7675,7 +7714,7 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 - **停止の合図 (SIGTERM / SIGINT)**: 1 回目で待ち受けをやめ、応答を返し終えていない要求を待ってから終了コード 0 で終わる。2 回目で、すぐ終了コード 1 で終わる。uvicorn も処理中の要求を待つ (Python 版の Dockerfile に `--timeout-graceful-shutdown` の指定は無く、上限なしで待つ)。
 - **トークンが無いとき**: `loadSettings` が待ち受けの前に例外を投げ、`main.ts` は例外の文 (変数名だけで、値は含まない) を標準エラーに出して終了コード 1 で終わる。
 - **待ち受けの場所**: `0.0.0.0:8000` に固定し、設定の項目は増やさない (Python 版の image が `uvicorn --host 0.0.0.0 --port 8000` で、design.md の設定の表にもポートは無い)。
-- **組み立てを 2 つのファイルに分けた**: `src/service.ts` (設定 → 実行管理 → アプリ → 待ち受け。ポート 0 でテストできる) と、`src/main.ts` (プロセスの入口。ポート、シグナル、終了コード)。design.md の判断 5 とディレクトリの図は「`main.ts` だけ」と書いている。`import.meta.main` を使えば 1 つにできるが、Node 24 ではまだ実験的な機能なので使わなかった。
+- **組み立てを 2 つのファイルに分けた**: `src/service.ts` (設定 → 実行管理 → アプリ → 待ち受け。ポート 0 でテストできる) と、`src/main.ts` (プロセスの入口。ポート、シグナル、終了コード)。design.md の判断 5 とディレクトリの図は「`main.ts` だけ」と書いている。`import.meta.main` を使えば 1 つにできるが、Node 24 ではまだ実験的な機能なので使わなかった。 **注記 (タスク 7.1、2026-11-11)**: 6.12 で足した `scripts/check-openapi-drift.ts` の入口 (72 行) は `import.meta.main` を使っている (読んで確かめた)。本番のコードではなく道具なので害は無いが、この文とは食い違う (27.13 のレビュアー B の指摘)。
 
 **停止の待ち方 (レビューで直した点)**
 
@@ -7687,7 +7726,7 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
   - 読まない相手に約 8.49MB の応答を返している最中の停止では、応答は最後まで届き (8,494,902 バイト)、読み終わりの約 45ms 後に停止が終わる。
   - 送信の途中で相手が切断した要求は、数から外れる。
 - **Python 版 (uvicorn) の停止との残りの違い** (どれも記録で足りるとレビューで判定した):
-  - 処理中の要求を待つ時間に上限が無い (uvicorn も同じ)。応答を読まない相手がいると、猶予時間の後の SIGKILL か 2 回目の合図まで終わらない。
+  - 処理中の要求を待つ時間に上限が無い (uvicorn も同じ)。応答を読まない相手がいると、猶予時間の後の SIGKILL か 2 回目の合図まで終わらない。 **注記 (タスク 7.1、2026-11-11)**: この形は、トークンなしでも起こせる (レビュアー B の実測。27.13)。
   - 応答を返し終えていない要求が残っている間は、開いている keep-alive の接続の次の要求にも応える。
   - 届いた直後で、まだハンドラーに渡っていない要求は、応答なしで切られる (uvicorn も同じ種類の振る舞い)。
   - 早い段階で返すエラー応答 (413 など) は、停止の瞬間に限り、相手に届く前に切られうる (推論。実験では 413 は届いた)。
@@ -7916,3 +7955,382 @@ devcontainer、Node v24.22.2、Linux 6.8。サービスのプロセスと子の 
 
 - Node 版の結果の JSON は `benchmark/baseline/` に置いていない (13.7 は「置ける」と書いているだけで、求めていない)。
 - 検証の担当の測り直しで、`dist/` の 113 ファイルの SHA-256 は build し直す前後で同じだった (計測が古い build に向いていたのではない)。サービスのログには、ベンチマークの間に `result=ok` の `extract` の行がちょうど 23 行あった。Elasticsearch の一時的な index は、道具が自分で消した (`_cat/indices/benchmark-*` は前後とも空)。
+
+### 27.13 タスク 7.1 (実装のレビュー、1 回目)
+
+2026-11-11、HEAD `fba405e950`。Fable の担当 3 人が、範囲を分けてレビューした。3 人とも、実装の担当とは別に新しく立てた担当で、互いの結果を見ずに進めた。この節は 3 人の報告をまとめたものである。各項目の「実行した」「読んだ」「推論」は、報告が付けた区別をそのまま写している。
+
+| 担当 | 範囲 | 判定 |
+|---|---|---|
+| A | 信頼できないファイルを扱う部分 (変換の層、子プロセス、親子の受け渡し) | GO。承認を止める指摘は無い |
+| B | 親プロセスの側 (HTTP の層、実行管理の層、設定、組み立て、OpenAPI の道具) | GO。承認を止める指摘は無い |
+| C | 機能の全体 (テスト全体、要件との対応、記録の漏れ、配布物と CI、取り込みの準備) | **NO-GO**。承認を止める指摘が 3 件 (B1・B2・B3) |
+
+C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である。どれも変換の層に触れないので、6.13 のベンチマークを測り直す必要は無い (C の判定)。
+
+#### 承認を止める指摘 3 件と、その対応
+
+- **B1: Python 版にあったログが Node 版に無く、どこにも記録されていなかった** (C が両方のコードを読んで確かめた)。
+  - 中身は 7.8 に記録した (要求ごとのログ、`/extract` の行の先頭の書式、親の側の診断の行と子の警告)。
+  - 対応: 記録した。戻すかどうかは、ユーザーに 3 つの選択肢で諮っている (7.8 の「決定」)。ユーザーが答えるまで、コードは変えない。(追記: ユーザーは 2026-11-11 に (イ) に決めた。決定の中身は 7.8 に、実装の結果は 27.15 に書く。)
+- **B2: design.md の Revalidation Triggers が「崩したものは 3 つ」と書いていて、実際より少なかった** (C が読んで確かめた)。
+  - 7.4 と 7.5 が「Revalidation Triggers に足す」と書いた本文の形の例外が、足されていなかった。7.6 の 9 通りも、完了の報告だけに回されていた。tasks.md の 9.5 (完了の報告) も 3 つだけを挙げていた。
+  - design.md と brief.md の「`/readyz` のスキーマは `{}`」も古かった。Node 版の文書は 200 に型を付け、503 も載せる (`src/http/api-schemas.ts` の `ReadySchema` と `NotReadySchema`)。
+  - そのままだと、取り込み (9.2) と完了の報告 (9.5) で、運用者や呼び出し側に見える違いが 12 件以上抜ける。
+  - 対応: 直した。design.md の Revalidation Triggers を、D1〜D3、7.5、7.6 と 27.7 の追加分、7.8、そのほかの記録への案内、生成クライアントの名前の変更の一覧にした。`{}` の文を直した。tasks.md の 9.5 は、この一覧を指す形にした。
+- **B3: 親が子の結果を `JSON.parse` に渡す前の検査 (`src/wire/json-structure-guard.ts`) の上限を緩めても、失敗するテストが無かった**。
+  - キーの数の上限 (16) を外しても緩めても、落ちるテストが無い。深さの上限 (64) は、外すと落ちるテストはあるが、値を数万まで緩めても通る (C が読んだ。A が実行して確かめた: キーの上限を外すと `length-prefixed-json.spec` の 66 件がすべて通り、深さの上限を外すと 2 件が落ちる)。
+  - 22.6 の「落ちるテストは作れない」は、`decodeResult` を通すテストに限った結論だった。検査の関数 `rejectUnsafeStructure` は export されているので、直接呼べば、上限の境界をテストで確かめられる (A の N3、C の B3)。
+  - 上限を消すほうがよい直しではない、と C は判定した。2 行の検査で、攻撃する側が届く経路のメモリを約 5 分の 1、時間を約 180 分の 1 にしている (22.6 の実測)。
+  - 対応: 境界のテスト (上限ちょうどは通り、1 つ超えると `WireProtocolError`) を足し、下の N1 に合わせて検査を厳しくする。いま実装している。**直しの結果は、この節の後に追記する。** (追記: 結果は 27.14 の 1 にある。最終の直しでは、上限のテストを足すのではなく、上限そのものを消して決まりを替えた。)
+
+#### レビュアー A (変換の層・子プロセス・親子の受け渡し)
+
+**確かめたこと**
+
+- 実行した: 悪意のある入力 約 150 件を、本番と同じ上限 (`prlimit`、RSS の上限 320MB、期限 55 秒) で本物の子に通した。あわせて、壊したファイル 15,000 件 (XLSX のバイト列、XLSX の XML、PPTX のバイト列、PPTX の XML、PDF のバイト列を 3,000 件ずつ) をプロセスの中で流した。すべて、決まった種類の結果で終わった。親が落ちた件、期限を過ぎても終わらない件、`internal`、捕まえていない例外、detail に入力の中身が出た件は、どれも 0。
+- ZIP (実行した): 圧縮を偽っていない 400MiB の部品は、子の最大 RSS が 102MB のままだった。1,000 バイトと申告して 400MiB に膨らむ部品は、116ms で `malformed`。600MiB と申告した部品は 117ms で拒んだ。10,001 個の要素は拒んだ。
+- XML (実行した): DOCTYPE とエンティティの 28 通りは、宣言をすべて拒み、DOCTYPE を落とし、何も展開しなかった。40 万個の属性、50 万段の入れ子、300 万個の兄弟の要素、150 万個のコメント、50 万個の宣言を持つ内部サブセットは、どれも 3 秒以内に決まった種類の結果で終わった。
+- テキスト系 (実行した): 20〜50MiB の 32 通りで、最長 5.1 秒、子の最大 RSS は 373MB まで。すべて決まった種類の結果で終わった。信頼できない文字列に当てる正規表現をすべて読み、極端に遅くなる入力は見つからなかった (読んだ)。
+- PDF (実行した): 5,001 ページは 119ms で拒んだ。偽の `/Count` や負の `/Count` は害が無かった。5,000 ページ × 10 万字は、41.8 秒かかって `memory_exceeded` で終わった (Python 版も、大きさを確かめる前に全ページを読む)。
+- メモリ (実行した): 子の最大 RSS のうち最も大きかったのは 443MB (共有文字列で膨らむ 8KB の XLSX)。記録済みの「監視の遅れ 148MB」の内側である。上限を超えた件は、すべて `memory_exceeded` で終わった。
+- 結果の検査 (読んで、実行した): 検査は `result-json.ts` の `JSON.parse` の直前にあり、飛ばす経路は無い。深さ 65 とキー 17 個は拒み、深さ 64 とキー 16 個は通る。エスケープで書いた重複のキー (`"kind"`) と `__proto__` のキーも拒む。
+- トークンが子に渡らないこと、子を信頼しないこと、エラーに入力の中身を入れないこと (読んだ): `src/child/**` と `src/conversion/**` は `process.env` を読まない。子への見出しは `fileName`・`mimeHint`・`limits`・`maxInputBytes` だけ。親は、結果のひとかたまり (frame) の長さを先頭の 4 バイトで確かめ、結果を受け取ったら子を止め、親が決める種類を子から受け取らない。detail は決まった文かクラス名だけである。
+- 形式と位置 (Python 版のコードと読み比べ、実行した): 形式の表は同じ。PDF・PPTX・XLSX の番号とラベルは同じ。
+
+**承認を止めない指摘**
+
+- **N1 (重要): 検査は深さとキーの数を抑えるが、要素の多い平らな配列を抑えない** (実行した。33MiB の結果の本文を、`dist/` の写しの `decodeResult` に渡した)。
+
+  | 結果の本文 | 親の最大 RSS | 時間 | 結果 |
+  |---|---|---|---|
+  | `{"ok":true,"pages":[{},{},…],"mimeType":"x"}` | 1,302MB | 2.1 秒 | 解釈した後に、形の検査で拒む |
+  | 同じ形で `[],[],…` | 1,043MB | 1.0 秒 | 解釈した後に拒む |
+  | 同じ形で `1,1,…` | 383MB | 0.4 秒 | 解釈した後に拒む |
+  | 形の正しい空のページ 804,720 個 | 289MB | 0.5 秒 | 受け付ける |
+
+  - 3 件同時だと親が約 3.9GB になり、2Gi の予算を超える。
+  - 承認を止める指摘にしなかった理由: 起こすには、悪意のある結果の本文を書く子が要る。正しく動く子は、3 つのキーを持つページを最大 10,000 個しか書かない。Python 版からの後退でもない (同じ本文を、Python の `json.loads` に、サービスと同じ重複キーの検査を付けて渡すと、最大 871MB だった。システムの Python 3.14 での実測で、サービスの 3.12 ではない)。
+  - 22.6 は入れ子とキーの数の場合だけを記録していたので、「検査が親のメモリを抑える」という読みは言いすぎだった (22.6 に注記を足した)。
+  - 対応: 検査を厳しくする (A の案: キーの数が 3 でないオブジェクトを拒む。最上位のオブジェクトの直下以外の配列を拒む)。B3 と一緒に、いま実装している。結果はこの節の後に追記する。(追記: 結果は 27.14 の 1 にある。)
+- **N2 (重要): wire の `readFrame` を呼ぶ本番のコードが無い** (読んだ)。親は `runner/result-frame.ts` で、子は `child/frame-io.ts` で読む。`readExact` と `readFrame` の約 65 行と約 10 件のテストが、サービスが使わない読み手だけを確かめていた。対応: `readExact` と `readFrame` とそのテストを消す (`writeFrame` は残す)。いま実装している。(追記: 結果は 27.14 の 2 にある。)
+- **N4: 子の標準エラーの警告は誰にも届かない**。7.8 の (a) の 3 に記録し、27.3・27.5・27.6 に注記を足した。
+- **N5: XLSX のセルの数の事前の検査をすり抜ける形が 3 つある** (実行した。前からあり、Python 版も同じ作り。記録だけが無かった)。どれも、422 `memory_exceeded` か、普通の 200 で終わった。
+  - `*.rels` という名前のシートの部品を `workbook.xml.rels` から指すと、数えられない (`xlsx-cell-count.ts` 10 行)。100 万セルで、子の最大 RSS は 382MB。
+  - `<c` の後に U+00A0 を置くと、数えられない (`xlsx-cell-scan.ts` 13 行)。最大 365MB。
+  - 中身が OOXML の XLSX を `a.xls` という名前で送るか、`application/vnd.ms-excel` として送ると、事前の検査の無い Office の経路に入る (`format-table.ts` 63 行)。70,100 セルで 200 が返った (同じバイト列を `.xlsx` で送ると拒む)。
+  - **受け入れる (取りまとめの担当の判断。Python 版と同じ作りで、後退ではない)**。レビュアー A が勧めたのは、記録することだけである。`MAX_XLSX_CELLS` は「早めに断るための検査」で、守りの境界は RSS の上限である。
+- **N6: `MAX_RESULT_BYTES` はラベルを数えない** (実行した。前からあり、Python 版も同じであることは読んで確かめた)。
+  - `conversion/assemble-pages.ts` 25 行は `content` だけを数える。20MiB のシート名を持つ 22KB の XLSX は、20MiB の `label` を付けて 200 を返した (子の最大 RSS は 186MB)。4KB の名前のシート 5,000 個は、ラベルだけで 20MB を返した。
+  - 結果の本文の上限 33MiB が抑えるので、親の予算は守られる。**受け入れる (取りまとめの担当の判断。Python 版と同じ作りで、後退ではない)**。レビュアー A が勧めたのは、記録することだけである。対象 spec の文は「結果全体の上限」と読めるので、取り込みのときに直す。
+- **N7 (好みの範囲。取り込みのときに考える)**: `ResolvedFormat` の null を許す 2 つの項目を、`route-converters.ts` が実行時にもう一度確かめている。種類で分けた型にすれば、この 2 つの確認が要らなくなる。`ooxml/` は 30 ファイルが平らに並んでいて、`zip-*` の 7 つを `zip/` に移す案は妥当である。
+
+**確かめられなかったこと**: Python 版を動かしての比較 (`.venv` が壊れているので、N1 の `json.loads` を除き、すべて読み比べ)。乗っ取られた子が作った孫のプロセスが残るか (runner は子の pid だけを止める。プロセスグループを止める処理も `RLIMIT_NPROC` も無い。試していない)。anydoc の中でメモリの確保に失敗して abort する場合 (27.2 の 64MiB の XML の部品は試し直していない)。bzip2・LZMA の要素と zip64 (27.2 に記録済み。試していない)。
+
+#### レビュアー B (HTTP の層・実行管理の層・設定)
+
+**確かめたこと**
+
+- 認証の比べ方 (読んだ): `bearer-auth.ts` は、送られた値と正しい値をそれぞれ SHA-256 にしてから `crypto.timingSafeEqual` で比べる。長さが違っても例外にならず、長さも漏れない。
+- 認証の範囲 (実行した): トークンなしで通るのは、`/healthz`・`/readyz`・`/openapi.json` と、その後ろに `?…` が付いた形だけだった。`/healthz/`、`/HEALTHZ`、`//healthz`、存在しないパス、小文字の `bearer`、空白 2 つ、空のトークン、`Basic`、8,000 字のトークン、1 字足りないトークン、クエリに入れたトークンは、すべて 401。`Authorization` が 2 行あるときは 1 行目だけを見る。
+- 認証は本文と枠より先 (実行した): トークンなしで `Content-Length: 99999999999` を送ると 413 ではなく 401。`Expect: 100-continue` には 100 を返さず 401。
+- トークンが子に渡らない (読んで、実行した): 動いている子の `/proc/<pid>/environ` は `RAYON_NUM_THREADS=1 MALLOC_ARENA_MAX=2` だけ。コマンドラインにトークンもファイル名も無い。
+- 子の制限 (実行した): `/usr/bin/prlimit` の絶対パスで起動する。子の `/proc/<pid>/limits` は、アドレス空間 2,751,463,424、CPU 60:65、core 1。
+- 同時実行の枠が、返されないまま残ることはない (実行した): `MAX_CONCURRENCY=1` で、次の 9 通りのどれの後も、次の要求が 200 だった。アップロード途中の切断 (10 回)、途中の FIN (10 回)、本文を送る前の切断 (10 回)、解析の失敗 (5 回)、アップロードの期限切れ、`Expect` の後の沈黙、変換中の切断 (5 回)、503、応答の途中の切断。子は残らなかった。
+- エラー応答とログ (実行した): 応答は決まった文だけ。ログに出るのは、拡張子 (英数字 10 字まで)・大きさ・時間・結果だけで、ファイル名・中身・形式の手がかり・トークンは出なかった。
+- エラーの表 (読んだ): `error-table.ts` の 9 種類は、Python 版の `extract_errors.py` と、状態・`code`・文が同じ。設定の既定値と検査も、Python 版の `config.py` と同じ。
+- 200 の応答の JSON (実行した): 制御文字、対にならないサロゲート、U+2028・U+2029 を混ぜた 2 万通り × 区切り 4 通りで、`JSON.stringify` と 1 字も違わなかった。
+- multipart の解析 (実行した): 6 万通りの本文で、丸ごと・1 バイトずつ・不揃いな区切りの 3 通りの結果が一致した。
+- `/readyz` を呼び続けたとき (実行した): 同時 200 件を 3 秒間続けると、1,600 件すべて 200 で、確認用の子は同時に 1 つだけだった。親の RSS は 114MiB。メモリは子 1 つ分 (64〜80MB) しか増えない。まだ残る負担は CPU で、呼ばれ続けると最大でおよそ 1 コアを使う (27.6 の記録どおり)。
+- 接続の数 (実行した): ヘッダーの途中で止めた接続は 1 本あたり約 11KiB。3,000 本で親の RSS が 79 → 111MiB になった。Node は 60 秒で切る (Python 版は切らなかった)。fd が尽きた状態 (`nofile=100` に 300 本) では、その間 500 `crashed` と `/readyz` の 503 になるが、親は落ちず、接続が減ると 200 に戻った。
+- 親のメモリ (実行した): 応答を読まない相手 6 件 (12MiB の結果) で、親が 112 → 299MiB になった。同時実行の枠の数を超えて結果を持つ形で、27.7 の記録どおり、トークンが要る。
+- コードを壊すと、テストが実際に失敗すること (実行した): トークンの比較を外すと `bearer-auth.integ` の 4 件、切断のときに枠を返さないと `slot-return.integ` の 1 件、ログにファイル名を出すと `request-log.integ` の 7 件が落ちた。変更は元に戻した。
+
+**記録されていなかった Python 版との違い 3 件 (ここに記録する。Req 1.9 の作業者の判断で、apps/app は送らない形か、意味の無い設定値)**
+
+1. **同じ接続に 2 つの要求を続けて書くと、2 つ目が 503 になる**。
+   - 実行した: `MAX_CONCURRENCY=1` で、1 本の接続に `POST /extract` を 2 つ続けて書くと、`200`、`503` が返った。Node は、続けて届いた要求をすぐハンドラーへ渡すので、1 つ目の変換中に 2 つ目が枠を取りに行く。
+   - 推論 (Python 版は動かしていない): Python 版は 1 つ目の応答を返してから 2 つ目を処理するはずで、`200`、`200` になる見込み。
+   - apps/app (axios) はこの送り方をしない。
+2. **`TIMEOUT_S` か `UPLOAD_TIMEOUT_S` が 2,147,484 秒以上だと、起動は通るが期限が 1 ミリ秒になる**。
+   - 実行した: `TIMEOUT_S=3000000` で起動すると、小さな TXT でも毎回 408 `extraction_timeout` になり、標準エラーに Node の `TimeoutOverflowWarning` が出た。`setTimeout` が、約 24.8 日を超える値を 1 ミリ秒に置き換えるためである。Python 版はこの値をそのまま長い期限として扱う。
+   - 対応: いま直している。大きすぎる値を起動時に拒むのではなく、`setTimeout` に渡せる最大の値に丸める (Python 版が受け付けていた設定値を新しく弾かないため)。
+3. **multipart の部品の見出しの空白の削り方が、長さの 2 乗の時間をかける** (`header-params.ts` 32〜38 行の、末尾の空白を取る正規表現)。
+   - 実行した: 見出しにタブ 4,150 個を入れた部品を 1,000 個並べた 4.0MiB の本文で、親の解析に 11.5 秒かかった。1 回の処理は最長 201ms で、断片ごとにイベントループへ戻る。起こせるのはトークンを持つ送り手だけで、アップロードの期限 (15 秒) と枠 (3) で上限がある。
+   - 対応: いま直している (末尾の空白を後ろから数えて切る形にする)。
+
+2 と 3 の直しの結果は、B3 と同じく、この節の後に追記する。(追記: 2 の結果は 27.14 の 4、3 の結果は 27.14 の 3 にある。)
+
+**記録への補足**
+
+- **停止が終わらなくなる形は、トークンなしでも起こせる** (実行した): トークンなしの接続 1 本が `GET /openapi.json` を 20 万個続けて送り、応答を読まないと、`stop()` は 6 秒待っても終わらなかった。その接続を切ると、すぐ終わった。uvicorn も待つ時間に上限が無く、k8s では猶予時間の後に SIGKILL されるので、受け入れの判断 (27.8) は変わらない。27.8 に注記を足した。
+- **`scripts/check-openapi-drift.ts` の 72 行が `import.meta.main` を使っている** (読んだ)。27.8 は「Node 24 ではまだ実験的なので使わなかった」と書いて `main.ts` と `service.ts` を分けた。道具だけなので害は無いが、記録と食い違う。27.8 に注記を足した。
+- **子が返す `mimeType` は、空でない文字列なら何でも通り、そのままログの行に入る** (読んだ。`wire/result-json.ts` 141 行、`extract-route.ts` 205 行)。正しく動く子は形式の表の決まった値しか返さず、Python 版も同じ作りなので、後退ではない。
+- **`main.ts` の停止の合図の処理に自動テストが無い** (ポートが 8000 に固定のため)。停止の待ち方そのものは `service.integ.ts` の 3 件が確かめている。B の範囲で、テストの無い振る舞いのうち最も大事なものである。足すかどうかは任意。
+- **確かめられなかったこと**: 上の 1 の Python 版の側。`node dist/main.js` の SIGTERM の後の終了コード (B の道具の誤りで取れなかった。27.8 に実測がある)。image の中と、CPU の上限の下での値。
+
+#### レビュアー C (機能の全体)
+
+**機械的な状態 (実行した。HEAD `fba405e950`)**
+
+- テスト全体: 133 ファイル、4,707 件。4,692 件が通り、3 件が失敗、12 件が skip。133 個の `*.spec.ts`・`*.integ.ts` がすべて実行されたことを、結果の一覧と突き合わせた。
+  - 失敗の 3 件は、どれも `test/deploy/compose.spec.ts` で、8.2 で通る予定のもの (`MAX_CONCURRENCY` が 3 で `WORKERS` が無いこと、`node` で `/readyz` を見る healthcheck、リポジトリのルートを context にした build)。
+  - skip の 12 件: 10 件は `benchmark/corpus-documents.spec.ts` の、旧来の日本語の文字コードの検査 (UTF-8・UTF-16 の文書 5 個には当てはまらない)。2 件は `benchmark/elasticsearch/measure-es-recall.spec.ts` (動いている Elasticsearch が要る。本物の計測は 27.12 にある)。不変条件の検査を隠す skip は無い。
+  - 注意: Linux でないと、不変条件のテストのほとんどが skip になる (`describe.skipIf(process.platform !== 'linux')`)。検査が実際に働くのは Linux の CI だけである。
+- `tsgo --noEmit`: 終了コード 0。`biome check`: 終了コード 0、378 ファイル、警告 37 件 (すべてテストと道具の `noAwaitInLoops` で、わざと順に流している loop)、エラー 0。
+- grep (`src`・`test`・`scripts`・`benchmark`・`docker`・`deploy`): `TODO`・`FIXME`・`TBD`・`XXX`・`HACK`・`not implemented` は 0。`.only(` は 0。条件つきでない `.skip(` は 0。本番のコードに `console.*` は 0。中身の無い仮の実装は見つからなかった。`src/http/openapi.json` は無い。理由の id `17.6` はコードにもテストにも残っていない (`test/http/blackbox-target.ts` の id は D2・D3・7.5-2・7.5-3・16.1・16.9 の 6 つ)。
+- リポジトリの状態 (git で確かめた): この package と spec に触れる commit は 58 個。package と spec の外で変えているのは、`pnpm-lock.yaml` (7 回) と `.github/workflows/ci-attachment-text-extractor.yml` だけ (`.github/workflows/attachment-text-extractor.yml` は足してから戻したので、差分は無い)。`packages/attachment-text-extractor-client/`・`apps/app/`・`infra/`・`services/` は変えていない。秘密の値は無い。commit した最大のファイルは 173KB (`header-param-oracle.json`)。`dist/`・`.turbo`・`node_modules` は無視されている。ライセンスの文 19 個と `THIRD-PARTY-NOTICES.md` は、27.10 のとおり `docker/licenses/pdfium-wasm/` にある。
+
+**要件との対応 (抜き取りで確かめた。全件ではない)**
+
+- **コードが食い違っている AC は無い。**
+- まだ満たしておらず、後のタスクに回してあるもの:
+  - Req 3.14 と 11.2 の image の中での計測、Req 8.1・8.2、Req 9.5 の実行 → 6.12 と 8.3。
+  - Req 7.3 のうち commit 済みの文書との比較、Req 7.4、Req 8.4 (失敗している compose のテスト 3 件)、Req 9.2・9.3 → 8.2 と 8.3。
+  - Req 10.1〜10.5 → 8.x。Req 12.1〜12.6 → 9.x。
+- 一部だけ満たしているもの: Req 2.1〜2.3 (`pages[]` の比較は 22/23 が一致。RTF・EPUB・XML・ipynb・TSV のファイルが比較に無い。tasks.md の 8.1 に扱いを書いた)。Req 9.1 (workflow のファイル名が文書と違う。tasks.md の 8.2 に書いた)。
+- 実装も無く、タスクにも割り当てられていなかったもの: サービスの `CLAUDE.md` (tasks.md の 8.2 に足した)。
+- 記録の漏れ: Req 1.9〜1.13 の手続きのうち、B1 と B2 (上で対応した)。
+
+**記録されていない小さな違い (C は確かめられなかった。記録だけ)**
+
+- 負の `MAX_CONCURRENCY`: Node 版は起動して、すべての要求に 503 を返す (`load-settings.ts` 92 行、`concurrency-slots.ts` 10 行を読んだ)。Python 版は起動時に止まる見込み (推論。`asyncio.Semaphore` が例外を出す)。
+- `LOG_LEVEL=NOTSET`: Python 版は `extract` の行を出さない見込み (推論。ロガーが root の WARNING を受け継ぐ)。Node 版はすべて書く (`request-log.ts` 15 行)。
+- 401 の本文の空白: Python 版は `json.dumps` の空白つき、Node 版は詰めた形。JSON として読めば同じ。
+- `Server: uvicorn` のヘッダーが、Node 版には無い。
+- 負の `TIMEOUT_S` は、`prlimit` の `--cpu` を負の値にする (推論。意味の無い設定値)。
+
+**テスト全体への所見**
+
+- 全体として強い (C が立てた補助の担当が各ディレクトリから 2 ファイル以上を抜き取り、C が読んで確かめた)。不変条件は、本物のプロセスと `/proc` で固定している。「無いこと」を確かめるテストには、本物の目印を流している。テストに `as any`・`as unknown as`・`as T` は 0。multipart の 2 つの手本のデータは、Node 版のコードからではなく、Python 版から記録している。
+- 注意: その手本のデータは、8.2 の後は作り直せない (取り込みのときに書く)。
+- 足すとよい検査: `extract-route.integ.ts` は `new Error('/srv/secret/path exploded')` を投げて応答だけを見ている。ログの側 (`error=<例外の名前>` の行) を見ていないので、例外の文をログに出す変更をしても通る。ログに `/srv/secret/path` が無いことの検査を 1 つ足すとよい。
+- 小さい点: `request-log.integ.ts` の「トークンがログに無い」は、401 を返す前に書かれた漏れしか捕まえない。`bearer-auth.integ.ts` と `test/http/auth.integ.ts` は、認証の要らないパスの表に無いパスでは、何も確かめないまま合格になる。`convert-module-loading.integ.ts` は、本物の子の入口ではなく `conversion/index.ts` から始めている。`src/smoke.spec.ts` は役に立つことを確かめていない (消してよい)。`REFUSAL_TABLE` には表のテストが無い (振る舞いで固定している)。
+- `test/global-setup.ts` は、vitest を始めるたびに `dist/` を消して作り直す (27.6 に記録済み)。同じ package で 2 つ同時に流すか、`turbo run build test` を流すと、互いを壊す。
+
+**負荷の高い CI の機械で、回によって結果が変わりそうなテスト (判断。負荷を掛けては流していない。6.12 と 8.3 への引き継ぎ)**
+
+16 コアのこの環境では、36 秒の 1 回の実行ですべて通った。2 vCPU の機械では、次のものが危ない。
+
+- **危ない**:
+  - `child-isolation.integ.ts` 345〜351 行: 本物の子の最大 RSS が 304MB 未満であることを見る。記録の値は XLSX で 289〜291MB、DOCX で 277〜297MB (余裕 7MB)。`vitest.config.ts` はファイルの並列を有効にしているので、`parent-memory`・`child-isolation`・`conversion-runner` が同時に動く。
+  - `conversion-runner.integ.ts` 519〜541 行: イベントループの止まりが 250ms 未満。
+  - `child-isolation.integ.ts` 149〜166 行: 0.4 秒の期限の時点で、すでに +8MB になっていること。
+- **余裕が小さい**:
+  - `parent-memory.integ.ts` の上限 440MiB と 480MiB。実測は 298〜368MiB と 315〜394MiB で、余裕は約 72〜86MiB、回ごとの幅は約 70MiB。
+  - 「1 秒以内」を見る検査 (`parent-watch.integ.ts` 34・52 行、`child-isolation.integ.ts` 288〜291 行、`service.integ.ts` 111・128・146 行)。`child-isolation.integ.ts` 291 行の 2 つめの確認は余分で、境目で落ちうる。
+  - CPU の速さに頼る単体テスト (`html.spec.ts` 129〜153 行、`safe-xml.spec.ts` 311〜355 行。余裕は 10〜25 倍)。
+  - `process-limits.integ.ts` 80〜89 行は、機械の hard の上限が無制限であることを前提にしている。
+- **安全**: 待ち受けはすべてポート 0。子は `afterEach` で回収する。長い期限には、内側の短い待ちが組になっている。
+- **C の勧め**: 最初の本物の CI の実行 (6.12、8.3) でどれかの結果が回によって変わったら、余裕を広げるのではなく、`*.integ.ts` をファイルの並列なしで流す。
+
+**タスクをまたぐ整合 (読んだ)**
+
+- 同じ内容を 1 か所だけに書く決まりは守られている: `ERROR_CODES` は `contract/error-code.ts` だけ。状態は `http/error-table.ts` だけ (401 は `bearer-auth.ts`)。既定値は `config/load-settings.ts` だけ。`process.env` を読むのは `main.ts` だけ。重なっているのは、`const MIB` (5 ファイル) と、時刻の書式 (`main.ts` 9 行と `request-log.ts` 58 行) だけ。`main.ts` の行は `LOG_LEVEL` を見ない (27.8 に記録済み)。
+- barrel: `runner/`・`http/`・`conversion/`・`contract/` は最小。`config/`・`formats/`・`wire/`・`child/`・`ooxml/`・`text/` には無い (`config/` を除き、27.4 と 27.9 に記録済み)。`http/api-schemas.ts` は、barrel を通さずに `../contract/error-code` を import している (barrel は型だけなので)。受け入れられる。
+- **コードのコメントが、この spec の research.md の節の番号を引いている**: 125 ファイルに約 200 個 (本番の `src/` に 43 行) と、workflow のコメント。9.3 と 9.5 でこの spec を消すと、参照先が無くなる (9.5 の grep は steering と他の spec だけを見る)。取り込みのときに、節の番号を保つか、コメントを書き換える。
+
+**配布物と CI のまとまり (C が立てた補助の担当が読み、C が抜き取りで確かめた)**
+
+- build・起動・CI の段階を壊す食い違いは無い。ポート 8000 と `0.0.0.0`、`/app/dist/main.js` と `/app/dist/child/child-entry.js`、uid 10001、`/usr/bin/prlimit`、環境変数の名前、probe の期限 (確認用の子 10 秒に対して k8s の期限 15 秒)、メモリの式 (69 + 3 × 625 + 64 = 2,008 ≤ 2,048)、猶予時間 85 秒は、互いに合っている。`WORKERS` は無い。workflow に `if: |` の塊は無い。ほかの workflow はこの package のテストを流していない。
+- 小さい食い違い:
+  - Dockerfile は `node:24.22.2` に固定し「CI と一緒に上げる」と書いているが、CI は `24.x` を使う。
+  - 何もしていない親の RSS は、実測で 82〜83MiB (27.11)。配備の式は 69 を使っている (6.12 で決める)。
+  - `service-client.mjs` の `prlimit` の確認は、子の V8 の引数なしで `node -e` を `--as=2624MiB` の下で起動する。23.7 は、2 CPU で 2,560MiB のときに起動に失敗した記録を持つ。CI の機械で注意して見る。
+  - Dockerfile の `RAYON_NUM_THREADS=1` は親にしか届かず、親は anydoc を読み込まない。働かない設定で、6.11 のタスクが求め、`dockerfile.spec.ts` 106 行が固定している (tasks.md の 8.2 に扱いを書いた)。
+
+**確かめなかったこと**: 関数の長さ (50 行以下) は、機械的には確かめていない。ファイルの大きさは確かめた (本番の最大は 405 行、テストの最大は 738 行)。変更を入れてテストが落ちるかの確認、サービスの起動、pnpm・turbo の実行はしていない。
+
+#### 「7.1 で判断する点」への答え
+
+| 記録 | 判断する点 | 答え |
+|---|---|---|
+| 27.1 | `replaceBatched` は、空に一致する正規表現で例外を投げる | A: 受け入れる。呼び出し側の 7 つの正規表現をすべて読み、空に一致するものは無い |
+| 27.1 | htmlparser2 の内部の項目 (`recognizeSelfClosing` と `index`) を書き換えている | A: 記録どおり受け入れる。版は `=12.0.0` に固定で、目印のテストが働く (1 つめの書き換えを外すと 2 件、2 つめを外すと 4 件が落ちる。そのうち 1 件は時間が入力に比例することのテストで、外すと 60 秒かかった。実行した) |
+| 27.2 | `ooxml/` が平らに並んでいる (`zip-*` を `zip/` に分けるか) | A: そのまま。分ける案は提案にとどめる。C: いまは分けない (好みの範囲。barrel を置くと、経路ごとの読み込みが効かなくなる) |
+| 27.2 | 前のレビューが勧めたが、無いテスト (`xmlns:` 40 万個が 1 秒未満、zip64 なしで 65,536 個を超える要素、終わりの記録の変形) | A: どれも不変条件を守るテストではないので、止めない。`xmlns:` 40 万個は、試すと全体で 169ms だった (実行した)。zip64 は A も試していない。テストは足していない |
+| 27.4 | `ooxml/index.ts` と `text/` の barrel が無い | A: 受け入れる。`text/` は意味がある (barrel を置くと、TXT の子が htmlparser2・entities・anydoc を読み込む)。`ooxml/` はほとんど差が無いが、置く利点も無い。design.md の図は取り込みで直す |
+| 27.3・27.4 | 経路ごとの動的な import | A: 妥当。実測 (200 万字の PDF で 302MB と 315MB) が根拠で、`convert-module-loading.integ.ts` が固定している |
+| 22.6 | キーの数の上限を緩めても、失敗するテストが無い | A: いまのコードでは記録どおり受け入れられるが、N3 のテストで閉じ、N1 と合わせて見直すほうがよい。C: テストが要る (B3)。**対応: 1 回目の時点では「テストを足す」とした。最終の直しでは、上限を消して決まりを替えた (27.14 の 1)** |
+| 27.6 | `readiness()` が結果を覚えない | C: 記録どおり受け入れる (確認用の子は同時に 1 つで、同時の呼び出しは共有する)。トークンなしの相手が `/readyz` を呼び続けると約 1 コアを使う点は、記録済みで、守りは NetworkPolicy である。B: 受け入れた判断は妥当 (上の実測) |
+| 27.8 | `start-server.ts` の `trackRequests` の上の 6 行のコメント | **2 人の答えが違う**。B: 取り込みのときに、対象 spec の research.md の節を指す 1〜2 行に縮める。C: 残す (Node の接続の数え方についての分かりにくい理由で、取り込みの後に spec の文で代わりになるものが無い)。**取りまとめの担当は、いまはそのままにする** |
+| 27.8 | `main.ts` の時刻つきの行の書式が、`request-log.ts` と別に書かれている | B と C: そのままでよい (2 行だけ。共有すると、`main.ts` が `http/` の内側のファイルに触ることになる) |
+| 27.8 | `test/http/blackbox-service.ts` が `startService` を使わず、自分で組み立てている | B と C: そのままでよい (Python 版にも向ける黒箱のテストで、接続を切る止め方が要る) |
+| 27.8 | `service.ts` と `main.ts` の分け方 | B: 妥当 (`service.ts` はポート 0 でテストでき、`main.ts` はプロセスに固有のことだけを持つ) |
+| 27.9 | `test/layers/import-specifiers.ts` の 3〜5 行のコメント (「読み込む形はすべて見える」) | A・B・C: 事実と違うので、文を弱める (「並べた形は見える」。`createRequire(...)("…")` を 1 つの式で呼ぶ形は見えない)。B は「取り込みのときでよい」とした。この節を書いた時点では、まだ直していなかった。その後に直した (27.14 の 5) |
+| 27.9 | 層の検査 (`test/layers`) の作りと、検査で見つけられないまま残した形 | B: 妥当。規則は表に書かれ、検査はその表を読むだけ。見つけられない形は記録どおり。C: 記録した形は受け入れられる |
+
+#### 取り込みの確認の一覧 (タスク 9 のためのもの。C の報告の 9 節を、節の番号で引く形に直した)
+
+行番号ではなく節の番号で引いている。C の報告は research.md の行番号を使っていたが、この節と注記を足したので、行番号はずれている。
+
+**対象 spec の design.md に書くもの**
+
+- [ ] Configuration: `WORKERS` を消す。同時実行の上限は `MAX_CONCURRENCY` だけになる (7.1)。
+- [ ] Configuration: メモリの段落を、Node 版の式・見積もり・最も重い負荷の実測・決定 (A) に置き換える (20.10、20.12)。
+- [ ] Configuration: 子の `env` の `MALLOC_ARENA_MAX=2`、子の node の引数 `--wasm-max-mem-pages=8192 --max-semi-space-size=4`、PDF の子が PDFium だけを読み込むことを書く (20.12)。
+- [ ] Configuration: `RLIMIT_AS` は `MAX_CHILD_RSS_MB` + 2,304MiB (19.10)。
+- [ ] Configuration: `RLIMIT_CORE` を 0 にする説明を、`--core=1` と理由に直す (15.7、15.11)。
+- [ ] Configuration: `TMPDIR=/tmp` を消す (どの一覧にも無かった項目。Node 版の Dockerfile は設定していない)。
+- [ ] Configuration: `LOG_LEVEL` の行から、`app` のロガーという言い方を消す。
+- [ ] HealthRouter: `dependencies` は `@firecrawl/anydoc`・`@embedpdf/pdfium`・`prlimit`・`converter` (7.3、18.10)。503 の本文には `dependencies` が無い。準備完了の結果を覚えない。確認は、決まった上限の下で PDF・PPTX・HTML を変換する (27.6、27.7)。
+- [ ] Error Handling: 本文の形の例外を足す。項目 1 は、訂正の後の文にする (7.4、7.5 とその訂正の注記)。
+- [ ] Error Handling: 検出のしかたの列を、PDFium のエラー番号と anydoc の `ConvertErrorCode` に直す (27.3)。`REFUSAL_TABLE` を書く (27.8)。
+- [ ] タイムアウトの合計を「約 74 秒」から約 70 秒 (回収の待ちの上限を足して 72 秒) に直す (20.12、20.8)。
+- [ ] 何もしていない親の RSS を、実測の値にする (20.12。69MiB と 82〜83MiB のどちらにするかは 6.12 で決める)。
+- [ ] Testing の基準値 285MB / 281MB を、Node 版の値と測り方に直す。最終の数字は 6.12 から取る (20.12、27.5)。
+- [ ] 部品と継ぎ目の説明は、23.1・23.5・23.6 から書き直す。この spec の File Structure Plan は移さない (design.md の冒頭の「例外」の注記)。
+- [ ] `RunInput` は `chunks` と `size` (27.7)。組み立ては `service.ts` と `main.ts` (27.8)。`oom_score_adj` は `child/oom-score.ts` にある (27.5)。`formats/`・`wire/`・`ooxml/`・`text/`・`config/`・`child/` に barrel が無いことと、その理由 (27.4、27.9)。`ConversionLimits` が `contract/` にある理由 (23.2)。
+- [ ] 配布物と CI: compose の `context` はリポジトリのルートで、`dockerfile` は `apps/attachment-text-extractor/docker/Dockerfile` (23.7)。この spec の Req 8 と Req 9 から書き直す。workflow のファイル名 (tasks.md の 8.2 で決める)。init のプロセスは要らないこと、猶予時間 85 秒 (27.10)。
+- [ ] Revalidation Triggers: この spec の design.md の Revalidation Triggers の全体 (B2 で足したものを含む) を移す。あわせて「子の最大 RSS の基準」「Node 版で狭まった検索の対象の範囲」「メモリの予算の実測」を足す (20.12)。
+- [ ] `MAX_RESULT_BYTES` の説明を、「`content` の合計の上限で、ラベルは数えない。全体は、結果の本文の上限 33MiB が抑える」と読める文にする (上の N6)。
+- [ ] `MAX_XLSX_CELLS` の説明を、「早めに断るための検査で、守りの境界は RSS の上限」と読める文にする (上の N5)。
+
+**対象 spec の requirements.md に書くもの**
+
+- [ ] この spec の Req 4 → 対象 spec の Req 5、Req 5 → Req 6、Req 7 → Req 7 として、末尾に足す。AC の番号は保つ。既存の 1.1〜4.2 の番号は変えない (brief.md の「Port-back の前提」)。
+- [ ] 崩した契約に当たる AC だけ、番号を変えずに文を直す。
+- [ ] AC 1.7 は文を変えず、`prlimit` の解釈を添える。
+- [ ] Req 5.4 の「各ディレクトリの `index.ts`」という言い方を直す (barrel の無いディレクトリが 6 つある)。
+- [ ] `MAX_XLSX_CELLS` を 65,000 に下げるのは、6.12 の結果がそれを求めたときだけ。
+- [ ] 導入の文を、Python 版の言い方を使わずに書き直す。
+
+**対象 spec の research.md に移すもの**
+
+- [ ] 計測の結果、試作の決定、ベンチマーク、7 節 (7.8 を含む) を移す。
+- [ ] 移す前に、この文書の中で書き戻す:
+  - 27.1〜27.4 を 18.7 に (18.7 の「2,725」はいまは正しくない)。
+  - メモリの値を 20.9 と 20.12 に (約 212 万字と約 198 万字)。
+  - 「PDF の子は PDFium だけを読み込む」を 20.1 に。
+  - 23.x の更新 (`wholeFile`、`ProbeInput`、`forwardedBytes`)。
+  - 理由の id `17.6` が無くなったこと (id は 6 つ)。
+  - 27.7 の「`requestTimeout` は 300 秒に固定」と「`close()` は処理中の接続も切る」は、27.8 で置き換わったこと。
+  - 「未決事項」の表 (OpenAPI、RSS の食い違い、`--core=1`)。
+  - 21.2 と 21.6 (`zod` と `hono-openapi` は本番の依存で、数は 9 ではなく 11)。
+  - 20.12 の 285MB についての注。
+- [ ] multipart の手本のデータ (`multipart-oracle.json` と `header-param-oracle.json`) は、撤去した Python 版から記録した固定のデータで、作り直せないことを書く。
+- [ ] コードのコメント約 200 個が引いている節の番号を、保つか、対応を付けて書き換える。
+
+**完了の報告でユーザーに示すもの (Req 1.12)**
+
+- [ ] D1 (`WORKERS`)、D2 (`/readyz` の名前)、D3 (`/docs` と `/redoc`)。
+- [ ] 7.5 (本文の形の例外。項目 1 は、`Connection: close` を付けた要求でだけ違う)。
+- [ ] 7.6 の 9 通りと、27.7 の追加分 (200 の応答が chunked、Hono の 404 の文、431、何も送らない接続の 60 秒の 408、`HEAD /healthz` が 200)。
+- [ ] 7.7 (生成クライアントの名前と、apps/app の呼び出し側の変更)。
+- [ ] 7.8 (ログ。ユーザーは (イ) に決めた。`/extract` 以外の要求ごとのログと、Web サーバーのアクセスログが無いこと (401、存在しないパス、probe の呼び出しはログに残らない) と、`/extract` の行の先頭の書式が違うことを示す。戻した診断の行と子の警告の結果は 27.15 から取る)。
+- [ ] 26 節の「完了の報告でユーザーに伝える、作業者の判断」の 1〜16。
+- [ ] 環境変数の名前は大文字だけで読み、`.env` は読まず、整数の書き方が厳しくなったこと (22.6)。
+- [ ] 運用者が設定した `RAYON_NUM_THREADS` を使わないこと (26 節の 2)。
+- [ ] Python 版は通すが Node 版は止める入力 (20.9)。
+- [ ] bzip2・LZMA の部品を持つ PPTX と、欠けた ZIP の 44 件が 422 になること (27.2、27.4)。
+- [ ] 文字コードの判定とデコードの違い (18.7、27.1、27.4)。
+- [ ] 壊れたファイルや珍しい形のファイルで、状態が Python 版と違うもの:
+  - 壊した PDF の一部は、Python 版が 422 `malformed`、Node 版が 200 になる (壊した 3,000 件のうち 40〜47 件。Node 版が拒み Python 版が通す入力は 0 件。27.3)。
+  - ZIP の暗号化の印の読み方で、`encrypted` と `malformed` が入れ替わる形がある。要素が 65,536 個を超えるのに zip64 でない ZIP は、Python 版が `limit_exceeded`、Node 版は 200 か `malformed` になる。印の付いたディレクトリ要素を持つ XLSX は、Python 版が失敗し、Node 版はページを返す (27.2)。
+  - 大きな入力で、Node 版だけが子の RSS の上限で止まり、422 `resource_limit_exceeded` になるものがある: `title` の中に `<&amp;` が続く 20MiB の HTML (27.1)、約 25〜30MiB 以上の XML の部品を 1 つ持つ PPTX、約 2,600 枚以上のスライドを持つ PPTX (27.2。枚数は見込み)。
+  - 64MiB の XML の部品では、anydoc の中でメモリの確保に失敗して子が abort し、500 になりうる (27.2)。
+- [ ] 準備完了の確認のしかた (27.6)。停止の待ち方と `requestTimeout` (27.8)。
+- [ ] この節で記録した小さな違い: 同じ接続の 2 つ目の要求が 503 になること、大きすぎる期限の扱い、負の `MAX_CONCURRENCY`、`LOG_LEVEL=NOTSET`、401 の本文の空白、`Server` ヘッダー。
+- [ ] ライセンスの文をリポジトリに置いたことと、anydoc のバイナリにライセンスの表示が入っていないこと (27.10。ユーザーの判断)。
+- [ ] メモリの計測のステップが push のたびに動くこと (27.11)。
+- [ ] 200 万字の PDF は、304MB の線まで 1〜2MB しか無いこと (27.11)。
+- [ ] ベンチマークで分からないことと、1 文書あたりの時間が約 10 倍であること (27.12)。
+- [ ] 既定値を下げた場合は、その値。
+
+**9.1 でユーザーに諮る Follow-ups**
+
+- [ ] `.kiro/steering/structure.md` の `services/` の節。
+- [ ] `.kiro/steering/tech.md`。
+- [ ] umbrella の README と、下流の indexing の文書 (Python の言い方、古いパス)。
+- [ ] ルートの `AGENTS.md` と `.claude/rules/project-structure.md` に、新しい app を載せるか。
+
+**タスク 8.2 で扱うもの (取り込みではないが、同じ一覧に置く。tasks.md の 8.1 と 8.2 に書いた)**
+
+- [ ] サービスの `CLAUDE.md` を書く。
+- [ ] `Dockerfile.dockerignore` の `services` の行を消す (27.10)。
+- [ ] compose の `init: true` と、Python 版の言い方のままのテストの題名を決める (27.10)。
+- [ ] workflow の `paths` と turbo の `test` の `inputs` に、クライアントの `openapi.json` と compose を足す (27.8、17.7)。
+- [ ] commit 済みの文書との比較を動かし始める。
+- [ ] 最初の docker の実行の後に、`local` の対象と `IN_SERVICE=` を消す (27.11)。
+- [ ] Dockerfile の `RAYON_NUM_THREADS` を残すか決める。
+- [ ] 8.1 の目印の検査を流し直す前に、Python 版の `.venv` を直す (27.12)。
+- [ ] workflow のファイル名を決め、requirements.md・design.md・brief.md と実物を一致させる。
+
+**取り込みのときに直す、この spec の design.md の古い記述 (C の承認を止めない指摘 7。8.x と 9.x の担当が読み違えないように置く)**
+
+- [ ] Technology Stack の「未決」「候補」の行 (PDF は `@embedpdf/pdfium` で、表の候補に名前が無い)。T1〜T4・T6・T7 の表に決定の行が無い。
+- [ ] `TMPDIR` の「T2 で確かめる」(Dockerfile は設定していない)。
+- [ ] 子の起動「約 27ms」(できたものは、小さな TXT 1 件で中央値 84ms、1 文書あたり 75〜130ms)。
+- [ ] 結果のひとかたまり (frame) の上限の説明 (コードは `maxResultBytes` の 2 倍 + 1MiB。`src/wire/length-prefixed-json.ts` 32 行。HEAD `fba405e950` の行番号で、7.1 の直しでずれうる)。
+- [ ] `package.json` の `dev` の script (実物には無い)。
+- [ ] Open Questions の、すでに答えが出ている項目。
+
+#### ユーザーに伝える・諮る点
+
+- **諮る**: ログを戻すかどうか (7.8 の「決定」)。選択肢は、(ア) このまま受け入れる、(イ) 親が書く診断の行を戻し、子の警告もサービスのログに通す、(ウ) (イ) に加えて `/extract` 以外の要求のログも戻す、の 3 つ。取りまとめの担当の推奨は (イ)。この節を書いた時点では、ユーザーはまだ決めておらず、コードは変えていなかった。(追記: ユーザーは 2026-11-11 に (イ) に決めた。`/extract` 以外の要求ごとのログと、Web サーバーのアクセスログは戻さない。7.8。実装の結果は 27.15 に書く。)
+- **伝える**: 1 文書あたりの時間が、Python 版の約 10 倍である (27.12。1 文書あたり 75〜130ms と約 8ms。要件の違反ではないが、まとめて index を作り直すときの処理量に効く)。
+- **伝えて判断を仰ぐ**: ライセンスの文 19 個をリポジトリに commit したこと。anydoc のネイティブのバイナリに、ライセンスの表示が何も入っていないこと (27.10)。
+- **伝える**: メモリの計測のステップが push のたびに動き、上限を超えるとジョブが失敗すること。200 万字の PDF の子の最大 RSS は、304MB の線まで 1〜2MB しか無いこと (27.11)。
+- **伝える**: タスク 6.12 は開いたままである。docker の実行も CI の実行も、まだ一度もしていない (27.10、27.11)。
+
+### 27.14 タスク 7.1 の直しと再レビュー
+
+27.13 の承認を止める指摘と、直す価値があるとした指摘を直した。コードの直しは Fable の担当が行い、別の新しい Fable の担当が独立にレビューして APPROVED とした (承認を止める指摘なし)。記録の直し (7.8、design.md の Revalidation Triggers、tasks.md の 8.1 と 8.2、27.13) は、別の Fable の担当が行った。数字は、とくに書いていなければ実測。変換の層 (`src/conversion`・`src/formats`) は変えていないので、6.13 は測り直していない。
+
+**1. wire の結果の検査 (27.13 の B3 と N1)**
+
+- 決まりを替えた。`rejectUnsafeStructure(json, skeleton)` は、`JSON.parse` の前に、正しい結果には出てこないオブジェクトと配列をすべて拒む。
+  - `{` は、いちばん外側か、配列の要素としてだけ許す。`[` は、いちばん外側のオブジェクトの直下でだけ許す。
+  - 配列の中に置けるのは、`{`・`,`・`]` と空白だけである (数・文字列・`true` などを要素にすると拒む)。
+  - いちばん外側のキーは `skeleton.topKeys` に、要素のキーは `skeleton.elementKeys` に無ければ拒む。同じキーが 2 回出たら拒む (前からの決まり)。要素を閉じる `}` の時点で、要素のキーがすべて出ていなければ拒む。
+- 正しい結果の形は 3 つで、どれもキーが 3 つである: 成功 (`ok`・`pages`・`mimeType`。配列は `pages` だけ)、ページ (`pageNumber`・`label`・`content`。値は数・null・文字列だけ)、失敗 (`ok`・`kind`・`detail`)。`result-json.ts` は、形の検査に使うのと同じキーの定数から `RESULT_SKELETON` を作って検査に渡す。そのため、キーの名前が 2 か所で食い違うことはない。
+- **入れ子の深さの上限 (64) とキーの数の上限 (16) は、どちらも消した。** 新しい決まりのもとでは、深さは 3 を超えず、キーは多くても 5 個なので、上限の処理は決して実行されない行になる。レビューの担当は、壊れた入力 300 万通りを含めて確かめ、「深さが 3 を超えないことは、どんなバイト列でも成り立つ」と判定した。22.6 と tasks.md の 7.1 に書いてあった「64 と 16 の上限をコードを読んで確かめる」は、当てはまらなくなった。
+- **この決まりが課す制約**: ページの要素は、3 つのキーをすべて持たなければならず、値に入れ子のオブジェクトや配列を置けない。ページに省略できる項目や入れ子の項目を足すときは、この検査も一緒に変える必要がある (`result-json.ts` の `PAGE_KEYS` の横に 1 行で書いた)。変え忘れると、すべての結果が拒まれるので、往復のテストがすぐに落ちる。
+- 効果 (33MiB の本文を `decodeResult` に通した。実装の担当の計測。待機時が約 145MB):
+
+  | 本文 | 直す前 | 直した後 |
+  |---|---|---|
+  | `pages` が `{}` の並び | 1,301MB・2,035ms | 145MB・14ms |
+  | `pages` が `[]` の並び | 1,042MB・1,019ms | 145MB・14ms |
+  | いちばん外側が `[[],…]` | 1,042MB・985ms | 145MB・14ms |
+  | `pages` が `1` の並び | 384MB・394ms | 145MB・14ms |
+  | 正しい空のページ 752,238 個 (受け入れる) | 282MB・492ms | 286MB・531ms |
+  | 実際に近い 18.9MB の結果 (100 ページ) | 67ms・119MB | 68ms・119MB |
+
+- まだ残るメモリと時間の負担 (レビューの担当の計測。待機時が約 250〜260MB の別の測り方なので、増え方で読む): いちばん重いのは、正しい形の結果 (空のページ 752,238 個) で、約 +170MB・0.5 秒。キーは正しいが値の型が違うページ 868,000 個は、`JSON.parse` の後で拒まれ、約 +95MB・0.48 秒。33MiB の文字列 1 つは 46ms。どれも正当な結果と区別できないか、負担が小さいので、この検査では拒まない。3 件同時でも、一時的に約 +0.5GB である。
+- 確かめ方: 本物の `encodeResult` で作った結果 20 万通り (本文に `{ } [ ] , : "` や `\`、制御文字、U+2028/2029 などを混ぜた) を、3 通りの書き方 (詰めた形、字下げした形、すべての文字列とキーを `\uXXXX` にしてキーの順を入れ替えた形) で通し、60 万通りすべてが検査を通って、復元した結果が元と同じだった。正しい JSON の文 40 万通りを、別に書いた判定と比べて、食い違いは 0 だった。決まりを 6 通りに緩めると、それぞれ 2〜5 件のテストが落ちる。
+- テストは `src/wire/json-structure-guard.spec.ts` (30 件) と、`length-prefixed-json.spec.ts` の小さな heap の 2 件。
+
+**2. 使われていない読み取りの処理を消した (27.13 の N2)**
+
+- `src/wire/length-prefixed-json.ts` の `readExact` と `readFrame` を消した (本番の呼び出しが無いことを grep で確かめた)。`writeFrame`・`encodeFrameHeader`・`maxResultFrameBytes` は残した。
+- それだけを確かめていたテスト 6 件を消し、4 件を「`writeFrame` が書くバイト列」を見る形に書き直した。
+- 消したテストが見ていた場合は、本物の読み取りのテストが見ている: 親 (`runner/result-frame.ts`) は `conversion-runner.integ.ts` (上限より長い結果、途中で切れた本文、制限時間まで届かない本文)、子 (`child/frame-io.ts`) は `child-entry*.integ.ts` (おかしな長さ、途中で切れた入力、上限を超えるファイル)。
+- どの読み取りにもテストが無い場合が 2 つある: 見出しが 1〜3 バイトで切れる場合と、長さが上限よりちょうど 1 大きい場合。本物の読み取りには、もとからこのテストが無かった (今回の削除で失ったものではない)。足すなら、見出しを 2 バイト書いて終わる偽の子を 1 つ足す。
+
+**3. 部品の見出しの空白の削り方 (27.13 の B の 3)**
+
+- `src/http/header-params.ts` の 3 つの正規表現を、両端から数えて切る処理に替えた。空白として扱う文字の集まりは同じ (0x09〜0x0d、0x1c〜0x20、0x85、0xa0)。
+- タブ 4,150 個の見出し 1,000 個の解析は、11,391ms から 8ms になった。
+- 直す前の処理と直した後の処理を、2,262,144 通りの入力 (空白の集まりに寄せた 200 万通りと、65,536 個の符号単位のすべてを、削る位置ごとに置いたもの) で比べ、結果はすべて同じだった (レビューの担当)。Python 版の結果を写した固定データのテスト (`header-params.spec` 2,017 件、`parse-multipart.spec` 295 件、`multipart-raw.integ` 180 件) は、変えずに通る。
+- 時間が長さに比例することを確かめるテストを 4 件足した。上限は 1,000ms で、直した後は 0.03〜1.2ms、直す前は 3.1〜9.3 秒である。
+
+**4. 大きすぎる時間の設定 (27.13 の B の 2)**
+
+- 起動のときに値を拒む形にはしなかった (Python 版が受け付けていた値を、新しく拒むことになるため)。秒をミリ秒に直す所で、タイマーが扱える最大の値 (2^31 − 1 ミリ秒、約 24.8 日) に丸める。`src/config/timer-delay.ts` の `toTimerDelayMs` の 1 か所である。
+- 設定から来るタイマーは 3 つで、すべて丸めている: 変換の制限時間 (`TIMEOUT_S`)、アップロードの制限時間 (`UPLOAD_TIMEOUT_S`)、`serverTimeouts` の `requestTimeout`。上限より小さい値の動きは変わらない。
+- あわせて分かったこと: `UPLOAD_TIMEOUT_S` が約 9.0e12 秒以上だと、`http.createServer` が `ERR_OUT_OF_RANGE` を投げて起動できなかった。同じ直しで起動できるようになった。
+- `prlimit` の `--cpu` は、タイマーではなく rlimit なので丸めていない (`--cpu=9007199254740996:9007199254741001` でも `prlimit` は終了コード 0 で動く)。
+- `TIMEOUT_S` は、0 や負の値でも設定の検査を通る (もとからの動きで、今回は変えていない)。
+
+**5. そのほか**
+
+- runner が想定外の例外を投げたときのログの行に、例外のクラスの名前はあり、例外の文やパスは無いことを確かめるテストを足した (`extract-route.integ.ts`。ログに例外の文を出すように変えると落ちる)。
+- `test/layers/import-specifiers.ts` のコメントを、「どの形が見えるか」を並べ、`createRequire(import.meta.url)("…")` を 1 つの式で呼ぶ形は見えないと書く形に直した (27.13 の表の「まだ直していない」は、この直しで済んだ)。
+- テスト全体: 4,735 件が通り、3 件 (`test/deploy/compose.spec.ts`。8.2) が失敗、12 件が skip。直す前の 4,692 件から +43 (`json-structure-guard.spec` +30、`timer-delay.spec` +8、`header-params.spec` +4 など。消したテストは 6 件)。`tsgo --noEmit` はエラー 0、`biome check` はエラー 0 (警告 37 件は、もとからあるテストの `noAwaitInLoops`)。レビューの担当も、テスト全体を自分で 1 回流して同じ数を得た。
+
+**直していないもの (記録だけ)**
+
+- ログ (7.8)。この節を書いた時点では、ユーザーの答えを待っていた。ユーザーは 2026-11-11 に (イ) に決めた。親が書く診断の行を戻し、子の警告をサービスのログに通す。`/extract` 以外の要求ごとのログと、Web サーバーのアクセスログは戻さない。実装は 7.1 の直しの一部としていま行っていて、結果は 27.15 に書く。
+- 27.13 に記録した、もとからある、検査で見つけられない形 (XLSX のセル数の事前の検査を避ける 3 つの形、`MAX_RESULT_BYTES` がラベルを数えないこと)、負の `MAX_CONCURRENCY`、同じ接続に続けて書いた 2 つめの要求が 503 になること。
+- 丸める所は「秒をミリ秒に直す所」で、`runChild` と `receiveUpload` の中ではない。この 2 つにミリ秒を直接渡す呼び出しを後から足すと、丸めが掛からない。

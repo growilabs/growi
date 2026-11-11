@@ -98,10 +98,14 @@
 - **対象 spec から引き継ぐもの**: `ErrorCode` の追加・変更、同じコードが複数の HTTP ステータスを持つこと、`pages[]` の規則、health / readiness の応答の形、`label` の中身、タイムアウトの順序、サイズと時間の上限の既定値。この書き換えは既定ではどれも変えない
 - **既定値を下げたとき (11.11)**: `MAX_CHILD_RSS_MB` を下げると、いまは通る大きなファイルが `resource_limit_exceeded` になる。`MAX_XLSX_CELLS` を下げると、検索の対象になる XLSX の範囲が狭くなる。どちらも apps/app 側の `maxFileSizeBytes` とは独立なので apps/app のコードは変わらないが、運用者に知らせる必要がある
 - **タイムアウトの合計 (3.13)**: 子プロセスの停止と回収にかかる時間が Python 版と変わる。最悪の合計が apps/app の既定 `timeoutMs` 90,000ms を超えたら、apps/app 側の既定を見直す
-- **契約を崩したとき (1.12)**: 崩した項目をここに書き足す。いま崩したものは次の 3 つで、記録は research.md の 7 節にある
+- **契約を崩したとき (1.12)**: 崩した項目をここに書き足す。いま Python 版と違えているものは、下の項目と、その次の「生成クライアントの名前の変更」である。記録は research.md の 7 節にある。完了の報告 (1.12) と取り込み (Req 12) は、この一覧をもとに作る
   - **`WORKERS` の廃止 (D1)**: compose と k8s の例から `WORKERS` を消す。運用者が `WORKERS` を設定していても無視される (起動は失敗しない)。2 以上を設定していた運用者は、同時実行の全体の上限が「ワーカー数 × `MAX_CONCURRENCY`」から `MAX_CONCURRENCY` だけに変わるので、必要なら `MAX_CONCURRENCY` を上げるか Pod を増やす。apps/app のコードと生成クライアントには影響しない
-  - **`/readyz` の `dependencies` の名前の変更 (D2)**: キーが Node 版の部品の実名と `prlimit` に変わり、`pypdfium2` と `charset-normalizer` は出なくなる。運用者が curl などで本文を見たときの表示が変わる。k8s と compose の health の確認は HTTP のステータスだけを見て本文を見ないので影響しない。OpenAPI のスキーマは `{}` なので、生成クライアントにも影響しない
+  - **`/readyz` の `dependencies` の名前の変更 (D2)**: キーが Node 版の部品の実名と `prlimit` に変わり、`pypdfium2` と `charset-normalizer` は出なくなる。運用者が curl などで本文を見たときの表示が変わる。k8s と compose の health の確認は HTTP のステータスだけを見て本文を見ないので影響しない。OpenAPI の文書は、200 の応答の `dependencies` を「名前から `ok` への対応」として型を付け、名前そのものは決めていない。そのため、名前を変えても生成クライアントは変わらない (`/readyz` の応答に型が付くこと自体は、下の「生成クライアントの名前の変更」に含まれる)。準備未完了のときの 503 の本文は `{"status":"not_ready"}` だけで、`dependencies` を出さない (research.md 27.7)
   - **`/docs` と `/redoc` の廃止 (D3)**: この 2 つのパスは 401 (トークンなし) か 404 (トークンあり) になる。apps/app は使っていない。生成クライアントには影響しない
+  - **本文の形の例外 (research.md 7.5。ユーザー判断)**: boundary に CR を含む要求は 422 を返す (Python 版は 200)。要求の `Content-Type` の `charset` は使わない (部品の名前とファイル名は、UTF-8 として正しければ UTF-8、そうでなければ latin-1 で読む)。`Content-Length` が実際の本文より小さい要求は、`Connection: close` を付けたときだけ Python 版と違う (Python 版は 422、Node 版は `code` の無い 400。付けない要求では、どちらも `code` の無い 400 で同じ)。apps/app (axios) はどの形も送らない
+  - **HTTP の層の細かい違い 9 通り (research.md 7.6。作業者の判断)**: `POST` 以外の `/extract` は 404 (Python 版は 405)。末尾に `/` を付けた `/extract/` は 404 (Python 版は 307)。`Expect: foo` は 417 (Python 版は 200)。`Host` の無い HTTP/1.1 の要求は 400 (Python 版は 200)。末尾に空白のある `Authorization` は 200 (Python 版は 401)。同じ種類の違いがほかにもある (research.md 27.7): 200 の応答は `Content-Length` を付けず chunked で返す、404 の本文は JSON ではなく Hono の既定の文字列、16KiB を超えるヘッダーは `code` の無い 431、何も送らない接続は 60 秒で `code` の無い 408、`HEAD /healthz` は 200。apps/app (axios) はどの形も送らず、chunked の応答は axios が解く
+  - **ログ (research.md 7.8。ユーザー判断)**: Node 版が出すログは、`/extract` の 1 件ごとの行、runner が想定外の例外を投げたときの ERROR の行、起動と停止の行、親が書く診断の行 (準備未完了の理由、子を起動できない理由)、子の警告である。Python 版が出していた、認証を通った要求ごとの行 (`/extract` 以外) と、Web サーバー自身のアクセスログは出さない。そのため、401 の要求、存在しないパスへの要求、probe の呼び出しは、ログに 1 行も残らない。行の先頭 (時刻の書式、ロガーの名前) も Python 版と違う
+  - **運用者から見えるそのほかの違い**: 応答の状態やログ、設定の読み方、停止の待ち方、CI と配布物に関わる違いを、research.md の 18.7・20.9・22.6・26 節・27.1〜27.8・27.10〜27.12 に記録した (壊れたファイルや大きなファイルで応答の状態が Python 版と違うものは、18.7・20.9・27.1〜27.4 にある)。完了の報告に載せる項目の一覧は research.md 27.13 の「取り込みの確認の一覧」にある
 - **生成クライアントの名前の変更 (7.1、7.2)**: OpenAPI の文書を経路の定義から作るので、操作とスキーマの名前が変わり、生成クライアントの関数名と型名が変わる (`postExtractExtractPost` → `postExtract` など。対応は research.md の 7.7)。`file` の型は `string` から `Blob` に変わる (いまの apps/app は `Buffer` を `string` と偽って渡している)。`POST /extract` に渡す項目の名前、応答の型、`ErrorCode` の値は変わらない。apps/app の呼び出し側は、名前と型の書き方の修正だけを撤去と同じ変更で行い、実行時の振る舞いは変えない。以後、経路の定義やスキーマを変えると文書と生成クライアントが変わるので、変えたときは生成クライアントを作り直し、apps/app の呼び出し側を見直す
 
 ## Architecture
@@ -383,7 +387,7 @@ graph LR
 - 段階 0 から撤去まで、Python 版はいまの場所にそのまま残し、いまの Python 用の CI もそのまま動かす。比較 (2.1、2.2)、ベースライン (2.11)、黒箱のテストの確認 (6.3) に使うためである。Python 版のコードは直さない (直すと比べる相手が変わる)
 - Node 版は最初から `apps/attachment-text-extractor/` で作る (D4)。Python 版は `services/attachment-text-extractor/` に残るので、作業の間は 2 つが別の場所に並ぶ。compose の `context` は、撤去のときまで Python 版を指したままにする (配布物を途中で切り替えない)
 - 撤去の手順: (1) compose の `context` と CI の `paths` を Node 版に切り替える、(2) `services/attachment-text-extractor/` をディレクトリごと消す、(3) Python 用の CI のジョブを消す、(4) commit 済みの OpenAPI の文書を Node 版が書き出したものに置き換え、生成クライアントを作り直し、apps/app の呼び出し側を直す (下の項目)。これを 1 つの変更にまとめる
-- Node 版の CI は、作業の間は Python 用の workflow とは別のファイル (`.github/workflows/ci-attachment-text-extractor.yml`) として足す。Python 版のテスト (`tests/test_ci_workflow.py`) が「Python 用の workflow のジョブは 1 つだけ」を前提にしているため、同じファイルには足せない。撤去のときに Python 用の workflow (`attachment-text-extractor.yml`) を消し、Node 用の workflow に image の確認と OpenAPI の drift 検知のジョブを足す (9.1)
+- Node 版の CI は、作業の間は Python 用の workflow とは別のファイル (`.github/workflows/ci-attachment-text-extractor.yml`) として足す。Python 版のテスト (`tests/test_ci_workflow.py`) が「Python 用の workflow のジョブは 1 つだけ」を前提にしているため、同じファイルには足せない。Node 用の workflow は、lint・型の検査・テストのジョブと、image の確認のジョブ (container の `/openapi.json` と書き出しの手順の文書の比較を含む。research.md 27.11) を持つ。撤去のときに Python 用の workflow (`attachment-text-extractor.yml`) を消し、Node 用の workflow で、commit 済みの OpenAPI の文書との比較 (drift 検知) を動かし始める (9.1)
 - **commit 済みの OpenAPI の文書の置き換えは、撤去と同じ変更で行う**。いまの Python 用の CI は、Python 版が書き出す文書と commit 済みの `openapi.json` を JSON として完全に比べている。作業の途中で commit 済みの文書を Node 版のものに置き換えると、Python 版の文書と合わなくなり、Python 用の CI が失敗する。また `attachment-search-indexing` の CI は orval で作り直した `src/generated/` の差分を `git diff --exit-code` で見ており、apps/app は生成クライアントの関数名で呼び出しているので、作り直した生成クライアントと apps/app の呼び出し側の修正も同じ変更に入れる必要がある。そのため、(1) commit 済みの文書を Node 版が書き出したものに置き換えること、(2) orval での生成クライアントの作り直し、(3) apps/app の呼び出し側の修正 (名前と型の書き方)、(4) Node 版の drift 検知 (Node 版が書き出す文書と commit 済みの文書の完全な比較) を CI で動かし始めること、(5) Python 用の CI の撤去、の 5 つを 1 つの変更にまとめる。それまでの間、commit 済みの文書は Python 版のもののままなので、Node 版の文書とは比べない。Node 版の OpenAPI のテストは、書き出しの手順が `GET /openapi.json` と同じ文書を書くことと、比べる関数そのものの働きを確かめる
 - 撤去してよい条件 (10.4、10.5): ベースラインを測り終えた、比較 (2.1、2.2) を記録した、黒箱のテストが Python 版で通った (6.3)、Node で作ったテスト用のファイルを Python 版のテストでも使えることを確かめた (D5)、ベンチマークの退行についてユーザーの判断が出た (2.14、11.12)、段階 4 のレビューを通った
 
@@ -394,7 +398,7 @@ D1〜D5 はすべてユーザーが決めた (2026-11-04)。
 | # | 項目 | 決定 | 理由と影響 |
 |---|---|---|---|
 | D1 | `WORKERS` の意味 | **(a) 廃止する** (決定)。サービスは読まず、compose と k8s の例から消す | 既定は 1 で、2 以上は接続の偏りで空きがあっても 503 が返る弱点があった (対象 spec の design.md §Open Questions)。スケールは HPA で Pod を増やす。Node では 1 プロセスでも受け口は止まらない (変換は子プロセス)。**契約を崩す** (1.4 の環境変数) ので、1.10 の記録を research.md の 7 節に置いた |
-| D2 | `/readyz` の `dependencies` に出す名前 | **決定: 実名**。Node 版が実際に使っている部品の実名 (npm の package 名) と `prlimit`。いま決まっているのは `@firecrawl/anydoc` と `prlimit` で、PDF の部品は「T1 の結果の実名」、文字コードの判定などに部品を使う場合は「T6 の結果の実名」になる。内部のモジュールをまとめた `converter` は今と同じく 1 つの名前で出す (認証なしの口に内部の名前を出さないため)。Python 版の名前 (`pypdfium2`、`charset-normalizer`) は Node 版で使わないので出さない | 運用者が見て、実際に何が読み込めているかが分かる名前にする。名前は T1・T6 の試作で採用が決まった時点で確定する。OpenAPI ではこの応答の形を決めていない (スキーマが `{}`) ので、生成クライアントは変わらない。`prlimit` は 8.8 で準備完了の条件になるので出す。名前が変わるので、1.10 の記録を research.md の 7 節に置いた |
+| D2 | `/readyz` の `dependencies` に出す名前 | **決定: 実名**。Node 版が実際に使っている部品の実名 (npm の package 名) と `prlimit`。いま決まっているのは `@firecrawl/anydoc` と `prlimit` で、PDF の部品は「T1 の結果の実名」、文字コードの判定などに部品を使う場合は「T6 の結果の実名」になる。内部のモジュールをまとめた `converter` は今と同じく 1 つの名前で出す (認証なしの口に内部の名前を出さないため)。Python 版の名前 (`pypdfium2`、`charset-normalizer`) は Node 版で使わないので出さない | 運用者が見て、実際に何が読み込めているかが分かる名前にする。名前は T1・T6 の試作で採用が決まった時点で確定する。OpenAPI の文書は `dependencies` の名前そのものを決めていない (名前から `ok` への対応として型を付けるだけ) ので、名前を変えても生成クライアントは変わらない。`prlimit` は 8.8 で準備完了の条件になるので出す。名前が変わるので、1.10 の記録を research.md の 7 節に置いた |
 | D3 | `/docs` と `/redoc` | **(a) 出さない** (決定)。`/openapi.json` は残す | apps/app は使っておらず、テストもない。出すには部品が 1 つ増える。**契約を崩す** (FastAPI が既定で出していた画面が消える) ので、1.10 の記録を research.md の 7 節に置いた |
 | D4 | 配置 | **(C) `apps/attachment-text-extractor/` に移し、pnpm workspace に入れる** (決定)。package の名前は `apps/pdf-converter` (`@growi/pdf-converter`) に倣って `@growi/attachment-text-extractor` | 下の「D4 の判断と影響」 |
 | D5 | テスト用のファイルの作り方 | **すべて Node で作り直す** (決定)。DOCX / XLSX / PPTX / PDF / XLS などを Node で生成する | 下の「D5 の判断と影響」 |
@@ -546,7 +550,7 @@ export interface ConversionRunner {
 - 認証は、`/healthz`、`/readyz`、`/openapi.json` 以外のすべてのパス (存在しないパスを含む) で先に行う (1.6)。比較は長さに左右されない比べ方 (`crypto.timingSafeEqual`) にする
 - `/docs` と `/redoc` は出さない (D3)。`/openapi.json` は残す
 - `/readyz` は `runner.readiness()` を呼ぶ。`prlimit` を起動できないとき、または確認用の子が起動できないときは 503 `not_ready` を返し、`/healthz` は 200 のままにする (8.8)。応答の `dependencies` には、D2 のとおり部品の実名 (`@firecrawl/anydoc`、T1 の結果の実名、使う場合は T6 の結果の実名) と `prlimit`、内部のモジュールをまとめた `converter` を出す
-- 1 件ごとのログは対象 spec と同じ形の 1 行 (`extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…`) にする (1.7)
+- 1 件ごとのログは対象 spec と同じ項目の 1 行 (`extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…`) にする (1.7)。行の先頭の書式と、Python 版にあって Node 版に無いログは「Monitoring」に書いた
 
 ## Data Models
 
@@ -590,7 +594,11 @@ export interface ConversionRunner {
 
 ### Monitoring
 
-1 件ごとのログの形は対象 spec と同じ。ファイル名・中身・Authorization ヘッダは出さない (1.7)。
+`/extract` の 1 件ごとのログは、対象 spec と同じ項目 (`extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…`) を 1 行で出す。ファイル名・中身・Authorization ヘッダは出さない (1.7)。行の先頭は「ISO 8601 の UTC の時刻、重要度、本文」の順で、Python 版の先頭 (地方時の時刻、重要度、ロガーの名前) とは違う。
+
+このほかに Node 版が出すログは、runner が想定外の例外を投げたときの ERROR の行、起動と停止の行、親が書く診断の行 (準備未完了の理由、子を起動できない理由)、子の警告 (たとえば `oom_score_adj` の書き込みの失敗) である。診断の行と子の警告は、障害の原因を運用者がログから調べられるようにするために出す。
+
+`/extract` 以外の要求ごとの行と、Web サーバー自身のアクセスログは出さない。そのため、401 の要求、存在しないパスへの要求、probe の呼び出しは、ログに 1 行も残らない。これは Python 版との違いで、ユーザーが決めた (research.md 7.8)。診断の行と子の警告の実装の結果は research.md 27.15 にある。
 
 ## ベンチマーク (2.7〜2.15)
 

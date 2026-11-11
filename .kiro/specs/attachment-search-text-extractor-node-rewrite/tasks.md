@@ -261,9 +261,10 @@
 - [ ] 7. 実装のレビューを通す
 - [ ] 7.1 実装した担当とは別の担当が、Opus で、欠陥を探す立場でレビューし、承認まで直す
   - レビューの担当は新しく立て、Opus の model を明示して使い、`kiro-review` の手順で、範囲 → 形 → 欠陥の順に見る (`.claude/rules/coding-style.md` の「筋の良い実装」)
+  - 2027-03-09 までは、ユーザーの指示により、Opus の代わりに Fable の model を明示して使う (レビューの担当を実装の担当とは別に新しく立てる決まりは変えない。research.md 27.13)
   - 不変条件 (認証、トークンを子に渡さない、隔離、入力を返さないエラー、メモリの予算 2Gi、対応形式、位置情報) が守られていることと、崩した契約がすべて research.md の 7 節に記録されていることを確かめる
-  - wire の結果の検査 (`json-structure-guard.ts`) に、入れ子の深さの上限 (64) とキー数の上限 (16) が `JSON.parse` の前に残っていることを、コードを読んで確かめる (キー数の上限を外すと落ちるテストが無い。research.md 22.6)
-  - `bearer-auth` のトークンの比較が `crypto.timingSafeEqual` であることを、コードを読んで確かめる (design.md 543 行。テストでは確かめていない)
+  - wire の結果の検査 (`json-structure-guard.ts`) は、正しい結果には出てこないオブジェクトと配列を、`JSON.parse` の前に拒む。この決まりを緩めると、`json-structure-guard.spec.ts` のテストが失敗するので、コードを読んで確かめる必要は無い (research.md 27.14)
+  - `bearer-auth` のトークンの比較が `crypto.timingSafeEqual` であることを、コードを読んで確かめる (design.md の「HTTP の層 (`http/`)」の 2 つめの項目、550 行。テストでは確かめていない)
   - 指摘を直し、同じレビューを通し直す。変換の層を直した場合は 6.13 を測り直し、下回った形式があれば 6.14 の手続きに戻る。直すべき指摘が残っていない状態でレビューの担当が承認する
   - _Requirements: 1.9, 1.10, 1.11, 1.12, 1.13, 5.1, 5.3, 5.4, 5.5, 5.6, 6.1, 6.6, 6.7_
 
@@ -271,6 +272,8 @@
 - [ ] 8.1 撤去の前提がそろっていることを確かめる
   - ベースライン (2.8)、比較 (6.13)、黒箱のテストの Python 版での確認 (4.6)、Node で作ったファイルの Python 版での確認 (2.5)、ベンチマークの判断 (2.9、6.14)、実装のレビューの承認 (7.1) が、すべて research.md かレビューの記録にある。7.1 で変換の層を直した場合は、その後に測り直した 6.13 の結果と判断がある
   - 6.x の後、撤去の前に、黒箱のテストを Python 版に向けて、24 節 (24.4) の目印の付けすぎ・付け忘れの検査をもう一度流し、0 件であることを記録する (研究記録 24.5)
+  - `pages[]` の比較 (6.13) に使った 23 個のファイルには、RTF・EPUB・XML・ipynb・TSV が無い (research.md 27.12)。撤去の後は Python 版と比べられなくなるので、撤去の前に次のどちらかを済ませる: (a) ユーザーが「この 5 つの形式は `pages[]` の比較が無いまま撤去する」ことを受け入れる (5 つの形式の目印の検査は、黒箱のテストが Python 版と Node 版の両方で通っている。research.md 24 節)、(b) 5 つの形式のファイルを 1 個ずつ両方の版に送り、`pages[]` の違いを research.md に記録する
+  - この worktree の Python 版の `.venv` は壊れている (research.md 27.12)。Python 版をもう一度動かす作業 (上の目印の検査、(b) の比較) の前に、`services/attachment-text-extractor/` で `uv python install 3.12` か `uv sync --frozen --extra dev` を流して直す (research.md 8 節)
   - そろっていない項目があれば、撤去に進まない
   - _Requirements: 10.4, 10.5_
   - _Depends: 2.5, 2.9, 4.6, 6.14, 7.1_
@@ -278,6 +281,13 @@
   - compose の build の `context` を Node 版に切り替え (リポジトリのルートを `context` にし、`dockerfile` を `apps/attachment-text-extractor/docker/Dockerfile` にする。research.md 23.7)、`WORKERS` を消し、healthcheck を `node` で `/readyz` を見る形に切り替える (`python`・`curl`・`wget` は slim の image に無い。`timeout` は 15 秒以上。research.md 23.7)。CI の `paths` を切り替え、Python 版のジョブを消す。`services/attachment-text-extractor/` をディレクトリごと消す
   - commit 済みの `packages/attachment-text-extractor-client/openapi.json` を、Node 版が書き出した文書に置き換え、orval で生成クライアントを作り直す。apps/app の呼び出し側 (`attachment-text-extractor.ts` とそのテスト) の関数名と型名を置き換え、`file` の型の書き方 (いまは `Buffer` を `string` と偽っている) を新しい型に合わせる (実行時の振る舞いは変えない。axios に渡る値が変わらないことをテストで確かめる)。Node 版の CI で、Node 版が書き出す文書と commit 済みの文書の完全な比較を動かし始める
   - 生成クライアントの `POST /extract` に渡す項目・応答の型・`ErrorCode` の値が変わっていないこと、apps/app の変更が呼び出し側の名前と型の書き方の修正だけであること、下流 spec のファイルに変更が無いこと、`services/attachment-text-extractor/` が無く、`apps/attachment-text-extractor/` の下と抽出サービスの CI workflow に `.py` のファイルと uv / ruff / pytest / poe を使う記述が無いことを確かめる (`.kiro/` と steering の古い記述は 9.4 で扱うので、ここでは確かめない)
+  - サービスの `CLAUDE.md` を Node 版の内容で `apps/attachment-text-extractor/CLAUDE.md` に書く (requirements.md の Scope と design.md の This Spec Owns が成果物に挙げている。いまあるのは `services/attachment-text-extractor/CLAUDE.md` だけで、ディレクトリごと消える)
+  - workflow のファイル名を決め、文書をそろえる: requirements.md の Req 9.1、design.md、brief.md は「`.github/workflows/attachment-text-extractor.yml` を置き換える」と書いているが、Node 版の workflow は `ci-attachment-text-extractor.yml` で、Python 版のファイルは消す。Node 版のファイルの名前を変えるか、文書の名前を直すかを決めて、3 つの文書と実物を一致させる
+  - Node 版の workflow の `paths` に `packages/attachment-text-extractor-client/openapi.json` と `infra/docker/compose.yaml` を足す (足さないと、クライアントの文書だけ・compose だけを変えた push で検査が動かない。research.md 17.7、27.13)。`apps/attachment-text-extractor/turbo.json` の `test` の `inputs` にクライアントの文書を足す (research.md 27.8)
+  - compose の `init: true` をどうするかを決める: 4.5 の `compose.spec.ts` は `init: true` を求め、Dockerfile と k8s の例は「init のプロセスは要らない」と書いている (research.md 27.10)。どちらかにそろえ、テストの題名に残る Python 版の言い方も直す
+  - `apps/attachment-text-extractor/docker/Dockerfile.dockerignore` から `services` の行を消す (research.md 27.10)
+  - Dockerfile の `ENV RAYON_NUM_THREADS=1` を残すかを決める: この設定は親にしか届かず、親は anydoc を読み込まない (子には `child-env.ts` が渡す)。消すなら `dockerfile.spec.ts` の検査も一緒に消し、残すなら理由を Dockerfile に書く (research.md 27.13)
+  - 最初の本物の docker の実行 (6.12、8.3) が済んだら、メモリの計測の `local` の対象と `check-image.sh` の `IN_SERVICE=` を消す (docker の無い環境で動かすためだけにある。research.md 27.11)
   - 4.5 の compose のテストを含むすべてのテストが通り、`turbo run lint test --filter @growi/attachment-text-extractor` と生成クライアントの package の lint / build が通る
   - _Requirements: 4.6, 7.1, 7.2, 7.3, 7.4, 7.5, 8.4, 9.1, 9.2, 10.1, 10.2, 10.3_
 - [ ] 8.3 配布物と CI を、CI でできる確認と人の確認に分けて確かめる
@@ -312,5 +322,5 @@
   - 対象 spec の `spec.json` の `updated_at` だけを更新し、`phase` と `approvals` は変えない
   - `roadmap.md` にこの spec の行があれば消す (いまは無い)
   - `.kiro/specs/attachment-search-text-extractor-node-rewrite/` を削除し、steering と他の spec からこの spec への参照が残っていないことを grep で確かめる
-  - 完了の報告で、崩した契約 (`WORKERS`、`/docs` と `/redoc`、`/readyz` の名前、ほかに崩したもの) と、下げた既定値があればその値をユーザーに示す
+  - 完了の報告で、Python 版と違えたものをすべてユーザーに示す。示す項目は、design.md の Revalidation Triggers の「契約を崩したとき」と「生成クライアントの名前の変更」の一覧と、research.md 27.13 の「取り込みの確認の一覧」の「完了の報告でユーザーに示すもの」から作る (`WORKERS`・`/docs` と `/redoc`・`/readyz` の名前の 3 つだけではない)。下げた既定値があれば、その値も示す
   - _Requirements: 1.12, 11.11, 12.4, 12.5_
