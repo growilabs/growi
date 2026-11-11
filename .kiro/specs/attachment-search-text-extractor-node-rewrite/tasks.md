@@ -153,6 +153,7 @@
   - _Boundary: HTTP の層のテスト、黒箱のテスト_
   - _Depends: 2.4, 3.8, 4.1_
 - [x] 4.5 配備物のテストを書く (P)
+  - (2026-11-11、ユーザーの決定) k8s の例のテスト (`k8s-manifests.spec.ts`) は、例と一緒に削除した (research.md 7.9、27.16)
   - Dockerfile (Node 24 の slim、最終の段で `prlimit` を実行する、本番に不要なものを含まない)、compose のエントリ (`WORKERS` が無い、安全設定)、k8s の例 (推奨の安全設定、メモリの requests / limits が 3.7 の予算に合う、`WORKERS` が無い)、共有メモリを使わないことを、ファイルを読んで確かめる
   - テストは配備物がまだ Node 版になっていないため失敗する
   - _Requirements: 8.3, 8.4, 8.5, 8.6, 8.7_
@@ -242,11 +243,16 @@
   - ビルドの段で `build` を流し、`dist/` を image に入れる (research.md 23.5)
   - image に、PDFium の WASM に入っている第三者の部品 (FreeType・OpenJPEG・libpng・zlib・libc++ など。JPEG と lcms も入っている見込み) のライセンス表示のファイルを入れる (`@embedpdf/pdfium` の package には `LICENSE` と `LICENSE.pdfium` しか入っておらず、これらの表示が無い。Python 版の pypdfium2 の wheel は `licenses/data/linux_x64/BUILD_LICENSES/` に持っていた)。出どころと入れ方は research.md の 21 節 (PDFium の第三者のライセンス) に従う
   - 4.5 のテストが通る (compose のテストは 8.2 で通る)
+  - (2026-11-11、ユーザーの決定) k8s の例は削除し、運用で守る条件を `docker/README.md` に文章で書く (research.md 27.16)
   - _Requirements: 8.1, 8.3, 8.5, 8.6, 8.7_
 - [ ] 6.12 Node 版の CI のジョブに image の確認を足す
   - image のビルド、大きさが 400MB 以下であることの検査、read-only rootfs・uid 10001・ネットワークなしでの起動、コンテナの中での `/readyz` の確認と PDF / DOCX の `POST /extract`、本番と同じ条件での `prlimit` の実行、コンテナの `/openapi.json` が書き出しの手順の文書と同じであることの確認を足す
-  - 最も重い負荷での 2Gi の確認 (3.7 の決定 (A) の実測の裏づけ。research.md 20.10 / 20.12): (A) の形 (応答を少しずつ書き、結果を一括の入れ物で受け取る) の本物の親で、本番の image の中で、S1 (制御文字だけの 5.5MB の TXT。結果は JSON で約 33MB を 3 件同時に 3 回続けて送る) と S2 (S1 の TXT と、上限まで伸びて止められる 8MiB の CSV を交互に 4 回送る) を、各 3 回以上測る。コンテナの cgroup の `memory.current` の増え方に待機時を足した値が 2Gi (2,048MiB) に収まり、Python 版の実測 (1,230MiB) と同じ程度であることを確かめ、値を research.md に記録する。収まらなければ、3.7 の決定をユーザーに諮り直す。あわせて 3.7 の基準のファイル (7 万セル 1 シートの XLSX、画像 12 枚の 48MB の DOCX) の子の最大 RSS を image の中で測り直し、`MAX_CHILD_RSS_MB` 320 の 0.95 倍 (304MB) 以内であることを確かめる (超えたら research.md 20 節の下げる値 (XLSX は 65,000 セル) を適用し、DOCX が超えたらユーザーに諮る)
-  - ローカルの docker で同じ手順が成功する
+  - 最も重い負荷での 2Gi の確認 (3.7 の決定 (A) の実測の裏づけ。research.md 20.10 / 20.12): (A) の形 (応答を少しずつ書き、結果を一括の入れ物で受け取る) の本物の親で、本番の image の中で、S1 (制御文字だけの 5.5MB の TXT。結果は JSON で約 33MB を 3 件同時に 3 回続けて送る) と S2 (S1 の TXT と、上限まで伸びて止められる 8MiB の CSV を交互に 4 回送る) を、各 3 回以上測る。コンテナの cgroup の `memory.current` の増え方に待機時を足した値が 2Gi (2,048MiB) に収まり、Python 版の実測 (1,230MiB) と同じ程度であることを確かめ、値を research.md に記録する。収まらなければ、3.7 の決定をユーザーに諮り直す。あわせて 3.7 の基準のファイル (7 万セル 1 シートの XLSX、画像 12 枚の 48MB の DOCX) の子の最大 RSS を image の中で測り直し、`MAX_CHILD_RSS_MB` 320 の 0.95 倍 (304MB) と比べる
+  - メモリの計測の合否 (ユーザーの決定、2026-11-11): ジョブを失敗にするのは、最も重い負荷の値が 2,048MiB を超えたときと、計測が正しく行えなかったときだけにする。子の最大 RSS が 304MB を超えたときは、表とジョブの要約に警告を出し、失敗にはしない (手元の余裕は XLSX が 290〜294MB、DOCX が 271〜282MB で 10〜30MB しか無く、別の機械では測るたびの差で線をまたぎうる。本当の上限 320MB はサービス自身が守る)。本物の実行で警告が出たら、research.md 20 節の手順に進む (XLSX は下げる値 65,000 セルを適用し、DOCX はユーザーに諮る)
+  - メモリの計測を動かす時 (ユーザーの決定、2026-11-11): 最初の 1 回は push で動かす (`workflow_dispatch` は、workflow のファイルが既定のブランチに載るまで使えないため)。最初の本物の数字を research.md に記録したら、メモリの計測は人が起動したとき (`workflow_dispatch`) だけ動く形に切り替える。以後は、変換の部品 (anydoc、PDFium)、Node の元の image、メモリに関わるコードを変えたときに人が動かす (workflow の `paths` は `pnpm-lock.yaml` を含むので、push のたびに測ると、関係の無い依存の更新でも動く)
+  - 最初の本物の実行は、ブランチを push して CI の実行を読む形で行う (devcontainer に docker が無い。ユーザーが push を認めた)
+  - このタスクは、最初の本物の実行の数字を research.md に記録し、メモリの計測を人が起動する形に切り替えた時点で完了とする (決定の実施の結果は research.md 27.16)
+  - 最初の本物の実行の後で、`docker/README.md` の冒頭の「まだ本物の container で確かめていない」という断り書きを、確かめた結果に合わせて書き直す
   - _Requirements: 8.1, 8.2, 9.1, 9.5, 11.2_
 - [x] 6.13 Node 版でベンチマークを測り、Python 版と比べる
   - 2.7 の道具を Node 版に向けて測り、2.8 のベースラインと形式ごと・指標ごとに比べる。2.9 で決めた絶対値の基準も確かめる
@@ -281,10 +287,11 @@
   - compose の build の `context` を Node 版に切り替え (リポジトリのルートを `context` にし、`dockerfile` を `apps/attachment-text-extractor/docker/Dockerfile` にする。research.md 23.7)、`WORKERS` を消し、healthcheck を `node` で `/readyz` を見る形に切り替える (`python`・`curl`・`wget` は slim の image に無い。`timeout` は 15 秒以上。research.md 23.7)。CI の `paths` を切り替え、Python 版のジョブを消す。`services/attachment-text-extractor/` をディレクトリごと消す
   - commit 済みの `packages/attachment-text-extractor-client/openapi.json` を、Node 版が書き出した文書に置き換え、orval で生成クライアントを作り直す。apps/app の呼び出し側 (`attachment-text-extractor.ts` とそのテスト) の関数名と型名を置き換え、`file` の型の書き方 (いまは `Buffer` を `string` と偽っている) を新しい型に合わせる (実行時の振る舞いは変えない。axios に渡る値が変わらないことをテストで確かめる)。Node 版の CI で、Node 版が書き出す文書と commit 済みの文書の完全な比較を動かし始める
   - 生成クライアントの `POST /extract` に渡す項目・応答の型・`ErrorCode` の値が変わっていないこと、apps/app の変更が呼び出し側の名前と型の書き方の修正だけであること、下流 spec のファイルに変更が無いこと、`services/attachment-text-extractor/` が無く、`apps/attachment-text-extractor/` の下と抽出サービスの CI workflow に `.py` のファイルと uv / ruff / pytest / poe を使う記述が無いことを確かめる (`.kiro/` と steering の古い記述は 9.4 で扱うので、ここでは確かめない)
-  - サービスの `CLAUDE.md` を Node 版の内容で `apps/attachment-text-extractor/CLAUDE.md` に書く (requirements.md の Scope と design.md の This Spec Owns が成果物に挙げている。いまあるのは `services/attachment-text-extractor/CLAUDE.md` だけで、ディレクトリごと消える)
+  - サービスの `CLAUDE.md` を Node 版の内容で `apps/attachment-text-extractor/CLAUDE.md` に書く (requirements.md の Scope と design.md の This Spec Owns が成果物に挙げている。いまあるのは `services/attachment-text-extractor/CLAUDE.md` だけで、ディレクトリごと消える)。運用者が読む条件は `docker/README.md` にあることを、`CLAUDE.md` から案内する
+  - 配布物に載せるライセンスの表示を決める: anydoc のネイティブのバイナリには、ライセンスの表示が何も入っていない (静的にリンクされた Rust の部品の表示が image に入らない。research.md 27.10)。載せる表示と、その作り方をユーザーに諮って決める。PDFium の WASM の第三者のライセンスの文 19 個は、リポジトリに置いたままにする (ユーザーの決定、2026-11-11。`@embedpdf/pdfium` の版を上げるたびに取り直す)
   - workflow のファイル名を決め、文書をそろえる: requirements.md の Req 9.1、design.md、brief.md は「`.github/workflows/attachment-text-extractor.yml` を置き換える」と書いているが、Node 版の workflow は `ci-attachment-text-extractor.yml` で、Python 版のファイルは消す。Node 版のファイルの名前を変えるか、文書の名前を直すかを決めて、3 つの文書と実物を一致させる
   - Node 版の workflow の `paths` に `packages/attachment-text-extractor-client/openapi.json` と `infra/docker/compose.yaml` を足す (足さないと、クライアントの文書だけ・compose だけを変えた push で検査が動かない。research.md 17.7、27.13)。`apps/attachment-text-extractor/turbo.json` の `test` の `inputs` にクライアントの文書を足す (research.md 27.8)
-  - compose の `init: true` をどうするかを決める: 4.5 の `compose.spec.ts` は `init: true` を求め、Dockerfile と k8s の例は「init のプロセスは要らない」と書いている (research.md 27.10)。どちらかにそろえ、テストの題名に残る Python 版の言い方も直す
+  - compose の `init: true` をどうするかを決める: 4.5 の `compose.spec.ts` は `init: true` を求め、Dockerfile のコメントは「init のプロセスは要らない」と書いている (research.md 27.10)。どちらかにそろえ、テストの題名に残る Python 版の言い方も直す
   - `apps/attachment-text-extractor/docker/Dockerfile.dockerignore` から `services` の行を消す (research.md 27.10)
   - Dockerfile の `ENV RAYON_NUM_THREADS=1` を残すかを決める: この設定は親にしか届かず、親は anydoc を読み込まない (子には `child-env.ts` が渡す)。消すなら `dockerfile.spec.ts` の検査も一緒に消し、残すなら理由を Dockerfile に書く (research.md 27.13)
   - 最初の本物の docker の実行 (6.12、8.3) が済んだら、メモリの計測の `local` の対象と `check-image.sh` の `IN_SERVICE=` を消す (docker の無い環境で動かすためだけにある。research.md 27.11)
@@ -293,7 +300,7 @@
 - [ ] 8.3 配布物と CI を、CI でできる確認と人の確認に分けて確かめる
   - GitHub に push するのは外に向けた操作なので、push する前にユーザーの承認を得る。この workflow は master 以外のブランチへの push でも trigger の条件 (`paths`) に合えば動くので、作業ブランチへの push を第一の方法にする
   - CI で確かめること (8.2 の変更を、trigger の条件に合うブランチに push して動かす): image のビルド、400MB 以下、read-only rootfs・uid 10001・ネットワークなしでの起動、`/readyz` が準備完了、PDF と DOCX の `POST /extract` が 200、`prlimit` の実行、OpenAPI の比較、lint・型の検査・テスト
-  - 人が確かめること (CI ではできない): GitHub 上の workflow の実行を `gh api repos/<org>/<repo>/actions/runs/<id>/jobs` で見て、ジョブの数が 0 より多く、すべてのステップが成功していること (ジョブが 0 件の実行は成功とみなさない)。arm64 の image がビルドできること (CI が x64 だけの場合)。k8s への適用は範囲外
+  - 人が確かめること (CI ではできない): GitHub 上の workflow の実行を `gh api repos/<org>/<repo>/actions/runs/<id>/jobs` で見て、ジョブの数が 0 より多く、すべてのステップが成功していること (ジョブが 0 件の実行は成功とみなさない)。arm64 の image がビルドできること (CI が x64 だけの場合)。本番の環境への適用は範囲外
   - CI の結果と、人が確かめた結果 (実行の id、ジョブの数) が research.md にある
   - _Requirements: 8.1, 8.2, 9.3, 9.5_
 
@@ -304,7 +311,8 @@
   - _Requirements: 12.6_
 - [ ] 9.2 対象 spec の requirements.md と design.md を書き直す
   - 対象 spec の design.md を、Node 版が最初からそうだったように書き直す (実行基盤、層の分け方の判断、子プロセスの作り方、`WORKERS` の無い設定の表とメモリの目安、`/readyz` の `dependencies`、Revalidation Triggers、下げた既定値があればその値)。以前の Python 版の経緯は本文に残さない
-  - 対象 spec の design.md の配布物と CI の記述を、この spec の Req 8 と Req 9 の中身 (Node 版の Dockerfile、compose、k8s の例、CI) に合わせて書き直す
+  - 対象 spec の design.md の配布物と CI の記述を、この spec の Req 8 と Req 9 の中身 (Node 版の Dockerfile、compose、運用者向けの文書 `docker/README.md`、CI) に合わせて書き直す
+  - 対象 spec が k8s の manifest の例を成果物としている記述を、同じ形に書き直す (research.md 7.9): requirements.md の Scope の「k8s manifest 例」の項目、AC 3.3 (推奨設定を「提供する」先を、manifest の例ではなく運用者向けの文書にする。番号は変えない)、配布物を確かめていないことを書いた注記、design.md の Out of Boundary と配布物の記述 (`deploy/k8s/` の例)
   - 対象 spec の requirements.md は、既存の番号 (Req 1〜4、AC 1.1〜4.2) を変えない。brief.md の「Port-back の前提」の番号の対応 (この spec の Req 4 → 対象 spec の Req 5、Req 5 → Req 6、Req 7 → Req 7。AC の番号は新しい要件の中でそのまま使う) に従って、対象 spec の末尾に追加する。崩した契約に当たる AC があれば、番号を変えずに文言だけを直す
   - 書き直した 2 つの文書に「Python」「FastAPI」「forkserver」などの経緯の言葉が残っていない (Node 版の判断の根拠として要るものを除く)
   - _Requirements: 1.12, 12.1, 12.2_

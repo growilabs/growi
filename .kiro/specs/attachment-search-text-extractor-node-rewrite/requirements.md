@@ -35,7 +35,7 @@
 ## Boundary Context
 
 - **In scope**:
-  - 抽出サービスを Node 版として `apps/attachment-text-extractor/` に作り直し (src、tests、Dockerfile、`deploy/k8s/`、CLAUDE.md、scripts)、`services/attachment-text-extractor/` の Python 版を消すこと (置き場所は design.md の D4 でユーザーが決めた)
+  - 抽出サービスを Node 版として `apps/attachment-text-extractor/` に作り直し (src、tests、Dockerfile、運用者向けの文書 `docker/README.md`、CLAUDE.md、scripts)、`services/attachment-text-extractor/` の Python 版を消すこと (置き場所は design.md の D4 でユーザーが決めた)
   - OpenAPI の文書を経路の定義から作る仕組みへの置き換え、書き出した文書と commit 済みの文書の食い違いの検査、名前の変更に伴う生成クライアントと apps/app の呼び出し側の修正
   - CI workflow と docker-compose のエントリの追従
   - 置き場所を `apps/` に移して pnpm workspace に入れることに伴う設定の変更 (lockfile、package ごとの turbo の設定、compose、CI の `paths`)
@@ -119,7 +119,7 @@
 11. If 親プロセス (HTTP を受けるプロセス) が子プロセスより先に終わる, the 子プロセス shall 自分で終了し、変換を続けない
 12. The 抽出サービス (Node 版) shall 子プロセスのコアダンプを出さない
 13. The 抽出サービス (Node 版) shall 最悪の合計時間 (本文の受信 `UPLOAD_TIMEOUT_S` + 変換 `TIMEOUT_S` + 子プロセスの停止と回収) を、apps/app の既定 `timeoutMs` (90,000ms) より短く保ち、その合計の内訳を計測で示す
-14. While 既定の設定 (枠 3、`MAX_CHILD_RSS_MB` は 320 または Req 11.11 で下げた値) で 3 件の変換が同時に動いている, the 抽出サービス (Node 版) shall コンテナ全体の実メモリを k8s の例の limits (2Gi) 以内に収める (計測の方法は Req 11.2 に従う)
+14. While 既定の設定 (枠 3、`MAX_CHILD_RSS_MB` は 320 または Req 11.11 で下げた値) で 3 件の変換が同時に動いている, the 抽出サービス (Node 版) shall コンテナ全体の実メモリを、コンテナのメモリの上限 2Gi (運用者向けの文書が示す値) 以内に収める (計測の方法は Req 11.2 に従う)
 
 ### Requirement 4: 実行基盤の制約
 
@@ -187,7 +187,7 @@
 2. When image を read-only rootfs・uid 10001・ネットワークなし (`--network none`) で起動する, the 抽出サービス shall `/readyz` で準備完了 (200) を返し、PDF と DOCX の `POST /extract` に 200 を返す
 3. The 抽出サービスの Docker image shall 本番に不要なもの (テスト用の依存、ビルドの道具、テストのファイル) を含めない
 4. The docker-compose のエントリ shall Node 版の image を使い、ほかの設定 (環境変数、tmpfs、安全設定) を Python 版と同じにする
-5. The `deploy/k8s/` の例 shall Node 版の image を使い、対象 spec の AC 3.3 の推奨設定 (read-only rootfs、非 root、capabilities の削除、外向き通信の遮断、tmpfs の一時領域) を保ち、メモリの requests / limits を Req 3.14 の計測に合わせて見直す
+5. The 抽出サービスの運用者向けの文書 (`docker/README.md`) shall サービスを動かすときに守る条件を、それぞれ理由を付けて示す。示す条件は、対象 spec の AC 3.3 の推奨設定 (read-only rootfs、非 root の uid 10001、capabilities の削除、権限を上げないこと、外向き通信の遮断、必要な場合の tmpfs の一時領域)、内向きの通信を GROWI のアプリからだけにすること、メモリの requests / limits (Req 3.14 の予算と計測に合わせた値と、その計算)、`/healthz` と `/readyz` を使う確認とその間隔・期限、停止の合図の後に待つ時間 (85 秒以上)、レプリカを増やしてスケールすること、必要な環境変数、ライセンス表示の置き場所とする。Kubernetes の manifest の例は持たない
 6. The 抽出サービス shall 共有メモリ (`/dev/shm`) を使わない
 7. When Docker image をビルドする, the Dockerfile shall 最終の段 (実行用の段) で `prlimit` を実行して版を表示させ、`prlimit` が無いか動かなければビルドを失敗させる
 8. If 起動時に `prlimit` が見つからない、または実行できない, the 抽出サービス shall `/readyz` で 503 `not_ready` を返し、`/healthz` は 200 のままにする (k8s がコンテナの再起動を繰り返さないようにするため)

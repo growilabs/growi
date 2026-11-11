@@ -156,7 +156,7 @@ design を書くために、小さな試作で次のことを確かめた。**�
 
 - **(a) 何を崩すか**: 対象 spec の design.md §Configuration の `WORKERS` (uvicorn のワーカー数、既定 1)。Req 1.4 の「同じ名前・同じ意味で受け付ける」を崩す。Node 版はこの環境変数を読まない。
 - **(b) 守ると何がどう複雑になるか**: Node には uvicorn のワーカーに当たる仕組みが無い。同じ意味を保つには、node:cluster で親を N 個に分け、それぞれが同時実行の枠と子の監視を持つ形にする必要があり、プロセスの管理が 1 段増える。さらに、Python 版で分かっていた弱点 (ワーカーが 2 つ以上だと OS の接続の振り分けが偏り、空きがあっても 503 が返る) も引き継ぐ。既定は 1 で、スケールは k8s の HPA で Pod を増やすのが本来の方法なので、ワーカーの数を持つ利点は小さい。
-- **(c) 下流の変更の範囲**: `infra/docker/compose.yaml` と `deploy/k8s/deployment.yaml` から `WORKERS` を消し、メモリの予算の式からワーカー数の項を消す (この spec の中)。apps/app のコード、生成クライアント、下流 spec の契約は変わらない。運用者から見える変化: `WORKERS` を設定していても無視される。2 以上にしていた場合は、同時実行の全体の上限が `MAX_CONCURRENCY` だけになる。
+- **(c) 下流の変更の範囲**: `infra/docker/compose.yaml` と `deploy/k8s/deployment.yaml` から `WORKERS` を消し、メモリの予算の式からワーカー数の項を消す (この spec の中。**注記、2026-11-11**: k8s の例そのものをやめることになった。7.9)。apps/app のコード、生成クライアント、下流 spec の契約は変わらない。運用者から見える変化: `WORKERS` を設定していても無視される。2 以上にしていた場合は、同時実行の全体の上限が `MAX_CONCURRENCY` だけになる。
 - **反映先**: design.md の Revalidation Triggers。取り込みのときに対象 spec の design.md §Configuration から `WORKERS` を消し、メモリの目安の式を書き直す (対象 spec の AC には `WORKERS` が出てこないので、AC の文言の変更は要らない)。完了の報告でユーザーに示す。
 
 ### 7.2 `/docs` と `/redoc` の廃止 (design.md の D3、2026-11-04)
@@ -297,6 +297,22 @@ design を書くために、小さな試作で次のことを確かめた。**�
   - **実装**: 7.1 の直しの一部として、いま行っている。結果は 27.15 に書く。この項目を書いた時点では、実装の結果は分かっていない。
 - **反映先**: design.md の Revalidation Triggers と Monitoring (書いた)。完了の報告でユーザーに示す (27.13 の「取り込みの確認の一覧」)。
 - **この項目に合わせて注記を足した記録**: 27.3、27.5、27.6、27.7 の該当の文 (それぞれの場所に注記がある)。
+
+### 7.9 k8s の manifest の例をやめる (ユーザーの決定、2026-11-11。Req 1.10・1.12)
+
+- **(a) 何を崩すか**: 対象 spec が成果物に挙げている「k8s manifest 例 (Deployment + Service + HPA + NetworkPolicy + securityContext)」(対象 spec の requirements.md の Scope。design.md は `deploy/k8s/` を「推奨設定を入れた例」と書いている)。Node 版では、6.11 で作った `deploy/k8s/` の例 (deployment・service・hpa・networkpolicy) と、その中身を確かめるテスト (`test/deploy/k8s-manifests.spec.ts` の 29 件。27.8 に記録した数) を消す。この spec の Req 8.5 は、「`deploy/k8s/` の例が推奨設定を保つ」から「運用者向けの文書が、守る条件を理由つきで示す」に書き直した (番号は同じ)。**守る条件そのものは要件のまま残る。** 無くなるのは YAML の例だけである。メモリの予算 2Gi (Req 3.14、1.13) は変わらない。
+- **(b) 守ると何がどう複雑になるか** (ユーザーが挙げた理由):
+  - `apps/` のほかの app は、Dockerfile だけを持ち、k8s の出力を持たない。この app だけが例を持つと、置き方の決まりが 1 つ増える。
+  - この例は、本物のクラスターに一度も適用していない (27.10)。
+  - 実際の配備は別の場所で管理されている。例を置くと、それと合わせ続ける手間が残り、合わなくなっても気づく仕組みが無い。
+  - 例が持っていた運用の条件は、文章で残せば足りる。
+- **(c) 下流の変更の範囲**:
+  - apps/app、生成クライアント、下流 spec: 変更なし。
+  - 運用者: そのまま写して使える manifest の出発点が無くなる。代わりに、運用者向けの文書 `apps/attachment-text-extractor/docker/README.md` が、サービスを設計しテストした条件を、それぞれ理由を付けて示す。示す条件は、メモリの上限 2Gi とその計算、非 root の uid 10001、read-only の root ファイルシステム、capabilities の削除、権限を上げないこと、外向き通信の遮断と GROWI のアプリからだけの内向き通信、`/healthz` (生存の確認) と `/readyz` (準備完了の確認) とその間隔・期限、停止の合図の後に待つ時間 (85 秒以上)、レプリカを増やすスケール、必要な環境変数、ライセンス表示の置き場所である。
+  - 対象 spec: 取り込みのときに、Scope の「k8s manifest 例」、AC 3.3 の読み方、design.md の配布物の記述を、同じ形に書き直す (tasks.md の 9.2)。
+- **決定 (ユーザー、2026-11-11)**: k8s の例を削除する。要件を書き直してよい。
+- **実施**: 例とテストの削除と `docker/README.md` の作成は、いま別の担当が行っている。結果は 27.16 に書く。この項目を書いた時点では、結果は分かっていない。
+- **反映先**: requirements.md (Scope、Req 3.14、Req 8.5)、design.md (This Spec Owns、Out of Boundary、ディレクトリの図、Testing Strategy、要件との対応表)、brief.md、tasks.md (6.11 の追記、8.2、8.3、9.2)。文書に載せる数字 (requests 512Mi と limits 2Gi、85 秒、確認の間隔と期限、`/tmp` の計算) の出どころは 27.10 である。完了の報告でユーザーに示す。
 
 ## 8. Python 版を devcontainer で起動する手順 (タスク 1.3)
 
@@ -7796,7 +7812,7 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 
 - `docker/Dockerfile`: `node:24.22.2-bookworm-slim` を元にした多段ビルド。build の段で `pnpm install --frozen-lockfile --ignore-scripts`、package の `build`、`pnpm deploy out --prod --legacy`。最終の段は `ENV RAYON_NUM_THREADS=1`、`RUN /usr/bin/prlimit --version`、uid 10001、`CMD ["node", "dist/main.js"]`。細かい版まで固定しているのは、4.5 のテストが `node:24.<minor>.<patch>-slim` の形を求めているためである (Python 版の Dockerfile も同じく固定していた)。20 節のメモリの基準は Node 24.21.0 で測ったものなので、6.12 で image の中で測り直す。
 - `docker/Dockerfile.dockerignore`: build の context はリポジトリのルート (23.7)。ほかの app は除く (`apps/pdf-converter` と同じやり方)。dockerignore は最後に合った行が勝つので、`apps/**` と `!apps/attachment-text-extractor` を先頭に置き、その後に `**/node_modules` と `**/dist` を置いた (逆の順だと、この app 自身の `node_modules` と古い `dist` が context に入る。`apps/pdf-converter` の dockerignore は逆の順のままである)。`services` の行は、8.2 でディレクトリごと消すときに一緒に消す。
-- `deploy/k8s/` (deployment・service・hpa・networkpolicy): Python 版の例から、`WORKERS` の環境変数を消し、コメントを Node 版に合わせた。ほかは引き継いだ。メモリは requests 512Mi、limits 2Gi (20.10・20.12)。`/tmp` は Memory の emptyDir 64Mi (69 + 3 × (320 + 148 + 157) + 64 = 2,008MiB ≤ 2,048MiB。20.7)。`terminationGracePeriodSeconds` は 85 (アップロードの 15 秒 + 変換の 55 秒 + 余裕。`main.ts` は SIGTERM の後、処理中の要求を上限なしで待つ)。readiness は `timeoutSeconds` 15・間隔 20 秒 (確認用の子の制限が 10 秒)。CPU (500m / 2) と HPA (2〜10、CPU 70%) は Python 版の値のままで、spec は値を決めていない。
+- `deploy/k8s/` (deployment・service・hpa・networkpolicy): Python 版の例から、`WORKERS` の環境変数を消し、コメントを Node 版に合わせた。ほかは引き継いだ。メモリは requests 512Mi、limits 2Gi (20.10・20.12)。`/tmp` は Memory の emptyDir 64Mi (69 + 3 × (320 + 148 + 157) + 64 = 2,008MiB ≤ 2,048MiB。20.7)。`terminationGracePeriodSeconds` は 85 (アップロードの 15 秒 + 変換の 55 秒 + 余裕。`main.ts` は SIGTERM の後、処理中の要求を上限なしで待つ)。readiness は `timeoutSeconds` 15・間隔 20 秒 (確認用の子の制限が 10 秒)。CPU (500m / 2) と HPA (2〜10、CPU 70%) は Python 版の値のままで、spec は値を決めていない。 **注記 (2026-11-11)**: ユーザーの決定で、k8s の例はやめることになった (7.9)。この項目の k8s の例についての記述は、その決定で置き換わる。ここに記録した数字 (requests 512Mi と limits 2Gi、`/tmp` の計算 2,008MiB ≤ 2,048MiB、`terminationGracePeriodSeconds` 85、readiness の期限 15 秒と間隔 20 秒) は、運用者向けの文書 `docker/README.md` に書く条件の出どころとして残る。結果は 27.16 に書く。
 
 **PDFium の WASM に入っている第三者の部品のライセンス表示 (21.5 の実施)**
 
@@ -7829,8 +7845,8 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 **そのほかの記録**
 
 - `NODE_ENV=production` は設定していない (`apps/pdf-converter` は設定している。`src/` はこれを読まない)。`preStop` の待ちは無い (Python 版の例と同じ)。`main.ts` は `0.0.0.0` だけで待ち受けるので、IPv6 だけのクラスターからは届かない (Python 版と同じ)。
-- 子は親の直接の子で、親がいなくなると自分で終わる (`src/child/parent-watch.ts`)。そのため init のプロセスは要らない、と Dockerfile と deployment のコメントに書いた。一方、4.5 の `compose.spec.ts` は compose の項目に `init: true` を求めている (8.2 で扱う。テストの題名は Python 版の言い方のままである)。
-- `docker/README.md` は作っていない (`apps/pdf-converter` にはある。tasks.md もテストも求めていない)。
+- 子は親の直接の子で、親がいなくなると自分で終わる (`src/child/parent-watch.ts`)。そのため init のプロセスは要らない、と Dockerfile と deployment のコメントに書いた。一方、4.5 の `compose.spec.ts` は compose の項目に `init: true` を求めている (8.2 で扱う。テストの題名は Python 版の言い方のままである)。 **注記 (2026-11-11)**: deployment の例はやめることになった (7.9)。「init のプロセスは要らない」ことは、`docker/README.md` に条件として書く。compose の `init: true` をどうするかは、引き続き 8.2 で決める。
+- `docker/README.md` は作っていない (`apps/pdf-converter` にはある。tasks.md もテストも求めていない)。 **注記 (2026-11-11)**: ユーザーの決定で、運用者向けの文書として作ることになった (7.9。Req 8.5)。結果は 27.16 に書く。
 
 ### 27.11 タスク 6.12 (CI の image の確認とメモリの計測) — 書いた部分だけ。タスクは未完了
 
@@ -7865,13 +7881,13 @@ process.exit(overMarked.length || forgotten.length ? 1 : 0);
 **メモリの計測の決まり**
 
 - S1: 制御文字だけの 5.5MB の TXT を 3 件同時に、3 回続けて送る。S2: その TXT を 3 件同時 → 上限まで伸びて止められる 8MiB の CSV を 3 件同時、を 4 往復 (20.7 と 20.7a の言い方に合わせた読み方)。
-- 合否: container の cgroup の値が 2,048MiB 以下、7 万セルの XLSX と 48MB の DOCX の子の最大 RSS が 304MB 以下。Python 版の 1,230MiB との比較と、200 万字の PDF は、表示するだけで合否に入れない (tasks.md が名前を挙げているのは XLSX と DOCX だけ)。cgroup の値はページキャッシュを含み、container に `--memory` の上限は付けない (厳しいほうの読み方)。
+- 合否: container の cgroup の値が 2,048MiB 以下、7 万セルの XLSX と 48MB の DOCX の子の最大 RSS が 304MB 以下。Python 版の 1,230MiB との比較と、200 万字の PDF は、表示するだけで合否に入れない (tasks.md が名前を挙げているのは XLSX と DOCX だけ)。cgroup の値はページキャッシュを含み、container に `--memory` の上限は付けない (厳しいほうの読み方)。 **注記 (ユーザーの決定、2026-11-11)**: 合否を変える。ジョブを失敗にするのは、container の cgroup の値が 2,048MiB を超えたときと、計測が正しく行えなかったときだけにする。子の最大 RSS が 304MB を超えたときは、表とジョブの要約に警告を出し、失敗にはしない。理由: 手元の余裕は 10〜30MB しか無く (XLSX 290〜294MB、DOCX 271〜282MB)、別の機械では測るたびの差で線をまたぎうる。本当の上限 320MB は、サービス自身が守る。実施の結果は 27.16 に書く。
 - 負荷は container の外から掛ける (送る側のメモリを cgroup に入れないため)。そのために、メモリの計測の container だけは `--network none` ではなく、ループバックにポートを公開する。ほかの設定は本番と同じ。
 - 正しく測れていないのに成功にならないための決まり (レビューで直した 3 点):
   - S2 の CSV は、応答の本文に `memory_exceeded` があることまで確かめる。別の理由の 422 (セル数の上限、結果が大きすぎる、時間切れ) は「意図しない応答」として失敗にする。
   - 子の最大 RSS は、送る前にログの `extract` の行を数え、ちょうど 1 行増えた行が `result=ok` のときだけ使う。5 秒待っても増えなければ「値なし」で失敗にする (前の要求の値を拾わないため)。
   - container の `memory.peak` を読めなければ失敗にする (`docker exec` で何度も読む粗いやり方には切り替えない。20 節の 20ms 間隔よりずっと粗く、最大値を低く読むため)。`memory.peak` は kernel 5.19 以降にある。
-- このステップは、push のたびに動かし、上限を超えたらジョブを失敗にする形にした (**ユーザーに伝える**。任意で起動する形は、workflow のファイルが既定のブランチに載るまで起動できないので、マージの前に数字を得る手段にならない。手元では 45〜48 秒で終わる)。
+- このステップは、push のたびに動かし、上限を超えたらジョブを失敗にする形にした (**ユーザーに伝える**。任意で起動する形は、workflow のファイルが既定のブランチに載るまで起動できないので、マージの前に数字を得る手段にならない。手元では 45〜48 秒で終わる)。 **注記 (ユーザーの決定、2026-11-11)**: push のたびに動かす形は、最初の 1 回だけにする。最初の本物の数字を記録した後は、人が起動したとき (`workflow_dispatch`) だけ動かす。動かすのは、変換の部品 (anydoc、PDFium)、Node の元の image、メモリに関わるコードを変えたときである。理由: workflow の `paths` は `pnpm-lock.yaml` を含み、monorepo のどの依存の更新でも変わるので、push のたびに測ると関係の無い変更でも動く。最初の 1 回を push で動かす理由は、上の文のとおりである。実施の結果は 27.16 に書く。
 
 **docker の外で測った、代わりの数字 (image の中の値ではない)**
 
@@ -7886,7 +7902,7 @@ devcontainer、Node v24.22.2、Linux 6.8。サービスのプロセスと子の 
 | 200 万字の PDF の子の最大 RSS | 302〜303MB | 表示だけ (27.3) |
 
 - S2 は、最大で Python 版より 149MiB 多く、上限までは約 670MiB ある (20.7a の「親と子の合計」の範囲 1,216〜1,365MiB とほぼ合う)。
-- XLSX は 304MB の線まで 10〜14MB、PDF は 1〜2MB しかない。image の中で少しでも増えると超える。XLSX が超えたら 20 節の下げる値 (65,000 セル) を適用し、DOCX が超えたらユーザーに諮る (tasks.md の 6.12)。PDF の余裕が 1MB であることは、ユーザーに伝える。
+- XLSX は 304MB の線まで 10〜14MB、PDF は 1〜2MB しかない。image の中で少しでも増えると超える。XLSX が超えたら 20 節の下げる値 (65,000 セル) を適用し、DOCX が超えたらユーザーに諮る (tasks.md の 6.12)。PDF の余裕が 1MB であることは、ユーザーに伝える。 **注記 (2026-11-11)**: この手順は残る。304MB を超えてもジョブは失敗しなくなったが、本物の実行で警告が出たら、この手順に進む。
 - S2 の CSV は、422 `resource_limit_exceeded`、ログは `result=memory_exceeded child_peak_rss_mb=349`。S1 の TXT は 200、応答は 33,000,111 バイト、子の最大 RSS は 137MB。
 
 **最初の本物の実行で確かめること (27.10 の一覧に足す)**
@@ -7896,7 +7912,7 @@ devcontainer、Node v24.22.2、Linux 6.8。サービスのプロセスと子の 
 3. 大きさの行のバイト数と docker の版を記録する (containerd の image store では、`.Size` が従来の store より大きく出ることがある)。
 4. `service` のステップが、`/readyz` の JSON、`200` の抽出の行 2 つ、上限の 3 行 (`2751463424:2751463424`、`60:65`、`1:1`)、文書が同じである旨を出すこと。
 5. メモリのステップ: S1 と S2 が 3 回ずつ 2,048MiB 以下、XLSX と DOCX の子の最大 RSS が 304MB 以下。数字、kernel の版、かかった時間を research.md に写す。`memory.peak` の `cat` で失敗したら、原因は runner の kernel か cgroup の版である。基準の値が「不明」と出たら、`docker logs` が 5 秒より遅れていないかを、出てきたサービスのログで先に見る。
-6. CI では確かめられないもの: arm64 と、docker のある手元での `check-image.sh all` と `memory` の 1 回の実行 (tasks.md の 6.12 の 3 つめ)。
+6. CI では確かめられないもの: arm64 と、docker のある手元での `check-image.sh all` と `memory` の 1 回の実行 (tasks.md の 6.12 の 3 つめ)。 (**注記、2026-11-11**: 手元の docker での実行は、6.12 の条件から外れた。最初の実行は push して CI で行う。27.16)
 
 **そのほかの記録**
 
@@ -8181,7 +8197,7 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 - [ ] Testing の基準値 285MB / 281MB を、Node 版の値と測り方に直す。最終の数字は 6.12 から取る (20.12、27.5)。
 - [ ] 部品と継ぎ目の説明は、23.1・23.5・23.6 から書き直す。この spec の File Structure Plan は移さない (design.md の冒頭の「例外」の注記)。
 - [ ] `RunInput` は `chunks` と `size` (27.7)。組み立ては `service.ts` と `main.ts` (27.8)。`oom_score_adj` は `child/oom-score.ts` にある (27.5)。`formats/`・`wire/`・`ooxml/`・`text/`・`config/`・`child/` に barrel が無いことと、その理由 (27.4、27.9)。`ConversionLimits` が `contract/` にある理由 (23.2)。
-- [ ] 配布物と CI: compose の `context` はリポジトリのルートで、`dockerfile` は `apps/attachment-text-extractor/docker/Dockerfile` (23.7)。この spec の Req 8 と Req 9 から書き直す。workflow のファイル名 (tasks.md の 8.2 で決める)。init のプロセスは要らないこと、猶予時間 85 秒 (27.10)。
+- [ ] 配布物と CI: compose の `context` はリポジトリのルートで、`dockerfile` は `apps/attachment-text-extractor/docker/Dockerfile` (23.7)。この spec の Req 8 と Req 9 から書き直す。workflow のファイル名 (tasks.md の 8.2 で決める)。init のプロセスは要らないこと、猶予時間 85 秒 (27.10)。 **注記 (2026-11-11)**: k8s の例はやめた (7.9)。この 2 つは、manifest ではなく運用者向けの文書 `docker/README.md` の条件として書く。対象 spec の Scope の「k8s manifest 例」、AC 3.3 の読み方、design.md の `deploy/k8s/` の記述も、同じ形に書き直す (tasks.md の 9.2)。
 - [ ] Revalidation Triggers: この spec の design.md の Revalidation Triggers の全体 (B2 で足したものを含む) を移す。あわせて「子の最大 RSS の基準」「Node 版で狭まった検索の対象の範囲」「メモリの予算の実測」を足す (20.12)。
 - [ ] `MAX_RESULT_BYTES` の説明を、「`content` の合計の上限で、ラベルは数えない。全体は、結果の本文の上限 33MiB が抑える」と読める文にする (上の N6)。
 - [ ] `MAX_XLSX_CELLS` の説明を、「早めに断るための検査で、守りの境界は RSS の上限」と読める文にする (上の N5)。
@@ -8217,6 +8233,7 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 - [ ] 7.5 (本文の形の例外。項目 1 は、`Connection: close` を付けた要求でだけ違う)。
 - [ ] 7.6 の 9 通りと、27.7 の追加分 (200 の応答が chunked、Hono の 404 の文、431、何も送らない接続の 60 秒の 408、`HEAD /healthz` が 200)。
 - [ ] 7.7 (生成クライアントの名前と、apps/app の呼び出し側の変更)。
+- [ ] 7.9 (k8s の manifest の例をやめ、守る条件を `docker/README.md` に文章で書いたこと)。
 - [ ] 7.8 (ログ。ユーザーは (イ) に決めた。`/extract` 以外の要求ごとのログと、Web サーバーのアクセスログが無いこと (401、存在しないパス、probe の呼び出しはログに残らない) と、`/extract` の行の先頭の書式が違うことを示す。戻した診断の行と子の警告の結果は 27.15 から取る)。
 - [ ] 26 節の「完了の報告でユーザーに伝える、作業者の判断」の 1〜16。
 - [ ] 環境変数の名前は大文字だけで読み、`.env` は読まず、整数の書き方が厳しくなったこと (22.6)。
@@ -8232,7 +8249,7 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 - [ ] 準備完了の確認のしかた (27.6)。停止の待ち方と `requestTimeout` (27.8)。
 - [ ] この節で記録した小さな違い: 同じ接続の 2 つ目の要求が 503 になること、大きすぎる期限の扱い、負の `MAX_CONCURRENCY`、`LOG_LEVEL=NOTSET`、401 の本文の空白、`Server` ヘッダー。
 - [ ] ライセンスの文をリポジトリに置いたことと、anydoc のバイナリにライセンスの表示が入っていないこと (27.10。ユーザーの判断)。
-- [ ] メモリの計測のステップが push のたびに動くこと (27.11)。
+- [ ] メモリの計測のステップが push のたびに動くこと (27.11)。 **注記 (2026-11-11)**: ユーザーの決定で変わった。示すのは、「失敗にするのは 2,048MiB を超えたときだけで、304MB を超えたときは警告」「最初の数字を記録した後は、人が起動したときだけ動く」である (27.11 の注記、27.16)。
 - [ ] 200 万字の PDF は、304MB の線まで 1〜2MB しか無いこと (27.11)。
 - [ ] ベンチマークで分からないことと、1 文書あたりの時間が約 10 倍であること (27.12)。
 - [ ] 既定値を下げた場合は、その値。
@@ -8249,6 +8266,8 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 - [ ] サービスの `CLAUDE.md` を書く。
 - [ ] `Dockerfile.dockerignore` の `services` の行を消す (27.10)。
 - [ ] compose の `init: true` と、Python 版の言い方のままのテストの題名を決める (27.10)。
+- [ ] 配布物に載せるライセンスの表示を決める (anydoc のバイナリに表示が無い件。27.10)。
+- [ ] サービスの `CLAUDE.md` から、運用者向けの文書 `docker/README.md` を案内する (7.9)。
 - [ ] workflow の `paths` と turbo の `test` の `inputs` に、クライアントの `openapi.json` と compose を足す (27.8、17.7)。
 - [ ] commit 済みの文書との比較を動かし始める。
 - [ ] 最初の docker の実行の後に、`local` の対象と `IN_SERVICE=` を消す (27.11)。
@@ -8269,9 +8288,10 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 
 - **諮る**: ログを戻すかどうか (7.8 の「決定」)。選択肢は、(ア) このまま受け入れる、(イ) 親が書く診断の行を戻し、子の警告もサービスのログに通す、(ウ) (イ) に加えて `/extract` 以外の要求のログも戻す、の 3 つ。取りまとめの担当の推奨は (イ)。この節を書いた時点では、ユーザーはまだ決めておらず、コードは変えていなかった。(追記: ユーザーは 2026-11-11 に (イ) に決めた。`/extract` 以外の要求ごとのログと、Web サーバーのアクセスログは戻さない。7.8。実装の結果は 27.15 に書く。)
 - **伝える**: 1 文書あたりの時間が、Python 版の約 10 倍である (27.12。1 文書あたり 75〜130ms と約 8ms。要件の違反ではないが、まとめて index を作り直すときの処理量に効く)。
-- **伝えて判断を仰ぐ**: ライセンスの文 19 個をリポジトリに commit したこと。anydoc のネイティブのバイナリに、ライセンスの表示が何も入っていないこと (27.10)。
-- **伝える**: メモリの計測のステップが push のたびに動き、上限を超えるとジョブが失敗すること。200 万字の PDF の子の最大 RSS は、304MB の線まで 1〜2MB しか無いこと (27.11)。
-- **伝える**: タスク 6.12 は開いたままである。docker の実行も CI の実行も、まだ一度もしていない (27.10、27.11)。
+- **伝えて判断を仰ぐ**: ライセンスの文 19 個をリポジトリに commit したこと。anydoc のネイティブのバイナリに、ライセンスの表示が何も入っていないこと (27.10)。(追記、ユーザーの答え、2026-11-11: ライセンスの文 19 個は、リポジトリに置いたままにする。`@embedpdf/pdfium` の版を上げるたびに取り直す。anydoc のバイナリの件は、配布物に載せる表示を決める 8.x のタスクで扱う (tasks.md の 8.2 に書いた)。)
+- **伝える**: メモリの計測のステップが push のたびに動き、上限を超えるとジョブが失敗すること。200 万字の PDF の子の最大 RSS は、304MB の線まで 1〜2MB しか無いこと (27.11)。(追記、ユーザーの決定、2026-11-11: ジョブを失敗にするのは、最も重い負荷の値が 2,048MiB を超えたときと、計測が正しく行えなかったときだけにする。304MB を超えたときは警告にする。最初の本物の数字を記録した後は、メモリの計測を人が起動したときだけ動かす。27.11 の注記と tasks.md の 6.12。結果は 27.16 に書く。)
+- **伝える**: タスク 6.12 は開いたままである。docker の実行も CI の実行も、まだ一度もしていない (27.10、27.11)。(追記、ユーザーの答え、2026-11-11: 最初の本物の実行は、ブランチを push して CI の実行を読む形で行う。ユーザーが push を認めた。)
+- **決まった (ユーザー、2026-11-11)**: k8s の manifest の例をやめ、運用で守る条件を `docker/README.md` に文章で書く (7.9)。
 
 ### 27.14 タスク 7.1 の直しと再レビュー
 
@@ -8424,3 +8444,45 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 - 戻した行の一覧 (上の表) と、戻していないもの (`/extract` 以外の要求の行、アクセスログ)。
 - 想定外の失敗の、例外の種類の名前をログに出さなくなったこと。
 - 準備未完了の理由は、「最初に失敗した確認と、その失敗のしかた」を言う (Python 版のように、読み込めなかった部品の一覧は出さない)。確認用の子の失敗は、変換ごとの行ではなく、準備の行にまとめて出る。
+
+### 27.16 k8s の例の削除と、メモリの計測の合否の変更 (7.9 と、2026-11-11 のユーザーの決定の実施)
+
+実装は Fable の担当、記録の書き換えは別の Fable の担当、独立レビューはさらに別の新しい Fable の担当が行った。1 回目 REJECTED (新しく書いた `docker/README.md` の中の、事実と合わない文が 2 つ) → 直し → 取りまとめの担当が、直した文をレビューの担当の示した文と照らして確かめた。削除、合否の決まり、要件の書き換えには、承認を止める指摘は無かった。数字は、とくに書いていなければ実測。
+
+**消したもの**
+
+- `deploy/k8s/` の 4 ファイル (deployment・service・hpa・networkpolicy)。`deploy/` のディレクトリも無くなった。
+- `test/deploy/k8s-manifests.spec.ts` (29 件)。
+- それだけが使っていたテスト用の補助: `deploy-files.ts` の `K8S_DIR`・`K8S_MANIFEST_FILES`・`APP_PORT`・`listK8sFiles`・`kubernetesMemoryToMiB`、`yaml-access.ts` の `numberAt`。`compose.spec.ts` (8.2) が使う補助 (`loadYamlFile`、`yaml-access.ts` のほかの関数、`yaml-parse.ts`) と、`yaml` の開発用の依存は残した。
+- 消したテストが見ていたもののうち、いまも在る物の性質 (uid 10001、起動のコマンド、`WORKERS` が無いこと、`/healthz` と `/readyz` が在りトークンが要らないこと) は、`dockerfile.spec.ts` と `health-routes.integ.ts` が見ている。Dockerfile の `EXPOSE 8000` と `src/main.ts` のポートが同じであることを見る単体のテストは無い (消したテストも見ていなかった)。足さなかった: `EXPOSE` は実行に効かない情報で、実際のポートは CI の image のジョブが確かめる (レビューの担当の判定も「足さなくてよい」)。
+
+**`docker/README.md` (新しい。運用者向けの文書。Req 8.5)**
+
+- image の作り方 (context はリポジトリのルート)、動かし方、サービスを動かすときに守る条件を、それぞれ理由を付けて書いた (134 行)。値は、消した manifest とコードから取った。レビューの担当が、消した manifest の条件と数字を 1 行ずつ文書と照らした: メモリの requests と limits、権限の設定の全部、3 つの確認 (startup・liveness・readiness) の間隔・期限・回数、停止の猶予の 85 秒、通信の制限、レプリカの数と自動スケールの値、環境変数は、すべて残っている。
+- 冒頭に「まだ本物の container で確かめていない」という断り書きがあり、最初の CI の実行が確かめる項目 (build、400MB、読み取り専用での起動、PDF と DOCX の抽出、image の中のメモリの計測) を挙げている。**最初の本物の実行の後で、この断り書きを書き直す** (tasks.md の 6.12 に足した)。
+- **manifest から意図して変えた点**:
+  - **書き込める `/tmp` は要らない、と書いた。** manifest は 64MiB の `/tmp` を用意していた。サービスが書き込むのは `/proc/self/oom_score_adj` だけで (27.10 の strace、`src/child/oom-score.ts`)、CI の `check-image.sh start` も tmpfs なしで container を起動する。そのため、メモリの式から 64MiB の項を外した: 69 + 3 × (320 + 148 + 157) = **1,944MiB** (27.10 と 7.9 の「2,008MiB」は、64MiB を足した値である)。`/tmp` を付けるなら、その大きさを式に足す、と書いた。
+  - **「2Gi の上限は、実測した最も重い負荷に基づく」と書いた。** 式の各項に本物の変換の値を入れると、`/tmp` を足さない式で 69 + 3 × (652〜666) = 約 2,025〜2,070MiB になり、2Gi とほぼ同じか、わずかに超える (20.7a の 2,089〜2,131MiB は、`/tmp` の 64MiB を足した値)。一方、実際に測った最も重い負荷は 1,135〜1,285MiB (container の外) である。式は、同時には起こらない最大値を足し合わせた、用心深い見積もりである (3.7 の決定 (A))。
+  - **CPU (500m / 2) と自動スケール (2〜10、CPU 70%、縮小の待ち 300 秒) は「出発点」と明記した。** Python 版の例から引き継いだ値で、Node 版で測った値ではない。
+- **意図して外したもの** (サービスに固有の条件ではないため。レビューの担当も同意): 「image の版を固定し `latest` を使わない」、PodDisruptionBudget の注、`maxSurge`、「kubelet の確認は NetworkPolicy の影響を受けない」(CNI によるので、書かないほうが安全)、namespace・label・image の tag の見本、`--memory-swap` と `pids-limit` (compose だけの設定。8.2)。
+- レビューで直した 2 つの文: (1) 本物の変換の合計を、`/tmp` を足した値のまま「同じ合計」と書いていた (上の数字に直した)。(2) 「`POST /extract` はすべてログに 1 行出る」と書いていた。認証はすべての経路の前に掛かるので、401 で断った要求は行を残さない (「トークンの確認を通った要求は 1 行出る。401 で断った要求は行を残さない」に直した)。あわせて、`extract …` の行は INFO で出ること (`LOG_LEVEL` を上げると出ない)、起動に失敗したときの行には時刻と重要度が付かないことも、正しく書き直した。
+
+**メモリの計測の合否 (`scripts/image-check/memory/`)**
+
+- 失敗にするのは、最も重い負荷の値が 2,048MiB を超えたときと、計測そのものが成り立っていないとき (回数が 3 回に満たない、基準のファイルが無い、子の最大 RSS がログに無い、意図しない応答があった) だけである。「正しく測れていないのに成功になる」ことを防ぐ決まり (27.11) は、変えていない。
+- 子の最大 RSS が 304MB を超えたときは、警告にする: 結果の表の「線との比較」の列に `**OVER by N MB (warning)**` と出し、結果の行の後に「WARNING (does not fail the check):」の一覧を出し、`::warning::` の行を標準出力に書く (GitHub Actions の注釈になる見込み。本物の実行では確かめていない)。終了コードは 0 のままである。PDF は、もとどおり表示するだけで、警告も出さない。
+- 超えたときの手続きは変えていない: XLSX が超えたら 20 節の下げる値 (65,000 セル) を適用し、DOCX が超えたらユーザーに諮る。警告が、その相談のきっかけになる。
+- テスト: `report.spec.ts` は 25 件から 33 件 (2 件を「304MB を超えても失敗にしない」に変え、8 件を足した)。レビューの担当が、判定を 8 通りに壊して、すべてテストが見つけることを確かめた (2,049MiB を通す、回数の不足を通す、子の最大 RSS の記録なしを通す、意図しない応答を通す、304MB を失敗に戻す、警告を出さない、まとめから警告を消す、など)。
+- container の外での計測 (`--target local`、今回の実行): S1 635〜710MiB、S2 1,255〜1,360MiB、XLSX の子 291〜292MB、DOCX の子 271〜281MB、PDF の子 303MB。304MB を超えた値は無く、警告の道筋は単体のテストだけが通っている。
+- **workflow のファイルは変えていない** (最初の本物の実行は push で動かすため)。最初の実行の数字を記録した後で、`.github/workflows/ci-attachment-text-extractor.yml` の「Measure memory in the image」のステップに、`if: github.event_name == workflow_dispatch` の 1 行を足す (1 行の `if:` で、workflow の決まりに合う。`workflow_dispatch` は `on:` にすでにある)。`check-image.sh` は変えなくてよい。
+
+**テスト全体**
+
+- 4,770 件が通り、3 件 (`test/deploy/compose.spec.ts`。8.2) が失敗、12 件が skip。27.15 の 4,791 件から、消した 29 件を引き、足した 8 件を加えた数である。テストのファイルは 140 本から 139 本。`tsgo --noEmit` はエラー 0、`biome check` はエラー 0。
+- レビューの担当がテスト全体を 2 回流したうちの 1 回で、`src/http/extract-route.integ.ts` の「a file of exactly the limit reaches the runner whole」が失敗した (ほかのセッションの vitest が同時に動いていた)。27.15 に記録した、もとからある、負荷に弱いテストである。
+
+**ユーザーの決定 (2026-11-11) のうち、まだ実施していないもの**
+
+- 最初の本物の実行 (push して CI で動かす) と、その数字の記録。
+- メモリの計測を、人が起動したときだけ動かす形に切り替えること。
+- 上の 2 つが済んだら、`docker/README.md` の断り書きを書き直し、tasks.md の 6.12 に完了の印を付ける。

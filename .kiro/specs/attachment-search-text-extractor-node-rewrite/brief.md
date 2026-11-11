@@ -19,7 +19,7 @@
 | 配置とツールチェーン | `services/attachment-text-extractor/` を pnpm workspace と turbo の外に置き、uv / pytest / ruff で完結させる | `apps/attachment-text-extractor/` (`@growi/attachment-text-extractor`) に移し、pnpm workspace に入れる。`apps/pdf-converter` と同じ形 (ユーザー判断。design.md の D4) |
 | Dockerfile | `python:3.12-slim-bookworm` + uv の multi-stage | Node の slim image を元にした multi-stage (400MB 以下、read-only rootfs、uid 10001、ネットワークなしで動くことは変えない) |
 | CI | `.github/workflows/attachment-text-extractor.yml` の Python 用ジョブ (ruff / pytest / image のビルドと起動確認) | 同じ workflow を Node 用 (lint / vitest / image のビルドと起動確認) に置き換える |
-| 配備物 | docker-compose のエントリ、`deploy/k8s/` の例 | 中身を Node 版に合わせる。推奨する安全設定は変えない |
+| 配備物 | docker-compose のエントリ、`deploy/k8s/` の例 | docker-compose のエントリは、中身を Node 版に合わせる。Kubernetes の manifest の例は持たず、動かすときに守る条件 (推奨する安全設定を含む) を、運用者向けの文書 `docker/README.md` に理由つきで書く (ユーザー判断。research.md 7.9) |
 | OpenAPI の書き出し手順 | `scripts/export_openapi.py` (FastAPI が自動で作る文書を書き出す) | 経路の定義から文書を作って書き出す手順に置き換える。操作とスキーマの名前は作る道具の既定に従うので、書き出す `openapi.json` と生成クライアントの関数名・型名は変わる。`POST /extract` に渡す項目、応答の型、`ErrorCode` の値は変えない (Req 7) |
 | 子プロセスの作り方と上限の掛け方 | Python の forkserver、子の中での `setrlimit` | Node では `setrlimit` が使えないため、作り方と仮想メモリ上限の掛け方は未決 (Req 11) |
 | 設計の根拠 (research.md / design.md の理由づけ) | Python のライブラリと実行環境の挙動に基づく | Node 版での計測結果に基づいて書き直す |
@@ -58,7 +58,7 @@
 
 対象 spec の design.md §Revalidation Triggers に挙がっている項目 (`ErrorCode`、同じコードが複数の HTTP ステータスを持つこと、`pages[]` の規則、health / readiness の応答の形、`label` の中身、タイムアウトの順序、サイズと時間の上限の既定値) は、**既定では変えない**。既定のままなら、この spec は下流 (`attachment-search-indexing`、apps/app) の見直しを起こさない。既定の方針を崩した場合は、崩した項目を design.md の Revalidation Triggers に書き、下流の変更を同じ作業で行う (Req 1.11、1.12)。
 
-既定の方針を崩したもの (ユーザー判断): `/readyz` の `dependencies` の名前の変更 (部品の実名に変える。本文を見る運用者の表示が変わる)、`WORKERS` の廃止 (compose と k8s の例から `WORKERS` を消す。運用者が設定していても無視される) と、`/docs` と `/redoc` の廃止 (2 つのパスが 401 か 404 になる)。どちらも apps/app と生成クライアントには影響しない。記録は research.md の 7 節。このほかに Python 版と違えたもの (本文の形の例外、HTTP の層の細かい違い、ログ、生成クライアントの名前) を含む全体の一覧は、design.md の Revalidation Triggers にある。
+既定の方針を崩したもの (ユーザー判断): `/readyz` の `dependencies` の名前の変更 (部品の実名に変える。本文を見る運用者の表示が変わる)、`WORKERS` の廃止 (compose から `WORKERS` を消す。運用者が設定していても無視される) と、`/docs` と `/redoc` の廃止 (2 つのパスが 401 か 404 になる)。どちらも apps/app と生成クライアントには影響しない。記録は research.md の 7 節。このほかに Python 版と違えたもの (本文の形の例外、HTTP の層の細かい違い、ログ、生成クライアントの名前) を含む全体の一覧は、design.md の Revalidation Triggers にある。
 
 このほか、次の 4 点は、この書き換えで触れる可能性がある。
 
@@ -101,7 +101,7 @@
 
 ### In
 
-- 抽出サービスを Node 版として `apps/attachment-text-extractor/` に作り直し (src、tests、Dockerfile、`deploy/k8s/`、CLAUDE.md、scripts、テスト用のファイルの Node の生成器)、`services/attachment-text-extractor/` の Python 版を消すこと
+- 抽出サービスを Node 版として `apps/attachment-text-extractor/` に作り直し (src、tests、Dockerfile、運用者向けの文書 `docker/README.md`、CLAUDE.md、scripts、テスト用のファイルの Node の生成器)、`services/attachment-text-extractor/` の Python 版を消すこと
 - OpenAPI の文書を経路の定義から作ること、その書き出し、commit 済みの文書の置き換えと生成クライアントの作り直し、apps/app の呼び出し側の名前と型の書き方の修正、書き出した文書が commit 済みの文書と同じであることの検査 (Req 7)
 - 検索の品質のベンチマーク (評価用の文書と正解) の作成と、Python 版・Node 版での計測
 - 上の Req 7 の変更のほかは、既定の方針を崩した場合に限り、その結果として要る下流 (apps/app の呼び出し側、生成クライアント、下流 spec の記述) の変更

@@ -69,7 +69,7 @@
 
 ### This Spec Owns
 
-- `apps/attachment-text-extractor/` の中のすべて (D4): Node 版のソースとテスト、Dockerfile、`deploy/k8s/` の例、サービスの CLAUDE.md、ベンチマーク
+- `apps/attachment-text-extractor/` の中のすべて (D4): Node 版のソースとテスト、Dockerfile、運用者向けの文書 (`docker/README.md`。動かすときに守る条件を理由つきで書く。8.5)、サービスの CLAUDE.md、ベンチマーク
 - Python 版の撤去 (Req 10)
 - `.github/workflows/attachment-text-extractor.yml` の置き換えと、`infra/docker/compose.yaml` のエントリの追従
 - OpenAPI の文書の作り方と書き出し、`packages/attachment-text-extractor-client/openapi.json` の置き換えと生成クライアントの再生成、それに伴う apps/app の呼び出し側 (`apps/app/src/features/search-attachments/server/services/attachment-text-extractor.ts` とそのテスト) の名前と型の書き方の修正 (7.4)
@@ -80,7 +80,7 @@
 
 - apps/app のコード (7.4 の呼び出し側の修正を除く)、`attachment-search-indexing` / `attachment-search-ui` の spec (既定では変えない。崩した場合だけ 1.11 の範囲で扱う)
 - `packages/attachment-text-extractor-client` の orval の設定 (`orval.config.js`)
-- 本番の k8s への適用と運用 (本 spec は例を提供する)
+- 本番の環境 (Kubernetes など) への適用と運用、manifest の例 (本 spec は、守る条件を `docker/README.md` に文章で示す。manifest の例は持たない。ほかの app も Dockerfile だけを持ち、実際の配備は別の場所で管理されているので、例を置くと実物と合わせ続ける手間だけが残る。research.md 7.9)
 - steering と root の `AGENTS.md` の書き換え (brief.md の Follow-ups。取り込みのときにユーザーが範囲を決める)
 
 ### Allowed Dependencies
@@ -99,7 +99,7 @@
 - **既定値を下げたとき (11.11)**: `MAX_CHILD_RSS_MB` を下げると、いまは通る大きなファイルが `resource_limit_exceeded` になる。`MAX_XLSX_CELLS` を下げると、検索の対象になる XLSX の範囲が狭くなる。どちらも apps/app 側の `maxFileSizeBytes` とは独立なので apps/app のコードは変わらないが、運用者に知らせる必要がある
 - **タイムアウトの合計 (3.13)**: 子プロセスの停止と回収にかかる時間が Python 版と変わる。最悪の合計が apps/app の既定 `timeoutMs` 90,000ms を超えたら、apps/app 側の既定を見直す
 - **契約を崩したとき (1.12)**: 崩した項目をここに書き足す。いま Python 版と違えているものは、下の項目と、その次の「生成クライアントの名前の変更」である。記録は research.md の 7 節にある。完了の報告 (1.12) と取り込み (Req 12) は、この一覧をもとに作る
-  - **`WORKERS` の廃止 (D1)**: compose と k8s の例から `WORKERS` を消す。運用者が `WORKERS` を設定していても無視される (起動は失敗しない)。2 以上を設定していた運用者は、同時実行の全体の上限が「ワーカー数 × `MAX_CONCURRENCY`」から `MAX_CONCURRENCY` だけに変わるので、必要なら `MAX_CONCURRENCY` を上げるか Pod を増やす。apps/app のコードと生成クライアントには影響しない
+  - **`WORKERS` の廃止 (D1)**: compose から `WORKERS` を消す。運用者が `WORKERS` を設定していても無視される (起動は失敗しない)。2 以上を設定していた運用者は、同時実行の全体の上限が「ワーカー数 × `MAX_CONCURRENCY`」から `MAX_CONCURRENCY` だけに変わるので、必要なら `MAX_CONCURRENCY` を上げるか Pod を増やす。apps/app のコードと生成クライアントには影響しない
   - **`/readyz` の `dependencies` の名前の変更 (D2)**: キーが Node 版の部品の実名と `prlimit` に変わり、`pypdfium2` と `charset-normalizer` は出なくなる。運用者が curl などで本文を見たときの表示が変わる。k8s と compose の health の確認は HTTP のステータスだけを見て本文を見ないので影響しない。OpenAPI の文書は、200 の応答の `dependencies` を「名前から `ok` への対応」として型を付け、名前そのものは決めていない。そのため、名前を変えても生成クライアントは変わらない (`/readyz` の応答に型が付くこと自体は、下の「生成クライアントの名前の変更」に含まれる)。準備未完了のときの 503 の本文は `{"status":"not_ready"}` だけで、`dependencies` を出さない (research.md 27.7)
   - **`/docs` と `/redoc` の廃止 (D3)**: この 2 つのパスは 401 (トークンなし) か 404 (トークンあり) になる。apps/app は使っていない。生成クライアントには影響しない
   - **本文の形の例外 (research.md 7.5。ユーザー判断)**: boundary に CR を含む要求は 422 を返す (Python 版は 200)。要求の `Content-Type` の `charset` は使わない (部品の名前とファイル名は、UTF-8 として正しければ UTF-8、そうでなければ latin-1 で読む)。`Content-Length` が実際の本文より小さい要求は、`Connection: close` を付けたときだけ Python 版と違う (Python 版は 422、Node 版は `code` の無い 400。付けない要求では、どちらも `code` の無い 400 で同じ)。apps/app (axios) はどの形も送らない
@@ -216,7 +216,7 @@ apps/attachment-text-extractor/
 ├── turbo.json                    # follows apps/pdf-converter/turbo.json
 ├── docker/Dockerfile             # multi-stage on node:24-slim, pnpm deploy --prod; final stage runs `prlimit --version` (8.7)
 ├── CLAUDE.md                     # service-local instructions, rewritten for Node
-├── deploy/k8s/                   # deployment / service / hpa / networkpolicy examples (8.5)
+├── docker/README.md              # operator-facing run conditions with reasons (8.5); no k8s manifests
 ├── scripts/
 │   ├── export-openapi.ts         # writes the document generated from the routes, for packages/attachment-text-extractor-client (7.1)
 │   └── check-openapi-drift.ts    # compares a generated document with the committed one (7.3)
@@ -397,7 +397,7 @@ D1〜D5 はすべてユーザーが決めた (2026-11-04)。
 
 | # | 項目 | 決定 | 理由と影響 |
 |---|---|---|---|
-| D1 | `WORKERS` の意味 | **(a) 廃止する** (決定)。サービスは読まず、compose と k8s の例から消す | 既定は 1 で、2 以上は接続の偏りで空きがあっても 503 が返る弱点があった (対象 spec の design.md §Open Questions)。スケールは HPA で Pod を増やす。Node では 1 プロセスでも受け口は止まらない (変換は子プロセス)。**契約を崩す** (1.4 の環境変数) ので、1.10 の記録を research.md の 7 節に置いた |
+| D1 | `WORKERS` の意味 | **(a) 廃止する** (決定)。サービスは読まず、compose から消す | 既定は 1 で、2 以上は接続の偏りで空きがあっても 503 が返る弱点があった (対象 spec の design.md §Open Questions)。スケールは HPA で Pod を増やす。Node では 1 プロセスでも受け口は止まらない (変換は子プロセス)。**契約を崩す** (1.4 の環境変数) ので、1.10 の記録を research.md の 7 節に置いた |
 | D2 | `/readyz` の `dependencies` に出す名前 | **決定: 実名**。Node 版が実際に使っている部品の実名 (npm の package 名) と `prlimit`。いま決まっているのは `@firecrawl/anydoc` と `prlimit` で、PDF の部品は「T1 の結果の実名」、文字コードの判定などに部品を使う場合は「T6 の結果の実名」になる。内部のモジュールをまとめた `converter` は今と同じく 1 つの名前で出す (認証なしの口に内部の名前を出さないため)。Python 版の名前 (`pypdfium2`、`charset-normalizer`) は Node 版で使わないので出さない | 運用者が見て、実際に何が読み込めているかが分かる名前にする。名前は T1・T6 の試作で採用が決まった時点で確定する。OpenAPI の文書は `dependencies` の名前そのものを決めていない (名前から `ok` への対応として型を付けるだけ) ので、名前を変えても生成クライアントは変わらない。`prlimit` は 8.8 で準備完了の条件になるので出す。名前が変わるので、1.10 の記録を research.md の 7 節に置いた |
 | D3 | `/docs` と `/redoc` | **(a) 出さない** (決定)。`/openapi.json` は残す | apps/app は使っておらず、テストもない。出すには部品が 1 つ増える。**契約を崩す** (FastAPI が既定で出していた画面が消える) ので、1.10 の記録を research.md の 7 節に置いた |
 | D4 | 配置 | **(C) `apps/attachment-text-extractor/` に移し、pnpm workspace に入れる** (決定)。package の名前は `apps/pdf-converter` (`@growi/pdf-converter`) に倣って `@growi/attachment-text-extractor` | 下の「D4 の判断と影響」 |
@@ -564,14 +564,14 @@ export interface ConversionRunner {
 
 環境変数の名前・既定値・意味は、対象 spec の design.md §Configuration の表と同じにする (1.4)。違いは次のものだけである。
 
-- `WORKERS`: 廃止する (D1)。サービスは読まない。compose と k8s の例からも消す。Node のプロセスは 1 つで、同時実行の上限は `MAX_CONCURRENCY` がそのまま全体の上限になる
+- `WORKERS`: 廃止する (D1)。サービスは読まない。compose からも消す。Node のプロセスは 1 つで、同時実行の上限は `MAX_CONCURRENCY` がそのまま全体の上限になる
 - `MAX_CHILD_RSS_MB`、`MAX_XLSX_CELLS`: Node 版の計測 (11.2) で成り立たなければ下げてよい (11.11)。上げない
 - `RAYON_NUM_THREADS=1` (anydoc の中のスレッドの数を 1 にする): anydoc の Rust の核は同じなので、Dockerfile と子の `env` で引き続き設定する (Python 版の調べでは、設定しないと仮想メモリのピークが 1.2GB に達した)
 - `TMPDIR`: Python 版は forkserver のソケットのために要った。Node 版で要るかどうかは T2 で確かめる。要らなければ設定しない
 
 `RLIMIT_AS` の値は環境変数にせず、T3 で決めた値をコードの定数にする (新しい設定項目を足さない)。
 
-**メモリの予算**: Python 版の目安は「ワーカー数 × 120MB + ワーカー数 × `MAX_CONCURRENCY` × (`MAX_CHILD_RSS_MB` + 100MB + アップロード 2 × `MAX_FILE_SIZE_MB` + 結果 16MiB × 3)」で、既定で約 1.8GB (k8s の例の limits は 2Gi)。Node 版ではワーカー数の項が無くなり (D1)、「親の RSS + `MAX_CONCURRENCY` × (…)」になる。親の待機時の RSS (devcontainer で何もしない Node が 45MB、research.md 1.5) と、子の最大 RSS (11.2) を測り直して、同じ形の式で計算し直す。計算した結果が 2Gi を超えるなら、既定値を下げる (11.11)。2Gi を上げることはしない (1.13)。
+**メモリの予算**: Python 版の目安は「ワーカー数 × 120MB + ワーカー数 × `MAX_CONCURRENCY` × (`MAX_CHILD_RSS_MB` + 100MB + アップロード 2 × `MAX_FILE_SIZE_MB` + 結果 16MiB × 3)」で、既定で約 1.8GB (コンテナのメモリの上限は 2Gi)。Node 版ではワーカー数の項が無くなり (D1)、「親の RSS + `MAX_CONCURRENCY` × (…)」になる。親の待機時の RSS (devcontainer で何もしない Node が 45MB、research.md 1.5) と、子の最大 RSS (11.2) を測り直して、同じ形の式で計算し直す。計算した結果が 2Gi を超えるなら、既定値を下げる (11.11)。2Gi を上げることはしない (1.13)。
 
 ## Error Handling
 
@@ -623,7 +623,8 @@ export interface ConversionRunner {
 - **実行管理の結合テスト** (`runner/**/*.integ.ts`、Linux): 本物の子プロセスで、時間切れ、RSS の超過、異常終了 (abort / segfault を起こす子)、親の消失、結果の上限、`prlimit` の上限が掛かっていることを確かめる。時間の期限は小数の引数で渡して短くする (対象 spec と同じ)
 - **HTTP の黒箱のテスト** (`apps/attachment-text-extractor/test/http/`): 抽出サービスの URL を受け取り、外から HTTP だけで確かめる。既定では Node 版をテストの中で起動するが、URL を環境変数で渡すと外のサービスに向けられる。6.3 では、これを Python 版に向けて動かす。内部の偽物 (遅い子など) を必要とするテストはここに入れず、HTTP の層のテストとして別に置く
 - **6.3 で Python 版に向けるときに外すテスト**: 意図して振る舞いを変える点を確かめるテストは、Python 版では通らないのが正しい。たとえば、経路の定義から作った OpenAPI の文書の名前 (7.1)、`/readyz` の `dependencies` の名前 (D2。Python 版は `pypdfium2` などを出すので、実名の検査は Python 版では通らない)、`/docs` と `/redoc` が無いこと (D3)、`WORKERS` を読まないこと (D1)、1.9 で崩した契約。こうしたテストには目印 (vitest のタグ、またはファイル名の決まり) を付け、6.3 の実行では外す。外したテストの一覧と、それぞれの根拠 (要件の番号か D の決定) をテストの対応表 (6.2) に書く。目印のないテストは、すべて Python 版で通らなければならない
-- **配備物のテスト**: Dockerfile、compose、k8s の例を読んで中身を確かめる (Python 版の `test_deploy_config.py` などに対応)
+- **配備物のテスト**: Dockerfile と compose を読んで中身を確かめる (Python 版の `test_deploy_config.py` などに対応)。運用者向けの文書 (`docker/README.md`) は文章なので、自動のテストの対象にしない
+- **image の中のメモリの計測 (CI)**: ジョブを失敗にするのは、最も重い負荷でのコンテナ全体の値が予算の 2,048MiB を超えたときと、計測が正しく行えなかったときだけにする。基準のファイルの子の最大 RSS が 304MB (上限 320MB の 0.95 倍) を超えたときは、表とジョブの要約に警告を出し、失敗にはしない。手元の余裕が 10〜30MB しか無く、別の機械では測るたびの差で線をまたぎうるためである (本当の上限 320MB は、サービス自身が守る)。警告が出たら、research.md 20 節の手順 (XLSX のセル数の既定値を下げる、DOCX はユーザーに諮る) に進む。この計測は、最初の本物の数字を記録した後は、人が起動したとき (`workflow_dispatch`) だけ動かす。動かすのは、変換の部品 (anydoc、PDFium)、Node の元の image、メモリに関わるコードを変えたときである。workflow の `paths` は `pnpm-lock.yaml` を含み、monorepo のどの依存の更新でも変わるので、push のたびに測ると関係の無い変更でも動いてしまう
 - **既定の上限での余裕**: 対象 spec と同じく、基準のファイル (7 万セル 1 シートの XLSX、画像 12 枚の 48MB の DOCX) の子の最大 RSS が上限の 0.95 倍までに収まることを確かめる。基準値は 11.2 で取り直す
 - **テストの書き方**: `essential-test-design` (観察できる結果を確かめ、仕組みを確かめない) と `essential-test-patterns` (vitest、`mock<T>()` を使い、型の主張 `as` を避ける) に従う
 - **自動では確かめられず、人が確かめること**: (1) image がビルドでき、大きさが 400MB 以下 (8.1)。(2) read-only rootfs・uid 10001・`--network none` で起動して `/readyz` が ready を返し、PDF と DOCX の `POST /extract` が 200 を返す (8.2)。(3) GitHub 上で workflow を trigger の条件に合うブランチで動かし、`gh api repos/<org>/<repo>/actions/runs/<id>/jobs` でジョブの数が 0 より多く、すべてのステップが成功している (9.3)
@@ -655,7 +656,7 @@ export interface ConversionRunner {
 | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6 | 層の分け方の判断 1〜7、File Structure Plan |
 | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8 | 実施の流れ、Testing Strategy (HTTP の黒箱のテスト) |
 | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6 | T5、`http/api-schemas.ts`、`http/openapi-route.ts`、`scripts/export-openapi.ts`、`scripts/check-openapi-drift.ts`、Modified Files、Revalidation Triggers |
-| 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8 | Technology Stack、File Structure Plan (Dockerfile、deploy)、HTTP の層 (`/readyz`)、Security Considerations |
+| 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8 | Technology Stack、File Structure Plan (Dockerfile、`docker/README.md`)、Out of Boundary (manifest の例を持たない)、HTTP の層 (`/readyz`)、Security Considerations |
 | 9.1, 9.2, 9.3, 9.4, 9.5 | Modified Files、実施の流れ (CI の扱い)、D4 |
 | 10.1, 10.2, 10.3, 10.4, 10.5 | Python 版の残し方と撤去の条件、D5 |
 | 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 11.11, 11.12 | 試作と計測で決める項目 (T1〜T7)、ユーザーの決定と判断を待つ項目 (D1〜D5)、Configuration |
