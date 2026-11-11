@@ -162,7 +162,7 @@ const updateAsHuman = async (
       if (!isConditional || !(err instanceof RevisionConflictError)) {
         throw err;
       }
-      // The lost attempt may already have saved wip/grant on the old document; always continue from a fresh read.
+      // Continue from a fresh read: the lost attempt's in-memory page is stale.
       page = await rereadPage(page, user);
       if (attempt >= HUMAN_SAVE_MAX_ATTEMPTS) {
         logger.warn(
