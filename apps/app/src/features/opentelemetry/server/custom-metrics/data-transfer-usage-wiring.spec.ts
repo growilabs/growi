@@ -52,12 +52,12 @@ describe('data transfer usage metrics wiring', () => {
     await provider.shutdown();
   });
 
-  it('records via the public barrel only after setupCustomMetrics() has run (Req 3.1)', async () => {
+  it('records via the public barrel only after setupCustomMetrics() has run (Req 11.7)', async () => {
     const { recordArchiveOperation, recordG2GTransfer } = await import(
       '../index'
     );
 
-    // Telemetry not yet set up: recording is a silent no-op (Req 3.2)
+    // Telemetry not yet set up: recording is a silent no-op (Req 11.8)
     expect(() => recordArchiveOperation('create', 'success')).not.toThrow();
     expect(() => recordG2GTransfer('source', 'failure')).not.toThrow();
     expect(await collectMetricNames()).not.toContain(ARCHIVE_METRIC);

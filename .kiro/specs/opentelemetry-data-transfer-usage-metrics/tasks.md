@@ -77,7 +77,7 @@
   - _Requirements: 3.1, 3.2, 4.3_
 
 - [ ] 5. opentelemetry spec への反映とこの spec の削除
-- [ ] 5.1 opentelemetry spec の設計と要件を書き換える
+- [x] 5.1 opentelemetry spec の設計と要件を書き換える
   - design.md の Custom Metric 層に、発生回数を数えるメトリクスの実装規約、外部の機能から記録する API と依存方向、本 spec で追加した 2 メトリクスを追加する
   - Extension Templates に発生回数型メトリクスの追加手順を、Allowed Dependencies と Revalidation Triggers に本 spec の内容を追加する
   - requirements.md の末尾に発生回数型メトリクスの要件を追加する（既存の要件番号は変えない）。amend の経緯は書かず、現在の事実として記述する
