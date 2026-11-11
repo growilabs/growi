@@ -74,10 +74,6 @@
 - **Findings**: 受信側 `receiveTransferData()` は 9 種のエラー応答と 1 種の成功応答を持つ。成功応答でも `failedCollections` / `importAborted` / `postProcessFailures` 等により取り込みが不完全な場合がある。`apiv3Err` の戻り値は `any` のため、エラー時は明示的に結果を返す形にする。
 - **Implications**: 受信側の判定は戻り値のみで行い、`res.statusCode` を併用しない。「取り込みが不完全」の定義は、送信側の既存判定式を `isTransferImportIncomplete()` として抽出して両側で共有する。
 
-### 手動検証の知見
-
-- devコンテナ内で公式の `otelcol` バイナリ（debug exporter、`localhost:4317`）を立てる方法で、有効時は各操作の件数が操作回数どおり届き、既存メトリクスに影響がなく、無効時は何も送られずアーカイブ作成にも影響しないことを確認できた。手順そのものは design.md の検証手順を参照。
-
 ## Architecture Pattern Evaluation
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
