@@ -3342,21 +3342,28 @@ class PageService implements IPageService {
     const childPagesWritable = new Writable({
       objectMode: true,
       write: async (batch, encoding, callback) => {
-        await this.updateChildPagesGrant(
-          batch,
-          grant,
-          user,
-          userRelatedGroups,
-          userRelatedParentGrantedGroups,
-        );
-        callback();
+        try {
+          await this.updateChildPagesGrant(
+            batch,
+            grant,
+            user,
+            userRelatedGroups,
+            userRelatedParentGrantedGroups,
+          );
+          callback();
+        } catch (err) {
+          callback(err);
+        }
       },
     });
 
-    await pipeline(childPagesReadableStream, batchStream, childPagesWritable);
-
-    // The bulk write above bypasses the per-page events.
-    this.pageEvent.emit('syncDescendantsUpdate', parentPage, user);
+    try {
+      await pipeline(childPagesReadableStream, batchStream, childPagesWritable);
+    } finally {
+      // The bulk write above bypasses the per-page events. Also on failure:
+      // the batches written before it are already stored.
+      this.pageEvent.emit('syncDescendantsUpdate', parentPage, user);
+    }
   }
 
   async updateChildPagesGrant(
