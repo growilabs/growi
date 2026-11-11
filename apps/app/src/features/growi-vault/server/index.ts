@@ -531,12 +531,12 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       (payload?: {
         affectedPages?: Array<{
           page: IPage & { _id: { toString(): string }; revision?: unknown };
-          previousGrant: unknown;
-          previousGrantedGroups: unknown;
-          previousGrantedUsers: unknown;
-          newGrant: unknown;
-          newGrantedGroups: unknown;
-          newGrantedUsers: unknown;
+          previousGrant: IPage['grant'];
+          previousGrantedGroups: IPage['grantedGroups'];
+          previousGrantedUsers: IPage['grantedUsers'];
+          newGrant: IPage['grant'];
+          newGrantedGroups: IPage['grantedGroups'];
+          newGrantedUsers: IPage['grantedUsers'];
         }>;
         user?: unknown;
       }) => {
@@ -544,27 +544,23 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
         if (!Array.isArray(items) || items.length === 0) return;
 
         for (const item of items) {
-          // Build a minimal page view with the PREVIOUS grant state so the
-          // namespace mapper computes the old namespaces correctly.
-          const previousPageView = {
-            ...item.page,
-            grant: item.previousGrant,
-            grantedGroups: item.previousGrantedGroups,
-            grantedUsers: item.previousGrantedUsers,
-          } as unknown as IPage;
-          const previousNamespaces =
-            vaultNamespaceMapper.computePageNamespaces(
-              previousPageView,
-            ).current;
+          const previousNamespaces = vaultNamespaceMapper.computePageNamespaces(
+            {
+              grant: item.previousGrant,
+              grantedGroups: item.previousGrantedGroups,
+              grantedUsers: item.previousGrantedUsers,
+            },
+          ).current;
 
-          // Build a "current state" view so the dispatcher computes new
-          // namespaces against the post-change grant.
+          // item.page still holds the grant from before the bulk write, and
+          // it is a Mongoose document whose fields a spread would not copy.
           const currentPageView = {
-            ...item.page,
+            _id: item.page._id,
+            path: item.page.path,
             grant: item.newGrant,
             grantedGroups: item.newGrantedGroups,
             grantedUsers: item.newGrantedUsers,
-          } as unknown as IPage & { _id: { toString(): string } };
+          };
 
           const revisionId =
             item.page.revision == null

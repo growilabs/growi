@@ -4,7 +4,10 @@ import type { Namespace } from '@growi/core/dist/interfaces/vault';
 import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction';
 import loggerFactory from '~/utils/logger';
 
-import type { VaultNamespaceMapper } from './vault-namespace-mapper';
+import type {
+  PageGrantState,
+  VaultNamespaceMapper,
+} from './vault-namespace-mapper';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:service:vault-dispatcher',
@@ -29,6 +32,12 @@ export const CHUNK_SIZE = 1000;
 // Event types
 // ---------------------------------------------------------------------------
 
+/** The page fields the dispatcher reads. */
+export type DispatchedPage = PageGrantState & {
+  readonly _id: { toString(): string };
+  readonly path: string;
+};
+
 /**
  * Represents a single-page lifecycle event emitted by PageService.
  *
@@ -50,7 +59,7 @@ export interface PageChangedEvent {
   /** Type of change that occurred. */
   readonly type: PageChangedEventType;
   /** The page object reflecting the current (post-change) state. */
-  readonly page: IPage & { _id: { toString(): string } };
+  readonly page: DispatchedPage;
   /** Revision ID of the current revision (undefined for delete events). */
   readonly revisionId?: string;
   /**
@@ -105,7 +114,7 @@ export interface BulkPageOperationEvent {
  */
 export interface PageRenamedEvent {
   /** The page object reflecting the current (post-rename) state. */
-  readonly page: IPage & { _id: { toString(): string } };
+  readonly page: DispatchedPage;
   /** The page path before the rename. */
   readonly oldPath: string;
   /** The page path after the rename. */

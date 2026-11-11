@@ -5733,6 +5733,7 @@ class PageService implements IPageService {
         savedPage = await pushRevision(savedPage, newRevision, user, {
           expectedRevisionId: options.expectedRevisionId,
         });
+        await savedPage.populateDataToShowRevision();
       } catch (err) {
         await this.emitUpdateAbortedAfterSave(
           savedPage._id,
@@ -5741,7 +5742,6 @@ class PageService implements IPageService {
         );
         throw err;
       }
-      await savedPage.populateDataToShowRevision();
     }
 
     this.pageEvent.emit('update', savedPage, user, updateEventExtras);
@@ -5849,6 +5849,7 @@ class PageService implements IPageService {
         savedPage = await pushRevision(savedPage, newRevision, user, {
           expectedRevisionId: options.expectedRevisionId,
         });
+        await savedPage.populateDataToShowRevision();
       } catch (err) {
         await this.emitUpdateAbortedAfterSave(
           savedPage._id,
@@ -5857,7 +5858,6 @@ class PageService implements IPageService {
         );
         throw err;
       }
-      await savedPage.populateDataToShowRevision();
     }
 
     // update scopes for descendants

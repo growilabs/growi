@@ -76,7 +76,7 @@ const derivePageNamespaces = (
     case PageGrant.GRANT_USER_GROUP: {
       // Each granted group maps to a distinct namespace (req 3.4)
       const groups = page.grantedGroups ?? [];
-      return groups.map((g) => `group-${g.item.toString()}`);
+      return groups.map((g) => `group-${getIdStringForRef(g.item)}`);
     }
 
     case PageGrant.GRANT_OWNER: {

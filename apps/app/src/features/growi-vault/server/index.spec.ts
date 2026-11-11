@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { model, Schema, Types } from 'mongoose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Task 5.2 tests register SIGTERM/SIGINT handlers via initializeVaultFeature.
@@ -192,6 +193,17 @@ import { vaultSettingsService } from './services/vault-settings-service';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// Stands in for the Page model: field access goes through prototype getters,
+// as on every hydrated Mongoose document.
+const DescendantPageModel = model(
+  'VaultIndexSpecDescendantPage',
+  new Schema({
+    path: String,
+    revision: Schema.Types.ObjectId,
+    grant: Number,
+  }),
+);
 
 function makeCrowiStub() {
   return {
@@ -631,6 +643,45 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
           .previousNamespaces,
       ).toEqual(['public']);
       expect(first.revisionId).toBe('rev1');
+    });
+
+    it('dispatches the id and path of a page given as a Mongoose document', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+      const pageDoc = new DescendantPageModel({
+        path: '/descendant',
+        revision: new Types.ObjectId(),
+        grant: 1,
+      });
+
+      crowi.events.page.emit('descendantsGrantChanged', {
+        affectedPages: [
+          {
+            page: pageDoc,
+            previousGrant: 1,
+            previousGrantedGroups: [],
+            previousGrantedUsers: [],
+            newGrant: 4,
+            newGrantedGroups: [],
+            newGrantedUsers: ['u1'],
+          },
+        ],
+        user: { _id: 'u1' },
+      });
+      await flush();
+
+      expect(dispatcherOnPageChanged).toHaveBeenCalledExactlyOnceWith({
+        type: 'acl-change',
+        page: {
+          _id: pageDoc._id,
+          path: '/descendant',
+          grant: 4,
+          grantedGroups: [],
+          grantedUsers: ['u1'],
+        },
+        previousNamespaces: ['public'],
+        revisionId: pageDoc.revision?.toString(),
+      });
     });
 
     it('does nothing for an empty affectedPages list', async () => {

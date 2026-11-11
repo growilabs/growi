@@ -1,5 +1,5 @@
-import type { IPage, IUserHasId } from '@growi/core';
-import { PageGrant, PageStatus } from '@growi/core';
+import type { IPage, IUserGroupHasId, IUserHasId } from '@growi/core';
+import { GroupType, PageGrant, PageStatus } from '@growi/core';
 import { Types } from 'mongoose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mock } from 'vitest-mock-extended';
@@ -278,40 +278,52 @@ describe('VaultNamespaceMapper.computePageNamespaces', () => {
 
   describe('GRANT_USER_GROUP page with one group', () => {
     it('returns the single group namespace', () => {
-      const groupId = 'abc-group-1';
+      const groupId = new Types.ObjectId();
       const page = buildPage({
         grant: PageGrant.GRANT_USER_GROUP,
-        grantedGroups: [
-          { type: 'UserGroup', item: { toString: () => groupId } as never },
-        ],
+        grantedGroups: [{ type: GroupType.userGroup, item: groupId }],
       });
 
       const result = mapper.computePageNamespaces(page);
 
-      expect(result.current).toEqual([`group-${groupId}`]);
+      expect(result.current).toEqual([`group-${groupId.toString()}`]);
     });
-  });
 
-  describe('GRANT_USER_GROUP page with multiple groups', () => {
-    it('returns one namespace per granted group (req 3.4)', () => {
-      const groupId1 = 'grp-id-001';
-      const groupId2 = 'grp-id-002';
+    it('resolves a granted group given as a populated document', () => {
+      const groupId = new Types.ObjectId();
       const page = buildPage({
         grant: PageGrant.GRANT_USER_GROUP,
         grantedGroups: [
-          { type: 'UserGroup', item: { toString: () => groupId1 } as never },
           {
-            type: 'ExternalUserGroup',
-            item: { toString: () => groupId2 } as never,
+            type: GroupType.userGroup,
+            item: mock<IUserGroupHasId>({ _id: groupId.toString() }),
           },
         ],
       });
 
       const result = mapper.computePageNamespaces(page);
 
+      expect(result.current).toEqual([`group-${groupId.toString()}`]);
+    });
+  });
+
+  describe('GRANT_USER_GROUP page with multiple groups', () => {
+    it('returns one namespace per granted group (req 3.4)', () => {
+      const groupId1 = new Types.ObjectId();
+      const groupId2 = new Types.ObjectId();
+      const page = buildPage({
+        grant: PageGrant.GRANT_USER_GROUP,
+        grantedGroups: [
+          { type: GroupType.userGroup, item: groupId1 },
+          { type: GroupType.externalUserGroup, item: groupId2 },
+        ],
+      });
+
+      const result = mapper.computePageNamespaces(page);
+
       expect(result.current).toEqual([
-        `group-${groupId1}`,
-        `group-${groupId2}`,
+        `group-${groupId1.toString()}`,
+        `group-${groupId2.toString()}`,
       ]);
     });
   });

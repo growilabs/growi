@@ -1,4 +1,4 @@
-import { type IUserHasId, PageGrant } from '@growi/core';
+import { GroupType, type IUserHasId, PageGrant } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
@@ -7,6 +7,9 @@ import { getInstance } from '^/test/setup/crowi';
 import type Crowi from '~/server/crowi';
 import { RevisionConflictError } from '~/server/models/errors';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import UserGroup from '~/server/models/user-group';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import SyncPageStatusService from '~/server/service/system-events/sync-page-status';
 import { prisma } from '~/utils/prisma';
 
 import { VaultInstruction } from '../models/vault-instruction';
@@ -28,8 +31,8 @@ describe('Vault instructions written for a single-page update', () => {
   let editor: HydratedDocument<IUserHasId>;
   let isV5CompatibleBefore: boolean;
 
-  // Each element is the argument list of one emit the Vault subscribes to.
-  let emittedUpdates: Parameters<VaultPageUpdateHandler>[];
+  // Results of the Vault subscriber for the events emitted so far.
+  let handled: Promise<void>[];
   const handlePageUpdate = createVaultPageUpdateHandler(
     createVaultDispatcher(vaultNamespaceMapper),
     vaultNamespaceMapper,
@@ -70,13 +73,10 @@ describe('Vault instructions written for a single-page update', () => {
     return page.save();
   };
 
-  /** Hands every captured emit to the Vault subscriber. */
+  /** Waits until the Vault subscriber has written everything it was handed. */
   const deliverEmittedUpdates = async (): Promise<void> => {
-    for (const args of emittedUpdates) {
-      // biome-ignore lint/performance/noAwaitInLoops: deliver in emit order
-      await handlePageUpdate(...args);
-    }
-    emittedUpdates = [];
+    await Promise.all(handled);
+    handled = [];
     await new Promise((resolve) => setTimeout(resolve, COALESCE_WINDOW_MS * 2));
   };
 
@@ -106,21 +106,28 @@ describe('Vault instructions written for a single-page update', () => {
     creator = await createUser('creator');
     editor = await createUser('editor');
 
-    // Capture the emits instead of running the app-wide listeners,
-    // whose background DB work would outlive the test.
-    vi.spyOn(crowi.pageService.pageEvent, 'emit').mockImplementation(
-      (event, page, _user, extras) => {
-        if (VAULT_PAGE_UPDATE_EVENTS.some((name) => name === event)) {
-          emittedUpdates.push([page, extras]);
-        }
-        return true;
-      },
-    );
+    // Same listener order as the running app: the page-status broadcaster is
+    // registered before the Vault subscriber.
+    new SyncPageStatusService(crowi, undefined, crowi.socketIoService);
+    for (const eventName of VAULT_PAGE_UPDATE_EVENTS) {
+      crowi.events.page.on(
+        eventName,
+        (
+          ...[page, , extras]: [
+            Parameters<VaultPageUpdateHandler>[0],
+            unknown,
+            Parameters<VaultPageUpdateHandler>[1],
+          ]
+        ) => {
+          handled.push(handlePageUpdate(page, extras));
+        },
+      );
+    }
     vi.spyOn(crowi.pageService, 'updatePageSubOperation').mockResolvedValue();
   }, 60_000);
 
   beforeEach(() => {
-    emittedUpdates = [];
+    handled = [];
   });
 
   afterAll(async () => {
@@ -139,6 +146,12 @@ describe('Vault instructions written for a single-page update', () => {
     await crowi.models.User.deleteMany({
       _id: { $in: [creator._id, editor._id] },
     });
+    const groups = await UserGroup.find({
+      name: `vault-page-update-integ-group-${WORKER_ID}`,
+    });
+    const groupIds = groups.map((group) => group._id);
+    await UserGroupRelation.deleteMany({ relatedGroup: { $in: groupIds } });
+    await UserGroup.deleteMany({ _id: { $in: groupIds } });
   });
 
   it('moves a public page to the namespace of the user who set it to only-me, not of its creator', async () => {
@@ -174,6 +187,33 @@ describe('Vault instructions written for a single-page update', () => {
     expect(await writtenInstructions(page)).toEqual([
       ['remove', `user-${editor._id}-only-me`],
       ['upsert', 'public'],
+    ]);
+  });
+
+  it('writes no remove for a body edit of a group page', async () => {
+    const group = await UserGroup.create({
+      name: `vault-page-update-integ-group-${WORKER_ID}`,
+    });
+    await UserGroupRelation.create({
+      relatedGroup: group._id,
+      relatedUser: editor._id,
+    });
+    const page = await createPublicPage('group-body-edit', true);
+    page.grant = PageGrant.GRANT_USER_GROUP;
+    page.grantedGroups = [{ type: GroupType.userGroup, item: group._id }];
+    await page.save();
+
+    await crowi.pageService.updatePage(
+      page,
+      'updated body',
+      'initial body',
+      editor,
+      {},
+    );
+    await deliverEmittedUpdates();
+
+    expect(await writtenInstructions(page)).toEqual([
+      ['upsert', `group-${group._id}`],
     ]);
   });
 
