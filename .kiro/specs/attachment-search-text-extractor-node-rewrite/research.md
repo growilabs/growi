@@ -8486,3 +8486,62 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 - 最初の本物の実行 (push して CI で動かす) と、その数字の記録。
 - メモリの計測を、人が起動したときだけ動かす形に切り替えること。
 - 上の 2 つが済んだら、`docker/README.md` の断り書きを書き直し、tasks.md の 6.12 に完了の印を付ける。
+
+### 27.17 最初の本物の実行の結果 (タスク 6.12)
+
+2026-11-11 に、ブランチを push して CI で動かした (ユーザーの許可を得た)。GitHub Actions の実行は 43012846673 (workflow「Node CI for attachment-text-extractor」、commit `38ec6d53bf`、push で起動)。runner の image は ubuntu-26.04 (20261101.186.1)。数字は、ジョブのログから読んだ実測である。成否は、実行の印ではなく、`gh api repos/growilabs/growi/actions/runs/43012846673/jobs` のジョブとステップの一覧で確かめた。
+
+**ジョブは 2 つで、どちらも動いた**
+
+| ジョブ | 結果 | 時間 |
+|---|---|---|
+| Node CI for attachment-text-extractor (lint とテスト) | 失敗 (見込みどおり) | 2 分 36 秒 |
+| Image check for attachment-text-extractor | すべてのステップが成功 | 3 分 58 秒 |
+
+- lint とテストのジョブ: `biome check` と `tsgo --noEmit` は通った。テストは 4,770 件が通り、3 件が失敗、12 件が skip (139 ファイル、121 秒)。失敗は `test/deploy/compose.spec.ts` の 3 件だけで、8.2 で通る (`WORKERS` がまだある、healthcheck が python、build の context)。27.13 と 27.15 に挙げた、負荷に弱いテストは、この実行では 1 つも失敗しなかった。
+
+**image の確認 (27.10 と 27.11 の一覧への答え)。image を作ったのは、これが初めてである**
+
+| 項目 | 結果 |
+|---|---|
+| 27.10 の 1: corepack と pnpm、ほかの app 抜きの install | 通った。corepack が pnpm 11.1.1 を取り、`pnpm install --frozen-lockfile --ignore-scripts` は 18.1 秒 |
+| 27.10 の 2: build が `rimraf` と `tsc` を見つける。2 回目の install が始まらない | 通った。`pnpm --filter … run build` は 3.7 秒で、install は始まっていない (ログを読んで確かめた) |
+| 27.10 の 3: キャッシュの mount の下の `pnpm deploy` | 通った (6.8 秒。「Shared workspace lockfile detected but configuration forces legacy deploy implementation」の警告が出るが、`--legacy` を指定しているためで、想定どおり) |
+| 27.10 の 4: 本番の依存だけの状態で、`/openapi.json` が書き出しと同じ | 同じだった |
+| 27.10 の 5: pdfium の `LICENSE` と `LICENSE.pdfium` | あった (コピーの段と `contents` の段が通った) |
+| 27.10 の 6: `--read-only`・uid 10001・ネットワークなし・tmpfs なしで、`/readyz`・PDF・DOCX | 通った。`/readyz` は 200 で、4 つの部品がすべて ok。PDF は 200 (1 ページ、16 字)、DOCX は 200 (1 ページ、18 字) |
+| 27.10 の 7: 400MB 以下 | `docker image inspect` の値は 89,175,439 バイト。**これは圧縮した大きさである見込み** (build のログが manifest list と unpacking を出していて、runner は containerd の image store を使っている)。展開した大きさは測っていない (見積もりは約 300MB。27.10) |
+| 27.10 の 8: arm64 | 確かめていない (runner が x64) |
+| 27.10 の 9: dockerignore の行の順 | `contents` の段が通った (build の段に、この app 以外と、置いた目印のファイルが無い) |
+| `prlimit` (Req 8.7、9.5) | build の最後の段で `prlimit from util-linux 2.38.1`。動いている container の中での上限は、`Max address space 2751463424:2751463424`、`Max cpu time 60:65`、`Max core file size 1:1` |
+| image の中の Node | v24.22.2 |
+
+**image の中のメモリ (Req 3.14、11.2)。container の cgroup v2 の `memory.peak`。各 3 回。ステップの時間は 79 秒**
+
+| 項目 | 結果 | 基準 |
+|---|---|---|
+| 待機時 | 34〜35MiB | — |
+| S1 の最大 | 486 / 480 / 467MiB (捨てられるページキャッシュを除くと 418〜483MiB) | 2,048MiB (残り 1,562MiB) |
+| S2 の最大 | 974 / 918 / 1,095MiB (同 807〜990MiB) | 2,048MiB (残り 953MiB)。Python 版の 1,230MiB より 135MiB 少ない |
+| 7 万セルの XLSX の子の最大 RSS | 291 / 291 / 291MB | 304MB の線の内側 |
+| 画像 12 枚・48MB の DOCX の子の最大 RSS | 266 / 262 / 262MB | 304MB の線の内側 |
+| 200 万字の PDF の子の最大 RSS | 306 / 306 / 305MB | 表示だけ (線とは比べない) |
+
+- 結果の行は「within the limits」。警告は出ていない。
+- **2Gi の予算は、image の中の実測で確かめられた** (3.7 の決定 (A) の裏づけ)。最も重い負荷でも、上限まで約 950MiB ある。27.11 の container の外の計測 (S2 が 1,178〜1,379MiB) より少ない。container の外の値は、サービスと子の RSS を足したもので、測り方が違う。
+- **待機時の親は 34〜35MiB** で、メモリの式に置いていた 69MiB (20.7) や、container の外の 82〜83MiB (27.11) より少ない。式は、用心深い見積もりのまま変えない。
+- **XLSX と DOCX は、`MAX_XLSX_CELLS` を下げる必要が無い** (tasks.md の 6.12 の「超えたら 65,000 セルに下げる」は、当てはまらなかった)。container の外の値 (XLSX 290〜294MB、DOCX 271〜282MB) とほぼ同じで、実行環境による違いは小さい。
+- **200 万字の PDF は 305〜306MB で、304MB の線を 1〜2MB 超える** (container の外では 302〜303MB)。線と比べる対象ではなく (tasks.md が名前を挙げているのは XLSX と DOCX)、子の上限 320MB までは 14MB あるので、変換は成功する。1 ページに 200 万字が入った PDF という、特殊な形の場合である (27.3)。**ユーザーに伝える。**
+
+**この実行の後で変えたこと**
+
+- `.github/workflows/ci-attachment-text-extractor.yml` の「Measure memory in the image」のステップに、`if: github.event_name == workflow_dispatch` を足した。メモリの計測は、人が workflow を起動したときだけ動く。動かすのは、変換の部品 (anydoc、PDFium) か Node の元の image を上げたとき、メモリに関わるコードを変えたときである。workflow のファイルが既定のブランチに入るまでは、人が起動することはできない。
+- `docker/README.md` の冒頭の断り書きを、この実行で確かめた内容 (日付と commit つき) に書き直した。メモリの段落は、image の中の値 (最も重い負荷 918〜1,095MiB、待機時 34〜35MiB) に合わせた。まだ確かめていないこととして、linux-arm64 と、本物のオーケストレーターの下での動き (確認、入れ替え、停止の猶予) を残した。CPU と自動スケールの値は「出発点で、測っていない」と書いたままである。
+
+**まだ確かめていないこと**
+
+- 展開した image の大きさ (上の表のとおり、報告された値は圧縮した大きさの見込み)。
+- linux-arm64 の image。
+- `::warning::` の行が GitHub Actions の注釈になること (この実行では、304MB を超えた対象のファイルが無く、警告が出なかった)。
+- 手元の docker での `check-image.sh all` (6.12 の条件から外した。27.16)。
+- 切り替えた後の workflow で、メモリのステップが飛ばされること (次の push の実行で確かめて、下に追記する)。
