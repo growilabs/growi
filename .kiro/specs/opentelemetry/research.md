@@ -42,6 +42,42 @@
   - `_resource` プロパティを直接書き換えることで、`start()` 前に Resource を差し替えられる。
 - **Implications**: `(sdk as any)._resource` への reflective アクセスを `getResource` / `setResource` で隔離。SDK のメジャー更新時に public API が出ていないか Revalidation Trigger として確認する。
 
+### データアーカイブ／お引越しの利用状況が見えなかった理由（発生回数メトリクスの背景）
+
+- **Context**: 管理画面のデータアーカイブとお引越し機能（G2G 転送）について、WESEEK 側で「使っているインスタンスがあるか」「どの程度の頻度で使われているか」を把握できなかった。
+- **Findings**:
+  - データアーカイブの操作（`ADMIN_ARCHIVE_DATA_CREATE` / `DOWNLOAD` / `DELETE` / `UPLOAD`、`ADMIN_GROWI_DATA_IMPORTED`）は監査ログの Large グループにのみ含まれ、監査ログ自体も初期状態で無効のため、多くのインスタンスで記録されない。
+  - お引越し機能には監査ログのアクションが存在しない。
+  - 監査ログは各インスタンスの DB に保存されるのみで、外部集計の経路がない。
+  - 既存の独自メトリクスはすべて ObservableGauge（送信時点の状態値）で、イベントの発生回数を表せない。本番のトレースは 1% サンプリングのため、トレースからも回数は読めない。
+- **Implications**: 監査ログの記録有無に依存しない、イベント発生時に加算する Counter で回数を送る。受信側で「期間内に 1 回以上利用したインスタンス数」「利用インスタンスの割合」「インスタンスごとの期間あたり利用回数」を集計できることが目的。
+
+### metrics API に Proxy がなく、SDK 登録前の Meter は Noop に固定される
+
+- **Context**: 計測ポイントはルート／サービス構築時（`growi.start()`）に評価されるコードにあり、SDK 開始（`startOpenTelemetry()` 内の `sdkInstance.start()` → `setupCustomMetrics()`）より前に実行される。
+- **Findings**:
+  - `@opentelemetry/api` 1.9 の metrics API には trace API のような Proxy プロバイダーがない。`metrics.getMeter()` は呼び出し時点のグローバル MeterProvider（未登録なら Noop）から Meter を返し、後から SDK が登録されても差し替わらない。
+  - Meter をモックする単体テストでは、この罠を検出できない（テストは通るが本番で何も送られない）。
+- **Implications**: Counter の生成は SDK 開始後に行う。検証は実 `MeterProvider` + `InMemoryMetricExporter` と、実送信の確認で行う。
+
+### お引越しは ExportService / ImportService を再利用している
+
+- **Findings**:
+  - 送信側の `startTransfer()` は内部で `exportService.export()` を、受信側の `importCollections()` は `importService.import()` を再利用している。
+  - 送信側 `startTransfer()` は route からバックグラウンド実行され、アーカイブ生成失敗・送信失敗・受信側の部分失敗・添付ファイル転送失敗を `admin:g2gProgress` に `ERROR` として emit する。ただし、取り込みが不完全でも throw せず resolve する経路がある（添付ファイル転送は続行し、画面にのみ ERROR を通知する）。route 側で Promise の成否だけを見ると部分失敗を成功と誤計上する。
+  - データアーカイブの作成（`export.js` POST `/`）は `exportService.export()` を await しておらず、非同期の失敗は `unhandledRejection` ハンドラ（ログのみ）に流れる。実行中の重複要求（`'There is an exporting process running.'`）も同期 throw ではなく async reject として届く。
+  - 通常インポートの route には、受付（`res.apiv3()`）後・`executeImport()` 前に `onErrorForImport` を emit して return する経路が 3 つある。
+- **Implications**: 成否の判定点は「操作の入口を知る層」に置き、送信側は取り込みの不完全さを戻り値で返す。
+
+### お引越し受信側の応答の種類
+
+- **Findings**: 受信側 `receiveTransferData()` は 9 種のエラー応答と 1 種の成功応答を持つ。成功応答でも `failedCollections` / `importAborted` / `postProcessFailures` 等により取り込みが不完全な場合がある。`apiv3Err` の戻り値は `any` のため、エラー時は明示的に結果を返す形にする。
+- **Implications**: 受信側の判定は戻り値のみで行い、`res.statusCode` を併用しない。「取り込みが不完全」の定義は、送信側の既存判定式を `isTransferImportIncomplete()` として抽出して両側で共有する。
+
+### 手動検証の知見
+
+- devコンテナ内で公式の `otelcol` バイナリ（debug exporter、`localhost:4317`）を立てる方法で、有効時は各操作の件数が操作回数どおり届き、既存メトリクスに影響がなく、無効時は何も送られずアーカイブ作成にも影響しないことを確認できた。手順そのものは design.md の検証手順を参照。
+
 ## Architecture Pattern Evaluation
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
@@ -146,6 +182,78 @@
 - **Selected Approach**: `otel:serviceInstanceId`（env: `OPENTELEMETRY_SERVICE_INSTANCE_ID`）を優先、フォールバックで `app:serviceInstanceId`（DB 由来）を使用。両方 undefined の場合は emit しない。
 - **Rationale**: 自動生成すると再起動ごとに ID が変わり「同じ GROWI インスタンス」の経時観測が困難になる。明示的に与えられた ID のみを passthrough することで、運用者がレプリカの境界を制御できる。
 - **Trade-offs**: ID 未指定時に emit されないため、レプリカ識別が必要なクエリは値の有無を考慮する必要がある。
+
+### Decision: 記録 API は SDK 開始後に生成した Counter を保持する（呼び出しのたびに getMeter しない）
+
+- **Context**: `@opentelemetry/api` 1.9 の metrics API には Proxy がなく、SDK 登録前に取得した Meter は Noop のまま固定される。業務コードの構築は SDK 開始より前に行われる。
+- **Alternatives Considered**:
+  1. 記録のたびに `metrics.getMeter().createCounter()` — 同名 instrument の再生成になり、SDK 側のキャッシュ挙動に依存する。
+  2. `setupCustomMetrics()` で生成してモジュール変数に保持 — 既存の `addXxxMetrics()` 構成と同じ。
+- **Selected Approach**: 2。未生成のあいだの記録は何もしない。記録関数は列挙型の引数のみを受け付け、汎用の `recordEvent(name, attrs)` は作らない（自由文字列を受け付けると、個人やコンテンツを特定しない属性だけを送るという制約を型で守れなくなる）。
+- **Rationale**: Noop 固定の罠を構造で避けられ、`OPENTELEMETRY_ENABLED=false` では何も送信されない既存の制御にそのまま従える。
+- **Follow-up**: Noop 固定の回帰は Meter モックでは検出できないため、実 `MeterProvider` + `InMemoryMetricExporter` でテストし、devコンテナで実送信を確認する。
+
+### Decision: Counter を 2 つに分ける（アーカイブ用とお引越し用）
+
+- **Context**: アーカイブとお引越しを区別して数える必要がある。
+- **Alternatives Considered**:
+  1. 1 つの Counter に `feature` 属性を付ける — お引越しにだけ `role`、アーカイブにだけ `operation` が付き、属性の組が系列ごとに揃わない。
+  2. 2 つの Counter — 各 Counter の属性が常に同じ組になる。
+- **Selected Approach**: 2（`growi.archive.operations`、`growi.g2g_transfer.operations`）。
+- **Rationale**: 系列ごとに属性の有無が変わると受信側のクエリが複雑になる。メトリクス名で機能が分かれていれば集計も読みやすい。
+- **Trade-offs**: メトリクス名が 2 つになるが、記録モジュールは 1 ファイルで所有する。
+
+### Decision: 受付前に拒否された要求は数えない（全操作共通）
+
+- **Context**: お引越しの事前確認での中止は数えない。他の操作にも同様の「受付前の拒否」（バリデーション 4xx、`validateTransferKey` 等）がある。
+- **Selected Approach**: 操作が受け付けられた後の成否のみを数える。アップロードだけは、受け付けたファイルの解析・検証（バージョン不一致）の失敗を失敗として数える。ファイル無し（400）は受付前の拒否として数えない。
+- **Rationale**: 受付前の拒否は「利用」ではなく入力不備で、数えると成功率の解釈がぶれる。
+
+### Decision: 計測はサービス層ではなく、操作の入口を知る層で行う
+
+- **Context**: お引越しが `ExportService` / `ImportService` を再利用している。
+- **Alternatives Considered**:
+  1. 各 route / service に Counter を直接埋め込む — メトリクス名・語彙が散らばり、Noop 固定の回避も各所で必要になる。
+  2. `ExportService` / `ImportService` 内で数える — お引越しがアーカイブとしても計上される。
+  3. 記録 API は custom-metrics に 1 か所、呼び出しは route / `executeImport()` の呼び出し元 / `startTransfer()` の呼び出し元に限定（採用）。
+- **Selected Approach**: 3。送信側の部分失敗は `startTransfer()` の戻り値で route に伝える。
+- **Rationale**: サービス層で数えるとアーカイブの回数にお引越しが二重計上される。共通サービスに計測の関心事を持ち込まない。
+- **Trade-offs**: 計測ポイントが 6 か所に分散するため、結合テストで G2G 転送がアーカイブとして数えられないこと・各箇所 1 回だけ呼ばれることを確認する。業務コードから `features/opentelemetry` への依存が生じるため、`~/features/opentelemetry/server` の barrel 経由のみに限定する。
+
+### Decision: 失敗は失敗として数え、部分失敗も失敗に含める
+
+- **Context**: 失敗の後にはやり直しが続くことが多く、失敗を数えると回数が水増しされるのではという懸念があった。
+- **Selected Approach**: 試行 1 回 = 1 カウントとし、結果（成功／失敗）を属性で区別する。一部のデータを取り込めずに終了した部分失敗は 3 値目を設けず失敗に含め、やり直しは独立した 1 回として数える。
+- **Rationale**:
+  - 結果ラベル付きカウンターは OTel／Prometheus の一般的な形で、受信側で目的別に絞り込める（有無・割合は全試行、利用頻度は成功のみ、安定性は失敗率）。
+  - 失敗を捨てると「使おうとして諦めた」インスタンスが見えなくなり、「利用者がいるか」という目的を損なう。
+  - 部分失敗は管理画面でエラーと表示される状態であり、通常インポート（`executeImport`）と送信側転送（`startTransfer`）は既に失敗として扱っている。判定をそれと揃えることで、利用者が見た結果と計測が一致する。
+- **却下した案**: 失敗を数えない／「部分失敗」の 3 値目を設ける（目的に対して過剰）。
+- **Follow-up**: 判定は `executeImport()` の戻り値（通常インポート）と `server/service/g2g-transfer.ts` の `isTransferImportIncomplete()`（お引越しの送信側・受信側）にある。ダウンロードは成否を区別せず `getFile()` 成功時点（`admin.js` の `actions.export.download`）のみ記録する。
+
+### Decision: 添付ファイルのみ失敗した転送は送信側=失敗・受信側=成功とする
+
+- **Context**: データの取り込みは完了したが、その後の添付ファイル転送だけが失敗した場合、両側で結果が分かれる。
+- **Selected Approach**: 送信側は `failure`、受信側は `success` として記録する。各側は、自分の管理画面に表示される結果をそのまま記録する。
+- **Rationale**:
+  - 送信側の管理画面には、添付ファイル転送の失敗がエラーとして表示される。
+  - 受信側では取り込み自体が完了しており、受信側が自分で判定する結果は成功である。
+  - 各側の計測を管理画面の表示と一致させることで、利用者が見た結果と計測がずれない。両側を無理に揃える案は、どちらかの画面の表示と食い違う。
+- **Trade-offs**: 同一の転送でも送信側と受信側の成功率は一致しないことがある。受信側のクエリでは、これを前提に解釈する。
+
+### Decision: インポートの記録は route の 1 か所に集約し、`executeImport()` は結果を返すだけにする
+
+- **Context**: インポート 1 回分の記録が、`import.ts`（`executeImport()` 前の失敗 3 経路）と `import-executor.ts`（成功・部分失敗・例外）の 2 ファイルに分散しうる。
+- **Selected Approach**: `executeImport()` の戻り値を `Promise<OperationResult>` にし、`import.ts` の受付後バックグラウンド処理で結果変数（初期値 `'failure'`）を持ち、`finally` で 1 回だけ記録する。`import-executor.ts` は型 `OperationResult` のみを参照する。
+- **Rationale**: 失敗経路が追加されても数え漏れ・二重計上が起きにくく、1 回の操作を 1 回だけ数えることをコードの構造で保証できる。お引越し送信側（route が `startTransfer()` の戻り値を見て記録）と同じ形になる。`executeImport()` のテストは記録関数のモックではなく戻り値で検証できる。
+
+### Decision: ページの一括エクスポート・受信側の設定・過去分の遡及は対象外とする
+
+- **Selected Approach**: 対象は管理画面のデータアーカイブ（作成・ダウンロード・アップロード・インポート）とお引越し（送信側・受信側）に限る。
+- **Rationale**:
+  - ページの一括エクスポートは、監査ログの Essential グループで常時記録済みのため、新たに数える必要がない。
+  - 受信側（コレクター・ダッシュボード）の設定は送信側の責務の外にある。新しいメトリクス名と属性は担当者に共有する（既存の Revalidation Trigger「受信側ダッシュボード／クエリの参照更新」に該当）。累積値のリセット判定は、OTLP 既定の累積値（start time 付き）で受信側が判別できる。
+  - リリース以前の利用実績は記録が存在しないため遡及しない。
 
 ## Risks & Mitigations
 
