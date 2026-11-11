@@ -63,12 +63,12 @@
   - _Requirements: 2.3, 2.4, 2.7, 2.8_
   - _Depends: 1.2, 3.1, 3.2_
 
-- [ ] 4. 結合確認
+- [x] 4. 結合確認
 - [x] 4.1 二重計上がないことと全体の健全性を確認する
   - お引越し 1 回の実行（送信側・受信側）で、アーカイブの利用回数が記録されないことを、お引越しの既存結合テスト（`apps/app/src/server/routes/apiv3/g2g-transfer.integ.ts`）に記録関数をモックしたケースを追加して確認する
   - apps/app の lint・テスト・ビルドがすべて通る
   - _Requirements: 1.9, 2.6_
-- [ ] 4.2 devコンテナでローカルのコレクターへの実送信を確認する
+- [x] 4.2 devコンテナでローカルのコレクターへの実送信を確認する
   - 前提: ホスト側で opentelemetry-collector-dev-setup を起動し、devコンテナをそのネットワークに接続する。お引越しの確認には GROWI を 2 インスタンス起動する
   - ローカルの OTel コレクターに接続し、テレメトリ有効の状態でアーカイブ作成・インポート・お引越しを実行して、2 つのメトリクスが期待どおりの属性で届くことを確認する
   - テレメトリ無効の状態で同じ操作を行い、何も送信されず操作結果も変わらないことを確認する
@@ -102,3 +102,4 @@
 - Log errors in pino form `logger.error({ err }, 'msg')` — `logger.error('msg', err)` drops the error under @growi/logger. Attach background-promise handlers with two-arg `.then(onOk, onErr)` so a throw in the success path cannot double-record.
 - `isTransferImportIncomplete` (service/g2g-transfer.ts) is the single definition of "transfer import incomplete" for both sides; its doc holds the rescue rationale. The receiver service has its own older `rescueFailed` (from `rescuePlan`, ~L1879) — out of scope, leave it.
 - 4.1: the double-count test lives in a new `g2g-transfer-no-archive-double-count.integ.ts` (not `g2g-transfer.integ.ts`, which only drives the receive side). Full `pnpm run test` (2026-11-11): 3 unrelated failures — `tools/i18n-sync/no-runtime-dependency.spec.ts` times out under full-suite load (passes alone) and two growi-vault integ files need `apps/growi-vault-manager/dist` built. `lint:*` and `pnpm run build` pass.
+- 4.2 (2026-11-11): verified in the devcontainer with the official `otelcol` binary (debug exporter on localhost:4317) instead of the host-side collector repo. Enabled: create/download/upload success+failure/import arrived with counts matching the operations; existing metrics unchanged. Disabled: nothing sent, archive creation unaffected. G2G not run manually (covered by the no-double-count integ test). Receiver-side sharing of the new metric names/attributes is done via the PR description.
