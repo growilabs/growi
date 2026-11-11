@@ -20,7 +20,10 @@ import { isStaleBootstrapRunner } from './services/resilience';
 import { createVaultBootstrapper } from './services/vault-bootstrapper';
 import { createVaultDispatcher } from './services/vault-dispatcher';
 import { vaultNamespaceMapper } from './services/vault-namespace-mapper';
-import { createVaultPageUpdateHandler } from './services/vault-page-update-handler';
+import {
+  createVaultPageUpdateHandler,
+  VAULT_PAGE_UPDATE_EVENTS,
+} from './services/vault-page-update-handler';
 import { vaultSettingsService } from './services/vault-settings-service';
 
 export { createVaultAdminRouter } from './routes/vault-admin';
@@ -307,18 +310,23 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       dispatcher,
       vaultNamespaceMapper,
     );
-    pageEvent.on(
-      'update',
-      (
-        page: IPage & { _id: { toString(): string } },
-        _user: unknown,
-        extras?: PageUpdateEventExtras,
-      ) => {
-        handlePageUpdate(page, extras).catch((err) => {
-          logger.warn({ err }, 'vault-dispatcher: error handling update event');
-        });
-      },
-    );
+    for (const eventName of VAULT_PAGE_UPDATE_EVENTS) {
+      pageEvent.on(
+        eventName,
+        (
+          page: IPage & { _id: { toString(): string } },
+          _user: unknown,
+          extras?: PageUpdateEventExtras,
+        ) => {
+          handlePageUpdate(page, extras).catch((err) => {
+            logger.warn(
+              { err, eventName },
+              'vault-dispatcher: error handling page update event',
+            );
+          });
+        },
+      );
+    }
 
     pageEvent.on(
       'delete',

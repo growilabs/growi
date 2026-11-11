@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
+import { RevisionConflictError } from '~/server/models/errors';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import { prisma } from '~/utils/prisma';
 
@@ -13,6 +14,7 @@ import { COALESCE_WINDOW_MS, createVaultDispatcher } from './vault-dispatcher';
 import { vaultNamespaceMapper } from './vault-namespace-mapper';
 import {
   createVaultPageUpdateHandler,
+  VAULT_PAGE_UPDATE_EVENTS,
   type VaultPageUpdateHandler,
 } from './vault-page-update-handler';
 
@@ -24,8 +26,9 @@ describe('Vault instructions written for a single-page update', () => {
   let Page: PageModel;
   let creator: HydratedDocument<IUserHasId>;
   let editor: HydratedDocument<IUserHasId>;
+  let isV5CompatibleBefore: boolean;
 
-  // Each element is the argument list of one 'update' emit from PageService.
+  // Each element is the argument list of one emit the Vault subscribes to.
   let emittedUpdates: Parameters<VaultPageUpdateHandler>[];
   const handlePageUpdate = createVaultPageUpdateHandler(
     createVaultDispatcher(vaultNamespaceMapper),
@@ -67,7 +70,7 @@ describe('Vault instructions written for a single-page update', () => {
     return page.save();
   };
 
-  /** Hands every 'update' PageService emitted to the Vault subscriber. */
+  /** Hands every captured emit to the Vault subscriber. */
   const deliverEmittedUpdates = async (): Promise<void> => {
     for (const args of emittedUpdates) {
       // biome-ignore lint/performance/noAwaitInLoops: deliver in emit order
@@ -93,6 +96,7 @@ describe('Vault instructions written for a single-page update', () => {
 
   beforeAll(async () => {
     crowi = await getInstance();
+    isV5CompatibleBefore = crowi.configManager.getConfig('app:isV5Compatible');
     await crowi.configManager.updateConfig('app:isV5Compatible', true);
     Page = mongoose.model<PageDocument, PageModel>('Page');
 
@@ -102,11 +106,11 @@ describe('Vault instructions written for a single-page update', () => {
     creator = await createUser('creator');
     editor = await createUser('editor');
 
-    // Capture the 'update' emits instead of running the app-wide listeners,
+    // Capture the emits instead of running the app-wide listeners,
     // whose background DB work would outlive the test.
     vi.spyOn(crowi.pageService.pageEvent, 'emit').mockImplementation(
       (event, page, _user, extras) => {
-        if (event === 'update') {
+        if (VAULT_PAGE_UPDATE_EVENTS.some((name) => name === event)) {
           emittedUpdates.push([page, extras]);
         }
         return true;
@@ -121,6 +125,10 @@ describe('Vault instructions written for a single-page update', () => {
 
   afterAll(async () => {
     vi.restoreAllMocks();
+    await crowi.configManager.updateConfig(
+      'app:isV5Compatible',
+      isV5CompatibleBefore,
+    );
     const pages = await Page.find({
       path: { $regex: `^${PATH_PREFIX}/` },
     });
@@ -182,6 +190,66 @@ describe('Vault instructions written for a single-page update', () => {
     await deliverEmittedUpdates();
 
     expect(await writtenInstructions(page)).toEqual([['upsert', 'public']]);
+  });
+
+  describe('when the body save loses a revision conflict after the grant was saved', () => {
+    const saveWithStaleRevision = async (
+      page: HydratedDocument<PageDocument>,
+    ): Promise<void> => {
+      await expect(
+        crowi.pageService.updatePage(
+          page,
+          'updated body',
+          'initial body',
+          editor,
+          {
+            grant: PageGrant.GRANT_OWNER,
+            expectedRevisionId: new mongoose.Types.ObjectId().toString(),
+          },
+        ),
+      ).rejects.toThrow(RevisionConflictError);
+    };
+
+    it.each([
+      { name: 'conflict-on-tree', onTree: true },
+      { name: 'conflict-legacy', onTree: false },
+    ])('removes the page from public even if the save is given up ($name)', async ({
+      name,
+      onTree,
+    }) => {
+      const page = await createPublicPage(name, onTree);
+
+      await saveWithStaleRevision(page);
+      await deliverEmittedUpdates();
+
+      expect(await writtenInstructions(page)).toEqual([
+        ['remove', 'public'],
+        ['upsert', `user-${editor._id}-only-me`],
+      ]);
+    });
+
+    it('removes the page from public when the save is retried from a fresh read', async () => {
+      const page = await createPublicPage('conflict-retry', true);
+
+      await saveWithStaleRevision(page);
+      const reread = await Page.findById(page._id).orFail();
+      await crowi.pageService.updatePage(
+        reread,
+        'updated body',
+        'initial body',
+        editor,
+        {
+          grant: PageGrant.GRANT_OWNER,
+          expectedRevisionId: String(reread.revision),
+        },
+      );
+      await deliverEmittedUpdates();
+
+      const written = await writtenInstructions(page);
+      expect(written).toContainEqual(['remove', 'public']);
+      expect(written).not.toContainEqual(['upsert', 'public']);
+      expect(written).toContainEqual(['upsert', `user-${editor._id}-only-me`]);
+    });
   });
 
   it('moves a page that is not on the page tree (legacy update path)', async () => {

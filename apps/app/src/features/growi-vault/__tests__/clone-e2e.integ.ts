@@ -321,28 +321,29 @@ describe('GROWI Vault — clone E2E contract', () => {
         grantedGroups: [],
         ...grantState,
       });
-    const filesClonedBy = async (pat: string | null): Promise<Set<string>> => {
+    const cloneHasFile = async (pat: string | null): Promise<boolean> => {
       const dir =
         pat == null ? await cloneAnonymous() : await cloneAuthenticated(pat);
       tmpDirs.push(dir);
-      return new Set(await listFiles(dir));
+      return (await listFiles(dir)).includes(file);
     };
-    const settle = async (): Promise<void> => {
-      // Upserts of a plain update sit in the coalesce buffer first.
-      await new Promise((r) => setTimeout(r, 1500));
-      await waitForInstructionsDrained(30_000);
-      await new Promise((r) => setTimeout(r, 500));
+    // vault-manager applies instructions asynchronously (and plain upserts
+    // first sit in the coalesce buffer), so clone until the state is reached.
+    const expectCloneEventually = async (
+      pat: string | null,
+      expected: 'has the file' | 'lacks the file',
+    ): Promise<void> => {
+      await expect
+        .poll(() => cloneHasFile(pat), { timeout: 30_000, interval: 500 })
+        .toBe(expected === 'has the file');
     };
 
     await handlePageUpdate(
       pageWith({ grant: PageGrant.GRANT_PUBLIC, grantedUsers: [] }),
     );
-    await settle();
 
-    expect((await filesClonedBy(null)).has(file)).toBe(true);
-    expect((await filesClonedBy(VAULT_E2E_CONFIG.admin.pat)).has(file)).toBe(
-      true,
-    );
+    await expectCloneEventually(null, 'has the file');
+    await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'has the file');
 
     await handlePageUpdate(
       pageWith({
@@ -355,15 +356,10 @@ describe('GROWI Vault — clone E2E contract', () => {
         previousGrantedUsers: [],
       },
     );
-    await settle();
 
-    expect((await filesClonedBy(null)).has(file)).toBe(false);
-    expect((await filesClonedBy(VAULT_E2E_CONFIG.admin.pat)).has(file)).toBe(
-      false,
-    );
-    expect((await filesClonedBy(VAULT_E2E_CONFIG.member.pat)).has(file)).toBe(
-      true,
-    );
+    await expectCloneEventually(null, 'lacks the file');
+    await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'lacks the file');
+    await expectCloneEventually(VAULT_E2E_CONFIG.member.pat, 'has the file');
   });
 
   // ----------------------------------------------------------------------

@@ -1,9 +1,18 @@
 import type { IPage } from '@growi/core';
 
-import type { PageUpdateEventExtras } from '~/server/events/page';
+import {
+  PAGE_EVENT_UPDATE_ABORTED_AFTER_SAVE,
+  type PageUpdateEventExtras,
+} from '~/server/events/page';
 
 import type { VaultDispatcher } from './vault-dispatcher';
 import type { VaultNamespaceMapper } from './vault-namespace-mapper';
+
+/** Page events handled by the subscriber built below. */
+export const VAULT_PAGE_UPDATE_EVENTS = [
+  'update',
+  PAGE_EVENT_UPDATE_ABORTED_AFTER_SAVE,
+] as const;
 
 type UpdatedPage = IPage & { _id: { toString(): string } };
 
@@ -24,45 +33,32 @@ const resolveRevisionId = (
 };
 
 /**
- * Builds the subscriber for the page 'update' event. When the update moved
- * the page out of a namespace, the page is removed from it; otherwise the
- * update is a plain upsert.
+ * Builds the subscriber for the page events that report a saved page together
+ * with the grant state it had before. The dispatcher compares the namespaces
+ * before and after, and removes the page from the ones it left.
  */
 export const createVaultPageUpdateHandler = (
   dispatcher: Pick<VaultDispatcher, 'onPageChanged'>,
   namespaceMapper: Pick<VaultNamespaceMapper, 'computePageNamespaces'>,
 ): VaultPageUpdateHandler => {
-  const resolveLeftNamespaces = (
-    page: UpdatedPage,
-    extras: PageUpdateEventExtras | undefined,
-  ): ReadonlyArray<string> => {
-    if (extras == null) {
-      return [];
-    }
-    const { current: previous } = namespaceMapper.computePageNamespaces({
-      grant: extras.previousGrant,
-      grantedGroups: extras.previousGrantedGroups,
-      grantedUsers: extras.previousGrantedUsers,
-    });
-    const { current } = namespaceMapper.computePageNamespaces(page);
-    return previous.filter((ns) => !current.includes(ns));
-  };
-
   return async (page, extras) => {
     const revisionId = resolveRevisionId(page.revision);
-    const leftNamespaces = resolveLeftNamespaces(page, extras);
 
-    if (leftNamespaces.length === 0) {
+    if (extras == null) {
       await dispatcher.onPageChanged({ type: 'update', page, revisionId });
       return;
     }
 
-    // Only the namespaces the page left are passed: a namespace it still
-    // belongs to must not receive a remove next to its upsert.
+    const { current: previousNamespaces } =
+      namespaceMapper.computePageNamespaces({
+        grant: extras.previousGrant,
+        grantedGroups: extras.previousGrantedGroups,
+        grantedUsers: extras.previousGrantedUsers,
+      });
     await dispatcher.onPageChanged({
       type: 'acl-change',
       page,
-      previousNamespaces: leftNamespaces,
+      previousNamespaces,
       revisionId,
     });
   };

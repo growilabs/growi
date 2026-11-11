@@ -58,7 +58,7 @@ const {
   dispatcherOnPageChanged: vi.fn().mockResolvedValue(undefined),
   dispatcherOnPageRenamed: vi.fn().mockResolvedValue(undefined),
   dispatcherOnBulkOperation: vi.fn().mockResolvedValue(undefined),
-  namespaceMapperComputePageNamespaces: vi.fn(() => ({
+  namespaceMapperComputePageNamespaces: vi.fn((_page?: unknown) => ({
     current: ['public'] as ReadonlyArray<string>,
     previous: undefined as ReadonlyArray<string> | undefined,
   })),
@@ -517,6 +517,61 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
         type: 'update',
         page: pages[0],
         revisionId: 'r1',
+      });
+    });
+  });
+
+  describe('page events that carry the previous grant state', () => {
+    it.each([
+      'update',
+      'updateAbortedAfterSave',
+    ])("hands the previous namespaces of a '%s' event to the dispatcher", async (eventName) => {
+      const previousGrantState = {
+        grant: 1,
+        grantedGroups: [],
+        grantedUsers: [],
+      };
+      namespaceMapperComputePageNamespaces.mockImplementation(
+        (page: unknown) => ({
+          current: [
+            page != null &&
+            typeof page === 'object' &&
+            'grant' in page &&
+            page.grant === previousGrantState.grant
+              ? 'public'
+              : 'user-u1-only-me',
+          ],
+          previous: undefined,
+        }),
+      );
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+      const page = {
+        _id: { toString: () => 'p1' },
+        path: '/p1',
+        revision: 'rev1',
+        grant: 4,
+        grantedGroups: [],
+        grantedUsers: ['u1'],
+      };
+
+      crowi.events.page.emit(
+        eventName,
+        page,
+        { _id: 'u1' },
+        {
+          previousGrant: previousGrantState.grant,
+          previousGrantedGroups: previousGrantState.grantedGroups,
+          previousGrantedUsers: previousGrantState.grantedUsers,
+        },
+      );
+      await flush();
+
+      expect(dispatcherOnPageChanged).toHaveBeenCalledExactlyOnceWith({
+        type: 'acl-change',
+        page,
+        previousNamespaces: ['public'],
+        revisionId: 'rev1',
       });
     });
   });

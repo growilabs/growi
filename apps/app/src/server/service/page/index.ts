@@ -74,7 +74,11 @@ import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
 import { prisma } from '~/utils/prisma';
 
-import { capturePreviousGrantState } from '../../events/page';
+import {
+  capturePreviousGrantState,
+  PAGE_EVENT_UPDATE_ABORTED_AFTER_SAVE,
+  type PageUpdateEventExtras,
+} from '../../events/page';
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
@@ -5516,6 +5520,32 @@ class PageService implements IPageService {
     return [...userUnrelatedPreviousGrantedGroups, ...userRelatedGrantedGroups];
   }
 
+  private async emitUpdateAbortedAfterSave(
+    pageId: ObjectIdLike,
+    user: IUserHasId,
+    extras: PageUpdateEventExtras,
+  ): Promise<void> {
+    try {
+      const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+        'Page',
+      );
+      const storedPage = await Page.findById(pageId);
+      if (storedPage != null) {
+        this.pageEvent.emit(
+          PAGE_EVENT_UPDATE_ABORTED_AFTER_SAVE,
+          storedPage,
+          user,
+          extras,
+        );
+      }
+    } catch (err) {
+      logger.error(
+        { err, pageId },
+        'Failed to report an update that was aborted after the page was saved',
+      );
+    }
+  }
+
   // There are cases where "revisionId" is not required for revision updates
   // See: https://dev.growi.org/651a6f4a008fee2f99187431#origin-%E3%81%AE%E5%BC%B7%E5%BC%B1
   async updatePage(
@@ -5699,9 +5729,18 @@ class PageService implements IPageService {
         origin,
         { proposalMark: options.proposalMark },
       );
-      savedPage = await pushRevision(savedPage, newRevision, user, {
-        expectedRevisionId: options.expectedRevisionId,
-      });
+      try {
+        savedPage = await pushRevision(savedPage, newRevision, user, {
+          expectedRevisionId: options.expectedRevisionId,
+        });
+      } catch (err) {
+        await this.emitUpdateAbortedAfterSave(
+          savedPage._id,
+          user,
+          updateEventExtras,
+        );
+        throw err;
+      }
       await savedPage.populateDataToShowRevision();
     }
 
@@ -5806,9 +5845,18 @@ class PageService implements IPageService {
         options.origin,
         { proposalMark: options.proposalMark },
       );
-      savedPage = await pushRevision(savedPage, newRevision, user, {
-        expectedRevisionId: options.expectedRevisionId,
-      });
+      try {
+        savedPage = await pushRevision(savedPage, newRevision, user, {
+          expectedRevisionId: options.expectedRevisionId,
+        });
+      } catch (err) {
+        await this.emitUpdateAbortedAfterSave(
+          savedPage._id,
+          user,
+          updateEventExtras,
+        );
+        throw err;
+      }
       await savedPage.populateDataToShowRevision();
     }
 

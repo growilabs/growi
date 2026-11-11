@@ -2,7 +2,10 @@ import { GroupType, type IPage, PageGrant } from '@growi/core';
 import { Types } from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
-import { VaultInstruction } from '../models/vault-instruction';
+import {
+  VaultInstruction,
+  type VaultInstructionDocument,
+} from '../models/vault-instruction';
 import { COALESCE_WINDOW_MS, createVaultDispatcher } from './vault-dispatcher';
 import { createVaultNamespaceMapper } from './vault-namespace-mapper';
 import {
@@ -43,21 +46,14 @@ const buildPage = (
     ...grantState,
   });
 
-/** `[op, namespace]` of every instruction written for the page, sorted. */
-const writtenInstructions = (): Array<[string, string]> =>
-  vi
-    .mocked(VaultInstruction.create)
-    .mock.calls.map(([doc]): [string, string] => {
-      const { op, payload } = doc as {
-        op: string;
-        payload: { namespace: string };
-      };
-      return [op, payload.namespace];
-    })
-    .sort();
+type WrittenInstruction = Pick<VaultInstructionDocument, 'op' | 'payload'>;
 
 describe('createVaultPageUpdateHandler', () => {
   let handle: VaultPageUpdateHandler;
+  // `[op, namespace]` of every instruction written to the outbox.
+  let written: Array<[string, string | undefined]>;
+  const writtenInstructions = (): Array<[string, string | undefined]> =>
+    [...written].sort();
 
   const handleAndFlush = async (
     ...args: Parameters<VaultPageUpdateHandler>
@@ -68,7 +64,13 @@ describe('createVaultPageUpdateHandler', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.mocked(VaultInstruction.create).mockResolvedValue({} as never);
+    written = [];
+    vi.mocked(VaultInstruction.create).mockImplementation(
+      async (doc: WrittenInstruction) => {
+        written.push([doc.op, doc.payload.namespace]);
+        return mock<VaultInstructionDocument>();
+      },
+    );
 
     const mapper = createVaultNamespaceMapper();
     handle = createVaultPageUpdateHandler(
@@ -169,6 +171,25 @@ describe('createVaultPageUpdateHandler', () => {
     expect(writtenInstructions()).toEqual([
       ['remove', `group-${groupId}`],
       ['upsert', `group-${keptGroupId}`],
+    ]);
+  });
+
+  it('does not bring the page back to public when the grant changes right after a body save', async () => {
+    const publicState = {
+      previousGrant: PageGrant.GRANT_PUBLIC,
+      previousGrantedGroups: [],
+      previousGrantedUsers: [],
+    };
+    await handle(buildPage({ grant: PageGrant.GRANT_PUBLIC }), publicState);
+
+    await handleAndFlush(
+      buildPage({ grant: PageGrant.GRANT_OWNER, grantedUsers: [userA] }),
+      publicState,
+    );
+
+    expect(written).toEqual([
+      ['remove', 'public'],
+      ['upsert', `user-${userA}-only-me`],
     ]);
   });
 
