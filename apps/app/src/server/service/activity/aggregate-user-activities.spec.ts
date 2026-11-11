@@ -3,7 +3,7 @@ import { mock } from 'vitest-mock-extended';
 import type { IActivity } from '~/interfaces/activity';
 import type { PrismaClient } from '~/utils/prisma';
 
-import { aggregateUserActivities } from './aggregate-user-activities';
+import { aggregateUserActivitiesLegacy } from './aggregate-user-activities';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -73,7 +73,7 @@ const STUB_PIPELINE: Record<string, unknown>[] = [
 // Tests — DB-free unit (aggregateRaw injected via mock)
 // ---------------------------------------------------------------------------
 
-describe('aggregateUserActivities — DB-free unit (injected pipeline + mock aggregateRaw)', () => {
+describe('aggregateUserActivitiesLegacy — DB-free unit (injected pipeline + mock aggregateRaw)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -111,7 +111,10 @@ describe('aggregateUserActivities — DB-free unit (injected pipeline + mock agg
     });
 
     // Act
-    const result = await aggregateUserActivities(mockPrisma, STUB_PIPELINE);
+    const result = await aggregateUserActivitiesLegacy(
+      mockPrisma,
+      STUB_PIPELINE,
+    );
 
     // Assert: structure
     expect(result.totalCount).toBe(2);
@@ -166,7 +169,10 @@ describe('aggregateUserActivities — DB-free unit (injected pipeline + mock agg
       activities: { aggregateRaw: mockAggregateRaw },
     });
 
-    const result = await aggregateUserActivities(mockPrisma, STUB_PIPELINE);
+    const result = await aggregateUserActivitiesLegacy(
+      mockPrisma,
+      STUB_PIPELINE,
+    );
 
     expect(result.totalCount).toBe(5);
 
@@ -189,7 +195,10 @@ describe('aggregateUserActivities — DB-free unit (injected pipeline + mock agg
       activities: { aggregateRaw: mockAggregateRaw },
     });
 
-    const result = await aggregateUserActivities(mockPrisma, STUB_PIPELINE);
+    const result = await aggregateUserActivitiesLegacy(
+      mockPrisma,
+      STUB_PIPELINE,
+    );
 
     expect(result.totalCount).toBe(0);
     expect(result.docs).toHaveLength(0);
@@ -212,7 +221,7 @@ describe('aggregateUserActivities — DB-free unit (injected pipeline + mock agg
       { $match: { user: 'custom' } },
     ];
 
-    await aggregateUserActivities(mockPrisma, customPipeline);
+    await aggregateUserActivitiesLegacy(mockPrisma, customPipeline);
 
     expect(mockAggregateRaw).toHaveBeenCalledWith({ pipeline: customPipeline });
   });
@@ -241,7 +250,10 @@ describe('aggregateUserActivities — DB-free unit (injected pipeline + mock agg
       activities: { aggregateRaw: mockAggregateRaw },
     });
 
-    const result = await aggregateUserActivities(mockPrisma, STUB_PIPELINE);
+    const result = await aggregateUserActivitiesLegacy(
+      mockPrisma,
+      STUB_PIPELINE,
+    );
 
     expect(result.totalCount).toBe(42);
   });
@@ -259,7 +271,7 @@ describe('aggregateUserActivities — DB-free unit (injected pipeline + mock agg
     });
 
     await expect(
-      aggregateUserActivities(mockPrisma, STUB_PIPELINE),
+      aggregateUserActivitiesLegacy(mockPrisma, STUB_PIPELINE),
     ).rejects.toThrow(/array/i);
   });
 
@@ -274,7 +286,7 @@ describe('aggregateUserActivities — DB-free unit (injected pipeline + mock agg
     });
 
     await expect(
-      aggregateUserActivities(mockPrisma, STUB_PIPELINE),
+      aggregateUserActivitiesLegacy(mockPrisma, STUB_PIPELINE),
     ).rejects.toThrow(/facet/i);
   });
 
@@ -291,7 +303,7 @@ describe('aggregateUserActivities — DB-free unit (injected pipeline + mock agg
     });
 
     await expect(
-      aggregateUserActivities(mockPrisma, STUB_PIPELINE),
+      aggregateUserActivitiesLegacy(mockPrisma, STUB_PIPELINE),
     ).rejects.toThrow(/docs/i);
   });
 
@@ -305,7 +317,7 @@ describe('aggregateUserActivities — DB-free unit (injected pipeline + mock agg
     });
 
     await expect(
-      aggregateUserActivities(mockPrisma, STUB_PIPELINE),
+      aggregateUserActivitiesLegacy(mockPrisma, STUB_PIPELINE),
     ).rejects.toThrow(/count/i);
   });
 });

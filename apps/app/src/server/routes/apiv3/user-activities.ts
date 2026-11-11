@@ -8,7 +8,7 @@ import type { PaginateResult } from 'mongoose';
 import type { IActivity } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { aggregateUserActivities } from '~/server/service/activity/aggregate-user-activities';
+import { aggregateUserActivitiesLegacy } from '~/server/service/activity/aggregate-user-activities';
 import { configManager } from '~/server/service/config-manager';
 import { toRawObjectId } from '~/server/util/prisma-raw-normalize';
 import loggerFactory from '~/utils/logger';
@@ -147,7 +147,7 @@ type ActivityPaginationResult = PaginateResult<IActivity>;
 /**
  * Builds the $facet aggregation pipeline for a single user's activity list.
  *
- * The pipeline is run via `aggregateRaw` (see `aggregateUserActivities`), so
+ * The pipeline is run via `aggregateRaw` (see `aggregateUserActivitiesLegacy`), so
  * `user` must be matched with `toRawObjectId`'s MongoDB Extended JSON `$oid`
  * form -- a raw ObjectId instance or bare string serializes to a plain JSON
  * string instead, which does not match a stored ObjectId-typed field and
@@ -288,7 +288,7 @@ export const setup = (crowi: Crowi): Router => {
           offset,
         });
 
-        const activityResults = await aggregateUserActivities(
+        const activityResults = await aggregateUserActivitiesLegacy(
           prisma,
           userActivityPipeline,
         );
