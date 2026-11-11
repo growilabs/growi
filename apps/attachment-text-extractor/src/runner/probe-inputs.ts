@@ -23,6 +23,8 @@ export const PROBE_LIMITS: ConversionLimits = {
 export const PROBE_MAX_INPUT_BYTES = MIB;
 
 export interface ProbeInput {
+  /** Names the probe in the log when it fails. */
+  readonly name: 'pdf' | 'pptx' | 'html';
   readonly chunks: readonly Uint8Array[];
   readonly size: number;
   readonly fileName: string;
@@ -69,12 +71,14 @@ const buildProbePdf = (text: string): Buffer => {
 export const PROBE_INPUTS: readonly ProbeInput[] = [
   {
     ...whole(buildProbePdf(PROBE_TEXT)),
+    name: 'pdf',
     fileName: 'probe.pdf',
     mimeHint: 'application/pdf',
     expectedText: PROBE_TEXT,
   },
   {
     ...whole(PROBE_PPTX),
+    name: 'pptx',
     fileName: 'probe.pptx',
     mimeHint:
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -88,6 +92,7 @@ export const PROBE_INPUTS: readonly ProbeInput[] = [
         'utf8',
       ),
     ),
+    name: 'html',
     fileName: 'probe.html',
     mimeHint: 'text/html',
     expectedText: `${PROBE_TEXT} & ok`,

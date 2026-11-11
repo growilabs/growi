@@ -1,9 +1,11 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import { ChildProcess, spawn } from 'node:child_process';
 import type { Readable, Writable } from 'node:stream';
 
+import { type ChildWarnings, NO_CHILD_WARNINGS } from '../wire/child-warning';
 import { writeFrame } from '../wire/length-prefixed-json';
 import { readStatusMemory, type SpawnCommand } from './linux';
 import { type ResultFrameEnding, readResultFrame } from './result-frame';
+import { readChildWarnings } from './stderr-warnings';
 
 const RESULT_FD = 3;
 const RSS_POLL_MS = 50;
@@ -32,7 +34,8 @@ export type ParentDecision =
 export type ChildRunEnding =
   | { readonly kind: 'result'; readonly body: Buffer }
   | { readonly kind: 'decided'; readonly decision: ParentDecision }
-  | { readonly kind: 'not-started' }
+  /** `errorCode` is the code Node gave the failed start (ENOENT, EAGAIN, ERR_INVALID_ARG_VALUE, ...), or `unknown`. */
+  | { readonly kind: 'not-started'; readonly errorCode: string }
   /** Ended (or was given up on) without a result and without a parent decision. */
   | {
       readonly kind: 'exited';
@@ -44,20 +47,44 @@ export interface ChildRunReport {
   readonly ending: ChildRunEnding;
   /** The largest VmRSS / VmHWM seen; 0 when none could be read. */
   readonly peakRssKib: number;
+  /** What the child wrote to its standard error, as far as it was read before the end. */
+  readonly warnings: ChildWarnings;
+  /** False when the child was still there SETTLE_CAP_MS after a SIGKILL. */
+  readonly reaped: boolean;
 }
 
 type Decided = Extract<ChildRunEnding, { kind: 'result' | 'decided' }>;
 
-const startChild = (spec: ChildRunSpec): ChildProcess | null => {
+const ERROR_CODE = /^[A-Z][A-Z0-9_]{0,31}$/;
+
+/**
+ * The error's `code` when it has the shape of the codes Node picks from its
+ * own closed sets (an errno name or an ERR_* name), never text from the
+ * input; and never the message, which holds the path.
+ */
+const errorCodeOf = (error: unknown): string => {
+  const code =
+    error instanceof Error && 'code' in error ? error.code : undefined;
+  return typeof code === 'string' && ERROR_CODE.test(code) ? code : 'unknown';
+};
+
+const notStarted = (error: unknown): ChildRunReport => ({
+  ending: { kind: 'not-started', errorCode: errorCodeOf(error) },
+  peakRssKib: 0,
+  warnings: NO_CHILD_WARNINGS,
+  reaped: true,
+});
+
+const startChild = (spec: ChildRunSpec): ChildProcess | ChildRunReport => {
   try {
     return spawn(spec.command.file, [...spec.command.args], {
-      // 0: input frames, 1/2: logs (discarded), 3: result frame, 4: liveness (never written)
+      // 0: input frames, 1: discarded, 2: warning codes, 3: result frame, 4: liveness (never written)
       stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
       env: { ...spec.env },
     });
-  } catch {
+  } catch (error) {
     // e.g. ENOTDIR is thrown, not emitted
-    return null;
+    return notStarted(error);
   }
 };
 
@@ -94,6 +121,7 @@ class ChildSupervision {
   private reapTimer: NodeJS.Timeout | undefined;
   private readonly deadline: NodeJS.Timeout;
   private readonly poll: NodeJS.Timeout;
+  private readonly warnings: () => ChildWarnings;
   private readonly onAbort = (): void =>
     this.decide({ kind: 'decided', decision: 'aborted' });
 
@@ -109,6 +137,8 @@ class ChildSupervision {
     );
     this.poll = setInterval(() => this.checkRss(), RSS_POLL_MS);
     signal.addEventListener('abort', this.onAbort, { once: true });
+    // Reads on its own and is asked once at the end: the result never waits for it.
+    this.warnings = readChildWarnings(child.stderr);
     this.wireChild();
     this.sampleRss();
   }
@@ -124,7 +154,6 @@ class ChildSupervision {
       stream?.on('error', () => {});
     }
     child.stdout?.resume();
-    child.stderr?.resume();
     const resultPipe = child.stdio[RESULT_FD];
     if (isReadable(resultPipe)) {
       readResultFrame(resultPipe, this.spec.maxResultFrameBytes, (ending) =>
@@ -233,12 +262,18 @@ class ChildSupervision {
     clearTimeout(this.settleTimer);
     clearTimeout(this.reapTimer);
     this.signal.removeEventListener('abort', this.onAbort);
+    const warnings = this.warnings();
     for (const stream of this.child.stdio) {
       stream?.destroy();
     }
     // The result body leaves with the report only, never kept here.
     this.decided = null;
-    this.resolve({ ending, peakRssKib: this.peakRssKib });
+    this.resolve({
+      ending,
+      peakRssKib: this.peakRssKib,
+      warnings,
+      reaped: hasExited(this.child),
+    });
   }
 }
 
@@ -256,22 +291,24 @@ export const runChild = (
       resolve({
         ending: { kind: 'decided', decision: 'aborted' },
         peakRssKib: 0,
+        warnings: NO_CHILD_WARNINGS,
+        reaped: true,
       });
       return;
     }
     const child = startChild(spec);
-    if (child === null) {
-      resolve({ ending: { kind: 'not-started' }, peakRssKib: 0 });
+    if (!(child instanceof ChildProcess)) {
+      resolve(child);
       return;
     }
     if (child.pid === undefined) {
       // A failed start (ENOENT, EACCES, EMFILE) is reported by an 'error' on
       // the next tick, with no 'exit'; on EMFILE / ENFILE child.stdio is never set.
-      child.once('error', () => {
+      child.once('error', (error) => {
         for (const stream of child.stdio ?? []) {
           stream?.destroy();
         }
-        resolve({ ending: { kind: 'not-started' }, peakRssKib: 0 });
+        resolve(notStarted(error));
       });
       return;
     }

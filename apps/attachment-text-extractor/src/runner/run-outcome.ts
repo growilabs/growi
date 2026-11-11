@@ -11,6 +11,24 @@ import type {
 // module does not import conversion-runner.ts.
 type Outcome = ConversionOutcome & { readonly childPeakRssMb: number | null };
 
+/**
+ * How a child ended when the failure kind alone does not tell the operator
+ * what to look at. Built from what the parent saw (the start error's errno
+ * name, the exit code, the signal), never from what the child wrote.
+ */
+export type ChildFault =
+  | { readonly cause: 'not_started'; readonly errorCode: string }
+  | { readonly cause: 'not_reaped' }
+  | { readonly cause: 'signal'; readonly signal: NodeJS.Signals }
+  | { readonly cause: 'exit_code'; readonly code: number }
+  | { readonly cause: 'invalid_result' };
+
+export interface RunReading {
+  readonly outcome: Outcome;
+  /** null when the child gave a valid result or the parent stopped it itself. */
+  readonly fault: ChildFault | null;
+}
+
 const KIB = 1024;
 
 // Fixed texts, the same as Python's child_supervision: nothing taken from the
@@ -64,41 +82,74 @@ const exitDetail = (
 };
 
 /** Decoded as JSON data only; anything that breaks the protocol is a crash (Req 3.9). */
-const decodedResult = (body: Buffer, peakRssKib: number): Outcome => {
+const readResult = (body: Buffer, peakRssKib: number): RunReading => {
   let outcome: ConversionOutcome;
   try {
     outcome = decodeResult(body);
   } catch {
-    return failed(
-      'crashed',
-      'conversion process sent an invalid result',
-      peakRssKib,
-    );
+    return {
+      outcome: failed(
+        'crashed',
+        'conversion process sent an invalid result',
+        peakRssKib,
+      ),
+      fault: { cause: 'invalid_result' },
+    };
   }
-  return { ...outcome, childPeakRssMb: peakRssMb(peakRssKib) };
+  return {
+    outcome: { ...outcome, childPeakRssMb: peakRssMb(peakRssKib) },
+    fault: null,
+  };
 };
 
-const outcomeOfEnding = (
-  ending: ChildRunEnding,
-  peakRssKib: number,
-): Outcome => {
+const exitFault = (
+  code: number | null,
+  signal: NodeJS.Signals | null,
+): ChildFault | null => {
+  if (signal !== null) {
+    return { cause: 'signal', signal };
+  }
+  return code === null ? null : { cause: 'exit_code', code };
+};
+
+const readEnding = (ending: ChildRunEnding, peakRssKib: number): RunReading => {
   switch (ending.kind) {
     case 'result':
-      return decodedResult(ending.body, peakRssKib);
+      return readResult(ending.body, peakRssKib);
     case 'decided': {
       const { failure, detail } = DECISION_FAILURES[ending.decision];
-      return failed(failure, detail, peakRssKib);
+      return { outcome: failed(failure, detail, peakRssKib), fault: null };
     }
     case 'not-started':
-      return failed('crashed', 'conversion process could not be started', 0);
+      return {
+        outcome: failed(
+          'crashed',
+          'conversion process could not be started',
+          0,
+        ),
+        fault: { cause: 'not_started', errorCode: ending.errorCode },
+      };
     case 'exited': {
       const failure = classifyExit(ending.code, ending.signal);
-      return failure === 'timeout'
-        ? failed(failure, DECISION_FAILURES.timeout.detail, peakRssKib)
-        : failed(failure, exitDetail(ending.code, ending.signal), peakRssKib);
+      return {
+        outcome:
+          failure === 'timeout'
+            ? failed(failure, DECISION_FAILURES.timeout.detail, peakRssKib)
+            : failed(
+                failure,
+                exitDetail(ending.code, ending.signal),
+                peakRssKib,
+              ),
+        fault: exitFault(ending.code, ending.signal),
+      };
     }
   }
 };
 
-export const outcomeOf = (report: ChildRunReport): Outcome =>
-  outcomeOfEnding(report.ending, report.peakRssKib);
+export const readReport = (report: ChildRunReport): RunReading => {
+  const reading = readEnding(report.ending, report.peakRssKib);
+  // A child that outlives its SIGKILL is the fault to report, whatever else happened.
+  return report.reaped
+    ? reading
+    : { ...reading, fault: { cause: 'not_reaped' } };
+};

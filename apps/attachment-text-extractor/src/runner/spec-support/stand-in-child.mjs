@@ -254,6 +254,23 @@ const modes = {
     sendSuccess(`received ${bodyLength} bytes`);
     process.exit(0);
   },
+  // Writes the decoded text to stderr `<repeat>` times ("<repeat>x<text>"),
+  // then answers like echo. The pause lets the parent read a short text before
+  // the exit; a long one blocks on the pipe until the parent reads anyway.
+  'stderr-echo': () => {
+    readRestOfBody();
+    const cut = argument.indexOf('x');
+    const text = Buffer.from(
+      decodeURIComponent(argument.slice(cut + 1)),
+      'utf8',
+    );
+    for (let left = Number(argument.slice(0, cut)); left > 0; left -= 1) {
+      writeAll(STDERR_FD, text);
+    }
+    sleepSync(50);
+    sendSuccess(`received ${bodyLength} bytes`);
+    process.exit(0);
+  },
   'report-self': () => {
     readRestOfBody();
     const environ = readFileSync('/proc/self/environ', 'latin1')

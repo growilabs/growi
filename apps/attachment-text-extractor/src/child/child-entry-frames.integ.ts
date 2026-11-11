@@ -121,13 +121,14 @@ describe.skipIf(process.platform !== 'linux')(
       expect(ending).not.toEqual({ code: 0, signal: null });
       expect(await child.result).toEqual(Buffer.alloc(0));
       await child.dispose();
-      expect((await logs).join('')).not.toContain(INPUT_MARKER);
+      // One warning code for the parent to translate (research.md 7.8), and nothing else.
+      expect((await logs).join('')).toBe('invalid_input_frame\n');
     });
 
-    it('prints nothing from the input while converting', async () => {
+    it('prints nothing at all while converting', async () => {
       const { logs } = await answer(entryHeader(), Buffer.from(INPUT_MARKER));
 
-      expect(logs).not.toContain(INPUT_MARKER);
+      expect(logs).toBe('');
     });
   },
 );

@@ -1,22 +1,10 @@
+import { createLeveledLog } from '../config/leveled-log';
 import type { LogLevel } from '../config/load-settings';
 
 // One line per POST /extract (Req 1.7), in the target spec's form:
 // "extract format=… size=… duration_ms=… result=… child_peak_rss_mb=…".
 // Never the file name, the content or the Authorization header: the format
 // is the cleaned extension only.
-
-const SEVERITY: Readonly<Record<LogLevel, number>> = {
-  CRITICAL: 50,
-  FATAL: 50,
-  ERROR: 40,
-  WARN: 30,
-  WARNING: 30,
-  INFO: 20,
-  DEBUG: 10,
-  NOTSET: 0,
-};
-
-type Written = 'INFO' | 'ERROR';
 
 export interface RequestFacts {
   /** The cleaned extension (formatOf), or the converted mimeType. */
@@ -45,18 +33,11 @@ export const formatOf = (fileName: string): string => {
   );
 };
 
-export const writeToStderr = (line: string): void => {
-  process.stderr.write(`${line}\n`);
-};
-
 export const createRequestLog = (
   level: LogLevel,
   writeLog: (line: string) => void,
 ): RequestLog => {
-  const emit = (severity: Written, message: string): void => {
-    if (SEVERITY[severity] < SEVERITY[level]) return;
-    writeLog(`${new Date().toISOString()} ${severity} ${message}`);
-  };
+  const emit = createLeveledLog(level, writeLog);
   return {
     start: () => {
       const started = performance.now();

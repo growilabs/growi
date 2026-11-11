@@ -148,7 +148,8 @@ describe.skipIf(process.platform !== 'linux')(
       if (outcome.kind === 'failed') {
         expect(outcome.detail).toMatch(/^[A-Za-z]+Error$/);
       }
-      expect(finished.logs).not.toContain(INPUT_MARKER);
+      // The warning code only: the error class stays in the result frame.
+      expect(finished.logs).toBe('failed_unexpectedly\n');
     });
 
     // Without a working watch the child could outlive its parent (Req 3.11),

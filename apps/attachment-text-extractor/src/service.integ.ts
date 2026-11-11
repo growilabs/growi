@@ -74,6 +74,29 @@ describe.skipIf(process.platform !== 'linux')(
       expect((await getPath(url(), '/readyz')).status).toBe(200);
     });
 
+    // research.md 7.8: the runner's diagnostic lines reach the same sink as
+    // the request lines. One megabyte is less than any child needs, so the
+    // probe child is stopped for its memory.
+    it('gives the runner the log the request lines go to', async () => {
+      const lines: string[] = [];
+      service = await startService(
+        { [TOKEN_NAME]: token, MAX_CHILD_RSS_MB: '1' },
+        LOCAL,
+        { writeLog: (line) => lines.push(line) },
+      );
+
+      const ready = await getPath(url(), '/readyz');
+      await postFile(url(), 'a.txt', 'hello', { token });
+
+      expect(ready.status).toBe(503);
+      expect(lines.map((line) => line.replace(/^\S+ /, ''))).toEqual([
+        'WARNING readiness probe failed: probe=pdf cause=failed result=memory_exceeded',
+        expect.stringMatching(
+          /^INFO extract format=txt .* result=memory_exceeded /,
+        ),
+      ]);
+    });
+
     it('stop() answers the request in flight, then refuses new connections', async () => {
       service = await startService({ [TOKEN_NAME]: token }, LOCAL, quiet);
       const address = { host: '127.0.0.1', port: service.port };

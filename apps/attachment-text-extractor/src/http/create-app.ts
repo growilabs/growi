@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import { writeToStderr } from '../config/leveled-log';
 import type { Settings } from '../config/load-settings';
 import type { ConversionRunner } from '../runner';
 import type { AppEnv } from './app-env';
@@ -7,7 +8,7 @@ import { bearerAuth } from './bearer-auth';
 import { registerExtractRoute } from './extract-route';
 import { registerHealthRoutes } from './health-routes';
 import { registerOpenApiRoute } from './openapi-route';
-import { createRequestLog, writeToStderr } from './request-log';
+import { createRequestLog } from './request-log';
 
 export interface AppDeps {
   readonly settings: Settings;

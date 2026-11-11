@@ -1,9 +1,9 @@
 // The conversion child's entry script; it runs on load. Started by the runner
-// through prlimit with fd 0 = input frames (header, then file), fd 1/2 = logs
-// the parent discards, fd 3 = the one result frame, fd 4 = liveness.
+// through prlimit with fd 0 = input frames (header, then file), fd 1 = discarded,
+// fd 2 = warning codes, fd 3 = the one result frame, fd 4 = liveness.
 //
-// Only fixed text and error class names are ever written: a message can quote
-// the input, and stdout and stderr are not the place for the user's file.
+// Only warning codes are ever written to stderr: a message can quote the
+// input, and the parent logs its own sentence for a code, never what it read.
 import type { ConversionOutcome } from '../contract';
 import { convert } from '../conversion';
 import {
@@ -11,6 +11,10 @@ import {
   decodeChildHeader,
   MAX_CHILD_HEADER_BYTES,
 } from '../wire/child-header';
+import {
+  type ChildWarningCode,
+  encodeChildWarning,
+} from '../wire/child-warning';
 import { WireProtocolError } from '../wire/length-prefixed-json';
 import { encodeChildResult } from './child-result';
 import { readFrameSync, writeFrameSync } from './frame-io';
@@ -31,8 +35,8 @@ interface ChildInput {
   readonly bytes: Buffer;
 }
 
-const log = (line: string): void => {
-  process.stderr.write(`conversion child ${line}\n`);
+const warn = (code: ChildWarningCode): void => {
+  process.stderr.write(encodeChildWarning(code));
 };
 
 const nameOf = (thrown: unknown): string =>
@@ -64,7 +68,7 @@ const createResultSender = (): ((body: Buffer) => boolean) => {
 const sendResult = createResultSender();
 
 const endUnexpectedly = (thrown: unknown): void => {
-  log(`failed unexpectedly: ${nameOf(thrown)}`);
+  warn('failed_unexpectedly');
   sendResult(internalResult(thrown));
   process.exit(UNEXPECTED_EXIT_CODE);
 };
@@ -79,7 +83,7 @@ const readInputOrExit = (): ChildInput => {
     if (!(error instanceof WireProtocolError)) {
       throw error;
     }
-    log('received an invalid input frame');
+    warn('invalid_input_frame');
     return process.exit(BAD_INPUT_EXIT_CODE);
   }
 };
@@ -111,12 +115,12 @@ const encodeConverted = ({ outcome, maxResultBytes }: Converted): Buffer =>
 const main = async (): Promise<void> => {
   // Before anything is read, so the score is in place for the whole conversion.
   if (!raiseOomScore()) {
-    log('could not raise its oom_score_adj');
+    warn('oom_score_not_raised');
   }
   await startParentWatch();
   const body = encodeConverted(await convertInput(readInputOrExit()));
   if (!sendResult(body)) {
-    log('could not send its result');
+    warn('result_not_sent');
   }
   process.exit(0);
 };

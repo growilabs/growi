@@ -1,26 +1,39 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import type { LeveledLog } from '../config/leveled-log';
 import { type Settings, toConversionLimits } from '../config/load-settings';
 import { toTimerDelayMs } from '../config/timer-delay';
 import type { ConversionLimits, ConversionOutcome } from '../contract';
 import { resolveFormat } from '../formats/format-table';
 import { checkInputSize } from '../formats/input-size';
 import { encodeChildHeader } from '../wire/child-header';
+import { type ChildWarnings, NO_CHILD_WARNINGS } from '../wire/child-warning';
 import {
   maxResultFrameBytes,
   WireProtocolError,
 } from '../wire/length-prefixed-json';
 import { buildChildEnv } from './child-env';
 import { runChild } from './child-run';
+import {
+  createOnceOnlyWarningLog,
+  createReadinessLog,
+  faultReason,
+  type Launcher,
+  logConversion,
+} from './diagnostics';
 import { limitedCommand, PRLIMIT_PATH, readOwnHardLimits } from './linux';
 import {
   PROBE_INPUTS,
   PROBE_LIMITS,
   PROBE_MAX_INPUT_BYTES,
 } from './probe-inputs';
-import { probeConversions, sharedWhileRunning } from './readiness';
-import { failed, outcomeOf } from './run-outcome';
+import {
+  type ProbeConversion,
+  probeConversions,
+  sharedWhileRunning,
+} from './readiness';
+import { failed, type RunReading, readReport } from './run-outcome';
 
 /** The file a child runs, and the node flags placed before it. */
 export interface ChildEntry {
@@ -129,15 +142,21 @@ const prepareChild = (
   }
 };
 
+type ChildReading = RunReading & { readonly warnings: ChildWarnings };
+
 const convertInChild = async (
   options: ConversionRunnerOptions,
   input: RunInput,
   timeoutS: number,
   signal: AbortSignal,
-): Promise<RunOutcome> => {
+): Promise<ChildReading> => {
   const start = prepareChild(input, options);
   if ('refusal' in start) {
-    return start.refusal;
+    return {
+      outcome: start.refusal,
+      fault: null,
+      warnings: NO_CHILD_WARNINGS,
+    };
   }
   const entry = options.childEntry ?? DEFAULT_CHILD_ENTRY;
   const command = limitedCommand(
@@ -166,11 +185,18 @@ const convertInChild = async (
     },
     signal,
   );
-  return outcomeOf(report);
+  return { ...readReport(report), warnings: report.warnings };
 };
 
+const SILENT: LeveledLog = () => {};
+
+/**
+ * `log` gets the diagnostic lines (research.md 7.8); the composition root
+ * passes the service's log, and without one nothing is written.
+ */
 export const createConversionRunner = (
   options: ConversionRunnerOptions,
+  log: LeveledLog = SILENT,
 ): ConversionRunner => {
   const probeTimeoutS = options.probeTimeoutS ?? DEFAULT_PROBE_TIMEOUT_S;
   // The operator's conversion limits may legitimately refuse even the probe
@@ -181,20 +207,39 @@ export const createConversionRunner = (
     limits: PROBE_LIMITS,
     maxInputBytes: PROBE_MAX_INPUT_BYTES,
   };
+  const launcher: Launcher = process.platform === 'linux' ? 'prlimit' : 'node';
   const neverAborted = new AbortController().signal;
-  const checkReadiness = sharedWhileRunning(
-    async (): Promise<Readiness> => ({
-      ready: await probeConversions(
-        (input, timeoutS) =>
-          convertInChild(probeOptions, input, timeoutS, neverAborted),
-        PROBE_INPUTS,
-        probeTimeoutS,
-      ),
-    }),
-  );
-  return {
-    run: (input, signal) =>
-      convertInChild(options, input, options.timeoutS, signal),
-    readiness: checkReadiness,
+  const reportReadiness = createReadinessLog(log);
+  const logProbeWarnings = createOnceOnlyWarningLog(log);
+  // A probe child that ends abnormally gets no line of its own: it is the
+  // not-ready reason, written when that changes.
+  const probe: ProbeConversion = async (input, timeoutS) => {
+    const { outcome, fault, warnings } = await convertInChild(
+      probeOptions,
+      input,
+      timeoutS,
+      neverAborted,
+    );
+    logProbeWarnings(warnings);
+    return {
+      outcome,
+      faultReason: fault === null ? null : faultReason(fault, launcher),
+    };
   };
+  const checkReadiness = sharedWhileRunning(async (): Promise<Readiness> => {
+    const reason = await probeConversions(probe, PROBE_INPUTS, probeTimeoutS);
+    reportReadiness(reason);
+    return { ready: reason === null };
+  });
+  const run: ConversionRunner['run'] = async (input, signal) => {
+    const { outcome, fault, warnings } = await convertInChild(
+      options,
+      input,
+      options.timeoutS,
+      signal,
+    );
+    logConversion(log, launcher, fault, warnings);
+    return outcome;
+  };
+  return { run, readiness: checkReadiness };
 };

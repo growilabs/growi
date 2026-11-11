@@ -1,3 +1,4 @@
+import { createLeveledLog, writeToStderr } from './config/leveled-log';
 import { loadSettings } from './config/load-settings';
 import { createApp, startServer } from './http';
 import { createConversionRunner, runnerOptionsFromSettings } from './runner';
@@ -16,10 +17,16 @@ export interface RunningService {
 export const startService = async (
   env: Readonly<Record<string, string | undefined>>,
   listen: { readonly port: number; readonly hostname: string },
-  { writeLog }: { readonly writeLog?: (line: string) => void } = {},
+  {
+    writeLog = writeToStderr,
+  }: { readonly writeLog?: (line: string) => void } = {},
 ): Promise<RunningService> => {
   const settings = loadSettings(env);
-  const runner = createConversionRunner(runnerOptionsFromSettings(settings));
+  // The runner's diagnostic lines and the request lines share one sink and level.
+  const runner = createConversionRunner(
+    runnerOptionsFromSettings(settings),
+    createLeveledLog(settings.logLevel, writeLog),
+  );
   const app = createApp({ settings, runner, writeLog });
   const server = await startServer(app, {
     ...listen,

@@ -30,6 +30,7 @@ const UPLOADS_CEILING_MIB = 330;
 const RESULTS_CEILING_MIB = 440;
 const MIXED_CEILING_MIB = 480;
 const TRICKLE_GROWTH_CEILING_MIB = 100;
+const TRICKLED_BYTES = 256 * 1024 + 1;
 const ALTERNATING_CEILING_MIB = 350;
 const SERVER = fileURLToPath(
   new URL('./spec-support/memory-server.mjs', import.meta.url),
@@ -238,19 +239,21 @@ describe.skipIf(process.platform !== 'linux')(
     });
 
     it('three bodies arriving a byte at a time', async () => {
-      const target = await startServer({ UPLOAD_TIMEOUT_S: '5' });
+      // A fixed number of bytes, not a fixed time: how many one-byte writes
+      // fit in a few seconds depends on what else the machine is running.
+      const target = await startServer({ UPLOAD_TIMEOUT_S: '60' });
       const idle = target.peakRssMib();
 
       const sent = await Promise.all(
         [1, 2, 3].map(() =>
-          sendInPieces(target, 8 * MIB, [Buffer.from('x')], {
-            forMs: 3_000,
+          sendInPieces(target, TRICKLED_BYTES, [Buffer.from('x')], {
+            forMs: 60_000,
             paceMs: 0,
           }),
         ),
       );
 
-      expect(Math.min(...sent)).toBeGreaterThan(256 * 1024);
+      expect(sent).toEqual(Array(3).fill(TRICKLED_BYTES));
       expect(target.peakRssMib() - idle).toBeLessThanOrEqual(
         TRICKLE_GROWTH_CEILING_MIB,
       );

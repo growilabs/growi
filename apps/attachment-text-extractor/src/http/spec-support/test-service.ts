@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
+import { createLeveledLog } from '../../config/leveled-log';
 import { loadSettings } from '../../config/load-settings';
 import {
   type ConversionRunner,
@@ -26,13 +27,14 @@ export interface TestService {
 export const startTestService = async (
   runner: ConversionRunner,
   env: Readonly<Record<string, string>> = {},
+  /** Give the array a real runner already writes to, to see both in one log. */
+  logs: string[] = [],
 ): Promise<TestService> => {
   const token = `spec-token-${randomBytes(8).toString('hex')}`;
   const settings = loadSettings({
     ATTACHMENT_EXTRACTOR_SERVICE_TOKEN: token,
     ...env,
   });
-  const logs: string[] = [];
   const app = createApp({
     settings,
     runner,
@@ -91,18 +93,23 @@ export const useTestService = (
 /**
  * The real runner for the settings `env` gives (the same ones the service
  * gets), with single options replaced: a stand-in child entry, a sub-second
- * deadline (TIMEOUT_S is an integer).
+ * deadline (TIMEOUT_S is an integer). With `logs`, its diagnostic lines go
+ * there, at the LOG_LEVEL of `env`, as service.ts wires them.
  */
 export const realRunner = (
   env: Readonly<Record<string, string>> = {},
   overrides: Partial<ConversionRunnerOptions> = {},
-): ConversionRunner =>
-  createConversionRunner({
-    ...runnerOptionsFromSettings(
-      loadSettings({
-        ATTACHMENT_EXTRACTOR_SERVICE_TOKEN: 'runner-only',
-        ...env,
-      }),
-    ),
-    ...overrides,
+  logs?: string[],
+): ConversionRunner => {
+  const settings = loadSettings({
+    ATTACHMENT_EXTRACTOR_SERVICE_TOKEN: 'runner-only',
+    ...env,
   });
+  const options = { ...runnerOptionsFromSettings(settings), ...overrides };
+  return logs === undefined
+    ? createConversionRunner(options)
+    : createConversionRunner(
+        options,
+        createLeveledLog(settings.logLevel, (line) => logs.push(line)),
+      );
+};
