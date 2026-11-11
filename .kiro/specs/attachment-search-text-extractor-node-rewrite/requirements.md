@@ -198,7 +198,7 @@
 
 #### Acceptance Criteria
 
-1. The `.github/workflows/attachment-text-extractor.yml` shall Node 版の lint、型の検査、vitest のテスト、image のビルド、image の大きさの検査、read-only rootfs・uid 10001・ネットワークなしでの起動の確認、OpenAPI の drift 検知を行う
+1. The `.github/workflows/ci-attachment-text-extractor.yml` shall Node 版の lint、型の検査、vitest のテスト、image のビルド、image の大きさの検査、read-only rootfs・uid 10001・ネットワークなしでの起動の確認、OpenAPI の drift 検知を行う
 2. The CI の workflow shall Python の道具 (uv、ruff、pytest) を使わない
 3. When CI の変更を確かめる, the 書き換え作業 shall trigger の条件 (`paths` など) に合うブランチで workflow を動かし、`gh api repos/<org>/<repo>/actions/runs/<id>/jobs` でジョブの数が 0 より多く、すべてのステップが成功したことを確かめる (ジョブが 0 件の実行は成功とみなさない)
 4. Where 抽出サービスを pnpm workspace に入れると決めた場合, the 既存の Node 用の CI shall 抽出サービスのテストが他の package のテストと競合せずに動くことを確かめる

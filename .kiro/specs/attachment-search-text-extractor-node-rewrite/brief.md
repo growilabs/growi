@@ -18,7 +18,7 @@
 | テキスト系の処理に使う部品 | Python 標準の `html.parser`、charset-normalizer、defusedxml | Node 側の同等の部品 (design で決める) |
 | 配置とツールチェーン | `services/attachment-text-extractor/` を pnpm workspace と turbo の外に置き、uv / pytest / ruff で完結させる | `apps/attachment-text-extractor/` (`@growi/attachment-text-extractor`) に移し、pnpm workspace に入れる。`apps/pdf-converter` と同じ形 (ユーザー判断。design.md の D4) |
 | Dockerfile | `python:3.12-slim-bookworm` + uv の multi-stage | Node の slim image を元にした multi-stage (400MB 以下、read-only rootfs、uid 10001、ネットワークなしで動くことは変えない) |
-| CI | `.github/workflows/attachment-text-extractor.yml` の Python 用ジョブ (ruff / pytest / image のビルドと起動確認) | 同じ workflow を Node 用 (lint / vitest / image のビルドと起動確認) に置き換える |
+| CI | `.github/workflows/attachment-text-extractor.yml` の Python 用ジョブ (ruff / pytest / image のビルドと起動確認) | Python 用の workflow を消し、Node 用の workflow `.github/workflows/ci-attachment-text-extractor.yml` (lint / vitest / image のビルドと起動確認) にする |
 | 配備物 | docker-compose のエントリ、`deploy/k8s/` の例 | docker-compose のエントリは、中身を Node 版に合わせる。Kubernetes の manifest の例は持たず、動かすときに守る条件 (推奨する安全設定を含む) を、運用者向けの文書 `docker/README.md` に理由つきで書く (ユーザー判断。research.md 7.9) |
 | OpenAPI の書き出し手順 | `scripts/export_openapi.py` (FastAPI が自動で作る文書を書き出す) | 経路の定義から文書を作って書き出す手順に置き換える。操作とスキーマの名前は作る道具の既定に従うので、書き出す `openapi.json` と生成クライアントの関数名・型名は変わる。`POST /extract` に渡す項目、応答の型、`ErrorCode` の値は変えない (Req 7) |
 | 子プロセスの作り方と上限の掛け方 | Python の forkserver、子の中での `setrlimit` | Node では `setrlimit` が使えないため、作り方と仮想メモリ上限の掛け方は未決 (Req 11) |
@@ -105,7 +105,7 @@
 - OpenAPI の文書を経路の定義から作ること、その書き出し、commit 済みの文書の置き換えと生成クライアントの作り直し、apps/app の呼び出し側の名前と型の書き方の修正、書き出した文書が commit 済みの文書と同じであることの検査 (Req 7)
 - 検索の品質のベンチマーク (評価用の文書と正解) の作成と、Python 版・Node 版での計測
 - 上の Req 7 の変更のほかは、既定の方針を崩した場合に限り、その結果として要る下流 (apps/app の呼び出し側、生成クライアント、下流 spec の記述) の変更
-- `.github/workflows/attachment-text-extractor.yml` の置き換えと、docker-compose のエントリ (`infra/docker/compose.yaml`) の追従
+- CI の workflow の置き換え (Python 用の `.github/workflows/attachment-text-extractor.yml` を消し、Node 用の `.github/workflows/ci-attachment-text-extractor.yml` にする) と、docker-compose のエントリ (`infra/docker/compose.yaml`) の追従
 - `apps/` に移すことに伴う変更 (`pnpm-lock.yaml`、package ごとの `turbo.json`、compose の build の `context`、CI の `paths`)
 - Python の資産の撤去
 - 未決事項を試作と計測で決めること (Req 11)

@@ -289,11 +289,11 @@
   - 生成クライアントの `POST /extract` に渡す項目・応答の型・`ErrorCode` の値が変わっていないこと、apps/app の変更が呼び出し側の名前と型の書き方の修正だけであること、下流 spec のファイルに変更が無いこと、`services/attachment-text-extractor/` が無く、`apps/attachment-text-extractor/` の下と抽出サービスの CI workflow に `.py` のファイルと uv / ruff / pytest / poe を使う記述が無いことを確かめる (`.kiro/` と steering の古い記述は 9.4 で扱うので、ここでは確かめない)
   - サービスの `CLAUDE.md` を Node 版の内容で `apps/attachment-text-extractor/CLAUDE.md` に書く (requirements.md の Scope と design.md の This Spec Owns が成果物に挙げている。いまあるのは `services/attachment-text-extractor/CLAUDE.md` だけで、ディレクトリごと消える)。運用者が読む条件は `docker/README.md` にあることを、`CLAUDE.md` から案内する
   - 配布物に載せるライセンスの表示を決める: anydoc のネイティブのバイナリには、ライセンスの表示が何も入っていない (静的にリンクされた Rust の部品の表示が image に入らない。research.md 27.10)。載せる表示と、その作り方をユーザーに諮って決める。PDFium の WASM の第三者のライセンスの文 19 個は、リポジトリに置いたままにする (ユーザーの決定、2026-11-11。`@embedpdf/pdfium` の版を上げるたびに取り直す)
-  - workflow のファイル名を決め、文書をそろえる: requirements.md の Req 9.1、design.md、brief.md は「`.github/workflows/attachment-text-extractor.yml` を置き換える」と書いているが、Node 版の workflow は `ci-attachment-text-extractor.yml` で、Python 版のファイルは消す。Node 版のファイルの名前を変えるか、文書の名前を直すかを決めて、3 つの文書と実物を一致させる
+  - workflow のファイル名は、Node 版の `ci-attachment-text-extractor.yml` のままにし、Python 版の `attachment-text-extractor.yml` は消す (ほかの app の workflow が `ci-<app>.yml` の形であるため)。requirements.md の Req 9.1、design.md、brief.md の記述を、この名前に合わせる
   - Node 版の workflow の `paths` に `packages/attachment-text-extractor-client/openapi.json` と `infra/docker/compose.yaml` を足す (足さないと、クライアントの文書だけ・compose だけを変えた push で検査が動かない。research.md 17.7、27.13)。`apps/attachment-text-extractor/turbo.json` の `test` の `inputs` にクライアントの文書を足す (research.md 27.8)
-  - compose の `init: true` をどうするかを決める: 4.5 の `compose.spec.ts` は `init: true` を求め、Dockerfile のコメントは「init のプロセスは要らない」と書いている (research.md 27.10)。どちらかにそろえ、テストの題名に残る Python 版の言い方も直す
+  - compose の `init: true` は外す (Node 版では、子は親の直接の子で、親がいなくなると自分で終わるので、init のプロセスは要らない。research.md 27.10)。4.5 の `compose.spec.ts` の該当の検査も外し、テストの題名に残る Python 版の言い方も直す
   - `apps/attachment-text-extractor/docker/Dockerfile.dockerignore` から `services` の行を消す (research.md 27.10)
-  - Dockerfile の `ENV RAYON_NUM_THREADS=1` を残すかを決める: この設定は親にしか届かず、親は anydoc を読み込まない (子には `child-env.ts` が渡す)。消すなら `dockerfile.spec.ts` の検査も一緒に消し、残すなら理由を Dockerfile に書く (research.md 27.13)
+  - Dockerfile の `ENV RAYON_NUM_THREADS=1` は消す (この設定は親にしか届かず、親は anydoc を読み込まない。子には `child-env.ts` が渡す)。`dockerfile.spec.ts` の検査も一緒に消す (research.md 27.13)
   - 最初の本物の docker の実行 (6.12、8.3) が済んだら、メモリの計測の `local` の対象と `check-image.sh` の `IN_SERVICE=` を消す (docker の無い環境で動かすためだけにある。research.md 27.11)
   - 4.5 の compose のテストを含むすべてのテストが通り、`turbo run lint test --filter @growi/attachment-text-extractor` と生成クライアントの package の lint / build が通る
   - _Requirements: 4.6, 7.1, 7.2, 7.3, 7.4, 7.5, 8.4, 9.1, 9.2, 10.1, 10.2, 10.3_

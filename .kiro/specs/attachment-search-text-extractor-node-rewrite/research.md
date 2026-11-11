@@ -8619,3 +8619,82 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 - Python 版が使っていた PyPI の wheel (`firecrawl-anydoc` 0.2.4) には、組み込まれた部品の一覧が入っている: `firecrawl_anydoc-0.2.4.dist-info/sboms/anydoc-python.cyclonedx.json` (CycloneDX 1.5、130KB)。部品は 113 個で、すべてにライセンスの種類が書いてある (`MIT OR Apache-2.0` が 80 個、`MIT` が 10 個、`Unlicense OR MIT` が 7 個、ほかは Apache-2.0・Zlib・BSD-3-Clause・Unicode-3.0・BSL-1.0・0BSD・LLVM の例外つき Apache-2.0 などの、どれも緩いライセンス)。ライセンスの文の全文は入っていない (取りまとめの担当が、直した `.venv` の中を見て確かめた)。
 - npm の package (`@firecrawl/anydoc` と `@firecrawl/anydoc-linux-x64-gnu` 0.2.4) には、この一覧も、ライセンスの文も入っていない (27.10)。
 - つまり、Python 版の image は「部品の一覧 (種類つき)」を持っていたが、Node 版の image は何も持っていない。一覧は Python 用の結合部のもので、Node 用の結合部では、結合のための部品がいくつか違う見込みである (確かめていない)。
+
+### 27.19 タスク 8.2 (Python 版の撤去と、切り替え) — anydoc のライセンスの表示だけが残っている
+
+実装は Fable の担当、独立レビューは別の新しい Fable の担当が行った。レビューは 1 回で APPROVED (承認を止める指摘なし)。その後、言い回しの直しを 3 つ入れた。commit は `b4d0d996a6`。数字は、とくに書いていなければ実測。**tasks.md の 8.2 には、まだ完了の印を付けていない** (anydoc のライセンスの表示を、ユーザーが決めていないため)。
+
+**消したもの**
+
+- `services/attachment-text-extractor/` (追跡していた 106 ファイル。`.venv` などの追跡していないものも含めて、ディスクからも消した。`services/` のディレクトリは無くなった)。
+- Python 用の workflow `.github/workflows/attachment-text-extractor.yml`。
+- リポジトリの全体 (`.kiro`・`.claude`・lockfile を除く) を調べて、消したものを指す記述を直した: `infra/docker/compose.yaml`、`docker/Dockerfile.dockerignore` の `services` の行、`check-image.sh` の `/opt/services` の確認。dependabot・mergify・release-drafter・`.gitignore`・`biome.json`・ルートの `turbo.json`・`.devcontainer` には、該当の記述が無かった。
+- わざと残したもの: `.devcontainer/app/postCreateCommand.sh` の uv の導入 (別の目的のもの)、`test/fixtures/legacy/PROVENANCE.md` (旧形式のファイルの出どころの記録)、「Python 版ではこう動いていた」と由来を書いたコメント (166 ファイルに約 390 行)、`BLACKBOX_TARGET=python`、`benchmark/baseline/python-baseline.json`、メモリの結果の表の Python 版との比較。Req 10.3 は満たしている (`apps/attachment-text-extractor/` に `.py` のファイルは 0。app と workflow に uv・ruff・pytest・poe を使う記述は 0)。
+- **9.1 の Follow-ups の候補に足すもの**: `test/http/blackbox-target.ts` の `BLACKBOX_TARGET=python` (向ける先の Python 版が無くなり、もう動かせない仕組みである)、由来を書いたコメントの整理、`src/config/load-settings.ts` の `LogLevel` の上のコメントに残る「Python logging level names」。
+
+**決めて実施したこと** (tasks.md の 8.2 が「決める」としていた点。取りまとめの担当が決め、ユーザーに伝えて、異論は無かった)
+
+- workflow のファイル名は、Node 版の `ci-attachment-text-extractor.yml` のままにした (ほかの app の workflow が `ci-<app>.yml` の形であるため)。requirements.md の Req 9.1、design.md、brief.md の記述を、この名前に合わせた。
+- compose の `init: true` は外した。`compose.spec.ts` の該当のテストは、向きを逆にせず、消した (`init` があっても害は無いので、「無いこと」を見ても何も守らない。子が自分で終わる性質は、親の見張りのテストと、`--init` なしで container を起動する CI の確認が見ている)。
+- Dockerfile の `ENV RAYON_NUM_THREADS=1` と、`dockerfile.spec.ts` の該当のテストを消した (子への設定は `src/runner/child-env.ts` と、そのテストが守っている)。使われなくなった補助 (`stageEnv`・`envAssignments`) と、そのテスト 1 件も消した。
+- 最初の本物の docker の実行が済んだので、メモリの計測の `local` の対象と、`check-image.sh` の `IN_SERVICE=` を消した。`service-client.mjs` の `--prlimit-path` は残した (「`prlimit` を動かせないときに終了コードが 0 でないこと」を見るテストが使っている)。
+
+**compose (`infra/docker/compose.yaml`)**
+
+- build は `context: ../..` (リポジトリのルート) と `dockerfile: apps/attachment-text-extractor/docker/Dockerfile`。`WORKERS` と `init` は無い。
+- healthcheck は、`node` で `http://127.0.0.1:8000/readyz` を見る (slim の image には python・curl・wget が無い。サービスは IPv4 だけで待ち受けるので、`localhost` ではなく `127.0.0.1` にした)。14 秒で打ち切り、Docker の 15 秒の期限の中に収まる。レビューの担当が、YAML から読んだ引数をそのまま動かして確かめた: 動いているサービスに対して終了 0 (387ms)、何も無いポートに対して終了 1、503 を返す相手に対して終了 1、返事をしない相手に対して 14.03 秒で終了 1。
+- `/tmp` の tmpfs 64m は残した (Req 8.4 とテストが求めている)。`docker/README.md` の「書き込める `/tmp` は要らない。付けるなら、その大きさを式に足す」と矛盾しない (1,944 + 64 = 2,008MiB ≤ 2g)。`pids_limit: 256` などは変えていない。
+- `compose.spec.ts` の、これまで失敗していた 3 件が通るようになった。
+
+**OpenAPI の文書と生成クライアント (Req 7.1〜7.5)**
+
+- `packages/attachment-text-extractor-client/openapi.json` を、`scripts/export-openapi.ts` の出力 (biome で整えたもの) に置き換え、orval で生成クライアントを作り直した。もう 1 回作り直しても、どちらのファイルも 1 バイトも変わらない (`ci-app.yml` の、生成クライアントの drift を見るステップが通る見込み)。クライアントの `dist/` も作り直した。
+- 名前の変わり方は、7.7 の表のとおりだった: `postExtractExtractPost` → `postExtract`、`healthzHealthzGet` → `getHealthz`、`readyzReadyzGet` → `getReadyz`、`BodyPostExtractExtractPost` → `PostExtractBody`、`BodyPostExtractExtractPostMimeType` は無くなり、`GetReadyz200`・`GetReadyz200Dependencies`・`GetReadyz503` が新しくできた。`ErrorCode`・`ErrorResponse`・`ExtractResponse`・`PageInfo` は変わらない。
+- 変わっていないこと (Req 7.2): `file` が必須で `mimeType` が任意であること、`/extract` の状態 (200・400・408・413・422・500・503)、`ErrorCode` の 8 つの値とその順。
+- 変わった形: `file` の型が `string` から `Blob` に、`mimeType` が null 可でなくなった。ほかに、`/healthz` の応答が `{status: 'ok'}` の型に、`/readyz` の応答に型が付いた。
+- **drift のテストが動き始めた** (Req 7.3): `test/openapi/export-openapi.integ.ts` が、書き出しの手順をプロセスとして動かし、その出力を commit 済みの文書と完全に比べる。レビューの担当が、commit 済みの文書の写しを 3 通りに変えて (`required` を空にする、説明に空白を 1 つ足す、enum に値を足す)、どれも違いの場所が出ることを確かめた。
+- workflow の `paths` に、`packages/attachment-text-extractor-client/openapi.json` と `infra/docker/compose.yaml` を足した。`apps/attachment-text-extractor/turbo.json` の `test` の `inputs` に、`$TURBO_DEFAULT$` と、この 2 つのファイル (`$TURBO_ROOT$/…` の書き方) を書いた。**turbo は手元で動かしていない** (lockfile は turbo 2.9.16。バイナリの中の検査の文と、書き方は合っている)。書き方が受け付けられなければ、次の CI の「Lint and test」が設定の読み込みで止まる。
+
+**apps/app の呼び出し側 (Req 7.4)**
+
+- 変えたのは `apps/app/src/features/search-attachments/server/services/attachment-text-extractor.ts` と、そのテストの 2 つだけ。関数名を `postExtract` に替え、`file` の型の書き方を `buffer as unknown as string` から `buffer as unknown as Blob` に替えた (コメントを 2 行付けた)。テストを 1 件足した (クライアントに渡る値が、保存されたバイト列と同じ Buffer で、`mimeType` を付けていないこと)。apps/app の該当のテストは 27 件が通り、app の全体の `tsgo --noEmit` はエラー 0。下流 spec のファイルは変えていない。
+- **実行時に送られる本文は、変える前と後で同じである** (実装の担当とレビューの担当が、別々に、受け口の HTTP サーバーで本文を取って確かめた。境界の文字列のほかは完全に同じ)。
+
+**確かめられた、もとからある問題: apps/app は、ファイルの部品を送っていない** (この spec では直さない)
+
+- 生成クライアントは、Node の組み込みの `FormData` に `file` を入れる。組み込みの `FormData` は、Blob でない値を文字列に変えるので、Buffer は UTF-8 の文字列になる。axios (1.15.0) は、文字列の値を「ファイル名の無い、テキストの項目」として書き出す。
+- そのため、要求の部品の見出しは `Content-Disposition: form-data; name="file"` だけで、`filename` も、部品の `Content-Type` も無い。中身も壊れる (265 バイトの入力が 524 バイトになり、UTF-8 として読めないバイトが U+FFFD に置き換わる)。
+- 本物の Node 版 (`node dist/main.js`) に送った結果: Buffer のまま (いまのコード) は 422 `extraction_failed`。`new Blob([buffer])` は 400 `unsupported_format` (ファイル名が `blob` になり、拡張子が無い)。`new File([buffer], 'sample.pdf')` は 200。拡張子の無いファイル名でも、`mimeType` を付ければ 200。
+- Python 版でも同じだった (コードを読んだ結論で、動かしてはいない): `routers/extract_upload.py` は、`file` がファイルの部品でなければ `InvalidUploadError` にし、それが 422 `extraction_failed` になる。
+- 呼び出し側の最初の commit (`0456c9914c`、2026-05-07) から、ずっとこの書き方である。この機能は master に入っておらず、リリースされたことは無い。つまり、**添付の全文検索は、いまのブランチでは 1 件も抽出に成功しない**。Node 版への書き換えが原因ではなく、書き換えで悪くもなっていない。
+- 新しい発見ではなく、記録済みの問題である: 対象 spec (`.kiro/specs/attachment-search-text-extractor/tasks.md`) が「Node 側の呼び出しは、ファイルを Blob にしてファイル名を付けて送っておらず (422 になる)。これは `attachment-search-indexing` の spec で直す」と書いている。ただし、直す側の `.kiro/specs/attachment-search-indexing/` には、この問題を書いた箇所が無い (grep で確かめた)。
+- 見つけるテストが無い: apps/app で生成クライアントを使うのはこのファイルだけで、テストはクライアントを差し替えている。本物の抽出サービスに送るテストは、apps/app にも e2e にも無い。
+- この spec が直さない理由: Req 7.4 は、apps/app で変えてよいものを「名前と、型の書き方」だけに限り、実行時の振る舞いを変えないと決めている。
+- 直し方の見込み (`attachment-search-indexing` の範囲): `callExtractor` で、`file: new File([buffer], attachment.originalName, { type: attachment.fileFormat })` を渡す。拡張子の無いファイル名に備えて `mimeType` も送るかは、その spec で決める。要るテストは、本物の生成クライアントを通して受け口のサーバーで本文を受け、部品に `filename` があることと、中身が入力とバイト単位で同じであることを見るもの。足したテスト (クライアントに渡る値が Buffer であること) は、直すときに書き換える。
+- **ユーザーに示して、どこで直すかを決めてもらう。** どちらにしても、`attachment-search-indexing` の spec に記録を足す必要がある。
+
+**サービスの説明書**
+
+- 中身は `apps/attachment-text-extractor/AGENTS.md` に書き (152 行)、`CLAUDE.md` は `@AGENTS.md` の 1 行にした (`apps/pdf-converter` と同じ、リポジトリの決まり)。ルートの `AGENTS.md` の、app ごとの説明書の一覧に 1 行足した。運用者が読む条件は `docker/README.md` にあることを案内している。書いてあるコマンドは、レビューの担当が、動かすか script を読んで確かめた。
+
+**テスト**
+
+- 抽出サービス: 4,771 件が通り、**失敗は 0**、12 件が skip (2 回流して同じ。レビューの担当の 1 回も同じ)。27.16 の「4,770 件が通り、3 件が失敗」から、消した 3 件 (compose の `init`、Dockerfile の `RAYON_NUM_THREADS`、`dockerfile-model` の ENV の読み取り) を引き、足した 1 件 (drift) を加え、失敗していた 3 件が通った数である。`tsgo --noEmit` はエラー 0、`biome check` はエラー 0。
+- 生成クライアント: `biome check` と `tsc` が通る。
+
+**手元では確かめられず、次の CI の実行で見るもの**
+
+- `ci-attachment-text-extractor.yml` のジョブが 2 つあり、どちらも通ること。「Lint and test」が通れば、`$TURBO_ROOT$` の書き方を turbo が受け付けたこと、compose の 3 件、drift のテストが、初めて本物で確かめられる。
+- image のジョブの build・大きさ・中身・起動・サービスの確認が通ること (`check-image.sh` で変えたのは、`IN_SERVICE` の既定値と同じ展開を直に書いたことと、`/opt/services` の確認を消したことだけ)。
+- `ci-app.yml` の、生成クライアントの drift を見るステップが通ること。
+- 消した Python 用の workflow の実行が出ないこと。
+
+**次の CI の実行でも確かめられないもの** (8.3 で、人が確かめる項目に入れる)
+
+- `docker compose build` と `up`: どのジョブも compose を使わない。確かめていないのは、`env_file`、container の中での healthcheck、`/tmp` の tmpfs、`pids_limit: 256` が親と子 3 つと確認用の子と healthcheck の `node` のスレッドの数に足りること。
+- メモリの計測: 人が起動したときだけ動く。workflow のファイルが既定のブランチに入るまでは、起動もできない。今回変えた `measure-memory.ts` と `targets.ts` (消しただけ) は、型の検査と、引数の読み取りまでしか確かめていない。
+- linux-arm64。
+
+**残っている 8.2 の項目**
+
+- 配布物に載せるライセンスの表示 (anydoc のネイティブのバイナリ)。判断の材料は 27.18 の最後にある。ユーザーの決定を待っている。

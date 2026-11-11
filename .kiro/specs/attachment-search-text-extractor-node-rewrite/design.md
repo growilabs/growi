@@ -71,7 +71,7 @@
 
 - `apps/attachment-text-extractor/` の中のすべて (D4): Node 版のソースとテスト、Dockerfile、運用者向けの文書 (`docker/README.md`。動かすときに守る条件を理由つきで書く。8.5)、サービスの CLAUDE.md、ベンチマーク
 - Python 版の撤去 (Req 10)
-- `.github/workflows/attachment-text-extractor.yml` の置き換えと、`infra/docker/compose.yaml` のエントリの追従
+- CI の workflow の置き換え (Python 用の `.github/workflows/attachment-text-extractor.yml` を消し、Node 用の `.github/workflows/ci-attachment-text-extractor.yml` にする) と、`infra/docker/compose.yaml` のエントリの追従
 - OpenAPI の文書の作り方と書き出し、`packages/attachment-text-extractor-client/openapi.json` の置き換えと生成クライアントの再生成、それに伴う apps/app の呼び出し側 (`apps/app/src/features/search-attachments/server/services/attachment-text-extractor.ts` とそのテスト) の名前と型の書き方の修正 (7.4)
 - 配置 (D4) に伴う `pnpm-lock.yaml` の変更と `apps/attachment-text-extractor/turbo.json` の追加 (`pnpm-workspace.yaml`、ルートの `turbo.json`、`vitest.workspace.mts` は変えない見込み)
 - 既定の方針を崩した場合に限り、その結果として要る下流の変更 (1.11)
@@ -295,7 +295,7 @@ apps/attachment-text-extractor/
 
 ### Modified Files
 
-- `.github/workflows/attachment-text-extractor.yml` — Node 版の lint・型の検査・テスト・image の確認・OpenAPI の drift 検知に置き換える (Req 9)
+- `.github/workflows/ci-attachment-text-extractor.yml` — Node 版の lint・型の検査・テスト・image の確認・OpenAPI の drift 検知を行う (Req 9)。Python 用の `.github/workflows/attachment-text-extractor.yml` は消す
 - `infra/docker/compose.yaml` — build の `context` を `apps/attachment-text-extractor` に変え、`WORKERS` を消す (8.4、D1、D4)
 - `packages/attachment-text-extractor-client/openapi.json` と `src/generated/index.ts` — Node 版が書き出した文書への置き換えと再生成 (7.1、7.2)
 - `apps/app/src/features/search-attachments/server/services/attachment-text-extractor.ts` とそのテスト — 生成クライアントの関数名と型名の置き換えと、`file` の型の書き方の修正だけ (7.4)
@@ -417,7 +417,7 @@ D1〜D5 はすべてユーザーが決めた (2026-11-04)。
 | `vitest.workspace.mts` | 変えない (`apps/*/vitest.config.ts` で自動で拾われる) |
 | `biome.json` | 変えない見込み (ルートが `**` を対象にしている)。`apps/pdf-converter` 向けの個別の設定があれば倣う |
 | `infra/docker/compose.yaml` | build の `context` を新しい場所に変え、`WORKERS` を消す (D1) |
-| `.github/workflows/attachment-text-extractor.yml` | `paths` を新しい場所に変え、Node 用のジョブに置き換える。`ci-pdf-converter.yml` の形を流用する (`pnpm install --frozen-lockfile`、`turbo --filter`) |
+| `.github/workflows/ci-attachment-text-extractor.yml` (Python 用の `attachment-text-extractor.yml` は消す) | Node 用のジョブを置く。`ci-pdf-converter.yml` の形を流用する (`pnpm install --frozen-lockfile`、`turbo --filter`) |
 | Dockerfile | `apps/attachment-text-extractor/docker/Dockerfile` (場所は pdf-converter に倣う)。ルートを context にして `pnpm deploy --prod` で取り出す |
 | 文書 | サービスの CLAUDE.md (新しい場所で書き直す)。steering の `structure.md` の「`services/` は Node 以外」(Follow-ups)。下流 spec と umbrella に残る `services/attachment-text-extractor/` のパス (契約には関係しない。Follow-ups) |
 
