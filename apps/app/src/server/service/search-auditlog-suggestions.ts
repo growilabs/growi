@@ -5,6 +5,7 @@ import type {
   AuditlogSuggestionField,
   AuditlogSuggestionsResponse,
 } from '~/interfaces/activity';
+import { AUDITLOG_SUGGESTION_FIELD_SPECS } from '~/server/interfaces/auditlog-suggestion-field-specs';
 import { UserStatus } from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -18,20 +19,6 @@ export type AuditlogSuggestionBackend = Pick<
   SearchService,
   'isReachable' | 'fullTextSearchDelegator'
 >;
-
-// Below this length a prefix matches most stored values, so the MongoDB
-// fallback would group most of the collection for a near-useless list. ES has
-// no such limit, so a 1-char username (e.g. `a`) stays suggestible there.
-const AUDITLOG_SUGGESTION_FALLBACK_MIN_QUERY_LENGTH: {
-  readonly [K in AuditlogSuggestionField]: number;
-} = {
-  username: 2,
-  // Nearly every endpoint shares the `/_api/` prefix, so no length short of
-  // `/_api/v3/` narrows the scan; the fallback's load is bounded by maxTimeMS
-  // instead, and '/' answers like ES does. Never rejects anything: the
-  // endpoint handler already returns early on an empty path.
-  endpoint: 1,
-};
 
 async function searchAuditlogFieldValues(
   backend: AuditlogSuggestionBackend,
@@ -57,10 +44,23 @@ async function searchAuditlogFieldValues(
       );
     }
   }
-  if (q.length < AUDITLOG_SUGGESTION_FALLBACK_MIN_QUERY_LENGTH[field]) {
+  if (
+    q.length < AUDITLOG_SUGGESTION_FIELD_SPECS[field].fallbackMinQueryLength
+  ) {
     return [];
   }
-  return mongoFallback(q, { offset: 0, limit });
+  // Any failure, maxTimeMS included, degrades to no suggestions rather than a
+  // 500: Prisma may not surface MongoDB's timeout code, so errors aren't
+  // told apart.
+  try {
+    return await mongoFallback(q, { offset: 0, limit });
+  } catch (err) {
+    logger.warn(
+      { err },
+      `Failed to search auditlog suggestions (${field}) on MongoDB. Returning no suggestions.`,
+    );
+    return [];
+  }
 }
 
 // searchAuditlogSuggestions dispatches through this map, so a new field (e.g.

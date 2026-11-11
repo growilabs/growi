@@ -15,15 +15,17 @@ const {
   mockFindSnapshotUsernamesByUsernameRegex,
   mockFindEndpointsByEndpointRegex,
   mockLoggerError,
+  mockLoggerWarn,
 } = vi.hoisted(() => ({
   mockFindSnapshotUsernamesByUsernameRegex: vi.fn(),
   mockFindEndpointsByEndpointRegex: vi.fn(),
   mockLoggerError: vi.fn(),
+  mockLoggerWarn: vi.fn(),
 }));
 
 vi.mock('~/utils/logger', () => ({
   default: () => ({
-    warn: vi.fn(),
+    warn: mockLoggerWarn,
     error: mockLoggerError,
     info: vi.fn(),
     debug: vi.fn(),
@@ -459,7 +461,7 @@ describe('searchAuditlogSuggestions()', () => {
     });
   });
 
-  it('should reject when any requested field fails', async () => {
+  it('should return no endpoints but keep the username suggestions when the endpoint MongoDB fallback fails', async () => {
     backend = createBackend(false);
     mockFindSnapshotUsernamesByUsernameRegex.mockResolvedValueOnce(['alice']);
     mockFindEndpointsByEndpointRegex.mockRejectedValueOnce(
@@ -469,9 +471,62 @@ describe('searchAuditlogSuggestions()', () => {
       { username: 'alice', status: UserStatus.STATUS_ACTIVE },
     ]);
 
-    await expect(
-      searchAuditlogSuggestions(backend, ['username', 'endpoint'], 'ali', 10),
-    ).rejects.toThrow('operation exceeded time limit');
+    const result = await searchAuditlogSuggestions(
+      backend,
+      ['username', 'endpoint'],
+      'ali',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: { activeUsernames: ['alice'], inactiveUsernames: [] },
+      endpoint: { endpoints: [] },
+    });
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      {
+        err: expect.objectContaining({
+          message: 'operation exceeded time limit',
+        }),
+      },
+      expect.stringContaining('MongoDB'),
+    );
+  });
+
+  it('should return no username suggestions when the username MongoDB fallback fails', async () => {
+    backend = createBackend(false);
+    mockFindSnapshotUsernamesByUsernameRegex.mockRejectedValueOnce(
+      new Error('operation exceeded time limit'),
+    );
+    setupUserModelMock(mockUserModel, []);
+
+    const result = await searchAuditlogSuggestions(
+      backend,
+      ['username'],
+      'ali',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: { activeUsernames: [], inactiveUsernames: [] },
+    });
+  });
+
+  it('should return no endpoints when both Elasticsearch and the MongoDB fallback fail', async () => {
+    vi.mocked(
+      backend.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockRejectedValue(new Error('ES is down'));
+    mockFindEndpointsByEndpointRegex.mockRejectedValueOnce(
+      new Error('operation exceeded time limit'),
+    );
+
+    const result = await searchAuditlogSuggestions(
+      backend,
+      ['endpoint'],
+      '/api',
+      10,
+    );
+
+    expect(result).toEqual({ endpoint: { endpoints: [] } });
   });
 
   it('should use the MongoDB fallback for endpoint when ES is unreachable', async () => {

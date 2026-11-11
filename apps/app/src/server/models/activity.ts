@@ -17,8 +17,8 @@ import {
   AllSupportedActions,
   AllSupportedEventModels,
   AllSupportedTargetModels,
-  AUDITLOG_SUGGESTION_CASE_INSENSITIVE,
 } from '~/interfaces/activity';
+import { AUDITLOG_SUGGESTION_FIELD_SPECS } from '~/server/interfaces/auditlog-suggestion-field-specs';
 
 import loggerFactory from '../../utils/logger';
 import { getOrCreateModel } from '../util/mongoose-utils';
@@ -56,7 +56,6 @@ const activitySchema = new Schema<ActivityDocument>(
     },
     endpoint: {
       type: String,
-      index: true,
     },
     targetModel: {
       type: String,
@@ -298,28 +297,8 @@ const buildSnapshotUsernameSubstringMatchStage = (q: string) => ({
   },
 });
 
-type SuggestionFieldSpec = {
-  readonly fieldPath: string;
-  readonly groupKey: Prisma.InputJsonValue;
-};
-
-const SUGGESTION_FIELD_SPECS: {
-  readonly [K in AuditlogSuggestionField]: SuggestionFieldSpec;
-} = {
-  username: {
-    fieldPath: 'snapshot.username',
-    groupKey: '$snapshot.username',
-  },
-  endpoint: {
-    fieldPath: 'endpoint',
-    // Mongo-side equivalent of sanitizeEndpointForIndex: the stored endpoint
-    // keeps its query string, the ES index does not.
-    groupKey: { $arrayElemAt: [{ $split: ['$endpoint', '?'] }, 0] },
-  },
-};
-
 const SNAPSHOT_USERNAME_GROUP_STAGE = {
-  $group: { _id: SUGGESTION_FIELD_SPECS.username.groupKey },
+  $group: { _id: AUDITLOG_SUGGESTION_FIELD_SPECS.username.mongo.groupKey },
 };
 
 // Prefix-only, unlike ES's fuzzy match for username: MongoDB has no native
@@ -328,14 +307,17 @@ const SNAPSHOT_USERNAME_GROUP_STAGE = {
 const buildFieldPrefixMatchStage = (
   field: AuditlogSuggestionField,
   q: string,
-) => ({
-  $match: {
-    [SUGGESTION_FIELD_SPECS[field].fieldPath]: {
-      $regex: `^${escapeSuggestionQuery(q)}`,
-      ...(AUDITLOG_SUGGESTION_CASE_INSENSITIVE[field] ? { $options: 'i' } : {}),
+) => {
+  const { mongo, caseInsensitive } = AUDITLOG_SUGGESTION_FIELD_SPECS[field];
+  return {
+    $match: {
+      [mongo.fieldPath]: {
+        $regex: `^${escapeSuggestionQuery(q)}`,
+        ...(caseInsensitive ? { $options: 'i' } : {}),
+      },
     },
-  },
-});
+  };
+};
 
 const buildFieldSuggestionPipeline = (
   field: AuditlogSuggestionField,
@@ -346,7 +328,7 @@ const buildFieldSuggestionPipeline = (
     buildFieldPrefixMatchStage(field, q),
     {
       $group: {
-        _id: SUGGESTION_FIELD_SPECS[field].groupKey,
+        _id: AUDITLOG_SUGGESTION_FIELD_SPECS[field].mongo.groupKey,
         count: { $sum: 1 },
       },
     },
@@ -361,9 +343,7 @@ const buildFieldSuggestionPipeline = (
 // MongoDB when ES is unreachable for every tenant at once.
 const AGGREGATE_MAX_TIME_MS = 5000;
 
-// Shared by every suggestion field's ES-fallback method. A new field (e.g.
-// `ip`) needs an entry in every map keyed by AuditlogSuggestionField; the type
-// checker flags each one that is missing.
+// Shared by every suggestion field's ES-fallback method.
 const findSuggestionValuesByPrefix = async (
   context: Pick<typeof prisma.activities, 'aggregateRaw'>,
   field: AuditlogSuggestionField,
