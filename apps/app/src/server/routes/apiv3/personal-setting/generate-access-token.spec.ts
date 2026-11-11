@@ -1,3 +1,4 @@
+import type EventEmitter from 'node:events';
 import type { Scope } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import express, {
@@ -7,7 +8,7 @@ import express, {
 } from 'express';
 import { Types } from 'mongoose';
 import request from 'supertest';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 import { AccessToken } from '~/server/models/access-token';
@@ -39,6 +40,13 @@ vi.mock('~/server/models/access-token', () => ({
   AccessToken: { generateToken: vi.fn() },
 }));
 
+const buildCrowi = (): Crowi => {
+  const events = mock<Crowi['events']>({
+    activity: mock<EventEmitter>(),
+  });
+  return mock<Crowi>({ events });
+};
+
 const buildApp = (user: TestUser) => {
   const app = express();
   app.use(express.json());
@@ -53,7 +61,7 @@ const buildApp = (user: TestUser) => {
   });
   app.post(
     '/generate-access-token',
-    generateAccessTokenHandlerFactory(mockDeep<Crowi>()),
+    generateAccessTokenHandlerFactory(buildCrowi()),
   );
   return app;
 };

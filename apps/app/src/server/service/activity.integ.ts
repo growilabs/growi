@@ -1,12 +1,13 @@
 import EventEmitter from 'events';
 import mongoose from 'mongoose';
-import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
+import { type MockProxy, mock } from 'vitest-mock-extended';
 
 import { ActionGroupSize, SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import Activity from '~/server/models/activity';
 import ActivityService from '~/server/service/activity';
 import type { ConfigValues } from '~/server/service/config-manager/config-definition';
+import type { ConfigManager } from '~/server/service/config-manager/config-manager';
 import { prisma } from '~/utils/prisma';
 
 vi.mock('~/utils/logger', () => ({
@@ -19,18 +20,22 @@ vi.mock('~/utils/logger', () => ({
 }));
 
 describe('ActivityService', () => {
-  let mockCrowi: DeepMockProxy<Crowi>;
+  let mockCrowi: MockProxy<Crowi>;
+  let configManager: MockProxy<ConfigManager>;
   let activityService: ActivityService;
   let activityEvent: EventEmitter;
 
   const setConfig = (config: Partial<ConfigValues>) => {
-    mockCrowi.configManager.getConfig.mockImplementation((key) => config[key]);
+    configManager.getConfig.mockImplementation((key) => config[key]);
   };
 
   beforeEach(() => {
     activityEvent = new EventEmitter();
-    mockCrowi = mockDeep<Crowi>();
-    mockCrowi.events.activity = activityEvent;
+    configManager = mock<ConfigManager>();
+    mockCrowi = mock<Crowi>({
+      configManager,
+      events: { activity: activityEvent },
+    });
     activityService = new ActivityService(mockCrowi);
     mockCrowi.activityService = activityService;
   });

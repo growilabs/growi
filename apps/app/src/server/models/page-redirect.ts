@@ -1,3 +1,4 @@
+import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import { Schema } from 'mongoose';
 
 import { Prisma } from '~/generated/prisma/client';
@@ -195,6 +196,10 @@ const aggregateRedirectsReaching = async (
     ],
   })) as unknown as RawPageRedirectWithChains[];
 
+// Keeps each read and each deleteMany far below the 16MB command limit even
+// for long non-ASCII paths.
+const MOVE_REDIRECT_BATCH_SIZE = 1000;
+
 export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
     result: {
@@ -272,6 +277,71 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.pageredirects>(this);
           return context.deleteMany({ where: { fromPath } });
+        },
+
+        // A move from `fromPath` to `toPath` leaves `fromPath + suffix ->
+        // toPath + suffix` for each moved page (suffix '' or '/...'); other
+        // redirects under `fromPath`, such as an earlier move of a former
+        // child, are not this move's to remove. A large subtree leaves tens of
+        // thousands of them, so candidates are read and deleted a page at a
+        // time. Prisma's `startsWith` does not escape regex metacharacters on
+        // MongoDB, so candidates are read raw.
+        async deleteRedirectsCreatedByMove({
+          fromPath,
+          toPath,
+        }: IPageRedirect): Promise<{ count: number }> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.pageredirects>(this);
+          // Same prefix replacement as renamePage, so a destination with a
+          // trailing slash yields dest//child just as the move wrote it.
+          const isCreatedByThisMove = (redirect: RawPageRedirectRow) =>
+            redirect.toPath ===
+            `${toPath}${redirect.fromPath.slice(fromPath.length)}`;
+          const deleteCreated = async (
+            rows: RawPageRedirectRow[],
+          ): Promise<number> => {
+            const ids = rows
+              .filter(isCreatedByThisMove)
+              .map((row) => row._id.$oid);
+            if (ids.length === 0) {
+              return 0;
+            }
+            const { count } = await context.deleteMany({
+              where: { id: { in: ids } },
+            });
+            return count;
+          };
+
+          const projection = { _id: 1, fromPath: 1, toPath: 1 };
+          const self = (await context.findRaw({
+            filter: { fromPath },
+            options: { projection },
+          })) as unknown as RawPageRedirectRow[];
+          let count = await deleteCreated(self);
+
+          const descendantPattern = `^${escapeStringForMongoRegex(fromPath.replace(/\/+$/, ''))}/`;
+          let after: string | null = null;
+          for (;;) {
+            // biome-ignore lint/performance/noAwaitInLoops: each page starts after the previous one
+            const page = (await context.findRaw({
+              filter: {
+                fromPath:
+                  after == null
+                    ? { $regex: descendantPattern }
+                    : { $regex: descendantPattern, $gt: after },
+              },
+              options: {
+                projection,
+                sort: { fromPath: 1 },
+                limit: MOVE_REDIRECT_BATCH_SIZE,
+              },
+            })) as unknown as RawPageRedirectRow[];
+            if (page.length === 0) {
+              return { count };
+            }
+            count += await deleteCreated(page);
+            after = page[page.length - 1].fromPath;
+          }
         },
 
         async removePageRedirectsByToPath(toPath: string): Promise<void> {
