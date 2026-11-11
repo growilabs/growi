@@ -136,6 +136,15 @@ export default defineConfig({
       // this file being touched.
       'slash_command.*.label',
       'slash_command.*.description',
+      // Keys are built at runtime from features/change-proposal/client/shared/label-keys.ts.
+      'change_proposal.operation_type.*',
+      'change_proposal.operation_status.*',
+      'change_proposal.proposal_status.*',
+      'change_proposal.reason.*',
+      'change_proposal.revert_refusal_reason.*',
+      'change_proposal.lifecycle.*',
+      'change_proposal.link.*',
+      'change_proposal.achievement.*',
     ],
 
     primaryLanguage: 'en_US',

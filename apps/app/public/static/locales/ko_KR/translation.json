@@ -249,7 +249,7 @@
     "password_is_not_set": "비밀번호가 설정되지 않았습니다."
   },
   "share_links": {
-    "Shere this page link to public": "이 페이지 링크를 공개적으로 공유",
+    "Share this page link to public": "이 페이지 링크를 공개적으로 공유",
     "share_link_list": "공유 링크 목록",
     "share_link_management": "공유 링크 관리",
     "delete_all_share_links": "모든 공유 링크 삭제",
@@ -1138,6 +1138,83 @@
     "tableBuilder": {
       "label": "표 빌더",
       "description": ""
+    }
+  },
+  "change_proposal": {
+    "operation_type": {
+      "edit": "페이지 편집",
+      "create": "페이지 생성",
+      "move": "페이지 이동",
+      "delete_completely": "페이지 완전 삭제"
+    },
+    "operation_status": {
+      "pending": "승인 대기",
+      "applied": "반영됨",
+      "failed": "실패",
+      "stale": "반영 보류 (페이지가 먼저 변경됨)",
+      "skipped": "건너뜀",
+      "reverted": "되돌림",
+      "revert_refused": "되돌릴 수 없음"
+    },
+    "proposal_status": {
+      "pending": "승인 대기",
+      "applied": "반영됨",
+      "partially_applied": "일부 반영됨",
+      "reverted": "되돌림",
+      "partially_reverted": "일부 되돌림",
+      "not_applied": "반영되지 않음",
+      "discarded": "나머지를 반영하지 않고 닫음",
+      "expired": "기한 만료",
+      "withdrawn": "철회됨"
+    },
+    "reason": {
+      "page_being_edited": "페이지를 편집 중",
+      "page_operation_in_progress": "페이지에 대한 다른 작업이 진행 중",
+      "target_unavailable": "대상 페이지를 찾을 수 없음",
+      "path_occupied": "해당 경로에 이미 페이지가 있음",
+      "grant_not_assignable": "페이지 공개 범위를 설정할 수 없음",
+      "feature_disabled": "기능이 비활성화됨",
+      "operation_type_disabled": "이 종류의 작업이 비활성화됨",
+      "requester_not_allowed": "요청한 사람에게 이 작업의 권한이 없음",
+      "write_error": "변경 내용을 쓰지 못함",
+      "not_revertible_state": "되돌릴 수 있는 상태가 아님",
+      "edited_after_apply": "반영 후 페이지가 편집됨",
+      "has_children": "페이지에 하위 페이지가 있음",
+      "moved_after_apply": "반영 후 페이지가 이동됨",
+      "original_path_occupied": "원래 경로에 이미 페이지가 있음",
+      "not_deletable": "페이지를 삭제할 권한이 없음",
+      "apply_failed": "되돌리기에 실패함",
+      "base_revision_changed": "반영 전에 페이지가 변경됨",
+      "skipped_by_requester": "요청한 사람이 건너뜀",
+      "discarded": "나머지를 반영하지 않고 닫음",
+      "expired": "기한 만료",
+      "withdrawn": "철회됨"
+    },
+    "revert_refusal_reason": {
+      "not_revertible_state": "되돌릴 수 있는 상태가 아님",
+      "target_unavailable": "대상 페이지를 찾을 수 없음",
+      "edited_after_apply": "반영 후 페이지가 편집됨",
+      "has_children": "페이지에 하위 페이지가 있음",
+      "moved_after_apply": "반영 후 페이지가 이동됨",
+      "original_path_occupied": "원래 경로에 이미 페이지가 있음",
+      "not_deletable": "페이지를 삭제할 권한이 없음",
+      "page_operation_in_progress": "페이지에 대한 다른 작업이 진행 중",
+      "apply_failed": "되돌리기에 실패함"
+    },
+    "lifecycle": {
+      "open": "승인 대기",
+      "settled": "완료",
+      "discarded": "나머지를 반영하지 않고 닫음",
+      "expired": "기한 만료",
+      "withdrawn": "철회됨"
+    },
+    "link": {
+      "follow_up": "후속",
+      "rework": "재검토",
+      "based_on": "원본"
+    },
+    "achievement": {
+      "settled_with_percent": "완료 (달성도 {{percent}}%)"
     }
   }
 }

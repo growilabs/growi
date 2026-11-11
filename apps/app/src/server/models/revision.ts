@@ -1,5 +1,9 @@
 import { allOrigin } from '@growi/core';
-import type { HasObjectId, Origin } from '@growi/core/dist/interfaces';
+import type {
+  HasObjectId,
+  IRevisionProposalMark,
+  Origin,
+} from '@growi/core/dist/interfaces';
 import type { Types } from 'mongoose';
 import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
@@ -39,6 +43,9 @@ const revisionSchema = new Schema(
     author: { type: Schema.Types.ObjectId, ref: 'User' },
     hasDiffToPrev: { type: Boolean },
     origin: { type: String, enum: allOrigin },
+    // Unset on revisions not made by a Change Proposal, so their sparse index stays small
+    proposalId: { type: Schema.Types.ObjectId },
+    proposalOperationKey: { type: String },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
@@ -100,7 +107,10 @@ export const extension = Prisma.defineExtension((client) => {
           previousBody: string | null,
           user: HasObjectId,
           origin?: Origin,
-          options: { format: string } = { format: 'markdown' },
+          options: {
+            format?: string;
+            proposalMark?: IRevisionProposalMark;
+          } = {},
         ): Prisma.revisionsUncheckedCreateInput {
           if (user._id == null) {
             throw new Error('user should have _id');
@@ -112,11 +122,13 @@ export const extension = Prisma.defineExtension((client) => {
           return {
             pageId: pageData._id.toString(),
             body: body,
-            format: options.format,
+            format: options.format ?? 'markdown',
             authorId: user._id,
             origin: origin,
             hasDiffToPrev:
               pageData.revision != null ? body !== previousBody : undefined,
+            proposalId: options.proposalMark?.proposalId,
+            proposalOperationKey: options.proposalMark?.proposalOperationKey,
           };
         },
       },

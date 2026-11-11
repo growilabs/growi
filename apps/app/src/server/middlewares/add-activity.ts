@@ -48,9 +48,9 @@ export const generateAddActivityMiddleware = () =>
     // a failure here must not crash the request.
     try {
       const { activityId } = beginActivity(context);
-      // Preserves the 37 downstream `emit('update', res.locals.activity._id)`
-      // call sites and the one `getIdStringForRef(res.locals.activity)`
-      // (update-page.ts) without touching them.
+      // Preserves the downstream `emit('update', res.locals.activity._id)`
+      // call sites (update-page.ts passes the same id to
+      // `emitPageUpdateActivity`) without touching them.
       res.locals.activity = { _id: activityId };
       registerFailsafeFinalizer(res, activityId, context);
     } catch (err) {

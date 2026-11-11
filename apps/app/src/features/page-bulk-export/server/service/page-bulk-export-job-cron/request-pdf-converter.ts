@@ -9,7 +9,6 @@ import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import { PageBulkExportJobStatus } from '../../../interfaces/page-bulk-export';
-import PageBulkExportPageSnapshot from '../../models/page-bulk-export-page-snapshot';
 import { BulkExportJobExpiredError } from './errors';
 
 /**
@@ -39,10 +38,9 @@ export async function requestPdfConverter(
     PdfCtrlSyncJobStatusBodyStatus.HTML_EXPORT_IN_PROGRESS;
 
   const lastExportPagePath = (
-    await PageBulkExportPageSnapshot.findOne({
-      pageBulkExportJob: pageBulkExportJob.id,
-    }).sort({
-      path: -1,
+    await prisma.pagebulkexportpagesnapshots.findFirst({
+      where: { pageBulkExportJobId: pageBulkExportJob.id },
+      orderBy: { path: 'desc' },
     })
   )?.path;
   if (lastExportPagePath == null) {

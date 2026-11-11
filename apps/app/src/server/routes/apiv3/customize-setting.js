@@ -446,6 +446,9 @@ export const setup = (crowi) => {
    *                      items:
    *                        $ref: '#/components/schemas/ThemesMetadata'
    */
+  // Intentionally not adminRequired: RevisionDiff (page history) reads this for
+  // non-admin viewers too, and the response holds nothing secret — the current
+  // theme is already exposed to every page via its stylesheet and forcedColorScheme.
   router.get(
     '/theme',
     accessTokenParser([SCOPE.READ.ADMIN.CUSTOMIZE]),
@@ -1192,6 +1195,7 @@ export const setup = (crowi) => {
     uploads.single('file'),
     accessTokenParser([SCOPE.WRITE.ADMIN.CUSTOMIZE]),
     loginRequiredStrictly,
+    adminRequired,
     uploads.single('file'),
     validator.logo,
     apiV3FormValidator,
