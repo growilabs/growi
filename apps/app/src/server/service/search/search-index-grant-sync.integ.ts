@@ -29,10 +29,12 @@ describe.skipIf(sharedElasticsearchUri == null)(
     let user: HydratedDocument<IUserHasId>;
     let searchService: SearchService;
     let elasticsearchHost: string;
+    let isV5CompatibleBefore: boolean;
 
     const createIndexedPublicPage = async (
       name: string,
       onTree: boolean,
+      parentPage?: PageDocument,
     ): Promise<HydratedDocument<PageDocument>> => {
       const root = await Page.findOne({ path: '/' }).orFail();
       const page = await Page.create({
@@ -40,7 +42,7 @@ describe.skipIf(sharedElasticsearchUri == null)(
         grant: PageGrant.GRANT_PUBLIC,
         creator: user._id,
         lastUpdateUser: user._id,
-        parent: onTree ? root._id : null,
+        parent: onTree ? (parentPage?._id ?? root._id) : null,
       });
       const revision = await prisma.revisions.create({
         data: {
@@ -83,6 +85,9 @@ describe.skipIf(sharedElasticsearchUri == null)(
 
       crowi = await getInstance();
       Page = mongoose.model<PageDocument, PageModel>('Page');
+      // Pages on the tree take the v5 update path; the others the legacy one.
+      isV5CompatibleBefore = configManager.getConfig('app:isV5Compatible');
+      await configManager.updateConfig('app:isV5Compatible', true);
 
       await crowi.models.User.deleteMany({ username: USERNAME });
       user = await crowi.models.User.create({
@@ -93,8 +98,6 @@ describe.skipIf(sharedElasticsearchUri == null)(
       if ((await Page.findOne({ path: '/' })) == null) {
         await Page.create({ path: '/', grant: PageGrant.GRANT_PUBLIC });
       }
-
-      vi.spyOn(crowi.pageService, 'updatePageSubOperation').mockResolvedValue();
 
       // Same listener order as the running app: the page-status broadcaster
       // is registered before the search service.
@@ -111,6 +114,10 @@ describe.skipIf(sharedElasticsearchUri == null)(
       );
       process.env.ELASTICSEARCH_URI = sharedElasticsearchUri;
       await configManager.loadConfigs();
+      await configManager.updateConfig(
+        'app:isV5Compatible',
+        isV5CompatibleBefore,
+      );
 
       const pages = await Page.find({ path: { $regex: `^${PATH_PREFIX}/` } });
       const pageIds = pages.map((page) => String(page._id));
@@ -130,6 +137,36 @@ describe.skipIf(sharedElasticsearchUri == null)(
       await expect
         .poll(() => indexedGrantOf(page), { timeout: 10_000 })
         .toBe(PageGrant.GRANT_OWNER);
+    }, 30_000);
+
+    it.each([
+      { name: 'descendants-on-tree', onTree: true },
+      { name: 'descendants-legacy', onTree: false },
+    ])('stores the new grant of a descendant when the grant is applied to descendants ($name)', async ({
+      name,
+      onTree,
+    }) => {
+      const parent = await createIndexedPublicPage(name, onTree);
+      const child = await createIndexedPublicPage(
+        `${name}/child`,
+        onTree,
+        parent,
+      );
+
+      await crowi.pageService.updatePage(parent, null, null, user, {
+        grant: PageGrant.GRANT_OWNER,
+        overwriteScopesOfDescendants: true,
+      });
+
+      await expect
+        .poll(async () => (await Page.findById(child._id))?.grant, {
+          timeout: 10_000,
+        })
+        .toBe(PageGrant.GRANT_OWNER);
+      await expect
+        .poll(() => indexedGrantOf(child), { timeout: 10_000 })
+        .toBe(PageGrant.GRANT_OWNER);
+      expect(await indexedGrantOf(parent)).toBe(PageGrant.GRANT_OWNER);
     }, 30_000);
 
     it.each([

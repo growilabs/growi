@@ -3350,6 +3350,9 @@ class PageService implements IPageService {
     });
 
     await pipeline(childPagesReadableStream, batchStream, childPagesWritable);
+
+    // The bulk write above bypasses the per-page events.
+    this.pageEvent.emit('syncDescendantsUpdate', parentPage, user);
   }
 
   async updateChildPagesGrant(
