@@ -1,15 +1,10 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { release } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import type { Service } from './loads';
 
-// Where the measured service runs: the image in a container (the numbers
-// tasks 6.12 asks for), or `node dist/main.js` on this machine (a stand-in
-// when there is no docker; its numbers are not the image's).
+// Where the measured service runs: the image in a container.
 
 const TOKEN_NAME = 'ATTACHMENT_EXTRACTOR_SERVICE_TOKEN';
 const MIB = 1024 * 1024;
@@ -23,11 +18,10 @@ export interface MemoryReading {
 export interface RunningTarget extends Service {
   read(): Promise<MemoryReading>;
   /**
-   * The highest total since the start, as the platform recorded it; null
-   * where the platform has no such record at all. Fails when it should have
-   * one and it cannot be read: the polled readings alone miss short peaks.
+   * The highest total since the start, as the kernel recorded it. Fails when
+   * it cannot be read: the polled readings alone miss short peaks.
    */
-  recordedPeakMib(): Promise<number | null>;
+  recordedPeakMib(): Promise<number>;
   logs(): Promise<string>;
   stop(): Promise<void>;
 }
@@ -136,71 +130,5 @@ export const dockerTarget = ({
         await run('docker', ['rm', '-f', containerName]);
       },
     };
-  },
-});
-
-const rssMibOf = (pid: number): number => {
-  try {
-    const status = readFileSync(`/proc/${pid}/status`, 'utf8');
-    return Number(/VmRSS:\s+(\d+) kB/.exec(status)?.[1] ?? 0) / 1024;
-  } catch {
-    // The process ended between the listing and the read.
-    return 0;
-  }
-};
-
-const childrenOf = (pid: number): readonly number[] => {
-  try {
-    return readFileSync(`/proc/${pid}/task/${pid}/children`, 'utf8')
-      .split(' ')
-      .filter((text) => text !== '')
-      .map(Number);
-  } catch {
-    return [];
-  }
-};
-
-const MAIN = fileURLToPath(new URL('../../../dist/main.js', import.meta.url));
-
-/** `node dist/main.js` on this machine, at its fixed port 8000. */
-export const localTarget = (): Target => ({
-  where: `OUTSIDE the image (a stand-in, not the image's numbers): node ${process.version} on Linux ${release()}, the RSS of the service process plus its children, not a cgroup reading`,
-  start: () => {
-    const token = randomBytes(16).toString('hex');
-    const logs: Buffer[] = [];
-    const child = spawn(process.execPath, [MAIN], {
-      env: {
-        PATH: process.env.PATH ?? '',
-        RAYON_NUM_THREADS: '1',
-        [TOKEN_NAME]: token,
-      },
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-    child.stderr.on('data', (data: Buffer) => logs.push(data));
-    const pid = child.pid;
-    if (pid === undefined) {
-      return Promise.reject(new Error('node dist/main.js did not start'));
-    }
-    return Promise.resolve({
-      baseUrl: 'http://127.0.0.1:8000',
-      token,
-      read: async () => ({
-        totalMib: Math.ceil(
-          [pid, ...childrenOf(pid)].reduce((sum, p) => sum + rssMibOf(p), 0),
-        ),
-        workingSetMib: null,
-      }),
-      recordedPeakMib: async () => null,
-      logs: async () => Buffer.concat(logs).toString('utf8'),
-      stop: () =>
-        new Promise((resolve) => {
-          if (child.exitCode !== null || child.signalCode !== null) {
-            resolve();
-            return;
-          }
-          child.once('exit', () => resolve());
-          child.kill('SIGTERM');
-        }),
-    });
   },
 });

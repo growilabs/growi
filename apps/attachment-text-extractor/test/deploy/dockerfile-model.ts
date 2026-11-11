@@ -172,24 +172,3 @@ export const copyOperands = (instruction: Instruction): CopyOperands => {
 // `CMD` / `ENTRYPOINT` in exec form (a JSON array), or null for the shell form.
 export const execForm = (instruction: Instruction): readonly string[] | null =>
   parseJsonStrings(instruction.args);
-
-// The variables an ENV instruction defines (`ENV A=1 B="x y"` and `ENV A 1`).
-export const envAssignments = (
-  instruction: Instruction,
-): Readonly<Record<string, string>> => {
-  const result: Record<string, string> = {};
-  if (/^\w+=/.test(instruction.args)) {
-    const pattern = /(\w+)=(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S*))/g;
-    for (const match of instruction.args.matchAll(pattern)) {
-      result[match[1]] = match[2] ?? match[3] ?? match[4] ?? '';
-    }
-  } else {
-    const [name, ...value] = instruction.args.split(/\s+/);
-    result[name] = value.join(' ').replace(/^"|"$/g, '');
-  }
-  return result;
-};
-
-// Every variable the stage sets with ENV, later definitions winning.
-export const stageEnv = (stage: Stage): Readonly<Record<string, string>> =>
-  Object.assign({}, ...instructionsOf(stage, 'ENV').map(envAssignments));

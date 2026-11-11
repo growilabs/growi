@@ -4,9 +4,8 @@
 // against 0.95 x MAX_CHILD_RSS_MB. Exits 1 when a load goes over the 2 Gi
 // limit or the measurement is not valid; a child over its line is a warning.
 //
-//   measure-memory.ts --target docker --image <tag> [--runs 3] [--port 18000]
+//   measure-memory.ts [--image <tag>] [--runs 3] [--port 18000]
 //                     [--container-name ate-memory] [--summary <file>]
-//   measure-memory.ts --target local    (node dist/main.js here; a stand-in only)
 import { appendFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
@@ -28,7 +27,6 @@ import {
 } from './report';
 import {
   dockerTarget,
-  localTarget,
   type MemoryReading,
   type RunningTarget,
   type Target,
@@ -122,7 +120,7 @@ const measureLoad = (target: Target, scenario: Scenario): Promise<LoadRun> =>
     return {
       scenario,
       idleMib: idle.totalMib,
-      highestMib: Math.max(highest.totalMib, recorded ?? 0),
+      highestMib: Math.max(highest.totalMib, recorded),
       workingSetHighestMib: highest.workingSetMib,
       unexpected,
     };
@@ -178,7 +176,6 @@ const measureBaselines = (
 
 const { values } = parseArgs({
   options: {
-    target: { type: 'string' },
     image: { type: 'string', default: 'attachment-text-extractor:ci' },
     'container-name': { type: 'string', default: 'ate-memory' },
     port: { type: 'string', default: '18000' },
@@ -187,20 +184,15 @@ const { values } = parseArgs({
   },
 });
 
-const TARGETS: Readonly<Record<string, () => Target>> = {
-  docker: () =>
-    dockerTarget({
-      image: values.image,
-      containerName: values['container-name'],
-      hostPort: Number(values.port),
-    }),
-  local: localTarget,
-};
-const target = TARGETS[values.target ?? '']?.();
+const target = dockerTarget({
+  image: values.image,
+  containerName: values['container-name'],
+  hostPort: Number(values.port),
+});
 const runs = Number(values.runs);
-if (target === undefined || !Number.isInteger(runs) || runs < 1) {
+if (!Number.isInteger(runs) || runs < 1) {
   say(
-    'usage: measure-memory.ts --target docker|local [--image <tag>] [--runs <n>] [--port <n>] [--container-name <name>] [--summary <file>]',
+    'usage: measure-memory.ts [--image <tag>] [--runs <n>] [--port <n>] [--container-name <name>] [--summary <file>]',
   );
   process.exit(2);
 }

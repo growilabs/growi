@@ -19,11 +19,9 @@ import {
 } from './yaml-access';
 
 // Static checks of the attachment-text-extractor entry in infra/docker/compose.yaml.
-// Req 8.4: the entry uses the Node image and keeps the Python version's other
-// settings (environment, tmpfs, safety settings). Python's test_deploy_config.py
-// TestCompose maps here (research.md 22.3); `WORKERS` is gone (D1). The build
-// context and the healthcheck only change when 8.2 switches the entry to the
-// Node version, so those two fail until then (tasks.md 6.11).
+// Req 8.4: the entry uses the Node image and keeps the previous service's other
+// settings (environment, tmpfs, safety settings); `WORKERS` is gone (D1). No
+// init process is asked for: docker/README.md says why none is needed.
 
 const service = (): YamlObject =>
   objectAt(loadYamlFile(COMPOSE_PATH), 'services', COMPOSE_SERVICE);
@@ -93,10 +91,6 @@ describe('compose entry: filesystem and users', () => {
     expect(
       volumes === undefined || (Array.isArray(volumes) && volumes.length === 0),
     ).toBe(true);
-  });
-
-  it('runs an init process that reaps orphaned conversion children', () => {
-    expect(service().init).toBe(true);
   });
 });
 

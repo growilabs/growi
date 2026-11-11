@@ -11,6 +11,10 @@ on:
       - tmp-mergify/merge-queue/**
     paths:
       - apps/attachment-text-extractor/**
+      # Read by the tests: the committed OpenAPI document is compared with the
+      # one the service generates, and the compose entry is checked.
+      - packages/attachment-text-extractor-client/openapi.json
+      - infra/docker/compose.yaml
       - .github/workflows/ci-attachment-text-extractor.yml
       - biome.json
       - tsconfig.base.json

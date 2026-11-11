@@ -48,10 +48,6 @@ RUN mkdir -p /licenses/pdfium-wasm/pdfium \
 ##
 FROM ${NODE_IMAGE}
 
-# Reaches the HTTP parent only. A conversion child gets an explicit environment
-# (src/runner/child-env.ts), which sets RAYON_NUM_THREADS=1 for anydoc itself.
-ENV RAYON_NUM_THREADS=1
-
 # Dedicated non-root user; no home dir keeps it compatible with a read-only rootfs.
 RUN groupadd --gid 10001 appgroup \
   && useradd --uid 10001 --gid appgroup --shell /usr/sbin/nologin --no-create-home appuser

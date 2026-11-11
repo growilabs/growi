@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { type DockerfileModel, parseDockerfile } from './dockerfile-model';
 import { parseYaml, type YamlValue } from './yaml-parse';
 
-// Where the deployment files of the Node service live (design.md D4, research.md
-// 23.7). The specs read these fixed paths, never the Python service's files.
+// Where the deployment files of the service live (design.md D4, research.md
+// 23.7). The specs read these fixed paths.
 
 export const PACKAGE_DIR = fileURLToPath(new URL('../../', import.meta.url));
 export const REPO_ROOT = resolve(PACKAGE_DIR, '../..');
@@ -23,9 +23,7 @@ export const readDeployFile = (path: string): string => {
     return readFileSync(path, 'utf8');
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      throw new Error(
-        `${relative(REPO_ROOT, path)} does not exist (the Node deployment file has not been created yet)`,
-      );
+      throw new Error(`${relative(REPO_ROOT, path)} does not exist`);
     }
     throw error;
   }

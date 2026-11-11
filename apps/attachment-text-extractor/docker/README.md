@@ -54,7 +54,7 @@ never run open. Take it from a secret, never from a literal in a manifest.
 | `MAX_RESULT_BYTES`, `MAX_CSV_BYTES`, `MAX_HTML_BYTES` | 16 MiB, 8 MiB, 20 MiB (in bytes) | Largest extracted text, CSV input, HTML input |
 | `MAX_XLSX_CELLS`, `MAX_PDF_PAGES` | 70,000, 5,000 | Per-document limits |
 | `MAX_ARCHIVE_ENTRIES`, `MAX_ARCHIVE_UNCOMPRESSED_MB` | 10,000, 512 | Limits on a ZIP-based document |
-| `LOG_LEVEL` | `INFO` | Python logging level names |
+| `LOG_LEVEL` | `INFO` | One of `CRITICAL`, `FATAL`, `ERROR`, `WARN`, `WARNING`, `INFO`, `DEBUG`, `NOTSET` (case-insensitive) |
 
 There is no `WORKERS` setting: one container is one Node process, limited by
 `MAX_CONCURRENCY` alone.

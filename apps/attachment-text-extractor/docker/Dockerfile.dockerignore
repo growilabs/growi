@@ -2,7 +2,6 @@ apps/**
 !apps/attachment-text-extractor
 apps/attachment-text-extractor/benchmark
 apps/attachment-text-extractor/test
-services
 **/node_modules
 **/dist
 **/coverage

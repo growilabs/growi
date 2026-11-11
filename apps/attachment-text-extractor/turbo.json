@@ -5,6 +5,13 @@
     "build": {
       "outputs": ["dist/**"],
       "outputLogs": "new-only"
+    },
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/attachment-text-extractor-client/openapi.json",
+        "$TURBO_ROOT$/infra/docker/compose.yaml"
+      ]
     }
   }
 }

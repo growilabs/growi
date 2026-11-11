@@ -19,9 +19,7 @@
 #   all       build size contents start service, then stop
 #
 # `service` needs the workspace's dependencies installed here (it runs
-# TypeScript). With IN_SERVICE set to an empty string it checks a service that
-# already listens on 127.0.0.1:8000 of this machine instead of a container
-# (ATTACHMENT_EXTRACTOR_SERVICE_TOKEN must then be exported); no docker needed.
+# TypeScript).
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -33,8 +31,6 @@ IMAGE_TAG=${IMAGE_TAG:-attachment-text-extractor:ci}
 IMAGE_MAX_BYTES=${IMAGE_MAX_BYTES:-400000000}
 CONTAINER_NAME=${CONTAINER_NAME:-ate-smoke}
 WORK_DIR=${WORK_DIR:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}/ate-image-check}
-# The command prefix that runs a command where the service is.
-IN_SERVICE=${IN_SERVICE-docker exec -i $CONTAINER_NAME}
 # A file with this name in a node_modules of the checkout must not reach the
 # build context.
 SENTINEL=.ate-build-context-sentinel
@@ -82,7 +78,6 @@ contents() {
       exit 1
     fi
     for path in \
-      /opt/services \
       /opt/apps/attachment-text-extractor/test \
       /opt/apps/attachment-text-extractor/benchmark \
       "/opt/node_modules/$0" \
@@ -144,11 +139,9 @@ start() {
     "$IMAGE_TAG"
 }
 
-# Runs service-client.mjs where the service is. $IN_SERVICE is split on
-# purpose: it is a command prefix.
+# Runs service-client.mjs inside the container.
 client() {
-  # shellcheck disable=SC2086
-  $IN_SERVICE node --input-type=module -e "$(cat "$HERE/service-client.mjs")" -- "$@"
+  docker exec -i "$CONTAINER_NAME" node --input-type=module -e "$(cat "$HERE/service-client.mjs")" -- "$@"
 }
 
 service() {
@@ -190,7 +183,7 @@ service() {
 }
 
 memory() {
-  ts_node scripts/image-check/memory/measure-memory.ts --target docker --image "$IMAGE_TAG" \
+  ts_node scripts/image-check/memory/measure-memory.ts --image "$IMAGE_TAG" \
     ${GITHUB_STEP_SUMMARY:+--summary "$GITHUB_STEP_SUMMARY"}
 }
 

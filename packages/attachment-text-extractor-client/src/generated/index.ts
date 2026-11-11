@@ -8,42 +8,26 @@
 
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 import axios from 'axios';
-export type HealthzHealthzGet200 = { [key: string]: string };
+export type PostExtractBody = {
+  file: Blob;
+  mimeType?: string;
+};
 
-export type PageInfoPageNumber = number | null;
+export type GetReadyz503 = {
+  status: 'not_ready';
+};
 
-export type PageInfoLabel = string | null;
+export type GetReadyz200Dependencies = { [key: string]: 'ok' };
 
-/**
- * Information extracted from a single logical page or section of a document.
+export type GetReadyz200 = {
+  dependencies: GetReadyz200Dependencies;
+  status: 'ready';
+};
 
-pageNumber and label are None when the source format has no positional
-page concept (e.g. plain text files).
- */
-export interface PageInfo {
-  content: string;
-  label: PageInfoLabel;
-  pageNumber: PageInfoPageNumber;
-}
+export type GetHealthz200 = {
+  status: 'ok';
+};
 
-/**
- * Successful extraction response returned by POST /extract.
-
-extractedCharacters is the sum of len(page.content) across all pages and
-is provided for audit logging and metrics purposes (Req 1.1).
- */
-export interface ExtractResponse {
-  extractedCharacters: number;
-  mimeType: string;
-  pages: PageInfo[];
-}
-
-/**
- * Machine-readable error codes for all defined failure modes.
-
-Extends str so that values serialize as plain JSON strings rather than
-enum objects, ensuring compatibility with FastAPI's OpenAPI generation.
- */
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
@@ -58,76 +42,56 @@ export const ErrorCode = {
   resource_limit_exceeded: 'resource_limit_exceeded',
 } as const;
 
-/**
- * Error response body returned for all 4xx/5xx responses from POST /extract.
- */
 export interface ErrorResponse {
   code: ErrorCode;
   message: string;
 }
 
-/**
- * Optional MIME type hint
- */
-export type BodyPostExtractExtractPostMimeType = string | null;
+export type PageInfoPageNumber = number | null;
 
-export interface BodyPostExtractExtractPost {
-  /** File to extract text from */
-  file: string;
-  /** Optional MIME type hint */
-  mimeType?: BodyPostExtractExtractPostMimeType;
+export type PageInfoLabel = string | null;
+
+export interface PageInfo {
+  content: string;
+  label: PageInfoLabel;
+  pageNumber: PageInfoPageNumber;
 }
 
-/**
- * Return 200 OK to confirm the process is alive.
+export interface ExtractResponse {
+  /**
+   * @minimum -9007199254740991
+   * @maximum 9007199254740991
+   */
+  extractedCharacters: number;
+  mimeType: string;
+  pages: PageInfo[];
+}
 
-This handler intentionally does no dependency checking — it exists only
-to tell the orchestrator that the process has not crashed.
- * @summary Liveness probe
- */
-export const healthzHealthzGet = <TData = AxiosResponse<HealthzHealthzGet200>>(
+export const getHealthz = <TData = AxiosResponse<GetHealthz200>>(
   options?: AxiosRequestConfig,
 ): Promise<TData> => {
   return axios.get(`/healthz`, options);
 };
 
-/**
- * 200 ``ready`` when the forkserver runs and has loaded the conversion dependencies, else 503.
-
-A not-ready cached state is re-verified (in a thread: it forks a probe child), so a pod that was
-taken out of service gets the call that brings it back. The body never carries paths or
-exception text.
- * @summary Readiness probe
- */
-export const readyzReadyzGet = <TData = AxiosResponse<unknown>>(
+export const getReadyz = <TData = AxiosResponse<GetReadyz200>>(
   options?: AxiosRequestConfig,
 ): Promise<TData> => {
   return axios.get(`/readyz`, options);
 };
 
-/**
- * Receive a multipart upload, enforce the slot and size limits, then convert.
-
-Authentication is handled upstream by BearerAuthMiddleware; this handler
-will only be reached by authenticated requests.
- * @summary Extract text from an uploaded file
- */
-export const postExtractExtractPost = <TData = AxiosResponse<ExtractResponse>>(
-  bodyPostExtractExtractPost: BodyPostExtractExtractPost,
+export const postExtract = <TData = AxiosResponse<ExtractResponse>>(
+  postExtractBody: PostExtractBody,
   options?: AxiosRequestConfig,
 ): Promise<TData> => {
   const formData = new FormData();
-  formData.append('file', bodyPostExtractExtractPost.file);
-  if (
-    bodyPostExtractExtractPost.mimeType !== undefined &&
-    bodyPostExtractExtractPost.mimeType !== null
-  ) {
-    formData.append('mimeType', bodyPostExtractExtractPost.mimeType);
+  formData.append('file', postExtractBody.file);
+  if (postExtractBody.mimeType !== undefined) {
+    formData.append('mimeType', postExtractBody.mimeType);
   }
 
   return axios.post(`/extract`, formData, options);
 };
 
-export type HealthzHealthzGetResult = AxiosResponse<HealthzHealthzGet200>;
-export type ReadyzReadyzGetResult = AxiosResponse<unknown>;
-export type PostExtractExtractPostResult = AxiosResponse<ExtractResponse>;
+export type GetHealthzResult = AxiosResponse<GetHealthz200>;
+export type GetReadyzResult = AxiosResponse<GetReadyz200>;
+export type PostExtractResult = AxiosResponse<ExtractResponse>;

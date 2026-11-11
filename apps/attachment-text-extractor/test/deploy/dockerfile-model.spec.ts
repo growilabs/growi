@@ -1,12 +1,10 @@
 import {
   copyOperands,
-  envAssignments,
   execForm,
   finalStage,
   instructionsOf,
   parseDockerfile,
   runCommand,
-  stageEnv,
 } from './dockerfile-model';
 
 const SAMPLE = [
@@ -18,7 +16,7 @@ const SAMPLE = [
   '  pnpm install --frozen-lockfile',
   '',
   'FROM node:$NODE_VERSION-slim',
-  'ENV RAYON_NUM_THREADS=1 GREETING="hello world"',
+  'ENV GREETING="hello world"',
   'COPY --from=builder --chown=node:node /out/dist /out/node_modules ./',
   'USER 10001',
   'CMD ["node", "dist/main.js"]',
@@ -72,17 +70,5 @@ describe('instruction readers', () => {
     const [cmd] = instructionsOf(stage, 'CMD');
     expect(execForm(cmd)).toEqual(['node', 'dist/main.js']);
     expect(execForm({ keyword: 'CMD', args: 'node dist/main.js' })).toBeNull();
-  });
-
-  it('reads ENV in the key=value form (with quotes) and the legacy form', () => {
-    expect(stageEnv(stage)).toEqual({
-      RAYON_NUM_THREADS: '1',
-      GREETING: 'hello world',
-    });
-    expect(envAssignments({ keyword: 'ENV', args: 'NAME some value' })).toEqual(
-      {
-        NAME: 'some value',
-      },
-    );
   });
 });

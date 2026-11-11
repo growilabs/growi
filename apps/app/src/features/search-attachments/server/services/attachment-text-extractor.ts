@@ -1,7 +1,7 @@
 import dns from 'node:dns/promises';
 import {
   ErrorCode,
-  postExtractExtractPost,
+  postExtract,
 } from '@growi/attachment-text-extractor-client';
 
 import type {
@@ -119,8 +119,10 @@ async function callExtractor(
   const { attachment, buffer, extractorUri, token, timeoutMs, isRetry } = opts;
 
   try {
-    const response = await postExtractExtractPost(
-      { file: buffer as unknown as string },
+    const response = await postExtract(
+      // Not a Blob: the client's FormData takes a Buffer as a text field, not
+      // as a file part.
+      { file: buffer as unknown as Blob },
       {
         baseURL: extractorUri,
         headers: { Authorization: `Bearer ${token}` },

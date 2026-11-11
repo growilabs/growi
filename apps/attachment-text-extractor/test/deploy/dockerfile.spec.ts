@@ -7,14 +7,13 @@ import {
   instructionsOf,
   runCommand,
   type Stage,
-  stageEnv,
 } from './dockerfile-model';
 
 // Static checks of apps/attachment-text-extractor/docker/Dockerfile. Building the
 // image needs docker, so these read the file; research.md 22.3 maps Python's
 // test_deploy_config.py (TestDockerfile) here, and 22.7 and 23.7 list what the
-// Node image adds (prlimit in the final stage, RAYON_NUM_THREADS, pnpm deploy,
-// no WORKERS, no /dev/shm). Requirements 8.1, 8.3, 8.6, 8.7.
+// Node image adds (prlimit in the final stage, pnpm deploy, no WORKERS, no
+// /dev/shm). Requirements 8.1, 8.3, 8.6, 8.7.
 
 const SERVICE_PACKAGE = '@growi/attachment-text-extractor';
 const PINNED_NODE_SLIM =
@@ -101,10 +100,6 @@ describe('Dockerfile final stage: runtime settings', () => {
     );
     expect(users.length).toBeGreaterThan(0);
     expect(users[users.length - 1]).toMatch(/^10001(:10001)?$/);
-  });
-
-  it('pins the anydoc thread count with RAYON_NUM_THREADS=1', () => {
-    expect(stageEnv(finalStage(loadDockerfile())).RAYON_NUM_THREADS).toBe('1');
   });
 
   it('starts the service with the exec form `node dist/main.js` so that Node is PID 1 and receives SIGTERM', () => {

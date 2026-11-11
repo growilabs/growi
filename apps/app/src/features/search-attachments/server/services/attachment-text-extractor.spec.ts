@@ -17,7 +17,7 @@ import { prisma } from '~/utils/prisma';
 
 // Mock the generated attachment-text-extractor-client function
 vi.mock('@growi/attachment-text-extractor-client', () => ({
-  postExtractExtractPost: vi.fn(),
+  postExtract: vi.fn(),
   ErrorCode: {
     unauthorized: 'unauthorized',
     unsupported_format: 'unsupported_format',
@@ -65,7 +65,7 @@ function makeStream(data: Buffer): NodeJS.ReadableStream {
 }
 
 describe('AttachmentTextExtractorService', () => {
-  let postExtractExtractPost: MockInstance;
+  let postExtract: MockInstance;
   let mockFileUploader: { findDeliveryFile: MockInstance };
 
   beforeEach(async () => {
@@ -75,8 +75,7 @@ describe('AttachmentTextExtractorService', () => {
     const extractorClient = await import(
       '@growi/attachment-text-extractor-client'
     );
-    postExtractExtractPost =
-      extractorClient.postExtractExtractPost as unknown as MockInstance;
+    postExtract = extractorClient.postExtract as unknown as MockInstance;
 
     // Setup file uploader mock
     mockFileUploader = {
@@ -139,7 +138,7 @@ describe('AttachmentTextExtractorService', () => {
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'serviceUnreachable' });
-    expect(postExtractExtractPost).not.toHaveBeenCalled();
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   it('returns serviceUnreachable when extractorUri is empty string', async () => {
@@ -155,7 +154,7 @@ describe('AttachmentTextExtractorService', () => {
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'serviceUnreachable' });
-    expect(postExtractExtractPost).not.toHaveBeenCalled();
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------
@@ -175,7 +174,7 @@ describe('AttachmentTextExtractorService', () => {
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'serviceUnreachable' });
-    expect(postExtractExtractPost).not.toHaveBeenCalled();
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   it('returns serviceUnreachable when extractorToken is empty string', async () => {
@@ -191,7 +190,7 @@ describe('AttachmentTextExtractorService', () => {
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'serviceUnreachable' });
-    expect(postExtractExtractPost).not.toHaveBeenCalled();
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------
@@ -207,7 +206,7 @@ describe('AttachmentTextExtractorService', () => {
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'serviceUnreachable' });
-    expect(postExtractExtractPost).not.toHaveBeenCalled();
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   it('blocks fd00:ec2::254 (AWS IPv6 metadata)', async () => {
@@ -220,7 +219,7 @@ describe('AttachmentTextExtractorService', () => {
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'serviceUnreachable' });
-    expect(postExtractExtractPost).not.toHaveBeenCalled();
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   it('blocks 100.100.100.200 (Alibaba metadata)', async () => {
@@ -233,7 +232,7 @@ describe('AttachmentTextExtractorService', () => {
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'serviceUnreachable' });
-    expect(postExtractExtractPost).not.toHaveBeenCalled();
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   it('blocks 192.0.0.192 (GCP internal metadata)', async () => {
@@ -246,7 +245,7 @@ describe('AttachmentTextExtractorService', () => {
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'serviceUnreachable' });
-    expect(postExtractExtractPost).not.toHaveBeenCalled();
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -260,14 +259,14 @@ describe('AttachmentTextExtractorService', () => {
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'serviceUnreachable' });
-    expect(postExtractExtractPost).not.toHaveBeenCalled();
+    expect(postExtract).not.toHaveBeenCalled();
   });
 
   // -----------------------------------------------------------------------
   // 4. success — 200 ExtractResponse → ExtractionOutcome kind='success'
   // -----------------------------------------------------------------------
   it('returns success with correct pages on 200 response', async () => {
-    postExtractExtractPost.mockResolvedValue({
+    postExtract.mockResolvedValue({
       data: {
         mimeType: 'application/pdf',
         extractedCharacters: 100,
@@ -291,8 +290,8 @@ describe('AttachmentTextExtractorService', () => {
     });
   });
 
-  it('calls postExtractExtractPost with correct options (baseURL, Bearer auth, timeout)', async () => {
-    postExtractExtractPost.mockResolvedValue({
+  it('calls postExtract with correct options (baseURL, Bearer auth, timeout)', async () => {
+    postExtract.mockResolvedValue({
       data: {
         mimeType: 'text/plain',
         extractedCharacters: 5,
@@ -303,20 +302,36 @@ describe('AttachmentTextExtractorService', () => {
     const service = await getService();
     await service.extractAttachment('attachment-id-1');
 
-    expect(postExtractExtractPost).toHaveBeenCalledOnce();
-    const [, options] = postExtractExtractPost.mock.calls[0];
+    expect(postExtract).toHaveBeenCalledOnce();
+    const [, options] = postExtract.mock.calls[0];
     expect(options.baseURL).toBe('http://localhost:8000');
     expect(options.headers?.Authorization).toBe('Bearer test-token');
     expect(options.timeout).toBe(60000);
+  });
+
+  it('hands the stored bytes to the client as `file`, unchanged and without a MIME type hint', async () => {
+    const stored = Buffer.from([
+      0x25, 0x50, 0x44, 0x46, 0x00, 0xff, 0xfe, 0x80,
+    ]);
+    mockFileUploader.findDeliveryFile.mockResolvedValue(makeStream(stored));
+    postExtract.mockResolvedValue({
+      data: { mimeType: 'application/pdf', extractedCharacters: 0, pages: [] },
+    });
+
+    const service = await getService();
+    await service.extractAttachment('attachment-id-1');
+
+    const [body] = postExtract.mock.calls[0];
+    expect(Object.keys(body)).toEqual(['file']);
+    expect(Buffer.isBuffer(body.file)).toBe(true);
+    expect(stored.equals(body.file)).toBe(true);
   });
 
   // -----------------------------------------------------------------------
   // 5. unsupported format — 400 unsupported_format
   // -----------------------------------------------------------------------
   it('returns unsupported on 400 unsupported_format error', async () => {
-    postExtractExtractPost.mockRejectedValue(
-      makeAxiosError(400, 'unsupported_format'),
-    );
+    postExtract.mockRejectedValue(makeAxiosError(400, 'unsupported_format'));
 
     const service = await getService();
     const result = await service.extractAttachment('attachment-id-1');
@@ -331,9 +346,7 @@ describe('AttachmentTextExtractorService', () => {
   // 6. file too large — 413 file_too_large
   // -----------------------------------------------------------------------
   it('returns tooLarge on 413 file_too_large error', async () => {
-    postExtractExtractPost.mockRejectedValue(
-      makeAxiosError(413, 'file_too_large'),
-    );
+    postExtract.mockRejectedValue(makeAxiosError(413, 'file_too_large'));
 
     const service = await getService();
     const result = await service.extractAttachment('attachment-id-1');
@@ -345,9 +358,7 @@ describe('AttachmentTextExtractorService', () => {
   // 7. extraction timeout — 408 extraction_timeout
   // -----------------------------------------------------------------------
   it('returns timeout on 408 extraction_timeout error', async () => {
-    postExtractExtractPost.mockRejectedValue(
-      makeAxiosError(408, 'extraction_timeout'),
-    );
+    postExtract.mockRejectedValue(makeAxiosError(408, 'extraction_timeout'));
 
     const service = await getService();
     const result = await service.extractAttachment('attachment-id-1');
@@ -361,7 +372,7 @@ describe('AttachmentTextExtractorService', () => {
   it('retries once on 503 service_busy and succeeds on second call', async () => {
     vi.useFakeTimers();
 
-    postExtractExtractPost
+    postExtract
       .mockRejectedValueOnce(makeAxiosError(503, 'service_busy'))
       .mockResolvedValueOnce({
         data: {
@@ -384,7 +395,7 @@ describe('AttachmentTextExtractorService', () => {
       mimeType: 'text/plain',
       pages: [{ pageNumber: null, label: null, content: 'hello' }],
     });
-    expect(postExtractExtractPost).toHaveBeenCalledTimes(2);
+    expect(postExtract).toHaveBeenCalledTimes(2);
 
     vi.useRealTimers();
   });
@@ -395,7 +406,7 @@ describe('AttachmentTextExtractorService', () => {
   it('returns serviceBusy after 2 consecutive 503 service_busy errors', async () => {
     vi.useFakeTimers();
 
-    postExtractExtractPost
+    postExtract
       .mockRejectedValueOnce(makeAxiosError(503, 'service_busy'))
       .mockRejectedValueOnce(makeAxiosError(503, 'service_busy'));
 
@@ -407,7 +418,7 @@ describe('AttachmentTextExtractorService', () => {
     const result = await resultPromise;
 
     expect(result).toEqual({ kind: 'serviceBusy' });
-    expect(postExtractExtractPost).toHaveBeenCalledTimes(2);
+    expect(postExtract).toHaveBeenCalledTimes(2);
 
     vi.useRealTimers();
   });
@@ -416,9 +427,7 @@ describe('AttachmentTextExtractorService', () => {
   // 10. unauthorized — 401 → serviceUnreachable + pino ERROR
   // -----------------------------------------------------------------------
   it('returns serviceUnreachable on 401 unauthorized and logs pino ERROR without token', async () => {
-    postExtractExtractPost.mockRejectedValue(
-      makeAxiosError(401, 'unauthorized'),
-    );
+    postExtract.mockRejectedValue(makeAxiosError(401, 'unauthorized'));
 
     // Import the module to get logger reference
     const { AttachmentTextExtractorService } = await import(
@@ -434,9 +443,7 @@ describe('AttachmentTextExtractorService', () => {
   });
 
   it('does not log the token value in the 401 error case', async () => {
-    postExtractExtractPost.mockRejectedValue(
-      makeAxiosError(401, 'unauthorized'),
-    );
+    postExtract.mockRejectedValue(makeAxiosError(401, 'unauthorized'));
 
     // Capture all log calls - we can't easily spy on the pino logger,
     // but we can verify the result and that no token appears in process output
@@ -457,7 +464,7 @@ describe('AttachmentTextExtractorService', () => {
       code: 'ECONNREFUSED',
       response: undefined,
     });
-    postExtractExtractPost.mockRejectedValue(networkError);
+    postExtract.mockRejectedValue(networkError);
 
     const service = await getService();
     const result = await service.extractAttachment('attachment-id-1');
@@ -478,9 +485,7 @@ describe('AttachmentTextExtractorService', () => {
   // 12. never throws — even on unexpected Error, returns ExtractionOutcome
   // -----------------------------------------------------------------------
   it('never throws — returns ExtractionOutcome even when an unexpected error occurs', async () => {
-    postExtractExtractPost.mockRejectedValue(
-      new Error('Unexpected internal error'),
-    );
+    postExtract.mockRejectedValue(new Error('Unexpected internal error'));
 
     const service = await getService();
 
@@ -520,7 +525,7 @@ describe('AttachmentTextExtractorService', () => {
   // 13. extraction_failed → failed
   // -----------------------------------------------------------------------
   it('returns failed on 500 extraction_failed error', async () => {
-    postExtractExtractPost.mockRejectedValue(
+    postExtract.mockRejectedValue(
       makeAxiosError(500, 'extraction_failed', 'Internal extraction error'),
     );
 
