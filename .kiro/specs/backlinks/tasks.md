@@ -476,8 +476,9 @@ Independent of B4/B5.
   - Create the document idle at boot with an upsert that uses `$setOnInsert` (idle, `coverage:
     none`), so a restart never resets coverage or progress and a missing document is recreated
   - Done when a unit test shows the claim succeeds once, is rejected for a second concurrent
-    claimant while the lease is live, and succeeds for a new claimant after the lease expires, a
-    second boot leaves existing coverage and progress fields untouched, and a deleted document is
+    claimant while the lease is live, and succeeds for a new claimant after the lease expires, an
+    `idle`, `stopped` or `complete` job is never claimed, a claim clears a stale `stopRequested`, an
+    unconfirmed write or a non-positive `leaseMs` throws, a second boot leaves existing coverage and progress fields untouched, and a deleted document is
     recreated idle with coverage `none`
   - _Requirements: 4.3, 4.4, 4.7, 4.8_
   - _Boundary: PageLinkBackfillJob_

@@ -939,8 +939,9 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
   overlap flag.
 - **Crash recovery via a lease**: a claim held by a dead owner would otherwise block the job
   forever. The claim carries `leaseExpiresAt`, **renewed at every checkpoint**, and the claim filter also
-  matches a document whose lease has expired, so another instance takes over and resumes from the
-  progress marker.
+  matches a `running` or `failed` document whose lease has expired, so another instance takes over and
+  resumes from the progress marker. The filter never matches `idle`, `stopped` or `complete`, so an
+  admin's cancel or Stop that lands after the caller's read is not overridden.
 - **Write ordering vs. the live listener (open — settle in B3.2)**: the backfill reads a page body
   and writes its rows later; the save-time listener may rewrite the same page's rows in between.
   Whether a stale backfill write can overwrite fresher rows is not established by this design.
