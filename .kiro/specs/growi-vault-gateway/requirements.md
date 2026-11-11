@@ -96,7 +96,7 @@
 2. When 匿名ユーザー（要件 2.4 によりゲスト読み取りが許可されている場合のみ到達する）の accessible namespace 集合を計算する場合, the GROWI Vault Gateway shall `['public']` のみを返す。ゲスト読み取りが許可されていない場合は要件 2.4a により namespace 計算前に 401 で拒否されるため、本計算には到達しない
 3. When GRANT_PUBLIC のページの namespace を計算する場合, the GROWI Vault Gateway shall `'public'` namespace を返す
 4. When GRANT_USER_GROUP のページの namespace を計算する場合, the GROWI Vault Gateway shall `'group-<gid>'` 形式で grantedGroups に対応する namespace を返す（複数グループが設定されている場合は複数の namespace を返す）
-5. When GRANT_OWNER のページの namespace を計算する場合, the GROWI Vault Gateway shall `'user-<creator-id>-only-me'` namespace を返す
+5. When GRANT_OWNER のページの namespace を計算する場合, the GROWI Vault Gateway shall ページの `grantedUsers` に含まれるユーザーごとに `'user-<granted-user-id>-only-me'` namespace を返し、ページの作成者（creator）を判定に使わない。`grantedUsers` が空の場合は namespace を返さない
 6. When status が `published` でないページ、または `/trash` 配下のページの namespace を計算する場合, the GROWI Vault Gateway shall namespace を発行しない（除外する）
 7. When ページの ACL が変更された場合, the GROWI Vault Gateway shall `previous` namespace と `current` namespace の両方を返し、dispatcher が remove + upsert の 2 件の instruction を発行できるようにする
 8. The GROWI Vault Gateway shall ユーザーが閲覧権限を持たないページの存在がいかなる応答経路からも推測不可能であることを保証する（namespace 計算時点で未認可ページを namespace に含めない）

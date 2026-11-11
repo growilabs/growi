@@ -34,7 +34,7 @@
 - 認証・認可は apps/app 標準 middleware 構成を共有する（要件 11）。git 固有の差異のみを 2 つの seam に局所化する: (a) `Authorization: Basic base64(x:PAT)` から PAT を抽出し標準トークン解決へ橋渡しする credential adapter、(b) 認証失敗時に `/login` リダイレクトではなく git 互換の `401 + WWW-Authenticate: Basic` を返す `loginRequired` の `fallback`
 - ゲスト/匿名アクセスの可否は `aclService.isGuestAllowedToRead()`（= `loginRequiredFactory(crowi, true)` の判定）に委譲する。許可されない場合（デフォルト `restrictGuestMode='Deny'` / `wikiMode='private'`）は匿名 clone を 401 で拒否する（要件 2.4a）
 - ユーザーがアクセス可能な namespace 集合の決定（GROWI ACL 評価）
-- ページの所属 namespace の決定（grant / grantedGroups / creator から）
+- ページの所属 namespace の決定（grant / grantedGroups / grantedUsers から）
 - ページ変更イベントの購読 → vault_instructions コレクション書き込み
 - 初回有効化 / 災害復旧時の bootstrap 主導（pages cursor stream + seed instructions 発行）
 - vault-manager への compose-view RPC 呼び出し
@@ -291,7 +291,7 @@ interface VaultNamespaceMapper {
 | GRANT_PUBLIC | `'public'` |
 | GRANT_RESTRICTED（anyone-with-link） | `'restricted-link'` |
 | GRANT_USER_GROUP（grantedGroups[i]） | グループごとに `'group-<gid>'`（複数 group ACL は複数 namespace） |
-| GRANT_OWNER（creator） | `'user-<creator-id>-only-me'` |
+| GRANT_OWNER（grantedUsers[i]） | 閲覧を許可されたユーザーごとに `'user-<granted-user-id>-only-me'`。ページの作成者（creator）は判定に使わない。grantedUsers が空なら namespace 不発行 |
 | `/trash` 配下 | namespace 不発行（除外） |
 | status !== 'published' | namespace 不発行（除外） |
 

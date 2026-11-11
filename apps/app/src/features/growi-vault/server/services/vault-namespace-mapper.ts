@@ -1,4 +1,4 @@
-import { type IPage, PageGrant } from '@growi/core';
+import { getIdStringForRef, type IPage, PageGrant } from '@growi/core';
 import type { Namespace } from '@growi/core/dist/interfaces/vault';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
@@ -72,12 +72,12 @@ const derivePageNamespaces = (page: IPage): ReadonlyArray<Namespace> => {
     }
 
     case PageGrant.GRANT_OWNER: {
-      // Creator ID identifies the private namespace (req 3.5)
-      const creatorId = page.creator?.toString();
-      if (creatorId == null) {
-        return [];
-      }
-      return [`user-${creatorId}-only-me`];
+      // Read access to an only-me page is decided by grantedUsers, not by the
+      // creator. No granted user means no namespace.
+      const grantedUsers = page.grantedUsers ?? [];
+      return grantedUsers
+        .filter((user) => user != null)
+        .map((user) => `user-${getIdStringForRef(user)}-only-me`);
     }
 
     default:
