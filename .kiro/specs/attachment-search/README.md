@@ -8,7 +8,7 @@
 
 このプロジェクトは 3-way split で以下 3 spec として実装されます:
 
-1. **`attachment-search-text-extractor/`** — Python FastAPI 抽出サービス (`services/attachment-text-extractor/`)
+1. **`attachment-search-text-extractor/`** — 抽出サービス (`apps/attachment-text-extractor/`。Node 24 + Hono)
 2. **`attachment-search-indexing/`** — apps/app サーバ側統合 (ES 連携、indexer、apiv3)
 3. **`attachment-search-ui/`** — apps/app クライアント側 UI (検索結果、管理画面)
 
@@ -27,8 +27,10 @@
 
 ## このディレクトリを開く人へ
 
+- このディレクトリの research.md・research-docker-image.md・design-review-fixes.md は、抽出サービスを Python (markitdown + FastAPI) で作る前提だった時期の記録で、書き換えていない。抽出サービスはいま Node 版で、その設計と根拠は `attachment-search-text-extractor` spec にある
+
 - 「なぜ 3 spec に分割したのか」を知りたい → `design-review-fixes.md` 冒頭の「経緯」
-- 「なぜ Tika や TS ポートではなく Python markitdown マイクロサービスなのか」を知りたい → `research.md` 末尾の「抽出アーキテクチャ選択の根拠」
+- 「なぜ抽出を apps/app の中で行わず、別のサービスに分けたのか」を知りたい → `research.md` 末尾の「抽出アーキテクチャ選択の根拠」 (当時の比較は Python 版が前提。いまの Node 版の判断は `attachment-search-text-extractor` spec にある)
 - 「既存 GROWI のどの部分にどう統合するのか」を知りたい → `research.md` の Current State Investigation
 - 「なぜ Docker image は自前ビルドなのか」を知りたい → `research-docker-image.md`
 - 個別 spec の requirements / design を見たい → 上記 3 sub-specs のディレクトリへ

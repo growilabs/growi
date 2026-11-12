@@ -128,6 +128,7 @@ pnpm start                      # Build and start
 growi/
 ├── apps/
 │   ├── app/                # Main GROWI application (Next.js + Express)
+│   ├── attachment-text-extractor/ # Attachment text extraction microservice (Hono)
 │   ├── pdf-converter/      # PDF conversion microservice
 │   └── slackbot-proxy/     # Slack integration proxy
 ├── packages/               # Shared libraries (@growi/core, @growi/ui, etc.)
