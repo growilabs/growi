@@ -1,4 +1,7 @@
-import { formatTruncatedPagePath } from './format-truncated-page-path';
+import {
+  formatTruncatedPagePath,
+  type PagePathPart,
+} from './format-truncated-page-path';
 
 describe('formatTruncatedPagePath', () => {
   describe('root paths', () => {
@@ -163,6 +166,142 @@ describe('formatTruncatedPagePath', () => {
 
       expect(withTrailing).toEqual(withoutTrailing);
       expect(withTrailing.fullPath).toBe('/A/B/C');
+    });
+  });
+
+  describe('collapse levels (ancestors folded from the root side, parent last)', () => {
+    const seg = (text: string, isPageName = false): PagePathPart => ({
+      type: 'segment',
+      text,
+      isPageName,
+    });
+    const ELLIPSIS: PagePathPart = { type: 'ellipsis' };
+
+    it.each<[string, number, readonly PagePathPart[][]]>([
+      [
+        '/a/b/c/d/leaf',
+        2,
+        [
+          [seg('a'), ELLIPSIS, seg('d'), seg('leaf', true)],
+          [ELLIPSIS, seg('d'), seg('leaf', true)],
+          [ELLIPSIS, seg('leaf', true)],
+        ],
+      ],
+      [
+        '/a/b/c/leaf',
+        2,
+        [
+          [seg('a'), ELLIPSIS, seg('c'), seg('leaf', true)],
+          [ELLIPSIS, seg('c'), seg('leaf', true)],
+          [ELLIPSIS, seg('leaf', true)],
+        ],
+      ],
+      [
+        '/a/b/leaf',
+        2,
+        [
+          [seg('a'), seg('b'), seg('leaf', true)],
+          [ELLIPSIS, seg('b'), seg('leaf', true)],
+          [ELLIPSIS, seg('leaf', true)],
+        ],
+      ],
+      [
+        '/a/leaf',
+        1,
+        [
+          [seg('a'), seg('leaf', true)],
+          [ELLIPSIS, seg('leaf', true)],
+        ],
+      ],
+      ['/leaf', 0, [[seg('leaf', true)]]],
+    ])('%s: maxCollapseLevel %i and the shape at each level', (path, max, expectedByLevel) => {
+      expect(formatTruncatedPagePath(path).maxCollapseLevel).toBe(max);
+
+      expectedByLevel.forEach((expected, level) => {
+        const result = formatTruncatedPagePath(path, level);
+        expect(result.parts).toEqual(expected);
+        expect(result.maxCollapseLevel).toBe(max);
+        expect(
+          result.parts.filter((p) => p.type === 'ellipsis').length,
+        ).toBeLessThanOrEqual(1);
+      });
+    });
+
+    it('returns maxCollapseLevel 0 and empty parts for the root at any level', () => {
+      const result = formatTruncatedPagePath('/', 2);
+
+      expect(result.isRoot).toBe(true);
+      expect(result.parts).toEqual([]);
+      expect(result.maxCollapseLevel).toBe(0);
+    });
+
+    it('keeps a bundled trailing date as the page name when folding', () => {
+      const result = formatTruncatedPagePath(
+        '/Projects/team/notes/2024/01/01',
+        2,
+      );
+
+      expect(result.parts).toEqual([ELLIPSIS, seg('2024/01/01', true)]);
+    });
+
+    it.each([
+      '/a/b/c/d/e/f/leaf',
+      '/a/b/c/leaf',
+      '/a/b/leaf',
+    ])('%s: ancestors after the ellipsis are the tail of the original chain at every level', (path) => {
+      const ancestorTexts = formatTruncatedPagePath(path)
+        .ancestorPath.split('/')
+        .filter(Boolean);
+
+      // Levels 1 and 2 fold from the root side, so the path starts with the ellipsis.
+      [1, 2].forEach((level) => {
+        const { parts } = formatTruncatedPagePath(path, level);
+        expect(parts[0]).toEqual(ELLIPSIS);
+
+        const shownAncestors = parts
+          .slice(1, -1)
+          .map((p) => (p.type === 'segment' ? p.text : '…'));
+        expect(shownAncestors).toEqual(
+          ancestorTexts.slice(ancestorTexts.length - (2 - level)),
+        );
+      });
+    });
+
+    it('clamps an out-of-range level into 0..maxCollapseLevel', () => {
+      expect(formatTruncatedPagePath('/a/b/c/d/leaf', 99).parts).toEqual([
+        ELLIPSIS,
+        seg('leaf', true),
+      ]);
+      expect(formatTruncatedPagePath('/a/leaf', 5).parts).toEqual([
+        ELLIPSIS,
+        seg('leaf', true),
+      ]);
+      expect(formatTruncatedPagePath('/a/b/c/d/leaf', -1).parts).toEqual([
+        seg('a'),
+        ELLIPSIS,
+        seg('d'),
+        seg('leaf', true),
+      ]);
+      expect(formatTruncatedPagePath('/leaf', 3).parts).toEqual([
+        seg('leaf', true),
+      ]);
+    });
+
+    it('treats a non-integer level as a whole level', () => {
+      const base = formatTruncatedPagePath('/a/b/c/d/leaf', 0).parts;
+      expect(
+        formatTruncatedPagePath('/a/b/c/d/leaf', Number.NaN).parts,
+      ).toEqual(base);
+      expect(formatTruncatedPagePath('/a/b/c/d/leaf', 0.5).parts).toEqual(base);
+      expect(formatTruncatedPagePath('/a/b/c/d/leaf', 1.5).parts).toEqual(
+        formatTruncatedPagePath('/a/b/c/d/leaf', 1).parts,
+      );
+    });
+
+    it('returns the base form when no level is given', () => {
+      expect(formatTruncatedPagePath('/a/b/c/d/leaf')).toEqual(
+        formatTruncatedPagePath('/a/b/c/d/leaf', 0),
+      );
     });
   });
 
