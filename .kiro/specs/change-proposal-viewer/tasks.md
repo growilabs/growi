@@ -27,7 +27,7 @@
   - 監査ログに表示する action の名前を、5 言語の `admin.json` に足す
   - 監査ログの絞り込みの一覧に新しい action が出ること、activity の既存のテストが通ることを確かめている
   - _Requirements: 4.10, 10.4_
-- [ ] 1.3 書き込み機能が有効かどうかを、画面の共通の値として渡す
+- [x] 1.3 書き込み機能が有効かどうかを、画面の共通の値として渡す
   - `getServerSideCommonInitialProps` の中で、`crowi` から取った `configManager` で `getConfig('app:changeProposalEnabled')` を読み、全画面で読む共通の props に足し、atom に入れる。同じ関数が `app:siteUrl` などを読む形と、`aiEnabled` を `crowi.isAiReady()` で読む形にそろえる。core の server の barrel の `readChangeProposalSettings()` は import しない（SSR の側で直接 import した `configManager` は設定を読み込んでいない別の実体になるため。research.md の「書き込み機能が有効なときだけ、Recent Changes に一覧へのリンクを出す」）
   - 共通の props の既存のテストに、`crowi` の設定が真のときと偽のときの値を足し、どちらも通っている。開発用のサーバーで、管理者の設定で書き込み機能を有効にしたあと、Recent Changes に一覧へのリンクが出ることを確かめている（SSR で読んだ値が実際の設定と一致することの確認）
   - _Requirements: 6.7_
