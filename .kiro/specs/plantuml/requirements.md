@@ -6,11 +6,11 @@ GROWI は Markdown 中の PlantUML 図を PlantUML サーバーへ送って SVG 
 - **GET**: 図のソース（先頭に GROWI のテーマを付けたもの）を圧縮して URL に入れ、`<img>` で取得する。URL には長さの上限があり、大きい図は上限を超えて描画に失敗する。失敗しても画面は空のままで、利用者からは「GROWI のバグ」に見える。
 - **POST**: 図のソースをリクエストの本文に入れて送る。URL の長さの上限を受けない。ただし公開 plantuml.com は POST の本文を無視して見本の図へリダイレクトするため使えない（2026-11 実測）。
 
-本 spec は次の4点で、大きい図を描けるようにし、描けないときは理由が分かるようにする。
+GROWI は、PlantUML 既定の見た目のままにせず、すべての図に GROWI のテーマ（ライト用・ダーク用）を付けて描画している。図の見た目を洗練させ、ダークモードでも図が浮かずに読めるようにするためである。本 spec はこのテーマ付与を前提として保ったまま、次の4点で、大きい図を描けるようにし、描けないときは理由が分かるようにする。
 
 1. 送信方式を送信先で自動的に選ぶ。公開 plantuml.com には GET、それ以外（自前の PlantUML サーバー）には POST で送る。管理者は GET を明示的に指定することもできる。
 2. POST は閲覧者のブラウザから PlantUML サーバーへ直接送る（GROWI サーバーは中継しない）。
-3. テーマを軽量化し、GET で送る URL を短くする。
+3. テーマを、見た目を変えずに軽量化し、GET で送る URL を短くする。
 4. 描画に失敗した図は、空のままにせず、図ごとに分かりやすいエラーを表示する。
 
 ## Boundary Context
@@ -53,15 +53,17 @@ GROWI は Markdown 中の PlantUML 図を PlantUML サーバーへ送って SVG 
 #### Acceptance Criteria
 1. When PlantUML サーバーから受け取った SVG を表示する, the GROWI shall SVG 内のスクリプトが実行されない形で表示する。
 
-### Requirement 5: テーマの軽量化
-**Objective:** As a GROWI 利用者, I want 図に付けるテーマが小さいこと, so that GET で送る URL が短くなり、より大きい図まで描画できる
+### Requirement 5: 図のスタイル（テーマ）とその軽量化
+**Objective:** As a GROWI 利用者, I want PlantUML 図が GROWI に合った洗練された見た目で、ライト・ダークどちらのモードでも見やすく表示されること, so that 図がページの中で浮かず、どちらのモードでも読みやすい
 
 #### Acceptance Criteria
-1. The GROWI shall 図に付けるテーマを、見た目を変えずに現行より小さくする。
-2. The GROWI shall 図の種類に応じてテーマを切り替えない（全図種に同じテーマを付ける）。
-3. While ダークモードである, when 図を表示する, the GROWI shall ダークモードに適した配色で図を描画する。
+1. The GROWI shall 送信方式（GET／POST）に関わらず、すべての PlantUML 図に GROWI のテーマを付けて描画する（PlantUML 既定の見た目のままにしない）。
+2. While ライトモードである, when 図を表示する, the GROWI shall ライトモード用のテーマを付けて図を描画する。
+3. While ダークモードである, when 図を表示する, the GROWI shall ダークモードに適した配色（背景・文字・線など）のテーマを付けて図を描画する。
 4. The GROWI shall ライト／ダークのいずれでも、全図種を判読できる見た目に保つ。
-5. When テーマを軽量化する, the GROWI shall 軽量化の前後で、問い合わせで報告された図の GET 用 URL の長さを実測し、公開 plantuml.com の上限内に収まるかを確認する。
+5. The GROWI shall 図の種類に応じてテーマを切り替えない（全図種に同じテーマを付ける）。
+6. The GROWI shall テーマを、見た目を変えずに現行より小さくし、GET で送る URL を短くする。
+7. When テーマを軽量化する, the GROWI shall 軽量化の前後で、問い合わせで報告された図の GET 用 URL の長さを実測し、公開 plantuml.com の上限内に収まるかを確認する。
 
 ### Requirement 6: 描画失敗時のエラー表示
 **Objective:** As a GROWI 利用者, I want 描画できない図で何が起きているか分かること, so that バグではなく制限や設定の問題だと理解して対処できる

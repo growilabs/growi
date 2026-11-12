@@ -8,7 +8,8 @@
 ### Goals
 - 送信方式を送信先で自動的に選び、管理者は GET を明示指定できる。
 - POST では URL 長の上限を受けずに大きい図を描画する。
-- テーマを軽量化し、GET で描ける図を増やす（問い合わせの図は GET のままで描けるようにする）。
+- どちらの方式でも、すべての図にライト・ダークに応じた GROWI のテーマを付ける（スタイルの洗練とダークモード対応のため）。
+- テーマを見た目を変えずに軽量化し、GET で描ける図を増やす（問い合わせの図は GET のままで描けるようにする）。
 - GET／POST のどちらでも、描画失敗を図ごとのエラー表示とコンソール警告にする。
 
 ### Non-Goals
@@ -24,7 +25,7 @@
 - remark プラグイン `plantuml.ts` の GET／POST 分岐と、`<plantuml>` 要素の属性。
 - `PlantUmlViewer` の描画（GET は `<img src>`、POST はブラウザから取得した SVG を `<img>` で表示）、失敗の検知、エラー表示、コンソール警告、描画中ステータスの遷移。
 - ブラウザから PlantUML サーバーへ POST する取得処理と、閲覧中だけ使う取得結果のメモ。
-- テーマ資産 `themes/carbon-gray-{common,light,dark}.puml.ts` の軽量化。
+- すべての図へのテーマの付与（ライト・ダーク）と、テーマ資産 `themes/carbon-gray-{common,light,dark}.puml.ts` の軽量化。
 - エラーメッセージの i18n キー（5ロケール）。
 
 ### Out of Boundary
@@ -83,6 +84,7 @@ graph TB
 - 方式: 既存の拡張。GROWI サーバー側に新しい API は作らない。
 - **送る主体は GET と同じブラウザ**: POST も閲覧者のブラウザから PlantUML サーバーへ直接送る。理由は research.md「中継しない」を参照。
 - **方式の決定は1か所**: サーバー側の `configuration-props` が判定関数で `'get' | 'post'` を決めて `RendererConfig` に入れる。ブラウザ側は決まった方式に従うだけで、方式を自分で判定しない。
+- **テーマはライト・ダークとも必ず付ける**: GET でも POST でも、すべての図にライトモードならライト用、ダークモードならダーク用のテーマを付ける。テーマは図の見た目を洗練させ、ダークモードで図が浮かないようにするためのもので、URL を縮めるために外すことはしない（検討の経緯は research.md「ライト・ダークともにテーマを付ける（撤廃しない）」）。URL を縮める手段は、見た目を変えないミニファイに限る。
 - **テーマはどちらの方式でもブラウザ側で付ける**: 今と同じく remark プラグインが付ける。POST でもサーバー側には何も持たせない。
 - **表示はどちらの方式でも `<img>`**: GET は URL、POST は取得した SVG から作った blob URL を `src` にする。
 
@@ -162,8 +164,9 @@ flowchart TD
 | 2.1–2.3 | GET の明示指定 | config-definition, http-method | 方式判定 |
 | 3.1–3.5 | POST での描画 | plantuml.ts, fetch-plantuml-svg, PlantUmlViewer | POST 経路 |
 | 4.1 | SVG の安全な表示 | PlantUmlViewer | `<img>` 表示 |
-| 5.1–5.4 | テーマの軽量化とダークモード維持 | theme assets | テーマ付加 |
-| 5.5 | 軽量化効果の実測 | theme assets（実測スクリプト） | — |
+| 5.1–5.5 | ライト・ダークのテーマ付与（スタイルの洗練・ダークモード） | plantuml.ts, theme assets | テーマ付加 |
+| 5.6 | テーマの軽量化 | theme assets | テーマ付加 |
+| 5.7 | 軽量化効果の実測 | theme assets（実測スクリプト） | — |
 | 6.1–6.7 | エラー表示・警告・i18n | PlantUmlViewer, fetch-plantuml-svg, locales | 失敗分岐 |
 | 7.1–7.2 | 自動スクロールとの連携 | PlantUmlViewer | ステータス遷移 |
 | 8.1–8.2 | 重複送信の抑制 | fetch-plantuml-svg（メモ） | POST 経路 |
@@ -178,7 +181,7 @@ flowchart TD
 | plantuml.ts（remark） | Client/transform | 方式で `<plantuml>` 要素の形を変える | 1.4, 3.1, 5, 9 | State |
 | fetch-plantuml-svg | Client/service | POST 送信、応答の分類、閲覧中のメモ | 3, 6.3, 6.4, 8 | Service |
 | PlantUmlViewer | Client/UI | 描画・失敗検知・エラー表示・ステータス遷移 | 3.4, 3.5, 4, 6, 7 | State |
-| theme assets | Client/asset | 軽量化（ミニファイ） | 5 | State |
+| theme assets | Client/asset | ライト・ダークのテーマと、その軽量化（ミニファイ） | 5 | State |
 | locales | Client/i18n | エラーメッセージ3件 × 5ロケール | 6.7 | State |
 
 ### http-method — 新規
@@ -250,6 +253,7 @@ type PlantUmlViewerProps = {
 - **描画中ステータス**: 成功・失敗・取得失敗のどの場合も `GROWI_IS_CONTENT_RENDERING_ATTR` を `'false'` にする。
 
 ### theme assets — 変更
+- **役割**: すべての図に付ける GROWI のテーマ。ライト用とダーク用があり、共通部分を common にまとめている。図の見た目を洗練させ、ダークモードでは背景・文字・線をダーク向けの配色にする。本 spec はこの役割を変えず、中身を小さくするだけにする。
 - **ミニファイが主な手段**: 行頭が `'`／`''` の PlantUML コメント行、行頭の空白、空行を取り除く。`!$VAR = '...'` のように `'` が行頭にない行は文字列リテラルなので残す。配色・skinparam・`<style>` の定義は1つも消さないので、ライト／ダークとも全図種の見た目は変わらない。
 - **理由を書いたコメントは消す前に移す**: 回避策の理由を記録したコメントがある。代表は `ParticipantPadding`／`Padding` を skinparam で書かない理由（書くと全図に "Please use CSS style instead of skinparam" 警告が描き込まれる #11258、汎用 `Padding` に効く CSS が無い plantuml/plantuml#2622）と、`sequenceDiagram` の `Padding`／`Margin` の注記。これらは、テンプレートリテラルの外（ファイル先頭の TSDoc）へ移す。何をしているかを繰り返すだけのコメント（`' Colors` など）は消してよい。
 - **追加で削る手段は、実測で足りない場合だけ**: 非 UML 図種の `<style>` 定義（board/gantt/json/mindmap/salt/wbs/wire/yaml）を消すと、その図種のダーク配色が失われる（`<style>` が唯一の色付け手段で、全体の既定文字色は無く背景は透明）。採用するのは、ミニファイだけでは問い合わせの図が上限に収まらないと分かった場合に限る。その場合も、ダーク用の既定色を補う対策と組にする。`sequenceDiagram` と `timingDiagram` は UML 図なので常に残す。
