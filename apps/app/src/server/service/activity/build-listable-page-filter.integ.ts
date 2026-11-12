@@ -97,6 +97,9 @@ describe('buildListablePageFilter', () => {
   const pages = {
     public: makePage('public', GRANT_PUBLIC),
     publicWipFalse: makePage('public-wip-false', GRANT_PUBLIC, { wip: false }),
+    publicIsEmptyFalse: makePage('public-is-empty-false', GRANT_PUBLIC, {
+      isEmpty: false,
+    }),
     viewerOnlyMe: makePage('viewer-only-me', GRANT_OWNER, {
       grantedUsers: [viewerId],
     }),
@@ -117,6 +120,7 @@ describe('buildListablePageFilter', () => {
     linkRestricted: makePage('link-restricted', GRANT_RESTRICTED),
     trashed: makePage('trashed', GRANT_PUBLIC, { status: 'deleted' }),
     wip: makePage('wip', GRANT_PUBLIC, { wip: true }),
+    empty: makePage('empty', GRANT_PUBLIC, { isEmpty: true }),
     viewerOnlyMeTrashed: makePage('viewer-only-me-trashed', GRANT_OWNER, {
       grantedUsers: [viewerId],
       status: 'deleted',
@@ -211,6 +215,7 @@ describe('buildListablePageFilter', () => {
       const expected = [
         pages.public,
         pages.publicWipFalse,
+        pages.publicIsEmptyFalse,
         pages.viewerOnlyMe,
         pages.viewerGroup,
         pages.viewerExternalGroup,
@@ -227,6 +232,7 @@ describe('buildListablePageFilter', () => {
       const expected = [
         pages.public,
         pages.publicWipFalse,
+        pages.publicIsEmptyFalse,
         ...(policy.hideRestrictedByOwner
           ? []
           : [pages.viewerOnlyMe, pages.othersOnlyMe]),

@@ -25,9 +25,15 @@ const EXCLUDE_WIP = {
   $or: [{ wip: null }, { wip: false }],
 };
 
+// Same content as the condition PageQueryBuilder adds unless includeEmpty is
+// set.
+const EXCLUDE_EMPTY = {
+  $or: [{ isEmpty: false }, { isEmpty: null }],
+};
+
 /**
  * Builds the filter matching the pages the existing page lists show to the
- * viewer (trashed and WIP pages excluded), in the form `findRaw` /
+ * viewer (trashed, WIP and empty pages excluded), in the form `findRaw` /
  * `aggregateRaw` accept.
  */
 export const buildListablePageFilter = async (
@@ -58,6 +64,6 @@ export const buildListablePageFilter = async (
   );
 
   return toRawFilter({
-    $and: [grantCondition, EXCLUDE_TRASHED, EXCLUDE_WIP],
+    $and: [grantCondition, EXCLUDE_TRASHED, EXCLUDE_WIP, EXCLUDE_EMPTY],
   });
 };
