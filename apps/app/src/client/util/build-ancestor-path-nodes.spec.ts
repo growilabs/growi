@@ -1,4 +1,5 @@
 import { buildAncestorPathNodes } from './build-ancestor-path-nodes';
+import { formatTruncatedPagePath } from './format-truncated-page-path';
 
 describe('buildAncestorPathNodes', () => {
   describe('when the path is the root', () => {
@@ -109,6 +110,97 @@ describe('buildAncestorPathNodes', () => {
         { type: 'ellipsis' },
         { type: 'link', href: '/daily/2024/01', text: '01' },
       ]);
+    });
+  });
+
+  describe('when a collapse level is given', () => {
+    it.each([
+      {
+        path: '/A/B/C/D',
+        level: 1,
+        expected: [
+          { type: 'ellipsis' },
+          { type: 'link', href: '/A/B/C', text: 'C' },
+        ],
+      },
+      { path: '/A/B/C/D', level: 2, expected: [{ type: 'ellipsis' }] },
+      {
+        path: '/A/B/C',
+        level: 1,
+        expected: [
+          { type: 'ellipsis' },
+          { type: 'link', href: '/A/B', text: 'B' },
+        ],
+      },
+      { path: '/A/B/C', level: 2, expected: [{ type: 'ellipsis' }] },
+      { path: '/A/B', level: 1, expected: [{ type: 'ellipsis' }] },
+      {
+        path: '/daily/2024/01/02',
+        level: 1,
+        expected: [
+          { type: 'ellipsis' },
+          { type: 'link', href: '/daily/2024/01', text: '01' },
+        ],
+      },
+    ])('folds $path at level $level, keeping each survivor linked to its own ancestor', ({
+      path,
+      level,
+      expected,
+    }) => {
+      const result = buildAncestorPathNodes(path, null, level);
+
+      expect(result.nodes).toEqual(expected);
+      expect(result.fullPath).toBe(path);
+    });
+
+    it('keeps the highlight on the surviving parent and drops it with the folded ancestors', () => {
+      const result = buildAncestorPathNodes(
+        '/foo/bar/baz',
+        '/<em>foo</em>/<em>bar</em>/baz',
+        1,
+      );
+
+      expect(result.nodes).toEqual([
+        { type: 'ellipsis' },
+        {
+          type: 'link',
+          href: '/foo/bar',
+          text: 'bar',
+          highlightedHtml: '<em>bar</em>',
+        },
+      ]);
+    });
+
+    it('treats a level beyond the maximum as the maximum', () => {
+      const result = buildAncestorPathNodes('/A/B/C/D', null, 5);
+
+      expect(result.nodes).toEqual([{ type: 'ellipsis' }]);
+    });
+
+    it.each(['/', '/A'])('still returns no nodes for %j', (path) => {
+      const result = buildAncestorPathNodes(path, null, 1);
+
+      expect(result.nodes).toEqual([]);
+    });
+  });
+
+  describe('maxCollapseLevel', () => {
+    it.each([
+      { path: '/', expected: 0 },
+      { path: '/A', expected: 0 },
+      { path: '/A/B', expected: 1 },
+      { path: '/A/B/C', expected: 2 },
+      { path: '/A/B/C/D/E', expected: 2 },
+    ])('is $expected for $path, matching formatTruncatedPagePath so both screens share one level scale', ({
+      path,
+      expected,
+    }) => {
+      const result = buildAncestorPathNodes(path);
+
+      expect(result.maxCollapseLevel).toBe(expected);
+      expect(result.maxCollapseLevel).toBe(
+        formatTruncatedPagePath(path).maxCollapseLevel,
+      );
     });
   });
 

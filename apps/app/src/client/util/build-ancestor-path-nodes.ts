@@ -24,6 +24,8 @@ export interface AncestorPathPlan {
   readonly nodes: readonly AncestorPathNode[];
   /** Full path including the page name, for the hover tooltip. */
   readonly fullPath: string;
+  /** Highest collapse level accepted, as reported by `formatTruncatedPagePath`. */
+  readonly maxCollapseLevel: number;
 }
 
 const ELLIPSIS: AncestorPathNode = { type: 'ellipsis' };
@@ -67,6 +69,9 @@ const toLinkNode = (
  * for parts before the ellipsis and from the tail for parts after it, so this
  * works for any truncation shape with at most one ellipsis.
  *
+ * `collapseLevel` is passed straight to `formatTruncatedPagePath` (default 0 =
+ * base form), so both search screens fold the same path the same way.
+ *
  * Highlight markup is resolved per segment by `alignHighlightedPathSegments`;
  * a segment whose markup cannot be trusted is rendered as plain text.
  *
@@ -75,13 +80,15 @@ const toLinkNode = (
 export const buildAncestorPathNodes = (
   path: string,
   highlightedPath?: string | null,
+  collapseLevel = 0,
 ): AncestorPathPlan => {
-  const truncated = formatTruncatedPagePath(path);
+  const truncated = formatTruncatedPagePath(path, collapseLevel);
+  const { fullPath, maxCollapseLevel } = truncated;
   // Drop the trailing page-name part (always exactly one, always last).
   const ancestorParts = truncated.parts.slice(0, -1);
 
   if (ancestorParts.length === 0) {
-    return { nodes: [], fullPath: truncated.fullPath };
+    return { nodes: [], fullPath, maxCollapseLevel };
   }
 
   const plainChain = buildRootFirstChain(
@@ -109,5 +116,5 @@ export const buildAncestorPathNodes = (
     return toLinkNode(plainChain[chainIndex], highlightedSegments[chainIndex]);
   });
 
-  return { nodes, fullPath: truncated.fullPath };
+  return { nodes, fullPath, maxCollapseLevel };
 };

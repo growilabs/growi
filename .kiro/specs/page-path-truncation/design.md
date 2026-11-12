@@ -346,7 +346,7 @@ export const buildAncestorPathNodes: (
 - （改訂）`AncestorPathPlan` に `maxCollapseLevel` を含め、呼び出し側がフックに渡せるようにする。
 - Preconditions: `path` は対象ページの完全パス。`highlightedPath` は Elasticsearch のハイライト markup を含む文字列、または未取得時は `null`/`undefined`。
 - Postconditions: `nodes` の `link` 要素の順序は root→leaf。`ellipsis` は高々 1 件、リンクを持たない。
-- Invariants: `path` が変わらない限り `nodes` の件数・順序は不変（ハイライトの有無は `highlightedHtml` の有無にのみ影響する）。
+- Invariants: `path` と `collapseLevel` が変わらない限り `nodes` の件数・順序は不変（ハイライトの有無は `highlightedHtml` の有無にのみ影響する）。
 
 ### `features/search` Domain
 
