@@ -59,17 +59,32 @@ export const alignHighlightedPathSegments = (
   });
 };
 
+const HTML_ESCAPES: Readonly<Record<string, string>> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+const escapeHtml = (text: string): string =>
+  text.replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
+
 /**
- * The page name of `path` with trailing-date bundling (`evalDatePath`) applied,
- * carrying its highlight markup when every segment it spans is reliably
- * highlighted, otherwise the plain page name.
+ * The page name of `path` with trailing-date bundling (`evalDatePath`) applied.
+ *
+ * - With `highlightedPath`: an HTML string for the caller to inject — the
+ *   highlight markup when every segment it spans is reliably highlighted,
+ *   otherwise the plain page name HTML-escaped (the plain path is not sanitized
+ *   like the server-side highlight is).
+ * - Without it: the plain page name as text, for the caller to render as text.
  */
 export const buildHighlightedPageName = (
   path: string,
   highlightedPath?: string | null,
 ): string => {
   const devided = new DevidedPagePath(path, false, true);
-  if (devided.isRoot) {
+  if (devided.isRoot || highlightedPath == null) {
     return devided.latter;
   }
 
@@ -81,5 +96,5 @@ export const buildHighlightedPageName = (
 
   return pageNameSegments.every((segment) => segment != null)
     ? pageNameSegments.join('/')
-    : devided.latter;
+    : escapeHtml(devided.latter);
 };

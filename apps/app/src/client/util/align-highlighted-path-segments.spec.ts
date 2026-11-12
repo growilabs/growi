@@ -108,4 +108,27 @@ describe('buildHighlightedPageName', () => {
   it('returns "/" for the root path', () => {
     expect(buildHighlightedPageName('/')).toBe('/');
   });
+
+  describe('when a highlight is given (the result is injected as HTML)', () => {
+    it('escapes the plain page name it falls back to', () => {
+      // The server-sanitized highlight drops the raw tag, so alignment fails
+      // and the plain (unsanitized) page name is used instead.
+      expect(
+        buildHighlightedPageName(
+          '/x/<img src=x onerror=alert(1)>',
+          `/${em('x')}/`,
+        ),
+      ).toBe('&lt;img src=x onerror=alert(1)&gt;');
+    });
+
+    it('escapes "&" and quotes in the fallback page name', () => {
+      expect(
+        buildHighlightedPageName(`/A/B/Q&A "it's"`, `/A/${em('B/Q')}&A`),
+      ).toBe('Q&amp;A &quot;it&#39;s&quot;');
+    });
+  });
+
+  it('does not escape the plain page name when no highlight is given (rendered as text)', () => {
+    expect(buildHighlightedPageName('/A/Q&A <b>')).toBe('Q&A <b>');
+  });
 });
