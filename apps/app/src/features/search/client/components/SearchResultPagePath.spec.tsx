@@ -83,6 +83,12 @@ describe('SearchResultPagePath', () => {
       expect(screen.getByText('/')).toBeInTheDocument();
       expect(screen.queryByText('…')).toBeNull();
     });
+
+    it('should render the root "/" as the bold page name, like the legacy label', () => {
+      render(<SearchResultPagePath path="/" />);
+
+      expect(screen.getByText('/').tagName).toBe('STRONG');
+    });
   });
 
   describe('character truncation is limited to the page name (Requirement 3.4, 3.6)', () => {

@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { Fragment } from 'react';
+import { Fragment, memo, useMemo } from 'react';
 
 import type { PagePathPart } from '~/client/util/format-truncated-page-path';
 import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-path';
@@ -26,14 +26,13 @@ interface KeyedPart {
 // Build a stable, unique key per part from the cumulative path prefix, so keys
 // stay unique even when two ancestors share the same text (no array index).
 const toKeyedParts = (parts: readonly PagePathPart[]): readonly KeyedPart[] => {
-  const keyed: KeyedPart[] = [];
-  let prefix = '';
-  for (const part of parts) {
-    prefix =
-      part.type === 'ellipsis' ? `${prefix}/…` : `${prefix}/${part.text}`;
-    keyed.push({ part, key: prefix });
-  }
-  return keyed;
+  const labels = parts.map((part) =>
+    part.type === 'ellipsis' ? '…' : part.text,
+  );
+  return parts.map((part, index) => ({
+    part,
+    key: `/${labels.slice(0, index + 1).join('/')}`,
+  }));
 };
 
 /**
@@ -50,46 +49,54 @@ const toKeyedParts = (parts: readonly PagePathPart[]): readonly KeyedPart[] => {
  * shortened path can be inspected on hover. Ancestor segments are never
  * character-truncated; only the page name is.
  */
-export const SearchResultPagePath = ({
-  path,
-}: SearchResultPagePathProps): JSX.Element => {
-  const { maxCollapseLevel } = formatTruncatedPagePath(path);
-  const { containerRef, shrinkableRef, collapseLevel } =
-    useFittingCollapseLevel(maxCollapseLevel, path);
-  const { isRoot, parts, fullPath } = formatTruncatedPagePath(
-    path,
-    collapseLevel,
-  );
+// Memoized: the search modal re-renders every row on each keystroke and on
+// arrow-key navigation, and each render re-parses the path and re-measures it.
+export const SearchResultPagePath = memo(
+  ({ path }: SearchResultPagePathProps): JSX.Element => {
+    const { maxCollapseLevel } = useMemo(
+      () => formatTruncatedPagePath(path),
+      [path],
+    );
+    const { containerRef, shrinkableRef, collapseLevel } =
+      useFittingCollapseLevel(maxCollapseLevel, path);
+    const { isRoot, parts, fullPath } = useMemo(
+      () => formatTruncatedPagePath(path, collapseLevel),
+      [path, collapseLevel],
+    );
 
-  return (
-    <span
-      ref={containerRef}
-      className={`${styles['search-result-page-path']} ${ROW_CLASS_NAME}`}
-      title={fullPath}
-    >
-      {isRoot ? (
-        <PathSeparator className={styles.separator} />
-      ) : (
-        // A separator precedes every part, producing the leading '/' plus the
-        // '/' separators between parts.
-        toKeyedParts(parts).map(({ part, key }) => (
-          <Fragment key={key}>
-            <PathSeparator className={styles.separator} />
-            {part.type === 'ellipsis' ? (
-              <span className={`${FIXED_PART_CLASS_NAME} text-muted`}>…</span>
-            ) : part.isPageName ? (
-              <strong
-                ref={shrinkableRef}
-                className={`${styles['page-name']} ${PAGE_NAME_CLASS_NAME}`}
-              >
-                {part.text}
-              </strong>
-            ) : (
-              <span className={FIXED_PART_CLASS_NAME}>{part.text}</span>
-            )}
-          </Fragment>
-        ))
-      )}
-    </span>
-  );
-};
+    return (
+      <span
+        ref={containerRef}
+        className={`${styles['search-result-page-path']} ${ROW_CLASS_NAME}`}
+        title={fullPath}
+      >
+        {isRoot ? (
+          // The root page's name is "/" itself, shown bold like other page names
+          <strong className={`${styles['page-name']} ${PAGE_NAME_CLASS_NAME}`}>
+            /
+          </strong>
+        ) : (
+          // A separator precedes every part, producing the leading '/' plus the
+          // '/' separators between parts.
+          toKeyedParts(parts).map(({ part, key }) => (
+            <Fragment key={key}>
+              <PathSeparator className={styles.separator} />
+              {part.type === 'ellipsis' ? (
+                <span className={`${FIXED_PART_CLASS_NAME} text-muted`}>…</span>
+              ) : part.isPageName ? (
+                <strong
+                  ref={shrinkableRef}
+                  className={`${styles['page-name']} ${PAGE_NAME_CLASS_NAME}`}
+                >
+                  {part.text}
+                </strong>
+              ) : (
+                <span className={FIXED_PART_CLASS_NAME}>{part.text}</span>
+              )}
+            </Fragment>
+          ))
+        )}
+      </span>
+    );
+  },
+);
