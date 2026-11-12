@@ -196,5 +196,38 @@ describe.skipIf(sharedElasticsearchUri == null)(
       );
       expect(await indexedGrantOf(page)).toBe(PageGrant.GRANT_PUBLIC);
     }, 30_000);
+
+    it.each([
+      { name: 'read-back-fails-on-tree', onTree: true },
+      { name: 'read-back-fails-legacy', onTree: false },
+    ])('stores the new grant in the index when reading the saved page back fails ($name)', async ({
+      name,
+      onTree,
+    }) => {
+      const page = await createIndexedPublicPage(name, onTree);
+      vi.spyOn(page, 'populate').mockRejectedValue(
+        new Error('transient read failure'),
+      );
+
+      await expect(
+        crowi.pageService.updatePage(
+          page,
+          'updated body',
+          'initial body',
+          user,
+          {
+            grant: PageGrant.GRANT_OWNER,
+            expectedRevisionId: String(page.revision),
+          },
+        ),
+      ).rejects.toThrow('transient read failure');
+
+      expect((await Page.findById(page._id).orFail()).grant).toBe(
+        PageGrant.GRANT_OWNER,
+      );
+      await expect
+        .poll(() => indexedGrantOf(page), { timeout: 10_000 })
+        .toBe(PageGrant.GRANT_OWNER);
+    }, 30_000);
   },
 );
