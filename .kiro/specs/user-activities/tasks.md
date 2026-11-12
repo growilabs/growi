@@ -142,7 +142,7 @@
 - (2.3) activities には「ユーザー・対象・操作・日時」の一意制約がある。同じ日時の履歴をテストで作るときは、ページか操作の種類を変える
 - (2.3) 結合テストの履歴の後始末は、テスト専用の `ip` の値で絞って消している（既存 `10.0.0.70`、タスク 2.3 `10.0.0.71`）。新しいまとまりを足すときは別の値を使う
 - (2.4) `build-listable-page-filter.integ.ts` は 751 行で、上限の 800 行に近い。次にこのファイルへテストを足すときは、2 つ目の `describe`（条件の組み立てと実行をつなぐテスト）を別ファイルへ移す。結合テストの履歴の後始末に使う `ip` は `10.0.0.72` まで使用済み。
-- (3.1) 未ログインのとき、実際のサーバーでは既存の `loginRequiredStrictly` が 403（本文 `Forbidden`）を返す。design.md の API Contract の表は 401 と書いていて食い違う。タスク 3.3 で、OpenAPI の記述と design.md の表を実際の応答（403）に合わせる。ルートの中の 401 の分岐は、`req.user` を型の言い換えなしで絞るために残す
+- (3.1) 未ログインのとき、実際のサーバーでは既存の `loginRequiredStrictly` が 403（本文 `Forbidden`）を返す。design.md の API Contract の表は 401 と書いていて食い違う。タスク 3.3 で、OpenAPI の記述と design.md の表を実際の応答（403）に合わせる
 - (3.1) ルートは 2 つのサービスを各ファイルから直接読み込んでいる。タスク 3.2 で `service/activity/index.ts` から公開し、ルートとテストの読み込み元をそこへ変える。ルートのテストの `vi.mock` に残る `aggregateUserActivitiesLegacy: vi.fn()` も 3.2 で消す。`user-activities.spec.ts` の `describe('GET /user-activities')` は新しいルートのテストなので、3.2 で消さない
 - (3.1) 開発サーバーへ直接呼ぶ確認は、この worktree からポート 3111・使い捨ての DB（`MONGO_URI` を起動コマンドの行だけで渡し、`ELASTICSEARCH_URI` は空にする）で起動して行えた。ユーザーはインストーラー API と登録 API で作り、HTTP でログインしてセッションを得る。終了後は自分が起動したプロセスだけを止め、DB を削除する
 - (3.2) サービスの入口の読み込み元は `~/server/service/activity/index` と書く。同じ階層に `service/activity.ts` があり、`~/server/service/activity` と書くとそちらに解決されるため

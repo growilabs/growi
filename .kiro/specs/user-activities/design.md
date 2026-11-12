@@ -256,7 +256,7 @@ sequenceDiagram
 - 管理設定 `security:list-policy:hideRestrictedByOwner` と `security:list-policy:hideRestrictedByGroup` を読む。
 - 閲覧者が属するグループを、`UserGroupRelation` と `ExternalUserGroupRelation` の両方から集める。
 - `generateGrantCondition` を呼ぶ。リンク限定のページは含めない。他人の「自分のみ」とグループ限定を含めるかどうかは、上の設定の否定で決める。
-- ごみ箱のページと WIP のページを除外する条件を足す。内容は `PageQueryBuilder` の `addConditionToExcludeTrashed` と `addConditionToExcludeWipPage` と同じにする。
+- ごみ箱のページ、WIP のページ、空ページ（子ページを置くためだけに存在する、本文の無いページ。`isEmpty` が真）を除外する条件を足す。内容は `PageQueryBuilder` の `addConditionToExcludeTrashed`、`addConditionToExcludeWipPage`、および `PageQueryBuilder` が空ページを含めない指定のときに足す条件と同じにする。
 - 閲覧者が管理者かどうか、閲覧者が対象ユーザー本人かどうかで、条件を変えない。
 - 返す条件は、Prisma の `findRaw` と `aggregateRaw` が受け付ける形にする（ObjectId は `{ $oid: string }`）。変換の方法は research.md の「条件を `aggregateRaw` と `findRaw` に渡す形」に従う。
 - 公開範囲の規則を、このファイルに書かない。
@@ -282,7 +282,7 @@ export const buildListablePageFilter: (
 ```
 
 - Preconditions: `viewer` はログイン済みの利用者である。
-- Postconditions: 返る条件は、既存の一覧が同じ閲覧者に見せるページ（ごみ箱と WIP を除く）にだけ一致する。
+- Postconditions: 返る条件は、既存の一覧が同じ閲覧者に見せるページ（ごみ箱、WIP、空ページを除く）にだけ一致する。
 - Invariants: 同じ閲覧者・同じ設定・同じグループなら、同じ条件を返す。
 
 #### 問い合わせの組み立て（`build-user-activity-queries.ts`）
@@ -454,13 +454,13 @@ export type IUserActivityUser = {
   _id: string;
   username: string;
   name: string;
-  imageUrlCached: string;
+  imageUrlCached?: string;
 };
 
 export type IUserActivity = {
   _id: string;
   action: SupportedActivityActionType;
-  createdAt: Date;
+  createdAt: string;
   user: IUserActivityUser;
   target: IUserActivityTargetPage;
 };
@@ -470,6 +470,8 @@ export type UserActivitiesResult = {
 };
 ```
 
+- `createdAt` は ISO 8601 形式の文字列である。JSON の応答に乗る値そのままの型にして、サーバーが返す値と画面が受け取る値で型を分けない。サーバーは `Date` を文字列に変換してから返す。
+- `imageUrlCached` は、アイコン画像の場所がまだ作られていないユーザー（一度もログインしていないユーザーなど）では保存されていない。その場合は応答に含めない。
 - 既存の型 `IPopulatedPageTarget`、`ActivityHasTargetPage`、`PopulatedUserActivitiesResult` は、上の型に置き換える。他の場所から使われていないことを確認したうえで削除する。
 - 応答に含めない項目: ページの公開範囲・状態・許可されたユーザーやグループ・ページを見たユーザーの一覧・いいねしたユーザーの一覧、ユーザーのメールアドレスや認証に関わる情報、履歴の接続元の情報（IP アドレス、呼び出し先）、履歴の記録時の写し。
 
@@ -481,6 +483,7 @@ export type UserActivitiesResult = {
 - 操作対象のページがすでに存在しない履歴（完全削除されたページへの履歴を含む）。
 - 操作対象のページがごみ箱にある履歴（削除の履歴を含む）。ページを復元すると、そのページへの履歴は再び一覧に出る。
 - 操作対象のページが WIP である履歴。
+- 操作対象のページが空ページである履歴。
 - 操作対象のページがリンク限定である履歴。
 
 このため、削除と完全削除の履歴は、要件 1.6 の対象の操作に含まれるが、通常は一覧に出ない。
@@ -520,7 +523,7 @@ export type UserActivitiesResult = {
 - 区別できないこと（2.3）: 存在しないページへの履歴と、一覧が見せないページへの履歴が、どちらも応答に現れないこと。
 - 返す項目（3.1、3.2、3.3、3.5）: 行が定めた項目だけを持つこと。
 - 総件数とページ送り（4.1〜4.4）: 総件数が、すべて取得したときの行の数と一致すること。重複も欠けも無いこと。同じ日時の履歴が複数あっても同じであること。新しい順であること。
-- ごみ箱と WIP（Data Models「一覧に出ない履歴」）: ごみ箱のページと WIP のページへの履歴が返らないこと。復元後は返ること。
+- ごみ箱、WIP、空ページ（Data Models「一覧に出ない履歴」）: ごみ箱のページ、WIP のページ、空ページへの履歴が返らないこと。復元後は返ること。
 - 0 件の場合: 対象ユーザーに履歴が無いとき、履歴はあるが見せてよいページが 1 つも無いときに、0 件の一覧が返ること。
 - 同じページへの複数の履歴: 同じページへの履歴が複数あるとき、そのすべてが行として返り、総件数に数えられること（4.2、4.4）。
 
