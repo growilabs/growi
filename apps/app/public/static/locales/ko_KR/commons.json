@@ -87,7 +87,13 @@
     "notifications": "알림",
     "filter_all": "전체",
     "no_news": "공지사항이 없습니다",
-    "view_detail": "자세히 보기"
+    "view_detail": "자세히 보기",
+    "change_proposal": {
+      "applied": "Change Proposal을 반영했습니다",
+      "reverted": "Change Proposal을 되돌렸습니다",
+      "revert_requested": "Change Proposal을 되돌려 달라고 요청했습니다",
+      "other_pages": "다른 페이지도 있습니다"
+    }
   },
   "personal_dropdown": {
     "home": "홈",

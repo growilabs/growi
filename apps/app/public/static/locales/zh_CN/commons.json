@@ -86,7 +86,13 @@
     "notifications": "通知",
     "filter_all": "全部",
     "no_news": "暂无公告",
-    "view_detail": "查看详情"
+    "view_detail": "查看详情",
+    "change_proposal": {
+      "applied": "反映了 Change Proposal",
+      "reverted": "已撤销 Change Proposal",
+      "revert_requested": "请求您撤销 Change Proposal",
+      "other_pages": "还有其他页面"
+    }
   },
   "personal_dropdown": {
     "home": "家",

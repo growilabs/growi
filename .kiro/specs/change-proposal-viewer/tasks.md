@@ -31,7 +31,7 @@
   - `getServerSideCommonInitialProps` の中で、`crowi` から取った `configManager` で `getConfig('app:changeProposalEnabled')` を読み、全画面で読む共通の props に足し、atom に入れる。同じ関数が `app:siteUrl` などを読む形と、`aiEnabled` を `crowi.isAiReady()` で読む形にそろえる。core の server の barrel の `readChangeProposalSettings()` は import しない（SSR の側で直接 import した `configManager` は設定を読み込んでいない別の実体になるため。research.md の「書き込み機能が有効なときだけ、Recent Changes に一覧へのリンクを出す」）
   - 共通の props の既存のテストに、`crowi` の設定が真のときと偽のときの値を足し、どちらも通っている。開発用のサーバーで、管理者の設定で書き込み機能を有効にしたあと、Recent Changes に一覧へのリンクが出ることを確かめている（SSR で読んだ値が実際の設定と一致することの確認）
   - _Requirements: 6.7_
-- [ ] 1.4 本 spec の画面と通知の翻訳のキーを、5 言語すべてに足す
+- [x] 1.4 本 spec の画面と通知の翻訳のキーを、5 言語すべてに足す
   - 本 spec の画面だけで使う文言（詳細ページ、一覧、印、入口の言葉、取り消しと頼む通知の画面、design の「反映されなかった操作」の見出しと、ページごとの通知の指定の表示の 2 つのキー、design の取り消しの結果が決まるまでの表示の 3 つのキー（処理中・対象にならなかった・再読み込みを促す文言）と「ページはもうありません」のキー）を `translation.json` の `change_proposal_viewer.*` に足す。操作の種類・操作の状態・全体の状態・理由・戻せない理由の言葉は core の `change_proposal.*` を使い、同じ意味のキーを足さない
   - 通知の文言（反映・取り消し・頼む通知の 3 つと、「ほかのページもあります」）を `commons.json` に足す（管理画面でも表示できるようにするため）
   - 件数を差し込むキーを作らない。英語・日本語・中国語・フランス語・韓国語のすべてに訳を入れる

@@ -1216,5 +1216,90 @@
     "achievement": {
       "settled_with_percent": "완료 (달성도 {{percent}}%)"
     }
+  },
+  "change_proposal_viewer": {
+    "entry": {
+      "ai_chat": "AI 채팅",
+      "vault": "Vault",
+      "mcp": "MCP",
+      "revert": "되돌리기"
+    },
+    "mark": {
+      "change_proposal": "Change Proposal",
+      "revert": "되돌리기",
+      "tooltip": {
+        "change_proposal": "Change Proposal에 의한 변경",
+        "revert": "Change Proposal을 되돌린 변경"
+      }
+    },
+    "list": {
+      "title": "Change Proposal",
+      "tab": {
+        "mine": "내 Change Proposal",
+        "applied": "반영됨"
+      },
+      "empty": "Change Proposal이 없습니다",
+      "load_more": "더 불러오기",
+      "show_more_pages": "더 보기",
+      "no_more": "더 이상 없습니다",
+      "error": "목록을 불러오지 못했습니다"
+    },
+    "detail": {
+      "not_found": "Change Proposal을 찾을 수 없습니다",
+      "error": "Change Proposal을 불러오지 못했습니다",
+      "requested_by": "요청한 사람",
+      "entry": "진입 경로",
+      "model": "모델",
+      "created_at": "생성 일시",
+      "last_applied_at": "마지막 반영 일시",
+      "reverts": "되돌린 대상",
+      "operations": "작업"
+    },
+    "remaining_operations": {
+      "title": "반영되지 않은 작업"
+    },
+    "per_page_notifications": {
+      "enabled": "페이지별 알림: 보냄",
+      "disabled": "페이지별 알림: 보내지 않음"
+    },
+    "operation": {
+      "page_gone": "페이지가 더 이상 없습니다",
+      "revertible": "되돌릴 수 있습니다",
+      "reverted_by": "되돌린 Change Proposal",
+      "show_diff": "차이 보기",
+      "hide_diff": "차이 숨기기",
+      "diff_unavailable": "차이를 표시할 수 없습니다",
+      "diff_loading": "차이를 불러오는 중",
+      "no_diff": "이 작업에는 표시할 차이가 없습니다"
+    },
+    "revert_all": {
+      "button": "되돌릴 수 있는 것을 모두 되돌리기",
+      "confirm_title": "다음 페이지를 되돌릴까요?",
+      "confirm_description": "다음 페이지를 되돌립니다.",
+      "confirm_submit": "되돌리기",
+      "error": "되돌리기에 실패했습니다",
+      "result_title": "되돌리기 결과"
+    },
+    "revert_result": {
+      "in_progress": "처리 중",
+      "not_targeted": "되돌리기 대상이 되지 않았습니다",
+      "timed_out": "되돌리기가 서버에서 계속 진행 중입니다. 잠시 후 이 페이지를 다시 불러오면 결과를 확인할 수 있습니다."
+    },
+    "revert_request": {
+      "button": "요청한 사람에게 되돌리기 요청",
+      "modal_title": "이 Change Proposal을 되돌리도록 요청",
+      "message_label": "메시지 (선택)",
+      "message_too_long": "메시지가 너무 깁니다",
+      "submit": "요청 보내기",
+      "result": {
+        "sent": "요청을 보냈습니다",
+        "not_found": "Change Proposal을 찾을 수 없습니다",
+        "too_long": "메시지가 너무 깁니다",
+        "recently_sent": "방금 요청을 보냈습니다. 잠시 후 다시 시도해 주세요.",
+        "own_proposal": "자신의 Change Proposal에는 요청을 보낼 수 없습니다",
+        "requester_unavailable": "요청한 사람에게 알림을 보낼 수 없습니다",
+        "error": "요청을 보내지 못했습니다"
+      }
+    }
   }
 }

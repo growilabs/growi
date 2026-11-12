@@ -1289,5 +1289,90 @@
     "achievement": {
       "settled_with_percent": "Completed ({{percent}}% achieved)"
     }
+  },
+  "change_proposal_viewer": {
+    "entry": {
+      "ai_chat": "AI chat",
+      "vault": "Vault",
+      "mcp": "MCP",
+      "revert": "Revert"
+    },
+    "mark": {
+      "change_proposal": "Change Proposal",
+      "revert": "Revert",
+      "tooltip": {
+        "change_proposal": "Changed by a Change Proposal",
+        "revert": "Made by reverting a Change Proposal"
+      }
+    },
+    "list": {
+      "title": "Change Proposals",
+      "tab": {
+        "mine": "My Change Proposals",
+        "applied": "Applied"
+      },
+      "empty": "No Change Proposals",
+      "load_more": "Load more",
+      "show_more_pages": "Show more",
+      "no_more": "No more Change Proposals",
+      "error": "Failed to load the list"
+    },
+    "detail": {
+      "not_found": "This Change Proposal was not found",
+      "error": "Failed to load the Change Proposal",
+      "requested_by": "Requested by",
+      "entry": "Entry",
+      "model": "Model",
+      "created_at": "Created",
+      "last_applied_at": "Last applied",
+      "reverts": "Reverts",
+      "operations": "Changes"
+    },
+    "remaining_operations": {
+      "title": "Changes that were not applied"
+    },
+    "per_page_notifications": {
+      "enabled": "Per-page notifications: sent",
+      "disabled": "Per-page notifications: not sent"
+    },
+    "operation": {
+      "page_gone": "The page no longer exists",
+      "revertible": "Can be reverted",
+      "reverted_by": "Reverted by",
+      "show_diff": "Show diff",
+      "hide_diff": "Hide diff",
+      "diff_unavailable": "The diff cannot be shown",
+      "diff_loading": "Loading the diff",
+      "no_diff": "There is no diff to show for this change"
+    },
+    "revert_all": {
+      "button": "Revert everything that can be reverted",
+      "confirm_title": "Revert these pages?",
+      "confirm_description": "The following pages will be reverted.",
+      "confirm_submit": "Revert",
+      "error": "Failed to revert",
+      "result_title": "Result of the revert"
+    },
+    "revert_result": {
+      "in_progress": "In progress",
+      "not_targeted": "Not included in the revert",
+      "timed_out": "The revert is still running on the server. Reload this page later to see the result."
+    },
+    "revert_request": {
+      "button": "Ask the requester to revert",
+      "modal_title": "Ask the requester to revert this Change Proposal",
+      "message_label": "Message (optional)",
+      "message_too_long": "The message is too long",
+      "submit": "Send request",
+      "result": {
+        "sent": "The request was sent",
+        "not_found": "The Change Proposal was not found",
+        "too_long": "The message is too long",
+        "recently_sent": "A request was sent a moment ago. Please try again later.",
+        "own_proposal": "You cannot send a request for your own Change Proposal",
+        "requester_unavailable": "The requester can no longer receive requests",
+        "error": "Failed to send the request"
+      }
+    }
   }
 }
