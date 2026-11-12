@@ -60,6 +60,7 @@ import {
   type PageModel,
   PageQueryBuilder,
   pushRevision,
+  saveRevision,
 } from '~/server/models/page';
 import type { IPageRedirect } from '~/server/models/page-redirect';
 import type { UserGroupDocument } from '~/server/models/user-group';
@@ -5697,7 +5698,7 @@ class PageService implements IPageService {
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
 
-    // With a body, pushRevision saves the pending field changes together with the revision.
+    // With a body, saveRevision saves the pending field changes together with the revision.
     let savedPage = newPageData;
     if (shouldUpdateBody) {
       const origin = options.origin;
@@ -5709,10 +5710,10 @@ class PageService implements IPageService {
         origin,
         { proposalMark: options.proposalMark },
       );
-      savedPage = await pushRevision(savedPage, newRevision, user, {
+      savedPage = await saveRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
-      await savedPage.populateDataToShowRevision();
+      await this.populateSavedPageForUpdate(savedPage, user);
     } else {
       savedPage = await savedPage.save();
     }
@@ -5807,7 +5808,7 @@ class PageService implements IPageService {
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
 
-    // With a body, pushRevision saves the pending field changes together with the revision.
+    // With a body, saveRevision saves the pending field changes together with the revision.
     let savedPage = pageData;
     if (shouldUpdateBody) {
       const newRevision = prisma.revisions.prepareRevision(
@@ -5818,10 +5819,10 @@ class PageService implements IPageService {
         options.origin,
         { proposalMark: options.proposalMark },
       );
-      savedPage = await pushRevision(savedPage, newRevision, user, {
+      savedPage = await saveRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
-      await savedPage.populateDataToShowRevision();
+      await this.populateSavedPageForUpdate(savedPage, user);
     } else {
       savedPage = await savedPage.save();
     }
@@ -5834,6 +5835,23 @@ class PageService implements IPageService {
     this.pageEvent.emit('update', savedPage, user, updateEventExtras);
 
     return savedPage;
+  }
+
+  /**
+   * The update is already stored, so 'update' is emitted even when populating
+   * fails; otherwise the listeners that mirror the page (search) would keep
+   * its old grant.
+   */
+  private async populateSavedPageForUpdate(
+    savedPage: HydratedDocument<PageDocument>,
+    user: IUserHasId,
+  ): Promise<void> {
+    try {
+      await savedPage.populateDataToShowRevision();
+    } catch (err) {
+      this.pageEvent.emit('update', savedPage, user);
+      throw err;
+    }
   }
 
   /**
