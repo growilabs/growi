@@ -22,7 +22,7 @@
   - viewer の外へ公開する barrel（`client/viewer/index.ts`）も作り、design の File Structure Plan にある公開する部品と hook（詳細ページ・一覧・印の部品・今の版の印の部品・印の hook・通知の hook）を、仮のファイルからの export として最後の形で並べる（グループ 3 と 5 の並行するタスクが、同じ barrel を書き換えないようにするため）
   - 型の検査が通り、server と client の両方から型と定数を import できる状態になっている
   - _Requirements: 4.3, 4.4, 4.9_
-- [ ] 1.2 頼む通知の action を宣言する
+- [x] 1.2 頼む通知の action を宣言する
   - action `CHANGE_PROPOSAL_REVERT_REQUEST` を足し、監査ログの設定にかかわらず記録される組（`EssentialActionGroup`）に入れる。core のタスク 1.5 が足した分類（`^CHANGE_PROPOSAL_`）に入ることを確かめる
   - 監査ログに表示する action の名前を、5 言語の `admin.json` に足す
   - 監査ログの絞り込みの一覧に新しい action が出ること、activity の既存のテストが通ることを確かめている

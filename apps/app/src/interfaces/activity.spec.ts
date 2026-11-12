@@ -552,6 +552,18 @@ describe('Change Proposal activity declarations', () => {
     expect(AllEssentialActions).toContain('CHANGE_PROPOSAL_REVERT');
   });
 
+  it('declares REVERT_REQUEST, always records it, and lists it in the filter groups and the Change Proposal category', () => {
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVERT_REQUEST).toBe(
+      'CHANGE_PROPOSAL_REVERT_REQUEST',
+    );
+    expect(AllSupportedActions).toContain('CHANGE_PROPOSAL_REVERT_REQUEST');
+    expect(AllEssentialActions).toContain('CHANGE_PROPOSAL_REVERT_REQUEST');
+    expect(AllMediumGroupActions).toContain('CHANGE_PROPOSAL_REVERT_REQUEST');
+    expect(AllLargeGroupActions).toContain('CHANGE_PROPOSAL_REVERT_REQUEST');
+    expect(ChangeProposalActions).toContain('CHANGE_PROPOSAL_REVERT_REQUEST');
+    expect(AdminActions).not.toContain('CHANGE_PROPOSAL_REVERT_REQUEST');
+  });
+
   it('also lists APPLY and REVERT in the Medium and Large groups so the audit log filter shows them', () => {
     for (const action of ['CHANGE_PROPOSAL_APPLY', 'CHANGE_PROPOSAL_REVERT']) {
       expect(AllEssentialActions).toContain(action);
@@ -576,11 +588,12 @@ describe('Change Proposal activity declarations', () => {
     );
   });
 
-  it('groups the three CHANGE_PROPOSAL_ actions into their own category without capturing the admin action', () => {
+  it('groups the CHANGE_PROPOSAL_ actions into their own category without capturing the admin action', () => {
     expect([...ChangeProposalActions].sort()).toEqual([
       'CHANGE_PROPOSAL_APPLY',
       'CHANGE_PROPOSAL_CREATE',
       'CHANGE_PROPOSAL_REVERT',
+      'CHANGE_PROPOSAL_REVERT_REQUEST',
     ]);
   });
 

@@ -1191,6 +1191,7 @@
     "CHANGE_PROPOSAL_CREATE": "Create Change Proposal",
     "CHANGE_PROPOSAL_APPLY": "Apply Change Proposal",
     "CHANGE_PROPOSAL_REVERT": "Revert Change Proposal",
+    "CHANGE_PROPOSAL_REVERT_REQUEST": "Request Change Proposal revert",
     "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "Update Change Proposal settings",
     "ADMIN_SITE_URL_UPDATE": "Update Site URL Settings",
     "ADMIN_MAIL_SMTP_UPDATE": "Update E-mail(SMTP) Settings",

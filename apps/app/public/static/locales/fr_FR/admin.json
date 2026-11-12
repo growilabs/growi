@@ -1178,6 +1178,7 @@
     "CHANGE_PROPOSAL_CREATE": "Créer un Change Proposal",
     "CHANGE_PROPOSAL_APPLY": "Appliquer un Change Proposal",
     "CHANGE_PROPOSAL_REVERT": "Annuler un Change Proposal",
+    "CHANGE_PROPOSAL_REVERT_REQUEST": "Demander l'annulation d'un Change Proposal",
     "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "Mettre à jour les paramètres de Change Proposal",
     "ADMIN_SITE_URL_UPDATE": "Modifier les paramètres d'URL",
     "ADMIN_MAIL_SMTP_UPDATE": "Modifier les paramètres d'e-mail",

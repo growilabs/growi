@@ -1180,6 +1180,7 @@
     "CHANGE_PROPOSAL_CREATE": "创建 Change Proposal",
     "CHANGE_PROPOSAL_APPLY": "反映 Change Proposal",
     "CHANGE_PROPOSAL_REVERT": "撤销 Change Proposal",
+    "CHANGE_PROPOSAL_REVERT_REQUEST": "请求撤销 Change Proposal",
     "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "更新 Change Proposal 设置",
     "ADMIN_SITE_URL_UPDATE": "更新站点 URL 设置",
     "ADMIN_MAIL_SMTP_UPDATE": "更新电子邮件（SMTP）设置",
