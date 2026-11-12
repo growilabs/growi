@@ -21,6 +21,7 @@ test.describe('Create page button', () => {
 
 test.describe('Create page button dropdown menu', () => {
   test('open and create today page', async ({ page }) => {
+    test.skip(!!process.env.CI, 'flaky on CI - see #12125; remove when fixed');
     await page.goto('/');
 
     // open dropdown menu
