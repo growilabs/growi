@@ -231,7 +231,7 @@
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
   - _Boundary: AuthorInfo, PageContentFooter, PageSideContents_
   - _Depends: 5.1_
-- [ ] 6.4 (P) 通知の一覧に Change Proposal の通知を組み込む
+- [x] 6.4 (P) 通知の一覧に Change Proposal の通知を組み込む
   - 通知の種類ごとの hook の並びに、5.9 の hook を足す。既読にする動きと未読の件数の数え直しは今のまま使う
   - サイドバーの通知、通知の一覧ページ、管理画面の通知のそれぞれで、3 つの通知が受け取った人の言語で表示され、開くと既読になることを確かめている。既存の種類の通知の表示が変わらないことも確かめている
   - _Requirements: 9.7, 9.8_
