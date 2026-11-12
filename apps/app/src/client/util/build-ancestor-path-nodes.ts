@@ -1,3 +1,5 @@
+import { normalizePath } from '@growi/core/dist/utils/path-utils';
+
 import { LinkedPagePath } from '~/models/linked-page-path';
 import { buildLinkedPagePathHref } from '~/utils/build-linked-page-path-href';
 
@@ -30,42 +32,52 @@ export interface AncestorPathPlan {
 
 const ELLIPSIS: AncestorPathNode = { type: 'ellipsis' };
 
+interface AncestorSegment {
+  /** The ancestor page itself, used to derive its href */
+  readonly page: LinkedPagePath;
+  readonly text: string;
+}
+
 /**
- * Flatten a `LinkedPagePath` chain (which links leaf -> root via `.parent`)
- * into a root-first array, stopping before the synthetic root sentinel node.
+ * One entry per "/"-separated ancestor segment, root first. Each entry is built
+ * from its own path prefix rather than by walking a single `LinkedPagePath`
+ * chain: `LinkedPagePath` does not split on `</` (so `</em>` in highlight
+ * markup stays intact), which would give a plain path like `/a</b` fewer chain
+ * nodes than segments and break the index mapping below.
  */
-const buildRootFirstChain = (topmost: LinkedPagePath): LinkedPagePath[] => {
-  const leafToRoot: LinkedPagePath[] = [];
+const buildAncestorSegments = (
+  ancestorPath: string,
+): readonly AncestorSegment[] => {
+  const segments = normalizePath(ancestorPath)
+    .split('/')
+    .filter((segment) => segment.length > 0);
 
-  let current: LinkedPagePath | undefined = topmost;
-  while (current != null && !current.isRoot) {
-    leafToRoot.push(current);
-    current = current.parent;
-  }
-
-  return leafToRoot.reverse();
+  return segments.map((text, index) => ({
+    page: new LinkedPagePath(`/${segments.slice(0, index + 1).join('/')}`),
+    text,
+  }));
 };
 
 const toLinkNode = (
-  plainNode: LinkedPagePath,
+  { page, text }: AncestorSegment,
   highlightedHtml: string | undefined,
 ): AncestorPathNode => ({
   type: 'link',
-  href: buildLinkedPagePathHref(plainNode),
-  text: plainNode.pathName,
+  href: buildLinkedPagePathHref(page),
+  text,
   // Markup identical to the plain text carries no highlight; render it as text.
-  ...(highlightedHtml != null && highlightedHtml !== plainNode.pathName
+  ...(highlightedHtml != null && highlightedHtml !== text
     ? { highlightedHtml }
     : {}),
 });
 
 /**
  * Bridge `formatTruncatedPagePath`'s truncation decision with the plain
- * `LinkedPagePath` chain and the per-segment highlight markup, returning a
+ * ancestor segments (links) and the per-segment highlight markup, returning a
  * React-agnostic display plan for the ancestor-only portion of a page path
  * (the page name itself is dropped; callers render it separately).
  *
- * Surviving parts are mapped back to chain positions by counting from the head
+ * Surviving parts are mapped back to ancestor positions by counting from the head
  * for parts before the ellipsis and from the tail for parts after it, so this
  * works for any truncation shape with at most one ellipsis.
  *
@@ -91,10 +103,8 @@ export const buildAncestorPathNodes = (
     return { nodes: [], fullPath, maxCollapseLevel };
   }
 
-  const plainChain = buildRootFirstChain(
-    new LinkedPagePath(truncated.ancestorPath),
-  );
-  // Ancestors are the leading segments of the path, so chain index === segment index.
+  const ancestors = buildAncestorSegments(truncated.ancestorPath);
+  // Ancestors are the leading segments of the path, so ancestor index === segment index.
   const highlightedSegments = alignHighlightedPathSegments(
     path,
     highlightedPath,
@@ -103,17 +113,20 @@ export const buildAncestorPathNodes = (
   const ellipsisIndex = ancestorParts.findIndex(
     (part) => part.type === 'ellipsis',
   );
-  const toChainIndex = (partIndex: number): number =>
+  const toAncestorIndex = (partIndex: number): number =>
     ellipsisIndex === -1 || partIndex < ellipsisIndex
       ? partIndex
-      : plainChain.length - (ancestorParts.length - partIndex);
+      : ancestors.length - (ancestorParts.length - partIndex);
 
   const nodes: AncestorPathNode[] = ancestorParts.map((part, partIndex) => {
     if (part.type === 'ellipsis') {
       return ELLIPSIS;
     }
-    const chainIndex = toChainIndex(partIndex);
-    return toLinkNode(plainChain[chainIndex], highlightedSegments[chainIndex]);
+    const ancestorIndex = toAncestorIndex(partIndex);
+    return toLinkNode(
+      ancestors[ancestorIndex],
+      highlightedSegments[ancestorIndex],
+    );
   });
 
   return { nodes, fullPath, maxCollapseLevel };

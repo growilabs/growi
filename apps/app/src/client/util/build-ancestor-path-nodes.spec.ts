@@ -211,4 +211,27 @@ describe('buildAncestorPathNodes', () => {
       expect(result.fullPath).toBe('/A/B/C/D');
     });
   });
+
+  // `</` in a plain path is a literal (only `</em>` in highlight markup is not a
+  // separator), so every "/" still splits an ancestor segment.
+  describe('when an ancestor segment ends with "<"', () => {
+    it('links every ancestor to its own prefix without throwing', () => {
+      const result = buildAncestorPathNodes('/a</b/c');
+
+      expect(result.nodes).toEqual([
+        { type: 'link', href: encodeURI('/a<'), text: 'a<' },
+        { type: 'link', href: encodeURI('/a</b'), text: 'b' },
+      ]);
+    });
+
+    it('keeps the parent linked to its own prefix when truncated', () => {
+      const result = buildAncestorPathNodes('/x</y/z/w/leaf');
+
+      expect(result.nodes).toEqual([
+        { type: 'link', href: encodeURI('/x<'), text: 'x<' },
+        { type: 'ellipsis' },
+        { type: 'link', href: encodeURI('/x</y/z/w'), text: 'w' },
+      ]);
+    });
+  });
 });
