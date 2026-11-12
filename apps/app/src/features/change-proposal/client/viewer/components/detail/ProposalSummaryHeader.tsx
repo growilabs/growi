@@ -12,6 +12,9 @@ import {
 } from '../../../shared';
 import { ENTRY_LABEL_KEYS } from '../../domain';
 import { RequesterActionSlot } from '../RequesterActionSlot';
+import { PerPageNotificationsLabel } from './PerPageNotificationsLabel';
+import { ProposalLinkChips } from './ProposalLinkChips';
+import { ProposalProgressLabel } from './ProposalProgressLabel';
 
 type ProposalSummaryHeaderProps = {
   readonly proposal: ChangeProposalView;
@@ -42,6 +45,7 @@ export const ProposalSummaryHeader = ({
     lastAppliedAt,
     status,
     revertOf,
+    basedOn,
   } = proposal;
 
   return (
@@ -66,10 +70,12 @@ export const ProposalSummaryHeader = ({
             <UserDate dateTime={lastAppliedAt} />
           </HeaderRow>
         )}
-        <div>
+        <div className="d-flex flex-wrap align-items-center gap-2">
           <span className="badge text-bg-secondary">
             {t(PROPOSAL_STATUS_LABEL_KEYS[status])}
           </span>
+          <ProposalProgressLabel view={proposal} />
+          <PerPageNotificationsLabel view={proposal} />
         </div>
         {revertOf != null && (
           <HeaderRow label={t('change_proposal_viewer.detail.reverts')}>
@@ -79,6 +85,11 @@ export const ProposalSummaryHeader = ({
           </HeaderRow>
         )}
       </dl>
+      {basedOn != null && (
+        <ProposalLinkChips
+          links={[{ proposalId: basedOn.proposalId, kind: 'based-on' }]}
+        />
+      )}
       <RequesterActionSlot proposal={proposal} />
     </div>
   );

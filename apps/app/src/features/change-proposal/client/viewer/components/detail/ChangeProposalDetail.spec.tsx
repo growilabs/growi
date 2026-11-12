@@ -102,6 +102,41 @@ const mockFound = (proposal: ChangeProposalView): void =>
   mockFetch({ data: { type: 'found', proposal } });
 
 describe('ChangeProposalDetail', () => {
+  describe('remaining operations', () => {
+    beforeEach(() => {
+      vi.mocked(useSWRxChangeProposal).mockReset();
+    });
+
+    it('lists operations that were not applied for the requester', () => {
+      mockFound(
+        createProposal({
+          isRequester: true,
+          operations: [
+            { key: 'f', type: 'edit', status: 'failed', path: '/failed-path' },
+          ],
+        }),
+      );
+      render(<ChangeProposalDetail proposalId="proposal-1" />);
+      expect(
+        screen.getByText('change_proposal_viewer.remaining_operations.title'),
+      ).toBeTruthy();
+    });
+
+    it('does not list them for a non-requester', () => {
+      mockFound(
+        createProposal({
+          operations: [
+            { key: 'f', type: 'edit', status: 'failed', path: '/failed-path' },
+          ],
+        }),
+      );
+      render(<ChangeProposalDetail proposalId="proposal-1" />);
+      expect(
+        screen.queryByText('change_proposal_viewer.remaining_operations.title'),
+      ).toBeNull();
+    });
+  });
+
   beforeEach(() => {
     vi.mocked(useSWRxChangeProposal).mockReset();
   });

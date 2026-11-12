@@ -16,7 +16,10 @@ vi.mock('../requester-action-slots', () => ({
 }));
 
 vi.mock('next-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) =>
+      options == null ? key : `${key}|${JSON.stringify(options)}`,
+  }),
 }));
 
 const createProposal = (
@@ -33,6 +36,45 @@ const createProposal = (
 });
 
 describe('ProposalSummaryHeader', () => {
+  it('places the progress word, the per-page notification wording and the based-on link for core-provided data', () => {
+    render(
+      <ProposalSummaryHeader
+        proposal={createProposal({
+          isRequester: true,
+          requesterState: {
+            lifecycle: 'settled',
+            achievement: { applied: 1, attempted: 2 },
+            perPageNotifications: { value: true, isEnabledBySettings: true },
+          },
+          basedOn: {
+            proposalId: 'base0000deadbeef',
+            relation: 'rework',
+            operationKeys: [],
+          },
+        })}
+      />,
+    );
+    expect(
+      screen.getByText(
+        'change_proposal.achievement.settled_with_percent|{"percent":50}',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('change_proposal_viewer.per_page_notifications.enabled'),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: '#deadbeef' }).getAttribute('href'),
+    ).toBe('/me/change-proposals/base0000deadbeef');
+    expect(screen.getByText('change_proposal.link.based_on')).toBeTruthy();
+  });
+
+  it('places none of them when core returned no requester state and no base', () => {
+    render(<ProposalSummaryHeader proposal={createProposal()} />);
+    expect(screen.queryByText(/change_proposal.achievement/)).toBeNull();
+    expect(screen.queryByText(/per_page_notifications/)).toBeNull();
+    expect(screen.queryByText('change_proposal.link.based_on')).toBeNull();
+  });
+
   it('omits the model name when core returned none', () => {
     render(<ProposalSummaryHeader proposal={createProposal()} />);
     expect(

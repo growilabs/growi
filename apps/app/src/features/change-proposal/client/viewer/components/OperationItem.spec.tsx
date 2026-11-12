@@ -67,6 +67,34 @@ const STATUSES: readonly OperationView['status'][] = [
 ];
 
 describe('OperationItem', () => {
+  describe('linked proposals', () => {
+    it('shows core-provided links with the relation word and detail page href', () => {
+      render(
+        <OperationItem
+          proposal={proposal}
+          operation={createOperation({
+            linkedProposals: [
+              { proposalId: 'aaaaaaaa11111111', relation: 'follow-up' },
+              { proposalId: 'bbbbbbbb22222222', relation: 'rework' },
+            ],
+          })}
+        />,
+      );
+      expect(
+        screen.getByRole('link', { name: '#11111111' }).getAttribute('href'),
+      ).toBe('/me/change-proposals/aaaaaaaa11111111');
+      expect(screen.getByText('change_proposal.link.follow_up')).toBeTruthy();
+      expect(screen.getByText('change_proposal.link.rework')).toBeTruthy();
+    });
+
+    it('shows no link words when core returned none', () => {
+      render(
+        <OperationItem proposal={proposal} operation={createOperation()} />,
+      );
+      expect(screen.queryByText(/change_proposal\.link\./)).toBeNull();
+    });
+  });
+
   describe('kind, status and reason', () => {
     it.each(STATUSES)('shows the status words for %s', (status) => {
       render(

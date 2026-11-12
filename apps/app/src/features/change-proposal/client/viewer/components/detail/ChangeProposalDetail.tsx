@@ -6,6 +6,7 @@ import { useSWRxChangeProposal } from '../../stores/use-swrx-change-proposal';
 import { OperationItem } from '../OperationItem';
 import { RequesterOnlySection } from '../RequesterOnlySection';
 import { ProposalSummaryHeader } from './ProposalSummaryHeader';
+import { RemainingOperationsList } from './RemainingOperationsList';
 import { RevertAllButton } from './RevertAllButton';
 import { RevertRequestModal } from './RevertRequestModal';
 import type { RevertRun } from './RevertResultList';
@@ -79,6 +80,7 @@ export const ChangeProposalDetail = ({
         />
       )}
       <RequesterOnlySection view={proposal} />
+      <RemainingOperationsList view={proposal} />
       <section>
         <h2 className="h5">{t('change_proposal_viewer.detail.operations')}</h2>
         {proposal.operations.map((operation) => (

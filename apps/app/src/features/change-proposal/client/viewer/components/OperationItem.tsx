@@ -12,6 +12,7 @@ import {
   REVERT_REFUSAL_REASON_LABEL_KEYS,
 } from '../../shared';
 import { toDiffPair } from '../stores/use-swrx-operation-diff';
+import { ProposalLinkChips } from './detail/ProposalLinkChips';
 import { OperationDiff } from './OperationDiff';
 import { RequesterActionSlot } from './RequesterActionSlot';
 
@@ -29,8 +30,14 @@ export const OperationItem = ({
   operation,
 }: OperationItemProps): JSX.Element => {
   const { t } = useTranslation();
-  const { type, status, reason, revertability, revertedByProposalId } =
-    operation;
+  const {
+    type,
+    status,
+    reason,
+    revertability,
+    revertedByProposalId,
+    linkedProposals,
+  } = operation;
 
   const renderPaths = (): JSX.Element => {
     if (
@@ -98,6 +105,12 @@ export const OperationItem = ({
             </Link>
           </span>
         )}
+        <ProposalLinkChips
+          links={(linkedProposals ?? []).map(({ proposalId, relation }) => ({
+            proposalId,
+            kind: relation,
+          }))}
+        />
         <RequesterActionSlot proposal={proposal} operation={operation} />
       </div>
       {toDiffPair(operation).type !== 'no-diff' && (

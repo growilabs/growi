@@ -29,6 +29,28 @@ const createSummary = (
 });
 
 describe('ChangeProposalSummaryItem', () => {
+  it('shows the lifecycle word of a requester item and nothing for a non-requester item', () => {
+    const { rerender } = render(
+      <ChangeProposalSummaryItem
+        proposal={createSummary({
+          isRequester: true,
+          requesterState: {
+            lifecycle: 'expired',
+            perPageNotifications: { value: true, isEnabledBySettings: true },
+          },
+        })}
+        dateTime="D"
+      />,
+    );
+    expect(screen.getByText('change_proposal.lifecycle.expired')).toBeTruthy();
+    expect(screen.queryByText(/per_page_notifications/)).toBeNull();
+
+    rerender(
+      <ChangeProposalSummaryItem proposal={createSummary()} dateTime="D" />,
+    );
+    expect(screen.queryByText('change_proposal.lifecycle.expired')).toBeNull();
+  });
+
   it('shows requester, entry word, model name, date and overall status word', () => {
     render(
       <ChangeProposalSummaryItem

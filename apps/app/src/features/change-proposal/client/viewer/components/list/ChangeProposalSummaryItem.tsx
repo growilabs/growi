@@ -8,6 +8,7 @@ import UserDate from '~/components/User/UserDate';
 import type { ChangeProposalSummaryView } from '../../../../interfaces';
 import { buildProposalHref, PROPOSAL_STATUS_LABEL_KEYS } from '../../../shared';
 import { ENTRY_LABEL_KEYS } from '../../domain';
+import { ProposalProgressLabel } from '../detail/ProposalProgressLabel';
 
 const INITIAL_VISIBLE_PATH_COUNT = 3;
 
@@ -49,6 +50,7 @@ export const ChangeProposalSummaryItem = ({
           <span className="badge text-bg-secondary">
             {t(PROPOSAL_STATUS_LABEL_KEYS[status])}
           </span>
+          <ProposalProgressLabel view={proposal} />
         </div>
       </Link>
       {visiblePages.length > 0 && (
