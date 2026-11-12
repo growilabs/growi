@@ -5843,14 +5843,14 @@ class PageService implements IPageService {
       savedPage = await savedPage.save();
     }
 
-    // update scopes for descendants
-    if (options.overwriteScopesOfDescendants && populateError == null) {
-      this.applyScopesToDescendantsWithStream(savedPage, user, true);
-    }
-
     this.pageEvent.emit('update', savedPage, user, updateEventExtras);
     if (populateError != null) {
       throw populateError;
+    }
+
+    // update scopes for descendants
+    if (options.overwriteScopesOfDescendants) {
+      this.applyScopesToDescendantsWithStream(savedPage, user, true);
     }
 
     return savedPage;
