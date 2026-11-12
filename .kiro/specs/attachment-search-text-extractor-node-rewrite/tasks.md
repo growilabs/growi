@@ -305,9 +305,9 @@
   - _Requirements: 8.1, 8.2, 9.3, 9.5_
 
 - [ ] 9. 対象 spec に取り込み、この spec を消す
-- [ ] 9.1 ユーザー判断: Follow-ups のうち直すものを決める
+- [x] 9.1 ユーザー判断: Follow-ups のうち直すものを決める
   - brief.md の Follow-ups の一覧 (steering の `structure.md` と `tech.md`、root の `AGENTS.md` と `project-structure.md`、umbrella と下流 spec に残る Python や古いパスの記述) を示し、どれを直すかをユーザーに諮る
-  - ユーザーの判断が記録されている
+  - ユーザーの判断が記録されている: すべて直す (2026-11-12)。`services/attachment-text-extractor/CLAUDE.md` は 8.2 でディレクトリごと消えたので、残りの 5 つが対象
   - _Requirements: 12.6_
 - [ ] 9.2 対象 spec の requirements.md と design.md を書き直す
   - 対象 spec の design.md を、Node 版が最初からそうだったように書き直す (実行基盤、層の分け方の判断、子プロセスの作り方、`WORKERS` の無い設定の表とメモリの目安、`/readyz` の `dependencies`、Revalidation Triggers、下げた既定値があればその値)。以前の Python 版の経緯は本文に残さない
@@ -320,9 +320,9 @@
   - この spec の research.md の計測の結果、試作の決定と理由、ベンチマークの結果、崩した契約の記録 (7 節) を、対象 spec の research.md に移す。Node 版で意味を失った Python に固有の知見は消し、まだ判断の材料になるもの (別コンテナで動かす理由など) は残す
   - この spec のディレクトリを消しても失われる根拠が無いことを確かめる
   - _Requirements: 12.3_
-- [ ] 9.4 Follow-ups のうち、ユーザーが直すと決めたものを直す
+- [x] 9.4 Follow-ups のうち、ユーザーが直すと決めたものを直す
   - 9.1 の判断のとおりに直す。決めていないものは直さない
-  - 直したファイルの一覧が記録されている
+  - 直したファイルの一覧が記録されている: `.kiro/steering/structure.md` (`services/` の節を消した)、`.kiro/steering/tech.md` (Python の道具に触れた更新記録を消した)、ルートの `AGENTS.md` と `.claude/rules/project-structure.md` (一覧に `apps/attachment-text-extractor/` を足した)、umbrella の `attachment-search/README.md` (いまの置き場所と、古い調査記録が Python 前提の時期のものだという注記)、下流の `attachment-search-indexing` の brief / requirements / design / research / tasks (Python・FastAPI・`services/` のパス・k8s の manifest・OpenAPI の drift 検知の仕組みの記述)。umbrella の research.md・research-docker-image.md・design-review-fixes.md は、当時の記録なので書き換えていない
   - _Requirements: 12.6_
   - _Depends: 9.1_
 - [ ] 9.5 対象 spec の spec.json を更新し、この spec を削除する

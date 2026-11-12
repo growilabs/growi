@@ -14,7 +14,7 @@
 - [x] 1.2 orval による TS クライアント自動生成と drift 検知 CI を整備する
   - `openapi.json` を入力に `src/generated/` を再生成する `pnpm gen` スクリプトを追加する
   - CI に `pnpm -F @growi/attachment-text-extractor-client gen && git diff --exit-code packages/attachment-text-extractor-client/src/` を追加し、orval 出力 drift を検知する
-  - CI に `git diff --exit-code packages/attachment-text-extractor-client/openapi.json` を追加し、上流 Python CI との 2 段 drift 検知を有効化する (上流 export 忘れ時に本 spec 側の CI が赤くなることを観察)
+  - CI に `git diff --exit-code packages/attachment-text-extractor-client/openapi.json` を追加し、上流のテスト (`export-openapi.integ.ts`) との 2 段 drift 検知を有効化する (上流 export 忘れ時に本 spec 側の CI が赤くなることを観察)
   - _Requirements: 2.1_
   - _Boundary: packages/attachment-text-extractor-client, CI_
   - _Depends: 1.1_

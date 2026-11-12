@@ -109,18 +109,18 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
 ### 既存パターン参考
 
 - `apps/pdf-converter` + `packages/pdf-converter-client` が Ts.ED (Node.js) + orval + axios で同パターンを構成
-- FastAPI も `/openapi.json` を自動生成するため spec 入力は同じ形で扱える ([FastAPI SDK generation docs](https://fastapi.tiangolo.com/advanced/generate-clients/))
+- 抽出サービスも route 定義から OpenAPI document を生成するため spec 入力は同じ形で扱える
 
 ### 採用パイプライン
 
-1. 上流 `services/attachment-text-extractor/scripts/export-openapi.py` が `/openapi.json` を `packages/attachment-text-extractor-client/openapi.json` に書き出し (上流 spec 責務)
+1. 上流 `apps/attachment-text-extractor/scripts/export-openapi.ts` が OpenAPI document を `packages/attachment-text-extractor-client/openapi.json` に書き出し (上流 spec 責務)
 2. `packages/attachment-text-extractor-client` の turbo task で orval を実行し TS クライアント生成
 3. CI で上流 spec と下流 committed artifact の差分を検出する `check-openapi-drift` task を追加
 4. 差分検知時はビルド失敗、手動で orval 再生成して commit する運用
 
 ### 検討したが不採用の方式
 
-- **ビルド時動的生成**: turbo の依存グラフに Python ビルドが混入するリスク。commit artifact 方式で監査性と再現性を確保
+- **ビルド時動的生成**: turbo の依存グラフにサービス側の export 実行が混入するリスク。commit artifact 方式で監査性と再現性を確保
 - **drift 検知なし**: 上流変更が下流を silent break するリスクがあるため必須
 
 ## 7. 添付権限スナップショット vs lookup

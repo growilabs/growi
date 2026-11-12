@@ -2,7 +2,7 @@
 
 ## Overview
 
-本 spec は GROWI 添付ファイル全文検索機能のうち **apps/app サーバ側の統合層** を定義する。上流 `attachment-search-text-extractor` spec が提供する FastAPI 抽出マイクロサービスを `packages/attachment-text-extractor-client` (orval 生成) 経由で呼び出し、添付ファイル専用 Elasticsearch インデックス (`attachments`) への書き込みを行う。既存の `AttachmentService` / `ElasticsearchDelegator` / `SearchService` / `ConfigManager` の拡張点を用い、独立サブシステムを作らずに feature module として統合する。
+本 spec は GROWI 添付ファイル全文検索機能のうち **apps/app サーバ側の統合層** を定義する。上流 `attachment-search-text-extractor` spec が提供する抽出マイクロサービス (`apps/attachment-text-extractor`) を `packages/attachment-text-extractor-client` (orval 生成) 経由で呼び出し、添付ファイル専用 Elasticsearch インデックス (`attachments`) への書き込みを行う。既存の `AttachmentService` / `ElasticsearchDelegator` / `SearchService` / `ConfigManager` の拡張点を用い、独立サブシステムを作らずに feature module として統合する。
 
 **Purpose**: apps/app 内で「抽出結果を ES へ upsert / 権限変更や削除を追従 / 一括再インデックスと個別再抽出を提供 / 検索クエリを multi-index で集約」する責務を完結させる。
 
@@ -21,7 +21,7 @@
 
 ### Non-Goals
 
-- Python 抽出サービス本体・Dockerfile・k8s manifest (上流 `attachment-search-text-extractor` spec)
+- 抽出サービス本体・Dockerfile・運用者向け手順書 `docker/README.md` (上流 `attachment-search-text-extractor` spec)
 - 検索結果 UI / 添付一覧モーダル UI / 管理画面 UI (下流 `attachment-search-ui` spec)
 - 既存 Page 検索のクエリ・ランキング・権限モデル本体の改変
 - 添付ファイル保管方式の変更
@@ -48,7 +48,7 @@
 
 ### Out of Boundary
 
-- Python 抽出サービス本体、FastAPI ルータ、Dockerfile、docker-compose / k8s manifest、NetworkPolicy (**`attachment-search-text-extractor` spec**)
+- 抽出サービス本体 (HTTP ルータを含む)、Dockerfile、docker-compose、運用者向け手順書 `docker/README.md` (ネットワーク分離などの運用条件を含む) (**`attachment-search-text-extractor` spec**)
 - 検索結果 UI コンポーネント (`AttachmentHitCard` / `AttachmentSubEntry` / `SearchResultFacetTabs`)、添付モーダルの「再抽出」ボタン、管理画面 (`AttachmentSearchSettings` / `AttachmentExtractionFailures` / `RebuildWithAttachmentsCheckbox`)、ユーザ向けガイダンス文言 (**`attachment-search-ui` spec**)
 - 添付ファイル保管方式 (`FileUploader` 抽象は据え置き)
 - 既存 Page 検索 (Page/Comment) のクエリ・ランキング・権限モデル本体の改変
@@ -58,7 +58,7 @@
 
 ### Allowed Dependencies
 
-- **上流**: `attachment-search-text-extractor` spec が提供する FastAPI OpenAPI spec (`POST /extract`、`ExtractResponse` / `ErrorResponse`)、Docker image、デプロイ manifest
+- **上流**: `attachment-search-text-extractor` spec が提供する OpenAPI spec (`POST /extract`、`ExtractResponse` / `ErrorResponse`)、Docker image、運用者向け手順書 `docker/README.md`
 - 既存 `AttachmentService.addAttachHandler` / `addDetachHandler` (ハンドラ登録のみ)
 - 既存 `ElasticsearchDelegator` (composition で添付向けメソッド合成、既存 Page 系メソッドは不変)。`searchAccessiblePages` からは既存の `createSearchQuery()` / `appendCriteriaForQueryString()` / `appendCriteriaForGroupFilter()` / `filterPagesByViewer()` を呼び出しのみで使う
 - 既存 `SearchService` の `parseSearchQuery()` / `resolve()` / `resolveFilterData()` (呼び出しのみ。演算子の解析ロジックは複製しない)
@@ -108,7 +108,7 @@
 ```mermaid
 graph TB
     subgraph upstream [Upstream - attachment-search-text-extractor spec]
-        FastAPI[FastAPI /extract]
+        Extractor[抽出サービス /extract]
     end
 
     subgraph downstream [Downstream - attachment-search-ui spec]
@@ -156,7 +156,7 @@ graph TB
     OrphanSweeper --> ESDelegator
 
     Extractor --> Client
-    Client -->|HTTP multipart| FastAPI
+    Client -->|HTTP multipart| Extractor
 
     SearchService -->|primary: 優先 slot 駆動<br/>facet=all は pages viewer-filtered、facet=attachments は attachments + ids 指定の page 検索で権限と絞り込み| ESDelegator
     SearchService -->|secondary: primary の pageId に<br/>terms 絞り + content match| ESDelegator
@@ -233,11 +233,11 @@ packages/attachment-text-extractor-client/
 
 #### OpenAPI / orval drift 検知パイプライン
 
-- **openapi.json**: 上流 `services/attachment-text-extractor/scripts/export_openapi.py` が `packages/attachment-text-extractor-client/openapi.json` を直接上書き生成。**commit 必須**
+- **openapi.json**: 上流 `apps/attachment-text-extractor/scripts/export-openapi.ts` (`pnpm run export-openapi`) が、route 定義から生成した OpenAPI を `packages/attachment-text-extractor-client/openapi.json` に書き出す。**commit 必須**
 - **orval 生成物 (`src/`)**: 本 spec の responsibility として commit する。開発者が `openapi.json` 更新時に orval を実行して commit、または CI が regenerate → diff check
-- **Python CI (上流 spec)**: `export_openapi.py` 実行 + `git diff --exit-code packages/attachment-text-extractor-client/openapi.json` で drift 検知
-- **Node CI (本 spec)**: orval 実行 + `git diff --exit-code packages/attachment-text-extractor-client/src/` で drift 検知
-- **turbo 依存での build 時再生成は不使用**: `services/` が pnpm workspace / turbo pipeline 外であるため、`pdf-converter-client` のような `dependsOn: ["@growi/pdf-converter#gen:swagger-spec"]` パターンは適用不可。commit artifact + 両 CI diff check が言語境界を跨ぐための最適解
+- **上流のテスト (上流 spec)**: `apps/attachment-text-extractor/test/openapi/export-openapi.integ.ts` が、サービスが生成する OpenAPI と commit 済み `openapi.json` を `scripts/check-openapi-drift.ts` で比較し、差があれば失敗する (`ci-attachment-text-extractor.yml` が実行)
+- **apps/app の CI (本 spec)**: `ci-app.yml` の "Check attachment-text-extractor-client orval drift" ステップが orval (`pnpm -F @growi/attachment-text-extractor-client gen`) を実行し、`git diff --exit-code` で `src/` と `openapi.json` の差分を検知する
+- **turbo 依存での build 時再生成は不使用**: クライアントの build は commit 済み `openapi.json` から orval を実行するだけで、サービス側の export を turbo の `dependsOn` には繋がない (`pdf-converter-client` の `dependsOn: ["@growi/pdf-converter#gen:swagger-spec"]` のようなパターンは使わない)。`openapi.json` はサービス変更時に手で再生成して commit し、上記のテストと CI の diff check で古さを検知する
 
 ### Modified Files
 
@@ -268,7 +268,7 @@ sequenceDiagram
     participant Idx as AttachmentSearchIndexer
     participant Ext as AttachmentTextExtractorService
     participant Mk as attachment-text-extractor-client
-    participant Upstream as FastAPI (upstream)
+    participant Upstream as 抽出サービス (upstream)
     participant ES as Elasticsearch
     participant Log as FailureLog
 
@@ -541,7 +541,7 @@ Key decisions:
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
-| AttachmentTextExtractorClient (packages) | Package (TS) | 抽出 API の型安全クライアント (orval 生成) | 2.1, 6.1, 7.1, 1.3 | orval (P0), upstream FastAPI (P0) | Service |
+| AttachmentTextExtractorClient (packages) | Package (TS) | 抽出 API の型安全クライアント (orval 生成) | 2.1, 6.1, 7.1, 1.3 | orval (P0), upstream 抽出サービス (P0) | Service |
 | AttachmentTextExtractorService | Server | クライアント wrapper + 失敗正規化 + 到達不可 fallback | 1.1, 1.2, 1.3, 1.4, 2.1 | AttachmentTextExtractorClient (P0), FileUploader (P0) | Service |
 | AttachmentSearchIndexer | Server | attach/detach/reextract/bulk の単一窓口、rebuild window 中は live + tmp への dual-write | 2.1–2.5, 3.1, 3.4, 7.1 | TextExtractor (P0), ESDelegator extension (P0), AttachmentReindexBatch (P0, lifecycle 参照), FailureLogService (P1) | Service, Event |
 | AttachmentOrphanSweeper | Server | rebuildIndex 内で親 Page 不在の添付 doc を eventual cleanup | 3.2, 4.4 | Page model (P0), ESDelegator extension (P0) | Batch |
@@ -1317,8 +1317,8 @@ interface IAttachmentHit {
 - **extractorUri allowlist (SSRF 防御、最小限)**: admin PUT での URI 受理時に (1) スキーム検証 (`http`/`https` のみ) と (2) クラウドメタデータ endpoint IP literal のピンポイント拒否 (`169.254.169.254` / `fd00:ec2::254` / `100.100.100.200` / `192.0.0.192`) のみを適用。k8s 内部 DNS / loopback / RFC1918 は許可する (正当な k8s / docker-compose デプロイで頻用)。DNS rebinding 対策として実呼び出し時に名前解決結果を再検証し、metadata IP literal に解決された場合のみ reject。admin 乗っ取り時の任意 URL (attacker.com) への添付流出リスクは admin アカウント保護の責務として切り分け、allowlist ではなく Bearer auth + NetworkPolicy で多層防御する設計
 - **Bearer auth (extractorToken)**: 上流抽出サービスへの全リクエストに `Authorization: Bearer` を付与。token は encrypted Config storage に保存し、admin GET API では `hasExtractorToken: boolean` のみ返却 (値は露出しない)。SSR props にも token 値は含めない。401 応答は `serviceUnreachable` に正規化して機能を自動 soft-disable、admin が token 不整合に気付くよう pino ERROR + FailureLog に記録
 - **fire-and-forget 下の可視性**: ハンドラが例外を握りつぶす特性を前提とし、FailureLog 永続化と pino ログを確実に呼ぶ二重経路で失敗を補足
-- **OpenAPI drift 検知**: `packages/attachment-text-extractor-client/openapi.json` を committed artifact とし、CI で上流 `services/attachment-text-extractor/` の `/openapi.json` と差分検知
-- **secret 管理**: `extractorToken` のみ encrypted storage に保持、admin GET API では値を露出しない (write-only)。それ以外の機能固有 secret は持たない (markitdown の外部 API キーは上流 spec 側で不使用と定義)
+- **OpenAPI drift 検知**: `packages/attachment-text-extractor-client/openapi.json` を committed artifact とし、CI で上流 `apps/attachment-text-extractor` が route 定義から生成する OpenAPI と差分検知
+- **secret 管理**: `extractorToken` のみ encrypted storage に保持、admin GET API では値を露出しない (write-only)。それ以外の機能固有 secret は持たない (外部 API キーは上流 spec 側で不使用と定義)
 
 ## Performance & Scalability
 
@@ -1387,7 +1387,7 @@ flowchart LR
 
 ## Open Questions / Risks
 
-1. ~~**OpenAPI drift 検知 CI の具体コマンド**: `pnpm turbo` + orval + 上流 `/openapi.json` エクスポートの pipeline 配線。実装時に確定~~ **[Resolved]** `openapi.json` と orval 生成物の両方を commit、Python CI で export 後の `git diff --exit-code openapi.json`、Node CI で orval 後の `git diff --exit-code src/` の 2 段 drift 検知を採用 (上記 File Structure Plan OpenAPI パイプラインセクション)
+1. ~~**OpenAPI drift 検知 CI の具体コマンド**: `pnpm turbo` + orval + 上流 `/openapi.json` エクスポートの pipeline 配線。実装時に確定~~ **[Resolved]** `openapi.json` と orval 生成物の両方を commit、上流のテスト (`export-openapi.integ.ts`) でサービス生成の OpenAPI と commit 済み `openapi.json` の差分を検知、`ci-app.yml` で orval 再生成後の `git diff --exit-code` により `src/` と `openapi.json` の差分を検知する 2 段 drift 検知を採用 (上記 File Structure Plan OpenAPI パイプラインセクション)
 2. ~~**権限イベント網羅性**: `updateMany` / `syncDescendantsUpdate` で全権限変更経路を捕捉できているか、`pageEvent` 全リスナの整合性を実装時に確認~~ **[Resolved: Option D 採用により自動解決]** 添付側は権限を保持せず query-time に page_index を参照するため、pageEvent 購読の網羅性は添付検索の正しさには影響しない (page_index 側の同期が既に妥当であれば自動的に添付検索にも反映される)
 3. **優先 slot 駆動検索の実測性能**: kuromoji + ngram analyzer を添付 index に適用した際の p95、`facet=attachments` primary の ids 指定 page 検索のレイテンシ分布、safety net 閾値 (primary 800ms / secondary 500ms) の妥当な値
 4. ~~**permission lookup の scale 監視 (新規 Risk)**: 1 クエリで 10k 件超の missing pageIds が発生するケース (巨大テナント × 添付ヒット多数のファセット検索) の ES 側性能。terms filter サイズの上限設定、page_index `max_terms_count` への抵触、および必要なら size chunking 戦略を実装時に検証~~ **[Resolved: 優先 slot 駆動モデル採用により構造的に消滅]** permission lookup 対象は常にページサイズ (default 20) bounded になり、terms 爆発リスクが構造的に発生しない
@@ -1396,4 +1396,4 @@ flowchart LR
 6. **中断後 tmp index の自動クリーンアップと orphan sweeper の統合運用**: 初期は tmp index を手動削除、orphan sweeper は rebuildIndex 内のみで動作。両者が別時点で発生するため、運用 runbook 上の役割分担と失敗時のリカバリ手順を実装時に明文化する必要あり
 7. **`packages/attachment-text-extractor-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
 9. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒 TTL in-memory cache を持たせたものの、horizontal scale 時は pod ごとに cache が独立するため admin GET 連打で全 pod が個別に agg を叩きうる。tenant scope の term filter / `precision_threshold` 指定 / Redis shared cache による緩和 / MongoDB 上の counter doc 化 (`syncAttachmentIndexed` で inc / `onDetach` で dec) への置換、いずれかを post-launch で検討 (初期実装は 30 秒 TTL のまま出荷)
-10. **PDF fallback の N-page full-parse コスト**: markitdown PR #1263 未マージ時の pdfminer.six fallback は `page_numbers=[i]` で繰り返し呼ぶため、N ページ PDF を N 回 full-parse する。200 ページの PDF で線形に増えるレイテンシ。PR マージ後に fallback を削除する計画だが、それまでは大ページ数 PDF の extraction timeout が顕在化しうる (上流側 `TIMEOUT_S=60` が safety net)。実装時に pdfminer の `extract_pages(doc)` iterator 単回呼び出し + per-page buffering 版に差し替え可能かも併せて検討
+10. ~~**PDF fallback の N-page full-parse コスト**: markitdown PR #1263 未マージ時の pdfminer.six fallback は `page_numbers=[i]` で繰り返し呼ぶため、N ページ PDF を N 回 full-parse する。200 ページの PDF で線形に増えるレイテンシ。PR マージ後に fallback を削除する計画だが、それまでは大ページ数 PDF の extraction timeout が顕在化しうる (上流側 `TIMEOUT_S=60` が safety net)。実装時に pdfminer の `extract_pages(doc)` iterator 単回呼び出し + per-page buffering 版に差し替え可能かも併せて検討~~ **[Resolved: 前提が消滅]** 上流の抽出サービスは PDF を PDFium (WASM) で抽出しており、pdfminer.six の fallback は存在しないため、このコストは発生しない

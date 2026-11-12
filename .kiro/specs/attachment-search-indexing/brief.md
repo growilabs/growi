@@ -35,7 +35,7 @@
 - **ES delegator 拡張**: 独立 delegator を作らず、既存 `ElasticsearchDelegator` に `syncAttachment*` メソッドと `addAllAttachments()` を composition で追加
 - **Indexer 単一窓口**: `AttachmentSearchIndexer.indexAttachment(attachmentId)` が attach/detach/reextract/bulk すべてのエントリポイント (Synthesis で汎化済み)
 - **権限スナップショット**: 添付 ES 文書に `grant` / `granted_users` / `granted_groups` をコピーして保持。親ページ変更時に `update_by_query` で partial update
-- **Client package**: `packages/attachment-text-extractor-client/` を新規追加。orval が `services/attachment-text-extractor/` の OpenAPI spec を入力に TS クライアントを自動生成 (pdf-converter-client と同パターン)
+- **Client package**: `packages/attachment-text-extractor-client/` を新規追加。orval が `apps/attachment-text-extractor` の OpenAPI spec (commit 済みの `openapi.json`) を入力に TS クライアントを自動生成 (pdf-converter-client と同パターン)
 - **Config keys**: `app:attachmentFullTextSearch:enabled` / `extractorUrl` / `maxFileSizeBytes` / `timeoutMs` / `maxConcurrency` を [config-definition.ts](apps/app/src/server/service/config-manager/config-definition.ts) に追加
 - **検索クエリ**: ES `_msearch` で page_index と attachments_index を並列クエリ、app 側で `pageId` 集約。viewer フィルタは既存 `filterPagesByViewer` と同じ権限モデル
 - **性能 fallback**: 添付 msearch が設定閾値を超過したら添付ヒットを除外し Page 結果のみ返す safety net
@@ -73,7 +73,7 @@
 - [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js): `PUT /search/indices` に `includeAttachments` フラグ受理。添付を含む作り直しは裏で実行して即応答し、完了・失敗は Socket.io で通知
 
 ### Out
-- Python 抽出サービス本体の実装 — `attachment-search-text-extractor` spec (前段 spec)
+- 抽出サービス本体 (`apps/attachment-text-extractor`) の実装 — `attachment-search-text-extractor` spec (前段 spec)
 - 検索結果 UI / 添付モーダル UI / 管理画面 UI — `attachment-search-ui` spec (後段 spec)
 - OpenAPI export script の実装 — `attachment-search-text-extractor` spec
 - 添付ファイル自体の保管方式変更 (FileUploader 抽象は据え置き)
@@ -130,5 +130,5 @@
 - **マルチテナント**: 共有 ES クラスタの ingest ノード上では抽出処理を実行しない (apps/app 側で完結)。抽出サービスの同時実行上限で他テナント影響を抑える
 - **ハンドラの fire-and-forget 特性**: 例外は pino ログと FailureLog 永続化で確実に捕捉する (UI に通知する経路は別 spec の admin UI が担当)
 - **API 後方互換**: `IPageWithSearchMeta.attachmentHits` は optional に限定、既存クライアントが破壊的変更を受けないこと
-- **OpenAPI drift 検知**: CI で `services/attachment-text-extractor/` の OpenAPI spec と `packages/attachment-text-extractor-client/openapi.json` の差分を検知し、古いクライアントでのビルドを防ぐ
+- **OpenAPI drift 検知**: CI で `apps/attachment-text-extractor` が route 定義から生成する OpenAPI spec と `packages/attachment-text-extractor-client/openapi.json` の差分を検知し、古いクライアントでのビルドを防ぐ
 - **rebuildIndex 中断時の方針**: best-effort 冪等バッチ (alias swap 未実行で旧 index 維持、admin の再実行で最初からやり直し)。チェックポイント再開は初期実装では採用しない

@@ -36,7 +36,7 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 
 - **In**: 添付 ES インデックス mapping / ハンドラ登録 / 権限変更連動 / 一括再インデックス / 個別再抽出 API / 失敗ログ model / admin API (設定・失敗ログ) / multi-index 検索集約 / 応答型拡張 / Config キー追加 (`extractorUri` / `timeoutMs` / `maxFileSizeBytes` の 3 キー、`extractorUri` は admin Config として扱う) / `packages/attachment-text-extractor-client` orval パイプライン
 - **Out**:
-  - Python 抽出サービス本体の実装・Dockerfile・k8s manifest (上流 `attachment-search-text-extractor` spec の責務)
+  - 抽出サービス本体の実装・Dockerfile・運用者向け手順書 `docker/README.md` (上流 `attachment-search-text-extractor` spec の責務)
   - 検索結果 UI / 添付一覧モーダル UI / 管理画面 UI (下流 `attachment-search-ui` spec の責務)
   - 添付ファイル保管方式の変更 (`FileUploader` 抽象は据え置き)
   - 既存 Page 検索のクエリ・ランキング・権限モデル本体の改変
@@ -50,7 +50,7 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
 - ES バージョン: 既存のサポート範囲 (8/9) に従う (mapping 変種を `attachments-mappings-esN.ts` に分離)
 - 非互換ゼロ: 機能無効時は既存検索 API のレイテンシ・結果順序・応答形式を機能導入前と同一にする
 - API 後方互換: `IPageWithSearchMeta.attachmentHits` は optional に限定
-- OpenAPI drift 検知: CI で上流 `services/attachment-text-extractor/` の OpenAPI spec と `packages/attachment-text-extractor-client/openapi.json` の差分を検知
+- OpenAPI drift 検知: CI で上流 `apps/attachment-text-extractor` が生成する OpenAPI spec と `packages/attachment-text-extractor-client/openapi.json` の差分を検知
 - ハンドラ fire-and-forget 特性: 例外は pino ログと FailureLog 永続化で確実に捕捉
 
 詳細は [brief.md](./brief.md) を参照。
@@ -85,7 +85,7 @@ GROWI の Elasticsearch 連携では Page の `path` / `body` / `comments` の�
   - `packages/attachment-text-extractor-client` の orval 生成パイプラインと OpenAPI drift 検知
 
 - **Out of scope (他 spec の責務)**:
-  - **上流 (`attachment-search-text-extractor` spec)**: Python FastAPI 抽出サービス本体、Dockerfile、docker-compose / k8s manifest、セキュリティハードニング、OpenAPI エクスポートスクリプト
+  - **上流 (`attachment-search-text-extractor` spec)**: 抽出サービス本体、Dockerfile、docker-compose、運用者向け手順書 `docker/README.md` (運用条件)、セキュリティハードニング、OpenAPI エクスポートスクリプト
   - **下流 (`attachment-search-ui` spec)**: 検索結果 UI (左ペイン集約・右ペイン添付ヒットカード・ファセットタブ)、添付ファイル一覧モーダルの「再抽出」ボタン、管理画面の設定フォーム・失敗ログパネル・rebuild チェックボックス・UI ガイダンス文言
   - 添付ファイル本体の保管方式変更 (`FileUploader` は据え置き)
   - 既存 Page 検索 (Page/Comment) のクエリ・ランキング・権限モデル本体の改変
