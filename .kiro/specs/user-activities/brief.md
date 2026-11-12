@@ -1,5 +1,7 @@
 # Brief: user-activities
 
+> これは discovery 時点の記録である。design.md や requirements.md と食い違うところは、そちらが現在の内容である。
+
 ## Problem
 
 ユーザーページの「最近の活動」は、`GET /_api/v3/user-activities` が返す操作履歴の一覧を表示している。この API について、次の点を定めた仕様の文書が無い。

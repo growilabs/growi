@@ -183,12 +183,12 @@
 ### 条件を `aggregateRaw` と `findRaw` に渡す形
 
 - **Context**: activities への問い合わせは Prisma の `aggregateRaw` で、pages への問い合わせは `findRaw` で実行する。`generateGrantCondition` が返す条件には ObjectId の値が入る。ページの ID の一覧も、問い合わせの間で受け渡す。
-- **Sources Consulted**: `apps/app/src/server/util/prisma-raw-normalize.ts`
-- **Findings**:
-  - `aggregateRaw` と `findRaw` に ObjectId を渡すには `{ $oid: string }` の形にする必要がある。1 つの ID を変換する `toRawObjectId` はあるが、条件のオブジェクト全体をたどって変換する関数は無い。
-  - 既存の変換の仕組み（同じファイルが応答の正規化に使っているもの）を入力側にも使えるかは、確認できていない。
-  - `findRaw` を apps/app で使っている箇所があるかは、確認していない。
-- **Implications**: design は「条件に含まれる ObjectId を、`aggregateRaw` と `findRaw` が受け付ける形に変換する」という契約だけを定める。実装では、まず既存の仕組みで足りるかを確認し、足りなければ条件をたどって置き換える小さな関数を `prisma-raw-normalize.ts` に足す。ページの ID の一覧は、文字列で受け渡し、問い合わせを組み立てるところで `toRawObjectId` で変換する。
+- **Sources Consulted**: `apps/app/src/server/util/prisma-raw-normalize.ts`、devcontainer の MongoDB に対する結合テスト
+- **Findings**（実装時に実測で確かめた）:
+  - `aggregateRaw` と `findRaw` に ObjectId を渡すには `{ $oid: string }` の形にする必要がある。mongoose の ObjectId をそのまま `findRaw` に渡すと、エラーにならずに 0 件が返る。
+  - 条件のオブジェクト全体をたどって変換するには `toRawFilter`（同じファイル）を使う。変換するのは ObjectId のインスタンスだけで、文字列の ID と Date は変換しない。そのため、閲覧者の ID やグループの ID は、ObjectId のインスタンスにしてから条件に入れる。
+  - 値が `undefined` の条件は、送信時にキーごと消える。既存の `addConditionToExcludeWipPage` は `{ wip: undefined }` と書いているので、同じ形で `findRaw` に渡すと、その分岐が空になって全ページに一致する。WIP を除外する条件は `{ wip: null }` と書く。
+- **Implications**: ページの条件は `toRawFilter` で変換してから渡す。ページの ID の一覧は文字列で受け渡し、問い合わせを組み立てるところで `toRawObjectId` で変換する。`PageQueryBuilder` の条件を書き写すときは、`undefined` を使った条件が無いかを確かめる。
 
 ### 画面がページについて使う項目
 
@@ -221,7 +221,6 @@
 - **Selected Approach**: 行ごと返さない。行を絞る手順は、次の Decision で定める。
 - **Rationale**: 総件数と返す行が自然に一致する。存在しないページへの履歴と閲覧できないページへの履歴は、どちらも返らないので区別できない。実測で、見込まれる件数（数千件）では数十 ms に収まった。
 - **Trade-offs**: 履歴が極端に多いユーザーでは遅くなる（100,000 件で 141〜688 ms）。
-- **Follow-up**: 実装時に、結合テストで総件数と返す行の一致を確認する。
 
 ### Decision: ページを重複なく調べてから、履歴を絞る（問い合わせ 3 回）
 
@@ -236,7 +235,6 @@
 - **Trade-offs**:
   - 2 回目と 3 回目の問い合わせの間にページの公開範囲が変わると、2 回目の時点の判定で行が返る。
   - 1 人が操作したページの数が非常に多いと、問い合わせの間で受け渡す ID の一覧が大きくなる（実測は 20,000 ページまで）。
-- **Follow-up**: Prisma を通した実際のコードでの応答時間は、Research Log の「ページを重複なく調べる形の実測」に記録した（基準の 100 ms 以内）。実測で確認していないことも同じ節に挙げた。
 
 ### Decision: 閲覧範囲は、一覧向けの管理設定に従う
 
@@ -244,10 +242,9 @@
 - **Alternatives Considered**:
   1. 一覧向けの管理設定に従う（検索・ページ一覧と同じ）
   2. 設定によらず、閲覧者が開けるページだけにする
-- **Selected Approach**: 一覧向けの管理設定に従う（ユーザー判断、2026-11-10）。要件 2.1 と 2.5 は、この決定に合わせて「既存の一覧が見せないページ」を基準にする書き方へ直した。
+- **Selected Approach**: 一覧向けの管理設定に従う（ユーザー判断、2026-11-10）。要件 2.1 と 2.5 は「既存の一覧が見せないページ」を基準にして書いてある。
 - **Rationale**: この API 専用の範囲を作らないという方針に合う。管理者が「制限付きページを一覧に出さない」と設定すれば、この API もそれに従う。
 - **Trade-offs**: 既定の設定では、閲覧者が開けない制限付きページのパスも、既存の一覧と同じように返る。
-- **Follow-up**: 設定の両方の値について、結合テストで確認する。
 
 ### Decision: リンク限定のページは含めない
 
@@ -259,13 +256,12 @@
 - **Rationale**: `GET /users/:id/recent` は本人が作ったページの一覧なので、本人なら必ず開ける。操作履歴には、他人が作ったリンク限定のページへの操作（いいね、コメント）も含まれるので、同じ理屈が成り立たない。要件 2.2 が基準にする検索・ページ一覧もリンク限定を含めない。
 - **Trade-offs**: 本人が自分のリンク限定のページを操作した履歴も、一覧に出ない。
 
-### Decision: ごみ箱のページと WIP のページは含めない
+### Decision: ごみ箱のページ、WIP のページ、空ページは含めない
 
-- **Context**: 既存の一覧はごみ箱のページを除外する。「最近の活動」画面は、公開済みでないページと WIP のページのパスを表示しない。
-- **Selected Approach**: 操作対象のページが、ごみ箱にあるか WIP であれば、その履歴を返さない。条件は `PageQueryBuilder` の `addConditionToExcludeTrashed` と `addConditionToExcludeWipPage` と同じ内容にする。
+- **Context**: 既存の一覧は、ごみ箱のページと空ページ（子ページを置くためだけに存在する、本文の無いページ）を除外する。「最近の活動」画面は、公開済みでないページと WIP のページのパスを表示しなかった。
+- **Selected Approach**: 操作対象のページが、ごみ箱にあるか、WIP であるか、空ページであれば、その履歴を返さない。条件は `PageQueryBuilder` の `addConditionToExcludeTrashed`、`addConditionToExcludeWipPage`、および `PageQueryBuilder` が空ページを含めない指定のときに足す条件と同じ内容にする。空ページを除くことはユーザー判断（2026-11-12）。
 - **Rationale**: 既存の一覧と、画面がこれまでパスを表示してきた範囲の両方に合う。
 - **Trade-offs**: ページの削除と完全削除の履歴は、操作対象のページがごみ箱にあるか存在しないため、一覧に出ない。復元すると、そのページへの履歴は再び一覧に出る。
-- **Follow-up**: この点は design.md に明記し、結合テストで確認する。
 
 ### Decision: 操作したユーザーの情報は、履歴の問い合わせとは別に 1 回だけ取得する
 
@@ -288,7 +284,6 @@
 - 2 回目と 3 回目の問い合わせの間にページの公開範囲が変わると、2 回目の時点の判定で行が返る — 2 つの問い合わせは続けて実行するので、ずれる時間は短い。次の呼び出しでは新しい公開範囲で判定される。
 - 同時に多数の呼び出しがある場合の応答時間は測っていない。
 - 既定の設定では、開けない制限付きページのパスが返る — 既存の一覧と同じ動きであり、要件の Adjacent expectations に明記した。
-- ObjectId の変換方法が未確定 — 契約だけを design に書き、実装の最初のタスクで確認する。
 
 ## References
 
