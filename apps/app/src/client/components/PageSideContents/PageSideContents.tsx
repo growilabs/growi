@@ -7,6 +7,7 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
 import { scrollToElement } from '~/client/util/smooth-scroll';
+import { CurrentRevisionProposalMark } from '~/features/change-proposal/client/viewer/marks';
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 import { showPageSideAuthorsAtom } from '~/states/server-configurations';
 import { useDescendantsPageListModalActions } from '~/states/ui/modal/descendants-page-list';
@@ -114,6 +115,7 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
             date={updatedAt}
             mode="update"
             locate="pageSide"
+            proposalMark={<CurrentRevisionProposalMark pageId={page._id} />}
           />
         </div>
       )}
