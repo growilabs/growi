@@ -65,7 +65,8 @@ export const createPageLinkBackfillJobModel = (
      * `running` / `failed` one that nobody holds or whose holder's lease has expired. Any
      * other status is never handed out (rationale: design.md, "Stop and resume").
      *
-     * A claim clears any stale `stopRequested`, in the same write.
+     * A claim from `requested` clears any stale `stopRequested` in the same write; a take-over
+     * of a `running` / `failed` job keeps it, so a live Stop is not lost.
      *
      * Expiry is judged on the database clock (`$$NOW`), so instances whose own clocks
      * disagree cannot steal a live claim from each other.
@@ -108,7 +109,13 @@ export const createPageLinkBackfillJobModel = (
         update: [
           {
             $set: {
-              stopRequested: false,
+              stopRequested: {
+                $cond: [
+                  { $eq: ['$status', 'requested'] },
+                  false,
+                  '$stopRequested',
+                ],
+              },
               claimedBy: { $literal: owner },
               status: 'running',
               leaseExpiresAt: { $add: ['$$NOW', leaseMs] },

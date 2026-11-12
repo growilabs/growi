@@ -267,6 +267,45 @@ describe('pagelinkbackfilljobs (integration)', () => {
       expect((await readJob())?.stopRequested).toBe(false);
     });
 
+    it('keeps a live stopRequested when taking over a running job whose lease expired', async () => {
+      await patchJobDocument({
+        status: 'running',
+        claimedBy: 'dead-owner',
+        leaseExpiresAt: { $date: '2000-01-01T00:00:00Z' },
+        stopRequested: true,
+      });
+
+      const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
+        leaseMs: LEASE_MS,
+      });
+
+      expect(claimed).toBe(true);
+      expect(await readJob()).toMatchObject({
+        status: 'running',
+        claimedBy: 'owner-b',
+        stopRequested: true,
+      });
+    });
+
+    it('keeps a live stopRequested when taking over an unheld failed job', async () => {
+      await patchJobDocument({
+        status: 'failed',
+        claimedBy: null,
+        stopRequested: true,
+      });
+
+      const claimed = await prisma.pagelinkbackfilljobs.tryClaim('owner-b', {
+        leaseMs: LEASE_MS,
+      });
+
+      expect(claimed).toBe(true);
+      expect(await readJob()).toMatchObject({
+        status: 'running',
+        claimedBy: 'owner-b',
+        stopRequested: true,
+      });
+    });
+
     it.each([
       0,
       -1,

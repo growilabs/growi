@@ -1045,8 +1045,9 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkResponse, IErrorV3
     at most one rest (about 15 s at 25% duty), which is why the UI shows "Stopping…" until the
     status changes. If the run's lease has already expired (a dead owner), the endpoint sets
     `stopped` directly, since no loop will see the flag.
-  - A claim clears any stale `stopRequested`, so a Stop clicked as a run finishes cannot stop the
-    next one at once.
+  - Only a claim from `requested` clears a stale `stopRequested`, so a Stop clicked as a run finishes
+    cannot stop the next one at once. A take-over of a `running` or `failed` job keeps the flag, so a
+    live Stop still takes effect at the next owner's checkpoint.
   - Resume (`POST resume`, valid only in `stopped`) sets `requested` and keeps `requestedScope`,
     `runCutoff` and the marker, so the run continues over the same range and redoes at most one
     checkpoint interval (idempotent upserts), the same path as crash recovery. A new start with a
