@@ -56,6 +56,8 @@ export const contextFor = (
   viewable: ViewablePages,
 ): VisibilityContext => ({
   isRequester: requesterId === viewerId,
+  isOriginalRequester: false,
+  revertProposalIdsByViewer: new Set(),
   viewablePageIds: viewable.viewablePageIds,
   anyoneWithLinkPageIds: viewable.anyoneWithLinkPageIds,
   deletedPageIds: viewable.deletedPageIds,

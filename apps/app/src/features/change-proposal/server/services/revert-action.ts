@@ -109,6 +109,8 @@ const readVisibleOperations = async (
   const viewable = await loadViewablePages(pageIds, user);
   const visible = selectVisibleOperations(proposal.operations, {
     isRequester: proposal.requester === user._id.toString(),
+    isOriginalRequester: false,
+    revertProposalIdsByViewer: new Set(),
     viewablePageIds: viewable.viewablePageIds,
     anyoneWithLinkPageIds: viewable.anyoneWithLinkPageIds,
     deletedPageIds: viewable.deletedPageIds,
