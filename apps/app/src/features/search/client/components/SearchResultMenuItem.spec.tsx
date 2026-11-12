@@ -137,7 +137,7 @@ describe('SearchResultMenuItem', () => {
       mockSearchResult(buildSearchResultItem());
       const { getItemProps } = setupGetItemProps();
 
-      const { container } = render(
+      render(
         <SearchResultMenuItem
           activeIndex={null}
           searchKeyword="memo"
@@ -145,10 +145,12 @@ describe('SearchResultMenuItem', () => {
         />,
       );
 
-      expect(screen.getByText(String(SEEN_USERS_COUNT))).toBeInTheDocument();
+      const count = screen.getByText(String(SEEN_USERS_COUNT));
+      expect(count).toBeInTheDocument();
 
-      // The footprint must not be squeezed out of the row.
-      expect(container.querySelector('.flex-shrink-0')).not.toBeNull();
+      // The footprint itself (not just any fixed part of the path) must not be
+      // squeezed out of the row.
+      expect(count.parentElement).toHaveClass('flex-shrink-0');
     });
   });
 
