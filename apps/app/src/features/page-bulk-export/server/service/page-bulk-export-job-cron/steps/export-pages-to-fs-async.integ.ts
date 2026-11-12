@@ -17,6 +17,7 @@ import {
   PageBulkExportJobStatus,
 } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import type { pagebulkexportjobs } from '~/generated/prisma/client';
+import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import type { IPageBulkExportJobCronService } from '..';
@@ -28,7 +29,9 @@ describe('exportPagesToFsAsync (real database)', () => {
   let tmpDir: string;
   let job: pagebulkexportjobs;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    // getPageWritable reads the attachment download timeout from config.
+    await configManager.loadConfigs();
     // getPageWritable resolves the exporting user via mongoose.model('User');
     // no fixture embeds an attachment image, so the user is never read.
     if (!mongoose.modelNames().includes('User')) {

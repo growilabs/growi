@@ -34,7 +34,11 @@ import ExternalUserGroupRelation from '~/features/external-user-group/server/mod
 import type { revisions } from '~/generated/prisma/client';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
-import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
+import type {
+  IOptionsForCreate,
+  IOptionsForInAppNotificationSuppression,
+  IOptionsForUpdate,
+} from '~/interfaces/page';
 import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config';
 import {
   PageDeleteConfigValue,
@@ -70,6 +74,7 @@ import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
 import { prisma } from '~/utils/prisma';
 
+import { capturePreviousGrantState } from '../../events/page';
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
@@ -88,7 +93,12 @@ import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { deleteCompletelyOperation as deleteCompletelyOperationImpl } from './delete-completely-operation';
 import { onSeen } from './events/seen';
 import { isGrantImmutablePath } from './grant-immutable-path';
-import type { IPageService } from './page-service';
+import type {
+  DeletionOptions,
+  DeletionVerdict,
+  EmptyTrashResult,
+  IPageService,
+} from './page-service';
 import { shouldUseV4Process } from './should-use-v4-process';
 
 export * from './page-service';
@@ -433,107 +443,140 @@ class PageService implements IPageService {
     return false;
   }
 
-  private async getAbsenseUserHomeList(
-    pages: PageDocument[],
-  ): Promise<string[]> {
-    const userHomepages = pages.filter((p) => isUsersHomepage(p.path));
-
-    const User = mongoose.model<IUser>('User');
-    const usernames = userHomepages
-      .map((page) => getUsernameByPath(page.path))
-      // see: https://zenn.dev/kimuson/articles/filter_safety_type_guard
-      .filter(
-        (username): username is Exclude<typeof username, null> =>
-          username !== null,
-      );
-    const existingUsernames = await User.distinct<string>('username', {
-      username: { $in: usernames },
-    });
-
-    return userHomepages
-      .filter((page) => {
-        const username = getUsernameByPath(page.path);
-        if (username == null) {
-          throw new Error('Cannot found username by path');
-        }
-        return !existingUsernames.includes(username);
-      })
-      .map((p) => p.path);
+  private async isProtectedUserHomepage(path: string): Promise<boolean> {
+    if (!isUsersHomepage(path)) {
+      return false;
+    }
+    if (!this.canDeleteUserHomepageByConfig()) {
+      return true;
+    }
+    return !(await this.isUsersHomepageOwnerAbsent(path));
   }
 
-  private async filterPages(
+  private async judgeDeletionWithGroups(
+    page: PageDocument,
+    user: IUserHasId,
+    { isCompletely, isRecursively }: DeletionOptions,
+    userRelatedGroups: PopulatedGrantedGroup[],
+  ): Promise<DeletionVerdict> {
+    const creatorId = await this.getCreatorIdForCanDelete(page);
+    const isPermitted = isCompletely
+      ? this.canDeleteCompletely(
+          page,
+          creatorId,
+          user,
+          isRecursively,
+          userRelatedGroups,
+        )
+      : this.canDelete(page, creatorId, user, isRecursively);
+    if (!isPermitted) {
+      return 'forbidden';
+    }
+    if (await this.isProtectedUserHomepage(page.path)) {
+      return 'protected_user_homepage';
+    }
+    return 'permitted';
+  }
+
+  /**
+   * Whether the user may delete the page. Every request to delete pages is
+   * judged here, directly or through filterPagesByDeletionAuthority.
+   */
+  async judgeDeletion(
+    page: PageDocument,
+    user: IUserHasId,
+    options: DeletionOptions,
+  ): Promise<DeletionVerdict> {
+    const userRelatedGroups = options.isCompletely
+      ? await this.pageGrantService.getUserRelatedGroups(user)
+      : [];
+    return this.judgeDeletionWithGroups(page, user, options, userRelatedGroups);
+  }
+
+  async filterPagesByDeletionAuthority(
     pages: PageDocument[],
     user: IUserHasId,
-    isRecursively: boolean,
-    canDeleteFunction: (
-      page: PageDocument,
-      creatorId: ObjectIdLike | null,
-      operator: any,
-      isRecursively: boolean,
-      userRelatedGroups: PopulatedGrantedGroup[],
-    ) => boolean,
+    options: DeletionOptions,
   ): Promise<PageDocument[]> {
     const userRelatedGroups =
       await this.pageGrantService.getUserRelatedGroups(user);
-    // An empty page is skipped by a non-recursive deletion, but deleting it
-    // recursively deletes everything under it, so it is judged then.
-    const shouldJudge = (p: PageDocument) => !p.isEmpty || isRecursively;
-    // Resolved up front: filter() treats a returned Promise as truthy and
-    // keeps every page, so the predicate below must stay synchronous.
-    const creatorIds = await Promise.all(
-      pages.map((p) =>
-        shouldJudge(p) ? this.getCreatorIdForCanDelete(p) : null,
-      ),
+    const verdicts = await Promise.all(
+      pages.map(async (page): Promise<DeletionVerdict> => {
+        // A non-recursive deletion skips an empty page, so its authority is
+        // judged only when everything under it is deleted along with it.
+        if (page.isEmpty && !options.isRecursively) {
+          return (await this.isProtectedUserHomepage(page.path))
+            ? 'protected_user_homepage'
+            : 'permitted';
+        }
+        return this.judgeDeletionWithGroups(
+          page,
+          user,
+          options,
+          userRelatedGroups,
+        );
+      }),
     );
-    const filteredPages = pages.filter((p, index) => {
-      if (!shouldJudge(p)) return true;
-      return canDeleteFunction(
-        p,
-        creatorIds[index],
-        user,
-        isRecursively,
-        userRelatedGroups,
-      );
-    });
-
-    if (!this.canDeleteUserHomepageByConfig()) {
-      return filteredPages.filter((p) => !isUsersHomepage(p.path));
-    }
-
-    // Confirmation of deletion of user homepages is an asynchronous process,
-    // so it is processed separately for performance optimization.
-    const absenseUserHomeList =
-      await this.getAbsenseUserHomeList(filteredPages);
-
-    const excludeActiveUserHomepage = (path: string) => {
-      if (!isUsersHomepage(path)) {
-        return true;
-      }
-      return absenseUserHomeList.includes(path);
-    };
-
-    return filteredPages.filter((p) => excludeActiveUserHomepage(p.path));
+    return pages.filter((_page, index) => verdicts[index] === 'permitted');
   }
 
-  async filterPagesByCanDeleteCompletely(
+  /**
+   * Delete the pages the user may delete, in the background, and return them.
+   */
+  async deletePagesWithAuthority(
     pages: PageDocument[],
     user: IUserHasId,
-    isRecursively: boolean,
+    options: DeletionOptions,
+    activityParameters,
   ): Promise<PageDocument[]> {
-    return this.filterPages(
+    const permittedPages = await this.filterPagesByDeletionAuthority(
       pages,
       user,
-      isRecursively,
-      this.canDeleteCompletely,
+      options,
     );
+    if (permittedPages.length > 0) {
+      this.deleteMultiplePages(
+        permittedPages,
+        user,
+        options,
+        activityParameters,
+      ).catch((err) => {
+        logger.error('Failed to delete pages.', err);
+      });
+    }
+    return permittedPages;
   }
 
-  async filterPagesByCanDelete(
-    pages: PageDocument[],
+  /**
+   * Completely delete the trashed pages the user may delete.
+   */
+  async emptyTrash(
     user: IUserHasId,
-    isRecursively: boolean,
-  ): Promise<PageDocument[]> {
-    return this.filterPages(pages, user, isRecursively, this.canDelete);
+    activityParameters,
+  ): Promise<EmptyTrashResult> {
+    const pagesInTrash = await this.findAllTrashPages(user);
+    // Each trashed page is deleted on its own, not together with its
+    // descendants, so it is judged by the single-page authority.
+    const deletablePages = await this.filterPagesByDeletionAuthority(
+      pagesInTrash,
+      user,
+      { isCompletely: true, isRecursively: false },
+    );
+    if (pagesInTrash.length > 0 && deletablePages.length === 0) {
+      return { isForbidden: true };
+    }
+
+    const nDeletedNonEmptyPages = await this.deleteTrashedPagesCompletely(
+      user,
+      activityParameters,
+      deletablePages,
+    );
+    return {
+      isForbidden: false,
+      isAllDeletable: deletablePages.length === pagesInTrash.length,
+      deletablePages,
+      nDeletedNonEmptyPages,
+    };
   }
 
   private shouldUseV4ProcessForRevert(page): boolean {
@@ -666,7 +709,7 @@ class PageService implements IPageService {
 
       throw err;
     }
-    if (page.descendantCount < 1) {
+    if (page.descendantCount < 1 && !options?.isInAppNotificationSuppressed) {
       const preNotify = preNotifyService.generatePreNotify(activity);
 
       this.activityEvent.emit('updated', activity, page, preNotify);
@@ -897,14 +940,16 @@ class PageService implements IPageService {
         descendantsSubscribedSets,
       ) as Ref<IUser>[];
 
-      const preNotify = preNotifyService.generatePreNotify(
-        activity,
-        async () => {
-          return descendantsSubscribedUsers;
-        },
-      );
+      if (!options?.isInAppNotificationSuppressed) {
+        const preNotify = preNotifyService.generatePreNotify(
+          activity,
+          async () => {
+            return descendantsSubscribedUsers;
+          },
+        );
 
-      this.activityEvent.emit('updated', activity, page, preNotify);
+        this.activityEvent.emit('updated', activity, page, preNotify);
+      }
     } catch (err) {
       logger.warn(err);
       throw Error(err);
@@ -2117,7 +2162,7 @@ class PageService implements IPageService {
   async deletePage(
     page,
     user,
-    options = {},
+    options: IOptionsForInAppNotificationSuppression = {},
     isRecursively = false,
     activityParameters,
   ) {
@@ -2144,13 +2189,8 @@ class PageService implements IPageService {
       throw new Error('Page is not deletable.');
     }
 
-    if (pagePathUtils.isUsersHomepage(page.path)) {
-      if (!this.canDeleteUserHomepageByConfig()) {
-        throw new Error('User Homepage is not deletable.');
-      }
-      if (!(await this.isUsersHomepageOwnerAbsent(page.path))) {
-        throw new Error('User Homepage is not deletable.');
-      }
+    if (await this.isProtectedUserHomepage(page.path)) {
+      throw new Error('User Homepage is not deletable.');
     }
 
     const newPath = Page.getDeletedPageName(page.path);
@@ -2252,7 +2292,7 @@ class PageService implements IPageService {
           this.pageEvent.emit('syncDescendantsUpdate', deletedPage, user);
         }
       })();
-    } else {
+    } else if (!options.isInAppNotificationSuppressed) {
       const preNotify = preNotifyService.generatePreNotify(activity);
 
       this.activityEvent.emit('updated', activity, page, preNotify);
@@ -2537,7 +2577,7 @@ class PageService implements IPageService {
   async deleteCompletely(
     page,
     user,
-    options = {},
+    options: IOptionsForInAppNotificationSuppression = {},
     isRecursively = false,
     preventEmitting = false,
     activityParameters,
@@ -2673,7 +2713,7 @@ class PageService implements IPageService {
           throw err;
         }
       })();
-    } else {
+    } else if (!options.isInAppNotificationSuppressed) {
       const preNotify = preNotifyService.generatePreNotify(activity);
 
       this.activityEvent.emit('updated', activity, page, preNotify);
@@ -2743,11 +2783,12 @@ class PageService implements IPageService {
    * authority; a page that is no longer in the trash or not editable by the
    * user is left as it is.
    */
-  async emptyTrashPage(
+  private async deleteTrashedPagesCompletely(
     user,
     activityParameters,
-    pageIdsToDelete: ObjectIdLike[],
+    pagesToDelete: PageDocument[],
   ): Promise<number> {
+    const pageIdsToDelete = pagesToDelete.map((p) => p._id);
     const Page = mongoose.model<IPage, PageModel>('Page');
     const trashPage = { path: '/trash' };
 
@@ -2854,7 +2895,7 @@ class PageService implements IPageService {
   }
 
   // no need to separate Main Sub since it is devided into single page operations
-  async deleteMultiplePages(
+  private async deleteMultiplePages(
     pagesToDelete,
     user,
     options,
@@ -2940,7 +2981,7 @@ class PageService implements IPageService {
   async revertDeletedPage(
     page,
     user,
-    options = {},
+    options: IOptionsForInAppNotificationSuppression = {},
     isRecursively = false,
     activityParameters?,
   ) {
@@ -3044,13 +3085,22 @@ class PageService implements IPageService {
 
       if (!isRecursively) {
         await this.updateDescendantCountOfAncestors(parent._id, 1, true);
-        this.activityEvent.emit(
-          'update',
-          activityId,
-          activityUpdateParameters,
-          page,
-          preNotifyService.generatePreNotify,
-        );
+        if (options.isInAppNotificationSuppressed) {
+          // Without a target the 'updated' listener creates no notification.
+          this.activityEvent.emit(
+            'update',
+            activityId,
+            activityUpdateParameters,
+          );
+        } else {
+          this.activityEvent.emit(
+            'update',
+            activityId,
+            activityUpdateParameters,
+            page,
+            preNotifyService.generatePreNotify,
+          );
+        }
       } else {
         let pageOp: PageOperationDocument;
         try {
@@ -3288,18 +3338,28 @@ class PageService implements IPageService {
     const childPagesWritable = new Writable({
       objectMode: true,
       write: async (batch, encoding, callback) => {
-        await this.updateChildPagesGrant(
-          batch,
-          grant,
-          user,
-          userRelatedGroups,
-          userRelatedParentGrantedGroups,
-        );
-        callback();
+        try {
+          await this.updateChildPagesGrant(
+            batch,
+            grant,
+            user,
+            userRelatedGroups,
+            userRelatedParentGrantedGroups,
+          );
+          callback();
+        } catch (err) {
+          callback(err);
+        }
       },
     });
 
-    await pipeline(childPagesReadableStream, batchStream, childPagesWritable);
+    try {
+      await pipeline(childPagesReadableStream, batchStream, childPagesWritable);
+    } finally {
+      // The bulk write above bypasses the per-page events. Also on failure:
+      // the batches written before it are already stored.
+      this.pageEvent.emit('syncDescendantsUpdate', parentPage, user);
+    }
   }
 
   async updateChildPagesGrant(
@@ -5117,6 +5177,7 @@ class PageService implements IPageService {
       null,
       user,
       options.origin,
+      { proposalMark: options.proposalMark },
     );
     savedPage = await pushRevision(savedPage, newRevision, user);
     await savedPage.populateDataToShowRevision();
@@ -5219,7 +5280,7 @@ class PageService implements IPageService {
       null,
       user,
       undefined,
-      { format },
+      { format, proposalMark: options.proposalMark },
     );
     savedPage = await pushRevision(savedPage, newRevision, user);
     await savedPage.populateDataToShowRevision();
@@ -5327,6 +5388,7 @@ class PageService implements IPageService {
       dummyUser,
     );
     savedPage = await pushRevision(savedPage, newRevision, dummyUser);
+    await savedPage.populate('revision');
 
     if (savedPage._id == null) {
       throw new Error('Something went wrong: _id is null');
@@ -5629,14 +5691,16 @@ class PageService implements IPageService {
       newPageData.descendantCount = 0;
     }
 
+    const updateEventExtras = capturePreviousGrantState(newPageData);
     newPageData.applyScope(user, grant, grantUserGroupIds);
-
-    // update existing page
-    let savedPage = await newPageData.save();
 
     // Update body
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
+
+    // With a body, pushRevision saves the pending field changes together with the revision.
+    let savedPage = newPageData;
+    let populateError: unknown;
     if (shouldUpdateBody) {
       const origin = options.origin;
       const newRevision = prisma.revisions.prepareRevision(
@@ -5645,12 +5709,26 @@ class PageService implements IPageService {
         previousBody,
         user,
         origin,
+        { proposalMark: options.proposalMark },
       );
-      savedPage = await pushRevision(savedPage, newRevision, user);
-      await savedPage.populateDataToShowRevision();
+      savedPage = await pushRevision(savedPage, newRevision, user, {
+        expectedRevisionId: options.expectedRevisionId,
+      });
+      // The update is already stored, so 'update' is still emitted below if
+      // populating fails; otherwise search and Vault would keep the old grant.
+      try {
+        await savedPage.populateDataToShowRevision();
+      } catch (err) {
+        populateError = err;
+      }
+    } else {
+      savedPage = await savedPage.save();
     }
 
-    this.pageEvent.emit('update', savedPage, user);
+    this.pageEvent.emit('update', savedPage, user, updateEventExtras);
+    if (populateError != null) {
+      throw populateError;
+    }
 
     // Update ex children's parent
     if (!wasOnTree && shouldBeOnTree) {
@@ -5733,14 +5811,16 @@ class PageService implements IPageService {
       grant,
       grantUserGroupIds,
     );
+    const updateEventExtras = capturePreviousGrantState(pageData);
     pageData.applyScope(user, grant, grantUserGroupIds);
-
-    // update existing page
-    let savedPage = await pageData.save();
 
     // Update revision
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
+
+    // With a body, pushRevision saves the pending field changes together with the revision.
+    let savedPage = pageData;
+    let populateError: unknown;
     if (shouldUpdateBody) {
       const newRevision = prisma.revisions.prepareRevision(
         pageData,
@@ -5748,17 +5828,30 @@ class PageService implements IPageService {
         previousBody,
         user,
         options.origin,
+        { proposalMark: options.proposalMark },
       );
-      savedPage = await pushRevision(savedPage, newRevision, user);
-      await savedPage.populateDataToShowRevision();
+      savedPage = await pushRevision(savedPage, newRevision, user, {
+        expectedRevisionId: options.expectedRevisionId,
+      });
+      // Same as updatePage: 'update' is still emitted below if populating fails.
+      try {
+        await savedPage.populateDataToShowRevision();
+      } catch (err) {
+        populateError = err;
+      }
+    } else {
+      savedPage = await savedPage.save();
+    }
+
+    this.pageEvent.emit('update', savedPage, user, updateEventExtras);
+    if (populateError != null) {
+      throw populateError;
     }
 
     // update scopes for descendants
     if (options.overwriteScopesOfDescendants) {
       this.applyScopesToDescendantsWithStream(savedPage, user, true);
     }
-
-    this.pageEvent.emit('update', savedPage, user);
 
     return savedPage;
   }
@@ -5769,7 +5862,7 @@ class PageService implements IPageService {
   async findAllTrashPages(
     user: IUserHasId,
     userGroups = null,
-  ): Promise<HydratedDocument<IPage>[]> {
+  ): Promise<PageDocument[]> {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
     // https://regex101.com/r/KYZWls/1
@@ -5782,7 +5875,7 @@ class PageService implements IPageService {
 
     await queryBuilder.addViewerCondition(user, userGroups);
 
-    const pages: HydratedDocument<IPage>[] = await queryBuilder
+    const pages: PageDocument[] = await queryBuilder
       .addConditionToSortPagesByAscPath()
       .query.lean()
       .exec();

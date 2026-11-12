@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { model, Schema, Types } from 'mongoose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Task 5.2 tests register SIGTERM/SIGINT handlers via initializeVaultFeature.
@@ -54,11 +55,13 @@ const {
   dispatcherOnPageRenamed,
   dispatcherOnBulkOperation,
   namespaceMapperComputePageNamespaces,
+  readStoredGrantState,
 } = vi.hoisted(() => ({
+  readStoredGrantState: vi.fn(),
   dispatcherOnPageChanged: vi.fn().mockResolvedValue(undefined),
   dispatcherOnPageRenamed: vi.fn().mockResolvedValue(undefined),
   dispatcherOnBulkOperation: vi.fn().mockResolvedValue(undefined),
-  namespaceMapperComputePageNamespaces: vi.fn(() => ({
+  namespaceMapperComputePageNamespaces: vi.fn((_page?: unknown) => ({
     current: ['public'] as ReadonlyArray<string>,
     previous: undefined as ReadonlyArray<string> | undefined,
   })),
@@ -88,6 +91,11 @@ vi.mock('./services/vault-namespace-mapper', () => ({
     computeAccessibleNamespaces: vi.fn(),
     computePageNamespaces: namespaceMapperComputePageNamespaces,
   },
+}));
+
+vi.mock('./services/vault-page-update-handler', async (importOriginal) => ({
+  ...(await importOriginal()),
+  readStoredGrantState,
 }));
 
 vi.mock('./routes/vault-gateway', () => ({
@@ -192,6 +200,17 @@ import { vaultSettingsService } from './services/vault-settings-service';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// Stands in for the Page model: field access goes through prototype getters,
+// as on every hydrated Mongoose document.
+const DescendantPageModel = model(
+  'VaultIndexSpecDescendantPage',
+  new Schema({
+    path: String,
+    revision: Schema.Types.ObjectId,
+    grant: Number,
+  }),
+);
 
 function makeCrowiStub() {
   return {
@@ -521,6 +540,69 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
     });
   });
 
+  describe("'update' event carrying the previous grant state", () => {
+    it('hands the previous namespaces to the dispatcher', async () => {
+      const previousGrantState = {
+        grant: 1,
+        grantedGroups: [],
+        grantedUsers: [],
+      };
+      namespaceMapperComputePageNamespaces.mockImplementation(
+        (page: unknown) => ({
+          current: [
+            page != null &&
+            typeof page === 'object' &&
+            'grant' in page &&
+            page.grant === previousGrantState.grant
+              ? 'public'
+              : 'user-u1-only-me',
+          ],
+          previous: undefined,
+        }),
+      );
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+      const page = {
+        _id: { toString: () => 'p1' },
+        path: '/p1',
+        revision: 'rev1',
+        grant: 4,
+        grantedGroups: [],
+        grantedUsers: ['u1'],
+      };
+      readStoredGrantState.mockResolvedValue({
+        grant: 4,
+        grantedGroups: [],
+        grantedUsers: ['u1'],
+      });
+
+      crowi.events.page.emit(
+        'update',
+        page,
+        { _id: 'u1' },
+        {
+          previousGrant: previousGrantState.grant,
+          previousGrantedGroups: previousGrantState.grantedGroups,
+          previousGrantedUsers: previousGrantState.grantedUsers,
+        },
+      );
+      await flush();
+
+      expect(dispatcherOnPageChanged).toHaveBeenCalledExactlyOnceWith({
+        type: 'acl-change',
+        page: {
+          _id: page._id,
+          path: '/p1',
+          grant: 4,
+          grantedGroups: [],
+          grantedUsers: ['u1'],
+        },
+        previousNamespaces: ['public'],
+        revisionId: 'rev1',
+      });
+    });
+  });
+
   // -------------------------------------------------------------------------
   // 'descendantsGrantChanged' — bulk grant change
   // -------------------------------------------------------------------------
@@ -576,6 +658,45 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
           .previousNamespaces,
       ).toEqual(['public']);
       expect(first.revisionId).toBe('rev1');
+    });
+
+    it('dispatches the id and path of a page given as a Mongoose document', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+      const pageDoc = new DescendantPageModel({
+        path: '/descendant',
+        revision: new Types.ObjectId(),
+        grant: 1,
+      });
+
+      crowi.events.page.emit('descendantsGrantChanged', {
+        affectedPages: [
+          {
+            page: pageDoc,
+            previousGrant: 1,
+            previousGrantedGroups: [],
+            previousGrantedUsers: [],
+            newGrant: 4,
+            newGrantedGroups: [],
+            newGrantedUsers: ['u1'],
+          },
+        ],
+        user: { _id: 'u1' },
+      });
+      await flush();
+
+      expect(dispatcherOnPageChanged).toHaveBeenCalledExactlyOnceWith({
+        type: 'acl-change',
+        page: {
+          _id: pageDoc._id,
+          path: '/descendant',
+          grant: 4,
+          grantedGroups: [],
+          grantedUsers: ['u1'],
+        },
+        previousNamespaces: ['public'],
+        revisionId: pageDoc.revision?.toString(),
+      });
     });
 
     it('does nothing for an empty affectedPages list', async () => {

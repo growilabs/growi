@@ -266,3 +266,33 @@ describe('InAppNotificationService.populateTargetAttachments', () => {
     expect(result[1].target).toEqual({ attachment: null });
   });
 });
+
+describe('InAppNotificationService.hideChangeProposalTargets', () => {
+  const service = new InAppNotificationService(
+    buildMockCrowi() as unknown as Crowi,
+  );
+
+  it('reduces a change proposal target to its id and leaves other targets as they are', () => {
+    const proposalId = new Types.ObjectId();
+    const pageTarget = { _id: new Types.ObjectId(), path: '/page' };
+    const notifications = [
+      {
+        targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
+        action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
+        target: proposalId,
+      },
+      {
+        targetModel: SupportedTargetModel.MODEL_PAGE,
+        action: SupportedAction.ACTION_PAGE_UPDATE,
+        target: pageTarget,
+      },
+    ] as unknown as IInAppNotification[];
+
+    const result = service.hideChangeProposalTargets(notifications);
+
+    expect(result.map(({ target }) => target)).toEqual([
+      { _id: proposalId },
+      pageTarget,
+    ]);
+  });
+});

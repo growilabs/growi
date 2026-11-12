@@ -272,7 +272,7 @@
     "password_is_not_set": "密码未设置"
   },
   "share_links": {
-    "Shere this page link to public": "Shere this page link to public",
+    "Share this page link to public": "Share this page link to public",
     "share_link_list": "Share link list",
     "share_link_management": "Share Link Management",
     "delete_all_share_links": "Delete all share links",
@@ -1158,6 +1158,83 @@
     "tableBuilder": {
       "label": "表格构建器",
       "description": ""
+    }
+  },
+  "change_proposal": {
+    "operation_type": {
+      "edit": "编辑页面",
+      "create": "创建页面",
+      "move": "移动页面",
+      "delete_completely": "完全删除页面"
+    },
+    "operation_status": {
+      "pending": "等待批准",
+      "applied": "已反映",
+      "failed": "失败",
+      "stale": "未反映（页面已先被更改）",
+      "skipped": "已跳过",
+      "reverted": "已撤销",
+      "revert_refused": "无法撤销"
+    },
+    "proposal_status": {
+      "pending": "等待批准",
+      "applied": "已反映",
+      "partially_applied": "部分已反映",
+      "reverted": "已撤销",
+      "partially_reverted": "部分已撤销",
+      "not_applied": "未反映",
+      "discarded": "已关闭，未反映其余部分",
+      "expired": "已过期",
+      "withdrawn": "已撤回"
+    },
+    "reason": {
+      "page_being_edited": "页面正在编辑中",
+      "page_operation_in_progress": "页面上有其他操作正在进行",
+      "target_unavailable": "找不到目标页面",
+      "path_occupied": "该路径已存在页面",
+      "grant_not_assignable": "无法设置页面权限",
+      "feature_disabled": "功能已关闭",
+      "operation_type_disabled": "此类操作已关闭",
+      "requester_not_allowed": "请求者无权执行此操作",
+      "write_error": "写入更改失败",
+      "not_revertible_state": "当前状态无法撤销",
+      "edited_after_apply": "反映后页面又被编辑过",
+      "has_children": "页面含有子页面",
+      "moved_after_apply": "反映后页面又被移动过",
+      "original_path_occupied": "原路径已存在页面",
+      "not_deletable": "没有删除该页面的权限",
+      "apply_failed": "撤销失败",
+      "base_revision_changed": "反映前页面已被更改",
+      "skipped_by_requester": "请求者已跳过",
+      "discarded": "已关闭，未反映其余部分",
+      "expired": "已过期",
+      "withdrawn": "已撤回"
+    },
+    "revert_refusal_reason": {
+      "not_revertible_state": "当前状态无法撤销",
+      "target_unavailable": "找不到目标页面",
+      "edited_after_apply": "反映后页面又被编辑过",
+      "has_children": "页面含有子页面",
+      "moved_after_apply": "反映后页面又被移动过",
+      "original_path_occupied": "原路径已存在页面",
+      "not_deletable": "没有删除该页面的权限",
+      "page_operation_in_progress": "页面上有其他操作正在进行",
+      "apply_failed": "撤销失败"
+    },
+    "lifecycle": {
+      "open": "等待批准",
+      "settled": "已完成",
+      "discarded": "已关闭，未反映其余部分",
+      "expired": "已过期",
+      "withdrawn": "已撤回"
+    },
+    "link": {
+      "follow_up": "后续",
+      "rework": "重新审视",
+      "based_on": "来源"
+    },
+    "achievement": {
+      "settled_with_percent": "已完成（完成度 {{percent}}%）"
     }
   }
 }
