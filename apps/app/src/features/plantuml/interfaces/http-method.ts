@@ -26,3 +26,7 @@ export function resolvePlantumlHttpMethod(
   }
   return 'post';
 }
+
+// Used only to choose the error message after a GET failure; never blocks a request.
+// Measured in research.md ("GET の URL 長の目安値").
+export const PLANTUML_GET_URL_LIKELY_TOO_LONG = 6800;
