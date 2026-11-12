@@ -5,9 +5,11 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 
 import type { AncestorPathNode } from '~/client/util/build-ancestor-path-nodes';
 import { buildAncestorPathNodes } from '~/client/util/build-ancestor-path-nodes';
+import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-path';
 import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
 import { LinkedPagePath } from '~/models/linked-page-path';
 
+import { useFittingCollapseLevel } from '../hooks/use-fitting-collapse-level';
 import { PathSeparator } from './PathSeparator';
 import {
   FIXED_PART_CLASS_NAME,
@@ -56,13 +58,18 @@ const AncestorNode = ({
 };
 
 // Stable key per node: link nodes are keyed by their (unique) href, and at
-// most one ellipsis node ever appears in a plan, so a constant key is safe.
+// most one ellipsis node ever appears in a plan at any collapse level, so a
+// constant key is safe.
 const nodeKey = (node: AncestorPathNode): string =>
   node.type === 'ellipsis' ? 'ellipsis' : node.href;
 
 /**
  * Presentational component that renders the ancestor-path portion of a search
- * result row on a single line, with Notion-style middle truncation. Surviving
+ * result row on a single line, with Notion-style middle truncation. When the
+ * base form does not fit, ancestors are folded into the ellipsis one by one
+ * (the parent last), following the same rule as the search modal. Since the
+ * page name sits on its own row, nothing here is character-truncated. The
+ * container's width must come from the parent, not its content. Surviving
  * ancestor segments stay individually clickable and keep search-keyword
  * highlighting; the page name itself is rendered separately by the caller
  * (see research.md "Row 1 vs Row 2 scope").
@@ -73,9 +80,18 @@ const nodeKey = (node: AncestorPathNode): string =>
  */
 export const SearchResultAncestorPath = memo(
   ({ path, highlightedPath }: SearchResultAncestorPathProps): JSX.Element => {
+    // The maximum level does not depend on the level itself
+    const { maxCollapseLevel } = useMemo(
+      () => formatTruncatedPagePath(path),
+      [path],
+    );
+    const { containerRef, collapseLevel } = useFittingCollapseLevel(
+      maxCollapseLevel,
+      path,
+    );
     const { nodes, fullPath } = useMemo(
-      () => buildAncestorPathNodes(path, highlightedPath),
-      [path, highlightedPath],
+      () => buildAncestorPathNodes(path, highlightedPath, collapseLevel),
+      [path, highlightedPath, collapseLevel],
     );
     // Like PageListItemL's legacy row, the trash icon marks pages *inside*
     // /trash; the /trash page itself sits directly under the top page.
@@ -83,6 +99,7 @@ export const SearchResultAncestorPath = memo(
 
     return (
       <span
+        ref={containerRef}
         className={`${styles['search-result-ancestor-path']} ${ROW_CLASS_NAME}`}
         title={fullPath}
       >
