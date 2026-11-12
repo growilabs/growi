@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 import type { PagePathPart } from '~/client/util/format-truncated-page-path';
 import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-path';
 
+import { useFittingCollapseLevel } from '../hooks/use-fitting-collapse-level';
 import { PathSeparator } from './PathSeparator';
 import {
   FIXED_PART_CLASS_NAME,
@@ -36,22 +37,33 @@ const toKeyedParts = (parts: readonly PagePathPart[]): readonly KeyedPart[] => {
 };
 
 /**
- * Presentational component that renders a page path on a single line with
- * Notion-style middle truncation. It owns only the path span; click-through and
- * footprint rendering stay in the surrounding row component.
+ * Renders a page path on a single line with Notion-style middle truncation. It
+ * owns only the path span; click-through and footprint rendering stay in the
+ * surrounding row component.
  *
- * The full path is always exposed via the native `title` attribute so that a
- * truncated path (either the middle omission or the page name's CSS ellipsis)
- * can be inspected on hover without measuring the DOM. Ancestor segments are
- * never character-truncated; only the page name is.
+ * When the base form does not fit, ancestors are folded into the ellipsis one
+ * by one (the parent last); a character-truncated page name also counts as not
+ * fitting. Only once every ancestor is folded is the page name left to its CSS
+ * ellipsis. The container's width must come from the parent, not its content.
+ *
+ * The full path is always exposed via the native `title` attribute so a
+ * shortened path can be inspected on hover. Ancestor segments are never
+ * character-truncated; only the page name is.
  */
 export const SearchResultPagePath = ({
   path,
 }: SearchResultPagePathProps): JSX.Element => {
-  const { isRoot, parts, fullPath } = formatTruncatedPagePath(path);
+  const { maxCollapseLevel } = formatTruncatedPagePath(path);
+  const { containerRef, shrinkableRef, collapseLevel } =
+    useFittingCollapseLevel(maxCollapseLevel, path);
+  const { isRoot, parts, fullPath } = formatTruncatedPagePath(
+    path,
+    collapseLevel,
+  );
 
   return (
     <span
+      ref={containerRef}
       className={`${styles['search-result-page-path']} ${ROW_CLASS_NAME}`}
       title={fullPath}
     >
@@ -67,6 +79,7 @@ export const SearchResultPagePath = ({
               <span className={`${FIXED_PART_CLASS_NAME} text-muted`}>…</span>
             ) : part.isPageName ? (
               <strong
+                ref={shrinkableRef}
                 className={`${styles['page-name']} ${PAGE_NAME_CLASS_NAME}`}
               >
                 {part.text}
