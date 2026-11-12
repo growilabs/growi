@@ -130,7 +130,7 @@
   - _Requirements: 5.1, 5.2, 6.1, 7.1, 7.2, 7.3, 10.2_
   - _Boundary: ProposalMarkBadge, CurrentRevisionProposalMark_
   - _Depends: 3.1_
-- [ ] 5.2 (P) 操作 1 つ分の表示と差分の開閉を作る
+- [x] 5.2 (P) 操作 1 つ分の表示と差分の開閉を作る
   - 種類、wiki のページのパス（design の OperationItem の「パスの決め方」: 移動は移動元と移動先、編集・新規作成・完全な削除は `page?.path ?? path`）、状態と理由、戻せるかどうか、取り消し済みなら取り消した Change Proposal へのリンク、差分の開閉を出す。種類・状態・理由・戻せない理由の言葉は core の `client/shared/` の表から引く
   - 戻せるかどうかは、core が `revertability` を返した操作にだけ出し、返さない操作には何も出さない
   - ページがもう無い操作（`page` が無い）も同じ規則で `path` を出す。`page` も `path` も無いとき（core がパスを記録する前に反映した編集の操作）だけ、パスの代わりに「ページはもうありません」を出す
