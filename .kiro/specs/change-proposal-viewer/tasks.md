@@ -264,7 +264,7 @@
   - 単体テストで、ページが消えた操作が、依頼した人・元の依頼した人（取り消しの Change Proposal の操作）・取り消した人（元の Change Proposal の操作）に返ること、取り消しの相手でも状態が待ち・失敗・古い・飛ばしたなら返らないこと、別の取り消しの Change Proposal を依頼した人や第三者には返らないこと、取り消しの相手の値が空のときは今までと同じ結果になること、まだページが無い新規作成が取り消しの相手の値に関係なく依頼した人にだけ返ること、ページが残っている操作の扱いが変わらないことを確かめている
   - _Requirements: 3.11_
   - _Boundary: core server/domain (select-visible-operations)_
-- [ ] 8.2 記録からパスを決める純関数を作り、操作の表示がそれを返せるようにする
+- [x] 8.2 記録からパスを決める純関数を作り、操作の表示がそれを返せるようにする
   - 新規作成の操作の `key` からパスへの表を作る純関数 `collectCreatedPaths` と、ページがもう無い操作のパスを記録から決める純関数 `recordedPathOf`（新規作成は `path`、移動は `toPath`、編集は `appliedPagePath`、完全な削除は `collectCreatedPaths` の表を `revertTarget.operationKey` で引いたパス、記録に無ければ無し）を `server/domain/` に足し、domain の barrel から export する。`server/services/proposal-notifier.ts` の `findDeletedCreatedPages` が自分で作っている同じ表を、`collectCreatedPaths` に置き換える
   - `server/services/to-operation-view.ts` の `toOperationView` が、呼び出し側が渡したパスを、完全な削除の操作と編集の操作の `path` に入れて返せるようにする（渡されなければ今のまま返さない）。呼び出し側は、完全な削除にはページがあるかどうかにかかわらずいつも元の新規作成のパスを、編集にはページがもう無いときだけ記録したパスを渡す（core の design の 1 件の取得の操作のパス）。画面は、移動以外で `page?.path ?? path` を表示する
   - 単体テストで、`collectCreatedPaths` が新規作成の操作だけから表を作ること、`recordedPathOf` が 4 つの種類ごとに記録のパスを返し、記録に無い編集と元の新規作成が見つからない完全な削除で無しを返すこと、`toOperationView` が完全な削除と編集の操作に渡されたパスを `path` として返し、渡されなければ返さないことを確かめている。まとめた通知の既存のテスト（完全に削除したページを元の依頼した人にだけ元の新規作成のパスで入れること）が変わらずに通っている

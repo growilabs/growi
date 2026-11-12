@@ -14,7 +14,7 @@ import type {
   ChangeProposalDocument,
   ChangeProposalNotificationSnapshot,
 } from '../../interfaces';
-import { selectNotifiedPageIds } from '../domain';
+import { collectCreatedPaths, selectNotifiedPageIds } from '../domain';
 import { pageModel } from './operation-handlers/page-model';
 
 const logger = loggerFactory(
@@ -59,11 +59,7 @@ const findDeletedCreatedPages = (
   if (original == null) {
     return [];
   }
-  const createdPaths = new Map(
-    original.operations.flatMap((op) =>
-      op.type === 'create' ? [[op.key, op.path] as const] : [],
-    ),
-  );
+  const createdPaths = collectCreatedPaths(original.operations);
   return proposal.operations.flatMap((op) => {
     if (op.type !== 'delete-completely' || op.status !== 'applied') {
       return [];
