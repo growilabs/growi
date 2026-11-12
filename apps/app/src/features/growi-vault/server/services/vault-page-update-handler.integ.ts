@@ -17,6 +17,7 @@ import { COALESCE_WINDOW_MS, createVaultDispatcher } from './vault-dispatcher';
 import { vaultNamespaceMapper } from './vault-namespace-mapper';
 import {
   createVaultPageUpdateHandler,
+  readStoredGrantState,
   type VaultPageUpdateHandler,
 } from './vault-page-update-handler';
 
@@ -35,6 +36,7 @@ describe('Vault instructions written for a single-page update', () => {
   const handlePageUpdate = createVaultPageUpdateHandler(
     createVaultDispatcher(vaultNamespaceMapper),
     vaultNamespaceMapper,
+    readStoredGrantState,
   );
 
   const createUser = async (
@@ -227,6 +229,33 @@ describe('Vault instructions written for a single-page update', () => {
     await deliverEmittedUpdates();
 
     expect(await writtenInstructions(page)).toEqual([['upsert', 'public']]);
+  });
+
+  it('keeps the page out of public when a body save loaded it before it became only-me', async () => {
+    const page = await createPublicPage('stale-body-save', true);
+    const loadedForBodySave = await Page.findById(page._id).orFail();
+
+    await crowi.pageService.updateGrant(
+      await Page.findById(page._id).orFail(),
+      editor,
+      { grant: PageGrant.GRANT_OWNER, userRelatedGrantedGroups: [] },
+    );
+    await deliverEmittedUpdates();
+    await VaultInstruction.deleteMany({ 'payload.pageId': String(page._id) });
+
+    await crowi.pageService.updatePage(
+      loadedForBodySave,
+      'updated body',
+      'initial body',
+      creator,
+      { expectedRevisionId: String(loadedForBodySave.revision) },
+    );
+    await deliverEmittedUpdates();
+
+    expect(await writtenInstructions(page)).toEqual([
+      ['remove', 'public'],
+      ['upsert', `user-${editor._id}-only-me`],
+    ]);
   });
 
   describe('when a save that changes body and grant loses a revision conflict', () => {

@@ -7,7 +7,10 @@ import {
   type VaultInstructionDocument,
 } from '../models/vault-instruction';
 import { COALESCE_WINDOW_MS, createVaultDispatcher } from './vault-dispatcher';
-import { createVaultNamespaceMapper } from './vault-namespace-mapper';
+import {
+  createVaultNamespaceMapper,
+  type PageGrantState,
+} from './vault-namespace-mapper';
 import {
   createVaultPageUpdateHandler,
   type VaultPageUpdateHandler,
@@ -52,6 +55,8 @@ describe('createVaultPageUpdateHandler', () => {
   let handle: VaultPageUpdateHandler;
   // `[op, namespace]` of every instruction written to the outbox.
   let written: Array<[string, string | undefined]>;
+  // What the handler reads back from the database for the page.
+  let storedGrantState: PageGrantState | null;
   const writtenInstructions = (): Array<[string, string | undefined]> =>
     [...written].sort();
 
@@ -76,6 +81,7 @@ describe('createVaultPageUpdateHandler', () => {
     handle = createVaultPageUpdateHandler(
       createVaultDispatcher(mapper),
       mapper,
+      async () => storedGrantState,
     );
   });
 
@@ -89,6 +95,7 @@ describe('createVaultPageUpdateHandler', () => {
       grant: PageGrant.GRANT_OWNER,
       grantedUsers: [userA],
     });
+    storedGrantState = page;
 
     await handleAndFlush(page, {
       previousGrant: PageGrant.GRANT_PUBLIC,
@@ -107,6 +114,7 @@ describe('createVaultPageUpdateHandler', () => {
       grant: PageGrant.GRANT_OWNER,
       grantedUsers: [userB],
     });
+    storedGrantState = page;
 
     await handleAndFlush(page, {
       previousGrant: PageGrant.GRANT_OWNER,
@@ -122,6 +130,7 @@ describe('createVaultPageUpdateHandler', () => {
 
   it('moves the page from the group to public when a group page becomes public', async () => {
     const page = buildPage({ grant: PageGrant.GRANT_PUBLIC });
+    storedGrantState = page;
 
     await handleAndFlush(page, {
       previousGrant: PageGrant.GRANT_USER_GROUP,
@@ -140,6 +149,7 @@ describe('createVaultPageUpdateHandler', () => {
       grant: PageGrant.GRANT_OWNER,
       grantedUsers: [userA],
     });
+    storedGrantState = page;
 
     await handleAndFlush(page, {
       previousGrant: PageGrant.GRANT_OWNER,
@@ -158,6 +168,7 @@ describe('createVaultPageUpdateHandler', () => {
       grant: PageGrant.GRANT_USER_GROUP,
       grantedGroups: [{ type: GroupType.userGroup, item: keptGroupId }],
     });
+    storedGrantState = page;
 
     await handleAndFlush(page, {
       previousGrant: PageGrant.GRANT_USER_GROUP,
@@ -180,17 +191,34 @@ describe('createVaultPageUpdateHandler', () => {
       previousGrantedGroups: [],
       previousGrantedUsers: [],
     };
-    await handle(buildPage({ grant: PageGrant.GRANT_PUBLIC }), publicState);
+    const bodySaved = buildPage({ grant: PageGrant.GRANT_PUBLIC });
+    storedGrantState = bodySaved;
+    await handle(bodySaved, publicState);
 
-    await handleAndFlush(
-      buildPage({ grant: PageGrant.GRANT_OWNER, grantedUsers: [userA] }),
-      publicState,
-    );
+    const grantChanged = buildPage({
+      grant: PageGrant.GRANT_OWNER,
+      grantedUsers: [userA],
+    });
+    storedGrantState = grantChanged;
+    await handleAndFlush(grantChanged, publicState);
 
     expect(written).toEqual([
       ['remove', 'public'],
       ['upsert', `user-${userA}-only-me`],
     ]);
+  });
+
+  it('only removes the page from where it was when it has been deleted since the update', async () => {
+    const page = buildPage({ grant: PageGrant.GRANT_PUBLIC });
+    storedGrantState = null;
+
+    await handleAndFlush(page, {
+      previousGrant: PageGrant.GRANT_PUBLIC,
+      previousGrantedGroups: [],
+      previousGrantedUsers: [],
+    });
+
+    expect(writtenInstructions()).toEqual([['remove', 'public']]);
   });
 
   it('only upserts when the event carries no previous grant state', async () => {

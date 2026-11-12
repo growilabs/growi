@@ -20,7 +20,10 @@ import { isStaleBootstrapRunner } from './services/resilience';
 import { createVaultBootstrapper } from './services/vault-bootstrapper';
 import { createVaultDispatcher } from './services/vault-dispatcher';
 import { vaultNamespaceMapper } from './services/vault-namespace-mapper';
-import { createVaultPageUpdateHandler } from './services/vault-page-update-handler';
+import {
+  createVaultPageUpdateHandler,
+  readStoredGrantState,
+} from './services/vault-page-update-handler';
 import { vaultSettingsService } from './services/vault-settings-service';
 
 export { createVaultAdminRouter } from './routes/vault-admin';
@@ -306,6 +309,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
     const handlePageUpdate = createVaultPageUpdateHandler(
       dispatcher,
       vaultNamespaceMapper,
+      readStoredGrantState,
     );
     pageEvent.on(
       'update',
