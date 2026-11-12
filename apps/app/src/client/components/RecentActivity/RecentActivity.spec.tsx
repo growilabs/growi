@@ -26,21 +26,18 @@ vi.mock('~/stores/recent-activity', () => ({
 
 type Result = UserActivitiesResult['serializedPaginationResult'];
 
-const buildRow = (index: number): IUserActivity =>
-  JSON.parse(
-    JSON.stringify({
-      _id: `activity-${index}`,
-      action: ActivityLogActions.ACTION_PAGE_UPDATE,
-      createdAt: '2026-11-11T09:00:00.000Z',
-      user: {
-        _id: 'user-1',
-        username: 'alice',
-        name: 'Alice',
-        imageUrlCached: '/images/alice.png',
-      },
-      target: { _id: `page-${index}`, path: `/page-${index}` },
-    }),
-  );
+const buildRow = (index: number): IUserActivity => ({
+  _id: `activity-${index}`,
+  action: ActivityLogActions.ACTION_PAGE_UPDATE,
+  createdAt: '2026-11-11T09:00:00.000Z',
+  user: {
+    _id: 'user-1',
+    username: 'alice',
+    name: 'Alice',
+    imageUrlCached: '/images/alice.png',
+  },
+  target: { _id: `page-${index}`, path: `/page-${index}` },
+});
 
 const mockResponse = (rowCount: number, totalDocs: number): void => {
   const data: Result = {

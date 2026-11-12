@@ -48,7 +48,8 @@ const validator = {
   ],
 };
 
-type UserActivitiesRequest = Request & { user?: IUserHasId };
+// loginRequiredStrictly lets a request through only when it has a user.
+type UserActivitiesRequest = Request & { user: IUserHasId };
 
 type UserActivitiesQuery = {
   limit?: number;
@@ -83,7 +84,7 @@ const findActivityUser = async (
     _id: user._id.toString(),
     username: user.username,
     name: user.name,
-    imageUrlCached: user.imageUrlCached,
+    imageUrlCached: user.imageUrlCached ?? undefined,
   };
 };
 
@@ -117,7 +118,7 @@ const toUserActivity = (
 ): IUserActivity => ({
   _id: row._id,
   action: row.action,
-  createdAt: row.createdAt,
+  createdAt: row.createdAt.toISOString(),
   user,
   target: row.target,
 });
@@ -288,10 +289,6 @@ export const setup = (crowi: Crowi): Router => {
     apiV3FormValidator,
     async (req: UserActivitiesRequest, res: ApiV3Response) => {
       const viewer = req.user;
-      if (viewer == null) {
-        return res.apiv3Err('Login is required.', 401);
-      }
-
       const validated = readValidatedQuery(req);
       const limit =
         validated.limit ??

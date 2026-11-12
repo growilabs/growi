@@ -11,22 +11,18 @@ vi.mock('next-i18next', () => ({
   }),
 }));
 
-// The wire value of createdAt is an ISO string even though the type says Date
-const buildActivity = (createdAt: string): IUserActivity =>
-  JSON.parse(
-    JSON.stringify({
-      _id: 'activity-1',
-      action: ActivityLogActions.ACTION_PAGE_CREATE,
-      createdAt,
-      user: {
-        _id: 'user-1',
-        username: 'alice',
-        name: 'Alice',
-        imageUrlCached: '/images/alice.png',
-      },
-      target: { _id: 'page-1', path: '/team/notes' },
-    }),
-  );
+const buildActivity = (createdAt: string): IUserActivity => ({
+  _id: 'activity-1',
+  action: ActivityLogActions.ACTION_PAGE_CREATE,
+  createdAt,
+  user: {
+    _id: 'user-1',
+    username: 'alice',
+    name: 'Alice',
+    imageUrlCached: '/images/alice.png',
+  },
+  target: { _id: 'page-1', path: '/team/notes' },
+});
 
 describe('ActivityListItem', () => {
   beforeEach(() => {
@@ -49,7 +45,7 @@ describe('ActivityListItem', () => {
     expect(link.getAttribute('href')).toBe('/team/notes');
   });
 
-  it('shows the action label and the elapsed time from an ISO string createdAt', () => {
+  it('shows the action label and the elapsed time since createdAt', () => {
     render(
       <ActivityListItem
         props={{ activity: buildActivity('2026-11-11T09:00:00.000Z') }}

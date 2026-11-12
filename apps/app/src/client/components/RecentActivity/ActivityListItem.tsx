@@ -51,7 +51,7 @@ const setIcon = (action: SupportedActivityActionType): string => {
   return IconActivityTranslationMap[action] || 'question_mark';
 };
 
-const calculateTimePassed = (date: Date | string, locale: Locale): string => {
+const calculateTimePassed = (date: string, locale: Locale): string => {
   const timePassed = formatDistanceToNow(date, {
     addSuffix: true,
     locale,

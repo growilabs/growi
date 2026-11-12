@@ -16,21 +16,15 @@ import { setup } from './user-activities';
 
 const mocks = vi.hoisted(() => ({ findUserById: vi.fn() }));
 
-// Stands in for the real login check: rejects a request without a user.
 vi.mock('~/server/middlewares/login-required', () => ({
   default:
     () =>
     (
-      req: express.Request & { user?: IUserHasId },
-      res: express.Response,
+      _req: express.Request,
+      _res: express.Response,
       next: express.NextFunction,
-    ) => {
-      if (req.user == null) {
-        res.sendStatus(401);
-        return;
-      }
-      next();
-    },
+    ) =>
+      next(),
 }));
 
 vi.mock('mongoose', async (importOriginal) => {
@@ -81,7 +75,7 @@ describe('GET /user-activities', () => {
     target: { _id: `65b000000000000000000${100 + n}`, path: `/page-${n}` },
   });
 
-  const buildApp = (user?: IUserHasId) => {
+  const buildApp = (user: IUserHasId) => {
     addCustomFunctionToResponse(express);
     const app = express();
     app.use((req: express.Request & { user?: IUserHasId }, _res, next) => {
@@ -101,14 +95,6 @@ describe('GET /user-activities', () => {
       totalCount: 0,
     });
     vi.mocked(configManager.getConfig).mockReturnValue(20);
-  });
-
-  it('rejects a request that is not logged in without querying anything', async () => {
-    const res = await request(buildApp()).get('/user-activities');
-
-    expect(res.status).toBe(401);
-    expect(mocks.findUserById).not.toHaveBeenCalled();
-    expect(aggregateUserActivities).not.toHaveBeenCalled();
   });
 
   it("asks for the caller's own activities when targetUserId is omitted", async () => {
@@ -227,6 +213,27 @@ describe('GET /user-activities', () => {
         user: expectedUser,
       },
     ]);
+  });
+
+  it('leaves out the image URL of a user who has none stored', async () => {
+    mocks.findUserById.mockImplementation(async (id: string) => ({
+      ...storedUser(id),
+      imageUrlCached: null,
+    }));
+    vi.mocked(aggregateUserActivities).mockResolvedValue({
+      docs: [row(1)],
+      totalCount: 1,
+    });
+
+    const res = await request(buildApp(viewer))
+      .get('/user-activities')
+      .query({ targetUserId: TARGET_ID });
+
+    expect(res.body.serializedPaginationResult.docs[0].user).toEqual({
+      _id: TARGET_ID,
+      username: `user-${TARGET_ID}`,
+      name: `Name ${TARGET_ID}`,
+    });
   });
 
   it('computes the paging values from the total count, limit and offset', async () => {

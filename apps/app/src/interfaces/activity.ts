@@ -867,13 +867,15 @@ export type IUserActivityUser = {
   _id: string;
   username: string;
   name: string;
-  imageUrlCached: string;
+  // Absent for a user whose image URL has not been generated yet.
+  imageUrlCached?: string;
 };
 
 export type IUserActivity = {
   _id: string;
   action: SupportedActivityActionType;
-  createdAt: Date;
+  // ISO 8601 string, as it travels in the JSON response.
+  createdAt: string;
   user: IUserActivityUser;
   target: IUserActivityTargetPage;
 };
