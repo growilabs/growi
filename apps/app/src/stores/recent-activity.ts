@@ -2,24 +2,20 @@ import type { SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
-import type {
-  ActivityHasTargetPage,
-  PopulatedUserActivitiesResult,
-} from '~/interfaces/activity';
-import type { PaginateResult } from '~/interfaces/mongoose-utils';
+import type { UserActivitiesResult } from '~/interfaces/activity';
 
 export const useSWRxRecentActivity = (
   limit?: number,
   offset?: number,
   targetUserId?: string,
-): SWRResponse<PaginateResult<ActivityHasTargetPage>, Error> => {
+): SWRResponse<UserActivitiesResult['serializedPaginationResult'], Error> => {
   const shouldFetch = targetUserId && targetUserId.length > 0;
   const key = shouldFetch
     ? ['/user-activities', limit, offset, targetUserId]
     : null;
 
   const fetcher = ([endpoint, limitParam, offsetParam, targetUserIdParam]) => {
-    const promise = apiv3Get<PopulatedUserActivitiesResult>(endpoint, {
+    const promise = apiv3Get<UserActivitiesResult>(endpoint, {
       limit: limitParam,
       offset: offsetParam,
       targetUserId: targetUserIdParam,

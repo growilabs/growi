@@ -882,24 +882,31 @@ export type ActivityHasUserId = IActivityHasId & {
   user: IUserHasId;
 };
 
-export type ActivityHasTargetPage = IActivityHasId & {
-  user: IUserHasId;
-  target: IPopulatedPageTarget;
-};
-
-import type { PageGrant } from '@growi/core';
-export interface IPopulatedPageTarget {
+export type IUserActivityTargetPage = {
   _id: string;
   path: string;
-  status: string;
-  grant?: PageGrant;
-  wip: boolean;
-  deletedAt: Date;
-}
+};
 
-export interface PopulatedUserActivitiesResult {
-  serializedPaginationResult: PaginateResult<ActivityHasTargetPage>;
-}
+export type IUserActivityUser = {
+  _id: string;
+  username: string;
+  name: string;
+  // Absent for a user whose image URL has not been generated yet.
+  imageUrlCached?: string;
+};
+
+export type IUserActivity = {
+  _id: string;
+  action: SupportedActivityActionType;
+  // ISO 8601 string, as it travels in the JSON response.
+  createdAt: string;
+  user: IUserActivityUser;
+  target: IUserActivityTargetPage;
+};
+
+export type UserActivitiesResult = {
+  serializedPaginationResult: PaginateResult<IUserActivity>;
+};
 
 export type ISearchFilter = {
   usernames?: string[];
