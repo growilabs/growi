@@ -41,6 +41,7 @@ vi.mock('~/states/context', () => ({
 
 vi.mock('../../stores/proposal-actions', () => ({
   revertOperations: vi.fn(),
+  sendRevertRequest: vi.fn(),
 }));
 
 vi.mock('../../stores/use-revert-progress', () => ({
@@ -428,5 +429,25 @@ describe('ChangeProposalDetail with a revert', () => {
     expect(screen.queryByText(RESULT_TITLE)).toBeNull();
     expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy();
     expect(screen.getByText('/created-page')).toBeTruthy();
+  });
+});
+
+describe('ChangeProposalDetail revert request', () => {
+  const REQUEST_BUTTON = 'change_proposal_viewer.revert_request.button';
+
+  beforeEach(() => {
+    vi.mocked(useSWRxChangeProposal).mockReset();
+  });
+
+  it('offers the revert request to a non-requester', () => {
+    mockFound(createProposal({ isRequester: false }));
+    render(<ChangeProposalDetail proposalId="proposal-1" />);
+    expect(screen.getByRole('button', { name: REQUEST_BUTTON })).toBeTruthy();
+  });
+
+  it('does not offer the revert request to the requester', () => {
+    mockFound(createProposal({ isRequester: true }));
+    render(<ChangeProposalDetail proposalId="proposal-1" />);
+    expect(screen.queryByRole('button', { name: REQUEST_BUTTON })).toBeNull();
   });
 });

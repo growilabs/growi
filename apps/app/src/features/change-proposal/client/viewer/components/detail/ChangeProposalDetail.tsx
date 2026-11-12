@@ -6,6 +6,7 @@ import { useSWRxChangeProposal } from '../../stores/use-swrx-change-proposal';
 import { OperationItem } from '../OperationItem';
 import { ProposalSummaryHeader } from './ProposalSummaryHeader';
 import { RevertAllButton } from './RevertAllButton';
+import { RevertRequestModal } from './RevertRequestModal';
 import type { RevertRun } from './RevertResultList';
 import { RevertResultList } from './RevertResultList';
 
@@ -68,6 +69,7 @@ export const ChangeProposalDetail = ({
         proposal={proposal}
         onReverted={(run) => setRevertState({ proposalId, run })}
       />
+      <RevertRequestModal proposal={proposal} />
       {revertRun != null && (
         <RevertResultList
           proposalId={proposalId}
