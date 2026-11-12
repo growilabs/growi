@@ -4,6 +4,18 @@ const PLANTUML_URI = 'http://localhost:8080/plantuml';
 const SVG_BODY =
   '<svg xmlns="http://www.w3.org/2000/svg"><text>diagram</text></svg>';
 
+const SVG_DATA_URL_PREFIX = 'data:image/svg+xml;base64,';
+
+// Fails the test unless the result is a base64 SVG data URL, then returns the
+// SVG text it carries.
+const decodeSvgDataUrl = (dataUrl: string): string => {
+  expect(dataUrl.startsWith(SVG_DATA_URL_PREFIX)).toBe(true);
+  return Buffer.from(
+    dataUrl.slice(SVG_DATA_URL_PREFIX.length),
+    'base64',
+  ).toString('utf8');
+};
+
 // The memo cap from design.md ("fetch-plantuml-svg — 新規": 目安 50件).
 const MEMO_CAPACITY = 50;
 
@@ -120,7 +132,7 @@ describe('fetchPlantumlSvg', () => {
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
-        expect(await result.blob.text()).toBe(SVG_BODY);
+        expect(decodeSvgDataUrl(result.dataUrl)).toBe(SVG_BODY);
       },
     );
 
@@ -202,6 +214,38 @@ describe('fetchPlantumlSvg', () => {
     });
   });
 
+  describe('data URL', () => {
+    it('keeps non-ASCII SVG text intact', async () => {
+      const japaneseSvg =
+        '<svg xmlns="http://www.w3.org/2000/svg"><text>日本語のクラス名 名前空間::クラス</text></svg>';
+      fetchMock.mockResolvedValueOnce(
+        svgResponse(200, 'image/svg+xml;charset=utf-8', japaneseSvg),
+      );
+
+      const result = await fetchPlantumlSvg(PLANTUML_URI, uniqueSource());
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(decodeSvgDataUrl(result.dataUrl)).toBe(japaneseSvg);
+    });
+
+    it('converts a large SVG (about 1 MB)', async () => {
+      const largeSvg = `<svg xmlns="http://www.w3.org/2000/svg">${'<text>図</text>'.repeat(70_000)}</svg>`;
+      expect(new TextEncoder().encode(largeSvg).length).toBeGreaterThan(
+        1_000_000,
+      );
+      fetchMock.mockResolvedValueOnce(
+        svgResponse(200, 'image/svg+xml', largeSvg),
+      );
+
+      const result = await fetchPlantumlSvg(PLANTUML_URI, uniqueSource());
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(decodeSvgDataUrl(result.dataUrl)).toBe(largeSvg);
+    });
+  });
+
   describe('memo', () => {
     it('does not send the same source to the same destination twice', async () => {
       const source = uniqueSource();
@@ -212,7 +256,7 @@ describe('fetchPlantumlSvg', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(second.ok).toBe(true);
       if (!second.ok) return;
-      expect(await second.blob.text()).toBe(SVG_BODY);
+      expect(decodeSvgDataUrl(second.dataUrl)).toBe(SVG_BODY);
     });
 
     it('sends once for two concurrent requests of the same source', async () => {

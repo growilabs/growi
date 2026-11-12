@@ -36,7 +36,7 @@
 ### Allowed Dependencies
 - 設定を画面へ渡す既存の経路: `config-definition` → `configuration-props`（通常ページと共有リンクページの両方がここを通る）→ `RendererConfig` → `rendererConfigAtom` / `useRendererConfig()` → `renderer.tsx`。
 - `url-join`、`loggerFactory`、`next-i18next` の `useTranslation`、`GROWI_IS_CONTENT_RENDERING_ATTR`。
-- ブラウザ標準の `fetch` と `URL.createObjectURL`。GROWI 独自の HTTP クライアント（apiv3 クライアント等）は使わない。独自ヘッダが付くと CORS の事前確認（OPTIONS）が発生するため。
+- ブラウザ標準の `fetch`（SVG の表示に `URL.createObjectURL` は使わない。理由は research.md「SVG は blob URL でなく data URL で表示する」）。GROWI 独自の HTTP クライアント（apiv3 クライアント等）は使わない。独自ヘッダが付くと CORS の事前確認（OPTIONS）が発生するため。
 
 ### Revalidation Triggers
 - `RendererConfig` の形（`plantumlHttpMethod` の追加）→ `RendererConfig` を作るテストやモック（例: `PageContentRenderer.spec.tsx`）。
@@ -86,7 +86,7 @@ graph TB
 - **方式の決定は1か所**: サーバー側の `configuration-props` が判定関数で `'get' | 'post'` を決めて `RendererConfig` に入れる。ブラウザ側は決まった方式に従うだけで、方式を自分で判定しない。
 - **テーマはライト・ダークとも必ず付ける**: GET でも POST でも、すべての図にライトモードならライト用、ダークモードならダーク用のテーマを付ける。テーマは図の見た目を洗練させ、ダークモードで図が浮かないようにするためのもので、URL を縮めるために外すことはしない（検討の経緯は research.md「ライト・ダークともにテーマを付ける（撤廃しない）」）。URL を縮める手段は、見た目を変えないミニファイに限る。
 - **テーマはどちらの方式でもブラウザ側で付ける**: 今と同じく remark プラグインが付ける。POST でもサーバー側には何も持たせない。
-- **表示はどちらの方式でも `<img>`**: GET は URL、POST は取得した SVG から作った blob URL を `src` にする。
+- **表示はどちらの方式でも `<img>`**: GET は URL、POST は取得した SVG を `data:image/svg+xml;base64,…` にした data URL を `src` にする（blob URL は使わない。理由は research.md「SVG は blob URL でなく data URL で表示する」）。
 
 ### 依存の向き
 `interfaces`（方式の型・判定関数・定数）→ `services`（remark プラグイン、取得処理）→ `components`（Viewer）。判定関数は副作用のない関数で、サーバーとブラウザの両方から import できる。
@@ -137,7 +137,7 @@ flowchart TD
     F -- no --> E3[error render failed]
     C -- post --> G[source attribute]
     G --> H[fetch POST from browser]
-    H -- image svg body with 200 or 400 --> I[blob url into img]
+    H -- image svg body with 200 or 400 --> I[data url into img]
     I -- onLoad --> OK
     I -- onError --> E3
     H -- network or CORS failure or opaqueredirect --> E2[error post unavailable]
@@ -222,7 +222,7 @@ type PlantUMLPluginParams = {
 ### fetch-plantuml-svg — 新規
 ```typescript
 type PlantumlSvgResult =
-  | { ok: true; blob: Blob }
+  | { ok: true; dataUrl: string }
   | { ok: false; reason: 'post-unavailable' | 'render-failed'; status?: number };
 
 // POST the themed source from the browser to `${plantumlUri}/svg`.
@@ -236,7 +236,7 @@ export function fetchPlantumlSvg(
   - ヘッダはこれだけにする。`Content-Type` が `text/plain` なら、ブラウザは事前確認（OPTIONS）を送らない。
 - 応答の分類は「System Flows / 決定事項」のとおり。
 - **閲覧中のメモ**: キーはテーマ付きソース（テーマにライト／ダークの違いが含まれる）。値は取得中の Promise。同じ図を同時に表示しても送信は1回にまとめる。件数に上限（目安 50件）を設け、超えたら古いものから捨てる（`Map` の挿入順を使い、新しい依存は足さない）。失敗した結果は残さず、次に表示したときは送り直す。
-- メモは Blob だけを持ち、blob URL は持たない。blob URL は Viewer が表示ごとに作り、自分で `revokeObjectURL` する。
+- 成功の結果は、`data:image/svg+xml;base64,` で始まる data URL の文字列にして返し、メモにもその文字列を持つ。応答の Content-Type が SVG であることは確認済みなので、接頭辞は取得処理が固定で付ける。Viewer は blob URL を作らない（解放の処理も要らない）。
 
 ### PlantUmlViewer — 変更
 ```typescript
@@ -247,7 +247,7 @@ type PlantUmlViewerProps = {
 ```
 - **送信先は `useRendererConfig().plantumlUri` から取る**。要素の属性からは取らない。`plantuml` タグと属性は rehype-sanitize で許可されているので、ページの作者も書けてしまうため。`useRendererConfig` は通常ページ・共有リンクページ・エディタのプレビューのどれでも、レンダラを作るときに使われている。
 - **GET**（`src` がある）: `<img src>`。`onLoad` で成功。`onError` で失敗とし、`src.length >= PLANTUML_GET_URL_LIKELY_TOO_LONG` なら理由を `url-too-long`、そうでなければ `render-failed` にする。
-- **POST**（`source` がある）: 表示時に `fetchPlantumlSvg` を呼ぶ。成功なら blob URL を作って `<img>` に入れ、アンマウント時やソース変更時に revoke する。古いソースの結果が後から返ってきたら捨てる。失敗なら、結果の理由（`post-unavailable` か `render-failed`）でエラーにする。`<img>` の `onError` は `render-failed`。
+- **POST**（`source` がある）: 表示時に `fetchPlantumlSvg` を呼ぶ。成功なら、受け取った data URL を `<img>` に入れる。古いソースの結果が後から返ってきたら捨てる。失敗なら、結果の理由（`post-unavailable` か `render-failed`）でエラーにする。`<img>` の `onError` は `render-failed`。
 - **エラー表示**: 画像の代わりに、`t('plantuml.<理由>')` のメッセージを図の位置に出す。他の図や本文には影響しない。
 - **コンソール警告**: `loggerFactory('growi:features:plantuml:PlantUmlViewer')` で、理由・方式・大きさ（GET は `src.length`、POST はソースの長さ、POST の場合は応答ステータスも）を `warn` で出す。
 - **描画中ステータス**: 成功・失敗・取得失敗のどの場合も `GROWI_IS_CONTENT_RENDERING_ATTR` を `'false'` にする。
@@ -304,7 +304,7 @@ GET で構文エラーの SVG（ステータス 400）を `<img>` が表示す�
 - `PlantUmlViewer.spec.tsx`:
   - GET の load で画像を表示する。
   - GET の error で、`src` が長ければ `url-too-long`、短ければ `render-failed` を表示する。
-  - POST の成功で blob URL の `<img>` を表示し、アンマウントで revoke する。
+  - POST の成功で data URL の `<img>` を表示する。`URL.createObjectURL` を呼ばない。
   - POST の `post-unavailable`／`render-failed` でそれぞれのメッセージを表示する。
   - どの分岐でも描画中ステータスが `'false'` になる。
   - `logger.warn` が呼ばれる。
@@ -325,7 +325,7 @@ GET で構文エラーの SVG（ステータス 400）を `<img>` が表示す�
 
 ## Security Considerations
 - **送信先は設定値だけ**: 送信先は `PLANTUML_URI` だけから決め、ページ本文の属性からは取らない（Req 3.4）。GROWI サーバーは PlantUML へ送らないので、SSRF の新しい経路はできない。
-- **XSS**: SVG は `<img>` でだけ表示する。画像として表示した SVG の中のスクリプトは実行されない。インライン SVG にはしない。
+- **XSS**: SVG は `<img>` でだけ表示する。画像として表示した SVG の中のスクリプトは実行されない。インライン SVG にはしない。さらに SVG は blob URL でなく data URL で表示する。blob URL は GROWI と同じ生成元になり、「画像を新しいタブで開く」で開かれると SVG 内のスクリプトが GROWI の権限で動くため。data URL の文書は生成元がどのサイトにも属さないので、新しいタブで開かれても GROWI の権限は使えない（主なブラウザは、さらにページとしての表示そのものを止める）。
 - **Cookie を送らない**: `credentials: 'omit'` で PlantUML サーバーへ Cookie を送らない。図のソースが送信先に渡るのは、今の GET と同じ。
 - **CORS**: plantuml-server は図の応答に `Access-Control-Allow-Origin: *` を付ける。ブラウザは Cookie の無い応答を読める。
 

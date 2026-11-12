@@ -1,7 +1,7 @@
 import urljoin from 'url-join';
 
 export type PlantumlSvgResult =
-  | { ok: true; blob: Blob }
+  | { ok: true; dataUrl: string }
   | {
       ok: false;
       reason: 'post-unavailable' | 'render-failed';
@@ -11,6 +11,23 @@ export type PlantumlSvgResult =
 const MEMO_CAPACITY = 50;
 
 const SVG_MEDIA_TYPE = 'image/svg+xml';
+
+// Fixed media type, never taken from the response (research.md "SVG は blob URL でなく data URL で表示する").
+const SVG_DATA_URL_PREFIX = `data:${SVG_MEDIA_TYPE};base64,`;
+
+// Keeps String.fromCharCode's argument count well below engine limits.
+const BASE64_CHUNK_SIZE = 0x8000;
+
+const toSvgDataUrl = (body: ArrayBuffer): string => {
+  const bytes = new Uint8Array(body);
+  const chunks: string[] = [];
+  for (let i = 0; i < bytes.length; i += BASE64_CHUNK_SIZE) {
+    chunks.push(
+      String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK_SIZE)),
+    );
+  }
+  return SVG_DATA_URL_PREFIX + btoa(chunks.join(''));
+};
 
 // Holds in-flight and successful results only; failures remove themselves.
 const memo = new Map<string, Promise<PlantumlSvgResult>>();
@@ -45,7 +62,7 @@ const classifyResponse = async (res: Response): Promise<PlantumlSvgResult> => {
     return renderFailed(res.status);
   }
   try {
-    return { ok: true, blob: await res.blob() };
+    return { ok: true, dataUrl: toSvgDataUrl(await res.arrayBuffer()) };
   } catch {
     return renderFailed(res.status);
   }

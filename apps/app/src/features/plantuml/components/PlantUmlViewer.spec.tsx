@@ -57,10 +57,11 @@ const renderWithConfig = (ui: ReactNode) => {
   return render(ui, { wrapper: Wrapper });
 };
 
-const svgBlob = (): Blob =>
-  new Blob(['<svg xmlns="http://www.w3.org/2000/svg"/>'], {
-    type: 'image/svg+xml',
-  });
+// Distinct per label, so a test can tell which result is on screen.
+const svgDataUrl = (label: string): string =>
+  `data:image/svg+xml;base64,${btoa(`<svg xmlns="http://www.w3.org/2000/svg"><text>${label}</text></svg>`)}`;
+
+const DEFAULT_DATA_URL = svgDataUrl('default');
 
 const deferFetch = () => {
   const pending = Promise.withResolvers<PlantumlSvgResult>();
@@ -68,26 +69,28 @@ const deferFetch = () => {
   return pending;
 };
 
+const findImg = (container: HTMLElement): Promise<HTMLImageElement> =>
+  waitFor(() => {
+    const found = container.querySelector('img');
+    expect(found).not.toBeNull();
+    return found as HTMLImageElement;
+  });
+
+// Stubbed so any use would be visible (research.md "SVG は blob URL でなく data URL で表示する").
 const originalCreateObjectURL = URL.createObjectURL;
-const originalRevokeObjectURL = URL.revokeObjectURL;
-let blobUrlCount = 0;
-const createObjectURL = vi.fn((_blob: Blob) => {
-  blobUrlCount += 1;
-  return `blob:test/${blobUrlCount}`;
-});
-const revokeObjectURL = vi.fn((_url: string) => {});
+const createObjectURL = vi.fn((_blob: Blob) => 'blob:test/created');
 
 beforeEach(() => {
   vi.clearAllMocks();
-  blobUrlCount = 0;
   URL.createObjectURL = createObjectURL;
-  URL.revokeObjectURL = revokeObjectURL;
-  vi.mocked(fetchPlantumlSvg).mockResolvedValue({ ok: true, blob: svgBlob() });
+  vi.mocked(fetchPlantumlSvg).mockResolvedValue({
+    ok: true,
+    dataUrl: DEFAULT_DATA_URL,
+  });
 });
 
 afterEach(() => {
   URL.createObjectURL = originalCreateObjectURL;
-  URL.revokeObjectURL = originalRevokeObjectURL;
 });
 
 describe('PlantUmlViewer', () => {
@@ -222,12 +225,8 @@ describe('PlantUmlViewer', () => {
         CONFIGURED_PLANTUML_URI,
         SOURCE,
       );
-      const img = await waitFor(() => {
-        const found = container.querySelector('img');
-        expect(found).not.toBeNull();
-        return found as HTMLImageElement;
-      });
-      expect(img.getAttribute('src')).toBe('blob:test/1');
+      const img = await findImg(container);
+      expect(img.getAttribute('src')).toBe(DEFAULT_DATA_URL);
     });
 
     it('should show nothing and keep rendering-status "true" while fetching', () => {
@@ -241,20 +240,15 @@ describe('PlantUmlViewer', () => {
       expect(getRenderingStatus(container)).toBe('true');
     });
 
-    it('should show the fetched SVG through a blob URL and set rendering-status to "false" after it loads', async () => {
-      const blob = svgBlob();
-      vi.mocked(fetchPlantumlSvg).mockResolvedValueOnce({ ok: true, blob });
+    it('should show the fetched SVG data URL and set rendering-status to "false" after it loads', async () => {
+      const dataUrl = svgDataUrl('fetched');
+      vi.mocked(fetchPlantumlSvg).mockResolvedValueOnce({ ok: true, dataUrl });
       const { container } = renderWithConfig(
         <PlantUmlViewer source={SOURCE} />,
       );
 
-      const img = await waitFor(() => {
-        const found = container.querySelector('img');
-        expect(found).not.toBeNull();
-        return found as HTMLImageElement;
-      });
-      expect(createObjectURL).toHaveBeenCalledWith(blob);
-      expect(img.getAttribute('src')).toBe('blob:test/1');
+      const img = await findImg(container);
+      expect(img.getAttribute('src')).toBe(dataUrl);
       expect(getRenderingStatus(container)).toBe('true');
 
       fireEvent.load(img);
@@ -263,54 +257,56 @@ describe('PlantUmlViewer', () => {
       expect(state.warn).not.toHaveBeenCalled();
     });
 
-    it('should revoke the blob URL on unmount', async () => {
-      const { container, unmount } = renderWithConfig(
+    it('should never show the fetched SVG through a blob URL', async () => {
+      const { container } = renderWithConfig(
         <PlantUmlViewer source={SOURCE} />,
       );
-      await waitFor(() => {
-        expect(container.querySelector('img')).not.toBeNull();
-      });
-      expect(revokeObjectURL).not.toHaveBeenCalled();
 
-      unmount();
+      const img = await findImg(container);
 
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:test/1');
+      expect(img.getAttribute('src')?.startsWith('data:image/svg+xml')).toBe(
+        true,
+      );
+      expect(createObjectURL).not.toHaveBeenCalled();
     });
 
-    it('should revoke the old blob URL and show the new diagram when the source changes', async () => {
+    it('should hide the old diagram while the new source loads, then show the new one', async () => {
       const { container, rerender } = renderWithConfig(
         <PlantUmlViewer source={SOURCE} />,
       );
       await waitFor(() => {
         expect(container.querySelector('img')?.getAttribute('src')).toBe(
-          'blob:test/1',
+          DEFAULT_DATA_URL,
         );
       });
 
       const newFetch = deferFetch();
       rerender(<PlantUmlViewer source={`${SOURCE}\n' changed`} />);
 
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:test/1');
-      // The revoked URL must not stay on screen while the new source loads.
       expect(container.querySelector('img')).toBeNull();
 
+      const changedDataUrl = svgDataUrl('changed');
       await act(async () => {
-        newFetch.resolve({ ok: true, blob: svgBlob() });
+        newFetch.resolve({ ok: true, dataUrl: changedDataUrl });
         await newFetch.promise;
       });
       expect(container.querySelector('img')?.getAttribute('src')).toBe(
-        'blob:test/2',
+        changedDataUrl,
       );
       expect(screen.queryByText(/^plantuml\./)).toBeNull();
     });
 
-    it('should not show the revoked blob URL when the source returns to an earlier value', async () => {
+    it('should show the refetched result when the source returns to an earlier value', async () => {
+      vi.mocked(fetchPlantumlSvg).mockResolvedValueOnce({
+        ok: true,
+        dataUrl: svgDataUrl('a'),
+      });
       const { container, rerender } = renderWithConfig(
         <PlantUmlViewer source="a" />,
       );
       await waitFor(() => {
         expect(container.querySelector('img')?.getAttribute('src')).toBe(
-          'blob:test/1',
+          svgDataUrl('a'),
         );
       });
       deferFetch();
@@ -319,15 +315,15 @@ describe('PlantUmlViewer', () => {
       rerender(<PlantUmlViewer source="b" />);
       rerender(<PlantUmlViewer source="a" />);
 
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:test/1');
       expect(container.querySelector('img')).toBeNull();
 
+      const refetchedDataUrl = svgDataUrl('a refetched');
       await act(async () => {
-        refetch.resolve({ ok: true, blob: svgBlob() });
+        refetch.resolve({ ok: true, dataUrl: refetchedDataUrl });
         await refetch.promise;
       });
       expect(container.querySelector('img')?.getAttribute('src')).toBe(
-        'blob:test/2',
+        refetchedDataUrl,
       );
     });
 
@@ -339,21 +335,19 @@ describe('PlantUmlViewer', () => {
       );
       rerender(<PlantUmlViewer source="new" />);
 
-      const newBlob = svgBlob();
+      const newDataUrl = svgDataUrl('new');
       await act(async () => {
-        newFetch.resolve({ ok: true, blob: newBlob });
+        newFetch.resolve({ ok: true, dataUrl: newDataUrl });
         await newFetch.promise;
       });
       await act(async () => {
-        oldFetch.resolve({ ok: true, blob: svgBlob() });
+        oldFetch.resolve({ ok: true, dataUrl: svgDataUrl('old') });
         await oldFetch.promise;
       });
 
-      expect(createObjectURL).toHaveBeenCalledTimes(1);
-      expect(createObjectURL).toHaveBeenCalledWith(newBlob);
       expect(container.querySelectorAll('img')).toHaveLength(1);
       expect(container.querySelector('img')?.getAttribute('src')).toBe(
-        'blob:test/1',
+        newDataUrl,
       );
     });
 
@@ -373,12 +367,13 @@ describe('PlantUmlViewer', () => {
       expect(screen.queryByText(/^plantuml\./)).toBeNull();
       expect(state.warn).not.toHaveBeenCalled();
 
+      const newDataUrl = svgDataUrl('new');
       await act(async () => {
-        newFetch.resolve({ ok: true, blob: svgBlob() });
+        newFetch.resolve({ ok: true, dataUrl: newDataUrl });
         await newFetch.promise;
       });
       expect(container.querySelector('img')?.getAttribute('src')).toBe(
-        'blob:test/1',
+        newDataUrl,
       );
     });
 
@@ -414,20 +409,15 @@ describe('PlantUmlViewer', () => {
           }),
           expect.any(String),
         );
-        expect(createObjectURL).not.toHaveBeenCalled();
       });
     });
 
-    describe('when the blob URL image fails to load', () => {
+    describe('when the data URL image fails to load', () => {
       it('should show the render-failed message, set rendering-status to "false" and warn', async () => {
         const { container } = renderWithConfig(
           <PlantUmlViewer source={SOURCE} />,
         );
-        const img = await waitFor(() => {
-          const found = container.querySelector('img');
-          expect(found).not.toBeNull();
-          return found as HTMLImageElement;
-        });
+        const img = await findImg(container);
 
         fireEvent.error(img);
 
@@ -442,6 +432,49 @@ describe('PlantUmlViewer', () => {
           }),
           expect.any(String),
         );
+      });
+
+      it('should show the new diagram when the source changes to one with a different SVG', async () => {
+        const { container, rerender } = renderWithConfig(
+          <PlantUmlViewer source={SOURCE} />,
+        );
+        fireEvent.error(await findImg(container));
+        const fixedDataUrl = svgDataUrl('fixed');
+        vi.mocked(fetchPlantumlSvg).mockResolvedValueOnce({
+          ok: true,
+          dataUrl: fixedDataUrl,
+        });
+
+        rerender(<PlantUmlViewer source={`${SOURCE}\n' fixed`} />);
+
+        const img = await findImg(container);
+        expect(img.getAttribute('src')).toBe(fixedDataUrl);
+        expect(screen.queryByText(/^plantuml\./)).toBeNull();
+      });
+
+      // The same data URL is the same bytes, which would fail to load again.
+      it('should keep showing the message when the source returns to one whose SVG failed', async () => {
+        const { container, rerender } = renderWithConfig(
+          <PlantUmlViewer source="a" />,
+        );
+        fireEvent.error(await findImg(container));
+        vi.mocked(fetchPlantumlSvg).mockResolvedValueOnce({
+          ok: true,
+          dataUrl: svgDataUrl('b'),
+        });
+        rerender(<PlantUmlViewer source="b" />);
+        await waitFor(() => {
+          expect(container.querySelector('img')?.getAttribute('src')).toBe(
+            svgDataUrl('b'),
+          );
+        });
+
+        rerender(<PlantUmlViewer source="a" />);
+
+        expect(
+          await screen.findByText('plantuml.render-failed'),
+        ).not.toBeNull();
+        expect(container.querySelector('img')).toBeNull();
       });
     });
   });

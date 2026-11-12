@@ -75,7 +75,7 @@ const GetDiagram = ({
   return <img src={src} onLoad={onSettled} onError={handleError} />;
 };
 
-type PostOutcome = { blobUrl: string } | { reason: PlantUmlErrorReason };
+type PostOutcome = { dataUrl: string } | { reason: PlantUmlErrorReason };
 
 const usePostOutcome = (
   plantumlUri: string,
@@ -86,15 +86,13 @@ const usePostOutcome = (
 
   useEffect(() => {
     let cancelled = false;
-    let blobUrl: string | undefined;
 
     fetchPlantumlSvg(plantumlUri, source).then((result) => {
       if (cancelled) {
         return;
       }
       if (result.ok) {
-        blobUrl = URL.createObjectURL(result.blob);
-        setOutcome({ blobUrl });
+        setOutcome({ dataUrl: result.dataUrl });
         return;
       }
       const { reason, status } = result;
@@ -109,10 +107,7 @@ const usePostOutcome = (
 
     return () => {
       cancelled = true;
-      if (blobUrl != null) {
-        URL.revokeObjectURL(blobUrl);
-      }
-      // Another source must never show this outcome or its revoked blob URL.
+      // Another source must never show this outcome.
       setOutcome(null);
     };
   }, [plantumlUri, source, onSettled]);
@@ -127,7 +122,7 @@ const PostDiagram = ({
   // Never from element attributes: page authors can write those (design.md "PlantUmlViewer — 変更").
   const { plantumlUri } = useRendererConfig();
   const outcome = usePostOutcome(plantumlUri, source, onSettled);
-  const [failedBlobUrl, setFailedBlobUrl] = useState<string | null>(null);
+  const [failedDataUrl, setFailedDataUrl] = useState<string | null>(null);
 
   if (outcome == null) {
     return null;
@@ -135,8 +130,8 @@ const PostDiagram = ({
   if ('reason' in outcome) {
     return <DiagramError reason={outcome.reason} />;
   }
-  const { blobUrl } = outcome;
-  if (failedBlobUrl === blobUrl) {
+  const { dataUrl } = outcome;
+  if (failedDataUrl === dataUrl) {
     return <DiagramError reason="render-failed" />;
   }
 
@@ -145,12 +140,12 @@ const PostDiagram = ({
       { reason: 'render-failed', method: 'post', sourceLength: source.length },
       WARN_MESSAGE,
     );
-    setFailedBlobUrl(blobUrl);
+    setFailedDataUrl(dataUrl);
     onSettled();
   };
 
   // biome-ignore lint/a11y/useAltText: PlantUML diagrams are purely visual
-  return <img src={blobUrl} onLoad={onSettled} onError={handleError} />;
+  return <img src={dataUrl} onLoad={onSettled} onError={handleError} />;
 };
 
 type PlantUmlViewerProps = {
