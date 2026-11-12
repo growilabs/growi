@@ -113,7 +113,7 @@
   - _Requirements: 4.2, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 10.1_
   - _Boundary: RevertRequestService_
   - _Depends: 1.1, 1.2_
-- [ ] 4.2 頼む通知の API を作り、core の router に登録する
+- [x] 4.2 頼む通知の API を作り、core の router に登録する
   - handler を作る関数 `revertRequestRouteHandlersFactory(crowi, getService)` を作り、core の `server/routes/index.ts` に `router.post('/:id/revert-request', revertRequestRouteHandlersFactory(crowi, getService))` として、`GET /:id` より前に登録する
   - middleware は core の `writeAccessChain(crowi)`（`server/routes/write-access.ts`）をそのまま使い、そのあとに一言の検査と `apiV3FormValidator` を置く。`:id` は検査しない（`param('id').isMongoId()` を置かない。形の正しくない ID も、core と同じく 404 `notfound` にする）
   - 送れたときだけ、応答の前に、target を渡さずに頼む通知の activity を記録する。サービスの結果ごとに、返す HTTP の状態と code を決める（400 長すぎる・自分のもの・依頼した人が無効、404 見つからない、409 最近送った）

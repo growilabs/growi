@@ -12,6 +12,7 @@ import { getProposalRouteHandlersFactory } from './get-proposal';
 import { listAppliedRouteHandlersFactory } from './list-applied';
 import { listMineRouteHandlersFactory } from './list-mine';
 import { revertRouteHandlersFactory } from './revert';
+import { revertRequestRouteHandlersFactory } from './revert-request';
 import { revisionMarksRouteHandlersFactory } from './revision-marks';
 import { setPerPageNotificationsRouteHandlersFactory } from './set-per-page-notifications';
 import { skipRouteHandlersFactory } from './skip';
@@ -48,6 +49,10 @@ export const createChangeProposalRouter = (
   router.post('/:id/skip', skipRouteHandlersFactory(crowi, getService));
   router.post('/:id/discard', discardRouteHandlersFactory(crowi, getService));
   router.post('/:id/revert', revertRouteHandlersFactory(crowi, getService));
+  router.post(
+    '/:id/revert-request',
+    revertRequestRouteHandlersFactory(crowi, getService),
+  );
   router.put(
     '/:id/per-page-notifications',
     setPerPageNotificationsRouteHandlersFactory(crowi, getService),

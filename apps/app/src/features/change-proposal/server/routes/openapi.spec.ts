@@ -21,6 +21,7 @@ const EXPECTED_OPERATIONS: [string, string][] = [
   ['/change-proposals/{id}/skip', 'post'],
   ['/change-proposals/{id}/discard', 'post'],
   ['/change-proposals/{id}/revert', 'post'],
+  ['/change-proposals/{id}/revert-request', 'post'],
   ['/change-proposals/{id}/per-page-notifications', 'put'],
 ];
 
@@ -50,7 +51,7 @@ describe('change-proposal OpenAPI documentation', () => {
     }
   });
 
-  it('documents all nine routes under the ChangeProposals tag', () => {
+  it('documents all ten routes under the ChangeProposals tag', () => {
     const paths = documentedPaths(ROUTES_GLOB);
 
     const documented = Object.entries(paths).flatMap(([route, item]) =>
