@@ -351,7 +351,6 @@ interface VaultDispatcher {
 - `delete`: `current` 配列の各 namespace から `remove` 1 件ずつ（pagePath は削除直前の値）
 - ACL 変更: `previous` 配列の各 namespace に `remove` + `current` 配列の各 namespace に `upsert`（各 namespace ごとに 1 件ずつ）
   - 単一ページ更新での ACL 変更の検出: `PageService.updatePage` / `updatePageV4`（権限だけを変える `updateGrant` もここを通る）は `pageEvent.emit('update', page, user, { previousGrant, previousGrantedGroups, previousGrantedUsers })` の第 3 引数で、更新前の権限状態を渡す。購読側（`vault-page-update-handler.ts`）は更新前の namespace を計算し、`previous` として dispatcher に渡す
-  - 権限を保存したあとで本文の書き込みが失敗した場合（revision の競合など）、`update` は発行されない。この場合 PageService は DB から読み直したページを添えて、`update` と同じ引数で `updateAbortedAfterSave` を発行する。購読側は `update` と同じ処理で受ける。このイベントは保存済みの権限を Vault に伝えるためのもので、`update` の他の購読者（全文検索・画面への通知）には届かない
   - dispatcher は `previous` のうち `current` に含まれない namespace（ページが抜けた namespace）にだけ `remove` を発行する。ページが引き続き属する namespace には `remove` を発行しない（同じ namespace への `remove` と `upsert` は書き込み順が保証されないため）。抜けた namespace が無ければ通常の `update`（coalesce 対象の `upsert`）として扱う。この規則は親ページ grant 一括変更の経路にも同じく適用される
   - `remove` を伴う操作（`delete` / ACL 変更 / 単一ページ rename）は、発行の前に、同じページの coalesce 待ちの `upsert` を対象 namespace のバッファから取り除く（待機中の `upsert` が後から書き込まれて `remove` を打ち消すのを防ぐ）
 - 単一ページ rename（`onPageRenamed`）: `current` 配列の各 namespace に `remove`（oldPath）+ `upsert`（newPath）を 1 件ずつ。ページ自身は namespace tree 上で blob（`<name>.md`）として保持されるため、ディレクトリ subtree 移動である `rename-prefix` では再配置できない（`rename-prefix` は `type === 'tree'` のエントリのみ移動する）。remove + upsert で blob を確実に旧パスから削除し新パスに再作成する。grant は rename で不変なので old/new は同一 namespace 集合に属する

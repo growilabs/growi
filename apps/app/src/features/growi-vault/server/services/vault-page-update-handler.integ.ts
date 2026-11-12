@@ -17,7 +17,6 @@ import { COALESCE_WINDOW_MS, createVaultDispatcher } from './vault-dispatcher';
 import { vaultNamespaceMapper } from './vault-namespace-mapper';
 import {
   createVaultPageUpdateHandler,
-  VAULT_PAGE_UPDATE_EVENTS,
   type VaultPageUpdateHandler,
 } from './vault-page-update-handler';
 
@@ -109,20 +108,18 @@ describe('Vault instructions written for a single-page update', () => {
     // Same listener order as the running app: the page-status broadcaster is
     // registered before the Vault subscriber.
     new SyncPageStatusService(crowi, undefined, crowi.socketIoService);
-    for (const eventName of VAULT_PAGE_UPDATE_EVENTS) {
-      crowi.events.page.on(
-        eventName,
-        (
-          ...[page, , extras]: [
-            Parameters<VaultPageUpdateHandler>[0],
-            unknown,
-            Parameters<VaultPageUpdateHandler>[1],
-          ]
-        ) => {
-          handled.push(handlePageUpdate(page, extras));
-        },
-      );
-    }
+    crowi.events.page.on(
+      'update',
+      (
+        ...[page, , extras]: [
+          Parameters<VaultPageUpdateHandler>[0],
+          unknown,
+          Parameters<VaultPageUpdateHandler>[1],
+        ]
+      ) => {
+        handled.push(handlePageUpdate(page, extras));
+      },
+    );
     vi.spyOn(crowi.pageService, 'updatePageSubOperation').mockResolvedValue();
   }, 60_000);
 

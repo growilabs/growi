@@ -22,7 +22,7 @@ const sharedElasticsearchUri = process.env.ELASTICSEARCH_URI;
 const INDEX_NAME = `growi_test_search_index_grant_sync_${WORKER_ID}`;
 
 describe.skipIf(sharedElasticsearchUri == null)(
-  'Search index after a page update that narrows the grant',
+  'Search index after a page update that changes the grant',
   () => {
     let crowi: Crowi;
     let Page: PageModel;
@@ -172,7 +172,7 @@ describe.skipIf(sharedElasticsearchUri == null)(
     it.each([
       { name: 'conflict-on-tree', onTree: true },
       { name: 'conflict-legacy', onTree: false },
-    ])('stores the new grant when the body save then loses a revision conflict ($name)', async ({
+    ])('keeps the grant, in the DB and in the index, when the save loses a revision conflict ($name)', async ({
       name,
       onTree,
     }) => {
@@ -191,9 +191,10 @@ describe.skipIf(sharedElasticsearchUri == null)(
         ),
       ).rejects.toThrow(RevisionConflictError);
 
-      await expect
-        .poll(() => indexedGrantOf(page), { timeout: 10_000 })
-        .toBe(PageGrant.GRANT_OWNER);
+      expect((await Page.findById(page._id).orFail()).grant).toBe(
+        PageGrant.GRANT_PUBLIC,
+      );
+      expect(await indexedGrantOf(page)).toBe(PageGrant.GRANT_PUBLIC);
     }, 30_000);
   },
 );

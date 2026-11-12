@@ -533,11 +533,8 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
     });
   });
 
-  describe('page events that carry the previous grant state', () => {
-    it.each([
-      'update',
-      'updateAbortedAfterSave',
-    ])("hands the previous namespaces of a '%s' event to the dispatcher", async (eventName) => {
+  describe("'update' event carrying the previous grant state", () => {
+    it('hands the previous namespaces to the dispatcher', async () => {
       const previousGrantState = {
         grant: 1,
         grantedGroups: [],
@@ -568,7 +565,7 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
       };
 
       crowi.events.page.emit(
-        eventName,
+        'update',
         page,
         { _id: 'u1' },
         {
