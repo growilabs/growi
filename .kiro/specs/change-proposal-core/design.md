@@ -86,7 +86,7 @@ requirements.md の受け入れ条件は、この基準で削らない。受け�
 次の変更をしたときは、`change-proposal-ai-agent` と `change-proposal-viewer` の結合を確かめ直す。
 - `ChangeProposalService` の公開の関数（作成・承認・取得）の入力と結果の形（作成の任意の `trigger` を含む）と、`ServiceError` の値
 - server の barrel が export するもの（`createChangeProposalService` と型 `ChangeProposalService`。`createProposal`・`approve`・`getForViewer` などは、この関数が返すサービスの関数である。ほかに型 `ProposalQuery`、`readChangeProposalSettings`、router を作る関数）と、`interfaces` の barrel が export するもの（型、`MAX_TOTAL_BODY_BYTES`、`ApplyTrigger` / `ApplyResult` / `RevertResult`）
-- REST API の応答の形（`ChangeProposalView` / `OperationView` / `ApplyResult` / `RevertResult`）、戻せない理由の値（`RevertRefusalReason`）、操作の種類・状態・理由の値。ページがもう無い操作に返すパス（`recordedPathOf`。完全な削除は元の新規作成のパス、編集は反映した時点に記録したパス `appliedPagePath`）と、一覧の要約の `pages` にそのパスを入れる扱い
+- REST API の応答の形（`ChangeProposalView` / `OperationView` / `ApplyResult` / `RevertResult`）、戻せない理由の値（`RevertRefusalReason`）、操作の種類・状態・理由の値。ページがもう無い操作に返すパス（`recordedPathOf`。完全な削除は元の新規作成のパス、編集は反映した時点に記録したパス `appliedPagePath`）と、一覧の要約の `pages` にそのパスを入れる扱い（`pages[].path` は任意で、パスを記録する前に反映した編集の操作はページの ID だけで入る）
 - 依頼した人以外の見る人に返す操作の決まり（`selectVisibleOperations`。対象のページがもう無い操作を取り消しの相手にも表示のために返し、取り消しの対象には入れない扱いを含む）と、依頼した人以外に返す `lastAppliedAt` の決め方。viewer の詳細ページは、取り消しの元と先のリンクがどちらの相手にも開けることと、取り消したあとに取り直した詳細に取り消した操作が残ることを、この決まりに頼っている
 - まとめたアプリ内通知の snapshot の形と、`targetModel` の名前、受け取る人の決め方
 - リビジョンの `proposalId` / `proposalOperationKey` の意味（何を記録するか）
@@ -308,7 +308,7 @@ stateDiagram-v2
   - 依頼した人以外には、状態が `applied` / `reverted` / `revert-refused` でない操作を返さない。Change Proposal の `lifecycle` はこの判断に使わない（要件 9.2）。
   - 依頼した人以外には、`anyoneWithLinkPageIds` に入るページの操作を返さない（要件 9.5）。
   - まだページが無い新規作成の操作（待ち・失敗・古い・飛ばした）は、依頼した人にだけ返す。取り消しの相手の扱いは、ページがもう無い操作にだけ当てる。
-- 文脈を作るのは `proposal-view-parts.ts` の `contextFor` だけにする。`selectVisibleOperations` を呼ぶどの処理も `contextFor` を使う（取り消しの対象を選ぶ `revert-action.ts` も、自分で文脈を組み立てない）。表示のための処理（1 件の取得・一覧・リビジョンの印・つながりの判定）は取り消しの相手の値を渡し、`revert-action.ts` は空の値（`isOriginalRequester` は偽、`revertProposalIdsByViewer` は空の集合）を渡す。
+- 文脈を作るのは `proposal-view-parts.ts` の `contextFor` だけにする。`selectVisibleOperations` を呼ぶどの処理も `contextFor` を使う（取り消しの対象を選ぶ `revert-action.ts` も、自分で文脈を組み立てない）。取り消しの相手の値を渡すのは、1 件の取得・自分の一覧・反映済みの一覧・つながりの判定である。`revert-action.ts` は空の値（`isOriginalRequester` は偽、`revertProposalIdsByViewer` は空の集合）を渡す。リビジョンの印（`revision-marks-query.ts`）も空の値を渡す。`deleteCompletely` はページのリビジョンも消す（`server/service/page/delete-completely-operation.ts`）ので、印がページのもう無い操作を指すことは無く、取り消しの相手の扱いが効く場面が無いためである。
 - `recordedPathOf` の規則: ページがもう無い操作のパスを、操作の記録から決める。新規作成は `path`、移動は移動先の `toPath`、編集は反映したときに記録した `appliedPagePath`（要件 6.7）、完全な削除は `collectCreatedPaths` で元の新規作成から引いたパス。記録に無いとき（`appliedPagePath` を記録する前に反映した編集など）は無し。1 件の取得の操作と、一覧の要約のページの一覧の両方がこの関数を使う（要件 9.13）。呼び出し側は、`selectVisibleOperations` を通った操作（依頼した人か取り消しの相手に返す操作）にだけ使うので、ページがもう無い操作のパスがほかの人に渡ることは無い。
 - `collectCreatedPaths` の規則: Change Proposal の操作のうち新規作成のものから、操作の `key` からパスへの表を作る。取り消しの Change Proposal の完全な削除の操作のパスは、この表を元の Change Proposal の操作で作り、`revertTarget.operationKey` で引く。応答の操作の `path`（要件 9.12）と、まとめた通知で元の依頼した人に入れる完全に削除したページのパス（要件 7.8）は、どちらもこの関数を使う。
 - `judgeRevertability` の規則（`Revertability` は Data Models を参照）。操作の種類ごとに規則を持ち、種類で分岐する場所はこの関数の中の表だけにする:
@@ -607,9 +607,9 @@ interface ChangeProposalService {
 
 **Responsibilities & Constraints**
 - 1 件の取得: 操作のページ ID をまとめて `Page.findByIdsAndViewer(ids, viewer, null, false, true)` で確かめ、その結果のうち `grant` が `GRANT_RESTRICTED` のものを `anyoneWithLinkPageIds` にする。`selectVisibleOperations` に通す。依頼した人でなく、残った操作が 1 つも無ければ `not-found` を返す（要件 9.2・9.3）。`lifecycle` は見せるかどうかの判断に使わない。承認待ちの Change Proposal でも、反映済みの操作があれば、依頼した人以外にはその操作だけを返す。
-- 取り消しの相手を決める値: `selectVisibleOperations` に通す Change Proposal のうち、取り消しの Change Proposal の `revertOf` と、対象のページがもう無い操作の `revertedByProposalId` を集め、その Change Proposal を Prisma の拡張の関数 `findRevertCounterparts(ids)` で 1 回の問い合わせでまとめて読む。この関数は、Change Proposal ごとに依頼した人と、操作の `key`・`type`・`path` を返す。依頼した人から Change Proposal ごとに `isOriginalRequester` と `revertProposalIdsByViewer` を決めて `contextFor` に渡し、操作から `collectCreatedPaths` で完全な削除の操作のパスを決める。1 件の取得・反映済みの一覧（読んだ 1 回分ごと）・自分の一覧・リビジョンの印・つながりの判定で、同じ読み方をする（文書ごとに読まない）。つながりの判定で読む後続・見直しの操作（`findLinkedProposals`）も、`revertedByProposalId` を読む。取り消しの対象の選び方（`revert-action.ts`）は、取り消しの相手の値を使わないので、この読み込みをしない。
-- 1 件の取得で、ページがもう無い操作を返すときは、パスを `recordedPathOf` で決めて `toOperationView` に渡す（要件 9.12・9.13）。完全な削除の操作の `path` は、元の Change Proposal の新規作成の操作から引く。ページが残っている操作は、今までどおり今のページ（`page`）を返す。
-- 戻せるかどうかの判定（`revertability`）は、取り消しの相手の値を空にした文脈でも残る操作（取り消しを求めたときに対象になり得る操作）にだけ付ける。取り消しの相手として表示されているだけの操作には付けない（表示する判定と、取り消しの実際の対象がずれないようにするため。要件 5.14）。
+- 取り消しの相手を決める値: `selectVisibleOperations` に通す Change Proposal のうち、取り消しの Change Proposal の `revertOf` と、対象のページがもう無い操作の `revertedByProposalId` を集め、その Change Proposal を Prisma の拡張の関数 `findRevertCounterparts(ids)` で 1 回の問い合わせでまとめて読む。この関数は、Change Proposal ごとに依頼した人と、操作の `key`・`type`・`path` を返す。依頼した人から Change Proposal ごとに `isOriginalRequester` と `revertProposalIdsByViewer` を決めて `contextFor` に渡し、操作から `collectCreatedPaths` で完全な削除の操作のパスを決める。1 件の取得・反映済みの一覧（読んだ 1 回分ごと）・自分の一覧・つながりの判定で、同じ読み方をする（文書ごとに読まない）。つながりの判定で読む後続・見直しの操作（`findLinkedProposals`）も、`revertedByProposalId` を読む。取り消しの対象の選び方（`revert-action.ts`）とリビジョンの印（`revision-marks-query.ts`）は、取り消しの相手の値を使わないので、この読み込みをしない。
+- 1 件の取得の操作のパス（`toOperationView` に渡す `path`）: 完全な削除の操作には、ページがあるかどうかにかかわらず、元の Change Proposal の新規作成の操作から引いたパスをいつも渡す（要件 9.12）。編集の操作には、ページがもう無いときだけ `recordedPathOf` で決めたパス（反映した時点に記録したパス）を渡す。新規作成は今までどおり作るときの `path` を、移動は `fromPath` と `toPath` を返す。ページが残っている操作には、今までどおり今のページ（`page`）も返す。画面は、移動以外の種類で `page?.path ?? path` を表示する（要件 9.13）。
+- 戻せるかどうかの判定（`revertability`）は、取り消しの相手として表示されているだけの操作には付けない。そのような操作は「見る人が依頼した人でなく、対象のページが `deletedPageIds` に入る操作」とちょうど同じなので、この条件で判定から外す（`selectVisibleOperations` をもう一度通さない）。表示する判定と、取り消しの実際の対象がずれないようにするためである（要件 5.14）。
 - 依頼した人以外への `lastAppliedAt` は、残った操作の `appliedAt` の最も新しいものにする。文書に保存した `lastAppliedAt` は、見えない操作の反映の日時を含むことがあるので、そのまま返さない（要件 9.10）。依頼した人には保存した値を返す。
 - 反映済みの操作ごとに、その時点のページの状態を 1 回の問い合わせでまとめて取り、`judgeRevertability` の結果を付ける（要件 5.14）。依頼した人以外には、その人が取り消せる操作の判定だけを付ける。
 - 依頼した人にだけ、`requesterState`（段階 `lifecycle` と、`computeAchievement` で数えた達成度）を付ける。依頼した人以外には付けない。依頼した人以外に見える操作は反映に関わった操作だけなので、段階（承認待ちか完了か）と達成度の分母から、見えない「待ち」の操作があるかどうかや数が分かってしまうためである（要件 12.1・12.4）。
@@ -620,7 +620,7 @@ interface ChangeProposalService {
 - 自分の一覧: `requester` と `createdAt` の索引で、新しい順に `page` / `limit` でページ送りする。
 - 反映済みの一覧: `appliedPageIds` を持つ文書を `lastAppliedAt` の新しい順に定数 `APPLIED_LIST_SCAN_BATCH`（50 件）ずつ読み、その分のページ ID をまとめて 1 回の `findByIdsAndViewer(ids, viewer, null, false, true)` で確かめる。文書ごとに、1 件の取得と同じく `selectVisibleOperations` に通し（`isRequester` は文書ごとに決める）、残った操作のうち状態が反映済み・取り消し済み・取り消しを断られたのものが 1 つ以上ある文書だけを残す。依頼した人以外には、リンクを知る人だけが見られるページの操作は残らないので、そのページだけを含む文書は一覧に出ない（要件 9.5・9.7）。1 回の要求で読む文書は定数 `APPLIED_LIST_SCAN_LIMIT`（500 件）までとし、続きの位置を `cursor` として返す。件数は返さない。
 - 一覧の要約（`ChangeProposalSummaryView`）の `lastAppliedAt`・`status`・`pages` も、1 件の取得と同じく残った操作だけから作る（要件 9.10）。読む順は文書に保存した `lastAppliedAt` のままにする（Security Considerations の「対策せずに受け入れる危険」）。
-- 一覧の要約の `pages`（`proposal-list-query.ts` の `visiblePagesOf`。自分の一覧と反映済みの一覧で共通）: 残った操作のうち、ページが今閲覧できるものは今のページのパスを使う。ページがもう無いもの（`deletedPageIds`）は、`recordedPathOf` で記録から決めたパスを、ページの ID とともに入れる。パスが記録に無い操作は入れない（要件 9.13）。
+- 一覧の要約の `pages`（`proposal-list-query.ts` の `visiblePagesOf`。自分の一覧と反映済みの一覧で共通）: 残った操作のうち、ページが今閲覧できるものは今のページのパスを使う。ページがもう無いもの（`deletedPageIds`）は、`recordedPathOf` で記録から決めたパスを、ページの ID とともに入れる。パスが記録に無い操作（パスを記録する前に反映した編集）は、パスを付けずに `{ id }` だけを入れる。どれもページの ID で重なりを除く。ここに来る操作は `selectVisibleOperations` を通ったもの（依頼した人か取り消しの相手に返すもの）だけなので、ほかの人に ID やパスは渡らない（要件 9.13）。
 - リビジョンの印: 指定されたリビジョン（100 件まで）のうち `proposalId` を持つものを取り、その印が指す操作（`proposalOperationKey`）を Change Proposal からまとめて引く。ページを `findByIdsAndViewer(ids, viewer, null, false, true)` で確かめ、操作ごとに `selectVisibleOperations` に通して、残った操作が作ったリビジョンの印だけを返す。取り消しで作られたかどうかは、Change Proposal の入口の種類から付ける（要件 9.8）。
 
 **Contracts**: Service [x]
@@ -896,7 +896,7 @@ type OperationView = {
   readonly reason?: OperationReason;
   readonly appliedAt?: string;
   readonly page?: { readonly id: string; readonly path: string };   // current page, only when visible
-  readonly path?: string;                                           // create: target path; delete-completely: the path of the create it reverts; edit: appliedPagePath, only when the page no longer exists
+  readonly path?: string;                                           // create: target path; delete-completely: the path of the create it reverts (always); edit: appliedPagePath, only when the page no longer exists
   readonly fromPath?: string;                                       // move
   readonly toPath?: string;                                         // move
   readonly baseRevisionId?: string;                                 // edit
@@ -932,7 +932,7 @@ type ChangeProposalView = {
   readonly operations: readonly OperationView[];
 };
 type ChangeProposalSummaryView = Omit<ChangeProposalView, 'operations' | 'basedOn'> & {
-  readonly pages: readonly { readonly id: string; readonly path: string }[]; // visible pages only
+  readonly pages: readonly { readonly id: string; readonly path?: string }[]; // visible pages; a deleted page uses the recorded path, absent for an edit applied before paths were recorded
 };
 type RevisionMarkView = { readonly revisionId: string; readonly proposalId: string; readonly isRevert: boolean };
 
@@ -1010,7 +1010,7 @@ type ChangeProposalNotificationSnapshot = {
 - 後続・見直しは、元の Change Proposal の依頼した人だけが作れる。元が無い場合と他の人の Change Proposal である場合は、同じ `based-on-unavailable` にする（他の人の Change Proposal の ID があるかどうかを確かめる手段にしないため）。
 - 操作の指定は、並び順の情報を持たない `key` で受ける。取り消しでは、存在しない `key` と、見えない操作の `key` を、どちらも同じように対象から外し、応答でも区別しない（要件 5.4）。リビジョンの印も `key` だけを持つ（要件 6.6）。
 - 依頼した人以外には、閲覧できるページに対する反映済み・取り消し済み・取り消しを断られたの操作だけを返す。承認待ち・失敗・古い・飛ばしたの操作は、そのページを閲覧できても返さない（要件 9.2）。`lastAppliedAt` と全体の状態も、返す操作だけから決める（要件 9.10）。
-- 対象のページがもう無い操作は、依頼した人と取り消しの相手にだけ返す（要件 9.11）。この 2 人は、ページが消える前にそのページを見る権利があったことが確かである（依頼した人の代わりにページが作られ、取り消した人は取り消すときにそのページを閲覧できた）。ほかの人には、ページが消えたあとで見る権利を確かめる手段が無いので返さない。記録から決めたパス（要件 9.13）も、この 2 人に返す操作と一覧の要約にだけ入る。取り消しの相手に返すのは表示のためだけで、その人が取り消しを求めたときの対象は広げない（要件 9.11）。
+- 対象のページがもう無い操作は、依頼した人と取り消しの相手にだけ返す（要件 9.11）。この 2 人は、ページが消える前にそのページを見る権利があったことが確かである（依頼した人の代わりにページが作られ、取り消した人は取り消すときにそのページを閲覧できた）。ほかの人には、ページが消えたあとで見る権利を確かめる手段が無いので返さない。記録から決めたパスとページの ID（要件 9.13）も、この 2 人に返す操作と一覧の要約にだけ入る。取り消しの相手に返すのは表示のためだけで、その人が取り消しを求めたときの対象は広げない（要件 9.11）。
 - 対策せずに受け入れる危険: 反映済みの一覧は、文書に保存した `lastAppliedAt` の順に読む。そのため、見えない操作があとから反映された Change Proposal は、表示する `lastAppliedAt`（見える操作の日時）よりも新しい位置に並ぶことがある。並び順の食い違いから分かるのは「見えない何かが、より新しく反映された」ことだけで、ページのパス・件数・中身は分からない。見る人ごとに並べ直すには、見る人ごとの反映の日時を別に保存して索引を作る必要がある。分かることが上のとおり少ないので、その仕組みは作らない。
 - ページごとの通知を出すときは、人が同じ操作をしたときと同じ受け取る人の決め方と、同じ閲覧範囲の判定（グローバル通知の `isSendNotification`）をそのまま使う。人の保存で届く人以外には届かないので、見えないページについて新しく分かることは増えない。
 - ログに本文を書かない。

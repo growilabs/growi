@@ -70,7 +70,7 @@
 次の変更があったときは、viewer との結合を確かめ直す。
 - core の `ChangeProposalView` / `OperationView` / `ChangeProposalSummaryView` / `RevisionMarkView` / `RevertResult` の形（`RevertResult` の `outcome` の値と、それぞれが持つ `reason` の値を含む）、状態と理由の値の増減
 - core が依頼した人以外に返す操作の条件（閲覧できるページへの操作のうち、状態が反映済み・取り消し済み・取り消しを断られた、のどれかである操作だけ。リンクを知る人だけが見られるページの操作は除く。ページがもう無い操作は、取り消しの相手にも返す）と、依頼した人以外への `lastAppliedAt` の決め方（見える操作だけから決める）。取り消しの元と先のリンクがどちらの相手にも開けること、取り消したあとの詳細ページに取り消した操作が残ることは、この条件に頼っている
-- core が操作に返すパス（新規作成の `path`、移動の `fromPath` / `toPath`、完全な削除の `path`）と、ページの `page` を返す条件
+- core が操作に返すパス（新規作成の `path`、移動の `fromPath` / `toPath`、完全な削除の `path`（いつも）、ページがもう無い編集の `path`）と、ページの `page` を返す条件。一覧の要約の `pages[].path` が任意であること（パスを記録する前に反映した編集の操作で、ページがもう無いものはページの ID だけで入る）
 - core の取り消しの結果（`RevertResult`）に、結果がまだ決まっていない操作を入れない扱いと、取り消しの Change Proposal の操作の `revertTarget`（「処理中」の操作を元の操作に結び付けるのに使う）
 - core の画面の共通の部品（`client/shared/`）の言葉の表の名前と翻訳のキー、`diff2html-options.ts` の関数の形
 - core の `buildProposalHref` が作る詳細ページの URL。viewer のページの route（`pages/me/change-proposals/[id].page.tsx`）はこの URL と一致させる。URL を変えるときは core と viewer を一緒に直す
@@ -235,7 +235,7 @@ apps/app/src/pages/me/change-proposals/
 - `apps/app/src/interfaces/activity.ts` — action `ACTION_CHANGE_PROPOSAL_REVERT_REQUEST = 'CHANGE_PROPOSAL_REVERT_REQUEST'` を足し、`EssentialActionGroup` に入れる（core のタスク 1.5 のあとで足す。分類の正規表現 `^CHANGE_PROPOSAL_` に自動で含まれる）
 - `apps/app/src/features/change-proposal/server/routes/index.ts`（core が作る）— `router.post('/:id/revert-request', revertRequestRouteHandlersFactory(crowi, getService))` を、`router.get('/:id', …)` より前に、ほかの書く route と並べて登録する
 - `apps/app/src/pages/common-props/commons.ts` — `changeProposalEnabled` を足す。値は `crowi` から取った `configManager` で読む `getConfig('app:changeProposalEnabled')`（同じファイルが `app:siteUrl` などを読むのと同じ形）。core の server の barrel の `readChangeProposalSettings()` は import しない（research.md の「書き込み機能が有効なときだけ、Recent Changes に一覧へのリンクを出す」）
-- core の server のファイル（tasks.md のグループ 8。決まりは core の design が持つ）: `server/domain/select-visible-operations.ts`（取り消しの相手の扱い）、`server/domain/` に `collectCreatedPaths` と `recordedPathOf` を足す、`server/services/to-operation-view.ts`（ページがもう無い操作の `path`）、`server/services/proposal-view-parts.ts`（`contextFor`）、`server/services/proposal-query.ts`（取り消しの相手の値、記録から決めたパス、`revertability` を付ける操作の絞り込み）・`proposal-list-query.ts`（取り消しの相手の値と、`visiblePagesOf` で記録から決めたパス）・`revision-marks-query.ts`（取り消しの相手の値）・`revert-action.ts`（`contextFor` に空の値を渡し、取り消しの対象は今のまま）、`server/services/proposal-notifier.ts`（`collectCreatedPaths` を使い、注記を今の扱いに直す）、`server/services/operation-handlers/edit.ts`（反映した時点のページのパスを結果に入れる）、`server/models/change-proposal.ts`（`findRevertCounterparts` を足し、`findLinkedProposals` で `revertedByProposalId` を読み、`recordOperationOutcome` で編集のパスを書く）・`change-proposal-query-parts.ts`（`toOutcomeData`）・`to-change-proposal-document.ts`（編集の `path` を `appliedPagePath` に変える）・`change-proposal-types.ts`（`RecordedOutcome` と `LinkedProposalRecord`）、`interfaces/change-proposal.ts`（`OperationRecord.appliedPagePath`）
+- core の server のファイル（tasks.md のグループ 8。決まりは core の design が持つ）: `server/domain/select-visible-operations.ts`（取り消しの相手の扱い）、`server/domain/` に `collectCreatedPaths` と `recordedPathOf` を足す、`server/services/to-operation-view.ts`（ページがもう無い操作の `path`）、`server/services/proposal-view-parts.ts`（`contextFor`）、`server/services/proposal-query.ts`（取り消しの相手の値、操作のパス、`revertability` を付ける操作の絞り込み）・`proposal-list-query.ts`（取り消しの相手の値と、`visiblePagesOf` で記録から決めたパス、またはパスの無い `{ id }`）・`revision-marks-query.ts` と `revert-action.ts`（`contextFor` に空の値を渡す。取り消しの対象と印は今のまま）、`server/services/proposal-notifier.ts`（`collectCreatedPaths` を使い、注記を今の扱いに直す）、`server/services/operation-handlers/edit.ts`（反映した時点のページのパスを結果に入れる。`findExistingResult` で読むページの項目に `path` を足す）・`operation-handlers/types.ts`（`AppliedOutcome` に `appliedPagePath`）・`proposal-applier.ts`（結果をそのまま記録に渡していることを確かめる）、`server/models/change-proposal.ts`（`findRevertCounterparts` を足し、`findLinkedProposals` で `revertedByProposalId` を読み、`recordOperationOutcome` で編集のパスを書く）・`change-proposal-query-parts.ts`（`toOutcomeData`）・`to-change-proposal-document.ts`（編集の `path` を `appliedPagePath` に変える）・`change-proposal-types.ts`（`RecordedOutcome` と `LinkedProposalRecord`）、`interfaces/change-proposal.ts`（`OperationRecord.appliedPagePath`）、`interfaces/api.ts`（`ChangeProposalSummaryView.pages[].path` を任意にする）
 - `apps/app/src/states/server-configurations/server-configurations.ts` / `apps/app/src/states/global/hydrate.ts` — `changeProposalEnabledAtom` を足して値を入れる
 - `apps/app/public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/translation.json` — 本 spec の画面だけで使う文言（`change_proposal_viewer.*`。入口の言葉を含む）。操作の種類・操作の状態・全体の状態・理由・戻せない理由の言葉（`change_proposal.*`）は core が足すので、viewer は足さない
 - `apps/app/public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/commons.json` — 通知の文言（`in_app_notification.change_proposal.*`）
@@ -318,7 +318,7 @@ sequenceDiagram
     Route-->>Sender: response
 ```
 
-- 判定の順は、見られるか（だめなら 404）→ 依頼した人自身か → 依頼した人が有効か → 短い間に送っていないか、とする。見られるかどうかの判定は core のサービスの `getForViewer` だけを使い、見えない操作の状態は読まない（要件 4.6・4.8）。core の見え方の決まりにより、取り消しの相手は、ページがもう無い操作だけを含む Change Proposal も見られるので、頼む通知を送れる（たとえば、元の Change Proposal の依頼した人が、取り消しの Change Proposal の依頼した人に「戻した分を戻してほしい」と頼む）。
+- 判定の順は、見られるか（だめなら 404）→ 依頼した人自身か → 依頼した人が有効か → 短い間に送っていないか、とする。見られるかどうかの判定は core のサービスの `getForViewer` だけを使い、見えない操作の状態は読まない（要件 4.6・4.8）。core の見え方の決まりにより、取り消しの相手は、ページがもう無い操作だけを含む Change Proposal も見られるので、頼む通知を送れる（たとえば、他の人の新規作成だけを取り消した人が、元の Change Proposal の依頼した人に「自分には見えない残りの操作も戻してほしい」と頼む。元の依頼した人は、残りの反映済みの操作を自分で取り消せる）。
 - activity の記録は、通知を入れたあとで、応答の前に行う（`activity-recording.md` の規則 1）。断ったときは activity の middleware の仕組みで「試みた」記録（`ACTION_UNSETTLED`）だけが残り、短い間に何度も送っていないかの確認には数えない。
 
 ## Requirements Traceability
@@ -557,11 +557,12 @@ function useRevertProgress(args: {
 
 #### ChangeProposalDetail と子の部品（summary）
 - `ChangeProposalDetail({ proposalId })`: `useSWRxChangeProposal` の結果が `not-found` なら、理由を区別しない「見つからない」表示にする（要件 1.3）。取得の失敗は別のエラー表示にする（存在の有無と関係が無い通信の失敗のため）。
+  - 取り消しの結果（`RevertResultList`）を表示している間は、最後に `found` で取れた表示を残し、取り直しの結果が `not-found` でも「見つからない」に置き換えない。core は取り消しの操作の結果を書いてから元の操作に印を書く（`proposal-applier.ts` の `applyOne`）ので、その間に取り直すと、ページが消えた新規作成しか見えていなかった取り消した人には、元の Change Proposal が一時的に「見つからない」になるためである。結果の表示を閉じたあと、またはページを読み直したあとは、取り直しの結果をそのまま表示する。
 - `ProposalSummaryHeader`: 依頼した人、入口（`ENTRY_LABEL_KEYS`）、モデル名、作成日時、反映日時（core の `lastAppliedAt` をそのまま。依頼した人以外には、core が見える操作だけから決めた値が入っている）、全体の状態（core の表から引く）、`ProposalProgressLabel`、`PerPageNotificationsLabel`、`basedOn` の `ProposalLinkChips`、本人向けの操作の場所（`RequesterActionSlot`）。入口が `revert` なら `revertOf` へのリンク。件数は出さない（要件 1.4）。
 - `OperationItem`: 種類、パス、状態と理由、戻せるかどうか（`revertability` があるときだけ。無いときは戻せるかどうかについて何も出さない。core は、反映済みか取り消しを断られたの操作で、かつ見る人が書き込みを求められるとき（有効なユーザーで読み取り専用でない）にだけ判定を付ける。要件 2.7。種類・状態・理由・戻せない理由の言葉は core の `client/shared/` の表から引く）、取り消し済みなら `revertedByProposalId` へのリンク、`linkedProposals` の `ProposalLinkChips`、本人向けの操作の場所（`RequesterActionSlot` に `operation` を渡す）、差分の開閉。`index` は表示しない（要件 2.10）。操作は応答の順に並べる。
-  - パスの決め方: 移動は `fromPath` → `toPath`。新規作成と完全な削除は `path`（完全な削除の `path` は、core が取り消した元の新規作成のパスを入れて返す。core の要件 9.12）。編集は、ページがあれば `page.path`、ページがもう無ければ core が返す `path`（反映した時点のページのパス。core の要件 6.7・9.13）。
+  - パスの決め方: 移動は `fromPath` → `toPath`。編集・新規作成・完全な削除は、同じ規則 `page?.path ?? path` で決める（ページがあれば今のページのパス、無ければ core が返した `path`）。core は、新規作成には作るときの `path` を、完全な削除にはページがあるかどうかにかかわらず元の新規作成のパスを（core の要件 9.12）、編集にはページがもう無いときだけ反映した時点に記録したパスを（core の要件 6.7・9.13）、`path` として返す。そのため、編集中の人がいたために見送った（飛ばした）完全な削除の操作のように、ページがまだある行も、今のページのパスで出る。
   - ページがもう無い操作（`page` が無い反映済み・取り消し済みの操作）も、上のパスで表示する。core は、取り消された新規作成の操作を取り消した人に、取り消しの Change Proposal の完全な削除の操作を元の依頼した人に、それぞれパスつきで返す（core の要件 9.11）。そのため、取り消しの元と先のリンク（要件 1.6・2.9）は両方の相手に開け、取り消したあとに取り直した詳細ページにも、取り消した操作がパスつきで残る（要件 3.11）。
-  - 編集の操作で `page` も `path` も無いとき（core がパスを記録する前に反映した編集の操作で、そのあと人がページを完全に削除した場合）だけ、パスの代わりに「ページはもうありません」と出す（core の要件の「今の制限」）。
+  - `page` も `path` も無いとき（core がパスを記録する前に反映した編集の操作で、そのあと人がページを完全に削除した場合）だけ、パスの代わりに「ページはもうありません」（`change_proposal_viewer.operation.page_gone`）と出す（core の要件の「今の制限」）。
   - 取り消しの相手として表示されているだけの操作には、core は戻せるかどうかの判定を付けない。そのため「戻せるものを全部戻す」の対象にもならない（core の要件 9.11）。
 - `RevertAllButton`: `selectRevertibleOperations` の結果が 1 つ以上で、ゲストでも読み取り専用でもないときだけ出す。押すと対象のパスを並べた確認の modal を出し、確定で `revertOperations` を呼ぶ。送信中は押せない。結果を `useRevertProgress` に渡して `RevertResultList` に表示する。`refreshAfterRevert` は `useRevertProgress` が、すべての結果が決まったとき（結果がはじめから全部そろっていれば、すぐ）か時間を過ぎたときに 1 回呼ぶ。
 - `RevertResultList`: 確認の modal に並べた操作（送った key）の 1 つずつを、そのパスとともに、`useRevertProgress` の `entries` の `state` ごとに出す。「取り消した」（`reverted`）、断られた理由（`revert-refused`。`reason` を core の戻せない理由の表で訳す。`reason` が無ければ「断られた」だけ）、見送った理由（`skipped`。`page-being-edited` を core の理由の表で訳す）、「処理中」（`in-progress`。要件 3.9）、「取り消しの対象にならなかった」（`not-targeted`）。`isTimedOut` が真なら、「処理はサーバーで続いています。しばらくしてから再読み込みしてください」と出す（要件 3.10）。件数は出さない。
@@ -622,7 +623,7 @@ const REQUESTER_ACTION_SLOTS: Readonly<Partial<Record<CreatableEntry, RequesterA
 
 #### ChangeProposalLists（summary）
 - タブで「自分の Change Proposal」（`useSWRInfxMyChangeProposals`）と「反映済み」（`useSWRInfxAppliedChangeProposals`）を切り替える。
-- `ChangeProposalSummaryItem`: 依頼した人、入口、モデル名、日時（自分のは作成日時、反映済みは core が見る人ごとに決めた `lastAppliedAt`）、全体の状態、`ProposalProgressLabel`（core が依頼した人の項目にだけ `requesterState` を付ける）、見られるページのパス（最初の 3 件を出し、残りは「さらに表示」で開く。件数は出さない）。項目全体を詳細ページへのリンクにする。core の要約の `pages` には、今閲覧できるページの今のパスと、ページがもう無い操作（依頼した人と取り消しの相手にだけ返る）の記録から決めたパスが入る（core の要件 9.13）。そのため、ページがもう無い操作だけが見える Change Proposal でも、取り消されたページのパスが出る。`pages` が空の項目（パスを記録する前に反映した編集の操作だけが残る場合）だけは、パスの欄を出さずにほかの項目を出す。
+- `ChangeProposalSummaryItem`: 依頼した人、入口、モデル名、日時（自分のは作成日時、反映済みは core が見る人ごとに決めた `lastAppliedAt`）、全体の状態、`ProposalProgressLabel`（core が依頼した人の項目にだけ `requesterState` を付ける）、見られるページのパス（最初の 3 件を出し、残りは「さらに表示」で開く。件数は出さない）。項目全体を詳細ページへのリンクにする。core の要約の `pages` には、今閲覧できるページの今のパスと、ページがもう無い操作（依頼した人と取り消しの相手にだけ返る）の記録から決めたパスが入る（core の要件 9.13）。そのため、ページがもう無い操作だけが見える Change Proposal でも、取り消されたページのパスが出る。core の要約の `pages[].path` は任意である（core の interface の変更。tasks.md のグループ 8）。`path` の無い項目（パスを記録する前に反映した編集の操作で、ページがもう無いもの。core がページの ID で重なりを除いて `{ id }` だけを入れる）は、詳細ページと同じく「ページはもうありません」（`change_proposal_viewer.operation.page_gone`）と出す。
 - 取得に失敗したら、表示済みの項目を残してエラーを出す（要件 8.6）。
 
 #### ChangeProposalNotification
@@ -801,13 +802,13 @@ viewer は新しいコレクションを作らない。core の型を使い、�
 - `PerPageNotificationsLabel`: 依頼した人で管理者の設定が有効なときだけ、指定の値に応じた言葉が出ること、管理者の設定が無効のときと `requesterState` が無いときに何も出ないこと、切り替えのボタンが無いこと（要件 11.6・11.7）。
 - `ProposalLinkChips`: 後続・見直し・元のリンクの言葉と行き先、core が返さないつながりが出ないこと（要件 12.1–12.4）。
 - `RequesterActionSlot` と `RemainingOperationsList`: 依頼した人で表に行がある入口だけ部品が読み込まれ、見出しと操作ごとの場所に表示されること。依頼した人以外では読み込みが起きないこと。表に行が無い入口（Vault・MCP を表す仮の値）でも、反映されなかった操作の一覧が出ること。「古い」が見送りの言葉で出て誤りの見た目にならないこと（要件 10.5・11.5・13.1–13.4）。
-- `OperationItem`: 状態ごとの表示、取り消し済みのリンク、本人以外に並び順の番号が出ないこと、まだ反映していない操作に差分の開閉が出ないこと、移動の 2 つのパス、`revertability` が無い操作に戻せるかどうかの表示が何も出ないこと、`page` の無い取り消し済みの新規作成と完全な削除の操作が `path` で表示されること、`page` の無い編集の操作が core の返した `path` で出て、`path` も無いときだけ「ページはもうありません」が出ること（要件 2.1・2.4・2.6・2.7・2.9・2.10・2.12・3.11）。
-- `ChangeProposalDetail`: 404 のときの表示が 1 種類であること、操作の件数の数字がどこにも出ないこと、本人以外に本人向けの場所が出ないこと、反映日時が core の `lastAppliedAt` のまま表示されること（要件 1.3・1.4・1.5・1.8）。
+- `OperationItem`: 状態ごとの表示、取り消し済みのリンク、本人以外に並び順の番号が出ないこと、まだ反映していない操作に差分の開閉が出ないこと、移動の 2 つのパス、`revertability` が無い操作に戻せるかどうかの表示が何も出ないこと、`page` の無い取り消し済みの新規作成と完全な削除の操作が `path` で表示されること、ページがまだある完全な削除の操作（飛ばした・失敗した・待ちのもの）が今のページのパスで表示されること、`page` の無い編集の操作が core の返した `path` で出て、`path` も無いときだけ「ページはもうありません」が出ること（要件 2.1・2.4・2.6・2.7・2.9・2.10・2.12・3.11）。
+- `ChangeProposalDetail`: 404 のときの表示が 1 種類であること、操作の件数の数字がどこにも出ないこと、本人以外に本人向けの場所が出ないこと、反映日時が core の `lastAppliedAt` のまま表示されること、取り消しの結果を表示している間に詳細の取り直しが `not-found` を返しても、最後に取れた表示と結果の一覧が残ること（要件 1.3・1.4・1.5・1.8・3.11）。
 - `RevertAllButton` と `RevertResultList`: 戻せる操作が無い・読み取り専用・ゲストのときに出ないこと、確認で取り消すと戻せる操作の key だけが送られること、`outcome` の 3 つの値ごとの結果の表示と表示の更新（要件 3.1–3.7）。
 - `useRevertProgress` と `RevertResultList`（fake timer で時間を進める）: 結果に無い key がパスつきで「処理中」と出ること、取り消しの Change Proposal の取り直しが 3 秒ごとに出て、すべて決まると止まり、表示が結果に変わり、`refreshAfterRevert` が 1 回だけ呼ばれること、60 秒を過ぎると取り直しが止まり再読み込みを促す文言が出ること、結果がはじめから全部そろっているときは取り直しが 1 回も出ないこと（要件 3.9・3.10）。
 - `RevertRequestModal` の出し方: 見える操作がすべて戻せる場合も、すべて取り消し済みの場合も、依頼した人以外には出ること。依頼した人・読み取り専用には出ないこと。文字数を超えると送れないこと（要件 4.1・4.3・10.3）。
 - `useChangeProposalModelNotification`: 3 つの通知の文言・リンク先が snapshot の `proposalId` から作られること、元の Change Proposal の依頼した人が受け取る取り消しの通知（snapshot の `proposalId` と `entry` が元の Change Proposal のもの）のリンク先が元の Change Proposal になること、`target` が `_id` だけでも動くこと、一言が HTML として解釈されないこと、読めない snapshot で null になること（要件 9.1–9.6）。
-- `ChangeProposalLists`: 空の 1 回分が続いたときに「これ以上無い」と出ず、自動で読み続ける回数に上限があること、件数が出ないこと（要件 8.4・8.5）。
+- `ChangeProposalLists`: 空の 1 回分が続いたときに「これ以上無い」と出ず、自動で読み続ける回数に上限があること、件数が出ないこと、`pages` の項目のうち `path` の無いものに「ページはもうありません」が出ること（要件 8.3・8.4・8.5）。
 - `CurrentRevisionProposalMark`: 古い版を表示していても今の版の印が出ること、ゲスト・共有リンクで問い合わせないこと（要件 7.3・10.2）。
 
 ### Integration Tests（server）
@@ -815,7 +816,7 @@ viewer は新しいコレクションを作らない。core の型を使い、�
 - 見えない操作で応答が変わらないこと: 送る人に見えない操作が「反映済み」「取り消し済み」のどちらでも、応答と通知の中身が同じであること（要件 4.8・10.1）。
 - activity: 監査ログが無効でも、送った人を操作者とする `CHANGE_PROPOSAL_REVERT_REQUEST` の activity が記録されること。応答をすぐに返しても操作者が残ること（`activity-recording.md` の規則 1 の確認）（要件 4.10）。
 - 通知の一覧の API が、頼む通知の `target` を `_id` だけで返し、snapshot の中身が受け取る人（依頼した人）向けのものだけであること（core の変更との結合）。
-- core の見え方の変更（tasks.md のグループ 8。core の要件 6.7・9.11・9.12・9.13）: ほかの人が新規作成を取り消したあと、取り消した人が元の Change Proposal を取得すると、その新規作成の操作が取り消し済みとしてパスつきで返り、反映済みの一覧の要約にもそのパスが入ること。元の Change Proposal の依頼した人が取り消しの Change Proposal を取得すると、完全な削除の操作が元の新規作成のパスつきで返り、`revertability` が付かないこと。元の依頼した人がその取り消しの Change Proposal に「見えるもの全部を取り消す」を求めても、完全な削除の操作の状態が変わらないこと。編集を反映するとページのパスが記録され、そのあと人がページを完全に削除しても、依頼した人にそのパスが返ること。どちらでもない第三者には、ページがもう無い操作だけの Change Proposal が「見つからない」になり、ほかの操作が見える Change Proposal でもページがもう無い操作もそのパスも返らないこと（1 件の取得と一覧の要約の両方）。
+- core の見え方の変更（tasks.md のグループ 8。core の要件 6.7・9.11・9.12・9.13）: ほかの人が新規作成を取り消したあと、取り消した人が元の Change Proposal を取得すると、その新規作成の操作が取り消し済みとしてパスつきで返り、反映済みの一覧の要約にもそのパスが入ること。元の Change Proposal の依頼した人が取り消しの Change Proposal を取得すると、完全な削除の操作が元の新規作成のパスつきで返り、`revertability` が付かないこと。元の依頼した人が、取り消しの相手としてだけ見えている取り消しの Change Proposal に「見えるもの全部を取り消す」を求めると、404 `notfound` になり、完全な削除の操作の状態が変わらないこと。編集を反映するとページのパスが記録され、そのあと人がページを完全に削除しても、依頼した人にそのパスが返ること。パスを記録する前に反映した編集の操作（パスの無い記録）でページが消えると、一覧の要約にページの ID だけの項目が入ること。どちらでもない第三者には、ページがもう無い操作だけの Change Proposal が「見つからない」になり、ほかの操作が見える Change Proposal でもページがもう無い操作もそのパスも返らないこと（1 件の取得と一覧の要約の両方）。
 
 ### E2E（core の実装のあとで）
 - 編集と新規作成を含む Change Proposal を反映し、他のユーザーで Recent Changes の印 → 詳細ページ → 差分 → 「戻せるものを全部戻す」までをたどる。そのあと、編集したページの行の印が「取り消し」の印に変わること（編集の取り消しは新しいリビジョンを作り、そのリビジョンは取り消しの Change Proposal の印を持つ。core の `revision-marks-query.ts` が `isRevert` を真で返す）、新規作成したページの行が消えること（ページが完全に削除されるため）を確かめる。新規作成の取り消しには、取り消す人がそのページを完全に削除してよいことが要る（core の要件 5.16）ので、E2E の準備で、2 人目のユーザーが完全な削除とごみ箱へ移すことをできる設定にしておく。詳細ページを取り直しても、取り消した 2 つの操作がパスつきで取り消し済みとして残ることも確かめる。一部のページだけを閲覧できるユーザーで、見えないページのパスと件数が詳細ページに出ないことも確かめる（要件 2.2・3.4・3.5・6.1・6.3・10.1）。
@@ -824,7 +825,7 @@ viewer は新しいコレクションを作らない。core の型を使い、�
 - `pnpm run lint:i18n` が baseline を引き上げずに通ること。5 言語すべてに新しいキーがあること（要件 10.4）。
 
 ## Security Considerations
-- 見えないページの存在を示さない: どの画面も、core が見る人ごとに絞った結果だけを表示する。件数を表示しない。印は core のリビジョンの印の API だけから取り、既存の応答に載るリビジョンの `proposalId` は読まない（一覧の表示の方針で出しているだけの行に印が付くのを防ぐ）。
+- 見えないページの存在を示さない: どの画面も、core が見る人ごとに絞った結果だけを表示する。件数を表示しない。印は core のリビジョンの印の API だけから取り、既存の応答に載るリビジョンの `proposalId` は読まない（一覧の表示の方針で出しているだけの行に印が付くのを防ぐ）。ただし、ページがもう無い操作は、core が依頼した人と取り消しの相手にだけ、記録から決めたパスつきで返すので、その 2 人には表示する（要件 10.1 の例外。core の要件 9.11・9.13）。完全に削除されたページは誰も閲覧できないが、この 2 人はページが消える前にそのページを見る権利があった。ほかの人には core が返さないので、画面にも出ない。
 - 頼む通知の API は、存在しない・見られない・本人でなく見える反映済みの操作が無いを同じ 404 にし、見えない操作の状態で応答を変えない。
 - 頼む通知の一言は利用者が書いた文なので、通知と画面のどちらでも React の文字として表示し、HTML や Markdown として解釈しない。長さは 500 文字までにする。
 - 依頼した人以外に、操作の並び順の番号を表示しない。反映日時は core の `lastAppliedAt` をそのまま表示する（依頼した人以外には、core が見える操作だけから決めた値が入っている）。
