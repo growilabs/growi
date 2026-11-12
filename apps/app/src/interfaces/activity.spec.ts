@@ -8,14 +8,44 @@ import type {
   ISnapshot,
 } from './activity';
 import {
+  AdminActions,
+  AllEssentialActions,
+  AllLargeGroupActions,
+  AllMediumGroupActions,
+  AllSmallGroupActions,
   AllSupportedActions,
+  AllSupportedTargetModels,
+  ChangeProposalActions,
   isAttachmentAddActivity,
   isAttachmentDownloadActivity,
   isAttachmentRemoveActivity,
+  isAuditlogSuggestionField,
   MODEL_ATTACHMENT,
   SupportedAction,
   SupportedTargetModel,
 } from './activity';
+
+describe('isAuditlogSuggestionField()', () => {
+  it('should return true for "username"', () => {
+    expect(isAuditlogSuggestionField('username')).toBe(true);
+  });
+
+  it('should return false for an unrecognized string', () => {
+    expect(isAuditlogSuggestionField('foo')).toBe(false);
+  });
+
+  it('should return false for empty string', () => {
+    expect(isAuditlogSuggestionField('')).toBe(false);
+  });
+
+  it('should return false for null', () => {
+    expect(isAuditlogSuggestionField(null)).toBe(false);
+  });
+
+  it('should return false for undefined', () => {
+    expect(isAuditlogSuggestionField(undefined)).toBe(false);
+  });
+});
 
 describe('SupportedAction - GROWI Vault resilience constants', () => {
   it('exports ACTION_VAULT_RESILIENCE_BOOTSTRAP_STARTED', () => {
@@ -129,14 +159,48 @@ describe('SupportedAction - admin AI setting update action', () => {
   });
 });
 
+describe('SupportedAction - inline comment constants', () => {
+  it('exports ACTION_INLINE_COMMENT_CREATE with the expected value', () => {
+    expect(SupportedAction.ACTION_INLINE_COMMENT_CREATE).toBe(
+      'INLINE_COMMENT_CREATE',
+    );
+  });
+
+  it('exports ACTION_INLINE_COMMENT_REPLY with the expected value', () => {
+    expect(SupportedAction.ACTION_INLINE_COMMENT_REPLY).toBe(
+      'INLINE_COMMENT_REPLY',
+    );
+  });
+
+  it('exports ACTION_INLINE_COMMENT_RESOLVE with the expected value', () => {
+    expect(SupportedAction.ACTION_INLINE_COMMENT_RESOLVE).toBe(
+      'INLINE_COMMENT_RESOLVE',
+    );
+  });
+
+  it('exports ACTION_INLINE_COMMENT_UNRESOLVE with the expected value', () => {
+    expect(SupportedAction.ACTION_INLINE_COMMENT_UNRESOLVE).toBe(
+      'INLINE_COMMENT_UNRESOLVE',
+    );
+  });
+
+  it('includes all four inline comment actions in AllSupportedActions', () => {
+    expect(AllSupportedActions).toContain('INLINE_COMMENT_CREATE');
+    expect(AllSupportedActions).toContain('INLINE_COMMENT_REPLY');
+    expect(AllSupportedActions).toContain('INLINE_COMMENT_RESOLVE');
+    expect(AllSupportedActions).toContain('INLINE_COMMENT_UNRESOLVE');
+  });
+});
+
 describe('SupportedTargetModel', () => {
-  it('includes Attachment while preserving the existing four models', () => {
+  it('includes Attachment and ChangeProposal while preserving the existing models', () => {
     expect(SupportedTargetModel).toEqual({
       MODEL_PAGE: 'Page',
       MODEL_USER: 'User',
       MODEL_PAGE_BULK_EXPORT_JOB: 'PageBulkExportJob',
       MODEL_AUDIT_LOG_BULK_EXPORT_JOB: 'AuditLogBulkExportJob',
       MODEL_ATTACHMENT: 'Attachment',
+      MODEL_CHANGE_PROPOSAL: 'ChangeProposal',
     });
   });
 
@@ -452,5 +516,75 @@ describe('ISnapshot union', () => {
     expectTypeOf<AttachmentRemoveSnapshot['fileSize']>().toEqualTypeOf<
       number | undefined
     >();
+  });
+});
+
+describe('Change Proposal activity declarations', () => {
+  const newActions = [
+    'CHANGE_PROPOSAL_CREATE',
+    'CHANGE_PROPOSAL_APPLY',
+    'CHANGE_PROPOSAL_REVERT',
+    'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE',
+  ];
+
+  it('declares the four actions with their literal values', () => {
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE).toBe(
+      'CHANGE_PROPOSAL_CREATE',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY).toBe(
+      'CHANGE_PROPOSAL_APPLY',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVERT).toBe(
+      'CHANGE_PROPOSAL_REVERT',
+    );
+    expect(SupportedAction.ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE).toBe(
+      'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE',
+    );
+    expect(AllSupportedActions).toEqual(expect.arrayContaining(newActions));
+  });
+
+  it('accepts ChangeProposal as a target model', () => {
+    expect(AllSupportedTargetModels).toContain('ChangeProposal');
+  });
+
+  it('always records APPLY and REVERT regardless of audit log settings', () => {
+    expect(AllEssentialActions).toContain('CHANGE_PROPOSAL_APPLY');
+    expect(AllEssentialActions).toContain('CHANGE_PROPOSAL_REVERT');
+  });
+
+  it('also lists APPLY and REVERT in the Medium and Large groups so the audit log filter shows them', () => {
+    for (const action of ['CHANGE_PROPOSAL_APPLY', 'CHANGE_PROPOSAL_REVERT']) {
+      expect(AllEssentialActions).toContain(action);
+      expect(AllMediumGroupActions).toContain(action);
+      expect(AllLargeGroupActions).toContain(action);
+    }
+  });
+
+  it('leaves CREATE governed by the audit log group settings', () => {
+    expect(AllEssentialActions).not.toContain('CHANGE_PROPOSAL_CREATE');
+    expect(AllSmallGroupActions).not.toContain('CHANGE_PROPOSAL_CREATE');
+    expect(AllMediumGroupActions).toContain('CHANGE_PROPOSAL_CREATE');
+    expect(AllLargeGroupActions).toContain('CHANGE_PROPOSAL_CREATE');
+  });
+
+  it('records the admin settings update only in the Large group', () => {
+    expect(AllMediumGroupActions).not.toContain(
+      'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE',
+    );
+    expect(AllLargeGroupActions).toContain(
+      'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE',
+    );
+  });
+
+  it('groups the three CHANGE_PROPOSAL_ actions into their own category without capturing the admin action', () => {
+    expect([...ChangeProposalActions].sort()).toEqual([
+      'CHANGE_PROPOSAL_APPLY',
+      'CHANGE_PROPOSAL_CREATE',
+      'CHANGE_PROPOSAL_REVERT',
+    ]);
+  });
+
+  it('keeps the admin settings action in the Admin category', () => {
+    expect(AdminActions).toContain('ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE');
   });
 });

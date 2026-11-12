@@ -1,17 +1,17 @@
 /* eslint-disable react/no-danger */
 import type React from 'react';
+import { useTranslation } from 'next-i18next';
 
 import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 
 type Props = {
   adminGeneralSecurityContainer: AdminGeneralSecurityContainer;
-  t: (key: string) => string;
 };
 
 export const UserPageVisibilitySettings: React.FC<Props> = ({
   adminGeneralSecurityContainer,
-  t,
 }) => {
+  const { t } = useTranslation('admin');
   return (
     <>
       <h4 className="mb-3">

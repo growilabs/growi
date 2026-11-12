@@ -12,14 +12,8 @@ import {
 } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
 import type mongoose from 'mongoose';
-import type {
-  AnyObject,
-  Document,
-  HydratedDocument,
-  Model,
-  Types,
-} from 'mongoose';
-import { Schema } from 'mongoose';
+import type { AnyObject, Document, HydratedDocument, Model } from 'mongoose';
+import { Error as MongooseError, Schema, Types } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 import nodePath from 'path';
@@ -31,11 +25,13 @@ import type {
   IPagePathWithDescendantCount,
 } from '~/interfaces/page';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import { prisma } from '~/utils/prisma';
 
 import loggerFactory from '../../utils/logger';
 import type Crowi from '../crowi';
 import { collectAncestorPaths } from '../util/collect-ancestor-paths';
 import { getOrCreateModel } from '../util/mongoose-utils';
+import { RevisionConflictError } from './errors';
 import {
   extractToAncestorsPaths,
   getPageSchema,
@@ -67,6 +63,12 @@ export interface PageDocument extends IPage, Document<Types.ObjectId> {
   populateDataToShowRevision(
     shouldExcludeBody?: boolean,
   ): Promise<IPagePopulatedToShowRevision & PageDocument>;
+  publish(): void;
+  unpublish(): void;
+  // Declared explicitly despite the index signature above: omitting
+  // wipExpirationSeconds would otherwise compile and store `new Date(NaN)`,
+  // surfacing only as a save-time CastError.
+  makeWip(disableTtl: boolean, wipExpirationSeconds: number): void;
 }
 
 type TargetAndAncestorsResult = {
@@ -184,7 +186,11 @@ export interface PageModel extends Model<PageDocument> {
     path: string,
   ): Promise<HydratedDocument<PageDocument> | null>;
   removeLeafEmptyPagesRecursively(pageId: ObjectIdLike): Promise<void>;
-  findTemplate(path: string): Promise<{
+  findTemplate(
+    path: string,
+    user: IUserHasId | null | undefined,
+    userGroups?: ObjectIdLike[] | null,
+  ): Promise<{
     templateBody?: string;
     templateTags?: string[];
   }>;
@@ -260,7 +266,7 @@ const schema = new Schema<PageDocument, PageModel>(
     commentCount: { type: Number, default: 0 },
     expandContentWidth: { type: Boolean },
     wip: { type: Boolean },
-    ttlTimestamp: { type: Date },
+    wipExpiredAt: { type: Date },
     updatedAt: { type: Date, default: Date.now }, // Do not use timetamps for updatedAt because it breaks 'updateMetadata: false' option
     deleteUser: { type: Schema.Types.ObjectId, ref: 'User' },
     deletedAt: { type: Date },
@@ -274,6 +280,13 @@ const schema = new Schema<PageDocument, PageModel>(
 // indexes
 schema.index({ createdAt: 1 });
 schema.index({ updatedAt: 1 });
+// sparse: only WIP pages awaiting expiry carry this field, so the index stays
+// proportional to them rather than to the whole collection. Safe for the only
+// query that uses it (`wipExpiredAt: { $lte: <Date> }`): a missing or null value
+// never satisfies a Date range comparison, so nothing the index omits is a hit.
+// Keep in sync with the createIndex options in the wipExpiredAt migration —
+// mismatched options on the same index name fail with IndexOptionsConflict.
+schema.index({ wipExpiredAt: 1 }, { sparse: true });
 // apply plugins
 schema.plugin(mongoosePaginate);
 schema.plugin(uniqueValidator);
@@ -1068,15 +1081,65 @@ schema.statics.findParentByPath = async function (
 /*
  * Utils from obsolete-page.js
  */
-export async function pushRevision(pageData, newRevision, user) {
-  await newRevision.save();
+/**
+ * Resolves with the stored page; its `revision` is the new revision's id,
+ * left unpopulated.
+ */
+export async function pushRevision(
+  pageData: HydratedDocument<PageDocument>,
+  newRevisionData,
+  user,
+  options?: { readonly expectedRevisionId?: ObjectIdLike },
+): Promise<HydratedDocument<PageDocument>> {
+  const newRevision = await prisma.revisions.create({ data: newRevisionData });
 
-  pageData.revision = newRevision;
+  pageData.revision = newRevision._id;
   pageData.latestRevisionBodyLength = newRevision.body.length;
   pageData.lastUpdateUser = user?._id ?? user;
-  pageData.updatedAt = Date.now();
+  pageData.updatedAt = new Date();
 
-  return pageData.save();
+  // `$where` is applied as-is, so it needs the stored type (ObjectId).
+  // One save writes the revision together with any pending field changes
+  // (grant, wip, ...), and matches nothing when another save got there first.
+  const expectedRevisionId = options?.expectedRevisionId;
+  if (expectedRevisionId != null) {
+    pageData.$where = {
+      revision: new Types.ObjectId(expectedRevisionId.toString()),
+    };
+  }
+
+  try {
+    return await pageData.save();
+  } catch (err) {
+    if (
+      expectedRevisionId != null &&
+      (err instanceof MongooseError.DocumentNotFoundError ||
+        err instanceof MongooseError.VersionError) &&
+      !(await pageStillAtRevision(pageData, expectedRevisionId))
+    ) {
+      await prisma.revisions.delete({ where: { id: newRevision.id } });
+      throw new RevisionConflictError(
+        pageData._id.toString(),
+        expectedRevisionId.toString(),
+      );
+    }
+    throw err;
+  } finally {
+    pageData.$where = {};
+  }
+}
+
+// True while the page still points at the expected revision, i.e. a failed
+// save was not caused by another save having moved the page forward.
+async function pageStillAtRevision(
+  pageData: HydratedDocument<PageDocument>,
+  expectedRevisionId: ObjectIdLike,
+): Promise<boolean> {
+  const Page = pageData.$model<Model<PageDocument>>('Page');
+  return (
+    (await Page.exists({ _id: pageData._id, revision: expectedRevisionId })) !=
+    null
+  );
 }
 
 /**
@@ -1469,19 +1532,22 @@ schema.methods.calculateAndUpdateLatestRevisionBodyLength = async function (
 
 schema.methods.publish = function () {
   this.wip = undefined;
-  this.ttlTimestamp = undefined;
+  this.wipExpiredAt = undefined;
 };
 
 schema.methods.unpublish = function () {
   this.wip = true;
-  this.ttlTimestamp = undefined;
+  this.wipExpiredAt = undefined;
 };
 
-schema.methods.makeWip = function (disableTtl: boolean) {
+schema.methods.makeWip = function (
+  disableTtl: boolean,
+  wipExpirationSeconds: number,
+) {
   this.wip = true;
 
   if (!disableTtl) {
-    this.ttlTimestamp = new Date();
+    this.wipExpiredAt = new Date(Date.now() + wipExpirationSeconds * 1000);
   }
 };
 

@@ -20,7 +20,7 @@ const AdminUpdateButtonRow = (props: Props): JSX.Element => {
           onClick={props.onClick}
           disabled={props.disabled ?? false}
         >
-          {t('Update')}
+          {t('commons:Update')}
         </button>
       </div>
     </div>

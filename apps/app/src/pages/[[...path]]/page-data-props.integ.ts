@@ -7,6 +7,7 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
+import { prisma } from '~/utils/prisma';
 
 import { getPageDataForInitial } from './page-data-props';
 
@@ -25,13 +26,6 @@ import { getPageDataForInitial } from './page-data-props';
 const WORKER_ID = process.env.VITEST_WORKER_ID ?? '1';
 const BASE_SEGMENT = `mdprops-${WORKER_ID}`;
 const BASE = `/${BASE_SEGMENT}`;
-
-type RevisionDoc = {
-  pageId: mongoose.Types.ObjectId;
-  body: string;
-  format: string;
-  author: mongoose.Types.ObjectId;
-};
 
 type HeaderValue = number | string | string[];
 
@@ -63,7 +57,6 @@ describe('getPageDataForInitial: Markdown alternate Link header (Requirement 6.2
   let crowi: Crowi;
   let Page: PageModel;
   let User: Model<IUser>;
-  let Revision: Model<RevisionDoc>;
 
   let testUser: HydratedDocument<IUser>;
   let normalId: string;
@@ -76,7 +69,6 @@ describe('getPageDataForInitial: Markdown alternate Link header (Requirement 6.2
 
     Page = mongoose.model<PageDocument, PageModel>('Page');
     User = mongoose.model<IUser>('User');
-    Revision = mongoose.model<RevisionDoc>('Revision');
 
     const name = `mdprops-user-${WORKER_ID}`;
     await User.deleteMany({ username: name });
@@ -95,13 +87,15 @@ describe('getPageDataForInitial: Markdown alternate Link header (Requirement 6.2
       lastUpdateUser: testUser._id,
       descendantCount: 0,
     });
-    const revision = await Revision.create({
-      pageId: normal._id,
-      body: 'NORMAL-PAGE-BODY',
-      format: 'markdown',
-      author: testUser._id,
+    const revision = await prisma.revisions.create({
+      data: {
+        pageId: normal._id.toString(),
+        body: 'NORMAL-PAGE-BODY',
+        format: 'markdown',
+        authorId: testUser._id.toString(),
+      },
     });
-    normal.revision = revision._id;
+    normal.revision = revision.id;
     await normal.save();
 
     // Empty container page: no revision; GSSP returns its props as "not found"

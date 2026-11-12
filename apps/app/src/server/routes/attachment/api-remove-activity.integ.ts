@@ -53,7 +53,6 @@ import { AttachmentMethodType } from '~/interfaces/attachment';
 import type Crowi from '~/server/crowi';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import { Attachment } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
@@ -95,7 +94,7 @@ describe('POST /_api/attachments.remove — activity settled with attachment sna
   // (IUserHasId types _id as string while the doc actually holds ObjectId).
   let testUserId: Types.ObjectId;
 
-  const createdAttachmentIds: Types.ObjectId[] = [];
+  const createdAttachmentIds: string[] = [];
 
   /** Create a removable attachment doc and register it for cleanup. */
   async function arrangeAttachment(overrides: {
@@ -104,17 +103,19 @@ describe('POST /_api/attachments.remove — activity settled with attachment sna
     originalName: string;
     fileSize: number;
   }) {
-    const attachment = await Attachment.create({
-      page: overrides.page,
-      creator: overrides.creator,
-      // fileName is globally unique — suffix with a fresh ObjectId
-      fileName: `attachment-remove-activity-integ-${new Types.ObjectId().toHexString()}.dat`,
-      fileFormat: 'application/octet-stream',
-      fileSize: overrides.fileSize,
-      originalName: overrides.originalName,
-      attachmentType: AttachmentType.WIKI_PAGE,
+    const attachment = await prisma.attachments.create({
+      data: {
+        pageId: overrides.page.toString(),
+        creatorId: overrides.creator?.toString(),
+        // fileName is globally unique — suffix with a fresh ObjectId
+        fileName: `attachment-remove-activity-integ-${new Types.ObjectId().toHexString()}.dat`,
+        fileFormat: 'application/octet-stream',
+        fileSize: overrides.fileSize,
+        originalName: overrides.originalName,
+        attachmentType: AttachmentType.WIKI_PAGE,
+      },
     });
-    createdAttachmentIds.push(attachment._id);
+    createdAttachmentIds.push(attachment.id);
     return attachment;
   }
 
@@ -205,7 +206,9 @@ describe('POST /_api/attachments.remove — activity settled with attachment sna
 
   afterAll(async () => {
     await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
-    await Attachment.deleteMany({ _id: { $in: createdAttachmentIds } });
+    await prisma.attachments.deleteMany({
+      where: { id: { in: createdAttachmentIds } },
+    });
     await crowi.models.Page.deleteMany({ path: PAGE_PATH });
     await crowi.models.User.deleteMany({ username: TEST_USERNAME });
     // Remove the injected config rows so later suites in this worker's DB
@@ -261,7 +264,9 @@ describe('POST /_api/attachments.remove — activity settled with attachment sna
     expect(await prisma.activities.count({ where: { ip: TEST_IP } })).toBe(1);
 
     // The real deletion path actually ran (not stubbed): the doc is gone.
-    expect(await Attachment.findById(attachment._id)).toBeNull();
+    expect(
+      await prisma.attachments.findUnique({ where: { id: attachment._id } }),
+    ).toBeNull();
   });
 
   it('page unresolvable — records the snapshot without pagePath and warns with attachmentId/pageId as structured fields (pino arg order)', async () => {

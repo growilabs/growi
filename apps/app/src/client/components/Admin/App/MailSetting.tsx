@@ -122,7 +122,7 @@ const MailSetting = (props: Props) => {
           <input
             className="form-control"
             type="text"
-            placeholder={`${t('eg')} mail@growi.org`}
+            placeholder={`${t('commons:eg')} mail@growi.org`}
             id="admin-mail-setting-from-address"
             {...register('fromAddress')}
           />
@@ -174,7 +174,7 @@ const MailSetting = (props: Props) => {
             className="btn btn-primary"
             disabled={adminAppContainer.state.retrieveError != null}
           >
-            {t('Update')}
+            {t('commons:Update')}
           </button>
           {adminAppContainer.state.transmissionMethod === 'smtp' && (
             <button

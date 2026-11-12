@@ -9,6 +9,7 @@ import { AuditLogBulkExportFormat } from '~/features/audit-log-bulk-export/inter
 import type { SupportedActionType } from '~/interfaces/activity';
 import { AllSupportedActions } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
@@ -21,12 +22,10 @@ import {
 
 const logger = loggerFactory('growi:routes:apiv3:audit-log-bulk-export');
 
-const router = Router();
-
 interface AuditLogExportReqBody {
   filters: {
     usernames?: string[];
-    actions?: SupportedActionType[];
+    actions?: SupportedActionType[] | null;
     dateFrom?: Date;
     dateTo?: Date;
   };
@@ -39,8 +38,10 @@ interface AuthorizedRequest
 }
 
 export const factory = (crowi: Crowi): Router => {
+  const router = Router();
   const accessTokenParser = crowi.accessTokenParser;
   const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
 
   const validators = {
     auditLogBulkExport: [
@@ -48,10 +49,7 @@ export const factory = (crowi: Crowi): Router => {
       body('filters.usernames').optional({ nullable: true }).isArray(),
       body('filters.usernames.*').optional({ nullable: true }).isString(),
       body('filters.actions').optional({ nullable: true }).isArray(),
-      body('filters.actions.*')
-        .optional({ nullable: true })
-        .isString()
-        .isIn(AllSupportedActions),
+      body('filters.actions.*').isString().isIn(AllSupportedActions),
       body('filters.dateFrom')
         .optional({ nullable: true })
         .isISO8601()
@@ -68,18 +66,19 @@ export const factory = (crowi: Crowi): Router => {
     '/',
     accessTokenParser([SCOPE.WRITE.ADMIN.AUDIT_LOG]),
     loginRequiredStrictly,
+    adminRequired,
     validators.auditLogBulkExport,
     apiV3FormValidator,
     async (req: AuthorizedRequest, res: ApiV3Response) => {
       const {
-        filters,
+        filters: requestFilters,
         format = AuditLogBulkExportFormat.json,
         restartJob,
       } = req.body;
 
       try {
         const jobId = await auditLogBulkExportService.createOrResetExportJob(
-          filters,
+          requestFilters,
           format,
           req.user?._id,
           restartJob,

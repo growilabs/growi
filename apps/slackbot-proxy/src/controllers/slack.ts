@@ -233,12 +233,10 @@ export class SlackCtrl {
     }
 
     // get relations
-    const installationId =
-      authorizeResult.enterpriseId || authorizeResult.teamId;
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
-        // biome-ignore lint/style/noNonNullAssertion: ignore
-        installationId!,
+        authorizeResult.teamId,
+        authorizeResult.enterpriseId,
       );
     const relations = await this.relationRepository
       .createQueryBuilder('relation')
@@ -441,12 +439,10 @@ export class SlackCtrl {
     }
 
     // check permission
-    const installationId =
-      authorizeResult.enterpriseId || authorizeResult.teamId;
     const installation =
       await this.installationRepository.findByTeamIdOrEnterpriseId(
-        // biome-ignore lint/style/noNonNullAssertion: ignore
-        installationId!,
+        authorizeResult.teamId,
+        authorizeResult.enterpriseId,
       );
     const relations = await this.relationRepository
       .createQueryBuilder('relation')

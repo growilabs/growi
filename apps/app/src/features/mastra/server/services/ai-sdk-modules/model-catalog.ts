@@ -6,6 +6,7 @@ import catalog from '^/resource/model-catalog-data.json' with { type: 'json' };
 
 import type { AiProvider } from '../../../interfaces/ai-provider';
 import {
+  type ModelCatalog,
   type ModelCatalogEntry,
   pickSelectableModels,
 } from './build-model-catalog';
@@ -17,6 +18,9 @@ import {
  * runtime snapshot must not shadow it (Req 9.5).
  */
 export const BUNDLED_CATALOG_GENERATED_AT = new Date(catalog._generatedAt);
+
+/** The committed catalog's models, for callers that need the whole catalog. */
+export const BUNDLED_CATALOG_MODELS: ModelCatalog = catalog.models;
 
 /**
  * Return the selectable models (id + display name) for the given provider from

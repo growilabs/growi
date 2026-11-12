@@ -125,6 +125,70 @@ describe('NewsFeed', () => {
     });
   });
 
+  describe('bodyFormat branch', () => {
+    test('renders Markdown when bodyFormat is "markdown"', () => {
+      const items = [
+        makeNewsItem({
+          body: { en_US: '# MDHeading' },
+          bodyFormat: 'markdown',
+        }),
+      ];
+      mocks.useSWRxNewsPage.mockReturnValue(swrResponse(makePage(items)));
+
+      const { container } = render(<NewsFeed />);
+
+      // Markdown rendered as an element (heading shifted h1 -> h3), not literal '#'
+      expect(container.querySelector('h3')?.textContent).toBe('MDHeading');
+      expect(container.textContent).not.toContain('# MDHeading');
+    });
+
+    test('renders plain text (pre-wrap) when bodyFormat is unset', () => {
+      const items = [makeNewsItem({ body: { en_US: '# NotHeading' } })];
+      mocks.useSWRxNewsPage.mockReturnValue(swrResponse(makePage(items)));
+
+      const { container } = render(<NewsFeed />);
+
+      // no Markdown parsing: the literal text is shown, no heading element
+      expect(container.querySelector('h3')).toBeNull();
+      expect(screen.getByText('# NotHeading')).toBeTruthy();
+    });
+
+    test('renders a Markdown body that has no images', () => {
+      const items = [
+        makeNewsItem({
+          body: { en_US: '## Heading\n\n- one\n- two' },
+          bodyFormat: 'markdown',
+        }),
+      ];
+      mocks.useSWRxNewsPage.mockReturnValue(swrResponse(makePage(items)));
+
+      const { container } = render(<NewsFeed />);
+
+      // Markdown path is exercised (heading shifted h2 -> h4, list rendered)
+      // and an image-free body emits no <img>.
+      expect(container.querySelector('h4')?.textContent).toBe('Heading');
+      expect(container.querySelectorAll('li')).toHaveLength(2);
+      expect(container.querySelector('img')).toBeNull();
+    });
+
+    test('an item without a body renders the item but no body block', () => {
+      const items = [
+        makeNewsItem({
+          title: { en_US: 'Titled' },
+          body: undefined,
+          bodyFormat: 'markdown',
+        }),
+      ];
+      mocks.useSWRxNewsPage.mockReturnValue(swrResponse(makePage(items)));
+
+      const { container } = render(<NewsFeed />);
+
+      expect(screen.getByText('Titled')).toBeTruthy();
+      // No body → the Markdown block is not rendered at all.
+      expect(container.querySelector('h4')).toBeNull();
+    });
+  });
+
   describe('pagination', () => {
     test('should not show the pager when all items fit on one page', () => {
       const items = [makeNewsItem(), makeNewsItem()];

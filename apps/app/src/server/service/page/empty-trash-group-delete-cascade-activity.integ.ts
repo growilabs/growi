@@ -3,9 +3,8 @@
  * bulk-deletion paths that reach deleteCompletelyOperation through the
  * deleteMultipleCompletely seam (task 7.3; read-back-from-real-DB style):
  *
- *   A. Empty trash: the REAL pageService.emptyTrashPage →
- *      deleteCompletelyDescendantsWithStream (batch stream over /trash
- *      descendants) → deleteMultipleCompletely(batch, user) →
+ *   A. Empty trash: the REAL pageService#deleteTrashedPagesCompletely
+ *      (batches of the given trashed pages) → deleteMultipleCompletely(batch, user) →
  *      deleteCompletelyOperation(ids, paths, { user }) →
  *      recordCascadeAttachmentRemovals (BEFORE removeAllAttachments).
  *   B. Group deletion: the REAL
@@ -21,8 +20,7 @@
  * to the seam's `user` argument (a creator-derived value would fail).
  *
  * Every assertion READS THE ACTIVITIES BACK FROM THE REAL DATABASE: the
- * recorder and createActivity swallow persistence errors, and the trash
- * stream's write handler additionally swallows whole-batch errors — a
+ * recorder and createActivity swallow persistence errors — a
  * silently-failing record surfaces only as a MISSING row.
  *
  * Recording gate: injected through the explicit configManager API
@@ -32,10 +30,10 @@
  * Activity rows are filtered by target/userId, NOT by a sentinel ip —
  * on these paths ip degrades to '' so an ip filter would match nothing.
  * The sentinel ip 10.0.0.77 (unused by sibling suites: .55/.56/.57/.70-.76/
- * .88/.99, 127.0.0.1) is passed only to emptyTrashPage's activityParameters
- * to prove ip was genuinely available at the entry point (it lands on the
- * parent PAGE_RECURSIVELY_DELETE_COMPLETELY activity) yet still degrades at
- * the seam.
+ * .88/.99, 127.0.0.1) is passed only to deleteTrashedPagesCompletely's
+ * activityParameters to prove ip was genuinely available at the entry point
+ * (it lands on the parent PAGE_RECURSIVELY_DELETE_COMPLETELY activity) yet
+ * still degrades at the seam.
  *
  * Requires a real MongoDB (wired by vitest.workspace.mts integ setup;
  * per-worker DB isolation via test/setup/mongo + test/setup/prisma).
@@ -62,7 +60,6 @@ import { AttachmentMethodType } from '~/interfaces/attachment';
 import { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import type Crowi from '~/server/crowi';
 import { AttachmentType } from '~/server/interfaces/attachment';
-import { Attachment } from '~/server/models/attachment';
 import type { PageModel } from '~/server/models/page';
 import UserGroup from '~/server/models/user-group';
 import { configManager } from '~/server/service/config-manager';
@@ -77,7 +74,7 @@ const TRASH_PAGE_PATH = '/trash/empty-trash-cascade-activity-integ';
 const GROUP_PAGE_PATH = '/group-delete-cascade-activity-integ';
 const GROUP_NAME = 'group-delete-cascade-activity-integ-group';
 
-// Passed to emptyTrashPage's activityParameters only — see header comment.
+// Passed to deleteTrashedPagesCompletely's activityParameters only — see header comment.
 const TRASH_ENTRY_IP = '10.0.0.77';
 const TRASH_ENTRY_ENDPOINT = '/_api/v3/pages/empty-trash-cascade-integ';
 
@@ -93,9 +90,8 @@ const GROUP_ATTACHMENT_FIXTURE = {
 
 describe('cascade attachment-removal activities through the deleteMultipleCompletely seam (read back from DB)', () => {
   let crowi: Crowi;
-  // The concrete service: emptyTrashPage is not part of the IPageService
-  // interface (its only production caller is the untyped apiv3 route), so
-  // crowi.pageService is narrowed to the implementation class below.
+  // The concrete service: deleteTrashedPagesCompletely is private to the
+  // implementation class, so crowi.pageService is narrowed to it below.
   let pageService: PageService;
   let Page: PageModel;
   // crowi.models.User is Model<any>, so the created docs are untyped; the
@@ -107,7 +103,7 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
   // (IUserHasId types _id as string while the doc actually holds ObjectId).
   let contentCreatorId: Types.ObjectId;
 
-  const createdAttachmentIds: Types.ObjectId[] = [];
+  const createdAttachmentIds: string[] = [];
 
   /** Create a metadata-only attachment doc and register it for cleanup. */
   async function arrangeAttachment(overrides: {
@@ -115,17 +111,19 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
     originalName: string;
     fileSize: number;
   }) {
-    const attachment = await Attachment.create({
-      page: overrides.page,
-      creator: contentCreatorId,
-      // fileName is globally unique — suffix with a fresh ObjectId
-      fileName: `trash-group-cascade-activity-integ-${new Types.ObjectId().toHexString()}.dat`,
-      fileFormat: 'application/octet-stream',
-      fileSize: overrides.fileSize,
-      originalName: overrides.originalName,
-      attachmentType: AttachmentType.WIKI_PAGE,
+    const attachment = await prisma.attachments.create({
+      data: {
+        pageId: overrides.page.toString(),
+        creatorId: contentCreatorId.toString(),
+        // fileName is globally unique — suffix with a fresh ObjectId
+        fileName: `trash-group-cascade-activity-integ-${new Types.ObjectId().toHexString()}.dat`,
+        fileFormat: 'application/octet-stream',
+        fileSize: overrides.fileSize,
+        originalName: overrides.originalName,
+        attachmentType: AttachmentType.WIKI_PAGE,
+      },
     });
-    createdAttachmentIds.push(attachment._id);
+    createdAttachmentIds.push(attachment.id);
     return attachment;
   }
 
@@ -154,7 +152,7 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
     // createActivity delegates to shoudUpdateActivity, which reads these via
     // configManager.getConfig — the DB-sourced value written by this explicit
     // API wins over env. ACTION_ATTACHMENT_REMOVE is in MediumActionGroup.
-    // (app:isV5Compatible is NOT needed: neither emptyTrashPage nor
+    // (app:isV5Compatible is NOT needed: neither deleteTrashedPagesCompletely nor
     // handlePrivatePagesForGroupsToDelete goes through shouldUseV4Process.)
     await configManager.updateConfigs({
       'app:auditLogEnabled': true,
@@ -202,7 +200,9 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
 
   afterAll(async () => {
     await deleteThisSuitesActivities();
-    await Attachment.deleteMany({ _id: { $in: createdAttachmentIds } });
+    await prisma.attachments.deleteMany({
+      where: { id: { in: createdAttachmentIds } },
+    });
     await Page.deleteMany({
       path: { $in: [TRASH_PAGE_PATH, GROUP_PAGE_PATH] },
     });
@@ -228,7 +228,7 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
     );
   });
 
-  describe('emptyTrashPage (empty trash)', () => {
+  describe('deleteTrashedPagesCompletely (empty trash)', () => {
     it('req 3.2 — creates one ACTION_ATTACHMENT_REMOVE activity per trashed attachment, recorded for the OPERATOR with the four snapshot fields + username; ip/endpoint degrade to ""', async () => {
       // Arrange: a real trashed page (path under /trash, off-tree, public —
       // exactly what generateReadStreamToOperateOnlyDescendants('/trash')
@@ -257,18 +257,18 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
       // activityParameters its production caller (apiv3 empty-trash route)
       // provides — proving below that ip/endpoint were available here yet
       // do not survive the deleteMultipleCompletely seam.
-      await pageService.emptyTrashPage(
+      await pageService['deleteTrashedPagesCompletely'](
         trashOperator,
-        {},
         {
           ip: TRASH_ENTRY_IP,
           endpoint: TRASH_ENTRY_ENDPOINT,
         },
+        [trashedPage],
       );
 
       // Assert: read the cascade activities back from the real DB. The
-      // stream's write handler swallows batch errors, so a failed record
-      // surfaces only as a missing row — poll via vi.waitFor. Rows are
+      // recorder swallows persistence errors, so a failed record surfaces
+      // only as a missing row — poll via vi.waitFor. Rows are
       // pinned by target (this suite's attachment ids), which keeps the
       // count exact even if this worker's DB held other leftover trash.
       const cascadeActivities = await vi.waitFor(
@@ -330,8 +330,10 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
       // are gone, while the snapshots read back above still hold the
       // pre-deletion data (freeze-before-removal, req 3.4 upstream).
       expect(
-        await Attachment.countDocuments({
-          _id: { $in: attachments.map((attachment) => attachment._id) },
+        await prisma.attachments.count({
+          where: {
+            id: { in: attachments.map((attachment) => attachment._id) },
+          },
         }),
       ).toBe(0);
       expect(await Page.findById(trashedPage._id)).toBeNull();
@@ -406,7 +408,9 @@ describe('cascade attachment-removal activities through the deleteMultipleComple
 
       // The real deletion completed: the attachment doc and the private
       // page are gone from the DB.
-      expect(await Attachment.findById(attachment._id)).toBeNull();
+      expect(
+        await prisma.attachments.findUnique({ where: { id: attachment._id } }),
+      ).toBeNull();
       expect(await Page.findById(privatePage._id)).toBeNull();
     }, 30_000);
   });

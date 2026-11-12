@@ -123,7 +123,7 @@ export const nordTheme = EditorView.theme(
     '.cm-tooltip-autocomplete': {
       '& > ul > li[aria-selected]': {
         backgroundColor: highlightBackground,
-        color: base03,
+        color: base06,
       },
     },
   },

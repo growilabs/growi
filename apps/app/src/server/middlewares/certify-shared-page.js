@@ -1,5 +1,6 @@
-import ShareLink from '~/server/models/share-link';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 const logger = loggerFactory('growi:middleware:certify-shared-page');
 
@@ -8,6 +9,13 @@ export const setup = (crowi) => {
   // Named function so the route-middleware snapshot tool can identify this
   // handler in the apiv3 auth chain.
   return async function certifySharedPage(req, res, next) {
+    // Link sharing was globally turned off: an existing, unexpired ShareLink
+    // document must not keep certifying requests (see
+    // reject-link-sharing-disabled.ts for the same guard on the page-render path).
+    if (configManager.getConfig('security:disableLinkSharing')) {
+      return next();
+    }
+
     // Accept both `pageId` (camelCase, used by /revisions, /page/info) and
     // `page_id` (snake_case, used by /comments.get) so this single shared
     // middleware can certify either route.
@@ -34,9 +42,15 @@ export const setup = (crowi) => {
       return next();
     }
 
-    const sharelink = await ShareLink.findOne({
-      _id: { $eq: shareLinkId },
-      relatedPage: { $eq: pageId },
+    const sharelink = await prisma.sharelinks.findFirst({
+      // coerce to string: shareLinkId/pageId come straight from
+      // req.query/req.body, and Express's default qs parser can turn a
+      // bracketed query key into an object (e.g. `?shareLinkId[$ne]=1`),
+      // which Prisma would otherwise accept as a filter operator
+      where: {
+        id: String(shareLinkId),
+        relatedPageId: String(pageId),
+      },
     });
 
     // check sharelink enabled

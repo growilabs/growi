@@ -40,3 +40,21 @@ export function serializeUserSecurely<U extends IUser>(
 
   return omitInsecureAttributes(user);
 }
+
+type PrismaUserLike = { imageAttachmentId?: string | null };
+
+export type IUserLegacyShape<U extends PrismaUserLike> = U & {
+  imageAttachment: U['imageAttachmentId'];
+};
+
+/**
+ * Restore the Mongoose-era field name (`imageAttachment`) on a Prisma user row.
+ *
+ * TODO: only `imageAttachment` is restored so far. Map the remaining Prisma/Mongoose as the callers that need them are migrated.
+ */
+export const toLegacyUserShape = <U extends PrismaUserLike>(
+  user: U,
+): IUserLegacyShape<U> => ({
+  ...user,
+  imageAttachment: user.imageAttachmentId,
+});

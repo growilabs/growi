@@ -1,10 +1,10 @@
 {
   "feature_name": "page-markdown-endpoint",
   "created_at": "2026-07-11T06:12:51Z",
-  "updated_at": "2026-07-11T18:19:46Z",
+  "updated_at": "2026-08-06T00:00:00Z",
   "language": "ja",
   "base_branch": "origin/dev/8.0.x",
-  "phase": "tasks-generated",
+  "phase": "implementation-complete",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -19,5 +19,6 @@
       "approved": true
     }
   },
-  "ready_for_implementation": true
+  "ready_for_implementation": true,
+  "increment_note": "Implemented and merged (PR #11460, with the follow-up work in the same branch). All sub-tasks are done; the unchecked entries in tasks.md are parent headers. base_branch records the branch this was implemented against at the time (origin/dev/8.0.x, since merged into master) and is kept as history."
 }

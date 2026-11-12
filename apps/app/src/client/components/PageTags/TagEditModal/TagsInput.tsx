@@ -12,11 +12,16 @@ type Props = {
   tags: string[];
   autoFocus: boolean;
   onTagsUpdated: (tags: string[]) => void;
+  // Must be unique per instance: rendering this input more than once on a page
+  // (e.g. the desktop and mobile search filter panels) would otherwise duplicate
+  // the DOM id and the derived `${id}-item-N` menu ids. Defaults to a static id
+  // that E2E selectors depend on for the single-instance TagEditModal usage.
+  id?: string;
 };
 
 export const TagsInput: FC<Props> = (props: Props) => {
   const { t } = useTranslation();
-  const { tags, autoFocus, onTagsUpdated } = props;
+  const { tags, autoFocus, onTagsUpdated, id } = props;
 
   const tagsInputRef = useRef<TypeaheadRef>(null);
   const [resultTags, setResultTags] = useState<string[]>([]);
@@ -26,6 +31,17 @@ export const TagsInput: FC<Props> = (props: Props) => {
 
   const isLoading = error == null && tagsSearch === undefined;
 
+  // Mirror the latest SWR result in a ref so searchHandler can read it without
+  // depending on it. AsyncTypeahead recreates its internal debounced search
+  // callback whenever the `onSearch` prop identity changes (see
+  // react-bootstrap-typeahead's useAsync), and its cleanup CANCELS any
+  // in-flight debounced call. If searchHandler's identity changed while a
+  // just-typed keystroke's search was still pending in the 200ms debounce
+  // window, that pending search was silently dropped and the typeahead
+  // dropdown never populated (root cause of #11734).
+  const tagsSearchRef = useRef(tagsSearch);
+  tagsSearchRef.current = tagsSearch;
+
   const changeHandler = useCallback(
     (selected: string[]) => {
       onTagsUpdated(selected);
@@ -33,15 +49,13 @@ export const TagsInput: FC<Props> = (props: Props) => {
     [onTagsUpdated],
   );
 
-  const searchHandler = useCallback(
-    (query: string) => {
-      const tagsSearchData = tagsSearch?.tags || [];
-      setSearchQuery(query);
-      tagsSearchData.unshift(query);
-      setResultTags(Array.from(new Set(tagsSearchData)));
-    },
-    [tagsSearch?.tags],
-  );
+  const searchHandler = useCallback((query: string) => {
+    const tagsSearchData = tagsSearchRef.current?.tags || [];
+    setSearchQuery(query);
+    // Build a new array instead of mutating tagsSearchData, which is SWR's
+    // cached response object — mutating it would corrupt the cache.
+    setResultTags(Array.from(new Set([query, ...tagsSearchData])));
+  }, []);
 
   const keyDownHandler = useCallback((event: KeyboardEvent<HTMLElement>) => {
     if (event.code === 'Space') {
@@ -66,9 +80,11 @@ export const TagsInput: FC<Props> = (props: Props) => {
   return (
     <div className={`${styles['tags-input']}`}>
       <AsyncTypeahead
-        id="tag-typeahead-asynctypeahead"
+        id={id ?? 'tag-typeahead-asynctypeahead'}
         ref={tagsInputRef}
-        defaultSelected={tags}
+        // Controlled: `tags` is owned by the parent, so external changes (a
+        // chips-bar clear, or TagEditModal's redirect reset) are reflected.
+        selected={tags}
         isLoading={isLoading}
         minLength={1}
         multiple

@@ -325,13 +325,13 @@ describe('config-definition multi-provider ai keys', () => {
     // Picker-owned catalog refresh keys share the ai:* prefix but are out of
     // this spec's boundary — guard them against an accidental ai:* sweep.
     describe('model catalog refresh keys (picker-owned, preserved)', () => {
-      it('keeps ai:modelCatalogRefreshOnStartup unchanged', () => {
+      it('defaults ai:modelCatalogRefreshOnStartup to ON', () => {
         expect(
           CONFIG_DEFINITIONS['ai:modelCatalogRefreshOnStartup'].envVarName,
         ).toBe('AI_MODEL_CATALOG_REFRESH_ON_STARTUP');
         expect(
           CONFIG_DEFINITIONS['ai:modelCatalogRefreshOnStartup'].defaultValue,
-        ).toBe(false);
+        ).toBe(true);
       });
 
       it('keeps ai:modelCatalogRefreshCronSchedule unchanged', () => {
@@ -354,19 +354,137 @@ describe('config-definition multi-provider ai keys', () => {
       expect(aiGroup).toBeDefined();
     });
 
-    // R5.2: env-only mode locks exactly the enable toggle + the two provider
-    // connection keys. R5.3: ai:allowedModels stays OUT of the group so model
-    // settings remain editable from the admin UI in env-only mode.
-    it('targets exactly the enable toggle and the two provider connection keys', () => {
+    // Env-only mode locks the enable toggle, the two provider connection keys
+    // and the two usage-metering keys (base model, disabled reason).
+    // ai:allowedModels stays OUT of the group so model settings remain
+    // editable from the admin UI in env-only mode.
+    it('targets exactly the enable toggle, the two provider connection keys and the two usage-metering keys', () => {
       expect(aiGroup?.targetKeys).toEqual([
         'app:aiEnabled',
         'ai:providers',
         'ai:providerApiKeys',
+        'ai:usageBaseModel',
+        'ai:disabledReason',
       ]);
+    });
+
+    it('defines ai:usageBaseModel and ai:disabledReason as env-only values without a default', () => {
+      expect(CONFIG_DEFINITIONS['ai:usageBaseModel'].envVarName).toBe(
+        'AI_USAGE_BASE_MODEL',
+      );
+      expect(
+        CONFIG_DEFINITIONS['ai:usageBaseModel'].defaultValue,
+      ).toBeUndefined();
+      expect(CONFIG_DEFINITIONS['ai:disabledReason'].envVarName).toBe(
+        'AI_DISABLED_REASON',
+      );
+      expect(
+        CONFIG_DEFINITIONS['ai:disabledReason'].defaultValue,
+      ).toBeUndefined();
     });
 
     it('does not target ai:allowedModels (model settings stay UI-editable)', () => {
       expect(aiGroup?.targetKeys).not.toContain('ai:allowedModels');
+    });
+  });
+
+  describe('env-only group env:useOnlyEnvVars:gcs', () => {
+    const gcsGroup = ENV_ONLY_GROUPS.find(
+      (group) => group.controlKey === 'env:useOnlyEnvVars:gcs',
+    );
+
+    it('is defined', () => {
+      expect(gcsGroup).toBeDefined();
+    });
+
+    // Regression: gcs:referenceFileWithRelayMode was omitted from this
+    // group, so a GROWI.cloud hosted-GCS admin could still change and
+    // persist the file-delivery method even though env-only mode is meant
+    // to lock every GCS setting to the infra-provided env vars.
+    it('targets the delivery-relay-mode key alongside the credential/bucket keys', () => {
+      expect(gcsGroup?.targetKeys).toEqual([
+        'gcs:apiKeyJsonPath',
+        'gcs:bucket',
+        'gcs:uploadNamespace',
+        'gcs:referenceFileWithRelayMode',
+        'gcs:lifetimeSecForTemporaryUrl',
+      ]);
+    });
+  });
+});
+
+describe('config-definition change-proposal keys', () => {
+  const cases = [
+    ['app:changeProposalEnabled', 'CHANGE_PROPOSAL_ENABLED', false],
+    ['changeProposal:isEditEnabled', 'CHANGE_PROPOSAL_IS_EDIT_ENABLED', true],
+    [
+      'changeProposal:isCreateEnabled',
+      'CHANGE_PROPOSAL_IS_CREATE_ENABLED',
+      true,
+    ],
+    ['changeProposal:isMoveEnabled', 'CHANGE_PROPOSAL_IS_MOVE_ENABLED', true],
+    [
+      'changeProposal:autoApplyPolicy',
+      'CHANGE_PROPOSAL_AUTO_APPLY_POLICY',
+      'none',
+    ],
+    [
+      'changeProposal:maxOperationsPerProposal',
+      'CHANGE_PROPOSAL_MAX_OPERATIONS_PER_PROPOSAL',
+      50,
+    ],
+    [
+      'changeProposal:maxProposalsPerUserPerDay',
+      'CHANGE_PROPOSAL_MAX_PROPOSALS_PER_USER_PER_DAY',
+      null,
+    ],
+    [
+      'changeProposal:pendingExpirationSeconds',
+      'CHANGE_PROPOSAL_PENDING_EXPIRATION_SECONDS',
+      2592000,
+    ],
+    [
+      'changeProposal:maintenanceCronSchedule',
+      'CHANGE_PROPOSAL_MAINTENANCE_CRON_SCHEDULE',
+      '*/10 * * * *',
+    ],
+    [
+      'changeProposal:perPageNotificationsEnabled',
+      'CHANGE_PROPOSAL_PER_PAGE_NOTIFICATIONS_ENABLED',
+      false,
+    ],
+  ] as const;
+
+  it.each(
+    cases,
+  )('declares %s with its env var and default', (key, envVarName, defaultValue) => {
+    expect(CONFIG_KEYS).toContain(key);
+    expect(CONFIG_DEFINITIONS[key].envVarName).toBe(envVarName);
+    expect(CONFIG_DEFINITIONS[key].defaultValue).toBe(defaultValue);
+  });
+  describe('env-only group env:useOnlyEnvVars:changeProposal', () => {
+    const changeProposalGroup = ENV_ONLY_GROUPS.find(
+      (group) => group.controlKey === 'env:useOnlyEnvVars:changeProposal',
+    );
+
+    it('is switched by CHANGE_PROPOSAL_USES_ONLY_ENV_VARS and off by default', () => {
+      const definition =
+        CONFIG_DEFINITIONS['env:useOnlyEnvVars:changeProposal'];
+      expect(definition.envVarName).toBe('CHANGE_PROPOSAL_USES_ONLY_ENV_VARS');
+      expect(definition.defaultValue).toBe(false);
+    });
+
+    it('targets exactly the keys the admin settings screen edits', () => {
+      expect(changeProposalGroup?.targetKeys).toEqual([
+        'app:changeProposalEnabled',
+        'changeProposal:isEditEnabled',
+        'changeProposal:isCreateEnabled',
+        'changeProposal:isMoveEnabled',
+        'changeProposal:autoApplyPolicy',
+        'changeProposal:maxOperationsPerProposal',
+        'changeProposal:maxProposalsPerUserPerDay',
+        'changeProposal:perPageNotificationsEnabled',
+      ]);
     });
   });
 });

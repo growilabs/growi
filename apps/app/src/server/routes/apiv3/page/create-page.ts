@@ -20,26 +20,26 @@ import mongoose from 'mongoose';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
-import { subscribeRuleNames } from '~/interfaces/in-app-notification';
 import type { IOptionsForCreate } from '~/interfaces/page';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
 } from '~/server/models/serializers';
 import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
+import { runAfterHumanCreate } from '~/server/service/page-save';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { grantBodyValidator } from './grant-body-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:page:create-page');
 
@@ -143,10 +143,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       .optional()
       .isString()
       .withMessage('body must be string or undefined'),
-    body('grant')
-      .optional()
-      .isInt({ min: 0, max: 5 })
-      .withMessage('grant must be integer from 1 to 5'),
+    grantBodyValidator({ required: false }),
     body('onlyInheritUserRelatedGrantedGroups')
       .optional()
       .isBoolean()
@@ -173,6 +170,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
 
   async function determineBodyAndTags(
     path: string,
+    user: IUserHasId,
     _body: string | null | undefined,
     _tags: string[] | null | undefined,
   ): Promise<{ body: string; tags: string[] }> {
@@ -187,7 +185,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         body += `${attachTitleHeader(path)}\n`;
       }
 
-      const templateData = await Page.findTemplate(path);
+      const templateData = await Page.findTemplate(path, user);
       if (templateData.templateTags != null) {
         tags = templateData.templateTags;
       }
@@ -207,9 +205,9 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     pageTags: string[];
   }) {
     const tagEvent = crowi.events.tag;
-    await PageTagRelation.updatePageTags(createdPage.id, pageTags);
+    await prisma.pagetagrelations.updatePageTags(createdPage.id, pageTags);
     tagEvent.emit('update', createdPage, pageTags);
-    return PageTagRelation.listTagNamesByPage(createdPage.id);
+    return prisma.pagetagrelations.listTagNamesByPage(createdPage.id);
   }
 
   /**
@@ -245,53 +243,6 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       activityEvent.emit('update', res.locals.activity._id, parameters);
     } catch (err) {
       logger.error('Failed to generate create activity', err);
-    }
-  }
-
-  async function postAction(
-    req: CreatePageRequest,
-    createdPage: HydratedDocument<PageDocument>,
-  ) {
-    // global notification
-    try {
-      await crowi.globalNotificationService.fire(
-        GlobalNotificationSettingEvent.PAGE_CREATE,
-        createdPage,
-        req.user,
-      );
-    } catch (err) {
-      logger.error('Create grobal notification failed', err);
-    }
-
-    // user notification
-    const { isSlackEnabled, slackChannels } = req.body;
-    if (isSlackEnabled) {
-      try {
-        const results = await crowi.userNotificationService.fire(
-          createdPage,
-          req.user,
-          slackChannels,
-          'create',
-        );
-        results.forEach((result) => {
-          if (result.status === 'rejected') {
-            logger.error('Create user notification failed', result.reason);
-          }
-        });
-      } catch (err) {
-        logger.error('Create user notification failed', err);
-      }
-    }
-
-    // create subscription
-    try {
-      await crowi.inAppNotificationService.createSubscription(
-        req.user._id,
-        createdPage._id,
-        subscribeRuleNames.PAGE_CREATE,
-      );
-    } catch (err) {
-      logger.error('Failed to create subscription document', err);
     }
   }
 
@@ -342,6 +293,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
 
       const { body, tags } = await determineBodyAndTags(
         pathToCreate,
+        req.user,
         bodyByParam,
         tagsByParam,
       );
@@ -393,7 +345,12 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
 
       res.apiv3(result, 201);
 
-      postAction(req, createdPage);
+      runAfterHumanCreate(crowi, {
+        page: createdPage,
+        user: req.user,
+        isSlackEnabled: req.body.isSlackEnabled,
+        slackChannels: req.body.slackChannels,
+      });
     },
   ];
 };

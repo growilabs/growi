@@ -11,6 +11,7 @@ type Props = {
 const LabeledProgressBar = (props: Props): JSX.Element => {
   const { header, currentCount, totalCount, isInProgress } = props;
 
+  const clampedCount = Math.min(currentCount, totalCount);
   const progressingColor = isInProgress ? 'info' : 'success';
 
   return (
@@ -18,7 +19,7 @@ const LabeledProgressBar = (props: Props): JSX.Element => {
       <h6 className="my-1">
         {header}
         <div className="float-end">
-          {currentCount} / {totalCount}
+          {clampedCount} / {totalCount}
         </div>
       </h6>
       <Progress multi>
@@ -28,7 +29,7 @@ const LabeledProgressBar = (props: Props): JSX.Element => {
           color={progressingColor}
           striped={isInProgress}
           animated={isInProgress}
-          value={currentCount}
+          value={clampedCount}
         />
       </Progress>
     </>

@@ -39,6 +39,53 @@ type ActivitiesSnapshot {
   fileSize     Int?
 }
 
+type ChangeproposalsOperationsRevertTarget {
+  proposalId   String @db.ObjectId
+  operationKey String
+}
+
+// One shape for every operation type; toChangeProposalDocument maps it onto the OperationRecord union
+type ChangeproposalsOperations {
+  index                Int
+  key                  String
+  type                 String
+  status               String
+  reason               String?
+  pageId               String?                                @db.ObjectId
+  baseRevisionId       String?                                @db.ObjectId
+  expectedRevisionId   String?                                @db.ObjectId
+  body                 String?
+  path                 String?
+  fromPath             String?
+  toPath               String?
+  removeRedirectsFrom  String?
+  approvedAt           DateTime?
+  appliedAt            DateTime?
+  resultPageId         String?                                @db.ObjectId
+  resultRevisionId     String?                                @db.ObjectId
+  revertTarget         ChangeproposalsOperationsRevertTarget?
+  revertedByProposalId String?                                @db.ObjectId
+  revertedAt           DateTime?
+}
+
+type ChangeproposalsBasedOn {
+  proposalId    String   @db.ObjectId
+  relation      String
+  operationKeys String[]
+}
+
+type ChangeproposalsApplyLease {
+  token     String
+  expiresAt DateTime
+}
+
+type AuditlogbulkexportjobsFilters {
+  users    String[]  @default([]) @db.ObjectId
+  actions  String[]  @default([])
+  dateFrom DateTime?
+  dateTo   DateTime?
+}
+
 type PageoperationsExPage {
   /// Field referred in an index, but found no data to define the type.
   id   Json? @map("_id")
@@ -70,7 +117,7 @@ model accesstokens {
 
 model activities {
   id          String             @id @default(auto()) @map("_id") @db.ObjectId
-  v           Int                @map("__v")
+  v           Int                @default(0) @map("__v")
   action      String
   createdAt   DateTime           @default(now())
   // ip/endpoint are optional as a safeguard: the legacy Mongoose schema never
@@ -94,8 +141,33 @@ model activities {
   @@index([createdAt], map: "createdAt_1")
 }
 
+model aiusagelogs {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  v                Int      @default(0) @map("__v")
+  userId           String   @db.ObjectId
+  feature          String
+  provider         String
+  modelId          String
+  callCount        Int
+  inputTokens      Int
+  outputTokens     Int
+  // Nullable fields are always written (as null when absent), never omitted:
+  // the usage aggregation counts a null weightedUnits as "unknown".
+  reasoningTokens  Int?
+  cacheReadTokens  Int?
+  cacheWriteTokens Int?
+  estimatedCostUsd Float?
+  weightedUnits    Float?
+  baseModelKey     String?
+  createdAt        DateTime @default(now())
+
+  // TTL (expireAfterSeconds: 90 days) is created by the Mongoose schema.
+  @@index([createdAt], map: "createdAt_1")
+}
+
 model attachments {
   id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  v                     Int       @default(0) @map("__v")
   pageId                String?   @map("page") @db.ObjectId
   creatorId             String?   @map("creator") @db.ObjectId
   filePath              String?
@@ -107,14 +179,44 @@ model attachments {
   temporaryUrlExpiredAt DateTime?
   attachmentType        String
   createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
 
-  creator              users?  @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  page                 pages?  @relation(fields: [pageId], references: [id])
-  userImageAttachments users[] @relation("UserImageAttachment")
+  creator                users?                   @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page                   pages?                   @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  userImageAttachments   users[]                  @relation("UserImageAttachment")
+  pagebulkexportjobs     pagebulkexportjobs[]
+  auditlogbulkexportjobs auditlogbulkexportjobs[]
 
   @@index([pageId], map: "page_1")
   @@index([creatorId], map: "creator_1")
+}
+
+model auditlogbulkexportjobs {
+  id                 String                        @id @default(auto()) @map("_id") @db.ObjectId
+  v                  Int                           @default(0) @map("__v")
+  userId             String                        @map("user") @db.ObjectId
+  filters            AuditlogbulkexportjobsFilters
+  filterHash         String
+  format             String                        @default("json")
+  status             String                        @default("exporting")
+  lastExportedId     String?
+  completedAt        DateTime?
+  restartFlag        Boolean                       @default(false)
+  totalExportedCount Int?                          @default(0)
+  // optional: the attachment is hard-deleted by the download-expiration cleanup
+  // (AuditLogBulkExportJobCleanUpCronService) while the job row survives until the
+  // same cron pass deletes it
+  attachmentId       String?                       @map("attachment") @db.ObjectId
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  user       users        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // SetNull (not NoAction): the cleanup removes the attachment before deleting the
+  // job so that a failed removal leaves the job row for the next cron to retry.
+  // NoAction would make Prisma reject deleting an attachment a job still references.
+  attachment attachments? @relation(fields: [attachmentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([filterHash], map: "filterHash_1")
+  @@index([attachmentId], map: "attachment_1")
 }
 
 model bookmarkfolders {
@@ -149,6 +251,46 @@ model bookmarks {
   @@index([userId], map: "user_1")
 }
 
+model auditlog_es_sync_status {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  key               String  @unique
+  hasUnsyncedEvents Boolean @default(false)
+}
+
+model changeproposals {
+  id                   String                      @id @default(auto()) @map("_id") @db.ObjectId
+  v                    Int                         @default(0) @map("__v")
+  requester            String                      @db.ObjectId
+  entry                String
+  modelLabel           String?
+  revertOf             String?                     @db.ObjectId
+  basedOn              ChangeproposalsBasedOn?
+  lifecycle            String
+  operations           ChangeproposalsOperations[]
+  appliedPageIds       String[]                    @db.ObjectId
+  lastAppliedAt        DateTime?
+  applyLease           ChangeproposalsApplyLease?
+  expiresAt            DateTime?
+  perPageNotifications Boolean                     @default(true)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+
+  @@index([requester, createdAt(sort: Desc)], map: "requester_1_createdAt_-1")
+  @@index([lifecycle, expiresAt], map: "lifecycle_1_expiresAt_1")
+  // The next four are sparse, which Prisma cannot express; the migration
+  // 20261110120000-add-change-proposal-indexes creates them.
+  @@index([applyLease.expiresAt], map: "applyLease.expiresAt_1")
+  @@index([lastAppliedAt(sort: Desc)], map: "lastAppliedAt_-1")
+  @@index([revertOf], map: "revertOf_1")
+  @@index([basedOn.proposalId], map: "basedOn.proposalId_1")
+}
+
+model changestream_resume_tokens {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  key   String @unique
+  token Json
+}
+
 model comments {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   v               Int      @default(0) @map("__v")
@@ -161,20 +303,31 @@ model comments {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  creator  users?     @relation(fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  revision revisions? @relation(fields: [revisionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  replyTo  comments?  @relation("CommentToReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  replies  comments[] @relation("CommentToReply")
+  isInline               Boolean   @default(false)
+  quote                  String?
+  prefix                 String?
+  suffix                 String?
+  approxOffset           Int?
+  anchorOriginRevisionId String?   @db.ObjectId
+  resolvedById           String?   @db.ObjectId
+  resolvedAt             DateTime?
+
+  page       pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  creator    users?     @relation("CommentCreator", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revision   revisions? @relation(fields: [revisionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replyTo    comments?  @relation("CommentToReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies    comments[] @relation("CommentToReply")
+  resolvedBy users?     @relation("InlineCommentResolver", fields: [resolvedById], references: [id])
 
   @@index([pageId], map: "page_1")
   @@index([creatorId], map: "creator_1")
   @@index([revisionId], map: "revision_1")
+  @@index([pageId, isInline])
 }
 
 model configs {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  v         Int?     @map("__v")
+  v         Int?     @default(0) @map("__v")
   createdAt DateTime @default(now())
   key       String   @unique(map: "key_1")
   updatedAt DateTime @updatedAt
@@ -281,7 +434,7 @@ model migrations {
 
 model namedqueries {
   id            String @id @default(auto()) @map("_id") @db.ObjectId
-  v             Int    @map("__v")
+  v             Int    @default(0) @map("__v")
   /// Could not determine type: the field only had null or empty values in the sample set.
   creator       Json?
   delegatorName String
@@ -314,11 +467,60 @@ model newsreadstatuses {
 }
 
 model pagebulkexportjobs {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+  id                       String    @id @default(auto()) @map("_id") @db.ObjectId
+  v                        Int       @default(0) @map("__v")
+  userId                   String    @map("user") @db.ObjectId
+  // optional: page complete-deletion (see deleteCompletelyOperation) does not
+  // touch jobs, so a job can keep pointing at a page that no longer exists.
+  // The relation below is NoAction on purpose; see the P2014 note in
+  // delete-completely-operation.ts.
+  pageId                   String?   @map("page") @db.ObjectId
+  lastExportedPagePath     String?
+  format                   String
+  completedAt              DateTime?
+  // optional: the attachment is hard-deleted by the download-expiration cleanup
+  // (PageBulkExportJobCleanUpCronService) while the job row survives until the
+  // same cron pass deletes it
+  attachmentId             String?   @map("attachment") @db.ObjectId
+  status                   String
+  statusOnPreviousCronExec String?
+  restartFlag              Boolean   @default(false)
+  revisionListHash         String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  user                        users                         @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page                        pages?                        @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // SetNull (not NoAction): the cleanup removes the attachment before deleting the
+  // job so that a failed removal leaves the job row for the next cron to retry.
+  // NoAction would make Prisma reject deleting an attachment a job still references.
+  attachment                  attachments?                  @relation(fields: [attachmentId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  pagebulkexportpagesnapshots pagebulkexportpagesnapshots[]
+
+  @@index([attachmentId], map: "attachment_1")
 }
 
 model pagebulkexportpagesnapshots {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  v                   Int      @default(0) @map("__v")
+  // optional: a job row is hard-deleted by PageBulkExportJobCleanUpCronService
+  // after its snapshots are deleted, but the two steps are not atomic
+  pageBulkExportJobId String?  @map("pageBulkExportJob") @db.ObjectId
+  path                String
+  // optional: revisions are hard-deleted on page complete-deletion
+  // (see deleteCompletelyOperation) without cleaning up snapshots
+  revisionId          String?  @map("revision") @db.ObjectId
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // SetNull (not NoAction): Prisma would otherwise reject the job hard-delete while
+  // a snapshot still references it; a leftover snapshot is orphaned instead
+  pageBulkExportJob pagebulkexportjobs? @relation(fields: [pageBulkExportJobId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  // SetNull (not NoAction): Prisma would otherwise reject the revision hard-delete
+  // while a snapshot still references it; the export skips snapshots whose revision is gone
+  revision          revisions?          @relation(fields: [revisionId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([pageBulkExportJobId, path, id], map: "pageBulkExportJob_1_path_1__id_1")
 }
 
 model pageoperations {
@@ -348,13 +550,14 @@ model pageoperations {
 
 model pageredirects {
   id       String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  fromPath Json?  @unique(map: "fromPath_1")
+  v        Int    @default(0) @map("__v")
+  fromPath String @unique(map: "fromPath_1")
+  toPath   String
 }
 
 model pages {
   id                       String    @id @default(auto()) @map("_id") @db.ObjectId
-  v                        Int       @map("__v")
+  v                        Int       @default(0) @map("__v")
   commentCount             Int       @default(0)
   createdAt                DateTime  @default(now())
   creatorId                String?   @map("creator") @db.ObjectId
@@ -375,19 +578,22 @@ model pages {
   revisionId               String?   @map("revision") @db.ObjectId
   seenUsers                String[]
   status                   String    @default("published")
-  ttlTimestamp             DateTime?
   updatedAt                DateTime  @default(now())
   wip                      Boolean?
+  wipExpiredAt             DateTime?
 
-  creator        users?        @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  lastUpdateUser users?        @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  parent         pages?        @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children       pages[]       @relation("ParentChild")
-  deleteUser     users?        @relation("DeletedPages", fields: [deleteUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  revisions      revisions[]
-  comments       comments[]
-  attachments    attachments[]
-  bookmarks      bookmarks[]
+  creator            users?               @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lastUpdateUser     users?               @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  parent             pages?               @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children           pages[]              @relation("ParentChild")
+  deleteUser         users?               @relation("DeletedPages", fields: [deleteUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revisions          revisions[]
+  comments           comments[]
+  attachments        attachments[]
+  bookmarks          bookmarks[]
+  pagetagrelations   pagetagrelations[]
+  sharelinks         sharelinks[]
+  pagebulkexportjobs pagebulkexportjobs[]
 
   @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")
@@ -396,21 +602,26 @@ model pages {
   @@index([creatorId], map: "creator_1")
   @@index([createdAt], map: "createdAt_1")
   @@index([updatedAt], map: "updatedAt_1")
-  @@index([ttlTimestamp], map: "ttlTimestamp_1")
+  // The mongoose schema declares this index as sparse; Prisma cannot express that,
+  // so once `prisma db push` takes over index creation (see .claude/rules/model.md)
+  // the sparse option has to be re-applied out of band. It must never regain
+  // expireAfterSeconds — see server/models/no-ttl-index-on-page.spec.ts.
+  @@index([wipExpiredAt], map: "wipExpiredAt_1")
 }
 
 model pagetagrelations {
-  id            String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  isPageTrashed Json?
-  /// Field referred in an index, but found no data to define the type.
-  relatedPage   Json?
-  /// Field referred in an index, but found no data to define the type.
-  relatedTag    Json?
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
+  v             Int     @default(0) @map("__v")
+  isPageTrashed Boolean @default(false)
+  relatedPageId String  @map("relatedPage") @db.ObjectId
+  relatedTagId  String  @map("relatedTag") @db.ObjectId
 
-  @@unique([relatedPage, relatedTag], map: "relatedPage_1_relatedTag_1")
-  @@index([relatedPage], map: "relatedPage_1")
-  @@index([relatedTag], map: "relatedTag_1")
+  relatedPage pages @relation(fields: [relatedPageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  relatedTag  tags  @relation(fields: [relatedTagId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([relatedPageId, relatedTagId], map: "relatedPage_1_relatedTag_1")
+  @@index([relatedPageId], map: "relatedPage_1")
+  @@index([relatedTagId], map: "relatedTag_1")
   @@index([isPageTrashed], map: "isPageTrashed_1")
 }
 
@@ -422,20 +633,28 @@ model passwordresetorders {
 
 model revisions {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  v             Int      @map("__v")
-  authorId      String   @map("author") @db.ObjectId
+  v             Int      @default(0) @map("__v")
+  authorId      String?  @map("author") @db.ObjectId
   body          String
   createdAt     DateTime @default(now())
   hasDiffToPrev Boolean?
-  format        String
+  format        String   @default("markdown")
   origin        String?
   pageId        String   @db.ObjectId
+  proposalId           String?  @db.ObjectId
+  proposalOperationKey String?
 
-  author   users      @relation(fields: [authorId], references: [id])
-  page     pages      @relation(fields: [pageId], references: [id])
+  author   users?     @relation(fields: [authorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   comments comments[]
 
+  pagebulkexportpagesnapshots pagebulkexportpagesnapshots[]
+
   @@index([pageId], map: "pageId_1")
+  @@index([authorId, createdAt(sort: Desc)], map: "author_1_createdAt_-1")
+  // Sparse, which Prisma cannot express; the migration
+  // 20261110120000-add-change-proposal-indexes creates it.
+  @@index([proposalId, proposalOperationKey], map: "proposalId_1_proposalOperationKey_1")
 }
 
 model rlflx {
@@ -457,11 +676,16 @@ model sessions {
 }
 
 model sharelinks {
-  id          String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  relatedPage Json?
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  v             Int       @default(0) @map("__v")
+  relatedPageId String    @map("relatedPage") @db.ObjectId
+  expiredAt     DateTime?
+  description   String?
+  createdAt     DateTime  @default(now())
 
-  @@index([relatedPage], map: "relatedPage_1")
+  relatedPage pages @relation(fields: [relatedPageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([relatedPageId], map: "relatedPage_1")
 }
 
 model slackappintegrations {
@@ -484,8 +708,10 @@ model subscriptions {
 
 model tags {
   id   String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  name Json?  @unique(map: "name_1")
+  v    Int    @default(0) @map("__v")
+  name String @unique(map: "name_1")
+
+  pagetagrelations pagetagrelations[]
 }
 
 model transferkeys {
@@ -510,7 +736,7 @@ model updateposts {
 
 model usergrouprelations {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  v            Int      @map("__v")
+  v            Int      @default(0) @map("__v")
   createdAt    DateTime @default(now())
   relatedGroup String   @db.ObjectId
   relatedUser  String   @db.ObjectId
@@ -518,7 +744,7 @@ model usergrouprelations {
 
 model usergroups {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  v           Int      @map("__v")
+  v           Int      @default(0) @map("__v")
   createdAt   DateTime @default(now())
   description String
   name        String   @unique(map: "name_1")
@@ -555,23 +781,27 @@ model users {
   lang                    Lang      @default(en_US)
   status                  Int       @default(2)
   lastLoginAt             DateTime?
+  contributionsMigratedAt DateTime?
   admin                   Boolean   @default(false)
   readOnly                Boolean   @default(false)
   isInvitationEmailSended Boolean   @default(false)
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
-  activities         activities[]
-  comments           comments[]
-  revisions          revisions[]
-  createdPages       pages[]            @relation("CreatedPages")
-  deletedPages       pages[]            @relation("DeletedPages")
-  lastUpdatedPages   pages[]            @relation("LastUpdatedPages")
-  imageAttachment    attachments?       @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
-  createdAttachments attachments[]      @relation("CreatedAttachments")
-  externalaccounts   externalaccounts[]
-  bookmarks          bookmarks[]
-  bookmarkfolders    bookmarkfolders[]
+  activities             activities[]
+  comments               comments[]               @relation("CommentCreator")
+  resolvedInlineComments comments[]               @relation("InlineCommentResolver")
+  revisions              revisions[]
+  createdPages           pages[]                  @relation("CreatedPages")
+  deletedPages           pages[]                  @relation("DeletedPages")
+  lastUpdatedPages       pages[]                  @relation("LastUpdatedPages")
+  imageAttachment        attachments?             @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
+  createdAttachments     attachments[]            @relation("CreatedAttachments")
+  externalaccounts       externalaccounts[]
+  bookmarks              bookmarks[]
+  bookmarkfolders        bookmarkfolders[]
+  pagebulkexportjobs     pagebulkexportjobs[]
+  auditlogbulkexportjobs auditlogbulkexportjobs[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")
@@ -581,7 +811,7 @@ model users {
 
 model useruisettings {
   id                        String  @id @default(auto()) @map("_id") @db.ObjectId
-  v                         Int     @map("__v")
+  v                         Int     @default(0) @map("__v")
   currentSidebarContents    String
   preferCollapsedModeByUser Boolean
   user                      String  @unique(map: "user_1") @db.ObjectId

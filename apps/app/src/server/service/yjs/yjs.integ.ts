@@ -3,8 +3,12 @@ import { YDocStatus } from '@growi/core/dist/consts';
 import { Types } from 'mongoose';
 import type { Server } from 'socket.io';
 import { mock } from 'vitest-mock-extended';
+import type { WebSocket } from 'ws';
+import type { WSSharedDoc } from 'y-websocket/bin/utils';
+import { docs } from 'y-websocket/bin/utils';
 
-import { Revision } from '../../models/revision';
+import { prisma } from '~/utils/prisma';
+
 import type { MongodbPersistence } from './extended/mongodb-persistence';
 import type { IYjsService } from './yjs';
 import { getYjsService, initializeYjsService } from './yjs';
@@ -32,41 +36,41 @@ const getPrivateMdbInstance = (yjsService: IYjsService): MongodbPersistence => {
 };
 
 describe('YjsService', () => {
-  describe('getYDocStatus()', () => {
-    beforeAll(() => {
-      const ioMock = mock<Server>();
-      const httpServer = http.createServer();
-      const sessionConfig = {
-        rolling: true,
-        secret: 'test-secret',
-        resave: false,
-        saveUninitialized: true,
-        cookie: { maxAge: 86400000 },
-        genid: () => 'test-session-id',
-      };
+  beforeAll(() => {
+    const ioMock = mock<Server>();
+    const httpServer = http.createServer();
+    const sessionConfig = {
+      rolling: true,
+      secret: 'test-secret',
+      resave: false,
+      saveUninitialized: true,
+      cookie: { maxAge: 86400000 },
+      genid: () => 'test-session-id',
+    };
 
-      // initialize
-      initializeYjsService(httpServer, ioMock, sessionConfig);
-    });
+    // initialize
+    initializeYjsService(httpServer, ioMock, sessionConfig);
+  });
 
-    afterEach(async () => {
-      await Revision.deleteMany({});
-    });
-
-    afterAll(async () => {
-      const yjsService = getYjsService();
-      const privateMdb = getPrivateMdbInstance(yjsService);
-      try {
-        await privateMdb.flushDB();
-      } catch (error) {
-        // Ignore errors that can occur due to async index creation:
-        // - 26: NamespaceNotFound (collection not yet created)
-        // - 276: IndexBuildAborted (cleanup during index creation)
-        const code = (error as { code?: number }).code;
-        if (code !== 26 && code !== 276) {
-          throw error;
-        }
+  afterAll(async () => {
+    const yjsService = getYjsService();
+    const privateMdb = getPrivateMdbInstance(yjsService);
+    try {
+      await privateMdb.flushDB();
+    } catch (error) {
+      // Ignore errors that can occur due to async index creation:
+      // - 26: NamespaceNotFound (collection not yet created)
+      // - 276: IndexBuildAborted (cleanup during index creation)
+      const code = (error as { code?: number }).code;
+      if (code !== 26 && code !== 276) {
+        throw error;
       }
+    }
+  });
+
+  describe('getYDocStatus()', () => {
+    afterEach(async () => {
+      await prisma.revisions.deleteMany();
     });
 
     it('returns ISOLATED when neither revisions nor YDocs exists', async () => {
@@ -104,7 +108,9 @@ describe('YjsService', () => {
 
       const pageId = new ObjectId();
 
-      await Revision.insertMany([{ pageId, body: '' }]);
+      await prisma.revisions.create({
+        data: { pageId: pageId.toString(), body: '' },
+      });
 
       // act
       const result = await yjsService.getYDocStatus(pageId.toString());
@@ -119,7 +125,9 @@ describe('YjsService', () => {
 
       const pageId = new ObjectId();
 
-      await Revision.insertMany([{ pageId, body: '' }]);
+      await prisma.revisions.create({
+        data: { pageId: pageId.toString(), body: '' },
+      });
 
       const privateMdb = getPrivateMdbInstance(yjsService);
       await privateMdb.setTypedMeta(
@@ -141,9 +149,13 @@ describe('YjsService', () => {
 
       const pageId = new ObjectId();
 
-      await Revision.insertMany([
-        { pageId, body: '', createdAt: new Date(2025, 1, 1) },
-      ]);
+      await prisma.revisions.create({
+        data: {
+          pageId: pageId.toString(),
+          body: '',
+          createdAt: new Date(2025, 1, 1),
+        },
+      });
 
       const privateMdb = getPrivateMdbInstance(yjsService);
       await privateMdb.setTypedMeta(
@@ -165,7 +177,9 @@ describe('YjsService', () => {
 
       const pageId = new ObjectId();
 
-      await Revision.insertMany([{ pageId, body: '' }]);
+      await prisma.revisions.create({
+        data: { pageId: pageId.toString(), body: '' },
+      });
 
       const privateMdb = getPrivateMdbInstance(yjsService);
       await privateMdb.setTypedMeta(
@@ -179,6 +193,50 @@ describe('YjsService', () => {
 
       // assert
       expect(result).toBe(YDocStatus.OUTDATED);
+    });
+  });
+
+  describe('getConnectionCount()', () => {
+    afterEach(() => {
+      docs.clear();
+    });
+
+    it('returns 0 when no doc exists for the page', () => {
+      expect(
+        getYjsService().getConnectionCount(new ObjectId().toString()),
+      ).toBe(0);
+    });
+
+    it('returns the number of connections while connected and 0 after all disconnect', () => {
+      const pageId = new ObjectId().toString();
+      const conns = new Map<WebSocket, Set<number>>();
+      docs.set(pageId, mock<WSSharedDoc>({ conns }));
+      const ws1 = mock<WebSocket>();
+      const ws2 = mock<WebSocket>();
+
+      conns.set(ws1, new Set());
+      expect(getYjsService().getConnectionCount(pageId)).toBe(1);
+
+      conns.set(ws2, new Set());
+      expect(getYjsService().getConnectionCount(pageId)).toBe(2);
+
+      conns.delete(ws1);
+      conns.delete(ws2);
+      expect(getYjsService().getConnectionCount(pageId)).toBe(0);
+    });
+
+    it('counts only the connections of the given page', () => {
+      const pageId = new ObjectId().toString();
+      const otherPageId = new ObjectId().toString();
+      docs.set(
+        otherPageId,
+        mock<WSSharedDoc>({
+          conns: new Map([[mock<WebSocket>(), new Set<number>()]]),
+        }),
+      );
+
+      expect(getYjsService().getConnectionCount(pageId)).toBe(0);
+      expect(getYjsService().getConnectionCount(otherPageId)).toBe(1);
     });
   });
 });

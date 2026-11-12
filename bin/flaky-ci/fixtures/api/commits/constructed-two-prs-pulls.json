@@ -1,0 +1,4 @@
+[
+  { "number": 100, "base": { "ref": "master" }, "state": "closed" },
+  { "number": 200, "base": { "ref": "feat/some-branch" }, "state": "open" }
+]

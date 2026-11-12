@@ -10,7 +10,7 @@ import {
 
 // ─── models.dev source (single source of truth for every ingest path) ────────
 // Consumed by BOTH catalog acquisition paths — the release-pre-step ingest
-// script (bin/vendor-model-catalog.ts) and the opt-in runtime refresh service
+// script (bin/vendor-model-catalog.ts) and the runtime refresh service
 // (refresh-model-catalog.ts, Req 9). The URL is a build-time constant: callers
 // can never point the ingest at another host (Req 9.7).
 
@@ -18,6 +18,24 @@ export const MODELS_DEV_URL = 'https://models.dev/api.json';
 export const MODELS_DEV_SOURCE_ATTRIBUTION = `${MODELS_DEV_URL} (MIT)`;
 
 // ─── Output contract ─────────────────────────────────────────────────────────
+
+export type ModelUnitPrices = {
+  /** USD per 1M tokens. Absent = unknown. */
+  readonly input?: number;
+  readonly output?: number;
+  readonly cacheRead?: number;
+  readonly cacheWrite?: number;
+};
+
+export type ModelPriceTier = ModelUnitPrices & {
+  /** The tier applies to a call whose total input tokens exceed this value. */
+  readonly inputTokensAbove: number;
+};
+
+export type ModelPricing = ModelUnitPrices & {
+  /** Sorted by inputTokensAbove ascending. Absent when the model has no tiers. */
+  readonly tiers?: readonly ModelPriceTier[];
+};
 
 /**
  * One selectable model in the catalog: its bare id (the AI SDK model id, also the
@@ -37,6 +55,7 @@ export const MODELS_DEV_SOURCE_ATTRIBUTION = `${MODELS_DEV_URL} (MIT)`;
 export type ModelCatalogEntry = {
   readonly id: string;
   readonly name: string;
+  readonly pricing?: ModelPricing;
 };
 
 /** provider → generation-time-filtered selectable models (sorted by id). */
@@ -59,9 +78,41 @@ export interface ModelCatalogFile {
 // CATALOG_PROVIDERS: a document written by a different version with a
 // different provider set fails validation and is ignored (conservative).
 
+const priceSchema = z.number().min(0);
+
+const unitPricesShape = {
+  input: priceSchema.optional(),
+  output: priceSchema.optional(),
+  cacheRead: priceSchema.optional(),
+  cacheWrite: priceSchema.optional(),
+};
+
+const modelPricingSchema = z.object({
+  ...unitPricesShape,
+  tiers: z
+    .array(z.object({ ...unitPricesShape, inputTokensAbove: priceSchema }))
+    .optional(),
+});
+
+// Pricing is advisory data on an otherwise valid entry: a stored document that
+// predates pricing, or carries a malformed one, keeps its models and loses only
+// the pricing.
+const persistedEntrySchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    pricing: z.unknown().optional(),
+  })
+  .transform(({ id, name, pricing }): ModelCatalogEntry => {
+    const parsed = modelPricingSchema.safeParse(pricing);
+    return parsed.success && pricing !== undefined
+      ? { id, name, pricing: parsed.data }
+      : { id, name };
+  });
+
 export const persistedModelCatalogSchema = z.record(
   z.enum(CATALOG_PROVIDERS),
-  z.array(z.object({ id: z.string(), name: z.string() })),
+  z.array(persistedEntrySchema),
 );
 
 // ─── Catalog accessors (shared by every read/report site) ───────────────────
@@ -127,11 +178,66 @@ const modelEntrySchema = z.looseObject({
   // change we must fail on — it degrades to the id (see the transform). Only
   // `tool_call`/`modalities.output` are treated as required drift signals above.
   name: z.string().optional(),
+  // Pricing is read leniently by extractPricing (never a drift signal).
+  cost: z.unknown().optional(),
 });
 
 const providerSchema = z.looseObject({
   models: z.record(z.string(), modelEntrySchema),
 });
+
+// ─── Pricing extraction (lenient: a malformed cost never drops a model) ─────
+
+const asPrice = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : undefined;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value != null && !Array.isArray(value);
+
+const extractUnitPrices = (raw: Record<string, unknown>): ModelUnitPrices => {
+  const input = asPrice(raw.input);
+  const output = asPrice(raw.output);
+  const cacheRead = asPrice(raw.cache_read);
+  const cacheWrite = asPrice(raw.cache_write);
+  return {
+    ...(input !== undefined && { input }),
+    ...(output !== undefined && { output }),
+    ...(cacheRead !== undefined && { cacheRead }),
+    ...(cacheWrite !== undefined && { cacheWrite }),
+  };
+};
+
+const extractTiers = (rawTiers: unknown): ModelPriceTier[] => {
+  if (!Array.isArray(rawTiers)) {
+    return [];
+  }
+  return rawTiers
+    .flatMap((rawTier): ModelPriceTier[] => {
+      if (!isRecord(rawTier) || !isRecord(rawTier.tier)) {
+        return [];
+      }
+      const inputTokensAbove = asPrice(rawTier.tier.size);
+      if (rawTier.tier.type !== 'context' || inputTokensAbove === undefined) {
+        return [];
+      }
+      return [{ ...extractUnitPrices(rawTier), inputTokensAbove }];
+    })
+    .toSorted((a, b) => a.inputTokensAbove - b.inputTokensAbove);
+};
+
+const extractPricing = (cost: unknown): ModelPricing | undefined => {
+  if (!isRecord(cost)) {
+    return undefined;
+  }
+  const unitPrices = extractUnitPrices(cost);
+  const tiers = extractTiers(cost.tiers);
+  if (Object.keys(unitPrices).length === 0 && tiers.length === 0) {
+    return undefined;
+  }
+  return { ...unitPrices, ...(tiers.length > 0 && { tiers }) };
+};
 
 // ─── Pure transform (network-free, deterministic, unit-tested) ───────────────
 
@@ -179,7 +285,10 @@ export const buildModelCatalog = (
     // models.dev omits it) so id and name come from one snapshot and never drift.
     const selectableEntries = Object.entries(parsed.models)
       .filter(([, entry]) => isSelectableModel(entry as ModelsDevModel))
-      .map(([id, entry]) => ({ id, name: entry.name ?? id }));
+      .map(([id, entry]): ModelCatalogEntry => {
+        const pricing = extractPricing(entry.cost);
+        return { id, name: entry.name ?? id, ...(pricing && { pricing }) };
+      });
 
     // Sort by id code point (locale-independent) to keep the emitted file
     // deterministic across environments. A bare `localeCompare()` collates per the

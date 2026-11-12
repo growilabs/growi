@@ -3,7 +3,6 @@
     "display_name": "Français"
   },
   "Help": "Aide",
-  "View": "Voir",
   "Edit": "Modifier",
   "Delete": "Supprimer",
   "delete_all": "Tout supprimer",
@@ -64,7 +63,9 @@
   "Presentation Mode": "Présentation",
   "Not available for guest": "Indisponible pour les invités",
   "Not available in this version": "Indisponible dans cette version",
+  "Not available for read only user": "Indisponible pour les utilisateurs en lecture seule",
   "Not available when \"anyone with the link\" is selected": "Si \"Tous les utilisateurs disposant du lien\" est sélectionné, la portée ne peut pas être modifiée",
+  "No users have liked this yet": "Aucun utilisateur n'a aimé cette page.",
   "No users have liked this yet.": "Aucun utilisateur n'a aimé cette page.",
   "No users have bookmarked yet": "Aucun utilisateur n'a mis en favoris cette page",
   "Create Archive Page": "Créer page d'archive",
@@ -108,8 +109,11 @@
   "Connected": "Connecté",
   "Loading": "Chargement...",
   "Disclose E-mail": "Divulguer adresse courriel",
+  "Slack Member ID": "ID de membre Slack",
   "page exists": "cette page est déjà existante",
   "Error occurred": "Une erreur est survenue",
+  "Successfully updated": "Mise à jour réussie",
+  "Failed to update": "Échec de la mise à jour",
   "Input page name": "Nom de la page",
   "Input page name (optional)": "Nom de la page (optionnel)",
   "Input parent page path": "Chemin de la page parent",
@@ -122,7 +126,6 @@
   "UserGroup": "Groupe utilisateur",
   "Basic Settings": "Paramètres de base",
   "The contents entered here will be shown in the header etc": "Le contenu entré ici sera visible dans l'en-tête",
-  "Browsing of this page is restricted": "Le contenu de cette page est restreint.",
   "Forbidden": "Accès interdit",
   "Public": "Tout le monde",
   "Anyone with the link": "Tous les utilisateurs disposant du lien",
@@ -230,8 +233,7 @@
       "apitoken_issued": "Aucun jeton d'API existant.",
       "update_token1": "Un nouveau jeton peut être généré.",
       "update_token2": "Modifiez le jeton aux endroits où celui-ci est utilisé, car l'ancien sera invalide."
-    },
-    "form_help": {}
+    }
   },
   "Access Token Settings": "Jeton d'accès",
   "page_me_access_token": {
@@ -275,7 +277,7 @@
     "password_is_not_set": "Mot de passe non saisi"
   },
   "share_links": {
-    "Shere this page link to public": "Partager cette page publiquement",
+    "Share this page link to public": "Partager cette page publiquement",
     "share_link_list": "Liens de partage",
     "share_link_management": "Liens de partage",
     "delete_all_share_links": "Supprimer tout les liens de partage",
@@ -415,13 +417,24 @@
     "comment_management_is_not_allowed": "La gestion des commentaires n'est pas autorisée.",
     "no_comments": "Il n'y a aucun commentaire."
   },
+  "inline_comment": {
+    "expand": "Développer",
+    "collapse": "Réduire",
+    "more": "Plus",
+    "expand_all_resolved": "Développer tous les commentaires résolus",
+    "list_menu": "Menu de la liste des commentaires",
+    "item_menu": "Actions du commentaire",
+    "view_at_posting": "Voir la page au moment de la publication"
+  },
   "page_api_error": {
     "notfound_or_forbidden": "Page originale introuvable ou accès restreint.",
     "already_exists": "Une page avec ce chemin existe déjà.",
     "outdated": "Page obsolète.",
+    "invalid_body": "La requête n'indique pas à quelle révision de la page elle s'applique.",
     "user_not_admin": "Seul un administrateur peut supprimer la page",
     "single_deletion_empty_pages": "Une page vide ne peut pas être supprimée",
-    "complete_deletion_not_allowed_for_user": "Vous n'êtes pas autorisé à supprimer cette page"
+    "complete_deletion_not_allowed_for_user": "Vous n'êtes pas autorisé à supprimer cette page",
+    "deletion_not_allowed_for_user": "Vous n'êtes pas autorisé à supprimer cette page"
   },
   "page_history": {
     "revision_list": "Historique des modifications",
@@ -514,6 +527,8 @@
     },
     "editor": {
       "title": "Raccourcis d'édition",
+      "Slash Command": "Commande slash",
+      "Slash Command Desc": "(Afficher le menu des commandes)",
       "Indent": "Indentation",
       "Outdent": "Retrait",
       "Save Page": "Sauvegarder la page",
@@ -553,7 +568,6 @@
     "resolve_and_save": "Résoudre et sauvegarder",
     "select_revision": "Sélectionner {{revision}}",
     "requested_revision": "moi",
-    "origin_revision": "origine",
     "latest_revision": "les autres",
     "selected_editable_revision": "Corps de page sélectionné (Modifiable)"
   },
@@ -567,8 +581,6 @@
     "recent_threads": "Éléments récents",
     "accuracy_notice": "Vérifiez les pages référencées pour vous assurer de l'exactitude des informations.",
     "sources": "{{count}} pages référencées",
-    "sources_one": "{{count}} page référencée",
-    "sources_other": "{{count}} pages référencées",
     "error": {
       "title": "Une erreur s'est produite",
       "retry": "Réessayer",
@@ -584,7 +596,9 @@
     "toaster": {
       "thread_deleted_success": "Discussion supprimée",
       "thread_deleted_failed": "Échec de la suppression de la discussion"
-    }
+    },
+    "sources_one": "{{count}} page référencée",
+    "sources_other": "{{count}} pages référencées"
   },
   "link_edit": {
     "edit_link": "Modifier lien",
@@ -685,6 +699,18 @@
     "number_of_list_to_display": "Afficher",
     "page_number_unit": "pages",
     "hit_number_unit": "trouvé",
+    "filter": "Filtres",
+    "search_option": "Options de recherche",
+    "filter_remove": "Supprimer",
+    "filter_clear": "Tout effacer",
+    "filter_author": "Auteur",
+    "filter_by_author": "Filtrer par auteur",
+    "filter_editor": "Éditeur",
+    "filter_by_editor": "Filtrer par éditeur",
+    "filter_tag": "Étiquette",
+    "filter_group": "Groupe",
+    "filter_group_select": "Sélectionner des groupes",
+    "filter_group_none": "Aucun groupe disponible",
     "sort_axis": {
       "relationScore": "Trier par pertinence",
       "createdAt": "Date de création",
@@ -926,8 +952,8 @@
     "page_delete_completely": "a supprimé complètement une page",
     "page_rename": "a renommé une page",
     "page_revert": "a restauré une page",
-    "page_duplicate": "a dupliqué une page",
     "page_like": "a aimé une page",
+    "page_duplicate": "a dupliqué une page",
     "comment_create": "a publié un commentaire"
   },
   "bookmark_folder": {
@@ -1015,6 +1041,7 @@
     },
     "textstyle": {
       "copy_done": "Copié !",
+      "copy_failed": "Échec de la copie",
       "this": "Ceci est du",
       "is": "",
       "bold": "gras",
@@ -1069,6 +1096,7 @@
       "alert": "Alerte",
       "alert_with_custom_title": "Alerte avec étiquette",
       "alert_with_custom_title_text": "Titre personnalisé",
+      "alert_block": "Bloc d'alerte",
       "alert_unavailable": "Non disponible pour ce style",
       "badge": "Badge",
       "text_color": "Couleur du texte",
@@ -1086,5 +1114,128 @@
     "searching": "Recherche en cours...",
     "noResults": "Aucune page trouvée",
     "candidatesLabel": "Pages suggérées"
+  },
+  "slash_command": {
+    "heading1": {
+      "label": "Titre 1",
+      "description": ""
+    },
+    "heading2": {
+      "label": "Titre 2",
+      "description": ""
+    },
+    "heading3": {
+      "label": "Titre 3",
+      "description": ""
+    },
+    "bulletList": {
+      "label": "Liste à puces",
+      "description": ""
+    },
+    "numberedList": {
+      "label": "Liste numérotée",
+      "description": ""
+    },
+    "taskList": {
+      "label": "Liste de tâches",
+      "description": ""
+    },
+    "quote": {
+      "label": "Citation",
+      "description": ""
+    },
+    "codeBlock": {
+      "label": "Bloc de code",
+      "description": ""
+    },
+    "table": {
+      "label": "Tableau",
+      "description": ""
+    },
+    "link": {
+      "label": "Lien",
+      "description": ""
+    },
+    "tableBuilder": {
+      "label": "Générateur de tableau",
+      "description": ""
+    }
+  },
+  "change_proposal": {
+    "operation_type": {
+      "edit": "Modifier la page",
+      "create": "Créer la page",
+      "move": "Déplacer la page",
+      "delete_completely": "Supprimer définitivement la page"
+    },
+    "operation_status": {
+      "pending": "En attente d'approbation",
+      "applied": "Appliqué",
+      "failed": "Échec",
+      "stale": "Non appliqué (la page avait changé)",
+      "skipped": "Ignoré",
+      "reverted": "Annulé",
+      "revert_refused": "Annulation impossible"
+    },
+    "proposal_status": {
+      "pending": "En attente d'approbation",
+      "applied": "Appliqué",
+      "partially_applied": "Partiellement appliqué",
+      "reverted": "Annulé",
+      "partially_reverted": "Partiellement annulé",
+      "not_applied": "Non appliqué",
+      "discarded": "Fermé sans appliquer le reste",
+      "expired": "Expiré",
+      "withdrawn": "Retiré"
+    },
+    "reason": {
+      "page_being_edited": "La page est en cours de modification",
+      "page_operation_in_progress": "Une autre opération sur la page est en cours",
+      "target_unavailable": "La page cible est introuvable",
+      "path_occupied": "Une page existe déjà à ce chemin",
+      "grant_not_assignable": "Les droits de la page ne peuvent pas être définis",
+      "feature_disabled": "La fonctionnalité est désactivée",
+      "operation_type_disabled": "Ce type d'opération est désactivé",
+      "requester_not_allowed": "Le demandeur n'est pas autorisé à effectuer cette opération",
+      "write_error": "Échec de l'écriture de la modification",
+      "not_revertible_state": "Dans un état qui ne permet pas l'annulation",
+      "edited_after_apply": "La page a été modifiée après l'application",
+      "has_children": "La page a des pages enfants",
+      "moved_after_apply": "La page a été déplacée après l'application",
+      "original_path_occupied": "Une page existe déjà au chemin d'origine",
+      "not_deletable": "Vous n'êtes pas autorisé à supprimer la page",
+      "apply_failed": "Échec de l'annulation",
+      "base_revision_changed": "La page avait changé avant l'application",
+      "skipped_by_requester": "Ignoré par le demandeur",
+      "discarded": "Fermé sans appliquer le reste",
+      "expired": "Expiré",
+      "withdrawn": "Retiré"
+    },
+    "revert_refusal_reason": {
+      "not_revertible_state": "Dans un état qui ne permet pas l'annulation",
+      "target_unavailable": "La page cible est introuvable",
+      "edited_after_apply": "La page a été modifiée après l'application",
+      "has_children": "La page a des pages enfants",
+      "moved_after_apply": "La page a été déplacée après l'application",
+      "original_path_occupied": "Une page existe déjà au chemin d'origine",
+      "not_deletable": "Vous n'êtes pas autorisé à supprimer la page",
+      "page_operation_in_progress": "Une autre opération sur la page est en cours",
+      "apply_failed": "Échec de l'annulation"
+    },
+    "lifecycle": {
+      "open": "En attente d'approbation",
+      "settled": "Terminé",
+      "discarded": "Fermé sans appliquer le reste",
+      "expired": "Expiré",
+      "withdrawn": "Retiré"
+    },
+    "link": {
+      "follow_up": "Suite",
+      "rework": "Révision",
+      "based_on": "Basé sur"
+    },
+    "achievement": {
+      "settled_with_percent": "Terminé ({{percent}} % réalisé)"
+    }
   }
 }

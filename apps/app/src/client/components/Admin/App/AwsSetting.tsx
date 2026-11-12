@@ -6,6 +6,7 @@ import type { FileUploadFormValues } from './FileUploadSetting.types';
 
 export type AwsSettingMoleculeProps = {
   register: UseFormRegister<FileUploadFormValues>;
+  awsUseOnlyEnvVars: boolean;
   s3ReferenceFileWithRelayMode: boolean;
   onChangeS3ReferenceFileWithRelayMode: (val: boolean) => void;
 };
@@ -17,6 +18,18 @@ export const AwsSettingMolecule = (
 
   return (
     <>
+      {props.awsUseOnlyEnvVars && (
+        <p
+          className="alert alert-info"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: fixed translation with a constant environment variable name
+          dangerouslySetInnerHTML={{
+            __html: t('admin:app_setting.fixed_by_env_var', {
+              envKey: 'AWS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+              envVar: 'true',
+            }),
+          }}
+        />
+      )}
       <div className="row my-3">
         <span className="text-start text-md-end col-md-3 col-form-label">
           {t('admin:app_setting.file_delivery_method')}
@@ -31,6 +44,7 @@ export const AwsSettingMolecule = (
               data-bs-toggle="dropdown"
               aria-haspopup="true"
               aria-expanded="true"
+              disabled={props.awsUseOnlyEnvVars}
             >
               {props.s3ReferenceFileWithRelayMode &&
                 t('admin:app_setting.file_delivery_method_relay')}
@@ -40,6 +54,7 @@ export const AwsSettingMolecule = (
             <div className="dropdown-menu">
               <button
                 className="dropdown-item"
+                disabled={props.awsUseOnlyEnvVars}
                 type="button"
                 onClick={() => {
                   props.onChangeS3ReferenceFileWithRelayMode(true);
@@ -49,6 +64,7 @@ export const AwsSettingMolecule = (
               </button>
               <button
                 className="dropdown-item"
+                disabled={props.awsUseOnlyEnvVars}
                 type="button"
                 onClick={() => {
                   props.onChangeS3ReferenceFileWithRelayMode(false);
@@ -77,8 +93,9 @@ export const AwsSettingMolecule = (
         <div className="col-md-6">
           <input
             className="form-control"
-            placeholder={`${t('eg')} ap-northeast-1`}
+            placeholder={`${t('commons:eg')} ap-northeast-1`}
             id="admin-aws-setting-region"
+            readOnly={props.awsUseOnlyEnvVars}
             {...props.register('s3Region')}
           />
         </div>
@@ -95,8 +112,9 @@ export const AwsSettingMolecule = (
           <input
             className="form-control"
             type="text"
-            placeholder={`${t('eg')} http://localhost:9000`}
+            placeholder={`${t('commons:eg')} http://localhost:9000`}
             id="admin-aws-setting-custom-endpoint"
+            readOnly={props.awsUseOnlyEnvVars}
             {...props.register('s3CustomEndpoint')}
           />
           <p className="form-text text-muted">
@@ -116,8 +134,9 @@ export const AwsSettingMolecule = (
           <input
             className="form-control"
             type="text"
-            placeholder={`${t('eg')} crowi`}
+            placeholder={`${t('commons:eg')} crowi`}
             id="admin-aws-setting-bucket-name"
+            readOnly={props.awsUseOnlyEnvVars}
             {...props.register('s3Bucket')}
           />
         </div>
@@ -135,6 +154,7 @@ export const AwsSettingMolecule = (
             className="form-control"
             type="text"
             id="admin-aws-setting-access-key-id"
+            readOnly={props.awsUseOnlyEnvVars}
             {...props.register('s3AccessKeyId')}
           />
         </div>
@@ -152,6 +172,7 @@ export const AwsSettingMolecule = (
             className="form-control"
             type="text"
             id="admin-aws-setting-secret-access-key"
+            readOnly={props.awsUseOnlyEnvVars}
             {...props.register('s3SecretAccessKey')}
           />
           <p className="form-text text-muted">

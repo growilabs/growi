@@ -1,3 +1,5 @@
+import { isPopulated } from '@growi/core';
+
 import { SocketEventName } from '~/interfaces/websocket';
 import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
@@ -111,6 +113,12 @@ class SyncPageStatusService implements S2sMessageHandlable {
     });
     this.emitter.on('update', (page, user) => {
       logger.debug("'update' event emitted.");
+
+      // An update without a body change (e.g. grant only) leaves the revision
+      // unpopulated and has nothing to broadcast.
+      if (page.revision == null || !isPopulated(page.revision)) {
+        return;
+      }
 
       const s2cMessagePageUpdated = new S2cMessagePageUpdated(page, user);
 

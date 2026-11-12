@@ -1,17 +1,15 @@
-import type { HydratedDocument } from 'mongoose';
-
+import type { pagebulkexportjobs } from '~/generated/prisma/client';
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import {
   PageBulkExportJobInProgressStatus,
   PageBulkExportJobStatus,
 } from '../../interfaces/page-bulk-export';
-import type { PageBulkExportJobDocument } from '../models/page-bulk-export-job';
-import PageBulkExportJob from '../models/page-bulk-export-job';
 import { pageBulkExportJobCronService } from './page-bulk-export-job-cron';
 
 const logger = loggerFactory(
@@ -48,21 +46,21 @@ class PageBulkExportJobCleanUpCronService extends CronService {
     const exportJobExpirationSeconds = configManager.getConfig(
       'app:bulkExportJobExpirationSeconds',
     );
-    const expiredExportJobs = await PageBulkExportJob.find({
-      $or: Object.values(PageBulkExportJobInProgressStatus).map((status) => ({
-        status,
-      })),
-      createdAt: {
-        $lt: new Date(Date.now() - exportJobExpirationSeconds * 1000),
+    const expiredExportJobs = await prisma.pagebulkexportjobs.findMany({
+      where: {
+        status: { in: Object.values(PageBulkExportJobInProgressStatus) },
+        createdAt: {
+          lt: new Date(Date.now() - exportJobExpirationSeconds * 1000),
+        },
       },
     });
 
-    const cleanUp = async (job: PageBulkExportJobDocument) => {
+    const cleanUp = async (job: pagebulkexportjobs) => {
       await pageBulkExportJobCronService?.notifyExportResultAndCleanUp(
         SupportedAction.ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED,
         job,
       );
-      logger.error(`Bulk export job has expired: ${job._id.toString()}`);
+      logger.error(`Bulk export job has expired: ${job.id}`);
     };
 
     if (pageBulkExportJobCronService != null) {
@@ -80,9 +78,11 @@ class PageBulkExportJobCleanUpCronService extends CronService {
     const thresholdDate = new Date(
       Date.now() - downloadExpirationSeconds * 1000,
     );
-    const downloadExpiredExportJobs = await PageBulkExportJob.find({
-      status: PageBulkExportJobStatus.completed,
-      completedAt: { $lt: thresholdDate },
+    const downloadExpiredExportJobs = await prisma.pagebulkexportjobs.findMany({
+      where: {
+        status: PageBulkExportJobStatus.completed,
+        completedAt: { lt: thresholdDate },
+      },
     });
 
     // Pick one "owner" job per shared attachment. When multiple jobs in this
@@ -94,31 +94,33 @@ class PageBulkExportJobCleanUpCronService extends CronService {
     // "File not found", leaving its job record undeleted as a permanent zombie.
     const attachmentOwnerJobIds = new Map<string, string>();
     for (const job of downloadExpiredExportJobs) {
-      const attachmentKey = job.attachment?.toString();
+      const attachmentKey = job.attachmentId;
       if (attachmentKey == null) continue;
       if (!attachmentOwnerJobIds.has(attachmentKey)) {
-        attachmentOwnerJobIds.set(attachmentKey, job._id.toString());
+        attachmentOwnerJobIds.set(attachmentKey, job.id);
       }
     }
 
-    const cleanUp = async (job: PageBulkExportJobDocument) => {
+    const cleanUp = async (job: pagebulkexportjobs) => {
       await pageBulkExportJobCronService?.cleanUpExportJobResources(job);
 
-      const attachmentKey = job.attachment?.toString();
+      const attachmentKey = job.attachmentId;
       if (attachmentKey == null) return;
       const isAttachmentOwner =
-        attachmentOwnerJobIds.get(attachmentKey) === job._id.toString();
+        attachmentOwnerJobIds.get(attachmentKey) === job.id;
       if (!isAttachmentOwner) return;
 
       const hasSameAttachmentAndDownloadNotExpired =
-        await PageBulkExportJob.findOne({
-          attachment: job.attachment,
-          _id: { $ne: job._id },
-          completedAt: { $gte: thresholdDate },
+        await prisma.pagebulkexportjobs.findFirst({
+          where: {
+            attachmentId: attachmentKey,
+            id: { not: job.id },
+            completedAt: { gte: thresholdDate },
+          },
         });
       if (hasSameAttachmentAndDownloadNotExpired == null) {
         // delete attachment if no other export job (which download has not expired) has re-used it
-        await this.crowi.attachmentService?.removeAttachment(job.attachment);
+        await this.crowi.attachmentService?.removeAttachment(attachmentKey);
       }
     };
 
@@ -132,8 +134,8 @@ class PageBulkExportJobCleanUpCronService extends CronService {
    * Delete bulk export jobs which have failed
    */
   async deleteFailedExportJobs() {
-    const failedExportJobs = await PageBulkExportJob.find({
-      status: PageBulkExportJobStatus.failed,
+    const failedExportJobs = await prisma.pagebulkexportjobs.findMany({
+      where: { status: PageBulkExportJobStatus.failed },
     });
 
     if (pageBulkExportJobCronService != null) {
@@ -147,8 +149,8 @@ class PageBulkExportJobCleanUpCronService extends CronService {
   }
 
   async cleanUpAndDeleteBulkExportJobs(
-    pageBulkExportJobs: HydratedDocument<PageBulkExportJobDocument>[],
-    cleanUp: (job: PageBulkExportJobDocument) => Promise<void>,
+    pageBulkExportJobs: pagebulkexportjobs[],
+    cleanUp: (job: pagebulkexportjobs) => Promise<void>,
   ): Promise<void> {
     const results = await Promise.allSettled(
       pageBulkExportJobs.map((job) => cleanUp(job)),
@@ -163,8 +165,10 @@ class PageBulkExportJobCleanUpCronService extends CronService {
       (_, index) => results[index].status === 'fulfilled',
     );
     if (cleanedUpJobs.length > 0) {
-      const cleanedUpJobIds = cleanedUpJobs.map((job) => job._id);
-      await PageBulkExportJob.deleteMany({ _id: { $in: cleanedUpJobIds } });
+      const cleanedUpJobIds = cleanedUpJobs.map((job) => job.id);
+      await prisma.pagebulkexportjobs.deleteMany({
+        where: { id: { in: cleanedUpJobIds } },
+      });
     }
   }
 }

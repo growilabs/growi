@@ -1,5 +1,6 @@
 {
   "Show": "显示",
+  "View": "查看",
   "Hide": "隐藏",
   "Add": "添加",
   "Insert": "插入",
@@ -7,9 +8,28 @@
   "Sign out": "退出",
   "New": "新建",
   "Send": "发送",
-  "Close": "关闭",
-  "Done": "完成",
+  "Clear": "清除",
   "Delete": "删除",
+  "Cancel": "取消",
+  "Close": "关闭",
+  "Confirm": "确定",
+  "Create": "创建",
+  "Created": "创建",
+  "Description": "描述",
+  "Done": "完成",
+  "Edit": "编辑",
+  "Email": "邮箱",
+  "Error occurred": "Error occurred",
+  "Help": "帮助",
+  "Name": "姓名",
+  "Password": "密码",
+  "Update": "更新",
+  "UserGroup": "用户组",
+  "V5 Page Migration": "转换为V5的兼容性",
+  "Warning": "警告",
+  "add": "添加",
+  "eg": "e.g.",
+  "username": "用户名",
   "meta": {
     "display_name": "简体中文"
   },
@@ -94,8 +114,6 @@
     "Copy to clipboard": "复制到剪贴板",
     "Page path": "页面路径",
     "Page URL": "页面Url",
-    "Parmanent link": "参数化链接",
-    "Page path and parmanent link": "页面路径及参数化链接",
     "Markdown link": "Markdown链接",
     "Append params": "Append params"
   },
@@ -229,5 +247,12 @@
         "user_group": "授予编辑用户组成员功能的权限。"
       }
     }
+  },
+  "username_suggestion": {
+    "active_user": "活跃用户",
+    "inactive_user": "非活跃用户"
+  },
+  "table_action": {
+    "edit": "编辑"
   }
 }

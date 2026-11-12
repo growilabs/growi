@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useCallback } from 'react';
+import { useTranslation } from 'next-i18next';
 import { Collapse } from 'reactstrap';
 
 import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
@@ -24,13 +25,12 @@ import {
 
 type Props = {
   adminGeneralSecurityContainer: AdminGeneralSecurityContainer;
-  t: (key: string) => string;
 };
 
 export const PageDeleteRightsSettings: React.FC<Props> = ({
   adminGeneralSecurityContainer,
-  t,
 }) => {
+  const { t } = useTranslation('admin');
   const {
     currentPageDeletionAuthority,
     currentPageCompleteDeletionAuthority,

@@ -1,16 +1,14 @@
-import type { HydratedDocument } from 'mongoose';
-
+import type { auditlogbulkexportjobs } from '~/generated/prisma/client';
 import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import {
   AuditLogBulkExportJobInProgressJobStatus,
   AuditLogBulkExportJobStatus,
 } from '../../interfaces/audit-log-bulk-export';
-import type { AuditLogBulkExportJobDocument } from '../models/audit-log-bulk-export-job';
-import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
 import { auditLogBulkExportJobCronService } from './audit-log-bulk-export-job-cron';
 
 const logger = loggerFactory(
@@ -50,14 +48,10 @@ class AuditLogBulkExportJobCleanUpCronService extends CronService {
       Date.now() - exportJobExpirationSeconds * 1000,
     );
 
-    const expiredExportJobs = await AuditLogBulkExportJob.find({
-      $or: Object.values(AuditLogBulkExportJobInProgressJobStatus).map(
-        (status) => ({
-          status,
-        }),
-      ),
-      createdAt: {
-        $lt: thresholdDate,
+    const expiredExportJobs = await prisma.auditlogbulkexportjobs.findMany({
+      where: {
+        status: { in: Object.values(AuditLogBulkExportJobInProgressJobStatus) },
+        createdAt: { lt: thresholdDate },
       },
     });
 
@@ -82,22 +76,29 @@ class AuditLogBulkExportJobCleanUpCronService extends CronService {
       Date.now() - downloadExpirationSeconds * 1000,
     );
 
-    const downloadExpiredExportJobs = await AuditLogBulkExportJob.find({
-      status: AuditLogBulkExportJobStatus.completed,
-      completedAt: { $lt: thresholdDate },
-    });
+    const downloadExpiredExportJobs =
+      await prisma.auditlogbulkexportjobs.findMany({
+        where: {
+          status: AuditLogBulkExportJobStatus.completed,
+          completedAt: { lt: thresholdDate },
+        },
+      });
 
-    const cleanUp = async (job: AuditLogBulkExportJobDocument) => {
+    const cleanUp = async (job: auditlogbulkexportjobs) => {
       await auditLogBulkExportJobCronService?.cleanUpExportJobResources(job);
 
+      if (job.attachmentId == null) return;
+
       const hasSameAttachmentAndDownloadNotExpired =
-        await AuditLogBulkExportJob.findOne({
-          attachment: job.attachment,
-          _id: { $ne: job._id },
-          completedAt: { $gte: thresholdDate },
+        await prisma.auditlogbulkexportjobs.findFirst({
+          where: {
+            attachmentId: job.attachmentId,
+            id: { not: job.id },
+            completedAt: { gte: thresholdDate },
+          },
         });
       if (hasSameAttachmentAndDownloadNotExpired == null) {
-        await this.crowi.attachmentService?.removeAttachment(job.attachment);
+        await this.crowi.attachmentService?.removeAttachment(job.attachmentId);
       }
     };
 
@@ -111,8 +112,8 @@ class AuditLogBulkExportJobCleanUpCronService extends CronService {
    * Delete audit log bulk export jobs which have failed
    */
   async deleteFailedExportJobs() {
-    const failedExportJobs = await AuditLogBulkExportJob.find({
-      status: AuditLogBulkExportJobStatus.failed,
+    const failedExportJobs = await prisma.auditlogbulkexportjobs.findMany({
+      where: { status: AuditLogBulkExportJobStatus.failed },
     });
 
     if (auditLogBulkExportJobCronService != null) {
@@ -126,8 +127,8 @@ class AuditLogBulkExportJobCleanUpCronService extends CronService {
   }
 
   async cleanUpAndDeleteBulkExportJobs(
-    auditLogBulkExportJobs: HydratedDocument<AuditLogBulkExportJobDocument>[],
-    cleanUp: (job: AuditLogBulkExportJobDocument) => Promise<void>,
+    auditLogBulkExportJobs: auditlogbulkexportjobs[],
+    cleanUp: (job: auditlogbulkexportjobs) => Promise<void>,
   ): Promise<void> {
     const results = await Promise.allSettled(
       auditLogBulkExportJobs.map((job) => cleanUp(job)),
@@ -140,8 +141,10 @@ class AuditLogBulkExportJobCleanUpCronService extends CronService {
       (_, index) => results[index].status === 'fulfilled',
     );
     if (cleanedUpJobs.length > 0) {
-      const cleanedUpJobIds = cleanedUpJobs.map((job) => job._id);
-      await AuditLogBulkExportJob.deleteMany({ _id: { $in: cleanedUpJobIds } });
+      const cleanedUpJobIds = cleanedUpJobs.map((job) => job.id);
+      await prisma.auditlogbulkexportjobs.deleteMany({
+        where: { id: { in: cleanedUpJobIds } },
+      });
     }
   }
 }

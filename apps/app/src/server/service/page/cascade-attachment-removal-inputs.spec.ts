@@ -19,7 +19,7 @@ import {
 } from './cascade-attachment-removal-inputs';
 
 describe('toAttachmentLikes', () => {
-  it('maps a Mongoose attachment (page reference held as `page`) to AttachmentLike with stringified _id and pageId', () => {
+  it('maps a prisma attachment row (page reference held as `pageId`) to AttachmentLike with stringified _id and pageId', () => {
     const attachmentId = new Types.ObjectId();
     const pageId = new Types.ObjectId();
 
@@ -28,7 +28,7 @@ describe('toAttachmentLikes', () => {
         _id: attachmentId,
         originalName: 'diagram.png',
         fileSize: 2048,
-        page: pageId,
+        pageId: pageId.toString(),
       },
     ]);
 
@@ -108,7 +108,7 @@ describe('buildPageIdToPathMap', () => {
 
     const map = buildPageIdToPathMap([pageId], ['/matched']);
     const [attachmentLike] = toAttachmentLikes([
-      { _id: new Types.ObjectId(), page: pageId },
+      { _id: new Types.ObjectId(), pageId: pageId.toString() },
     ]);
 
     expect(
