@@ -1,4 +1,10 @@
 export { addApplicationMetrics } from './application-metrics';
+export {
+  addDataTransferUsageMetrics,
+  type OperationResult,
+  recordArchiveOperation,
+  recordG2GTransfer,
+} from './data-transfer-usage-metrics';
 export { addInstalledAtMetrics } from './installed-at-metrics';
 export { addMongooseConnectionPoolMetrics } from './mongoose-connection-pool-metrics';
 export { addPageCountsMetrics } from './page-counts-metrics';
@@ -8,6 +14,9 @@ export { addYjsMetrics } from './yjs-metrics';
 
 export const setupCustomMetrics = async (): Promise<void> => {
   const { addApplicationMetrics } = await import('./application-metrics');
+  const { addDataTransferUsageMetrics } = await import(
+    './data-transfer-usage-metrics'
+  );
   const { addInstalledAtMetrics } = await import('./installed-at-metrics');
   const { addUserCountsMetrics } = await import('./user-counts-metrics');
   const { addPageCountsMetrics } = await import('./page-counts-metrics');
@@ -25,4 +34,5 @@ export const setupCustomMetrics = async (): Promise<void> => {
   addSystemMetrics();
   addYjsMetrics();
   addMongooseConnectionPoolMetrics();
+  addDataTransferUsageMetrics();
 };

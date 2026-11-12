@@ -179,7 +179,7 @@ describe('push route POST /transfer — re-runs the transferability judgement at
     // reach this call at all.
     startTransferSpy = vi
       .spyOn(pusherService, 'startTransfer')
-      .mockResolvedValue(undefined);
+      .mockResolvedValue({ importIncomplete: false });
   });
 
   afterEach(async () => {

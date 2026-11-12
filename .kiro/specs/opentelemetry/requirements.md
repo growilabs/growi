@@ -13,12 +13,15 @@ GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を **�
   - Diag Logger の pino アダプタ (`logger.ts`)。
   - SemConv の不安定 attribute のローカルコピー (`semconv.ts`)。
   - identity 専用の Resource Attribute 供給 (`custom-resource-attributes/`)。
-  - Custom Metric の emit と合成 (`custom-metrics/`、合計 4 モジュール: application / user-counts / page-counts / system)。
+  - Custom Metric の emit と合成 (`custom-metrics/`。モジュール一覧は design.md の File Structure Plan を参照)。状態値を観測するメトリクス（ObservableGauge）と、発生回数を数えるメトリクス（Counter）の両方を含む。
+  - `features/opentelemetry` の外の機能から発生回数を記録する API（`features/opentelemetry/server` の barrel が公開する記録関数）と、データアーカイブ・お引越し（GROWI 間転送）の各計測点における記録呼び出しの位置と成否の対応。
   - `otel:anonymizeInBestEffort` に応じた匿名化 hook の受け渡し（要件 1.5）。匿名化の中身は対象外。
   - `otel:*` 設定キー 4 種の利用ポリシー。
 - **Out of scope**:
   - HTTP の匿名化（`anonymization/`）。`opentelemetry-anonymization` を参照。
   - `growiInfoService` / `configManager` / `loggerFactory` などの上流サービスの設計や API 変更。
+  - データアーカイブ・お引越しの業務処理そのもの（エクスポート・インポート・転送の処理、成否判定、管理画面への通知、HTTP 応答、監査ログ）。
+  - 受信側での発生回数の集計（期間内の増加分の算出、再起動による累積値リセットの判別）。
   - 既存メトリクス（`growi.users.total` / `growi.users.active` / `growi.pages.total` / `growi.configs` / `system.*` / `process.*`）の名称変更や再構成。
   - OpenTelemetry のログシグナル統合（log signal は現状未使用）。
   - クライアント側（ブラウザ）からの telemetry 出力。
@@ -27,6 +30,7 @@ GROWI の OpenTelemetry 統合 (`apps/app/src/features/opentelemetry/`) を **�
 - **Adjacent expectations**:
   - 上流: `growiInfoService.getGrowiInfo({ includeAttachmentInfo, includeUserCountInfo, includePageCountInfo })` の API シグネチャ・返り値型が維持されることに依存する。破壊的変更があった場合は Revalidation Triggers として `custom-metrics/` および `custom-resource-attributes/application-resource-attributes.ts` を再評価する。
   - 上流: `configManager.getConfig('otel:*')` の 4 キーが現状の意味で参照可能であることに依存する。
+  - 上流: データアーカイブ・お引越しの各処理が成否を戻り値で返すこと（`ExportService.export()` の結果、`executeImport()` の `OperationResult`、`startTransfer()` の `G2GTransferResult`、`receiveTransferData()` の取り込み結果）に依存する。呼び出し形が変わった場合は Revalidation Triggers として計測点を再評価する。
   - 下流: OpenTelemetry Collector およびその先のダッシュボード／アラート群が本 spec の Metric Schema / Resource Attribute 表に整合した参照クエリを保持していること。変更時は PR 説明にて運用者へ通知する。
 
 ## Requirements
@@ -131,3 +135,22 @@ HTTP の匿名化は `opentelemetry-anonymization` を参照する。
 1. When 新規 Custom Metric モジュールを追加する, the GROWI server shall `custom-metrics/` 配下にファイルを追加し、`addXxxMetrics(): void` をエクスポートし、`custom-metrics/index.ts` の `setupCustomMetrics()` から呼び出す。
 2. 匿名化の対象や規則を追加・変更する場合は `opentelemetry-anonymization` を参照する。
 3. The GROWI server shall identity 情報を Resource Attribute 経由で、設定値を `growi.configs` ラベル経由で、観測値を `growi.*` / `system.*` / `process.*` メトリクス経由でそれぞれ emit する責務分離を維持する。
+4. When `features/opentelemetry` の外の機能から発生回数を記録する, the GROWI server shall `features/opentelemetry/server` の barrel が公開する記録関数と型のみを経由し、`custom-metrics/` 配下の内部ファイルを直接 import しない。
+
+### Requirement 11: 発生回数型メトリクスとデータアーカイブ・お引越しの利用回数
+
+**Objective:** GROWI 開発チームとして、管理画面のデータアーカイブ（GROWI アーカイブファイルの作成・ダウンロード・アップロード・インポート）とお引越し（GROWI 間転送）が各インスタンスでどの程度使われているかを、監査ログの設定に依存せず既存のメトリクス送信で把握し、利用の有無・利用インスタンスの割合・利用頻度を受信側で集計できるようにしたい。
+
+#### Acceptance Criteria
+
+1. The GROWI server shall データアーカイブの作成・ダウンロード・アップロード・インポートの試行回数を、単調増加の Counter `growi.archive.operations`（単位 `{operation}`）として、属性 `operation`（`create` / `download` / `upload` / `import`）と `result`（`success` / `failure`）を付けて記録する。ダウンロードは対象ファイルの取得に成功した時点でのみ `success` として記録する。
+2. The GROWI server shall お引越しの試行回数を、送信側（転送の実行）と受信側（受け取ったデータの取り込み）のそれぞれで、Counter `growi.g2g_transfer.operations`（単位 `{transfer}`）として、属性 `role`（`source` / `destination`）と `result`（`success` / `failure`）を付けて記録し、データアーカイブの回数とは別のメトリクスとして区別する。
+3. If インポートまたはお引越しの取り込みが一部のデータを取り込めずに終了した, the GROWI server shall 管理画面にエラーとして通知される条件と同じ条件で、結果 `failure` として記録する。お引越しでは送信側・受信側それぞれについて記録する。
+4. The GROWI server shall 1 回の操作につき 1 回だけ記録し、お引越しが内部で行うエクスポート・インポートをデータアーカイブの回数に含めない。失敗した操作のやり直しは、独立した 1 回として記録する。
+5. If 要求が操作の受付前に拒否された（ルートの入力検証ミドルウェアによる拒否、アップロードでのファイル未添付、お引越し受信の転送キー検証・取り込みジョブの確保による拒否、インポートの応答前の拒否、お引越しの転送開始前の確認（接続確認・転送可否の判定）による中止）, the GROWI server shall 記録しない。受付後に操作の中で起きた検証・解析の失敗は、結果 `failure` として記録する。
+6. The GROWI server shall 監査ログの有効・無効およびアクショングループの設定にかかわらず記録する。
+7. While `otel:enabled` が `true`, the GROWI server shall 記録した回数を既存のメトリクス送信の周期で累積値として送信し、受信側が任意の期間の増加分を算出でき、プロセス再起動による 0 からの数え直しを判別できる形にする。
+8. While `otel:enabled` が `false`, または SDK の開始前, the GROWI server shall 記録関数の呼び出しを何もせずに終え、何も送信しない。
+9. The GROWI server shall 発生回数型メトリクスの属性を固定の列挙値に限定し、ページ内容・ページパス・ユーザー名やユーザー ID・メールアドレス・ファイル名・コレクション名・転送先の URL を含めない。インスタンスの識別は Resource Attribute（Requirement 2）に委ねる。
+10. If 回数の記録に失敗した, the GROWI server shall 呼び出し元の処理を中断せず結果も変えず、`diag` ロガーに error を記録する。
+11. The GROWI server shall 記録の有無によって、計測対象の操作の画面表示・応答内容・応答までの時間に利用者が認識できる差を生じさせない（応答前に待ち合わせを追加しない）。

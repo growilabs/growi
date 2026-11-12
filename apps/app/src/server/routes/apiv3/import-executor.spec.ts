@@ -26,7 +26,7 @@ describe('executeImport', () => {
     const adminEvent = mock<EventEmitter>();
     const activityEvent = mock<EventEmitter>();
 
-    await executeImport({
+    const result = await executeImport({
       importService,
       adminEvent,
       activityEvent,
@@ -38,6 +38,7 @@ describe('executeImport', () => {
       importSettingsMap,
     });
 
+    expect(result).toBe('success');
     expect(activityEvent.emit).toHaveBeenCalledWith('update', activityId, {
       action: SupportedAction.ACTION_ADMIN_GROWI_DATA_IMPORTED,
     });
@@ -60,7 +61,7 @@ describe('executeImport', () => {
     const adminEvent = mock<EventEmitter>();
     const activityEvent = mock<EventEmitter>();
 
-    await executeImport({
+    const result = await executeImport({
       importService,
       adminEvent,
       activityEvent,
@@ -74,6 +75,7 @@ describe('executeImport', () => {
       message:
         'Collections that could not be imported: pagetagrelations, revisions',
     });
+    expect(result).toBe('failure');
     expect(activityEvent.emit).not.toHaveBeenCalled();
   });
 
@@ -86,7 +88,7 @@ describe('executeImport', () => {
     const adminEvent = mock<EventEmitter>();
     const activityEvent = mock<EventEmitter>();
 
-    await executeImport({
+    const result = await executeImport({
       importService,
       adminEvent,
       activityEvent,
@@ -96,6 +98,7 @@ describe('executeImport', () => {
       importSettingsMap,
     });
 
+    expect(result).toBe('success');
     expect(importService.import).toHaveBeenCalledWith(
       collections,
       importSettingsMap,
@@ -113,7 +116,7 @@ describe('executeImport', () => {
     const adminEvent = mock<EventEmitter>();
     const activityEvent = mock<EventEmitter>();
 
-    await executeImport({
+    const result = await executeImport({
       importService,
       adminEvent,
       activityEvent,
@@ -128,6 +131,7 @@ describe('executeImport', () => {
     expect(adminEvent.emit).toHaveBeenCalledWith('onErrorForImport', {
       message: 'boom',
     });
+    expect(result).toBe('failure');
     expect(activityEvent.emit).not.toHaveBeenCalled();
   });
 });

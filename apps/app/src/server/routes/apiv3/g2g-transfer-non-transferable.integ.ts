@@ -238,6 +238,9 @@ describe('non-transferable collections at the transfer routes', () => {
       vi.mocked(pusherService.getTransferability).mockResolvedValue({
         canTransfer: true,
       });
+      vi.mocked(pusherService.startTransfer).mockResolvedValue({
+        importIncomplete: false,
+      });
 
       const response = await request(app)
         .post('/transfer')

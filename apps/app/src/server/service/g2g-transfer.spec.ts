@@ -20,9 +20,11 @@ import {
   computePasswordSeedFingerprint,
   G2GTransferPusherService,
   type IDataGROWIInfo,
+  isTransferImportIncomplete,
   readPostProcessFailures,
   readRescueApplied,
   readRescueOutcome,
+  type TransferImportOutcome,
   toArchivePostErrorEvent,
   toTransferability,
 } from './g2g-transfer';
@@ -1079,5 +1081,93 @@ describe('G2GTransferPusherService.startTransfer post-process clean-up failure',
       mongo: G2G_PROGRESS_STATUS.COMPLETED,
       attachments: G2G_PROGRESS_STATUS.COMPLETED,
     });
+  });
+});
+
+describe('isTransferImportIncomplete', () => {
+  const clean: TransferImportOutcome = {
+    failedCollections: [],
+    importAborted: false,
+    rescue: null,
+    rescueApplied: false,
+    postProcessFailures: [],
+  };
+
+  test('is complete when nothing failed and no rescue was planned', () => {
+    expect(isTransferImportIncomplete(clean)).toBe(false);
+  });
+
+  test('is complete when a planned rescue was applied', () => {
+    expect(
+      isTransferImportIncomplete({
+        ...clean,
+        rescue: { rescued: [] },
+        rescueApplied: true,
+      }),
+    ).toBe(false);
+  });
+
+  test.each<[string, Partial<TransferImportOutcome>]>([
+    ['a collection failed', { failedCollections: ['pages'] }],
+    ['the import aborted', { importAborted: true }],
+    [
+      'a planned rescue was not applied',
+      { rescue: { rescued: [] }, rescueApplied: false },
+    ],
+    ['a post-process step failed', { postProcessFailures: ['x'] }],
+  ])('is incomplete when only %s', (_label, override) => {
+    expect(isTransferImportIncomplete({ ...clean, ...override })).toBe(true);
+  });
+});
+
+describe('G2GTransferPusherService.startTransfer result', () => {
+  test('resolves importIncomplete: false when the destination imported everything', async () => {
+    const { crowi } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(
+      mock<AxiosResponse>({
+        data: {
+          failedCollections: [],
+          importAborted: false,
+          rescue: null,
+          rescueApplied: false,
+          postProcessFailures: [],
+        },
+      }),
+    );
+    vi.spyOn(pusher, 'transferAttachments').mockResolvedValueOnce();
+
+    const result = await pusher.startTransfer(
+      tk,
+      { _id: 'operator-id' },
+      ['pages'],
+      {},
+      mock<IDataGROWIInfo>(),
+    );
+
+    expect(result).toEqual({ importIncomplete: false });
+  });
+
+  test('resolves importIncomplete: true when the destination left the import incomplete', async () => {
+    const { crowi } = buildCrowiAndSocket();
+    const pusher = new G2GTransferPusherService(crowi);
+
+    vi.spyOn(rawAxios, 'post').mockResolvedValueOnce(
+      mock<AxiosResponse>({
+        data: { failedCollections: ['pagetagrelations'] },
+      }),
+    );
+    vi.spyOn(pusher, 'transferAttachments').mockResolvedValueOnce();
+
+    const result = await pusher.startTransfer(
+      tk,
+      { _id: 'operator-id' },
+      ['pages'],
+      {},
+      mock<IDataGROWIInfo>(),
+    );
+
+    expect(result).toEqual({ importIncomplete: true });
   });
 });

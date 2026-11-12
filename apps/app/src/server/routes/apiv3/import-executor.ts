@@ -1,5 +1,6 @@
 import type EventEmitter from 'node:events';
 
+import type { OperationResult } from '~/features/opentelemetry/server';
 import { SupportedAction } from '~/interfaces/activity';
 import type { PendingActivityContext } from '~/server/service/activity/index';
 import { pendingActivityContext } from '~/server/service/activity/index';
@@ -52,6 +53,9 @@ export interface ExecuteImportArgs {
  * escapes as an unhandled rejection, 'onErrorForImport' is never emitted, and
  * the client sees the import silently do nothing.
  *
+ * Resolves to the outcome for the caller to record; a partial import counts as a
+ * failure.
+ *
  * Three outcomes, and each one has to reach the operator differently:
  *  - every collection imported → the audit row is settled, and ImportService has
  *    already emitted 'onTerminateForImport' for the screen;
@@ -66,7 +70,7 @@ export const executeImport = async ({
   activityContext,
   collections,
   importSettingsMap,
-}: ExecuteImportArgs): Promise<void> => {
+}: ExecuteImportArgs): Promise<OperationResult> => {
   try {
     const { failedCollections } = await importService.import(
       collections,
@@ -92,12 +96,12 @@ export const executeImport = async ({
       adminEvent.emit('onErrorForImport', {
         message: `Collections that could not be imported: ${failedCollections.join(', ')}`,
       });
-      return;
+      return 'failure';
     }
 
     if (activityId == null) {
       // Nothing to settle — see ExecuteImportArgs.activityId. The import itself is done.
-      return;
+      return 'success';
     }
 
     // Re-arm the context captured before the response (see
@@ -109,8 +113,10 @@ export const executeImport = async ({
     activityEvent.emit('update', activityId, {
       action: SupportedAction.ACTION_ADMIN_GROWI_DATA_IMPORTED,
     });
+    return 'success';
   } catch (err) {
     logger.error(err);
     adminEvent.emit('onErrorForImport', { message: (err as Error).message });
+    return 'failure';
   }
 };

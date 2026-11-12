@@ -10,6 +10,10 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import path from 'pathe';
 
+import {
+  type OperationResult,
+  recordG2GTransfer,
+} from '~/features/opentelemetry/server';
 import { isCoherentOptionsMap } from '~/models/admin/g2g-transfer-preset';
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -36,7 +40,10 @@ import type {
   IDataGROWIInfo,
   ImportCollectionsResult,
 } from '~/server/service/g2g-transfer';
-import { X_GROWI_TRANSFER_KEY_HEADER_NAME } from '~/server/service/g2g-transfer';
+import {
+  isTransferImportIncomplete,
+  X_GROWI_TRANSFER_KEY_HEADER_NAME,
+} from '~/server/service/g2g-transfer';
 import type { ImportSettings } from '~/server/service/import';
 import { getImportService } from '~/server/service/import';
 import type { UniqueConflictReport } from '~/server/service/import/detect-unique-conflicts';
@@ -476,7 +483,7 @@ export const setup = (crowi: Crowi): Router => {
   const receiveTransferData = async (
     req: Request & { file: any },
     res: ApiV3Response,
-  ): Promise<void> => {
+  ): Promise<ImportCollectionsResult | null> => {
     const { file } = req;
     const {
       collections: strCollections,
@@ -497,13 +504,14 @@ export const setup = (crowi: Crowi): Router => {
       sourceGROWIUploadConfigs = JSON.parse(strUploadConfigs);
     } catch (err) {
       logger.error(err);
-      return res.apiv3Err(
+      res.apiv3Err(
         new ErrorV3(
           'Failed to parse request body.',
           G2G_PARSE_FAILED_ERROR_CODE,
         ),
         500,
       );
+      return null;
     }
 
     /*
@@ -522,13 +530,14 @@ export const setup = (crowi: Crowi): Router => {
         { protectedCollections },
         'Refused the transfer import: the request names collections that must not be transferred',
       );
-      return res.apiv3Err(
+      res.apiv3Err(
         new ErrorV3(
           `These collections must not be transferred: ${protectedCollections.join(', ')}`,
           G2G_PROTECTED_COLLECTION_ERROR_CODE,
         ),
         400,
       );
+      return null;
     }
 
     /*
@@ -549,13 +558,14 @@ export const setup = (crowi: Crowi): Router => {
         { collections },
         'Refused the transfer import: the import-method assignment mixes replacing and appending',
       );
-      return res.apiv3Err(
+      res.apiv3Err(
         new ErrorV3(
           'The import-method assignment must either replace every collection or replace none of them.',
           G2G_MIXED_IMPORT_MODES_ERROR_CODE,
         ),
         400,
       );
+      return null;
     }
 
     /*
@@ -576,13 +586,14 @@ export const setup = (crowi: Crowi): Router => {
       meta = zipFileStat?.meta;
     } catch (err) {
       logger.error(err);
-      return res.apiv3Err(
+      res.apiv3Err(
         new ErrorV3(
           'Failed to validate transfer data file.',
           G2G_VALIDATION_FAILED_ERROR_CODE,
         ),
         500,
       );
+      return null;
     }
 
     /*
@@ -592,13 +603,14 @@ export const setup = (crowi: Crowi): Router => {
       importService.validate(meta);
     } catch (err) {
       logger.error(err);
-      return res.apiv3Err(
+      res.apiv3Err(
         new ErrorV3(
           'The version of this GROWI and the uploaded GROWI data are not the same',
           G2G_VERSION_INCOMPATIBLE_ERROR_CODE,
         ),
         500,
       );
+      return null;
     }
 
     /*
@@ -613,12 +625,13 @@ export const setup = (crowi: Crowi): Router => {
       );
     } catch (err) {
       logger.error(err);
-      return res.apiv3Err(
+      res.apiv3Err(
         new ErrorV3(
           'Import settings are invalid. See GROWI docs about details.',
           G2G_IMPORT_SETTINGS_INVALID_ERROR_CODE,
         ),
       );
+      return null;
     }
 
     /*
@@ -644,13 +657,14 @@ export const setup = (crowi: Crowi): Router => {
       // A detection that could not complete says nothing about whether the archive
       // collides, and importing on that basis is exactly what drops documents
       // silently and breaks group-granted pages (issue #10151). Fail instead.
-      return res.apiv3Err(
+      res.apiv3Err(
         new ErrorV3(
           'Failed to detect data conflicts before import.',
           G2G_CONFLICT_DETECTION_FAILED_ERROR_CODE,
         ),
         500,
       );
+      return null;
     }
 
     if (hasConflicts(conflictReport)) {
@@ -674,13 +688,14 @@ export const setup = (crowi: Crowi): Router => {
         },
         'Aborted the transfer import before writing anything: the transfer data conflicts with existing data',
       );
-      return res.apiv3Err(
+      res.apiv3Err(
         new ErrorV3(
           summarizeUniqueConflicts(conflictReport),
           G2G_DATA_CONFLICT_ERROR_CODE,
         ),
         409,
       );
+      return null;
     }
 
     let importResult: ImportCollectionsResult;
@@ -692,13 +707,14 @@ export const setup = (crowi: Crowi): Router => {
       );
     } catch (err) {
       logger.error(err);
-      return res.apiv3Err(
+      res.apiv3Err(
         new ErrorV3(
           'Failed to import MongoDB collections',
           G2G_MONGO_COLLECTION_IMPORT_FAILURE_ERROR_CODE,
         ),
         500,
       );
+      return null;
     }
 
     // The response body is the only way anything that happened over here reaches the
@@ -710,7 +726,7 @@ export const setup = (crowi: Crowi): Router => {
     // Answered as a success even when the import aborted: the source transfers no
     // attachment at all unless it is (requirement 5.2, which outranks 2.8 here), and
     // `importAborted` is what keeps that success from reading as a finished transfer.
-    return res.apiv3({
+    res.apiv3({
       message: 'Successfully started to receive transfer data.',
       failedCollections: importResult.failedCollections,
       importAborted: importResult.importAborted,
@@ -719,6 +735,7 @@ export const setup = (crowi: Crowi): Router => {
       postProcessFailures: importResult.postProcessFailures,
       maintenanceModeReleased: importResult.maintenanceModeReleased,
     });
+    return importResult;
   };
 
   /**
@@ -820,8 +837,12 @@ export const setup = (crowi: Crowi): Router => {
       // it.
       const importJob = takeImportJob(req);
 
+      let transferResult: OperationResult = 'failure';
       try {
-        await receiveTransferData(req, res);
+        const importResult = await receiveTransferData(req, res);
+        if (importResult != null && !isTransferImportIncomplete(importResult)) {
+          transferResult = 'success';
+        }
       } finally {
         // Both run whether the transfer succeeded or failed: a failed one leaves just as
         // much on disk, and the retry it invites would pile another copy on top. The
@@ -829,6 +850,7 @@ export const setup = (crowi: Crowi): Router => {
         // shared directory.
         await deleteReceivedArchive(importService.baseDir, req.file);
         importJob?.release();
+        recordG2GTransfer('destination', transferResult);
       }
     },
   );
@@ -1352,13 +1374,20 @@ export const setup = (crowi: Crowi): Router => {
       // Start transfer
       // DO NOT "await". Let it run in the background.
       // Errors should be emitted through websocket.
-      g2gTransferPusherService.startTransfer(
-        tk,
-        req.user,
-        collections,
-        optionsMap,
-        destGROWIInfo,
-      );
+      // Not every rejection path inside startTransfer logs before throwing, so log here too.
+      g2gTransferPusherService
+        .startTransfer(tk, req.user, collections, optionsMap, destGROWIInfo)
+        .then(
+          ({ importIncomplete }) =>
+            recordG2GTransfer(
+              'source',
+              importIncomplete ? 'failure' : 'success',
+            ),
+          (err) => {
+            recordG2GTransfer('source', 'failure');
+            logger.error({ err }, 'G2G transfer failed');
+          },
+        );
 
       return res.apiv3({ message: 'Successfully requested auto transfer.' });
     },
