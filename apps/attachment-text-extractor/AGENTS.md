@@ -104,7 +104,7 @@ src/
 scripts/                  # OpenAPI export and drift check, image check, memory measurement
 test/                     # deploy-file checks, black-box HTTP tests, layer check, fixtures
 benchmark/                # corpus, scoring, report
-docker/                   # Dockerfile, README for operators, third-party licence texts
+docker/                   # Dockerfile, README for operators
 ```
 
 Tests are co-located (`*.spec.ts` unit, `*.integ.ts` with real processes or sockets);
@@ -143,8 +143,7 @@ and `wire` are leaves shared by both sides. `zod` and `hono-openapi` belong to
   OpenAPI document.
 - **Dependencies** are permissively licensed, run offline and are pinned where the
   output depends on them (`@firecrawl/anydoc`, `@embedpdf/pdfium`, `htmlparser2`).
-  `test/deploy/production-dependencies.spec.ts` lists the production ones. After
-  upgrading `@embedpdf/pdfium`, refresh `docker/licenses/pdfium-wasm/`.
+  `test/deploy/production-dependencies.spec.ts` lists the production ones.
 
 ## Specs
 

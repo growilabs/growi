@@ -18,7 +18,6 @@ import {
 const SERVICE_PACKAGE = '@growi/attachment-text-extractor';
 const PINNED_NODE_SLIM =
   /^node:24\.\d+\.\d+-(?:(?:bookworm|trixie)-)?slim(?:@sha256:[0-9a-f]{64})?$/;
-const LICENSES_DIRECTORY = /(^|\/)licenses(\/|$)/i;
 const SHIPPED_PATHS = new Set(['dist', 'node_modules', 'package.json']);
 
 const stageByReference = (model: DockerfileModel, reference: string): Stage => {
@@ -35,9 +34,6 @@ const lastSegment = (path: string): string =>
     .replace(/\/\.?$/, '')
     .split('/')
     .pop() ?? '';
-
-const isLicenseCopy = (destination: string): boolean =>
-  LICENSES_DIRECTORY.test(destination);
 
 // The shell commands of a stage's RUN instructions, one entry per `&&`, `;` or `|`.
 const shellSegments = (stage: Stage): readonly string[] =>
@@ -236,13 +232,12 @@ describe('Dockerfile: production dependencies only (Req 8.3)', () => {
     expect(loadPackageManifest().scripts.build).toBeTruthy();
   });
 
-  it('copies only dist, node_modules and package.json (plus licence notices) into the final stage, from a build stage', () => {
+  it('copies only dist, node_modules and package.json into the final stage, from a build stage', () => {
     const copies = instructionsOf(finalStage(loadDockerfile()), 'COPY').map(
       copyOperands,
     );
-    const shipped = copies.filter((copy) => !isLicenseCopy(copy.destination));
-    expect(shipped.length).toBeGreaterThan(0);
-    for (const copy of shipped) {
+    expect(copies.length).toBeGreaterThan(0);
+    for (const copy of copies) {
       expect(
         copy.from,
         `COPY ${copy.sources.join(' ')} must come from a build stage`,
@@ -255,7 +250,7 @@ describe('Dockerfile: production dependencies only (Req 8.3)', () => {
       }
     }
     const names = new Set(
-      shipped.flatMap((copy) => copy.sources.map(lastSegment)),
+      copies.flatMap((copy) => copy.sources.map(lastSegment)),
     );
     expect(names.has('dist')).toBe(true);
     expect(names.has('node_modules')).toBe(true);
@@ -268,25 +263,6 @@ describe('Dockerfile: production dependencies only (Req 8.3)', () => {
       expect(segment).not.toMatch(
         /\b(build-essential|gcc|g\+\+|make|python3?|git)\b/,
       );
-    }
-  });
-});
-
-describe('Dockerfile: third-party licence notices (research.md 21.5)', () => {
-  it('puts the licence notices of the PDFium WASM into a licenses directory of the final stage', () => {
-    const copies = instructionsOf(finalStage(loadDockerfile()), 'COPY').map(
-      copyOperands,
-    );
-    const licenceCopies = copies.filter((copy) =>
-      isLicenseCopy(copy.destination),
-    );
-    expect(licenceCopies.length).toBeGreaterThan(0);
-    for (const copy of licenceCopies) {
-      for (const source of copy.sources) {
-        expect(source, 'a licence COPY copies licence files only').toMatch(
-          /(^|\/)[^/]*(licen[cs]e|notice|copying)[^/]*\/?$/i,
-        );
-      }
     }
   });
 });

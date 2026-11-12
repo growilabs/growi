@@ -33,15 +33,6 @@ RUN pnpm --filter @growi/attachment-text-extractor run build
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
   pnpm deploy out --prod --legacy --filter @growi/attachment-text-extractor
 
-# Third-party licence notices: the ones kept in this repository for the libraries
-# inside the PDFium WASM, plus the two files the npm package itself carries.
-RUN mkdir -p /licenses/pdfium-wasm/pdfium \
-  && cp -R apps/attachment-text-extractor/docker/licenses/. /licenses/ \
-  && cp out/node_modules/@embedpdf/pdfium/LICENSE \
-        out/node_modules/@embedpdf/pdfium/LICENSE.pdfium \
-        /licenses/pdfium-wasm/pdfium/
-
-
 
 ##
 ## release
@@ -62,7 +53,6 @@ WORKDIR /app
 COPY --from=builder /opt/apps/attachment-text-extractor/package.json ./package.json
 COPY --from=builder /opt/out/node_modules ./node_modules
 COPY --from=builder /opt/apps/attachment-text-extractor/dist ./dist
-COPY --from=builder /licenses /licenses/
 
 USER 10001
 

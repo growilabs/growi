@@ -101,10 +101,7 @@ contents() {
     for file in \
       /app/package.json \
       /app/dist/main.js \
-      /app/dist/child/child-entry.js \
-      /licenses/THIRD-PARTY-NOTICES.md \
-      /licenses/pdfium-wasm/pdfium/LICENSE \
-      /licenses/pdfium-wasm/pdfium/LICENSE.pdfium
+      /app/dist/child/child-entry.js
     do
       if [ ! -s "$file" ]; then
         echo "missing from the image: $file" >&2

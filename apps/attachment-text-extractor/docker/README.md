@@ -118,7 +118,7 @@ a 300 s scale-down window were carried over from the previous (Python) service:
 still starting points, never measured. CPU is only a proxy, since a container
 with all slots busy answers 503.
 
-Logs and licence notices
+Logs
 ------------------------
 
 Logs go to standard error, one `<UTC time> <level> <message>` per line; there is
@@ -130,5 +130,3 @@ child warned about or how it failed (`conversion child …`) and when readiness
 changed (`readiness probe failed: …`, then `readiness probe passed again`).
 Start and stop write `listening on …` and `SIGTERM received, …`; a start that
 fails writes one bare message naming the setting at fault.
-
-Third-party licence notices are in the image under `/licenses`.
