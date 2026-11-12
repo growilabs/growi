@@ -47,11 +47,11 @@
 
 ### Allowed Dependencies
 - `@growi/core/dist/models` の `DevidedPagePath`（`evalDatePath` によるページ名決定・former/latter 分割に利用のみ）。
-- `@growi/core/dist/utils` の `normalizePath`・`pagePathUtils.isTrashPage`。
-- `~/models/linked-page-path` の `LinkedPagePath`（祖先チェーンの走査に利用のみ）。
+- `@growi/core/dist/utils` の `normalizePath`・`pagePathUtils.isTrashPage` / `isTrashTopPage`。
+- `~/models/linked-page-path` の `LinkedPagePath`（各祖先の href 導出に利用のみ）。
 - 移設後の `~/client/util/format-truncated-page-path`（`formatTruncatedPagePath`）。
 - 既存の検索結果データ `pageData.path` / `elasticSearchResult.highlightedPath`（追加取得なし）。
-- （改訂）`usehooks-ts`（既存依存, 2.16）の `useResizeObserver`。ResizeObserver の無い環境（jsdom・SSR）では何もしないため、テストや初回描画で例外にならない。
+- （改訂）`usehooks-ts`（既存依存, 2.16）の `useResizeObserver` / `useIsomorphicLayoutEffect`。ResizeObserver の無い環境（jsdom・SSR）では何もしないため、テストや初回描画で例外にならない。
 
 ### Revalidation Triggers
 - `formatTruncatedPagePath` の戻り値（`TruncatedPagePath.parts` の形状・順序）が変わる場合。
@@ -164,10 +164,13 @@ apps/app/src/
 ├── client/util/
 │   ├── format-truncated-page-path.ts       # 変更: collapseLevel 引数と maxCollapseLevel を追加（既定 0 = 現行の基本形）
 │   ├── format-truncated-page-path.spec.ts  # 変更: 段階ごとの形を追加検証
-│   ├── build-ancestor-path-nodes.ts        # 変更: collapseLevel を受け取り formatTruncatedPagePath に渡す
-│   └── build-ancestor-path-nodes.spec.ts   # 変更: 畳んだ段階でもリンク・ハイライトが正しい祖先に対応することを検証
+│   ├── build-ancestor-path-nodes.ts        # 変更: collapseLevel を受け取り formatTruncatedPagePath に渡す。祖先を接頭辞ごとに組む
+│   ├── build-ancestor-path-nodes.spec.ts   # 変更: 畳んだ段階でもリンク・ハイライトが正しい祖先に対応することを検証
+│   ├── align-highlighted-path-segments.ts  # 変更（レビュー修正）: HTML として埋め込むフォールバックのページ名をエスケープ
+│   └── align-highlighted-path-segments.spec.ts
 └── features/search/client/
     ├── hooks/
+    │   ├── layout-test-utils.ts                # 新規: テスト用に要素の幅と ResizeObserver を与えるヘルパー（両コンポーネントのテストで共用）
     │   ├── use-fitting-collapse-level.ts       # 新規: 描画結果の溢れを見て段階を選ぶフック（両描画コンポーネントで共有）
     │   └── use-fitting-collapse-level.spec.tsx # 新規
     └── components/
@@ -183,7 +186,7 @@ apps/app/src/
 - フックは `features/search/client/hooks/` に置く。現時点の消費者は `features/search` 内の 2 コンポーネントのみで、将来のパンくず（roadmap Phase 2）で必要になった時点で共有の場所へ移す（先取りしない）。
 
 ### 配置方針の補足
-`buildAncestorPathNodes` の本 spec における唯一の消費者は検索結果一覧だが、内部でやっていること（truncation 判定の出力を `LinkedPagePath` チェーンにマッピングし直す）は、将来 `PagePathNav` 等でも同型で必要になる見込みが高い（[roadmap.md](./roadmap.md) 参照）。そのため `features/search/` ではなく `client/util/` に置き、`highlightedPath` を省略可能な引数にしてハイライト非対応の消費者からも呼べるインターフェースにする。呼び出し元（実際にこの関数を使う画面）は本 spec のスコープ内（検索結果一覧のみ）にとどめ、他サーフェスへの適用自体は行わない。
+`buildAncestorPathNodes` の本 spec における唯一の消費者は検索結果一覧だが、内部でやっていること（truncation 判定の出力を祖先ごとのリンクにマッピングし直す）は、将来 `PagePathNav` 等でも同型で必要になる見込みが高い（[roadmap.md](./roadmap.md) 参照）。そのため `features/search/` ではなく `client/util/` に置き、`highlightedPath` を省略可能な引数にしてハイライト非対応の消費者からも呼べるインターフェースにする。呼び出し元（実際にこの関数を使う画面）は本 spec のスコープ内（検索結果一覧のみ）にとどめ、他サーフェスへの適用自体は行わない。
 
 ## System Flows
 
@@ -195,7 +198,7 @@ flowchart TD
     Format --> DropName[末尾のページ名パーツを除去]
     DropName --> HasAncestors{祖先パーツが 1 つ以上ある?}
     HasAncestors -->|no| HomeOnly[ルートのアイコンと / のみ描画]
-    HasAncestors -->|yes| BuildChains[plain の LinkedPagePath チェーンとハイライトのセグメントを対応付け]
+    HasAncestors -->|yes| BuildChains[祖先セグメントごとのリンクとハイライトのセグメントを対応付け]
     BuildChains --> Render[AncestorPathNode 列を Link / ellipsis として描画, title=fullPath]
     HomeOnly --> Render
 ```
@@ -244,8 +247,8 @@ flowchart TD
 | 3.8 | 横幅を超えない | `useFittingCollapseLevel`, 共通 1 行 CSS レシピ（行の `overflow: hidden`） | — | — |
 | 3.9 | 両画面で同一の規則 | `formatTruncatedPagePath`, `useFittingCollapseLevel`（両コンポーネントで共有） | — | — |
 | 4.1 | 省略時のフルパスホバー | `SearchResultPagePath`, `SearchResultAncestorPath` | `fullPath` → `title` 属性 | System Flows: Render |
-| 5.1–5.2 | 生存セグメントのリンク維持・省略記号は非リンク | `buildAncestorPathNodes`, `SearchResultAncestorPath` | `AncestorPathNode`（`link` / `ellipsis` の判別） | System Flows: BuildChains→ZipNodes |
-| 6.1–6.2 | 検索ハイライトの維持 | `alignHighlightedPathSegments`, `buildAncestorPathNodes` | `AncestorPathNode.highlightedHtml` | System Flows: BuildChains→ZipNodes |
+| 5.1–5.2 | 生存セグメントのリンク維持・省略記号は非リンク | `buildAncestorPathNodes`, `SearchResultAncestorPath` | `AncestorPathNode`（`link` / `ellipsis` の判別） | System Flows: BuildChains |
+| 6.1–6.2 | 検索ハイライトの維持 | `alignHighlightedPathSegments`, `buildAncestorPathNodes` | `AncestorPathNode.highlightedHtml` | System Flows: BuildChains |
 | 7.1–7.2 | ページ名決定規則の統一（`evalDatePath`） | `PageListItemL`（`evalDatePath` 統一）, `formatTruncatedPagePath` | — | — |
 | 8.1 | 適用範囲の限定（オプトイン） | `PageListItemL`（既定 未指定）, `PageList.tsx`, `IdenticalPathPage.tsx`（無変更） | `Props.renderTruncatedAncestorPath` | — |
 | 9.1–9.2 | 既存挙動の非破壊・追加通信なし | `PageListItemL`（変更範囲を祖先パス描画に限定） | — | — |
@@ -258,7 +261,7 @@ flowchart TD
 | `alignHighlightedPathSegments` | Shared util（`client/util/`） | ハイライト markup をプレーンパスのセグメントに対応付ける（祖先行・ページ名行で共用） | 6, 7 | `normalizePath`（P0） | Service |
 | `buildAncestorPathNodes` | Shared util（`client/util/`） | 中間省略判定と `LinkedPagePath`・ハイライトを橋渡しし、React 非依存のレンダリング計画を返す | 2, 5, 6 | `formatTruncatedPagePath`（P0）, `LinkedPagePath`（P0）, `alignHighlightedPathSegments`（P0） | Service |
 | `useFittingCollapseLevel` | `features/search` hook | （改訂）描画結果の溢れと幅の変化から、収まる最小の畳み込み段階を選ぶ | 3 | `useResizeObserver`（P0） | State |
-| `SearchResultAncestorPath` | `features/search` component | 検索結果一覧の祖先パス部分を 1 行・リンク付き・ハイライト付きで描画する | 1, 2, 3, 4, 5, 6 | `buildAncestorPathNodes`（P0）, `useFittingCollapseLevel`（P0） | State |
+| `SearchResultAncestorPath` | `features/search` component | 検索結果一覧の祖先パス部分を 1 行・リンク付き・ハイライト付きで描画する | 1, 2, 3, 4, 5, 6 | `buildAncestorPathNodes`（P0）, `formatTruncatedPagePath`（P1, 最大段階の取得）, `useFittingCollapseLevel`（P0） | State |
 | `SearchResultPagePath` | `features/search` component | （改訂）検索モーダルのパスを、選ばれた段階で 1 行描画する | 1, 2, 3, 4 | `formatTruncatedPagePath`（P0）, `useFittingCollapseLevel`（P0） | State |
 | `PageListItemL` | `client/components/PageList` | オプトイン prop に応じて祖先パス描画先を切り替え、`evalDatePath` を統一する | 7, 8, 9 | `alignHighlightedPathSegments`（P0）, `PagePathHierarchicalLink`（P0, 既存） | State |
 
@@ -287,7 +290,7 @@ export interface TruncatedPagePath {
   readonly isRoot: boolean;
   readonly parts: readonly PagePathPart[];
   readonly fullPath: string;
-  /** 日付束ね後の祖先部分（DevidedPagePath.former）。buildAncestorPathNodes が同じパスを再分割せずに祖先チェーンを組むために使う */
+  /** 日付束ね後の祖先部分（DevidedPagePath.former）。buildAncestorPathNodes が同じパスを再分割せずに祖先を組むために使う */
   readonly ancestorPath: string;
   /** （改訂）このパスで取りうる最大の畳み込み段階。基本形で見えている祖先セグメントの数に等しい（0〜2） */
   readonly maxCollapseLevel: number;
@@ -311,13 +314,14 @@ export const formatTruncatedPagePath: (
 | Requirements | 2.1, 2.2, 3.2, 3.3, 5.1, 5.2, 6.1, 6.2 |
 
 **Responsibilities & Constraints**
-- 純粋関数。`LinkedPagePath` の構築・走査のみ行い、React 要素は生成しない。
+- 純粋関数。React 要素は生成しない。
+- 祖先は `/` で区切ったセグメントごとに、そのパス接頭辞から `LinkedPagePath` を作って href を導く。`LinkedPagePath` は `</em>` を守るため `</` で分割しないので、1 本のチェーンを辿ると `/a</b` のような素のパスでセグメント数とずれる（レビューで発覚した不具合）。
 - ハイライトは `alignHighlightedPathSegments` がセグメントごとにテキスト照合で検証する。位置が偶然一致しているだけのセグメントに誤ってハイライトを付けないため、検証できたセグメントにのみ `highlightedHtml` を付ける。
 - 本 spec の呼び出し元は検索結果一覧のみだが、`highlightedPath` を省略可能な引数とすることで、ハイライト非対応の将来消費者(roadmap.md 参照)からも同じ関数をそのまま呼べるインターフェースにする。実装や呼び出し元を先取りして増やすことはしない。
 
 **Dependencies**
 - Outbound: `formatTruncatedPagePath`（P0） — 中間省略の判定
-- Outbound: `LinkedPagePath`（P0） — 祖先チェーンの構築・href/pathName 取得
+- Outbound: `LinkedPagePath`（P0） — 各祖先の href 導出
 
 **Contracts**: Service [x]
 
@@ -335,6 +339,7 @@ export type AncestorPathNode =
 export interface AncestorPathPlan {
   readonly nodes: readonly AncestorPathNode[];
   readonly fullPath: string; // ページ名を含む完全パス。ホバー用
+  readonly maxCollapseLevel: number; // （改訂）formatTruncatedPagePath と同じ値
 }
 
 export const buildAncestorPathNodes: (
@@ -343,7 +348,7 @@ export const buildAncestorPathNodes: (
   collapseLevel?: number, // （改訂）formatTruncatedPagePath にそのまま渡す。既定 0
 ) => AncestorPathPlan;
 ```
-- （改訂）`AncestorPathPlan` に `maxCollapseLevel` を含め、呼び出し側がフックに渡せるようにする。
+- （改訂）`AncestorPathPlan` は `maxCollapseLevel` も返す。ただし `SearchResultAncestorPath` は段階を決める前に最大段階が要るため、計画より軽い `formatTruncatedPagePath(path).maxCollapseLevel` から取る（検索モーダルと同じ取り方）。
 - Preconditions: `path` は対象ページの完全パス。`highlightedPath` は Elasticsearch のハイライト markup を含む文字列、または未取得時は `null`/`undefined`。
 - Postconditions: `nodes` の `link` 要素の順序は root→leaf。`ellipsis` は高々 1 件、リンクを持たない。
 - Invariants: `path` と `collapseLevel` が変わらない限り `nodes` の件数・順序は不変（ハイライトの有無は `highlightedHtml` の有無にのみ影響する）。
@@ -439,6 +444,8 @@ export const useFittingCollapseLevel: (
 ## Error Handling
 
 パス文字列は常にサーバーから取得済みのページデータに由来し、ユーザー入力の直接検証は不要。唯一のフォールバックは、ハイライトとプレーンパスの対応が検証できないセグメントをプレーンテキストで表示することであり、例外を投げず表示劣化のみで継続する。
+
+（改訂）ページ名行はハイライトがあるとき HTML として埋め込まれるため、`buildHighlightedPageName` はハイライトがあればフォールバックのページ名を HTML エスケープして返し、無ければプレーンテキストとして返す（呼び出し側の HTML / テキストの切り替え条件と一致させる）。プレーンパスはサーバー側のハイライトと違ってサニタイズされておらず、取り込み済みの古いページなどは `<` を含みうるため（レビューで発覚した XSS）。
 
 ## Testing Strategy
 

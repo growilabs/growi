@@ -49,7 +49,7 @@
 
 > タスク 1〜5 は初版の記録（要件番号は改訂前のもの。旧 2.3 は改訂後の 1.2 に相当）。以下は改訂後の requirements.md / design.md に基づく。
 
-- [ ] 6. Foundation: 畳み込み段階の定義
+- [x] 6. Foundation: 畳み込み段階の定義
 - [x] 6.1 中間省略の判定に「畳み込み段階」を加える
   - 段階 0 を現行の基本形とし、段階を 1 つ上げるごとに残っている祖先を先頭側から 1 つ省略記号へ畳む（親は最後に畳まれる）。取りうる最大段階も返す
   - 範囲外の段階は 0〜最大段階に丸める。段階を指定しない既存の呼び出しは現行と同じ結果を返す
@@ -81,7 +81,7 @@
   - _Requirements: 3.1, 3.4, 3.5, 3.6, 3.8_
   - _Boundary: 共通 1 行 CSS レシピ, SearchResultPagePath, SearchResultAncestorPath_
 
-- [ ] 9. Integration: 両画面に段階的な畳み込みを適用する
+- [x] 9. Integration: 両画面に段階的な畳み込みを適用する
 - [x] 9.1 検索モーダルのパス表示に適用する
   - フックが選んだ段階でパスを描画し、ページ名を「文字単位で縮む要素」としてフックに渡す
   - 溢れる状態を与えたとき、畳んだ形（省略記号 1 つ、区切りだけが並ぶ `//` が無い）で描画され、最大段階ではページ名だけが切り詰め対象になることをコンポーネントテストで確認し green。`title` のフルパスは従来どおり
@@ -113,3 +113,6 @@
   - **Lesson**: a `min-width: 0` fix on the truncating element's immediate wrapper is not enough — verify by measuring (or visually confirming) every ancestor level up to the actual scrollable/visible boundary, since *any* intermediate flex item without `min-width: 0` breaks the chain, even ones that pre-date the feature and were never touched before.
   - **Tooling note**: `npx playwright install chromium` succeeded in this devcontainer (network access was fine) after the earlier claim in this same file that "no browser binary was available" — that claim was about *not yet having tried*, not a real environment limitation. Installed to `/home/vscode/.cache/ms-playwright`; usable via `require('/workspace/growi/node_modules/.pnpm/playwright-core@<version>/node_modules/playwright-core')` (not hoisted to workspace-root `node_modules` under this pnpm layout). Keep any such verification script **outside** `apps/app/` — nodemon watches `*.*` there and restarts the whole dev server (with a crash-loop if a second `pnpm run dev` is started against an already-running one) on every file add/edit; use the session scratchpad directory instead.
 - PR #11743 review: highlights are matched to plain-path segments by text in one shared util, because re-running `DevidedPagePath` on the highlighted string let the `/` of `</em>` shift the split (lost page-name and date-path highlights). The opt-in flag became the `renderTruncatedAncestorPath` render prop, and the root icon now reuses `PagePathHierarchicalLink` (see design.md / research.md).
+- Tasks 6–9 (truncation unification): RED evidence for component wiring came from running the new tests against the unchanged component instead of a runtime flag; tests drive the real `useFittingCollapseLevel` through `hooks/layout-test-utils.ts` (stubbed `scrollWidth`/`clientWidth` + fake ResizeObserver whose first notification simulates the browser's initial one and must be ignored).
+- Code review of the revision found two pre-existing #11743 defects, fixed here: (1) `buildHighlightedPageName` fell back to the raw page name, which `PageListItemL` injects as HTML → escape the fallback whenever a highlight is given (XSS for imported/legacy paths containing `<`); (2) `LinkedPagePath` does not split on `</`, so walking one chain misaligned `/`-split segments and crashed `/_search` → build each ancestor from its own path prefix.
+- `@growi/core` dist goes stale after pulling or switching branches (typecheck then fails in unrelated `features/openai`); rebuild it with `pnpm run build` in `packages/core` before trusting typecheck/build results.
