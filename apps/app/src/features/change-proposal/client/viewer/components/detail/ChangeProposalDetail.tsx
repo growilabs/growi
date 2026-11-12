@@ -40,7 +40,11 @@ export const ChangeProposalDetail = ({
       <section>
         <h2 className="h5">{t('change_proposal_viewer.detail.operations')}</h2>
         {proposal.operations.map((operation) => (
-          <OperationItem key={operation.key} operation={operation} />
+          <OperationItem
+            key={operation.key}
+            proposal={proposal}
+            operation={operation}
+          />
         ))}
       </section>
     </div>

@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 
-import type { OperationView } from '../../../interfaces';
+import type { ChangeProposalView, OperationView } from '../../../interfaces';
 import {
   buildProposalHref,
   formatProposalShortId,
@@ -13,14 +13,19 @@ import {
 } from '../../shared';
 import { toDiffPair } from '../stores/use-swrx-operation-diff';
 import { OperationDiff } from './OperationDiff';
+import { RequesterActionSlot } from './RequesterActionSlot';
 
-type OperationItemProps = { readonly operation: OperationView };
+type OperationItemProps = {
+  readonly proposal: ChangeProposalView;
+  readonly operation: OperationView;
+};
 
 const PathText = ({ value }: { readonly value: string }): JSX.Element => (
   <code className="text-break">{value}</code>
 );
 
 export const OperationItem = ({
+  proposal,
   operation,
 }: OperationItemProps): JSX.Element => {
   const { t } = useTranslation();
@@ -93,6 +98,7 @@ export const OperationItem = ({
             </Link>
           </span>
         )}
+        <RequesterActionSlot proposal={proposal} operation={operation} />
       </div>
       {toDiffPair(operation).type !== 'no-diff' && (
         <div className="mt-2">

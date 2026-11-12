@@ -11,6 +11,7 @@ import {
   PROPOSAL_STATUS_LABEL_KEYS,
 } from '../../../shared';
 import { ENTRY_LABEL_KEYS } from '../../domain';
+import { RequesterActionSlot } from '../RequesterActionSlot';
 
 type ProposalSummaryHeaderProps = {
   readonly proposal: ChangeProposalView;
@@ -44,38 +45,41 @@ export const ProposalSummaryHeader = ({
   } = proposal;
 
   return (
-    <dl className="mb-3">
-      <HeaderRow label={t('change_proposal_viewer.detail.requested_by')}>
-        <span>{`${requester.name} (@${requester.username})`}</span>
-      </HeaderRow>
-      <HeaderRow label={t('change_proposal_viewer.detail.entry')}>
-        {t(ENTRY_LABEL_KEYS[entry])}
-      </HeaderRow>
-      {modelLabel != null && (
-        <HeaderRow label={t('change_proposal_viewer.detail.model')}>
-          {modelLabel}
+    <div className="mb-3">
+      <dl className="mb-0">
+        <HeaderRow label={t('change_proposal_viewer.detail.requested_by')}>
+          <span>{`${requester.name} (@${requester.username})`}</span>
         </HeaderRow>
-      )}
-      <HeaderRow label={t('change_proposal_viewer.detail.created_at')}>
-        <UserDate dateTime={createdAt} />
-      </HeaderRow>
-      {lastAppliedAt != null && (
-        <HeaderRow label={t('change_proposal_viewer.detail.last_applied_at')}>
-          <UserDate dateTime={lastAppliedAt} />
+        <HeaderRow label={t('change_proposal_viewer.detail.entry')}>
+          {t(ENTRY_LABEL_KEYS[entry])}
         </HeaderRow>
-      )}
-      <div>
-        <span className="badge text-bg-secondary">
-          {t(PROPOSAL_STATUS_LABEL_KEYS[status])}
-        </span>
-      </div>
-      {revertOf != null && (
-        <HeaderRow label={t('change_proposal_viewer.detail.reverts')}>
-          <Link href={buildProposalHref(revertOf)}>
-            {formatProposalShortId(revertOf)}
-          </Link>
+        {modelLabel != null && (
+          <HeaderRow label={t('change_proposal_viewer.detail.model')}>
+            {modelLabel}
+          </HeaderRow>
+        )}
+        <HeaderRow label={t('change_proposal_viewer.detail.created_at')}>
+          <UserDate dateTime={createdAt} />
         </HeaderRow>
-      )}
-    </dl>
+        {lastAppliedAt != null && (
+          <HeaderRow label={t('change_proposal_viewer.detail.last_applied_at')}>
+            <UserDate dateTime={lastAppliedAt} />
+          </HeaderRow>
+        )}
+        <div>
+          <span className="badge text-bg-secondary">
+            {t(PROPOSAL_STATUS_LABEL_KEYS[status])}
+          </span>
+        </div>
+        {revertOf != null && (
+          <HeaderRow label={t('change_proposal_viewer.detail.reverts')}>
+            <Link href={buildProposalHref(revertOf)}>
+              {formatProposalShortId(revertOf)}
+            </Link>
+          </HeaderRow>
+        )}
+      </dl>
+      <RequesterActionSlot proposal={proposal} />
+    </div>
   );
 };
