@@ -74,7 +74,6 @@ import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
 import { prisma } from '~/utils/prisma';
 
-import { PAGE_EVENT_UPDATE_ABORTED_AFTER_SAVE } from '../../events/page';
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
@@ -5524,30 +5523,6 @@ class PageService implements IPageService {
       (g) => !userRelatedPreviousGrantedGroups.includes(getIdForRef(g.item)),
     );
     return [...userUnrelatedPreviousGrantedGroups, ...userRelatedGrantedGroups];
-  }
-
-  private async emitUpdateAbortedAfterSave(
-    pageId: ObjectIdLike,
-    user: IUserHasId,
-  ): Promise<void> {
-    try {
-      const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
-        'Page',
-      );
-      const storedPage = await Page.findById(pageId);
-      if (storedPage != null) {
-        this.pageEvent.emit(
-          PAGE_EVENT_UPDATE_ABORTED_AFTER_SAVE,
-          storedPage,
-          user,
-        );
-      }
-    } catch (err) {
-      logger.error(
-        { err, pageId },
-        'Failed to report an update that was aborted after the page was saved',
-      );
-    }
   }
 
   // There are cases where "revisionId" is not required for revision updates

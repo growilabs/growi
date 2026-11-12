@@ -7,14 +7,6 @@ import type Crowi from '../crowi';
 
 const logger = loggerFactory('growi:events:page');
 
-/**
- * Emitted with the same arguments as 'update' when an update saved the page,
- * grant included, but failed before it could emit 'update' (e.g. the body
- * write lost a revision conflict). The page is re-read, so it carries what is
- * stored now.
- */
-export const PAGE_EVENT_UPDATE_ABORTED_AFTER_SAVE = 'updateAbortedAfterSave';
-
 class PageEvent extends EventEmitter {
   crowi: Crowi;
 

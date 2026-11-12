@@ -29,7 +29,6 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../crowi';
-import { PAGE_EVENT_UPDATE_ABORTED_AFTER_SAVE } from '../events/page';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import type {
   ParsedQuery,
@@ -210,12 +209,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
     );
     pageEvent.on(
       'update',
-      this.fullTextSearchDelegator.syncPageUpdated.bind(
-        this.fullTextSearchDelegator,
-      ),
-    );
-    pageEvent.on(
-      PAGE_EVENT_UPDATE_ABORTED_AFTER_SAVE,
       this.fullTextSearchDelegator.syncPageUpdated.bind(
         this.fullTextSearchDelegator,
       ),
