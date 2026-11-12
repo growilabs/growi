@@ -56,6 +56,19 @@ never run open. Take it from a secret, never from a literal in a manifest.
 | `MAX_ARCHIVE_ENTRIES`, `MAX_ARCHIVE_UNCOMPRESSED_MB` | 10,000, 512 | Limits on a ZIP-based document |
 | `LOG_LEVEL` | `INFO` | One of `CRITICAL`, `FATAL`, `ERROR`, `WARN`, `WARNING`, `INFO`, `DEBUG`, `NOTSET` (case-insensitive) |
 
+Three size limits apply to an attachment, and the smallest one wins:
+
+- GROWI's upload limit `MAX_FILE_SIZE` (set in GROWI; unlimited by default).
+- GROWI's extraction limit `GROWI_ATTACHMENT_EXTRACTOR_MAX_FILE_SIZE_BYTES`
+  (default 50 MiB). GROWI does not send a larger attachment to this service and
+  logs it as too large.
+- This service's `MAX_FILE_SIZE_MB` (default 50). A larger upload gets 413
+  `file_too_large`, which GROWI also logs as too large.
+
+Keep GROWI's extraction limit at or below `MAX_FILE_SIZE_MB`, so that GROWI
+rejects a large file without sending it. If you raise `MAX_FILE_SIZE_MB`, check
+the memory figures below again: they were measured with 50 MB.
+
 There is no `WORKERS` setting: one container is one Node process, limited by
 `MAX_CONCURRENCY` alone.
 

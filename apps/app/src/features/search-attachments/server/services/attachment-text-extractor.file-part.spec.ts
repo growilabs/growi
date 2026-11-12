@@ -225,4 +225,47 @@ describe('AttachmentTextExtractorService request body', () => {
 
     expect(parts).toHaveLength(1);
   });
+
+  it('maps a real 413 file_too_large answer to tooLarge', async () => {
+    const server = http.createServer((req, res) => {
+      req.resume();
+      res.statusCode = 413;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({ code: 'file_too_large', message: 'File too large' }),
+      );
+    });
+    servers.push(server);
+    const port = await new Promise<number>((resolve) => {
+      server.listen(0, '127.0.0.1', () =>
+        resolve((server.address() as AddressInfo).port),
+      );
+    });
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+      mock<AttachmentWithComputed>({
+        id: 'a1',
+        _id: 'a1',
+        fileName: 'c0ffee.bin',
+        originalName: 'report.pdf',
+        fileFormat: 'application/pdf',
+        fileSize: BINARY.length,
+      }),
+    );
+    vi.spyOn(configManager, 'getConfig').mockImplementation(((key: string) => {
+      if (key === 'app:attachmentFullTextSearch:extractorUri')
+        return `http://127.0.0.1:${port}`;
+      if (key === 'app:attachmentFullTextSearch:extractorToken') return 'tok';
+      if (key === 'app:attachmentFullTextSearch:timeoutMs') return 5000;
+      return undefined;
+    }) as typeof configManager.getConfig);
+
+    const service = new AttachmentTextExtractorService({
+      findDeliveryFile: async () => Readable.from(BINARY),
+    });
+
+    expect(await service.extractAttachment('a1')).toEqual({
+      kind: 'tooLarge',
+      fileSize: BINARY.length,
+    });
+  });
 });

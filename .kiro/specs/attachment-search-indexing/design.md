@@ -565,6 +565,7 @@ Key decisions:
 
 **Responsibilities & Constraints**
 - FileUploader からバイトを取得し `attachment-text-extractor-client` に multipart 送信
+- **大きさの上限**: 保存してある `fileSize` が `app:attachmentFullTextSearch:maxFileSizeBytes` (既定 50MiB) を超える添付は、ファイルを読まず、抽出サービスにも送らずに `tooLarge` を返す。抽出サービスの `MAX_FILE_SIZE_MB` (超えると 413 `file_too_large` → `tooLarge`) と、アップロードの上限 `app:maxFileSize` も効くので、実際に抽出される大きさは 3 つのうち最も小さい値になる。この設定は抽出サービスの上限以下にする (`apps/attachment-text-extractor/docker/README.md`)
 - **送る内容** (`extract-request-body.ts` が組み立てる。理由は research.md 9 節):
   - ファイルは、本物のファイルの部品 (`File`) として送る。`Buffer` をそのまま渡すと、Node の `FormData` が文字列の項目に変えてしまい、抽出サービスは 422 を返す
   - 部品のファイル名は `file.<拡張子>` にする。拡張子は、元のファイル名の最後の `.` より後ろが英数字 1〜16 字のときだけ使い (小文字にする)、それ以外は `file` にする。元のファイル名 (利用者が付けた、長さも文字も自由な名前) は、抽出サービスに送らない

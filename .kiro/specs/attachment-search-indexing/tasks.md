@@ -327,3 +327,8 @@
   - 本物の生成クライアントを、受け取った要求を記録するだけのサーバに向けて、ファイルの部品・ファイル名・`mimeType` の項目が決まりどおりに届くことを確かめる
   - `file_encrypted` と `resource_limit_exceeded` を、それぞれの結果 (`encrypted`、`resourceLimit`) と失敗の理由コード (`fileEncrypted`、`resourceLimitExceeded`) に対応させる
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 8.3_
+
+- [x] 11.2 `maxFileSizeBytes` を超える添付を、読まずに `tooLarge` にする
+  - ファイルを読む前に、保存してある大きさと設定を比べる。超えたら、読まず、送らない。上限ちょうどは送る
+  - 抽出サービスが 413 `file_too_large` を返したとき、本物の生成クライアントを通して `tooLarge` になることをテストで固定する
+  - _Requirements: 8.3_

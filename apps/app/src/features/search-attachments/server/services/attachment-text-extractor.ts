@@ -252,7 +252,15 @@ export class AttachmentTextExtractorService {
         };
       }
 
-      // --- Step 5: Fetch file bytes ---
+      // --- Step 5: Skip oversized files before reading them into memory ---
+      const maxFileSizeBytes = configManager.getConfig(
+        'app:attachmentFullTextSearch:maxFileSizeBytes',
+      );
+      if (attachment.fileSize > maxFileSizeBytes) {
+        return { kind: 'tooLarge', fileSize: attachment.fileSize };
+      }
+
+      // --- Step 6: Fetch file bytes ---
       const stream = await this.fileUploader.findDeliveryFile(attachment);
       // The chunks are not kept in a variable, so only the body's copy stays
       // in memory while the request runs.
@@ -261,7 +269,7 @@ export class AttachmentTextExtractorService {
         attachment,
       );
 
-      // --- Step 6: Call extractor (with built-in retry for 503) ---
+      // --- Step 7: Call extractor (with built-in retry for 503) ---
       return await callExtractor({
         attachment,
         body,

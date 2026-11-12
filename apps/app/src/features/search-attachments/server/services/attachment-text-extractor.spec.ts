@@ -366,6 +366,70 @@ describe('AttachmentTextExtractorService', () => {
     expect(result).toEqual({ kind: 'tooLarge', fileSize: 1024 });
   });
 
+  describe('extraction size limit (app:attachmentFullTextSearch:maxFileSizeBytes)', () => {
+    const LIMIT = 1000;
+
+    const setup = (fileSize: number) => {
+      vi.mocked(configManager.getConfig).mockImplementation((key: string) => {
+        if (key === 'app:attachmentFullTextSearch:extractorUri')
+          return 'http://localhost:8000';
+        if (key === 'app:attachmentFullTextSearch:extractorToken')
+          return 'test-token';
+        if (key === 'app:attachmentFullTextSearch:timeoutMs') return 60000;
+        if (key === 'app:attachmentFullTextSearch:maxFileSizeBytes')
+          return LIMIT;
+        return undefined;
+      });
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+        mock<AttachmentWithComputed>({
+          id: 'attachment-id-1',
+          _id: 'attachment-id-1',
+          fileFormat: 'application/pdf',
+          fileSize,
+          originalName: 'test.pdf',
+        }),
+      );
+      postExtract.mockResolvedValue({
+        data: {
+          mimeType: 'application/pdf',
+          extractedCharacters: 0,
+          pages: [],
+        },
+      });
+    };
+
+    it('returns tooLarge without reading the file or calling the extractor when over the limit', async () => {
+      setup(LIMIT + 1);
+
+      const service = await getService();
+      const result = await service.extractAttachment('attachment-id-1');
+
+      expect(result).toEqual({ kind: 'tooLarge', fileSize: LIMIT + 1 });
+      expect(mockFileUploader.findDeliveryFile).not.toHaveBeenCalled();
+      expect(postExtract).not.toHaveBeenCalled();
+    });
+
+    it('sends the file when its size equals the limit', async () => {
+      setup(LIMIT);
+
+      const service = await getService();
+      const result = await service.extractAttachment('attachment-id-1');
+
+      expect(result.kind).toBe('success');
+      expect(postExtract).toHaveBeenCalledOnce();
+    });
+
+    it('sends the file when it is under the limit', async () => {
+      setup(LIMIT - 1);
+
+      const service = await getService();
+      const result = await service.extractAttachment('attachment-id-1');
+
+      expect(result.kind).toBe('success');
+      expect(postExtract).toHaveBeenCalledOnce();
+    });
+  });
+
   // -----------------------------------------------------------------------
   // 7. extraction timeout — 408 extraction_timeout
   // -----------------------------------------------------------------------
