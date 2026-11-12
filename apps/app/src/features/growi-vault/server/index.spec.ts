@@ -55,7 +55,9 @@ const {
   dispatcherOnPageRenamed,
   dispatcherOnBulkOperation,
   namespaceMapperComputePageNamespaces,
+  readStoredGrantState,
 } = vi.hoisted(() => ({
+  readStoredGrantState: vi.fn(),
   dispatcherOnPageChanged: vi.fn().mockResolvedValue(undefined),
   dispatcherOnPageRenamed: vi.fn().mockResolvedValue(undefined),
   dispatcherOnBulkOperation: vi.fn().mockResolvedValue(undefined),
@@ -89,6 +91,11 @@ vi.mock('./services/vault-namespace-mapper', () => ({
     computeAccessibleNamespaces: vi.fn(),
     computePageNamespaces: namespaceMapperComputePageNamespaces,
   },
+}));
+
+vi.mock('./services/vault-page-update-handler', async (importOriginal) => ({
+  ...(await importOriginal()),
+  readStoredGrantState,
 }));
 
 vi.mock('./routes/vault-gateway', () => ({
@@ -563,6 +570,11 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
         grantedGroups: [],
         grantedUsers: ['u1'],
       };
+      readStoredGrantState.mockResolvedValue({
+        grant: 4,
+        grantedGroups: [],
+        grantedUsers: ['u1'],
+      });
 
       crowi.events.page.emit(
         'update',
@@ -578,7 +590,13 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
 
       expect(dispatcherOnPageChanged).toHaveBeenCalledExactlyOnceWith({
         type: 'acl-change',
-        page,
+        page: {
+          _id: page._id,
+          path: '/p1',
+          grant: 4,
+          grantedGroups: [],
+          grantedUsers: ['u1'],
+        },
         previousNamespaces: ['public'],
         revisionId: 'rev1',
       });

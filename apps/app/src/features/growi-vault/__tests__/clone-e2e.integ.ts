@@ -304,10 +304,18 @@ describe('GROWI Vault — clone E2E contract', () => {
       pageId,
     });
 
+    const onlyMeGrantState = {
+      grant: PageGrant.GRANT_OWNER,
+      grantedGroups: [],
+      grantedUsers: [grantedUserId],
+    };
+
     const { dispatcher } = getVaultE2eHandle();
     const handlePageUpdate = createVaultPageUpdateHandler(
       dispatcher,
       vaultNamespaceMapper,
+      // The page is never stored; the grant-changing update reads this back.
+      async () => onlyMeGrantState,
     );
     const pageWith = (
       grantState: Pick<IPage, 'grant' | 'grantedUsers'>,
@@ -345,17 +353,11 @@ describe('GROWI Vault — clone E2E contract', () => {
     await expectCloneEventually(null, 'has the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'has the file');
 
-    await handlePageUpdate(
-      pageWith({
-        grant: PageGrant.GRANT_OWNER,
-        grantedUsers: [grantedUserId],
-      }),
-      {
-        previousGrant: PageGrant.GRANT_PUBLIC,
-        previousGrantedGroups: [],
-        previousGrantedUsers: [],
-      },
-    );
+    await handlePageUpdate(pageWith(onlyMeGrantState), {
+      previousGrant: PageGrant.GRANT_PUBLIC,
+      previousGrantedGroups: [],
+      previousGrantedUsers: [],
+    });
 
     await expectCloneEventually(null, 'lacks the file');
     await expectCloneEventually(VAULT_E2E_CONFIG.admin.pat, 'lacks the file');
