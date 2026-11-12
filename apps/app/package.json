@@ -244,7 +244,7 @@
     "mdast-util-wiki-link": "^0.1.2",
     "mermaid": "^11.16.1",
     "method-override": "^3.0.0",
-    "micromark-extension-gfm-table": "^2.1.0",
+    "micromark-extension-gfm-table": "^2.1.2",
     "micromark-extension-wiki-link": "^0.0.4",
     "migrate-mongo": "^11.0.0",
     "mkdirp": "^1.0.3",

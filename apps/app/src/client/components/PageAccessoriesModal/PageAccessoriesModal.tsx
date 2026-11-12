@@ -4,11 +4,13 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
+import { BacklinksPanel } from '~/features/backlinks/client/components/BacklinksPanel';
 import {
   useIsGuestUser,
   useIsReadOnlyUser,
   useIsSharedUser,
 } from '~/states/context';
+import { useShareLinkId } from '~/states/page';
 import { disableLinkSharingAtom } from '~/states/server-configurations';
 import { useDeviceLargerThanLg } from '~/states/ui/device';
 import {
@@ -44,6 +46,9 @@ const PageAttachmentIcon = (): JSX.Element => (
 const ShareLinkIcon = (): JSX.Element => (
   <span className="material-symbols-outlined">share</span>
 );
+const BacklinksIcon = (): JSX.Element => (
+  <span className="material-symbols-outlined">input</span>
+);
 
 const PageHistoryContent = (): JSX.Element => {
   const { close } = usePageAccessoriesModalActions();
@@ -59,6 +64,10 @@ const ShareLinkContent = (): JSX.Element => {
   return <ShareLink />;
 };
 
+const BacklinksContent = (): JSX.Element => {
+  return <BacklinksPanel />;
+};
+
 interface PageAccessoriesModalSubstanceProps {
   isWindowExpanded: boolean;
   setIsWindowExpanded: (expanded: boolean) => void;
@@ -71,6 +80,7 @@ const PageAccessoriesModalSubstance = ({
   const { t } = useTranslation();
 
   const isSharedUser = useIsSharedUser();
+  const shareLinkId = useShareLinkId();
   const isGuestUser = useIsGuestUser();
   const isReadOnlyUser = useIsReadOnlyUser();
   const isLinkSharingDisabled = useAtomValue(disableLinkSharingAtom);
@@ -103,8 +113,25 @@ const PageAccessoriesModalSubstance = ({
           !isSharedUser &&
           !isLinkSharingDisabled,
       },
+      [PageAccessoriesModalContents.Backlinks]: {
+        Icon: BacklinksIcon,
+        Content: BacklinksContent,
+        i18n: t('backlinks.panel'),
+        // A share link grants one page, not the link graph around it. Guests keep it
+        // (asserted in backlinks.spec.ts). UI-only, not a security boundary — the
+        // endpoint serves guests too, filtered to readable sources.
+        // Keyed on shareLinkId because isSharedUser is never written: always false.
+        isLinkEnabled: () => shareLinkId == null,
+      },
     };
-  }, [t, isGuestUser, isReadOnlyUser, isSharedUser, isLinkSharingDisabled]);
+  }, [
+    t,
+    isGuestUser,
+    isReadOnlyUser,
+    isSharedUser,
+    shareLinkId,
+    isLinkSharingDisabled,
+  ]);
 
   // Memoize expand/contract handlers
   const expandWindow = useCallback(
