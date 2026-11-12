@@ -1,6 +1,7 @@
 import dns from 'node:dns/promises';
 import {
   ErrorCode,
+  type PostExtractBody,
   postExtract,
 } from '@growi/attachment-text-extractor-client';
 
@@ -13,6 +14,7 @@ import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
+import { buildExtractRequestBody } from './extract-request-body';
 import { isCloudMetadataAddress } from './validate-extractor-uri';
 
 const logger = loggerFactory('growi:service:search-attachments:extractor');
@@ -29,15 +31,23 @@ const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Converts a readable stream to a Buffer by collecting all chunks.
+ * Collects the chunks of a readable stream. They are not joined: the request
+ * body copies them once, and a joined Buffer would be a second copy.
  */
-async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
+async function streamToChunks(
+  stream: NodeJS.ReadableStream,
+): Promise<Buffer[]> {
   const chunks: Buffer[] = [];
   for await (const chunk of stream) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
   }
-  return Buffer.concat(chunks);
+  return chunks;
 }
+
+const ERROR_CODES: readonly string[] = Object.values(ErrorCode);
+
+const isErrorCode = (value: unknown): value is ErrorCode =>
+  typeof value === 'string' && ERROR_CODES.includes(value);
 
 /**
  * Maps an Axios error response from the attachment-text-extractor service to
@@ -61,6 +71,11 @@ function mapAxiosErrorToOutcome(
   const code = data?.code;
   const message = data?.message ?? '';
 
+  if (!isErrorCode(code)) {
+    return null;
+  }
+
+  // No default: a code added to the client must fail to compile here
   switch (code) {
     case ErrorCode.unsupported_format:
       return { kind: 'unsupported', mimeType: attachment.fileFormat };
@@ -71,6 +86,10 @@ function mapAxiosErrorToOutcome(
     case ErrorCode.service_busy:
       // Caller handles retry; signal with a sentinel
       return { kind: 'serviceBusy' };
+    case ErrorCode.file_encrypted:
+      return { kind: 'encrypted' };
+    case ErrorCode.resource_limit_exceeded:
+      return { kind: 'resourceLimit', message };
     case ErrorCode.extraction_failed:
       return {
         kind: 'failed',
@@ -84,8 +103,6 @@ function mapAxiosErrorToOutcome(
         'attachment-text-extractor returned 401 unauthorized',
       );
       return { kind: 'serviceUnreachable' };
-    default:
-      return null;
   }
 }
 
@@ -102,7 +119,7 @@ function isAxiosError(
 
 type CallExtractorOptions = {
   attachment: AttachmentWithComputed;
-  buffer: Buffer;
+  body: PostExtractBody;
   extractorUri: string;
   token: string;
   timeoutMs: number;
@@ -116,21 +133,16 @@ type CallExtractorOptions = {
 async function callExtractor(
   opts: CallExtractorOptions,
 ): Promise<ExtractionOutcome> {
-  const { attachment, buffer, extractorUri, token, timeoutMs, isRetry } = opts;
+  const { attachment, body, extractorUri, token, timeoutMs, isRetry } = opts;
 
   try {
-    const response = await postExtract(
-      // Not a Blob: the client's FormData takes a Buffer as a text field, not
-      // as a file part.
-      { file: buffer as unknown as Blob },
-      {
-        baseURL: extractorUri,
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: timeoutMs,
-        // A redirect could point the request at an internal address (SSRF)
-        maxRedirects: 0,
-      },
-    );
+    const response = await postExtract(body, {
+      baseURL: extractorUri,
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: timeoutMs,
+      // A redirect could point the request at an internal address (SSRF)
+      maxRedirects: 0,
+    });
 
     const pages: ExtractedPage[] = response.data.pages.map((p) => ({
       pageNumber: p.pageNumber,
@@ -242,12 +254,17 @@ export class AttachmentTextExtractorService {
 
       // --- Step 5: Fetch file bytes ---
       const stream = await this.fileUploader.findDeliveryFile(attachment);
-      const buffer = await streamToBuffer(stream);
+      // The chunks are not kept in a variable, so only the body's copy stays
+      // in memory while the request runs.
+      const body = buildExtractRequestBody(
+        await streamToChunks(stream),
+        attachment,
+      );
 
       // --- Step 6: Call extractor (with built-in retry for 503) ---
       return await callExtractor({
         attachment,
-        buffer,
+        body,
         extractorUri,
         token: extractorToken,
         timeoutMs,

@@ -463,6 +463,14 @@ describe('AttachmentReindexBatch', () => {
           expectedCode: 'serviceUnreachable',
         },
         {
+          outcome: { kind: 'encrypted' } as const,
+          expectedCode: 'fileEncrypted',
+        },
+        {
+          outcome: { kind: 'resourceLimit', message: 'msg' } as const,
+          expectedCode: 'resourceLimitExceeded',
+        },
+        {
           outcome: {
             kind: 'failed',
             reasonCode: 'x',

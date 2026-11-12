@@ -22,6 +22,8 @@ export type ExtractionOutcome =
   | { kind: 'timeout' }
   | { kind: 'serviceBusy' }
   | { kind: 'serviceUnreachable' }
+  | { kind: 'encrypted' }
+  | { kind: 'resourceLimit'; message: string }
   | { kind: 'failed'; reasonCode: string; message: string };
 
 /**
@@ -106,6 +108,8 @@ export interface ExtractionFailureEntry {
     | 'extractionTimeout'
     | 'serviceBusy'
     | 'serviceUnreachable'
+    | 'fileEncrypted'
+    | 'resourceLimitExceeded'
     | 'extractionFailed';
   readonly message: string | null;
   readonly occurredAt: Date;

@@ -12,6 +12,8 @@ export const ExtractionFailureReasonCode = {
   extractionTimeout: 'extractionTimeout',
   serviceBusy: 'serviceBusy',
   serviceUnreachable: 'serviceUnreachable',
+  fileEncrypted: 'fileEncrypted',
+  resourceLimitExceeded: 'resourceLimitExceeded',
   extractionFailed: 'extractionFailed',
 } as const;
 

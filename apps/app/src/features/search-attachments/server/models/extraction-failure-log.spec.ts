@@ -19,13 +19,17 @@ describe('ExtractionFailureReasonCode', () => {
     expect(ExtractionFailureReasonCode.serviceUnreachable).toBe(
       'serviceUnreachable',
     );
+    expect(ExtractionFailureReasonCode.fileEncrypted).toBe('fileEncrypted');
+    expect(ExtractionFailureReasonCode.resourceLimitExceeded).toBe(
+      'resourceLimitExceeded',
+    );
     expect(ExtractionFailureReasonCode.extractionFailed).toBe(
       'extractionFailed',
     );
   });
 
-  it('has exactly 6 reason codes', () => {
-    expect(Object.keys(ExtractionFailureReasonCode)).toHaveLength(6);
+  it('has exactly 8 reason codes', () => {
+    expect(Object.keys(ExtractionFailureReasonCode)).toHaveLength(8);
   });
 });
 
@@ -81,10 +85,12 @@ describe('ExtractionFailureLog schema', () => {
         'extractionTimeout',
         'serviceBusy',
         'serviceUnreachable',
+        'fileEncrypted',
+        'resourceLimitExceeded',
         'extractionFailed',
       ]),
     );
-    expect(field.enumValues).toHaveLength(6);
+    expect(field.enumValues).toHaveLength(8);
   });
 
   it('has message field as String', () => {

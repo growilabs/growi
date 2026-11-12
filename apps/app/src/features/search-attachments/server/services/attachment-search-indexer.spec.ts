@@ -358,6 +358,16 @@ describe('AttachmentSearchIndexer', () => {
         'serviceUnreachable',
       ],
       [
+        'encrypted',
+        { kind: 'encrypted' } as ExtractionOutcome,
+        'fileEncrypted',
+      ],
+      [
+        'resourceLimit',
+        { kind: 'resourceLimit', message: 'too big' } as ExtractionOutcome,
+        'resourceLimitExceeded',
+      ],
+      [
         'failed',
         {
           kind: 'failed',

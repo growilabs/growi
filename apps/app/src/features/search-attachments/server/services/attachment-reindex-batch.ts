@@ -100,11 +100,11 @@ export async function* iterateAllAttachmentIds(
 
 /**
  * Maps an ExtractionOutcome.kind to the reasonCode string expected by
- * ExtractionFailureEntry. Returns null for the 'success' kind (not a failure).
+ * ExtractionFailureEntry.
  */
 function outcomeToReasonCode(
-  kind: ExtractionOutcome['kind'],
-): ExtractionFailureEntry['reasonCode'] | null {
+  kind: Exclude<ExtractionOutcome['kind'], 'success'>,
+): ExtractionFailureEntry['reasonCode'] {
   switch (kind) {
     case 'unsupported':
       return 'unsupportedFormat';
@@ -116,10 +116,12 @@ function outcomeToReasonCode(
       return 'serviceBusy';
     case 'serviceUnreachable':
       return 'serviceUnreachable';
+    case 'encrypted':
+      return 'fileEncrypted';
+    case 'resourceLimit':
+      return 'resourceLimitExceeded';
     case 'failed':
       return 'extractionFailed';
-    default:
-      return null;
   }
 }
 
@@ -271,20 +273,20 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
 
     // Record failure for non-success outcomes
     if (outcome.kind !== 'success') {
-      const reasonCode = outcomeToReasonCode(outcome.kind);
-      if (reasonCode != null) {
-        const message = outcome.kind === 'failed' ? outcome.message : null;
-        await this.failureLogService.record({
-          attachmentId,
-          pageId: attachment.pageId,
-          fileName: attachment.fileName,
-          fileFormat: attachment.fileFormat,
-          fileSize: attachment.fileSize,
-          reasonCode,
-          message,
-          occurredAt: new Date(),
-        });
-      }
+      const message =
+        outcome.kind === 'failed' || outcome.kind === 'resourceLimit'
+          ? outcome.message
+          : null;
+      await this.failureLogService.record({
+        attachmentId,
+        pageId: attachment.pageId,
+        fileName: attachment.fileName,
+        fileFormat: attachment.fileFormat,
+        fileSize: attachment.fileSize,
+        reasonCode: outcomeToReasonCode(outcome.kind),
+        message,
+        occurredAt: new Date(),
+      });
     }
   }
 

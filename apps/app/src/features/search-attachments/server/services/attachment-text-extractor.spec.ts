@@ -15,18 +15,14 @@ import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
-// Mock the generated attachment-text-extractor-client function
-vi.mock('@growi/attachment-text-extractor-client', () => ({
-  postExtract: vi.fn(),
-  ErrorCode: {
-    unauthorized: 'unauthorized',
-    unsupported_format: 'unsupported_format',
-    file_too_large: 'file_too_large',
-    extraction_timeout: 'extraction_timeout',
-    service_busy: 'service_busy',
-    extraction_failed: 'extraction_failed',
-  },
-}));
+// Only the HTTP call is replaced; the error codes are the generated ones
+vi.mock(
+  import('@growi/attachment-text-extractor-client'),
+  async (importOriginal) => ({
+    ...(await importOriginal()),
+    postExtract: vi.fn(),
+  }),
+);
 
 // Mock configManager
 vi.mock('~/server/service/config-manager', () => ({
@@ -309,22 +305,38 @@ describe('AttachmentTextExtractorService', () => {
     expect(options.timeout).toBe(60000);
   });
 
-  it('hands the stored bytes to the client as `file`, unchanged and without a MIME type hint', async () => {
+  it('hands the stored bytes to the client as a named file, on the retry too', async () => {
+    vi.useFakeTimers();
     const stored = Buffer.from([
       0x25, 0x50, 0x44, 0x46, 0x00, 0xff, 0xfe, 0x80,
     ]);
     mockFileUploader.findDeliveryFile.mockResolvedValue(makeStream(stored));
-    postExtract.mockResolvedValue({
-      data: { mimeType: 'application/pdf', extractedCharacters: 0, pages: [] },
-    });
+    postExtract
+      .mockRejectedValueOnce(makeAxiosError(503, 'service_busy'))
+      .mockResolvedValueOnce({
+        data: {
+          mimeType: 'application/pdf',
+          extractedCharacters: 0,
+          pages: [],
+        },
+      });
 
     const service = await getService();
-    await service.extractAttachment('attachment-id-1');
+    const resultPromise = service.extractAttachment('attachment-id-1');
+    await vi.runAllTimersAsync();
+    await resultPromise;
+    vi.useRealTimers();
 
-    const [body] = postExtract.mock.calls[0];
-    expect(Object.keys(body)).toEqual(['file']);
-    expect(Buffer.isBuffer(body.file)).toBe(true);
-    expect(stored.equals(body.file)).toBe(true);
+    expect(postExtract).toHaveBeenCalledTimes(2);
+    for (const [body] of postExtract.mock.calls) {
+      expect(Object.keys(body)).toEqual(['file']);
+      expect(body.file).toBeInstanceOf(File);
+      expect(body.file.name).toBe('file.pdf');
+      expect(body.file.type).toBe('');
+      expect(stored.equals(Buffer.from(await body.file.arrayBuffer()))).toBe(
+        true,
+      );
+    }
   });
 
   // -----------------------------------------------------------------------
@@ -364,6 +376,51 @@ describe('AttachmentTextExtractorService', () => {
     const result = await service.extractAttachment('attachment-id-1');
 
     expect(result).toEqual({ kind: 'timeout' });
+  });
+
+  it('returns encrypted on 422 file_encrypted error', async () => {
+    postExtract.mockRejectedValue(makeAxiosError(422, 'file_encrypted'));
+
+    const service = await getService();
+    const result = await service.extractAttachment('attachment-id-1');
+
+    expect(result).toEqual({ kind: 'encrypted' });
+  });
+
+  it('returns resourceLimit with the message on 422 resource_limit_exceeded error', async () => {
+    postExtract.mockRejectedValue(
+      makeAxiosError(
+        422,
+        'resource_limit_exceeded',
+        'limit_exceeded: the document exceeds a processing limit',
+      ),
+    );
+
+    const service = await getService();
+    const result = await service.extractAttachment('attachment-id-1');
+
+    expect(result).toEqual({
+      kind: 'resourceLimit',
+      message: 'limit_exceeded: the document exceeds a processing limit',
+    });
+  });
+
+  it.each([
+    'a_code_this_version_does_not_know',
+    'constructor',
+    undefined,
+  ])('returns serviceUnreachable on an error response with the unknown code %s', async (code) => {
+    postExtract.mockRejectedValue(
+      Object.assign(new Error('error'), {
+        isAxiosError: true,
+        response: { status: 422, data: { code, message: 'error' } },
+      }),
+    );
+
+    const service = await getService();
+    const result = await service.extractAttachment('attachment-id-1');
+
+    expect(result).toEqual({ kind: 'serviceUnreachable' });
   });
 
   // -----------------------------------------------------------------------

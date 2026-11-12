@@ -69,6 +69,10 @@ function outcomeKindToReasonCode(
       return 'serviceBusy';
     case 'serviceUnreachable':
       return 'serviceUnreachable';
+    case 'encrypted':
+      return 'fileEncrypted';
+    case 'resourceLimit':
+      return 'resourceLimitExceeded';
     case 'failed':
       return 'extractionFailed';
   }
@@ -80,7 +84,7 @@ function outcomeKindToReasonCode(
 function outcomeToMessage(
   outcome: Exclude<ExtractionOutcome, { kind: 'success' }>,
 ): string | null {
-  if (outcome.kind === 'failed') {
+  if (outcome.kind === 'failed' || outcome.kind === 'resourceLimit') {
     return outcome.message ?? null;
   }
   return null;
