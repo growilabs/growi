@@ -20,6 +20,7 @@
 
 | ファイル | 内容 | 主な参照元 |
 |---|---|---|
+| [roadmap.md](./roadmap.md) | spec の一覧と、まだ着手していない拡張の候補 (拡張子の表に無いテキストのファイルの抽出など) | — |
 | [research.md](./research.md) | gap analysis (既存 GROWI コード調査) + design phase discovery (FastAPI-orval / markitdown PR #1263 / GROWI.cloud 制約) | 3 sub-specs の research.md / brief.md |
 | [research-docker-image.md](./research-docker-image.md) | markitdown REST API Docker image 選定調査 (サードパーティ pre-built 評価、自前ビルド用 Dockerfile 提案) | `attachment-search-text-extractor` |
 | [design-review-fixes.md](./design-review-fixes.md) | 3-way split 後の `/kiro-validate-design` で指摘された 9 Critical/Minor Issues の解消記録 | (歴史的記録、spec からは未参照) |

@@ -190,6 +190,18 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
   - Page 側の作り直しは関数として受け取り、batch から `SearchService` への依存を作らない
   - alias swap は Page と添付で別々に行う。以前の設計は両 index の同時 swap を描いていたが、Page 側は既存の `rebuildIndex()` の中で swap が完結しており、同時にするには既存コードを分解する必要がある。2 つの swap の間も、添付ヒットの権限は検索時に page_index から引くため漏洩は起きない
 
+## 9. 抽出サービスへ送る内容 (2026-11)
+
+- 観察: 生成クライアントの `file` に `Buffer` を渡していた。Node の `FormData` は `Blob` でない値を文字列の項目に変えるので、ファイルの部品が 1 度も送られず、抽出サービスはすべての添付に 422 を返していた。以前の生成クライアントが `file` を `string` と書いていたため、型の検査では見つからなかった。テストは axios を差し替えていたので、実際に送られる形を見ていなかった
+- 判断:
+  - ファイルの部品として送り、本物の生成クライアントを、要求を記録するサーバに向けるテストで形を固定する
+  - 部品のファイル名は `file.<拡張子>` にする。抽出サービスがファイル名から読むのは拡張子だけなので、利用者が付けた名前 (長さも文字も自由) を外へ出す理由が無い。見出しの長さの上限や、引用符・改行の扱いの問題も、まとめて避けられる
+  - 保存してある MIME type は、拡張子が使えないときだけ `mimeType` で送る。抽出サービスは知っている `mimeType` を拡張子より優先し、保存してある MIME type はブラウザの申告なので拡張子と食い違うことがある
+  - 部品の `Content-Type` には MIME type を入れない。抽出サービスは読まず、長い値は部品の見出しの上限に当たって 422 になる
+- 分かっている制限:
+  - 抽出サービスが知らない拡張子のテキストのファイル (`.conf`、`.tf` など) は `unsupported` になる。中身を見て抽出する拡張は [../attachment-search/roadmap.md](../attachment-search/roadmap.md) に載せた
+  - `app:attachmentFullTextSearch:maxFileSizeBytes` は、設定と管理 API にあるが、送る前の大きさの検査には使われていない。いま効いている上限は、抽出サービスの `MAX_FILE_SIZE_MB` だけである
+
 ## 参照
 
 - Reference research (gap analysis + design phase discovery): [../attachment-search/research.md](../attachment-search/research.md)

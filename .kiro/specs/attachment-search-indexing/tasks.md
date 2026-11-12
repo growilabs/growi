@@ -109,7 +109,7 @@
 ## 5. Core: FailureLog 永続化
 
 - [x] 5.1 `ExtractionFailureLog` Mongoose model を追加する
-  - `attachmentId` / `pageId` / `fileName` / `fileFormat` / `fileSize` / `reasonCode` (enum: `unsupportedFormat` / `fileTooLarge` / `extractionTimeout` / `serviceBusy` / `serviceUnreachable` / `extractionFailed`) / `message` / `occurredAt` / `retentionGroupHash` を schema 化する
+  - `attachmentId` / `pageId` / `fileName` / `fileFormat` / `fileSize` / `reasonCode` (enum: `unsupportedFormat` / `fileTooLarge` / `extractionTimeout` / `serviceBusy` / `serviceUnreachable` / `fileEncrypted` / `resourceLimitExceeded` / `extractionFailed`) / `message` / `occurredAt` / `retentionGroupHash` を schema 化する
   - `occurredAt` 90 日 TTL index を設定し、TTL が機能することを integ test で確認 (期限切れ doc が MongoDB から自動削除される)
   - _Requirements: 8.3_
   - _Boundary: features/search-attachments/server/models_
@@ -319,3 +319,11 @@
   - secondary 閾値超過時 enrichment skip で primary のみ返ること
   - _Requirements: 9.1, 9.2_
   - _Boundary: performance_
+
+## 11. 抽出サービスへの送信の修正
+
+- [x] 11.1 添付ファイルを、本物のファイルの部品として抽出サービスに送る
+  - 送る内容を `extract-request-body.ts` で組み立てる (design.md の AttachmentTextExtractorService の「送る内容」)
+  - 本物の生成クライアントを、受け取った要求を記録するだけのサーバに向けて、ファイルの部品・ファイル名・`mimeType` の項目が決まりどおりに届くことを確かめる
+  - `file_encrypted` と `resource_limit_exceeded` を、それぞれの結果 (`encrypted`、`resourceLimit`) と失敗の理由コード (`fileEncrypted`、`resourceLimitExceeded`) に対応させる
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 8.3_

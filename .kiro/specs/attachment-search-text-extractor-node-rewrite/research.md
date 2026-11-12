@@ -8725,3 +8725,29 @@ C の 3 件は、記録の漏れが 2 件、テストの不足が 1 件である
 - `docker compose build` と `up` (`env_file`、container の中での healthcheck、`/tmp` の tmpfs、`pids_limit: 256` が足りること)。
 - 展開した image の大きさ (CI が報告する 89,175,439 バイトは、圧縮した大きさの見込み。27.17)。
 - メモリの計測を、人が workflow を起動して動かすこと (workflow のファイルが既定のブランチに入った後でないと、起動できない)。
+
+### 27.20 タスク 8.2 と 8.3 の締め (2026-11-12)
+
+**ライセンスの表示は、image にもリポジトリにも置かない (ユーザーの決定)**
+
+- 決定: anydoc のバイナリに入っている部品の一覧と、PDFium の WASM の第三者のライセンスの文 19 個を、どちらも外す。理由は、機能には要らないこと、`apps/` の下のほかの app (`apps/app`、`apps/pdf-converter`、`apps/slackbot-proxy`) の image がこの種の表示を持っていないこと、依存の版を上げるたびに取り直す手間が続くことである。21 節と 27.10、27.18、27.19 の「表示を入れる」向きの記述は、この決定で置き換える。
+- 外したもの: `docker/licenses/` (`THIRD-PARTY-NOTICES.md` と `pdfium-wasm/` の 19 ファイル)、Dockerfile の `/licenses` を作る `RUN` と `COPY`、`check-image.sh` の `/licenses` の存在の検査、`dockerfile.spec.ts` のライセンスの検査、README と `AGENTS.md` の記述。anydoc の一覧 (作りかけで、commit していなかった) も捨てた。
+- 調べた結果は、Req 5.4 (依存は許容的なライセンスだけ) の根拠として残す:
+  - anydoc 0.2.4 (上流の tag `v0.2.4`、commit `42bf1c5ecdde9eb0d96d6bd75a9e6698cf93b14c`) の Node 用のバイナリに組み込まれる Rust の部品は 130 個で、GPL・AGPL・LGPL などの許容的でないライセンスのものは 0 個だった (MIT、Apache-2.0、BSD、Zlib、Unicode-3.0、BSL-1.0、0BSD など)。anydoc 自身は MIT である。
+  - PDFium の WASM に入っている第三者の部品 (FreeType、OpenJPEG、libpng、zlib、libjpeg-turbo、lcms、ICU、abseil、fast_float、agg、emscripten の実行時の部品) も、すべて許容的なライセンスである (21.5)。
+- 上流の版を上げたときは、この 2 つをもう一度確かめる (許容的でないライセンスの部品が入っていないこと)。一覧やライセンスの文を作り直す必要は無い。
+
+**apps/app から抽出サービスへ、ファイルが届いていなかった (27.19 の「分かっている不具合」を、この PR で直した)**
+
+- 直した commit は `b1e3adb4a5`。送る内容の決まり (ファイル名は `file.<拡張子>`、部品の `Content-Type` は付けない、保存してある MIME type は拡張子が使えないときだけ送る) は、`attachment-search-indexing` の design.md と research.md に書いた。
+- Python 版のときから同じ不具合があった (生成クライアントが `file` を `string` と書いていたので、型の検査では見つからなかった)。Node への書き直しで入った不具合ではない。
+
+**サービスが知らない拡張子のテキストのファイル (`.conf`、`.tf` など) は、抽出しないままにする (ユーザーの決定)**
+
+- いまの形式の判定は拡張子と `mimeType` の表だけで行い、中身は見ない。表に無い拡張子は `unsupported_format` になる。
+- 中身がテキストなら抽出する、という拡張は、将来の作業として `.kiro/specs/attachment-search/roadmap.md` に載せた。
+
+**8.3 の、人が確かめる項目で済んでいないもの (未確認のまま、タスクは完了にする。ユーザーの決定)**
+
+- 27.19 の末尾の 4 つ (linux-arm64 の build、`docker compose` の build と up、展開した image の大きさ、メモリの計測を人が起動すること) は、どれも確かめていない。この開発環境には docker が無い。
+- CI で確かめることは、すべて済んでいる (27.17、27.19)。

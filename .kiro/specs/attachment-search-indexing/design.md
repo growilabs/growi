@@ -565,6 +565,11 @@ Key decisions:
 
 **Responsibilities & Constraints**
 - FileUploader からバイトを取得し `attachment-text-extractor-client` に multipart 送信
+- **送る内容** (`extract-request-body.ts` が組み立てる。理由は research.md 9 節):
+  - ファイルは、本物のファイルの部品 (`File`) として送る。`Buffer` をそのまま渡すと、Node の `FormData` が文字列の項目に変えてしまい、抽出サービスは 422 を返す
+  - 部品のファイル名は `file.<拡張子>` にする。拡張子は、元のファイル名の最後の `.` より後ろが英数字 1〜16 字のときだけ使い (小文字にする)、それ以外は `file` にする。元のファイル名 (利用者が付けた、長さも文字も自由な名前) は、抽出サービスに送らない
+  - 部品の `Content-Type` には、保存してある MIME type を入れない (抽出サービスは読まない)
+  - フォームの `mimeType` は、使える拡張子が無く、保存してある MIME type (`fileFormat`) が空でないときだけ送る。抽出サービスは、知っている `mimeType` を拡張子より優先するので、ブラウザが申告した MIME type が拡張子と食い違うファイル (Windows の Excel で開ける CSV は `application/vnd.ms-excel` で保存される) を、誤った形式で読ませないためである
 - **503 `service_busy` retry (burst 耐性)**: 上流が 503 `service_busy` を返した場合、exponential backoff + jitter で**最大 1 回だけ retry** (default 500ms + jitter(0-500ms) 待機)。2 回目も 503 なら `serviceBusy` として正規化し ExtractionFailureLog に記録。retry 回数と base delay は `AttachmentSearchService` の設定可能定数として export (テスト容易性)。複雑な queue / BullMQ は初期実装では導入しない (k8s HPA が pod 増設で対応する前提)
 - **Bearer auth**: 呼び出しごとに `configManager.getConfig('app:attachmentFullTextSearch:extractorToken')` を取得し `Authorization: Bearer <token>` ヘッダに付与。token 未設定時は `isFeatureEnabled()` 段階で早期 return するので通常は到達しないが、保険として未設定検出時は `serviceUnreachable` 正規化
 - **extractorUri DNS rebinding 対策 (metadata IP のみ)**: 送信前に URI の host を DNS 解決し、結果がクラウドメタデータ endpoint IP literal (`169.254.169.254` / `fd00:ec2::254` / `100.100.100.200` / `192.0.0.192`) のいずれかに解決される場合のみ request を送らず `serviceUnreachable` 正規化。k8s 内部 DNS / loopback / RFC1918 への解決は許可

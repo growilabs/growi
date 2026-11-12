@@ -241,7 +241,7 @@
   - `apps/pdf-converter` に倣い、Node 24 の slim を元にし、`pnpm deploy --prod` で本番の依存だけを取り出す multi-stage の Dockerfile を作る。最終の段で `prlimit` を実行し、無ければビルドを失敗させる。`RAYON_NUM_THREADS=1` を設定する
   - k8s の例 (deployment、service、hpa、networkpolicy) を新しい場所に作り、`WORKERS` を消し、メモリの requests / limits を 3.7 の予算に合わせる
   - ビルドの段で `build` を流し、`dist/` を image に入れる (research.md 23.5)
-  - image に、PDFium の WASM に入っている第三者の部品 (FreeType・OpenJPEG・libpng・zlib・libc++ など。JPEG と lcms も入っている見込み) のライセンス表示のファイルを入れる (`@embedpdf/pdfium` の package には `LICENSE` と `LICENSE.pdfium` しか入っておらず、これらの表示が無い。Python 版の pypdfium2 の wheel は `licenses/data/linux_x64/BUILD_LICENSES/` に持っていた)。出どころと入れ方は research.md の 21 節 (PDFium の第三者のライセンス) に従う
+  - image には、第三者の部品のライセンスの文を入れない (ユーザーの決定、2026-11-12。`apps/` の下のほかの app と同じ扱いにする。調べた結果は research.md の 21 節と 27.20 に残す)
   - 4.5 のテストが通る (compose のテストは 8.2 で通る)
   - (2026-11-11、ユーザーの決定) k8s の例は削除し、運用で守る条件を `docker/README.md` に文章で書く (research.md 27.16)
   - _Requirements: 8.1, 8.3, 8.5, 8.6, 8.7_
@@ -283,12 +283,12 @@
   - そろっていない項目があれば、撤去に進まない
   - _Requirements: 10.4, 10.5_
   - _Depends: 2.5, 2.9, 4.6, 6.14, 7.1_
-- [ ] 8.2 撤去と切り替えを 1 つの変更として行う
+- [x] 8.2 撤去と切り替えを 1 つの変更として行う
   - compose の build の `context` を Node 版に切り替え (リポジトリのルートを `context` にし、`dockerfile` を `apps/attachment-text-extractor/docker/Dockerfile` にする。research.md 23.7)、`WORKERS` を消し、healthcheck を `node` で `/readyz` を見る形に切り替える (`python`・`curl`・`wget` は slim の image に無い。`timeout` は 15 秒以上。research.md 23.7)。CI の `paths` を切り替え、Python 版のジョブを消す。`services/attachment-text-extractor/` をディレクトリごと消す
   - commit 済みの `packages/attachment-text-extractor-client/openapi.json` を、Node 版が書き出した文書に置き換え、orval で生成クライアントを作り直す。apps/app の呼び出し側 (`attachment-text-extractor.ts` とそのテスト) の関数名と型名を置き換え、`file` の型の書き方 (いまは `Buffer` を `string` と偽っている) を新しい型に合わせる (実行時の振る舞いは変えない。axios に渡る値が変わらないことをテストで確かめる)。Node 版の CI で、Node 版が書き出す文書と commit 済みの文書の完全な比較を動かし始める
   - 生成クライアントの `POST /extract` に渡す項目・応答の型・`ErrorCode` の値が変わっていないこと、apps/app の変更が呼び出し側の名前と型の書き方の修正だけであること、下流 spec のファイルに変更が無いこと、`services/attachment-text-extractor/` が無く、`apps/attachment-text-extractor/` の下と抽出サービスの CI workflow に `.py` のファイルと uv / ruff / pytest / poe を使う記述が無いことを確かめる (`.kiro/` と steering の古い記述は 9.4 で扱うので、ここでは確かめない)
   - サービスの `CLAUDE.md` を Node 版の内容で `apps/attachment-text-extractor/CLAUDE.md` に書く (requirements.md の Scope と design.md の This Spec Owns が成果物に挙げている。いまあるのは `services/attachment-text-extractor/CLAUDE.md` だけで、ディレクトリごと消える)。運用者が読む条件は `docker/README.md` にあることを、`CLAUDE.md` から案内する
-  - 配布物に載せるライセンスの表示を決める: anydoc のネイティブのバイナリには、ライセンスの表示が何も入っていない (静的にリンクされた Rust の部品の表示が image に入らない。research.md 27.10)。載せる表示と、その作り方をユーザーに諮って決める。PDFium の WASM の第三者のライセンスの文 19 個は、リポジトリに置いたままにする (ユーザーの決定、2026-11-11。`@embedpdf/pdfium` の版を上げるたびに取り直す)
+  - 配布物に載せるライセンスの表示は、作らない (ユーザーの決定、2026-11-12)。anydoc のバイナリに入っている部品の一覧も、PDFium の WASM の第三者のライセンスの文 19 個も、リポジトリと image に置かない。依存が許容的なライセンスであること (Req 5.4) は調べて確かめてあり、結果は research.md 27.20 にある
   - workflow のファイル名は、Node 版の `ci-attachment-text-extractor.yml` のままにし、Python 版の `attachment-text-extractor.yml` は消す (ほかの app の workflow が `ci-<app>.yml` の形であるため)。requirements.md の Req 9.1、design.md、brief.md の記述を、この名前に合わせる
   - Node 版の workflow の `paths` に `packages/attachment-text-extractor-client/openapi.json` と `infra/docker/compose.yaml` を足す (足さないと、クライアントの文書だけ・compose だけを変えた push で検査が動かない。research.md 17.7、27.13)。`apps/attachment-text-extractor/turbo.json` の `test` の `inputs` にクライアントの文書を足す (research.md 27.8)
   - compose の `init: true` は外す (Node 版では、子は親の直接の子で、親がいなくなると自分で終わるので、init のプロセスは要らない。research.md 27.10)。4.5 の `compose.spec.ts` の該当の検査も外し、テストの題名に残る Python 版の言い方も直す
@@ -297,11 +297,11 @@
   - 最初の本物の docker の実行 (6.12、8.3) が済んだら、メモリの計測の `local` の対象と `check-image.sh` の `IN_SERVICE=` を消す (docker の無い環境で動かすためだけにある。research.md 27.11)
   - 4.5 の compose のテストを含むすべてのテストが通り、`turbo run lint test --filter @growi/attachment-text-extractor` と生成クライアントの package の lint / build が通る
   - _Requirements: 4.6, 7.1, 7.2, 7.3, 7.4, 7.5, 8.4, 9.1, 9.2, 10.1, 10.2, 10.3_
-- [ ] 8.3 配布物と CI を、CI でできる確認と人の確認に分けて確かめる
+- [x] 8.3 配布物と CI を、CI でできる確認と人の確認に分けて確かめる
   - GitHub に push するのは外に向けた操作なので、push する前にユーザーの承認を得る。この workflow は master 以外のブランチへの push でも trigger の条件 (`paths`) に合えば動くので、作業ブランチへの push を第一の方法にする
   - CI で確かめること (8.2 の変更を、trigger の条件に合うブランチに push して動かす): image のビルド、400MB 以下、read-only rootfs・uid 10001・ネットワークなしでの起動、`/readyz` が準備完了、PDF と DOCX の `POST /extract` が 200、`prlimit` の実行、OpenAPI の比較、lint・型の検査・テスト
   - 人が確かめること (CI ではできない): GitHub 上の workflow の実行を `gh api repos/<org>/<repo>/actions/runs/<id>/jobs` で見て、ジョブの数が 0 より多く、すべてのステップが成功していること (ジョブが 0 件の実行は成功とみなさない)。arm64 の image がビルドできること (CI が x64 だけの場合)。本番の環境への適用は範囲外
-  - CI の結果と、人が確かめた結果 (実行の id、ジョブの数) が research.md にある
+  - CI の結果と、人が確かめた結果 (実行の id、ジョブの数) が research.md にある。人が確かめる項目のうち済んでいないもの (arm64 の build、`docker compose` の build と up、展開した image の大きさ、メモリの計測を人が起動すること) は、research.md 27.19 と 27.20 に「未確認」として残し、このタスクは完了にする (ユーザーの決定、2026-11-12)
   - _Requirements: 8.1, 8.2, 9.3, 9.5_
 
 - [ ] 9. 対象 spec に取り込み、この spec を消す
