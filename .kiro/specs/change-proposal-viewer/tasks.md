@@ -81,7 +81,7 @@
   - 404 とほかの失敗を区別すること、空の続きが続く場合に決めた回数で止まり、続きの位置が無いときだけ「これ以上無い」になることをテストで確かめている
   - _Requirements: 1.3, 8.1, 8.2, 8.5, 8.6_
   - _Boundary: use-swrx-change-proposal, use-swrinfx-change-proposal-lists_
-- [ ] 3.3 (P) 操作の差分を取る hook と、差分を表示する部品を作る
+- [x] 3.3 (P) 操作の差分を取る hook と、差分を表示する部品を作る
   - 編集は元のリビジョンと反映で作ったリビジョン、新規作成は空と反映で作ったリビジョンの組を作る。ページの ID は `op.page?.id` から取る（`OperationView` は `resultPageId` を持たない）。移動・完全な削除・まだ反映していない操作は差分を持たない（`no-diff`）。`page` が無い（ページが削除された・閲覧できない）か `resultRevisionId` が無い編集・新規作成は、問い合わせずに「表示できない」（`unavailable`）にする
   - 操作の差分を開いたときだけ、revision-diff の差分の API に 1 組を送る。閲覧できない・組が正しくない・通信の失敗は「表示できない」にする
   - 差分の文字列を表示する部品を作る。設定は core の `client/shared` の barrel の `buildDiff2HtmlOptions` / `useDiff2HtmlColorScheme`、あらかじめ用意した CSS は `import '~/features/change-proposal/client/shared/diff2html.vendor-styles.prebuilt'`（読み込むだけ。`RevisionDiff.tsx` と同じ）で読む。`RevisionDiff.module.scss` にある `.d2h-wrapper` の `position: relative` と `table-layout: fixed` と同じ指定を、部品の CSS module に持つ
