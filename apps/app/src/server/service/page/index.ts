@@ -60,7 +60,6 @@ import {
   type PageModel,
   PageQueryBuilder,
   pushRevision,
-  saveRevision,
 } from '~/server/models/page';
 import type { IPageRedirect } from '~/server/models/page-redirect';
 import type { UserGroupDocument } from '~/server/models/user-group';
@@ -5392,6 +5391,7 @@ class PageService implements IPageService {
       dummyUser,
     );
     savedPage = await pushRevision(savedPage, newRevision, dummyUser);
+    await savedPage.populate('revision');
 
     if (savedPage._id == null) {
       throw new Error('Something went wrong: _id is null');
@@ -5701,7 +5701,7 @@ class PageService implements IPageService {
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
 
-    // With a body, saveRevision saves the pending field changes together with the revision.
+    // With a body, pushRevision saves the pending field changes together with the revision.
     let savedPage = newPageData;
     if (shouldUpdateBody) {
       const origin = options.origin;
@@ -5713,7 +5713,7 @@ class PageService implements IPageService {
         origin,
         { proposalMark: options.proposalMark },
       );
-      savedPage = await saveRevision(savedPage, newRevision, user, {
+      savedPage = await pushRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
       await this.populateSavedPageForUpdate(savedPage, user, updateEventExtras);
@@ -5811,7 +5811,7 @@ class PageService implements IPageService {
     const isBodyPresent = body != null;
     const shouldUpdateBody = isBodyPresent;
 
-    // With a body, saveRevision saves the pending field changes together with the revision.
+    // With a body, pushRevision saves the pending field changes together with the revision.
     let savedPage = pageData;
     if (shouldUpdateBody) {
       const newRevision = prisma.revisions.prepareRevision(
@@ -5822,7 +5822,7 @@ class PageService implements IPageService {
         options.origin,
         { proposalMark: options.proposalMark },
       );
-      savedPage = await saveRevision(savedPage, newRevision, user, {
+      savedPage = await pushRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
       await this.populateSavedPageForUpdate(savedPage, user, updateEventExtras);
