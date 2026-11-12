@@ -45,6 +45,64 @@
   - `turbo run lint --filter @growi/app`・`turbo run test --filter @growi/app`・`turbo run build --filter @growi/app` を実行し、すべて green であることを確認する
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 4.1, 5.1, 5.2, 6.1, 6.2, 7.1, 7.2, 8.1, 9.1, 9.2_
 
+## 改訂: 省略表記の統一（issue #194253）
+
+> タスク 1〜5 は初版の記録（要件番号は改訂前のもの。旧 2.3 は改訂後の 1.2 に相当）。以下は改訂後の requirements.md / design.md に基づく。
+
+- [ ] 6. Foundation: 畳み込み段階の定義
+- [ ] 6.1 中間省略の判定に「畳み込み段階」を加える
+  - 段階 0 を現行の基本形とし、段階を 1 つ上げるごとに残っている祖先を先頭側から 1 つ省略記号へ畳む（親は最後に畳まれる）。取りうる最大段階も返す
+  - 範囲外の段階は 0〜最大段階に丸める。段階を指定しない既存の呼び出しは現行と同じ結果を返す
+  - 4 単位以上・3 単位・2 単位・1 単位・ルートの各パスについて、design.md「畳み込み段階の選択」の表どおりの形と最大段階になり、どの段階でも省略記号が高々 1 個であることをユニットテストで確認し、既存テストも含め green
+  - _Requirements: 1.1, 1.2, 2.1, 2.2, 3.2, 3.3, 3.9_
+  - _Boundary: formatTruncatedPagePath_
+
+- [ ] 6.2 祖先パスの表示計画を段階に対応させる
+  - 検索結果一覧用の祖先パス表示計画が段階を受け取り、その段階の判定結果からリンク・ハイライトを組み立てるようにする。最大段階も計画に含める
+  - 段階 1・2 に畳んだとき、残った祖先が正しい href とハイライトに対応し、省略記号がリンクを持たないことをユニットテストで確認し、既存テストも含め green
+  - _Requirements: 3.2, 3.3, 5.1, 5.2, 6.1, 6.2_
+  - _Boundary: buildAncestorPathNodes_
+
+- [ ] 7. (P) Foundation: 描画結果から段階を選ぶフックを実装する
+  - 描画後・表示前に、コンテナまたはページ名（指定された場合）の溢れを確認し、溢れていれば最大段階まで 1 つずつ段階を上げる
+  - コンテナ幅の変化を検知し、広がったら段階 0 から、狭まったら現在の段階から判定し直す。監視開始直後の最初の通知は変化として扱わない。パスが変わったら段階 0 に戻す
+  - ResizeObserver の無い環境でも例外にならず、初回の判定は行う
+  - レイアウトの無いテスト環境で要素の幅（溢れの有無）と ResizeObserver を与えるテスト用ヘルパーを用意し、タスク 9 のコンポーネントテストでも同じものを使う
+  - そのヘルパーを使って「溢れていれば最大段階まで上がる」「溢れなければ段階 0」「最大段階で止まる」「パスが変わると段階 0」「幅が広がると段階 0 から再判定」「幅が狭まると現在の段階から再判定」をテストで確認し green
+  - _Requirements: 3.2, 3.6, 3.7, 3.8_
+  - _Boundary: useFittingCollapseLevel_
+
+- [ ] 8. Core: 共通の 1 行 CSS レシピを「祖先は縮めない」に組み替える
+  - 祖先セグメントは縮めず、文字単位の省略もしない。文字単位で縮むのはページ名だけにする。区切りと省略記号は縮めない。行の `overflow: hidden` は保険として残す
+  - 検索モーダル・検索結果一覧の両コンポーネント用 SCSS を新レシピに合わせる
+  - 両コンポーネントのクラスの付け方（文字単位の省略用クラスをページ名だけに付ける）もここで直す。段階の適用はタスク 9 で行う
+  - このタスク単独の時点では、長い祖先は行の `overflow: hidden` で切れて見える（タスク 9 で畳み込みが入るまでの一時的な状態で、同じ PR 内で解消する）
+  - 祖先セグメントに文字単位の省略用クラスが付かず、ページ名にだけ付くことを既存のコンポーネントテストの更新で確認し green
+  - _Requirements: 3.1, 3.4, 3.5, 3.6, 3.8_
+  - _Boundary: 共通 1 行 CSS レシピ, SearchResultPagePath, SearchResultAncestorPath_
+
+- [ ] 9. Integration: 両画面に段階的な畳み込みを適用する
+- [ ] 9.1 検索モーダルのパス表示に適用する
+  - フックが選んだ段階でパスを描画し、ページ名を「文字単位で縮む要素」としてフックに渡す
+  - 溢れる状態を与えたとき、畳んだ形（省略記号 1 つ、区切りだけが並ぶ `//` が無い）で描画され、最大段階ではページ名だけが切り詰め対象になることをコンポーネントテストで確認し green。`title` のフルパスは従来どおり
+  - 溢れの状態はタスク 7 のテスト用ヘルパーで与える（フック自体はモックしない）
+  - _Requirements: 1.3, 3.2, 3.3, 3.5, 3.6, 3.7, 3.9, 4.1_
+  - _Boundary: SearchResultPagePath_
+
+- [ ] 9.2 (P) 検索結果一覧の祖先パス表示に適用する
+  - フックが選んだ段階を祖先パスの表示計画に渡して描画する（ページ名は別行のため、文字単位で縮む要素は渡さない）
+  - 溢れる状態を与えたとき、畳んだ形で描画され、残った祖先がリンク・ハイライトを保ち、`//` が出ないことをコンポーネントテストで確認し green
+  - _Requirements: 1.3, 3.2, 3.3, 3.5, 3.7, 3.9, 4.1, 5.1, 6.1_
+  - 溢れの状態はタスク 7 のテスト用ヘルパーで与える（フック自体はモックしない）
+  - _Boundary: SearchResultAncestorPath_
+
+- [ ] 10. Validation: 実機確認と回帰確認
+  - dev server で検索モーダルと `/_search` を開き、モーダル・ウィンドウ幅を変えながら、表記が `/…/` だけに揃うこと、`//` が出ないこと、親が最後まで残ること、幅を戻すと畳んだ祖先が戻ること、同じパスが両画面で同じ畳み方になることを確認する（headless Chromium での計測も可）
+  - `/_search` で 200 件表示にし、表示・リサイズの体感に問題がないことを確認する
+  - 子ページ一覧・パス重複選択画面の表示が変わっていないことを確認する
+  - `apps/app` で `pnpm run lint`・`pnpm run test`・`pnpm run build` がすべて green
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.1, 5.1, 5.2, 6.1, 6.2, 7.1, 7.2, 8.1, 9.1, 9.2_
+
 ## Implementation Notes
 
 - Task 4.1: `LinkedPagePath`'s constructor always calls `new DevidedPagePath(path)` with no `evalDatePath` argument (always `false`), so re-wrapping an already-`evalDatePath`-bundled string (e.g. a date-bundled page name like `"2024/01/15"`) in a fresh `LinkedPagePath` silently re-splits it and destroys the bundling. When `evalDatePath` needs to reach a piece of UI, read the value directly off the `DevidedPagePath` instance (e.g. `.latter`) rather than passing it through a new `LinkedPagePath`.
