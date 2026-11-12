@@ -179,7 +179,7 @@
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
   - _Boundary: ChangeProposalLists, ChangeProposalSummaryItem_
   - _Depends: 2.1, 3.2, 8.4_
-- [ ] 5.9 (P) Change Proposal の通知の表示の hook を作る
+- [x] 5.9 (P) Change Proposal の通知の表示の hook を作る
   - 通知の対象の種類が Change Proposal で、snapshot を読めたときだけ表示の値を返し、それ以外は null を返す
   - リンク先は snapshot の Change Proposal の ID から作り、通知の対象（`_id` だけ）は読まない。文言は `commons` の名前空間の翻訳を使い、通知の種類ごとの分岐の中で、キーを文字のまま書いた `t()` を呼ぶ（表から引くと翻訳の検査の道具がキーを見つけられず、使われていないキーに数えられるため）。反映と取り消しではページのパスを最初の 3 件まで出し、件数は出さない。頼む通知では一言を文字のまま出し、長いものは省略する
   - 部品のテストで、3 つの通知の文言とリンク先、元の Change Proposal の依頼した人が受け取る取り消しの通知（snapshot の `proposalId` と `entry` が元の Change Proposal のもの）のリンク先が元の Change Proposal の詳細ページになること、対象が `_id` だけでも動くこと、一言が HTML として解釈されないこと、読めない snapshot で null になることを確かめている
