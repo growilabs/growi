@@ -14,7 +14,7 @@
 > **i18n**: 新しい文言は、この spec の中で 5 言語すべてを訳す（タスク 1.4）。操作の種類・操作の状態・全体の状態・理由・戻せない理由の言葉（`change_proposal.*`）は core が足したものを使い、本計画では足さない。`lint:i18n` の baseline は引き上げない。キーを足した時点ではまだコードから使われていないため、`lint:i18n` を通すことは、キーを使う部品がそろったあとのタスク 7.3 で確かめる。
 
 - [ ] 1. 土台: 型・定数・action・共通の値・翻訳のキー
-- [ ] 1.1 頼む通知の型と、viewer の定数と、2 つの barrel を用意する
+- [x] 1.1 頼む通知の型と、viewer の定数と、2 つの barrel を用意する
   - 頼む通知の要求の形、通知の snapshot の形、一言の長さの上限（500 文字）、同じ人が送れる間隔（24 時間）を、server と client の両方から import できる場所に宣言する
   - 頼む通知の型は `interfaces/revert-request.ts` に置き、core のタスク 1.1 が作った `interfaces/index.ts` の barrel に `export * from './revert-request'` の 1 行を足す。viewer がこの barrel に加える変更は、この 1 行だけにする
   - 一覧の URL、印の問い合わせを分ける件数（100 件）、反映済みの一覧で空の続きを自動で読む回数（3 回）、取り消しの結果を取り直す間隔（3 秒）と止めるまでの時間（60 秒）を定数として宣言する（詳細ページの URL は core の `client/shared/` の `buildProposalHref` を使い、ここでは作らない）
