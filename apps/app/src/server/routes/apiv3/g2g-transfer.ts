@@ -1374,8 +1374,7 @@ export const setup = (crowi: Crowi): Router => {
       // Start transfer
       // DO NOT "await". Let it run in the background.
       // Errors should be emitted through websocket.
-      // This handler replaces the global unhandledRejection logger for this promise, so it
-      // logs too: not every rejection path inside startTransfer logs before throwing.
+      // Not every rejection path inside startTransfer logs before throwing, so log here too.
       g2gTransferPusherService
         .startTransfer(tk, req.user, collections, optionsMap, destGROWIInfo)
         .then(
