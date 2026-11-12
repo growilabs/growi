@@ -145,6 +145,13 @@ export default defineConfig({
       'change_proposal.lifecycle.*',
       'change_proposal.link.*',
       'change_proposal.achievement.*',
+      // Keys are built at runtime from features/change-proposal/client/viewer/domain/entry-labels.ts.
+      // Enumerated, not `change_proposal_viewer.entry.*`: the same prefix
+      // family also has static `t()` call sites.
+      'change_proposal_viewer.entry.ai_chat',
+      'change_proposal_viewer.entry.vault',
+      'change_proposal_viewer.entry.mcp',
+      'change_proposal_viewer.entry.revert',
     ],
 
     primaryLanguage: 'en_US',
