@@ -75,7 +75,10 @@ import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
 import { prisma } from '~/utils/prisma';
 
-import { capturePreviousGrantState } from '../../events/page';
+import {
+  capturePreviousGrantState,
+  type PageUpdateEventExtras,
+} from '../../events/page';
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
@@ -5713,7 +5716,7 @@ class PageService implements IPageService {
       savedPage = await saveRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
-      await this.populateSavedPageForUpdate(savedPage, user);
+      await this.populateSavedPageForUpdate(savedPage, user, updateEventExtras);
     } else {
       savedPage = await savedPage.save();
     }
@@ -5822,7 +5825,7 @@ class PageService implements IPageService {
       savedPage = await saveRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
-      await this.populateSavedPageForUpdate(savedPage, user);
+      await this.populateSavedPageForUpdate(savedPage, user, updateEventExtras);
     } else {
       savedPage = await savedPage.save();
     }
@@ -5839,17 +5842,18 @@ class PageService implements IPageService {
 
   /**
    * The update is already stored, so 'update' is emitted even when populating
-   * fails; otherwise the listeners that mirror the page (search) would keep
-   * its old grant.
+   * fails; otherwise the listeners that mirror the page (search, Vault) would
+   * keep its old grant.
    */
   private async populateSavedPageForUpdate(
     savedPage: HydratedDocument<PageDocument>,
     user: IUserHasId,
+    updateEventExtras: PageUpdateEventExtras,
   ): Promise<void> {
     try {
       await savedPage.populateDataToShowRevision();
     } catch (err) {
-      this.pageEvent.emit('update', savedPage, user);
+      this.pageEvent.emit('update', savedPage, user, updateEventExtras);
       throw err;
     }
   }

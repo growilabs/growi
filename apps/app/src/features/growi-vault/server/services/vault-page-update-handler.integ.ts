@@ -295,6 +295,38 @@ describe('Vault instructions written for a single-page update', () => {
     });
   });
 
+  it.each([
+    { name: 'read-back-fails-on-tree', onTree: true },
+    { name: 'read-back-fails-legacy', onTree: false },
+  ])('moves the page even if reading the saved page back fails ($name)', async ({
+    name,
+    onTree,
+  }) => {
+    const page = await createPublicPage(name, onTree);
+    vi.spyOn(page, 'populate').mockRejectedValue(
+      new Error('transient read failure'),
+    );
+
+    await expect(
+      crowi.pageService.updatePage(
+        page,
+        'updated body',
+        'initial body',
+        editor,
+        {
+          grant: PageGrant.GRANT_OWNER,
+          expectedRevisionId: String(page.revision),
+        },
+      ),
+    ).rejects.toThrow('transient read failure');
+    await deliverEmittedUpdates();
+
+    expect(await writtenInstructions(page)).toEqual([
+      ['remove', 'public'],
+      ['upsert', `user-${editor._id}-only-me`],
+    ]);
+  });
+
   it('moves a page that is not on the page tree (legacy update path)', async () => {
     const page = await createPublicPage('legacy-to-only-me', false);
 
