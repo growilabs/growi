@@ -58,7 +58,7 @@
 - [x] 3.2 パスの規則と共通パラメータ名を宣言する
   - design.md の表のとおり、8 つのパスの規則（データ URL・静的ファイル・秘密の値の区切り・API の区切り・残すページ・`.md`・ゴミ箱・ページ表示）をこの順で宣言する
   - データ URL の locale は `AllLang` で判定する
-  - 共通で匿名化するパラメータ名（`q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token`）を宣言する
+  - 共通で匿名化するパラメータ名（`q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token`、`pagePath`、`prefix`、`fileNameOrId`、`options`）を宣言する
   - `/static/`・`/images/` は最後の区切りが静的ファイルの拡張子（design.md の一覧）で終わるときだけ静的ファイルとして残す。データ URL の中のパスはデコード前の外側のパスから切り出す。`.md` の規則はユーザーページも対象にする
   - 完了時: 規則と共通パラメータ名を 1 つにまとめた宣言が公開され、実行関数に渡して代表的な URL（ページ表示・データ URL・共有リンク・API のページパス・拡張子の無い `/images/<ページ>`）が期待どおりに匿名化される
   - _Requirements: 2.4, 2.5, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 7.1, 7.2, 7.3, 7.4_

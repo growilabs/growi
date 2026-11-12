@@ -10,7 +10,7 @@
 
 用語:
 
-- **利用者データ**: ページパス、検索キーワード（名前付き検索の名前を含む）、タグ名、ユーザー名、およびそれらの入力途中の断片。
+- **利用者データ**: ページパス、検索キーワード（名前付き検索の名前を含む）、タグ名、ユーザー名、添付ファイル名、およびそれらの入力途中の断片。
 - **秘密の値**: 知っているだけでアクセスや操作ができてしまう値。共有リンク ID、パスワード再設定トークン、ユーザー有効化トークン。
 - **URL 属性**: トレースの span に記録される、リクエスト URL を含む属性。`http.target`、`http.url`、`url.path`、`url.query`。
 - **一覧表**: 本 spec の「匿名化対象一覧」節。URL の形ごとに扱いを定める。
@@ -138,7 +138,7 @@
 
 | ID | パラメータ名 | 扱い | 規則 | 置換後の形 |
 |---|---|---|---|---|
-| `Q01` | `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token`（名前は最初の `[` より前の部分で比べるので、`name[]`・`name[0]`・`name[a][0]` の形も含む） | 匿名化する | `sensitive-query-params` | 値を `[ANONYMIZED]`（JSON 配列なら `["[ANONYMIZED]"]`） |
+| `Q01` | `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token`、`pagePath`、`prefix`、`fileNameOrId`、`options`（名前は最初の `[` より前の部分で比べるので、`name[]`・`name[0]`・`name[a][0]` の形も含む） | 匿名化する | `sensitive-query-params` | 値を `[ANONYMIZED]`（JSON 配列なら `["[ANONYMIZED]"]`） |
 
 ### ページ表示
 
@@ -199,6 +199,9 @@
 | `A07` | `GET /_api/v3/pages/list?path=`、`/subordinated-list?path=` | ページパス（`path`） | 匿名化する。`limit` などは残す | `sensitive-query-params` | `path=[ANONYMIZED]` |
 | `A08` | `GET /_api/pages.updatePost?path=` | ページパス（`path`） | 匿名化する | `sensitive-query-params` | `path=[ANONYMIZED]` |
 | `A09` | `/_api/v3/page/info?pageId=`、`/_api/v3/revisions/<id>` など、API で ID だけを含む URL | ページ・版の ID | 意図的にそのまま残す（ObjectId は利用者データでなく、閲覧には権限が要る） | （規則なし） | 変更なし |
+| `A10` | `GET /_api/lsx?pagePath=&options[filter]=&options[except]=&options[tag]=`（lsx プラグイン） | ページパス（`pagePath`）・ページパスの断片とタグ名（`options[...]`） | 匿名化する。`offset`・`limit` は残す。`options[depth]` なども同じ名前なのでまとめて匿名化される | `sensitive-query-params` | `pagePath=[ANONYMIZED]&options[filter]=[ANONYMIZED]&...` |
+| `A11` | `GET /_api/attachment-refs/ref?pagePath=&fileNameOrId=`（attachment-refs プラグイン） | ページパス（`pagePath`）・添付ファイル名（`fileNameOrId`） | 匿名化する | `sensitive-query-params` | `pagePath=[ANONYMIZED]&fileNameOrId=[ANONYMIZED]` |
+| `A12` | `GET /_api/attachment-refs/refs?pagePath=&prefix=&options[regexp]=`（attachment-refs プラグイン） | ページパス（`pagePath`・`prefix`）・ページパスの正規表現（`options[...]`） | 匿名化する | `sensitive-query-params` | `pagePath=[ANONYMIZED]&prefix=[ANONYMIZED]&options[regexp]=[ANONYMIZED]` |
 
 ### 秘密の値
 

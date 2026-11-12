@@ -12,4 +12,8 @@ export const SENSITIVE_QUERY_PARAMS: readonly string[] = [
   'shareLinkId',
   'searchFilter',
   'access_token',
+  'pagePath',
+  'prefix',
+  'fileNameOrId',
+  'options',
 ];

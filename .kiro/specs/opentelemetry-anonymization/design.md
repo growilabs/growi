@@ -48,7 +48,7 @@
 ### Revalidation Triggers
 
 - 利用者データ・秘密の値を**パスの区切り**に含むルートを追加・改名する → パスの規則と一覧表の行を追加する。
-- 利用者データを**新しい名前のクエリパラメータ**で受け取るエンドポイントを追加する → 全 URL 共通のパラメータ名に追加する（追加しないと漏れ、照合テストでも検出できない）。
+- 利用者データを**新しい名前のクエリパラメータ**で受け取るエンドポイントを追加する（`packages/*/src/server` のプラグインが登録するルートを含む） → 全 URL 共通のパラメータ名に追加する（追加しないと漏れ、照合テストでも検出できない）。
 - 静的ファイルの配信元（`public/` 直下、`express.static` のマウント先）を追加する。
 - Next.js のメジャー更新、または i18n・basePath・trailingSlash の設定変更 → データ URL の形が変わる。
 - `@growi/core` の `isCreatablePage` の禁止パターン、`isPermalink`、`AllLang` の変更。
@@ -311,7 +311,7 @@ export type AnonymizationRules = {
 | `page-view` | ユーザーページ（`isUserPage`）、またはページとして扱えるパス（`isPageRoute`） | `hash-page-path`（ユーザーページはユーザー名と配下を別々に、それ以外はパス全体をハッシュ化） |
 | （どれにも当てはまらない） | `/_api/...`、`/admin`、`/me`、`/login` などのシステムページ | 変えない |
 
-全 URL 共通で匿名化するクエリパラメータ（`SENSITIVE_QUERY_PARAMS`）: `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token`。
+全 URL 共通で匿名化するクエリパラメータ（`SENSITIVE_QUERY_PARAMS`）: `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token`、`pagePath`、`prefix`、`fileNameOrId`、`options`。
 
 - `isPageRoute` は既存の判定（`@growi/core` の `isCreatablePage` を、ページ名に使えない 1 文字の禁止文字を置き換えてから呼ぶ）を引き継ぐ。`.` による除外は行わない。
 - `secret-path-segments`・`api-path-segments` は、**デコード前**のパスを `/` で区切ってから型と照合し、置き換える（区切りの中の `%2F` を区切りとみなさないため。外部認証のユーザー名には文字の制約が無い）。それ以外の規則の判定とハッシュ化はデコード後のパスで行う。
