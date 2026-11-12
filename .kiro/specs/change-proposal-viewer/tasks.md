@@ -104,7 +104,7 @@
   - _Depends: 2.5, 3.2, 3.4_
 
 - [ ] 4. 頼む通知の server の処理（client のグループ 2・3 と並行してよい）
-- [ ] 4.1 (P) 頼む通知を送るサービスを作る
+- [x] 4.1 (P) 頼む通知を送るサービスを作る
   - サービスは、core の router から渡る `getService`（core の `GetChangeProposalService`。`server/routes/read-access.ts`）を引数で受け取り、`getService().getForViewer(proposalId, sender)` で見られるかどうかを決める。`getForViewer` は core の server の barrel が export する関数ではなくサービスの関数なので、サービスを自分で作らない
   - 見られるかどうかを core の 1 件の取得（見る人ごとの絞り込み）だけで決め、見られなければ「見つからない」を返す。操作の中身は読まない
   - 自分の Change Proposal なら断る。依頼した人が有効なユーザーでなければ断る。同じ人・同じ Change Proposal の頼む通知の activity が 24 時間以内にあれば断る
