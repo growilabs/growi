@@ -7,8 +7,8 @@ import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-pat
 import { PathSeparator } from './PathSeparator';
 import {
   FIXED_PART_CLASS_NAME,
+  PAGE_NAME_CLASS_NAME,
   ROW_CLASS_NAME,
-  SEGMENT_CLASS_NAME,
 } from './truncated-path-row-classes';
 
 import styles from './SearchResultPagePath.module.scss';
@@ -41,8 +41,9 @@ const toKeyedParts = (parts: readonly PagePathPart[]): readonly KeyedPart[] => {
  * footprint rendering stay in the surrounding row component.
  *
  * The full path is always exposed via the native `title` attribute so that a
- * truncated path (either the static middle omission or the runtime per-segment
- * CSS ellipsis) can be inspected on hover without measuring the DOM.
+ * truncated path (either the middle omission or the page name's CSS ellipsis)
+ * can be inspected on hover without measuring the DOM. Ancestor segments are
+ * never character-truncated; only the page name is.
  */
 export const SearchResultPagePath = ({
   path,
@@ -66,14 +67,12 @@ export const SearchResultPagePath = ({
               <span className={`${FIXED_PART_CLASS_NAME} text-muted`}>…</span>
             ) : part.isPageName ? (
               <strong
-                className={`${styles.segment} ${styles['page-name']} ${SEGMENT_CLASS_NAME}`}
+                className={`${styles['page-name']} ${PAGE_NAME_CLASS_NAME}`}
               >
                 {part.text}
               </strong>
             ) : (
-              <span className={`${styles.segment} ${SEGMENT_CLASS_NAME}`}>
-                {part.text}
-              </span>
+              <span className={FIXED_PART_CLASS_NAME}>{part.text}</span>
             )}
           </Fragment>
         ))

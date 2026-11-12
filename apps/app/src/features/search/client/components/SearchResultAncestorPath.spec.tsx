@@ -61,6 +61,18 @@ describe('SearchResultAncestorPath', () => {
     });
   });
 
+  describe('ancestor segments are never character-truncated (Requirement 3.4, 3.5)', () => {
+    it('does not apply the character-level ellipsis class to any ancestor link', () => {
+      render(<SearchResultAncestorPath path={DEEP_PATH} />);
+
+      for (const name of ['Projects', 'notes']) {
+        expect(screen.getByRole('link', { name })).not.toHaveClass(
+          'text-truncate',
+        );
+      }
+    });
+  });
+
   describe('search keyword highlight (Requirement 6.1, 6.2)', () => {
     it('reflects <em> highlight markup on a surviving segment', () => {
       const { container } = render(

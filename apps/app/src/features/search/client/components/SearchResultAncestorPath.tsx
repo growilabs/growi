@@ -12,7 +12,6 @@ import { PathSeparator } from './PathSeparator';
 import {
   FIXED_PART_CLASS_NAME,
   ROW_CLASS_NAME,
-  SEGMENT_CLASS_NAME,
 } from './truncated-path-row-classes';
 
 import styles from './SearchResultAncestorPath.module.scss';
@@ -31,7 +30,8 @@ const ROOT_LINKED_PAGE_PATH = new LinkedPagePath('/');
 // A surviving ancestor segment (`link`) is rendered as a next/link, either as
 // plain text or, when a corresponding highlight was resolved, with the
 // Elasticsearch <em> markup applied. `ellipsis` renders as plain, non-link text
-// (Requirement 5.2: the ellipsis is never itself a navigation target).
+// (Requirement 5.2: the ellipsis is never itself a navigation target). Neither
+// ever shrinks: an ancestor is shown in full or collapsed into the ellipsis.
 const AncestorNode = ({
   node,
 }: {
@@ -42,11 +42,7 @@ const AncestorNode = ({
   }
 
   return (
-    <Link
-      href={node.href}
-      prefetch={false}
-      className={`${styles.segment} ${SEGMENT_CLASS_NAME}`}
-    >
+    <Link href={node.href} prefetch={false} className={FIXED_PART_CLASS_NAME}>
       {node.highlightedHtml != null ? (
         <span
           // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight markup is sanitized

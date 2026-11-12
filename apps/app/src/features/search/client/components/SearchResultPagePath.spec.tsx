@@ -80,6 +80,37 @@ describe('SearchResultPagePath', () => {
     });
   });
 
+  describe('character truncation is limited to the page name (Requirement 3.4, 3.6)', () => {
+    // Bootstrap's character-level ellipsis utility
+    const CHAR_TRUNCATION_CLASS = 'text-truncate';
+
+    it('should apply character truncation to the page name', () => {
+      render(
+        <SearchResultPagePath path="/Projects/GROWI/GROWI.cloud/team/notes/memo" />,
+      );
+
+      expect(screen.getByText('memo')).toHaveClass(CHAR_TRUNCATION_CLASS);
+    });
+
+    it('should never apply character truncation to a visible ancestor segment', () => {
+      render(
+        <SearchResultPagePath path="/Projects/GROWI/GROWI.cloud/team/notes/memo" />,
+      );
+
+      expect(screen.getByText('Projects')).not.toHaveClass(
+        CHAR_TRUNCATION_CLASS,
+      );
+      expect(screen.getByText('notes')).not.toHaveClass(CHAR_TRUNCATION_CLASS);
+    });
+
+    it('should character-truncate only the page name of a short path', () => {
+      render(<SearchResultPagePath path="/A/B" />);
+
+      expect(screen.getByText('A')).not.toHaveClass(CHAR_TRUNCATION_CLASS);
+      expect(screen.getByText('B')).toHaveClass(CHAR_TRUNCATION_CLASS);
+    });
+  });
+
   describe('one-line safety net (structure)', () => {
     it('should apply the single-line container class to the root element', () => {
       const { container } = render(<SearchResultPagePath path="/A/B" />);

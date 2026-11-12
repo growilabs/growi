@@ -1,10 +1,13 @@
-// Shared Notion-style middle-truncation row recipe: a single-line flex
-// container whose ancestor/page-name segments each truncate individually
-// with an ellipsis before the row itself is allowed to overflow.
+// Shared single-line path row recipe. Ancestor segments, separators and the
+// ellipsis marker never shrink, so an ancestor is always shown in full (never
+// character-truncated, never squeezed down to bare "/" separators). Only the
+// page name may shrink and truncate per character. Fitting a long path into the
+// row is the job of collapsing ancestors into the ellipsis (collapse levels);
+// the row's `overflow: hidden` is only the last-resort safety net.
 //
 // Only the properties Bootstrap has no utility for live here; the rest of the
 // recipe is applied as utility classes in the markup (see ROW_CLASS_NAME /
-// SEGMENT_CLASS_NAME / FIXED_PART_CLASS_NAME in truncated-path-row-classes.ts).
+// PAGE_NAME_CLASS_NAME / FIXED_PART_CLASS_NAME in truncated-path-row-classes.ts).
 //
 // Consumed by SearchResultPagePath.module.scss (search modal) and
 // SearchResultAncestorPath.module.scss (search results list) via `@use`. Not a
@@ -15,9 +18,8 @@
   min-width: 0;
 }
 
-@mixin segment {
-  // Highest shrink priority: ancestor/page-name segments give up space first,
-  // before the ellipsis marker or separators (which never shrink).
-  flex-shrink: 100;
+@mixin page-name {
+  // Lets the page name shrink below its content width so its per-character
+  // ellipsis can engage; it is the only part of the row allowed to shrink.
   min-width: 0;
 }

@@ -1,20 +1,15 @@
 @use './truncated-path-row' as t;
 
 // Single-line container. `min-width: 0` lets it shrink inside the flex row so
-// the inner ellipsis can engage instead of overflowing the modal width.
+// the page name's ellipsis can engage instead of overflowing the modal width.
 .search-result-page-path {
   @include t.row;
 }
 
-// Ancestor / page-name segments: truncate individually with an ellipsis.
-.segment {
-  @include t.segment;
-}
-
-// The page name shrinks last (small, but > 0 so it can still truncate as a
-// last resort, guaranteeing the line never overflows).
+// The page name is the only segment that shrinks and truncates per character;
+// ancestors keep their full width (see _truncated-path-row.scss).
 .page-name {
-  flex-shrink: 1;
+  @include t.page-name;
 }
 
 .separator {
