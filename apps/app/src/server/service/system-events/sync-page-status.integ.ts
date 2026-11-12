@@ -84,6 +84,11 @@ describe('SyncPageStatusService on a grant-only page update', () => {
     expect(laterUpdateListener).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ _id: page._id }),
       user,
+      {
+        previousGrant: PageGrant.GRANT_PUBLIC,
+        previousGrantedGroups: [],
+        previousGrantedUsers: [],
+      },
     );
   });
 });

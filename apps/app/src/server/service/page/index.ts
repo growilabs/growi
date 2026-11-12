@@ -74,6 +74,7 @@ import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
 import { prisma } from '~/utils/prisma';
 
+import { capturePreviousGrantState } from '../../events/page';
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { PathAlreadyExistsError } from '../../models/errors';
 import type { PageOperationDocument } from '../../models/page-operation';
@@ -5690,6 +5691,7 @@ class PageService implements IPageService {
       newPageData.descendantCount = 0;
     }
 
+    const updateEventExtras = capturePreviousGrantState(newPageData);
     newPageData.applyScope(user, grant, grantUserGroupIds);
 
     // Update body
@@ -5698,6 +5700,7 @@ class PageService implements IPageService {
 
     // With a body, pushRevision saves the pending field changes together with the revision.
     let savedPage = newPageData;
+    let populateError: unknown;
     if (shouldUpdateBody) {
       const origin = options.origin;
       const newRevision = prisma.revisions.prepareRevision(
@@ -5711,12 +5714,21 @@ class PageService implements IPageService {
       savedPage = await pushRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
-      await this.populateSavedPageForUpdate(savedPage, user);
+      // The update is already stored, so 'update' is still emitted below if
+      // populating fails; otherwise search and Vault would keep the old grant.
+      try {
+        await savedPage.populateDataToShowRevision();
+      } catch (err) {
+        populateError = err;
+      }
     } else {
       savedPage = await savedPage.save();
     }
 
-    this.pageEvent.emit('update', savedPage, user);
+    this.pageEvent.emit('update', savedPage, user, updateEventExtras);
+    if (populateError != null) {
+      throw populateError;
+    }
 
     // Update ex children's parent
     if (!wasOnTree && shouldBeOnTree) {
@@ -5799,6 +5811,7 @@ class PageService implements IPageService {
       grant,
       grantUserGroupIds,
     );
+    const updateEventExtras = capturePreviousGrantState(pageData);
     pageData.applyScope(user, grant, grantUserGroupIds);
 
     // Update revision
@@ -5807,6 +5820,7 @@ class PageService implements IPageService {
 
     // With a body, pushRevision saves the pending field changes together with the revision.
     let savedPage = pageData;
+    let populateError: unknown;
     if (shouldUpdateBody) {
       const newRevision = prisma.revisions.prepareRevision(
         pageData,
@@ -5819,9 +5833,19 @@ class PageService implements IPageService {
       savedPage = await pushRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
-      await this.populateSavedPageForUpdate(savedPage, user);
+      // Same as updatePage: 'update' is still emitted below if populating fails.
+      try {
+        await savedPage.populateDataToShowRevision();
+      } catch (err) {
+        populateError = err;
+      }
     } else {
       savedPage = await savedPage.save();
+    }
+
+    this.pageEvent.emit('update', savedPage, user, updateEventExtras);
+    if (populateError != null) {
+      throw populateError;
     }
 
     // update scopes for descendants
@@ -5829,26 +5853,7 @@ class PageService implements IPageService {
       this.applyScopesToDescendantsWithStream(savedPage, user, true);
     }
 
-    this.pageEvent.emit('update', savedPage, user);
-
     return savedPage;
-  }
-
-  /**
-   * The update is already stored, so 'update' is emitted even when populating
-   * fails; otherwise the listeners that mirror the page (search) would keep
-   * its old grant.
-   */
-  private async populateSavedPageForUpdate(
-    savedPage: HydratedDocument<PageDocument>,
-    user: IUserHasId,
-  ): Promise<void> {
-    try {
-      await savedPage.populateDataToShowRevision();
-    } catch (err) {
-      this.pageEvent.emit('update', savedPage, user);
-      throw err;
-    }
   }
 
   /**
