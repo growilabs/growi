@@ -1,18 +1,43 @@
-import type { JSX } from 'react';
+import { type JSX, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
 import type { ChangeProposalView } from '../../../../interfaces';
 import { useSWRxChangeProposal } from '../../stores/use-swrx-change-proposal';
 import { OperationItem } from '../OperationItem';
 import { ProposalSummaryHeader } from './ProposalSummaryHeader';
+import { RevertAllButton } from './RevertAllButton';
+import type { RevertRun } from './RevertResultList';
+import { RevertResultList } from './RevertResultList';
 
 type ChangeProposalDetailProps = { readonly proposalId: string };
+
+const useLastFoundProposal = (
+  proposalId: string,
+  current: ChangeProposalView | null,
+): ChangeProposalView | null => {
+  const [lastFound, setLastFound] = useState<ChangeProposalView | null>(null);
+  useEffect(() => {
+    if (current != null) {
+      setLastFound(current);
+    }
+  }, [current]);
+  return lastFound?.id === proposalId ? lastFound : null;
+};
 
 export const ChangeProposalDetail = ({
   proposalId,
 }: ChangeProposalDetailProps): JSX.Element | null => {
   const { t } = useTranslation();
   const { data, error } = useSWRxChangeProposal(proposalId);
+  const [revertState, setRevertState] = useState<{
+    readonly proposalId: string;
+    readonly run: RevertRun;
+  } | null>(null);
+  const revertRun =
+    revertState?.proposalId === proposalId ? revertState.run : null;
+
+  const found = data?.type === 'found' ? data.proposal : null;
+  const lastFound = useLastFoundProposal(proposalId, found);
 
   if (error != null) {
     return (
@@ -24,7 +49,11 @@ export const ChangeProposalDetail = ({
   if (data == null) {
     return null;
   }
-  if (data.type === 'not-found') {
+
+  // See design.md (ChangeProposalDetail) for why a not-found refetch is
+  // ignored while a revert result is shown.
+  const proposal = found ?? (revertRun != null ? lastFound : null);
+  if (proposal == null) {
     return (
       <div className="alert alert-secondary">
         {t('change_proposal_viewer.detail.not_found')}
@@ -32,11 +61,20 @@ export const ChangeProposalDetail = ({
     );
   }
 
-  const proposal: ChangeProposalView = data.proposal;
-
   return (
     <div>
       <ProposalSummaryHeader proposal={proposal} />
+      <RevertAllButton
+        proposal={proposal}
+        onReverted={(run) => setRevertState({ proposalId, run })}
+      />
+      {revertRun != null && (
+        <RevertResultList
+          proposalId={proposalId}
+          run={revertRun}
+          originalOperations={proposal.operations}
+        />
+      )}
       <section>
         <h2 className="h5">{t('change_proposal_viewer.detail.operations')}</h2>
         {proposal.operations.map((operation) => (
