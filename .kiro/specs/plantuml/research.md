@@ -81,6 +81,10 @@
 - **理由**: 非 UML 図種（board/gantt/json/mindmap/salt/wbs/wire/yaml）の配色は `<style>` でしか付けられない。消すとダークモードでその図種が読めなくなる（全体の既定文字色は無く、背景は透明）。しかも定義を消しても deflate が既に圧縮しているため、ほとんど縮まない。`sequenceDiagram` と `timingDiagram` は UML 図なので、どの場合も残す。
 - 図の種類ごとにテーマを切り替えることはしない（図種が増えるたびに保守が要るため）。テーマを完全に無くすこともしない（ダークモードで白い図が浮くため）。
 
+### POST の失敗を GET でやり直さない
+- **決定**: POST で描画できなかったときに、自動で GET で送り直すことはしない。
+- **理由**: 失敗のたびにリクエストが2回になり、POST 非対応や CORS の設定漏れといった本当の原因が見えにくくなる。管理者が原因を知って `PLANTUML_HTTP_METHOD=get` を選べるよう、エラーメッセージで案内する。
+
 ### Changeset は作らない
 `@growi/app` は `.changeset/config.json` の ignore 対象で、かつ private。changeset を足しても何も bump されず、changesets/action がリリース PR の作成で止まり、publish まで進まなくなる（commit `1d0a0d9f7a` 参照）。app のリリースノートは release-drafter が作る。
 
@@ -96,21 +100,8 @@
 対処:
 - エラーメッセージで、管理者が `PLANTUML_HTTP_METHOD=get` を設定すれば元に戻せることを案内する。
 - リリースノートで、自前サーバーの環境は POST に切り替わることと、戻し方を知らせる（spec の範囲外の作業）。
-- POST が失敗したときに、自動で GET でやり直す仕組みは入れていない。入れるかどうかは未決（下の「未決事項」）。
+- POST が失敗したときに、自動で GET でやり直すことはしない（「Decisions」の「POST の失敗を GET でやり直さない」を参照）。
 
 ### その他
 - 公開 plantuml.com が将来 POST を受け付けるようになっても、送信先で判定する方式なので GET のまま動き続ける。
-- GET で構文エラーの SVG（400）を `<img>` が表示するか onError になるかは、実ブラウザで確かめていない（タスク 4.2）。どちらでも今より悪くはならない（表示されるなら今も後も表示され、onError なら今は空表示のところに「描画できなかった」が出る）。ただし onError の場合、GET では構文エラーだと分からず、POST（エラー画像を表示する）と見え方がそろわない。
-
-## 未決事項
-- **POST が失敗したら GET でやり直すか**: 入れると、POST に対応していない自前サーバーでも、管理者が何もせずに今までどおり描ける。一方で、失敗のたびにリクエストが2回になり、本当の設定ミスが見えにくくなる。今の spec には入れていない。
-
-## 既存コードの把握（実装の手がかり）
-- テーマを付ける処理: `features/plantuml/services/plantuml.ts`。コードブロックの先頭にテーマを付け、`@akebifiky/remark-simple-plantuml` で画像ノードにしてから `<plantuml src>` 要素に置き換える。`plantumlUri` が空なら要素を作らない。
-- テーマ資産: `themes/carbon-gray-{common,light,dark}.puml.ts`。文字列を default export するだけの TS モジュール。light／dark は common を内挿する。
-- 表示: `features/plantuml/components/PlantUmlViewer.tsx`。`onLoad`／`onError` のどちらでも描画中ステータスを `'false'` にするだけ。
-- レンダラへの登録: `client/services/renderer/renderer.tsx` の3か所（通常表示・簡易表示・プレビュー）。どれも `RendererConfig` を受け取る。
-- 設定の受け渡し: `configuration-props.ts` の `getServerSideRendererConfigProps`。共有リンク用はこれを引き継ぐ。ブラウザ側では `useRendererConfig()` で読める。
-- 失敗時のログとステータス切り替えの手本: `features/mermaid/components/MermaidViewer.tsx`。
-- i18n の手本: `DrawioViewerWithEditButton.tsx`（`useTranslation` と `t()`）。
-- SSR と PDF 一括エクスポート: SSR 用レンダラは plantuml プラグインを登録しておらず、図はハイドレーション後にブラウザで描かれる。`page-bulk-export` は plantuml を `<pre>`／`<code>` のまま出力する。
+- GET で構文エラーの SVG（400）を `<img>` が表示するか onError になるかは、実ブラウザで確かめていない（タスク 4.2）。どちらでも今より悪くはならない（表示されるなら今も後も表示され、onError なら今は空表示のところに「描画できなかった」が出る）。ただし onError の場合、GET では構文エラーだと分からず、POST（エラー画像を表示
