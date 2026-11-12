@@ -199,7 +199,7 @@ export function resolvePlantumlHttpMethod(
 export const PLANTUML_GET_URL_LIKELY_TOO_LONG: number;
 ```
 - 判定の順序は「System Flows / 決定事項」のとおり。
-- 目安値は、公開 plantuml.com で GET が失敗し始める `src.length`（URL 全体の長さ）を実測して決める（タスク 1.2）。既存の実測では、8,318字で失敗し 6,882字で成功している。上限の正体は Tomcat の `maxHttpHeaderSize` 既定値 8192（リクエスト行とヘッダの合計）と見られる。
+- 目安値は 6800 とする（タスク 1.2 の実測。根拠は research.md）。公開 plantuml.com へブラウザ相当のヘッダで送ると、`src.length`（URL 全体の長さ）が約 7,026 から失敗する。上限の正体は Tomcat の `maxHttpHeaderSize` 既定値 8192（リクエスト行とヘッダの合計）で、途中の Cloudflare などがヘッダを足すため、URL だけで測ると 8192 より短い値で失敗する。
 
 ### plantumlHttpMethod config — 新規
 - `config-definition.ts` に `'app:plantumlHttpMethod': defineConfig<string | undefined>({ envVarName: 'PLANTUML_HTTP_METHOD', defaultValue: undefined })` を追加する。
