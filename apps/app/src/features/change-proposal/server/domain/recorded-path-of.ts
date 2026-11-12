@@ -1,4 +1,15 @@
-import type { OperationRecord } from '../../interfaces';
+import type { ProposalMark } from '../../interfaces';
+
+// Narrow on purpose: operations read without their bodies are accepted as well
+// as full operation records.
+type RecordedPathSource =
+  | { readonly type: 'create'; readonly path: string }
+  | { readonly type: 'move'; readonly toPath: string }
+  | { readonly type: 'edit'; readonly appliedPagePath?: string }
+  | {
+      readonly type: 'delete-completely';
+      readonly revertTarget?: ProposalMark;
+    };
 
 /**
  * The path of an operation's page as recorded on the operation, for a page that
@@ -6,7 +17,7 @@ import type { OperationRecord } from '../../interfaces';
  * `collectCreatedPaths`, used for a delete-completely that reverts a create.
  */
 export const recordedPathOf = (
-  op: OperationRecord,
+  op: RecordedPathSource,
   createdPaths: ReadonlyMap<string, string>,
 ): string | undefined => {
   switch (op.type) {

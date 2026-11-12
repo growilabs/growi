@@ -148,9 +148,8 @@ const buildNotificationInputs = async ({
       if (pages.length === 0) {
         return null;
       }
-      // The original requester may not be able to open the revert proposal (its
-      // deleted pages are shown to the reverter only), but always sees the
-      // original, where every reverted operation is recorded.
+      // The original requester is pointed at the original, where every operation
+      // they asked for is recorded together with whether it was reverted.
       const linked = isOriginalRequester
         ? { proposalId: original._id, entry: original.entry }
         : {};

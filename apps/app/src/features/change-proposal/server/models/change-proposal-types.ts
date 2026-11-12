@@ -70,6 +70,18 @@ export type LinkedProposalRecord = {
     readonly status: OperationStatus;
     readonly pageId?: string;
     readonly resultPageId?: string;
+    readonly revertedByProposalId?: string;
+  }[];
+};
+
+// `path` is the stored field: a create's target path, or an edit's page path when applied.
+export type RevertCounterpartRecord = {
+  readonly id: string;
+  readonly requester: string;
+  readonly operations: readonly {
+    readonly key: string;
+    readonly type: OperationType;
+    readonly path?: string;
   }[];
 };
 

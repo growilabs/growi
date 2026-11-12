@@ -278,7 +278,7 @@
   - 単体テストで、`toOutcomeData` が `appliedPagePath` のあるときだけ `path` を書くこと、編集の行の `path` が `appliedPagePath` になり、`path` の無い編集の行も今までどおり読めることを確かめている。結合テストで、編集の反映（取り消しの Change Proposal の編集を含む）のあとに操作の記録に反映した時点のページのパスが残ること、止まったあとのやり直しでも残ることを確かめている
   - _Requirements: 2.1, 3.11_
   - _Boundary: core interfaces, server/models (change-proposal-query-parts, to-change-proposal-document, change-proposal-types), operation-handlers/edit, operation-handlers/types, proposal-applier_
-- [ ] 8.4 見え方とパスの決まりを使うすべての処理を直す（8.1・8.2・8.3 のあと）
+- [x] 8.4 見え方とパスの決まりを使うすべての処理を直す（8.1・8.2・8.3 のあと）
   - `server/models/change-proposal.ts` に、Change Proposal の ID の一覧から、それぞれの依頼した人と、操作の `key`・`type`・`path` を 1 回の問い合わせで読む Prisma の拡張の関数 `findRevertCounterparts` を足す。`findLinkedProposals` の操作の select に `revertedByProposalId` を足し、`server/models/change-proposal-types.ts` の `LinkedProposalRecord` の操作の型にも足す（一覧が使う `summarySelect` は、すでに `revertOf`・`revertedByProposalId`・`path`・`toPath` を読んでいる）。`interfaces/api.ts` の `ChangeProposalSummaryView.pages` の要素の `path` を任意にする
   - `server/services/proposal-view-parts.ts` の `contextFor` が、取り消しの相手の 2 つの値を受け取るようにする。`selectVisibleOperations` に通す Change Proposal から、取り消しの Change Proposal の `revertOf` と、ページがもう無い操作の `revertedByProposalId` を集めて `findRevertCounterparts` で 1 回で読み、Change Proposal ごとに 2 つの値と、完全な削除の操作のパスの表（`collectCreatedPaths`）を決める共通の処理を作る
   - その共通の処理を、`proposal-query.ts`（1 件の取得、後続・見直しと元へのつながりの判定）と `proposal-list-query.ts`（自分の一覧と、反映済みの一覧の 1 回分ごと）で使う。どれも文書ごとには読まない
