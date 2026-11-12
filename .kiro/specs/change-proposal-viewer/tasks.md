@@ -186,7 +186,7 @@
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.8_
   - _Boundary: ChangeProposalNotification_
   - _Depends: 1.2, 2.4_
-- [ ] 5.10 詳細ページと一覧のページを `/me/change-proposals` の下に作る
+- [x] 5.10 詳細ページと一覧のページを `/me/change-proposals` の下に作る
   - `pages/me/change-proposals/` に一覧と詳細の 2 つのページを置き、既存の `/me` の画面と同じ props と layout で、部品をブラウザだけで読み込む
   - ID の形が正しくなければ、取得せずに「見つからない」を出す
   - 詳細ページの route が、core の `buildProposalHref`（`client/shared/`）が作る URL と一致していることを確かめている
