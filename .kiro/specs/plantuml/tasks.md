@@ -107,6 +107,7 @@
   - 完了条件: 図種ごとの確認結果（スクリーンショットかチェックリスト）が残っている
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
   - _Depends: 1.1_
+  - _Blocked: この実行環境には実ブラウザ（Chromium / Playwright）が無く、図種ごとのライト・ダークの見た目を確かめられない。実ブラウザのある環境で確認する（MANUAL_VERIFY_REQUIRED）_
 
 - [ ] 4.2 実ブラウザで両方の方式を確認する
   - 公開 plantuml.com の場合:
@@ -121,5 +122,6 @@
   - 完了条件: 確認結果が research.md に記録されている
   - _Requirements: 1.1, 1.2, 2.1, 3.1, 3.2, 3.3, 3.5, 6.2, 6.3, 9.1_
   - _Depends: 2.3, 3.5_
+  - _Blocked: この実行環境には実ブラウザと docker が無く、公開 plantuml.com・自前 plantuml-server・CORS なしプロキシでの実機確認ができない。実ブラウザと docker のある環境で確認し、結果を research.md に記録する（MANUAL_VERIFY_REQUIRED）_
 
 > Changeset は作らない。`@growi/app` は `.changeset/config.json` の ignore 対象かつ private なので、changeset を追加しても何も bump されず、リリース PR の作成が止まる。app のリリースノートは release-drafter が作る。
