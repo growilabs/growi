@@ -229,7 +229,7 @@ describe('Vault instructions written for a single-page update', () => {
     expect(await writtenInstructions(page)).toEqual([['upsert', 'public']]);
   });
 
-  describe('when the body save loses a revision conflict after the grant was saved', () => {
+  describe('when a save that changes body and grant loses a revision conflict', () => {
     const saveWithStaleRevision = async (
       page: HydratedDocument<PageDocument>,
     ): Promise<void> => {
@@ -250,7 +250,7 @@ describe('Vault instructions written for a single-page update', () => {
     it.each([
       { name: 'conflict-on-tree', onTree: true },
       { name: 'conflict-legacy', onTree: false },
-    ])('removes the page from public even if the save is given up ($name)', async ({
+    ])('keeps the grant and writes nothing ($name)', async ({
       name,
       onTree,
     }) => {
@@ -259,14 +259,20 @@ describe('Vault instructions written for a single-page update', () => {
       await saveWithStaleRevision(page);
       await deliverEmittedUpdates();
 
-      expect(await writtenInstructions(page)).toEqual([
-        ['remove', 'public'],
-        ['upsert', `user-${editor._id}-only-me`],
-      ]);
+      expect((await Page.findById(page._id).orFail()).grant).toBe(
+        PageGrant.GRANT_PUBLIC,
+      );
+      expect(await writtenInstructions(page)).toEqual([]);
     });
 
-    it('removes the page from public when the save is retried from a fresh read', async () => {
-      const page = await createPublicPage('conflict-retry', true);
+    it.each([
+      { name: 'conflict-retry-on-tree', onTree: true },
+      { name: 'conflict-retry-legacy', onTree: false },
+    ])('moves the page once the save is retried from a fresh read ($name)', async ({
+      name,
+      onTree,
+    }) => {
+      const page = await createPublicPage(name, onTree);
 
       await saveWithStaleRevision(page);
       const reread = await Page.findById(page._id).orFail();
@@ -282,10 +288,10 @@ describe('Vault instructions written for a single-page update', () => {
       );
       await deliverEmittedUpdates();
 
-      const written = await writtenInstructions(page);
-      expect(written).toContainEqual(['remove', 'public']);
-      expect(written).not.toContainEqual(['upsert', 'public']);
-      expect(written).toContainEqual(['upsert', `user-${editor._id}-only-me`]);
+      expect(await writtenInstructions(page)).toEqual([
+        ['remove', 'public'],
+        ['upsert', `user-${editor._id}-only-me`],
+      ]);
     });
   });
 
