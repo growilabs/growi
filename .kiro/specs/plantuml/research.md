@@ -1,0 +1,116 @@
+# Research & Design Decisions — plantuml
+
+## 問題の原因（調査で確定）
+
+問い合わせ: GROWI v3.3.8 から v7 系へ移行した後、一部の PlantUML 図だけが空表示になる（構文エラーは出ない）。同じページの他の図は描画される。ネームスペース名やクラス名を変えると描画される。Redmine #187170。
+
+- 原因は文字数や文字種の制限ではない。図を PlantUML サーバーへ送る GET の URL が長すぎて拒否されている。
+- 移行後に表に出た主な原因は、v7 系の GROWI が各図の先頭に約14,000字のテーマを付けるようになり、URL が約2倍に膨らんだこと。v3.3.8 はテーマを付けていなかった。
+- 名前を変えると描画されるのは、単調な名前ほど deflate の圧縮が効いて URL が短くなるから（文字数が減るからではない）。
+
+## 実測
+
+### テーマの軽量化（2026-08、問い合わせの図・ライトテーマ）
+`plantuml-encoder` で「テーマ＋図」を符号化して測った。
+
+| 条件 | エンコード後 | URL 全体 | 8192 以内か |
+|---|---|---|---|
+| テーマ無し | 3,652 | 3,690 | 以内 |
+| 現行テーマ | 8,280 | **8,318** | **超過**（失敗の実態） |
+| ミニファイ後 | 6,844 | **6,882** | 以内（余裕 約1,310） |
+
+- テーマの生の長さは 14,581 → 11,331（22%減）。URL 全体は 17%減（1,436字）。
+- deflate は空白やインデントを既に圧縮するので、効いているのはコメントの削除。空白を消すだけではほぼ縮まない。
+- 8192 はリクエスト行とすべてのヘッダの合計。自前サーバーで Cookie が乗ると余裕が減る。公開 plantuml.com へは Cookie が乗らない。
+- **結論**: ミニファイだけで、問い合わせの図は GET のまま描画できる見込み。ただし 200 になることはタスク 1.2 で確かめる。
+
+### 公開 plantuml.com の応答（2026-11-12）
+
+| リクエスト | 応答 |
+|---|---|
+| `POST /plantuml/svg`（本文に図、`text/plain; charset=UTF-8`） | 302。本文は空で、見本の図「Bob -> Alice : hello」の URL へリダイレクトする |
+| 末尾 `/` 付き、`plantuml.com`（www なし）への POST | 302 で同じ見本の図へ、または 301 で www 付きへ |
+| 同じ図の GET | 200。送った図が描画される |
+| 構文エラーの図の GET | 400、`image/svg+xml`、`Access-Control-Allow-Origin: *`（エラーを描いた SVG） |
+| URL 約10,000字の GET | 400、`text/html`（Tomcat のエラーページ）、CORS ヘッダ無し |
+
+- 公開 plantuml.com は POST の本文を無視する。サーバーは Cloudflare の後ろにあり、公式ドキュメントに POST の説明は無い。理由は分からないが、POST は使えないものとして扱う。
+- URL が上限を超えたときは、画像でない応答が返る。そのため `<img>` は onError になる。
+
+### plantuml-server の POST の仕様（ソースと実機で確認、2026-08）
+- `UmlDiagramService.doPost()` が本文の生のテキストを読み、リダイレクトせずに画像を返す（PR #74 で 2018-04 に追加）。設定は要らない。公式の Docker イメージ（`plantuml/plantuml-server:jetty`）でもそのまま POST が使える。POST 先は `/svg`。
+- 本文は生のテキスト（deflate＋base64 は GET のときだけ）。
+- `doPost` は文字コードを決めていない。`Content-Type: text/plain; charset=UTF-8` を付けないと ISO-8859-1 として読まれ、日本語が文字化けする。
+- `DiagramResponse.sendDiagram()` の先頭で `Access-Control-Allow-Origin: *` を付ける。図も構文エラーの画像も、ブラウザから読める。
+- 構文エラーは 400 と、エラーを描いた画像。
+- 自前サーバーでの PoC: URL が 17,929字になる図で、GET は 414、同じ図の POST は 200（正しい SVG）。
+
+## Decisions
+
+### 送信方式は送信先で決める
+- **決定**: 既定では、公開 plantuml.com（`*.plantuml.com` を含む）には GET、それ以外には POST で送る。`PLANTUML_HTTP_METHOD=get` を指定すれば常に GET にする。POST を強制する値は用意しない。
+- **理由**: 本来はすべて POST にしたいが、公開 plantuml.com は POST を受け付けない。方式の選び方を管理者に任せる（既定 GET の opt-in）と、自前サーバーの環境でも、管理者が気付いて設定するまで大きい図が描けないままになる。
+- **影響**: 自前サーバーの環境は、アップデートしただけで POST に切り替わる（下の「リスク」を参照）。
+
+### GROWI サーバーで中継しない（ブラウザから直接 POST する）
+- **決定**: POST も GET と同じく、閲覧者のブラウザから PlantUML サーバーへ直接送る。
+- **理由**:
+  - 中継すると、PlantUML サーバーへ送る主体が「ブラウザ」から「GROWI サーバー」に変わる。ブラウザからは届くが GROWI サーバーからは届かない送信先（例: `PLANTUML_URI=http://localhost:8080/...`）が壊れる。
+  - 中継をやめると、そのために要る仕組みがまとめて要らなくなる。GROWI の新しい API、認証と共有リンクの扱い、SSRF 対策、本文サイズの検査、サーバー側キャッシュ（`lru-cache`）、エディタのプレビューでキャッシュが汚れる問題への対策がそれにあたる。
+  - 直接 POST を退ける理由として挙がっていたものは、どれも当たらない。CORS は plantuml-server が許可ヘッダを付ける。サーバーをブラウザに見せる点は今の GET も同じ。サニタイズは `<img>` で表示すれば要らない。
+- **失うもの**: サーバー側のキャッシュ。閲覧中のメモで同じ図の送り直しは防げる。
+
+### リダイレクトは追わずに検出する
+- **決定**: `fetch` に `redirect: 'manual'` を指定し、`res.type === 'opaqueredirect'` なら「POST が使えない」とする。
+- **理由**: `'follow'` だと、POST 非対応のサーバーが返す見本の図を黙って表示してしまう。`'error'` だと、接続失敗や CORS 失敗と同じ例外になり区別できない。
+
+### 構文エラーの SVG は図として表示する
+- **決定**: `image/svg+xml` の応答は、ステータスが 400 でも図として表示する。
+- **理由**: PlantUML は構文エラーを画像に描いて返す。書いた人が誤りに気付ける、PlantUML 本来の見せ方なので、エラー表示に置き換えない。
+
+### GET の失敗は onError で検知し、長さで止めない
+- **決定**: GET の失敗は `<img>` の onError で検知する。URL 長の目安値は、失敗後のメッセージを選ぶためだけに使う。
+- **理由**: URL の上限はサーバーごとに違う（Tomcat 既定 8192、上限を上げた自前サーバーなど）。長さでリクエストを止めると、描ける図まで消える。onError は実際の失敗だけを捕まえる。
+
+### POST を勧める案内は出さない
+- **決定**: GET で失敗したときに「自前サーバーと POST で解決できる」と案内する機能は作らない。
+- **理由**: 送信先で方式を選ぶようにしたので、自前サーバーの環境は既定で POST になる。この案内が当てはまるのは「自前サーバーなのに GET を明示した」環境だけで、そうした管理者は事情を分かって選んでいる。
+
+### テーマはミニファイで軽くし、定義は消さない
+- **決定**: コメント行・行頭の空白・空行だけを消す。配色・skinparam・`<style>` の定義は消さない。
+- **理由**: 非 UML 図種（board/gantt/json/mindmap/salt/wbs/wire/yaml）の配色は `<style>` でしか付けられない。消すとダークモードでその図種が読めなくなる（全体の既定文字色は無く、背景は透明）。しかも定義を消しても deflate が既に圧縮しているため、ほとんど縮まない。`sequenceDiagram` と `timingDiagram` は UML 図なので、どの場合も残す。
+- 図の種類ごとにテーマを切り替えることはしない（図種が増えるたびに保守が要るため）。テーマを完全に無くすこともしない（ダークモードで白い図が浮くため）。
+
+### Changeset は作らない
+`@growi/app` は `.changeset/config.json` の ignore 対象で、かつ private。changeset を足しても何も bump されず、changesets/action がリリース PR の作成で止まり、publish まで進まなくなる（commit `1d0a0d9f7a` 参照）。app のリリースノートは release-drafter が作る。
+
+## リスク
+
+### 自前サーバーの環境は、アップデートだけで POST に切り替わる
+`<img>` の GET は、サーバー側に何も求めない。一方、ブラウザからの `fetch` の POST には、次の条件が要る。どれかが欠けると、今まで描けていた図が「POST に対応していないか、接続できない」のエラーになる。
+
+- **CORS の許可ヘッダ**: plantuml-server は図の応答に付ける。ただし、手前の認証プロキシや nginx がエラーを返す場合や、plantuml-server 以外の互換サーバーでは付かないことがある。
+- **POST 対応**: plantuml-server は 2018 年以降対応している。それ以外の互換サーバーは実装による。
+- **混在コンテンツ**: GROWI が https で `PLANTUML_URI` が http の場合、ブラウザは http への `fetch` を止める。ただし `<img>` の http も、Chrome などの現行のブラウザは https へ自動で切り替え、https が無ければ失敗する。そのため GET でも既に描画できていない可能性が高く、差は小さい（実ブラウザでは未確認）。
+
+対処:
+- エラーメッセージで、管理者が `PLANTUML_HTTP_METHOD=get` を設定すれば元に戻せることを案内する。
+- リリースノートで、自前サーバーの環境は POST に切り替わることと、戻し方を知らせる（spec の範囲外の作業）。
+- POST が失敗したときに、自動で GET でやり直す仕組みは入れていない。入れるかどうかは未決（下の「未決事項」）。
+
+### その他
+- 公開 plantuml.com が将来 POST を受け付けるようになっても、送信先で判定する方式なので GET のまま動き続ける。
+- GET で構文エラーの SVG（400）を `<img>` が表示するか onError になるかは、実ブラウザで確かめていない（タスク 4.2）。どちらでも今より悪くはならない（表示されるなら今も後も表示され、onError なら今は空表示のところに「描画できなかった」が出る）。ただし onError の場合、GET では構文エラーだと分からず、POST（エラー画像を表示する）と見え方がそろわない。
+
+## 未決事項
+- **POST が失敗したら GET でやり直すか**: 入れると、POST に対応していない自前サーバーでも、管理者が何もせずに今までどおり描ける。一方で、失敗のたびにリクエストが2回になり、本当の設定ミスが見えにくくなる。今の spec には入れていない。
+
+## 既存コードの把握（実装の手がかり）
+- テーマを付ける処理: `features/plantuml/services/plantuml.ts`。コードブロックの先頭にテーマを付け、`@akebifiky/remark-simple-plantuml` で画像ノードにしてから `<plantuml src>` 要素に置き換える。`plantumlUri` が空なら要素を作らない。
+- テーマ資産: `themes/carbon-gray-{common,light,dark}.puml.ts`。文字列を default export するだけの TS モジュール。light／dark は common を内挿する。
+- 表示: `features/plantuml/components/PlantUmlViewer.tsx`。`onLoad`／`onError` のどちらでも描画中ステータスを `'false'` にするだけ。
+- レンダラへの登録: `client/services/renderer/renderer.tsx` の3か所（通常表示・簡易表示・プレビュー）。どれも `RendererConfig` を受け取る。
+- 設定の受け渡し: `configuration-props.ts` の `getServerSideRendererConfigProps`。共有リンク用はこれを引き継ぐ。ブラウザ側では `useRendererConfig()` で読める。
+- 失敗時のログとステータス切り替えの手本: `features/mermaid/components/MermaidViewer.tsx`。
+- i18n の手本: `DrawioViewerWithEditButton.tsx`（`useTranslation` と `t()`）。
+- SSR と PDF 一括エクスポート: SSR 用レンダラは plantuml プラグインを登録しておらず、図はハイドレーション後にブラウザで描かれる。`page-bulk-export` は plantuml を `<pre>`／`<code>` のまま出力する。
