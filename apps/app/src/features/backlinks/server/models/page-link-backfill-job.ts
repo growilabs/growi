@@ -62,9 +62,8 @@ export const createPageLinkBackfillJobModel = (
 
     /**
      * Atomically claim the job for `owner`. Succeeds only for a `requested` job, or for a
-     * `running` / `failed` one that nobody holds or whose holder's lease has expired. An
-     * `idle`, `stopped` or `complete` job is never handed out, so an admin's cancel or Stop
-     * that lands between the caller's read and this call is not overridden.
+     * `running` / `failed` one that nobody holds or whose holder's lease has expired. Any
+     * other status is never handed out (rationale: design.md, "Stop and resume").
      *
      * A claim clears any stale `stopRequested`, in the same write.
      *
