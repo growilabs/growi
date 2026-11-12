@@ -32,7 +32,7 @@ const ROOT_LINKED_PAGE_PATH = new LinkedPagePath('/');
 // A surviving ancestor segment (`link`) is rendered as a next/link, either as
 // plain text or, when a corresponding highlight was resolved, with the
 // Elasticsearch <em> markup applied. `ellipsis` renders as plain, non-link text
-// (Requirement 5.2: the ellipsis is never itself a navigation target). Neither
+// (the ellipsis is never itself a navigation target). Neither
 // ever shrinks: an ancestor is shown in full or collapsed into the ellipsis.
 const AncestorNode = ({
   node,
@@ -72,7 +72,7 @@ const nodeKey = (node: AncestorPathNode): string =>
  * container's width must come from the parent, not its content. Surviving
  * ancestor segments stay individually clickable and keep search-keyword
  * highlighting; the page name itself is rendered separately by the caller
- * (see research.md "Row 1 vs Row 2 scope").
+ * on its own row.
  *
  * The full path (including the page name) is always exposed via the native
  * `title` attribute so it can be inspected on hover, regardless of whether the
