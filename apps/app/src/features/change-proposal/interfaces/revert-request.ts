@@ -10,3 +10,9 @@ export type ChangeProposalRevertRequestSnapshot = {
   // '' when omitted; plain text
   readonly message: string;
 };
+
+export const REVERT_REQUEST_ERROR_CODES = {
+  ownProposal: 'own_proposal',
+  requesterUnavailable: 'requester_unavailable',
+  recentlySent: 'revert_request_recently_sent',
+} as const;

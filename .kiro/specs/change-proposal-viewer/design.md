@@ -711,7 +711,7 @@ function sendRevertRequest(args: {
 
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| POST | `/change-proposals/:id/revert-request` | `RevertRequestBody` | `{}` | 400 `validation`（文字数）、400 `own_proposal`、400 `requester_unavailable`、404 `notfound`、409 `revert_request_recently_sent` |
+| POST | `/change-proposals/:id/revert-request` | `RevertRequestBody` | `{}` | 400 `validation_failed`（文字数。`apiV3FormValidator` が出す既定の code）、400 `own_proposal`、400 `requester_unavailable`、404 `notfound`、409 `revert_request_recently_sent` |
 
 - 送れたときだけ、応答の前に `activityEvent.emit('update', res.locals.activity._id, { action: ACTION_CHANGE_PROPOSAL_REVERT_REQUEST, targetModel: 'ChangeProposal', target: proposalId })` を呼ぶ。4 番目の引数（target の文書）は渡さない（決まった形の通知の処理を動かさないため）。
 - 存在しない ID・形の正しくない ID・見られない Change Proposal・本人でなく見える操作に反映済み（反映済み・取り消し済み・取り消しを断られた）のものが無い（すべて待ちの場合を含む）、はすべて同じ 404 `notfound` にする（`page-write-action-403-404.md`）。この判定は core の `getForViewer` の結果だけで決まる。
@@ -776,7 +776,7 @@ viewer は新しいコレクションを作らない。core の型を使い、�
 - 通知は、読めない通知だけを表示しない。
 
 ### Error Categories and Responses
-- **頼む通知の API**: 入力の誤り（400 `validation`）、自分の Change Proposal（400 `own_proposal`）、依頼した人が無効（400 `requester_unavailable`）、見つからない（404 `notfound`）、短い間に送った（409 `revert_request_recently_sent`）。読み取り専用ユーザーは `excludeReadOnlyUser` の既存の応答。
+- **頼む通知の API**: 入力の誤り（400 `validation_failed`）、自分の Change Proposal（400 `own_proposal`）、依頼した人が無効（400 `requester_unavailable`）、見つからない（404 `notfound`）、短い間に送った（409 `revert_request_recently_sent`）。読み取り専用ユーザーは `excludeReadOnlyUser` の既存の応答。
 - **core の API の結果**: 404 は「見つからない」、取り消しの結果の操作ごとの「断られた」「見送った」は理由の言葉で表示する。
 
 ### Monitoring
