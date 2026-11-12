@@ -1,5 +1,11 @@
 # @growi/core
 
+## 3.2.0
+
+### Minor Changes
+
+- [#12222](https://github.com/growilabs/growi/pull/12222) [`c1ebe52`](https://github.com/growilabs/growi/commit/c1ebe5235a58296d4e55ea03b8348d870dcac00c) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Add `IRevisionProposalMark` and the optional `proposalId` / `proposalOperationKey` fields on `IRevision`, which mark a revision created by a Change Proposal operation
+
 ## 3.1.3
 
 ### Patch Changes
