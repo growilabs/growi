@@ -74,7 +74,11 @@ export const generateViewOptions = (
     math,
     [
       plantuml.remarkPlugin,
-      { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
+      {
+        plantumlUri: config.plantumlUri,
+        plantumlHttpMethod: config.plantumlHttpMethod,
+        isDarkMode: config.isDarkMode,
+      },
     ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaidRemarkPlugin,
@@ -243,7 +247,11 @@ export const generateSimpleViewOptions = (
     math,
     [
       plantuml.remarkPlugin,
-      { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
+      {
+        plantumlUri: config.plantumlUri,
+        plantumlHttpMethod: config.plantumlHttpMethod,
+        isDarkMode: config.isDarkMode,
+      },
     ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaidRemarkPlugin,
@@ -366,7 +374,11 @@ export const generatePreviewOptions = (
     closedMath,
     [
       plantuml.remarkPlugin,
-      { plantumlUri: config.plantumlUri, isDarkMode: config.isDarkMode },
+      {
+        plantumlUri: config.plantumlUri,
+        plantumlHttpMethod: config.plantumlHttpMethod,
+        isDarkMode: config.isDarkMode,
+      },
     ],
     [drawio.remarkPlugin, { isDarkMode: config.isDarkMode }],
     mermaidRemarkPlugin,
