@@ -45,7 +45,7 @@
   - すべての値に翻訳のキーがあり、そのキーが 5 言語の `translation.json` にあることと、表のキーがすべて `preservePatterns` に書かれていることをテストで確かめている
   - _Requirements: 1.2, 10.4_
   - _Boundary: Viewer Pure Functions (entry-labels), i18next.config.ts_
-- [ ] 2.2 (P) 戻せる操作の選び方を作る
+- [x] 2.2 (P) 戻せる操作の選び方を作る
   - 戻せると判定された操作だけを選ぶ。判定の無い操作と戻せない操作は選ばない
   - 戻せる・戻せない・判定の無い操作が混ざった場合をテストで確かめている
   - _Requirements: 3.3_
