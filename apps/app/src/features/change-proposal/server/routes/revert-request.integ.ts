@@ -1,4 +1,5 @@
 import type { IUserHasId } from '@growi/core';
+import { PageGrant } from '@growi/core';
 import express from 'express';
 import mongoose, { type HydratedDocument, Types } from 'mongoose';
 import request from 'supertest';
@@ -17,10 +18,15 @@ import { prisma } from '~/utils/prisma';
 
 import {
   type ChangeProposalDocument,
+  type OperationReason,
+  type OperationStatus,
   REVERT_REQUEST_ERROR_CODES,
   REVERT_REQUEST_MESSAGE_MAX_LENGTH,
 } from '../../interfaces';
-import { createChangeProposalService } from '../services/change-proposal-service';
+import {
+  type ChangeProposalService,
+  createChangeProposalService,
+} from '../services/change-proposal-service';
 import { createApplierTestKit } from '../services/proposal-applier.test-kit';
 import { createChangeProposalRouter } from '.';
 
@@ -404,5 +410,247 @@ describe('POST /change-proposals/:id/revert-request', () => {
     expect(
       doc.actionUsers.map((u: { username: string }) => u.username),
     ).toEqual([users.subscriber.username]);
+  });
+
+  describe('operations on pages the sender cannot see', () => {
+    type HiddenState =
+      | 'applied'
+      | 'pending'
+      | 'reverted'
+      | 'failed'
+      | 'stale'
+      | 'skipped'
+      | 'revert-refused';
+    type ForcedState = {
+      readonly status: OperationStatus;
+      readonly reason: OperationReason | null;
+    };
+    // States no short flow reaches for one operation are written directly.
+    const FORCED_STATES: Partial<Record<HiddenState, ForcedState>> = {
+      failed: { status: 'failed', reason: 'write-error' },
+      stale: { status: 'stale', reason: 'base-revision-changed' },
+      skipped: { status: 'skipped', reason: 'skipped-by-requester' },
+      'revert-refused': {
+        status: 'revert-refused',
+        reason: 'edited-after-apply',
+      },
+    };
+    const HIDDEN_STATES: readonly HiddenState[] = [
+      'applied',
+      'pending',
+      'reverted',
+      'failed',
+      'stale',
+      'skipped',
+      'revert-refused',
+    ];
+
+    let coreService: ChangeProposalService;
+    const builtProposalIds: string[] = [];
+
+    type Built = {
+      readonly proposalId: string;
+      readonly visiblePageId: string;
+      readonly hiddenKey: string;
+    };
+
+    const createHiddenPage = async (label: string) => {
+      const page = await crowi.pageService.create(
+        kit.nextPath(label),
+        'base body',
+        users.requester,
+        { grant: PageGrant.GRANT_OWNER },
+      );
+      await kit.waitForPageOperationsToFinish();
+      return kit.findPage(page._id);
+    };
+
+    const hiddenKeyOf = (proposal: ChangeProposalDocument): string => {
+      const op = proposal.operations.find((o) => o.index === 1);
+      if (op == null) throw new Error('hidden operation not found');
+      return op.key;
+    };
+
+    const forceState = (proposalId: string, key: string, state: ForcedState) =>
+      prisma.changeproposals.update({
+        where: { id: proposalId },
+        data: {
+          operations: { updateMany: { where: { key }, data: state } },
+        },
+      });
+
+    // A proposal editing one public page and one page only the requester can
+    // view, with the visible edit in visibleState and the hidden one in hiddenState.
+    const buildProposal = async (
+      label: string,
+      visibleState: 'applied' | 'pending',
+      hiddenState: HiddenState,
+    ): Promise<Built> => {
+      const visible = await kit.createPage(`${label}-visible`);
+      const hidden = await createHiddenPage(`${label}-hidden`);
+      const stored = await kit.storeProposal(
+        [kit.editInput(visible), kit.editInput(hidden)],
+        { approve: visibleState === 'applied' },
+      );
+      builtProposalIds.push(stored._id);
+      const hiddenKey = hiddenKeyOf(stored);
+
+      if (visibleState === 'applied') {
+        if (hiddenState === 'pending') {
+          kit.editingPageIds.add(hidden._id.toString());
+        }
+        await kit.newApplier().apply(stored._id, BACKGROUND, { ip: TEST_IP });
+        await kit.waitForPageOperationsToFinish();
+        kit.editingPageIds.clear();
+        if (hiddenState === 'reverted') {
+          const revert = await coreService.revert(
+            stored._id,
+            users.requester,
+            [hiddenKey],
+            BACKGROUND,
+          );
+          await kit.waitForPageOperationsToFinish();
+          expect(revert.ok).toBe(true);
+        }
+      } else if (hiddenState !== 'pending') {
+        // The visible edit stays pending; only the hidden one moves on.
+        await forceState(
+          stored._id,
+          hiddenKey,
+          FORCED_STATES[hiddenState] ?? { status: hiddenState, reason: null },
+        );
+      }
+      const forced = FORCED_STATES[hiddenState];
+      if (visibleState === 'applied' && forced != null) {
+        await forceState(stored._id, hiddenKey, forced);
+      }
+
+      const reloaded = await kit.reload(stored._id);
+      expect(kit.operationOf(reloaded, hiddenKey).status).toBe(hiddenState);
+      expect(reloaded.operations.find((o) => o.index === 0)?.status).toBe(
+        visibleState,
+      );
+      return {
+        proposalId: stored._id,
+        visiblePageId: visible._id.toString(),
+        hiddenKey,
+      };
+    };
+
+    const operationPageIdsSeenBySender = async (proposalId: string) => {
+      asUser(users.subscriber);
+      const res = await request(app).get(`${MOUNT_PATH}/${proposalId}`);
+      expect(res.status).toBe(200);
+      return res.body.proposal.operations.map(
+        (op: { page?: { id: string } }) => op.page?.id,
+      );
+    };
+
+    // Everything the requester receives, minus what differs per proposal or per send.
+    const deliveredToRequester = async (proposalId: string) => {
+      const notifications = await revertRequestsTo(proposalId);
+      return notifications.map((n) => ({
+        user: n.user.toString(),
+        targetModel: n.targetModel,
+        action: n.action,
+        status: n.status,
+        activityCount: n.activities.length,
+        snapshot: { ...JSON.parse(n.snapshot), proposalId: '' },
+      }));
+    };
+
+    type Answer = { readonly status: number; readonly body: unknown };
+    type Delivered = Awaited<ReturnType<typeof deliveredToRequester>>;
+
+    const responseOf = (res: request.Response): Answer => ({
+      status: res.status,
+      body: res.body,
+    });
+
+    beforeAll(() => {
+      coreService = createChangeProposalService(crowi, {
+        applier: kit.newApplier(),
+      });
+    });
+
+    afterAll(async () => {
+      // Revert proposals made through the core service are not tracked by the kit.
+      const reverts = await prisma.changeproposals.findMany({
+        where: { revertOf: { in: builtProposalIds } },
+        select: { id: true },
+      });
+      const revertIds = reverts.map((p) => p.id);
+      await InAppNotification.deleteMany({ target: { $in: revertIds } });
+      await prisma.changeproposals.deleteMany({
+        where: { id: { in: revertIds } },
+      });
+    });
+
+    it('answers and notifies the same way whatever state the hidden operation is in', async () => {
+      const built: Built[] = [];
+      for (const state of HIDDEN_STATES) {
+        // biome-ignore lint/performance/noAwaitInLoops: fixtures share page-operation waits
+        built.push(await buildProposal(`hidden-${state}`, 'applied', state));
+      }
+      for (const { proposalId, visiblePageId } of built) {
+        // biome-ignore lint/performance/noAwaitInLoops: one read per variant
+        expect(await operationPageIdsSeenBySender(proposalId)).toEqual([
+          visiblePageId,
+        ]);
+      }
+
+      const outcomes: {
+        first: Answer;
+        second: Answer;
+        delivered: Delivered;
+      }[] = [];
+      for (const { proposalId } of built) {
+        asUser(users.subscriber);
+        // biome-ignore lint/performance/noAwaitInLoops: each send is checked against the cooldown
+        const first = responseOf(await send(proposalId, { message: 'mm' }));
+        await waitForActivitiesAt(endpointOf(proposalId), 1);
+        const second = responseOf(await send(proposalId, { message: 'mm' }));
+        outcomes.push({
+          first,
+          second,
+          delivered: await deliveredToRequester(proposalId),
+        });
+      }
+
+      expect(outcomes[0].first).toEqual({ status: 200, body: {} });
+      expect(outcomes[0].second.status).toBe(409);
+      expect(outcomes[0].delivered).toHaveLength(1);
+      for (const outcome of outcomes) {
+        expect(outcome).toEqual(outcomes[0]);
+      }
+    });
+
+    it('answers the same 404 and notifies nobody whatever state the hidden operation is in when the visible one is not applied', async () => {
+      const built: Built[] = [];
+      for (const state of HIDDEN_STATES) {
+        // biome-ignore lint/performance/noAwaitInLoops: fixtures share page-operation waits
+        built.push(await buildProposal(`unseen-${state}`, 'pending', state));
+      }
+
+      const outcomes: { res: Answer; delivered: Delivered }[] = [];
+      for (const { proposalId } of built) {
+        asUser(users.subscriber);
+        // biome-ignore lint/performance/noAwaitInLoops: sequential sends keep the comparison simple
+        const res = responseOf(await send(proposalId, { message: 'mm' }));
+        outcomes.push({
+          res,
+          delivered: await deliveredToRequester(proposalId),
+        });
+      }
+
+      expect(outcomes[0].res).toEqual({
+        status: 404,
+        body: { errors: [expect.objectContaining({ code: 'notfound' })] },
+      });
+      expect(outcomes[0].delivered).toEqual([]);
+      for (const outcome of outcomes) {
+        expect(outcome).toEqual(outcomes[0]);
+      }
+    });
   });
 });

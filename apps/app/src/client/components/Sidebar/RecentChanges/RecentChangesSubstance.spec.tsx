@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
 import type { ReactNode } from 'react';
-import type { IPageHasId } from '@growi/core';
+import type { IPageHasId, IRevisionHasId } from '@growi/core';
+import { PageGrant } from '@growi/core';
 import { render, screen, waitFor } from '@testing-library/react';
 import { SWRConfig } from 'swr';
 import { mock } from 'vitest-mock-extended';
@@ -151,6 +152,51 @@ describe('RecentChangesContent proposal marks', () => {
     const row = mark.closest('li');
     expect(row?.textContent).toContain('page1');
     expect(row?.textContent).not.toContain('page0');
+  });
+
+  it('puts no mark on a title-only row core returned no mark for, even when the listing carries its proposal', async () => {
+    // A row shown by the list display policy: restricted, and its populated
+    // revision carries the proposal fields of the existing response.
+    const titleOnlyRevision: IRevisionHasId = {
+      _id: 'revhidden',
+      pageId: 'hidden',
+      body: '',
+      author: 'someone',
+      format: 'markdown',
+      proposalId: 'prophidden',
+      proposalOperationKey: 'keyhidden',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+    };
+    const titleOnlyRow = mock<IPageHasId>({
+      ...makePage('hidden', 'revhidden'),
+      grant: PageGrant.GRANT_OWNER,
+      revision: titleOnlyRevision,
+    });
+    setListing([
+      {
+        pages: [makePage('page0', 'rev0'), titleOnlyRow],
+        totalCount: 2,
+        offset: 0,
+      },
+    ]);
+    mocks.apiv3Post.mockResolvedValue(
+      marksResponse([
+        { revisionId: 'rev0', proposalId: 'prop0', isRevert: false },
+      ]),
+    );
+
+    renderContent();
+
+    const controlMark = await screen.findByRole('link', {
+      name: 'change_proposal_viewer.mark.change_proposal',
+    });
+    expect(controlMark.closest('li')?.textContent).toContain('page0');
+    expect(mocks.apiv3Post.mock.calls[0][1].revisionIds).toContain('revhidden');
+    const titleOnlyItem = screen.getByText('hidden').closest('li');
+    expect(titleOnlyItem?.textContent).toContain('lock');
+    expect(titleOnlyItem?.querySelectorAll('a[href*="prop"]')).toHaveLength(0);
+    expect(screen.queryAllByRole('link', { name: /mark\./ })).toHaveLength(1);
   });
 
   it('sends one request per batch and does not refetch earlier batches when more are loaded', async () => {
