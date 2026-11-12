@@ -246,10 +246,11 @@ describe('receive route POST / records the destination-side outcome', () => {
   });
 
   test('records nothing when the transfer key is rejected', async () => {
+    // No body: the key is rejected before the upload is read, so a client still writing the
+    // archive would race the server closing the connection and fail with EPIPE.
     const response = await request(app)
       .post('/')
-      .set(X_GROWI_TRANSFER_KEY_HEADER_NAME, 'not-a-valid-key')
-      .attach('transferDataZipFile', zipPath);
+      .set(X_GROWI_TRANSFER_KEY_HEADER_NAME, 'not-a-valid-key');
 
     expect(response.status).not.toBe(200);
     expect(recordG2GTransfer).not.toHaveBeenCalled();
