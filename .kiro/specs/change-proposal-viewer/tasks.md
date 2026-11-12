@@ -55,7 +55,7 @@
   - 重複、順番、100 件の境目の前後をテストで確かめている
   - _Requirements: 5.4, 6.1_
   - _Boundary: Viewer Pure Functions (chunk-revision-ids, build-revision-mark-map)_
-- [ ] 2.4 (P) 通知の snapshot を読む処理を作る
+- [x] 2.4 (P) 通知の snapshot を読む処理を作る
   - action が反映・取り消しなら core のまとめた通知の形として、頼む通知（1.2 で宣言した action）なら頼む通知の形として読む
   - JSON として読めない、項目が欠けている、型が違う、知らない action、Change Proposal の ID の形が正しくない、のどれでも例外を投げずに null を返す
   - 3 つの正しい形と、上の壊れた入力のすべてをテストで確かめている
