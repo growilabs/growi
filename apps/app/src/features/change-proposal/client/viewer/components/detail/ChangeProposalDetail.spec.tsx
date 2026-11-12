@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import type { ComponentType, JSX } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { format } from 'date-fns/format';
@@ -20,6 +21,7 @@ import { revertOperations } from '../../stores/proposal-actions';
 import { useRevertProgress } from '../../stores/use-revert-progress';
 import type { ChangeProposalFetchResult } from '../../stores/use-swrx-change-proposal';
 import { useSWRxChangeProposal } from '../../stores/use-swrx-change-proposal';
+import type { RequesterOnlySectionProps } from '../requester-only-sections';
 import { ChangeProposalDetail } from './ChangeProposalDetail';
 
 vi.mock('next-i18next', () => ({
@@ -46,6 +48,15 @@ vi.mock('../../stores/proposal-actions', () => ({
 
 vi.mock('../../stores/use-revert-progress', () => ({
   useRevertProgress: vi.fn(),
+}));
+
+const requesterOnlyMocks = vi.hoisted(() => {
+  const sections: Record<string, unknown> = {};
+  return { loader: vi.fn(), sections };
+});
+
+vi.mock('../requester-only-sections', () => ({
+  REQUESTER_ONLY_SECTIONS: requesterOnlyMocks.sections,
 }));
 
 const DATE_FORMAT = 'yyyy/MM/dd HH:mm:ss';
@@ -449,5 +460,43 @@ describe('ChangeProposalDetail revert request', () => {
     mockFound(createProposal({ isRequester: true }));
     render(<ChangeProposalDetail proposalId="proposal-1" />);
     expect(screen.queryByRole('button', { name: REQUEST_BUTTON })).toBeNull();
+  });
+});
+
+describe('ChangeProposalDetail requester-only area', () => {
+  const PlaceholderSection = ({
+    proposalId,
+  }: RequesterOnlySectionProps): JSX.Element => (
+    <div data-testid="requester-only-placeholder">{proposalId}</div>
+  );
+
+  beforeEach(() => {
+    vi.mocked(useSWRxChangeProposal).mockReset();
+    requesterOnlyMocks.loader.mockReset();
+    requesterOnlyMocks.loader.mockImplementation(
+      async (): Promise<ComponentType<RequesterOnlySectionProps>> =>
+        PlaceholderSection,
+    );
+    for (const key of Object.keys(requesterOnlyMocks.sections)) {
+      delete requesterOnlyMocks.sections[key];
+    }
+    requesterOnlyMocks.sections['ai-chat'] = requesterOnlyMocks.loader;
+  });
+
+  it('shows the registered placeholder to the requester with the proposal id', async () => {
+    mockFound(createProposal({ isRequester: true }));
+    render(<ChangeProposalDetail proposalId="proposal-1" />);
+
+    const placeholder = await screen.findByTestId('requester-only-placeholder');
+    expect(placeholder.textContent).toBe('proposal-1');
+  });
+
+  it('shows no requester-only area and never loads it for a non-requester', async () => {
+    mockFound(createProposal({ isRequester: false }));
+    render(<ChangeProposalDetail proposalId="proposal-1" />);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByTestId('requester-only-placeholder')).toBeNull();
+    expect(requesterOnlyMocks.loader).not.toHaveBeenCalled();
   });
 });

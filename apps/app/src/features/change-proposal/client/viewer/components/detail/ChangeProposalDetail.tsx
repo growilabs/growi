@@ -4,6 +4,7 @@ import { useTranslation } from 'next-i18next';
 import type { ChangeProposalView } from '../../../../interfaces';
 import { useSWRxChangeProposal } from '../../stores/use-swrx-change-proposal';
 import { OperationItem } from '../OperationItem';
+import { RequesterOnlySection } from '../RequesterOnlySection';
 import { ProposalSummaryHeader } from './ProposalSummaryHeader';
 import { RevertAllButton } from './RevertAllButton';
 import { RevertRequestModal } from './RevertRequestModal';
@@ -77,6 +78,7 @@ export const ChangeProposalDetail = ({
           originalOperations={proposal.operations}
         />
       )}
+      <RequesterOnlySection view={proposal} />
       <section>
         <h2 className="h5">{t('change_proposal_viewer.detail.operations')}</h2>
         {proposal.operations.map((operation) => (
