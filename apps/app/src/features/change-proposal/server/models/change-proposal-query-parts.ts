@@ -152,6 +152,9 @@ export const toOutcomeData = (
         ...(outcome.resultRevisionId == null
           ? {}
           : { resultRevisionId: outcome.resultRevisionId }),
+        ...(outcome.appliedPagePath == null
+          ? {}
+          : { path: outcome.appliedPagePath }),
       };
     case 'pending':
       return { reason: outcome.reason, approvedAt: { unset: true } };

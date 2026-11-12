@@ -271,7 +271,7 @@
   - _Requirements: 2.1, 3.11_
   - _Boundary: core server/domain (collect-created-paths, recorded-path-of), to-operation-view, proposal-notifier_
   - _Depends: 8.3_
-- [ ] 8.3 (P) 編集の操作を反映したときに、ページのパスを操作の記録に残す
+- [x] 8.3 (P) 編集の操作を反映したときに、ページのパスを操作の記録に残す
   - `interfaces/change-proposal.ts` の `OperationRecord` に任意の `appliedPagePath` を、handler が返す `server/services/operation-handlers/types.ts` の `AppliedOutcome` と、記録に渡す `server/models/change-proposal-types.ts` の `RecordedOutcome` の `applied` の両方に任意の `appliedPagePath` を足す。`server/services/proposal-applier.ts` は handler の結果をそのまま `recordOperationOutcome` に渡している（`attempt` → `applyOne`）ので、値が途中で落ちないことを確かめる
   - `server/services/operation-handlers/edit.ts` の `execute` は、書き込みの前に読んだページの `path` を結果の `appliedPagePath` に入れる。`findExistingResult` が使う `findAdoptedMarkedRevisionId` は、ページを `{ revision: 1 }` だけで読んでいるので、読む項目に `path` を足し、リビジョンの ID と一緒にパスも返す。ページがまだあればそのパスを `appliedPagePath` に入れ、無ければ入れない
   - `server/models/change-proposal-query-parts.ts` の `toOutcomeData` は、`appliedPagePath` があるときだけ操作の `path` に書く。`server/models/to-change-proposal-document.ts` は、編集の行の `path` を `appliedPagePath` に変える（新規作成の `path` の扱いは変えない）。DB の項目 `path` を使うので、`schema.prisma` と migration は変えない

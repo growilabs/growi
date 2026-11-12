@@ -26,6 +26,7 @@ export type AppliedOutcome = {
   readonly status: 'applied';
   readonly resultPageId: string;
   readonly resultRevisionId: string | null;
+  readonly appliedPagePath?: string;
 };
 
 export type OperationOutcome =

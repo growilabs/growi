@@ -267,6 +267,7 @@ describe('edit operation handler', () => {
         status: 'applied',
         resultPageId: page._id.toString(),
         resultRevisionId: latestRevisionId,
+        appliedPagePath: page.path,
       });
       const revision = await prisma.revisions.findUniqueOrThrow({
         where: { id: latestRevisionId },
@@ -405,7 +406,9 @@ describe('edit operation handler', () => {
       expect(await handler.findExistingResult(op, ctx)).toBeNull();
       const applied = await handler.execute(op, ctx);
 
-      expect(await handler.findExistingResult(op, ctx)).toEqual(applied);
+      const existing = await handler.findExistingResult(op, ctx);
+      expect(existing).toEqual(applied);
+      expect(existing).toMatchObject({ appliedPagePath: page.path });
       expect(
         await prisma.revisions.count({
           where: { proposalId: ctx.proposalId, proposalOperationKey: op.key },

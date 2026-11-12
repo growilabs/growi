@@ -37,6 +37,8 @@ export type RecordedOutcome =
       readonly status: 'applied';
       readonly resultPageId: string;
       readonly resultRevisionId: string | null;
+      // Stored in the operation's `path` field (edit only).
+      readonly appliedPagePath?: string;
     }
   | { readonly status: 'stale'; readonly reason: StaleReason }
   | { readonly status: 'failed'; readonly reason: FailureReason }

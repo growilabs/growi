@@ -179,12 +179,17 @@ const toOperationState = (row: OperationRowWithoutBody) => ({
   ...optional('revertedAt', row.revertedAt),
 });
 
+// An edit reuses the create's `path` field for the page path at apply time.
 const toOperationSummaryRecord = (
   row: OperationRowWithoutBody,
-): OperationSummaryRecord => ({
-  ...toPayloadWithoutBody(row),
-  ...toOperationState(row),
-});
+): OperationSummaryRecord => {
+  const payload = toPayloadWithoutBody(row);
+  return {
+    ...payload,
+    ...toOperationState(row),
+    ...(payload.type === 'edit' ? optional('appliedPagePath', row.path) : {}),
+  };
+};
 
 const toOperationRecord = (row: ChangeproposalsOperations): OperationRecord => {
   const summary = toOperationSummaryRecord(row);
