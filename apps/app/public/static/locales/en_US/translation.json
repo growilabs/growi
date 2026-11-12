@@ -1292,6 +1292,7 @@
   },
   "plantuml": {
     "url-too-long": "The diagram is too large and probably exceeds the URL length limit of the PlantUML server. Split or simplify the diagram.",
+    "post-unavailable": "The PlantUML server may not support POST, or the browser cannot reach it. The administrator can switch back to GET by setting PLANTUML_HTTP_METHOD=get.",
     "render-failed": "The diagram could not be rendered. The PlantUML server could not be reached, or it returned an error."
   }
 }

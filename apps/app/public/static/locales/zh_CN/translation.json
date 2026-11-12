@@ -1239,6 +1239,7 @@
   },
   "plantuml": {
     "url-too-long": "图表过大，很可能超出了 PlantUML 服务器的 URL 长度限制。请拆分或简化图表。",
+    "post-unavailable": "PlantUML 服务器可能不支持 POST，或者浏览器无法连接到该服务器。管理员可以通过设置 PLANTUML_HTTP_METHOD=get 切换回 GET 方式。",
     "render-failed": "无法渲染图表。无法连接到 PlantUML 服务器，或服务器返回了错误。"
   }
 }
