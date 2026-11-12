@@ -3,7 +3,7 @@
 > タスク 1〜2（テーマの軽量化とエラー表示）は、それだけで問い合わせの図を GET のまま描けるようにする見込みのまとまりで、単独の PR として出せる。タスク 3（送信方式の選択と POST）はその後に続ける。
 
 - [ ] 1. テーマの軽量化
-- [ ] 1.1 テーマをミニファイする
+- [x] 1.1 テーマをミニファイする
   - ライト・ダーク・共通の3つのテーマ資産から、行頭が `'`／`''` の PlantUML コメント行、行頭の空白、空行を取り除く。`'` が行頭にない行（文字列リテラル）は残す
   - 配色・skinparam・`<style>` の定義は1つも消さない（非 UML 図種の `<style>` も、`sequenceDiagram`・`timingDiagram` も残す）
   - 回避策の理由を書いたコメント（`ParticipantPadding`／`Padding` を skinparam で書かない理由 #11258・plantuml/plantuml#2622、`sequenceDiagram` の `Padding`／`Margin` の注記）は、消す前にファイル先頭の TSDoc へ移す
