@@ -110,13 +110,14 @@ describe('anonymization coverage', () => {
       ANONYMIZATION_RULES.sensitiveQueryParams.map((name) => [name]),
     )('sensitive query parameter %s is anonymized by an example', (name) => {
       const maskedByExample = COVERAGE_EXAMPLES.some(({ expectedTarget }) =>
-        (expectedTarget ?? '')
-          .split(/[?&]/)
-          .some(
-            (pair) =>
-              pair.startsWith(`${name}=%5BANONYMIZED%5D`) ||
-              pair.startsWith(`${name}[]=%5BANONYMIZED%5D`),
-          ),
+        (expectedTarget ?? '').split(/[?&]/).some((pair) => {
+          const [rawName, value = ''] = pair.split('=');
+          const decodedName = decodeURIComponent(rawName);
+          return (
+            decodedName.split('[')[0] === name &&
+            value.startsWith('%5BANONYMIZED%5D')
+          );
+        }),
       );
       expect(maskedByExample).toBe(true);
     });

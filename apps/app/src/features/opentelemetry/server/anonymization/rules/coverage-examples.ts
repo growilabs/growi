@@ -521,6 +521,27 @@ export const COVERAGE_EXAMPLES: readonly CoverageExample[] = [
     expectedTarget: null,
     route: '/_api/v3/revisions/:id([0-9a-fA-F]{24})',
   },
+  {
+    id: 'A10',
+    ruleIds: ['sensitive-query-params'],
+    url: '/_api/lsx?pagePath=%2Fwiki%2Fpage&offset=0&limit=50&options%5Bfilter%5D=draft&options%5Bexcept%5D=old&options%5Btag%5D=secret&options%5Bdepth%5D=1',
+    expectedTarget: `/_api/lsx?pagePath=${MASK}&offset=0&limit=50&options%5Bfilter%5D=${MASK}&options%5Bexcept%5D=${MASK}&options%5Btag%5D=${MASK}&options%5Bdepth%5D=${MASK}`,
+    route: '/_api/lsx',
+  },
+  {
+    id: 'A11',
+    ruleIds: ['sensitive-query-params'],
+    url: '/_api/attachment-refs/ref?pagePath=%2Fwiki%2Fpage&fileNameOrId=plan.png',
+    expectedTarget: `/_api/attachment-refs/ref?pagePath=${MASK}&fileNameOrId=${MASK}`,
+    route: '/_api/attachment-refs/ref',
+  },
+  {
+    id: 'A12',
+    ruleIds: ['sensitive-query-params'],
+    url: '/_api/attachment-refs/refs?pagePath=%2Fwiki%2Fpage&prefix=%2Fwiki&options%5Bregexp%5D=%5Eplan.*',
+    expectedTarget: `/_api/attachment-refs/refs?pagePath=${MASK}&prefix=${MASK}&options%5Bregexp%5D=${MASK}`,
+    route: '/_api/attachment-refs/refs',
+  },
 
   // Secret values
   {

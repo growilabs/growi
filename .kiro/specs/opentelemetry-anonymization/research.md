@@ -90,10 +90,17 @@
 ### Decision: クエリパラメータは名前で匿名化する
 
 - **Context**: エンドポイントごとにパラメータを並べると、新しいエンドポイントのたびに規則の追加が要る。GROWI では `path`・`q` などの名前が多くのエンドポイントで同じ意味に使われている。
-- **Selected Approach**: `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token` を、どの URL に付いていても `[ANONYMIZED]` に置き換える。
+- **Selected Approach**: `q`、`nq`、`path`、`paths`、`fromPath`、`toPath`、`searchText`、`searchWord`、`username`、`shareLinkId`、`searchFilter`、`access_token`、`pagePath`、`prefix`、`fileNameOrId`、`options` を、どの URL に付いていても `[ANONYMIZED]` に置き換える。
 - **Rationale**: 新しいエンドポイントが既存の名前を使う限り、規則の追加なしで匿名化される。途中に `_search` を含むページ URL の `q` のような、どの規則も想定していない組み合わせも匿名化される。
 - **Trade-offs**: 利用者データでない `q` や `path` も匿名化される（トレースの読みやすさが少し落ちるだけで、害は無い）。新しい名前のパラメータは名前を足すまで漏れる（Revalidation Triggers に記載）。要件 2.5 を「パス部分を書き換えない」に改めた。
 - **Follow-up**: 一覧表の各 API 行は、この名前の一覧が実際にそのエンドポイントを覆っていることを示す例として残す。
+
+### Decision: プラグインのルートのクエリ名も一覧に入れる
+
+- **Context**: `packages/` のプラグイン（remark-lsx の `/_api/lsx`、remark-attachment-refs の `/_api/attachment-refs/*`）は、ページ表示のたびにページパスを `pagePath`・`prefix` で送るが、一覧表にも名前の一覧にも無く、平文で記録されていた。`packages/` でサーバーのルートを持つのはこの 2 つだけで、読むクエリは `pagePath`・`prefix`・`fileNameOrId`・`options`・`offset`・`limit`。
+- **Selected Approach**: `pagePath`・`prefix`・`fileNameOrId`・`options` を名前の一覧に加える。`options` は `options[filter]` のような形で送られるため、`options` の名前ごと匿名化する。
+- **Rationale**: `options` の中には利用者データ（lsx の `filter`・`except`・`tag`、attachment-refs の `regexp`）とそうでない値（`depth`・`sort`・`reverse` など）が混ざるが、名前は最初の `[` より前で比べるため、一部だけを残すには照合の仕組みを変える必要がある。添付ファイル名はページの内容を表すことが多いため、利用者データとして扱う。
+- **Trade-offs**: `options[depth]` などの利用者データでない値もトレースから読めなくなる。`GET /_api/v3/users/usernames` の `options`（表示するユーザーの種類を選ぶ真偽値の JSON）も匿名化されるが、害は無い。
 
 ### Decision: 置き換えたパラメータ以外のクエリを再エンコードしない
 
