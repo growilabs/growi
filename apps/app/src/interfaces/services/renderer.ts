@@ -1,3 +1,5 @@
+import type { PlantumlHttpMethod } from '~/features/plantuml/interfaces/http-method';
+
 import type { RehypeSanitizeConfiguration } from './rehype-sanitize';
 
 export type RendererConfig = {
@@ -11,6 +13,7 @@ export type RendererConfig = {
 
   drawioUri: string;
   plantumlUri: string;
+  plantumlHttpMethod: PlantumlHttpMethod;
 } & RehypeSanitizeConfiguration;
 
 export type RendererConfigExt = RendererConfig & {

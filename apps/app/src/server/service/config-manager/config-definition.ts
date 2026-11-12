@@ -55,6 +55,7 @@ export const CONFIG_KEYS = [
   'app:globalLang',
   'app:fileUploadType',
   'app:plantumlUri',
+  'app:plantumlHttpMethod',
   'app:drawioUri',
   'app:nchanUri',
   'app:siteUrl',
@@ -462,6 +463,10 @@ export const CONFIG_DEFINITIONS = {
   'app:plantumlUri': defineConfig<string>({
     envVarName: 'PLANTUML_URI',
     defaultValue: 'https://www.plantuml.com/plantuml',
+  }),
+  'app:plantumlHttpMethod': defineConfig<string | undefined>({
+    envVarName: 'PLANTUML_HTTP_METHOD',
+    defaultValue: undefined,
   }),
   'app:drawioUri': defineConfig<string>({
     envVarName: 'DRAWIO_URI',
