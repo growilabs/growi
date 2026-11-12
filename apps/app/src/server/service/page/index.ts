@@ -3337,18 +3337,28 @@ class PageService implements IPageService {
     const childPagesWritable = new Writable({
       objectMode: true,
       write: async (batch, encoding, callback) => {
-        await this.updateChildPagesGrant(
-          batch,
-          grant,
-          user,
-          userRelatedGroups,
-          userRelatedParentGrantedGroups,
-        );
-        callback();
+        try {
+          await this.updateChildPagesGrant(
+            batch,
+            grant,
+            user,
+            userRelatedGroups,
+            userRelatedParentGrantedGroups,
+          );
+          callback();
+        } catch (err) {
+          callback(err);
+        }
       },
     });
 
-    await pipeline(childPagesReadableStream, batchStream, childPagesWritable);
+    try {
+      await pipeline(childPagesReadableStream, batchStream, childPagesWritable);
+    } finally {
+      // The bulk write above bypasses the per-page events. Also on failure:
+      // the batches written before it are already stored.
+      this.pageEvent.emit('syncDescendantsUpdate', parentPage, user);
+    }
   }
 
   async updateChildPagesGrant(
@@ -5377,6 +5387,7 @@ class PageService implements IPageService {
       dummyUser,
     );
     savedPage = await pushRevision(savedPage, newRevision, dummyUser);
+    await savedPage.populate('revision');
 
     if (savedPage._id == null) {
       throw new Error('Something went wrong: _id is null');
@@ -5700,7 +5711,7 @@ class PageService implements IPageService {
       savedPage = await pushRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
-      await savedPage.populateDataToShowRevision();
+      await this.populateSavedPageForUpdate(savedPage, user);
     } else {
       savedPage = await savedPage.save();
     }
@@ -5808,7 +5819,7 @@ class PageService implements IPageService {
       savedPage = await pushRevision(savedPage, newRevision, user, {
         expectedRevisionId: options.expectedRevisionId,
       });
-      await savedPage.populateDataToShowRevision();
+      await this.populateSavedPageForUpdate(savedPage, user);
     } else {
       savedPage = await savedPage.save();
     }
@@ -5821,6 +5832,23 @@ class PageService implements IPageService {
     this.pageEvent.emit('update', savedPage, user);
 
     return savedPage;
+  }
+
+  /**
+   * The update is already stored, so 'update' is emitted even when populating
+   * fails; otherwise the listeners that mirror the page (search) would keep
+   * its old grant.
+   */
+  private async populateSavedPageForUpdate(
+    savedPage: HydratedDocument<PageDocument>,
+    user: IUserHasId,
+  ): Promise<void> {
+    try {
+      await savedPage.populateDataToShowRevision();
+    } catch (err) {
+      this.pageEvent.emit('update', savedPage, user);
+      throw err;
+    }
   }
 
   /**
