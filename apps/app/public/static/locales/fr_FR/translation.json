@@ -1237,5 +1237,9 @@
     "achievement": {
       "settled_with_percent": "Terminé ({{percent}} % réalisé)"
     }
+  },
+  "plantuml": {
+    "url-too-long": "Le diagramme est trop volumineux et dépasse probablement la longueur d'URL maximale du serveur PlantUML. Divisez ou simplifiez le diagramme.",
+    "render-failed": "Le diagramme n'a pas pu être affiché. Le serveur PlantUML est injoignable ou a renvoyé une erreur."
   }
 }

@@ -1273,5 +1273,9 @@
     "achievement": {
       "settled_with_percent": "完了（達成度 {{percent}}%）"
     }
+  },
+  "plantuml": {
+    "url-too-long": "図が大きすぎて、PlantUML サーバーの URL 長の上限を超えた可能性があります。図を分割するか、簡略化してください。",
+    "render-failed": "図を描画できませんでした。PlantUML サーバーに接続できないか、サーバーがエラーを返しました。"
   }
 }
