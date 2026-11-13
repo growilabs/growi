@@ -1,5 +1,5 @@
 // Shapes of a conversation read out of a chat service, shared by the answer
-// the GROWI sends back (`command-answer`) and the conversation the proxy
+// GROWI sends back (`command-answer`) and the conversation the proxy
 // hands over on request.
 
 /** What a summary covered: how many messages, and the first and last one's time. */

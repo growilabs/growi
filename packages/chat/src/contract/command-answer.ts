@@ -27,7 +27,7 @@ export type AgentAnswer =
       readonly kind: 'page-created';
       readonly pageUrl: string;
       readonly range: ConversationRange;
-      /** The service limits how much history is readable, so the range is partial. */
+      /** True when a service limit cut the range short of the full conversation. */
       readonly truncated: boolean;
     }
   | {
@@ -43,11 +43,7 @@ export interface CommandAnswerRequest extends RequestEnvelope {
   readonly answer: AgentAnswer;
 }
 
-/**
- * `delivered`, `undeliverable` and `unknown-request` are final: GROWI must not
- * send the same answer again. Only `in-progress` (and an HTTP failure or
- * timeout) is worth a retry.
- */
+/** Final states and retry conditions: see design.md (CommandAnswerResult). */
 export interface CommandAnswerResult {
   readonly status:
     | 'delivered'

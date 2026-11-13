@@ -108,6 +108,16 @@ describe('parseCommandAnswerRequest', () => {
     rejects(requestWith({ kind: 'failed', reason: 'because' }));
   });
 
+  it('rejects a conversation failure whose remedy field is absent, unlike null', () => {
+    rejects(
+      requestWith({
+        kind: 'failed',
+        reason: 'conversation-unavailable',
+        conversationFailure: { reason: 'empty' },
+      }),
+    );
+  });
+
   it('rejects a conversation failure with an unknown reason', () => {
     rejects(
       requestWith({
@@ -150,6 +160,15 @@ describe('parseCommandAnswerRequest', () => {
         kind: 'page-created',
         pageUrl: 'https://a',
         range: { messageCount: 1, firstPostedAt: 'x' },
+        truncated: false,
+      },
+    ],
+    [
+      'a range with a missing first date',
+      {
+        kind: 'page-created',
+        pageUrl: 'https://a',
+        range: { messageCount: 1, lastPostedAt: '2026-06-01T01:00:00.000Z' },
         truncated: false,
       },
     ],
@@ -217,6 +236,19 @@ describe('parseCommandAnswerRequest', () => {
       const atLimit = withUrl('u'.repeat(2000));
       expect(parseCommandAnswerRequest(atLimit)).toEqual(atLimit);
       rejects(withUrl('u'.repeat(2001)));
+    });
+
+    it('accepts exactly 200 messages in a range and rejects 201', () => {
+      const withCount = (messageCount: number) =>
+        requestWith({
+          kind: 'page-created',
+          pageUrl: 'https://a',
+          range: { ...range, messageCount },
+          truncated: false,
+        });
+      const atLimit = withCount(200);
+      expect(parseCommandAnswerRequest(atLimit)).toEqual(atLimit);
+      rejects(withCount(201));
     });
 
     it('accepts a page url of exactly 2,000 characters and rejects 2,001', () => {
