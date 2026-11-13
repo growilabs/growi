@@ -26,7 +26,7 @@
   - 答えの本文の長さと出典の件数に上限を設ける
   - 完了の条件: 口の表に行があり、本文と結果が parser で往復し、上限を超えた本文が拒まれる
   - _Requirements: 5.8, 5.12, 15.6, 15.7, 15.19_
-- [ ] 1.4 会話を求める口を足す
+- [x] 1.4 会話を求める口を足す
   - GROWI から proxy への向きで、元の依頼の番号だけを送り、発言の一覧と範囲・「まだ古い発言がある」、または読めなかった理由と取れる操作を返す口を定義し、parser を足す
   - 完了の条件: 口の表に行があり、成功と 6 種類の失敗の結果が parser で往復する
   - _Requirements: 5.7, 5.13, 5.14, 5.15, 5.16, 5.17_
@@ -224,3 +224,5 @@
 - 1.3: エンドポイント `command-answer` を足すと proxy の既存の試験 3 件（署名付きエンドポイントを全部数える試験）が落ちるため、ユーザーの承認を得て、署名検証だけを通して 501 を返す仮のルートハンドラ（apps/chat-integration-proxy/src/routes/command-answer-routes.ts）を proxy に足した。3.5 で本物に差し替え、専用の依存（RoutesAppDeps の項目）に分ける。1.4 の `conversation` エンドポイントでも同じことが起きるので、同じ形の仮のルートハンドラを足す（これもユーザー承認済みの扱い）。
 - 1.3: design.md に定めの無い上限（remedy 500・日時 64・relationId／requestId 128）と `conversationFailure: null` の拒否は試験で守っていない（reviewer は任意の指摘とした）。1.4 で会話の失敗の 6 種類の理由を網羅して往復させる。
 - この worktree では `@growi/ui` などの dist が未 build のため、app の型検査と app の試験は動かない。app を触るタスク（4 以降）の前に `pnpm turbo run build --filter @growi/app^...` で依存を build する。
+- 1.4: `conversation` の成功の結果は、parser が「messages が空」と「range.messageCount と messages.length の食い違い」を通す（design.md に定めが無いため、承認済みの設計は変えていない）。3.5 の proxy は、0 件なら失敗の `empty` を返し、成功では range.messageCount を messages の件数から作ること。5.x の GROWI 側は、受け取った成功の件数を信用せず、messages から数え直し、0 件なら要約しないこと。
+- 1.4: 発言の markdown は空を許す（画像やファイルだけの発言は本文が空。parse-command.ts の keep と同じ）。3.5 の proxy は空の発言を除かずに渡してよい。
