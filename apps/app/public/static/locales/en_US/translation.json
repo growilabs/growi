@@ -1342,8 +1342,7 @@
       "show_diff": "Show diff",
       "hide_diff": "Hide diff",
       "diff_unavailable": "The diff cannot be shown",
-      "diff_loading": "Loading the diff",
-      "no_diff": "There is no diff to show for this change"
+      "diff_loading": "Loading the diff"
     },
     "revert_all": {
       "button": "Revert everything that can be reverted",

@@ -1269,8 +1269,7 @@
       "show_diff": "차이 보기",
       "hide_diff": "차이 숨기기",
       "diff_unavailable": "차이를 표시할 수 없습니다",
-      "diff_loading": "차이를 불러오는 중",
-      "no_diff": "이 작업에는 표시할 차이가 없습니다"
+      "diff_loading": "차이를 불러오는 중"
     },
     "revert_all": {
       "button": "되돌릴 수 있는 것을 모두 되돌리기",

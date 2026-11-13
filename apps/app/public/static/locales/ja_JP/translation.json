@@ -1326,8 +1326,7 @@
       "show_diff": "差分を表示",
       "hide_diff": "差分を閉じる",
       "diff_unavailable": "差分を表示できません",
-      "diff_loading": "差分を読み込んでいます",
-      "no_diff": "この操作には表示できる差分はありません"
+      "diff_loading": "差分を読み込んでいます"
     },
     "revert_all": {
       "button": "戻せるものを全部戻す",

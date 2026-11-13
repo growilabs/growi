@@ -1289,8 +1289,7 @@
       "show_diff": "显示差异",
       "hide_diff": "隐藏差异",
       "diff_unavailable": "无法显示差异",
-      "diff_loading": "正在加载差异",
-      "no_diff": "此操作没有可显示的差异"
+      "diff_loading": "正在加载差异"
     },
     "revert_all": {
       "button": "撤销所有可撤销的操作",

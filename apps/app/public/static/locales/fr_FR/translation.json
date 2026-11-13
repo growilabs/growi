@@ -1290,8 +1290,7 @@
       "show_diff": "Afficher les différences",
       "hide_diff": "Masquer les différences",
       "diff_unavailable": "Impossible d'afficher les différences",
-      "diff_loading": "Chargement des différences",
-      "no_diff": "Aucune différence à afficher pour cette modification"
+      "diff_loading": "Chargement des différences"
     },
     "revert_all": {
       "button": "Annuler tout ce qui peut l'être",
