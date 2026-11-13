@@ -92,13 +92,13 @@ core の「本要件で使う言い方」の語（Change Proposal、操作、依
 2. When 承認者である人または依頼した人が、承認待ちの Change Proposal 全体の承認を求めた場合, the Change Proposal System shall その人にとっての承認の対象の操作をすべて反映する。その人が閲覧できないページの操作は反映しない。
 3. The Change Proposal System shall 依頼した人が、承認者として指定されていなくても、いつでも自分の Change Proposal を承認できるようにする。
 4. Where 承認者がグループとして指定されている場合, the Change Proposal System shall そのグループの所属者の誰か 1 人が承認すれば、その操作を反映する。同じグループの別の所属者の承認を重ねて求めない。
-5. When 複数の承認者である人が、同じ操作の承認や判断を同時に求めた場合, the Change Proposal System shall その操作を 1 回だけ反映し、同じ操作を二度書き込まない。後から処理された求めには、その時点の操作の状態を返す。
+5. When 複数の承認者である人が、同じ操作の承認や判断を同時に求めた場合, the Change Proposal System shall その操作を 1 回だけ反映し、同じ操作を二度書き込まない。後から処理された求めには、その人に見える「待ち」の操作が残っている限り、その時点の操作の状態を返す。
 6. If 承認者である人が、自分が閲覧できないページの操作の判断を求めた場合, then the Change Proposal System shall それを受け付けず、そのページの操作が存在しない場合と同じ応答を返す。
-7. If 承認者でもなく依頼した人でもないユーザーが、承認待ちの Change Proposal の判断・承認者の追加・承認者の削除を求めた場合, then the Change Proposal System shall それを受け付けず、Change Proposal が存在しない場合と同じ応答を返す。
+7. If 承認者でもなく依頼した人でもないユーザー、または承認者であってもその人に返す操作が 1 つも無いユーザーが、承認待ちの Change Proposal の判断・承認者の追加・承認者の削除を求めた場合, then the Change Proposal System shall それを受け付けず、Change Proposal が存在しない場合と同じ応答を返す。
 8. When 承認によって操作が反映された場合, the Change Proposal System shall その操作に、承認した人、日時、経路（画面・API・AI の道具などのどこから承認したか）、承認した人が依頼した人自身であるか、を記録する。
 9. If 期限切れ・破棄・取り下げ・完了になった Change Proposal の承認または判断を求められた場合, then the Change Proposal System shall core の 2.10、4.7 と同じように、反映せず、反映できない状態であることを返す。
 10. When 承認によって、編集中の人がいたために操作が「待ち」のまま残った場合, the Change Proposal System shall core の 4.8 と同じように、その操作を承認待ちとして扱い、承認者である人または依頼した人が後から再び承認できるようにする。
-11. If すでに状態が「待ち」でない操作（反映済み、却下、飛ばした、など）の承認または判断が求められた場合, then the Change Proposal System shall 書き込まず、その時点の操作の状態を返す。
+11. If すでに状態が「待ち」でない操作（反映済み、却下、飛ばした、など）の承認または判断が求められた場合, then the Change Proposal System shall 書き込まず、その人に見える「待ち」の操作が残っている限り、その時点の操作の状態を返す。その人に見える「待ち」の操作が残っていない場合は、9 と同じ、反映できない状態であることを返す。
 
 ### Requirement 3: 却下と放棄
 
