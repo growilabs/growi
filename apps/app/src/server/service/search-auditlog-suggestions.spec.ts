@@ -99,7 +99,7 @@ describe('searchAuditlogSuggestions()', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('should return {} without calling ES when fields does not include username', async () => {
+  it('should return {} without calling ES when fields is empty', async () => {
     const result = await searchAuditlogSuggestions(backend, [], 'alice', 10);
 
     expect(result).toEqual({});
