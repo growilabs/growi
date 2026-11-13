@@ -108,7 +108,7 @@ apps/app/src/client/components/Admin/AuditLog/AuditLogSearchTypeahead/
 
 ### Modified Files
 - `apps/app/src/interfaces/activity.ts` — `ISearchFilter` に `endpoints?: string[]` を足す
-- `apps/app/src/server/routes/apiv3/build-activity-list-where.ts` — endpoint の条件（パス部分の完全一致）を足す
+- `apps/app/src/server/routes/apiv3/build-activity-list-where.ts` — endpoint の条件（パス部分の完全一致）を足す。`usernames` / `endpoints` の型の判定を `Array.isArray` を含む形にする
 - `apps/app/src/server/routes/apiv3/build-activity-list-where.spec.ts` — endpoint の条件の単体テストを足す
 - `apps/app/src/server/routes/apiv3/fetch-activity-list.ts` — `resolveActivityListWhere` で `endpoints` を受け渡す
 - `apps/app/src/server/routes/apiv3/fetch-activity-list.integ.ts`（新規） — 実際の MongoDB で、パス部分の完全一致と正規表現の記号のエスケープを確かめる
@@ -210,10 +210,10 @@ export type ISearchFilter = {
 | Requirements | 1.3, 2.1, 2.2, 2.3, 2.4, 3.8, 5.2 |
 
 **Responsibilities & Constraints**
-- `endpoints` が空でない文字列配列のときだけ endpoint の条件を足す（`usernames` と同じ判定）。
+- `usernames` と `endpoints` は、`Array.isArray(x) && x.length > 0 && x.every((v) => typeof v === 'string')` を満たすときだけ条件を足す。既存の `usernames` の判定（`x.length > 0 && x.every(...)`）は、文字列が来ると `.every` がなく TypeError になるため、同じ形に直す。
 - endpoint の条件は「値が選んだパスのいずれかと等しい」または「値が `<パス>?` で始まる」の OR。前方一致の値は `escapeStringForMongoRegex(パス) + '\\?'` とする。Prisma は `startsWith` の値をエスケープせずに `$regexMatch` に渡すため、呼び出し側でのエスケープが必須（`.claude/rules/mongodb-regex.md`）。
 - 大文字小文字は区別する（`mode: 'insensitive'` を使わない）。
-- 他の条件（username・action・期間）とは AND で結合する。`where` のトップレベルの `OR` は endpoint の条件だけが使う。
+- 他の条件（username・action・期間）とは AND で結合する。endpoint の OR は `where.AND` の要素（`AND: [{ OR: [...] }]`）として足し、トップレベルの `OR` は使わない。今後、別の OR 条件（IP など）を足しても衝突しない。
 
 **Contracts**: Service [x]
 
@@ -235,7 +235,7 @@ export function buildEndpointWhere(
 - Postconditions: 返す条件は、保存値のパス部分が `paths` のいずれかと完全に一致する行だけに一致する。
 
 **Implementation Notes**
-- Validation: 一覧の GET 経路は `searchFilter` を JSON 文字列として受け取り、POST 経路はオブジェクトとして受け取る。どちらも中身の型は `buildActivityListWhere` の文字列配列の判定で守る（既存の `usernames` と同じ）。値は Prisma にリテラルとして渡り、正規表現の部分はエスケープするので、NoSQL / 正規表現の注入は起きない。
+- Validation: 一覧の GET 経路は `searchFilter` を JSON 文字列として受け取り、POST 経路はオブジェクトとして受け取る。validator は足さず、中身の型は両経路が必ず通る `buildActivityListWhere` の判定 1 か所で守る（GET の `searchFilter` は validator の時点では JSON 文字列で、中身を検証できないため）。判定を満たさない値は、その条件を付けずに無視する。値は Prisma にリテラルとして渡り、正規表現の部分はエスケープするので、NoSQL / 正規表現の注入は起きない。
 - Risks: Prisma が将来 `startsWith` をエスケープするようになると二重エスケープで一致しなくなる。integ テストで検知する。
 
 #### ResolveActivityListWhere（拡張）
@@ -294,15 +294,17 @@ export type SuggestionGroup =
 export function buildSuggestionGroups(args: {
   results: readonly FieldSuggestionResult[];
   selected: readonly SuggestionOption[];
+  currentText: string; // text currently in the input
+  fetchedForKeyword: string; // keyword the results were fetched for
 }): SuggestionGroup[];
 
 export function isSameSuggestion(a: SuggestionOption, b: SuggestionOption): boolean;
 ```
 - Postconditions:
+  - `currentText` と `fetchedForKeyword` が違うとき（入力が取得に使った keyword より新しいとき）は、空の配列を返す。この判定は失敗のグループにもかかる。古い応答を隠す判定は、この関数だけが持つ。
   - `results` の順序（= `AUDITLOG_SEARCH_SCOPES` の順序）でグループを返す。
   - 選択済みの値（`kind` と `value` が一致するもの）は候補から除く。
   - `error` の field は `state: 'error'` のグループを返す。候補が 0 件の field はグループを返さない。
-- 古い応答を隠す判定（入力中の文字と、取得に使った keyword が違えば候補を出さない）は、既存の `UsernameTypeahead` と同じ考え方で、コンポーネントの `filterBy` が行う。
 
 #### useAuditLogSearchSuggestions
 
@@ -347,14 +349,19 @@ export type AuditLogSearchTypeaheadProps = {
 // forwardRef<IClearable, AuditLogSearchTypeaheadProps>
 ```
 - State model: `scope`（初期値 `'all'`）、`selected: SuggestionOption[]`、`searchKeyword`。scope と選択は独立した状態で、scope を変えても `selected` は変えない（3.9）。
-- 入力欄は `AsyncTypeahead` を `multiple` で使い、`allowNew` は使わない（1.5）。`renderMenu` で `buildSuggestionGroups` の結果を見出し付きで描き、`error` のグループには取得できなかった旨の文言を出す（4.1, 4.2）。ユーザーの候補には Active / Inactive のバッジを付ける（デザインに合わせる）。`renderToken` で種類が分かるトークンを描く。
+- 入力欄は `AsyncTypeahead` を `multiple` で使い、`allowNew` は使わない（1.5）。
+- 候補一覧の描き方: `react-bootstrap-typeahead` 6.3 の `renderMenu` は、`filterBy` を通した後の結果と、入力中の文字（第 3 引数の `state.text`）を受け取る。そこで、`filterBy` はすべての候補を通すだけにし、`renderMenu` の中で `buildSuggestionGroups` に `state.text` と取得に使った keyword を渡してグループを組み立てる。古い応答を隠す判定と、選択済みの値を除く判定は、`buildSuggestionGroups` だけが持つ。
+- `error` のグループには取得できなかった旨の文言を出す（4.1, 4.2）。候補が 1 件もなく失敗のグループだけがある場合も、その文言を出す。ユーザーの候補には Active / Inactive のバッジを付ける（デザインに合わせる）。`renderToken` で種類が分かるトークンを描く。
+- 読み込み中の表示: `useAuditLogSearchSuggestions` の結果のうち、どれか 1 つでも `isLoading` なら、`AsyncTypeahead` の `isLoading` を true にする。
 - 「絞り込みを選択」は入力欄の右に置くドロップダウンで、`AUDITLOG_SEARCH_SCOPES` から選択肢を作る。
 - `IClearable.clear()` は選択と入力を空にし、scope を `'all'` に戻す（5.3）。
 - 候補の取得に失敗しても、`selected` と `onChange` は呼ばない（4.3）。
 
 **Implementation Notes**
 - Integration: 候補 API の `endpoint` の field は PR #12119 で入る。マージ前は `AuditlogSuggestionField` に `endpoint` がないので、このコンポーネントとフックの実装は PR #12119 のマージ後に着手する。
-- Risks: `AsyncTypeahead` は同じ keyword の再検索で `onSearch` を呼ばないため、既存と同じく `useCache={false}` にする。
+- Risks:
+  - `AsyncTypeahead` は同じ keyword の再検索で `onSearch` を呼ばないため、既存と同じく `useCache={false}` にする。
+  - `renderMenu` は、`filterBy` を通した結果が 0 件でも呼ばれる。既存の `UsernameTypeahead` のように結果が空なら空を返すと、失敗のグループだけの表示（4.2）が消えるので、結果が空でも早期 return しない。
 
 #### AuditLogManagement（変更）
 - `AuditLogUsernameTypeahead` を `AuditLogSearchTypeahead` に置き換える。`onChange` で `selectedUsernames` と `selectedEndpoints` を更新し、1 ページ目に戻す（5.1）。
@@ -378,15 +385,17 @@ export type AuditLogSearchTypeaheadProps = {
 
 ## Error Handling
 
-- **候補の取得失敗**: field ごとの SWR の `error` を、候補一覧の中の「取得できませんでした」の表示にする。他の field の候補、選択済みの値、一覧には影響させない。MongoDB フォールバックの失敗は候補 API が空の候補として返すため、この表示になるのはリクエスト自体が失敗した場合（ネットワーク、サーバーの 500 など）に限られる。
+- **候補の取得要求の失敗**: field ごとの SWR の `error` を、候補一覧の中の「取得できませんでした」の表示にする。他の field の候補、選択済みの値、一覧には影響させない（4.1–4.3）。
+- **候補 API が空の候補を返す場合**: 全文検索サーバーが使えずデータベースでの検索も失敗したとき、候補 API は warn ログを出して空の候補を 200 で返す（PR #12119 の契約）。画面からは区別できないため「該当なし」と同じ表示になる。要件の Boundary Context に既知の制約として書いており、サーバーのログで追う。
 - **一覧の取得失敗**: 既存のまま（`toastError('Failed to get Audit Log')`）。
-- **不正な `endpoints`**: 文字列でない要素を含む場合は、`usernames` と同じく endpoint の条件を付けない。
+- **不正な `usernames` / `endpoints`**: 配列でない、または文字列でない要素を含む場合は、その条件を付けずに無視する。例外は投げない。
 
 ## Testing Strategy
 
 ### Unit Tests
-- `buildActivityListWhere` / `buildEndpointWhere`: `endpoints` があるときに等しい値と `<パス>?` の前方一致の OR になること、正規表現の記号を含むパスがエスケープされること、`endpoints` が空・未指定・文字列でない要素を含むときは条件が付かないこと、username・action・期間と同時に指定したときに AND になること（2.1–2.4, 3.8, 5.2）
-- `buildSuggestionGroups`: 「すべて」で username → endpoint の順のグループになること、選択済みの値が除かれること、失敗した field が `error` のグループになり他の field は残ること、0 件の field はグループにならないこと（3.3, 4.1, 4.2）
+- `buildActivityListWhere` / `buildEndpointWhere`: `endpoints` があるときに等しい値と `<パス>?` の前方一致の OR が `AND` の要素として付くこと、正規表現の記号を含むパスがエスケープされること、`endpoints` が空・未指定・文字列でない要素を含むときは条件が付かないこと、username・action・期間と同時に指定したときに AND になること（2.1–2.4, 3.8, 5.2）
+- `buildActivityListWhere` の型の判定: `usernames` / `endpoints` に配列でない値（`"abc"` など）が来ても例外を投げず、その条件を付けないこと（1.3）
+- `buildSuggestionGroups`: 「すべて」で username → endpoint の順のグループになること、選択済みの値が除かれること、失敗した field が `error` のグループになり他の field は残ること、0 件の field はグループにならないこと。入力中の文字と取得に使った keyword が違うときは、失敗のグループも含めて空になること（1.1, 3.3, 4.1, 4.2）
 - `buildActivitySearchFilter`: `endpoints` が `ISearchFilter` に入ること（1.3）
 
 ### Integration Tests
@@ -400,6 +409,8 @@ export type AuditLogSearchTypeaheadProps = {
   - 「すべて」で見出し付きの候補一覧が出て、ユーザーの候補に Active / Inactive のバッジが出ること（3.3, 3.7）
   - 値を選んだまま scope を切り替えても、トークンが残ること（3.9）
   - 一方の field の取得失敗で、その field の失敗表示と、もう一方の候補が出ること。選択済みのトークンが残ること（4.1, 4.3）
+  - 検索対象を「URL」に絞った状態で取得に失敗し、候補が 1 件もないときにも、失敗表示が出ること（4.2）
+  - 入力を続けて、表示中の候補が古い keyword のものになったときは、その候補を出さないこと（1.1）
   - `clear()` でトークンが消え、scope が「すべて」に戻ること（5.3）
 - locale drift: `audit_log_management.search.*` の全キーが 5 ロケールの `admin.json` にあること（6.1）
 

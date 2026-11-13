@@ -38,8 +38,8 @@
 
 - **共有コンポーネント**: `UsernameTypeahead` は全文検索ページ（`SearchUsernameTypeahead`）も使う。監査ログ用に作り直す変更が、全文検索ページの動きを変えてはいけない。
 - **エクスポートのモーダル**: `AuditLogUsernameTypeahead` を使い続ける（範囲外）。監査ログ画面から `AuditLogUsernameTypeahead` を外しても、モーダル側では残す。
-- **一覧の API の 2 経路**: `GET /activity` と `POST /activity/list` の両方の validator に endpoint 条件の検証を足す必要がある（文字列の配列であることの検証。NoSQL injection の対策）。
-- **部分失敗**: yuki さんのレビューでは、UI が field を 1 つしか送らない前提で、候補 API の部分失敗の処理（`allSettled`）を削った。種類ごとに失敗を見分けるには、この前提との関係を設計で決める必要がある。
+- **一覧の API の 2 経路**: `GET /activity` と `POST /activity/list` の両方で、endpoint 条件が文字列の配列であることを検証する必要がある（NoSQL injection の対策）。検証の置き場所は設計で決める。
+- **部分失敗**: 候補 API は複数 field の部分失敗を扱わない（1 つでも失敗したら 500）。種類ごとに失敗を見分けるには、この契約との関係を設計で決める必要がある。
 
 ### 実装の選択肢
 
@@ -129,11 +129,23 @@
 ### Decision: 候補は field ごとに別リクエストで取得する
 - **Context**: 要件 4.1（一部の種類だけ失敗したとき、取れた種類は出す）。
 - **Alternatives Considered**:
-  1. 1 リクエストで `field=username&field=endpoint` を送り、サーバーで部分失敗を返す — 候補 API の契約を変える。PR #12119 のレビューで、UI が field を 1 つしか送らない前提で `allSettled` を削った経緯と逆になる。
+  1. 1 リクエストで `field=username&field=endpoint` を送り、サーバーで部分失敗を返す — 候補 API の契約（1 つでも失敗したら 500）を変えることになる。
   2. field ごとに `useSWRxAuditlogSuggestions` を呼ぶ — 失敗を SWR の `error` で種類ごとに見分けられる。
 - **Selected Approach**: 2。
 - **Trade-offs**: 「すべて」のときはキー入力ごとのリクエストが 2 本になる（入力欄の `delay` で間引かれる）。
-- **Follow-up**: MongoDB フォールバックの失敗は候補 API が空の候補として返す（PR #12119）ので、画面で「取得できなかった」と表示されるのは、リクエスト自体が失敗した場合に限られる。
+
+### Decision: 「取得できなかった」の表示は、候補のリクエスト自体の失敗に限る
+- **Context**: 要件 4。候補 API は、全文検索サーバーが使えずデータベースでの検索も失敗したとき（時間切れなど）、warn ログを出して空の候補を 200 で返す（PR #12119 の契約）。画面からは「該当なし」と区別できない。
+- **Alternatives Considered**:
+  1. 要件 4 の対象をリクエスト自体の失敗に限り、データベースでの検索の失敗は既知の制約とする。
+  2. 候補 API が field ごとに失敗を示す印を返すようにする — 要件 4 の目的を完全に満たすが、PR #12119 の契約を変え、本 spec の範囲を越える。
+- **Selected Approach**: 1。要件 4 を「候補の取得要求が失敗した」場合に限る形に書き換え、データベースでの検索の失敗は Boundary Context に既知の制約として書く。
+- **Rationale**: 候補 API の失敗時の振る舞いは、失敗と 0 件を区別しないことを受け入れたうえで決まっている。画面側だけで区別する手段はない。
+
+### Decision: `searchFilter` の型の検証は `buildActivityListWhere` の 1 か所で行う
+- **Context**: 要件 1.3 と、一覧 API の 2 経路（GET はクエリの JSON 文字列、POST は本文のオブジェクト）。
+- **Selected Approach**: validator は足さず、`buildActivityListWhere` で `Array.isArray(x) && x.length > 0 && x.every((v) => typeof v === 'string')` を満たすときだけ条件を付ける。同じ関数の既存の `usernames` の判定も同じ形に直す（今は `"abc"` のような文字列が来ると `.every` がなく TypeError になる）。
+- **Rationale**: GET と POST はどちらも `resolveActivityListWhere` → `buildActivityListWhere` を通る。GET の `searchFilter` は validator の時点では JSON 文字列で、中身を検証するには route で一度パースしてから検証する必要がある。型の判定を両経路が必ず通る純粋関数に置けば、1 か所で済み、単体テストで固定できる。
 
 ### Decision: パス部分の完全一致は `in` と、エスケープした `startsWith` の OR で表す
 - **Context**: 要件 2.1〜2.4。
@@ -158,3 +170,4 @@
 - Prisma のバージョンアップで `startsWith` がエスケープするようになり、二重エスケープで一致しなくなる — 正規表現の記号を含むパスと `/_api/v3/pages` の除外を確かめる integ テストで検知する。
 - 一覧のクエリが全件走査のまま — 今の username・action の絞り込みと同じ水準。activities は既定で 30 日で消える。改善は本 spec の範囲外。
 - PR #12119 が未マージ — 候補 API の `endpoint` に依存するタスクは、PR #12119 のマージ後に着手する。
+- `react-bootstrap-typeahead` 6.3.2 は、候補一覧を開くかを `isShown`（`open` / `minLength` / `showMenu` / `text`）だけで決め、結果の件数は見ない。フィルタ後の結果が 0 件でも `renderMenu` は呼ばれる — `renderMenu` が結果が空のときに早期 return すると、失敗表示だけの場合（要件 4.2）が消える。早期 return せず、コンポーネントテストで固定する。
