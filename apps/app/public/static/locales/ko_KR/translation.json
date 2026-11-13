@@ -1216,5 +1216,10 @@
     "achievement": {
       "settled_with_percent": "완료 (달성도 {{percent}}%)"
     }
+  },
+  "plantuml": {
+    "url-too-long": "다이어그램이 너무 커서 PlantUML 서버의 URL 길이 제한을 초과했을 가능성이 높습니다. 다이어그램을 나누거나 단순화하세요.",
+    "post-unavailable": "PlantUML 서버가 POST를 지원하지 않거나 브라우저에서 서버에 연결할 수 없을 수 있습니다. 관리자는 PLANTUML_HTTP_METHOD=get을 설정하여 GET 방식으로 되돌릴 수 있습니다.",
+    "render-failed": "다이어그램을 렌더링할 수 없습니다. PlantUML 서버에 연결할 수 없거나 서버에서 오류가 반환되었습니다."
   }
 }
