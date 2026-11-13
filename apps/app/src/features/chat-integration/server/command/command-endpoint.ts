@@ -662,6 +662,13 @@ const computeResponse = async (
     return handleWriteCommand(request, crowi, auditContext);
   }
 
+  if (request.kind === COMMAND_NAMES.agent) {
+    return errorResponse(
+      'unknown-kind',
+      'This GROWI does not handle the agent command yet.',
+    );
+  }
+
   const resolved = await resolveActor(request.relationId, request.actor);
   const denial = resolveReadDenial(
     resolved,

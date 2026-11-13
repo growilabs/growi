@@ -56,6 +56,13 @@ export type CommandRequest = CommandEnvelope &
         readonly messages: ReadonlyArray<KeepMessage>;
       }
     | {
+        readonly kind: typeof COMMAND_NAMES.agent;
+        /** The request with only the mention of the bot itself removed (Requirement 15.17). */
+        readonly text: string;
+        /** Opaque to GROWI (design.md CommandVocabulary). */
+        readonly conversationKey: string;
+      }
+    | {
         readonly kind: typeof COMMAND_NAMES.linkPreview;
         readonly pageUrl: string;
       }
@@ -94,6 +101,7 @@ export const RESPONSE_KINDS = {
   linkPreview: 'link-preview',
   help: 'help',
   accountLinkRequired: 'account-link-required',
+  accepted: 'accepted',
   error: 'error',
 } as const;
 
@@ -133,6 +141,11 @@ export type CommandResponse =
       readonly growiLabel: string;
       readonly linkUrl: string;
     }
+  /**
+   * The answer is sent later through its own endpoint; this carries no part
+   * of it (Requirement 15.5).
+   */
+  | { readonly kind: typeof RESPONSE_KINDS.accepted }
   | {
       readonly kind: typeof RESPONSE_KINDS.error;
       readonly code:
@@ -141,6 +154,10 @@ export type CommandResponse =
         | 'invalid'
         | 'not-permitted-in-channel'
         | 'no-settings'
-        | 'unknown-kind';
+        | 'unknown-kind'
+        /** Requirement 15.4: GROWI AI is not enabled or has no model configured. */
+        | 'ai-unavailable'
+        /** Requirement 15.12: this user's previous `agent` request is still running. */
+        | 'busy';
       readonly message: string;
     };

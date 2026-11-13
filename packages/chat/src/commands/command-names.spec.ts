@@ -5,6 +5,7 @@ import {
   COMMAND_TRAITS,
   type CommandName,
   type CommandTargeting,
+  type DirectMessagePolicy,
   isWriteCommand,
   targetingOf,
 } from './command-names';
@@ -18,6 +19,7 @@ describe('command name vocabulary', () => {
       search: 'search',
       createPage: 'create-page',
       keep: 'keep',
+      agent: 'agent',
       linkPreview: 'link-preview',
       help: 'help',
     });
@@ -36,23 +38,39 @@ describe('command traits', () => {
     );
   });
 
-  const cases: readonly [CommandName, boolean, CommandTargeting][] = [
+  const cases: readonly [
+    CommandName,
+    boolean,
+    CommandTargeting,
+    DirectMessagePolicy,
+  ][] = [
     // Requirement 8.4: a command aimed at every GROWI fans out without asking.
-    [COMMAND_NAMES.search, false, 'broadcast'],
+    [COMMAND_NAMES.search, false, 'broadcast', 'follows-all-channels'],
     // Requirement 14.1: help reports what the channel can do, per GROWI.
-    [COMMAND_NAMES.help, false, 'broadcast'],
+    [COMMAND_NAMES.help, false, 'broadcast', 'follows-all-channels'],
     // Requirement 8.2: a single-target write makes the user pick when the
     // channel has several GROWIs linked. Requirement 11.1: it writes.
-    [COMMAND_NAMES.createPage, true, 'single'],
-    [COMMAND_NAMES.keep, true, 'single'],
+    [COMMAND_NAMES.createPage, true, 'single', 'follows-all-channels'],
+    [COMMAND_NAMES.keep, true, 'single', 'follows-all-channels'],
+    // Requirement 11.6 / 15.13: agent writes (it can create a page), so it is
+    // denied until an admin allows it, and it targets exactly one GROWI.
+    // Requirement 11.7: whether it runs in a DM is its own setting, not the
+    // "all channels" rule the other commands follow.
+    [COMMAND_NAMES.agent, true, 'single', 'separate-flag'],
     // Requirement 6.4: the target follows from the URL, never from a prompt.
-    [COMMAND_NAMES.linkPreview, false, 'url-matched'],
+    [COMMAND_NAMES.linkPreview, false, 'url-matched', 'follows-all-channels'],
   ];
 
-  it.each(cases)('%s: writes=%s targeting=%s', (name, writes, targeting) => {
+  it.each(
+    cases,
+  )('%s: writes=%s targeting=%s directMessagePolicy=%s', (name, writes, targeting, directMessagePolicy) => {
     expect(isWriteCommand(name)).toBe(writes);
     expect(targetingOf(name)).toBe(targeting);
-    expect(COMMAND_TRAITS[name]).toEqual({ writes, targeting });
+    expect(COMMAND_TRAITS[name]).toEqual({
+      writes,
+      targeting,
+      directMessagePolicy,
+    });
   });
 
   it('uses only the three ways a target can be decided', () => {

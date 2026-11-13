@@ -18,7 +18,7 @@ import { parseChatAccountRef } from './common-fields.js';
 import { arr, isRecord, oneOf, str } from './shape.js';
 
 const RELATION_ID_MAX = 128;
-/** Bounded well above `COMMAND_NAMES`'s current size (5), for future growth. */
+/** Bounded well above `COMMAND_NAMES`'s current size (6), for future growth. */
 const CHANNEL_PERMISSIONS_MAX = 50;
 /** A single command's allow-list of channels. */
 const ALLOWED_CHANNELS_MAX = 1000;

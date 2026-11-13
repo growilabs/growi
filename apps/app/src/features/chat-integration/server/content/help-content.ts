@@ -41,6 +41,12 @@ const HELP_COMMANDS: ReadonlyArray<HelpCommandEntry> = [
       "Import a range of this channel's conversation as a new GROWI page.",
   },
   {
+    name: COMMAND_NAMES.agent,
+    usage: '/growi agent [request]',
+    description:
+      'Ask GROWI AI a question, or ask it to summarize this conversation into a page.',
+  },
+  {
     name: COMMAND_NAMES.linkPreview,
     usage: 'Paste a GROWI page URL',
     description:

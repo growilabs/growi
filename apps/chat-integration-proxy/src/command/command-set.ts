@@ -8,7 +8,7 @@
 // This is a RICHER, PROXY-SIDE SUPERSET of `@growi/chat`'s own
 // `COMMAND_TRAITS` (packages/chat/src/commands/command-names.ts). That file
 // already owns the shared vocabulary (`CommandName` / `COMMAND_NAMES`) and a
-// 2-field trait (`writes` / `targeting`) needed by both sides of the
+// 3-field trait (`writes` / `targeting` / `directMessagePolicy`) needed by both sides of the
 // integration. This file adds what only the proxy needs to build a
 // `CommandRequest`/prompt a modal: the fields to collect (`FieldSpec[]`),
 // the permission-check name, and (for `search`) the server-decided `limit`.
@@ -73,7 +73,7 @@ export interface CommandTrait {
 export const SEARCH_DEFAULT_LIMIT = 10;
 
 /**
- * The 5-command shared vocabulary's proxy-side traits, keyed by the SAME
+ * The shared vocabulary's proxy-side traits, keyed by the SAME
  * `CommandName` union `@growi/chat` declares. `Record<CommandName,
  * CommandTrait>` makes a missing entry a compile error, not a runtime gap
  * -- the same mechanism `@growi/chat`'s own `COMMAND_TRAITS` already uses
@@ -138,6 +138,12 @@ export const COMMAND_TRAITS: Readonly<Record<CommandName, CommandTrait>> = {
     sends: 'command-request',
     targeting: 'exactly-one',
     permissionCheckName: COMMAND_NAMES.keep,
+  },
+  [COMMAND_NAMES.agent]: {
+    fields: [],
+    sends: 'command-request',
+    targeting: 'exactly-one',
+    permissionCheckName: COMMAND_NAMES.agent,
   },
   [COMMAND_NAMES.help]: {
     fields: [],

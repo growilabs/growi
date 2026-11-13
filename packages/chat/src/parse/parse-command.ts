@@ -48,6 +48,9 @@ const POSTED_AT_MAX = 64;
  */
 const KEEP_MARKDOWN_MAX = 20_000;
 const PAGE_URL_MAX = 2000;
+/** `agent`'s request text and conversation key bounds (design.md CommandVocabulary). */
+const AGENT_TEXT_MAX = 8000;
+const CONVERSATION_KEY_MAX = 256;
 
 type ParseError = { readonly error: 'malformed' | 'unknown-kind' };
 
@@ -146,6 +149,14 @@ export const parseCommandRequest = (
       }
       return { ...envelope, kind, path, messages };
     }
+    case COMMAND_NAMES.agent: {
+      const text = str(raw.text, AGENT_TEXT_MAX);
+      const conversationKey = str(raw.conversationKey, CONVERSATION_KEY_MAX);
+      if (text === undefined || conversationKey === undefined) {
+        return { error: 'malformed' };
+      }
+      return { ...envelope, kind, text, conversationKey };
+    }
     case COMMAND_NAMES.linkPreview: {
       const pageUrl = str(raw.pageUrl, PAGE_URL_MAX);
       if (pageUrl === undefined) {
@@ -157,8 +168,8 @@ export const parseCommandRequest = (
       return { ...envelope, kind };
     }
     default: {
-      // Unreachable: COMMAND_NAME_VALUES enumerates all 5 CommandName
-      // members and `kind` was already narrowed to one of them above.
+      // Unreachable: COMMAND_NAME_VALUES enumerates every CommandName
+      // member and `kind` was already narrowed to one of them above.
       return { error: 'unknown-kind' };
     }
   }
@@ -168,7 +179,7 @@ export const parseCommandRequest = (
 // parseCommandResponse (task 6.4)
 //
 // Unlike CommandRequest, CommandResponse carries no shared envelope --
-// design.md's contract type is a bare 6-member discriminated union with no
+// design.md's contract type is a bare discriminated union with no
 // `relationId`/`op` common to all variants. So there is no "envelope fields"
 // stage here: `kind` is read first, and each variant validates only its own
 // fields (same all-or-nothing rule as everywhere else in this package: a
@@ -193,7 +204,7 @@ const COMMENT_COUNT_MAX = 1_000_000;
  */
 const IMPORTED_MESSAGE_COUNT_MAX = MESSAGES_MAX;
 const EXCERPT_MAX = 2000;
-/** The command vocabulary is small (5 names); generous headroom for growth. */
+/** The command vocabulary is small; generous headroom for growth. */
 const COMMANDS_MAX = 50;
 const USAGE_MAX = 200;
 const DESCRIPTION_MAX = 500;
@@ -208,6 +219,8 @@ const ERROR_CODES = [
   'not-permitted-in-channel',
   'no-settings',
   'unknown-kind',
+  'ai-unavailable',
+  'busy',
 ] as const;
 
 const RESPONSE_KIND_VALUES = Object.values(RESPONSE_KINDS);
@@ -367,6 +380,9 @@ export const parseCommandResponse = (
       }
       return { kind, growiLabel, linkUrl };
     }
+    case RESPONSE_KINDS.accepted: {
+      return { kind };
+    }
     case RESPONSE_KINDS.error: {
       const code = oneOf(raw.code, ERROR_CODES);
       const message = str(raw.message, ERROR_MESSAGE_MAX);
@@ -376,8 +392,8 @@ export const parseCommandResponse = (
       return { kind, code, message };
     }
     default: {
-      // Unreachable: RESPONSE_KIND_VALUES enumerates all 6 ResponseKind
-      // members and `kind` was already narrowed to one of them above.
+      // Unreachable: RESPONSE_KIND_VALUES enumerates every ResponseKind
+      // member and `kind` was already narrowed to one of them above.
       return { error: 'unknown-kind' };
     }
   }

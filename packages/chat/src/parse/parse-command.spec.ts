@@ -277,6 +277,57 @@ describe('parseCommandRequest', () => {
     });
   });
 
+  describe('kind: agent', () => {
+    const base = {
+      ...envelope,
+      kind: 'agent',
+      text: 'Summarize the onboarding pages',
+      conversationKey: 'slack:C1:1700000000.000100',
+    };
+
+    it('accepts a valid agent command', () => {
+      expect(parseCommandRequest(base)).toEqual(base);
+    });
+
+    it('accepts text and conversationKey at their upper bounds', () => {
+      const atLimit = {
+        ...base,
+        text: 'x'.repeat(8000),
+        conversationKey: 'k'.repeat(256),
+      };
+      expect(parseCommandRequest(atLimit)).toEqual(atLimit);
+    });
+
+    it('rejects text over 8000 characters', () => {
+      expect(parseCommandRequest({ ...base, text: 'x'.repeat(8001) })).toEqual({
+        error: 'malformed',
+      });
+    });
+
+    it('rejects a conversationKey over 256 characters', () => {
+      expect(
+        parseCommandRequest({ ...base, conversationKey: 'k'.repeat(257) }),
+      ).toEqual({ error: 'malformed' });
+    });
+
+    it.each([
+      'text',
+      'conversationKey',
+    ] as const)('rejects when %s is missing', (key) => {
+      const { [key]: _omit, ...rest } = base;
+      expect(parseCommandRequest(rest)).toEqual({ error: 'malformed' });
+    });
+
+    it.each([
+      'text',
+      'conversationKey',
+    ] as const)('rejects an empty %s', (key) => {
+      expect(parseCommandRequest({ ...base, [key]: '' })).toEqual({
+        error: 'malformed',
+      });
+    });
+  });
+
   describe('kind: link-preview', () => {
     const base = {
       ...envelope,
@@ -560,6 +611,20 @@ describe('parseCommandResponse', () => {
     });
   });
 
+  describe('kind: accepted', () => {
+    it('accepts an accepted response', () => {
+      expect(parseCommandResponse({ kind: 'accepted' })).toStrictEqual({
+        kind: 'accepted',
+      });
+    });
+
+    it('drops any extra field so no part of an answer rides along', () => {
+      expect(
+        parseCommandResponse({ kind: 'accepted', markdown: 'the answer' }),
+      ).toStrictEqual({ kind: 'accepted' });
+    });
+  });
+
   describe('kind: account-link-required', () => {
     const base = {
       kind: 'account-link-required',
@@ -594,6 +659,8 @@ describe('parseCommandResponse', () => {
       'not-permitted-in-channel',
       'no-settings',
       'unknown-kind',
+      'ai-unavailable',
+      'busy',
     ])('accepts every real error code: %s', (code) => {
       expect(parseCommandResponse({ ...base, code })).toEqual({
         ...base,

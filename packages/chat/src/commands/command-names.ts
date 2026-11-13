@@ -10,6 +10,7 @@ export const COMMAND_NAMES = {
   search: 'search',
   createPage: 'create-page',
   keep: 'keep',
+  agent: 'agent',
   linkPreview: 'link-preview',
   help: 'help',
 } as const;
@@ -32,18 +33,53 @@ export type CommandTargeting =
   /** Target decided by URL match; the user is never asked (Requirement 6.4). */
   | 'url-matched';
 
+/** How a command is judged when it is run in a DM (Requirement 11.7). */
+export type DirectMessagePolicy =
+  /** A DM counts as a channel only under `allowedChannels: 'all'`. */
+  | 'follows-all-channels'
+  /** A DM is judged by its own setting alone, whatever the channel setting says. */
+  | 'separate-flag';
+
 export interface CommandTraits {
   /** Denied by default unless the channel allows it (Requirement 11.1). */
   readonly writes: boolean;
   readonly targeting: CommandTargeting;
+  readonly directMessagePolicy: DirectMessagePolicy;
 }
 
 export const COMMAND_TRAITS: Readonly<Record<CommandName, CommandTraits>> = {
-  [COMMAND_NAMES.search]: { writes: false, targeting: 'broadcast' },
-  [COMMAND_NAMES.help]: { writes: false, targeting: 'broadcast' },
-  [COMMAND_NAMES.createPage]: { writes: true, targeting: 'single' },
-  [COMMAND_NAMES.keep]: { writes: true, targeting: 'single' },
-  [COMMAND_NAMES.linkPreview]: { writes: false, targeting: 'url-matched' },
+  [COMMAND_NAMES.search]: {
+    writes: false,
+    targeting: 'broadcast',
+    directMessagePolicy: 'follows-all-channels',
+  },
+  [COMMAND_NAMES.help]: {
+    writes: false,
+    targeting: 'broadcast',
+    directMessagePolicy: 'follows-all-channels',
+  },
+  [COMMAND_NAMES.createPage]: {
+    writes: true,
+    targeting: 'single',
+    directMessagePolicy: 'follows-all-channels',
+  },
+  [COMMAND_NAMES.keep]: {
+    writes: true,
+    targeting: 'single',
+    directMessagePolicy: 'follows-all-channels',
+  },
+  // It can create a page, so it writes and stays denied until an admin
+  // allows it (Requirement 11.6).
+  [COMMAND_NAMES.agent]: {
+    writes: true,
+    targeting: 'single',
+    directMessagePolicy: 'separate-flag',
+  },
+  [COMMAND_NAMES.linkPreview]: {
+    writes: false,
+    targeting: 'url-matched',
+    directMessagePolicy: 'follows-all-channels',
+  },
 };
 
 export const isWriteCommand = (name: CommandName): boolean =>

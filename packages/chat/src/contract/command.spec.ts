@@ -103,6 +103,25 @@ describe('CommandRequest', () => {
     expect(request.messages[0]).toEqual(message);
   });
 
+  it('builds an agent request carrying the request text and the conversation key (Requirement 15.1)', () => {
+    const request: CommandRequest = {
+      relationId: 'rel-1',
+      op: OP_NAMES.command,
+      requestId: 'req-1',
+      actor: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
+      channel: {
+        platform: 'slack',
+        channelId: toNativeChannelId('C1'),
+        channelName: 'general',
+        isPrivate: false,
+      },
+      kind: COMMAND_NAMES.agent,
+      text: 'Summarize the onboarding pages',
+      conversationKey: 'slack:C1:1700000000.000100',
+    };
+    expect(request.kind).toBe('agent');
+  });
+
   it('builds a link-preview request carrying the posted URL (Requirement 6.2, 6.3)', () => {
     const request: CommandRequest = {
       relationId: 'rel-1',
@@ -190,13 +209,14 @@ describe('RESPONSE_KINDS / ResponseKind', () => {
       linkPreview: 'link-preview',
       help: 'help',
       accountLinkRequired: 'account-link-required',
+      accepted: 'accepted',
       error: 'error',
     });
   });
 
   it('accepts every ResponseKind literal', () => {
     const kinds: readonly ResponseKind[] = Object.values(RESPONSE_KINDS);
-    expect(kinds).toHaveLength(6);
+    expect(kinds).toHaveLength(7);
   });
 });
 
@@ -295,5 +315,21 @@ describe('CommandResponse', () => {
       message: 'A page already exists at this path.',
     };
     expect(pathConflict.code).toBe('path-conflict');
+  });
+
+  it('builds the agent refusals: AI unavailable and a request already in progress (Requirement 15.4, 15.12)', () => {
+    const aiUnavailable: CommandResponse = {
+      kind: RESPONSE_KINDS.error,
+      code: 'ai-unavailable',
+      message: 'GROWI AI is not enabled.',
+    };
+    expect(aiUnavailable.code).toBe('ai-unavailable');
+
+    const busy: CommandResponse = {
+      kind: RESPONSE_KINDS.error,
+      code: 'busy',
+      message: 'Your previous request is still being processed.',
+    };
+    expect(busy.code).toBe('busy');
   });
 });
