@@ -1,5 +1,4 @@
 import { type JSX, memo, useCallback, useEffect, useMemo } from 'react';
-import Link from 'next/link';
 import { type IPageHasId, isPopulated } from '@growi/core';
 import { getIdStringForRef } from '@growi/core/dist/interfaces';
 import { DevidedPagePath } from '@growi/core/dist/models';
@@ -9,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 import { FormattedDistanceDate } from '~/client/components/FormattedDistanceDate';
 import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
-import { CHANGE_PROPOSAL_LIST_HREF } from '~/features/change-proposal/client/viewer/consts';
 import {
   ProposalMarkBadge,
   useSWRxRevisionMarks,
@@ -18,7 +16,6 @@ import type { RevisionMarkView } from '~/features/change-proposal/interfaces';
 import { LinkedPagePath } from '~/models/linked-page-path';
 import { useIsGuestUser } from '~/states/context';
 import { useSetSearchKeyword } from '~/states/search';
-import { useChangeProposalEnabled } from '~/states/server-configurations';
 import { useSWRINFxRecentlyUpdated } from '~/stores/page-listing';
 import loggerFactory from '~/utils/logger';
 
@@ -242,8 +239,6 @@ export const RecentChangesHeader = ({
   onWipPageShownChange,
 }: HeaderProps): JSX.Element => {
   const { t } = useTranslation();
-  const changeProposalEnabled = useChangeProposalEnabled();
-  const isGuestUser = useIsGuestUser();
 
   const { mutate } = useSWRINFxRecentlyUpdated(isWipPageShown, {
     suspense: true,
@@ -267,15 +262,6 @@ export const RecentChangesHeader = ({
 
   return (
     <>
-      {changeProposalEnabled && !isGuestUser && (
-        <Link
-          href={CHANGE_PROPOSAL_LIST_HREF}
-          className="ms-2 small text-nowrap"
-        >
-          {t('change_proposal_viewer.list.title')}
-        </Link>
-      )}
-
       <SidebarHeaderReloadButton onClick={() => mutate()} />
 
       <div className="me-1">

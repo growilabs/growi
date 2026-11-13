@@ -10,10 +10,7 @@ import { mock } from 'vitest-mock-extended';
 import type { apiv3Post } from '~/client/util/apiv3-client';
 import type { useSWRINFxRecentlyUpdated } from '~/stores/page-listing';
 
-import {
-  RecentChangesContent,
-  RecentChangesHeader,
-} from './RecentChangesSubstance';
+import { RecentChangesContent } from './RecentChangesSubstance';
 
 type RecentlyUpdated = ReturnType<typeof useSWRINFxRecentlyUpdated>;
 type Batch = { pages: IPageHasId[]; totalCount: number; offset: number };
@@ -23,7 +20,6 @@ const mocks = vi.hoisted(() => ({
   useSWRINFxRecentlyUpdated: vi.fn(),
   apiv3Post: vi.fn(),
   useIsGuestUser: vi.fn<() => boolean>(),
-  useChangeProposalEnabled: vi.fn<() => boolean>(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -40,9 +36,6 @@ vi.mock('~/client/util/apiv3-client', () => ({
 }));
 vi.mock('~/states/context', () => ({
   useIsGuestUser: mocks.useIsGuestUser,
-}));
-vi.mock('~/states/server-configurations', () => ({
-  useChangeProposalEnabled: mocks.useChangeProposalEnabled,
 }));
 vi.mock('~/states/search', () => ({
   useSetSearchKeyword: () => vi.fn(),
@@ -106,7 +99,6 @@ describe('RecentChangesContent proposal marks', () => {
       },
     );
     mocks.useIsGuestUser.mockReturnValue(false);
-    mocks.useChangeProposalEnabled.mockReturnValue(true);
   });
 
   it('shows every row while the marks request is still pending, without a mark', () => {
@@ -227,57 +219,5 @@ describe('RecentChangesContent proposal marks', () => {
 
     expect(mocks.apiv3Post).not.toHaveBeenCalled();
     expect(screen.getByText('page0')).toBeDefined();
-  });
-});
-
-describe('RecentChangesHeader link to the change proposal list', () => {
-  const renderHeader = () =>
-    render(
-      <RecentChangesHeader
-        isSmall={false}
-        onSizeChange={vi.fn()}
-        isWipPageShown
-        onWipPageShownChange={vi.fn()}
-      />,
-      { wrapper },
-    );
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    setListing([]);
-    mocks.useIsGuestUser.mockReturnValue(false);
-  });
-
-  it('shows the link to a logged-in user when the write feature is enabled', () => {
-    mocks.useChangeProposalEnabled.mockReturnValue(true);
-
-    renderHeader();
-
-    expect(
-      screen
-        .getByRole('link', { name: 'change_proposal_viewer.list.title' })
-        .getAttribute('href'),
-    ).toBe('/me/change-proposals');
-  });
-
-  it('does not show the link when the write feature is disabled', () => {
-    mocks.useChangeProposalEnabled.mockReturnValue(false);
-
-    renderHeader();
-
-    expect(
-      screen.queryByRole('link', { name: 'change_proposal_viewer.list.title' }),
-    ).toBeNull();
-  });
-
-  it('does not show the link to a guest even when the write feature is enabled', () => {
-    mocks.useChangeProposalEnabled.mockReturnValue(true);
-    mocks.useIsGuestUser.mockReturnValue(true);
-
-    renderHeader();
-
-    expect(
-      screen.queryByRole('link', { name: 'change_proposal_viewer.list.title' }),
-    ).toBeNull();
   });
 });

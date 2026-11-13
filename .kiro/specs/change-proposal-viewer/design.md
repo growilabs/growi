@@ -36,7 +36,7 @@
 - 本人だけに出す内容を入口ごとに宣言する表（`requester-only-sections.ts` の `REQUESTER_ONLY_SECTIONS`。部品が受け取る値は `{ proposalId: string }`）と、それを読み込む場所。表は `'ai-chat'` の行を持たない状態で出し、`'ai-chat'` の行（`AiRecordSection`）は `change-proposal-ai-agent` が足す
 - 本人向けの操作を入口ごとに宣言する表（`requester-action-slots.ts` の `REQUESTER_ACTION_SLOTS`。Change Proposal 全体に置く部品は `ProposalActionSlotProps = { proposal: ChangeProposalView }`、操作ごとに置く部品は `OperationActionSlotProps = { proposal: ChangeProposalView; operation: OperationView }` を受け取る）と、それを読み込む場所（`RequesterActionSlot`）。表は `'ai-chat'` の行を持たない状態で出し、`'ai-chat'` の行（`ProposalFollowUpAction` / `OperationReworkAction`）は `change-proposal-ai-agent` が足す
 - 完了と達成度の表示（`ProposalProgressLabel`）、つながりの表示（`ProposalLinkChips`）、反映されなかった操作の一覧（`RemainingOperationsList`）
-- Recent Changes の一覧へのリンクを出すかどうかを決める画面の共通の値（`changeProposalEnabled`。SSR で `crowi.configManager.getConfig('app:changeProposalEnabled')` から作る。core の `readChangeProposalSettings()` の `isEnabled` と同じ設定キー）
+- アカウントメニューの一覧へのリンクを出すかどうかを決める画面の共通の値（`changeProposalEnabled`。SSR で `crowi.configManager.getConfig('app:changeProposalEnabled')` から作る。core の `readChangeProposalSettings()` の `isEnabled` と同じ設定キー）
 - 「戻せるものを全部戻す」のあとで、結果の決まっていない操作を「処理中」と表示し、決まるまで取り直す流れ（`deriveRevertProgress` と `useRevertProgress`）
 - core の変更の実装（tasks.md のグループ 8）: ページがもう無い操作を取り消しの相手にも表示のために返す見え方の決まり（core の要件 9.11。取り消しの対象は広げない）、完全な削除の操作の `path`（core の要件 9.12）、編集の操作に反映した時点のページのパスを記録すること（core の要件 6.7）、ページがもう無い操作のパスを操作の記録から決めて 1 件の取得と一覧の要約の両方で返すこと（core の要件 9.13）。決まり（契約）は core の spec が持ち、本 spec は同じ PR でそれを実装するタスクだけを持つ
 - 入口を表す言葉の表と、その翻訳のキー（`change_proposal_viewer.*`）。この表から実行時に決まるキーの `preservePatterns`
@@ -357,7 +357,7 @@ sequenceDiagram
 | 5.5 | 印の失敗で止めない | useSWRxRevisionMarks | `RevisionMarksState` | 印を付ける流れ |
 | 6.1–6.3 | Recent Changes の印 | RecentChangesSubstance、ProposalMarkBadge、useSWRxRevisionMarks | `RevisionMarkView` | 印を付ける流れ |
 | 6.4–6.6 | 一覧を変えない、待たない、失敗しても行を出す | RecentChangesSubstance、useSWRxRevisionMarks | — | 印を付ける流れ |
-| 6.7 | 一覧へのリンク | RecentChangesSubstance、`changeProposalEnabledAtom` | `changeProposalEnabled` | — |
+| 6.7 | 一覧へのリンク | PersonalDropdown、`changeProposalEnabledAtom` | `changeProposalEnabled` | — |
 | 7.1–7.4 | 作者の表示の印 | CurrentRevisionProposalMark、AuthorInfo | `latestRevisionId` | 印を付ける流れ |
 | 8.1–8.3 | 2 つの一覧 | ChangeProposalLists、ChangeProposalSummaryItem、useSWRInfx 一覧 | `ChangeProposalSummaryView` | — |
 | 8.4 | 件数を出さない | ChangeProposalLists、ChangeProposalSummaryItem | — | — |
@@ -718,7 +718,7 @@ function sendRevertRequest(args: {
 - OpenAPI の JSDoc を書く（core が `generate-spec-apiv3.sh` の対象に足すディレクトリに置くので、生成の対象に入る）。
 
 ### Existing Screen Integrations（summary）
-- **Recent Changes**: `RecentChangesContent` は、`useSWRINFxRecentlyUpdated` の 1 回分ごとに、その行の `revision` の ID を印の hook に渡す小さな部品を、行の一覧の部品と行の部品の間に置く（1 回分 = 20 件）。ゲストのときは null を渡す。`PageItem` は任意の `proposalMark` を受け取り、WIP の印の横に `ProposalMarkBadge` を出す。見出しの部品は `changeProposalEnabledAtom` が真で、ゲストでないときだけ一覧へのリンクを出す。一覧の取得の hook とページ送りは変えない（要件 6.4）。
+- **Recent Changes**: `RecentChangesContent` は、`useSWRINFxRecentlyUpdated` の 1 回分ごとに、その行の `revision` の ID を印の hook に渡す小さな部品を、行の一覧の部品と行の部品の間に置く（1 回分 = 20 件）。ゲストのときは null を渡す。`PageItem` は任意の `proposalMark` を受け取り、WIP の印の横に `ProposalMarkBadge` を出す。一覧へのリンクは Recent Changes ではなく、アカウントメニュー（`PersonalDropdown`）に、`changeProposalEnabledAtom` が真のときだけ出す（メニューはログイン中のユーザーにしか出ないので、ゲストには出ない）。一覧の取得の hook とページ送りは変えない（要件 6.4）。
 - **ページ履歴**: `PageRevisionTable` は、読み込んだリビジョンの ID を印の hook に渡し（全件を読んだときも hook が 100 件ずつに分ける）、`Revision` に `proposalMark` を渡す。`Revision` は「最新」の印の隣に `ProposalMarkBadge` を出す。差分のない行の簡単な表示にも同じように出す。
 - **作者の表示**: `AuthorInfo` に任意の `badge` を足し、`PageContentFooter` と `PageSideContents` は最後に更新した人の `AuthorInfo` にだけ `CurrentRevisionProposalMark` を渡す。
 - **通知**: `useModelNotification` の `??` の並びの最後に `useChangeProposalModelNotification` を足す。既読にする動きと未読の件数は既存のまま（要件 9.7）。
@@ -855,7 +855,7 @@ viewer が前提にしている core の決まりを挙げる。どれも core �
 | OQ-V1 | 本人向けの内容（AI が書いた要約と会話）を出す部品の受け取る値と置き場所 | 決定。置き場所は viewer の `requester-only-sections.ts` の `REQUESTER_ONLY_SECTIONS`、部品が受け取る値は `{ proposalId: string }`。viewer は `'ai-chat'` の行を持たない表を出し、`change-proposal-ai-agent` が `AiRecordSection` を作って `'ai-chat'` の行に登録する（ai-agent のこのタスクは viewer のタスク 5.6 のあとで行う）。受け取る値を変えるときは Revalidation Triggers に従う |
 | OQ-V2 | 頼む通知の一言の長さ（500 文字）と、同じ人が送れる間隔（24 時間） | 定数として持つ。運用で変える必要が出たら設定キーにする |
 | OQ-V3 | 依頼した人が、詳細ページから承認待ちの操作を承認できるようにするか | 本 spec では承認の操作とページごとの通知の指定を変える操作を置かず、状態と指定の値だけを表示する。Vault や MCP の入口が来たときに、承認の画面をどこに置くかと一緒に決める |
-| OQ-V4 | 書き込み機能を無効にしたあと、Recent Changes の一覧へのリンクも消してよいか | 消す（research.md の判断）。印・通知・URL からは行ける |
+| OQ-V4 | 書き込み機能を無効にしたあと、アカウントメニューの一覧へのリンクも消してよいか | 消す（research.md の判断）。印・通知・URL からは行ける |
 | OQ-V5 | ページがもう無い編集の操作にパスを出すか | 決定。core が反映のときに編集のページのパスを記録し（core の要件 6.7）、ページがもう無いときに返す（core の要件 9.13）。記録を始める前に反映した操作だけは「ページはもうありません」と出す |
 
 その他のリスク:

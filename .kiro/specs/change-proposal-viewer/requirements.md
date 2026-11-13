@@ -151,7 +151,7 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 4. When ページ履歴の続きを読み込んだ場合, the Change Proposal Viewer shall 読み込んだリビジョンにも同じように印を付ける。
 5. If 印の取得に失敗した場合、または時間がかかっている場合, then the Change Proposal Viewer shall ページ履歴の表示と操作を止めずに、印だけを表示しない。
 
-### Requirement 6: Recent Changes の印と一覧への入口
+### Requirement 6: Recent Changes の印と一覧への入口（アカウントメニュー）
 
 **Objective:** Recent Changes を見るユーザーとして、どのページが Change Proposal で更新されたかを一覧の中で見分けたい。まとめて書き換えられたことに気付くため。
 
@@ -162,7 +162,7 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 4. The Change Proposal Viewer shall Recent Changes の一覧の並び順、表示する行、続きの読み込みの振る舞いを変えない。
 5. The Change Proposal Viewer shall 印を調べ終わるのを待たずに一覧の行を表示し、印は調べ終わった行から後で付ける。
 6. If 印の取得に失敗した場合, then the Change Proposal Viewer shall 一覧の行をそのまま表示し、印だけを表示しない。
-7. Where 書き込み機能が管理者によって有効にされている場合, the Change Proposal Viewer shall Recent Changes から Change Proposal の一覧へ移るリンクを表示する。
+7. Where 書き込み機能が管理者によって有効にされている場合, the Change Proposal Viewer shall ログイン中のユーザーのアカウントメニュー（サイドバーのユーザーアイコンを押して開くメニュー）に、Change Proposal の一覧へ移るリンクを表示する。Recent Changes の見出しにはこのリンクを置かない。
 
 ### Requirement 7: ページの作者表示の印
 

@@ -160,12 +160,13 @@ umbrella の判断は [../change-proposal/research.md](../change-proposal/resear
 - **Rationale**: 同じ値の言葉を 2 つの spec が別々に持つと、値が増えたときに片方だけが直り、画面ごとに言葉が食い違う。core の値の型と同じ場所に表を置けば、値が増えたときに型の検査で 1 か所の不足として分かる。
 - **Trade-offs**: 言葉を変えるときは core の表を直す。viewer の画面だけの言い回しが欲しくなったら、`change_proposal_viewer.*` に別のキーとして足す。
 
-### Decision: 書き込み機能が有効なときだけ、Recent Changes に一覧へのリンクを出す
+### Decision: 書き込み機能が有効なときだけ、アカウントメニューに一覧へのリンクを出す
 - **Context**: 要件 6.7。書き込み機能は初期値で無効で、多くの wiki では Change Proposal が 1 件も無い。
 - **Selected Approach**: 書き込み機能の設定キー `app:changeProposalEnabled` を、`getServerSideCommonInitialProps` の中で `crowi` から取った `configManager` で読み（`crowi.configManager.getConfig('app:changeProposalEnabled')`）、画面の共通の値として渡す。真のときだけリンクを出す。core の `readChangeProposalSettings()` は、SSR の側から呼ばない。印・詳細ページ・一覧そのものは、設定にかかわらず動く。
-- **Rationale**: 無効にしたあとも、反映済みの Change Proposal と取り消しは残る（core 要件 5.13）。印と詳細ページは、それをたどる手段として残す必要がある。一方、一度も使っていない wiki の Recent Changes に入口を出すと、意味の無いリンクになる。読み方を `crowi` 経由にするのは、`readChangeProposalSettings()` が `configManager` を直接 import していて、SSR の側では設定を読み込んでいない別の実体を読むためである（「core の実装との突き合わせ」。実際に初期値が返るか例外になるかは未確認）。`commons.ts` は AI の有効・無効を `crowi.isAiReady()` で、ほかの設定を `crowi` の `configManager` で読んでおり、同じ形にそろえる。
+- **Rationale**: 無効にしたあとも、反映済みの Change Proposal と取り消しは残る（core 要件 5.13）。印と詳細ページは、それをたどる手段として残す必要がある。一方、一度も使っていない wiki で入口を出すと、意味の無いリンクになる。読み方を `crowi` 経由にするのは、`readChangeProposalSettings()` が `configManager` を直接 import していて、SSR の側では設定を読み込んでいない別の実体を読むためである（「core の実装との突き合わせ」。実際に初期値が返るか例外になるかは未確認）。`commons.ts` は AI の有効・無効を `crowi.isAiReady()` で、ほかの設定を `crowi` の `configManager` で読んでおり、同じ形にそろえる。
 - **Trade-offs**: 設定キーの名前を viewer も知ることになる。キーの名前や意味が変わったときは viewer も直す（design.md の Revalidation Triggers）。
 - **Trade-offs**: 無効にしたあとは、一覧へは通知・印・URL からしか行けない。
+- **置き場所**: 一覧の URL は `/me/change-proposals` で、自分用の画面である。Recent Changes はページの更新を並べる画面で、一覧とは役割が違うため、見出しに置くと別の機能のリンクに見える。ユーザーのアカウントメニューは `/me`（設定）と同じ並びで、自分用の画面への入口として自然なため、ここに置く。
 
 ### Decision: 本人向けの操作は、入口ごとの宣言の表から引く
 - **Context**: 要件 13。umbrella の決定 7。AI チャットの入口は、詳細ページに「後続 Change Proposal を作る」と、操作ごとの「AI に見直してもらう」を出したい。Vault・MCP の入口は、今は同じことができない。
