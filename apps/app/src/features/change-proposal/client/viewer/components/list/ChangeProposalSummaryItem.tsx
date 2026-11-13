@@ -9,6 +9,11 @@ import type { ChangeProposalSummaryView } from '../../../../interfaces';
 import { buildProposalHref, PROPOSAL_STATUS_LABEL_KEYS } from '../../../shared';
 import { ENTRY_LABEL_KEYS } from '../../domain';
 import { ProposalProgressLabel } from '../detail/ProposalProgressLabel';
+import { StatusBadge } from '../StatusBadge';
+import { SymbolIcon } from '../SymbolIcon';
+import { ENTRY_ICONS, PROPOSAL_STATUS_APPEARANCE } from '../status-appearance';
+
+import styles from './ChangeProposalSummaryItem.module.scss';
 
 const INITIAL_VISIBLE_PATH_COUNT = 3;
 
@@ -31,45 +36,57 @@ export const ChangeProposalSummaryItem = ({
   const hasHiddenPages = pages.length > visiblePages.length;
 
   return (
-    <li className="list-group-item">
+    <li className={styles.item}>
+      {/* stretched-link makes the whole card open the detail page; the
+          show-more button is lifted above it so it stays clickable. */}
       <Link
         href={buildProposalHref(proposal.id)}
-        className="d-block text-decoration-none text-reset"
+        className={`stretched-link ${styles['item-link']}`}
       >
-        <div className="d-flex flex-wrap align-items-center gap-2">
-          <span className="fw-bold">{`${requester.name} (@${requester.username})`}</span>
-          <span className="badge text-bg-light border">
+        <span className={styles.top}>
+          <StatusBadge
+            appearance={PROPOSAL_STATUS_APPEARANCE[status]}
+            label={t(PROPOSAL_STATUS_LABEL_KEYS[status])}
+          />
+          <ProposalProgressLabel view={proposal} />
+          <span className={styles.date}>
+            <UserDate dateTime={dateTime} />
+          </span>
+        </span>
+        <span className={styles.who}>
+          <span className={styles.name}>{requester.name}</span>
+          <span className={styles.username}>{`@${requester.username}`}</span>
+          <span className={styles.entry}>
+            <SymbolIcon name={ENTRY_ICONS[entry]} className={styles.icon} />
             {t(ENTRY_LABEL_KEYS[entry])}
           </span>
           {modelLabel != null && (
-            <span className="text-muted">{modelLabel}</span>
+            <span className={styles.model}>{modelLabel}</span>
           )}
-          <span className="text-muted">
-            <UserDate dateTime={dateTime} />
-          </span>
-          <span className="badge text-bg-secondary">
-            {t(PROPOSAL_STATUS_LABEL_KEYS[status])}
-          </span>
-          <ProposalProgressLabel view={proposal} />
-        </div>
+        </span>
       </Link>
       {visiblePages.length > 0 && (
-        <ul className="list-unstyled mb-0 mt-1 small">
-          {visiblePages.map((page) => (
-            <li key={page.id} className="text-break">
-              {page.path ?? (
-                <span className="text-muted">
-                  {t('change_proposal_viewer.operation.page_gone')}
-                </span>
-              )}
-            </li>
-          ))}
+        <ul className={styles.pages}>
+          {visiblePages.map((page) =>
+            page.path != null ? (
+              <li key={page.id} className={styles.page}>
+                {page.path}
+              </li>
+            ) : (
+              <li
+                key={page.id}
+                className={`${styles.page} ${styles['page-gone']}`}
+              >
+                {t('change_proposal_viewer.operation.page_gone')}
+              </li>
+            ),
+          )}
         </ul>
       )}
       {hasHiddenPages && (
         <button
           type="button"
-          className="btn btn-link btn-sm p-0"
+          className={`btn btn-link btn-sm ${styles['show-more']}`}
           onClick={() => setShowsAllPages(true)}
         >
           {t('change_proposal_viewer.list.show_more_pages')}

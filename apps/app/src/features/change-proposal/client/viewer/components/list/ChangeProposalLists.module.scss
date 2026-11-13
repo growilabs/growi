@@ -1,0 +1,83 @@
+// One row of tabs that scrolls sideways instead of wrapping when it does not fit.
+.tablist {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.tab {
+  position: relative;
+  flex: none;
+  padding: 0.5rem 0.125rem 0.625rem;
+  font-weight: 600;
+  color: var(--bs-secondary-color);
+  white-space: nowrap;
+  background: none;
+  border: 0;
+
+  &:hover {
+    color: var(--bs-body-color);
+  }
+
+  &:focus-visible {
+    border-radius: var(--bs-border-radius-sm);
+    outline: 2px solid var(--bs-primary);
+    outline-offset: -2px;
+  }
+
+  // A border (not a background or shadow) so the marker survives forced colors.
+  &[aria-selected='true'] {
+    color: var(--bs-emphasis-color);
+
+    &::after {
+      position: absolute;
+      inset: auto 0 -1px;
+      content: '';
+      border-bottom: 3px solid var(--bs-primary);
+      border-radius: 3px 3px 0 0;
+    }
+  }
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0;
+  margin: 0 0 1.25rem;
+  list-style: none;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.end-of-list {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 0 0 1.25rem;
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+
+  &::before,
+  &::after {
+    flex: 1;
+    content: '';
+    border-top: 1px solid var(--bs-border-color);
+  }
+}

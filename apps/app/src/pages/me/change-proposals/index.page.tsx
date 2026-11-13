@@ -47,7 +47,9 @@ const ChangeProposalListPage: NextPageWithLayout<Props> = () => {
 
         <div className="main ps-sidebar">
           <div className="container-lg wide-gutter-x-lg">
-            <h1 className="sticky-top py-2 fs-3">{title}</h1>
+            <h1 className="fs-3 mt-4 mb-3">
+              {t('change_proposal_viewer.list.title')}
+            </h1>
 
             <ChangeProposalLists />
           </div>
