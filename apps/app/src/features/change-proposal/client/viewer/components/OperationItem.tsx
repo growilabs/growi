@@ -79,7 +79,10 @@ export const OperationItem = ({
   };
 
   return (
-    <div className="border rounded p-2 mb-2">
+    <div
+      className="border rounded p-2 mb-2"
+      data-testid="change-proposal-operation"
+    >
       <div className="d-flex flex-wrap align-items-center gap-2">
         {operation.index != null && (
           <span className="text-muted small">{`#${operation.index + 1}`}</span>
