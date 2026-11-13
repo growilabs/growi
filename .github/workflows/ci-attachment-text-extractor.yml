@@ -1,0 +1,122 @@
+name: Node CI for attachment-text-extractor
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - release/**
+      - rc/**
+      - changeset-release/**
+      - mergify/merge-queue/**
+      - tmp-mergify/merge-queue/**
+    paths:
+      - apps/attachment-text-extractor/**
+      # Read by the tests: the committed OpenAPI document is compared with the
+      # one the service generates, and the compose entry is checked.
+      - packages/attachment-text-extractor-client/openapi.json
+      - infra/docker/compose.yaml
+      - .github/workflows/ci-attachment-text-extractor.yml
+      - biome.json
+      - tsconfig.base.json
+      - turbo.json
+      - pnpm-lock.yaml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Req 8.1 of the node-rewrite spec: the image stays within 400 MB.
+  IMAGE_MAX_BYTES: '400000000'
+  IMAGE_TAG: attachment-text-extractor:ci
+  CONTAINER_NAME: ate-smoke
+  CHECK_IMAGE: apps/attachment-text-extractor/scripts/image-check/check-image.sh
+
+# ci-app.yml selects ./packages/* and @growi/app only, so it does not run this package's tests a second time.
+jobs:
+  ci-attachment-text-extractor:
+    name: Node CI for attachment-text-extractor
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: |
+          pnpm add turbo --global
+          pnpm install --frozen-lockfile
+
+      - name: Lint and test
+        run: turbo run lint test --filter=@growi/attachment-text-extractor --env-mode=loose
+
+  # The steps are those of scripts/image-check/check-image.sh, which runs the
+  # same procedure on any machine with docker (`check-image.sh all`).
+  ci-attachment-text-extractor-image:
+    name: Image check for attachment-text-extractor
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+          cache: pnpm
+
+      # For the scripts that run outside the container: the sample files and
+      # the OpenAPI export come from the sources.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build image
+        run: bash "$CHECK_IMAGE" build
+
+      - name: Check image size
+        run: bash "$CHECK_IMAGE" size
+
+      - name: Check image contents
+        run: bash "$CHECK_IMAGE" contents
+
+      # No published port exists with --network none, so the checks of the next step run inside the container.
+      - name: Start container (read-only rootfs, uid 10001, no network)
+        run: bash "$CHECK_IMAGE" start
+
+      - name: Check readiness, PDF and DOCX extraction, prlimit and the OpenAPI document
+        run: bash "$CHECK_IMAGE" service
+
+      - name: Show container logs on failure
+        if: failure()
+        run: bash "$CHECK_IMAGE" logs || true
+
+      - name: Remove container
+        if: always()
+        run: bash "$CHECK_IMAGE" stop || true
+
+      # Req 3.14 and 11.2: the heaviest loads against the 2 Gi limit and the
+      # child peak RSS of the baseline files, in containers of their own. The
+      # figures go to the job summary. Only when the workflow is started by
+      # hand: do that after upgrading the conversion libraries (anydoc,
+      # PDFium) or the Node base image, or after changing memory-related code.
+      # Not on every push, because the path filter includes pnpm-lock.yaml and
+      # unrelated dependency updates would start it.
+      - name: Measure memory in the image
+        if: github.event_name == 'workflow_dispatch'
+        run: bash "$CHECK_IMAGE" memory

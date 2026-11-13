@@ -1,0 +1,47 @@
+services:
+  attachment-text-extractor:
+    build:
+      # The repository root: the image is built from the pnpm workspace.
+      context: ../..
+      dockerfile: apps/attachment-text-extractor/docker/Dockerfile
+    image: attachment-text-extractor:local
+    env_file:
+      - .env
+    environment:
+      # The reasons for these values and for the limits below are in
+      # apps/attachment-text-extractor/docker/README.md. Raising MAX_CONCURRENCY
+      # means raising mem_limit by the amount the memory sum there grows.
+      MAX_CONCURRENCY: "3"
+    ports:
+      - "8000:8000"
+    networks:
+      - internal
+    healthcheck:
+      # /readyz converts probe files in a real conversion child (10s limit), so
+      # the timeout must be longer than that. The image has no curl or wget.
+      test:
+        - "CMD"
+        - "node"
+        - "-e"
+        - "fetch('http://127.0.0.1:8000/readyz', { signal: AbortSignal.timeout(14000) }).then((res) => process.exit(res.ok ? 0 : 1), () => process.exit(1))"
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      # The service itself writes nothing here; counts against mem_limit.
+      - /tmp:size=64m,mode=1777
+    user: "10001:10001"
+    mem_limit: 2g
+    memswap_limit: 2g
+    pids_limit: 256
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  internal:
+    driver: bridge
+    internal: true  # egress blocked: outbound traffic from containers is disallowed

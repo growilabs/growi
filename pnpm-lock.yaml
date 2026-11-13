@@ -151,7 +151,7 @@ importers:
         version: 3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.1)
       vitest-mock-extended:
         specifier: ^3.1.0
-        version: 3.1.0(typescript@5.9.3)(vitest@3.2.6)
+        version: 3.1.0(typescript@5.9.3)(vitest@3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.1))
 
   apps/app:
     dependencies:
@@ -236,6 +236,9 @@ importers:
       '@google-cloud/storage':
         specifier: ^5.8.5
         version: 5.20.5(encoding@0.1.13)
+      '@growi/attachment-text-extractor-client':
+        specifier: workspace:^
+        version: link:../../packages/attachment-text-extractor-client
       '@growi/core':
         specifier: workspace:^
         version: link:../../packages/core
@@ -298,16 +301,16 @@ importers:
         version: 2.6.1
       '@mastra/ai-sdk':
         specifier: ^1.4.1
-        version: 1.4.4(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6))(zod@4.6.6)
+        version: 1.4.4(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6))(zod@4.6.6)
       '@mastra/core':
         specifier: ^1.80.0
-        version: 1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6)
+        version: 1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6)
       '@mastra/memory':
         specifier: ^1.17.5
-        version: 1.20.2(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6))(zod@4.6.6)
+        version: 1.20.2(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6))(zod@4.6.6)
       '@mastra/mongodb':
         specifier: ^1.8.0
-        version: 1.9.1(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6))(encoding@0.1.13)
+        version: 1.9.1(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6))(encoding@0.1.13)
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.0
@@ -1138,6 +1141,85 @@ importers:
         specifier: ^6.0.0
         version: 6.0.1
 
+  apps/attachment-text-extractor:
+    dependencies:
+      '@embedpdf/pdfium':
+        specifier: '=2.15.1'
+        version: 2.15.1
+      '@firecrawl/anydoc':
+        specifier: '=0.2.4'
+        version: 0.2.4
+      '@hono/node-server':
+        specifier: ^2.1.6
+        version: 2.1.7(hono@4.13.17)
+      '@xmldom/xmldom':
+        specifier: ^0.9.12
+        version: 0.9.12
+      entities:
+        specifier: ^8.1.0
+        version: 8.1.0
+      hono:
+        specifier: ^4.13.16
+        version: 4.13.17
+      hono-openapi:
+        specifier: ^1.5.0
+        version: 1.5.0(hono@4.13.17)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6)
+      htmlparser2:
+        specifier: '=12.0.0'
+        version: 12.0.0
+      yauzl:
+        specifier: ^3.4.0
+        version: 3.4.0
+      yazl:
+        specifier: ^3.3.1
+        version: 3.3.1
+      zod:
+        specifier: ^4.6.6
+        version: 4.6.6
+    devDependencies:
+      '@swc-node/register':
+        specifier: ^1.10.9
+        version: 1.10.9(@swc/core@1.16.1(@swc/helpers@0.5.23))(@swc/types@0.1.28)(typescript@5.9.3)
+      '@swc/core':
+        specifier: ^1.9.2
+        version: 1.16.1(@swc/helpers@0.5.23)
+      '@types/emscripten':
+        specifier: ^1.41.6
+        version: 1.41.6
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      '@types/yauzl':
+        specifier: ^3.4.0
+        version: 3.4.0
+      '@types/yazl':
+        specifier: ^3.3.1
+        version: 3.3.1
+      ajv:
+        specifier: ^8.18.0
+        version: 8.18.0
+      cfb:
+        specifier: ^1.2.2
+        version: 1.2.2
+      iconv-lite:
+        specifier: ^0.7.3
+        version: 0.7.3
+      officecrypto-tool:
+        specifier: 0.0.19
+        version: 0.0.19
+      playwright-core:
+        specifier: 1.64.1
+        version: 1.64.1
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.1)
+      vitest-mock-extended:
+        specifier: ^3.1.0
+        version: 3.1.0(typescript@5.9.3)(vitest@3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.1))
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.1
+
   apps/growi-vault-manager:
     dependencies:
       '@godaddy/terminus':
@@ -1438,6 +1520,19 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.1)
+
+  packages/attachment-text-extractor-client:
+    dependencies:
+      axios:
+        specifier: ^1.15.0
+        version: 1.15.0
+      tslib:
+        specifier: ^2.8.0
+        version: 2.8.1
+    devDependencies:
+      orval:
+        specifier: '=7.2.0'
+        version: 7.2.0(encoding@0.1.13)(openapi-types@12.1.3)(typescript@5.9.3)
 
   packages/core:
     dependencies:
@@ -3135,6 +3230,9 @@ packages:
     resolution: {integrity: sha512-PogTXSIAuoB7QiD5BnZHIlLCiGIAEsxr1jHL6UWNnlDZp5YvfuwGy2IGiE/lBIjt5FsG+eHnEPj/I71Bw6MWJA==}
     engines: {node: '>=20'}
 
+  '@embedpdf/pdfium@2.15.1':
+    resolution: {integrity: sha512-qDH4gEkGSQT0iM+07Hpm3LyvoB7PEFbW3Qyk6+LPkEYLJYfHagkHM1OzYlDq2EDOhJRguykTkzdMOT3/w27x5Q==}
+
   '@emnapi/core@1.2.0':
     resolution: {integrity: sha512-E7Vgw78I93we4ZWdYCb4DGAwRROGkMIXk7/y87UmANR+J6qsWusmC3gLt0H+O0KOt5e6O38U8oJamgbudrES/w==}
 
@@ -3605,6 +3703,57 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=9.0.0'}
     deprecated: Please update to a newer version
 
+  '@firecrawl/anydoc-darwin-arm64@0.2.4':
+    resolution: {integrity: sha512-1Eg0rPGVMN052E7Y2+zswANS0KLaWhXvYb9CPgO8HEtclzu3hKAIJ00lIu5PF+DXafZ10ZS4fmrcP+9Ifct9qw==}
+    engines: {node: '>= 20'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@firecrawl/anydoc-darwin-x64@0.2.4':
+    resolution: {integrity: sha512-fTM8y6COu+jBqWRJ0Je0OqaDDt7YxJ8LU4ISoypO5eOBNXI3+l6tK1ZRwUclYWXGBr/6JaUWEgdyJVFfd/fpJg==}
+    engines: {node: '>= 20'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@firecrawl/anydoc-linux-arm64-gnu@0.2.4':
+    resolution: {integrity: sha512-gRrrjluTfQCjOO6wBefEP1QumYlUcGWKP7secVIO+ly8U/+DDQ70bOHW2lOGu19hA/23j7bc7bb3oLPAaBY82A==}
+    engines: {node: '>= 20'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@firecrawl/anydoc-linux-arm64-musl@0.2.4':
+    resolution: {integrity: sha512-fpzby6xqD709GmYUpnrWh7/2Csa6lwGrZrYPNGyn4KMEuJ1ibsNv6I3kdZAotMUKZ8nlNdPp32v964eBpsijcw==}
+    engines: {node: '>= 20'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@firecrawl/anydoc-linux-x64-gnu@0.2.4':
+    resolution: {integrity: sha512-yfvx+iGo2CvZH0TB9MeyNjkrd5/psNFEuxkl2Jah/VNFesPRASqjjCkDRY7tKw7fPij1u/UyFVxI6bsu6Iow9Q==}
+    engines: {node: '>= 20'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@firecrawl/anydoc-linux-x64-musl@0.2.4':
+    resolution: {integrity: sha512-9OWpM84c5SA/2wjfFxgfhupxziapus+7DERWmcOvkVxNp2H5Qj/9Y74c9leP2i03SjmBDl9tYWMVd3k/S3rY6w==}
+    engines: {node: '>= 20'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@firecrawl/anydoc-win32-x64-msvc@0.2.4':
+    resolution: {integrity: sha512-E7d14hy5kZNsMNnHiutU6r9yr53LrKXSsMSFtl0QhU/1KWuvRnjhQEuMiuW4YbsMcPlEaK10WtBVF86g9OMW6A==}
+    engines: {node: '>= 20'}
+    cpu: [x64]
+    os: [win32]
+
+  '@firecrawl/anydoc@0.2.4':
+    resolution: {integrity: sha512-rfJxa5L+nhoqR5yodcRZoGDLaSfxMTpBuhVj1gSacfW4ZGjBt4cjfErXwaKjPYrpWRTPIBye2sh36UhqgOP1Og==}
+    engines: {node: '>= 20'}
+    hasBin: true
+
   '@floating-ui/core@1.6.9':
     resolution: {integrity: sha512-uMXCuQ3BItDUbAMhIXw7UPXRfAlOAvZzdK9BWpE60MCn+Svt3aLn9jsPTi/WNGlRUu2uI0v5S7JiIUsbsvh3fw==}
 
@@ -3672,6 +3821,12 @@ packages:
       '@headless-tree/core': '*'
       react: '*'
       react-dom: '*'
+
+  '@hono/node-server@2.1.7':
+    resolution: {integrity: sha512-Wr0E6S+v2Bw9FkpGNP5BQ5QbJvclUa06UVehd65WFZe6XeJwbrKQQ5wPDevc0IC+QyzbO7v3Llh5uo45IZcSnA==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: ^4 || ^5.0.0-0
 
   '@hono/standard-validator@0.4.1':
     resolution: {integrity: sha512-Q0+1dgMKAXEvsmJ5FNoamwnfrf/I5JNnKn7WzfynH8nJlNe1lNOW1+vlKpEQZbrBLEgmxIeys6HjRotDvZzq+A==}
@@ -6809,6 +6964,9 @@ packages:
   '@types/dotenv-flow@3.3.3':
     resolution: {integrity: sha512-aJjBsKw4bfGjvaRwrxBtEOfYZxCAq+LiFTpZ4DGTEK2b9eLVt/IAClapSxMfgV4Mi/2bIBKKjoTCO0lOh4ACLg==}
 
+  '@types/emscripten@1.41.6':
+    resolution: {integrity: sha512-uN+9i8bFT5CUcZfyIEYDrSueACEyKGbUs5kC/72DGlZZoinh84sJfVV0i8UOJD1asdzkvLPBRrKs41kZ8MdEXg==}
+
   '@types/es-aggregate-error@1.0.6':
     resolution: {integrity: sha512-qJ7LIFp06h1QE1aVxbVd+zJP2wdaugYXYfd6JxsyRMrYHaxb6itXPogW2tz+ylUJ1n1b+JF1PHyYCfYHm0dvUg==}
 
@@ -7026,6 +7184,12 @@ packages:
   '@types/yauzl@2.10.3':
     resolution: {integrity: sha512-oJoftv0LSuaDZE3Le4DbKX+KS9G36NzOeSap90UIK0yMA/NhKJhqlSGtNDORNRaIbQfzjXDrQa0ytJ6mNRGz/Q==}
 
+  '@types/yauzl@3.4.0':
+    resolution: {integrity: sha512-NRPn5w6h8dhcnmx3YIRQcqMywY/+nND/uOkJessedcrowO3C0AssHp3tMJpxKAwOhFOo0OV1y9VtsC5hbKKBAw==}
+
+  '@types/yazl@3.3.1':
+    resolution: {integrity: sha512-DIWfCKpsTp6hE5BDBHV3+fIL/bLUF9Bv13iDrWnMlmhQpH67buNvI291ZauQ1xcccxK3FqQ9honnXpq4R8NMuQ==}
+
   '@types/zen-observable@0.8.3':
     resolution: {integrity: sha512-fbF6oTd4sGGy0xjHPKAt+eS2CrxJ3+6gQ3FGcBoIJR2TLAyCkCyI8JqZNy+FeON0AhVgNJoUumVoZQjBFUqHkw==}
 
@@ -7238,6 +7402,10 @@ packages:
     engines: {node: '>=10.0.0'}
     deprecated: this version has critical issues, please update to the latest version
 
+  '@xmldom/xmldom@0.9.12':
+    resolution: {integrity: sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A==}
+    engines: {node: '>=14.6'}
+
   '@xyflow/react@12.11.0':
     resolution: {integrity: sha512-na4IO33FSs2OS72hASgZDmTYwFAkef7Z74uBUVrong3ARmQQHfnRUVaCFn1kTt5LbS6pK03TbYjCPGLjLFfziA==}
     peerDependencies:
@@ -7299,6 +7467,10 @@ packages:
     resolution: {integrity: sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw==}
     engines: {node: '>=0.4.0'}
     hasBin: true
+
+  adler-32@1.3.1:
+    resolution: {integrity: sha512-ynZ4w/nUUv5rrsR8UUGoe1VC9hZj6V5hU9Qw1HlMDJGEJw5S7TfTErWTjMys6M7vr0YWcPqs3qAr4ss0nDfP+A==}
+    engines: {node: '>=0.8'}
 
   agent-base@6.0.2:
     resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
@@ -7797,6 +7969,10 @@ packages:
   buffer-crc32@0.2.13:
     resolution: {integrity: sha512-VO9Ht/+p3SN7SKWqcrgEzjGbRSJYTx+Q1pTQC0wrWqHx0vpJraQ6GtHx8tvcg1rlK1byhU5gccxgOgj7B0TDkQ==}
 
+  buffer-crc32@1.0.0:
+    resolution: {integrity: sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w==}
+    engines: {node: '>=8.0.0'}
+
   buffer-equal-constant-time@1.0.1:
     resolution: {integrity: sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==}
 
@@ -7911,6 +8087,10 @@ packages:
 
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
+
+  cfb@1.2.2:
+    resolution: {integrity: sha512-KfdUZsSOw19/ObEWasvBP/Ac4reZvAGauZhs6S/gqNhXhI7cKwvlH7ulj+dOEYnca4bm4SGo8C1bTAQvnTjgQA==}
+    engines: {node: '>=0.8'}
 
   chai@5.3.3:
     resolution: {integrity: sha512-4zNhdJD/iOjSH0A05ea+Ke6MU5mmpQcbQsSOkgdaUMJ9zTlDTD/GYlwohmIE2u0gaxHYiVHEn1Fw9mZ/ktJWgw==}
@@ -8806,6 +8986,10 @@ packages:
   crypt@0.0.2:
     resolution: {integrity: sha512-mCxBlsHFYh9C+HVpiEacem8FEBnMXgU9gy4zmNC+SXAZNB/1idgp/aulFJ4FgCi7GPEVbfyng092GqL2k2rmow==}
 
+  crypto-js@4.2.0:
+    resolution: {integrity: sha512-KALDyEYgpY+Rlob/iriUtjV6d5Eq+Y191A5g4UqLAi8CyGP9N1+FdVbkc1SxKc2r4YAYqG8JzO2KGL+AizD70Q==}
+    deprecated: Active development of CryptoJS has been discontinued. This library is no longer maintained.
+
   crypto-random-string@2.0.0:
     resolution: {integrity: sha512-v1plID3y9r/lPhviJ1wrXpLeyUIGAZ2SHNYTEapm7/8A9nLPoyvVp3RK/EPFqn5kEznyWgYZNsRtYYIWbuG8KA==}
     engines: {node: '>=8'}
@@ -9334,18 +9518,34 @@ packages:
   dom-serializer@2.0.0:
     resolution: {integrity: sha512-wIkAryiqt/nV5EQKqQpo3SToSOV9J0DnbJqwK7Wv/Trc92zIAYZ4FlMu+JPFW1DfGFt81ZTCGgDEabffXeLyJg==}
 
+  dom-serializer@3.1.1:
+    resolution: {integrity: sha512-4MEa38/QexBob6gFNwu+EGdWvhJ1OKuNwdYY3Y3NyeWDQfnGeDYQUDfIRzWu5B5gsv03so2Uxd28YC6zrsx3Lw==}
+    engines: {node: '>=20.19.0'}
+
   domelementtype@2.3.0:
     resolution: {integrity: sha512-OLETBj6w0OsagBwdXnPdN0cnMfF9opN69co+7ZrbfPGrdpPVNBUj02spi6B1N7wChLQiPn4CSH/zJvXw56gmHw==}
+
+  domelementtype@3.0.0:
+    resolution: {integrity: sha512-umCQid3jKbDmVjx8jGaW7uUykm4DEUeyV21hPxNMo2nV955DhUThwqyOIDtreepP31hl84X7G5U9ZfsWvIB3Pg==}
+    engines: {node: '>=20.19.0'}
 
   domhandler@5.0.3:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
+
+  domhandler@6.0.1:
+    resolution: {integrity: sha512-gYzvtM72ZtxQO0T048kd6HWSbbGCNOUwcnfQ01cqIJ4X2IYKFFHZ5mKvrQETcFXxsRObZulDaKmy//R7TPtsBg==}
+    engines: {node: '>=20.19.0'}
 
   dompurify@3.4.13:
     resolution: {integrity: sha512-2vmYIoqjze2d+kakP8S/nS5shfsl587kzwEjcGlTdiksUVgFHnFCsLYDVj/JNqJVOQZGSYBTmuycv0PodwmnMQ==}
 
   domutils@3.1.0:
     resolution: {integrity: sha512-H78uMmQtI2AhgDJjWeQmHwJJ2bLPD3GMmO7Zja/ZZh84wkm+4ut+IUnUdRa8uCGX88DiVx1j6FRe1XfxEgjEZA==}
+
+  domutils@4.0.2:
+    resolution: {integrity: sha512-qI4JLRKnSzqFqr7hAlS5xQDusBCjKSEG4t4+7aNrIQMHBcsC2TGEhuyABJdYkgSewL57PNLYEiibY2iPKhKpaA==}
+    engines: {node: '>=20.19.0'}
 
   dot-case@3.0.4:
     resolution: {integrity: sha512-Kv5nKlh6yRrdrGvxeJ2e5y2eRUpkUosIW4A2AS38zwSz27zu7ufDwQPi5Jhs3XAlGNetl3bmnGhQsMtkKJnj3w==}
@@ -9498,6 +9698,10 @@ packages:
   entities@6.0.1:
     resolution: {integrity: sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g==}
     engines: {node: '>=0.12'}
+
+  entities@8.1.0:
+    resolution: {integrity: sha512-kxL7msIffSuh9aaFAMD7rxAIuTRMAHMeBtgHW2yUdWw732ZNh4MehkF2gdjvtdmikkaIP9bFDDJOPlsvm7avrA==}
+    engines: {node: '>=20.19.0'}
 
   env-paths@2.2.1:
     resolution: {integrity: sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A==}
@@ -10438,6 +10642,10 @@ packages:
   html-void-elements@3.0.0:
     resolution: {integrity: sha512-bEqo66MRXsUGxWHV5IP0PUiAWwoEjba4VCzg0LjFJBpchPaTfyfCKTG6bc5F8ucKec3q5y6qOdGyYTSBEvhCrg==}
 
+  htmlparser2@12.0.0:
+    resolution: {integrity: sha512-Tz7u1i95/g2x2jz81+x0FBVhBhY5aRTvD3tXXdFaljuNdzDLJ8UGNRrTcj2cgQvAg3iW/h77Fz15nLW0L0CrZw==}
+    engines: {node: '>=20.19.0'}
+
   htmlparser2@8.0.2:
     resolution: {integrity: sha512-GYdjWKDkbRLkZ5geuHs5NY1puJ+PXwP7+fHPRz06Eirsb9ugf6d8kkXav6ADhcODhFFPMIXyxkxSuMf3D6NCFA==}
 
@@ -11182,6 +11390,7 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
+    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}
@@ -12747,6 +12956,9 @@ packages:
   object.assign@4.1.5:
     resolution: {integrity: sha512-byy+U7gp+FVwmyzKPYhW2h5l3crpmGsxl7X2s8y43IgxvG4g3QZ6CffDtsNQy1WsmZpQbO+ybo0AlW7TY6DcBQ==}
     engines: {node: '>= 0.4'}
+
+  officecrypto-tool@0.0.19:
+    resolution: {integrity: sha512-nb/HkY025+qgNo2yYIivmAe/7B0UhejJXIzsWMIKB7fSDB317J1WDQvnpKqL+q+A0DCPzFYvK/iAFfWk+3Ygtw==}
 
   ohash@2.0.11:
     resolution: {integrity: sha512-RdR9FQrFwNBNXAr4GixM8YaRZRJ5PUWbKYbE5eOsrwAjJW0q2REGcf79oYPsLyskQCZG1PLN+S/K1V00joZAoQ==}
@@ -16073,6 +16285,10 @@ packages:
     resolution: {integrity: sha512-ySPiMjM0+pLDftHgXY4By0uswI3SPKLDw/i3UXbnO8M/p28zqexCUoPmQFrYD+/1BzhGJSs2i1ERWKJAtiLrug==}
     engines: {node: '>=4.0.0'}
 
+  xml2js@0.6.2:
+    resolution: {integrity: sha512-T4rieHaC1EXcES0Kxxj4JWgaUQHDk+qwHcYOCFHfiwKz7tOVPLq7Hjq9dM1WCMhylqMEfP7hMcOIChvotiZegA==}
+    engines: {node: '>=4.0.0'}
+
   xmlbuilder@11.0.1:
     resolution: {integrity: sha512-fDlsI/kFEx7gLvbecc0/ohLG50fugQp8ryHzMTuW9vSa1GJ0XYWKnhsUx7oie3G98+r56aTQIUB4kht42R3JvA==}
     engines: {node: '>=4.0'}
@@ -16208,6 +16424,13 @@ packages:
   yauzl@3.1.3:
     resolution: {integrity: sha512-JCCdmlJJWv7L0q/KylOekyRaUrdEoUxWkWVcgorosTROCFWiS9p2NNPE9Yb91ak7b1N5SxAZEliWpspbZccivw==}
     engines: {node: '>=12'}
+
+  yauzl@3.4.0:
+    resolution: {integrity: sha512-jIH9yLR9wqr0wOS0TpBvo/g/2UgZH5qePVbjgRliiF0BYvOZyaBknKsF+x9Iht0O6sqgnB93rCICdOZFecJuDw==}
+    engines: {node: '>=12'}
+
+  yazl@3.3.1:
+    resolution: {integrity: sha512-BbETDVWG+VcMUle37k5Fqp//7SDOK2/1+T7X8TD96M3D9G8jK5VLUdQVdVjGi8im7FGkazX7kk5hkU8X4L5Bng==}
 
   yjs@13.6.19:
     resolution: {integrity: sha512-GNKw4mEUn5yWU2QPHRx8jppxmCm9KzbBhB4qJLUJFiiYD0g/tDVgXQ7aPkyh01YO28kbs2J/BEbWBagjuWyejw==}
@@ -18289,6 +18512,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@embedpdf/pdfium@2.15.1': {}
+
   '@emnapi/core@1.2.0':
     dependencies:
       '@emnapi/wasi-threads': 1.0.1
@@ -18538,6 +18763,37 @@ snapshots:
 
   '@faker-js/faker@9.0.1': {}
 
+  '@firecrawl/anydoc-darwin-arm64@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-darwin-x64@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-linux-arm64-gnu@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-linux-arm64-musl@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-linux-x64-gnu@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-linux-x64-musl@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc-win32-x64-msvc@0.2.4':
+    optional: true
+
+  '@firecrawl/anydoc@0.2.4':
+    optionalDependencies:
+      '@firecrawl/anydoc-darwin-arm64': 0.2.4
+      '@firecrawl/anydoc-darwin-x64': 0.2.4
+      '@firecrawl/anydoc-linux-arm64-gnu': 0.2.4
+      '@firecrawl/anydoc-linux-arm64-musl': 0.2.4
+      '@firecrawl/anydoc-linux-x64-gnu': 0.2.4
+      '@firecrawl/anydoc-linux-x64-musl': 0.2.4
+      '@firecrawl/anydoc-win32-x64-msvc': 0.2.4
+
   '@floating-ui/core@1.6.9':
     dependencies:
       '@floating-ui/utils': 0.2.9
@@ -18630,6 +18886,10 @@ snapshots:
       '@headless-tree/core': 1.6.3
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
+
+  '@hono/node-server@2.1.7(hono@4.13.17)':
+    dependencies:
+      hono: 4.13.17
 
   '@hono/standard-validator@0.4.1(@standard-schema/spec@1.1.0)(hono@4.13.17)':
     dependencies:
@@ -19215,12 +19475,12 @@ snapshots:
       markdown-it-front-matter: 0.2.4
       postcss: 8.5.32
 
-  '@mastra/ai-sdk@1.4.4(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6))(zod@4.6.6)':
+  '@mastra/ai-sdk@1.4.4(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6))(zod@4.6.6)':
     dependencies:
-      '@mastra/core': 1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6)
+      '@mastra/core': 1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6)
       zod: 4.6.6
 
-  '@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6)':
+  '@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6)':
     dependencies:
       '@a2a-js/sdk-v0_3': '@a2a-js/sdk@0.3.14(@grpc/grpc-js@1.14.3)(express@4.21.0)'
       '@a2a-js/sdk-v1': '@a2a-js/sdk@1.0.1(@grpc/grpc-js@1.14.3)(express@4.21.0)'
@@ -19273,9 +19533,9 @@ snapshots:
       - zod-openapi
       - zod-to-json-schema
 
-  '@mastra/memory@1.20.2(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6))(zod@4.6.6)':
+  '@mastra/memory@1.20.2(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6))(zod@4.6.6)':
     dependencies:
-      '@mastra/core': 1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6)
+      '@mastra/core': 1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6)
       '@mastra/schema-compat': 1.2.11(zod@4.6.6)
       async-mutex: 0.5.0
       diff: 8.0.4
@@ -19289,10 +19549,10 @@ snapshots:
       - supports-color
       - zod
 
-  '@mastra/mongodb@1.9.1(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6))(encoding@0.1.13)':
+  '@mastra/mongodb@1.9.1(@mastra/core@1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6))(encoding@0.1.13)':
     dependencies:
       '@lukeed/uuid': 2.0.1
-      '@mastra/core': 1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod-to-json-schema@3.25.2(zod@4.6.6))(zod@4.6.6)
+      '@mastra/core': 1.80.0(@grpc/grpc-js@1.14.3)(@opentelemetry/api@1.9.0)(ai@6.0.197(zod@4.6.6))(express@4.21.0)(rxjs@7.8.1)(zod@4.6.6)
       cloudflare: 5.2.0(encoding@0.1.13)
       mongodb: 7.2.0
     transitivePeerDependencies:
@@ -22563,6 +22823,8 @@ snapshots:
 
   '@types/dotenv-flow@3.3.3': {}
 
+  '@types/emscripten@1.41.6': {}
+
   '@types/es-aggregate-error@1.0.6':
     dependencies:
       '@types/node': 24.19.2
@@ -22807,6 +23069,14 @@ snapshots:
     dependencies:
       '@types/node': 24.19.2
     optional: true
+
+  '@types/yauzl@3.4.0':
+    dependencies:
+      '@types/node': 24.19.2
+
+  '@types/yazl@3.3.1':
+    dependencies:
+      '@types/node': 24.19.2
 
   '@types/zen-observable@0.8.3': {}
 
@@ -23084,6 +23354,8 @@ snapshots:
 
   '@xmldom/xmldom@0.7.13': {}
 
+  '@xmldom/xmldom@0.9.12': {}
+
   '@xyflow/react@12.11.0(@types/react-dom@18.3.0)(@types/react@18.3.3)(immer@9.0.21)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
       '@xyflow/system': 0.0.77
@@ -23154,6 +23426,8 @@ snapshots:
   acorn-walk@8.3.2: {}
 
   acorn@8.16.0: {}
+
+  adler-32@1.3.1: {}
 
   agent-base@6.0.2:
     dependencies:
@@ -23775,6 +24049,8 @@ snapshots:
 
   buffer-crc32@0.2.13: {}
 
+  buffer-crc32@1.0.0: {}
+
   buffer-equal-constant-time@1.0.1: {}
 
   buffer-from@1.1.1: {}
@@ -23942,6 +24218,11 @@ snapshots:
       upper-case-first: 2.0.2
 
   ccount@2.0.1: {}
+
+  cfb@1.2.2:
+    dependencies:
+      adler-32: 1.3.1
+      crc-32: 1.2.2
 
   chai@5.3.3:
     dependencies:
@@ -24584,6 +24865,8 @@ snapshots:
 
   crypt@0.0.2: {}
 
+  crypto-js@4.2.0: {}
+
   crypto-random-string@2.0.0: {}
 
   crypto@1.0.1: {}
@@ -25090,11 +25373,23 @@ snapshots:
       domhandler: 5.0.3
       entities: 4.5.0
 
+  dom-serializer@3.1.1:
+    dependencies:
+      domelementtype: 3.0.0
+      domhandler: 6.0.1
+      entities: 8.1.0
+
   domelementtype@2.3.0: {}
+
+  domelementtype@3.0.0: {}
 
   domhandler@5.0.3:
     dependencies:
       domelementtype: 2.3.0
+
+  domhandler@6.0.1:
+    dependencies:
+      domelementtype: 3.0.0
 
   dompurify@3.4.13:
     optionalDependencies:
@@ -25105,6 +25400,12 @@ snapshots:
       dom-serializer: 2.0.0
       domelementtype: 2.3.0
       domhandler: 5.0.3
+
+  domutils@4.0.2:
+    dependencies:
+      dom-serializer: 3.1.1
+      domelementtype: 3.0.0
+      domhandler: 6.0.1
 
   dot-case@3.0.4:
     dependencies:
@@ -25270,6 +25571,8 @@ snapshots:
   entities@4.5.0: {}
 
   entities@6.0.1: {}
+
+  entities@8.1.0: {}
 
   env-paths@2.2.1: {}
 
@@ -26553,6 +26856,13 @@ snapshots:
   html-void-elements@2.0.1: {}
 
   html-void-elements@3.0.0: {}
+
+  htmlparser2@12.0.0:
+    dependencies:
+      domelementtype: 3.0.0
+      domhandler: 6.0.1
+      domutils: 4.0.2
+      entities: 8.1.0
 
   htmlparser2@8.0.2:
     dependencies:
@@ -29138,6 +29448,12 @@ snapshots:
       define-properties: 1.2.1
       has-symbols: 1.1.0
       object-keys: 1.1.1
+
+  officecrypto-tool@0.0.19:
+    dependencies:
+      cfb: 1.2.2
+      crypto-js: 4.2.0
+      xml2js: 0.6.2
 
   ohash@2.0.11: {}
 
@@ -32705,7 +33021,7 @@ snapshots:
       sass: 1.77.6
       yaml: 2.9.1
 
-  vitest-mock-extended@3.1.0(typescript@5.9.3)(vitest@3.2.6):
+  vitest-mock-extended@3.1.0(typescript@5.9.3)(vitest@3.2.6(@types/node@24.19.2)(@vitest/ui@3.2.4(vitest@3.2.6))(happy-dom@15.7.4)(jiti@2.7.0)(jsdom@26.1.0)(lightningcss@1.32.0)(sass@1.77.6)(yaml@2.9.1)):
     dependencies:
       ts-essentials: 10.0.2(typescript@5.9.3)
       typescript: 5.9.3
@@ -32987,6 +33303,11 @@ snapshots:
       sax: 1.3.0
       xmlbuilder: 11.0.1
 
+  xml2js@0.6.2:
+    dependencies:
+      sax: 1.3.0
+      xmlbuilder: 11.0.1
+
   xmlbuilder@11.0.1: {}
 
   xmlbuilder@15.1.1: {}
@@ -33132,6 +33453,14 @@ snapshots:
     dependencies:
       buffer-crc32: 0.2.13
       pend: 1.2.0
+
+  yauzl@3.4.0:
+    dependencies:
+      pend: 1.2.0
+
+  yazl@3.3.1:
+    dependencies:
+      buffer-crc32: 1.0.0
 
   yjs@13.6.19(patch_hash=77e358564f94f24bf093efab53a526f00b88f73d21c6d417e3e34041e0bfd0b5):
     dependencies:

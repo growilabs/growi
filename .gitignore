@@ -54,6 +54,9 @@ out
 
 .devcontainer/compose.extend.yml
 
+# docker env files (secrets — never commit)
+infra/docker/.env
+
 # Memory profiling artifacts (heap snapshots are large and may contain sensitive data)
 *.heapsnapshot
 /tmp/memory-profiler/

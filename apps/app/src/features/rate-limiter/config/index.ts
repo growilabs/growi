@@ -121,4 +121,10 @@ export const defaultConfigWithRegExp: IApiRateLimitEndpointMap = {
     method: 'GET',
     maxRequests: MAX_REQUESTS_TIER_4,
   },
+  // Each request converts a whole attachment. The bucket is per attachment
+  // (the path holds its id); the route also caps runs across attachments.
+  '/_api/v3/attachments/[0-9a-f]{24}/reextract': {
+    method: 'POST',
+    maxRequests: MAX_REQUESTS_TIER_1,
+  },
 };

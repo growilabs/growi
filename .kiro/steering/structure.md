@@ -17,4 +17,4 @@ For apps/app-specific examples and build tooling details, see `apps/app/.claude/
 See: `.claude/rules/project-structure.md` — "@growi/core — Shared Domain Hub" section (always loaded).
 
 ---
-_Updated: 2026-06-16. Repointed broken monorepo-overview SKILL.md references to `.claude/rules/project-structure.md` (the skill no longer exists)._
+_Updated: 2026-11-12. Removed the `services/` note: the only service there (attachment-text-extractor) is now a Node app under `apps/`. Prior: 2026-06-16. Repointed broken monorepo-overview SKILL.md references to `.claude/rules/project-structure.md` (the skill no longer exists). Prior: 2026-05-07 added `services/` directory note._
