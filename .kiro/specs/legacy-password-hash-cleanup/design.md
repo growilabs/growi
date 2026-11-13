@@ -1,378 +1,369 @@
 # Design Document: legacy-password-hash-cleanup
 
 ## Overview
-**Purpose**: サーバーのシェルに入れない GROWI 管理者が、管理画面のセキュリティ設定から次の 2 つを行えるようにする。
-- パスワード形式の移行状況を確認する
-- 移行済みユーザー（旧形式と新形式の両方を持つユーザー）から旧形式（SHA-256）パスワードを削除する
 
-**Users**: GROWI.cloud などの管理者が、password-hash-upgrade の最終段階（旧形式の後片付け）で使う。
+管理画面のセキュリティ設定に、ローカル認証パスワードの移行状況を見るための**読み取り専用のセクション**を追加する。表示するのは、パスワード形式ごとのユーザー数（3 区分）と、移行を催促すべき未移行ユーザーの一覧の 2 つである。
 
-**Impact**: 次の 3 点を変える。
-- 既存の cleanup スクリプトから、件数の集計と旧形式の削除を共有サービスに切り出す。スクリプトの挙動は変えない。
-- セキュリティ設定 API にエンドポイントを 2 本足す。
-- 管理画面にセクションを 1 つ足す。
+旧形式パスワードの除去そのものは password-hash-upgrade が担当する。ログイン・パスワード設定・変更・リセットのいずれかで新形式が書かれるとき、同じ保存で旧形式が除去されるため、削除を実行する操作はこの機能に存在しない。残っている旧形式パスワードは未移行ユーザーのもの＝そのユーザーの唯一の資格情報であり、管理者が消せるものではない。
+
+**Users**: サーバーのシェルに入れない GROWI 管理者（GROWI.cloud など）。status 系のスクリプトを実行できないため、移行の進み具合と、誰に声をかければ移行が進むのかを画面から知る必要がある。
+**Impact**: 管理画面のセキュリティ設定に読み取り専用のセクションを 1 つ追加する。認証の挙動とユーザーの保存データは変更しない。
 
 ### Goals
-- 4 区分の件数と、未移行ユーザーの ACTIVE 内訳を画面に表示する（1.1–1.5）
-- 移行済みユーザーの旧形式パスワードを、中止判定なしで一括削除する（2.1–2.8）
-- 確認ダイアログにダウングレード時の影響を警告し、実行を監査ログに残す（3.x, 4.x）
-- 削除の基準を、スクリプトと画面で 1 か所の実装として共有する（5.2）
+
+- 移行状況（3 区分の件数）を管理画面で確認できるようにする
+- 催促すれば移行が進むユーザー（外部アカウントと連携していない未移行ユーザー）を特定できるようにする
+- 旧形式パスワードが 1 人分も残っていない環境では、このセクションを表示しない
 
 ### Non-Goals
-- 未移行ユーザーへの催促、メール送信、PASSWORD_SEED の案内
-- ダウングレード準備・再アップグレード準備の画面化
-- status migration（`20260724000001-password-hash-status.js`）の書き換え
-- 監査ログに削除件数を記録すること（snapshot の拡張）。実行者と件数はサーバーログに出す（4.5）
-- 監査ログが既定で無効な環境でも記録されるようにすること。action は他の管理者操作と同じく `LargeActionGroup` だけに入れる
+
+- 旧形式パスワードの削除操作（移行時に除去されるため、残るのは未移行ユーザーの唯一の資格情報だけ）
+- 催促そのもの（メール・通知の送信）
+- パスワードリセットの代行
+- PASSWORD_SEED の削除・変更の案内
+- 旧バージョンへ戻す際の準備（password-hash-upgrade の Requirement 4 のとおり DB バックアップの復元で行う）
 
 ## Boundary Commitments
 
 ### This Spec Owns
-- 共有サービス `legacy-password-cleanup`: 形式ごとの件数の集計と、移行済みユーザーからの旧形式パスワードの除去
-- セキュリティ設定 API の 2 エンドポイント: 移行状況の取得と旧形式パスワードの削除。レスポンスの型も含む
-- 監査ログの action `ADMIN_LEGACY_PASSWORD_DELETE` と、5 ロケール分のラベル
-- 管理画面のセクション `LegacyPasswordCleanupSetting` と、その SWR hook
-- `runPasswordHashCleanup` の内部を共有サービス呼び出しに置き換えること（外から見た挙動は変えない）
+
+- 管理画面セキュリティ設定内の「移行状況」セクションの表示・非表示の判断
+- 移行状況の件数を返す読み取り専用エンドポイントと、その集計クエリ
+- 催促が必要な未移行ユーザーの一覧を返す読み取り専用エンドポイントと、その抽出クエリ・並び順・ページング
+- 上記 2 つのエンドポイントの**レスポンスの形**（`~/interfaces/password-hash-status`）。ただし件数の**区分の集合そのものは親 spec が定義**しており、本 spec はそれを写して公開するだけである
+- このセクションが追加する表示文言（5 ロケール）
 
 ### Out of Boundary
-- 形式分類フィルタ（`password-hash-format-filters.ts`）の定義の変更。この spec は使うだけ
-- 未移行の ACTIVE ユーザーがいると中止する判定。これは cleanup スクリプトだけの方針で、共有サービスには入れない
-- 認証時のハッシュ検証と遅延移行（password-hash-upgrade が持つ）
-- status migration、downgrade-prep、reupgrade-prep スクリプト
-- 監査ログの記録ゲートや snapshot の型（activity-log 系 spec が持つ）
-- password-hash-upgrade spec の契約の変更。この spec は amend spec ではない（`.claude/rules/spec-lifecycle.md`）。upgrade spec の cleanup スクリプトの要件（Req 3.3 / 3.4）と挙動はそのまま残し、旧 `password` を削除する 2 つ目の入口として画面を追加するだけである。upgrade spec の design.md の Phase 3（全員の移行を確認したあとに cleanup を行う）は、CLI で行う手順として引き続き有効である。画面からはそれより前でも削除できるが、その理由は research.md の Decision「CLI では中止し、画面では中止しない理由」に書いた。Phase 3 に含まれる旧 SHA-256 の検証コードの削除も、この spec では扱わない
+
+- 旧形式パスワードの除去（password-hash-upgrade の Requirement 1.5 / 2.2 が担当）
+- パスワード形式の分類ルールと**区分の集合の定義**（`password-hash-format-filters.ts` と親 spec の Requirement 3.1 が単一の正。本 spec はそれを**利用するだけ**で定義しない）
+- status migration が報告する区分の変更（親 spec の成果物であり、親 spec の tasks で扱う）
+- ユーザーのステータス定義（`UserStatus`）
+- 外部アカウント（`externalaccounts`）のデータモデル
+- 認証・ログインの挙動
 
 ### Allowed Dependencies
-- `server/models/user/password-hash-format-filters.ts`（分類フィルタ）と `server/models/user/conts.ts`（UserStatus）
-- 既存のミドルウェア: `accessTokenParser`、`loginRequiredStrictly`、`adminRequired`、`generateAddActivityMiddleware`、`crowi.events.activity`
-- クライアント: `apiv3-client`、`toastr`、`Admin/App/ConfirmModal`、`swr`
-- 依存の向きは次のとおりとし、逆向きの import は禁止する。
 
-  `interfaces` → `models/user`（filters）→ `service/legacy-password-cleanup` → `routes/apiv3/security-settings/*` と `scripts/password-hash-cleanup`
+- `~/server/models/user/password-hash-format-filters`（分類フィルタの単一の正）
+- `users` / `externalaccounts` コレクション（読み取りのみ）
+- 既存の管理者向けミドルウェア連鎖（`accessTokenParser` → `loginRequiredStrictly` → `adminRequired`）
+- 既存の apiv3 ルーター（`security-settings`）と `express-validator`
+- クライアントの SWR 規約（`~/stores/admin/*`）と既存の管理画面コンポーネント
 
-  - クライアントは `interfaces` の型だけを参照し、`server/` は import しない。
-  - `scripts/` を `routes/` や `service/` から import してはならない。
+依存の向き: `interfaces` → `models/user`（フィルタ） → `server/service` → `server/routes` → `stores` → `client/components`。逆向きの import を禁止する。
 
 ### Revalidation Triggers
-- 形式分類フィルタの定義が変わったとき（新しい形式の追加や「値なし」の扱いの変更）。件数の区分と削除対象の両方に影響する
-- activity-log（記録ゲート）spec で記録対象の action を許可リスト方式にする場合。`ADMIN_LEGACY_PASSWORD_DELETE` を許可リストに入れる必要がある
-- `PasswordHashFormatCounts` や API レスポンスの形が変わったとき（クライアントのセクションに影響する）
-- password-hash-upgrade で、両形式のユーザーの検証方針（新形式を優先する）が変わったとき（2.8 の前提が崩れる）
+
+- `password-hash-format-filters.ts` の分類の定義が変わったとき（件数の意味が変わる）
+- password-hash-upgrade が「新形式を書くとき旧形式を除去する」挙動をやめたとき（3 区分では表せなくなる）
+- 2 つのエンドポイントのレスポンス形が変わったとき
+- `UserStatus` の値が増減したとき（アクティブ / アクティブ以外の内訳が変わる）
+- `externalaccounts` の `user` 参照の持ち方が変わったとき（一覧の除外条件が変わる）
 
 ## Architecture
 
 ### Existing Architecture Analysis
-- `runPasswordHashCleanup` は、未移行ユーザーの ACTIVE 内訳を数え、ACTIVE がいれば中止し、いなければ `updateMany(bothFilter, $unset password)` を実行する。この 3 段階が 1 つの関数にまとまっている。
-- `security-settings/index.js`（1778 行の JS）は 1 つの `setup(crowi)` に全エンドポイントを持つ。ただし、同じ apiv3 の配下では、エンドポイントごとに TS の handler factory を作って `index` から登録する前例がある（`personal-setting/delete-all-access-tokens.ts` など）。
-- 管理画面のセキュリティ設定は unstated container を中心に作られている。一方、新しい管理機能は `stores/admin/*` の SWR hook を使う（`useSWRxExportStatus` など）。
+
+- 管理画面のセキュリティ設定は `SecurityManagementContents.jsx` が各設定セクションを並べる構成で、セクション単位での追加・非表示が可能である
+- apiv3 の管理者向けルートは `accessTokenParser` → `loginRequiredStrictly` → `adminRequired` の順で固定されている（`security-settings/index.js`）
+- 管理画面のサーバーデータ取得は SWR（`~/stores/admin/*`）に集約されている
+- パスワード形式の分類は `password-hash-format-filters.ts` に集約済みで、status migration もこれを使う。**件数の定義をここ以外に書かない**ことが、CLI と画面の数字が食い違わない唯一の担保である
 
 ### Architecture Pattern & Boundary Map
+
 ```mermaid
-graph LR
-  subgraph Client
-    Section[LegacyPasswordCleanupSetting]
-    Hook[useSWRxPasswordHashStatus]
-    Modal[ConfirmModal]
-  end
-  subgraph Server
-    GetH[getPasswordHashStatusHandlers]
-    DelH[deleteLegacyPasswordsHandlers]
-    Svc[legacy-password-cleanup service]
-    Script[password-hash-cleanup script]
-    Filters[password-hash-format-filters]
-  end
-  Types[interfaces password-hash-status]
-  Section --> Hook
-  Section --> Modal
-  Hook --> GetH
-  Section --> DelH
-  GetH --> Svc
-  DelH --> Svc
-  Script --> Svc
-  Svc --> Filters
-  Section -.-> Types
-  Svc -.-> Types
-  DelH --> Activity[activity event]
+graph TB
+    Admin[Admin Security Settings page] --> Section[Migration status section]
+    Section --> StatusHook[useSWRxPasswordHashStatus]
+    Section --> ListHook[useSWRxPasswordHashUnmigratedUsers]
+    StatusHook --> StatusApi[GET password-hash-status]
+    ListHook --> ListApi[GET password-hash-unmigrated-users]
+    StatusApi --> StatusService[count service]
+    ListApi --> ListService[unmigrated users service]
+    StatusService --> Filters[password-hash-format-filters]
+    ListService --> Filters
+    StatusService --> Mongo[(MongoDB users)]
+    ListService --> Mongo
+    ListService --> ExtAccounts[(MongoDB externalaccounts)]
 ```
 
-- **Selected pattern**: 共有サービスを切り出し、入口を 2 つ（CLI と HTTP）用意する。中止判定は入口側の方針として、スクリプトだけが持つ。
-- **New components rationale**:
-  - 共有サービス: 5.2 の「同じ基準」をコードとして 1 か所に置くため
-  - 2 つの handler ファイル: 1778 行の JS を大きくしないため
-  - 型ファイル: クライアントとサーバーの境界をまたいで型を共有するため
-- **Steering compliance**:
-  - 中核の処理を返り値のある関数にし、入口は薄く保つ（Pure Function Extraction）
-  - 中止するかどうかをフラグで切り替えない（Data-Driven Control）
-  - クライアントから server を import しない
+**Architecture Integration**:
+- 選択したパターン: 既存の管理画面セクション + 読み取り専用 apiv3 エンドポイント 2 本。書き込み経路を持たないため、状態遷移も冪等性の考慮も不要になる
+- 境界の分け方: 「分類の定義」はモデル層のフィルタ、「集計」はサービス層、「公開」はルート層、「表示」はクライアント。件数の定義はサービス層に複製しない
+- 維持する既存パターン: 管理者ミドルウェア連鎖、apiv3 のレスポンス形、SWR のフック命名
+- 新規コンポーネントの理由: 集計と抽出はクエリの形が大きく異なる（単一コレクションの集計 / 2 コレクションの結合）ため、サービスを 2 つに分ける
 
 ### Technology Stack
+
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Frontend | React + reactstrap、`swr`（既存） | セクション、確認モーダル、件数の取得と再取得 | 新しい依存はない |
-| Backend | Express apiv3（既存） | 2 エンドポイント、権限、監査ログ | 新しい依存はない |
-| Data | MongoDB `users` コレクション（mongodb driver の `Collection` 経由。既存スクリプトと同じ） | `countDocuments` と `updateMany($unset)` | スキーマとインデックスは変えない |
+| Frontend | React 18 + SWR（既存） | セクション表示、件数と一覧の取得 | 新規依存なし |
+| Backend / Services | Express + apiv3（既存） | 読み取り専用エンドポイント 2 本 | 新規依存なし |
+| Data / Storage | MongoDB（既存） | `users` の集計、`externalaccounts` との結合 | `$facet` と `$lookup` を使用。新規依存なし |
 
 ## File Structure Plan
 
-### Directory Structure（新規）
+### Directory Structure
+
 ```
 apps/app/src/
 ├── interfaces/
-│   └── password-hash-status.ts             # PasswordHashFormatCounts と API レスポンスの型（クライアントとサーバーで共有）
+│   └── password-hash-status.ts              # 2 つのレスポンス型と件数の型
 ├── server/
 │   ├── service/
-│   │   ├── legacy-password-cleanup.ts       # countPasswordHashFormats / unsetLegacyPasswordOfMigratedUsers
-│   │   └── legacy-password-cleanup.integ.ts
+│   │   ├── password-hash-status.ts          # 3 区分の件数を 1 回の走査で集計
+│   │   └── password-hash-unmigrated-users.ts # 催促対象の抽出・並び順・ページング
 │   └── routes/apiv3/security-settings/
-│       ├── password-hash-status.ts           # GET handler factory
-│       ├── delete-legacy-passwords.ts        # DELETE handler factory（監査ログ付き）
-│       ├── delete-legacy-passwords-activity.integ.ts  # activity の確定で実行者が残るかの drift テスト
-│       └── legacy-password-cleanup.integ.ts  # 2 つの handler の supertest
-├── stores/admin/
-│   └── password-hash-status.ts              # useSWRxPasswordHashStatus
-└── client/components/Admin/Security/
-    ├── LegacyPasswordCleanupSetting.tsx      # セクション（件数表、削除ボタン、確認モーダル）
-    ├── LegacyPasswordCleanupSetting.spec.tsx
-    └── LegacyPasswordCleanupSetting.i18n.spec.ts  # 5 ロケールのキーが揃っているかの検査
+│       ├── password-hash-status.ts          # GET /password-hash-status
+│       └── password-hash-unmigrated-users.ts # GET /password-hash-unmigrated-users
+└── client/
+    ├── stores/admin/
+    │   ├── password-hash-status.ts          # 件数取得フック
+    │   └── password-hash-unmigrated-users.ts # 一覧取得フック（無限スクロール）
+    └── components/Admin/Security/
+        ├── PasswordHashStatusSetting.tsx     # セクション本体と表示・非表示の判断
+        ├── PasswordHashCountTable.tsx        # 件数表
+        ├── UnmigratedUserList.tsx            # 一覧と無限スクロール
+        └── ErrorWithRetry.tsx                # エラー表示と再試行（件数・一覧で共用）
 ```
 
 ### Modified Files
-- `apps/app/src/server/scripts/password-hash-cleanup.ts`: 未移行ユーザーの内訳は `countPasswordHashFormats` で、削除は `unsetLegacyPasswordOfMigratedUsers` で行うように置き換える。中止の判定、戻り値の型、ログの文言は変えない。
-- `apps/app/src/server/routes/apiv3/security-settings/index.js`: 2 つの handler factory を import して登録する（追加は 2 行程度）。
-- `apps/app/src/interfaces/activity.ts`: `ACTION_ADMIN_LEGACY_PASSWORD_DELETE` の定数を足し、`SupportedAction` と `LargeActionGroup` に登録する（`ACTION_ADMIN_SECURITY_SETTINGS_UPDATE` と同じ扱い）。
-- `apps/app/src/client/components/Admin/Security/SecurityManagementContents.jsx`: `ShareLinkSetting` のセクションの後に `<LegacyPasswordCleanupSetting />` のセクションを足す。
-- `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/admin.json`: `security_settings.legacy_password_cleanup.*` と `audit_log_action.ADMIN_LEGACY_PASSWORD_DELETE` を足す。
+
+- `apps/app/src/client/components/Admin/Security/SecurityManagementContents.jsx` — セクションの組み込み先。読み込むコンポーネント名を `PasswordHashStatusSetting` に変更する
+- `apps/app/src/server/routes/apiv3/security-settings/index.js` — 読み取り専用の 2 ルートのみを登録する
+- `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/admin.json` — 残る表示文言のみを保持する
+
+### 削除するファイル
+
+削除操作を提供しないため、次のファイルは存在しない状態が正しい。
+
+- `server/routes/apiv3/security-settings/delete-legacy-passwords.ts` と同 `-activity.integ.ts`
+- `server/service/legacy-password-cleanup.ts` と同 `.integ.ts`、`routes/.../legacy-password-cleanup.integ.ts`
+- `client/components/Admin/Security/useLegacyPasswordDelete.ts`
+- `client/components/Admin/Security/LegacyPasswordCleanupSetting.tsx`（`PasswordHashStatusSetting.tsx` が後継）とその spec
+- `interfaces/activity.ts` の `ACTION_ADMIN_LEGACY_PASSWORD_DELETE`
+- 削除の確認ダイアログ・警告・成功メッセージの翻訳キー（5 ロケール）
 
 ## System Flows
 
+### セクションの初期表示
+
 ```mermaid
 sequenceDiagram
-  participant A as Admin
-  participant S as Section
-  participant API as security-setting API
-  participant Svc as legacy-password-cleanup
-  A->>S: open security settings
-  S->>API: GET password-hash-status
-  API->>Svc: countPasswordHashFormats
-  Svc-->>API: counts
-  API-->>S: counts
-  A->>S: click delete (enabled only if both > 0)
-  S->>A: ConfirmModal (count, irreversible, downgrade warning)
-  A->>S: confirm
-  S->>API: DELETE legacy-passwords
-  API->>Svc: unsetLegacyPasswordOfMigratedUsers
-  Svc-->>API: unsetCount
-  API->>API: emit activity ADMIN_LEGACY_PASSWORD_DELETE
-  API-->>S: unsetCount
-  S->>A: toast success with count
-  S->>API: revalidate GET password-hash-status
+    participant Admin
+    participant Section as Migration status section
+    participant StatusApi as GET password-hash-status
+    participant ListApi as GET password-hash-unmigrated-users
+
+    Admin->>Section: セキュリティ設定を開く
+    Section->>StatusApi: 件数を取得
+    alt 取得に失敗
+        StatusApi-->>Section: error
+        Section-->>Admin: セクションを表示したままエラーと再試行
+    else 旧形式のみが 0 人
+        StatusApi-->>Section: counts
+        Section-->>Admin: セクションを表示しない
+    else 旧形式のみが 1 人以上
+        StatusApi-->>Section: counts
+        Section->>ListApi: 1 ページ目を取得
+        ListApi-->>Section: users, totalCount
+        Section-->>Admin: 件数表と一覧
+    end
 ```
 
-- **ボタンを無効にする条件**: 件数の取得中、取得に失敗したとき、`both === 0` のとき（1.5, 2.5）。
-- **サーバー側では中止判定をしない**: 対象が 0 件でも正常に応答し、`unsetCount: 0` を返す（2.3, 2.6）。
+取得中はセクションを出さない（8.3）。件数の取得に失敗したときだけはセクションを隠さずエラーを出す（8.4）。「隠す」と「失敗して分からない」は区別できなければならないため、この 2 つは別扱いにする。
+
+### 一覧の読み込みと再試行
+
+- 末尾までスクロールしたら次ページを読む（7.6）
+- 最初の読み込みに失敗したら一覧の代わりにエラーと再試行を出し、件数表には影響させない（7.8）
+- 続きの読み込みに失敗したら読み込み済みの行を残し、末尾にエラーと再試行を出す（7.9）
+- 画面内の移動で開き直したときは、読み込み済みのページをすべて取り直す（7.10、失敗時は 7.11）
 
 ## Requirements Traceability
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1 | 4 区分の件数を表示 | Service, GET handler, Section | `PasswordHashFormatCounts` | 表示 |
-| 1.2 | 未移行ユーザーの ACTIVE 内訳 | Service, Section | `legacyOnly.active / nonActive` | 表示 |
-| 1.3 | 「両形式」を削除対象として示す | Section | `both` | 表示 |
-| 1.4 | 削除後に件数を更新 | Section, Hook | SWR `mutate` | 削除 → 再取得 |
-| 1.5 | 取得に失敗したらエラーを表示し、削除を受け付けない | Section, Hook | `error` | 表示 |
-| 2.1 | ステータスを問わず、移行済みユーザー全員から削除 | Service, DELETE handler | `unsetLegacyPasswordOfMigratedUsers` | 削除 |
-| 2.2 | 他の区分は変更しない | Service | `bothFilter` だけを対象にする | 削除 |
-| 2.3 | 未移行の ACTIVE ユーザーがいても中止しない | Service, DELETE handler | 中止判定なし | 削除 |
-| 2.4 | 削除件数を成功メッセージで表示 | DELETE handler, Section | `DeleteLegacyPasswordsResponse` | 削除 |
-| 2.5 | 対象が 0 人ならボタンを無効にする | Section | `both === 0` | 表示 |
-| 2.6 | 対象が 0 人でも正常に応答する | Service, DELETE handler | `unsetCount: 0` | 削除 |
-| 2.7 | エラー時はエラーを表示し、成功は表示しない | Section, DELETE handler | `ErrorV3` | 削除 |
-| 2.8 | 現行バージョンでのログインは変わらない | （既存の検証）Service が `passwordHash` に触れないこと | — | — |
-| 3.1 | 実行前に確認ダイアログを出す | Section | `ConfirmModal` | 削除 |
-| 3.2 | 件数と、取り消せないことを表示 | Section | `warningMessage` | 削除 |
-| 3.3 | ダウングレード時の影響を警告 | Section | `supplymentaryMessage` | 削除 |
-| 3.4 | キャンセルしたら何もしない | Section | `onCancel` | 削除 |
-| 4.1 | 管理者だけに許可 | GET/DELETE handler | `adminRequired`、SCOPE | — |
-| 4.2 | 管理者以外は拒否し、データを返さない | GET/DELETE handler | `adminRequired` | — |
-| 4.3 | 監査ログが有効で記録対象のときに記録 | DELETE handler, activity.ts | `ADMIN_LEGACY_PASSWORD_DELETE`（`LargeActionGroup`） | 削除 |
-| 4.4 | ハッシュの値を表示しない | API の型 | 件数だけを返す | — |
-| 4.5 | 実行者と件数をサーバーログに出す | DELETE handler | `logger.info` | 削除 |
-| 5.1 | スクリプトの挙動を変えない | cleanup script | `PasswordHashCleanupResult`（変更なし） | — |
-| 5.2 | 削除の基準を共有する | Service | `unsetLegacyPasswordOfMigratedUsers` | — |
-| 5.3 | 件数の区分を status と同じ定義にする | Service | 共有フィルタ | — |
-| 6.1 | 5 ロケール対応 | locales, Section, i18n spec | `admin.json` | — |
+| 1.1 | 3 区分の件数表示 | 件数サービス、件数表 | `PasswordHashFormatCounts` | 初期表示 |
+| 1.2 | 未移行の内訳（アクティブ / それ以外） | 件数サービス、件数表 | `PasswordHashFormatCounts` | 初期表示 |
+| 1.6 | 件数の取得失敗時にエラーと再試行 | セクション、`ErrorWithRetry` | — | 初期表示 |
+| 1.7 | 画面内移動で件数を取り直す | 件数取得フック | SWR revalidation | 初期表示 |
+| 4.1 | 2 つの取得を管理者だけに許可 | 両エンドポイント | ミドルウェア連鎖 | — |
+| 4.2 | 非管理者の要求を拒否しデータを返さない | 両エンドポイント | ミドルウェア連鎖 | — |
+| 4.4 | ハッシュ値を表示しない | 両サービスの射影 | `PasswordHashUnmigratedUser` | — |
+| 6.1 | 5 ロケールの表示文言 | 翻訳リソース | — | — |
+| 7.1, 7.2, 7.3 | 催促対象の抽出（ステータスを問わず、外部アカウント連携は除く） | 一覧サービス | `PasswordHashUnmigratedUser` | 一覧の読み込み |
+| 7.4 | 各行の項目と未ログインの表示 | 一覧サービス、一覧 | `PasswordHashUnmigratedUser` | 一覧の読み込み |
+| 7.5 | 最終ログインの新しい順、未ログインは最後 | 一覧サービス | 並び順 | 一覧の読み込み |
+| 7.6 | 続きの読み込み | 一覧取得フック、一覧 | ページング | 一覧の読み込み |
+| 7.7 | 0 人のときの表示 | 一覧 | — | 一覧の読み込み |
+| 7.8–7.9, 7.11 | 読み込み失敗と再試行 | 一覧、`ErrorWithRetry` | — | 一覧の読み込み |
+| 7.10 | 開き直しで取り直す | 一覧取得フック | SWR revalidation | 一覧の読み込み |
+| 8.1, 8.3, 8.4 | セクションの表示・非表示 | セクション | — | 初期表示 |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
-| PasswordHashStatus types | interfaces | クライアントとサーバーで共有する型 | 1.1, 1.2, 2.4, 4.4 | — | State |
-| legacy-password-cleanup | server/service | 件数の集計と旧形式の除去 | 1.1–1.3, 2.1–2.3, 2.6, 2.8, 5.2, 5.3 | format filters (P0) | Service |
-| getPasswordHashStatusHandlers | server/routes | 件数の取得 API | 1.1, 1.5, 4.1, 4.2, 4.4 | Service (P0), adminRequired (P0) | API |
-| deleteLegacyPasswordsHandlers | server/routes | 削除 API と監査ログ | 2.1, 2.3, 2.4, 2.6, 2.7, 4.1–4.3, 4.5 | Service (P0), activity event (P1) | API |
-| password-hash-cleanup script（変更） | server/scripts | 中止判定を含む CLI | 5.1, 5.2 | Service (P0) | Batch |
-| useSWRxPasswordHashStatus | stores/admin | 件数の取得と再取得 | 1.1, 1.4, 1.5 | apiv3Get (P0) | State |
-| LegacyPasswordCleanupSetting | client UI | 件数表、削除ボタン、確認 | 1.x, 2.4, 2.5, 2.7, 3.x, 6.1 | Hook (P0), ConfirmModal (P1) | — |
+| 件数サービス | Server / Service | 3 区分の件数を 1 回の走査で集計 | 1.1, 1.2, 4.4 | MongoDB (P0)、分類フィルタ (P0) | Service |
+| 一覧サービス | Server / Service | 催促対象の抽出・並び順・ページング | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 4.4 | MongoDB (P0)、分類フィルタ (P0) | Service |
+| 件数エンドポイント | Server / Route | 件数の公開 | 1.1, 1.2, 4.1, 4.2 | 件数サービス (P0) | API |
+| 一覧エンドポイント | Server / Route | 一覧の公開 | 7.1, 7.6, 4.1, 4.2 | 一覧サービス (P0) | API |
+| 取得フック 2 種 | Client / Store | SWR による取得と再検証 | 1.7, 7.6, 7.10 | 両エンドポイント (P0) | State |
+| セクション | Client / UI | 表示・非表示の判断と子の配置 | 1.6, 8.1, 8.3, 8.4 | 件数フック (P0) | — |
+| 件数表 / 一覧 / エラー表示 | Client / UI | 表示のみ | 1.1, 1.2, 7.1–7.9 | — | — |
 
-### interfaces
+### Server / Service
 
-#### PasswordHashStatus types（`interfaces/password-hash-status.ts`）
-```typescript
-export interface PasswordHashFormatCounts {
-  /** passwordHash only (fully migrated) */
-  readonly upgradedOnly: number;
-  /** both fields present — the deletion target */
-  readonly both: number;
-  /** password only (not migrated), split by user status */
-  readonly legacyOnly: { readonly active: number; readonly nonActive: number };
-  /** neither field */
-  readonly noPassword: number;
-}
-
-export interface PasswordHashStatusResponse {
-  readonly counts: PasswordHashFormatCounts;
-}
-
-export interface DeleteLegacyPasswordsResponse {
-  readonly unsetCount: number;
-}
-```
-- `legacyOnly.active + legacyOnly.nonActive` は、status migration の `legacyOnly` と一致する（`activeUserFilter` と `nonActiveUserFilter` は互いに補集合なので）。
-
-### server/service
-
-#### legacy-password-cleanup（`server/service/legacy-password-cleanup.ts`）
+#### 件数サービス（`password-hash-status.ts`）
 
 | Field | Detail |
 |-------|--------|
-| Intent | 形式ごとの件数を集計し、移行済みユーザーから旧形式パスワードを除去する |
-| Requirements | 1.1–1.3, 2.1–2.3, 2.6, 2.8, 5.2, 5.3 |
+| Intent | `users` を 1 回走査して 3 区分の件数を返す |
+| Requirements | 1.1, 1.2, 4.4 |
 
 **Responsibilities & Constraints**
-- 分類には `password-hash-format-filters` だけを使い、独自の条件を書かない（5.3）。
-- 中止判定やステータスによる絞り込みはしない。除去の対象は `bothFilter` に当てはまるユーザー全員（2.1–2.3）。
-- `passwordHash` には触れない（2.8 の前提）。
-- ログは出さない。実行者を知っているのは呼び出し側（DELETE handler とスクリプト）なので、件数のログは呼び出し側が出す。
-
-**Dependencies**
-- Inbound: GET/DELETE handler（P0）、cleanup script（P0）
-- Outbound: `password-hash-format-filters`（P0）
+- 区分の判定は `password-hash-format-filters.ts` の `upgradedOnlyFilter` / `legacyOnlyFilter` / `noPasswordFilter` を使う。条件をこのサービスに書き写さない
+- `legacyOnly` のみ `activeUserFilter` / `nonActiveUserFilter` で内訳に割る
+- 資格情報のフィールドを**射影に含めない**
 
 **Contracts**: Service [x]
 
-##### Service Interface
 ```typescript
-import type { Collection, Document, Filter } from 'mongodb';
-import type { PasswordHashFormatCounts } from '~/interfaces/password-hash-status';
-
-export function countPasswordHashFormats(
-  users: Collection,
-  baseFilter?: Filter<Document>,
-): Promise<PasswordHashFormatCounts>;
-
-export function unsetLegacyPasswordOfMigratedUsers(
-  users: Collection,
-  baseFilter?: Filter<Document>,
-): Promise<{ readonly unset: number }>;
+export const countPasswordHashFormats = (
+  users: Collection<Document>,
+) => Promise<PasswordHashFormatCounts>;
 ```
-- 事前条件: `users` は `users` コレクション。`baseFilter` の既定値は `{}`（コレクション全体）。integ テストでは、マーカーで絞り込むために使う。
-- 事後条件（unset）: 呼び出した時点で `bothFilter` に当てはまっていた文書から、`password` フィールドがなくなる。戻り値は `modifiedCount`。
-- 不変条件: 何度呼んでも結果は同じ（2 回目は `unset: 0`）。
-
-### server/routes
-
-#### getPasswordHashStatusHandlers / deleteLegacyPasswordsHandlers
-**Contracts**: API [x]
-
-`personal-setting/delete-all-access-tokens.ts` と同じく、`(crowi: Crowi) => RequestHandler[]` を返す factory とし、`security-settings/index.js` から登録する。
-
-- `users` コレクションは、リクエストごとに handler の中で `mongoose.connection.collection('users')` から取得し、サービスに渡す（既存のスクリプトと同じ取得方法）。
-- `lint:route-guard`（`tools/lint/route-top-level-guard.cjs`）に従い、モジュールのトップレベルには import、型、`loggerFactory(...)` の初期化と factory の宣言だけを置く。コレクションの取得やミドルウェアの生成は、factory か handler の中で行う。
-
-##### API Contract
-| Method | Endpoint | Middleware | Response | Errors |
-|--------|----------|------------|----------|--------|
-| GET | `/_api/v3/security-setting/password-hash-status` | `accessTokenParser([SCOPE.READ.ADMIN.SECURITY])`, `loginRequiredStrictly`, `adminRequired` | `PasswordHashStatusResponse` | 管理者以外は `/` へ 302 リダイレクト（既存の `adminRequired` の挙動）、500 `password-hash-status-fetch-failed` |
-| DELETE | `/_api/v3/security-setting/legacy-passwords` | `accessTokenParser([SCOPE.WRITE.ADMIN.SECURITY])`, `loginRequiredStrictly`, `adminRequired`, `addActivity` | `DeleteLegacyPasswordsResponse` | 管理者以外は `/` へ 302 リダイレクト、500 `legacy-password-delete-failed` |
+- Preconditions: MongoDB に接続済みであること
+- Postconditions: 書き込みを一切行わない
+- Invariants: 3 区分の合計が対象ユーザー総数に一致する（どのユーザーも必ず 1 区分に属する）
 
 **Implementation Notes**
-- DELETE は成功したときだけ `activityEvent.emit('update', res.locals.activity._id, { action: SupportedAction.ACTION_ADMIN_LEGACY_PASSWORD_DELETE })` を呼ぶ。`unsetCount` が 0 でも呼ぶ（実行したという事実を残す）。snapshot は既定のまま。実際に記録されるかどうかは監査ログの設定で決まる（`AUDIT_LOG_ENABLED=true` かつ `LARGE`、または `AUDIT_LOG_ADDITIONAL_ACTIONS` で個別に追加）（4.3）。
-- DELETE は成功したとき、監査ログの設定にかかわらず `logger.info` で実行者（`req.user._id` と `username`）と `unsetCount` を 1 行出す（4.5）。
-- emit は `res.apiv3()` より前に行い、その間に `await` を挟まない（`apps/app/.claude/rules/activity-recording.md` Rule 1）。後にすると、activity が実行者なし（`user: null`）で確定してしまう。
-- 失敗時は `res.apiv3Err(new ErrorV3(...), 500)` のように、ステータス 500 を明示して渡す。`apiv3Err` は、ステータスを省くと 400 を返す（`routes/apiv3/response.js`）。前例の `delete-all-access-tokens.ts` や `security-settings/index.js` の DELETE はステータスを省いているので、そこに倣わない。GET も同じ。
-- レスポンスは件数だけを返し、ユーザーの文書は返さない（4.4）。
-- OpenAPI の JSDoc は、既存の security-setting エンドポイントの書き方に合わせる。
+- Integration: 区分ごとに `countDocuments` を呼ぶと走査が区分数ぶん増えるため、`$facet` で 1 回の走査にまとめる
+- Validation: 「両形式」の区分は持たない。password-hash-upgrade が同時書き込みを行わないため、その状態は到達不能である
+- Risks: フィルタ側の定義が変われば件数の意味が変わる（Revalidation Triggers に記載）
 
-### server/scripts（変更）
+#### 一覧サービス（`password-hash-unmigrated-users.ts`）
 
-#### password-hash-cleanup
-- `runPasswordHashCleanup` の外から見た契約（引数、`PasswordHashCleanupResult`、中止の条件、ログの文言）は変えない（5.1）。
-- 中身だけを次のように置き換える。
-  - ① 未移行ユーザーの内訳は `countPasswordHashFormats(...).legacyOnly` から取る
-  - ③ の削除は `unsetLegacyPasswordOfMigratedUsers` で行う
-  - ② の中止判定はスクリプトに残す
-- 既存の `password-hash-cleanup.integ.ts` が、変更せずにそのまま通ること。これを回帰の検出に使う。
+| Field | Detail |
+|-------|--------|
+| Intent | 旧形式のみを持ち、外部アカウントと連携していないユーザーを、最終ログインの新しい順に返す |
+| Requirements | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 4.4 |
 
-### client
+**Responsibilities & Constraints**
+- 抽出条件は `legacyOnlyFilter`（ステータスでは絞らない。7.2）
+- 外部アカウントを持つユーザーを除外する（7.3）
+- 並びは `lastLoginAt` の降順。未ログインを最後に置く（7.5）
+- 返す項目はユーザー名・メールアドレス・最終ログイン日時のみ（4.4）。未ログインのユーザーは `lastLoginAt` を `null` で返し、表示側が「ログインしたことがない」旨を出す（7.4）
 
-#### useSWRxPasswordHashStatus（`stores/admin/password-hash-status.ts`）
+**Contracts**: Service [x]
+
 ```typescript
-export const useSWRxPasswordHashStatus: () => SWRResponse<PasswordHashFormatCounts, Error>;
+export const listUnmigratedUsersToNudge = (
+  users: Collection<Document>,
+  externalAccounts: Collection<Document>,
+  options: { readonly page: number; readonly limit: number },
+) => Promise<PasswordHashUnmigratedUsersResponse>;
 ```
-- `useSWRxExportStatus` に倣い、`useSWRImmutable('/security-setting/password-hash-status', …)` で取得する。削除が成功したら、呼び出し側が `mutate()` で再取得する（1.4）。
+- Preconditions: `page >= 1`、`limit` は上限以下であること（ルート層で検証済み）
+- Postconditions: 書き込みを一切行わない
+- Invariants: 同じ入力に対して行の重複・欠落が起きない
 
-#### LegacyPasswordCleanupSetting（`client/components/Admin/Security/LegacyPasswordCleanupSetting.tsx`）
-表示だけのコンポーネントなので、概要だけを書く。
-- 見出しは `h2.border-bottom`。件数表は 4 区分で、「旧形式のみ」の行に ACTIVE とそれ以外の内訳を併記する。「両形式」の行には、削除対象であることを示す（1.1–1.3）。
-- ボタンは `btn-danger`。取得中、取得エラー、`both === 0` のときは `disabled` にする（1.5, 2.5）。取得エラーのときは、件数表の代わりにエラーメッセージを出す。
-- 確認には `ConfirmModal` を使う（3.1–3.4）。
-  - `warningMessage`: 対象件数と、取り消せないこと
-  - `supplymentaryMessage`: ダウングレード時の影響（ACTIVE ユーザーはパスワードリセットで復旧でき、それ以外は個別に対応が必要）。加えて、ダウングレードから戻した直後で再アップグレード準備スクリプトを実行していない場合は、先に実行すること（実行前に削除すると、現在のパスワードでログインできないユーザーが出る）
-  - `confirmButtonTitle`: 削除
-  - `onCancel`: モーダルを閉じるだけ
-  - `ConfirmModal` には手を加えない。実行ボタンは既存どおり `btn-outline-primary` のままで、処理中も無効化しない。二重に実行されても、サーバー側の削除が冪等なので実害はない（2 回目は `unsetCount: 0`）。
-- 確定したら `apiv3Delete('/security-setting/legacy-passwords')` を呼ぶ。成功したら `toastSuccess`（件数を含む）を出して `mutate()` する。失敗したら `toastError` を出し、途中まで削除されている可能性があるので、こちらも `mutate()` で件数を取り直す（2.4, 2.7）。
-- `ConfirmModal` は `onConfirm` でモーダルを閉じないので、セクション側で開閉の状態を持ち、確定したときに閉じる。
-- hook は、レスポンスに `counts` がない場合（302 のリダイレクトで HTML が返った場合など）をエラーとして扱う（1.5）。
-- 文言はすべて `t('admin:security_settings.legacy_password_cleanup.*')` を使う（6.1）。
+**Implementation Notes**
+- Integration: 外部アカウントの除外は `$lookup` + `$match` で行う。**`externalaccounts.distinct('user')` の結果を `$nin` に渡す実装は採用しない** — 連携ユーザー数に比例して配列が大きくなり、16MB の BSON 上限を超えると一覧が 500 になるため
+- Integration: 段の順序は `$match`（`legacyOnlyFilter`） → `$sort`（`lastLoginAt` 降順, `_id` 昇順） → `$lookup` → `$match`（連携なし） → `$skip` → `$limit` → `$project` とする。`$sort` を `$lookup` より前に置くのは、部分索引で整列済みの順序をそのまま使い、全件を読み込んでから並べ替える形（ブロッキングソート）を避けるためである
+- Integration: `totalCount` は同じ `$match` → `$lookup` → `$match` に `$count` を続けて求める。除外条件を含めずに数えると、一覧に出ない行まで件数に入る
+- Validation: 並び順は `lastLoginAt` 降順に `_id` を第 2 キーとして加える。`lastLoginAt` は同値・欠損が起きるため、これがないとページ送りで行が重複・欠落する
+- Risks: `lastLoginAt` 降順に使える索引が無いと、ページを読むたびに全件を並べ替える。旧形式保持者だけを対象とする部分索引で走査範囲を限定する（Performance 参照）
+
+### Server / Route
+
+両エンドポイントとも `accessTokenParser` → `loginRequiredStrictly` → `adminRequired` の順で保護する（4.1、4.2）。書き込みを行わないため activity の記録は伴わない。
+
+**Contracts**: API [x]
+
+| Method | Endpoint | Request | Response | Errors |
+|--------|----------|---------|----------|--------|
+| GET | `/_api/v3/security-settings/password-hash-status` | — | `PasswordHashStatusResponse` | 403, 500 |
+| GET | `/_api/v3/security-settings/password-hash-unmigrated-users` | `page`, `limit`（任意） | `PasswordHashUnmigratedUsersResponse` | 400, 403, 500 |
+
+`page` / `limit` は `express-validator` で整数・範囲・上限を検証する。重複クエリが配列として渡る経路があるため、単一値であることも検証する。
+
+### Client
+
+- **セクション**: 件数の取得結果だけで表示・非表示を決める。取得中は出さない（8.3）、失敗時は出してエラーを見せる（8.4）、`legacyOnly` の合計が 0 なら出さない（8.1）
+- **件数表・一覧・エラー表示**: 表示のみ。一覧は末尾到達で次ページを読み、失敗時は読み込み済みの行を保持したまま再試行を出す
+- 2 つのフックは画面内の移動で再検証する（1.7、7.10）
+
+## Data Models
+
+### Domain Model
+
+ユーザーは資格情報フィールドの有無により、次の 3 区分のいずれか 1 つに属する。
+
+```
+upgradedOnly : passwordHash あり / password なし   — 移行済み
+legacyOnly   : passwordHash なし / password あり   — 未移行（アクティブ / それ以外に細分）
+noPassword   : どちらも なし                        — パスワード未設定
+```
+
+「両方あり」は、password-hash-upgrade が新形式を書くときに必ず旧形式を除去するため存在しない。
+
+### Physical Data Model
+
+- 一覧は `legacyOnly` を `lastLoginAt` 降順で読む。全ユーザーを対象とした `lastLoginAt` の索引では、未移行者が走査の最後尾に来るため実質的に全件を読む。**旧形式保持者のみを含む部分索引**を用意し、走査を未移行者の集合に限定する
+- 部分索引の条件は `{ password: { $exists: true } }` とする。`partialFilterExpression` は `$exists: false` を受け付けないため「`passwordHash` が無い」を条件に含められないが、両形式を同時に持つユーザーが存在しない以上、「`password` がある」は旧形式保持者と一致する。一覧側のクエリの述語はこの条件の部分集合になるため、索引は選択されうる
+- 件数側は `lastLoginAt` を条件に含まないためこの索引は効かない。件数は `$facet` による単一走査で賄う
+- **索引の作成は migrate-mongo のマイグレーションで行い、Mongoose スキーマには定義しない。** `.claude/rules/model.md` は「Prisma 移行が完了するまで索引作成は Mongoose が持つ」と記しているが、その趣旨は索引作成を Prisma 側へ早期に移さないことであり、リポジトリには既にマイグレーションで索引を作る前例がある（`20260619120000-add-unique-key-index-to-auditlog-es-sync-collections.js`）。一方で Mongoose スキーマに `partialFilterExpression` を書いた前例は無い。前例のある側に合わせる
 
 ## Error Handling
-- **件数の取得に失敗**: サーバーは `ErrorV3('…', 'password-hash-status-fetch-failed')` を返し、logger.error を出す。クライアントは、エラーの表示とボタンの無効化を行う。
-- **削除に失敗**: サーバーは `ErrorV3('…', 'legacy-password-delete-failed')` を返し、`ADMIN_LEGACY_PASSWORD_DELETE` を emit しない。なお、`addActivity` を通ったリクエストが 400 以上で終わると、既存の fail-safe（`registerFailsafeFinalizer` → `recordFailsafeAttempt`）が `ACTION_UNSETTLED` の試行記録を 1 行残す。これは activity 基盤の既存の挙動で、この spec では変えない。`updateMany` は文書単位でしか原子的でないため、途中で失敗すると一部の文書だけが除去されている可能性がある。ただし操作は冪等なので、再実行すれば残りが除去される。クライアントはエラーをトーストで出し、`mutate()` で実際の件数を表示し直す。
-- **同時実行**:
-  - 削除の最中に遅延移行で「両形式」になったユーザーは、今回は対象外で、次の実行で除去される。
-  - 管理者 2 人が同時に実行しても、冪等なので問題ない。
+
+### Error Strategy
+
+| 失敗 | サーバーの応答 | 画面 |
+|---|---|---|
+| 非管理者による要求 | 403、データを返さない | 管理画面に到達しないため考慮不要 |
+| `page` / `limit` が不正 | 400（エラーコード付き） | 一覧のエラー表示 |
+| 集計・抽出の失敗 | 500（エラーコード付き）、サーバーログに記録 | 件数はセクションを出したままエラー、一覧は一覧部分のみエラー |
+
+件数と一覧は独立して失敗しうる。一覧の失敗が件数表を巻き込まないことを要件（7.8）が明示しているため、エラー状態を 1 つにまとめない。
+
+### Monitoring
+
+失敗時はエラーコードとともにサーバーログへ出力する。件数・一覧ともに読み取りのみのため、監査ログの記録対象にはしない。
 
 ## Testing Strategy
-- **Integration（service: `legacy-password-cleanup.integ.ts`、マーカーを `baseFilter` にする）**
-  - 4 区分とステータスを組み合わせたユーザーを用意し、`countPasswordHashFormats` が各区分と ACTIVE 内訳を正しく数えること。空文字や null の `password` は「パスワード未設定」に数えること（1.1, 1.2, 5.3）
-  - `unsetLegacyPasswordOfMigratedUsers` が、停止中や招待中を含むすべての「両形式」ユーザーから `password` を除去し、`passwordHash` は残すこと。未移行の ACTIVE ユーザーがいても実行されること（2.1, 2.3）
-  - 他の区分（新形式のみ、旧形式のみ、未設定）の文書が変わらないこと（2.2）
-  - 2 回目の呼び出しで `unset: 0` になること（2.6）
-  - 除去した後も、元のパスワードで `passwordHashService.verify` が成功すること（2.8）
-- **Integration（routes: `legacy-password-cleanup.integ.ts`、supertest）**: `file-upload-setting.integ.ts` に倣い、`access-token-parser`、`login-required`、`add-activity` はモックに差し替える。`admin-required` だけは本物を使い、`req.user` に admin が true または false のユーザーを注入する（`vi.mock` はファイル全体に効くので、差し替えると 302 を検証できない）。次の 3 点は前例に倣わない。
-  - **レスポンスの拡張は本物を使う**: `file-upload-setting.integ.ts` の自前の `apiv3Err` は既定のステータスが 500 なので、handler が 500 を渡し忘れてもテストが通ってしまう。`routes/apiv3/response.js` の拡張を express に組み込み、既定値 400 の本物の挙動でテストする。エラー時の検証は、handler から `, 500` を消すと落ちることを mutation で確かめる。
-  - **サービスは部分モックにする**: 例外の場合を作るために、`vi.mock` で共有サービスを `vi.importActual` の実装に差し替え、例外のテストでだけ `mockRejectedValueOnce` を使う。それ以外のテストは本物のサービスで DB を操作する。
-  - **件数は差分で検証する**: handler は `baseFilter` なしでコレクション全体を対象にする。テスト用の DB は worker ごとに分かれている（`growi_test_${VITEST_WORKER_ID}`）が、同じファイル内の他のテストや migration が作ったデータは残りうる。そのため、件数は全体の絶対値ではなく、マーカー付きで用意したユーザーの変化（そのユーザーから `password` が消えたか、件数が用意した数以上増減したか）で検証する。
-  - **ログの検証**: handler は `logger` をモジュールのトップレベルで作るので、`passport-local-lazy-migration.integ.ts` に倣い `vi.mock('~/utils/logger')` で差し替えて検証する。この差し替えは本物の `adminRequired` の `logger.warn` にも効くので、呼び出しの回数ではなく、実行者と件数を含む `info` の呼び出しがあることを確かめる。
 
-  検証すること:
-  - GET のレスポンスが `counts` の数値だけで、ハッシュのフィールドを含まないこと（1.1, 4.4）
-  - DELETE が `unsetCount` を返し、マーカー付きの両形式ユーザーから `password` が消え、`ADMIN_LEGACY_PASSWORD_DELETE` で activity を emit すること（2.4, 4.3）
-  - DELETE が成功したとき、実行者と件数を含むログを出すこと（4.5）
-  - 管理者でないユーザーで呼んだとき（本物の `adminRequired` に `admin: false` のユーザーを与える）、302 になり、件数を返さず、マーカー付きのユーザーの文書も変わらないこと（4.1, 4.2）
-  - GET でサービスが例外を投げたとき、500 とエラーコードを返すこと（1.5）
-  - DELETE でサービスが例外を投げたとき、500 とエラーコードを返し、`ADMIN_LEGACY_PASSWORD_DELETE` を emit しないこと（2.7）。fail-safe が残す `ACTION_UNSETTLED` の行は activity 基盤の責任なので、ここでは検証しない
-- **Integration（drift: `delete-legacy-passwords-activity.integ.ts`）**: `activity-recording.md` の Rule 1 が求める drift テスト。`page/create-page.integ.ts` に倣い、本物の `addActivity`、ActivityService の listener、activity の確定処理、Prisma を使う。偽の `res` は `apiv3()` の中で同期的に `finish` を発火させる。この状態でも、確定した `ADMIN_LEGACY_PASSWORD_DELETE` の行に実行者（`user`）が残ることを確かめる。監査ログを有効にし、記録範囲を LARGE に設定してから実行する（4.3）。上の route の integ テストは `add-activity` をモックし、emit をスパイにしているので、この順序の不具合は検出できない。本物の handler は worker の DB 全体を対象に削除するが、このテストが確かめるのは activity の行だけなので問題ない
-- **Regression**: 既存の `password-hash-cleanup.integ.ts` を変更せずに通すこと（5.1, 5.2）。
-- **Component（`LegacyPasswordCleanupSetting.spec.tsx`、RTL）**
-  - 件数と ACTIVE 内訳を表示すること（1.1–1.3）
-  - `both === 0` のとき、取得エラーのとき、またはレスポンスに `counts` がないとき、ボタンが無効になること（1.5, 2.5）
-  - 確認モーダルに件数とダウングレードの警告が出ること。キャンセルしたら API が呼ばれないこと。確定したらモーダルが閉じること（3.1–3.4）
-  - 確定して成功したら件数入りのトーストが出て再取得されること。失敗したらエラーのトーストが出て、成功のトーストは出ず、件数は再取得されること（1.4, 2.4, 2.7）
-- **i18n（`LegacyPasswordCleanupSetting.i18n.spec.ts`）**: `features/growi-vault/client/i18n-reconcile.spec.ts` に倣い、追加したすべてのキー（`security_settings.legacy_password_cleanup.*` と `audit_log_action.ADMIN_LEGACY_PASSWORD_DELETE`）が 5 ロケールすべての `admin.json` に空でない文字列として存在することを確かめる。このブランチには i18n キーを検査する lint スクリプトがないので、この spec を 6.1 の検証とする。
+### Unit Tests
+- 件数サービス: 3 区分それぞれに属するユーザーを置き、件数と `legacyOnly` の内訳が一致すること
+- 件数サービス: `password: ''` のユーザーが `noPassword` に数えられること（空文字は不在として扱う）
+- 一覧サービス: 外部アカウントを持つ未移行ユーザーが一覧に出ないこと
+- 一覧サービス: `lastLoginAt` が同値のユーザーが複数いても、ページを跨いで重複・欠落しないこと
+- 一覧サービス: 未ログインのユーザーが最後に並ぶこと
+
+### Integration Tests
+- 管理者による取得が 200 で、レスポンスに資格情報のフィールドが含まれないこと
+- 非管理者による取得が拒否され、データが返らないこと（両エンドポイント）
+- `page` / `limit` の不正値が 400 になること（配列で渡した場合を含む）
+- 一覧のページングが `page` / `limit` を反映すること
+
+### UI Tests
+- 未移行が 0 人のときセクションが描画されないこと
+- 取得中にセクションが描画されないこと
+- 件数の取得に失敗したとき、セクションが描画され、再試行の操作が出ること
+- 一覧の初回失敗時に、件数表は残り一覧部分だけがエラーになること
+- 続きの読み込みに失敗したとき、読み込み済みの行が残ること
 
 ## Security Considerations
-- 権限: 既存のセキュリティ設定と同じ `adminRequired` と SCOPE（`READ/WRITE.ADMIN.SECURITY`）を使う。アクセストークンで呼ぶ場合も、同じスコープが必要。
-- 情報を漏らさない: API が返すのは件数だけで、ユーザー名やハッシュは返さない。
-- 取り消せないこと: 確認モーダルで明示する。実行者と件数は、監査ログの設定にかかわらずサーバーログで追える。監査ログが有効で LARGE の環境では、監査ログにも実行者が残る。
+
+- 2 つのエンドポイントは管理者専用であり、ユーザー名・メールアドレス・最終ログイン日時という個人情報を返す。ミドルウェア連鎖の順序（認証 → 管理者判定）を崩さない
+- パスワードとハッシュの値は、射影にもレスポンスにも含めない（4.4）
+- 件数と一覧は読み取りのみで、ユーザーの保存データを変更しない。したがって取り消し不能な操作は存在しない
+
+## Performance & Scalability
+
+- 件数: 区分ごとの `countDocuments` ではなく `$facet` による単一走査とする。区分数ぶんの走査を避ける
+- 一覧: 外部アカウントの除外を `$lookup` で行い、連携ユーザー ID の配列をアプリケーション側に載せない（BSON 16MB 上限による 500 を避ける）
+- 一覧: 旧形式保持者のみを含む部分索引により、`lastLoginAt` 降順の走査を未移行者に限定する
+- いずれも管理者が開いたときにのみ実行される低頻度の読み取りであり、常時の負荷は生じない
+- 実装時に `explain` で、一覧のクエリが部分索引を `IXSCAN` として選び、ブロッキングソートが発生しないことを確認する。確認できない場合は段の順序か索引の条件を見直す
