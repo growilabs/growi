@@ -71,7 +71,7 @@ Path-scoped rules load only when the work touches matching files:
 
 | Rule | Applies to | Description |
 |------|-----------|-------------|
-| **model** | `apps/app/src/server/models/**` | Mongoose → Prisma migration rules: new indexes are created by a migrate-mongo migration (no `prisma db push` on deploy), statics become `Prisma.defineExtension`, `_id`/`__v` mapping, changed `__v` semantics |
+| **model** | `apps/app/src/server/models/**` | Mongoose → Prisma migration rules: Mongoose keeps owning index creation until the migration finishes, statics become `Prisma.defineExtension`, `_id`/`__v` mapping, changed `__v` semantics |
 
 ### On-Demand Skills
 

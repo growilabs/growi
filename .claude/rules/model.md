@@ -11,12 +11,8 @@ The `/mongoose-to-prisma` skill owns the step-by-step migration procedure.
 
 ## Overall strategy
 
-- Deploys never run `prisma db push`, so `schema.prisma` alone creates no
-  index. Indexes a Mongoose schema already declares stay there for now; a
-  **new** index goes in a migrate-mongo migration (`createIndex`) and is also
-  declared in `schema.prisma` with the same `map` name — not as a Mongoose
-  `index: true`, which stops being provisioned once that model leaves
-  Mongoose.
+- Mongoose remains responsible for collection/index creation until every
+  model has been migrated; only then does `prisma db push` take over.
 - Mongoose statics and instance methods are replaced by `Prisma.defineExtension`.
 
 ## `_id` / `__v`
