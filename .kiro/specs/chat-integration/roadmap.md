@@ -68,7 +68,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 | 順 | まとまり | 含む項目 | 進め方 | 対象 |
 |---|---|---|---|---|
-| 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作り、それと同時に定期処理の間隔を延ばす。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。要件と設計は承認済み。タスクの作成と承認がこれから | umbrella、protocol、proxy、app |
+| 7 | コマンドの再編 | `agent` の追加、`keep` の吸収。通知の「書いてすぐ送る」を同じ口で作り、それと同時に定期処理の間隔を延ばす。DM の先頭の `@誰か` の扱いと、Teams の `personal` 範囲を要件で決める | amend spec [chat-integration-agent](../chat-integration-agent/)。要件・設計・タスクは承認済み。実装がこれから | umbrella、protocol、proxy、app |
 | 8 | 管理画面の作り直し | 管理画面のうち、チャンネルの権限と「できること」の表 | amend spec `chat-integration-admin-ui`（名前は仮） | app |
 | 9 | コマンドの表示の締め | スラッシュコマンドの実機確認、`help` の一覧の書き方、Discord のスレッドでの追加入力 | proxy の残タスク 12.4 | proxy |
 | 10 | URL の展開の確認フロー | 共有してよいかを本人に尋ねてから展開する | `/kiro-discovery` から着手する。`agent` の「本人にだけ届ける」しくみの上に作るので、`agent` の後 | 3 spec すべて |
@@ -84,7 +84,7 @@ proxy と app は互いを知らず、protocol の契約だけで話す。
 
 ### 7. コマンドの再編（amend spec [chat-integration-agent](../chat-integration-agent/)）
 
-`search`・`create-page`・`agent` に再編する。`keep` は `agent` に吸収する。要件と設計は承認済み（2026-11-12）。タスクの作成と承認がこれから。答えを本人にだけ届ける仕組みは実装済み（[chat-integration-proxy の design.md](../chat-integration-proxy/design.md)「PrivateReplier — 本人宛ての返事の届け方」）。前提の installation の特定は直した（proxy の research.md の決定 P16）。
+`search`・`create-page`・`agent` に再編する。`keep` は `agent` に吸収する。要件・設計・タスクは承認済み（2026-11-13）。実装がこれから。答えを本人にだけ届ける仕組みは実装済み（[chat-integration-proxy の design.md](../chat-integration-proxy/design.md)「PrivateReplier — 本人宛ての返事の届け方」）。前提の installation の特定は直した（proxy の research.md の決定 P16）。
 
 - **この spec の要件で決めること（roadmap から移した）**:
   - **DM の先頭の `@誰か` が落ちる**: `agent` は DM や AI アプリの画面で自由な文章を受け取るので、「@alice について…」の先頭の語が落ちる。command 層が bot 自身の名前や id を知らないために起きる（[proxy の research.md](../chat-integration-proxy/research.md)「既知の問題」2）。直し方を要件で決める
