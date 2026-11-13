@@ -41,6 +41,8 @@ export interface ChannelRef {
   readonly channelId: NativeChannelId;
   readonly channelName: string;
   readonly isPrivate: boolean;
+  /** Omitted means "not a DM" (Requirement 11.7). */
+  readonly isDirectMessage?: boolean;
 }
 
 export interface MessageRef {

@@ -45,6 +45,47 @@ describe('parseSettingsPush', () => {
     expect(parseSettingsPush(withNone)).toEqual(withNone);
   });
 
+  it('keeps allowedInDirectMessage when given, and leaves it absent when omitted', () => {
+    const withFlag = {
+      ...valid,
+      settings: {
+        ...valid.settings,
+        channelPermissions: [
+          {
+            commandName: 'agent',
+            allowedChannels: 'all' as const,
+            allowedInDirectMessage: true,
+          },
+          { commandName: 'search', allowedChannels: 'all' as const },
+        ],
+      },
+    };
+    const result = parseSettingsPush(withFlag);
+    expect(result).toEqual(withFlag);
+    if (!('error' in result)) {
+      expect(result.settings.channelPermissions[1]).not.toHaveProperty(
+        'allowedInDirectMessage',
+      );
+    }
+  });
+
+  it('rejects a non-boolean allowedInDirectMessage', () => {
+    const bad = {
+      ...valid,
+      settings: {
+        ...valid.settings,
+        channelPermissions: [
+          {
+            commandName: 'agent',
+            allowedChannels: 'all' as const,
+            allowedInDirectMessage: 'yes',
+          },
+        ],
+      },
+    };
+    expect(parseSettingsPush(bad)).toEqual({ error: 'malformed' });
+  });
+
   it('accepts version 0', () => {
     expect(parseSettingsPush({ ...valid, version: 0 })).toEqual({
       ...valid,

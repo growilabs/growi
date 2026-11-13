@@ -49,11 +49,22 @@ const parseChannelPermissionRow = (
   const commandName = oneOf(v.commandName, COMMAND_NAME_VALUES);
   const allowedChannels = parseAllowedChannels(v.allowedChannels);
 
-  if (commandName === undefined || allowedChannels === undefined) {
+  const allowedInDirectMessage = v.allowedInDirectMessage;
+
+  if (
+    commandName === undefined ||
+    allowedChannels === undefined ||
+    (allowedInDirectMessage !== undefined &&
+      typeof allowedInDirectMessage !== 'boolean')
+  ) {
     return undefined;
   }
 
-  return { commandName, allowedChannels };
+  return {
+    commandName,
+    allowedChannels,
+    ...(allowedInDirectMessage === undefined ? {} : { allowedInDirectMessage }),
+  };
 };
 
 /**

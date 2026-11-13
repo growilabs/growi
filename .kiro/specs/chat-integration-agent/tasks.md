@@ -16,7 +16,7 @@
   - `agent` の依頼（呼びかけを外した文章と会話の鍵、それぞれの長さの上限）、「受け付けた」の応答、「AI が使えない」「処理中」のエラーを足し、依頼と応答の parser を合わせる
   - 完了の条件: protocol の試験で、`agent` の依頼と応答が往復し、長さの上限を超えた依頼が拒まれる。protocol・proxy・app の型検査が通り、既存の試験は変更なしで通る
   - _Requirements: 11.6, 15.1, 15.4, 15.12, 15.13_
-- [ ] 1.2 DM であることを伝え、`agent` の DM の許可を判定できるようにする
+- [x] 1.2 DM であることを伝え、`agent` の DM の許可を判定できるようにする
   - チャンネルの参照に「DM である」の欄を、権限の設定に「DM で許す」の欄を、どちらも省略できる欄として足し、parser を合わせる（省略は「DM ではない」「許さない」と読む。proxy が値を入れるのは 2.2）
   - 権限の判定に、「DM で、専用の欄で判定するコマンドなら、その欄が真のときだけ許す」決まりを足す。判定はコマンドの名前で分岐せず、コマンドの性質だけを見る
   - 完了の条件: 判定の試験で、`agent` は「すべてのチャンネル」を許していても DM の欄が偽なら DM で断られ、ほかのコマンドは今までどおり「すべてのチャンネル」で DM も許される。protocol・proxy・app の型検査が通る
@@ -220,3 +220,4 @@
 
 - 1.1: proxy の `agent` の行（command-set.ts）と app の `unknown-kind` の分岐・ヘルプの `agent` の行は、型検査を通すための仮のもの。proxy は 3.1・3.2、app とヘルプは 5.3 で置き換える（ヘルプの使い方の欄は `/growi agent [request]` のままなので `@GROWI agent …` に合わせる）。管理者が許可すると、それまでは `agent` が何も返さない経路がある（リリース前なので許容）。
 - 試験が時々失敗する既存の 3 件（manage-account-links-service.spec、viewer-page-filter.spec、command-endpoint.integ の準備段階）は、今回の変更と無関係。失敗したら回し直して切り分ける。
+- 1.2: design.md は `ChannelRef.isDirectMessage` を省略できない欄と書くが、実装は tasks.md どおり省略できる欄（省略は「DM ではない」）。タスク 7 の書き戻しで design 側を実装に合わせる。proxy の discord-gateway-facade.integ（stops listening on shutdown）も、負荷が高いときだけ時々落ちる既存の試験。

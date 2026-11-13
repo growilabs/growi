@@ -71,17 +71,25 @@ export const parseChannelRef = (v: unknown): ChannelRef | undefined => {
       ? v.channelName
       : undefined;
   const isPrivate = v.isPrivate;
+  const isDirectMessage = v.isDirectMessage;
 
   if (
     platform === undefined ||
     channelId === undefined ||
     channelName === undefined ||
-    typeof isPrivate !== 'boolean'
+    typeof isPrivate !== 'boolean' ||
+    (isDirectMessage !== undefined && typeof isDirectMessage !== 'boolean')
   ) {
     return undefined;
   }
 
-  return { platform, channelId, channelName, isPrivate };
+  return {
+    platform,
+    channelId,
+    channelName,
+    isPrivate,
+    ...(isDirectMessage === undefined ? {} : { isDirectMessage }),
+  };
 };
 
 /**

@@ -7,7 +7,11 @@
 // RelationSettings) and the proxy (which enforces it per incoming command)
 // must compute the identical verdict from the identical inputs.
 
-import { type CommandName, isWriteCommand } from '../commands/command-names.js';
+import {
+  COMMAND_TRAITS,
+  type CommandName,
+  isWriteCommand,
+} from '../commands/command-names.js';
 import type { ChannelRef } from '../contract/common.js';
 import type { RelationSettings } from '../contract/settings.js';
 
@@ -45,6 +49,17 @@ export const judge = (
     return isWriteCommand(commandName)
       ? { allowed: false, reason: 'no-settings' }
       : { allowed: true };
+  }
+
+  // A command that decides DMs by its own setting ignores allowedChannels
+  // entirely in a DM (Requirement 11.7).
+  if (
+    channel.isDirectMessage === true &&
+    COMMAND_TRAITS[commandName].directMessagePolicy === 'separate-flag'
+  ) {
+    return row.allowedInDirectMessage === true
+      ? { allowed: true }
+      : { allowed: false, reason: 'not-permitted-in-channel' };
   }
 
   if (row.allowedChannels === 'all') {

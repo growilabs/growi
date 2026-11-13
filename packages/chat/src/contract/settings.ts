@@ -25,6 +25,11 @@ export interface RelationSettings {
   readonly channelPermissions: ReadonlyArray<{
     readonly commandName: CommandName;
     readonly allowedChannels: ReadonlyArray<NativeChannelId> | 'all' | 'none';
+    /**
+     * Read only by commands whose `directMessagePolicy` is 'separate-flag'.
+     * Omitted means "not allowed in a DM" (Requirement 11.7).
+     */
+    readonly allowedInDirectMessage?: boolean;
   }>;
 }
 

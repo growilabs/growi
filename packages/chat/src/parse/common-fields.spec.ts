@@ -66,6 +66,24 @@ describe('parseChannelRef', () => {
     expect(parseChannelRef(rest)).toBeUndefined();
   });
 
+  it('keeps isDirectMessage when given, and leaves it absent when omitted', () => {
+    expect(parseChannelRef({ ...valid, isDirectMessage: true })).toEqual({
+      ...valid,
+      isDirectMessage: true,
+    });
+    expect(parseChannelRef({ ...valid, isDirectMessage: false })).toEqual({
+      ...valid,
+      isDirectMessage: false,
+    });
+    expect(parseChannelRef(valid)).not.toHaveProperty('isDirectMessage');
+  });
+
+  it('rejects a non-boolean isDirectMessage', () => {
+    expect(
+      parseChannelRef({ ...valid, isDirectMessage: 'true' }),
+    ).toBeUndefined();
+  });
+
   it('rejects a non-boolean isPrivate', () => {
     expect(parseChannelRef({ ...valid, isPrivate: 'false' })).toBeUndefined();
   });

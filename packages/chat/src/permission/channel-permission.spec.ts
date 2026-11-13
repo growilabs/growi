@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { COMMAND_NAMES } from '../commands/command-names.js';
-import type { ChannelRef } from '../contract/common.js';
+import type { ChannelRef, NativeChannelId } from '../contract/common.js';
 import type { RelationSettings } from '../contract/settings.js';
 import { toNativeChannelId } from '../parse/channel-id.js';
 import { filterBroadcastTargets, judge } from './channel-permission.js';
@@ -11,6 +11,11 @@ const channel = (channelId: string, channelName = 'general'): ChannelRef => ({
   channelId: toNativeChannelId(channelId),
   channelName,
   isPrivate: false,
+});
+
+const directMessage = (channelId = 'D1'): ChannelRef => ({
+  ...channel(channelId, ''),
+  isDirectMessage: true,
 });
 
 describe('judge', () => {
@@ -97,6 +102,111 @@ describe('judge', () => {
       expect(judge(settings, COMMAND_NAMES.createPage, channel('C3'))).toEqual({
         allowed: false,
         reason: 'not-permitted-in-channel',
+      });
+    });
+  });
+
+  describe('direct messages (Requirement 11.7)', () => {
+    const settingsFor = (
+      commandName: (typeof COMMAND_NAMES)[keyof typeof COMMAND_NAMES],
+      allowedChannels: 'all' | 'none' | ReadonlyArray<NativeChannelId>,
+      allowedInDirectMessage?: boolean,
+    ): RelationSettings => ({
+      relationId: 'r1',
+      channelPermissions: [
+        {
+          commandName,
+          allowedChannels,
+          ...(allowedInDirectMessage === undefined
+            ? {}
+            : { allowedInDirectMessage }),
+        },
+      ],
+    });
+
+    it.each([
+      ['false', false],
+      ['omitted', undefined],
+    ])('denies agent in a DM when the DM setting is %s, even with allowedChannels all', (_label, flag) => {
+      const settings = settingsFor(COMMAND_NAMES.agent, 'all', flag);
+
+      expect(judge(settings, COMMAND_NAMES.agent, directMessage())).toEqual({
+        allowed: false,
+        reason: 'not-permitted-in-channel',
+      });
+    });
+
+    it('allows agent in a DM only by the DM setting, even with allowedChannels none', () => {
+      const settings = settingsFor(COMMAND_NAMES.agent, 'none', true);
+
+      expect(judge(settings, COMMAND_NAMES.agent, directMessage())).toEqual({
+        allowed: true,
+      });
+    });
+
+    it.each([
+      ['false', false],
+      ['omitted', undefined],
+    ])('denies agent in a DM listed in allowedChannels when the DM setting is %s', (_label, flag) => {
+      const settings = settingsFor(
+        COMMAND_NAMES.agent,
+        [toNativeChannelId('D1')],
+        flag,
+      );
+
+      expect(judge(settings, COMMAND_NAMES.agent, directMessage('D1'))).toEqual(
+        { allowed: false, reason: 'not-permitted-in-channel' },
+      );
+    });
+
+    it('allows agent in a DM by the DM setting even when allowedChannels lists only other channels', () => {
+      const settings = settingsFor(
+        COMMAND_NAMES.agent,
+        [toNativeChannelId('C1')],
+        true,
+      );
+
+      expect(judge(settings, COMMAND_NAMES.agent, directMessage('D1'))).toEqual(
+        { allowed: true },
+      );
+    });
+
+    it('still judges agent in a regular channel by allowedChannels alone', () => {
+      const settings = settingsFor(COMMAND_NAMES.agent, 'all', false);
+
+      expect(judge(settings, COMMAND_NAMES.agent, channel('C1'))).toEqual({
+        allowed: true,
+      });
+    });
+
+    it('treats a channel without isDirectMessage as not a DM', () => {
+      const settings = settingsFor(COMMAND_NAMES.agent, 'all', false);
+
+      expect(judge(settings, COMMAND_NAMES.agent, channel('D1'))).toEqual({
+        allowed: true,
+      });
+    });
+
+    it('keeps a follows-all-channels command allowed in a DM under all, whatever the DM setting says', () => {
+      const settings = settingsFor(COMMAND_NAMES.createPage, 'all', false);
+
+      expect(
+        judge(settings, COMMAND_NAMES.createPage, directMessage()),
+      ).toEqual({ allowed: true });
+    });
+
+    it('keeps a follows-all-channels command denied in a DM under none, whatever the DM setting says', () => {
+      const settings = settingsFor(COMMAND_NAMES.createPage, 'none', true);
+
+      expect(
+        judge(settings, COMMAND_NAMES.createPage, directMessage()),
+      ).toEqual({ allowed: false, reason: 'not-permitted-in-channel' });
+    });
+
+    it('still denies agent with no-settings in a DM when the relation has no row for it', () => {
+      expect(judge(null, COMMAND_NAMES.agent, directMessage())).toEqual({
+        allowed: false,
+        reason: 'no-settings',
       });
     });
   });
