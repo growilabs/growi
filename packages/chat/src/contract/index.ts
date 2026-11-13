@@ -17,12 +17,24 @@ export type {
 } from './command.js';
 export { RESPONSE_KINDS } from './command.js';
 export type {
+  AgentAnswer,
+  AgentFailureReason,
+  AnswerSource,
+  CommandAnswerRequest,
+  CommandAnswerResult,
+} from './command-answer.js';
+export type {
   ChannelRef,
   ChatAccountRef,
   MessageRef,
   NativeChannelId,
   PlatformName,
 } from './common.js';
+export type {
+  ConversationFailure,
+  ConversationFailureReason,
+  ConversationRange,
+} from './conversation.js';
 export type {
   NotificationRequest,
   NotificationResult,

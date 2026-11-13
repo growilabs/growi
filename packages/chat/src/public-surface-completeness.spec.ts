@@ -28,6 +28,8 @@ describe('src/index.ts (client-safe entry point) exports every claimed value', (
     'parseAccountLinkStartResponse',
     'parseCapabilityReport',
     'parseChannelInventory',
+    'parseCommandAnswerRequest',
+    'parseCommandAnswerResult',
     'parseCommandRequest',
     'parseCommandResponse',
     'parseConnectionStatusView',

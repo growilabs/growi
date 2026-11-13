@@ -186,6 +186,7 @@ describe('INBOUND_OP_BY_PATH', () => {
         ['/chat-integration/capabilities', 'capabilities'],
         ['/chat-integration/connection-status', 'connection-status'],
         ['/chat-integration/channels', 'channels'],
+        ['/chat-integration/command-answer', 'command-answer'],
       ].sort(),
     );
   });

@@ -28,6 +28,7 @@ export const OP_NAMES = {
   capabilities: 'capabilities',
   connectionStatus: 'connection-status',
   channels: 'channels',
+  commandAnswer: 'command-answer',
 } as const;
 
 export type OpName = (typeof OP_NAMES)[keyof typeof OP_NAMES];
@@ -176,5 +177,12 @@ export const OP_ENDPOINTS: Readonly<Record<OpName, OpEndpointDescriptor>> = {
     pathTemplate: '{proxyUri}/chat-integration/channels',
     bodyTypeName: 'OpOnlyRequest',
     requirementIds: ['2.2', '11.1'],
+  },
+  [OP_NAMES.commandAnswer]: {
+    op: OP_NAMES.commandAnswer,
+    direction: 'growi-to-proxy',
+    pathTemplate: '{proxyUri}/chat-integration/command-answer',
+    bodyTypeName: 'CommandAnswerRequest',
+    requirementIds: ['5.8', '5.12', '15.6', '15.7', '15.19'],
   },
 };

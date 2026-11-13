@@ -27,6 +27,7 @@ import {
   type OpName,
   parseAccountLinkStart,
   parseChallengeResponse,
+  parseCommandAnswerRequest,
   parseCommandRequest,
   parseKeyRegistration,
   parseKeyRevocation,
@@ -414,6 +415,13 @@ describe('別の口への流用 -- a signature made for one op is refused at eve
           markdown: 'a page was updated',
           containsRestrictedPage: false,
         };
+      case OP_NAMES.commandAnswer:
+        return {
+          relationId,
+          op,
+          requestId: 'req-0003',
+          answer: { kind: 'text', markdown: 'an answer', sources: [] },
+        };
       case OP_NAMES.settingsPush:
         return {
           relationId,
@@ -450,6 +458,8 @@ describe('別の口への流用 -- a signature made for one op is refused at eve
         return parseKeyRevocation;
       case OP_NAMES.notification:
         return parseNotificationRequest;
+      case OP_NAMES.commandAnswer:
+        return parseCommandAnswerRequest;
       case OP_NAMES.settingsPush:
         return parseSettingsPush;
       default:
@@ -518,7 +528,7 @@ describe('別の口への流用 -- a signature made for one op is refused at eve
   it('covers every op in OP_NAMES', () => {
     // Guards the `it.each` below against silently shrinking if an op is
     // added and the table stops being exhaustive.
-    expect(OP_LIST).toHaveLength(12);
+    expect(OP_LIST).toHaveLength(13);
   });
 
   it.each(

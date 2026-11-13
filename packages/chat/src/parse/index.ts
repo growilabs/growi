@@ -16,6 +16,10 @@
 //   internal, not a standalone checker" role as `common-fields.ts`.
 export { parseNativeChannelId, toNativeChannelId } from './channel-id.js';
 export { parseCommandRequest, parseCommandResponse } from './parse-command.js';
+export {
+  parseCommandAnswerRequest,
+  parseCommandAnswerResult,
+} from './parse-command-answer.js';
 export { parseOpEnvelope } from './parse-envelope.js';
 export { parseKeyRegistration, parseKeyRevocation } from './parse-keys.js';
 export {

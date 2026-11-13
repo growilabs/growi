@@ -29,6 +29,7 @@ describe('op vocabulary', () => {
       capabilities: 'capabilities',
       connectionStatus: 'connection-status',
       channels: 'channels',
+      commandAnswer: 'command-answer',
     });
   });
 
@@ -170,6 +171,13 @@ describe('op endpoint table', () => {
       pathTemplate: '{proxyUri}/chat-integration/channels',
       bodyTypeName: 'OpOnlyRequest',
       requirementIds: ['2.2', '11.1'],
+    },
+    {
+      op: OP_NAMES.commandAnswer,
+      direction: 'growi-to-proxy',
+      pathTemplate: '{proxyUri}/chat-integration/command-answer',
+      bodyTypeName: 'CommandAnswerRequest',
+      requirementIds: ['5.8', '5.12', '15.6', '15.7', '15.19'],
     },
   ];
 
