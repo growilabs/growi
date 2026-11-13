@@ -1,0 +1,151 @@
+import type { IUser } from '@growi/core';
+import mongoose from 'mongoose';
+
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+} from '~/interfaces/activity';
+import { AUDITLOG_SUGGESTION_FIELD_SPECS } from '~/server/interfaces/auditlog-suggestion-field-specs';
+import { UserStatus } from '~/server/models/user/conts';
+import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
+
+import type SearchService from './search';
+import { sanitizeEndpointForIndex } from './search-delegator/sanitize-endpoint-for-index';
+
+const logger = loggerFactory('growi:service:search-auditlog-suggestions');
+
+export type AuditlogSuggestionBackend = Pick<
+  SearchService,
+  'isReachable' | 'fullTextSearchDelegator'
+>;
+
+async function searchAuditlogFieldValues(
+  backend: AuditlogSuggestionBackend,
+  field: AuditlogSuggestionField,
+  q: string,
+  limit: number,
+  mongoFallback: (
+    q: string,
+    option: { offset: number; limit: number },
+  ) => Promise<string[]>,
+): Promise<string[]> {
+  if (backend.isReachable) {
+    try {
+      return await backend.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
+        field,
+        q,
+        limit,
+      );
+    } catch (err) {
+      logger.error(
+        { err },
+        `Failed to search auditlog suggestions (${field}) on Elasticsearch. Falling back to MongoDB.`,
+      );
+    }
+  }
+  if (
+    q.length < AUDITLOG_SUGGESTION_FIELD_SPECS[field].fallbackMinQueryLength
+  ) {
+    return [];
+  }
+  // Any failure, maxTimeMS included, degrades to no suggestions rather than a
+  // 500: Prisma may not surface MongoDB's timeout code, so errors aren't
+  // told apart.
+  try {
+    return await mongoFallback(q, { offset: 0, limit });
+  } catch (err) {
+    logger.warn(
+      { err },
+      `Failed to search auditlog suggestions (${field}) on MongoDB. Returning no suggestions.`,
+    );
+    return [];
+  }
+}
+
+// searchAuditlogSuggestions dispatches through this map, so a new field (e.g.
+// `ip`) needs no change there.
+const AUDITLOG_SUGGESTION_HANDLERS: {
+  [K in AuditlogSuggestionField]: (
+    backend: AuditlogSuggestionBackend,
+    q: string,
+    limit: number,
+  ) => Promise<AuditlogSuggestionsResponse>;
+} = {
+  async username(backend, q, limit) {
+    const usernames = await searchAuditlogFieldValues(
+      backend,
+      'username',
+      q,
+      limit,
+      // Wrapped, not passed directly: the Prisma extension method reads
+      // `this` via Prisma.getExtensionContext, so passing it as a bare
+      // reference would detach it from `prisma.activities` and throw.
+      (query, option) =>
+        prisma.activities.findSnapshotUsernamesByUsernameRegex(query, option),
+    );
+
+    const User = mongoose.model<IUser>('User');
+    const users =
+      usernames.length === 0
+        ? []
+        : await User.find({ username: { $in: usernames } })
+            .select('username status')
+            .lean();
+
+    const activeUsernames = new Set(
+      users
+        .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+        .map((u) => u.username),
+    );
+
+    // A username with no live User match (e.g. deleted -- statusDelete()
+    // renames the User doc's username to `deleted_at_*`) must still be
+    // searchable in the audit trail, so anything not proven active is
+    // treated as inactive rather than silently dropped.
+    return {
+      username: {
+        activeUsernames: usernames.filter((u) => activeUsernames.has(u)),
+        inactiveUsernames: usernames.filter((u) => !activeUsernames.has(u)),
+      },
+    };
+  },
+
+  // Unlike username, no User-model classification applies — endpoints have
+  // no notion of Active/Inactive.
+  async endpoint(backend, q, limit) {
+    // Both backends match against the path-only value, so q's query string is
+    // dropped here once rather than in each backend.
+    const pathQ = sanitizeEndpointForIndex(q).trim();
+    if (pathQ === '') return { endpoint: { endpoints: [] } };
+
+    const endpoints = await searchAuditlogFieldValues(
+      backend,
+      'endpoint',
+      pathQ,
+      limit,
+      (query, option) =>
+        prisma.activities.findEndpointsByEndpointRegex(query, option),
+    );
+
+    return { endpoint: { endpoints } };
+  },
+};
+
+export const searchAuditlogSuggestions = async (
+  backend: AuditlogSuggestionBackend,
+  fields: AuditlogSuggestionField[],
+  q: string,
+  limit: number,
+): Promise<AuditlogSuggestionsResponse> => {
+  const trimmedQ = q.trim();
+  if (trimmedQ === '') return {};
+
+  const responses = await Promise.all(
+    [...new Set(fields)].map((field) =>
+      AUDITLOG_SUGGESTION_HANDLERS[field](backend, trimmedQ, limit),
+    ),
+  );
+
+  return Object.assign({}, ...responses);
+};

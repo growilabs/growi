@@ -90,6 +90,7 @@ model activities {
   @@unique([userId, target, action, createdAt], map: "user_1_target_1_action_1_createdAt_1")
   @@index([userId], map: "user_1")
   @@index([snapshot.username], map: "snapshot.username_1")
+  @@index([endpoint], map: "endpoint_1")
   @@index([target, action], map: "target_1_action_1")
   @@index([createdAt], map: "createdAt_1")
 }

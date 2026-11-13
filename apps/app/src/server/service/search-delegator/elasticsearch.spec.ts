@@ -400,6 +400,33 @@ describe('ElasticsearchDelegator', () => {
         );
       });
 
+      it('should match endpoint by case-sensitive prefix only, without fuzzy', async () => {
+        await delegator.searchAuditlogByFuzzyWildcard(
+          'endpoint',
+          '/_api/v3/page',
+          10,
+        );
+
+        expect(mockES8Client.search).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: {
+              bool: {
+                should: [
+                  {
+                    wildcard: {
+                      endpoint: {
+                        value: '/_api/v3/page*',
+                        case_insensitive: false,
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          }),
+        );
+      });
+
       it('should use auditlogs-alias as index', async () => {
         await delegator.searchAuditlogByFuzzyWildcard('username', 'alice', 10);
 

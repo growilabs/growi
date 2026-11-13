@@ -360,41 +360,6 @@ describe('findSnapshotUsernamesByUsernameRegex', () => {
     expect(result).toEqual([]);
   });
 
-  it.each([
-    '',
-    ' ',
-    'a',
-  ])('short-circuits to [] for q=%j even when a matching username exists (MIN_QUERY_LENGTH guard)', async (q) => {
-    // A username that WOULD match every one of these queries if the guard
-    // were absent (empty/whitespace/single-char all prefix-match 'a...').
-    await prisma.activities.createMany({
-      data: [makeActivityData({ username: 'aaaaaaaaaa' })],
-    });
-
-    const result = await prisma.activities.findSnapshotUsernamesByUsernameRegex(
-      q,
-      {
-        offset: 0,
-        limit: 10,
-      },
-    );
-
-    expect(result).toEqual([]);
-  });
-
-  it('queries normally once q reaches MIN_QUERY_LENGTH (2 chars)', async () => {
-    await prisma.activities.createMany({
-      data: [makeActivityData({ username: 'aaaaaaaaaa' })],
-    });
-
-    const result = await prisma.activities.findSnapshotUsernamesByUsernameRegex(
-      'aa',
-      { offset: 0, limit: 10 },
-    );
-
-    expect(result).toEqual(['aaaaaaaaaa']);
-  });
-
   it('matches by prefix even with incidental surrounding whitespace in q', async () => {
     await prisma.activities.createMany({
       data: [

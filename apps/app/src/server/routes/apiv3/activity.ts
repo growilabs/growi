@@ -485,9 +485,14 @@ export const setup = (crowi: Crowi): Router => {
    *       - name: field
    *         in: query
    *         required: false
+   *         description: Field(s) to suggest. Repeatable. When omitted, every field is searched.
+   *         style: form
+   *         explode: true
    *         schema:
-   *           type: string
-   *           enum: [username]
+   *           type: array
+   *           items:
+   *             type: string
+   *             enum: [username, endpoint]
    *       - name: q
    *         in: query
    *         required: false
@@ -531,7 +536,7 @@ export const setup = (crowi: Crowi): Router => {
         );
         return res.apiv3(result);
       } catch (err) {
-        logger.error('Failed to get suggestions', err);
+        logger.error({ err }, 'Failed to get suggestions');
         return res.apiv3Err(err, 500);
       }
     },

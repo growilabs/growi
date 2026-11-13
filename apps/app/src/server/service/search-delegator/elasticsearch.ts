@@ -12,6 +12,7 @@ import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import { SocketEventName } from '~/interfaces/websocket';
+import { AUDITLOG_SUGGESTION_FIELD_SPECS } from '~/server/interfaces/auditlog-suggestion-field-specs';
 import type { ActivityDocument } from '~/server/models/activity';
 import type { SocketIoService } from '~/server/service/socket-io';
 import loggerFactory from '~/utils/logger';
@@ -960,15 +961,21 @@ class ElasticsearchDelegator
     limit: number,
   ): Promise<string[]> {
     const escaped = q.replace(/([*?\\])/g, '\\$1');
+    const { fuzzy, caseInsensitive } = AUDITLOG_SUGGESTION_FIELD_SPECS[field];
     const query = {
       bool: {
         should: [
           {
             wildcard: {
-              [field]: { value: `${escaped}*`, case_insensitive: true },
+              [field]: {
+                value: `${escaped}*`,
+                case_insensitive: caseInsensitive,
+              },
             },
           },
-          { fuzzy: { [field]: { value: escaped, fuzziness: 'AUTO' } } },
+          ...(fuzzy
+            ? [{ fuzzy: { [field]: { value: escaped, fuzziness: 'AUTO' } } }]
+            : []),
         ],
       },
     };
