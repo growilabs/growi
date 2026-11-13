@@ -1,5 +1,6 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
+import { resolvePlantumlHttpMethod } from '~/features/plantuml/interfaces/http-method';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { RegistrationMode } from '~/interfaces/registration-mode';
 
@@ -30,6 +31,10 @@ export const getServerSideRendererConfigProps: GetServerSideProps<
         ),
         drawioUri: configManager.getConfig('app:drawioUri'),
         plantumlUri: configManager.getConfig('app:plantumlUri'),
+        plantumlHttpMethod: resolvePlantumlHttpMethod(
+          configManager.getConfig('app:plantumlUri'),
+          configManager.getConfig('app:plantumlHttpMethod'),
+        ),
 
         // XSS Options
         isEnabledXssPrevention: configManager.getConfig(

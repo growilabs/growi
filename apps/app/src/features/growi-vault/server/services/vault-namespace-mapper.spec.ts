@@ -1,6 +1,8 @@
-import type { IPage } from '@growi/core';
-import { PageGrant, PageStatus } from '@growi/core';
+import type { IPage, IUserGroupHasId, IUserHasId } from '@growi/core';
+import { GroupType, PageGrant, PageStatus } from '@growi/core';
+import { Types } from 'mongoose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 import {
   createVaultNamespaceMapper,
@@ -276,40 +278,52 @@ describe('VaultNamespaceMapper.computePageNamespaces', () => {
 
   describe('GRANT_USER_GROUP page with one group', () => {
     it('returns the single group namespace', () => {
-      const groupId = 'abc-group-1';
+      const groupId = new Types.ObjectId();
       const page = buildPage({
         grant: PageGrant.GRANT_USER_GROUP,
-        grantedGroups: [
-          { type: 'UserGroup', item: { toString: () => groupId } as never },
-        ],
+        grantedGroups: [{ type: GroupType.userGroup, item: groupId }],
       });
 
       const result = mapper.computePageNamespaces(page);
 
-      expect(result.current).toEqual([`group-${groupId}`]);
+      expect(result.current).toEqual([`group-${groupId.toString()}`]);
     });
-  });
 
-  describe('GRANT_USER_GROUP page with multiple groups', () => {
-    it('returns one namespace per granted group (req 3.4)', () => {
-      const groupId1 = 'grp-id-001';
-      const groupId2 = 'grp-id-002';
+    it('resolves a granted group given as a populated document', () => {
+      const groupId = new Types.ObjectId();
       const page = buildPage({
         grant: PageGrant.GRANT_USER_GROUP,
         grantedGroups: [
-          { type: 'UserGroup', item: { toString: () => groupId1 } as never },
           {
-            type: 'ExternalUserGroup',
-            item: { toString: () => groupId2 } as never,
+            type: GroupType.userGroup,
+            item: mock<IUserGroupHasId>({ _id: groupId.toString() }),
           },
         ],
       });
 
       const result = mapper.computePageNamespaces(page);
 
+      expect(result.current).toEqual([`group-${groupId.toString()}`]);
+    });
+  });
+
+  describe('GRANT_USER_GROUP page with multiple groups', () => {
+    it('returns one namespace per granted group (req 3.4)', () => {
+      const groupId1 = new Types.ObjectId();
+      const groupId2 = new Types.ObjectId();
+      const page = buildPage({
+        grant: PageGrant.GRANT_USER_GROUP,
+        grantedGroups: [
+          { type: GroupType.userGroup, item: groupId1 },
+          { type: GroupType.externalUserGroup, item: groupId2 },
+        ],
+      });
+
+      const result = mapper.computePageNamespaces(page);
+
       expect(result.current).toEqual([
-        `group-${groupId1}`,
-        `group-${groupId2}`,
+        `group-${groupId1.toString()}`,
+        `group-${groupId2.toString()}`,
       ]);
     });
   });
@@ -329,27 +343,59 @@ describe('VaultNamespaceMapper.computePageNamespaces', () => {
   // GRANT_OWNER
   // -------------------------------------------------------------------------
 
-  describe('GRANT_OWNER page with a known creator', () => {
-    it('returns the user-only-me namespace for the creator (req 3.5)', () => {
-      const creatorId = 'creator-user-id-xyz';
+  describe('GRANT_OWNER page', () => {
+    const creatorId = new Types.ObjectId();
+    const grantedUserId = new Types.ObjectId();
+
+    it('returns the only-me namespace of the granted user, not of the creator', () => {
       const page = buildPage({
         grant: PageGrant.GRANT_OWNER,
-        creator: { toString: () => creatorId } as never,
+        creator: creatorId,
+        grantedUsers: [grantedUserId],
       });
 
       const result = mapper.computePageNamespaces(page);
 
-      expect(result.current).toEqual([`user-${creatorId}-only-me`]);
+      expect(result.current).toEqual([
+        `user-${grantedUserId.toString()}-only-me`,
+      ]);
     });
-  });
 
-  describe('GRANT_OWNER page without a creator', () => {
-    it('returns an empty current array when creator is undefined', () => {
+    it('resolves a granted user given as a populated document', () => {
       const page = buildPage({
         grant: PageGrant.GRANT_OWNER,
-        creator: undefined,
+        creator: creatorId,
+        grantedUsers: [mock<IUserHasId>({ _id: grantedUserId.toString() })],
       });
+
       const result = mapper.computePageNamespaces(page);
+
+      expect(result.current).toEqual([
+        `user-${grantedUserId.toString()}-only-me`,
+      ]);
+    });
+
+    it('returns no namespace when grantedUsers is empty, even if a creator is set', () => {
+      const page = buildPage({
+        grant: PageGrant.GRANT_OWNER,
+        creator: creatorId,
+        grantedUsers: [],
+      });
+
+      const result = mapper.computePageNamespaces(page);
+
+      expect(result.current).toEqual([]);
+    });
+
+    it('returns no namespace when grantedUsers is missing, even if a creator is set', () => {
+      const page = buildPage({
+        grant: PageGrant.GRANT_OWNER,
+        creator: creatorId,
+        grantedUsers: undefined,
+      });
+
+      const result = mapper.computePageNamespaces(page);
+
       expect(result.current).toEqual([]);
     });
   });

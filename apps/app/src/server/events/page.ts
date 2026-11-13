@@ -7,6 +7,28 @@ import type Crowi from '../crowi';
 
 const logger = loggerFactory('growi:events:page');
 
+/**
+ * Third argument of the 'update' event: the grant state the page had before
+ * the update was applied.
+ */
+export interface PageUpdateEventExtras {
+  previousGrant: IPage['grant'];
+  previousGrantedGroups: IPage['grantedGroups'];
+  previousGrantedUsers: IPage['grantedUsers'];
+}
+
+/**
+ * Must be called before the update touches the page's grant fields: the arrays
+ * are copied because the update replaces them on the same document.
+ */
+export const capturePreviousGrantState = (
+  page: Pick<IPage, 'grant' | 'grantedGroups' | 'grantedUsers'>,
+): PageUpdateEventExtras => ({
+  previousGrant: page.grant,
+  previousGrantedGroups: [...(page.grantedGroups ?? [])],
+  previousGrantedUsers: [...(page.grantedUsers ?? [])],
+});
+
 class PageEvent extends EventEmitter {
   crowi: Crowi;
 

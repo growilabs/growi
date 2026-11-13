@@ -34,7 +34,7 @@
 - 認証・認可は apps/app 標準 middleware 構成を共有する（要件 11）。git 固有の差異のみを 2 つの seam に局所化する: (a) `Authorization: Basic base64(x:PAT)` から PAT を抽出し標準トークン解決へ橋渡しする credential adapter、(b) 認証失敗時に `/login` リダイレクトではなく git 互換の `401 + WWW-Authenticate: Basic` を返す `loginRequired` の `fallback`
 - ゲスト/匿名アクセスの可否は `aclService.isGuestAllowedToRead()`（= `loginRequiredFactory(crowi, true)` の判定）に委譲する。許可されない場合（デフォルト `restrictGuestMode='Deny'` / `wikiMode='private'`）は匿名 clone を 401 で拒否する（要件 2.4a）
 - ユーザーがアクセス可能な namespace 集合の決定（GROWI ACL 評価）
-- ページの所属 namespace の決定（grant / grantedGroups / creator から）
+- ページの所属 namespace の決定（grant / grantedGroups / grantedUsers から）
 - ページ変更イベントの購読 → vault_instructions コレクション書き込み
 - 初回有効化 / 災害復旧時の bootstrap 主導（pages cursor stream + seed instructions 発行）
 - vault-manager への compose-view RPC 呼び出し
@@ -291,7 +291,7 @@ interface VaultNamespaceMapper {
 | GRANT_PUBLIC | `'public'` |
 | GRANT_RESTRICTED（anyone-with-link） | `'restricted-link'` |
 | GRANT_USER_GROUP（grantedGroups[i]） | グループごとに `'group-<gid>'`（複数 group ACL は複数 namespace） |
-| GRANT_OWNER（creator） | `'user-<creator-id>-only-me'` |
+| GRANT_OWNER（grantedUsers[i]） | 閲覧を許可されたユーザーごとに `'user-<granted-user-id>-only-me'`。ページの作成者（creator）は判定に使わない。grantedUsers が空なら namespace 不発行 |
 | `/trash` 配下 | namespace 不発行（除外） |
 | status !== 'published' | namespace 不発行（除外） |
 
@@ -350,6 +350,9 @@ interface VaultDispatcher {
 - `create` / `update`: `current` 配列の各 namespace に `upsert` 1 件ずつ（pagePath・revisionId・pageId を含む）
 - `delete`: `current` 配列の各 namespace から `remove` 1 件ずつ（pagePath は削除直前の値）
 - ACL 変更: `previous` 配列の各 namespace に `remove` + `current` 配列の各 namespace に `upsert`（各 namespace ごとに 1 件ずつ）
+  - 単一ページ更新での ACL 変更の検出: `PageService.updatePage` / `updatePageV4`（権限だけを変える `updateGrant` もここを通る）は `pageEvent.emit('update', page, user, { previousGrant, previousGrantedGroups, previousGrantedUsers })` の第 3 引数で、更新前の権限状態を渡す。購読側（`vault-page-update-handler.ts`）は更新前の namespace を計算し、`previous` として dispatcher に渡す
+  - dispatcher は `previous` のうち `current` に含まれない namespace（ページが抜けた namespace）にだけ `remove` を発行する。ページが引き続き属する namespace には `remove` を発行しない（同じ namespace への `remove` と `upsert` は書き込み順が保証されないため）。抜けた namespace が無ければ通常の `update`（coalesce 対象の `upsert`）として扱う。この規則は親ページ grant 一括変更の経路にも同じく適用される
+  - `remove` を伴う操作（`delete` / ACL 変更 / 単一ページ rename）は、発行の前に、同じページの coalesce 待ちの `upsert` を対象 namespace のバッファから取り除く（待機中の `upsert` が後から書き込まれて `remove` を打ち消すのを防ぐ）
 - 単一ページ rename（`onPageRenamed`）: `current` 配列の各 namespace に `remove`（oldPath）+ `upsert`（newPath）を 1 件ずつ。ページ自身は namespace tree 上で blob（`<name>.md`）として保持されるため、ディレクトリ subtree 移動である `rename-prefix` では再配置できない（`rename-prefix` は `type === 'tree'` のエントリのみ移動する）。remove + upsert で blob を確実に旧パスから削除し新パスに再作成する。grant は rename で不変なので old/new は同一 namespace 集合に属する
 
 **coalesce 挙動**

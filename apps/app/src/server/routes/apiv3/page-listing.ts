@@ -233,6 +233,7 @@ const routerFactory = (crowi: Crowi): Router => {
   router.get(
     '/info',
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
+    loginRequired,
     validator.pageIdsOrPathRequired,
     validator.infoParams,
     apiV3FormValidator,

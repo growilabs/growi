@@ -1212,5 +1212,87 @@
         "description": ""
       }
     }
+  },
+  "change_proposal": {
+    "operation_type": {
+      "edit": "Edit page",
+      "create": "Create page",
+      "move": "Move page",
+      "delete_completely": "Delete page completely"
+    },
+    "operation_status": {
+      "pending": "Waiting for approval",
+      "applied": "Applied",
+      "failed": "Failed",
+      "stale": "Not applied (the page had changed)",
+      "skipped": "Skipped",
+      "reverted": "Reverted",
+      "revert_refused": "Could not be reverted"
+    },
+    "proposal_status": {
+      "pending": "Awaiting approval",
+      "applied": "Applied",
+      "partially_applied": "Partially applied",
+      "reverted": "Reverted",
+      "partially_reverted": "Partially reverted",
+      "not_applied": "Not applied",
+      "discarded": "Closed without applying the rest",
+      "expired": "Expired",
+      "withdrawn": "Withdrawn"
+    },
+    "reason": {
+      "page_being_edited": "The page is being edited",
+      "page_operation_in_progress": "Another operation on the page is in progress",
+      "target_unavailable": "The target page is not available",
+      "path_occupied": "A page already exists at the path",
+      "grant_not_assignable": "The page permission cannot be set",
+      "feature_disabled": "The feature is turned off",
+      "operation_type_disabled": "This kind of operation is turned off",
+      "requester_not_allowed": "The requester is not allowed to do this",
+      "write_error": "Failed to write the change",
+      "not_revertible_state": "Not in a state that can be reverted",
+      "edited_after_apply": "The page was edited after it was applied",
+      "has_children": "The page has child pages",
+      "moved_after_apply": "The page was moved after it was applied",
+      "original_path_occupied": "A page already exists at the original path",
+      "not_deletable": "You are not allowed to delete the page",
+      "apply_failed": "Reverting failed",
+      "base_revision_changed": "The page had changed before it was applied",
+      "skipped_by_requester": "Skipped by the requester",
+      "discarded": "Closed without applying the rest",
+      "expired": "Expired",
+      "withdrawn": "Withdrawn"
+    },
+    "revert_refusal_reason": {
+      "not_revertible_state": "Not in a state that can be reverted",
+      "target_unavailable": "The target page is not available",
+      "edited_after_apply": "The page was edited after it was applied",
+      "has_children": "The page has child pages",
+      "moved_after_apply": "The page was moved after it was applied",
+      "original_path_occupied": "A page already exists at the original path",
+      "not_deletable": "You are not allowed to delete the page",
+      "page_operation_in_progress": "Another operation on the page is in progress",
+      "apply_failed": "Reverting failed"
+    },
+    "lifecycle": {
+      "open": "Awaiting approval",
+      "settled": "Completed",
+      "discarded": "Closed without applying the rest",
+      "expired": "Expired",
+      "withdrawn": "Withdrawn"
+    },
+    "link": {
+      "follow_up": "Follow-up",
+      "rework": "Rework",
+      "based_on": "Based on"
+    },
+    "achievement": {
+      "settled_with_percent": "Completed ({{percent}}% achieved)"
+    }
+  },
+  "plantuml": {
+    "url-too-long": "The diagram is too large and probably exceeds the URL length limit of the PlantUML server. Split or simplify the diagram.",
+    "post-unavailable": "The PlantUML server may not support POST, or the browser cannot reach it. The administrator can switch back to GET by setting PLANTUML_HTTP_METHOD=get.",
+    "render-failed": "The diagram could not be rendered. The PlantUML server could not be reached, or it returned an error."
   }
 }

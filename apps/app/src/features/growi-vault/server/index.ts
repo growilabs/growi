@@ -1,6 +1,7 @@
 import type { IPage } from '@growi/core';
 import type { Router } from 'express';
 
+import type { PageUpdateEventExtras } from '~/server/events/page';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
@@ -19,6 +20,10 @@ import { isStaleBootstrapRunner } from './services/resilience';
 import { createVaultBootstrapper } from './services/vault-bootstrapper';
 import { createVaultDispatcher } from './services/vault-dispatcher';
 import { vaultNamespaceMapper } from './services/vault-namespace-mapper';
+import {
+  createVaultPageUpdateHandler,
+  readStoredGrantState,
+} from './services/vault-page-update-handler';
 import { vaultSettingsService } from './services/vault-settings-service';
 
 export { createVaultAdminRouter } from './routes/vault-admin';
@@ -301,26 +306,21 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       },
     );
 
+    const handlePageUpdate = createVaultPageUpdateHandler(
+      dispatcher,
+      vaultNamespaceMapper,
+      readStoredGrantState,
+    );
     pageEvent.on(
       'update',
-      (page: IPage & { _id: { toString(): string } }, _user: unknown) => {
-        const revisionId =
-          page.revision != null
-            ? typeof page.revision === 'object' && '_id' in page.revision
-              ? (
-                  page.revision as { _id: { toString(): string } }
-                )._id.toString()
-              : page.revision.toString()
-            : undefined;
-
-        dispatcher
-          .onPageChanged({ type: 'update', page, revisionId })
-          .catch((err) => {
-            logger.warn(
-              { err },
-              'vault-dispatcher: error handling update event',
-            );
-          });
+      (
+        page: IPage & { _id: { toString(): string } },
+        _user: unknown,
+        extras?: PageUpdateEventExtras,
+      ) => {
+        handlePageUpdate(page, extras).catch((err) => {
+          logger.warn({ err }, 'vault-dispatcher: error handling update event');
+        });
       },
     );
 
@@ -527,12 +527,12 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       (payload?: {
         affectedPages?: Array<{
           page: IPage & { _id: { toString(): string }; revision?: unknown };
-          previousGrant: unknown;
-          previousGrantedGroups: unknown;
-          previousGrantedUsers: unknown;
-          newGrant: unknown;
-          newGrantedGroups: unknown;
-          newGrantedUsers: unknown;
+          previousGrant: IPage['grant'];
+          previousGrantedGroups: IPage['grantedGroups'];
+          previousGrantedUsers: IPage['grantedUsers'];
+          newGrant: IPage['grant'];
+          newGrantedGroups: IPage['grantedGroups'];
+          newGrantedUsers: IPage['grantedUsers'];
         }>;
         user?: unknown;
       }) => {
@@ -540,27 +540,23 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
         if (!Array.isArray(items) || items.length === 0) return;
 
         for (const item of items) {
-          // Build a minimal page view with the PREVIOUS grant state so the
-          // namespace mapper computes the old namespaces correctly.
-          const previousPageView = {
-            ...item.page,
-            grant: item.previousGrant,
-            grantedGroups: item.previousGrantedGroups,
-            grantedUsers: item.previousGrantedUsers,
-          } as unknown as IPage;
-          const previousNamespaces =
-            vaultNamespaceMapper.computePageNamespaces(
-              previousPageView,
-            ).current;
+          const previousNamespaces = vaultNamespaceMapper.computePageNamespaces(
+            {
+              grant: item.previousGrant,
+              grantedGroups: item.previousGrantedGroups,
+              grantedUsers: item.previousGrantedUsers,
+            },
+          ).current;
 
-          // Build a "current state" view so the dispatcher computes new
-          // namespaces against the post-change grant.
+          // item.page still holds the grant from before the bulk write, and
+          // it is a Mongoose document whose fields a spread would not copy.
           const currentPageView = {
-            ...item.page,
+            _id: item.page._id,
+            path: item.page.path,
             grant: item.newGrant,
             grantedGroups: item.newGrantedGroups,
             grantedUsers: item.newGrantedUsers,
-          } as unknown as IPage & { _id: { toString(): string } };
+          };
 
           const revisionId =
             item.page.revision == null

@@ -51,7 +51,13 @@
   "typescript.preferences.autoImportFileExcludePatterns": ["node_modules/*"],
   "typescript.validate.enable": true,
 
-  "vitest.filesWatcherInclude": "**/*",
+  // Merged with VS Code's defaults. The default "**/node_modules/*/**" does not match
+  // pnpm's ".pnpm" store, and Claude Code worktrees each carry a full checkout.
+  "files.watcherExclude": {
+    "**/node_modules/.pnpm/**": true,
+    "**/.claude/worktrees/**": true
+  },
+
   "git-worktree-menu.worktreeDir": "/workspace"
 
 }

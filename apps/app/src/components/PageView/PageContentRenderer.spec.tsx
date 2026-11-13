@@ -42,6 +42,7 @@ const mockRendererConfig: RendererConfig = {
   sanitizeType: RehypeSanitizeType.RECOMMENDED,
   drawioUri: '',
   plantumlUri: '',
+  plantumlHttpMethod: 'get',
 };
 
 describe('PageContentRenderer', () => {

@@ -2,7 +2,8 @@
  * Integration test — update-page must emit the update activity BEFORE the
  * response is sent, so the settled activity row keeps its operator (`user`).
  *
- * Root cause this guards against (see update-page.ts > generateUpdateActivity):
+ * Root cause this guards against (see emitPageUpdateActivity in
+ * service/page-save/page-notifications.ts):
  *   The activity's request context (userId / ip / endpoint / username) lives in
  *   the process-local `pendingActivityContext`, keyed by the pre-minted id, and
  *   `registerFailsafeFinalizer` clears that entry on the `res` 'finish'/'close'
@@ -21,7 +22,7 @@
  * the fix it is GREEN.
  *
  * Path under test (real, unmocked emit/listener/settle/prisma): the REAL
- * update-page terminal handler -> generateUpdateActivity -> shouldGenerateUpdate
+ * update-page terminal handler -> emitPageUpdateActivity -> shouldGenerateUpdate
  * -> crowi.events.activity.emit('update') -> the REAL ActivityService listener
  * -> pendingActivityContext.take -> settleActivityRecord ->
  * prisma.activities.createByParameters. Only the page-persistence collaborators
