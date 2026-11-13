@@ -247,7 +247,8 @@ type PlantUmlViewerProps = {
 ```
 - **送信先は `useRendererConfig().plantumlUri` から取る**。要素の属性からは取らない。`plantuml` タグと属性は rehype-sanitize で許可されているので、ページの作者も書けてしまうため。`useRendererConfig` は通常ページ・共有リンクページ・エディタのプレビューのどれでも、レンダラを作るときに使われている。
 - **GET**（`src` がある）: `<img src>`。`onLoad` で成功。`onError` で失敗とし、`src.length >= PLANTUML_GET_URL_LIKELY_TOO_LONG` なら理由を `url-too-long`、そうでなければ `render-failed` にする。
-- **POST**（`source` がある）: 表示時に `fetchPlantumlSvg` を呼ぶ。成功なら、受け取った data URL を `<img>` に入れる。古いソースの結果が後から返ってきたら捨てる。失敗なら、結果の理由（`post-unavailable` か `render-failed`）でエラーにする。`<img>` の `onError` は `render-failed`。
+- **方式の選び方**: `useRendererConfig()` の `plantumlHttpMethod` が `'post'`、かつ `plantumlUri` が空でなく、かつ `source` があるときだけ POST にする。それ以外は、`src` があれば GET、どちらも無ければ何も描かない（外側の描画中ステータスの要素も作らない）。`source` は rehype-sanitize の許可リストを通るので、ページの作者が手書きでき、プラグインが作った要素と区別できない。そのため、`source` の有無だけで方式を決めない（GET の環境で POST が飛ぶ、送信先が空のときにページ相対のパスへ POST が飛ぶ、のを防ぐ）。
+- **POST**（上の条件を満たす）: 表示時に `fetchPlantumlSvg` を呼ぶ。成功なら、受け取った data URL を `<img>` に入れる。取得中は、直前に成功した図があればそれを表示し続ける（エディタのプレビューで、ソースが変わるたびに図が消えて下の本文がずれるのを防ぐ。GET は新しい画像が届くまで古い画像を表示し続けるのと同じ）。古いソースの結果が後から返ってきたら捨てる。失敗なら、結果の理由（`post-unavailable` か `render-failed`）でエラーにする。`<img>` の `onError` は `render-failed`。
 - **エラー表示**: 画像の代わりに、`t('plantuml.<理由>')` のメッセージを図の位置に出す。他の図や本文には影響しない。
 - **コンソール警告**: `loggerFactory('growi:features:plantuml:PlantUmlViewer')` で、理由・方式・大きさ（GET は `src.length`、POST はソースの長さ、POST の場合は応答ステータスも）を `warn` で出す。
 - **描画中ステータス**: 成功・失敗・取得失敗のどの場合も `GROWI_IS_CONTENT_RENDERING_ATTR` を `'false'` にする。
@@ -310,6 +311,8 @@ GET で構文エラーの SVG（ステータス 400）を `<img>` が表示す�
   - `logger.warn` が呼ばれる。
   - 複数の Viewer のうち1つが失敗しても、他は表示される。
   - 送信先は `useRendererConfig` の値を使い、要素の属性は使わない。
+  - 方式が GET の設定で `source` だけの要素 → 送信せず何も描かない。送信先が空で `source` がある → 送信せず何も描かない。
+  - POST でソースが変わったとき、新しい結果が届くまで古い図を表示し続け、古いソースの結果が後から届いても捨てる。
 - `PageContentRenderer.spec.tsx` ほか `RendererConfig` のモックに `plantumlHttpMethod` を追加する。`config-definition` のキー一覧のテストを更新する。
 
 ### 実測・手動確認

@@ -8,6 +8,7 @@ import React, {
 import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import { useTranslation } from 'next-i18next';
 
+import type { RendererConfig } from '~/interfaces/services/renderer';
 import { useRendererConfig } from '~/states/server-configurations';
 import loggerFactory from '~/utils/logger';
 
@@ -77,12 +78,19 @@ const GetDiagram = ({
 
 type PostOutcome = { dataUrl: string } | { reason: PlantUmlErrorReason };
 
+// The last outcome that arrived, with the request it belongs to.
+type SettledPost = {
+  plantumlUri: string;
+  source: string;
+  outcome: PostOutcome;
+};
+
 const usePostOutcome = (
   plantumlUri: string,
   source: string,
   onSettled: () => void,
 ): PostOutcome | null => {
-  const [outcome, setOutcome] = useState<PostOutcome | null>(null);
+  const [settled, setSettled] = useState<SettledPost | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,7 +100,11 @@ const usePostOutcome = (
         return;
       }
       if (result.ok) {
-        setOutcome({ dataUrl: result.dataUrl });
+        setSettled({
+          plantumlUri,
+          source,
+          outcome: { dataUrl: result.dataUrl },
+        });
         return;
       }
       const { reason, status } = result;
@@ -100,27 +112,35 @@ const usePostOutcome = (
         { reason, method: 'post', sourceLength: source.length, status },
         WARN_MESSAGE,
       );
-      setOutcome({ reason });
+      setSettled({ plantumlUri, source, outcome: { reason } });
       // No <img> is created, so onLoad/onError will never settle the status.
       onSettled();
     });
 
     return () => {
       cancelled = true;
-      // Another source must never show this outcome.
-      setOutcome(null);
     };
   }, [plantumlUri, source, onSettled]);
 
-  return outcome;
+  if (settled == null) {
+    return null;
+  }
+  if (settled.plantumlUri === plantumlUri && settled.source === source) {
+    return settled.outcome;
+  }
+  // While a new source loads, keep the previous diagram on screen like GET's
+  // <img> does, but never a fetch failure that belongs to another source.
+  return 'dataUrl' in settled.outcome ? settled.outcome : null;
 };
 
 const PostDiagram = ({
+  plantumlUri,
   source,
   onSettled,
-}: DiagramProps & { source: string }): JSX.Element | null => {
-  // Never from element attributes: page authors can write those (design.md "PlantUmlViewer — 変更").
-  const { plantumlUri } = useRendererConfig();
+}: DiagramProps & {
+  plantumlUri: string;
+  source: string;
+}): JSX.Element | null => {
   const outcome = usePostOutcome(plantumlUri, source, onSettled);
   const [failedDataUrl, setFailedDataUrl] = useState<string | null>(null);
 
@@ -153,13 +173,23 @@ type PlantUmlViewerProps = {
   source?: string;
 };
 
-// POST wins when both are present, so GET and POST never apply together.
+type DiagramSelection = PlantUmlViewerProps &
+  Pick<RendererConfig, 'plantumlUri' | 'plantumlHttpMethod'>;
+
+// Method and destination come only from the renderer config, never from the
+// element: page authors can hand-write its attributes (design.md "PlantUmlViewer — 変更").
 const selectDiagram = (
-  { src, source }: PlantUmlViewerProps,
+  { src, source, plantumlUri, plantumlHttpMethod }: DiagramSelection,
   onSettled: () => void,
 ): JSX.Element | null => {
-  if (source != null) {
-    return <PostDiagram source={source} onSettled={onSettled} />;
+  if (plantumlHttpMethod === 'post' && plantumlUri !== '' && source != null) {
+    return (
+      <PostDiagram
+        plantumlUri={plantumlUri}
+        source={source}
+        onSettled={onSettled}
+      />
+    );
   }
   if (src != null) {
     return <GetDiagram src={src} onSettled={onSettled} />;
@@ -170,6 +200,7 @@ const selectDiagram = (
 export const PlantUmlViewer = React.memo(
   ({ src, source }: PlantUmlViewerProps): JSX.Element | null => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const { plantumlUri, plantumlHttpMethod } = useRendererConfig();
 
     const markRendered = useCallback(() => {
       containerRef.current?.setAttribute(
@@ -178,7 +209,10 @@ export const PlantUmlViewer = React.memo(
       );
     }, []);
 
-    const diagram = selectDiagram({ src, source }, markRendered);
+    const diagram = selectDiagram(
+      { src, source, plantumlUri, plantumlHttpMethod },
+      markRendered,
+    );
     if (diagram == null) {
       return null;
     }

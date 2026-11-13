@@ -10,6 +10,7 @@ import {
 import { createStore, Provider } from 'jotai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { RendererConfig } from '~/interfaces/services/renderer';
 import { rendererConfigAtom } from '~/states/server-configurations';
 
 import {
@@ -44,18 +45,25 @@ const getRenderingStatus = (container: HTMLElement): string | null =>
     GROWI_IS_CONTENT_RENDERING_ATTR,
   );
 
-const renderWithConfig = (ui: ReactNode) => {
+const renderWithConfig = (
+  ui: ReactNode,
+  config: Partial<RendererConfig> = {},
+) => {
   const store = createStore();
   store.set(rendererConfigAtom, {
     ...store.get(rendererConfigAtom),
     plantumlUri: CONFIGURED_PLANTUML_URI,
-    plantumlHttpMethod: 'post',
+    plantumlHttpMethod: 'get',
+    ...config,
   });
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <Provider store={store}>{children}</Provider>
   );
   return render(ui, { wrapper: Wrapper });
 };
+
+const renderWithPost = (ui: ReactNode) =>
+  renderWithConfig(ui, { plantumlHttpMethod: 'post' });
 
 // Distinct per label, so a test can tell which result is on screen.
 const svgDataUrl = (label: string): string =>
@@ -211,9 +219,69 @@ describe('PlantUmlViewer', () => {
     expect(healthy.getAttribute(GROWI_IS_CONTENT_RENDERING_ATTR)).toBe('false');
   });
 
+  // Page authors can hand-write a source attribute, so it alone must not select POST.
+  describe('choosing between GET and POST', () => {
+    it('should send nothing and render nothing for a source-only element when the method is GET', async () => {
+      const { container } = renderWithConfig(
+        <PlantUmlViewer source={SOURCE} />,
+      );
+
+      await act(async () => {});
+
+      expect(fetchPlantumlSvg).not.toHaveBeenCalled();
+      expect(container.innerHTML).toBe('');
+    });
+
+    it('should show the src image without fetching when the method is GET and both attributes are present', async () => {
+      const src = 'http://example.com/plantuml/svg/abc';
+      const { container } = renderWithConfig(
+        <PlantUmlViewer source={SOURCE} src={src} />,
+      );
+
+      await act(async () => {});
+
+      expect(fetchPlantumlSvg).not.toHaveBeenCalled();
+      expect(container.querySelector('img')?.getAttribute('src')).toBe(src);
+    });
+
+    it('should show the src image without fetching when the method is POST and only src is present', async () => {
+      const src = 'http://example.com/plantuml/svg/abc';
+      const { container } = renderWithPost(<PlantUmlViewer src={src} />);
+
+      await act(async () => {});
+
+      expect(fetchPlantumlSvg).not.toHaveBeenCalled();
+      expect(container.querySelector('img')?.getAttribute('src')).toBe(src);
+    });
+
+    it('should send nothing and render nothing when the method is POST but no destination is configured', async () => {
+      const { container } = renderWithConfig(
+        <PlantUmlViewer source={SOURCE} />,
+        { plantumlHttpMethod: 'post', plantumlUri: '' },
+      );
+
+      await act(async () => {});
+
+      expect(fetchPlantumlSvg).not.toHaveBeenCalled();
+      expect(container.innerHTML).toBe('');
+    });
+
+    it('should fetch the source from the configured destination when the method is POST', async () => {
+      const { container } = renderWithPost(<PlantUmlViewer source={SOURCE} />);
+
+      const img = await findImg(container);
+
+      expect(fetchPlantumlSvg).toHaveBeenCalledWith(
+        CONFIGURED_PLANTUML_URI,
+        SOURCE,
+      );
+      expect(img.getAttribute('src')).toBe(DEFAULT_DATA_URL);
+    });
+  });
+
   describe('POST (source)', () => {
     it('should take the destination only from the renderer config and ignore src', async () => {
-      const { container } = renderWithConfig(
+      const { container } = renderWithPost(
         <PlantUmlViewer
           source={SOURCE}
           src="https://attacker.example.test/svg/abc"
@@ -231,9 +299,7 @@ describe('PlantUmlViewer', () => {
 
     it('should show nothing and keep rendering-status "true" while fetching', () => {
       deferFetch();
-      const { container } = renderWithConfig(
-        <PlantUmlViewer source={SOURCE} />,
-      );
+      const { container } = renderWithPost(<PlantUmlViewer source={SOURCE} />);
 
       expect(container.querySelector('img')).toBeNull();
       expect(screen.queryByText(/^plantuml\./)).toBeNull();
@@ -243,9 +309,7 @@ describe('PlantUmlViewer', () => {
     it('should show the fetched SVG data URL and set rendering-status to "false" after it loads', async () => {
       const dataUrl = svgDataUrl('fetched');
       vi.mocked(fetchPlantumlSvg).mockResolvedValueOnce({ ok: true, dataUrl });
-      const { container } = renderWithConfig(
-        <PlantUmlViewer source={SOURCE} />,
-      );
+      const { container } = renderWithPost(<PlantUmlViewer source={SOURCE} />);
 
       const img = await findImg(container);
       expect(img.getAttribute('src')).toBe(dataUrl);
@@ -258,9 +322,7 @@ describe('PlantUmlViewer', () => {
     });
 
     it('should never show the fetched SVG through a blob URL', async () => {
-      const { container } = renderWithConfig(
-        <PlantUmlViewer source={SOURCE} />,
-      );
+      const { container } = renderWithPost(<PlantUmlViewer source={SOURCE} />);
 
       const img = await findImg(container);
 
@@ -270,8 +332,8 @@ describe('PlantUmlViewer', () => {
       expect(createObjectURL).not.toHaveBeenCalled();
     });
 
-    it('should hide the old diagram while the new source loads, then show the new one', async () => {
-      const { container, rerender } = renderWithConfig(
+    it('should keep showing the old diagram while the new source loads, then show the new one', async () => {
+      const { container, rerender } = renderWithPost(
         <PlantUmlViewer source={SOURCE} />,
       );
       await waitFor(() => {
@@ -283,7 +345,9 @@ describe('PlantUmlViewer', () => {
       const newFetch = deferFetch();
       rerender(<PlantUmlViewer source={`${SOURCE}\n' changed`} />);
 
-      expect(container.querySelector('img')).toBeNull();
+      expect(container.querySelector('img')?.getAttribute('src')).toBe(
+        DEFAULT_DATA_URL,
+      );
 
       const changedDataUrl = svgDataUrl('changed');
       await act(async () => {
@@ -301,7 +365,7 @@ describe('PlantUmlViewer', () => {
         ok: true,
         dataUrl: svgDataUrl('a'),
       });
-      const { container, rerender } = renderWithConfig(
+      const { container, rerender } = renderWithPost(
         <PlantUmlViewer source="a" />,
       );
       await waitFor(() => {
@@ -309,19 +373,26 @@ describe('PlantUmlViewer', () => {
           svgDataUrl('a'),
         );
       });
-      deferFetch();
+      const bFetch = deferFetch();
       const refetch = deferFetch();
 
       rerender(<PlantUmlViewer source="b" />);
       rerender(<PlantUmlViewer source="a" />);
 
-      expect(container.querySelector('img')).toBeNull();
+      expect(container.querySelector('img')?.getAttribute('src')).toBe(
+        svgDataUrl('a'),
+      );
 
       const refetchedDataUrl = svgDataUrl('a refetched');
       await act(async () => {
         refetch.resolve({ ok: true, dataUrl: refetchedDataUrl });
         await refetch.promise;
       });
+      await act(async () => {
+        bFetch.resolve({ ok: true, dataUrl: svgDataUrl('b') });
+        await bFetch.promise;
+      });
+      expect(container.querySelectorAll('img')).toHaveLength(1);
       expect(container.querySelector('img')?.getAttribute('src')).toBe(
         refetchedDataUrl,
       );
@@ -330,7 +401,7 @@ describe('PlantUmlViewer', () => {
     it('should discard a result for an old source that arrives after the source changed', async () => {
       const oldFetch = deferFetch();
       const newFetch = deferFetch();
-      const { container, rerender } = renderWithConfig(
+      const { container, rerender } = renderWithPost(
         <PlantUmlViewer source="old" />,
       );
       rerender(<PlantUmlViewer source="new" />);
@@ -354,7 +425,7 @@ describe('PlantUmlViewer', () => {
     it('should not show a stale failure for an old source', async () => {
       const oldFetch = deferFetch();
       const newFetch = deferFetch();
-      const { container, rerender } = renderWithConfig(
+      const { container, rerender } = renderWithPost(
         <PlantUmlViewer source="old" />,
       );
       rerender(<PlantUmlViewer source="new" />);
@@ -390,7 +461,7 @@ describe('PlantUmlViewer', () => {
           reason,
           status,
         });
-        const { container } = renderWithConfig(
+        const { container } = renderWithPost(
           <PlantUmlViewer source={SOURCE} />,
         );
 
@@ -410,11 +481,37 @@ describe('PlantUmlViewer', () => {
           expect.any(String),
         );
       });
+
+      it('should stop showing the failure as soon as the source changes', async () => {
+        vi.mocked(fetchPlantumlSvg).mockResolvedValueOnce({
+          ok: false,
+          reason: 'post-unavailable',
+        });
+        const { container, rerender } = renderWithPost(
+          <PlantUmlViewer source="a" />,
+        );
+        await screen.findByText('plantuml.post-unavailable');
+        const newFetch = deferFetch();
+
+        rerender(<PlantUmlViewer source="b" />);
+
+        expect(screen.queryByText(/^plantuml\./)).toBeNull();
+        expect(container.querySelector('img')).toBeNull();
+
+        const newDataUrl = svgDataUrl('b');
+        await act(async () => {
+          newFetch.resolve({ ok: true, dataUrl: newDataUrl });
+          await newFetch.promise;
+        });
+        expect(container.querySelector('img')?.getAttribute('src')).toBe(
+          newDataUrl,
+        );
+      });
     });
 
     describe('when the data URL image fails to load', () => {
       it('should show the render-failed message, set rendering-status to "false" and warn', async () => {
-        const { container } = renderWithConfig(
+        const { container } = renderWithPost(
           <PlantUmlViewer source={SOURCE} />,
         );
         const img = await findImg(container);
@@ -435,7 +532,7 @@ describe('PlantUmlViewer', () => {
       });
 
       it('should show the new diagram when the source changes to one with a different SVG', async () => {
-        const { container, rerender } = renderWithConfig(
+        const { container, rerender } = renderWithPost(
           <PlantUmlViewer source={SOURCE} />,
         );
         fireEvent.error(await findImg(container));
@@ -454,7 +551,7 @@ describe('PlantUmlViewer', () => {
 
       // The same data URL is the same bytes, which would fail to load again.
       it('should keep showing the message when the source returns to one whose SVG failed', async () => {
-        const { container, rerender } = renderWithConfig(
+        const { container, rerender } = renderWithPost(
           <PlantUmlViewer source="a" />,
         );
         fireEvent.error(await findImg(container));

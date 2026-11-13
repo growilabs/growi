@@ -1275,7 +1275,7 @@
     }
   },
   "plantuml": {
-    "url-too-long": "図が大きすぎて、PlantUML サーバーの URL 長の上限を超えた可能性があります。図を分割するか、簡略化してください。",
+    "url-too-long": "図が大きすぎて、PlantUML サーバーの URL 長の上限を超えた可能性が高いです。図を分割するか、簡略化してください。",
     "post-unavailable": "PlantUML サーバーが POST に対応していないか、ブラウザから接続できない可能性があります。管理者は PLANTUML_HTTP_METHOD=get を設定すると GET 方式に戻せます。",
     "render-failed": "図を描画できませんでした。PlantUML サーバーに接続できないか、サーバーがエラーを返しました。"
   }
