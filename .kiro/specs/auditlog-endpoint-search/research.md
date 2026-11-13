@@ -83,3 +83,78 @@
   - 「すべて」のときの種類ごとの件数
   - 一覧の API の `ISearchFilter` に足す項目名
 - 依存: PR #12119 のマージ。
+
+---
+
+## Design Discovery（2026-11-13）
+
+### Summary
+- **Feature**: `auditlog-endpoint-search`
+- **Discovery Scope**: Extension（既存の監査ログ画面・一覧 API への追加）
+- **Key Findings**:
+  - Prisma 6.19 の MongoDB コネクタは `findMany` の条件を `$expr` の集約に変換する。`startsWith` は `$regexMatch` になり、**値の正規表現記号をエスケープしない**。
+  - 今の一覧の絞り込み（username・action）も含め、Prisma 経由の一覧クエリは `COLLSCAN` で実行されている。endpoint の条件を足しても、走査の種類は変わらない。
+  - 候補の取得を field ごとに別リクエストにすれば、候補 API の契約（1 つでも失敗したら 500）を変えずに、種類ごとの失敗を見分けられる。
+
+## Research Log
+
+### Prisma の `startsWith` が MongoDB でどう実行されるか
+- **Context**: 一覧の絞り込みを「パス部分の完全一致」にするには、保存値が `<パス>` と等しいか、`<パス>?` で始まるかを判定する必要がある。
+- **Sources Consulted**: 一時的な integ テストで `prisma.activities.findMany` を実行し、MongoDB のプロファイラ（`profile: 2`）で実際に送られたコマンドと実行計画を記録した（テストは確認後に削除）。
+- **Findings**:
+  - `{ endpoint: { in: [...] } }` は `$expr` の `$eq` の `$or`、`{ endpoint: { startsWith: s } }` は `$expr` の `$regexMatch: { regex: "^" + s }` になる。
+  - `s` はエスケープされない。`(` を含む値でクエリ自体が失敗した（`Invalid Regex in $regexMatch: missing closing parenthesis`）。`?` も量指定子として解釈され、`startsWith('/_api/v3/page?')` は `/_api/v3/pag` で始まる値にも一致する。
+  - `escapeStringForMongoRegex(パス) + '\\?'` を渡すと期待どおりに一致した（`/_api/v3/page` と `/_api/v3/page?x=1` に一致し、`/_api/v3/pages` には一致しない。`(` を含むパスも一致した）。
+  - 実行計画は、endpoint の条件の有無にかかわらず `COLLSCAN`。`$expr` で包まれるため、`endpoint_1` インデックスは使われない。
+- **Implications**:
+  - `startsWith` に渡す値は、呼び出し側で `escapeStringForMongoRegex` でエスケープする（`.claude/rules/mongodb-regex.md` の対象）。Prisma が将来エスケープするようになると二重エスケープで一致しなくなるので、この振る舞いを integ テストで固定する。
+  - 一覧の絞り込みの性能は、今と同じ水準（全件走査＋ページング）にとどまる。インデックスを効かせるには `aggregateRaw` などへの書き換えが必要だが、一覧の既存の仕組みを変えることになるため、本 spec では行わない。
+
+### `react-bootstrap-typeahead` 6.3 で種類の違う候補を扱う
+- **Context**: ユーザーと URL の候補を 1 つの入力欄で扱う（要件 3）。
+- **Findings**:
+  - オプションは任意のオブジェクトでよく、`labelKey` を関数にすれば種類ごとに表示を変えられる。`renderMenu` で `Menu.Header` を使った見出し付きの一覧は、既存の `UsernameTypeahead` が既に使っている。`renderToken` で選択済みの値（トークン）の見た目を変えられる。
+  - 既存の `UsernameTypeahead` は全文検索ページとも共有しているので、監査ログ用の変更を入れると全文検索ページに影響する。
+- **Implications**: 監査ログ用の検索欄は新しいコンポーネントとして作り、同じライブラリの同じ API を使う。新しい依存は増えない。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations |
+|---|---|---|---|
+| 既存の `UsernameTypeahead` を汎用化 | URL と種類の切り替えを足す | ファイルが少ない | 全文検索ページに監査ログ固有の機能が入り込む |
+| 監査ログ用の検索欄を新設（採用） | 候補の組み立てを純粋関数に切り出し、コンポーネントは薄くする | 全文検索ページとエクスポートのモーダルに影響しない | 見出し付きの候補一覧を新しく書く |
+
+## Design Decisions
+
+### Decision: 候補は field ごとに別リクエストで取得する
+- **Context**: 要件 4.1（一部の種類だけ失敗したとき、取れた種類は出す）。
+- **Alternatives Considered**:
+  1. 1 リクエストで `field=username&field=endpoint` を送り、サーバーで部分失敗を返す — 候補 API の契約を変える。PR #12119 のレビューで、UI が field を 1 つしか送らない前提で `allSettled` を削った経緯と逆になる。
+  2. field ごとに `useSWRxAuditlogSuggestions` を呼ぶ — 失敗を SWR の `error` で種類ごとに見分けられる。
+- **Selected Approach**: 2。
+- **Trade-offs**: 「すべて」のときはキー入力ごとのリクエストが 2 本になる（入力欄の `delay` で間引かれる）。
+- **Follow-up**: MongoDB フォールバックの失敗は候補 API が空の候補として返す（PR #12119）ので、画面で「取得できなかった」と表示されるのは、リクエスト自体が失敗した場合に限られる。
+
+### Decision: パス部分の完全一致は `in` と、エスケープした `startsWith` の OR で表す
+- **Context**: 要件 2.1〜2.4。
+- **Alternatives Considered**:
+  1. `aggregateRaw` / `findRaw` で `$regex` を直接書く — インデックスを使えるが、一覧の取得の仕組みを Prisma の `findMany` から書き換えることになる。
+  2. 保存時に `?` 以降を除いたパスを別フィールドに持つ — データモデルの変更と既存データの移行が必要。
+  3. `in` と、`escapeStringForMongoRegex` でエスケープした `startsWith('<パス>\\?')` の OR — 既存の `where` の組み立てに収まる。
+- **Selected Approach**: 3。
+- **Trade-offs**: Prisma がエスケープしないという振る舞いに依存する。integ テストで固定する。性能は今の一覧と同じ水準。
+
+### Decision: 「すべて」のときの候補は種類ごとに 5 件まで
+- **Context**: 要件 3.5。
+- **Selected Approach**: field ごとのリクエストの `limit` を 5 にする（`useSWRxAuditlogSuggestions` の既定値と同じ）。種類を 1 つに絞ったときも同じ 5 件にして、定数を 1 つにする。
+- **Rationale**: field ごとにリクエストを分けるので、件数の上限がそのまま種類ごとの上限になる。一方の種類が他方を押し出すことはない。
+
+### Synthesis
+- **Generalization**: 「検索対象の種類」をデータ（`AUDITLOG_SEARCH_SCOPES` の表）で持ち、種類ごとの取得・見出し・トークンの表示をその表から引く。IP を後で足すときは、表に 1 行足して候補の取得を足すだけで済む。ただし、実装するのは今回の要件のユーザーと URL だけにする。
+- **Build vs. Adopt**: 入力欄は既存の `react-bootstrap-typeahead` を使う。新しい依存はない。
+- **Simplification**: 候補 API とサーバー側の候補の検索は変えない。エクスポートのモーダルは既存の `AuditLogUsernameTypeahead` のまま残す。
+
+## Risks & Mitigations
+- Prisma のバージョンアップで `startsWith` がエスケープするようになり、二重エスケープで一致しなくなる — 正規表現の記号を含むパスと `/_api/v3/pages` の除外を確かめる integ テストで検知する。
+- 一覧のクエリが全件走査のまま — 今の username・action の絞り込みと同じ水準。activities は既定で 30 日で消える。改善は本 spec の範囲外。
+- PR #12119 が未マージ — 候補 API の `endpoint` に依存するタスクは、PR #12119 のマージ後に着手する。
