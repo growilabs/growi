@@ -1,11 +1,12 @@
 import { type JSX, useCallback } from 'react';
-import { PagePathLabel, UserPicture } from '@growi/ui/dist/components';
+import { UserPicture } from '@growi/ui/dist/components';
 import { useDebounce } from 'usehooks-ts';
 
 import { useSWRxSearch } from '~/stores/search';
 
 import type { GetItemProps } from '../interfaces/downshift';
 import { SearchMenuItem } from './SearchMenuItem';
+import { SearchResultPagePath } from './SearchResultPagePath';
 
 type Props = {
   activeIndex: number | null;
@@ -67,11 +68,14 @@ export const SearchResultMenuItem = (props: Props): JSX.Element => {
         >
           <UserPicture user={item.data.creator} />
 
-          <span className="ms-3 text-break text-wrap">
-            <PagePathLabel path={item.data.path} />
+          {/* Let the path take the remaining width and shrink below its content
+              size; min-width:0 is what actually enables the 1-line ellipsis
+              inside SearchResultPagePath (no Bootstrap min-width-0 utility). */}
+          <span className="ms-3 flex-grow-1" style={{ minWidth: 0 }}>
+            <SearchResultPagePath path={item.data.path} />
           </span>
 
-          <span className="text-body-tertiary ms-2 d-flex justify-content-center align-items-center">
+          <span className="text-body-tertiary ms-2 d-flex justify-content-center align-items-center flex-shrink-0">
             <span className="material-symbols-outlined fs-6 p-0">
               footprint
             </span>
