@@ -34,11 +34,14 @@ const parseMessage = (v: unknown): ConversationMessage | undefined => {
 
   const postedAt = str(v.postedAt, POSTED_AT_MAX);
   const author = parseChatAccountRef(v.author);
-  const markdown = str(v.markdown, MESSAGE_MARKDOWN_MAX);
+  // Checked by hand, not via `str`: an attachment-only post has an empty body
+  // (see KEEP_MARKDOWN_MAX in parse-command.ts).
+  const { markdown } = v;
 
   return postedAt === undefined ||
     author === undefined ||
-    markdown === undefined
+    typeof markdown !== 'string' ||
+    markdown.length > MESSAGE_MARKDOWN_MAX
     ? undefined
     : { postedAt, author, markdown };
 };

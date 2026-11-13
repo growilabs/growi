@@ -35,10 +35,7 @@ export interface ConversationMessage {
   readonly markdown: string;
 }
 
-/**
- * Names no channel or thread: the proxy looks the place up from its record of
- * the request, so GROWI cannot read an arbitrary conversation.
- */
+/** See design.md (ConversationContract) for why no channel or thread is named. */
 export interface ConversationRequest extends RequestEnvelope {
   readonly op: typeof OP_NAMES.conversation;
   /** The `requestId` of the original `agent` request. */

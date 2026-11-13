@@ -176,7 +176,8 @@ describe('parseConversationResult', () => {
     ['postedAt', { ...message, postedAt: undefined }],
     ['author', { ...message, author: undefined }],
     ['markdown', { ...message, markdown: undefined }],
-    ['an empty markdown', { ...message, markdown: '' }],
+    ['a numeric markdown', { ...message, markdown: 42 }],
+    ['a null markdown', { ...message, markdown: null }],
     [
       'an unknown author platform',
       { ...message, author: { ...message.author, platform: 'irc' } },
@@ -187,6 +188,26 @@ describe('parseConversationResult', () => {
     ],
   ])('rejects a message with %s missing or invalid', (_label, bad) => {
     rejectsResult({ ...success, messages: [message, bad] });
+  });
+
+  it('round-trips a message whose markdown is empty (attachment-only post)', () => {
+    const raw = {
+      ...success,
+      messages: [{ ...message, markdown: '' }, message],
+    };
+    expect(parseConversationResult(raw)).toEqual(raw);
+  });
+
+  it('drops fields the sender added to a success and to its messages', () => {
+    const raw = {
+      ...success,
+      extra: 'x',
+      messages: [{ ...message, extra: 'y' }],
+    };
+    expect(parseConversationResult(raw)).toEqual({
+      ...success,
+      messages: [message],
+    });
   });
 
   describe('size limits', () => {
