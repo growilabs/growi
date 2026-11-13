@@ -13,7 +13,7 @@
 >
 > **i18n**: 新しい文言は、この spec の中で 5 言語すべてを訳す（タスク 1.4）。操作の種類・操作の状態・全体の状態・理由・戻せない理由の言葉（`change_proposal.*`）は core が足したものを使い、本計画では足さない。`lint:i18n` の baseline は引き上げない。キーを足した時点ではまだコードから使われていないため、`lint:i18n` を通すことは、キーを使う部品がそろったあとのタスク 7.3 で確かめる。
 
-- [ ] 1. 土台: 型・定数・action・共通の値・翻訳のキー
+- [x] 1. 土台: 型・定数・action・共通の値・翻訳のキー
 - [x] 1.1 頼む通知の型と、viewer の定数と、2 つの barrel を用意する
   - 頼む通知の要求の形、通知の snapshot の形、一言の長さの上限（500 文字）、同じ人が送れる間隔（24 時間）を、server と client の両方から import できる場所に宣言する
   - 頼む通知の型は `interfaces/revert-request.ts` に置き、core のタスク 1.1 が作った `interfaces/index.ts` の barrel に `export * from './revert-request'` の 1 行を足す。viewer がこの barrel に加える変更は、この 1 行だけにする
@@ -38,7 +38,7 @@
   - 足したすべてのキーが 5 言語の 3 つのファイルにそろっていることを確かめている（`lint:i18n` を通すことは 7.3 で確かめる）
   - _Requirements: 1.2, 9.8, 10.4_
 
-- [ ] 2. 表示の判断の純関数（グループ 1 の 1.1・1.2・1.4 だけに依存し、1.3 を待たない）
+- [x] 2. 表示の判断の純関数（グループ 1 の 1.1・1.2・1.4 だけに依存し、1.3 を待たない）
 - [x] 2.1 (P) 入口から翻訳のキーへの対応の表を作る
   - 入口について、値をキーにした表を作る。core の値が増えたときに型の検査で表の不足が分かる形にする。操作の種類・操作の状態・全体の状態・理由・戻せない理由の表は core の `client/shared/` のものを使い、viewer では作らない
   - この表から実行時に決まるキーを、`i18next.config.ts` の `extract.preservePatterns` に 1 つずつ書く（`*` は使わない）。core の表のキーの分は core が書くので、ここでは書かない
@@ -67,7 +67,7 @@
   - _Requirements: 3.9, 3.10_
   - _Boundary: Viewer Pure Functions (derive-revert-progress)_
 
-- [ ] 3. 取得と送信の hook
+- [x] 3. 取得と送信の hook
 - [x] 3.1 (P) リビジョンの印を取る hook を作る
   - 渡されたリビジョンの ID を 100 件ずつに分けて core のリビジョンの印の API に送り、結果をまとめて返す。ID が無い（ゲスト・共有リンク）か空のときは問い合わせない
   - 取得中と失敗のときは空の印を返し、画面の表示を止めない（suspense を使わない）。取り消しのあとに、すべての印を一斉に取り直す関数を用意する
@@ -103,7 +103,7 @@
   - _Boundary: use-revert-progress_
   - _Depends: 2.5, 3.2, 3.4_
 
-- [ ] 4. 頼む通知の server の処理（client のグループ 2・3 と並行してよい）
+- [x] 4. 頼む通知の server の処理（client のグループ 2・3 と並行してよい）
 - [x] 4.1 (P) 頼む通知を送るサービスを作る
   - サービスは、core の router から渡る `getService`（core の `GetChangeProposalService`。`server/routes/read-access.ts`）を引数で受け取り、`getService().getForViewer(proposalId, sender)` で見られるかどうかを決める。`getForViewer` は core の server の barrel が export する関数ではなくサービスの関数なので、サービスを自分で作らない
   - 見られるかどうかを core の 1 件の取得（見る人ごとの絞り込み）だけで決め、見られなければ「見つからない」を返す。操作の中身は読まない
@@ -122,7 +122,7 @@
   - _Requirements: 4.3, 4.10, 4.11_
   - _Depends: 4.1_
 
-- [ ] 5. viewer の画面の部品
+- [x] 5. viewer の画面の部品
 - [x] 5.1 (P) 印の部品と、今の版の印の部品を作る
   - 印が取り消しで作られたものかどうかで「取り消し」と「Change Proposal」の印を選び、詳細ページへのリンクにする。tooltip は ref で指す
   - 今の版の印の部品は、ページの情報の今のリビジョンの ID を 1 件だけ印の hook に渡す。ゲストと共有リンクでは問い合わせない
@@ -211,7 +211,7 @@
   - _Boundary: ProposalProgressLabel, PerPageNotificationsLabel, ProposalLinkChips, RemainingOperationsList_
   - _Depends: 5.8, 5.11_
 
-- [ ] 6. 既存の画面への組み込み
+- [x] 6. 既存の画面への組み込み
 - [x] 6.1 (P) Recent Changes に印と一覧へのリンクを足す
   - 一覧を読んだ 1 回分（20 件）ごとに、その行の今のリビジョンの ID を印の hook に渡す。ゲストのときは渡さない。行のタイトルの横（WIP の印の隣）に印を出す
   - 見出しに、書き込み機能が有効なときだけ一覧へのリンクを出す。一覧の取得の hook、並び順、続きの読み込みは変えない
@@ -238,7 +238,7 @@
   - _Boundary: ModelNotification index_
   - _Depends: 5.9_
 
-- [ ] 7. 全体の確認
+- [x] 7. 全体の確認
 - [x] 7.1 viewer が持つ部分で、見えないページの存在が分からないことを確かめる
   - core の API の絞り込みそのものは core の tasks.md のタスク 8.3 と、本計画の 8.4 の結合テストが確かめるので、ここでは viewer が持つ部分だけを確かめる
   - 結合テスト（server）: 一部のページだけを閲覧できる人が頼む通知を送ったとき、見えない操作の状態をいくつか変えても、応答の状態・code・本文と、依頼した人に届く通知の中身が変わらないこと
@@ -257,7 +257,7 @@
   - Recent Changes・ページ履歴・作者の表示・通知の既存のテストが変更なしで通っていることを確かめている
   - _Requirements: 6.4, 10.4_
 
-- [ ] 8. core の変更: ページがもう無い操作の見え方とパス（core の要件 6.7・9.11・9.12・9.13。決まりは core の design と、research.md の決定「ページがもう無い操作は、取り消しの相手にも見せる」「編集の操作のパスは、反映したときに操作の記録に残す」にある）
+- [x] 8. core の変更: ページがもう無い操作の見え方とパス（core の要件 6.7・9.11・9.12・9.13。決まりは core の design と、research.md の決定「ページがもう無い操作は、取り消しの相手にも見せる」「編集の操作のパスは、反映したときに操作の記録に残す」にある）
 - [x] 8.1 (P) 見え方の純関数に、取り消しの相手の扱いを足す
   - `server/domain/select-visible-operations.ts` の `VisibilityOperationFacts` に `revertedByProposalId` を、`VisibilityContext` に `isOriginalRequester`（見ている取り消しの Change Proposal の元を、見る人が依頼した）と `revertProposalIdsByViewer`（見る人が依頼した取り消しの Change Proposal の ID の集合）を足す
   - 対象のページが `deletedPageIds` に入る操作は、依頼した人に返し、取り消しの相手（`isOriginalRequester` が真、または操作の `revertedByProposalId` が `revertProposalIdsByViewer` に入る）には、状態が反映済み・取り消し済み・取り消しを断られたのときだけ返す。まだページが無い新規作成（ページの ID が無い）は、今のまま依頼した人にだけ返す
