@@ -16,7 +16,10 @@ import {
   type PageDeletePermissionServices,
 } from './page-delete-permission';
 
-export type ViewablePages = Omit<VisibilityContext, 'isRequester'> & {
+export type ViewablePages = Omit<
+  VisibilityContext,
+  'isRequester' | 'isOriginalRequester' | 'revertProposalIdsByViewer'
+> & {
   readonly pages: ReadonlyMap<string, HydratedDocument<PageDocument>>;
 };
 

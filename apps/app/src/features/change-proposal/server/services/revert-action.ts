@@ -18,7 +18,6 @@ import {
   judgeRevertability,
   type RevertibleOperationFacts,
   selectVisibleOperations,
-  targetPageIdOf,
 } from '../domain';
 import type {
   RevertTargets,
@@ -40,6 +39,8 @@ import {
 import type { PageDeletePermissionServices } from './page-delete-permission';
 import { isRequesterAllowed } from './pre-write-checks';
 import type { ProposalApplier } from './proposal-applier';
+import { contextFor, pageIdsOf } from './proposal-view-parts';
+import { NO_REVERT_COUNTERPART } from './revert-counterparts';
 import { toRevertRefusalReason } from './to-original-operation-change';
 
 const logger = loggerFactory(
@@ -102,17 +103,20 @@ const readVisibleOperations = async (
   readonly visible: readonly OperationRecord[];
   readonly viewable: ViewablePages;
 }> => {
-  const pageIds = proposal.operations.flatMap((op) => {
-    const pageId = targetPageIdOf(op);
-    return pageId == null ? [] : [pageId];
-  });
-  const viewable = await loadViewablePages(pageIds, user);
-  const visible = selectVisibleOperations(proposal.operations, {
-    isRequester: proposal.requester === user._id.toString(),
-    viewablePageIds: viewable.viewablePageIds,
-    anyoneWithLinkPageIds: viewable.anyoneWithLinkPageIds,
-    deletedPageIds: viewable.deletedPageIds,
-  });
+  const viewable = await loadViewablePages(
+    pageIdsOf(proposal.operations),
+    user,
+  );
+  // Empty counterpart values: operations shown only to a revert counterpart are never revert targets.
+  const visible = selectVisibleOperations(
+    proposal.operations,
+    contextFor(
+      proposal.requester,
+      user._id.toString(),
+      viewable,
+      NO_REVERT_COUNTERPART,
+    ),
+  );
   return { visible, viewable };
 };
 

@@ -73,7 +73,8 @@ export type ChangeProposalSummaryView = Omit<
   ChangeProposalView,
   'operations' | 'basedOn'
 > & {
-  readonly pages: readonly { readonly id: string; readonly path: string }[];
+  // path is absent for a page that no longer exists and has no recorded path
+  readonly pages: readonly { readonly id: string; readonly path?: string }[];
 };
 
 export type RevisionMarkView = {

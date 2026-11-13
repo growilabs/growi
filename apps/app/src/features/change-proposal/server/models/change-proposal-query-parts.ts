@@ -10,6 +10,7 @@ import type {
   OriginalOperationChange,
   RecordedOutcome,
   RequesterWriteResult,
+  RevertCounterpartRecord,
 } from './change-proposal-types';
 import {
   toBasedOn,
@@ -152,6 +153,9 @@ export const toOutcomeData = (
         ...(outcome.resultRevisionId == null
           ? {}
           : { resultRevisionId: outcome.resultRevisionId }),
+        ...(outcome.appliedPagePath == null
+          ? {}
+          : { path: outcome.appliedPagePath }),
       };
     case 'pending':
       return { reason: outcome.reason, approvedAt: { unset: true } };
@@ -183,6 +187,7 @@ export const toLinkedProposalRecord = (row: {
     status: string;
     pageId: string | null;
     resultPageId: string | null;
+    revertedByProposalId: string | null;
   }[];
 }): LinkedProposalRecord => {
   if (row.basedOn == null) {
@@ -199,9 +204,26 @@ export const toLinkedProposalRecord = (row: {
       status: toOperationStatus(op.status),
       ...(op.pageId == null ? {} : { pageId: op.pageId }),
       ...(op.resultPageId == null ? {} : { resultPageId: op.resultPageId }),
+      ...(op.revertedByProposalId == null
+        ? {}
+        : { revertedByProposalId: op.revertedByProposalId }),
     })),
   };
 };
+
+export const toRevertCounterpartRecord = (row: {
+  id: string;
+  requester: string;
+  operations: { key: string; type: string; path: string | null }[];
+}): RevertCounterpartRecord => ({
+  id: row.id,
+  requester: row.requester,
+  operations: row.operations.map((op) => ({
+    key: op.key,
+    type: toOperationType(op.type),
+    ...(op.path == null ? {} : { path: op.path }),
+  })),
+});
 
 // Tells why a requester-scoped conditional write matched nothing.
 export const toRequesterWriteMiss = (

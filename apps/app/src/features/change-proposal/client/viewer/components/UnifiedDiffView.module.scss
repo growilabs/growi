@@ -1,0 +1,8 @@
+.unified-diff-view {
+  table-layout: fixed;
+
+  // Keep the line number column in place while the diff scrolls sideways.
+  :global(.d2h-wrapper) {
+    position: relative;
+  }
+}

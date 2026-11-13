@@ -177,7 +177,10 @@ describe('ProposalApplier.apply lease handling', () => {
     });
     expect(await markedRevisions(proposal._id, op.key)).toHaveLength(1);
     const after = await reload(proposal._id);
-    expect(after.operations[0].status).toBe('applied');
+    expect(after.operations[0]).toMatchObject({
+      status: 'applied',
+      appliedPagePath: page.path,
+    });
     expect(after.appliedPageIds).toEqual([page._id.toString()]);
     expect(after.lastAppliedAt).toBeInstanceOf(Date);
     expect(after.lifecycle).toBe('settled');

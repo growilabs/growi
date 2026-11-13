@@ -1,6 +1,8 @@
 import type { IUserHasId } from '@growi/core';
 import mongoose from 'mongoose';
 
+import { prisma } from '~/utils/prisma';
+
 import type {
   ChangeProposalDocument,
   ChangeProposalView,
@@ -15,6 +17,13 @@ import {
   type VisibilityOperationFacts,
 } from '../domain';
 import type { ViewablePages } from './current-page-facts';
+import {
+  type RevertCounterpartFacts,
+  type RevertCounterpartSource,
+  type RevertCounterpartValues,
+  revertCounterpartFactsOf,
+  revertCounterpartIdsOf,
+} from './revert-counterparts';
 
 export type RequesterView = ChangeProposalView['requester'];
 
@@ -54,12 +63,34 @@ export const contextFor = (
   requesterId: string,
   viewerId: string,
   viewable: ViewablePages,
+  counterpart: RevertCounterpartValues,
 ): VisibilityContext => ({
   isRequester: requesterId === viewerId,
+  isOriginalRequester: counterpart.isOriginalRequester,
+  revertProposalIdsByViewer: counterpart.revertProposalIdsByViewer,
   viewablePageIds: viewable.viewablePageIds,
   anyoneWithLinkPageIds: viewable.anyoneWithLinkPageIds,
   deletedPageIds: viewable.deletedPageIds,
 });
+
+/**
+ * Reads the revert counterparts of every proposal about to be filtered in one
+ * query, then answers each proposal's counterpart values and create paths.
+ */
+export const loadRevertCounterparts = async (
+  proposals: readonly RevertCounterpartSource[],
+  viewerId: string,
+  deletedPageIds: ReadonlySet<string>,
+): Promise<(proposal: RevertCounterpartSource) => RevertCounterpartFacts> => {
+  const ids = revertCounterpartIdsOf(proposals, deletedPageIds);
+  const records =
+    ids.length === 0
+      ? []
+      : await prisma.changeproposals.findRevertCounterparts(ids);
+  const byId = new Map(records.map((record) => [record.id, record]));
+  return (proposal) =>
+    revertCounterpartFactsOf(proposal, viewerId, byId, deletedPageIds);
+};
 
 // The newest appliedAt among the returned operations; the stored value may come
 // from an operation the viewer must not learn about (requirement 9.10).

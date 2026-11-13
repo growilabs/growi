@@ -1181,6 +1181,7 @@
     "CHANGE_PROPOSAL_CREATE": "Change Proposal 생성",
     "CHANGE_PROPOSAL_APPLY": "Change Proposal 반영",
     "CHANGE_PROPOSAL_REVERT": "Change Proposal 되돌리기",
+    "CHANGE_PROPOSAL_REVERT_REQUEST": "Change Proposal 되돌리기 요청",
     "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "Change Proposal 설정 업데이트",
     "ADMIN_SITE_URL_UPDATE": "사이트 URL 설정 업데이트",
     "ADMIN_MAIL_SMTP_UPDATE": "이메일(SMTP) 설정 업데이트",

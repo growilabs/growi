@@ -145,6 +145,21 @@ export default defineConfig({
       'change_proposal.lifecycle.*',
       'change_proposal.link.*',
       'change_proposal.achievement.*',
+      // Keys are built at runtime from features/change-proposal/client/viewer/domain/entry-labels.ts.
+      // Enumerated, not `change_proposal_viewer.entry.*`: the same prefix
+      // family also has static `t()` call sites.
+      'change_proposal_viewer.entry.ai_chat',
+      'change_proposal_viewer.entry.vault',
+      'change_proposal_viewer.entry.mcp',
+      'change_proposal_viewer.entry.revert',
+      // Keys are built at runtime from features/change-proposal/client/viewer/components/detail/RevertRequestModal.tsx.
+      'change_proposal_viewer.revert_request.result.sent',
+      'change_proposal_viewer.revert_request.result.not_found',
+      'change_proposal_viewer.revert_request.result.too_long',
+      'change_proposal_viewer.revert_request.result.recently_sent',
+      'change_proposal_viewer.revert_request.result.own_proposal',
+      'change_proposal_viewer.revert_request.result.requester_unavailable',
+      'change_proposal_viewer.revert_request.result.error',
     ],
 
     primaryLanguage: 'en_US',

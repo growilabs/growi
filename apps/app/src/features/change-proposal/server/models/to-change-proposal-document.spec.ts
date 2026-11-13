@@ -107,6 +107,36 @@ describe('toChangeProposalDocument', () => {
     ]);
   });
 
+  it('reads the path stored on an applied edit as the page path at apply time', () => {
+    const doc = toChangeProposalDocument(
+      proposalRow({
+        operations: [
+          operationRow({
+            type: 'edit',
+            status: 'applied',
+            pageId: PAGE_ID,
+            baseRevisionId: REVISION_ID,
+            body: 'new body',
+            path: '/applied/日本語　パス',
+          }),
+        ],
+      }),
+    );
+
+    expect(doc.operations).toStrictEqual([
+      {
+        type: 'edit',
+        pageId: PAGE_ID,
+        baseRevisionId: REVISION_ID,
+        body: 'new body',
+        index: 0,
+        key: 'k-0',
+        status: 'applied',
+        appliedPagePath: '/applied/日本語　パス',
+      },
+    ]);
+  });
+
   it('maps a create operation', () => {
     const doc = toChangeProposalDocument(
       proposalRow({
@@ -366,6 +396,46 @@ describe('toChangeProposalSummary', () => {
         baseRevisionId: REVISION_ID,
         index: 0,
         key: 'k-0',
+        status: 'pending',
+      },
+    ]);
+  });
+
+  it('reads the path stored on an edit as appliedPagePath and keeps a create path as its target path', () => {
+    const { body: _editBody, ...editWithoutBody } = operationRow({
+      type: 'edit',
+      status: 'applied',
+      pageId: PAGE_ID,
+      baseRevisionId: REVISION_ID,
+      path: '/applied',
+    });
+    const { body: _createBody, ...createWithoutBody } = operationRow({
+      index: 1,
+      key: 'k-1',
+      type: 'create',
+      path: '/new',
+    });
+
+    const summary = toChangeProposalSummary({
+      ...proposalRow({}),
+      operations: [editWithoutBody, createWithoutBody],
+    });
+
+    expect(summary.operations).toStrictEqual([
+      {
+        type: 'edit',
+        pageId: PAGE_ID,
+        baseRevisionId: REVISION_ID,
+        index: 0,
+        key: 'k-0',
+        status: 'applied',
+        appliedPagePath: '/applied',
+      },
+      {
+        type: 'create',
+        path: '/new',
+        index: 1,
+        key: 'k-1',
         status: 'pending',
       },
     ]);

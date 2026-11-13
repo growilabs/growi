@@ -1236,5 +1236,89 @@
     "achievement": {
       "settled_with_percent": "已完成（完成度 {{percent}}%）"
     }
+  },
+  "change_proposal_viewer": {
+    "entry": {
+      "ai_chat": "AI 聊天",
+      "vault": "Vault",
+      "mcp": "MCP",
+      "revert": "撤销"
+    },
+    "mark": {
+      "change_proposal": "Change Proposal",
+      "revert": "撤销",
+      "tooltip": {
+        "change_proposal": "由 Change Proposal 所做的更改",
+        "revert": "通过撤销 Change Proposal 所做的更改"
+      }
+    },
+    "list": {
+      "title": "Change Proposal",
+      "tab": {
+        "mine": "我的 Change Proposal",
+        "applied": "已反映"
+      },
+      "empty": "没有 Change Proposal",
+      "load_more": "加载更多",
+      "show_more_pages": "显示更多",
+      "no_more": "没有更多了",
+      "error": "无法加载列表"
+    },
+    "detail": {
+      "not_found": "未找到该 Change Proposal",
+      "error": "无法加载 Change Proposal",
+      "requested_by": "请求者",
+      "entry": "入口",
+      "model": "模型",
+      "created_at": "创建时间",
+      "last_applied_at": "最后反映时间",
+      "reverts": "撤销的对象",
+      "operations": "操作"
+    },
+    "remaining_operations": {
+      "title": "未反映的操作"
+    },
+    "per_page_notifications": {
+      "enabled": "逐页通知：发送",
+      "disabled": "逐页通知：不发送"
+    },
+    "operation": {
+      "page_gone": "该页面已不存在",
+      "revertible": "可以撤销",
+      "reverted_by": "撤销它的 Change Proposal",
+      "show_diff": "显示差异",
+      "hide_diff": "隐藏差异",
+      "diff_unavailable": "无法显示差异",
+      "diff_loading": "正在加载差异"
+    },
+    "revert_all": {
+      "button": "撤销所有可撤销的操作",
+      "confirm_title": "要撤销以下页面吗？",
+      "confirm_description": "将撤销以下页面。",
+      "confirm_submit": "撤销",
+      "error": "撤销失败",
+      "result_title": "撤销结果"
+    },
+    "revert_result": {
+      "in_progress": "处理中",
+      "not_targeted": "未包含在撤销中",
+      "timed_out": "撤销仍在服务器上进行。请稍后重新加载此页面查看结果。"
+    },
+    "revert_request": {
+      "button": "请请求者撤销",
+      "modal_title": "请请求者撤销此 Change Proposal",
+      "message_label": "留言（可选）",
+      "message_too_long": "留言过长",
+      "submit": "发送请求",
+      "result": {
+        "sent": "请求已发送",
+        "not_found": "未找到该 Change Proposal",
+        "too_long": "留言过长",
+        "recently_sent": "刚刚已发送过请求。请稍后再试。",
+        "own_proposal": "无法对自己的 Change Proposal 发送请求",
+        "requester_unavailable": "无法向请求者发送通知",
+        "error": "发送请求失败"
+      }
+    }
   }
 }

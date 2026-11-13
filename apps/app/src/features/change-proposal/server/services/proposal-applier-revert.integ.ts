@@ -136,6 +136,11 @@ describe('ProposalApplier.apply writing revert results onto the original operati
       revertedByProposalId: revert._id,
     });
     expect(original.revertedAt).toBeInstanceOf(Date);
+    const [revertKey] = revert.operations.map((op) => op.key);
+    expect(operationOf(await reload(revert._id), revertKey)).toMatchObject({
+      status: 'applied',
+      appliedPagePath: applied.page.path,
+    });
   });
 
   it('marks the original operation reverted when the revert write was already done by an interrupted run', async () => {
@@ -163,6 +168,10 @@ describe('ProposalApplier.apply writing revert results onto the original operati
     expect(await originalOperation(applied)).toMatchObject({
       status: 'reverted',
       revertedByProposalId: revert._id,
+    });
+    expect(operationOf(await reload(revert._id), revertKey)).toMatchObject({
+      status: 'applied',
+      appliedPagePath: applied.page.path,
     });
   });
 

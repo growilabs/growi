@@ -28,7 +28,11 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 `change-proposal-core` の要件の「本要件で使う言い方」と同じ語を使う（Change Proposal、操作、編集・新規作成・移動、元のリビジョン、依頼した人、入口、反映、取り消し、見る人、閲覧できるページ、操作の 7 つの状態）。本 spec で足す言い方は次のとおり。
 
 - **詳細ページ**: 1 件の Change Proposal の中身を表示する画面。
-- **見える操作**: `change-proposal-core` が、見る人に返した操作。見る人が閲覧できるページに対する操作だけが返る。依頼した人以外には、リンクを知る人だけが見られるページの操作は返らない。また依頼した人以外には、状態が「反映済み」「取り消し済み」「取り消しを断られた」のどれかである操作だけが返り、「待ち」「失敗」「古い」「飛ばした」の操作は返らない。そのため依頼した人以外には、全体の状態が「承認待ち」や「一部だけ反映」と表示されることは無い。
+- **見える操作**: `change-proposal-core` が、見る人に返した操作（core の要件の「見る人に返す操作」）。決まりは次のとおり。
+  - 依頼した人には、閲覧できるページに対する操作、まだページが無い新規作成の操作、対象のページが完全に削除されてもう無い操作が返る。
+  - 依頼した人以外には、閲覧できるページ（リンクを知る人だけが見られるページを除く）に対する操作のうち、状態が「反映済み」「取り消し済み」「取り消しを断られた」のどれかである操作だけが返る。「待ち」「失敗」「古い」「飛ばした」の操作は返らない。そのため依頼した人以外には、全体の状態が「承認待ち」や「一部だけ反映」と表示されることは無い。
+  - 対象のページがもう無い操作は、依頼した人のほかに、取り消しの相手にも返る（状態が「反映済み」「取り消し済み」「取り消しを断られた」のものだけ）。取り消しの相手は、元の Change Proposal の操作ではその操作を取り消した人、取り消しの Change Proposal の操作では元の Change Proposal の依頼した人である（core の要件 9.11）。ほかの人には返らない。取り消しの相手に返るのは表示のためで、取り消しの相手が「戻せるものを全部戻す」を押しても、その操作は取り消しの対象にならない（core はその操作に戻せるかどうかの判定を付けない）。
+  - ページがもう無い操作にも、core は操作の記録から決めたパスを付けて返す（新規作成は作るときのパス、移動は移動元と移動先、完全な削除は取り消した元の新規作成のパス、編集は反映した時点のページのパス。core の要件 6.7・9.12・9.13）。一覧の要約のページの一覧にも、同じパスが入る。core がパスを記録する前に反映した編集の操作だけは、ページがもう無いとパスが返らない。そのような操作は、詳細ページでも一覧でも、パスの代わりに「ページはもうありません」と表示する（core の要件の「今の制限」。一覧の要約では、パスの無いページの ID だけの項目として返る）。
 - **戻せるかどうかの判定**: 反映済みの操作について、その時点で取り消せるかどうかと、取り消せない理由。`change-proposal-core` が見る人ごとに決めて返す。本 spec は判定しない。
 - **印**: 既存の画面の行や作者の表示の横に付ける小さな表示。「Change Proposal で作られた」ことを表す印と、「取り消しで作られた」ことを表す印の 2 種類がある。印は詳細ページへのリンクを兼ねる。
 - **今の版**: ページの最新のリビジョン。古い版を表示している間も、ページの最新のリビジョンを指す。
@@ -95,11 +99,11 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 4. The Change Proposal Viewer shall 移動の操作について、移動元のパスと移動先のパスを表示する。
 5. The Change Proposal Viewer shall パスを常に wiki のページのパスで表示し、Vault がファイル名に付ける接尾辞（`__hash8` や `_orphaned/` など）を表示しない。
 6. When 操作の状態が「待ち」「失敗」「古い」「飛ばした」「取り消しを断られた」のいずれかである場合, the Change Proposal Viewer shall その理由を言葉で表示する。
-7. When 操作が反映済みまたは取り消しを断られた状態である場合, the Change Proposal Viewer shall `change-proposal-core` が返した戻せるかどうかの判定を、「戻せる」または戻せない理由（他の人が編集したため戻せない、など）の言葉で表示する。
+7. When `change-proposal-core` が操作に戻せるかどうかの判定を返した場合, the Change Proposal Viewer shall その判定を、「戻せる」または戻せない理由（他の人が編集したため戻せない、など）の言葉で表示する。core が判定を返さない操作（反映済みでも取り消しを断られたでもない操作と、見る人が書き込みを求められない場合（有効なユーザーでない、または読み取り専用ユーザー）のすべての操作）には、戻せるかどうかについて何も表示しない。
 8. The Change Proposal Viewer shall 戻せるかどうかを自分では判定せず、`change-proposal-core` が返した判定だけを表示する。
 9. When 操作が取り消し済みである場合, the Change Proposal Viewer shall その操作を取り消した Change Proposal の詳細ページへのリンクを表示する。
 10. If 見る人が依頼した人でない場合, then the Change Proposal Viewer shall 操作の並び順の番号を表示しない。
-11. If ある操作の差分を取得できなかった場合, then the Change Proposal Viewer shall その操作の差分の部分にだけ「表示できない」と表示し、他の操作と詳細ページの表示を続ける。
+11. If ある操作の差分を取得できなかった場合（対象のページが削除されたか閲覧できず、core がページを返さない場合を含む）, then the Change Proposal Viewer shall その操作の差分の部分にだけ「表示できない」と表示し、他の操作と詳細ページの表示を続ける。
 12. While 操作がまだ反映されていない場合（依頼した人にだけ返る操作）, the Change Proposal Viewer shall 状態と理由だけを表示し、差分と承認の操作を表示しない。
 
 ### Requirement 3: 画面からの取り消し
@@ -115,6 +119,9 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 6. If 取り消しを求めたときに通信に失敗した場合、または「見つからない」が返った場合, then the Change Proposal Viewer shall 詳細ページの表示を変えずに、取り消せなかったことを表示する。
 7. If 見る人が読み取り専用ユーザーである場合、またはログインしていない場合, then the Change Proposal Viewer shall 「戻せるものを全部戻す」ボタンを表示しない。
 8. The Change Proposal Viewer shall 見えない操作がほかにあることを理由に、ボタンを隠したり取り消しを止めたりしない。
+9. While 取り消しを求めた操作の結果がまだ決まっていない場合（`change-proposal-core` が取り消しの Change Proposal を作ったが、取り消しの結果にその操作が入っていない場合）, the Change Proposal Viewer shall 取り消しを求めたすべての操作を、確認のときに並べたパスとともに表示し、結果の決まっていない操作を「処理中」と表示する。
+10. While 「処理中」の操作が残っている場合, the Change Proposal Viewer shall 決まった間隔で取り消しの状態を自動で取り直し、すべての操作の結果が決まったら 3.4 と同じ結果の表示と表示の更新を行う。取り直した状態から、その操作が取り消しの対象に入っていないと分かったとき、または core が取り消しの Change Proposal を作らなかったのに結果にその操作が無いときは、「処理中」にせず、取り消しの対象にならなかったと表示する。決まった時間を過ぎても決まらない操作が残るときは、取り直すのをやめ、「処理はサーバーで続いているので、しばらくしてから再読み込みしてほしい」ことを表示する。
+11. When 取り消しのあとに詳細ページを取り直した場合, the Change Proposal Viewer shall 取り消した操作を、対象のページが完全に削除された場合も、取り消し済みとして core が返したパスとともに表示し続ける。
 
 ### Requirement 4: 本人に戻すよう頼む
 
@@ -186,7 +193,7 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 
 #### Acceptance Criteria
 1. When まとめた通知が反映についてのものである場合, the Change Proposal Viewer shall 依頼した人と、通知の中身にあるページのパスを表示し、その Change Proposal の詳細ページへのリンクにする。
-2. When まとめた通知が取り消しについてのものである場合, the Change Proposal Viewer shall 取り消した人と、通知の中身にあるページのパスを表示し、その取り消しの Change Proposal の詳細ページへのリンクにする。
+2. When まとめた通知が取り消しについてのものである場合, the Change Proposal Viewer shall 取り消した人と、通知の中身にあるページのパスを表示し、通知の中身が指す Change Proposal の詳細ページへのリンクにする。通知の中身が指すのは、ふつうは取り消しの Change Proposal だが、元の Change Proposal の依頼した人が受け取った通知では、元の Change Proposal である（core の要件 7.8）。
 3. When 頼む通知を表示する場合, the Change Proposal Viewer shall 送った人と添えられた一言を表示し、その Change Proposal の詳細ページへのリンクにする。
 4. The Change Proposal Viewer shall 添えられた一言を、書式や HTML として解釈せず、文字のまま表示する。
 5. The Change Proposal Viewer shall 通知に、通知の中身にあるページ以外のページのパスと、操作やページの件数を表示しない。
@@ -196,10 +203,10 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 
 ### Requirement 10: 全体にかかわる約束
 
-**Objective:** wiki を使うすべてのユーザーとして、Change Proposal の画面から、自分が閲覧できないページの存在を知らされたくない。また、自分の言語で画面を使いたい。
+**Objective:** wiki を使うすべてのユーザーとして、Change Proposal の画面から、自分が閲覧できないページの存在を知らされたくない（ただし、ページがもう無い操作を、依頼した人と取り消しの相手に表示する場合は除く）。また、自分の言語で画面を使いたい。
 
 #### Acceptance Criteria
-1. The Change Proposal Viewer shall 本 spec で足す画面・印・通知・エラーのどこにも、見る人が閲覧できないページのパス、タイトル、件数、「ほかにある」こと、存在しない場合との違いを表示しない。
+1. The Change Proposal Viewer shall 本 spec で足す画面・印・通知・エラーのどこにも、見る人が閲覧できないページのパス、タイトル、件数、「ほかにある」こと、存在しない場合との違いを表示しない。ただし、ページがもう無い操作を、依頼した人と取り消しの相手に表示する場合（3.11、core の要件 9.11・9.13）は除く。完全に削除されたページは誰も閲覧できないが、この 2 人にはその操作とパスを表示する。
 2. If ログインしていない人、または共有リンクでページを見ている人がページ履歴・Recent Changes・ページを表示した場合, then the Change Proposal Viewer shall 印を表示せず、印のための問い合わせもしない。
 3. Where 見る人が読み取り専用ユーザーである場合, the Change Proposal Viewer shall 詳細ページ・一覧・印は表示し、取り消しと頼む通知の操作は表示しない。
 4. The Change Proposal Viewer shall 新しく足す文言を、GROWI が対応する 5 言語（英語・日本語・中国語・フランス語・韓国語）すべてで表示する。
@@ -226,7 +233,7 @@ AI や外部の仕組みが Change Proposal で多くのページを書き換え
 1. When core が操作に後続・見直しの Change Proposal を返した場合, the Change Proposal Viewer shall その操作の表示に「後続: #ID」「見直し: #ID」を、それぞれの詳細ページへのリンクとして表示する。
 2. When core が詳細ページの Change Proposal に元の Change Proposal を返した場合, the Change Proposal Viewer shall 詳細ページの見出しに「元: #ID」を、元の詳細ページへのリンクとして表示する。
 3. The Change Proposal Viewer shall core が返したつながりだけを表示し、自分ではつながりを探さない。
-4. The Change Proposal Viewer shall #ID に、core の画面の共通の部品が決める Change Proposal の短い ID を使う。
+4. The Change Proposal Viewer shall #ID に、core の画面の共通の部品が決める Change Proposal の短い ID（先頭の `#` を含む）をそのまま使う。
 
 ### Requirement 13: 本人向けの操作と、反映されなかった操作の一覧
 

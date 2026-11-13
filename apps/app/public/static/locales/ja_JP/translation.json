@@ -1273,5 +1273,89 @@
     "achievement": {
       "settled_with_percent": "完了（達成度 {{percent}}%）"
     }
+  },
+  "change_proposal_viewer": {
+    "entry": {
+      "ai_chat": "AI チャット",
+      "vault": "Vault",
+      "mcp": "MCP",
+      "revert": "取り消し"
+    },
+    "mark": {
+      "change_proposal": "Change Proposal",
+      "revert": "取り消し",
+      "tooltip": {
+        "change_proposal": "Change Proposal による変更",
+        "revert": "Change Proposal を取り消した変更"
+      }
+    },
+    "list": {
+      "title": "Change Proposal",
+      "tab": {
+        "mine": "自分の Change Proposal",
+        "applied": "反映済み"
+      },
+      "empty": "Change Proposal はありません",
+      "load_more": "さらに読み込む",
+      "show_more_pages": "さらに表示",
+      "no_more": "これ以上ありません",
+      "error": "一覧を読み込めませんでした"
+    },
+    "detail": {
+      "not_found": "Change Proposal が見つかりません",
+      "error": "Change Proposal を読み込めませんでした",
+      "requested_by": "依頼した人",
+      "entry": "入口",
+      "model": "モデル",
+      "created_at": "作成日時",
+      "last_applied_at": "最後に反映した日時",
+      "reverts": "取り消し元",
+      "operations": "操作"
+    },
+    "remaining_operations": {
+      "title": "反映されなかった操作"
+    },
+    "per_page_notifications": {
+      "enabled": "ページごとの通知: 出す",
+      "disabled": "ページごとの通知: 出さない"
+    },
+    "operation": {
+      "page_gone": "ページはもうありません",
+      "revertible": "戻せます",
+      "reverted_by": "取り消した Change Proposal",
+      "show_diff": "差分を表示",
+      "hide_diff": "差分を閉じる",
+      "diff_unavailable": "差分を表示できません",
+      "diff_loading": "差分を読み込んでいます"
+    },
+    "revert_all": {
+      "button": "戻せるものを全部戻す",
+      "confirm_title": "次のページを元に戻しますか？",
+      "confirm_description": "次のページを取り消します。",
+      "confirm_submit": "取り消す",
+      "error": "取り消しに失敗しました",
+      "result_title": "取り消しの結果"
+    },
+    "revert_result": {
+      "in_progress": "処理中",
+      "not_targeted": "取り消しの対象になりませんでした",
+      "timed_out": "取り消しはサーバーで続いています。しばらくしてからこのページを再読み込みすると、結果が分かります。"
+    },
+    "revert_request": {
+      "button": "本人に戻すよう頼む",
+      "modal_title": "この Change Proposal を戻すよう本人に頼む",
+      "message_label": "一言（任意）",
+      "message_too_long": "一言が長すぎます",
+      "submit": "頼む通知を送る",
+      "result": {
+        "sent": "頼む通知を送りました",
+        "not_found": "Change Proposal が見つかりません",
+        "too_long": "一言が長すぎます",
+        "recently_sent": "少し前に頼む通知を送りました。しばらくしてからもう一度お試しください。",
+        "own_proposal": "自分の Change Proposal には頼む通知を送れません",
+        "requester_unavailable": "依頼した人には通知を送れません",
+        "error": "頼む通知を送れませんでした"
+      }
+    }
   }
 }

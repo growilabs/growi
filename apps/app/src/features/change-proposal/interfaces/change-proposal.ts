@@ -138,6 +138,8 @@ export type OperationRecord = OperationPayload & {
   readonly appliedAt?: Date;
   readonly resultPageId?: string;
   readonly resultRevisionId?: string;
+  // Edit only: the page path when applied, kept as is after the page moves or is deleted.
+  readonly appliedPagePath?: string;
   readonly revertTarget?: ProposalMark;
   readonly revertedByProposalId?: string;
   readonly revertedAt?: Date;

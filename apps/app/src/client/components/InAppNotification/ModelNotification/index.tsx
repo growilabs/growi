@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import type { HasObjectId } from '@growi/core';
 
+import { useChangeProposalModelNotification } from '~/features/change-proposal/client/viewer/notification';
 import type { IInAppNotification } from '~/interfaces/in-app-notification';
 
 import { useAuditLogBulkExportJobModelNotification } from './AuditLogBulkExportJobModelNotification';
@@ -26,12 +27,15 @@ export const useModelNotification = (
     usePageBulkExportJobModelNotification(notification);
   const auditLogBulkExportJobModelNotificationUtils =
     useAuditLogBulkExportJobModelNotification(notification);
+  const changeProposalModelNotificationUtils =
+    useChangeProposalModelNotification(notification);
 
   const modelNotificationUtils =
     pageModelNotificationUtils ??
     userModelNotificationUtils ??
     pageBulkExportResultModelNotificationUtils ??
-    auditLogBulkExportJobModelNotificationUtils;
+    auditLogBulkExportJobModelNotificationUtils ??
+    changeProposalModelNotificationUtils;
 
   return modelNotificationUtils;
 };

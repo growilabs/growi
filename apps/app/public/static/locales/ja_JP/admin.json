@@ -1180,6 +1180,7 @@
     "CHANGE_PROPOSAL_CREATE": "Change Proposal の作成",
     "CHANGE_PROPOSAL_APPLY": "Change Proposal の反映",
     "CHANGE_PROPOSAL_REVERT": "Change Proposal の取り消し",
+    "CHANGE_PROPOSAL_REVERT_REQUEST": "Change Proposal の取り消し依頼",
     "ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE": "Change Proposal 設定の更新",
     "ADMIN_SITE_URL_UPDATE": "サイトURL設定の更新",
     "ADMIN_MAIL_SMTP_UPDATE": "メール設定（SMTP）の更新",

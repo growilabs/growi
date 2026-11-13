@@ -1237,5 +1237,89 @@
     "achievement": {
       "settled_with_percent": "Terminé ({{percent}} % réalisé)"
     }
+  },
+  "change_proposal_viewer": {
+    "entry": {
+      "ai_chat": "Chat IA",
+      "vault": "Vault",
+      "mcp": "MCP",
+      "revert": "Annulation"
+    },
+    "mark": {
+      "change_proposal": "Change Proposal",
+      "revert": "Annulation",
+      "tooltip": {
+        "change_proposal": "Modifié par un Change Proposal",
+        "revert": "Effectué en annulant un Change Proposal"
+      }
+    },
+    "list": {
+      "title": "Change Proposals",
+      "tab": {
+        "mine": "Mes Change Proposals",
+        "applied": "Appliqués"
+      },
+      "empty": "Aucun Change Proposal",
+      "load_more": "Charger plus",
+      "show_more_pages": "Afficher plus",
+      "no_more": "Il n'y en a plus",
+      "error": "Impossible de charger la liste"
+    },
+    "detail": {
+      "not_found": "Ce Change Proposal est introuvable",
+      "error": "Impossible de charger le Change Proposal",
+      "requested_by": "Demandé par",
+      "entry": "Point d'entrée",
+      "model": "Modèle",
+      "created_at": "Créé le",
+      "last_applied_at": "Dernière application",
+      "reverts": "Annule",
+      "operations": "Modifications"
+    },
+    "remaining_operations": {
+      "title": "Modifications non appliquées"
+    },
+    "per_page_notifications": {
+      "enabled": "Notifications par page : envoyées",
+      "disabled": "Notifications par page : non envoyées"
+    },
+    "operation": {
+      "page_gone": "La page n'existe plus",
+      "revertible": "Peut être annulée",
+      "reverted_by": "Annulée par",
+      "show_diff": "Afficher les différences",
+      "hide_diff": "Masquer les différences",
+      "diff_unavailable": "Impossible d'afficher les différences",
+      "diff_loading": "Chargement des différences"
+    },
+    "revert_all": {
+      "button": "Annuler tout ce qui peut l'être",
+      "confirm_title": "Annuler les modifications de ces pages ?",
+      "confirm_description": "Les modifications des pages suivantes seront annulées.",
+      "confirm_submit": "Confirmer l'annulation",
+      "error": "Échec de l'annulation",
+      "result_title": "Résultat de l'annulation"
+    },
+    "revert_result": {
+      "in_progress": "En cours",
+      "not_targeted": "Non inclus dans l'annulation",
+      "timed_out": "L'annulation est toujours en cours sur le serveur. Rechargez cette page plus tard pour voir le résultat."
+    },
+    "revert_request": {
+      "button": "Demander au demandeur d'annuler",
+      "modal_title": "Demander au demandeur d'annuler ce Change Proposal",
+      "message_label": "Message (facultatif)",
+      "message_too_long": "Le message est trop long",
+      "submit": "Envoyer la demande",
+      "result": {
+        "sent": "La demande a été envoyée",
+        "not_found": "Le Change Proposal est introuvable",
+        "too_long": "Le message est trop long",
+        "recently_sent": "Une demande a été envoyée il y a un instant. Réessayez plus tard.",
+        "own_proposal": "Vous ne pouvez pas envoyer de demande pour votre propre Change Proposal",
+        "requester_unavailable": "Le demandeur ne peut plus recevoir de demandes",
+        "error": "Échec de l'envoi de la demande"
+      }
+    }
   }
 }

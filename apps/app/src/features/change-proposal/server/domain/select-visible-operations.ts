@@ -7,10 +7,15 @@ export type VisibilityOperationFacts = {
   readonly status: OperationStatus;
   readonly pageId?: string;
   readonly resultPageId?: string;
+  readonly revertedByProposalId?: string;
 };
 
 export type VisibilityContext = {
   readonly isRequester: boolean;
+  // The viewed proposal is a revert and the viewer requested its original.
+  readonly isOriginalRequester: boolean;
+  // Revert proposals the viewer requested.
+  readonly revertProposalIdsByViewer: ReadonlySet<string>;
   readonly viewablePageIds: ReadonlySet<string>;
   readonly anyoneWithLinkPageIds: ReadonlySet<string>;
   // Pages that no longer exist at all; viewability cannot be judged for them.
@@ -29,15 +34,31 @@ export const targetPageIdOf = (
   op: VisibilityOperationFacts,
 ): string | undefined => (op.type === 'create' ? op.resultPageId : op.pageId);
 
+const isRevertCounterpart = (
+  op: VisibilityOperationFacts,
+  ctx: VisibilityContext,
+): boolean =>
+  ctx.isOriginalRequester ||
+  (op.revertedByProposalId != null &&
+    ctx.revertProposalIdsByViewer.has(op.revertedByProposalId));
+
 const isVisible = (
   op: VisibilityOperationFacts,
   ctx: VisibilityContext,
 ): boolean => {
   const pageId = targetPageIdOf(op);
 
-  // Like a create with no page yet, only the requester sees it.
-  if (pageId == null || ctx.deletedPageIds.has(pageId)) {
+  if (pageId == null) {
     return ctx.isRequester;
+  }
+  // Who sees an operation on a page that is gone: see research.md's decision
+  // on showing such operations to revert counterparts.
+  if (ctx.deletedPageIds.has(pageId)) {
+    return (
+      ctx.isRequester ||
+      (isRevertCounterpart(op, ctx) &&
+        STATUSES_VISIBLE_TO_OTHERS.has(op.status))
+    );
   }
   if (!ctx.viewablePageIds.has(pageId)) {
     return false;

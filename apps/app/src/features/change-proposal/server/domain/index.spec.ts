@@ -6,6 +6,7 @@ describe('change-proposal domain barrel', () => {
       [
         'buildProposalLinks',
         'buildRevertOperations',
+        'collectCreatedPaths',
         'computeAchievement',
         'deriveProposalStatus',
         'expandApprovalTargets',
@@ -13,6 +14,7 @@ describe('change-proposal domain barrel', () => {
         'isOwnPageForAutoApply',
         'judgeRevertability',
         'planApplyOrder',
+        'recordedPathOf',
         'selectAutoApplyTargets',
         'selectNotifiedPageIds',
         'selectVisibleOperations',
