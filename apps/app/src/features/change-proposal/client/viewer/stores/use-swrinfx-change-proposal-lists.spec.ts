@@ -36,6 +36,17 @@ const wrapper = ({ children }: { children?: ReactNode }) =>
     children,
   );
 
+// One cache for several mounts, like the app's cache across client-side navigation.
+const wrapperSharingCache = () => {
+  const cache = new Map();
+  return ({ children }: { children?: ReactNode }) =>
+    createElement(
+      SWRConfig,
+      { value: { provider: () => cache, dedupingInterval: 0 } },
+      children,
+    );
+};
+
 const summary = (id: string): ChangeProposalSummaryView =>
   mock<ChangeProposalSummaryView>({ id });
 
@@ -82,6 +93,65 @@ describe('useSWRInfxMyChangeProposals', () => {
       await result.current.setSize(3);
     });
     expect(mockedApiv3Get).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('opening a list again with a warm cache', () => {
+  beforeEach(() => {
+    mockedApiv3Get.mockReset();
+  });
+
+  it('refreshes my list that was cached empty before proposals existed', async () => {
+    let items: ChangeProposalSummaryView[] = [];
+    mockedApiv3Get.mockImplementation(async () =>
+      buildResponse({ items, hasNext: false }),
+    );
+    const shared = wrapperSharingCache();
+
+    const first = renderHook(() => useSWRInfxMyChangeProposals(20), {
+      wrapper: shared,
+    });
+    await waitFor(() =>
+      expect(first.result.current.data?.[0].items).toEqual([]),
+    );
+    first.unmount();
+
+    items = [summary('a'), summary('b')];
+    const second = renderHook(() => useSWRInfxMyChangeProposals(20), {
+      wrapper: shared,
+    });
+    await waitFor(() =>
+      expect(second.result.current.data?.[0].items.map((i) => i.id)).toEqual([
+        'a',
+        'b',
+      ]),
+    );
+  });
+
+  it('refreshes the applied list that was cached empty before proposals existed', async () => {
+    let items: ChangeProposalSummaryView[] = [];
+    mockedApiv3Get.mockImplementation(async () =>
+      buildResponse({ items, nextCursor: null }),
+    );
+    const shared = wrapperSharingCache();
+
+    const first = renderHook(() => useSWRInfxAppliedChangeProposals(20), {
+      wrapper: shared,
+    });
+    await waitFor(() =>
+      expect(first.result.current.data?.[0].items).toEqual([]),
+    );
+    first.unmount();
+
+    items = [summary('a')];
+    const second = renderHook(() => useSWRInfxAppliedChangeProposals(20), {
+      wrapper: shared,
+    });
+    await waitFor(() =>
+      expect(second.result.current.data?.[0].items.map((i) => i.id)).toEqual([
+        'a',
+      ]),
+    );
   });
 });
 

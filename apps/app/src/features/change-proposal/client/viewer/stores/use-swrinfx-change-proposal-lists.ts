@@ -20,6 +20,14 @@ export type AppliedProposalsPage = {
   readonly nextCursor: string | null;
 };
 
+// An infinite list keeps its pages in the SWR cache, so a list opened again would show
+// what it held the last time. revalidateOnMount refreshes the cached pages when the
+// list is opened; revalidateFirstPage: false keeps 'load more' from refetching page 1.
+const INFINITE_LIST_OPTIONS = {
+  revalidateFirstPage: false,
+  revalidateOnMount: true,
+} as const;
+
 type MineKey = readonly [typeof MINE_ENDPOINT, number, number];
 type AppliedKey = readonly [typeof APPLIED_ENDPOINT, number, string | null];
 
@@ -53,7 +61,7 @@ export const useSWRInfxMyChangeProposals = (
         ? null
         : [MINE_ENDPOINT, limit, pageIndex + 1],
     fetchMinePage,
-    { revalidateFirstPage: false },
+    INFINITE_LIST_OPTIONS,
   );
 
 export const useSWRInfxAppliedChangeProposals = (
@@ -69,7 +77,7 @@ export const useSWRInfxAppliedChangeProposals = (
         : [APPLIED_ENDPOINT, limit, previous.nextCursor];
     },
     fetchAppliedPage,
-    { revalidateFirstPage: false },
+    INFINITE_LIST_OPTIONS,
   );
 
   const { data, size, setSize, isValidating } = swr;
