@@ -54,6 +54,12 @@ describe('rendererConfig.plantumlHttpMethod', () => {
       'get',
       'get',
     ],
+    [
+      'forced to post with the public server',
+      'https://www.plantuml.com/plantuml',
+      'post',
+      'post',
+    ],
   ])('is resolved from the config (%s)', async (_label, uri, method, expected) => {
     const rendererConfig = await readRendererConfig(
       getServerSideRendererConfigProps,

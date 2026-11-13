@@ -27,10 +27,26 @@ describe('resolvePlantumlHttpMethod', () => {
     });
   });
 
-  describe('configured values other than get are ignored', () => {
+  describe('explicit POST setting', () => {
     it.each([
-      ['post', 'http://localhost:8080/plantuml', 'post'],
-      ['post', 'https://www.plantuml.com/plantuml', 'get'],
+      ['post', 'http://localhost:8080/plantuml'],
+      ['POST', 'https://plantuml.example.com'],
+      ['Post', 'https://www.plantuml.com/plantuml'],
+      ['post', 'https://plantuml.com/plantuml'],
+    ])('returns post for configured %s even with URI %s', (configured, uri) => {
+      expect(resolvePlantumlHttpMethod(uri, configured)).toBe('post');
+    });
+
+    it.each([
+      ['', 'an empty destination'],
+      ['not a url', 'an unparseable destination'],
+    ])('still returns get for %j (%s)', (uri) => {
+      expect(resolvePlantumlHttpMethod(uri, 'post')).toBe('get');
+    });
+  });
+
+  describe('configured values other than get and post are ignored', () => {
+    it.each([
       ['foo', 'http://localhost:8080/plantuml', 'post'],
       ['foo', 'https://www.plantuml.com/plantuml', 'get'],
       ['', 'http://localhost:8080/plantuml', 'post'],

@@ -15,6 +15,7 @@ import type {
   AiProviderApiKeys,
   AiProvidersConfig,
 } from '~/features/mastra/interfaces/provider-settings';
+import type { PlantumlHttpMethod } from '~/features/plantuml/interfaces/http-method';
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type {
@@ -464,7 +465,7 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'PLANTUML_URI',
     defaultValue: 'https://www.plantuml.com/plantuml',
   }),
-  'app:plantumlHttpMethod': defineConfig<string | undefined>({
+  'app:plantumlHttpMethod': defineConfig<PlantumlHttpMethod | undefined>({
     envVarName: 'PLANTUML_HTTP_METHOD',
     defaultValue: undefined,
   }),

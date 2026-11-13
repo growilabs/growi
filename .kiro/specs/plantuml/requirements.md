@@ -8,14 +8,14 @@ GROWI は Markdown 中の PlantUML 図を PlantUML サーバーへ送って SVG 
 
 GROWI は、PlantUML 既定の見た目のままにせず、すべての図に GROWI のテーマ（ライト用・ダーク用）を付けて描画している。図の見た目を洗練させ、ダークモードでも図が浮かずに読めるようにするためである。本 spec はこのテーマ付与を前提として保ったまま、次の4点で、大きい図を描けるようにし、描けないときは理由が分かるようにする。
 
-1. 送信方式を送信先で自動的に選ぶ。公開 plantuml.com には GET、それ以外（自前の PlantUML サーバー）には POST で送る。管理者は GET を明示的に指定することもできる。
+1. 送信方式を送信先で自動的に選ぶ。公開 plantuml.com には GET、それ以外（自前の PlantUML サーバー）には POST で送る。管理者は GET または POST を明示的に指定することもできる。
 2. POST は閲覧者のブラウザから PlantUML サーバーへ直接送る（GROWI サーバーは中継しない）。
 3. テーマを、見た目を変えずに軽量化し、GET で送る URL を短くする。
 4. 描画に失敗した図は、空のままにせず、図ごとに分かりやすいエラーを表示する。
 
 ## Boundary Context
-- **In scope**: 送信方式の自動選択と GET の明示指定、ブラウザからの POST 描画、テーマの軽量化（ライト／ダークとも）、描画失敗の検知とエラー表示（GET／POST とも）、エラーメッセージの5ロケール翻訳、自動スクロールとの連携の維持。
-- **Out of scope**: GROWI サーバーによる PlantUML への中継、PlantUML サーバーや手前のリバースプロキシ（nginx 等）の上限設定、公開 plantuml.com での POST、SSR・印刷・PDF 一括エクスポートでの図の描画（現状 GET でも描画していない）、図の種類ごとのテーマ切り替え、テーマの完全撤去、管理画面への設定 UI 追加、PlantUML サーバーの構築手順の提供。
+- **In scope**: 送信方式の自動選択と GET／POST の明示指定、ブラウザからの POST 描画、テーマの軽量化（ライト／ダークとも）、描画失敗の検知とエラー表示（GET／POST とも）、エラーメッセージの5ロケール翻訳、自動スクロールとの連携の維持。
+- **Out of scope**: GROWI サーバーによる PlantUML への中継、PlantUML サーバーや手前のリバースプロキシ（nginx 等）の上限設定、公開 plantuml.com で POST が使えるようにすること、SSR・印刷・PDF 一括エクスポートでの図の描画（現状 GET でも描画していない）、図の種類ごとのテーマ切り替え、テーマの完全撤去、管理画面への設定 UI 追加、PlantUML サーバーの構築手順の提供。
 - **Adjacent expectations**: PlantUML サーバーの送信先は既存設定 `PLANTUML_URI`（`app:plantumlUri`）に従う。POST で描画するには、送信先のサーバーが POST での描画と CORS（ブラウザから別サイトの応答を読むための許可ヘッダ）に対応している必要がある。公式の plantuml-server は両方に対応している。
 
 ## Requirements
@@ -29,13 +29,14 @@ GROWI は、PlantUML 既定の見た目のままにせず、すべての図に G
 3. If 送信先の URL を解釈できない, then the GROWI shall GET 方式で図を送る。
 4. Where 送信先が設定されていない（空文字）, the GROWI shall 現行どおり PlantUML 図を描画しない。
 
-### Requirement 2: GET の明示指定
-**Objective:** As a GROWI 管理者, I want GET 方式を明示的に指定できること, so that POST に対応していないサーバーやネットワーク構成でも従来どおり描画できる
+### Requirement 2: 送信方式の明示指定
+**Objective:** As a GROWI 管理者, I want 送信方式を GET または POST に明示的に指定できること, so that 自動選択が合わないサーバーやネットワーク構成でも、使える方式で描画できる
 
 #### Acceptance Criteria
 1. When 管理者が送信方式として GET を指定する（大文字・小文字は区別しない）, the GROWI shall 送信先に関わらず GET 方式で図を送る。
-2. If 送信方式の設定値が GET 以外の値である, then the GROWI shall その値を無視して自動選択（Req 1）に従う。
+2. If 送信方式の設定値が GET でも POST でもない値である, then the GROWI shall その値を無視して自動選択（Req 1）に従う。
 3. The GROWI shall 送信方式の設定を環境変数で変更できる構成項目として提供する。
+4. When 管理者が送信方式として POST を指定する（大文字・小文字は区別しない）, the GROWI shall 送信先に関わらず POST 方式で図を送る。ただし、送信先が空または解釈できない場合は、Req 1.3・1.4 に従う。
 
 ### Requirement 3: POST 方式での描画
 **Objective:** As a 大きな PlantUML 図を書く利用者, I want GET では URL が長すぎて描けない図も描画されること, so that 図の分割や名前の変更をせずに閲覧できる

@@ -2,12 +2,14 @@ export type PlantumlHttpMethod = 'get' | 'post';
 
 const PUBLIC_PLANTUML_HOST = 'plantuml.com';
 
-// `configured` is the PLANTUML_HTTP_METHOD value; only `get` is honored, anything else falls back to auto-selection.
+// `configured` is the raw PLANTUML_HTTP_METHOD value. The environment is not validated, so it
+// is a plain string here; anything other than get/post (case-insensitive) is ignored.
 export function resolvePlantumlHttpMethod(
   plantumlUri: string,
   configured: string | undefined,
 ): PlantumlHttpMethod {
-  if (configured?.toLowerCase() === 'get') {
+  const explicit = configured?.toLowerCase();
+  if (explicit === 'get') {
     return 'get';
   }
 
@@ -16,6 +18,10 @@ export function resolvePlantumlHttpMethod(
     hostname = new URL(plantumlUri).hostname.toLowerCase();
   } catch {
     return 'get';
+  }
+
+  if (explicit === 'post') {
+    return 'post';
   }
 
   if (

@@ -6,7 +6,7 @@
 **Impact**: 変更は `features/plantuml` と、設定を画面へ渡す既存の経路に1項目足すだけに収まる。GROWI サーバーには新しい API を作らない。描画のリクエストは今の GET と同じく、閲覧者のブラウザから PlantUML サーバーへ直接送る。
 
 ### Goals
-- 送信方式を送信先で自動的に選び、管理者は GET を明示指定できる。
+- 送信方式を送信先で自動的に選び、管理者は GET または POST を明示指定できる。
 - POST では URL 長の上限を受けずに大きい図を描画する。
 - どちらの方式でも、すべての図にライト・ダークに応じた GROWI のテーマを付ける（スタイルの洗練とダークモード対応のため）。
 - テーマを見た目を変えずに軽量化し、GET で描ける図を増やす（問い合わせの図は GET のままで描けるようにする）。
@@ -148,7 +148,7 @@ flowchart TD
 ```
 
 **決定事項**
-- **方式は送信先で決める**: `resolvePlantumlHttpMethod` は次の順で判定する。(1) 設定値が `get`（大文字・小文字は区別しない）なら `'get'`。(2) 送信先 URL を解析できない、または空なら `'get'`（空のときはプラグインがそもそも要素を作らない）。(3) ホスト名が `plantuml.com` か `*.plantuml.com` なら `'get'`。(4) それ以外は `'post'`。ホスト名は完全一致か `.plantuml.com` で終わるかで比べ、`plantuml.com.example.org` のような部分一致を誤判定しない。
+- **方式は送信先で決める**: `resolvePlantumlHttpMethod` は次の順で判定する。(1) 設定値が `get`（大文字・小文字は区別しない）なら `'get'`。(2) 送信先 URL を解析できない、または空なら `'get'`（空のときはプラグインがそもそも要素を作らない）。(3) 設定値が `post`（大文字・小文字は区別しない）なら `'post'`。(4) ホスト名が `plantuml.com` か `*.plantuml.com` なら `'get'`。(5) それ以外は `'post'`。設定値が `get`・`post` 以外なら、無視して (2) 以降の自動選択に進む。ホスト名は完全一致か `.plantuml.com` で終わるかで比べ、`plantuml.com.example.org` のような部分一致を誤判定しない。
 - **POST の応答の扱い**:
   - `Content-Type` が `image/svg+xml` の応答は、ステータスが 200 でも 400 でも「図」として表示する。PlantUML は構文エラーのとき、400 と一緒にエラーを描いた SVG を返すため。
   - `fetch` が例外になった場合（接続できない、CORS の許可が無い、混在コンテンツで止められた）と、`res.type === 'opaqueredirect'`（サーバーがリダイレクトを返した＝POST を受け付けない。公開 plantuml.com はこの挙動）は、「POST が使えない」失敗とする。
@@ -161,7 +161,7 @@ flowchart TD
 | Requirement | Summary | Components | Flows |
 |---|---|---|---|
 | 1.1–1.4 | 送信先による方式の自動選択 | http-method（判定関数）, configuration-props, plantuml.ts | 方式判定 |
-| 2.1–2.3 | GET の明示指定 | config-definition, http-method | 方式判定 |
+| 2.1–2.4 | 送信方式の明示指定 | config-definition, http-method | 方式判定 |
 | 3.1–3.5 | POST での描画 | plantuml.ts, fetch-plantuml-svg, PlantUmlViewer | POST 経路 |
 | 4.1 | SVG の安全な表示 | PlantUmlViewer | `<img>` 表示 |
 | 5.1–5.5 | ライト・ダークのテーマ付与（スタイルの洗練・ダークモード） | plantuml.ts, theme assets | テーマ付加 |
@@ -189,7 +189,8 @@ flowchart TD
 // features/plantuml/interfaces/http-method.ts
 export type PlantumlHttpMethod = 'get' | 'post';
 
-// configured: value of PLANTUML_HTTP_METHOD (undefined when unset)
+// configured: raw value of PLANTUML_HTTP_METHOD (undefined when unset). The environment is
+// not validated, so it is a string here; only get/post (case-insensitive) are honored.
 export function resolvePlantumlHttpMethod(
   plantumlUri: string,
   configured: string | undefined,
@@ -202,7 +203,7 @@ export const PLANTUML_GET_URL_LIKELY_TOO_LONG: number;
 - 目安値は 6800 とする（タスク 1.2 の実測。根拠は research.md）。公開 plantuml.com へブラウザ相当のヘッダで送ると、`src.length`（URL 全体の長さ）が約 7,026 から失敗する。上限の正体は Tomcat の `maxHttpHeaderSize` 既定値 8192（リクエスト行とヘッダの合計）で、途中の Cloudflare などがヘッダを足すため、URL だけで測ると 8192 より短い値で失敗する。
 
 ### plantumlHttpMethod config — 新規
-- `config-definition.ts` に `'app:plantumlHttpMethod': defineConfig<string | undefined>({ envVarName: 'PLANTUML_HTTP_METHOD', defaultValue: undefined })` を追加する。
+- `config-definition.ts` に `'app:plantumlHttpMethod': defineConfig<PlantumlHttpMethod | undefined>({ envVarName: 'PLANTUML_HTTP_METHOD', defaultValue: undefined })`（設定の型は `'get' | 'post' | undefined`。環境変数は実行時に検証されないので、判定関数は引数を `string | undefined` で受け、`get`・`post` 以外を無視する） を追加する。
 - `configuration-props.ts` で `resolvePlantumlHttpMethod(getConfig('app:plantumlUri'), getConfig('app:plantumlHttpMethod'))` を呼び、結果を `rendererConfig.plantumlHttpMethod` に入れる。
 
 ### plantuml.ts（remark プラグイン）— 変更
@@ -281,12 +282,13 @@ GET で構文エラーの SVG（ステータス 400）を `<img>` が表示す�
 
 ### Unit
 - `http-method.spec.ts`: `resolvePlantumlHttpMethod` を `it.each` で検証する。
-  - 設定値 `get`／`GET` → `'get'`
+  - 設定値 `get`／`GET` → `'get'`（自前サーバーでも）
+  - 設定値 `post`／`POST` → `'post'`（公開 plantuml.com でも）。ただし送信先が空・解析できない場合は `'get'`
   - 未設定で、`https://www.plantuml.com/plantuml` と `https://plantuml.com/plantuml` → `'get'`
   - `http://localhost:8080/plantuml` と `https://plantuml.example.com` → `'post'`
   - `https://plantuml.com.example.org` → `'post'`（部分一致で誤判定しない）
   - 空文字、解析できない文字列 → `'get'`
-  - 設定値 `post` や `foo` → 無視して自動選択
+  - 設定値 `foo` や空文字 → 無視して自動選択
 - `plantuml.spec.ts`:
   - GET では、今と同じテーマ付き＋エンコード済みの `src` を持つ要素になる。
   - POST では `src` が無く、テーマ付きソースの属性を持つ要素になる。
