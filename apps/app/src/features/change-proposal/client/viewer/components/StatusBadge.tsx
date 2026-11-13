@@ -9,9 +9,8 @@ import styles from './StatusBadge.module.scss';
 const TONE_CLASSES = {
   success: 'text-success-emphasis bg-success-subtle border-success-subtle',
   info: 'text-info-emphasis bg-info-subtle border-info-subtle',
-  warning: 'text-warning-emphasis bg-warning-subtle border-warning-subtle',
   danger: 'text-danger-emphasis bg-danger-subtle border-danger-subtle',
-  neutral: 'text-body-secondary bg-body-tertiary border-secondary-subtle',
+  neutral: 'text-body-emphasis bg-body-tertiary border-secondary-subtle',
 } as const satisfies Record<StatusTone, string>;
 
 type StatusBadgeProps = {

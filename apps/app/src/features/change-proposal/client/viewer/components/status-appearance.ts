@@ -6,7 +6,9 @@ import type {
 } from '../../../interfaces';
 import type { RevertProgressEntry } from '../domain';
 
-export type StatusTone = 'success' | 'info' | 'warning' | 'danger' | 'neutral';
+// No warning tone: Bootstrap's warning text on its subtle background is under
+// 4.5:1 in GROWI's light themes.
+export type StatusTone = 'success' | 'info' | 'danger' | 'neutral';
 
 export type StatusAppearance = {
   readonly tone: StatusTone;
@@ -34,13 +36,13 @@ export const OPERATION_STATUS_APPEARANCE = {
   stale: { tone: 'neutral', icon: 'skip_next' },
   skipped: { tone: 'neutral', icon: 'skip_next' },
   reverted: { tone: 'neutral', icon: 'undo' },
-  'revert-refused': { tone: 'warning', icon: 'block' },
+  'revert-refused': { tone: 'neutral', icon: 'block' },
 } as const satisfies Record<OperationStatus, StatusAppearance>;
 
 export const REVERT_PROGRESS_APPEARANCE = {
   'in-progress': { tone: 'info', icon: 'progress_activity' },
   reverted: { tone: 'success', icon: 'check_circle' },
-  'revert-refused': { tone: 'warning', icon: 'block' },
+  'revert-refused': { tone: 'neutral', icon: 'block' },
   skipped: { tone: 'neutral', icon: 'skip_next' },
   'not-targeted': { tone: 'neutral', icon: 'remove' },
 } as const satisfies Record<RevertProgressEntry['state'], StatusAppearance>;

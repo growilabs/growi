@@ -4,7 +4,6 @@
   gap: 0.5rem;
   align-items: center;
   padding: 2.5rem 1rem;
-  color: var(--bs-secondary-color);
   text-align: center;
   text-wrap: pretty;
   border: 1px dashed var(--bs-border-color);
@@ -13,7 +12,7 @@
 
 .empty-icon {
   font-size: 2.5rem;
-  opacity: 0.7;
+  color: var(--bs-secondary-color);
 }
 
 .error-panel {
