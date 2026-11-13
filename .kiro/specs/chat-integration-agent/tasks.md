@@ -21,7 +21,7 @@
   - 権限の判定に、「DM で、専用の欄で判定するコマンドなら、その欄が真のときだけ許す」決まりを足す。判定はコマンドの名前で分岐せず、コマンドの性質だけを見る
   - 完了の条件: 判定の試験で、`agent` は「すべてのチャンネル」を許していても DM の欄が偽なら DM で断られ、ほかのコマンドは今までどおり「すべてのチャンネル」で DM も許される。protocol・proxy・app の型検査が通る
   - _Requirements: 11.7_
-- [ ] 1.3 答えを送る口を足す
+- [x] 1.3 答えを送る口を足す
   - GROWI から proxy への向きの口として、答え（文章と出典、作ったページと要約した範囲、失敗とその理由）の本文と、結果（届けた・届けられなかった・知らない依頼・配達中）を定義し、parser を足す
   - 答えの本文の長さと出典の件数に上限を設ける
   - 完了の条件: 口の表に行があり、本文と結果が parser で往復し、上限を超えた本文が拒まれる
@@ -221,3 +221,6 @@
 - 1.1: proxy の `agent` の行（command-set.ts）と app の `unknown-kind` の分岐・ヘルプの `agent` の行は、型検査を通すための仮のもの。proxy は 3.1・3.2、app とヘルプは 5.3 で置き換える（ヘルプの使い方の欄は `/growi agent [request]` のままなので `@GROWI agent …` に合わせる）。管理者が許可すると、それまでは `agent` が何も返さない経路がある（リリース前なので許容）。
 - 試験が時々失敗する既存の 3 件（manage-account-links-service.spec、viewer-page-filter.spec、command-endpoint.integ の準備段階）は、今回の変更と無関係。失敗したら回し直して切り分ける。
 - 1.2: design.md は `ChannelRef.isDirectMessage` を省略できない欄と書くが、実装は tasks.md どおり省略できる欄（省略は「DM ではない」）。タスク 7 の書き戻しで design 側を実装に合わせる。proxy の discord-gateway-facade.integ（stops listening on shutdown）も、負荷が高いときだけ時々落ちる既存の試験。
+- 1.3: エンドポイント `command-answer` を足すと proxy の既存の試験 3 件（署名付きエンドポイントを全部数える試験）が落ちるため、ユーザーの承認を得て、署名検証だけを通して 501 を返す仮のルートハンドラ（apps/chat-integration-proxy/src/routes/command-answer-routes.ts）を proxy に足した。3.5 で本物に差し替え、専用の依存（RoutesAppDeps の項目）に分ける。1.4 の `conversation` エンドポイントでも同じことが起きるので、同じ形の仮のルートハンドラを足す（これもユーザー承認済みの扱い）。
+- 1.3: design.md に定めの無い上限（remedy 500・日時 64・relationId／requestId 128）と `conversationFailure: null` の拒否は試験で守っていない（reviewer は任意の指摘とした）。1.4 で会話の失敗の 6 種類の理由を網羅して往復させる。
+- この worktree では `@growi/ui` などの dist が未 build のため、app の型検査と app の試験は動かない。app を触るタスク（4 以降）の前に `pnpm turbo run build --filter @growi/app^...` で依存を build する。

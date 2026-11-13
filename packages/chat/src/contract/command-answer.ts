@@ -27,7 +27,7 @@ export type AgentAnswer =
       readonly kind: 'page-created';
       readonly pageUrl: string;
       readonly range: ConversationRange;
-      /** True when a service limit cut the range short of the full conversation. */
+      /** True when older messages remained unread, so the range does not reach the start of the conversation. */
       readonly truncated: boolean;
     }
   | {
@@ -43,7 +43,7 @@ export interface CommandAnswerRequest extends RequestEnvelope {
   readonly answer: AgentAnswer;
 }
 
-/** Final states and retry conditions: see design.md (CommandAnswerResult). */
+/** Final states and retry conditions: see design.md (CommandAnswerContract). */
 export interface CommandAnswerResult {
   readonly status:
     | 'delivered'
