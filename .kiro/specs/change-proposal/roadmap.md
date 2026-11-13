@@ -76,6 +76,7 @@ GROWI の AI 機能は、今は検索と、読んだページをもとにした�
 - [x] change-proposal-core -- Change Proposal のデータ・状態・サーバー側の反映と取り消し・管理者の設定・通知のまとめ。Dependencies: none
 - [x] change-proposal-ai-agent -- GROWI AI Agent から Change Proposal を作る道具、書き込みの守り、チャット画面での承認。Dependencies: change-proposal-core（詳細ページへの部品の登録の 2 タスクだけ change-proposal-viewer にも依存）
 - [x] change-proposal-viewer -- 反映済みの Change Proposal の詳細ページ、ページ履歴と Recent Changes の印、画面からの取り消し。Dependencies: change-proposal-core
+- [ ] change-proposal-reviewers -- amend spec。Change Proposal に承認者（ユーザー・グループ）を持たせ、依頼した人以外が承認できるようにする。最後のタスクで change-proposal-core に内容を戻して削除する。Dependencies: change-proposal-core
 
 ## Future (brief はまだ作らない)
 
