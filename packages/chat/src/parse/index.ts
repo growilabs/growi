@@ -20,6 +20,10 @@ export {
   parseCommandAnswerRequest,
   parseCommandAnswerResult,
 } from './parse-command-answer.js';
+export {
+  parseConversationRequest,
+  parseConversationResult,
+} from './parse-conversation.js';
 export { parseOpEnvelope } from './parse-envelope.js';
 export { parseKeyRegistration, parseKeyRevocation } from './parse-keys.js';
 export {

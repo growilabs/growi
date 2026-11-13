@@ -33,7 +33,10 @@ export type {
 export type {
   ConversationFailure,
   ConversationFailureReason,
+  ConversationMessage,
   ConversationRange,
+  ConversationRequest,
+  ConversationResult,
 } from './conversation.js';
 export type {
   NotificationRequest,
