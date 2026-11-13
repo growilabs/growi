@@ -4,7 +4,8 @@ import {
   isIPageInfoForEntity,
 } from '@growi/core/dist/interfaces';
 
-import { useIsGuestUser, useIsSharedUser } from '~/states/context';
+import { useIsGuestUser } from '~/states/context';
+import { useShareLinkId } from '~/states/page/hooks';
 import { useSWRxPageInfo } from '~/stores/page';
 
 import { useSWRxRevisionMarks } from '../stores/use-swrx-revision-marks';
@@ -16,8 +17,8 @@ export const CurrentRevisionProposalMark = ({
   pageId,
 }: CurrentRevisionProposalMarkProps): JSX.Element | null => {
   const isGuestUser = useIsGuestUser();
-  const isSharedUser = useIsSharedUser();
-  const isUnavailable = isGuestUser || isSharedUser;
+  const shareLinkId = useShareLinkId();
+  const isUnavailable = isGuestUser || shareLinkId != null;
 
   const { data: pageInfo } = useSWRxPageInfo(isUnavailable ? null : pageId);
 

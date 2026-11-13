@@ -116,10 +116,20 @@ describe('RevertRequestModal', () => {
   });
 
   describe('message length', () => {
-    it('cannot send a message over the limit and shows the length hint', async () => {
+    // Counted the way the server validator counts: an emoji written as a
+    // surrogate pair, or followed by a variation selector, is one character.
+    const CHARACTERS = [
+      ['ASCII letters', 'a'],
+      ['surrogate-pair emoji', '\u{1F600}'],
+      ['emoji with a variation selector', '\u2764\uFE0F'],
+    ] as const;
+
+    it.each(
+      CHARACTERS,
+    )('cannot send a message over the limit of %s and shows the length hint', async (_label, char) => {
       render(<RevertRequestModal proposal={createProposal()} />);
       await openModal();
-      typeMessage('a'.repeat(REVERT_REQUEST_MESSAGE_MAX_LENGTH + 1));
+      typeMessage(char.repeat(REVERT_REQUEST_MESSAGE_MAX_LENGTH + 1));
 
       const submit = screen.getByRole('button', { name: SUBMIT });
       expect((submit as HTMLButtonElement).disabled).toBe(true);
@@ -128,11 +138,13 @@ describe('RevertRequestModal', () => {
       expect(sendRevertRequest).not.toHaveBeenCalled();
     });
 
-    it('can send a message of exactly the limit', async () => {
+    it.each(
+      CHARACTERS,
+    )('can send a message of exactly the limit of %s', async (_label, char) => {
       vi.mocked(sendRevertRequest).mockResolvedValue({ type: 'sent' });
       render(<RevertRequestModal proposal={createProposal()} />);
       await openModal();
-      const message = 'a'.repeat(REVERT_REQUEST_MESSAGE_MAX_LENGTH);
+      const message = char.repeat(REVERT_REQUEST_MESSAGE_MAX_LENGTH);
       typeMessage(message);
 
       const submit = screen.getByRole('button', { name: SUBMIT });

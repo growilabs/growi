@@ -84,9 +84,6 @@ export const OperationItem = ({
       data-testid="change-proposal-operation"
     >
       <div className="d-flex flex-wrap align-items-center gap-2">
-        {operation.index != null && (
-          <span className="text-muted small">{`#${operation.index + 1}`}</span>
-        )}
         <span className="badge text-bg-light border">
           {t(OPERATION_TYPE_LABEL_KEYS[type])}
         </span>

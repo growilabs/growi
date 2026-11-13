@@ -241,15 +241,19 @@ describe('OperationItem', () => {
   });
 
   describe('order number', () => {
-    it('shows the order number to the requester', () => {
-      render(
+    it.each([
+      true,
+      false,
+    ])('shows no order number even when core returned index (isRequester: %s)', (isRequester) => {
+      const { container } = render(
         <OperationItem
-          proposal={proposal}
+          proposal={{ ...proposal, isRequester }}
           operation={createOperation({ index: 7 })}
         />,
       );
 
-      expect(screen.getByText('#8')).toBeTruthy();
+      expect(screen.queryByText('#8')).toBeNull();
+      expect(container.textContent).not.toMatch(/#\d/);
     });
 
     it('shows no order number when core did not return index', () => {

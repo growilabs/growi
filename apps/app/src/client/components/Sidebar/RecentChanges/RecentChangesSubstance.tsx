@@ -243,6 +243,7 @@ export const RecentChangesHeader = ({
 }: HeaderProps): JSX.Element => {
   const { t } = useTranslation();
   const changeProposalEnabled = useChangeProposalEnabled();
+  const isGuestUser = useIsGuestUser();
 
   const { mutate } = useSWRINFxRecentlyUpdated(isWipPageShown, {
     suspense: true,
@@ -266,7 +267,7 @@ export const RecentChangesHeader = ({
 
   return (
     <>
-      {changeProposalEnabled && (
+      {changeProposalEnabled && !isGuestUser && (
         <Link
           href={CHANGE_PROPOSAL_LIST_HREF}
           className="ms-2 small text-nowrap"

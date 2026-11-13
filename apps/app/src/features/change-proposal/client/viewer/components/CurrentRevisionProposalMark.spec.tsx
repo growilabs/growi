@@ -6,7 +6,7 @@ import { CurrentRevisionProposalMark } from './CurrentRevisionProposalMark';
 
 const mocks = vi.hoisted(() => ({
   useIsGuestUser: vi.fn<() => boolean>(),
-  useIsSharedUser: vi.fn<() => boolean>(),
+  useShareLinkId: vi.fn<() => string | undefined>(),
   useSWRxPageInfo: vi.fn(),
   useSWRxRevisionMarks: vi.fn(),
 }));
@@ -16,7 +16,9 @@ vi.mock('next-i18next', () => ({
 }));
 vi.mock('~/states/context', () => ({
   useIsGuestUser: mocks.useIsGuestUser,
-  useIsSharedUser: mocks.useIsSharedUser,
+}));
+vi.mock('~/states/page/hooks', () => ({
+  useShareLinkId: mocks.useShareLinkId,
 }));
 vi.mock('~/stores/page', () => ({
   useSWRxPageInfo: mocks.useSWRxPageInfo,
@@ -36,7 +38,7 @@ describe('CurrentRevisionProposalMark', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.useIsGuestUser.mockReturnValue(false);
-    mocks.useIsSharedUser.mockReturnValue(false);
+    mocks.useShareLinkId.mockReturnValue(undefined);
     mocks.useSWRxPageInfo.mockReturnValue({
       data: {
         isNotFound: false,
@@ -73,11 +75,11 @@ describe('CurrentRevisionProposalMark', () => {
   });
 
   it.each([
-    ['guest', true, false],
-    ['shared-link', false, true],
-  ])('renders nothing and requests no marks for a %s viewer', (_label, guest, shared) => {
+    ['guest', true, undefined],
+    ['share-link', false, 'sharelink1'],
+  ])('renders nothing and requests neither page info nor marks for a %s viewer', (_label, guest, shareLinkId) => {
     mocks.useIsGuestUser.mockReturnValue(guest);
-    mocks.useIsSharedUser.mockReturnValue(shared);
+    mocks.useShareLinkId.mockReturnValue(shareLinkId);
     setMarks({
       'current-rev': {
         revisionId: 'current-rev',
@@ -90,6 +92,7 @@ describe('CurrentRevisionProposalMark', () => {
       <CurrentRevisionProposalMark pageId="page1" />,
     );
 
+    expect(mocks.useSWRxPageInfo).toHaveBeenLastCalledWith(null);
     expect(mocks.useSWRxRevisionMarks).toHaveBeenLastCalledWith(null);
     expect(container.textContent).toBe('');
   });

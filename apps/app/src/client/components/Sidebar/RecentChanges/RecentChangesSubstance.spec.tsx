@@ -245,9 +245,10 @@ describe('RecentChangesHeader link to the change proposal list', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     setListing([]);
+    mocks.useIsGuestUser.mockReturnValue(false);
   });
 
-  it('shows the link when the write feature is enabled', () => {
+  it('shows the link to a logged-in user when the write feature is enabled', () => {
     mocks.useChangeProposalEnabled.mockReturnValue(true);
 
     renderHeader();
@@ -261,6 +262,17 @@ describe('RecentChangesHeader link to the change proposal list', () => {
 
   it('does not show the link when the write feature is disabled', () => {
     mocks.useChangeProposalEnabled.mockReturnValue(false);
+
+    renderHeader();
+
+    expect(
+      screen.queryByRole('link', { name: 'change_proposal_viewer.list.title' }),
+    ).toBeNull();
+  });
+
+  it('does not show the link to a guest even when the write feature is enabled', () => {
+    mocks.useChangeProposalEnabled.mockReturnValue(true);
+    mocks.useIsGuestUser.mockReturnValue(true);
 
     renderHeader();
 

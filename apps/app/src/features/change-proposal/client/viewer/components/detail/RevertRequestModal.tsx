@@ -5,7 +5,10 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 
 import type { ChangeProposalView } from '../../../../interfaces';
-import { REVERT_REQUEST_MESSAGE_MAX_LENGTH } from '../../../../interfaces';
+import {
+  countRevertRequestMessageLength,
+  REVERT_REQUEST_MESSAGE_MAX_LENGTH,
+} from '../../../../interfaces';
 import type { RevertRequestResult } from '../../stores/proposal-actions';
 import { sendRevertRequest } from '../../stores/proposal-actions';
 
@@ -45,7 +48,9 @@ export const RevertRequestModal = ({
     return null;
   }
 
-  const isTooLong = message.length > REVERT_REQUEST_MESSAGE_MAX_LENGTH;
+  const isTooLong =
+    countRevertRequestMessageLength(message) >
+    REVERT_REQUEST_MESSAGE_MAX_LENGTH;
   const isSent = result?.type === 'sent';
 
   const open = (): void => {
