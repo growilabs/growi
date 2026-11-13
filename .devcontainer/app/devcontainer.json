@@ -45,9 +45,6 @@
         "bierner.markdown-mermaid",
         // TypeScript (Native Preview)
         "typescriptteam.native-preview",
-        // Test
-        "vitest.explorer",
-        "ms-playwright.playwright",
         // git/github
         "codeinklingon.git-worktree-menu",
         "github.vscode-pull-request-github",
@@ -57,9 +54,6 @@
         // DB
         "cweijan.vscode-database-client2",
         "mongodb.mongodb-vscode",
-        // Debug
-        "msjsdiag.debugger-for-chrome",
-        "firefox-devtools.vscode-firefox-debug",
         // prisma
         "Prisma.prisma@6.19.0"
       ],
