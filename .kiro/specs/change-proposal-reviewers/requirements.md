@@ -168,7 +168,7 @@ core の「本要件で使う言い方」の語（Change Proposal、操作、依
 6. The Change Proposal System shall 依頼した人自身が行った承認については、依頼した人に通知を送らない。
 7. The Change Proposal System shall 反映のあとのまとめたアプリ内通知（core の 7.2・7.8）の宛先と中身を、この Requirement によって変えない。
 8. When 承認・却下・放棄が行われた場合, the Change Proposal System shall それを新しい種類の activity として、判断した人を操作者として、監査ログの設定にかかわらず記録する。
-9. When 承認によって操作が反映された場合, the Change Proposal System shall 反映の activity に、承認した人を含める。
+9. When 承認によって操作が反映された場合, the Change Proposal System shall 承認した人を、承認の activity（6.8）と、操作に残る記録（承認した人・経路・日時）に残す。反映の activity の記録は変えない（1 回の反映が、複数の人の承認をまとめて書くことがあるため）。
 10. The Change Proposal System shall 承認者の指定と、承認者の追加・削除について、activity を別には記録しない（Change Proposal の中の記録で足りる）。
 
 ### Requirement 7: 反映のときの権限と作者

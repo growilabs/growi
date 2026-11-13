@@ -56,7 +56,7 @@
 
 ### activity と通知
 - **事実**: 1 つの activity ID に記録できる行は 1 つ。HTTP の求めで反映が動くと、その求めの activity ID を使い回し、記録されるユーザーは求めた人になる。
-- **判断**: 承認の求めでは、「承認」の activity をその求めの ID で記録し、反映の activity は新しい ID（`beginActivity`）で記録する。反映の activity の操作者は、反映を動かした人（承認者）にする。背景の再実行では依頼した人のまま。要件 6.9 の「承認した人を含める」は、この操作者で満たす（要件の文言との差は design.md の「要件との差と読み方」に書く）。
+- **判断**: 承認の求めでは、「承認」の activity をその求めの ID で記録し、承認の求めで動く反映は背景の反映と同じ形で呼ぶ（反映の activity は新しい ID、操作者は依頼した人。既存の背景の経路と同じ）。1 回の反映が複数の人の承認をまとめて書くことがあるので、「反映の activity に承認した人を含める」は成り立たない。そのため、要件 6.9 を「承認した人を承認の activity と操作の項目に残す。反映の activity は変えない」に直した（設計の検証 1 回目の指摘）。
 - **事実**: 新しい activity の種類は、`~/interfaces/activity.ts` の `SupportedAction`、`EssentialActionGroup`、`MediumActionGroup` に足す。監査ログの設定にかかわらず記録するのは、Essential に入れることで実現している。名前は `public/static/locales/*/admin.json` の `audit_log_action.*` に 5 言語で足す（`i18next.config.ts` に登録済みのワイルドカードで足りる）。
 - **事実**: 通知は、通知の種類（action）を新しく足し、snapshot に `kind` を持たせ、`InAppNotification.create` を直接呼ぶ前例が「戻すよう頼む」通知にある。`upsertByActivity` は 7 日以内の似た通知をまとめるので使わない。一覧の取得では `MODEL_CHANGE_PROPOSAL` の対象を読み込まず、通知の中身は snapshot だけに頼る。viewer の表示は `parse-notification-snapshot.ts` が `null` を返す通知を一覧に出さないので、viewer の対応が済むまで、新しい通知は表示されない。
 

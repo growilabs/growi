@@ -162,7 +162,8 @@ src/migrations/
 - `server/services/normalize-create-input.ts`、`server/domain/select-auto-apply-targets.ts`、`server/domain/validate-based-on.ts`（`rejected` を元にできる状態に）。
 - `server/domain/select-visible-operations.ts`、`server/services/proposal-view-parts.ts`、`proposal-query.ts`、`proposal-list-query.ts`、`to-operation-view.ts` — 役割（依頼した人・承認者・それ以外）で見える操作と値を分ける。
 - `server/domain/derive-proposal-status.ts` — 「反映できなかった操作がある」の判定に `rejected` を足す（コンパイルで見つからないので、手で直す）。
-- `server/services/proposal-activity.ts`、`proposal-applier.ts`（承認の求めで動いた反映は新しい activity ID で記録）、`proposal-notifier.ts`。
+- `server/services/proposal-activity.ts`、`proposal-applier.ts`（承認の求めで動く反映を、背景の反映と同じ形で呼び、新しい activity ID で記録する）、`proposal-notifier.ts`。
+- `server/services/current-page-facts.ts` — `loadViewablePages` に、取得済みの所属グループ（`ViewerIdentity`）を渡せるようにする（今は所属グループに `null` を渡して、中でもう一度取得している）。
 - `server/routes/approve.ts`（承認者にも開く）、`index.ts`（ルート登録。`/review-queue` は `/:id` より前）、`write-access.ts`（`respondWithServiceError` に新しいエラーコード）、`openapi.spec.ts`。
 - `client/shared/label-keys.ts`、`client/viewer/components/status-appearance.ts`、`client/viewer/domain/derive-revert-progress.ts` — `rejected` を足す（型の網羅のための最小の追従）。
 - `apps/app/src/interfaces/activity.ts` — 新しい action を `SupportedAction`、`EssentialActionGroup`、`MediumActionGroup` に足す。
@@ -183,12 +184,13 @@ sequenceDiagram
   U->>R: POST /:id/approve { operationKeys? }
   R->>S: approve(actor, keys, channel)
   S->>S: 所属グループ取得 / 承認者である人か判定
-  S->>S: 承認の対象を解決（判断に使うページを閲覧できる操作）
-  S->>M: markApproved（status=pending かつ approvedAt=null の操作に approvedAt/approvedBy/channel）
+  S->>S: 承認の対象を解決し、0 件なら 404。キーに同じページの操作をまとめる処理を適用してから、対象で絞る
+  S->>M: markApproved（status=pending かつ未承認の操作に approvedAt/approvedBy/channel。時刻はこの求めで 1 つ）
+  S->>M: 読み直し（この求めで書き換えた操作を決める）
   S->>AP: apply（依頼した人の権限で確認し、依頼した人を作者にして書き込む）
-  AP-->>S: 反映の結果
-  S->>N: 依頼した人へ review-result（依頼した人以外が承認したとき）
-  S-->>R: results
+  AP-->>S: 反映の結果（他の人が承認した操作も含みうる）
+  S->>N: 依頼した人へ review-result（この求めで書き換えた操作だけ。依頼した人以外が承認したとき）
+  S-->>R: results（この人の承認の対象のキーだけに絞る）
   R-->>U: 200 { results }
 ```
 
@@ -308,7 +310,7 @@ function reviewScopeOf(op: OperationRecord): ReviewScope;
 function resolveAncestors(candidatePaths: readonly string[], existingPaths: ReadonlySet<string>): string | null;
 ```
 
-- 新規作成・移動の「親」は、`dirname(path)` を上へたどった最初の既存のページ。ルート（`/`）まで無ければ、ルートのページとする。
+- 新規作成・移動の「親」は、core の反映と同じ規則（`findNonEmptyClosestAncestor`）で決める。`dirname(path)` を上へたどった、**空でない**最初の既存のページ（空のページは飛ばす）。ルート（`/`）まで無ければ、ルートのページとする。
 
 #### review-decision
 
@@ -354,8 +356,21 @@ interface ReviewerActions {
 ```
 
 - 事前条件: 呼び出し側は、読み取り専用ユーザーとゲストを `writeAccessChain` で断っている（要件 7.5）。
-- 共通の手順: (1) Change Proposal を読む。(2) 所属グループを取得し、依頼した人または承認者かを判定する。どちらでもなければ `not-found`（要件 2.7）。(3) `rejectOperations`・`abstain` は、依頼した人なら `requester-cannot-review`（要件 3.14）。(4) 承認の対象を解決し、求められたキーのうち承認の対象でないものは、存在しないキーと同じに扱って無視する（要件 2.6）。(5) 条件付きで書き込む。(6) 書き込んだ操作について通知と activity を作る。
-- 事後条件: `rejectAll` は、すべての `pending` かつ未承認の操作を `rejected` にし、`wholeRejection` を記録し、`settleIfNoPending` で完了にする。承認済み（反映待ち）の操作は却下せず、その時点の状態を返す。
+- 共通の手順（6 つの操作すべてに、この順で適用する）:
+  1. Change Proposal を読む。存在しなければ `not-found`。
+  2. 所属グループを取得し、依頼した人または承認者かを判定する。どちらでもなければ `not-found`（要件 2.7）。
+  3. 承認の対象を解決する。**依頼した人でない場合、承認の対象が 0 件なら `not-found` を返す**（要件 2.7、5.4）。これは、キーを使わない操作（`rejectAll`、`addReviewers`、`removeReviewers`）にも同じく適用する。閉じた提案でも、この確認を `not-open` の判定より先に行う（見える操作が無い人に、提案が閉じているかどうかを知らせないため）。
+  4. `rejectOperations`・`rejectAll`・`abstain` は、依頼した人なら `requester-cannot-review`（要件 3.14）。
+  5. キーを使う操作は、求められたキーに「同じページの操作をまとめる処理」（`expandApprovalTargets`）を適用し、**そのあとで**承認の対象と照らし合わせ、対象に入るものだけを残す。対象でないキーは、存在しないキーと同じに扱って無視する（要件 2.6）。
+  6. 条件付きで書き込む。
+  7. 書き込んだ操作を、下の「書き込んだ操作の判定」で決め、その操作だけから通知と activity を作る。
+  8. 応答の `results` は、反映や却下の結果をそのまま返さず、**その人の承認の対象のキーだけ**に絞って返す（依頼した人は、これまでどおり全部）。反映の処理は、ほかの人が承認した操作も読み直してまとめて反映するので、結果には、その人に見えない操作が混ざりうる。
+- **書き込んだ操作の判定**: Prisma の `updateMany` が返す件数は、文書の数で、文書の中の操作を何件書き換えたかではない（条件に合う操作が 0 件でも、文書が外側の条件に合えば 1 を返す）。そのため、書き込みのあとで文書を読み直し、次の条件に合う操作だけを「この求めで書き換えたもの」とする。求めの処理の最初に時刻を 1 つ取り、その時刻を書き込みに使う。
+  - 却下: `rejectedBy` が本人で、`rejectedAt` がこの求めの時刻と等しい。
+  - 承認: `approvedBy` が本人で、`approvedAt` がこの求めの時刻と等しい。
+  - 放棄: `abstentions` に、本人・そのキー・この求めの時刻の要素がある。
+  同じ人が 2 回続けて求めても、2 回目は時刻が違うので、書き換えたものに数えない。
+- 事後条件: `rejectAll` は、すべての `pending` かつ未承認の操作を `rejected` にし、`wholeRejection` を記録し、`settleIfNoPending` で完了にする。承認済み（反映待ち）の操作は却下せず、その時点の状態を返す。却下の条件の「未承認」は、`approvedAt` が項目として無い、または `null`（Prisma は「項目が無い」と「値が `null`」を区別するので、`isSet: false` または `null` の両方を条件に書く。既存の `change-proposal-query-parts.ts` の前例と同じ）。
 - `addReviewers`・`removeReviewers`: `lifecycle: 'open'` の条件で書く。閉じていれば `not-open`（要件 4.8）。追加は存在確認（ユーザーまたはグループ）をしてから書く。承認者の合計が上限（20）を超えるなら `too-many-reviewers`。削除で承認者が空になったら、依頼した人だけを承認者とみなす（要件 4.4）。記録は消さない（要件 4.12）。
 - Invariants: 反映は `proposal-applier` を呼ぶだけで、書き込みの権限と作者は依頼した人のまま（要件 7.1〜7.3）。
 
@@ -401,7 +416,7 @@ interface ReviewResultSnapshot {
 #### proposal-activity
 
 - 新しい action: `CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`（操作ごとの却下と全体の却下）、`CHANGE_PROPOSAL_ABSTAIN`。3 つとも `EssentialActionGroup` と `MediumActionGroup` に入れる（要件 6.8、監査ログの設定にかかわらず記録）。
-- 承認の求めでは、承認の activity をその求めの ID で記録し、反映の activity は新しい ID（`beginActivity`）で、反映を動かした承認者を操作者として記録する（要件 6.9。差は下の「要件との差と読み方」）。
+- 承認の求めでは、承認の activity をその求めの ID で記録する。承認の求めで動く反映は、背景の反映と同じ形（`trigger.kind: 'background'`）で呼び、反映の activity は新しい ID（`beginActivity`）で、操作者を依頼した人として記録する（既存の背景の経路と同じ。反映の中身は変えない）。1 回の反映が複数の人の承認をまとめて書くことがあるので、承認した人は、承認の activity と、操作の項目（`approvedBy`）で分かる（要件 6.9）。
 - 承認者の指定・追加・削除の activity は記録しない（要件 6.10）。
 
 ### route
@@ -424,7 +439,7 @@ interface ReviewResultSnapshot {
 
 ### Domain Model
 - Change Proposal（集約）が、承認者（`reviewers`）、放棄（`abstentions`）、全体の却下（`wholeRejection`）、変更の目的（`purpose`）を持つ。操作は、承認・却下の記録を自分の項目として持つ。
-- 不変条件: `reviewers` の各要素は `(kind, id)` で一意。`status: 'rejected'` の操作は `rejectedBy`・`rejectedAt` を持つ。`approvedAt` を持つ操作は `approvedBy` を持つ。
+- 不変条件: `reviewers` の各要素は `(kind, id)` で一意。`status: 'rejected'` の操作は `rejectedBy`・`rejectedAt` を持つ。承認の求めで `approvedAt` が付いた操作は `approvedBy` と `approvedChannel` を持つ。作成の直後の自動反映と、取り消しの Change Proposal の作成（`revert-action.ts`）で `approvedAt` だけが付く操作は、`approvedBy` を持たない（承認の求めではないため）。
 
 ### Physical Data Model（`prisma/schema.prisma` の `changeproposals`）
 
@@ -471,7 +486,7 @@ interface OperationView {
 
 | 状況 | 応答 | 理由 |
 |---|---|---|
-| 存在しない／依頼した人でも承認者でもない／見える操作が 0 件 | 404 `notfound`（同一） | 要件 2.7、5.4 |
+| 存在しない／依頼した人でも承認者でもない／承認の対象が 0 件（全 6 操作と取得に共通。閉じた提案でも、これを先に判定する） | 404 `notfound`（同一） | 要件 2.7、5.4 |
 | 見えないページの操作のキー／存在しないキー | 無視（`results` に含めない） | 要件 2.6 |
 | 閉じた提案への判断・承認者の追加・削除 | 409 `not-open` | 要件 2.9、4.8 |
 | コメントが長い | 400 `comment-too-long` | 要件 3.7 |
@@ -521,7 +536,7 @@ interface OperationView {
 3. viewer・ai-agent の追従（別の spec）。書き込み機能を有効にする前に入っていること。
 
 ## 要件との差と読み方
-1. **要件 6.9（反映の activity に承認した人を含める）**: 反映の activity は、反映を動かした人（承認者）を操作者にする。承認の activity が別の行で、承認した人を記録する。背景の再実行で反映が動いたときは、操作者は依頼した人で、承認した人は操作の項目（`approvedBy`）と承認の activity で分かる。「含める」は、この 2 つの行で満たす、と読む。
+1. **要件 6.9**: 設計の検証で、「反映の activity に承認した人を含める」では、1 回の反映が複数の人の承認をまとめて書くため、承認した人が 1 人に決まらないと分かった。そこで要件 6.9 を、「承認した人を承認の activity と操作の項目に残す。反映の activity は変えない」に直した（要件の変更として扱った）。
 2. **要件 5.2（並び順）**: 依頼した人には元の番号を返し、承認者には見える操作の中での順位を返す。元の番号から隠した操作の存在が分かるのを避けるため。
 3. **要件 1.7、3.7、1.9 の上限の値**: 承認者は 20、コメントは 500 文字、変更の目的は 2000 文字（定数）。管理者の設定にはしない。
 4. **要件 5.5（期限が近い順）**: 期限が無い文書（設定で期限を無効にした場合だけ）は、MongoDB の昇順で先頭に並ぶ。専用の扱いは作らない。
