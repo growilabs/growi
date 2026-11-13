@@ -8,6 +8,7 @@ import {
   PROPOSAL_LINK_LABEL_KEYS,
   type ProposalLinkKind,
 } from '../../../shared';
+import { SymbolIcon } from '../SymbolIcon';
 
 export type ProposalLinkChip = {
   readonly proposalId: string;
@@ -27,9 +28,13 @@ export const ProposalLinkChips = ({
   return (
     <span className="d-inline-flex flex-wrap gap-2 small">
       {links.map(({ proposalId, kind }) => (
-        <span key={`${kind}:${proposalId}`}>
+        <span
+          key={`${kind}:${proposalId}`}
+          className="d-inline-flex align-items-center gap-1 px-2 border rounded-pill text-body-secondary"
+        >
+          <SymbolIcon name="link" />
           {t(PROPOSAL_LINK_LABEL_KEYS[kind])}{' '}
-          <Link href={buildProposalHref(proposalId)}>
+          <Link href={buildProposalHref(proposalId)} className="font-monospace">
             {formatProposalShortId(proposalId)}
           </Link>
         </span>

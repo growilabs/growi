@@ -12,24 +12,29 @@ import {
 } from '../../../shared';
 import { ENTRY_LABEL_KEYS } from '../../domain';
 import { RequesterActionSlot } from '../RequesterActionSlot';
+import { StatusBadge } from '../StatusBadge';
+import { SymbolIcon } from '../SymbolIcon';
+import { ENTRY_ICONS, PROPOSAL_STATUS_APPEARANCE } from '../status-appearance';
 import { PerPageNotificationsLabel } from './PerPageNotificationsLabel';
 import { ProposalLinkChips } from './ProposalLinkChips';
 import { ProposalProgressLabel } from './ProposalProgressLabel';
+
+import styles from './ProposalSummaryHeader.module.scss';
 
 type ProposalSummaryHeaderProps = {
   readonly proposal: ChangeProposalView;
 };
 
-const HeaderRow = ({
+const Fact = ({
   label,
   children,
 }: {
   readonly label: string;
   readonly children: ReactNode;
 }): JSX.Element => (
-  <div className="d-flex gap-2">
-    <dt className="fw-normal text-muted">{label}</dt>
-    <dd className="mb-0">{children}</dd>
+  <div className={styles.fact}>
+    <dt>{label}</dt>
+    <dd>{children}</dd>
   </div>
 );
 
@@ -49,46 +54,54 @@ export const ProposalSummaryHeader = ({
   } = proposal;
 
   return (
-    <div className="mb-3">
-      <dl className="mb-0">
-        <HeaderRow label={t('change_proposal_viewer.detail.requested_by')}>
-          <span>{`${requester.name} (@${requester.username})`}</span>
-        </HeaderRow>
-        <HeaderRow label={t('change_proposal_viewer.detail.entry')}>
-          {t(ENTRY_LABEL_KEYS[entry])}
-        </HeaderRow>
-        {modelLabel != null && (
-          <HeaderRow label={t('change_proposal_viewer.detail.model')}>
-            {modelLabel}
-          </HeaderRow>
-        )}
-        <HeaderRow label={t('change_proposal_viewer.detail.created_at')}>
-          <UserDate dateTime={createdAt} />
-        </HeaderRow>
-        {lastAppliedAt != null && (
-          <HeaderRow label={t('change_proposal_viewer.detail.last_applied_at')}>
-            <UserDate dateTime={lastAppliedAt} />
-          </HeaderRow>
-        )}
-        <div className="d-flex flex-wrap align-items-center gap-2">
-          <span className="badge text-bg-secondary">
-            {t(PROPOSAL_STATUS_LABEL_KEYS[status])}
+    <div className={styles.summary}>
+      <div className={styles.status}>
+        <StatusBadge
+          size="md"
+          appearance={PROPOSAL_STATUS_APPEARANCE[status]}
+          label={t(PROPOSAL_STATUS_LABEL_KEYS[status])}
+        />
+        <ProposalProgressLabel view={proposal} />
+        <PerPageNotificationsLabel view={proposal} />
+      </div>
+      <dl className={styles.facts}>
+        <Fact label={t('change_proposal_viewer.detail.requested_by')}>
+          <span className={styles.name}>{requester.name}</span>{' '}
+          <span className={styles.username}>{`@${requester.username}`}</span>
+        </Fact>
+        <Fact label={t('change_proposal_viewer.detail.entry')}>
+          <span className={styles.entry}>
+            <SymbolIcon name={ENTRY_ICONS[entry]} className={styles.icon} />
+            {t(ENTRY_LABEL_KEYS[entry])}
           </span>
-          <ProposalProgressLabel view={proposal} />
-          <PerPageNotificationsLabel view={proposal} />
-        </div>
+        </Fact>
+        {modelLabel != null && (
+          <Fact label={t('change_proposal_viewer.detail.model')}>
+            <span className={styles.model}>{modelLabel}</span>
+          </Fact>
+        )}
+        <Fact label={t('change_proposal_viewer.detail.created_at')}>
+          <UserDate dateTime={createdAt} />
+        </Fact>
+        {lastAppliedAt != null && (
+          <Fact label={t('change_proposal_viewer.detail.last_applied_at')}>
+            <UserDate dateTime={lastAppliedAt} />
+          </Fact>
+        )}
         {revertOf != null && (
-          <HeaderRow label={t('change_proposal_viewer.detail.reverts')}>
+          <Fact label={t('change_proposal_viewer.detail.reverts')}>
             <Link href={buildProposalHref(revertOf)}>
               {formatProposalShortId(revertOf)}
             </Link>
-          </HeaderRow>
+          </Fact>
         )}
       </dl>
       {basedOn != null && (
-        <ProposalLinkChips
-          links={[{ proposalId: basedOn.proposalId, kind: 'based-on' }]}
-        />
+        <div className={styles.links}>
+          <ProposalLinkChips
+            links={[{ proposalId: basedOn.proposalId, kind: 'based-on' }]}
+          />
+        </div>
       )}
       <RequesterActionSlot proposal={proposal} />
     </div>

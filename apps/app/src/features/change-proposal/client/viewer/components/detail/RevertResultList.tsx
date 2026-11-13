@@ -9,6 +9,11 @@ import {
 } from '../../../shared';
 import type { RevertProgressEntry } from '../../domain';
 import { useRevertProgress } from '../../stores/use-revert-progress';
+import { StatusBadge } from '../StatusBadge';
+import { SymbolIcon } from '../SymbolIcon';
+import { REVERT_PROGRESS_APPEARANCE } from '../status-appearance';
+
+import styles from './DetailPanel.module.scss';
 
 export type RevertTarget = {
   readonly key: string;
@@ -61,28 +66,35 @@ export const RevertResultList = ({
   };
 
   return (
-    <section className="border rounded p-2 mb-3">
-      <h2 className="h6">
+    <section className={styles.panel}>
+      <h2 className={styles.title}>
+        <SymbolIcon name="undo" className={styles['title-icon']} />
         {t('change_proposal_viewer.revert_all.result_title')}
       </h2>
-      <ul className="list-unstyled mb-0">
-        {run.targets.map((target) => (
-          <li key={target.key} className="d-flex flex-wrap gap-2">
-            {target.path != null ? (
-              <code className="text-break">{target.path}</code>
-            ) : (
-              <span className="text-muted">
-                {t('change_proposal_viewer.operation.page_gone')}
-              </span>
-            )}
-            <span className="small">
-              {labelOf(entries.find((entry) => entry.key === target.key))}
-            </span>
-          </li>
-        ))}
+      <ul className={styles.rows}>
+        {run.targets.map((target) => {
+          const entry = entries.find((e) => e.key === target.key);
+          return (
+            <li key={target.key} className={styles.row}>
+              {target.path != null ? (
+                <code className={styles.path}>{target.path}</code>
+              ) : (
+                <span className={styles['page-gone']}>
+                  {t('change_proposal_viewer.operation.page_gone')}
+                </span>
+              )}
+              <StatusBadge
+                appearance={
+                  REVERT_PROGRESS_APPEARANCE[entry?.state ?? 'in-progress']
+                }
+                label={labelOf(entry)}
+              />
+            </li>
+          );
+        })}
       </ul>
       {isTimedOut && (
-        <p className="small text-muted mt-2 mb-0">
+        <p className={styles.note}>
           {t('change_proposal_viewer.revert_result.timed_out')}
         </p>
       )}

@@ -7,6 +7,11 @@ import {
   OPERATION_STATUS_LABEL_KEYS,
   selectRemainingOperations,
 } from '../../../shared';
+import { StatusBadge } from '../StatusBadge';
+import { SymbolIcon } from '../SymbolIcon';
+import { OPERATION_STATUS_APPEARANCE } from '../status-appearance';
+
+import styles from './DetailPanel.module.scss';
 
 type RemainingOperationsListProps = {
   readonly view: Pick<ChangeProposalView, 'isRequester' | 'operations'>;
@@ -25,11 +30,12 @@ export const RemainingOperationsList = ({
   }
 
   return (
-    <section className="mb-3">
-      <h2 className="h5">
+    <section className={styles.panel}>
+      <h2 className={styles.title}>
+        <SymbolIcon name="pending_actions" className={styles['title-icon']} />
         {t('change_proposal_viewer.remaining_operations.title')}
       </h2>
-      <ul className="list-unstyled mb-0">
+      <ul className={styles.rows}>
         {remaining.map((operation) => {
           const path =
             operation.page?.path ??
@@ -37,25 +43,25 @@ export const RemainingOperationsList = ({
             operation.toPath ??
             operation.fromPath;
           return (
-            <li
-              key={operation.key}
-              className="d-flex flex-wrap align-items-center gap-2"
-            >
+            <li key={operation.key} className={styles.row}>
               {path != null ? (
-                <code className="text-break">{path}</code>
+                <code className={styles.path}>{path}</code>
               ) : (
-                <span className="text-muted">
+                <span className={styles['page-gone']}>
                   {t('change_proposal_viewer.operation.page_gone')}
                 </span>
               )}
-              <span className="badge text-bg-light border">
-                {t(OPERATION_STATUS_LABEL_KEYS[operation.status])}
+              <span className={styles.result}>
+                <StatusBadge
+                  appearance={OPERATION_STATUS_APPEARANCE[operation.status]}
+                  label={t(OPERATION_STATUS_LABEL_KEYS[operation.status])}
+                />
+                {operation.reason != null && (
+                  <span className={styles.reason}>
+                    {t(OPERATION_REASON_LABEL_KEYS[operation.reason])}
+                  </span>
+                )}
               </span>
-              {operation.reason != null && (
-                <span className="small text-muted">
-                  {t(OPERATION_REASON_LABEL_KEYS[operation.reason])}
-                </span>
-              )}
             </li>
           );
         })}

@@ -31,6 +31,24 @@ const ChangeProposalDetail = dynamic(
   { ssr: false },
 );
 
+const ChangeProposalDetailHeading = dynamic(
+  () =>
+    // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+    import('~/features/change-proposal/client/viewer').then(
+      (m) => m.ChangeProposalDetailHeading,
+    ),
+  { ssr: false },
+);
+
+const ChangeProposalNotFound = dynamic(
+  () =>
+    // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
+    import('~/features/change-proposal/client/viewer').then(
+      (m) => m.ChangeProposalNotFound,
+    ),
+  { ssr: false },
+);
+
 type Props = CommonInitialProps &
   CommonEachProps &
   BasicLayoutConfigurationProps;
@@ -53,12 +71,11 @@ const ChangeProposalDetailPage: NextPageWithLayout<Props> = () => {
 
         <div className="main ps-sidebar">
           <div className="container-lg wide-gutter-x-lg">
+            <ChangeProposalDetailHeading proposalId={proposalId} />
             {proposalId != null ? (
               <ChangeProposalDetail proposalId={proposalId} />
             ) : (
-              <div className="alert alert-secondary">
-                {t('change_proposal_viewer.detail.not_found')}
-              </div>
+              <ChangeProposalNotFound />
             )}
           </div>
         </div>

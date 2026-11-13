@@ -1,0 +1,39 @@
+.heading {
+  margin: 1.5rem 0 1rem;
+}
+
+.back-link {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+  min-block-size: 1.5rem;
+  margin-bottom: 0.375rem;
+  font-size: 0.875rem;
+  color: var(--bs-secondary-color);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--bs-body-color);
+    text-decoration: underline;
+  }
+}
+
+.back-icon {
+  font-size: 1.1rem;
+}
+
+.title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.5rem;
+  align-items: baseline;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.short-id {
+  font-family: var(--font-family-monospace, var(--bs-font-monospace));
+  font-size: 0.7em;
+  font-weight: 400;
+  color: var(--bs-secondary-color);
+}

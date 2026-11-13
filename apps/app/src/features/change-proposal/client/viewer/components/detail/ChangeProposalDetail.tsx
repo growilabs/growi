@@ -5,12 +5,16 @@ import type { ChangeProposalView } from '../../../../interfaces';
 import { useSWRxChangeProposal } from '../../stores/use-swrx-change-proposal';
 import { OperationItem } from '../OperationItem';
 import { RequesterOnlySection } from '../RequesterOnlySection';
+import { StatePanel } from '../StatePanel';
+import { ChangeProposalNotFound } from './ChangeProposalNotFound';
 import { ProposalSummaryHeader } from './ProposalSummaryHeader';
 import { RemainingOperationsList } from './RemainingOperationsList';
 import { RevertAllButton } from './RevertAllButton';
 import { RevertRequestModal } from './RevertRequestModal';
 import type { RevertRun } from './RevertResultList';
 import { RevertResultList } from './RevertResultList';
+
+import styles from './ChangeProposalDetail.module.scss';
 
 type ChangeProposalDetailProps = { readonly proposalId: string };
 
@@ -25,6 +29,30 @@ const useLastFoundProposal = (
     }
   }, [current]);
   return lastFound?.id === proposalId ? lastFound : null;
+};
+
+const SKELETON_OPERATION_KEYS = ['a', 'b'] as const;
+
+const DetailSkeleton = (): JSX.Element => {
+  const { t } = useTranslation();
+  return (
+    <div aria-busy="true">
+      <span className="visually-hidden">{t('Loading')}</span>
+      <div aria-hidden="true" className="placeholder-glow">
+        <div className={styles.skeleton}>
+          <span className="placeholder col-2 rounded-pill" />
+          <span className="placeholder col-7" />
+          <span className="placeholder col-5" />
+        </div>
+        {SKELETON_OPERATION_KEYS.map((key) => (
+          <div key={key} className={styles.skeleton}>
+            <span className="placeholder col-3" />
+            <span className="placeholder col-8" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 export const ChangeProposalDetail = ({
@@ -44,34 +72,32 @@ export const ChangeProposalDetail = ({
 
   if (error != null) {
     return (
-      <div className="alert alert-danger">
+      <StatePanel icon="error" variant="error">
         {t('change_proposal_viewer.detail.error')}
-      </div>
+      </StatePanel>
     );
   }
   if (data == null) {
-    return null;
+    return <DetailSkeleton />;
   }
 
   // See design.md (ChangeProposalDetail) for why a not-found refetch is
   // ignored while a revert result is shown.
   const proposal = found ?? (revertRun != null ? lastFound : null);
   if (proposal == null) {
-    return (
-      <div className="alert alert-secondary">
-        {t('change_proposal_viewer.detail.not_found')}
-      </div>
-    );
+    return <ChangeProposalNotFound />;
   }
 
   return (
-    <div>
+    <div className={styles.detail}>
       <ProposalSummaryHeader proposal={proposal} />
-      <RevertAllButton
-        proposal={proposal}
-        onReverted={(run) => setRevertState({ proposalId, run })}
-      />
-      <RevertRequestModal proposal={proposal} />
+      <div className={styles.actions}>
+        <RevertAllButton
+          proposal={proposal}
+          onReverted={(run) => setRevertState({ proposalId, run })}
+        />
+        <RevertRequestModal proposal={proposal} />
+      </div>
       {revertRun != null && (
         <RevertResultList
           proposalId={proposalId}
@@ -81,15 +107,17 @@ export const ChangeProposalDetail = ({
       )}
       <RequesterOnlySection view={proposal} />
       <RemainingOperationsList view={proposal} />
-      <section>
-        <h2 className="h5">{t('change_proposal_viewer.detail.operations')}</h2>
-        {proposal.operations.map((operation) => (
-          <OperationItem
-            key={operation.key}
-            proposal={proposal}
-            operation={operation}
-          />
-        ))}
+      <section className={styles.operations}>
+        <h2 className={styles['section-title']}>
+          {t('change_proposal_viewer.detail.operations')}
+        </h2>
+        <ul className={styles['operation-list']}>
+          {proposal.operations.map((operation) => (
+            <li key={operation.key}>
+              <OperationItem proposal={proposal} operation={operation} />
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
   );

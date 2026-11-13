@@ -15,6 +15,14 @@ import { toDiffPair } from '../stores/use-swrx-operation-diff';
 import { ProposalLinkChips } from './detail/ProposalLinkChips';
 import { OperationDiff } from './OperationDiff';
 import { RequesterActionSlot } from './RequesterActionSlot';
+import { StatusBadge } from './StatusBadge';
+import { SymbolIcon } from './SymbolIcon';
+import {
+  OPERATION_STATUS_APPEARANCE,
+  OPERATION_TYPE_ICONS,
+} from './status-appearance';
+
+import styles from './OperationItem.module.scss';
 
 type OperationItemProps = {
   readonly proposal: ChangeProposalView;
@@ -22,7 +30,7 @@ type OperationItemProps = {
 };
 
 const PathText = ({ value }: { readonly value: string }): JSX.Element => (
-  <code className="text-break">{value}</code>
+  <code className={styles.path}>{value}</code>
 );
 
 export const OperationItem = ({
@@ -45,11 +53,11 @@ export const OperationItem = ({
       (operation.fromPath != null || operation.toPath != null)
     ) {
       return (
-        <span>
+        <span className={styles.move}>
           {operation.fromPath != null && (
             <PathText value={operation.fromPath} />
           )}
-          <span className="mx-1">→</span>
+          <span className={styles['move-arrow']} />
           {operation.toPath != null && <PathText value={operation.toPath} />}
         </span>
       );
@@ -57,7 +65,7 @@ export const OperationItem = ({
     const path = operation.page?.path ?? operation.path;
     if (path == null) {
       return (
-        <span className="text-muted">
+        <span className={styles['page-gone']}>
           {t('change_proposal_viewer.operation.page_gone')}
         </span>
       );
@@ -69,36 +77,49 @@ export const OperationItem = ({
     if (revertability == null) {
       return null;
     }
-    return (
-      <span className="small text-muted">
-        {revertability.revertible
-          ? t('change_proposal_viewer.operation.revertible')
-          : t(REVERT_REFUSAL_REASON_LABEL_KEYS[revertability.reason])}
+    return revertability.revertible ? (
+      <span className={`${styles.note} ${styles.revertible}`}>
+        <SymbolIcon name="undo" className={styles['note-icon']} />
+        {t('change_proposal_viewer.operation.revertible')}
+      </span>
+    ) : (
+      <span className={styles.note}>
+        <SymbolIcon name="lock" className={styles['note-icon']} />
+        {t(REVERT_REFUSAL_REASON_LABEL_KEYS[revertability.reason])}
       </span>
     );
   };
 
   return (
-    <div
-      className="border rounded p-2 mb-2"
+    <article
+      className={styles.operation}
       data-testid="change-proposal-operation"
     >
-      <div className="d-flex flex-wrap align-items-center gap-2">
-        <span className="badge text-bg-light border">
+      <div className={styles.head}>
+        <span className={styles.type}>
+          <SymbolIcon
+            name={OPERATION_TYPE_ICONS[type]}
+            className={styles['type-icon']}
+          />
           {t(OPERATION_TYPE_LABEL_KEYS[type])}
         </span>
-        {renderPaths()}
-        <span className="badge text-bg-secondary">
-          {t(OPERATION_STATUS_LABEL_KEYS[status])}
-        </span>
+        <StatusBadge
+          appearance={OPERATION_STATUS_APPEARANCE[status]}
+          label={t(OPERATION_STATUS_LABEL_KEYS[status])}
+        />
+      </div>
+      <h3 className={styles.title}>{renderPaths()}</h3>
+      <div className={styles.notes}>
         {reason != null && (
-          <span className="small text-muted">
+          <span className={styles.note}>
+            <SymbolIcon name="info" className={styles['note-icon']} />
             {t(OPERATION_REASON_LABEL_KEYS[reason])}
           </span>
         )}
         {renderRevertability()}
         {revertedByProposalId != null && (
-          <span className="small">
+          <span className={styles.note}>
+            <SymbolIcon name="undo" className={styles['note-icon']} />
             {t('change_proposal_viewer.operation.reverted_by')}{' '}
             <Link href={buildProposalHref(revertedByProposalId)}>
               {formatProposalShortId(revertedByProposalId)}
@@ -114,10 +135,8 @@ export const OperationItem = ({
         <RequesterActionSlot proposal={proposal} operation={operation} />
       </div>
       {toDiffPair(operation).type !== 'no-diff' && (
-        <div className="mt-2">
-          <OperationDiff operation={operation} />
-        </div>
+        <OperationDiff operation={operation} />
       )}
-    </div>
+    </article>
   );
 };

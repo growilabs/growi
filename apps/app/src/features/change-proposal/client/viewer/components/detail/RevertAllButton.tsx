@@ -7,7 +7,11 @@ import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 import type { ChangeProposalView, OperationView } from '../../../../interfaces';
 import { selectRevertibleOperations } from '../../domain';
 import { revertOperations } from '../../stores/proposal-actions';
+import { StatePanel } from '../StatePanel';
+import { SymbolIcon } from '../SymbolIcon';
 import type { RevertRun, RevertTarget } from './RevertResultList';
+
+import styles from './RevertActions.module.scss';
 
 type RevertAllButtonProps = {
   readonly proposal: ChangeProposalView;
@@ -43,6 +47,7 @@ export const RevertAllButton = ({
   // A second click can arrive before the re-render that disables the button.
   const isSendingRef = useRef(false);
   const [hasFailed, setHasFailed] = useState(false);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
   if (isGuestUser || isReadOnlyUser || revertibleOperations.length === 0) {
     return null;
@@ -81,34 +86,41 @@ export const RevertAllButton = ({
     }
   };
 
+  // A fragment so the button and its error sit directly in the parent's action row.
   return (
-    <div className="mb-3">
+    <>
       <button
         type="button"
-        className="btn btn-outline-danger btn-sm"
+        className={`btn btn-outline-danger ${styles['action-button']}`}
         disabled={isSending}
         onClick={open}
       >
+        <SymbolIcon name="undo" className={styles['action-icon']} />
         {t('change_proposal_viewer.revert_all.button')}
       </button>
       {hasFailed && (
-        <div className="alert alert-danger mt-2 mb-0">
+        <StatePanel icon="error" variant="error">
           {t('change_proposal_viewer.revert_all.error')}
-        </div>
+        </StatePanel>
       )}
-      <Modal isOpen={confirmTargets != null} toggle={close}>
+      <Modal
+        isOpen={confirmTargets != null}
+        toggle={close}
+        autoFocus={false}
+        onOpened={() => cancelButtonRef.current?.focus()}
+      >
         <ModalHeader toggle={close}>
           {t('change_proposal_viewer.revert_all.confirm_title')}
         </ModalHeader>
         <ModalBody>
           <p>{t('change_proposal_viewer.revert_all.confirm_description')}</p>
-          <ul className="mb-0">
+          <ul className={styles['confirm-list']}>
             {confirmTargets?.map((target) => (
               <li key={target.key}>
                 {target.path != null ? (
-                  <code className="text-break">{target.path}</code>
+                  <code className={styles['confirm-path']}>{target.path}</code>
                 ) : (
-                  <span className="text-muted">
+                  <span className="text-body-secondary fst-italic">
                     {t('change_proposal_viewer.operation.page_gone')}
                   </span>
                 )}
@@ -117,9 +129,11 @@ export const RevertAllButton = ({
           </ul>
         </ModalBody>
         <ModalFooter>
+          {/* Focus starts on the safe choice of this destructive confirmation. */}
           <button
+            ref={cancelButtonRef}
             type="button"
-            className="btn btn-sm btn-outline-secondary"
+            className="btn btn-outline-secondary"
             disabled={isSending}
             onClick={close}
           >
@@ -127,14 +141,20 @@ export const RevertAllButton = ({
           </button>
           <button
             type="button"
-            className="btn btn-sm btn-danger"
+            className="btn btn-danger"
             disabled={isSending}
             onClick={confirm}
           >
+            {isSending && (
+              <span
+                className="spinner-border spinner-border-sm me-2"
+                aria-hidden="true"
+              />
+            )}
             {t('change_proposal_viewer.revert_all.confirm_submit')}
           </button>
         </ModalFooter>
       </Modal>
-    </div>
+    </>
   );
 };

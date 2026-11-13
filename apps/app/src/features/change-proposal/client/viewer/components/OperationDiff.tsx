@@ -3,7 +3,10 @@ import { useTranslation } from 'next-i18next';
 
 import type { OperationView } from '../../../interfaces';
 import { useSWRxOperationDiff } from '../stores/use-swrx-operation-diff';
+import { SymbolIcon } from './SymbolIcon';
 import { UnifiedDiffView } from './UnifiedDiffView';
+
+import styles from './OperationDiff.module.scss';
 
 type OperationDiffProps = { readonly operation: OperationView };
 
@@ -20,33 +23,35 @@ export const OperationDiff = ({
     }
     if (isLoading || data == null) {
       return (
-        <p className="text-muted small mt-2 mb-0">
+        <p className={styles.message}>
+          <span
+            className="spinner-border spinner-border-sm"
+            aria-hidden="true"
+          />
           {t('change_proposal_viewer.operation.diff_loading')}
         </p>
       );
     }
     if (data.type === 'unavailable') {
       return (
-        <p className="text-muted small mt-2 mb-0">
+        <p className={styles.message}>
+          <SymbolIcon name="visibility_off" className={styles.icon} />
           {t('change_proposal_viewer.operation.diff_unavailable')}
         </p>
       );
     }
-    return (
-      <div className="mt-2">
-        <UnifiedDiffView unifiedDiff={data.unifiedDiff} />
-      </div>
-    );
+    return <UnifiedDiffView unifiedDiff={data.unifiedDiff} />;
   };
 
   return (
-    <div>
+    <div className={styles.diff}>
       <button
         type="button"
-        className="btn btn-sm btn-outline-secondary"
+        className={`btn btn-sm btn-outline-secondary ${styles.toggle}`}
         aria-expanded={isOpen}
         onClick={() => setIsOpen((prev) => !prev)}
       >
+        <SymbolIcon name="expand_more" className={styles.chevron} />
         {t(
           isOpen
             ? 'change_proposal_viewer.operation.hide_diff'
