@@ -161,6 +161,18 @@
 - **Selected Approach**: field ごとのリクエストの `limit` を 5 にする（`useSWRxAuditlogSuggestions` の既定値と同じ）。種類を 1 つに絞ったときも同じ 5 件にして、定数を 1 つにする。
 - **Rationale**: field ごとにリクエストを分けるので、件数の上限がそのまま種類ごとの上限になる。一方の種類が他方を押し出すことはない。
 
+### Decision: 古い候補は `filterBy` で除き、失敗のグループは `renderMenu` で出し分ける
+- **Context**: 要件 1.1, 1.5, 4.2。`react-bootstrap-typeahead` 6.3.2 は、キーボード操作をメニューに描いた内容ではなく `filterBy` を通した結果で処理する。
+  - Tab や → で確定する候補（`initialItem`）を更新するのは、実際に描かれた先頭（`position === 0`）の `MenuItem` だけ（`es/behaviors/item.js`）。
+  - `initialItem` が消えるのは、`filterBy` を通した結果が 0 件のときだけ（`es/core/TypeaheadManager.js`）。
+  - 入力補完のヒントは `initialItem` から作られ、`multiple` でも出る。ヒントがあれば Tab か →（カーソルが入力の末尾にあるとき）で `onAdd(initialItem)` が呼ばれる（`es/utils/defaultSelectHint.js`）。
+  - Enter で確定するのは矢印キーで選んだ `activeItem` で、矢印キーで移動できるのは実際に描かれた `MenuItem` だけなので、描かれていない候補は Enter では確定されない。
+- **Alternatives Considered**:
+  1. `filterBy` はすべて通し、古い候補と選択済みの値は `renderMenu` の中だけで除く — 古い候補が `filterBy` の結果に残るので `initialItem` が消えず、メニューに出ていない古い候補を Tab で確定できてしまう。
+  2. 候補ごとの除外は `filterBy`、失敗のグループの出し分けは `renderMenu` で行い、どちらも同じ判定（`isFreshForText`）を使う。
+- **Selected Approach**: 2。既存の `UsernameTypeahead`（`filterBy` で `shouldShowUsernameSuggestion` を使う）と同じ形。
+- **Rationale**: 失敗は候補ではないので `filterBy` を通らず、`renderMenu` で出し分けるしかない。判定を 1 つの純粋関数にまとめれば、2 か所で判定がずれない。
+
 ### Synthesis
 - **Generalization**: 「検索対象の種類」をデータ（`AUDITLOG_SEARCH_SCOPES` の表）で持ち、種類ごとの取得・見出し・トークンの表示をその表から引く。IP を後で足すときは、表に 1 行足して候補の取得を足すだけで済む。ただし、実装するのは今回の要件のユーザーと URL だけにする。
 - **Build vs. Adopt**: 入力欄は既存の `react-bootstrap-typeahead` を使う。新しい依存はない。

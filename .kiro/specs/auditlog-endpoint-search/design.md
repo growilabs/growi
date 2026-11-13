@@ -27,7 +27,7 @@
 - 一覧の絞り込み条件の endpoint（`ISearchFilter.endpoints`）と、その一致の仕方（パス部分の完全一致）
 - 監査ログ画面のリセット・ページ番号との連携
 - 本機能で追加する文言（`admin` 名前空間）の 5 ロケール分
-- `.kiro/specs/activity-log-snapshot/design.md` の `findSnapshotUsernamesByUsernameRegex` の段落の書き直し（Amend target）
+- `.kiro/specs/activity-log-snapshot/design.md` の `findSnapshotUsernamesByUsernameRegex` の段落の書き直し（Amend target）。古くなった記述を今のコードに合わせるだけで、`activity-log-snapshot` の契約は変えない。本 spec は新機能の spec であり、`.claude/rules/spec-lifecycle.md` の amend spec ではないので、対象の spec に書き戻して本 spec を削除するタスクは作らない
 
 ### Out of Boundary
 - 候補 API（`GET /_api/v3/activity/suggestions`）の契約とサーバー側の検索（PR #12119 が所有）
@@ -116,7 +116,7 @@ apps/app/src/client/components/Admin/AuditLog/AuditLogSearchTypeahead/
 - `apps/app/src/client/components/Admin/AuditLog/build-search-filter.ts` / `.spec.ts` — `endpoints` を受け取る
 - `apps/app/src/client/components/Admin/AuditLogManagement.tsx` — `AuditLogUsernameTypeahead` を `AuditLogSearchTypeahead` に置き換え、選択済みの endpoint を状態に持ち、リセットで検索欄を初期状態に戻す
 - `apps/app/public/static/locales/{en_US,fr_FR,ja_JP,ko_KR,zh_CN}/admin.json` — `audit_log_management.search.*` の文言を足す
-- `.kiro/specs/activity-log-snapshot/design.md` — `findSnapshotUsernamesByUsernameRegex` の段落を、呼び出し元（`search-auditlog-suggestions.ts`）と最小文字数の判定の位置（呼び出し側）に合わせて書き直す。`spec.json` の `updated_at` を更新する
+- `.kiro/specs/activity-log-snapshot/design.md` — `findSnapshotUsernamesByUsernameRegex` の段落を、呼び出し元（`search-auditlog-suggestions.ts`）と最小文字数の判定の位置（呼び出し側）に合わせて書き直す。`spec.json` の `updated_at` を更新する。書き直した後の段落は `search-auditlog-suggestions.ts` を呼び出し元として書くので、このファイルが入る PR #12119 のマージ後に着手する
 
 `AuditLogUsernameTypeahead` と `UsernameTypeahead` は変更しない（エクスポートのモーダルと全文検索ページが使い続ける）。
 
@@ -153,7 +153,7 @@ sequenceDiagram
 | 1.2 | 選んだ URL をトークン表示し一覧を絞り込む | AuditLogSearchTypeahead, AuditLogManagement | `onChange` | 選択 → 一覧 |
 | 1.3 | 複数選択、いずれかに一致 | AuditLogSearchTypeahead, BuildActivityListWhere | `ISearchFilter.endpoints` | — |
 | 1.4 | 選択を外すと条件から外れる | AuditLogSearchTypeahead, AuditLogManagement | `onChange` | — |
-| 1.5 | 候補から選んだ値だけが条件 | AuditLogSearchTypeahead | 自由入力なし（`allowNew` を使わない） | — |
+| 1.5 | 候補から選んだ値だけが条件 | AuditLogSearchTypeahead, search-suggestion-options | 自由入力なし（`allowNew` を使わない）、古い候補を `filterBy` で除く | — |
 | 1.6 | 空のときは候補を出さない | useAuditLogSearchSuggestions | 空の keyword ではリクエストしない | — |
 | 2.1 | パス部分の完全一致 | BuildActivityListWhere | `buildEndpointWhere` | — |
 | 2.2 | クエリ文字列を除いて判定 | BuildActivityListWhere | `buildEndpointWhere` | — |
@@ -183,7 +183,7 @@ sequenceDiagram
 | BuildActivityListWhere（拡張） | Server / pure | `ISearchFilter` を Prisma `where` に変換する。endpoint の条件を足す | 1.3, 2.1–2.4, 3.8, 5.2 | Prisma（P0）、`escapeStringForMongoRegex`（P0） | Service |
 | ResolveActivityListWhere（拡張） | Server / pure | `endpoints` を受け渡す | 1.3 | BuildActivityListWhere（P0） | Service |
 | search-scopes | Client / data | 検索対象の種類の表 | 3.2, 3.4 | — | State |
-| search-suggestion-options | Client / pure | 種類ごとの結果から候補のグループを組み立てる | 1.1, 3.3, 3.7, 4.1, 4.2 | search-scopes（P0） | Service |
+| search-suggestion-options | Client / pure | 候補を出すかの判定と、候補一覧のグループの組み立て | 1.1, 1.5, 3.3, 3.7, 4.1, 4.2 | search-scopes（P0） | Service |
 | useAuditLogSearchSuggestions | Client / hook | scope に応じて field ごとに候補を取得する | 1.1, 1.6, 3.4, 3.5, 4.1 | `useSWRxAuditlogSuggestions`（P0） | Service |
 | AuditLogSearchTypeahead | Client / UI | 検索欄 | 1.2, 1.4, 1.5, 3.1, 3.2, 3.9, 4.3, 5.3 | 上記 3 つ（P0）、`react-bootstrap-typeahead`（P0） | State |
 | AuditLogManagement（変更） | Client / UI | 選択済みの値を一覧の条件に渡す | 1.2, 3.6, 5.1, 5.3 | AuditLogSearchTypeahead（P0）、`buildActivitySearchFilter`（P0） | — |
@@ -270,8 +270,8 @@ export const DEFAULT_AUDITLOG_SEARCH_SCOPE: AuditLogSearchScope; // 'all'
 
 | Field | Detail |
 |---|---|
-| Intent | field ごとの取得結果を、候補一覧に出すグループの配列に変換する純粋関数 |
-| Requirements | 1.1, 3.3, 3.7, 4.1, 4.2 |
+| Intent | 候補を出すかどうかの判定と、候補一覧に出すグループの組み立てを行う純粋関数 |
+| Requirements | 1.1, 1.5, 3.3, 3.7, 4.1, 4.2 |
 
 **Contracts**: Service [x]
 
@@ -291,20 +291,37 @@ export type SuggestionGroup =
   | { field: AuditLogSearchField; state: 'options'; options: readonly SuggestionOption[] }
   | { field: AuditLogSearchField; state: 'error' };
 
-export function buildSuggestionGroups(args: {
-  results: readonly FieldSuggestionResult[];
-  selected: readonly SuggestionOption[];
+// The single staleness predicate: results fetched for an older keyword are stale.
+export function isFreshForText(args: {
   currentText: string; // text currently in the input
   fetchedForKeyword: string; // keyword the results were fetched for
+}): boolean;
+
+// Used as the typeahead's filterBy: hides stale and already-selected options.
+export function shouldShowSuggestionOption(args: {
+  option: SuggestionOption;
+  currentText: string;
+  fetchedForKeyword: string;
+  selected: readonly SuggestionOption[];
+}): boolean;
+
+// Used inside renderMenu: groups the options that passed filterBy and adds
+// error groups for failed fields.
+export function buildSuggestionGroups(args: {
+  visibleOptions: readonly SuggestionOption[]; // renderMenu's results (after filterBy)
+  results: readonly FieldSuggestionResult[]; // for the per-field error flag and order
+  currentText: string;
+  fetchedForKeyword: string;
 }): SuggestionGroup[];
 
 export function isSameSuggestion(a: SuggestionOption, b: SuggestionOption): boolean;
 ```
-- Postconditions:
-  - `currentText` と `fetchedForKeyword` が違うとき（入力が取得に使った keyword より新しいとき）は、空の配列を返す。この判定は失敗のグループにもかかる。古い応答を隠す判定は、この関数だけが持つ。
-  - `results` の順序（= `AUDITLOG_SEARCH_SCOPES` の順序）でグループを返す。
-  - 選択済みの値（`kind` と `value` が一致するもの）は候補から除く。
-  - `error` の field は `state: 'error'` のグループを返す。候補が 0 件の field はグループを返さない。
+- 古い応答の判定は `isFreshForText` の 1 つだけで、次の 2 か所がこれを使う。
+  - **候補ごとの除外（`filterBy`）**: `shouldShowSuggestionOption` が、古い候補と選択済みの値（`kind` と `value` が一致するもの）を除く。既存の `UsernameTypeahead` の `shouldShowUsernameSuggestion` と同じ形。候補が全部除かれると `filterBy` を通した結果が 0 件になり、ライブラリが Tab で確定する候補（`initialItem`）も消える。
+  - **失敗のグループの出し分け（`renderMenu`）**: 失敗は候補ではないので `filterBy` を通らない。`buildSuggestionGroups` が `isFreshForText` で判定し、古いときは失敗のグループを出さない。
+- `buildSuggestionGroups` の Postconditions:
+  - `results` の順序（= `AUDITLOG_SEARCH_SCOPES` の順序）でグループを返す。各グループの候補は `visibleOptions` のうちその種類のもの。
+  - `error` の field は、`isFreshForText` が true のときだけ `state: 'error'` のグループを返す。表示する候補が 0 件の field はグループを返さない。
 
 #### useAuditLogSearchSuggestions
 
@@ -350,7 +367,7 @@ export type AuditLogSearchTypeaheadProps = {
 ```
 - State model: `scope`（初期値 `'all'`）、`selected: SuggestionOption[]`、`searchKeyword`。scope と選択は独立した状態で、scope を変えても `selected` は変えない（3.9）。
 - 入力欄は `AsyncTypeahead` を `multiple` で使い、`allowNew` は使わない（1.5）。
-- 候補一覧の描き方: `react-bootstrap-typeahead` 6.3 の `renderMenu` は、`filterBy` を通した後の結果と、入力中の文字（第 3 引数の `state.text`）を受け取る。そこで、`filterBy` はすべての候補を通すだけにし、`renderMenu` の中で `buildSuggestionGroups` に `state.text` と取得に使った keyword を渡してグループを組み立てる。古い応答を隠す判定と、選択済みの値を除く判定は、`buildSuggestionGroups` だけが持つ。
+- 候補一覧の描き方: `react-bootstrap-typeahead` 6.3 は、Tab や →（カーソルが入力の末尾にあるとき）による入力補完のヒントの確定と、その確定に使う `initialItem` の消去を、メニューに描いた内容ではなく `filterBy` を通した後の結果に依存して行う。そのため、古い候補と選択済みの値は `filterBy`（`shouldShowSuggestionOption`）で除き、メニューに出ない候補がキーボード操作で確定されないようにする。`renderMenu` は、第 1 引数の結果（`filterBy` を通した後）と第 3 引数の `state.text` を `buildSuggestionGroups` に渡し、見出し付きのグループと失敗のグループを組み立てる。
 - `error` のグループには取得できなかった旨の文言を出す（4.1, 4.2）。候補が 1 件もなく失敗のグループだけがある場合も、その文言を出す。ユーザーの候補には Active / Inactive のバッジを付ける（デザインに合わせる）。`renderToken` で種類が分かるトークンを描く。
 - 読み込み中の表示: `useAuditLogSearchSuggestions` の結果のうち、どれか 1 つでも `isLoading` なら、`AsyncTypeahead` の `isLoading` を true にする。
 - 「絞り込みを選択」は入力欄の右に置くドロップダウンで、`AUDITLOG_SEARCH_SCOPES` から選択肢を作る。
@@ -395,7 +412,8 @@ export type AuditLogSearchTypeaheadProps = {
 ### Unit Tests
 - `buildActivityListWhere` / `buildEndpointWhere`: `endpoints` があるときに等しい値と `<パス>?` の前方一致の OR が `AND` の要素として付くこと、正規表現の記号を含むパスがエスケープされること、`endpoints` が空・未指定・文字列でない要素を含むときは条件が付かないこと、username・action・期間と同時に指定したときに AND になること（2.1–2.4, 3.8, 5.2）
 - `buildActivityListWhere` の型の判定: `usernames` / `endpoints` に配列でない値（`"abc"` など）が来ても例外を投げず、その条件を付けないこと（1.3）
-- `buildSuggestionGroups`: 「すべて」で username → endpoint の順のグループになること、選択済みの値が除かれること、失敗した field が `error` のグループになり他の field は残ること、0 件の field はグループにならないこと。入力中の文字と取得に使った keyword が違うときは、失敗のグループも含めて空になること（1.1, 3.3, 4.1, 4.2）
+- `shouldShowSuggestionOption`: 入力中の文字と取得に使った keyword が違うときは候補を出さないこと、選択済みの値（`kind` と `value` が一致）は出さないこと、種類が違えば同じ `value` でも出すこと（1.1, 1.5）
+- `buildSuggestionGroups`: 「すべて」で username → endpoint の順のグループになること、失敗した field が `error` のグループになり他の field は残ること、表示する候補が 0 件の field はグループにならないこと。入力中の文字と取得に使った keyword が違うときは、失敗のグループを出さないこと（3.3, 4.1, 4.2）
 - `buildActivitySearchFilter`: `endpoints` が `ISearchFilter` に入ること（1.3）
 
 ### Integration Tests
@@ -411,6 +429,7 @@ export type AuditLogSearchTypeaheadProps = {
   - 一方の field の取得失敗で、その field の失敗表示と、もう一方の候補が出ること。選択済みのトークンが残ること（4.1, 4.3）
   - 検索対象を「URL」に絞った状態で取得に失敗し、候補が 1 件もないときにも、失敗表示が出ること（4.2）
   - 入力を続けて、表示中の候補が古い keyword のものになったときは、その候補を出さないこと（1.1）
+  - 候補を取得したあと入力を短くして候補が古くなった状態で、Tab・→・Enter を押しても、古い候補が選択されないこと（1.1, 1.5）
   - `clear()` でトークンが消え、scope が「すべて」に戻ること（5.3）
 - locale drift: `audit_log_management.search.*` の全キーが 5 ロケールの `admin.json` にあること（6.1）
 
