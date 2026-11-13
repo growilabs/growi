@@ -62,7 +62,7 @@
 - `change-proposal-core` の画面の共通の部品（`features/change-proposal/client/shared/` の barrel）: 操作の種類・操作の状態・全体の状態・理由・戻せない理由の言葉の表（`label-keys.ts`）、段階・つながりの関係の言葉の表と達成度の文言（`PROPOSAL_LIFECYCLE_LABEL_KEYS`・`PROPOSAL_LINK_LABEL_KEYS`・`ACHIEVEMENT_LABEL_KEY`）、`toAchievementPercent`・`selectRemainingOperations`・`formatProposalShortId`・`buildProposalHref`、diff2html の設定（`diff2html-options.ts` の `buildDiff2HtmlOptions` / `useDiff2HtmlColorScheme`）
 - diff2html のあらかじめ用意した CSS: barrel からは export されていない。読み込むだけの import `import '~/features/change-proposal/client/shared/diff2html.vendor-styles.prebuilt'` で読む（ページ履歴の `client/components/PageHistory/RevisionDiff.tsx` と同じ書き方）
 - `revision-diff` の `POST /_api/v3/revisions/diff` と、その DTO の型
-- 既存の部品と仕組み: `ModelNotification`、`useModelNotification`、`AuthorInfo`、`Revision`、`PageRevisionTable`、`RecentChangesSubstance`、`useSWRxPageInfo`、`useIsGuestUser` / `useIsReadOnlyUser` / `useIsSharedUser`、`InAppNotification` のモデル、`inAppNotificationService.emitSocketIo`、`activityEvent`、`Activity` のモデル、`User` のモデル
+- 既存の部品と仕組み: `ModelNotification`、`useModelNotification`、`AuthorInfo`、`Revision`、`PageRevisionTable`、`RecentChangesSubstance`、`useSWRxPageInfo`、`useIsGuestUser` / `useIsReadOnlyUser` / `useShareLinkId`（共有リンクで見ているかの判定。`useIsSharedUser` は本番で値が設定されないので使わない）、`InAppNotification` のモデル、`inAppNotificationService.emitSocketIo`、`activityEvent`、`Activity` のモデル、`User` のモデル
 - diff2html と `diff`（既存の依存）。新しい外部ライブラリは足さない
 - 依存の向き: `interfaces` → `client/viewer/domain`（純関数）→ `client/viewer/stores`（SWR）→ `client/viewer/components` → 既存の画面の部品・`pages/me/change-proposals/`。`client/shared/`（core）は `client/viewer/components` から import する。server の側は `interfaces` → `server/services/revert-request-service.ts` → `server/routes/revert-request.ts`。client は server のファイルを import しない
 
@@ -228,7 +228,7 @@ apps/app/src/pages/me/change-proposals/
 ### Modified Files
 - `apps/app/src/client/components/PageHistory/PageRevisionTable.tsx` — 読み込んだリビジョンの ID で印の hook を呼び、行ごとに印を `Revision` に渡す
 - `apps/app/src/client/components/PageHistory/Revision.tsx` — 任意の `proposalMark` を受け取り、作者の名前の横（「最新」の印の隣）に `ProposalMarkBadge` を出す
-- `apps/app/src/client/components/Sidebar/RecentChanges/RecentChangesSubstance.tsx` — 読み込んだ 1 回分（20 件）ごとに印の hook を呼び、`PageItem` のタイトルの横に印を出す。見出しの部品に、`changeProposalEnabled` が真のときだけ一覧へのリンクを足す
+- `apps/app/src/client/components/Sidebar/RecentChanges/RecentChangesSubstance.tsx` — 読み込んだ 1 回分（20 件）ごとに印の hook を呼び、`PageItem` のタイトルの横に印を出す。見出しの部品に、`changeProposalEnabled` が真で、ゲストでないときだけ一覧へのリンクを足す
 - `apps/app/src/client/components/AuthorInfo/AuthorInfo.tsx` — 任意の `badge?: ReactNode` を受け取り、利用者の表示の横に出す
 - `apps/app/src/components/PageView/PageContentFooter.tsx` / `apps/app/src/client/components/PageSideContents/PageSideContents.tsx` — 最後に更新した人の `AuthorInfo` に `badge={<CurrentRevisionProposalMark pageId=… />}` を渡す
 - `apps/app/src/client/components/InAppNotification/ModelNotification/index.tsx` — `useChangeProposalModelNotification` を `??` の並びに足す
@@ -718,7 +718,7 @@ function sendRevertRequest(args: {
 - OpenAPI の JSDoc を書く（core が `generate-spec-apiv3.sh` の対象に足すディレクトリに置くので、生成の対象に入る）。
 
 ### Existing Screen Integrations（summary）
-- **Recent Changes**: `RecentChangesContent` は、`useSWRINFxRecentlyUpdated` の 1 回分ごとに、その行の `revision` の ID を印の hook に渡す小さな部品を、行の一覧の部品と行の部品の間に置く（1 回分 = 20 件）。ゲストのときは null を渡す。`PageItem` は任意の `proposalMark` を受け取り、WIP の印の横に `ProposalMarkBadge` を出す。見出しの部品は `changeProposalEnabledAtom` が真のときだけ一覧へのリンクを出す。一覧の取得の hook とページ送りは変えない（要件 6.4）。
+- **Recent Changes**: `RecentChangesContent` は、`useSWRINFxRecentlyUpdated` の 1 回分ごとに、その行の `revision` の ID を印の hook に渡す小さな部品を、行の一覧の部品と行の部品の間に置く（1 回分 = 20 件）。ゲストのときは null を渡す。`PageItem` は任意の `proposalMark` を受け取り、WIP の印の横に `ProposalMarkBadge` を出す。見出しの部品は `changeProposalEnabledAtom` が真で、ゲストでないときだけ一覧へのリンクを出す。一覧の取得の hook とページ送りは変えない（要件 6.4）。
 - **ページ履歴**: `PageRevisionTable` は、読み込んだリビジョンの ID を印の hook に渡し（全件を読んだときも hook が 100 件ずつに分ける）、`Revision` に `proposalMark` を渡す。`Revision` は「最新」の印の隣に `ProposalMarkBadge` を出す。差分のない行の簡単な表示にも同じように出す。
 - **作者の表示**: `AuthorInfo` に任意の `badge` を足し、`PageContentFooter` と `PageSideContents` は最後に更新した人の `AuthorInfo` にだけ `CurrentRevisionProposalMark` を渡す。
 - **通知**: `useModelNotification` の `??` の並びの最後に `useChangeProposalModelNotification` を足す。既読にする動きと未読の件数は既存のまま（要件 9.7）。
