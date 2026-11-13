@@ -27,7 +27,13 @@ vi.mock('next-i18next', () => ({
 vi.mock('next/dynamic', () => ({
   default: (loader: () => Promise<unknown>) => {
     const source = String(loader);
-    if (source.includes('ChangeProposalDetail')) {
+    if (/\bChangeProposalDetailHeading\b/.test(source)) {
+      return () => <div data-testid="heading-component" />;
+    }
+    if (/\bChangeProposalNotFound\b/.test(source)) {
+      return () => <div data-testid="not-found-component" />;
+    }
+    if (/\bChangeProposalDetail\b/.test(source)) {
       return (props: { proposalId: string }) => {
         detailRendered(props);
         return <div data-testid="detail-component" />;
@@ -113,9 +119,7 @@ describe('ChangeProposalDetailPage', () => {
     mockQuery({ id });
     render(<ChangeProposalDetailPage {...detailProps} />);
 
-    expect(
-      screen.getByText('change_proposal_viewer.detail.not_found'),
-    ).toBeTruthy();
+    expect(screen.getByTestId('not-found-component')).toBeTruthy();
     expect(screen.queryByTestId('detail-component')).toBeNull();
     expect(detailRendered).not.toHaveBeenCalled();
   });
