@@ -56,7 +56,7 @@
   - Due to the nature of a one-way hash, converting scrypt → SHA-256 is impossible (unless the plaintext is known)
   - Mainstream approaches: (A) keep the old hash in a separate field + write the new hash to a new field (B) reset the password before the downgrade
   - Lesson from Magento: there was a case where an inverted-condition bug overwrote bcrypt hashes with SHA-256 (breaking the hashes of migrated users)
-- **Implications**: Adopt the dual-field approach (`password` = keep SHA-256, `passwordHash` = store scrypt). Because the old format remains in the existing field, the old version keeps working as-is even after a downgrade
+- **Implications**: Keeping the old hash alive in a second field (A) was investigated and rejected — see "Decision: no support for a program-only rollback". The supported procedure is (B)'s operational equivalent: restore the database backup taken before the upgrade. Each user therefore holds exactly one credential at a time
 
 ---
 
@@ -64,8 +64,9 @@
 
 | Option | Description | Strengths | Risks / Limitations | Assessment |
 |--------|------|------|------------|------|
-| **Single-field overwrite** | Overwrite the `password` field from SHA-256 → scrypt | Simple | Cannot log in after a downgrade; the cleanup migration is effectively a no-op | Rejected |
-| **Dual-field approach** | `password` (keep SHA-256) + `passwordHash` (new field added, stores scrypt) | Downgrade-safe, the old version keeps working as-is, clear migration-state management | Requires adding a new field to the User schema | **Adopted** |
+| **Single-field overwrite** | Overwrite the `password` field from SHA-256 → scrypt | Simple, one field | An older build reads the field and finds an unparsable value; the format cannot be told apart from the legacy one without a prefix convention | Rejected |
+| **Two fields, one populated** | `password` (legacy SHA-256) + `passwordHash` (scrypt); writing one removes the other | The format is known from which field exists; the weak hash leaves the database as each user migrates; no state needs cleaning up later | Requires adding a field to the User schema; an older build cannot verify a migrated user | **Adopted** |
+| **Two fields, both retained** | Keep the SHA-256 hash alongside the scrypt hash during the migration period | An older build keeps authenticating unmigrated users after a program-only rollback | A replaced password stays verifiable; needs cleanup / downgrade-prep / re-upgrade-prep scripts to manage and remove the second credential | Rejected (see the decision below) |
 | **passwordHashVersion field** | Manage a version flag in a separate field | Explicit | Adds a field and redundantly manages information that the hash itself can already distinguish | Rejected (distinguishable by hash prefix) |
 | **argon2id** | OWASP's top recommendation | Highest security | The native-build problem on Alpine Docker persists | Rejected (prioritize the zero-dependency scrypt) |
 
@@ -73,17 +74,28 @@
 
 ## Design Decisions
 
-### Decision: Dual-field approach
+### Decision: two credential fields, only one populated at a time
 
-- **Context**: Achieving both downgrade safety and seamless lazy migration
+- **Context**: Representing both formats during a migration that runs for as long as users keep returning
 - **Alternatives Considered**:
-  1. Single-field overwrite — overwrite `password` with scrypt. Simple but not downgrade-safe
-  2. Dual-field — keep `password` (SHA-256) + add `passwordHash` (adopted)
-  3. Format detection by prefix — both formats mixed in one field, distinguished by prefix
-- **Selected Approach**: The `password` field keeps the SHA-256 hash as-is. On login, write the scrypt hash to the `passwordHash` field. New users set only `passwordHash` (no `password`)
-- **Rationale**: Because the old version references only the `password` field, unmigrated users can still log in after a downgrade. Downgrade safety is maintained until the cleanup migration runs
-- **Trade-offs**: Requires adding the `passwordHash` field to the schema. The migration script can decide based on field presence (clearer than a regular expression)
-- **Follow-up**: Update the implementation of `isPasswordSet()` to check both fields
+  1. Single-field overwrite — one field holding either format, told apart by prefix
+  2. Two fields, exactly one populated (adopted)
+  3. Two fields both retained during the migration period — rejected, see the next decision
+- **Selected Approach**: `password` holds the legacy SHA-256 hash and `passwordHash` holds the scrypt hash. Every write of one removes the other, so which field exists *is* the user's migration state
+- **Rationale**: The format is determined by field presence rather than by parsing, which keeps verification and the status report simple, and the weak hash disappears per user at the moment that user migrates. Only three states exist, so no state has to be reconciled or cleaned up later
+- **Trade-offs**: Requires adding the `passwordHash` field to the schema, and an older build cannot verify a user who has already migrated
+- **Follow-up**: `isPasswordSet()` checks both fields, since either one means "has a password"
+
+### Decision: no support for a program-only rollback
+
+- **Context**: What happens when an administrator needs to run a build that predates scrypt
+- **Alternatives Considered**:
+  1. Retain the legacy hash during the migration period so the older build keeps working, then remove it with a cleanup script, with downgrade-prep and re-upgrade-prep scripts for the surrounding procedure
+  2. Treat restoring the pre-upgrade database backup as the supported procedure (adopted)
+- **Selected Approach**: Option 2. The database backup taken before the upgrade is restored; changes made after the upgrade are lost. Nothing in the code preserves a second credential for the older build
+- **Rationale**: Option 1 keeps the SHA-256 hash of a password that may since have been replaced, so a password the user believes they retired stays verifiable on the older build. It also needs three lifecycle scripts, each with its own abort conditions and status scoping, in the part of the system where a defect is most expensive. Comparable products (GitLab, Confluence) document backup restore as the way back rather than maintaining dual credentials
+- **Trade-offs**: If the program alone is reverted, every user who has used their local password since the upgrade must reset it. That is recoverable through `/forgot-password`; a revived leaked password is not. Accepted deliberately
+- **Follow-up**: The upgrade guide has to state the backup-restore procedure and this consequence (Req 4.1); it is delivered outside this change
 
 ### Decision: Adopt scrypt (node:crypto) (changed after re-evaluation)
 
@@ -116,7 +128,7 @@
 - **The DB search pattern of `findUserByEmailAndPassword`** — query-by-hash is impossible with the non-deterministic scrypt hash → change to the fetch-then-compare pattern. Identify and fix every place where existing code uses `{ email, password: hash }` in a query
 - **Making Passport LocalStrategy async** — currently a synchronous callback. Making it async changes error handling → explicitly call done(err) in try/catch
 - **scrypt memory consumption (operations)** — the OWASP minimum recommendation (N=2^17=131072, r=8) uses about 128MB per call. `maxmem` must be set to ≥192MB (Node's default 32MB would throw). The asynchronous `crypto.scrypt` is capped in concurrency by the libuv thread pool, so the peak is roughly "number of threads × 128MB ≈ 512MB". Factor this transient allocation into the container's memory budget, and under pressure either shrink `UV_THREADPOOL_SIZE` or consider the alternative N=2^16, r=8, p=2 ≈ 64MB/call. Rate limiting on the login endpoint is also recommended (scrypt does not have bcrypt's 72-byte truncation limit)
-- **Legacy users not logging in for a long time** — with lazy migration alone, there can be users who remain on SHA-256 forever → periodically check via the Status migration, and separately consider a forced reset after a certain period (out of this scope)
+- **Legacy users not logging in for a long time** — with lazy migration alone, users who authenticate only through an external provider, who are inactive, or who never return keep their SHA-256 hash forever, and nothing removes it in bulk. `PASSWORD_SEED` and the legacy verification path therefore have no scheduled end → watch the remaining count with the status migration and the admin screen's unmigrated-user list, and handle the stragglers by asking them to log in or by resetting their password (a forced reset after a certain period is out of this scope)
 - **User-enumeration timing attack (surfaced by the scrypt change)** — non-existent users return immediately, whereas existing users take tens to hundreds of ms due to the scrypt recomputation, so the response-time difference lets one infer whether a user exists. The difference is more pronounced than in the SHA-256 era. Mitigation: run a dummy scrypt comparison even when the user does not exist (within this scope, it is recommended to check whether rate limiting on the login endpoint already exists; if not, a separate task)
 - **Non-constant-time comparison on the legacy SHA-256 path** — `this.password === generatePassword(password)` is not a strict constant-time comparison, but because it compares hashes rather than plaintext, the actual attack risk is extremely low. It can be fully resolved by using `crypto.timingSafeEqual` on the legacy path of `PasswordHashService.verify()` (not required)
 
@@ -154,10 +166,7 @@ Verified the gaps between the requirements ↔ the existing codebase by cross-ch
 
 ### Detected gaps (to be addressed during implementation)
 
-1. **The `src/server/scripts/` directory does not yet exist**: cleanup / downgrade-prep are newly created in this directory. The standalone execution method is the same `pnpm run ts-node src/server/scripts/<name>.ts` as `repl.ts` (the `ts-node` script loads `dotenv-flow` + `tsconfig-paths`). We need to **either add an execution script entry to package.json or clearly document the execution command in the README/design**.
-2. **The reset-email sending logic is not reusable**: `sendPasswordResetEmail()` is a local function inside `forgot-password.js` and is **not exported**. It cannot be reused directly from downgrade-prep, so we need to either (a) extract it into a shared helper, or (b) duplicate the `mailService.send()` call + template inside the script. The design's "send the reset email via the existing mail service" does not make this point explicit.
-3. **`PasswordResetOrder` has both a Mongoose and a Prisma version**: `src/generated/prisma/models/passwordresetorders.ts` also exists, but `forgot-password.js` uses the Mongoose version (`~/server/models/password-reset-order`). This spec also standardizes on the Mongoose version for consistency (the Prisma version is not used).
+1. **`PasswordResetOrder` has both a Mongoose and a Prisma version**: `src/generated/prisma/models/passwordresetorders.ts` also exists, but `forgot-password.js` uses the Mongoose version (`~/server/models/password-reset-order`). This spec also standardizes on the Mongoose version for consistency (the Prisma version is not used).
 
 ### Implications
 - Most of the premises actually exist, and there is no integration blocker that would prevent the scrypt migration.
-- The above gaps 1 and 2 affect the implementation details of downgrade-prep (task 4.3), so reflecting them in the design/tasks will make implementation smoother.

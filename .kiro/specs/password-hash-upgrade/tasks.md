@@ -45,17 +45,17 @@
   - _Requirements: 2.2, 2.3_
   - _Boundary: User Model_
 
-- [x] 2.2 Make isPasswordValid, setPassword, and updatePassword async and delegate to PasswordHashService
+- [ ] 2.2 Make isPasswordValid, setPassword, and updatePassword async and delegate to PasswordHashService
   - Make `isPasswordValid(password)` async: call `PasswordHashService.verify(password, this.passwordHash, this.password, SEED)` and return the `VerifyResult`
-  - Make `setPassword(password, options?)` async: set `this.passwordHash = await PasswordHashService.hash(password)` **and retire the legacy `password` (SHA-256) field** (`this.password = undefined` → `$unset` on save). A replaced password must not stay verifiable: otherwise, after a change/reset, the OLD password still authenticates on a downgraded build. The exception is `options.keepLegacyHash: true`, passed only by the lazy migration in `verifyLocalCredentials`, which re-hashes the SAME password and therefore keeps the legacy field (the `both` state = downgrade safety during the migration period)
+  - Make `setPassword(password)` async: set `this.passwordHash = await PasswordHashService.hash(password)` **and always remove the legacy `password` (SHA-256) field** (`this.password = undefined` → `$unset` on save). There is no opt-out: a replaced password must not stay verifiable anywhere, and a second credential that nothing ever removes must not exist
   - Update all **five existing methods** that call `setPassword` to add `await` (if left un-awaited, `save()` would persist without passwordHash set, making login impossible):
     - `updatePassword` (v8: setPassword call at line ~230)
     - `activateInvitedUser` (v8: line ~299) — invited-user activation. **If missing, the affected user cannot log in**
     - `resetPasswordByRandomString` (v8: line ~598)
     - `createUserByEmail` (v8: line ~614) — email-invited user creation. **If missing, the affected user cannot log in**
     - `createUserByEmailAndPasswordAndStatus` (v8: line ~706)
-  - Confirm that after `setPassword()` `passwordHash` is set and the legacy `password` field is cleared (and that `{ keepLegacyHash: true }` keeps it), and that all five callers work without TypeScript compilation errors
-  - _Requirements: 1.1, 1.3, 2.1, 2.2_
+  - Confirm that after `setPassword()` `passwordHash` is set and the legacy `password` field is cleared on every path, and that all five callers work without TypeScript compilation errors
+  - _Requirements: 1.1, 1.3, 1.5, 2.1, 2.2_
   - _Boundary: User Model_
 
 - [x] 2.3 Remove findUserByEmailAndPassword (dead code)
@@ -111,19 +111,19 @@
   - _Boundary: User Model_
 
 - [ ] 3. (P) Making Passport LocalStrategy async and integrating lazy migration
-- [x] 3.1 Make Passport LocalStrategy async and trigger lazy migration
+- [ ] 3.1 Make Passport LocalStrategy async and trigger lazy migration
   - Change or wrap `findUserByUsernameOrEmail` from callback style to Promise-based (async/await)
   - Change the LocalStrategy callback to an async function, passing all errors to `done(err)` in a try/catch
-  - When `VerifyResult.needsRehash === true` (on successful legacy authentication): execute `await user.setPassword(password, { keepLegacyHash: true })` + `await user.save()` before returning `done(null, user)` (`keepLegacyHash` retains the legacy SHA-256 field — this path re-hashes the SAME password, so nothing is retired)
+  - When `VerifyResult.needsRehash === true` (on successful legacy authentication): execute `await user.setPassword(password)` + `await user.save()` before returning `done(null, user)`; that single save writes the scrypt hash and removes the legacy SHA-256 field together
   - On a `save()` failure during lazy migration, record an error log but still let the login succeed (it can be retried on the next login)
   - When `isValid === false`, return `done(null, false)`
-  - Confirm that when a user with a SHA-256 hash logs in for the first time, the `passwordHash` field is set in the DB
+  - Confirm that when a user with a SHA-256 hash logs in for the first time, the `passwordHash` field is set in the DB **and the `password` field is gone**
   - _Requirements: 2.1, 2.2, 2.3_
   - _Depends: 2.2, 2.3_
   - _Boundary: Passport LocalStrategy_
 
-- [x] 3.2 Create integration tests for the login flow
-  - Confirm that a legacy SHA-256 user logs in successfully and that after lazy migration `passwordHash` is written to the DB
+- [ ] 3.2 Create integration tests for the login flow
+  - Confirm that a legacy SHA-256 user logs in successfully and that after lazy migration `passwordHash` is written to the DB and `password` is unset
   - Confirm that a scrypt user logs in successfully and that no rehash occurs
   - Confirm that login fails with invalid credentials
   - Confirm that local login fails for a user with no password set (both fields absent), and that **no WARNING log is emitted** (Req 2.5)
@@ -131,90 +131,34 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
   - _Boundary: Passport LocalStrategy_
 
-- [ ] 4. (P) Implementing the migration scripts
-- [x] 4.1 (P) Implement the Status migration script
+- [ ] 4. (P) Implementing the status migration
+- [ ] 4.1 (P) Implement the Status migration script
   - Create the `20260724000001-password-hash-status` migration (**v8: use a timestamp later than the current latest `20260721103639`**. The old `20260514000001` would become a past date and migrate-mongo would treat it as out-of-order, so it is not allowed)
-  - Inside `up()`, tally the number of users in the following 4 categories (no DB writes):
-    - upgradedOnly (`passwordHash` present, `password` absent): fully migrated
-    - both (both fields present): mid-migration
+  - Inside `up()`, tally the number of users in the following 3 categories (no DB writes):
+    - upgradedOnly (`passwordHash` present, `password` absent): migrated
     - legacyOnly (`passwordHash` absent, `password` present): not yet migrated
     - noPassword (both fields absent): password not set
   - Output the tally results to stdout via `logger.info`
-  - Confirm that after running the migration nothing has been written to the DB and that the 4-category counts are output to logger.info
+  - Confirm that after running the migration nothing has been written to the DB and that the 3-category counts are output to logger.info
   - _Requirements: 3.1, 3.2_
   - _Boundary: Status migration script_
 
-- [x] 4.2 (P) Implement the Cleanup standalone script
-  - Create `apps/app/src/server/scripts/password-hash-cleanup.ts` (a standalone script not managed by migrate-mongo)
-  - At script start, get the number of `legacyOnly` users (`passwordHash` absent, `password` present) **among ACTIVE users** (`activeUserFilter`), plus the non-active count separately
-  - If the ACTIVE `legacyOnly` count > 0: output an error message (including both counts) and process.exit(1) (Req 3.4). Non-active `legacyOnly` users must NOT block the abort — they can never log in, so lazy migration can never migrate them and the cleanup phase would be unreachable forever; WARN about them instead
-  - Otherwise: `$unset` the legacy `password` from every `both`-category user via `updateMany(bothFilter, { $unset: { password: '' } })`, using the shared `bothFilter` from `password-hash-format-filters.ts` (Req 3.3). This write is deliberately NOT status-scoped
-  - Confirm that when ACTIVE `legacyOnly` users exist it aborts with no changes made to the DB, that the error message includes the count, and that a non-active `legacyOnly` user alone does not abort the run
-  - _Requirements: 3.3, 3.4_
-  - _Boundary: Cleanup migration script_
-
-- [x] 4.3 (P) Implement the Downgrade prep standalone script
-  - Create `apps/app/src/server/scripts/password-hash-downgrade-prep.ts` (a standalone script that requires the Crowi bootstrap)
-  - In the script, tally and log the number of users who would be unable to log in after a downgrade (`passwordHash` present, `password` absent), split into ACTIVE (processed) and non-active (reported only) (Req 4.1)
-  - When the environment variable `SEND_RESET_EMAILS` is `'true'`:
-    - For each **ACTIVE** target user, create a `PasswordResetOrder` and send a reset email using the existing mail service (Req 4.2). Non-active users are never emailed and never `$unset`: `/forgot-password` rejects them on both POST and PUT, so removing their `passwordHash` would be a permanent lockout — WARN and leave them for manual handling
-    - **Only after confirming the email was sent successfully**, `$unset` (remove the field entirely) the `passwordHash` of the successful users to make login impossible (Req 4.3)
-    - **CRITICAL**: use `$unset` (remove the field entirely) rather than assigning `null`/`''`. The shared classification filters treat a `null`/empty credential as ABSENT (`present` = `{ $exists: true, $nin: [null, ''] }`), so `$unset` moves the user cleanly to `noPassword`; leaving a stray `null`/`''` field is avoided for consistency with `statusDelete`'s `undefined` scrub, keeping counts accurate and preventing duplicate email sends on re-run
-    - Do not unset users whose send failed (they can be retried on the next re-run)
-    - Log the success and failure counts at INFO/WARNING respectively
-  - Confirm that when `SEND_RESET_EMAILS` is unset only the tally counts are output and the DB is not changed
-  - _Requirements: 4.1, 4.2, 4.3_
-  - _Boundary: Downgrade prep migration script_
-
-- [x] 4.4 (P) Implement the Re-upgrade prep standalone script
-  - Create `apps/app/src/server/scripts/password-hash-reupgrade-prep.ts` (a standalone script not managed by migrate-mongo), run when returning to the new build after a temporary downgrade
-  - `$unset` the scrypt `passwordHash` from every `both`-category user via `updateMany(bothFilter, { $unset: { passwordHash: '' } })`, using the shared `bothFilter` from `password-hash-format-filters.ts` (Req 4.4). This closes the reverse resurrection hole: a password changed on the downgraded build is written only to the legacy `password`, so the surviving `passwordHash` is stale; because `verify()` always prefers `passwordHash`, removing it forces re-verification against the current legacy `password` and re-migration on the next login
-  - This write is deliberately NOT status-scoped: every `both` user retains a live legacy `password`, so removing `passwordHash` can never strip a user's only credential (contrast downgrade-prep, which is ACTIVE-only because it strips `passwordHash` from `upgradedOnly` users who have none)
-  - Reset ALL `both` users unconditionally: a hash cannot be reversed, so the changed-on-old-build subset is indistinguishable; resetting an unchanged user is harmless (one re-migration). The run is idempotent (after it, targets are `legacyOnly`, so a re-run finds none)
-  - _Requirements: 4.4_
-  - _Boundary: Re-upgrade prep script_
-
-- [ ] 5. Integration tests for the migration scripts
-- [x] 5.1 (P) Create integration tests for the Status migration script
-  - Prepare users in the 4 categories (upgradedOnly, both, legacyOnly, noPassword) in the test DB
+- [ ] 5. Integration tests for the status migration
+- [ ] 5.1 (P) Create integration tests for the Status migration script
+  - Prepare users in the 3 categories (upgradedOnly, legacyOnly, noPassword) in the test DB
   - Confirm that after running `up()` each count matches its expected value
   - Confirm that after running `up()` no user document in the DB has been changed at all
   - Confirm that the integration test PASSes
   - _Requirements: 3.1, 3.2_
   - _Boundary: Status migration script_
 
-- [x] 5.2 (P) Create integration tests for the Cleanup standalone script
-  - Confirm that with ACTIVE `legacyOnly` users present the script run aborts and no user document is changed, and that a NON-ACTIVE `legacyOnly` user does not block the run (it is only reported)
-  - Confirm that when all users are already migrated to `passwordHash` the `password` field is `$unset`
-  - Confirm that the integration test PASSes
-  - _Requirements: 3.3, 3.4_
-  - _Boundary: Cleanup migration script_
-
-- [x] 5.3 (P) Create integration tests for the Downgrade prep standalone script
-  - Confirm that when `SEND_RESET_EMAILS` is unset the DB is not changed and only the counts are output
-  - Confirm that when `SEND_RESET_EMAILS=true` a `PasswordResetOrder` is created for the target users
-  - Confirm that when `SEND_RESET_EMAILS=true` only users whose email was sent successfully have their `passwordHash` `$unset` (field absent), and that the `passwordHash` of users whose send failed is unchanged
-  - Confirm that a NON-ACTIVE `upgradedOnly` user is never emailed and never `$unset` (it is only counted)
-  - Confirm that a user after `$unset` is classified as `noPassword` by the status migration and does not remain in `upgradedOnly` (regression prevention for duplicate email sends)
-  - Confirm that the integration test PASSes
-  - _Requirements: 4.1, 4.2, 4.3_
-  - _Boundary: Downgrade prep migration script_
-
-- [x] 5.4 (P) Create integration tests for the Re-upgrade prep standalone script
-  - Confirm that `passwordHash` is `$unset` from every `both` user regardless of status (ACTIVE and non-active), leaving the legacy `password` intact
-  - Confirm that `legacyOnly` (no passwordHash to remove) and `upgradedOnly` (no legacy password, so it cannot hold a stale hash) users are left untouched
-  - Confirm that the run is idempotent (a second run finds no `both` users and writes nothing)
-  - Confirm that the integration test PASSes
-  - _Requirements: 4.4_
-  - _Boundary: Re-upgrade prep script_
-
 - [ ] 6. Confirming resolution of the CodeQL alert (CWE-916 / #541)
 - [ ] 6.1 Re-scan CodeQL after implementation and confirm the alert state
   _Manual/CI: CodeQL runs on GitHub Actions, so it cannot be confirmed in the devcontainer. After pushing the branch, confirm the state of #541 in the CI CodeQL re-scan._
-  _Code-level evidence (confirmed in this run): the password **storage** path is scrypt-only (`hash()` in `password-hash.ts` is scrypt, and `setPassword` delegates to `hash()`). SHA-256 remains only in the legacy **verification** path (`SHA256(SEED+plaintext)` inside `verifyLegacy` at `password-hash.ts:248`) and cannot be removed for Req 2.1 backward compatibility. The sha256 at `user/index.js:163` is `generateApiToken` (out of scope). → The CWE-916 storage-path vulnerability is resolved. If the legacy verification line is re-flagged by CodeQL, apply a dismissal of "migration-period-only, not used for new storage, to be removed after Cleanup"; full green is achieved after the Cleanup phase._
+  _Code-level evidence (confirmed in this run): the password **storage** path is scrypt-only (`hash()` in `password-hash.ts` is scrypt, and `setPassword` delegates to `hash()`). SHA-256 remains only in the legacy **verification** path (`SHA256(SEED+plaintext)` inside `verifyLegacy` at `password-hash.ts:248`) and cannot be removed for Req 2.1 backward compatibility. The sha256 at `user/index.js:163` is `generateApiToken` (out of scope). → The CWE-916 storage-path vulnerability is resolved. If the legacy verification line is re-flagged by CodeQL, it needs a dismissal that does not promise a removal date: nothing forces the remaining legacy hashes to disappear, so the verification path can only go once an operator confirms via the status report that no user holds one._
   - Confirm via a CodeQL re-scan whether making the storage path scrypt-based resolves `js/insufficient-password-hash` (alert #541)
-  - If the legacy verification path (`SHA256(SEED + plaintext)` inside `verify()`) is re-flagged, apply a **justified dismissal** at that location (e.g. "for migration-period-only legacy hash verification. Not used for new storage. Scheduled for removal after Cleanup")
-  - Record in the PR / Issue that the SHA-256 computation cannot be removed for backward compatibility (Req 2.1) and that full green is achieved once the legacy verification code is deleted in the Cleanup phase
+  - If the legacy verification path (`SHA256(SEED + plaintext)` inside `verify()`) is re-flagged, apply a **justified dismissal** at that location (e.g. "legacy hash verification only. Not used for new storage. Removable once no user holds a legacy hash")
+  - Record in the PR / Issue that the SHA-256 computation cannot be removed for backward compatibility (Req 2.1), and that it has **no scheduled removal date**: a user who never uses their local password keeps their legacy hash indefinitely, so the status report is what tells an operator when the path can finally be deleted
   - Confirm that the alert is resolved on CodeQL (or a justified dismissal is applied)
   - _Requirements: 1.1, 1.3_
   - _Boundary: PasswordHashService_
@@ -225,7 +169,6 @@ This spec is implemented on the 8.0.x line (`feat/170496-password-hash-algorithm
 
 - **Imports have no extension** (do not write `.js`/`.jsx` in relative / `~/` specifiers; `.js` is added only in the build output). The imports in `password-hash.ts` and each modified file follow this convention.
 - **The User model is still Mongoose `.js` in v8** (`src/server/models/user/index.js`). Since it has not been migrated to Prisma, edit the Mongoose methods as designed.
-- **Standalone scripts (4.2 / 4.3)**: `src/server/scripts/` does not exist yet in v8, so create it new. Run them with `pnpm run tsrun <path>` (not `ts-node`, but the ESM runner that `--import`s `bin/runtime/dev-esm-resolver.mjs` + `bin/runtime/env-preload.mjs`). The downgrade-prep Crowi bootstrap must also work under ESM.
 - **migrate-mongo (4.1)**: the v8 config is `config/migrate-mongo-config.cjs` (the trigger `pnpm run migrate:migrate-mongo` itself is unchanged). The migration file is `.js` and the co-located integration test is `.integ.ts` (following the existing example `20260721103639-backfill-users-timestamps.integ.ts`). Use a timestamp later than the current latest (`20260721103639`).
 - **server-boot-imports**: `PasswordHashService` uses only `node:crypto` (no added cost), so a top-level import is fine. It does not violate the lazy-loading convention for heavyweight SDKs.
 - **activity-recording**: this spec only edits conditional expressions within existing routes (login / personal-setting / user-activation), with no route additions or middleware-order changes, so no activity-recording changes are needed.
@@ -238,5 +181,5 @@ This spec is implemented on the 8.0.x line (`feat/170496-password-hash-algorithm
 - **PROCESS (v8)**: Subagents tend to skip the heavy `tsgo --noEmit` (~400s), and **biome/vitest do not detect type errors**, so type errors slipped through commits (tasks 1.2/2.2). Actually occurred: ① pino's `logger.warn` takes **an object as the first argument** (`logger.warn({ error }, 'msg')`. String-first, object-second is TS2769) ② `crowi.env` from `mockDeep<Crowi>()` is a proxy type, so assigning `crowi.env = {…}` is not allowed; set the property as `crowi.env.PASSWORD_SEED = …`. **Run `pnpm exec tsgo --noEmit` once at the completion of each group** (`lint:typecheck` = `tsgo --noEmit`).
 - **3.1 (v8)**: Extract the LocalStrategy verify logic into an exported pure function `verifyLocalCredentials(User, username, password, done)` and make `setupLocalStrategy` a thin adapter. `findUserByUsernameOrEmail` (callback) is Promise-wrapped inside passport.ts (the User model is unchanged = boundary maintained). On `needsRehash`, `setPassword`+`save`; a failure of that save is logged only and login continues to succeed. All errors go through try/catch → `done(err)`.
 - **2.4 (v8)**: `omitInsecureAttributes()` uses destructure-drop (`const { password, passwordHash, apiToken, email, ...rest }`) for runtime exclusion. `passwordHash` was also added to the Omit union of `IUserSerializedSecurely`. `passwordHash?: string` on `IUser`. The changeset is `.changeset/password-hash-omit.md` (@growi/core patch). **Because @growi/core consumers import `dist`, `turbo run build --filter @growi/core` is required before the app-level integ tests (2.8/3.2)**. Note: subagent tool executions leak grep/echo permissions into `.claude/settings.json` (outside the boundary) → revert with `git checkout -- .claude/settings.json` before committing.
-- **2.2 (v8)**: The User model uses the default singleton via `import { passwordHashService } from '~/server/service/password-hash';` (no extension). `isPasswordValid` passes `crowi.env.PASSWORD_SEED` (= the same accessor as the existing generatePassword) to verify and returns `Promise<VerifyResult>` (not boolean → external callers are awaited in 2.5/3.1). `setPassword` writes `this.passwordHash` and, by default, RETIRES the legacy `this.password`; only the Passport lazy re-hash passes `keepLegacyHash: true` (same password, nothing replaced) — see the credential-revocation note in design.md. (This entry originally recorded the pre-review behaviour of leaving `password` untouched.) All 5 callers (updatePassword/activateInvitedUser/resetPasswordByRandomString/createUserByEmail/createUserByEmailAndPasswordAndStatus) are awaited. `generatePassword` is kept through 2.3 (findUserByEmailAndPassword is its last caller). This change resolves 2 pre-existing useAwait warnings in updatePassword/activateInvitedUser.
+- **2.2 (v8)**: The User model uses the default singleton via `import { passwordHashService } from '~/server/service/password-hash';` (no extension). `isPasswordValid` passes `crowi.env.PASSWORD_SEED` (= the same accessor as the existing generatePassword) to verify and returns `Promise<VerifyResult>` (not boolean → external callers are awaited in 2.5/3.1). `setPassword` writes `this.passwordHash` and always removes the legacy `this.password`, with no opt-out — see the credential-revocation note in design.md. All 5 callers (updatePassword/activateInvitedUser/resetPasswordByRandomString/createUserByEmail/createUserByEmailAndPasswordAndStatus) are awaited. `generatePassword` is kept through 2.3 (findUserByEmailAndPassword is its last caller). This change resolves 2 pre-existing useAwait warnings in updatePassword/activateInvitedUser.
 - **1.3 (v8)**: All required matrix cases of 1.3 + the optional extension (weak parameters → needsRehash:true) are already covered by `password-hash.spec.ts` (all 12 cases) created in 1.2. Confirmed no additional tests are needed and completed 1.3. noPassword treats an empty string as absent too, and malformed verifies 3 cases: invalid scrypt envelope / non-hex legacy / corrupt envelope.
