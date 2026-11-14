@@ -24,10 +24,10 @@ import { judge } from '@growi/chat';
 
 import { toProtocolChannelRef } from '../capabilities/index.js';
 import {
+  type ChannelPermissionRecord,
   createChannelPermissionRepository,
   createRelationRepository,
   type DbClient,
-  type PermittedChannels,
 } from '../db/index.js';
 import type { Relation, SdkChannelRef } from '../types/index.js';
 import { growiBasePathOf } from './growi-uri-resolver.js';
@@ -206,13 +206,19 @@ const matchByUrl = (
 const settingsFor = (
   relationId: string,
   commandName: CommandName,
-  channels: PermittedChannels | null,
+  permission: ChannelPermissionRecord | null,
 ): RelationSettings | null =>
-  channels == null
+  permission == null
     ? null
     : {
         relationId,
-        channelPermissions: [{ commandName, allowedChannels: channels }],
+        channelPermissions: [
+          {
+            commandName,
+            allowedChannels: permission.channels,
+            allowedInDirectMessage: permission.allowedInDirectMessage,
+          },
+        ],
       };
 
 interface Judged {
@@ -235,12 +241,12 @@ export const createGrowiSelector = (deps: GrowiSelectorDeps): GrowiSelector => {
     const protocolChannel = toProtocolChannelRef(channel);
     return Promise.all(
       candidates.map(async (relation) => {
-        const channels = await permissions.find(
+        const permission = await permissions.find(
           relation.relationId,
           commandName,
         );
         const verdict = judge(
-          settingsFor(relation.relationId, commandName, channels),
+          settingsFor(relation.relationId, commandName, permission),
           commandName,
           protocolChannel,
         );

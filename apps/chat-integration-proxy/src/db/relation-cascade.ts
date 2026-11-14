@@ -36,6 +36,7 @@ import type {
   ChannelPermissionRepository,
   OwnKeyRepository,
   PeerKeyRepository,
+  PendingAgentRequestRepository,
   PendingCollectionRepository,
   ProcessedNotificationRepository,
   RelationRepository,
@@ -53,6 +54,7 @@ export interface RelationCascadeRepositories {
   readonly peerKeys: PeerKeyRepository;
   readonly channelPermissions: ChannelPermissionRepository;
   readonly pendingCollections: PendingCollectionRepository;
+  readonly pendingAgentRequests: PendingAgentRequestRepository;
   readonly processedNotifications: ProcessedNotificationRepository;
 }
 
@@ -79,6 +81,7 @@ export const deleteRelationCascade = async (
   await repositories.peerKeys.deleteByRelation(relationId);
   await repositories.channelPermissions.deleteByRelation(relationId);
   await repositories.pendingCollections.deleteByRelation(relationId);
+  await repositories.pendingAgentRequests.deleteByRelation(relationId);
   await repositories.processedNotifications.deleteByRelation(relationId);
   await repositories.relations.remove(relationId);
 };

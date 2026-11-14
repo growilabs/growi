@@ -290,6 +290,7 @@ describe('the periodic work createProxyDependencies composes', () => {
       db.requestNonce,
       db.processedNotificationTarget,
       db.pendingCollection,
+      db.pendingAgentRequest,
       db.pairingOrder,
     ]) {
       delegate.deleteMany.mockResolvedValue({ count: 0 });
@@ -316,7 +317,7 @@ describe('the periodic work createProxyDependencies composes', () => {
     return { deps: captured, db, locks };
   };
 
-  it('declares exactly the four tables design.md lists under 期限切れの掃除', async () => {
+  it('declares exactly the tables design.md lists under 期限切れの掃除', async () => {
     const { deps } = await capture();
 
     // Asserted by name and as a whole list: a missing entry is a table that
@@ -326,6 +327,7 @@ describe('the periodic work createProxyDependencies composes', () => {
       'request_nonce',
       'processed_notification_target',
       'pending_collection',
+      'pending_agent_request',
       'pairing_order',
     ]);
   });
@@ -337,6 +339,7 @@ describe('the periodic work createProxyDependencies composes', () => {
       request_nonce: db.requestNonce,
       processed_notification_target: db.processedNotificationTarget,
       pending_collection: db.pendingCollection,
+      pending_agent_request: db.pendingAgentRequest,
       pairing_order: db.pairingOrder,
     } as const;
 

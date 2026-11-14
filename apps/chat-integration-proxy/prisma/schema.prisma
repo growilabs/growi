@@ -81,6 +81,7 @@ model Relation {
   processedNotificationTargets ProcessedNotificationTarget[]
   channelPermissions           ChannelPermission[]
   pendingCollections           PendingCollection[]
+  pendingAgentRequests         PendingAgentRequest[]
   pairingOrders                PairingOrder[]
 
   @@unique([installationId, growiUri])
@@ -205,22 +206,47 @@ model InstallationChannel {
 // `COMMAND_TRAITS`' `targeting`) and no per-row `updated_at` (there is one
 // version per relation: `relation.settings_version`).
 model ChannelPermission {
-  id          String   @id @default(uuid()) @db.Uuid
-  relationId  String   @map("relation_id") @db.Uuid
-  commandName String   @map("command_name")
-  channels    String[]
+  id                     String   @id @default(uuid()) @db.Uuid
+  relationId             String   @map("relation_id") @db.Uuid
+  commandName            String   @map("command_name")
+  channels               String[]
   // `RelationSettings.allowedChannels` has three values -- `'all'`, `'none'`
   // and a list of channel ids -- and `channels` alone can only carry two of
   // them. An empty list already means `'none'` (nothing matches), so storing
   // `'all'` as an empty list would read back as its exact opposite, and
   // deleting the row instead reads as `'no-settings'`, which `judge()` turns
   // into a DENIAL for write commands. This flag is the third value.
-  allowAll    Boolean  @default(false) @map("allow_all")
+  allowAll               Boolean  @default(false) @map("allow_all")
+  // `RelationSettings.channelPermissions[].allowedInDirectMessage`. Read only
+  // for a command whose `directMessagePolicy` is `'separate-flag'`; an omitted
+  // value is stored as `false`, which `judge()` reads as "not allowed".
+  allowedInDirectMessage Boolean  @default(false) @map("allowed_in_direct_message")
 
   relation Relation @relation(fields: [relationId], references: [id], onDelete: Restrict)
 
   @@unique([relationId, commandName])
   @@map("channel_permission")
+}
+
+// An `agent` request GROWI accepted, kept so the answer can be delivered
+// later without GROWI ever knowing where the question was asked.
+model PendingAgentRequest {
+  relationId        String    @map("relation_id") @db.Uuid
+  requestId         String    @map("request_id")
+  installationId    String    @map("installation_id")
+  // `StoredAnswerOrigin` (pending-agent-request-repository.ts).
+  origin            Json
+  // 'delivering', 'delivered' or 'undeliverable'; NULL until a delivery starts.
+  deliveryStatus    String?   @map("delivery_status")
+  // When `deliveryStatus` became 'delivering'.
+  deliveryClaimedAt DateTime? @map("delivery_claimed_at") @db.Timestamptz(3)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(3)
+
+  relation Relation @relation(fields: [relationId], references: [id], onDelete: Restrict)
+
+  @@id([relationId, requestId])
+  @@index([expiresAt])
+  @@map("pending_agent_request")
 }
 
 // A command invocation waiting for more input (a modal submission, a

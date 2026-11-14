@@ -31,6 +31,7 @@ import type {
   OwnKeyRepository,
   PairingOrderRepository,
   PeerKeyRepository,
+  PendingAgentRequestRepository,
   PendingCollectionRepository,
   ProcessedNotificationRepository,
   RelationRepository,
@@ -58,6 +59,7 @@ export interface InstallationStoreDeps {
   readonly peerKeys: PeerKeyRepository;
   readonly channelPermissions: ChannelPermissionRepository;
   readonly pendingCollections: PendingCollectionRepository;
+  readonly pendingAgentRequests: PendingAgentRequestRepository;
   readonly processedNotifications: ProcessedNotificationRepository;
   readonly pairingOrders: PairingOrderRepository;
   readonly channels: InstallationChannelRepository;

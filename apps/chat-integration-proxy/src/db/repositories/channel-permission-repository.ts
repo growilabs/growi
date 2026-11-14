@@ -31,6 +31,12 @@ import type { DbClient } from '../prisma-client.js';
  */
 export type PermittedChannels = ReadonlyArray<NativeChannelId> | 'all';
 
+export interface ChannelPermissionRecord {
+  readonly channels: PermittedChannels;
+  /** Read by `judge()` only for a command whose DMs have their own flag. */
+  readonly allowedInDirectMessage: boolean;
+}
+
 export interface ChannelPermissionRepository {
   /**
    * What is permitted for `(relationId, commandName)`, or `null` when no
@@ -41,12 +47,17 @@ export interface ChannelPermissionRepository {
   find(
     relationId: string,
     commandName: string,
-  ): Promise<PermittedChannels | null>;
-  /** Creates or replaces what is permitted for `(relationId, commandName)`. */
+  ): Promise<ChannelPermissionRecord | null>;
+  /**
+   * Creates or replaces what is permitted for `(relationId, commandName)`.
+   * An omitted `allowedInDirectMessage` is stored as `false`: the replaced
+   * row's flag is never carried over.
+   */
   upsert(
     relationId: string,
     commandName: string,
     channels: PermittedChannels,
+    options?: { readonly allowedInDirectMessage?: boolean },
   ): Promise<void>;
   /**
    * Deletes every row for a relation. Part of the unpairing sequence
@@ -64,25 +75,32 @@ export const createChannelPermissionRepository = (
   find: async (relationId, commandName) => {
     const row = await db.channelPermission.findUnique({
       where: { relationId_commandName: { relationId, commandName } },
-      select: { channels: true, allowAll: true },
+      select: { channels: true, allowAll: true, allowedInDirectMessage: true },
     });
     if (row == null) {
       return null;
     }
     // An entry that is not a service's own id can match no channel, since
     // every comparison is between such ids; it is dropped, which denies.
-    return row.allowAll
-      ? 'all'
-      : row.channels.flatMap((channel) => parseNativeChannelId(channel) ?? []);
+    return {
+      channels: row.allowAll
+        ? 'all'
+        : row.channels.flatMap(
+            (channel) => parseNativeChannelId(channel) ?? [],
+          ),
+      allowedInDirectMessage: row.allowedInDirectMessage,
+    };
   },
 
-  upsert: async (relationId, commandName, channels) => {
+  upsert: async (relationId, commandName, channels, options) => {
     // The list is emptied when the flag is set, so the two columns can never
     // disagree about what the row permits.
-    const stored =
-      channels === 'all'
+    const stored = {
+      ...(channels === 'all'
         ? { channels: [], allowAll: true }
-        : { channels: [...channels], allowAll: false };
+        : { channels: [...channels], allowAll: false }),
+      allowedInDirectMessage: options?.allowedInDirectMessage ?? false,
+    };
     await db.channelPermission.upsert({
       where: { relationId_commandName: { relationId, commandName } },
       create: { relationId, commandName, ...stored },

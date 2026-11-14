@@ -8,6 +8,7 @@
 // layer's public contract.
 
 export type {
+  ChannelPermissionRecord,
   ChannelPermissionRepository,
   PermittedChannels,
 } from './channel-permission-repository.js';
@@ -35,6 +36,14 @@ export type {
 export { createPairingOrderRepository } from './pairing-order-repository.js';
 export type { PeerKeyRepository } from './peer-key-repository.js';
 export { createPeerKeyRepository } from './peer-key-repository.js';
+export type {
+  AgentDeliveryStatus,
+  NewPendingAgentRequest,
+  PendingAgentRequestRecord,
+  PendingAgentRequestRepository,
+  StoredAnswerOrigin,
+} from './pending-agent-request-repository.js';
+export { createPendingAgentRequestRepository } from './pending-agent-request-repository.js';
 export type {
   NewPendingCollection,
   PendingCollectionRecord,

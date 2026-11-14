@@ -11,7 +11,8 @@
 // instance at a time:
 //
 //  1. **Reaping expired rows** -- `request_nonce`, `processed_notification_
-//     target`, `pending_collection` and `pairing_order` (design.md's 期限切れ
+//     target`, `pending_collection`, `pending_agent_request` and
+//     `pairing_order` (design.md's 期限切れ
 //     の掃除 paragraph). Retention is what makes the replay refusals in
 //     Requirement 10.4 enforceable without the tables growing without bound,
 //     and reaping `pending_collection` is what stops a component posted long

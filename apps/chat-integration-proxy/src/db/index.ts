@@ -19,7 +19,7 @@
 export type { DbClient, PrismaClient } from './prisma-client.js';
 export { createPrismaClient } from './prisma-client.js';
 // The one composed sequence this layer publishes rather than a single-table
-// primitive: removing one relation touches six repositories in a fixed order,
+// primitive: removing one relation touches seven repositories in a fixed order,
 // and it has callers in two different layers (`platform/` and `relation/`).
 // See the file's own header for why it lives here and not in `relation/`.
 export type { RelationCascadeRepositories } from './relation-cascade.js';

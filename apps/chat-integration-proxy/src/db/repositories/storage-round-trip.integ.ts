@@ -16,19 +16,25 @@ import { generateKeyPairSync, randomUUID, sign, verify } from 'node:crypto';
 import { toNativeChannelId } from '@growi/chat';
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { testSdkChannelId } from '../../capabilities/test-channels.js';
+import {
+  testSdkChannel,
+  testSdkChannelId,
+} from '../../capabilities/test-channels.js';
 import type {
   InstallationCredentials,
   Invocation,
   SdkChannelId,
 } from '../../types/index.js';
 import { createPrismaClient, type PrismaClient } from '../prisma-client.js';
+import { deleteRelationCascade } from '../relation-cascade.js';
 import { createChannelPermissionRepository } from './channel-permission-repository.js';
 import { createInstallationChannelRepository } from './installation-channel-repository.js';
 import { createInstallationRepository } from './installation-repository.js';
 import { createOwnKeyRepository } from './own-key-repository.js';
 import { createPairingOrderRepository } from './pairing-order-repository.js';
 import { createPeerKeyRepository } from './peer-key-repository.js';
+import type { StoredAnswerOrigin } from './pending-agent-request-repository.js';
+import { createPendingAgentRequestRepository } from './pending-agent-request-repository.js';
 import { createPendingCollectionRepository } from './pending-collection-repository.js';
 import { createProcessedNotificationRepository } from './processed-notification-repository.js';
 import { createRelationRepository } from './relation-repository.js';
@@ -131,6 +137,9 @@ afterAll(async () => {
     where: { relationId: { in: relationIds } },
   });
   await prisma.pendingCollection.deleteMany({
+    where: { relationId: { in: relationIds } },
+  });
+  await prisma.pendingAgentRequest.deleteMany({
     where: { relationId: { in: relationIds } },
   });
   await prisma.processedNotificationTarget.deleteMany({
@@ -498,11 +507,27 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
     ]);
     await expect(
       channelPermissions.find(relation.relationId, 'search'),
-    ).resolves.toEqual(['C0001', 'C0002']);
+    ).resolves.toEqual({
+      channels: ['C0001', 'C0002'],
+      allowedInDirectMessage: false,
+    });
+
+    // The direct-message flag survives a round trip, and an upsert that does
+    // not mention it clears it (Requirement 11.7).
+    await channelPermissions.upsert(relation.relationId, 'agent', [], {
+      allowedInDirectMessage: true,
+    });
+    await expect(
+      channelPermissions.find(relation.relationId, 'agent'),
+    ).resolves.toEqual({ channels: [], allowedInDirectMessage: true });
+    await channelPermissions.upsert(relation.relationId, 'agent', []);
+    await expect(
+      channelPermissions.find(relation.relationId, 'agent'),
+    ).resolves.toEqual({ channels: [], allowedInDirectMessage: false });
 
     await expect(
       channelPermissions.deleteByRelation(relation.relationId),
-    ).resolves.toBe(1);
+    ).resolves.toBe(2);
     await expect(
       channelPermissions.find(relation.relationId, 'search'),
     ).resolves.toBeNull();
@@ -618,6 +643,161 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
 
     await prisma.pendingCollection.deleteMany({
       where: { correlationId: freshId },
+    });
+  });
+
+  describe('pending agent requests (Requirement 15.7)', () => {
+    const originOf = (channelId: string): StoredAnswerOrigin => ({
+      channel: testSdkChannel('slack', {
+        channelId: testSdkChannelId('slack', channelId),
+        isDirectMessage: true,
+      }),
+      actor: { platform: 'slack', accountId: 'U0001', displayName: 'Alice' },
+      sourceMessageId: '1700000000.000100',
+      threadRootId: null,
+      replyThreadRootId: '1700000000.000100',
+      place: 'direct',
+      requestSummary: 'summarize the thread',
+    });
+
+    const newRelation = async (label: string) => {
+      const { prisma, installationId } = await context();
+      const relation = await createRelationRepository(prisma).create({
+        installationId,
+        growiUri: `https://${label}-${WORKSPACE_ID}.example.com`,
+        growiLabel: label,
+        searchWeight: 1,
+        settingsVersion: 0,
+      });
+      return { prisma, installationId, relation };
+    };
+
+    it('reads back what was saved, with no delivery started yet', async () => {
+      const { prisma, installationId, relation } = await newRelation('agent-a');
+      const repository = createPendingAgentRequestRepository(prisma);
+      const origin = originOf(`D-${randomUUID()}`);
+      const expiresAt = new Date(Date.now() + 86_400_000);
+
+      await repository.create({
+        relationId: relation.relationId,
+        requestId: 'req-1',
+        installationId,
+        origin,
+        expiresAt,
+      });
+
+      await expect(
+        repository.find(relation.relationId, 'req-1'),
+      ).resolves.toEqual({
+        relationId: relation.relationId,
+        requestId: 'req-1',
+        installationId,
+        origin,
+        deliveryStatus: null,
+        deliveryClaimedAt: null,
+        expiresAt,
+      });
+      await expect(
+        repository.find(relation.relationId, 'req-unknown'),
+      ).resolves.toBeNull();
+    });
+
+    it('reads back the delivery state a later step stored', async () => {
+      const { prisma, installationId, relation } = await newRelation('agent-b');
+      const repository = createPendingAgentRequestRepository(prisma);
+      const claimedAt = new Date('2026-11-01T00:00:00.000Z');
+      await repository.create({
+        relationId: relation.relationId,
+        requestId: 'req-1',
+        installationId,
+        origin: originOf(`D-${randomUUID()}`),
+        expiresAt: new Date(Date.now() + 86_400_000),
+      });
+      await prisma.pendingAgentRequest.update({
+        where: {
+          relationId_requestId: {
+            relationId: relation.relationId,
+            requestId: 'req-1',
+          },
+        },
+        data: { deliveryStatus: 'delivering', deliveryClaimedAt: claimedAt },
+      });
+
+      const record = await repository.find(relation.relationId, 'req-1');
+
+      expect(record?.deliveryStatus).toBe('delivering');
+      expect(record?.deliveryClaimedAt).toEqual(claimedAt);
+    });
+
+    it('sweeps only the requests past their expiry', async () => {
+      const { prisma, installationId, relation } = await newRelation('agent-c');
+      const repository = createPendingAgentRequestRepository(prisma);
+      const base = {
+        relationId: relation.relationId,
+        installationId,
+        origin: originOf(`D-${randomUUID()}`),
+      };
+      await repository.create({
+        ...base,
+        requestId: 'expired',
+        expiresAt: new Date(Date.now() - 1_000),
+      });
+      await repository.create({
+        ...base,
+        requestId: 'fresh',
+        expiresAt: new Date(Date.now() + 600_000),
+      });
+
+      await repository.deleteExpired(new Date());
+
+      await expect(
+        repository.find(relation.relationId, 'expired'),
+      ).resolves.toBeNull();
+      await expect(
+        repository.find(relation.relationId, 'fresh'),
+      ).resolves.not.toBeNull();
+    });
+
+    it('is removed together with its relation, so unpairing is not refused by the foreign key', async () => {
+      const { prisma, installationId, relation } = await newRelation('agent-d');
+      const other = await newRelation('agent-e');
+      const pending = createPendingAgentRequestRepository(prisma);
+      const expiresAt = new Date(Date.now() + 86_400_000);
+      await Promise.all(
+        [relation, other.relation].map((owner) =>
+          pending.create({
+            relationId: owner.relationId,
+            requestId: 'req-1',
+            installationId,
+            origin: originOf(`D-${randomUUID()}`),
+            expiresAt,
+          }),
+        ),
+      );
+
+      await deleteRelationCascade(
+        {
+          relations: createRelationRepository(prisma),
+          ownKeys: createOwnKeyRepository(prisma, testCipher),
+          peerKeys: createPeerKeyRepository(prisma),
+          channelPermissions: createChannelPermissionRepository(prisma),
+          pendingCollections: createPendingCollectionRepository(prisma),
+          pendingAgentRequests: pending,
+          processedNotifications: createProcessedNotificationRepository(prisma),
+        },
+        relation.relationId,
+      );
+
+      await expect(
+        pending.find(relation.relationId, 'req-1'),
+      ).resolves.toBeNull();
+      await expect(
+        createRelationRepository(prisma).findById(relation.relationId),
+      ).resolves.toBeNull();
+      // Another relation's request is untouched.
+      await expect(
+        pending.find(other.relation.relationId, 'req-1'),
+      ).resolves.not.toBeNull();
     });
   });
 

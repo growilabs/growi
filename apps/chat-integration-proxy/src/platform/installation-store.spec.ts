@@ -80,6 +80,9 @@ const depsRecording = (
     pendingCollections: mock<InstallationStoreDeps['pendingCollections']>({
       deleteByRelation: recordForRelation('pendingCollection'),
     }),
+    pendingAgentRequests: mock<InstallationStoreDeps['pendingAgentRequests']>({
+      deleteByRelation: recordForRelation('pendingAgentRequest'),
+    }),
     processedNotifications: mock<
       InstallationStoreDeps['processedNotifications']
     >({
@@ -107,6 +110,7 @@ const childLabelsOf = (relationId: string) => [
   `peerKey:${relationId}`,
   `channelPermission:${relationId}`,
   `pendingCollection:${relationId}`,
+  `pendingAgentRequest:${relationId}`,
   `processedNotification:${relationId}`,
   `relation.remove:${relationId}`,
 ];

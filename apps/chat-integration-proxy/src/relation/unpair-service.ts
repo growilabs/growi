@@ -22,6 +22,7 @@ import {
   createChannelPermissionRepository,
   createOwnKeyRepository,
   createPeerKeyRepository,
+  createPendingAgentRequestRepository,
   createPendingCollectionRepository,
   createProcessedNotificationRepository,
   createRelationRepository,
@@ -62,6 +63,7 @@ export const createUnpairService = (deps: UnpairServiceDeps): UnpairService => {
     peerKeys: createPeerKeyRepository(db),
     channelPermissions: createChannelPermissionRepository(db),
     pendingCollections: createPendingCollectionRepository(db),
+    pendingAgentRequests: createPendingAgentRequestRepository(db),
     processedNotifications: createProcessedNotificationRepository(db),
   };
 

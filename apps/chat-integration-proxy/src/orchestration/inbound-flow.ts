@@ -493,7 +493,14 @@ export const createInboundFlow = (deps: InboundFlowDeps): InboundFlow => {
                 ? []
                 : row.allowedChannels;
           // biome-ignore lint/performance/noAwaitInLoops: one unit of work; the rows are written in the order they arrived.
-          await permissions.upsert(request.relationId, row.commandName, stored);
+          await permissions.upsert(
+            request.relationId,
+            row.commandName,
+            stored,
+            {
+              allowedInDirectMessage: row.allowedInDirectMessage === true,
+            },
+          );
         }
       });
     },

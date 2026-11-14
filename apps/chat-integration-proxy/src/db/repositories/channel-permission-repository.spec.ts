@@ -13,13 +13,14 @@ describe('channelPermissionRepository.find', () => {
       commandName: 'search',
       channels: ['C0001', 'C0002'],
       allowAll: false,
+      allowedInDirectMessage: false,
     });
     const repository = createChannelPermissionRepository(prisma);
 
-    await expect(repository.find('relation-1', 'search')).resolves.toEqual([
-      'C0001',
-      'C0002',
-    ]);
+    await expect(repository.find('relation-1', 'search')).resolves.toEqual({
+      channels: ['C0001', 'C0002'],
+      allowedInDirectMessage: false,
+    });
   });
 
   it("leaves out a stored entry that is not a service's own channel id, so it permits nothing", async () => {
@@ -32,12 +33,14 @@ describe('channelPermissionRepository.find', () => {
       commandName: 'search',
       channels: ['C0001', 'slack:C0002'],
       allowAll: false,
+      allowedInDirectMessage: false,
     });
     const repository = createChannelPermissionRepository(prisma);
 
-    await expect(repository.find('relation-1', 'search')).resolves.toEqual([
-      'C0001',
-    ]);
+    await expect(repository.find('relation-1', 'search')).resolves.toEqual({
+      channels: ['C0001'],
+      allowedInDirectMessage: false,
+    });
   });
 
   it('distinguishes "no row" (no-settings) from an explicit empty restriction', async () => {
@@ -58,6 +61,7 @@ describe('channelPermissionRepository.upsert', () => {
       commandName: 'search',
       channels: ['C0001'],
       allowAll: false,
+      allowedInDirectMessage: false,
     });
     const repository = createChannelPermissionRepository(prisma);
 
@@ -105,11 +109,55 @@ describe("channelPermissionRepository and RelationSettings' 'all'", () => {
       commandName: 'create-page',
       channels: [],
       allowAll: true,
+      allowedInDirectMessage: false,
     });
     const repository = createChannelPermissionRepository(prisma);
 
-    await expect(repository.find('relation-1', 'create-page')).resolves.toBe(
-      'all',
+    await expect(repository.find('relation-1', 'create-page')).resolves.toEqual(
+      { channels: 'all', allowedInDirectMessage: false },
+    );
+  });
+
+  it('reads back the direct-message flag beside the channel setting', async () => {
+    const prisma = mockDeep<PrismaClient>();
+    prisma.channelPermission.findUnique.mockResolvedValue({
+      id: 'perm-1',
+      relationId: 'relation-1',
+      commandName: 'agent',
+      channels: [],
+      allowAll: false,
+      allowedInDirectMessage: true,
+    });
+    const repository = createChannelPermissionRepository(prisma);
+
+    await expect(repository.find('relation-1', 'agent')).resolves.toEqual({
+      channels: [],
+      allowedInDirectMessage: true,
+    });
+  });
+
+  it('stores the direct-message flag, and clears it when none is given', async () => {
+    const prisma = mockDeep<PrismaClient>();
+    const repository = createChannelPermissionRepository(prisma);
+
+    await repository.upsert('relation-1', 'agent', [], {
+      allowedInDirectMessage: true,
+    });
+    await repository.upsert('relation-1', 'agent', []);
+
+    expect(prisma.channelPermission.upsert).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        create: expect.objectContaining({ allowedInDirectMessage: true }),
+        update: expect.objectContaining({ allowedInDirectMessage: true }),
+      }),
+    );
+    expect(prisma.channelPermission.upsert).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        create: expect.objectContaining({ allowedInDirectMessage: false }),
+        update: expect.objectContaining({ allowedInDirectMessage: false }),
+      }),
     );
   });
 
@@ -121,6 +169,7 @@ describe("channelPermissionRepository and RelationSettings' 'all'", () => {
       commandName: 'create-page',
       channels: [],
       allowAll: true,
+      allowedInDirectMessage: false,
     });
     const repository = createChannelPermissionRepository(prisma);
 
@@ -142,6 +191,7 @@ describe("channelPermissionRepository and RelationSettings' 'all'", () => {
       commandName: 'search',
       channels: ['C1'],
       allowAll: false,
+      allowedInDirectMessage: false,
     });
     const repository = createChannelPermissionRepository(prisma);
 

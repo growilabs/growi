@@ -46,6 +46,7 @@ const unpairablePrisma = (): DeepMockProxy<PrismaClient> => {
   db.peerKey.deleteMany.mockResolvedValue({ count: 1 });
   db.channelPermission.deleteMany.mockResolvedValue({ count: 2 });
   db.pendingCollection.deleteMany.mockResolvedValue({ count: 0 });
+  db.pendingAgentRequest.deleteMany.mockResolvedValue({ count: 0 });
   db.processedNotificationTarget.deleteMany.mockResolvedValue({ count: 3 });
   db.relation.delete.mockResolvedValue(relationRow);
   return db;
@@ -72,6 +73,7 @@ const deletionSequence = (db: DeepMockProxy<PrismaClient>): string[] => {
     ['peer_key', db.peerKey.deleteMany],
     ['channel_permission', db.channelPermission.deleteMany],
     ['pending_collection', db.pendingCollection.deleteMany],
+    ['pending_agent_request', db.pendingAgentRequest.deleteMany],
     [
       'processed_notification_target',
       db.processedNotificationTarget.deleteMany,
@@ -100,6 +102,7 @@ describe('unpairService.unpair', () => {
       'peer_key',
       'channel_permission',
       'pending_collection',
+      'pending_agent_request',
       'processed_notification_target',
       'relation',
     ]);

@@ -665,6 +665,48 @@ describe('settings-push (Requirement 11.4)', () => {
     );
   });
 
+  const pushWithDirectMessage = (
+    allowedInDirectMessage: boolean | undefined,
+  ): SettingsPushRequest => ({
+    relationId: RELATION_ID,
+    op: OP_NAMES.settingsPush,
+    version: 4,
+    settings: {
+      relationId: RELATION_ID,
+      channelPermissions: [
+        {
+          commandName: 'agent',
+          allowedChannels: 'none',
+          ...(allowedInDirectMessage === undefined
+            ? {}
+            : { allowedInDirectMessage }),
+        },
+      ],
+    },
+  });
+
+  it.each([
+    [true, true],
+    [false, false],
+    // An omitted flag is stored as "not allowed" (Requirement 11.7).
+    [undefined, false],
+  ])('stores allowedInDirectMessage %s as %s', async (pushed, stored) => {
+    const prisma = createPrisma([]);
+    prisma.relation.updateMany.mockResolvedValue({ count: 1 });
+    prisma.channelPermission.deleteMany.mockResolvedValue({ count: 0 });
+
+    await flowOver(prisma, postingPlatform()).pushSettings(
+      pushWithDirectMessage(pushed),
+    );
+
+    expect(prisma.channelPermission.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ allowedInDirectMessage: stored }),
+        update: expect.objectContaining({ allowedInDirectMessage: stored }),
+      }),
+    );
+  });
+
   it('writes nothing at all when the push is not newer than what is stored', async () => {
     // A late retry of an older save must not undo the newer one. The
     // comparison is the condition ON the update, so "no row matched" is what

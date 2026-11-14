@@ -55,6 +55,11 @@ const reposRecording = (calls: string[]): RelationCascadeRepositories => {
         deleteByRelation: recordChild('pendingCollection'),
       },
     ),
+    pendingAgentRequests: mock<
+      RelationCascadeRepositories['pendingAgentRequests']
+    >({
+      deleteByRelation: recordChild('pendingAgentRequest'),
+    }),
     processedNotifications: mock<
       RelationCascadeRepositories['processedNotifications']
     >({
@@ -75,6 +80,7 @@ describe('deleteRelationCascade', () => {
       'peerKey:rel-1',
       'channelPermission:rel-1',
       'pendingCollection:rel-1',
+      'pendingAgentRequest:rel-1',
       'processedNotification:rel-1',
       'relation.remove:rel-1',
     ]);

@@ -29,6 +29,7 @@ import {
   createOwnKeyRepository,
   createPairingOrderRepository,
   createPeerKeyRepository,
+  createPendingAgentRequestRepository,
   createPendingCollectionRepository,
   createPrismaClient,
   createProcessedNotificationRepository,
@@ -212,6 +213,7 @@ export const createProxyDependencies = async (
   const peerKeys = createPeerKeyRepository(db);
   const channelPermissions = createChannelPermissionRepository(db);
   const pendingCollections = createPendingCollectionRepository(db);
+  const pendingAgentRequests = createPendingAgentRequestRepository(db);
   const processedNotifications = createProcessedNotificationRepository(db);
   const pairingOrders = createPairingOrderRepository(db);
   const requestNonces = createRequestNonceRepository(db);
@@ -267,6 +269,7 @@ export const createProxyDependencies = async (
     peerKeys,
     channelPermissions,
     pendingCollections,
+    pendingAgentRequests,
     processedNotifications,
     pairingOrders,
     channels,
@@ -434,9 +437,9 @@ export const createProxyDependencies = async (
   };
 
   /**
-   * The one schedule this app runs. The four tables design.md lists under
+   * The one schedule this app runs. The tables design.md lists under
    * 期限切れの掃除 are declared here rather than imported by the sweeper, so
-   * adding a fifth is a change to this list alone.
+   * adding another is a change to this list alone.
    */
   const sweeper = buildSweeper({
     locks: facade.locks(),
@@ -449,6 +452,10 @@ export const createProxyDependencies = async (
       {
         name: 'pending_collection',
         deleteExpired: pendingCollections.deleteExpired,
+      },
+      {
+        name: 'pending_agent_request',
+        deleteExpired: pendingAgentRequests.deleteExpired,
       },
       { name: 'pairing_order', deleteExpired: pairingOrders.deleteExpired },
     ],

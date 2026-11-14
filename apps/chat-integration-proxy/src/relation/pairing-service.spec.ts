@@ -821,6 +821,7 @@ describe('pairingService.unpair (Requirement 9.7)', () => {
     prisma.peerKey.deleteMany.mockResolvedValue({ count: 1 });
     prisma.channelPermission.deleteMany.mockResolvedValue({ count: 0 });
     prisma.pendingCollection.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.pendingAgentRequest.deleteMany.mockResolvedValue({ count: 0 });
     prisma.processedNotificationTarget.deleteMany.mockResolvedValue({
       count: 0,
     });

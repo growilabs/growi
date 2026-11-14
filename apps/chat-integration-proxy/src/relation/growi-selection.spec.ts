@@ -67,6 +67,7 @@ const BRAVO = relationRow('rel-b', 'https://bravo.example.com/', 'Bravo');
 const withPermissions = (
   prisma: DeepMockProxy<PrismaClient>,
   permitted: Readonly<Record<string, ReadonlyArray<string> | 'all'>>,
+  directMessageAllowed: ReadonlyArray<string> = [],
 ): void => {
   prisma.channelPermission.findUnique.mockImplementation(((args: {
     where: { relationId_commandName: { relationId: string } };
@@ -79,10 +80,11 @@ const withPermissions = (
     // `'all'` lives in its own column, because an empty `channels` array
     // already means "no channel permitted". The row is written the way
     // `ChannelPermissionRepository.upsert` writes it.
+    const allowedInDirectMessage = directMessageAllowed.includes(relationId);
     return Promise.resolve(
       channels === 'all'
-        ? { channels: [], allowAll: true }
-        : { channels: [...channels], allowAll: false },
+        ? { channels: [], allowAll: true, allowedInDirectMessage }
+        : { channels: [...channels], allowAll: false, allowedInDirectMessage },
     );
     // The mocked delegate's own parameter type is Prisma's generic
     // find-unique shape, which cannot be named outside `db/` (the architecture
@@ -365,6 +367,52 @@ describe('nothing to run against (Requirements 8.6 / 11.3)', () => {
         },
       ],
     });
+  });
+});
+
+describe('a direct message is judged by its own flag for a separate-flag command (Requirement 11.7)', () => {
+  const DM = testSdkChannel('slack', {
+    channelId: testSdkChannelId('slack', 'D-direct'),
+    isDirectMessage: true,
+  });
+
+  const selectAgentIn = (
+    permitted: Readonly<Record<string, ReadonlyArray<string> | 'all'>>,
+    directMessageAllowed: ReadonlyArray<string>,
+  ) => {
+    const prisma = mockDeep<PrismaClient>();
+    prisma.relation.findMany.mockResolvedValue([ALPHA, BRAVO]);
+    withPermissions(prisma, permitted, directMessageAllowed);
+    return selectorOver(prisma).select({
+      targeting: 'exactly-one',
+      installationId: INSTALLATION,
+      channel: DM,
+      commandName: 'agent',
+    });
+  };
+
+  it('runs against the GROWI whose flag is on, even when its channel setting is none', async () => {
+    const outcome = await selectAgentIn({ 'rel-a': [], 'rel-b': 'all' }, [
+      'rel-a',
+    ]);
+
+    expect(outcome).toEqual({
+      kind: 'execute',
+      targets: [expect.objectContaining({ relationId: 'rel-a' })],
+      excluded: [
+        {
+          relationId: 'rel-b',
+          growiLabel: 'Bravo',
+          reason: 'not-permitted-in-channel',
+        },
+      ],
+    });
+  });
+
+  it('refuses every GROWI whose flag is off, even when its channel setting is all', async () => {
+    const outcome = await selectAgentIn({ 'rel-a': 'all', 'rel-b': 'all' }, []);
+
+    expect(outcome.kind).toBe('explain');
   });
 });
 
