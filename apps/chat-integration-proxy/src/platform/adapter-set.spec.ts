@@ -10,7 +10,7 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { DiscordAdapter } from '@chat-adapter/discord';
-import { createSlackAdapter, type SlackAdapter } from '@chat-adapter/slack';
+import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
 import type { PlatformName } from '@growi/chat';
 import type { Adapter } from 'chat';
 import { mock } from 'vitest-mock-extended';
@@ -105,6 +105,45 @@ describe('createAppAdapters', () => {
     const adapters = createAppAdapters(slackOnly, ADAPTER_FACTORIES, CONTEXT);
 
     expect(Object.keys(adapters)).toEqual(['slack']);
+  });
+
+  describe('the Slack AI app view', () => {
+    // What the adapter does with a top-level DM message is the observable
+    // difference: it roots a thread at the message when the view is on, and
+    // leaves the thread part empty when it is off.
+    const threadOfTopLevelDm = (agentView?: boolean): string => {
+      const { slack, ...rest } = FULL_APP_CONFIG;
+      if (slack == null) throw new Error('fixture has no Slack config');
+      const adapter = createAppAdapters(
+        {
+          ...rest,
+          slack: { ...slack, ...(agentView == null ? {} : { agentView }) },
+        },
+        ADAPTER_FACTORIES,
+        CONTEXT,
+      ).slack;
+      if (!(adapter instanceof SlackAdapter)) {
+        throw new Error('slack did not build a Slack adapter');
+      }
+      // Protected in the typings, public at runtime; reading it is how the
+      // view's effect is seen without a live socket.
+      return adapter['threadIdForMessageEvent']({
+        channel_type: 'im',
+        channel: 'D0DIRECT01',
+        ts: '1700000001.000100',
+      });
+    };
+
+    it('is off unless the operator enabled it', () => {
+      expect(threadOfTopLevelDm()).toBe('slack:D0DIRECT01:');
+      expect(threadOfTopLevelDm(false)).toBe('slack:D0DIRECT01:');
+    });
+
+    it('roots a thread at each DM message when the operator enabled it', () => {
+      expect(threadOfTopLevelDm(true)).toBe(
+        'slack:D0DIRECT01:1700000001.000100',
+      );
+    });
   });
 
   it('never builds an app-wide adapter for mattermost, whose connection target is per installation', () => {

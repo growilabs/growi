@@ -137,6 +137,11 @@ export interface PlatformAppConfig {
     readonly clientSecret: string;
     /** `xapp-`-prefixed app-level token; opens the Socket Mode connection. */
     readonly appToken: string;
+    /**
+     * Whether the operator enabled Slack's AI app view (default off). Needs the
+     * matching Slack app setting, so it is the operator's choice, not ours.
+     */
+    readonly agentView?: boolean;
   };
   readonly discord?: {
     readonly applicationId: string;

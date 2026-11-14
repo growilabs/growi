@@ -44,6 +44,7 @@ import {
   createAppAdapters,
   createChatState,
   createInstallationAdapter,
+  processingStatusSetterOf,
 } from './adapter-set.js';
 import { BOT_USER_NAME, createDistributedLock } from './bot-factory.js';
 import { refreshOnBotJoin } from './bot-joined-channel.js';
@@ -72,6 +73,7 @@ import {
   postInThread as postInThreadOf,
   post as postOf,
   replace as replaceOf,
+  setProcessingStatus as setProcessingStatusOf,
 } from './outbound.js';
 import {
   createModalTriggerRegistry,
@@ -123,6 +125,18 @@ export interface PlatformFacade {
     message: OutboundMessage,
     scope: { readonly installationId: string },
   ): Promise<PostOutcome>;
+  /**
+   * Shows that the bot is working on the request made in the thread rooted at
+   * `threadRootId`. Does nothing, and answers normally, on a service with no
+   * such indicator or where the operator turned it off, and when the service
+   * refuses it. Callable outside an event's handling, so `installationId` is
+   * required.
+   */
+  setProcessingStatus(
+    target: SdkChannelRef,
+    threadRootId: string,
+    scope: { readonly installationId: string },
+  ): Promise<void>;
   /**
    * Opens (or reuses) the 1:1 conversation with `user` and posts there.
    * `near` is the channel the request came from: like `postEphemeral`'s
@@ -574,6 +588,19 @@ export const createPlatformFacade = async (
       const context = outboundContext(target.platform, scope);
       if (context == null) return notAddressable(target.platform);
       return await postInThreadOf(context, target, threadRootId, message);
+    },
+
+    async setProcessingStatus(target, threadRootId, scope) {
+      const context = outboundContext(target.platform, scope);
+      if (context == null) return;
+      await setProcessingStatusOf(context, target, threadRootId, {
+        set: processingStatusSetterOf(
+          target.platform,
+          appConfig,
+          ADAPTER_FACTORIES,
+        ),
+        report: (message, error) => reportOperationalFailure?.(message, error),
+      });
     },
 
     async postDirect(near, user, message, scope) {

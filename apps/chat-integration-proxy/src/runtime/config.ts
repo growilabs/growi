@@ -146,22 +146,40 @@ const readServiceSection = <T>(
   );
 };
 
+/**
+ * The AI app view is a switch on a configured Slack app, not a credential, so
+ * it is read apart from the all-or-nothing credential set and left out of the
+ * result unless on.
+ */
+const withAgentView = (
+  env: NodeJS.ProcessEnv,
+  slack: NonNullable<PlatformAppConfig['slack']> | undefined,
+): PlatformAppConfig['slack'] => {
+  const value = read(env, 'SLACK_AGENT_VIEW');
+  return slack != null && (value === 'true' || value === '1')
+    ? { ...slack, agentView: true }
+    : slack;
+};
+
 const readPlatformAppConfig = (env: NodeJS.ProcessEnv): PlatformAppConfig => ({
-  slack: readServiceSection(
+  slack: withAgentView(
     env,
-    'Slack',
-    {
-      signingSecret: 'SLACK_SIGNING_SECRET',
-      clientId: 'SLACK_CLIENT_ID',
-      clientSecret: 'SLACK_CLIENT_SECRET',
-      appToken: 'SLACK_APP_TOKEN',
-    },
-    (v) => ({
-      signingSecret: v.signingSecret,
-      clientId: v.clientId,
-      clientSecret: v.clientSecret,
-      appToken: v.appToken,
-    }),
+    readServiceSection(
+      env,
+      'Slack',
+      {
+        signingSecret: 'SLACK_SIGNING_SECRET',
+        clientId: 'SLACK_CLIENT_ID',
+        clientSecret: 'SLACK_CLIENT_SECRET',
+        appToken: 'SLACK_APP_TOKEN',
+      },
+      (v) => ({
+        signingSecret: v.signingSecret,
+        clientId: v.clientId,
+        clientSecret: v.clientSecret,
+        appToken: v.appToken,
+      }),
+    ),
   ),
   discord: readServiceSection(
     env,

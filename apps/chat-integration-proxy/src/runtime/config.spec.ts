@@ -170,6 +170,34 @@ describe('loadConfig', () => {
       expect(platformApp.teams).toBeUndefined();
     });
 
+    it.each([
+      'true',
+      '1',
+    ])('enables the Slack AI app view when SLACK_AGENT_VIEW is %s', (value) => {
+      const { platformApp } = loadConfig({
+        ...minimalEnv(),
+        ...slackEnv,
+        SLACK_AGENT_VIEW: value,
+      });
+
+      expect(platformApp.slack?.agentView).toBe(true);
+    });
+
+    it.each([
+      undefined,
+      '',
+      'false',
+      '0',
+    ])('leaves the Slack AI app view disabled when SLACK_AGENT_VIEW is %j', (value) => {
+      const { platformApp } = loadConfig({
+        ...minimalEnv(),
+        ...slackEnv,
+        SLACK_AGENT_VIEW: value,
+      });
+
+      expect(platformApp.slack?.agentView).not.toBe(true);
+    });
+
     it('reads Discord and Teams independently of Slack', () => {
       const { platformApp } = loadConfig({
         ...minimalEnv(),

@@ -237,6 +237,8 @@ export const createFakeChatService = (
     postInThread: async (channel, threadRootId, message) =>
       capture({ kind: 'thread-post', channel, threadRootId, message }),
 
+    setProcessingStatus: async () => undefined,
+
     postEphemeral: (channel, user, message, scope) => {
       const ephemeral: CapturedPost = {
         kind: 'ephemeral',

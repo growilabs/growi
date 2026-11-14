@@ -16,7 +16,7 @@ import {
   type PostgresStateAdapter,
 } from '@chat-adapter/state-pg';
 import { createTeamsAdapter } from '@chat-adapter/teams';
-import type { PlatformName } from '@growi/chat';
+import type { NativeChannelId, PlatformName } from '@growi/chat';
 import type { Adapter } from 'chat';
 import { createMattermostAdapter } from 'chat-adapter-mattermost';
 
@@ -53,6 +53,20 @@ export interface AppAdapterContext {
  * `Record<PlatformName, AdapterFactory>` below still gives compile-time
  * completeness across all four services.
  */
+/**
+ * Shows "the bot is working on it" on the thread rooted at `threadRootId`,
+ * on the service's own side. Runs inside the installation's scope, and may
+ * reject; the caller absorbs that.
+ */
+export type ProcessingStatusSetter = (
+  adapter: Adapter,
+  channelId: NativeChannelId,
+  threadRootId: string,
+) => Promise<void>;
+
+/** What Slack's thread status line reads after the bot's name. */
+const SLACK_PROCESSING_STATUS = '考えています…';
+
 export type AdapterFactory =
   | {
       readonly credentialSource: 'app';
@@ -61,6 +75,14 @@ export type AdapterFactory =
         appConfig: PlatformAppConfig,
         context: AppAdapterContext,
       ) => Adapter | null;
+      /**
+       * Present when the service can show a processing indicator. Answers
+       * `null` when this deployment's configuration turns it off, so the
+       * caller never has to know which setting that is.
+       */
+      readonly processingStatus?: (
+        appConfig: PlatformAppConfig,
+      ) => ProcessingStatusSetter | null;
       /**
        * Present when one adapter speaks for many workspaces and learns whose
        * bot to speak as only from the incoming event. Outside an event --
@@ -179,8 +201,26 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           installationProvider: createSlackInstallationLookup({
             installations: context.installations,
           }),
+          // Off unless the operator enabled it: the adapter then roots a thread
+          // at every DM message (research.md, AI app view).
+          ...(slack.agentView === true ? { agentView: true } : {}),
         });
       },
+      processingStatus: (appConfig) =>
+        appConfig.slack?.agentView === true
+          ? async (adapter, channelId, threadRootId) => {
+              if (!(adapter instanceof SlackAdapter)) {
+                throw new TypeError(
+                  'a Slack status was handed a non-Slack adapter',
+                );
+              }
+              await adapter.setAssistantStatus(
+                channelId,
+                threadRootId,
+                SLACK_PROCESSING_STATUS,
+              );
+            }
+          : null,
       // The adapter reads the token from its request context, which only an
       // incoming event fills in; `withBotToken` fills it for `work`. The
       // workspace id is passed as the adapter's own `installationId` -- the
@@ -323,6 +363,21 @@ export const createAppAdapters = (
       return adapter == null ? [] : [[platform, adapter] as const];
     }),
   );
+
+/**
+ * How to show the processing indicator on `platform`, or `null` when the
+ * service has none or this deployment turned it off.
+ */
+export const processingStatusSetterOf = (
+  platform: PlatformName,
+  appConfig: PlatformAppConfig,
+  factories: Readonly<Record<PlatformName, AdapterFactory>>,
+): ProcessingStatusSetter | null => {
+  const factory = factories[platform];
+  return factory.credentialSource === 'app'
+    ? (factory.processingStatus?.(appConfig) ?? null)
+    : null;
+};
 
 /**
  * The adapter for one installation of an installation-credentialed service

@@ -41,7 +41,7 @@ import {
 } from 'chat';
 import type { MattermostThreadId } from 'chat-adapter-mattermost';
 
-import { supports } from '../capabilities/index.js';
+import { nativeChannelIdOf, supports } from '../capabilities/index.js';
 import type {
   DirectPostOutcome,
   EphemeralPostOutcome,
@@ -54,6 +54,7 @@ import type {
   SdkChannelRef,
   SdkMessageRef,
 } from '../types/index.js';
+import type { ProcessingStatusSetter } from './adapter-set.js';
 import { directMessageChannelRef, encodeActionId } from './event-mapping.js';
 import type { ScopedRun } from './installation-scope.js';
 
@@ -721,6 +722,36 @@ export const postInThread = async (
       toPostable(message, target.platform, context.botName),
     ),
   );
+
+/**
+ * Shows the processing indicator on the thread rooted at `threadRootId`. A
+ * display aid, so a failure is handed to `report` and never thrown; a caller
+ * with no `set` (the service has none, or it is switched off) gets nothing sent.
+ */
+export const setProcessingStatus = async (
+  context: OutboundContext,
+  target: SdkChannelRef,
+  threadRootId: string,
+  {
+    set,
+    report,
+  }: {
+    readonly set: ProcessingStatusSetter | null;
+    readonly report?: (message: string, error: unknown) => void;
+  },
+): Promise<void> => {
+  if (set == null) return;
+  try {
+    await runScoped(context, () =>
+      set(context.adapter, nativeChannelIdOf(target), threadRootId),
+    );
+  } catch (error) {
+    report?.(
+      `could not show the processing status on ${target.platform}`,
+      error,
+    );
+  }
+};
 
 /**
  * Posts a preview of what a link points at, next to the message that carried
