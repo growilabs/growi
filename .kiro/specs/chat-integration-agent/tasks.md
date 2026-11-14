@@ -45,7 +45,7 @@
   - 本人に宛てた返事の宛先（origin）にも、2 つの根元と場所の種類（チャンネルか DM か）を足す
   - 完了の条件: 4 サービスで、bot への呼びかけだけが外れて先頭のほかの利用者への言及が残り、Slack の DM（AI アプリの画面が無効）で依頼の発言が答えを置く根元になる試験が通る。既存のコマンドの試験と、本人に宛てた返事・聞き返しの試験は変更なしで通る
   - _Requirements: 15.8, 15.14, 15.17_
-- [ ] 2.3 スレッドの中へ投稿する操作を足す
+- [x] 2.3 スレッドの中へ投稿する操作を足す
   - 本人にだけ見えるメッセージをスレッドの中に出す、スレッドの中にふつうに投稿する、の 2 つの操作を足す。どちらもイベントの処理の外から、installation を指定して呼べる
   - 完了の条件: 代役のサービスを使った結合試験で、スレッドの根元が各サービスの投稿に渡る
   - _Requirements: 15.8_
@@ -233,3 +233,6 @@
 - 2.2: `PrivateReplyOrigin` の新しい欄は省略できる（省略は根元なし・DM ではない）。normalize から作った origin は DM のとき `place: 'direct'` だけが付き、チャンネルの依頼には place が付かない。3.2 で `StoredAnswerOrigin` を作るときは `place ?? 'channel'` と根元の `?? null` で補う（型の強制変換は使わない）。
 - 2.2: `private-reply-adapters.integ.ts` が参照していた決定 P8（語の形で呼びかけを見分ける決まり）は取り除いた。タスク 7 の書き戻しで proxy 側の research.md の P8 を「取り除いた」と書き直す。
 - 2.2: 範囲外で気づいた点（コードを読んだだけ、未確認）: Mattermost adapter の `detectMention` は `(^|\s)@growi\b` を使うので、`@growi-admin` だけに宛てた投稿でも bot が反応しうる。`chat` 本体の `detectMention` は Discord と Teams で `adapter.userName`（既定 `bot`）を使うので、手で打った `@bot` で反応しうる。
+- 2.3: `postInThread` は根元を文字列で必須とする。根元が無いとき（Teams の DM など）、3.4 は既存の `post`／`postDirect` を使う。`postEphemeral` は根元が省略可能で、省略するとチャンネルの階層に出る。Discord で消えたスレッドへ送ると 404 で `bot-not-in-channel` に分類される（3.4 の経路からは呼ばれない）。Slack の頻度の制限は `platform-error`。
+- 2.3: testing/fake-chat-service.ts の `postInThread` は scope を記録しない。3.4 の試験で「どの installation で送ったか」を確かめるときは、Mattermost のように installation を 2 つ開いた構成を使うか、記録を足す。スレッドへの投稿だけを失敗させるときは、`script.post` を `kind === 'thread-post'` で分ける。
+- 2.3: 実サービスの画面で、スレッドの外の依頼への本人だけのメッセージがスレッドの中に見えるかは未確認のまま（6.3 の実機確認）。
