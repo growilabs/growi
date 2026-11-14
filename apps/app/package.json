@@ -139,7 +139,7 @@
     "@opentelemetry/exporter-metrics-otlp-grpc": "^0.202.0",
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.202.0",
     "@opentelemetry/instrumentation-express": "^0.65.0",
-    "@opentelemetry/instrumentation-http": "^0.217.0",
+    "@opentelemetry/instrumentation-http": "^0.222.0",
     "@opentelemetry/instrumentation-mongodb": "^0.70.0",
     "@opentelemetry/instrumentation-mongoose": "^0.67.0",
     "@opentelemetry/resources": "^2.0.1",
