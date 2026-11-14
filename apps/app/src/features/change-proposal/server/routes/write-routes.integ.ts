@@ -297,6 +297,13 @@ describe('change-proposal write routes', () => {
       ]);
     });
 
+    // This test issues 4 concurrent requests through the real Express+Mongo+Prisma
+    // stack; the default 5000ms test timeout (vitest.workspace.mts sets none for
+    // app-integration) is tight for that under a busy CI runner (matrix divergence
+    // observed on the same commit — see issue #12251). Neither of the two drivers
+    // essential-test-patterns calls out for a timeout bump applies here (no loop
+    // parameter to redesign away, no shared setupFiles hook to blame), so this is a
+    // bare timeout increase on this one test rather than a redesign.
     it('answers a missing, malformed, someone else’s and someone else’s settled proposal with one identical 404', async () => {
       const othersPending = await newPendingProposal();
       const othersSettled = await settledProposal();
@@ -319,7 +326,7 @@ describe('change-proposal write routes', () => {
         'pending',
       );
       await expectOneUnsettledAttempt(endpointOf(othersPending._id, 'approve'));
-    });
+    }, 15_000);
 
     it('answers the requester’s settled proposal with 409 not_open', async () => {
       asUser(users.requester);
