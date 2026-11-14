@@ -528,6 +528,22 @@ describe('fromMessage, on each service: where the answer goes and what was asked
       ).toBe(`ask @${MATTERMOST_BOT_NAME}-admin`);
     });
 
+    it("does not take a dotted username that merely starts with the bot's for the bot", () => {
+      expect(
+        mentionFrom(mattermostChannelThread(), {
+          text: `@${MATTERMOST_BOT_NAME} ask @${MATTERMOST_BOT_NAME}.admin`,
+        }).textWithoutBotAddress,
+      ).toBe(`ask @${MATTERMOST_BOT_NAME}.admin`);
+    });
+
+    it('still takes the bot address when a sentence-ending period follows it', () => {
+      expect(
+        mentionFrom(mattermostChannelThread(), {
+          text: `ask @${MATTERMOST_BOT_NAME}.`,
+        }).textWithoutBotAddress,
+      ).toBe('ask .');
+    });
+
     it('drops a Teams address only when the mention names the bot itself, not a person with the same display name', () => {
       expect(
         mentionFrom(teamsChannelThread(), {

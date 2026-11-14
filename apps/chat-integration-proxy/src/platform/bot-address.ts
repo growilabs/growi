@@ -68,7 +68,7 @@ const escapeForRegExp = (value: string): string =>
 
 /**
  * Every whole-word occurrence of an address goes, with the spaces after it;
- * a longer name that only starts with one (`@growi-admin`) stays. Line breaks
+ * a longer name that only starts with one (`@growi-admin`, `@growi.admin`) stays. Line breaks
  * are kept: a multi-line answer depends on them.
  */
 export const withoutBotAddresses = (
@@ -80,7 +80,7 @@ export const withoutBotAddresses = (
       (remaining, address) =>
         remaining.replace(
           new RegExp(
-            `(?<!\\w)${escapeForRegExp(address)}(?![\\w-])[ \\t]*`,
+            `(?<!\\w)${escapeForRegExp(address)}(?![\\w-]|\\.\\w)[ \\t]*`,
             'gi',
           ),
           '',
