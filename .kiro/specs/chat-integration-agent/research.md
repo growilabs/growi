@@ -149,7 +149,9 @@
 - **Context**: DM の先頭の `@誰か` が落ちる（要件 15.17、proxy の「既知の問題」2）
 - **Selected Approach**: platform 層が、bot 自身の id や名前を使って、bot への呼びかけだけを外した文章をイベントに載せる。command 層は、語の形で推測するのをやめる
 - **Rationale**: bot 自身を知っているのは platform 層（アダプタ）だけである。呼びかけの形はサービスごとに違い（Slack は `@<bot の user id>`、Discord は `<@<application id>>`、Teams は `@<表示名>`、Mattermost は `@<bot のユーザー名>`）、proxy の調査で確かめてある
-- **Trade-offs**: `PlatformEvent` の形が変わる。`search` など既存のコマンドの引数の取り方も、同じ文章から始まるようになる
+- **Trade-offs**:
+  - `PlatformEvent` の形が変わる。`search` など既存のコマンドの引数の取り方も、同じ文章から始まるようになる
+  - 既知の制限: Teams で、アプリと大文字小文字まで同じ表示名の人に、アプリと同じ発言の中で言及すると、その人への言及も外れる。adapter が `<at>` を `@名前` にした後の文章には、どの `@名前` がどの言及かを結ぶ情報が無いため。tenant にアプリと同じ表示名の人がいる場合だけに起こる。また、呼びかけの前後に空白を入れずに英数字の語がくっついている場合（`@GROWIsearch`、`hi<@id>`）は、呼びかけを外さずにそのまま渡す。手で打った `@GROWIX` や長い別人の ID を壊さないことを優先した
 
 ### Decision: Slack のチャンネルでの答えの出し方
 

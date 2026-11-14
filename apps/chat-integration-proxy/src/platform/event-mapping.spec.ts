@@ -389,14 +389,21 @@ describe('fromMessage, on each service: where the answer goes and what was asked
       ...(personal ? { conversationType: 'personal' as const } : {}),
     });
 
-  /** A Teams activity as `message.raw`: the bot is its recipient. */
+  /**
+   * A Teams activity as `message.raw`: the bot is its recipient. `text` is the
+   * entity's own `<at>…</at>`, for a name Teams writes with HTML escapes.
+   */
   const teamsActivity = (
-    mentions: ReadonlyArray<{ readonly id: string; readonly name: string }>,
+    mentions: ReadonlyArray<{
+      readonly id: string;
+      readonly name: string;
+      readonly text?: string;
+    }>,
   ) => ({
     recipient: { id: TEAMS_BOT, name: 'GROWI' },
-    entities: mentions.map(({ id, name }) => ({
+    entities: mentions.map(({ id, name, text }) => ({
       type: 'mention',
-      text: `<at>${name}</at>`,
+      text: text ?? `<at>${name}</at>`,
       mentioned: { id, name },
     })),
   });
@@ -613,6 +620,174 @@ describe('fromMessage, on each service: where the answer goes and what was asked
           raw: teamsActivity([{ id: '29:1namesake', name: 'GROWI' }]),
         }).textWithoutBotAddress,
       ).toBe('@GROWI please review');
+    });
+
+    it("Teams: keeps a colleague's mention whose display name differs from the bot's only in case", () => {
+      expect(
+        mentionFrom(teamsChannelThread(), {
+          text: '@GROWI admin 権限の手順を @GROWI Admin に送って',
+          raw: teamsActivity([
+            { id: TEAMS_BOT, name: 'GROWI' },
+            { id: '29:1admin', name: 'GROWI Admin' },
+          ]),
+        }).textWithoutBotAddress,
+      ).toBe('admin 権限の手順を @GROWI Admin に送って');
+    });
+
+    it("Teams: drops the bot address followed by the words of a colleague's name written in another case", () => {
+      expect(
+        mentionFrom(teamsChannelThread(), {
+          text: '@GROWI Admin 権限について @Growi Admin に聞いて',
+          raw: teamsActivity([
+            { id: TEAMS_BOT, name: 'GROWI' },
+            { id: '29:1admin', name: 'Growi Admin' },
+          ]),
+        }).textWithoutBotAddress,
+      ).toBe('Admin 権限について @Growi Admin に聞いて');
+    });
+
+    it.each([
+      { bot: 'GROWI', other: 'Growi' },
+      { bot: 'growi bot', other: 'GROWI Bot' },
+    ])('Teams: keeps the mention of $other, whose display name is the bot $bot in another case', ({
+      bot,
+      other,
+    }) => {
+      expect(
+        mentionFrom(teamsChannelThread(), {
+          text: `@${bot} ask @${other}`,
+          raw: teamsActivity([
+            { id: TEAMS_BOT, name: bot },
+            { id: '29:1other', name: other },
+          ]),
+        }).textWithoutBotAddress,
+      ).toBe(`ask @${other}`);
+    });
+
+    it.each([
+      {
+        service: 'Slack',
+        thread: slackChannelThread,
+        text: `@${SLACK_BOT}search foo`,
+        expected: 'search foo',
+      },
+      {
+        service: 'Slack',
+        thread: slackChannelThread,
+        text: `@${SLACK_BOT}-san search`,
+        expected: '-san search',
+      },
+      {
+        service: 'Discord',
+        thread: discordThread,
+        text: `<@${DISCORD_APP}>search`,
+        expected: 'search',
+      },
+      {
+        service: 'Discord',
+        thread: discordThread,
+        text: `<@${DISCORD_APP}>-san search`,
+        expected: '-san search',
+      },
+    ])('$service: drops the bot address that ends where the bot id ends, in $text', ({
+      thread,
+      text,
+      expected,
+    }) => {
+      expect(mentionFrom(thread(), { text }).textWithoutBotAddress).toBe(
+        expected,
+      );
+    });
+
+    it('Slack: keeps the bot id when it only ends a longer word', () => {
+      expect(
+        mentionFrom(slackChannelThread(), {
+          text: `@${SLACK_BOT} ask about deploy@${SLACK_BOT} now`,
+        }).textWithoutBotAddress,
+      ).toBe(`ask about deploy@${SLACK_BOT} now`);
+    });
+
+    it('Slack: keeps the mention of a longer user id that starts with the bot id', () => {
+      expect(
+        mentionFrom(slackChannelThread(), {
+          text: `@${SLACK_BOT} ask @${SLACK_BOT}2`,
+        }).textWithoutBotAddress,
+      ).toBe(`ask @${SLACK_BOT}2`);
+    });
+
+    it("Teams: keeps a hand-typed name that only starts with the bot's", () => {
+      expect(
+        mentionFrom(teamsChannelThread(), {
+          text: '@GROWI ask @GROWIX',
+          raw: teamsActivity([{ id: TEAMS_BOT, name: 'GROWI' }]),
+        }).textWithoutBotAddress,
+      ).toBe('ask @GROWIX');
+    });
+
+    it('Teams: drops the bot address whose display name Teams writes with an HTML escape', () => {
+      expect(
+        mentionFrom(teamsChannelThread(), {
+          text: '@R&D Bot search',
+          raw: teamsActivity([
+            { id: TEAMS_BOT, name: 'R&D Bot', text: '<at>R&amp;D Bot</at>' },
+          ]),
+        }).textWithoutBotAddress,
+      ).toBe('search');
+    });
+
+    it("Teams: keeps a colleague's mention, written with an HTML escape, whose display name starts with the bot's", () => {
+      expect(
+        mentionFrom(teamsChannelThread(), {
+          text: '@GROWI ask @GROWI & Co',
+          raw: teamsActivity([
+            { id: TEAMS_BOT, name: 'GROWI' },
+            {
+              id: '29:1co',
+              name: 'GROWI & Co',
+              text: '<at>GROWI &amp; Co</at>',
+            },
+          ]),
+        }).textWithoutBotAddress,
+      ).toBe('ask @GROWI & Co');
+    });
+
+    it.each([
+      {
+        service: 'Slack',
+        space: 'an ideographic space',
+        thread: slackChannelThread,
+        text: `ask @${SLACK_BOT}　検索`,
+        raw: {},
+      },
+      {
+        service: 'Teams',
+        space: 'an ideographic space',
+        thread: teamsChannelThread,
+        text: 'ask @GROWI　検索',
+        raw: teamsActivity([{ id: TEAMS_BOT, name: 'GROWI' }]),
+      },
+      {
+        service: 'Mattermost',
+        space: 'an ideographic space',
+        thread: mattermostChannelThread,
+        text: `ask @${MATTERMOST_BOT_NAME}　検索`,
+        raw: {},
+      },
+      {
+        service: 'Mattermost',
+        space: 'a no-break space',
+        thread: mattermostChannelThread,
+        text: `ask @${MATTERMOST_BOT_NAME} 検索`,
+        raw: {},
+      },
+    ])('$service: drops $space after the bot address too', ({
+      thread,
+      text,
+      raw,
+    }) => {
+      expect(mentionFrom(thread(), { text, raw }).textWithoutBotAddress).toBe(
+        'ask 検索',
+      );
     });
   });
 
