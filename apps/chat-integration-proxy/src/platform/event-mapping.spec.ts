@@ -518,6 +518,41 @@ describe('fromMessage, on each service: where the answer goes and what was asked
         mentionFrom(thread, { text: `@${SLACK_BOT}\nfirst line\n\nsecond` })
           .textWithoutBotAddress,
       ).toBe('first line\n\nsecond');
+      expect(
+        mentionFrom(thread, { text: `please\n@${SLACK_BOT}\nfirst` })
+          .textWithoutBotAddress,
+      ).toBe('please\n\nfirst');
+    });
+
+    it('drops every bot address in the text, not only the first', () => {
+      expect(
+        mentionFrom(slackChannelThread(), {
+          text: `@${SLACK_BOT} please @${SLACK_BOT} summarize`,
+        }).textWithoutBotAddress,
+      ).toBe('please summarize');
+    });
+
+    it('Discord: drops the nickname form of the bot address too', () => {
+      expect(
+        mentionFrom(discordThread(), { text: `<@!${DISCORD_APP}> search foo` })
+          .textWithoutBotAddress,
+      ).toBe('search foo');
+    });
+
+    it('Mattermost: drops the bot address typed in another case, as usernames do not differ by case', () => {
+      expect(
+        mentionFrom(mattermostChannelThread(), {
+          text: `@${MATTERMOST_BOT_NAME.toUpperCase()} search foo`,
+        }).textWithoutBotAddress,
+      ).toBe('search foo');
+    });
+
+    it("keeps the bot's name when it only ends a longer word, such as a login written as user@host", () => {
+      expect(
+        mentionFrom(mattermostChannelThread(), {
+          text: `@${MATTERMOST_BOT_NAME} ask about deploy@${MATTERMOST_BOT_NAME} now`,
+        }).textWithoutBotAddress,
+      ).toBe(`ask about deploy@${MATTERMOST_BOT_NAME} now`);
     });
 
     it("does not take a longer name that merely starts with the bot's for the bot", () => {
@@ -542,6 +577,33 @@ describe('fromMessage, on each service: where the answer goes and what was asked
           text: `ask @${MATTERMOST_BOT_NAME}.`,
         }).textWithoutBotAddress,
       ).toBe('ask .');
+    });
+
+    it.each([
+      'GROWI Admin',
+      'GROWI太郎',
+    ])("Teams: keeps the mention of %s, whose display name merely starts with the bot's", (name) => {
+      expect(
+        mentionFrom(teamsChannelThread(), {
+          text: `@GROWI ask @${name}`,
+          raw: teamsActivity([
+            { id: TEAMS_BOT, name: 'GROWI' },
+            { id: '29:1x', name },
+          ]),
+        }).textWithoutBotAddress,
+      ).toBe(`ask @${name}`);
+    });
+
+    it("Teams: still drops the bot address when the bot's display name is the longer one", () => {
+      expect(
+        mentionFrom(teamsChannelThread(), {
+          text: '@GROWI Admin ask @GROWI',
+          raw: teamsActivity([
+            { id: TEAMS_BOT, name: 'GROWI Admin' },
+            { id: '29:1x', name: 'GROWI' },
+          ]),
+        }).textWithoutBotAddress,
+      ).toBe('ask @GROWI');
     });
 
     it('drops a Teams address only when the mention names the bot itself, not a person with the same display name', () => {

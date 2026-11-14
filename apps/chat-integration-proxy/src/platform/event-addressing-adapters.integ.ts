@@ -304,64 +304,76 @@ class DirectTeamsAdapter extends TeamsAdapter {
   }
 }
 
+/**
+ * A 1:1 message that addresses the app and then mentions `person`, received
+ * through a real Teams adapter; the entities are what Teams attaches to it.
+ */
+const teamsDirectMention = async (
+  person: { readonly id: string; readonly name: string },
+  rest: string,
+): Promise<Extract<PlatformEvent, { kind: 'mention' }>> => {
+  const service = await serviceOf(() => ({ status: 404, body: {} }));
+  const serviceUrl = `${service.url}/teams/`;
+  const adapter = new DirectTeamsAdapter({
+    appId: TEAMS_APP,
+    // The Teams SDK decodes whatever token it is given, so it has to be
+    // JWT-shaped; a password would make it fetch one from Microsoft.
+    token: () =>
+      [
+        { alg: 'none', typ: 'JWT' },
+        {
+          aud: 'https://api.botframework.com',
+          appid: TEAMS_APP,
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        },
+      ]
+        .map((part) => Buffer.from(JSON.stringify(part)).toString('base64url'))
+        .concat('signature')
+        .join('.'),
+    apiUrl: serviceUrl,
+  });
+  const caught = await listenOn(adapter);
+
+  await adapter.receive(
+    {
+      type: 'message',
+      id: unique(),
+      channelId: 'msteams',
+      serviceUrl,
+      timestamp: new Date().toISOString(),
+      from: { id: '29:1alice', name: 'Alice' },
+      recipient: { id: `28:${TEAMS_APP}`, name: TEAMS_APP_NAME },
+      conversation: {
+        id: TEAMS_DM,
+        conversationType: 'personal',
+        tenantId: TEAMS_TENANT,
+      },
+      channelData: { tenant: { id: TEAMS_TENANT } },
+      text: `<at>${TEAMS_APP_NAME}</at> <at>${person.name}</at> ${rest}`,
+      entities: [
+        {
+          type: 'mention',
+          text: `<at>${TEAMS_APP_NAME}</at>`,
+          mentioned: { id: `28:${TEAMS_APP}`, name: TEAMS_APP_NAME },
+        },
+        {
+          type: 'mention',
+          text: `<at>${person.name}</at>`,
+          mentioned: person,
+        },
+      ],
+    },
+    serviceUrl,
+  );
+  return mentionOf(await caught.next());
+};
+
 describe('Teams', () => {
   it("drops only the mention that names the app itself, under the app's display name, keeping the person mentioned next", async () => {
-    const service = await serviceOf(() => ({ status: 404, body: {} }));
-    const serviceUrl = `${service.url}/teams/`;
-    const adapter = new DirectTeamsAdapter({
-      appId: TEAMS_APP,
-      // The Teams SDK decodes whatever token it is given, so it has to be
-      // JWT-shaped; a password would make it fetch one from Microsoft.
-      token: () =>
-        [
-          { alg: 'none', typ: 'JWT' },
-          {
-            aud: 'https://api.botframework.com',
-            appid: TEAMS_APP,
-            exp: Math.floor(Date.now() / 1000) + 3600,
-          },
-        ]
-          .map((part) =>
-            Buffer.from(JSON.stringify(part)).toString('base64url'),
-          )
-          .concat('signature')
-          .join('.'),
-      apiUrl: serviceUrl,
-    });
-    const caught = await listenOn(adapter);
-
-    await adapter.receive(
-      {
-        type: 'message',
-        id: unique(),
-        channelId: 'msteams',
-        serviceUrl,
-        timestamp: new Date().toISOString(),
-        from: { id: '29:1alice', name: 'Alice' },
-        recipient: { id: `28:${TEAMS_APP}`, name: TEAMS_APP_NAME },
-        conversation: {
-          id: TEAMS_DM,
-          conversationType: 'personal',
-          tenantId: TEAMS_TENANT,
-        },
-        channelData: { tenant: { id: TEAMS_TENANT } },
-        text: `<at>${TEAMS_APP_NAME}</at> <at>Alice</at> please review`,
-        entities: [
-          {
-            type: 'mention',
-            text: `<at>${TEAMS_APP_NAME}</at>`,
-            mentioned: { id: `28:${TEAMS_APP}`, name: TEAMS_APP_NAME },
-          },
-          {
-            type: 'mention',
-            text: '<at>Alice</at>',
-            mentioned: { id: '29:1alice', name: 'Alice' },
-          },
-        ],
-      },
-      serviceUrl,
+    const event = await teamsDirectMention(
+      { id: '29:1alice', name: 'Alice' },
+      'please review',
     );
-    const event = mentionOf(await caught.next());
 
     expect(event.textWithoutBotAddress).toBe('@Alice please review');
     // A Teams 1:1 conversation has no replies under a message to answer in.
@@ -369,6 +381,17 @@ describe('Teams', () => {
       threadRootId: null,
       replyThreadRootId: null,
     });
+  });
+
+  it("keeps a person whose display name starts with the app's", async () => {
+    const event = await teamsDirectMention(
+      { id: '29:1admin', name: `${TEAMS_APP_NAME} Admin` },
+      'please review',
+    );
+
+    expect(event.textWithoutBotAddress).toBe(
+      `@${TEAMS_APP_NAME} Admin please review`,
+    );
   });
 });
 
