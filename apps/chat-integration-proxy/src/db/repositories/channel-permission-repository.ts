@@ -62,7 +62,8 @@ export interface ChannelPermissionRepository {
   /**
    * Deletes every row for a relation. Part of the unpairing sequence
    * (design.md: `own_key` / `peer_key` / `channel_permission` /
-   * `pending_collection` / `processed_notification_target` are all deleted
+   * `pending_collection` / `pending_agent_request` /
+   * `processed_notification_target` are all deleted
    * before the `relation` row itself) -- composing that ordered sequence is
    * a later task's job; this is only the primitive.
    */

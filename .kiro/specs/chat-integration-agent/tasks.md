@@ -32,7 +32,7 @@
   - _Requirements: 5.7, 5.13, 5.14, 5.15, 5.16, 5.17_
 
 - [ ] 2. proxy: 受け取り・保存・読み取りの土台
-- [ ] 2.1 答えを待つ依頼の記録と、DM の許可の保存先を用意する
+- [x] 2.1 答えを待つ依頼の記録と、DM の許可の保存先を用意する
   - 答えを待つ依頼の表（連携・依頼の番号・installation・宛先・配達の状態と取った時刻・期限）と、権限の表の「DM で許す」の欄を、migration で足す
   - 依頼の記録を読み書きする repository を作り、期限切れの掃除の一覧と、連携の解除で消す順序に加える
   - 設定の受け取りで「DM で許す」を保存し、判定に渡す
@@ -226,3 +226,6 @@
 - この worktree では `@growi/ui` などの dist が未 build のため、app の型検査と app の試験は動かない。app を触るタスク（4 以降）の前に `pnpm turbo run build --filter @growi/app^...` で依存を build する。
 - 1.4: `conversation` の成功の結果は、parser が「messages が空」と「range.messageCount と messages.length の食い違い」を通す（design.md に定めが無いため、承認済みの設計は変えていない）。3.5 の proxy は、0 件なら失敗の `empty` を返し、成功では range.messageCount を messages の件数から作ること。5.x の GROWI 側は、受け取った成功の件数を信用せず、messages から数え直し、0 件なら要約しないこと。
 - 1.4: 発言の markdown は空を許す（画像やファイルだけの発言は本文が空。parse-command.ts の keep と同じ）。3.5 の proxy は空の発言を除かずに渡してよい。
+- 2.1: `pending_agent_request.installation_id` は UUID で `installation` へ Restrict の外部キーを持つ。3.2 は、依頼の記録に必ず relation の `installationId` を渡すこと（`PrivateReplyOrigin.installationId` は null を取りうるが、agent の依頼を受け付ける時点で relation は決まっている）。別の値を渡すと、その installation の削除が記録の期限まで拒まれる。
+- 2.1: 依頼の記録の repository は `create`・`find`・`deleteExpired`・`deleteByRelation` だけ。1 件を消す操作は 3.2、配達の印を条件つきで付ける操作は 3.4 で足す。24 時間の期限は呼び出し側（3.2）が `expiresAt` として渡す。知らない `deliveryStatus` の行は `find` で例外になる（3.4 の `null` は「配達を始めていない」の意味）。
+- 2.1: `installation-store-removal.integ.ts` は失敗すると共有 DB に試験の行を残す。共有 DB に残った試験行（ランダム id）は他の試験を妨げない。proxy の全体試験では command-flow-e2e.integ が 5 秒の時間切れで毎回落ちる環境がある（単独では通り、直前のコミットでも同じ）。
