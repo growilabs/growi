@@ -38,7 +38,7 @@
   - 設定の受け取りで「DM で許す」を保存し、判定に渡す
   - 完了の条件: migration を適用した状態で、保存の往復の結合試験と、掃除の一覧の試験（表の数）が通り、連携を解除すると依頼の記録も消える
   - _Requirements: 11.7, 15.7_
-- [ ] 2.2 スレッドの根元と、bot への呼びかけを外した文章を、イベントからコマンドまで通す
+- [x] 2.2 スレッドの根元と、bot への呼びかけを外した文章を、イベントからコマンドまで通す
   - イベントに、実際にスレッドの中にあったときの根元・答えを置くスレッドの根元・DM であること・bot 自身への呼びかけだけを外した文章を載せ、コマンドの呼び出しまで運ぶ（聞き返しの記録に残る形は省略できる欄にする）
   - 答えを置く根元は、DM のスレッドの外の発言なら発言そのもの、返信の階層の無い Teams の DM では無し、とする
   - 語の形で呼びかけを推測していた処理を取り除き、既存のコマンドの引数も新しい文章から取る
@@ -229,3 +229,7 @@
 - 2.1: `pending_agent_request.installation_id` は UUID で `installation` へ Restrict の外部キーを持つ。3.2 は、依頼の記録に必ず relation の `installationId` を渡すこと（`PrivateReplyOrigin.installationId` は null を取りうるが、agent の依頼を受け付ける時点で relation は決まっている）。別の値を渡すと、その installation の削除が記録の期限まで拒まれる。
 - 2.1: 依頼の記録の repository は `create`・`find`・`deleteExpired`・`deleteByRelation` だけ。1 件を消す操作は 3.2、配達の印を条件つきで付ける操作は 3.4 で足す。24 時間の期限は呼び出し側（3.2）が `expiresAt` として渡す。知らない `deliveryStatus` の行は `find` で例外になる（3.4 の `null` は「配達を始めていない」の意味）。
 - 2.1: `installation-store-removal.integ.ts` は失敗すると共有 DB に試験の行を残す。共有 DB に残った試験行（ランダム id）は他の試験を妨げない。proxy の全体試験では command-flow-e2e.integ が 5 秒の時間切れで毎回落ちる環境がある（単独では通り、直前のコミットでも同じ）。
+- 2.2: MentionEvent の DM の欄は design.md の `isDirectMessage` ではなく既存の `inDirectMessage` のまま（同じ意味の欄を 2 つ持たない）。Invocation と `ChannelRef` は `isDirectMessage`。タスク 7 の書き戻しで design 側を実装に合わせる。Discord の DM は `replyThreadRootId` が null（Discord の DM ではスレッドが作れない）。
+- 2.2: `PrivateReplyOrigin` の新しい欄は省略できる（省略は根元なし・DM ではない）。normalize から作った origin は DM のとき `place: 'direct'` だけが付き、チャンネルの依頼には place が付かない。3.2 で `StoredAnswerOrigin` を作るときは `place ?? 'channel'` と根元の `?? null` で補う（型の強制変換は使わない）。
+- 2.2: `private-reply-adapters.integ.ts` が参照していた決定 P8（語の形で呼びかけを見分ける決まり）は取り除いた。タスク 7 の書き戻しで proxy 側の research.md の P8 を「取り除いた」と書き直す。
+- 2.2: 範囲外で気づいた点（コードを読んだだけ、未確認）: Mattermost adapter の `detectMention` は `(^|\s)@growi\b` を使うので、`@growi-admin` だけに宛てた投稿でも bot が反応しうる。`chat` 本体の `detectMention` は Discord と Teams で `adapter.userName`（既定 `bot`）を使うので、手で打った `@bot` で反応しうる。
