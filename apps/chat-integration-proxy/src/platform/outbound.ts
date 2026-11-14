@@ -20,7 +20,9 @@
 //     `card` and `interactiveActions`; both are declared once in
 //     `capabilities/` and consulted through `levelOf` / `supports`.
 
+import type { DiscordThreadId } from '@chat-adapter/discord';
 import type { SlackThreadId } from '@chat-adapter/slack';
+import type { TeamsThreadId } from '@chat-adapter/teams';
 import type { ChatAccountRef, PlatformName } from '@growi/chat';
 import {
   Actions,
@@ -347,6 +349,57 @@ export const channelThreadId = (
   rootMessageId: string | null,
 ): string => CHANNEL_ADDRESSING[platform](adapter, channelId, rootMessageId);
 
+/**
+ * How each service addresses a thread whose root is `threadRootId`, the value
+ * `threadRootsOf` (`thread-roots.ts`) reads off an event. A different question
+ * from `CHANNEL_ADDRESSING`'s message root: Discord's root is a thread channel
+ * id, not a message id, and Teams carries the root inside the conversation id.
+ *
+ * Verified against the installed adapters:
+ * - Slack, Mattermost: the root is the message the thread hangs from, which
+ *   `CHANNEL_ADDRESSING` already expresses.
+ * - Discord: `discord:<guild>:<channel>:<thread>`; `postMessage` sends to the
+ *   thread channel when the fourth segment is present.
+ * - Teams: `postMessage` and `postEphemeral` send to the conversation id, and
+ *   a channel conversation id ending `;messageid=<root>` is a reply under that
+ *   post. `channelIdFromThreadId` strips that suffix, so it is re-added here.
+ */
+const THREAD_ADDRESSING: Readonly<Record<PlatformName, ChannelAddressing>> = {
+  slack: CHANNEL_ADDRESSING.slack,
+  mattermost: CHANNEL_ADDRESSING.mattermost,
+  discord: (adapter, channelId, threadRootId) => {
+    const { guildId, channelId: parent } = adapter.decodeThreadId(
+      channelId,
+    ) as DiscordThreadId;
+    return adapter.encodeThreadId({
+      guildId,
+      channelId: parent,
+      ...(threadRootId == null ? {} : { threadId: threadRootId }),
+    } satisfies DiscordThreadId);
+  },
+  teams: (adapter, channelId, threadRootId) => {
+    if (threadRootId == null) return channelId;
+    const { conversationId, conversationType, serviceUrl } =
+      adapter.decodeThreadId(channelId) as TeamsThreadId;
+    return adapter.encodeThreadId({
+      conversationId: `${conversationId.replace(/;messageid=\d+/, '')};messageid=${threadRootId}`,
+      conversationType,
+      serviceUrl,
+    } satisfies TeamsThreadId);
+  },
+};
+
+/**
+ * The adapter thread id for the thread rooted at `threadRootId`, or the
+ * channel itself when there is no root (a Teams DM has no reply hierarchy).
+ */
+const threadIdOf = (
+  adapter: Adapter,
+  platform: PlatformName,
+  channelId: SdkChannelId,
+  threadRootId: string | null,
+): string => THREAD_ADDRESSING[platform](adapter, channelId, threadRootId);
+
 // --------------------------------------------------------------------------
 // Failures
 // --------------------------------------------------------------------------
@@ -619,12 +672,16 @@ export const post = async (
  * Addressed at the adapter directly, like `replace`: `ChannelImpl` would hand
  * the adapter the channel id as it is, and Mattermost's adapter accepts only a
  * thread id.
+ *
+ * With `threadRootId` the message appears inside that thread; without it, at
+ * the channel level.
  */
 export const postEphemeral = async (
   context: OutboundContext,
   target: SdkChannelRef,
   user: ChatAccountRef,
   message: OutboundMessage,
+  threadRootId: string | null = null,
 ): Promise<EphemeralPostOutcome> => {
   const { adapter } = context;
   const native = adapter.postEphemeral;
@@ -635,13 +692,35 @@ export const postEphemeral = async (
     () =>
       native.call(
         adapter,
-        channelThreadId(adapter, target.platform, target.channelId, null),
+        threadIdOf(adapter, target.platform, target.channelId, threadRootId),
         user.accountId,
         toPostable(message, target.platform, context.botName),
       ),
     'ephemeral',
   );
 };
+
+/**
+ * Posts into the thread rooted at `threadRootId`, visible to everyone who can
+ * read it. A caller with no root posts with `post` instead.
+ */
+export const postInThread = async (
+  context: OutboundContext,
+  target: SdkChannelRef,
+  threadRootId: string,
+  message: OutboundMessage,
+): Promise<PostOutcome> =>
+  attempt(context, () =>
+    context.adapter.postMessage(
+      threadIdOf(
+        context.adapter,
+        target.platform,
+        target.channelId,
+        threadRootId,
+      ),
+      toPostable(message, target.platform, context.botName),
+    ),
+  );
 
 /**
  * Posts a preview of what a link points at, next to the message that carried

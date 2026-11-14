@@ -53,7 +53,8 @@ export type CapturedPostKind =
   | 'ephemeral'
   | 'direct'
   | 'replace'
-  | 'preview';
+  | 'preview'
+  | 'thread-post';
 
 export interface CapturedPost {
   readonly kind: CapturedPostKind;
@@ -63,6 +64,8 @@ export interface CapturedPost {
   readonly user?: ChatAccountRef;
   /** Set on a replacement or a preview: which message it attached to. */
   readonly messageId?: string;
+  /** Set on a thread post, and on an ephemeral shown inside a thread. */
+  readonly threadRootId?: string;
   readonly message: OutboundMessage;
 }
 
@@ -231,11 +234,17 @@ export const createFakeChatService = (
     post: async (channel, message) =>
       capture({ kind: 'post', channel, message }),
 
-    postEphemeral: (channel, user, message) => {
+    postInThread: async (channel, threadRootId, message) =>
+      capture({ kind: 'thread-post', channel, threadRootId, message }),
+
+    postEphemeral: (channel, user, message, scope) => {
       const ephemeral: CapturedPost = {
         kind: 'ephemeral',
         channel,
         user,
+        ...(scope?.threadRootId == null
+          ? {}
+          : { threadRootId: scope.threadRootId }),
         message,
       };
       const scripted = script.postEphemeral?.(ephemeral);

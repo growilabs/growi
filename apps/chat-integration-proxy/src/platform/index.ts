@@ -69,6 +69,7 @@ import {
   attachPreview as attachPreviewOf,
   postDirect as postDirectOf,
   postEphemeral as postEphemeralOf,
+  postInThread as postInThreadOf,
   post as postOf,
   replace as replaceOf,
 } from './outbound.js';
@@ -108,8 +109,20 @@ export interface PlatformFacade {
     scope?: {
       readonly installationId?: string;
       readonly requestMessageId?: string | null;
+      /** Shows the message inside this thread instead of at the channel level. */
+      readonly threadRootId?: string | null;
     },
   ): Promise<EphemeralPostOutcome>;
+  /**
+   * Posts into the thread rooted at `threadRootId`, as everyone in it can see.
+   * Callable outside an event's handling, so `installationId` is required.
+   */
+  postInThread(
+    target: SdkChannelRef,
+    threadRootId: string,
+    message: OutboundMessage,
+    scope: { readonly installationId: string },
+  ): Promise<PostOutcome>;
   /**
    * Opens (or reuses) the 1:1 conversation with `user` and posts there.
    * `near` is the channel the request came from: like `postEphemeral`'s
@@ -548,7 +561,19 @@ export const createPlatformFacade = async (
         orderingClock ?? realEphemeralOrderingClock,
       );
       onOrderingWait?.(waitedMs);
-      return await postEphemeralOf(context, target, user, message);
+      return await postEphemeralOf(
+        context,
+        target,
+        user,
+        message,
+        scope?.threadRootId ?? null,
+      );
+    },
+
+    async postInThread(target, threadRootId, message, scope) {
+      const context = outboundContext(target.platform, scope);
+      if (context == null) return notAddressable(target.platform);
+      return await postInThreadOf(context, target, threadRootId, message);
     },
 
     async postDirect(near, user, message, scope) {
