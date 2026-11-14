@@ -5,7 +5,7 @@ ALTER TABLE "channel_permission" ADD COLUMN "allowed_in_direct_message" BOOLEAN 
 CREATE TABLE "pending_agent_request" (
     "relation_id" UUID NOT NULL,
     "request_id" TEXT NOT NULL,
-    "installation_id" TEXT NOT NULL,
+    "installation_id" UUID NOT NULL,
     "origin" JSONB NOT NULL,
     "delivery_status" TEXT,
     "delivery_claimed_at" TIMESTAMPTZ(3),
@@ -17,3 +17,5 @@ CREATE TABLE "pending_agent_request" (
 CREATE INDEX "pending_agent_request_expires_at_idx" ON "pending_agent_request"("expires_at");
 
 ALTER TABLE "pending_agent_request" ADD CONSTRAINT "pending_agent_request_relation_id_fkey" FOREIGN KEY ("relation_id") REFERENCES "relation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "pending_agent_request" ADD CONSTRAINT "pending_agent_request_installation_id_fkey" FOREIGN KEY ("installation_id") REFERENCES "installation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

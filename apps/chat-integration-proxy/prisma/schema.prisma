@@ -52,9 +52,10 @@ model Installation {
   // former must answer `inventory-not-ready`, not `channel-not-in-installation`.
   channelsSyncedAt DateTime? @map("channels_synced_at") @db.Timestamptz(3)
 
-  channels      InstallationChannel[]
-  relations     Relation[]
-  pairingOrders PairingOrder[]
+  channels             InstallationChannel[]
+  relations            Relation[]
+  pairingOrders        PairingOrder[]
+  pendingAgentRequests PendingAgentRequest[]
 
   @@unique([platform, workspaceId])
   @@map("installation")
@@ -228,12 +229,12 @@ model ChannelPermission {
   @@map("channel_permission")
 }
 
-// An `agent` request GROWI accepted, kept so the answer can be delivered
-// later without GROWI ever knowing where the question was asked.
+// An `agent` request GROWI accepted. Why the destination is kept here and not
+// sent to GROWI: design.md, Security Considerations.
 model PendingAgentRequest {
   relationId        String    @map("relation_id") @db.Uuid
   requestId         String    @map("request_id")
-  installationId    String    @map("installation_id")
+  installationId    String    @map("installation_id") @db.Uuid
   // `StoredAnswerOrigin` (pending-agent-request-repository.ts).
   origin            Json
   // 'delivering', 'delivered' or 'undeliverable'; NULL until a delivery starts.
@@ -242,7 +243,8 @@ model PendingAgentRequest {
   deliveryClaimedAt DateTime? @map("delivery_claimed_at") @db.Timestamptz(3)
   expiresAt         DateTime  @map("expires_at") @db.Timestamptz(3)
 
-  relation Relation @relation(fields: [relationId], references: [id], onDelete: Restrict)
+  relation     Relation     @relation(fields: [relationId], references: [id], onDelete: Restrict)
+  installation Installation @relation(fields: [installationId], references: [id], onDelete: Restrict)
 
   @@id([relationId, requestId])
   @@index([expiresAt])

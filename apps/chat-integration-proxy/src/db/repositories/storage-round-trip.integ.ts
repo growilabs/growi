@@ -729,6 +729,31 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       expect(record?.deliveryClaimedAt).toEqual(claimedAt);
     });
 
+    it('refuses to read a row whose delivery state it does not know, instead of treating it as not yet started', async () => {
+      const { prisma, installationId, relation } = await newRelation('agent-g');
+      const repository = createPendingAgentRequestRepository(prisma);
+      await repository.create({
+        relationId: relation.relationId,
+        requestId: 'req-1',
+        installationId,
+        origin: originOf(`D-${randomUUID()}`),
+        expiresAt: new Date(Date.now() + 86_400_000),
+      });
+      await prisma.pendingAgentRequest.update({
+        where: {
+          relationId_requestId: {
+            relationId: relation.relationId,
+            requestId: 'req-1',
+          },
+        },
+        data: { deliveryStatus: 'garbled' },
+      });
+
+      await expect(
+        repository.find(relation.relationId, 'req-1'),
+      ).rejects.toThrow(/garbled/);
+    });
+
     it('sweeps only the requests past their expiry', async () => {
       const { prisma, installationId, relation } = await newRelation('agent-c');
       const repository = createPendingAgentRequestRepository(prisma);
@@ -798,6 +823,24 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       await expect(
         pending.find(other.relation.relationId, 'req-1'),
       ).resolves.not.toBeNull();
+    });
+
+    it('refuses a request that names an installation which does not exist', async () => {
+      const { prisma, relation } = await newRelation('agent-f');
+      const repository = createPendingAgentRequestRepository(prisma);
+
+      await expect(
+        repository.create({
+          relationId: relation.relationId,
+          requestId: 'req-1',
+          installationId: randomUUID(),
+          origin: originOf(`D-${randomUUID()}`),
+          expiresAt: new Date(Date.now() + 86_400_000),
+        }),
+      ).rejects.toThrow();
+      await expect(
+        repository.find(relation.relationId, 'req-1'),
+      ).resolves.toBeNull();
     });
   });
 

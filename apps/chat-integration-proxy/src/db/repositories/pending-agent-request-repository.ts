@@ -1,7 +1,5 @@
-// An `agent` request GROWI accepted and has not yet answered (design.md's
-// `pending_agent_request` table). The answer arrives later, from GROWI, naming
-// only `(relationId, requestId)`; this row is what lets the proxy find the
-// place to post it without GROWI ever being told where the question was asked.
+// An `agent` request GROWI accepted and has not yet answered. Why the answer's
+// destination is kept here and not sent to GROWI: design.md, Security Considerations.
 //
 // This file is storage only: which delivery state follows which, and when a
 // stale 'delivering' mark may be taken over, belong to the answer flow.
@@ -69,14 +67,30 @@ const DELIVERY_STATUSES: ReadonlyArray<AgentDeliveryStatus> = [
   'undeliverable',
 ];
 
+// Throws on an unknown value: reading it as `null` ("not started") would let
+// the answer be delivered again.
+const toDeliveryStatus = (
+  row: PendingAgentRequestRow,
+): AgentDeliveryStatus | null => {
+  if (row.deliveryStatus == null) return null;
+  const known = DELIVERY_STATUSES.find(
+    (status) => status === row.deliveryStatus,
+  );
+  if (known == null) {
+    throw new Error(
+      `pending_agent_request ${row.relationId}/${row.requestId} has an unknown delivery_status: ${row.deliveryStatus}`,
+    );
+  }
+  return known;
+};
+
 const toRecord = (row: PendingAgentRequestRow): PendingAgentRequestRecord => ({
   relationId: row.relationId,
   requestId: row.requestId,
   installationId: row.installationId,
   // The JSON column round-trips what `create` wrote.
   origin: row.origin as StoredAnswerOrigin,
-  deliveryStatus:
-    DELIVERY_STATUSES.find((status) => status === row.deliveryStatus) ?? null,
+  deliveryStatus: toDeliveryStatus(row),
   deliveryClaimedAt: row.deliveryClaimedAt,
   expiresAt: row.expiresAt,
 });
