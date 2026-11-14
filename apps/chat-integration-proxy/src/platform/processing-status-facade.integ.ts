@@ -46,9 +46,18 @@ const directMessage: SdkChannelRef = {
 describe('setProcessingStatus through the facade, on Slack', () => {
   let facade: PlatformFacade | undefined;
 
+  // Records the bot token the call would be sent with. Slack resolves it from
+  // the installation the call is bound to; an unbound call has none.
+  const tokensUsed: string[] = [];
   const setStatus = vi
     .spyOn(SlackAdapter.prototype, 'setAssistantStatus')
-    .mockResolvedValue(undefined);
+    .mockImplementation(async function (this: SlackAdapter) {
+      tokensUsed.push(
+        await Reflect.apply(Reflect.get(this, 'getToken'), this, []),
+      );
+    });
+
+  const reportOperationalFailure = vi.fn();
 
   const open = async (config: PlatformAppConfig): Promise<PlatformFacade> => {
     facade = await createPlatformFacade(
@@ -60,11 +69,16 @@ describe('setProcessingStatus through the facade, on Slack', () => {
         resolve: async () => ({ slack: { botToken: 'xoxb-installation-x' } }),
       }),
       mock<PlatformEventSink>(),
+      { reportOperationalFailure },
     );
     return facade;
   };
 
-  beforeEach(() => setStatus.mockClear());
+  beforeEach(() => {
+    setStatus.mockClear();
+    tokensUsed.length = 0;
+    reportOperationalFailure.mockClear();
+  });
   afterEach(async () => {
     await facade?.shutdown();
     facade = undefined;
@@ -83,6 +97,7 @@ describe('setProcessingStatus through the facade, on Slack', () => {
       REQUEST_TS,
       expect.any(String),
     );
+    expect(tokensUsed).toEqual(['xoxb-installation-x']);
   });
 
   it.each([
@@ -107,6 +122,7 @@ describe('setProcessingStatus through the facade, on Slack', () => {
         installationId: 'installation-x',
       }),
     ).resolves.toBeUndefined();
+    expect(reportOperationalFailure).toHaveBeenCalledTimes(1);
   });
 
   it('does nothing on a service that has no indicator, even with the AI app view enabled', async () => {

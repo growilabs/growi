@@ -38,6 +38,20 @@ export interface AppAdapterContext {
 }
 
 /**
+ * Shows "the bot is working on it" on the thread rooted at `threadRootId`,
+ * on the service's own side. Runs inside the installation's scope, and may
+ * reject; the caller absorbs that.
+ */
+export type ProcessingStatusSetter = (
+  adapter: Adapter,
+  channelId: NativeChannelId,
+  threadRootId: string,
+) => Promise<void>;
+
+/** What Slack's thread status line reads after the bot's name. */
+const SLACK_PROCESSING_STATUS = '考えています…';
+
+/**
  * Where one service reads the credentials it needs to be constructed at all
  * (design.md: 「アプリごとの接続は `PlatformAppConfig` から開き、installation
  * ごとの接続は `InstallationCredentials` から開く」).
@@ -53,20 +67,6 @@ export interface AppAdapterContext {
  * `Record<PlatformName, AdapterFactory>` below still gives compile-time
  * completeness across all four services.
  */
-/**
- * Shows "the bot is working on it" on the thread rooted at `threadRootId`,
- * on the service's own side. Runs inside the installation's scope, and may
- * reject; the caller absorbs that.
- */
-export type ProcessingStatusSetter = (
-  adapter: Adapter,
-  channelId: NativeChannelId,
-  threadRootId: string,
-) => Promise<void>;
-
-/** What Slack's thread status line reads after the bot's name. */
-const SLACK_PROCESSING_STATUS = '考えています…';
-
 export type AdapterFactory =
   | {
       readonly credentialSource: 'app';

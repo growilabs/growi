@@ -13,7 +13,10 @@ import {
   type ChatServiceStandIn,
   startChatServiceStandIn,
 } from './chat-service-stand-in.js';
+import type { InstallationProvider } from './installation-provider.js';
+import { installationRunner } from './installation-scope.js';
 import { setProcessingStatus } from './outbound.js';
+import { createSlackInstallationLookup } from './slack-installation-lookup.js';
 
 const REQUEST_TS = '1793094064.140309';
 
@@ -45,16 +48,38 @@ describe('the processing indicator', () => {
   });
   afterEach(() => service.close());
 
-  const slackContext = () => ({
-    adapter: createSlackAdapter({
-      botToken: 'xoxb-test',
+  // Built as in production: no `botToken`, so the bot is resolved from the
+  // installation the call is bound to. A call that is not bound has no token.
+  const slackContext = () => {
+    const installations = mock<InstallationProvider>({
+      list: async () => [
+        { installationId: 'installation-x', workspaceId: 'T0000000X' },
+      ],
+      resolve: async () => ({ slack: { botToken: 'xoxb-installation-x' } }),
+    });
+    const adapter = createSlackAdapter({
+      mode: 'socket',
+      appToken: 'xapp-1-test',
       signingSecret: 'signing-secret',
+      installationProvider: createSlackInstallationLookup({
+        installations,
+        fetch: (input, init) =>
+          fetch(new URL(new URL(String(input)).pathname, service.url), init),
+      }),
       apiUrl: `${service.url}/api/`,
       webClientOptions: { retryConfig: { retries: 0 } },
-    }),
-    state: mock<StateAdapter>(),
-    botName: 'growi',
-  });
+    });
+    return {
+      adapter,
+      state: mock<StateAdapter>(),
+      botName: 'growi',
+      run:
+        installationRunner('slack', adapter, 'installation-x', {
+          installations,
+          factories: ADAPTER_FACTORIES,
+        }) ?? undefined,
+    };
+  };
 
   const show = async (
     agentView: boolean | undefined,
@@ -74,6 +99,9 @@ describe('the processing indicator', () => {
 
     expect(service.requests).toHaveLength(1);
     expect(service.requests[0]?.path).toBe('/api/assistant.threads.setStatus');
+    expect(service.requests[0]?.authorization).toBe(
+      'Bearer xoxb-installation-x',
+    );
     expect(service.requests[0]?.body).toMatchObject({
       channel_id: 'D0DIRECT01',
       thread_ts: REQUEST_TS,
