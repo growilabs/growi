@@ -51,7 +51,7 @@ export {
   SEARCH_DEFAULT_LIMIT,
 } from './command-set.js';
 export type { CommandStartEvent } from './invocation.js';
-export { CommandInvocation, stripAddressToken } from './invocation.js';
+export { CommandInvocation } from './invocation.js';
 export type {
   PrivateReplier,
   PrivateReplierDeps,

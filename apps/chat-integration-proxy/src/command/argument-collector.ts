@@ -36,7 +36,6 @@ import type {
   OutboundMessage,
   PlatformEvent,
 } from '../types/index.js';
-import { stripAddressToken } from './invocation.js';
 import { type PrivateReplier, privateReplyOriginOf } from './private-reply.js';
 
 export type StartOutcome =
@@ -599,9 +598,7 @@ export const createArgumentCollector = (
           return answerChoiceByPosition(
             loaded.record,
             loaded.state,
-            stripAddressToken(event.text, {
-              inDirectMessage: event.inDirectMessage,
-            }),
+            event.textWithoutBotAddress,
           );
         }
         if (loaded.state.awaiting == null) return { status: 'not-mine' };
@@ -611,9 +608,7 @@ export const createArgumentCollector = (
           loaded.record.invocation,
           loaded.state,
           {
-            [loaded.state.awaiting]: stripAddressToken(event.text, {
-              inDirectMessage: event.inDirectMessage,
-            }),
+            [loaded.state.awaiting]: event.textWithoutBotAddress,
           },
         );
       }

@@ -20,6 +20,7 @@ import { testSdkChannel } from '../capabilities/test-channels.js';
 import type {
   InteractionRef,
   Invocation,
+  PlatformEvent,
   SdkChannelRef,
 } from '../types/index.js';
 import { CommandInvocation } from './invocation.js';
@@ -42,8 +43,11 @@ describe('CommandInvocation.normalize', () => {
       channel,
       actor,
       text: '@growi search foo',
+      textWithoutBotAddress: 'search foo',
       inDirectMessage: false,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 
@@ -92,15 +96,18 @@ describe('CommandInvocation.normalize', () => {
     expect(fromMention).not.toEqual(fromSlashCommand);
   });
 
-  it('strips the mention address token before splitting the command name off the remaining text', () => {
+  it('splits the command name off the text the bot address was taken out of', () => {
     const result = CommandInvocation.normalize({
       kind: 'mention',
       platform: 'slack',
       channel,
       actor,
       text: '@growi keep https://growi.example.com/page',
+      textWithoutBotAddress: 'keep https://growi.example.com/page',
       inDirectMessage: false,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 
@@ -115,8 +122,11 @@ describe('CommandInvocation.normalize', () => {
       channel,
       actor,
       text: '@growi',
+      textWithoutBotAddress: '',
       inDirectMessage: false,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 
@@ -149,8 +159,11 @@ describe('CommandInvocation.normalize', () => {
       channel,
       actor,
       text: 'search foo',
+      textWithoutBotAddress: 'search foo',
       inDirectMessage: true,
       messageId: 'M1',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
       installation: { kind: 'identified', installationId: 'inst-dm' },
     });
@@ -206,60 +219,99 @@ describe('Invocation', () => {
     expect(fromMention.argsText).toBe(fromSlashCommand.argsText);
   });
 
-  describe('in a direct message', () => {
-    const dm = (text: string) =>
+  describe('taking the command from the text the platform layer left after the bot address (15.17)', () => {
+    const mention = (
+      textWithoutBotAddress: string,
+      overrides: Partial<Extract<PlatformEvent, { kind: 'mention' }>> = {},
+    ) =>
       CommandInvocation.normalize({
         kind: 'mention',
         platform: 'slack',
         channel,
         actor,
-        text,
+        text: 'typed text the command layer must not read',
+        textWithoutBotAddress,
         inDirectMessage: true,
         messageId: 'M0002',
+        threadRootId: null,
+        replyThreadRootId: null,
         interaction: null,
+        ...overrides,
       });
 
-    it('reads an unaddressed first word as the command name', () => {
-      const result = dm('search foo');
+    it('reads the command name and its arguments off that text', () => {
+      const result = mention('search foo bar');
 
       expect(result.commandName).toBe('search');
-      expect(result.argsText).toBe('foo');
+      expect(result.argsText).toBe('foo bar');
       expect(result.sourceMessageId).toBe('M0002');
     });
 
-    // Accepted tradeoff of recognizing an address by shape: the command layer
-    // cannot tell a mention of another person from the bot's own address.
-    it('drops a leading @-word that is not the bot, as the shape rule cannot tell them apart', () => {
-      const result = dm('@alice please review');
+    it('keeps a mention of another person that leads it, instead of guessing it is the bot', () => {
+      const result = mention('@alice please review');
 
-      expect(result.commandName).toBe('please');
-      expect(result.argsText).toBe('review');
+      expect(result.commandName).toBe('@alice');
+      expect(result.argsText).toBe('please review');
     });
 
-    it.each([
-      ['Slack', '@U0BOT search foo'],
-      ['Discord', '<@123456789> search foo'],
-      ['Teams', '@growi search foo'],
-    ])('still drops a leading bot address (%s form)', (_service, text) => {
-      const result = dm(text);
+    it('drops no word of a channel mention on its own', () => {
+      const result = mention('growi search foo', { inDirectMessage: false });
 
-      expect(result.commandName).toBe('search');
-      expect(result.argsText).toBe('foo');
+      expect(result.commandName).toBe('growi');
+      expect(result.argsText).toBe('search foo');
     });
   });
 
-  it('still drops the first word of a channel mention even when it is not address-shaped', () => {
-    const result = CommandInvocation.normalize({
-      kind: 'mention',
-      platform: 'slack',
-      channel,
-      actor,
-      text: 'growi search foo',
-      inDirectMessage: false,
-      messageId: 'M0003',
-      interaction: null,
+  describe('where the request was made (15.8, 15.14)', () => {
+    const mention = (
+      overrides: Partial<Extract<PlatformEvent, { kind: 'mention' }>>,
+    ) =>
+      CommandInvocation.normalize({
+        kind: 'mention',
+        platform: 'slack',
+        channel,
+        actor,
+        text: 'help',
+        textWithoutBotAddress: 'help',
+        inDirectMessage: false,
+        messageId: 'M0004',
+        threadRootId: null,
+        replyThreadRootId: null,
+        interaction: null,
+        ...overrides,
+      });
+
+    it('carries both thread roots and the direct-message flag of a request in a DM thread', () => {
+      const result = mention({
+        inDirectMessage: true,
+        threadRootId: 'M0001',
+        replyThreadRootId: 'M0001',
+      });
+
+      expect(result).toMatchObject({
+        threadRootId: 'M0001',
+        replyThreadRootId: 'M0001',
+        isDirectMessage: true,
+      });
     });
 
-    expect(result.commandName).toBe('search');
+    it('keeps the two roots apart when only the answer has a thread to go to', () => {
+      const result = mention({
+        inDirectMessage: true,
+        threadRootId: null,
+        replyThreadRootId: 'M0004',
+      });
+
+      expect(result.replyThreadRootId).toBe('M0004');
+      expect(result.threadRootId ?? null).toBeNull();
+    });
+
+    it('leaves out what a request in a channel, outside a thread, has nothing to say about', () => {
+      const result = mention({});
+
+      expect(result).not.toHaveProperty('threadRootId');
+      expect(result).not.toHaveProperty('replyThreadRootId');
+      expect(result).not.toHaveProperty('isDirectMessage');
+    });
   });
 });

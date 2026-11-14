@@ -15,8 +15,12 @@
 //     back-reference. `src/architecture.spec.ts`'s Chat SDK origin guard covers
 //     the complementary half (no file outside `platform/**` may even name an SDK
 //     type); neither implies the other.
+import { createDiscordAdapter } from '@chat-adapter/discord';
+import { createSlackAdapter } from '@chat-adapter/slack';
+import { createTeamsAdapter } from '@chat-adapter/teams';
 import type {
   ActionEvent,
+  Adapter,
   Author,
   Channel,
   ChannelVisibility,
@@ -26,6 +30,7 @@ import type {
   SlashCommandEvent,
   Thread,
 } from 'chat';
+import { createMattermostAdapter } from 'chat-adapter-mattermost';
 import { mock } from 'vitest-mock-extended';
 
 import type { InteractionRef, PlatformEvent } from '../types/index.js';
@@ -66,7 +71,7 @@ const slackThread = (
   } = {},
 ): Thread =>
   mock<Thread>({
-    adapter: mock({ name: 'slack' }),
+    adapter: mock({ name: 'slack', botUserId: 'U0BOT0001' }),
     channelId: overrides.channelId ?? 'slack:C0001',
     isDM: overrides.isDM ?? false,
     channelVisibility: overrides.channelVisibility ?? 'workspace',
@@ -124,7 +129,7 @@ describe('fromMessage', () => {
   it('turns an addressed message into a mention carrying the platform, channel, speaker and text', () => {
     const event = fromMessage(
       slackThread(),
-      message({ text: '@growi search foo' }),
+      message({ text: '@U0BOT0001 search foo' }),
     );
 
     expect(event).toEqual({
@@ -141,9 +146,12 @@ describe('fromMessage', () => {
         accountId: 'U0001',
         displayName: 'Alice Example',
       },
-      text: '@growi search foo',
+      text: '@U0BOT0001 search foo',
+      textWithoutBotAddress: 'search foo',
       inDirectMessage: false,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: null,
       // A message event never carries a modal trigger (design.md: 「mention の
       // 通知には付いてこない」).
       interaction: null,
@@ -300,8 +308,11 @@ describe('fromMessage', () => {
       'channel',
       'actor',
       'text',
+      'textWithoutBotAddress',
       'inDirectMessage',
       'messageId',
+      'threadRootId',
+      'replyThreadRootId',
       'interaction',
     ]);
     expectNoSdkValueLeaked(linkPosted, [
@@ -312,6 +323,352 @@ describe('fromMessage', () => {
       'messageRef',
       'urls',
     ]);
+  });
+});
+
+// Requirements 15.8, 15.14 and 15.17, read off the four REAL adapters (built
+// offline, never connected): each one's own thread ids and its own idea of who
+// the bot is, so the cases follow what the adapters actually encode rather
+// than a copy of it.
+describe('fromMessage, on each service: where the answer goes and what was asked', () => {
+  const SLACK_BOT = 'U0BOT0001';
+  const DISCORD_APP = '900000000000000001';
+  const TEAMS_BOT = '28:00000000-0000-0000-0000-00000000a99';
+  const MATTERMOST_BOT_NAME = 'growi';
+
+  const slack = createSlackAdapter({
+    mode: 'socket',
+    appToken: 'xapp-1-test',
+    signingSecret: 'signing-secret',
+    botUserId: SLACK_BOT,
+  });
+  const discord = createDiscordAdapter({
+    applicationId: DISCORD_APP,
+    publicKey: 'a'.repeat(64),
+    botToken: 'discord-bot-token',
+  });
+  const teams = createTeamsAdapter({ appId: 'app', appPassword: 'password' });
+  // `userName` is what the adapter takes from `/users/me` on connecting.
+  const mattermost = createMattermostAdapter({
+    baseUrl: 'http://mattermost.invalid',
+    botToken: 'mattermost-bot-token',
+    userName: MATTERMOST_BOT_NAME,
+  });
+
+  const threadOf = (
+    adapter: Adapter,
+    threadId: string,
+    isDM: boolean,
+  ): Thread => {
+    const thread = mock<Thread>({
+      id: threadId,
+      channelId: adapter.channelIdFromThreadId(threadId),
+      isDM,
+      channelVisibility: isDM ? 'private' : 'workspace',
+      channel: mock<Channel>({ name: 'general' }),
+    });
+    // Assigned rather than passed in: `mock()` would wrap the adapter in a
+    // proxy, which cannot reach the adapter's private class fields.
+    Object.assign(thread, { adapter });
+    return thread;
+  };
+
+  const mentionFrom = (
+    thread: Thread,
+    overrides: Partial<Message>,
+  ): Extract<PlatformEvent, { kind: 'mention' }> => {
+    const event = fromMessage(thread, message(overrides));
+    if (event?.kind !== 'mention') throw new Error(`got ${event?.kind}`);
+    return event;
+  };
+
+  const teamsThreadId = (conversationId: string, personal = false): string =>
+    teams.encodeThreadId({
+      conversationId,
+      serviceUrl: 'https://smba.trafficmanager.net/teams/',
+      ...(personal ? { conversationType: 'personal' as const } : {}),
+    });
+
+  /** A Teams activity as `message.raw`: the bot is its recipient. */
+  const teamsActivity = (
+    mentions: ReadonlyArray<{ readonly id: string; readonly name: string }>,
+  ) => ({
+    recipient: { id: TEAMS_BOT, name: 'GROWI' },
+    entities: mentions.map(({ id, name }) => ({
+      type: 'mention',
+      text: `<at>${name}</at>`,
+      mentioned: { id, name },
+    })),
+  });
+
+  const slackChannelThread = () =>
+    threadOf(slack, 'slack:C0001:1700000000.000100', false);
+  const discordThread = () =>
+    threadOf(
+      discord,
+      'discord:700000000000000001:710000000000000001:930000000000000001',
+      false,
+    );
+  const teamsChannelThread = () =>
+    threadOf(
+      teams,
+      teamsThreadId('19:general@thread.tacv2;messageid=1700000000111'),
+      false,
+    );
+  const mattermostChannelThread = () =>
+    threadOf(
+      mattermost,
+      mattermost.encodeThreadId({ channelId: 'channel1', rootPostId: 'post1' }),
+      false,
+    );
+
+  describe('the text without the bot address (15.17)', () => {
+    it.each([
+      {
+        service: 'Slack',
+        thread: slackChannelThread,
+        text: `@${SLACK_BOT} @Alice please review`,
+        raw: {},
+        expected: '@Alice please review',
+      },
+      {
+        service: 'Discord',
+        thread: discordThread,
+        text: `<@${DISCORD_APP}> <@920000000000000002> please review`,
+        raw: {},
+        expected: '<@920000000000000002> please review',
+      },
+      {
+        service: 'Teams',
+        thread: teamsChannelThread,
+        text: '@GROWI @Alice please review',
+        raw: teamsActivity([
+          { id: TEAMS_BOT, name: 'GROWI' },
+          { id: '29:1alice', name: 'Alice' },
+        ]),
+        expected: '@Alice please review',
+      },
+      {
+        service: 'Mattermost',
+        thread: mattermostChannelThread,
+        text: `@${MATTERMOST_BOT_NAME} @alice please review`,
+        raw: {},
+        expected: '@alice please review',
+      },
+    ])('$service: drops only the bot address and keeps the mention of another person that now leads the text', ({
+      thread,
+      text,
+      raw,
+      expected,
+    }) => {
+      const event = mentionFrom(thread(), { text, raw });
+
+      expect(event.textWithoutBotAddress).toBe(expected);
+      expect(event.text).toBe(text);
+    });
+
+    it.each([
+      {
+        service: 'Slack',
+        thread: () => threadOf(slack, 'slack:D0001:', true),
+        text: '@Alice please review',
+        raw: {},
+      },
+      {
+        service: 'Discord',
+        thread: () => threadOf(discord, 'discord:@me:910000000000000001', true),
+        text: '<@920000000000000002> please review',
+        raw: {},
+      },
+      {
+        service: 'Teams',
+        thread: () => threadOf(teams, teamsThreadId('a:1direct', true), true),
+        text: '@Alice please review',
+        raw: teamsActivity([{ id: '29:1alice', name: 'Alice' }]),
+      },
+      {
+        service: 'Mattermost',
+        thread: () =>
+          threadOf(
+            mattermost,
+            mattermost.encodeThreadId({ channelId: 'direct1' }),
+            true,
+          ),
+        text: '@alice please review',
+        raw: {},
+      },
+    ])('$service: leaves a direct message that starts with another person as typed', ({
+      thread,
+      text,
+      raw,
+    }) => {
+      expect(mentionFrom(thread(), { text, raw }).textWithoutBotAddress).toBe(
+        text,
+      );
+    });
+
+    it('drops a bot address in the middle without leaving a double space, and keeps the line breaks after it', () => {
+      const thread = threadOf(slack, 'slack:D0001:', true);
+
+      expect(
+        mentionFrom(thread, { text: `please @${SLACK_BOT} summarize` })
+          .textWithoutBotAddress,
+      ).toBe('please summarize');
+      expect(
+        mentionFrom(thread, { text: `@${SLACK_BOT}\nfirst line\n\nsecond` })
+          .textWithoutBotAddress,
+      ).toBe('first line\n\nsecond');
+    });
+
+    it("does not take a longer name that merely starts with the bot's for the bot", () => {
+      expect(
+        mentionFrom(mattermostChannelThread(), {
+          text: `@${MATTERMOST_BOT_NAME} ask @${MATTERMOST_BOT_NAME}-admin`,
+        }).textWithoutBotAddress,
+      ).toBe(`ask @${MATTERMOST_BOT_NAME}-admin`);
+    });
+
+    it('drops a Teams address only when the mention names the bot itself, not a person with the same display name', () => {
+      expect(
+        mentionFrom(teamsChannelThread(), {
+          text: '@GROWI please review',
+          raw: teamsActivity([{ id: '29:1namesake', name: 'GROWI' }]),
+        }).textWithoutBotAddress,
+      ).toBe('@GROWI please review');
+    });
+  });
+
+  describe('the two thread roots (15.8, 15.14)', () => {
+    it.each([
+      {
+        place: 'a Slack channel, outside a thread',
+        thread: slackChannelThread,
+        messageId: '1700000000.000100',
+        threadRootId: null,
+        replyThreadRootId: null,
+      },
+      {
+        place: 'a Slack channel, inside a thread',
+        thread: slackChannelThread,
+        messageId: '1700000000.000200',
+        threadRootId: '1700000000.000100',
+        replyThreadRootId: '1700000000.000100',
+      },
+      {
+        place: 'a Slack DM with the AI app view off, outside a thread',
+        thread: () => threadOf(slack, 'slack:D0001:', true),
+        messageId: '1700000000.000300',
+        threadRootId: null,
+        replyThreadRootId: '1700000000.000300',
+      },
+      {
+        place: 'a Slack DM, replying in the thread of an earlier request',
+        thread: () => threadOf(slack, 'slack:D0001:1700000000.000300', true),
+        messageId: '1700000000.000400',
+        threadRootId: '1700000000.000300',
+        replyThreadRootId: '1700000000.000300',
+      },
+      {
+        place:
+          'a Slack DM with the AI app view on, where each message roots its own thread',
+        thread: () => threadOf(slack, 'slack:D0001:1700000000.000500', true),
+        messageId: '1700000000.000500',
+        threadRootId: null,
+        replyThreadRootId: '1700000000.000500',
+      },
+      {
+        place:
+          'a Discord channel, in the thread the adapter started from the message',
+        thread: discordThread,
+        messageId: '930000000000000001',
+        threadRootId: null,
+        replyThreadRootId: null,
+      },
+      {
+        place: 'a Discord thread, replying',
+        thread: discordThread,
+        messageId: '930000000000000002',
+        threadRootId: '930000000000000001',
+        replyThreadRootId: '930000000000000001',
+      },
+      {
+        place: 'a Discord DM, which has no threads',
+        thread: () => threadOf(discord, 'discord:@me:910000000000000001', true),
+        messageId: '930000000000000003',
+        threadRootId: null,
+        replyThreadRootId: null,
+      },
+      {
+        place: 'a Teams channel, outside a thread',
+        thread: teamsChannelThread,
+        messageId: '1700000000111',
+        threadRootId: null,
+        replyThreadRootId: null,
+      },
+      {
+        place: 'a Teams channel, inside a thread',
+        thread: teamsChannelThread,
+        messageId: '1700000000222',
+        threadRootId: '1700000000111',
+        replyThreadRootId: '1700000000111',
+      },
+      {
+        place: 'a Teams DM, which has no reply hierarchy',
+        thread: () => threadOf(teams, teamsThreadId('a:1direct', true), true),
+        messageId: '1700000000333',
+        threadRootId: null,
+        replyThreadRootId: null,
+      },
+      {
+        place: 'a Mattermost channel, outside a thread',
+        thread: mattermostChannelThread,
+        messageId: 'post1',
+        threadRootId: null,
+        replyThreadRootId: null,
+      },
+      {
+        place: 'a Mattermost channel, inside a thread',
+        thread: mattermostChannelThread,
+        messageId: 'post2',
+        threadRootId: 'post1',
+        replyThreadRootId: 'post1',
+      },
+      {
+        place: 'a Mattermost DM, outside a thread',
+        thread: () =>
+          threadOf(
+            mattermost,
+            mattermost.encodeThreadId({
+              channelId: 'direct1',
+              rootPostId: 'post3',
+            }),
+            true,
+          ),
+        messageId: 'post3',
+        threadRootId: null,
+        replyThreadRootId: 'post3',
+      },
+    ])('$place', ({ thread, messageId, threadRootId, replyThreadRootId }) => {
+      const event = mentionFrom(thread(), { id: messageId, text: 'help' });
+
+      expect(event).toMatchObject({
+        messageId,
+        threadRootId,
+        replyThreadRootId,
+      });
+    });
+  });
+
+  it('tells GROWI a direct message is one through the channel it names, and says nothing for a channel', () => {
+    const inDm = mentionFrom(threadOf(slack, 'slack:D0001:', true), {
+      text: 'help',
+    });
+    const inChannel = mentionFrom(slackChannelThread(), { text: 'help' });
+
+    expect(inDm.channel.isDirectMessage).toBe(true);
+    expect(inDm.inDirectMessage).toBe(true);
+    expect(inChannel.channel).not.toHaveProperty('isDirectMessage');
+    expect(inChannel.inDirectMessage).toBe(false);
   });
 });
 

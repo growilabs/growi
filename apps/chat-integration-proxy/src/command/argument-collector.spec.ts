@@ -147,8 +147,11 @@ const mentionAnswer = (
   channel: channelOf(platform),
   actor: actorOf(platform),
   text: `@growi ${text}`,
+  textWithoutBotAddress: text,
   inDirectMessage: options.inDirectMessage,
   messageId: 'M0001',
+  threadRootId: null,
+  replyThreadRootId: null,
   interaction: null,
 });
 
@@ -359,8 +362,11 @@ describe('ArgumentCollector.start', () => {
       }),
       actor: actorOf('mattermost'),
       text: 'foo bar',
+      textWithoutBotAddress: 'foo bar',
       inDirectMessage: true,
       messageId: 'M-dm',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 
@@ -432,8 +438,11 @@ describe('ArgumentCollector.start', () => {
       channel: dm,
       actor: actorOf('mattermost'),
       text: 'foo bar',
+      textWithoutBotAddress: 'foo bar',
       inDirectMessage: true,
       messageId: 'M-dm',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 
@@ -505,8 +514,11 @@ describe('ArgumentCollector.start', () => {
       channel: dm,
       actor: actorOf('mattermost'),
       text: 'foo bar',
+      textWithoutBotAddress: 'foo bar',
       inDirectMessage: true,
       messageId: 'M-dm',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 
@@ -742,8 +754,11 @@ describe('ArgumentCollector.resume', () => {
       channel: channelOf('mattermost'),
       actor: actorOf('mattermost'),
       text: 'foo bar',
+      textWithoutBotAddress: 'foo bar',
       inDirectMessage: true,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 
@@ -769,6 +784,38 @@ describe('ArgumentCollector.resume', () => {
     expect(outcome).toEqual({
       status: 'collected',
       values: { path: '/memo/today', body: 'foo bar' },
+      invocation,
+    });
+  });
+
+  it('keeps a mention of another person that starts an answer typed in a direct message (15.17)', async () => {
+    const invocation = invocationOf(
+      'mattermost',
+      COMMAND_NAMES.createPage,
+      '/memo/today',
+    );
+    await collectorAt(NOW).start(invocation, CREATE_PAGE_FIELDS);
+
+    const outcome = await collectorAt(NOW).resume({
+      kind: 'mention',
+      platform: 'mattermost',
+      channel: channelOf('mattermost'),
+      actor: actorOf('mattermost'),
+      text: '@alice please check\nthe second line',
+      textWithoutBotAddress: '@alice please check\nthe second line',
+      inDirectMessage: true,
+      messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: 'M0001',
+      interaction: null,
+    });
+
+    expect(outcome).toEqual({
+      status: 'collected',
+      values: {
+        path: '/memo/today',
+        body: '@alice please check\nthe second line',
+      },
       invocation,
     });
   });
@@ -1100,8 +1147,11 @@ describe('ArgumentCollector.startGrowiChoice / resuming a GROWI choice', () => {
       channel: dm,
       actor: actorOf('mattermost'),
       text: '2',
+      textWithoutBotAddress: '2',
       inDirectMessage: true,
       messageId: 'M-dm',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 

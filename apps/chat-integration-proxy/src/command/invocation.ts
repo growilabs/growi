@@ -19,8 +19,7 @@ import type { Invocation } from '../types/invocation.js';
 
 /**
  * Splits `text` on the first run of whitespace into a head token and the
- * (trimmed) remainder. Used twice below: once to drop the mention's own
- * address token, once to pull the command name off what is left.
+ * (trimmed) remainder: the command name and its arguments.
  */
 const splitFirstToken = (
   text: string,
@@ -45,47 +44,25 @@ export type CommandStartEvent = Extract<
   { readonly kind: 'mention' | 'slash-command' }
 >;
 
-// The command layer is never given the bot's own name or id, so a DM's
-// address cannot be compared with it and is recognized by shape instead:
-// Slack `@<user id>`, Discord `<@<application id>>`, Teams
-// `@<app display name>`, Mattermost the typed `@<username>`.
-const BOT_ADDRESS_SHAPE = /^(?:@\S+|<@[^>\s]+>)$/;
-
-/**
- * Removes the address a mention carries before the real content. In a
- * channel the first word is always the address. In a direct message the user
- * is already talking to the bot, so the first word is dropped only when it
- * looks like an address -- otherwise it is the command's (or answer's) own
- * first word.
- *
- * Exported because `argument-collector.ts` needs the same address-stripping
- * for a follow-up ANSWER, which is not a command and must not be re-split
- * into a command name and a remainder: an answer to a `multiline` field can
- * legitimately start with a short first line, and splitting then rejoining it
- * would collapse the newline after that line.
- */
-export const stripAddressToken = (
-  text: string,
-  options: { readonly inDirectMessage: boolean },
-): string => {
-  const { head, rest } = splitFirstToken(text);
-  if (options.inDirectMessage && !BOT_ADDRESS_SHAPE.test(head)) {
-    return text.trim();
-  }
-  return rest;
-};
+/** What a mention says about its place, leaving out the values absence already means. */
+const placeOf = (
+  event: Extract<CommandStartEvent, { readonly kind: 'mention' }>,
+): Pick<
+  Invocation,
+  'threadRootId' | 'replyThreadRootId' | 'isDirectMessage'
+> => ({
+  ...(event.threadRootId == null ? {} : { threadRootId: event.threadRootId }),
+  ...(event.replyThreadRootId == null
+    ? {}
+    : { replyThreadRootId: event.replyThreadRootId }),
+  ...(event.inDirectMessage ? { isDirectMessage: true } : {}),
+});
 
 export const CommandInvocation = {
   /**
-   * `mention`'s `text` still carries the address token the bot was mentioned
-   * with (`event-mapping.ts`'s `fromMessage` copies `message.text` through
-   * unchanged, e.g. `"@growi search foo"` -- confirmed against its
-   * `event-mapping.spec.ts` fixtures, which assert the address token is
-   * still present on the produced `PlatformEvent`). This function is
-   * therefore the one place that strips it. In a channel mention the first
-   * whitespace-delimited word is always the address and is dropped. In a DM
-   * it is dropped only when it has a bot-address shape (delegated to
-   * `stripAddressToken`), then the command name is read off the rest.
+   * A `mention` is read off `textWithoutBotAddress`, which the platform layer
+   * built from the bot's own identity (research.md's Decision on removing
+   * the bot address there); `text` is never re-parsed here.
    *
    * `slash-command`'s `command` / `text` are already split by the platform's
    * own UI (design.md: 「コマンド名が確定しているため」), so they map
@@ -96,10 +73,7 @@ export const CommandInvocation = {
     const { commandName, argsText } =
       event.kind === 'mention'
         ? (() => {
-            const afterAddress = stripAddressToken(event.text, {
-              inDirectMessage: event.inDirectMessage,
-            });
-            const { head, rest } = splitFirstToken(afterAddress);
+            const { head, rest } = splitFirstToken(event.textWithoutBotAddress);
             return { commandName: head, argsText: rest };
           })()
         : { commandName: event.command.trim(), argsText: event.text.trim() };
@@ -115,6 +89,7 @@ export const CommandInvocation = {
       ...(event.installation == null
         ? {}
         : { installation: event.installation }),
+      ...(event.kind === 'mention' ? placeOf(event) : {}),
     };
   },
 };

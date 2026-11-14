@@ -69,8 +69,11 @@ describe('createDeferredEventSink', () => {
     channel: testSdkChannel('slack'),
     actor: { platform: 'slack', accountId: 'U1', displayName: 'someone' },
     text: 'hello',
+    textWithoutBotAddress: 'hello',
     inDirectMessage: false,
     messageId: 'M0001',
+    threadRootId: null,
+    replyThreadRootId: null,
     interaction: null,
   };
 
@@ -553,8 +556,11 @@ describe('a register command typed in chat (Requirement 9.1)', () => {
       channel,
       actor,
       text: '@growi register',
+      textWithoutBotAddress: 'register',
       inDirectMessage: false,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 
@@ -655,8 +661,11 @@ describe('a command typed where the saved channel inventory lists nothing (a DM)
       channel,
       actor,
       text,
+      textWithoutBotAddress: text,
       inDirectMessage: true,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: 'M0001',
       interaction: null,
       ...(installation == null ? {} : { installation }),
     });

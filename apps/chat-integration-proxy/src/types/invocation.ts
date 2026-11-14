@@ -39,4 +39,12 @@ export interface Invocation {
    * rows saved before it existed, which resolve through the inventory.
    */
   readonly installation?: EventInstallation;
+  /**
+   * The mention's two thread roots and whether it was made in a DM. Optional
+   * because the invocation is stored in `pending_collection`; absent reads as
+   * `null` (no root) and `false` (not a DM), so `normalize` leaves those out.
+   */
+  readonly threadRootId?: string | null;
+  readonly replyThreadRootId?: string | null;
+  readonly isDirectMessage?: boolean;
 }

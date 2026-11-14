@@ -27,14 +27,18 @@ const actor = {
   displayName: 'Yuki',
 };
 
+// What the platform layer leaves of `text` once it drops the bot's own address.
 const mentionEvent = (text: string): PlatformEvent => ({
   kind: 'mention',
   platform: PLATFORM,
   channel,
   actor,
   text,
+  textWithoutBotAddress: text.replace(/^@growi(?=\s|$)/, '').trim(),
   inDirectMessage: false,
   messageId: 'M0001',
+  threadRootId: null,
+  replyThreadRootId: null,
   interaction: null,
 });
 
@@ -331,8 +335,11 @@ describe('PlatformEvent', () => {
         channel,
         actor,
         text: 'hi',
+        textWithoutBotAddress: 'hi',
         inDirectMessage: false,
         messageId: 'M0001',
+        threadRootId: null,
+        replyThreadRootId: null,
         interaction: null,
       },
       {
@@ -405,8 +412,11 @@ describe('PlatformEvent', () => {
       channel: testSdkChannel('discord'),
       actor: { platform: 'discord', accountId: 'U1', displayName: 'Alice' },
       text: 'hi',
+      textWithoutBotAddress: 'hi',
       inDirectMessage: false,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 

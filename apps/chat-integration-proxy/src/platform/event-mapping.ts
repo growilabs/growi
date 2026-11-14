@@ -37,6 +37,8 @@ import type {
   SdkChannelRef,
 } from '../types/index.js';
 import { ADAPTER_FACTORIES } from './adapter-set.js';
+import { BOT_ADDRESS_READINGS, withoutBotAddresses } from './bot-address.js';
+import { THREAD_ROOT_READINGS, threadRootsOf } from './thread-roots.js';
 
 /**
  * The Chat SDK types an adapter's `name` as a plain `string` -- it is the
@@ -71,6 +73,9 @@ const toPlatformName = (adapterName: string): PlatformName | null =>
  * private: it says "only invited members can see this", which is what a
  * disclosure decision needs to be able to rely on, and neither of those two
  * values asserts that.
+ *
+ * `isDirectMessage` is set only on a DM: the protocol reads its absence as
+ * "not a DM".
  */
 const toChannelRef = (
   platform: PlatformName,
@@ -90,6 +95,7 @@ const toChannelRef = (
     channelId,
     channelName: source.channelName ?? '',
     isPrivate: source.isDM || source.channelVisibility === 'private',
+    ...(source.isDM ? { isDirectMessage: true } : {}),
   };
 };
 
@@ -249,8 +255,18 @@ export const fromMessage = (
       channel,
       actor,
       text: message.text,
+      textWithoutBotAddress: withoutBotAddresses(
+        message.text,
+        BOT_ADDRESS_READINGS[platform](thread.adapter, message),
+      ),
       inDirectMessage: thread.isDM,
       messageId: message.id,
+      ...threadRootsOf(THREAD_ROOT_READINGS[platform], {
+        adapter: thread.adapter,
+        threadId: thread.id,
+        messageId: message.id,
+        isDirectMessage: thread.isDM,
+      }),
       // A message notification never carries a modal handle (design.md:
       // 「mention の通知には付いてこない」).
       interaction: null,

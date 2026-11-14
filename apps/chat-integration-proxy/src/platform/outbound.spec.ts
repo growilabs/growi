@@ -916,6 +916,7 @@ describe('postDirect', () => {
         ),
         channelName: '',
         isPrivate: true,
+        isDirectMessage: true,
       },
     });
   });

@@ -51,8 +51,17 @@ export type PlatformEvent = (
        * which is also true for a private channel.
        */
       readonly inDirectMessage: boolean;
+      /** `text` with only the bot's own address taken out; any other mention stays as typed. */
+      readonly textWithoutBotAddress: string;
       /** The id of the requesting message itself, for acting on it later. */
       readonly messageId: string;
+      /**
+       * The root of the thread the message was actually posted in, `null`
+       * outside one; `replyThreadRootId` is where an answer goes. Kept apart
+       * on purpose -- see design.md's EventMapping section.
+       */
+      readonly threadRootId: string | null;
+      readonly replyThreadRootId: string | null;
       readonly interaction: InteractionRef | null;
     }
   | {

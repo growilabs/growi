@@ -557,6 +557,50 @@ describe('privateReplyOriginOf', () => {
 
     expect(origin.requestSummary).toBe(`search ${'x'.repeat(73)}…`);
   });
+
+  it('addresses a request in a DM thread by both thread roots, as a DM', () => {
+    const origin = privateReplyOriginOf(
+      {
+        ...invocationWith('search', 'foo'),
+        threadRootId: null,
+        replyThreadRootId: 'M1',
+        isDirectMessage: true,
+      },
+      null,
+    );
+
+    expect(origin).toMatchObject({
+      threadRootId: null,
+      replyThreadRootId: 'M1',
+      place: 'direct',
+    });
+  });
+
+  it('addresses a request in a channel thread by its root, as a channel', () => {
+    const origin = privateReplyOriginOf(
+      {
+        ...invocationWith('search', 'foo'),
+        threadRootId: 'T1',
+        replyThreadRootId: 'T1',
+        isDirectMessage: false,
+      },
+      null,
+    );
+
+    expect(origin).toMatchObject({
+      threadRootId: 'T1',
+      replyThreadRootId: 'T1',
+      place: 'channel',
+    });
+  });
+
+  it('says nothing about the place of a request that carried none, such as one saved before it was recorded', () => {
+    const origin = privateReplyOriginOf(invocationWith('search', 'foo'), null);
+
+    expect(origin).not.toHaveProperty('threadRootId');
+    expect(origin).not.toHaveProperty('replyThreadRootId');
+    expect(origin).not.toHaveProperty('place');
+  });
 });
 
 describe('private reply timing trace', () => {

@@ -975,8 +975,11 @@ describe('dead ends the user is told about', () => {
       channel,
       actor,
       text: '@growi /memo',
+      textWithoutBotAddress: '/memo',
       inDirectMessage: false,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: null,
       interaction: null,
     });
 
@@ -1181,8 +1184,11 @@ describe('where a private reply says it came from', () => {
       channel,
       actor,
       text: '/memo',
+      textWithoutBotAddress: '/memo',
       inDirectMessage: true,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: 'M0001',
       interaction: null,
       installation: { kind: 'identified', installationId: 'inst-dm' },
     });
@@ -1199,8 +1205,11 @@ describe('where a private reply says it came from', () => {
       channel,
       actor,
       text: '@growi /memo',
+      textWithoutBotAddress: '/memo',
       inDirectMessage: true,
       messageId: 'M0001',
+      threadRootId: null,
+      replyThreadRootId: 'M0001',
       interaction: null,
     });
 

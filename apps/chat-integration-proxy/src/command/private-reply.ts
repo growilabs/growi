@@ -27,6 +27,16 @@ export interface PrivateReplyOrigin {
    * (e.g. "this workspace is not registered"); the replier then resolves it from `channel`.
    */
   readonly installationId: string | null;
+  /**
+   * Where in the place the request was made (design.md's EventMapping and
+   * `StoredAnswerOrigin`). Absent when the request carried none -- a modal,
+   * a slash command, a row saved before these existed -- and read then as no
+   * root, in a channel.
+   */
+  readonly threadRootId?: string | null;
+  readonly replyThreadRootId?: string | null;
+  /** `direct` is a DM with the bot, the Slack AI app view included. */
+  readonly place?: 'channel' | 'direct';
 }
 
 export type PrivateReplyOutcome =
@@ -119,6 +129,15 @@ export const privateReplyOriginOf = (
       (invocation.installation?.kind === 'identified'
         ? invocation.installation.installationId
         : null),
+    ...(invocation.threadRootId === undefined
+      ? {}
+      : { threadRootId: invocation.threadRootId }),
+    ...(invocation.replyThreadRootId === undefined
+      ? {}
+      : { replyThreadRootId: invocation.replyThreadRootId }),
+    ...(invocation.isDirectMessage === undefined
+      ? {}
+      : { place: invocation.isDirectMessage ? 'direct' : 'channel' }),
   };
 };
 

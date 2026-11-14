@@ -126,22 +126,36 @@ interface MentionOverrides extends EventOverrides {
   readonly messageId?: string;
 }
 
+/**
+ * The address these fake services give their bot. What the platform layer
+ * would drop from a mention addressed to it is exactly this, nothing else.
+ */
+const FAKE_BOT_ADDRESS = /^@growi(?=\s|$)/;
+
 export const mentionOn = (
   platform: PlatformName,
   options: MentionOverrides,
-): PlatformEvent => ({
-  kind: 'mention',
-  platform,
-  channel: options.channel ?? channelOn(platform),
-  actor: options.actor ?? actorOn(platform),
-  text: options.text,
-  inDirectMessage: options.inDirectMessage ?? false,
-  messageId: options.messageId ?? `${platform}-message-1`,
-  interaction:
-    options.interaction === undefined
-      ? interactionOn(platform)
-      : options.interaction,
-});
+): PlatformEvent => {
+  const inDirectMessage = options.inDirectMessage ?? false;
+  const messageId = options.messageId ?? `${platform}-message-1`;
+  return {
+    kind: 'mention',
+    platform,
+    channel: options.channel ?? channelOn(platform),
+    actor: options.actor ?? actorOn(platform),
+    text: options.text,
+    textWithoutBotAddress: options.text.replace(FAKE_BOT_ADDRESS, '').trim(),
+    inDirectMessage,
+    messageId,
+    // Outside a thread: a DM request is answered under itself.
+    threadRootId: null,
+    replyThreadRootId: inDirectMessage ? messageId : null,
+    interaction:
+      options.interaction === undefined
+        ? interactionOn(platform)
+        : options.interaction,
+  };
+};
 
 export const actionOn = (
   platform: PlatformName,

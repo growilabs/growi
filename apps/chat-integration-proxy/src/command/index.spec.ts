@@ -22,7 +22,6 @@ describe('command/ public entry point', () => {
         'privateReplyOriginOf',
         'isWorkspaceAdmin',
         'parseAdminCommand',
-        'stripAddressToken',
       ].sort(),
     );
   });
