@@ -51,10 +51,9 @@ describe('setProcessingStatus through the facade, on Slack', () => {
   const tokensUsed: string[] = [];
   const setStatus = vi
     .spyOn(SlackAdapter.prototype, 'setAssistantStatus')
-    .mockImplementation(async function (this: SlackAdapter) {
-      tokensUsed.push(
-        await Reflect.apply(Reflect.get(this, 'getToken'), this, []),
-      );
+    .mockImplementation(function (this: SlackAdapter) {
+      tokensUsed.push(this.webClient.token ?? '(none)');
+      return Promise.resolve();
     });
 
   const reportOperationalFailure = vi.fn();
@@ -148,5 +147,6 @@ describe('setProcessingStatus through the facade, on Slack', () => {
       }),
     ).resolves.toBeUndefined();
     expect(setStatus).not.toHaveBeenCalled();
+    expect(reportOperationalFailure).not.toHaveBeenCalled();
   });
 });

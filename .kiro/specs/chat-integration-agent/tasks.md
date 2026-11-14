@@ -49,7 +49,7 @@
   - 本人にだけ見えるメッセージをスレッドの中に出す、スレッドの中にふつうに投稿する、の 2 つの操作を足す。どちらもイベントの処理の外から、installation を指定して呼べる
   - 完了の条件: 代役のサービスを使った結合試験で、スレッドの根元が各サービスの投稿に渡る
   - _Requirements: 15.8_
-- [ ] 2.4 処理中の表示と、Slack の AI アプリの画面の設定を足す
+- [x] 2.4 処理中の表示と、Slack の AI アプリの画面の設定を足す
   - 処理中の表示を出す操作を足す。対応しないサービスでは何もしない
   - 運用者の設定で Slack の AI アプリの画面を有効にできるようにする（既定は無効）
   - 完了の条件: AI アプリの画面が有効・無効の両方で、既存の「DM へ届け直す」と「DM での聞き返し」の結合試験が通り、有効なときだけ処理中の表示が Slack に送られる
@@ -236,3 +236,5 @@
 - 2.3: `postInThread` は根元を文字列で必須とする。根元が無いとき（Teams の DM など）、3.4 は既存の `post`／`postDirect` を使う。`postEphemeral` は根元が省略可能で、省略するとチャンネルの階層に出る。Discord で消えたスレッドへ送ると 404 で `bot-not-in-channel` に分類される（3.4 の経路からは呼ばれない）。Slack の頻度の制限は `platform-error`。
 - 2.3: testing/fake-chat-service.ts の `postInThread` は scope を記録しない。3.4 の試験で「どの installation で送ったか」を確かめるときは、Mattermost のように installation を 2 つ開いた構成を使うか、記録を足す。スレッドへの投稿だけを失敗させるときは、`script.post` を `kind === 'thread-post'` で分ける。
 - 2.3: 実サービスの画面で、スレッドの外の依頼への本人だけのメッセージがスレッドの中に見えるかは未確認のまま（6.3 の実機確認）。
+- 2.4: 処理中の表示の判定は、工場（`ADAPTER_FACTORIES`）の `processingStatus(appConfig)` が単独で持つ（無効・対応しないサービスは `null`）。能力表には処理中の表示の行を足さない。3.x の AgentFlow は、場所が `direct` のときだけ `replyThreadRootId`（依頼の発言そのもの）を渡して `setProcessingStatus` を呼ぶ。チャンネルでは呼ばない（Slack の assistant のスレッドは DM 専用）。タスク 7 で design の「能力表が処理中の表示を持つなら」をこの作りに合わせる。
+- 2.4: 処理中の表示の文言 `考えています…` と、`SLACK_AGENT_VIEW` の真の値（`true`／`1`）は design に定めが無く、実装で決めた（`adapter-set.ts` の定数、`runtime/config.ts`）。`docs/setup-slack.md`（`SLACK_AGENT_VIEW` と `assistant:write` 権限）は 3.7 で書く。偽のチャットサービスの `setProcessingStatus` は呼び出しを記録しない。3.2・6.2 の通しの試験で「処理中の表示 → 同じスレッドに答え」を確かめるときは、記録を足す。
