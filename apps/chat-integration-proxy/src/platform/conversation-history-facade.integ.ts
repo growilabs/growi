@@ -1,7 +1,6 @@
 // `PlatformFacade.fetchConversation` through the real facade, on Mattermost
 // with two installations open: the read goes to the installation named, reads
-// the thread or the channel's latest posts, and leaves out the bot's own posts
-// and the request. Mattermost is the service connected per installation, so
+// the thread, and leaves out the bot's own posts and the request. Mattermost is the service connected per installation, so
 // it is where naming the wrong installation would read someone else's server.
 import { randomUUID } from 'node:crypto';
 import { mock } from 'vitest-mock-extended';
@@ -48,13 +47,9 @@ const post = (id: string, userId: string, at: number, message: string) => ({
 });
 
 /** Mattermost's post list: ids in `order` (newest first), posts by id. */
-const postList = (
-  posts: ReadonlyArray<ReturnType<typeof post>>,
-  extra: Record<string, unknown> = {},
-) => ({
+const postList = (posts: ReadonlyArray<ReturnType<typeof post>>) => ({
   order: [...posts].reverse().map((p) => p.id),
   posts: Object.fromEntries(posts.map((p) => [p.id, p])),
-  ...extra,
 });
 
 const startMattermost = async (
@@ -81,13 +76,6 @@ const startMattermost = async (
     ];
     if (path === `/api/v4/posts/${ROOT}/thread`) {
       return { body: postList(threadPosts) };
-    }
-    // Routed by path alone, as a real server routes it.
-    if (
-      new URL(path, 'http://stand-in').pathname ===
-      `/api/v4/channels/${CHANNEL}/posts`
-    ) {
-      return { body: postList(threadPosts, { has_next: true }) };
     }
     return { status: 404, body: { message: 'not found' } };
   });
@@ -181,11 +169,10 @@ describe('fetchConversation on Mattermost, with two installations open', () => {
     expect(readPaths(serverA)).toEqual([]);
   });
 
-  // chat-adapter-mattermost 1.1.3 assigns the query to `URL.pathname`, which
-  // percent-encodes the `?`, so no server routes this read. Starts passing,
-  // and must lose `.fails`, once the adapter sends a real query.
-  it.fails("reads the channel's latest posts when the request is not in a thread, and says older ones remain", async () => {
+  // Why: see the comment on `CONVERSATION_SOURCES.mattermost`.
+  it('answers unsupported, sending nothing, when the request is not in a thread', async () => {
     await open();
+    const sentBefore = [serverA.requests.length, serverB.requests.length];
 
     const outcome = await facade.fetchConversation(
       channel(),
@@ -193,14 +180,14 @@ describe('fetchConversation on Mattermost, with two installations open', () => {
       { installationId: installationB },
     );
 
-    expect(outcome).toMatchObject({ ok: true, truncated: true });
-    expect(outcome.ok && outcome.messages.map((m) => m.text)).toEqual([
-      'shall we ship?',
-      'after QA',
-    ]);
-    expect(readPaths(serverB)).toEqual([
-      `/api/v4/channels/${CHANNEL}/posts?page=0&per_page=200`,
-    ]);
+    expect(outcome).toEqual({
+      ok: false,
+      reason: 'unsupported',
+      remedy: null,
+    });
+    expect([serverA.requests.length, serverB.requests.length]).toEqual(
+      sentBefore,
+    );
   });
 
   it('answers not-in-channel when the server refuses the bot', async () => {

@@ -148,7 +148,7 @@ export const readSlackConversation: ConversationPageReader = async (
   context,
   target,
   threadRootId,
-  limit,
+  { keep, perThreadCall },
 ) => {
   const { credentials } = await installationCredentialsOf(
     'slack',
@@ -170,15 +170,21 @@ export const readSlackConversation: ConversationPageReader = async (
   const channel = nativeChannelIdOf(target);
   const botUserId = await botUserIdOf(client, token);
 
+  // History answers newest first; a thread is answered oldest first, so its
+  // newest `keep` are cut from the end of a larger answer.
   const answer =
     threadRootId == null
-      ? await client.conversations.history({ channel, limit })
+      ? await client.conversations.history({ channel, limit: keep })
       : await client.conversations.replies({
           channel,
           ts: threadRootId,
-          limit,
+          limit: perThreadCall,
         });
-  const raws: ReadonlyArray<SlackMessage> = answer.messages ?? [];
+  const answered: ReadonlyArray<SlackMessage> = answer.messages ?? [];
+  const raws =
+    threadRootId == null
+      ? answered
+      : answered.slice(Math.max(0, answered.length - keep));
 
   const names = await displayNamesOf(
     client,
@@ -199,6 +205,6 @@ export const readSlackConversation: ConversationPageReader = async (
         names,
       }),
     ),
-    hasMore: answer.has_more === true,
+    hasMore: answer.has_more === true || raws.length < answered.length,
   };
 };

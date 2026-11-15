@@ -71,20 +71,38 @@ export interface ReadMessage {
 
 export interface ConversationPage {
   readonly messages: ReadonlyArray<ReadMessage>;
-  /** The service said there is more than this read returned. */
+  /**
+   * Older messages remain than this read returns: the service said so, or the
+   * read left some out to return only the newest.
+   */
   readonly hasMore: boolean;
+}
+
+export interface ConversationReadSize {
+  /** The most the read returns, the newest ones. */
+  readonly keep: number;
+  /** The most one call asks for a thread; see `ConversationSource`. */
+  readonly perThreadCall: number;
 }
 
 export type ConversationPageReader = (
   context: ConversationReadContext,
   target: SdkChannelRef,
   threadRootId: string | null,
-  limit: number,
+  size: ConversationReadSize,
 ) => Promise<ConversationPage>;
 
 export interface ConversationSource {
-  /** The most one read may ask this service for. */
+  /** The most one read returns. */
   readonly maxPerRead: number;
+  /**
+   * The most one call asks for when the service answers a thread oldest
+   * first, so that the newest `maxPerRead` are cut from a larger answer.
+   * `maxPerRead` when absent.
+   */
+  readonly maxPerThreadCall?: number;
+  /** When `false`, a read outside a thread answers `unsupported`, unasked. */
+  readonly readsLatestOfPlace: boolean;
   readonly read: ConversationPageReader;
 }
 
@@ -125,10 +143,10 @@ const readThroughAdapter: ConversationPageReader = async (
   { adapter },
   target,
   threadRootId,
-  limit,
+  { keep },
 ) => {
   const page = await fetchPageOf(adapter, target, threadRootId, {
-    limit,
+    limit: keep,
     direction: 'backward',
   });
   return {
@@ -144,18 +162,37 @@ const readThroughAdapter: ConversationPageReader = async (
 };
 
 /**
- * Per service: how it is read, and the most one read asks for. Slack is read
- * with its own Web API client rather than through the adapter, so that a rate
- * limit comes back at once instead of being retried (design.md,
- * ConversationReader). Teams' 50 is not yet confirmed on a real tenant.
+ * Per service: how it is read, the most one read returns, and whether the
+ * place's latest messages can be read at all. Slack is read with its own Web
+ * API client rather than through the adapter, so that a rate limit comes back
+ * at once instead of being retried (design.md, ConversationReader); it answers
+ * a thread oldest first, up to 1000 per call. Teams' 50 is not yet confirmed
+ * on a real tenant.
  */
 export const CONVERSATION_SOURCES: Readonly<
   Record<PlatformName, ConversationSource>
 > = {
-  slack: { maxPerRead: 200, read: readSlackConversation },
-  discord: { maxPerRead: 100, read: readThroughAdapter },
-  teams: { maxPerRead: 50, read: readThroughAdapter },
-  mattermost: { maxPerRead: 200, read: readThroughAdapter },
+  slack: {
+    maxPerRead: 200,
+    maxPerThreadCall: 1000,
+    readsLatestOfPlace: true,
+    read: readSlackConversation,
+  },
+  discord: {
+    maxPerRead: 100,
+    readsLatestOfPlace: true,
+    read: readThroughAdapter,
+  },
+  teams: { maxPerRead: 50, readsLatestOfPlace: true, read: readThroughAdapter },
+  // chat-adapter-mattermost 1.1.3 sends the channel read's query inside the
+  // path, so the read never reaches the posts endpoint. Recheck on every
+  // version of the adapter: the pin in `conversation-history.integ.ts` fails
+  // once it is fixed.
+  mattermost: {
+    maxPerRead: 200,
+    readsLatestOfPlace: false,
+    read: readThroughAdapter,
+  },
 };
 
 const REMEDIES: Readonly<Record<ConversationFailureReason, string | null>> = {
@@ -225,7 +262,7 @@ const readFailureOf = (error: unknown): ConversationFailureReason | null => {
 };
 
 /**
- * Reads once. `truncated` is what the service said of the read itself, so
+ * Reads once. `truncated` is what the read said of the conversation, so
  * leaving out the bot's messages and the request does not change it.
  *
  * A failure no row names propagates: every reason carries a meaning for the
@@ -238,10 +275,16 @@ export const fetchConversation = async (
   range: ConversationRange,
 ): Promise<ConversationOutcome> => {
   const source = sources[target.platform];
-  const limit = Math.min(range.limit, source.maxPerRead);
+  if (range.threadRootId == null && !source.readsLatestOfPlace) {
+    return { ok: false, reason: 'unsupported', remedy: REMEDIES.unsupported };
+  }
+  const keep = Math.min(range.limit, source.maxPerRead);
   let page: ConversationPage;
   try {
-    page = await source.read(context, target, range.threadRootId, limit);
+    page = await source.read(context, target, range.threadRootId, {
+      keep,
+      perThreadCall: source.maxPerThreadCall ?? keep,
+    });
   } catch (error) {
     const reason = readFailureOf(error);
     if (reason == null) throw error;

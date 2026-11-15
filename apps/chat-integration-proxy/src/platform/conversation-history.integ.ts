@@ -2,10 +2,13 @@
 // Discord adapter, with only the services' HTTP replaced by local stand-ins:
 // which call reads a thread and which reads the place's latest messages, what
 // comes back, and what a refusal -- a missing bot, a rate limit -- becomes.
-// Neither service needs the Chat SDK state here, so no database is touched.
+// Also what the REAL Mattermost adapter sends for a channel read, which is why
+// that read is declared unsupported. None of them needs the Chat SDK state
+// here, so no database is touched.
 import { randomInt } from 'node:crypto';
 import { createDiscordAdapter } from '@chat-adapter/discord';
 import { SlackAdapter } from '@chat-adapter/slack';
+import { createMattermostAdapter } from 'chat-adapter-mattermost';
 import { mock } from 'vitest-mock-extended';
 
 import { toSdkChannelId } from '../capabilities/index.js';
@@ -232,11 +235,148 @@ describe('Slack', () => {
         body: expect.objectContaining({
           channel: SLACK_CHANNEL,
           ts: SLACK_ROOT,
-          limit: '200',
+          limit: '1000',
         }),
       }),
     ]);
     expect(requestsTo(slack, 'conversations.history')).toEqual([]);
+  });
+
+  describe('a long thread', () => {
+    const ROOTER = 'U0ROOTER1';
+
+    /** The root and `replies` replies, oldest first, as Slack answers. */
+    const longThread = (replies: number) => [
+      slackMessage(SLACK_ROOT, ROOTER, 'the root'),
+      ...Array.from({ length: replies }, (_, i) =>
+        slackMessage(
+          `${1_700_000_000 + i + 1}.000100`,
+          i % 2 === 0 ? ALICE : BOB,
+          `reply ${i + 1}`,
+        ),
+      ),
+    ];
+
+    const slackAnswering = (
+      messages: ReturnType<typeof longThread>,
+      hasMore = false,
+    ) =>
+      startSlack({
+        'conversations.replies': () => ({
+          body: { ok: true, messages, has_more: hasMore },
+        }),
+      });
+
+    const replyTexts = (from: number, to: number) =>
+      Array.from({ length: to - from + 1 }, (_, i) => `reply ${from + i}`);
+
+    it('returns the newest 200, oldest first, and says older ones remain', async () => {
+      const slack = await slackAnswering(longThread(250));
+
+      const outcome = await fetchConversation(
+        slackContext(slack),
+        CONVERSATION_SOURCES,
+        slackChannel,
+        IN_THREAD,
+      );
+
+      expect(outcome).toMatchObject({ ok: true, truncated: true });
+      expect(outcome.ok && outcome.messages.map((m) => m.text)).toEqual(
+        replyTexts(51, 250),
+      );
+    });
+
+    it('returns every message, and says none remain, when the thread fits in 200', async () => {
+      const slack = await slackAnswering(longThread(199));
+
+      const outcome = await fetchConversation(
+        slackContext(slack),
+        CONVERSATION_SOURCES,
+        slackChannel,
+        IN_THREAD,
+      );
+
+      expect(outcome).toMatchObject({ ok: true, truncated: false });
+      expect(outcome.ok && outcome.messages.map((m) => m.text)).toEqual([
+        'the root',
+        ...replyTexts(1, 199),
+      ]);
+    });
+
+    it('returns only as many of the newest as the caller asks for', async () => {
+      const slack = await slackAnswering(longThread(50));
+
+      const outcome = await fetchConversation(
+        slackContext(slack),
+        CONVERSATION_SOURCES,
+        slackChannel,
+        { ...IN_THREAD, limit: 30 },
+      );
+
+      expect(outcome).toMatchObject({ ok: true, truncated: true });
+      expect(outcome.ok && outcome.messages.map((m) => m.text)).toEqual(
+        replyTexts(21, 50),
+      );
+      expect(requestsTo(slack, 'conversations.replies')).toEqual([
+        expect.objectContaining({
+          body: expect.objectContaining({ limit: '1000' }),
+        }),
+      ]);
+    });
+
+    it('does not look up the authors of the messages it leaves out', async () => {
+      const slack = await slackAnswering(longThread(250));
+
+      await fetchConversation(
+        slackContext(slack),
+        CONVERSATION_SOURCES,
+        slackChannel,
+        IN_THREAD,
+      );
+
+      expect(
+        requestsTo(slack, 'users.info').map(
+          (request) => (request.body as { user?: string }).user,
+        ),
+      ).not.toContain(ROOTER);
+    });
+
+    it('says older messages remain when Slack answers fewer than it was asked for and offers more', async () => {
+      const slack = await slackAnswering(longThread(14), true);
+
+      const outcome = await fetchConversation(
+        slackContext(slack),
+        CONVERSATION_SOURCES,
+        slackChannel,
+        IN_THREAD,
+      );
+
+      expect(outcome).toMatchObject({ ok: true, truncated: true });
+      expect(outcome.ok && outcome.messages.map((m) => m.text)).toEqual([
+        'the root',
+        ...replyTexts(1, 14),
+      ]);
+    });
+
+    // Slack answers a thread from its oldest message, 1000 at most per call;
+    // past that, one call cannot reach the latest replies.
+    it('says older messages remain, returning the newest 200 of what one call reached, when the thread is longer than one call', async () => {
+      const reached = longThread(999);
+      const slack = await slackAnswering(reached, true);
+
+      const outcome = await fetchConversation(
+        slackContext(slack),
+        CONVERSATION_SOURCES,
+        slackChannel,
+        IN_THREAD,
+      );
+
+      expect(outcome).toMatchObject({ ok: true, truncated: true });
+      expect(outcome.ok && outcome.messages.map((m) => m.text)).toEqual(
+        replyTexts(800, 999),
+      );
+      expect(requestsTo(slack, 'conversations.replies')).toHaveLength(1);
+    });
   });
 
   it('reads the latest messages of the place when the request is not in a thread, oldest first', async () => {
@@ -717,5 +857,34 @@ describe('Discord', () => {
     });
     expect(ms).toBeLessThan(5_000);
     expect(discord.service.requests).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mattermost
+// ---------------------------------------------------------------------------
+
+describe('Mattermost', () => {
+  // Pins the upstream fault `CONVERSATION_SOURCES.mattermost` works around.
+  // When this starts failing, the adapter sends a real query: the channel read
+  // can be offered again.
+  it('chat-adapter-mattermost sends the channel read with its query inside the path', async () => {
+    const mattermostChannel = 'channelinb00000000000000000';
+    const service = await serviceOf(() => ({
+      status: 404,
+      body: { message: 'not found' },
+    }));
+    const adapter = createMattermostAdapter({
+      baseUrl: service.url,
+      botToken: 'mattermost-bot-token',
+    });
+
+    await adapter
+      .fetchChannelMessages(mattermostChannel, { limit: 200 })
+      .catch(() => undefined);
+
+    expect(service.requests.map((request) => request.path)).toEqual([
+      `/api/v4/channels/${mattermostChannel}/posts%3Fpage=0&per_page=200`,
+    ]);
   });
 });

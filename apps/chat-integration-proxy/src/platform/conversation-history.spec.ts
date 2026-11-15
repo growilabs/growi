@@ -169,7 +169,7 @@ describe('fetchConversation', () => {
     const outcome = await fetchConversation(
       contextOf(adapter),
       CONVERSATION_SOURCES,
-      channelOf('mattermost'),
+      channelOf('discord'),
       RECENT,
     );
 
@@ -193,7 +193,6 @@ describe('fetchConversation', () => {
   it.each([
     ['discord', 200, 100],
     ['teams', 200, 50],
-    ['mattermost', 200, 200],
     ['discord', 30, 30],
   ] as const)('asks %s for at most what it serves in one read (asked %i, sends %i)', async (platform, asked, sent) => {
     const adapter = adapterMock();
@@ -211,6 +210,85 @@ describe('fetchConversation', () => {
       channelOf(platform).channelId,
       expect.objectContaining({ limit: sent }),
     );
+  });
+
+  describe('Mattermost', () => {
+    const IN_THREAD = {
+      threadRootId: 'rootpost000000000000000000',
+      requestMessageId: null,
+      limit: 200,
+    };
+
+    it("answers unsupported for the place's latest messages, without asking the server", async () => {
+      const adapter = adapterMock();
+      adapter.fetchChannelMessages.mockResolvedValue({
+        messages: [
+          messageOf('m1', '2026-09-01T09:00:00.000Z', { userId: 'U1' }),
+        ],
+      });
+
+      const outcome = await fetchConversation(
+        contextOf(adapter),
+        CONVERSATION_SOURCES,
+        channelOf('mattermost'),
+        RECENT,
+      );
+
+      expect(outcome).toEqual({
+        ok: false,
+        reason: 'unsupported',
+        remedy: null,
+      });
+      expect(adapter.fetchChannelMessages).not.toHaveBeenCalled();
+      expect(adapter.fetchMessages).not.toHaveBeenCalled();
+    });
+
+    it("reads the request's thread, asking for at most 200", async () => {
+      const adapter = adapterMock();
+      adapter.fetchMessages.mockResolvedValue({
+        messages: [
+          messageOf('m2', '2026-09-01T10:00:00.000Z', { userId: 'U2' }),
+          messageOf('m1', '2026-09-01T09:00:00.000Z', { userId: 'U1' }),
+        ],
+        nextCursor: 'older',
+      });
+
+      const outcome = await fetchConversation(
+        contextOf(adapter),
+        CONVERSATION_SOURCES,
+        channelOf('mattermost'),
+        { ...IN_THREAD, limit: 500 },
+      );
+
+      expect(outcome).toMatchObject({ ok: true, truncated: true });
+      expect(outcome.ok && outcome.messages.map((m) => m.text)).toEqual([
+        'text of m1',
+        'text of m2',
+      ]);
+      expect(adapter.fetchMessages).toHaveBeenCalledTimes(1);
+      expect(adapter.fetchMessages.mock.calls[0]?.[1]).toMatchObject({
+        limit: 200,
+      });
+    });
+
+    it('answers not-in-channel when the server refuses the thread read', async () => {
+      const adapter = adapterMock();
+      adapter.fetchMessages.mockRejectedValue(
+        Object.assign(new Error('forbidden'), {
+          name: 'PermissionError',
+          adapter: 'mattermost',
+        }),
+      );
+
+      const outcome = await fetchConversation(
+        contextOf(adapter),
+        CONVERSATION_SOURCES,
+        channelOf('mattermost'),
+        IN_THREAD,
+      );
+
+      expect(outcome).toMatchObject({ ok: false, reason: 'not-in-channel' });
+    });
   });
 
   it('answers unsupported when the adapter cannot read a channel at all', async () => {
@@ -247,7 +325,7 @@ describe('fetchConversation', () => {
       ['Teams Graph answering 429', 'teams', graphError(429), 'rate-limited'],
       [
         'an adapter reporting its own rate limit',
-        'mattermost',
+        'teams',
         Object.assign(new Error('Rate limited by mattermost'), {
           name: 'AdapterRateLimitError',
           code: 'RATE_LIMITED',
@@ -275,15 +353,6 @@ describe('fetchConversation', () => {
         'Discord answering 403',
         'discord',
         networkError('discord', 'Discord API error: 403 {"code":50001}'),
-        'not-in-channel',
-      ],
-      [
-        'Mattermost answering 403',
-        'mattermost',
-        Object.assign(new Error('forbidden'), {
-          name: 'PermissionError',
-          adapter: 'mattermost',
-        }),
         'not-in-channel',
       ],
     ] as const)('%s answers %s', async (_label, platform, error, reason) => {
