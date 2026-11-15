@@ -25,7 +25,7 @@ import {
   readSlackConversation,
 } from './slack-conversation.js';
 
-export type ConversationFailureReason =
+export type ConversationReadFailureReason =
   | 'not-in-channel'
   | 'not-permitted'
   | 'unsupported'
@@ -39,11 +39,11 @@ export type ConversationOutcome =
     }
   | {
       readonly ok: false;
-      readonly reason: ConversationFailureReason;
+      readonly reason: ConversationReadFailureReason;
       readonly remedy: string | null;
     };
 
-export interface ConversationRange {
+export interface ConversationReadRange {
   /** The thread to read; `null` reads the place's latest messages. */
   readonly threadRootId: string | null;
   /** The request's own message, left out of the answer. */
@@ -195,17 +195,18 @@ export const CONVERSATION_SOURCES: Readonly<
   },
 };
 
-const REMEDIES: Readonly<Record<ConversationFailureReason, string | null>> = {
-  'not-in-channel':
-    'bot がこの場所に参加していないため、会話を読めません。bot を招待してから、もう一度お試しください。',
-  'not-permitted':
-    'bot に会話の履歴を読む権限がありません。チャットサービスの管理者に、履歴を読む権限を足してアプリを入れ直してもらってください。',
-  unsupported: null,
-  'rate-limited': null,
-};
+const REMEDIES: Readonly<Record<ConversationReadFailureReason, string | null>> =
+  {
+    'not-in-channel':
+      'bot がこの場所に参加していないため、会話を読めません。bot を招待してから、もう一度お試しください。',
+    'not-permitted':
+      'bot に会話の履歴を読む権限がありません。チャットサービスの管理者に、履歴を読む権限を足してアプリを入れ直してもらってください。',
+    unsupported: null,
+    'rate-limited': null,
+  };
 
 interface ReadFailureRow {
-  readonly failure: ConversationFailureReason;
+  readonly failure: ConversationReadFailureReason;
   readonly matches: (error: Error & Record<string, unknown>) => boolean;
 }
 
@@ -252,7 +253,9 @@ const READ_FAILURE_ROWS: ReadonlyArray<ReadFailureRow> = [
   },
 ];
 
-const readFailureOf = (error: unknown): ConversationFailureReason | null => {
+const readFailureOf = (
+  error: unknown,
+): ConversationReadFailureReason | null => {
   if (!(error instanceof Error)) return null;
   const carrier = error as Error & Record<string, unknown>;
   return (
@@ -272,7 +275,7 @@ export const fetchConversation = async (
   context: ConversationReadContext,
   sources: Readonly<Record<PlatformName, ConversationSource>>,
   target: SdkChannelRef,
-  range: ConversationRange,
+  range: ConversationReadRange,
 ): Promise<ConversationOutcome> => {
   const source = sources[target.platform];
   if (range.threadRootId == null && !source.readsLatestOfPlace) {

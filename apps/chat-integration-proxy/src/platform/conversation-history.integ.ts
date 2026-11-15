@@ -6,6 +6,7 @@
 // that read is declared unsupported. None of them needs the Chat SDK state
 // here, so no database is touched.
 import { randomInt } from 'node:crypto';
+import { inspect } from 'node:util';
 import { createDiscordAdapter } from '@chat-adapter/discord';
 import { SlackAdapter } from '@chat-adapter/slack';
 import { createMattermostAdapter } from 'chat-adapter-mattermost';
@@ -135,6 +136,14 @@ const startSlack = async (
   });
   return service;
 };
+
+/** Holds the reply back past the read's five-second limit. */
+const answerAfter =
+  (ms: number, reply: StandInReply): SlackMethodAnswer =>
+  () =>
+    new Promise<StandInReply>((resolve) =>
+      setTimeout(() => resolve(reply), ms),
+    );
 
 const credentialsOf = (
   botToken: string | undefined,
@@ -601,21 +610,19 @@ describe('Slack', () => {
     expect(requestsTo(slack, 'conversations.history')).toHaveLength(1);
   });
 
-  it('stops waiting for Slack after five seconds', async () => {
+  it('stops waiting for Slack after five seconds, failing without the token in what it throws', async () => {
     const slack = await startSlack({
-      'conversations.history': () =>
-        new Promise<StandInReply>((resolve) =>
-          setTimeout(
-            () =>
-              resolve({ body: { ok: true, messages: [], has_more: false } }),
-            9_000,
-          ),
-        ),
+      'conversations.history': answerAfter(9_000, {
+        body: { ok: true, messages: [], has_more: false },
+      }),
     });
+    const token = `xoxb-leak-${unique()}`;
 
     const { settled, ms } = await elapsedMs(() =>
       fetchConversation(
-        slackContext(slack),
+        slackContext(slack, {
+          installations: slackInstallations({ T1: token }),
+        }),
         CONVERSATION_SOURCES,
         slackChannel,
         RECENT,
@@ -625,7 +632,191 @@ describe('Slack', () => {
     expect(settled.status).toBe('rejected');
     expect(ms).toBeGreaterThanOrEqual(4_500);
     expect(ms).toBeLessThan(7_000);
+    const reason = settled.status === 'rejected' ? settled.reason : null;
+    expect(inspect(reason, { depth: null })).not.toContain(token);
   }, 15_000);
+
+  it('fails without the token in what it throws when Slack does not answer who the bot is', async () => {
+    const slack = await startSlack({
+      'auth.test': answerAfter(9_000, {
+        body: { ok: true, user_id: SLACK_BOT_USER, team_id: 'T0000000X' },
+      }),
+    });
+    const token = `xoxb-leak-${unique()}`;
+
+    const { settled } = await elapsedMs(() =>
+      fetchConversation(
+        slackContext(slack, {
+          installations: slackInstallations({ T1: token }),
+        }),
+        CONVERSATION_SOURCES,
+        slackChannel,
+        IN_THREAD,
+      ),
+    );
+
+    expect(settled.status).toBe('rejected');
+    const reason = settled.status === 'rejected' ? settled.reason : null;
+    expect(inspect(reason, { depth: null })).not.toContain(token);
+  }, 15_000);
+
+  it('still reads the conversation, with ids for names, and stops looking names up once a lookup gets no answer', async () => {
+    const authors = Array.from({ length: 8 }, (_, i) => `U0PERSON${i}`);
+    const slack = await startSlack({
+      'conversations.history': () => ({
+        body: {
+          ok: true,
+          messages: authors.map((user, i) =>
+            slackMessage(
+              `17000000${String(i).padStart(2, '0')}.000100`,
+              user,
+              'hi',
+            ),
+          ),
+          has_more: false,
+        },
+      }),
+      'users.info': answerAfter(9_000, {
+        body: { ok: true, user: { id: 'U0', name: 'u', real_name: 'Late' } },
+      }),
+    });
+
+    const outcome = await fetchConversation(
+      slackContext(slack),
+      CONVERSATION_SOURCES,
+      slackChannel,
+      RECENT,
+    );
+
+    expect(
+      outcome.ok && outcome.messages.map((m) => m.author.displayName),
+    ).toEqual(authors);
+    expect(requestsTo(slack, 'users.info').length).toBeLessThan(authors.length);
+  }, 20_000);
+
+  it('does not look up the author of a message posted under a name of its own', async () => {
+    const carol = 'U0CAROL01';
+    const slack = await startSlack({
+      'conversations.history': () => ({
+        body: {
+          ok: true,
+          messages: [
+            {
+              ...slackMessage(SLACK_ROOT, carol, 'deployed'),
+              username: 'deploy-bot',
+            },
+          ],
+          has_more: false,
+        },
+      }),
+      'users.info': () => ({
+        body: {
+          ok: true,
+          user: { id: carol, name: carol, real_name: 'Carol' },
+        },
+      }),
+    });
+
+    const outcome = await fetchConversation(
+      slackContext(slack),
+      CONVERSATION_SOURCES,
+      slackChannel,
+      RECENT,
+    );
+
+    expect(
+      outcome.ok && outcome.messages.map((m) => m.author.displayName),
+    ).toEqual(['deploy-bot']);
+    expect(requestsTo(slack, 'users.info')).toEqual([]);
+  });
+
+  describe('the bot whose messages are left out', () => {
+    const OTHER_BOT_USER = 'U0BOT0002';
+    const BOTH_BOTS = [
+      slackMessage(SLACK_ROOT, ALICE, 'from Alice'),
+      slackMessage('1700000100.000200', SLACK_BOT_USER, 'from the first bot'),
+      slackMessage('1700000200.000300', OTHER_BOT_USER, 'from the second bot'),
+    ];
+
+    it("is each installation's own bot, not another installation's", async () => {
+      const tokens = {
+        T1: `xoxb-one-${unique()}`,
+        T2: `xoxb-two-${unique()}`,
+      };
+      const slack = await startSlack({
+        'auth.test': ({ authorization }) => ({
+          body: {
+            ok: true,
+            user_id:
+              authorization === `Bearer ${tokens.T1}`
+                ? SLACK_BOT_USER
+                : OTHER_BOT_USER,
+          },
+        }),
+        'conversations.history': () => ({
+          body: {
+            ok: true,
+            messages: [...BOTH_BOTS].reverse(),
+            has_more: false,
+          },
+        }),
+      });
+      const installations = slackInstallations(tokens);
+      const textsReadBy = async (installationId: string) => {
+        const outcome = await fetchConversation(
+          slackContext(slack, { installations, installationId }),
+          CONVERSATION_SOURCES,
+          slackChannel,
+          { ...RECENT, requestMessageId: null },
+        );
+        return outcome.ok && outcome.messages.map((m) => m.text);
+      };
+
+      expect(await textsReadBy('installation-T1')).toEqual([
+        'from Alice',
+        'from the second bot',
+      ]);
+      expect(await textsReadBy('installation-T2')).toEqual([
+        'from Alice',
+        'from the first bot',
+      ]);
+    });
+
+    it('fails the read when Slack cannot say who the bot is, and asks again on the next read', async () => {
+      let asked = 0;
+      const slack = await startSlack({
+        'auth.test': () => {
+          asked += 1;
+          return asked === 1
+            ? { status: 500, body: {} }
+            : { body: { ok: true, user_id: SLACK_BOT_USER } };
+        },
+      });
+      const context = slackContext(slack);
+
+      await expect(
+        fetchConversation(
+          context,
+          CONVERSATION_SOURCES,
+          slackChannel,
+          IN_THREAD,
+        ),
+      ).rejects.toThrow();
+      const second = await fetchConversation(
+        context,
+        CONVERSATION_SOURCES,
+        slackChannel,
+        IN_THREAD,
+      );
+
+      expect(second.ok && second.messages.map((m) => m.text)).toEqual([
+        'shall we ship on Friday?',
+        'only if QA signs off',
+        'QA signed off',
+      ]);
+      expect(requestsTo(slack, 'auth.test')).toHaveLength(2);
+    });
+  });
 
   it("reads with the named installation's token, and no other", async () => {
     const slack = await startSlack();

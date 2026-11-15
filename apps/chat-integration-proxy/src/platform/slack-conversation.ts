@@ -3,7 +3,13 @@
 // for about thirty minutes, and the read has to report one at once instead
 // (design.md, ConversationReader). Going around the adapter also means its
 // author lookup is not available, so the authors' names are looked up here.
-import { ErrorCode, WebClient, type WebClientOptions } from '@slack/web-api';
+import {
+  ErrorCode,
+  type Logger,
+  LogLevel,
+  WebClient,
+  type WebClientOptions,
+} from '@slack/web-api';
 import type { Adapter } from 'chat';
 
 import { nativeChannelIdOf } from '../capabilities/index.js';
@@ -16,15 +22,36 @@ import { toChatAccountRef } from './event-mapping.js';
 import { installationCredentialsOf } from './installation-scope.js';
 
 /**
+ * This app reports only through the functions handed to it
+ * (`runtime/dependencies.ts`); the client's own logger would write to the
+ * console behind them. A failure that matters reaches the caller as a
+ * rejection instead.
+ */
+const SILENT_LOGGER: Logger = {
+  debug: () => undefined,
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+  setLevel: () => undefined,
+  getLevel: () => LogLevel.ERROR,
+  setName: () => undefined,
+};
+
+/**
  * Every call this read makes -- the read, `auth.test`, `users.info` -- gives
  * up at once on a rate limit or any other failure, and after five seconds on
  * a server that does not answer. The client's default retry policy would try
  * again for about thirty minutes on each of those.
+ *
+ * A failed request's error would otherwise carry the HTTP request it came
+ * from, `Authorization: Bearer <token>` included, to whoever prints it.
  */
 const READ_CLIENT_OPTIONS = {
   rejectRateLimitedCalls: true,
   timeout: 5_000,
   retryConfig: { retries: 0 },
+  attachOriginalToWebAPIRequestError: false,
+  logger: SILENT_LOGGER,
 } satisfies WebClientOptions;
 
 /** How many `users.info` calls are in flight at once. */
@@ -73,9 +100,20 @@ const botUserIdOf = (client: WebClient, token: string): Promise<string> => {
 };
 
 /**
+ * A lookup failure that the lookups after it would most likely meet too: a
+ * rate limit, or no answer in time (or no connection) at all.
+ */
+const endsNameLookups = (error: unknown): boolean =>
+  isSlackRateLimited(error) ||
+  (error instanceof Error &&
+    (error as Error & { readonly code?: unknown }).code ===
+      ErrorCode.RequestError);
+
+/**
  * The name each of `userIds` is shown by, for those Slack would tell. A user
- * left out is shown by their id. The first rate limit stops the lookups that
- * have not started yet: a name is not worth failing the read for.
+ * left out is shown by their id. The first rate limit, timeout or lost
+ * connection stops the lookups that have not started yet: a name is not worth
+ * failing -- or slowing -- the read for.
  */
 const displayNamesOf = async (
   client: WebClient,
@@ -83,12 +121,12 @@ const displayNamesOf = async (
 ): Promise<ReadonlyMap<string, string>> => {
   const names = new Map<string, string>();
   const waiting = [...userIds];
-  let rateLimited = false;
+  let givenUp = false;
 
   const lookUpWaiting = async (): Promise<void> => {
     for (
       let userId = waiting.shift();
-      userId != null && !rateLimited;
+      userId != null && !givenUp;
       userId = waiting.shift()
     ) {
       try {
@@ -101,7 +139,7 @@ const displayNamesOf = async (
           user?.name;
         if (name != null && name !== '') names.set(userId, name);
       } catch (error) {
-        if (isSlackRateLimited(error)) rateLimited = true;
+        if (endsNameLookups(error)) givenUp = true;
       }
     }
   };

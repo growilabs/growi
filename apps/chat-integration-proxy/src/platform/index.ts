@@ -57,7 +57,7 @@ import {
 import {
   CONVERSATION_SOURCES,
   type ConversationOutcome,
-  type ConversationRange,
+  type ConversationReadRange,
   fetchConversation as fetchConversationOf,
 } from './conversation-history.js';
 import {
@@ -190,7 +190,7 @@ export interface PlatformFacade {
    */
   fetchConversation(
     target: SdkChannelRef,
-    range: ConversationRange,
+    range: ConversationReadRange,
     scope: { readonly installationId: string },
   ): Promise<ConversationOutcome>;
   /** Replaces an already-posted message, for answers that outlive the deadline. */
