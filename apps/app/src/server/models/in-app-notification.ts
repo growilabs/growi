@@ -90,8 +90,8 @@ export interface UpsertByActivityParams {
   // null for activities that have no single target (e.g. empty trash)
   target: string | null;
   action: string;
-  // undefined for targets that have no snapshot (e.g. User, AuditLogBulkExportJob)
-  snapshot: string | undefined;
+  // null for targets that have no snapshot (e.g. User, AuditLogBulkExportJob)
+  snapshot: string | null;
   createdAt: Date;
   lastWeek: Date;
 }

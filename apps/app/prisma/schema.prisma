@@ -395,8 +395,8 @@ model inappnotifications {
   // so ids that point at deleted activities are expected.
   activities  String[] @db.ObjectId
   createdAt   DateTime @default(now())
-  // optional: targets without a snapshot (User, AuditLogBulkExportJob) are stored
-  // without the field
+  // optional: targets without a snapshot (User, AuditLogBulkExportJob) have null
+  // or no field (legacy documents)
   snapshot    String?
   status      String   @default("UNOPENED")
   // polymorphic: the collection `target` points at is selected by `targetModel`.

@@ -52,7 +52,7 @@ describe('inappnotifications.upsertByActivity', () => {
       targetModel: 'User',
       target,
       action: 'USER_REGISTRATION_APPROVAL_REQUEST',
-      snapshot: undefined,
+      snapshot: null,
       createdAt: now,
       lastWeek: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
     });
@@ -62,6 +62,24 @@ describe('inappnotifications.upsertByActivity', () => {
     });
     expect(docs).toHaveLength(1);
     expect(docs[0].snapshot).toBeNull();
+  });
+
+  it('does not merge a notification without a snapshot into one that has a snapshot', async () => {
+    await upsert(new ObjectId().toString(), now);
+    await prisma.inappnotifications.upsertByActivity({
+      userIds: [userId],
+      activityId: new ObjectId().toString(),
+      targetModel: 'Page',
+      target,
+      action: 'PAGE_CREATE',
+      snapshot: null,
+      createdAt: now,
+      lastWeek: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+    });
+
+    expect(await prisma.inappnotifications.count({ where: { userId } })).toBe(
+      2,
+    );
   });
 
   it('creates a new document when the previous one is older than the window', async () => {

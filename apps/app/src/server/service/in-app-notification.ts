@@ -90,7 +90,7 @@ export class InAppNotificationService {
   upsertByActivity = async (
     users: Types.ObjectId[],
     activity: ActivityDocument,
-    snapshot: string,
+    snapshot?: string,
     createdAt?: Date | null,
   ): Promise<void> => {
     const { _id: activityId, targetModel, target, action } = activity;
@@ -102,7 +102,7 @@ export class InAppNotificationService {
       targetModel,
       target: target != null ? String(target) : null,
       action,
-      snapshot,
+      snapshot: snapshot ?? null,
       createdAt: now,
       lastWeek: subDays(now, 7),
     });
