@@ -12,6 +12,7 @@
 import type { PlatformName } from '@growi/chat';
 import type { Adapter } from 'chat';
 
+import type { InstallationCredentials } from '../types/index.js';
 import type { AdapterFactory } from './adapter-set.js';
 import type { InstallationProvider } from './installation-provider.js';
 
@@ -44,31 +45,47 @@ export const installationRunner = (
   }
   const bind = factory.bindInstallation;
 
-  return async (work) => {
-    // Looked up among this service's installations only, so a scope naming
-    // another service's installation cannot lend its credentials here.
-    const listed = await deps.installations.list(platform);
-    const found = listed.find(
-      (installation) => installation.installationId === installationId,
-    );
-    if (found == null) {
-      throw new Error(
-        `installation ${installationId} is not a ${platform} installation this proxy holds`,
-      );
-    }
-    const credentials = await deps.installations.resolve(
-      platform,
-      found.workspaceId,
-    );
-    if (credentials == null) {
-      throw new Error(
-        `installation ${installationId} carries no ${platform} credentials`,
-      );
-    }
-    return await bind(
+  return async (work) =>
+    await bind(
       adapter,
-      { workspaceId: found.workspaceId, credentials },
+      await installationCredentialsOf(
+        platform,
+        installationId,
+        deps.installations,
+      ),
       work,
     );
-  };
+};
+
+/**
+ * The workspace and credentials of installation `installationId` of
+ * `platform`. Throws when this proxy holds no such installation, or it carries
+ * no credentials.
+ */
+export const installationCredentialsOf = async (
+  platform: PlatformName,
+  installationId: string,
+  installations: InstallationProvider,
+): Promise<{
+  readonly workspaceId: string;
+  readonly credentials: InstallationCredentials;
+}> => {
+  // Looked up among this service's installations only, so a scope naming
+  // another service's installation cannot lend its credentials here.
+  const listed = await installations.list(platform);
+  const found = listed.find(
+    (installation) => installation.installationId === installationId,
+  );
+  if (found == null) {
+    throw new Error(
+      `installation ${installationId} is not a ${platform} installation this proxy holds`,
+    );
+  }
+  const credentials = await installations.resolve(platform, found.workspaceId);
+  if (credentials == null) {
+    throw new Error(
+      `installation ${installationId} carries no ${platform} credentials`,
+    );
+  }
+  return { workspaceId: found.workspaceId, credentials };
 };

@@ -55,6 +55,12 @@ import {
   createConnectionManager,
 } from './connection-manager.js';
 import {
+  CONVERSATION_SOURCES,
+  type ConversationOutcome,
+  type ConversationRange,
+  fetchConversation as fetchConversationOf,
+} from './conversation-history.js';
+import {
   type EphemeralOrderingClock,
   realEphemeralOrderingClock,
   waitBeforeEphemeral,
@@ -175,6 +181,18 @@ export interface PlatformFacade {
     target: SdkChannelRef,
     range: TimeRange,
   ): Promise<HistoryOutcome>;
+  /**
+   * The thread rooted at `threadRootId`, or the place's latest messages when
+   * it is `null`, oldest first, read once and without the bot's own messages
+   * or `requestMessageId`. Callable outside an event's handling, so
+   * `installationId` is required. Throws on a failure that is none of the
+   * outcome's reasons, such as the service not answering in time.
+   */
+  fetchConversation(
+    target: SdkChannelRef,
+    range: ConversationRange,
+    scope: { readonly installationId: string },
+  ): Promise<ConversationOutcome>;
   /** Replaces an already-posted message, for answers that outlive the deadline. */
   replace(
     message: SdkMessageRef,
@@ -665,6 +683,17 @@ export const createPlatformFacade = async (
         };
       }
       return await fetchHistoryOf({ adapter }, target, range);
+    },
+
+    async fetchConversation(target, range, scope) {
+      const adapter = adapterFor(target.platform, scope.installationId);
+      if (adapter == null) throw new Error(unaddressable(target.platform));
+      return await fetchConversationOf(
+        { adapter, installationId: scope.installationId, installations },
+        CONVERSATION_SOURCES,
+        target,
+        range,
+      );
     },
 
     async replace(message, replacement, scope) {

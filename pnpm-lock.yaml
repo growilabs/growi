@@ -1164,6 +1164,9 @@ importers:
       '@prisma/client':
         specifier: 6.19.2
         version: 6.19.2(prisma@6.19.2(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3)
+      '@slack/web-api':
+        specifier: ^7.18.0
+        version: 7.19.0
       chat:
         specifier: 4.38.1
         version: 4.38.1(ai@6.0.197(zod@4.6.6))(zod@4.6.6)

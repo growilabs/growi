@@ -393,8 +393,10 @@ const THREAD_ADDRESSING: Readonly<Record<PlatformName, ChannelAddressing>> = {
 /**
  * The adapter thread id for the thread rooted at `threadRootId`, or the
  * channel itself when there is no root (a Teams DM has no reply hierarchy).
+ * Also how `conversation-history.ts` addresses the thread it reads, so a
+ * thread is named the same way whether it is posted into or read.
  */
-const threadIdOf = (
+export const threadIdOf = (
   adapter: Adapter,
   platform: PlatformName,
   channelId: SdkChannelId,

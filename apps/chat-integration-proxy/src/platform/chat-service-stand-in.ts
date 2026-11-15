@@ -25,9 +25,13 @@ export interface StandInReply {
   readonly status?: number;
   /** Sent as JSON; no body at all when absent. */
   readonly body?: unknown;
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
-export type StandInResponder = (request: ReceivedRequest) => StandInReply;
+/** A promise holds the response back until it settles. */
+export type StandInResponder = (
+  request: ReceivedRequest,
+) => StandInReply | Promise<StandInReply>;
 
 export interface ChatServiceStandIn {
   readonly url: string;
@@ -103,8 +107,11 @@ export const startChatServiceStandIn = async (
         body: await readBody(request),
       };
       requests.push(received);
-      const reply = responder(received);
+      const reply = await responder(received);
       response.statusCode = reply.status ?? 200;
+      for (const [name, value] of Object.entries(reply.headers ?? {})) {
+        response.setHeader(name, value);
+      }
       if (reply.body === undefined) {
         response.end();
         return;

@@ -314,6 +314,12 @@ export const createFakeChatService = (
     fetchHistory: async (channel, range) =>
       script.fetchHistory?.(channel, range) ?? { ok: true, messages: [] },
 
+    fetchConversation: async () => ({
+      ok: true,
+      messages: [],
+      truncated: false,
+    }),
+
     webhookHandler: (platform) => async (request) => {
       webhookCalls.push(platform);
       return (

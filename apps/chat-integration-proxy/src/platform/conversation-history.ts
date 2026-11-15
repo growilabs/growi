@@ -1,0 +1,264 @@
+// design.md's ConversationReader: the messages of the thread a request was
+// made in, or -- outside a thread -- the latest messages of the place, read in
+// one call, oldest first, without the bot's own messages and the request
+// itself (Requirement 5.7). A refusal the reader can act on, or wait out,
+// becomes a reason (5.13, 5.15, 5.17); whether older messages remain becomes
+// `truncated` (5.16).
+//
+// How each service is read, and how many messages one read may ask it for, is
+// declared once in `CONVERSATION_SOURCES`; the executor below never branches
+// on a service name.
+import type { PlatformName } from '@growi/chat';
+import {
+  type Adapter,
+  type FetchOptions,
+  type FetchResult,
+  NotImplementedError,
+} from 'chat';
+
+import type { HistoryMessage, SdkChannelRef } from '../types/index.js';
+import { toChatAccountRef } from './event-mapping.js';
+import type { InstallationProvider } from './installation-provider.js';
+import { channelAccessFailure, threadIdOf } from './outbound.js';
+import {
+  isSlackRateLimited,
+  readSlackConversation,
+} from './slack-conversation.js';
+
+export type ConversationFailureReason =
+  | 'not-in-channel'
+  | 'not-permitted'
+  | 'unsupported'
+  | 'rate-limited';
+
+export type ConversationOutcome =
+  | {
+      readonly ok: true;
+      readonly messages: ReadonlyArray<HistoryMessage>;
+      readonly truncated: boolean;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: ConversationFailureReason;
+      readonly remedy: string | null;
+    };
+
+export interface ConversationRange {
+  /** The thread to read; `null` reads the place's latest messages. */
+  readonly threadRootId: string | null;
+  /** The request's own message, left out of the answer. */
+  readonly requestMessageId: string | null;
+  readonly limit: number;
+}
+
+/** What a read needs besides its arguments. */
+export interface ConversationReadContext {
+  readonly adapter: Adapter;
+  readonly installationId: string;
+  readonly installations: InstallationProvider;
+  /** Slack's Web API root; the service's own when absent. */
+  readonly slackApiUrl?: string;
+}
+
+/** One message as read, before the bot's own and the request are left out. */
+export interface ReadMessage {
+  readonly id: string;
+  readonly postedAt: Date;
+  readonly author: HistoryMessage['author'];
+  readonly text: string;
+  readonly fromBot: boolean;
+}
+
+export interface ConversationPage {
+  readonly messages: ReadonlyArray<ReadMessage>;
+  /** The service said there is more than this read returned. */
+  readonly hasMore: boolean;
+}
+
+export type ConversationPageReader = (
+  context: ConversationReadContext,
+  target: SdkChannelRef,
+  threadRootId: string | null,
+  limit: number,
+) => Promise<ConversationPage>;
+
+export interface ConversationSource {
+  /** The most one read may ask this service for. */
+  readonly maxPerRead: number;
+  readonly read: ConversationPageReader;
+}
+
+/**
+ * The adapter's own read of the thread, or of the channel.
+ *
+ * Each service read this way speaks with one bot per adapter (none of them
+ * declares `bindInstallation`), so nothing is run inside an installation's
+ * scope here; Slack, the one that does, is read by `readSlackConversation`.
+ */
+const fetchPageOf = (
+  adapter: Adapter,
+  target: SdkChannelRef,
+  threadRootId: string | null,
+  options: FetchOptions,
+): Promise<FetchResult> => {
+  if (threadRootId != null) {
+    return adapter.fetchMessages(
+      threadIdOf(adapter, target.platform, target.channelId, threadRootId),
+      options,
+    );
+  }
+  if (adapter.fetchChannelMessages == null) {
+    throw new NotImplementedError(
+      `the ${target.platform} adapter cannot read a channel`,
+      'fetchChannelMessages',
+    );
+  }
+  return adapter.fetchChannelMessages(target.channelId, options);
+};
+
+/**
+ * Through the adapter's own reads. Each adapter read this way names a cursor
+ * when it judges that more messages remain; Discord's judgement is "the page
+ * came back full".
+ */
+const readThroughAdapter: ConversationPageReader = async (
+  { adapter },
+  target,
+  threadRootId,
+  limit,
+) => {
+  const page = await fetchPageOf(adapter, target, threadRootId, {
+    limit,
+    direction: 'backward',
+  });
+  return {
+    messages: page.messages.map((message) => ({
+      id: message.id,
+      postedAt: message.metadata.dateSent,
+      author: toChatAccountRef(target.platform, message.author),
+      text: message.text,
+      fromBot: message.author.isMe,
+    })),
+    hasMore: page.nextCursor != null,
+  };
+};
+
+/**
+ * Per service: how it is read, and the most one read asks for. Slack is read
+ * with its own Web API client rather than through the adapter, so that a rate
+ * limit comes back at once instead of being retried (design.md,
+ * ConversationReader). Teams' 50 is not yet confirmed on a real tenant.
+ */
+export const CONVERSATION_SOURCES: Readonly<
+  Record<PlatformName, ConversationSource>
+> = {
+  slack: { maxPerRead: 200, read: readSlackConversation },
+  discord: { maxPerRead: 100, read: readThroughAdapter },
+  teams: { maxPerRead: 50, read: readThroughAdapter },
+  mattermost: { maxPerRead: 200, read: readThroughAdapter },
+};
+
+const REMEDIES: Readonly<Record<ConversationFailureReason, string | null>> = {
+  'not-in-channel':
+    'bot がこの場所に参加していないため、会話を読めません。bot を招待してから、もう一度お試しください。',
+  'not-permitted':
+    'bot に会話の履歴を読む権限がありません。チャットサービスの管理者に、履歴を読む権限を足してアプリを入れ直してもらってください。',
+  unsupported: null,
+  'rate-limited': null,
+};
+
+interface ReadFailureRow {
+  readonly failure: ConversationFailureReason;
+  readonly matches: (error: Error & Record<string, unknown>) => boolean;
+}
+
+/**
+ * What only a read is refused with, checked before the rows every channel
+ * operation shares (`channelAccessFailure`). Recognised structurally, as in
+ * `outbound.ts`, from the shapes the installed adapters and clients throw.
+ */
+const READ_FAILURE_ROWS: ReadonlyArray<ReadFailureRow> = [
+  { failure: 'rate-limited', matches: isSlackRateLimited },
+  // `RateLimitError` (chat) and `AdapterRateLimitError` (@chat-adapter/shared).
+  {
+    failure: 'rate-limited',
+    matches: (error) => error.code === 'RATE_LIMITED',
+  },
+  {
+    failure: 'rate-limited',
+    matches: (error) =>
+      error.name === 'NetworkError' &&
+      /Discord API error: 429\b/.test(error.message),
+  },
+  // Teams reads through Graph, whose errors reach here untranslated.
+  {
+    failure: 'rate-limited',
+    matches: (error) => error.name === 'GraphError' && error.statusCode === 429,
+  },
+  {
+    failure: 'not-permitted',
+    matches: (error) => error.name === 'GraphError' && error.statusCode === 403,
+  },
+  {
+    failure: 'not-in-channel',
+    matches: (error) => error.name === 'GraphError' && error.statusCode === 404,
+  },
+  // The Teams adapter turns a chat's 403 into this, naming the permissions.
+  {
+    failure: 'not-permitted',
+    matches: (error) =>
+      error.name === 'NotImplementedError' && /permission/i.test(error.message),
+  },
+  {
+    failure: 'unsupported',
+    matches: (error) => error.name === 'NotImplementedError',
+  },
+];
+
+const readFailureOf = (error: unknown): ConversationFailureReason | null => {
+  if (!(error instanceof Error)) return null;
+  const carrier = error as Error & Record<string, unknown>;
+  return (
+    READ_FAILURE_ROWS.find((row) => row.matches(carrier))?.failure ??
+    channelAccessFailure(error)
+  );
+};
+
+/**
+ * Reads once. `truncated` is what the service said of the read itself, so
+ * leaving out the bot's messages and the request does not change it.
+ *
+ * A failure no row names propagates: every reason carries a meaning for the
+ * reader, and a dropped connection or a timeout has none of them.
+ */
+export const fetchConversation = async (
+  context: ConversationReadContext,
+  sources: Readonly<Record<PlatformName, ConversationSource>>,
+  target: SdkChannelRef,
+  range: ConversationRange,
+): Promise<ConversationOutcome> => {
+  const source = sources[target.platform];
+  const limit = Math.min(range.limit, source.maxPerRead);
+  let page: ConversationPage;
+  try {
+    page = await source.read(context, target, range.threadRootId, limit);
+  } catch (error) {
+    const reason = readFailureOf(error);
+    if (reason == null) throw error;
+    return { ok: false, reason, remedy: REMEDIES[reason] };
+  }
+
+  const messages = page.messages
+    .filter(
+      (message) => !message.fromBot && message.id !== range.requestMessageId,
+    )
+    .toSorted(
+      (left, right) => left.postedAt.getTime() - right.postedAt.getTime(),
+    )
+    .map(({ postedAt, author, text }) => ({
+      postedAt: postedAt.toISOString(),
+      author,
+      text,
+    }));
+  return { ok: true, messages, truncated: page.hasMore };
+};

@@ -252,6 +252,8 @@ describe('Chat SDK import origin', () => {
   /**
    * design.md Allowed Dependencies: these may be used from `src/platform/**` only.
    * `@growi/chat` is explicitly allowed from every layer and is NOT part of this list.
+   * `@slack/web-api` is the Slack SDK the conversation read calls directly
+   * (`platform/conversation-history.ts`), so it is held to the same rule.
    */
   const RESTRICTED_PACKAGES = [
     'chat',
@@ -260,6 +262,7 @@ describe('Chat SDK import origin', () => {
     '@chat-adapter/teams',
     '@chat-adapter/state-pg',
     'chat-adapter-mattermost',
+    '@slack/web-api',
   ];
   const PLATFORM_DIR = `platform${sep}`;
 
