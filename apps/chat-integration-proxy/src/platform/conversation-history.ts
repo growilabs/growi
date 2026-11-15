@@ -264,12 +264,21 @@ const readFailureOf = (
   );
 };
 
+const withoutRequestOf = (error: unknown): Error => {
+  if (!(error instanceof Error)) return new Error(String(error));
+  return Object.assign(new Error(error.message), { name: error.name });
+};
+
 /**
  * Reads once. `truncated` is what the read said of the conversation, so
  * leaving out the bot's messages and the request does not change it.
  *
  * A failure no row names propagates: every reason carries a meaning for the
- * reader, and a dropped connection or a timeout has none of them.
+ * reader, and a dropped connection or a timeout has none of them. It is
+ * rethrown as a new error holding only the original's `name` and `message`:
+ * the original (Teams' Graph client throws its HTTP client's error as is)
+ * carries the request it came from, `Authorization: Bearer <token>` included,
+ * to whoever logs it.
  */
 export const fetchConversation = async (
   context: ConversationReadContext,
@@ -290,7 +299,7 @@ export const fetchConversation = async (
     });
   } catch (error) {
     const reason = readFailureOf(error);
-    if (reason == null) throw error;
+    if (reason == null) throw withoutRequestOf(error);
     return { ok: false, reason, remedy: REMEDIES[reason] };
   }
 

@@ -186,7 +186,10 @@ export interface PlatformFacade {
    * it is `null`, oldest first, read once and without the bot's own messages
    * or `requestMessageId`. Callable outside an event's handling, so
    * `installationId` is required. Throws on a failure that is none of the
-   * outcome's reasons, such as the service not answering in time.
+   * outcome's reasons, such as the service not answering in time; that failure
+   * is thrown as a new `Error` keeping only the original's `name` and
+   * `message`, so nothing the original carried (a request's credentials) is
+   * reachable from it.
    */
   fetchConversation(
     target: SdkChannelRef,

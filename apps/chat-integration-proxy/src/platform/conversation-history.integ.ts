@@ -529,6 +529,64 @@ describe('Slack', () => {
     expect(requestsTo(slack, 'users.info').length).toBeLessThan(authors.length);
   });
 
+  it('shows only the author whose lookup failed by id when the failure is not one that ends the lookups', async () => {
+    const writers = Array.from({ length: 6 }, (_, i) => `U0WRITER${i}`);
+    let failedUser: string | undefined;
+    const slack = await startSlack({
+      'conversations.history': () => ({
+        body: {
+          ok: true,
+          messages: writers
+            .map((user, i) =>
+              slackMessage(
+                `17000000${String(i).padStart(2, '0')}.000100`,
+                user,
+                'hi',
+              ),
+            )
+            .reverse(),
+          has_more: false,
+        },
+      }),
+      // The first lookup fails at once; the others answer a little later, so
+      // the failure is known before the lookups waiting for a free slot start.
+      'users.info': ({ body }) => {
+        const user = (body as { user?: string } | null)?.user ?? '';
+        failedUser ??= user;
+        if (user === failedUser) {
+          return { body: { ok: false, error: 'missing_scope' } };
+        }
+        const reply: StandInReply = {
+          body: {
+            ok: true,
+            user: { id: user, name: user, real_name: `Name of ${user}` },
+          },
+        };
+        return new Promise<StandInReply>((resolve) =>
+          setTimeout(() => resolve(reply), 150),
+        );
+      },
+    });
+
+    const outcome = await fetchConversation(
+      slackContext(slack),
+      CONVERSATION_SOURCES,
+      slackChannel,
+      RECENT,
+    );
+
+    expect(
+      outcome.ok && outcome.messages.map((m) => m.author.displayName),
+    ).toEqual(
+      writers.map((user) => (user === failedUser ? user : `Name of ${user}`)),
+    );
+    expect(
+      requestsTo(slack, 'users.info')
+        .map((request) => (request.body as { user?: string }).user)
+        .sort(),
+    ).toEqual([...writers].sort());
+  });
+
   it('answers rate-limited at once, without waiting or asking again, when Slack answers 429', async () => {
     const slack = await startSlack({
       'conversations.history': () => ({
@@ -1021,6 +1079,21 @@ describe('Discord', () => {
       reason: 'not-in-channel',
       remedy: expect.any(String),
     });
+  });
+
+  it('lets a failure it cannot name propagate without the bot token in what it throws', async () => {
+    const discord = await startDiscord(() => ({ status: 500, body: {} }));
+
+    const thrown = await fetchConversation(
+      discord.context,
+      CONVERSATION_SOURCES,
+      discordChannel,
+      { threadRootId: null, requestMessageId: null, limit: 200 },
+    ).catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect(inspect(thrown, { depth: null })).not.toContain('discord-bot-token');
+    expect(JSON.stringify(thrown)).not.toContain('discord-bot-token');
   });
 
   it('answers rate-limited at once, asking only once, when Discord answers 429', async () => {

@@ -4,6 +4,7 @@
 // which reason the caller gets. The adapters are mocked at their boundary
 // (the `fetch*` call); the services' own wire behaviour is covered by
 // `conversation-history.integ.ts` and `conversation-history-facade.integ.ts`.
+import { inspect } from 'node:util';
 import type { PlatformName } from '@growi/chat';
 import { type Adapter, Message, NotImplementedError } from 'chat';
 import { mock } from 'vitest-mock-extended';
@@ -404,19 +405,33 @@ describe('fetchConversation', () => {
       });
     });
 
-    it('lets a failure it cannot name propagate', async () => {
+    it('lets a failure it cannot name propagate, without the request it carried', async () => {
+      const fakeToken = 'Bearer fake-graph-token-0123456789';
       const adapter = adapterMock();
-      const dropped = new Error('socket hang up');
+      const dropped = Object.assign(new Error('socket hang up'), {
+        name: 'AxiosError',
+        code: 'ECONNRESET',
+        config: { headers: { Authorization: fakeToken } },
+        request: { headers: { Authorization: fakeToken } },
+        response: { config: { headers: { Authorization: fakeToken } } },
+      });
       adapter.fetchChannelMessages.mockRejectedValue(dropped);
 
-      await expect(
-        fetchConversation(
-          contextOf(adapter),
-          CONVERSATION_SOURCES,
-          channelOf('discord'),
-          RECENT,
-        ),
-      ).rejects.toBe(dropped);
+      const thrown = await fetchConversation(
+        contextOf(adapter),
+        CONVERSATION_SOURCES,
+        channelOf('discord'),
+        RECENT,
+      ).catch((error: unknown) => error);
+
+      expect(thrown).toBeInstanceOf(Error);
+      expect(thrown).toMatchObject({
+        name: 'AxiosError',
+        message: 'socket hang up',
+      });
+      expect(thrown).not.toHaveProperty('cause');
+      expect(inspect(thrown, { depth: null })).not.toContain(fakeToken);
+      expect(JSON.stringify(thrown)).not.toContain(fakeToken);
     });
   });
 });
