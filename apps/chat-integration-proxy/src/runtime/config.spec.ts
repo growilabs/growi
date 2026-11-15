@@ -525,6 +525,22 @@ describe('loadConfig', () => {
       ).toThrow(/MATTERMOST_INSTALLATIONS/);
     });
 
+    it('never quotes the broken declaration back, since the JSON parser quotes the text around where it failed', () => {
+      const load = () =>
+        loadConfig({
+          ...minimalEnv(),
+          MATTERMOST_INSTALLATIONS:
+            '[{"workspaceId":"team-1","botToken": mmLEAKTEST0123456789}]',
+        });
+
+      expect(load).toThrow(/MATTERMOST_INSTALLATIONS/);
+      expect(load).toThrow(
+        expect.objectContaining({
+          message: expect.not.stringContaining('LEAKTEST'),
+        }),
+      );
+    });
+
     it('refuses an entry missing a field the connection cannot be opened without, naming the field', () => {
       for (const field of [
         'workspaceId',

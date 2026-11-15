@@ -9,6 +9,7 @@
 
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { inspect } from 'node:util';
 import { DiscordAdapter } from '@chat-adapter/discord';
 import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
 import type { PlatformName } from '@growi/chat';
@@ -345,6 +346,112 @@ describe("Slack's workspace of the event being handled", () => {
     });
 
     await expect(workspaceOfEventAs('xoxb-late')).resolves.toBe('T4');
+  });
+});
+
+describe('a Slack request that fails before reaching Slack', () => {
+  // Driven through the adapter the registry builds, as a Socket Mode bot
+  // would: the event's bot token is bound, and the HTTPS call fails at the
+  // connection stage. Whatever the caller then prints must not carry the token.
+  const closedPort = async (): Promise<number> => {
+    const probe = createServer();
+    await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
+    const { port } = probe.address() as AddressInfo;
+    await new Promise<void>((resolve) => probe.close(() => resolve()));
+    return port;
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('rejects with an error that, printed in full, does not contain the bot token', async () => {
+    const factory = ADAPTER_FACTORIES.slack;
+    if (
+      factory.credentialSource !== 'app' ||
+      factory.bindInstallation == null
+    ) {
+      throw new Error('Slack declares no way to bind an installation');
+    }
+    const adapter = factory.create(FULL_APP_CONFIG, CONTEXT);
+    if (!(adapter instanceof SlackAdapter)) {
+      throw new Error('slack did not build a Slack adapter');
+    }
+    const url = `http://127.0.0.1:${await closedPort()}/api/auth.test`;
+    // The client's own retry policy waits out about half an hour of backoff.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+    let settled = false;
+    const failure = factory
+      .bindInstallation(
+        adapter,
+        {
+          workspaceId: 'T1',
+          credentials: { slack: { botToken: 'xoxb-LEAK-TEST' } },
+        },
+        () => {
+          if (adapter.webClient.token !== 'xoxb-LEAK-TEST') {
+            throw new Error('the bound client does not carry the bot token');
+          }
+          return adapter.webClient.apiCall(url);
+        },
+      )
+      .then(
+        () => {
+          throw new Error('the call to a closed port succeeded');
+        },
+        (error: unknown) => error,
+      )
+      .finally(() => {
+        settled = true;
+      });
+    for (let i = 0; i < 200 && !settled; i++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each retry is scheduled only after the previous attempt's connection fails, so the clock has to advance one step at a time
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+    }
+    const error = await failure;
+
+    expect(error).toMatchObject({ code: 'slack_webapi_request_error' });
+    expect(inspect(error, { depth: null })).not.toContain('xoxb-LEAK-TEST');
+    expect(JSON.stringify(error)).not.toContain('xoxb-LEAK-TEST');
+  });
+});
+
+describe("the Teams adapter's own logging", () => {
+  // The adapter logs the failure it then answers for. A body that fails to
+  // parse is the one such failure reachable without Azure; the parser's
+  // message quotes the body, as a Graph failure's request carries its token.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('writes nothing to the process output when it rejects a webhook body', async () => {
+    const chunks: string[] = [];
+    const keep = (...args: unknown[]): void => {
+      chunks.push(args.map((arg) => inspect(arg, { depth: null })).join(' '));
+    };
+    for (const method of ['error', 'warn', 'info', 'log', 'debug'] as const) {
+      vi.spyOn(console, method).mockImplementation(keep);
+    }
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      keep(chunk);
+      return true;
+    });
+    const adapter =
+      ADAPTER_FACTORIES.teams.credentialSource === 'app'
+        ? ADAPTER_FACTORIES.teams.create(FULL_APP_CONFIG, CONTEXT)
+        : null;
+    if (adapter == null) throw new Error('teams adapter not built');
+
+    const response = await adapter.handleWebhook(
+      new Request('http://127.0.0.1/api/teams', {
+        method: 'POST',
+        body: '{"token": xoxb-LEAK-TEST}',
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(chunks.join('\n')).toBe('');
   });
 });
 

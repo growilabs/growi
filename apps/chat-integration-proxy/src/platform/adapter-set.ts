@@ -26,6 +26,7 @@ import type {
 } from '../types/index.js';
 import type { InstallationProvider } from './installation-provider.js';
 import type { ListenerWindow } from './listener-loop.js';
+import { createSdkLogger } from './sdk-logger.js';
 import { createSlackInstallationLookup } from './slack-installation-lookup.js';
 
 /**
@@ -162,6 +163,16 @@ const slackWorkspaceOfToken = (client: SlackWebClient): Promise<string> => {
 };
 
 /**
+ * What every adapter logs to: nothing. A failure an adapter logs, it also
+ * throws to its caller or answers for, and this app reports only through the
+ * functions handed to it (`runtime/dependencies.ts`); the adapters' default
+ * logger would print the failed request, credentials included, behind them.
+ * Mattermost's adapter switches to its Chat instance's logger once
+ * initialized (`platform/index.ts` sets that one).
+ */
+const ADAPTER_LOGGER = createSdkLogger();
+
+/**
  * The single declared place that says how each of the four services is
  * constructed. Consumers below iterate this table; none of them branches on a
  * service name (`.claude/rules/coding-style.md`, "data-driven control over
@@ -204,6 +215,12 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           // Off unless the operator enabled it: the adapter then roots a thread
           // at every DM message (research.md, AI app view).
           ...(slack.agentView === true ? { agentView: true } : {}),
+          // A request that fails before Slack answers would otherwise carry
+          // the HTTP request it came from -- `Authorization: Bearer <token>`
+          // and the `token=` body -- to whoever prints the error. The adapter
+          // hands these options to its per-workspace clients as well.
+          webClientOptions: { attachOriginalToWebAPIRequestError: false },
+          logger: ADAPTER_LOGGER,
         });
       },
       processingStatus: (appConfig) =>
@@ -277,6 +294,7 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           applicationId: discord.applicationId,
           publicKey: discord.publicKey,
           botToken: discord.botToken,
+          logger: ADAPTER_LOGGER,
         });
       },
       // No `webhookUrl`: without one the adapter hands each Gateway event to
@@ -320,6 +338,7 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
         return createTeamsAdapter({
           appId: teams.clientId,
           appPassword: teams.clientSecret,
+          logger: ADAPTER_LOGGER,
         });
       },
     },
@@ -331,6 +350,7 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
         return createMattermostAdapter({
           baseUrl: mattermost.baseUrl,
           botToken: mattermost.botToken,
+          logger: ADAPTER_LOGGER,
         });
       },
     },

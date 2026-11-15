@@ -512,9 +512,13 @@ const readMattermostInstallations = (
   try {
     parsed = JSON.parse(rawJson);
   } catch (error) {
+    // The parser's own message quotes the text around the failure, which may
+    // be part of a bot token; only the position is carried over.
+    const position =
+      error instanceof Error ? /at position (\d+)/.exec(error.message) : null;
     throw new ConfigurationError(
-      `${MATTERMOST_ENV_NAME} is not readable as JSON: ${
-        error instanceof Error ? error.message : String(error)
+      `${MATTERMOST_ENV_NAME} is not readable as JSON${
+        position == null ? '' : ` (at position ${position[1]})`
       }. Expected a list such as [{workspaceId:team-1,workspaceName:Example,baseUrl:https://mattermost.internal,botToken:...}].`,
     );
   }

@@ -86,6 +86,7 @@ import {
   type ModalTriggerRegistry,
   openModal as openModalOf,
 } from './prompt.js';
+import { createSdkLogger } from './sdk-logger.js';
 import { webhookOptionsFor } from './webhook-options.js';
 
 /**
@@ -304,6 +305,9 @@ const createPlatformBot = (
     adapters: { [platform]: adapter },
     state,
     userName: BOT_USER_NAME,
+    // A handler's failure is logged here and nowhere else, so it reaches the
+    // operator -- as one line, without the error object (`sdk-logger.ts`).
+    logger: createSdkLogger((line) => deps.reportOperationalFailure(line)),
   });
   const { refreshChannels, installationId } = deps;
   const lookupDeps = {

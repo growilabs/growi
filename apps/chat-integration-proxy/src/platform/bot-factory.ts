@@ -23,6 +23,7 @@ import {
   createChatState,
   createInstallationAdapter,
 } from './adapter-set.js';
+import { createSdkLogger } from './sdk-logger.js';
 
 /**
  * The name the bot answers to. Design.md settles every follow-up interaction
@@ -145,7 +146,12 @@ export const createAppBot = (
   const adapters = createAppAdapters(appConfig, ADAPTER_FACTORIES, context);
 
   return {
-    bot: new Chat({ adapters, state, userName: BOT_USER_NAME }),
+    bot: new Chat({
+      adapters,
+      state,
+      userName: BOT_USER_NAME,
+      logger: createSdkLogger(),
+    }),
     state,
     locks: createDistributedLock(state),
     // `Object.keys` always widens to `string[]`; `adapters`' own key type is
@@ -186,5 +192,6 @@ export const createInstallationBot = (
     adapters: { [platform]: adapter },
     state,
     userName: BOT_USER_NAME,
+    logger: createSdkLogger(),
   });
 };
