@@ -4,6 +4,9 @@
  * document holding every activity id; outside the window a new one is created.
  */
 import { ObjectId } from 'mongodb';
+import mongoose from 'mongoose';
+
+import { getInstance } from '^/test/setup/crowi';
 
 import { prisma } from '~/utils/prisma';
 
@@ -101,6 +104,8 @@ describe('inappnotifications.paginateAndIncludeTarget', () => {
   let targetUserId: string;
 
   beforeAll(async () => {
+    // registers the Mongoose Page model that Page targets are read through
+    await getInstance();
     const owner = await prisma.users.create({
       data: {
         username: `owner-${suffix}`,
@@ -115,13 +120,6 @@ describe('inappnotifications.paginateAndIncludeTarget', () => {
     });
     ownerId = owner.id;
     targetUserId = targetUser.id;
-  });
-
-  afterAll(async () => {
-    await prisma.inappnotifications.deleteMany({ where: { userId: ownerId } });
-    await prisma.users.deleteMany({
-      where: { id: { in: [ownerId, targetUserId] } },
-    });
   });
 
   it('attaches the user and resolves the target by targetModel, with the total count', async () => {
@@ -205,9 +203,6 @@ describe('inappnotifications.paginateAndIncludeTarget', () => {
     await prisma.inappnotifications.deleteMany({
       where: { userId: ownerId, targetModel: 'PageBulkExportJob' },
     });
-    await prisma.activities.delete({ where: { id: activity.id } });
-    await prisma.pagebulkexportjobs.delete({ where: { id: job.id } });
-    await prisma.attachments.delete({ where: { id: attachment.id } });
   });
 
   it('reduces a change proposal target to its id without loading it', async () => {
@@ -249,5 +244,31 @@ describe('inappnotifications.paginateAndIncludeTarget', () => {
 
     expect(result.docs[0].target).toBeNull();
     expect(result.docs[0].activities).toEqual([]);
+  });
+
+  it('resolves a Page target to the page document', async () => {
+    const pageId = new ObjectId();
+    await mongoose.connection
+      .collection('pages')
+      .insertOne({ _id: pageId, path: `/in-app-notification/${suffix}` });
+    await prisma.inappnotifications.create({
+      data: {
+        userId: ownerId,
+        action: 'PAGE_UPDATE',
+        targetModel: 'Page',
+        target: pageId.toString(),
+        activities: [],
+      },
+    });
+
+    const result = await prisma.inappnotifications.paginateAndIncludeTarget({
+      where: { userId: ownerId, targetModel: 'Page' },
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(result.docs[0].target).toMatchObject({
+      path: `/in-app-notification/${suffix}`,
+    });
   });
 });
