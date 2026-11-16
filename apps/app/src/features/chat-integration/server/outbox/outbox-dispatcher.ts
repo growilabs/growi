@@ -54,8 +54,8 @@ export const NOTIFICATION_RETRY_CONFIG = {
 } as const;
 
 /**
- * Upper bound on rows handled per `drain` call, so one tick cannot run
- * unboundedly long against a large backlog -- the next tick continues.
+ * Upper bound on rows handled per `drain` call. `requestDrain` drains again
+ * after a full batch, so a burst of writes is not left for the cron.
  */
 const MAX_ROWS_PER_DRAIN = 50;
 
@@ -262,15 +262,23 @@ export const createOutboxDispatcher = (
     return counts;
   };
 
-  const requestDrain = createCoalescingRunner(
-    () => drain(clock()),
-    (err) => {
-      // Name and message only: an HTTP error object carries signed headers.
-      const { name, message } =
-        err instanceof Error ? err : { name: 'Error', message: String(err) };
-      logger.error({ name, message }, 'Failed to drain the chat outbox');
-    },
-  );
+  // Ends: every handled row is sent, given up, or pushed into the future
+  // by its retry delay, so only newly written rows keep a batch full.
+  const drainBacklog = async (): Promise<void> => {
+    let handled: number;
+    do {
+      // biome-ignore lint/performance/noAwaitInLoops: batches run one after another by design
+      const { sent, failed, givenUp } = await drain(clock());
+      handled = sent + failed + givenUp;
+    } while (handled >= MAX_ROWS_PER_DRAIN);
+  };
+
+  const requestDrain = createCoalescingRunner(drainBacklog, (err) => {
+    // Name and message only: an HTTP error object carries signed headers.
+    const { name, message } =
+      err instanceof Error ? err : { name: 'Error', message: String(err) };
+    logger.error({ name, message }, 'Failed to drain the chat outbox');
+  });
 
   return { drain, requestDrain };
 };

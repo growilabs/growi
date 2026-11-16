@@ -306,5 +306,32 @@ describe('createOutboxDispatcher timing', () => {
 
       await expect(dispatcher.requestDrain()).resolves.toBeUndefined();
     });
+
+    // One drain handles at most 50 rows; the rest of a burst must not be
+    // left for the 5-minute cron.
+    it('sends a backlog larger than one drain’s batch in a single request', async () => {
+      const rowCount = 51;
+      await ChatOutboxRow.insertMany(
+        Array.from({ length: rowCount }, (_, i) => ({
+          kind: 'notification',
+          requestId: `req-${i}`,
+          relationId: 'rel-1',
+          targets: [{ platform: 'slack', channelId: 'C1' }],
+          markdown: `notification ${i}`,
+          containsRestrictedPage: false,
+          nextAttemptAt: new Date(),
+        })),
+      );
+      const deliverer = sendingDeliverer();
+
+      await createOutboxDispatcher({
+        deliverers: { notification: deliverer },
+      }).requestDrain();
+
+      expect(deliverer).toHaveBeenCalledTimes(rowCount);
+      expect(await ChatOutboxRow.countDocuments({ state: 'sent' })).toBe(
+        rowCount,
+      );
+    });
   });
 });
