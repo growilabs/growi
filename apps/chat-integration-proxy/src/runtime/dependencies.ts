@@ -40,6 +40,7 @@ import {
 import { createFanOutCollector, createGrowiClient } from '../growi/index.js';
 import {
   createAdminFlow,
+  createAgentFlow,
   createAnswerFlow,
   createCommandFlow,
   createEventSink,
@@ -392,6 +393,17 @@ export const createProxyDependencies = async (
     resolveInstallationId,
     adminFlow,
     privateReplier,
+    commandHandlers: {
+      agent: createAgentFlow({
+        growiClient,
+        pendingAgentRequests,
+        privateReplier,
+        platform: facade,
+        // A string only: `AgentFlow` never hands over an error object.
+        reportOperationalFailure: (message) =>
+          reporters.reportOperationalFailure(message),
+      }),
+    },
   });
 
   // The knot is tied here, before anything is served or connected.
