@@ -160,6 +160,7 @@ const setup = async (script: FakeChatScript = {}) => {
   );
   const answerFlow = createAnswerFlow({
     pendingAgentRequests,
+    relations,
     privateReplier: createPrivateReplier({
       platform: facade,
       describePlace: async () => null,

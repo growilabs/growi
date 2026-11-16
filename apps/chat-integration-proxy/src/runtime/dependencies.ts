@@ -418,6 +418,7 @@ export const createProxyDependencies = async (
   const inboundFlow = createInboundFlow({ db, cipher, platform: facade });
   const answerFlow = createAnswerFlow({
     pendingAgentRequests,
+    relations,
     privateReplier,
     platform: facade,
     // A string only: `AnswerFlow` never hands over an error object.

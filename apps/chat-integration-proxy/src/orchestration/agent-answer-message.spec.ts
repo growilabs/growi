@@ -30,11 +30,13 @@ const render = (
   answer: AgentAnswer,
   place: AnswerPlace,
   platform: PlatformName = 'slack',
+  growiLabel: string | null = 'Team Wiki',
 ): string =>
   textOf(
     agentAnswerMessage(answer, {
       place,
       continuePlace: CONTINUE_PLACE[platform],
+      growiLabel,
     }),
   );
 
@@ -65,7 +67,38 @@ describe('agentAnswerMessage: text answers', () => {
   });
 
   it('writes no source section when there are no sources', () => {
-    expect(render(textAnswer(), 'direct')).toBe('The answer body.');
+    expect(render(textAnswer(), 'direct')).toBe(
+      'GROWI「Team Wiki」からの答え:\n\nThe answer body.',
+    );
+  });
+
+  describe('naming the GROWI the answer came from', () => {
+    it('puts the GROWI label on the first line, above the untouched answer body', () => {
+      const [first, ...rest] = render(textAnswer(), 'direct').split('\n\n');
+      expect(first).toBe('GROWI「Team Wiki」からの答え:');
+      expect(rest[0]).toBe('The answer body.');
+    });
+
+    it('writes no header when the GROWI is no longer known', () => {
+      expect(render(textAnswer(), 'direct', 'slack', null)).toBe(
+        'The answer body.',
+      );
+    });
+
+    it('keeps a label from turning into markdown, a link or a mention', () => {
+      const header = render(
+        textAnswer(),
+        'direct',
+        'slack',
+        '*bold* `code` [x](https://evil.example.com) <!channel> @here\nnext',
+      ).split('\n\n')[0];
+      expect(header).not.toContain('\n');
+      expect(header).toContain('\\*bold\\*');
+      expect(header).toContain('\\`code\\`');
+      expect(header).toContain('\\[x\\]');
+      expect(header).not.toContain('<!channel>');
+      expect(header).not.toMatch(/@here/);
+    });
   });
 
   it('keeps a title that would break a markdown link from ending the link early', () => {

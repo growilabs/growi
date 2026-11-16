@@ -117,6 +117,7 @@ const flowOver = (
       claimDelivery: async () => false,
       recordDeliveryResult: async () => {},
     },
+    relations: { findById: async () => null },
     privateReplier: mock<Pick<PrivateReplier, 'reply'>>(),
     platform: {
       ...mock<Pick<PlatformFacade, 'post' | 'postInThread'>>(),

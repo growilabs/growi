@@ -159,7 +159,8 @@ interface SetupOptions {
 
 const setup = async (options: SetupOptions = {}) => {
   const { prisma, installationId } = await context();
-  const relation = await createRelationRepository(prisma).create({
+  const relations = createRelationRepository(prisma);
+  const relation = await relations.create({
     installationId,
     growiUri: `https://growi-${randomUUID()}.example.com`,
     growiLabel: 'Team Wiki',
@@ -206,6 +207,7 @@ const setup = async (options: SetupOptions = {}) => {
   const flowAt = (now: Date) =>
     createAnswerFlow({
       pendingAgentRequests,
+      relations,
       privateReplier,
       platform: facade,
       reportOperationalFailure,
@@ -232,6 +234,7 @@ const setup = async (options: SetupOptions = {}) => {
     facade,
     privateReplier,
     pendingAgentRequests,
+    relations,
     relationId: relation.relationId,
     installationId,
     flow: flowAt(new Date()),
@@ -265,6 +268,9 @@ describe('delivering an answer that arrives after the request (Requirements 15.7
       });
       expect(posts[0]).not.toHaveProperty('threadRootId');
       expect(markdownOf(posts[0])).toContain('GROWI is a wiki.');
+      expect(markdownOf(posts[0]).split('\n')[0]).toBe(
+        'GROWI「Team Wiki」からの答え:',
+      );
       // A channel answer on a service with a DM to carry on in says so.
       expect(markdownOf(posts[0])).toContain('bot との DM');
     });
@@ -531,6 +537,7 @@ describe('delivering an answer that arrives after the request (Requirements 15.7
       privateReplier,
       facade,
       reportOperationalFailure,
+      relations,
     } = await setup();
     const requestId = await save(channelOrigin());
     // What a copy read before the other delivery claimed and finished.
@@ -538,6 +545,7 @@ describe('delivering an answer that arrives after the request (Requirements 15.7
     await flow.deliver(answerTo(relationId, requestId));
     let reads = 0;
     const late = createAnswerFlow({
+      relations,
       pendingAgentRequests: {
         ...pendingAgentRequests,
         find: (...args) => {

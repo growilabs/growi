@@ -15,6 +15,7 @@ import type { PrivateReplier, PrivateReplyOrigin } from '../command/index.js';
 import type {
   PendingAgentRequestRecord,
   PendingAgentRequestRepository,
+  RelationRepository,
   StoredAnswerOrigin,
 } from '../db/index.js';
 import type { PlatformFacade } from '../platform/index.js';
@@ -36,6 +37,8 @@ export interface AnswerFlowDeps {
     PendingAgentRequestRepository,
     'find' | 'claimDelivery' | 'recordDeliveryResult'
   >;
+  /** Names the GROWI an answer came from. */
+  readonly relations: Pick<RelationRepository, 'findById'>;
   readonly privateReplier: Pick<PrivateReplier, 'reply'>;
   readonly platform: Pick<
     PlatformFacade,
@@ -117,6 +120,7 @@ const privateReplyOriginOf = (
 export const createAnswerFlow = (deps: AnswerFlowDeps): AnswerFlow => {
   const {
     pendingAgentRequests,
+    relations,
     privateReplier,
     platform,
     reportOperationalFailure,
@@ -184,9 +188,11 @@ export const createAnswerFlow = (deps: AnswerFlowDeps): AnswerFlow => {
         };
       }
 
+      const relation = await relations.findById(relationId);
       const message = agentAnswerMessage(answer, {
         place: record.origin.place,
         continuePlace: CONTINUE_PLACE[record.origin.channel.platform],
+        growiLabel: relation?.growiLabel ?? null,
       });
       const status = await deliverTo(record, message);
       await pendingAgentRequests.recordDeliveryResult(
