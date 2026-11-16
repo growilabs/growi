@@ -1,7 +1,4 @@
 import { type JSX, memo, useCallback, useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
-import withLoadingProps from 'next-dynamic-loading-props';
-import { useIsomorphicLayoutEffect } from 'usehooks-ts';
 
 import {
   useCollapsedContentsOpened,
@@ -11,25 +8,7 @@ import {
   useSidebarMode,
 } from '~/states/ui/sidebar';
 
-import type { ResizableAreaProps } from '../Common/ResizableArea';
-// Imported directly, not via the barrel, so ResizableArea itself stays in the
-// dynamically loaded chunk below
-import { ResizableAreaFallback } from '../Common/ResizableArea/ResizableAreaFallback';
-
-const ResizableArea = withLoadingProps<ResizableAreaProps>((useLoadingProps) =>
-  dynamic(
-    () => import('../Common/ResizableArea').then((mod) => mod.ResizableArea),
-    {
-      ssr: false,
-      loading: () => {
-        const { children, ...rest } = useLoadingProps();
-        return (
-          <ResizableAreaFallback {...rest}>{children}</ResizableAreaFallback>
-        );
-      },
-    },
-  ),
-);
+import { ResizableArea } from '../Common/ResizableArea';
 
 const resizableAreaMinWidth = 348;
 const sidebarNavCollapsedWidth = 48;
@@ -63,7 +42,6 @@ export const ResizableContainer = memo(
     const setPreferCollapsedMode = useSetPreferCollapsedMode();
     const [, setCollapsedContentsOpened] = useCollapsedContentsOpened();
 
-    const [isClient, setClient] = useState(false);
     const [resizableAreaWidth, setResizableAreaWidth] = useState<
       number | undefined
     >(
@@ -86,10 +64,6 @@ export const ResizableContainer = memo(
       setCollapsedContentsOpened(false);
     }, [setCollapsedContentsOpened, setPreferCollapsedMode]);
 
-    useIsomorphicLayoutEffect(() => {
-      setClient(true);
-    }, []);
-
     // open/close resizable container when drawer mode
     useEffect(() => {
       setResizableAreaWidth(
@@ -107,14 +81,7 @@ export const ResizableContainer = memo(
       setIsDrawerOpened,
     ]);
 
-    return !isClient ? (
-      <ResizableAreaFallback
-        className="flex-expand-vert"
-        width={resizableAreaWidth}
-      >
-        {children}
-      </ResizableAreaFallback>
-    ) : (
+    return (
       <ResizableArea
         className="flex-expand-vert"
         width={resizableAreaWidth}
