@@ -17,6 +17,7 @@ import {
   activeReviewers,
   deriveViewerRole,
   isReviewer,
+  type ReviewScopeOperation,
   type ViewerIdentity,
 } from '../domain';
 import type {
@@ -30,6 +31,7 @@ import type {
   ReviewEntry,
 } from './change-proposal-types';
 import {
+  required,
   toBasedOn,
   toOperationStatus,
   toOperationType,
@@ -208,18 +210,45 @@ export const toOriginalOperationData = (
       }
     : { status: change.status, reason: change.reason };
 
+type LinkedOperationRow = {
+  key: string;
+  type: string;
+  status: string;
+  pageId: string | null;
+  path: string | null;
+  toPath: string | null;
+  resultPageId: string | null;
+};
+
+const toLinkedOperation = (op: LinkedOperationRow): ReviewScopeOperation => {
+  const type = toOperationType(op.type);
+  const state = {
+    key: op.key,
+    status: toOperationStatus(op.status),
+    ...(op.resultPageId == null ? {} : { resultPageId: op.resultPageId }),
+  };
+  switch (type) {
+    case 'create':
+      return { ...state, type, path: required(op.path, 'path', type) };
+    case 'move':
+      return {
+        ...state,
+        type,
+        pageId: required(op.pageId, 'pageId', type),
+        toPath: required(op.toPath, 'toPath', type),
+      };
+    default:
+      return { ...state, type, pageId: required(op.pageId, 'pageId', type) };
+  }
+};
+
 export const toLinkedProposalRecord = (row: {
   id: string;
   requester: string;
   entry: string;
   basedOn: ChangeproposalsBasedOn | null;
-  operations: {
-    key: string;
-    type: string;
-    status: string;
-    pageId: string | null;
-    resultPageId: string | null;
-  }[];
+  reviewers: ChangeproposalsReviewers[];
+  operations: LinkedOperationRow[];
 }): LinkedProposalRecord => {
   if (row.basedOn == null) {
     throw new Error(`Linked change proposal ${row.id} has no basedOn`);
@@ -229,13 +258,8 @@ export const toLinkedProposalRecord = (row: {
     requester: row.requester,
     entry: toProposalEntry(row.entry),
     basedOn: toBasedOn(row.basedOn),
-    operations: row.operations.map((op) => ({
-      key: op.key,
-      type: toOperationType(op.type),
-      status: toOperationStatus(op.status),
-      ...(op.pageId == null ? {} : { pageId: op.pageId }),
-      ...(op.resultPageId == null ? {} : { resultPageId: op.resultPageId }),
-    })),
+    reviewers: row.reviewers.map(toReviewerRef),
+    operations: row.operations.map(toLinkedOperation),
   };
 };
 

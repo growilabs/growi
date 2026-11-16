@@ -112,7 +112,7 @@
   - _Requirements: 5.3, 5.4, 5.6, 5.10_
   - _Depends: 4.1_
   - _Boundary: select-visible-operations, proposal-view-parts, proposal-list-query, proposal-query（役割の判定と絞り込みの呼び出しだけ。承認者向けの値は 4.3）_
-- [ ] 4.3 承認者向けの値と、判断の記録の返し方を作る
+- [x] 4.3 承認者向けの値と、判断の記録の返し方を作る
   - 承認者に、変更後の本文、元のリビジョンが今も最新か、順位（閲覧できるページの操作の中での順位）、変更の目的、承認者の一覧を返す。依頼した人にだけ返す値（段階と達成度、AI の要約など）は、承認者に返さない
   - 承認・却下・放棄の記録は、依頼した人と、そのページを閲覧できる承認者にだけ返す。全体の却下の記録は、依頼した人にだけ返す
   - 後続・見直しへのリンクは、相手の提案ごとに役割を決め直し、閲覧できるページの操作が 0 件なら出さない
@@ -283,3 +283,6 @@
 - 4.2: 役割を 3 つ（依頼した人・承認者・それ以外）に分ける処理は、`review-scope-visibility.ts` の `decideReviewScope` にある。`select-visible-operations.ts` は 2 つの役割のまま変えていない（design の部品の一覧と食い違うので、cleanup で design を直す）。取得（`getForViewer`）は、1 回の求めにつき `loadViewerIdentity` を 1 回読み、`deriveViewerRole` で役割を決め、`resolveReviewScopeWithPages`（`review-scope-resolver.ts`。後続・見直し・元の提案のページも同じ 1 回の閲覧の判定で確かめる）の `visibleKeys` で操作を絞る。依頼した人でない人は、見える操作が 0 件なら「見つからない」。全体の状態は、依頼した人には実際の lifecycle、それ以外には見える段階（`deriveVisibleStage`）から出す。
 - 4.2: **4.3・4.4 の実装者へ**: 反映済みの一覧（`scanAppliedVisible`）と自分の一覧の項目の `viewerRole` は、`'requester'` か `'other'` だけ（承認者にも「それ以外の人」の規則を当てる。要件 5.10）。`'reviewer'` を返すのは、取得と、4.4 の承認者としての一覧だけ。4.3 で `toProposalHeaderView` に承認者向けの値（`purpose`、`reviewers` など）を足すときは、`role === 'reviewer'` を条件にして、反映済みの一覧に漏らさない。5.10 の前後比較のテスト（`change-proposal-service-get-by-role.integ.ts`）は、取得の `operations` を配列全体で比べている。4.3 で承認の記録などを足したら、比べる項目を見直す。後続・見直し・元の提案へのリンクは、今は「それ以外の人」の規則のまま。相手の提案ごとに役割を決め直すのは 4.3。
 - 4.2: 取得で所属を読む箇所が 1 か所残る。反映済みの新規作成の取り消し可否の判定（`createCanDeletePageCompletely` → `getUserRelatedGroups`）が、グループの文書が要るために別の関数で所属を読む。「1 回の求めにつき 1 回」の見張りのテストはこの経路を通らない。9.x の全体の確認で、直すか判断する。存在しない提案と、見える操作が 0 件の提案とで、応答までの時間に差が出るのは core からある作り（design が同一と決めているのは応答の中身だけ）。
+- 4.3: 承認者向けの値は `toParticipantHeaderFields`（`review-views.ts`）で作り、`getForViewer` の中で足す。`toProposalHeaderView` の中では作らない（`toProposalHeaderView` は反映済みの一覧と自分の一覧でも使うため）。**4.4 の実装者へ**: 承認者としての一覧の項目に `purpose` などを出すときは、`toParticipantHeaderFields` を role `'reviewer'` で使う。反映済みの一覧には使わない。承認者には、判断の対象の操作（閲覧できるページの「待ち」）にだけ `proposedBody`・`order`（閲覧できる操作の中での順位。依頼した人には index と同じ値）・`baseIsLatest`（編集のみ）を返す。判断の記録は、同じ人・同じキーの最新 1 件だけ（`latestReviews`。却下か放棄かは区別しない）。`wholeRejections` は依頼した人にだけ返す。名前は `participant-names.ts` が 1 回の問い合わせで読む（ユーザーはユーザー名と氏名だけ。グループは名前だけ）。リンクは `resolveReviewScopesWithPages`（複数の提案を一度に解決）で、相手の提案ごとに役割を決め直し、閲覧できる操作が 0 件なら出さない。
+- 4.3: **7.2（OpenAPI）と cleanup へ**: `OperationView` の新しい項目（`order`、`baseIsLatest`、`approval`（`byRequester` を含む）、`rejections`、`abstentions`）は、OpenAPI に書く。`ApprovalView.byRequester`（要件 2.8 の「承認した人が依頼した人自身か」。`approvedBy === requester` から決める）は design の Data Contracts に無いので、core に戻すとき（10.1）に design の型へ足す。`ReviewerView.name` は、ユーザーならユーザー名（氏名でない）。viewer で表示名が要るときに見直す。`getForViewer` は 57 行（50 行の目安を超える）。結果の組み立てを小さな関数に出せば収まる。9.3 の全体の確認で、直すか判断する。
+- 4.3: 5.10 の前後比較のテストが比べない項目は、承認者・依頼した人にだけ返す `approval`・`rejections`・`abstentions` の 3 つだけにする（`order`・`baseIsLatest`・`proposedBody` を外すと、`reviewTargetKeys` を `visibleKeys` に替える変異が生き残る）。

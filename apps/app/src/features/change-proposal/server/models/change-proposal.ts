@@ -635,12 +635,15 @@ export const extension = Prisma.defineExtension((client) => {
               requester: true,
               entry: true,
               basedOn: true,
+              reviewers: true,
               operations: {
                 select: {
                   key: true,
                   type: true,
                   status: true,
                   pageId: true,
+                  path: true,
+                  toPath: true,
                   resultPageId: true,
                 },
               },

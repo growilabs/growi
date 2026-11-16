@@ -1,10 +1,10 @@
 import {
   APPLIED_AT_LEAST_ONCE_STATUSES,
-  type OperationRecord,
   type ViewerRole,
 } from '../../interfaces';
 import {
   deriveVisibleStage,
+  type ReviewScopeOperation,
   resolveAncestors,
   reviewScopeOf,
   selectVisibleOperations,
@@ -31,7 +31,7 @@ export type ReviewScopeFacts = {
 
 // Applied operations keep the rule for other viewers (Reviewers Req 5.10).
 const isJudgedByReviewScope = (
-  op: OperationRecord,
+  op: ReviewScopeOperation,
   role: ViewerRole,
 ): boolean =>
   role === 'reviewer' && !APPLIED_AT_LEAST_ONCE_STATUSES.includes(op.status);
@@ -40,7 +40,7 @@ const isJudgedByReviewScope = (
 // is empty): such an operation is never shown to a reviewer, rather than shown
 // without a viewing check.
 const judgingPageIdsOf = (
-  op: OperationRecord,
+  op: ReviewScopeOperation,
   nonEmptyPageIdByPath: ReadonlyMap<string, readonly string[]>,
 ): readonly string[] | null => {
   const scope = reviewScopeOf(op);
@@ -59,7 +59,7 @@ const judgingPageIdsOf = (
 };
 
 export const ancestorPathsToLoad = (
-  operations: readonly OperationRecord[],
+  operations: readonly ReviewScopeOperation[],
   role: ViewerRole,
 ): readonly string[] => [
   ...new Set(
@@ -70,7 +70,7 @@ export const ancestorPathsToLoad = (
 ];
 
 export const pageIdsToLoad = (
-  operations: readonly OperationRecord[],
+  operations: readonly ReviewScopeOperation[],
   role: ViewerRole,
   nonEmptyPageIdByPath: ReadonlyMap<string, readonly string[]>,
 ): readonly string[] => [
@@ -86,7 +86,7 @@ export const pageIdsToLoad = (
 ];
 
 const isVisibleByReviewScope = (
-  op: OperationRecord,
+  op: ReviewScopeOperation,
   { viewable, nonEmptyPageIdByPath }: ReviewScopeFacts,
 ): boolean => {
   const pageIds = judgingPageIdsOf(op, nonEmptyPageIdByPath);
@@ -100,7 +100,7 @@ const isVisibleByReviewScope = (
 };
 
 export const decideReviewScope = (
-  operations: readonly OperationRecord[],
+  operations: readonly ReviewScopeOperation[],
   role: ViewerRole,
   facts: ReviewScopeFacts,
 ): ReviewScopeResult => {

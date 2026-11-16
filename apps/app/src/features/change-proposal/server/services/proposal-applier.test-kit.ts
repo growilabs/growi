@@ -54,6 +54,7 @@ export type StoreProposalOptions = {
   readonly perPageNotifications?: boolean;
   readonly expiresAt?: Date;
   readonly reviewers?: readonly ReviewerRef[];
+  readonly purpose?: string;
 };
 
 const PAGE_OPERATION_WAIT_MS = 5000;
@@ -165,6 +166,7 @@ export const createApplierTestKit = (args: {
       perPageNotifications: options.perPageNotifications ?? false,
       expiresAt: options.expiresAt,
       reviewers: options.reviewers,
+      purpose: options.purpose,
       operations: operations.map((op) => ({ ...op, approvedAt })),
     });
     proposalIds.push(created._id);

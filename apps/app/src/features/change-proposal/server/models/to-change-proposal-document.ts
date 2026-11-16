@@ -123,7 +123,7 @@ const toMember = <T extends string>(
   return value as T;
 };
 
-const required = <T>(
+export const required = <T>(
   value: T | null | undefined,
   field: string,
   type: string,

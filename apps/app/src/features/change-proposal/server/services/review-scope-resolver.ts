@@ -1,5 +1,5 @@
-import type { OperationRecord, ViewerRole } from '../../interfaces';
-import type { ViewerIdentity } from '../domain';
+import type { ViewerRole } from '../../interfaces';
+import type { ReviewScopeOperation, ViewerIdentity } from '../domain';
 import { loadViewablePages, type ViewablePages } from './current-page-facts';
 import { pageModel } from './operation-handlers/page-model';
 import {
@@ -40,36 +40,47 @@ const loadNonEmptyPageIdByPath = async (
   return byPath;
 };
 
+export type ReviewScopeSubject = {
+  readonly operations: readonly ReviewScopeOperation[];
+  readonly role: ViewerRole;
+};
+
 /**
- * resolveReviewScope, with `alsoCheckPageIds` checked in the same viewing check
- * and every page it read handed back, for a caller that shows pages next to
- * the operations without checking them a second time.
+ * resolveReviewScope for several proposals at once, each by the viewer's role
+ * in it, with `alsoCheckPageIds` checked in the same viewing check and every
+ * page it read handed back, for a caller that shows pages next to the
+ * operations without checking them a second time.
  */
-export const resolveReviewScopeWithPages = async (
-  operations: readonly OperationRecord[],
+export const resolveReviewScopesWithPages = async (
+  subjects: readonly ReviewScopeSubject[],
   viewer: ViewerIdentity,
-  role: ViewerRole,
   alsoCheckPageIds: readonly string[],
 ): Promise<{
-  readonly scope: ReviewScopeResult;
+  readonly scopes: readonly ReviewScopeResult[];
   readonly viewable: ViewablePages;
 }> => {
-  const nonEmptyPageIdByPath = await loadNonEmptyPageIdByPath(
-    ancestorPathsToLoad(operations, role),
-  );
+  const nonEmptyPageIdByPath = await loadNonEmptyPageIdByPath([
+    ...new Set(
+      subjects.flatMap((s) => ancestorPathsToLoad(s.operations, s.role)),
+    ),
+  ]);
   const viewable = await loadViewablePages(
     [
-      ...pageIdsToLoad(operations, role, nonEmptyPageIdByPath),
+      ...subjects.flatMap((s) =>
+        pageIdsToLoad(s.operations, s.role, nonEmptyPageIdByPath),
+      ),
       ...alsoCheckPageIds,
     ],
     { _id: viewer.userId },
     viewer,
   );
   return {
-    scope: decideReviewScope(operations, role, {
-      viewable,
-      nonEmptyPageIdByPath,
-    }),
+    scopes: subjects.map((s) =>
+      decideReviewScope(s.operations, s.role, {
+        viewable,
+        nonEmptyPageIdByPath,
+      }),
+    ),
     viewable,
   };
 };
@@ -81,8 +92,14 @@ export const resolveReviewScopeWithPages = async (
  * check (which also asks, for pages it could not return, whether they exist).
  */
 export const resolveReviewScope = async (
-  operations: readonly OperationRecord[],
+  operations: readonly ReviewScopeOperation[],
   viewer: ViewerIdentity,
   role: ViewerRole,
-): Promise<ReviewScopeResult> =>
-  (await resolveReviewScopeWithPages(operations, viewer, role, [])).scope;
+): Promise<ReviewScopeResult> => {
+  const { scopes } = await resolveReviewScopesWithPages(
+    [{ operations, role }],
+    viewer,
+    [],
+  );
+  return scopes[0];
+};

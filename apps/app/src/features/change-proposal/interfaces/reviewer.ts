@@ -57,6 +57,8 @@ export type ApprovalView = {
   readonly by: UserSummary;
   readonly at: string;
   readonly channel: ReviewChannel;
+  // Derived from the approver and the requester, never stored.
+  readonly byRequester: boolean;
 };
 
 export type DecisionResponse = {

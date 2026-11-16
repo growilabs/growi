@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { IUserHasId } from '@growi/core';
 import { PageGrant } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
@@ -17,9 +18,13 @@ import type {
   ChangeProposalDocument,
   ChangeProposalSummaryView,
   ChangeProposalView,
+  OperationView,
   ReviewerRef,
 } from '../../interfaces';
-import type { CreateOperationInput } from '../models/change-proposal-types';
+import type {
+  AttributedApproval,
+  CreateOperationInput,
+} from '../models/change-proposal-types';
 import {
   type ChangeProposalService,
   createChangeProposalService,
@@ -82,10 +87,11 @@ describe('ChangeProposalService reads by viewer role', () => {
   const applyKeys = async (
     proposal: ChangeProposalDocument,
     keys: readonly string[],
+    approver: string | AttributedApproval = proposal.requester,
   ): Promise<ChangeProposalDocument> => {
     await prisma.changeproposals.markApproved(
       proposal._id,
-      proposal.requester,
+      approver,
       keys,
       new Date(),
     );
@@ -119,9 +125,20 @@ describe('ChangeProposalService reads by viewer role', () => {
     return items.find((item) => item.id === proposalId);
   };
 
+  // A participant's own additions (Reviewers Req 3.8, 5.7), outside what 5.10 keeps.
+  const PARTICIPANT_FIELDS: ReadonlySet<string> = new Set([
+    'approval',
+    'rejections',
+    'abstentions',
+  ]);
+  const withoutParticipantFields = (op: OperationView) =>
+    Object.fromEntries(
+      Object.entries(op).filter(([field]) => !PARTICIPANT_FIELDS.has(field)),
+    );
+
   // What Reviewers Req 5.10 keeps: the applied operations shown and the state read from them.
   const appliedViewFacts = (view: ChangeProposalView) => ({
-    operations: view.operations,
+    operations: view.operations.map(withoutParticipantFields),
     status: view.status,
     lastAppliedAt: view.lastAppliedAt,
     requesterState: view.requesterState,
@@ -320,7 +337,11 @@ describe('ChangeProposalService reads by viewer role', () => {
         [kit.editInput(applied), kit.editInput(hidden)],
         [],
       );
-      await applyKeys(proposal, [keyOf(proposal, 0)]);
+      await applyKeys(proposal, [keyOf(proposal, 0)], {
+        approver: requesterIdentity(),
+        channel: 'ui',
+        decisionToken: randomUUID(),
+      });
       const read = async () => ({
         view: viewOf(
           await service.getForViewer(proposal._id, users.subscriber),
@@ -341,6 +362,11 @@ describe('ChangeProposalService reads by viewer role', () => {
       expect(appliedViewFacts(after.view)).toEqual(
         appliedViewFacts(before.view),
       );
+      expect(before.view.operations[0]).not.toHaveProperty('approval');
+      expect(after.view.operations[0]?.approval).toMatchObject({
+        by: { id: users.requester._id.toString() },
+        byRequester: true,
+      });
       expect(appliedItemFacts(after.item)).toEqual(
         appliedItemFacts(before.item),
       );

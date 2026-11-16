@@ -1,4 +1,17 @@
-import type { OperationRecord } from '../../interfaces';
+import type { OperationReason, OperationStatus } from '../../interfaces';
+
+// What deciding an operation's reviewers and visibility reads; an OperationRecord
+// and the operations of a linked-proposal record both satisfy it.
+export type ReviewScopeOperation = (
+  | { readonly type: 'edit' | 'delete-completely'; readonly pageId: string }
+  | { readonly type: 'create'; readonly path: string }
+  | { readonly type: 'move'; readonly pageId: string; readonly toPath: string }
+) & {
+  readonly key: string;
+  readonly status: OperationStatus;
+  readonly reason?: OperationReason;
+  readonly resultPageId?: string;
+};
 
 // Pages a reviewer must be able to view to decide an operation.
 export type ReviewScope = {
@@ -20,7 +33,7 @@ const ancestorCandidatesOf = (path: string): readonly string[] => {
 };
 
 // A complete deletion never decides reviewers (see design.md, review-scope).
-export const reviewScopeOf = (op: OperationRecord): ReviewScope => {
+export const reviewScopeOf = (op: ReviewScopeOperation): ReviewScope => {
   switch (op.type) {
     case 'edit':
     case 'delete-completely':

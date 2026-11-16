@@ -2,8 +2,6 @@ import type {
   BasedOn,
   FailureReason,
   OperationPayload,
-  OperationStatus,
-  OperationType,
   ProposalEntry,
   ProposalMark,
   RevertRefusalReason,
@@ -15,7 +13,7 @@ import type {
   StaleReason,
   WaitingReason,
 } from '../../interfaces';
-import type { ViewerIdentity } from '../domain';
+import type { ReviewScopeOperation, ViewerIdentity } from '../domain';
 
 export type CreateOperationInput = OperationPayload & {
   readonly revertTarget?: ProposalMark;
@@ -89,13 +87,9 @@ export type LinkedProposalRecord = {
   readonly requester: string;
   readonly entry: ProposalEntry;
   readonly basedOn: BasedOn;
-  readonly operations: readonly {
-    readonly key: string;
-    readonly type: OperationType;
-    readonly status: OperationStatus;
-    readonly pageId?: string;
-    readonly resultPageId?: string;
-  }[];
+  readonly reviewers: readonly ReviewerRef[];
+  // Enough for the viewer's role in the linked proposal to decide what they see.
+  readonly operations: readonly ReviewScopeOperation[];
 };
 
 export type AppliedListCursor = {

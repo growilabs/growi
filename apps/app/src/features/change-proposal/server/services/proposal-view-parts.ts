@@ -92,7 +92,7 @@ const requesterStateOf = (
   };
 };
 
-/** Reads every requester in one query; a deleted user reads as empty names. */
+/** Reads the given users in one query; a deleted user reads as empty names. */
 export const readRequesters = async (
   requesterIds: readonly string[],
 ): Promise<(requesterId: string) => RequesterView> => {
