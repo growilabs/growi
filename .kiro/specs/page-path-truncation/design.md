@@ -171,7 +171,8 @@ apps/app/src/
 └── features/search/client/
     ├── hooks/
     │   ├── layout-test-utils.ts                # 新規: テスト用に要素の幅と ResizeObserver を与えるヘルパー（両コンポーネントのテストで共用）
-    │   ├── use-fitting-collapse-level.ts       # 新規: 描画結果の溢れを見て段階を選ぶフック（両描画コンポーネントで共有）
+    │   ├── use-fitting-collapse-level.ts       # 新規: 描画結果の溢れを見て段階を選ぶフック（段階の意味は持たない）
+    │   ├── use-path-collapse-level.ts          # 新規（レビュー修正）: パスから最大段階を求めて上記を呼ぶ。両描画コンポーネントで共有
     │   └── use-fitting-collapse-level.spec.tsx # 新規
     └── components/
         ├── _truncated-path-row.scss            # 変更: 祖先は縮めない／ページ名だけ縮む、に組み替え
@@ -230,7 +231,7 @@ flowchart TD
 ```
 
 - 判定は描画後・画面表示前に行い、途中の段階は表示しない（方式の選定理由は research.md「収まるかの判定」）。幅・パスが変わったときの扱いは `useFittingCollapseLevel` を参照。
-- 「収まらない」は、コンテナの溢れ（`scrollWidth > clientWidth`）と、ページ名の文字単位の切り詰め（ページ名要素の溢れ）のどちらかで判定する。祖先は縮まないので、祖先が収まらなければ必ずどちらかが溢れる。
+- 「収まらない」は、コンテナの溢れ（`scrollWidth > clientWidth`。整数への丸めで 1px 溢れて見えるだけの場合は収まっているとみなす）と、ページ名の文字単位の切り詰め（ページ名要素の溢れ）のどちらかで判定する。祖先は縮まないので、祖先が収まらなければ必ずどちらかが溢れる。
 
 ## Requirements Traceability
 
@@ -261,8 +262,8 @@ flowchart TD
 | `alignHighlightedPathSegments` | Shared util（`client/util/`） | ハイライト markup をプレーンパスのセグメントに対応付ける（祖先行・ページ名行で共用） | 6, 7 | `normalizePath`（P0） | Service |
 | `buildAncestorPathNodes` | Shared util（`client/util/`） | 中間省略判定と `LinkedPagePath`・ハイライトを橋渡しし、React 非依存のレンダリング計画を返す | 2, 5, 6 | `formatTruncatedPagePath`（P0）, `LinkedPagePath`（P0）, `alignHighlightedPathSegments`（P0） | Service |
 | `useFittingCollapseLevel` | `features/search` hook | （改訂）描画結果の溢れと幅の変化から、収まる最小の畳み込み段階を選ぶ | 3 | `useResizeObserver`（P0） | State |
-| `SearchResultAncestorPath` | `features/search` component | 検索結果一覧の祖先パス部分を 1 行・リンク付き・ハイライト付きで描画する | 1, 2, 3, 4, 5, 6 | `buildAncestorPathNodes`（P0）, `formatTruncatedPagePath`（P1, 最大段階の取得）, `useFittingCollapseLevel`（P0） | State |
-| `SearchResultPagePath` | `features/search` component | （改訂）検索モーダルのパスを、選ばれた段階で 1 行描画する | 1, 2, 3, 4 | `formatTruncatedPagePath`（P0）, `useFittingCollapseLevel`（P0） | State |
+| `SearchResultAncestorPath` | `features/search` component | 検索結果一覧の祖先パス部分を 1 行・リンク付き・ハイライト付きで描画する | 1, 2, 3, 4, 5, 6 | `buildAncestorPathNodes`（P0）, `usePathCollapseLevel`（P0） | State |
+| `SearchResultPagePath` | `features/search` component | （改訂）検索モーダルのパスを、選ばれた段階で 1 行描画する | 1, 2, 3, 4 | `formatTruncatedPagePath`（P0）, `usePathCollapseLevel`（P0） | State |
 | `PageListItemL` | `client/components/PageList` | オプトイン prop に応じて祖先パス描画先を切り替え、`evalDatePath` を統一する | 7, 8, 9 | `alignHighlightedPathSegments`（P0）, `PagePathHierarchicalLink`（P0, 既存） | State |
 
 ### Shared Util
@@ -339,7 +340,6 @@ export type AncestorPathNode =
 export interface AncestorPathPlan {
   readonly nodes: readonly AncestorPathNode[];
   readonly fullPath: string; // ページ名を含む完全パス。ホバー用
-  readonly maxCollapseLevel: number; // （改訂）formatTruncatedPagePath と同じ値
 }
 
 export const buildAncestorPathNodes: (
@@ -348,7 +348,7 @@ export const buildAncestorPathNodes: (
   collapseLevel?: number, // （改訂）formatTruncatedPagePath にそのまま渡す。既定 0
 ) => AncestorPathPlan;
 ```
-- （改訂）`AncestorPathPlan` は `maxCollapseLevel` も返す。ただし `SearchResultAncestorPath` は段階を決める前に最大段階が要るため、計画より軽い `formatTruncatedPagePath(path).maxCollapseLevel` から取る（検索モーダルと同じ取り方）。
+- （改訂）最大段階は計画には含めない。段階を決める前に必要なので、両画面とも `usePathCollapseLevel` が `formatTruncatedPagePath(path).maxCollapseLevel` から求める。
 - Preconditions: `path` は対象ページの完全パス。`highlightedPath` は Elasticsearch のハイライト markup を含む文字列、または未取得時は `null`/`undefined`。
 - Postconditions: `nodes` の `link` 要素の順序は root→leaf。`ellipsis` は高々 1 件、リンクを持たない。
 - Invariants: `path` と `collapseLevel` が変わらない限り `nodes` の件数・順序は不変（ハイライトの有無は `highlightedHtml` の有無にのみ影響する）。
@@ -364,10 +364,10 @@ export const buildAncestorPathNodes: (
 
 **Responsibilities & Constraints**
 - 描画後・表示前に溢れを確認し、溢れていれば段階を 1 つ上げて描画し直す（System Flows「畳み込み段階の選択」）。
-- コンテナの幅の変化を `useResizeObserver` で検知する。広がったら段階 0 から、狭まったら現在の段階から判定し直す。パス（`resetKey`）が変わったら段階 0 に戻す。
-- 段階の意味（何をどう畳むか）は持たない。`maxCollapseLevel` は呼び出し側が `formatTruncatedPagePath` / `buildAncestorPathNodes` の結果から渡す。
+- コンテナの幅の変化を `useResizeObserver` で検知する。広がったら段階 0 から、狭まったら現在の段階から判定し直す。`resetKey` が変わったら段階 0 に戻す。
+- 段階の意味（何をどう畳むか）は持たない。両画面は `usePathCollapseLevel(path, highlightedPath?)` 経由で使い、これが最大段階を求め、パスとハイライトを `resetKey` にする（ハイライトは太字で幅が変わるため、同じページでもハイライトが変われば基本形から判定し直す）。
 - ResizeObserver の無い環境では幅の変化を検知しないだけで、初回の判定は行う。
-- 監視開始直後の最初の通知は「幅の変化」として扱わない（全行が判定をやり直さないため）。
+- 幅の変化は「段階を決めたときのコンテナ幅」と比べて判断する。同じ幅の通知（監視開始直後の通知を含む）は無視し、全行が判定をやり直さないようにする。段階を決めてから監視が始まるまでの間に幅が変わっていても取りこぼさない（レビューで発覚）。
 - **呼び出し側の前提**: `containerRef` を付ける要素の幅は、中身ではなく親が与える使用可能幅で決まること（現状は両画面とも親の `flex-grow-1` ＋ `min-width: 0` で成立）。中身の幅で決まると、畳んだ後に幅が広がっても検知できず、畳んだままになる。
 
 **Contracts**: State [x]
@@ -383,7 +383,7 @@ export interface FittingCollapseLevel {
 
 export const useFittingCollapseLevel: (
   maxCollapseLevel: number,
-  resetKey: string, // 通常はページパス
+  resetKey: string, // 描画内容の幅が変わりうるもの（パス・ハイライト）から作る
 ) => FittingCollapseLevel;
 ```
 
@@ -445,7 +445,7 @@ export const useFittingCollapseLevel: (
 
 パス文字列は常にサーバーから取得済みのページデータに由来し、ユーザー入力の直接検証は不要。唯一のフォールバックは、ハイライトとプレーンパスの対応が検証できないセグメントをプレーンテキストで表示することであり、例外を投げず表示劣化のみで継続する。
 
-（改訂）ページ名行はハイライトがあるとき HTML として埋め込まれるため、`buildHighlightedPageName` はハイライトがあればフォールバックのページ名を HTML エスケープして返し、無ければプレーンテキストとして返す（呼び出し側の HTML / テキストの切り替え条件と一致させる）。プレーンパスはサーバー側のハイライトと違ってサニタイズされておらず、取り込み済みの古いページなどは `<` を含みうるため（レビューで発覚した XSS）。
+（改訂）ページ名行はハイライトがあるとき HTML として埋め込まれるため、`buildHighlightedPageName` はハイライトがあれば、ハイライトを含まない部分（フォールバックのページ名や、`<em>` を含まないセグメント）を HTML エスケープして返し、無ければプレーンテキストとして返す（呼び出し側の HTML / テキストの切り替え条件と一致させる）。プレーンパスはサーバー側のハイライトと違ってサニタイズされておらず、取り込み済みの古いページなどは `<` を含みうるため（レビューで発覚した XSS）。
 
 ## Testing Strategy
 
