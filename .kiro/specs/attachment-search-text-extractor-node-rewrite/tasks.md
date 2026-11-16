@@ -309,14 +309,14 @@
   - brief.md の Follow-ups の一覧 (steering の `structure.md` と `tech.md`、root の `AGENTS.md` と `project-structure.md`、umbrella と下流 spec に残る Python や古いパスの記述) を示し、どれを直すかをユーザーに諮る
   - ユーザーの判断が記録されている: すべて直す (2026-11-12)。`services/attachment-text-extractor/CLAUDE.md` は 8.2 でディレクトリごと消えたので、残りの 5 つが対象
   - _Requirements: 12.6_
-- [ ] 9.2 対象 spec の requirements.md と design.md を書き直す
+- [x] 9.2 対象 spec の requirements.md と design.md を書き直す
   - 対象 spec の design.md を、Node 版が最初からそうだったように書き直す (実行基盤、層の分け方の判断、子プロセスの作り方、`WORKERS` の無い設定の表とメモリの目安、`/readyz` の `dependencies`、Revalidation Triggers、下げた既定値があればその値)。以前の Python 版の経緯は本文に残さない
   - 対象 spec の design.md の配布物と CI の記述を、この spec の Req 8 と Req 9 の中身 (Node 版の Dockerfile、compose、運用者向けの文書 `docker/README.md`、CI) に合わせて書き直す
   - 対象 spec が k8s の manifest の例を成果物としている記述を、同じ形に書き直す (research.md 7.9): requirements.md の Scope の「k8s manifest 例」の項目、AC 3.3 (推奨設定を「提供する」先を、manifest の例ではなく運用者向けの文書にする。番号は変えない)、配布物を確かめていないことを書いた注記、design.md の Out of Boundary と配布物の記述 (`deploy/k8s/` の例)
   - 対象 spec の requirements.md は、既存の番号 (Req 1〜4、AC 1.1〜4.2) を変えない。brief.md の「Port-back の前提」の番号の対応 (この spec の Req 4 → 対象 spec の Req 5、Req 5 → Req 6、Req 7 → Req 7。AC の番号は新しい要件の中でそのまま使う) に従って、対象 spec の末尾に追加する。崩した契約に当たる AC があれば、番号を変えずに文言だけを直す
   - 書き直した 2 つの文書に「Python」「FastAPI」「forkserver」などの経緯の言葉が残っていない (Node 版の判断の根拠として要るものを除く)
   - _Requirements: 1.12, 12.1, 12.2_
-- [ ] 9.3 設計の根拠を対象 spec の research.md に移す
+- [x] 9.3 設計の根拠を対象 spec の research.md に移す
   - この spec の research.md の計測の結果、試作の決定と理由、ベンチマークの結果、崩した契約の記録 (7 節) を、対象 spec の research.md に移す。Node 版で意味を失った Python に固有の知見は消し、まだ判断の材料になるもの (別コンテナで動かす理由など) は残す
   - この spec のディレクトリを消しても失われる根拠が無いことを確かめる
   - _Requirements: 12.3_
