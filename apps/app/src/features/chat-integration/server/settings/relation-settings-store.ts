@@ -9,7 +9,7 @@ import mongoose from 'mongoose';
 import { ChatRelation } from '../models/chat-relation';
 import {
   toStoredAllowedChannels,
-  toWireAllowedChannels,
+  toWireChannelPermission,
 } from './allowed-channels';
 import { ChatChannelPermission } from './models/chat-channel-permission';
 
@@ -38,10 +38,7 @@ export const readRelationSettings = async (
 
   const rows = await ChatChannelPermission.find({ relationId }).lean();
   const channelPermissions: RelationSettings['channelPermissions'] = rows.map(
-    (row) => ({
-      commandName: row.commandName,
-      allowedChannels: toWireAllowedChannels(row),
-    }),
+    toWireChannelPermission,
   );
 
   return {
@@ -112,6 +109,9 @@ export const writeRelationSettings = async (
           relationId,
           commandName: permission.commandName,
           ...toStoredAllowedChannels(permission.allowedChannels),
+          ...(permission.allowedInDirectMessage === undefined
+            ? {}
+            : { allowedInDirectMessage: permission.allowedInDirectMessage }),
         })),
         { session },
       );

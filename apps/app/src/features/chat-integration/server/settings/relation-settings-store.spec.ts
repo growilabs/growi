@@ -99,6 +99,52 @@ describe('relation-settings-store', () => {
     );
   });
 
+  it('round-trips the direct-message permission of an agent row, and leaves it off rows that never set it', async () => {
+    await writeRelationSettings(RELATION_ID, [
+      {
+        commandName: 'agent',
+        allowedChannels: 'none',
+        allowedInDirectMessage: true,
+      },
+      { commandName: 'search', allowedChannels: 'all' },
+    ]);
+
+    const read = await readRelationSettings(RELATION_ID);
+    expect(read?.settings.channelPermissions).toEqual(
+      expect.arrayContaining([
+        {
+          commandName: 'agent',
+          allowedChannels: 'none',
+          allowedInDirectMessage: true,
+        },
+        { commandName: 'search', allowedChannels: 'all' },
+      ]),
+    );
+    const search = read?.settings.channelPermissions.find(
+      (p) => p.commandName === 'search',
+    );
+    expect(search).not.toHaveProperty('allowedInDirectMessage');
+  });
+
+  it('reads an explicit false back as false, not as missing', async () => {
+    await writeRelationSettings(RELATION_ID, [
+      {
+        commandName: 'agent',
+        allowedChannels: 'all',
+        allowedInDirectMessage: false,
+      },
+    ]);
+
+    const read = await readRelationSettings(RELATION_ID);
+    expect(read?.settings.channelPermissions).toEqual([
+      {
+        commandName: 'agent',
+        allowedChannels: 'all',
+        allowedInDirectMessage: false,
+      },
+    ]);
+  });
+
   it('increments the version once per save, never by more', async () => {
     await writeRelationSettings(RELATION_ID, []);
     await writeRelationSettings(RELATION_ID, []);

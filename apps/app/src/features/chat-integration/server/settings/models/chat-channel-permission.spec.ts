@@ -8,6 +8,7 @@ describe('ChatChannelPermission schema', () => {
     'commandName',
     'channelScope',
     'allowedChannels',
+    'allowedInDirectMessage',
   ] as const;
 
   it.each(allFields)('declares field "%s"', (field) => {
@@ -61,6 +62,14 @@ describe('ChatChannelPermission schema', () => {
       const error = build({ channelScope: 'everything' }).validateSync();
       expect(error?.errors.channelScope).toBeDefined();
     });
+  });
+
+  it('leaves allowedInDirectMessage unset on a row that never set it', () => {
+    const row = new ChatChannelPermission({
+      relationId: 'relation-under-test',
+      commandName: 'search',
+    });
+    expect(row.allowedInDirectMessage).toBeUndefined();
   });
 
   it('uses collection name chat_channel_permissions', () => {

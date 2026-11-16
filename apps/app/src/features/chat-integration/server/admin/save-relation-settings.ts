@@ -25,6 +25,7 @@
 
 import {
   COMMAND_NAMES,
+  COMMAND_TRAITS,
   type CommandName,
   type NativeChannelId,
   parseNativeChannelId,
@@ -131,6 +132,40 @@ const parseAllowedChannels = (
   return { ok: true, allowedChannels: ids };
 };
 
+type ParsedAllowedInDirectMessage =
+  | {
+      readonly ok: true;
+      readonly value: { readonly allowedInDirectMessage?: boolean };
+    }
+  | { readonly ok: false; readonly detail: string };
+
+/**
+ * The flag is meaningful only for a command that decides direct messages by
+ * its own setting (Requirement 11.7). Accepting it elsewhere would store a
+ * value no reader looks at, so it is refused rather than silently dropped.
+ */
+const parseAllowedInDirectMessage = (
+  commandName: CommandName,
+  value: unknown,
+): ParsedAllowedInDirectMessage => {
+  if (value === undefined) {
+    return { ok: true, value: {} };
+  }
+  if (typeof value !== 'boolean') {
+    return {
+      ok: false,
+      detail: `invalid allowedInDirectMessage for '${commandName}': must be a boolean`,
+    };
+  }
+  if (COMMAND_TRAITS[commandName].directMessagePolicy !== 'separate-flag') {
+    return {
+      ok: false,
+      detail: `'${commandName}' has no separate direct-message setting, so allowedInDirectMessage must be omitted`,
+    };
+  }
+  return { ok: true, value: { allowedInDirectMessage: value } };
+};
+
 type ParsedChannelPermissions =
   | {
       readonly ok: true;
@@ -177,10 +212,19 @@ const parseChannelPermissions = (raw: unknown): ParsedChannelPermissions => {
       return allowed;
     }
 
+    const directMessage = parseAllowedInDirectMessage(
+      commandName as CommandName,
+      row.allowedInDirectMessage,
+    );
+    if (!directMessage.ok) {
+      return directMessage;
+    }
+
     seen.add(commandName as CommandName);
     parsed.push({
       commandName: commandName as CommandName,
       allowedChannels: allowed.allowedChannels,
+      ...directMessage.value,
     });
   }
 

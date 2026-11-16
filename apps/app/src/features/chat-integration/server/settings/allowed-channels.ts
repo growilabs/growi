@@ -46,6 +46,20 @@ export const toStoredAllowedChannels = (
   return { channelScope: 'listed', allowedChannels: [...wire] };
 };
 
+/** One stored row as the wire's `channelPermissions[]` entry. */
+export const toWireChannelPermission = (
+  row: Pick<IChatChannelPermission, 'commandName'> &
+    Parameters<typeof toWireAllowedChannels>[0] & {
+      readonly allowedInDirectMessage?: boolean | null;
+    },
+): RelationSettings['channelPermissions'][number] => ({
+  commandName: row.commandName,
+  allowedChannels: toWireAllowedChannels(row),
+  ...(typeof row.allowedInDirectMessage === 'boolean'
+    ? { allowedInDirectMessage: row.allowedInDirectMessage }
+    : {}),
+});
+
 export const toWireAllowedChannels = (stored: {
   // Optional because a row written before `channelScope` existed has no
   // value for it; `'listed'` is the reading that preserves its meaning.

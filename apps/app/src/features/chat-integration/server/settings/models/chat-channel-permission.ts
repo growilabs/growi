@@ -37,6 +37,12 @@ export interface IChatChannelPermission {
    * no separate platform field is needed per channel entry.
    */
   allowedChannels: string[];
+  /**
+   * The separate direct-message permission of a command whose
+   * `directMessagePolicy` is 'separate-flag'. Absent on every other row, and
+   * absent means "not allowed in a DM" (Requirement 11.7).
+   */
+  allowedInDirectMessage?: boolean;
 }
 
 export interface ChatChannelPermissionDocument
@@ -62,6 +68,8 @@ const chatChannelPermissionSchema = new Schema<
       default: 'listed',
     },
     allowedChannels: { type: [String], required: true, default: [] },
+    // No default: only rows that were saved with the flag carry it.
+    allowedInDirectMessage: { type: Boolean },
   },
   {
     collection: 'chat_channel_permissions',

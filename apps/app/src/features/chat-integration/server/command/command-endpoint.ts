@@ -73,7 +73,7 @@ import {
   type ViewerFilterActor,
 } from '../content';
 import { ChatProcessedRequest } from '../models/chat-processed-request';
-import { toWireAllowedChannels } from '../settings/allowed-channels';
+import { toWireChannelPermission } from '../settings/allowed-channels';
 import { ChatChannelPermission } from '../settings/models/chat-channel-permission';
 import {
   type ResolvedActor,
@@ -185,14 +185,7 @@ const checkChannelPermission = async (
 
   const settings: RelationSettings = {
     relationId: request.relationId,
-    channelPermissions: rows.map((row) => ({
-      commandName: row.commandName,
-      // Read through the shared translation, never straight off the row:
-      // 'all'/'none' are stored as a scope with an empty channel list, so
-      // taking `allowedChannels` at face value would turn "allowed
-      // everywhere" into "allowed nowhere".
-      allowedChannels: toWireAllowedChannels(row),
-    })),
+    channelPermissions: rows.map(toWireChannelPermission),
   };
 
   return judge(settings, request.kind, request.channel);

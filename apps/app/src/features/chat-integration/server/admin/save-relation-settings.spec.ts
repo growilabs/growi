@@ -131,6 +131,43 @@ describe('saveRelationSettings', () => {
     });
   });
 
+  it('carries the direct-message permission into the push and the stored rows', async () => {
+    await saveRelationSettings(RELATION_ID, [
+      {
+        commandName: 'agent',
+        allowedChannels: 'none',
+        allowedInDirectMessage: true,
+      },
+      { commandName: 'search', allowedChannels: 'all' },
+    ]);
+
+    expect(proxyClient.pushSettings).toHaveBeenCalledWith(RELATION_ID, {
+      version: INITIAL_VERSION + 1,
+      settings: {
+        relationId: RELATION_ID,
+        channelPermissions: [
+          {
+            commandName: 'agent',
+            allowedChannels: 'none',
+            allowedInDirectMessage: true,
+          },
+          { commandName: 'search', allowedChannels: 'all' },
+        ],
+      },
+    });
+    expect(
+      (await readRelationSettings(RELATION_ID))?.settings.channelPermissions,
+    ).toEqual(
+      expect.arrayContaining([
+        {
+          commandName: 'agent',
+          allowedChannels: 'none',
+          allowedInDirectMessage: true,
+        },
+      ]),
+    );
+  });
+
   it("keeps the save when the push is refused -- the proxy's settings-pull picks it up later", async () => {
     vi.mocked(proxyClient.pushSettings).mockResolvedValue({
       ok: false,
@@ -241,6 +278,51 @@ describe('saveRelationSettings', () => {
       expect((await runHelp('req-after-listed')).kind).toBe('help');
     });
 
+    describe('an agent request in a direct message', () => {
+      const agentDm = (requestId: string): CommandRequest => ({
+        relationId: RELATION_ID,
+        op: 'command',
+        requestId,
+        actor: {
+          platform: 'slack',
+          accountId: 'U0ACCOUNT',
+          displayName: 'Chatty Person',
+        },
+        channel: { ...CHANNEL, isPrivate: true, isDirectMessage: true },
+        kind: 'agent',
+        text: 'hello',
+        conversationKey: 'slack:C0GENERAL:1',
+      });
+
+      const runAgentDm = (requestId: string) =>
+        createCommandEndpoint(mock<Crowi>()).handle(agentDm(requestId));
+
+      it('is judged by the saved direct-message permission alone, even when every channel is allowed', async () => {
+        await saveRelationSettings(RELATION_ID, [
+          {
+            commandName: 'agent',
+            allowedChannels: 'all',
+            allowedInDirectMessage: false,
+          },
+        ]);
+        expect(await runAgentDm('dm-off')).toMatchObject({
+          kind: 'error',
+          code: 'not-permitted-in-channel',
+        });
+
+        await saveRelationSettings(RELATION_ID, [
+          {
+            commandName: 'agent',
+            allowedChannels: 'none',
+            allowedInDirectMessage: true,
+          },
+        ]);
+        expect(await runAgentDm('dm-on')).not.toMatchObject({
+          code: 'not-permitted-in-channel',
+        });
+      });
+    });
+
     it('judges a command from the service-native channel id as permitted once an administrator listed that id', async () => {
       const nativeId = toNativeChannelId('C0CBFQ5558V');
       await saveRelationSettings(RELATION_ID, [
@@ -314,6 +396,36 @@ describe('saveRelationSettings', () => {
       [
         'a channel id that is not a string',
         [{ commandName: 'search', allowedChannels: [42] }],
+      ],
+      [
+        'a direct-message permission that is not a boolean',
+        [
+          {
+            commandName: 'agent',
+            allowedChannels: 'all',
+            allowedInDirectMessage: 'yes',
+          },
+        ],
+      ],
+      [
+        'a direct-message permission on a command that has no separate direct-message setting',
+        [
+          {
+            commandName: 'search',
+            allowedChannels: 'all',
+            allowedInDirectMessage: true,
+          },
+        ],
+      ],
+      [
+        'a false direct-message permission on a command that has no separate setting',
+        [
+          {
+            commandName: 'search',
+            allowedChannels: 'all',
+            allowedInDirectMessage: false,
+          },
+        ],
       ],
       [
         'two rows for the same command',
