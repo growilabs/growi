@@ -88,13 +88,20 @@ export const buildHighlightedPageName = (
     return devided.latter;
   }
 
-  const pageNameSegmentCount = toSegments(devided.latter, '/').length;
+  const plainSegments = toSegments(devided.latter, '/');
   const pageNameSegments = alignHighlightedPathSegments(
     path,
     highlightedPath,
-  ).slice(-pageNameSegmentCount);
+  ).slice(-plainSegments.length);
 
-  return pageNameSegments.every((segment) => segment != null)
-    ? pageNameSegments.join('/')
-    : escapeHtml(devided.latter);
+  if (!pageNameSegments.every((segment) => segment != null)) {
+    return escapeHtml(devided.latter);
+  }
+  // A segment equal to its plain text carries no highlight and is still plain
+  // text (possibly with `&` or entity-like sequences), so escape it too.
+  return pageNameSegments
+    .map((segment, index) =>
+      segment === plainSegments[index] ? escapeHtml(segment) : segment,
+    )
+    .join('/');
 };

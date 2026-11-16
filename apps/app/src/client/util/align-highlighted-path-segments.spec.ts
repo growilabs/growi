@@ -121,6 +121,14 @@ describe('buildHighlightedPageName', () => {
       ).toBe('&lt;img src=x onerror=alert(1)&gt;');
     });
 
+    it('escapes a page name that carries no highlight of its own (only an ancestor is highlighted)', () => {
+      // The server leaves "&lt;" as is, so the segment equals the plain text
+      // and would otherwise be injected unescaped.
+      expect(buildHighlightedPageName('/A/x&lt;y', `/${em('A')}/x&lt;y`)).toBe(
+        'x&amp;lt;y',
+      );
+    });
+
     it('escapes "&" and quotes in the fallback page name', () => {
       expect(
         buildHighlightedPageName(`/A/B/Q&A "it's"`, `/A/${em('B/Q')}&A`),
