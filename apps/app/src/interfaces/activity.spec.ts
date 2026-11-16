@@ -1,8 +1,11 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
+import type { ReviewChannel } from '~/features/change-proposal/interfaces';
+
 import type {
   AttachmentRemoveSnapshot,
   AttachmentSnapshot,
+  ChangeProposalReviewSnapshot,
   DefaultSnapshot,
   IActivity,
   ISnapshot,
@@ -20,6 +23,7 @@ import {
   isAttachmentDownloadActivity,
   isAttachmentRemoveActivity,
   isAuditlogSuggestionField,
+  isChangeProposalReviewActivity,
   MODEL_ATTACHMENT,
   SupportedAction,
   SupportedTargetModel,
@@ -576,15 +580,143 @@ describe('Change Proposal activity declarations', () => {
     );
   });
 
-  it('groups the three CHANGE_PROPOSAL_ actions into their own category without capturing the admin action', () => {
+  it('groups the CHANGE_PROPOSAL_ actions into their own category without capturing the admin action', () => {
     expect([...ChangeProposalActions].sort()).toEqual([
+      'CHANGE_PROPOSAL_ABSTAIN',
       'CHANGE_PROPOSAL_APPLY',
+      'CHANGE_PROPOSAL_APPROVE',
       'CHANGE_PROPOSAL_CREATE',
+      'CHANGE_PROPOSAL_REJECT',
       'CHANGE_PROPOSAL_REVERT',
+      'CHANGE_PROPOSAL_REVIEWER_ADD',
+      'CHANGE_PROPOSAL_REVIEWER_REMOVE',
+      'CHANGE_PROPOSAL_REVIEW_REQUEST',
+      'CHANGE_PROPOSAL_REVIEW_RESULT',
     ]);
   });
 
   it('keeps the admin settings action in the Admin category', () => {
     expect(AdminActions).toContain('ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE');
+  });
+});
+
+describe('Change Proposal review activity declarations', () => {
+  const reviewActions = [
+    'CHANGE_PROPOSAL_APPROVE',
+    'CHANGE_PROPOSAL_REJECT',
+    'CHANGE_PROPOSAL_ABSTAIN',
+    'CHANGE_PROPOSAL_REVIEWER_ADD',
+    'CHANGE_PROPOSAL_REVIEWER_REMOVE',
+  ];
+  const notificationActions = [
+    'CHANGE_PROPOSAL_REVIEW_REQUEST',
+    'CHANGE_PROPOSAL_REVIEW_RESULT',
+  ];
+
+  it('Reviewers Req 6.8/6.10 — declares the five review actions with their literal values', () => {
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE).toBe(
+      'CHANGE_PROPOSAL_APPROVE',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT).toBe(
+      'CHANGE_PROPOSAL_REJECT',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN).toBe(
+      'CHANGE_PROPOSAL_ABSTAIN',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD).toBe(
+      'CHANGE_PROPOSAL_REVIEWER_ADD',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE).toBe(
+      'CHANGE_PROPOSAL_REVIEWER_REMOVE',
+    );
+  });
+
+  it('Reviewers Req 6.8/6.10 — records the review actions regardless of audit log settings and lists them in the audit log groups', () => {
+    for (const action of reviewActions) {
+      expect(AllEssentialActions).toContain(action);
+      expect(AllMediumGroupActions).toContain(action);
+      expect(AllLargeGroupActions).toContain(action);
+      expect(AllSmallGroupActions).not.toContain(action);
+    }
+  });
+
+  it('declares the two notification actions so in-app notifications accept them, without recording them as activities', () => {
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST).toBe(
+      'CHANGE_PROPOSAL_REVIEW_REQUEST',
+    );
+    expect(SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT).toBe(
+      'CHANGE_PROPOSAL_REVIEW_RESULT',
+    );
+    for (const action of notificationActions) {
+      expect(AllSupportedActions).toContain(action);
+      expect(AllEssentialActions).not.toContain(action);
+      expect(AllMediumGroupActions).not.toContain(action);
+    }
+  });
+});
+
+describe('isChangeProposalReviewActivity', () => {
+  it('Reviewers Req 6.8 — narrows a review activity so reviewChannel is readable', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
+      snapshot: { username: 'alice', reviewChannel: 'api' },
+    };
+
+    if (!isChangeProposalReviewActivity(activity)) {
+      expect.unreachable('an APPROVE activity must match the guard');
+    }
+    // Reading reviewChannel only compiles after narrowing
+    expect(activity.snapshot?.reviewChannel).toBe('api');
+    expect(activity.snapshot?.username).toBe('alice');
+  });
+
+  it('Reviewers Req 6.8/6.10 — matches every one of the five review actions', () => {
+    for (const action of [
+      SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE,
+    ]) {
+      expect(isChangeProposalReviewActivity({ action })).toBe(true);
+    }
+  });
+
+  it('rejects the other change proposal actions and the notification actions', () => {
+    for (const action of [
+      SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REVERT,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST,
+      SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
+    ]) {
+      expect(isChangeProposalReviewActivity({ action })).toBe(false);
+    }
+  });
+
+  it('rejects other actions even when the snapshot carries a reviewChannel-shaped field', () => {
+    const activity: Pick<IActivity, 'action' | 'snapshot'> = {
+      action: SupportedAction.ACTION_ATTACHMENT_REMOVE,
+      snapshot: { username: 'alice', reviewChannel: 'ui' },
+    };
+
+    expect(isChangeProposalReviewActivity(activity)).toBe(false);
+  });
+});
+
+describe('ChangeProposalReviewSnapshot type', () => {
+  it('Reviewers Req 6.8 — carries an optional username and an optional review channel', () => {
+    expectTypeOf<ChangeProposalReviewSnapshot>().toEqualTypeOf<{
+      username?: string;
+      reviewChannel?: ReviewChannel;
+    }>();
+  });
+
+  it('is a member of the ISnapshot union without exposing reviewChannel on the unnarrowed union', () => {
+    const snapshot: ChangeProposalReviewSnapshot = { reviewChannel: 'ai-tool' };
+    const asUnion: ISnapshot = snapshot;
+
+    expect(asUnion).toBe(snapshot);
+    expectTypeOf<ISnapshot>().not.toHaveProperty('reviewChannel');
   });
 });

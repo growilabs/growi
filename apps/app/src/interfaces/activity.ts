@@ -1,5 +1,7 @@
 import type { HasObjectId, IUser, IUserHasId, Ref } from '@growi/core';
 
+import type { ReviewChannel } from '~/features/change-proposal/interfaces';
+
 import type { PaginateResult } from './mongoose-utils';
 
 // Model
@@ -104,6 +106,15 @@ const ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH = 'ADMIN_AI_MODEL_CATALOG_REFRESH';
 const ACTION_CHANGE_PROPOSAL_CREATE = 'CHANGE_PROPOSAL_CREATE';
 const ACTION_CHANGE_PROPOSAL_APPLY = 'CHANGE_PROPOSAL_APPLY';
 const ACTION_CHANGE_PROPOSAL_REVERT = 'CHANGE_PROPOSAL_REVERT';
+const ACTION_CHANGE_PROPOSAL_APPROVE = 'CHANGE_PROPOSAL_APPROVE';
+const ACTION_CHANGE_PROPOSAL_REJECT = 'CHANGE_PROPOSAL_REJECT';
+const ACTION_CHANGE_PROPOSAL_ABSTAIN = 'CHANGE_PROPOSAL_ABSTAIN';
+const ACTION_CHANGE_PROPOSAL_REVIEWER_ADD = 'CHANGE_PROPOSAL_REVIEWER_ADD';
+const ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE =
+  'CHANGE_PROPOSAL_REVIEWER_REMOVE';
+// In-app notification actions only; never recorded as activities
+const ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST = 'CHANGE_PROPOSAL_REVIEW_REQUEST';
+const ACTION_CHANGE_PROPOSAL_REVIEW_RESULT = 'CHANGE_PROPOSAL_REVIEW_RESULT';
 const ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE =
   'ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE';
 const ACTION_ADMIN_SITE_URL_UPDATE = 'ADMIN_SITE_URL_UPDATE';
@@ -364,6 +375,13 @@ export const SupportedAction = {
   ACTION_CHANGE_PROPOSAL_CREATE,
   ACTION_CHANGE_PROPOSAL_APPLY,
   ACTION_CHANGE_PROPOSAL_REVERT,
+  ACTION_CHANGE_PROPOSAL_APPROVE,
+  ACTION_CHANGE_PROPOSAL_REJECT,
+  ACTION_CHANGE_PROPOSAL_ABSTAIN,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE,
+  ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST,
+  ACTION_CHANGE_PROPOSAL_REVIEW_RESULT,
   ACTION_ADMIN_CHANGE_PROPOSAL_SETTINGS_UPDATE,
   ACTION_ADMIN_SITE_URL_UPDATE,
   ACTION_ADMIN_MAIL_SMTP_UPDATE,
@@ -523,6 +541,11 @@ export const EssentialActionGroup = {
   ACTION_AUDIT_LOG_BULK_EXPORT_NO_RESULTS,
   ACTION_CHANGE_PROPOSAL_APPLY,
   ACTION_CHANGE_PROPOSAL_REVERT,
+  ACTION_CHANGE_PROPOSAL_APPROVE,
+  ACTION_CHANGE_PROPOSAL_REJECT,
+  ACTION_CHANGE_PROPOSAL_ABSTAIN,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE,
 } as const;
 
 export const ActionGroupSize = {
@@ -599,6 +622,11 @@ export const MediumActionGroup = {
   ACTION_CHANGE_PROPOSAL_CREATE,
   ACTION_CHANGE_PROPOSAL_APPLY,
   ACTION_CHANGE_PROPOSAL_REVERT,
+  ACTION_CHANGE_PROPOSAL_APPROVE,
+  ACTION_CHANGE_PROPOSAL_REJECT,
+  ACTION_CHANGE_PROPOSAL_ABSTAIN,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+  ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE,
 } as const;
 
 // MediumActionGroup + All Actions by Admin Users - PAGE_VIEW
@@ -826,11 +854,24 @@ export type AttachmentSnapshot = {
 export type AttachmentRemoveSnapshot = AttachmentSnapshot;
 
 /**
+ * Snapshot variant for the change proposal review activities (approve /
+ * reject / abstain / reviewer add / reviewer remove), carrying where the
+ * request came from.
+ */
+export type ChangeProposalReviewSnapshot = {
+  username?: string;
+  reviewChannel?: ReviewChannel;
+};
+
+/**
  * Discriminated union of snapshot shapes. The discriminant is the activity's
  * existing `action` field (see the isAttachment*Activity guards); snapshots
  * carry no discriminator field of their own.
  */
-export type ISnapshot = DefaultSnapshot | AttachmentSnapshot;
+export type ISnapshot =
+  | DefaultSnapshot
+  | AttachmentSnapshot
+  | ChangeProposalReviewSnapshot;
 
 export type IActivity = {
   user?: Ref<IUser>;
@@ -875,6 +916,26 @@ export const isAttachmentDownloadActivity = (
 ): activity is Pick<IActivity, 'action' | 'snapshot'> & {
   snapshot?: AttachmentSnapshot;
 } => activity.action === SupportedAction.ACTION_ATTACHMENT_DOWNLOAD;
+
+const CHANGE_PROPOSAL_REVIEW_ACTIONS: ReadonlySet<SupportedActionType> =
+  new Set([
+    SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE,
+    SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+    SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN,
+    SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD,
+    SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE,
+  ]);
+
+/**
+ * Narrows a change proposal review activity's snapshot to
+ * ChangeProposalReviewSnapshot. Same pattern as isAttachmentRemoveActivity:
+ * `action` is the sole discriminant.
+ */
+export const isChangeProposalReviewActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: ChangeProposalReviewSnapshot;
+} => CHANGE_PROPOSAL_REVIEW_ACTIONS.has(activity.action);
 
 export type IActivityHasId = IActivity & HasObjectId;
 

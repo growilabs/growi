@@ -41,7 +41,7 @@
   - これは、公開の順序（Boundary Context）を守るための設定で、承認者を指定する作成（1.1）を受け付ける条件になる
   - _Requirements: 1.1_
   - _Boundary: config-definition, settings_
-- [ ] 1.5 activity の action と snapshot の型を足す（共有の仕組みの変更）
+- [x] 1.5 activity の action と snapshot の型を足す（共有の仕組みの変更）
   - 承認・却下・放棄・承認者の追加・承認者の削除の 5 つの action と、通知の 2 つの action を、`SupportedAction` と、activity の action の各一覧（監査ログの設定にかかわらず記録する一覧、中程度の一覧）に足す。`admin.json` の 5 言語に、これらの表示名を足す
   - snapshot の型に、経路の項目つきの新しい型と type guard を足す（型と guard は共有の `interfaces/activity.ts`。snapshot を作る処理は、1.5 では作らず、5.2 で作る）
   - activity を実際に保存する経路（`createByParameters`）の snapshot の組み立てに、経路の項目を足し、受ける型を広げる。更新の経路（`updateByParameters` の `buildSnapshotUpdateEnvelope`）にも、同じ項目を足す
@@ -260,3 +260,7 @@
 - 1.2: 統合テストの索引の完全一致は、CI の雛形 DB（すべての migration を当てたもの）で新しい索引が入ると落ちる。今後 `changeproposals` の索引を足すときも、`20261110120000-add-change-proposal-indexes.integ.ts` は名前の包含で確かめる形のままにする。
 - 1.3: 承認日時を消す 3 か所（`toOutcomeData` の pending、`skipPendingOperations`、`closeIfStillOpen`）は、共通の `UNSET_APPROVAL`（`change-proposal-query-parts.ts`。approvedAt・approvedBy・approvedChannel・decisionToken を `{ unset: true }` で消す）を使う。3.x の承認の書き込みで項目を足すときも、この定義を一緒に直す。`createProposal` は、reviewers（入力 ?? `[]`）と `reviews: []` と purpose を常に渡し、`CreateProposalInput` に `purpose?` と `reviewers?: readonly ReviewerRef[]`（`addedBy` と `addedAt` つき）を足した。3.3 は `ReviewerInput` からこの形を組み立てて渡す。`ChangeProposalDocument` の `reviewers` と `reviews` は必須。
 - 1.4: 機能の切り替えは `readChangeProposalSettings().isReviewersEnabled` で読む。`env:useOnlyEnvVars:changeProposal` の targetKeys には足していない（その一覧は管理画面で編集する項目だけを並べる。管理画面の項目は作らない）。
+- 1.5: 通知の 2 つの action（`ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST` / `_REVIEW_RESULT`）は `SupportedAction` だけに入れた（Essential と Medium には入れない。design 167 行）。判断と承認者の 5 つは Essential と Medium に入っている。`createByParameters` と `buildSnapshotUpdateEnvelope` は、snapshot の項目を手で並べている。`ISnapshot` に新しい variant を足すときは、この 2 か所と `PersistableSnapshotFields`（`server/models/activity.ts`）も直す。
+- 1.5: 7.2（OpenAPI）で、`/activity` の GET の応答の `snapshot` の定義（`server/routes/apiv3/activity.ts` の 131〜170 行付近）に `reviewChannel` を足す。応答には出るが、今は仕様に書かれていない。
+- 1.5: 「監査ログの設定にかかわらず記録する」（6.8 / 6.10）は、今は一覧に入っていることで確かめている。設定を切った状態で実際に保存されることは、5.2 か 9.1 の結合テストで確かめる。
+- 1.5: `REVIEW_RESULT` の中国語（审阅结果）とフランス語（examen）は、8.1 で「判断」の共通の訳語を決めるときに、そろえるかを見直す。
