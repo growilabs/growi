@@ -96,7 +96,7 @@
   - 溢れの状態はタスク 7 のテスト用ヘルパーで与える（フック自体はモックしない）
   - _Boundary: SearchResultAncestorPath_
 
-- [ ] 10. Validation: 実機確認と回帰確認
+- [x] 10. Validation: 実機確認と回帰確認
   - dev server で検索モーダルと `/_search` を開き、モーダル・ウィンドウ幅を変えながら、表記が `/…/` だけに揃うこと、`//` が出ないこと、親が最後まで残ること、幅を戻すと畳んだ祖先が戻ること、同じパスが両画面で同じ畳み方になることを確認する（headless Chromium での計測も可）
   - `/_search` で 200 件表示にし、表示・リサイズの体感に問題がないことを確認する
   - 子ページ一覧・パス重複選択画面の表示が変わっていないことを確認する
@@ -116,3 +116,4 @@
 - Tasks 6–9 (truncation unification): RED evidence for component wiring came from running the new tests against the unchanged component instead of a runtime flag; tests drive the real `useFittingCollapseLevel` through `hooks/layout-test-utils.ts` (stubbed `scrollWidth`/`clientWidth` + fake ResizeObserver whose first notification simulates the browser's initial one and must be ignored).
 - Code review of the revision found two pre-existing #11743 defects, fixed here: (1) `buildHighlightedPageName` fell back to the raw page name, which `PageListItemL` injects as HTML → escape the fallback whenever a highlight is given (XSS for imported/legacy paths containing `<`); (2) `LinkedPagePath` does not split on `</`, so walking one chain misaligned `/`-split segments and crashed `/_search` → build each ancestor from its own path prefix.
 - `@growi/core` dist goes stale after pulling or switching branches (typecheck then fails in unrelated `features/openai`); rebuild it with `pnpm run build` in `packages/core` before trusting typecheck/build results.
+- Task 10 (2026-11-16): build OK; `pnpm run test` 2465/2467 (the 2 failures are load-induced 5s timeouts in unrelated opentelemetry / page-bulk-export specs that pass in isolation). Headless smoke on /_search (`q=trunctest0722`, 4 pages × 50 rows ≈ 200 varied paths, widths 1400/700/420/320 and back): 0 rows with `//`, more than one `…` or a character-truncated ancestor, 0 overflowing rows; first-ancestor folding grows as the width shrinks and returns when widened. The page size is the admin "list size" setting (the per-page selector is commented out), so 200 rows on one page was not exercised. Environment detours: after a branch switch all `node_modules` had to be wiped and reinstalled, `apps/app/.next/dev` had to be deleted (stale Turbopack cache made logged-in pages 404 / hang), and the ES index had to be rebuilt by an admin.
