@@ -511,33 +511,31 @@ describe('Gen 2 end-to-end: pairing -> settings -> command -> notification -> re
       }
     };
 
-    it('reaches every channel the relation was configured for, through the cron drain', async () => {
+    it('reaches every channel the relation was configured for as soon as the notification is written, without a cron tick (Requirement 2.10)', async () => {
       const { relationId } = await establishPairing();
       await configureDestinations(relationId);
 
       await firePageCreate();
 
-      // Written down first, delivered later (Requirement 2.5's two stages).
       const enqueued = await ChatOutboxRow.find({ relationId }).lean();
       expect(enqueued).toHaveLength(2);
-      expect(enqueued.every((row) => row.state === 'pending')).toBe(true);
       expect(
         enqueued.flatMap((row) => row.targets.map((t) => t.channelId)).sort(),
       ).toEqual([CHANNEL_FAILING, CHANNEL_OK].sort());
       expect(enqueued[0].markdown).toContain(NOTIFIED_PAGE_PATH);
 
-      // The real cron job is what turns the outbox into posts.
-      await new OutboxDispatchCronService().executeJob();
-
+      // Nothing here drains: the write itself started the send.
+      await vi.waitFor(async () => {
+        const delivered = await ChatOutboxRow.find({ relationId }).lean();
+        expect(delivered.every((row) => row.state === 'sent')).toBe(true);
+      });
       expect(
         postAttempts()
           .map((attempt) => attempt.split(':')[1])
           .sort(),
       ).toEqual([CHANNEL_FAILING, CHANNEL_OK].sort());
-      const delivered = await ChatOutboxRow.find({
-        relationId,
-      }).lean();
-      expect(delivered.every((row) => row.state === 'sent')).toBe(true);
+      // Let any follow-up drain finish before the next test clears the rows.
+      await outboxDispatcher.requestDrain();
     });
 
     it('re-posts only the destination that failed, never the one that already got it (Requirement 2.4, 10.4)', async () => {
@@ -548,6 +546,8 @@ describe('Gen 2 end-to-end: pairing -> settings -> command -> notification -> re
       );
 
       await firePageCreate();
+      // A tick landing while the write's own drain runs waits for it rather
+      // than running beside it, so once it returns the first round is settled.
       await new OutboxDispatchCronService().executeJob();
 
       const afterFirstRound = await ChatOutboxRow.find({

@@ -24,6 +24,7 @@ describe('createGen2NotificationDispatcher', () => {
     await dispatch(destination);
 
     expect(enqueue).toHaveBeenCalledWith({
+      kind: 'notification',
       relationId: 'rel-1',
       targets: [{ platform: 'slack', channelId: 'C1' }],
       markdown: 'someone created [/a](https://growi.example.com/a)',

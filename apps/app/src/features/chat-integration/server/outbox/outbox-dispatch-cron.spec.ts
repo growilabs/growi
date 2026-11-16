@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { type MockProxy, mock } from 'vitest-mock-extended';
 
 import CronService from '~/server/service/cron';
 
@@ -12,90 +13,80 @@ import {
   OutboxDispatchCronService,
   outboxDispatchCronService,
 } from './outbox-dispatch-cron';
+import type { OutboxDispatcher } from './outbox-dispatcher';
 
 vi.mock('../pairing/sweep-unpaired-relations', () => ({
   sweepUnpairedRelations: vi.fn(),
 }));
+
+const idleDispatcher = (): MockProxy<OutboxDispatcher> => {
+  const dispatcher = mock<OutboxDispatcher>();
+  dispatcher.requestDrain.mockResolvedValue(undefined);
+  return dispatcher;
+};
 
 describe('OutboxDispatchCronService', () => {
   it('is one of GROWI’s CronService jobs rather than a scheduling mechanism of its own', () => {
     expect(outboxDispatchCronService).toBeInstanceOf(CronService);
   });
 
-  it('runs every minute', () => {
-    expect(outboxDispatchCronService.getCronSchedule()).toBe('* * * * *');
+  it('runs every 5 minutes', () => {
+    expect(outboxDispatchCronService.getCronSchedule()).toBe('*/5 * * * *');
   });
 
   describe('when deciding whether to drain', () => {
     const NOW = new Date('2026-01-01T00:00:00.000Z');
-    const drainResult = { sent: 0, failed: 0, givenUp: 0 };
 
     it('does not drain when no integration exists', async () => {
-      const drain = vi.fn().mockResolvedValue(drainResult);
+      const dispatcher = idleDispatcher();
       const hasAnyIntegration = vi.fn().mockResolvedValue(false);
 
       await new OutboxDispatchCronService({
-        dispatcher: { drain },
+        dispatcher,
         presence: { hasAnyIntegration, markPresent: vi.fn() },
         clock: () => NOW,
       }).executeJob();
 
-      expect(drain).not.toHaveBeenCalled();
+      expect(dispatcher.requestDrain).not.toHaveBeenCalled();
+      expect(dispatcher.drain).not.toHaveBeenCalled();
     });
 
-    it('drains once, at the clock’s instant, when an integration exists', async () => {
-      const drain = vi.fn().mockResolvedValue(drainResult);
+    // Through `requestDrain`, so a tick that lands while a drain started by
+    // a write is running never runs a second drain beside it.
+    it('requests one drain, after asking at the clock’s instant, when an integration exists', async () => {
+      const dispatcher = idleDispatcher();
       const hasAnyIntegration = vi.fn().mockResolvedValue(true);
 
       await new OutboxDispatchCronService({
-        dispatcher: { drain },
+        dispatcher,
         presence: { hasAnyIntegration, markPresent: vi.fn() },
         clock: () => NOW,
       }).executeJob();
 
       expect(hasAnyIntegration).toHaveBeenCalledWith(NOW);
-      expect(drain).toHaveBeenCalledTimes(1);
-      expect(drain).toHaveBeenCalledWith(NOW);
+      expect(dispatcher.requestDrain).toHaveBeenCalledTimes(1);
+      expect(dispatcher.drain).not.toHaveBeenCalled();
     });
 
     it('drains when the presence check fails open', async () => {
-      const drain = vi.fn().mockResolvedValue(drainResult);
+      const dispatcher = idleDispatcher();
       const presence = createIntegrationPresence({
         anyRelationExists: vi.fn().mockRejectedValue(new Error('db down')),
       });
 
       await new OutboxDispatchCronService({
-        dispatcher: { drain },
+        dispatcher,
         presence,
         clock: () => NOW,
       }).executeJob();
 
-      expect(drain).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not throw out of the job when draining fails', async () => {
-      const drain = vi.fn().mockRejectedValue(new Error('proxy exploded'));
-
-      await expect(
-        new OutboxDispatchCronService({
-          dispatcher: { drain },
-          presence: {
-            hasAnyIntegration: vi.fn().mockResolvedValue(true),
-            markPresent: vi.fn(),
-          },
-          clock: () => NOW,
-        }).executeJob(),
-      ).resolves.toBeUndefined();
-
-      expect(drain).toHaveBeenCalledTimes(1);
+      expect(dispatcher.requestDrain).toHaveBeenCalledTimes(1);
     });
   });
 
   it('never sweeps relations itself', async () => {
-    const drain = vi.fn().mockResolvedValue({ sent: 0, failed: 0, givenUp: 0 });
-
     await new OutboxDispatchCronService({
-      dispatcher: { drain },
+      dispatcher: idleDispatcher(),
       presence: {
         hasAnyIntegration: vi.fn().mockResolvedValue(true),
         markPresent: vi.fn(),
@@ -105,10 +96,12 @@ describe('OutboxDispatchCronService', () => {
     expect(sweepUnpairedRelations).not.toHaveBeenCalled();
   });
 
-  // The 10-minute answer lifetime plus the 1-minute tick bound how long
-  // another process takes to deliver a row whose writer stopped (2.9).
+  // Requirement 2.9: the 10-minute answer lifetime plus the 5-minute tick
+  // bound how long another process takes to deliver a row whose writer
+  // stopped -- about 10 + 5 = 15 minutes.
   describe('delivery of a row written by a process that then stopped', () => {
     const MINUTE = 60 * 1000;
+    const TICK_MINUTES = 5;
     const T = new Date('2026-01-01T00:00:00.000Z').getTime();
 
     const firstDrainMinute = async (
@@ -120,34 +113,36 @@ describe('OutboxDispatchCronService', () => {
         .fn<() => Promise<boolean>>()
         .mockResolvedValueOnce(false)
         .mockResolvedValue(true);
-      const drain = vi
-        .fn()
-        .mockResolvedValue({ sent: 0, failed: 0, givenUp: 0 });
+      const dispatcher = idleDispatcher();
       const cron = new OutboxDispatchCronService({
-        dispatcher: { drain },
+        dispatcher,
         presence: createIntegrationPresence({ anyRelationExists }),
         clock: () => new Date(currentTime),
       });
 
-      for (let minute = 0; minute <= 15; minute++) {
+      for (let minute = 0; minute <= 30; minute += TICK_MINUTES) {
         currentTime =
           T + minute * MINUTE + (minute === 0 ? processBStartsDelayMs : 0);
         // biome-ignore lint/performance/noAwaitInLoops: ticks must run in order
         await cron.executeJob();
-        if (drain.mock.calls.length > 0) {
+        if (dispatcher.requestDrain.mock.calls.length > 0) {
           return minute;
         }
       }
       return null;
     };
 
-    it('drains first on the tick where the remembered answer has expired', async () => {
+    it('ticks every 5 minutes and remembers an answer for 10 minutes', () => {
+      expect(outboxDispatchCronService.getCronSchedule()).toBe('*/5 * * * *');
       expect(PRESENCE_ANSWER_TTL_MS).toBe(10 * MINUTE);
+    });
+
+    it('drains first on the tick where the remembered answer has expired (10 minutes)', async () => {
       expect(await firstDrainMinute(0)).toBe(10);
     });
 
-    it('drains one tick later when the deciding tick started late', async () => {
-      expect(await firstDrainMinute(30 * 1000)).toBe(11);
+    it('drains one tick later when the deciding tick started late (10-minute answer + one 5-minute tick = 15 minutes)', async () => {
+      expect(await firstDrainMinute(30 * 1000)).toBe(15);
     });
   });
 

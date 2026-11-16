@@ -32,6 +32,7 @@ export const createGen2NotificationDispatcher = (
 ): DestinationDispatcher => {
   return async (destination) => {
     await outbox.enqueue({
+      kind: 'notification',
       relationId: destination.relationId,
       // `Gen2Destination.platform` is deliberately typed as a bare `string`
       // (destination-registry.ts) so this module stays agnostic of the

@@ -6,24 +6,21 @@
 // `server/service/cron.ts`'s `CronService`, all of them started from the one
 // place every cron in this repository is started (`crowi/index.ts`'s
 // `setupCron`). A fourth mechanism is not needed and would only be a second
-// place to look, so this is a `CronService` too, running once a minute.
+// place to look, so this is a `CronService` too, running every 5 minutes: a
+// written row is sent right away (`requestDrain`), so the cron only picks up
+// retries and sends that stopped mid-way (Requirement 2.11).
 //
 // The cron gives no exclusion of its own -- every instance ticks -- which is
 // exactly why the drain takes a row at a time with a conditional update. See
 // `outbox-dispatcher.ts`. A tick that finds no chat integration at all
-// does nothing, so a GROWI that never used one pays no per-minute queries.
+// does nothing, so a GROWI that never used one pays no per-tick queries.
 
 import CronService from '~/server/service/cron';
-import loggerFactory from '~/utils/logger';
 
 import type { IntegrationPresence } from '../integration-presence';
 import { integrationPresence } from '../integration-presence';
 import { outboxDispatcher } from './deliverers';
 import type { OutboxDispatcher } from './outbox-dispatcher';
-
-const logger = loggerFactory(
-  'growi:features:chat-integration:outbox-dispatch-cron',
-);
 
 export interface OutboxDispatchCronDeps {
   readonly dispatcher?: OutboxDispatcher;
@@ -45,23 +42,14 @@ export class OutboxDispatchCronService extends CronService {
   }
 
   override getCronSchedule(): string {
-    return '* * * * *';
+    return '*/5 * * * *';
   }
 
   override async executeJob(): Promise<void> {
-    const now = this.clock();
-
-    if (!(await this.presence.hasAnyIntegration(now))) {
+    if (!(await this.presence.hasAnyIntegration(this.clock()))) {
       return;
     }
-
-    // `CronService` already logs a thrown job, but catching here keeps the
-    // failure message specific to the outbox.
-    try {
-      await this.dispatcher.drain(now);
-    } catch (err) {
-      logger.error('Failed to drain the chat outbox', err);
-    }
+    await this.dispatcher.requestDrain();
   }
 }
 

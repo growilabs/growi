@@ -1,58 +1,81 @@
 // The "書き留める" half of design.md's "通知を2段に分ける" split (Requirements
-// 2.1, 2.2, 2.5, 2.6, 12.3). Delivering a row is `outbox-dispatcher.ts`'s job.
+// 2.1, 2.2, 2.5, 2.6, 2.10, 12.3). Delivering a row is `outbox-dispatcher.ts`'s
+// job; writing one also asks it to start right away.
 
 import { randomUUID } from 'node:crypto';
+import type { AgentAnswer } from '@growi/chat';
 
 import type { IntegrationPresence } from '../integration-presence';
 import { integrationPresence } from '../integration-presence';
+import { outboxDispatcher } from './deliverers';
 import type { ChatOutboxTarget } from './models/chat-outbox';
 import { ChatOutboxRow } from './models/chat-outbox';
+import type { OutboxDispatcher } from './outbox-dispatcher';
 
 export interface NotificationOutboxEntry {
+  readonly kind: 'notification';
   readonly relationId: string;
   readonly targets: ReadonlyArray<ChatOutboxTarget>;
   readonly markdown: string;
   readonly containsRestrictedPage: boolean;
 }
 
+export interface CommandAnswerOutboxEntry {
+  readonly kind: 'command-answer';
+  readonly relationId: string;
+  /** The `requestId` of the request this answers, not a new one. */
+  readonly requestId: string;
+  readonly answer: AgentAnswer;
+}
+
+export type OutboxEntry = NotificationOutboxEntry | CommandAnswerOutboxEntry;
+
 export interface ChatOutbox {
   /**
-   * Called from the page-save processing. **Does not wait for delivery** --
-   * design.md's Requirement 2.5 ("通知が失敗してもページ操作は完了させる") requires this
-   * to return as soon as the row is written, not once the proxy has been
-   * contacted.
+   * Write the entry down and ask the dispatcher to send it. **Resolves once
+   * the row is written, not once it is sent** -- Requirement 2.5 ("通知が失敗
+   * してもページ操作は完了させる"), and a failed send never reaches the caller.
    */
-  enqueue(entry: NotificationOutboxEntry): Promise<void>;
+  enqueue(entry: OutboxEntry): Promise<void>;
 }
 
 export interface ChatOutboxDeps {
   readonly presence?: IntegrationPresence;
+  readonly dispatcher?: OutboxDispatcher;
 }
 
 /**
- * The real `ChatOutbox`, backed by `chat_notification_outbox`
- * (task 1.2's model). `requestId` is minted here, exactly once, with
- * `crypto.randomUUID()` -- and never regenerated afterwards. The outbox
- * dispatcher re-signs and retries against this SAME row/id;
- * it does not call `enqueue` again for a retry (design.md "requestId は行を
- * 作るときに1度だけ採番し、再送しても変えない" -- Requirement 10.4).
+ * A notification's `requestId` is minted here, exactly once, and never
+ * regenerated: a retry re-sends the SAME row (Requirement 10.4). A command
+ * answer reuses the `requestId` of the request it answers.
  */
-export const createChatOutbox = (deps: ChatOutboxDeps = {}): ChatOutbox => {
-  const presence = deps.presence ?? integrationPresence;
-
-  return {
-    async enqueue(entry) {
-      await ChatOutboxRow.create({
-        kind: 'notification',
+const rowFor = (entry: OutboxEntry) =>
+  entry.kind === 'notification'
+    ? {
+        kind: entry.kind,
         requestId: randomUUID(),
         relationId: entry.relationId,
         targets: entry.targets,
         markdown: entry.markdown,
         containsRestrictedPage: entry.containsRestrictedPage,
-        state: 'pending',
-      });
+      }
+    : {
+        kind: entry.kind,
+        requestId: entry.requestId,
+        relationId: entry.relationId,
+        answer: entry.answer,
+      };
+
+export const createChatOutbox = (deps: ChatOutboxDeps = {}): ChatOutbox => {
+  const presence = deps.presence ?? integrationPresence;
+  const dispatcher = deps.dispatcher ?? outboxDispatcher;
+
+  return {
+    async enqueue(entry) {
+      await ChatOutboxRow.create({ ...rowFor(entry), state: 'pending' });
       // Lets this process's dispatch job skip its existence check right away.
       presence.markPresent(new Date());
+      void dispatcher.requestDrain();
     },
   };
 };

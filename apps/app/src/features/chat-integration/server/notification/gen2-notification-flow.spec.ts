@@ -17,6 +17,7 @@
 // relation produce 2 rows with 2 different requestIds, not 1 row with a
 // 2-element targets array. The test below pins this actual behavior.
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
+import { mock } from 'vitest-mock-extended';
 
 import {
   connectSelfContainedMongo,
@@ -24,12 +25,20 @@ import {
 } from '^/test/setup/mongo/self-contained-connection';
 
 import { ChatNotificationDestination } from '../models/chat-notification-destination';
+import { createChatOutbox } from '../outbox/chat-outbox';
 import { ChatOutboxRow } from '../outbox/models/chat-outbox';
+import type { OutboxDispatcher } from '../outbox/outbox-dispatcher';
 import { createGen2NotificationDispatcher } from './destination-dispatcher';
 import { DestinationRegistry } from './destination-registry';
 import { findGen2DestinationsForPathAndEvent } from './find-destinations-for-path-and-event';
 
 describe('Gen 2 notification dispatch -- real path matching + real outbox writes', () => {
+  // The rows are written for real; sending them is another spec's concern,
+  // and a background drain would race the assertions on the written rows.
+  const idleDispatcher = mock<OutboxDispatcher>();
+  idleDispatcher.requestDrain.mockResolvedValue(undefined);
+  const writeOnlyOutbox = createChatOutbox({ dispatcher: idleDispatcher });
+
   let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
@@ -63,7 +72,11 @@ describe('Gen 2 notification dispatch -- real path matching + real outbox writes
     );
     const registry = new DestinationRegistry(destinations);
     await registry.dispatchAll(
-      createGen2NotificationDispatcher('someone created [/a/b](url)', false),
+      createGen2NotificationDispatcher(
+        'someone created [/a/b](url)',
+        false,
+        writeOnlyOutbox,
+      ),
     );
 
     const rows = await ChatOutboxRow.find({});
@@ -86,7 +99,11 @@ describe('Gen 2 notification dispatch -- real path matching + real outbox writes
     ];
     const registry = new DestinationRegistry(explicitDestinations);
     await registry.dispatchAll(
-      createGen2NotificationDispatcher('someone commented', false),
+      createGen2NotificationDispatcher(
+        'someone commented',
+        false,
+        writeOnlyOutbox,
+      ),
     );
 
     const rows = await ChatOutboxRow.find({});
@@ -122,7 +139,9 @@ describe('Gen 2 notification dispatch -- real path matching + real outbox writes
       'pageCreate',
     );
     const registry = new DestinationRegistry(destinations);
-    await registry.dispatchAll(createGen2NotificationDispatcher('body', false));
+    await registry.dispatchAll(
+      createGen2NotificationDispatcher('body', false, writeOnlyOutbox),
+    );
 
     const rows = await ChatOutboxRow.find({}).sort({ relationId: 1 });
     expect(rows).toHaveLength(2);
@@ -154,7 +173,9 @@ describe('Gen 2 notification dispatch -- real path matching + real outbox writes
       'pageCreate',
     );
     const registry = new DestinationRegistry(destinations);
-    await registry.dispatchAll(createGen2NotificationDispatcher('body', false));
+    await registry.dispatchAll(
+      createGen2NotificationDispatcher('body', false, writeOnlyOutbox),
+    );
 
     const rows = await ChatOutboxRow.find({}).sort({
       'targets.0.channelId': 1,
