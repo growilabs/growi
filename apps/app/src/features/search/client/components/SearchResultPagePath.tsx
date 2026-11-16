@@ -1,10 +1,10 @@
-import type { JSX } from 'react';
+import type { JSX, RefObject } from 'react';
 import { Fragment, memo, useMemo } from 'react';
 
 import type { PagePathPart } from '~/client/util/format-truncated-page-path';
 import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-path';
 
-import { useFittingCollapseLevel } from '../hooks/use-fitting-collapse-level';
+import { usePathCollapseLevel } from '../hooks/use-path-collapse-level';
 import { PathSeparator } from './PathSeparator';
 import {
   FIXED_PART_CLASS_NAME,
@@ -35,6 +35,31 @@ const toKeyedParts = (parts: readonly PagePathPart[]): readonly KeyedPart[] => {
   }));
 };
 
+const PAGE_NAME_CLASS = `${styles['page-name']} ${PAGE_NAME_CLASS_NAME}`;
+
+interface PathPartViewProps {
+  readonly part: PagePathPart;
+  /** Attached to the page name so a character-truncated name counts as not fitting */
+  readonly pageNameRef: RefObject<HTMLElement>;
+}
+
+const PathPartView = ({
+  part,
+  pageNameRef,
+}: PathPartViewProps): JSX.Element => {
+  if (part.type === 'ellipsis') {
+    return <span className={`${FIXED_PART_CLASS_NAME} text-muted`}>…</span>;
+  }
+  if (part.isPageName) {
+    return (
+      <strong ref={pageNameRef} className={PAGE_NAME_CLASS}>
+        {part.text}
+      </strong>
+    );
+  }
+  return <span className={FIXED_PART_CLASS_NAME}>{part.text}</span>;
+};
+
 /**
  * Renders a page path on a single line with Notion-style middle truncation. It
  * owns only the path span; click-through and footprint rendering stay in the
@@ -53,12 +78,8 @@ const toKeyedParts = (parts: readonly PagePathPart[]): readonly KeyedPart[] => {
 // arrow-key navigation, and each render re-parses the path and re-measures it.
 export const SearchResultPagePath = memo(
   ({ path }: SearchResultPagePathProps): JSX.Element => {
-    const { maxCollapseLevel } = useMemo(
-      () => formatTruncatedPagePath(path),
-      [path],
-    );
     const { containerRef, shrinkableRef, collapseLevel } =
-      useFittingCollapseLevel(maxCollapseLevel, path);
+      usePathCollapseLevel(path);
     const { isRoot, parts, fullPath } = useMemo(
       () => formatTruncatedPagePath(path, collapseLevel),
       [path, collapseLevel],
@@ -72,27 +93,14 @@ export const SearchResultPagePath = memo(
       >
         {isRoot ? (
           // The root page's name is "/" itself, shown bold like other page names
-          <strong className={`${styles['page-name']} ${PAGE_NAME_CLASS_NAME}`}>
-            /
-          </strong>
+          <strong className={PAGE_NAME_CLASS}>/</strong>
         ) : (
           // A separator precedes every part, producing the leading '/' plus the
           // '/' separators between parts.
           toKeyedParts(parts).map(({ part, key }) => (
             <Fragment key={key}>
               <PathSeparator className={styles.separator} />
-              {part.type === 'ellipsis' ? (
-                <span className={`${FIXED_PART_CLASS_NAME} text-muted`}>…</span>
-              ) : part.isPageName ? (
-                <strong
-                  ref={shrinkableRef}
-                  className={`${styles['page-name']} ${PAGE_NAME_CLASS_NAME}`}
-                >
-                  {part.text}
-                </strong>
-              ) : (
-                <span className={FIXED_PART_CLASS_NAME}>{part.text}</span>
-              )}
+              <PathPartView part={part} pageNameRef={shrinkableRef} />
             </Fragment>
           ))
         )}

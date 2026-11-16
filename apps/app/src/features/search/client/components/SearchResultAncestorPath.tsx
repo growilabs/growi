@@ -5,11 +5,10 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 
 import type { AncestorPathNode } from '~/client/util/build-ancestor-path-nodes';
 import { buildAncestorPathNodes } from '~/client/util/build-ancestor-path-nodes';
-import { formatTruncatedPagePath } from '~/client/util/format-truncated-page-path';
 import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
 import { LinkedPagePath } from '~/models/linked-page-path';
 
-import { useFittingCollapseLevel } from '../hooks/use-fitting-collapse-level';
+import { usePathCollapseLevel } from '../hooks/use-path-collapse-level';
 import { PathSeparator } from './PathSeparator';
 import {
   FIXED_PART_CLASS_NAME,
@@ -80,14 +79,9 @@ const nodeKey = (node: AncestorPathNode): string =>
  */
 export const SearchResultAncestorPath = memo(
   ({ path, highlightedPath }: SearchResultAncestorPathProps): JSX.Element => {
-    // The maximum level does not depend on the level itself
-    const { maxCollapseLevel } = useMemo(
-      () => formatTruncatedPagePath(path),
-      [path],
-    );
-    const { containerRef, collapseLevel } = useFittingCollapseLevel(
-      maxCollapseLevel,
+    const { containerRef, collapseLevel } = usePathCollapseLevel(
       path,
+      highlightedPath,
     );
     const { nodes, fullPath } = useMemo(
       () => buildAncestorPathNodes(path, highlightedPath, collapseLevel),

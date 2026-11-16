@@ -161,7 +161,12 @@ describe('SearchResultAncestorPath', () => {
       resizeObserver = installFakeResizeObserver();
       restoreWidths = stubElementWidths((element) => {
         if (!element.hasAttribute('title')) return undefined;
-        const contentWidth = (element.textContent?.length ?? 0) * CHAR_WIDTH;
+        // Highlighted (bold) characters count double
+        const highlightedLength = Array.from(
+          element.querySelectorAll('em'),
+        ).reduce((sum, em) => sum + (em.textContent?.length ?? 0), 0);
+        const contentWidth =
+          ((element.textContent?.length ?? 0) + highlightedLength) * CHAR_WIDTH;
         return {
           scrollWidth: Math.max(availableWidth, contentWidth),
           clientWidth: availableWidth,
@@ -260,6 +265,25 @@ describe('SearchResultAncestorPath', () => {
       rerender(<SearchResultAncestorPath path="/A/B/C" />);
 
       expect(renderedPath()).toBe('home/A/B');
+    });
+
+    it('re-fits from the base form when only the highlight changes', () => {
+      // With "Projects" highlighted the base form needs 290; without it, 210
+      availableWidth = 250;
+      const { rerender } = render(
+        <SearchResultAncestorPath
+          path={DEEP_PATH}
+          highlightedPath={DEEP_PATH.replace('Projects', '<em>Projects</em>')}
+        />,
+      );
+      expect(renderedPath()).toBe('home/…/notes');
+
+      // Same page in a new search whose keyword no longer hits an ancestor
+      rerender(
+        <SearchResultAncestorPath path={DEEP_PATH} highlightedPath={null} />,
+      );
+
+      expect(renderedPath()).toBe('home/Projects/…/notes');
     });
   });
 });

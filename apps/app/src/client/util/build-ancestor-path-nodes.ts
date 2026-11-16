@@ -26,8 +26,6 @@ export interface AncestorPathPlan {
   readonly nodes: readonly AncestorPathNode[];
   /** Full path including the page name, for the hover tooltip. */
   readonly fullPath: string;
-  /** Highest collapse level accepted, as reported by `formatTruncatedPagePath`. */
-  readonly maxCollapseLevel: number;
 }
 
 const ELLIPSIS: AncestorPathNode = { type: 'ellipsis' };
@@ -95,12 +93,12 @@ export const buildAncestorPathNodes = (
   collapseLevel = 0,
 ): AncestorPathPlan => {
   const truncated = formatTruncatedPagePath(path, collapseLevel);
-  const { fullPath, maxCollapseLevel } = truncated;
+  const { fullPath } = truncated;
   // Drop the trailing page-name part (always exactly one, always last).
   const ancestorParts = truncated.parts.slice(0, -1);
 
   if (ancestorParts.length === 0) {
-    return { nodes: [], fullPath, maxCollapseLevel };
+    return { nodes: [], fullPath };
   }
 
   const ancestors = buildAncestorSegments(truncated.ancestorPath);
@@ -129,5 +127,5 @@ export const buildAncestorPathNodes = (
     );
   });
 
-  return { nodes, fullPath, maxCollapseLevel };
+  return { nodes, fullPath };
 };

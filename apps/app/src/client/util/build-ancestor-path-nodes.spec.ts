@@ -1,5 +1,4 @@
 import { buildAncestorPathNodes } from './build-ancestor-path-nodes';
-import { formatTruncatedPagePath } from './format-truncated-page-path';
 
 describe('buildAncestorPathNodes', () => {
   describe('when the path is the root', () => {
@@ -181,26 +180,6 @@ describe('buildAncestorPathNodes', () => {
       const result = buildAncestorPathNodes(path, null, 1);
 
       expect(result.nodes).toEqual([]);
-    });
-  });
-
-  describe('maxCollapseLevel', () => {
-    it.each([
-      { path: '/', expected: 0 },
-      { path: '/A', expected: 0 },
-      { path: '/A/B', expected: 1 },
-      { path: '/A/B/C', expected: 2 },
-      { path: '/A/B/C/D/E', expected: 2 },
-    ])('is $expected for $path, matching formatTruncatedPagePath so both screens share one level scale', ({
-      path,
-      expected,
-    }) => {
-      const result = buildAncestorPathNodes(path);
-
-      expect(result.maxCollapseLevel).toBe(expected);
-      expect(result.maxCollapseLevel).toBe(
-        formatTruncatedPagePath(path).maxCollapseLevel,
-      );
     });
   });
 
