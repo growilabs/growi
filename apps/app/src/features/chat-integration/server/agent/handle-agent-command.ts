@@ -12,6 +12,7 @@ import {
 import type { IUser } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
 
+import { isAiEnabled } from '~/features/mastra/server/services/is-ai-enabled';
 import loggerFactory from '~/utils/logger';
 
 import type { CommandAuditContext } from '../command/command-endpoint';
@@ -35,6 +36,16 @@ type AgentCommandRequest = Extract<
 >;
 
 const ACCEPTED: CommandResponse = { kind: RESPONSE_KINDS.accepted };
+
+/**
+ * Requirement 15.4 asks for the reason. Readiness is "enabled AND
+ * configured" (`isAiReady`), so once it is false, an enabled GROWI AI can
+ * only be missing a model -- the same split the mastra routes' guard makes.
+ */
+const aiUnavailableMessage = (): string =>
+  isAiEnabled()
+    ? 'GROWI AI has no AI model configured on this GROWI. Ask your GROWI administrator.'
+    : 'GROWI AI is not enabled on this GROWI. Ask your GROWI administrator.';
 
 const isDuplicateKeyError = (error: unknown): boolean =>
   typeof error === 'object' &&
@@ -86,7 +97,7 @@ export const handleAgentCommand = async (params: {
     return {
       kind: RESPONSE_KINDS.error,
       code: 'ai-unavailable',
-      message: 'GROWI AI is not available on this GROWI.',
+      message: aiUnavailableMessage(),
     };
   }
 

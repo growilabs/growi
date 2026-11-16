@@ -85,8 +85,8 @@ const routerPathFor = (op: InboundPeerOp): string => {
 const PAIRING_CHALLENGE_PATH = '/peer/pairing/challenge';
 
 /**
- * `command` -- real behavior for all 5 command kinds as of task 5.2 (search,
- * link-preview, help from task 5.1; create-page/keep from task 5.2).
+ * `command` -- real behavior for every command kind `command-endpoint.ts`
+ * serves (search, link-preview, help, create-page, and accepting agent).
  *
  * `requestArrivedAt` is captured as the very first statement, before even
  * reading `chatPeer.body` -- design.md's audit-logging section is explicit

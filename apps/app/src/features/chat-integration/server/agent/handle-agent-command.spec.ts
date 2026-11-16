@@ -277,6 +277,23 @@ describe('accepting an agent request', () => {
       expect(await ChatAgentRequest.countDocuments({})).toBe(0);
     });
 
+    it('stays refused on a connection whose administrator has not allowed it yet (Requirement 11.6)', async () => {
+      await ChatChannelPermission.deleteMany({});
+      const actor = nextActor();
+      await createLinkedUser(actor);
+      const runAgentRequest = fakeRunner();
+      const endpoint = createCommandEndpoint(buildCrowi({ aiReady: true }), {
+        runAgentRequest,
+      });
+
+      const response = await endpoint.handle(agentRequest(actor));
+      await afterResponseIsSent();
+
+      expect(response).toMatchObject({ kind: 'error', code: 'no-settings' });
+      expect(runAgentRequest).not.toHaveBeenCalled();
+      expect(await ChatAgentRequest.countDocuments({})).toBe(0);
+    });
+
     it('asks an unlinked person to link their account (Requirement 15.3)', async () => {
       const actor = nextActor();
       const runAgentRequest = fakeRunner();
@@ -358,6 +375,49 @@ describe('accepting an agent request', () => {
       const next = await endpoint.handle(agentRequest(actor));
 
       expect(next).toEqual({ kind: 'accepted' });
+    });
+  });
+
+  // Readiness is "turned on AND a model is configured"; the person is told
+  // which of the two is missing.
+  describe('the reason given when GROWI AI is unavailable (Requirement 15.4)', () => {
+    afterEach(async () => {
+      await configManager.updateConfigs(
+        { 'app:aiEnabled': undefined },
+        { removeIfUndefined: true, skipPubsub: true },
+      );
+    });
+
+    const refusalMessage = async (): Promise<string> => {
+      const actor = nextActor();
+      await createLinkedUser(actor);
+      const endpoint = createCommandEndpoint(buildCrowi({ aiReady: false }), {
+        runAgentRequest: fakeRunner(),
+      });
+      const response = await endpoint.handle(agentRequest(actor));
+      expect(response).toMatchObject({ kind: 'error', code: 'ai-unavailable' });
+      return response.kind === 'error' ? response.message : '';
+    };
+
+    it('says GROWI AI is turned off when an administrator has not enabled it', async () => {
+      await configManager.updateConfigs(
+        { 'app:aiEnabled': false },
+        { skipPubsub: true },
+      );
+
+      expect(await refusalMessage()).toMatch(/not enabled/i);
+    });
+
+    it('says no AI model is configured when GROWI AI is enabled but has no usable model', async () => {
+      await configManager.updateConfigs(
+        { 'app:aiEnabled': true },
+        { skipPubsub: true },
+      );
+
+      const message = await refusalMessage();
+
+      expect(message).toMatch(/no AI model/i);
+      expect(message).not.toMatch(/not enabled/i);
     });
   });
 
