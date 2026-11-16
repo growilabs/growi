@@ -57,7 +57,7 @@
 - **判断**: 承認の求めでは、「承認」の activity をその求めの ID で記録し、承認の求めで動く反映は背景の反映と同じ形で呼ぶ（反映の activity は新しい ID、操作者は依頼した人。既存の背景の経路と同じ）。1 回の反映が複数の人の承認をまとめて書くことがあるので、「反映の activity に承認した人を含める」は成り立たない。そのため、要件 6.9 を「承認した人を承認の activity と操作の項目に残す。反映の activity は変えない」に直した（設計の検証 1 回目の指摘）。
 - **事実**: 新しい activity の種類は、`~/interfaces/activity.ts` の `SupportedAction`、`EssentialActionGroup`、`MediumActionGroup` に足す。監査ログの設定にかかわらず記録するのは、Essential に入れることで実現している。名前は `public/static/locales/*/admin.json` の `audit_log_action.*` に 5 言語で足す（`i18next.config.ts` に登録済みのワイルドカードで足りる）。
 - **事実**: 通知は、通知の種類（action）を新しく足し、snapshot に `kind` を持たせ、`InAppNotification.create` を直接呼ぶ前例が「戻すよう頼む」通知にある。`upsertByActivity` は 7 日以内の似た通知をまとめるので使わない。一覧の取得では `MODEL_CHANGE_PROPOSAL` の対象を読み込まず、通知の中身は snapshot だけに頼る。viewer の表示は `parse-notification-snapshot.ts` が `null` を返す通知を一覧に出さないので、viewer の対応が済むまで、新しい通知は表示されない。
-- **判断（単純化のレビューのあと）**: 承認者の追加・削除も activity に記録し（`CHANGE_PROPOSAL_REVIEWER_ADD`、`CHANGE_PROPOSAL_REVIEWER_REMOVE`）、承認・却下・放棄・追加・削除の activity に、経路（`ui`、`api`、`ai-tool`）を残す（オーナー決定）。activity には経路の項目が無いので、snapshot の型に `channel` を足した新しい型を、`AttachmentSnapshot` の前例に倣って足す。activity は一定期間後に消えるので、長く残る記録は、Change Proposal の中の記録（`approvedChannel`、`reviewers` の `removedBy` など）のままにする。
+- **判断（単純化のレビューのあと）**: 承認者の追加・削除も activity に記録し（`CHANGE_PROPOSAL_REVIEWER_ADD`、`CHANGE_PROPOSAL_REVIEWER_REMOVE`）、承認・却下・放棄・追加・削除の activity に、経路（`ui`、`api`、`ai-tool`）を残す（オーナー決定）。activity には経路の項目が無いので、snapshot の型に `reviewChannel` を足した新しい型（`ChangeProposalReviewSnapshot`）と type guard を、`interfaces/activity.ts` に足す（リポジトリの snapshot の配置方針と `AttachmentSnapshot` の前例に沿う）。保存先の `ActivitiesSnapshot` は共有の 1 つの composite 型で、union にできないので、項目 `reviewChannel` を足す。保存口の `buildSnapshotUpdateEnvelope` が項目を固定で書き出しているので、ここにも足す。activity は一定期間後に消えるので、長く残る記録は、Change Proposal の中の記録（`approvedChannel`、`reviewers` の `removedBy` など）のままにする。
 
 ### 経路（画面・API・AI の道具）
 - **事実**: `accessTokenParser` は、どの方法でログインしたかの印を残さない。AI の道具は service を直接呼ぶので、引数で明示できる。
@@ -104,7 +104,7 @@
 2. `reviewers` が無い古い文書を Prisma が空の配列として返すか（補完の migration で無くす）。
 3. 配列要素に張る複合索引の実測の効き方。
 4. アクセストークン認証かどうかを `req` から読む方法。
-5. activity の更新（`server/models/activity.ts`）で、snapshot に `channel` を足しても、既存の `username` が保たれること（更新が snapshot の項目を、書いたものだけ置き換える作りかを確かめる）。
+5. activity の更新（`server/models/activity.ts`）で、snapshot に `reviewChannel` を足しても（`buildSnapshotUpdateEnvelope` に足したうえで）、既存の `username` が保たれ、`reviewChannel` が保存されること（更新が snapshot の項目を、書いたものだけ置き換える作りかを確かめる）。
 
 ## References
 - `.kiro/specs/change-proposal-core/design.md`、`requirements.md`、`research.md`

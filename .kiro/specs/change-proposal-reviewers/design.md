@@ -52,7 +52,7 @@
 - `ChangeProposalView` と `OperationView` に役割（`viewerRole`）、承認者、判断の記録、承認者向けの値が加わったこと。
 - `POST /:id/approve` の応答の形は変えない（`{ result: ApplyResult }`）。ただし、(1) `done` の `results` は、求めたキーのうち見る人に見える操作のすべて（この回の反映の結果か、読み直した状態）になる。(2) `in-progress` に、省略できる項目 `results` が加わる（既存の読み手には追加の項目）。ai-agent の承認の画面は、依頼した人にとっては従来どおり。
 - 承認待ちが、依頼した人以外にも（承認者に）返るようになったこと（viewer の「見える操作」の定義、承認待ちを見せない前提の要件）。
-- activity の snapshot の型に、経路の項目（`channel`）を足した新しい型が加わったこと（`ActivitiesSnapshot` と `ISnapshot` を使う、監査ログの表示・検索の処理）。
+- activity の snapshot の型に、経路の項目（`reviewChannel`）を足した新しい型（`ChangeProposalReviewSnapshot`）と type guard（`isChangeProposalReviewActivity`）が加わったこと（`ActivitiesSnapshot` と `ISnapshot` を使う、監査ログの表示・検索の処理）。
 - 通知に新しい種類（`review-request`、`review-result`）が加わったこと（viewer の `parse-notification-snapshot.ts`、`ChangeProposalNotification.tsx`、`commons.json`）。
 - 公開の順序: viewer の承認画面と承認待ちの一覧、ai-agent の承認者の指定の入口が入ったあとで、機能の切り替え `app:changeProposalReviewersEnabled` を有効にすること（初期値は無効。無効の間は、承認者の指定と追加を受け付けない）。
 
@@ -164,7 +164,7 @@ src/migrations/
 - `server/services/proposal-activity.ts`（`ChangeProposalAction` の型に新しい 5 つの action を足す）、`proposal-applier.ts`（承認の求めで動く反映を、背景の反映と同じ形で呼び、新しい activity ID で記録する。背景の形で呼ぶときは、求めの `ip` と `endpoint` を渡さない。反映の activity の操作者は依頼した人なので、承認者の `ip` を並べると、監査ログを誤って読ませるため。承認者の `ip` と `endpoint` は、承認の activity が持つ）、`proposal-notifier.ts`。
 - `server/services/current-page-facts.ts` — `loadViewablePages` に、取得済みの所属グループ（`ViewerIdentity`）を渡せるようにする（今は所属グループに `null` を渡して、中でもう一度取得している）。
 - `server/routes/approve.ts`（承認者にも開く。swagger の説明「Only the requester may approve」を直す）、`index.ts`（ルート登録。`/review-queue` は `/:id` より前）、`write-access.ts`（`respondWithServiceError` に新しいエラーコード）、`openapi.spec.ts`。
-- `apps/app/src/interfaces/activity.ts` — 新しい activity の action（`CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`、`CHANGE_PROPOSAL_ABSTAIN`、`CHANGE_PROPOSAL_REVIEWER_ADD`、`CHANGE_PROPOSAL_REVIEWER_REMOVE`）を `SupportedAction`、`EssentialActionGroup`、`MediumActionGroup` に足す。経路（`ui`、`api`、`ai-tool`）を activity に残すため、snapshot の型に、経路の項目を足した新しい型（`ChangeProposalReviewSnapshot`: `username?` と `channel?`）を、`ISnapshot` の和集合に足す（添付ファイルの activity が `AttachmentSnapshot` を足した前例と同じ作り）。`prisma/schema.prisma` の `ActivitiesSnapshot` に `channel String?` を足す（Mongo では migration は要らない）。**通知の action（`ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST`、`ACTION_CHANGE_PROPOSAL_REVIEW_RESULT`）も、`SupportedAction` に足す**（`InAppNotification` の `action` 項目は `AllSupportedActions` の値しか受け付けないので、足さないと通知の作成が検証で失敗する）。名前が `CHANGE_PROPOSAL_` で始まるので監査ログの絞り込みの一覧にも出るため、`admin.json` の 5 言語に、通知の action の表示名も足す。承認者の追加から送る通知は、通知の元になった activity（承認者の追加の activity）を持たせない（「戻すよう頼む」通知と同じ作り方で、`activities` を空にする）。
+- `apps/app/src/interfaces/activity.ts` — 新しい activity の action（`CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`、`CHANGE_PROPOSAL_ABSTAIN`、`CHANGE_PROPOSAL_REVIEWER_ADD`、`CHANGE_PROPOSAL_REVIEWER_REMOVE`）を `SupportedAction`、`EssentialActionGroup`、`MediumActionGroup` に足す。経路（`ui`、`api`、`ai-tool`）を activity に残すため、snapshot の型に、経路の項目を足した新しい型（`ChangeProposalReviewSnapshot`: `username?` と `reviewChannel?`）と、type guard（`isChangeProposalReviewActivity`。`action` で判別する）を足し、型を `ISnapshot` の和集合に足す（リポジトリの snapshot の配置方針と、添付ファイルの activity が `AttachmentSnapshot` を足した前例に沿う。型と guard は `interfaces/activity.ts` に置き、snapshot を作る処理は `features/change-proposal/` の `proposal-activity.ts` に置く）。保存先の `prisma/schema.prisma` の `ActivitiesSnapshot` は、全 activity で共有する 1 つの composite 型で、union にできないので、専用の型は作れない。ここに `reviewChannel String?` を足す（Mongo では migration は要らない。「channel」は Slack のチャンネルと取り違えやすいので、機能に固有の名前にする。添付ファイルの項目名も、同じ考え方）。**保存口の `buildSnapshotUpdateEnvelope`（`server/models/activity.ts`）は、保存する項目を固定で書き出しているので、`reviewChannel` を足す（足さないと、書いても保存されず、黙って捨てられる）。****通知の action（`ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST`、`ACTION_CHANGE_PROPOSAL_REVIEW_RESULT`）も、`SupportedAction` に足す**（`InAppNotification` の `action` 項目は `AllSupportedActions` の値しか受け付けないので、足さないと通知の作成が検証で失敗する）。名前が `CHANGE_PROPOSAL_` で始まるので監査ログの絞り込みの一覧にも出るため、`admin.json` の 5 言語に、通知の action の表示名も足す。承認者の追加から送る通知は、通知の元になった activity（承認者の追加の activity）を持たせない（「戻すよう頼む」通知と同じ作り方で、`activities` を空にする）。
 - 設定キー `app:changeProposalReviewersEnabled`（真偽値、既定は無効、環境変数 `CHANGE_PROPOSAL_REVIEWERS_ENABLED`）の定義。`config-definition.ts` の `app:changeProposalEnabled`（環境変数 `CHANGE_PROPOSAL_ENABLED`）と同じ場所に足し、`config-definition.spec.ts` の表に 1 行足す。管理画面の項目は作らない。この値は、既存の設定の読み出し（`server/services/settings.ts` の `readChangeProposalSettings()`）に足し、設定を読む場所を 1 つにまとめる。この値を読んで確かめるのは、承認者を保存する 2 か所だけにする（オーナー決定）。(1) 作成で、呼び出し側が `reviewers` を指定したとき（依頼した人以外を含むとき）、(2) `addReviewers`。無効なら、どちらも 400 `reviewers-disabled` を返す。承認者が保存されなければ、ほかの経路（承認者の承認、却下・放棄、承認者としての一覧、承認者への通知）は、承認者がいないので、自然に何も起きない。後続・見直しが引き継ぐ承認者は、すでに保存されたものなので、この確認の対象外にする。無効にしても、すでに指定された承認者の動きは止めない。純関数は設定を読まない。
 - locale（5 言語）: `translation.json`（`change_proposal.*` の表示名）、`commons.json`（通知の種類の文言は viewer が足すので、本 spec ではキーの契約だけを決める）、`admin.json`（`audit_log_action.*`）。
 
@@ -242,7 +242,7 @@ stateDiagram-v2
 | 6.1〜6.4 | 承認者への通知（個人のみ、見える分だけ） | `review-notifier` | snapshot `kind: 'review-request'` | — |
 | 6.5、6.6 | 依頼した人への結果の通知 | `review-notifier` | snapshot `kind: 'review-result'` | 承認 |
 | 6.7 | 反映のまとめた通知は不変 | `proposal-notifier`（変更なし） | — | — |
-| 6.8〜6.10 | 新しい activity（承認・却下・放棄・承認者の追加・削除。経路つき）、反映の activity | `proposal-activity`、`activity.ts`、`ActivitiesSnapshot` | 新しい action 5 つ、snapshot の `channel` | 承認 |
+| 6.8〜6.10 | 新しい activity（承認・却下・放棄・承認者の追加・削除。経路つき）、反映の activity | `proposal-activity`、`activity.ts`、`ActivitiesSnapshot` | 新しい action 5 つ、snapshot の `reviewChannel` | 承認 |
 | 7.1〜7.7 | 反映時の権限・作者、読み取り専用、無効化 | `proposal-applier`（変更なし）、`writeAccessChain` | — | 承認 |
 | 8.1〜8.6 | 既存の動きの維持、後続・見直しの引き継ぎ | `change-proposal-service`、`reviewer-model`、`select-auto-apply-targets` | — | — |
 | 8.7 | 5 言語の表示名・activity 名 | locale、`label-keys` | — | — |
@@ -442,7 +442,7 @@ interface ReviewResultSnapshot {
 - 新しい action: `CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`（操作ごとの却下と全体の却下）、`CHANGE_PROPOSAL_ABSTAIN`、`CHANGE_PROPOSAL_REVIEWER_ADD`、`CHANGE_PROPOSAL_REVIEWER_REMOVE`。5 つとも `EssentialActionGroup` と `MediumActionGroup` に入れる（要件 6.8、監査ログの設定にかかわらず記録）。
 - 承認の求めでは、承認の activity をその求めの ID で記録する。承認の求めで動く反映は、背景の反映と同じ形（`trigger.kind: 'background'`）で呼び、反映の activity は新しい ID（`beginActivity`）で、操作者を依頼した人として記録する（既存の背景の経路と同じ。反映の中身は変えない）。1 回の反映が複数の人の承認をまとめて書くことがあるので、承認した人は、承認の activity と、操作の項目（`approvedBy`）で分かる（要件 6.9）。
 - 承認者の追加・削除は、`CHANGE_PROPOSAL_REVIEWER_ADD`・`CHANGE_PROPOSAL_REVIEWER_REMOVE` の activity として記録する（要件 6.10。1 つの求めにつき 1 行。誰を追加・削除したかは、Change Proposal の中の `reviewers` の記録で分かる）。作成のときの承認者の指定は、作成の activity（core の 7.7）に含まれ、別には記録しない。
-- 承認・却下・放棄・承認者の追加・削除の activity には、snapshot の `channel` に、`ReviewActor.channel` を書く（要件 6.8、6.10）。activity の更新で、snapshot の `username` が保たれることを、実装で確かめる（`server/models/activity.ts` の更新の経路）。
+- 承認・却下・放棄・承認者の追加・削除の activity には、snapshot の `reviewChannel` に、`ReviewActor.channel` を書く（要件 6.8、6.10）。activity の更新で、snapshot の `username` が保たれることを、実装で確かめる（`server/models/activity.ts` の更新の経路）。
 
 #### 応答と入力の型（`interfaces/reviewer.ts`）
 
@@ -549,7 +549,7 @@ interface OperationView {
 - 「見つからない」の同一性: 存在しない提案、関係のない人、見える操作が 0 件の承認者の 3 つで応答が同じ。
 - 後続・見直しの承認者の引き継ぎと、承認者を指定した提案の自動反映の抑止（要件 1.11、8.4、8.5）。
 - 通知: `review-request` の宛先（個人のみ、依頼した人と追加した人を除く）、中身が受け取る人の閲覧できるページだけであること。`review-result` の宛先と、本人が承認したときは送らないこと。
-- activity: 承認・却下・放棄・承認者の追加・削除が、経路（`channel`）とともに、監査ログの設定にかかわらず記録されること。snapshot の `username` が保たれること。承認の求めで動いた反映の activity の操作者が依頼した人であること（承認した人は承認の activity と `approvedBy` で分かること）。
+- activity: 承認・却下・放棄・承認者の追加・削除が、経路（`reviewChannel`）とともに、監査ログの設定にかかわらず記録されること。`reviewChannel` が `buildSnapshotUpdateEnvelope` を通って保存されること。snapshot の `username` が保たれること。承認の求めで動いた反映の activity の操作者が依頼した人であること（承認した人は承認の activity と `approvedBy` で分かること）。
 
 ### 追従のテスト
 - i18n の監査が基準内であること（新しいキーは 5 言語を同じ作業で訳す）。操作の状態（`OperationStatus`）は変えないので、viewer の型の網羅への追従は要らない。
