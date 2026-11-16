@@ -81,6 +81,46 @@
   - 起動時に AI の部品を読み込まないことを、`no-eager-ai-imports.spec.ts` が静的な import の連なりで検査する。chat-integration の経路は起動時に読み込まれるので、AI に触れるモジュールは dynamic import の向こうに置く
 - **Implications**: 会話の id は計算で決める。出典のリンクは、呼び出す側が道具の実行結果から作って答えに添える
 
+### インストール済みの Mastra の generate の結果と打ち切り
+
+- **Context**: 設計は 2 つのことを前提にしている。(1) 道具が開いたページを `generate` の戻り値から取り出せる。(2) 打ち切られた `generate` は例外を投げずに結果を返す。タスク 5.1 で、インストール済みのライブラリを実際に動かして確かめた
+- **確かめた版**: `@mastra/core` 1.41.0（`apps/app/package.json` の指定は `^1.32.1`）、`ai` 6.0.197（偽の言語モデル `MockLanguageModelV3` は `ai/test` のもの）
+- **確かめ方**: 本物の `Agent` に偽の言語モデルと小さな道具をつなぎ、ネットワークにも API キーにも触れずに `generate` を呼んだ。試験は `apps/app/src/features/chat-integration/server/agent/mastra-generate-library-contract.spec.ts`。版を上げてこの振る舞いが変わると、この試験が落ちる
+- **Findings（偽の言語モデルの作り方）**:
+  - `generate` は言語モデルの `doGenerate` を呼ぶ。`doStream` は呼ばない。5.4・5.6 の試験で偽の言語モデルを作るときは `doGenerate` を差し替える（`doStream` だけを用意すると `Not implemented` で失敗する）
+  - `doGenerate` は 1 回の呼び出しで答え全体を返すので、`generate` には「文字が少しずつ届く途中」が無い。「途中で打ち切る」に当たるのは、2 回目以降の言語モデルの呼び出しの最中に打ち切ることである
+  - 言語モデルの呼び出しが失敗すると、Mastra は既定で 2 回やり直し、その間に実時間で待つ。試験で失敗させるときは `modelSettings: { maxRetries: 0 }` を渡す
+- **Findings（道具が開いたページ）**:
+  - 道具の結果は `result.toolResults` にある。1 件の形は `{ type: 'tool-result', payload: { toolCallId, toolName, args, result } }` で、`payload.result` が道具の出力そのもの
+  - `result.toolResults` は、その実行のすべての段の結果を集めたもの（最後の段だけではない）。段ごとの結果は `result.steps[i].toolResults` にもある
+  - `payload.toolName` は、agent の `tools` に登録したときの名前（`growiAgent` では `getPageContentTool`）で、道具の `id`（`get-page-content-tool`）ではない
+  - 道具が例外を投げた呼び出しは `toolResults` に入らない（`toolCalls` には入る）。`{ result: 'not_found_or_forbidden' }` のように失敗を値で返した呼び出しは `toolResults` に入る
+  - 会話の記録つきで 2 回目の依頼を実行すると、`toolResults` にはその回の道具の結果だけが入る。前の回の結果は混ざらない
+  - `result.steps[i].content` は、同じ段の呼び出しの一部を落とすことがあった。取り出しには使わない
+  - `getPageContentTool` の出力にはページの題名が無い（`pageId` と `path` だけ）。ブラウザの出典の一覧（`features/mastra/client/components/ChatSidebar/page-sources.ts` の `extractPageSources`）も、`pageId` と `path` だけを並べている
+- **Findings（打ち切り）**:
+  - 打ち切った `generate` は、どの時点で打ち切っても例外を投げずに結果を返した。試した時点は、呼ぶ前から打ち切り済み・最初の言語モデルの呼び出しの最中・2 回目の言語モデルの呼び出しの最中・道具の実行の最中、の 4 つ。打ち切りの理由（`AbortController.abort()` の引数）は、既定の `AbortError`、`AbortSignal.timeout` と同じ `TimeoutError`、ふつうの `Error` の 3 種類で試し、どれも同じだった
+  - 返った結果には、打ち切られたことを示す欄が無い。`error` は `undefined`。`finishReason` は `'tripwire'` で、`tripwire.reason` は `'Processor tripwire triggered'` になる（打ち切りとは関係のない文言）
+  - 打ち切りより前に終わった段の中身は残る。たとえば 1 段目が文章と道具の呼び出しを返し、2 段目の最中に打ち切ると、`text` には 1 段目の文章（途中までの答え）が入り、`toolResults` には 1 段目の道具の結果が入る
+  - 道具の実行の最中に打ち切っても、道具は止まらずに最後まで動き、その結果も `toolResults` に入る。その後で言語モデルを呼び直すことはない
+  - 出力の形を決めた（`structuredOutput`）呼び出しを打ち切ると、`object` は `undefined` で返る（例外にはならない）
+  - 打ち切りの合図（`abortSignal`）は、言語モデルの呼び出しにそのまま渡る。本物の provider では、送信中の HTTP 要求も止まる
+  - 打ち切り以外の失敗は例外になる。言語モデルの呼び出しの失敗は、そのエラーで `generate` が失敗する。出力の形を決めた呼び出しで、言語モデルの答えが形に合わないときは `MastraError`（`Structured output validation failed`）で失敗する
+
+#### 設計の前提との照合（設計の修正は不要）
+
+- 打ち切られた `generate` は例外にならず結果を返す: **YES**
+- 打ち切られたかどうかは、呼び出した側の `signal.aborted` で見分ける: **YES**。結果の中には見分ける手段が無いので、これが唯一の方法である
+- 道具が開いたページを戻り値から取り出せる: **YES**。`result.toolResults` から取り出せる
+
+#### 5.4・5.6 が守ること
+
+- 出典は、`result.toolResults` のうち `payload.toolName === 'getPageContentTool'` かつ `payload.result.result === 'ok'` のものから、`payload.result.page` の `pageId` と `path` を取る。同じページを 2 回開く（見出しの一覧を読んでから、その節を読む）ので、`pageId` で重複を除き、最初に開いた順に並べる。ブラウザの `extractPageSources` と同じ決まりである。`AnswerSource` の `title` は道具の出力に無いので、パスから作る（全体か最後の階層かは 5.4 で決める）。`url` は GROWI のサイトの URL と `pageId` から作る（ブラウザの出典と同じ `/{pageId}` の形）
+- 取り出しの関数は、試験の中に置いた形（`extractOpenedPages`）を 5.4 で `agent/` の本番のファイルに移し、この試験はそれを読み込むように直す。同じ決まりを 2 か所に書かないため
+- 打ち切りは、`generate` が返った後に `signal.aborted` を見て判定する。`finishReason`・`error`・`text` が空かどうかでは判定できない（途中までの答えが `text` に入っていることがある）。打ち切られたときは、途中までの答えも出典も使わない
+- 結果を読む前に `signal.aborted` を見る。5.4 の `classify`・`summarize` が `object` の形を検査して例外を投げる作りにすると、打ち切られたときに「形が違う」という失敗になり、5.6 の時間切れの判定から漏れる
+- `generate` は打ち切り以外の失敗では例外を投げるので、5.6 は呼び出しを `try/catch` で囲む。`catch` の中でも先に `signal.aborted` を見て、真なら時間切れにする（suggest-path の `agentic-engine.ts` と同じ）
+
 ### 作成中（WIP）のページの自動削除
 
 - **Context**: 要約のページを WIP で作ると、既定で 2 日後に消えるのではないか、という懸念を確かめた
