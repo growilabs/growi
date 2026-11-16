@@ -151,24 +151,62 @@ describe('sending a command answer through the production deliverer table', () =
   /**
    * Like the real proxy: the first request for a `requestId` is delivered,
    * any later one gets the first result back and is not delivered again.
+   * `replyAfter` holds back only the reply, not the delivery.
    */
   const rememberingProxy = () => {
     const resultByRequestId = new Map<string, CommandAnswerResult>();
     let deliveries = 0;
-    const answer = (request: ReceivedRequest, res: ServerResponse) => {
+    const answer = (
+      request: ReceivedRequest,
+      res: ServerResponse,
+      replyAfter: Promise<void> = Promise.resolve(),
+    ) => {
       const { requestId }: { requestId: string } = JSON.parse(request.body);
       const remembered = resultByRequestId.get(requestId);
       if (remembered != null) {
-        respondJson(res, 200, remembered);
+        void replyAfter.then(() => respondJson(res, 200, remembered));
         return;
       }
       deliveries += 1;
       const result: CommandAnswerResult = { status: 'delivered' };
       resultByRequestId.set(requestId, result);
-      respondJson(res, 200, result);
+      void replyAfter.then(() => respondJson(res, 200, result));
     };
     return { answer, deliveries: () => deliveries };
   };
+
+  const enqueueWithoutSending = () =>
+    createChatOutbox({ dispatcher: mock<OutboxDispatcher>() }).enqueue({
+      kind: 'command-answer',
+      relationId: RELATION_ID,
+      requestId: REQUEST_ID,
+      answer: ANSWER,
+    });
+
+  /**
+   * One process claims the row and its first request hangs until
+   * `releaseFirst`; another process takes the stale claim back and sends.
+   */
+  const sendFromStalledThenOtherProcess = async (
+    firstArrived: Latch,
+    releaseFirst: Latch,
+  ) => {
+    await enqueueWithoutSending();
+    const stalled = createOutboxDispatcher({ deliverers: OUTBOX_DELIVERERS });
+    const other = createOutboxDispatcher({ deliverers: OUTBOX_DELIVERERS });
+
+    const stalledDrain = stalled.drain(new Date());
+    await firstArrived.promise;
+    await other.drain(new Date(Date.now() + CLAIM_STALE_AFTER_MS + 1000));
+    releaseFirst.release();
+    await stalledDrain;
+  };
+
+  const requestIdsReceived = () =>
+    received.map((r) => {
+      const { requestId }: { requestId: string } = JSON.parse(r.body);
+      return requestId;
+    });
 
   it('sends an enqueued answer once as a signed command-answer request, then keeps the row without the answer', async () => {
     const proxy = rememberingProxy();
@@ -214,38 +252,48 @@ describe('sending a command answer through the production deliverer table', () =
     expect(row).not.toHaveProperty('answer');
   });
 
-  it('stays sent, with one delivery, when a stalled process’s send fails after another process took the row back and sent it', async () => {
+  it('stays sent when a stalled process’s send fails after another process took the row back and sent it', async () => {
     const proxy = rememberingProxy();
     const firstArrived = createLatch();
     const releaseFirst = createLatch();
     responder = (request, res) => {
       if (received.length === 1) {
-        // The stalled process: its request hangs, then its connection fails.
+        // Never reaches the proxy's delivery; the connection fails later.
         firstArrived.release();
         void releaseFirst.promise.then(() => respondJson(res, 500, {}));
         return;
       }
       proxy.answer(request, res);
     };
-    await createChatOutbox({
-      dispatcher: mock<OutboxDispatcher>(),
-    }).enqueue({
-      kind: 'command-answer',
-      relationId: RELATION_ID,
-      requestId: REQUEST_ID,
-      answer: ANSWER,
+
+    await sendFromStalledThenOtherProcess(firstArrived, releaseFirst);
+
+    expect(requestIdsReceived()).toEqual([REQUEST_ID, REQUEST_ID]);
+    const row = await storedRow();
+    expect(row).toMatchObject({
+      state: 'sent',
+      attempts: 0,
+      result: { status: 'delivered' },
     });
-    const stalled = createOutboxDispatcher({ deliverers: OUTBOX_DELIVERERS });
-    const other = createOutboxDispatcher({ deliverers: OUTBOX_DELIVERERS });
+    expect(row).not.toHaveProperty('answer');
+  });
 
-    const stalledDrain = stalled.drain(new Date());
-    await firstArrived.promise;
-    // The other process ticks once the stalled claim has gone stale.
-    await other.drain(new Date(Date.now() + CLAIM_STALE_AFTER_MS + 1000));
-    releaseFirst.release();
-    await stalledDrain;
+  it('delivers once when another process re-sends a row whose first send was delivered but answered late', async () => {
+    const proxy = rememberingProxy();
+    const firstArrived = createLatch();
+    const releaseFirst = createLatch();
+    responder = (request, res) => {
+      if (received.length === 1) {
+        firstArrived.release();
+        proxy.answer(request, res, releaseFirst.promise);
+        return;
+      }
+      proxy.answer(request, res);
+    };
 
-    expect(received).toHaveLength(2);
+    await sendFromStalledThenOtherProcess(firstArrived, releaseFirst);
+
+    expect(requestIdsReceived()).toEqual([REQUEST_ID, REQUEST_ID]);
     expect(proxy.deliveries()).toBe(1);
     const row = await storedRow();
     expect(row).toMatchObject({
