@@ -137,9 +137,9 @@
   - _Requirements: 4.11, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
   - _Depends: 1.5, 4.1_
   - _Boundary: review-notifier_
-- [ ] 5.2 承認・却下・放棄・承認者の追加と削除の activity を記録する
+- [x] 5.2 承認・却下・放棄・承認者の追加と削除の activity を記録する
   - 記録する関数に、経路の引数と、操作者・trigger（求めの activity の ID か、背景か）を足し、5 つの action で、経路つきの snapshot を `emit` で送る
-  - 応答を送る前に、同期的に記録する（`activity-recording` の規則）。承認者の ip と endpoint は、承認の activity だけに持たせる
+  - 応答を送る前に、同期的に記録する（`activity-recording` の規則）。承認者の ip と endpoint は、承認の activity に残す（承認がきっかけで動く反映の activity には渡さない。それは 6.2 の担当）
   - 監査ログを無効にしていても記録されること、経路が保存されること、操作者と `username` が保たれることを、結合テストで確かめている
   - _Requirements: 6.8, 6.9, 6.10_
   - _Depends: 1.5_
@@ -294,3 +294,5 @@
 - 5.1: 通知は `server/services/review-notifier.ts`（`createReviewNotifier(crowi)`、`notifyReviewRequest({ proposal, candidates: ReviewerInput[], actorId, activityId })`、`notifyReviewResult({ proposal, reviewer: IUserHasId, activityId, decision })`、`ReviewDecisionNotice = { kind: 'operations'; result: 'approved' | 'rejected' | 'abstained'; operationKeys; comment? } | { kind: 'whole-rejection'; comment? }`）と、DB を読まない純関数 `review-notification-content.ts` に置いた。名前は design に無く、実装者が決めた。5.3 と 6.x はこの名前で呼ぶ。例外は投げず、失敗はログだけ（`proposal-notifier` と同じ）。承認者への通知は、候補を個人のユーザーに絞り、依頼した人・追加した人・停止中のユーザー・保存された提案で有効な承認者でない人・判断の対象が 0 件の人を除く。1 人ずつ `loadViewerIdentity` で役割を決める。結果の通知は、依頼した人自身の判断では送らない。
 - 5.1: **6.2・6.3 の実装者へ（重要）**: `notifyReviewResult` は、渡された `decision.operationKeys` を「この求めで実際に書き込んだキー」としてそのまま信じる。承認のルートのリクエストの項目名も `operationKeys` なので、`req.body.operationKeys` をそのまま渡す誤りが起こりやすい。**承認なら、読み直した proposal から `decisionToken` で決めたキーだけを渡す**。却下・放棄は、記録を足したキーを渡す。また、proposal は**書き込んだあとに読み直したもの**を渡す（反映する前の proposal を渡すと、新規作成に `resultPageId` が無く、作られたページを依頼した人が閲覧できなくても、パスが通知に入ってしまう）。6.2・6.3 の結合テストで、すでに判断済みのキーを含む求めを送ったとき、そのキーが結果の通知に出ないことを確かめる。**5.3 の実装者へ**: `candidates` に有効な個人の承認者、`actorId` に依頼した人を渡す（引き継いだ承認者は `addedBy` が依頼した人になっている）。**6.4 の実装者へ**: `AddReviewersResult.added` を渡す。
 - 5.1: `ReviewRequestNotificationSnapshot.pages[].id` は、承認待ちの新規作成には入らない（まだページが無い。作る予定のパスだけ `{ path }`。このパスは、承認者が取得で見られる値と同じ条件）。viewer の `parse-notification-snapshot` は、id の無い項目を扱う必要がある。**10.2 で viewer の Revalidation Triggers に足す。** `AnyChangeProposalNotificationSnapshot`（3 種の snapshot の和集合）は、5.1 でも使っていない。5.3 のあとでも使われなければ、9.3 の全体の確認で消す。グループ経由ですでに承認者だった人を、あとから個人として追加すると、通知が送られる（「新しく承認者になった」の読み方。許容）。結果の通知の Socket.IO を確かめるテストは無い（承認者への通知の側にはある）。
+- 5.2: `recordProposalActivity`（`proposal-activity.ts`）に経路の引数 `channel: ReviewChannel` を足した。引数の型は action で 2 つに分かれる: 承認・却下・放棄・承認者の追加・削除（`ProposalReviewAction`）では `channel` が必須、作成・反映・取り消しでは `channel?: never`。snapshot には `reviewChannel` だけを入れ、`username` は保存の処理（`settle-activity-record.ts` の `?? context?.username`）が入れる。記録は同期で、5 つの action すべてが監査ログを無効にしていても保存されることを確かめた（1.5 の申し送りは、これで閉じた）。操作者 `operator` と trigger（`request` か `background`）は前からある引数。`ProposalReviewAction` の export は、6.x で使わなければ外す。
+- 5.2: **6.2 の実装者へ（重要）**: HTTP の求めから記録するとき、ip と endpoint は route の middleware が保存した情報から自動で入る（`recordProposalActivity` が入れているのではない）。「承認者の ip と endpoint は承認の activity に残し、承認がきっかけで動く反映の activity には渡さない」の意味は、承認の activity と反映の activity を比べたもの（要件 6.9、design 164・445 行）。却下・放棄・追加・削除の activity から ip を外す意味ではない（外すと監査の証拠を書き換えることになる）。承認者の ip が反映の activity に入りうる経路は、`proposal-applier.ts` の `reportApplied`（374 行付近）が `request: run.request` を渡している 1 か所だけ。6.2 では、承認の求めで動く反映が `run.request` を渡さないことと、反映の行に ip が無いことを、結合テストで確かめる。背景から記録するときに `request` を渡すと、承認の activity に ip が入る（`beginActivity` が `request?.ip` を使う）。AI の道具の求めには HTTP の情報が無いので、今は実害は無い。

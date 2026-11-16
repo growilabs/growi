@@ -20,11 +20,23 @@ const TEST_IP = '10.0.0.145';
 const TEST_ENDPOINT = '/_api/v3/cp-proposal-activity-integ';
 const REQUESTER_USERNAME = 'cpProposalActivityRequester';
 const REVERTER_USERNAME = 'cpProposalActivityReverter';
+const REVIEWER_USERNAME = 'cpProposalActivityReviewer';
+
+const REVIEW_ACTIONS = [
+  [SupportedAction.ACTION_CHANGE_PROPOSAL_APPROVE, '6.8, 6.9'],
+  [SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT, '6.8'],
+  [SupportedAction.ACTION_CHANGE_PROPOSAL_ABSTAIN, '6.8'],
+  [SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_ADD, '6.10'],
+  [SupportedAction.ACTION_CHANGE_PROPOSAL_REVIEWER_REMOVE, '6.10'],
+] as const;
 
 describe('recordProposalActivity', () => {
   let crowi: Crowi;
   let requester: HydratedDocument<IUserHasId>;
   let reverter: HydratedDocument<IUserHasId>;
+  let reviewer: HydratedDocument<IUserHasId>;
+  // Rows recorded without a request carry no TEST_IP, so cleanup goes by id.
+  const recordedIds: string[] = [];
 
   const waitForActivity = (activityId: string) =>
     vi.waitFor(
@@ -42,7 +54,8 @@ describe('recordProposalActivity', () => {
 
   beforeAll(async () => {
     crowi = await getInstance();
-    // Apply and revert must be recorded even with the audit log turned off (7.5).
+    // Apply, revert (7.5) and the review actions (Reviewers Req 6.8, 6.10) must
+    // be recorded even with the audit log turned off.
     await configManager.updateConfigs({ 'app:auditLogEnabled': false });
 
     const User = mongoose.model<IUserHasId>('User');
@@ -55,12 +68,17 @@ describe('recordProposalActivity', () => {
       });
     requester = await createUser(REQUESTER_USERNAME);
     reverter = await createUser(REVERTER_USERNAME);
+    reviewer = await createUser(REVIEWER_USERNAME);
   });
 
   afterAll(async () => {
-    await prisma.activities.deleteMany({ where: { ip: TEST_IP } });
+    await prisma.activities.deleteMany({
+      where: { OR: [{ ip: TEST_IP }, { id: { in: recordedIds } }] },
+    });
     await mongoose.model('User').deleteMany({
-      username: { $in: [REQUESTER_USERNAME, REVERTER_USERNAME] },
+      username: {
+        $in: [REQUESTER_USERNAME, REVERTER_USERNAME, REVIEWER_USERNAME],
+      },
     });
     await configManager.updateConfigs(
       { 'app:auditLogEnabled': undefined },
@@ -143,6 +161,82 @@ describe('recordProposalActivity', () => {
       userId: reverter._id.toString(),
       ip: TEST_IP,
     });
+  });
+
+  it.each(
+    REVIEW_ACTIONS,
+  )('records %s on the request activity with the channel, the operator and the request ip although the response finishes right after, even with the audit log off (Reviewers Req %s)', async (action) => {
+    const proposalId = new mongoose.Types.ObjectId().toString();
+    const { activityId: routeActivityId } = beginActivity({
+      ip: TEST_IP,
+      endpoint: TEST_ENDPOINT,
+      userId: reviewer._id.toString(),
+      username: reviewer.username,
+      createdAt: new Date(),
+    });
+
+    const { activityId } = recordProposalActivity(crowi, {
+      action,
+      proposalId,
+      operator: reviewer,
+      trigger: { kind: 'request', activityId: routeActivityId },
+      channel: 'api',
+    });
+    // The response's finish clears the stashed context.
+    pendingActivityContext.clear(routeActivityId);
+
+    expect(activityId).toBe(routeActivityId);
+    const row = await waitForActivity(routeActivityId);
+    expect(row).toMatchObject({
+      action,
+      targetModel: SupportedTargetModel.MODEL_CHANGE_PROPOSAL,
+      target: proposalId,
+      userId: reviewer._id.toString(),
+      ip: TEST_IP,
+      endpoint: TEST_ENDPOINT,
+    });
+    expect(row.snapshot).toMatchObject({
+      username: REVIEWER_USERNAME,
+      reviewChannel: 'api',
+    });
+  });
+
+  it('records a review action without a request activity under the reviewer, with the channel (Reviewers Req 6.8)', async () => {
+    const proposalId = new mongoose.Types.ObjectId().toString();
+
+    const { activityId } = recordProposalActivity(crowi, {
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+      proposalId,
+      operator: reviewer,
+      trigger: { kind: 'background' },
+      channel: 'ai-tool',
+    });
+    recordedIds.push(activityId);
+
+    const row = await waitForActivity(activityId);
+    expect(row).toMatchObject({
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_REJECT,
+      target: proposalId,
+      userId: reviewer._id.toString(),
+    });
+    expect(row.snapshot).toMatchObject({
+      username: REVIEWER_USERNAME,
+      reviewChannel: 'ai-tool',
+    });
+  });
+
+  it('records no channel on an apply', async () => {
+    const { activityId } = recordProposalActivity(crowi, {
+      action: SupportedAction.ACTION_CHANGE_PROPOSAL_APPLY,
+      proposalId: new mongoose.Types.ObjectId().toString(),
+      operator: requester,
+      trigger: { kind: 'background' },
+    });
+    recordedIds.push(activityId);
+
+    const row = await waitForActivity(activityId);
+    expect(row.snapshot?.reviewChannel ?? null).toBeNull();
+    expect(row.snapshot?.username).toBe(REQUESTER_USERNAME);
   });
 
   it('clears the context it created when the emit throws', () => {
