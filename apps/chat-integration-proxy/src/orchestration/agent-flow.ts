@@ -65,6 +65,24 @@ const storedOriginOf = (origin: PrivateReplyOrigin): StoredAnswerOrigin => ({
   requestSummary: origin.requestSummary,
 });
 
+type SendResult = Awaited<ReturnType<GrowiClient['sendCommand']>>;
+
+const refusalNoticeOf = (
+  growiLabel: string,
+  sent: SendResult,
+): OutboundMessage => {
+  if (!sent.ok) return notDeliveredNotice(growiLabel);
+  const { response } = sent;
+  switch (response.kind) {
+    case 'account-link-required':
+      return accountLinkNotice(response.growiLabel, response.linkUrl);
+    case 'error':
+      return refusedNotice(growiLabel, response.message);
+    default:
+      return unexpectedAnswerNotice(growiLabel);
+  }
+};
+
 export const createAgentFlow = (deps: AgentFlowDeps): AgentEntry => {
   const {
     growiClient,
@@ -126,6 +144,15 @@ export const createAgentFlow = (deps: AgentFlowDeps): AgentEntry => {
       text,
       conversationKey,
     };
+    const dropRecord = async (): Promise<void> => {
+      try {
+        await pendingAgentRequests.delete(relation.relationId, requestId);
+      } catch {
+        reportOperationalFailure(
+          `agent request ${requestId} for relation ${relation.relationId}: the pending request could not be dropped after GROWI refused it; it is kept until it expires.`,
+        );
+      }
+    };
     const sent = await growiClient.sendCommand(relation.growiUri, request);
 
     if (!sent.ok && sent.reason === 'unreachable') {
@@ -139,21 +166,13 @@ export const createAgentFlow = (deps: AgentFlowDeps): AgentEntry => {
     }
     if (sent.ok && sent.response.kind === 'accepted') return;
 
-    await pendingAgentRequests.delete(relation.relationId, requestId);
-    if (!sent.ok) {
-      await tell(notDeliveredNotice(relation.growiLabel));
-      return;
-    }
-    const { response } = sent;
-    switch (response.kind) {
-      case 'account-link-required':
-        await tell(accountLinkNotice(response.growiLabel, response.linkUrl));
-        return;
-      case 'error':
-        await tell(refusedNotice(relation.growiLabel, response.message));
-        return;
-      default:
-        await tell(unexpectedAnswerNotice(relation.growiLabel));
+    // Told before the record is dropped: a failing delete must not leave the
+    // requester waiting for an answer that will never come. A record left
+    // behind is swept when it expires.
+    try {
+      await tell(refusalNoticeOf(relation.growiLabel, sent));
+    } finally {
+      await dropRecord();
     }
   };
 };

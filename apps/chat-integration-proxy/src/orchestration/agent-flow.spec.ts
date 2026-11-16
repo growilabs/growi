@@ -87,6 +87,7 @@ const harness = (
     ok: true,
     response: { kind: 'accepted' },
   },
+  options: { readonly deleteThrows?: boolean } = {},
 ) => {
   const stored = new Map<string, PendingAgentRequestRecord>();
   const sent: Array<{
@@ -102,6 +103,7 @@ const harness = (
     installationId: string;
   }> = [];
   const reports: string[] = [];
+  const calls: string[] = [];
 
   const privateReplier: PrivateReplier = {
     reply: (origin, message) => {
@@ -109,6 +111,7 @@ const harness = (
       return Promise.resolve({ kind: 'in-place' });
     },
     acknowledge: (origin, fallback) => {
+      calls.push('acknowledge');
       acknowledged.push({ origin, fallback: textOf(fallback) });
       return Promise.resolve();
     },
@@ -117,6 +120,7 @@ const harness = (
   const deps: AgentFlowDeps = {
     growiClient: {
       sendCommand: (_growiUri, request) => {
+        calls.push('send');
         sent.push({ request, storedAtSend: [...stored.keys()] });
         return Promise.resolve(answer);
       },
@@ -131,8 +135,14 @@ const harness = (
         stored.set(`${request.relationId}/${request.requestId}`, record);
         return Promise.resolve(record);
       },
-      delete: async (relationId, requestId) =>
-        stored.delete(`${relationId}/${requestId}`) ? 1 : 0,
+      delete: (relationId, requestId) => {
+        if (options.deleteThrows) {
+          return Promise.reject(new Error('database unavailable'));
+        }
+        return Promise.resolve(
+          stored.delete(`${relationId}/${requestId}`) ? 1 : 0,
+        );
+      },
     },
     privateReplier,
     platform: {
@@ -160,6 +170,7 @@ const harness = (
     acknowledged: () => [...acknowledged],
     statuses: () => [...statuses],
     reports: () => [...reports],
+    calls: () => [...calls],
   };
 };
 
@@ -245,6 +256,7 @@ describe('what is recorded for the answer', () => {
       threadRootId: 'T-read',
       replyThreadRootId: 'T-reply',
       place: 'direct',
+      sourceMessageId: 'M-1',
     });
   });
 });
@@ -260,6 +272,14 @@ describe('showing the request was received (Requirements 15.5, 15.16)', () => {
       { origin: input.origin, fallback: expect.stringContaining('Wiki') },
     ]);
     expect(flow.acknowledged()[0]?.fallback).not.toContain('onboarding');
+  });
+
+  it('shows the request was received before sending it to GROWI', async () => {
+    const flow = harness();
+
+    await flow.entry(inputOf(invocationOn(channel)));
+
+    expect(flow.calls()).toEqual(['acknowledge', 'send']);
   });
 
   it('shows the processing status in a DM, on the thread the answer will go to, as the installation the request belongs to', async () => {
@@ -360,6 +380,26 @@ describe("GROWI's answer", () => {
     ]);
   });
 
+  it('still tells the requester when the record cannot be dropped', async () => {
+    const flow = harness(
+      {
+        ok: true,
+        response: {
+          kind: 'error',
+          code: 'busy',
+          message: '前の依頼を処理しています。',
+        },
+      },
+      { deleteThrows: true },
+    );
+
+    await flow.entry(inputOf(invocationOn(channel)));
+
+    expect(flow.replies().map((reply) => reply.text)).toEqual([
+      'GROWI「Wiki」で実行できませんでした: 前の依頼を処理しています。',
+    ]);
+  });
+
   it('drops the record when GROWI answers with something that is not an answer to agent', async () => {
     const flow = harness({
       ok: true,
@@ -430,6 +470,18 @@ describe('a request the protocol would refuse', () => {
 
     await flow.entry(
       inputOf(invocationOn(channel), { text: 'a'.repeat(AGENT_TEXT_MAX) }),
+    );
+
+    expect(flow.sent()).toHaveLength(1);
+  });
+
+  it('sends a request whose conversation key is exactly at the limit', async () => {
+    const flow = harness();
+
+    await flow.entry(
+      inputOf(invocationOn(channel), {
+        conversationKey: 'k'.repeat(CONVERSATION_KEY_MAX),
+      }),
     );
 
     expect(flow.sent()).toHaveLength(1);
