@@ -1,9 +1,20 @@
 import { randomUUID } from 'node:crypto';
+import { isValidObjectId } from '@growi/core/dist/utils/objectid-utils';
 
-import type { ChangeproposalsBasedOn, Prisma } from '~/generated/prisma/client';
-
-import type { OperationStatus, ProposalEntry } from '../../interfaces';
 import type {
+  ChangeproposalsBasedOn,
+  ChangeproposalsReviewers,
+  Prisma,
+} from '~/generated/prisma/client';
+
+import type {
+  OperationStatus,
+  ProposalEntry,
+  ReviewerKind,
+} from '../../interfaces';
+import { deriveViewerRole, type ViewerIdentity } from '../domain';
+import type {
+  AttributedApproval,
   ClosingLifecycle,
   CreateOperationInput,
   LinkedProposalRecord,
@@ -16,6 +27,7 @@ import {
   toOperationStatus,
   toOperationType,
   toProposalEntry,
+  toReviewerRef,
 } from './to-change-proposal-document';
 
 // An approval's by/channel/token are meaningless without approvedAt, so they go together.
@@ -226,5 +238,84 @@ export const toRequesterWriteMiss = (
   requesterId: string,
 ): RequesterWriteResult =>
   row == null || row.requester !== requesterId
+    ? { ok: false, code: 'not-found' }
+    : { ok: false, code: 'not-open' };
+
+// Prisma tells an absent field apart from a null one, so both count as "not approved".
+export const unapprovedOperation = {
+  OR: [{ approvedAt: { isSet: false } }, { approvedAt: null }],
+} satisfies Prisma.ChangeproposalsOperationsWhereInput;
+
+const reviewerIdsOfKind = (
+  kind: ReviewerKind,
+  ids: Iterable<string>,
+): Prisma.ChangeproposalsReviewersWhereInput[] => {
+  const valid = [...ids].filter((id) => isValidObjectId(id));
+  return valid.length === 0 ? [] : [{ kind, id: { in: valid } }];
+};
+
+// A reviewer entry that names the viewer or one of the viewer's groups, and was not removed.
+const activeReviewerMatching = (
+  viewer: ViewerIdentity,
+): Prisma.ChangeproposalsReviewersWhereInput => ({
+  AND: [
+    {
+      OR: [
+        ...reviewerIdsOfKind('user', [viewer.userId]),
+        ...reviewerIdsOfKind('user-group', viewer.userGroupIds),
+        ...reviewerIdsOfKind(
+          'external-user-group',
+          viewer.externalUserGroupIds,
+        ),
+      ],
+    },
+    { OR: [{ removedAt: { isSet: false } }, { removedAt: null }] },
+  ],
+});
+
+// The requester may always approve, whoever the reviewers are.
+export const approverWhere = (
+  approver: string | AttributedApproval,
+): Prisma.changeproposalsWhereInput =>
+  typeof approver === 'string'
+    ? { requester: approver }
+    : {
+        OR: [
+          { requester: approver.approver.userId },
+          {
+            reviewers: { some: activeReviewerMatching(approver.approver) },
+          },
+        ],
+      };
+
+export const toApprovalData = (
+  now: Date,
+  approver: string | AttributedApproval,
+): Prisma.ChangeproposalsOperationsUpdateInput =>
+  typeof approver === 'string'
+    ? { approvedAt: now }
+    : // Keyed like UNSET_APPROVAL so the fields written and the fields cleared cannot drift apart.
+      ({
+        approvedAt: now,
+        approvedBy: approver.approver.userId,
+        approvedChannel: approver.channel,
+        decisionToken: approver.decisionToken,
+      } satisfies Record<keyof typeof UNSET_APPROVAL, unknown>);
+
+// Tells why an approval write matched nothing; the approver may have been removed
+// from the reviewers after the caller's check, which reads as not-found.
+export const toReviewerWriteMiss = (
+  row: {
+    readonly requester: string;
+    readonly reviewers: readonly ChangeproposalsReviewers[];
+  } | null,
+  approver: ViewerIdentity,
+): RequesterWriteResult =>
+  row == null ||
+  deriveViewerRole(
+    row.requester,
+    row.reviewers.map(toReviewerRef),
+    approver,
+  ) === 'other'
     ? { ok: false, code: 'not-found' }
     : { ok: false, code: 'not-open' };

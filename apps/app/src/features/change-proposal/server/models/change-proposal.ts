@@ -13,6 +13,7 @@ import type {
   SkipReason,
 } from '../../interfaces';
 import {
+  approverWhere,
   closableWhere,
   hasPendingOperation,
   idNotIn,
@@ -23,16 +24,20 @@ import {
   SETTLED,
   settleableWhere,
   summarySelect,
+  toApprovalData,
   toLinkedProposalRecord,
   toOperationCreateInput,
   toOriginalOperationData,
   toOutcomeData,
   toRequesterWriteMiss,
+  toReviewerWriteMiss,
   UNSET_APPROVAL,
+  unapprovedOperation,
   withoutUndefined,
 } from './change-proposal-query-parts';
 import type {
   AppliedListCursor,
+  AttributedApproval,
   ClosingLifecycle,
   CreateProposalInput,
   LinkedProposalRecord,
@@ -251,41 +256,65 @@ export const extension = Prisma.defineExtension((client) => {
           );
         },
 
+        /**
+         * Approves the chosen pending, not-yet-approved operations. A requester id alone
+         * (auto-apply) records no approver. `ok` means only that the proposal matched, not
+         * that an operation was written: the caller re-reads the operations carrying its
+         * decisionToken to learn which ones this request approved.
+         */
         async markApproved(
           id: string,
-          requesterId: string,
+          approver: string | AttributedApproval,
           keys: readonly string[],
           now: Date,
         ): Promise<RequesterWriteResult> {
           const context =
             Prisma.getExtensionContext<typeof prisma.changeproposals>(this);
+          const approverId =
+            typeof approver === 'string' ? approver : approver.approver.userId;
           const written =
             isValidObjectId(id) &&
-            isValidObjectId(requesterId) &&
+            isValidObjectId(approverId) &&
             (await runConditionalWrite(() =>
               context.updateMany({
-                where: { id, requester: requesterId, lifecycle: 'open' },
+                where: { id, lifecycle: 'open', ...approverWhere(approver) },
                 data: {
                   operations: {
                     updateMany: {
-                      where: { key: { in: [...keys] }, status: PENDING },
-                      data: { approvedAt: now },
+                      where: {
+                        key: { in: [...keys] },
+                        status: PENDING,
+                        ...unapprovedOperation,
+                      },
+                      data: toApprovalData(now, approver),
                     },
                   },
                 },
               }),
             ));
-          return written
-            ? { ok: true }
-            : explainRequesterWriteMiss(
-                (pid) =>
-                  context.findUnique({
-                    where: { id: pid },
-                    select: { requester: true },
-                  }),
-                id,
-                requesterId,
-              );
+          if (written) {
+            return { ok: true };
+          }
+          if (typeof approver === 'string') {
+            return explainRequesterWriteMiss(
+              (pid) =>
+                context.findUnique({
+                  where: { id: pid },
+                  select: { requester: true },
+                }),
+              id,
+              approver,
+            );
+          }
+          return toReviewerWriteMiss(
+            isValidObjectId(id) && isValidObjectId(approverId)
+              ? await context.findUnique({
+                  where: { id },
+                  select: { requester: true, reviewers: true },
+                })
+              : null,
+            approver.approver,
+          );
         },
 
         /**

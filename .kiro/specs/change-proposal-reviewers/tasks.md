@@ -72,7 +72,7 @@
   - _Boundary: review-decision, derive-visible-stage_
 
 - [ ] 3. 承認と判断の記録の書き込み、作成での承認者
-- [ ] 3.1 承認の書き込みを承認者にも広げる
+- [x] 3.1 承認の書き込みを承認者にも広げる
   - 最初に、2.1〜2.3 で作った純関数を、純関数のディレクトリの barrel と、その `index.spec.ts` に登録する（3.2 以降と 4.x が、barrel を通して使う）
   - 承認の書き込みの条件を、依頼した人に加えて、承認者である人（本人、または所属グループの ID を持つ人）に広げ、承認した人・経路・日時・求めの印を、操作に書く。作成直後の自動反映は、承認した人を書かない呼び方を残す
   - 承認者向けに、書き込めなかった理由を判定する関数を足す（同時に承認者から外された場合は「見つからない」、提案が閉じた場合は「閉じている」）。依頼した人だけの操作が使う既存の関数は、変えない
@@ -267,3 +267,6 @@
 - 2.1: `server/domain/reviewer-model.ts` に置いた（barrel は未登録。登録は 3.1）。`ViewerIdentity` 型もここで export している。`isReviewer` は、有効な承認者が 1 件でもあれば依頼した人を承認者に含めない（design 299 行）。依頼した人の承認の権限は、呼び出し側が「依頼した人 または isReviewer」で判定する。
 - 2.2: `server/domain/review-scope.ts` に `reviewScopeOf` と `resolveAncestors` を置いた（barrel は未登録。登録は 3.1）。**4.1 の実装者へ**: `resolveAncestors` が `null` を返したとき（ルートのページまで空、または無い異常なデータ）は、その操作を「承認者に見えない操作」として扱う。core の `create.ts:51-56` は親が `null` だと閲覧の確認を飛ばして先へ進むが、まねると閲覧の確認なしで承認者に操作が見えて、要件 5.6 を破る。また、空のページを飛ばすことは、本物の空のページを使った結合テストで確かめる（`existingPaths` に空でないページのパスだけを渡す）。
 - 2.3: `server/domain/review-decision.ts`（`canApprove`）と `derive-visible-stage.ts`（`deriveVisibleStage`、`VisibleStage`）に置いた（barrel は未登録。登録は 3.1）。design に `deriveVisibleStage` の型が無かったので、引数は閲覧できる操作だけ `readonly Pick<OperationRecord, 'status' | 'reason'>[]`、戻り値は `VisibleStage`（`'open' | 'expired' | 'discarded' | 'withdrawn' | 'settled'`。core の `deriveProposalStatus` の第 1 引数にそのまま渡せる）とした。`canApprove` の `awaitingApply` は、承認を書いてから反映が終わるまでの間にだけ当てはまる。編集中で待ちに戻った操作は `UNSET_APPROVAL` で `approvedAt` が消えるので、`awaitingApply` にならず、再び承認できる（要件 2.10）。
+- 3.1: `server/domain/index.ts`（barrel）に 2.1〜2.3 の純関数を登録した。以後は barrel を通して import する。`markApproved` の 2 番目の引数は `string | AttributedApproval`（`{ approver: ViewerIdentity; channel: ReviewChannel; decisionToken: string }`）。文字列は今までの呼び方（作成直後の自動反映と requester-actions。承認した人などを書かない）。どちらの呼び方にも「未承認」（`approvedAt` が無いか null）の条件が付いたので、承認済みで反映がまだの操作を再承認しても、`approvedAt` は変わらない。`UNSET_APPROVAL` との食い違いは、`satisfies Record<keyof typeof UNSET_APPROVAL, unknown>` が型で防ぐ。承認者向けの書き込めなかった理由の判定は `toReviewerWriteMiss`（`change-proposal-query-parts.ts`）。
+- 3.1: **6.2 の実装者へ**: `markApproved` の `ok` は「提案が条件に合った」ことだけを表し、操作を書いたかどうかは表さない（Prisma が数えるのは文書の数）。操作を書いたかは、`decisionToken` で読み直して判定する。また、書き込みの衝突（Prisma のエラー P2034）であきらめると、`toReviewerWriteMiss` は lifecycle を読まないので、開いている提案でも `not-open` を返しうる（依頼した人の経路と同じ作り。960 回の同時承認では起きなかった）。6.2 で、lifecycle が `open` のまま権限があるなら、`not-open` を返さず読み直す形を検討する。
+- 3.1: 要件 2.8 の「承認した人が依頼した人自身か」は保存しない。応答を組み立てるとき（4.3）に `approvedBy === requester` から決める。

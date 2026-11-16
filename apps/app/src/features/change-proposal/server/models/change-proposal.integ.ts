@@ -3,6 +3,12 @@ import mongoose from 'mongoose';
 
 import { prisma } from '~/utils/prisma';
 
+import type {
+  ReviewChannel,
+  ReviewerKind,
+  ReviewerRef,
+} from '../../interfaces';
+import type { ViewerIdentity } from '../domain';
 import type { CreateProposalInput } from './change-proposal-types';
 
 // Concurrency checks: 2 callers rarely overlap enough to expose a split read/write,
@@ -819,6 +825,353 @@ describe('ChangeProposal model (Prisma extension)', () => {
 
       expect(ids).toContain(created._id);
       expect(ids).not.toContain(notApproved._id);
+    });
+  });
+
+  describe('markApproved by a reviewer', () => {
+    const identityOf = (
+      userId: string,
+      groups: {
+        readonly userGroupIds?: readonly string[];
+        readonly externalUserGroupIds?: readonly string[];
+      } = {},
+    ): ViewerIdentity => ({
+      userId,
+      userGroupIds: new Set(groups.userGroupIds ?? []),
+      externalUserGroupIds: new Set(groups.externalUserGroupIds ?? []),
+    });
+
+    const reviewerRef = (
+      kind: ReviewerKind,
+      id: string,
+      removedAt?: Date,
+    ): ReviewerRef => ({
+      kind,
+      id,
+      addedBy: newObjectId(),
+      addedAt: new Date(),
+      ...(removedAt == null ? {} : { removedBy: newObjectId(), removedAt }),
+    });
+
+    const approveAs = (
+      id: string,
+      approver: ViewerIdentity,
+      keys: readonly string[],
+      options: { channel?: ReviewChannel; token?: string; now?: Date } = {},
+    ) =>
+      prisma.changeproposals.markApproved(
+        id,
+        {
+          approver,
+          channel: options.channel ?? 'ui',
+          decisionToken: options.token ?? randomUUID(),
+        },
+        keys,
+        options.now ?? new Date(),
+      );
+
+    const approvalFieldsOf = async (id: string, key: string) => {
+      const read = await prisma.changeproposals.findProposal(id);
+      const op = read?.operations.find((o) => o.key === key);
+      return {
+        approvedAt: op?.approvedAt,
+        approvedBy: op?.approvedBy,
+        approvedChannel: op?.approvedChannel,
+        decisionToken: op?.decisionToken,
+      };
+    };
+
+    const noApproval = {
+      approvedAt: undefined,
+      approvedBy: undefined,
+      approvedChannel: undefined,
+      decisionToken: undefined,
+    };
+
+    it('writes the approver, channel, time and request token on the chosen pending operation of a user reviewer (Reviewers Req 2.1, 2.8)', async () => {
+      const reviewerId = newObjectId();
+      const created = await createProposal({
+        reviewers: [reviewerRef('user', reviewerId)],
+      });
+      const [chosen, other] = created.operations.map((op) => op.key);
+      const now = new Date();
+      const token = randomUUID();
+
+      const result = await approveAs(
+        created._id,
+        identityOf(reviewerId),
+        [chosen],
+        { channel: 'api', token, now },
+      );
+
+      expect(result).toStrictEqual({ ok: true });
+      expect(await approvalFieldsOf(created._id, chosen)).toStrictEqual({
+        approvedAt: now,
+        approvedBy: reviewerId,
+        approvedChannel: 'api',
+        decisionToken: token,
+      });
+      expect(await approvalFieldsOf(created._id, other)).toStrictEqual(
+        noApproval,
+      );
+    });
+
+    it('writes the approval of a member of a reviewer user group or external user group (Reviewers Req 2.4)', async () => {
+      const userGroupId = newObjectId();
+      const externalGroupId = newObjectId();
+      const created = await createProposal({
+        reviewers: [
+          reviewerRef('user-group', userGroupId),
+          reviewerRef('external-user-group', externalGroupId),
+        ],
+      });
+      const [first, second] = created.operations.map((op) => op.key);
+      const userGroupMember = newObjectId();
+      const externalGroupMember = newObjectId();
+
+      const byUserGroup = await approveAs(
+        created._id,
+        identityOf(userGroupMember, { userGroupIds: [userGroupId] }),
+        [first],
+      );
+      const byExternalGroup = await approveAs(
+        created._id,
+        identityOf(externalGroupMember, {
+          externalUserGroupIds: [externalGroupId],
+        }),
+        [second],
+      );
+
+      expect(byUserGroup).toStrictEqual({ ok: true });
+      expect(byExternalGroup).toStrictEqual({ ok: true });
+      expect((await approvalFieldsOf(created._id, first)).approvedBy).toBe(
+        userGroupMember,
+      );
+      expect((await approvalFieldsOf(created._id, second)).approvedBy).toBe(
+        externalGroupMember,
+      );
+    });
+
+    it('writes the approval of the requester even when only other people are reviewers (Reviewers Req 2.3)', async () => {
+      const requester = newRequester();
+      const created = await createProposal({
+        requester,
+        reviewers: [reviewerRef('user', newObjectId())],
+      });
+      const key = created.operations[0].key;
+
+      const result = await approveAs(created._id, identityOf(requester), [key]);
+
+      expect(result).toStrictEqual({ ok: true });
+      expect((await approvalFieldsOf(created._id, key)).approvedBy).toBe(
+        requester,
+      );
+    });
+
+    it('writes nothing for a user who is neither the requester nor a reviewer, and answers not-found (Reviewers Req 2.7)', async () => {
+      const groupId = newObjectId();
+      const created = await createProposal({
+        reviewers: [
+          reviewerRef('user', newObjectId()),
+          reviewerRef('user-group', groupId),
+        ],
+      });
+      const key = created.operations[0].key;
+      // The group id is held only as an external group, so the kind does not match.
+      const outsider = identityOf(newObjectId(), {
+        externalUserGroupIds: [groupId],
+      });
+
+      const result = await approveAs(created._id, outsider, [key]);
+
+      expect(result).toStrictEqual({ ok: false, code: 'not-found' });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual(
+        noApproval,
+      );
+    });
+
+    it('answers not-found to a reviewer removed just before the write, and writes nothing (Reviewers Req 2.7)', async () => {
+      const removedReviewer = newObjectId();
+      const created = await createProposal({
+        reviewers: [
+          reviewerRef('user', newObjectId()),
+          reviewerRef('user', removedReviewer, new Date()),
+        ],
+      });
+      const key = created.operations[0].key;
+
+      const result = await approveAs(created._id, identityOf(removedReviewer), [
+        key,
+      ]);
+
+      expect(result).toStrictEqual({ ok: false, code: 'not-found' });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual(
+        noApproval,
+      );
+    });
+
+    it('answers not-found for a missing or malformed proposal id', async () => {
+      const approver = identityOf(newObjectId());
+
+      expect(await approveAs(newObjectId(), approver, ['k'])).toStrictEqual({
+        ok: false,
+        code: 'not-found',
+      });
+      expect(await approveAs('not-an-id', approver, ['k'])).toStrictEqual({
+        ok: false,
+        code: 'not-found',
+      });
+    });
+
+    it('answers not-open to a reviewer and to the requester on a closed proposal (Reviewers Req 2.9)', async () => {
+      const reviewerId = newObjectId();
+      const created = await createProposal({
+        reviewers: [reviewerRef('user', reviewerId)],
+      });
+      const key = created.operations[0].key;
+      await prisma.changeproposals.closeIfStillOpen(
+        created._id,
+        'withdrawn',
+        new Date(),
+      );
+
+      const byReviewer = await approveAs(created._id, identityOf(reviewerId), [
+        key,
+      ]);
+      const byRequester = await approveAs(
+        created._id,
+        identityOf(created.requester),
+        [key],
+      );
+
+      expect(byReviewer).toStrictEqual({ ok: false, code: 'not-open' });
+      expect(byRequester).toStrictEqual({ ok: false, code: 'not-open' });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual(
+        noApproval,
+      );
+    });
+
+    it('keeps the first approval when another reviewer approves the same operation later (Reviewers Req 2.5)', async () => {
+      const first = newObjectId();
+      const second = newObjectId();
+      const created = await createProposal({
+        reviewers: [reviewerRef('user', first), reviewerRef('user', second)],
+      });
+      const key = created.operations[0].key;
+      const firstAt = new Date(Date.now() - 1000);
+      const firstToken = randomUUID();
+      await approveAs(created._id, identityOf(first), [key], {
+        channel: 'ui',
+        token: firstToken,
+        now: firstAt,
+      });
+
+      const later = await approveAs(created._id, identityOf(second), [key], {
+        channel: 'api',
+        token: randomUUID(),
+      });
+
+      expect(later).toStrictEqual({ ok: true });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual({
+        approvedAt: firstAt,
+        approvedBy: first,
+        approvedChannel: 'ui',
+        decisionToken: firstToken,
+      });
+    });
+
+    it(
+      'writes the approval of exactly one of many concurrent group members (Reviewers Req 2.5)',
+      async () => {
+        for (let round = 0; round < ROUNDS; round++) {
+          const groupId = newObjectId();
+          const created = await createProposal({
+            reviewers: [reviewerRef('user-group', groupId)],
+          });
+          const key = created.operations[0].key;
+          const members = Array.from({ length: CONCURRENCY }, () => ({
+            userId: newObjectId(),
+            token: randomUUID(),
+          }));
+
+          await Promise.all(
+            members.map((member) =>
+              approveAs(
+                created._id,
+                identityOf(member.userId, { userGroupIds: [groupId] }),
+                [key],
+                { token: member.token },
+              ),
+            ),
+          );
+
+          const written = await approvalFieldsOf(created._id, key);
+          const winner = members.find((m) => m.token === written.decisionToken);
+          expect(winner).toBeDefined();
+          expect(written.approvedBy).toBe(winner?.userId);
+        }
+      },
+      CONCURRENCY_TIMEOUT_MS,
+    );
+
+    it('lets another reviewer approve again after the operation went back to waiting (Reviewers Req 2.10)', async () => {
+      const first = newObjectId();
+      const second = newObjectId();
+      const created = await createProposal({
+        operations: [editOp()],
+        reviewers: [reviewerRef('user', first), reviewerRef('user', second)],
+      });
+      const key = created.operations[0].key;
+      await approveAs(created._id, identityOf(first), [key]);
+      const lease = randomUUID();
+      await prisma.changeproposals.claimApplyLease(
+        created._id,
+        lease,
+        new Date(),
+      );
+      await prisma.changeproposals.recordOperationOutcome(
+        created._id,
+        lease,
+        key,
+        { status: 'pending', reason: 'page-being-edited' },
+        new Date(),
+      );
+      await prisma.changeproposals.releaseApplyLease(created._id, lease);
+      const now = new Date();
+      const token = randomUUID();
+
+      const result = await approveAs(created._id, identityOf(second), [key], {
+        channel: 'ai-tool',
+        token,
+        now,
+      });
+
+      expect(result).toStrictEqual({ ok: true });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual({
+        approvedAt: now,
+        approvedBy: second,
+        approvedChannel: 'ai-tool',
+        decisionToken: token,
+      });
+    });
+
+    it('writes no approver, channel or token when auto-apply approves for the requester', async () => {
+      const created = await createProposal({ operations: [editOp()] });
+      const key = created.operations[0].key;
+      const now = new Date();
+
+      const result = await prisma.changeproposals.markApproved(
+        created._id,
+        created.requester,
+        [key],
+        now,
+      );
+
+      expect(result).toStrictEqual({ ok: true });
+      expect(await approvalFieldsOf(created._id, key)).toStrictEqual({
+        ...noApproval,
+        approvedAt: now,
+      });
     });
   });
 

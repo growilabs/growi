@@ -230,7 +230,7 @@ export const toBasedOn = (row: ChangeproposalsBasedOn): BasedOn => ({
   operationKeys: [...row.operationKeys],
 });
 
-const toReviewerRef = (row: ChangeproposalsReviewers): ReviewerRef => ({
+export const toReviewerRef = (row: ChangeproposalsReviewers): ReviewerRef => ({
   kind: toMember(REVIEWER_KINDS, row.kind, 'reviewer kind'),
   id: row.id,
   addedBy: row.addedBy,

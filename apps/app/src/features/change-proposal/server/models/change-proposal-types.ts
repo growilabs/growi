@@ -7,11 +7,13 @@ import type {
   ProposalEntry,
   ProposalMark,
   RevertRefusalReason,
+  ReviewChannel,
   ReviewerRef,
   SkipReason,
   StaleReason,
   WaitingReason,
 } from '../../interfaces';
+import type { ViewerIdentity } from '../domain';
 
 export type CreateOperationInput = OperationPayload & {
   readonly revertTarget?: ProposalMark;
@@ -34,6 +36,13 @@ export type CreateProposalInput = {
 export type RequesterWriteResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly code: 'not-found' | 'not-open' };
+
+// An approval made by a request, so it records who approved, from where, and which request wrote it.
+export type AttributedApproval = {
+  readonly approver: ViewerIdentity;
+  readonly channel: ReviewChannel;
+  readonly decisionToken: string;
+};
 
 export type RecordedOutcome =
   | {
