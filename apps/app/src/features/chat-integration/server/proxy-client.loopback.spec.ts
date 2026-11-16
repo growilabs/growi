@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto';
-import type { IncomingHttpHeaders, Server } from 'node:http';
+import type { IncomingHttpHeaders, Server, ServerResponse } from 'node:http';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type {
@@ -26,6 +26,7 @@ import {
   fetchConversation,
   notify,
   OP_DEADLINES_MS,
+  type ProxyCallOptions,
   pushSettings,
   registerKeyWithProxy,
   revokeKeyWithProxy,
@@ -48,7 +49,10 @@ interface ReceivedRequest {
 type Responder = (
   received: ReceivedRequest,
   respond: (status: number, body: string) => void,
+  res: ServerResponse,
 ) => void;
+
+type SignedOp = keyof typeof OP_DEADLINES_MS;
 
 describe('proxy-client against a loopback proxy', () => {
   let mongod: MongoMemoryServer | undefined;
@@ -72,10 +76,14 @@ describe('proxy-client against a loopback proxy', () => {
           body: Buffer.concat(chunks).toString('utf8'),
         };
         received.push(request);
-        responder(request, (status, body) => {
-          res.writeHead(status, { 'content-type': 'application/json' });
-          res.end(body);
-        });
+        responder(
+          request,
+          (status, body) => {
+            res.writeHead(status, { 'content-type': 'application/json' });
+            res.end(body);
+          },
+          res,
+        );
       });
     });
     await new Promise<void>((resolve) =>
@@ -246,24 +254,22 @@ describe('proxy-client against a loopback proxy', () => {
 
   describe('a proxy that never answers', () => {
     const SHORT_MS = 150;
-    const shortDeadlines = {
-      ...OP_DEADLINES_MS,
-      [OP_NAMES.notification]: SHORT_MS,
-      [OP_NAMES.settingsPush]: SHORT_MS,
-      [OP_NAMES.keyRegisterToProxy]: SHORT_MS,
-      [OP_NAMES.keyRevokeToProxy]: SHORT_MS,
-      [OP_NAMES.capabilities]: SHORT_MS,
-      [OP_NAMES.connectionStatus]: SHORT_MS,
-      [OP_NAMES.channels]: SHORT_MS,
-      [OP_NAMES.commandAnswer]: SHORT_MS,
-      [OP_NAMES.conversation]: SHORT_MS,
+    // Only the op under test gets the short deadline; every other op gets a
+    // value far past the per-test limit, so a call reading another op's
+    // deadline hangs and fails the test.
+    const deadlinesOnlyFor = (op: SignedOp) => {
+      const deadlinesMs = { ...OP_DEADLINES_MS };
+      for (const name of Object.keys(deadlinesMs) as SignedOp[]) {
+        deadlinesMs[name] = name === op ? SHORT_MS : 60_000;
+      }
+      return { deadlinesMs };
     };
-    const options = { deadlinesMs: shortDeadlines };
 
     it.each([
       [
         'notify',
-        (id: string) =>
+        OP_NAMES.notification,
+        (id: string, options: ProxyCallOptions) =>
           notify(
             id,
             {
@@ -279,7 +285,8 @@ describe('proxy-client against a loopback proxy', () => {
       ],
       [
         'pushSettings',
-        (id: string) =>
+        OP_NAMES.settingsPush,
+        (id: string, options: ProxyCallOptions) =>
           pushSettings(
             id,
             {
@@ -291,7 +298,8 @@ describe('proxy-client against a loopback proxy', () => {
       ],
       [
         'registerKeyWithProxy',
-        (id: string) =>
+        OP_NAMES.keyRegisterToProxy,
+        (id: string, options: ProxyCallOptions) =>
           registerKeyWithProxy(
             id,
             {
@@ -304,35 +312,78 @@ describe('proxy-client against a loopback proxy', () => {
       ],
       [
         'revokeKeyWithProxy',
-        (id: string) => revokeKeyWithProxy(id, 'k', options),
+        OP_NAMES.keyRevokeToProxy,
+        (id: string, options: ProxyCallOptions) =>
+          revokeKeyWithProxy(id, 'k', options),
       ],
-      ['fetchCapabilities', (id: string) => fetchCapabilities(id, options)],
+      [
+        'fetchCapabilities',
+        OP_NAMES.capabilities,
+        (id: string, options: ProxyCallOptions) =>
+          fetchCapabilities(id, options),
+      ],
       [
         'fetchConnectionStatus',
-        (id: string) => fetchConnectionStatus(id, options),
+        OP_NAMES.connectionStatus,
+        (id: string, options: ProxyCallOptions) =>
+          fetchConnectionStatus(id, options),
       ],
-      ['fetchChannels', (id: string) => fetchChannels(id, options)],
+      [
+        'fetchChannels',
+        OP_NAMES.channels,
+        (id: string, options: ProxyCallOptions) => fetchChannels(id, options),
+      ],
       [
         'sendCommandAnswer',
-        (id: string) =>
+        OP_NAMES.commandAnswer,
+        (id: string, options: ProxyCallOptions) =>
           sendCommandAnswer(id, { requestId: 'r', answer }, options),
       ],
       [
         'fetchConversation',
-        (id: string) => fetchConversation(id, { requestId: 'r' }, options),
+        OP_NAMES.conversation,
+        (id: string, options: ProxyCallOptions) =>
+          fetchConversation(id, { requestId: 'r' }, options),
       ],
-    ])('%s comes back as an unreachable failure at its deadline', async (label, call) => {
-      const relationId = `relation-hang-${label}`;
+    ])(
+      '%s comes back as an unreachable failure at its own op deadline',
+      async (label, op, call) => {
+        const relationId = `relation-hang-${label}`;
+        await setUpRelation(relationId);
+        responder = () => {};
+
+        const startedAt = Date.now();
+        const outcome = await call(relationId, deadlinesOnlyFor(op));
+
+        expect(outcome).toEqual({ ok: false, reason: 'unreachable' });
+        expect(Date.now() - startedAt).toBeGreaterThanOrEqual(SHORT_MS - 20);
+        expect(Date.now() - startedAt).toBeLessThan(5000);
+      },
+      5_000,
+    );
+
+    it('fails at the deadline when the proxy sends headers at once and then trickles the body', async () => {
+      const relationId = 'relation-trickle';
       await setUpRelation(relationId);
-      responder = () => {};
+      let trickle: NodeJS.Timeout | undefined;
+      responder = (_r, _respond, res) => {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.flushHeaders();
+        res.on('close', () => clearInterval(trickle));
+        trickle = setInterval(() => res.write(' '), 50);
+      };
 
       const startedAt = Date.now();
-      const outcome = await call(relationId);
+      const outcome = await fetchChannels(
+        relationId,
+        deadlinesOnlyFor(OP_NAMES.channels),
+      );
+      const elapsed = Date.now() - startedAt;
 
       expect(outcome).toEqual({ ok: false, reason: 'unreachable' });
-      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(SHORT_MS - 20);
-      expect(Date.now() - startedAt).toBeLessThan(5000);
-    });
+      expect(elapsed).toBeGreaterThanOrEqual(SHORT_MS - 20);
+      expect(elapsed).toBeLessThan(2_000);
+    }, 5_000);
   });
 
   describe('the production deadline table', () => {

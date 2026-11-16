@@ -1,7 +1,7 @@
 // GROWI's single outbound channel to the chat-integration proxy (design.md
-// `ProxyClient`, Requirements 1.3, 1.4, 10.1). Every one of the 8 things
-// GROWI sends to the proxy goes through the two low-level helpers below
-// (`callSignedOp` for the 7 signed ops, `submitPairing` for the one
+// `ProxyClient`, Requirements 1.3, 1.4, 10.1). Every thing GROWI
+// sends to the proxy goes through the low-level helpers below
+// (`callSignedOp` for the signed ops, `submitPairing` for the one
 // unsigned one) -- so a caller can never build a proxy request from scratch
 // and skip one of the properties this file exists to guarantee.
 //
@@ -303,9 +303,8 @@ const sendSigned = async (
  */
 const callSignedOp = async <T extends object>(
   relationId: string,
-  op: SignedProxyOp,
+  { op, parse }: { readonly op: SignedProxyOp; readonly parse: Parse<T> },
   bodyFields: Record<string, unknown>,
-  parse: Parse<T>,
   options: ProxyCallOptions,
 ): Promise<ProxyCallResult<T>> => {
   const sent = await sendSigned(relationId, op, bodyFields, options);
@@ -338,9 +337,8 @@ export const notify = (
 ): Promise<ProxyCallResult<NotificationResult>> =>
   callSignedOp<NotificationResult>(
     relationId,
-    OP_NAMES.notification,
+    { op: OP_NAMES.notification, parse: parseNotificationResult },
     params,
-    parseNotificationResult,
     options,
   );
 
@@ -378,9 +376,8 @@ export const registerKeyWithProxy = (
 ): Promise<ProxyCallResult<KeyOperationResult>> =>
   callSignedOp<KeyOperationResult>(
     relationId,
-    OP_NAMES.keyRegisterToProxy,
+    { op: OP_NAMES.keyRegisterToProxy, parse: parseKeyOperationResult },
     { key },
-    parseKeyOperationResult,
     options,
   );
 
@@ -392,9 +389,8 @@ export const revokeKeyWithProxy = (
 ): Promise<ProxyCallResult<KeyOperationResult>> =>
   callSignedOp<KeyOperationResult>(
     relationId,
-    OP_NAMES.keyRevokeToProxy,
+    { op: OP_NAMES.keyRevokeToProxy, parse: parseKeyOperationResult },
     { keyId },
-    parseKeyOperationResult,
     options,
   );
 
@@ -405,9 +401,8 @@ export const fetchCapabilities = (
 ): Promise<ProxyCallResult<CapabilityReport>> =>
   callSignedOp<CapabilityReport>(
     relationId,
-    OP_NAMES.capabilities,
+    { op: OP_NAMES.capabilities, parse: parseCapabilityReport },
     {},
-    parseCapabilityReport,
     options,
   );
 
@@ -418,9 +413,8 @@ export const fetchConnectionStatus = (
 ): Promise<ProxyCallResult<ConnectionStatusView>> =>
   callSignedOp<ConnectionStatusView>(
     relationId,
-    OP_NAMES.connectionStatus,
+    { op: OP_NAMES.connectionStatus, parse: parseConnectionStatusView },
     {},
-    parseConnectionStatusView,
     options,
   );
 
@@ -431,9 +425,8 @@ export const fetchChannels = (
 ): Promise<ProxyCallResult<ChannelInventory>> =>
   callSignedOp<ChannelInventory>(
     relationId,
-    OP_NAMES.channels,
+    { op: OP_NAMES.channels, parse: parseChannelInventory },
     {},
-    parseChannelInventory,
     options,
   );
 
@@ -449,9 +442,8 @@ export const sendCommandAnswer = (
 ): Promise<ProxyCallResult<CommandAnswerResult>> =>
   callSignedOp<CommandAnswerResult>(
     relationId,
-    OP_NAMES.commandAnswer,
+    { op: OP_NAMES.commandAnswer, parse: parseCommandAnswerResult },
     params,
-    parseCommandAnswerResult,
     options,
   );
 
@@ -463,9 +455,8 @@ export const fetchConversation = (
 ): Promise<ProxyCallResult<ConversationResult>> =>
   callSignedOp<ConversationResult>(
     relationId,
-    OP_NAMES.conversation,
+    { op: OP_NAMES.conversation, parse: parseConversationResult },
     params,
-    parseConversationResult,
     options,
   );
 
