@@ -39,7 +39,12 @@ export type CapabilityName =
   | 'card'
   | 'linkPreview'
   | 'fetchMessages'
-  | 'plainReply';
+  | 'plainReply'
+  | 'agent-answer-in-thread'
+  | 'agent-continue-conversation'
+  | 'conversation-summary'
+  | 'ephemeral-in-unreplied-thread'
+  | 'free-text-agent-in-direct';
 
 type CapabilityRow = Readonly<Record<PlatformName, CapabilityLevel>>;
 
@@ -123,6 +128,47 @@ export const CAPABILITY_TABLE: Readonly<Record<CapabilityName, CapabilityRow>> =
       teams: 'unverified',
       mattermost: 'unverified',
     },
+    // Rows below are the `agent` command's (chat-integration-agent spec,
+    // design.md 'PlatformFacade に足す操作'). 'unverified' on the first and
+    // fourth means the API call is wired but how a real client renders it has
+    // not been confirmed (spec tasks 6.3).
+    'agent-answer-in-thread': {
+      slack: 'unverified',
+      discord: 'none',
+      teams: 'unverified',
+      mattermost: 'unverified',
+    },
+    // Slack continues in the AI app view when SLACK_AGENT_VIEW is on and in
+    // the bot DM otherwise; Teams DMs have no reply hierarchy and Discord
+    // refuses DM requests.
+    'agent-continue-conversation': {
+      slack: 'full',
+      discord: 'none',
+      teams: 'none',
+      mattermost: 'full',
+    },
+    // The level also carries how much can be read: `degraded` means the
+    // history read can fall short of the whole conversation beyond the
+    // per-call cap in conversation-history.ts.
+    'conversation-summary': {
+      slack: 'degraded',
+      discord: 'full',
+      teams: 'unverified',
+      mattermost: 'degraded',
+    },
+    'ephemeral-in-unreplied-thread': {
+      slack: 'unverified',
+      discord: 'none',
+      teams: 'unverified',
+      mattermost: 'unverified',
+    },
+    // Slack only, and only while SLACK_AGENT_VIEW is on (off by default).
+    'free-text-agent-in-direct': {
+      slack: 'degraded',
+      discord: 'none',
+      teams: 'none',
+      mattermost: 'none',
+    },
   };
 
 /**
@@ -161,6 +207,9 @@ export const CAPABILITY_SUBSTITUTE: Readonly<
     'Tell the user that link previews are unavailable on this service.',
   // 呼びかけ付きの返信にする
   plainReply: 'Reply with the user mentioned in the message.',
+  // research.md の「Slack のチャンネルでの答えの出し方」の決定 2
+  'ephemeral-in-unreplied-thread':
+    'Post the private answer at the channel level instead of inside the thread.',
 };
 
 /** The raw level, for a caller that needs to tell `degraded` apart from `none`. */

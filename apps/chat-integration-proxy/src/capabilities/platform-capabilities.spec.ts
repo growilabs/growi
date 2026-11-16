@@ -223,3 +223,49 @@ describe('buildCapabilityReport() (Requirement 1.3)', () => {
     expect(levelOf('discord')).toBe('none');
   });
 });
+
+describe('agent capability rows in the report (Requirements 1.20, 15.9)', () => {
+  const report = buildCapabilityReport();
+  const reported = (platform: PlatformName, capability: string) =>
+    report.platforms
+      .find((entry) => entry.platform === platform)
+      ?.capabilities.find((row) => row.capability === capability);
+
+  // slack, discord, teams, mattermost
+  const EXPECTED: Readonly<
+    Record<string, readonly [string, string, string, string]>
+  > = {
+    'agent-answer-in-thread': [
+      'unverified',
+      'none',
+      'unverified',
+      'unverified',
+    ],
+    'agent-continue-conversation': ['full', 'none', 'none', 'full'],
+    'conversation-summary': ['degraded', 'full', 'unverified', 'degraded'],
+    'ephemeral-in-unreplied-thread': [
+      'unverified',
+      'none',
+      'unverified',
+      'unverified',
+    ],
+    'free-text-agent-in-direct': ['degraded', 'none', 'none', 'none'],
+  };
+
+  it.each(
+    Object.entries(EXPECTED),
+  )('reports %s at the level each service has', (capability, levels) => {
+    ALL_PLATFORMS.forEach((platform, index) => {
+      expect(reported(platform, capability)?.level).toBe(levels[index]);
+    });
+  });
+
+  it('names the channel-level fallback where an unreplied thread cannot show a private message', () => {
+    expect(
+      reported('slack', 'ephemeral-in-unreplied-thread')?.substitute,
+    ).toEqual(expect.any(String));
+    expect(
+      reported('discord', 'ephemeral-in-unreplied-thread')?.substitute,
+    ).toEqual(expect.any(String));
+  });
+});
