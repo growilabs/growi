@@ -4,7 +4,7 @@
   - `apps/app/src/features/search/client/utils/format-truncated-page-path.ts` と `.spec.ts` を `apps/app/src/client/util/` へ移動する(内容は変更しない)
   - `apps/app/src/features/search/client/components/SearchResultPagePath.tsx` の import 元を新しいパスに更新する
   - 移設後、検索モーダルの既存テスト(`format-truncated-page-path.spec.ts`、`SearchResultPagePath.spec.tsx`)を実行し、そのまま green であることを確認する(挙動無変更の証跡)
-  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 7.1, 7.2_
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 7.1, 7.2_
   - _Boundary: formatTruncatedPagePath_
 
 - [x] 2. Core: 中間省略判定と `LinkedPagePath` の橋渡し純粋関数を実装する
@@ -12,16 +12,16 @@
   - ルート/0 祖先(ホームアイコンのみ)、3 単位以下(全祖先)、4 単位以上(先頭＋省略記号＋直近祖先のみ)、ハイライト付き(対応する祖先にのみ `highlightedHtml` が設定される)の各ケースを実装する
   - プレーン/ハイライトチェーンの総ノード数が一致しない場合、祖先パス全体をプレーンテキストにフォールバックする防御的分岐を実装する(ノード単位の部分フォールバックにはしない)
   - `build-ancestor-path-nodes.spec.ts` を新規作成し、上記すべてのケースを検証するユニットテストが green であることを確認する
-  - _Requirements: 2.1, 2.2, 2.3, 5.1, 5.2, 6.1, 6.2_
+  - _Requirements: 1.2, 2.1, 2.2, 5.1, 5.2, 6.1, 6.2_
   - _Boundary: buildAncestorPathNodes_
 
 - [x] 3. Core: 検索結果一覧専用の祖先パス表示コンポーネントを実装する
   - `apps/app/src/features/search/client/components/SearchResultAncestorPath.tsx` を実装し、`buildAncestorPathNodes` の結果を、生存セグメントは `Link`(ハイライトがあれば markup 込み)、省略記号は非リンクのプレーンテキストとして描画する
   - コンテナに `title` 属性としてページ名を含む完全パスを常時付与する
   - 祖先 0 件の場合は現行の `PagePathHierarchicalLink` root 分岐と同じホーム/ゴミ箱アイコン表現を描画する
-  - `SearchResultAncestorPath.module.scss` に、1 行固定・`flex-shrink` によるセグメント単位のオーバーフロー安全網(検索結果一覧の行幅制約に合わせた優先度)を実装する
+  - `SearchResultAncestorPath.module.scss` に、パスを 1 行に固定するスタイルを実装する
   - `SearchResultAncestorPath.spec.tsx` を新規作成し、`title` の内容、省略記号が非リンクであること、生存セグメントの `href`、ハイライト markup の反映、祖先 0 件時のアイコン描画のテストが green であることを確認する
-  - _Requirements: 1.1, 1.2, 1.3, 3.1, 3.2, 3.3, 4.1, 5.1, 5.2, 6.1, 6.2_
+  - _Requirements: 1.1, 1.3, 3.1, 3.8, 4.1, 5.1, 5.2, 6.1, 6.2_
   - _Boundary: SearchResultAncestorPath_
 
 - [x] 4. Integration: `PageListItemL` のオプトイン配線と `/_search` への適用
@@ -43,11 +43,7 @@
   - devcontainer の dev server で `/_search` を開き、階層の深い実データ(または深い階層のテストページ)を検索して、祖先パスが 1 行に収まりホバーでフルパスが確認できること、生存セグメントのクリック遷移、検索キーワードのハイライトが機能することを目視確認する
   - `PageList.tsx`(子ページ一覧)・`IdenticalPathPage.tsx`(パス重複選択画面)を実際に開き、表示が変更前と同じ(全セグメント表示のまま)であることを確認する
   - `turbo run lint --filter @growi/app`・`turbo run test --filter @growi/app`・`turbo run build --filter @growi/app` を実行し、すべて green であることを確認する
-  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 4.1, 5.1, 5.2, 6.1, 6.2, 7.1, 7.2, 8.1, 9.1, 9.2_
-
-## 改訂: 省略表記の統一（issue #194253）
-
-> タスク 1〜5 は初版の記録（要件番号は改訂前のもの。旧 2.3 は改訂後の 1.2 に相当）。以下は改訂後の requirements.md / design.md に基づく。
+  - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 3.1, 3.8, 4.1, 5.1, 5.2, 6.1, 6.2, 7.1, 7.2, 8.1, 9.1, 9.2_
 
 - [x] 6. Foundation: 畳み込み段階の定義
 - [x] 6.1 中間省略の判定に「畳み込み段階」を加える
