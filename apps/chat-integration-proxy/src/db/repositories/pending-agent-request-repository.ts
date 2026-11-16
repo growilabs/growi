@@ -50,6 +50,28 @@ export interface PendingAgentRequestRepository {
    * went, so a request already gone is not an error.
    */
   delete(relationId: string, requestId: string): Promise<number>;
+  /**
+   * Marks the request `delivering` as of `claimedAt`, in one conditional
+   * write, when no delivery has started or the current mark is older than
+   * `staleBefore`. Answers whether this call took the claim, so of several
+   * callers at once exactly one gets `true`.
+   */
+  claimDelivery(
+    relationId: string,
+    requestId: string,
+    claimedAt: Date,
+    staleBefore: Date,
+  ): Promise<boolean>;
+  /**
+   * Stores how the delivery claimed at `claimedAt` ended. Does nothing once
+   * that claim has been taken over, so only the current claim settles it.
+   */
+  recordDeliveryResult(
+    relationId: string,
+    requestId: string,
+    claimedAt: Date,
+    result: Exclude<AgentDeliveryStatus, 'delivering'>,
+  ): Promise<void>;
   /** Deletes every row past its `expiresAt`; scheduling is `runtime/sweeper.ts`. */
   deleteExpired(now: Date): Promise<number>;
   /** Part of the ordered removal of one relation (`db/relation-cascade.ts`). */
@@ -125,6 +147,38 @@ export const createPendingAgentRequestRepository = (
       where: { relationId, requestId },
     });
     return result.count;
+  },
+
+  claimDelivery: async (relationId, requestId, claimedAt, staleBefore) => {
+    // `updateMany`: its `where` may carry the condition, and its count says
+    // whether this UPDATE (not a concurrent one) changed the row.
+    const result = await db.pendingAgentRequest.updateMany({
+      where: {
+        relationId,
+        requestId,
+        OR: [
+          { deliveryStatus: null },
+          {
+            deliveryStatus: 'delivering',
+            deliveryClaimedAt: { lt: staleBefore },
+          },
+        ],
+      },
+      data: { deliveryStatus: 'delivering', deliveryClaimedAt: claimedAt },
+    });
+    return result.count === 1;
+  },
+
+  recordDeliveryResult: async (relationId, requestId, claimedAt, result) => {
+    await db.pendingAgentRequest.updateMany({
+      where: {
+        relationId,
+        requestId,
+        deliveryStatus: 'delivering',
+        deliveryClaimedAt: claimedAt,
+      },
+      data: { deliveryStatus: result },
+    });
   },
 
   deleteExpired: async (now) => {

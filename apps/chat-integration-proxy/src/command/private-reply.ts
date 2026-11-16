@@ -44,10 +44,20 @@ export type PrivateReplyOutcome =
   | { readonly kind: 'direct'; readonly directChannel: SdkChannelRef }
   | { readonly kind: 'undeliverable' };
 
+/** How one reply is placed, beyond what its origin says. */
+export interface PrivateReplyOptions {
+  /**
+   * The thread the in-place message is shown under. Absent or `null`, it is
+   * shown where replies always are; `origin.threadRootId` is never read for it.
+   */
+  readonly threadRootId?: string | null;
+}
+
 export interface PrivateReplier {
   reply(
     origin: PrivateReplyOrigin,
     message: OutboundMessage,
+    options?: PrivateReplyOptions,
   ): Promise<PrivateReplyOutcome>;
   /**
    * Tells the requester the request was received, without content: a reaction on the
@@ -288,6 +298,7 @@ export const createPrivateReplier = (
     origin: PrivateReplyOrigin,
     message: OutboundMessage,
     scope: Scope,
+    threadRootId: string | null = null,
   ): Promise<PrivateReplyOutcome> => {
     const ephemeral = await settle<EphemeralPostOutcome>(
       () =>
@@ -298,6 +309,7 @@ export const createPrivateReplier = (
             platform.postEphemeral(origin.channel, origin.actor, message, {
               ...scope,
               requestMessageId: origin.sourceMessageId,
+              ...(threadRootId == null ? {} : { threadRootId }),
             }),
           (outcome) => ({
             ok: outcome.ok,
@@ -357,8 +369,13 @@ export const createPrivateReplier = (
   };
 
   return {
-    async reply(origin, message) {
-      return deliver(origin, message, await scopeOf(origin));
+    async reply(origin, message, options) {
+      return deliver(
+        origin,
+        message,
+        await scopeOf(origin),
+        options?.threadRootId ?? null,
+      );
     },
     async acknowledge(origin, fallback) {
       const scope = await scopeOf(origin);

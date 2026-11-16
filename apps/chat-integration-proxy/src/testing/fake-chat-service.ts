@@ -64,6 +64,8 @@ export interface CapturedPost {
   readonly messageId?: string;
   /** Set on a thread post, and on an ephemeral shown inside a thread. */
   readonly threadRootId?: string;
+  /** Set on a channel post or a thread post whose caller named the installation. */
+  readonly installationId?: string;
   readonly message: OutboundMessage;
 }
 
@@ -233,11 +235,22 @@ export const createFakeChatService = (
   };
 
   const facade: PlatformFacade = {
-    post: async (channel, message) =>
-      capture({ kind: 'post', channel, message }),
+    post: async (channel, message, scope) =>
+      capture({
+        kind: 'post',
+        channel,
+        ...(scope == null ? {} : { installationId: scope.installationId }),
+        message,
+      }),
 
-    postInThread: async (channel, threadRootId, message) =>
-      capture({ kind: 'thread-post', channel, threadRootId, message }),
+    postInThread: async (channel, threadRootId, message, scope) =>
+      capture({
+        kind: 'thread-post',
+        channel,
+        threadRootId,
+        installationId: scope.installationId,
+        message,
+      }),
 
     setProcessingStatus: (channel, threadRootId, scope) => {
       processingStatuses.push({

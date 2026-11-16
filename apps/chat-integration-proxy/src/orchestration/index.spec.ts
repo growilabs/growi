@@ -12,6 +12,7 @@ describe('orchestration/ public entry point', () => {
     expect(Object.keys(orchestrationLayer).sort()).toEqual([
       'createAdminFlow',
       'createAgentFlow',
+      'createAnswerFlow',
       'createCommandFlow',
       'createEventSink',
       'createInboundFlow',

@@ -852,6 +852,148 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       ).resolves.not.toBeNull();
     });
 
+    describe('claiming a delivery', () => {
+      const CLAIMED_AT = new Date('2026-11-01T00:00:00.000Z');
+      const later = (ms: number) => new Date(CLAIMED_AT.getTime() + ms);
+
+      const pendingRequest = async (label: string) => {
+        const { prisma, installationId, relation } = await newRelation(label);
+        const repository = createPendingAgentRequestRepository(prisma);
+        await repository.create({
+          relationId: relation.relationId,
+          requestId: 'req-1',
+          installationId,
+          origin: originOf(`D-${randomUUID()}`),
+          expiresAt: new Date(Date.now() + 86_400_000),
+        });
+        return { repository, relationId: relation.relationId };
+      };
+
+      it('claims a request no delivery has started on, once', async () => {
+        const { repository, relationId } = await pendingRequest('claim-a');
+
+        await expect(
+          repository.claimDelivery(relationId, 'req-1', CLAIMED_AT, CLAIMED_AT),
+        ).resolves.toBe(true);
+        await expect(
+          repository.claimDelivery(relationId, 'req-1', later(1), CLAIMED_AT),
+        ).resolves.toBe(false);
+
+        const record = await repository.find(relationId, 'req-1');
+        expect(record?.deliveryStatus).toBe('delivering');
+        expect(record?.deliveryClaimedAt).toEqual(CLAIMED_AT);
+      });
+
+      it('takes over a delivering mark only when it is older than the cut-off', async () => {
+        const { repository, relationId } = await pendingRequest('claim-b');
+        await repository.claimDelivery(
+          relationId,
+          'req-1',
+          CLAIMED_AT,
+          CLAIMED_AT,
+        );
+
+        // A mark made exactly at the cut-off is not older than it.
+        await expect(
+          repository.claimDelivery(relationId, 'req-1', later(2), CLAIMED_AT),
+        ).resolves.toBe(false);
+        await expect(
+          repository.claimDelivery(relationId, 'req-1', later(3), later(1)),
+        ).resolves.toBe(true);
+        await expect(
+          repository.find(relationId, 'req-1'),
+        ).resolves.toMatchObject({
+          deliveryStatus: 'delivering',
+          deliveryClaimedAt: later(3),
+        });
+      });
+
+      it('never claims a request whose delivery has finished, however old', async () => {
+        const { repository, relationId } = await pendingRequest('claim-c');
+        await repository.claimDelivery(
+          relationId,
+          'req-1',
+          CLAIMED_AT,
+          CLAIMED_AT,
+        );
+        await repository.recordDeliveryResult(
+          relationId,
+          'req-1',
+          CLAIMED_AT,
+          'undeliverable',
+        );
+
+        await expect(
+          repository.claimDelivery(relationId, 'req-1', later(1), later(1)),
+        ).resolves.toBe(false);
+        await expect(
+          repository.find(relationId, 'req-1'),
+        ).resolves.toMatchObject({ deliveryStatus: 'undeliverable' });
+      });
+
+      it('records a result only for the claim that is still current', async () => {
+        const { repository, relationId } = await pendingRequest('claim-d');
+        await repository.claimDelivery(
+          relationId,
+          'req-1',
+          CLAIMED_AT,
+          CLAIMED_AT,
+        );
+        await repository.claimDelivery(relationId, 'req-1', later(5), later(1));
+
+        // The claim taken over at `CLAIMED_AT` no longer settles the request.
+        await repository.recordDeliveryResult(
+          relationId,
+          'req-1',
+          CLAIMED_AT,
+          'undeliverable',
+        );
+        await expect(
+          repository.find(relationId, 'req-1'),
+        ).resolves.toMatchObject({ deliveryStatus: 'delivering' });
+
+        await repository.recordDeliveryResult(
+          relationId,
+          'req-1',
+          later(5),
+          'delivered',
+        );
+        await expect(
+          repository.find(relationId, 'req-1'),
+        ).resolves.toMatchObject({ deliveryStatus: 'delivered' });
+      });
+
+      it('lets exactly one of several simultaneous claims through', async () => {
+        const { repository, relationId } = await pendingRequest('claim-e');
+
+        const claims = await Promise.all(
+          Array.from({ length: 5 }, (_, index) =>
+            repository.claimDelivery(
+              relationId,
+              'req-1',
+              later(index),
+              CLAIMED_AT,
+            ),
+          ),
+        );
+
+        expect(claims.filter((claimed) => claimed)).toHaveLength(1);
+      });
+
+      it('claims nothing for a request it does not hold', async () => {
+        const { repository, relationId } = await pendingRequest('claim-f');
+
+        await expect(
+          repository.claimDelivery(
+            relationId,
+            'req-unknown',
+            CLAIMED_AT,
+            CLAIMED_AT,
+          ),
+        ).resolves.toBe(false);
+      });
+    });
+
     it('refuses a request that names an installation which does not exist', async () => {
       const { prisma, relation } = await newRelation('agent-f');
       const repository = createPendingAgentRequestRepository(prisma);

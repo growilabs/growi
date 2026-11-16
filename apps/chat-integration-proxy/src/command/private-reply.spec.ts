@@ -433,6 +433,45 @@ describe('PrivateReplier.reply -- details', () => {
   });
 });
 
+describe('PrivateReplier.reply -- the thread the reply is shown under', () => {
+  const inThread = originOf({ threadRootId: 'T-1', replyThreadRootId: 'T-1' });
+  const message: OutboundMessage = { kind: 'markdown', markdown: 'answer' };
+
+  it('shows the reply under the thread root its caller names', async () => {
+    const { platform, replier } = setup();
+    platform.postEphemeral.mockResolvedValue(EPHEMERAL.ok);
+
+    await replier.reply(inThread, message, { threadRootId: 'T-answer' });
+
+    expect(platform.postEphemeral).toHaveBeenCalledWith(
+      inThread.channel,
+      actor,
+      message,
+      {
+        installationId: 'inst-1',
+        requestMessageId: 'm-1',
+        threadRootId: 'T-answer',
+      },
+    );
+  });
+
+  it('keeps a reply its caller names no root for where it was, even for a request made inside a thread', async () => {
+    const { platform, replier } = setup();
+    platform.postEphemeral.mockResolvedValue(EPHEMERAL.ok);
+
+    await replier.reply(inThread, message);
+    await replier.reply(inThread, message, { threadRootId: null });
+
+    for (const call of platform.postEphemeral.mock.calls) {
+      expect(call[3]).toStrictEqual({
+        installationId: 'inst-1',
+        requestMessageId: 'm-1',
+      });
+    }
+    expect(platform.postEphemeral).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('PrivateReplier.acknowledge', () => {
   const fallback: OutboundMessage = {
     kind: 'markdown',
