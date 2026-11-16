@@ -12,7 +12,7 @@ import type {
   StoredAnswerOrigin,
 } from '../db/index.js';
 import type { PlatformFacade } from '../platform/index.js';
-import type { HistoryMessage } from '../types/index.js';
+import type { HistoryMessage, OutboundMessage } from '../types/index.js';
 import { channelAnswerRootOf, createAnswerFlow } from './answer-flow.js';
 
 const origin = (
@@ -485,5 +485,49 @@ describe('fitting what was read into what GROWI accepts (protocol limits)', () =
     );
 
     expect(fitted.author.accountId).toBe('a'.repeat(200));
+  });
+});
+
+describe('delivering when the GROWI label cannot be read', () => {
+  it('still posts the answer, without the header, and reports the failure', async () => {
+    const record = recordOf('req-1', origin({ place: 'direct' }));
+    const posted: OutboundMessage[] = [];
+    const reports: string[] = [];
+    const flow = createAnswerFlow({
+      pendingAgentRequests: {
+        find: async () => record,
+        claimDelivery: async () => true,
+        recordDeliveryResult: async () => {},
+      },
+      relations: {
+        findById: () => Promise.reject(new Error('db down')),
+      },
+      privateReplier: mock<Pick<PrivateReplier, 'reply'>>(),
+      platform: {
+        ...mock<Pick<PlatformFacade, 'postInThread' | 'fetchConversation'>>(),
+        post: (_channel, message) => {
+          posted.push(message);
+          return Promise.resolve({ ok: true, messageId: 'posted-1' });
+        },
+      },
+      reportOperationalFailure: (text) => {
+        reports.push(text);
+      },
+      now: () => NOW,
+    });
+
+    await expect(
+      flow.deliver({
+        op: OP_NAMES.commandAnswer,
+        relationId: RELATION_ID,
+        requestId: 'req-1',
+        answer: { kind: 'text', markdown: 'The body.', sources: [] },
+      }),
+    ).resolves.toEqual({ status: 'delivered' });
+
+    expect(posted).toEqual([{ kind: 'markdown', markdown: 'The body.' }]);
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toContain('req-1');
+    expect(reports[0]).not.toContain('db down');
   });
 });

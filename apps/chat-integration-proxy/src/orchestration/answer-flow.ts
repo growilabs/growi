@@ -127,6 +127,22 @@ export const createAnswerFlow = (deps: AnswerFlowDeps): AnswerFlow => {
     now = () => new Date(),
   } = deps;
 
+  // The delivery claim is already taken when this runs, so a failed lookup
+  // must not stop the answer: it goes out without the header instead.
+  const growiLabelOf = async (
+    relationId: string,
+    requestId: string,
+  ): Promise<string | null> => {
+    try {
+      return (await relations.findById(relationId))?.growiLabel ?? null;
+    } catch {
+      reportOperationalFailure(
+        `the GROWI label for agent request ${requestId} could not be read; the answer was posted without it`,
+      );
+      return null;
+    }
+  };
+
   const deliverTo = async (
     record: PendingAgentRequestRecord,
     message: OutboundMessage,
@@ -188,11 +204,10 @@ export const createAnswerFlow = (deps: AnswerFlowDeps): AnswerFlow => {
         };
       }
 
-      const relation = await relations.findById(relationId);
       const message = agentAnswerMessage(answer, {
         place: record.origin.place,
         continuePlace: CONTINUE_PLACE[record.origin.channel.platform],
-        growiLabel: relation?.growiLabel ?? null,
+        growiLabel: await growiLabelOf(relationId, requestId),
       });
       const status = await deliverTo(record, message);
       await pendingAgentRequests.recordDeliveryResult(

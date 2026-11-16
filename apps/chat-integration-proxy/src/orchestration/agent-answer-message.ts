@@ -39,20 +39,18 @@ const encodeLinkUrl = (url: string): string =>
 const escapeLinkLabel = (label: string): string =>
   label.replace(/\s+/g, ' ').replace(/[\\[\]]/g, (char) => `\\${char}`);
 
-// The label is chosen by whoever paired the GROWI, so it must not turn the
-// header into markup, a link or a mention. A zero-width space after `@` stops
-// `@here` / `@channel` from being recognised.
-const escapeGrowiLabel = (label: string): string =>
-  label
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/[\\`*_~[\]<>|#]/g, (char) => `\\${char}`)
-    .replace(/@/g, '@\u200B');
+// The label is chosen by whoever paired the GROWI. Newlines are folded so the
+// header stays one line, and a zero-width space after `<` and `@` stops
+// `<!channel>`, `<@U1>`, `@here` and the like from being recognised as
+// mentions. Markdown characters are left alone: not every service's converter
+// honours a backslash escape.
+const neutralizeGrowiLabel = (label: string): string =>
+  label.replace(/\s+/g, ' ').trim().replace(/[<@]/g, '$&\u200B');
 
 const answerHeader = (growiLabel: string | null): string | null =>
   growiLabel == null || growiLabel.trim() === ''
     ? null
-    : `GROWI「${escapeGrowiLabel(growiLabel)}」からの答え:`;
+    : `GROWI「${neutralizeGrowiLabel(growiLabel)}」からの答え:`;
 
 const sourceLine = ({
   title,
@@ -73,7 +71,6 @@ const textMessage = (
   context: AnswerMessageContext,
 ): string =>
   [
-    answerHeader(context.growiLabel),
     answer.markdown,
     answer.sources.length === 0
       ? null
@@ -158,16 +155,26 @@ const failedMessage = (
     ? conversationFailureMessage(answer.conversationFailure)
     : FAILURE_SENTENCES[answer.reason];
 
+const withHeader = (
+  body: string,
+  context: AnswerMessageContext,
+): OutboundMessage =>
+  markdown(
+    [answerHeader(context.growiLabel), body]
+      .filter((part) => part != null)
+      .join('\n\n'),
+  );
+
 export const agentAnswerMessage = (
   answer: AgentAnswer,
   context: AnswerMessageContext,
 ): OutboundMessage => {
   switch (answer.kind) {
     case 'text':
-      return markdown(textMessage(answer, context));
+      return withHeader(textMessage(answer, context), context);
     case 'page-created':
-      return markdown(pageCreatedMessage(answer));
+      return withHeader(pageCreatedMessage(answer), context);
     case 'failed':
-      return markdown(failedMessage(answer));
+      return withHeader(failedMessage(answer), context);
   }
 };

@@ -85,19 +85,56 @@ describe('agentAnswerMessage: text answers', () => {
       );
     });
 
-    it('keeps a label from turning into markdown, a link or a mention', () => {
+    it('keeps a label from becoming a mention or a line break, leaving its visible text as written', () => {
       const header = render(
         textAnswer(),
         'direct',
         'slack',
-        '*bold* `code` [x](https://evil.example.com) <!channel> @here\nnext',
+        'Wiki <!channel> <@U1> @here @channel @everyone\nnext   line',
       ).split('\n\n')[0];
       expect(header).not.toContain('\n');
-      expect(header).toContain('\\*bold\\*');
-      expect(header).toContain('\\`code\\`');
-      expect(header).toContain('\\[x\\]');
-      expect(header).not.toContain('<!channel>');
-      expect(header).not.toMatch(/@here/);
+      expect(header).not.toContain('<!');
+      expect(header).not.toContain('<@');
+      for (const mention of ['@here', '@channel', '@everyone']) {
+        expect(header).not.toContain(mention);
+      }
+      expect(header.replace(/\u200B/g, '')).toBe(
+        'GROWI「Wiki <!channel> <@U1> @here @channel @everyone next line」からの答え:',
+      );
+    });
+
+    it('puts the header first in a page-created answer', () => {
+      const text = render(
+        {
+          kind: 'page-created',
+          pageUrl: 'https://wiki.example.com/p',
+          range: {
+            firstPostedAt: '2026-01-01T00:00:00Z',
+            lastPostedAt: '2026-01-02T00:00:00Z',
+            messageCount: 3,
+          },
+          truncated: false,
+        },
+        'direct',
+      );
+      expect(text.startsWith('GROWI「Team Wiki」からの答え:\n')).toBe(true);
+      expect(text).toContain('https://wiki.example.com/p');
+    });
+
+    it('puts the header first in a failed answer', () => {
+      const text = render({ kind: 'failed', reason: 'timeout' }, 'direct');
+      expect(text.startsWith('GROWI「Team Wiki」からの答え:\n')).toBe(true);
+      expect(text).toContain('中止しました');
+    });
+
+    it('writes no header on a failed answer when the GROWI is unknown', () => {
+      const text = render(
+        { kind: 'failed', reason: 'timeout' },
+        'direct',
+        'slack',
+        null,
+      );
+      expect(text.startsWith('答えの作成')).toBe(true);
     });
   });
 
