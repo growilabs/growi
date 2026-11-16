@@ -43,7 +43,7 @@ export interface IChatNotificationOutbox {
    * Informational proxy audit-trail signal (design.md
    * "通知を2段に分ける" -- `containsRestrictedPage` is proxy申し送りにすぎず、
    * dropping the body already happened in `markdown` by the time `enqueue`
-   * is called). Persisted here so `NotificationDispatcher` (task 8.2) can
+   * is called). Persisted here so the notification deliverer can
    * carry it into the wire-level `NotificationRequest` when it drains this
    * row -- it is NOT redundant with `markdown`, which never contains a
    * restricted page's body regardless of this flag's value.

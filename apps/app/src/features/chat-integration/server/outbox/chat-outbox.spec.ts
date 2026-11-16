@@ -96,7 +96,7 @@ describe('notificationOutbox.enqueue', () => {
       containsRestrictedPage: false,
     });
 
-    // Read through the driver: a schema default would hide a missing field.
+    // Read the stored document: the dispatcher selects rows by the stored kind.
     const stored = await ChatNotificationOutbox.collection.findOne({});
     expect(stored?.kind).toBe('notification');
   });
