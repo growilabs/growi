@@ -296,15 +296,6 @@ export class AttachmentSearchIndexer
         'Attachment indexed successfully',
       );
     } else {
-      // Failure path: index a metadata-only doc + record the failure
-      const fallbackDoc = buildFailureDoc(attachment, pageId);
-      await this.writeToIndexes(
-        attachmentId,
-        pageId,
-        [fallbackDoc],
-        targetIndexes,
-      );
-
       const failureEntry: ExtractionFailureEntry = {
         attachmentId,
         pageId,
@@ -316,7 +307,23 @@ export class AttachmentSearchIndexer
         occurredAt: new Date(),
       };
 
+      // Recorded before the write so an Elasticsearch failure cannot hide
+      // the extraction outcome
       await this.failureLog.record(failureEntry);
+
+      try {
+        await this.writeToIndexes(
+          attachmentId,
+          pageId,
+          [buildFailureDoc(attachment, pageId)],
+          targetIndexes,
+        );
+      } catch (err) {
+        logger.warn(
+          { err, attachmentId, pageId },
+          'Failed to index the metadata-only doc for a failed extraction',
+        );
+      }
 
       logger.info(
         { attachmentId, pageId, kind: outcome.kind },

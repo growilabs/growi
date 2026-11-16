@@ -812,6 +812,34 @@ describe('AttachmentSearchIndexer', () => {
       expect(failureLog.record).toHaveBeenCalledOnce();
     });
 
+    it('records the extraction failure and returns its outcome even when the Elasticsearch write also fails', async () => {
+      enableFeature();
+
+      const attachment = makeAttachment({ pageId: 'page-77' });
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
+
+      const delegator = makeDelegator();
+      vi.mocked(delegator.syncAttachmentIndexed).mockRejectedValue(
+        new Error('es down'),
+      );
+      const failureLog = makeFailureLog();
+
+      const indexer = makeIndexer(
+        makeExtractor({ kind: 'timeout' }),
+        delegator,
+        failureLog,
+        makeReindexBatch(),
+        makeSearchService(true),
+      );
+
+      const result = await indexer.reindex('att-001');
+
+      expect(result).toEqual({ ok: true, outcome: { kind: 'timeout' } });
+      expect(failureLog.record).toHaveBeenCalledOnce();
+      const [entry] = vi.mocked(failureLog.record).mock.calls[0];
+      expect(entry.reasonCode).toBe('extractionTimeout');
+    });
+
     it('returns { ok: false } when feature is disabled', async () => {
       disableFeature();
 

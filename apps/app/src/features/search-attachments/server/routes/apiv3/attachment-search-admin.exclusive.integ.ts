@@ -150,16 +150,23 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
     }, 60_000);
 
     afterAll(async () => {
-      await request(app)
-        .put(`${MOUNT}/config`)
-        .send({ extractorUri: null, extractorToken: null });
       await extractor?.close();
       vi.restoreAllMocks();
       await deleteIndices(NAMES.indices);
       await prisma.attachments.deleteMany({});
+      await files?.cleanup();
+      if (crowi == null) return;
+      // The exclusive DB is shared: leave none of the settings this file wrote
+      await crowi.configManager.updateConfigs(
+        {
+          'app:attachmentFullTextSearch:extractorUri': undefined,
+          'app:attachmentFullTextSearch:extractorToken': undefined,
+          'app:attachmentFullTextSearch:timeoutMs': undefined,
+        },
+        { removeIfUndefined: true },
+      );
       await crowi.models.Page.deleteMany({ _id: pageId });
       await crowi.models.User.deleteMany({ _id: admin?._id });
-      await files?.cleanup();
       crowi.attachmentSearchIndexer = undefined;
       crowi.attachmentReindexBatch = undefined;
       crowi.attachmentIndexOperations = undefined;

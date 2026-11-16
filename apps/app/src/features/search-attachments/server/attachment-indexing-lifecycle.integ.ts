@@ -167,9 +167,10 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       await prisma.attachments.deleteMany({
         where: { id: { in: createdAttachmentIds } },
       });
+      await files?.cleanup();
+      if (crowi == null) return;
       await crowi.models.Page.deleteMany({ _id: pageId });
       await crowi.models.User.deleteMany({ _id: user?._id });
-      await files?.cleanup();
       crowi.attachmentSearchIndexer = undefined;
       crowi.attachmentReindexBatch = undefined;
       crowi.attachmentIndexOperations = undefined;

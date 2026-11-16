@@ -622,7 +622,7 @@ export interface AttachmentTextExtractorService {
 - `isFeatureEnabled()` チェック → ON 時のみ抽出呼び出し、OFF 時は早期 return。判定式は `searchService.isConfigured && extractorUri != null && extractorUri !== '' && extractorToken != null && extractorToken !== ''` (独立した `enabled` Config キーは持たず算出値。token 未設定時も機能無効として扱い、Bearer auth を構造的に強制)
 - 成功時: ES `{page}-attachments-alias` (live alias) に bulk upsert (1 添付 = N 文書)。**権限フィールドは一切書き込まない** (Option D)
 - 失敗時 (unsupported / tooLarge / timeout / busy / unreachable / failed): metadata-only 1 文書 + FailureLog 永続化
-- `onDetach(attachmentId)` で `attachmentId` キーの全文書削除。機能が無効でも削除する (再び有効にしたときに文書が戻らないように)。ただし alias がまだ無い (機能を一度も有効にしていない) ときは、alias 宛ての refresh と削除を送らない。作り直し中の作り直し先への削除は alias の有無に関係なく行う
+- `onDetach(attachmentId)` で `attachmentId` キーの全文書削除。機能が無効でも削除する (再び有効にしたときに文書が戻らないように)。
 - **rebuild window 中の dual-write**: `reindexBatch.isRebuilding()` が true の間、`onAttach`/`onDetach` は live alias と作り直し先の index (`reindexBatch.getTmpIndexName()` が返す名前) の**両方**に書き込む。live 側が真の source、tmp 側は alias swap 後の continuity 担保のための補助書き込み。tmp 側 write 失敗は live 側の成功を阻害せず pino 記録のみ
 - **親 Page 削除の real-time cascade は行わない** (`onPageDeleted` は本 contract に含めない)。親 Page 不在添付は query-time permission 判定でヒットから除外され、eventual cleanup は `AttachmentOrphanSweeper` が rebuildIndex 時に担う
 
