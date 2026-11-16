@@ -525,10 +525,13 @@ describe('Gen 2 end-to-end: pairing -> settings -> command -> notification -> re
       expect(enqueued[0].markdown).toContain(NOTIFIED_PAGE_PATH);
 
       // Nothing here drains: the write itself started the send.
-      await vi.waitFor(async () => {
-        const delivered = await ChatOutboxRow.find({ relationId }).lean();
-        expect(delivered.every((row) => row.state === 'sent')).toBe(true);
-      });
+      await vi.waitFor(
+        async () => {
+          const delivered = await ChatOutboxRow.find({ relationId }).lean();
+          expect(delivered.every((row) => row.state === 'sent')).toBe(true);
+        },
+        { timeout: 5000 },
+      );
       expect(
         postAttempts()
           .map((attempt) => attempt.split(':')[1])

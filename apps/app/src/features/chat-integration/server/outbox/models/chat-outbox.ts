@@ -64,7 +64,7 @@ export interface IChatOutboxRow {
    * pushed forward by the backoff after every failed round.
    *
    * A separate field rather than reusing `claimedAt`: `claimedAt` answers
-   * "when did somebody take this row" (what the 5-minute stale-claim
+   * "when did somebody take this row" (what the 4-minute stale-claim
    * recovery reads), and overloading it would make a backing-off row look
    * like a crashed one.
    */

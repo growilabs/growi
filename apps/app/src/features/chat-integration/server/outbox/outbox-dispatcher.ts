@@ -131,6 +131,14 @@ const backoffMsFor = (attempts: number): number => {
   return base + jitter;
 };
 
+/** Which rows one run of claims may take. */
+interface ClaimScope {
+  /** A `pending` row is due when its next attempt is at or before this. */
+  readonly dueBy: Date;
+  /** Rows this run has already tried; never taken twice in one run. */
+  readonly tried: ReadonlyArray<unknown>;
+}
+
 /**
  * Take one row for this process, or `null` when there is nothing to do. The
  * `$or` is the whole exclusion mechanism: a row is claimable when it is
@@ -139,13 +147,15 @@ const backoffMsFor = (attempts: number): number => {
  */
 const claimOneRow = async (
   kinds: ReadonlyArray<OutboxKind>,
+  scope: ClaimScope,
   now: Date,
 ): Promise<ChatOutboxRowDocument | null> =>
   ChatOutboxRow.findOneAndUpdate(
     {
       kind: { $in: kinds },
+      _id: { $nin: scope.tried },
       $or: [
-        { state: 'pending', nextAttemptAt: { $lte: now } },
+        { state: 'pending', nextAttemptAt: { $lte: scope.dueBy } },
         {
           state: 'claimed',
           claimedAt: { $lt: new Date(now.getTime() - CLAIM_STALE_AFTER_MS) },
@@ -237,18 +247,25 @@ export const createOutboxDispatcher = (
   const kinds = OUTBOX_KINDS.filter((kind) => deps.deliverers[kind] != null);
   const clock = deps.clock ?? (() => new Date());
 
-  const drain = async (now: Date): Promise<DrainSummary> => {
+  /**
+   * One batch of at most `MAX_ROWS_PER_DRAIN` rows. Each row is claimed at
+   * `currentTime()`, not at the batch's start: otherwise the later rows of
+   * a long batch look stale while they are being sent.
+   */
+  const drainBatch = async (
+    scope: ClaimScope,
+    currentTime: () => Date,
+  ): Promise<{ summary: DrainSummary; tried: ReadonlyArray<unknown> }> => {
     const counts = { sent: 0, failed: 0, givenUp: 0 };
-    const startedAt = clock().getTime();
+    let tried = scope.tried;
 
     for (let i = 0; i < MAX_ROWS_PER_DRAIN; i++) {
-      // Claimed at the current time, not the drain's start: otherwise the
-      // later rows of a long drain look stale while they are being sent.
-      const claimedAt = new Date(now.getTime() + clock().getTime() - startedAt);
-      const row = await claimOneRow(kinds, claimedAt);
+      const claimedAt = currentTime();
+      const row = await claimOneRow(kinds, { ...scope, tried }, claimedAt);
       if (row == null) {
         break;
       }
+      tried = [...tried, row._id];
       const deliver = deps.deliverers[row.kind];
       if (deliver == null) {
         // Unreachable: only kinds with a deliverer are claimed.
@@ -259,17 +276,28 @@ export const createOutboxDispatcher = (
       counts[outcome] += 1;
     }
 
-    return counts;
+    return { summary: counts, tried };
   };
 
-  // Ends: every handled row is sent, given up, or pushed into the future
-  // by its retry delay, so only newly written rows keep a batch full.
+  const drain = async (now: Date): Promise<DrainSummary> => {
+    const startedAt = clock().getTime();
+    const { summary } = await drainBatch({ dueBy: now, tried: [] }, () => {
+      return new Date(now.getTime() + clock().getTime() - startedAt);
+    });
+    return summary;
+  };
+
+  // Batch after batch, but only over the rows due when the run began and
+  // each row at most once, so the run ends whatever the deliverers answer.
+  // A row written during the run is sent by the run its writer requests.
   const drainBacklog = async (): Promise<void> => {
+    let scope: ClaimScope = { dueBy: clock(), tried: [] };
     let handled: number;
     do {
       // biome-ignore lint/performance/noAwaitInLoops: batches run one after another by design
-      const { sent, failed, givenUp } = await drain(clock());
-      handled = sent + failed + givenUp;
+      const { summary, tried } = await drainBatch(scope, clock);
+      scope = { ...scope, tried };
+      handled = summary.sent + summary.failed + summary.givenUp;
     } while (handled >= MAX_ROWS_PER_DRAIN);
   };
 

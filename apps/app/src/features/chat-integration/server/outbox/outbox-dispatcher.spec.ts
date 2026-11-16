@@ -135,6 +135,19 @@ const seedPendingNotification = (
     ...fields,
   });
 
+const seedBacklog = (count: number, nextAttemptAt: Date) =>
+  ChatOutboxRow.insertMany(
+    Array.from({ length: count }, (_, i) => ({
+      kind: 'notification',
+      requestId: `req-${i}`,
+      relationId: 'rel-1',
+      targets: [{ platform: 'slack', channelId: 'C1' }],
+      markdown: `notification ${i}`,
+      containsRestrictedPage: false,
+      nextAttemptAt,
+    })),
+  );
+
 interface Latch {
   readonly promise: Promise<void>;
   readonly release: () => void;
@@ -258,20 +271,16 @@ describe('createOutboxDispatcher timing', () => {
   });
 
   describe('requestDrain', () => {
-    it('sends rows written one after another without any cron, never two deliveries at once', async () => {
+    // That two drains never overlap is coalescing-runner.spec's concern.
+    it('sends rows written while a drain is running without waiting for the cron', async () => {
       const firstStarted = createLatch();
       const releaseFirst = createLatch();
       const sent: string[] = [];
-      let inFlight = 0;
-      let maxInFlight = 0;
       const deliverer = vi.fn<Deliverer>(async (row) => {
-        inFlight += 1;
-        maxInFlight = Math.max(maxInFlight, inFlight);
         if (row.requestId === 'req-1') {
           firstStarted.release();
           await releaseFirst.promise;
         }
-        inFlight -= 1;
         sent.push(row.requestId);
         return { outcome: 'sent' };
       });
@@ -290,7 +299,6 @@ describe('createOutboxDispatcher timing', () => {
       await Promise.all([first, second, third]);
 
       expect([...sent].sort()).toEqual(['req-1', 'req-2', 'req-3']);
-      expect(maxInFlight).toBe(1);
       expect(await ChatOutboxRow.find({}).distinct('state')).toEqual(['sent']);
     });
 
@@ -311,17 +319,7 @@ describe('createOutboxDispatcher timing', () => {
     // left for the 5-minute cron.
     it('sends a backlog larger than one drain’s batch in a single request', async () => {
       const rowCount = 51;
-      await ChatOutboxRow.insertMany(
-        Array.from({ length: rowCount }, (_, i) => ({
-          kind: 'notification',
-          requestId: `req-${i}`,
-          relationId: 'rel-1',
-          targets: [{ platform: 'slack', channelId: 'C1' }],
-          markdown: `notification ${i}`,
-          containsRestrictedPage: false,
-          nextAttemptAt: new Date(),
-        })),
-      );
+      await seedBacklog(rowCount, new Date());
       const deliverer = sendingDeliverer();
 
       await createOutboxDispatcher({
@@ -333,5 +331,74 @@ describe('createOutboxDispatcher timing', () => {
         rowCount,
       );
     });
+
+    // A retry due again at once (or soon) must not keep a full batch coming
+    // back forever: one request tries each row once.
+    it.each([
+      0, 10,
+    ])('finishes, trying each row once, when every row of a full backlog asks to be retried after %i ms', async (retryAfterMs) => {
+      const rowCount = 60;
+      await seedBacklog(rowCount, new Date());
+      const deliverer = vi.fn<Deliverer>(() => {
+        if (deliverer.mock.calls.length > 3 * rowCount) {
+          // Ends a runaway loop so the failure is an assertion, not a hang.
+          return Promise.reject(new Error('runaway drain'));
+        }
+        return Promise.resolve({ outcome: 'retry', retryAfterMs });
+      });
+
+      await createOutboxDispatcher({
+        deliverers: { notification: deliverer },
+      }).requestDrain();
+
+      const attempted = deliverer.mock.calls.map(([row]) => row.requestId);
+      expect(attempted).toHaveLength(rowCount);
+      expect(new Set(attempted).size).toBe(rowCount);
+    });
+
+    it('leaves rows written during the run to the follow-up run their writer requests', async () => {
+      await seedBacklog(1, new Date());
+      const deliverer = vi.fn<Deliverer>(async (row) => {
+        if (row.requestId === 'req-0') {
+          // Written, but nobody asks for a drain for it.
+          await seedPendingNotification('req-late', {
+            nextAttemptAt: new Date(),
+          });
+        }
+        return { outcome: 'sent' };
+      });
+
+      await createOutboxDispatcher({
+        deliverers: { notification: deliverer },
+      }).requestDrain();
+
+      expect(deliverer.mock.calls.map(([row]) => row.requestId)).toEqual([
+        'req-0',
+      ]);
+      expect(
+        (await ChatOutboxRow.findOne({ requestId: 'req-late' }))?.state,
+      ).toBe('pending');
+    });
+  });
+
+  it('tries each row at most once per drain even when its retry is due at the same instant', async () => {
+    const rowCount = 3;
+    await seedBacklog(rowCount, new Date(T - MINUTE));
+    const deliverer = vi.fn<Deliverer>(() => {
+      if (deliverer.mock.calls.length > 3 * rowCount) {
+        return Promise.reject(new Error('runaway drain'));
+      }
+      return Promise.resolve({ outcome: 'retry', retryAfterMs: 0 });
+    });
+
+    // A frozen clock: every claim happens at T, so a retry due after 0 ms is
+    // due at exactly the drain's own time.
+    const summary = await createOutboxDispatcher({
+      deliverers: { notification: deliverer },
+      clock: () => new Date(T),
+    }).drain(new Date(T));
+
+    expect(summary).toEqual({ sent: 0, failed: rowCount, givenUp: 0 });
+    expect(deliverer).toHaveBeenCalledTimes(rowCount);
   });
 });
