@@ -134,8 +134,8 @@ Teams SDK 側（`@microsoft/teams.apps`）がリクエストの `Authorization` 
 > **この節の中身は、実機で確かめるまで確定しない。**
 > 確認が済むまでは、下に書いたこと以外を断定しない。
 
-Teams では、本人にだけ見える返事をその場に出せないとき（6 章）や、DM で聞き返しに答えるときに、
-利用者が bot との 1 対 1 の会話に書き込む。`agent` の答えも、本人にだけ見える形でその場に出せなければ、
+Teams では、本人にだけ見える返事をその場に出せないとき（6 章）に、bot が利用者との 1 対 1 の会話へ書き込む。
+利用者が書き込むのは、DM で聞き返しに答えるときだけである。`agent` の答えも、本人にだけ見える形でその場に出せなければ、
 その会話に届く。Teams には `agent` の続きをやり取りする場所は無い（能力表の
 `agent-continue-conversation` の Teams の欄は `none`。`src/capabilities/platform-capabilities.ts`
 の `CONTINUE_PLACE`）。bot がその会話へ書き込むために、Teams アプリを個人の範囲（`personal`）にも入れる必要が

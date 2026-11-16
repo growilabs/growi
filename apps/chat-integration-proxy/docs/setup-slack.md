@@ -179,7 +179,7 @@ proxy の環境変数と Slack アプリの設定の両方を変える。**既�
 | 項目 | 内容 |
 |---|---|
 | マニフェストの `features.agent_view` | agent_view のアプリであることを示す設定。**マニフェストでの正確な書き方は未確認**（アダプタの README には無い）。実機で確かめて、この表を直す |
-| イベント `app_home_opened`・`app_context_changed`・`agent_session_stopped` | アダプタは `agentView` を有効にすると `app_home_opened`・`app_context_changed` を受け取る処理を持つが、proxy はこれらに処理を登録していない（利用者が画面を開いたこと・見ているものの変化には対応しない）。`agent_session_stopped`（利用者が止めるボタンを押した通知）はアダプタ 4.38.1 が扱わない。Slack が agent_view のアプリのマニフェストにこれらを求めるかは**未確認**。実機で、足さずに動くかを確かめる |
+| イベント `app_home_opened`・`app_context_changed`・`agent_session_stopped` | アダプタは `app_context_changed` をいつも、`app_home_opened` を `agentView` が有効なときに受け取る処理を持つが、proxy はこれらに処理を登録していない（利用者が画面を開いたこと・見ているものの変化には対応しない）。`agent_session_stopped`（利用者が止めるボタンを押した通知）はアダプタ 4.38.1 が扱わない。Slack が agent_view のアプリのマニフェストにこれらを求めるかは**未確認**。実機で、足さずに動くかを確かめる |
 
 イベント `assistant_thread_started`・`assistant_thread_context_changed` は、古い仕組み
 （assistant_view）のイベントである。アダプタの型定義の注は、`assistant_thread_started` を
