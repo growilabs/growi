@@ -2,7 +2,7 @@
 // (design.md `NotificationContent` -- Requirements 2.1, 2.2, 2.3).
 //
 // design.md's "文面は NotificationContent が作る" note is the reason this module
-// exists as a separate step from `NotificationOutbox.enqueue` (task 8.1, not
+// exists as a separate step from `ChatOutbox.enqueue` (task 8.1, not
 // yet built): `enqueue` receives an already-finished `markdown` string
 // specifically because dropping a restricted page's body must happen HERE,
 // before the outbox ever sees it -- `containsRestrictedPage` on the outbox

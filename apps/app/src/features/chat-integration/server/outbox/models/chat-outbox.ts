@@ -15,19 +15,15 @@ export const OUTBOX_KINDS = ['notification', 'command-answer'] as const;
 
 export type OutboxKind = (typeof OUTBOX_KINDS)[number];
 
-export type ChatNotificationOutboxState =
-  | 'pending'
-  | 'claimed'
-  | 'sent'
-  | 'given-up';
+export type ChatOutboxState = 'pending' | 'claimed' | 'sent' | 'given-up';
 
 /** One notification-fan-out target, mirrors `NotificationRequest.targets`. */
-export interface ChatNotificationOutboxTarget {
+export interface ChatOutboxTarget {
   platform: PlatformName;
   channelId: string;
 }
 
-export interface IChatNotificationOutbox {
+export interface IChatOutboxRow {
   /**
    * Which deliverer sends this row. `targets`, `markdown` and
    * `containsRestrictedPage` are written on `notification` rows only, and
@@ -37,7 +33,7 @@ export interface IChatNotificationOutbox {
   /** On a `command-answer` row, the `requestId` of the `agent` request. */
   requestId: string;
   relationId: string;
-  targets: ChatNotificationOutboxTarget[];
+  targets: ChatOutboxTarget[];
   markdown: string;
   /**
    * Informational proxy audit-trail signal (design.md
@@ -49,7 +45,7 @@ export interface IChatNotificationOutbox {
    * restricted page's body regardless of this flag's value.
    */
   containsRestrictedPage: boolean;
-  state: ChatNotificationOutboxState;
+  state: ChatOutboxState;
   /**
    * Number of delivery attempts that count toward giving up. A round whose
    * only failures were `inventory-not-ready` does NOT increment this
@@ -83,39 +79,32 @@ export interface IChatNotificationOutbox {
   createdAt: Date;
 }
 
-export interface ChatNotificationOutboxDocument
-  extends IChatNotificationOutbox,
-    Document {}
+export interface ChatOutboxRowDocument extends IChatOutboxRow, Document {}
 
-export interface ChatNotificationOutboxModel
-  extends Model<ChatNotificationOutboxDocument> {}
+export interface ChatOutboxRowModel extends Model<ChatOutboxRowDocument> {}
 
-const chatNotificationOutboxTargetSchema =
-  new Schema<ChatNotificationOutboxTarget>(
-    {
-      platform: {
-        type: String,
-        enum: [
-          'slack',
-          'discord',
-          'teams',
-          'mattermost',
-        ] satisfies PlatformName[],
-        required: true,
-      },
-      channelId: { type: String, required: true },
+const chatOutboxTargetSchema = new Schema<ChatOutboxTarget>(
+  {
+    platform: {
+      type: String,
+      enum: [
+        'slack',
+        'discord',
+        'teams',
+        'mattermost',
+      ] satisfies PlatformName[],
+      required: true,
     },
-    { _id: false },
-  );
+    channelId: { type: String, required: true },
+  },
+  { _id: false },
+);
 
-function isNotificationRow(this: ChatNotificationOutboxDocument): boolean {
+function isNotificationRow(this: ChatOutboxRowDocument): boolean {
   return this.kind === 'notification';
 }
 
-const chatNotificationOutboxSchema = new Schema<
-  ChatNotificationOutboxDocument,
-  ChatNotificationOutboxModel
->(
+const chatOutboxSchema = new Schema<ChatOutboxRowDocument, ChatOutboxRowModel>(
   {
     kind: {
       type: String,
@@ -126,7 +115,7 @@ const chatNotificationOutboxSchema = new Schema<
     requestId: { type: String, required: true },
     relationId: { type: String, required: true },
     targets: {
-      type: [chatNotificationOutboxTargetSchema],
+      type: [chatOutboxTargetSchema],
       required: isNotificationRow,
       default: [],
     },
@@ -139,7 +128,7 @@ const chatNotificationOutboxSchema = new Schema<
         'claimed',
         'sent',
         'given-up',
-      ] satisfies ChatNotificationOutboxState[],
+      ] satisfies ChatOutboxState[],
       required: true,
       default: 'pending',
     },
@@ -160,17 +149,17 @@ const chatNotificationOutboxSchema = new Schema<
 // rows, oldest claim first". This is a different access pattern than the
 // write-back-by-request lookup below, so it is a separate index rather than
 // a single combined one (design.md is explicit that these are two indexes).
-chatNotificationOutboxSchema.index({ state: 1, claimedAt: 1 });
+chatOutboxSchema.index({ state: 1, claimedAt: 1 });
 
 // The other half of the same claim: `drain`'s filter is an `$or` of "a
 // `pending` row whose backoff has elapsed" and "a `claimed` row whose claim
 // went stale", and MongoDB picks an index per `$or` branch. The index above
 // serves the stale-claim branch; this one serves the pending branch, which is
 // the one every ordinary tick uses.
-chatNotificationOutboxSchema.index({ state: 1, nextAttemptAt: 1 });
+chatOutboxSchema.index({ state: 1, nextAttemptAt: 1 });
 
 // The proxy's result write-back looks up the row by (relationId, requestId).
-chatNotificationOutboxSchema.index({ relationId: 1, requestId: 1 });
+chatOutboxSchema.index({ relationId: 1, requestId: 1 });
 
 // The unique (relationId, requestId) index on `command-answer` rows is created
 // by a migration (20261116120000-add-kind-to-chat-notification-outbox), not here.
@@ -178,7 +167,7 @@ chatNotificationOutboxSchema.index({ relationId: 1, requestId: 1 });
 // Only `sent` rows are subject to the 30-day TTL; `given-up` rows must
 // survive until an operator inspects them, so the TTL index is scoped with
 // partialFilterExpression rather than applied to every row's createdAt.
-chatNotificationOutboxSchema.index(
+chatOutboxSchema.index(
   { createdAt: 1 },
   {
     expireAfterSeconds: NOTIFICATION_OUTBOX_SENT_TTL_SECONDS,
@@ -186,7 +175,9 @@ chatNotificationOutboxSchema.index(
   },
 );
 
-export const ChatNotificationOutbox = getOrCreateModel<
-  ChatNotificationOutboxDocument,
-  ChatNotificationOutboxModel
->('ChatNotificationOutbox', chatNotificationOutboxSchema);
+// The Mongoose model name keeps its original string: the collection is pinned
+// above, so only the registry key would change, and nothing needs it to.
+export const ChatOutboxRow = getOrCreateModel<
+  ChatOutboxRowDocument,
+  ChatOutboxRowModel
+>('ChatNotificationOutbox', chatOutboxSchema);

@@ -9,7 +9,7 @@ import type { Collection, Db } from 'mongodb';
 import mongoose from 'mongoose';
 
 import { createNotificationDeliverer } from '~/features/chat-integration/server/notification/notification-deliverer';
-import { ChatNotificationOutbox } from '~/features/chat-integration/server/outbox/models/chat-outbox';
+import { ChatOutboxRow } from '~/features/chat-integration/server/outbox/models/chat-outbox';
 import { createOutboxDispatcher } from '~/features/chat-integration/server/outbox/outbox-dispatcher';
 import type { notify as notifyFn } from '~/features/chat-integration/server/proxy-client';
 
@@ -59,7 +59,7 @@ describe('add-kind-to-chat-notification-outbox', () => {
     collection = db.collection('chat_notification_outbox');
     // The schema's own indexes exist on every running GROWI before this
     // migration runs; the new index has to be creatable next to them.
-    await ChatNotificationOutbox.init();
+    await ChatOutboxRow.init();
   });
 
   beforeEach(async () => {

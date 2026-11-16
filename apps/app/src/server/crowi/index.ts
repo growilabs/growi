@@ -14,7 +14,7 @@ import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server';
-import { chatNotificationDispatchCronService } from '~/features/chat-integration/server/outbox';
+import { outboxDispatchCronService } from '~/features/chat-integration/server/outbox';
 import { unpairedRelationSweepCronService } from '~/features/chat-integration/server/pairing/unpaired-relation-sweep-cron';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
@@ -505,7 +505,7 @@ class Crowi {
     // Gen 2 chat integration: delivers queued notifications, and separately
     // retires unpaired relations past their retention (both take one row at a
     // time with a conditional update, so every instance may run them).
-    chatNotificationDispatchCronService.startCron();
+    outboxDispatchCronService.startCron();
     unpairedRelationSweepCronService.startCron();
 
     // News feed sync cron

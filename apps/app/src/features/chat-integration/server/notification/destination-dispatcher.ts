@@ -1,13 +1,13 @@
 import type { PlatformName } from '@growi/chat';
 
-import type { NotificationOutbox } from '../outbox';
-import { notificationOutbox } from '../outbox';
+import type { ChatOutbox } from '../outbox';
+import { chatOutbox } from '../outbox';
 import type { DestinationDispatcher } from './destination-registry';
 
 /**
  * The real Gen 2 destination dispatcher -- replaces task 2.3's placeholder
  * ("受け側は仮のものでよい" -- design.md task 2.3, deferred to task 8.1's
- * `NotificationOutbox` boundary).
+ * `ChatOutbox` boundary).
  *
  * Writes ONE `chat_notification_outbox` row per destination it is called
  * with (scoped to that destination's own `relationId`), rather than
@@ -28,7 +28,7 @@ import type { DestinationDispatcher } from './destination-registry';
 export const createGen2NotificationDispatcher = (
   markdown: string,
   containsRestrictedPage: boolean,
-  outbox: NotificationOutbox = notificationOutbox,
+  outbox: ChatOutbox = chatOutbox,
 ): DestinationDispatcher => {
   return async (destination) => {
     await outbox.enqueue({

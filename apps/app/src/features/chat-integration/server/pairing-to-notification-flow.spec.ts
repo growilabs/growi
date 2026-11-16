@@ -83,8 +83,8 @@ import { ChatNotificationDestination } from './models/chat-notification-destinat
 import { ChatProcessedRequest } from './models/chat-processed-request';
 import { ChatRelation } from './models/chat-relation';
 import { outboxDispatcher } from './outbox/deliverers';
-import { ChatNotificationOutbox } from './outbox/models/chat-outbox';
-import { ChatNotificationDispatchCronService } from './outbox/outbox-dispatch-cron';
+import { ChatOutboxRow } from './outbox/models/chat-outbox';
+import { OutboxDispatchCronService } from './outbox/outbox-dispatch-cron';
 import { ChatChallengeAttempt } from './pairing/models/chat-challenge-attempt';
 import { ChatPendingPairing } from './pairing/models/pending-pairing';
 import { createPairingEndpoint } from './pairing/pairing-endpoint';
@@ -393,7 +393,7 @@ describe('Gen 2 end-to-end: pairing -> settings -> command -> notification -> re
       ChatChallengeAttempt.deleteMany({}),
       ChatChannelPermission.deleteMany({}),
       ChatNotificationDestination.deleteMany({}),
-      ChatNotificationOutbox.deleteMany({}),
+      ChatOutboxRow.deleteMany({}),
       ChatProcessedRequest.deleteMany({}),
       getUserModel().deleteMany({}),
     ]);
@@ -518,7 +518,7 @@ describe('Gen 2 end-to-end: pairing -> settings -> command -> notification -> re
       await firePageCreate();
 
       // Written down first, delivered later (Requirement 2.5's two stages).
-      const enqueued = await ChatNotificationOutbox.find({ relationId }).lean();
+      const enqueued = await ChatOutboxRow.find({ relationId }).lean();
       expect(enqueued).toHaveLength(2);
       expect(enqueued.every((row) => row.state === 'pending')).toBe(true);
       expect(
@@ -527,14 +527,14 @@ describe('Gen 2 end-to-end: pairing -> settings -> command -> notification -> re
       expect(enqueued[0].markdown).toContain(NOTIFIED_PAGE_PATH);
 
       // The real cron job is what turns the outbox into posts.
-      await new ChatNotificationDispatchCronService().executeJob();
+      await new OutboxDispatchCronService().executeJob();
 
       expect(
         postAttempts()
           .map((attempt) => attempt.split(':')[1])
           .sort(),
       ).toEqual([CHANNEL_FAILING, CHANNEL_OK].sort());
-      const delivered = await ChatNotificationOutbox.find({
+      const delivered = await ChatOutboxRow.find({
         relationId,
       }).lean();
       expect(delivered.every((row) => row.state === 'sent')).toBe(true);
@@ -548,9 +548,9 @@ describe('Gen 2 end-to-end: pairing -> settings -> command -> notification -> re
       );
 
       await firePageCreate();
-      await new ChatNotificationDispatchCronService().executeJob();
+      await new OutboxDispatchCronService().executeJob();
 
-      const afterFirstRound = await ChatNotificationOutbox.find({
+      const afterFirstRound = await ChatOutboxRow.find({
         relationId,
       }).lean();
       const sent = afterFirstRound.filter((row) => row.state === 'sent');
@@ -581,7 +581,7 @@ describe('Gen 2 end-to-end: pairing -> settings -> command -> notification -> re
       expect(failingAttempts).toHaveLength(2);
       expect(failingAttempts[0]).toBe(failingAttempts[1]);
 
-      const settled = await ChatNotificationOutbox.find({ relationId }).lean();
+      const settled = await ChatOutboxRow.find({ relationId }).lean();
       expect(settled.every((row) => row.state === 'sent')).toBe(true);
     });
   });
@@ -661,7 +661,7 @@ describe('Gen 2 end-to-end: pairing -> settings -> command -> notification -> re
 
       await firePageCreate();
 
-      expect(await ChatNotificationOutbox.countDocuments({})).toBe(0);
+      expect(await ChatOutboxRow.countDocuments({})).toBe(0);
       expect(await ChatIntegrationKey.countDocuments({ relationId })).toBe(0);
       expect(await ChatNotificationDestination.countDocuments({})).toBe(0);
       // The saved permission is gone with the relation, so the same write

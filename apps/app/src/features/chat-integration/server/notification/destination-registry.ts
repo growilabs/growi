@@ -11,7 +11,7 @@ export interface Gen2Destination {
    * Which relation this destination's channel belongs to. Required (not
    * task 2.3's original scope) because task 8.1's real dispatch writes a
    * `chat_notification_outbox` row scoped to one relation
-   * (`NotificationOutbox.enqueue` -- design.md "通知を2段に分ける") --
+   * (`ChatOutbox.enqueue` -- design.md "通知を2段に分ける") --
    * without it, a destination could not be routed to the right relation's
    * outbox row.
    */
@@ -29,8 +29,8 @@ export interface DestinationDispatchResult {
 
 /**
  * Delivers to one destination. Task 2.3 wires only the iteration point --
- * the real implementation (writing into `NotificationOutbox` and draining it
- * to the proxy) is task 8.1/8.2's `NotificationOutbox`/`NotificationDispatcher`
+ * the real implementation (writing into `ChatOutbox` and draining it
+ * to the proxy) is task 8.1/8.2's `ChatOutbox`/`NotificationDispatcher`
  * boundary, not this one.
  */
 export type DestinationDispatcher = (

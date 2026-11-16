@@ -9,23 +9,21 @@ import {
 } from '../integration-presence';
 import { sweepUnpairedRelations } from '../pairing/sweep-unpaired-relations';
 import {
-  ChatNotificationDispatchCronService,
-  chatNotificationDispatchCronService,
+  OutboxDispatchCronService,
+  outboxDispatchCronService,
 } from './outbox-dispatch-cron';
 
 vi.mock('../pairing/sweep-unpaired-relations', () => ({
   sweepUnpairedRelations: vi.fn(),
 }));
 
-describe('ChatNotificationDispatchCronService', () => {
+describe('OutboxDispatchCronService', () => {
   it('is one of GROWI’s CronService jobs rather than a scheduling mechanism of its own', () => {
-    expect(chatNotificationDispatchCronService).toBeInstanceOf(CronService);
+    expect(outboxDispatchCronService).toBeInstanceOf(CronService);
   });
 
   it('runs every minute', () => {
-    expect(chatNotificationDispatchCronService.getCronSchedule()).toBe(
-      '* * * * *',
-    );
+    expect(outboxDispatchCronService.getCronSchedule()).toBe('* * * * *');
   });
 
   describe('when deciding whether to drain', () => {
@@ -36,7 +34,7 @@ describe('ChatNotificationDispatchCronService', () => {
       const drain = vi.fn().mockResolvedValue(drainResult);
       const hasAnyIntegration = vi.fn().mockResolvedValue(false);
 
-      await new ChatNotificationDispatchCronService({
+      await new OutboxDispatchCronService({
         dispatcher: { drain },
         presence: { hasAnyIntegration, markPresent: vi.fn() },
         clock: () => NOW,
@@ -49,7 +47,7 @@ describe('ChatNotificationDispatchCronService', () => {
       const drain = vi.fn().mockResolvedValue(drainResult);
       const hasAnyIntegration = vi.fn().mockResolvedValue(true);
 
-      await new ChatNotificationDispatchCronService({
+      await new OutboxDispatchCronService({
         dispatcher: { drain },
         presence: { hasAnyIntegration, markPresent: vi.fn() },
         clock: () => NOW,
@@ -66,7 +64,7 @@ describe('ChatNotificationDispatchCronService', () => {
         anyRelationExists: vi.fn().mockRejectedValue(new Error('db down')),
       });
 
-      await new ChatNotificationDispatchCronService({
+      await new OutboxDispatchCronService({
         dispatcher: { drain },
         presence,
         clock: () => NOW,
@@ -79,7 +77,7 @@ describe('ChatNotificationDispatchCronService', () => {
       const drain = vi.fn().mockRejectedValue(new Error('proxy exploded'));
 
       await expect(
-        new ChatNotificationDispatchCronService({
+        new OutboxDispatchCronService({
           dispatcher: { drain },
           presence: {
             hasAnyIntegration: vi.fn().mockResolvedValue(true),
@@ -96,7 +94,7 @@ describe('ChatNotificationDispatchCronService', () => {
   it('never sweeps relations itself', async () => {
     const drain = vi.fn().mockResolvedValue({ sent: 0, failed: 0, givenUp: 0 });
 
-    await new ChatNotificationDispatchCronService({
+    await new OutboxDispatchCronService({
       dispatcher: { drain },
       presence: {
         hasAnyIntegration: vi.fn().mockResolvedValue(true),
@@ -125,7 +123,7 @@ describe('ChatNotificationDispatchCronService', () => {
       const drain = vi
         .fn()
         .mockResolvedValue({ sent: 0, failed: 0, givenUp: 0 });
-      const cron = new ChatNotificationDispatchCronService({
+      const cron = new OutboxDispatchCronService({
         dispatcher: { drain },
         presence: createIntegrationPresence({ anyRelationExists }),
         clock: () => new Date(currentTime),
@@ -165,8 +163,8 @@ describe('ChatNotificationDispatchCronService', () => {
     );
     const source = await readFile(crowiIndexPath, 'utf8');
 
-    expect(source).toContain('chatNotificationDispatchCronService');
-    expect(source).toContain('chatNotificationDispatchCronService.startCron()');
+    expect(source).toContain('outboxDispatchCronService');
+    expect(source).toContain('outboxDispatchCronService.startCron()');
   });
 
   it('is the outbox module’s cron that crowi starts, and only once', async () => {
@@ -176,10 +174,10 @@ describe('ChatNotificationDispatchCronService', () => {
     );
 
     expect(source).toMatch(
-      /import \{[^}]*\bchatNotificationDispatchCronService\b[^}]*\} from '~\/features\/chat-integration\/server\/outbox(\/outbox-dispatch-cron)?';/,
+      /import \{[^}]*\boutboxDispatchCronService\b[^}]*\} from '~\/features\/chat-integration\/server\/outbox(\/outbox-dispatch-cron)?';/,
     );
     expect(
-      source.match(/chatNotificationDispatchCronService\.startCron\(\)/g),
+      source.match(/outboxDispatchCronService\.startCron\(\)/g),
     ).toHaveLength(1);
   });
 });

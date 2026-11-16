@@ -6,7 +6,7 @@ import {
   disconnectSelfContainedMongo,
 } from '^/test/setup/mongo/self-contained-connection';
 
-import { ChatNotificationOutbox } from './models/chat-outbox';
+import { ChatOutboxRow } from './models/chat-outbox';
 import type { Deliverer } from './outbox-dispatcher';
 import { createOutboxDispatcher } from './outbox-dispatcher';
 
@@ -17,7 +17,7 @@ const ANSWER: AgentAnswer = {
 };
 
 const seedNotificationRow = () =>
-  ChatNotificationOutbox.create({
+  ChatOutboxRow.create({
     kind: 'notification',
     requestId: 'req-notification',
     relationId: 'rel-1',
@@ -27,7 +27,7 @@ const seedNotificationRow = () =>
   });
 
 const seedAnswerRow = () =>
-  ChatNotificationOutbox.create({
+  ChatOutboxRow.create({
     kind: 'command-answer',
     requestId: 'req-answer',
     relationId: 'rel-1',
@@ -47,7 +47,7 @@ describe('createOutboxDispatcher kind routing', () => {
   });
 
   beforeEach(async () => {
-    await ChatNotificationOutbox.deleteMany({});
+    await ChatOutboxRow.deleteMany({});
   });
 
   afterAll(async () => {
@@ -71,7 +71,7 @@ describe('createOutboxDispatcher kind routing', () => {
     expect(commandAnswer.mock.calls.map(([row]) => row.requestId)).toEqual([
       'req-answer',
     ]);
-    const states = await ChatNotificationOutbox.find({}).distinct('state');
+    const states = await ChatOutboxRow.find({}).distinct('state');
     expect(states).toEqual(['sent']);
   });
 
@@ -80,7 +80,7 @@ describe('createOutboxDispatcher kind routing', () => {
   it('leaves a row whose kind has no deliverer pending and untouched, while still sending the rest', async () => {
     await seedNotificationRow();
     const answerRow = await seedAnswerRow();
-    const before = await ChatNotificationOutbox.collection.findOne({
+    const before = await ChatOutboxRow.collection.findOne({
       _id: answerRow._id,
     });
     const notification = sendingDeliverer();
@@ -91,7 +91,7 @@ describe('createOutboxDispatcher kind routing', () => {
 
     expect(summary).toEqual({ sent: 1, failed: 0, givenUp: 0 });
     expect(notification).toHaveBeenCalledTimes(1);
-    const after = await ChatNotificationOutbox.collection.findOne({
+    const after = await ChatOutboxRow.collection.findOne({
       _id: answerRow._id,
     });
     expect(after).toEqual(before);
@@ -110,7 +110,7 @@ describe('createOutboxDispatcher kind routing', () => {
       },
     }).drain(new Date());
 
-    const row = await ChatNotificationOutbox.findOne({});
+    const row = await ChatOutboxRow.findOne({});
     expect(row?.state).toBe('sent');
     expect(row?.result).toEqual(result);
   });

@@ -1,6 +1,6 @@
 import { mock } from 'vitest-mock-extended';
 
-import type { NotificationOutbox } from '../outbox';
+import type { ChatOutbox } from '../outbox';
 import { createGen2NotificationDispatcher } from './destination-dispatcher';
 import type { Gen2Destination } from './destination-registry';
 import { DestinationRegistry } from './destination-registry';
@@ -8,7 +8,7 @@ import { DestinationRegistry } from './destination-registry';
 describe('createGen2NotificationDispatcher', () => {
   it("enqueues one outbox row for the destination it is given, scoped to that destination's relation", async () => {
     const enqueue = vi.fn().mockResolvedValue(undefined);
-    const outbox = mock<NotificationOutbox>({ enqueue });
+    const outbox = mock<ChatOutbox>({ enqueue });
 
     const dispatch = createGen2NotificationDispatcher(
       'someone created [/a](https://growi.example.com/a)',
@@ -33,7 +33,7 @@ describe('createGen2NotificationDispatcher', () => {
 
   it('threads containsRestrictedPage through to the outbox row', async () => {
     const enqueue = vi.fn().mockResolvedValue(undefined);
-    const outbox = mock<NotificationOutbox>({ enqueue });
+    const outbox = mock<ChatOutbox>({ enqueue });
 
     const dispatch = createGen2NotificationDispatcher(
       'someone edited [/secret](https://growi.example.com/secret)',
@@ -54,7 +54,7 @@ describe('createGen2NotificationDispatcher', () => {
 
   it('a relation with 2+ configured destinations produces one outbox call PER destination, proving the caller repeats per relation rather than stopping after one', async () => {
     const enqueue = vi.fn().mockResolvedValue(undefined);
-    const outbox = mock<NotificationOutbox>({ enqueue });
+    const outbox = mock<ChatOutbox>({ enqueue });
     const destinations: Gen2Destination[] = [
       { relationId: 'rel-1', platform: 'slack', channelId: 'C1' },
       { relationId: 'rel-1', platform: 'slack', channelId: 'C2' },

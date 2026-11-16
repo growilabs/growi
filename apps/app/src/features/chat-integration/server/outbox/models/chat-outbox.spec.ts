@@ -2,11 +2,11 @@ import type { AgentAnswer } from '@growi/chat';
 import { describe, expect, it } from 'vitest';
 
 import {
-  ChatNotificationOutbox,
+  ChatOutboxRow,
   NOTIFICATION_OUTBOX_SENT_TTL_SECONDS,
 } from './chat-outbox';
 
-describe('ChatNotificationOutbox schema', () => {
+describe('ChatOutboxRow schema', () => {
   const allFields = [
     'requestId',
     'relationId',
@@ -21,23 +21,23 @@ describe('ChatNotificationOutbox schema', () => {
   ] as const;
 
   it.each(allFields)('declares field "%s"', (field) => {
-    expect(ChatNotificationOutbox.schema.path(field)).toBeDefined();
+    expect(ChatOutboxRow.schema.path(field)).toBeDefined();
   });
 
   it('claimedAt defaults to null', () => {
-    const path = ChatNotificationOutbox.schema.path('claimedAt');
+    const path = ChatOutboxRow.schema.path('claimedAt');
     expect(
       (path as unknown as { defaultValue: unknown }).defaultValue,
     ).toBeNull();
   });
 
   it('attempts defaults to 0', () => {
-    const path = ChatNotificationOutbox.schema.path('attempts');
+    const path = ChatOutboxRow.schema.path('attempts');
     expect((path as unknown as { defaultValue: unknown }).defaultValue).toBe(0);
   });
 
   const getIndexes = () =>
-    ChatNotificationOutbox.schema.indexes() as unknown as ReadonlyArray<
+    ChatOutboxRow.schema.indexes() as unknown as ReadonlyArray<
       [Record<string, unknown>, Record<string, unknown>]
     >;
 
@@ -113,7 +113,7 @@ describe('ChatNotificationOutbox schema', () => {
 
   it('uses collection name chat_notification_outbox', () => {
     const collectionName = (
-      ChatNotificationOutbox.schema as unknown as {
+      ChatOutboxRow.schema as unknown as {
         options?: { collection?: string };
       }
     ).options?.collection;
@@ -121,7 +121,7 @@ describe('ChatNotificationOutbox schema', () => {
   });
 });
 
-describe('ChatNotificationOutbox row kinds', () => {
+describe('ChatOutboxRow row kinds', () => {
   const base = { requestId: 'req-1', relationId: 'rel-1' };
   const notificationFields = {
     targets: [{ platform: 'slack' as const, channelId: 'C1' }],
@@ -131,7 +131,7 @@ describe('ChatNotificationOutbox row kinds', () => {
 
   it('accepts a notification row with its notification fields', async () => {
     await expect(
-      new ChatNotificationOutbox({
+      new ChatOutboxRow({
         ...base,
         kind: 'notification',
         ...notificationFields,
@@ -146,7 +146,7 @@ describe('ChatNotificationOutbox row kinds', () => {
     const { [field]: _omitted, ...rest } = notificationFields;
 
     await expect(
-      new ChatNotificationOutbox({
+      new ChatOutboxRow({
         ...base,
         kind: 'notification',
         ...rest,
@@ -156,7 +156,7 @@ describe('ChatNotificationOutbox row kinds', () => {
 
   it('accepts a command-answer row that has none of the notification fields', async () => {
     await expect(
-      new ChatNotificationOutbox({
+      new ChatOutboxRow({
         ...base,
         kind: 'command-answer',
         answer: { kind: 'text', markdown: 'the answer', sources: [] },
@@ -170,7 +170,7 @@ describe('ChatNotificationOutbox row kinds', () => {
       markdown: 'the answer',
       sources: [],
     };
-    const row = new ChatNotificationOutbox({
+    const row = new ChatOutboxRow({
       ...base,
       kind: 'command-answer',
       answer,
@@ -181,7 +181,7 @@ describe('ChatNotificationOutbox row kinds', () => {
 
   it('rejects a row of a kind it does not know', async () => {
     await expect(
-      new ChatNotificationOutbox({
+      new ChatOutboxRow({
         ...base,
         kind: 'something-else',
         ...notificationFields,

@@ -11,7 +11,7 @@ import type { IOptionsForCreate, IOptionsForUpdate } from '../page';
 export type IApiv3ChatIntegrationDestinationInput = {
   /**
    * Which relation (paired Gen 2 workspace) this destination's channel
-   * belongs to. Required so `NotificationOutbox.enqueue` (task 8.1) can
+   * belongs to. Required so `ChatOutbox.enqueue` (task 8.1) can
    * route the save-time-selected destination to the right relation's
    * outbox row -- without it, a channel picked from the save-time UI could
    * not be told apart from the same channel id in a different workspace.

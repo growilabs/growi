@@ -130,7 +130,7 @@ class GlobalNotificationService {
    * iterates the resulting set generically -- this method never branches on
    * destination platform. The actual write to `chat_notification_outbox`
    * happens inside `createGen2NotificationDispatcher` (task 8.1's
-   * `NotificationOutbox` boundary), not here.
+   * `ChatOutbox` boundary), not here.
    */
   private async fireGen2Destinations(
     event: string,

@@ -24,7 +24,7 @@ import {
 } from '^/test/setup/mongo/self-contained-connection';
 
 import { ChatNotificationDestination } from '../models/chat-notification-destination';
-import { ChatNotificationOutbox } from '../outbox/models/chat-outbox';
+import { ChatOutboxRow } from '../outbox/models/chat-outbox';
 import { createGen2NotificationDispatcher } from './destination-dispatcher';
 import { DestinationRegistry } from './destination-registry';
 import { findGen2DestinationsForPathAndEvent } from './find-destinations-for-path-and-event';
@@ -40,7 +40,7 @@ describe('Gen 2 notification dispatch -- real path matching + real outbox writes
 
   beforeEach(async () => {
     await ChatNotificationDestination.deleteMany({});
-    await ChatNotificationOutbox.deleteMany({});
+    await ChatOutboxRow.deleteMany({});
   });
 
   afterAll(async () => {
@@ -66,7 +66,7 @@ describe('Gen 2 notification dispatch -- real path matching + real outbox writes
       createGen2NotificationDispatcher('someone created [/a/b](url)', false),
     );
 
-    const rows = await ChatNotificationOutbox.find({});
+    const rows = await ChatOutboxRow.find({});
     expect(rows).toHaveLength(1);
     expect(rows[0].relationId).toBe('rel-admin-1');
     expect(rows[0].toObject().targets).toEqual([
@@ -89,7 +89,7 @@ describe('Gen 2 notification dispatch -- real path matching + real outbox writes
       createGen2NotificationDispatcher('someone commented', false),
     );
 
-    const rows = await ChatNotificationOutbox.find({});
+    const rows = await ChatOutboxRow.find({});
     expect(rows).toHaveLength(1);
     expect(rows[0].relationId).toBe('rel-explicit-1');
     expect(rows[0].toObject().targets).toEqual([
@@ -124,7 +124,7 @@ describe('Gen 2 notification dispatch -- real path matching + real outbox writes
     const registry = new DestinationRegistry(destinations);
     await registry.dispatchAll(createGen2NotificationDispatcher('body', false));
 
-    const rows = await ChatNotificationOutbox.find({}).sort({ relationId: 1 });
+    const rows = await ChatOutboxRow.find({}).sort({ relationId: 1 });
     expect(rows).toHaveLength(2);
     expect(rows.map((r) => r.relationId)).toEqual(['rel-1', 'rel-2']);
   });
@@ -156,7 +156,7 @@ describe('Gen 2 notification dispatch -- real path matching + real outbox writes
     const registry = new DestinationRegistry(destinations);
     await registry.dispatchAll(createGen2NotificationDispatcher('body', false));
 
-    const rows = await ChatNotificationOutbox.find({}).sort({
+    const rows = await ChatOutboxRow.find({}).sort({
       'targets.0.channelId': 1,
     });
     expect(rows).toHaveLength(2);

@@ -25,19 +25,19 @@ const logger = loggerFactory(
   'growi:features:chat-integration:outbox-dispatch-cron',
 );
 
-export interface ChatNotificationDispatchCronDeps {
+export interface OutboxDispatchCronDeps {
   readonly dispatcher?: OutboxDispatcher;
   readonly presence?: IntegrationPresence;
   /** Test seam; production uses `() => new Date()`. */
   readonly clock?: () => Date;
 }
 
-export class ChatNotificationDispatchCronService extends CronService {
+export class OutboxDispatchCronService extends CronService {
   private readonly dispatcher: OutboxDispatcher;
   private readonly presence: IntegrationPresence;
   private readonly clock: () => Date;
 
-  constructor(deps: ChatNotificationDispatchCronDeps = {}) {
+  constructor(deps: OutboxDispatchCronDeps = {}) {
     super();
     this.dispatcher = deps.dispatcher ?? outboxDispatcher;
     this.presence = deps.presence ?? integrationPresence;
@@ -65,5 +65,4 @@ export class ChatNotificationDispatchCronService extends CronService {
   }
 }
 
-export const chatNotificationDispatchCronService =
-  new ChatNotificationDispatchCronService(); // singleton instance
+export const outboxDispatchCronService = new OutboxDispatchCronService(); // singleton instance

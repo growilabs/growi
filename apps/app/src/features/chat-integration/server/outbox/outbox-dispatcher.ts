@@ -21,11 +21,8 @@
 
 import loggerFactory from '~/utils/logger';
 
-import type {
-  ChatNotificationOutboxDocument,
-  OutboxKind,
-} from './models/chat-outbox';
-import { ChatNotificationOutbox, OUTBOX_KINDS } from './models/chat-outbox';
+import type { ChatOutboxRowDocument, OutboxKind } from './models/chat-outbox';
+import { ChatOutboxRow, OUTBOX_KINDS } from './models/chat-outbox';
 
 const logger = loggerFactory(
   'growi:features:chat-integration:outbox-dispatcher',
@@ -75,7 +72,7 @@ export type DeliveryVerdict =
     };
 
 export type Deliverer = (
-  row: ChatNotificationOutboxDocument,
+  row: ChatOutboxRowDocument,
   now: Date,
 ) => Promise<DeliveryVerdict>;
 
@@ -128,8 +125,8 @@ const backoffMsFor = (attempts: number): number => {
 const claimOneRow = async (
   kinds: ReadonlyArray<OutboxKind>,
   now: Date,
-): Promise<ChatNotificationOutboxDocument | null> =>
-  ChatNotificationOutbox.findOneAndUpdate(
+): Promise<ChatOutboxRowDocument | null> =>
+  ChatOutboxRow.findOneAndUpdate(
     {
       kind: { $in: kinds },
       $or: [
@@ -148,12 +145,12 @@ const resultOf = (verdict: DeliveryVerdict): { result?: unknown } =>
   'result' in verdict ? { result: verdict.result } : {};
 
 const settleAsRetry = async (
-  row: ChatNotificationOutboxDocument,
+  row: ChatOutboxRowDocument,
   verdict: Extract<DeliveryVerdict, { outcome: 'retry' }>,
   now: Date,
 ): Promise<RowOutcome> => {
   if (verdict.retryAfterMs != null) {
-    await ChatNotificationOutbox.updateOne(
+    await ChatOutboxRow.updateOne(
       { _id: row._id },
       {
         $set: {
@@ -171,7 +168,7 @@ const settleAsRetry = async (
   if (attempts >= NOTIFICATION_RETRY_CONFIG.maxAttempts) {
     // Deliberately left in place with no TTL: `given-up` is the record
     // Requirement 2.4 asks for, and only an operator retires it.
-    await ChatNotificationOutbox.updateOne(
+    await ChatOutboxRow.updateOne(
       { _id: row._id },
       {
         $set: {
@@ -189,7 +186,7 @@ const settleAsRetry = async (
     return 'givenUp';
   }
 
-  await ChatNotificationOutbox.updateOne(
+  await ChatOutboxRow.updateOne(
     { _id: row._id },
     {
       $set: {
@@ -205,14 +202,14 @@ const settleAsRetry = async (
 };
 
 const settle = async (
-  row: ChatNotificationOutboxDocument,
+  row: ChatOutboxRowDocument,
   verdict: DeliveryVerdict,
   now: Date,
 ): Promise<RowOutcome> => {
   if (verdict.outcome === 'retry') {
     return settleAsRetry(row, verdict, now);
   }
-  await ChatNotificationOutbox.updateOne(
+  await ChatOutboxRow.updateOne(
     { _id: row._id },
     { $set: { state: 'sent', ...resultOf(verdict), claimedAt: null } },
   );

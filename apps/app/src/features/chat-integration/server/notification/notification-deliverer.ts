@@ -21,7 +21,7 @@ import { parseNativeChannelId, parseNotificationResult } from '@growi/chat';
 
 import loggerFactory from '~/utils/logger';
 
-import type { ChatNotificationOutboxDocument } from '../outbox/models/chat-outbox';
+import type { ChatOutboxRowDocument } from '../outbox/models/chat-outbox';
 import type { Deliverer, DeliveryVerdict } from '../outbox/outbox-dispatcher';
 import { notify } from '../proxy-client';
 
@@ -104,7 +104,7 @@ const retryVerdict = (merged: NotificationResult): DeliveryVerdict => {
 
 /** The row's targets that have not been posted yet and that the proxy can accept. */
 const pendingTargetsOf = (
-  row: ChatNotificationOutboxDocument,
+  row: ChatOutboxRowDocument,
   recorded: ReadonlyArray<NotificationOutcome>,
 ): ReadonlyArray<NotificationRequest['targets'][number]> => {
   const postedKeys = new Set(

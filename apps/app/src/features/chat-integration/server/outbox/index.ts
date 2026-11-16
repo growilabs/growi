@@ -1,6 +1,6 @@
 export type {
-  NotificationOutbox,
+  ChatOutbox,
   NotificationOutboxEntry,
 } from './chat-outbox';
-export { notificationOutbox } from './chat-outbox';
-export { chatNotificationDispatchCronService } from './outbox-dispatch-cron';
+export { chatOutbox } from './chat-outbox';
+export { outboxDispatchCronService } from './outbox-dispatch-cron';

@@ -15,8 +15,8 @@ import {
   disconnectSelfContainedMongo,
 } from '^/test/setup/mongo/self-contained-connection';
 
-import type { ChatNotificationOutboxTarget } from '../outbox/models/chat-outbox';
-import { ChatNotificationOutbox } from '../outbox/models/chat-outbox';
+import type { ChatOutboxTarget } from '../outbox/models/chat-outbox';
+import { ChatOutboxRow } from '../outbox/models/chat-outbox';
 import type { DrainSummary } from '../outbox/outbox-dispatcher';
 import {
   CLAIM_STALE_AFTER_MS,
@@ -36,11 +36,11 @@ const createNotificationDispatcher = (deps: { notify: typeof notifyFn }) =>
   });
 
 const RELATION_ID = 'rel-1';
-const TARGET_A: ChatNotificationOutboxTarget = {
+const TARGET_A: ChatOutboxTarget = {
   platform: 'slack',
   channelId: 'C-A',
 };
-const TARGET_B: ChatNotificationOutboxTarget = {
+const TARGET_B: ChatOutboxTarget = {
   platform: 'slack',
   channelId: 'C-B',
 };
@@ -55,10 +55,7 @@ interface NotifyRecorder {
 
 const outcomesFor = (
   entries: ReadonlyArray<
-    [
-      ChatNotificationOutboxTarget,
-      NotificationResult['outcomes'][number]['status'],
-    ]
+    [ChatOutboxTarget, NotificationResult['outcomes'][number]['status']]
   >,
 ): NotificationResult => ({
   outcomes: entries.map(([target, status]) => ({
@@ -86,7 +83,7 @@ const recordingNotify = (
 };
 
 const seedRow = (
-  targets: ReadonlyArray<ChatNotificationOutboxTarget>,
+  targets: ReadonlyArray<ChatOutboxTarget>,
   overrides: Partial<{
     state: 'pending' | 'claimed' | 'sent' | 'given-up';
     attempts: number;
@@ -95,7 +92,7 @@ const seedRow = (
     result: unknown;
   }> = {},
 ) =>
-  ChatNotificationOutbox.create({
+  ChatOutboxRow.create({
     requestId: 'req-1',
     relationId: RELATION_ID,
     targets,
@@ -115,7 +112,7 @@ describe('notificationDispatcher.drain', () => {
   });
 
   beforeEach(async () => {
-    await ChatNotificationOutbox.deleteMany({});
+    await ChatOutboxRow.deleteMany({});
   });
 
   afterAll(async () => {
@@ -142,7 +139,7 @@ describe('notificationDispatcher.drain', () => {
     expect(recorder.calls).toHaveLength(1);
     expect(recorder.calls[0].targets).toEqual([TARGET_A, TARGET_B]);
 
-    const row = await ChatNotificationOutbox.findOne({});
+    const row = await ChatOutboxRow.findOne({});
     expect(row?.state).toBe('sent');
   });
 
@@ -198,7 +195,7 @@ describe('notificationDispatcher.drain', () => {
     expect(recorder.calls).toHaveLength(2);
     expect(recorder.calls[1].targets).toEqual([TARGET_B]);
 
-    const row = await ChatNotificationOutbox.findOne({});
+    const row = await ChatOutboxRow.findOne({});
     expect(row?.state).toBe('sent');
   });
 
@@ -235,7 +232,7 @@ describe('notificationDispatcher.drain', () => {
     }
 
     expect(summaries.at(-1)).toEqual({ sent: 0, failed: 0, givenUp: 1 });
-    const row = await ChatNotificationOutbox.findOne({});
+    const row = await ChatOutboxRow.findOne({});
     expect(row?.state).toBe('given-up');
     expect(row?.attempts).toBe(NOTIFICATION_RETRY_CONFIG.maxAttempts);
 
@@ -270,7 +267,7 @@ describe('notificationDispatcher.drain', () => {
       }
 
       expect(recorder.calls).toHaveLength(rounds);
-      const row = await ChatNotificationOutbox.findOne({});
+      const row = await ChatOutboxRow.findOne({});
       expect(row?.state).toBe('pending');
       expect(row?.attempts).toBe(0);
     });
@@ -289,7 +286,7 @@ describe('notificationDispatcher.drain', () => {
         now,
       );
 
-      const row = await ChatNotificationOutbox.findOne({});
+      const row = await ChatOutboxRow.findOne({});
       expect(row?.nextAttemptAt.getTime()).toBe(
         now.getTime() + INVENTORY_NOT_READY_RETRY_INTERVAL_MS,
       );
@@ -316,7 +313,7 @@ describe('notificationDispatcher.drain', () => {
         new Date(),
       );
 
-      const row = await ChatNotificationOutbox.findOne({});
+      const row = await ChatOutboxRow.findOne({});
       expect(row?.attempts).toBe(1);
     });
   });
@@ -370,7 +367,7 @@ describe('notificationDispatcher.drain', () => {
     }).drain(new Date());
 
     expect(summary).toEqual({ sent: 2, failed: 0, givenUp: 0 });
-    const states = await ChatNotificationOutbox.find({}).distinct('state');
+    const states = await ChatOutboxRow.find({}).distinct('state');
     expect(states).toEqual(['sent']);
   });
 
@@ -396,7 +393,7 @@ describe('notificationDispatcher.drain', () => {
       new Date(),
     );
 
-    const row = await ChatNotificationOutbox.findOne({});
+    const row = await ChatOutboxRow.findOne({});
     expect(row?.result).toMatchObject({
       outcomes: [
         expect.objectContaining({
@@ -428,7 +425,7 @@ describe('notificationDispatcher.drain', () => {
     await dispatcher.drain(first);
     await dispatcher.drain(new Date(first.getTime() + 60 * 60 * 1000));
 
-    const row = await ChatNotificationOutbox.findOne({});
+    const row = await ChatOutboxRow.findOne({});
     const result = row?.result as NotificationResult;
     expect(result.outcomes.map((o) => [o.channelId, o.status]).sort()).toEqual([
       [TARGET_A.channelId, 'posted'],
@@ -445,7 +442,7 @@ describe('notificationDispatcher.drain', () => {
     }).drain(new Date());
 
     expect(summary).toEqual({ sent: 0, failed: 1, givenUp: 0 });
-    const row = await ChatNotificationOutbox.findOne({});
+    const row = await ChatOutboxRow.findOne({});
     expect(row?.state).toBe('pending');
     expect(row?.attempts).toBe(1);
   });

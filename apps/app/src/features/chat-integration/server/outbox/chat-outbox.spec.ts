@@ -7,10 +7,10 @@ import {
 } from '^/test/setup/mongo/self-contained-connection';
 
 import type { IntegrationPresence } from '../integration-presence';
-import { createNotificationOutbox, notificationOutbox } from './chat-outbox';
-import { ChatNotificationOutbox } from './models/chat-outbox';
+import { chatOutbox, createChatOutbox } from './chat-outbox';
+import { ChatOutboxRow } from './models/chat-outbox';
 
-describe('notificationOutbox.enqueue', () => {
+describe('chatOutbox.enqueue', () => {
   let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
@@ -20,7 +20,7 @@ describe('notificationOutbox.enqueue', () => {
   });
 
   beforeEach(async () => {
-    await ChatNotificationOutbox.deleteMany({});
+    await ChatOutboxRow.deleteMany({});
   });
 
   afterAll(async () => {
@@ -28,14 +28,14 @@ describe('notificationOutbox.enqueue', () => {
   });
 
   it('creates exactly one row with all fields persisted and a requestId assigned', async () => {
-    await notificationOutbox.enqueue({
+    await chatOutbox.enqueue({
       relationId: 'rel-1',
       targets: [{ platform: 'slack', channelId: 'C1' }],
       markdown: 'someone created [/a](https://growi.example.com/a)',
       containsRestrictedPage: false,
     });
 
-    const rows = await ChatNotificationOutbox.find({});
+    const rows = await ChatOutboxRow.find({});
     expect(rows).toHaveLength(1);
     const [row] = rows;
     expect(row.relationId).toBe('rel-1');
@@ -52,20 +52,20 @@ describe('notificationOutbox.enqueue', () => {
   });
 
   it('mints a FRESH requestId for each call -- two enqueue calls for the same relation never reuse an id', async () => {
-    await notificationOutbox.enqueue({
+    await chatOutbox.enqueue({
       relationId: 'rel-1',
       targets: [{ platform: 'slack', channelId: 'C1' }],
       markdown: 'first notification',
       containsRestrictedPage: false,
     });
-    await notificationOutbox.enqueue({
+    await chatOutbox.enqueue({
       relationId: 'rel-1',
       targets: [{ platform: 'slack', channelId: 'C1' }],
       markdown: 'second, unrelated notification',
       containsRestrictedPage: false,
     });
 
-    const rows = await ChatNotificationOutbox.find({}).sort({ markdown: 1 });
+    const rows = await ChatOutboxRow.find({}).sort({ markdown: 1 });
     expect(rows).toHaveLength(2);
     expect(rows[0].requestId).not.toBe(rows[1].requestId);
 
@@ -77,19 +77,19 @@ describe('notificationOutbox.enqueue', () => {
   });
 
   it('persists a restricted page notification with containsRestrictedPage true', async () => {
-    await notificationOutbox.enqueue({
+    await chatOutbox.enqueue({
       relationId: 'rel-1',
       targets: [{ platform: 'discord', channelId: 'D1' }],
       markdown: 'someone edited [/secret](https://growi.example.com/secret)',
       containsRestrictedPage: true,
     });
 
-    const [row] = await ChatNotificationOutbox.find({});
+    const [row] = await ChatOutboxRow.find({});
     expect(row.containsRestrictedPage).toBe(true);
   });
 
   it('stores the row as a notification in the stored document itself', async () => {
-    await notificationOutbox.enqueue({
+    await chatOutbox.enqueue({
       relationId: 'rel-1',
       targets: [{ platform: 'slack', channelId: 'C1' }],
       markdown: 'someone created [/a](https://growi.example.com/a)',
@@ -97,12 +97,12 @@ describe('notificationOutbox.enqueue', () => {
     });
 
     // Read the stored document: the dispatcher selects rows by the stored kind.
-    const stored = await ChatNotificationOutbox.collection.findOne({});
+    const stored = await ChatOutboxRow.collection.findOne({});
     expect(stored?.kind).toBe('notification');
   });
 });
 
-describe('createNotificationOutbox presence marking', () => {
+describe('createChatOutbox presence marking', () => {
   let mongod: MongoMemoryServer | undefined;
 
   beforeAll(async () => {
@@ -112,7 +112,7 @@ describe('createNotificationOutbox presence marking', () => {
   });
 
   beforeEach(async () => {
-    await ChatNotificationOutbox.deleteMany({});
+    await ChatOutboxRow.deleteMany({});
   });
 
   afterAll(async () => {
@@ -130,9 +130,9 @@ describe('createNotificationOutbox presence marking', () => {
     const presence = mock<IntegrationPresence>();
     const before = Date.now();
 
-    await createNotificationOutbox({ presence }).enqueue(entry);
+    await createChatOutbox({ presence }).enqueue(entry);
 
-    expect(await ChatNotificationOutbox.countDocuments({})).toBe(1);
+    expect(await ChatOutboxRow.countDocuments({})).toBe(1);
     expect(presence.markPresent).toHaveBeenCalledTimes(1);
     const [markedAt] = presence.markPresent.mock.calls[0];
     expect(markedAt.getTime()).toBeGreaterThanOrEqual(before);
@@ -143,13 +143,13 @@ describe('createNotificationOutbox presence marking', () => {
     const presence = mock<IntegrationPresence>();
 
     await expect(
-      createNotificationOutbox({ presence }).enqueue({
+      createChatOutbox({ presence }).enqueue({
         ...entry,
         markdown: '',
       }),
     ).rejects.toThrow();
 
     expect(presence.markPresent).not.toHaveBeenCalled();
-    expect(await ChatNotificationOutbox.countDocuments({})).toBe(0);
+    expect(await ChatOutboxRow.countDocuments({})).toBe(0);
   });
 });
