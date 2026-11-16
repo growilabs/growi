@@ -15,16 +15,25 @@ import {
   disconnectSelfContainedMongo,
 } from '^/test/setup/mongo/self-contained-connection';
 
-import type { notify as notifyFn } from '../proxy-client';
-import type { ChatNotificationOutboxTarget } from './models/chat-notification-outbox';
-import { ChatNotificationOutbox } from './models/chat-notification-outbox';
-import type { DrainSummary } from './notification-dispatcher';
+import type { ChatNotificationOutboxTarget } from '../outbox/models/chat-outbox';
+import { ChatNotificationOutbox } from '../outbox/models/chat-outbox';
+import type { DrainSummary } from '../outbox/outbox-dispatcher';
 import {
   CLAIM_STALE_AFTER_MS,
-  createNotificationDispatcher,
-  INVENTORY_NOT_READY_RETRY_INTERVAL_MS,
+  createOutboxDispatcher,
   NOTIFICATION_RETRY_CONFIG,
-} from './notification-dispatcher';
+} from '../outbox/outbox-dispatcher';
+import type { notify as notifyFn } from '../proxy-client';
+import {
+  createNotificationDeliverer,
+  INVENTORY_NOT_READY_RETRY_INTERVAL_MS,
+} from './notification-deliverer';
+
+/** The shared dispatcher with only the notification deliverer registered. */
+const createNotificationDispatcher = (deps: { notify: typeof notifyFn }) =>
+  createOutboxDispatcher({
+    deliverers: { notification: createNotificationDeliverer(deps) },
+  });
 
 const RELATION_ID = 'rel-1';
 const TARGET_A: ChatNotificationOutboxTarget = {

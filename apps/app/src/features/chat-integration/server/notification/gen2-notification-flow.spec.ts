@@ -24,10 +24,10 @@ import {
 } from '^/test/setup/mongo/self-contained-connection';
 
 import { ChatNotificationDestination } from '../models/chat-notification-destination';
+import { ChatNotificationOutbox } from '../outbox/models/chat-outbox';
 import { createGen2NotificationDispatcher } from './destination-dispatcher';
 import { DestinationRegistry } from './destination-registry';
 import { findGen2DestinationsForPathAndEvent } from './find-destinations-for-path-and-event';
-import { ChatNotificationOutbox } from './models/chat-notification-outbox';
 
 describe('Gen 2 notification dispatch -- real path matching + real outbox writes', () => {
   let mongod: MongoMemoryServer | undefined;

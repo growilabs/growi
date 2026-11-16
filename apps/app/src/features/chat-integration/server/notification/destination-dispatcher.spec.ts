@@ -1,9 +1,9 @@
 import { mock } from 'vitest-mock-extended';
 
+import type { NotificationOutbox } from '../outbox';
 import { createGen2NotificationDispatcher } from './destination-dispatcher';
 import type { Gen2Destination } from './destination-registry';
 import { DestinationRegistry } from './destination-registry';
-import type { NotificationOutbox } from './notification-outbox';
 
 describe('createGen2NotificationDispatcher', () => {
   it("enqueues one outbox row for the destination it is given, scoped to that destination's relation", async () => {

@@ -1,9 +1,10 @@
+import type { AgentAnswer } from '@growi/chat';
 import { describe, expect, it } from 'vitest';
 
 import {
   ChatNotificationOutbox,
   NOTIFICATION_OUTBOX_SENT_TTL_SECONDS,
-} from './chat-notification-outbox';
+} from './chat-outbox';
 
 describe('ChatNotificationOutbox schema', () => {
   const allFields = [
@@ -117,5 +118,74 @@ describe('ChatNotificationOutbox schema', () => {
       }
     ).options?.collection;
     expect(collectionName).toBe('chat_notification_outbox');
+  });
+});
+
+describe('ChatNotificationOutbox row kinds', () => {
+  const base = { requestId: 'req-1', relationId: 'rel-1' };
+  const notificationFields = {
+    targets: [{ platform: 'slack' as const, channelId: 'C1' }],
+    markdown: 'someone created /a',
+    containsRestrictedPage: false,
+  };
+
+  it('accepts a notification row with its notification fields', async () => {
+    await expect(
+      new ChatNotificationOutbox({
+        ...base,
+        kind: 'notification',
+        ...notificationFields,
+      }).validate(),
+    ).resolves.toBeUndefined();
+  });
+
+  it.each([
+    'markdown',
+    'containsRestrictedPage',
+  ] as const)('rejects a notification row without %s', async (field) => {
+    const { [field]: _omitted, ...rest } = notificationFields;
+
+    await expect(
+      new ChatNotificationOutbox({
+        ...base,
+        kind: 'notification',
+        ...rest,
+      }).validate(),
+    ).rejects.toThrow(field);
+  });
+
+  it('accepts a command-answer row that has none of the notification fields', async () => {
+    await expect(
+      new ChatNotificationOutbox({
+        ...base,
+        kind: 'command-answer',
+        answer: { kind: 'text', markdown: 'the answer', sources: [] },
+      }).validate(),
+    ).resolves.toBeUndefined();
+  });
+
+  it('keeps the answer of a command-answer row as written', async () => {
+    const answer: AgentAnswer = {
+      kind: 'text',
+      markdown: 'the answer',
+      sources: [],
+    };
+    const row = new ChatNotificationOutbox({
+      ...base,
+      kind: 'command-answer',
+      answer,
+    });
+
+    expect(row.toObject().answer).toEqual(answer);
+  });
+
+  it('rejects a row of a kind it does not know', async () => {
+    await expect(
+      new ChatNotificationOutbox({
+        ...base,
+        kind: 'something-else',
+        ...notificationFields,
+      }).validate(),
+    ).rejects.toThrow('kind');
   });
 });

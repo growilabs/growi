@@ -1,8 +1,8 @@
 import type { PlatformName } from '@growi/chat';
 
+import type { NotificationOutbox } from '../outbox';
+import { notificationOutbox } from '../outbox';
 import type { DestinationDispatcher } from './destination-registry';
-import type { NotificationOutbox } from './notification-outbox';
-import { notificationOutbox } from './notification-outbox';
 
 /**
  * The real Gen 2 destination dispatcher -- replaces task 2.3's placeholder

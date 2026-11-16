@@ -1,4 +1,4 @@
-// What actually turns `NotificationDispatcher` into something that happens.
+// What actually turns `OutboxDispatcher` into something that happens.
 //
 // design.md: GROWI already has three collections-with-a-`state`-column that
 // are worked through periodically (`page-bulk-export`,
@@ -10,7 +10,7 @@
 //
 // The cron gives no exclusion of its own -- every instance ticks -- which is
 // exactly why the drain takes a row at a time with a conditional update. See
-// `notification-dispatcher.ts`. A tick that finds no chat integration at all
+// `outbox-dispatcher.ts`. A tick that finds no chat integration at all
 // does nothing, so a GROWI that never used one pays no per-minute queries.
 
 import CronService from '~/server/service/cron';
@@ -18,28 +18,28 @@ import loggerFactory from '~/utils/logger';
 
 import type { IntegrationPresence } from '../integration-presence';
 import { integrationPresence } from '../integration-presence';
-import type { NotificationDispatcher } from './notification-dispatcher';
-import { notificationDispatcher } from './notification-dispatcher';
+import { outboxDispatcher } from './deliverers';
+import type { OutboxDispatcher } from './outbox-dispatcher';
 
 const logger = loggerFactory(
-  'growi:features:chat-integration:notification-dispatch-cron',
+  'growi:features:chat-integration:outbox-dispatch-cron',
 );
 
 export interface ChatNotificationDispatchCronDeps {
-  readonly dispatcher?: NotificationDispatcher;
+  readonly dispatcher?: OutboxDispatcher;
   readonly presence?: IntegrationPresence;
   /** Test seam; production uses `() => new Date()`. */
   readonly clock?: () => Date;
 }
 
 export class ChatNotificationDispatchCronService extends CronService {
-  private readonly dispatcher: NotificationDispatcher;
+  private readonly dispatcher: OutboxDispatcher;
   private readonly presence: IntegrationPresence;
   private readonly clock: () => Date;
 
   constructor(deps: ChatNotificationDispatchCronDeps = {}) {
     super();
-    this.dispatcher = deps.dispatcher ?? notificationDispatcher;
+    this.dispatcher = deps.dispatcher ?? outboxDispatcher;
     this.presence = deps.presence ?? integrationPresence;
     this.clock = deps.clock ?? (() => new Date());
   }
@@ -60,7 +60,7 @@ export class ChatNotificationDispatchCronService extends CronService {
     try {
       await this.dispatcher.drain(now);
     } catch (err) {
-      logger.error('Failed to drain the chat notification outbox', err);
+      logger.error('Failed to drain the chat outbox', err);
     }
   }
 }

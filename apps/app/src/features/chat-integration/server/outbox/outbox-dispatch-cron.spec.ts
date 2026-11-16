@@ -11,7 +11,7 @@ import { sweepUnpairedRelations } from '../pairing/sweep-unpaired-relations';
 import {
   ChatNotificationDispatchCronService,
   chatNotificationDispatchCronService,
-} from './notification-dispatch-cron';
+} from './outbox-dispatch-cron';
 
 vi.mock('../pairing/sweep-unpaired-relations', () => ({
   sweepUnpairedRelations: vi.fn(),
@@ -167,5 +167,19 @@ describe('ChatNotificationDispatchCronService', () => {
 
     expect(source).toContain('chatNotificationDispatchCronService');
     expect(source).toContain('chatNotificationDispatchCronService.startCron()');
+  });
+
+  it('is the outbox module’s cron that crowi starts, and only once', async () => {
+    const source = await readFile(
+      path.resolve(import.meta.dirname, '../../../../server/crowi/index.ts'),
+      'utf8',
+    );
+
+    expect(source).toMatch(
+      /import \{[^}]*\bchatNotificationDispatchCronService\b[^}]*\} from '~\/features\/chat-integration\/server\/outbox(\/outbox-dispatch-cron)?';/,
+    );
+    expect(
+      source.match(/chatNotificationDispatchCronService\.startCron\(\)/g),
+    ).toHaveLength(1);
   });
 });

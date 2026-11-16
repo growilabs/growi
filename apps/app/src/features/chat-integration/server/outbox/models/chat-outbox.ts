@@ -1,4 +1,4 @@
-import type { PlatformName } from '@growi/chat';
+import type { AgentAnswer, PlatformName } from '@growi/chat';
 import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
@@ -10,6 +10,10 @@ import { getOrCreateModel } from '~/server/util/mongoose-utils';
  * (design.md `chat_notification_outbox` row).
  */
 export const NOTIFICATION_OUTBOX_SENT_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+export const OUTBOX_KINDS = ['notification', 'command-answer'] as const;
+
+export type OutboxKind = (typeof OUTBOX_KINDS)[number];
 
 export type ChatNotificationOutboxState =
   | 'pending'
@@ -24,6 +28,13 @@ export interface ChatNotificationOutboxTarget {
 }
 
 export interface IChatNotificationOutbox {
+  /**
+   * Which deliverer sends this row. `targets`, `markdown` and
+   * `containsRestrictedPage` are written on `notification` rows only, and
+   * `answer` on `command-answer` rows only.
+   */
+  kind: OutboxKind;
+  /** On a `command-answer` row, the `requestId` of the `agent` request. */
   requestId: string;
   relationId: string;
   targets: ChatNotificationOutboxTarget[];
@@ -68,6 +79,7 @@ export interface IChatNotificationOutbox {
    * `NotificationResult` contract, not duplicated here.
    */
   result: unknown;
+  answer: AgentAnswer | null;
   createdAt: Date;
 }
 
@@ -96,20 +108,30 @@ const chatNotificationOutboxTargetSchema =
     { _id: false },
   );
 
+function isNotificationRow(this: ChatNotificationOutboxDocument): boolean {
+  return this.kind === 'notification';
+}
+
 const chatNotificationOutboxSchema = new Schema<
   ChatNotificationOutboxDocument,
   ChatNotificationOutboxModel
 >(
   {
+    kind: {
+      type: String,
+      enum: OUTBOX_KINDS,
+      required: true,
+      default: 'notification',
+    },
     requestId: { type: String, required: true },
     relationId: { type: String, required: true },
     targets: {
       type: [chatNotificationOutboxTargetSchema],
-      required: true,
+      required: isNotificationRow,
       default: [],
     },
-    markdown: { type: String, required: true },
-    containsRestrictedPage: { type: Boolean, required: true },
+    markdown: { type: String, required: isNotificationRow },
+    containsRestrictedPage: { type: Boolean, required: isNotificationRow },
     state: {
       type: String,
       enum: [
@@ -125,6 +147,7 @@ const chatNotificationOutboxSchema = new Schema<
     claimedAt: { type: Date, default: null },
     nextAttemptAt: { type: Date, required: true, default: () => new Date() },
     result: { type: Schema.Types.Mixed, default: null },
+    answer: { type: Schema.Types.Mixed, default: null },
     createdAt: { type: Date, required: true, default: () => new Date() },
   },
   {
@@ -148,6 +171,9 @@ chatNotificationOutboxSchema.index({ state: 1, nextAttemptAt: 1 });
 
 // The proxy's result write-back looks up the row by (relationId, requestId).
 chatNotificationOutboxSchema.index({ relationId: 1, requestId: 1 });
+
+// The unique (relationId, requestId) index on `command-answer` rows is created
+// by a migration (20261116120000-add-kind-to-chat-notification-outbox), not here.
 
 // Only `sent` rows are subject to the 30-day TTL; `given-up` rows must
 // survive until an operator inspects them, so the TTL index is scoped with

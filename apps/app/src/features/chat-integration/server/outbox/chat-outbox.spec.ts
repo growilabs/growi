@@ -7,11 +7,8 @@ import {
 } from '^/test/setup/mongo/self-contained-connection';
 
 import type { IntegrationPresence } from '../integration-presence';
-import { ChatNotificationOutbox } from './models/chat-notification-outbox';
-import {
-  createNotificationOutbox,
-  notificationOutbox,
-} from './notification-outbox';
+import { createNotificationOutbox, notificationOutbox } from './chat-outbox';
+import { ChatNotificationOutbox } from './models/chat-outbox';
 
 describe('notificationOutbox.enqueue', () => {
   let mongod: MongoMemoryServer | undefined;
@@ -89,6 +86,19 @@ describe('notificationOutbox.enqueue', () => {
 
     const [row] = await ChatNotificationOutbox.find({});
     expect(row.containsRestrictedPage).toBe(true);
+  });
+
+  it('stores the row as a notification in the stored document itself', async () => {
+    await notificationOutbox.enqueue({
+      relationId: 'rel-1',
+      targets: [{ platform: 'slack', channelId: 'C1' }],
+      markdown: 'someone created [/a](https://growi.example.com/a)',
+      containsRestrictedPage: false,
+    });
+
+    // Read through the driver: a schema default would hide a missing field.
+    const stored = await ChatNotificationOutbox.collection.findOne({});
+    expect(stored?.kind).toBe('notification');
   });
 });
 

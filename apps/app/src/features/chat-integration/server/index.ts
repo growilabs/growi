@@ -38,7 +38,7 @@ import './account-link/models/chat-account-link-order';
 import './keys/models/chat-integration-key';
 import './pairing/models/pending-pairing';
 import './pairing/models/chat-challenge-attempt';
-import './notification/models/chat-notification-outbox';
+import './outbox/models/chat-outbox';
 import './settings/models/chat-channel-permission';
 import './oauth-install-state/models/chat-oauth-install-state';
 

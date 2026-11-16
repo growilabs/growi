@@ -9,7 +9,7 @@
 // its own unit test already (`pairing/pairing-service.spec.ts`,
 // `admin/save-relation-settings.spec.ts`,
 // `notification/gen2-notification-flow.spec.ts`,
-// `notification/notification-dispatcher.spec.ts`), and each of those seeds
+// `notification/notification-deliverer.spec.ts`), and each of those seeds
 // its own `chat_relations` row by hand. What none of them can show is that
 // the relation the PAIRING procedure produces is the relation all of the
 // later stages actually work on: the `relationId` here is the one the proxy
@@ -82,9 +82,9 @@ import { ChatIntegrationKey } from './keys/models/chat-integration-key';
 import { ChatNotificationDestination } from './models/chat-notification-destination';
 import { ChatProcessedRequest } from './models/chat-processed-request';
 import { ChatRelation } from './models/chat-relation';
-import { ChatNotificationOutbox } from './notification/models/chat-notification-outbox';
-import { ChatNotificationDispatchCronService } from './notification/notification-dispatch-cron';
-import { notificationDispatcher } from './notification/notification-dispatcher';
+import { outboxDispatcher } from './outbox/deliverers';
+import { ChatNotificationOutbox } from './outbox/models/chat-outbox';
+import { ChatNotificationDispatchCronService } from './outbox/outbox-dispatch-cron';
 import { ChatChallengeAttempt } from './pairing/models/chat-challenge-attempt';
 import { ChatPendingPairing } from './pairing/models/pending-pairing';
 import { createPairingEndpoint } from './pairing/pairing-endpoint';
@@ -567,7 +567,7 @@ describe('Gen 2 end-to-end: pairing -> settings -> command -> notification -> re
         answerFor(req, []),
       );
       const laterThanAnyBackoff = new Date(Date.now() + 60 * 60 * 1000);
-      await notificationDispatcher.drain(laterThanAnyBackoff);
+      await outboxDispatcher.drain(laterThanAnyBackoff);
 
       // The whole point: the channel that already received the notification
       // was asked exactly once, and the failed one carries the SAME
