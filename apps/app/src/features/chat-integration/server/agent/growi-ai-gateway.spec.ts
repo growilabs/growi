@@ -19,6 +19,7 @@ import type { GetPageContentToolOutput } from '~/features/mastra/server/services
 import { conversationThreadIdOf } from './conversation-thread-id';
 import { createGrowiAiGateway } from './growi-ai-gateway';
 import type {
+  AiRunContext,
   GrowiAiGateway,
   GrowiAiRunOutcome,
   GrowiAiRuntime,
@@ -265,8 +266,8 @@ describe('GrowiAiGateway.classify', () => {
     ).rejects.toThrow();
   });
 
-  it('reports an abort, without calling the model, when the signal is already aborted', async () => {
-    const { gateway, model } = harness([
+  it('reports an abort, without starting a run, when the signal is already aborted', async () => {
+    const { gateway, model, runOutcomes } = harness([
       textStep('{"intent":"answer","path":null}'),
     ]);
     const controller = running();
@@ -279,6 +280,7 @@ describe('GrowiAiGateway.classify', () => {
 
     expect(outcome).toEqual({ kind: 'aborted' });
     expect(model.doGenerateCalls).toHaveLength(0);
+    expect(runOutcomes).toEqual([]);
   });
 
   it('reports an abort, not a malformed output, when aborted while the model is answering', async () => {
@@ -438,8 +440,10 @@ describe('GrowiAiGateway.answer', () => {
     expect(runOutcomes).toEqual(['completed']);
   });
 
-  it('reports an abort, without calling the model, when the signal is already aborted', async () => {
-    const { gateway, model } = harness([textStep('never')]);
+  it('reports an abort, without starting a run or a conversation, when the signal is already aborted', async () => {
+    const { gateway, model, memory, runOutcomes } = harness([
+      textStep('never'),
+    ]);
     const controller = running();
     controller.abort();
 
@@ -450,6 +454,11 @@ describe('GrowiAiGateway.answer', () => {
 
     expect(outcome).toEqual({ kind: 'aborted' });
     expect(model.doGenerateCalls).toHaveLength(0);
+    expect(runOutcomes).toEqual([]);
+    const { threads } = await memory.listThreads({
+      filter: { resourceId: user._id },
+    });
+    expect(threads).toEqual([]);
   });
 
   it('reports an abort, and drops the partial text and sources, when aborted during a later model call', async () => {
@@ -485,27 +494,6 @@ describe('GrowiAiGateway.answer', () => {
       { user, signal: controller.signal },
     );
 
-    expect(outcome).toEqual({ kind: 'aborted' });
-  });
-
-  it('reports an abort when the signal fires after generate has returned the whole answer', async () => {
-    const controller = running();
-    const { gateway, agent } = harness([textStep('full answer')]);
-    const generate = agent.generate.bind(agent);
-    const returnedTexts: string[] = [];
-    vi.spyOn(agent, 'generate').mockImplementation(async (...args) => {
-      const result = await generate(...args);
-      returnedTexts.push(result.text);
-      controller.abort();
-      return result;
-    });
-
-    const outcome = await gateway.answer(
-      { text: 'question', ...conversation },
-      { user, signal: controller.signal },
-    );
-
-    expect(returnedTexts).toEqual(['full answer']);
     expect(outcome).toEqual({ kind: 'aborted' });
   });
 
@@ -599,8 +587,8 @@ describe('GrowiAiGateway.summarize', () => {
     ).rejects.toThrow();
   });
 
-  it('reports an abort, without calling the model, when the signal is already aborted', async () => {
-    const { gateway, model } = harness([textStep('never')]);
+  it('reports an abort, without starting a run, when the signal is already aborted', async () => {
+    const { gateway, model, runOutcomes } = harness([textStep('never')]);
     const controller = running();
     controller.abort();
 
@@ -611,6 +599,7 @@ describe('GrowiAiGateway.summarize', () => {
 
     expect(outcome).toEqual({ kind: 'aborted' });
     expect(model.doGenerateCalls).toHaveLength(0);
+    expect(runOutcomes).toEqual([]);
   });
 
   it('reports an abort, not a malformed output, when aborted while the model is writing', async () => {
@@ -654,5 +643,61 @@ describe('GrowiAiGateway conversation records', () => {
     expect(afterAnswer.threads.map((thread) => thread.id)).toEqual([
       rememberedThreadId,
     ]);
+  });
+});
+
+// --- an abort that comes after the model has answered ---------------------------
+
+type Operation = (
+  gateway: GrowiAiGateway,
+  context: AiRunContext,
+) => Promise<GrowiAiRunOutcome<unknown>>;
+
+const SUMMARY_JSON = JSON.stringify({ title: 'Summary', body: 'body' });
+const CLASSIFICATION_JSON = '{"intent":"answer","path":null}';
+
+const operations: ReadonlyArray<readonly [string, string, Operation]> = [
+  [
+    'classify',
+    CLASSIFICATION_JSON,
+    (gateway, context) => gateway.classify('question', context),
+  ],
+  [
+    'answer',
+    'full answer',
+    (gateway, context) =>
+      gateway.answer({ text: 'question', ...conversation }, context),
+  ],
+  [
+    'summarize',
+    SUMMARY_JSON,
+    (gateway, context) => gateway.summarize(messages, 'Summarize', context),
+  ],
+];
+
+describe('GrowiAiGateway: an abort after generate has returned', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each(
+    operations,
+  )('%s reports an abort although generate returned the whole output', async (_name, output, operate) => {
+    const controller = running();
+    const { gateway, agent, runOutcomes } = harness([textStep(output)]);
+    const generate = agent.generate.bind(agent);
+    const returnedTexts: string[] = [];
+    vi.spyOn(agent, 'generate').mockImplementation(async (...args) => {
+      const result = await generate(...args);
+      returnedTexts.push(result.text);
+      controller.abort();
+      return result;
+    });
+
+    const outcome = await operate(gateway, { user, signal: controller.signal });
+
+    expect(returnedTexts).toEqual([output]);
+    expect(outcome).toEqual({ kind: 'aborted' });
+    expect(runOutcomes).toEqual(['failed']);
   });
 });
