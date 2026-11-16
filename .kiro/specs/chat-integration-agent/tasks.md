@@ -106,7 +106,7 @@
   - 完了の条件: 起動の配線の試験が通り、Slack の導入ドキュメントに上の内容があり、Teams の節がある
   - _Requirements: 1.21_
 
-- [ ] 4. app: 書き留めと送り手を 1 つにする
+- [x] 4. app: 書き留めと送り手を 1 つにする
 - [x] 4.1 通知の書き留めを、種類つきの書き留めに広げる
   - 通知の送り手を書き留めの共通の場所へ移し、取る・送り直す・諦めるの仕組みを、種類ごとの「1 件の送り方」の表を受け取る形にする。通知 1 件の送り方は今の動きのまま移す
   - 書き留めに種類と答えの欄を足し、通知の欄の必須を通知の行に限り、答えの行に限った「連携と依頼の番号」の一意の索引を張る。既存の行に種類を補う migration を足す
@@ -123,7 +123,7 @@
   - 完了の条件: 応答しない proxy に対して呼び出しが打ち切り時間で失敗として返る試験と、2 つの呼び出しの往復の試験が通る
   - _Requirements: 5.7, 15.6_
   - _Boundary: ProxyClient_
-- [ ] 4.4 答え 1 件の送り方
+- [x] 4.4 答え 1 件の送り方
   - 答えの行を送り、届けた・届けられなかった・知らない依頼なら終わり、配達中・HTTP の失敗・打ち切りなら送り直しにする。送れた行からは答えの本文を消し、諦めた答えの行は 7 日で消える
   - 完了の条件: 結果ごとの判定と、送れた行の本文が消えること、5 回目の失敗で諦めて理由が残ることの試験が通る
   - _Requirements: 15.6, 15.11_
@@ -292,3 +292,4 @@
 - 4.4 → **5.x への引き継ぎ**: 答えは `chatOutbox.enqueue({ kind: 'command-answer', relationId, requestId, answer })` で書き留める（`requestId` は `agent` の依頼の番号をそのまま渡す）。書き留めた直後に送られる。送れた後の行は `{ kind: 'command-answer', relationId, requestId, state: 'sent', result: { status: 'delivered' } }` のような形で、`answer` は無い。同じ依頼の答えを 2 回書き留めると、索引 `relationId_1_requestId_1_command_answer_unique` で重複のエラー（E11000、`code === 11000`）になる。送れた行は本文が消えても 30 日残るので、送れた後の 2 回目も重複になる。諦めた行は 7 日で消えるので、それより後なら同じ依頼の答えをもう一度書き留められる。
 - 4.4 → **タスク 7（design.md への書き戻し）へ**: `createOutboxDispatcher` の表は全種類必須で、「送り方の無い種類は取らない」決まりは無い。`Deliverer<K>` は `kind` だけを絞った行を受け取る。答えの送り方のファイルは `outbox/command-answer-deliverer.ts`（design の構成図に無いので足す）。`in-progress` と全部の呼び出しの失敗は、数える送り直しにする。答えの行の `result` は `{ status }` か `{ failure }`。`settle` は取った時刻を条件に書く。送れた行の `answer` は送り手が種類に関係なく消す。諦めた答えの行の 7 日は `createdAt` を基準にし、索引は migration が作る（Data Models と Security Considerations の「答えの保存」に書く）。
 - 4.4（試験の注意）: 新しい migration の試験は、前の migration（20261116120000）の `up` を先に呼んでから確かめる。MONGO_URI を付けずに回すと、ひな型の DB が使われず migration が 1 つも走っていないため。
+- 4.4（レビューの申し送り）: **5.x へ**: 答えは `chatOutbox.enqueue({kind:"command-answer", relationId, requestId, answer})` で書き留める（直後に送られる）。同じ依頼の答えを 2 回書き留めると E11000（`code === 11000`）になる。送れた行は本文が消えても 30 日残るので、送れた後の 2 回目も重複になる。長い答えは書き留める前に上限（本文 30,000 文字・出典 20 件）まで切り詰める（5.6）。proxy が受付を拒んで依頼の記録を消した経路では、答えは `unknown-request` で静かに終わる。避けるなら 5.6 で受付の結果を確かめてから書き留める。行に残る `{failure:"http-error"}` からは 400（答えが長すぎる）と 5xx を見分けられない。**7 へ**: 判定は `sent`／`retry` の 2 つで `give-up` は無い。7 日の期限は `createdAt` が基準なので実際は「諦めてから 7 日弱」で消える。行が諦めるまでは実際は 25〜30 分ほど（送り直しの間隔 1・2・4・8 分と、定期処理 5 分ごとから）。`settle` は取ったときの `claimedAt` と `state: claimed` を条件に書く。送り方は `outbox/command-answer-deliverer.ts`。
