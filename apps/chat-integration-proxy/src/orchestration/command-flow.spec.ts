@@ -21,6 +21,7 @@ import type { GrowiSelector, SelectionRequest } from '../relation/index.js';
 import type { Invocation, OutboundMessage, Relation } from '../types/index.js';
 import type { AdminFlow } from './admin-flow.js';
 import {
+  type AgentEntry,
   type CommandFlowDeps,
   type CommandFlowPlatform,
   createCommandFlow,
@@ -73,7 +74,9 @@ interface Harness {
   readonly postedMessages: () => ReadonlyArray<OutboundMessage>;
 }
 
-const createHarness = (): Harness => {
+const createHarness = (
+  commandHandlers?: CommandFlowDeps['commandHandlers'],
+): Harness => {
   const platform = mock<CommandFlowPlatform>();
   vi.mocked(platform.post).mockResolvedValue({ ok: true, messageId: 'M100' });
   vi.mocked(platform.replace).mockResolvedValue({
@@ -121,6 +124,7 @@ const createHarness = (): Harness => {
     resolveInstallationId,
     adminFlow,
     privateReplier,
+    ...(commandHandlers == null ? {} : { commandHandlers }),
     newRequestId: (() => {
       // Requirement 10.4 keys duplicate-execution detection on this value, so
       // the fixture has to make two targets' ids actually differ.
@@ -586,108 +590,6 @@ describe('the five commands, end to end', () => {
     });
   });
 
-  it('keep: never reaches GROWI when the chosen range holds no messages', async () => {
-    vi.mocked(harness.selector.select).mockResolvedValue({
-      kind: 'execute',
-      targets: [GROWI_A],
-      excluded: [],
-    });
-    vi.mocked(harness.collector.start).mockResolvedValue({
-      status: 'collected',
-      values: { range: '2026-09-01..2026-09-02', path: '/memo/log' },
-    });
-    vi.mocked(harness.platform.fetchHistory).mockResolvedValue({
-      ok: true,
-      messages: [],
-    });
-
-    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.keep));
-
-    expect(harness.growiClient.sendCommand).not.toHaveBeenCalled();
-    expect(harness.ephemeralMessages()).toHaveLength(1);
-  });
-
-  it('keep: turns the fetched conversation into the messages GROWI stores', async () => {
-    vi.mocked(harness.selector.select).mockResolvedValue({
-      kind: 'execute',
-      targets: [GROWI_A],
-      excluded: [],
-    });
-    vi.mocked(harness.collector.start).mockResolvedValue({
-      status: 'collected',
-      values: { range: '2026-09-01..2026-09-02', path: '/memo/log' },
-    });
-    vi.mocked(harness.platform.fetchHistory).mockResolvedValue({
-      ok: true,
-      messages: [
-        { postedAt: '2026-09-01T01:00:00.000Z', author: actor, text: 'hi' },
-      ],
-    });
-    vi.mocked(harness.growiClient.sendCommand).mockResolvedValue({
-      ok: true,
-      response: { kind: 'created', pageUrl: 'https://rel-a.example.com/log' },
-    });
-
-    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.keep));
-
-    const [, range] =
-      vi.mocked(harness.platform.fetchHistory).mock.calls[0] ?? [];
-    expect(range).toEqual({
-      since: new Date('2026-09-01T00:00:00.000Z'),
-      until: new Date('2026-09-02T00:00:00.000Z'),
-    });
-    const request = vi.mocked(harness.growiClient.sendCommand).mock
-      .calls[0]?.[1] as CommandRequest;
-    expect(request).toMatchObject({
-      kind: COMMAND_NAMES.keep,
-      path: '/memo/log',
-      messages: [
-        {
-          postedAt: '2026-09-01T01:00:00.000Z',
-          author: actor,
-          markdown: 'hi',
-        },
-      ],
-    });
-  });
-
-  it('keep: refuses a range it cannot read whole, instead of importing the wrong days', async () => {
-    vi.mocked(harness.selector.select).mockResolvedValue({
-      kind: 'execute',
-      targets: [GROWI_A],
-      excluded: [],
-    });
-    vi.mocked(harness.collector.start).mockResolvedValue({
-      status: 'collected',
-      values: { range: '2026-09-01', path: '/memo/log' },
-    });
-    vi.mocked(harness.platform.fetchHistory).mockResolvedValue({
-      ok: true,
-      messages: [
-        { postedAt: '2026-09-01T01:00:00.000Z', author: actor, text: 'hi' },
-      ],
-    });
-    vi.mocked(harness.growiClient.sendCommand).mockResolvedValue({
-      ok: true,
-      response: { kind: 'created', pageUrl: 'https://rel-a.example.com/log' },
-    });
-
-    // '2026-09-01' alone IS a whole day, so this one is accepted -- what the
-    // rule refuses is a range the positional parse could not read whole.
-    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.keep));
-
-    vi.mocked(harness.collector.start).mockResolvedValue({
-      status: 'collected',
-      values: { range: 'last-week', path: '/memo/log' },
-    });
-    await harness.flow.startCommand(invocationOf(COMMAND_NAMES.keep));
-
-    const refusal = harness.ephemeralMessages().at(-1);
-    if (refusal?.kind !== 'markdown') throw new Error('expected markdown');
-    expect(refusal.markdown).toContain('..');
-    expect(harness.growiClient.sendCommand).toHaveBeenCalledTimes(1);
-  });
-
   it('link: offers every paired GROWI, then starts the link on the one chosen', async () => {
     vi.mocked(harness.selector.select).mockResolvedValue({
       kind: 'choose',
@@ -736,6 +638,228 @@ describe('the five commands, end to end', () => {
     );
     expect(notice.markdown).toContain(GROWI_B.growiLabel);
     expect(harness.platform.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('agent', () => {
+  const dmChannel = testSdkChannel(PLATFORM, { isDirectMessage: true });
+
+  const agentInvocation = (
+    overrides: Partial<Invocation> = {},
+  ): Invocation => ({
+    ...invocationOf(COMMAND_NAMES.agent, 'summarise the onboarding page'),
+    sourceMessageId: 'M-request',
+    ...overrides,
+  });
+
+  const withAgentEntry = () => {
+    const agent = vi.fn<AgentEntry>().mockResolvedValue();
+    return { agent, harness: createHarness({ agent }) };
+  };
+
+  const permitGrowi = (harness: Harness, ...targets: Relation[]) =>
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'execute',
+      targets,
+      excluded: [],
+    });
+
+  const collectText = (harness: Harness, text: string) =>
+    vi.mocked(harness.collector.start).mockResolvedValue({
+      status: 'collected',
+      values: { text },
+    });
+
+  it('hands the request text, the asker and the place to the agent entry, and sends nothing itself (Requirement 15.1)', async () => {
+    const { agent, harness } = withAgentEntry();
+    permitGrowi(harness, GROWI_A);
+    collectText(harness, 'summarise the onboarding page');
+
+    const invocation = agentInvocation();
+    await harness.flow.startCommand(invocation);
+
+    expect(harness.collector.start).toHaveBeenCalledWith(invocation, [
+      { name: 'text', label: 'Request', required: true, kind: 'multiline' },
+    ]);
+    expect(agent).toHaveBeenCalledTimes(1);
+    const [input] = agent.mock.calls[0] ?? [];
+    expect(input).toMatchObject({
+      invocation: {
+        commandName: COMMAND_NAMES.agent,
+        channel,
+        actor,
+      },
+      relation: GROWI_A,
+      origin: { installationId: INSTALLATION_ID },
+      text: 'summarise the onboarding page',
+    });
+    expect(harness.growiClient.sendCommand).not.toHaveBeenCalled();
+    expect(harness.ephemeralMessages()).toHaveLength(0);
+  });
+
+  it('builds the conversation key from the chat-side ids: platform, the id the service shows, and the thread root the answer goes to (Requirement 15.14)', async () => {
+    const { agent, harness } = withAgentEntry();
+    permitGrowi(harness, GROWI_A);
+    collectText(harness, 'and the next one?');
+
+    await harness.flow.startCommand(
+      agentInvocation({ replyThreadRootId: 'T-root' }),
+    );
+
+    expect(agent.mock.calls[0]?.[0].conversationKey).toBe('slack:C1:T-root');
+  });
+
+  it('uses the request message itself as the root when there is no thread to answer in', async () => {
+    const { agent, harness } = withAgentEntry();
+    permitGrowi(harness, GROWI_A);
+    collectText(harness, 'first question');
+
+    await harness.flow.startCommand(
+      agentInvocation({ replyThreadRootId: null, sourceMessageId: 'M-first' }),
+    );
+
+    expect(agent.mock.calls[0]?.[0].conversationKey).toBe('slack:C1:M-first');
+  });
+
+  it('does not use the thread the request was read from when the answer goes elsewhere', async () => {
+    const { agent, harness } = withAgentEntry();
+    permitGrowi(harness, GROWI_A);
+    collectText(harness, 'q');
+
+    await harness.flow.startCommand(
+      agentInvocation({
+        threadRootId: 'T-read',
+        replyThreadRootId: null,
+        sourceMessageId: 'M-q',
+      }),
+    );
+
+    expect(agent.mock.calls[0]?.[0].conversationKey).toBe('slack:C1:M-q');
+  });
+
+  it('tells the asker the command is not usable, and does not call the agent entry, when no id can name the conversation', async () => {
+    const { agent, harness } = withAgentEntry();
+    permitGrowi(harness, GROWI_A);
+    collectText(harness, 'q');
+
+    await harness.flow.startCommand(
+      agentInvocation({ replyThreadRootId: null, sourceMessageId: null }),
+    );
+
+    expect(agent).not.toHaveBeenCalled();
+    expect(harness.ephemeralMessages()).toHaveLength(1);
+  });
+
+  it('asks the selector about `agent` as a single-GROWI command, naming the place so a DM is judged as one (Requirement 15.13)', async () => {
+    const { harness } = withAgentEntry();
+    permitGrowi(harness, GROWI_A);
+    collectText(harness, 'q');
+
+    await harness.flow.startCommand(
+      agentInvocation({ channel: dmChannel, isDirectMessage: true }),
+    );
+
+    expect(vi.mocked(harness.selector.select).mock.calls[0]?.[0]).toEqual({
+      targeting: 'exactly-one',
+      installationId: INSTALLATION_ID,
+      channel: dmChannel,
+      commandName: COMMAND_NAMES.agent,
+    });
+  });
+
+  it('asks which GROWI when several are permitted, then hands the request to the chosen one (Requirement 8.2)', async () => {
+    const { agent, harness } = withAgentEntry();
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'choose',
+      options: [GROWI_A, GROWI_B],
+      excluded: [],
+    });
+    collectText(harness, 'which one?');
+
+    await harness.flow.startCommand(agentInvocation());
+
+    expect(harness.collector.startGrowiChoice).toHaveBeenCalledWith(
+      expect.objectContaining({ commandName: COMMAND_NAMES.agent }),
+      { text: 'which one?' },
+      [
+        { relationId: GROWI_A.relationId, growiLabel: GROWI_A.growiLabel },
+        { relationId: GROWI_B.relationId, growiLabel: GROWI_B.growiLabel },
+      ],
+    );
+    expect(agent).not.toHaveBeenCalled();
+
+    await harness.flow.runChosenGrowi(
+      agentInvocation(),
+      { text: 'which one?' },
+      GROWI_B.relationId,
+    );
+
+    expect(agent).toHaveBeenCalledTimes(1);
+    expect(agent.mock.calls[0]?.[0]).toMatchObject({
+      relation: GROWI_B,
+      text: 'which one?',
+    });
+  });
+
+  it('hands the request on after the text was collected by a later answer', async () => {
+    const { agent, harness } = withAgentEntry();
+    permitGrowi(harness, GROWI_A);
+
+    await harness.flow.runCollected(agentInvocation(), {
+      text: 'typed in the modal',
+    });
+
+    expect(agent.mock.calls[0]?.[0]).toMatchObject({
+      relation: GROWI_A,
+      text: 'typed in the modal',
+    });
+  });
+
+  it('explains, and never reaches the agent entry, when the channel has not been allowed to run it (Requirement 11.6)', async () => {
+    const { agent, harness } = withAgentEntry();
+    vi.mocked(harness.selector.select).mockResolvedValue({
+      kind: 'explain',
+      reason: 'not-permitted',
+      excluded: [],
+    });
+
+    await harness.flow.startCommand(agentInvocation());
+
+    expect(harness.collector.start).not.toHaveBeenCalled();
+    expect(agent).not.toHaveBeenCalled();
+    expect(harness.ephemeralMessages()).toHaveLength(1);
+  });
+
+  it('says the command is not usable right now, instead of staying silent, while no agent entry is wired', async () => {
+    const harness = createHarness();
+    permitGrowi(harness, GROWI_A);
+    collectText(harness, 'q');
+
+    await harness.flow.startCommand(agentInvocation());
+
+    expect(harness.growiClient.sendCommand).not.toHaveBeenCalled();
+    const message = harness.ephemeralMessages().at(-1);
+    if (message?.kind !== 'markdown') throw new Error('expected markdown');
+    expect(message.markdown).toContain('agent');
+    expect(message.markdown).toContain('今使えません');
+  });
+});
+
+describe('keep -- no longer a command', () => {
+  it('answers it as a word it does not know, before any permission check or question', async () => {
+    const harness = createHarness();
+
+    await harness.flow.startCommand(
+      invocationOf('keep', '2026-09-01..2026-09-02 /memo/log'),
+    );
+
+    expect(harness.selector.select).not.toHaveBeenCalled();
+    expect(harness.collector.start).not.toHaveBeenCalled();
+    expect(harness.growiClient.sendCommand).not.toHaveBeenCalled();
+    const message = harness.ephemeralMessages()[0];
+    if (message?.kind !== 'markdown') throw new Error('expected markdown');
+    expect(message.markdown).toContain('keep');
+    expect(message.markdown).toContain('コマンドはありません');
   });
 });
 

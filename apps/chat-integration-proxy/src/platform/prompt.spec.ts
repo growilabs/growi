@@ -23,12 +23,7 @@ import {
 const FORM: ModalForm = {
   title: '会話をページにする',
   fields: [
-    {
-      name: 'range',
-      label: '取り込む範囲',
-      required: true,
-      kind: 'time-range',
-    },
+    { name: 'topic', label: '話題', required: true, kind: 'text' },
     { name: 'path', label: '保存先', required: true, kind: 'path' },
     {
       name: 'note',
@@ -115,7 +110,7 @@ describe('openModal', () => {
     const modal = opened[0];
     if (modal == null) throw new Error('nothing was opened');
     expect(inputsOf(modal).map((child) => child.id)).toEqual([
-      'range',
+      'topic',
       'path',
       'note',
     ]);
@@ -131,7 +126,7 @@ describe('openModal', () => {
     if (modal == null) throw new Error('nothing was opened');
     expect(inputsOf(modal)).toHaveLength(modal.children.length);
     expect(inputsOf(modal).map((child) => child.label)).toEqual([
-      '取り込む範囲',
+      '話題',
       '保存先',
       'メモ',
     ]);
@@ -157,7 +152,7 @@ describe('openModal', () => {
     expect(path?.multiline).toBe(false);
   });
 
-  it('shows the reader how to write a range, since one field collects one string', async () => {
+  it('shows the reader how to write a path', async () => {
     const registry = createModalTriggerRegistry();
     const { opener, opened } = openerSpy();
 
@@ -165,9 +160,9 @@ describe('openModal', () => {
 
     const modal = opened[0];
     if (modal == null) throw new Error('nothing was opened');
-    const range = inputsOf(modal).find((child) => child.id === 'range');
-    expect(range?.placeholder).not.toBe('');
-    expect(range?.placeholder).toBeDefined();
+    const path = inputsOf(modal).find((child) => child.id === 'path');
+    expect(path?.placeholder).not.toBe('');
+    expect(path?.placeholder).toBeDefined();
   });
 
   it('refuses to reuse a trigger, because the platform hands each one out once', async () => {

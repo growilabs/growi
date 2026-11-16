@@ -637,8 +637,8 @@ describe('ArgumentCollector.start', () => {
       CREATE_PAGE_FIELDS,
     );
     await twice.start(
-      invocationOf('mattermost', COMMAND_NAMES.keep, ''),
-      COMMAND_TRAITS[COMMAND_NAMES.keep].fields,
+      invocationOf('mattermost', COMMAND_NAMES.agent, ''),
+      COMMAND_TRAITS[COMMAND_NAMES.agent].fields,
     );
 
     expect(repository.rows.size).toBe(1);

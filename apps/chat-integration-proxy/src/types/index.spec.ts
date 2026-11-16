@@ -6,8 +6,6 @@ import type {
   DistributedLock,
   EphemeralPostOutcome,
   FieldSpec,
-  HistoryMessage,
-  HistoryOutcome,
   InstallationCredentials,
   InteractionRef,
   Invocation,
@@ -19,7 +17,6 @@ import type {
   ReactionOutcome,
   Relation,
   SdkChannelRef,
-  TimeRange,
 } from './index.js';
 
 // Task 1.3 declares pure cross-layer types -- there is no runtime behavior
@@ -54,18 +51,10 @@ describe('AdminActorRoles', () => {
   });
 });
 
-describe('InteractionRef / TimeRange / ModalForm / FieldSpec', () => {
+describe('InteractionRef / ModalForm / FieldSpec', () => {
   it('constructs an InteractionRef carrying only an opaque token', () => {
     const interaction: InteractionRef = { token: 'trigger-abc' };
     expect(Object.keys(interaction)).toEqual(['token']);
-  });
-
-  it('constructs a TimeRange bounding a conversation-history import', () => {
-    const range: TimeRange = {
-      since: new Date('2026-09-01T00:00:00Z'),
-      until: new Date('2026-09-01T12:00:00Z'),
-    };
-    expect(range.since.getTime()).toBeLessThan(range.until.getTime());
   });
 
   it('constructs a FieldSpec for every declared kind', () => {
@@ -73,7 +62,6 @@ describe('InteractionRef / TimeRange / ModalForm / FieldSpec', () => {
       'text',
       'multiline',
       'path',
-      'time-range',
     ];
     const specs: readonly FieldSpec[] = kinds.map((kind) => ({
       name: 'keyword',
@@ -81,7 +69,7 @@ describe('InteractionRef / TimeRange / ModalForm / FieldSpec', () => {
       required: true,
       kind,
     }));
-    expect(specs).toHaveLength(4);
+    expect(specs).toHaveLength(3);
   });
 
   it('constructs a ModalForm from a title and an ordered FieldSpec list', () => {
@@ -117,7 +105,7 @@ describe('Relation', () => {
   });
 });
 
-describe('OutboundMessage / HistoryOutcome / HistoryMessage', () => {
+describe('OutboundMessage', () => {
   it('constructs every OutboundMessage variant without any Chat SDK Card type', () => {
     const markdown: OutboundMessage = { kind: 'markdown', markdown: '**hi**' };
     const list: OutboundMessage = {
@@ -161,22 +149,6 @@ describe('OutboundMessage / HistoryOutcome / HistoryMessage', () => {
       false,
       false,
     ]);
-  });
-
-  it('constructs both HistoryOutcome branches', () => {
-    const message: HistoryMessage = {
-      postedAt: '2026-09-01T00:00:00Z',
-      author: { platform: 'slack', accountId: 'U1', displayName: 'Alice' },
-      text: 'let’s keep this',
-    };
-    const ok: HistoryOutcome = { ok: true, messages: [message] };
-    const failed: HistoryOutcome = {
-      ok: false,
-      reason: 'not-in-channel',
-      remedy: 'invite the bot to this channel',
-    };
-    expect(ok.ok && ok.messages).toEqual([message]);
-    expect(!failed.ok && failed.reason).toBe('not-in-channel');
   });
 });
 

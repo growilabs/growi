@@ -546,8 +546,8 @@ const FAILURE_ROWS: ReadonlyArray<FailureRow> = [
 /**
  * Why the bot could not reach the channel, or `null` when the failure says
  * nothing about channel access. Shared by every operation that touches a
- * channel -- `outbound.ts`'s four and `history.ts`'s `fetchHistory` -- so that
- * one recognition serves both rather than each growing its own copy.
+ * channel -- `outbound.ts`'s four and the conversation read -- so that
+ * one recognition serves them all rather than each growing its own copy.
  */
 export const channelAccessFailure = (
   error: unknown,

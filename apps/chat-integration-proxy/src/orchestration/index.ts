@@ -17,10 +17,6 @@
 // per-destination notification record is kept -- stay module-private, the same
 // way `growi/index.ts` holds its own defaults down: no caller passes one, and a
 // second name for one number is how two of them start to disagree.
-//
-// `parseTimeRange` / `TIME_RANGE_USAGE` stay internal for the same reason:
-// they exist because `command-flow.ts` is the side that calls `fetchHistory`,
-// and no layer to the right of this one interprets a range.
 export type {
   AdminFlow,
   AdminFlowDeps,
@@ -28,7 +24,13 @@ export type {
   ObserveActorRoles,
 } from './admin-flow.js';
 export { createAdminFlow } from './admin-flow.js';
-export type { CommandFlowDeps, CommandFlowPlatform } from './command-flow.js';
+export type {
+  AgentEntry,
+  AgentRequestInput,
+  CommandFlowDeps,
+  CommandFlowPlatform,
+  CommandHandlers,
+} from './command-flow.js';
 export { createCommandFlow } from './command-flow.js';
 export type { CommandFlow, LinkPostedEvent } from './event-sink.js';
 export { createEventSink } from './event-sink.js';

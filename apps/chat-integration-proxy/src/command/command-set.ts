@@ -73,21 +73,33 @@ export interface CommandTrait {
 export const SEARCH_DEFAULT_LIMIT = 10;
 
 /**
+ * The shared vocabulary minus `keep`, which this app no longer runs.
+ * `@growi/chat` still lists it until it is removed there (tasks.md 6.1),
+ * after which this is `CommandName` again.
+ */
+export type TypeableCommandName = Exclude<
+  CommandName,
+  typeof COMMAND_NAMES.keep
+>;
+
+/**
  * The shared vocabulary's proxy-side traits, keyed by the SAME
- * `CommandName` union `@growi/chat` declares. `Record<CommandName,
+ * `CommandName` union `@growi/chat` declares. `Record<TypeableCommandName,
  * CommandTrait>` makes a missing entry a compile error, not a runtime gap
  * -- the same mechanism `@growi/chat`'s own `COMMAND_TRAITS` already uses
  * (design.md: 「宣言に無い言葉が打てず、性質を書いていないコマンドを
  * 作れない」).
  *
  * `title` is deliberately absent from every `fields` list below --
- * `CommandRequest`'s `create-page` and `keep` variants do not carry a
+ * `CommandRequest`'s `create-page` variant does not carry a
  * title field, so collecting one would only be discarded. GROWI derives
  * the page title itself, from the body's first heading or the path's tail
  * segment. Adding a title field requires extending the protocol contract
  * first, out of scope here.
  */
-export const COMMAND_TRAITS: Readonly<Record<CommandName, CommandTrait>> = {
+export const COMMAND_TRAITS: Readonly<
+  Record<TypeableCommandName, CommandTrait>
+> = {
   [COMMAND_NAMES.search]: {
     fields: [
       {
@@ -120,27 +132,15 @@ export const COMMAND_TRAITS: Readonly<Record<CommandName, CommandTrait>> = {
     targeting: 'exactly-one',
     permissionCheckName: COMMAND_NAMES.createPage,
   },
-  [COMMAND_NAMES.keep]: {
+  [COMMAND_NAMES.agent]: {
     fields: [
       {
-        name: 'range',
-        label: 'Time range',
+        name: 'text',
+        label: 'Request',
         required: true,
-        kind: 'time-range',
-      },
-      {
-        name: 'path',
-        label: 'Path',
-        required: true,
-        kind: 'path',
+        kind: 'multiline',
       },
     ],
-    sends: 'command-request',
-    targeting: 'exactly-one',
-    permissionCheckName: COMMAND_NAMES.keep,
-  },
-  [COMMAND_NAMES.agent]: {
-    fields: [],
     sends: 'command-request',
     targeting: 'exactly-one',
     permissionCheckName: COMMAND_NAMES.agent,

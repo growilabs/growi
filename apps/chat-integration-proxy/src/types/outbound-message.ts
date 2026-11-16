@@ -1,5 +1,5 @@
-// `OutboundMessage` / `HistoryOutcome` / `HistoryMessage` are three of the
-// `PlatformFacade`'s seven boundary types (design.md's Invariants for
+// `OutboundMessage` / `HistoryMessage` are two of the
+// `PlatformFacade`'s boundary types (design.md's Invariants for
 // `PlatformFacade`): "platform 層の出入口に Chat SDK の型を含めない" --
 // carrying zero Chat SDK types here is what lets the task-1.7 lint rule
 // (forbid `chat` / `@chat-adapter/*` imports outside `platform/**`) hold
@@ -84,22 +84,7 @@ export type PostOutcome =
     };
 
 /**
- * `PlatformFacade.fetchHistory()`'s result. `not-in-channel` / `not-permitted`
- * / `unsupported` cover Requirement 5.4 (bot cannot read this channel's
- * history) and 5.6 (this chat service does not support history at all).
- */
-export type HistoryOutcome =
-  | { readonly ok: true; readonly messages: ReadonlyArray<HistoryMessage> }
-  | {
-      readonly ok: false;
-      readonly reason: 'not-in-channel' | 'not-permitted' | 'unsupported';
-      readonly remedy: string;
-    };
-
-/**
- * One message `fetchHistory` returns. Converted into a `KeepMessage`
- * (`@growi/chat`'s contract) before being sent to GROWI -- see design.md's
- * comment on this exact interface.
+ * One message of a conversation read from a chat service.
  */
 export interface HistoryMessage {
   readonly postedAt: string;

@@ -4,7 +4,7 @@
 // relation -> growi -> orchestration -> routes`) imports these from here,
 // not from the individual files below.
 //
-// `InteractionRef` / `TimeRange` / `ModalForm` / `FieldSpec` are declared
+// `InteractionRef` / `ModalForm` / `FieldSpec` are declared
 // directly in this file per the File Structure Plan; the remaining types
 // each live in their own file (one per design.md's "repository が返す型は
 // `types/` に置く" grouping) and are re-exported below.
@@ -33,17 +33,6 @@ export interface InteractionRef {
 }
 
 /**
- * The value the `keep` command's `range` field (`FieldSpec.kind ===
- * 'time-range'`) collects, and what `PlatformFacade.fetchHistory(target,
- * range: TimeRange)` (design.md, PlatformFacade section) takes to bound the
- * conversation history to import (Requirement 5.1 / 5.2).
- */
-export interface TimeRange {
-  readonly since: Date;
-  readonly until: Date;
-}
-
-/**
  * What `PlatformFacade.openModal(trigger, form, correlationId)` opens: a
  * title (shown as the modal's heading) plus the ordered `FieldSpec`s a
  * `CommandSet` entry declares it collects (design.md's CommandSet table).
@@ -66,7 +55,7 @@ export interface FieldSpec {
   readonly name: string;
   readonly label: string;
   readonly required: boolean;
-  readonly kind: 'text' | 'multiline' | 'path' | 'time-range';
+  readonly kind: 'text' | 'multiline' | 'path';
   readonly maxLength?: number;
 }
 
@@ -89,7 +78,6 @@ export type {
   DirectPostOutcome,
   EphemeralPostOutcome,
   HistoryMessage,
-  HistoryOutcome,
   ListRow,
   OutboundMessage,
   PostOutcome,

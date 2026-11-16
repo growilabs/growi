@@ -178,10 +178,9 @@ export const createModalTriggerRegistry = (
  * requires the same `FieldSpec` list to collect the same
  * `Record<string, string>` through the ask-back path as well (「同じ
  * `FieldSpec` から Slack（modal）と Discord（聞き返し）の両方で値が集まること」).
- * The ask-back path can only ever produce one string per question, so a
- * `time-range` rendered as two date pickers would give the two paths different
- * shapes and force `ArgumentCollector` to know which one it is talking to.
- * Instead the range is one string and one parser serves both.
+ * The ask-back path can only ever produce one string per question, so a kind
+ * rendered as several widgets would give the two paths different shapes and
+ * force `ArgumentCollector` to know which one it is talking to.
  *
  * Declared as a table rather than a `switch` so that adding a kind is an entry
  * here and nothing else (`.claude/rules/coding-style.md`).
@@ -195,10 +194,6 @@ const FIELD_PRESENTATION: Readonly<
   text: { multiline: false, placeholder: '' },
   multiline: { multiline: true, placeholder: '' },
   path: { multiline: false, placeholder: '/例/保存先のページ' },
-  'time-range': {
-    multiline: false,
-    placeholder: '2026-09-01 〜 2026-09-02',
-  },
 };
 
 const toInput = (field: FieldSpec) => {

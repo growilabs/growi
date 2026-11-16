@@ -9,7 +9,7 @@
 // (`ChatInstance`, `PostgresStateAdapter`), `prompt.ts`'s `ModalOpener` /
 // `ModalTriggerRegistry` (`ModalElement`), `outbound.ts`'s `OutboundContext` /
 // `toPostable` / `channelThreadId` (`Adapter`, `StateAdapter`,
-// `AdapterPostableMessage`), `history.ts`'s `HistoryContext`,
+// `AdapterPostableMessage`),
 // `event-handlers.ts`'s `HandlerHost`, and `event-mapping.ts` in full.
 // `index.spec.ts` asserts the export list rather than trusting this comment.
 import type { ChatAccountRef, PlatformName } from '@growi/chat';
@@ -22,7 +22,6 @@ import type {
   DirectPostOutcome,
   DistributedLock,
   EphemeralPostOutcome,
-  HistoryOutcome,
   InteractionRef,
   ModalForm,
   OutboundMessage,
@@ -33,7 +32,6 @@ import type {
   ReactionOutcome,
   SdkChannelRef,
   SdkMessageRef,
-  TimeRange,
 } from '../types/index.js';
 import {
   observeActorRoles as observeActorRolesOf,
@@ -67,7 +65,6 @@ import {
 } from './ephemeral-ordering.js';
 import { registerEventHandlers } from './event-handlers.js';
 import { identifyEventInstallation } from './event-installation.js';
-import { fetchHistory as fetchHistoryOf } from './history.js';
 import type { InstallationProvider } from './installation-provider.js';
 import { installationRunner } from './installation-scope.js';
 import { type RunningListener, startListenerLoop } from './listener-loop.js';
@@ -178,10 +175,6 @@ export interface PlatformFacade {
     target: SdkMessageRef,
     preview: OutboundMessage,
   ): Promise<PostOutcome>;
-  fetchHistory(
-    target: SdkChannelRef,
-    range: TimeRange,
-  ): Promise<HistoryOutcome>;
   /**
    * The thread rooted at `threadRootId`, or the place's latest messages when
    * it is `null`, oldest first, read once and without the bot's own messages
@@ -689,18 +682,6 @@ export const createPlatformFacade = async (
       const context = outboundContext(target.channel.platform);
       if (context == null) return notAddressable(target.channel.platform);
       return await attachPreviewOf(context, target, preview);
-    },
-
-    async fetchHistory(target, range) {
-      const adapter = adapterFor(target.platform);
-      if (adapter == null) {
-        return {
-          ok: false,
-          reason: 'unsupported',
-          remedy: unaddressable(target.platform),
-        };
-      }
-      return await fetchHistoryOf({ adapter }, target, range);
     },
 
     async fetchConversation(target, range, scope) {

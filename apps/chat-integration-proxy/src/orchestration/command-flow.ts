@@ -18,8 +18,11 @@
 //    design.md: 「どちらも投稿の経路は 1 本にする」. Both go to the requester
 //    alone: the link is one-time and short-lived, so it must not sit in a
 //    channel.
-//  - **`keep` never reaches GROWI when the range holds nothing** (Requirement
-//    5.5). `fetchHistory` answering with no messages ends the command here.
+//  - **`agent` is handed on, not sent, from here.** What sending it involves
+//    (recording it, the acknowledgement, the answer coming later) belongs to
+//    `agent-flow`, which `commandHandlers.agent` stands for; this flow only
+//    decides the request may run, against which GROWI, with which text and
+//    conversation key.
 //  - **Nothing branches on a command name literal.** Which fields to collect,
 //    what to send and how the target is decided all come from
 //    `COMMAND_TRAITS` / `LINK_TRAIT`; the one place a name is read is where
@@ -52,6 +55,7 @@ import {
   type PrivateReplyOrigin,
   privateReplyOriginOf,
   SEARCH_DEFAULT_LIMIT,
+  type TypeableCommandName,
 } from '../command/index.js';
 import {
   type FanOutCollector,
@@ -66,7 +70,6 @@ import type {
   SelectionOutcome,
 } from '../relation/index.js';
 import type {
-  HistoryMessage,
   InstallationPlace,
   Invocation,
   ListRow,
@@ -76,9 +79,9 @@ import type {
   SdkChannelRef,
 } from '../types/index.js';
 import type { AdminFlow } from './admin-flow.js';
+import { conversationKeyOf } from './conversation-key.js';
 import type { CommandFlow, LinkPostedEvent } from './event-sink.js';
 import { NO_WORKSPACE_TEXT } from './no-workspace-wording.js';
-import { parseTimeRange, TIME_RANGE_USAGE } from './time-range.js';
 
 /**
  * The facade operations a user command uses. Narrowed with `Pick` for the
@@ -89,8 +92,29 @@ import { parseTimeRange, TIME_RANGE_USAGE } from './time-range.js';
  */
 export type CommandFlowPlatform = Pick<
   PlatformFacade,
-  'post' | 'replace' | 'attachPreview' | 'fetchHistory'
+  'post' | 'replace' | 'attachPreview'
 >;
+
+/** What `agent-flow` needs to take an `agent` request over from here. */
+export interface AgentRequestInput {
+  readonly invocation: Invocation;
+  readonly origin: PrivateReplyOrigin;
+  readonly relation: Relation;
+  /** The request, with the bot's own address already taken off. */
+  readonly text: string;
+  readonly conversationKey: string;
+}
+
+export type AgentEntry = (input: AgentRequestInput) => Promise<void>;
+
+/**
+ * Commands whose work happens outside this flow, keyed by command name.
+ * A command that was declared but has no entry here is answered as not
+ * usable rather than left without a reply.
+ */
+export interface CommandHandlers {
+  readonly agent?: AgentEntry;
+}
 
 export interface CommandFlowDeps {
   readonly platform: CommandFlowPlatform;
@@ -119,6 +143,7 @@ export interface CommandFlowDeps {
    */
   readonly adminFlow: AdminFlow;
   readonly privateReplier: PrivateReplier;
+  readonly commandHandlers?: CommandHandlers;
   /** Requirement 10.4 keys duplicate-execution detection on this. */
   readonly newRequestId?: () => string;
   readonly searchLimit?: number;
@@ -275,6 +300,9 @@ const footerOf = (
     .filter((note) => note != null)
     .join('\n') || undefined;
 
+const notUsableNotice = (word: string): string =>
+  `\`${word}\` は今使えません。`;
+
 const explanation = (
   commandName: string,
   outcome: Extract<SelectionOutcome, { kind: 'explain' }>,
@@ -349,7 +377,7 @@ const previewMarkdown = (
  * whatever the user typed, and `COMMAND_TRAITS` / `SelectionRequest` are both
  * keyed by the declared vocabulary.
  */
-const isCommandName = (word: string): word is CommandName =>
+const isCommandName = (word: string): word is TypeableCommandName =>
   Object.hasOwn(COMMAND_TRAITS, word);
 
 /**
@@ -381,13 +409,6 @@ const asChoiceOptions = (
     growiLabel: relation.growiLabel,
   }));
 
-const toKeepMessages = (messages: ReadonlyArray<HistoryMessage>) =>
-  messages.map((message) => ({
-    postedAt: message.postedAt,
-    author: message.author,
-    markdown: message.text,
-  }));
-
 /** Who a fan-out command is sent to, and who was left out of it. */
 interface FanOutTargets {
   readonly targets: ReadonlyArray<Relation>;
@@ -408,6 +429,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     resolveInstallationId,
     adminFlow,
     privateReplier,
+    commandHandlers = {},
     newRequestId = () => crypto.randomUUID(),
     searchLimit = SEARCH_DEFAULT_LIMIT,
   } = deps;
@@ -545,58 +567,39 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
 
   // -- one GROWI -----------------------------------------------------------
 
-  /**
-   * The body of a command that runs against a single GROWI, or `null` when
-   * the command ends here (Requirement 5.5's empty range, an unreadable
-   * channel, a range that cannot be read whole) -- in which case the user has
-   * already been told.
-   */
-  const buildSingleRequest = async (
+  /** The body of a command sent to a single GROWI as it stands. */
+  const buildSingleRequest = (
+    invocation: Invocation,
+    relation: Relation,
+    values: Readonly<Record<string, string>>,
+  ): CommandRequest | null => {
+    if (invocation.commandName !== COMMAND_NAMES.createPage) return null;
+    return {
+      ...envelopeFor(invocation, relation),
+      kind: COMMAND_NAMES.createPage,
+      path: values.path ?? '',
+      body: values.body ?? '',
+    };
+  };
+
+  const runAgent = async (
     invocation: Invocation,
     origin: PrivateReplyOrigin,
     relation: Relation,
     values: Readonly<Record<string, string>>,
-  ): Promise<CommandRequest | null> => {
-    if (invocation.commandName === COMMAND_NAMES.createPage) {
-      return {
-        ...envelopeFor(invocation, relation),
-        kind: COMMAND_NAMES.createPage,
-        path: values.path ?? '',
-        body: values.body ?? '',
-      };
+  ): Promise<void> => {
+    const conversationKey = conversationKeyOf(invocation);
+    if (commandHandlers.agent == null || conversationKey == null) {
+      await tell(origin, markdown(notUsableNotice(invocation.commandName)));
+      return;
     }
-    if (invocation.commandName !== COMMAND_NAMES.keep) return null;
-
-    const range = parseTimeRange(values.range ?? '');
-    if (range == null) {
-      await tell(origin, markdown(TIME_RANGE_USAGE));
-      return null;
-    }
-
-    const history = await platform.fetchHistory(invocation.channel, range);
-    if (!history.ok) {
-      // Requirement 5.4 / 5.6: the reason AND what to do about it, both of
-      // which `HistoryOutcome` already carries.
-      await tell(origin, markdown(history.remedy));
-      return null;
-    }
-    if (history.messages.length === 0) {
-      // Requirement 5.5: no page, and GROWI is not called at all.
-      await tell(
-        origin,
-        markdown(
-          '指定された範囲に発言が 1 件もありませんでした。ページは作成していません。',
-        ),
-      );
-      return null;
-    }
-
-    return {
-      ...envelopeFor(invocation, relation),
-      kind: COMMAND_NAMES.keep,
-      path: values.path ?? '',
-      messages: toKeepMessages(history.messages),
-    };
+    await commandHandlers.agent({
+      invocation,
+      origin,
+      relation,
+      text: values.text ?? '',
+      conversationKey,
+    });
   };
 
   const showResponse = async (
@@ -650,12 +653,11 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
     relation: Relation,
     values: Readonly<Record<string, string>>,
   ): Promise<void> => {
-    const request = await buildSingleRequest(
-      invocation,
-      origin,
-      relation,
-      values,
-    );
+    if (invocation.commandName === COMMAND_NAMES.agent) {
+      await runAgent(invocation, origin, relation, values);
+      return;
+    }
+    const request = buildSingleRequest(invocation, relation, values);
     if (request == null) return;
 
     const sent = await growiClient.sendCommand(relation.growiUri, request);

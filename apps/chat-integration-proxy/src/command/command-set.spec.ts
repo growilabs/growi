@@ -1,4 +1,4 @@
-import { COMMAND_NAMES } from '@growi/chat';
+import { COMMAND_NAMES, COMMAND_TRAITS as PROTOCOL_TRAITS } from '@growi/chat';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -16,7 +16,11 @@ import {
 // establishes this same convention for this app).
 describe('COMMAND_TRAITS completeness', () => {
   it('has a declared trait for every CommandName vocabulary value', () => {
-    const commandNames = Object.values(COMMAND_NAMES);
+    // The protocol still lists `keep` until it is removed there (tasks.md 6.1);
+    // the proxy no longer declares it.
+    const commandNames = Object.values(COMMAND_NAMES).filter(
+      (name) => name !== 'keep',
+    );
     expect(commandNames.length).toBeGreaterThan(0);
 
     for (const name of commandNames) {
@@ -67,19 +71,38 @@ describe('search', () => {
   });
 });
 
-describe('create-page / keep -- title is deliberately not collected', () => {
+describe('create-page -- title is deliberately not collected', () => {
   it('create-page has no title field', () => {
     const trait = COMMAND_TRAITS[COMMAND_NAMES.createPage];
     expect(trait.fields.some((field) => field.name === 'title')).toBe(false);
     expect(trait.fields.map((field) => field.name)).toEqual(['path', 'body']);
     expect(trait.targeting).toBe('exactly-one');
   });
+});
 
-  it('keep has no title field', () => {
-    const trait = COMMAND_TRAITS[COMMAND_NAMES.keep];
-    expect(trait.fields.some((field) => field.name === 'title')).toBe(false);
-    expect(trait.fields.map((field) => field.name)).toEqual(['range', 'path']);
+describe('agent', () => {
+  it('collects one required multi-line request text and runs against exactly one GROWI (Requirement 15.1, 15.13)', () => {
+    const trait = COMMAND_TRAITS[COMMAND_NAMES.agent];
+    expect(trait.fields).toEqual([
+      { name: 'text', label: 'Request', required: true, kind: 'multiline' },
+    ]);
+    expect(trait.sends).toBe('command-request');
     expect(trait.targeting).toBe('exactly-one');
+    expect(trait.permissionCheckName).toBe(COMMAND_NAMES.agent);
+  });
+
+  it('agrees with the protocol declaration: a write that targets a single GROWI', () => {
+    expect(PROTOCOL_TRAITS[COMMAND_NAMES.agent]).toMatchObject({
+      writes: true,
+      targeting: 'single',
+    });
+    expect(COMMAND_TRAITS[COMMAND_NAMES.agent].targeting).toBe('exactly-one');
+  });
+});
+
+describe('keep', () => {
+  it('is not a declared command any more (Requirement 15.1)', () => {
+    expect(Object.hasOwn(COMMAND_TRAITS, 'keep')).toBe(false);
   });
 });
 

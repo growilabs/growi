@@ -31,7 +31,6 @@ import type {
   DirectPostOutcome,
   DistributedLock,
   EphemeralPostOutcome,
-  HistoryOutcome,
   InteractionRef,
   ModalForm,
   OutboundMessage,
@@ -43,7 +42,6 @@ import type {
   ReactionOutcome,
   SdkChannelRef,
   SdkMessageRef,
-  TimeRange,
 } from '../types/index.js';
 import { sdkChannelIdOn } from './chat-events.js';
 
@@ -103,10 +101,6 @@ export interface FakeChatScript {
   readonly addReaction?: (reaction: CapturedReaction) => ReactionOutcome;
   readonly openModal?: (modal: CapturedModal) => boolean;
   readonly listChannels?: (installationId: string) => ChannelListing;
-  readonly fetchHistory?: (
-    channel: SdkChannelRef,
-    range: TimeRange,
-  ) => HistoryOutcome;
   readonly webhook?: (
     platform: PlatformName,
     request: Request,
@@ -310,9 +304,6 @@ export const createFakeChatService = (
 
     listChannels: async (installationId) =>
       script.listChannels?.(installationId) ?? { channels: [] },
-
-    fetchHistory: async (channel, range) =>
-      script.fetchHistory?.(channel, range) ?? { ok: true, messages: [] },
 
     fetchConversation: async () => ({
       ok: true,

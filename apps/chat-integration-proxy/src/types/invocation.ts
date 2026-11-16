@@ -15,7 +15,7 @@
 // - `platform` / `channel` / `actor` / `interaction`: carried through as-is
 //   from the originating `PlatformEvent`.
 // - `commandName`: the word identifying which `CommandSet` entry this is
-//   (design.md's "打つ言葉" column, e.g. `search`, `create-page`, `keep`).
+//   (design.md's "打つ言葉" column, e.g. `search`, `create-page`, `agent`).
 // - `argsText`: whatever free text followed the command name, still
 //   unparsed -- `ArgumentCollector` is what turns it into per-`FieldSpec`
 //   values.

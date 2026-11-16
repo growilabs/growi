@@ -102,8 +102,8 @@ describe('CommandInvocation.normalize', () => {
       platform: 'slack',
       channel,
       actor,
-      text: '@growi keep https://growi.example.com/page',
-      textWithoutBotAddress: 'keep https://growi.example.com/page',
+      text: '@growi agent summarise https://growi.example.com/page',
+      textWithoutBotAddress: 'agent summarise https://growi.example.com/page',
       inDirectMessage: false,
       messageId: 'M0001',
       threadRootId: null,
@@ -111,8 +111,8 @@ describe('CommandInvocation.normalize', () => {
       interaction: null,
     });
 
-    expect(result.commandName).toBe('keep');
-    expect(result.argsText).toBe('https://growi.example.com/page');
+    expect(result.commandName).toBe('agent');
+    expect(result.argsText).toBe('summarise https://growi.example.com/page');
   });
 
   it('produces an empty commandName and argsText for a mention with no command word, without throwing', () => {
