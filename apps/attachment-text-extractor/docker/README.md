@@ -127,8 +127,7 @@ rolling update keep the old container until the new one is ready.
 
 **Scaling is by replicas.** The service is stateless; run at least two. CPU
 request 500m / limit 2 and autoscaling on 70 % CPU between 2 and 10 replicas with
-a 300 s scale-down window were carried over from the previous (Python) service:
-still starting points, never measured. CPU is only a proxy, since a container
+a 300 s scale-down window are starting points, never measured. CPU is only a proxy, since a container
 with all slots busy answers 503.
 
 Logs
