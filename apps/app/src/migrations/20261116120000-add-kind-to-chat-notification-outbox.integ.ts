@@ -9,6 +9,7 @@ import type { Collection, Db } from 'mongodb';
 import mongoose from 'mongoose';
 
 import { createNotificationDeliverer } from '~/features/chat-integration/server/notification/notification-deliverer';
+import { OUTBOX_DELIVERERS } from '~/features/chat-integration/server/outbox/deliverers';
 import { ChatOutboxRow } from '~/features/chat-integration/server/outbox/models/chat-outbox';
 import { createOutboxDispatcher } from '~/features/chat-integration/server/outbox/outbox-dispatcher';
 import type { notify as notifyFn } from '~/features/chat-integration/server/proxy-client';
@@ -110,7 +111,10 @@ describe('add-kind-to-chat-notification-outbox', () => {
       };
     };
     const dispatcher = createOutboxDispatcher({
-      deliverers: { notification: createNotificationDeliverer({ notify }) },
+      deliverers: {
+        ...OUTBOX_DELIVERERS,
+        notification: createNotificationDeliverer({ notify }),
+      },
     });
     const now = new Date();
 

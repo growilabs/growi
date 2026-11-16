@@ -164,6 +164,19 @@ describe('ChatOutboxRow row kinds', () => {
     ).resolves.toBeUndefined();
   });
 
+  it.each([
+    ['without an answer', {}],
+    ['with a null answer', { answer: null }],
+  ])('rejects a command-answer row %s', async (_label, answerField) => {
+    await expect(
+      new ChatOutboxRow({
+        ...base,
+        kind: 'command-answer',
+        ...answerField,
+      }).validate(),
+    ).rejects.toThrow('answer');
+  });
+
   it('keeps the answer of a command-answer row as written', async () => {
     const answer: AgentAnswer = {
       kind: 'text',

@@ -15,6 +15,7 @@ import {
   disconnectSelfContainedMongo,
 } from '^/test/setup/mongo/self-contained-connection';
 
+import { OUTBOX_DELIVERERS } from '../outbox/deliverers';
 import type { ChatOutboxTarget } from '../outbox/models/chat-outbox';
 import { ChatOutboxRow } from '../outbox/models/chat-outbox';
 import type { DrainSummary } from '../outbox/outbox-dispatcher';
@@ -29,10 +30,13 @@ import {
   INVENTORY_NOT_READY_RETRY_INTERVAL_MS,
 } from './notification-deliverer';
 
-/** The shared dispatcher with only the notification deliverer registered. */
+/** The production table, with the notification deliverer's `notify` faked. */
 const createNotificationDispatcher = (deps: { notify: typeof notifyFn }) =>
   createOutboxDispatcher({
-    deliverers: { notification: createNotificationDeliverer(deps) },
+    deliverers: {
+      ...OUTBOX_DELIVERERS,
+      notification: createNotificationDeliverer(deps),
+    },
   });
 
 const RELATION_ID = 'rel-1';

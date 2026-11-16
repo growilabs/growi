@@ -1,10 +1,10 @@
 // The "送る" half of the outbox (Requirements 2.4, 2.5, 2.6, 10.4, 10.7,
 // 15.11): claims a row, hands it to the deliverer registered for its kind,
 // and settles it as sent, as a retry with backoff, or as given up. How ONE row
-// of a kind is sent is the deliverer's job; this module never looks inside a
-// row's kind-specific fields.
+// of a kind is sent is the deliverer's job; this module never reads a row's
+// kind-specific fields.
 //
-// Three properties are the reason this file exists at all:
+// Four properties are the reason this file exists at all:
 //
 //  - **One row is taken by exactly one process.** There is no shared
 //    distributed lock in this repository, and `crowi/index.ts` starts crons
@@ -16,17 +16,30 @@
 //    nobody, never reaching `given-up`. That is exactly the situation
 //    Requirement 2.4 exists for, so a claim older than
 //    `CLAIM_STALE_AFTER_MS` is re-claimable.
-//  - **Only kinds with a deliverer are claimed.** A row of a kind this
-//    process cannot send stays `pending` for a process that can.
+//  - **Only the process holding the claim writes the outcome.** A process
+//    that stalled past `CLAIM_STALE_AFTER_MS` finds its claim taken over
+//    when it settles, and its outcome is dropped: otherwise it could put a
+//    row another process already sent back to `pending`.
+//  - **A sent row keeps no answer body** (design.md "残し方").
+//
+// Every kind has a deliverer (`DelivererTable`). Rows are claimed only for
+// the kinds this code knows, so a row of a kind added by a newer version
+// stays `pending` for a process that can send it.
 //
 // Drains start from two places -- right after a row is written
 // (`requestDrain`, Requirement 2.10) and from the cron -- and both go
 // through `requestDrain`, so a process never runs two drains at once.
 
+import type { UpdateQuery } from 'mongoose';
+
 import loggerFactory from '~/utils/logger';
 
 import { createCoalescingRunner } from './coalescing-runner';
-import type { ChatOutboxRowDocument, OutboxKind } from './models/chat-outbox';
+import type {
+  ChatOutboxRowDocument,
+  OutboxKind,
+  OutboxRow,
+} from './models/chat-outbox';
 import { ChatOutboxRow, OUTBOX_KINDS } from './models/chat-outbox';
 
 const logger = loggerFactory(
@@ -76,13 +89,18 @@ export type DeliveryVerdict =
       readonly retryAfterMs?: number;
     };
 
-export type Deliverer = (
-  row: ChatOutboxRowDocument,
+/**
+ * How one row of a kind is sent. Reports a failure as `retry`, never by
+ * throwing: a throw leaves the row claimed for `CLAIM_STALE_AFTER_MS` and
+ * ends the drain.
+ */
+export type Deliverer<K extends OutboxKind = OutboxKind> = (
+  row: OutboxRow<K>,
   now: Date,
 ) => Promise<DeliveryVerdict>;
 
-/** How to send one row, per kind. A kind without an entry is never claimed. */
-export type DelivererTable = { readonly [K in OutboxKind]?: Deliverer };
+/** How to send one row, for every kind. */
+export type DelivererTable = { readonly [K in OutboxKind]: Deliverer<K> };
 
 export interface DrainSummary {
   /** Rows the deliverer reported as sent. */
@@ -146,13 +164,12 @@ interface ClaimScope {
  * claim went stale (the claiming process died).
  */
 const claimOneRow = async (
-  kinds: ReadonlyArray<OutboxKind>,
   scope: ClaimScope,
   now: Date,
 ): Promise<ChatOutboxRowDocument | null> =>
   ChatOutboxRow.findOneAndUpdate(
     {
-      kind: { $in: kinds },
+      kind: { $in: OUTBOX_KINDS },
       _id: { $nin: scope.tried },
       $or: [
         { state: 'pending', nextAttemptAt: { $lte: scope.dueBy } },
@@ -169,60 +186,80 @@ const claimOneRow = async (
 const resultOf = (verdict: DeliveryVerdict): { result?: unknown } =>
   'result' in verdict ? { result: verdict.result } : {};
 
+/**
+ * Write a row's outcome, but only while this process still holds the claim it
+ * delivered under. Returns false when another process has taken it back.
+ */
+const writeOutcome = async (
+  row: ChatOutboxRowDocument,
+  update: UpdateQuery<ChatOutboxRowDocument>,
+): Promise<boolean> => {
+  const { matchedCount } = await ChatOutboxRow.updateOne(
+    { _id: row._id, state: 'claimed', claimedAt: row.claimedAt },
+    update,
+  );
+  if (matchedCount === 0) {
+    logger.warn(
+      { kind: row.kind, relationId: row.relationId, requestId: row.requestId },
+      'Dropped the outcome of a chat outbox row another process took back',
+    );
+    return false;
+  }
+  return true;
+};
+
 const settleAsRetry = async (
   row: ChatOutboxRowDocument,
   verdict: Extract<DeliveryVerdict, { outcome: 'retry' }>,
   now: Date,
 ): Promise<RowOutcome> => {
   if (verdict.retryAfterMs != null) {
-    await ChatOutboxRow.updateOne(
-      { _id: row._id },
-      {
-        $set: {
-          state: 'pending',
-          ...resultOf(verdict),
-          claimedAt: null,
-          nextAttemptAt: new Date(now.getTime() + verdict.retryAfterMs),
-        },
+    await writeOutcome(row, {
+      $set: {
+        state: 'pending',
+        ...resultOf(verdict),
+        claimedAt: null,
+        nextAttemptAt: new Date(now.getTime() + verdict.retryAfterMs),
       },
-    );
+    });
     return 'failed';
   }
 
   const attempts = row.attempts + 1;
   if (attempts >= NOTIFICATION_RETRY_CONFIG.maxAttempts) {
-    // Deliberately left in place with no TTL: `given-up` is the record
-    // Requirement 2.4 asks for, and only an operator retires it.
-    await ChatOutboxRow.updateOne(
-      { _id: row._id },
-      {
-        $set: {
-          state: 'given-up',
-          ...resultOf(verdict),
-          attempts,
-          claimedAt: null,
-        },
-      },
-    );
-    logger.warn(
-      { kind: row.kind, relationId: row.relationId, requestId: row.requestId },
-      'Gave up delivering a chat outbox row',
-    );
-    return 'givenUp';
-  }
-
-  await ChatOutboxRow.updateOne(
-    { _id: row._id },
-    {
+    // `given-up` is the record Requirements 2.4 and 15.11 ask for. A
+    // notification row has no TTL and only an operator retires it; a
+    // command-answer row expires 7 days after it was written (see the model).
+    const written = await writeOutcome(row, {
       $set: {
-        state: 'pending',
+        state: 'given-up',
         ...resultOf(verdict),
         attempts,
         claimedAt: null,
-        nextAttemptAt: new Date(now.getTime() + backoffMsFor(attempts)),
       },
+    });
+    if (written) {
+      logger.warn(
+        {
+          kind: row.kind,
+          relationId: row.relationId,
+          requestId: row.requestId,
+        },
+        'Gave up delivering a chat outbox row',
+      );
+    }
+    return 'givenUp';
+  }
+
+  await writeOutcome(row, {
+    $set: {
+      state: 'pending',
+      ...resultOf(verdict),
+      attempts,
+      claimedAt: null,
+      nextAttemptAt: new Date(now.getTime() + backoffMsFor(attempts)),
     },
-  );
+  });
   return 'failed';
 };
 
@@ -234,18 +271,27 @@ const settle = async (
   if (verdict.outcome === 'retry') {
     return settleAsRetry(row, verdict, now);
   }
-  await ChatOutboxRow.updateOne(
-    { _id: row._id },
-    { $set: { state: 'sent', ...resultOf(verdict), claimedAt: null } },
-  );
+  await writeOutcome(row, {
+    $set: { state: 'sent', ...resultOf(verdict), claimedAt: null },
+    $unset: { answer: '' },
+  });
   return 'sent';
 };
 
 export const createOutboxDispatcher = (
   deps: OutboxDispatcherDeps,
 ): OutboxDispatcher => {
-  const kinds = OUTBOX_KINDS.filter((kind) => deps.deliverers[kind] != null);
   const clock = deps.clock ?? (() => new Date());
+
+  // Generic over the kind so the table's entry for `row.kind` is typed as
+  // that kind's deliverer.
+  const deliverRow = <K extends OutboxKind>(
+    row: OutboxRow<K>,
+    now: Date,
+  ): Promise<DeliveryVerdict> => {
+    const deliver: Deliverer<K> = deps.deliverers[row.kind];
+    return deliver(row, now);
+  };
 
   /**
    * One batch of at most `MAX_ROWS_PER_DRAIN` rows. Each row is claimed at
@@ -261,17 +307,12 @@ export const createOutboxDispatcher = (
 
     for (let i = 0; i < MAX_ROWS_PER_DRAIN; i++) {
       const claimedAt = currentTime();
-      const row = await claimOneRow(kinds, { ...scope, tried }, claimedAt);
+      const row = await claimOneRow({ ...scope, tried }, claimedAt);
       if (row == null) {
         break;
       }
       tried = [...tried, row._id];
-      const deliver = deps.deliverers[row.kind];
-      if (deliver == null) {
-        // Unreachable: only kinds with a deliverer are claimed.
-        throw new Error(`No deliverer for outbox kind: ${row.kind}`);
-      }
-      const verdict = await deliver(row, claimedAt);
+      const verdict = await deliverRow(row, claimedAt);
       const outcome = await settle(row, verdict, claimedAt);
       counts[outcome] += 1;
     }

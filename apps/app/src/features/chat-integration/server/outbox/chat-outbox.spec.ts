@@ -182,7 +182,7 @@ describe('ChatOutbox.enqueue', () => {
         return Promise.resolve({ outcome: 'sent' });
       });
       const dispatcher = createOutboxDispatcher({
-        deliverers: { notification: deliverer },
+        deliverers: { notification: deliverer, 'command-answer': deliverer },
       });
 
       await createChatOutbox({
@@ -207,7 +207,7 @@ describe('ChatOutbox.enqueue', () => {
         return Promise.reject(new Error('proxy exploded'));
       });
       const dispatcher = createOutboxDispatcher({
-        deliverers: { notification: deliverer },
+        deliverers: { notification: deliverer, 'command-answer': deliverer },
       });
 
       await expect(

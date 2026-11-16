@@ -8,8 +8,16 @@ import {
 
 import { ChatOutboxRow } from './models/chat-outbox';
 import { outboxDispatchCronService } from './outbox-dispatch-cron';
-import type { Deliverer, DrainSummary } from './outbox-dispatcher';
-import { createOutboxDispatcher } from './outbox-dispatcher';
+import type {
+  Deliverer,
+  DelivererTable,
+  DrainSummary,
+  OutboxDispatcherDeps,
+} from './outbox-dispatcher';
+import {
+  CLAIM_STALE_AFTER_MS,
+  createOutboxDispatcher,
+} from './outbox-dispatcher';
 
 const ANSWER: AgentAnswer = {
   kind: 'text',
@@ -76,39 +84,29 @@ describe('createOutboxDispatcher kind routing', () => {
     expect(states).toEqual(['sent']);
   });
 
-  // A row of a kind this process has no deliverer for is never claimed, so
-  // a process that knows the kind can still send it.
-  it('leaves a row whose kind has no deliverer pending and untouched, while still sending the rest', async () => {
-    await seedNotificationRow();
-    const answerRow = await seedAnswerRow();
-    const before = await ChatOutboxRow.collection.findOne({
-      _id: answerRow._id,
-    });
+  // The real check is the type checker: each `@ts-expect-error` below fails
+  // `lint:typecheck` as unused once a table may leave a kind out.
+  it('does not accept a deliverer table that leaves a kind out', () => {
     const notification = sendingDeliverer();
 
-    const summary = await createOutboxDispatcher({
-      deliverers: { notification },
-    }).drain(new Date());
+    // @ts-expect-error -- no deliverer for 'command-answer'
+    const table: DelivererTable = { notification };
+    // @ts-expect-error -- no deliverer for 'command-answer'
+    const deps: OutboxDispatcherDeps = { deliverers: { notification } };
 
-    expect(summary).toEqual({ sent: 1, failed: 0, givenUp: 0 });
-    expect(notification).toHaveBeenCalledTimes(1);
-    const after = await ChatOutboxRow.collection.findOne({
-      _id: answerRow._id,
-    });
-    expect(after).toEqual(before);
-    expect(after?.state).toBe('pending');
+    expect(Object.keys(table)).toEqual(['notification']);
+    expect(Object.keys(deps.deliverers)).toEqual(['notification']);
   });
 
   it('writes the result a deliverer reports onto the row', async () => {
     await seedNotificationRow();
     const result = { outcomes: [] };
+    const deliverer = vi
+      .fn<Deliverer>()
+      .mockResolvedValue({ outcome: 'sent', result });
 
     await createOutboxDispatcher({
-      deliverers: {
-        notification: vi
-          .fn<Deliverer>()
-          .mockResolvedValue({ outcome: 'sent', result }),
-      },
+      deliverers: { notification: deliverer, 'command-answer': deliverer },
     }).drain(new Date());
 
     const row = await ChatOutboxRow.findOne({});
@@ -195,13 +193,16 @@ describe('createOutboxDispatcher timing', () => {
       }
       // Another process drains while the second row is being sent.
       otherProcessSummary = await createOutboxDispatcher({
-        deliverers: { notification: otherProcessDeliverer },
+        deliverers: {
+          notification: otherProcessDeliverer,
+          'command-answer': otherProcessDeliverer,
+        },
       }).drain(new Date(current + 1000));
       return { outcome: 'sent' };
     });
 
     await createOutboxDispatcher({
-      deliverers: { notification: deliverer },
+      deliverers: { notification: deliverer, 'command-answer': deliverer },
       clock: () => new Date(current),
     }).drain(new Date(T));
 
@@ -214,6 +215,42 @@ describe('createOutboxDispatcher timing', () => {
     );
     expect(otherProcessDeliverer).not.toHaveBeenCalled();
     expect(otherProcessSummary).toEqual({ sent: 0, failed: 0, givenUp: 0 });
+  });
+
+  it.each<[string, Awaited<ReturnType<Deliverer>>]>([
+    ['a retry', { outcome: 'retry', result: { by: 'stalled' } }],
+    ['a sent', { outcome: 'sent', result: { by: 'stalled' } }],
+  ])('keeps the result of the process that took a stale row back when the stalled process later reports %s', async (_label, lateVerdict) => {
+    await seedPendingNotification('req-taken-back');
+    const otherProcessDeliverer = vi
+      .fn<Deliverer>()
+      .mockResolvedValue({ outcome: 'sent', result: { by: 'other' } });
+    const stalledDeliverer = vi.fn<Deliverer>(async () => {
+      await createOutboxDispatcher({
+        deliverers: {
+          notification: otherProcessDeliverer,
+          'command-answer': otherProcessDeliverer,
+        },
+      }).drain(new Date(T + CLAIM_STALE_AFTER_MS + 1000));
+      return lateVerdict;
+    });
+
+    await createOutboxDispatcher({
+      deliverers: {
+        notification: stalledDeliverer,
+        'command-answer': stalledDeliverer,
+      },
+      clock: () => new Date(T),
+    }).drain(new Date(T));
+
+    expect(otherProcessDeliverer).toHaveBeenCalledTimes(1);
+    expect(
+      await ChatOutboxRow.collection.findOne({ requestId: 'req-taken-back' }),
+    ).toMatchObject({
+      state: 'sent',
+      attempts: 0,
+      result: { by: 'other' },
+    });
   });
 
   describe('Requirement 2.11: a send that stopped mid-way is taken back within 10 minutes', () => {
@@ -250,7 +287,7 @@ describe('createOutboxDispatcher timing', () => {
         const deliverer = sendingDeliverer();
         // A frozen clock: each tick's drain runs at exactly the tick's time.
         const dispatcher = createOutboxDispatcher({
-          deliverers: { notification: deliverer },
+          deliverers: { notification: deliverer, 'command-answer': deliverer },
           clock: () => new Date(T),
         });
 
@@ -285,7 +322,7 @@ describe('createOutboxDispatcher timing', () => {
         return { outcome: 'sent' };
       });
       const dispatcher = createOutboxDispatcher({
-        deliverers: { notification: deliverer },
+        deliverers: { notification: deliverer, 'command-answer': deliverer },
       });
 
       await seedPendingNotification('req-1', { nextAttemptAt: new Date() });
@@ -304,12 +341,11 @@ describe('createOutboxDispatcher timing', () => {
 
     it('resolves rather than rejects when the drain fails', async () => {
       await seedPendingNotification('req-1', { nextAttemptAt: new Date() });
+      const deliverer = vi
+        .fn<Deliverer>()
+        .mockRejectedValue(new Error('proxy exploded'));
       const dispatcher = createOutboxDispatcher({
-        deliverers: {
-          notification: vi
-            .fn<Deliverer>()
-            .mockRejectedValue(new Error('proxy exploded')),
-        },
+        deliverers: { notification: deliverer, 'command-answer': deliverer },
       });
 
       await expect(dispatcher.requestDrain()).resolves.toBeUndefined();
@@ -323,7 +359,7 @@ describe('createOutboxDispatcher timing', () => {
       const deliverer = sendingDeliverer();
 
       await createOutboxDispatcher({
-        deliverers: { notification: deliverer },
+        deliverers: { notification: deliverer, 'command-answer': deliverer },
       }).requestDrain();
 
       expect(deliverer).toHaveBeenCalledTimes(rowCount);
@@ -348,7 +384,7 @@ describe('createOutboxDispatcher timing', () => {
       });
 
       await createOutboxDispatcher({
-        deliverers: { notification: deliverer },
+        deliverers: { notification: deliverer, 'command-answer': deliverer },
       }).requestDrain();
 
       const attempted = deliverer.mock.calls.map(([row]) => row.requestId);
@@ -369,7 +405,7 @@ describe('createOutboxDispatcher timing', () => {
       });
 
       await createOutboxDispatcher({
-        deliverers: { notification: deliverer },
+        deliverers: { notification: deliverer, 'command-answer': deliverer },
       }).requestDrain();
 
       expect(deliverer.mock.calls.map(([row]) => row.requestId)).toEqual([
@@ -394,7 +430,7 @@ describe('createOutboxDispatcher timing', () => {
     // A frozen clock: every claim happens at T, so a retry due after 0 ms is
     // due at exactly the drain's own time.
     const summary = await createOutboxDispatcher({
-      deliverers: { notification: deliverer },
+      deliverers: { notification: deliverer, 'command-answer': deliverer },
       clock: () => new Date(T),
     }).drain(new Date(T));
 

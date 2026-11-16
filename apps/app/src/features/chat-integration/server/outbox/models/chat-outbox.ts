@@ -5,9 +5,11 @@ import { Schema } from 'mongoose';
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
 /**
- * Retention period for a `sent` outbox row, in seconds. `given-up` rows are
- * NOT covered by this TTL -- they stay until an operator looks at them
- * (design.md `chat_notification_outbox` row).
+ * Retention period for a `sent` outbox row, in seconds. A `given-up`
+ * notification row is NOT covered by any TTL -- it stays until an operator
+ * looks at it (design.md `chat_notification_outbox` row). A `given-up`
+ * command-answer row expires after 7 days, by an index the migration
+ * 20261116130000-expire-given-up-command-answers creates.
  */
 export const NOTIFICATION_OUTBOX_SENT_TTL_SECONDS = 30 * 24 * 60 * 60;
 
@@ -70,16 +72,22 @@ export interface IChatOutboxRow {
    */
   nextAttemptAt: Date;
   /**
-   * The proxy's `NotificationResult` written back after a delivery attempt.
-   * Opaque at the schema level -- shape is owned by `@growi/chat`'s
-   * `NotificationResult` contract, not duplicated here.
+   * What the last delivery attempt reported, written by the row's deliverer:
+   * a `NotificationResult` on a notification row, a `CommandAnswerResult` or
+   * `{ failure }` on a command-answer row. Opaque at the schema level.
    */
   result: unknown;
+  /** Absent once a command-answer row is sent: the body is not kept. */
   answer: AgentAnswer | null;
   createdAt: Date;
 }
 
 export interface ChatOutboxRowDocument extends IChatOutboxRow, Document {}
+
+/** A row as its kind's deliverer receives it. */
+export type OutboxRow<K extends OutboxKind> = ChatOutboxRowDocument & {
+  readonly kind: K;
+};
 
 export interface ChatOutboxRowModel extends Model<ChatOutboxRowDocument> {}
 
@@ -102,6 +110,10 @@ const chatOutboxTargetSchema = new Schema<ChatOutboxTarget>(
 
 function isNotificationRow(this: ChatOutboxRowDocument): boolean {
   return this.kind === 'notification';
+}
+
+function isCommandAnswerRow(this: ChatOutboxRowDocument): boolean {
+  return this.kind === 'command-answer';
 }
 
 const chatOutboxSchema = new Schema<ChatOutboxRowDocument, ChatOutboxRowModel>(
@@ -136,7 +148,12 @@ const chatOutboxSchema = new Schema<ChatOutboxRowDocument, ChatOutboxRowModel>(
     claimedAt: { type: Date, default: null },
     nextAttemptAt: { type: Date, required: true, default: () => new Date() },
     result: { type: Schema.Types.Mixed, default: null },
-    answer: { type: Schema.Types.Mixed, default: null },
+    // Checked on create only; the dispatcher removes it once the row is sent.
+    answer: {
+      type: Schema.Types.Mixed,
+      default: null,
+      required: isCommandAnswerRow,
+    },
     createdAt: { type: Date, required: true, default: () => new Date() },
   },
   {
@@ -162,7 +179,9 @@ chatOutboxSchema.index({ state: 1, nextAttemptAt: 1 });
 chatOutboxSchema.index({ relationId: 1, requestId: 1 });
 
 // The unique (relationId, requestId) index on `command-answer` rows is created
-// by a migration (20261116120000-add-kind-to-chat-notification-outbox), not here.
+// by a migration (20261116120000-add-kind-to-chat-notification-outbox), not here,
+// and so is the 7-day expiry of given-up `command-answer` rows
+// (20261116130000-expire-given-up-command-answers).
 
 // Only `sent` rows are subject to the 30-day TTL; `given-up` rows must
 // survive until an operator inspects them, so the TTL index is scoped with
