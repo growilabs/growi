@@ -301,7 +301,7 @@ describe.skipIf(esUri == null)(
               updated_at: now,
             },
           ],
-          [ATTACHMENT_INDEX],
+          ATTACHMENT_INDEX,
         );
       }
       for (const index of [PAGE_INDEX, ATTACHMENT_INDEX]) {

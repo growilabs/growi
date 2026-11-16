@@ -33,6 +33,7 @@ const logger = loggerFactory('growi:service:search-attachments:indexer');
 export interface ReindexBatchRef {
   isRebuilding(): boolean;
   getTmpIndexName(): string | null;
+  recordDetached(attachmentId: string): void;
 }
 
 /** Public contract for AttachmentSearchIndexer. */
@@ -237,7 +238,7 @@ export class AttachmentSearchIndexer
         attachmentId,
         pageId,
         docs,
-        [liveIndex],
+        liveIndex,
       );
     }
 
@@ -248,9 +249,12 @@ export class AttachmentSearchIndexer
     if (tmpIndexes.length > 0) {
       const tmpResults = await Promise.allSettled(
         tmpIndexes.map((tmpIndex) =>
-          this.delegatorExt.syncAttachmentIndexed(attachmentId, pageId, docs, [
+          this.delegatorExt.syncAttachmentIndexed(
+            attachmentId,
+            pageId,
+            docs,
             tmpIndex,
-          ]),
+          ),
         ),
       );
       for (let i = 0; i < tmpResults.length; i++) {
@@ -278,9 +282,10 @@ export class AttachmentSearchIndexer
     pageId: string,
   ): Promise<ExtractionOutcome> {
     const attachmentId = attachment._id.toString();
-    const targetIndexes = this.getTargetIndexes();
 
     const outcome = await this.extractor.extractAttachment(attachmentId);
+    // Resolved after the extraction: a rebuild may have started meanwhile
+    const targetIndexes = this.getTargetIndexes();
 
     if (outcome.kind === 'success') {
       const docs = buildSuccessDocs(attachment, pageId, outcome);
@@ -360,6 +365,7 @@ export class AttachmentSearchIndexer
    */
   async onDetach(attachmentId: string): Promise<void> {
     try {
+      this.reindexBatch.recordDetached(attachmentId);
       const targetIndexes = this.getTargetIndexes();
 
       // Attempt live first, then tmp (best-effort for each)

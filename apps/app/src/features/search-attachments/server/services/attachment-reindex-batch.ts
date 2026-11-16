@@ -40,6 +40,8 @@ export interface AttachmentReindexBatchInterface {
   isRebuilding(): boolean;
   /** The index being filled, once it exists; live writes go there too. */
   getTmpIndexName(): string | null;
+  /** Notes an attachment deleted while a rebuild runs; ignored otherwise. */
+  recordDetached(attachmentId: string): void;
 }
 
 /** Number of attachment rows fetched from MongoDB per page during a rebuild. */
@@ -187,6 +189,8 @@ function buildDocs(
 export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
   private _isRebuilding = false;
   private _tmpIndexName: string | null = null;
+  // The scan may write an attachment into the new index after it was deleted
+  private readonly detachedDuringRebuild = new Set<string>();
 
   private readonly extractor: AttachmentTextExtractorService;
   private readonly delegatorExt: AttachmentIndexOperations;
@@ -227,6 +231,13 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
 
       this._tmpIndexName = await this.delegatorExt.createRebuildIndex();
       const result = await this.addAllAttachments(this._tmpIndexName);
+      // Deletions from here on reach the new index through the dual delete
+      if (this.detachedDuringRebuild.size > 0) {
+        await this.delegatorExt.removeAttachmentsFromIndex(
+          [...this.detachedDuringRebuild],
+          this._tmpIndexName,
+        );
+      }
       await this.delegatorExt.swapAttachmentAlias(this._tmpIndexName);
 
       this.socketIoService
@@ -239,19 +250,29 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
         ?.emit(SocketEventName.AttachmentRebuildingFailed, {
           error: err instanceof Error ? err.message : String(err),
         });
-      if (this._tmpIndexName != null) {
+      // Cleared first so no live write re-creates the index being dropped
+      const tmpIndexName = this._tmpIndexName;
+      this._tmpIndexName = null;
+      if (tmpIndexName != null) {
         await this.delegatorExt
-          .dropRebuildIndex(this._tmpIndexName)
+          .dropRebuildIndex(tmpIndexName)
           .catch((dropErr) =>
             logger.error(
-              { err: dropErr, index: this._tmpIndexName },
+              { err: dropErr, index: tmpIndexName },
               'Failed to drop the half-built attachment index',
             ),
           );
       }
     } finally {
       this._tmpIndexName = null;
+      this.detachedDuringRebuild.clear();
       this._isRebuilding = false;
+    }
+  }
+
+  recordDetached(attachmentId: string): void {
+    if (this._isRebuilding) {
+      this.detachedDuringRebuild.add(attachmentId);
     }
   }
 
@@ -281,9 +302,12 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
     const docs = buildDocs(attachment, pageId, outcome);
 
     // Upsert ES docs (success and failure alike get a metadata doc)
-    await this.delegatorExt.syncAttachmentIndexed(attachmentId, pageId, docs, [
+    await this.delegatorExt.syncAttachmentIndexed(
+      attachmentId,
+      pageId,
+      docs,
       targetIndex,
-    ]);
+    );
 
     // Record failure for non-success outcomes
     if (outcome.kind !== 'success') {

@@ -68,6 +68,10 @@ export class ES9ClientDelegator {
       params: estypes.IndicesStatsRequest,
     ): Promise<estypes.IndicesStatsResponse> =>
       this.client.indices.stats(params),
+    refresh: (
+      params: estypes.IndicesRefreshRequest,
+    ): Promise<estypes.IndicesRefreshResponse> =>
+      this.client.indices.refresh(params),
   };
 
   nodes = {

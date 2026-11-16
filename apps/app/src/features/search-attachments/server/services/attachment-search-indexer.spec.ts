@@ -103,6 +103,7 @@ function makeReindexBatch(
   return {
     isRebuilding: vi.fn().mockReturnValue(isRebuilding),
     getTmpIndexName: vi.fn().mockReturnValue(tmpIndexName),
+    recordDetached: vi.fn(),
   };
 }
 
@@ -257,7 +258,7 @@ describe('AttachmentSearchIndexer', () => {
 
       expect(calledAttachmentId).toBe('att-001');
       expect(calledPageId).toBe('page-42');
-      expect(calledIndexes).toEqual(['attachments-alias']);
+      expect(calledIndexes).toBe('attachments-alias');
 
       // Two docs — one per extracted page
       expect(calledDocs).toHaveLength(2);
@@ -433,14 +434,46 @@ describe('AttachmentSearchIndexer', () => {
       // Should be called twice: once for live, once for tmp
       expect(delegator.syncAttachmentIndexed).toHaveBeenCalledTimes(2);
 
-      const allCalls = vi.mocked(delegator.syncAttachmentIndexed).mock.calls;
-      const liveCall = allCalls.find(
-        (c) => c[3].includes('attachments-alias') && c[3].length === 1,
-      );
-      const tmpCall = allCalls.find((c) => c[3].includes('attachments-tmp'));
+      const targets = vi
+        .mocked(delegator.syncAttachmentIndexed)
+        .mock.calls.map((c) => c[3]);
+      expect(targets).toEqual(['attachments-alias', 'attachments-tmp']);
+    });
 
-      expect(liveCall).toBeDefined();
-      expect(tmpCall).toBeDefined();
+    it('also writes to the new index when the rebuild creates it during the extraction', async () => {
+      enableFeature();
+      const delegator = makeDelegator();
+      const reindexBatch = makeReindexBatch(false, null);
+      const extractor = makeExtractor({
+        kind: 'success',
+        pages: [{ pageNumber: 1, label: null, content: 'content' }],
+        mimeType: 'application/pdf',
+      });
+      vi.mocked(extractor.extractAttachment).mockImplementation(() => {
+        vi.mocked(reindexBatch.isRebuilding).mockReturnValue(true);
+        vi.mocked(reindexBatch.getTmpIndexName).mockReturnValue(
+          'attachments-2',
+        );
+        return Promise.resolve({
+          kind: 'success',
+          pages: [{ pageNumber: 1, label: null, content: 'content' }],
+          mimeType: 'application/pdf',
+        });
+      });
+
+      const indexer = makeIndexer(
+        extractor,
+        delegator,
+        makeFailureLog(),
+        reindexBatch,
+        makeSearchService(true),
+      );
+      await indexer.onAttach('page-1', makeAttachment(), makeMullerFile());
+
+      const targets = vi
+        .mocked(delegator.syncAttachmentIndexed)
+        .mock.calls.map((c) => c[3]);
+      expect(targets).toEqual(['attachments-alias', 'attachments-2']);
     });
   });
 
@@ -495,6 +528,22 @@ describe('AttachmentSearchIndexer', () => {
   // ----------------------------------------------------------------
 
   describe('onDetach', () => {
+    it('tells the reindex batch which attachment was deleted', async () => {
+      enableFeature();
+      const reindexBatch = makeReindexBatch(true, 'attachments-2');
+      const indexer = makeIndexer(
+        makeExtractor(),
+        makeDelegator(),
+        makeFailureLog(),
+        reindexBatch,
+        makeSearchService(true),
+      );
+
+      await indexer.onDetach('att-007');
+
+      expect(reindexBatch.recordDetached).toHaveBeenCalledWith('att-007');
+    });
+
     it('calls syncAttachmentRemoved with live index only when not rebuilding', async () => {
       enableFeature();
       const delegator = makeDelegator();

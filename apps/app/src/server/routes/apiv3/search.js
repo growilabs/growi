@@ -255,10 +255,13 @@ export const setup = (crowi) => {
    *        409:
    *          description: >
    *            `rebuild_in_progress` — a rebuild with `includeAttachments` is already running
+   *        400:
+   *          description: >
+   *            `search-service-unconfigured` / `search-service-unreachable`, or invalid parameters
    *        503:
    *          description: >
-   *            The search service is unavailable, or `feature_disabled` — `includeAttachments`
-   *            was requested while attachment full-text search is disabled
+   *            `feature_disabled` — `includeAttachments` was requested while attachment
+   *            full-text search is disabled — or the operation itself failed
    */
   router.put(
     '/indices',
@@ -322,7 +325,7 @@ export const setup = (crowi) => {
                 );
               }
 
-              // Unset only when the search service is not configured
+              // Optional on Crowi: unset when the attachment search module was not wired
               const batch = crowi.attachmentReindexBatch;
               if (batch == null) {
                 return res.apiv3Err(

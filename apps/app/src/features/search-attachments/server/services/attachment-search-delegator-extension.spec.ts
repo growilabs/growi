@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { estypes } from '@elastic/elasticsearch8';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
 import type { IAttachmentEsDoc } from '~/features/search-attachments/interfaces/attachment-search';
+import type { ES8ClientDelegator } from '~/server/service/search-delegator/elasticsearch-client-delegator/es8-client-delegator';
 
 import { mappings as es8Mappings } from '../mappings/attachments-mappings-es8';
 import {
@@ -8,97 +11,95 @@ import {
   attachmentIndexNames,
 } from './attachment-search-delegator-extension';
 
-// Minimal mock of an ES8 client delegator
-function makeClientMock() {
-  const mock = {
-    delegatorVersion: 8 as const,
-    bulk: vi.fn().mockResolvedValue({ errors: false, items: [], took: 1 }),
-    deleteByQuery: vi.fn().mockResolvedValue({ deleted: 1, failures: [] }),
-    indices: {
-      create: vi.fn().mockResolvedValue({ acknowledged: true }),
-      exists: vi.fn().mockResolvedValue(false),
-      existsAlias: vi.fn().mockResolvedValue(false),
-      putAlias: vi.fn().mockResolvedValue({ acknowledged: true }),
-      getAlias: vi.fn().mockRejectedValue(
-        Object.assign(new Error('alias_missing_exception'), {
-          statusCode: 404,
-        }),
-      ),
-    },
-  };
-  return mock;
+/** An ES 8 client whose writes succeed; index and alias calls are set per test. */
+function makeClientMock(): DeepMockProxy<ES8ClientDelegator> {
+  const client = mockDeep<ES8ClientDelegator>();
+  client.delegatorVersion = 8;
+  client.bulk.mockResolvedValue({ errors: false, items: [], took: 1 });
+  client.deleteByQuery.mockResolvedValue({ deleted: 1, failures: [] });
+  client.indices.create.mockResolvedValue({
+    acknowledged: true,
+    shards_acknowledged: true,
+    index: 'created',
+  });
+  return client;
 }
 
+const indexNameOf = (index: estypes.Indices | undefined): string =>
+  String(index);
+
 /**
- * In-memory stand-in for the ES index and alias APIs, holding one alias.
- * `state()` reports which indices exist and which the alias points to.
+ * Backs the client's index and alias APIs with an in-memory set of indices
+ * and one alias. `state()` reports which indices exist and which the alias
+ * points to.
  */
-function makeIndicesFake(existing: string[], aliased: string[]) {
+function installIndicesFake(
+  client: DeepMockProxy<ES8ClientDelegator>,
+  existing: string[],
+  aliased: string[],
+) {
   const indices = new Set(existing);
   const aliasTargets = new Set(aliased);
   const notFound = () =>
     Object.assign(new Error('not_found'), { statusCode: 404 });
-  // Wraps a synchronous body as an async ES API call
-  const api = <A, R>(body: (args: A) => R) =>
-    vi.fn((args: A): Promise<R> => {
-      try {
-        return Promise.resolve(body(args));
-      } catch (err) {
-        return Promise.reject(err);
-      }
+  const acknowledged = { acknowledged: true };
+
+  client.indices.create.mockImplementation(({ index }) => {
+    if (indices.has(index)) {
+      return Promise.reject(new Error('resource_already_exists_exception'));
+    }
+    indices.add(index);
+    return Promise.resolve({
+      ...acknowledged,
+      shards_acknowledged: true,
+      index,
     });
-  return {
-    indices: {
-      create: api(({ index }: { index: string }) => {
-        if (indices.has(index)) {
-          throw new Error('resource_already_exists_exception');
-        }
-        indices.add(index);
-        return { acknowledged: true };
-      }),
-      delete: api(({ index }: { index: string }) => {
-        if (!indices.delete(index)) throw notFound();
-        aliasTargets.delete(index);
-        return { acknowledged: true };
-      }),
-      exists: api(({ index }: { index: string }) => indices.has(index)),
-      existsAlias: api(() => aliasTargets.size > 0),
-      getAlias: api(({ name }: { name: string }) => {
-        if (aliasTargets.size === 0) throw notFound();
-        return Object.fromEntries(
-          [...aliasTargets].map((index) => [
-            index,
-            { aliases: { [name]: {} } },
-          ]),
-        );
-      }),
-      putAlias: api(({ index }: { index: string }) => {
-        aliasTargets.add(index);
-        return { acknowledged: true };
-      }),
-      updateAliases: api(
-        ({
-          actions,
-        }: {
-          actions: Array<{
-            add?: { index: string };
-            remove?: { index: string };
-          }>;
-        }) => {
-          for (const action of actions) {
-            if (action.add != null) aliasTargets.add(action.add.index);
-            if (action.remove != null) aliasTargets.delete(action.remove.index);
-          }
-          return { acknowledged: true };
-        },
+  });
+  client.indices.delete.mockImplementation(({ index }) => {
+    const name = indexNameOf(index);
+    if (!indices.delete(name)) return Promise.reject(notFound());
+    aliasTargets.delete(name);
+    return Promise.resolve(acknowledged);
+  });
+  client.indices.exists.mockImplementation(({ index }) =>
+    Promise.resolve(indices.has(indexNameOf(index))),
+  );
+  client.indices.existsAlias.mockImplementation(() =>
+    Promise.resolve(aliasTargets.size > 0),
+  );
+  client.indices.getAlias.mockImplementation((params) => {
+    if (aliasTargets.size === 0) return Promise.reject(notFound());
+    const name = String(params?.name);
+    return Promise.resolve(
+      Object.fromEntries(
+        [...aliasTargets].map((index) => [index, { aliases: { [name]: {} } }]),
       ),
-    },
+    );
+  });
+  client.indices.putAlias.mockImplementation(({ index }) => {
+    aliasTargets.add(indexNameOf(index));
+    return Promise.resolve(acknowledged);
+  });
+  client.indices.updateAliases.mockImplementation(({ actions }) => {
+    for (const action of actions ?? []) {
+      if (action.add != null) aliasTargets.add(indexNameOf(action.add.index));
+      if (action.remove != null)
+        aliasTargets.delete(indexNameOf(action.remove.index));
+    }
+    return Promise.resolve(acknowledged);
+  });
+
+  return {
     state: () => ({
       indices: [...indices].sort(),
       aliased: [...aliasTargets].sort(),
     }),
   };
 }
+
+/** The bulk operations of the n-th bulk call, serialized. */
+const bulkOperations = (client: DeepMockProxy<ES8ClientDelegator>, call = 0) =>
+  client.bulk.mock.calls[call][0].operations ?? [];
 
 const SAMPLE_DOC: IAttachmentEsDoc = {
   attachmentId: 'att1',
@@ -116,14 +117,13 @@ const SAMPLE_DOC: IAttachmentEsDoc = {
 };
 
 describe('AttachmentSearchDelegatorExtension', () => {
-  let client: ReturnType<typeof makeClientMock>;
+  let client: DeepMockProxy<ES8ClientDelegator>;
   let ext: AttachmentSearchDelegatorExtension;
 
   beforeEach(() => {
     client = makeClientMock();
     ext = new AttachmentSearchDelegatorExtension(
-      // biome-ignore lint/suspicious/noExplicitAny: test mock uses a partial client shape
-      client as any,
+      client,
       attachmentIndexNames('growi'),
     );
   });
@@ -133,9 +133,9 @@ describe('AttachmentSearchDelegatorExtension', () => {
   // ----------------------------------------------------------------
   describe('createAttachmentIndex', () => {
     it('creates a custom-named index when provided', async () => {
-      await ext.createAttachmentIndex('attachments-tmp');
+      await ext.createAttachmentIndex('growi-attachments-2');
       expect(client.indices.create).toHaveBeenCalledWith(
-        expect.objectContaining({ index: 'attachments-tmp' }),
+        expect.objectContaining({ index: 'growi-attachments-2' }),
       );
     });
   });
@@ -157,24 +157,32 @@ describe('AttachmentSearchDelegatorExtension', () => {
   });
 
   describe('syncAttachmentIndexed', () => {
-    it('requires the alias to exist for writes through the alias only', async () => {
+    it('requires the alias to exist for writes through the alias', async () => {
       await ext.syncAttachmentIndexed(
         'att1',
         'page1',
         [SAMPLE_DOC],
-        ['growi-attachments-alias', 'growi-attachments-2'],
+        'growi-attachments-alias',
       );
 
-      // biome-ignore lint/suspicious/noExplicitAny: accessing mock arg properties
-      const { operations } = client.bulk.mock.calls[0][0] as any;
-      expect(operations[0]).toEqual({
+      expect(bulkOperations(client)[0]).toEqual({
         index: {
           _index: 'growi-attachments-alias',
           _id: 'att1_1',
           require_alias: true,
         },
       });
-      expect(operations[2]).toEqual({
+    });
+
+    it('writes to a concrete index without requiring an alias', async () => {
+      await ext.syncAttachmentIndexed(
+        'att1',
+        'page1',
+        [SAMPLE_DOC],
+        'growi-attachments-2',
+      );
+
+      expect(bulkOperations(client)[0]).toEqual({
         index: { _index: 'growi-attachments-2', _id: 'att1_1' },
       });
     });
@@ -182,7 +190,15 @@ describe('AttachmentSearchDelegatorExtension', () => {
     it('rejects when Elasticsearch reports failed items', async () => {
       client.bulk.mockResolvedValueOnce({
         errors: true,
-        items: [{ index: { error: { type: 'index_not_found_exception' } } }],
+        items: [
+          {
+            index: {
+              _index: 'growi-attachments-alias',
+              status: 404,
+              error: { type: 'index_not_found_exception', reason: 'no alias' },
+            },
+          },
+        ],
         took: 1,
       });
 
@@ -191,84 +207,82 @@ describe('AttachmentSearchDelegatorExtension', () => {
           'att1',
           'page1',
           [SAMPLE_DOC],
-          ['growi-attachments-alias'],
+          'growi-attachments-alias',
         ),
-      ).rejects.toThrow();
+      ).rejects.toThrow('index_not_found_exception');
     });
 
-    it('calls bulk with operations for each doc × each target index', async () => {
-      const docs = [SAMPLE_DOC];
-      await ext.syncAttachmentIndexed('att1', 'page1', docs, [
-        'attachments',
-        'attachments-tmp',
-      ]);
+    it('writes every extracted page in one bulk call, one doc id per page', async () => {
+      await ext.syncAttachmentIndexed(
+        'att1',
+        'page1',
+        [
+          { ...SAMPLE_DOC, pageNumber: 3 },
+          { ...SAMPLE_DOC, pageNumber: null },
+        ],
+        'growi-attachments-alias',
+      );
 
       expect(client.bulk).toHaveBeenCalledOnce();
-      // biome-ignore lint/suspicious/noExplicitAny: accessing mock arg properties
-      const bulkArg = client.bulk.mock.calls[0][0] as any;
-
-      // For 1 doc × 2 indexes: 2 × (index command + body) = 4 items
-      expect(bulkArg.operations ?? bulkArg.body).toHaveLength(4);
-    });
-
-    it('constructs doc ID as attachmentId_pageNumber pattern', async () => {
-      const docs = [{ ...SAMPLE_DOC, pageNumber: 3 }];
-      await ext.syncAttachmentIndexed('att1', 'page1', docs, ['attachments']);
-
-      // biome-ignore lint/suspicious/noExplicitAny: accessing mock arg properties
-      const bulkArg = client.bulk.mock.calls[0][0] as any;
-      const serialized = JSON.stringify(bulkArg.operations ?? bulkArg.body);
-      expect(serialized).toContain('att1_3');
-    });
-
-    it('uses pageNumber=0 when pageNumber is null', async () => {
-      const docs = [{ ...SAMPLE_DOC, pageNumber: null }];
-      await ext.syncAttachmentIndexed('att1', 'page1', docs, ['attachments']);
-
-      // biome-ignore lint/suspicious/noExplicitAny: accessing mock arg properties
-      const bulkArg = client.bulk.mock.calls[0][0] as any;
-      const serialized = JSON.stringify(bulkArg.operations ?? bulkArg.body);
-      expect(serialized).toContain('att1_0');
+      const ids = bulkOperations(client)
+        .filter((_, i) => i % 2 === 0)
+        .map((op) => JSON.stringify(op));
+      expect(ids).toEqual([
+        expect.stringContaining('"att1_3"'),
+        expect.stringContaining('"att1_0"'),
+      ]);
     });
 
     it('does NOT include permission fields in bulk bodies', async () => {
-      const docs = [SAMPLE_DOC];
-      await ext.syncAttachmentIndexed('att1', 'page1', docs, ['attachments']);
+      await ext.syncAttachmentIndexed(
+        'att1',
+        'page1',
+        [SAMPLE_DOC],
+        'growi-attachments-alias',
+      );
 
-      // biome-ignore lint/suspicious/noExplicitAny: accessing mock arg properties
-      const bulkArg = client.bulk.mock.calls[0][0] as any;
-      const serialized = JSON.stringify(bulkArg.operations ?? bulkArg.body);
+      const serialized = JSON.stringify(bulkOperations(client));
       expect(serialized).not.toContain('"grant"');
       expect(serialized).not.toContain('granted_users');
       expect(serialized).not.toContain('granted_groups');
       expect(serialized).not.toContain('"creator"');
     });
+  });
 
-    it('sends one single _bulk call for multiple target indexes', async () => {
-      const docs = [SAMPLE_DOC];
-      await ext.syncAttachmentIndexed('att1', 'page1', docs, [
-        'attachments',
-        'attachments-tmp',
-      ]);
-      // Must be exactly 1 bulk call, not 2
-      expect(client.bulk).toHaveBeenCalledOnce();
+  describe('removeAttachmentsFromIndex', () => {
+    it('refreshes the index first so just-written docs are found, then deletes every given attachment', async () => {
+      const order: string[] = [];
+      client.indices.refresh.mockImplementation(() => {
+        order.push('refresh');
+        return Promise.resolve({
+          _shards: { total: 1, successful: 1, failed: 0 },
+        });
+      });
+      client.deleteByQuery.mockImplementation(() => {
+        order.push('delete');
+        return Promise.resolve({ deleted: 2, failures: [] });
+      });
+
+      await ext.removeAttachmentsFromIndex(['a1', 'a2'], 'growi-attachments-2');
+
+      expect(order).toEqual(['refresh', 'delete']);
+      expect(client.indices.refresh).toHaveBeenCalledWith({
+        index: 'growi-attachments-2',
+      });
+      expect(client.deleteByQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          index: 'growi-attachments-2',
+          query: { terms: { attachmentId: ['a1', 'a2'] } },
+        }),
+      );
     });
 
-    it('handles multiple docs across multiple target indexes in one bulk call', async () => {
-      const docs = [
-        { ...SAMPLE_DOC, pageNumber: 1 },
-        { ...SAMPLE_DOC, pageNumber: 2 },
-      ];
-      await ext.syncAttachmentIndexed('att1', 'page1', docs, [
-        'attachments',
-        'attachments-tmp',
-      ]);
+    it('rejects when the delete fails, so the rebuild does not swap', async () => {
+      client.deleteByQuery.mockRejectedValue(new Error('ES is down'));
 
-      expect(client.bulk).toHaveBeenCalledOnce();
-      // biome-ignore lint/suspicious/noExplicitAny: accessing mock arg properties
-      const bulkArg = client.bulk.mock.calls[0][0] as any;
-      // 2 docs × 2 indexes = 4 (index+body) pairs = 8 items
-      expect(bulkArg.operations ?? bulkArg.body).toHaveLength(8);
+      await expect(
+        ext.removeAttachmentsFromIndex(['a1'], 'growi-attachments-2'),
+      ).rejects.toThrow('ES is down');
     });
   });
 
@@ -278,14 +292,14 @@ describe('AttachmentSearchDelegatorExtension', () => {
   describe('syncAttachmentRemoved', () => {
     it('calls deleteByQuery for each target index', async () => {
       await ext.syncAttachmentRemoved('att1', [
-        'attachments',
-        'attachments-tmp',
+        'growi-attachments-alias',
+        'growi-attachments-2',
       ]);
       expect(client.deleteByQuery).toHaveBeenCalledTimes(2);
     });
 
     it('tolerates an index that does not exist yet', async () => {
-      await ext.syncAttachmentRemoved('att-x', ['attachments']);
+      await ext.syncAttachmentRemoved('att-x', ['growi-attachments-alias']);
 
       expect(client.deleteByQuery).toHaveBeenCalledWith(
         expect.objectContaining({ ignore_unavailable: true }),
@@ -293,10 +307,8 @@ describe('AttachmentSearchDelegatorExtension', () => {
     });
 
     it('passes attachmentId as term filter', async () => {
-      await ext.syncAttachmentRemoved('att-x', ['attachments']);
-      // biome-ignore lint/suspicious/noExplicitAny: accessing mock arg properties
-      const arg = client.deleteByQuery.mock.calls[0][0] as any;
-      const serialized = JSON.stringify(arg);
+      await ext.syncAttachmentRemoved('att-x', ['growi-attachments-alias']);
+      const serialized = JSON.stringify(client.deleteByQuery.mock.calls[0][0]);
       expect(serialized).toContain('att-x');
       expect(serialized).toContain('attachmentId');
     });
@@ -366,10 +378,13 @@ describe('AttachmentSearchDelegatorExtension', () => {
     } as const;
 
     const setup = (existing: string[], aliased: string[]) => {
-      const fake = makeIndicesFake(existing, aliased);
+      const lifecycleClient = makeClientMock();
+      const fake = {
+        indices: lifecycleClient.indices,
+        ...installIndicesFake(lifecycleClient, existing, aliased),
+      };
       const lifecycleExt = new AttachmentSearchDelegatorExtension(
-        // biome-ignore lint/suspicious/noExplicitAny: test mock uses a partial client shape
-        { delegatorVersion: 8, indices: fake.indices } as any,
+        lifecycleClient,
         NAMES,
       );
       return { fake, lifecycleExt };

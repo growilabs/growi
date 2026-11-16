@@ -61,11 +61,15 @@ export const invalidateRequiresReindexCache = (): void => {
  * - attachment full-text search is not enabled
  * - MongoDB has no indexable attachments (nothing to index)
  *
- * Otherwise runs a cardinality aggregation on the `attachments` ES index and
+ * Otherwise runs a cardinality aggregation on the attachment alias and
  * compares the unique-attachmentId count against the indexable attachments.
  *
  * Result is cached for CACHE_TTL_MS milliseconds.
  */
+const isIndexNotFound = (err: unknown): boolean =>
+  (err as { meta?: { body?: { error?: { type?: string } } } })?.meta?.body
+    ?.error?.type === 'index_not_found_exception';
+
 export const computeRequiresReindex = async (
   crowi: Crowi,
   isEnabled: boolean,
@@ -120,9 +124,13 @@ export const computeRequiresReindex = async (
         }
       }
     } catch (err) {
-      logger.error({ err }, 'computeRequiresReindex: ES query failed');
-      // On error, do not cache; return false conservatively
-      return false;
+      if (!isIndexNotFound(err)) {
+        logger.error({ err }, 'computeRequiresReindex: ES query failed');
+        // On error, do not cache; return false conservatively
+        return false;
+      }
+      // Enabled but the alias is missing: prompt the admin to rebuild
+      value = true;
     }
   }
 

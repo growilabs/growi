@@ -465,9 +465,11 @@ sequenceDiagram
             Att->>Idx: onAttach / onDetach (新規アップロード / 削除)
             Idx->>Batch: isRebuilding? / getTmpIndexName()
             Idx->>Del: dual-write: {page}-attachments-alias (= 旧 index) + {page}-attachments-2 の両方に upsert/delete
+            Idx->>Batch: onDetach なら recordDetached(id)
         end
 
         Batch->>Batch: AttachmentOrphanSweeper.sweep({page}-attachments-2)
+        Batch->>Del: removeAttachmentsFromIndex(作り直し中に削除された id, {page}-attachments-2) — refresh してから削除
         Batch->>Del: swapAttachmentAlias({page}-attachments-2) — 1 回の updateAliases で付け替え、旧 index を削除
         Batch->>Sock: FinishAddAttachment
         Note over Batch: 例外時は AttachmentRebuildingFailed を emit し、作りかけの index を削除 (alias が指していない場合だけ)。finally で isRebuilding=false
@@ -483,7 +485,7 @@ Key decisions:
 - 個別失敗はスキップして FailureLog に残し batch 継続
 - **実 index は 2 つを交互に使う** (Req 6.4)。alias が指している方には作り直しの間まったく触れず、新しい方を埋め終えてから alias を付け替える。Page 側の `rebuildIndex()` は「tmp に複製 → alias を tmp へ → 本体を消して作り直す → alias を戻す」形なので、途中で止まると本体が作りかけのまま alias が戻り、旧 index を保てない。添付の作り直しは抽出を伴い長時間かかるため、この形は採らない (research.md 8.6)
 - 例外で止まった場合は alias swap 未実行のまま旧 index を維持し、作りかけの index を削除する。削除は「alias が指していない index」に限る。プロセスが落ちて削除できなかった index は、次回の作り直しの先頭で drop される。実行中フラグは `startRebuild()` 内部の finally で必ず下ろす (呼び出し側に後始末を任せない)
-- **rebuild window 中の dual-write**: `AttachmentSearchIndexer.onAttach/onDetach` が `AttachmentReindexBatch.isRebuilding()` を参照し、true の間は live alias (`{page}-attachments-alias`) と、作り直し先の index (`getTmpIndexName()` が返す名前) の**両方**に書き込む。これにより alias swap 後に新規アップロードや削除が失われない。`getTmpIndexName()` は作り直し先の index を作り終えてから名前を返す。それより前の書き込みは live だけに入るが、走査はその後に MongoDB を読むので、その添付も新しい index に入る
+- **rebuild window 中の dual-write**: `AttachmentSearchIndexer.onAttach/onDetach` が `AttachmentReindexBatch.isRebuilding()` を参照し、true の間は live alias (`{page}-attachments-alias`) と、作り直し先の index (`getTmpIndexName()` が返す名前) の**両方**に書き込む。これにより alias swap 後に新規アップロードや削除が失われない。ただし削除には、作り直しの走査がその添付を読んで抽出している間に起きた場合の穴がある。削除はその時点の両 index に効くが、走査はその後で抽出結果を作り直し先へ書くので、削除済みの添付が戻ってしまう。そこで `onDetach` は削除した添付の id を `AttachmentReindexBatch.recordDetached()` に渡し、batch は作り直し中に渡された id を覚えておく。走査と orphan sweep が終わったら、alias swap の直前にそれらを作り直し先から消す (`removeAttachmentsFromIndex`。delete-by-query は refresh 前の文書を見ないため、先に refresh する)。この時点で走査は終わっているので、以後の削除は二重削除だけで足りる。`getTmpIndexName()` は作り直し先の index を作り終えてから名前を返す。それより前の書き込みは live だけに入るが、走査はその後に MongoDB を読むので、その添付も新しい index に入る
 - **dual-write の冪等性**: tmp index への書き込みは、bulk upsert が後から同 `_id` で上書きする可能性があるが、doc ID が `${attachmentId}_${pageNumber ?? 0}` で決定的なため順序に依存しない。bulk 側が後勝ちでも real-time 側が後勝ちでも最終状態は同一
 - **dual-write 失敗時**: tmp 側 write の失敗は live 側の成功を阻害しない (pino 記録して continue)。alias swap 後は live が単一 source になり自動的に整合
 - **orphan sweeper**: real-time cascade (pageEvent 購読による即時削除) は採用しない。`AttachmentService.removeAllAttachments()` (ページ削除に伴う一括削除) は detach handler を呼ばないため、ページ削除で残った添付 doc もここで回収する。`AttachmentOrphanSweeper` が MongoDB Page collection と照合して親 Page 不在の添付 doc を eventual に cleanup する。query-time permission 判定により、sweeper 実行までの間も snippet 漏洩は発生しない (`facet=attachments` primary の ids 検索で親 Page 不在 → 該当添付ヒットを drop、`facet=all` secondary の terms クエリは primaryIds = viewer 許諾済ページに限定されるため孤児添付は含まれない)
@@ -726,8 +728,8 @@ export interface AttachmentIndexOperations {
   createRebuildIndex(): Promise<string>;                                                              // alias が指していない方の実 index を drop → create し、その名前を返す
   swapAttachmentAlias(index: string): Promise<void>;                                                  // 1 回の updateAliases で alias を index へ付け替え、前の実 index を削除
   dropRebuildIndex(index: string): Promise<void>;                                                     // alias が指していなければ index を削除 (失敗時の後始末)
-  // rebuild window 中 dual-write 対応のため targetIndexes を受け取る
-  syncAttachmentIndexed(attachmentId: string, pageId: string, docs: AttachmentEsDoc[], targetIndexes: string[]): Promise<void>;
+  removeAttachmentsFromIndex(attachmentIds: string[], index: string): Promise<void>;                 // refresh してから指定添付の文書を delete-by-query で消す (swap 直前)
+  syncAttachmentIndexed(attachmentId: string, pageId: string, docs: AttachmentEsDoc[], targetIndex: string): Promise<void>; // alias 宛てだけ require_alias: true
   syncAttachmentRemoved(attachmentId: string, targetIndexes: string[]): Promise<void>;
   // Note: grant propagation API (syncPageAttachmentsGrantUpdated) is intentionally absent.
   // Under Option D, permission is resolved at query time by looking up page_index.
@@ -743,9 +745,8 @@ export interface AttachmentIndexOperations {
 ```
 
 **dual-write の利用方法**:
-- 通常時 (rebuild 非実行): `syncAttachmentIndexed/Removed(…, ['{page}-attachments-alias'])` で live alias にのみ書く
-- rebuild window 中: `AttachmentSearchIndexer` が `reindexBatch.getTmpIndexName()` から作り直し先 (例: `'{page}-attachments-2'`) を得て `syncAttachmentIndexed/Removed(…, ['{page}-attachments-alias', '{page}-attachments-2'])` と呼ぶ
-- `targetIndexes` は 1 回の bulk で書ききる (individual ES `_bulk` 内の action で複数 index 指定)。2 回別 API コールにはしない
+- 通常時 (rebuild 非実行): live alias (`{page}-attachments-alias`) にだけ書く
+- rebuild window 中: `AttachmentSearchIndexer` が `reindexBatch.getTmpIndexName()` から作り直し先 (例: `'{page}-attachments-2'`) を得て、live alias と作り直し先に 1 回ずつ書く (live を先に書き、作り直し先の失敗は live の成功を妨げない)。書き込み先は抽出の後で決める (抽出中に作り直しが始まることがあるため)
 
 - ES 8/9 mapping 変種を version-aware に選択 (**権限フィールドは mapping に含めない**)
 - `searchAttachmentsBody` は attachments_index 向け content match body を返す pure builder。受け取るのは `AttachmentKeywordTerms` だけなので、`author:jim` のような演算子トークンが添付本文の検索語に混ざることは型の上で起きない (Req 4.6)。primary (facet=attachments / facet=all の 1 ページ目) と secondary の共通基底
@@ -1258,7 +1259,8 @@ interface IAttachmentHit {
   - facet=`all` で `terms: { pageId: primaryIds }` が発火し、permission 再チェックは行わない (primary で viewer filter 通過済の前提)
   - secondary レイテンシ閾値超過時に enrichment を skip し空の `ISecondarySearchResult` を返すこと
 - `AttachmentSearchIndexer` dual-write 分岐:
-  - `reindexBatch.isRebuilding()` が false のとき `syncAttachmentIndexed/Removed` の `targetIndexes` が `['{page}-attachments-alias']` のみ
+  - `reindexBatch.isRebuilding()` が false のとき書き込み先が live alias だけであること。抽出中に作り直しが始まったら作り直し先にも書くこと
+  - `onDetach` が削除した添付の id を `recordDetached()` に渡すこと
   - `reindexBatch.isRebuilding()` が true のとき live alias と作り直し先の両方が渡ること
   - tmp 側 write 失敗時も live 側は成功扱いで return、pino に warn log が出ること
 - `AttachmentReindexBatch.startRebuild`:

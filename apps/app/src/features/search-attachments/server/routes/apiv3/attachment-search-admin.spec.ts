@@ -296,6 +296,41 @@ describe('attachment-search-admin', () => {
       );
     });
 
+    it('returns true when the attachment index does not exist yet, so the admin is prompted to rebuild', async () => {
+      countAttachments.mockResolvedValue(10);
+      const esClient = {
+        search: vi.fn().mockRejectedValue(
+          Object.assign(new Error('index_not_found_exception'), {
+            meta: {
+              statusCode: 404,
+              body: { error: { type: 'index_not_found_exception' } },
+            },
+          }),
+        ),
+      };
+
+      const result = await computeRequiresReindex(
+        buildCrowiWithEsClient(esClient) as never,
+        true,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false when the count fails for another reason', async () => {
+      countAttachments.mockResolvedValue(10);
+      const esClient = {
+        search: vi.fn().mockRejectedValue(new Error('ES is down')),
+      };
+
+      const result = await computeRequiresReindex(
+        buildCrowiWithEsClient(esClient) as never,
+        true,
+      );
+
+      expect(result).toBe(false);
+    });
+
     it('does not count attachments without a page, which are never indexed', async () => {
       // 10 attachments, 4 of them without a page
       countAttachments.mockImplementation((async (args?: {

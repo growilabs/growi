@@ -290,7 +290,7 @@ describe.skipIf(esUri == null)(
             updated_at: now,
           },
         ],
-        [ATTACHMENT_INDEX],
+        ATTACHMENT_INDEX,
       );
     };
 

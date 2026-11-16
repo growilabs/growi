@@ -68,6 +68,7 @@ function makeDelegatorExtStub() {
     createRebuildIndex: vi.fn().mockResolvedValue('attachments-2'),
     swapAttachmentAlias: vi.fn().mockResolvedValue(undefined),
     dropRebuildIndex: vi.fn().mockResolvedValue(undefined),
+    removeAttachmentsFromIndex: vi.fn().mockResolvedValue(undefined),
     syncAttachmentIndexed: vi.fn().mockResolvedValue(undefined),
     syncAttachmentRemoved: vi.fn().mockResolvedValue(undefined),
     searchAttachmentsBody: vi.fn(),
@@ -276,7 +277,7 @@ describe('AttachmentReindexBatch', () => {
         'a1',
         'page-abc',
         expect.any(Array),
-        ['attachments-2'],
+        'attachments-2',
       );
       expect(orphanSweeper.sweep).toHaveBeenCalledWith('attachments-2');
       expect(delegatorExt.swapAttachmentAlias).toHaveBeenCalledWith(
@@ -325,6 +326,61 @@ describe('AttachmentReindexBatch', () => {
       );
       expect(batch.getTmpIndexName()).toBeNull();
       expect(batch.startRebuild(() => new Promise<void>(() => {}))).toBe(true);
+    });
+
+    it('removes attachments deleted while they were being extracted from the new index before the swap', async () => {
+      setupAttachmentMock([makeAttachment({ id: 'a1' })]);
+      const order: string[] = [];
+      extractor.extractAttachment.mockImplementation(() => {
+        // The user deletes the attachment while the rebuild extracts it; the
+        // rebuild then writes it into the new index afterwards
+        batch.recordDetached('a1');
+        return Promise.resolve(successOutcome);
+      });
+      delegatorExt.removeAttachmentsFromIndex.mockImplementation(() => {
+        order.push('purge');
+        return Promise.resolve();
+      });
+      delegatorExt.swapAttachmentAlias.mockImplementation(() => {
+        order.push('swap');
+        return Promise.resolve();
+      });
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(delegatorExt.removeAttachmentsFromIndex).toHaveBeenCalledWith(
+        ['a1'],
+        'attachments-2',
+      );
+      expect(order).toEqual(['purge', 'swap']);
+    });
+
+    it('ignores deletions that happened outside a rebuild', async () => {
+      setupAttachmentMock([]);
+      batch.recordDetached('a1');
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(delegatorExt.removeAttachmentsFromIndex).not.toHaveBeenCalled();
+      expect(delegatorExt.swapAttachmentAlias).toHaveBeenCalled();
+    });
+
+    it('stops sending live writes to the new index before dropping it on failure', async () => {
+      vi.spyOn(prisma.attachments, 'count').mockRejectedValue(
+        new Error('MongoDB is down'),
+      );
+      let tmpWhileDropping: string | null = 'unset';
+      delegatorExt.dropRebuildIndex.mockImplementation(() => {
+        tmpWhileDropping = batch.getTmpIndexName();
+        return Promise.resolve();
+      });
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(tmpWhileDropping).toBeNull();
     });
 
     it('does not touch the attachment indices when the page rebuild fails', async () => {

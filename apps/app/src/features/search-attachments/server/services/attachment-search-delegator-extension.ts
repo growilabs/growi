@@ -7,7 +7,6 @@
  * - NO permission fields (grant / granted_users / granted_groups / creator) are stored in
  *   attachment ES documents — permissions are resolved at query time from page_index.
  * - Document IDs follow the pattern `${attachmentId}_${pageNumber ?? 0}`.
- * - When `targetIndexes` contains multiple indices, all writes happen in ONE `_bulk` call.
  */
 
 import type { IAttachmentEsDoc } from '~/features/search-attachments/interfaces/attachment-search';
@@ -88,11 +87,16 @@ export interface AttachmentIndexOperations {
   swapAttachmentAlias(index: string): Promise<void>;
   /** Deletes `index` unless the alias points to it. */
   dropRebuildIndex(index: string): Promise<void>;
+  /** Deletes every doc of the given attachments from `index`, including docs written just before. */
+  removeAttachmentsFromIndex(
+    attachmentIds: string[],
+    index: string,
+  ): Promise<void>;
   syncAttachmentIndexed(
     attachmentId: string,
     pageId: string,
     docs: IAttachmentEsDoc[],
-    targetIndexes: string[],
+    targetIndex: string,
   ): Promise<void>;
   syncAttachmentRemoved(
     attachmentId: string,
@@ -188,7 +192,7 @@ const deleteByQueryForIndex = (
       index: indexName,
       query: deleteQuery,
       conflicts: 'proceed',
-      // The index does not exist until something has been indexed
+      // The alias is missing while the feature has never been enabled
       ignore_unavailable: true,
     });
   }
@@ -197,7 +201,7 @@ const deleteByQueryForIndex = (
       index: indexName,
       query: deleteQuery,
       conflicts: 'proceed',
-      // The index does not exist until something has been indexed
+      // The alias is missing while the feature has never been enabled
       ignore_unavailable: true,
     });
   }
@@ -330,8 +334,7 @@ export class AttachmentSearchDelegatorExtension
   // ----------------------------------------------------------------
 
   /**
-   * Bulk-upserts the extracted attachment pages into every index in `targetIndexes`.
-   * All writes are issued as a single `_bulk` API call to minimise round-trips.
+   * Bulk-upserts the extracted attachment pages into `targetIndex` in one `_bulk` call.
    *
    * Idempotent: calling twice with the same arguments overwrites the previous docs
    * because the doc ID is deterministic (`${attachmentId}_${pageNumber ?? 0}`).
@@ -340,48 +343,41 @@ export class AttachmentSearchDelegatorExtension
     attachmentId: string,
     pageId: string,
     docs: IAttachmentEsDoc[],
-    targetIndexes: string[],
+    targetIndex: string,
   ): Promise<void> {
-    if (targetIndexes.length === 0 || docs.length === 0) {
+    if (docs.length === 0) {
       return;
     }
 
-    // Build a flat array of alternating [index-action, document] pairs for every
-    // (index, doc) combination. ES _bulk requires this interleaved format.
-    // biome-ignore lint/suspicious/noExplicitAny: Bulk operations are polymorphic across ES versions
-    const operations: any[] = [];
+    // Never let a write auto-create a concrete index named like the alias
+    const requireAlias =
+      targetIndex === this.names.alias ? { require_alias: true } : {};
 
-    for (const indexName of targetIndexes) {
-      for (const doc of docs) {
-        const docId = buildDocId(attachmentId, doc.pageNumber);
-
-        // Index (upsert) action header
-        operations.push({
-          index: {
-            _index: indexName,
-            _id: docId,
-            // Never let a write auto-create a concrete index named like the alias
-            ...(indexName === this.names.alias ? { require_alias: true } : {}),
-          },
-        });
-
-        // Document body — NO permission fields
-        operations.push({
-          attachmentId: doc.attachmentId,
-          pageId: doc.pageId,
-          pageNumber: doc.pageNumber,
-          label: doc.label,
-          fileName: doc.fileName,
-          originalName: doc.originalName,
-          fileFormat: doc.fileFormat,
-          fileSize: doc.fileSize,
-          attachmentType: doc.attachmentType,
-          content: doc.content,
-          created_at: doc.created_at,
-          updated_at: doc.updated_at,
-        });
-      }
-    }
+    // ES _bulk takes alternating [action, document] entries
+    const operations = docs.flatMap((doc) => [
+      {
+        index: {
+          _index: targetIndex,
+          _id: buildDocId(attachmentId, doc.pageNumber),
+          ...requireAlias,
+        },
+      },
+      // NO permission fields
+      {
+        attachmentId: doc.attachmentId,
+        pageId: doc.pageId,
+        pageNumber: doc.pageNumber,
+        label: doc.label,
+        fileName: doc.fileName,
+        originalName: doc.originalName,
+        fileFormat: doc.fileFormat,
+        fileSize: doc.fileSize,
+        attachmentType: doc.attachmentType,
+        content: doc.content,
+        created_at: doc.created_at,
+        updated_at: doc.updated_at,
+      },
+    ]);
 
     // Call bulk through the narrowed type guard so TypeScript resolves the correct overload.
     let response: {
@@ -410,12 +406,31 @@ export class AttachmentSearchDelegatorExtension
     }
   }
 
+  async removeAttachmentsFromIndex(
+    attachmentIds: string[],
+    index: string,
+  ): Promise<void> {
+    const query = { terms: { attachmentId: attachmentIds } };
+    // delete-by-query only sees docs made searchable by a refresh
+    if (isES8ClientDelegator(this.client)) {
+      await this.client.indices.refresh({ index });
+      await this.client.deleteByQuery({ index, query, conflicts: 'proceed' });
+      return;
+    }
+    if (isES9ClientDelegator(this.client)) {
+      await this.client.indices.refresh({ index });
+      await this.client.deleteByQuery({ index, query, conflicts: 'proceed' });
+      return;
+    }
+    throw new Error('Unsupported Elasticsearch version');
+  }
+
   /**
    * Removes all ES documents for the given `attachmentId` from each target index.
    * Uses `deleteByQuery` to cover all page-number variants without knowing them in advance.
    *
    * Failures on individual indexes are logged and swallowed so that a failure on
-   * `attachments-tmp` does not block removal from the live `attachments` index.
+   * one index does not block removal from the others.
    */
   async syncAttachmentRemoved(
     attachmentId: string,

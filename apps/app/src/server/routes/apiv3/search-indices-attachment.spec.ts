@@ -290,11 +290,11 @@ describe('PUT /search/indices — includeAttachments extension', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Test 4: includeAttachments=true + batch not registered (task 9.1 pending) → 503
+  // Test 4: includeAttachments=true + batch not registered → 503
   // -------------------------------------------------------------------------
   it('4. includeAttachments=true + batch not registered → 503 feature_disabled', async () => {
     setupFeatureFlag(true);
-    // attachmentReindexBatch is null — not yet registered (task 9.1)
+    // attachmentReindexBatch is null — the attachment search module was not wired
     const crowi = buildCrowiStub({ attachmentReindexBatch: null });
     const app = buildTestApp(crowi);
 
