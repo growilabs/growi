@@ -161,6 +161,14 @@ describe('AttachmentSearchDelegatorExtension', () => {
       expect(client.deleteByQuery).toHaveBeenCalledTimes(2);
     });
 
+    it('tolerates an index that does not exist yet', async () => {
+      await ext.syncAttachmentRemoved('att-x', ['attachments']);
+
+      expect(client.deleteByQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ ignore_unavailable: true }),
+      );
+    });
+
     it('passes attachmentId as term filter', async () => {
       await ext.syncAttachmentRemoved('att-x', ['attachments']);
       // biome-ignore lint/suspicious/noExplicitAny: accessing mock arg properties

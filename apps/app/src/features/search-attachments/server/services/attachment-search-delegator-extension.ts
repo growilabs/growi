@@ -187,6 +187,8 @@ const deleteByQueryForIndex = (
       index: indexName,
       query: deleteQuery,
       conflicts: 'proceed',
+      // The index does not exist until something has been indexed
+      ignore_unavailable: true,
     });
   }
   if (isES9ClientDelegator(client)) {
@@ -194,6 +196,8 @@ const deleteByQueryForIndex = (
       index: indexName,
       query: deleteQuery,
       conflicts: 'proceed',
+      // The index does not exist until something has been indexed
+      ignore_unavailable: true,
     });
   }
   return Promise.reject(new Error('Unsupported Elasticsearch version'));

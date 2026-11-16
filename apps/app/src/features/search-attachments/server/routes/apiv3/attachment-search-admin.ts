@@ -232,7 +232,8 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
         );
         // SECURITY: hasExtractorToken is a boolean only — the token value must
         // never be included in the response.
-        const hasExtractorToken = tokenValue != null && tokenValue !== '';
+        const hasExtractorToken =
+          tokenValue != null && tokenValue.trim() !== '';
 
         const timeoutMs = configManager.getConfig(
           'app:attachmentFullTextSearch:timeoutMs',
@@ -312,11 +313,9 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
         }
 
         if ('extractorToken' in req.body) {
-          // null → delete (use removeIfUndefined option)
+          // null, '' or whitespace only → delete (removeIfUndefined option)
           updates['app:attachmentFullTextSearch:extractorToken'] =
-            extractorToken != null && extractorToken !== ''
-              ? extractorToken
-              : undefined;
+            extractorToken?.trim() || undefined;
         }
 
         if ('timeoutMs' in req.body && timeoutMs != null) {

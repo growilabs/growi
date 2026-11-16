@@ -545,7 +545,7 @@ describe('AttachmentSearchIndexer', () => {
       expect(tmpCall[0]).toBe('att-999');
     });
 
-    it('does not touch the index while the feature is disabled', async () => {
+    it('removes the docs of an attachment deleted while the feature is disabled', async () => {
       disableFeature();
       const delegator = makeDelegator();
 
@@ -559,7 +559,9 @@ describe('AttachmentSearchIndexer', () => {
 
       await indexer.onDetach('att-001');
 
-      expect(delegator.syncAttachmentRemoved).not.toHaveBeenCalled();
+      expect(delegator.syncAttachmentRemoved).toHaveBeenCalledWith('att-001', [
+        'attachments',
+      ]);
     });
 
     it('does not throw if syncAttachmentRemoved throws', async () => {

@@ -1,7 +1,10 @@
 import { mock } from 'vitest-mock-extended';
 
+import type Crowi from '~/server/crowi';
 import type { AttachmentWithComputed } from '~/server/models/attachment';
 import { configManager } from '~/server/service/config-manager';
+import type SearchService from '~/server/service/search';
+import type ElasticsearchDelegator from '~/server/service/search-delegator/elasticsearch';
 
 import { initAttachmentFullTextSearch } from './index';
 import type { AttachmentSearchResultAggregator } from './services/attachment-search-result-aggregator';
@@ -23,7 +26,6 @@ vi.mock('./services/attachment-text-extractor', () => ({
   },
 }));
 
-type Crowi = Parameters<typeof initAttachmentFullTextSearch>[0];
 type AttachHandler = (
   pageId: string | null,
   attachment: AttachmentWithComputed,
@@ -48,25 +50,26 @@ const makeCrowi = () => {
   };
   const attachHandlers: AttachHandler[] = [];
   let aggregator: AttachmentSearchResultAggregator | undefined;
-  // A partial crowi: only the services the feature wires itself into
-  const crowi = {
-    searchService: {
+  const fullTextSearchDelegator = mock<ElasticsearchDelegator>();
+  // The feature reads the delegator's private client at runtime
+  Object.defineProperty(fullTextSearchDelegator, 'client', { value: esClient });
+  // Only the services the feature wires itself into
+  const crowi = mock<Crowi>({
+    searchService: mock<SearchService>({
       isConfigured: true,
-      fullTextSearchDelegator: { client: esClient },
+      fullTextSearchDelegator,
       setAttachmentSearchResultAggregator: (
         agg: AttachmentSearchResultAggregator,
       ) => {
         aggregator = agg;
       },
-    },
+    }),
     attachmentService: {
       addAttachHandler: (handler: AttachHandler) =>
         attachHandlers.push(handler),
       addDetachHandler: vi.fn(),
     },
-    socketIoService: {},
-    fileUploadService: {},
-  } as unknown as Crowi;
+  });
   return {
     crowi,
     esClient,
@@ -104,12 +107,10 @@ describe('initAttachmentFullTextSearch', () => {
   it('does not register handlers when searchService is not configured', () => {
     const addAttachHandler = vi.fn();
     const addDetachHandler = vi.fn();
-    const fakeCrowi = {
+    const fakeCrowi = mock<Crowi>({
       searchService: { isConfigured: false },
       attachmentService: { addAttachHandler, addDetachHandler },
-      socketIoService: {},
-      fileUploadService: {},
-    } as unknown as Crowi;
+    });
 
     initAttachmentFullTextSearch(fakeCrowi);
 

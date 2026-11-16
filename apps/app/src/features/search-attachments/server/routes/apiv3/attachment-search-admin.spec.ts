@@ -585,6 +585,22 @@ describe('GET /failures', () => {
   });
 });
 
+describe('GET /config', () => {
+  it('reports a whitespace-only token as not set', async () => {
+    vi.mocked(configManager.getConfig).mockImplementation(((key: string) =>
+      key === 'app:attachmentFullTextSearch:extractorToken'
+        ? ' \n'
+        : undefined) as never);
+
+    const res = await supertest(buildTestApp(true)).get(
+      '/admin/attachment-search/config',
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.config.hasExtractorToken).toBe(false);
+  });
+});
+
 describe('PUT /config validation', () => {
   const put = (body: Record<string, unknown>) =>
     supertest(buildTestApp(true))
@@ -640,6 +656,20 @@ describe('PUT /config validation', () => {
     expect(storedUpdates()).toEqual({
       'app:attachmentFullTextSearch:timeoutMs': body.timeoutMs,
       'app:attachmentFullTextSearch:maxFileSizeBytes': body.maxFileSizeBytes,
+    });
+  });
+
+  it('stores the token without its surrounding whitespace', async () => {
+    expect((await put({ extractorToken: ' token-value\n' })).status).toBe(200);
+    expect(storedUpdates()).toEqual({
+      'app:attachmentFullTextSearch:extractorToken': 'token-value',
+    });
+  });
+
+  it('clears the token when it is whitespace only', async () => {
+    expect((await put({ extractorToken: ' \n' })).status).toBe(200);
+    expect(storedUpdates()).toEqual({
+      'app:attachmentFullTextSearch:extractorToken': undefined,
     });
   });
 

@@ -353,15 +353,13 @@ export class AttachmentSearchIndexer
 
   /**
    * Called when an attachment is detached/deleted.
-   * Removes all ES documents for the attachment from all target indexes.
+   * Removes all ES documents for the attachment from all target indexes,
+   * also while the feature is disabled: the docs would otherwise reappear
+   * once it is enabled again.
    * Never throws.
    */
   async onDetach(attachmentId: string): Promise<void> {
     try {
-      if (!this.isFeatureEnabled()) {
-        return;
-      }
-
       const targetIndexes = this.getTargetIndexes();
 
       // Attempt live first, then tmp (best-effort for each)
