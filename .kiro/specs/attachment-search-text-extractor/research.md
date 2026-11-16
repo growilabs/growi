@@ -265,6 +265,8 @@ anydoc の出力にはスライドの区切りが無い。見出しを手がか�
 
 採用した方式の利点: 追加の依存が要らない。結合セルの文字を 1 回だけ出す。表は Markdown で出るので、他の Office 形式と書式が揃う。文字の出方が、丸ごと anydoc で変換した場合と完全に同じになる。
 
+分割した変換は、共有部品 (マスター・レイアウト・テーマ) をスライドごとのパッケージに写すので、処理量は「スライド数 × 共有部品の大きさ」に比例する (2026-10 の計測で 2,000 枚・マスター 200KB で約 6 秒)。上限は `TIMEOUT_S` と RSS の上限が受け持つ。
+
 Node.js 版の分割は、スライドごとの包みを無圧縮で `yazl` で書く。4,000 スライドの分割は 4.7 秒で、時間はスライド数に比例する。メモリは §4.11。
 
 ### 2.7 日本語の正規化をかける理由と範囲
@@ -537,6 +539,34 @@ umbrella の [research-docker-image.md](../attachment-search/research-docker-ima
 
 **メモリ**: 50MiB × 3 件の親の最大 RSS は、断片のまま渡す形で 244〜258MiB (それ以前の実装は 263MiB)。連結する形は 376〜379MiB だった。1 バイトずつ届く本文でも、塊にまとめる持ち方で親の増え方は 12〜16MiB (まとめない形は 781MiB)。
 
+**応答の後に閉じる接続への早めのエラー応答** (`src/http/early-answer.ts`):
+
+Node は、応答の後に接続を閉じる要求 (HTTP/1.0 で keep-alive を頼んでいない要求と、`Connection: close` の要求) に、本文を読み終える前のエラー応答 (宣言が上限超の 413、受け取り途中の 413、認証の 401 など) を返すと、応答を書いた直後に、読み残しのある接続を閉じる (`socket.destroySoon`)。このとき接続のリセットが起き、クライアントがまだ読んでいない応答が捨てられる、と考えると結果に合う (パケットは見ていない)。次の案を比べた。
+
+- 0: 何もしない (Node の既定)
+- 1: `c.env.outgoing.shouldKeepAlive = true` を立てる
+- 2: 1 に加えて、`Connection: close` の要求なら、応答の後で読み残しを読み捨ててから `socket.end()`
+- 3: 要求の `Connection` ヘッダーを正規表現で見て `close` なら、このソケットの `destroySoon` を「読み残しを読み捨ててから `socket.end()`」に差し替える
+- 4: **`c.env.outgoing.shouldKeepAlive === false` なら、`destroySoon` を「読み残しを読み捨ててから、元の `destroySoon` を呼ぶ」に差し替える (採用)**。Node が「応答の後に閉じる」と決めた要求を、Node 自身の判定で選ぶ。差し替えた関数は 1 つのソケットで 1 回だけ動く
+
+30 回送って 413 が届いた回数 (3 組):
+
+| 要求 | 移行の前の実装 | 案 0 | 案 3 | **案 4 (採用)** |
+|---|---|---|---|---|
+| HTTP/1.0 (`Connection` ヘッダーなし)、宣言が上限超の 2MiB | 30 / 30 / 30 | 28 / 27 / 26 | 15 / 1 / 1 | **30 / 30 / 30** |
+| HTTP/1.1 + `Connection: close`、宣言が上限超の 2MiB | 30 / 30 / 30 | 20 / 13 / 23 | 30 / 30 / 30 | 30 / 30 / 30 |
+| 同、宣言が上限超の 2MiB を 1 回で書く | 30 | 17 | 30 | 30 |
+| 同、宣言なし (chunked) 20MiB で受け取り途中の 413 | 30 | 22 | 30 | 30 |
+| keep-alive の chunked 20MiB | 30 | 30 | 30 | 30 |
+
+- 案 0 で届かなかった回は、すべて `EPIPE` (クライアントが書いている途中で接続が切られた) だった。案 0 はばらつきが大きい (別の計測では HTTP/1.0 で 25 / 19 / 18、`Connection: close` で 25 / 3 / 8)。
+- 案 3 は、HTTP/1.0 の要求に `Connection` ヘッダーが無いので正規表現に当たらず、差し替えが働かない (HTTP/1.0 の値は案 0 のばらつきの範囲)。案 4 は、Node が閉じると決めたすべての要求を対象にする。
+- 案 1 と 2 は、要求が `close` と言っているのに応答に `keep-alive` と返す副作用があった。案 4 では、HTTP/1.0 と `Connection: close` の要求には `Connection: close`、keep-alive の要求には `keep-alive` が返る。
+- **読み捨ての後に `socket.end()` だけを呼ぶ形は採らない**: Node の普通の閉じ方 (送信を終え、送り終えたらソケットを壊す) のうち「壊す」をしないので、FIN を送らない相手のソケットが残る。FIN を送らないクライアント 20 本で、fd が 19 → 39 に増えたまま 15 秒たっても戻らなかった (5 本が 90 秒後まで残った回もある)。fd が尽きると、`/healthz` を含むすべての接続を受け付けられなくなり、これはトークンなしで起こせる。読み捨ての後に元の `destroySoon` を呼ぶ形では、fd は 19 のままだった。
+- **案 4 の弱点**: `shouldKeepAlive` と `destroySoon` は `@types/node` の型定義にあるが、「応答の後に `shouldKeepAlive` を見て `destroySoon` を呼ぶ」という流れは Node の文書が約束するものではない。将来の Node で流れが変わると、黙って案 0 に戻る。`src/http/early-answer.integ.ts` が、HTTP/1.0 と `Connection: close` の要求への 413 (宣言のものと受け取り途中のもの) を 30 回ずつ送り、すべて届くことと応答の `Connection` を確かめて見張る。クライアントは別のプロセス (`src/http/spec-support/repeat-upload-client.mjs`) で動かす。サーバーと同じプロセスでは、案 0 に戻しても 413 が先に読み取られ、後戻りを見つけられなかったため。
+- 同じ接続に続けて送った 2 件目: `Connection: close` の要求への 413 の後の 2 件目には 400 (`Connection: close`) が返る (`close` と言った後に送られた要求なので妥当)。keep-alive なら 413 の後の 2 件目は 200。
+- apps/app (axios。Node 24 の既定のエージェントは keep-alive) は `Connection: close` を付けず、HTTP/1.0 も使わないので、どの案でも影響は無い (axios で計 240 回すべて届いた)。
+
 **選ばなかった形**: §3.9 の表のとおり (`formData()`、検査 + `@fastify/busboy`、`busboy`、`c.req.raw.body`)。
 
 ### 4.5 OpenAPI の作り方
@@ -700,6 +730,8 @@ umbrella の [research-docker-image.md](../attachment-search/research-docker-ima
 - `src/http/extract-route.integ.ts` の「a file of exactly the limit reaches the runner whole」: vitest の既定の 5 秒が負荷の高いときに足りない。
 - `test/http/errors.integ.ts` の「encrypted-pptx gives its status, code and kind」: 負荷の下で 5 回中 1 回落ちた。
 - 「1 秒以内」を見る検査 (`parent-watch.integ.ts`、`child-isolation.integ.ts`、`service.integ.ts`)、CPU の速さに頼る単体テスト (`html.spec.ts`、`safe-xml.spec.ts`。余裕は 10〜25 倍)、機械の hard の上限が無制限であることを前提にする `process-limits.integ.ts`。
+- テストの許容値は、移行の前の実装のテストより緩めてある: 期限の件は 3.5 秒未満、イベントループの応答は 250ms 未満、fd の増加は 10 未満、親のメモリは 66MB 未満。
+- `vitest.config.ts` は `pool: 'forks'` を明示していない。「子が残らない」の検査は、vitest の既定 (テストのファイルごとにプロセスを分ける) に頼っている。既定が変わったら見直す。
 - テスト全体を並列に流したときの所要と最大の合計 RSS: 16 CPU で約 23 秒・約 3.2GiB、4 CPU で 35 秒・1.5GiB、2 CPU で 93 秒・1.0GiB。
 
 ---
@@ -862,6 +894,9 @@ Node と Hono の既定の振る舞いを採り、以前の実装に合わせる
 
 - Hono (`@hono/node-server` 2.1.6) では、`Content-Length` を見て本文を読む前に 413 を返せる。`c.req.raw.signal` は、本文を送り終えた後の切断で `abort` を出す。本文の途中の切断では、要求のストリームが `complete` にならないまま閉じる。
 - `@hono/node-server` は `c.req.raw.body` を `Readable.toWeb` で作り、断片ごとに 1 回写す。
+- `c.req.header()` は Web の `Headers` を読むので、同じ名前のヘッダーが 2 行ある要求では値を `, ` でつないで返す (`Content-Type` や `Authorization` が 2 行ある要求で状態が変わった)。要求のヘッダー (`authorization`・`content-length`・`expect`・`content-type`) は `c.env.incoming.headers` から読む。
+- `@hono/node-server` の `autoCleanupIncoming` (既定で有効) は切らない。
+- Node は、応答の後に閉じる要求 (HTTP/1.0 と `Connection: close`) に本文を読み終える前のエラー応答を返すと、`socket.destroySoon` で読み残しのある接続を閉じ、クライアントが読む前の応答が捨てられうる。対処は §4.4 の「応答の後に閉じる接続への早めのエラー応答」。
 - Node の HTTP の解析器は、`Content-Length` より後ろの余ったバイトをすぐ次の要求として読み、壊れていれば 400 を返して接続を閉じる (以前の実装の httptools も同じ)。`Host` の無い HTTP/1.1 の要求を拒むのは公開の設定では変えられない。
 - `server.close()` は、Node が内部で行う `headersTimeout` と `requestTimeout` の見張りも止める。ヘッダーを途中まで送った接続を Node は「要求の途中」と数え、`closeIdleConnections()` では閉じない。
 - `setTimeout` は約 24.8 日を超える値を 1 ミリ秒に置き換え、`TimeoutOverflowWarning` を出す。
@@ -951,6 +986,7 @@ Node と Hono の既定の振る舞いを採り、以前の実装に合わせる
 | 14.x | PDF の部品の選定 | §4.2、§1.2 (PDFium) |
 | 15.x | 子プロセスの作り方、親の見張り、コアダンプ (`15.4 (1')`、`15.11` は `--core=1`) | §4.3 |
 | 16.x | 本文の受け取りと multipart の分解 (`16.9` は §5.5 の HTTP の層の違いも指す) | §4.4、§5.4、§5.5 |
+| 16.5、16.9 (6.8 の項)、16.10 | 応答の後に閉じる接続への早めのエラー応答 (案 0〜4、`destroySoon` の差し替え)、ヘッダーを `c.env.incoming.headers` から読むこと | §4.4 (応答の後に閉じる接続への早めのエラー応答)、§6 (Node.js と Hono) |
 | 17.x | OpenAPI の作り方と drift の検査 | §4.5 |
 | 18.x | テキスト系の部品 (`18.7` は以前の実装との違い) | §4.6、§5.9 |
 | 19.x | `RLIMIT_AS` | §4.7 |
@@ -968,6 +1004,10 @@ Node と Hono の既定の振る舞いを採り、以前の実装に合わせる
 | 27.12 | Node.js 版のベンチマーク | §4.1 |
 | 27.13〜27.16 | 実装のレビュー、ログ、k8s の例の削除 | §5.7、§5.8、§4.14 |
 | 27.17〜27.20 | 最初の CI の実行、撤去、ライセンスの表示 | §4.13、§1.4、§1.6 |
+
+**作業用の spec の design.md の名前**: コメントの `D1` → §5.1、`D2` → §5.3、`D3` → §5.2、`D4` → §2.9 (Node.js + Hono で書き、`apps/` に置く)、`D5` → §4.12、「design.md Benchmark」→ design.md §Testing Strategy (検索の品質のベンチマーク)、「File Structure Plan」→ 移していない (design.md §層の分け方の判断と、コードそのものを読む)。
+
+この表に対応の無い細かい項目 (`16.5 option 0`、`16.3 (d)(m)(v)`、`15.4 (1)(1')(6)(7)`、`22.7 errors`、`9.7` など) は、commit `cc9fb5a372` の `.kiro/specs/attachment-search-text-extractor-node-rewrite/research.md` で読める (`git show cc9fb5a372:<パス>`)。
 
 ### 8.2 要件の番号
 

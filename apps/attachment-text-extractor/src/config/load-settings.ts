@@ -11,7 +11,7 @@ const LOG_LEVELS = [
   'NOTSET',
 ] as const;
 
-/** Python logging level names; request-log maps them to its own levels. */
+/** Accepted LOG_LEVEL names (case-insensitive); request-log maps them to its own levels. */
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
 export interface Settings {

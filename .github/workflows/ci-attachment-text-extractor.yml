@@ -29,7 +29,7 @@ permissions:
   contents: read
 
 env:
-  # Req 8.1 of the node-rewrite spec: the image stays within 400 MB.
+  # The image stays within 400 MB (attachment-search-text-extractor design.md, delivery and CI).
   IMAGE_MAX_BYTES: '400000000'
   IMAGE_TAG: attachment-text-extractor:ci
   CONTAINER_NAME: ate-smoke

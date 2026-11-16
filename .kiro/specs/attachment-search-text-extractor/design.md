@@ -94,7 +94,7 @@
 
 - **タイムアウトの順序**: apps/app の `timeoutMs` は、抽出サービス側の最悪の合計より長くする。最悪の合計は、本文の受信 `UPLOAD_TIMEOUT_S` 15 秒 + 変換 `TIMEOUT_S` 55 秒 + 子の停止と回収 (実測 6〜12ms) で約 70 秒、回収の待ちの上限 2 秒を足しても 72 秒 (research.md §4.10)。apps/app の既定は 90000ms。apps/app が先に諦めると、抽出サービス側の変換が無駄に続く。抽出サービス側の既定を変えるときは、apps/app 側の既定と、運用者の停止の猶予 (85 秒以上) も見直す
 - **サイズ・時間の上限の既定値**: apps/app 側の `maxFileSizeBytes` / `timeoutMs` と食い違うと、apps/app が待つ前にこちらが打ち切る (またはその逆) ことが起きる。既定値は下げていない (`MAX_CHILD_RSS_MB` 320、`MAX_XLSX_CELLS` 70,000 のまま)
-- **子の最大 RSS の基準 (11.2 の基準のファイル)**: 既定値は、子の部品の読み込みを経路ごとに分け (PDF の子は PDFium だけ)、子の node に `--max-semi-space-size=4` と `--wasm-max-mem-pages=8192` を付け、子の `env` に `MALLOC_ARENA_MAX=2` を入れた形で、基準のファイルが 0.95 倍 (304MB) に収まることに依っている。image の中の実測で、7 万セル 1 シートの XLSX が 291MB、画像 12 枚の 48MB の DOCX が 262〜266MB (research.md §4.8、§4.13)。部品の読み込み方、子の node の引数、anydoc・PDFium・テキスト系の部品の版、Node の元の image を変えたら、CI のメモリの計測を人が起動して測り直す。XLSX が 304MB を超えたら `MAX_XLSX_CELLS` を 65,000 に下げ (research.md §4.8 で決めた下げ幅)、DOCX が超えたらユーザーに諮る
+- **子の最大 RSS の基準 (Req 2 の上限の余裕を見る基準のファイル。research.md §4.8)**: 既定値は、子の部品の読み込みを経路ごとに分け (PDF の子は PDFium だけ)、子の node に `--max-semi-space-size=4` と `--wasm-max-mem-pages=8192` を付け、子の `env` に `MALLOC_ARENA_MAX=2` を入れた形で、基準のファイルが 0.95 倍 (304MB) に収まることに依っている。image の中の実測で、7 万セル 1 シートの XLSX が 291MB、画像 12 枚の 48MB の DOCX が 262〜266MB (research.md §4.8、§4.13)。部品の読み込み方、子の node の引数、anydoc・PDFium・テキスト系の部品の版、Node の元の image を変えたら、CI のメモリの計測を人が起動して測り直す。XLSX が 304MB を超えたら `MAX_XLSX_CELLS` を 65,000 に下げ (research.md §4.8 で決めた下げ幅)、DOCX が超えたらユーザーに諮る
 - **検索の対象の範囲**: 次の入力は RSS の上限で `resource_limit_exceeded` になる。1 つの要素が約 48MiB の画像を持つ XLSX (セルが少なくても)、結果が約 1,310 万字を超える ASCII の DOCX、1 ページに約 212 万字を超える PDF (304MB の線では約 198 万字。1 ページ 200 万字の PDF は image の中で 305〜306MB で、線をわずかに超えるが成功する。上限は下げず記録にとどめるとユーザーが決めた)、約 25〜30MiB 以上の XML の部品を 1 つ持つ PPTX、約 2,600 枚以上のスライドを持つ PPTX、`title` に `<&amp;` が続く 20MiB の HTML (research.md §4.11)。apps/app のコードは変わらないが、運用者に知らせる
 - **メモリの予算 (2Gi)**: 2Gi を守る根拠は、最も重い負荷の実測である (image の中で 918〜1,095MiB。research.md §4.9)。最悪の値を足し合わせた見積もりは 2Gi とほぼ同じか少し超えるが、ユーザーが実測を根拠にすることを承認した。親の作り (応答を少しずつ書き、子の結果を 1 つの入れ物で受け取る)、`MAX_CONCURRENCY`、`MAX_CHILD_RSS_MB`、`MAX_RESULT_BYTES` を変えたら、最も重い負荷を測り直す
 
@@ -352,7 +352,7 @@ interface ConversionRunner {
 
 - 入力は fd 0 を同期の読み取り (`readSync`) で読む。`process.stdin` に触ると fd 0 が非同期の読み方に変わるため
 - 起動直後に `/proc/self/oom_score_adj` に 1000 を書く (値を上げる方向なので権限は要らない)。cgroup v1 や docker-compose では、コンテナのメモリが足りなくなったとき、OS が HTTP のプロセスより先に子を止めるようになる。ただし k8s (cgroup v2) の既定では `memory.oom.group` が有効で、コンテナが上限に達すると OS はコンテナ内のプロセスをまとめて止めるので、この設定は効かない。メモリの主な守りは、親の RSS 監視で上限の手前で止めることである。書けなかったときは警告を出して変換を続ける
-- 親が先に終わったら子も終わる (2.7 の隔離の一部): 子の中に見張り専用の worker thread を 1 つ立て、その worker 自身のイベントループで fd 4 をソケットとして読み、読み終わり (親が消えて書き込み側が閉じた) で自分に SIGKILL を送る。子のメインのスレッドが同期の処理 (PDFium の WASM、長い文字列の処理) で止まっていても働く (親を SIGKILL して 3〜10ms で子が終わる)。worker の中で止まる読み方 (`fs.readSync`) を使うと、子の `process.exit()` が worker を待って返らなくなるので使わない (research.md §4.3)。worker には `execArgv: []` を渡す (親の node の引数を受け継ぐと起動に失敗する場合がある)。worker の分だけ子の RSS が約 12MB 増える
+- 親が先に終わったら子も終わる (2.7 の隔離の一部): 子の中に見張り専用の worker thread を 1 つ立て、その worker 自身のイベントループで fd 4 をソケットとして読み、読み終わり (親が消えて書き込み側が閉じた) で自分に SIGKILL を送る。子のメインのスレッドが同期の処理 (PDFium の WASM、長い文字列の処理) で止まっていても働く (親を SIGKILL して 3〜7ms で子が終わる)。worker の中で止まる読み方 (`fs.readSync`) を使うと、子の `process.exit()` が worker を待って返らなくなるので使わない (research.md §4.3)。worker には `execArgv: []` を渡す (親の node の引数を受け継ぐと起動に失敗する場合がある)。worker の分だけ子の RSS が約 12MB 増える
 - 子の警告 (`oom_score_adj` を上げられない、入力が不正、結果を送れない、想定外の失敗) は、標準エラーに決まった 4 つの符号のどれかを 1 行で書くだけにする。例外の文や入力は書かない
 
 ### Conversion 層 (`conversion/`。子プロセスの中だけで動く)
@@ -693,5 +693,6 @@ AC 3.3 の推奨設定を含め、サービスを動かすときに守る条件�
 - **将来の一本化**: anydoc がページ・スライドの区切りを返すようになれば (上流の未マージのブランチ `feat/pdf-pages`)、PDFium と PPTX の分割をなくせる。取り込まれた時点で見直す
 - **PDFium の版**: `@embedpdf/pdfium` の中の PDFium の版は package に書かれていない。版を上げたときに出力が変わったかは、ベンチマークで確かめる
 - **乗っ取られた子の孫**: 実行管理は子の pid だけを止め、プロセスグループや `RLIMIT_NPROC` で孫を止める処理は無い (試していない)
+- **応答の後に閉じる接続への早めのエラー応答**: HTTP/1.0 と `Connection: close` の要求に本文を読み終える前のエラー応答 (413 など) を確実に届けるため、`shouldKeepAlive === false` のソケットの `destroySoon` を「読み残しを読み捨ててから元の `destroySoon` を呼ぶ」に差し替えている (`src/http/early-answer.ts`)。この流れは Node の文書が約束する挙動ではなく、将来の Node で変わると黙って既定 (413 が届かないことがある) に戻る。`src/http/early-answer.integ.ts` の 30 回の繰り返しが見張る (research.md §4.4)
 - **readiness の CPU**: `/readyz` は結果を覚えないので、トークンなしで呼び続けられると最大で約 1 コアを使う。守りは内向きの通信の制限である
 - **CPU の上限の下の速さ**: CPU の limits 2 の下で 3 件が同時に動いたときの変換の速さは測っていない

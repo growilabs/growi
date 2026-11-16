@@ -19,8 +19,9 @@ No deployment manifests are shipped.
 > limit; conversion children 291 MB (XLSX), 262 - 266 MB (DOCX) and 305 - 306 MB
 > (a single-page 2-million-character PDF) against the 320 MB cap.
 >
-> **Still unverified:** linux-arm64, and behaviour under a real orchestrator
-> (probes, rolling update, termination grace).
+> **Still unverified:** linux-arm64, `docker compose build` and `up`, the memory
+> measurement started by hand (`workflow_dispatch`), and behaviour under a real
+> orchestrator (probes, rolling update, termination grace).
 
 Build and run
 -------------
