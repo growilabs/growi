@@ -769,6 +769,7 @@ export const createPlatformFacade = async (
   };
 };
 
+export { ANSWER_DELIVERY_RECLAIM_MS } from './answer-delivery-window.js';
 export type { ChannelRefreshDeps } from './channels.js';
 export { refreshChannelInventory } from './channels.js';
 export type {

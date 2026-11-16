@@ -61,6 +61,7 @@ describe('the surface this layer publishes', () => {
     // "re-export only what callers need"), and the reviewer of that decision
     // is whoever changes this line.
     expect(exportedNames(source)).toEqual([
+      'ANSWER_DELIVERY_RECLAIM_MS',
       'ChannelRefreshDeps',
       'ChannelRefreshFailure',
       'ConnectionManager',

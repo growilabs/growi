@@ -10,7 +10,11 @@
 // internals. `bot-factory.ts` composes what this file builds; nothing outside
 // `platform/` imports either.
 import { createDiscordAdapter, DiscordAdapter } from '@chat-adapter/discord';
-import { createSlackAdapter, SlackAdapter } from '@chat-adapter/slack';
+import {
+  createSlackAdapter,
+  SlackAdapter,
+  type SlackAdapterConfig,
+} from '@chat-adapter/slack';
 import {
   createPostgresState,
   type PostgresStateAdapter,
@@ -24,6 +28,7 @@ import type {
   InstallationCredentials,
   PlatformAppConfig,
 } from '../types/index.js';
+import { SLACK_REQUEST_DEADLINE_MS } from './answer-delivery-window.js';
 import type { InstallationProvider } from './installation-provider.js';
 import type { ListenerWindow } from './listener-loop.js';
 import { createSlackInstallationLookup } from './slack-installation-lookup.js';
@@ -183,6 +188,30 @@ const slackWorkspaceOfToken = (client: SlackWebClient): Promise<string> => {
 };
 
 /**
+ * The options every Slack Web API client of the adapter is built with. Each
+ * call is tried once and ends within `requestDeadlineMs`: the client's default
+ * retry policy and its wait on a rate limit would otherwise go on for about
+ * thirty minutes (see `SLACK_REQUEST_DEADLINE_MS`). The deadline is an abort
+ * signal per request rather than the client's `timeout`, which only measures
+ * how long the connection stays silent.
+ *
+ * A request that fails before Slack answers would otherwise carry the HTTP
+ * request it came from -- `Authorization: Bearer <token>` and the `token=`
+ * body -- to whoever prints the error.
+ */
+export const slackWebClientOptions = (
+  requestDeadlineMs: number,
+): NonNullable<SlackAdapterConfig['webClientOptions']> => ({
+  retryConfig: { retries: 0 },
+  rejectRateLimitedCalls: true,
+  requestInterceptor: (config) => ({
+    ...config,
+    signal: AbortSignal.timeout(requestDeadlineMs),
+  }),
+  attachOriginalToWebAPIRequestError: false,
+});
+
+/**
  * The single declared place that says how each of the four services is
  * constructed. Consumers below iterate this table; none of them branches on a
  * service name (`.claude/rules/coding-style.md`, "data-driven control over
@@ -225,11 +254,9 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           // Off unless the operator enabled it: the adapter then roots a thread
           // at every DM message (research.md, AI app view).
           ...(slack.agentView === true ? { agentView: true } : {}),
-          // A request that fails before Slack answers would otherwise carry
-          // the HTTP request it came from -- `Authorization: Bearer <token>`
-          // and the `token=` body -- to whoever prints the error. The adapter
-          // hands these options to its per-workspace clients as well.
-          webClientOptions: { attachOriginalToWebAPIRequestError: false },
+          // The adapter hands these options to its per-workspace clients as
+          // well, so every Slack call it makes is bounded the same way.
+          webClientOptions: slackWebClientOptions(SLACK_REQUEST_DEADLINE_MS),
           logger: context.logger.child('slack'),
         });
       },
