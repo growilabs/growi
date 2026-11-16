@@ -21,6 +21,7 @@ import type {
   ChangeProposalDocument,
   ChangeProposalNotificationSnapshot,
   OperationRecord,
+  ReviewerRef,
 } from '../../interfaces';
 import type { CreateOperationInput } from '../models/change-proposal-types';
 import type { EditingPresenceSource } from './editing-presence';
@@ -52,6 +53,7 @@ export type StoreProposalOptions = {
   readonly basedOn?: ChangeProposalDocument['basedOn'];
   readonly perPageNotifications?: boolean;
   readonly expiresAt?: Date;
+  readonly reviewers?: readonly ReviewerRef[];
 };
 
 const PAGE_OPERATION_WAIT_MS = 5000;
@@ -162,6 +164,7 @@ export const createApplierTestKit = (args: {
       basedOn: options.basedOn,
       perPageNotifications: options.perPageNotifications ?? false,
       expiresAt: options.expiresAt,
+      reviewers: options.reviewers,
       operations: operations.map((op) => ({ ...op, approvedAt })),
     });
     proposalIds.push(created._id);

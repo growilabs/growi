@@ -1,4 +1,4 @@
-import type { OperationRecord } from '../../interfaces';
+import type { OperationRecord, ReviewerRef } from '../../interfaces';
 import {
   type AutoApplyPageFacts,
   isOwnPageForAutoApply,
@@ -68,11 +68,13 @@ describe('isOwnPageForAutoApply', () => {
 
 describe('selectAutoApplyTargets', () => {
   it("selects nothing for policy 'none'", () => {
-    expect(selectAutoApplyTargets('none', ops, facts, 'u1', null)).toEqual([]);
+    expect(selectAutoApplyTargets('none', ops, facts, 'u1', null, [])).toEqual(
+      [],
+    );
   });
 
   it("selects every operation for policy 'all'", () => {
-    expect(selectAutoApplyTargets('all', ops, facts, 'u1', null)).toEqual([
+    expect(selectAutoApplyTargets('all', ops, facts, 'u1', null, [])).toEqual([
       0, 1, 2, 3, 4, 5,
     ]);
   });
@@ -84,6 +86,7 @@ describe('selectAutoApplyTargets', () => {
       facts,
       'u1',
       null,
+      [],
     );
 
     it('selects operations on pages the requester created', () => {
@@ -111,7 +114,7 @@ describe('selectAutoApplyTargets', () => {
 
   it('selects only creates for own-pages when the requester owns nothing', () => {
     expect(
-      selectAutoApplyTargets('own-pages', ops, new Map(), 'u1', null),
+      selectAutoApplyTargets('own-pages', ops, new Map(), 'u1', null, []),
     ).toEqual([2]);
   });
 
@@ -122,18 +125,76 @@ describe('selectAutoApplyTargets', () => {
   ] as const)('relation with policy %s', (policy) => {
     it('selects nothing for a rework', () => {
       expect(
-        selectAutoApplyTargets(policy, ops, facts, 'u1', 'rework'),
+        selectAutoApplyTargets(policy, ops, facts, 'u1', 'rework', []),
       ).toEqual([]);
     });
 
     it('follows the policy for a follow-up', () => {
       expect(
-        selectAutoApplyTargets(policy, ops, facts, 'u1', 'follow-up'),
-      ).toEqual(selectAutoApplyTargets(policy, ops, facts, 'u1', null));
+        selectAutoApplyTargets(policy, ops, facts, 'u1', 'follow-up', []),
+      ).toEqual(selectAutoApplyTargets(policy, ops, facts, 'u1', null, []));
     });
   });
 
   it('returns an empty list for no operations', () => {
-    expect(selectAutoApplyTargets('all', [], facts, 'u1', null)).toEqual([]);
+    expect(selectAutoApplyTargets('all', [], facts, 'u1', null, [])).toEqual(
+      [],
+    );
+  });
+
+  describe('reviewers', () => {
+    const reviewer = (
+      kind: ReviewerRef['kind'],
+      id: string,
+      removed = false,
+    ): ReviewerRef => ({
+      kind,
+      id,
+      addedBy: 'u1',
+      addedAt: new Date('2026-11-01T00:00:00.000Z'),
+      ...(removed
+        ? { removedBy: 'u1', removedAt: new Date('2026-11-02T00:00:00.000Z') }
+        : {}),
+    });
+
+    describe.each(['own-pages', 'all'] as const)('with policy %s', (policy) => {
+      it.each([
+        ['another user', [reviewer('user', 'u2')]],
+        ['a user group', [reviewer('user-group', 'g1')]],
+        ['an external group', [reviewer('external-user-group', 'e1')]],
+        [
+          'the requester and another user',
+          [reviewer('user', 'u1'), reviewer('user', 'u2')],
+        ],
+      ])('selects nothing when %s is a reviewer (Reviewers Req 1.11)', (_label, reviewers) => {
+        expect(
+          selectAutoApplyTargets(policy, ops, facts, 'u1', null, reviewers),
+        ).toEqual([]);
+      });
+
+      it('selects nothing for a follow-up with another reviewer (Reviewers Req 8.5)', () => {
+        expect(
+          selectAutoApplyTargets(policy, ops, facts, 'u1', 'follow-up', [
+            reviewer('user', 'u2'),
+          ]),
+        ).toEqual([]);
+      });
+
+      it('follows the policy when the requester alone is the reviewer (Reviewers Req 8.2)', () => {
+        expect(
+          selectAutoApplyTargets(policy, ops, facts, 'u1', null, [
+            reviewer('user', 'u1'),
+          ]),
+        ).toEqual(selectAutoApplyTargets(policy, ops, facts, 'u1', null, []));
+      });
+
+      it('follows the policy once every other reviewer has been removed', () => {
+        expect(
+          selectAutoApplyTargets(policy, ops, facts, 'u1', null, [
+            reviewer('user', 'u2', true),
+          ]),
+        ).toEqual(selectAutoApplyTargets(policy, ops, facts, 'u1', null, []));
+      });
+    });
   });
 });

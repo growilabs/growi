@@ -6,6 +6,7 @@ import type {
   BasedOn,
   CreatableEntry,
   CreatableOperationInput,
+  ReviewerInput,
 } from '../../interfaces';
 import type { CreateInputRejection } from './normalize-create-input';
 
@@ -22,6 +23,9 @@ export type ServiceError =
   | { readonly code: 'target-unavailable'; readonly index: number }
   | { readonly code: 'base-revision-mismatch'; readonly index: number }
   | { readonly code: 'user-not-allowed' }
+  // reviewers other than the requester while app:changeProposalReviewersEnabled is off
+  | { readonly code: 'reviewers-disabled' }
+  | { readonly code: 'reviewer-not-found' }
   // missing base, other requester's, or a revert proposal — one shape
   | { readonly code: 'based-on-unavailable' }
   | {
@@ -38,6 +42,9 @@ export type CreateProposalRequest = {
   readonly requester: IUserHasId | null;
   readonly entry: CreatableEntry;
   readonly modelLabel?: string;
+  readonly purpose?: string;
+  // Omitted: a follow-up or rework inherits the base's reviewers, others get none.
+  readonly reviewers?: readonly ReviewerInput[];
   readonly operations: readonly CreatableOperationInput[];
   readonly request?: RequestParameters;
   // request: the caller route's activity is settled as CHANGE_PROPOSAL_CREATE
