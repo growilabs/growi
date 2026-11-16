@@ -42,9 +42,14 @@ describe('expire-given-up-command-answers', () => {
     }
     db = connectedDb;
     collection = db.collection('chat_notification_outbox');
-    // The schema's own indexes, the sent-row expiry among them, exist on every
-    // running GROWI; the new index has to be creatable next to them.
+    // The schema's own indexes, the sent-row expiry among them, and the
+    // previous migration's index exist on every running GROWI; the new index
+    // has to be creatable next to them.
     await ChatOutboxRow.init();
+    const previous = await import(
+      './20261116120000-add-kind-to-chat-notification-outbox'
+    );
+    await previous.up(db);
   });
 
   beforeEach(async () => {
