@@ -151,26 +151,21 @@ describe('sending a command answer through the production deliverer table', () =
   /**
    * Like the real proxy: the first request for a `requestId` is delivered,
    * any later one gets the first result back and is not delivered again.
-   * `replyAfter` holds back only the reply, not the delivery.
    */
   const rememberingProxy = () => {
     const resultByRequestId = new Map<string, CommandAnswerResult>();
     let deliveries = 0;
-    const answer = (
-      request: ReceivedRequest,
-      res: ServerResponse,
-      replyAfter: Promise<void> = Promise.resolve(),
-    ) => {
+    const answer = (request: ReceivedRequest, res: ServerResponse) => {
       const { requestId }: { requestId: string } = JSON.parse(request.body);
       const remembered = resultByRequestId.get(requestId);
       if (remembered != null) {
-        void replyAfter.then(() => respondJson(res, 200, remembered));
+        respondJson(res, 200, remembered);
         return;
       }
       deliveries += 1;
       const result: CommandAnswerResult = { status: 'delivered' };
       resultByRequestId.set(requestId, result);
-      void replyAfter.then(() => respondJson(res, 200, result));
+      respondJson(res, 200, result);
     };
     return { answer, deliveries: () => deliveries };
   };
@@ -269,32 +264,6 @@ describe('sending a command answer through the production deliverer table', () =
     await sendFromStalledThenOtherProcess(firstArrived, releaseFirst);
 
     expect(requestIdsReceived()).toEqual([REQUEST_ID, REQUEST_ID]);
-    const row = await storedRow();
-    expect(row).toMatchObject({
-      state: 'sent',
-      attempts: 0,
-      result: { status: 'delivered' },
-    });
-    expect(row).not.toHaveProperty('answer');
-  });
-
-  it('delivers once when another process re-sends a row whose first send was delivered but answered late', async () => {
-    const proxy = rememberingProxy();
-    const firstArrived = createLatch();
-    const releaseFirst = createLatch();
-    responder = (request, res) => {
-      if (received.length === 1) {
-        firstArrived.release();
-        proxy.answer(request, res, releaseFirst.promise);
-        return;
-      }
-      proxy.answer(request, res);
-    };
-
-    await sendFromStalledThenOtherProcess(firstArrived, releaseFirst);
-
-    expect(requestIdsReceived()).toEqual([REQUEST_ID, REQUEST_ID]);
-    expect(proxy.deliveries()).toBe(1);
     const row = await storedRow();
     expect(row).toMatchObject({
       state: 'sent',

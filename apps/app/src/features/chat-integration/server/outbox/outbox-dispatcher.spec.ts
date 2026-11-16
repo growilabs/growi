@@ -253,6 +253,52 @@ describe('createOutboxDispatcher timing', () => {
     });
   });
 
+  it('drops the stalled process’s retry while the process that took the row back is still sending, then keeps that process’s sent', async () => {
+    await seedPendingNotification('req-taken-back');
+    const otherStarted = createLatch();
+    const releaseOther = createLatch();
+    const otherProcessDeliverer = vi.fn<Deliverer>(async () => {
+      otherStarted.release();
+      await releaseOther.promise;
+      return { outcome: 'sent', result: { by: 'other' } };
+    });
+    let otherProcessDrain: Promise<DrainSummary> | undefined;
+    const stalledDeliverer = vi.fn<Deliverer>(async () => {
+      otherProcessDrain = createOutboxDispatcher({
+        deliverers: {
+          notification: otherProcessDeliverer,
+          'command-answer': otherProcessDeliverer,
+        },
+      }).drain(new Date(T + CLAIM_STALE_AFTER_MS + 1000));
+      await otherStarted.promise;
+      return { outcome: 'retry', result: { by: 'stalled' } };
+    });
+
+    await createOutboxDispatcher({
+      deliverers: {
+        notification: stalledDeliverer,
+        'command-answer': stalledDeliverer,
+      },
+      clock: () => new Date(T),
+    }).drain(new Date(T));
+
+    // The stalled process has settled; the row is still the other's claim.
+    expect(
+      await ChatOutboxRow.collection.findOne({ requestId: 'req-taken-back' }),
+    ).toMatchObject({ state: 'claimed', attempts: 0 });
+
+    releaseOther.release();
+    await otherProcessDrain;
+
+    expect(
+      await ChatOutboxRow.collection.findOne({ requestId: 'req-taken-back' }),
+    ).toMatchObject({
+      state: 'sent',
+      attempts: 0,
+      result: { by: 'other' },
+    });
+  });
+
   describe('Requirement 2.11: a send that stopped mid-way is taken back within 10 minutes', () => {
     const TICK_MS = 5 * MINUTE;
 
