@@ -14,7 +14,9 @@ export type ReviewRequestNotificationSnapshot = {
   readonly kind: 'review-request';
   readonly proposalId: string;
   readonly requester: { readonly id: string; readonly username: string };
-  readonly pages: readonly { readonly id: string; readonly path: string }[];
+  // Only pages this recipient may decide. A create has no page yet, so it
+  // carries the path it would create and no id.
+  readonly pages: readonly { readonly id?: string; readonly path: string }[];
 };
 
 export type ReviewResultNotificationSnapshot = {
