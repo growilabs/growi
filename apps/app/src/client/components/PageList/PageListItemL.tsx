@@ -299,8 +299,7 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
 
             <div
               className="flex-grow-1 px-2 px-md-4"
-              // Every flex ancestor of the truncated path needs min-width:0 to shrink;
-              // this wrapper predates truncation and defaulted to min-width:auto.
+              // Every flex ancestor of the truncated path needs min-width:0 to shrink.
               style={isPathTruncationEnabled ? { minWidth: 0 } : undefined}
             >
               <div className="d-flex justify-content-between">
