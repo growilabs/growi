@@ -307,7 +307,11 @@ const createPlatformBot = (
     userName: BOT_USER_NAME,
     // A handler's failure is logged here and nowhere else, so it reaches the
     // operator -- as one line, without the error object (`sdk-logger.ts`).
-    logger: createSdkLogger((line) => deps.reportOperationalFailure(line)),
+    // The SDK's own lines do not say which service they are about.
+    logger: createSdkLogger(
+      (line) => deps.reportOperationalFailure(line),
+      `chat-sdk:${platform}`,
+    ),
   });
   const { refreshChannels, installationId } = deps;
   const lookupDeps = {
@@ -390,7 +394,13 @@ export const createPlatformFacade = async (
       reportOperationalFailure?.(message, error),
   };
 
+  const adapterContext = {
+    logger: createSdkLogger((line) =>
+      handlerDeps.reportOperationalFailure(line),
+    ),
+  };
   const appAdapters = createAppAdapters(appConfig, ADAPTER_FACTORIES, {
+    ...adapterContext,
     installations,
   });
   // Walked over the declared services rather than over the built map's own
@@ -488,6 +498,7 @@ export const createPlatformFacade = async (
       unit.platform,
       credentials,
       ADAPTER_FACTORIES,
+      adapterContext,
     );
     if (adapter == null) throw new Error(unaddressable(unit.platform));
 

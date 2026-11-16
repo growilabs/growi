@@ -18,12 +18,12 @@ import type {
 } from '../types/index.js';
 import {
   ADAPTER_FACTORIES,
+  type AdapterContext,
   type AppAdapterContext,
   createAppAdapters,
   createChatState,
   createInstallationAdapter,
 } from './adapter-set.js';
-import { createSdkLogger } from './sdk-logger.js';
 
 /**
  * The name the bot answers to. Design.md settles every follow-up interaction
@@ -150,7 +150,7 @@ export const createAppBot = (
       adapters,
       state,
       userName: BOT_USER_NAME,
-      logger: createSdkLogger(),
+      logger: context.logger,
     }),
     state,
     locks: createDistributedLock(state),
@@ -180,11 +180,13 @@ export const createInstallationBot = (
   platform: PlatformName,
   credentials: InstallationCredentials,
   state: StateAdapter,
+  context: AdapterContext,
 ): ChatInstance | null => {
   const adapter = createInstallationAdapter(
     platform,
     credentials,
     ADAPTER_FACTORIES,
+    context,
   );
   if (adapter == null) return null;
 
@@ -192,6 +194,6 @@ export const createInstallationBot = (
     adapters: { [platform]: adapter },
     state,
     userName: BOT_USER_NAME,
-    logger: createSdkLogger(),
+    logger: context.logger.child(platform),
   });
 };

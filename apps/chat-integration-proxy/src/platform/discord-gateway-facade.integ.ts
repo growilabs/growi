@@ -58,11 +58,15 @@ describe('the Discord Gateway through the facade', () => {
     facade = null;
   });
 
-  const open = async (config: PlatformAppConfig): Promise<PlatformFacade> => {
+  const open = async (
+    config: PlatformAppConfig,
+    callbacks: Parameters<typeof createPlatformFacade>[3] = {},
+  ): Promise<PlatformFacade> => {
     const opened = await createPlatformFacade(
       config,
       mock<InstallationProvider>({ list: async () => [] }),
       mock<PlatformEventSink>(),
+      callbacks,
     );
     facade = opened;
     await opened.connections().start();
@@ -94,6 +98,60 @@ describe('the Discord Gateway through the facade', () => {
 
     expect(signals).toHaveLength(1);
     expect(signals[0]?.aborted).toBe(true);
+  });
+
+  // A handler that throws (a Teams Graph failure rethrown from a keep
+  // command, say) is caught by the Chat instance and only logged; the SDK's
+  // default logger would print the error with the request it carried.
+  it('reports what the Chat instance logs as one line about Discord, without what the error carried', async () => {
+    const initialize = vi.spyOn(DiscordAdapter.prototype, 'initialize');
+    const reportOperationalFailure = vi.fn();
+    try {
+      await open(WITH_DISCORD, { reportOperationalFailure });
+      const chat = initialize.mock.calls[0]?.[0];
+      if (chat == null)
+        throw new Error('the Discord adapter was not initialized');
+      reportOperationalFailure.mockClear();
+
+      chat.getLogger().error('Message processing error', {
+        error: Object.assign(new Error('Request failed with status code 500'), {
+          name: 'AxiosError',
+          config: { headers: { Authorization: 'Bearer xoxb-LEAK-TEST' } },
+        }),
+        threadId: 'discord:G1:C1',
+      });
+
+      expect(reportOperationalFailure).toHaveBeenCalledTimes(1);
+      const [line, error] = reportOperationalFailure.mock.calls[0] ?? [];
+      expect(line).toEqual(
+        expect.stringMatching(
+          /^\[chat-sdk:discord\] Message processing error \(AxiosError: Request failed with status code 500\)/,
+        ),
+      );
+      expect(line).not.toContain('xoxb-LEAK-TEST');
+      expect(error).toBeUndefined();
+    } finally {
+      initialize.mockRestore();
+    }
+  });
+
+  it('reports what the Discord adapter logs, as one line about Discord', async () => {
+    const reportOperationalFailure = vi.fn();
+    const opened = await open(WITH_DISCORD, { reportOperationalFailure });
+    reportOperationalFailure.mockClear();
+
+    const response = await opened.webhookHandler('discord')(
+      new Request('http://127.0.0.1/webhooks/discord', {
+        method: 'POST',
+        body: '{"type":1}',
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(reportOperationalFailure).toHaveBeenCalledWith(
+      '[chat-sdk:discord] Discord signature verification failed: missing headers',
+      undefined,
+    );
   });
 
   it('never listens when Discord is not configured', async () => {

@@ -17,7 +17,7 @@ import {
 } from '@chat-adapter/state-pg';
 import { createTeamsAdapter } from '@chat-adapter/teams';
 import type { NativeChannelId, PlatformName } from '@growi/chat';
-import type { Adapter } from 'chat';
+import type { Adapter, Logger } from 'chat';
 import { createMattermostAdapter } from 'chat-adapter-mattermost';
 
 import type {
@@ -26,15 +26,27 @@ import type {
 } from '../types/index.js';
 import type { InstallationProvider } from './installation-provider.js';
 import type { ListenerWindow } from './listener-loop.js';
-import { createSdkLogger } from './sdk-logger.js';
 import { createSlackInstallationLookup } from './slack-installation-lookup.js';
+
+/** What every adapter is built with besides its credentials. */
+export interface AdapterContext {
+  /**
+   * Where the adapter logs, made by `createSdkLogger` with a reporter.
+   * Some failures an adapter only logs and then drops -- a Slack event whose
+   * workspace token cannot be resolved, a Discord Gateway login that fails --
+   * so this is the only place the operator learns of them. Never the
+   * adapter's default logger, which prints the failed request it was given,
+   * credentials included.
+   */
+  readonly logger: Logger;
+}
 
 /**
  * What an app-credentialed adapter may need beyond the app config: a service
  * that serves many workspaces over one app-wide connection (Slack) resolves
  * each workspace's bot from this proxy's installations.
  */
-export interface AppAdapterContext {
+export interface AppAdapterContext extends AdapterContext {
   readonly installations: InstallationProvider;
 }
 
@@ -126,7 +138,10 @@ export type AdapterFactory =
   | {
       readonly credentialSource: 'installation';
       /** `null` when this installation carries no credentials for the service. */
-      readonly create: (credentials: InstallationCredentials) => Adapter | null;
+      readonly create: (
+        credentials: InstallationCredentials,
+        context: AdapterContext,
+      ) => Adapter | null;
     };
 
 /**
@@ -161,16 +176,6 @@ const slackWorkspaceOfToken = (client: SlackWebClient): Promise<string> => {
   }
   return asked;
 };
-
-/**
- * What every adapter logs to: nothing. A failure an adapter logs, it also
- * throws to its caller or answers for, and this app reports only through the
- * functions handed to it (`runtime/dependencies.ts`); the adapters' default
- * logger would print the failed request, credentials included, behind them.
- * Mattermost's adapter switches to its Chat instance's logger once
- * initialized (`platform/index.ts` sets that one).
- */
-const ADAPTER_LOGGER = createSdkLogger();
 
 /**
  * The single declared place that says how each of the four services is
@@ -220,7 +225,7 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           // and the `token=` body -- to whoever prints the error. The adapter
           // hands these options to its per-workspace clients as well.
           webClientOptions: { attachOriginalToWebAPIRequestError: false },
-          logger: ADAPTER_LOGGER,
+          logger: context.logger.child('slack'),
         });
       },
       processingStatus: (appConfig) =>
@@ -287,14 +292,14 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
             : adapter.decodeThreadId(channelId).guildId,
         );
       },
-      create: (appConfig) => {
+      create: (appConfig, context) => {
         const discord = appConfig.discord;
         if (discord == null) return null;
         return createDiscordAdapter({
           applicationId: discord.applicationId,
           publicKey: discord.publicKey,
           botToken: discord.botToken,
-          logger: ADAPTER_LOGGER,
+          logger: context.logger.child('discord'),
         });
       },
       // No `webhookUrl`: without one the adapter hands each Gateway event to
@@ -328,7 +333,7 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
     },
     teams: {
       credentialSource: 'app',
-      create: (appConfig) => {
+      create: (appConfig, context) => {
         const teams = appConfig.teams;
         if (teams == null) return null;
         // The adapter names these `appId` / `appPassword`; design.md's
@@ -338,19 +343,19 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
         return createTeamsAdapter({
           appId: teams.clientId,
           appPassword: teams.clientSecret,
-          logger: ADAPTER_LOGGER,
+          logger: context.logger.child('teams'),
         });
       },
     },
     mattermost: {
       credentialSource: 'installation',
-      create: (credentials) => {
+      create: (credentials, context) => {
         const mattermost = credentials.mattermost;
         if (mattermost == null) return null;
         return createMattermostAdapter({
           baseUrl: mattermost.baseUrl,
           botToken: mattermost.botToken,
-          logger: ADAPTER_LOGGER,
+          logger: context.logger.child('mattermost'),
         });
       },
     },
@@ -409,10 +414,11 @@ export const createInstallationAdapter = (
   platform: PlatformName,
   credentials: InstallationCredentials,
   factories: Readonly<Record<PlatformName, AdapterFactory>>,
+  context: AdapterContext,
 ): Adapter | null => {
   const factory = factories[platform];
   return factory.credentialSource === 'installation'
-    ? factory.create(credentials)
+    ? factory.create(credentials, context)
     : null;
 };
 

@@ -28,6 +28,7 @@ import {
   createInstallationAdapter,
 } from './adapter-set.js';
 import type { InstallationProvider } from './installation-provider.js';
+import { createSdkLogger } from './sdk-logger.js';
 
 const FULL_APP_CONFIG: PlatformAppConfig = {
   slack: {
@@ -48,6 +49,7 @@ const FULL_APP_CONFIG: PlatformAppConfig = {
 
 const CONTEXT: AppAdapterContext = {
   installations: mock<InstallationProvider>(),
+  logger: createSdkLogger(),
 };
 
 describe('ADAPTER_FACTORIES (the declared registry)', () => {
@@ -186,13 +188,18 @@ describe('createInstallationAdapter', () => {
 
   it('builds a mattermost adapter from that installation own connection target', () => {
     expect(
-      createInstallationAdapter('mattermost', credentials, ADAPTER_FACTORIES),
+      createInstallationAdapter(
+        'mattermost',
+        credentials,
+        ADAPTER_FACTORIES,
+        CONTEXT,
+      ),
     ).not.toBeNull();
   });
 
   it('builds nothing when the installation carries no credentials for that service', () => {
     expect(
-      createInstallationAdapter('mattermost', {}, ADAPTER_FACTORIES),
+      createInstallationAdapter('mattermost', {}, ADAPTER_FACTORIES, CONTEXT),
     ).toBeNull();
   });
 
@@ -202,6 +209,7 @@ describe('createInstallationAdapter', () => {
         'slack',
         { slack: { botToken: 'xoxb-1' } },
         ADAPTER_FACTORIES,
+        CONTEXT,
       ),
     ).toBeNull();
   });
@@ -417,15 +425,16 @@ describe('a Slack request that fails before reaching Slack', () => {
   });
 });
 
-describe("the Teams adapter's own logging", () => {
-  // The adapter logs the failure it then answers for. A body that fails to
-  // parse is the one such failure reachable without Azure; the parser's
-  // message quotes the body, as a Graph failure's request carries its token.
+describe('what the adapters log', () => {
+  // Some failures an adapter only logs and then drops, so the logger it is
+  // built with must carry them to the operator: a line per log call, naming
+  // the service, and nothing on the process output. Each case is a failure reachable without
+  // the service itself.
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('writes nothing to the process output when it rejects a webhook body', async () => {
+  const captureProcessOutput = (): (() => string) => {
     const chunks: string[] = [];
     const keep = (...args: unknown[]): void => {
       chunks.push(args.map((arg) => inspect(arg, { depth: null })).join(' '));
@@ -437,21 +446,64 @@ describe("the Teams adapter's own logging", () => {
       keep(chunk);
       return true;
     });
-    const adapter =
-      ADAPTER_FACTORIES.teams.credentialSource === 'app'
-        ? ADAPTER_FACTORIES.teams.create(FULL_APP_CONFIG, CONTEXT)
-        : null;
-    if (adapter == null) throw new Error('teams adapter not built');
+    return () => chunks.join('\n');
+  };
 
-    const response = await adapter.handleWebhook(
-      new Request('http://127.0.0.1/api/teams', {
+  it.each([
+    {
+      platform: 'slack',
+      request: new Request('http://127.0.0.1/api/slack', {
         method: 'POST',
-        body: '{"token": xoxb-LEAK-TEST}',
+        headers: { 'x-slack-socket-token': 'not-the-forwarding-secret' },
+        body: '{}',
       }),
-    );
+      status: 401,
+      line: /^\[chat-sdk:slack\] Invalid socket forwarding token$/,
+    },
+    {
+      platform: 'discord',
+      request: new Request('http://127.0.0.1/api/discord', {
+        method: 'POST',
+        body: '{"type":1}',
+      }),
+      status: 401,
+      line: /^\[chat-sdk:discord\] Discord signature verification failed: missing headers$/,
+    },
+    {
+      platform: 'teams',
+      request: new Request('http://127.0.0.1/api/teams', {
+        method: 'POST',
+        body: '{not json',
+      }),
+      status: 400,
+      line: /^\[chat-sdk:teams\] Failed to parse request body \(SyntaxError: /,
+    },
+  ] as const)('reports $platform rejecting a webhook to the operator', async ({
+    platform,
+    request,
+    status,
+    line,
+  }) => {
+    const written = captureProcessOutput();
+    const lines: string[] = [];
+    const factory = ADAPTER_FACTORIES[platform];
+    const adapter =
+      factory.credentialSource === 'app'
+        ? factory.create(FULL_APP_CONFIG, {
+            ...CONTEXT,
+            logger: createSdkLogger((reported) => lines.push(reported)),
+          })
+        : null;
+    if (adapter == null) throw new Error(`${platform} adapter not built`);
 
-    expect(response.status).toBe(400);
-    expect(chunks.join('\n')).toBe('');
+    const response = await adapter.handleWebhook(request);
+
+    expect(response.status).toBe(status);
+    expect(lines).toContainEqual(expect.stringMatching(line));
+    for (const reported of lines) {
+      expect(reported.startsWith(`[chat-sdk:${platform}] `)).toBe(true);
+    }
+    expect(written()).toBe('');
   });
 });
 

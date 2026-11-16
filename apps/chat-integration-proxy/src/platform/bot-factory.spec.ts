@@ -22,8 +22,12 @@ import {
   LOCK_KEY_NAMESPACE,
 } from './bot-factory.js';
 import type { InstallationProvider } from './installation-provider.js';
+import { createSdkLogger } from './sdk-logger.js';
 
-const CONTEXT = { installations: mock<InstallationProvider>() };
+const CONTEXT = {
+  installations: mock<InstallationProvider>(),
+  logger: createSdkLogger(),
+};
 
 const APP_CONFIG: PlatformAppConfig = {
   slack: {
@@ -234,7 +238,12 @@ describe('createInstallationBot', () => {
   it('assembles a mattermost bot from one installation own connection target', async () => {
     const appBot = createAppBot(APP_CONFIG, CONTEXT);
 
-    const bot = createInstallationBot('mattermost', credentials, appBot.state);
+    const bot = createInstallationBot(
+      'mattermost',
+      credentials,
+      appBot.state,
+      CONTEXT,
+    );
 
     expect(bot).not.toBeNull();
     await appBot.state.disconnect();
@@ -243,7 +252,9 @@ describe('createInstallationBot', () => {
   it('assembles nothing when that installation carries no credentials for the service', async () => {
     const appBot = createAppBot(APP_CONFIG, CONTEXT);
 
-    expect(createInstallationBot('mattermost', {}, appBot.state)).toBeNull();
+    expect(
+      createInstallationBot('mattermost', {}, appBot.state, CONTEXT),
+    ).toBeNull();
     await appBot.state.disconnect();
   });
 });
