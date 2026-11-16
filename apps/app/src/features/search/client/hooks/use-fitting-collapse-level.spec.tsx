@@ -121,6 +121,13 @@ describe('useFittingCollapseLevel', () => {
       expect(renderedCollapseLevel()).toBe(MAX_COLLAPSE_LEVEL);
     });
 
+    it('does not collapse for a 1px overflow caused by width rounding', () => {
+      // CONTENT_WIDTHS[0] is 300: scrollWidth 300 vs clientWidth 299
+      availableWidth = 299;
+      render(<Probe />);
+      expect(renderedCollapseLevel()).toBe(0);
+    });
+
     it('goes back to level 0 when the path changes', () => {
       availableWidth = 150;
       const { rerender } = render(<Probe resetKey="/a/b/c/d/leaf" />);
@@ -150,14 +157,27 @@ describe('useFittingCollapseLevel', () => {
       });
     };
 
-    it('does not treat the first notification as a width change', () => {
+    it('ignores a notification that reports the width the path was fitted at', () => {
+      const renderedLevels: number[] = [];
+      availableWidth = 250;
+      render(<Probe onRender={(level) => renderedLevels.push(level)} />);
+      expect(renderedCollapseLevel()).toBe(1);
+
+      renderedLevels.length = 0;
+      notifyWidth(250);
+      expect(renderedCollapseLevel()).toBe(1);
+      expect(renderedLevels).toEqual([]);
+    });
+
+    it('re-fits from level 0 when the width grew before the first notification arrived', () => {
       availableWidth = 250;
       render(<Probe />);
       expect(renderedCollapseLevel()).toBe(1);
 
+      // The observer starts after the fitting; the container has widened meanwhile
       availableWidth = 1000;
       notifyWidth(1000);
-      expect(renderedCollapseLevel()).toBe(1);
+      expect(renderedCollapseLevel()).toBe(0);
     });
 
     it('re-checks from level 0 when the container widens', () => {
