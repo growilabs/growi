@@ -7,6 +7,7 @@ import type {
   ProposalEntry,
   ProposalMark,
   RevertRefusalReason,
+  ReviewerRef,
   SkipReason,
   StaleReason,
   WaitingReason,
@@ -24,6 +25,8 @@ export type CreateProposalInput = {
   readonly revertOf?: string;
   readonly basedOn?: BasedOn;
   readonly perPageNotifications: boolean;
+  readonly purpose?: string;
+  readonly reviewers?: readonly ReviewerRef[];
   readonly expiresAt?: Date;
   readonly operations: readonly CreateOperationInput[];
 };

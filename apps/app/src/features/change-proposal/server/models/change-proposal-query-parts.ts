@@ -18,6 +18,14 @@ import {
   toProposalEntry,
 } from './to-change-proposal-document';
 
+// An approval's by/channel/token are meaningless without approvedAt, so they go together.
+export const UNSET_APPROVAL = {
+  approvedAt: { unset: true },
+  approvedBy: { unset: true },
+  approvedChannel: { unset: true },
+  decisionToken: { unset: true },
+} satisfies Prisma.ChangeproposalsOperationsUpdateInput;
+
 export const PENDING: OperationStatus = 'pending';
 export const REVERT_ENTRY: ProposalEntry = 'revert';
 export const SETTLED = 'settled';
@@ -160,7 +168,10 @@ export const toOutcomeData = (
           : { resultRevisionId: outcome.resultRevisionId }),
       };
     case 'pending':
-      return { reason: outcome.reason, approvedAt: { unset: true } };
+      return {
+        reason: outcome.reason,
+        ...UNSET_APPROVAL,
+      };
     default:
       return { status: outcome.status, reason: outcome.reason };
   }

@@ -28,6 +28,7 @@ import {
   toOriginalOperationData,
   toOutcomeData,
   toRequesterWriteMiss,
+  UNSET_APPROVAL,
   withoutUndefined,
 } from './change-proposal-query-parts';
 import type {
@@ -135,6 +136,9 @@ export const extension = Prisma.defineExtension((client) => {
               appliedPageIds: [],
               expiresAt: input.expiresAt,
               perPageNotifications: input.perPageNotifications,
+              purpose: input.purpose,
+              reviewers: (input.reviewers ?? []).map((r) => ({ ...r })),
+              reviews: [],
             }),
           });
           return toChangeProposalDocument(created);
@@ -321,7 +325,7 @@ export const extension = Prisma.defineExtension((client) => {
                       data: {
                         status: 'skipped',
                         reason,
-                        approvedAt: { unset: true },
+                        ...UNSET_APPROVAL,
                       },
                     },
                   },
@@ -439,7 +443,7 @@ export const extension = Prisma.defineExtension((client) => {
                     data: {
                       status: 'skipped',
                       reason: closing,
-                      approvedAt: { unset: true },
+                      ...UNSET_APPROVAL,
                     },
                   },
                 },

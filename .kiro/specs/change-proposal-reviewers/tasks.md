@@ -28,7 +28,7 @@
   - _Requirements: 1.4, 5.5_
   - _Depends: 1.1_
   - _Boundary: Prisma schema, migration_
-- [ ] 1.3 モデルの読み出しに、新しい項目を通す
+- [x] 1.3 モデルの読み出しに、新しい項目を通す
   - 文書を変換する処理と、取得・一覧で選ぶ項目の一覧に、新しい項目を足す（足し忘れると、一覧の応答から黙って消える）
   - 承認日時を消す 3 か所で、承認した人・経路・求めの印も一緒に消す
   - 新しい項目を保存した文書と、持たない古い文書の両方が、型どおりに読めることを結合テストで確かめている
@@ -258,3 +258,4 @@
 - 1.2: Prisma の MongoDB は、配列の項目を渡さずに create すると、その項目を文書に保存しない。読むときは `[]` が返るので表示には影響しないが、DB を直接条件にする問い合わせ（`$size`、`$exists` など）は、項目の無い文書と食い違う。`createProposal`（`change-proposal.ts`）は、いつも `reviewers`（入力 ?? `[]`）と `reviews: []` を渡す。1.3 か 3.3 で行う。
 - 1.2: `summarySelect` / `operationSummarySelect` への新しい項目の追加は 1.2 で済んでいる（schema の変更で型検査が壊れるため）。1.3 に残るのは、変換処理（`toProposalFields` / `toOperationState`）に通すこと、`ChangeProposalDocument` の型に足すこと、承認日時を消す 3 か所で `approvedBy` / `approvedChannel` / `decisionToken` も消すこと。`reviews` は一覧の取得でも読み出されるので、全体の却下の記録を依頼した人にだけ返す絞り込みは、応答を組み立てる側で守る。
 - 1.2: 統合テストの索引の完全一致は、CI の雛形 DB（すべての migration を当てたもの）で新しい索引が入ると落ちる。今後 `changeproposals` の索引を足すときも、`20261110120000-add-change-proposal-indexes.integ.ts` は名前の包含で確かめる形のままにする。
+- 1.3: 承認日時を消す 3 か所（`toOutcomeData` の pending、`skipPendingOperations`、`closeIfStillOpen`）は、共通の `UNSET_APPROVAL`（`change-proposal-query-parts.ts`。approvedAt・approvedBy・approvedChannel・decisionToken を `{ unset: true }` で消す）を使う。3.x の承認の書き込みで項目を足すときも、この定義を一緒に直す。`createProposal` は、reviewers（入力 ?? `[]`）と `reviews: []` と purpose を常に渡し、`CreateProposalInput` に `purpose?` と `reviewers?: readonly ReviewerRef[]`（`addedBy` と `addedAt` つき）を足した。3.3 は `ReviewerInput` からこの形を組み立てて渡す。`ChangeProposalDocument` の `reviewers` と `reviews` は必須。

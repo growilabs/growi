@@ -185,6 +185,148 @@ describe('ChangeProposal model (Prisma extension)', () => {
     });
   });
 
+  describe('reviewer fields (Reviewers Req 1.1, 1.8)', () => {
+    const approveRaw = (id: string, approver: string) =>
+      mongoose.connection.collection('changeproposals').updateOne(
+        { _id: new mongoose.Types.ObjectId(id) },
+        {
+          $set: {
+            'operations.$[].approvedAt': new Date(),
+            'operations.$[].approvedBy': new mongoose.Types.ObjectId(approver),
+            'operations.$[].approvedChannel': 'ui',
+            'operations.$[].decisionToken': 'token-1',
+          },
+        },
+      );
+
+    const expectApprovalCleared = async (id: string) => {
+      const raw = await rawDocument(id);
+      const read = await prisma.changeproposals.findProposal(id);
+      for (const op of raw?.operations ?? []) {
+        for (const field of [
+          'approvedAt',
+          'approvedBy',
+          'approvedChannel',
+          'decisionToken',
+        ]) {
+          expect(op).not.toHaveProperty(field);
+        }
+      }
+      for (const op of read?.operations ?? []) {
+        expect(op.approvedBy).toBeUndefined();
+        expect(op.approvedChannel).toBeUndefined();
+        expect(op.decisionToken).toBeUndefined();
+      }
+    };
+
+    it('reads back the purpose and the reviewers given at creation', async () => {
+      const reviewerId = newObjectId();
+      const addedAt = new Date();
+      const created = await createProposal({
+        purpose: 'why',
+        reviewers: [
+          { kind: 'user', id: reviewerId, addedBy: newObjectId(), addedAt },
+        ],
+      });
+
+      const found = await prisma.changeproposals.findProposal(created._id);
+
+      expect(found?.purpose).toBe('why');
+      expect(found?.reviewers).toMatchObject([
+        { kind: 'user', id: reviewerId, addedAt },
+      ]);
+      expect(found?.reviews).toStrictEqual([]);
+    });
+
+    it('always stores reviewers and reviews as arrays, even when none are given', async () => {
+      const created = await createProposal();
+
+      const raw = await rawDocument(created._id);
+
+      expect(raw?.reviewers).toStrictEqual([]);
+      expect(raw?.reviews).toStrictEqual([]);
+    });
+
+    it('reads a document stored before the fields existed as empty arrays', async () => {
+      const created = await createProposal();
+      await mongoose.connection
+        .collection('changeproposals')
+        .updateOne(
+          { _id: new mongoose.Types.ObjectId(created._id) },
+          { $unset: { reviewers: '', reviews: '', purpose: '' } },
+        );
+
+      const found = await prisma.changeproposals.findProposal(created._id);
+      const [listed] = await prisma.changeproposals.findMany({
+        where: { id: created._id },
+        select: { reviewers: true, reviews: true, purpose: true },
+      });
+
+      expect(found?.reviewers).toStrictEqual([]);
+      expect(found?.reviews).toStrictEqual([]);
+      expect(found).not.toHaveProperty('purpose');
+      expect(listed.reviewers).toStrictEqual([]);
+    });
+
+    it('reads the approval fields of an approved operation', async () => {
+      const created = await createProposal({ operations: [editOp()] });
+      const approver = newObjectId();
+      await approveRaw(created._id, approver);
+
+      const found = await prisma.changeproposals.findProposal(created._id);
+
+      expect(found?.operations[0]).toMatchObject({
+        approvedBy: approver,
+        approvedChannel: 'ui',
+        decisionToken: 'token-1',
+      });
+    });
+
+    it('clears the approval fields when the requester skips an operation', async () => {
+      const created = await createProposal({ operations: [editOp()] });
+      await approveRaw(created._id, newObjectId());
+
+      await prisma.changeproposals.skipPendingOperations(
+        created._id,
+        created.requester,
+        'all-pending',
+      );
+
+      await expectApprovalCleared(created._id);
+    });
+
+    it('clears the approval fields when a proposal is closed', async () => {
+      const created = await createProposal({ operations: [editOp()] });
+      await approveRaw(created._id, newObjectId());
+
+      await prisma.changeproposals.closeIfStillOpen(
+        created._id,
+        'withdrawn',
+        new Date(),
+      );
+
+      await expectApprovalCleared(created._id);
+    });
+
+    it('clears the approval fields when an operation goes back to waiting', async () => {
+      const created = await createProposal({ operations: [editOp()] });
+      await approveRaw(created._id, newObjectId());
+      const token = randomUUID();
+      const now = new Date();
+      await prisma.changeproposals.claimApplyLease(created._id, token, now);
+
+      await prisma.changeproposals.recordOperationOutcome(
+        created._id,
+        token,
+        created.operations[0].key,
+        { status: 'pending', reason: 'page-being-edited' },
+        now,
+      );
+
+      await expectApprovalCleared(created._id);
+    });
+  });
+
   describe('recordOperationOutcome', () => {
     it('rewrites only the targeted operation and leaves the other operations and bodies intact', async () => {
       const created = await createProposal({
