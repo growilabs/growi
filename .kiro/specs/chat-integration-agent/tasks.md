@@ -107,7 +107,7 @@
   - _Requirements: 1.21_
 
 - [ ] 4. app: 書き留めと送り手を 1 つにする
-- [ ] 4.1 通知の書き留めを、種類つきの書き留めに広げる
+- [x] 4.1 通知の書き留めを、種類つきの書き留めに広げる
   - 通知の送り手を書き留めの共通の場所へ移し、取る・送り直す・諦めるの仕組みを、種類ごとの「1 件の送り方」の表を受け取る形にする。通知 1 件の送り方は今の動きのまま移す
   - 書き留めに種類と答えの欄を足し、通知の欄の必須を通知の行に限り、答えの行に限った「連携と依頼の番号」の一意の索引を張る。既存の行に種類を補う migration を足す
   - 移した定期処理を、起動時の配線（`server/crowi/index.ts`）から起動する
@@ -277,3 +277,4 @@
 - 4.1: 既存の試験を変えずに通すため、名前は変えていない（model の名前 `ChatNotificationOutbox`、定期処理の `chatNotificationDispatchCronService`、通知専用の入口 `notificationOutbox.enqueue`）。design の種類つきの入口 `ChatOutbox.enqueue(OutboxEntry)` と `requestDrain` は 4.2・4.4 で足す。`targets`・`markdown`・`containsRestrictedPage` は、型の上では全部の行にある欄のまま（答えの行には実際には無い。schema の必須は通知の行だけ）。
 - 4.1: `kind` の schema の既定値は `notification` だが、送り手は DB に入っている値で行を選ぶので、`kind` の無い既存の行は migration（`20261116120000-add-kind-to-chat-notification-outbox`）の後に初めて送られる。答えの行の一意の索引の名前は `relationId_1_requestId_1_command_answer_unique`（同じ欄の索引が schema 側に既にあり、既定の名前は使えない）。
 - 4.3: `ProxyClient` に `sendCommandAnswer(relationId, {requestId, answer}, options?)` と `fetchConversation(relationId, {requestId}, options?)` を足した。口ごとの打ち切りは `OP_DEADLINES_MS`（通知 15 秒、ほかは 10 秒。`Record<SignedProxyOp, number>` なので口を足すと型エラーになる）で、`AbortSignal.timeout` を使う（axios の `timeout` は本文を少しずつ送る相手に効かない）。打ち切りは `{ok:false, reason:"unreachable"}`、応答の形の不正は `malformed-response`、proxy が返した会話の失敗は `{ok:true, response:{ok:false, failure}}`。**4.4 への引き継ぎ: 答えの送信で `malformed-response` が返ったときも、HTTP の失敗・打ち切りと同じ送り直し（諦めるまでの回数に数える）にする。** proxy は `requestId` ごとに結果を覚えて 2 回目を届け直さないので二重配達にならない。長すぎる答え（本文 30,000 文字・出典 20 件を超える）は proxy が 400 で断るので、5.6 で書き留める前に切り詰める。試験は `vi.mock` を使う既存 spec と分けて `proxy-client.loopback.spec.ts` に置いた。
+- 4.1（レビューの申し送り）: **4.2 へ**: `CLAIM_STALE_AFTER_MS` を 4 分に、`claimedAt` を drain の開始時刻でなく行を 1 件取るごとの現在時刻に、定期処理を `*/5` に、`outboxDispatcher` に同時に 1 つだけ走る `requestDrain` を足す。`ChatOutbox.enqueue(OutboxEntry)` を入れるときに、`ChatNotificationOutbox`・`notificationOutbox`・`chatNotificationDispatchCronService` をファイル名（chat-outbox・outbox-dispatch-cron）と合わせてまとめて変え、chat-outbox.spec の「保存された kind」の試験の扱いも見直す。**4.4 へ**: 送り方の表 `DelivererTable` を全種類必須にして登録漏れを型検査で防ぐ（できれば種類ごとの行の型による絞り込みも戻す）。`retryAfterMs` 付きの `retry` は「回数に数えない」意味も持つので、proxy の `in-progress` を回数に数えるなら `retryAfterMs` を付けない（付けると `in-progress` が返り続ける相手に永久に送り直す）。答えの行を書くときに `answer` があることを確かめ、送れた行から `answer` を消す。諦めた答えの行を 7 日で消す索引は、schema でなく名前を明示した migration で作り、既存の「送れた行の期限」の索引と名前・部分条件がぶつからないことを MongoDB 6.0 と 8.x で確かめる。**7（design.md への書き戻し）へ**: 判定の形を `sent`／`retry` の 2 つにして `give-up` を無くした。送り方の無い種類の行は取らない。表は種類ごとに省略できる（4.4 で全種類必須にする）。種類ごとの行の型による絞り込みを省いた。起動の配線の試験は、コメントにされた呼び出しを見分けられない（照合の前にコメントを除くと直る。任意）。
