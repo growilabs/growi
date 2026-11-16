@@ -105,3 +105,42 @@ describe('import boundary for the public AI usage API', () => {
     }
   });
 });
+
+// The chat integration's AI entry is imported statically by the `agent`
+// command path, which is registered at boot. Only
+// `chat-integration/server/agent/growi-ai-runtime.ts` may touch the AI stack,
+// and it is reached solely through the loader's dynamic import(). Traced on
+// their own so a regression is caught even before the boot path reaches them.
+const CHAT_INTEGRATION_AI_ENTRY_ROOTS = [
+  'features/chat-integration/server/agent/growi-ai-gateway.ts',
+  'features/chat-integration/server/agent/growi-ai-gateway-types.ts',
+  'features/chat-integration/server/agent/load-growi-ai-runtime.ts',
+  'features/chat-integration/server/agent/conversation-thread-id.ts',
+  'features/chat-integration/server/agent/opened-pages.ts',
+] as const;
+
+describe('import boundary for the chat integration AI entry', () => {
+  it('has no static import chain from the chat integration AI entry to heavy AI packages', () => {
+    const violations = traceStaticImportChains({
+      srcRoot: SRC_ROOT,
+      entrypoints: CHAT_INTEGRATION_AI_ENTRY_ROOTS,
+      bannedPattern: HEAVY_PACKAGE,
+    });
+    const formatted = violations.map(formatViolation);
+
+    expect(
+      formatted,
+      `The chat integration AI entry must reach the AI stack only through the loader's dynamic import().\n\n` +
+        `${formatted.join('\n\n')}`,
+    ).toEqual([]);
+  });
+
+  it('still finds every chat integration AI entry root it traces from', () => {
+    for (const root of CHAT_INTEGRATION_AI_ENTRY_ROOTS) {
+      expect(
+        fs.existsSync(path.join(SRC_ROOT, root)),
+        `chat integration AI entry root disappeared: ${root} — update CHAT_INTEGRATION_AI_ENTRY_ROOTS`,
+      ).toBe(true);
+    }
+  });
+});

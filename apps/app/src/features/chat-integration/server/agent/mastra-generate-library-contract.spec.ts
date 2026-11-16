@@ -5,7 +5,6 @@
 // dynamic import (no-eager-ai-imports.spec.ts).
 import { Agent, type ToolsInput } from '@mastra/core/agent';
 import { InMemoryStore } from '@mastra/core/storage';
-import type { FullOutput } from '@mastra/core/stream';
 import { createTool } from '@mastra/core/tools';
 import { Memory } from '@mastra/memory';
 import { MockLanguageModelV3 } from 'ai/test';
@@ -13,49 +12,9 @@ import { z } from 'zod';
 
 import type { GetPageContentToolOutput } from '~/features/mastra/server/services/mastra-modules/tools/get-page-content-tool';
 
-// --- What the AI entry (task 5.4 / 5.6) does with a generate result ---------
+import { extractOpenedPages } from './opened-pages';
 
-type OpenedPage = { readonly pageId: string; readonly path: string };
-
-// The registration KEY in growiAgent's `tools` record, which is what Mastra
-// reports as `toolName` (not the tool's `id`, 'get-page-content-tool').
-const PAGE_TOOL_KEY = 'getPageContentTool';
-
-const isOpenedPageOutput = (
-  value: unknown,
-): value is { result: 'ok'; page: OpenedPage } => {
-  if (typeof value !== 'object' || value == null) return false;
-  if (!('result' in value) || value.result !== 'ok') return false;
-  if (!('page' in value)) return false;
-  const { page } = value;
-  return (
-    typeof page === 'object' &&
-    page != null &&
-    'pageId' in page &&
-    typeof page.pageId === 'string' &&
-    'path' in page &&
-    typeof page.path === 'string'
-  );
-};
-
-// Same rules as the browser's extractPageSources (page-sources.ts): only the
-// page-content tool, only `result: 'ok'`, deduplicated by pageId in
-// first-seen order.
-const extractOpenedPages = (
-  result: Pick<FullOutput<unknown>, 'toolResults'>,
-): OpenedPage[] => {
-  const seen = new Set<string>();
-  const pages: OpenedPage[] = [];
-  for (const { payload } of result.toolResults) {
-    if (payload.toolName !== PAGE_TOOL_KEY) continue;
-    if (!isOpenedPageOutput(payload.result)) continue;
-    const { pageId, path } = payload.result.page;
-    if (seen.has(pageId)) continue;
-    seen.add(pageId);
-    pages.push({ pageId, path });
-  }
-  return pages;
-};
+// --- How a caller must classify a generate call --------------------------------
 
 type Settled<T> =
   | { readonly kind: 'completed'; readonly value: T }
