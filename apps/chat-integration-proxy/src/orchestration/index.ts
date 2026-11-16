@@ -6,6 +6,8 @@
 // `createAdminFlow` is exported even though no layer to the right calls it:
 // `CommandFlowDeps.adminFlow` is required, so the composition point cannot
 // build a `CommandFlow` without being able to build an `AdminFlow` first.
+// `createAgentFlow` is exported for the same reason: it is what the
+// composition point hands `CommandFlowDeps.commandHandlers.agent`.
 //
 // `CommandFlow` and `LinkPostedEvent` are here because implementing the flow
 // means naming both. `KNOWN_COMMAND_WORDS` and `EventSinkDeps` are NOT: the
@@ -24,6 +26,8 @@ export type {
   ObserveActorRoles,
 } from './admin-flow.js';
 export { createAdminFlow } from './admin-flow.js';
+export type { AgentFlowDeps } from './agent-flow.js';
+export { createAgentFlow } from './agent-flow.js';
 export type {
   AgentEntry,
   AgentRequestInput,

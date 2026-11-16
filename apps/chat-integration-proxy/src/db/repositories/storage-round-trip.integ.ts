@@ -783,6 +783,33 @@ describe('task 2.2 storage round trip through real PostgreSQL (Requirements 2.5,
       ).resolves.not.toBeNull();
     });
 
+    it('deletes the one request named, leaves its neighbour, and treats a request already gone as nothing to do', async () => {
+      const { prisma, installationId, relation } = await newRelation('agent-h');
+      const repository = createPendingAgentRequestRepository(prisma);
+      const base = {
+        relationId: relation.relationId,
+        installationId,
+        origin: originOf(`D-${randomUUID()}`),
+        expiresAt: new Date(Date.now() + 86_400_000),
+      };
+      await repository.create({ ...base, requestId: 'refused' });
+      await repository.create({ ...base, requestId: 'accepted' });
+
+      await expect(
+        repository.delete(relation.relationId, 'refused'),
+      ).resolves.toBe(1);
+
+      await expect(
+        repository.find(relation.relationId, 'refused'),
+      ).resolves.toBeNull();
+      await expect(
+        repository.find(relation.relationId, 'accepted'),
+      ).resolves.not.toBeNull();
+      await expect(
+        repository.delete(relation.relationId, 'refused'),
+      ).resolves.toBe(0);
+    });
+
     it('is removed together with its relation, so unpairing is not refused by the foreign key', async () => {
       const { prisma, installationId, relation } = await newRelation('agent-d');
       const other = await newRelation('agent-e');

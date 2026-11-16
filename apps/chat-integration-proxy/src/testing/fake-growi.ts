@@ -97,6 +97,10 @@ export interface ScriptedAnswer {
   readonly body: unknown;
 }
 
+/**
+ * A responder whose promise never settles stands for a GROWI that does not
+ * answer; `close` still ends the request it holds.
+ */
 export type OpResponder = (
   request: FakeGrowiRequest,
 ) => ScriptedAnswer | Promise<ScriptedAnswer>;
@@ -368,6 +372,9 @@ export const startFakeGrowi = async (
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close((error) => (error == null ? resolve() : reject(error)));
+        // A responder scripted never to answer (GROWI not answering in time)
+        // holds its connection open, and `close` alone would wait for it.
+        if ('closeAllConnections' in server) server.closeAllConnections();
       }),
   };
 };

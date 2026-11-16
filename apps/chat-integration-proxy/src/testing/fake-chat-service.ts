@@ -72,6 +72,12 @@ export interface CapturedReaction {
   readonly reaction: ReactionName;
 }
 
+export interface CapturedProcessingStatus {
+  readonly channel: SdkChannelRef;
+  readonly threadRootId: string;
+  readonly installationId: string;
+}
+
 /** Whether the proxy handled a delivered event, and what went wrong if not. */
 export type DeliveryOutcome =
   | { readonly handled: true }
@@ -153,6 +159,7 @@ export interface FakeChatService {
    */
   readonly posts: () => ReadonlyArray<CapturedPost>;
   readonly reactions: () => ReadonlyArray<CapturedReaction>;
+  readonly processingStatuses: () => ReadonlyArray<CapturedProcessingStatus>;
   readonly modals: () => ReadonlyArray<CapturedModal>;
   /** Everything `webhookHandler` was asked to serve, by service. */
   readonly webhookCalls: () => ReadonlyArray<PlatformName>;
@@ -200,6 +207,7 @@ export const createFakeChatService = (
 ): FakeChatService => {
   const posts: CapturedPost[] = [];
   const reactions: CapturedReaction[] = [];
+  const processingStatuses: CapturedProcessingStatus[] = [];
   const modals: CapturedModal[] = [];
   const webhookCalls: PlatformName[] = [];
   let sink: PlatformEventSink | null = null;
@@ -231,7 +239,14 @@ export const createFakeChatService = (
     postInThread: async (channel, threadRootId, message) =>
       capture({ kind: 'thread-post', channel, threadRootId, message }),
 
-    setProcessingStatus: async () => undefined,
+    setProcessingStatus: (channel, threadRootId, scope) => {
+      processingStatuses.push({
+        channel,
+        threadRootId,
+        installationId: scope.installationId,
+      });
+      return Promise.resolve();
+    },
 
     postEphemeral: (channel, user, message, scope) => {
       const ephemeral: CapturedPost = {
@@ -346,6 +361,7 @@ export const createFakeChatService = (
 
     posts: () => [...posts],
     reactions: () => [...reactions],
+    processingStatuses: () => [...processingStatuses],
     modals: () => [...modals],
     webhookCalls: () => [...webhookCalls],
     shutdownCount: () => shutdowns,

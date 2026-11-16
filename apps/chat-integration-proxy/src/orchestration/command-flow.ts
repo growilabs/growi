@@ -81,6 +81,14 @@ import type {
 import type { AdminFlow } from './admin-flow.js';
 import { conversationKeyOf } from './conversation-key.js';
 import type { CommandFlow, LinkPostedEvent } from './event-sink.js';
+import {
+  accountLinkNotice,
+  markdown,
+  notDeliveredNotice,
+  notUsableNotice,
+  refusedNotice,
+  unexpectedAnswerNotice,
+} from './growi-reply-wording.js';
 import { NO_WORKSPACE_TEXT } from './no-workspace-wording.js';
 
 /**
@@ -152,28 +160,6 @@ export interface CommandFlowDeps {
 // ---------------------------------------------------------------------------
 // Wording
 // ---------------------------------------------------------------------------
-
-const markdown = (text: string): OutboundMessage => ({
-  kind: 'markdown',
-  markdown: text,
-});
-
-/**
- * The ONE rendering of "you need to link your account with this GROWI".
- *
- * `growiLabel` is always named, not only where several GROWIs are linked: a
- * link is granted by one GROWI alone (Requirement 7.2), and a user who cannot
- * tell which one asked will tie the wrong account. Naming it unconditionally
- * also means the wording does not depend on a count this function would
- * otherwise have to be told.
- */
-const accountLinkNotice = (
-  growiLabel: string,
-  linkUrl: string,
-): OutboundMessage =>
-  markdown(
-    `GROWI「${growiLabel}」との紐付けが必要です。次のリンクを開き、その GROWI にログインした状態で紐付けを承認してください（1 回だけ使えます。短時間で失効します）:\n\n<${linkUrl}>`,
-  );
 
 /**
  * How a GROWI may answer a command asked of every GROWI without giving what
@@ -299,9 +285,6 @@ const footerOf = (
   ]
     .filter((note) => note != null)
     .join('\n') || undefined;
-
-const notUsableNotice = (word: string): string =>
-  `\`${word}\` は今使えません。`;
 
 const explanation = (
   commandName: string,
@@ -590,7 +573,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
   ): Promise<void> => {
     const conversationKey = conversationKeyOf(invocation);
     if (commandHandlers.agent == null || conversationKey == null) {
-      await tell(origin, markdown(notUsableNotice(invocation.commandName)));
+      await tell(origin, notUsableNotice(invocation.commandName));
       return;
     }
     await commandHandlers.agent({
@@ -629,21 +612,14 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
       case 'error':
         await tell(
           origin,
-          markdown(
-            `GROWI「${relation.growiLabel}」で実行できませんでした: ${response.message}`,
-          ),
+          refusedNotice(relation.growiLabel, response.message),
         );
         return;
       default:
         // `search` / `help` are answered through the fan-out and
         // `link-preview` through `previewLinks`; arriving here means GROWI
         // answered a different question than the one asked.
-        await tell(
-          origin,
-          markdown(
-            `GROWI「${relation.growiLabel}」から想定外の応答が返りました。`,
-          ),
-        );
+        await tell(origin, unexpectedAnswerNotice(relation.growiLabel));
     }
   };
 
@@ -662,10 +638,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
 
     const sent = await growiClient.sendCommand(relation.growiUri, request);
     if (!sent.ok) {
-      await tell(
-        origin,
-        markdown(`GROWI「${relation.growiLabel}」に届きませんでした。`),
-      );
+      await tell(origin, notDeliveredNotice(relation.growiLabel));
       return;
     }
     await showResponse(invocation, origin, relation, sent.response);
@@ -682,10 +655,7 @@ export const createCommandFlow = (deps: CommandFlowDeps): CommandFlow => {
       actor: invocation.actor,
     });
     if (!started.ok) {
-      await tell(
-        origin,
-        markdown(`GROWI「${relation.growiLabel}」に届きませんでした。`),
-      );
+      await tell(origin, notDeliveredNotice(relation.growiLabel));
       return;
     }
 

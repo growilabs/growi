@@ -194,6 +194,24 @@ describe('proxy -> fake GROWI', () => {
     // pass while proving nothing, so the missing script has to be visible.
     expect(result).toEqual({ ok: false, reason: 'http-error' });
   });
+
+  it('closes while a request it is scripted never to answer is still open', async () => {
+    const growi = await startFakeGrowi({
+      responders: { [OP_NAMES.command]: () => new Promise(() => {}) },
+    });
+
+    const { identity, client } = proxySide(growi.hostname);
+    growi.registerPeerKey(identity.asPeerKey);
+    const pending = client.sendCommand(growi.baseUrl, commandRequest());
+    await vi.waitFor(() => expect(growi.received()).toHaveLength(1));
+
+    await growi.close();
+
+    await expect(pending).resolves.toEqual({
+      ok: false,
+      reason: 'unreachable',
+    });
+  });
 });
 
 describe('fake GROWI -> proxy', () => {

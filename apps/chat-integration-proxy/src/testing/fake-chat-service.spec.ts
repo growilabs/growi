@@ -294,6 +294,23 @@ describe('capturing direct messages and reactions', () => {
     expect(chat.reactions()).toEqual([{ target, reaction: 'eyes' }]);
   });
 
+  it('records each processing status with the thread and the installation it was shown for', async () => {
+    const { chat, facade } = await attached();
+    const directMessage = channelOn('slack', { isDirectMessage: true });
+
+    await facade.setProcessingStatus(directMessage, '1700000000.000100', {
+      installationId: 'inst-1',
+    });
+
+    expect(chat.processingStatuses()).toEqual([
+      {
+        channel: directMessage,
+        threadRootId: '1700000000.000100',
+        installationId: 'inst-1',
+      },
+    ]);
+  });
+
   it('answers a reaction with the failure it was scripted to fail with', async () => {
     const chat = createFakeChatService({
       addReaction: () => ({ ok: false, detail: 'message_not_found' }),

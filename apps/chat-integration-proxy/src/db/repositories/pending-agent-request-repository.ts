@@ -45,6 +45,11 @@ export interface PendingAgentRequestRepository {
     relationId: string,
     requestId: string,
   ): Promise<PendingAgentRequestRecord | null>;
+  /**
+   * Deletes the one request, when GROWI turned it down. Answers how many rows
+   * went, so a request already gone is not an error.
+   */
+  delete(relationId: string, requestId: string): Promise<number>;
   /** Deletes every row past its `expiresAt`; scheduling is `runtime/sweeper.ts`. */
   deleteExpired(now: Date): Promise<number>;
   /** Part of the ordered removal of one relation (`db/relation-cascade.ts`). */
@@ -113,6 +118,13 @@ export const createPendingAgentRequestRepository = (
       where: { relationId_requestId: { relationId, requestId } },
     });
     return row == null ? null : toRecord(row);
+  },
+
+  delete: async (relationId, requestId) => {
+    const result = await db.pendingAgentRequest.deleteMany({
+      where: { relationId, requestId },
+    });
+    return result.count;
   },
 
   deleteExpired: async (now) => {
