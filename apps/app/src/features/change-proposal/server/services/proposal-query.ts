@@ -6,22 +6,22 @@ import type {
   BasedOn,
   ChangeProposalDocument,
   ChangeProposalView,
+  OperationRecord,
   OperationStatus,
+  ViewerRole,
 } from '../../interfaces';
 import {
   buildProposalLinks,
+  deriveViewerRole,
   judgeRevertability,
   type LinkedProposalFacts,
   selectVisibleOperations,
   targetPageIdOf,
+  type ViewerIdentity,
 } from '../domain';
 import type { LinkedProposalRecord } from '../models/change-proposal-types';
 import type { ServiceResult } from './change-proposal-service-types';
-import {
-  loadCurrentPageFacts,
-  loadViewablePages,
-  type ViewablePages,
-} from './current-page-facts';
+import { loadCurrentPageFacts, type ViewablePages } from './current-page-facts';
 import type { PageDeletePermissionServices } from './page-delete-permission';
 import { isRequesterAllowed } from './pre-write-checks';
 import {
@@ -35,6 +35,8 @@ import {
   readRequesters,
   toProposalHeaderView,
 } from './proposal-view-parts';
+import { resolveReviewScopeWithPages } from './review-scope-resolver';
+import { loadViewerIdentity } from './reviewer-identity';
 import {
   createRevisionMarksQuery,
   type RevisionMarksQuery,
@@ -101,10 +103,39 @@ const narrowBasedOn = (
   return operationKeys.length === 0 ? undefined : { ...basedOn, operationKeys };
 };
 
+// Every page involved is checked in the one viewing check the role's scope makes,
+// with the groups the caller already read.
+const readViewerScope = async (
+  proposal: ChangeProposalDocument,
+  identity: ViewerIdentity,
+  alsoCheckPageIds: readonly string[],
+): Promise<{
+  readonly role: ViewerRole;
+  readonly visible: readonly OperationRecord[];
+  readonly viewable: ViewablePages;
+}> => {
+  const role = deriveViewerRole(
+    proposal.requester,
+    proposal.reviewers,
+    identity,
+  );
+  const { scope, viewable } = await resolveReviewScopeWithPages(
+    proposal.operations,
+    identity,
+    role,
+    [...pageIdsOf(proposal.operations), ...alsoCheckPageIds],
+  );
+  return {
+    role,
+    visible: proposal.operations.filter((op) => scope.visibleKeys.has(op.key)),
+    viewable,
+  };
+};
+
 /**
- * Builds what one viewer may see of a proposal. Every page involved — the
- * proposal's, its follow-ups' and reworks', and its base's — is checked in a
- * single findByIdsAndViewer call, read the same way as a revert reads it.
+ * Builds what one viewer may see of a proposal, by the viewer's role. Every
+ * page involved — the proposal's, its follow-ups' and reworks', and its base's —
+ * is checked in a single findByIdsAndViewer call, read the same way as a revert reads it.
  */
 export const createProposalQuery = (
   deps: ProposalQueryDeps,
@@ -121,24 +152,20 @@ export const createProposalQuery = (
 
     // The requester's links all lead to their own proposals, so only other
     // viewers need the linked and base proposals' pages checked.
-    const [linked, base] = await Promise.all([
+    const [identity, linked, base] = await Promise.all([
+      loadViewerIdentity(viewerId),
       prisma.changeproposals.findLinkedProposals(proposal._id),
       !isRequester && proposal.basedOn != null
         ? prisma.changeproposals.findProposal(proposal.basedOn.proposalId)
         : null,
     ]);
-    const viewable = await loadViewablePages(
+    const { role, visible, viewable } = await readViewerScope(
+      proposal,
+      identity,
       [
-        ...pageIdsOf(proposal.operations),
         ...(isRequester ? [] : linked.flatMap((l) => pageIdsOf(l.operations))),
         ...(base == null ? [] : pageIdsOf(base.operations)),
       ],
-      viewer,
-    );
-
-    const visible = selectVisibleOperations(
-      proposal.operations,
-      contextFor(proposal.requester, viewerId, viewable),
     );
     if (!isRequester && visible.length === 0) {
       return NOT_FOUND;
@@ -200,7 +227,7 @@ export const createProposalQuery = (
           id: proposal._id,
           proposal,
           visible,
-          isRequester,
+          role,
           requester: requesterOf(proposal.requester),
           isPerPageNotificationsEnabled:
             readChangeProposalSettings().perPageNotificationsEnabled,

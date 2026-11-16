@@ -1,6 +1,6 @@
 import type { OperationRecord, ViewerRole } from '../../interfaces';
 import type { ViewerIdentity } from '../domain';
-import { loadViewablePages } from './current-page-facts';
+import { loadViewablePages, type ViewablePages } from './current-page-facts';
 import { pageModel } from './operation-handlers/page-model';
 import {
   ancestorPathsToLoad,
@@ -41,6 +41,40 @@ const loadNonEmptyPageIdByPath = async (
 };
 
 /**
+ * resolveReviewScope, with `alsoCheckPageIds` checked in the same viewing check
+ * and every page it read handed back, for a caller that shows pages next to
+ * the operations without checking them a second time.
+ */
+export const resolveReviewScopeWithPages = async (
+  operations: readonly OperationRecord[],
+  viewer: ViewerIdentity,
+  role: ViewerRole,
+  alsoCheckPageIds: readonly string[],
+): Promise<{
+  readonly scope: ReviewScopeResult;
+  readonly viewable: ViewablePages;
+}> => {
+  const nonEmptyPageIdByPath = await loadNonEmptyPageIdByPath(
+    ancestorPathsToLoad(operations, role),
+  );
+  const viewable = await loadViewablePages(
+    [
+      ...pageIdsToLoad(operations, role, nonEmptyPageIdByPath),
+      ...alsoCheckPageIds,
+    ],
+    { _id: viewer.userId },
+    viewer,
+  );
+  return {
+    scope: decideReviewScope(operations, role, {
+      viewable,
+      nonEmptyPageIdByPath,
+    }),
+    viewable,
+  };
+};
+
+/**
  * Which of a proposal's operations the viewer sees, may decide, and the stage
  * those alone imply. The page queries do not grow with the number of
  * operations: the ancestor candidates of all of them at once, then one viewing
@@ -50,17 +84,5 @@ export const resolveReviewScope = async (
   operations: readonly OperationRecord[],
   viewer: ViewerIdentity,
   role: ViewerRole,
-): Promise<ReviewScopeResult> => {
-  const nonEmptyPageIdByPath = await loadNonEmptyPageIdByPath(
-    ancestorPathsToLoad(operations, role),
-  );
-  const viewable = await loadViewablePages(
-    pageIdsToLoad(operations, role, nonEmptyPageIdByPath),
-    { _id: viewer.userId },
-    viewer,
-  );
-  return decideReviewScope(operations, role, {
-    viewable,
-    nonEmptyPageIdByPath,
-  });
-};
+): Promise<ReviewScopeResult> =>
+  (await resolveReviewScopeWithPages(operations, viewer, role, [])).scope;

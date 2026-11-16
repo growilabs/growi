@@ -104,7 +104,7 @@
   - _Requirements: 2.2, 2.6, 5.4, 5.6, 5.9_
   - _Depends: 2.1, 2.2, 2.3_
   - _Boundary: reviewer-identity, review-scope-resolver, current-page-facts_
-- [ ] 4.2 閲覧できるページの操作の絞り込みを、役割別にする
+- [x] 4.2 閲覧できるページの操作の絞り込みを、役割別にする
   - 閲覧できるページの操作を役割別に絞る（依頼した人と、承認者でも依頼した人でもない人は、今の規則のまま。承認者は 4.1 の結果）。見る人の役割に、承認者を足す。絞り込みの引数が変わるので、反映済みの一覧（`proposal-list-query`）と、要約の組み立ても追従させる
   - 全体の状態は、依頼した人でない人には、見える段階から計算する。実際の段階を、全体の状態の言葉に出さない（取得と一覧の見出しの両方）
   - 閲覧できるページの操作が 0 件の承認者の取得は、存在しない場合と同じ「見つからない」になる
@@ -280,3 +280,6 @@
 - 4.1: `server/services/` に `reviewer-identity.ts`（`loadViewerIdentity(userId)`）、`review-scope-resolver.ts`（`resolveReviewScope(operations, viewer: ViewerIdentity, role)` → `ReviewScopeResult`: `visibleKeys` / `visibleStage` / `reviewTargetKeys`）、`review-scope-visibility.ts`（DB を読まない部分。`ReviewScopeResult` の型はここ。resolver から re-export）を置いた。`loadViewablePages(pageIds, viewer, identity?)` は、取得済みの所属を 3 番目の引数で受ける（既存の呼び出し元は今も所属を読み直している。所属を渡す形への切り替えは、使う側の 4.2 以降で行う）。**4.2 の実装者へ**: 役割ごとの分け方（依頼した人・承認者・それ以外）は `decideReviewScope` が持っているので、作り直さず `visibleKeys` をそのまま使う。依頼した人の役割でも `visibleStage` は返るが、依頼した人には実際の lifecycle を使い、この値を使わない。
 - 4.1: `loadViewerIdentity` は、design が書く `pageGrantService.getUserRelatedGroups` を包まず、`UserGroupRelation` / `ExternalUserGroupRelation` の `findAllUserGroupIdsRelatedToUser` を直接読む。ページの閲覧の判定（`addViewerCondition`）が読むのと同じ関数なので、「グループで承認者になる」と「そのグループのページを閲覧できる」が同じ所属から決まる。`getUserRelatedGroups` は消えたグループの関連を落とすが、そうした関連はグループの削除時と起動時（`removeAllInvalidRelations`）に掃除される。結果の違いは実際には出ない。
 - 4.1: 承認者の「判断に使うページ」の上のページは、閲覧の権限で絞らずに、空でない最も近い上のページのパスで決め、**そのパスにある空でないページをすべて**閲覧できる必要がある（`path` は一意でなく、ツリーに載らないページが同じパスを持てるため。1 つに絞ると、閲覧できない親の代わりに、閲覧できる同じパスのページで判定してしまう）。ツリーに載るページだけに絞る直し方は、移行前の v4 のページ（`parent: null`）が親のとき別の形で漏れるので使わない。`resolveAncestors` が `null`、または確かめるページが 1 つも無い操作は見せない。
+- 4.2: 役割を 3 つ（依頼した人・承認者・それ以外）に分ける処理は、`review-scope-visibility.ts` の `decideReviewScope` にある。`select-visible-operations.ts` は 2 つの役割のまま変えていない（design の部品の一覧と食い違うので、cleanup で design を直す）。取得（`getForViewer`）は、1 回の求めにつき `loadViewerIdentity` を 1 回読み、`deriveViewerRole` で役割を決め、`resolveReviewScopeWithPages`（`review-scope-resolver.ts`。後続・見直し・元の提案のページも同じ 1 回の閲覧の判定で確かめる）の `visibleKeys` で操作を絞る。依頼した人でない人は、見える操作が 0 件なら「見つからない」。全体の状態は、依頼した人には実際の lifecycle、それ以外には見える段階（`deriveVisibleStage`）から出す。
+- 4.2: **4.3・4.4 の実装者へ**: 反映済みの一覧（`scanAppliedVisible`）と自分の一覧の項目の `viewerRole` は、`'requester'` か `'other'` だけ（承認者にも「それ以外の人」の規則を当てる。要件 5.10）。`'reviewer'` を返すのは、取得と、4.4 の承認者としての一覧だけ。4.3 で `toProposalHeaderView` に承認者向けの値（`purpose`、`reviewers` など）を足すときは、`role === 'reviewer'` を条件にして、反映済みの一覧に漏らさない。5.10 の前後比較のテスト（`change-proposal-service-get-by-role.integ.ts`）は、取得の `operations` を配列全体で比べている。4.3 で承認の記録などを足したら、比べる項目を見直す。後続・見直し・元の提案へのリンクは、今は「それ以外の人」の規則のまま。相手の提案ごとに役割を決め直すのは 4.3。
+- 4.2: 取得で所属を読む箇所が 1 か所残る。反映済みの新規作成の取り消し可否の判定（`createCanDeletePageCompletely` → `getUserRelatedGroups`）が、グループの文書が要るために別の関数で所属を読む。「1 回の求めにつき 1 回」の見張りのテストはこの経路を通らない。9.x の全体の確認で、直すか判断する。存在しない提案と、見える操作が 0 件の提案とで、応答までの時間に差が出るのは core からある作り（design が同一と決めているのは応答の中身だけ）。
