@@ -51,10 +51,7 @@ import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
 import { configManager } from './config-manager';
-import {
-  canShowSnippetForGrant,
-  snippetGrantFieldsOf,
-} from './search/can-show-snippet';
+import { canShowSnippetOfPage } from './search/can-show-snippet';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
 
@@ -1046,10 +1043,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   canShowSnippet(pageData, user, userGroups): boolean {
-    return canShowSnippetForGrant(snippetGrantFieldsOf(pageData), {
-      userId: user?._id?.toString() ?? null,
-      userGroupIds: userGroups?.map((id) => id.toString()) ?? null,
-    });
+    return canShowSnippetOfPage(pageData, user, userGroups);
   }
 }
 

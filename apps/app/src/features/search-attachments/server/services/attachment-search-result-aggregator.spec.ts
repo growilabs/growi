@@ -1,4 +1,4 @@
-import type { IUserHasId } from '@growi/core';
+import { type IUserHasId, PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
@@ -97,11 +97,31 @@ const nameOf = (id: unknown): string =>
   Object.entries(objectIds).find(([, o]) => o.toString() === String(id))?.[0] ??
   String(id);
 
-const makePageSearchResult = (names: string[]): IFormattedSearchResult => ({
+// The grant fields of a page document; public unless the test says otherwise.
+type PageGrantDoc = {
+  grant?: number | null;
+  grantedUsers?: unknown[];
+  grantedGroups?: unknown[];
+};
+const PUBLIC: PageGrantDoc = {
+  grant: PageGrant.GRANT_PUBLIC,
+  grantedUsers: [],
+  grantedGroups: [],
+};
+
+const makePageSearchResult = (
+  names: string[],
+  grants: Record<string, PageGrantDoc> = {},
+): IFormattedSearchResult => ({
   meta: { total: 42, took: 5, hitsCount: names.length },
   data: names.map(
     (name): IPageWithSearchMeta => ({
-      data: { _id: oid(name), path: `/${name}` } as never,
+      data: {
+        _id: oid(name),
+        path: `/${name}`,
+        ...PUBLIC,
+        ...grants[name],
+      } as never,
       meta: {
         bookmarkCount: 0,
         elasticSearchResult: {
@@ -188,51 +208,124 @@ describe('AttachmentSearchResultAggregator', () => {
   });
 
   describe('searchPrimary facet=all, from=0', () => {
-    it('embeds attachment hits only for primary pages the viewer may see, keeping the formatted page items', async () => {
-      const pageResult = makePageSearchResult([
-        'page1',
-        'page2',
-        'listed-but-hidden',
-      ]);
+    it('embeds attachment hits only for primary pages whose content page search shows the viewer, keeping the formatted page items', async () => {
+      const pageResult = makePageSearchResult(
+        ['page1', 'own', 'listed-but-hidden'],
+        {
+          own: {
+            grant: PageGrant.GRANT_OWNER,
+            grantedUsers: [new mongoose.Types.ObjectId('a'.repeat(24))],
+          },
+          // Listed under the default list policy, but its content is hidden
+          'listed-but-hidden': {
+            grant: PageGrant.GRANT_OWNER,
+            grantedUsers: [new mongoose.Types.ObjectId()],
+          },
+        },
+      );
       pageSearchFn.mockResolvedValue(pageResult);
       client.searchAttachments.mockResolvedValue(
         makeAttachmentResponse([
           { pageId: idOf('page1'), attachmentId: 'att1' },
+          { pageId: idOf('own'), attachmentId: 'att-own' },
           { pageId: idOf('listed-but-hidden'), attachmentId: 'att-hidden' },
           { pageId: idOf('not-in-primary'), attachmentId: 'att-other' },
         ]),
       );
-      client.searchAccessiblePages.mockResolvedValue(accessible(idOf('page1')));
+      // The page result alone decides; the page index is not consulted
+      client.searchAccessiblePages.mockRejectedValue(new Error('es down'));
+      const owner: AttachmentSearchViewer = {
+        user: mock<IUserHasId>({ _id: 'a'.repeat(24) }),
+        userGroups: [],
+      };
 
-      const result = await makeAggregator().searchPrimary(inputFor(viewer), {
+      const result = await makeAggregator().searchPrimary(inputFor(owner), {
         facet: 'all',
         from: 0,
         size: 20,
       });
 
-      expect(client.searchAccessiblePages).toHaveBeenCalledWith(
-        [idOf('page1'), idOf('listed-but-hidden')],
-        viewer,
-        NO_FILTER,
-      );
       expect(result.items.map((i) => i.data)).toEqual(
         pageResult.data.map((i) => i.data),
       );
       expect(result.items.map((i) => i.meta?.elasticSearchResult)).toEqual(
         pageResult.data.map((i) => i.meta?.elasticSearchResult),
       );
-      expect(attachmentIdsOf(result.items)).toEqual({ page1: ['att1'] });
+      expect(attachmentIdsOf(result.items)).toEqual({
+        page1: ['att1'],
+        own: ['att-own'],
+      });
       expect(result.meta.total).toBe(42);
       expect(result.facet).toBe('all');
       expect(result.primarySlot).toBe('pages');
     });
 
-    it('matches attachment content with the keyword terms only and checks the operators on the parent page', async () => {
+    it.each([
+      { who: 'a member', groups: [oid('group1')], kept: true },
+      { who: 'a non-member', groups: [oid('group2')], kept: false },
+      { who: 'a guest', groups: null, kept: false },
+    ])('keeps the hits of a group page for $who only when the group grants it', async ({
+      groups,
+      kept,
+    }) => {
+      pageSearchFn.mockResolvedValue(
+        makePageSearchResult(['groupPage'], {
+          groupPage: {
+            grant: PageGrant.GRANT_USER_GROUP,
+            grantedGroups: [{ item: oid('group1'), type: 'UserGroup' }],
+          },
+        }),
+      );
+      client.searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([
+          { pageId: idOf('groupPage'), attachmentId: 'g' },
+        ]),
+      );
+      const who: AttachmentSearchViewer =
+        groups == null ? guest : { user: viewer.user, userGroups: groups };
+
+      const result = await makeAggregator().searchPrimary(inputFor(who), {
+        facet: 'all',
+        from: 0,
+        size: 20,
+      });
+
+      expect(attachmentIdsOf(result.items)).toEqual(
+        kept ? { groupPage: ['g'] } : {},
+      );
+    });
+
+    it('drops the hits of a page item that carries no grant data (fail-close)', async () => {
+      pageSearchFn.mockResolvedValue(
+        makePageSearchResult(['page1', 'noGrant'], {
+          noGrant: { grant: undefined },
+        }),
+      );
+      client.searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([
+          { pageId: idOf('page1'), attachmentId: 'a' },
+          { pageId: idOf('noGrant'), attachmentId: 'b' },
+        ]),
+      );
+
+      const result = await makeAggregator().searchPrimary(inputFor(guest), {
+        facet: 'all',
+        from: 0,
+        size: 20,
+      });
+
+      expect(result.items.map((i) => nameOf(i.data._id))).toEqual([
+        'page1',
+        'noGrant',
+      ]);
+      expect(attachmentIdsOf(result.items)).toEqual({ page1: ['a'] });
+    });
+
+    it('matches attachment content with the keyword terms only', async () => {
       pageSearchFn.mockResolvedValue(makePageSearchResult(['page1']));
       client.searchAttachments.mockResolvedValue(
         makeAttachmentResponse([{ pageId: idOf('page1'), attachmentId: 'a' }]),
       );
-      client.searchAccessiblePages.mockResolvedValue(accessible(idOf('page1')));
       const input = inputFor(viewer, {
         match: ['minutes'],
         author: ['jim'],
@@ -249,10 +342,6 @@ describe('AttachmentSearchResultAggregator', () => {
       expect(body).toContain('"query":"minutes"');
       expect(body).not.toContain('jim');
       expect(body).not.toContain('/user');
-      expect(client.searchAccessiblePages.mock.calls[0][2]).toEqual({
-        terms: { ...NO_FILTER.terms, author: ['jim'], not_prefix: ['/user'] },
-        resolvedFilterData: input.resolvedFilterData,
-      });
     });
 
     it('does not search attachments for an operator-only query', async () => {
@@ -264,23 +353,6 @@ describe('AttachmentSearchResultAggregator', () => {
       );
 
       expect(client.searchAttachments).not.toHaveBeenCalled();
-      expect(result.items.map((i) => nameOf(i.data._id))).toEqual(['page1']);
-      expect(attachmentIdsOf(result.items)).toEqual({});
-    });
-
-    it('keeps the page results but drops every attachment hit when the permission check fails', async () => {
-      pageSearchFn.mockResolvedValue(makePageSearchResult(['page1']));
-      client.searchAttachments.mockResolvedValue(
-        makeAttachmentResponse([{ pageId: idOf('page1'), attachmentId: 'a' }]),
-      );
-      client.searchAccessiblePages.mockRejectedValue(new Error('es down'));
-
-      const result = await makeAggregator().searchPrimary(inputFor(viewer), {
-        facet: 'all',
-        from: 0,
-        size: 20,
-      });
-
       expect(result.items.map((i) => nameOf(i.data._id))).toEqual(['page1']);
       expect(attachmentIdsOf(result.items)).toEqual({});
     });

@@ -90,3 +90,23 @@ export const snippetGrantFieldsOf = (
     ),
   ),
 });
+
+/** The viewer as page search receives it: the user and the ids of their groups. */
+export const snippetViewerOf = (
+  user: { readonly _id?: unknown } | null | undefined,
+  userGroups: readonly unknown[] | null | undefined,
+): SnippetViewer => ({
+  userId: user?._id == null ? null : String(user._id),
+  userGroupIds: userGroups?.map((id) => String(id)) ?? null,
+});
+
+/** Page search's snippet decision for a page document and a viewer. */
+export const canShowSnippetOfPage = (
+  page: PageGrantDocumentFields,
+  user: { readonly _id?: unknown } | null | undefined,
+  userGroups: readonly unknown[] | null | undefined,
+): boolean =>
+  canShowSnippetForGrant(
+    snippetGrantFieldsOf(page),
+    snippetViewerOf(user, userGroups),
+  );

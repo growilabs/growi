@@ -2,7 +2,10 @@ import type { IUserHasId } from '@growi/core';
 
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { ResolvedFilterData } from '~/server/interfaces/search';
-import { canShowSnippetForGrant } from '~/server/service/search/can-show-snippet';
+import {
+  canShowSnippetForGrant,
+  snippetViewerOf,
+} from '~/server/service/search/can-show-snippet';
 import type ElasticsearchDelegator from '~/server/service/search-delegator/elasticsearch';
 
 import {
@@ -147,10 +150,7 @@ export const createSearchAccessiblePages =
       );
     }
 
-    const snippetViewer = {
-      userId: user?._id.toString() ?? null,
-      userGroupIds: userGroups?.map((id) => id.toString()) ?? null,
-    };
+    const snippetViewer = snippetViewerOf(user, userGroups);
     const requested = new Set(uniqueIds);
 
     const indexed = response.hits.hits.flatMap((hit): AccessiblePage[] => {

@@ -318,8 +318,8 @@
   - _Boundary: integration_
 
 - [ ] 10.8 primary / secondary 検索性能とスナップ safety net を perf test で確認する (`attachment-search-performance.integ.ts`: 手で走らせる測定。`ATTACHMENT_SEARCH_PERF=1` のときだけ動き、CI では飛ばす。測定値は research.md 8.7)
-  - primary p95 が機能有効時に既存 Page 検索比 +30% 以内 (facet=`all` 1 ページ目 msearch 並列、2 ページ目以降 Page 単体と同等) — **未達**。2 ページ目以降は同等だが、1 ページ目は手元の測定で +43〜82% (research.md 8.7)
-  - secondary p95 が 500ms 以内 (非同期なので初期描画に影響しない) — 手元の測定で 29〜56ms
+  - primary p95 が機能有効時に既存 Page 検索比 +30% 以内 (facet=`all` 1 ページ目 msearch 並列、2 ページ目以降 Page 単体と同等) — **未達**。2 ページ目以降は同等だが、1 ページ目は手元の測定で +48〜53% (権限確認の往復をやめる前は +50〜80%。research.md 8.7)
+  - secondary p95 が 500ms 以内 (非同期なので初期描画に影響しない) — 手元の測定で 32〜71ms
   - primary 閾値超過時 facet=`all` が facet=`pages` 相当に degrade、facet=`attachments` が `primaryResultIncomplete: true` を返す safety net (`attachment-search-result-aggregator.spec.ts` で固定済み)
   - secondary 閾値超過時 enrichment skip で primary のみ返ること (`attachment-search-result-aggregator.spec.ts` で固定済み)
   - _Requirements: 9.1, 9.2_

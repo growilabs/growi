@@ -334,6 +334,7 @@ sequenceDiagram
             Del->>ES: parallel search
             ES-->>Del: { pages: top N, attachments: top N }
             Svc->>Svc: pages を primary として確定、attachments は「pageId が primary 20 件に一致するもののみ」を primary に埋め込み (解釈 A)、不一致分は破棄
+            Note over Svc: 埋め込むのは、ページ検索がその viewer に本文の断片を見せるページ (primary の各ページの MongoDB 文書に canShowSnippet と同じ規則を当てて判定。ES・MongoDB への追加の問い合わせはしない)
         else from > 0 (2 ページ目以降)
             Svc->>Del: page_index search (search_after カーソル)
             Del->>ES: page_index search
@@ -842,13 +843,15 @@ interface ISecondarySearchResult {
 | facet | primary の動作 | secondary の動作 |
 |---|---|---|
 | `pages` | 既存 Page 検索経路のみ (attachments_index を触らない、aggregator を呼ばない) | 呼ばない |
-| `all` | pages を優先 (既存 Page 検索と同じクエリ = 演算子込み)。from==0 のみ attachments_index を本文語だけで同時取得し、primary 20 件と pageId が一致するものを解釈 A で埋め込み | primary の 20 pageId に `terms` で絞った attachments_index 検索 (本文語のみ) |
+| `all` | pages を優先 (既存 Page 検索と同じクエリ = 演算子込み)。from==0 のみ attachments_index を本文語だけで同時取得し、primary 20 件と pageId が一致し、かつページ検索がそのページの本文の断片を viewer に見せるものだけを解釈 A で埋め込み | primary の 20 pageId に `terms` で絞った attachments_index 検索 (本文語のみ) |
 | `attachments` | attachments_index を本文語だけで優先検索 → unique pageIds (≤ size × k 件) を `searchAccessiblePages` に渡し、viewer filter と演算子の絞り込み条件を満たすページに属するヒットだけを残す | primary の parent page メタは取得済みのため通常 no-op |
 
 **検索演算子の振り分け** (Req 4.5 / 4.6):
 - `QueryTerms` を `AttachmentKeywordTerms` (`match` / `not_match` / `phrase` / `not_phrase`) と `PageFilterTerms` (それ以外の全キー) に分ける pure function `splitQueryTerms()` を置く。`PageFilterTerms` を「`AttachmentKeywordTerms` 以外すべて」と定義するため、今後 `QueryTerms` に演算子が増えても自動的に親ページ側に入る (本文語に紛れ込まない)
 - 添付本文には `AttachmentKeywordTerms` だけを当てる。親ページには `PageFilterTerms` + `resolvedFilterData` を viewer filter と一緒に当てる
-- `facet=all` の primary は既存 Page 検索そのものなので演算子は最初から効いており、添付ヒットは primary の pageId に限定されるため追加処理は要らない
+- `facet=all` の primary は既存 Page 検索そのものなので演算子は最初から効いており、添付ヒットは primary の pageId に限定されるため演算子の追加処理は要らない
+- `facet=all` の 1 ページ目の権限判定は、primary のページ検索の結果だけで行う。ページ検索は viewer filter (`filterPagesByViewer`)・演算子・`security:disableUserPages` (`parseSearchQuery` で演算子に変換済み) をすでに当てており、結果の各項目はページ検索が本文の断片の表示を決めたのと同じ MongoDB のページ文書を持っている。そこで各項目に `canShowSnippetOfPage` (`SearchService.canShowSnippet` と同じ関数) を当て、本文の断片が見せられるページの添付ヒットだけを残す。page_index と MongoDB への問い合わせ (`searchAccessiblePages`) はこの経路では行わない。権限情報 (`grant`) を持たない項目のヒットは捨てる (fail-close)
+- page_index 側の権限項目でも同じ規則を当てる `searchAccessiblePages` の判定は、MongoDB 側が見せると判断したページを、page_index が古いときに余計に落とすだけなので、「ページ検索が本文の断片を見せるページだけ」という規則の上では要らない
 - 本文語が空 (例: `author:jim` だけのクエリ) のときは、添付 index には問い合わせない。`facet=attachments` は空 items を返し、`facet=all` は添付ヒットを付けない
 - 検索クエリが named query (`nq:`) により DEFAULT 以外の delegator に解決された場合は、facet の指定にかかわらず `pages` として扱い aggregator を呼ばない (添付 index は DEFAULT の全文検索 delegator にだけ存在するため)
 
@@ -1219,7 +1222,7 @@ interface IAttachmentHit {
 - **System Errors (5xx)**: 抽出サービス到達不可 / ES エラーは apps/app 側で握りつぶし、「検索対象外」として保存を継続 (Req 1)
 - **Extraction-specific errors**: 上流が返す `unsupported_format` / `file_too_large` / `extraction_timeout` / `service_busy` / `file_encrypted` / `resource_limit_exceeded` / `extraction_failed` を `AttachmentTextExtractorService` で `ExtractionOutcome` に統一正規化。`encrypted` と `resourceLimit` も他の失敗と同じく、メタデータだけの文書を登録し ExtractionFailureLog に記録する (Req 2.4 / 8.3)。上流は成功時に `pages[]` を最低 1 要素返す (中身が空の場合あり) ので、画像だけの PDF なども成功として 1 文書が登録される
 - **到達不可**: ネットワーク層 throw を catch して `serviceUnreachable` に畳み込む
-- **Permission 判定失敗**: `facet=attachments` primary または secondary の viewer 再検証で `searchAccessiblePages` が失敗した場合、Aggregator は該当添付ヒットを全て除外する fail-close 経路に合流 (漏洩防止優先)。facet=`all` primary では pages viewer filter が有効なので別経路で degrade
+- **Permission 判定失敗**: `facet=attachments` primary または secondary の viewer 再検証で `searchAccessiblePages` が失敗した場合、Aggregator は該当添付ヒットを全て除外する fail-close 経路に合流 (漏洩防止優先)。facet=`all` の 1 ページ目は `searchAccessiblePages` を使わず、ページ検索の結果の MongoDB 文書から判定する (権限情報の無い項目のヒットは捨てる)
 - **Permission 判定は「返ってきたものだけ許可」(fail-close 徹底)**: `searchAccessiblePages` の応答に含まれた pageId だけを許可し、含まれない pageId (存在しない・権限が無い・絞り込み条件を満たさない) は理由を区別せず一律除外する。shard の一部失敗 (`_shards.failed > 0`) を含む応答は判定に使わず、全件除外する。**「応答に無い pageId を許可する」fail-open ブランチは絶対に実装しない**
 - **Orphan sweeper 失敗**: `AttachmentOrphanSweeper` の失敗は `rebuildIndex` 全体の成功を阻害しない。pino に構造化ログを記録し、alias swap は続行 (query-time permission 判定によりユーザ可視性は守られるため、cleanup 遅延は許容)
 - **rebuild window 中の dual-write 失敗**: tmp index 側の write 失敗は live 側の成功を阻害しない (pino 記録のみ、real-time event は成功扱い)。tmp 側だけに書き漏れが発生した場合、alias swap 後に当該添付が検索で出ないが、次回の rebuild で救済。ユーザーが遭遇する期間は短く、可視性に致命的な影響はないと判断

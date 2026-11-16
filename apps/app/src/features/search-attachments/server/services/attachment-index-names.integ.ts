@@ -49,17 +49,31 @@ vi.mock('~/utils/logger', () => ({
 }));
 
 const RUN = uniqueRunToken();
-// One page index name is a prefix of the other
-const TENANT_A = `fix_attnames_${RUN}`;
-const TENANT_B = `fix_attnames_${RUN}b`;
-const NO_ALIAS = `fix_attnames_${RUN}c`;
+// Every case has tenants of its own: vitest does not stop a timed-out test,
+// so a shared tenant could still be rebuilt while the next case reads it.
+// Within a pair, one page index name is a prefix of the other.
+const tenantPair = (prefix: string) => ({
+  shorter: `fix_attnames_${RUN}${prefix}`,
+  longer: `fix_attnames_${RUN}${prefix}b`,
+});
+const PAIR_1 = tenantPair('x');
+const PAIR_2 = tenantPair('y');
+const NO_ALIAS_WRITE = `fix_attnames_${RUN}c`;
+const NO_ALIAS_DELETE = `fix_attnames_${RUN}d`;
 
 describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
   'attachment index names (real Elasticsearch)',
   () => {
     let client: ReturnType<typeof getClient>;
     const createdAttachmentIds: string[] = [];
-    const allNames = [TENANT_A, TENANT_B, NO_ALIAS].map(attachmentIndexNames);
+    const allNames = [
+      PAIR_1.shorter,
+      PAIR_1.longer,
+      PAIR_2.shorter,
+      PAIR_2.longer,
+      NO_ALIAS_WRITE,
+      NO_ALIAS_DELETE,
+    ].map(attachmentIndexNames);
 
     const extensionFor = (names: AttachmentIndexNames) =>
       new AttachmentSearchDelegatorExtension(client, names);
@@ -106,8 +120,8 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
     });
 
     it.each([
-      { acting: TENANT_A, other: TENANT_B },
-      { acting: TENANT_B, other: TENANT_A },
+      { acting: PAIR_1.shorter, other: PAIR_1.longer },
+      { acting: PAIR_2.longer, other: PAIR_2.shorter },
     ])('creating and rebuilding the attachment index of $acting leaves $other untouched', async ({
       acting,
       other,
@@ -136,11 +150,9 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
 
       expect(await aliasTargets(actingNames.alias)).toEqual([third]);
       expect(await snapshot(otherNames)).toEqual(before);
-    });
+    }, 30_000);
 
     describe('while the alias does not exist', () => {
-      const names = attachmentIndexNames(NO_ALIAS);
-
       const indexerWith = (extension: AttachmentSearchDelegatorExtension) =>
         new AttachmentSearchIndexer({
           extractor: mock<AttachmentTextExtractorService>({
@@ -169,6 +181,7 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
       });
 
       it('fails a write into a logged error without creating an index named like the alias', async () => {
+        const names = attachmentIndexNames(NO_ALIAS_WRITE);
         const indexer = indexerWith(extensionFor(names));
         const attachment = await prisma.attachments.create({
           data: {
@@ -209,13 +222,14 @@ describe.skipIf(process.env.ELASTICSEARCH_URI == null)(
         await extensionFor(names).ensureAttachmentIndex();
         expect(await aliasTargets(names.alias)).toEqual([names.indices[0]]);
         await deleteIndices(names.indices);
-      });
+      }, 30_000);
 
       it('lets a delete pass without creating anything', async () => {
+        const names = attachmentIndexNames(NO_ALIAS_DELETE);
         const indexer = indexerWith(extensionFor(names));
 
         await expect(
-          indexer.onDetach(`${NO_ALIAS}-gone`),
+          indexer.onDetach(`${NO_ALIAS_DELETE}-gone`),
         ).resolves.toBeUndefined();
 
         expect(errorLogs).toEqual([]);

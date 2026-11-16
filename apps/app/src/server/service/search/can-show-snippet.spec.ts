@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 
 import {
   canShowSnippetForGrant,
+  canShowSnippetOfPage,
   snippetGrantFieldsOf,
 } from './can-show-snippet';
 
@@ -138,5 +139,50 @@ describe('snippetGrantFieldsOf', () => {
       grantedUserIds: [],
       grantedGroupIds: [],
     });
+  });
+});
+
+describe('canShowSnippetOfPage', () => {
+  const userId = new mongoose.Types.ObjectId();
+  const groupId = new mongoose.Types.ObjectId();
+  const user = { _id: userId };
+
+  it.each([
+    [
+      'the owner, by ObjectId',
+      { grant: PageGrant.GRANT_OWNER, grantedUsers: [userId] },
+      user,
+      [],
+      true,
+    ],
+    [
+      'a group member, by ObjectId',
+      {
+        grant: PageGrant.GRANT_USER_GROUP,
+        grantedGroups: [{ item: groupId, type: 'UserGroup' }],
+      },
+      user,
+      [groupId],
+      true,
+    ],
+    [
+      'a guest on an owner page',
+      { grant: PageGrant.GRANT_OWNER, grantedUsers: [userId] },
+      null,
+      null,
+      false,
+    ],
+    [
+      'a guest on a group page',
+      {
+        grant: PageGrant.GRANT_USER_GROUP,
+        grantedGroups: [{ item: groupId, type: 'UserGroup' }],
+      },
+      null,
+      null,
+      false,
+    ],
+  ])('judges a page document for %s', (_, doc, viewerUser, groups, expected) => {
+    expect(canShowSnippetOfPage(doc, viewerUser, groups)).toBe(expected);
   });
 });

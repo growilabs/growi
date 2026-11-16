@@ -8,10 +8,14 @@
  *
  * Page items always come from the regular page search pipeline (search +
  * result formatting), so they carry exactly what `/_api/search` returns.
- * Every attachment hit, on every path, passes searchAccessiblePages for the
- * viewer and the query's operators before it is returned; any failure there
- * drops the hits (fail-close). Only the keyword part of the query is matched
- * against attachment content.
+ * An attachment hit is returned only when page search would show the same
+ * viewer the content of its parent page:
+ * - facet=all first page: decided from the page result items themselves
+ *   (page search already applied the viewer filter and the operators, and its
+ *   items carry the MongoDB documents it judged snippets by)
+ * - every other path: searchAccessiblePages for the viewer and the query's
+ *   operators; any failure there drops the hits (fail-close)
+ * Only the keyword part of the query is matched against attachment content.
  *
  * Safety net: if primary latency > PRIMARY_TIMEOUT_MS, degrade gracefully.
  */
@@ -25,6 +29,7 @@ import type {
   QueryTerms,
   ResolvedFilterData,
 } from '~/server/interfaces/search';
+import { canShowSnippetOfPage } from '~/server/service/search/can-show-snippet';
 import loggerFactory from '~/utils/logger';
 
 import { buildAttachmentSearchQuery } from '../queries/build-attachment-search-query';
@@ -207,6 +212,25 @@ const failureKind = (err: unknown): 'timeout' | 'error' =>
 const pageIdOf = (item: IPageWithSearchMeta): string =>
   item.data._id.toString();
 
+/**
+ * The ids of the page result items whose content page search showed the
+ * viewer, by the same rule on the same MongoDB documents. An item without
+ * grant data is not a page document and is dropped (fail-close).
+ */
+const snippetVisiblePageIds = (
+  items: readonly IPageWithSearchMeta[],
+  { user, userGroups }: AttachmentSearchViewer,
+): Set<string> =>
+  new Set(
+    items
+      .filter(
+        ({ data }) =>
+          data.grant !== undefined &&
+          canShowSnippetOfPage(data, user, userGroups),
+      )
+      .map(pageIdOf),
+  );
+
 type SplitInput = {
   keywords: AttachmentKeywordTerms;
   filter: PageSearchFilter;
@@ -271,7 +295,7 @@ export class AttachmentSearchResultAggregator {
   }
 
   // --------------------------------------------------------------------------
-  // Permission gate shared by every path
+  // Permission gate for facet=attachments and the secondary phase
   // --------------------------------------------------------------------------
 
   /**
@@ -365,28 +389,10 @@ export class AttachmentSearchResultAggregator {
     }
 
     // Interpretation A: only attachment hits on pages of the primary page result
-    const pageIdSet = new Set(pageResult.data.map(pageIdOf));
-    const candidateHits = attachmentResponse.hits.hits.filter((h) =>
-      pageIdSet.has(h._source.pageId),
-    );
-
-    let visiblePageIds = new Set<string>();
-    try {
-      visiblePageIds = await this.findVisiblePageIds(
-        [...new Set(candidateHits.map((h) => h._source.pageId))],
-        split,
-        this.PRIMARY_TIMEOUT_MS,
-      );
-    } catch (err) {
-      // fail-close: keep the page results, embed no attachment hits
-      logger.warn(
-        { err, failure: failureKind(err) },
-        'searchPrimaryAll: permission check failed — dropping attachment hits (fail-close)',
-      );
-    }
+    const visiblePageIds = snippetVisiblePageIds(pageResult.data, input.viewer);
 
     const attachmentHitsByPageId = new Map<string, IAttachmentHit[]>();
-    for (const hit of candidateHits) {
+    for (const hit of attachmentResponse.hits.hits) {
       const pageId = hit._source.pageId;
       if (!visiblePageIds.has(pageId)) continue;
       attachmentHitsByPageId.set(pageId, [
