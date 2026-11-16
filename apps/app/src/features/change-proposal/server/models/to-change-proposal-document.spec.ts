@@ -35,6 +35,9 @@ const emptyOperation: ChangeproposalsOperations = {
   revertTarget: null,
   revertedByProposalId: null,
   revertedAt: null,
+  approvedBy: null,
+  approvedChannel: null,
+  decisionToken: null,
 };
 
 const operationRow = (
@@ -56,6 +59,9 @@ const proposalRow = (fields: Partial<changeproposals>): changeproposals => ({
   applyLease: null,
   expiresAt: null,
   perPageNotifications: true,
+  purpose: null,
+  reviewers: [],
+  reviews: [],
   createdAt: CREATED_AT,
   updatedAt: CREATED_AT,
   ...fields,

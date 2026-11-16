@@ -43,6 +43,9 @@ export const operationSummarySelect = {
     revertTarget: true,
     revertedByProposalId: true,
     revertedAt: true,
+    approvedBy: true,
+    approvedChannel: true,
+    decisionToken: true,
   },
 } satisfies Prisma.ChangeproposalsOperationsDefaultArgs;
 
@@ -60,6 +63,9 @@ export const summarySelect = {
   applyLease: true,
   expiresAt: true,
   perPageNotifications: true,
+  purpose: true,
+  reviewers: true,
+  reviews: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.changeproposalsSelect;

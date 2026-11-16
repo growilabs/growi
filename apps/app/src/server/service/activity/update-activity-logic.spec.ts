@@ -53,6 +53,7 @@ function makeActivity(overrides: { userId?: string | null; createdAt?: Date }) {
       pagePath: null,
       pageId: null,
       fileSize: null,
+      reviewChannel: null,
     },
     event: null,
     eventModel: null,

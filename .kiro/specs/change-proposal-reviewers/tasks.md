@@ -20,7 +20,7 @@
   - 型の検査が通り、server と client の両方から、足した型と定数を import できる状態になっている
   - _Requirements: 1.7, 1.9, 3.6, 5.1, 5.2, 5.7_
   - _Boundary: interfaces, proposal-view-parts（役割の初期値）, client の spec の fixture_
-- [ ] 1.2 Prisma の schema と migration に、承認者・判断の記録・承認の記録を足す
+- [x] 1.2 Prisma の schema と migration に、承認者・判断の記録・承認の記録を足す
   - 文書に、承認者（外した人・日時つき）、変更の目的、判断の記録を足し、操作に、承認した人・経路・求めの印を足す。共有の activity の snapshot の型に、経路の項目（`reviewChannel`）を足す。Prisma の client を生成し直す
   - 配列の要素に張る索引を、schema に同じ名前の `@@index` として書けるかを、最初に小さく試す（既存に前例が無い）。受け付けなければ、migration の `createIndex` だけで作り、schema には書かない。どちらにしたかと理由を記録する
   - 新しい migration（ESM。`up` と `down` を名前付きで export する）で、承認者と判断の記録を空の配列に補完し、承認者の一覧用の索引（`lifecycle`、承認者の ID、`_id`）を作る
@@ -254,3 +254,7 @@
 - 1.1: `DecisionResponse.reason` は `OperationReason | null`、既存の `ApplyResult.reason` は省略できる項目。6.3 と 7.1（OpenAPI）で形をそろえる。
 - 1.1: `ReviewerView` / `UserSummary` / `ReviewDecisionView` / `ApprovalView` は design.md に型の定義が無く、実装者が決めた。4.3 で形を変えるときは、この型と一緒に直す。
 - 統合テストは `env -u MONGO_URI pnpm vitest run <名前>` で回す（MONGO_URI を付けるとメインの node_modules の symlink が壊れる）。
+- 1.2: 配列の複合型の要素の索引 `@@index([lifecycle, reviewers.id, id])` を Prisma は受け付けた（`prisma validate` と generate で確認）。schema と migration に同じ名前（`lifecycle_1_reviewers.id_1__id_1`）で書いた。複合型の名前は既存の付け方に合わせて `ChangeproposalsReviewers` / `ChangeproposalsReviews`（design の `ReviewerRef` / `Review` とは違う）。
+- 1.2: Prisma の MongoDB は、配列の項目を渡さずに create すると、その項目を文書に保存しない。読むときは `[]` が返るので表示には影響しないが、DB を直接条件にする問い合わせ（`$size`、`$exists` など）は、項目の無い文書と食い違う。`createProposal`（`change-proposal.ts`）は、いつも `reviewers`（入力 ?? `[]`）と `reviews: []` を渡す。1.3 か 3.3 で行う。
+- 1.2: `summarySelect` / `operationSummarySelect` への新しい項目の追加は 1.2 で済んでいる（schema の変更で型検査が壊れるため）。1.3 に残るのは、変換処理（`toProposalFields` / `toOperationState`）に通すこと、`ChangeProposalDocument` の型に足すこと、承認日時を消す 3 か所で `approvedBy` / `approvedChannel` / `decisionToken` も消すこと。`reviews` は一覧の取得でも読み出されるので、全体の却下の記録を依頼した人にだけ返す絞り込みは、応答を組み立てる側で守る。
+- 1.2: 統合テストの索引の完全一致は、CI の雛形 DB（すべての migration を当てたもの）で新しい索引が入ると落ちる。今後 `changeproposals` の索引を足すときも、`20261110120000-add-change-proposal-indexes.integ.ts` は名前の包含で確かめる形のままにする。

@@ -14,6 +14,8 @@ describe('add-change-proposal-indexes', () => {
     migrate = await import('./20261110120000-add-change-proposal-indexes');
   });
 
+  // Later migrations add more indexes to changeproposals, and CI clones a DB
+  // that already has every migration applied, so only these six are checked by name.
   it('gives changeproposals its six indexes, four of them sparse, and no TTL index', async () => {
     await migrate.up(mongoose.connection.db);
 
@@ -25,8 +27,8 @@ describe('add-change-proposal-indexes', () => {
       'revertOf_1',
       'basedOn.proposalId_1',
     ];
-    expect([...byName.keys()].filter((name) => name !== '_id_').sort()).toEqual(
-      [...denseNames, ...sparseNames].sort(),
+    expect([...byName.keys()]).toEqual(
+      expect.arrayContaining([...denseNames, ...sparseNames]),
     );
     for (const name of denseNames) {
       expect(byName.get(name)?.sparse, name).not.toBe(true);
