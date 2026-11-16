@@ -40,24 +40,12 @@ import {
   RESPONSE_KINDS,
   type RelationSettings,
 } from '@growi/chat';
-import type { IUserHasId, PageGrant } from '@growi/core';
-import { isCreatablePage } from '@growi/core/dist/utils/page-path-utils';
+import type { PageGrant } from '@growi/core';
 import mongoose from 'mongoose';
 import urljoin from 'url-join';
 
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
-// `service/activity.ts` (a legacy file) shadows the `service/activity/`
-// directory's barrel -- `~/server/service/activity` alone resolves to that
-// file, not `index.ts`. Explicit `/index` is required (see
-// `~/server/middlewares/add-activity.ts` for the same pattern).
-import {
-  beginActivity,
-  type PendingActivityContext,
-  pendingActivityContext,
-  recordFailsafeAttempt,
-} from '~/server/service/activity/index';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
@@ -82,44 +70,22 @@ import { ChatProcessedRequest } from '../models/chat-processed-request';
 import { toWireChannelPermission } from '../settings/allowed-channels';
 import { ChatChannelPermission } from '../settings/models/chat-channel-permission';
 import {
+  type CommandAuditContext,
+  performWriteCommand,
+  type WriteActor,
+  type WriteCommandResult,
+} from './perform-write-command';
+import {
   type ResolvedActor,
   resolveActor,
   resolveReadDenial,
 } from './resolve-actor';
 
+export type { CommandAuditContext };
+
 const logger = loggerFactory(
   'growi:features:chat-integration:command-endpoint',
 );
-
-/**
- * The resolved GROWI user permitted to perform a write -- `ResolvedActor`'s
- * `user` field, narrowed to non-null. `resolveActor`/`resolveWriter`
- * below is what guarantees a value reaching `performWriteCommand` is never
- * null: `writeDenied` gates every path that would otherwise leave `user`
- * empty (not-linked, inactive) before it gets this far.
- */
-type WriteActor = NonNullable<ResolvedActor['user']>;
-
-/**
- * The request-time facts `beginActivity`'s context needs that only the
- * Express layer has (`req.ip` / `req.originalUrl`) or that must be captured
- * before any async work runs (`requestArrivedAt`). `peer-router.ts`'s
- * `commandHandler` captures `requestArrivedAt = new Date()` as the very
- * first statement of the request, before even reading `chatPeer.body`, and
- * passes it through here -- design.md is explicit that the Activity row's
- * `createdAt` must be the request's arrival time, not whenever `handle`
- * happens to reach the write-command branch deep inside `computeResponse`.
- *
- * Optional so the many read-only-command call sites (this file's own
- * `.spec.ts`, task 5.1's tests) do not need to fabricate one; a write
- * command reaching `handle` with no context still gets a (less precise, but
- * safe) `new Date()` fallback rather than throwing -- see `handle` below.
- */
-export interface CommandAuditContext {
-  readonly ip?: string;
-  readonly endpoint?: string;
-  readonly requestArrivedAt: Date;
-}
 
 export interface CommandEndpoint {
   handle(
@@ -405,152 +371,46 @@ const handleLinkPreview = async (
   return { kind: RESPONSE_KINDS.linkPreview, ...preview };
 };
 
-/**
- * Performs a write command's page creation (design.md: "書き込みを行うコマンド...
- * はそのまま要る"),
- * checking permission and path conflict, and recording an Activity for every
- * outcome once past that point.
- *
- * `beginActivity` runs BEFORE the `isCreatablePage` / path-existence checks,
- * not after: by the time `performWriteCommand` is called, `resolveActor`
- * has already determined the actor is real and permitted to write
- * (`resolveWriter` gates `writeDenied` before this function is ever
- * reached) -- so `isCreatablePage` failing and a path conflict are both
- * "the handler's own validation, run for an authenticated operator", the
- * same category `activity-recording.md`'s Rule 2 records as
- * `ACTION_UNSETTLED` for a normal apiv3 route (validators/handler errors
- * that run after `addActivity`). Only `writeDenied` (not-linked / inactive /
- * read-only -- resolved before this function runs) is the "no operator yet"
- * category that skips recording (design.md: "断った要求... は記録しない").
- *
- * `isCreatablePage` is the one gate GROWI's own `determinePath` applies that
- * `pageService.create` itself does not (design.md's "既存の機能を呼ぶだけ
- * では要件を満たせない" > "ページ作成"). The path-existence check runs
- * BEFORE `pageService.create`, so a duplicate answers with a DISTINCT
- * `path-conflict` code rather than being routed through
- * `pageService.create`'s generic `Error('Cannot process create')`, which
- * does not distinguish "path taken" from any other failure
- * (design.md: "他の失敗と区別できない").
- *
- * Requirements: 4.2, 4.5, 4.6.
- */
-const performWriteCommand = async (params: {
-  readonly path: string;
-  readonly actor: WriteActor;
-  readonly crowi: Crowi;
-  readonly auditContext: CommandAuditContext;
-  readonly buildBody: () => Promise<string>;
-}): Promise<CommandResponse> => {
-  const { path, actor, crowi, auditContext, buildBody } = params;
-
-  const context: PendingActivityContext = {
-    ip: auditContext.ip,
-    endpoint: auditContext.endpoint,
-    userId: actor._id.toString(),
-    username: actor.username,
-    createdAt: auditContext.requestArrivedAt,
-  };
-  const { activityId } = beginActivity(context);
-
-  // Every path below this point had `beginActivity` already called for it,
-  // so every one of them must end in either an emit (success) or this
-  // failsafe record (failure) -- this small helper is what keeps that
-  // invariant from being restated (and risking drift) at each call site.
-  const respondWithFailedAttempt = async (
-    response: CommandResponse,
-  ): Promise<CommandResponse> => {
-    // `recordFailsafeAttempt` normally fires from `registerFailsafeFinalizer`,
-    // watching `res`'s status code -- this endpoint always answers 200, so
-    // that path never triggers, and this is called directly instead
-    // (design.md: "失敗した書き込み（path-conflict など）は
-    // ACTION_UNSETTLED として残す").
-    await recordFailsafeAttempt(activityId, context);
-    return response;
-  };
-
-  try {
-    if (!isCreatablePage(path)) {
-      return await respondWithFailedAttempt(
-        errorResponse(
-          'forbidden',
-          'This path is reserved and cannot be used for a page.',
-        ),
+const toCreatePageResponse = (result: WriteCommandResult): CommandResponse => {
+  switch (result.kind) {
+    case 'created':
+      return {
+        kind: RESPONSE_KINDS.created,
+        pageUrl: urljoin(growiInfoService.getSiteUrl(), result.path),
+      };
+    case 'path-conflict':
+      return errorResponse(
+        'path-conflict',
+        'A page already exists at this path.',
       );
-    }
-
-    const Page = mongoose.model<PageDocument>('Page');
-    const alreadyExists = (await Page.exists({ path, isEmpty: false })) != null;
-    if (alreadyExists) {
-      return await respondWithFailedAttempt(
-        errorResponse('path-conflict', 'A page already exists at this path.'),
-      );
-    }
-
-    const body = await buildBody();
-    // `pageService.create` declares `user: HasObjectId` (`_id: string`), but
-    // every real caller -- including every apiv3 route's `req.user` -- passes
-    // a Mongoose document whose `_id` is actually a `Types.ObjectId`; the
-    // `Express.Request.user` augmentation types it as `IUserHasId` anyway
-    // (see `create-page.ts`'s own `req.user: IUserHasId`). Same cast, same
-    // reason: no type expresses "a hydrated document, but with `_id`
-    // widened to `string`" without a much larger shim.
-    const createdPage = await crowi.pageService.create(
-      path,
-      body,
-      actor as unknown as IUserHasId,
-      {},
-    );
-
-    // Emit before returning the response -- the intent of
-    // `activity-recording.md` Rule 1 (emit before `res.apiv3()`) applied to
-    // an endpoint with no `res` of its own: nothing may run between this
-    // emit and the caller handing the response back that could let the
-    // context be cleared first.
-    crowi.events.activity.emit('update', activityId, {
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: createdPage,
-      action: SupportedAction.ACTION_PAGE_CREATE,
-      contributor: actor,
-    });
-
-    return {
-      kind: RESPONSE_KINDS.created,
-      pageUrl: urljoin(growiInfoService.getSiteUrl(), createdPage.path),
-    };
-  } catch (error) {
-    // An unexpected failure (e.g. pageService.create's own grant validation)
-    // by a resolved, permitted actor -- same "failed write attempt" bucket
-    // as path-conflict above.
-    logger.error('Failed to create a page for a chat write command', error);
-    return await respondWithFailedAttempt(
-      errorResponse(
-        'forbidden',
-        'Could not create the page (insufficient permission, or an unexpected error).',
-      ),
-    );
-  } finally {
-    // Unconditional: emit already took the context via
-    // `pendingActivityContext.take()` on the success path, making this a
-    // no-op there; on every other path this is what actually clears it.
-    // Skipping this would leak the entry for the life of the process
-    // (`pending-activity-context.ts`: no time-based sweep).
-    pendingActivityContext.clear(activityId);
+    case 'forbidden':
+      return result.reason === 'reserved-path'
+        ? errorResponse(
+            'forbidden',
+            'This path is reserved and cannot be used for a page.',
+          )
+        : errorResponse(
+            'forbidden',
+            'Could not create the page (insufficient permission, or an unexpected error).',
+          );
   }
 };
 
-const handleCreatePage = (
+const handleCreatePage = async (
   request: Extract<CommandRequest, { kind: typeof COMMAND_NAMES.createPage }>,
   actor: WriteActor,
   crowi: Crowi,
   auditContext: CommandAuditContext,
 ): Promise<CommandResponse> =>
-  performWriteCommand({
-    path: request.path,
-    actor,
-    crowi,
-    auditContext,
-    buildBody: async () => request.body,
-  });
+  toCreatePageResponse(
+    await performWriteCommand({
+      path: request.path,
+      actor,
+      crowi,
+      auditContext,
+      buildBody: async () => request.body,
+    }),
+  );
 
 /**
  * Every writing command (`create-page`, and `agent`, which may create a page)
