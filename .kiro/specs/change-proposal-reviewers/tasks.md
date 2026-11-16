@@ -11,7 +11,7 @@
 > **公開の順序**: 承認者の機能は、viewer の承認画面と承認待ちの一覧、ai-agent の承認者の指定の入口ができるまで、機能の切り替え（1.4）を無効のままにする。それまでは、承認者を指定して作る入口と、承認者の追加が、受け付けられない。
 
 - [ ] 1. 土台: 型・データ・設定・activity の宣言
-- [ ] 1.1 承認者・判断の記録・上限・経路の型と、応答の型を宣言する
+- [x] 1.1 承認者・判断の記録・上限・経路の型と、応答の型を宣言する
   - 承認者の指定（ユーザー・ユーザーグループ・外部認証のグループ。追加した人と日時、外した人と日時）、判断の記録（却下と放棄。キーが空なら全体の却下）、経路（画面・API・AI の道具）、承認者の入力の型を宣言し、barrel から export する
   - 上限の値（承認者 20、コメント 500 文字、変更の目的 2000 文字）を定数として宣言する
   - 取得と一覧の応答の型に、役割、変更の目的、承認者の一覧、全体の却下の記録（依頼した人にだけ返す）、操作の承認者向けの値（変更後の本文、元のリビジョンが今も最新か、承認者の中での順位、承認・却下・放棄の記録）を足す。承認の応答の `in-progress` に、省略できる結果の項目を足す
@@ -246,3 +246,11 @@
   - `.kiro/specs/change-proposal-reviewers/` を削除する。最後に、steering と roadmap に、この spec への参照が残っていないことを確かめている
   - _Requirements: なし（spec-lifecycle の規則による作業）_
   - _Depends: 10.1_
+
+## Implementation Notes
+
+- 1.1: コードの名前は design.md と違う。通知の snapshot は `ReviewRequestNotificationSnapshot` / `ReviewResultNotificationSnapshot`（design は `ReviewRequestSnapshot` / `ReviewResultSnapshot`）、コメントの上限は `MAX_REVIEW_COMMENT_LENGTH`（design は `COMMENT_MAX_LENGTH`）。後続タスクは実装の名前を使う。`AnyChangeProposalNotificationSnapshot`（3 種の和集合）は 5.x で使わなければ消す。
+- 1.1: コメントと変更の目的の文字数は、既存の `MODEL_LABEL_MAX_CODE_POINTS` と同じく、コードポイントで数える（`.length` は使わない）。3.3 と 6.3 で守る。
+- 1.1: `DecisionResponse.reason` は `OperationReason | null`、既存の `ApplyResult.reason` は省略できる項目。6.3 と 7.1（OpenAPI）で形をそろえる。
+- 1.1: `ReviewerView` / `UserSummary` / `ReviewDecisionView` / `ApprovalView` は design.md に型の定義が無く、実装者が決めた。4.3 で形を変えるときは、この型と一緒に直す。
+- 統合テストは `env -u MONGO_URI pnpm vitest run <名前>` で回す（MONGO_URI を付けるとメインの node_modules の symlink が壊れる）。

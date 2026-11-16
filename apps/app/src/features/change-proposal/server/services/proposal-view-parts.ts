@@ -140,6 +140,7 @@ export const toProposalHeaderView = (args: {
       : { lastAppliedAt: lastAppliedAt.toISOString() }),
     status: deriveProposalStatus(proposal.lifecycle, visible),
     isRequester,
+    viewerRole: isRequester ? 'requester' : 'other',
     ...(proposal.revertOf == null ? {} : { revertOf: proposal.revertOf }),
     ...(isRequester
       ? {

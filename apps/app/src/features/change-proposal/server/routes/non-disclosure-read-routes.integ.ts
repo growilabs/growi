@@ -402,7 +402,9 @@ describe('change proposals never disclose pages a viewer cannot see (read routes
         'operations',
         'requester',
         'status',
+        'viewerRole',
       ]);
+      expect(proposal.viewerRole).toBe('other');
       expect(proposal.status).toBe('applied');
       expect(proposal.lastAppliedAt).toBe(T1.toISOString());
       expect(proposal.operations).toHaveLength(1);
