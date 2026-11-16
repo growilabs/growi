@@ -145,7 +145,7 @@ core の「本要件で使う言い方」の語（Change Proposal、操作、依
 2. When 承認者である人が、承認待ちの Change Proposal の取得を求めた場合, the Change Proposal System shall 承認の対象の操作について、変更後の本文（差分を作るための内容）、元のリビジョン、その元のリビジョンが今も最新かどうか、並び順を返す。
 3. The Change Proposal System shall 依頼した人でも承認者である人でもない見る人には、承認待ちの Change Proposal を返さない。
 4. If 承認者である人が、承認待ちの Change Proposal を取得しようとしたときに、その人に返す操作が 1 つも無い場合, then the Change Proposal System shall Change Proposal が存在しない場合と同じ「見つからない」応答を返す。
-5. When 見る人が、自分が承認者である承認待ちの Change Proposal の一覧を求めた場合, the Change Proposal System shall その人にとっての承認の対象の操作を 1 つ以上含む承認待ちの Change Proposal を、期限が近い順に、ページ送りできる形で返す。
+5. When 見る人が、自分が承認者である承認待ちの Change Proposal の一覧を求めた場合, the Change Proposal System shall その人にとっての承認の対象の操作を 1 つ以上含む承認待ちの Change Proposal を、作成が古い順（期限は作成時に決まるので、期限が近い順と同じになる）に、ページ送りできる形で返す。
 6. The Change Proposal System shall 承認者である人に返す操作を、その人が閲覧できるページ（リンクを知る人だけが見られるページを除く）に対する操作だけにする。閲覧できない操作の件数や、閲覧できない操作があることを示す情報を含めない。
 7. The Change Proposal System shall 承認者である人への応答に、承認者の一覧（ユーザーの名前とグループの名前）、承認・却下・放棄した人、承認者を追加・削除した人を含める。ただし、見る人が見られないページの存在を示す情報は含めない。
 8. The Change Proposal System shall 依頼した人にだけ返している内容（段階と達成度、ページごとの通知の指定、AI が書いた要約や会話、入口が用意する本人向けの内容など）を、承認者である人には返さない。変更の目的は、承認者である人にも返す。
@@ -164,9 +164,9 @@ core の「本要件で使う言い方」の語（Change Proposal、操作、依
 5. When 承認者である人が、承認・却下・放棄を求め、その求めが受け付けられた場合, the Change Proposal System shall 1 回の求めにつき 1 件のアプリ内通知を、依頼した人に送る。中身は、判断した人、各操作の結果、添えられたコメント、Change Proposal の詳細ページへのリンクにする。
 6. The Change Proposal System shall 依頼した人自身が行った承認については、依頼した人に通知を送らない。
 7. The Change Proposal System shall 反映のあとのまとめたアプリ内通知（core の 7.2・7.8）の宛先と中身を、この Requirement によって変えない。
-8. When 承認・却下・放棄が行われた場合, the Change Proposal System shall それを新しい種類の activity として、判断した人を操作者として、監査ログの設定にかかわらず記録する。
+8. When 承認・却下・放棄が行われた場合, the Change Proposal System shall それを新しい種類の activity として、判断した人を操作者として、経路（画面・API・AI の道具のどこから求めたか）とともに、監査ログの設定にかかわらず記録する。
 9. When 承認によって操作が反映された場合, the Change Proposal System shall 承認した人を、承認の activity（6.8）と、操作に残る記録（承認した人・経路・日時）に残す。反映の activity の記録は変えない（1 回の反映が、複数の人の承認をまとめて書くことがあるため）。
-10. The Change Proposal System shall 承認者の指定と、承認者の追加・削除について、activity を別には記録しない（Change Proposal の中の記録で足りる）。
+10. When 承認者が追加または削除された場合, the Change Proposal System shall それを新しい種類の activity として、追加または削除した人を操作者として、経路とともに、監査ログの設定にかかわらず記録する。誰を追加・削除したかは、Change Proposal の中の記録（4.10）で分かる。作成のときの承認者の指定は、作成の activity（core の 7.7）に含まれ、別には記録しない。
 
 ### Requirement 7: 反映のときの権限と作者
 

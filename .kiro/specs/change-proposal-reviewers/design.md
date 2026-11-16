@@ -52,8 +52,9 @@
 - `ChangeProposalView` と `OperationView` に役割（`viewerRole`）、承認者、判断の記録、承認者向けの値が加わったこと。
 - `POST /:id/approve` の応答の形は変えない（`{ result: ApplyResult }`）。ただし、(1) `done` の `results` は、求めたキーのうち見る人に見える操作のすべて（この回の反映の結果か、読み直した状態）になる。(2) `in-progress` に、省略できる項目 `results` が加わる（既存の読み手には追加の項目）。ai-agent の承認の画面は、依頼した人にとっては従来どおり。
 - 承認待ちが、依頼した人以外にも（承認者に）返るようになったこと（viewer の「見える操作」の定義、承認待ちを見せない前提の要件）。
+- activity の snapshot の型に、経路の項目（`channel`）を足した新しい型が加わったこと（`ActivitiesSnapshot` と `ISnapshot` を使う、監査ログの表示・検索の処理）。
 - 通知に新しい種類（`review-request`、`review-result`）が加わったこと（viewer の `parse-notification-snapshot.ts`、`ChangeProposalNotification.tsx`、`commons.json`）。
-- 公開の順序: viewer の承認画面と承認待ちの一覧、ai-agent の承認者の指定の入口が入ったあとで、機能の切り替え `app:changeProposalReviewersEnabled` を有効にすること（初期値は無効。無効の間は、承認者の機能がすべて働かない）。
+- 公開の順序: viewer の承認画面と承認待ちの一覧、ai-agent の承認者の指定の入口が入ったあとで、機能の切り替え `app:changeProposalReviewersEnabled` を有効にすること（初期値は無効。無効の間は、承認者の指定と追加を受け付けない）。
 
 ## Architecture
 
@@ -69,7 +70,7 @@
 flowchart LR
   subgraph Routes[routes]
     A[approve 拡張]
-    R[reject / reject-all / abstain（記録のみ）]
+    R[reviews 却下・放棄（記録のみ）]
     V[reviewers 追加・削除]
     Q[review-queue]
   end
@@ -143,10 +144,8 @@ server/
 │   ├── review-queue-query.ts        # 承認者としての一覧（カーソル、1 回に調べる上限）
 │   └── review-notifier.ts           # review-request と review-result の通知
 └── routes/
-    ├── reject.ts                    # POST /:id/reject
-    ├── reject-all.ts                # POST /:id/reject-all
-    ├── abstain.ts                   # POST /:id/abstain
-    ├── reviewers.ts                 # POST /:id/reviewers（追加）、POST /:id/reviewers/remove（削除）
+    ├── reviews.ts                   # POST /:id/reviews（却下・全体の却下・放棄の記録）
+    ├── reviewers.ts                 # PATCH /:id/reviewers（追加・削除）
     └── review-queue.ts              # GET /review-queue
 src/migrations/
 └── 2026111XXXXXXX-add-change-proposal-reviewer-indexes.js   # 索引と reviewers の補完
@@ -162,11 +161,11 @@ src/migrations/
 - `server/services/change-proposal-service.ts` — 作成に `reviewers`・`purpose` を受け、後続・見直しで承認者を引き継ぎ、承認者を指定した提案の自動反映を抑止する。
 - `server/services/normalize-create-input.ts`、`server/domain/select-auto-apply-targets.ts`。
 - `server/domain/select-visible-operations.ts`、`server/services/proposal-view-parts.ts`、`proposal-query.ts`、`proposal-list-query.ts`、`to-operation-view.ts` — 役割（依頼した人・承認者・それ以外）で見える操作と値を分ける。依頼した人以外には、実際の `lifecycle` ではなく `visibleStage` を、全体の状態の計算（`proposal-view-parts.ts:172` の `deriveProposalStatus` の入力）に渡す。後続・見直しへのリンクと、元の Change Proposal へのリンク（`proposal-query.ts` の取得）は、相手の提案ごとに、見る人の役割と承認者の一覧を読んで決め直し、相手の提案で見える操作が 0 件なら、そのリンクを出さない（相手の提案の存在を知らせないため）。承認者には、反映済み・取り消し済み・取り消しを断られた操作は今の「それ以外の人」の規則（対象のページ）で、それ以外の状態（待ち・飛ばした・古い・失敗）の操作は、判断に使うページ（編集は対象のページ、新規作成は親、移動は移動元と移動先の親）をすべて閲覧でき、リンクを知る人だけのページを含まない場合に返す（要件 5.1、5.6、5.10）。却下・放棄の記録は、依頼した人と、その操作のページを閲覧できる承認者にだけ返す（全体の却下の記録は依頼した人にだけ返す。要件 3.8）。依頼した人と、承認者でもない人の見える操作は変えない。
-- `server/services/proposal-activity.ts`（`ChangeProposalAction` の型に新しい 3 つの action を足す）、`proposal-applier.ts`（承認の求めで動く反映を、背景の反映と同じ形で呼び、新しい activity ID で記録する。背景の形で呼ぶときは、求めの `ip` と `endpoint` を渡さない。反映の activity の操作者は依頼した人なので、承認者の `ip` を並べると、監査ログを誤って読ませるため。承認者の `ip` と `endpoint` は、承認の activity が持つ）、`proposal-notifier.ts`。
+- `server/services/proposal-activity.ts`（`ChangeProposalAction` の型に新しい 5 つの action を足す）、`proposal-applier.ts`（承認の求めで動く反映を、背景の反映と同じ形で呼び、新しい activity ID で記録する。背景の形で呼ぶときは、求めの `ip` と `endpoint` を渡さない。反映の activity の操作者は依頼した人なので、承認者の `ip` を並べると、監査ログを誤って読ませるため。承認者の `ip` と `endpoint` は、承認の activity が持つ）、`proposal-notifier.ts`。
 - `server/services/current-page-facts.ts` — `loadViewablePages` に、取得済みの所属グループ（`ViewerIdentity`）を渡せるようにする（今は所属グループに `null` を渡して、中でもう一度取得している）。
 - `server/routes/approve.ts`（承認者にも開く。swagger の説明「Only the requester may approve」を直す）、`index.ts`（ルート登録。`/review-queue` は `/:id` より前）、`write-access.ts`（`respondWithServiceError` に新しいエラーコード）、`openapi.spec.ts`。
-- `apps/app/src/interfaces/activity.ts` — 新しい activity の action（`CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`、`CHANGE_PROPOSAL_ABSTAIN`）を `SupportedAction`、`EssentialActionGroup`、`MediumActionGroup` に足す。**通知の action（`ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST`、`ACTION_CHANGE_PROPOSAL_REVIEW_RESULT`）も、`SupportedAction` に足す**（`InAppNotification` の `action` 項目は `AllSupportedActions` の値しか受け付けないので、足さないと通知の作成が検証で失敗する）。名前が `CHANGE_PROPOSAL_` で始まるので監査ログの絞り込みの一覧にも出るため、`admin.json` の 5 言語に、通知の action の表示名も足す。承認者の追加から送る通知は activity を持たない（要件 6.10）ので、「戻すよう頼む」通知と同じ作り方で、`activities` を持たせない。
-- 設定キー `app:changeProposalReviewersEnabled`（真偽値、既定は無効、環境変数 `CHANGE_PROPOSAL_REVIEWERS_ENABLED`）の定義。`config-definition.ts` の `app:changeProposalEnabled`（環境変数 `CHANGE_PROPOSAL_ENABLED`）と同じ場所に足し、`config-definition.spec.ts` の表に 1 行足す。管理画面の項目は作らない。この値は、既存の設定の読み出し（`server/services/settings.ts` の `readChangeProposalSettings()`）に足し、設定を読む場所を 1 つにまとめる。サービスの入口（`reviewer-actions`、作成での `reviewers` の受け付け、`review-queue-query`、`review-notifier`）が、1 か所の関数（`isReviewerFeatureEnabled()`）で読む。純関数（`deriveViewerRole` ほか）は設定を読まず、`reviewersEnabled` を引数で受ける。無効のとき、依頼した人の承認は、これまでどおり `reviewer-actions.approve` が通す（切り替えが止めるのは、承認者の機能だけ）。無効の間に作る後続・見直しは、元の承認者を引き継がず、承認者を持たない提案として作る（要件 8.4 は、有効のときの動き）。
+- `apps/app/src/interfaces/activity.ts` — 新しい activity の action（`CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`、`CHANGE_PROPOSAL_ABSTAIN`、`CHANGE_PROPOSAL_REVIEWER_ADD`、`CHANGE_PROPOSAL_REVIEWER_REMOVE`）を `SupportedAction`、`EssentialActionGroup`、`MediumActionGroup` に足す。経路（`ui`、`api`、`ai-tool`）を activity に残すため、snapshot の型に、経路の項目を足した新しい型（`ChangeProposalReviewSnapshot`: `username?` と `channel?`）を、`ISnapshot` の和集合に足す（添付ファイルの activity が `AttachmentSnapshot` を足した前例と同じ作り）。`prisma/schema.prisma` の `ActivitiesSnapshot` に `channel String?` を足す（Mongo では migration は要らない）。**通知の action（`ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST`、`ACTION_CHANGE_PROPOSAL_REVIEW_RESULT`）も、`SupportedAction` に足す**（`InAppNotification` の `action` 項目は `AllSupportedActions` の値しか受け付けないので、足さないと通知の作成が検証で失敗する）。名前が `CHANGE_PROPOSAL_` で始まるので監査ログの絞り込みの一覧にも出るため、`admin.json` の 5 言語に、通知の action の表示名も足す。承認者の追加から送る通知は、通知の元になった activity（承認者の追加の activity）を持たせない（「戻すよう頼む」通知と同じ作り方で、`activities` を空にする）。
+- 設定キー `app:changeProposalReviewersEnabled`（真偽値、既定は無効、環境変数 `CHANGE_PROPOSAL_REVIEWERS_ENABLED`）の定義。`config-definition.ts` の `app:changeProposalEnabled`（環境変数 `CHANGE_PROPOSAL_ENABLED`）と同じ場所に足し、`config-definition.spec.ts` の表に 1 行足す。管理画面の項目は作らない。この値は、既存の設定の読み出し（`server/services/settings.ts` の `readChangeProposalSettings()`）に足し、設定を読む場所を 1 つにまとめる。この値を読んで確かめるのは、承認者を保存する 2 か所だけにする（オーナー決定）。(1) 作成で、呼び出し側が `reviewers` を指定したとき（依頼した人以外を含むとき）、(2) `addReviewers`。無効なら、どちらも 400 `reviewers-disabled` を返す。承認者が保存されなければ、ほかの経路（承認者の承認、却下・放棄、承認者としての一覧、承認者への通知）は、承認者がいないので、自然に何も起きない。後続・見直しが引き継ぐ承認者は、すでに保存されたものなので、この確認の対象外にする。無効にしても、すでに指定された承認者の動きは止めない。純関数は設定を読まない。
 - locale（5 言語）: `translation.json`（`change_proposal.*` の表示名）、`commons.json`（通知の種類の文言は viewer が足すので、本 spec ではキーの契約だけを決める）、`admin.json`（`audit_log_action.*`）。
 
 ## System Flows
@@ -214,7 +213,7 @@ stateDiagram-v2
 
 ### 承認者としての一覧
 
-`GET /review-queue?cursor=` は、`{lifecycle:'open', reviewers に、本人かその所属グループの ID を持ち、かつ外されていない（`removedAt` が `isSet: false` または `null`）要素を含む}` を、期限が近い順（`expiresAt` 昇順、次に `_id`）に読み、1 回に調べる件数の上限まで繰り返す。読んだ Change Proposal ごとに、その人の承認の対象（「待ち」で、判断に使うページを閲覧できるもの）を 1 つ以上持つものだけを返す。続きの位置（カーソル）を返す。
+`GET /review-queue?cursor=` は、`{lifecycle:'open', reviewers に、本人かその所属グループの ID を持ち、かつ外されていない（`removedAt` が `isSet: false` または `null`）要素を含む}` を、作成が古い順（`_id` の昇順）に読み、1 回に調べる件数の上限まで繰り返す。期限は、作成時に「作成時刻 ＋ 設定値」で書かれ、ほかで書き換えないので、作成が古い順は、期限が近い順と同じになる。読んだ Change Proposal ごとに、その人の承認の対象（「待ち」で、判断に使うページを閲覧できるもの）を 1 つ以上持つものだけを返す。続きの位置（カーソル）を返す。
 
 ## Requirements Traceability
 
@@ -228,12 +227,12 @@ stateDiagram-v2
 | 2.6、2.7 | 見えない操作・非関係者の応答 | `reviewer-actions`、`write-access`（同一の「見つからない」） | — | — |
 | 2.8 | 承認の記録（人・日時・経路・本人か） | model（`approvedBy` など）、`detectChannel` | 操作の項目 | 承認 |
 | 2.9、2.10 | 閉じた提案、編集中で残った承認 | `reviewer-actions`、`derive-visible-stage`、`toRequesterWriteMiss` の拡張 | `not-open` | — |
-| 3.1〜3.3 | 却下・全体の却下・放棄の記録 | `reviewer-actions`、model（`reviews[]`） | `POST /:id/reject`、`/reject-all`、`/abstain` | — |
+| 3.1〜3.3 | 却下・全体の却下・放棄の記録 | `reviewer-actions`、model（`reviews[]`） | `POST /:id/reviews` | — |
 | 3.4 | 同じ人の後の判断で記録を置き換える | model（`reviews[]` の削除と追加） | — | — |
 | 3.5〜3.8 | コメントの記録・長さ・文字のまま・見える範囲 | `reviewer-actions`、`to-operation-view`、`select-visible-operations` | `COMMENT_MAX_LENGTH` | — |
 | 3.9 | 却下・放棄が status・承認・段階・達成度を変えない | `reviewer-actions`（status を書かない）、`review-decision`（承認の規則だけ） | — | 状態 |
 | 3.10、3.11 | 依頼した人は却下・放棄しない、非関係者 | `reviewer-actions` | `requester-cannot-review` | — |
-| 4.1〜4.4、4.6〜4.9 | 承認者の追加・削除、既定への戻り、検証 | `reviewer-actions`、`reviewer-model`、model | `POST /:id/reviewers`、`/reviewers/remove` | — |
+| 4.1〜4.4、4.6〜4.9 | 承認者の追加・削除、既定への戻り、検証 | `reviewer-actions`、`reviewer-model`、model | `PATCH /:id/reviewers` | — |
 | 4.5、4.10〜4.12 | 存在しない承認者、記録、通知、削除後の記録 | `reviewer-actions`、`review-notifier`、model（記録は残す） | — | — |
 | 5.1、5.2 | 承認待ちの取得と承認者向けの値 | `proposal-query`、`proposal-view-parts`、`to-operation-view` | `ChangeProposalView`、`OperationView` | — |
 | 5.3、5.4 | 非関係者には返さない、見える操作が 0 件なら「見つからない」 | `select-visible-operations`、`proposal-query` | — | — |
@@ -243,7 +242,7 @@ stateDiagram-v2
 | 6.1〜6.4 | 承認者への通知（個人のみ、見える分だけ） | `review-notifier` | snapshot `kind: 'review-request'` | — |
 | 6.5、6.6 | 依頼した人への結果の通知 | `review-notifier` | snapshot `kind: 'review-result'` | 承認 |
 | 6.7 | 反映のまとめた通知は不変 | `proposal-notifier`（変更なし） | — | — |
-| 6.8〜6.10 | 新しい activity、反映の activity、記録しない範囲 | `proposal-activity`、`activity.ts` | 新しい action 3 つ | 承認 |
+| 6.8〜6.10 | 新しい activity（承認・却下・放棄・承認者の追加・削除。経路つき）、反映の activity | `proposal-activity`、`activity.ts`、`ActivitiesSnapshot` | 新しい action 5 つ、snapshot の `channel` | 承認 |
 | 7.1〜7.7 | 反映時の権限・作者、読み取り専用、無効化 | `proposal-applier`（変更なし）、`writeAccessChain` | — | 承認 |
 | 8.1〜8.6 | 既存の動きの維持、後続・見直しの引き継ぎ | `change-proposal-service`、`reviewer-model`、`select-auto-apply-targets` | — | — |
 | 8.7 | 5 言語の表示名・activity 名 | locale、`label-keys` | — | — |
@@ -261,7 +260,7 @@ stateDiagram-v2
 | reviewer-actions | service | 承認・却下・放棄・承認者の追加と削除 | 2、3、4 | model、resolver、notifier、activity | Service、API |
 | review-queue-query | service | 承認者としての一覧 | 5.5 | model、resolver | API |
 | review-notifier | service | 承認者・依頼した人への通知 | 6.1〜6.6 | `InAppNotification` | Event |
-| routes（5 本） | route | HTTP の入口 | 2〜5 | `writeAccessChain`、`readAccessChain` | API |
+| routes（4 本） | route | HTTP の入口 | 2〜5 | `writeAccessChain`、`readAccessChain` | API |
 
 ### domain
 
@@ -419,7 +418,7 @@ interface ReviewQueuePage { readonly items: readonly ChangeProposalSummaryView[]
 function listReviewQueue(viewer: ViewerIdentity, cursor: string | null, limit: number): Promise<ReviewQueuePage>;
 ```
 
-- 1 回に調べる件数の上限（`REVIEW_QUEUE_SCAN_LIMIT`、`listAppliedVisible` と同じ値）に達したら、見つかった分と続きの位置を返す。期限が無い文書（設定で期限を無効にした場合だけ）は、期限がある文書のあとに、`_id` 順で並べる（2 段階で読む）。カーソルは `期限の段階（t か n）:期限の時刻（n では空）:ID` を、利用者が中身を読めない形（サーバーの秘密の値で暗号化した文字列）にしたもので（最後に読んだ文書の ID は、その人に見える操作が 0 件の提案のこともあり、そのまま見せると、その ID の取得が 404 になることから、見えない操作だけの提案の存在が分かるため。core の反映済みの一覧は平文だが、承認者の一覧は読む対象が「自分が承認者の提案」に限られ、分かることが多くなるので、こちらは暗号化する）、`getTime()` に値の無い期限を渡さない。不正な値は、既存の前例（`list-applied.ts` と `proposal-list-query.ts`）に合わせ、ルートが 400 で断り、サービスは空の結果を返す。
+- 1 回に調べる件数の上限（`REVIEW_QUEUE_SCAN_LIMIT`、`listAppliedVisible` と同じ値）に達したら、見つかった分と続きの位置を返す。カーソルは、最後に調べた文書の `_id` を、そのまま文字にしたもの（暗号化しない。core の反映済みの一覧と同じ作り）。最後に調べた文書が、その人に返す操作が 0 件の提案のこともあり、その場合は、カーソルから、その ID の提案が存在し、自分が承認者に指定されていることが分かる（ページのパスや内容は分からない）。この点を許容する（オーナー決定）。不正な値は、既存の前例（`list-applied.ts` と `proposal-list-query.ts`）に合わせ、ルートが 400 で断り、サービスは空の結果を返す。
 
 #### review-notifier
 
@@ -440,9 +439,10 @@ interface ReviewResultSnapshot {
 
 #### proposal-activity
 
-- 新しい action: `CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`（操作ごとの却下と全体の却下）、`CHANGE_PROPOSAL_ABSTAIN`。3 つとも `EssentialActionGroup` と `MediumActionGroup` に入れる（要件 6.8、監査ログの設定にかかわらず記録）。
+- 新しい action: `CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`（操作ごとの却下と全体の却下）、`CHANGE_PROPOSAL_ABSTAIN`、`CHANGE_PROPOSAL_REVIEWER_ADD`、`CHANGE_PROPOSAL_REVIEWER_REMOVE`。5 つとも `EssentialActionGroup` と `MediumActionGroup` に入れる（要件 6.8、監査ログの設定にかかわらず記録）。
 - 承認の求めでは、承認の activity をその求めの ID で記録する。承認の求めで動く反映は、背景の反映と同じ形（`trigger.kind: 'background'`）で呼び、反映の activity は新しい ID（`beginActivity`）で、操作者を依頼した人として記録する（既存の背景の経路と同じ。反映の中身は変えない）。1 回の反映が複数の人の承認をまとめて書くことがあるので、承認した人は、承認の activity と、操作の項目（`approvedBy`）で分かる（要件 6.9）。
-- 承認者の指定・追加・削除の activity は記録しない（要件 6.10）。
+- 承認者の追加・削除は、`CHANGE_PROPOSAL_REVIEWER_ADD`・`CHANGE_PROPOSAL_REVIEWER_REMOVE` の activity として記録する（要件 6.10。1 つの求めにつき 1 行。誰を追加・削除したかは、Change Proposal の中の `reviewers` の記録で分かる）。作成のときの承認者の指定は、作成の activity（core の 7.7）に含まれ、別には記録しない。
+- 承認・却下・放棄・承認者の追加・削除の activity には、snapshot の `channel` に、`ReviewActor.channel` を書く（要件 6.8、6.10）。activity の更新で、snapshot の `username` が保たれることを、実装で確かめる（`server/models/activity.ts` の更新の経路）。
 
 #### 応答と入力の型（`interfaces/reviewer.ts`）
 
@@ -459,11 +459,8 @@ type DecisionResponse = { readonly type: 'done'; readonly results: readonly { ke
 | Method | Path | Middleware | Request | Response | Errors |
 |---|---|---|---|---|---|
 | POST | `/:id/approve`（既存を拡張。応答の形は変えない） | `writeAccessChain` | `{ operationKeys? }` | `{ result: ApplyResult }`（`type: 'done'` の `results` は、求めたキーのうち、その人に見える操作のすべて。`in-progress` には、見える操作の読み直した状態の `results`（省略できる項目）を足す） | 404、409（`not-open`） |
-| POST | `/:id/reject` | `writeAccessChain` | `{ operationKeys, comment? }` | `{ result: { type: 'done', results } }`（承認と同じ形） | 400（`comment-too-long`、`requester-cannot-review`）、404、409 |
-| POST | `/:id/reject-all` | `writeAccessChain` | `{ comment? }` | 同上 | 400、404、409 |
-| POST | `/:id/abstain` | `writeAccessChain` | `{ operationKeys, comment? }` | 同上 | 400、404、409 |
-| POST | `/:id/reviewers` | `writeAccessChain` | `{ reviewers: [{kind, id}] }` | 204 | 400（`reviewer-not-found`、`too-many-reviewers`）、404、409（`not-open`） |
-| POST | `/:id/reviewers/remove` | `writeAccessChain` | `{ reviewers: [{kind, id}] }` | 204 | 404、409 |
+| POST | `/:id/reviews` | `writeAccessChain` | `{ kind: 'reject' \| 'abstain', operationKeys?, comment? }`。`reject` で `operationKeys` を省くと、Change Proposal 全体の却下。`abstain` は `operationKeys` が必須 | `{ result: { type: 'done', results } }`（承認と同じ形） | 400（`comment-too-long`、`requester-cannot-review`、`operationKeys` の欠落）、404、409 |
+| PATCH | `/:id/reviewers` | `writeAccessChain` | `{ add?: [{kind, id}], remove?: [{kind, id}] }` | 204 | 400（`reviewer-not-found`、`too-many-reviewers`、`reviewers-disabled`）、404、409（`not-open`） |
 | GET | `/review-queue` | `readAccessChain` | `?cursor=` | `{ items, nextCursor }` | — |
 
 - すべてのルートの `@swagger` の tag は `ChangeProposals`。`openapi.spec.ts` の操作の一覧とテスト名を更新する。`/review-queue` は `/:id` より前に登録する。
@@ -486,7 +483,7 @@ type DecisionResponse = { readonly type: 'done'; readonly results: readonly { ke
 | 操作 | `approvedBy`、`approvedChannel` | `String?` | 承認した人・経路（`approvedAt` と同時に書き、同時に消す） |
 | 操作 | `decisionToken` | `String?` | 承認を書いた求めの印（UUID）。「この求めで書き換えたか」の判定に使う |
 
-- 索引（新しい migration で `createIndex`、schema.prisma に同じ名前で `@@index`）: `{lifecycle: 1, 'reviewers.id': 1, expiresAt: 1, _id: 1}`。
+- 索引（新しい migration で `createIndex`、schema.prisma に同じ名前で `@@index`）: `{lifecycle: 1, 'reviewers.id': 1, _id: 1}`。
 - 補完: 同じ migration で、`reviewers` が無い文書に `$set: { reviewers: [], reviews: [] }`。
 
 ### Data Contracts & Integration（API の型）
@@ -523,7 +520,7 @@ interface OperationView {
 | 見えないページの操作のキー／存在しないキー | 無視（`results` に含めない） | 要件 2.6 |
 | 見える操作だが、判断の対象でない（反映済み・飛ばしたなど） | 書き込まず、その時点の状態を返す | 要件 2.5、2.11 |
 | 提案は実際には開いているが、その人に見える「待ち」が 0 件（「見える段階」が open でない）で、判断・承認者の追加・削除を求めた | 409 `not-open`（実際の段階を知らせないため） | 要件 5.6、2.9 |
-| 機能の切り替え `app:changeProposalReviewersEnabled` が無効で、承認者の指定・追加・削除・却下・放棄・承認者としての一覧を求めた | 作成での指定は 400 `reviewers-disabled`。ほかは存在しないものとして 404（一覧は空） | 公開の順序 |
+| 機能の切り替え `app:changeProposalReviewersEnabled` が無効で、承認者を指定して作成、または承認者の追加を求めた | 400 `reviewers-disabled` | 公開の順序 |
 | 閉じた提案への判断・承認者の追加・削除 | 409 `not-open` | 要件 2.9、4.8 |
 | コメントが長い | 400 `comment-too-long` | 要件 3.6 |
 | 依頼した人が却下・放棄を求めた | 400 `requester-cannot-review` | 要件 3.10 |
@@ -552,7 +549,7 @@ interface OperationView {
 - 「見つからない」の同一性: 存在しない提案、関係のない人、見える操作が 0 件の承認者の 3 つで応答が同じ。
 - 後続・見直しの承認者の引き継ぎと、承認者を指定した提案の自動反映の抑止（要件 1.11、8.4、8.5）。
 - 通知: `review-request` の宛先（個人のみ、依頼した人と追加した人を除く）、中身が受け取る人の閲覧できるページだけであること。`review-result` の宛先と、本人が承認したときは送らないこと。
-- activity: 承認・却下・放棄が監査ログの設定にかかわらず記録されること。承認の求めで動いた反映の activity の操作者が依頼した人であること（承認した人は承認の activity と `approvedBy` で分かること）。
+- activity: 承認・却下・放棄・承認者の追加・削除が、経路（`channel`）とともに、監査ログの設定にかかわらず記録されること。snapshot の `username` が保たれること。承認の求めで動いた反映の activity の操作者が依頼した人であること（承認した人は承認の activity と `approvedBy` で分かること）。
 
 ### 追従のテスト
 - i18n の監査が基準内であること（新しいキーは 5 言語を同じ作業で訳す）。操作の状態（`OperationStatus`）は変えないので、viewer の型の網羅への追従は要らない。
@@ -570,7 +567,7 @@ interface OperationView {
 - 配列の索引の実際の効き方は未測定。実装のタスクで、代表的な規模のデータで計測する。
 
 ## Migration Strategy
-1. migration: `reviewers`・`reviews` の補完と、`{lifecycle, reviewers.id, expiresAt, _id}` の索引を `createIndex`。schema.prisma に `@@index` を宣言。`down` は索引を落とす。
+1. migration: `reviewers`・`reviews` の補完と、`{lifecycle, reviewers.id, _id}` の索引を `createIndex`。schema.prisma に `@@index` を宣言。`down` は索引を落とす。
 2. サーバーのコード（新しい項目を読み書きする）。
 3. viewer・ai-agent の追従（別の spec）。
 4. 機能の切り替え `app:changeProposalReviewersEnabled` を有効にする（最後の手順。viewer と ai-agent の追従が入ったあと）。
@@ -578,14 +575,15 @@ interface OperationView {
 ## 要件との差と読み方
 1. **要件 6.9**: 設計の検証で、「反映の activity に承認した人を含める」では、1 回の反映が複数の人の承認をまとめて書くため、承認した人が 1 人に決まらないと分かった。そこで要件 6.9 を、「承認した人を承認の activity と操作の項目に残す。反映の activity は変えない」に直した（要件の変更として扱った）。
 2. **「見える段階」（要件 2.9、4.8、5.6）**: 依頼した人でない人には、提案の実際の段階ではなく、見える操作から決めた段階（見える「待ち」が 1 件以上なら `open`、無ければ閉じている）を、409 の判定と全体の状態の計算に使う。見えない「待ち」の操作があるかどうかを、409 の有無や全体の状態から知らせないため。副作用として、提案は実際には開いているが、その人に見える「待ち」が無い場合も、判断を求めると 409 `not-open` になる。要件 2.5・2.11 についても同じ差がある。たとえばグループの所属者 M1 と M2 が同じ操作を承認し、M1 の承認で操作が反映されたあと、その操作しか見えない M2 の求めには、提案が実際にはまだ開いていても 409 が返る。そのため、要件 2.5・2.11 の「その時点の操作の状態を返す」は、「依頼した人以外には、その人に見える『待ち』の操作が残っている限り」の条件つきに直した（下の 7 番）。依頼した人には、この「見える段階」を使わず、実際の段階で 409 かどうかを決める（依頼した人に見えない「待ち」だけが残る場合は、409 ではなく 200 になる。依頼した人は自分の提案の全体を知っているので、漏洩にならない）。
-3. **機能の切り替え**: 新しい設定キー `app:changeProposalReviewersEnabled`（既定は無効。管理画面の項目は作らない）を足す。無効の間は、承認者の指定を受け付けず（`reviewers-disabled`）、承認者の追加・削除・却下・放棄・承認者としての一覧と承認者への通知を、存在しないものとして扱う（404 か空）。依頼した人の承認は、これまでどおり働く。viewer と ai-agent の追従が入るまで、書き込み機能が有効な環境でも、画面が無いまま承認者の機能が使われないようにするため。
+3. **機能の切り替え**: 新しい設定キー `app:changeProposalReviewersEnabled`（既定は無効。管理画面の項目は作らない）を足す。無効の間は、承認者を指定した作成と、承認者の追加を受け付けない（400 `reviewers-disabled`）。確かめる場所は、この 2 か所だけで、ほかの経路は、承認者が保存されないことで働かない。すでに指定された承認者の動きは、無効にしても止めない。viewer と ai-agent の追従が入るまで、書き込み機能が有効な環境でも、画面が無いまま承認者の機能が使われないようにするため。
 4. **要件 5.2（並び順）**: 依頼した人には元の番号を返し、承認者には見える操作の中での順位を返す。元の番号から隠した操作の存在が分かるのを避けるため。
 5. **要件 1.7、3.6、1.9 の上限の値**: 承認者は 20、コメントは 500 文字、変更の目的は 2000 文字（定数）。管理者の設定にはしない。
-6. **要件 5.5（期限が近い順）**: 期限が無い文書（設定で期限を無効にした場合だけ）は、期限がある文書のあとに、`_id` 順で並べる（2 段階で読み、カーソルに段階を持たせる）。
+6. **要件 5.5（並び順）**: 承認者としての一覧は、作成が古い順（`_id` 順）に並べる。期限が作成時にだけ書かれ、全体で 1 つの設定値から決まるので、期限が近い順と同じになる（設定値を途中で変えると、その前後で少しずれる）。カーソルは暗号化しない（オーナー決定。5.5 の文言を直した）。
 7. **見える操作が 0 件の承認者**: 承認者であっても、その人に返す操作が 0 件なら、判断だけでなく承認者の追加・削除も、存在しない場合と同じ 404 になる（要件 2.7 の文言を直した。要件 5.4 と同じ基準）。409 `not-open` の応答には `results` を入れない（要件 2.5・2.11 の「その時点の状態を返す」は、「見える段階」が open の場合に限る。要件の文言も直した）。
-8. **依頼した人の承認の変更**: 今の承認は、依頼した人が閲覧できなくなったページの操作を、見えるかどうかで絞らずに承認し、反映時の権限の確認で「失敗」にする。新しい設計の承認は、要件 2.1 のとおり、依頼した人に見える操作だけを対象にするので、そのような操作は「待ち」のまま残る（期限切れで「飛ばした」になる）。意図した変更で、テストに入れる。
-9. **却下は反映を止めない**（オーナー決定）: 却下と放棄は、操作の status も承認の条件も変えない記録と通知である。そのため、操作の status は 7 つのままで、却下しても Change Proposal は完了にならない。依頼した人が操作を「飛ばす」か Change Proposal を破棄するまで残り、放置されると期限切れになる。承認との競合の条件も、`settleIfNoPending` の呼び出しも要らない。viewer の表示名は、止めない意味が伝わる語（「変更を依頼」など）にする案（viewer の spec で決める）。API の名前は `reject` のままにするので、実装では、`reject` が反映を止めないことを、コメントで明記する。
-10. **既存の「飛ばす」の競合の穴**: 本 spec では直さず、別の修正として記録する（research.md）。
+8. **要件 6.10 の変更**: 承認者の追加・削除も、新しい activity（経路つき）として記録する（オーナー決定。当初は、Change Proposal の中の記録だけだった）。
+9. **依頼した人の承認の変更**: 今の承認は、依頼した人が閲覧できなくなったページの操作を、見えるかどうかで絞らずに承認し、反映時の権限の確認で「失敗」にする。新しい設計の承認は、要件 2.1 のとおり、依頼した人に見える操作だけを対象にするので、そのような操作は「待ち」のまま残る（期限切れで「飛ばした」になる）。意図した変更で、テストに入れる。
+10. **却下は反映を止めない**（オーナー決定）: 却下と放棄は、操作の status も承認の条件も変えない記録と通知である。そのため、操作の status は 7 つのままで、却下しても Change Proposal は完了にならない。依頼した人が操作を「飛ばす」か Change Proposal を破棄するまで残り、放置されると期限切れになる。承認との競合の条件も、`settleIfNoPending` の呼び出しも要らない。viewer の表示名は、止めない意味が伝わる語（「変更を依頼」など）にする案（viewer の spec で決める）。API の名前は `reject` のままにするので、実装では、`reject` が反映を止めないことを、コメントで明記する。
+11. **既存の「飛ばす」の競合の穴**: 本 spec では直さず、別の修正として記録する（research.md）。
 
 ## 実装時に確かめる点
 research.md の「実装時に確かめる点」。特に、(1) 配列の複合型に張る `@@index` の前例が既存に無い（既存の 5 件はどれも配列でない複合型）ので、schema.prisma に書いて Prisma が受け付けるかと、(4) アクセストークン認証かどうかの判別は、最初のタスクで小さく試して結果を記録する。
