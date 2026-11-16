@@ -103,9 +103,10 @@ const toChannelRef = (
  * `fullName` is what the platform shows; the handle is the fallback when it is
  * empty.
  *
- * Exported for `history.ts` (task 3.5), which names the author of every
- * imported message: one derivation means a person appears under the same name
- * whether they are quoted in a page or addressed the bot.
+ * Exported for `conversation-history.ts` and `slack-conversation.ts`, which
+ * name the author of every message they read: one derivation means a person
+ * appears under the same name whether they are quoted in a summary or
+ * addressed the bot.
  */
 export const toChatAccountRef = (platform: PlatformName, author: Author) => ({
   platform,

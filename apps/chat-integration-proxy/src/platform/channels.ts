@@ -105,13 +105,13 @@ export class MissingChannelCredentialsError extends Error {
 const SLACK_PAGE_SIZE = 200;
 
 /**
- * A bound on every paginated walk in this file, for the same reason
- * `history.ts` bounds its own: a workspace with tens of thousands of channels
- * would otherwise hold the refresh open indefinitely. At `SLACK_PAGE_SIZE`
- * this covers 10,000 Slack channels.
+ * A bound on every paginated walk in this file: a workspace with tens of
+ * thousands of channels would otherwise hold the refresh open indefinitely. At
+ * `SLACK_PAGE_SIZE` this covers 10,000 Slack channels.
  *
- * **Reaching it is a failure, not a stopping point** -- the opposite of
- * `history.ts`, which answers with what it found. A truncated inventory looks
+ * **Reaching it is a failure, not a stopping point** -- unlike
+ * `conversation-history.ts`, which answers with what it read and marks the
+ * result as truncated. A truncated inventory looks
  * exactly like a smaller workspace once it is written, so every channel past
  * the bound would be refused as `channel-not-in-installation` with no sign
  * that anything was cut off. Failing keeps the last complete inventory in

@@ -1,6 +1,5 @@
 import {
   COMMAND_NAMES,
-  type CommandRequest,
   type CommandResponse,
   OP_NAMES,
   type PlatformName,
