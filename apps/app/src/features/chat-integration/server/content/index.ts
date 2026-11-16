@@ -12,7 +12,6 @@
 // `resolveActor` and the candidate list it built from the search hits -- and
 // so has to name them.
 
-export { buildConversationPageBody } from './conversation-page';
 export type { HelpCommandEntry } from './help-content';
 export { buildHelpContent } from './help-content';
 export type {

@@ -1,9 +1,11 @@
-// Handling the 5 commands the proxy sends over the `command` op (design.md
-// `CommandEndpoint`): search / link-preview / help (task 5.1, read-only) and
-// create-page / keep (task 5.2, writes -- see `performWriteCommand` below).
+// Handling the commands the proxy sends over the `command` op (design.md
+// `CommandEndpoint`): search / link-preview / help (task 5.1, read-only),
+// create-page (task 5.2, a write -- see `performWriteCommand` below) and
+// agent (accepted here and run later -- see `handleAgent` below).
 //
 // Three invariants design.md states for `CommandEndpoint.handle`, all
-// enforced here, in this order, before any command-specific work runs:
+// enforced here, in this order, before any command-specific work runs
+// (`agent` keeps the first two but not the third -- see `handleAgent`):
 //
 //   1. **Never throw.** Every path below returns a `CommandResponse`; the
 //      one `try`/`catch` at the very top of `handle` is the backstop for a
@@ -64,7 +66,11 @@ import {
   findOrCreatePendingAccountLinkOrder,
 } from '../account-link/create-link-order';
 import {
-  buildConversationPageBody,
+  type AgentRequestRunner,
+  handleAgentCommand,
+  notYetWiredAgentRunner,
+} from '../agent';
+import {
   buildHelpContent,
   buildLinkPreview,
   filterPagesForViewer,
@@ -87,7 +93,7 @@ const logger = loggerFactory(
 
 /**
  * The resolved GROWI user permitted to perform a write -- `ResolvedActor`'s
- * `user` field, narrowed to non-null. `resolveActor`/`handleWriteCommand`
+ * `user` field, narrowed to non-null. `resolveActor`/`resolveWriter`
  * below is what guarantees a value reaching `performWriteCommand` is never
  * null: `writeDenied` gates every path that would otherwise leave `user`
  * empty (not-linked, inactive) before it gets this far.
@@ -400,15 +406,15 @@ const handleLinkPreview = async (
 };
 
 /**
- * Performs a write command's page creation (`create-page` and `keep` both go
- * through this -- design.md: "書き込みを行うコマンド... はそのまま要る"),
+ * Performs a write command's page creation (design.md: "書き込みを行うコマンド...
+ * はそのまま要る"),
  * checking permission and path conflict, and recording an Activity for every
  * outcome once past that point.
  *
  * `beginActivity` runs BEFORE the `isCreatablePage` / path-existence checks,
  * not after: by the time `performWriteCommand` is called, `resolveActor`
  * has already determined the actor is real and permitted to write
- * (`handleWriteCommand` gates `writeDenied` before this function is ever
+ * (`resolveWriter` gates `writeDenied` before this function is ever
  * reached) -- so `isCreatablePage` failing and a path conflict are both
  * "the handler's own validation, run for an authenticated operator", the
  * same category `activity-recording.md`'s Rule 2 records as
@@ -426,7 +432,7 @@ const handleLinkPreview = async (
  * does not distinguish "path taken" from any other failure
  * (design.md: "他の失敗と区別できない").
  *
- * Requirements: 4.2, 4.5, 4.6, 5.2.
+ * Requirements: 4.2, 4.5, 4.6.
  */
 const performWriteCommand = async (params: {
   readonly path: string;
@@ -434,10 +440,8 @@ const performWriteCommand = async (params: {
   readonly crowi: Crowi;
   readonly auditContext: CommandAuditContext;
   readonly buildBody: () => Promise<string>;
-  readonly importedMessageCount?: number;
 }): Promise<CommandResponse> => {
-  const { path, actor, crowi, auditContext, buildBody, importedMessageCount } =
-    params;
+  const { path, actor, crowi, auditContext, buildBody } = params;
 
   const context: PendingActivityContext = {
     ip: auditContext.ip,
@@ -512,7 +516,6 @@ const performWriteCommand = async (params: {
     return {
       kind: RESPONSE_KINDS.created,
       pageUrl: urljoin(growiInfoService.getSiteUrl(), createdPage.path),
-      ...(importedMessageCount != null ? { importedMessageCount } : {}),
     };
   } catch (error) {
     // An unexpected failure (e.g. pageService.create's own grant validation)
@@ -549,49 +552,22 @@ const handleCreatePage = (
     buildBody: async () => request.body,
   });
 
-const handleKeep = (
-  request: Extract<CommandRequest, { kind: typeof COMMAND_NAMES.keep }>,
-  actor: WriteActor,
-  crowi: Crowi,
-  auditContext: CommandAuditContext,
-): Promise<CommandResponse> =>
-  performWriteCommand({
-    path: request.path,
-    actor,
-    crowi,
-    auditContext,
-    // design.md "会話の取り込み": the page body is built from the imported
-    // messages, resolving each speaker's GROWI username in one batched
-    // query (task 4.3) -- NOT from `actor`, who only ran the `keep` command
-    // and may not be quoted in the transcript at all.
-    buildBody: () =>
-      buildConversationPageBody(request.relationId, request.messages),
-    importedMessageCount: request.messages.length,
-  });
-
 /**
- * `create-page` / `keep` share 3 requirements with every other write
- * (design.md: "書き込みを行うコマンド... はそのまま要る"): the permission
- * judgment `resolveActor` already makes, the path-conflict pre-check, and
- * idempotent resend -- the last of which `handleWithIdempotency` below
- * already gives every command kind, write or not.
- *
- * `resolveActor`'s `writeDenied` gates ALL writes (design.md invariant):
- * `user: null` (not-linked / inactive) reuses `buildReadDenialResponse`'s
- * exact denial mapping (Requirement 7.6's account-link guidance for
- * not-linked, the "currently unavailable" message for inactive); a resolved
- * but read-only user is refused with `forbidden`. Neither refusal reaches
- * `performWriteCommand`, so neither creates an Activity row (design.md:
- * "断った要求... は記録しない").
+ * Every writing command (`create-page`, and `agent`, which may create a page)
+ * needs a linked GROWI user who may write (design.md invariant: `writeDenied`
+ * gates ALL writes). `user: null` (not-linked / inactive) reuses
+ * `buildReadDenialResponse`'s exact denial mapping (Requirement 7.6's
+ * account-link guidance for not-linked, the "currently unavailable" message
+ * for inactive); a resolved but read-only user is refused with `forbidden`.
+ * No refusal here creates an Activity row (design.md: "断った要求... は記録しない").
  */
-const handleWriteCommand = async (
-  request: Extract<
-    CommandRequest,
-    { kind: typeof COMMAND_NAMES.createPage | typeof COMMAND_NAMES.keep }
-  >,
+const resolveWriter = async (
+  request: CommandRequest,
   crowi: Crowi,
-  auditContext: CommandAuditContext,
-): Promise<CommandResponse> => {
+): Promise<
+  | { readonly user: WriteActor; readonly refusal?: never }
+  | { readonly user?: never; readonly refusal: CommandResponse }
+> => {
   const resolved = await resolveActor(request.relationId, request.actor);
 
   if (resolved.user == null) {
@@ -600,39 +576,38 @@ const handleWriteCommand = async (
     // 'read-only'` or `null`).
     const denial =
       resolved.writeDenied === 'inactive' ? 'inactive' : 'not-linked';
-    return buildReadDenialResponse(
-      denial,
-      request.relationId,
-      request.actor,
-      crowi,
-    );
+    return {
+      refusal: await buildReadDenialResponse(
+        denial,
+        request.relationId,
+        request.actor,
+        crowi,
+      ),
+    };
   }
   if (resolved.writeDenied === 'read-only') {
-    return errorResponse(
-      'forbidden',
-      'Your GROWI user is read-only and cannot create pages.',
-    );
+    return {
+      refusal: errorResponse(
+        'forbidden',
+        'Your GROWI user is read-only and cannot create pages.',
+      ),
+    };
   }
-
-  // Fold the originating channel into the audit context's `endpoint` here,
-  // once, for both write commands (design.md: "チャット経由であることと
-  // 発言元のチャンネルを残す") -- see `withChatChannelTag` above for why
-  // `endpoint` is where this goes.
-  const auditContextWithChannel: CommandAuditContext = {
-    ...auditContext,
-    endpoint: withChatChannelTag(auditContext.endpoint, request.channel),
-  };
-
-  if (request.kind === COMMAND_NAMES.createPage) {
-    return handleCreatePage(
-      request,
-      resolved.user,
-      crowi,
-      auditContextWithChannel,
-    );
-  }
-  return handleKeep(request, resolved.user, crowi, auditContextWithChannel);
+  return { user: resolved.user };
 };
+
+/**
+ * Folds the originating channel into the audit context's `endpoint`
+ * (design.md: "チャット経由であることと発言元のチャンネルを残す") -- see
+ * `withChatChannelTag` above for why `endpoint` is where this goes.
+ */
+const withChannelInAudit = (
+  auditContext: CommandAuditContext,
+  channel: ChannelRef,
+): CommandAuditContext => ({
+  ...auditContext,
+  endpoint: withChatChannelTag(auditContext.endpoint, channel),
+});
 
 const computeResponse = async (
   request: CommandRequest,
@@ -645,20 +620,32 @@ const computeResponse = async (
   }
 
   if (request.kind === COMMAND_NAMES.help) {
-    return { kind: RESPONSE_KINDS.help, commands: buildHelpContent() };
+    return {
+      kind: RESPONSE_KINDS.help,
+      commands: buildHelpContent({ aiReady: crowi.isAiReady() }),
+    };
+  }
+
+  if (request.kind === COMMAND_NAMES.createPage) {
+    const writer = await resolveWriter(request, crowi);
+    if (writer.refusal != null) {
+      return writer.refusal;
+    }
+    return handleCreatePage(
+      request,
+      writer.user,
+      crowi,
+      withChannelInAudit(auditContext, request.channel),
+    );
   }
 
   if (
-    request.kind === COMMAND_NAMES.createPage ||
-    request.kind === COMMAND_NAMES.keep
+    request.kind !== COMMAND_NAMES.search &&
+    request.kind !== COMMAND_NAMES.linkPreview
   ) {
-    return handleWriteCommand(request, crowi, auditContext);
-  }
-
-  if (request.kind === COMMAND_NAMES.agent) {
     return errorResponse(
       'unknown-kind',
-      'This GROWI does not handle the agent command yet.',
+      'This GROWI does not handle this command.',
     );
   }
 
@@ -725,18 +712,68 @@ const handleWithIdempotency = async (
   return response;
 };
 
+/**
+ * design.md HandleAgentCommand: channel permission, then the linked writer,
+ * then (in `handleAgentCommand`) AI availability and the insertion of the
+ * running row. `agent` does not go through `handleWithIdempotency`: its
+ * running row is what recognises a re-send, and a stored refusal
+ * (`ai-unavailable`, `busy`) must not be replayed once the cause is gone.
+ */
+const handleAgent = async (
+  request: Extract<CommandRequest, { kind: typeof COMMAND_NAMES.agent }>,
+  crowi: Crowi,
+  auditContext: CommandAuditContext,
+  runAgentRequest: AgentRequestRunner,
+): Promise<CommandResponse> => {
+  const verdict = await checkChannelPermission(request);
+  if (!verdict.allowed) {
+    return permissionDeniedResponse(verdict);
+  }
+
+  const writer = await resolveWriter(request, crowi);
+  if (writer.refusal != null) {
+    return writer.refusal;
+  }
+
+  return handleAgentCommand({
+    request,
+    user: writer.user,
+    auditContext: withChannelInAudit(auditContext, request.channel),
+    aiReady: crowi.isAiReady(),
+    runAgentRequest,
+  });
+};
+
+export interface CommandEndpointDependencies {
+  /** Started after an `agent` request has been answered `accepted`. */
+  readonly runAgentRequest: AgentRequestRunner;
+}
+
+// Task 5.6 replaces the interim runner here with the real one.
+const DEFAULT_DEPENDENCIES: CommandEndpointDependencies = {
+  runAgentRequest: notYetWiredAgentRunner,
+};
+
 /** Builds the `CommandEndpoint` this GROWI serves `command` requests with. */
-export const createCommandEndpoint = (crowi: Crowi): CommandEndpoint => ({
+export const createCommandEndpoint = (
+  crowi: Crowi,
+  dependencies: CommandEndpointDependencies = DEFAULT_DEPENDENCIES,
+): CommandEndpoint => ({
   handle: async (
     request: CommandRequest,
     auditContext?: CommandAuditContext,
   ): Promise<CommandResponse> => {
+    const context = auditContext ?? { requestArrivedAt: new Date() };
     try {
-      return await handleWithIdempotency(
-        request,
-        crowi,
-        auditContext ?? { requestArrivedAt: new Date() },
-      );
+      if (request.kind === COMMAND_NAMES.agent) {
+        return await handleAgent(
+          request,
+          crowi,
+          context,
+          dependencies.runAgentRequest,
+        );
+      }
+      return await handleWithIdempotency(request, crowi, context);
     } catch (error) {
       logger.error('Unexpected failure while handling a chat command', error);
       return errorResponse(

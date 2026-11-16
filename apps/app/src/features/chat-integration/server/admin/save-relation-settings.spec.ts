@@ -24,6 +24,7 @@ import {
   toNativeChannelId,
 } from '@growi/chat';
 import type { MongoMemoryServer } from 'mongodb-memory-server-core';
+import mongoose from 'mongoose';
 import {
   afterAll,
   beforeAll,
@@ -41,7 +42,11 @@ import {
 } from '^/test/setup/mongo/self-contained-connection';
 
 import type Crowi from '~/server/crowi';
+import userModelFactory from '~/server/models/user';
+import { UserStatus } from '~/server/models/user/conts';
 
+import { ChatAccountLink } from '../account-link/models/chat-account-link';
+import { ChatAgentRequest } from '../agent/models/chat-agent-request';
 import { createCommandEndpoint } from '../command/command-endpoint';
 import { ChatProcessedRequest } from '../models/chat-processed-request';
 import { ChatRelation } from '../models/chat-relation';
@@ -79,6 +84,8 @@ describe('saveRelationSettings', () => {
       'growi_test_unit_save_relation_settings',
     ));
     await ChatChannelPermission.init();
+    // An accepted agent request needs a linked GROWI user.
+    userModelFactory(null);
   });
 
   afterAll(async () => {
@@ -295,7 +302,30 @@ describe('saveRelationSettings', () => {
       });
 
       const runAgentDm = (requestId: string) =>
-        createCommandEndpoint(mock<Crowi>()).handle(agentDm(requestId));
+        createCommandEndpoint(mock<Crowi>({ isAiReady: vi.fn(() => true) }), {
+          runAgentRequest: vi.fn(async () => {}),
+        }).handle(agentDm(requestId));
+
+      beforeEach(async () => {
+        await Promise.all([
+          ChatAccountLink.deleteMany({}),
+          ChatAgentRequest.deleteMany({}),
+          mongoose.model('User').deleteMany({}),
+        ]);
+        const user = await mongoose.model('User').create({
+          name: 'Chatty Person',
+          username: 'chatty-person',
+          email: 'chatty-person@example.com',
+          status: UserStatus.STATUS_ACTIVE,
+        });
+        await ChatAccountLink.create({
+          relationId: RELATION_ID,
+          userId: user._id,
+          platform: 'slack',
+          accountId: 'U0ACCOUNT',
+          linkedAt: new Date(),
+        });
+      });
 
       it('is judged by the saved direct-message permission alone, even when every channel is allowed', async () => {
         await saveRelationSettings(RELATION_ID, [
@@ -317,9 +347,7 @@ describe('saveRelationSettings', () => {
             allowedInDirectMessage: true,
           },
         ]);
-        expect(await runAgentDm('dm-on')).not.toMatchObject({
-          code: 'not-permitted-in-channel',
-        });
+        expect(await runAgentDm('dm-on')).toEqual({ kind: 'accepted' });
       });
     });
 

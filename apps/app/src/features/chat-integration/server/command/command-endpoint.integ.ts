@@ -1,8 +1,8 @@
 // Task 5.2's completion condition, proved against the real DB (real Prisma
-// `activities`, real Mongo `Page`/`User`/`chat_account_links`): the two
-// write commands (`create-page` and `keep`) each check "may this actor write
-// here" and "does this path already exist" BEFORE writing, answer the two
-// refusals with DISTINCT response codes, and record an Activity for every
+// `activities`, real Mongo `Page`/`User`/`chat_account_links`): the
+// write command `create-page` checks "may this actor write
+// here" and "does this path already exist" BEFORE writing, answers the two
+// refusals with DISTINCT response codes, and records an Activity for every
 // outcome once resolveActor has determined a real, permitted operator --
 // but never before that point (design.md: "断った要求... は記録しない").
 //
@@ -101,27 +101,6 @@ const createPageRequest = (
     ...overrides,
   }) as Extract<CommandRequest, { kind: 'create-page' }>;
 
-const keepRequest = (
-  overrides: Partial<Extract<CommandRequest, { kind: 'keep' }>> = {},
-): Extract<CommandRequest, { kind: 'keep' }> =>
-  ({
-    relationId: RELATION_ID,
-    op: 'command',
-    requestId: `req-keep-${++seq}`,
-    actor: nextActor(),
-    channel: CHANNEL,
-    kind: 'keep',
-    path: `/chat-keep-target-${seq}`,
-    messages: [
-      {
-        postedAt: '2026-01-01T00:00:00.000Z',
-        author: nextActor(),
-        markdown: 'first message',
-      },
-    ],
-    ...overrides,
-  }) as Extract<CommandRequest, { kind: 'keep' }>;
-
 async function waitForActivityRows(
   where: { id: string },
   maxWaitMs = 5000,
@@ -162,17 +141,12 @@ describe('createCommandEndpoint -- write commands (task 5.2, real DB)', () => {
     // `judge` (design.md's channel-permission check, run before anything
     // else) default-denies a write command with no stored settings row
     // (Requirement 11.3/11.5's "no-settings" default) -- this suite is about
-    // what happens AFTER that gate, so both write commands are explicitly
+    // what happens AFTER that gate, so the write command is explicitly
     // allowed in this channel for every test here.
     await ChatChannelPermission.create([
       {
         relationId: RELATION_ID,
         commandName: 'create-page',
-        allowedChannels: [CHANNEL.channelId],
-      },
-      {
-        relationId: RELATION_ID,
-        commandName: 'keep',
         allowedChannels: [CHANNEL.channelId],
       },
     ]);
@@ -353,50 +327,6 @@ describe('createCommandEndpoint -- write commands (task 5.2, real DB)', () => {
     });
   });
 
-  describe('keep — reuses the same 3 write properties (Requirement 5.2, 5.3)', () => {
-    it('builds the page body from the imported messages (task 4.3), attributes the linked speaker, and creates the page', async () => {
-      const runnerActor = nextActor();
-      const runner = await createLinkedActiveUser(runnerActor);
-      const speakerActor = nextActor();
-      await createLinkedActiveUser(speakerActor);
-
-      const request = keepRequest({
-        actor: runnerActor,
-        messages: [
-          {
-            postedAt: '2026-01-01T00:00:00.000Z',
-            author: speakerActor,
-            markdown: 'hello from the transcript',
-          },
-        ],
-      });
-
-      const pageId = new Types.ObjectId();
-      vi.spyOn(crowi.pageService, 'create').mockResolvedValue({
-        _id: pageId,
-        path: request.path,
-        // biome-ignore lint/suspicious/noExplicitAny: minimal stub for the page create
-      } as any);
-
-      const endpoint = createCommandEndpoint(crowi);
-      const response = await endpoint.handle(request, buildAuditContext());
-
-      expect(response).toEqual({
-        kind: 'created',
-        pageUrl: expect.stringContaining(request.path),
-        importedMessageCount: 1,
-      });
-      // The created page's author is the person who ran `keep` (the
-      // resolved actor), NOT the message's speaker.
-      expect(crowi.pageService.create).toHaveBeenCalledWith(
-        request.path,
-        expect.stringContaining('hello from the transcript'),
-        expect.objectContaining({ _id: runner._id }),
-        {},
-      );
-    });
-  });
-
   describe('audit log retains the operator and the originating channel (task 5.3, Requirement 4.3)', () => {
     it('create-page: the Activity row keeps both the operator and the chat channel the command came from', async () => {
       const actor = nextActor();
@@ -425,30 +355,6 @@ describe('createCommandEndpoint -- write commands (task 5.2, real DB)', () => {
       // field, so this only checks that the channel's matching identifier
       // (`platform` + `channelId`) survives somewhere on the row, not any
       // particular field/format.
-      expect(rows[0].endpoint).toContain(CHANNEL.platform);
-      expect(rows[0].endpoint).toContain(CHANNEL.channelId);
-    });
-
-    it('keep: the Activity row keeps both the operator and the chat channel the command came from', async () => {
-      const runnerActor = nextActor();
-      const runner = await createLinkedActiveUser(runnerActor);
-      const request = keepRequest({ actor: runnerActor });
-
-      const pageId = new Types.ObjectId();
-      vi.spyOn(crowi.pageService, 'create').mockResolvedValue({
-        _id: pageId,
-        path: request.path,
-        // biome-ignore lint/suspicious/noExplicitAny: minimal stub for the page create
-      } as any);
-
-      const endpoint = createCommandEndpoint(crowi);
-      await endpoint.handle(request, buildAuditContext());
-
-      const activityId = vi.mocked(activityModule.beginActivity).mock.results[0]
-        .value.activityId as string;
-      const rows = await waitForActivityRows({ id: activityId });
-      expect(rows).toHaveLength(1);
-      expect(rows[0].userId).toBe(runner._id.toString());
       expect(rows[0].endpoint).toContain(CHANNEL.platform);
       expect(rows[0].endpoint).toContain(CHANNEL.channelId);
     });

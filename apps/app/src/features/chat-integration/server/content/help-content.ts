@@ -8,11 +8,9 @@
 // against this same command list -- this module has no channel/actor
 // parameter to narrow with, on purpose.
 //
-// A static list is correct here because every command in `COMMAND_NAMES` is
-// unconditionally available in this version -- there is no feature flag or
-// config toggle that removes one of them. If a future command becomes
-// conditionally available, this module gains a parameter for that condition
-// then; it is not invented ahead of need now.
+// The one condition that narrows the list is whether GROWI AI can be used
+// (Requirement 14.6): an entry declares that it needs AI, and the list is
+// filtered on that declaration rather than on a command name.
 
 import { COMMAND_NAMES, type CommandName } from '@growi/chat';
 
@@ -23,42 +21,49 @@ export interface HelpCommandEntry {
   readonly description: string;
 }
 
-const HELP_COMMANDS: ReadonlyArray<HelpCommandEntry> = [
+interface HelpCommandDeclaration extends HelpCommandEntry {
+  readonly requiresAi: boolean;
+}
+
+const HELP_COMMANDS: ReadonlyArray<HelpCommandDeclaration> = [
   {
     name: COMMAND_NAMES.search,
     usage: '/growi search [keyword]',
     description: 'Search pages across every GROWI linked to this channel.',
+    requiresAi: false,
   },
   {
     name: COMMAND_NAMES.createPage,
     usage: '/growi create-page',
     description: 'Create a new GROWI page from this channel.',
-  },
-  {
-    name: COMMAND_NAMES.keep,
-    usage: '/growi keep',
-    description:
-      "Import a range of this channel's conversation as a new GROWI page.",
+    requiresAi: false,
   },
   {
     name: COMMAND_NAMES.agent,
-    usage: '/growi agent [request]',
+    usage: '@GROWI agent [request]',
     description:
       'Ask GROWI AI a question, or ask it to summarize this conversation into a page.',
+    requiresAi: true,
   },
   {
     name: COMMAND_NAMES.linkPreview,
     usage: 'Paste a GROWI page URL',
     description:
       "Posting a linked GROWI page's URL attaches a summary of that page.",
+    requiresAi: false,
   },
   {
     name: COMMAND_NAMES.help,
     usage: '/growi help',
     description: 'Show this list of commands.',
+    requiresAi: false,
   },
 ];
 
-/** Every command this GROWI version's chat integration provides (Requirement 14.2). */
-export const buildHelpContent = (): ReadonlyArray<HelpCommandEntry> =>
-  HELP_COMMANDS;
+/** Every command this GROWI version's chat integration provides right now (Requirements 14.2, 14.6). */
+export const buildHelpContent = (conditions: {
+  readonly aiReady: boolean;
+}): ReadonlyArray<HelpCommandEntry> =>
+  HELP_COMMANDS.filter(
+    (command) => conditions.aiReady || !command.requiresAi,
+  ).map(({ name, usage, description }) => ({ name, usage, description }));

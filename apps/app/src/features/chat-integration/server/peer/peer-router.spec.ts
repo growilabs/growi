@@ -44,11 +44,11 @@ import { ChatChannelPermission } from '../settings/models/chat-channel-permissio
 
 /**
  * `command`'s handler (task 5.1) needs a `Crowi` instance -- `help` (the
- * kind every fixture below uses) never touches any of its services, so an
- * auto-stubbed mock is enough to prove the wiring without faking search/ACL
- * behavior this file has no business asserting on.
+ * kind every fixture below uses) only asks it whether GROWI AI is available,
+ * so an auto-stubbed mock is enough to prove the wiring without faking
+ * search/ACL behavior this file has no business asserting on.
  */
-const buildMockCrowi = (): Crowi => mock<Crowi>();
+const buildMockCrowi = (): Crowi => mock<Crowi>({ isAiReady: () => false });
 
 const JSON_CONTENT_TYPE = 'application/json';
 const MOUNT_PATH = '/_api/v3/chat-integration';
@@ -365,7 +365,7 @@ describe('peer-router (task 3.5 -- the 6 entry points, wired for real)', () => {
       expect(response.status).toBe(200);
       expect(response.body).toEqual({
         kind: RESPONSE_KINDS.help,
-        commands: buildHelpContent(),
+        commands: buildHelpContent({ aiReady: false }),
       });
     });
   });

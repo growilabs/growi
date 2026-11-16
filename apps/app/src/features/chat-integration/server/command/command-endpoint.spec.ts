@@ -150,10 +150,17 @@ const helpRequest = (overrides: Partial<CommandRequest> = {}): CommandRequest =>
     ...overrides,
   }) as CommandRequest;
 
+// GROWI AI is unavailable unless a test says otherwise: search, link-preview
+// and help must keep working on a GROWI without AI.
 const buildCrowi = (
-  overrides: { isGuestAllowedToRead?: boolean; appTitle?: string } = {},
+  overrides: {
+    isGuestAllowedToRead?: boolean;
+    appTitle?: string;
+    aiReady?: boolean;
+  } = {},
 ): Crowi =>
   mock<Crowi>({
+    isAiReady: vi.fn(() => overrides.aiReady ?? false),
     aclService: {
       isGuestAllowedToRead: vi.fn(() => overrides.isGuestAllowedToRead ?? true),
     },
@@ -201,16 +208,31 @@ describe('createCommandEndpoint (task 5.1)', () => {
 
   describe('help', () => {
     it("answers this GROWI's real command list without resolving an actor (Requirement 14.2)", async () => {
-      const crowi = buildCrowi();
+      const crowi = buildCrowi({ aiReady: true });
       const endpoint = createCommandEndpoint(crowi);
 
       const response = await endpoint.handle(helpRequest());
 
       expect(response).toEqual({
         kind: 'help',
-        commands: buildHelpContent(),
+        commands: buildHelpContent({ aiReady: true }),
       });
       expect(resolveActorModule.resolveActor).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [true, true],
+      [false, false],
+    ])('lists agent only when GROWI AI is available (aiReady: %s) (Requirement 14.6)', async (aiReady, listsAgent) => {
+      const endpoint = createCommandEndpoint(buildCrowi({ aiReady }));
+
+      const response = await endpoint.handle(helpRequest());
+
+      expect(response.kind).toBe('help');
+      const names =
+        response.kind === 'help' ? response.commands.map((c) => c.name) : [];
+      expect(names.includes('agent')).toBe(listsAgent);
+      expect(names).toContain('search');
     });
   });
 
