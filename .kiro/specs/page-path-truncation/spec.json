@@ -1,0 +1,22 @@
+{
+  "feature_name": "page-path-truncation",
+  "created_at": "2026-08-13T05:50:19Z",
+  "updated_at": "2026-08-20T07:41:32Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": false
+}

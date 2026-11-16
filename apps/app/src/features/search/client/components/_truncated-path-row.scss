@@ -1,0 +1,23 @@
+// Shared Notion-style middle-truncation row recipe: a single-line flex
+// container whose ancestor/page-name segments each truncate individually
+// with an ellipsis before the row itself is allowed to overflow.
+//
+// Only the properties Bootstrap has no utility for live here; the rest of the
+// recipe is applied as utility classes in the markup (see ROW_CLASS_NAME /
+// SEGMENT_CLASS_NAME / FIXED_PART_CLASS_NAME in truncated-path-row-classes.ts).
+//
+// Consumed by SearchResultPagePath.module.scss (search modal) and
+// SearchResultAncestorPath.module.scss (search results list) via `@use`. Not a
+// CSS module itself (leading underscore) -- each consumer still declares its
+// own module-scoped class names.
+
+@mixin row {
+  min-width: 0;
+}
+
+@mixin segment {
+  // Highest shrink priority: ancestor/page-name segments give up space first,
+  // before the ellipsis marker or separators (which never shrink).
+  flex-shrink: 100;
+  min-width: 0;
+}
