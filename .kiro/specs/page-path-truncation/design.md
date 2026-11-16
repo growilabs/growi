@@ -388,7 +388,7 @@ export const useFittingCollapseLevel: (
 ```
 
 **Implementation Notes**
-- Risks: Web フォント読み込み後の再判定はしない（理由は research.md「Web フォントの読み込み」）。
+- Web フォントの読み込みが段階を決めた後に終わると、コンテナ幅は変わらず文字幅だけが変わる。`document.fonts` の `loadingdone` で段階 0 から判定し直す（当初は対策しない判断だったが、祖先が行の端で切れて見えるのは本改修で解消したい見た目そのものなので、PR レビューを受けて対応した）。
 
 #### `SearchResultAncestorPath`（新規）
 
