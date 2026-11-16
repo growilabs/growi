@@ -30,6 +30,7 @@ const stubConfigs = (values: Record<string, unknown>): IConfigManagerForApp => {
 
 const allDefaults = {
   'app:changeProposalEnabled': false,
+  'app:changeProposalReviewersEnabled': false,
   'changeProposal:isEditEnabled': true,
   'changeProposal:isCreateEnabled': true,
   'changeProposal:isMoveEnabled': true,
@@ -47,6 +48,7 @@ describe('readChangeProposalSettings', () => {
     const settings = readChangeProposalSettings();
 
     expect(settings.isEnabled).toBe(false);
+    expect(settings.isReviewersEnabled).toBe(false);
     expect(settings.enabledOperationTypes).toEqual(
       new Set(['edit', 'create', 'move']),
     );
@@ -55,6 +57,12 @@ describe('readChangeProposalSettings', () => {
     expect(settings.maxOperationsPerProposal).toBeNull();
     expect(settings.maxProposalsPerUserPerDay).toBeNull();
     expect(settings.pendingExpirationSeconds).toBeNull();
+  });
+
+  it('reports the reviewers feature as enabled when its switch is on (Reviewers Req 1.1)', () => {
+    stubConfigs({ ...allDefaults, 'app:changeProposalReviewersEnabled': true });
+
+    expect(readChangeProposalSettings().isReviewersEnabled).toBe(true);
   });
 
   it('excludes operation types whose switch is off', () => {

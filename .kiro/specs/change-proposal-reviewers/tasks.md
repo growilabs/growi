@@ -35,7 +35,7 @@
   - _Requirements: 1.1, 1.8_
   - _Depends: 1.2_
   - _Boundary: change-proposal model_
-- [ ] 1.4 (P) 機能の切り替えの設定キーを宣言する
+- [x] 1.4 (P) 機能の切り替えの設定キーを宣言する
   - 設定キー `app:changeProposalReviewersEnabled`（真偽値、既定は無効、環境変数 `CHANGE_PROPOSAL_REVIEWERS_ENABLED`）を宣言し、既存の設定の読み出しに足す。設定キーの宣言の既存テストの表に 1 行足す。管理画面の項目は作らない
   - 既定が無効であることと、環境変数で有効にできることを、テストで確かめている
   - これは、公開の順序（Boundary Context）を守るための設定で、承認者を指定する作成（1.1）を受け付ける条件になる
@@ -259,3 +259,4 @@
 - 1.2: `summarySelect` / `operationSummarySelect` への新しい項目の追加は 1.2 で済んでいる（schema の変更で型検査が壊れるため）。1.3 に残るのは、変換処理（`toProposalFields` / `toOperationState`）に通すこと、`ChangeProposalDocument` の型に足すこと、承認日時を消す 3 か所で `approvedBy` / `approvedChannel` / `decisionToken` も消すこと。`reviews` は一覧の取得でも読み出されるので、全体の却下の記録を依頼した人にだけ返す絞り込みは、応答を組み立てる側で守る。
 - 1.2: 統合テストの索引の完全一致は、CI の雛形 DB（すべての migration を当てたもの）で新しい索引が入ると落ちる。今後 `changeproposals` の索引を足すときも、`20261110120000-add-change-proposal-indexes.integ.ts` は名前の包含で確かめる形のままにする。
 - 1.3: 承認日時を消す 3 か所（`toOutcomeData` の pending、`skipPendingOperations`、`closeIfStillOpen`）は、共通の `UNSET_APPROVAL`（`change-proposal-query-parts.ts`。approvedAt・approvedBy・approvedChannel・decisionToken を `{ unset: true }` で消す）を使う。3.x の承認の書き込みで項目を足すときも、この定義を一緒に直す。`createProposal` は、reviewers（入力 ?? `[]`）と `reviews: []` と purpose を常に渡し、`CreateProposalInput` に `purpose?` と `reviewers?: readonly ReviewerRef[]`（`addedBy` と `addedAt` つき）を足した。3.3 は `ReviewerInput` からこの形を組み立てて渡す。`ChangeProposalDocument` の `reviewers` と `reviews` は必須。
+- 1.4: 機能の切り替えは `readChangeProposalSettings().isReviewersEnabled` で読む。`env:useOnlyEnvVars:changeProposal` の targetKeys には足していない（その一覧は管理画面で編集する項目だけを並べる。管理画面の項目は作らない）。

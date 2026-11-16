@@ -12,6 +12,7 @@ import type {
 
 export type ChangeProposalSettings = {
   readonly isEnabled: boolean;
+  readonly isReviewersEnabled: boolean;
   readonly enabledOperationTypes: ReadonlySet<CreatableOperationType>;
   readonly autoApplyPolicy: AutoApplyPolicy;
   readonly maxOperationsPerProposal: number | null;
@@ -59,6 +60,8 @@ export const readChangeProposalSettings = (): ChangeProposalSettings => {
 
   return {
     isEnabled: configManager.getConfig('app:changeProposalEnabled') === true,
+    isReviewersEnabled:
+      configManager.getConfig('app:changeProposalReviewersEnabled') === true,
     enabledOperationTypes,
     autoApplyPolicy: toAutoApplyPolicy(
       configManager.getConfig('changeProposal:autoApplyPolicy'),

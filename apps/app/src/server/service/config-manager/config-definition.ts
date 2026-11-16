@@ -386,6 +386,7 @@ export const CONFIG_KEYS = [
 
   // Change Proposal Settings
   'app:changeProposalEnabled',
+  'app:changeProposalReviewersEnabled',
   'changeProposal:isEditEnabled',
   'changeProposal:isCreateEnabled',
   'changeProposal:isMoveEnabled',
@@ -1642,6 +1643,10 @@ export const CONFIG_DEFINITIONS = {
   // default here and would bring the operation cap back.
   'app:changeProposalEnabled': defineConfig<boolean>({
     envVarName: 'CHANGE_PROPOSAL_ENABLED',
+    defaultValue: false,
+  }),
+  'app:changeProposalReviewersEnabled': defineConfig<boolean>({
+    envVarName: 'CHANGE_PROPOSAL_REVIEWERS_ENABLED',
     defaultValue: false,
   }),
   'changeProposal:isEditEnabled': defineConfig<boolean>({

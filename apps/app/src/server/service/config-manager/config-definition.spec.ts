@@ -416,6 +416,11 @@ describe('config-definition multi-provider ai keys', () => {
 describe('config-definition change-proposal keys', () => {
   const cases = [
     ['app:changeProposalEnabled', 'CHANGE_PROPOSAL_ENABLED', false],
+    [
+      'app:changeProposalReviewersEnabled',
+      'CHANGE_PROPOSAL_REVIEWERS_ENABLED',
+      false,
+    ],
     ['changeProposal:isEditEnabled', 'CHANGE_PROPOSAL_IS_EDIT_ENABLED', true],
     [
       'changeProposal:isCreateEnabled',
