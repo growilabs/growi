@@ -215,6 +215,22 @@ export const CAPABILITY_SUBSTITUTE: Readonly<
     'Post the private answer at the channel level instead of inside the thread.',
 };
 
+/**
+ * Where a person can carry on with the `agent` after an answer in a channel.
+ * Separate from `CAPABILITY_TABLE`: it names the place, which a capability
+ * level cannot, and a test keeps it in step with `agent-continue-conversation`.
+ * Slack is always `direct-message`: with the AI app view on, the bot DM is
+ * that view, so the wording does not depend on `SLACK_AGENT_VIEW`.
+ */
+export type ContinuePlace = 'direct-message' | 'none';
+
+export const CONTINUE_PLACE: Readonly<Record<PlatformName, ContinuePlace>> = {
+  slack: 'direct-message',
+  discord: 'none',
+  teams: 'none',
+  mattermost: 'direct-message',
+};
+
 /** The raw level, for a caller that needs to tell `degraded` apart from `none`. */
 export function levelOf(
   capability: CapabilityName,

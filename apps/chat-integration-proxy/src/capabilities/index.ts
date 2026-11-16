@@ -27,12 +27,14 @@ export {
 export type {
   CapabilityName,
   ConnectionUnit,
+  ContinuePlace,
 } from './platform-capabilities.js';
 export {
   buildCapabilityReport,
   CAPABILITY_SUBSTITUTE,
   CAPABILITY_TABLE,
   CONNECTION_UNIT_TABLE,
+  CONTINUE_PLACE,
   EPHEMERAL_MUST_FOLLOW_REQUEST_SECOND,
   levelOf,
   REQUIRES_INBOUND_REACHABILITY,

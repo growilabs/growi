@@ -5,6 +5,7 @@ import {
   buildCapabilityReport,
   CAPABILITY_TABLE,
   CONNECTION_UNIT_TABLE,
+  CONTINUE_PLACE,
   levelOf,
   REQUIRES_INBOUND_REACHABILITY,
   supports,
@@ -268,5 +269,24 @@ describe('agent capability rows in the report (Requirements 1.20, 15.9)', () => 
     expect(
       reported('discord', 'ephemeral-in-unreplied-thread')?.substitute,
     ).toEqual(expect.any(String));
+  });
+});
+
+describe('CONTINUE_PLACE (Requirement 15.9)', () => {
+  it('names a place to continue in for Slack and Mattermost, and none for Discord and Teams', () => {
+    expect(CONTINUE_PLACE).toEqual({
+      slack: 'direct-message',
+      discord: 'none',
+      teams: 'none',
+      mattermost: 'direct-message',
+    });
+  });
+
+  it('has a place exactly where the agent-continue-conversation row is full', () => {
+    for (const platform of ALL_PLATFORMS) {
+      expect(CONTINUE_PLACE[platform] !== 'none').toBe(
+        supports('agent-continue-conversation', platform),
+      );
+    }
   });
 });
