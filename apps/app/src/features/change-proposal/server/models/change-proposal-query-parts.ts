@@ -10,9 +10,15 @@ import type {
 import type {
   OperationStatus,
   ProposalEntry,
+  ReviewerInput,
   ReviewerKind,
 } from '../../interfaces';
-import { deriveViewerRole, type ViewerIdentity } from '../domain';
+import {
+  activeReviewers,
+  deriveViewerRole,
+  isReviewer,
+  type ViewerIdentity,
+} from '../domain';
 import type {
   AttributedApproval,
   ClosingLifecycle,
@@ -21,6 +27,7 @@ import type {
   OriginalOperationChange,
   RecordedOutcome,
   RequesterWriteResult,
+  ReviewEntry,
 } from './change-proposal-types';
 import {
   toBasedOn,
@@ -254,6 +261,11 @@ const reviewerIdsOfKind = (
   return valid.length === 0 ? [] : [{ kind, id: { in: valid } }];
 };
 
+// Prisma tells an absent field apart from a null one, so both count as "not removed".
+const notRemoved = {
+  OR: [{ removedAt: { isSet: false } }, { removedAt: null }],
+} satisfies Prisma.ChangeproposalsReviewersWhereInput;
+
 // A reviewer entry that names the viewer or one of the viewer's groups, and was not removed.
 const activeReviewerMatching = (
   viewer: ViewerIdentity,
@@ -269,24 +281,38 @@ const activeReviewerMatching = (
         ),
       ],
     },
-    { OR: [{ removedAt: { isSet: false } }, { removedAt: null }] },
+    notRemoved,
   ],
 });
 
-// The requester may always approve, whoever the reviewers are.
+export const activeReviewerEntries = (
+  inputs: readonly ReviewerInput[],
+): Prisma.ChangeproposalsReviewersWhereInput => ({
+  AND: [
+    { OR: inputs.map((input) => ({ kind: input.kind, id: input.id })) },
+    notRemoved,
+  ],
+});
+
+export const reviewerWhere = (
+  viewer: ViewerIdentity,
+): Prisma.changeproposalsWhereInput => ({
+  reviewers: { some: activeReviewerMatching(viewer) },
+});
+
+// The requester may always act on their proposal, whoever the reviewers are.
+export const requesterOrReviewerWhere = (
+  viewer: ViewerIdentity,
+): Prisma.changeproposalsWhereInput => ({
+  OR: [{ requester: viewer.userId }, reviewerWhere(viewer)],
+});
+
 export const approverWhere = (
   approver: string | AttributedApproval,
 ): Prisma.changeproposalsWhereInput =>
   typeof approver === 'string'
     ? { requester: approver }
-    : {
-        OR: [
-          { requester: approver.approver.userId },
-          {
-            reviewers: { some: activeReviewerMatching(approver.approver) },
-          },
-        ],
-      };
+    : requesterOrReviewerWhere(approver.approver);
 
 export const toApprovalData = (
   now: Date,
@@ -319,3 +345,103 @@ export const toReviewerWriteMiss = (
   ) === 'other'
     ? { ok: false, code: 'not-found' }
     : { ok: false, code: 'not-open' };
+
+type ReviewerScopedRow = {
+  readonly requester: string;
+  readonly lifecycle: string;
+  readonly reviewers: readonly ChangeproposalsReviewers[];
+};
+
+export const isRequesterOrReviewer = (
+  row: ReviewerScopedRow,
+  viewer: ViewerIdentity,
+): boolean =>
+  deriveViewerRole(row.requester, row.reviewers.map(toReviewerRef), viewer) !==
+  'other';
+
+// Matches reviewerWhere: an active entry names the viewer. With no active entries
+// nobody is, although the requester would then count as a reviewer for approving.
+export const isActiveReviewer = (
+  row: ReviewerScopedRow,
+  viewer: ViewerIdentity,
+): boolean => {
+  const refs = row.reviewers.map(toReviewerRef);
+  return (
+    activeReviewers(refs).length > 0 && isReviewer(refs, row.requester, viewer)
+  );
+};
+
+export const isActiveReviewerEntry = (
+  row: ReviewerScopedRow,
+  input: ReviewerInput,
+): boolean =>
+  activeReviewers(row.reviewers.map(toReviewerRef)).some(
+    (r) => r.kind === input.kind && r.id === input.id,
+  );
+
+// Tells why a write limited to open proposals and to permitted actors matched nothing,
+// or null when neither explains it.
+export const explainOpenWriteMiss = (
+  row: ReviewerScopedRow | null,
+  permitted: (row: ReviewerScopedRow) => boolean,
+): Extract<RequesterWriteResult, { ok: false }> | null => {
+  if (row == null || !permitted(row)) {
+    return { ok: false, code: 'not-found' };
+  }
+  return row.lifecycle === 'open' ? null : { ok: false, code: 'not-open' };
+};
+
+// Prisma tells an absent field apart from a null one, so both count as "no operation key".
+const wholeProposalReview = {
+  OR: [{ operationKey: { isSet: false } }, { operationKey: null }],
+} satisfies Prisma.ChangeproposalsReviewsWhereInput;
+
+// Without isSet, Prisma's `in` on a composite list element also matches a record whose
+// operationKey is absent, which is a whole rejection.
+const reviewsOfOperations = (
+  operationKeys: readonly string[],
+): Prisma.ChangeproposalsReviewsWhereInput => ({
+  operationKey: { isSet: true, in: [...operationKeys] },
+});
+
+// Only records older than the replacement, so the replacement itself survives.
+export const reviewsReplacedBy = (
+  by: string,
+  entry: ReviewEntry,
+  now: Date,
+): Prisma.ChangeproposalsReviewsWhereInput => ({
+  by,
+  at: { lt: now },
+  ...(entry.operationKeys === 'whole-proposal'
+    ? wholeProposalReview
+    : reviewsOfOperations(entry.operationKeys)),
+});
+
+export const reviewsClearedByApproval = (
+  by: string,
+  operationKeys: readonly string[],
+  wholeProposal: boolean,
+): Prisma.ChangeproposalsReviewsWhereInput => ({
+  by,
+  OR: [
+    reviewsOfOperations(operationKeys),
+    ...(wholeProposal ? [wholeProposalReview] : []),
+  ],
+});
+
+export const toReviewCreateInputs = (
+  by: string,
+  entry: ReviewEntry,
+  now: Date,
+): Prisma.ChangeproposalsReviewsCreateInput[] => {
+  const record = withoutUndefined({
+    kind: entry.kind,
+    by,
+    at: now,
+    comment: entry.comment,
+    channel: entry.channel,
+  });
+  return entry.operationKeys === 'whole-proposal'
+    ? [record]
+    : entry.operationKeys.map((operationKey) => ({ ...record, operationKey }));
+};

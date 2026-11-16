@@ -80,7 +80,7 @@
   - _Requirements: 2.1, 2.5, 2.8, 2.9, 2.10_
   - _Depends: 1.3_
   - _Boundary: change-proposal model_
-- [ ] 3.2 承認者の追加・削除と、判断の記録の書き込みを足す
+- [x] 3.2 承認者の追加・削除と、判断の記録の書き込みを足す
   - 承認者の追加（入力 1 件ごとの条件付きの追加。同じ承認者の重ねての追加を防ぐ）と削除（外した人と日時を書き、要素は消さない）の書き込み
   - 判断の記録の追加（却下・放棄・全体の却下）と、同じ人の前の記録の置き換え、承認のときに同じ人の記録を消すこと（全体の承認では、全体の却下の記録も消す）の書き込み
   - 同時に別の人が別の承認者を足しても、片方が消えないこと、削除後も判断の記録が残ること、置き換えと削除の動きを、結合テストで確かめている
@@ -270,3 +270,7 @@
 - 3.1: `server/domain/index.ts`（barrel）に 2.1〜2.3 の純関数を登録した。以後は barrel を通して import する。`markApproved` の 2 番目の引数は `string | AttributedApproval`（`{ approver: ViewerIdentity; channel: ReviewChannel; decisionToken: string }`）。文字列は今までの呼び方（作成直後の自動反映と requester-actions。承認した人などを書かない）。どちらの呼び方にも「未承認」（`approvedAt` が無いか null）の条件が付いたので、承認済みで反映がまだの操作を再承認しても、`approvedAt` は変わらない。`UNSET_APPROVAL` との食い違いは、`satisfies Record<keyof typeof UNSET_APPROVAL, unknown>` が型で防ぐ。承認者向けの書き込めなかった理由の判定は `toReviewerWriteMiss`（`change-proposal-query-parts.ts`）。
 - 3.1: **6.2 の実装者へ**: `markApproved` の `ok` は「提案が条件に合った」ことだけを表し、操作を書いたかどうかは表さない（Prisma が数えるのは文書の数）。操作を書いたかは、`decisionToken` で読み直して判定する。また、書き込みの衝突（Prisma のエラー P2034）であきらめると、`toReviewerWriteMiss` は lifecycle を読まないので、開いている提案でも `not-open` を返しうる（依頼した人の経路と同じ作り。960 回の同時承認では起きなかった）。6.2 で、lifecycle が `open` のまま権限があるなら、`not-open` を返さず読み直す形を検討する。
 - 3.1: 要件 2.8 の「承認した人が依頼した人自身か」は保存しない。応答を組み立てるとき（4.3）に `approvedBy === requester` から決める。
+- 3.2: 書き込みの関数は `prisma.changeproposals` の 4 つ（本体は `server/models/change-proposal-reviewer-writes.ts`、`runConditionalWrite` は `conditional-write.ts`）。6.x はこの名前で呼ぶ。`addReviewers(id, actor: ViewerIdentity, inputs, now): Promise<AddReviewersResult>`（`added` は新しく有効にした承認者だけ。通知の宛先（要件 4.11）にはこれを使う）、`removeReviewers(id, actor, inputs, now): Promise<RequesterWriteResult>`、`addReviews(id, reviewer: ViewerIdentity, entry: ReviewEntry, now): Promise<RequesterWriteResult>`（`ReviewEntry` は `{ channel; comment? } & ({ kind: ReviewKind; operationKeys: readonly string[] } | { kind: 'reject'; operationKeys: 'whole-proposal' })`）、`clearReviewsOnApproval(id, approverId, operationKeys, { wholeProposal }): Promise<boolean>`。design.md の手順 6 は、記録の置き換えを「足してから、今回の日時より前の記録を消す」に直した（消してから足すと、間に提案が閉じたり承認者が外されたりしたとき、前の記録だけが失われるため）。
+- 3.2: **6.x の実装者へ**: (1) 追加・削除の書き込みの条件には「依頼した人、または有効な承認者」が入っている（design の箇条より 1 つ多いが、Security Considerations に合わせた）。却下・放棄の書き込みの条件は「有効な承認者の要素が本人を指す」なので、依頼した人自身が承認者の一覧に入っていると条件を通る。依頼した人の却下・放棄を断る判定（`requester-cannot-review`）は 6.3 で先に行う。有効な承認者が 0 件の提案では、誰も却下・放棄を書けない。(2) 書き込みの衝突（Prisma のエラー P2034）であきらめたとき、新しい 3 関数は例外を投げる（3.1 の `markApproved` は `not-open`）。`addReviewers` が途中で例外を投げると、それまでに足した承認者は保存されたまま、呼び出し側に報告されない（通知から漏れる）。6.4 で扱いを決める。(3) `addReviewers` の入力が空のときは、開いているかも権限も確かめずに `ok` を返す。入力の検証と `not-open` の判定は、6.4 で先に行う。(4) `clearReviewsOnApproval` は `lifecycle: 'open'` を条件にしない（承認のあとの反映で提案が完了していることがあるため）。6.2 では、承認として受け付けたキーをすべて渡す（編集中の人がいて「待ち」のまま残った操作のキーも含む）。(5) 同じ人が同じ操作について同時に 2 回求めると、記録が 2 件残ることがある。読み出す側（4.3）は、同じ人・同じキーの最新の 1 件だけを使う。
+- 3.2: Prisma の MongoDB の落とし穴（今後の書き込みでも同じ）: (a) 省略できる項目（`reviews.operationKey`）に `in` で条件を付けると、項目が無い記録（全体の却下）にも合う。`isSet: true` を一緒に付ける。(b) 複合型の要素の条件の `OR: []` は「すべての要素に合う」と解釈される。対象が 0 件のときは書き込まない。
+- 3.2: `change-proposal.integ.ts` が約 2300 行になった。分割するなら、describe「adding and removing reviewers」と「reviews (reject and abstain records)」を `change-proposal-reviewers.integ.ts` に移し、共通の補助関数をテスト用の補助ファイルへ出す。このタスクの範囲を超えるので、実施するかは 9.3（全体の確認）で判断する。

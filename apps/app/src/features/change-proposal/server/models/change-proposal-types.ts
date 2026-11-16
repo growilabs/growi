@@ -8,7 +8,9 @@ import type {
   ProposalMark,
   RevertRefusalReason,
   ReviewChannel,
+  ReviewerInput,
   ReviewerRef,
+  ReviewKind,
   SkipReason,
   StaleReason,
   WaitingReason,
@@ -43,6 +45,19 @@ export type AttributedApproval = {
   readonly channel: ReviewChannel;
   readonly decisionToken: string;
 };
+
+export type AddReviewersResult =
+  | { readonly ok: true; readonly added: readonly ReviewerInput[] }
+  | { readonly ok: false; readonly code: 'not-found' | 'not-open' };
+
+// A reject or abstain record on the chosen operations, or a rejection of the whole proposal.
+export type ReviewEntry = {
+  readonly channel: ReviewChannel;
+  readonly comment?: string;
+} & (
+  | { readonly kind: ReviewKind; readonly operationKeys: readonly string[] }
+  | { readonly kind: 'reject'; readonly operationKeys: 'whole-proposal' }
+);
 
 export type RecordedOutcome =
   | {
