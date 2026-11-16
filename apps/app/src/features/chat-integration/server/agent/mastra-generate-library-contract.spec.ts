@@ -473,6 +473,83 @@ describe('Mastra generate: an aborted run', () => {
     expect(await settled).toEqual({ kind: 'timeout' });
   });
 
+  it('returns the whole answer with finishReason stop when the abort comes after the last model call', async () => {
+    const controller = new AbortController();
+
+    const pending = agentWith(planModel([textStep('full answer')])).generate(
+      'question',
+      {
+        abortSignal: controller.signal,
+        modelSettings: { maxRetries: 0 },
+        // The run's own deadline firing after the model has answered, before
+        // generate returns.
+        onFinish: () => {
+          controller.abort();
+        },
+      },
+    );
+    const settled = settle(pending, controller.signal);
+    const result = await pending;
+
+    expect(result.text).toBe('full answer');
+    expect(result.finishReason).toBe('stop');
+    expect(result.error).toBeUndefined();
+    expect(controller.signal.aborted).toBe(true);
+    expect(await settled).toEqual({ kind: 'timeout' });
+  });
+
+  it('saves the question and the partial answer of an aborted remembered run, and replays them on the next turn', async () => {
+    const memory = new Memory({ storage: new InMemoryStore() });
+    const thread = {
+      thread: '123e4567-e89b-12d3-a456-426614174001',
+      resource: 'user-1',
+    };
+    const controller = new AbortController();
+    const inFlight = inFlightUntilAborted();
+    const model = planModel([
+      toolCallStep([pageCall('c1', 'p1')], 'partial text '),
+      inFlight.step,
+      textStep('next answer'),
+    ]);
+    const agent = agentWith(model, undefined, memory);
+
+    const pending = agent.generate('first question', {
+      memory: thread,
+      maxSteps: 5,
+      abortSignal: controller.signal,
+      modelSettings: { maxRetries: 0 },
+    });
+    await inFlight.entered;
+    controller.abort();
+    await pending;
+    const { messages } = await memory.recall({
+      threadId: thread.thread,
+      resourceId: thread.resource,
+    });
+
+    expect(
+      messages.map((message) => [message.role, message.content.content]),
+    ).toEqual([
+      ['user', 'first question'],
+      ['assistant', 'partial text '],
+    ]);
+    expect(messages[1]?.content.parts).toContainEqual(
+      expect.objectContaining({
+        type: 'tool-invocation',
+        toolInvocation: expect.objectContaining({
+          state: 'result',
+          toolCallId: 'c1',
+        }),
+      }),
+    );
+
+    await agent.generate('second question', { memory: thread, maxSteps: 5 });
+
+    expect(
+      model.doGenerateCalls.at(-1)?.prompt.map((message) => message.role),
+    ).toEqual(['system', 'user', 'assistant', 'tool', 'user']);
+  });
+
   it('resolves with an undefined object when a structured-output run is aborted', async () => {
     const controller = new AbortController();
     const inFlight = inFlightUntilAborted();
