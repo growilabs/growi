@@ -268,6 +268,7 @@ describe('AttachmentSearchDelegatorExtension', () => {
       expect(order).toEqual(['refresh', 'delete']);
       expect(client.indices.refresh).toHaveBeenCalledWith({
         index: 'growi-attachments-2',
+        ignore_unavailable: true,
       });
       expect(client.deleteByQuery).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -275,6 +276,24 @@ describe('AttachmentSearchDelegatorExtension', () => {
           query: { terms: { attachmentId: ['a1', 'a2'] } },
         }),
       );
+    });
+
+    it('rejects when Elasticsearch reports docs it could not delete', async () => {
+      client.deleteByQuery.mockResolvedValue({
+        deleted: 0,
+        failures: [
+          {
+            id: 'a1_1',
+            index: 'growi-attachments-2',
+            status: 409,
+            cause: { type: 'version_conflict_engine_exception', reason: 'x' },
+          },
+        ],
+      });
+
+      await expect(
+        ext.removeAttachmentsFromIndex(['a1'], 'growi-attachments-2'),
+      ).rejects.toThrow('version_conflict_engine_exception');
     });
 
     it('rejects when the delete fails, so the rebuild does not swap', async () => {
@@ -290,6 +309,31 @@ describe('AttachmentSearchDelegatorExtension', () => {
   // syncAttachmentRemoved
   // ----------------------------------------------------------------
   describe('syncAttachmentRemoved', () => {
+    it('refreshes each index before deleting, so a doc written just before is removed too', async () => {
+      const order: string[] = [];
+      client.indices.refresh.mockImplementation(({ index } = {}) => {
+        order.push(`refresh ${String(index)}`);
+        return Promise.resolve({
+          _shards: { total: 1, successful: 1, failed: 0 },
+        });
+      });
+      client.deleteByQuery.mockImplementation(({ index }) => {
+        order.push(`delete ${String(index)}`);
+        return Promise.resolve({ deleted: 1, failures: [] });
+      });
+
+      await ext.syncAttachmentRemoved('att1', ['growi-attachments-alias']);
+
+      expect(order).toEqual([
+        'refresh growi-attachments-alias',
+        'delete growi-attachments-alias',
+      ]);
+      expect(client.indices.refresh).toHaveBeenCalledWith({
+        index: 'growi-attachments-alias',
+        ignore_unavailable: true,
+      });
+    });
+
     it('calls deleteByQuery for each target index', async () => {
       await ext.syncAttachmentRemoved('att1', [
         'growi-attachments-alias',

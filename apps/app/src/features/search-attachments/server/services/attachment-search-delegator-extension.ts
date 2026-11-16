@@ -177,35 +177,46 @@ const composeAttachmentSearchBody = (
 };
 
 /**
- * Performs a deleteByQuery for one index using the appropriate ES version API.
- * Returns a settled result so callers can handle partial failures without throwing.
+ * Deletes every doc of the given attachments from `index`. Rejects when
+ * Elasticsearch reports docs it could not delete.
  */
-const deleteByQueryForIndex = (
+const deleteAttachmentDocs = async (
   client: ElasticsearchClientDelegator,
-  indexName: string,
-  attachmentId: string,
-): Promise<unknown> => {
-  const deleteQuery = { term: { attachmentId } };
+  index: string,
+  attachmentIds: string[],
+): Promise<void> => {
+  const params = {
+    index,
+    // The alias is missing while the feature has never been enabled
+    ignore_unavailable: true,
+  };
+  const query = { terms: { attachmentId: attachmentIds } };
 
+  // delete-by-query only sees docs made searchable by a refresh
+  let failures: unknown[] | undefined;
   if (isES8ClientDelegator(client)) {
-    return client.deleteByQuery({
-      index: indexName,
-      query: deleteQuery,
+    await client.indices.refresh(params);
+    ({ failures } = await client.deleteByQuery({
+      ...params,
+      query,
       conflicts: 'proceed',
-      // The alias is missing while the feature has never been enabled
-      ignore_unavailable: true,
-    });
-  }
-  if (isES9ClientDelegator(client)) {
-    return client.deleteByQuery({
-      index: indexName,
-      query: deleteQuery,
+    }));
+  } else if (isES9ClientDelegator(client)) {
+    await client.indices.refresh(params);
+    ({ failures } = await client.deleteByQuery({
+      ...params,
+      query,
       conflicts: 'proceed',
-      // The alias is missing while the feature has never been enabled
-      ignore_unavailable: true,
-    });
+    }));
+  } else {
+    throw new Error('Unsupported Elasticsearch version');
   }
-  return Promise.reject(new Error('Unsupported Elasticsearch version'));
+
+  if (failures != null && failures.length > 0) {
+    throw new Error(
+      `Delete of attachments from ${index} failed: ${JSON.stringify(failures)}`,
+    );
+  }
 };
 
 /**
@@ -406,23 +417,11 @@ export class AttachmentSearchDelegatorExtension
     }
   }
 
-  async removeAttachmentsFromIndex(
+  removeAttachmentsFromIndex(
     attachmentIds: string[],
     index: string,
   ): Promise<void> {
-    const query = { terms: { attachmentId: attachmentIds } };
-    // delete-by-query only sees docs made searchable by a refresh
-    if (isES8ClientDelegator(this.client)) {
-      await this.client.indices.refresh({ index });
-      await this.client.deleteByQuery({ index, query, conflicts: 'proceed' });
-      return;
-    }
-    if (isES9ClientDelegator(this.client)) {
-      await this.client.indices.refresh({ index });
-      await this.client.deleteByQuery({ index, query, conflicts: 'proceed' });
-      return;
-    }
-    throw new Error('Unsupported Elasticsearch version');
+    return deleteAttachmentDocs(this.client, index, attachmentIds);
   }
 
   /**
@@ -443,7 +442,7 @@ export class AttachmentSearchDelegatorExtension
     // Run deleteByQuery for all target indexes concurrently.
     const results = await Promise.allSettled(
       targetIndexes.map((indexName) =>
-        deleteByQueryForIndex(this.client, indexName, attachmentId),
+        deleteAttachmentDocs(this.client, indexName, [attachmentId]),
       ),
     );
 

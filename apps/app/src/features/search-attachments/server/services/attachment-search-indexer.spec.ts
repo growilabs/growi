@@ -151,6 +151,10 @@ function disableFeature(): void {
 describe('AttachmentSearchIndexer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The attachment still exists unless a test says otherwise
+    vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+      makeAttachment(),
+    );
   });
 
   afterEach(() => {
@@ -526,6 +530,49 @@ describe('AttachmentSearchIndexer', () => {
   // ----------------------------------------------------------------
   // 6. onDetach: calls syncAttachmentRemoved with correct indexes
   // ----------------------------------------------------------------
+
+  describe('onAttach — attachment deleted while it was being extracted', () => {
+    it('removes the docs it just wrote when the attachment no longer exists', async () => {
+      enableFeature();
+      const delegator = makeDelegator();
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(null);
+      const indexer = makeIndexer(
+        makeExtractor(),
+        delegator,
+        makeFailureLog(),
+        makeReindexBatch(true, 'attachments-2'),
+        makeSearchService(true),
+      );
+
+      await indexer.onAttach('page-1', makeAttachment(), makeMullerFile());
+
+      expect(delegator.syncAttachmentIndexed).toHaveBeenCalled();
+      expect(delegator.syncAttachmentRemoved).toHaveBeenCalledWith('att-001', [
+        'attachments-alias',
+        'attachments-2',
+      ]);
+    });
+
+    it('keeps the docs when the attachment still exists', async () => {
+      enableFeature();
+      const delegator = makeDelegator();
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+        makeAttachment(),
+      );
+      const indexer = makeIndexer(
+        makeExtractor(),
+        delegator,
+        makeFailureLog(),
+        makeReindexBatch(false, null),
+        makeSearchService(true),
+      );
+
+      await indexer.onAttach('page-1', makeAttachment(), makeMullerFile());
+
+      expect(delegator.syncAttachmentIndexed).toHaveBeenCalled();
+      expect(delegator.syncAttachmentRemoved).not.toHaveBeenCalled();
+    });
+  });
 
   describe('onDetach', () => {
     it('tells the reindex batch which attachment was deleted', async () => {

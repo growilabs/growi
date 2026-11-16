@@ -356,6 +356,29 @@ describe('AttachmentReindexBatch', () => {
       expect(order).toEqual(['purge', 'swap']);
     });
 
+    it('keeps the alias and drops the new index when removing the deleted attachments fails', async () => {
+      setupAttachmentMock([makeAttachment({ id: 'a1' })]);
+      extractor.extractAttachment.mockImplementation(() => {
+        batch.recordDetached('a1');
+        return Promise.resolve(successOutcome);
+      });
+      delegatorExt.removeAttachmentsFromIndex.mockRejectedValue(
+        new Error('delete failed'),
+      );
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(delegatorExt.swapAttachmentAlias).not.toHaveBeenCalled();
+      expect(delegatorExt.dropRebuildIndex).toHaveBeenCalledWith(
+        'attachments-2',
+      );
+      expect(socketIoService._emit).toHaveBeenCalledWith(
+        SocketEventName.AttachmentRebuildingFailed,
+        { error: 'delete failed' },
+      );
+    });
+
     it('ignores deletions that happened outside a rebuild', async () => {
       setupAttachmentMock([]);
       batch.recordDetached('a1');

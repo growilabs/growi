@@ -54,6 +54,10 @@ export const invalidateRequiresReindexCache = (): void => {
   requiresReindexCache = null;
 };
 
+const isIndexNotFound = (err: unknown): boolean =>
+  (err as { meta?: { body?: { error?: { type?: string } } } })?.meta?.body
+    ?.error?.type === 'index_not_found_exception';
+
 /**
  * Computes whether the attachment ES index is out of sync with MongoDB.
  *
@@ -63,13 +67,10 @@ export const invalidateRequiresReindexCache = (): void => {
  *
  * Otherwise runs a cardinality aggregation on the attachment alias and
  * compares the unique-attachmentId count against the indexable attachments.
+ * Returns `true` when the alias does not exist yet.
  *
  * Result is cached for CACHE_TTL_MS milliseconds.
  */
-const isIndexNotFound = (err: unknown): boolean =>
-  (err as { meta?: { body?: { error?: { type?: string } } } })?.meta?.body
-    ?.error?.type === 'index_not_found_exception';
-
 export const computeRequiresReindex = async (
   crowi: Crowi,
   isEnabled: boolean,

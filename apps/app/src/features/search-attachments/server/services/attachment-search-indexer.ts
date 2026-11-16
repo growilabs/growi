@@ -324,7 +324,32 @@ export class AttachmentSearchIndexer
       );
     }
 
+    await this.removeIfDeletedMeanwhile(attachmentId);
+
     return outcome;
+  }
+
+  /**
+   * A delete during the extraction finds nothing to remove, and the write
+   * then lands afterwards. MongoDB drops the row before the detach handler
+   * runs, so checking after the write catches every such delete.
+   */
+  private async removeIfDeletedMeanwhile(attachmentId: string): Promise<void> {
+    const row = await prisma.attachments.findUnique({
+      where: { id: attachmentId },
+      select: { id: true },
+    });
+    if (row != null) {
+      return;
+    }
+    logger.info(
+      { attachmentId },
+      'Attachment was deleted while being indexed; removing its docs',
+    );
+    await this.delegatorExt.syncAttachmentRemoved(
+      attachmentId,
+      this.getTargetIndexes(),
+    );
   }
 
   // ----------------------------------------------------------------
