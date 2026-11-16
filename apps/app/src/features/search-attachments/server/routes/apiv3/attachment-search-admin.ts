@@ -18,6 +18,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 import { body, query } from 'express-validator';
 
+import { ATTACHMENT_INDEX_NAMES } from '~/features/search-attachments/server/services/attachment-search-delegator-extension';
 import { ExtractionFailureLogService } from '~/features/search-attachments/server/services/extraction-failure-log-service';
 import { indexableAttachments } from '~/features/search-attachments/server/services/indexable-attachments';
 import { isAttachmentFullTextSearchEnabled } from '~/features/search-attachments/server/services/is-attachment-full-text-search-enabled';
@@ -97,7 +98,7 @@ export const computeRequiresReindex = async (
 
         if (esClient != null && typeof esClient.search === 'function') {
           const result = await esClient.search({
-            index: 'attachments',
+            index: ATTACHMENT_INDEX_NAMES.alias,
             body: {
               size: 0,
               aggs: {

@@ -189,6 +189,12 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
   - 実行中フラグの上げ下ろしを API route から `AttachmentReindexBatch.startRebuild()` の内部へ移した。応答後に処理が続く形では、route の try/finally で後始末する以前の設計が成り立たないため
   - Page 側の作り直しは関数として受け取り、batch から `SearchService` への依存を作らない
   - alias swap は Page と添付で別々に行う。以前の設計は両 index の同時 swap を描いていたが、Page 側は既存の `rebuildIndex()` の中で swap が完結しており、同時にするには既存コードを分解する必要がある。2 つの swap の間も、添付ヒットの権限は検索時に page_index から引くため漏洩は起きない
+  - 二重起動のときは `startRebuild()` が例外を投げずに `false` を返す。route はそれを見て 409 にするだけで、例外クラスを route と batch で共有しなくて済む
+- 実 index の名前 (2026-11): alias `attachments-alias` の裏に実 index `attachments-1` / `attachments-2` を置き、作り直しのたびに alias が指していない方を埋めて付け替える
+  - 以前の設計は「固定名 `attachments-tmp` に作って alias `attachments` を付け替える」だった。付け替えた後は `attachments-tmp` が本番になるので、次の作り直しが最初に行う「`attachments-tmp` を drop」で本番を消してしまう。また alias と同じ名前の実 index は作れないので、alias `attachments` の裏の最初の実 index に置ける名前も無かった
+  - Page 側の `rebuildIndex()` (tmp に複製 → alias を tmp へ → 本体を消して作り直す → alias を戻す) をそのまま真似ない理由: 途中で止まると、起動時の normalize が tmp (旧データの複製) を消し、作りかけの本体に alias を戻す。Req 6.4 (中断しても旧 index を保つ) を満たせない。添付の作り直しは抽出を伴い何時間もかかりうるので、途中で止まる可能性を無視できない
+  - 同じ理由で、余った実 index は起動時に消さず、次の作り直しの先頭で消す。消すのは常に「alias が指していない方」だけにする
+  - alias 名を `attachments` にしなかったのは、Page (`<index>-alias`) と監査ログ (`auditlogs-alias`) の命名に揃えるためと、以前の実装で Elasticsearch が自動作成した実 index `attachments` が開発環境に残っていても名前がぶつからないようにするため
 
 ## 9. 抽出サービスへ送る内容 (2026-11)
 

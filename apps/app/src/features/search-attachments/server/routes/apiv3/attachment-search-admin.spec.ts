@@ -290,7 +290,7 @@ describe('attachment-search-admin', () => {
       expect(result).toBe(true);
       expect(esClient.search).toHaveBeenCalledWith(
         expect.objectContaining({
-          index: 'attachments',
+          index: 'attachments-alias',
         }),
       );
     });

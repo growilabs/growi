@@ -321,22 +321,18 @@ export const setup = (crowi) => {
                 );
               }
 
-              const tmpIndexName = 'attachments-tmp';
-              try {
-                batch.begin(tmpIndexName);
-                // Rebuild page/comment index (awaited so we sequence attachments after)
-                await searchService.rebuildIndex();
-
-                await batch.addAllAttachments(
-                  tmpIndexName,
-                  (processed, total) => {
-                    logger.debug(
-                      `Attachment reindex progress: ${processed}/${total}`,
-                    );
-                  },
+              // NOT wait the processing is terminated
+              const isStarted = batch.startRebuild(() =>
+                searchService.rebuildIndex(true),
+              );
+              if (!isStarted) {
+                return res.apiv3Err(
+                  new ErrorV3(
+                    'A rebuild including attachments is already running',
+                    'rebuild_in_progress',
+                  ),
+                  409,
                 );
-              } finally {
-                batch.end();
               }
 
               activityEvent.emit('update', res.locals.activity._id, {
@@ -345,7 +341,7 @@ export const setup = (crowi) => {
 
               return res
                 .status(200)
-                .send({ message: 'Operation is successfully processed.' });
+                .send({ message: 'Operation is successfully requested.' });
             }
 
             // includeAttachments=false: existing fire-and-forget page rebuild

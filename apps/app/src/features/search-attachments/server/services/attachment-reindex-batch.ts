@@ -1,17 +1,13 @@
 /**
- * AttachmentReindexBatch — orchestrates a full rebuild of the attachment ES index.
+ * AttachmentReindexBatch — rebuilds the attachment ES index in the background.
  *
- * Lifecycle (managed by the API route, task 8.6):
- *   1. API route calls `begin(tmpIndexName)` → sets rebuilding flag
- *   2. API route calls `addAllAttachments(tmpIndexName, progress)` → pages through MongoDB attachment ids
- *   3. API route calls `end()` → clears flag
+ * `startRebuild` rebuilds the page index, fills a fresh attachment index,
+ * sweeps orphans from it and only then moves the alias onto it, so the live
+ * index stays as it was until the swap (see design.md Flow 5).
  *
- * Design constraints:
  * - Individual attachment extraction failures NEVER abort the batch — log + continue.
  * - NO permission fields stored in any ES document.
  * - Socket events are emitted to the admin namespace so the admin UI can display progress.
- * - Sweep (orphan cleanup) happens after bulk indexing but BEFORE alias swap (alias swap
- *   is performed by the API route after `addAllAttachments` resolves).
  */
 
 import type {
@@ -35,19 +31,14 @@ const logger = loggerFactory('growi:service:search-attachments:reindex-batch');
 
 // ---- Public types -----------------------------------------------------------
 
-/** Callback invoked after each attachment is processed (success or failure). */
-export type ProgressCallback = (processed: number, total: number) => void;
-
 export interface AttachmentReindexBatchInterface {
-  addAllAttachments(
-    targetIndex: string,
-    progress: ProgressCallback,
-  ): Promise<void>;
-  /** Begins a rebuild session. Throws a 409 error if a rebuild is already running. */
-  begin(tmpIndexName: string): void;
-  /** Ends the current rebuild session, clearing in-memory state. */
-  end(): void;
+  /**
+   * Starts the rebuild without waiting for it. Returns false, starting
+   * nothing, when a rebuild is already running.
+   */
+  startRebuild(rebuildPageIndex: () => Promise<void>): boolean;
   isRebuilding(): boolean;
+  /** The index being filled, once it exists; live writes go there too. */
   getTmpIndexName(): string | null;
 }
 
@@ -218,29 +209,50 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
     this.socketIoService = socketIoService;
   }
 
-  // ---- Lifecycle state -------------------------------------------------------
+  // ---- Lifecycle -------------------------------------------------------------
 
-  /**
-   * Marks the start of a rebuild run and records the temporary index name.
-   * Throws a 409-status error if a rebuild is already in progress.
-   */
-  begin(tmpIndexName: string): void {
+  startRebuild(rebuildPageIndex: () => Promise<void>): boolean {
     if (this._isRebuilding) {
-      throw Object.assign(new Error('Rebuild already in progress'), {
-        status: 409,
-      });
+      return false;
     }
+    // Set before any await so a concurrent request sees it
     this._isRebuilding = true;
-    this._tmpIndexName = tmpIndexName;
+    void this.rebuild(rebuildPageIndex);
+    return true;
   }
 
-  /**
-   * Marks the end of a rebuild run and clears in-memory state.
-   * Safe to call even if `begin` was never called.
-   */
-  end(): void {
-    this._isRebuilding = false;
-    this._tmpIndexName = null;
+  private async rebuild(rebuildPageIndex: () => Promise<void>): Promise<void> {
+    try {
+      await rebuildPageIndex();
+
+      this._tmpIndexName = await this.delegatorExt.createRebuildIndex();
+      const result = await this.addAllAttachments(this._tmpIndexName);
+      await this.delegatorExt.swapAttachmentAlias(this._tmpIndexName);
+
+      this.socketIoService
+        .getAdminSocket()
+        .emit(SocketEventName.FinishAddAttachment, result);
+    } catch (err) {
+      logger.error({ err }, 'Attachment index rebuild failed');
+      this.socketIoService
+        .getAdminSocket()
+        ?.emit(SocketEventName.AttachmentRebuildingFailed, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      if (this._tmpIndexName != null) {
+        await this.delegatorExt
+          .dropRebuildIndex(this._tmpIndexName)
+          .catch((dropErr) =>
+            logger.error(
+              { err: dropErr, index: this._tmpIndexName },
+              'Failed to drop the half-built attachment index',
+            ),
+          );
+      }
+    } finally {
+      this._tmpIndexName = null;
+      this._isRebuilding = false;
+    }
   }
 
   isRebuilding(): boolean {
@@ -295,101 +307,47 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
   // ---- Bulk indexing ---------------------------------------------------------
 
   /**
-   * Iterates every Attachment document in MongoDB, extracts text, and upserts
-   * ES docs into `targetIndex`.
-   *
-   * Algorithm:
-   * 1. Drop and recreate `targetIndex` (idempotent fresh start).
-   * 2. Page through all attachment ids — for each attachment:
-   *    a. Load the row, then call extractor.
-   *    b. On success: build docs → `syncAttachmentIndexed`.
-   *    c. On failure: build metadata-only doc → `syncAttachmentIndexed` +
-   *       `failureLogService.record`. Log and continue.
-   *    d. Emit `AddAttachmentProgress` socket event.
-   *    e. Call the `progress` callback.
-   * 3. Run orphan sweep on `targetIndex` after all docs are processed.
-   * 4. Emit `FinishAddAttachment` socket event.
-   *
-   * On unrecoverable error: emit `RebuildingFailed` then rethrow.
-   *
-   * Individual attachment failures NEVER abort the batch.
+   * Extracts and indexes every attachment into `targetIndex`, then removes
+   * docs whose page no longer exists. A failure on one attachment is logged
+   * and skipped.
    */
   async addAllAttachments(
     targetIndex: string,
-    progress: ProgressCallback,
-  ): Promise<void> {
+  ): Promise<{ totalCount: number; count: number }> {
     const socket = this.socketIoService.getAdminSocket();
 
-    try {
-      // Step 1: Fresh index (drop if exists, then create)
-      await this.delegatorExt.createAttachmentIndex(targetIndex);
+    const total = await prisma.attachments.count({
+      where: indexableAttachments,
+    });
+    logger.info(
+      { targetIndex, total },
+      'addAllAttachments: starting paged walk',
+    );
 
-      // Step 2: Count total for progress reporting
-      const total = await prisma.attachments.count({
-        where: indexableAttachments,
-      });
-
-      logger.info(
-        { targetIndex, total },
-        'addAllAttachments: starting paged walk',
-      );
-
-      let processed = 0;
-
-      // Step 3: Page through every attachment id
-      for await (const attachmentId of iterateAllAttachmentIds()) {
-        try {
-          await this.indexAttachment(attachmentId, targetIndex);
-        } catch (err) {
-          // Individual failure — log and continue
-          logger.error(
-            { err, attachmentId },
-            'addAllAttachments: skipping attachment due to unexpected error',
-          );
-        }
-
-        processed += 1;
-        progress(processed, total);
-
-        socket.emit(SocketEventName.AddAttachmentProgress, {
-          totalCount: total,
-          count: processed,
-        });
-
-        logger.debug(
-          { attachmentId, processed, total },
-          'addAllAttachments: processed attachment',
+    let processed = 0;
+    for await (const attachmentId of iterateAllAttachmentIds()) {
+      try {
+        await this.indexAttachment(attachmentId, targetIndex);
+      } catch (err) {
+        logger.error(
+          { err, attachmentId },
+          'addAllAttachments: skipping attachment due to unexpected error',
         );
       }
 
-      // Step 4: Orphan sweep (after all docs indexed, before alias swap)
-      const sweepResult = await this.orphanSweeper.sweep(targetIndex);
-      logger.info(
-        { targetIndex, ...sweepResult },
-        'addAllAttachments: orphan sweep complete',
-      );
-
-      // Step 5: Done
-      logger.info(
-        { targetIndex, processed, total },
-        'addAllAttachments: finished',
-      );
-
-      socket.emit(SocketEventName.FinishAddAttachment, {
-        totalCount: processed,
+      processed += 1;
+      socket.emit(SocketEventName.AddAttachmentProgress, {
+        totalCount: total,
         count: processed,
       });
-    } catch (err) {
-      logger.error(
-        { err, targetIndex },
-        'addAllAttachments: fatal error during batch indexing',
-      );
-
-      socket.emit(SocketEventName.RebuildingFailed, {
-        error: (err as Error).message,
-      });
-
-      throw err;
     }
+
+    const sweepResult = await this.orphanSweeper.sweep(targetIndex);
+    logger.info(
+      { targetIndex, processed, total, ...sweepResult },
+      'addAllAttachments: finished',
+    );
+
+    return { totalCount: processed, count: processed };
   }
 }

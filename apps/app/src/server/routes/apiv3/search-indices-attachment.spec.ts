@@ -3,17 +3,10 @@
  *
  * Covers task 8.6 boundary:
  *  1. includeAttachments=false → existing fire-and-forget page rebuild (no batch calls)
- *  2. includeAttachments=true + feature enabled + batch available →
- *       batch.begin, rebuildIndex (awaited), addAllAttachments, batch.end called in order
+ *  2. includeAttachments=true + feature enabled → rebuild started in the background, 200 at once
  *  3. includeAttachments=true + feature disabled → 503
- *  4. includeAttachments=true + batch not registered (task 9.1 pending) → 503
- *  5. includeAttachments=true + batch.begin throws (concurrent rebuild) → 503, batch.end still called
- *  6. includeAttachments=true + addAllAttachments throws → 503, batch.end still called
- *
- * Implementation note: search.js declares `const router = express.Router()` at module scope.
- * To prevent handler accumulation across tests (each `searchRouterFactory(crowi)` call would
- * add another PUT /indices handler to the same singleton router), we use
- * `vi.isolateModules` to get a fresh module instance per test.
+ *  4. includeAttachments=true + batch not registered → 503
+ *  5. includeAttachments=true while a rebuild is running → 409
  */
 
 import express from 'express';
@@ -110,16 +103,12 @@ vi.mock('../../middlewares/add-activity', () => ({
 // ---------------------------------------------------------------------------
 
 type MockBatch = {
-  begin: ReturnType<typeof vi.fn>;
-  addAllAttachments: ReturnType<typeof vi.fn>;
-  end: ReturnType<typeof vi.fn>;
+  startRebuild: ReturnType<typeof vi.fn>;
 };
 
 function buildMockBatch(): MockBatch {
   return {
-    begin: vi.fn(),
-    addAllAttachments: vi.fn().mockResolvedValue(undefined),
-    end: vi.fn(),
+    startRebuild: vi.fn().mockReturnValue(true),
   };
 }
 
@@ -232,9 +221,7 @@ describe('PUT /search/indices — includeAttachments extension', () => {
     expect(crowi.searchService.rebuildIndex).toHaveBeenCalledTimes(1);
 
     // Batch must NOT be touched
-    expect(batch.begin).not.toHaveBeenCalled();
-    expect(batch.addAllAttachments).not.toHaveBeenCalled();
-    expect(batch.end).not.toHaveBeenCalled();
+    expect(batch.startRebuild).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
@@ -251,67 +238,35 @@ describe('PUT /search/indices — includeAttachments extension', () => {
       .send({ operation: 'rebuild' });
 
     expect(res.status).toBe(200);
-    expect(batch.begin).not.toHaveBeenCalled();
-    expect(batch.addAllAttachments).not.toHaveBeenCalled();
-    expect(batch.end).not.toHaveBeenCalled();
+    expect(batch.startRebuild).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
-  // Test 2: includeAttachments=true + feature enabled + batch available
-  //         → begin → rebuildIndex (awaited) → addAllAttachments → end in order
+  // Test 2: includeAttachments=true + feature enabled → started, not awaited
   // -------------------------------------------------------------------------
-  it('2. includeAttachments=true + feature enabled + batch available → full orchestration', async () => {
+  it('2. includeAttachments=true + feature enabled → starts the rebuild and answers before it completes', async () => {
     setupFeatureFlag(true);
     const batch = buildMockBatch();
     const crowi = buildCrowiStub({ attachmentReindexBatch: batch });
+    // The page rebuild never finishes within this request
+    vi.mocked(crowi.searchService.rebuildIndex).mockReturnValue(
+      new Promise<void>(() => {}),
+    );
+    batch.startRebuild.mockImplementation((rebuildPageIndex: () => unknown) => {
+      void rebuildPageIndex();
+      return true;
+    });
     const app = buildTestApp(crowi);
-
-    // Track call order across begin / rebuildIndex / addAllAttachments / end
-    const callOrder: string[] = [];
-    batch.begin.mockImplementation(() => {
-      callOrder.push('begin');
-    });
-    vi.mocked(crowi.searchService.rebuildIndex).mockImplementation(() => {
-      callOrder.push('rebuildIndex');
-      return Promise.resolve();
-    });
-    batch.addAllAttachments.mockImplementation(() => {
-      callOrder.push('addAllAttachments');
-      return Promise.resolve();
-    });
-    batch.end.mockImplementation(() => {
-      callOrder.push('end');
-    });
 
     const res = await supertest(app)
       .put('/search/indices')
       .send({ operation: 'rebuild', includeAttachments: true });
 
     expect(res.status).toBe(200);
-    expect(res.body.message).toBe('Operation is successfully processed.');
-
-    // Each method called exactly once
-    expect(batch.begin).toHaveBeenCalledTimes(1);
-    expect(crowi.searchService.rebuildIndex).toHaveBeenCalledTimes(1);
-    expect(batch.addAllAttachments).toHaveBeenCalledTimes(1);
-    expect(batch.end).toHaveBeenCalledTimes(1);
-
-    // Call order: begin → rebuildIndex → addAllAttachments → end
-    expect(callOrder).toEqual([
-      'begin',
-      'rebuildIndex',
-      'addAllAttachments',
-      'end',
-    ]);
-
-    // begin receives the tmp index name
-    expect(batch.begin).toHaveBeenCalledWith('attachments-tmp');
-
-    // addAllAttachments receives tmp index name + a progress callback
-    expect(batch.addAllAttachments).toHaveBeenCalledWith(
-      'attachments-tmp',
-      expect.any(Function),
-    );
+    expect(res.body.message).toBe('Operation is successfully requested.');
+    expect(batch.startRebuild).toHaveBeenCalledTimes(1);
+    // The page rebuild runs as part of it, reporting progress like a page-only rebuild
+    expect(crowi.searchService.rebuildIndex).toHaveBeenCalledWith(true);
   });
 
   // -------------------------------------------------------------------------
@@ -331,9 +286,7 @@ describe('PUT /search/indices — includeAttachments extension', () => {
     expect(res.body.errors[0].code).toBe('feature_disabled');
 
     // No batch interaction
-    expect(batch.begin).not.toHaveBeenCalled();
-    expect(batch.addAllAttachments).not.toHaveBeenCalled();
-    expect(batch.end).not.toHaveBeenCalled();
+    expect(batch.startRebuild).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
@@ -354,58 +307,20 @@ describe('PUT /search/indices — includeAttachments extension', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Test 5: includeAttachments=true + batch.begin throws → 503, end still called
+  // Test 5: a rebuild is already running → 409
   // -------------------------------------------------------------------------
-  it('5. batch.begin throws (concurrent rebuild) → 503 and batch.end is still called', async () => {
+  it('5. includeAttachments=true while a rebuild is running → 409 rebuild_in_progress', async () => {
     setupFeatureFlag(true);
     const batch = buildMockBatch();
+    batch.startRebuild.mockReturnValue(false);
     const crowi = buildCrowiStub({ attachmentReindexBatch: batch });
     const app = buildTestApp(crowi);
-
-    const concurrentError = Object.assign(
-      new Error('Rebuild already in progress'),
-      { status: 409 },
-    );
-    batch.begin.mockImplementation(() => {
-      throw concurrentError;
-    });
 
     const res = await supertest(app)
       .put('/search/indices')
       .send({ operation: 'rebuild', includeAttachments: true });
 
-    expect(res.status).toBe(503);
-
-    // begin was called and threw
-    expect(batch.begin).toHaveBeenCalledTimes(1);
-    // addAllAttachments must NOT have been reached
-    expect(batch.addAllAttachments).not.toHaveBeenCalled();
-    // end must still be called (try/finally guarantee)
-    expect(batch.end).toHaveBeenCalledTimes(1);
-  });
-
-  // -------------------------------------------------------------------------
-  // Test 6: addAllAttachments throws → 503, end still called
-  // -------------------------------------------------------------------------
-  it('6. addAllAttachments throws → 503 and batch.end is still called', async () => {
-    setupFeatureFlag(true);
-    const batch = buildMockBatch();
-    const crowi = buildCrowiStub({ attachmentReindexBatch: batch });
-    const app = buildTestApp(crowi);
-
-    batch.addAllAttachments.mockRejectedValue(
-      new Error('ES cluster unavailable'),
-    );
-
-    const res = await supertest(app)
-      .put('/search/indices')
-      .send({ operation: 'rebuild', includeAttachments: true });
-
-    expect(res.status).toBe(503);
-
-    expect(batch.begin).toHaveBeenCalledTimes(1);
-    expect(batch.addAllAttachments).toHaveBeenCalledTimes(1);
-    // end must still be called despite addAllAttachments throwing
-    expect(batch.end).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(409);
+    expect(res.body.errors[0].code).toBe('rebuild_in_progress');
   });
 });

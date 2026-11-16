@@ -1,7 +1,7 @@
 /**
  * Attachment-specific operations added on top of the existing ElasticsearchDelegator
- * via composition. This class owns the lifecycle and query building for the `attachments`
- * index and does NOT touch any Page-related index operations.
+ * via composition. This class owns the lifecycle and query building for the attachment
+ * indices and does NOT touch any Page-related index operations.
  *
  * Key design constraints:
  * - NO permission fields (grant / granted_users / granted_groups / creator) are stored in
@@ -22,12 +22,20 @@ const logger = loggerFactory(
   'growi:service:search-attachments:delegator-extension',
 );
 
-/** Default name of the attachments ES index. */
-export const DEFAULT_ATTACHMENT_INDEX_NAME = 'attachments';
+export type AttachmentIndexNames = {
+  /** Every read and live write goes through this alias. */
+  readonly alias: string;
+  /**
+   * The alias points to one of these; a rebuild fills the other and then
+   * moves the alias, so the live index stays untouched until the swap.
+   */
+  readonly indices: readonly [string, string];
+};
 
-/** Alias name for the live attachments index (= <indexName>-alias). */
-export const attachmentAliasName = (indexName: string): string =>
-  `${indexName}-alias`;
+export const ATTACHMENT_INDEX_NAMES: AttachmentIndexNames = {
+  alias: 'attachments-alias',
+  indices: ['attachments-1', 'attachments-2'],
+};
 
 /** Options accepted by `searchAttachmentsBody` and `searchAttachmentsByPageIdsBody`. */
 export type SearchOptions = {
@@ -64,7 +72,14 @@ export const MAX_PAGE_IDS_FOR_SECONDARY = DEFAULT_SIZE;
 
 /** Interface that the delegator extension exposes to higher-level services. */
 export interface AttachmentIndexOperations {
-  createAttachmentIndex(indexName?: string): Promise<void>;
+  /** Creates the first index behind the alias unless the alias already exists. */
+  ensureAttachmentIndex(): Promise<void>;
+  /** Creates a fresh index the alias does not point to, and returns its name. */
+  createRebuildIndex(): Promise<string>;
+  /** Moves the alias to `index` and deletes the index it pointed to before. */
+  swapAttachmentAlias(index: string): Promise<void>;
+  /** Deletes `index` unless the alias points to it. */
+  dropRebuildIndex(index: string): Promise<void>;
   syncAttachmentIndexed(
     attachmentId: string,
     pageId: string,
@@ -84,28 +99,6 @@ export interface AttachmentIndexOperations {
     pageIds: string[],
     options?: SearchOptions,
   ): Record<string, unknown>;
-  /**
-   * Bulk-write stub for task 4.1. The full implementation (MongoDB cursor walk +
-   * text extraction) is provided by AttachmentReindexBatch (task 6.3), which
-   * calls `syncAttachmentIndexed` for each attachment after extraction.
-   *
-   * This method is a no-op placeholder: real callers use `syncAttachmentIndexed` directly.
-   */
-  addAllAttachments(
-    targetIndex: string,
-    progress: (processed: number, total: number) => void,
-  ): Promise<void>;
-  /**
-   * Initializes the attachments index and alias, with alias collision detection.
-   *
-   * Returns `{ initialized: true }` on success, or
-   * `{ initialized: false, reason: 'alias_conflict' }` when the `attachments`
-   * alias is found to point to a foreign (non-owned) index.
-   */
-  initializeAttachmentIndex(): Promise<{
-    initialized: boolean;
-    reason?: string;
-  }>;
 }
 
 /**
@@ -215,17 +208,21 @@ export class AttachmentSearchDelegatorExtension
 {
   private readonly client: ElasticsearchClientDelegator;
 
-  constructor(client: ElasticsearchClientDelegator) {
+  private readonly names: AttachmentIndexNames;
+
+  constructor(
+    client: ElasticsearchClientDelegator,
+    names: AttachmentIndexNames = ATTACHMENT_INDEX_NAMES,
+  ) {
     this.client = client;
+    this.names = names;
   }
 
   // ----------------------------------------------------------------
   // Index lifecycle
   // ----------------------------------------------------------------
 
-  async createAttachmentIndex(
-    indexName: string = DEFAULT_ATTACHMENT_INDEX_NAME,
-  ): Promise<void> {
+  async createAttachmentIndex(indexName: string): Promise<void> {
     if (isES8ClientDelegator(this.client)) {
       const { mappings } = await import(
         '~/features/search-attachments/server/mappings/attachments-mappings-es8'
@@ -251,87 +248,69 @@ export class AttachmentSearchDelegatorExtension
     throw new Error('Unsupported Elasticsearch version');
   }
 
-  /**
-   * The set of index names owned by this feature module.
-   * An alias that points to any index outside this set is considered a collision.
-   */
-  private static readonly OWNED_INDEX_NAMES = [
-    'attachments',
-    'attachments-tmp',
-  ] as const;
+  /** The index the alias points to, or null when the alias does not exist. */
+  private async findLiveIndex(): Promise<string | null> {
+    const { alias } = this.names;
+    if (!(await this.client.indices.existsAlias({ name: alias }))) {
+      return null;
+    }
+    const aliasInfo = await this.client.indices.getAlias({ name: alias });
+    return Object.keys(aliasInfo)[0] ?? null;
+  }
 
-  /**
-   * Initializes the `attachments` index and alias, guarded by alias collision detection.
-   *
-   * Algorithm:
-   * 1. Query ES for any alias named `attachments`.
-   *    - If ES returns 404, the alias does not exist → safe to proceed.
-   * 2. For each index that carries the alias, verify it belongs to this spec.
-   *    - If any index is NOT in OWNED_INDEX_NAMES, emit WARN and abort.
-   * 3. Ensure the `attachments` index exists (create if absent).
-   * 4. Ensure the alias `attachments` points to the `attachments` index.
-   * 5. Return `{ initialized: true }`.
-   */
-  async initializeAttachmentIndex(): Promise<{
-    initialized: boolean;
-    reason?: string;
-  }> {
-    const aliasName = DEFAULT_ATTACHMENT_INDEX_NAME; // 'attachments'
-    const indexName = DEFAULT_ATTACHMENT_INDEX_NAME; // 'attachments'
+  async ensureAttachmentIndex(): Promise<void> {
+    if ((await this.findLiveIndex()) != null) {
+      return;
+    }
+    const [index] = this.names.indices;
+    if (!(await this.client.indices.exists({ index }))) {
+      await this.createAttachmentIndex(index);
+    }
+    await this.client.indices.putAlias({ name: this.names.alias, index });
+  }
 
-    // Step 1: Check for alias collision
-    let aliasInfo: Record<string, unknown> | null = null;
-    try {
-      aliasInfo = (await this.client.indices.getAlias({
-        name: aliasName,
-      })) as Record<string, unknown>;
-    } catch (err) {
-      // ES returns 404 when alias does not exist — treat as "alias absent, proceed"
-      const statusCode = (err as { statusCode?: number })?.statusCode;
-      if (statusCode !== 404) {
-        // Unexpected error: rethrow
-        throw err;
+  async createRebuildIndex(): Promise<string> {
+    const live = await this.findLiveIndex();
+    const [first, second] = this.names.indices;
+    const index = live === first ? second : first;
+    // Left over by an interrupted rebuild
+    if (await this.client.indices.exists({ index })) {
+      await this.client.indices.delete({ index });
+    }
+    await this.createAttachmentIndex(index);
+    return index;
+  }
+
+  async swapAttachmentAlias(index: string): Promise<void> {
+    const { alias } = this.names;
+    const previous = await this.findLiveIndex();
+    const isMoving = previous != null && previous !== index;
+    await this.client.indices.updateAliases({
+      actions: [
+        { add: { alias, index } },
+        ...(isMoving ? [{ remove: { alias, index: previous } }] : []),
+      ],
+    });
+    if (isMoving) {
+      try {
+        await this.client.indices.delete({ index: previous });
+      } catch (err) {
+        // The swap itself succeeded; the next rebuild drops this index
+        logger.warn(
+          { err, index: previous },
+          'Failed to delete the previous attachment index',
+        );
       }
     }
+  }
 
-    // Step 2: Collision detection
-    if (aliasInfo != null) {
-      for (const owningIndexName of Object.keys(aliasInfo)) {
-        if (
-          !(
-            AttachmentSearchDelegatorExtension.OWNED_INDEX_NAMES as readonly string[]
-          ).includes(owningIndexName)
-        ) {
-          logger.warn(
-            { foreignIndex: owningIndexName },
-            "'attachments' alias points to a foreign index — skipping attachment index initialization to prevent data corruption",
-          );
-          return { initialized: false, reason: 'alias_conflict' };
-        }
-      }
+  async dropRebuildIndex(index: string): Promise<void> {
+    if ((await this.findLiveIndex()) === index) {
+      return;
     }
-
-    // Step 3: Ensure the index exists
-    const isExistsIndex = await this.client.indices.exists({
-      index: indexName,
-    });
-    if (!isExistsIndex) {
-      await this.createAttachmentIndex(indexName);
+    if (await this.client.indices.exists({ index })) {
+      await this.client.indices.delete({ index });
     }
-
-    // Step 4: Ensure the alias points to the index
-    const isExistsAlias = await this.client.indices.existsAlias({
-      name: aliasName,
-      index: indexName,
-    });
-    if (!isExistsAlias) {
-      await this.client.indices.putAlias({
-        name: aliasName,
-        index: indexName,
-      });
-    }
-
-    return { initialized: true };
   }
 
   // ----------------------------------------------------------------
@@ -493,31 +472,5 @@ export class AttachmentSearchDelegatorExtension
     return composeAttachmentSearchBody(query, options, {
       terms: { pageId: pageIds },
     });
-  }
-
-  // ----------------------------------------------------------------
-  // Bulk reindex (stub — real implementation in AttachmentReindexBatch, task 6.3)
-  // ----------------------------------------------------------------
-
-  /**
-   * Stub implementation for the delegator-level addAllAttachments interface.
-   *
-   * The full MongoDB cursor walk + text extraction orchestration lives in
-   * `AttachmentReindexBatch.addAllAttachments` (task 6.3), which in turn calls
-   * `syncAttachmentIndexed` on this class for each extracted attachment.
-   *
-   * This stub exists to satisfy the `AttachmentIndexOperations` contract and to allow
-   * future callers (test doubles, stubs) to reference the method by name without
-   * depending on the batch class.
-   */
-  addAllAttachments(
-    _targetIndex: string,
-    _progress: (processed: number, total: number) => void,
-  ): Promise<void> {
-    // Implementation provided by AttachmentReindexBatch (task 6.3).
-    logger.warn(
-      'addAllAttachments called on delegator extension — this is a stub. Use AttachmentReindexBatch instead.',
-    );
-    return Promise.resolve();
   }
 }

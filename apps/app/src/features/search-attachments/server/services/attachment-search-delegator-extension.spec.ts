@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { IAttachmentEsDoc } from '~/features/search-attachments/interfaces/attachment-search';
 
+import { mappings as es8Mappings } from '../mappings/attachments-mappings-es8';
 import { AttachmentSearchDelegatorExtension } from './attachment-search-delegator-extension';
 
 // Minimal mock of an ES8 client delegator
@@ -23,6 +24,77 @@ function makeClientMock() {
     },
   };
   return mock;
+}
+
+/**
+ * In-memory stand-in for the ES index and alias APIs, holding one alias.
+ * `state()` reports which indices exist and which the alias points to.
+ */
+function makeIndicesFake(existing: string[], aliased: string[]) {
+  const indices = new Set(existing);
+  const aliasTargets = new Set(aliased);
+  const notFound = () =>
+    Object.assign(new Error('not_found'), { statusCode: 404 });
+  // Wraps a synchronous body as an async ES API call
+  const api = <A, R>(body: (args: A) => R) =>
+    vi.fn((args: A): Promise<R> => {
+      try {
+        return Promise.resolve(body(args));
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    });
+  return {
+    indices: {
+      create: api(({ index }: { index: string }) => {
+        if (indices.has(index)) {
+          throw new Error('resource_already_exists_exception');
+        }
+        indices.add(index);
+        return { acknowledged: true };
+      }),
+      delete: api(({ index }: { index: string }) => {
+        if (!indices.delete(index)) throw notFound();
+        aliasTargets.delete(index);
+        return { acknowledged: true };
+      }),
+      exists: api(({ index }: { index: string }) => indices.has(index)),
+      existsAlias: api(() => aliasTargets.size > 0),
+      getAlias: api(({ name }: { name: string }) => {
+        if (aliasTargets.size === 0) throw notFound();
+        return Object.fromEntries(
+          [...aliasTargets].map((index) => [
+            index,
+            { aliases: { [name]: {} } },
+          ]),
+        );
+      }),
+      putAlias: api(({ index }: { index: string }) => {
+        aliasTargets.add(index);
+        return { acknowledged: true };
+      }),
+      updateAliases: api(
+        ({
+          actions,
+        }: {
+          actions: Array<{
+            add?: { index: string };
+            remove?: { index: string };
+          }>;
+        }) => {
+          for (const action of actions) {
+            if (action.add != null) aliasTargets.add(action.add.index);
+            if (action.remove != null) aliasTargets.delete(action.remove.index);
+          }
+          return { acknowledged: true };
+        },
+      ),
+    },
+    state: () => ({
+      indices: [...indices].sort(),
+      aliased: [...aliasTargets].sort(),
+    }),
+  };
 }
 
 const SAMPLE_DOC: IAttachmentEsDoc = {
@@ -54,13 +126,6 @@ describe('AttachmentSearchDelegatorExtension', () => {
   // createAttachmentIndex
   // ----------------------------------------------------------------
   describe('createAttachmentIndex', () => {
-    it('creates the "attachments" index by default', async () => {
-      await ext.createAttachmentIndex();
-      expect(client.indices.create).toHaveBeenCalledWith(
-        expect.objectContaining({ index: 'attachments' }),
-      );
-    });
-
     it('creates a custom-named index when provided', async () => {
       await ext.createAttachmentIndex('attachments-tmp');
       expect(client.indices.create).toHaveBeenCalledWith(
@@ -234,78 +299,130 @@ describe('AttachmentSearchDelegatorExtension', () => {
   });
 
   // ----------------------------------------------------------------
-  // initializeAttachmentIndex
+  // Index lifecycle (alias over two alternating physical indices)
   // ----------------------------------------------------------------
-  describe('initializeAttachmentIndex', () => {
-    it('creates index and alias when neither exists, returns { initialized: true }', async () => {
-      // getAlias throws 404 → alias does not exist
-      client.indices.getAlias.mockRejectedValue(
-        Object.assign(new Error('alias_missing_exception'), {
-          statusCode: 404,
-        }),
-      );
-      // index does not exist
-      client.indices.exists.mockResolvedValue(false);
-      // alias does not exist on index
-      client.indices.existsAlias.mockResolvedValue(false);
+  describe('index lifecycle', () => {
+    const NAMES = {
+      alias: 'att-alias',
+      indices: ['att-1', 'att-2'],
+    } as const;
 
-      const result = await ext.initializeAttachmentIndex();
-
-      expect(result).toEqual({ initialized: true });
-      expect(client.indices.create).toHaveBeenCalledWith(
-        expect.objectContaining({ index: 'attachments' }),
+    const setup = (existing: string[], aliased: string[]) => {
+      const fake = makeIndicesFake(existing, aliased);
+      const lifecycleExt = new AttachmentSearchDelegatorExtension(
+        // biome-ignore lint/suspicious/noExplicitAny: test mock uses a partial client shape
+        { delegatorVersion: 8, indices: fake.indices } as any,
+        NAMES,
       );
-      expect(client.indices.putAlias).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'attachments', index: 'attachments' }),
-      );
-    });
+      return { fake, lifecycleExt };
+    };
 
-    it('returns { initialized: false, reason: "alias_conflict" } when alias points to a foreign index', async () => {
-      // getAlias resolves — alias "attachments" points to "some-foreign-index"
-      client.indices.getAlias.mockResolvedValue({
-        'some-foreign-index': { aliases: { attachments: {} } },
+    describe('ensureAttachmentIndex', () => {
+      it('creates the first index with the attachment mappings and points the alias at it', async () => {
+        const { fake, lifecycleExt } = setup([], []);
+
+        await lifecycleExt.ensureAttachmentIndex();
+
+        expect(fake.state()).toEqual({
+          indices: ['att-1'],
+          aliased: ['att-1'],
+        });
+        expect(fake.indices.create).toHaveBeenCalledWith({
+          index: 'att-1',
+          ...es8Mappings,
+        });
       });
 
-      const result = await ext.initializeAttachmentIndex();
+      it('leaves an existing alias where it is', async () => {
+        const { fake, lifecycleExt } = setup(['att-2'], ['att-2']);
 
-      expect(result).toEqual({ initialized: false, reason: 'alias_conflict' });
-      // Must NOT create any index or alias
-      expect(client.indices.create).not.toHaveBeenCalled();
-      expect(client.indices.putAlias).not.toHaveBeenCalled();
+        await lifecycleExt.ensureAttachmentIndex();
+
+        expect(fake.state()).toEqual({
+          indices: ['att-2'],
+          aliased: ['att-2'],
+        });
+      });
     });
 
-    it('proceeds normally when alias already points to the owned "attachments" index', async () => {
-      // getAlias resolves — alias "attachments" points to owned index
-      client.indices.getAlias.mockResolvedValue({
-        attachments: { aliases: { attachments: {} } },
+    describe('createRebuildIndex', () => {
+      it.each([
+        { live: 'att-1', expected: 'att-2' },
+        { live: 'att-2', expected: 'att-1' },
+      ])('builds into the index the alias does not point to ($live → $expected)', async ({
+        live,
+        expected,
+      }) => {
+        const { fake, lifecycleExt } = setup([live], [live]);
+
+        const target = await lifecycleExt.createRebuildIndex();
+
+        expect(target).toBe(expected);
+        expect(fake.state()).toEqual({
+          indices: ['att-1', 'att-2'],
+          aliased: [live],
+        });
       });
-      // index already exists
-      client.indices.exists.mockResolvedValue(true);
-      // alias already set on attachments index
-      client.indices.existsAlias.mockResolvedValue(true);
 
-      const result = await ext.initializeAttachmentIndex();
+      it('replaces a leftover from an interrupted rebuild with a fresh index', async () => {
+        const { fake, lifecycleExt } = setup(['att-1', 'att-2'], ['att-1']);
 
-      expect(result).toEqual({ initialized: true });
-      // Index already exists → create must NOT be called
-      expect(client.indices.create).not.toHaveBeenCalled();
-      // Alias already set → putAlias must NOT be called
-      expect(client.indices.putAlias).not.toHaveBeenCalled();
+        await lifecycleExt.createRebuildIndex();
+
+        expect(fake.indices.delete).toHaveBeenCalledWith({ index: 'att-2' });
+        expect(fake.indices.create).toHaveBeenCalledWith(
+          expect.objectContaining({ index: 'att-2' }),
+        );
+      });
     });
 
-    it('proceeds normally when alias points to owned "attachments-tmp" index', async () => {
-      // getAlias resolves — alias "attachments" points to owned tmp index
-      client.indices.getAlias.mockResolvedValue({
-        'attachments-tmp': { aliases: { attachments: {} } },
+    describe('swapAttachmentAlias', () => {
+      it('moves the alias in one atomic call and deletes the previous index', async () => {
+        const { fake, lifecycleExt } = setup(['att-1', 'att-2'], ['att-1']);
+
+        await lifecycleExt.swapAttachmentAlias('att-2');
+
+        expect(fake.state()).toEqual({
+          indices: ['att-2'],
+          aliased: ['att-2'],
+        });
+        expect(fake.indices.updateAliases).toHaveBeenCalledOnce();
       });
-      // index already exists
-      client.indices.exists.mockResolvedValue(true);
-      // alias already set
-      client.indices.existsAlias.mockResolvedValue(true);
 
-      const result = await ext.initializeAttachmentIndex();
+      it('points a missing alias at the new index', async () => {
+        const { fake, lifecycleExt } = setup(['att-1'], []);
 
-      expect(result).toEqual({ initialized: true });
+        await lifecycleExt.swapAttachmentAlias('att-1');
+
+        expect(fake.state()).toEqual({
+          indices: ['att-1'],
+          aliased: ['att-1'],
+        });
+      });
+    });
+
+    describe('dropRebuildIndex', () => {
+      it('deletes an index the alias does not point to', async () => {
+        const { fake, lifecycleExt } = setup(['att-1', 'att-2'], ['att-1']);
+
+        await lifecycleExt.dropRebuildIndex('att-2');
+
+        expect(fake.state()).toEqual({
+          indices: ['att-1'],
+          aliased: ['att-1'],
+        });
+      });
+
+      it('never deletes the index the alias points to', async () => {
+        const { fake, lifecycleExt } = setup(['att-1'], ['att-1']);
+
+        await lifecycleExt.dropRebuildIndex('att-1');
+
+        expect(fake.state()).toEqual({
+          indices: ['att-1'],
+          aliased: ['att-1'],
+        });
+      });
     });
   });
 });

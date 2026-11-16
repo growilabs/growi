@@ -324,7 +324,7 @@ class Crowi {
     ]);
 
     // Wire attachment full-text search after searchService + attachmentService are ready.
-    initAttachmentFullTextSearch(this);
+    await initAttachmentFullTextSearch(this);
 
     await Promise.all([
       // globalNotification depends on slack and mailer

@@ -4,8 +4,8 @@ import loggerFactory from '~/utils/logger';
 import { createAttachmentOrphanSweeper } from './services/attachment-orphan-sweeper';
 import { AttachmentReindexBatch } from './services/attachment-reindex-batch';
 import {
+  ATTACHMENT_INDEX_NAMES,
   AttachmentSearchDelegatorExtension,
-  DEFAULT_ATTACHMENT_INDEX_NAME,
 } from './services/attachment-search-delegator-extension';
 import { AttachmentSearchIndexer } from './services/attachment-search-indexer';
 import { AttachmentTextExtractorService } from './services/attachment-text-extractor';
@@ -24,7 +24,9 @@ const logger = loggerFactory('growi:features:search-attachments:init');
  * isAttachmentFullTextSearchEnabled when it is called, so enabling the
  * feature from the admin page takes effect without a restart.
  */
-export function initAttachmentFullTextSearch(crowi: Crowi): void {
+export async function initAttachmentFullTextSearch(
+  crowi: Crowi,
+): Promise<void> {
   const {
     searchService,
     attachmentService,
@@ -51,6 +53,14 @@ export function initAttachmentFullTextSearch(crowi: Crowi): void {
   const esClient: any = (searchService.fullTextSearchDelegator as any)?.client;
 
   const delegatorExt = new AttachmentSearchDelegatorExtension(esClient);
+
+  // Created even while the feature is disabled, so enabling it later needs
+  // no restart; mirrors the page index normalization at startup.
+  try {
+    await delegatorExt.ensureAttachmentIndex();
+  } catch (err) {
+    logger.error({ err }, 'Failed to create the attachment index');
+  }
 
   // ----------------------------------------------------------------
   // Build orphan sweeper with version-agnostic ES callbacks
@@ -116,7 +126,7 @@ export function initAttachmentFullTextSearch(crowi: Crowi): void {
   const aggregator = createAttachmentSearchResultAggregator({
     searchService,
     esClient,
-    attachmentIndexName: DEFAULT_ATTACHMENT_INDEX_NAME,
+    attachmentIndexName: ATTACHMENT_INDEX_NAMES.alias,
   });
 
   searchService.setAttachmentSearchResultAggregator(aggregator);

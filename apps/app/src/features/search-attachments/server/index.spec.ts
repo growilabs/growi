@@ -47,6 +47,12 @@ const makeCrowi = () => {
     delegatorVersion: 8,
     bulk: vi.fn().mockResolvedValue({ errors: false }),
     search: vi.fn().mockResolvedValue({ hits: { hits: [] } }),
+    indices: {
+      existsAlias: vi.fn().mockResolvedValue(false),
+      exists: vi.fn().mockResolvedValue(false),
+      create: vi.fn().mockResolvedValue({ acknowledged: true }),
+      putAlias: vi.fn().mockResolvedValue({ acknowledged: true }),
+    },
   };
   const attachHandlers: AttachHandler[] = [];
   let aggregator: AttachmentSearchResultAggregator | undefined;
@@ -104,7 +110,7 @@ describe('initAttachmentFullTextSearch', () => {
     vi.mocked(configManager.getConfig).mockReturnValue(null);
   });
 
-  it('does not register handlers when searchService is not configured', () => {
+  it('does not register handlers when searchService is not configured', async () => {
     const addAttachHandler = vi.fn();
     const addDetachHandler = vi.fn();
     const fakeCrowi = mock<Crowi>({
@@ -112,16 +118,30 @@ describe('initAttachmentFullTextSearch', () => {
       attachmentService: { addAttachHandler, addDetachHandler },
     });
 
-    initAttachmentFullTextSearch(fakeCrowi);
+    await initAttachmentFullTextSearch(fakeCrowi);
 
     expect(addAttachHandler).not.toHaveBeenCalled();
     expect(addDetachHandler).not.toHaveBeenCalled();
   });
 
+  it('creates the attachment index behind its alias, even while the feature is disabled', async () => {
+    const { crowi, esClient } = makeCrowi();
+
+    await initAttachmentFullTextSearch(crowi);
+
+    expect(esClient.indices.create).toHaveBeenCalledWith(
+      expect.objectContaining({ index: 'attachments-1' }),
+    );
+    expect(esClient.indices.putAlias).toHaveBeenCalledWith({
+      name: 'attachments-alias',
+      index: 'attachments-1',
+    });
+  });
+
   describe('when the feature is disabled at startup and enabled later in the config', () => {
     it('indexes an attachment uploaded after enabling', async () => {
       const { crowi, esClient, attachHandlers } = makeCrowi();
-      initAttachmentFullTextSearch(crowi);
+      await initAttachmentFullTextSearch(crowi);
       enableInConfig();
 
       await Promise.all(
@@ -132,14 +152,14 @@ describe('initAttachmentFullTextSearch', () => {
 
       expect(esClient.bulk).toHaveBeenCalledWith({
         operations: expect.arrayContaining([
-          { index: { _index: 'attachments', _id: 'att-1_1' } },
+          { index: { _index: 'attachments-alias', _id: 'att-1_1' } },
         ]),
       });
     });
 
     it('searches the attachment index for facet=attachments', async () => {
       const { crowi, esClient, getAggregator } = makeCrowi();
-      initAttachmentFullTextSearch(crowi);
+      await initAttachmentFullTextSearch(crowi);
       enableInConfig();
 
       await getAggregator()?.searchPrimary(
@@ -168,7 +188,7 @@ describe('initAttachmentFullTextSearch', () => {
       );
 
       expect(esClient.search).toHaveBeenCalledWith(
-        expect.objectContaining({ index: 'attachments' }),
+        expect.objectContaining({ index: 'attachments-alias' }),
       );
     });
   });

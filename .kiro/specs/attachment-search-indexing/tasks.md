@@ -226,11 +226,13 @@
   - _Boundary: features/search-attachments/server/routes/apiv3_
   - _Depends: 5.2_
 
-- [ ] 8.6 `PUT /_api/v3/search/indices` の `includeAttachments` フラグ受理を追加する (一部のみ。フラグの受理と、機能が無効なときの 503 はできている。残り: 作り直した `attachments-tmp` を本番の index に切り替える alias の付け替え (`putAlias` は初回作成のときにしか呼ばれない)、作り直しをリクエストの中で待たず開始だけして即座に応答すること (`startRebuild`)、同時に走ったときに 503 でなく 409 を返すこと)
+- [x] 8.6 `PUT /_api/v3/search/indices` の `includeAttachments` フラグ受理を追加する
   - 既存 route に `includeAttachments?: boolean` を受理するよう最小差分で拡張する
-  - `includeAttachments=true` かつ 機能有効時に `AttachmentReindexBatch.begin()` → Page 再インデックス (既存) → `addAllAttachments(tmp)` → orphan sweep → alias swap → `Batch.end()` を **try/finally で** 実行する経路を組み立てる
-  - `includeAttachments=false` のときは従来どおり Page/Comment のみ処理し `attachments` alias は据え置き、機能無効時は 503
-  - _Requirements: 6.1, 6.2, 6.3, 6.4_
+  - `includeAttachments=true` かつ 機能有効時は `AttachmentReindexBatch.startRebuild(() => searchService.rebuildIndex(true))` を呼んで完了を待たずに 200 を返す。実行中なら 409 `rebuild_in_progress`
+  - batch は裏で Page 再インデックス (既存) → alias が指していない方の実 index を作成 → 全添付を書き込み → orphan sweep → alias swap を行い、失敗時は作りかけの index を消して実行中フラグを下ろす (try/catch/finally は batch の内部)
+  - 起動時に `attachments-alias` と最初の実 index を作る (機能が無効でも作る。後から有効にしたときに再起動を要らなくするため)
+  - `includeAttachments=false` のときは従来どおり Page/Comment のみ処理し添付の alias と実 index は据え置き、機能無効時は 503
+  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
   - _Boundary: apiv3 search route / ReindexBatch integration_
   - _Depends: 6.3, 8.1_
 

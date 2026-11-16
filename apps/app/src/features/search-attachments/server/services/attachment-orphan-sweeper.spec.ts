@@ -18,13 +18,10 @@ import {
 /** Build a minimal AttachmentIndexOperations stub. */
 function makeDelegatorExtStub() {
   return {
-    createAttachmentIndex: vi.fn(),
     syncAttachmentIndexed: vi.fn(),
     syncAttachmentRemoved: vi.fn(),
     searchAttachmentsBody: vi.fn(),
     searchAttachmentsByPageIdsBody: vi.fn(),
-    addAllAttachments: vi.fn(),
-    initializeAttachmentIndex: vi.fn(),
   };
 }
 

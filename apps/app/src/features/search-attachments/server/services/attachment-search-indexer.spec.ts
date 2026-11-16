@@ -82,9 +82,6 @@ function makeDelegator(): AttachmentIndexOperations {
   return {
     syncAttachmentIndexed: vi.fn().mockResolvedValue(undefined),
     syncAttachmentRemoved: vi.fn().mockResolvedValue(undefined),
-    createAttachmentIndex: vi.fn(),
-    addAllAttachments: vi.fn(),
-    initializeAttachmentIndex: vi.fn(),
     searchAttachmentsBody: vi.fn(),
     searchAttachmentsByPageIdsBody: vi.fn(),
   } as unknown as AttachmentIndexOperations;
@@ -259,7 +256,7 @@ describe('AttachmentSearchIndexer', () => {
 
       expect(calledAttachmentId).toBe('att-001');
       expect(calledPageId).toBe('page-42');
-      expect(calledIndexes).toEqual(['attachments']);
+      expect(calledIndexes).toEqual(['attachments-alias']);
 
       // Two docs — one per extracted page
       expect(calledDocs).toHaveLength(2);
@@ -437,7 +434,7 @@ describe('AttachmentSearchIndexer', () => {
 
       const allCalls = vi.mocked(delegator.syncAttachmentIndexed).mock.calls;
       const liveCall = allCalls.find(
-        (c) => c[3].includes('attachments') && c[3].length === 1,
+        (c) => c[3].includes('attachments-alias') && c[3].length === 1,
       );
       const tmpCall = allCalls.find((c) => c[3].includes('attachments-tmp'));
 
@@ -513,7 +510,7 @@ describe('AttachmentSearchIndexer', () => {
       await indexer.onDetach('att-001');
 
       expect(delegator.syncAttachmentRemoved).toHaveBeenCalledWith('att-001', [
-        'attachments',
+        'attachments-alias',
       ]);
     });
 
@@ -534,7 +531,7 @@ describe('AttachmentSearchIndexer', () => {
 
       const calls = vi.mocked(delegator.syncAttachmentRemoved).mock.calls;
       const liveCall = calls.find(
-        (c) => c[1].includes('attachments') && c[1].length === 1,
+        (c) => c[1].includes('attachments-alias') && c[1].length === 1,
       );
       const tmpCall = calls.find((c) => c[1].includes('attachments-tmp'));
 
@@ -560,7 +557,7 @@ describe('AttachmentSearchIndexer', () => {
       await indexer.onDetach('att-001');
 
       expect(delegator.syncAttachmentRemoved).toHaveBeenCalledWith('att-001', [
-        'attachments',
+        'attachments-alias',
       ]);
     });
 

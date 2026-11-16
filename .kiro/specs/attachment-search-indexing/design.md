@@ -34,7 +34,7 @@
 
 - `packages/attachment-text-extractor-client` の orval 生成パイプラインと `openapi.json` drift 検知の CI 入口
 - 抽出クライアントラッパ (`AttachmentTextExtractorService`) による失敗正規化と到達不可フォールバック
-- 添付専用 ES インデックス `attachments` の mapping (ES 8/9) とライフサイクル (create / alias swap / bulk)。**添付 ES 文書に権限フィールドは保持しない** (`grant` / `granted_users` / `granted_groups` / `creator` を含まない)
+- 添付専用 ES インデックス (alias `attachments-alias` と、その裏の実 index `attachments-1` / `attachments-2`) の mapping (ES 8/9) とライフサイクル (create / alias swap / bulk)。**添付 ES 文書に権限フィールドは保持しない** (`grant` / `granted_users` / `granted_groups` / `creator` を含まない)
 - `AttachmentSearchIndexer` による attach / detach / reextract / bulk の単一パイプライン
 - **優先 slot 駆動検索 + secondary enrichment 設計**: primary ページングは優先 slot (`pages` or `attachments`) 単独で発行し、permission 判定を常にページサイズ bounded に保つ。`facet=attachments` primary では親 Page を「pageId 指定 + viewer filter + 検索演算子の絞り込み条件」付きの page_index 検索 1 回で判定、`facet=all` secondary では primary の pageId 配列に `terms` で絞った attachments_index 検索 (`SearchResultAggregator` が全体を統合)
 - `AttachmentReindexBatch` による、HTTP 応答を待たせない tmp index streaming 再インデックスと Socket.io 進捗・完了・失敗イベント発行 (UI 描画は対象外)、および `AttachmentOrphanSweeper` の統合呼び出し (rebuildIndex 時に親 Page が不在の添付 doc を cleanup)
@@ -183,7 +183,7 @@ graph TB
 | Server runtime | Node 24 / Express / pino | indexer / 権限 sync / reindex batch / apiv3 | 既存スタック踏襲 |
 | HTTP client | axios (orval 生成) | 抽出サービス呼び出し | server 専用依存 |
 | Client package | `packages/attachment-text-extractor-client` (orval 生成) | 上流 OpenAPI → TS クライアント | `pdf-converter-client` 同パターン |
-| Data — search | Elasticsearch 8/9 (既存) | 添付専用 index `attachments` | 既存 Page index とは別 index |
+| Data — search | Elasticsearch 8/9 (既存) | 添付専用 index (alias `attachments-alias`) | 既存 Page index とは別 index |
 | Data — log | MongoDB + Prisma (既存) | `extractionfailurelogs` collection (Prisma モデル) | TTL index 90 日は migrate-mongo の migration で作成 |
 | Messaging | Socket.io (既存) | 一括再インデックス進捗 | 添付向けイベント名を追加 |
 
@@ -446,43 +446,44 @@ sequenceDiagram
     participant Ext as TextExtractor
 
     Admin->>Api: PUT /search/indices rebuild includeAttachments=true
-    Api->>Batch: startRebuild(() => searchService.rebuildIndex())
+    Api->>Batch: startRebuild(() => searchService.rebuildIndex(true))
     alt 既に実行中
-        Batch-->>Api: throw RebuildInProgressError (同期)
+        Batch-->>Api: false (同期)
         Api-->>Admin: 409 rebuild_in_progress
     else 未実行
-        Batch->>Batch: isRebuilding=true, tmpIndexName=attachments-tmp (同期)
-        Batch-->>Api: return (await しない)
+        Batch->>Batch: isRebuilding=true (同期)
+        Batch-->>Api: true (await しない)
         Api-->>Admin: 200 (作り直しは裏で継続)
         Batch->>Svc: rebuildPageIndex() — 既存 rebuildIndex (Page 側の tmp 作成と alias swap を含む)
         Svc->>Sock: AddPageProgress / FinishAddPage (既存)
-        Batch->>Del: drop attachments-tmp → create attachments-tmp
+        Batch->>Del: createRebuildIndex() — alias が指していない方 (例: attachments-2) を drop → create
         Batch->>Ext: extract per attachment (prisma.attachments を id 順にページング)
-        Batch->>Del: bulk upsert to attachments-tmp
+        Batch->>Del: bulk upsert to attachments-2
         Batch->>Sock: AddAttachmentProgress
 
         par rebuild window 中の real-time event (並行発生しうる)
             Att->>Idx: onAttach / onDetach (新規アップロード / 削除)
             Idx->>Batch: isRebuilding? / getTmpIndexName()
-            Idx->>Del: dual-write: live attachments + attachments-tmp 両方に upsert/delete
+            Idx->>Del: dual-write: attachments-alias (= 旧 index) + attachments-2 の両方に upsert/delete
         end
 
-        Batch->>Batch: AttachmentOrphanSweeper.sweep(attachments-tmp)
-        Batch->>Del: attachments alias swap (attachments-tmp → attachments)
+        Batch->>Batch: AttachmentOrphanSweeper.sweep(attachments-2)
+        Batch->>Del: swapAttachmentAlias(attachments-2) — 1 回の updateAliases で付け替え、旧 index を削除
         Batch->>Sock: FinishAddAttachment
-        Note over Batch: 例外時は AttachmentRebuildingFailed を emit。finally で isRebuilding=false
+        Note over Batch: 例外時は AttachmentRebuildingFailed を emit し、作りかけの index を削除 (alias が指していない場合だけ)。finally で isRebuilding=false
     end
 ```
 
 Key decisions:
 - **HTTP 応答は作り直しの完了を待たない** (Req 6.5)。添付の作り直しは添付ごとに抽出サービスを呼ぶため数分〜数時間かかりうる。API route は `startRebuild()` を呼んで即 200 を返し、完了・失敗は Socket.io (`FinishAddAttachment` / `AttachmentRebuildingFailed`) で通知する。監査ログの作り直し (`PUT /search/auditlog-indices`) と同じ非同期の流儀
-- **二重起動の判定は同期で行う** (Req 6.6)。`startRebuild()` は await する前に実行中フラグを確認して立てるため、API route は 409 を同じリクエストの中で返せる
+- **二重起動の判定は同期で行う** (Req 6.6)。`startRebuild()` は await する前に実行中フラグを確認して立て、実行中なら何も始めずに `false` を返す。API route はそれを見て 409 を同じリクエストの中で返す
 - **ページと添付は同じ要求で作り直す**。添付はページに属するため、`includeAttachments=true` のときは Page/Comment の作り直しに続けて添付を作り直す。直列実行 (Page 完了後に Attachment 開始)
-- **alias swap は index ごとに行う**。Page 側は既存 `rebuildIndex()` の中で swap し、添付側は bulk と orphan sweep の完了後に `attachments` alias を swap する。2 つの swap の間は「Page は新 index、添付は旧 index」の状態になるが、添付ヒットの権限は検索時に page_index から引くため (Flow 2)、漏洩は起きない
-- includeAttachments=false の場合は従来どおり Page/Comment のみを fire-and-forget で作り直し、既存 `attachments` alias は据え置き
+- **alias swap は index ごとに行う**。Page 側は既存 `rebuildIndex()` の中で swap し、添付側は bulk と orphan sweep の完了後に `attachments-alias` を swap する。2 つの swap の間は「Page は新 index、添付は旧 index」の状態になるが、添付ヒットの権限は検索時に page_index から引くため (Flow 2)、漏洩は起きない
+- includeAttachments=false の場合は従来どおり Page/Comment のみを fire-and-forget で作り直し、`attachments-alias` と添付の実 index には触れない
 - 個別失敗はスキップして FailureLog に残し batch 継続
-- 中断時は alias swap 未実行のまま旧 index 維持、tmp index は orphan として残存 (次回実行の先頭で drop)。実行中フラグは `startRebuild()` 内部の finally で必ず下ろす (呼び出し側に後始末を任せない)
-- **rebuild window 中の dual-write**: `AttachmentSearchIndexer.onAttach/onDetach` が `AttachmentReindexBatch.isRebuilding()` を参照し、true の間は live alias (`attachments`) と tmp index (`attachments-tmp`) の**両方**に書き込む。これにより alias swap 後に新規アップロードが消失しない。既存 Page 側 `rebuildIndex()` の tmp index への並行書き込みと同パターン
+- **実 index は 2 つを交互に使う** (Req 6.4)。alias が指している方には作り直しの間まったく触れず、新しい方を埋め終えてから alias を付け替える。Page 側の `rebuildIndex()` は「tmp に複製 → alias を tmp へ → 本体を消して作り直す → alias を戻す」形なので、途中で止まると本体が作りかけのまま alias が戻り、旧 index を保てない。添付の作り直しは抽出を伴い長時間かかるため、この形は採らない (research.md 8.6)
+- 例外で止まった場合は alias swap 未実行のまま旧 index を維持し、作りかけの index を削除する。削除は「alias が指していない index」に限る。プロセスが落ちて削除できなかった index は、次回の作り直しの先頭で drop される。実行中フラグは `startRebuild()` 内部の finally で必ず下ろす (呼び出し側に後始末を任せない)
+- **rebuild window 中の dual-write**: `AttachmentSearchIndexer.onAttach/onDetach` が `AttachmentReindexBatch.isRebuilding()` を参照し、true の間は live alias (`attachments-alias`) と、作り直し先の index (`getTmpIndexName()` が返す名前) の**両方**に書き込む。これにより alias swap 後に新規アップロードや削除が失われない。`getTmpIndexName()` は作り直し先の index を作り終えてから名前を返す。それより前の書き込みは live だけに入るが、走査はその後に MongoDB を読むので、その添付も新しい index に入る
 - **dual-write の冪等性**: tmp index への書き込みは、bulk upsert が後から同 `_id` で上書きする可能性があるが、doc ID が `${attachmentId}_${pageNumber ?? 0}` で決定的なため順序に依存しない。bulk 側が後勝ちでも real-time 側が後勝ちでも最終状態は同一
 - **dual-write 失敗時**: tmp 側 write の失敗は live 側の成功を阻害しない (pino 記録して continue)。alias swap 後は live が単一 source になり自動的に整合
 - **orphan sweeper**: real-time cascade (pageEvent 購読による即時削除) は採用しない。`AttachmentService.removeAllAttachments()` (ページ削除に伴う一括削除) は detach handler を呼ばないため、ページ削除で残った添付 doc もここで回収する。`AttachmentOrphanSweeper` が MongoDB Page collection と照合して親 Page 不在の添付 doc を eventual に cleanup する。query-time permission 判定により、sweeper 実行までの間も snippet 漏洩は発生しない (`facet=attachments` primary の ids 検索で親 Page 不在 → 該当添付ヒットを drop、`facet=all` secondary の terms クエリは primaryIds = viewer 許諾済ページに限定されるため孤児添付は含まれない)
@@ -521,7 +522,7 @@ Key decisions:
 | 6.3 | 進捗 Socket.io | Socket.io `AddAttachmentProgress` / `FinishAddAttachment` | — | Flow 5 |
 | 6.4 | 中断時 alias 不変 | AttachmentReindexBatch alias swap last | — | Flow 5 |
 | 6.5 | 作り直しを待たずに応答 + 完了・失敗通知 | AttachmentReindexBatch.startRebuild + Socket.io `FinishAddAttachment` / `AttachmentRebuildingFailed` | `PUT /search/indices` | Flow 5 |
-| 6.6 | 二重起動は 409 | AttachmentReindexBatch.startRebuild (同期で RebuildInProgressError) | `PUT /search/indices` 409 `rebuild_in_progress` | Flow 5 |
+| 6.6 | 二重起動は 409 | AttachmentReindexBatch.startRebuild (同期で `false` を返す) | `PUT /search/indices` 409 `rebuild_in_progress` | Flow 5 |
 | 7.1 | 再抽出エンドポイント | AttachmentSearchIndexer.reindex | `POST /attachments/:id/reextract` | Flow 4 |
 | 7.2 | 権限ガード | apiv3 middleware (admin OR page editor) | — | — |
 | 7.3 | 無効時 503 | require-search-attachments-enabled middleware | — | — |
@@ -617,10 +618,10 @@ export interface AttachmentTextExtractorService {
 
 **Responsibilities & Constraints**
 - `isFeatureEnabled()` チェック → ON 時のみ抽出呼び出し、OFF 時は早期 return。判定式は `searchService.isConfigured && extractorUri != null && extractorUri !== '' && extractorToken != null && extractorToken !== ''` (独立した `enabled` Config キーは持たず算出値。token 未設定時も機能無効として扱い、Bearer auth を構造的に強制)
-- 成功時: ES `attachments` (live alias) に bulk upsert (1 添付 = N 文書)。**権限フィールドは一切書き込まない** (Option D)
+- 成功時: ES `attachments-alias` (live alias) に bulk upsert (1 添付 = N 文書)。**権限フィールドは一切書き込まない** (Option D)
 - 失敗時 (unsupported / tooLarge / timeout / busy / unreachable / failed): metadata-only 1 文書 + FailureLog 永続化
 - `onDetach(attachmentId)` で `attachmentId` キーの全文書削除
-- **rebuild window 中の dual-write**: `reindexBatch.isRebuilding()` が true の間、`onAttach`/`onDetach` は live alias と tmp index (`reindexBatch.getTmpIndexName()` が返す `attachments-tmp`) の**両方**に書き込む。live 側が真の source、tmp 側は alias swap 後の continuity 担保のための補助書き込み。tmp 側 write 失敗は live 側の成功を阻害せず pino 記録のみ
+- **rebuild window 中の dual-write**: `reindexBatch.isRebuilding()` が true の間、`onAttach`/`onDetach` は live alias と作り直し先の index (`reindexBatch.getTmpIndexName()` が返す名前) の**両方**に書き込む。live 側が真の source、tmp 側は alias swap 後の continuity 担保のための補助書き込み。tmp 側 write 失敗は live 側の成功を阻害せず pino 記録のみ
 - **親 Page 削除の real-time cascade は行わない** (`onPageDeleted` は本 contract に含めない)。親 Page 不在添付は query-time permission 判定でヒットから除外され、eventual cleanup は `AttachmentOrphanSweeper` が rebuildIndex 時に担う
 
 **Contracts**: **Service [x]** / **Event [x]**
@@ -675,27 +676,25 @@ export interface AttachmentOrphanSweeper {
 **Contracts**: **Batch [x]**
 
 ```typescript
-export class RebuildInProgressError extends Error {}
-
 export interface AttachmentReindexBatch {
   // Starts the page rebuild followed by the attachment rebuild and returns
-  // without awaiting them. Throws RebuildInProgressError synchronously when a
-  // rebuild is already running, so the caller can answer 409 in the same request.
-  startRebuild(rebuildPageIndex: () => Promise<void>): void;
+  // without awaiting them. Returns false, starting nothing, when a rebuild is
+  // already running, so the caller can answer 409 in the same request.
+  startRebuild(rebuildPageIndex: () => Promise<void>): boolean;
 
   // dual-write 判定用 (AttachmentSearchIndexer.onAttach/onDetach から同期参照)
   isRebuilding(): boolean;                      // in-memory boolean 参照 (同期、ロック不要)
-  getTmpIndexName(): string | null;             // isRebuilding=true のとき 'attachments-tmp'、それ以外 null
+  getTmpIndexName(): string | null;             // 作り直し先の index を作り終えてから swap まではその名前、それ以外 null
 }
 ```
 
-- Trigger: `PUT /_api/v3/search/indices { operation: 'rebuild', includeAttachments: true }` の API route が `startRebuild(() => searchService.rebuildIndex())` を呼ぶ。Page 側の作り直しは引数で受け取り、batch 自身は `SearchService` を参照しない
-- 処理順 (裏で実行): `rebuildPageIndex()` → `attachments-tmp` を drop → create → MongoDB 上の全 attachment を `prisma.attachments.findMany` の id 順ページング (`take` + `cursor`) で走査し、バイトを FileUploader から逐次取得して抽出 → bulk upsert → `AttachmentOrphanSweeper.sweep('attachments-tmp')` → `attachments` alias swap → `FinishAddAttachment`
-- tmp index 命名規約: `${indexName}-tmp` 形式。本 spec では `indexName = 'attachments'` なので tmp は **`attachments-tmp`** 固定。既存 Page 側の `${pageIndexName}-tmp` と同じパターン。timestamp/version 付きの命名は使わない (累積なし)
+- Trigger: `PUT /_api/v3/search/indices { operation: 'rebuild', includeAttachments: true }` の API route が `startRebuild(() => searchService.rebuildIndex(true))` を呼ぶ (Page 側の進捗イベントも出す)。Page 側の作り直しは引数で受け取り、batch 自身は `SearchService` を参照しない
+- 処理順 (裏で実行): `rebuildPageIndex()` → `createRebuildIndex()` (alias が指していない方の実 index を drop → create) → MongoDB 上の全 attachment を `prisma.attachments.findMany` の id 順ページング (`take` + `id > 直前の id`) で走査し、バイトを FileUploader から逐次取得して抽出 → bulk upsert → `AttachmentOrphanSweeper.sweep(作り直し先)` → `swapAttachmentAlias(作り直し先)` → `FinishAddAttachment`
+- index 命名: alias は `attachments-alias` (Page 側の `${indexName}-alias` と同じ形)。実 index は `attachments-1` / `attachments-2` の固定 2 つで、作り直しのたびに alias が指す方が入れ替わる。timestamp/version 付きの命名は使わない (累積なし)。alias と同じ名前の実 index は作れないため、実 index に `attachments` という名前は使わない
 - Progress: Socket.io `AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed`。Page 側は既存の `AddPageProgress` / `FinishAddPage` / `RebuildingFailed` をそのまま使う
-- 失敗時: 個別失敗は FailureLog に残しスキップ、batch は継続。作り直し全体が例外で止まった場合は `AttachmentRebuildingFailed` を emit し、alias swap 未実行のまま旧 index を維持する。`attachments-tmp` は残置されるが次回実行の先頭で drop されるため**累積しない**
+- 失敗時: 個別失敗は FailureLog に残しスキップ、batch は継続。作り直し全体が例外で止まった場合は `AttachmentRebuildingFailed` を emit し、alias swap 未実行のまま旧 index を維持して、作りかけの index を削除する (alias が指していないことを確かめてから)。プロセス停止で残った index は次回実行の先頭で drop されるため**累積しない**
 - **実行中フラグの管理**: `startRebuild()` が同期でフラグを立て、裏の処理の finally で必ず下ろす。フラグの上げ下ろしを batch の内部に閉じ込めることで、呼び出し側の後始末漏れによる `isRebuilding=true` の残留 (残るとすべての attach/detach が無駄に tmp へ書き続ける) を構造的に防ぐ。プロセス再起動で in-memory state は `false` に初期化される (作り直しは中断扱い、次回手動で再実行)
-- 並行実行: 実行中に `startRebuild()` が呼ばれたら `RebuildInProgressError` を同期で throw し、API route は 409 `rebuild_in_progress` を返す
+- 並行実行: 実行中に `startRebuild()` が呼ばれたら何も始めずに `false` を返し、API route は 409 `rebuild_in_progress` を返す。この経路では実行中フラグに触れない (走っている作り直しのフラグを下ろさない)
 
 ### ElasticsearchDelegator extension
 
@@ -722,8 +721,10 @@ export interface AccessiblePage {
 }
 
 export interface AttachmentIndexOperations {
-  createAttachmentIndex(indexName?: string): Promise<void>;                                           // default 'attachments'、rebuild 時は 'attachments-tmp' 指定
-  swapAttachmentAlias(fromTmpIndex: string): Promise<void>;                                           // 'attachments' alias を tmp 側の実 index に付け替える
+  ensureAttachmentIndex(): Promise<void>;                                                             // 起動時: alias が無ければ attachments-1 を mapping 付きで作り alias を張る
+  createRebuildIndex(): Promise<string>;                                                              // alias が指していない方の実 index を drop → create し、その名前を返す
+  swapAttachmentAlias(index: string): Promise<void>;                                                  // 1 回の updateAliases で alias を index へ付け替え、前の実 index を削除
+  dropRebuildIndex(index: string): Promise<void>;                                                     // alias が指していなければ index を削除 (失敗時の後始末)
   // rebuild window 中 dual-write 対応のため targetIndexes を受け取る
   syncAttachmentIndexed(attachmentId: string, pageId: string, docs: AttachmentEsDoc[], targetIndexes: string[]): Promise<void>;
   syncAttachmentRemoved(attachmentId: string, targetIndexes: string[]): Promise<void>;
@@ -741,8 +742,8 @@ export interface AttachmentIndexOperations {
 ```
 
 **dual-write の利用方法**:
-- 通常時 (rebuild 非実行): `syncAttachmentIndexed/Removed(…, ['attachments'])` で live alias にのみ書く
-- rebuild window 中: `AttachmentSearchIndexer` が `reindexBatch.getTmpIndexName()` から `'attachments-tmp'` を得て `syncAttachmentIndexed/Removed(…, ['attachments', 'attachments-tmp'])` と呼ぶ
+- 通常時 (rebuild 非実行): `syncAttachmentIndexed/Removed(…, ['attachments-alias'])` で live alias にのみ書く
+- rebuild window 中: `AttachmentSearchIndexer` が `reindexBatch.getTmpIndexName()` から作り直し先 (例: `'attachments-2'`) を得て `syncAttachmentIndexed/Removed(…, ['attachments-alias', 'attachments-2'])` と呼ぶ
 - `targetIndexes` は 1 回の bulk で書ききる (individual ES `_bulk` 内の action で複数 index 指定)。2 回別 API コールにはしない
 
 - ES 8/9 mapping 変種を version-aware に選択 (**権限フィールドは mapping に含めない**)
@@ -997,7 +998,7 @@ async function computeRequiresReindex(): Promise<boolean> {
 
   // 3. ES attachments index 上のユニーク添付数 (1 添付 = N docs のため cardinality agg が必須)
   const esUniqueCount = await esClient.search({
-    index: 'attachments',
+    index: 'attachments-alias',
     size: 0,
     body: {
       aggs: {
@@ -1151,9 +1152,9 @@ Primary fields:
 ```
 
 ライフサイクル:
-- `attachments` 実インデックス + `attachments` エイリアス (既存 Page 側 `${indexName}` と同じ命名)
-- **起動時 alias 衝突チェック**: `initializeSearchIndex` で `attachments` alias の既存を確認。alias が本 spec 所有の実 index 以外 (外部運用で作成された index や deprecated version) を指している場合、起動ログに WARN を出して human intervention を促す (`initialize` は続行しない)。OSS デプロイで既存 `attachments` index / alias 名が別用途で使われていた場合の silent upsert 破壊を防止
-- rebuildIndex 時は**固定名 `attachments-tmp`** を使って atomic alias swap (Page 側 `${pageIndexName}-tmp` と同じパターン)。開始時に drop → create で冪等化し、tmp index は累積しない
+- alias `attachments-alias` + 実 index `attachments-1` / `attachments-2` のどちらか一方。読み書きはすべて alias を通す
+- **起動時**: 検索サービスが設定されていれば、機能の有効・無効にかかわらず `initAttachmentFullTextSearch` が `ensureAttachmentIndex()` を呼ぶ。alias が無ければ `attachments-1` を mapping 付きで作って alias を張り、あれば何もしない。管理画面から機能を有効にしたときに再起動なしで書き込めるようにするため。失敗しても起動は止めずログに残す (Page 側の起動時 normalize と同じ位置づけ)。起動時には余った実 index を消さない (別のインスタンスで作り直し中かもしれないため)
+- 作り直し時は alias が指していない方の実 index を drop → create して埋め、1 回の `updateAliases` で付け替えてから旧 index を削除する。実 index は 2 つから増えない
 - ES 8/9 それぞれの mapping は `mappings/attachments-mappings-esN.ts` で differ
 
 ### Logical Data Model — MongoDB `extractionfailurelogs` (Prisma モデル)
@@ -1219,7 +1220,7 @@ interface IAttachmentHit {
 - **Permission 判定は「返ってきたものだけ許可」(fail-close 徹底)**: `searchAccessiblePages` の応答に含まれた pageId だけを許可し、含まれない pageId (存在しない・権限が無い・絞り込み条件を満たさない) は理由を区別せず一律除外する。shard の一部失敗 (`_shards.failed > 0`) を含む応答は判定に使わず、全件除外する。**「応答に無い pageId を許可する」fail-open ブランチは絶対に実装しない**
 - **Orphan sweeper 失敗**: `AttachmentOrphanSweeper` の失敗は `rebuildIndex` 全体の成功を阻害しない。pino に構造化ログを記録し、alias swap は続行 (query-time permission 判定によりユーザ可視性は守られるため、cleanup 遅延は許容)
 - **rebuild window 中の dual-write 失敗**: tmp index 側の write 失敗は live 側の成功を阻害しない (pino 記録のみ、real-time event は成功扱い)。tmp 側だけに書き漏れが発生した場合、alias swap 後に当該添付が検索で出ないが、次回の rebuild で救済。ユーザーが遭遇する期間は短く、可視性に致命的な影響はないと判断
-- **作り直し全体の失敗**: `startRebuild()` の裏の処理が例外で止まった場合は `AttachmentRebuildingFailed` を emit し、alias swap は行わない。実行中フラグは `startRebuild()` 内部の finally で必ず下ろす。プロセス再起動時も in-memory boolean のため `false` から始まる
+- **作り直し全体の失敗**: `startRebuild()` の裏の処理が例外で止まった場合は `AttachmentRebuildingFailed` を emit し、alias swap は行わず、作りかけの index を削除する。実行中フラグは `startRebuild()` 内部の finally で必ず下ろす。プロセス再起動時も in-memory boolean のため `false` から始まる
 
 ### Monitoring
 
@@ -1255,14 +1256,19 @@ interface IAttachmentHit {
   - facet=`all` で `terms: { pageId: primaryIds }` が発火し、permission 再チェックは行わない (primary で viewer filter 通過済の前提)
   - secondary レイテンシ閾値超過時に enrichment を skip し空の `ISecondarySearchResult` を返すこと
 - `AttachmentSearchIndexer` dual-write 分岐:
-  - `reindexBatch.isRebuilding()` が false のとき `syncAttachmentIndexed/Removed` の `targetIndexes` が `['attachments']` のみ
-  - `reindexBatch.isRebuilding()` が true のとき `['attachments', 'attachments-tmp']` 両方が渡ること
+  - `reindexBatch.isRebuilding()` が false のとき `syncAttachmentIndexed/Removed` の `targetIndexes` が `['attachments-alias']` のみ
+  - `reindexBatch.isRebuilding()` が true のとき live alias と作り直し先の両方が渡ること
   - tmp 側 write 失敗時も live 側は成功扱いで return、pino に warn log が出ること
 - `AttachmentReindexBatch.startRebuild`:
-  - 呼び出しが裏の処理の完了を待たずに返り、返った直後から `isRebuilding() === true` / `getTmpIndexName() === 'attachments-tmp'` であること
-  - 裏の処理の完了後は `isRebuilding() === false` / `getTmpIndexName() === null` に戻り、`FinishAddAttachment` が emit されること
-  - 渡した `rebuildPageIndex` が reject した場合も実行中フラグが下り、`AttachmentRebuildingFailed` が emit され、alias swap が行われないこと
-  - 実行中に再度呼ぶと `RebuildInProgressError` を同期で throw すること
+  - 呼び出しが裏の処理の完了を待たずに返り、返った直後から `isRebuilding() === true` であること。走査中は `getTmpIndexName()` が作り直し先を返すこと
+  - 処理順が Page の作り直し → 作り直し先の作成 → 書き込み → orphan sweep → alias swap であり、完了後は `isRebuilding() === false` / `getTmpIndexName() === null` に戻り、`FinishAddAttachment` が emit されること
+  - 途中で失敗した場合も実行中フラグが下り、`AttachmentRebuildingFailed` が emit され、alias swap が行われず、作りかけの index が削除されること
+  - 実行中に再度呼ぶと `false` を返すこと
+- ElasticsearchDelegator extension の index ライフサイクル (ES の index/alias API をメモリ上の偽物に置き換えて状態で確かめる):
+  - alias が無いときだけ `attachments-1` を mapping 付きで作り alias を張ること
+  - 作り直し先が alias の指していない方になり、残骸があれば作り直されること
+  - swap が 1 回の `updateAliases` で行われ、旧 index が消えること
+  - alias が指している index は後始末で消さないこと
 - `build-snippet-segments` (ES highlighter parse):
   - `<em>...</em>` で囲まれた部分が `{text, highlighted: true}`、それ以外が `{text, highlighted: false}` になること
   - `<script>alert(1)</script>` / `<img src=x onerror=...>` を含む input が全て `{text, highlighted: false}` の単一 segment になり、tag はエスケープされずそのまま text に保持される (UI 層の React text node で escape される前提)
@@ -1278,8 +1284,6 @@ interface IAttachmentHit {
 - reextract current grant 再チェック:
   - session は editor 権限、しかし Page current grant では viewer 以下 (demote 済み) の状態で reextract 呼び出し → 403 forbidden
   - session / Page current grant ともに editor → 200 + `ExtractionOutcome` 返却
-- attachments alias 名衝突検出:
-  - 起動時 `attachments` alias が既存 index 以外を指していたら WARN ログ + initialize 中断 (silent overwrite 防止)
 
 ### Integration Tests
 
@@ -1289,11 +1293,11 @@ interface IAttachmentHit {
 - 親ページ削除 → **real-time cascade は発生しない**が、次回検索で当該添付ヒットが primary の ids 指定 page 検索により除外される。rebuildIndex 実行後に orphan sweeper によりドキュメントが実削除される
 - `GET /search/attachments?q=...&pageIds=...` (secondary endpoint) → primaryIds で指定された pageId の添付ヒットのみ返り、viewer 許諾済ページ前提のため permission 再チェックは行わない。pageIds.length 超過で 400。消失/権限失効ページは ids 指定の page 検索で検出して除外
 - 検索演算子の適用: 2 人のユーザがそれぞれ作成したページに同じ語を含む添付を置き、`author:<一方> <語>` を facet=`attachments` / `all` で検索すると、一方のページの添付だけが返ること。`-tag:` / `prefix:` / `group:` でも同様に親ページの条件で絞られること
-- `PUT /search/indices { includeAttachments: true }` → 作り直しの完了前に 200 が返る → 裏で Page の作り直し → `attachments-tmp` 生成 → orphan sweeper 実行 → `attachments` alias swap → `FinishAddAttachment` を受信
+- `PUT /search/indices { includeAttachments: true }` → 作り直しの完了前に 200 が返る → 裏で Page の作り直し → alias が指していない方の実 index 生成 → orphan sweeper 実行 → `attachments-alias` swap → `FinishAddAttachment` を受信
 - 作り直しの実行中に 2 回目の `PUT /search/indices { includeAttachments: true }` → 409 `rebuild_in_progress`
-- **rebuild window 中の dual-write**: rebuild 実行中に別テスト runner から `AttachmentService.attach()` / `detach()` を発火させ、live alias と `attachments-tmp` の両方に doc が存在することを assert。alias swap 後も live alias から当該添付が検索 hit することを E2E 検証
+- **rebuild window 中の dual-write**: rebuild 実行中に別テスト runner から `AttachmentService.attach()` / `detach()` を発火させ、live alias と作り直し先の両方に doc が存在することを assert。alias swap 後も live alias から当該添付が検索 hit することを E2E 検証
 - **rebuild window 中の dual-write 失敗耐性**: tmp index を中途で delete して bulk がエラーになる状況を stub で作り、live 側の書き込みが成功し続け、real-time event の成功戻り値が返ることを assert
-- **作り直し失敗時の後始末**: Page 側の `rebuildIndex()` が例外を throw したとき、`AttachmentRebuildingFailed` を受信し、`isRebuilding=false` に戻り、`attachments` alias は旧 index を指したままであること
+- **作り直し失敗時の後始末**: Page 側の `rebuildIndex()` が例外を throw したとき、`AttachmentRebuildingFailed` を受信し、`isRebuilding=false` に戻り、`attachments-alias` は旧 index を指したままであること
 - `POST /attachments/:id/reextract` → ES 文書が更新される / 権限なしで 403 / 機能無効で 503
 - 機能無効化 → 添付 handler が一切抽出呼び出しを行わない
 - `GET /admin/attachment-search/failures` → 記録済みエントリが返る
@@ -1370,10 +1374,10 @@ flowchart LR
 - Phase 3: 既存添付を取り込む admin は rebuildIndex を実行
 - ロールバック (soft-disable): admin UI で `extractorUri` を空文字 / null にクリア → 算出値 `isAttachmentFullTextSearchEnabled` が `false` に遷移し検索経路は旧挙動。`attachments` index は残置されるが参照されない
 
-### rebuildIndex 中断時の方針 (既存 Page 側と同規約)
+### rebuildIndex 中断時の方針
 
 - 実行中に apps/app が再起動・ネットワーク断などで中断した場合、alias swap は未実行のまま旧 index が残る (Req 9 AC 9.1 互換性担保)
-- 中断により `attachments-tmp` が残置される場合も、**次回 rebuildIndex 実行の先頭で `client.indices.delete({ index: 'attachments-tmp', ignore_unavailable: true })` により drop → create** で最初からやり直す。**tmp index は累積しない** (既存 Page 側 `${pageIndexName}-tmp` と完全同規約)
+- 中断により作りかけの実 index が残置される場合も、**次回 rebuildIndex 実行の先頭で、alias が指していない方を drop → create** して最初からやり直す。実 index は `attachments-1` / `attachments-2` の 2 つから増えない
 - 個別失敗は `ExtractionFailureLog` 記録のうえスキップ、batch は継続
 - チェックポイント再開型は初期実装では採用しない (100k 件超テナント向け enhancement)
 

@@ -22,7 +22,10 @@ import type { AttachmentWithComputed } from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
-import type { AttachmentIndexOperations } from './attachment-search-delegator-extension';
+import {
+  ATTACHMENT_INDEX_NAMES,
+  type AttachmentIndexOperations,
+} from './attachment-search-delegator-extension';
 import type { AttachmentTextExtractorService } from './attachment-text-extractor';
 import type { ExtractionFailureLogServiceInterface } from './extraction-failure-log-service';
 import { isAttachmentFullTextSearchEnabled } from './is-attachment-full-text-search-enabled';
@@ -198,7 +201,7 @@ export class AttachmentSearchIndexer
    * When the reindex batch is rebuilding, both the live index and tmp index are included.
    */
   private getTargetIndexes(): string[] {
-    const live = 'attachments';
+    const live = ATTACHMENT_INDEX_NAMES.alias;
     if (this.reindexBatch.isRebuilding()) {
       const tmp = this.reindexBatch.getTmpIndexName();
       if (tmp != null) {
@@ -227,7 +230,7 @@ export class AttachmentSearchIndexer
     docs: IAttachmentEsDoc[],
     targetIndexes: string[],
   ): Promise<void> {
-    const liveIndex = 'attachments';
+    const liveIndex = ATTACHMENT_INDEX_NAMES.alias;
     const tmpIndexes = targetIndexes.filter((idx) => idx !== liveIndex);
     const hasLive = targetIndexes.includes(liveIndex);
 
@@ -363,7 +366,7 @@ export class AttachmentSearchIndexer
       const targetIndexes = this.getTargetIndexes();
 
       // Attempt live first, then tmp (best-effort for each)
-      const liveIndex = 'attachments';
+      const liveIndex = ATTACHMENT_INDEX_NAMES.alias;
       const tmpIndexes = targetIndexes.filter((idx) => idx !== liveIndex);
 
       if (targetIndexes.includes(liveIndex)) {

@@ -14,10 +14,8 @@ import { prisma } from '~/utils/prisma';
 
 import {
   AttachmentReindexBatch,
-  type AttachmentReindexBatchInterface,
   type FetchAttachmentIdPage,
   iterateAllAttachmentIds,
-  type ProgressCallback,
   REINDEX_PAGE_SIZE,
 } from './attachment-reindex-batch';
 
@@ -66,13 +64,14 @@ function makeAttachment(
 /** Builds a minimal stub for AttachmentIndexOperations. */
 function makeDelegatorExtStub() {
   return {
-    createAttachmentIndex: vi.fn().mockResolvedValue(undefined),
+    ensureAttachmentIndex: vi.fn().mockResolvedValue(undefined),
+    createRebuildIndex: vi.fn().mockResolvedValue('attachments-2'),
+    swapAttachmentAlias: vi.fn().mockResolvedValue(undefined),
+    dropRebuildIndex: vi.fn().mockResolvedValue(undefined),
     syncAttachmentIndexed: vi.fn().mockResolvedValue(undefined),
     syncAttachmentRemoved: vi.fn().mockResolvedValue(undefined),
     searchAttachmentsBody: vi.fn(),
     searchAttachmentsByPageIdsBody: vi.fn(),
-    addAllAttachments: vi.fn().mockResolvedValue(undefined),
-    initializeAttachmentIndex: vi.fn().mockResolvedValue({ initialized: true }),
   };
 }
 
@@ -186,7 +185,7 @@ describe('AttachmentReindexBatch', () => {
   let failureLogService: ReturnType<typeof makeFailureLogStub>;
   let orphanSweeper: ReturnType<typeof makeOrphanSweeperStub>;
   let socketIoService: ReturnType<typeof makeSocketIoServiceStub>;
-  let batch: AttachmentReindexBatchInterface;
+  let batch: AttachmentReindexBatch;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -215,49 +214,131 @@ describe('AttachmentReindexBatch', () => {
     vi.restoreAllMocks();
   });
 
-  // -------------------------------------------------------------------------
-  // 1. begin() sets isRebuilding + getTmpIndexName
-  // -------------------------------------------------------------------------
-  describe('begin()', () => {
-    it('sets isRebuilding=true and records the tmp index name', () => {
-      batch.begin('attachments-tmp');
+  const progressEvents = () =>
+    socketIoService._emit.mock.calls
+      .filter(([event]) => event === SocketEventName.AddAttachmentProgress)
+      .map(([, payload]) => payload);
 
+  // -------------------------------------------------------------------------
+  // 1. startRebuild — runs in the background, one at a time
+  // -------------------------------------------------------------------------
+  describe('startRebuild', () => {
+    const successOutcome = {
+      kind: 'success' as const,
+      pages: [{ pageNumber: 1, label: null, content: 'text' }],
+      mimeType: 'text/plain',
+    };
+
+    const waitUntilFinished = () =>
+      vi.waitFor(() => expect(batch.isRebuilding()).toBe(false));
+
+    const emittedEvents = () =>
+      socketIoService._emit.mock.calls.map(([event]) => event);
+
+    it('returns before the rebuild completes and refuses a second rebuild meanwhile', () => {
+      const neverEnding = new Promise<void>(() => {});
+
+      const started = batch.startRebuild(() => neverEnding);
+
+      expect(started).toBe(true);
       expect(batch.isRebuilding()).toBe(true);
-      expect(batch.getTmpIndexName()).toBe('attachments-tmp');
+      expect(batch.startRebuild(() => Promise.resolve())).toBe(false);
     });
 
-    it('throws a 409-status error when a rebuild is already in progress', () => {
-      batch.begin('attachments-tmp');
+    it('builds into a fresh index, sweeps it, then swaps the alias and reports completion', async () => {
+      setupAttachmentMock([makeAttachment({ id: 'a1' })]);
+      extractor.extractAttachment.mockResolvedValue(successOutcome);
+      const order: string[] = [];
+      const step =
+        <T>(name: string, result: T) =>
+        () => {
+          order.push(name);
+          return Promise.resolve(result);
+        };
+      delegatorExt.createRebuildIndex.mockImplementation(
+        step('create', 'attachments-2'),
+      );
+      delegatorExt.syncAttachmentIndexed.mockImplementation(
+        step('write', undefined),
+      );
+      orphanSweeper.sweep.mockImplementation(
+        step('sweep', { removed: 0, failed: 0 }),
+      );
+      delegatorExt.swapAttachmentAlias.mockImplementation(
+        step('swap', undefined),
+      );
 
-      let caught: unknown;
-      try {
-        batch.begin('attachments-tmp');
-      } catch (err) {
-        caught = err;
-      }
+      batch.startRebuild(step('pages', undefined));
+      await waitUntilFinished();
 
-      expect(caught).toBeInstanceOf(Error);
-      expect((caught as Error & { status: number }).status).toBe(409);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // 2. end() clears state
-  // -------------------------------------------------------------------------
-  describe('end()', () => {
-    it('sets isRebuilding=false and clears getTmpIndexName', () => {
-      batch.begin('attachments-tmp');
-      batch.end();
-
-      expect(batch.isRebuilding()).toBe(false);
+      expect(order).toEqual(['pages', 'create', 'write', 'sweep', 'swap']);
+      expect(delegatorExt.syncAttachmentIndexed).toHaveBeenCalledWith(
+        'a1',
+        'page-abc',
+        expect.any(Array),
+        ['attachments-2'],
+      );
+      expect(orphanSweeper.sweep).toHaveBeenCalledWith('attachments-2');
+      expect(delegatorExt.swapAttachmentAlias).toHaveBeenCalledWith(
+        'attachments-2',
+      );
+      expect(socketIoService._emit).toHaveBeenCalledWith(
+        SocketEventName.FinishAddAttachment,
+        { totalCount: 1, count: 1 },
+      );
+      expect(delegatorExt.dropRebuildIndex).not.toHaveBeenCalled();
       expect(batch.getTmpIndexName()).toBeNull();
     });
 
-    it('is safe to call even when begin() was never called', () => {
-      // Should not throw
-      expect(() => batch.end()).not.toThrow();
-      expect(batch.isRebuilding()).toBe(false);
+    it('exposes the index being built so live writes reach it too', async () => {
+      setupAttachmentMock([makeAttachment({ id: 'a1' })]);
+      let tmpDuringWalk: string | null = null;
+      extractor.extractAttachment.mockImplementation(() => {
+        tmpDuringWalk = batch.getTmpIndexName();
+        return Promise.resolve(successOutcome);
+      });
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(tmpDuringWalk).toBe('attachments-2');
+    });
+
+    it('keeps the alias, drops the half-built index and reports the failure when a step fails', async () => {
+      vi.spyOn(prisma.attachments, 'count').mockRejectedValue(
+        new Error('MongoDB is down'),
+      );
+
+      batch.startRebuild(() => Promise.resolve());
+      await waitUntilFinished();
+
+      expect(delegatorExt.swapAttachmentAlias).not.toHaveBeenCalled();
+      expect(delegatorExt.dropRebuildIndex).toHaveBeenCalledWith(
+        'attachments-2',
+      );
+      expect(socketIoService._emit).toHaveBeenCalledWith(
+        SocketEventName.AttachmentRebuildingFailed,
+        { error: 'MongoDB is down' },
+      );
+      expect(emittedEvents()).not.toContain(
+        SocketEventName.FinishAddAttachment,
+      );
       expect(batch.getTmpIndexName()).toBeNull();
+      expect(batch.startRebuild(() => new Promise<void>(() => {}))).toBe(true);
+    });
+
+    it('does not touch the attachment indices when the page rebuild fails', async () => {
+      batch.startRebuild(() =>
+        Promise.reject(new Error('page rebuild failed')),
+      );
+      await waitUntilFinished();
+
+      expect(delegatorExt.createRebuildIndex).not.toHaveBeenCalled();
+      expect(delegatorExt.swapAttachmentAlias).not.toHaveBeenCalled();
+      expect(socketIoService._emit).toHaveBeenCalledWith(
+        SocketEventName.AttachmentRebuildingFailed,
+        { error: 'page rebuild failed' },
+      );
     });
   });
 
@@ -281,10 +362,7 @@ describe('AttachmentReindexBatch', () => {
         .mockResolvedValueOnce(successOutcome)
         .mockResolvedValueOnce(successOutcome);
 
-      const progressCalls: Array<[number, number]> = [];
-      const progress: ProgressCallback = (p, t) => progressCalls.push([p, t]);
-
-      await batch.addAllAttachments('attachments-tmp', progress);
+      await batch.addAllAttachments('attachments-tmp');
 
       // Both attachments were extracted
       expect(extractor.extractAttachment).toHaveBeenCalledTimes(2);
@@ -297,10 +375,10 @@ describe('AttachmentReindexBatch', () => {
       // No failures recorded
       expect(failureLogService.record).not.toHaveBeenCalled();
 
-      // Progress callback called once per attachment
-      expect(progressCalls).toEqual([
-        [1, 2],
-        [2, 2],
+      // Progress reported once per attachment
+      expect(progressEvents()).toEqual([
+        { totalCount: 2, count: 1 },
+        { totalCount: 2, count: 2 },
       ]);
     });
 
@@ -316,18 +394,16 @@ describe('AttachmentReindexBatch', () => {
         pages: [{ pageNumber: 1, label: 'Page 1', content: 'x' }],
         mimeType: 'application/pdf',
       });
-      const progress = vi.fn();
-
-      await batch.addAllAttachments('attachments-tmp', progress);
+      const result = await batch.addAllAttachments('attachments-tmp');
 
       const extractedIds = extractor.extractAttachment.mock.calls.map(
         ([id]) => id,
       );
       expect(extractedIds).toEqual(attachments.map((a) => a.id));
-      expect(progress).toHaveBeenLastCalledWith(
-        attachments.length,
-        attachments.length,
-      );
+      expect(result).toEqual({
+        totalCount: attachments.length,
+        count: attachments.length,
+      });
     });
 
     it('keeps indexing later rows when one row cannot be loaded', async () => {
@@ -340,24 +416,14 @@ describe('AttachmentReindexBatch', () => {
         pages: [{ pageNumber: 1, label: 'Page 1', content: 'x' }],
         mimeType: 'application/pdf',
       });
-      const progress = vi.fn();
-
-      await batch.addAllAttachments('attachments-tmp', progress);
+      const result = await batch.addAllAttachments('attachments-tmp');
 
       expect(extractor.extractAttachment.mock.calls.map(([id]) => id)).toEqual([
         'attach-001',
         'attach-003',
       ]);
       expect(delegatorExt.syncAttachmentIndexed).toHaveBeenCalledTimes(2);
-      expect(progress).toHaveBeenLastCalledWith(3, 3);
-      expect(socketIoService._emit).not.toHaveBeenCalledWith(
-        SocketEventName.RebuildingFailed,
-        expect.anything(),
-      );
-      expect(socketIoService._emit).toHaveBeenCalledWith(
-        SocketEventName.FinishAddAttachment,
-        { totalCount: 3, count: 3 },
-      );
+      expect(result).toEqual({ totalCount: 3, count: 3 });
     });
 
     it('neither extracts nor indexes attachments that belong to no page', async () => {
@@ -372,9 +438,7 @@ describe('AttachmentReindexBatch', () => {
         pages: [{ pageNumber: 1, label: 'Page 1', content: 'x' }],
         mimeType: 'application/pdf',
       });
-      const progress = vi.fn();
-
-      await batch.addAllAttachments('attachments-tmp', progress);
+      const result = await batch.addAllAttachments('attachments-tmp');
 
       expect(extractor.extractAttachment.mock.calls.map(([id]) => id)).toEqual([
         'attach-001',
@@ -383,18 +447,7 @@ describe('AttachmentReindexBatch', () => {
       expect(
         delegatorExt.syncAttachmentIndexed.mock.calls.map(([id]) => id),
       ).toEqual(['attach-001', 'attach-003']);
-      expect(progress).toHaveBeenLastCalledWith(2, 2);
-    });
-
-    it('drops and recreates the target index before paging through attachments', async () => {
-      setupAttachmentMock([]);
-
-      await batch.addAllAttachments('attachments-tmp', vi.fn());
-
-      expect(delegatorExt.createAttachmentIndex).toHaveBeenCalledOnce();
-      expect(delegatorExt.createAttachmentIndex).toHaveBeenCalledWith(
-        'attachments-tmp',
-      );
+      expect(result).toEqual({ totalCount: 2, count: 2 });
     });
   });
 
@@ -467,7 +520,7 @@ describe('AttachmentReindexBatch', () => {
 
       extractor.extractAttachment.mockResolvedValueOnce(failureOutcome);
 
-      await batch.addAllAttachments('attachments-tmp', vi.fn());
+      await batch.addAllAttachments('attachments-tmp');
 
       // Metadata-only doc still indexed
       expect(delegatorExt.syncAttachmentIndexed).toHaveBeenCalledOnce();
@@ -536,7 +589,7 @@ describe('AttachmentReindexBatch', () => {
         extractor.extractAttachment.mockResolvedValueOnce(outcome);
 
         // biome-ignore lint/performance/noAwaitInLoops: sequential iteration is intentional in this test
-        await batch.addAllAttachments('attachments-tmp', vi.fn());
+        await batch.addAllAttachments('attachments-tmp');
 
         expect(failureLogService.record).toHaveBeenCalledOnce();
         expect(failureLogService.record.mock.calls[0][0].reasonCode).toBe(
@@ -559,7 +612,7 @@ describe('AttachmentReindexBatch', () => {
           mimeType: 'text/plain',
         });
 
-      await batch.addAllAttachments('attachments-tmp', vi.fn());
+      await batch.addAllAttachments('attachments-tmp');
 
       // Second attachment was still processed
       expect(extractor.extractAttachment).toHaveBeenCalledTimes(2);
@@ -575,7 +628,7 @@ describe('AttachmentReindexBatch', () => {
     it('runs orphan sweep on targetIndex after all docs are indexed', async () => {
       setupAttachmentMock([]);
 
-      await batch.addAllAttachments('attachments-tmp', vi.fn());
+      await batch.addAllAttachments('attachments-tmp');
 
       expect(orphanSweeper.sweep).toHaveBeenCalledOnce();
       expect(orphanSweeper.sweep).toHaveBeenCalledWith('attachments-tmp');
@@ -600,7 +653,7 @@ describe('AttachmentReindexBatch', () => {
         mimeType: 'text/plain',
       });
 
-      await batch.addAllAttachments('attachments-tmp', vi.fn());
+      await batch.addAllAttachments('attachments-tmp');
 
       const { _emit: emit } = socketIoService;
 
@@ -612,49 +665,6 @@ describe('AttachmentReindexBatch', () => {
       expect(progressCalls[0][1]).toEqual({ totalCount: 3, count: 1 });
       expect(progressCalls[1][1]).toEqual({ totalCount: 3, count: 2 });
       expect(progressCalls[2][1]).toEqual({ totalCount: 3, count: 3 });
-    });
-
-    it('emits FinishAddAttachment after all attachments are indexed', async () => {
-      setupAttachmentMock([makeAttachment()]);
-
-      extractor.extractAttachment.mockResolvedValue({
-        kind: 'success' as const,
-        pages: [{ pageNumber: 1, label: null, content: 'text' }],
-        mimeType: 'text/plain',
-      });
-
-      await batch.addAllAttachments('attachments-tmp', vi.fn());
-
-      const { _emit: emit } = socketIoService;
-
-      const finishCalls = emit.mock.calls.filter(
-        ([event]) => event === SocketEventName.FinishAddAttachment,
-      );
-
-      expect(finishCalls).toHaveLength(1);
-      expect(finishCalls[0][1]).toMatchObject({ totalCount: 1, count: 1 });
-    });
-
-    it('emits RebuildingFailed and rethrows when a fatal error occurs', async () => {
-      // Simulate createAttachmentIndex throwing
-      delegatorExt.createAttachmentIndex.mockRejectedValueOnce(
-        new Error('ES is down'),
-      );
-
-      // count won't even be reached, but mock anyway
-      setupAttachmentMock([]);
-
-      await expect(
-        batch.addAllAttachments('attachments-tmp', vi.fn()),
-      ).rejects.toThrow('ES is down');
-
-      const { _emit: emit } = socketIoService;
-      const failedCalls = emit.mock.calls.filter(
-        ([event]) => event === SocketEventName.RebuildingFailed,
-      );
-
-      expect(failedCalls).toHaveLength(1);
-      expect(failedCalls[0][1]).toMatchObject({ error: 'ES is down' });
     });
   });
 });
