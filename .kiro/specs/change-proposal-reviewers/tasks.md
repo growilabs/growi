@@ -63,7 +63,7 @@
   - barrel には、ここでは触らない（登録は 3.1）
   - _Requirements: 2.2, 5.6_
   - _Boundary: review-scope_
-- [ ] 2.3 (P) 承認を受け付ける状態の規則と、見える段階の純関数を作る
+- [x] 2.3 (P) 承認を受け付ける状態の規則と、見える段階の純関数を作る
   - 承認の規則: 「待ち」でない操作、すでに承認済みの操作は、書き込まず、その時点の状態を返す
   - 見える段階: 閲覧できるページの「待ち」の操作があれば開いている。無ければ、閲覧できるページの「飛ばした」の操作の理由（期限切れ・破棄・取り下げ）の段階、それも無ければ完了。実際の段階を使わない
   - 閲覧できるページの操作が「失敗」1 件で、閲覧できないページの「待ち」が 1 件ある提案を破棄しても、操作が 1 件だけの提案と同じ段階になることを、単体テストで確かめている
@@ -266,3 +266,4 @@
 - 1.5: `REVIEW_RESULT` の中国語（审阅结果）とフランス語（examen）は、8.1 で「判断」の共通の訳語を決めるときに、そろえるかを見直す。
 - 2.1: `server/domain/reviewer-model.ts` に置いた（barrel は未登録。登録は 3.1）。`ViewerIdentity` 型もここで export している。`isReviewer` は、有効な承認者が 1 件でもあれば依頼した人を承認者に含めない（design 299 行）。依頼した人の承認の権限は、呼び出し側が「依頼した人 または isReviewer」で判定する。
 - 2.2: `server/domain/review-scope.ts` に `reviewScopeOf` と `resolveAncestors` を置いた（barrel は未登録。登録は 3.1）。**4.1 の実装者へ**: `resolveAncestors` が `null` を返したとき（ルートのページまで空、または無い異常なデータ）は、その操作を「承認者に見えない操作」として扱う。core の `create.ts:51-56` は親が `null` だと閲覧の確認を飛ばして先へ進むが、まねると閲覧の確認なしで承認者に操作が見えて、要件 5.6 を破る。また、空のページを飛ばすことは、本物の空のページを使った結合テストで確かめる（`existingPaths` に空でないページのパスだけを渡す）。
+- 2.3: `server/domain/review-decision.ts`（`canApprove`）と `derive-visible-stage.ts`（`deriveVisibleStage`、`VisibleStage`）に置いた（barrel は未登録。登録は 3.1）。design に `deriveVisibleStage` の型が無かったので、引数は閲覧できる操作だけ `readonly Pick<OperationRecord, 'status' | 'reason'>[]`、戻り値は `VisibleStage`（`'open' | 'expired' | 'discarded' | 'withdrawn' | 'settled'`。core の `deriveProposalStatus` の第 1 引数にそのまま渡せる）とした。`canApprove` の `awaitingApply` は、承認を書いてから反映が終わるまでの間にだけ当てはまる。編集中で待ちに戻った操作は `UNSET_APPROVAL` で `approvedAt` が消えるので、`awaitingApply` にならず、再び承認できる（要件 2.10）。
