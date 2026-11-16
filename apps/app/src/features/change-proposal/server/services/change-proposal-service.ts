@@ -14,6 +14,7 @@ import {
 } from '../../interfaces';
 import {
   type AutoApplyPageFacts,
+  activeReviewers,
   selectAutoApplyTargets,
   validateBasedOn,
   validateProposalInput,
@@ -48,6 +49,7 @@ import {
   type RequesterActions,
 } from './requester-actions';
 import { createRevertAction, type RevertAction } from './revert-action';
+import { createReviewNotifier, type ReviewNotifier } from './review-notifier';
 import {
   type ChangeProposalSettings,
   readChangeProposalSettings,
@@ -70,6 +72,7 @@ export type ChangeProposalService = RequesterActions &
 
 export type ChangeProposalServiceDeps = {
   readonly applier?: ProposalApplier;
+  readonly reviewNotifier?: ReviewNotifier;
   readonly now?: () => Date;
   readonly maintenanceBatchSize?: number;
   readonly appliedListScan?: AppliedListScan;
@@ -241,7 +244,25 @@ export const createChangeProposalService = (
   deps: ChangeProposalServiceDeps = {},
 ): ChangeProposalService => {
   const applier = deps.applier ?? createProposalApplier(crowi);
+  const reviewNotifier = deps.reviewNotifier ?? createReviewNotifier(crowi);
   const now = deps.now ?? (() => new Date());
+
+  // With a reviewer other than the requester, auto-apply writes nothing, so the saved proposal is current (tasks.md 3.3).
+  const notifyReviewers = async (
+    proposal: ChangeProposalDocument,
+    activityId: string,
+  ): Promise<void> => {
+    const candidates = activeReviewers(proposal.reviewers);
+    if (candidates.length === 0) {
+      return;
+    }
+    await reviewNotifier.notifyReviewRequest({
+      proposal,
+      candidates,
+      actorId: proposal.requester,
+      activityId,
+    });
+  };
 
   const approveAndApply = async (
     proposal: ChangeProposalDocument,
@@ -345,7 +366,7 @@ export const createChangeProposalService = (
         operations: normalized.operations,
       });
 
-      recordProposalActivity(crowi, {
+      const { activityId } = recordProposalActivity(crowi, {
         action: SupportedAction.ACTION_CHANGE_PROPOSAL_CREATE,
         proposalId: proposal._id,
         operator: requester,
@@ -359,6 +380,7 @@ export const createChangeProposalService = (
         pageFacts,
         input.request,
       );
+      await notifyReviewers(proposal, activityId);
       return { ok: true, value: { proposalId: proposal._id, apply } };
     },
   };

@@ -145,7 +145,7 @@
   - _Depends: 1.5_
   - _Boundary: proposal-activity_
 
-- [ ] 5.3 作成のときの承認者への通知をつなぐ
+- [x] 5.3 作成のときの承認者への通知をつなぐ
   - 承認者を指定して作成した直後（後続・見直しを含む）に、作成の activity の ID を渡して、承認者への通知（5.1）を送る。引き継いだ承認者にも送る
   - 承認者を指定しない作成では、通知が送られないこと、承認者を指定した作成では、閲覧できるページの判断の対象を持つ承認者に送られることを、結合テストで確かめている
   - _Requirements: 6.1_
@@ -296,3 +296,4 @@
 - 5.1: `ReviewRequestNotificationSnapshot.pages[].id` は、承認待ちの新規作成には入らない（まだページが無い。作る予定のパスだけ `{ path }`。このパスは、承認者が取得で見られる値と同じ条件）。viewer の `parse-notification-snapshot` は、id の無い項目を扱う必要がある。**10.2 で viewer の Revalidation Triggers に足す。** `AnyChangeProposalNotificationSnapshot`（3 種の snapshot の和集合）は、5.1 でも使っていない。5.3 のあとでも使われなければ、9.3 の全体の確認で消す。グループ経由ですでに承認者だった人を、あとから個人として追加すると、通知が送られる（「新しく承認者になった」の読み方。許容）。結果の通知の Socket.IO を確かめるテストは無い（承認者への通知の側にはある）。
 - 5.2: `recordProposalActivity`（`proposal-activity.ts`）に経路の引数 `channel: ReviewChannel` を足した。引数の型は action で 2 つに分かれる: 承認・却下・放棄・承認者の追加・削除（`ProposalReviewAction`）では `channel` が必須、作成・反映・取り消しでは `channel?: never`。snapshot には `reviewChannel` だけを入れ、`username` は保存の処理（`settle-activity-record.ts` の `?? context?.username`）が入れる。記録は同期で、5 つの action すべてが監査ログを無効にしていても保存されることを確かめた（1.5 の申し送りは、これで閉じた）。操作者 `operator` と trigger（`request` か `background`）は前からある引数。`ProposalReviewAction` の export は、6.x で使わなければ外す。
 - 5.2: **6.2 の実装者へ（重要）**: HTTP の求めから記録するとき、ip と endpoint は route の middleware が保存した情報から自動で入る（`recordProposalActivity` が入れているのではない）。「承認者の ip と endpoint は承認の activity に残し、承認がきっかけで動く反映の activity には渡さない」の意味は、承認の activity と反映の activity を比べたもの（要件 6.9、design 164・445 行）。却下・放棄・追加・削除の activity から ip を外す意味ではない（外すと監査の証拠を書き換えることになる）。承認者の ip が反映の activity に入りうる経路は、`proposal-applier.ts` の `reportApplied`（374 行付近）が `request: run.request` を渡している 1 か所だけ。6.2 では、承認の求めで動く反映が `run.request` を渡さないことと、反映の行に ip が無いことを、結合テストで確かめる。背景から記録するときに `request` を渡すと、承認の activity に ip が入る（`beginActivity` が `request?.ip` を使う）。AI の道具の求めには HTTP の情報が無いので、今は実害は無い。
+- 5.3: 作成の流れは「保存 → 作成の activity の記録 → 自動反映 → 承認者への通知」。`ChangeProposalServiceDeps` に省略できる `reviewNotifier?: ReviewNotifier`（既定は `createReviewNotifier(crowi)`）を足した。通知（`notifyReviewers`）には、保存した提案をそのまま渡す（読み直さない）。依頼した人以外の承認者がいると、自動反映は何も書かないので、保存した提案が最新。読み直しは、通知の中身を変えず、保存のあとで作成全体を失敗させうる経路を足すだけなので使わない。5.1 の「書き込んだあとに読み直した proposal を渡す」は、承認の求め（6.2・6.3）向けで、作成（5.3）には当てはまらない。作成の activity の ID は `recordProposalActivity` の戻り値から取る。引き継いだ承認者にも送る。HTTP の求めの作成と見直し（rework）の個別のテストは無い（前者は ID をそのまま返すだけ。後者は後続と同じ処理）。
