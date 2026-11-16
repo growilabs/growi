@@ -14,7 +14,14 @@
 // CSS module itself (leading underscore) -- each consumer still declares its
 // own module-scoped class names.
 
+// The row's width must not depend on its content: useFittingCollapseLevel only
+// re-checks when the row's width changes, so a row that narrows with its
+// collapsed content would never widen again. As a flex item, `flex: 1 1 0`
+// takes the free space whatever the content length; as a block it already
+// fills its parent. Callers therefore place the row directly in their layout,
+// without a wrapper of their own.
 @mixin row {
+  flex: 1 1 0;
   min-width: 0;
 }
 

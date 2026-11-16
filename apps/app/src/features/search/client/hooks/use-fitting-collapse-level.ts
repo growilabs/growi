@@ -61,8 +61,10 @@ const initialState = (resetKey: string): FittingState => ({
  * - `resetKey` must change whenever the rendered content can change width
  *   (the path, its highlight markup) or `maxCollapseLevel` can change; the
  *   fitting then restarts from level 0.
- * - Assumes the container's width is given by its parent, not by its content;
- *   otherwise widening could not be detected and the path would stay collapsed.
+ * - Assumes the container's width does not depend on its content; otherwise
+ *   widening could not be detected and the path would stay collapsed. The
+ *   shared row recipe (`_truncated-path-row.scss`) provides this as long as the
+ *   container is placed directly in a flex row or a block.
  */
 export const useFittingCollapseLevel = (
   maxCollapseLevel: number,

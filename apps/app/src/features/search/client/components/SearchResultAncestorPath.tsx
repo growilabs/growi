@@ -68,7 +68,7 @@ const nodeKey = (node: AncestorPathNode): string =>
  * base form does not fit, ancestors are folded into the ellipsis one by one
  * (the parent last), following the same rule as the search modal. Since the
  * page name sits on its own row, nothing here is character-truncated. The
- * container's width must come from the parent, not its content. Surviving
+ * row sizes itself to the free space of its flex parent. Surviving
  * ancestor segments stay individually clickable and keep search-keyword
  * highlighting; the page name itself is rendered separately by the caller
  * on its own row.

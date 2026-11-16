@@ -305,13 +305,10 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
               <div className="d-flex justify-content-between">
                 {/* page path */}
                 {legacyAncestorPath == null ? (
-                  // min-width:0 enables the 1-line ellipsis (no Bootstrap utility for it).
-                  <span className="flex-grow-1" style={{ minWidth: 0 }}>
-                    {renderTruncatedAncestorPath?.(
-                      pageData.path,
-                      highlightedPath,
-                    )}
-                  </span>
+                  // Rendered directly in this flex row: the truncated path sizes
+                  // itself to the free width, and a wrapper here would size it
+                  // by its content instead.
+                  renderTruncatedAncestorPath?.(pageData.path, highlightedPath)
                 ) : (
                   <PagePathHierarchicalLink
                     linkedPagePath={legacyAncestorPath.linkedPagePath}

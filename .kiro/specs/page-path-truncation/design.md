@@ -60,7 +60,7 @@
 - `PageListItemL` の新規 prop 以外の方法で `/_search` 以外の消費者が祖先パス表示のカスタマイズを必要とする場合（現状は「prop を渡さなければ現行維持」という前提に依存）。
 - `collapseLevel` の意味（先頭側から畳む・省略記号は高々 1 個）を変える場合。`buildAncestorPathNodes` の対応付けがこの不変条件に依存する。
 - パス表示の行に、パス以外の縮む要素が加わる場合。「収まらない」の判定が、コンテナとページ名の 2 か所の溢れだけを見ている前提が崩れる。
-- `SearchResultMenuItem` / `PageListItemL` でパス表示を包む要素の配置が変わる場合。パス表示の幅が親から与えられる前提（`useFittingCollapseLevel` 参照）が崩れると、幅が広がっても畳んだまま戻らなくなる。
+- 共通 mixin `_truncated-path-row.scss` の `row` から `flex: 1 1 0` を外す場合、またはパス表示を flex の行・block 要素以外（`inline-block` の要素や、幅を中身で決める包み要素の中など）に置く場合。パス表示の要素の幅が中身の長さで決まるようになり、`collapseLevel` を上げた後にウィンドウを広げても `useFittingCollapseLevel` が幅の変化を検知できず、祖先セグメントが `…` に置き換えられたままになる。
 
 ## Architecture
 
@@ -368,7 +368,7 @@ export const buildAncestorPathNodes: (
 - 段階の意味（何をどう畳むか）は持たない。両画面は `usePathCollapseLevel(path, highlightedPath?)` 経由で使い、これが最大段階を求め、パスとハイライトを `resetKey` にする（ハイライトは太字で幅が変わるため、同じページでもハイライトが変われば基本形から判定し直す）。
 - ResizeObserver の無い環境では幅の変化を検知しないだけで、初回の判定は行う。
 - 幅の変化は「段階を決めたときのコンテナ幅」と比べて判断する。同じ幅の通知（監視開始直後の通知を含む）は無視し、全行が判定をやり直さないようにする。段階を決めてから監視が始まるまでの間に幅が変わっていても取りこぼさない。
-- **呼び出し側の前提**: `containerRef` を付ける要素の幅は、中身ではなく親が与える使用可能幅で決まること（現状は両画面とも親の `flex-grow-1` ＋ `min-width: 0` で成立）。中身の幅で決まると、畳んだ後に幅が広がっても検知できず、畳んだままになる。
+- **幅の前提**: `containerRef` を付ける要素の幅は、中身の長さで決まってはいけない。中身の長さで決まると、`collapseLevel` を上げた後に幅が広がっても検知できず、祖先セグメントが `…` に置き換えられたままになる。この前提は呼び出し側ではなく、パス表示の要素自身が満たす。共通 mixin `row` の `flex: 1 1 0` と `min-width: 0` により、flex の行に直接置けば残りの幅いっぱいになり、block 要素の中に置けば親の幅いっぱいになる。そのため、呼び出し側（`SearchResultMenuItem`・`PageListItemL`）はパス表示を包む要素を挟まずに、行へ直接置く。`SearchResultPagePath` は、呼び出し側が余白を指定するための `className` を受け取る。
 
 **Contracts**: State [x]
 

@@ -16,6 +16,8 @@ import styles from './SearchResultPagePath.module.scss';
 
 interface SearchResultPagePathProps {
   readonly path: string;
+  /** Spacing from the caller (e.g. margins); the row sizes itself */
+  readonly className?: string;
 }
 
 interface KeyedPart {
@@ -68,7 +70,8 @@ const PathPartView = ({
  * When the base form does not fit, ancestors are folded into the ellipsis one
  * by one (the parent last); a character-truncated page name also counts as not
  * fitting. Only once every ancestor is folded is the page name left to its CSS
- * ellipsis. The container's width must come from the parent, not its content.
+ * ellipsis. The row sizes itself to the free space of its flex parent, so the
+ * caller places it directly in the layout (no sizing wrapper).
  *
  * The full path is always exposed via the native `title` attribute so a
  * shortened path can be inspected on hover. Ancestor segments are never
@@ -77,7 +80,7 @@ const PathPartView = ({
 // Memoized: the search modal re-renders every row on each keystroke and on
 // arrow-key navigation, and each render re-parses the path and re-measures it.
 export const SearchResultPagePath = memo(
-  ({ path }: SearchResultPagePathProps): JSX.Element => {
+  ({ path, className }: SearchResultPagePathProps): JSX.Element => {
     const { containerRef, shrinkableRef, collapseLevel } =
       usePathCollapseLevel(path);
     const { isRoot, parts, fullPath } = useMemo(
@@ -88,7 +91,7 @@ export const SearchResultPagePath = memo(
     return (
       <span
         ref={containerRef}
-        className={`${styles['search-result-page-path']} ${ROW_CLASS_NAME}`}
+        className={`${styles['search-result-page-path']} ${ROW_CLASS_NAME} ${className ?? ''}`}
         title={fullPath}
       >
         {isRoot ? (

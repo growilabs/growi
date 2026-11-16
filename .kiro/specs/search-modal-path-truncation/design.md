@@ -92,7 +92,7 @@ apps/app/src/features/search/client/
 ```
 
 ### Modified Files
-- `apps/app/src/features/search/client/components/SearchResultMenuItem.tsx` — パス表示部の `<span className="ms-3 text-break text-wrap"><PagePathLabel .../></span>` を `<SearchResultPagePath path={item.data.path} />` に差し替え。行内で幅が正しく縮むよう、パス要素に flex 伸縮（`flex-grow` + `min-width: 0`）を持たせ、footprint span には縮小防止（`flex-shrink-0`）を付与する。`PagePathLabel` の import を削除。
+- `apps/app/src/features/search/client/components/SearchResultMenuItem.tsx` — パス表示部の `<span className="ms-3 text-break text-wrap"><PagePathLabel .../></span>` を `<SearchResultPagePath path={item.data.path} />` に差し替え。`SearchResultPagePath` は包む要素を挟まずに `<li>` の直下に置き、左の余白は `className="ms-3"` で渡す。footprint span には縮小防止（`flex-shrink-0`）を付与する。`PagePathLabel` の import を削除。
 
 > `PagePathLabel`（@growi/ui）・`SearchMenuItem`・SCSS 変数等の共有資産は変更しない。
 
@@ -203,7 +203,7 @@ interface SearchResultPagePathProps {
 **Implementation Notes**
 - **描画**: root は `/` を現行同様に表示（2.2）。非 root は先頭に `/`、以降 `segment` を `/` 区切りで描画。`isPageName` のセグメントは `<strong>` で太字（1.3）。`ellipsis` パーツは中間省略と分かる独立要素（`…`、muted 表示）として描画（1.4）。ハイライト HTML を含まないためプレーンテキストとして描画する。
 - **1 行表示（3.x）**: ルート要素は 1 行固定。祖先セグメント・区切り `/`・`…` は縮めず、ページ名だけが縮んで文字単位で切り詰められる。幅が足りないときの畳み込みは `.kiro/specs/page-path-truncation/` の design.md（`useFittingCollapseLevel`・`SearchResultPagePath`）に従う。
-- **行レイアウト連携**: `SearchResultMenuItem` の `<li>`（`d-flex`）内で本要素が可変幅を占めるよう `flex-grow: 1; min-width: 0`。footprint（既読数）は縮小しないよう `flex-shrink-0`。
+- **行レイアウト連携**: 本要素は `SearchResultMenuItem` の `<li>`（`d-flex`）の直下に置き、共通 mixin の `flex: 1 1 0; min-width: 0` によって、パスの長さに関係なく行の残りの幅いっぱいになる（`page-path-truncation` の design.md「幅の前提」）。footprint（既読数）は縮小しないよう `flex-shrink-0`。
 - **ツールチップ（4.x）**: ルート要素へ `title={fullPath}` を常時付与する。祖先の畳み込みとページ名の切り詰めは実行時の幅で決まるため、「省略時に必ずフルパスを提示する（4.1）」を最も単純に満たす実装として、常に `title` を付与する（非省略の短いパスでは可視文字列と一致するだけで害はない）。
 - **非破壊（5.x）**: 本要素はパス `<span>` の内部のみを所有し、`<li>` のクリック遷移（`getItemProps`）・footprint 表示には関与しない。
 

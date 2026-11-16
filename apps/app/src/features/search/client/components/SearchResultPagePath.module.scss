@@ -1,7 +1,6 @@
 @use './truncated-path-row' as t;
 
-// Single-line container. `min-width: 0` lets it shrink inside the flex row so
-// the page name's ellipsis can engage instead of overflowing the modal width.
+// Single-line container that takes the free width of the search result row.
 .search-result-page-path {
   @include t.row;
 }

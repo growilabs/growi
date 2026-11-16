@@ -68,12 +68,7 @@ export const SearchResultMenuItem = (props: Props): JSX.Element => {
         >
           <UserPicture user={item.data.creator} />
 
-          {/* Let the path take the remaining width and shrink below its content
-              size; min-width:0 is what actually enables the 1-line ellipsis
-              inside SearchResultPagePath (no Bootstrap min-width-0 utility). */}
-          <span className="ms-3 flex-grow-1" style={{ minWidth: 0 }}>
-            <SearchResultPagePath path={item.data.path} />
-          </span>
+          <SearchResultPagePath path={item.data.path} className="ms-3" />
 
           <span className="text-body-tertiary ms-2 d-flex justify-content-center align-items-center flex-shrink-0">
             <span className="material-symbols-outlined fs-6 p-0">

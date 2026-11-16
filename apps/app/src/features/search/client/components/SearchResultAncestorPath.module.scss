@@ -1,10 +1,9 @@
 @use './truncated-path-row' as t;
 
-// Single-line container for the search-result row's ancestor breadcrumb.
-// `min-width: 0` lets it shrink inside PageListItemL's row (which also carries
-// a checkbox, icon, and "last update" sibling) so the row's overflow safety net
-// clips instead of the row overflowing or wrapping. Ancestor links never shrink
-// (see _truncated-path-row.scss); the page name is rendered on a separate row.
+// Single-line container for the search-result row's ancestor breadcrumb; it
+// takes the free width of PageListItemL's path row. Ancestor links never
+// shrink (see _truncated-path-row.scss); the page name is rendered on a
+// separate row.
 .search-result-ancestor-path {
   @include t.row;
 }
