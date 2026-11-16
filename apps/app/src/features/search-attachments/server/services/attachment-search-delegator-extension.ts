@@ -441,9 +441,17 @@ export class AttachmentSearchDelegatorExtension
 
     // Run deleteByQuery for all target indexes concurrently.
     const results = await Promise.allSettled(
-      targetIndexes.map((indexName) =>
-        deleteAttachmentDocs(this.client, indexName, [attachmentId]),
-      ),
+      targetIndexes.map(async (indexName) => {
+        // Every detach reaches here; skip the round trips on a deployment
+        // where the feature was never enabled and the alias does not exist
+        if (
+          indexName === this.names.alias &&
+          !(await this.client.indices.existsAlias({ name: indexName }))
+        ) {
+          return;
+        }
+        return deleteAttachmentDocs(this.client, indexName, [attachmentId]);
+      }),
     );
 
     for (let i = 0; i < results.length; i++) {

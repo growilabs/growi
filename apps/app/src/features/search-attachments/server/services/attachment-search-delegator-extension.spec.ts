@@ -309,6 +309,33 @@ describe('AttachmentSearchDelegatorExtension', () => {
   // syncAttachmentRemoved
   // ----------------------------------------------------------------
   describe('syncAttachmentRemoved', () => {
+    beforeEach(() => {
+      client.indices.existsAlias.mockResolvedValue(true);
+    });
+
+    it('sends nothing to the alias while it does not exist (the feature was never enabled)', async () => {
+      client.indices.existsAlias.mockResolvedValue(false);
+
+      await ext.syncAttachmentRemoved('att1', ['growi-attachments-alias']);
+
+      expect(client.indices.refresh).not.toHaveBeenCalled();
+      expect(client.deleteByQuery).not.toHaveBeenCalled();
+    });
+
+    it('still deletes from the rebuild index while the alias does not exist', async () => {
+      client.indices.existsAlias.mockResolvedValue(false);
+
+      await ext.syncAttachmentRemoved('att1', [
+        'growi-attachments-alias',
+        'growi-attachments-2',
+      ]);
+
+      expect(client.deleteByQuery).toHaveBeenCalledTimes(1);
+      expect(client.deleteByQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 'growi-attachments-2' }),
+      );
+    });
+
     it('refreshes each index before deleting, so a doc written just before is removed too', async () => {
       const order: string[] = [];
       client.indices.refresh.mockImplementation(({ index } = {}) => {

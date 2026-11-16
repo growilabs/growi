@@ -265,11 +265,11 @@
 
 ## 10. Validation: Integration / Performance tests
 
-- [ ] 10.1 添付アップロード / 削除の E2E 経路を integ test で固定する
-  - 添付アップロード → attach handler → `attachments` index に bulk upsert された文書数が抽出 pages 数と一致すること
-  - ES 文書に `grant` / `granted_users` / `granted_groups` / `creator` が一切含まれないこと (Option D の E2E 固定)
-  - 添付削除 → detach handler → 該当 attachmentId の全文書が削除されること
-  - 機能無効時 (URI 空文字) → attach handler が extractor を一切呼ばず既存挙動と完全一致すること
+- [x] 10.1 添付アップロード / 削除の E2E 経路を integ test で固定する (`attachment-indexing-lifecycle.integ.ts`: 本物の `AttachmentService` と `initAttachmentFullTextSearch`、本物の抽出クライアントを手元の代わりの抽出サービスにつなぎ、本物の ES に書く)
+  - 添付アップロード → attach handler → alias に書かれた文書数が抽出 pages 数と一致すること
+  - ES 文書に `grant` / `granted_users` / `granted_groups` / `creator` が一切含まれないこと (文書の項目が決まった 12 項目だけであることで確かめる)
+  - 添付削除 → detach handler → 該当 attachmentId の全文書が削除されること。機能を無効にした後の削除でも消えること
+  - 機能無効時 (URI 空文字) → 抽出サービスへの要求が 1 件も無く、文書も作られず、添付の保存は通常どおりであること。ページの無い添付も抽出・登録されないこと
   - _Requirements: 2.1, 2.2, 2.5, 3.1, 9.1_
   - _Boundary: integration_
 
@@ -281,46 +281,47 @@
   - _Requirements: 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 9.1, 9.3_
   - _Boundary: integration_
 
-- [ ] 10.3 rebuild window 中の dual-write integ test を追加する
-  - rebuild 実行中に別 runner から `AttachmentService.attach()` / `detach()` を発火させ、live alias と作り直し先の index の両方に doc が存在することを assert
-  - alias swap 後に live alias から当該添付が検索 hit すること
-  - tmp index を中途 delete して bulk がエラーになる stub で、live 側 write が成功し続け real-time event 戻り値が正常であること
-  - `startRebuild()` 後に `rebuildIndex()` が例外 throw しても `isRebuilding=false` に戻り、alias が旧 index を指したままであること (lifecycle leak 耐性)
+- [x] 10.3 rebuild window 中の dual-write integ test を追加する (`attachment-indexing-lifecycle.integ.ts` の「during a rebuild」。走査は代わりの抽出サービスが特定の添付への応答を止めることで途中に留める)
+  - rebuild 実行中に `AttachmentService.createAttachment()` / `removeAttachment()` を発火させ、アップロードは旧 index と作り直し先の両方に入り、削除は両方から消えること。実行中の 2 回目の `startRebuild()` は何も始めず `false` を返すこと
+  - alias swap 後に alias が作り直し先を指し、alias への検索で作り直し中にアップロードした添付がヒットすること。作り直し中に削除した添付は残らないこと
+  - 走査がある添付を抽出している間にその添付が削除されても、swap 後の index に残らないこと
+  - 作り直し先に書き込み禁止 (`index.blocks.write`) を設定して書き込みを失敗させても、アップロードは通常どおり終わり、旧 index (live) 側には書かれていること (作り直し先を消すだけでは、書き込みが同じ名前の index を自動で作るので失敗にならない)
+  - `startRebuild()` に渡したページの作り直しが例外で止まっても `isRebuilding()` が false に戻り、alias が旧 index を指したままで、`AttachmentRebuildingFailed` が送られ、次の作り直しを始められること
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
   - _Boundary: integration_
 
-- [ ] 10.4 (P) extractor / auth / allowlist の fail-close 経路を integ test で固定する
-  - 上流 401 `unauthorized` が `serviceUnreachable` に正規化され、FailureLog 記録 + pino ERROR が出ること
-  - extractorToken 未設定時に抽出呼び出しが一切走らず `isAttachmentFullTextSearchEnabled=false` になること
-  - extractorUri host が metadata IP literal に解決されるケースで request 送信前に `serviceUnreachable` となること
-  - admin PUT で `file://` / metadata IP を指定した URI が 400 `invalid_extractor_uri` になること
+- [x] 10.4 (P) extractor / auth / allowlist の fail-close 経路を integ test で固定する (`attachment-extractor-fail-close.integ.ts`)
+  - 上流 401 `unauthorized` が `serviceUnreachable` に正規化され、`GET /failures` に記録が出て、ERROR のログが出ること。ログに token の値が含まれないこと
+  - extractorToken 未設定時に抽出サービスへの要求が 1 件も無く、`GET /config` の `isAttachmentFullTextSearchEnabled` が false になること
+  - extractorUri の host の名前解決が metadata IP を返すとき、要求を送らずに `serviceUnreachable` になること (名前解決だけを差し替え、URI は手元の代わりの抽出サービスを指す。差し替えない場合は要求が届くことも確かめる)
+  - admin PUT で `file://` / `ftp://` / `data:` / metadata IP (表記ちがいを含む) を指定した URI が 400 `invalid_extractor_uri` になり、RFC1918 と k8s 内部 DNS の URI は受理されること
   - _Requirements: 1.1, 1.3, 1.4, 5.2_
   - _Boundary: integration_
 
-- [ ] 10.5 (P) `requiresReindex` 算出・キャッシュを integ test で固定する
-  - 機能有効化直後 (既存添付 N 件、ES 0 件) で `true`、rebuild 完了直後 (ES N 件) で `false` になること
-  - `PUT config` 成功時に 30 秒 TTL cache が invalidate され次回 GET で再計算されること
-  - 機能無効 / mongoCount===0 の早期 return 経路で ES aggregation を叩かないこと
+- [x] 10.5 (P) `requiresReindex` 算出・キャッシュを integ test で固定する (`attachment-search-admin.exclusive.integ.ts`: 添付の総数を数えるので、コレクションを空にできる exclusive の DB で走らせる。機能の有効化と設定の変更は PUT /config で行う)
+  - 機能有効化直後 (既存添付 N 件、ES 0 件) で `true`、作り直しの完了後に再計算すると (ES N 件) `false` になること
+  - 作り直しの完了直後は 30 秒のキャッシュが前の値 (`true`) を返し、`PUT config` が成功すると次回 GET で再計算されること
+  - 機能無効、または添付が 0 件のときは、alias が無くても `false` になること (ES に問い合わせると alias が無いので `true` になるため、問い合わせていないことが分かる)。添付があって alias が無いときは `true` になること
   - _Requirements: 5.3_
   - _Boundary: integration_
 
-- [ ] 10.6 (P) reextract handler の current grant 再チェックを integ test で固定する
-  - session は editor 権限、Page current grant では viewer 以下 (demote 済み) の状態で `POST /attachments/:id/reextract` が 403 forbidden を返すこと
-  - session / Page current grant ともに editor の状態で 200 + `ExtractionOutcome` 返却
+- [x] 10.6 (P) reextract handler の current grant 再チェックを integ test で固定する (`attachment-reextract.integ.ts` の「who may call it」)
+  - 一度は 200 を返した利用者でも、親ページの権限をその人が閲覧できないものに変えた直後の `POST /attachments/:id/reextract` は 404 `notfound_or_forbidden` になること (Req 7.2。権限が無いことと添付が無いことを区別しない)
+  - 現在の権限で閲覧できる利用者と admin には 200 + 結果の種別 (`kind`) だけを返すこと
   - _Requirements: 7.1, 7.2_
   - _Boundary: integration_
 
-- [ ] 10.7 (P) 添付 index の名前の分離と `require_alias` を integ test で固定する
-  - page index 名の違う 2 つの設定で作成・作り直しを行い、互いの alias と実 index に触れないこと
-  - alias が無い状態で添付を書き込むと失敗し (例外にならずログに残り)、alias と同じ名前の実 index が作られないこと
+- [x] 10.7 (P) 添付 index の名前の分離と `require_alias` を integ test で固定する (`attachment-index-names.integ.ts`)
+  - page index 名の違う 2 つの設定 (一方の名前がもう一方の先頭部分になる組み合わせ) で作成・作り直し・後始末を行い、互いの alias と実 index と文書に触れないこと
+  - alias が無い状態で添付を書き込むと失敗し (例外にならず `require_alias` の失敗としてログに残り)、alias と同じ名前の実 index が作られず、後から alias を作れること。alias が無い状態の削除は何も作らずに終わること
   - _Requirements: 9.2_
   - _Boundary: integration_
 
-- [ ] 10.8 primary / secondary 検索性能とスナップ safety net を perf test で確認する
-  - primary p95 が機能有効時に既存 Page 検索比 +30% 以内 (facet=`all` 1 ページ目 msearch 並列、2 ページ目以降 Page 単体と同等)
-  - secondary p95 が 500ms 以内 (非同期なので初期描画に影響しない)
-  - primary 閾値超過時 facet=`all` が facet=`pages` 相当に degrade、facet=`attachments` が `primaryResultIncomplete: true` を返す safety net
-  - secondary 閾値超過時 enrichment skip で primary のみ返ること
+- [ ] 10.8 primary / secondary 検索性能とスナップ safety net を perf test で確認する (`attachment-search-performance.integ.ts`: 手で走らせる測定。`ATTACHMENT_SEARCH_PERF=1` のときだけ動き、CI では飛ばす。測定値は research.md 8.7)
+  - primary p95 が機能有効時に既存 Page 検索比 +30% 以内 (facet=`all` 1 ページ目 msearch 並列、2 ページ目以降 Page 単体と同等) — **未達**。2 ページ目以降は同等だが、1 ページ目は手元の測定で +43〜82% (research.md 8.7)
+  - secondary p95 が 500ms 以内 (非同期なので初期描画に影響しない) — 手元の測定で 29〜56ms
+  - primary 閾値超過時 facet=`all` が facet=`pages` 相当に degrade、facet=`attachments` が `primaryResultIncomplete: true` を返す safety net (`attachment-search-result-aggregator.spec.ts` で固定済み)
+  - secondary 閾値超過時 enrichment skip で primary のみ返ること (`attachment-search-result-aggregator.spec.ts` で固定済み)
   - _Requirements: 9.1, 9.2_
   - _Boundary: performance_
 

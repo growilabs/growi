@@ -163,17 +163,11 @@ const MAX_FILE_SIZE_BYTES_MAX = 500 * 1024 * 1024;
 const EXTRACTOR_TOKEN_MAX_LENGTH = 1024;
 
 const putConfigValidator = [
+  // The URI itself is checked in the handler, which answers invalid_extractor_uri
   body('extractorUri')
     .optional({ nullable: true })
-    .custom((value) => {
-      // null / empty string → soft-disable (allowed)
-      if (value == null || value === '') return true;
-      const result = validateExtractorUri(value);
-      if (!result.ok) {
-        throw new Error(result.reason);
-      }
-      return true;
-    }),
+    .isString()
+    .withMessage('extractorUri must be a string or null'),
   body('extractorToken')
     .optional({ nullable: true })
     .isString()
@@ -302,7 +296,6 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
             maxFileSizeBytes?: number;
           };
 
-        // Validate URI explicitly (covers non-empty strings bypassed by express-validator custom)
         if (extractorUri != null && extractorUri !== '') {
           const uriResult = validateExtractorUri(extractorUri);
           if (!uriResult.ok) {

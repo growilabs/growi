@@ -426,8 +426,8 @@ sequenceDiagram
 **Editor 権限判定の current grant 再チェック**: 「page editor」判定は middleware pipeline ではなく **handler 内でリクエスト時点の page_index (or Page collection) を参照して都度判定** する。session cache や middleware で事前解決した `isPageEditor` フラグは使わない (権限失効後の古い判定が残る可能性があるため)。具体的には:
 1. attachment から `pageId` を取得
 2. 親 Page の `grant` / `grantedUsers` / `grantedGroups` / `creator` を参照
-3. `viewer` が現在の権限モデルで edit 可能かを `filterPagesByViewer` と同等の判定ロジックで評価
-4. 不可なら 403 forbidden
+3. `viewer` が admin か、現在の権限でそのページを閲覧できるか (`Page.isAccessiblePageByViewer`) を評価
+4. 不可なら、添付やページが無いときと区別のつかない 404 `notfound_or_forbidden` を返す (Req 7.2)
 
 これにより、権限 demote された editor が session 残存を利用して不正 reextract するシナリオを防ぐ。
 
@@ -622,7 +622,7 @@ export interface AttachmentTextExtractorService {
 - `isFeatureEnabled()` チェック → ON 時のみ抽出呼び出し、OFF 時は早期 return。判定式は `searchService.isConfigured && extractorUri != null && extractorUri !== '' && extractorToken != null && extractorToken !== ''` (独立した `enabled` Config キーは持たず算出値。token 未設定時も機能無効として扱い、Bearer auth を構造的に強制)
 - 成功時: ES `{page}-attachments-alias` (live alias) に bulk upsert (1 添付 = N 文書)。**権限フィールドは一切書き込まない** (Option D)
 - 失敗時 (unsupported / tooLarge / timeout / busy / unreachable / failed): metadata-only 1 文書 + FailureLog 永続化
-- `onDetach(attachmentId)` で `attachmentId` キーの全文書削除
+- `onDetach(attachmentId)` で `attachmentId` キーの全文書削除。機能が無効でも削除する (再び有効にしたときに文書が戻らないように)。ただし alias がまだ無い (機能を一度も有効にしていない) ときは、alias 宛ての refresh と削除を送らない。作り直し中の作り直し先への削除は alias の有無に関係なく行う
 - **rebuild window 中の dual-write**: `reindexBatch.isRebuilding()` が true の間、`onAttach`/`onDetach` は live alias と作り直し先の index (`reindexBatch.getTmpIndexName()` が返す名前) の**両方**に書き込む。live 側が真の source、tmp 側は alias swap 後の continuity 担保のための補助書き込み。tmp 側 write 失敗は live 側の成功を阻害せず pino 記録のみ
 - **親 Page 削除の real-time cascade は行わない** (`onPageDeleted` は本 contract に含めない)。親 Page 不在添付は query-time permission 判定でヒットから除外され、eventual cleanup は `AttachmentOrphanSweeper` が rebuildIndex 時に担う
 
@@ -1289,8 +1289,8 @@ interface IAttachmentHit {
   - `_shards.failed > 0` の応答では添付ヒットが全件除外されること
   - `searchAccessiblePages` が throw した場合に添付ヒットが全件除外されること
 - reextract current grant 再チェック:
-  - session は editor 権限、しかし Page current grant では viewer 以下 (demote 済み) の状態で reextract 呼び出し → 403 forbidden
-  - session / Page current grant ともに editor → 200 + `ExtractionOutcome` 返却
+  - 一度は 200 を返した利用者でも、親ページの権限をその人が閲覧できないものに変えた後の呼び出しは 404 `notfound_or_forbidden` になること
+  - 現在の権限で閲覧できる利用者と admin には 200 + 結果の種別 (`kind`) だけを返すこと
 
 ### Integration Tests
 
@@ -1303,9 +1303,9 @@ interface IAttachmentHit {
 - `PUT /search/indices { includeAttachments: true }` → 作り直しの完了前に 200 が返る → 裏で Page の作り直し → alias が指していない方の実 index 生成 → orphan sweeper 実行 → `{page}-attachments-alias` swap → `FinishAddAttachment` を受信
 - 作り直しの実行中に 2 回目の `PUT /search/indices { includeAttachments: true }` → 409 `rebuild_in_progress`
 - **rebuild window 中の dual-write**: rebuild 実行中に別テスト runner から `AttachmentService.attach()` / `detach()` を発火させ、live alias と作り直し先の両方に doc が存在することを assert。alias swap 後も live alias から当該添付が検索 hit することを E2E 検証
-- **rebuild window 中の dual-write 失敗耐性**: tmp index を中途で delete して bulk がエラーになる状況を stub で作り、live 側の書き込みが成功し続け、real-time event の成功戻り値が返ることを assert
+- **rebuild window 中の dual-write 失敗耐性**: 作り直し先の index に書き込み禁止 (`index.blocks.write`) を設定して書き込みがエラーになる状況を作り (消すだけでは、書き込みが同じ名前の index を自動で作り直すのでエラーにならない)、live 側の書き込みが成功し続け、real-time event の成功戻り値が返ることを assert
 - **作り直し失敗時の後始末**: Page 側の `rebuildIndex()` が例外を throw したとき、`AttachmentRebuildingFailed` を受信し、`isRebuilding=false` に戻り、`{page}-attachments-alias` は旧 index を指したままであること
-- `POST /attachments/:id/reextract` → ES 文書が更新される / 権限なしで 403 / 機能無効で 503
+- `POST /attachments/:id/reextract` → ES 文書が更新される / 権限なしで 404 `notfound_or_forbidden` / 機能無効で 503
 - 機能無効化 → 添付 handler が一切抽出呼び出しを行わない
 - `GET /admin/attachment-search/failures` → 記録済みエントリが返る
 
