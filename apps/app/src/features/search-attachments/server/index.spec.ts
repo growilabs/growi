@@ -56,7 +56,13 @@ const makeCrowi = () => {
   };
   const attachHandlers: AttachHandler[] = [];
   let aggregator: AttachmentSearchResultAggregator | undefined;
-  const fullTextSearchDelegator = mock<ElasticsearchDelegator>();
+  const fullTextSearchDelegator = mock<ElasticsearchDelegator>({
+    getConnectionInfo: () => ({
+      host: undefined,
+      auth: undefined,
+      indexName: 'tenant-a',
+    }),
+  });
   // The feature reads the delegator's private client at runtime
   Object.defineProperty(fullTextSearchDelegator, 'client', { value: esClient });
   // Only the services the feature wires itself into
@@ -124,17 +130,27 @@ describe('initAttachmentFullTextSearch', () => {
     expect(addDetachHandler).not.toHaveBeenCalled();
   });
 
-  it('creates the attachment index behind its alias, even while the feature is disabled', async () => {
+  it('does not create any attachment index while the feature is disabled', async () => {
+    const { crowi, esClient } = makeCrowi();
+
+    await initAttachmentFullTextSearch(crowi);
+
+    expect(esClient.indices.create).not.toHaveBeenCalled();
+    expect(esClient.indices.putAlias).not.toHaveBeenCalled();
+  });
+
+  it('creates the attachment index behind its alias, named after the page index, when the feature is enabled', async () => {
+    enableInConfig();
     const { crowi, esClient } = makeCrowi();
 
     await initAttachmentFullTextSearch(crowi);
 
     expect(esClient.indices.create).toHaveBeenCalledWith(
-      expect.objectContaining({ index: 'attachments-1' }),
+      expect.objectContaining({ index: 'tenant-a-attachments-1' }),
     );
     expect(esClient.indices.putAlias).toHaveBeenCalledWith({
-      name: 'attachments-alias',
-      index: 'attachments-1',
+      name: 'tenant-a-attachments-alias',
+      index: 'tenant-a-attachments-1',
     });
   });
 
@@ -152,7 +168,13 @@ describe('initAttachmentFullTextSearch', () => {
 
       expect(esClient.bulk).toHaveBeenCalledWith({
         operations: expect.arrayContaining([
-          { index: { _index: 'attachments-alias', _id: 'att-1_1' } },
+          {
+            index: {
+              _index: 'tenant-a-attachments-alias',
+              _id: 'att-1_1',
+              require_alias: true,
+            },
+          },
         ]),
       });
     });
@@ -188,7 +210,7 @@ describe('initAttachmentFullTextSearch', () => {
       );
 
       expect(esClient.search).toHaveBeenCalledWith(
-        expect.objectContaining({ index: 'attachments-alias' }),
+        expect.objectContaining({ index: 'tenant-a-attachments-alias' }),
       );
     });
   });

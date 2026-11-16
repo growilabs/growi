@@ -27,7 +27,10 @@ import {
 import { listRegisteredRoutes } from '~/test-utils/express-route-walker';
 import { prisma } from '~/utils/prisma';
 
-import { AttachmentSearchDelegatorExtension } from '../services/attachment-search-delegator-extension';
+import {
+  AttachmentSearchDelegatorExtension,
+  attachmentIndexNames,
+} from '../services/attachment-search-delegator-extension';
 import type { AttachmentSearchIndexerInterface } from '../services/attachment-search-indexer';
 import { MAX_ROUNDS } from '../services/collect-visible-attachment-hits';
 import { createAttachmentSearchResultAggregator } from '../services/create-attachment-search-result-aggregator';
@@ -52,7 +55,8 @@ const RUN =
   );
 const TOKEN = `zzattroute${RUN}`;
 const PAGE_INDEX = `fix_attroute_pages_${RUN}`;
-const ATTACHMENT_INDEX = `fix_attroute_attachments_${RUN}`;
+const ATTACHMENT_NAMES = attachmentIndexNames(PAGE_INDEX);
+const ATTACHMENT_INDEX = ATTACHMENT_NAMES.alias;
 const USER_HEADER = 'x-attachment-search-routes-test-user';
 
 const PAGE_KINDS = ['public', 'restricted', 'owner'] as const;
@@ -186,8 +190,11 @@ describe.skipIf(esUri == null)(
         index: PAGE_INDEX,
         name: delegator.aliasName,
       });
-      const attachmentExt = new AttachmentSearchDelegatorExtension(esClient);
-      await attachmentExt.createAttachmentIndex(ATTACHMENT_INDEX);
+      const attachmentExt = new AttachmentSearchDelegatorExtension(
+        esClient,
+        ATTACHMENT_NAMES,
+      );
+      await attachmentExt.ensureAttachmentIndex();
 
       const searchService = SearchServiceForTest.forDelegator(crowi, delegator);
       searchService.setAttachmentSearchResultAggregator(
@@ -309,8 +316,8 @@ describe.skipIf(esUri == null)(
     afterAll(async () => {
       vi.restoreAllMocks();
       crowi.attachmentSearchIndexer = undefined;
-      for (const index of [PAGE_INDEX, ATTACHMENT_INDEX]) {
-        // biome-ignore lint/performance/noAwaitInLoops: two indices
+      for (const index of [PAGE_INDEX, ...ATTACHMENT_NAMES.indices]) {
+        // biome-ignore lint/performance/noAwaitInLoops: a few indices
         await fetch(`${esHost}/${index}`, { method: 'DELETE' });
       }
       await AccessToken.deleteAllTokensByUserId(users.creator._id);

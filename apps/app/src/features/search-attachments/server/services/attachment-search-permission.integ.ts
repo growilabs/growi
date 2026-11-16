@@ -22,7 +22,10 @@ import {
 } from '~/server/service/search-delegator/elasticsearch.testing';
 import { prisma } from '~/utils/prisma';
 
-import { AttachmentSearchDelegatorExtension } from './attachment-search-delegator-extension';
+import {
+  AttachmentSearchDelegatorExtension,
+  attachmentIndexNames,
+} from './attachment-search-delegator-extension';
 import { createAttachmentSearchResultAggregator } from './create-attachment-search-result-aggregator';
 import { resolveAttachmentSearchViewer } from './resolve-attachment-search-viewer';
 
@@ -54,7 +57,8 @@ const OP_TOKEN = `zzoperator${RUN}`;
 const DRIFT_TOKEN = `zzdrift${RUN}`;
 const TAG_A = `attperm-tag-${RUN}`;
 const PAGE_INDEX = `fix_attperm_pages_${RUN}`;
-const ATTACHMENT_INDEX = `fix_attperm_attachments_${RUN}`;
+const ATTACHMENT_NAMES = attachmentIndexNames(PAGE_INDEX);
+const ATTACHMENT_INDEX = ATTACHMENT_NAMES.alias;
 
 const PAGE_KINDS = [
   'public',
@@ -319,8 +323,11 @@ describe.skipIf(esUri == null)(
         name: delegator.aliasName,
       });
 
-      attachmentExt = new AttachmentSearchDelegatorExtension(esClient);
-      await attachmentExt.createAttachmentIndex(ATTACHMENT_INDEX);
+      attachmentExt = new AttachmentSearchDelegatorExtension(
+        esClient,
+        ATTACHMENT_NAMES,
+      );
+      await attachmentExt.ensureAttachmentIndex();
 
       searchService = SearchServiceForTest.forDelegator(crowi, delegator);
       searchService.setAttachmentSearchResultAggregator(
@@ -520,8 +527,8 @@ describe.skipIf(esUri == null)(
 
     afterAll(async () => {
       vi.restoreAllMocks();
-      for (const index of [PAGE_INDEX, ATTACHMENT_INDEX]) {
-        // biome-ignore lint/performance/noAwaitInLoops: two indices
+      for (const index of [PAGE_INDEX, ...ATTACHMENT_NAMES.indices]) {
+        // biome-ignore lint/performance/noAwaitInLoops: a few indices
         await fetch(`${esHost}/${index}`, { method: 'DELETE' });
       }
       const Page = mongoose.model<PageDocument, PageModel>('Page');

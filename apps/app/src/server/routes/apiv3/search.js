@@ -236,6 +236,12 @@ export const setup = (crowi) => {
    *                    * `normalize` - Normalize indices
    *                    * `rebuild` - Rebuild indices
    *                  enum: [normalize, rebuild]
+   *                includeAttachments:
+   *                  type: boolean
+   *                  description: >
+   *                    With `rebuild`, also rebuild the attachment full-text index after the pages.
+   *                    The response does not wait for completion; progress and the result are
+   *                    sent over Socket.io (`finishAddAttachment` / `attachmentRebuildingFailed`).
    *      responses:
    *        200:
    *          description: Return 200
@@ -246,6 +252,13 @@ export const setup = (crowi) => {
    *                  message:
    *                    type: string
    *                    description: Operation is successfully processed, or requested
+   *        409:
+   *          description: >
+   *            `rebuild_in_progress` — a rebuild with `includeAttachments` is already running
+   *        503:
+   *          description: >
+   *            The search service is unavailable, or `feature_disabled` — `includeAttachments`
+   *            was requested while attachment full-text search is disabled
    */
   router.put(
     '/indices',

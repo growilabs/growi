@@ -18,7 +18,6 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 import { body, query } from 'express-validator';
 
-import { ATTACHMENT_INDEX_NAMES } from '~/features/search-attachments/server/services/attachment-search-delegator-extension';
 import { ExtractionFailureLogService } from '~/features/search-attachments/server/services/extraction-failure-log-service';
 import { indexableAttachments } from '~/features/search-attachments/server/services/indexable-attachments';
 import { isAttachmentFullTextSearchEnabled } from '~/features/search-attachments/server/services/is-attachment-full-text-search-enabled';
@@ -95,10 +94,15 @@ export const computeRequiresReindex = async (
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const delegator: any = crowi.searchService?.fullTextSearchDelegator;
         const esClient = delegator?.client;
+        const aliasName = crowi.attachmentIndexOperations?.aliasName;
 
-        if (esClient != null && typeof esClient.search === 'function') {
+        if (
+          esClient != null &&
+          aliasName != null &&
+          typeof esClient.search === 'function'
+        ) {
           const result = await esClient.search({
-            index: ATTACHMENT_INDEX_NAMES.alias,
+            index: aliasName,
             body: {
               size: 0,
               aggs: {
@@ -335,6 +339,19 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
 
         // Invalidate requiresReindex cache so next GET recomputes
         invalidateRequiresReindexCache();
+
+        // Enabling at runtime needs the index without a restart
+        if (
+          isAttachmentFullTextSearchEnabled(
+            crowi.searchService?.isConfigured === true,
+          )
+        ) {
+          try {
+            await crowi.attachmentIndexOperations?.ensureAttachmentIndex();
+          } catch (err) {
+            logger.error({ err }, 'Failed to create the attachment index');
+          }
+        }
 
         return res.apiv3({});
       } catch (err) {

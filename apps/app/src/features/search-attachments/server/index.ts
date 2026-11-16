@@ -4,13 +4,14 @@ import loggerFactory from '~/utils/logger';
 import { createAttachmentOrphanSweeper } from './services/attachment-orphan-sweeper';
 import { AttachmentReindexBatch } from './services/attachment-reindex-batch';
 import {
-  ATTACHMENT_INDEX_NAMES,
   AttachmentSearchDelegatorExtension,
+  attachmentIndexNames,
 } from './services/attachment-search-delegator-extension';
 import { AttachmentSearchIndexer } from './services/attachment-search-indexer';
 import { AttachmentTextExtractorService } from './services/attachment-text-extractor';
 import { createAttachmentSearchResultAggregator } from './services/create-attachment-search-result-aggregator';
 import { ExtractionFailureLogService } from './services/extraction-failure-log-service';
+import { isAttachmentFullTextSearchEnabled } from './services/is-attachment-full-text-search-enabled';
 
 const logger = loggerFactory('growi:features:search-attachments:init');
 
@@ -52,14 +53,20 @@ export async function initAttachmentFullTextSearch(
   // biome-ignore lint/suspicious/noExplicitAny: delegator.client is private; runtime access is intentional
   const esClient: any = (searchService.fullTextSearchDelegator as any)?.client;
 
-  const delegatorExt = new AttachmentSearchDelegatorExtension(esClient);
+  const delegatorExt = new AttachmentSearchDelegatorExtension(
+    esClient,
+    attachmentIndexNames(
+      searchService.fullTextSearchDelegator.getConnectionInfo().indexName,
+    ),
+  );
 
-  // Created even while the feature is disabled, so enabling it later needs
-  // no restart; mirrors the page index normalization at startup.
-  try {
-    await delegatorExt.ensureAttachmentIndex();
-  } catch (err) {
-    logger.error({ err }, 'Failed to create the attachment index');
+  // Enabling the feature later creates it from the admin config route
+  if (isAttachmentFullTextSearchEnabled(true)) {
+    try {
+      await delegatorExt.ensureAttachmentIndex();
+    } catch (err) {
+      logger.error({ err }, 'Failed to create the attachment index');
+    }
   }
 
   // ----------------------------------------------------------------
@@ -119,6 +126,7 @@ export async function initAttachmentFullTextSearch(
   // ----------------------------------------------------------------
   crowi.attachmentSearchIndexer = indexer;
   crowi.attachmentReindexBatch = reindexBatch;
+  crowi.attachmentIndexOperations = delegatorExt;
 
   // ----------------------------------------------------------------
   // Build and inject AttachmentSearchResultAggregator into SearchService
@@ -126,7 +134,7 @@ export async function initAttachmentFullTextSearch(
   const aggregator = createAttachmentSearchResultAggregator({
     searchService,
     esClient,
-    attachmentIndexName: ATTACHMENT_INDEX_NAMES.alias,
+    attachmentIndexName: delegatorExt.aliasName,
   });
 
   searchService.setAttachmentSearchResultAggregator(aggregator);

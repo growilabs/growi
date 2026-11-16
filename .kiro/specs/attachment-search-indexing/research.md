@@ -190,11 +190,17 @@ umbrella gap analysis 時点では「親ページ権限変更のイベントフ�
   - Page 側の作り直しは関数として受け取り、batch から `SearchService` への依存を作らない
   - alias swap は Page と添付で別々に行う。以前の設計は両 index の同時 swap を描いていたが、Page 側は既存の `rebuildIndex()` の中で swap が完結しており、同時にするには既存コードを分解する必要がある。2 つの swap の間も、添付ヒットの権限は検索時に page_index から引くため漏洩は起きない
   - 二重起動のときは `startRebuild()` が例外を投げずに `false` を返す。route はそれを見て 409 にするだけで、例外クラスを route と batch で共有しなくて済む
-- 実 index の名前 (2026-11): alias `attachments-alias` の裏に実 index `attachments-1` / `attachments-2` を置き、作り直しのたびに alias が指していない方を埋めて付け替える
+- 実 index の名前 (2026-11): alias `{page}-attachments-alias` の裏に実 index `{page}-attachments-1` / `{page}-attachments-2` を置き、作り直しのたびに alias が指していない方を埋めて付け替える。`{page}` は page index 名 (Elasticsearch URI のパス)
   - 以前の設計は「固定名 `attachments-tmp` に作って alias `attachments` を付け替える」だった。付け替えた後は `attachments-tmp` が本番になるので、次の作り直しが最初に行う「`attachments-tmp` を drop」で本番を消してしまう。また alias と同じ名前の実 index は作れないので、alias `attachments` の裏の最初の実 index に置ける名前も無かった
   - Page 側の `rebuildIndex()` (tmp に複製 → alias を tmp へ → 本体を消して作り直す → alias を戻す) をそのまま真似ない理由: 途中で止まると、起動時の normalize が tmp (旧データの複製) を消し、作りかけの本体に alias を戻す。Req 6.4 (中断しても旧 index を保つ) を満たせない。添付の作り直しは抽出を伴い何時間もかかりうるので、途中で止まる可能性を無視できない
   - 同じ理由で、余った実 index は起動時に消さず、次の作り直しの先頭で消す。消すのは常に「alias が指していない方」だけにする
-  - alias 名を `attachments` にしなかったのは、Page (`<index>-alias`) と監査ログ (`auditlogs-alias`) の命名に揃えるためと、以前の実装で Elasticsearch が自動作成した実 index `attachments` が開発環境に残っていても名前がぶつからないようにするため
+  - 名前を page index 名から導くのは、1 つの Elasticsearch を複数の GROWI (GROWI.cloud のテナントなど) で共有するため。Page の index は URI のパスで名前を分けており、添付だけ固定名だと、あるテナントの作り直しが別のテナントの添付 index を消してしまう
+  - alias 名を `attachments` にしなかったのは、Page (`<index>-alias`) の命名に揃えるためと、以前の実装で Elasticsearch が自動作成した実 index `attachments` が開発環境に残っていても名前がぶつからないようにするため
+  - alias を通す書き込みに `require_alias: true` を付けるのは、alias が無いときの書き込みで Elasticsearch が alias と同じ名前の実 index を自動作成し、以後 alias を張れなくなるのを防ぐため。そのおかげで index の作成を「機能が有効なとき」(起動時と、管理画面で有効にしたとき) に限れる。作成前の書き込みは失敗としてログに残るだけで、次の作り直しで取り込まれる
+- 残っている制約 (2026-11 時点、いずれも作り直しを止めるほどではないと判断):
+  - 実行中フラグはプロセスごとのメモリにある。アプリを複数インスタンスで動かすと、別インスタンスへの 2 回目の要求は 409 にならず作り直しが二重に走る。作り直し中に別インスタンスが受けた添付の書き込みは旧 index にだけ入り、alias を付け替えた時点で検索に出なくなる (次の作り直しで戻る)。監査ログの作り直しも同じ前提 (1 インスタンスで実行する)
+  - 作り直しがある添付の抽出をしている最中にその添付が削除されると、削除は live と作り直し先の両方に効くが、その後に作り直しが抽出結果を作り直し先へ書き込むため、削除済みの添付の文書が新しい index に戻ってくる。orphan sweep は親ページの有無しか見ないので消えない。次の作り直しで消える
+  - 添付を含む作り直しの実行中に、添付を含まない (`includeAttachments=false`) 作り直しを要求すると、ページの作り直しが 2 本同時に走る。ページの作り直しにはもともと二重起動の判定が無い (本 spec より前からの挙動)
 
 ## 9. 抽出サービスへ送る内容 (2026-11)
 

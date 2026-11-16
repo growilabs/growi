@@ -32,10 +32,16 @@ export type AttachmentIndexNames = {
   readonly indices: readonly [string, string];
 };
 
-export const ATTACHMENT_INDEX_NAMES: AttachmentIndexNames = {
-  alias: 'attachments-alias',
-  indices: ['attachments-1', 'attachments-2'],
-};
+/**
+ * Derived from the page index name, which comes from the Elasticsearch URI
+ * path, so GROWI apps sharing one Elasticsearch do not collide.
+ */
+export const attachmentIndexNames = (
+  pageIndexName: string,
+): AttachmentIndexNames => ({
+  alias: `${pageIndexName}-attachments-alias`,
+  indices: [`${pageIndexName}-attachments-1`, `${pageIndexName}-attachments-2`],
+});
 
 /** Options accepted by `searchAttachmentsBody` and `searchAttachmentsByPageIdsBody`. */
 export type SearchOptions = {
@@ -72,6 +78,8 @@ export const MAX_PAGE_IDS_FOR_SECONDARY = DEFAULT_SIZE;
 
 /** Interface that the delegator extension exposes to higher-level services. */
 export interface AttachmentIndexOperations {
+  /** Every read and live write goes through this alias. */
+  readonly aliasName: string;
   /** Creates the first index behind the alias unless the alias already exists. */
   ensureAttachmentIndex(): Promise<void>;
   /** Creates a fresh index the alias does not point to, and returns its name. */
@@ -212,10 +220,14 @@ export class AttachmentSearchDelegatorExtension
 
   constructor(
     client: ElasticsearchClientDelegator,
-    names: AttachmentIndexNames = ATTACHMENT_INDEX_NAMES,
+    names: AttachmentIndexNames,
   ) {
     this.client = client;
     this.names = names;
+  }
+
+  get aliasName(): string {
+    return this.names.alias;
   }
 
   // ----------------------------------------------------------------
@@ -344,7 +356,14 @@ export class AttachmentSearchDelegatorExtension
         const docId = buildDocId(attachmentId, doc.pageNumber);
 
         // Index (upsert) action header
-        operations.push({ index: { _index: indexName, _id: docId } });
+        operations.push({
+          index: {
+            _index: indexName,
+            _id: docId,
+            // Never let a write auto-create a concrete index named like the alias
+            ...(indexName === this.names.alias ? { require_alias: true } : {}),
+          },
+        });
 
         // Document body — NO permission fields
         operations.push({
@@ -378,23 +397,15 @@ export class AttachmentSearchDelegatorExtension
       throw new Error('Unsupported Elasticsearch version');
     }
 
+    // Rejected so callers handle it like any other ES failure
     if (response.errors) {
       const failedItems = (response.items ?? []).filter(
         (item) => item.index?.error != null,
       );
-      logger.error(
-        { attachmentId, pageId, failedItems },
-        'syncAttachmentIndexed: bulk write reported errors',
-      );
-    } else {
-      logger.debug(
-        {
-          attachmentId,
-          pageId,
-          docCount: docs.length,
-          indexCount: targetIndexes.length,
-        },
-        'syncAttachmentIndexed: bulk write succeeded',
+      throw new Error(
+        `Bulk write of attachment ${attachmentId} (page ${pageId}) failed: ${JSON.stringify(
+          failedItems.map((item) => item.index?.error),
+        )}`,
       );
     }
   }

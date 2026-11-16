@@ -80,6 +80,7 @@ function makeExtractor(
 
 function makeDelegator(): AttachmentIndexOperations {
   return {
+    aliasName: 'attachments-alias',
     syncAttachmentIndexed: vi.fn().mockResolvedValue(undefined),
     syncAttachmentRemoved: vi.fn().mockResolvedValue(undefined),
     searchAttachmentsBody: vi.fn(),

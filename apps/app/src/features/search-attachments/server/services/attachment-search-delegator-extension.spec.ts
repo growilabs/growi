@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IAttachmentEsDoc } from '~/features/search-attachments/interfaces/attachment-search';
 
 import { mappings as es8Mappings } from '../mappings/attachments-mappings-es8';
-import { AttachmentSearchDelegatorExtension } from './attachment-search-delegator-extension';
+import {
+  AttachmentSearchDelegatorExtension,
+  attachmentIndexNames,
+} from './attachment-search-delegator-extension';
 
 // Minimal mock of an ES8 client delegator
 function makeClientMock() {
@@ -118,8 +121,11 @@ describe('AttachmentSearchDelegatorExtension', () => {
 
   beforeEach(() => {
     client = makeClientMock();
-    // biome-ignore lint/suspicious/noExplicitAny: test mock uses a partial client shape
-    ext = new AttachmentSearchDelegatorExtension(client as any);
+    ext = new AttachmentSearchDelegatorExtension(
+      // biome-ignore lint/suspicious/noExplicitAny: test mock uses a partial client shape
+      client as any,
+      attachmentIndexNames('growi'),
+    );
   });
 
   // ----------------------------------------------------------------
@@ -137,7 +143,59 @@ describe('AttachmentSearchDelegatorExtension', () => {
   // ----------------------------------------------------------------
   // syncAttachmentIndexed
   // ----------------------------------------------------------------
+  describe('attachmentIndexNames', () => {
+    it('derives every attachment index name from the page index name', () => {
+      expect(attachmentIndexNames('tenant-a')).toEqual({
+        alias: 'tenant-a-attachments-alias',
+        indices: ['tenant-a-attachments-1', 'tenant-a-attachments-2'],
+      });
+    });
+
+    it('exposes the alias that reads and live writes go through', () => {
+      expect(ext.aliasName).toBe('growi-attachments-alias');
+    });
+  });
+
   describe('syncAttachmentIndexed', () => {
+    it('requires the alias to exist for writes through the alias only', async () => {
+      await ext.syncAttachmentIndexed(
+        'att1',
+        'page1',
+        [SAMPLE_DOC],
+        ['growi-attachments-alias', 'growi-attachments-2'],
+      );
+
+      // biome-ignore lint/suspicious/noExplicitAny: accessing mock arg properties
+      const { operations } = client.bulk.mock.calls[0][0] as any;
+      expect(operations[0]).toEqual({
+        index: {
+          _index: 'growi-attachments-alias',
+          _id: 'att1_1',
+          require_alias: true,
+        },
+      });
+      expect(operations[2]).toEqual({
+        index: { _index: 'growi-attachments-2', _id: 'att1_1' },
+      });
+    });
+
+    it('rejects when Elasticsearch reports failed items', async () => {
+      client.bulk.mockResolvedValueOnce({
+        errors: true,
+        items: [{ index: { error: { type: 'index_not_found_exception' } } }],
+        took: 1,
+      });
+
+      await expect(
+        ext.syncAttachmentIndexed(
+          'att1',
+          'page1',
+          [SAMPLE_DOC],
+          ['growi-attachments-alias'],
+        ),
+      ).rejects.toThrow();
+    });
+
     it('calls bulk with operations for each doc × each target index', async () => {
       const docs = [SAMPLE_DOC];
       await ext.syncAttachmentIndexed('att1', 'page1', docs, [

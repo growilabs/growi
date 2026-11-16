@@ -79,6 +79,7 @@ function buildCrowiWithEsClient(esClient: unknown) {
     searchService: {
       fullTextSearchDelegator: { client: esClient },
     },
+    attachmentIndexOperations: { aliasName: 'tenant-a-attachments-alias' },
   };
 }
 
@@ -290,7 +291,7 @@ describe('attachment-search-admin', () => {
       expect(result).toBe(true);
       expect(esClient.search).toHaveBeenCalledWith(
         expect.objectContaining({
-          index: 'attachments-alias',
+          index: 'tenant-a-attachments-alias',
         }),
       );
     });
@@ -451,7 +452,10 @@ vi.mock('~/server/middlewares/access-token-parser', () => ({
  * Builds a minimal express app that wraps the admin router under /admin/attachment-search.
  * `isAdmin` controls whether the adminRequired middleware allows the request.
  */
-function buildTestApp(isAdmin: boolean) {
+function buildTestApp(
+  isAdmin: boolean,
+  ensureAttachmentIndex: () => Promise<void> = vi.fn(),
+) {
   const app = express();
   app.use(express.json());
 
@@ -486,7 +490,8 @@ function buildTestApp(isAdmin: boolean) {
 
   // Create a minimal Crowi stub
   const crowiStub = {
-    searchService: { fullTextSearchDelegator: null },
+    searchService: { fullTextSearchDelegator: null, isConfigured: true },
+    attachmentIndexOperations: { ensureAttachmentIndex },
   };
 
   const router = attachmentSearchAdminFactory(crowiStub as never);
@@ -684,5 +689,59 @@ describe('PUT /config validation', () => {
     expect(storedUpdates()).toEqual({
       'app:attachmentFullTextSearch:extractorToken': undefined,
     });
+  });
+});
+
+describe('PUT /config — attachment index creation', () => {
+  const setEnabled = (enabled: boolean) =>
+    vi.mocked(configManager.getConfig).mockImplementation(((key: string) => {
+      if (key === 'app:attachmentFullTextSearch:extractorUri')
+        return enabled ? 'http://extractor:8000' : undefined;
+      if (key === 'app:attachmentFullTextSearch:extractorToken')
+        return enabled ? 'token' : undefined;
+      return undefined;
+    }) as never);
+
+  beforeEach(() => {
+    vi.mocked(configManager.updateConfigs).mockReset();
+    vi.mocked(configManager.updateConfigs).mockResolvedValue(undefined);
+  });
+
+  it('creates the attachment index when the feature is enabled after the update', async () => {
+    setEnabled(true);
+    const ensureAttachmentIndex = vi.fn().mockResolvedValue(undefined);
+
+    const res = await supertest(buildTestApp(true, ensureAttachmentIndex))
+      .put('/admin/attachment-search/config')
+      .send({ extractorUri: 'http://extractor:8000', extractorToken: 'token' });
+
+    expect(res.status).toBe(200);
+    expect(ensureAttachmentIndex).toHaveBeenCalledOnce();
+  });
+
+  it('does not create the attachment index while the feature stays disabled', async () => {
+    setEnabled(false);
+    const ensureAttachmentIndex = vi.fn().mockResolvedValue(undefined);
+
+    const res = await supertest(buildTestApp(true, ensureAttachmentIndex))
+      .put('/admin/attachment-search/config')
+      .send({ timeoutMs: 30000 });
+
+    expect(res.status).toBe(200);
+    expect(ensureAttachmentIndex).not.toHaveBeenCalled();
+  });
+
+  it('still saves the config when the index cannot be created', async () => {
+    setEnabled(true);
+    const ensureAttachmentIndex = vi
+      .fn()
+      .mockRejectedValue(new Error('ES is down'));
+
+    const res = await supertest(buildTestApp(true, ensureAttachmentIndex))
+      .put('/admin/attachment-search/config')
+      .send({ extractorUri: 'http://extractor:8000', extractorToken: 'token' });
+
+    expect(res.status).toBe(200);
+    expect(configManager.updateConfigs).toHaveBeenCalledOnce();
   });
 });

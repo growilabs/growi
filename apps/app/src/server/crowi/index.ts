@@ -24,6 +24,7 @@ import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
 import { initAttachmentFullTextSearch } from '~/features/search-attachments/server';
 import type { AttachmentReindexBatchInterface } from '~/features/search-attachments/server/services/attachment-reindex-batch';
+import type { AttachmentIndexOperations } from '~/features/search-attachments/server/services/attachment-search-delegator-extension';
 import type { AttachmentSearchIndexerInterface } from '~/features/search-attachments/server/services/attachment-search-indexer';
 import type { SessionConfig } from '~/interfaces/session-config';
 import { startCron as startAccessTokenCron } from '~/server/service/access-token';
@@ -162,6 +163,8 @@ class Crowi {
   attachmentSearchIndexer?: AttachmentSearchIndexerInterface;
 
   attachmentReindexBatch?: AttachmentReindexBatchInterface;
+
+  attachmentIndexOperations?: AttachmentIndexOperations;
 
   auditlogChangeStreamService: AuditlogChangeStreamService | null = null;
 

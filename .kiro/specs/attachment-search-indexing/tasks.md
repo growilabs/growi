@@ -78,16 +78,18 @@
 ## 4. Core: ES delegator 拡張と query builder 群
 
 - [x] 4.1 (P) `attachment-search-delegator-extension` に index ライフサイクル / bulk 操作を実装する
-  - `createAttachmentIndex(indexName)` (default `attachments`、rebuild 時 `attachments-tmp`) / `syncAttachmentIndexed(..., targetIndexes)` / `syncAttachmentRemoved(..., targetIndexes)` / `addAllAttachments(targetIndex, progress)` を追加する
+  - `ensureAttachmentIndex()` / `createRebuildIndex()` / `swapAttachmentAlias(index)` / `dropRebuildIndex(index)` (alias の裏の 2 つの実 index を交互に使う) と `syncAttachmentIndexed(..., targetIndexes)` / `syncAttachmentRemoved(..., targetIndexes)` を追加する
   - doc ID を `${attachmentId}_${pageNumber ?? 0}` で決定し、`targetIndexes` 複数指定時は 1 回の `_bulk` で書き切る (2 回別 API コールにしない)
   - 既存 `ElasticsearchDelegator` と composition で合成し、既存 Page 系メソッドは不変であることを確認する
   - _Requirements: 2.2, 2.5, 3.1, 6.1, 9.2_
   - _Boundary: ESDelegator extension_
   - _Depends: 2.2_
 
-- [x] 4.2 (P) `attachments` alias 衝突検出を起動時に組み込む
-  - `initializeSearchIndex` 相当の処理で `attachments` alias が本 spec 所有以外の実 index を指している場合に WARN ログを出し initialize を続行しない
-  - 既存 OSS デプロイで衝突がある場合にログが出て human intervention を促すことを test で確認
+- [x] 4.2 (P) 添付 index の名前と作成のタイミングを、他のアプリや既存の index とぶつからないようにする
+  - 名前は page index 名 (Elasticsearch URI のパス) から `<page index>-attachments-alias` / `-attachments-1` / `-attachments-2` と導き、1 つの Elasticsearch を共有する GROWI 同士でぶつからないようにする (`attachmentIndexNames()` が唯一の出どころ)
+  - alias を通す書き込みには `require_alias: true` を付け、alias が無いときに Elasticsearch が同名の実 index を自動作成しないようにする。失敗は他の ES 失敗と同じく例外として呼び出し側でログに残す
+  - index は機能が有効なときだけ作る (起動時と、管理画面の設定保存で有効になったとき)。機能を使わない環境には作らない
+  - 以前ここにあった「`attachments` alias が他の index を指していたら起動を止める」衝突検出は、名前を page index 名から導くようにしたことで不要になり、削除した
   - _Requirements: 2.5, 9.2_
   - _Boundary: ESDelegator extension_
   - _Depends: 4.1_
@@ -145,11 +147,10 @@
   - _Depends: 4.1_
 
 - [x] 6.3 `AttachmentReindexBatch` を実装する
-  - `addAllAttachments(targetIndex, progress)`: MongoDB の全 attachment を cursor で走査し、FileUploader からバイト取得 → extractor 経由 → `syncAttachmentIndexed` で tmp index に bulk upsert、個別失敗は `ExtractionFailureLogService.record` してスキップ継続
-  - `begin(tmpIndexName)` / `end()` / `isRebuilding()` / `getTmpIndexName()` の in-memory lifecycle state を提供し、`begin()` 重複で 409 conflict を throw する
-  - Socket.io `AddAttachmentProgress` / `FinishAddAttachment` / `RebuildingFailed` を既存 progress チャネルで発行する
-  - bulk 完了後 alias swap **前** に `AttachmentOrphanSweeper.sweep` を呼ぶ
-  - `attachments-tmp` は開始時に drop → create で冪等化 (累積しない)
+  - `addAllAttachments(targetIndex)`: MongoDB の全 attachment を id 順に走査し、FileUploader からバイト取得 → extractor 経由 → `syncAttachmentIndexed` で作り直し先の index に bulk upsert、個別失敗は `ExtractionFailureLogService.record` してスキップ継続。最後に `AttachmentOrphanSweeper.sweep` を呼ぶ (alias swap **前**)
+  - `startRebuild(rebuildPageIndex)` / `isRebuilding()` / `getTmpIndexName()` の in-memory lifecycle state を提供する。実行中フラグの上げ下ろしは batch 内部で行い、実行中の再呼び出しは `false` を返す
+  - Socket.io `AddAttachmentProgress` / `FinishAddAttachment` / `AttachmentRebuildingFailed` を既存 progress チャネルで発行する
+  - 作り直し先は alias が指していない方の実 index で、開始時に drop → create する (実 index は 2 つから増えない)
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
   - _Boundary: features/search-attachments/server/services_
   - _Depends: 3.2, 4.1, 5.2, 6.2_
@@ -281,10 +282,10 @@
   - _Boundary: integration_
 
 - [ ] 10.3 rebuild window 中の dual-write integ test を追加する
-  - rebuild 実行中に別 runner から `AttachmentService.attach()` / `detach()` を発火させ、live alias と `attachments-tmp` の両方に doc が存在することを assert
+  - rebuild 実行中に別 runner から `AttachmentService.attach()` / `detach()` を発火させ、live alias と作り直し先の index の両方に doc が存在することを assert
   - alias swap 後に live alias から当該添付が検索 hit すること
   - tmp index を中途 delete して bulk がエラーになる stub で、live 側 write が成功し続け real-time event 戻り値が正常であること
-  - `Batch.begin()` 後に `rebuildIndex()` が例外 throw しても finally で `Batch.end()` が呼ばれ `isRebuilding=false` に戻ること (lifecycle leak 耐性)
+  - `startRebuild()` 後に `rebuildIndex()` が例外 throw しても `isRebuilding=false` に戻り、alias が旧 index を指したままであること (lifecycle leak 耐性)
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
   - _Boundary: integration_
 
@@ -309,8 +310,9 @@
   - _Requirements: 7.1, 7.2_
   - _Boundary: integration_
 
-- [ ] 10.7 (P) `attachments` alias 衝突検出を integ test で固定する
-  - 起動前に本 spec 所有外の実 index を指す `attachments` alias を仕込み、起動時に WARN ログ + initialize 中断が観測されること
+- [ ] 10.7 (P) 添付 index の名前の分離と `require_alias` を integ test で固定する
+  - page index 名の違う 2 つの設定で作成・作り直しを行い、互いの alias と実 index に触れないこと
+  - alias が無い状態で添付を書き込むと失敗し (例外にならずログに残り)、alias と同じ名前の実 index が作られないこと
   - _Requirements: 9.2_
   - _Boundary: integration_
 
