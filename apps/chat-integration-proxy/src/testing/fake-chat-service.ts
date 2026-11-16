@@ -74,6 +74,18 @@ export interface CapturedReaction {
   readonly reaction: ReactionName;
 }
 
+type ConversationRead = Parameters<PlatformFacade['fetchConversation']>;
+type ConversationOutcome = Awaited<
+  ReturnType<PlatformFacade['fetchConversation']>
+>;
+
+/** One conversation read the proxy asked for. */
+export interface CapturedConversationRead {
+  readonly target: ConversationRead[0];
+  readonly range: ConversationRead[1];
+  readonly installationId: string;
+}
+
 export interface CapturedProcessingStatus {
   readonly channel: SdkChannelRef;
   readonly threadRootId: string;
@@ -109,6 +121,13 @@ export interface FakeChatScript {
   readonly addReaction?: (reaction: CapturedReaction) => ReactionOutcome;
   readonly openModal?: (modal: CapturedModal) => boolean;
   readonly listChannels?: (installationId: string) => ChannelListing;
+  /**
+   * What a conversation read answers. Unscripted, every read finds no
+   * messages. A throw stands for a failure the reader has no reason for.
+   */
+  readonly fetchConversation?: (
+    read: CapturedConversationRead,
+  ) => ConversationOutcome;
   readonly webhook?: (
     platform: PlatformName,
     request: Request,
@@ -162,6 +181,7 @@ export interface FakeChatService {
   readonly posts: () => ReadonlyArray<CapturedPost>;
   readonly reactions: () => ReadonlyArray<CapturedReaction>;
   readonly processingStatuses: () => ReadonlyArray<CapturedProcessingStatus>;
+  readonly conversationReads: () => ReadonlyArray<CapturedConversationRead>;
   readonly modals: () => ReadonlyArray<CapturedModal>;
   /** Everything `webhookHandler` was asked to serve, by service. */
   readonly webhookCalls: () => ReadonlyArray<PlatformName>;
@@ -210,6 +230,7 @@ export const createFakeChatService = (
   const posts: CapturedPost[] = [];
   const reactions: CapturedReaction[] = [];
   const processingStatuses: CapturedProcessingStatus[] = [];
+  const conversationReads: CapturedConversationRead[] = [];
   const modals: CapturedModal[] = [];
   const webhookCalls: PlatformName[] = [];
   let sink: PlatformEventSink | null = null;
@@ -333,11 +354,23 @@ export const createFakeChatService = (
     listChannels: async (installationId) =>
       script.listChannels?.(installationId) ?? { channels: [] },
 
-    fetchConversation: async () => ({
-      ok: true,
-      messages: [],
-      truncated: false,
-    }),
+    fetchConversation: (target, range, scope) => {
+      const read: CapturedConversationRead = {
+        target,
+        range,
+        installationId: scope.installationId,
+      };
+      conversationReads.push(read);
+      // Inside `then`, so a scripted throw rejects as the real read does.
+      return Promise.resolve().then(
+        () =>
+          script.fetchConversation?.(read) ?? {
+            ok: true,
+            messages: [],
+            truncated: false,
+          },
+      );
+    },
 
     webhookHandler: (platform) => async (request) => {
       webhookCalls.push(platform);
@@ -375,6 +408,7 @@ export const createFakeChatService = (
     posts: () => [...posts],
     reactions: () => [...reactions],
     processingStatuses: () => [...processingStatuses],
+    conversationReads: () => [...conversationReads],
     modals: () => [...modals],
     webhookCalls: () => [...webhookCalls],
     shutdownCount: () => shutdowns,

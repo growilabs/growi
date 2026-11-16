@@ -40,6 +40,7 @@ import {
 import { createFanOutCollector, createGrowiClient } from '../growi/index.js';
 import {
   createAdminFlow,
+  createAnswerFlow,
   createCommandFlow,
   createEventSink,
   createInboundFlow,
@@ -396,6 +397,14 @@ export const createProxyDependencies = async (
   deferred.attach(createEventSink({ collector, flow: commandFlow }));
 
   const inboundFlow = createInboundFlow({ db, cipher, platform: facade });
+  const answerFlow = createAnswerFlow({
+    pendingAgentRequests,
+    privateReplier,
+    platform: facade,
+    // A string only: `AnswerFlow` never hands over an error object.
+    reportOperationalFailure: (message) =>
+      reporters.reportOperationalFailure(message),
+  });
 
   const signature: SignatureGuardDeps = {
     resolvePublicKey: (ref) => peerKeys.findPublicKey(ref, new Date()),
@@ -413,6 +422,7 @@ export const createProxyDependencies = async (
 
   const routes: RoutesAppDeps = {
     notification: { signature, inboundFlow },
+    agentInbound: { signature, answerFlow },
     key: { signature, inboundFlow },
     read: {
       signature,

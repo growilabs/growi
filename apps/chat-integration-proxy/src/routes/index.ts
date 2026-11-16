@@ -17,6 +17,8 @@
 // `pairing-routes.ts` builds ONE exchange, not something another layer calls,
 // and its own spec reaches it directly as a sibling. Same rule
 // `relation/index.ts` records for `buildPinnedRequestOptions`.
+export type { AgentInboundRoutesDeps } from './agent-inbound-routes.js';
+export { registerAgentInboundRoutes } from './agent-inbound-routes.js';
 export type { RoutesAppDeps } from './app.js';
 export { createRoutesApp } from './app.js';
 export type { HealthRoutesDeps } from './health-routes.js';

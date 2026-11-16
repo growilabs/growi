@@ -1,8 +1,14 @@
 // `AnswerFlow` -- delivering the answer GROWI sends some time after an `agent`
-// request, to the place and the person the request's record names
-// (design.md's AnswerFlow). Why the destination comes from the record and not
-// from GROWI: research.md, 「答えの宛先は proxy が覚える」.
-import type { CommandAnswerRequest, CommandAnswerResult } from '@growi/chat';
+// request, to the place and the person the request's record names, and reading
+// the conversation of that place when GROWI asks for it (design.md's
+// AnswerFlow). Why the destination comes from the record and not from GROWI:
+// research.md, 「答えの宛先は proxy が覚える」.
+import type {
+  CommandAnswerRequest,
+  CommandAnswerResult,
+  ConversationRequest,
+  ConversationResult,
+} from '@growi/chat';
 
 import { CONTINUE_PLACE, supports } from '../capabilities/index.js';
 import type { PrivateReplier, PrivateReplyOrigin } from '../command/index.js';
@@ -14,9 +20,15 @@ import type {
 import type { PlatformFacade } from '../platform/index.js';
 import type { OutboundMessage } from '../types/index.js';
 import { agentAnswerMessage } from './agent-answer-message.js';
+import { conversationResultOf } from './conversation-result.js';
 
 export interface AnswerFlow {
   deliver(request: CommandAnswerRequest): Promise<CommandAnswerResult>;
+  /**
+   * Rejects with the reader's own failure when it has no reason for it
+   * (`PlatformFacade.fetchConversation`).
+   */
+  readConversation(request: ConversationRequest): Promise<ConversationResult>;
 }
 
 export interface AnswerFlowDeps {
@@ -25,7 +37,10 @@ export interface AnswerFlowDeps {
     'find' | 'claimDelivery' | 'recordDeliveryResult'
   >;
   readonly privateReplier: Pick<PrivateReplier, 'reply'>;
-  readonly platform: Pick<PlatformFacade, 'post' | 'postInThread'>;
+  readonly platform: Pick<
+    PlatformFacade,
+    'post' | 'postInThread' | 'fetchConversation'
+  >;
   /**
    * Where a DM answer that could not be posted is noted for the operator
    * (umbrella Requirement 1.12); a channel answer is noted by the replier.
@@ -40,7 +55,20 @@ export interface AnswerFlowDeps {
  */
 const ANSWER_DELIVERY_RECLAIM_MS = 2 * 60 * 1000;
 
+/** design.md ConversationContract: at most 200 messages. */
+const CONVERSATION_READ_LIMIT = 200;
+
 type DeliveryResult = 'delivered' | 'undeliverable';
+
+/**
+ * Past its expiry a record only waits for the sweep (research.md,
+ * 「答えの宛先は proxy が覚える」 Follow-up), so it answers nothing more.
+ */
+const isOnRecord = (
+  record: PendingAgentRequestRecord | null,
+  now: Date,
+): record is PendingAgentRequestRecord =>
+  record != null && record.expiresAt > now;
 
 /**
  * The thread a channel answer is shown in: the request's own thread, else --
@@ -60,9 +88,7 @@ const resultWithoutDelivering = (
   record: PendingAgentRequestRecord | null,
   now: Date,
 ): CommandAnswerResult['status'] | null => {
-  // Past its expiry the record only waits for the sweep (research.md,
-  // 「答えの宛先は proxy が覚える」 Follow-up).
-  if (record == null || record.expiresAt <= now) return 'unknown-request';
+  if (!isOnRecord(record, now)) return 'unknown-request';
   if (
     record.deliveryStatus === 'delivered' ||
     record.deliveryStatus === 'undeliverable'
@@ -170,6 +196,30 @@ export const createAnswerFlow = (deps: AnswerFlowDeps): AnswerFlow => {
         status,
       );
       return { status };
+    },
+
+    async readConversation({ relationId, requestId }) {
+      const record = await pendingAgentRequests.find(relationId, requestId);
+      if (!isOnRecord(record, now())) {
+        return {
+          ok: false,
+          failure: { reason: 'unknown-request', remedy: null },
+        };
+      }
+      const { origin, installationId } = record;
+      // `threadRootId`, never `replyThreadRootId`: a DM request made outside a
+      // thread is answered in the thread it starts, but its conversation is
+      // the DM's latest messages (design.md EventMapping).
+      const outcome = await platform.fetchConversation(
+        origin.channel,
+        {
+          threadRootId: origin.threadRootId,
+          requestMessageId: origin.sourceMessageId,
+          limit: CONVERSATION_READ_LIMIT,
+        },
+        { installationId },
+      );
+      return conversationResultOf(outcome);
     },
   };
 };

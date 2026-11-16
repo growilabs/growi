@@ -21,6 +21,7 @@ import type {
 } from '../platform/index.js';
 import type { KeyRoutesDeps } from '../routes/index.js';
 import {
+  type AgentInboundRoutesDeps,
   INBOUND_OP_BY_PATH,
   type NotificationRoutesDeps,
   PAIRING_SUBMIT_PATH,
@@ -42,6 +43,7 @@ const signedPath = [...INBOUND_OP_BY_PATH.keys()][0] as string;
 
 const routesDeps = (signature: SignatureGuardDeps): RoutesAppDeps => ({
   notification: mock<NotificationRoutesDeps>({ signature }),
+  agentInbound: mock<AgentInboundRoutesDeps>({ signature }),
   key: mock<KeyRoutesDeps>({ signature }),
   read: mock<ReadRoutesDeps>({ signature }),
   pairing: mock<PairingRoutesDeps>(),

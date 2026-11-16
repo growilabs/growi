@@ -26,12 +26,22 @@
 import { type KeyObject, sign as nodeSign } from 'node:crypto';
 import type {
   ChallengeResponse,
+  CommandAnswerRequest,
+  CommandAnswerResult,
+  ConversationRequest,
+  ConversationResult,
   OpName,
   OwnershipChallenge,
   PublicKeyRegistration,
   RequestEnvelope,
 } from '@growi/chat';
-import { OP_ENDPOINTS, parseOwnershipChallenge } from '@growi/chat';
+import {
+  OP_ENDPOINTS,
+  OP_NAMES,
+  parseCommandAnswerResult,
+  parseConversationResult,
+  parseOwnershipChallenge,
+} from '@growi/chat';
 import type { KeyRef, VerifyFailure } from '@growi/chat/server';
 import {
   acceptEnvelope,
@@ -132,6 +142,14 @@ export interface ProxyAnswer {
   readonly body: unknown;
 }
 
+/**
+ * A proxy answer as GROWI would take it: read with the protocol's own parser,
+ * so a body GROWI would refuse comes back as the parser's error, not as data.
+ */
+export interface ParsedProxyAnswer<T> extends ProxyAnswer {
+  readonly parsed: T | { readonly error: 'malformed' };
+}
+
 export interface FakeGrowi {
   /** e.g. `http://127.0.0.1:49152` -- what a relation stores as `growi_uri`. */
   readonly baseUrl: string;
@@ -163,6 +181,16 @@ export interface FakeGrowi {
     proxyBaseUrl: string,
     params: CallProxyParams,
   ) => Promise<ProxyAnswer>;
+  /** Sends an `agent` answer, signed, as GROWI's outbox does. */
+  readonly sendCommandAnswer: (
+    proxyBaseUrl: string,
+    request: Omit<CommandAnswerRequest, 'op'>,
+  ) => Promise<ParsedProxyAnswer<CommandAnswerResult>>;
+  /** Asks, signed, for the conversation an `agent` request was made in. */
+  readonly requestConversation: (
+    proxyBaseUrl: string,
+    request: Omit<ConversationRequest, 'op'>,
+  ) => Promise<ParsedProxyAnswer<ConversationResult>>;
   readonly close: () => Promise<void>;
 }
 
@@ -320,6 +348,43 @@ export const startFakeGrowi = async (
 
   const { server, baseUrl } = await serveOnFreePort(app);
 
+  const callProxy: FakeGrowi['callProxy'] = async (proxyBaseUrl, params) => {
+    const envelope = {
+      ...params.body,
+      relationId: params.relationId,
+      op: params.op,
+    };
+    // Serialized once: these bytes are both what is hashed and what is sent.
+    const payload = JSON.stringify(envelope);
+    const headers = { 'content-type': 'application/json' };
+    const signed = sign({
+      method: 'POST',
+      headers,
+      body: Buffer.from(payload, 'utf8'),
+      key: { relationId: params.relationId, keyId: own.key.keyId },
+      privateKey: own.privateKey,
+      expiresInSec,
+    });
+
+    const response = await fetch(
+      `${proxyBaseUrl}${params.path ?? proxyPathForOp(params.op)}`,
+      {
+        method: 'POST',
+        headers: { ...headers, ...signed.headers },
+        body: payload,
+      },
+    );
+    const text = await response.text();
+    let parsedAnswer: unknown = text;
+    try {
+      parsedAnswer = JSON.parse(text);
+    } catch {
+      // Left as text: an intermediary's error page is not JSON, and a
+      // harness that threw on it would hide the status the caller wants.
+    }
+    return { status: response.status, body: parsedAnswer };
+  };
+
   return {
     baseUrl,
     hostname: LOOPBACK,
@@ -332,41 +397,24 @@ export const startFakeGrowi = async (
     received: () => [...received],
     refusals: () => [...refusals],
 
-    callProxy: async (proxyBaseUrl, params) => {
-      const envelope = {
-        ...params.body,
-        relationId: params.relationId,
-        op: params.op,
-      };
-      // Serialized once: these bytes are both what is hashed and what is sent.
-      const payload = JSON.stringify(envelope);
-      const headers = { 'content-type': 'application/json' };
-      const signed = sign({
-        method: 'POST',
-        headers,
-        body: Buffer.from(payload, 'utf8'),
-        key: { relationId: params.relationId, keyId: own.key.keyId },
-        privateKey: own.privateKey,
-        expiresInSec,
-      });
+    callProxy,
 
-      const response = await fetch(
-        `${proxyBaseUrl}${params.path ?? proxyPathForOp(params.op)}`,
-        {
-          method: 'POST',
-          headers: { ...headers, ...signed.headers },
-          body: payload,
-        },
-      );
-      const text = await response.text();
-      let parsedAnswer: unknown = text;
-      try {
-        parsedAnswer = JSON.parse(text);
-      } catch {
-        // Left as text: an intermediary's error page is not JSON, and a
-        // harness that threw on it would hide the status the caller wants.
-      }
-      return { status: response.status, body: parsedAnswer };
+    sendCommandAnswer: async (proxyBaseUrl, { relationId, ...body }) => {
+      const answer = await callProxy(proxyBaseUrl, {
+        relationId,
+        op: OP_NAMES.commandAnswer,
+        body,
+      });
+      return { ...answer, parsed: parseCommandAnswerResult(answer.body) };
+    },
+
+    requestConversation: async (proxyBaseUrl, { relationId, ...body }) => {
+      const answer = await callProxy(proxyBaseUrl, {
+        relationId,
+        op: OP_NAMES.conversation,
+        body,
+      });
+      return { ...answer, parsed: parseConversationResult(answer.body) };
     },
 
     close: () =>

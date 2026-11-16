@@ -23,6 +23,7 @@ import { mock } from 'vitest-mock-extended';
 import { REQUIRES_INBOUND_REACHABILITY } from '../capabilities/index.js';
 import type { InstallationStore, PlatformFacade } from '../platform/index.js';
 import type { PlatformAppConfig } from '../types/index.js';
+import type { AgentInboundRoutesDeps } from './agent-inbound-routes.js';
 import { createRoutesApp, type RoutesAppDeps } from './app.js';
 import { HEALTH_PATH } from './health-routes.js';
 import { installCallbackPath } from './install-routes.js';
@@ -42,6 +43,7 @@ const APP_CONFIG: PlatformAppConfig = {
 
 const appDeps = (overrides: Partial<RoutesAppDeps> = {}): RoutesAppDeps => ({
   notification: mock<NotificationRoutesDeps>(),
+  agentInbound: mock<AgentInboundRoutesDeps>(),
   key: mock<KeyRoutesDeps>(),
   read: mock<ReadRoutesDeps>(),
   pairing: mock<PairingRoutesDeps>(),

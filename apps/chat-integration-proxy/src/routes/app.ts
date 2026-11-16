@@ -19,8 +19,8 @@
 // than against a wiring the test wrote itself.
 import { Hono } from 'hono';
 
-import { registerCommandAnswerRoutes } from './command-answer-routes.js';
-import { registerConversationRoutes } from './conversation-routes.js';
+import type { AgentInboundRoutesDeps } from './agent-inbound-routes.js';
+import { registerAgentInboundRoutes } from './agent-inbound-routes.js';
 import { registerHealthRoutes } from './health-routes.js';
 import type { InstallRoutesDeps } from './install-routes.js';
 import { registerInstallRoutes } from './install-routes.js';
@@ -38,6 +38,7 @@ import { registerWebhookRoutes } from './webhook-routes.js';
 
 export interface RoutesAppDeps {
   readonly notification: NotificationRoutesDeps;
+  readonly agentInbound: AgentInboundRoutesDeps;
   readonly key: KeyRoutesDeps;
   readonly read: ReadRoutesDeps;
   readonly pairing: PairingRoutesDeps;
@@ -73,8 +74,7 @@ export const createRoutesApp = (
   // "this endpoint is guarded" a property of this file rather than of the
   // endpoint, and `app.spec.ts` would then be checking this file's wiring.
   registerNotificationRoutes(app, deps.notification);
-  registerCommandAnswerRoutes(app, deps.notification);
-  registerConversationRoutes(app, deps.notification);
+  registerAgentInboundRoutes(app, deps.agentInbound);
   registerKeyRoutes(app, deps.key);
   registerReadRoutes(app, deps.read);
 

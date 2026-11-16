@@ -329,3 +329,51 @@ describe('capturing direct messages and reactions', () => {
     expect(outcome).toEqual({ ok: false, detail: 'message_not_found' });
   });
 });
+
+describe('reading a conversation', () => {
+  const RANGE = { threadRootId: 'T-1', requestMessageId: 'M-1', limit: 200 };
+
+  it('finds no messages unless scripted, and records what was asked for', async () => {
+    const { chat, facade } = await attached();
+
+    const outcome = await facade.fetchConversation(channelOn('slack'), RANGE, {
+      installationId: 'inst-1',
+    });
+
+    expect(outcome).toEqual({ ok: true, messages: [], truncated: false });
+    expect(chat.conversationReads()).toEqual([
+      {
+        target: channelOn('slack'),
+        range: RANGE,
+        installationId: 'inst-1',
+      },
+    ]);
+  });
+
+  it('answers what it was scripted to, and rejects with what the script threw', async () => {
+    const chat = createFakeChatService({
+      fetchConversation: (read) => {
+        if (read.installationId === 'inst-broken') {
+          throw new Error('socket hang up');
+        }
+        return { ok: false, reason: 'rate-limited', remedy: null };
+      },
+    });
+    const facade = await chat.createFacade(
+      { stateConnectionString: 'unused' },
+      { list: () => Promise.resolve([]), resolve: () => Promise.resolve(null) },
+      { handle: async () => {} },
+    );
+
+    await expect(
+      facade.fetchConversation(channelOn('slack'), RANGE, {
+        installationId: 'inst-1',
+      }),
+    ).resolves.toEqual({ ok: false, reason: 'rate-limited', remedy: null });
+    await expect(
+      facade.fetchConversation(channelOn('slack'), RANGE, {
+        installationId: 'inst-broken',
+      }),
+    ).rejects.toThrow('socket hang up');
+  });
+});
