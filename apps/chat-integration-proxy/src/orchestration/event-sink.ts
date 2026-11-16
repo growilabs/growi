@@ -8,13 +8,14 @@
 // through the `CommandFlow` interface below, which is declared here rather
 // than imported so that this file stays complete on its own: routing is
 // testable against the interface before either flow exists.
-import { COMMAND_NAMES } from '@growi/chat';
+import { COMMAND_NAMES, type PlatformName } from '@growi/chat';
 
 import {
   ADMIN_COMMAND_WORDS,
   type ArgumentCollector,
   CommandInvocation,
   LINK_COMMAND_WORD,
+  type ResumeOutcome,
 } from '../command/index.js';
 import type {
   Invocation,
@@ -27,6 +28,8 @@ export type LinkPostedEvent = Extract<
   PlatformEvent,
   { readonly kind: 'link-posted' }
 >;
+
+type MentionEvent = Extract<PlatformEvent, { readonly kind: 'mention' }>;
 
 /**
  * Every word this app answers to, as one set built from the three places that
@@ -96,18 +99,21 @@ export interface EventSinkDeps {
    */
   readonly collector: Pick<ArgumentCollector, 'resume'>;
   readonly flow: CommandFlow;
+  /**
+   * The services whose DMs are an AI app view in this deployment, derived
+   * from the operator's configuration (`platform/`'s `agentViewPlatforms`).
+   * Absent means none.
+   */
+  readonly agentViewPlatforms?: ReadonlySet<PlatformName>;
 }
 
 export const createEventSink = (deps: EventSinkDeps): PlatformEventSink => {
-  const { collector, flow } = deps;
+  const { collector, flow, agentViewPlatforms = new Set() } = deps;
 
-  /**
-   * The single destination for everything that continues an exchange already
-   * under way: a modal submission, a button press, and an answer typed as a
-   * mention all resume the same stored collection.
-   */
-  const resumeCollection = async (event: PlatformEvent): Promise<void> => {
-    const outcome = await collector.resume(event);
+  const settle = async (
+    event: PlatformEvent,
+    outcome: ResumeOutcome,
+  ): Promise<void> => {
     switch (outcome.status) {
       case 'collected':
         // Every value is in. The invocation comes back from the STORED row,
@@ -144,6 +150,35 @@ export const createEventSink = (deps: EventSinkDeps): PlatformEventSink => {
         // ours -- a stale press from a superseded command, or an id that was
         // never among the ones offered.
         return;
+      case 'released':
+        // Only answered when asked for, which `inAgentView` alone does.
+        return;
+    }
+  };
+
+  /**
+   * The single destination for everything that continues an exchange already
+   * under way: a modal submission, a button press, and an answer typed as a
+   * mention all resume the same stored collection.
+   */
+  const resumeCollection = async (event: PlatformEvent): Promise<void> =>
+    settle(event, await collector.resume(event));
+
+  /**
+   * design.md's AI app view routing: an answer to the outstanding question
+   * first, and anything else -- whatever its first word -- an `agent`
+   * request. Text that answers nothing drops the question (`released`), and
+   * an expired one is no longer there to answer.
+   */
+  const inAgentView = async (event: MentionEvent): Promise<void> => {
+    const outcome = await collector.resume(event, { releaseUnanswered: true });
+    switch (outcome.status) {
+      case 'released':
+      case 'expired':
+      case 'not-mine':
+        return flow.startCommand(CommandInvocation.agentRequest(event));
+      default:
+        return settle(event, outcome);
     }
   };
 
@@ -161,6 +196,9 @@ export const createEventSink = (deps: EventSinkDeps): PlatformEventSink => {
           // to it could only ever be dead code.
           return flow.startCommand(CommandInvocation.normalize(event));
         case 'mention': {
+          if (event.inDirectMessage && agentViewPlatforms.has(event.platform)) {
+            return inAgentView(event);
+          }
           const invocation = CommandInvocation.normalize(event);
           // Step 1 → 2. Recognizing the word FIRST is what makes design.md's
           // 「新しいコマンドが優先される」 hold: `ArgumentCollector.start`

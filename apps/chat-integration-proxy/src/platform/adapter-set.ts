@@ -97,6 +97,11 @@ export type AdapterFactory =
         appConfig: PlatformAppConfig,
       ) => ProcessingStatusSetter | null;
       /**
+       * Present when the service has an AI app view in its DMs. Answers
+       * whether this deployment's configuration turned it on.
+       */
+      readonly agentView?: (appConfig: PlatformAppConfig) => boolean;
+      /**
        * Present when one adapter speaks for many workspaces and learns whose
        * bot to speak as only from the incoming event. Outside an event --
        * a notification from GROWI -- it has to be told, and this is how:
@@ -228,6 +233,7 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           logger: context.logger.child('slack'),
         });
       },
+      agentView: (appConfig) => appConfig.slack?.agentView === true,
       processingStatus: (appConfig) =>
         appConfig.slack?.agentView === true
           ? async (adapter, channelId, threadRootId) => {
@@ -403,6 +409,23 @@ export const processingStatusSetterOf = (
     ? (factory.processingStatus?.(appConfig) ?? null)
     : null;
 };
+
+/** The services whose DMs this deployment turned into an AI app view. */
+export const agentViewPlatformsOf = (
+  appConfig: PlatformAppConfig,
+  factories: Readonly<Record<PlatformName, AdapterFactory>>,
+): ReadonlySet<PlatformName> =>
+  new Set(
+    (Object.keys(factories) as ReadonlyArray<PlatformName>).filter(
+      (platform) => {
+        const factory = factories[platform];
+        return (
+          factory.credentialSource === 'app' &&
+          factory.agentView?.(appConfig) === true
+        );
+      },
+    ),
+  );
 
 /**
  * The adapter for one installation of an installation-credentialed service

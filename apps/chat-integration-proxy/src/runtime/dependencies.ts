@@ -46,6 +46,7 @@ import {
   createInboundFlow,
 } from '../orchestration/index.js';
 import {
+  agentViewPlatforms,
   createInstallationProvider,
   createInstallationStore,
   createPlatformFacade,
@@ -394,7 +395,13 @@ export const createProxyDependencies = async (
   });
 
   // The knot is tied here, before anything is served or connected.
-  deferred.attach(createEventSink({ collector, flow: commandFlow }));
+  deferred.attach(
+    createEventSink({
+      collector,
+      flow: commandFlow,
+      agentViewPlatforms: agentViewPlatforms(config.platformApp),
+    }),
+  );
 
   const inboundFlow = createInboundFlow({ db, cipher, platform: facade });
   const answerFlow = createAnswerFlow({

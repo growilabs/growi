@@ -1177,3 +1177,156 @@ describe('ArgumentCollector.startGrowiChoice / resuming a GROWI choice', () => {
     expect(resumed).toEqual({ status: 'not-mine' });
   });
 });
+
+describe('ArgumentCollector.resume where unanswered text starts a new request (the AI app view, 15.15)', () => {
+  let repository: ReturnType<typeof createFakeRepository>;
+  let platform: ArgumentCollectorPlatform;
+  let privateReplier: PrivateReplier;
+
+  const OPTIONS = [
+    { relationId: 'rel-a', growiLabel: 'GROWI A' },
+    { relationId: 'rel-b', growiLabel: 'GROWI B' },
+  ];
+  const RELEASE = { releaseUnanswered: true } as const;
+
+  beforeEach(() => {
+    repository = createFakeRepository();
+    platform = mock<ArgumentCollectorPlatform>();
+    vi.mocked(platform.openModal).mockResolvedValue(true);
+    privateReplier = inPlaceReplier();
+  });
+
+  const collector = () =>
+    createArgumentCollector({
+      pendingCollections: repository,
+      platform,
+      privateReplier,
+      now: () => NOW,
+      newCorrelationId: () => 'corr-1',
+    });
+
+  const typedInDm = (text: string) =>
+    mentionAnswer('slack', text, { inDirectMessage: true });
+
+  const pendingChoice = async () => {
+    await collector().startGrowiChoice(
+      invocationOf('slack', COMMAND_NAMES.createPage),
+      { path: '/memo', body: 'text' },
+      OPTIONS,
+    );
+    vi.mocked(privateReplier.reply).mockClear();
+  };
+
+  it('still takes a numbered answer to an outstanding GROWI choice', async () => {
+    await pendingChoice();
+
+    const outcome = await collector().resume(typedInDm('2'), RELEASE);
+
+    expect(outcome).toMatchObject({
+      status: 'growi-chosen',
+      relationId: 'rel-b',
+    });
+  });
+
+  it('drops a GROWI choice the text does not answer, instead of asking it again', async () => {
+    await pendingChoice();
+
+    const outcome = await collector().resume(
+      typedInDm('search for the release notes'),
+      RELEASE,
+    );
+
+    expect(outcome).toEqual({ status: 'released' });
+    expect(repository.rows.size).toBe(0);
+    expect(
+      vi
+        .mocked(privateReplier.reply)
+        .mock.calls.map(([, message]) => message.kind),
+    ).not.toContain('choice');
+  });
+
+  it('tells the user which command the dropped input belonged to', async () => {
+    await pendingChoice();
+
+    await collector().resume(typedInDm('今週の議事録は？'), RELEASE);
+
+    expect(privateReplier.reply).toHaveBeenCalledTimes(1);
+    const [, message] = vi.mocked(privateReplier.reply).mock.calls[0] ?? [];
+    expect(message).toEqual({
+      kind: 'markdown',
+      markdown: expect.stringContaining(`\`${COMMAND_NAMES.createPage}\``),
+    });
+  });
+
+  it('drops a choice whose question was delivered to this DM from another channel', async () => {
+    const dm = testSdkChannel('slack', {
+      channelId: testSdkChannelId('slack', 'D1'),
+      isPrivate: true,
+    });
+    vi.mocked(privateReplier.reply).mockResolvedValue({
+      kind: 'direct',
+      directChannel: dm,
+    });
+    await collector().startGrowiChoice(
+      invocationOf('slack', COMMAND_NAMES.createPage),
+      {},
+      OPTIONS,
+    );
+
+    const outcome = await collector().resume(
+      { ...typedInDm('別の話です'), channel: dm },
+      RELEASE,
+    );
+
+    expect(outcome).toEqual({ status: 'released' });
+    expect(repository.rows.size).toBe(0);
+  });
+
+  it('takes any text as the answer to an outstanding field question', async () => {
+    const invocation = invocationOf(
+      'slack',
+      COMMAND_NAMES.createPage,
+      '/memo/today',
+    );
+    await collector().start(invocation, CREATE_PAGE_FIELDS);
+
+    const outcome = await collector().resume(
+      typedInDm('search for the release notes'),
+      RELEASE,
+    );
+
+    expect(outcome).toEqual({
+      status: 'collected',
+      values: { path: '/memo/today', body: 'search for the release notes' },
+      invocation,
+    });
+  });
+
+  it('drops a collection waiting on a modal, which typed text cannot answer', async () => {
+    await collector().start(
+      invocationOf('slack', COMMAND_NAMES.createPage, '', true),
+      CREATE_PAGE_FIELDS,
+    );
+
+    const outcome = await collector().resume(typedInDm('こんにちは'), RELEASE);
+
+    expect(outcome).toEqual({ status: 'released' });
+    expect(repository.rows.size).toBe(0);
+  });
+
+  it('answers not-mine, and says nothing, when nothing is outstanding', async () => {
+    const outcome = await collector().resume(typedInDm('こんにちは'), RELEASE);
+
+    expect(outcome).toEqual({ status: 'not-mine' });
+    expect(privateReplier.reply).not.toHaveBeenCalled();
+  });
+
+  it('asks a choice again, as before, when the caller did not ask for release', async () => {
+    await pendingChoice();
+
+    const outcome = await collector().resume(typedInDm('こんにちは'));
+
+    expect(outcome).toEqual({ status: 'pending' });
+    expect(repository.rows.size).toBe(1);
+  });
+});

@@ -1,12 +1,23 @@
 import { COMMAND_NAMES, type PlatformName } from '@growi/chat';
 import { mock } from 'vitest-mock-extended';
 
-import { testSdkChannel } from '../capabilities/test-channels.js';
+import {
+  testSdkChannel,
+  testSdkChannelId,
+} from '../capabilities/test-channels.js';
 import {
   ADMIN_COMMAND_WORDS,
   type ArgumentCollector,
+  type ArgumentCollectorPlatform,
+  CommandInvocation,
+  createArgumentCollector,
   LINK_COMMAND_WORD,
+  type PrivateReplier,
 } from '../command/index.js';
+import type {
+  PendingCollectionRecord,
+  PendingCollectionRepository,
+} from '../db/index.js';
 import type {
   Invocation,
   PlatformEvent,
@@ -421,5 +432,313 @@ describe('PlatformEvent', () => {
     });
 
     expect(handled.map((event) => event.kind)).toEqual(['mention']);
+  });
+});
+
+describe("Slack's AI app view: every typed message is an agent request (15.15)", () => {
+  const dm = testSdkChannel('slack', {
+    channelId: testSdkChannelId('slack', 'D1'),
+    isPrivate: true,
+  });
+
+  /** A message typed into the bot's DM; under the view, it roots its own thread. */
+  const typedInDm = (
+    text: string,
+    platform: PlatformName = 'slack',
+  ): Extract<PlatformEvent, { kind: 'mention' }> => ({
+    kind: 'mention',
+    platform,
+    channel:
+      platform === 'slack'
+        ? dm
+        : testSdkChannel(platform, {
+            channelId: testSdkChannelId(platform, 'D1'),
+          }),
+    actor: { ...actor, platform },
+    text,
+    textWithoutBotAddress: text,
+    inDirectMessage: true,
+    messageId: 'M0009',
+    threadRootId: null,
+    replyThreadRootId: 'M0009',
+    interaction: null,
+  });
+
+  const agentRequestFor = (text: string) =>
+    expect.objectContaining({
+      commandName: COMMAND_NAMES.agent,
+      argsText: text,
+      channel: dm,
+      sourceMessageId: 'M0009',
+      replyThreadRootId: 'M0009',
+      isDirectMessage: true,
+    });
+
+  const setupView = (agentViewPlatforms: ReadonlySet<PlatformName>) => {
+    const flow = mock<CommandFlow>();
+    const collector = mock<Pick<ArgumentCollector, 'resume'>>();
+    collector.resume.mockResolvedValue({ status: 'not-mine' });
+    return {
+      flow,
+      collector,
+      sink: createEventSink({ flow, collector, agentViewPlatforms }),
+    };
+  };
+  const VIEW_ON = new Set<PlatformName>(['slack']);
+
+  it('starts an agent request with the whole text when it starts with "search"', async () => {
+    const { sink, flow } = setupView(VIEW_ON);
+
+    await sink.handle(typedInDm('search for the release notes'));
+
+    expect(flow.startCommand).toHaveBeenCalledTimes(1);
+    expect(flow.startCommand).toHaveBeenCalledWith(
+      agentRequestFor('search for the release notes'),
+    );
+  });
+
+  it.each([
+    COMMAND_NAMES.createPage,
+    COMMAND_NAMES.help,
+    LINK_COMMAND_WORD,
+    ...ADMIN_COMMAND_WORDS,
+  ])('starts an agent request, not "%s", whatever command the first word names', async (word) => {
+    const { sink, flow } = setupView(VIEW_ON);
+
+    await sink.handle(typedInDm(`${word} please`));
+
+    expect(flow.startCommand).toHaveBeenCalledTimes(1);
+    expect(flow.startCommand).toHaveBeenCalledWith(
+      agentRequestFor(`${word} please`),
+    );
+  });
+
+  it('starts an agent request for text naming no command, which an ordinary DM ignores', async () => {
+    const { sink, flow } = setupView(VIEW_ON);
+
+    await sink.handle(typedInDm('今週の議事録はどこ？'));
+
+    expect(flow.startCommand).toHaveBeenCalledWith(
+      agentRequestFor('今週の議事録はどこ？'),
+    );
+  });
+
+  it('asks the collector first, in the mode that drops a question the text does not answer', async () => {
+    const { sink, collector } = setupView(VIEW_ON);
+    const event = typedInDm('search for the release notes');
+
+    await sink.handle(event);
+
+    expect(collector.resume).toHaveBeenCalledWith(event, {
+      releaseUnanswered: true,
+    });
+  });
+
+  it('runs the command against the GROWI the text chose, instead of starting a request', async () => {
+    const { sink, flow, collector } = setupView(VIEW_ON);
+    collector.resume.mockResolvedValue({
+      status: 'growi-chosen',
+      invocation: anInvocation,
+      values: { path: '/memo' },
+      relationId: 'rel-b',
+    });
+
+    await sink.handle(typedInDm('2'));
+
+    expect(flow.runChosenGrowi).toHaveBeenCalledWith(
+      anInvocation,
+      { path: '/memo' },
+      'rel-b',
+    );
+    expect(flow.startCommand).not.toHaveBeenCalled();
+  });
+
+  it('runs the command once the text completes the values asked for', async () => {
+    const { sink, flow, collector } = setupView(VIEW_ON);
+    collector.resume.mockResolvedValue({
+      status: 'collected',
+      values: { keyword: 'foo' },
+      invocation: anInvocation,
+    });
+
+    await sink.handle(typedInDm('foo'));
+
+    expect(flow.runCollected).toHaveBeenCalledWith(anInvocation, {
+      keyword: 'foo',
+    });
+    expect(flow.startCommand).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'pending',
+    'cancelled',
+  ] as const)('starts nothing new when the text was taken as an answer (%s)', async (status) => {
+    const { sink, flow, collector } = setupView(VIEW_ON);
+    collector.resume.mockResolvedValue({ status });
+
+    await sink.handle(typedInDm('foo'));
+
+    expect(flow.startCommand).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'released',
+    'expired',
+  ] as const)('starts an agent request when the outstanding question is gone (%s)', async (status) => {
+    const { sink, flow, collector } = setupView(VIEW_ON);
+    collector.resume.mockResolvedValue({ status });
+
+    await sink.handle(typedInDm('別の質問です'));
+
+    expect(flow.startCommand).toHaveBeenCalledWith(
+      agentRequestFor('別の質問です'),
+    );
+    expect(flow.reportExpired).not.toHaveBeenCalled();
+  });
+
+  describe('everywhere else, routing is unchanged', () => {
+    it('keeps "search" a search in a DM while the view is off', async () => {
+      const { sink, flow, collector } = setupView(new Set());
+
+      await sink.handle(typedInDm('search for the release notes'));
+
+      expect(flow.startCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          commandName: COMMAND_NAMES.search,
+          argsText: 'for the release notes',
+        }),
+      );
+      expect(collector.resume).not.toHaveBeenCalled();
+    });
+
+    it('keeps "search" a search when no view setting is handed over at all', async () => {
+      const flow = mock<CommandFlow>();
+      const collector = mock<Pick<ArgumentCollector, 'resume'>>();
+      const sink = createEventSink({ flow, collector });
+
+      await sink.handle(typedInDm('search for the release notes'));
+
+      expect(flow.startCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ commandName: COMMAND_NAMES.search }),
+      );
+    });
+
+    it('keeps "search" a search in a Slack channel while the view is on', async () => {
+      const { sink, flow } = setupView(VIEW_ON);
+
+      await sink.handle(mentionEvent('@growi search for the release notes'));
+
+      expect(flow.startCommand).toHaveBeenCalledWith(
+        expect.objectContaining({
+          commandName: COMMAND_NAMES.search,
+          argsText: 'for the release notes',
+        }),
+      );
+    });
+
+    it('keeps "search" a search in another service\'s DM while Slack\'s view is on', async () => {
+      const { sink, flow } = setupView(VIEW_ON);
+
+      await sink.handle(
+        typedInDm('search for the release notes', 'mattermost'),
+      );
+
+      expect(flow.startCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ commandName: COMMAND_NAMES.search }),
+      );
+    });
+
+    it('ignores text naming no command in a DM while the view is off', async () => {
+      const { sink, flow, collector } = setupView(new Set());
+      const event = typedInDm('今週の議事録はどこ？');
+
+      await sink.handle(event);
+
+      expect(flow.startCommand).not.toHaveBeenCalled();
+      expect(collector.resume).toHaveBeenCalledWith(event);
+    });
+  });
+
+  describe('with the real argument collector behind it', () => {
+    const OPTIONS = [
+      { relationId: 'rel-a', growiLabel: 'GROWI A' },
+      { relationId: 'rel-b', growiLabel: 'GROWI B' },
+    ];
+
+    /** Just enough of the table for one user in one DM. */
+    const inMemoryCollections = () => {
+      const rows = new Map<string, PendingCollectionRecord>();
+      const repository = mock<PendingCollectionRepository>({
+        create: (row) => {
+          const record = { ...row, relationId: null };
+          rows.set(row.correlationId, record);
+          return Promise.resolve(record);
+        },
+        findByCorrelationId: (correlationId) =>
+          Promise.resolve(rows.get(correlationId) ?? null),
+        findInFlight: (platform, channelId, actorAccountId) =>
+          Promise.resolve(
+            [...rows.values()].find(
+              (row) =>
+                row.platform === platform &&
+                row.channelId === channelId &&
+                row.actorAccountId === actorAccountId,
+            ) ?? null,
+          ),
+        remove: (correlationId) => {
+          rows.delete(correlationId);
+          return Promise.resolve();
+        },
+      });
+      return { rows, repository };
+    };
+
+    const setupWithCollector = async () => {
+      const { rows, repository } = inMemoryCollections();
+      const privateReplier = mock<PrivateReplier>();
+      privateReplier.reply.mockResolvedValue({ kind: 'in-place' });
+      const collector = createArgumentCollector({
+        pendingCollections: repository,
+        platform: mock<ArgumentCollectorPlatform>(),
+        privateReplier,
+      });
+      // A GROWI choice left open in this DM, as `create-page` asked it.
+      await collector.startGrowiChoice(
+        { ...CommandInvocation.normalize(typedInDm('create-page /memo x')) },
+        { path: '/memo', body: 'x' },
+        OPTIONS,
+      );
+      const flow = mock<CommandFlow>();
+      return {
+        rows,
+        flow,
+        sink: createEventSink({ flow, collector, agentViewPlatforms: VIEW_ON }),
+      };
+    };
+
+    it('starts a new agent request from text that does not choose a GROWI, and drops the choice', async () => {
+      const { rows, flow, sink } = await setupWithCollector();
+
+      await sink.handle(typedInDm('今週の議事録を探して'));
+
+      expect(flow.startCommand).toHaveBeenCalledWith(
+        agentRequestFor('今週の議事録を探して'),
+      );
+      expect(flow.runChosenGrowi).not.toHaveBeenCalled();
+      expect(rows.size).toBe(0);
+    });
+
+    it('takes a numbered answer as the choice, and starts no request', async () => {
+      const { flow, sink } = await setupWithCollector();
+
+      await sink.handle(typedInDm('2'));
+
+      expect(flow.runChosenGrowi).toHaveBeenCalledWith(
+        expect.objectContaining({ commandName: COMMAND_NAMES.createPage }),
+        { path: '/memo', body: 'x' },
+        'rel-b',
+      );
+      expect(flow.startCommand).not.toHaveBeenCalled();
+    });
   });
 });

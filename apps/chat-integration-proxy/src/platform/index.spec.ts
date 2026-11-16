@@ -75,6 +75,7 @@ describe('the surface this layer publishes', () => {
       'OAuthExchangeTable',
       'PlatformFacade',
       'RECONCILE_INTERVAL_MS',
+      'agentViewPlatforms',
       'completeOAuthCallback',
       'createInstallationProvider',
       'createInstallationStore',

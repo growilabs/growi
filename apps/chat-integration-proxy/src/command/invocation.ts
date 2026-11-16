@@ -14,6 +14,8 @@
 // address, or a slash command registered with empty text) is a valid,
 // non-throwing outcome: rejecting an unrecognized or empty `commandName` is
 // `CommandSet`'s job (a later task), not this one's.
+import { COMMAND_NAMES } from '@growi/chat';
+
 import type { PlatformEvent } from '../types/index.js';
 import type { Invocation } from '../types/invocation.js';
 
@@ -90,6 +92,22 @@ export const CommandInvocation = {
         ? {}
         : { installation: event.installation }),
       ...(event.kind === 'mention' ? placeOf(event) : {}),
+    };
+  },
+
+  /**
+   * A message typed into Slack's AI app view: the whole text is an `agent`
+   * request, whatever its first word (design.md's DM routing; Requirement
+   * 15.15). Everything else is what `normalize` reads off the same mention,
+   * so the answer lands in the same thread and conversation.
+   */
+  agentRequest(
+    event: Extract<CommandStartEvent, { readonly kind: 'mention' }>,
+  ): Invocation {
+    return {
+      ...CommandInvocation.normalize(event),
+      commandName: COMMAND_NAMES.agent,
+      argsText: event.textWithoutBotAddress.trim(),
     };
   },
 };

@@ -39,6 +39,7 @@ import {
 } from './actor-roles.js';
 import {
   ADAPTER_FACTORIES,
+  agentViewPlatformsOf,
   createAppAdapters,
   createChatState,
   createInstallationAdapter,
@@ -332,6 +333,16 @@ const createPlatformBot = (
   });
   return { platform, adapter, chat };
 };
+
+/**
+ * The services whose DMs this deployment turned into an AI app view, read
+ * from the configuration the facade is opened with (`EventSink` routes those
+ * DMs by it).
+ */
+export const agentViewPlatforms = (
+  appConfig: PlatformAppConfig,
+): ReadonlySet<PlatformName> =>
+  agentViewPlatformsOf(appConfig, ADAPTER_FACTORIES);
 
 export const createPlatformFacade = async (
   appConfig: PlatformAppConfig,

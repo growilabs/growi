@@ -36,6 +36,7 @@ import type {
   OutboundMessage,
   PlatformEvent,
 } from '../types/index.js';
+import { CommandInvocation } from './invocation.js';
 import { type PrivateReplier, privateReplyOriginOf } from './private-reply.js';
 
 export type StartOutcome =
@@ -65,7 +66,22 @@ export type ResumeOutcome =
       readonly relationId: string;
     }
   | { readonly status: 'pending' }
+  /**
+   * Only with `ResumeOptions.releaseUnanswered`: a typed message did not
+   * answer what was outstanding, so the row is gone and the user was told.
+   */
+  | { readonly status: 'released' }
   | { readonly status: 'cancelled' | 'expired' | 'not-mine' };
+
+export interface ResumeOptions {
+  /**
+   * For a place where a typed message that answers nothing outstanding starts
+   * a new request instead -- Slack's AI app view, which offers no other way
+   * out of a question (design.md's DM routing). The outstanding question is
+   * dropped rather than asked again.
+   */
+  readonly releaseUnanswered?: boolean;
+}
 
 /** One GROWI a choice offers, as the user reads it and as it is answered. */
 export interface GrowiChoiceOption {
@@ -93,7 +109,7 @@ export interface ArgumentCollector {
     values: Readonly<Record<string, string>>,
     options: ReadonlyArray<GrowiChoiceOption>,
   ): Promise<StartOutcome>;
-  resume(event: PlatformEvent): Promise<ResumeOutcome>;
+  resume(event: PlatformEvent, options?: ResumeOptions): Promise<ResumeOutcome>;
   sweepExpired(now: Date): Promise<number>;
 }
 
@@ -456,6 +472,7 @@ export const createArgumentCollector = (
     record: PendingCollectionRecord,
     state: ChoiceState,
     text: string,
+    release: (() => Promise<ResumeOutcome>) | null,
   ): Promise<ResumeOutcome> => {
     const offered = offeredOptionsOf(record.offeredOptions);
     const position = Number.parseInt(text.trim(), 10);
@@ -464,6 +481,7 @@ export const createArgumentCollector = (
         ? offered[position - 1]
         : undefined;
     if (picked != null) return chosen(record, state, picked.relationId);
+    if (release != null) return release();
 
     // Undeliverable or not, the row stays: the user just reached us, and the
     // original question may still be answered.
@@ -473,6 +491,18 @@ export const createArgumentCollector = (
       growiChoiceMessage(record.commandName, record.correlationId, offered),
     );
     return { status: 'pending' };
+  };
+
+  /** Throws `record` away, telling the user at `invocation`'s place first. */
+  const discard = async (
+    invocation: Invocation,
+    record: PendingCollectionRecord,
+  ): Promise<void> => {
+    await privateReplier.reply(
+      privateReplyOriginOf(invocation, null),
+      discardNoticeFor(record.commandName),
+    );
+    await pendingCollections.remove(record.correlationId);
   };
 
   const loadOwn = async (
@@ -525,11 +555,7 @@ export const createArgumentCollector = (
         inFlight != null &&
         inFlight.channelId === invocation.channel.channelId
       ) {
-        await privateReplier.reply(
-          privateReplyOriginOf(invocation, null),
-          discardNoticeFor(inFlight.commandName),
-        );
-        await pendingCollections.remove(inFlight.correlationId);
+        await discard(invocation, inFlight);
       }
 
       const values = parseArgsText(invocation.argsText, fields);
@@ -577,7 +603,7 @@ export const createArgumentCollector = (
       return { status: 'pending', correlationId };
     },
 
-    resume: async (event) => {
+    resume: async (event, options) => {
       // A follow-up answer can only arrive as a mention: `reply` was removed
       // from `PlatformEvent` (design.md: 「`plainReply` に依存しない」), so the
       // user answers by addressing the bot again. Which collection it answers
@@ -594,14 +620,30 @@ export const createArgumentCollector = (
 
         const loaded = await loadOwn(inFlight.correlationId);
         if (loaded.kind !== 'ok') return { status: loaded.kind };
+        // Unlike `start`, a row only routed to this DM goes too: in the AI app
+        // view it would otherwise keep reading later messages as its answer.
+        const release =
+          options?.releaseUnanswered === true
+            ? async (): Promise<ResumeOutcome> => {
+                await discard(
+                  CommandInvocation.normalize(event),
+                  loaded.record,
+                );
+                return { status: 'released' };
+              }
+            : null;
         if (isChoiceState(loaded.state)) {
           return answerChoiceByPosition(
             loaded.record,
             loaded.state,
             event.textWithoutBotAddress,
+            release,
           );
         }
-        if (loaded.state.awaiting == null) return { status: 'not-mine' };
+        // Waiting on a modal: typed text cannot answer it.
+        if (loaded.state.awaiting == null) {
+          return release == null ? { status: 'not-mine' } : release();
+        }
 
         return advance(
           inFlight.correlationId,

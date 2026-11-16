@@ -315,3 +315,57 @@ describe('Invocation', () => {
     });
   });
 });
+
+describe('CommandInvocation.agentRequest (the Slack AI app view, 15.15)', () => {
+  const mentionInView = (
+    textWithoutBotAddress: string,
+  ): Extract<PlatformEvent, { kind: 'mention' }> => ({
+    kind: 'mention',
+    platform: 'slack',
+    channel,
+    actor,
+    text: textWithoutBotAddress,
+    textWithoutBotAddress,
+    inDirectMessage: true,
+    messageId: 'M0007',
+    threadRootId: null,
+    replyThreadRootId: 'M0007',
+    interaction: null,
+    installation: { kind: 'identified', installationId: 'T1' },
+  });
+
+  it('makes the whole text an agent request, even when it starts with another command name', () => {
+    const result = CommandInvocation.agentRequest(
+      mentionInView('search for the release notes'),
+    );
+
+    expect(result).toMatchObject({
+      commandName: 'agent',
+      argsText: 'search for the release notes',
+    });
+  });
+
+  it('keeps a mention of another person that leads the text (15.17)', () => {
+    const result = CommandInvocation.agentRequest(
+      mentionInView('<@U0002> の書いたページを探して'),
+    );
+
+    expect(result.argsText).toBe('<@U0002> の書いたページを探して');
+  });
+
+  it('keeps everything else a mention would carry, so the answer goes to the same thread', () => {
+    const event = mentionInView('link');
+
+    expect(CommandInvocation.agentRequest(event)).toEqual({
+      ...CommandInvocation.normalize(event),
+      commandName: 'agent',
+      argsText: 'link',
+    });
+    expect(CommandInvocation.agentRequest(event)).toMatchObject({
+      sourceMessageId: 'M0007',
+      replyThreadRootId: 'M0007',
+      isDirectMessage: true,
+      installation: { kind: 'identified', installationId: 'T1' },
+    });
+  });
+});

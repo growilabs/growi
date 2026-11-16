@@ -23,6 +23,7 @@ import type {
 import type { AdapterFactory, AppAdapterContext } from './adapter-set.js';
 import {
   ADAPTER_FACTORIES,
+  agentViewPlatformsOf,
   createAppAdapters,
   createChatState,
   createInstallationAdapter,
@@ -622,5 +623,51 @@ describe('listener windows (services that must be told to start listening)', () 
       await window?.ended;
       expect(ended).toBe(true);
     });
+  });
+});
+
+describe('agentViewPlatformsOf (where a DM is an AI app view, 15.15)', () => {
+  const withSlackAgentView = (agentView?: boolean): PlatformAppConfig => {
+    const { slack, ...rest } = FULL_APP_CONFIG;
+    if (slack == null) throw new Error('fixture has no Slack config');
+    return {
+      ...rest,
+      slack: { ...slack, ...(agentView == null ? {} : { agentView }) },
+    };
+  };
+
+  it('names Slack when the operator enabled its AI app view', () => {
+    expect([
+      ...agentViewPlatformsOf(withSlackAgentView(true), ADAPTER_FACTORIES),
+    ]).toEqual(['slack']);
+  });
+
+  it('names nothing while the view is off or Slack is not configured', () => {
+    const { slack: _slack, ...withoutSlack } = FULL_APP_CONFIG;
+
+    expect(
+      agentViewPlatformsOf(withSlackAgentView(), ADAPTER_FACTORIES).size,
+    ).toBe(0);
+    expect(
+      agentViewPlatformsOf(withSlackAgentView(false), ADAPTER_FACTORIES).size,
+    ).toBe(0);
+    expect(agentViewPlatformsOf(withoutSlack, ADAPTER_FACTORIES).size).toBe(0);
+  });
+
+  it('reads the registry it is handed rather than a hard-coded service name', () => {
+    const factories: Readonly<Record<PlatformName, AdapterFactory>> = {
+      slack: { credentialSource: 'app', create: () => null },
+      discord: {
+        credentialSource: 'app',
+        create: () => null,
+        agentView: () => true,
+      },
+      teams: { credentialSource: 'app', create: () => null },
+      mattermost: { credentialSource: 'installation', create: () => null },
+    };
+
+    expect([
+      ...agentViewPlatformsOf(withSlackAgentView(true), factories),
+    ]).toEqual(['discord']);
   });
 });
