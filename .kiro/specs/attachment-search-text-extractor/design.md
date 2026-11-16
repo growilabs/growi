@@ -21,7 +21,7 @@
 
 **Purpose**: 形式ごとに適した部品で文字を取り出し、日本語の検索に向く形に正規化して返す。悪意あるファイルや重いファイルが来ても、サービス全体と他テナントの抽出を止めない。monorepo のほかの部分と同じ TypeScript と道具で保守できるようにする。
 
-**Users**: 直接の利用者は apps/app (下流 spec `attachment-search-indexing`)。運用者は GROWI.cloud の SRE (k8s の共有 Deployment) と OSS の配布者 (docker-compose)。
+**Users**: 直接の利用者は apps/app (下流 spec `attachment-search-indexing`)。運用者は GROWI.cloud の SRE (k8s の共有 Deployment) と OSS の配布者 (Docker image)。
 
 **Impact**: サービスは Node.js 24 + Hono で書き、`apps/pdf-converter` と同じく pnpm workspace の一員である。そのため開発者全員の `pnpm install` に anydoc のネイティブ部品 (linux x64 で約 8MB) と PDFium の WASM (約 7MB) が入る。API の型 (`ErrorCode`) と、経路の定義から作る OpenAPI の文書は、下流の生成クライアントと apps/app の分類に直結する (§Revalidation Triggers)。
 
@@ -51,7 +51,7 @@
 - `pages[]` の意味の取り決め (単位、`pageNumber` / `label` の付け方、空の要素の扱い、最低 1 要素を返す規則)
 - エラーの分類と HTTP ステータスの対応 (§Error Handling)
 - OpenAPI の文書: 経路の定義から作り、`scripts/export-openapi.ts` で `packages/attachment-text-extractor-client/openapi.json` に書き出す。文書が変わったときは、生成クライアントの作り直しと apps/app の呼び出し側 (`apps/app/src/features/search-attachments/server/services/attachment-text-extractor.ts` とそのテスト) の名前と型の書き方の修正も、同じ変更で行う (7.4)
-- docker-compose のエントリ (`infra/docker/compose.yaml`) と、このサービス専用の CI workflow (`.github/workflows/ci-attachment-text-extractor.yml`)
+- このサービス専用の CI workflow (`.github/workflows/ci-attachment-text-extractor.yml`)
 
 ### Out of Boundary
 
@@ -86,7 +86,7 @@
 - **同じコードが複数の HTTP ステータスを持つこと**: `extraction_failed` は、壊れたファイル・不正な本文・切断では 422、想定外の異常では 500 になる。`extraction_timeout` は、本文の受信の期限切れと変換の期限切れの両方で 408 になる。apps/app はステータスではなくコードで分岐しているので今は影響しないが、ステータスで判断する処理を足すときは注意する
 - **`code` を持たない応答**: Node の HTTP の層が返す 400 (壊れた HTTP の要求、`Content-Length` が本文より短く `Connection: close` の要求)・408 (何も送らない接続を 60 秒で閉じる)・417 (`Expect` が `100-continue` 以外)・431 (16KiB を超えるヘッダー) と、Hono の既定の 404 (本文は JSON でなく文字列) は、`ErrorResponse` の形を持たない。apps/app の `mapAxiosErrorToOutcome` は `code` の無い応答をすべて `serviceUnreachable` にする。apps/app (axios) はどの形も送らない
 - **`pages[]` の規則**: 「最低 1 要素を返す」「中身が空の要素は除く (全部空なら空の 1 要素)」「`pageNumber` に飛びがありうる (XLSX の空シート)」は、下流の検索文書の作り方の前提になる
-- **health / readiness の応答**: `/readyz` の 200 は `{"status":"ready","dependencies":{...}}` で、`dependencies` のキーは `@firecrawl/anydoc`・`@embedpdf/pdfium`・`prlimit`・`converter` である (部品の実名。読み込めているものが運用者に分かるようにするため)。503 の本文は `{"status":"not_ready"}` だけで、`dependencies` を出さない。OpenAPI の文書は 200 と 503 の両方に型を付けるが、`dependencies` は「名前から `ok` への対応」としてだけ型を付けるので、キーの名前を変えても生成クライアントは変わらない。形を変えるときは文書を書き出し直す。apps/app は health / readiness を呼んでいない。k8s と compose の確認はステータスだけを見る
+- **health / readiness の応答**: `/readyz` の 200 は `{"status":"ready","dependencies":{...}}` で、`dependencies` のキーは `@firecrawl/anydoc`・`@embedpdf/pdfium`・`prlimit`・`converter` である (部品の実名。読み込めているものが運用者に分かるようにするため)。503 の本文は `{"status":"not_ready"}` だけで、`dependencies` を出さない。OpenAPI の文書は 200 と 503 の両方に型を付けるが、`dependencies` は「名前から `ok` への対応」としてだけ型を付けるので、キーの名前を変えても生成クライアントは変わらない。形を変えるときは文書を書き出し直す。apps/app は health / readiness を呼んでいない。k8s と Docker の確認はステータスだけを見る
 - **`label` の中身**: PDF と PPTX の `label` は番号だけの文字列 (例: `"12"`) にし、「スライド」「p.」などの文言は付けない。GROWI は 5 言語に対応しており、文言は UI 側で各言語に合わせて付けるべきだから。attachment-search-ui spec は `label` を「Slide N / Sheet name / Page N」の表示文字列として想定しているので、形式と `pageNumber` から文言を組み立てる形に直す必要がある
 - **生成クライアントの名前 (7.1, 7.2, 7.4)**: 文書を経路の定義から作るので、操作とスキーマの名前は文書を作る道具 (`hono-openapi` + zod) の既定で決まる。いまの名前は `postExtract`・`getHealthz`・`getReadyz`、本文の型 `PostExtractBody` (`file: Blob` 必須、`mimeType?: string`)、応答の型 `PostExtractResult`・`GetHealthz200`・`GetHealthzResult`・`GetReadyz200`・`GetReadyz200Dependencies`・`GetReadyz503`・`GetReadyzResult`、名前の付いたスキーマ `ErrorCode`・`ErrorResponse`・`ExtractResponse`・`PageInfo`・`PageInfoPageNumber`・`PageInfoLabel` である。経路の定義やスキーマ、文書を作る部品の版を変えると名前が変わりうるので、変えたときは生成クライアントを作り直し、apps/app の呼び出し側を直し、名前の対応を research.md に記録する (7.5。いまの対応は research.md §5.6)
 
@@ -351,7 +351,7 @@ interface ConversionRunner {
 子プロセスの中で、親を見張り、変換を呼んで結果を 1 回だけ送る (2.5, 2.6, 2.7)。
 
 - 入力は fd 0 を同期の読み取り (`readSync`) で読む。`process.stdin` に触ると fd 0 が非同期の読み方に変わるため
-- 起動直後に `/proc/self/oom_score_adj` に 1000 を書く (値を上げる方向なので権限は要らない)。cgroup v1 や docker-compose では、コンテナのメモリが足りなくなったとき、OS が HTTP のプロセスより先に子を止めるようになる。ただし k8s (cgroup v2) の既定では `memory.oom.group` が有効で、コンテナが上限に達すると OS はコンテナ内のプロセスをまとめて止めるので、この設定は効かない。メモリの主な守りは、親の RSS 監視で上限の手前で止めることである。書けなかったときは警告を出して変換を続ける
+- 起動直後に `/proc/self/oom_score_adj` に 1000 を書く (値を上げる方向なので権限は要らない)。cgroup v1 や Docker 単体では、コンテナのメモリが足りなくなったとき、OS が HTTP のプロセスより先に子を止めるようになる。ただし k8s (cgroup v2) の既定では `memory.oom.group` が有効で、コンテナが上限に達すると OS はコンテナ内のプロセスをまとめて止めるので、この設定は効かない。メモリの主な守りは、親の RSS 監視で上限の手前で止めることである。書けなかったときは警告を出して変換を続ける
 - 親が先に終わったら子も終わる (2.7 の隔離の一部): 子の中に見張り専用の worker thread を 1 つ立て、その worker 自身のイベントループで fd 4 をソケットとして読み、読み終わり (親が消えて書き込み側が閉じた) で自分に SIGKILL を送る。子のメインのスレッドが同期の処理 (PDFium の WASM、長い文字列の処理) で止まっていても働く (親を SIGKILL して 3〜7ms で子が終わる)。worker の中で止まる読み方 (`fs.readSync`) を使うと、子の `process.exit()` が worker を待って返らなくなるので使わない (research.md §4.3)。worker には `execArgv: []` を渡す (親の node の引数を受け継ぐと起動に失敗する場合がある)。worker の分だけ子の RSS が約 12MB 増える
 - 子の警告 (`oom_score_adj` を上げられない、入力が不正、結果を送れない、想定外の失敗) は、標準エラーに決まった 4 つの符号のどれかを 1 行で書くだけにする。例外の文や入力は書かない
 
@@ -524,7 +524,7 @@ interface ConversionRunner {
 ```
 
 - 69MiB は image の外で測った待機時の値で、image の中の 34〜35MiB より大きいが、用心のためにそのまま使う
-- 書き込める `/tmp` は要らない (サービスが書くファイルは子の `/proc/self/oom_score_adj` だけ)。メモリの上の tmpfs を付けるなら、その大きさを式に足す (compose は 64MiB を付けているので 2,008MiB)
+- 書き込める `/tmp` は要らない (サービスが書くファイルは子の `/proc/self/oom_score_adj` だけ)。メモリの上の tmpfs を付けるなら、その大きさを式に足す (64MiB を付けるなら 2,008MiB)
 - 本物の変換の値を項に入れると約 2,025〜2,070MiB で 2Gi とほぼ同じか少し超えるが、同時には起きない最大値を足しているためで、ユーザーが実測を根拠にすることを承認した (research.md §4.9)
 - 運用者が `MAX_CONCURRENCY` か `MAX_CHILD_RSS_MB` を上げたら、式の増える分だけ上限を上げる。`MAX_FILE_SIZE_MB` を上げたら測り直す (50MB で測った値である)
 
@@ -577,14 +577,14 @@ interface ConversionRunner {
 - **実行管理と子の結合テスト** (`*.integ.ts`、Linux でだけ動く): 本物の子プロセスで、時間切れ、RSS の超過、異常終了 (abort / segfault を起こす子)、親の消失、結果の上限、`prlimit` の上限が掛かっていること、トークンが子に渡らないこと (`/proc/<pid>/environ`)、子が残らないことを確かめる。子は `dist/` の JavaScript として起動するので、テストの前に build する (`test/global-setup.ts`。同じ package で vitest を 2 つ同時に動かすと、互いの `dist/` を壊す)。時間の期限は小数の引数で渡して短くする
 - **HTTP の黒箱のテスト** (`test/http/`): 外から HTTP だけで確かめる。既定ではテストの中でサービスを起動し、URL を環境変数で渡すと外のサービスに向けられる
 - **層の向きのテスト** (`test/layers/`): §層の分け方の判断 1・2・5 の規則を、本番のファイルの import と突き合わせる
-- **配備物のテスト** (`test/deploy/`): Dockerfile と compose を読んで中身を確かめる。本番の依存の一覧も固定する。運用者向けの文書 (`docker/README.md`) は文章なので、自動のテストの対象にしない
+- **配備物のテスト** (`test/deploy/`): Dockerfile を読んで中身を確かめる。本番の依存の一覧も固定する。運用者向けの文書 (`docker/README.md`) は文章なので、自動のテストの対象にしない
 - **OpenAPI**: 書き出しの手順をプロセスとして動かし、出力を commit 済みの `openapi.json` と完全に比べる (7.3)。`/extract` の実際の応答を `ajv` で文書と照合する
 - **既定の上限での余裕 (基準値)**: 7 万セル 1 シートの XLSX と、画像 12 枚の 48MB の DOCX の子の最大 RSS (子が自分で読んだ `VmHWM`) が、上限の 0.95 倍 (304MB) 未満であることを確かめる。手元の値は XLSX 289〜294MB、DOCX 262〜297MB で、余裕は 10〜30MB しか無い。CI の機械や負荷で揺れたら、まずこの許容を見る (50ms ごとの見回りの値は、終わる直前の山を取り逃がして DOCX で最大約 50MB 少なく出る)
 - **image の中のメモリの計測 (CI)**: workflow を人が起動したとき (`workflow_dispatch`) だけ動く。最も重い負荷を各 3 回流し、コンテナ全体の値が 2,048MiB を超えたとき、または計測が正しく行えなかったとき (回数の不足、基準のファイルが無い、子の最大 RSS がログに無い、意図しない応答) だけ失敗にする。基準のファイルの子の最大 RSS が 304MB を超えたら警告にする (失敗にしない。本当の上限 320MB はサービス自身が守る)。動かすのは、anydoc・PDFium・Node の元の image を上げたときと、メモリに関わるコードを変えたときである (workflow の `paths` は `pnpm-lock.yaml` を含むので、push のたびに測ると関係の無い依存の更新でも動く)
 - **検索の品質のベンチマーク** (`benchmark/`): 日本語を含む 23 文書と正解の語句 118 個で、語句の再現率、位置の正しさ、文字化けと分断、Elasticsearch (kuromoji) での検索の当たり方を測る。PDF の部品や anydoc の版を替えたら流し、`benchmark/baseline/python-baseline.json` と比べて下回らないことを確かめる (research.md §4.1)。このファイルは、移行の前の実装で測った基準値である
 - **負荷に弱いテスト**: 子の RSS の余裕、イベントループの止まり、「1 秒以内」を見るテストなどは、2 vCPU の機械や並行して動くテストで落ちうる。落ちたら許容を広げるのではなく、時間に頼る部分を外すか、制限時間を明示する (一覧は research.md §4.14)
 - **テストの書き方**: `essential-test-design` (観察できる結果を確かめ、仕組みを確かめない) と `essential-test-patterns` (vitest、`mock<T>()` を使い、型の主張 `as` を避ける) に従う
-- **自動では確かめられず、人が確かめること** (未確認のまま残っている): (1) linux-arm64 の image の build と動作。(2) `docker compose build` と `up` (`env_file`、コンテナの中の healthcheck、`/tmp` の tmpfs、`pids_limit: 256` が親と子 3 つと確認用の子と healthcheck のスレッドに足りること)。(3) 展開した image の大きさ (CI の報告 89,175,439 バイトは圧縮した大きさの見込み)。(4) 既定のブランチに入った後に、メモリの計測を人が起動して流すこと。(5) GitHub 上で workflow を変えたときは、trigger の条件に合うブランチで動かし、`gh api repos/<org>/<repo>/actions/runs/<id>/jobs` でジョブの数が 0 より多く、すべてのステップが成功していることを確かめる (0 ジョブの実行は成功とみなさない)
+- **自動では確かめられず、人が確かめること** (未確認のまま残っている): (1) linux-arm64 の image の build と動作。(2) 展開した image の大きさ (CI の報告 89,175,439 バイトは圧縮した大きさの見込み)。(3) 既定のブランチに入った後に、メモリの計測を人が起動して流すこと。(4) GitHub 上で workflow を変えたときは、trigger の条件に合うブランチで動かし、`gh api repos/<org>/<repo>/actions/runs/<id>/jobs` でジョブの数が 0 より多く、すべてのステップが成功していることを確かめる (0 ジョブの実行は成功とみなさない)
 
 ## 配布物と CI
 
@@ -612,17 +612,11 @@ AC 3.3 の推奨設定を含め、サービスを動かすときに守る条件�
 - 必要な環境変数と、GROWI の側の大きさの上限との関係
 - ログの形
 - 最初の CI の実行で確かめたことと、まだ確かめていないこと
-
-### docker-compose (`infra/docker/compose.yaml`)
-
-- build は `context: ../..` と `dockerfile: apps/attachment-text-extractor/docker/Dockerfile`
-- `read_only`、`user: "10001:10001"`、`cap_drop: ALL`、`no-new-privileges`、`mem_limit: 2g`、`memswap_limit: 2g`、`pids_limit: 256`、外向き通信の無い内部のネットワーク
-- `/tmp` の tmpfs 64MiB は付けている (メモリの式で 2,008MiB ≤ 2g)
-- healthcheck は `node -e` で `http://127.0.0.1:8000/readyz` を見る (slim の image には curl も wget も無い。サービスは IPv4 だけで待ち受けるので `localhost` にしない)。中の期限 14 秒、Docker の `timeout` 15 秒 (確認用の子の期限 10 秒より長くする)
+- コマンド形式の healthcheck (Docker の `HEALTHCHECK` など) は、slim の image に curl も wget も無いので `node -e` で `http://127.0.0.1:8000/readyz` を見る。サービスは IPv4 だけで待ち受けるので `localhost` にしない。中の期限 14 秒、確認の `timeout` 15 秒 (確認用の子の期限 10 秒より長くする)
 
 ### CI (`.github/workflows/ci-attachment-text-extractor.yml`)
 
-- trigger は push (この app、生成クライアントの `openapi.json`、`infra/docker/compose.yaml`、workflow 自身、ルートの `biome.json`・`tsconfig.base.json`・`turbo.json`、`pnpm-lock.yaml` の変更) と `workflow_dispatch`。`apps/attachment-text-extractor/turbo.json` の `test` の `inputs` にも、生成クライアントの `openapi.json` と compose を入れる (どちらかだけを変えた変更でも検査が動くように)
+- trigger は push (この app、生成クライアントの `openapi.json`、workflow 自身、ルートの `biome.json`・`tsconfig.base.json`・`turbo.json`、`pnpm-lock.yaml` の変更) と `workflow_dispatch`。`apps/attachment-text-extractor/turbo.json` の `test` の `inputs` にも、生成クライアントの `openapi.json` を入れる (生成クライアントだけを変えた変更でも検査が動くように)
 - ジョブ 1 (lint とテスト): `turbo run lint test --filter @growi/attachment-text-extractor` (biome、`tsgo`、vitest。OpenAPI の drift の検査を含む)
 - ジョブ 2 (image の確認。`scripts/image-check/check-image.sh` を段階ごとに呼ぶ): build、400MB 以下、image の中身 (本番に不要なものが無い、uid 10001)、`--read-only --user 10001 --network none --cap-drop ALL --security-opt no-new-privileges` (tmpfs なし) での起動、`/readyz` が 200、PDF と DOCX の `POST /extract` が 200、動いているコンテナの中で本番と同じ条件で `prlimit` を実行して上限を確かめること、コンテナの `/openapi.json` が書き出しの手順の文書と同じこと、失敗したときのログ、後片づけ。メモリの計測のステップは `workflow_dispatch` のときだけ動く
 - 2 つのジョブは互いを待たない。ほかの workflow はこの package のテストを流さない。apps/app の CI は、生成クライアントを orval で作り直して commit 済みのものと同じことを確かめる
@@ -667,7 +661,7 @@ AC 3.3 の推奨設定を含め、サービスを動かすときに守る条件�
 | 2.5, 2.7, 2.9 | ConversionRunner、Child 層、抽出の流れ |
 | 2.6 | ArchiveGuard、XlsxSheetSplitter、PdfConverter、Configuration |
 | 2.8 | ConversionRunner、Configuration (メモリの守り方) |
-| 3.1 | 配布物と CI (docker-compose) |
+| 3.1 | 配布物と CI (Dockerfile、運用者向けの文書) |
 | 3.2, 3.4 | Performance & Scalability、運用者向けの文書 |
 | 3.3 | 運用者向けの文書、Security Considerations |
 | 4.1 | Boundary Commitments (独立したサービス) |

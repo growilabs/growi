@@ -5,7 +5,7 @@ Extracts the text of an attachment (PDF, Office documents, CSV, HTML, plain text
 for GROWI's full-text search. It parses untrusted files, so each conversion runs
 in a short-lived child process under memory and time limits.
 
-This page is for whoever writes the real deployment (Kubernetes, compose, ...):
+This page is for whoever writes the real deployment (Kubernetes, Docker Compose, ...):
 the conditions the service is designed and tested under, each with its reason.
 No deployment manifests are shipped.
 
@@ -19,7 +19,7 @@ No deployment manifests are shipped.
 > limit; conversion children 291 MB (XLSX), 262 - 266 MB (DOCX) and 305 - 306 MB
 > (a single-page 2-million-character PDF) against the 320 MB cap.
 >
-> **Still unverified:** linux-arm64, `docker compose build` and `up`, the memory
+> **Still unverified:** linux-arm64, the memory
 > measurement started by hand (`workflow_dispatch`), and behaviour under a real
 > orchestrator (probes, rolling update, termination grace).
 
@@ -119,6 +119,11 @@ service fetch or send anything) and allow inbound port 8000 from the app alone.
   conversion child under a 10 s limit, so give the check a timeout of 15 s, and a
   period no shorter than that (20 s, 3 failures). A 503 means "send no traffic
   for now" and can recover by itself; it is not a reason to restart.
+- A command-style health check (for example a Docker `HEALTHCHECK`) cannot use
+  curl or wget: the slim image has neither. Run `node -e` against
+  `http://127.0.0.1:8000/readyz` (not `localhost`: the service listens on IPv4
+  only), with the in-script deadline below the check timeout (14 s inside a 15 s
+  timeout).
 
 **Graceful stop: at least 85 s.** On SIGTERM the service stops accepting and
 waits for the requests in flight, with no upper bound of its own (a second

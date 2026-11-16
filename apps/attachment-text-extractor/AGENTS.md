@@ -22,7 +22,7 @@ Run from `apps/attachment-text-extractor/`.
 pnpm run lint:biome        # biome check
 pnpm run lint:typecheck    # tsgo --noEmit
 pnpm vitest run            # all tests (about 2 minutes)
-pnpm vitest run compose.spec   # one file, by partial name
+pnpm vitest run dockerfile.spec   # one file, by partial name
 pnpm run build             # dist/ (tsc + .js extensions)
 ```
 

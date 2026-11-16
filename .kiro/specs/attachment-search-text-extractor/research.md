@@ -103,7 +103,7 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 ### 1.3 サービスの構成
 
 - **動かす場所**: apps/app のプロセスの中では動かさない。独立したコンテナとして動かし、apps/app からは HTTP (multipart) で呼ぶ。
-- **配布**: GROWI.cloud では k8s の共有 Deployment + 自動スケールとして、テナント間で共有する。OSS 版は docker-compose に 1 コンテナとして同梱する。サービスは状態を持たない。k8s の manifest の例は持たず、守る条件を `docker/README.md` に文章で書く (§5.8)。
+- **配布**: GROWI.cloud では k8s の共有 Deployment + 自動スケールとして、テナント間で共有する。OSS 版は Docker image を使う。サービスは状態を持たない。k8s の manifest の例は持たず、守る条件を `docker/README.md` に文章で書く (§5.8)。
 - **言語と実行環境**: Node.js 24 + TypeScript。HTTP は Hono (`@hono/node-server`)。monorepo のほかの部分と同じ言語と道具 (pnpm / turbo / vitest / biome) で保守する。
 - **置き場所**: `apps/attachment-text-extractor/` (`@growi/attachment-text-extractor`)。`apps/pdf-converter` と同じく pnpm workspace の一員で、package ごとの `turbo.json` を持つ。`pnpm-workspace.yaml`、ルートの `turbo.json`、`vitest.workspace.mts` は変えずに済む (`apps/*` がすでに対象)。
 - **変換の実行**: 変換は、リクエストごとに 1 つの子プロセスで実行する。子は `/usr/bin/prlimit` で包んだ `child_process.spawn` で起動する (§4.3)。
@@ -120,6 +120,7 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 - **image の大きさ**: 400MB 以下 (CI が検査する。§4.13)。
 - **CI**: このサービス専用の GitHub Actions workflow (`.github/workflows/ci-attachment-text-extractor.yml`)。lint とテストのジョブと、image の確認のジョブを持つ。ほかの app の workflow と同じ `ci-<app>.yml` の名前にした。
 - **OpenAPI → 生成クライアント**: 経路の定義の横に書いた zod のスキーマから `hono-openapi` で文書を作る (§4.5)。`scripts/export-openapi.ts` で `packages/attachment-text-extractor-client/openapi.json` に書き出し、orval で生成クライアントを作る。名前は道具の既定に従う。
+- **compose ファイルは同梱しない**: どこからも使われておらず、運用の条件は `docker/README.md` にある。ユーザーの決定 2026-11-16。
 
 ### 1.4 外部とのつながりとライセンス
 
@@ -166,7 +167,6 @@ umbrella 側の資料: [../attachment-search/research.md](../attachment-search/r
 次の確認は、開発環境に docker が無いため行っておらず、未確認のまま完了にした (ユーザーの決定、2026-11-12)。
 
 - linux-arm64 の image の build と動作 (`node:24.22.2-bookworm-slim` の arm64 のタグと、`@firecrawl/anydoc-linux-arm64-gnu` が npm にあることは確かめた)。
-- `docker compose build` と `up` (`env_file`、コンテナの中の healthcheck、`/tmp` の tmpfs、`pids_limit: 256` が親と子 3 つと確認用の子と healthcheck の `node` のスレッドの数に足りること)。
 - 展開した image の大きさ (CI が報告した 89,175,439 バイトは圧縮した大きさの見込み。見積もりは約 300MB)。
 - メモリの計測を人が workflow を起動して流すこと (workflow のファイルが既定のブランチに入るまで起動できない)。
 - 304MB を超えたときの `::warning::` の行が GitHub Actions の注釈になること。
@@ -1041,7 +1041,7 @@ Node と Hono の既定の振る舞いを採り、以前の実装に合わせる
 | Req 6.x | 進め方 (TDD とレビュー) | research.md §4.12、§7.1 |
 | Req 7.x | OpenAPI と生成クライアント | Req 7.x (同じ枝番) |
 | Req 8.1〜8.3、8.7 | image の元・大きさ・中身・`prlimit` の検査 | design.md §配布物と CI (Dockerfile) |
-| Req 8.4 | compose のエントリ | design.md §配布物と CI (docker-compose)、AC 3.1 |
+| Req 8.4 | Docker image の配布 (compose は同梱しない) | design.md §配布物と CI (Dockerfile)、AC 3.1 |
 | Req 8.5 | 運用者向けの文書 | AC 3.3、design.md §配布物と CI |
 | Req 8.6 | `/dev/shm` を使わない | design.md §Security Considerations |
 | Req 8.8 | `prlimit` が使えなければ `/readyz` を 503 | design.md §HealthRoutes |

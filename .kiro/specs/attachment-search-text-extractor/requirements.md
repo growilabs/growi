@@ -15,7 +15,7 @@ GROWI monorepo には添付ファイル (PDF / Office / テキスト系) から�
 ### 達成したい姿
 
 - 添付ファイルのバイト列を HTTP multipart で受け取り、ページ / スライド / シート単位に分割した Markdown テキストを JSON で返す独立マイクロサービスが存在する
-- サービスはステートレスで、k8s の共有 Deployment として運用でき、OSS docker-compose でも同梱できる
+- サービスはステートレスで、k8s の共有 Deployment として運用でき、Docker image を使う OSS の環境でも動かせる
 - 外部バイナリ・ネットワーク egress を要求せず、npm から取得できる部品 (ビルド済みのネイティブ部品と WebAssembly を含む) だけで完結する
 - 悪意ある大容量 / 細工された / ハングを起こす添付に対するリソース保護 (最大サイズ / タイムアウト / 同時実行上限 / 展開量などの上限) が組み込まれている
 - 日本語の添付を検索で見つけられる形のテキストを返す (抽出時に入る語の途中の空白・改行を残さない)
@@ -29,7 +29,7 @@ GROWI monorepo には添付ファイル (PDF / Office / テキスト系) から�
 
 ### スコープ
 
-- **In**: `apps/attachment-text-extractor/` ディレクトリ全体 (package 設定 / src / テスト / scripts / ベンチマーク / Dockerfile / 運用者向けの文書 `docker/README.md` / `AGENTS.md`) / Hono アプリ (`POST /extract` multipart、`GET /healthz`、`GET /readyz`、`GET /openapi.json`) / 形式別の変換と形式の対応表 / リソース保護 / 日本語テキストの正規化 / API のスキーマ / 経路の定義から作る OpenAPI の文書とその書き出し / docker-compose エントリ / 専用 CI workflow (`.github/workflows/ci-attachment-text-extractor.yml`) / サービス単体テスト
+- **In**: `apps/attachment-text-extractor/` ディレクトリ全体 (package 設定 / src / テスト / scripts / ベンチマーク / Dockerfile / 運用者向けの文書 `docker/README.md` / `AGENTS.md`) / Hono アプリ (`POST /extract` multipart、`GET /healthz`、`GET /readyz`、`GET /openapi.json`) / 形式別の変換と形式の対応表 / リソース保護 / 日本語テキストの正規化 / API のスキーマ / 経路の定義から作る OpenAPI の文書とその書き出し / 専用 CI workflow (`.github/workflows/ci-attachment-text-extractor.yml`) / サービス単体テスト
 - **Out**: GROWI 側統合 (AttachmentService ハンドラ登録、ES インデックス化、生成クライアントを使う側の実装、検索結果 UI、管理画面、抽出失敗ログの Mongo 永続化等) は下流 spec の責務。k8s の manifest の例は持たない (動かすときに守る条件は `docker/README.md` に文章で書く)。画像 OCR / 音声動画文字起こし / YouTube / Azure DI / ZIP 再帰展開 / Docling 等の高精度抽出 / Outlook MSG は本 spec のスコープ外
 
 ### 制約
@@ -65,7 +65,6 @@ GROWI 本体 (apps/app) との統合、生成クライアントの利用、Elast
   - 外部 egress 遮断下での動作と、外部バイナリを要しない依存 (例外は util-linux の `prlimit`。AC 1.7 の注記)
   - API のスキーマ (`ExtractResponse` / `PageInfo` / `ErrorResponse` / `ErrorCode`) と API 契約
   - Dockerfile (multi-stage、非 root、セキュリティハードニング対応) と、動かすときに守る条件を理由つきで書いた運用者向けの文書 (`docker/README.md`)
-  - docker-compose エントリ (OSS 配布向け)
   - 経路の定義から作る OpenAPI の文書と、その書き出し (`scripts/export-openapi.ts` → `packages/attachment-text-extractor-client/openapi.json`)、書き出した文書と commit 済みの文書の食い違いの検査。文書が変わったときの生成クライアントの作り直しと、それに合わせる apps/app の呼び出し側の名前と型の書き方の修正 (Req 7)
   - 専用 CI workflow (lint / 型の検査 / vitest / image の確認)
   - サービス単体テストと、検索の品質のベンチマーク
@@ -133,16 +132,16 @@ GROWI 本体 (apps/app) との統合、生成クライアントの利用、Elast
 
 <!-- derived from umbrella Requirement 13 (AC 13.1, 13.2, 13.3, 13.5 のみ。13.4 は apps/app 側責務として attachment-search-indexing spec へ) -->
 
-**Objective:** GROWI の配布者 (OSS / GROWI.cloud) として、抽出サービスを既存の配布の仕組み (docker-compose / k8s) に加え、セキュリティの設定を強制した形で運用したい。なぜなら、既存の運用者が導入する手間を抑えつつ、コンテナからの脱出や外部通信による情報漏洩の危険を減らすから。
+**Objective:** GROWI の配布者 (OSS / GROWI.cloud) として、抽出サービスをDocker image と k8s の共有 Deployment として、セキュリティの設定を強制した形で運用したい。なぜなら、既存の運用者が導入する手間を抑えつつ、コンテナからの脱出や外部通信による情報漏洩の危険を減らすから。
 
 #### Acceptance Criteria
 
-1. The OSS docker-compose 配布 shall 抽出サービスを単一コンテナとして同梱し、既存の compose 体系に追加する <!-- derived from umbrella R13.1 -->
+1. The 抽出サービス shall 単一コンテナの Docker image として配布され、Dockerfile (`apps/attachment-text-extractor/docker/Dockerfile`) と、運用者向けの文書 (`docker/README.md`) を同梱する。compose ファイルは同梱しない <!-- derived from umbrella R13.1 -->
 2. The GROWI.cloud (k8s) 配布 shall 抽出サービスを共有 Deployment として提供し、負荷に応じて HPA により自動スケールする <!-- derived from umbrella R13.2 -->
 3. The 抽出サービスの運用者向けの文書 (`apps/attachment-text-extractor/docker/README.md`) shall read-only root filesystem、非 root 実行、capabilities drop、network egress 遮断、tmpfs ベースの一時領域 (必要な場合) を推奨設定として、それぞれ理由を付けて提供する <!-- derived from umbrella R13.3 -->
 4. The 抽出サービス shall 状態を持たず (ステートレス)、任意のレプリカ数でスケール可能である <!-- derived from umbrella R13.5 -->
 
-**自動テストで検証できない残存ギャップ**: k8s の manifest は持たないので、3.2 の共有 Deployment と自動スケールの設定は、運用者が `docker/README.md` の条件から書く。そこにある CPU の requests / limits と自動スケールの値は出発点で、測った値ではない。CI は image のビルド、大きさ、read-only rootfs・uid 10001・ネットワークなしでの起動、`/readyz`、PDF と DOCX の抽出を確かめている (research.md §4.13)。確かめていないのは、`docker compose build` と `up` (compose の healthcheck、`/tmp` の tmpfs、`pids_limit` を含む)、linux-arm64 の image、展開した image の大きさ、本物のオーケストレーターの下での動き (確認、入れ替え、停止の猶予) である。
+**自動テストで検証できない残存ギャップ**: k8s の manifest は持たないので、3.2 の共有 Deployment と自動スケールの設定は、運用者が `docker/README.md` の条件から書く。そこにある CPU の requests / limits と自動スケールの値は出発点で、測った値ではない。CI は image のビルド、大きさ、read-only rootfs・uid 10001・ネットワークなしでの起動、`/readyz`、PDF と DOCX の抽出を確かめている (research.md §4.13)。確かめていないのは、linux-arm64 の image、展開した image の大きさ、本物のオーケストレーターの下での動き (確認、入れ替え、停止の猶予) である。
 
 ### Requirement 4: マルチテナント隔離
 

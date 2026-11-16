@@ -17,7 +17,7 @@ GROWI には添付ファイル (PDF / Office 等) のテキストを抽出する
 ## Desired Outcome
 
 - 添付ファイルのバイト列を HTTP multipart で受け取り、**ページ/スライド/シート単位に分割した Markdown テキスト** を JSON で返す独立マイクロサービスが存在する
-- サービスは **ステートレス** で、k8s の共有 Deployment として運用でき、OSS docker-compose でも同梱できる
+- サービスは **ステートレス** で、k8s の共有 Deployment として運用でき、Docker image を使う OSS の環境でも動かせる
 - 外部バイナリ・ネットワーク egress を要求せず、npm から取得できる部品 (ビルド済みのネイティブ部品と WASM を含む) だけで完結する (子プロセスに上限を掛ける util-linux の `prlimit` は例外として認める)
 - 悪意ある大容量/ハングを起こす添付に対するリソース保護 (最大サイズ / タイムアウト / 同時実行上限) が組み込まれている
 - Image サイズは 400MB 以下に収まる
@@ -54,7 +54,6 @@ GROWI には添付ファイル (PDF / Office 等) のテキストを抽出する
 - 変換処理を子プロセスで実行する仕組み
 - Dockerfile (multi-stage + 非 root + セキュリティハードニング対応) と運用者向けの文書
 - 経路の定義から作る OpenAPI の文書とその書き出し。文書が変わったときの生成クライアントの作り直しと、apps/app の呼び出し側の名前と型の書き方の修正
-- docker-compose エントリ (`infra/docker/compose.yaml`)
 - 専用 CI workflow (`.github/workflows/ci-attachment-text-extractor.yml`: lint / 型の検査 / vitest / image の確認)
 - サービス単体テストと、検索の品質のベンチマーク
 
@@ -74,7 +73,7 @@ GROWI には添付ファイル (PDF / Office 等) のテキストを抽出する
 3. **子の入口** (`src/child/`) — 親の見張りと、変換の呼び出し
 4. **変換の層** (`src/conversion/`) — 形式別の変換と正規化。純関数
 5. **共有の層** (`src/contract/`、`src/formats/`、`src/wire/`) と設定 (`src/config/`)
-6. **配布物** (Dockerfile / `docker/README.md` / docker-compose のエントリ / CI workflow)
+6. **配布物** (Dockerfile / `docker/README.md` / CI workflow)
 
 ## Out of Boundary
 
@@ -94,7 +93,7 @@ GROWI には添付ファイル (PDF / Office 等) のテキストを抽出する
 
 ### Downstream (影響先)
 - `attachment-search-indexing` spec — OpenAPI の文書、生成クライアント、Docker image を消費
-- OSS 配布 (docker-compose) と GROWI.cloud (k8s) 運用
+- OSS 配布 (Docker image) と GROWI.cloud (k8s) 運用
 - 将来の抽出エンジン差し替え (anydoc がページ・スライド区切りを返すようになった場合の一本化、Docling 等) — 契約 (pages[] 構造) を保つ前提
 
 ## Existing Spec Touchpoints

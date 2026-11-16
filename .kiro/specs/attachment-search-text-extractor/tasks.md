@@ -66,8 +66,8 @@
 - [x] 6.1 実装した担当とは別の担当が、欠陥を探す立場でレビューし、承認まで直す
 
 - [x] 7. 配布物と CI の切り替え
-- [x] 7.1 docker-compose のエントリを切り替え、commit 済みの `openapi.json` と生成クライアントを作り直し、apps/app の呼び出し側の名前と型の書き方を直す。CI で commit 済みの文書との比較を動かし始める
+- [x] 7.1 commit 済みの `openapi.json` と生成クライアントを作り直し、apps/app の呼び出し側の名前と型の書き方を直す。CI で commit 済みの文書との比較を動かし始める
   - _Requirements: 3.1, 7.2, 7.3, 7.4, 7.5_
 - [x] 7.2 配布物と CI を、CI でできる確認と人の確認に分けて確かめる
-  - CI の実行をジョブとステップの一覧 (`gh api repos/<org>/<repo>/actions/runs/<id>/jobs`) で確かめた。docker が要る人の確認 (linux-arm64、`docker compose build` と `up`、展開した image の大きさ、メモリの計測を人が起動すること) は未確認のまま残した (ユーザーの決定。research.md §1.6)
+  - CI の実行をジョブとステップの一覧 (`gh api repos/<org>/<repo>/actions/runs/<id>/jobs`) で確かめた。docker が要る人の確認 (linux-arm64、展開した image の大きさ、メモリの計測を人が起動すること) は未確認のまま残した (ユーザーの決定。research.md §1.6)
   - _Requirements: 1.7, 2.4, 3.1, 3.3_
