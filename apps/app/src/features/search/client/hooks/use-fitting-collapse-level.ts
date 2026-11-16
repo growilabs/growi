@@ -1,4 +1,10 @@
-import { type RefObject, useCallback, useRef, useState } from 'react';
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useIsomorphicLayoutEffect, useResizeObserver } from 'usehooks-ts';
 
 export interface FittingCollapseLevel {
@@ -104,6 +110,23 @@ export const useFittingCollapseLevel = (
   }, []);
 
   useResizeObserver({ ref: containerRef, onResize });
+
+  // A web font that finishes loading after fitting changes the text width but
+  // not the container width, so no resize notification arrives. Re-fit from the
+  // base form so it works whether the new font is wider or narrower.
+  useEffect(() => {
+    const fonts = typeof document === 'undefined' ? undefined : document.fonts;
+    if (fonts == null) return;
+    const refitFromBase = (): void => {
+      setState((prev) => ({
+        ...prev,
+        level: 0,
+        checkRequest: prev.checkRequest + 1,
+      }));
+    };
+    fonts.addEventListener('loadingdone', refitFromBase);
+    return () => fonts.removeEventListener('loadingdone', refitFromBase);
+  }, []);
 
   return { containerRef, shrinkableRef, collapseLevel };
 };

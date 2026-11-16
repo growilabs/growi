@@ -44,19 +44,21 @@ const renderedCollapseLevel = (): number =>
 
 describe('useFittingCollapseLevel', () => {
   // Layout model driven by the test: the container is given `availableWidth`
-  // and needs CONTENT_WIDTHS[level] for the level it currently renders.
+  // and needs contentWidths[level] for the level it currently renders.
   let availableWidth: number;
+  let contentWidths: readonly number[];
   let shrinkableOverflows: boolean;
   let restoreWidths: () => void;
 
   beforeEach(() => {
     availableWidth = 1000;
+    contentWidths = CONTENT_WIDTHS;
     shrinkableOverflows = false;
     restoreWidths = stubElementWidths((element) => {
       if (element.dataset.testid === 'container') {
         const level = Number(element.dataset.collapseLevel);
         return {
-          scrollWidth: Math.max(CONTENT_WIDTHS[level], availableWidth),
+          scrollWidth: Math.max(contentWidths[level], availableWidth),
           clientWidth: availableWidth,
         };
       }
@@ -212,6 +214,57 @@ describe('useFittingCollapseLevel', () => {
       expect(renderedCollapseLevel()).toBe(2);
       // Narrowing must not restart from the base form
       expect(renderedLevels).not.toContain(0);
+    });
+  });
+
+  // Web fonts change text width without resizing the container, so no
+  // ResizeObserver notification arrives; the font set's loading event must
+  // trigger the re-fit instead.
+  describe('web fonts finishing to load after fitting', () => {
+    let fonts: EventTarget;
+    let originalFonts: PropertyDescriptor | undefined;
+
+    beforeEach(() => {
+      originalFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
+      fonts = new EventTarget();
+      Object.defineProperty(document, 'fonts', {
+        configurable: true,
+        value: fonts,
+      });
+    });
+
+    afterEach(() => {
+      if (originalFonts != null) {
+        Object.defineProperty(document, 'fonts', originalFonts);
+      } else {
+        Reflect.deleteProperty(document, 'fonts');
+      }
+    });
+
+    const finishFontLoading = (): void => {
+      act(() => {
+        fonts.dispatchEvent(new Event('loadingdone'));
+      });
+    };
+
+    it('re-fits from level 0 when a narrower font makes the base form fit', () => {
+      availableWidth = 250;
+      render(<Probe />);
+      expect(renderedCollapseLevel()).toBe(1);
+
+      contentWidths = [240, 160, 80];
+      finishFontLoading();
+      expect(renderedCollapseLevel()).toBe(0);
+    });
+
+    it('collapses further when a wider font makes the current level overflow', () => {
+      availableWidth = 250;
+      render(<Probe />);
+      expect(renderedCollapseLevel()).toBe(1);
+
+      contentWidths = [400, 300, 200];
+      finishFontLoading();
+      expect(renderedCollapseLevel()).toBe(2);
     });
   });
 
