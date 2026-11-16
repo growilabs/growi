@@ -149,10 +149,13 @@ export const CAPABILITY_TABLE: Readonly<Record<CapabilityName, CapabilityRow>> =
     },
     // The level also carries how much can be read: `degraded` means the
     // history read can fall short of the whole conversation beyond the
-    // per-call cap in conversation-history.ts.
+    // per-call cap in conversation-history.ts (every service has one).
+    // Mattermost additionally cannot read the recent messages of a place
+    // outside a thread (answered as unsupported); Teams is unverified until
+    // its cap is checked on a real service.
     'conversation-summary': {
       slack: 'degraded',
-      discord: 'full',
+      discord: 'degraded',
       teams: 'unverified',
       mattermost: 'degraded',
     },

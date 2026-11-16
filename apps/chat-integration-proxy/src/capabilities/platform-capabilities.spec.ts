@@ -242,7 +242,8 @@ describe('agent capability rows in the report (Requirements 1.20, 15.9)', () => 
       'unverified',
     ],
     'agent-continue-conversation': ['full', 'none', 'none', 'full'],
-    'conversation-summary': ['degraded', 'full', 'unverified', 'degraded'],
+    // Every service with a per-call cap is degraded; Teams is unverified.
+    'conversation-summary': ['degraded', 'degraded', 'unverified', 'degraded'],
     'ephemeral-in-unreplied-thread': [
       'unverified',
       'none',
