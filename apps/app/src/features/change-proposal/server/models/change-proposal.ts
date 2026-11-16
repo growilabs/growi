@@ -36,6 +36,7 @@ import {
   unapprovedOperation,
   withoutUndefined,
 } from './change-proposal-query-parts';
+import { listReviewQueueAfter } from './change-proposal-review-queue';
 import {
   addReviewers,
   addReviews,
@@ -707,6 +708,20 @@ export const extension = Prisma.defineExtension((client) => {
             select: summarySelect,
           });
           return rows.map(toChangeProposalSummary);
+        },
+
+        /** Open proposals with an active reviewer entry for the viewer or a group of theirs, by `_id` after `afterId`. */
+        listReviewQueueAfter(
+          viewer: ViewerIdentity,
+          afterId: string | null,
+          take: number,
+        ): Promise<ChangeProposalSummary[]> {
+          return listReviewQueueAfter(
+            Prisma.getExtensionContext<typeof prisma.changeproposals>(this),
+            viewer,
+            afterId,
+            take,
+          );
         },
 
         /** Reads the proposals the marks point at, keeping only the marked operations. */

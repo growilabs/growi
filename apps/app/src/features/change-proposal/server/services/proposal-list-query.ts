@@ -53,7 +53,7 @@ export type AppliedListScan = {
 
 const APPLIED_LIST_SCAN_BATCH = 50;
 const APPLIED_LIST_SCAN_LIMIT = 500;
-const DEFAULT_APPLIED_LIST_SCAN: AppliedListScan = {
+export const DEFAULT_APPLIED_LIST_SCAN: AppliedListScan = {
   batchSize: APPLIED_LIST_SCAN_BATCH,
   limit: APPLIED_LIST_SCAN_LIMIT,
 };
@@ -74,7 +74,7 @@ const decodeCursor = (value: string): AppliedListCursor | null => {
     : { lastAppliedAt: new Date(Number(match[1])), id: match[2] };
 };
 
-const isPositiveInteger = (value: number): boolean =>
+export const isPositiveInteger = (value: number): boolean =>
   Number.isInteger(value) && value > 0;
 
 type VisibleSummary = {
@@ -84,7 +84,7 @@ type VisibleSummary = {
   readonly pages: ChangeProposalSummaryView['pages'];
 };
 
-const visiblePagesOf = (
+export const visiblePagesOf = (
   visible: readonly OperationSummaryRecord[],
   viewable: ViewablePages,
 ): ChangeProposalSummaryView['pages'] => {
