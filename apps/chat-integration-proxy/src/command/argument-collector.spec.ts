@@ -1245,6 +1245,41 @@ describe('ArgumentCollector.resume where unanswered text starts a new request (t
     ).not.toContain('choice');
   });
 
+  it.each([
+    '1月の議事録を探して',
+    '2つのページの違いは？',
+    '2024年の計画は？',
+  ])('drops a GROWI choice for a sentence that merely starts with a digit: %s', async (sentence) => {
+    await pendingChoice();
+
+    const outcome = await collector().resume(typedInDm(sentence), RELEASE);
+
+    expect(outcome).toEqual({ status: 'released' });
+    expect(repository.rows.size).toBe(0);
+  });
+
+  it.each([
+    ['1', 'rel-a'],
+    [' 2 ', 'rel-b'],
+  ])('takes a digits-only answer %j as a choice', async (answer, relationId) => {
+    await pendingChoice();
+
+    const outcome = await collector().resume(typedInDm(answer), RELEASE);
+
+    expect(outcome).toMatchObject({ status: 'growi-chosen', relationId });
+  });
+
+  it('keeps reading a leading number as the choice when the caller did not ask for release', async () => {
+    await pendingChoice();
+
+    const outcome = await collector().resume(typedInDm('1月の議事録を探して'));
+
+    expect(outcome).toMatchObject({
+      status: 'growi-chosen',
+      relationId: 'rel-a',
+    });
+  });
+
   it('tells the user which command the dropped input belonged to', async () => {
     await pendingChoice();
 

@@ -475,7 +475,13 @@ export const createArgumentCollector = (
     release: (() => Promise<ResumeOutcome>) | null,
   ): Promise<ResumeOutcome> => {
     const offered = offeredOptionsOf(record.offeredOptions);
-    const position = Number.parseInt(text.trim(), 10);
+    const trimmed = text.trim();
+    // In the AI app view nearly every message is a sentence, so a leading
+    // digit ("1月の議事録を探して") must not count as picking an option.
+    const position =
+      release != null && !/^\d+$/.test(trimmed)
+        ? Number.NaN
+        : Number.parseInt(trimmed, 10);
     const picked =
       Number.isInteger(position) && position >= 1 && position <= offered.length
         ? offered[position - 1]

@@ -345,6 +345,15 @@ describe('CommandInvocation.agentRequest (the Slack AI app view, 15.15)', () => 
     });
   });
 
+  it('takes the request from the text left after the bot address, not the typed text (15.17)', () => {
+    const result = CommandInvocation.agentRequest({
+      ...mentionInView('質問'),
+      text: '<@UBOT> 質問',
+    });
+
+    expect(result.argsText).toBe('質問');
+  });
+
   it('keeps a mention of another person that leads the text (15.17)', () => {
     const result = CommandInvocation.agentRequest(
       mentionInView('<@U0002> の書いたページを探して'),
