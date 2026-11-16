@@ -76,6 +76,32 @@ describe('agentAnswerMessage: text answers', () => {
     expect(text).toContain('[a \\[b\\] c](https://wiki.example.com/x%20y%29)');
   });
 
+  it('folds a newline or run of spaces in a title so the source stays on one line', () => {
+    const text = render(
+      textAnswer([
+        { title: 'line1\nline2   x', url: 'https://wiki.example.com/p' },
+      ]),
+      'direct',
+    );
+    expect(text).toContain('- [line1 line2 x](https://wiki.example.com/p)');
+  });
+
+  it('escapes a backslash in a title so it cannot escape the closing bracket', () => {
+    const text = render(
+      textAnswer([{ title: 'a\\b', url: 'https://wiki.example.com/p' }]),
+      'direct',
+    );
+    expect(text).toContain('[a\\\\b](https://wiki.example.com/p)');
+  });
+
+  it('percent-encodes every character that can end or split a link in a source URL', () => {
+    const text = render(
+      textAnswer([{ title: 'T', url: 'https://wiki.example.com/<a>|b`c' }]),
+      'direct',
+    );
+    expect(text).toContain('(https://wiki.example.com/%3Ca%3E%7Cb%60c)');
+  });
+
   it('falls back to the URL as the label when the title is blank', () => {
     const text = render(
       textAnswer([{ title: '  ', url: 'https://wiki.example.com/p' }]),
@@ -142,6 +168,23 @@ describe('agentAnswerMessage: page-created answers (Requirements 5.12, 5.16)', (
     expect(text).toContain('37 件');
     expect(text).toContain('2026-11-10 01:05');
     expect(text).toContain('2026-11-12 23:59');
+  });
+
+  it('writes the page link as an angle-bracket link with the URL encoded', () => {
+    const text = render(
+      {
+        kind: 'page-created',
+        pageUrl: 'https://wiki.example.com/a b)c',
+        range: {
+          messageCount: 1,
+          firstPostedAt: '2026-11-10T01:05:00.000Z',
+          lastPostedAt: '2026-11-10T01:06:00.000Z',
+        },
+        truncated: false,
+      },
+      'direct',
+    );
+    expect(text).toContain('<https://wiki.example.com/a%20b%29c>');
   });
 
   it('says the times are UTC so they are not read as local time', () => {
