@@ -118,7 +118,7 @@
   - 取った時刻を 1 件ごとの現在時刻にし、取り直しの時間を 4 分に、定期処理を 5 分に 1 回にする。要件 2.9 の試験の時間の上限を合わせる
   - 完了の条件: 書き留めた通知が定期処理を待たずに送られ、続けて書き留めても送り手が重ならず、止まった送信が 10 分以内に取り直される試験が通る
   - _Requirements: 2.10, 2.11_
-- [ ] 4.3 (P) proxy への 2 つの呼び出しと、口ごとの打ち切り時間
+- [x] 4.3 (P) proxy への 2 つの呼び出しと、口ごとの打ち切り時間
   - 答えを送る呼び出しと、会話を求める呼び出しを足す。署名つきの呼び出しに、口ごとの打ち切り時間（通知は 15 秒、ほかは 10 秒）を付ける
   - 完了の条件: 応答しない proxy に対して呼び出しが打ち切り時間で失敗として返る試験と、2 つの呼び出しの往復の試験が通る
   - _Requirements: 5.7, 15.6_
@@ -276,3 +276,4 @@
 - 4.1: `DeliveryVerdict` は design の形から変えた。`give-up` は無く、`sent`・`retry` に行へ書く記録（`result`）を付けられる。`retryAfterMs` 付きの `retry` は「相手の準備がまだ」の意味で、回数に数えず、その時間だけ待つ（通知の `inventory-not-ready`）。付けない `retry` はふつうの失敗で、回数に数えて間隔を延ばし、5 回目で `given-up` にする。4.4 の「諦めた理由が残る」は、`retry` の `result` に理由を入れれば `given-up` の行に残る。送れた答えの行から `answer` を消す処理と、諦めた答えの行の 7 日の期限は、まだ無い（4.4 で足す）。
 - 4.1: 既存の試験を変えずに通すため、名前は変えていない（model の名前 `ChatNotificationOutbox`、定期処理の `chatNotificationDispatchCronService`、通知専用の入口 `notificationOutbox.enqueue`）。design の種類つきの入口 `ChatOutbox.enqueue(OutboxEntry)` と `requestDrain` は 4.2・4.4 で足す。`targets`・`markdown`・`containsRestrictedPage` は、型の上では全部の行にある欄のまま（答えの行には実際には無い。schema の必須は通知の行だけ）。
 - 4.1: `kind` の schema の既定値は `notification` だが、送り手は DB に入っている値で行を選ぶので、`kind` の無い既存の行は migration（`20261116120000-add-kind-to-chat-notification-outbox`）の後に初めて送られる。答えの行の一意の索引の名前は `relationId_1_requestId_1_command_answer_unique`（同じ欄の索引が schema 側に既にあり、既定の名前は使えない）。
+- 4.3: `ProxyClient` に `sendCommandAnswer(relationId, {requestId, answer}, options?)` と `fetchConversation(relationId, {requestId}, options?)` を足した。口ごとの打ち切りは `OP_DEADLINES_MS`（通知 15 秒、ほかは 10 秒。`Record<SignedProxyOp, number>` なので口を足すと型エラーになる）で、`AbortSignal.timeout` を使う（axios の `timeout` は本文を少しずつ送る相手に効かない）。打ち切りは `{ok:false, reason:"unreachable"}`、応答の形の不正は `malformed-response`、proxy が返した会話の失敗は `{ok:true, response:{ok:false, failure}}`。**4.4 への引き継ぎ: 答えの送信で `malformed-response` が返ったときも、HTTP の失敗・打ち切りと同じ送り直し（諦めるまでの回数に数える）にする。** proxy は `requestId` ごとに結果を覚えて 2 回目を届け直さないので二重配達にならない。長すぎる答え（本文 30,000 文字・出典 20 件を超える）は proxy が 400 で断るので、5.6 で書き留める前に切り詰める。試験は `vi.mock` を使う既存 spec と分けて `proxy-client.loopback.spec.ts` に置いた。
