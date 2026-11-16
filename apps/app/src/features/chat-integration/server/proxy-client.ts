@@ -42,7 +42,11 @@
 import type {
   CapabilityReport,
   ChannelInventory,
+  CommandAnswerRequest,
+  CommandAnswerResult,
   ConnectionStatusView,
+  ConversationRequest,
+  ConversationResult,
   KeyOperationResult,
   KeyRegistrationRequest,
   KeyRevocationRequest,
@@ -58,7 +62,9 @@ import {
   OP_NAMES,
   parseCapabilityReport,
   parseChannelInventory,
+  parseCommandAnswerResult,
   parseConnectionStatusView,
+  parseConversationResult,
   parseKeyOperationResult,
   parseNotificationResult,
   parsePairingResult,
@@ -100,6 +106,44 @@ export type ProxyCallFailure =
 export type ProxyCallResult<T> =
   | { readonly ok: true; readonly response: T }
   | { readonly ok: false; readonly reason: ProxyCallFailure };
+
+/** The ops GROWI sends to the proxy through `sendSigned`. */
+type SignedProxyOp = Extract<
+  OpName,
+  | typeof OP_NAMES.notification
+  | typeof OP_NAMES.settingsPush
+  | typeof OP_NAMES.keyRegisterToProxy
+  | typeof OP_NAMES.keyRevokeToProxy
+  | typeof OP_NAMES.capabilities
+  | typeof OP_NAMES.connectionStatus
+  | typeof OP_NAMES.channels
+  | typeof OP_NAMES.commandAnswer
+  | typeof OP_NAMES.conversation
+>;
+
+/**
+ * How long a signed call may take before it is given up as `unreachable`,
+ * per op (design.md: the path that sends right after a request must not hang
+ * on a proxy that never answers). A notification is answered only after the
+ * proxy has posted to every target, which the proxy bounds at 8 s, so it
+ * gets longer than that.
+ */
+export const OP_DEADLINES_MS: Readonly<Record<SignedProxyOp, number>> = {
+  [OP_NAMES.notification]: 15_000,
+  [OP_NAMES.settingsPush]: 10_000,
+  [OP_NAMES.keyRegisterToProxy]: 10_000,
+  [OP_NAMES.keyRevokeToProxy]: 10_000,
+  [OP_NAMES.capabilities]: 10_000,
+  [OP_NAMES.connectionStatus]: 10_000,
+  [OP_NAMES.channels]: 10_000,
+  [OP_NAMES.commandAnswer]: 10_000,
+  [OP_NAMES.conversation]: 10_000,
+};
+
+/** Overrides the production defaults; only tests need it. */
+export interface ProxyCallOptions {
+  readonly deadlinesMs?: Readonly<Record<SignedProxyOp, number>>;
+}
 
 const CONTENT_TYPE = 'application/json';
 const PROXY_URI_PLACEHOLDER = '{proxyUri}';
@@ -176,8 +220,9 @@ const resolveProxyUri = async (relationId: string): Promise<string | null> => {
  */
 const sendSigned = async (
   relationId: string,
-  op: OpName,
+  op: SignedProxyOp,
   bodyFields: Record<string, unknown>,
+  options: ProxyCallOptions,
 ): Promise<
   | { readonly ok: true; readonly rawBody: string }
   | { readonly ok: false; readonly reason: ProxyCallFailure }
@@ -223,6 +268,9 @@ const sendSigned = async (
       // the same `catch` as a genuine network failure and be reported as
       // `unreachable` instead of `http-error`.
       validateStatus: () => true,
+      // Covers connecting, sending and reading the body together; an abort
+      // throws, landing in the same `unreachable` as any network failure.
+      signal: AbortSignal.timeout((options.deadlinesMs ?? OP_DEADLINES_MS)[op]),
     });
   } catch {
     return { ok: false, reason: 'unreachable' };
@@ -255,11 +303,12 @@ const sendSigned = async (
  */
 const callSignedOp = async <T extends object>(
   relationId: string,
-  op: OpName,
+  op: SignedProxyOp,
   bodyFields: Record<string, unknown>,
   parse: Parse<T>,
+  options: ProxyCallOptions,
 ): Promise<ProxyCallResult<T>> => {
-  const sent = await sendSigned(relationId, op, bodyFields);
+  const sent = await sendSigned(relationId, op, bodyFields, options);
   if (!sent.ok) {
     return sent;
   }
@@ -285,12 +334,14 @@ export const notify = (
     NotificationRequest,
     'requestId' | 'targets' | 'markdown' | 'containsRestrictedPage'
   >,
+  options: ProxyCallOptions = {},
 ): Promise<ProxyCallResult<NotificationResult>> =>
   callSignedOp<NotificationResult>(
     relationId,
     OP_NAMES.notification,
     params,
     parseNotificationResult,
+    options,
   );
 
 /**
@@ -305,8 +356,14 @@ export const notify = (
 export const pushSettings = async (
   relationId: string,
   params: Pick<SettingsPushRequest, 'settings' | 'version'>,
+  options: ProxyCallOptions = {},
 ): Promise<ProxyCallResult<void>> => {
-  const sent = await sendSigned(relationId, OP_NAMES.settingsPush, params);
+  const sent = await sendSigned(
+    relationId,
+    OP_NAMES.settingsPush,
+    params,
+    options,
+  );
   if (!sent.ok) {
     return sent;
   }
@@ -317,57 +374,99 @@ export const pushSettings = async (
 export const registerKeyWithProxy = (
   relationId: string,
   key: KeyRegistrationRequest['key'],
+  options: ProxyCallOptions = {},
 ): Promise<ProxyCallResult<KeyOperationResult>> =>
   callSignedOp<KeyOperationResult>(
     relationId,
     OP_NAMES.keyRegisterToProxy,
     { key },
     parseKeyOperationResult,
+    options,
   );
 
 /** Requirement 10.5: revoke one of this GROWI's own keys as the proxy knows it. */
 export const revokeKeyWithProxy = (
   relationId: string,
   keyId: KeyRevocationRequest['keyId'],
+  options: ProxyCallOptions = {},
 ): Promise<ProxyCallResult<KeyOperationResult>> =>
   callSignedOp<KeyOperationResult>(
     relationId,
     OP_NAMES.keyRevokeToProxy,
     { keyId },
     parseKeyOperationResult,
+    options,
   );
 
 /** Requirement 1.3: what each connected chat service can do, for the admin screen. */
 export const fetchCapabilities = (
   relationId: string,
+  options: ProxyCallOptions = {},
 ): Promise<ProxyCallResult<CapabilityReport>> =>
   callSignedOp<CapabilityReport>(
     relationId,
     OP_NAMES.capabilities,
     {},
     parseCapabilityReport,
+    options,
   );
 
 /** Requirement 1.4: connection health for this relation's service, for the admin screen. */
 export const fetchConnectionStatus = (
   relationId: string,
+  options: ProxyCallOptions = {},
 ): Promise<ProxyCallResult<ConnectionStatusView>> =>
   callSignedOp<ConnectionStatusView>(
     relationId,
     OP_NAMES.connectionStatus,
     {},
     parseConnectionStatusView,
+    options,
   );
 
 /** Requirement 2.2/11.1: the channel inventory the admin screen picks notification targets from. */
 export const fetchChannels = (
   relationId: string,
+  options: ProxyCallOptions = {},
 ): Promise<ProxyCallResult<ChannelInventory>> =>
   callSignedOp<ChannelInventory>(
     relationId,
     OP_NAMES.channels,
     {},
     parseChannelInventory,
+    options,
+  );
+
+/**
+ * Requirement 15.6: deliver the answer to an `agent` request, however long
+ * after the request it is ready. The caller (the outbox) decides what to do
+ * with each result; see design.md CommandAnswerContract.
+ */
+export const sendCommandAnswer = (
+  relationId: string,
+  params: Pick<CommandAnswerRequest, 'requestId' | 'answer'>,
+  options: ProxyCallOptions = {},
+): Promise<ProxyCallResult<CommandAnswerResult>> =>
+  callSignedOp<CommandAnswerResult>(
+    relationId,
+    OP_NAMES.commandAnswer,
+    params,
+    parseCommandAnswerResult,
+    options,
+  );
+
+/** Requirement 5.7: ask the proxy for the conversation an `agent` request was made in. */
+export const fetchConversation = (
+  relationId: string,
+  params: Pick<ConversationRequest, 'requestId'>,
+  options: ProxyCallOptions = {},
+): Promise<ProxyCallResult<ConversationResult>> =>
+  callSignedOp<ConversationResult>(
+    relationId,
+    OP_NAMES.conversation,
+    params,
+    parseConversationResult,
+    options,
   );
 
 /**
