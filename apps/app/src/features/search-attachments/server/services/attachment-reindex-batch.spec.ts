@@ -71,7 +71,6 @@ function makeDelegatorExtStub() {
     syncAttachmentRemoved: vi.fn().mockResolvedValue(undefined),
     searchAttachmentsBody: vi.fn(),
     searchAttachmentsByPageIdsBody: vi.fn(),
-    mgetPagesForPermissionBody: vi.fn(),
     addAllAttachments: vi.fn().mockResolvedValue(undefined),
     initializeAttachmentIndex: vi.fn().mockResolvedValue({ initialized: true }),
   };
@@ -118,23 +117,42 @@ function makeFetchIdPage(
     ids.filter((id) => afterId == null || id > afterId).slice(0, take);
 }
 
+type AttachmentWhere = {
+  id?: { gt?: string };
+  pageId?: { isSet?: boolean; not?: null };
+};
+
+/** Applies the `pageId` filter the way MongoDB would. */
+const matchingRows = (
+  attachments: AttachmentWithComputed[],
+  where: AttachmentWhere | undefined,
+): AttachmentWithComputed[] =>
+  where?.pageId?.isSet === true && where.pageId.not === null
+    ? attachments.filter((a) => a.pageId != null)
+    : attachments;
+
 /**
  * Backs `prisma.attachments.count` / `findMany` (id paging, honouring
- * `where.id.gt` and `take`) / `findUnique` with the given rows. Ids listed in
- * `unloadable` make `findUnique` reject, like a row that violates the schema.
+ * `where.id.gt`, `where.pageId` and `take`) / `findUnique` with the given
+ * rows. Ids listed in `unloadable` make `findUnique` reject, like a row that
+ * violates the schema.
  */
 function setupAttachmentMock(
   attachments: AttachmentWithComputed[],
   unloadable: string[] = [],
 ): void {
-  vi.spyOn(prisma.attachments, 'count').mockResolvedValue(attachments.length);
+  vi.spyOn(prisma.attachments, 'count').mockImplementation(
+    (async (args?: { where?: AttachmentWhere }) =>
+      matchingRows(attachments, args?.where).length) as never,
+  );
   vi.spyOn(prisma.attachments, 'findMany').mockImplementation((async (args: {
-    where?: { id?: { gt?: string } };
+    where?: AttachmentWhere;
     take?: number;
   }) => {
-    const ids = await makeFetchIdPage(attachments)(
+    const rows = matchingRows(attachments, args.where);
+    const ids = await makeFetchIdPage(rows)(
       args.where?.id?.gt ?? null,
-      args.take ?? attachments.length,
+      args.take ?? rows.length,
     );
     return ids.map((id) => ({ id }));
     // biome-ignore lint/suspicious/noExplicitAny: Prisma's generic return type cannot be satisfied by a plain stub
@@ -342,6 +360,32 @@ describe('AttachmentReindexBatch', () => {
       );
     });
 
+    it('neither extracts nor indexes attachments that belong to no page', async () => {
+      const attachments = [
+        makeAttachment({ id: 'attach-001' }),
+        makeAttachment({ id: 'attach-002', pageId: null }),
+        makeAttachment({ id: 'attach-003' }),
+      ];
+      setupAttachmentMock(attachments);
+      extractor.extractAttachment.mockResolvedValue({
+        kind: 'success',
+        pages: [{ pageNumber: 1, label: 'Page 1', content: 'x' }],
+        mimeType: 'application/pdf',
+      });
+      const progress = vi.fn();
+
+      await batch.addAllAttachments('attachments-tmp', progress);
+
+      expect(extractor.extractAttachment.mock.calls.map(([id]) => id)).toEqual([
+        'attach-001',
+        'attach-003',
+      ]);
+      expect(
+        delegatorExt.syncAttachmentIndexed.mock.calls.map(([id]) => id),
+      ).toEqual(['attach-001', 'attach-003']);
+      expect(progress).toHaveBeenLastCalledWith(2, 2);
+    });
+
     it('drops and recreates the target index before paging through attachments', async () => {
       setupAttachmentMock([]);
 
@@ -391,13 +435,16 @@ describe('AttachmentReindexBatch', () => {
       expect(ids).toHaveLength(REINDEX_PAGE_SIZE);
       expect(findMany).toHaveBeenNthCalledWith(1, {
         select: { id: true },
-        where: {},
+        where: { pageId: { isSet: true, not: null } },
         orderBy: { id: 'asc' },
         take: REINDEX_PAGE_SIZE,
       });
       expect(findMany).toHaveBeenNthCalledWith(2, {
         select: { id: true },
-        where: { id: { gt: firstPage.at(-1)?.id } },
+        where: {
+          pageId: { isSet: true, not: null },
+          id: { gt: firstPage.at(-1)?.id },
+        },
         orderBy: { id: 'asc' },
         take: REINDEX_PAGE_SIZE,
       });

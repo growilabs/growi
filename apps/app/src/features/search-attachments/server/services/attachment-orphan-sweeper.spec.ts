@@ -23,7 +23,6 @@ function makeDelegatorExtStub() {
     syncAttachmentRemoved: vi.fn(),
     searchAttachmentsBody: vi.fn(),
     searchAttachmentsByPageIdsBody: vi.fn(),
-    mgetPagesForPermissionBody: vi.fn(),
     addAllAttachments: vi.fn(),
     initializeAttachmentIndex: vi.fn(),
   };

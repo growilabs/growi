@@ -37,9 +37,11 @@ const MIB = 1024 * 1024;
 const TOKEN_NAME = 'ATTACHMENT_EXTRACTOR_SERVICE_TOKEN';
 const INTEGER_PATTERN = /^[+-]?\d+$/;
 
+// A header value never carries its surrounding whitespace, so an untrimmed
+// token (e.g. read from a secret file ending in a newline) could never match.
 const readToken = (env: Env): string => {
-  const token = env[TOKEN_NAME];
-  if (token == null || token.trim() === '') {
+  const token = env[TOKEN_NAME]?.trim();
+  if (token == null || token === '') {
     throw new Error(`${TOKEN_NAME} must be set to a non-empty value`);
   }
   return token;

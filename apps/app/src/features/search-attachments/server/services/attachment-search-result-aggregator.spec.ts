@@ -187,27 +187,6 @@ describe('AttachmentSearchResultAggregator', () => {
     client = mock<AttachmentIndexClient>();
   });
 
-  describe('searchPrimary facet=pages', () => {
-    it('returns the formatted page search result as is and never touches attachments', async () => {
-      const pageResult = makePageSearchResult(['page1', 'page2']);
-      pageSearchFn.mockResolvedValue(pageResult);
-      const input = inputFor(viewer);
-
-      const result = await makeAggregator().searchPrimary(input, {
-        facet: 'pages',
-        from: 0,
-        size: 20,
-      });
-
-      expect(pageSearchFn).toHaveBeenCalledWith(input, { from: 0, size: 20 });
-      expect(client.searchAttachments).not.toHaveBeenCalled();
-      expect(client.searchAccessiblePages).not.toHaveBeenCalled();
-      expect(result.primarySlot).toBe('pages');
-      expect(result.items).toEqual(pageResult.data);
-      expect(result.meta.total).toBe(42);
-    });
-  });
-
   describe('searchPrimary facet=all, from=0', () => {
     it('embeds attachment hits only for primary pages the viewer may see, keeping the formatted page items', async () => {
       const pageResult = makePageSearchResult([
@@ -306,30 +285,54 @@ describe('AttachmentSearchResultAggregator', () => {
       expect(attachmentIdsOf(result.items)).toEqual({});
     });
 
-    it('degrades to a pages-only result when the primary searches exceed the timeout', async () => {
-      pageSearchFn
-        .mockImplementationOnce(() =>
-          delayed(makePageSearchResult(['page1']), 200),
-        )
-        .mockResolvedValueOnce(makePageSearchResult(['page2']));
+    it('degrades to the pages-only result of the one page search when the primary searches exceed the timeout', async () => {
+      pageSearchFn.mockImplementation(() =>
+        delayed(makePageSearchResult(['page1']), 200),
+      );
       client.searchAttachments.mockImplementation(() =>
         delayed(makeAttachmentResponse([]), 200),
       );
-      const input = inputFor(viewer);
 
-      const result = await makeAggregator(50).searchPrimary(input, {
+      const result = await makeAggregator(50).searchPrimary(inputFor(viewer), {
         facet: 'all',
         from: 0,
         size: 20,
       });
 
       expect(result.primarySlot).toBe('pages');
-      expect(result.items.map((i) => nameOf(i.data._id))).toEqual(['page2']);
+      expect(result.items.map((i) => nameOf(i.data._id))).toEqual(['page1']);
       expect(attachmentIdsOf(result.items)).toEqual({});
-      expect(pageSearchFn).toHaveBeenLastCalledWith(input, {
+      expect(pageSearchFn).toHaveBeenCalledOnce();
+    });
+
+    it('degrades to the pages-only result of the one page search when the attachment search fails', async () => {
+      pageSearchFn.mockResolvedValue(makePageSearchResult(['page1']));
+      client.searchAttachments.mockRejectedValue(new Error('es down'));
+
+      const result = await makeAggregator().searchPrimary(inputFor(viewer), {
+        facet: 'all',
         from: 0,
         size: 20,
       });
+
+      expect(result.primarySlot).toBe('pages');
+      expect(result.items.map((i) => nameOf(i.data._id))).toEqual(['page1']);
+      expect(result.meta.total).toBe(42);
+      expect(attachmentIdsOf(result.items)).toEqual({});
+      expect(pageSearchFn).toHaveBeenCalledOnce();
+    });
+
+    it('fails when the page search fails', async () => {
+      pageSearchFn.mockRejectedValue(new Error('page search down'));
+      client.searchAttachments.mockResolvedValue(makeAttachmentResponse([]));
+
+      await expect(
+        makeAggregator().searchPrimary(inputFor(viewer), {
+          facet: 'all',
+          from: 0,
+          size: 20,
+        }),
+      ).rejects.toThrow('page search down');
     });
   });
 

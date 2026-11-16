@@ -158,7 +158,7 @@ class Crowi {
 
   searchService!: SearchService;
 
-  /** Set by initAttachmentFullTextSearch only when the feature is enabled at boot. */
+  /** Set by initAttachmentFullTextSearch when the search service is configured. */
   attachmentSearchIndexer?: AttachmentSearchIndexerInterface;
 
   attachmentReindexBatch?: AttachmentReindexBatchInterface;

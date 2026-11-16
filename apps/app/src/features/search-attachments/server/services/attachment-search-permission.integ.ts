@@ -20,11 +20,8 @@ import {
   getClient,
   setIndexName,
 } from '~/server/service/search-delegator/elasticsearch.testing';
-import { ES8ClientDelegator } from '~/server/service/search-delegator/elasticsearch-client-delegator/es8-client-delegator';
-import { ES9ClientDelegator } from '~/server/service/search-delegator/elasticsearch-client-delegator/es9-client-delegator';
 import { prisma } from '~/utils/prisma';
 
-import { mgetPagesForPermissionBody } from '../queries/mget-pages-for-permission-body';
 import { AttachmentSearchDelegatorExtension } from './attachment-search-delegator-extension';
 import { createAttachmentSearchResultAggregator } from './create-attachment-search-result-aggregator';
 import { resolveAttachmentSearchViewer } from './resolve-attachment-search-viewer';
@@ -133,10 +130,7 @@ describe.skipIf(esUri == null)(
     let crowi: Crowi;
     let delegator: ElasticsearchDelegator;
     let searchService: SearchServiceForTest;
-    // The same service without an attachment aggregator (feature not initialized).
-    let searchServiceWithoutAggregator: SearchServiceForTest;
     let esHost: string;
-    let esServerMajor: number;
 
     const users = {} as Record<Exclude<ViewerName, 'guest'>, IUserHasId>;
     const pageIds: Record<string, string> = {};
@@ -300,10 +294,6 @@ describe.skipIf(esUri == null)(
       crowi = await getInstance();
       if (esUri == null) throw new Error('ELASTICSEARCH_URI is not set');
       esHost = new URL(esUri).origin;
-      const info = (await (await fetch(esHost)).json()) as {
-        version: { number: string };
-      };
-      esServerMajor = Number(info.version.number.split('.')[0]);
 
       const originalGetConfig = configManager.getConfig.bind(configManager);
       vi.spyOn(configManager, 'getConfig').mockImplementation((key, source) => {
@@ -333,10 +323,6 @@ describe.skipIf(esUri == null)(
       await attachmentExt.createAttachmentIndex(ATTACHMENT_INDEX);
 
       searchService = SearchServiceForTest.forDelegator(crowi, delegator);
-      searchServiceWithoutAggregator = SearchServiceForTest.forDelegator(
-        crowi,
-        delegator,
-      );
       searchService.setAttachmentSearchResultAggregator(
         createAttachmentSearchResultAggregator({
           searchService,
@@ -638,17 +624,6 @@ describe.skipIf(esUri == null)(
             from: 1,
             size: 20,
           });
-          const pagesOnly = await searchService.searchByFacet(query, viewer, {
-            facet: 'pages',
-            from: 0,
-            size: 20,
-          });
-          const withoutAggregator =
-            await searchServiceWithoutAggregator.searchByFacet(query, viewer, {
-              facet: 'all',
-              from: 0,
-              size: 20,
-            });
 
           const expectedFirst = await pageSearch(query, name);
           const expectedSecond = await pageSearch(query, name, { offset: 1 });
@@ -659,18 +634,7 @@ describe.skipIf(esUri == null)(
           expect(asPageJson(secondPage.items)).toEqual(
             asPageJson(expectedSecond.data),
           );
-          expect(asPageJson(pagesOnly.items)).toEqual(
-            asPageJson(expectedFirst.data),
-          );
-          expect(asPageJson(withoutAggregator.items)).toEqual(
-            asPageJson(expectedFirst.data),
-          );
-          for (const item of [
-            ...firstPage.items,
-            ...secondPage.items,
-            ...pagesOnly.items,
-            ...withoutAggregator.items,
-          ]) {
+          for (const item of [...firstPage.items, ...secondPage.items]) {
             const keys = Object.keys(JSON.parse(JSON.stringify(item.data)));
             expect(keys).not.toContain('comments');
             expect(keys).not.toContain('tag_names');
@@ -726,7 +690,6 @@ describe.skipIf(esUri == null)(
       it.each([
         { facet: 'all' as const, from: 0 },
         { facet: 'all' as const, from: 1 },
-        { facet: 'pages' as const, from: 0 },
       ])('escapes the snippet exactly as page search does (facet=$facet from=$from)', async ({
         facet,
         from,
@@ -739,16 +702,13 @@ describe.skipIf(esUri == null)(
           expect(item.meta?.elasticSearchResult?.snippet).toContain('&lt;img');
         }
 
-        for (const service of [searchService, searchServiceWithoutAggregator]) {
-          // biome-ignore lint/performance/noAwaitInLoops: two services
-          const result = await service.searchByFacet(query, viewer, {
-            facet,
-            from,
-            size: 20,
-          });
-          expect(asPageJson(result.items)).toEqual(asPageJson(expected.data));
-          expect(JSON.stringify(result.items)).not.toContain('<img');
-        }
+        const result = await searchService.searchByFacet(query, viewer, {
+          facet,
+          from,
+          size: 20,
+        });
+        expect(asPageJson(result.items)).toEqual(asPageJson(expected.data));
+        expect(JSON.stringify(result.items)).not.toContain('<img');
       }, 30_000);
     });
 
@@ -1011,47 +971,6 @@ describe.skipIf(esUri == null)(
         expect(kindsOf(Object.keys(withDuplicates.enrichments))).toEqual([
           'owner',
         ]);
-      });
-    });
-
-    describe('mget on the real page index', () => {
-      const assertLightweightMget = async (
-        client: ES8ClientDelegator | ES9ClientDelegator,
-      ): Promise<void> => {
-        const response = await client.mget<Record<string, unknown>>({
-          index: PAGE_INDEX,
-          ...mgetPagesForPermissionBody([pageIds.public, pageIds.deleted]),
-        });
-
-        const byId = Object.fromEntries(
-          response.docs.map((doc) => [doc._id, doc]),
-        );
-        const publicDoc = byId[pageIds.public];
-        expect(
-          publicDoc != null && 'found' in publicDoc && publicDoc.found,
-        ).toBe(true);
-        const source =
-          publicDoc != null && '_source' in publicDoc ? publicDoc._source : {};
-        expect(source).toMatchObject({ grant: PageGrant.GRANT_PUBLIC });
-        expect(Object.keys(source ?? {})).not.toContain('body');
-        const deletedDoc = byId[pageIds.deleted];
-        expect(
-          deletedDoc != null && 'found' in deletedDoc && deletedDoc.found,
-        ).toBe(false);
-      };
-
-      it('ES8ClientDelegator returns only the requested lightweight fields', async () => {
-        await assertLightweightMget(
-          new ES8ClientDelegator({ node: esHost }, false),
-        );
-      });
-
-      // The v9 client cannot talk to an Elasticsearch 8 server.
-      it('ES9ClientDelegator returns only the requested lightweight fields', async (ctx) => {
-        if (esServerMajor < 9) ctx.skip();
-        await assertLightweightMget(
-          new ES9ClientDelegator({ node: esHost }, false),
-        );
       });
     });
   },

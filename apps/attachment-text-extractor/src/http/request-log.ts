@@ -7,7 +7,7 @@ import type { LogLevel } from '../config/load-settings';
 // is the cleaned extension only.
 
 export interface RequestFacts {
-  /** The cleaned extension (formatOf), or the converted mimeType. */
+  /** The cleaned extension (formatOf). */
   readonly format?: string;
   readonly size?: number;
   readonly childPeakRssMb?: number | null;

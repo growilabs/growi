@@ -295,6 +295,22 @@ describe('attachment-search-admin', () => {
       );
     });
 
+    it('does not count attachments without a page, which are never indexed', async () => {
+      // 10 attachments, 4 of them without a page
+      countAttachments.mockImplementation((async (args?: {
+        where?: { pageId?: { isSet?: boolean; not?: null } };
+      }) =>
+        args?.where?.pageId?.isSet === true && args.where.pageId.not === null
+          ? 6
+          : 10) as never);
+
+      const crowi = buildCrowiWithEsClient(buildEsClientWithCardinality(6));
+
+      const result = await computeRequiresReindex(crowi as never, true);
+
+      expect(result).toBe(false);
+    });
+
     it('returns false when mongoCount === esCount', async () => {
       countAttachments.mockResolvedValue(5);
 

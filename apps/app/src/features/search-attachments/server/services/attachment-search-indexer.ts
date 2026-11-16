@@ -19,13 +19,13 @@ import type {
   IAttachmentEsDoc,
 } from '~/features/search-attachments/interfaces/attachment-search';
 import type { AttachmentWithComputed } from '~/server/models/attachment';
-import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import type { AttachmentIndexOperations } from './attachment-search-delegator-extension';
 import type { AttachmentTextExtractorService } from './attachment-text-extractor';
 import type { ExtractionFailureLogServiceInterface } from './extraction-failure-log-service';
+import { isAttachmentFullTextSearchEnabled } from './is-attachment-full-text-search-enabled';
 
 const logger = loggerFactory('growi:service:search-attachments:indexer');
 
@@ -100,13 +100,13 @@ function outcomeToMessage(
  */
 function buildSuccessDocs(
   attachment: AttachmentWithComputed,
-  pageId: string | null,
+  pageId: string,
   outcome: Extract<ExtractionOutcome, { kind: 'success' }>,
 ): IAttachmentEsDoc[] {
   const now = new Date().toISOString();
   return outcome.pages.map((p) => ({
     attachmentId: attachment._id.toString(),
-    pageId: pageId ?? '',
+    pageId,
     pageNumber: p.pageNumber,
     label: p.label,
     fileName: attachment.fileName,
@@ -129,12 +129,12 @@ function buildSuccessDocs(
  */
 function buildFailureDoc(
   attachment: AttachmentWithComputed,
-  pageId: string | null,
+  pageId: string,
 ): IAttachmentEsDoc {
   const now = new Date().toISOString();
   return {
     attachmentId: attachment._id.toString(),
-    pageId: pageId ?? '',
+    pageId,
     pageNumber: null,
     label: null,
     fileName: attachment.fileName,
@@ -185,30 +185,8 @@ export class AttachmentSearchIndexer
   // Feature gate
   // ----------------------------------------------------------------
 
-  /**
-   * Returns true when the attachment full-text search indexing feature is ready.
-   *
-   * All four conditions must hold:
-   * 1. The search service is configured (Elasticsearch reachable)
-   * 2. A non-empty extractorUri is configured
-   * 3. A non-empty extractorToken is configured
-   */
   private isFeatureEnabled(): boolean {
-    const extractorUri = configManager.getConfig(
-      'app:attachmentFullTextSearch:extractorUri',
-    ) as string | undefined;
-
-    const extractorToken = configManager.getConfig(
-      'app:attachmentFullTextSearch:extractorToken',
-    ) as string | undefined;
-
-    return (
-      this.searchService.isConfigured &&
-      extractorUri != null &&
-      extractorUri !== '' &&
-      extractorToken != null &&
-      extractorToken !== ''
-    );
+    return isAttachmentFullTextSearchEnabled(this.searchService.isConfigured);
   }
 
   // ----------------------------------------------------------------
@@ -245,7 +223,7 @@ export class AttachmentSearchIndexer
    */
   private async writeToIndexes(
     attachmentId: string,
-    pageId: string | null,
+    pageId: string,
     docs: IAttachmentEsDoc[],
     targetIndexes: string[],
   ): Promise<void> {
@@ -257,7 +235,7 @@ export class AttachmentSearchIndexer
     if (hasLive) {
       await this.delegatorExt.syncAttachmentIndexed(
         attachmentId,
-        pageId ?? '',
+        pageId,
         docs,
         [liveIndex],
       );
@@ -270,12 +248,9 @@ export class AttachmentSearchIndexer
     if (tmpIndexes.length > 0) {
       const tmpResults = await Promise.allSettled(
         tmpIndexes.map((tmpIndex) =>
-          this.delegatorExt.syncAttachmentIndexed(
-            attachmentId,
-            pageId ?? '',
-            docs,
-            [tmpIndex],
-          ),
+          this.delegatorExt.syncAttachmentIndexed(attachmentId, pageId, docs, [
+            tmpIndex,
+          ]),
         ),
       );
       for (let i = 0; i < tmpResults.length; i++) {
@@ -300,7 +275,7 @@ export class AttachmentSearchIndexer
    */
   private async extractAndIndex(
     attachment: AttachmentWithComputed,
-    pageId: string | null,
+    pageId: string,
   ): Promise<ExtractionOutcome> {
     const attachmentId = attachment._id.toString();
     const targetIndexes = this.getTargetIndexes();
@@ -327,7 +302,7 @@ export class AttachmentSearchIndexer
 
       const failureEntry: ExtractionFailureEntry = {
         attachmentId,
-        pageId: pageId ?? null,
+        pageId,
         fileName: attachment.fileName,
         fileFormat: attachment.fileFormat,
         fileSize: attachment.fileSize,
@@ -352,7 +327,9 @@ export class AttachmentSearchIndexer
   // ----------------------------------------------------------------
 
   /**
-   * Called when an attachment is attached to a page.
+   * Called when an attachment is created. Attachments without a page (profile
+   * pictures, brand logos) are not indexed: search results are scoped by the
+   * page's permissions.
    * Fire-and-forget safe — never throws.
    */
   async onAttach(
@@ -361,11 +338,7 @@ export class AttachmentSearchIndexer
     _file: Express.Multer.File,
   ): Promise<void> {
     try {
-      if (!this.isFeatureEnabled()) {
-        logger.debug(
-          { attachmentId: attachment._id?.toString() },
-          'onAttach: feature disabled, skipping indexing',
-        );
+      if (pageId == null || !this.isFeatureEnabled()) {
         return;
       }
 
@@ -385,6 +358,10 @@ export class AttachmentSearchIndexer
    */
   async onDetach(attachmentId: string): Promise<void> {
     try {
+      if (!this.isFeatureEnabled()) {
+        return;
+      }
+
       const targetIndexes = this.getTargetIndexes();
 
       // Attempt live first, then tmp (best-effort for each)
@@ -455,7 +432,11 @@ export class AttachmentSearchIndexer
         return { ok: false, outcome: { kind: 'serviceUnreachable' } };
       }
 
-      const pageId = attachment.pageId;
+      const { pageId } = attachment;
+      if (pageId == null) {
+        logger.warn({ attachmentId }, 'reindex: attachment has no page');
+        return { ok: false, outcome: { kind: 'serviceUnreachable' } };
+      }
 
       const outcome = await this.extractAndIndex(attachment, pageId);
 

@@ -1,7 +1,14 @@
 import type { GetServerSidePropsContext } from 'next';
 import { describe, expect, it } from 'vitest';
 
+import { configManager } from '~/server/service/config-manager';
+
 import { getServerSideSearchConfigurationProps } from './search-configurations';
+
+// crowi.configManager is this same singleton in production
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: { getConfig: vi.fn() },
+}));
 
 // Helper to build a minimal context with configurable crowi dependencies
 const createMockContext = (opts: {
@@ -25,9 +32,9 @@ const createMockContext = (opts: {
     'app:attachmentFullTextSearch:extractorToken': extractorToken,
   };
 
-  const configManager = {
-    getConfig: (key: string) => configMap[key],
-  };
+  vi.mocked(configManager.getConfig).mockImplementation(
+    (key: string) => configMap[key] as never,
+  );
 
   const searchService = {
     isConfigured,
@@ -112,6 +119,20 @@ describe('getServerSideSearchConfigurationProps', () => {
       isConfigured: true,
       extractorUri: 'http://attachment-text-extractor:8080',
       extractorToken: '',
+    });
+
+    const result = await getServerSideSearchConfigurationProps(ctx);
+    const { props } = result as {
+      props: { searchConfig: Record<string, unknown> };
+    };
+    expect(props.searchConfig.isAttachmentFullTextSearchEnabled).toBe(false);
+  });
+
+  it('returns isAttachmentFullTextSearchEnabled=false when extractorToken is whitespace only', async () => {
+    const ctx = createMockContext({
+      isConfigured: true,
+      extractorUri: 'http://attachment-text-extractor:8080',
+      extractorToken: ' \n',
     });
 
     const result = await getServerSideSearchConfigurationProps(ctx);

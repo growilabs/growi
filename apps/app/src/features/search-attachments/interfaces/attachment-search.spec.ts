@@ -13,8 +13,6 @@ import type {
   ExtractionOutcome,
   IAttachmentEsDoc,
   IAttachmentHit,
-  IPrimarySearchResult,
-  ISecondarySearchResult,
   ISnippetSegment,
 } from './attachment-search';
 // Verify the module exists at runtime (not just types)
@@ -278,88 +276,6 @@ describe('ExtractionFailureEntry', () => {
       },
     ];
     expect(entries).toHaveLength(6);
-  });
-});
-
-// ---- IPrimarySearchResult ----
-
-describe('IPrimarySearchResult', () => {
-  test('accepts valid shape', () => {
-    const result: IPrimarySearchResult = {
-      items: [
-        {
-          pageId: 'page-001',
-          attachmentHits: [
-            {
-              attachmentId: 'att-001',
-              pageId: 'page-001',
-              fileName: 'doc.pdf',
-              originalName: 'Document.pdf',
-              fileFormat: 'application/pdf',
-              fileSize: 1024,
-              snippets: [],
-              pageNumber: null,
-              label: null,
-            },
-          ],
-        },
-      ],
-      meta: {
-        total: 1,
-        hitsCount: 1,
-        took: 5,
-        primaryResultIncomplete: false,
-        nextCursor: null,
-      },
-    };
-    expect(result.items).toHaveLength(1);
-    expect(result.meta.total).toBe(1);
-  });
-
-  test('accepts nextCursor as string', () => {
-    const result: IPrimarySearchResult = {
-      items: [],
-      meta: {
-        total: 100,
-        hitsCount: 10,
-        took: 12,
-        primaryResultIncomplete: true,
-        nextCursor: 'cursor-abc-123',
-      },
-    };
-    expect(result.meta.nextCursor).toBe('cursor-abc-123');
-  });
-});
-
-// ---- ISecondarySearchResult ----
-
-describe('ISecondarySearchResult', () => {
-  test('accepts valid shape', () => {
-    const result: ISecondarySearchResult = {
-      attachmentHitsByPageId: {
-        'page-001': [
-          {
-            attachmentId: 'att-001',
-            pageId: 'page-001',
-            fileName: 'doc.pdf',
-            originalName: 'Document.pdf',
-            fileFormat: 'application/pdf',
-            fileSize: 1024,
-            snippets: [],
-            pageNumber: null,
-            label: null,
-          },
-        ],
-      },
-    };
-    expect(Object.keys(result.attachmentHitsByPageId)).toHaveLength(1);
-  });
-
-  test('accepts empty record', () => {
-    const result: ISecondarySearchResult = {
-      attachmentHitsByPageId: {},
-    };
-    expect(result.attachmentHitsByPageId).toEqual({});
   });
 });
 

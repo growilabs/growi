@@ -19,6 +19,8 @@ import express from 'express';
 import { body, query } from 'express-validator';
 
 import { ExtractionFailureLogService } from '~/features/search-attachments/server/services/extraction-failure-log-service';
+import { indexableAttachments } from '~/features/search-attachments/server/services/indexable-attachments';
+import { isAttachmentFullTextSearchEnabled } from '~/features/search-attachments/server/services/is-attachment-full-text-search-enabled';
 import { validateExtractorUri } from '~/features/search-attachments/server/services/validate-extractor-uri';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -56,11 +58,11 @@ export const invalidateRequiresReindexCache = (): void => {
  * Computes whether the attachment ES index is out of sync with MongoDB.
  *
  * Returns `false` immediately when:
- * - attachment full-text search is not enabled (no extractorUri set)
- * - MongoDB has 0 attachments (nothing to index)
+ * - attachment full-text search is not enabled
+ * - MongoDB has no indexable attachments (nothing to index)
  *
  * Otherwise runs a cardinality aggregation on the `attachments` ES index and
- * compares the unique-attachmentId count against `prisma.attachments.count()`.
+ * compares the unique-attachmentId count against the indexable attachments.
  *
  * Result is cached for CACHE_TTL_MS milliseconds.
  */
@@ -81,7 +83,9 @@ export const computeRequiresReindex = async (
   if (isEnabled) {
     try {
       const { prisma } = await import('~/utils/prisma');
-      const mongoCount = await prisma.attachments.count();
+      const mongoCount = await prisma.attachments.count({
+        where: indexableAttachments,
+      });
 
       if (mongoCount > 0) {
         // Access the ES client via the search service delegator.
@@ -237,20 +241,18 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
           'app:attachmentFullTextSearch:maxFileSizeBytes',
         );
 
-        const isAttachmentFullTextSearchEnabled =
-          extractorUri != null && extractorUri !== '';
-
-        const requiresReindex = await computeRequiresReindex(
-          crowi,
-          isAttachmentFullTextSearchEnabled,
+        const isEnabled = isAttachmentFullTextSearchEnabled(
+          crowi.searchService?.isConfigured === true,
         );
+
+        const requiresReindex = await computeRequiresReindex(crowi, isEnabled);
 
         const config: AttachmentSearchConfig = {
           extractorUri,
           hasExtractorToken,
           timeoutMs,
           maxFileSizeBytes,
-          isAttachmentFullTextSearchEnabled,
+          isAttachmentFullTextSearchEnabled: isEnabled,
           requiresReindex,
         };
 

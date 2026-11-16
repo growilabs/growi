@@ -201,11 +201,7 @@ const convertAndAnswer = async (
     });
   }
   if (outcome.kind === 'ok') {
-    line('ok', {
-      ...facts,
-      format: outcome.mimeType,
-      childPeakRssMb: outcome.childPeakRssMb,
-    });
+    line('ok', { ...facts, childPeakRssMb: outcome.childPeakRssMb });
     return extractResponse(outcome.pages, outcome.mimeType);
   }
   line(outcome.failure, { ...facts, childPeakRssMb: outcome.childPeakRssMb });

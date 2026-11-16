@@ -636,7 +636,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   /**
    * Register an AttachmentSearchResultAggregator for faceted search routing.
-   * Called by initAttachmentFullTextSearch (task 9.1) after setup.
+   * Called by initAttachmentFullTextSearch.
    */
   setAttachmentSearchResultAggregator(
     agg: AttachmentSearchResultAggregator,
@@ -645,11 +645,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   /**
-   * Facet-aware search entry point.
-   *
-   * facet=pages (default): existing page-only path — no attachment index touched.
-   * facet=all | facet=attachments: routed through AttachmentSearchResultAggregator.
-   * Falls back to page-only when the aggregator is not yet initialised.
+   * Facet-aware search entry point, routed through the
+   * AttachmentSearchResultAggregator. Callers check
+   * isAttachmentFullTextSearchEnabled first.
    *
    * `viewer` is resolved the same way the page search route resolves it; a
    * null user means guest.
@@ -662,41 +660,33 @@ class SearchService implements SearchQueryParser, SearchResolver {
     keyword: string,
     viewer: AttachmentSearchViewer,
     options: {
-      facet?: 'pages' | 'all' | 'attachments';
+      facet: 'all' | 'attachments';
       from?: number;
       size?: number;
       resolve?: 'primary' | 'full';
     },
   ): Promise<IPrimarySearchResult> {
-    const facet = options.facet ?? 'pages';
+    const { facet } = options;
     const from = options.from ?? 0;
     const size = options.size ?? 20;
 
-    const input = await this.createAttachmentSearchInput(keyword, viewer);
-
     const aggregator = this.attachmentSearchResultAggregator;
-    if (facet !== 'pages' && aggregator != null) {
-      const primary = await aggregator.searchPrimary(input, {
-        facet,
-        from,
-        size,
-      });
-      if (facet !== 'all' || options.resolve !== 'full') {
-        return primary;
-      }
-      return {
-        ...primary,
-        items: await this.attachSecondaryHits(aggregator, input, primary.items),
-      };
+    if (aggregator == null) {
+      throw new Error('Attachment search is not initialized');
     }
 
-    // Page-only fallback: the regular page search for the same viewer
-    const result = await this.searchFormattedPages(input, { from, size });
+    const input = await this.createAttachmentSearchInput(keyword, viewer);
+    const primary = await aggregator.searchPrimary(input, {
+      facet,
+      from,
+      size,
+    });
+    if (facet !== 'all' || options.resolve !== 'full') {
+      return primary;
+    }
     return {
-      facet: 'pages',
-      primarySlot: 'pages',
-      items: result.data,
-      meta: { total: result.meta.total },
+      ...primary,
+      items: await this.attachSecondaryHits(aggregator, input, primary.items),
     };
   }
 

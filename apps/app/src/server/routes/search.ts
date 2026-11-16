@@ -158,8 +158,8 @@ export const setup = (crowi: Crowi, app) => {
    *           description: |
    *             Optional. `all` / `attachments` include attachment hits while
    *             attachment full-text search is enabled; the response meta then
-   *             carries `facet`, a nullable `total` and optional
-   *             `primaryResultIncomplete` / `nextCursor`; `limit` must then be
+   *             carries `facet`, a nullable `total` and an optional
+   *             `primaryResultIncomplete`; `limit` must then be
    *             an integer from 1 to 200 and `offset` a non-negative integer,
    *             otherwise the answer is `{ ok: false, code: 400 }`. Omitted,
    *             `pages`, combined with `nq`, or with the feature disabled, the

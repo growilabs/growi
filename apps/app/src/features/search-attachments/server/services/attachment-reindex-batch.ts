@@ -29,6 +29,7 @@ import type { AttachmentOrphanSweeper } from './attachment-orphan-sweeper';
 import type { AttachmentIndexOperations } from './attachment-search-delegator-extension';
 import type { AttachmentTextExtractorService } from './attachment-text-extractor';
 import type { ExtractionFailureLogServiceInterface } from './extraction-failure-log-service';
+import { indexableAttachments } from './indexable-attachments';
 
 const logger = loggerFactory('growi:service:search-attachments:reindex-batch');
 
@@ -56,8 +57,8 @@ export const REINDEX_PAGE_SIZE = 100;
 // ---- Internal helpers -------------------------------------------------------
 
 /**
- * Fetches up to `take` attachment ids greater than `afterId` (or from the
- * start when null), in ascending order.
+ * Fetches up to `take` indexable attachment ids greater than `afterId` (or
+ * from the start when null), in ascending order.
  */
 export type FetchAttachmentIdPage = (
   afterId: string | null,
@@ -70,7 +71,10 @@ export type FetchAttachmentIdPage = (
 const fetchAttachmentIdPage: FetchAttachmentIdPage = async (afterId, take) => {
   const rows = await prisma.attachments.findMany({
     select: { id: true },
-    where: afterId != null ? { id: { gt: afterId } } : {},
+    where: {
+      ...indexableAttachments,
+      ...(afterId != null ? { id: { gt: afterId } } : {}),
+    },
     orderBy: { id: 'asc' },
     take,
   });
@@ -136,10 +140,10 @@ function outcomeToReasonCode(
  */
 function buildDocs(
   attachment: AttachmentWithComputed,
+  pageId: string,
   outcome: ExtractionOutcome,
 ): IAttachmentEsDoc[] {
   const attachmentId = attachment.id;
-  const pageId = attachment.pageId ?? '';
   const createdAt =
     attachment.createdAt != null
       ? attachment.createdAt.toISOString()
@@ -255,21 +259,19 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
     const attachment = await prisma.attachments.findUnique({
       where: { id: attachmentId },
     });
-    if (attachment == null) {
-      // Deleted after its id was paged
+    // Deleted after its id was paged
+    if (attachment?.pageId == null) {
       return;
     }
+    const { pageId } = attachment;
 
     const outcome = await this.extractor.extractAttachment(attachmentId);
-    const docs = buildDocs(attachment, outcome);
+    const docs = buildDocs(attachment, pageId, outcome);
 
     // Upsert ES docs (success and failure alike get a metadata doc)
-    await this.delegatorExt.syncAttachmentIndexed(
-      attachmentId,
-      docs[0]?.pageId ?? '',
-      docs,
-      [targetIndex],
-    );
+    await this.delegatorExt.syncAttachmentIndexed(attachmentId, pageId, docs, [
+      targetIndex,
+    ]);
 
     // Record failure for non-success outcomes
     if (outcome.kind !== 'success') {
@@ -279,7 +281,7 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
           : null;
       await this.failureLogService.record({
         attachmentId,
-        pageId: attachment.pageId,
+        pageId,
         fileName: attachment.fileName,
         fileFormat: attachment.fileFormat,
         fileSize: attachment.fileSize,
@@ -323,7 +325,9 @@ export class AttachmentReindexBatch implements AttachmentReindexBatchInterface {
       await this.delegatorExt.createAttachmentIndex(targetIndex);
 
       // Step 2: Count total for progress reporting
-      const total = await prisma.attachments.count();
+      const total = await prisma.attachments.count({
+        where: indexableAttachments,
+      });
 
       logger.info(
         { targetIndex, total },

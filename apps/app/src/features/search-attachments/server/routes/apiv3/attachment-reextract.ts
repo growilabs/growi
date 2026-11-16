@@ -17,9 +17,8 @@
  *     has no page, the page is gone, or the caller is neither admin nor able
  *     to edit the page (= can view it, the same rule the attachment upload
  *     route applies)
- *   - 503 if the feature is disabled, or was enabled after boot (no indexer
- *     yet), or MAX_CONCURRENT_REEXTRACTIONS other attachments are being
- *     re-extracted
+ *   - 503 if the feature is disabled, or MAX_CONCURRENT_REEXTRACTIONS other
+ *     attachments are being re-extracted
  *   - 200 { outcome: { kind } } otherwise (ReextractResponse)
  *
  * Concurrent authorized requests for one attachment share one extraction.
@@ -84,8 +83,8 @@ const notFoundOrForbidden = (res: ApiV3Response) =>
   );
 
 /**
- * @param crowi — supplies the indexer (set at boot only when the feature is
- *   enabled) and the search service, both read per request
+ * @param crowi — supplies the indexer (set at boot when the search service
+ *   is configured) and the search service, both read per request
  */
 export function createAttachmentReextractRouter(crowi: Crowi): express.Router {
   const router = express.Router();

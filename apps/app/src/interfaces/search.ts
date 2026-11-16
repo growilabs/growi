@@ -50,7 +50,6 @@ export type IFacetedSearchResultMeta = {
   hitsCount: number;
   /** true only when the attachment search or its permission lookup failed */
   primaryResultIncomplete?: boolean;
-  nextCursor?: string;
 };
 
 /**

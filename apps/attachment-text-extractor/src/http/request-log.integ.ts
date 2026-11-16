@@ -74,7 +74,7 @@ describe('the request line', () => {
 
     expect(await linesAfter(1)).toEqual([
       {
-        format: 'text/plain',
+        format: 'txt',
         size: CONTENT_MARKER.length,
         result: 'ok',
         rss: '42',
@@ -84,6 +84,19 @@ describe('the request line', () => {
     expect(everything).not.toContain(CONTENT_MARKER);
     expect(everything).not.toContain(FILE_NAME_MARKER);
     expect(everything).not.toContain(service.current().token);
+  });
+
+  it('logs the format taken from the upload, never the mimeType the child reported', async () => {
+    const forged =
+      'text/plain\nextract format=forged size=0 duration_ms=0 result=ok';
+    runner.run.mockResolvedValue(succeeded(undefined, { mimeType: forged }));
+
+    await post('a.txt', 'x');
+
+    expect(await linesAfter(1)).toEqual([
+      { format: 'txt', size: 1, result: 'ok', rss: '42' },
+    ]);
+    expect(service.current().logs.join('\n')).not.toContain('forged');
   });
 
   it('names the failure kind and the child RSS, never the detail', async () => {

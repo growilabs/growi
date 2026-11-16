@@ -132,15 +132,9 @@ export interface IPrimarySearchResult {
   meta: {
     /** The page search total for a page-primary result; always null for facet=attachments. */
     total: number | null;
-    nextCursor?: string;
     /** facet=attachments: the attachment search or the permission check failed. */
     primaryResultIncomplete?: boolean;
   };
-  secondary?: ISecondarySearchResult;
-}
-
-export interface ISecondarySearchResult {
-  attachmentHitsByPageId: Record<string, IAttachmentHit[]>;
 }
 
 /**
@@ -257,17 +251,12 @@ export class AttachmentSearchResultAggregator {
   async searchPrimary(
     input: AttachmentSearchInput,
     options: {
-      facet: 'all' | 'pages' | 'attachments';
+      facet: 'all' | 'attachments';
       from: number;
       size: number;
     },
   ): Promise<IPrimarySearchResult> {
     const { facet, from, size } = options;
-
-    // facet=pages: MUST NOT touch attachments_index at all
-    if (facet === 'pages') {
-      return await this.searchPrimaryPages(input, from, size);
-    }
 
     if (facet === 'all') {
       // from>0: only page search (same as facet=pages), no attachment query
@@ -278,12 +267,7 @@ export class AttachmentSearchResultAggregator {
       return await this.searchPrimaryAll(input, size);
     }
 
-    if (facet === 'attachments') {
-      return await this.searchPrimaryAttachments(input, from, size);
-    }
-
-    // Should never reach here given TypeScript exhaustive check, but handle defensively
-    throw new Error(`Unknown facet: ${facet}`);
+    return await this.searchPrimaryAttachments(input, from, size);
   }
 
   // --------------------------------------------------------------------------
@@ -352,26 +336,31 @@ export class AttachmentSearchResultAggregator {
           )
         : Promise.resolve({ hits: { hits: [] } });
 
-    let pageResult: IFormattedSearchResult;
-    let attachmentResponse: AttachmentSearchResponse;
-
+    let attachmentResponse: AttachmentSearchResponse | null = null;
     try {
-      [pageResult, attachmentResponse] = await withTimeout(
-        Promise.all([pageSearchPromise, attachmentSearchPromise]),
+      const [, attachmentSettled] = await withTimeout(
+        Promise.allSettled([pageSearchPromise, attachmentSearchPromise]),
         this.PRIMARY_TIMEOUT_MS,
       );
+      if (attachmentSettled.status === 'rejected') {
+        throw attachmentSettled.reason;
+      }
+      attachmentResponse = attachmentSettled.value;
     } catch (err) {
-      // Safety net: degrade to pages-only result
       logger.warn(
         { err, failure: failureKind(err) },
         'searchPrimaryAll: primary search failed — degrading to pages-only',
       );
-      const degradedResult = await this.pageSearchFn(input, { from: 0, size });
+    }
+
+    // A failed page search fails the request, as on every other path
+    const pageResult = await pageSearchPromise;
+    if (attachmentResponse == null) {
       return {
         facet: 'all',
         primarySlot: 'pages',
-        items: degradedResult.data,
-        meta: { total: degradedResult.meta.total },
+        items: pageResult.data,
+        meta: { total: pageResult.meta.total },
       };
     }
 

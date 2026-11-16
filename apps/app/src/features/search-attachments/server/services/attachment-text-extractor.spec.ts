@@ -305,6 +305,47 @@ describe('AttachmentTextExtractorService', () => {
     expect(options.timeout).toBe(60000);
   });
 
+  it('sends the token without its surrounding whitespace', async () => {
+    vi.mocked(configManager.getConfig).mockImplementation((key: string) => {
+      if (key === 'app:attachmentFullTextSearch:extractorUri')
+        return 'http://localhost:8000';
+      if (key === 'app:attachmentFullTextSearch:extractorToken')
+        return ' test-token\n';
+      if (key === 'app:attachmentFullTextSearch:timeoutMs') return 60000;
+      if (key === 'app:attachmentFullTextSearch:maxFileSizeBytes')
+        return 52428800;
+      return undefined;
+    });
+    postExtract.mockResolvedValue({
+      data: {
+        mimeType: 'text/plain',
+        extractedCharacters: 5,
+        pages: [{ pageNumber: null, label: null, content: 'hello' }],
+      },
+    });
+
+    const service = await getService();
+    await service.extractAttachment('attachment-id-1');
+
+    const [, options] = postExtract.mock.calls[0];
+    expect(options.headers?.Authorization).toBe('Bearer test-token');
+  });
+
+  it('returns serviceUnreachable when extractorToken is whitespace only', async () => {
+    vi.mocked(configManager.getConfig).mockImplementation((key: string) => {
+      if (key === 'app:attachmentFullTextSearch:extractorUri')
+        return 'http://localhost:8000';
+      if (key === 'app:attachmentFullTextSearch:extractorToken') return ' \n';
+      return undefined;
+    });
+
+    const service = await getService();
+    const result = await service.extractAttachment('attachment-id-1');
+
+    expect(result).toEqual({ kind: 'serviceUnreachable' });
+    expect(postExtract).not.toHaveBeenCalled();
+  });
+
   it('hands the stored bytes to the client as a named file, on the retry too', async () => {
     vi.useFakeTimers();
     const stored = Buffer.from([

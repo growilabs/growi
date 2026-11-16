@@ -2,39 +2,16 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 
 import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
+import { isAttachmentFullTextSearchEnabled } from '~/features/search-attachments/server/services/is-attachment-full-text-search-enabled';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import auditLogEnabledRequired from '~/server/middlewares/audit-log-enabled-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-
-/**
- * Returns true when the attachment full-text search feature is fully configured.
- * Mirrors the logic in require-search-attachments-enabled.ts.
- *
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {boolean}
- */
-function isAttachmentSearchEnabled(crowi) {
-  const extractorUri = configManager.getConfig(
-    'app:attachmentFullTextSearch:extractorUri',
-  );
-  const extractorToken = configManager.getConfig(
-    'app:attachmentFullTextSearch:extractorToken',
-  );
-  return (
-    crowi.searchService?.isConfigured === true &&
-    extractorUri != null &&
-    extractorUri !== '' &&
-    extractorToken != null &&
-    extractorToken !== ''
-  );
-}
 
 const logger = loggerFactory('growi:routes:apiv3:search');
 
@@ -320,7 +297,9 @@ export const setup = (crowi) => {
           case 'rebuild':
             if (includeAttachments) {
               // Guard: attachment search feature must be enabled
-              if (!isAttachmentSearchEnabled(crowi)) {
+              if (
+                !isAttachmentFullTextSearchEnabled(searchService.isConfigured)
+              ) {
                 return res.apiv3Err(
                   new ErrorV3(
                     'Attachment full-text search feature is disabled',
@@ -330,7 +309,7 @@ export const setup = (crowi) => {
                 );
               }
 
-              // Guard: batch service must be registered (done in task 9.1)
+              // Unset only when the search service is not configured
               const batch = crowi.attachmentReindexBatch;
               if (batch == null) {
                 return res.apiv3Err(

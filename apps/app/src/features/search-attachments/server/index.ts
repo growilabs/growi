@@ -1,5 +1,4 @@
 import type Crowi from '~/server/crowi';
-import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { createAttachmentOrphanSweeper } from './services/attachment-orphan-sweeper';
@@ -20,9 +19,10 @@ const logger = loggerFactory('growi:features:search-attachments:init');
  *
  * Must be called AFTER searchService and attachmentService are initialized.
  *
- * When the feature is disabled (extractorUri or extractorToken unset, or
- * searchService not configured), this function returns immediately without
- * registering any handlers — full backward compatibility is preserved.
+ * Everything is registered whenever Elasticsearch is configured, even while
+ * the extractor settings are unset: each part checks
+ * isAttachmentFullTextSearchEnabled when it is called, so enabling the
+ * feature from the admin page takes effect without a restart.
  */
 export function initAttachmentFullTextSearch(crowi: Crowi): void {
   const {
@@ -32,29 +32,10 @@ export function initAttachmentFullTextSearch(crowi: Crowi): void {
     fileUploadService,
   } = crowi;
 
-  // ----------------------------------------------------------------
-  // Feature gate — check all required config values
-  // ----------------------------------------------------------------
-  const extractorUri = configManager.getConfig(
-    'app:attachmentFullTextSearch:extractorUri',
-  ) as string | null | undefined;
-  const extractorToken = configManager.getConfig(
-    'app:attachmentFullTextSearch:extractorToken',
-  ) as string | null | undefined;
-
-  const isEnabled =
-    searchService?.isConfigured === true &&
-    extractorUri != null &&
-    extractorUri !== '' &&
-    extractorToken != null &&
-    extractorToken !== '';
-
-  if (!isEnabled) {
+  // Unlike the extractor settings, this is fixed for the process lifetime.
+  if (searchService?.isConfigured !== true) {
     logger.info(
-      'Attachment full-text search disabled ' +
-        `(searchConfigured=${searchService?.isConfigured}, ` +
-        `extractorUri=${extractorUri != null ? '"set"' : 'null'}, ` +
-        `extractorToken=${extractorToken != null ? '"set"' : 'null'})`,
+      'Attachment full-text search not wired: search service is not configured',
     );
     return;
   }

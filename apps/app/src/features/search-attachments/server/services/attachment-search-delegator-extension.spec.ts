@@ -300,20 +300,4 @@ describe('AttachmentSearchDelegatorExtension', () => {
       expect(result).toEqual({ initialized: true });
     });
   });
-
-  // ----------------------------------------------------------------
-  // mgetPagesForPermissionBody
-  // ----------------------------------------------------------------
-  describe('mgetPagesForPermissionBody', () => {
-    it('returns mget request parameters using the page index field names', () => {
-      const params = ext.mgetPagesForPermissionBody(['page-abc', 'page-def']);
-
-      expect(params.ids).toEqual(['page-abc', 'page-def']);
-      expect(params).not.toHaveProperty('_source');
-      expect(params._source_includes).toEqual(
-        expect.arrayContaining(['grant', 'granted_users', 'granted_groups']),
-      );
-      expect(params._source_includes).not.toContain('body');
-    });
-  });
 });

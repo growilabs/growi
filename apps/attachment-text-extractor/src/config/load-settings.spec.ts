@@ -38,6 +38,10 @@ describe('loadSettings: the service token is required (Req 1.5)', () => {
   it('fails when the token is whitespace only', () => {
     expect(() => loadSettings({ [TOKEN]: '   ' })).toThrow(TOKEN);
   });
+
+  it('drops the whitespace around the token', () => {
+    expect(loadSettings({ [TOKEN]: ' tok\n' }).serviceToken).toBe('tok');
+  });
 });
 
 describe('loadSettings: defaults (Req 1.4)', () => {

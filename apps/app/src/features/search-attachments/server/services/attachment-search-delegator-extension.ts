@@ -18,11 +18,6 @@ import {
 } from '~/server/service/search-delegator/elasticsearch-client-delegator';
 import loggerFactory from '~/utils/logger';
 
-import {
-  type MgetPagesParams,
-  mgetPagesForPermissionBody,
-} from '../queries/mget-pages-for-permission-body';
-
 const logger = loggerFactory(
   'growi:service:search-attachments:delegator-extension',
 );
@@ -89,7 +84,6 @@ export interface AttachmentIndexOperations {
     pageIds: string[],
     options?: SearchOptions,
   ): Record<string, unknown>;
-  mgetPagesForPermissionBody(pageIds: string[]): MgetPagesParams;
   /**
    * Bulk-write stub for task 4.1. The full implementation (MongoDB cursor walk +
    * text extraction) is provided by AttachmentReindexBatch (task 6.3), which
@@ -495,14 +489,6 @@ export class AttachmentSearchDelegatorExtension
     return composeAttachmentSearchBody(query, options, {
       terms: { pageId: pageIds },
     });
-  }
-
-  /**
-   * Builds lightweight mget request parameters for the page index.
-   * The result is never used as an authorization decision.
-   */
-  mgetPagesForPermissionBody(pageIds: string[]): MgetPagesParams {
-    return mgetPagesForPermissionBody(pageIds);
   }
 
   // ----------------------------------------------------------------

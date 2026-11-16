@@ -113,7 +113,7 @@ export const toFacetedSearchResult = (
   result: IPrimarySearchResult,
 ): IFacetedSearchResult => {
   const data: IPageWithSearchMeta[] = result.items;
-  const { total, primaryResultIncomplete, nextCursor } = result.meta;
+  const { total, primaryResultIncomplete } = result.meta;
   return {
     data,
     meta: {
@@ -121,7 +121,6 @@ export const toFacetedSearchResult = (
       total,
       hitsCount: data.length,
       ...(primaryResultIncomplete != null ? { primaryResultIncomplete } : {}),
-      ...(nextCursor != null ? { nextCursor } : {}),
     },
   };
 };

@@ -206,9 +206,11 @@ export class AttachmentTextExtractorService {
       }
 
       // --- Step 2: Check auth token ---
-      const extractorToken = configManager.getConfig(
-        'app:attachmentFullTextSearch:extractorToken',
-      ) as string | undefined;
+      // A header value cannot carry surrounding whitespace (e.g. the newline
+      // a token read from a secret file ends in).
+      const extractorToken = configManager
+        .getConfig('app:attachmentFullTextSearch:extractorToken')
+        ?.trim();
 
       if (!extractorToken) {
         return { kind: 'serviceUnreachable' };

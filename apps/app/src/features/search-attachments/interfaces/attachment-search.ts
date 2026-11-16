@@ -75,25 +75,6 @@ export interface IAttachmentHit {
   readonly label: string | null;
 }
 
-export interface IPrimarySearchResult {
-  readonly items: Array<{
-    readonly pageId: string;
-    readonly attachmentHits: IAttachmentHit[];
-  }>;
-  readonly meta: {
-    /** null: no count is reported (it would count hits the viewer cannot see) */
-    readonly total: number | null;
-    readonly hitsCount: number;
-    readonly took: number;
-    readonly primaryResultIncomplete: boolean;
-    readonly nextCursor: string | null;
-  };
-}
-
-export interface ISecondarySearchResult {
-  readonly attachmentHitsByPageId: Record<string, IAttachmentHit[]>;
-}
-
 // ---- Failure log ----
 
 export interface ExtractionFailureEntry {

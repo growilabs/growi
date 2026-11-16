@@ -1,7 +1,7 @@
 import { configManager } from '~/server/service/config-manager';
 
 const isSet = (value: string | null | undefined): boolean =>
-  value != null && value !== '';
+  value != null && value.trim() !== '';
 
 /**
  * The computed `isAttachmentFullTextSearchEnabled` flag, read from the live

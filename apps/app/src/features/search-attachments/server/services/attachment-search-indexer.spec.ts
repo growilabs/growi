@@ -87,7 +87,6 @@ function makeDelegator(): AttachmentIndexOperations {
     initializeAttachmentIndex: vi.fn(),
     searchAttachmentsBody: vi.fn(),
     searchAttachmentsByPageIdsBody: vi.fn(),
-    mgetPagesForPermissionBody: vi.fn(),
   } as unknown as AttachmentIndexOperations;
 }
 
@@ -293,36 +292,26 @@ describe('AttachmentSearchIndexer', () => {
       expect(failureLog.record).not.toHaveBeenCalled();
     });
 
-    it('uses empty string for pageId when pageId argument is null', async () => {
+    it('neither extracts nor indexes an attachment that belongs to no page', async () => {
       enableFeature();
 
-      const extractor = makeExtractor({
-        kind: 'success',
-        pages: [{ pageNumber: 1, label: null, content: 'Content' }],
-        mimeType: 'application/pdf',
-      });
+      const extractor = makeExtractor();
       const delegator = makeDelegator();
       const failureLog = makeFailureLog();
-      const reindexBatch = makeReindexBatch();
 
       const indexer = makeIndexer(
         extractor,
         delegator,
         failureLog,
-        reindexBatch,
+        makeReindexBatch(),
         makeSearchService(true),
       );
 
       await indexer.onAttach(null, makeAttachment(), makeMullerFile());
 
-      const [, calledPageId] = vi.mocked(delegator.syncAttachmentIndexed).mock
-        .calls[0];
-      expect(calledPageId).toBe('');
-
-      const [calledDocs] = [
-        vi.mocked(delegator.syncAttachmentIndexed).mock.calls[0][2],
-      ];
-      expect(calledDocs[0].pageId).toBe('');
+      expect(extractor.extractAttachment).not.toHaveBeenCalled();
+      expect(delegator.syncAttachmentIndexed).not.toHaveBeenCalled();
+      expect(failureLog.record).not.toHaveBeenCalled();
     });
   });
 
@@ -509,6 +498,7 @@ describe('AttachmentSearchIndexer', () => {
 
   describe('onDetach', () => {
     it('calls syncAttachmentRemoved with live index only when not rebuilding', async () => {
+      enableFeature();
       const delegator = makeDelegator();
       const reindexBatch = makeReindexBatch(false, null);
 
@@ -528,6 +518,7 @@ describe('AttachmentSearchIndexer', () => {
     });
 
     it('calls syncAttachmentRemoved for both live and tmp when rebuilding', async () => {
+      enableFeature();
       const delegator = makeDelegator();
       const reindexBatch = makeReindexBatch(true, 'attachments-tmp');
 
@@ -554,7 +545,25 @@ describe('AttachmentSearchIndexer', () => {
       expect(tmpCall[0]).toBe('att-999');
     });
 
+    it('does not touch the index while the feature is disabled', async () => {
+      disableFeature();
+      const delegator = makeDelegator();
+
+      const indexer = makeIndexer(
+        makeExtractor(),
+        delegator,
+        makeFailureLog(),
+        makeReindexBatch(false, null),
+        makeSearchService(true),
+      );
+
+      await indexer.onDetach('att-001');
+
+      expect(delegator.syncAttachmentRemoved).not.toHaveBeenCalled();
+    });
+
     it('does not throw if syncAttachmentRemoved throws', async () => {
+      enableFeature();
       const delegator = makeDelegator();
       vi.mocked(delegator.syncAttachmentRemoved).mockRejectedValue(
         new Error('ES error'),
@@ -576,6 +585,32 @@ describe('AttachmentSearchIndexer', () => {
   // ----------------------------------------------------------------
   // 7. reindex: attachment not found → { ok: false }
   // ----------------------------------------------------------------
+
+  describe('reindex — attachment without a page', () => {
+    it('returns { ok: false } without extracting or indexing', async () => {
+      enableFeature();
+      vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(
+        makeAttachment({ pageId: null }),
+      );
+
+      const extractor = makeExtractor();
+      const delegator = makeDelegator();
+
+      const indexer = makeIndexer(
+        extractor,
+        delegator,
+        makeFailureLog(),
+        makeReindexBatch(),
+        makeSearchService(true),
+      );
+
+      const result = await indexer.reindex('att-001');
+
+      expect(result.ok).toBe(false);
+      expect(extractor.extractAttachment).not.toHaveBeenCalled();
+      expect(delegator.syncAttachmentIndexed).not.toHaveBeenCalled();
+    });
+  });
 
   describe('reindex — attachment not found', () => {
     it('returns { ok: false } when the attachment row does not exist', async () => {
@@ -657,7 +692,7 @@ describe('AttachmentSearchIndexer', () => {
     it('returns { ok: true, outcome } with failure kind on extraction failure', async () => {
       enableFeature();
 
-      const attachment = makeAttachment();
+      const attachment = makeAttachment({ pageId: 'page-77' });
       vi.spyOn(prisma.attachments, 'findUnique').mockResolvedValue(attachment);
 
       const failureOutcome: ExtractionOutcome = { kind: 'timeout' };
