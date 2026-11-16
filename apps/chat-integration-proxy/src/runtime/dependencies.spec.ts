@@ -1,3 +1,4 @@
+import { OP_NAMES } from '@growi/chat';
 import type { ServerType } from '@hono/node-server';
 import { type DeepMockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
@@ -10,6 +11,7 @@ import type { PrismaClient, StoredAnswerOrigin } from '../db/index.js';
 import type { ConnectionManager, PlatformFacade } from '../platform/index.js';
 import { startFakeGrowi } from '../testing/fake-growi.js';
 import { serveOnFreePort } from '../testing/free-port.js';
+import { createSigningIdentity } from '../testing/signing-identity.js';
 import type {
   DistributedLock,
   EventInstallation,
@@ -786,31 +788,70 @@ describe('the agent feature wired by createProxyDependencies (Requirement 1.21)'
     },
   });
 
-  // The paths below reach the GROWI client after the point under test; nothing
-  // may leave this process.
-  const refuseNetwork = (): void => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
-      new Error('no network in this test'),
-    );
-  };
-
-  /** One linked GROWI that permits every command in a DM, behind the built graph. */
+  /**
+   * One linked GROWI that permits every command in a DM, behind the built
+   * graph. The GROWI is a fake on a loopback socket reached by its IP address,
+   * so no name is resolved; it accepts every `agent` request it is sent.
+   */
   const proxyWithOneGrowi = async (
-    proxyConfig: ProxyConfig,
+    baseConfig: ProxyConfig,
     reporters?: ProxyReporters,
   ) => {
+    const started = await startFakeGrowi({
+      responders: {
+        [OP_NAMES.command]: () => ({ body: { kind: 'accepted' } }),
+      },
+    });
+    // Closed once, whether a test closes it to stand for an unreachable GROWI
+    // or leaves it to the end of the test.
+    let closing: Promise<void> | null = null;
+    const growi = {
+      ...started,
+      close: () => {
+        closing ??= started.close();
+        return closing;
+      },
+    };
+    onTestFinished(() => growi.close());
+    const signing = createSigningIdentity(RELATION_ID, 'proxy-key-0001');
+    growi.registerPeerKey(signing.asPeerKey);
+    const proxyConfig: ProxyConfig = {
+      ...baseConfig,
+      // The stored key below is the plain PEM, whatever cipher `loadConfig`
+      // built from its environment.
+      cipher: { encrypt: (v) => v, decrypt: (v) => v },
+      closedNetwork: {
+        allowList: [growi.hostname],
+        trustedCaCertsFor: () => [],
+      },
+    };
     const db = mockDeep<PrismaClient>();
     db.relation.findMany.mockResolvedValue([
       {
         id: RELATION_ID,
         installationId: 'inst-1',
-        growiUri: 'https://growi.internal',
+        growiUri: growi.baseUrl,
         growiLabel: 'Team Wiki',
         searchWeight: 1,
         settingsVersion: 0,
         createdAt: new Date('2026-09-01T00:00:00.000Z'),
       },
     ] as never);
+    // The key the proxy signs its request to GROWI with.
+    db.ownKey.findMany.mockResolvedValue([
+      {
+        keyId: signing.key.keyId,
+        validFrom: new Date(0),
+        revokedAt: null,
+        supersededKeyId: null,
+        deliveredToPeerAt: new Date(0),
+      },
+    ] as never);
+    db.ownKey.findUnique.mockResolvedValue({
+      privateKeyPem: signing.privateKey
+        .export({ type: 'pkcs8', format: 'pem' })
+        .toString(),
+    } as never);
     db.channelPermission.findUnique.mockResolvedValue({
       channels: [],
       allowAll: true,
@@ -859,15 +900,19 @@ describe('the agent feature wired by createProxyDependencies (Requirement 1.21)'
             : '',
         )
         .join('\n');
-    return { db, facade, runtime, sink: sink as PlatformEventSink, said };
+    return {
+      db,
+      facade,
+      growi,
+      runtime,
+      sink: sink as PlatformEventSink,
+      said,
+    };
   };
 
   describe('the agent command', () => {
-    beforeEach(refuseNetwork);
-    afterEach(() => vi.restoreAllMocks());
-
     it('is handed to the agent flow, which records the request before sending it', async () => {
-      const { db, said, sink } = await proxyWithOneGrowi(config());
+      const { db, growi, said, sink } = await proxyWithOneGrowi(config());
 
       await sink.handle(directMessage('agent summarize this thread'));
 
@@ -881,21 +926,48 @@ describe('the agent feature wired by createProxyDependencies (Requirement 1.21)'
       // The answer a missing entry gives: the request is never recorded.
       expect(said()).not.toContain('今使えません');
       expect(said()).toContain('依頼しています');
+      // The request reached GROWI, under the id the record was kept with.
+      const [received] = growi.received();
+      expect(received?.body).toMatchObject({
+        kind: 'agent',
+        text: 'summarize this thread',
+      });
+      expect(
+        vi.mocked(db.pendingAgentRequest.create).mock.calls[0]?.[0].data,
+      ).toMatchObject({ requestId: received?.body.requestId });
+    });
+
+    it('tells the operator, with one message, when GROWI cannot be reached', async () => {
+      const reportOperationalFailure = vi.fn();
+      const { growi, said, sink } = await proxyWithOneGrowi(config(), {
+        reportOperationalFailure,
+      });
+      await growi.close();
+
+      await sink.handle(directMessage('agent summarize this thread'));
+
+      expect(reportOperationalFailure.mock.calls).toEqual([
+        [expect.stringContaining('GROWI did not answer')],
+      ]);
+      expect(said()).toContain('時間内に届きませんでした');
     });
   });
 
   describe('the Slack AI app view', () => {
-    beforeEach(refuseNetwork);
-    afterEach(() => vi.restoreAllMocks());
-
     it('sends a DM that names no command to agent when SLACK_AGENT_VIEW is on', async () => {
-      const { db, sink } = await proxyWithOneGrowi(
+      const { db, facade, sink } = await proxyWithOneGrowi(
         config({ platformApp: slackWith(true) }),
       );
 
       await sink.handle(directMessage('search for the release notes'));
 
       expect(db.pendingAgentRequest.create).toHaveBeenCalledTimes(1);
+      // The "thinking" indicator of that DM, on the thread the request starts.
+      expect(facade.setProcessingStatus).toHaveBeenCalledWith(
+        channel,
+        'M-dm-1',
+        { installationId: 'inst-1' },
+      );
     });
 
     it('keeps the ordinary DM routing, where search stays search, when it is off', async () => {
@@ -940,7 +1012,7 @@ describe('the agent feature wired by createProxyDependencies (Requirement 1.21)'
     /** The built routes on a real loopback socket, with a fake GROWI whose key the storage knows. */
     const served = async (reporters?: ProxyReporters) => {
       const built = await proxyWithOneGrowi(config(), reporters);
-      const growi = await startFakeGrowi();
+      const { growi } = built;
       built.db.peerKey.findUnique.mockResolvedValue({
         relationId: RELATION_ID,
         keyId: growi.ownKey.keyId,
@@ -956,10 +1028,8 @@ describe('the agent feature wired by createProxyDependencies (Requirement 1.21)'
         new Promise<void>((resolve) => {
           target.close(() => resolve());
         });
-      onTestFinished(async () => {
-        await Promise.all([growi.close(), close(server)]);
-      });
-      return { ...built, growi, baseUrl };
+      onTestFinished(() => close(server));
+      return { ...built, baseUrl };
     };
 
     it('answers a signed command-answer with a result the protocol names, not a 501', async () => {
@@ -1013,6 +1083,43 @@ describe('the agent feature wired by createProxyDependencies (Requirement 1.21)'
           messages: [{ markdown: 'which day do we ship?' }],
         },
       });
+    });
+
+    it('hands an answer to a request made in a channel to its requester alone', async () => {
+      const { db, facade, growi, baseUrl, said } = await served();
+      const channelOrigin: StoredAnswerOrigin = {
+        ...origin,
+        channel: testSdkChannel('slack', {
+          channelId: testSdkChannelId('slack', 'C1'),
+          isPrivate: false,
+          isDirectMessage: false,
+        }),
+        place: 'channel',
+        replyThreadRootId: null,
+      };
+      db.pendingAgentRequest.findUnique.mockResolvedValue({
+        relationId: RELATION_ID,
+        requestId: 'req-3',
+        installationId: 'inst-1',
+        origin: channelOrigin,
+        deliveryStatus: null,
+        deliveryClaimedAt: null,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      } as never);
+      db.pendingAgentRequest.updateMany.mockResolvedValue({ count: 1 });
+
+      const answer = await growi.sendCommandAnswer(baseUrl, {
+        relationId: RELATION_ID,
+        requestId: 'req-3',
+        answer: { kind: 'text', markdown: 'Ship on Friday.', sources: [] },
+      });
+
+      expect(answer).toMatchObject({
+        status: 200,
+        parsed: { status: 'delivered' },
+      });
+      expect(said()).toContain('Ship on Friday.');
+      expect(facade.postInThread).not.toHaveBeenCalled();
     });
 
     it('tells the operator about an answer that could not be posted, as a message and nothing else', async () => {
