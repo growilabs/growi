@@ -97,7 +97,7 @@
   - _Boundary: change-proposal-service, normalize-create-input, select-auto-apply-targets_
 
 - [ ] 4. 閲覧できるページの操作の絞り込みと、取得・一覧
-- [ ] 4.1 所属グループの取得と、閲覧できるページの操作・判断の対象・見える段階の解決
+- [x] 4.1 所属グループの取得と、閲覧できるページの操作・判断の対象・見える段階の解決
   - ユーザーの所属グループ（ユーザーグループと外部認証グループ）を、1 回の求めにつき 1 回だけ取得する。閲覧の判定（`loadViewablePages`）が、取得済みの所属を受け取れるようにする
   - 依頼した人・承認者・それ以外の人ごとに、閲覧できるページの操作、判断の対象（閲覧できるページの「待ち」の操作）、見える段階を解決する。判断に使うページは、上のページの候補をまとめて 1 回で引く
   - リンクを知る人だけが見られるページを含む操作が、承認者に含まれないことと、反映済みなどの状態の操作が、今の「それ以外の人」の規則（対象のページ）で決まることを、結合テストで確かめている
@@ -277,3 +277,6 @@
 - 3.3: 作成の入力は `purpose` と `reviewers`（`ReviewerInput`）を受ける。検証は `normalize-create-input.ts`（変更の目的は 2000 コードポイント、承認者は重複をまとめた後に 20 まで）、切り替えの確認と存在の確認と引き継ぎは `create-reviewers.ts`（`checkGivenReviewers`、`inheritReviewers`）。誤りのコード: 作成では `input-rejected` の中に `{ code: 'too-many-reviewers' | 'purpose-too-long', max }` と `invalid-reviewer`、`ServiceError` に `reviewers-disabled` と `reviewer-not-found`。6.4 の `ReviewerActionError` では `too-many-reviewers` が単独のコードなので、**7.x（OpenAPI と route）で形をそろえるか判断する**。新しい `ServiceError` のコードは、`respondWithServiceError` の既定の分岐で 500 になる（作成の route は今は無い）。7.x で 400 に対応づける。
 - 3.3: **6.4 の実装者へ**: 承認者の実在確認 `allReviewersExist`（`create-reviewers.ts` の中だけの関数）を、追加でも使い回すために export する。確認は「文書があるか」だけで、削除済み・停止中のユーザーも存在とみなす（design に決まりが無い。変える場合は、要件 1.5 の文言と一緒に判断する）。引き継いだ承認者の `addedBy` / `addedAt` は、依頼した人と今回の作成の日時に付け直した（5.3 の通知が「依頼した人と追加した人」を除くとき、元の提案で承認者を足した人が誤って外れないため）。後続の提案では、追加の経緯は元の提案の記録に残る。4.3 と viewer で「だれが追加したか」を表示するときの参考にする。後続・見直しで `reviewers: []` を明示すると、引き継ぎをやめて承認者なしになる。
 - 3.3: 自動反映の判定（`selectAutoApplyTargets`）には、入力でなく保存した文書の承認者を渡す。依頼した人以外の承認者がいれば、方針にかかわらず何も選ばない。承認者への通知（5.3）は、まだ呼んでいない。
+- 4.1: `server/services/` に `reviewer-identity.ts`（`loadViewerIdentity(userId)`）、`review-scope-resolver.ts`（`resolveReviewScope(operations, viewer: ViewerIdentity, role)` → `ReviewScopeResult`: `visibleKeys` / `visibleStage` / `reviewTargetKeys`）、`review-scope-visibility.ts`（DB を読まない部分。`ReviewScopeResult` の型はここ。resolver から re-export）を置いた。`loadViewablePages(pageIds, viewer, identity?)` は、取得済みの所属を 3 番目の引数で受ける（既存の呼び出し元は今も所属を読み直している。所属を渡す形への切り替えは、使う側の 4.2 以降で行う）。**4.2 の実装者へ**: 役割ごとの分け方（依頼した人・承認者・それ以外）は `decideReviewScope` が持っているので、作り直さず `visibleKeys` をそのまま使う。依頼した人の役割でも `visibleStage` は返るが、依頼した人には実際の lifecycle を使い、この値を使わない。
+- 4.1: `loadViewerIdentity` は、design が書く `pageGrantService.getUserRelatedGroups` を包まず、`UserGroupRelation` / `ExternalUserGroupRelation` の `findAllUserGroupIdsRelatedToUser` を直接読む。ページの閲覧の判定（`addViewerCondition`）が読むのと同じ関数なので、「グループで承認者になる」と「そのグループのページを閲覧できる」が同じ所属から決まる。`getUserRelatedGroups` は消えたグループの関連を落とすが、そうした関連はグループの削除時と起動時（`removeAllInvalidRelations`）に掃除される。結果の違いは実際には出ない。
+- 4.1: 承認者の「判断に使うページ」の上のページは、閲覧の権限で絞らずに、空でない最も近い上のページのパスで決め、**そのパスにある空でないページをすべて**閲覧できる必要がある（`path` は一意でなく、ツリーに載らないページが同じパスを持てるため。1 つに絞ると、閲覧できない親の代わりに、閲覧できる同じパスのページで判定してしまう）。ツリーに載るページだけに絞る直し方は、移行前の v4 のページ（`parent: null`）が親のとき別の形で漏れるので使わない。`resolveAncestors` が `null`、または確かめるページが 1 つも無い操作は見せない。
