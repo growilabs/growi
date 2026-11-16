@@ -18,7 +18,12 @@ import type {
   RelationRepository,
   StoredAnswerOrigin,
 } from '../db/index.js';
-import type { PlatformFacade } from '../platform/index.js';
+// Declared in `platform/` so the Slack request deadline can be checked
+// against it (`platform/answer-delivery-window.ts`).
+import {
+  ANSWER_DELIVERY_RECLAIM_MS,
+  type PlatformFacade,
+} from '../platform/index.js';
 import type { OutboundMessage } from '../types/index.js';
 import { agentAnswerMessage } from './agent-answer-message.js';
 import { conversationResultOf } from './conversation-result.js';
@@ -51,12 +56,6 @@ export interface AnswerFlowDeps {
   readonly reportOperationalFailure: (message: string) => void;
   readonly now?: () => Date;
 }
-
-/**
- * How old a `delivering` mark must be before another delivery may take it
- * over (design.md AnswerFlow, `ANSWER_DELIVERY_RECLAIM_MS`).
- */
-const ANSWER_DELIVERY_RECLAIM_MS = 2 * 60 * 1000;
 
 /** design.md ConversationContract: at most 200 messages. */
 const CONVERSATION_READ_LIMIT = 200;
@@ -137,7 +136,7 @@ export const createAnswerFlow = (deps: AnswerFlowDeps): AnswerFlow => {
       return (await relations.findById(relationId))?.growiLabel ?? null;
     } catch {
       reportOperationalFailure(
-        `the GROWI label for agent request ${requestId} could not be read; the answer was posted without it`,
+        `the GROWI label for agent request ${requestId} could not be read; the answer is being posted without it`,
       );
       return null;
     }

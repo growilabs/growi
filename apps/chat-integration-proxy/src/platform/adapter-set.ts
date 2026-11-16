@@ -53,6 +53,12 @@ export interface AdapterContext {
  */
 export interface AppAdapterContext extends AdapterContext {
   readonly installations: InstallationProvider;
+  /**
+   * Where the Slack adapter sends its Web API calls. Left out in production,
+   * which talks to Slack itself; a test points it at a loopback stand-in so
+   * the adapter this factory builds can be exercised as built.
+   */
+  readonly slackApiUrl?: string;
 }
 
 /**
@@ -257,6 +263,9 @@ export const ADAPTER_FACTORIES: Readonly<Record<PlatformName, AdapterFactory>> =
           // The adapter hands these options to its per-workspace clients as
           // well, so every Slack call it makes is bounded the same way.
           webClientOptions: slackWebClientOptions(SLACK_REQUEST_DEADLINE_MS),
+          ...(context.slackApiUrl == null
+            ? {}
+            : { apiUrl: context.slackApiUrl }),
           logger: context.logger.child('slack'),
         });
       },

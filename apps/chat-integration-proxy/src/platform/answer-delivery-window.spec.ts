@@ -15,7 +15,7 @@ import type {
   PostOutcome,
   SdkChannelRef,
 } from '../types/index.js';
-import { slackWebClientOptions } from './adapter-set.js';
+import { ADAPTER_FACTORIES, slackWebClientOptions } from './adapter-set.js';
 import {
   ANSWER_DELIVERY_RECLAIM_MS,
   SLACK_REQUEST_DEADLINE_MS,
@@ -27,6 +27,7 @@ import {
   startChatServiceStandIn,
 } from './chat-service-stand-in.js';
 import { MAX_ORDERING_DELAY_MS } from './ephemeral-ordering.js';
+import type { InstallationProvider } from './installation-provider.js';
 import { postInThread } from './outbound.js';
 import { createSdkLogger } from './sdk-logger.js';
 
@@ -153,6 +154,70 @@ describe('a Slack post made with the production client options', () => {
 
     expect(outcome).toEqual({ ok: true, messageId: '1700000001.000200' });
   });
+});
+
+describe('the Slack adapter the factory builds', () => {
+  it(
+    'is bounded the same way: a rate-limited post fails at once, tried once',
+    async () => {
+      const slack = await standIn(() => ({
+        status: 429,
+        headers: { 'retry-after': '600' },
+        body: { ok: false, error: 'ratelimited' },
+      }));
+      const factory = ADAPTER_FACTORIES.slack;
+      if (
+        factory.credentialSource !== 'app' ||
+        factory.bindInstallation == null
+      ) {
+        throw new Error('Slack declares no way to post as an installation');
+      }
+      const bind = factory.bindInstallation;
+      const adapter = factory.create(
+        {
+          slack: {
+            signingSecret: 'signing-secret',
+            clientId: 'client-id',
+            clientSecret: 'client-secret',
+            appToken: 'xapp-1-test',
+          },
+          stateConnectionString: 'postgres://unused',
+        },
+        {
+          installations: mock<InstallationProvider>(),
+          logger: createSdkLogger(),
+          slackApiUrl: `${slack.url}/api/`,
+        },
+      );
+      if (adapter == null) throw new Error('no Slack adapter was built');
+
+      const startedAt = performance.now();
+      const outcome = await postInThread(
+        {
+          adapter,
+          state: mock<StateAdapter>(),
+          botName: BOT_USER_NAME,
+          run: (work) =>
+            bind(
+              adapter,
+              {
+                workspaceId: 'T0000000X',
+                credentials: { slack: { botToken: 'xoxb-test' } },
+              },
+              work,
+            ),
+        },
+        CHANNEL,
+        THREAD_ROOT,
+        ANSWER,
+      );
+
+      expect(outcome).toMatchObject({ ok: false, reason: 'platform-error' });
+      expect(performance.now() - startedAt).toBeLessThan(SLACK_MS);
+      expect(slack.requests).toHaveLength(1);
+    },
+    TEST_TIMEOUT_MS,
+  );
 });
 
 describe('the Slack request deadline against the answer reclaim window', () => {

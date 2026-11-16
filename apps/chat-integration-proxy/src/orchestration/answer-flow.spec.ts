@@ -529,5 +529,7 @@ describe('delivering when the GROWI label cannot be read', () => {
     expect(reports).toHaveLength(1);
     expect(reports[0]).toContain('req-1');
     expect(reports[0]).not.toContain('db down');
+    // Reported before the post, so it must not claim the post happened.
+    expect(reports[0]).toContain('is being posted without it');
   });
 });
