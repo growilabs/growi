@@ -145,6 +145,7 @@ const SITE_URL = 'https://wiki.example.com';
 
 type Harness = {
   readonly gateway: GrowiAiGateway;
+  readonly agent: Agent;
   readonly memory: Memory;
   readonly model: MockLanguageModelV3;
   readonly runOutcomes: string[];
@@ -184,7 +185,7 @@ const harness = (
     loadRuntime: async () => runtime,
     siteUrl: () => SITE_URL,
   });
-  return { gateway, memory, model, runOutcomes };
+  return { gateway, agent, memory, model, runOutcomes };
 };
 
 const user = mock<IUserHasId>({ _id: '64b7f0c2a1b2c3d4e5f60718' });
@@ -470,7 +471,7 @@ describe('GrowiAiGateway.answer', () => {
     expect(runOutcomes).toEqual(['failed']);
   });
 
-  it('reports an abort when the signal fires as the model returns the whole answer', async () => {
+  it('reports an abort when the signal fires while the model call returns', async () => {
     const controller = running();
     const { gateway } = harness([
       () => {
@@ -484,6 +485,27 @@ describe('GrowiAiGateway.answer', () => {
       { user, signal: controller.signal },
     );
 
+    expect(outcome).toEqual({ kind: 'aborted' });
+  });
+
+  it('reports an abort when the signal fires after generate has returned the whole answer', async () => {
+    const controller = running();
+    const { gateway, agent } = harness([textStep('full answer')]);
+    const generate = agent.generate.bind(agent);
+    const returnedTexts: string[] = [];
+    vi.spyOn(agent, 'generate').mockImplementation(async (...args) => {
+      const result = await generate(...args);
+      returnedTexts.push(result.text);
+      controller.abort();
+      return result;
+    });
+
+    const outcome = await gateway.answer(
+      { text: 'question', ...conversation },
+      { user, signal: controller.signal },
+    );
+
+    expect(returnedTexts).toEqual(['full answer']);
     expect(outcome).toEqual({ kind: 'aborted' });
   });
 
@@ -604,5 +626,33 @@ describe('GrowiAiGateway.summarize', () => {
     controller.abort();
 
     expect(await pending).toEqual({ kind: 'aborted' });
+  });
+});
+
+// --- conversation records -----------------------------------------------------
+
+describe('GrowiAiGateway conversation records', () => {
+  it('keeps classify and summarize out of the user AI threads, and records only the answer', async () => {
+    const { gateway, memory } = harness([
+      textStep('{"intent":"summarize-to-page","path":null}'),
+      textStep(JSON.stringify({ title: 'Summary', body: 'body' })),
+      textStep('answer'),
+    ]);
+    const context = { user, signal: running().signal };
+
+    await gateway.classify('Summarize this conversation', context);
+    await gateway.summarize(messages, 'Summarize', context);
+    const afterSummary = await memory.listThreads({
+      filter: { resourceId: user._id },
+    });
+    await gateway.answer({ text: 'question', ...conversation }, context);
+    const afterAnswer = await memory.listThreads({
+      filter: { resourceId: user._id },
+    });
+
+    expect(afterSummary.threads).toEqual([]);
+    expect(afterAnswer.threads.map((thread) => thread.id)).toEqual([
+      rememberedThreadId,
+    ]);
   });
 });

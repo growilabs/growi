@@ -1,6 +1,6 @@
 // Pins behaviour of the INSTALLED Mastra (`agent.generate`) that the chat
 // integration's AI entry relies on (research.md "インストール済みの Mastra の
-// generate の結果と打ち切り"). Mastra is imported only here, at test time;
+// generate の結果と打ち切り"). Mastra is imported here only at test time;
 // production modules under this directory must keep reaching it through a
 // dynamic import (no-eager-ai-imports.spec.ts).
 import { Agent, type ToolsInput } from '@mastra/core/agent';
