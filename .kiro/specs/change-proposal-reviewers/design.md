@@ -164,7 +164,7 @@ src/migrations/
 - `server/services/proposal-activity.ts`（`ChangeProposalAction` の型に新しい 5 つの action を足す）、`proposal-applier.ts`（承認の求めで動く反映を、背景の反映と同じ形で呼び、新しい activity ID で記録する。背景の形で呼ぶときは、求めの `ip` と `endpoint` を渡さない。反映の activity の操作者は依頼した人なので、承認者の `ip` を並べると、監査ログを誤って読ませるため。承認者の `ip` と `endpoint` は、承認の activity が持つ）、`proposal-notifier.ts`。
 - `server/services/current-page-facts.ts` — `loadViewablePages` に、取得済みの所属グループ（`ViewerIdentity`）を渡せるようにする（今は所属グループに `null` を渡して、中でもう一度取得している）。
 - `server/routes/approve.ts`（承認者にも開く。swagger の説明「Only the requester may approve」を直す）、`index.ts`（ルート登録。`/review-queue` は `/:id` より前）、`write-access.ts`（`respondWithServiceError` に新しいエラーコード）、`openapi.spec.ts`。
-- `apps/app/src/interfaces/activity.ts` — 新しい activity の action（`CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`、`CHANGE_PROPOSAL_ABSTAIN`、`CHANGE_PROPOSAL_REVIEWER_ADD`、`CHANGE_PROPOSAL_REVIEWER_REMOVE`）を `SupportedAction`、`EssentialActionGroup`、`MediumActionGroup` に足す。経路（`ui`、`api`、`ai-tool`）を activity に残すため、snapshot の型に、経路の項目を足した新しい型（`ChangeProposalReviewSnapshot`: `username?` と `reviewChannel?`）と、type guard（`isChangeProposalReviewActivity`。`action` で判別する）を足し、型を `ISnapshot` の和集合に足す（リポジトリの snapshot の配置方針と、添付ファイルの activity が `AttachmentSnapshot` を足した前例に沿う。型と guard は `interfaces/activity.ts` に置き、snapshot を作る処理は `features/change-proposal/` の `proposal-activity.ts` に置く）。保存先の `prisma/schema.prisma` の `ActivitiesSnapshot` は、全 activity で共有する 1 つの composite 型で、union にできないので、専用の型は作れない。ここに `reviewChannel String?` を足す（Mongo では migration は要らない。「channel」は Slack のチャンネルと取り違えやすいので、機能に固有の名前にする。添付ファイルの項目名も、同じ考え方）。**保存口の `buildSnapshotUpdateEnvelope`（`server/models/activity.ts`）は、保存する項目を固定で書き出しているので、`reviewChannel` を足す（足さないと、書いても保存されず、黙って捨てられる）。****通知の action（`ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST`、`ACTION_CHANGE_PROPOSAL_REVIEW_RESULT`）も、`SupportedAction` に足す**（`InAppNotification` の `action` 項目は `AllSupportedActions` の値しか受け付けないので、足さないと通知の作成が検証で失敗する）。名前が `CHANGE_PROPOSAL_` で始まるので監査ログの絞り込みの一覧にも出るため、`admin.json` の 5 言語に、通知の action の表示名も足す。承認者の追加から送る通知は、通知の元になった activity（承認者の追加の activity）を持たせない（「戻すよう頼む」通知と同じ作り方で、`activities` を空にする）。
+- `apps/app/src/interfaces/activity.ts` — 新しい activity の action（`CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`、`CHANGE_PROPOSAL_ABSTAIN`、`CHANGE_PROPOSAL_REVIEWER_ADD`、`CHANGE_PROPOSAL_REVIEWER_REMOVE`）を `SupportedAction`、`EssentialActionGroup`、`MediumActionGroup` に足す。経路（`ui`、`api`、`ai-tool`）を activity に残すため、snapshot の型に、経路の項目を足した新しい型（`ChangeProposalReviewSnapshot`: `username?` と `reviewChannel?`）と、type guard（`isChangeProposalReviewActivity`。`action` で判別する）を足し、型を `ISnapshot` の和集合に足す（リポジトリの snapshot の配置方針と、添付ファイルの activity が `AttachmentSnapshot` を足した前例に沿う。型と guard は `interfaces/activity.ts` に置き、snapshot を作る処理は `features/change-proposal/` の `proposal-activity.ts` に置く）。保存先の `prisma/schema.prisma` の `ActivitiesSnapshot` は、全 activity で共有する 1 つの composite 型で、union にできないので、専用の型は作れない。ここに `reviewChannel String?` を足す（Mongo では migration は要らない。「channel」は Slack のチャンネルと取り違えやすいので、機能に固有の名前にする。添付ファイルの項目名も、同じ考え方）。**activity を実際に保存する経路は、`emit('update')` → `settleActivityRecord` → `createByParameters`（`server/models/activity.ts`）で、`createByParameters` が snapshot の項目（`username`、`originalName`、`pagePath`、`pageId`、`fileSize`）を固定で組み立てている。ここに `reviewChannel` を足す（足さないと、書いても保存されず、黙って捨てられる）。`updateByParameters` が使う `buildSnapshotUpdateEnvelope` にも、同じ項目を足して、2 つをそろえる（本番の記録の経路では、こちらは呼ばれない）。`proposal-activity.ts` の `recordProposalActivity` には、経路の引数（`channel`）を足し、snapshot に `reviewChannel` として入れて、`emit` で送る。****通知の action（`ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST`、`ACTION_CHANGE_PROPOSAL_REVIEW_RESULT`）も、`SupportedAction` に足す**（`InAppNotification` の `action` 項目は `AllSupportedActions` の値しか受け付けないので、足さないと通知の作成が検証で失敗する）。名前が `CHANGE_PROPOSAL_` で始まるので監査ログの絞り込みの一覧にも出るため、`admin.json` の 5 言語に、通知の action の表示名も足す。承認者の追加から送る通知は、通知の元になった activity（承認者の追加の activity）を持たせない（「戻すよう頼む」通知と同じ作り方で、`activities` を空にする）。
 - 設定キー `app:changeProposalReviewersEnabled`（真偽値、既定は無効、環境変数 `CHANGE_PROPOSAL_REVIEWERS_ENABLED`）の定義。`config-definition.ts` の `app:changeProposalEnabled`（環境変数 `CHANGE_PROPOSAL_ENABLED`）と同じ場所に足し、`config-definition.spec.ts` の表に 1 行足す。管理画面の項目は作らない。この値は、既存の設定の読み出し（`server/services/settings.ts` の `readChangeProposalSettings()`）に足し、設定を読む場所を 1 つにまとめる。この値を読んで確かめるのは、承認者を保存する 2 か所だけにする（オーナー決定）。(1) 作成で、呼び出し側が `reviewers` を指定したとき（依頼した人以外を含むとき）、(2) `addReviewers`。無効なら、どちらも 400 `reviewers-disabled` を返す。承認者が保存されなければ、ほかの経路（承認者の承認、却下・放棄、承認者としての一覧、承認者への通知）は、承認者がいないので、自然に何も起きない。後続・見直しが引き継ぐ承認者は、すでに保存されたものなので、この確認の対象外にする。無効にしても、すでに指定された承認者の動きは止めない。純関数は設定を読まない。
 - locale（5 言語）: `translation.json`（`change_proposal.*` の表示名）、`commons.json`（通知の種類の文言は viewer が足すので、本 spec ではキーの契約だけを決める）、`admin.json`（`audit_log_action.*`）。
 
@@ -226,7 +226,7 @@ stateDiagram-v2
 | 2.5、2.11 | 同時承認、待ちでない操作 | model の条件付き更新、`review-decision` | — | 承認、状態 |
 | 2.6、2.7 | 見えない操作・非関係者の応答 | `reviewer-actions`、`write-access`（同一の「見つからない」） | — | — |
 | 2.8 | 承認の記録（人・日時・経路・本人か） | model（`approvedBy` など）、`detectChannel` | 操作の項目 | 承認 |
-| 2.9、2.10 | 閉じた提案、編集中で残った承認 | `reviewer-actions`、`derive-visible-stage`、`toRequesterWriteMiss` の拡張 | `not-open` | — |
+| 2.9、2.10 | 閉じた提案、編集中で残った承認 | `reviewer-actions`、`derive-visible-stage`、`toReviewerWriteMiss` | `not-open` | — |
 | 3.1〜3.3 | 却下・全体の却下・放棄の記録 | `reviewer-actions`、model（`reviews[]`） | `POST /:id/reviews` | — |
 | 3.4 | 同じ人の後の判断で記録を置き換える | model（`reviews[]` の削除と追加） | — | — |
 | 3.5〜3.8 | コメントの記録・長さ・文字のまま・見える範囲 | `reviewer-actions`、`to-operation-view`、`select-visible-operations` | `COMMENT_MAX_LENGTH` | — |
@@ -365,10 +365,10 @@ interface ReviewerActions {
 - 共通の手順（6 つの操作すべてに、この順で適用する）:
   1. Change Proposal を読む。存在しなければ `not-found`。
   2. 所属グループを取得し、依頼した人または承認者かを判定する。どちらでもなければ `not-found`（要件 2.7）。
-  3. 見える操作を解決する（`resolveReviewScope`）。**依頼した人でない場合、見える操作（状態を問わない）が 0 件なら `not-found` を返す**（要件 2.7、5.4）。取得（GET）と同じ関数・同じ集合で判定する。これは、キーを使わない操作（`rejectAll`、`addReviewers`、`removeReviewers`）にも同じく適用する。この確認は `not-open` の判定より先に行う（見える操作が無い人に、提案が閉じているかどうかを知らせないため）。見える操作が 1 つでもある場合、**依頼した人でない人にとっての提案の段階は、見える操作だけから決めた値（「見える段階」`visibleStage`。`deriveVisibleStage` が決める。上の `ReviewScopeResult` の説明）を使う**。`not-open`（409）の判定（`visibleStage` が `open` 以外なら 409）、取得（GET）の全体の状態（`proposal-view-parts.ts` で `deriveProposalStatus` に渡す段階。今は実際の `proposal.lifecycle` を渡している）、一覧の見出しの全体の状態は、すべてこの値を使う。実際の `lifecycle` を渡すと、見えない「待ち」の操作の有無が、全体の状態（`discarded`、`expired` など）の言葉から分かってしまう（見える操作が「失敗」1 件だけで、見えない「待ち」が 1 件ある提案を破棄すると、その人の画面だけ `discarded` になる。操作が 1 件だけの提案なら `not-applied`）。書き込みの条件には、実際の `lifecycle: 'open'` を残す（同時に閉じられた場合の防御）。そのため、提案が実際には開いているが、見える「待ち」が 0 件の承認者にも 409 が返る（下の「要件との差と読み方」）。
+  3. 見える操作を解決する（`resolveReviewScope`）。**依頼した人でない場合、見える操作（状態を問わない）が 0 件なら `not-found` を返す**（要件 2.7、5.4）。取得（GET）と同じ関数・同じ集合で判定する。これは、キーを使わない操作（`rejectAll`、`addReviewers`、`removeReviewers`）にも同じく適用する。この確認は `not-open` の判定より先に行う（見える操作が無い人に、提案が閉じているかどうかを知らせないため）。見える操作が 1 つでもある場合、**依頼した人でない人にとっての提案の段階は、見える操作だけから決めた値（「見える段階」`visibleStage`。`deriveVisibleStage` が決める。下の `ReviewScopeResult` の説明）を使う**。`not-open`（409）の判定（`visibleStage` が `open` 以外なら 409）、取得（GET）の全体の状態（`proposal-view-parts.ts` で `deriveProposalStatus` に渡す段階。今は実際の `proposal.lifecycle` を渡している）、一覧の見出しの全体の状態は、すべてこの値を使う。実際の `lifecycle` を渡すと、見えない「待ち」の操作の有無が、全体の状態（`discarded`、`expired` など）の言葉から分かってしまう（見える操作が「失敗」1 件だけで、見えない「待ち」が 1 件ある提案を破棄すると、その人の画面だけ `discarded` になる。操作が 1 件だけの提案なら `not-applied`）。書き込みの条件には、実際の `lifecycle: 'open'` を残す（同時に閉じられた場合の防御）。そのため、提案が実際には開いているが、見える「待ち」が 0 件の承認者にも 409 が返る（下の「要件との差と読み方」）。
   4. `rejectOperations`・`rejectAll`・`abstain` は、依頼した人なら `requester-cannot-review`（要件 3.10）。
   5. キーを使う操作は、次の順で絞る。(a) 求められたキーのうち、見える操作に入らないものは、存在しないキーと同じに扱って無視する（要件 2.6）。(b) 残ったキーに「同じページの操作をまとめる処理」（`expandApprovalTargets`）を、**見える操作の中だけで**適用する（見えないキーを送って、同じページの見える操作を承認させることはできない。まとめる対象も見える操作に限り、見えない移動の操作などは含めない）。(c) 見える操作に入り、判断の対象（`reviewTargetKeys` = 見える操作のうち、状態が「待ち」のもの。自分が放棄した操作も含む）に入らないキー（すでに反映済み・飛ばしたなど）は、書き込まず、その時点の状態を返す（要件 2.11、2.5）。(d) 判断の対象だけを書き込む（承認は承認の書き込み、却下・放棄は記録の追加）。全体の承認（キーなし）は、求めたキーを `reviewTargetKeys` とし、依頼した人は、これまでどおり依頼した人に返す「待ち」の操作全部とする。全体の却下（`rejectAll`）はキーを使わず、操作の対象を選ばない（下の事後条件）。
-  6. 書き込む。すべての判断（承認・却下・放棄）と、承認者の追加・削除は、書き込みの前に `not-open`（見える段階が承認待ちでない）を確かめる。却下と放棄は、`reviews[]` に記録を足すだけで、操作の status と `approvedAt` を書かない。同じ人が同じ操作（または全体）について前に残した記録は、`reviews[]` から `deleteMany` で消してから、新しい記録を足す（要件 3.4）。承認では、書き換えた操作について、同じ人の却下・放棄の記録を `reviews[]` から消す。記録は状態を決めないので、削除と追加を別の更新にして、途中で止まっても、最悪は古い記録が残るだけにする。読み出し側は、同じ人・同じキーの記録は、最新の 1 件だけを使う。
+  6. 書き込む。すべての判断（承認・却下・放棄）と、承認者の追加・削除は、書き込みの前に `not-open`（見える段階が承認待ちでない）を確かめる。却下と放棄は、`reviews[]` に記録を足すだけで、操作の status と `approvedAt` を書かない。同じ人が同じ操作（または全体）について前に残した記録は、`reviews[]` から `deleteMany` で消してから、新しい記録を足す（要件 3.4）。承認では、承認として受け付けたキー（判断の対象に入るもの）のすべてについて、同じ人の却下・放棄の記録を `reviews[]` から消す（この求めで書き換えなかった操作、たとえば編集中の人がいて「待ち」のまま残った操作も含む）。記録は状態を決めないので、削除と追加を別の更新にして、途中で止まっても、最悪は古い記録が残るだけにする。読み出し側は、同じ人・同じキーの記録は、最新の 1 件だけを使う。
   7. 承認では、下の「書き込んだ操作の判定」で決めた操作だけから、却下・放棄では、記録を足した操作（と、全体の却下）から、通知と activity を作る。
   8. 応答を、1 つの組み立て関数（`buildDecisionResponse`）で作る。`done` の `results` は、**求めたキーのうち、その人に見える操作のすべて**を並べる。この回の反映が扱った操作には反映の結果（状態と理由）を、それ以外の操作（すでに反映済み・飛ばしたなど、この回は書かなかった操作）には、書き込みのあとに読み直した状態と理由を入れる（要件 2.5、2.11）。反映の処理は、ほかの人が承認した操作も読み直してまとめて反映するので、反映の結果には、その人に見えない操作が混ざりうる。そのため、反映の結果を、その人に見える操作のキーだけに絞ってから並べる。別の処理が排他の印（リース）を持っていて反映が動かせないとき（`in-progress`）は、今の応答の形に、見えるキーの読み直した状態の `results`（省略できる項目）を足して返す。これは既存の `in-progress` の読み手（ai-agent）にとって追加の項目なので、約束を壊さない。
 - **書き込んだ操作の判定（承認のみ）**: Prisma の `updateMany` が返す件数は、文書の数で、文書の中の操作を何件書き換えたかではない（条件に合う操作が 0 件でも、文書が外側の条件に合えば 1 を返す）。そのため、承認の書き込みのあとで文書を読み直し、この求めの印（`decisionToken`）を持つ操作だけを「この求めで書き換えたもの」とする。求めの処理の最初に、ランダムな印（UUID）を 1 つ作り、承認の書き込みで操作の項目 `decisionToken` に書く。同じ人が同時に 2 回求めても、印が違うので、書き換えたものに数えない。時刻の一致には頼らない（同じミリ秒の 2 回の求めを区別できないため）。却下と放棄は、条件に合うかどうかを問わず記録を足すだけなので、この判定は要らない（足した記録は、この求めで作ったものとして分かる）。
@@ -428,12 +428,12 @@ interface ReviewResultSnapshot {
   kind: 'review-result'; proposalId: string;
   reviewer: { id: string; username: string };
   items: readonly { path: string; result: 'approved' | 'rejected' | 'abstained'; comment?: string }[];
-  wholeRejectionComment?: string;
+  wholeRejection?: { comment?: string };   // この求めで、全体の却下を記録したとき。コメントが無くても、全体の却下を表せる
 }
 ```
 
 - `review-request`: 新しく承認者である人になった**個人のユーザー**（要件 6.2：グループの所属者には送らない）のうち、依頼した人と追加した人を除き、承認の対象を 1 つ以上持つ人に、1 人 1 件。`pages` は、その人の承認の対象のページだけで作る（要件 6.3）。
-- `review-result`: 1 回の求めにつき 1 件を、依頼した人に（求めた人が依頼した人自身のときは送らない。要件 6.6）。`items` は、「この求めで承認した、または却下・放棄の記録を足した操作」のうち、**依頼した人に見える操作**（依頼した人の規則で絞った操作。依頼した人が閲覧できなくなったページの操作は隠す。`select-visible-operations.ts` の依頼した人の規則）だけから作る。絞った結果が 0 件なら、通知を送らない（反映の通知と同じ作り方）。コメントは、操作ごとのコメントと全体の却下のコメントをそのまま入れる（全体の却下のコメントは、依頼した人が受け取る通知なので入れてよい）。
+- `review-result`: 1 回の求めにつき 1 件を、依頼した人に（求めた人が依頼した人自身のときは送らない。要件 6.6）。`items` は、「この求めで承認した、または却下・放棄の記録を足した操作」のうち、**依頼した人に見える操作**（依頼した人の規則で絞った操作。依頼した人が閲覧できなくなったページの操作は隠す。`select-visible-operations.ts` の依頼した人の規則）だけから作る。絞った結果が 0 件で、かつ、この求めが全体の却下を記録していなければ、通知を送らない（反映の通知と同じ作り方）。全体の却下を記録した求めは、`items` が空でも通知を送る（全体の却下は、操作に紐づかず、閲覧できないページの情報を含まない）。コメントは、操作ごとのコメントと全体の却下のコメントをそのまま入れる（全体の却下のコメントは、依頼した人が受け取る通知なので入れてよい）。
 - どちらも `InAppNotification.create` を直接呼ぶ（`upsertByActivity` は使わない）。action は `ACTION_CHANGE_PROPOSAL_REVIEW_REQUEST`、`ACTION_CHANGE_PROPOSAL_REVIEW_RESULT`。
 - 通知の表示（viewer の `parse-notification-snapshot.ts`、`ChangeProposalNotification.tsx`、`commons.json` の文言）は viewer の spec が足す。それまでは、`parse` が `null` を返す通知は一覧に出ない。
 
@@ -441,8 +441,8 @@ interface ReviewResultSnapshot {
 
 - 新しい action: `CHANGE_PROPOSAL_APPROVE`、`CHANGE_PROPOSAL_REJECT`（操作ごとの却下と全体の却下）、`CHANGE_PROPOSAL_ABSTAIN`、`CHANGE_PROPOSAL_REVIEWER_ADD`、`CHANGE_PROPOSAL_REVIEWER_REMOVE`。5 つとも `EssentialActionGroup` と `MediumActionGroup` に入れる（要件 6.8、監査ログの設定にかかわらず記録）。
 - 承認の求めでは、承認の activity をその求めの ID で記録する。承認の求めで動く反映は、背景の反映と同じ形（`trigger.kind: 'background'`）で呼び、反映の activity は新しい ID（`beginActivity`）で、操作者を依頼した人として記録する（既存の背景の経路と同じ。反映の中身は変えない）。1 回の反映が複数の人の承認をまとめて書くことがあるので、承認した人は、承認の activity と、操作の項目（`approvedBy`）で分かる（要件 6.9）。
-- 承認者の追加・削除は、`CHANGE_PROPOSAL_REVIEWER_ADD`・`CHANGE_PROPOSAL_REVIEWER_REMOVE` の activity として記録する（要件 6.10。1 つの求めにつき 1 行。誰を追加・削除したかは、Change Proposal の中の `reviewers` の記録で分かる）。作成のときの承認者の指定は、作成の activity（core の 7.7）に含まれ、別には記録しない。
-- 承認・却下・放棄・承認者の追加・削除の activity には、snapshot の `reviewChannel` に、`ReviewActor.channel` を書く（要件 6.8、6.10）。activity の更新で、snapshot の `username` が保たれることを、実装で確かめる（`server/models/activity.ts` の更新の経路）。
+- 承認者の追加・削除は、`CHANGE_PROPOSAL_REVIEWER_ADD`・`CHANGE_PROPOSAL_REVIEWER_REMOVE` の activity として記録する（要件 6.10。1 つの求めは、追加か削除のどちらか 1 つだけを受け付けるので、1 つの求めにつき 1 行で、action も決まる。誰を追加・削除したかは、Change Proposal の中の `reviewers` の記録で分かる）。作成のときの承認者の指定は、作成の activity（core の 7.7）に含まれ、別には記録しない。
+- 承認・却下・放棄・承認者の追加・削除の activity には、snapshot の `reviewChannel` に、`ReviewActor.channel` を書く（要件 6.8、6.10）。`recordProposalActivity` の引数に経路を足し、snapshot に入れて `emit` で送る。`username` は、`settle-activity-record.ts` の `?? context?.username` で保たれる（既存の仕組み）。
 
 #### 応答と入力の型（`interfaces/reviewer.ts`）
 
@@ -459,8 +459,8 @@ type DecisionResponse = { readonly type: 'done'; readonly results: readonly { ke
 | Method | Path | Middleware | Request | Response | Errors |
 |---|---|---|---|---|---|
 | POST | `/:id/approve`（既存を拡張。応答の形は変えない） | `writeAccessChain` | `{ operationKeys? }` | `{ result: ApplyResult }`（`type: 'done'` の `results` は、求めたキーのうち、その人に見える操作のすべて。`in-progress` には、見える操作の読み直した状態の `results`（省略できる項目）を足す） | 404、409（`not-open`） |
-| POST | `/:id/reviews` | `writeAccessChain` | `{ kind: 'reject' \| 'abstain', operationKeys?, comment? }`。`reject` で `operationKeys` を省くと、Change Proposal 全体の却下。`abstain` は `operationKeys` が必須 | `{ result: { type: 'done', results } }`（承認と同じ形） | 400（`comment-too-long`、`requester-cannot-review`、`operationKeys` の欠落）、404、409 |
-| PATCH | `/:id/reviewers` | `writeAccessChain` | `{ add?: [{kind, id}], remove?: [{kind, id}] }` | 204 | 400（`reviewer-not-found`、`too-many-reviewers`、`reviewers-disabled`）、404、409（`not-open`） |
+| POST | `/:id/reviews` | `writeAccessChain` | `{ kind: 'reject' \| 'abstain', operationKeys?, comment? }`。`reject` で `operationKeys` を省くと、Change Proposal 全体の却下。`operationKeys` が空の配列なら 400 `invalid-request`。`abstain` は `operationKeys` が必須 | `{ result: { type: 'done', results } }`（承認と同じ形。全体の却下では、操作に何も書かないので、`results` は空） | 400（`comment-too-long`、`requester-cannot-review`、`invalid-request`）、404、409 |
+| PATCH | `/:id/reviewers` | `writeAccessChain` | `{ add: [{kind, id}] }` または `{ remove: [{kind, id}] }`。**どちらか 1 つだけ**（両方、またはどちらも無ければ 400 `invalid-request`） | 204 | 400（`reviewer-not-found`、`too-many-reviewers`、`reviewers-disabled`、`invalid-request`）、404、409（`not-open`） |
 | GET | `/review-queue` | `readAccessChain` | `?cursor=` | `{ items, nextCursor }` | — |
 
 - すべてのルートの `@swagger` の tag は `ChangeProposals`。`openapi.spec.ts` の操作の一覧とテスト名を更新する。`/review-queue` は `/:id` より前に登録する。
@@ -494,7 +494,7 @@ interface ChangeProposalView {
   readonly viewerRole: 'requester' | 'reviewer' | 'other';
   readonly purpose?: string;                          // 依頼した人と承認者に返す
   readonly reviewers?: readonly ReviewerView[];       // 依頼した人と承認者に返す
-  readonly wholeRejection?: { by: UserSummary; at: string; comment?: string }; // 全体の却下の記録。依頼した人にだけ返す（承認者には返さない）
+  readonly wholeRejections?: readonly { by: UserSummary; at: string; comment?: string }[]; // 全体の却下の記録（人ごとに最新の 1 件）。依頼した人にだけ返す（承認者には返さない）
 }
 interface OperationView {
   // 既存の項目に加えて
@@ -508,7 +508,7 @@ interface OperationView {
 }
 ```
 
-- 返す範囲: 承認者には、その人が閲覧できるページの操作だけを返す（要件 5.6）。`rejections[]` と `abstentions[]`（コメントを含む）は、依頼した人と、そのページを閲覧できる承認者にだけ返す（要件 3.8）。`wholeRejection`（記録そのもの。却下した人・日時・コメント）は、依頼した人にだけ返す。承認者には、見える操作ごとの `rejections[].by` で、誰が却下したかが分かる（要件 5.7）。
+- 返す範囲: 承認者には、その人が閲覧できるページの操作だけを返す（要件 5.6）。`rejections[]` と `abstentions[]`（コメントを含む）は、依頼した人と、そのページを閲覧できる承認者にだけ返す（要件 3.8）。`wholeRejections[]`（記録そのもの。却下した人・日時・コメント）は、依頼した人にだけ返す。承認者には、見える操作ごとの `rejections[].by` で、誰が却下したかが分かる（要件 5.7）。
 - `baseIsLatest` は、編集の操作だけについて、`baseRevision` が今のページの最新のリビジョンかを、1 回のまとめた問い合わせで計算する。
 - 依頼した人にだけ返す値（段階、達成度、AI の要約・会話、ページごとの通知の指定、`requesterState`）は、承認者には返さない（要件 5.8）。
 
@@ -549,7 +549,7 @@ interface OperationView {
 - 「見つからない」の同一性: 存在しない提案、関係のない人、見える操作が 0 件の承認者の 3 つで応答が同じ。
 - 後続・見直しの承認者の引き継ぎと、承認者を指定した提案の自動反映の抑止（要件 1.11、8.4、8.5）。
 - 通知: `review-request` の宛先（個人のみ、依頼した人と追加した人を除く）、中身が受け取る人の閲覧できるページだけであること。`review-result` の宛先と、本人が承認したときは送らないこと。
-- activity: 承認・却下・放棄・承認者の追加・削除が、経路（`reviewChannel`）とともに、監査ログの設定にかかわらず記録されること。`reviewChannel` が `buildSnapshotUpdateEnvelope` を通って保存されること。snapshot の `username` が保たれること。承認の求めで動いた反映の activity の操作者が依頼した人であること（承認した人は承認の activity と `approvedBy` で分かること）。
+- activity: 承認・却下・放棄・承認者の追加・削除が、経路（`reviewChannel`）とともに、監査ログの設定にかかわらず記録されること。`reviewChannel` が `emit('update')` の経路（`createByParameters`）で保存されること。snapshot の `username` が保たれること。承認の求めで動いた反映の activity の操作者が依頼した人であること（承認した人は承認の activity と `approvedBy` で分かること）。
 
 ### 追従のテスト
 - i18n の監査が基準内であること（新しいキーは 5 言語を同じ作業で訳す）。操作の状態（`OperationStatus`）は変えないので、viewer の型の網羅への追従は要らない。
