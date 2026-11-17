@@ -52,8 +52,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value != null;
 
 // Code points, not UTF-16 units or graphemes (see tasks.md 5.1 note).
-const isWithinCodePoints = (value: unknown, max: number): value is string =>
-  isString(value) && Array.from(value).length <= max;
+export const isWithinCodePoints = (
+  value: unknown,
+  max: number,
+): value is string => isString(value) && Array.from(value).length <= max;
 
 // Copies only the declared fields so nothing else from the caller reaches the document.
 // An unknown type passes through untouched for validateProposalInput to reject.
