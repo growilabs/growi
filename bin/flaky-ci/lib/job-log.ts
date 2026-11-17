@@ -1,6 +1,7 @@
 /**
  * Reading facts out of one CI job log: vitest failure blocks, Playwright
- * `::error` annotations, and a Playwright shard's own count summary.
+ * `::error` annotations, a Playwright shard's own count summary, and each
+ * Playwright run's end-of-run summary with its flaky and failed test lists.
  *
  * This replaces the literal-pattern greps `detect-flaky-ci/SKILL.md` Step 2
  * and Step 3 used to spell out (`FAIL `, `::error`, ` flaky`, and
@@ -279,3 +280,196 @@ export const extractSummary = (text: string): Summary | null => {
     skipped: counts.get('skipped') ?? 0,
   };
 };
+
+export type PlaywrightListedTest = {
+  /** The project name printed between `[` and `]`, e.g. `firefox/guest-mode`. */
+  readonly project: string;
+  /** The spec path without its `:line:col`. */
+  readonly specPath: string;
+  /** The group names and the test name, joined with ` > `. */
+  readonly testTitle: string;
+};
+
+export type PlaywrightTestList =
+  | { readonly kind: 'read'; readonly tests: readonly PlaywrightListedTest[] }
+  | {
+      readonly kind: 'unreadable';
+      /**
+       * `count-mismatch`: the heading's count differs from the number of test
+       * lines under it. `malformed-entry`: a line under it is not a full
+       * `[project] › path:line:col › title` line.
+       */
+      readonly reason: 'count-mismatch' | 'malformed-entry';
+    };
+
+export type PlaywrightRun = {
+  readonly counts: Summary;
+  readonly flaky: PlaywrightTestList;
+  readonly failed: PlaywrightTestList;
+  /** The lines read as this run's summary, timestamps kept, in printed order. */
+  readonly excerpt: string;
+};
+
+const TITLE_SEPARATOR = ' › ';
+const PROJECT_SEGMENT = /^\[([^\]]+)\]$/;
+const POSITIONED_SPEC_PATH = /^(.+):\d+:\d+$/;
+
+/**
+ * Splits one `[project] › path:line:col › group › … › test` line, or returns
+ * `null` when the line does not have that full shape. A ` › ` inside a title
+ * cannot be told apart from the separator Playwright prints between titles,
+ * so it becomes ` > ` like any other boundary.
+ */
+export const parsePlaywrightTestLine = (
+  line: string,
+): PlaywrightListedTest | null => {
+  const [projectSegment, positionedPath, ...titles] = line
+    .trim()
+    .split(TITLE_SEPARATOR);
+  const project = projectSegment?.match(PROJECT_SEGMENT)?.[1];
+  const specPath = positionedPath?.match(POSITIONED_SPEC_PATH)?.[1];
+  if (project == null || specPath == null || titles.length === 0) {
+    return null;
+  }
+  return { project, specPath, testTitle: titles.join(' > ') };
+};
+
+const RUN_COUNT_KEYWORDS = [
+  'failed',
+  'flaky',
+  'interrupted',
+  'skipped',
+  'did not run',
+  'passed',
+] as const;
+type RunCountKeyword = (typeof RUN_COUNT_KEYWORDS)[number];
+
+/**
+ * Anchored on the leading number, so vitest's totals
+ * (` Test Files  1 failed | 309 passed (310)`) never match. `interrupted` and
+ * `did not run` are read only so that they do not end a summary.
+ */
+const RUN_COUNT_LINE = new RegExp(
+  `^\\s*(\\d+)\\s+(${RUN_COUNT_KEYWORDS.join('|')})\\b`,
+);
+const NOTICE_PREFIX = '##[notice]';
+/**
+ * Deliberately looser than `parsePlaywrightTestLine`: a list line with a
+ * broken shape must still stay inside its list, so that the list comes back
+ * as `malformed-entry` rather than as a count mismatch.
+ */
+const LISTED_TEST_START = /^\s*\[[^\]]+\] › /;
+
+type LineKind = 'count' | 'echoed-count' | 'listed-test' | 'other';
+
+const classifyLine = (body: string): LineKind => {
+  if (RUN_COUNT_LINE.test(body)) {
+    return 'count';
+  }
+  if (
+    body.startsWith(NOTICE_PREFIX) &&
+    RUN_COUNT_LINE.test(body.slice(NOTICE_PREFIX.length))
+  ) {
+    return 'echoed-count';
+  }
+  return LISTED_TEST_START.test(body) ? 'listed-test' : 'other';
+};
+
+type SummaryRange = {
+  /** The runner's `##[notice]` re-print of a summary, never read. */
+  readonly echoed: boolean;
+  readonly lines: readonly string[];
+};
+
+/**
+ * Groups the text into summary ranges: a count line (plain or echoed) opens
+ * one, count and listed-test lines continue it, any other line closes it. An
+ * echoed count line always opens a new range, so an echo printed right after
+ * a summary never extends that summary.
+ */
+const collectSummaryRanges = (
+  lines: readonly string[],
+): readonly SummaryRange[] => {
+  const ranges: SummaryRange[] = [];
+  let open: { echoed: boolean; lines: string[] } | null = null;
+  for (const line of lines) {
+    const kind = classifyLine(withoutTimestamp(line));
+    if (kind === 'count' || kind === 'echoed-count') {
+      if (open == null || kind === 'echoed-count') {
+        if (open != null) {
+          ranges.push(open);
+        }
+        open = { echoed: kind === 'echoed-count', lines: [] };
+      }
+      open.lines.push(line);
+    } else if (kind === 'listed-test' && open != null) {
+      open.lines.push(line);
+    } else if (open != null) {
+      ranges.push(open);
+      open = null;
+    }
+  }
+  if (open != null) {
+    ranges.push(open);
+  }
+  return ranges;
+};
+
+const toTestList = (
+  count: number,
+  entries: readonly string[],
+): PlaywrightTestList => {
+  const parsed = entries.map(parsePlaywrightTestLine);
+  const tests = parsed.filter(
+    (test): test is PlaywrightListedTest => test != null,
+  );
+  if (tests.length !== parsed.length) {
+    return { kind: 'unreadable', reason: 'malformed-entry' };
+  }
+  if (tests.length !== count) {
+    return { kind: 'unreadable', reason: 'count-mismatch' };
+  }
+  return { kind: 'read', tests };
+};
+
+/** Reads one summary range: each listed-test line belongs to the count line above it. */
+const readRun = (range: SummaryRange): PlaywrightRun => {
+  const counts = new Map<RunCountKeyword, number>();
+  const entries = new Map<RunCountKeyword, string[]>();
+  let heading: RunCountKeyword | null = null;
+  for (const line of range.lines) {
+    const body = withoutTimestamp(line);
+    const found = body.match(RUN_COUNT_LINE);
+    if (found?.[1] != null && found[2] != null) {
+      heading = found[2] as RunCountKeyword;
+      counts.set(heading, Number.parseInt(found[1], 10));
+    } else if (heading != null) {
+      entries.set(heading, [...(entries.get(heading) ?? []), body]);
+    }
+  }
+  const listFor = (keyword: 'failed' | 'flaky'): PlaywrightTestList =>
+    toTestList(counts.get(keyword) ?? 0, entries.get(keyword) ?? []);
+  return {
+    counts: {
+      failed: counts.get('failed') ?? 0,
+      flaky: counts.get('flaky') ?? 0,
+      passed: counts.get('passed') ?? 0,
+      skipped: counts.get('skipped') ?? 0,
+    },
+    flaky: listFor('flaky'),
+    failed: listFor('failed'),
+    excerpt: range.lines.join('\n'),
+  };
+};
+
+/**
+ * Every Playwright run's end-of-run summary in the log, in printed order, with
+ * its `failed` and `flaky` test lists — an empty array when the log carries no
+ * summary at all. The `##[notice]` echo of a summary is dropped as a whole.
+ * Nothing is guessed: a list that does not read cleanly comes back as
+ * `unreadable` with its reason.
+ */
+export const extractPlaywrightRuns = (text: string): readonly PlaywrightRun[] =>
+  collectSummaryRanges(strip(text).split('\n'))
+    .filter((range) => !range.echoed)
+    .map(readRun);

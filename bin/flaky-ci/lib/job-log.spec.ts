@@ -5,8 +5,10 @@ import { describe, expect, it } from 'vitest';
 import {
   extractFailBlocks,
   extractPlaywrightAnnotations,
+  extractPlaywrightRuns,
   extractSummary,
   isSharedSetupHookBlock,
+  parsePlaywrightTestLine,
 } from './job-log.ts';
 
 const readFixture = (name: string): string =>
@@ -29,6 +31,39 @@ const PLAYWRIGHT_11914 = readFixture('11914-playwright-flaky-excerpt.txt');
 const PLAYWRIGHT_ONE_FAILED = readFixture(
   'constructed-playwright-1-failed-0-flaky-excerpt.txt',
 );
+/**
+ * Real firefox job: one flaky test reported by `##[error]` annotations only,
+ * and two Playwright runs (normal, then guest-mode), each summary echoed again
+ * under `##[notice]`.
+ */
+const PLAYWRIGHT_TWO_RUNS = readFixture(
+  '43419616882-playwright-flaky-two-runs-excerpt.txt',
+);
+/** Real firefox job whose end-of-run list names two flaky tests. */
+const PLAYWRIGHT_TWO_FLAKY = readFixture(
+  '39935584265-playwright-two-flaky-excerpt.txt',
+);
+/** Real chromium job: one test failed every attempt, plus `1 did not run`. */
+const PLAYWRIGHT_FAILED_ALL_ATTEMPTS = readFixture(
+  '41984122671-playwright-failed-all-attempts-excerpt.txt',
+);
+/** Constructed: `2 flaky` heading over a single test line. */
+const PLAYWRIGHT_COUNT_MISMATCH = readFixture(
+  'constructed-playwright-flaky-count-mismatch-excerpt.txt',
+);
+/** Constructed: a list line that lacks its `path:line:col` position. */
+const PLAYWRIGHT_ENTRY_WITHOUT_POSITION = readFixture(
+  'constructed-playwright-list-entry-without-position-excerpt.txt',
+);
+
+const CREATE_PAGE_BUTTON_TEST = {
+  project: 'firefox',
+  specPath: 'playwright/20-basic-features/create-page-button.spec.ts',
+  testTitle: 'Create page button dropdown menu > open and create today page',
+};
+const INLINE_COMMENT_REPLY_TITLE =
+  'Inline comment - hover/click/tap on a saved body highlight opens a preview popover with simple reply (Req 2.1-2.5) > Requirement 2.3: submitting a reply from the popover posts it, and it appears nested under the origin item in the bottom list';
+const EMPTY_LIST = { kind: 'read', tests: [] };
 
 const SPEC_PATH_11849 =
   'src/client/components/Admin/Common/AdminCodeEditor.spec.tsx';
@@ -308,5 +343,265 @@ describe('job-log.extractSummary', () => {
       passed: 0,
       skipped: 2,
     });
+  });
+});
+
+describe('job-log.extractPlaywrightRuns', () => {
+  it('reads the flaky test from the end-of-run list when the log carries only `##[error]` annotations', () => {
+    expect(PLAYWRIGHT_TWO_RUNS).not.toContain('::error ');
+
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_TWO_RUNS);
+
+    expect(runs[0]?.flaky).toEqual({
+      kind: 'read',
+      tests: [CREATE_PAGE_BUTTON_TEST],
+    });
+  });
+
+  it('drops the `##[notice]` echo of a summary as a whole, including its untimestamped continuation lines', () => {
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_TWO_RUNS);
+
+    expect(runs).toHaveLength(2);
+    expect(runs.some((run) => run.excerpt.includes('##[notice]'))).toBe(false);
+  });
+
+  it('returns the normal run and the guest-mode run of one job as separate runs, without mixing their counts', () => {
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_TWO_RUNS);
+
+    expect(runs.map((run) => run.counts)).toEqual([
+      { failed: 0, flaky: 1, passed: 119, skipped: 0 },
+      { failed: 0, flaky: 0, passed: 3, skipped: 0 },
+    ]);
+    expect(runs[1]?.flaky).toEqual(EMPTY_LIST);
+    expect(runs[1]?.failed).toEqual(EMPTY_LIST);
+  });
+
+  it('returns the lines read as each run’s summary as its excerpt, timestamps kept, in printed order', () => {
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_TWO_RUNS);
+
+    expect(runs.map((run) => run.excerpt)).toEqual([
+      [
+        '2026-11-13T11:57:10.1200900Z   1 flaky',
+        '2026-11-13T11:57:10.1201655Z     [firefox] › playwright/20-basic-features/create-page-button.spec.ts:23:3 › Create page button dropdown menu › open and create today page ',
+        '2026-11-13T11:57:10.1202212Z   119 passed (5.0m)',
+      ].join('\n'),
+      '2026-11-13T11:57:24.3041969Z   3 passed (12.7s)',
+    ]);
+  });
+
+  it('returns every test of a list that names two flaky tests', () => {
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_TWO_FLAKY);
+
+    expect(runs[0]?.flaky).toEqual({
+      kind: 'read',
+      tests: [
+        CREATE_PAGE_BUTTON_TEST,
+        {
+          project: 'firefox',
+          specPath: 'playwright/20-basic-features/inline-comment.spec.ts',
+          testTitle:
+            'Inline comment - hover-to-popover transit and popover-lock timing (Req 15.7-15.9); resolve from the popover and click-path regression (Req 15.10, 4.6) > Req 15.1, 15.4: clicking the highlight still opens the popover immediately, with no visible delay, and it stays open with no further interaction',
+        },
+      ],
+    });
+  });
+
+  it('returns a test that failed every attempt in the failed list, not the flaky one, and reads past `did not run`', () => {
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_FAILED_ALL_ATTEMPTS);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.counts).toEqual({
+      failed: 1,
+      flaky: 0,
+      passed: 118,
+      skipped: 0,
+    });
+    expect(runs[0]?.failed).toEqual({
+      kind: 'read',
+      tests: [
+        {
+          project: 'chromium',
+          specPath: 'playwright/20-basic-features/inline-comment.spec.ts',
+          testTitle: INLINE_COMMENT_REPLY_TITLE,
+        },
+      ],
+    });
+    expect(runs[0]?.flaky).toEqual(EMPTY_LIST);
+  });
+
+  it('reports a list whose heading count differs from its number of test lines as unreadable', () => {
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_COUNT_MISMATCH);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.flaky).toEqual({
+      kind: 'unreadable',
+      reason: 'count-mismatch',
+    });
+  });
+
+  it('reports a list with a test line lacking its position as a malformed entry, not a count mismatch', () => {
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_ENTRY_WITHOUT_POSITION);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.flaky).toEqual({
+      kind: 'unreadable',
+      reason: 'malformed-entry',
+    });
+  });
+
+  it('returns no run — not a run of zeros — for a vitest log, whose own totals are not a Playwright summary', () => {
+    expect(CI_APP_TEST).toContain('1 failed');
+
+    expect(extractPlaywrightRuns(CI_APP_TEST)).toEqual([]);
+  });
+
+  it('reads the flaky test of a log with no timestamps at all', () => {
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_11914);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.flaky).toEqual({
+      kind: 'read',
+      tests: [
+        {
+          project: 'chromium',
+          specPath: 'playwright/20-basic-features/inline-comment.spec.ts',
+          testTitle: INLINE_COMMENT_REPLY_TITLE,
+        },
+      ],
+    });
+  });
+
+  it('reports `1 flaky` with no test line under it as a count mismatch', () => {
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_11903);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.counts).toEqual({
+      failed: 0,
+      flaky: 1,
+      passed: 106,
+      skipped: 0,
+    });
+    expect(runs[0]?.flaky).toEqual({
+      kind: 'unreadable',
+      reason: 'count-mismatch',
+    });
+  });
+
+  it('returns the test of a `1 failed / 0 flaky` run in the failed list', () => {
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_ONE_FAILED);
+
+    expect(runs[0]?.failed).toEqual({
+      kind: 'read',
+      tests: [
+        {
+          project: 'webkit',
+          specPath: 'playwright/20-basic-features/comments.spec.ts',
+          testTitle: 'Successfully add comments',
+        },
+      ],
+    });
+    expect(runs[0]?.flaky).toEqual(EMPTY_LIST);
+  });
+
+  it('leaves no trailing whitespace on a test title read from a list line that ends with a space', () => {
+    const listLine = PLAYWRIGHT_TWO_RUNS.split('\n').find((line) =>
+      line.includes('[firefox] › '),
+    );
+    expect(listLine?.endsWith(' ')).toBe(true);
+
+    const runs = extractPlaywrightRuns(PLAYWRIGHT_TWO_RUNS);
+    const flaky = runs[0]?.flaky;
+
+    expect(flaky?.kind === 'read' && flaky.tests[0]?.testTitle).toBe(
+      'Create page button dropdown menu > open and create today page',
+    );
+  });
+
+  it('assigns the tests listed under `interrupted` to neither the failed nor the flaky list', () => {
+    const log = [
+      '  1 interrupted',
+      '    [chromium] › playwright/a.spec.ts:1:1 › stopped case ',
+      '  1 flaky',
+      '    [chromium] › playwright/b.spec.ts:2:2 › flaky case ',
+      '  3 passed (1.0m)',
+    ].join('\n');
+
+    const runs = extractPlaywrightRuns(log);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.counts).toEqual({
+      failed: 0,
+      flaky: 1,
+      passed: 3,
+      skipped: 0,
+    });
+    expect(runs[0]?.flaky).toEqual({
+      kind: 'read',
+      tests: [
+        {
+          project: 'chromium',
+          specPath: 'playwright/b.spec.ts',
+          testTitle: 'flaky case',
+        },
+      ],
+    });
+    expect(runs[0]?.failed).toEqual(EMPTY_LIST);
+  });
+
+  it('closes a run that ends the text with no line after it', () => {
+    expect(extractPlaywrightRuns('2026-09-14T09:41:02.5Z   2 skipped')).toEqual(
+      [
+        {
+          counts: { failed: 0, flaky: 0, passed: 0, skipped: 2 },
+          flaky: EMPTY_LIST,
+          failed: EMPTY_LIST,
+          excerpt: '2026-09-14T09:41:02.5Z   2 skipped',
+        },
+      ],
+    );
+  });
+});
+
+describe('job-log.parsePlaywrightTestLine', () => {
+  it('splits project, spec path and the ` › `-separated title path, joining the titles with ` > `', () => {
+    expect(
+      parsePlaywrightTestLine(
+        '    [firefox/guest-mode] › playwright/30-search/search.spec.ts:12:5 › Search › nested group › finds a page ',
+      ),
+    ).toEqual({
+      project: 'firefox/guest-mode',
+      specPath: 'playwright/30-search/search.spec.ts',
+      testTitle: 'Search > nested group > finds a page',
+    });
+  });
+
+  it('keeps a `:` inside the test title', () => {
+    expect(
+      parsePlaywrightTestLine(
+        '[chromium] › playwright/a.spec.ts:7:3 › Req 15.1: opens the popover',
+      )?.testTitle,
+    ).toBe('Req 15.1: opens the popover');
+  });
+
+  it('returns null for a line without the `path:line:col` position', () => {
+    expect(
+      parsePlaywrightTestLine(
+        '[firefox] › playwright/a.spec.ts › Create page button dropdown menu › open',
+      ),
+    ).toBeNull();
+  });
+
+  it('returns null for a line with no test title after the position', () => {
+    expect(
+      parsePlaywrightTestLine('[firefox] › playwright/a.spec.ts:23:3 '),
+    ).toBeNull();
+  });
+
+  it('returns null for a numbered failure heading, which is not a list line', () => {
+    expect(
+      parsePlaywrightTestLine(
+        '##[error]  1) [firefox] › playwright/a.spec.ts:23:3 › group › case ',
+      ),
+    ).toBeNull();
   });
 });
